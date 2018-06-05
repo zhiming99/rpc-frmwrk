@@ -61,7 +61,7 @@ DONE    To implement the match mechanism in the CRpcReqForwarder and CRpcRemoteR
 DONE    To add TcpBusPort and CTcpStreamPdo
 DONE    To add channel management on CTcpStreamPdo 
 
-        To add the CRpcTcpFido and its driver
+DONE    To add the CRpcTcpFido and its driver
         To review further the `OnCancel' support for tasks in iftasks.h
 
         To initiate a eventRmtModOffline notify
@@ -88,8 +88,8 @@ DONE    To find a general solution for SendResponse and FillRespData, similiar t
 DONE    To override StartEx for CRpcTcpBridge/CRpcTcpBridgeProxy
 
 DONE    To implement WriteStream and ReadStream
-        To implement SendData and FetchData support for RPC interfaces.
-        To add support to cancel SendData/FetchData gracefully 
+DONE    To implement SendData and FetchData support for RPC interfaces.
+DONE    To add support to cancel SendData/FetchData gracefully 
 
         To dispatch the Remote Server Offline/Online and Remote Module Offline/Online events from the CRpcTcpBridgeProxy to the CRpcReqForwarder
 
