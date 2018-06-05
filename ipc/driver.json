@@ -1,0 +1,155 @@
+{
+    "Version" : "1.0",
+    "Drivers" : 
+    [
+
+        {
+            "DriverName"    : "DBusBusDriver",
+            "DriverType"    : "BusDriver",
+            "BusClass"      : "DBusBus",
+            "InternalClass" : "CDBusBusDriver",
+            "Description"   : "This is a bus driver, and the port it creats is the DBusBusPort",
+            "PortClasses"   :
+            [
+                "DBusBusPort"
+            ]
+        },
+        {
+            "DriverName"    : "RpcTcpBusDriver",
+            "DriverType"    : "BusDriver",
+            "BusClass"      : "RpcTcpBus",
+            "InternalClass" : "CRpcTcpBusDriver",
+            "PortClasses"   :
+            [
+                "RpcTcpBusPort"
+            ]
+        },
+        {
+            "DriverName"    : "ProxyFdoDriver",
+            "DriverType"    : "PortDriver",
+            "InternalClass" : "CProxyFdoDriver",
+            "Description"   : "This is a function port driver, and the port it creats is the DBusProxyFdo",
+            "PortClasses"   :
+            [
+                "DBusProxyFdo"
+            ]
+        },
+        {
+            "DriverName"    : "RpcTcpFidoDrv",
+            "DriverType"    : "PortDriver",
+            "InternalClass" : "CRpcTcpFidoDrv",
+            "Description"   : "This is a filter port driver, and the port it creats is the CRpcTcpFido",
+            "PortClasses"   :
+            [
+                "RpcTcpFido"
+            ]
+        }
+    ],
+
+    "Ports" :
+    [
+        {
+            "PortType"      : "Pdo",
+            "PortClass"     : "DBusLocalPdo",
+            "InternalClass" : "CDBusLocalPdo",
+            "PortDriver"    : "",
+            "BusPortClass"  : "DBusBusPort"
+        },
+        {
+            "PortType"      : "Pdo",
+            "PortClass"     : "DBusLoopbackPdo",
+            "InternalClass" : "CDBusLoopbackPdo",
+            "PortDriver"    : "",
+            "BusPortClass"  : "DBusBusPort"
+        },
+        {
+            "PortType"      : "Pdo",
+            "PortClass"     : "DBusProxyPdo",
+            "InternalClass" : "CDBusProxyPdo",
+            "PortDriver"    : "",
+            "BusPortClass"  : "DBusBusPort"
+        },
+        {
+            "PortType"      : "Fdo",
+            "PortClass"     : "DBusProxyFdo",
+            "InternalClass" : "CDBusProxyFdo",
+            "PortDriver"    : "ProxyFdoDriver"
+        },
+        {
+            "PortType"      : "Fido",
+            "PortClass"     : "RpcTcpFido",
+            "InternalClass" : "CRpcTcpFido",
+            "PortDriver"    : "",
+            "BusPortClass"  : "RpcTcpBusPort"
+        },
+        {
+            "PortType"      : "Pdo",
+            "PortClass"     : "TcpStreamPdo",
+            "InternalClass" : "CTcpStreamPdo",
+            "PortDriver"    : "",
+            "BusPortClass"  : "RpcTcpBusPort"
+        },
+        {
+            "PortType"      : "Fdo",
+            "PortClass"     : "DBusBusPort",
+            "PortDriver"    : "DBusBusDriver",
+            "InternalClass" : "CDBusBusPort"
+        },
+        {
+            "PortType"      : "Fdo",
+            "PortClass"     : "RpcTcpBusPort",
+            "PortDriver"    : "RpcTcpBusDriver",
+            "InternalClass" : "CTcpRpcBusPort"
+        }
+    ],
+
+    "Modules" :
+    [
+        {
+            "ModName" : "Mod_RpcRouter_0",
+            "DriversToLoad" :
+            [
+                "DBusBusDriver",
+                "RpcTcpBusDriver"
+            ],
+            "PreloadableObjects" :
+            [
+                "RpcRouter"
+            ],
+            "ClassFactories" :
+            [
+            ]
+        },
+        {
+            "ModName" : "Mod_StreamSvr_0",
+            "DriversToLoad" :
+            [
+                "DBusBusDriver"
+            ]
+        }
+    ],
+
+    "Match" :
+    [
+        {
+            "PortClass" : "DBusLocalPdo",
+            "FdoDriver" : ""
+        },
+        {
+            "PortClass" : "DBusProxyPdo",
+            "FdoDriver" : "ProxyFdoDriver",
+            "Description" : "This match provides a binding between the pdo and fdo"
+        },
+        {
+            "PortClass" : "TcpStreamPdo",
+            "FidoDriver" : "RpcTcpFidoDrv",
+            "Description" : "This match provides a binding between the pdo and the uppper fido"
+        }
+    ],
+
+    "Arch" :
+    {
+        "Processors" : "2"
+    }
+}
+
