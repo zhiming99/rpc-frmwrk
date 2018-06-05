@@ -1,0 +1,53 @@
+#PATH :=/usr/local/angstrom/arm/bin/:$(PATH)
+#CROSS_COMPILE := arm-angstrom-linux-gnueabi-
+CROSS:= $(CROSS_COMPILE)
+ARCH := arm
+BASE:=/home/zhiming/gfso
+
+CC := $(CROSS_COMPILE)gcc
+CPP := $(CROSS_COMPILE)g++
+LD := $(CROSS_COMPILE)ld
+AR := $(CROSS_COMPILE)ar
+AS := $(CROSS_COMPILE)as
+STRIP := $(CROSS_COMPILE)strip
+CUR_DIR := $(shell pwd)
+
+C_FLAGS :=  -Wall -c -m32
+C_DEFINES :=
+
+DEBUG_FLAGS := -DDEBUG -ggdb
+RELEASE_FLAGS := -O2
+
+C_INCLUDE := -I../include \
+	-I/usr/include/glib-2.0 \
+	-I/usr/lib/glib-2.0/include \
+	-I/usr/include/dbus-1.0 \
+	-I/usr/lib/dbus-1.0/include \
+	-I/home/zhiming/mywork/jsoncpp-src-0.6.0-rc2/include \
+
+
+OUTPUT_DIR := ../debug
+
+ifeq ($(MAKECMDGOALS),) 
+	C_FLAGS += $(DEBUG_FLAGS)
+else ifeq ($(MAKECMDGOALS),debug) 
+	C_FLAGS += $(DEBUG_FLAGS)
+else ifeq ($(MAKECMDGOALS),all) 
+	C_FLAGS += $(DEBUG_FLAGS)
+endif
+
+ifeq ($(MAKECMDGOALS),release)
+	C_FLAGS += $(RELEASE_FLAGS)
+	C_DEFINES += $(C_DEFINES) -DPRODUCTION 
+	OUTPUT_DIR := ../release
+else ifeq ($(MAKECMDGOALS),rclean)
+	OUTPUT_DIR := ../release
+endif
+
+ifeq ($(MODE),Release)
+	OUTPUT_DIR := ../release
+endif
+
+CPP_FLAGS := $(C_FLAGS) -std=c++11
+LINKER_OPTION := -shared -m32 -ldl -lstdc++ -L$(BASE)/rootfs/base/usr/lib -L/usr/lib/ -Wl,-rpath=/user/lib -L/lib -Wl,-rpath=/lib
+
