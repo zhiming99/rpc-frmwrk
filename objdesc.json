@@ -1,0 +1,29 @@
+{
+    "Version" : "1.0",
+    "BusName" : "DBusBusPort_0",
+    "PortClass": "DBusLocalPdo",
+    "PortId" : "0",
+    "ServerName": "AsyncServer",
+    "Objects" :
+    [
+        {
+            "ObjectName": "CAsyncServer",
+            "RequestTimeoutSec" : "120",
+            "KeepAliveTimeoutSec" : "60",
+
+            "Interfaces" :
+            [
+                {
+                    "Comment-0" : "the following two are the mandatory attributes",
+                    "InterfaceName" : "CAsyncServer",
+
+                    "Comment-1" : "the following is a flag whether to use the object clsid for this interface, usually it indicates this is the major interface of this object, there must be one interface bind to clsid",
+                    "BindToClsid" : "true"
+                },
+                {
+                    "InterfaceName" : "IInterfaceServer"
+                }
+            ]
+        }
+    ]
+}
