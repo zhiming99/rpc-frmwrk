@@ -25,6 +25,7 @@
 #include "defines.h"
 #include "prxyport.h"
 #include "emaphelp.h"
+#include "reqopen.h"
 
 
 using namespace std;

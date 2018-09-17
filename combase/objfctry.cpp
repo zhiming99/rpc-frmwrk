@@ -16,33 +16,51 @@
  * =====================================================================================
  */
 
-#include <glib/glib.h>
 #include <map>
 #include <vector>
 #include "defines.h"
 #include "stlcont.h"
 #include "objfctry.h"
 
+typedef gint32 (*PUNLOADLIBRARY )();
+
+
+gint32 UnloadLibrary( void* hDll )
+{
+    if( hDll == nullptr )
+        return -EINVAL;
+
+    PUNLOADLIBRARY pFunc =
+        ( PUNLOADLIBRARY  )dlsym( hDll, "DllUnload" );
+
+    if( pFunc == nullptr )
+        return -ENOENT;
+
+    gint32 ret = ( *pFunc )();
+    dlclose( hDll );
+
+    return ret;
+}
 
 gint32 CClassFactory::CreateInstance( 
-    EnumClsid clsid,
+    EnumClsid iClsid,
     CObjBase*& pObj,
     const IConfigDb* pCfg )
 {
     gint32 ret = -ENOENT;
 
-    if( m_oMapIdToObjMaker.find( iClsid )
-        != m_oMapIdToObjMaker.end() )
+    if( m_oMapObjMakers.find( iClsid )
+        != m_oMapObjMakers.end() )
     {
         ret = 0;
-        pObj = ( *m_oMapIdToObjMaker.at( iClsid ) )( pCfg );
-        if( !pObj.IsEmpty() )
+        pObj = ( *m_oMapObjMakers.at( iClsid ) )( pCfg );
+        if( pObj != nullptr )
         {
             pObj->AddRef();
         }
         else
         {
-            ret = -EFAUTL;
+            ret = -EFAULT;
         }
     }
 
@@ -68,10 +86,10 @@ EnumClsid CClassFactory::GetClassId(
         return clsid( Invalid );
 
     NAME2ID_MAP::iterator itr = 
-        m_oMapName2Id.find( iClsid );
+        m_oMapName2Id.find( szClassName );
 
     if( itr == m_oMapName2Id.end() )
-        return nullptr;
+        return clsid( Invalid );
 
     return itr->second;
 }
@@ -81,7 +99,180 @@ void CClassFactory::EnumClassIds(
 {
     for( auto itr : m_oMapId2Name )
     {
-        vecClsIds.push_back( itr->first );
+        vecClsIds.push_back( itr.first );
     }
     return;
+}
+
+CClassFactories::CClassFactories()
+    :CStlVector<ELEM_CLASSFACTORIES>()
+{
+    SetClassId( clsid( CClassFactories  ) );
+}
+
+CClassFactories::~CClassFactories()
+{
+    Clear();
+}
+
+/**
+* @name CreateInstance similiar to
+* CoCreateInstance, except the name.
+* @{ */
+/**  @} */
+
+gint32 CClassFactories::CreateInstance( 
+    EnumClsid clsid,
+    CObjBase*& pObj,
+    const IConfigDb* pCfg )
+{
+    gint32 ret = -ENOTSUP;
+
+    // CStdRMutex oLock( GetLock() );
+    // we are exposed to concurrent condition
+    MyType& vecFactories = ( *this )();
+    MyItr itr = vecFactories.begin();
+    while( itr != vecFactories.end() )
+    {
+        ret = ( itr->second )->CreateInstance(
+                clsid, pObj, pCfg );
+
+        if( SUCCEEDED( ret ) )
+            break;
+
+        ++itr;
+    }
+    return ret;
+
+}
+
+const char* CClassFactories::GetClassName(
+    EnumClsid iClsid )
+{
+    CStdRMutex oLock( GetLock() );
+
+    const char* pszName = nullptr;
+    MyType& vecFactories = ( *this )();
+    MyItr itr = vecFactories.begin();
+
+    while( itr != vecFactories.end() )
+    {
+        pszName = ( itr->second )->GetClassName( iClsid );
+        if( pszName != nullptr )
+            return pszName;
+
+        ++itr;
+    }
+    return nullptr;
+}
+
+EnumClsid CClassFactories::GetClassId(
+    const char* pszClassName )
+{
+    if( pszClassName == nullptr )
+        return clsid( Invalid );
+
+    CStdRMutex oLock( GetLock() );
+    EnumClsid iClsid = clsid( Invalid );
+    MyType& vecFactories = ( *this )();
+    MyItr itr = vecFactories.begin();
+
+    while( itr != vecFactories.end() )
+    {
+        iClsid = ( itr->second )->GetClassId( pszClassName );
+        if( iClsid != clsid( Invalid ) )
+            return iClsid;
+
+        ++itr;
+    }
+    return clsid( Invalid );
+}
+
+gint32 CClassFactories::AddFactory(
+    const FactoryPtr& pFactory, void* hDll )
+{
+    if( pFactory.IsEmpty() )
+        return -EINVAL;
+
+    if( hDll == nullptr )
+    {
+        // that's fine, indicating this
+        // factory is from current module
+    }
+
+    CStdRMutex oLock( GetLock() );
+    MyType& vecFactories = ( *this) ();
+
+    vecFactories.push_back( 
+        ELEM_CLASSFACTORIES( hDll, pFactory ) );
+
+    return 0;
+}
+
+gint32 CClassFactories::RemoveFactory(
+    FactoryPtr& pFactory )
+{
+
+    CStdRMutex oLock( GetLock() );
+    MyType& vecFactories = ( *this) ();
+    MyItr itr = vecFactories.begin();
+
+    while( itr != vecFactories.end() )
+    {
+        if( itr->second->GetObjId()
+            == pFactory->GetObjId() )
+        {
+            if( itr->first != nullptr )
+                UnloadLibrary( itr->first );
+
+            vecFactories.erase( itr );
+            return 0;
+        }
+
+        ++itr;
+    }
+    return -ENOENT;
+
+}
+
+void CClassFactories::Clear()
+{
+    CStdRMutex oLock( GetLock() );
+    MyType& vecFactories = ( *this) ();
+    MyItr itr = vecFactories.begin();
+
+    while( itr != vecFactories.end() )
+    {
+        if( !itr->second.IsEmpty() )
+        {
+            itr->second.Clear();
+        }
+        if( itr->first != nullptr )
+        {
+            UnloadLibrary( itr->first );
+            itr->first = nullptr;
+        }
+        ++itr;
+    }
+    vecFactories.clear();
+}
+
+void CClassFactories::EnumClassIds(
+    std::vector< EnumClsid >& vecClsIds )
+{
+    CStdRMutex oLock( GetLock() );
+    MyType& vecFactories = ( *this) ();
+    MyItr itr = vecFactories.begin();
+
+    while( itr != vecFactories.end() )
+    {
+        std::vector< EnumClsid > vecIds;
+        if( !itr->second.IsEmpty() )
+        {
+            itr->second->EnumClassIds( vecIds );
+            vecClsIds.insert( vecClsIds.end(),
+                vecIds.begin(), vecIds.end() );
+        }
+        ++itr;
+    }
 }

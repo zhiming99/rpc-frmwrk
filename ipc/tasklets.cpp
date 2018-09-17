@@ -37,11 +37,18 @@ CTasklet::CTasklet( const IConfigDb* pCfg )
 
 gint32 CTasklet::GetProperty(
         gint32 iProp,
-        CBuffer& oBuf )
+        CBuffer& oBuf ) const
 {
     if( m_pCtx.IsEmpty() )
         return -ENOENT;
-    return m_pCtx->GetProperty( iProp, oBuf );
+
+    gint32 ret = 0;
+
+    ret = m_pCtx->GetProperty( iProp, oBuf );
+    if( ret == -ENOENT )
+        ret =super::GetProperty( iProp, oBuf );
+
+    return ret;
 }
 
 gint32 CTasklet::SetProperty(
@@ -76,14 +83,16 @@ gint32 CTasklet::EnumProperties(
 gint32 CTasklet::GetPropertyType(
     gint32 iProp, gint32& iType ) const
 {
-    gint32 ret = super::GetPropertyType( iProp, iType );
-    if( SUCCEEDED( ret ) )
-        return ret;
+    gint32 ret = 0;
 
     if( m_pCtx.IsEmpty() )
         return ret;
 
-    return m_pCtx->GetPropertyType( iProp, iType );
+    ret = m_pCtx->GetPropertyType( iProp, iType );
+    if( SUCCEEDED( ret ) )
+        return ret;
+
+     return super::GetPropertyType( iProp, iType );
 }
 
 gint32 CTasklet::OnEvent(
@@ -179,6 +188,53 @@ gint32 CTasklet::GetIrpFromParams( IrpPtr& pIrp )
 
     return ret;
 }
+
+gint32 CTaskletRetriable::ScheduleRetry()
+{
+    gint32 ret = 0;
+
+    do{
+        guint32 dwInterval = 0;
+
+        CIoManager* pMgr = nullptr;
+        CCfgOpener oParams(
+            ( IConfigDb* )GetConfig() );
+
+        ret = oParams.GetPointer(
+            propIoMgr, pMgr );
+
+        if( ERROR( ret ) )
+            break;
+
+        ret = oParams.GetIntProp(
+            propIntervalSec, dwInterval );
+
+        if( ERROR( ret ) )
+            break;
+
+        gint32 iRetries = DecRetries();
+        if( iRetries <= 0 )
+        {
+            ret = iRetries;
+            break;
+        }
+        CTimerService& oTimerSvc =
+            pMgr->GetUtils().GetTimerSvc();
+
+        m_iTimerId = oTimerSvc.AddTimer(
+            dwInterval, this, eventRetry );
+
+        if( m_iTimerId < 0 )
+        {
+            ret = m_iTimerId;
+            m_iTimerId = 0;
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
 /**
 * @name CTaskletRetriable::operator()
 * the main entry of the retriable tasklet
@@ -199,80 +255,63 @@ gint32 CTaskletRetriable::operator()(
     guint32 dwContext )
 {
     // dwContext = 0, the first run
-    // dwContext = eventTimeout, this is a retry
+    // dwContext = eventTimeout, this is a retry 
     gint32 ret = 0;
+    bool bExcept = false;
+    guint32 dwTimeWaitUs = 1024;
 
-    try{
-        // no allow of reentrency from concurrency or
-        // the cyclic call
-        CReentrancyGuard oTaskEntered( this );
-
-        ObjPtr ptrMgr;
-        CIoManager* pMgr = nullptr;
-        CCfgOpener oParams( ( IConfigDb* )m_pCtx );
-
-        ret = oParams.GetObjPtr(
-            propIoMgr, ptrMgr );
-
-        if( ERROR( ret ) )
-            return ret;
-
-        pMgr = ptrMgr;
-
-        // test if we are from a retry
-        if( dwContext == eventTimeout )
-        {
-            vector< guint32 > vecParams;
-            ret = GetParamList( vecParams );
-            if( SUCCEEDED( ret ) )
+    do{
+        try{
+            // no allow of reentrency from concurrency or
+            // the cyclic call
+            CReentrancyGuard oTaskEntered( this );
+            // test if we are from a retry
+            if( dwContext == eventTimeout )
             {
-                gint32 iEvent = vecParams[ 1 ];
-                if( iEvent == eventRetry )
+                vector< guint32 > vecParams;
+                ret = GetParamList( vecParams );
+                if( SUCCEEDED( ret ) )
                 {
-                    // reset the timer id
-                    m_iTimerId = 0;
+                    gint32 iEvent = vecParams[ 1 ];
+                    if( iEvent == eventRetry )
+                    {
+                        // reset the timer id
+                        m_iTimerId = 0;
+                    }
                 }
             }
+
+            ret = Process( dwContext );
+
+            if( ret == STATUS_MORE_PROCESS_NEEDED )
+            {
+                gint32 iRet = ScheduleRetry();
+                if( ERROR( iRet ) )
+                    ret = iRet;
+            }
         }
-
-        ret = Process( dwContext );
-
-        if( ret == STATUS_MORE_PROCESS_NEEDED )
+        catch( std::system_error& oErr )
         {
-            do{
-                guint32 dwInterval = 0;
-
-                ret = oParams.GetIntProp(
-                    propIntervalSec, dwInterval );
-
-                if( ERROR( ret ) )
-                    break;
-
-                gint32 iRetries = DecRetries();
-                if( iRetries <= 0 )
-                {
-                    ret = iRetries;
-                    break;
-                }
-                CTimerService& oTimerSvc =
-                    pMgr->GetUtils().GetTimerSvc();
-
-                m_iTimerId = oTimerSvc.AddTimer(
-                    dwInterval, this, eventRetry );
-
-                if( m_iTimerId < 0 )
-                {
-                    ret = m_iTimerId;
-                    m_iTimerId = 0;
-                }
-
-            }while( 0 );
+            ret = oErr.code().value();
+            bExcept = true;
+            DebugPrint( ret,
+                "hit the reentrence lock, %d", GetTid() );
         }
-    }
-    catch( std::system_error& oErr )
-    {
-        ret = oErr.code().value();
-    }
+
+        if( bExcept )
+        {
+            // reschedule
+            usleep( dwTimeWaitUs );
+
+            if( dwTimeWaitUs < ( 1024 ^ 2 ) )
+                dwTimeWaitUs <<= 1;
+            bExcept = false;
+
+            continue;
+        }
+        break;
+
+    }while( 1 );
 
     return ret;
 }
@@ -380,7 +419,7 @@ gint32 CTaskletRetriable::DecRetries()
 
 gint32 CTaskletRetriable::ResetTimer()
 {
-    if( iTimerId <= 0 )
+    if( m_iTimerId <= 0 )
         return -EINVAL;
 
     CIoManager* pMgr = nullptr;
@@ -395,8 +434,8 @@ gint32 CTaskletRetriable::ResetTimer()
     CTimerService& oTimerSvc =
         pMgr->GetUtils().GetTimerSvc();
 
-    ret = oTimerSvc.ResetTimer( iTimerId );
-
+    ret = oTimerSvc.ResetTimer( m_iTimerId );
+    return ret;
 }
 
 gint32 CTaskletRetriable::RemoveTimer(
@@ -453,4 +492,33 @@ CTaskletRetriable::CTaskletRetriable(
     if( !oCfg.exist( propIntervalSec ) )
         oCfg.SetIntProp( propIntervalSec,
             TASKLET_RETRY_DEF_INTERVALSEC );
+}
+
+gint32 CSyncCallback::operator()(
+    guint32 dwContext )
+{
+    if( dwContext != eventTaskComp &&
+        dwContext != eventIrpComp )
+        return -ENOTSUP;
+    Sem_Post( &m_semWait );
+    return 0;
+}
+
+gint32 CSyncCallback::WaitForComplete()
+{
+    gint32 ret = 0;
+    do{
+        ret = sem_wait( &m_semWait );
+
+        if( ret == -1 && errno == EINTR )
+            continue;
+        
+        if( ret == -1 )
+            ret = -errno;
+
+        break;
+
+    }while( 1 );
+
+    return ret;
 }

@@ -26,6 +26,10 @@
 #include <glib.h>
 #include <semaphore.h>
 #include <chrono>
+#include <sys/types.h>
+#include <unistd.h>
+#include <syscall.h>
+#include <thread>
 
 #include "clsids.h"
 #include "propids.h"
@@ -42,9 +46,15 @@
 #define IPV4_ADDR_BYTES         4
 #define MAX_IPADDR_SIZE         IPV6_ADDR_BYTES
 
+#define likely(x)               __builtin_expect((x),1)
+#define unlikely(x)             __builtin_expect((x),0)
 
-#define ERROR( ret_ ) ( ( ( gint32 )ret_ ) < 0 )
-#define SUCCEEDED( ret_ ) ( ret_ == 0 )
+#define ERROR_LIKELY( ret_ )   likely( ( ( ( gint32 )ret_ ) < 0 ) )
+#define ERROR_UNLIKELY( ret_ ) unlikely( ( ( ( gint32 )ret_ ) < 0 ) )
+
+#define ERROR( ret_ )          ERROR_UNLIKELY( ret_ )
+
+#define SUCCEEDED( ret_ )      likely( ( ret_ == 0 ) )
 #define FAILED( ret_ ) ERROR( ret_ )
 
 // the status codes
@@ -88,7 +98,7 @@ do{\
     {\
         for( int i = 0; i < iCount; ++i )\
         {\
-            sem_post( &sem_ );\
+            Sem_Post( &sem_ );\
         }\
     }\
 }while( 0 )
@@ -99,7 +109,7 @@ do{\
     if( 0 == sem_getvalue( &sem_, &iCount ) )\
     {\
         if( iCount > 0 )\
-            sem_post( &sem_ );\
+            Sem_Post( &sem_ );\
     }\
 }while( 0 )
 
@@ -129,28 +139,47 @@ do{\
 #define REG_MAX_PATH    2048
 #define REG_MAX_NAME    128 
 
-#define DebugMsg( ret, strMsg ) \
-    DebugMsgInternal( ret, strMsg, __func__, __LINE__ )
+#define __FILENAME__ (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 
-inline std::string DebugMsgInternal(
-    gint32 ret, const std::string& strMsg, const char* szFunc, gint32 iLineNum )
-{
-    char szBuf[ REG_MAX_NAME * 2 ];
-    szBuf[ REG_MAX_NAME - 1 ] = 0;
-    snprintf( szBuf,
-        sizeof( szBuf ) - 1,
-        "%s(%d): %s(%d)",
-        szFunc,
-        iLineNum,
-        strMsg.c_str(),
-        ret );
-    return std::string( szBuf );
-}
+#define DebugMsg( ret, strFmt, ... ) \
+ DebugMsgEx( __FILENAME__, __LINE__, ret, strFmt, ##__VA_ARGS__ )
+
+#ifdef DEBUG
+#define DebugPrint( ret, strFmt, ... ) \
+({ printf( "%s\n", \
+    DebugMsg( ret, strFmt, ##__VA_ARGS__ ).c_str() );} )
+#else
+
+#define DebugPrint( ret, strFmt, ... )
+
+#endif
+
+// for Sem_Timedwait interval
+#define THREAD_WAKEUP_INTERVAL      10
+
+extern std::string DebugMsgInternal(
+    gint32 ret, const std::string& strMsg,
+    const char* szFunc, gint32 iLineNum );
+
+extern std::string DebugMsgEx(
+    const char* szFunc, gint32 iLineNum,
+    gint32 ret, const std::string& strFmt, ... );
 
 extern gint32 ErrnoFromDbusErr( const char *error );
 
 extern guint64 htonll( guint64 hostll );
 extern guint64 ntohll( guint64 netll );
+extern int Sem_Init( sem_t* psem, int pshared, unsigned int value );
+extern int Sem_Timedwait( sem_t* psem, const timespec& ts );
+extern int Sem_TimedwaitSec( sem_t* psem, gint32 iSec );
+extern int Sem_Post( sem_t* psem );
+
+// set the name of the current thread
+extern gint32 SetThreadName(const std::string& strName );
+extern std::string GetThreadName();
+inline guint32 GetTid()
+{ return ( guint32 )syscall( SYS_gettid ); }
+
 
 
 using stdstr = std::string;
@@ -264,6 +293,8 @@ enum EnumEventId
     cmdShutdown,
     cmdPause,
     cmdResume,
+    eventResumed,
+    eventPaused,
     
     eventTaskThrdCtx, 
     eventOneShotTaskThrdCtx,
@@ -281,6 +312,7 @@ enum EnumEventId
     // time elapsed in second
     eventAgeSec,
     eventCeiling,
+    eventTimeoutCancel,
 
     eventMaxReserved = 0x10000,
     eventUserStart = 0x10001,
@@ -340,15 +372,14 @@ class CBuffer;
 class IConfigDb;
 class CObjBase
 {
-#ifdef DEBUG
     // boundary marker
     guint32                                 m_dwMagic;
-#endif
+    static std::atomic< gint32 >            m_atmObjCount;
     EnumClsid                               m_dwClsid;
     mutable std::atomic< gint32 >           m_atmRefCount;
     guint64                                 m_qwObjId;
 
-    static std::atomic< guint64 >           m_atmObjCount;
+    static std::atomic< guint64 >           m_atmObjId;
     public:
 
     CObjBase();
@@ -362,7 +393,14 @@ class CObjBase
 
     gint32 AddRef();
 
+    // used in some constructors to guard the object
+    // from being deleted. Don't use this function
+    // unless you know what you are doing
+    gint32 DecRef();
+
     gint32 Release();
+
+    gint32 GetRefCount();
 
     EnumClsid GetClsid() const;
 
@@ -407,6 +445,12 @@ class CObjBase
         // object version number
         return "1.0";
     }
+    static gint32 GetActCount()
+    { return m_atmObjCount; }
+
+#ifdef DEBUG
+    void Dump( std::string& strDump );
+#endif
 };
 
 class IEventSink : public CObjBase
@@ -474,10 +518,9 @@ class IThread : public IService
     public:
     virtual void ThreadProc( void* context ) = 0;
     virtual gint32 GetLoadCount() const = 0;
-    virtual bool IsRunning() const;
-    virtual gint32 Start() = 0;
-    virtual gint32 Stop() = 0;
-
+    virtual bool IsRunning() const = 0;
+    virtual gint32 SetThreadName(
+        const char* szName = nullptr );
 };
 
 class IoRequestPacket;
@@ -535,6 +578,7 @@ class CMutex
         m_pMutex->unlock();
     }
 
+    private:
     inline bool IsLocked() const
     {
         return m_bLocked;
@@ -550,28 +594,8 @@ class  CStdRTMutex :
     public CMutex<stdrtmutex> 
 {
     public:
-    CStdRTMutex( stdrtmutex& oMutex ) :
-        CMutex< stdrtmutex >( oMutex )
-    {;}
-
-    CStdRTMutex( stdrtmutex& oMutex, bool bTryLock ) :
-        CMutex< stdrtmutex >( oMutex )
-    {;}
-
-    CStdRTMutex( stdrtmutex& oMutex, guint32 dwTryTimeMs )
-    {
-        m_pMutex = &oMutex;
-        if( dwTryTimeMs == 0 )
-        {
-            Lock();
-        }
-        else
-        {
-            bool bLocked = m_pMutex->try_lock_for(
-                std::chrono::milliseconds( dwTryTimeMs ));
-            if( bLocked )
-                m_bLocked = true;
-        }
-    }
+    CStdRTMutex( stdrtmutex& oMutex );
+    CStdRTMutex( stdrtmutex& oMutex, bool bTryLock );
+    CStdRTMutex( stdrtmutex& oMutex, guint32 dwTryTimeMs );
 };
 

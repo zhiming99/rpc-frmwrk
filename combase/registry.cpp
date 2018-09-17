@@ -24,6 +24,8 @@ using namespace std;
 CDirEntry::CDirEntry()
 {
     m_pParent = NULL;
+    m_mapProps.NewObj();
+    SetClassId( clsid( CDirEntry ) );
 }
 CDirEntry::~CDirEntry()
 {
@@ -31,6 +33,7 @@ CDirEntry::~CDirEntry()
     RemoveAllProps();
     m_pParent = nullptr;
     m_strName = "";
+    m_mapProps.Clear();
 }
 
 void CDirEntry::SetName(
@@ -92,7 +95,7 @@ gint32 CDirEntry::SetProperty(
 }
 
 gint32 CDirEntry::GetProperty(
-    gint32 iProp, CBuffer& oBuf )
+    gint32 iProp, CBuffer& oBuf ) const
 {
     gint32 ret = 0;
     if( !m_mapProps->exist( iProp ) )
@@ -117,7 +120,8 @@ gint32 CDirEntry::RemoveProp(
 
 void CDirEntry::RemoveAllProps()
 {
-    m_mapProps->RemoveAll();
+    if( !m_mapProps.IsEmpty() )
+        m_mapProps->RemoveAll();
 }
 
 CDirEntry* CDirEntry::GetChild(
@@ -170,6 +174,7 @@ gint32 CDirEntry::AddChild(
     if( itr == m_mapChilds.end() )
     {
         CDirEntry* pEnt = new CDirEntry;
+        pEnt->DecRef();
         pEnt->SetName( strName );
         pEnt->SetParent( this );
         m_mapChilds[ strName ] = pEnt;
@@ -198,6 +203,8 @@ gint32 CDirEntry::RemoveChild(
 }
 
 CRegistry::CRegistry()
+    : super(),
+    m_pCurDir( &m_oRootDir )
 {
     SetClassId( Clsid_CRegistry );
 }
@@ -238,7 +245,7 @@ gint32 CRegistry::Namei(
 
         if( pos > 0 && ( pos + 1 == strTemp.size() ) )
         {
-            // repeated '/', remove it
+            // repeated or trailing '/', remove it
             strTemp.erase( pos );
             continue;
         }
@@ -250,12 +257,19 @@ gint32 CRegistry::Namei(
         }
 
         vecComponents.push_back( strTemp.substr( pos + 1 ) );
-        strTemp.erase( pos );
+
+        if( pos > 0 )
+            strTemp.erase( pos );
+        else
+        {
+            // keep the root directory
+            strTemp.erase( pos + 1 );
+        }
     }
 
     if( ret == 0 && vecComponents.size() > 1 )
     {
-        reverse( vecComponents.begin(), vecComponents.end() -  1 );
+        reverse( vecComponents.begin(), vecComponents.end() );
     }
     return ret;
 }
@@ -278,6 +292,7 @@ gint32 CRegistry::ListDir(
         while( itr != m_pCurDir->m_mapChilds.end() )
         {
             vecContents.push_back( itr->second->m_strName );
+            ++itr;
         }
     }
     return ret;
@@ -304,8 +319,6 @@ gint32 CRegistry::ChangeDir(
         {
             if( *itr == "." )
             {
-                ++itr;
-                continue;
             }
             else if( *itr == ".." )
             {
@@ -315,8 +328,10 @@ gint32 CRegistry::ChangeDir(
                     break;
                 }
                 pCurDir = pCurDir->GetParent();
-                ++itr;
-                continue;
+            }
+            else if( *itr == "/" )
+            {
+                pCurDir = &m_oRootDir;
             }
             else
             {
@@ -326,8 +341,8 @@ gint32 CRegistry::ChangeDir(
                     ret = -ENOENT;
                     break;
                 }
-                ++itr;
             }
+            ++itr;
         }
         if( ret == 0 )
         {
@@ -468,11 +483,11 @@ gint32 CRegistry::MakeDir(
                 if( pRollback == nullptr )
                     pRollback = pParent;
 
-                ret = pCurDir->AddChild( *itr );
+                ret = pParent->AddChild( *itr );
                 if( ret < 0 )
                     break;
 
-                pCurDir = pCurDir->GetChild( *itr );
+                pCurDir = pParent->GetChild( *itr );
                 if( pCurDir == nullptr )
                 {
                     ret = -EFAULT;
@@ -601,10 +616,21 @@ gint32 CRegistry::RemoveDir(
             // weird, fine
             ret = 0;
         }
+        m_pCurDir->m_mapProps.Clear();
     }
     catch( std::out_of_range& e )
     {
         ret = -ENOENT;
     }
+
+    CDirEntry* pParent = 
+        m_pCurDir->GetParent();
+
+    if( pParent != nullptr )
+    {
+        pParent->RemoveChild(
+            m_pCurDir->GetName() );
+    }
+
     return ret;
 }

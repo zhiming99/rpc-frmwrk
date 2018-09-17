@@ -24,6 +24,7 @@
 #include "stlcont.h"
 #include "emaphelp.h"
 #include "connhelp.h"
+#include "ifhelper.h"
 
 using namespace std;
 
@@ -49,6 +50,21 @@ void CPnpManager::OnPortAttached(
         return;
     
     do{
+        IrpPtr pMasterIrp;
+
+        CCfgOpenerObj oPortCfg( pPort );
+        if( oPortCfg.exist( propMasterIrp ) )
+        {
+            ObjPtr pObj;
+            oPortCfg.GetObjPtr(
+                propMasterIrp, pObj );
+
+            pMasterIrp = pObj;
+
+            oPortCfg.RemoveProperty(
+                propMasterIrp );
+        }
+
         // Note: we do not care if it is a pdo
         // or fdo, let's build the port stack on top
         // of the current `pPort' following the
@@ -57,7 +73,8 @@ void CPnpManager::OnPortAttached(
         if( ERROR( ret ) )
         {
             // don't care because it will always fail
-            // and we can work with just on port
+            // at the end and we can work with just one
+            // port
         }
 
         // notify the ports the stack is built
@@ -89,7 +106,20 @@ void CPnpManager::OnPortAttached(
 
         oEvtMap.SubscribeEvent( pEvent );
 
-        ret = StartPortStack( pPort );
+        // using deferred call to avoid the callback
+        // from the StartPortsInternal to happen before
+        // caller quits
+        ObjPtr pPortObj( pPort );
+        ObjPtr pIrpObj( ( CObjBase*) pMasterIrp );
+
+        ret = DEFER_CALL( GetIoMgr(),
+            this,
+            &CPnpManager::StartPortStack,
+            pPortObj,
+            pIrpObj );
+
+        if( SUCCEEDED( ret ) )
+            ret = STATUS_PENDING;
 
     }while( 0 );
 
@@ -121,16 +151,14 @@ gint32 CPnpMgrStartPortCompletionTask::operator()(
     EnumEventId iEventId = eventPortStarted;
 
     do{
-        CCfgOpener oCfg( ( IConfigDb* )m_pCtx );
+        CCfgOpener oCfg( ( IConfigDb* )GetConfig() );
         ObjPtr evtSinkPtr;
         ObjPtr pObj;
 
         ret = oCfg.GetObjPtr( propIrpPtr, pObj );
 
         if( ERROR( ret ) )
-        {
             break;
-        }
 
         IrpPtr pIrp = pObj;
 
@@ -156,10 +184,10 @@ gint32 CPnpMgrStartPortCompletionTask::operator()(
         iRet = pIrp->GetStatus();
 
         ret2 = oCfg.GetObjPtr( propPortPtr, pPort );
-
         if( ERROR( ret2 ) )
             break;
 
+        oCfg.RemoveProperty( propPortPtr );
         if( pPort.IsEmpty() )
         {
             ret2 = -EFAULT;
@@ -176,6 +204,7 @@ gint32 CPnpMgrStartPortCompletionTask::operator()(
         IEventSink* pEventSink = evtSinkPtr;
         if( nullptr == pEventSink )
         {
+            oCfg.RemoveProperty( propEventSink );
             ret2 = -EINVAL;
             break;
         }
@@ -336,11 +365,9 @@ gint32 CPnpManager::StartPortsInternal(
             // for master irp, we don't need a callback
             // though it is an asynchronous call
             CStdRMutex oIrpLock( pMasterIrp->GetLock() );
-            if( !pMasterIrp->CanContinue( IRP_STATE_READY ) )
-            {
-                ret = ERROR_STATE;
+            ret = pMasterIrp->CanContinue( IRP_STATE_READY );
+            if( ERROR( ret ) )
                 break;
-            }
 
             IPort* pMasterPort = pMasterIrp->GetTopPort();
             CPort* pCPort = static_cast< CPort* >( pMasterPort );
@@ -357,35 +384,15 @@ gint32 CPnpManager::StartPortsInternal(
         if( ret == STATUS_PENDING )
             break;
 
+        EventPtr pCallback = pIrp->m_pCallback;
+
         pIrp->RemoveTimer();
         pIrp->RemoveCallback();
         pIrp->SetStatus( ret );
 
-        EventPtr pCallback = pIrp->m_pCallback;
-
         if( !pMasterIrp.IsEmpty() )
         {
-            CStdRMutex oIrpLock( pMasterIrp->GetLock() );
-            if( !pMasterIrp->CanContinue( IRP_STATE_READY ) )
-            {
-                ret = ERROR_STATE;
-            }
-            else
-            {
-                pMasterIrp->RemoveSlaveIrp( pIrp );
-                pIrp->SetMasterIrp( nullptr );
-
-                if( pMasterIrp->GetSlaveCount() == 0 )
-                {
-                    pMasterIrp->PopCtxStack();
-                    pMasterIrp->GetTopStack()->SetStatus( ret );
-                    oIrpLock.Unlock();
-
-                    GetIoMgr()->CompleteIrp( pMasterIrp );
-
-                    oIrpLock.Lock();
-                }
-            }
+            GetIoMgr()->CompleteAssocIrp( pIrp );
         }
 
         // add the event sink to the handle map and
@@ -442,7 +449,9 @@ gint32 CPnpManager::QueryStop(
 
         // we will wait 2 minutes for
         // a query stop operation
-        pIrp->SetTimer( PORT_START_TIMEOUT_SEC, GetIoMgr() );
+        pIrp->SetTimer( PORT_START_TIMEOUT_SEC + 1,
+            GetIoMgr() );
+
         HANDLE hPort = PortToHandle( pPort );
         
         if( pMasterIrp.IsEmpty() )
@@ -454,14 +463,15 @@ gint32 CPnpManager::QueryStop(
             // set up a callback for query stop in case it returns
             // pending
             EventPtr pEvent;
-            CCfgOpener c;
+            CCfgOpener oArgs;
 
-            c.SetPointer( propIoMgr, GetIoMgr() );
-            c.SetObjPtr( propIrpPtr, ObjPtr( pMasterIrp ) );
-            c.SetObjPtr( propObjPtr, ObjPtr( pPort ) );
+            oArgs.SetPointer( propIoMgr, GetIoMgr() );
+            oArgs.SetObjPtr( propIrpPtr, ObjPtr( pMasterIrp ) );
+            oArgs.SetObjPtr( propObjPtr, ObjPtr( pPort ) );
 
             pEvent.NewObj(
-                clsid( CPnpMgrQueryStopCompletion ), c.GetCfg() );
+                clsid( CPnpMgrQueryStopCompletion ),
+                oArgs.GetCfg() );
 
             pIrp->SetSyncCall( false );
             pIrp->SetCallback( pEvent, hPort );
@@ -496,6 +506,21 @@ gint32 CPnpManager::QueryStop(
             // to retry this irp later sometime
             pIrp->RemoveTimer();
             pIrp->RemoveCallback();
+
+            // FIXME: not a proper approach
+            if( !pMasterIrp.IsEmpty() )
+            {
+                CStdRMutex oLock(
+                    pMasterIrp->GetLock() );
+
+                ret = pMasterIrp->CanContinue(
+                    IRP_STATE_READY );
+
+                if( ERROR( ret ) )
+                    break;
+
+                pMasterIrp->RemoveSlaveIrp( pIrp );
+            }
         }
         else
         {
@@ -531,12 +556,13 @@ gint32 CPnpManager::DoStop(
         CCfgOpener c;
         c.SetPointer( propIoMgr, GetIoMgr() );
         c.SetObjPtr( propObjPtr, ObjPtr( pPort ) );
+        c.SetObjPtr( propIrpPtr, ObjPtr( pMasterIrp ) );
 
         IntVecPtr pParamList( true );
         // the irp to send to the port
+        ( *pParamList )().push_back( eventIrpComp );
         ( *pParamList )().push_back( ( guint32 )pIrp );
-        ( *pParamList )().push_back( 0 );
-        ( *pParamList )().push_back( 0 );
+        ( *pParamList )().push_back( eventZero );
 
         // a flag to indicate we are in the DoStop
         // a bad tweak
@@ -572,15 +598,14 @@ gint32 CPnpMgrQueryStopCompletion::operator()(
     // stop the port stack.
     gint32 ret = 0;
     do{
-        bool bInCompletion = true;
         ObjPtr pObj;
-        CCfgOpener a( ( IConfigDb* )m_pCtx );
+        CCfgOpener a( ( IConfigDb* )GetConfig() );
 
         CIoManager* pMgr = nullptr;
         ret = a.GetPointer( propIoMgr, pMgr  );
         if( ERROR( ret ) )
             break;
-        m_pCtx->RemoveProperty( propIoMgr );
+        a.RemoveProperty( propIoMgr );
 
         PortPtr pPort;
         ret = a.GetObjPtr( propObjPtr, pObj );
@@ -594,14 +619,14 @@ gint32 CPnpMgrQueryStopCompletion::operator()(
             break;
 
         IntVecPtr pParamList( pObj );
-        m_pCtx->RemoveProperty( propParamList );
+        a.RemoveProperty( propParamList );
 
         ret = a.GetObjPtr( propIrpPtr, pObj );
         if( ERROR( ret ) )
             break;
 
         IrpPtr pMasterIrp( pObj );
-        m_pCtx->RemoveProperty( propIrpPtr );
+        a.RemoveProperty( propIrpPtr );
         if( pMasterIrp.IsEmpty() )
         {
             ret = -EINVAL;
@@ -612,7 +637,9 @@ gint32 CPnpMgrQueryStopCompletion::operator()(
 
         if( ( *pParamList )().size() == dwArgCount
             && ( *pParamList )()[ 3 ] == 1 )
-            bInCompletion = false;
+        {
+            // we are not from an irp completion
+        }
 
         // the first parameter is the pointer to
         // the irp this irp is guarded by refcount
@@ -620,28 +647,44 @@ gint32 CPnpMgrQueryStopCompletion::operator()(
         IrpPtr pIrp = reinterpret_cast< IRP* >(
             ( *pParamList )()[ 1 ] );
 
-        if( pIrp.IsEmpty()
-            || pIrp->GetStackSize() == 0 )
+        if( pIrp.IsEmpty() ||
+            pIrp->GetStackSize() == 0 )
         {
             ret = -EINVAL;
             break;
+        }
+ 
+        // reuse the irp
+        if( dwContext == eventIrpComp )
+        {
+            if( pIrp->SetState(
+                IRP_STATE_COMPLETED,
+                IRP_STATE_READY ) )
+            {
+                ret = -EINVAL;
+                break;
+            }
+            pIrp->SetMasterIrp( nullptr );
+            pIrp->PopCtxStack();
+            pIrp->AllocNextStack( pPort );
         }
 
         IrpCtxPtr& pIrpCtx = pIrp->GetTopStack();
 
         if( true )
         {
-            CStdRMutex b( pMasterIrp->GetLock() );
-            if( !pMasterIrp->CanContinue( IRP_STATE_READY ) )
-            {
-                ret = ERROR_STATE;
+            CStdRMutex oIrpLock( pMasterIrp->GetLock() );
+            ret = pMasterIrp->CanContinue( IRP_STATE_READY );
+            if( ERROR( ret ) )
                 break;
-            }
 
+            pMasterIrp->RemoveSlaveIrp( pIrp );
             // we don't care if the irp is
             // succeeded or not
             pIrpCtx->SetMajorCmd( IRP_MJ_PNP );
             pIrpCtx->SetMinorCmd( IRP_MN_PNP_STOP );
+            pPort->AllocIrpCtxExt( pIrpCtx, ( PIRP )pIrp );
+
             pIrp->SetSyncCall( false );
 
             // clear the callback if any
@@ -659,15 +702,14 @@ gint32 CPnpMgrQueryStopCompletion::operator()(
         }
 
         // we will wait 2 minutes for stop request
-        pIrp->SetTimer( PORT_START_TIMEOUT_SEC, pMgr );
-
+        pIrp->SetTimer( PORT_START_TIMEOUT_SEC + 2, pMgr );
         HANDLE hPort = PortToHandle( ( IPort* )pPort );
         ret = pMgr->SubmitIrp( hPort, pIrp, false );
 
         if( ret == STATUS_PENDING )
         {
-            // in the next irp completion the
-            // association will gone via
+            // in the other irp completion the
+            // association will be gone via
             // CompleteAssocIrp
             break;
         }
@@ -676,23 +718,7 @@ gint32 CPnpMgrQueryStopCompletion::operator()(
             pIrp->RemoveTimer();
         }
 
-        CStdRMutex b( pMasterIrp->GetLock() );
-        if( !pMasterIrp->CanContinue( IRP_STATE_READY ) )
-        {
-            ret = ERROR_STATE;
-            break;
-        }
-
-        pMasterIrp->RemoveSlaveIrp( pIrp );
-        if( pMasterIrp->GetSlaveCount() == 0
-            && bInCompletion ) 
-        {
-            pMasterIrp->GetTopStack()->SetStatus( ret );
-            b.Unlock();
-            pMgr->CompleteIrp( pMasterIrp );
-            b.Lock();
-        }
-
+        pMgr->CompleteAssocIrp( pIrp );
         // pMasterIrp, when goes out this scope,
         // should have 1 reference, that is kept
         // by the workitem
@@ -714,25 +740,25 @@ gint32 CPnpMgrDoStopNoMasterIrp::operator()(
     gint32 ret = 0;
     do{
         ObjPtr pObj;
-        CCfgOpener a( ( IConfigDb* )m_pCtx );
+        CCfgOpener oCfg( ( IConfigDb* )m_pCtx );
 
         CIoManager* pMgr = nullptr;
-        ret = a.GetPointer( propIoMgr, pMgr  );
+        ret = oCfg.GetPointer( propIoMgr, pMgr  );
         if( ERROR( ret ) )
             break;
 
         PortPtr pPort;
-        ret = a.GetObjPtr( propObjPtr, pObj );
+        ret = oCfg.GetObjPtr( propObjPtr, pObj );
         if( ERROR( ret ) )
             break;
 
         pPort = ( IPort* )pObj;
-        ret = a.GetObjPtr( propParamList, pObj );
+        ret = oCfg.GetObjPtr( propParamList, pObj );
         if( ERROR( ret ) )
             break;
 
         IntVecPtr pParamList( pObj );
-        a.RemoveProperty( propParamList );
+        oCfg.RemoveProperty( propParamList );
 
         // the first parameter is the pointer to
         // the irp which is guarded by refcount in
@@ -740,8 +766,8 @@ gint32 CPnpMgrDoStopNoMasterIrp::operator()(
         IrpPtr pIrp = reinterpret_cast< IRP* >(
             ( *pParamList )()[ 1 ] );
 
-        if( pIrp.IsEmpty()
-            || pIrp->GetStackSize() == 0 )
+        if( pIrp.IsEmpty() ||
+            pIrp->GetStackSize() == 0 )
         {
             ret = -EINVAL;
             break;
@@ -764,14 +790,17 @@ gint32 CPnpMgrDoStopNoMasterIrp::operator()(
         }
 
         // we will wait 2 minutes for stop request
-        pIrp->SetTimer( PORT_START_TIMEOUT_SEC, pMgr );
+        pIrp->SetTimer( PORT_START_TIMEOUT_SEC + 3, pMgr );
         HANDLE hPort = PortToHandle( ( IPort* )pPort );
 
         // no need to check existance of the port
         ret = pMgr->SubmitIrp( hPort, pIrp, false );
         if( ret == STATUS_PENDING )
         {
-            pIrp->WaitForComplete();
+            ret = pIrp->WaitForComplete();
+            if( ERROR( ret ) )
+                break;
+            ret = pIrp->GetStatus();
             break;
         }
         else
@@ -787,13 +816,35 @@ gint32 CPnpMgrDoStopNoMasterIrp::operator()(
 gint32 CPnpMgrStopPortAndDestroyTask::operator()(
     guint32 dwContext )
 {
-    // parameters:
-    // propIoMgr
-    // propPortPtr: the port to stop and destroy
     gint32 ret = 0;
+
+    switch( ( EnumEventId )dwContext )
+    {
+    case eventOneShotTaskThrdCtx:
+    case eventTaskThrdCtx:
+        {
+            ret = OnScheduledTask( dwContext );
+            break;
+        }
+    case eventIrpComp:
+        {
+            ret = OnIrpComplete( dwContext );
+            break;
+        }
+    default:
+        break;
+    }
+    return ret;
+}
+
+gint32 CPnpMgrStopPortAndDestroyTask::OnIrpComplete(
+    guint32 dwContext )
+{
+    gint32 ret = 0;
+    
     do{
         CIoManager* pMgr;
-        CParamList oParams( m_pCtx );
+        CParamList oParams( GetConfig() );
         ret = oParams.GetPointer( propIoMgr, pMgr );
         if( ERROR( ret ) )
             break;
@@ -812,15 +863,116 @@ gint32 CPnpMgrStopPortAndDestroyTask::operator()(
         }
 
         CPnpManager& oPnpMgr = pMgr->GetPnpMgr();
-        ret = oPnpMgr.StopPortStack( pPort );
-        if( ERROR( ret ) )
-            break;
-
         oPnpMgr.DestroyPortStack( pPort );
 
     }while( 0 );
 
+    return ret;
+}
+
+gint32 CPnpMgrStopPortAndDestroyTask::OnScheduledTask(
+    guint32 dwContext )
+{
+    // parameters:
+    // propIoMgr
+    // propPortPtr: the port to stop and destroy
+    gint32 ret = 0;
+    do{
+        CIoManager* pMgr;
+        CParamList oParams( GetConfig() );
+        ret = oParams.GetPointer( propIoMgr, pMgr );
+        if( ERROR( ret ) )
+            break;
+
+        ObjPtr pObj;
+        ret = oParams.GetObjPtr(
+            propPortPtr, pObj );
+        if( ERROR( ret ) )
+            break;
+
+        CPort* pPort = pObj;
+        if( pPort == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        // FIXME: this irp is not through the port
+        // stack, so it is out of the irp tracking
+        // mechanism, IrpIn and IrpOut. it could be a
+        // problem when canceling happens on it.
+        //
+        // For the dbusbus port, when completing this
+        // irp, the port is already in the stopped
+        // state because the slave irp is the true `stop'
+        // irp which physically stop the port.
+        //
+        // this irp is solely for synchronous purpose
+        IrpPtr pMasterIrp( true );
+        pMasterIrp->AllocNextStack( pPort );
+        IrpCtxPtr& pIrpCtx = pMasterIrp->GetTopStack(); 
+
+        // star the port
+        pIrpCtx->SetMajorCmd( IRP_MJ_PNP );
+        pIrpCtx->SetMinorCmd( IRP_MN_PNP_STOP );
+        pIrpCtx->SetIoDirection( IRP_DIR_OUT );
+        pPort->AllocIrpCtxExt( pIrpCtx,
+            ( PIRP )pMasterIrp );
+
+        pMasterIrp->SetCallback(
+            EventPtr( this ), 0 );
+
+        pMasterIrp->SetSyncCall( false );
+
+        pMasterIrp->SetTimer(
+            PORT_START_TIMEOUT_SEC + 4, pMgr );
+
+        CPnpManager& oPnpMgr = pMgr->GetPnpMgr();
+
+        // there is chance the slave irp time-out and
+        // then this master irp is completed by
+        // CompleteAssocIrp, which is not an expected
+        // behavior.
+        CStdRMutex oIrpLock(
+            pMasterIrp->GetLock() );
+
+        ret = oPnpMgr.StopPortStack(
+            pPort, pMasterIrp );
+
+        if( ret == STATUS_PENDING )
+            break;
+
+        pMasterIrp->SetState( IRP_STATE_READY,
+            IRP_STATE_COMPLETED );
+
+        pMasterIrp->RemoveCallback();
+        pMasterIrp->RemoveTimer();
+
+        oIrpLock.Unlock();
+
+        // on error stopping, we do nothing, otherwise,
+        // endless stop
+        guint32 dwState = pPort->GetPortState();
+        if( dwState == PORT_STATE_STOPPED )
+            oPnpMgr.DestroyPortStack( pPort );
+
+    }while( 0 );
+
     return SetError( ret );
+}
+
+gint32 CPnpMgrStopPortAndDestroyTask::OnEvent(
+    EnumEventId iEvent,
+    guint32 dwParam1,
+    guint32 dwParam2,
+    guint32* pData )
+{
+    // there is race condition between eventIrpComp
+    // from the normal irp completion and the timeout
+    // irp completion.
+    CReentrancyGuard oGuard( this );
+    return super::OnEvent( iEvent,
+        dwParam1, dwParam2, pData );
 }
 
 /**
@@ -847,14 +999,20 @@ gint32 CPnpManager::StopPortsInternal(
 
         pPort = pPort->GetTopmostPort();
 
-        IrpPtr pIrp( true );
-        pIrp->AllocNextStack( nullptr );
+        IrpPtr pQueryIrp( true );
+        pQueryIrp->AllocNextStack( pPort );
 
-        ret = QueryStop( pPort, pIrp, pMasterIrp );
+        ret = QueryStop( pPort, pQueryIrp, pMasterIrp );
         if( ret == STATUS_PENDING )
             break;
 
-        ret = DoStop( pPort, pIrp, pMasterIrp );
+        if( ERROR( ret ) )
+            break;
+
+        IrpPtr pStopIrp( true );
+        pStopIrp->AllocNextStack( pPort );
+
+        ret = DoStop( pPort, pStopIrp, pMasterIrp );
 
     }while( 0 );
 
@@ -862,8 +1020,17 @@ gint32 CPnpManager::StopPortsInternal(
 }
 
 gint32 CPnpManager::StartPortStack(
-    IPort* pPort, IRP* pMasterIrp )
+    ObjPtr pPortObj, ObjPtr pMasterIrpObj )
 {
+    if( pPortObj.IsEmpty() )
+        return -EINVAL;
+
+    IPort* pPort = pPortObj;
+    if( pPort == nullptr )
+        return -EINVAL;
+
+    IRP* pMasterIrp = pMasterIrpObj;
+
     gint32 ret = StartPortsInternal(
         pPort, pMasterIrp );
 
@@ -958,15 +1125,17 @@ void CPnpManager::OnPortStarted( IPort* pTopPort )
 }
 
 gint32 CPnpManager::DestroyPortStack(
-    IPort* pPort )
+    IPort* pPortToDestroy )
 {
     gint32 ret = 0;
     do{
-        if( pPort == nullptr )
+        if( pPortToDestroy == nullptr )
         {
             ret = -EINVAL;
             break;
         }
+
+        IPort* pPort = pPortToDestroy;
 
         deque< PortPtr > quePorts; 
         PortPtr pReadyPort;
@@ -986,18 +1155,15 @@ gint32 CPnpManager::DestroyPortStack(
             if( pReadyPort.IsEmpty() )
             {
                 // this is the case when the port
-                // failed to start, especially for
+                // failed to start, for example,
                 // CTcpStreamPdo
                 if( pPortImpl->GetPortState()
                     == PORT_STATE_READY )
                     pReadyPort = pPort;
             }
-
             pPort = pPort->GetLowerPort();
         }
 
-        // notify the ports the stack is built
-        // a chance for port to register with registry
         IrpPtr pIrp( true );
         pIrp->AllocNextStack( nullptr );
         IrpCtxPtr& pIrpCtx = pIrp->GetTopStack(); 
@@ -1007,12 +1173,18 @@ gint32 CPnpManager::DestroyPortStack(
         pIrpCtx->SetMinorCmd( IRP_MN_PNP_STACK_DESTROY );
 
         pIrpCtx->SetIoDirection( IRP_DIR_OUT );
+
+        pPort = pPortToDestroy;
         HANDLE hPort = PortToHandle( pPort );
 
         // no check of the port existance, because
         // we are sure it exists
-        ret = GetIoMgr()->SubmitIrp(
-            hPort, pIrp, false );
+        ret = ERROR_STATE;
+        if( pPort != pReadyPort )
+        {
+            ret = GetIoMgr()->SubmitIrp(
+                hPort, pIrp, false );
+        }
 
         if( ret == ERROR_STATE )
         {
@@ -1030,15 +1202,17 @@ gint32 CPnpManager::DestroyPortStack(
 
             if( portPtr.IsEmpty() )
             {
-                quePorts.pop_front();
-                continue;
+                string strError = DebugMsg(
+                    -EFAULT, "port ptr is null" );
+                throw std::runtime_error( strError );
             }
 
             if( portPtr == pReadyPort )
             {
-                // we need to stop the following
-                // port which is still in READY
-                // state
+                // we need to stop the port of portPtr,
+                // and the underlying ports which is
+                // still in READY state, before
+                // destroying them
                 CCfgOpener oCfg;
                 ret = oCfg.SetPointer( propIoMgr, GetIoMgr() );
 
@@ -1073,18 +1247,22 @@ gint32 CPnpManager::DestroyPortStack(
                     quePorts.front() );
             }
 
-            CCfgOpenerObj a( pPortImpl );
+            CCfgOpenerObj oPortCfg( pPortImpl );
             guint32 dwType = 0;
-            ret = a.GetIntProp( propPortType, dwType );
+            ret = oPortCfg.GetIntProp( propPortType, dwType );
             if( ERROR( ret ) )
-                continue;
+            {
+                string strError = DebugMsg(
+                    ret, "Fatal Error: propPortType is missing" );
+                throw std::runtime_error( strError );
+            }
 
             switch( dwType )
             {
             case PORTFLG_TYPE_PDO:
                 {
                     ObjPtr pObj;
-                    ret = a.GetObjPtr( propBusPortPtr, pObj );
+                    ret = oPortCfg.GetObjPtr( propBusPortPtr, pObj );
                     if( ERROR( ret ) )
                         break;
 
@@ -1092,10 +1270,11 @@ gint32 CPnpManager::DestroyPortStack(
 
                     guint32 dwPortId;
 
-                    ret = a.GetIntProp( propPortId, dwPortId );
+                    ret = oPortCfg.GetIntProp( propPortId, dwPortId );
                     if( ERROR( ret ) )
                         break;
 
+                    CStdRMutex oPortLock( pBus->GetLock() );
                     pBus->RemovePdoPort( dwPortId );
                     break;
                 }
@@ -1105,7 +1284,7 @@ gint32 CPnpManager::DestroyPortStack(
                     // at this moment, we should be OK
                     // to be the only user to access this
                     // port
-                    ret = a.GetObjPtr( propDrvPtr, pObj );
+                    ret = oPortCfg.GetObjPtr( propDrvPtr, pObj );
                     if( ERROR( ret ) )
                         break;
 
@@ -1122,7 +1301,7 @@ gint32 CPnpManager::DestroyPortStack(
                     // at this moment, we should be OK
                     // to be the only user to access this
                     // port
-                    ret = a.GetObjPtr( propDrvPtr, pObj );
+                    ret = oPortCfg.GetObjPtr( propDrvPtr, pObj );
                     if( ERROR( ret ) )
                         break;
 
@@ -1157,7 +1336,7 @@ gint32 CPnpMgrStopPortStackTask::operator()(
         guint32* pData = nullptr;
         CIoManager* pMgr = nullptr;
 
-        CParamList oParams( m_pCtx );
+        CParamList oParams( GetConfig() );
 
         oParams.Pop( dwVal );
         pData = ( guint32* )dwVal;
@@ -1181,13 +1360,8 @@ gint32 CPnpMgrStopPortStackTask::operator()(
             CPnpManager& oPnpMgr =
                 pMgr->GetPnpMgr();
 
-            gint32 ret =
-                oPnpMgr.StopPortStack( pPort );
-
-            if( ERROR( ret ) )
-                break;
-
-            oPnpMgr.DestroyPortStack( pPort );
+            ret = oPnpMgr.DestroyPortStack(
+                pPort );
         }
 
     }while( 0 );
@@ -1390,10 +1564,12 @@ gint32 CPnpManager::Start()
             GetIoMgr()->GetModName().c_str() );
 
         CStdRMutex a( oReg.GetLock() );
-        if( !oReg.ExistingDir( strPath ) )
+        ret = oReg.ExistingDir( strPath );
+        if( ERROR( ret ) )
         {
-            ret = -ENOENT;
-            break;
+            ret = oReg.MakeDir( strPath );
+            if( ERROR( ret ) )
+                break;
         }
 
         ret = oReg.ChangeDir( strPath );

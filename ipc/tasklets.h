@@ -53,7 +53,7 @@ class CTasklet : public ICancellableTask
 
     gint32 GetProperty(
             gint32 iProp,
-            CBuffer& oBuf );
+            CBuffer& oBuf ) const;
 
     gint32 SetProperty(
             gint32 iProp,
@@ -75,6 +75,9 @@ class CTasklet : public ICancellableTask
 
     gint32 OnCancel( guint32 dwContext )
     { return 0;}
+
+    const CfgPtr& GetConfig() const
+    {  return m_pCtx; }
 
     CfgPtr& GetConfig()
     {  return m_pCtx; }
@@ -99,18 +102,18 @@ class CTasklet : public ICancellableTask
 
     class CReentrancyGuard
     {
-        CTasklet* m_pParentTask;
+        CTasklet* m_pTask;
         public:
         CReentrancyGuard( CTasklet* pTask )
-        : m_pParentTask( pTask )
+        : m_pTask( pTask )
         {
             if( pTask != nullptr )
                 pTask->MarkInProcess();
         }
         ~CReentrancyGuard()
         {
-            if( m_pParentTask != nullptr )
-                m_pParentTask->ClearInProcess();
+            if( m_pTask != nullptr )
+                m_pTask->ClearInProcess();
         }
     };
 
@@ -127,9 +130,10 @@ class CTasklet : public ICancellableTask
             }
             // already locked by someone
             throw std::system_error(
-                EDEADLK, std::system_category() );
+                -EDEADLK, std::system_category() );
         }
     }
+
     void ClearInProcess()
     {
         bool bExpected = true;
@@ -165,10 +169,15 @@ namespace std
     struct less<TaskletPtr>
     {
         bool operator()(const TaskletPtr& k1, const TaskletPtr& k2) const
-            {
-              return ( reinterpret_cast< unsigned long >( ( CTasklet* )k1  )
-                        < reinterpret_cast< unsigned long >( ( CTasklet* )k2 ) );
-            }
+        {
+            if( unlikely( k2.IsEmpty() ) )
+                return false;
+
+            if( unlikely( k1.IsEmpty() ) )
+                return true;
+
+            return k1->GetObjId() < k2->GetObjId();
+        }
     };
 }
 
@@ -183,7 +192,7 @@ class CTaskletSync : public CTasklet
     CTaskletSync( const IConfigDb* pCfg = nullptr )
         : super( pCfg )
     {
-        sem_init( &m_semSync, 0, 0 );
+        Sem_Init( &m_semSync, 0, 0 );
     }
 
     ~CTaskletSync()
@@ -201,11 +210,12 @@ class CTaskletSync : public CTasklet
         gint32 ret = CTasklet::OnEvent(
             iEvent, dwParam1, dwParam2, pData );
 
-        sem_post( &m_semSync );
+        Sem_Post( &m_semSync );
         return ret;
     }
 
-    bool IsAsync() { return false; }
+    bool IsAsync() const
+    { return false; }
 
     gint32 WaitForComplete()
     {
@@ -237,6 +247,7 @@ class CTaskletRetriable : public CTasklet
     void ResetRetries();
     gint32 DecRetries();
     bool CanRetry() const;
+    gint32 ScheduleRetry();
 
     gint32 ResetTimer();
     gint32 RemoveTimer();
@@ -247,12 +258,12 @@ class CTaskletRetriable : public CTasklet
 };
 
 class CIoMgrStopTask
-    : public CTasklet
+    : public CTaskletSync
 {
     public:
-    typedef CTasklet super;
+    typedef CTaskletSync super;
     CIoMgrStopTask( const IConfigDb* pCfg = nullptr )
-        : CTasklet( pCfg )
+        : CTaskletSync( pCfg )
     {
         SetClassId( clsid( CIoMgrStopTask ) );
     }
@@ -409,7 +420,7 @@ class CProxyPdoDisconnectTask
     gint32 operator()( guint32 dwContext );
 };
 
-class CDBusPdoListenDBEventTask
+/*class CDBusPdoListenDBEventTask
     : public CTasklet
 {
     public:
@@ -420,7 +431,7 @@ class CDBusPdoListenDBEventTask
         SetClassId( clsid( CDBusPdoListenDBEventTask ) );
     }
     gint32 operator()( guint32 dwContext );
-};
+};*/
 
 class CPnpMgrStartPortCompletionTask
     : public CTasklet
@@ -446,6 +457,13 @@ class CPnpMgrStopPortAndDestroyTask
         SetClassId( clsid( CPnpMgrStopPortAndDestroyTask ) );
     }
     gint32 operator()( guint32 dwContext );
+    gint32 OnIrpComplete( guint32 dwContext );
+    gint32 OnScheduledTask( guint32 dwContext );
+
+    gint32 OnEvent( EnumEventId iEvent,
+            guint32 dwParam1,
+            guint32 dwParam2,
+            guint32* pData );
 };
 
 class CPortStateResumeSubmitTask
@@ -624,3 +642,29 @@ class CFidoRecvDataTask
     }
     gint32 Process( guint32 dwContext );
 };
+
+class CSyncCallback :
+    public CTasklet
+{
+    protected:
+    sem_t m_semWait;
+
+    public:
+    typedef  CTasklet super;
+
+    CSyncCallback( const IConfigDb* pCfg = nullptr)
+        : CTasklet( pCfg ) 
+    {
+        SetClassId( clsid( CSyncCallback ) );
+        Sem_Init( &m_semWait, 0, 0 );
+    }
+
+    ~CSyncCallback()
+    {
+        sem_destroy( &m_semWait );
+    }
+
+    gint32 operator()( guint32 dwContext = 0 );
+    gint32 WaitForComplete();
+};
+

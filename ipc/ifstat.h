@@ -49,6 +49,9 @@ typedef enum
     stateRecovery,
     statePaused,
     stateUnknown,
+    stateStopping,
+    statePausing,
+    stateResuming,
     stateInvalid
 
 }EnumIfState;
@@ -105,6 +108,9 @@ class IInterfaceState :
     virtual gint32 ClosePort() = 0;
 
     virtual gint32 SetStateOnEvent(
+        EnumEventId iEvent ) = 0;
+
+    virtual gint32 TestSetState(
         EnumEventId iEvent ) = 0;
 
     virtual gint32 CopyProp( gint32 iProp,
@@ -223,6 +229,11 @@ class CInterfaceState : public IInterfaceState
         return oCfg.CopyProp( iProp, pObj );
     }
 
+    gint32 EnumProperties(
+        std::vector< gint32 >& vecProps ) const;
+
+    bool exist( gint32 iProp ) const;
+
     virtual gint32 OnEvent( EnumEventId iEvent,
                 guint32 dwParam1,
                 guint32 dwParam2,
@@ -232,6 +243,9 @@ class CInterfaceState : public IInterfaceState
     { return m_iState; }
 
     virtual gint32 SetStateOnEvent(
+        EnumEventId iEvent );
+
+    gint32 TestSetState(
         EnumEventId iEvent );
 
     gint32 ScheduleOpenPortTask(
@@ -266,7 +280,6 @@ class CLocalProxyState : public CInterfaceState
     public:
 
     typedef CInterfaceState super;
-    virtual EnumIfState GetState();
 
     CLocalProxyState( const IConfigDb* pCfg );
 
@@ -309,8 +322,10 @@ class CIfServerState : public CInterfaceState
     typedef CInterfaceState super;
 
     CIfServerState( const IConfigDb* pCfg );
+
     virtual gint32 OpenPort(
         IEventSink* pCallback );
+
     virtual gint32 SubscribeEvents();
 
     virtual bool IsMyDest(

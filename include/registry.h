@@ -20,6 +20,7 @@
 
 #include "defines.h"
 #include "autoptr.h"
+#include "configdb.h"
 
 class CDirEntry : public CObjBase
 {
@@ -54,7 +55,7 @@ class CDirEntry : public CObjBase
 
     gint32 GetProperty( 
         gint32 iProp,
-        CBuffer& oBuf );
+        CBuffer& oBuf ) const;
 
     gint32 RemoveChild( const std::string& strName );
 
@@ -74,6 +75,9 @@ class CRegistry : public CObjBase
     std::recursive_mutex m_oLock;
 
     public:
+
+    typedef CObjBase super;
+
     CRegistry();
     ~CRegistry();
 

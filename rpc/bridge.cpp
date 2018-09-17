@@ -19,11 +19,11 @@
 
 #include "configdb.h"
 #include "defines.h"
-#include "proxy.h"
 #include "rpcroute.h"
 #include "dbusport.h"
 #include "tcpport.h"
 #include "emaphelp.h"
+#include "ifhelper.h"
 
 using namespace std;
 
@@ -60,8 +60,6 @@ CRpcTcpBridgeProxy::CRpcTcpBridgeProxy(
             "Error occurs in CRpcTcpBridgeProxy ctor" );
         throw runtime_error( strMsg );
     }
-
-    InitUserFuncs();
 }
 
 gint32 CRpcTcpBridgeProxy::InitUserFuncs()
@@ -293,10 +291,11 @@ gint32 CRpcTcpBridgeProxy::BuildBufForIrpFwrdReq(
 
         // NOTE: the task id is for keep-alive
         // purpose
+        const char* pszIp = strIpAddr.c_str();
         if( !dbus_message_append_args( pMsg,
-            DBUS_TYPE_STRING, strIpAddr.c_str(),
+            DBUS_TYPE_STRING, &pszIp,
             DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
-            pReqMsgBuf->ptr(), pReqMsgBuf->size(),
+            &pReqMsgBuf->ptr(), pReqMsgBuf->size(),
             DBUS_TYPE_UINT64, &qwTaskId,
             DBUS_TYPE_INVALID ) )
         {
@@ -382,14 +381,14 @@ gint32 CRpcTcpBridgeProxy::ForwardRequest(
 }
 
 gint32 CRpcTcpBridgeProxy::FillRespDataFwrdReq(
-    IRP* pIrp, IConfigDb* pResp )
+    IRP* pIrp, CfgPtr& pResp )
 {
     gint32 ret = 0;
     if( pIrp == nullptr ||
         pIrp->GetStackSize() == 0 )
         return -EINVAL;
 
-    if( pResp == nullptr )
+    if( pResp.IsEmpty() )
         return -EINVAL;
 
     do{
@@ -408,7 +407,7 @@ gint32 CRpcTcpBridgeProxy::FillRespDataFwrdReq(
             break;
         }
 
-        CParamList oParams( pResp );
+        CParamList oParams( ( IConfigDb* )pResp );
 
         DMsgPtr pFwrdMsg;
         pFwrdMsg = ( DMsgPtr& )*pCtx->m_pRespData;
@@ -433,14 +432,14 @@ gint32 CRpcTcpBridgeProxy::FillRespDataFwrdReq(
 }
 
 gint32 CRpcTcpBridgeProxy::FillRespData(
-    IRP* pIrp, IConfigDb* pResp )
+    IRP* pIrp, CfgPtr& pResp )
 {
     gint32 ret = 0;
     if( pIrp == nullptr ||
         pIrp->GetStackSize() == 0 )
         return -EINVAL;
 
-    if( pResp == nullptr )
+    if( pResp.IsEmpty() )
         return -EINVAL;
 
     // retrieve the data from the irp
@@ -451,7 +450,7 @@ gint32 CRpcTcpBridgeProxy::FillRespData(
 
     guint32 dwCtrlCode = pCtx->GetCtrlCode();
 
-    CParamList oParams( pResp );
+    CParamList oParams( ( IConfigDb* )pResp );
     oParams.SetIntProp( propReturnValue,
         pIrp->GetStatus() );
 
@@ -1262,6 +1261,7 @@ gint32 CRpcTcpBridgeShared::ReadWriteStream(
                 RemoveProperty( propIrpPtr );
             pIrp->RemoveCallback();
             pIrp->RemoveTimer();
+            pIrp->ClearIrpThread();
         }
 
     }while( 0 );
@@ -1546,8 +1546,6 @@ CRpcTcpBridge::CRpcTcpBridge(
             break;
         }
 
-        InitUserFuncs();
-
     }while( 0 );
 
     if( ERROR( ret ) )
@@ -1556,6 +1554,10 @@ CRpcTcpBridge::CRpcTcpBridge(
             "Error occurs in CRpcTcpBridge ctor" );
         throw runtime_error( strMsg );
     }
+}
+
+CRpcTcpBridge::~CRpcTcpBridge()
+{
 }
 
 gint32 CRpcTcpBridge::EnableRemoteEvent(
@@ -1906,10 +1908,11 @@ gint32 CRpcTcpBridge::BuildBufForIrpFwrdEvt(
         if( ERROR( ret ) )
             break;
 
+        const char* pszIp = strIpAddr.c_str();
         if( !dbus_message_append_args( pMsg,
-            DBUS_TYPE_STRING, strIpAddr.c_str(),
+            DBUS_TYPE_STRING, &pszIp,
             DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
-            pMsgBuf->ptr(), pMsgBuf->size(),
+            &pMsgBuf->ptr(), pMsgBuf->size(),
             DBUS_TYPE_INVALID ) )
         {
             ret = -ENOMEM;
@@ -3232,6 +3235,10 @@ gint32 CRpcTcpBridge::OpenStream_Server(
 
 gint32 CRpcTcpBridge::InitUserFuncs()
 {
+    gint32 ret = super::InitUserFuncs();
+    if( ERROR( ret ) )
+        return ret;
+
     BEGIN_HANDLER_MAP;
 
     ADD_SERVICE_HANDLER(

@@ -25,6 +25,7 @@
 #include "defines.h"
 #include "dbusport.h"
 #include "emaphelp.h"
+#include "reqopen.h"
 
 using namespace std;
 
@@ -66,7 +67,6 @@ gint32 CRpcBasePort::DispatchSignalMsg(
     DMsgPtr pMsg( pMessage );
 
     CStdRMutex oPortLock( GetLock() );
-
     guint32 dwPortState = GetPortState();
 
     if( !CanAcceptMsg( dwPortState ) )
@@ -94,6 +94,11 @@ gint32 CRpcBasePort::DispatchSignalMsg(
         }
 
         MATCH_ENTRY& oMe = itr->second;
+        if( !oMe.IsConnected() )
+        {
+            ++itr;
+            continue;
+        }
         if( oMe.m_queWaitingIrps.empty() )
         {
             oMe.m_quePendingMsgs.push_back( pMsg );
@@ -136,7 +141,7 @@ gint32 CRpcBasePort::DispatchSignalMsg(
                 pCtx->SetStatus( 0 );
                 vecIrpsToComplete.push_back( pIrp );
 
-                // we complete one irp for a time
+                // we complete one irp at a time
                 if( m_pCfgDb->exist( propSingleIrp ) )
                 {
                     CCfgOpener oCfg( ( IConfigDb* )m_pCfgDb );
@@ -156,6 +161,7 @@ gint32 CRpcBasePort::DispatchSignalMsg(
             pCtx->SetStatus( -EINVAL );
             vecIrpsError.push_back( pIrp );
         }
+        ++itr;
     }
 
     oPortLock.Unlock();
@@ -197,11 +203,14 @@ gint32 CRpcBasePort::FindIrpForResp(
 
         if( true )
         {
-            CStdRMutex oPortLock( GetLock() );
-
             guint32 dwSerial = 0;
 
-            ret = pMsg.GetSerial( dwSerial );
+            CStdRMutex oPortLock( GetLock() );
+            guint32 dwPortState = GetPortState();
+            if( !CanAcceptMsg( dwPortState ) )
+                return ERROR_STATE;
+
+            ret = pMsg.GetReplySerial( dwSerial );
             if( ERROR( ret ) )
                 break;
 
@@ -264,14 +273,18 @@ gint32 CRpcBasePort::DispatchRespMsg(
     if( pMsg == nullptr )
         return -EINVAL;
 
-    CStdRMutex oPortLock( GetLock() );
-    guint32 dwPortState = GetPortState();
-    if( !CanAcceptMsg( dwPortState ) )
-        return ERROR_STATE;
+    gint32 ret = 0;
 
-    gint32 ret = FindIrpForResp( pMsg, pIrp );
-    if( ERROR( ret ) )
-        return ret;
+    do{
+        ret = FindIrpForResp( pMsg, pIrp );
+        if( ERROR( ret ) )
+        {
+            DebugPrint( ret,
+                "Error dispatching response messages" );
+            return ret;
+        }
+
+    }while( 0 );
 
     ret = GetIoMgr()->CompleteIrp( pIrp );
 
@@ -326,7 +339,8 @@ DBusHandlerResult CRpcBasePort::DispatchMsg(
     {
     case DBUS_MESSAGE_TYPE_SIGNAL:
         {
-            DispatchSignalMsg( pMsg );
+            if( DispatchSignalMsg( pMsg ) != -ENOENT )
+                ret = DBUS_HANDLER_RESULT_HANDLED;
             break;
         }
     case DBUS_MESSAGE_TYPE_ERROR:
@@ -427,9 +441,50 @@ gint32 CRpcBasePort::DispatchData(
     if( pData == nullptr )
         return -EINVAL;
 
+
+    if( m_pTestIrp.IsEmpty() )
+    {
+        m_pTestIrp.NewObj();
+        m_pTestIrp->AllocNextStack( nullptr );
+        IrpCtxPtr& pIrpCtx = m_pTestIrp->GetTopStack(); 
+        pIrpCtx->SetMajorCmd( IRP_MJ_FUNC );
+        pIrpCtx->SetMinorCmd( IRP_MN_IOCTL );
+        pIrpCtx->SetCtrlCode( CTRLCODE_LISTENING );
+    }
+
     DMsgPtr& pMsg = *pData;
     gint32 iType = pMsg.GetType();
     DBusHandlerResult ret2; 
+    if( true )
+    {
+        CStdRMutex oPortLock( GetLock() );
+        guint32 dwPortState = GetPortState();
+
+        if( !( dwPortState == PORT_STATE_READY
+             || dwPortState == PORT_STATE_BUSY_SHARED
+             || dwPortState == PORT_STATE_BUSY
+             || dwPortState == PORT_STATE_BUSY_RESUME ) )
+        {
+            return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+        }
+    }
+
+    guint32 dwOldState = 0;
+    ret = CanContinue( m_pTestIrp,
+        PORT_STATE_BUSY_SHARED, &dwOldState );
+
+    if( ERROR( ret ) )
+    {
+#ifdef DEBUG
+        string strDump = pMsg.DumpMsg();
+
+        DebugPrint( ret, 
+            "Error, dmsg cannot be processed, %s",
+            strDump.c_str() );
+#endif
+
+        return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+    }
 
     do{
 
@@ -444,6 +499,8 @@ gint32 CRpcBasePort::DispatchData(
         PostDispatchMsg( iType, pMsg );
 
     }while( 0 );
+
+    PopState( dwOldState );
 
     if( iType == DBUS_MESSAGE_TYPE_SIGNAL
         && ret2 == DBUS_HANDLER_RESULT_HALT )
@@ -501,6 +558,7 @@ gint32 CRpcBasePort::HandleRegMatch(
                 // note that the dbus match
                 // is not added if not connected
                 oMe.SetConnected( false );
+                ret = -ENOTCONN;
             }
             else
             {
@@ -511,8 +569,6 @@ gint32 CRpcBasePort::HandleRegMatch(
             // new match rule
             // let's register a match 
             ( *pMap )[ matchPtr ] = oMe;
-
-            ret = 0;
 
         }
         else
@@ -557,7 +613,6 @@ gint32 CRpcBasePort::HandleUnregMatch( IRP* pIrp )
         if( ERROR( ret ) )
             break;
 
-
         if( pMap->find( matchPtr ) != pMap->end() )
         {
             MATCH_ENTRY& oEntry = ( *pMap )[ matchPtr ] ;
@@ -594,13 +649,13 @@ gint32 CRpcBasePort::HandleUnregMatch( IRP* pIrp )
                     GetIoMgr()->CancelIrp(
                         irpPtr, true, -ECANCELED );
                 }
-                oPortLock.Lock();
             }
         }
         else
         {
             ret = -ENOENT;
         }
+
     }while( 0 );
 
     return ret;
@@ -655,8 +710,9 @@ gint32 CRpcBasePort::HandleListening( IRP* pIrp )
             }
             if( oMe.m_quePendingMsgs.size() )
             {
-                *( pCtx->m_pRespData ) =
-                    oMe.m_quePendingMsgs.front();
+                BufPtr pBuf( true );
+                *pBuf = oMe.m_quePendingMsgs.front();
+                pCtx->SetRespData( pBuf );
 
                 oMe.m_quePendingMsgs.pop_front();
                 // immediate return
@@ -875,7 +931,9 @@ gint32 CRpcBasePort::RemoveIrpFromMap(
                 == itr->second->GetObjId() )
             {
                 bFound = true;
+                break;
             }
+            ++itr;
         }
         if( bFound )
         {
@@ -918,7 +976,7 @@ gint32 CRpcBasePort::CancelAllIrps( gint32 iErrno )
         while( itrResp != m_mapSerial2Resp.end() )
         {
             vecIrpRemaining.push_back( itrResp->second );
-            itrResp++;
+            ++itrResp;
         }
 
         m_mapSerial2Resp.clear();
@@ -931,6 +989,7 @@ gint32 CRpcBasePort::CancelAllIrps( gint32 iErrno )
         {
             GetIoMgr()->CancelIrp(
                 *itrIrp, true, iErrno );
+            ++itrIrp;
         }
 
         oPortLock.Lock();
@@ -961,10 +1020,26 @@ gint32 CRpcBasePort::PreStop( IRP *pIrp )
 gint32 CRpcBasePort::CancelFuncIrp(
     IRP* pIrp, bool bForce )
 {
-    if( pIrp == nullptr )
+    if( pIrp == nullptr ||
+        pIrp->GetStackSize() == 0 )
         return -EINVAL;
 
-    gint32 ret = RemoveIrpFromMap( pIrp );
+    gint32 ret = 0;
+
+    do{
+        CStdRMutex oPortLock( GetLock() );
+        ret = RemoveIrpFromMap( pIrp );
+        guint32 dwPortState = GetPortState();
+
+        if( dwPortState == PORT_STATE_STOPPING &&
+            ERROR( ret ) )
+        {
+            // already removed by ClearMatchMap
+            ret = 0;
+            break;
+        }
+
+    }while( 0 );
 
     if( ERROR( ret ) )
         return ret;
@@ -1073,6 +1148,10 @@ DBusHandlerResult CRpcBasePort::DispatchDBusSysMsg(
             ret = DBUS_HANDLER_RESULT_HANDLED;
         }
     }
+    else
+    {
+        ret = DBUS_HANDLER_RESULT_HALT;
+    }
 
     return ret;
 }
@@ -1144,7 +1223,8 @@ gint32 CRpcPdoPort::ScheduleModOnOfflineTask(
     //
     // 2. Depends on the order of the PDOs in the
     // message process array
-    if( clsid( CDBusLocalPdo ) != GetClsid() )
+    if( clsid( CDBusLocalPdo ) != GetClsid() &&
+        clsid( CDBusLoopbackPdo ) != GetClsid() )
     {
         // make sure to send just once
         return 0;
@@ -1216,7 +1296,7 @@ gint32 CRpcBasePort::ClearReqIrpsOnDest(
                 vecIrpsToCancel.push_back( itr2->second );
                 vecIrpToRemove.push_back( itr2->first );
             }
-            itr2++;
+            ++itr2;
         }
 
         for( guint32 i = 0; i < vecIrpToRemove.size(); ++i )
@@ -1229,6 +1309,78 @@ gint32 CRpcBasePort::ClearReqIrpsOnDest(
     return ret;
 }
 
+gint32 CRpcBasePort::OnModOnOffline(
+    DMsgPtr& pMsg, bool bOnline,
+    const std::string& strModName )
+{
+    gint32 ret = 0;
+    vector< IrpPtr > vecIrpsToCancel;
+    do{
+        bool bInterested = false;
+
+        CStdRMutex oPortLock( GetLock() );
+
+        guint32 dwPortState = GetPortState();
+        if( !CanAcceptMsg( dwPortState ) )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+
+        map< MatchPtr, MATCH_ENTRY>::iterator itr =
+            m_mapEvtTable.begin();
+
+        while( itr != m_mapEvtTable.end() )
+        {
+            if( itr->first->IsMyDest( strModName ) ||
+                itr->first->IsMyObjPath( strModName ) )
+            {
+                bInterested = true;
+                MATCH_ENTRY& oMe = itr->second;
+                oMe.SetConnected( bOnline );
+                if( !bOnline &&
+                    oMe.m_queWaitingIrps.size() )
+                {
+                    // cancel those irps
+                    vecIrpsToCancel.insert( 
+                        vecIrpsToCancel.begin(),
+                        oMe.m_queWaitingIrps.begin(),   
+                        oMe.m_queWaitingIrps.end() );
+
+                    oMe.m_queWaitingIrps.clear();
+                    oMe.m_quePendingMsgs.clear();
+                }
+            }
+            ++itr;
+        }
+
+        if( !bOnline )
+        {
+            // clear all the pending request irps
+            // waiting for responses from that
+            // module
+            ClearReqIrpsOnDest(
+                strModName, vecIrpsToCancel );
+        }
+
+        if( bInterested )
+        {
+            // finally, schedule a task to send out
+            // the module online/offline message
+            ret = ScheduleModOnOfflineTask(
+                strModName, bOnline );
+        }
+
+    }while( 0 );
+
+    for( guint32 i = 0; i < vecIrpsToCancel.size(); ++i )
+    {
+        GetIoMgr()->CancelIrp(
+            vecIrpsToCancel[ i ], true, -ENOTCONN );
+    }
+
+    return ret;
+}
 /**
 * @name OnModOnOffline
 * handler of a dbus message indicating the remote
@@ -1238,7 +1390,7 @@ gint32 CRpcBasePort::ClearReqIrpsOnDest(
 /**  @} */
 
 gint32 CRpcBasePort::OnModOnOffline(
-    DBusMessage* pMsg )
+    DBusMessage* pDBusMsg )
 {
     // mark those matches with the specified
     // interface online or offline, which will
@@ -1249,22 +1401,23 @@ gint32 CRpcBasePort::OnModOnOffline(
     // once. Performance could be an issue.
     gint32 ret = 0;
 
-    if( pMsg == nullptr )
+    if( pDBusMsg == nullptr )
         return -EINVAL;
 
-    bool bOnline = false;
     vector< IrpPtr > vecIrpsToCancel;
 
     do{
-
-        CDBusError oError;
+        bool bOnline = false;
         char* pszModName = nullptr;
+        CDBusError oError;
+        DMsgPtr pMsg( pDBusMsg );
+
+        // remote module online/offline
         char* pszOldOwner = nullptr;
         char* pszNewOwner = nullptr; 
 
-
         if( !dbus_message_get_args(
-            pMsg, oError,
+            pDBusMsg, oError,
             DBUS_TYPE_STRING, &pszModName,
             DBUS_TYPE_STRING, &pszOldOwner,
             DBUS_TYPE_STRING, &pszNewOwner,
@@ -1281,52 +1434,10 @@ gint32 CRpcBasePort::OnModOnOffline(
             bOnline = true;
         }
 
-        CStdRMutex oPortLock( GetLock() );
-
-        guint32 dwPortState = GetPortState();
-        if( !CanAcceptMsg( dwPortState ) )
-        {
-            ret = ERROR_STATE;
-            break;
-        }
-
-        map< MatchPtr, MATCH_ENTRY>::iterator itr =
-            m_mapEvtTable.begin();
-
-        ret = 0;
-
-        string strModName = string( pszModName );
-
-        while( itr != m_mapEvtTable.end() )
-        {
-            if( itr->first->IsMyDest( strModName ) ||
-                itr->first->IsMyObjPath( strModName ) )
-            {
-                itr->second.SetConnected( bOnline );
-            }
-        }
-
-        if( !bOnline )
-        {
-            // clear all the pending request irps
-            // waiting for responses from that
-            // module
-            ClearReqIrpsOnDest(
-                strModName, vecIrpsToCancel );
-        }
-
-        // finally, schedule a task to send out
-        // the module online/offline message
-        ret = ScheduleModOnOfflineTask(
-            strModName, bOnline );
+        ret = OnModOnOffline( pMsg,
+            bOnline, std::string( pszModName ) );
 
     }while( 0 );
-
-    for( guint32 i = 0; i < vecIrpsToCancel.size(); ++i )
-    {
-        GetIoMgr()->CancelIrp(
-            vecIrpsToCancel[ i ], true, -ENOTCONN );
-    }
 
     return ret;
 }
@@ -1544,6 +1655,10 @@ CRpcPdoPort::CRpcPdoPort( const IConfigDb* pCfg )
     }while( 0 );
 }
 
+gint32 CRpcBasePort::ScheduleModOnOfflineTask(
+    const std::string strModName, bool bOnline )
+{ return -ENOTSUP; }
+
 gint32 CRpcBasePort::BuildSendDataReq(
     IConfigDb* pCfg, DMsgPtr& pMsg )
 {
@@ -1647,11 +1762,11 @@ gint32 CRpcBasePort::BuildSendDataReq(
 
         if( !dbus_message_append_args( pMsg,
             DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
-            pCfgBuf->ptr(), pCfgBuf->size(),
-            iFdType, iFd,
-            DBUS_TYPE_UINT32, dwOffset,
-            DBUS_TYPE_UINT32, dwSize,
-            DBUS_TYPE_UINT64, qwTaskId,
+            &pCfgBuf->ptr(), pCfgBuf->size(),
+            iFdType, &iFd,
+            DBUS_TYPE_UINT32, &dwOffset,
+            DBUS_TYPE_UINT32, &dwSize,
+            DBUS_TYPE_UINT64, &qwTaskId,
             DBUS_TYPE_INVALID ) )
         {
             ret = ERROR_FAIL;
@@ -1764,8 +1879,8 @@ gint32 CRpcPdoPort::SendDBusMsg(
     if( m_pBusPort->GetClsid()
         == clsid( CDBusBusPort ) )
     {
-        CDBusBusPort* pBus =
-            static_cast< CDBusBusPort* >( m_pBusPort );
+        CDBusBusPort* pBus = static_cast
+        < CDBusBusPort* >( m_pBusPort );
 
         ret = pBus->SendDBusMsg( pMsg, pdwSerial );
     }
@@ -1792,6 +1907,11 @@ gint32 CRpcPdoPort::HandleSendReq( IRP* pIrp )
         guint32 dwIoDir = pCtx->GetIoDirection();
 
         ret = -EINVAL;
+
+        // NOTE: there are slim chances, that the
+        // response message can arrive before the
+        // irp enters m_mapSerial2Resp
+        CStdRMutex oPortLock( GetLock() );
 
         if( dwIoDir == IRP_DIR_INOUT ||
             dwIoDir == IRP_DIR_OUT )
@@ -1821,7 +1941,6 @@ gint32 CRpcPdoPort::HandleSendReq( IRP* pIrp )
         {
             // waiting for response
             IrpPtr irpPtr( pIrp );
-            CStdRMutex oPortLock( GetLock() );
             m_mapSerial2Resp[ dwSerial ] = irpPtr;
             ret = STATUS_PENDING;
         }
@@ -1907,39 +2026,28 @@ gint32 CRpcPdoPort::SetupDBusSetting(
                 ret = -EINVAL;
                 break;
             }
-            if( !dbus_bus_name_has_owner(
-                m_pDBusConn,
-                strDest.c_str(),
-                dbusError ) )
+
+            CDBusBusPort *pBusPort = static_cast
+                < CDBusBusPort* >( m_pBusPort );
+
+            ret = pBusPort->IsDBusSvrOnline( strDest );
+            if( ERROR( ret ) )
             {
-                // detect if the server is online
-                // or not
-                if( dbusError.GetName() == nullptr )
-                {
-                    ret = ENOTCONN;
-                }
-                else
-                {
-                    ret = dbusError.Errno();
-                }
+                // server is not online
                 break;
             }
-
-            dbusError.Reset();
-
             // add the match rule for the signal
             // messages
             string strRules = pMsgMatch->ToDBusRules(
                 DBUS_MESSAGE_TYPE_SIGNAL );
 
-            dbus_bus_add_match(
-                m_pDBusConn,
-                strRules.c_str(),
-                dbusError );
-
-            if( dbusError.GetName() != nullptr )
+            if( SUCCEEDED( ret ) || ret == ENOTCONN )
             {
-                ret = dbusError.Errno();
+                gint32 iRet = 
+                    pBusPort->AddRules( strRules );
+
+                if( ERROR( iRet ) )
+                    ret = iRet;
             }
         }
 
@@ -1962,21 +2070,14 @@ gint32 CRpcPdoPort::ClearDBusSetting(
     if( pMsgMatch == nullptr )
         return -EINVAL;
 
-    CDBusError dbusError;
-
     do{
-        string strRules =
-            pMsgMatch->ToDBusRules( DBUS_MESSAGE_TYPE_INVALID );
+        string strRules = pMsgMatch->
+            ToDBusRules( DBUS_MESSAGE_TYPE_INVALID );
 
-        dbus_bus_remove_match( 
-            m_pDBusConn,
-            strRules.c_str(),
-            dbusError );
+        CDBusBusPort *pBusPort = static_cast
+            < CDBusBusPort* >( m_pBusPort );
 
-        if( dbusError.GetName() != nullptr )
-        {
-            ret = dbusError.Errno();
-        }
+        ret = pBusPort->RemoveRules( strRules );
 
     }while( 0 );
 

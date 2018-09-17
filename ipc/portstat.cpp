@@ -24,9 +24,8 @@
 #include "port.h"
 
 using namespace std;
-#define PORTSTAT_MAP_LEN        11
 // refer to portstat.xlsx
-static const gint8  m_arrStatMap[ PORTSTAT_MAP_LEN ][ PORTSTAT_MAP_LEN ] =
+const gint8  CPortState::m_arrStatMap[ PORTSTAT_MAP_LEN ][ PORTSTAT_MAP_LEN ] =
 {
     // 1: on submit
     // 2: depending on context
@@ -66,7 +65,7 @@ CPortState::CPortState(
 {
     SetClassId( clsid( CPortState ) );
 
-    sem_init( &m_semWaitForReady, 0, 0 );
+    Sem_Init( &m_semWaitForReady, 0, 0 );
 
     m_vecStates.push_back(
         PORT_STATE_ATTACHED );
@@ -393,6 +392,14 @@ bool CPortState::SetPortStateWake(
     if( ERROR( ret ) )
         return false;
 
+    if( bWakeAll ) 
+    {
+        SEM_WAKEUP_ALL( m_semWaitForReady );
+    }
+    else
+    {
+        SEM_WAKEUP_SINGLE( m_semWaitForReady );
+    }
     return true;
 }
 

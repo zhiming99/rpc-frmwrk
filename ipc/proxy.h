@@ -19,36 +19,22 @@
 #pragma once
 
 #include <sys/time.h>
+#include <tuple>
+#include <deque>
 #include "defines.h"
 #include "utils.h"
 #include "configdb.h"
 #include "msgmatch.h"
 #include "ifstat.h"
+#include "reqopen.h"
 
 #define ICT_MAX_IRPS 100
 #define ICT_MAX_IFS 10
 
-#define IFSTATE_OPENPORT_RETIRES        1
+#define IFSTATE_OPENPORT_RETRIES        3
 #define IFSTATE_OPENPORT_INTERVAL       180
 #define IFSTATE_ENABLE_EVENT_TIMEOUT    IFSTATE_OPENPORT_INTERVAL
 #define IFSTATE_DEFAULT_IOREQ_TIMEOUT   IFSTATE_OPENPORT_INTERVAL
-
-// CallFlags for SubmitIoRequest & InvokeMethod
-#define CF_MESSAGE_TYPE_MASK            0x07
-#define CF_ASYNC_CALL                   0x08 
-#define CF_WITH_REPLY                   0x10
-
-// the server will send keep-alive heartbeat to
-// the client at the specified interval specified
-// by propIntervalSec
-#define CF_KEEP_ALIVE                   0x20
-
-// the request to send is not a dbus message,
-// instead a ConfigDb
-#define CF_NON_DBUS                     0x40
-
-#define MAX_BYTES_PER_TRANSFER ( 1024 * 1024 )
-#define MAX_BYTES_PER_FILE     ( 512 * 1024 * 1024 )
 
 class IGenericInterface :
     public IServiceEx
@@ -58,6 +44,7 @@ class IGenericInterface :
     typedef IServiceEx super;
 
     virtual EnumIfState GetState() const = 0;
+    virtual bool IsServer() const = 0;
 
 };
 
@@ -106,8 +93,7 @@ class CGenericInterface :
         return ( ( CInterfaceState* )m_pIfStat )->GetIoMgr();
     }
 
-    CGenericInterface( const IConfigDb* pCfg )
-    {;}
+    CGenericInterface( const IConfigDb* pCfg );
 
     virtual gint32 GetProperty(
         gint32 iProp, CBuffer& pVal ) const
@@ -126,6 +112,12 @@ class CGenericInterface :
         return m_pIfStat->RemoveProperty( iProp );
     }
 
+    gint32 EnumProperties(
+        std::vector< gint32 >& vecProps ) const
+    {
+        return m_pIfStat->EnumProperties( vecProps );
+    }
+
     gint32 CopyProp( gint32 iProp, CObjBase* pObj )
     {
         return m_pIfStat->CopyProp( iProp, pObj );
@@ -134,6 +126,11 @@ class CGenericInterface :
     gint32 SetStateOnEvent( EnumEventId iEvent )
     {
         return m_pIfStat->SetStateOnEvent( iEvent );
+    }
+
+    gint32 TestSetState( EnumEventId iEvent )
+    {
+        return m_pIfStat->TestSetState( iEvent );
     }
 
     virtual EnumIfState GetState() const
@@ -212,7 +209,10 @@ class CRpcBaseOperations :
         EnumEventId iEvent,
         IEventSink* pCallback );
 
+    gint32 AddPortProps();
+
     public:
+
     typedef CGenericInterface super;
     CRpcBaseOperations( const IConfigDb* pCfg )
         : super( pCfg )
@@ -247,7 +247,7 @@ class CRpcBaseOperations :
     gint32 DoResume(
         IEventSink* pCallback = nullptr );
 
-    gint32 DoModEvent(
+    virtual gint32 DoModEvent(
         EnumEventId iEvent,
         const std::string& strModule );
 
@@ -281,10 +281,14 @@ class CRpcInterfaceBase :
     public IInterfaceCommands
 {
 
-    TaskGrpPtr      m_pRootTaskGroup;
 
     gint32 PauseResume( bool bResume,
         IEventSink* pCallback );
+
+    // multiple interface support
+    protected:
+    std::vector< MatchPtr > m_vecMatches;
+    TaskGrpPtr              m_pRootTaskGroup;
 
     public:
 
@@ -294,7 +298,7 @@ class CRpcInterfaceBase :
         :super( pCfg )
     {;}
 
-    gint32 DoCleanUp();
+    gint32 ClearActiveTasks();
 
     TaskGrpPtr& GetTaskGroup()
     { return m_pRootTaskGroup; }
@@ -387,10 +391,46 @@ struct IRpcNonDBusIf
 };
 
 typedef std::map< std::string, TaskletPtr > FUNC_MAP;
-extern std::map< gint32, FUNC_MAP > g_mapFuncs;
-
 typedef std::map< std::string, ObjPtr > PROXY_MAP;
-extern std::map< gint32, PROXY_MAP > g_mapProxyFuncs;
+
+
+const std::string& CoGetIfNameFromIid(
+    EnumClsid Iid );
+
+EnumClsid CoGetIidFromIfName(
+    const std::string& strName );
+
+gint32 CoAddIidName(
+    const std::string& strName,
+    EnumClsid Iid );
+
+#define ToInternalName( _strIfName ) \
+do{ \
+    if( IsServer() ) \
+    { \
+        _strIfName += ":s" + \
+            std::to_string( GetObjId() ); \
+    } \
+    else \
+    { \
+        _strIfName += ":p" + \
+            std::to_string( GetObjId() ); \
+    } \
+}while( 0 )
+
+#define ToPublicName( _strIfName ) \
+do{ \
+    std::string strSuffix= ":p"; \
+    if( IsServer() ) \
+        strSuffix= ":s"; \
+    strSuffix += \
+        std::to_string( GetObjId() ); \
+    size_t pos = _strIfName.find( strSuffix ); \
+    if( pos == std::string::npos ) \
+        break; \
+    _strIfName = _strIfName.substr( 0, pos ); \
+}while( 0 )
+
 /**
 * @name CRpcServices as an interface to provide
 * the transport layer interface for an rpc
@@ -404,9 +444,31 @@ class CRpcServices :
 
     friend class CIfServiceNextMsgTask;
 
+
+    std::deque< CfgPtr > m_queEvents;
+    gint32 RebuildMatches();
+
+    gint32 PackEvent( EnumEventId iEvent,
+        guint32 dwParam1,
+        guint32 dwParam2,
+        guint32* pData,
+        CfgPtr& pDestCfg  );
+
+    gint32 UnpackEvent( CfgPtr& pSrcCfg,
+        EnumEventId& iEvent,
+        guint32& dwParam1,
+        guint32& dwParam2,
+        guint32*& pData );
+
+    gint32 RestartListening();
+
     protected:
 
+    std::map< gint32, PROXY_MAP > m_mapProxyFuncs;
+    std::map< gint32, FUNC_MAP > m_mapFuncs;
+
     std::deque< EventPtr > m_queTasks;
+
     gint32 InvokeNextMethod();
 
     virtual gint32 SetupReqIrp( IRP* pIrp,
@@ -421,80 +483,31 @@ class CRpcServices :
         IConfigDb* pReqCall );
 
     gint32 FillRespData(
-        DMsgPtr& pMsg, IConfigDb* pResp );
+        DMsgPtr& pMsg, CfgPtr& pResp );
 
+    gint32 SetFuncMap( FUNC_MAP& oMap,
+        EnumClsid iIfId = clsid( Invalid ) );
 
-    gint32 SetFuncMap( FUNC_MAP& oMap )
-    {
-        g_mapFuncs[ GetClsid() ] = oMap;
-        return 0;
-    }
+    FUNC_MAP* GetFuncMap(
+        EnumClsid iIfId = clsid( Invalid ) );
 
-    FUNC_MAP* GetFuncMap()
-    {
-        try{
-            FUNC_MAP& oFuncMap =
-                g_mapFuncs.at( GetClsid() );
-            return &oFuncMap;
-        }
-        catch( const std::out_of_range& e )
-        {
-        }
-        return nullptr;
-    }
+    PROXY_MAP* GetProxyMap(
+        EnumClsid iIfId = clsid( Invalid ) );
 
-    PROXY_MAP* GetProxyMap()
-    {
-        try{
-            PROXY_MAP& oProxyMap =
-                g_mapProxyFuncs.at( GetClsid() );
-            return &oProxyMap;
-        }
-        catch( const std::out_of_range& e )
-        {
-        }
-        return nullptr;
-    }
-
-    gint32 SetProxyMap( PROXY_MAP& oMap )
-    {
-        g_mapProxyFuncs[ GetClsid() ] = oMap;
-        return 0;
-    }
+    gint32 SetProxyMap( PROXY_MAP& oMap,
+        EnumClsid iIfId = clsid( Invalid ) );
 
     public:
 
     gint32 GetDelegate(
         const std::string& strFunc,
-        TaskletPtr& pFunc )
-    {
-        gint32 ret = 0;
-        try{
-            pFunc = g_mapFuncs.
-                at( GetClsid() ).at( strFunc );
-        }
-        catch( const std::out_of_range& e )
-        {
-            ret = -ERANGE;
-        }
-        return ret;
-    }
+        TaskletPtr& pFunc,
+        EnumClsid iIfId = clsid( Invalid ) );
 
     gint32 GetProxy(
         const std::string& strFunc,
-        ObjPtr& pProxy )
-    {
-        gint32 ret = 0;
-        try{
-            pProxy = g_mapProxyFuncs.
-                at( GetClsid() ).at( strFunc );
-        }
-        catch( const std::out_of_range& e )
-        {
-            ret = -ERANGE;
-        }
-        return ret;
-    }
+        ObjPtr& pProxy,
+        EnumClsid iIfId = clsid( Invalid ) );
 
     typedef CRpcInterfaceBase super;
 
@@ -503,11 +516,15 @@ class CRpcServices :
     using IRpcNonDBusIf::DoInvoke;
     using IRpcNonDBusIf::OnCancel;
     using IRpcNonDBusIf::SendResponse;
-    /*  
+/**
+* @name InitUserFuncs
+
         // InitUserFuncs function should be called
         // from the topmost level of your
         // interface's constructor
         //
+* @{ */
+/**  
         // the content for the server interface
         // should be like the following:
         //
@@ -555,10 +572,13 @@ class CRpcServices :
         ADD_PROXY_METHOD( SYS_METHOD_USERCANCELREQ, guint64 );
 
         END_PROXY_MAP
-    */
- 
+ @} */
+
     virtual gint32 InitUserFuncs() 
     { return 0; }
+
+    virtual gint32 StartEx(
+        IEventSink* pCallback );
 
     CRpcServices( const IConfigDb* pCfg );
 
@@ -627,7 +647,7 @@ class CRpcServices :
     virtual gint32 OnCancel(
         DBusMessage* pReqMsg,
         IEventSink* pCallback = nullptr )
-    { return -ENOTSUP; }
+    { return 0; }
 
     bool IsQueuedReq();
     guint32 GetQueueSize() const;
@@ -643,7 +663,7 @@ class CRpcServices :
         guint64* pTaskId = nullptr );
 
     virtual gint32 FillRespData(
-        IRP* pIrp, IConfigDb* pResp );
+        IRP* pIrp, CfgPtr& pResp );
 
     virtual gint32 SendResponse(
         DBusMessage* pReqMsg,
@@ -658,59 +678,35 @@ class CRpcServices :
     virtual gint32 OnKeepAlive(
         IEventSink* pInvokeTask,
         EnumKAPhase bOrigin ) = 0;
-};
 
-class CReqBuilder : public CParamList
-{
-    CRpcBaseOperations* m_pIf;
-    gint32 GetCallOptions( CfgPtr& pCfg );
+    static gint32 LoadObjDesc(
+        const std::string& strFile,
+        const std::string& strObjName,
+        bool bServer,
+        CfgPtr& pCfg );
 
-    public:
-    typedef CParamList super;
-    CReqBuilder( CRpcBaseOperations* pIf );
-    CReqBuilder( const IConfigDb* pReq = nullptr ); // copy constructor
-    CReqBuilder( IConfigDb* pReq );
-    gint32 SetIfName( const std::string& strIfName );
-    gint32 SetObjPath( const std::string& strObjPath ); 
-    gint32 SetDestination( const std::string& strDestination ); 
-    gint32 SetMethodName( const std::string& strMethodName ); 
-    gint32 SetSender( const std::string& strSender );
-    gint32 SetKeepAliveSec( guint32 dwTimeoutSec ); 
-    gint32 SetTimeoutSec( guint32 dwTimeoutSec); 
-    gint32 SetCallFlags( guint32 dwFlags );
-    gint32 SetReturnValue( gint32 iRet );
-    gint32 SetIpAddr(
-        const std::string& strIpAddr, bool bSrc );
-    gint32 SetTaskId( guint64 dwTaskid );
-};
+    virtual gint32 OnEvent( EnumEventId iEvent,
+        guint32 dwParam1 = 0,
+        guint32 dwParam2 = 0,
+        guint32* pData = NULL  );
 
-class CReqOpener : public CParamList
-{
-    gint32 GetCallOptions( CfgPtr& pCfg ) const;
-    public:
-    typedef CParamList super;
-    CReqOpener( IConfigDb* pCfg ) : super( pCfg )
-    {;}
-    gint32 GetIfName( std::string& strIfName ) const;
-    gint32 GetObjPath( std::string& strObjPath ) const; 
-    gint32 GetDestination( std::string& strDestination ) const; 
-    gint32 GetMethodName( std::string& strMethodName ) const; 
-    gint32 GetSender( std::string& strSender ) const;
-    gint32 GetKeepAliveSec( guint32& dwTimeoutSec ) const; 
-    gint32 GetTimeoutSec( guint32& dwTimeoutSec) const; 
-    gint32 GetCallFlags( guint32& dwFlags ) const; 
-    gint32 GetReturnValue( gint32& iRet ) const;
-    gint32 GetIpAddr( std::string& strIpAddr,
-        bool bSrc ) const;
-    gint32 GetTaskId( guint64& dwTaskid ) const;
+    virtual gint32 DoModEvent(
+        EnumEventId iEvent,
+        const std::string& strModule );
 
-    bool HasReply() const;
-    bool IsKeepAlive() const;
-    gint32 GetReqType( guint32& dwType ) const;
+    virtual gint32 OnPostStop(
+        IEventSink* pCallback );
+
+    virtual gint32 OnPreStart(
+        IEventSink* pCallback );
 };
 
 template< typename ...Args>
 class CMethodProxy;
+
+class CSyncCallback;
+
+#define DecType( _T ) typename std::decay< _T >::type
 
 class CInterfaceProxy :
     public CRpcServices
@@ -752,6 +748,9 @@ class CInterfaceProxy :
 
     CInterfaceProxy( const IConfigDb* pCfg );
     ~CInterfaceProxy();
+
+    bool IsServer() const
+    { return false; }
 
     virtual gint32 SendData(
         IConfigDb* pDataDesc,           // [in]
@@ -828,8 +827,8 @@ class CInterfaceProxy :
     gint32 CallUserProxyFunc(
         IEventSink* pCallback,
         guint64& qwIoTaskId,
-        std::string strMethod,
-        Args... args )
+        const std::string& strMethod,
+        Args&&... args )
     {
         std::string strName = USER_METHOD( strMethod );
         return CallProxyFunc( pCallback, qwIoTaskId, 
@@ -840,15 +839,31 @@ class CInterfaceProxy :
     gint32 CallProxyFunc(
         IEventSink* pCallback,
         guint64& qwIoTaskId,
-        std::string strMethod,
-        Args... args )
+        const std::string& strMethod,
+        Args&&... args )
     {
         ObjPtr pObj;
-        gint32 ret = GetProxy( strMethod, pObj );
+
+        CCfgOpenerObj oCfg( pCallback );
+        std::string strIfName;
+
+        gint32 ret = oCfg.GetStrProp(
+            propIfName, strIfName );
+
+        if( ERROR( ret ) ) 
+            return ret;
+
+        strIfName = IF_NAME_FROM_DBUS( strIfName );
+        ToInternalName( strIfName );
+
+        EnumClsid iid =
+            CoGetIidFromIfName( strIfName );
+
+        ret = GetProxy( strMethod, pObj, iid );
         if( ERROR( ret ) )
             return ret;
 
-        CMethodProxy< Args...>* pProxy = pObj;
+        CMethodProxy< DecType( Args )...>* pProxy = pObj;
         if( pProxy == nullptr )
             return -EFAULT;
 
@@ -861,8 +876,52 @@ class CInterfaceProxy :
     // a user-initialized cancel request
     gint32 UserCancelRequest(
         IEventSink* pCallback,
-	guint64& qwThisTaksId,
+        guint64& qwThisTaksId,
         guint64 qwTaskToCancel );
+
+    // a helper to use UserCancelRequest
+    // it is a synchronous call
+    gint32 CancelRequest(
+        guint64 qwTaskId );
+
+    template< typename ...Args >
+    gint32 AsyncCall(
+        IEventSink* pCallback,
+        CfgPtr& pOptions,
+        CfgPtr& pResp,
+        const std::string& strMethod,
+        Args&&... args );
+
+    template< typename ...Args >
+    gint32 SyncCallEx(
+        CfgPtr& pOptions,
+        CfgPtr& pResp,
+        const std::string& strMethod,
+        Args&&... args );
+
+    template< typename ...Args >
+    gint32 SyncCall(
+        CfgPtr& pResp,
+        const std::string& strMethod,
+        Args&&... args )
+    {
+        CParamList oOptions;
+        std::string strIfName =
+            CoGetIfNameFromIid( GetClsid() );
+        ToPublicName( strIfName );
+        oOptions[ propIfName ] =
+            DBUS_IF_NAME( strIfName );
+
+        return SyncCallEx( oOptions.GetCfg(),
+            pResp, strMethod, args... );
+    }
+    // FillArgs assumes that the response package
+    // contains at least a propReturnValue property. if
+    // the return value is zero, the property 0..n,
+    // contains the other returned information.
+    template< typename ...Args >
+    gint32 FillArgs( CfgPtr& pResp,
+        gint32& iRet, Args&&... args );
 };
 
 class CInterfaceServer :
@@ -879,14 +938,14 @@ class CInterfaceServer :
         gint32 fd,                      // [in]
         guint32 dwOffset,               // [in]
         guint32 dwSize,                 // [in]
-        IEventSink* pCallback = nullptr ) = 0;
+        IEventSink* pCallback = nullptr );
 
     virtual gint32 FetchData_Server(
         IConfigDb* pDataDesc,           // [in, out]
         gint32& fd,                     // [out]
         guint32& dwOffset,              // [out]
         guint32& dwSize,                // [out]
-        IEventSink* pCallback = nullptr ) = 0;
+        IEventSink* pCallback = nullptr );
 
     // invoke a method on subclass via the method
     // name
@@ -922,6 +981,9 @@ class CInterfaceServer :
 
     CInterfaceServer( const IConfigDb* pCfg );
     ~CInterfaceServer();
+
+    bool IsServer() const
+    { return true; }
 
     // called to set the response to send back
     virtual gint32 SetResponse(
@@ -994,899 +1056,294 @@ class CInterfaceServer :
     gint32 UserCancelRequest(
         IEventSink* pInvokeTask,
         guint64 qwIoTaskId );
-};
 
-// callback definitions for sync/async interface
-// calls
-class CGenericCallback :
-    public CTasklet
-{
-
-    public:
-    typedef CTasklet   super; 
-
-    CGenericCallback()
-        : CTasklet( nullptr )
-    {;}
-
-    gint32 NormalizeParams( bool bResp, IConfigDb* pResp,
-        std::vector< BufPtr >& oRes )
+    template< int N, typename ...Args >
+    struct FillResp
     {
-        CParamList oResp( pResp );
+        FillResp( std::tuple<Args...>& oTuple,
+            CParamList& oParams )
+        {
+            FillResp<N-1, Args...> oAv( oTuple, oParams );
+            oParams.Push( std::get<N-1>( oTuple ) );
+        }
+    };
+
+    template< typename ...Args >
+    struct FillResp< 1, Args... >
+    {
+        FillResp( std::tuple<Args...>& oTuple,
+            CParamList& oParams )
+        {
+            oParams.Push( std::get<0>( oTuple ) );
+        }
+    };
+
+    template< typename ...Args >
+    struct FillResp< 0, Args... >
+    {
+        FillResp( std::tuple<Args...>& oTuple,
+            CParamList& oParams )
+        {}
+    };
+
+    template< typename ...Args >
+    gint32 FillAndSetResponse(
+        IEventSink* pCallback,
+        gint32 iRet,
+        Args&&... args )
+    {
         gint32 ret = 0;
+
         do{
-            if( bResp )
+            CParamList oResp;
+
+            oResp[ propReturnValue ] = iRet;
+            if( SUCCEEDED( iRet ) )
             {
-                gint32 iRet = 0;
-                ret = oResp.GetIntProp( propReturnValue,
-                    ( guint32& )iRet );
-
-                if( ERROR( ret ) )
-                    break;
-
-                BufPtr pBuf( true );
-
-                *pBuf = ( guint32 )iRet;
-                oRes.push_back( pBuf );
+                auto oTuple = std::tuple<Args...>(args...);
+                FillResp<sizeof...(Args), Args...> oFr(
+                    oTuple, oResp );
             }
 
-            guint32 dwSize = 0;
-            ret = oResp.GetSize( dwSize );
-            if( ERROR( ret )  )
-                break;
-
-            // NOTE: if iRet is an error code, the
-            // dwSize could be zero, and we need
-            // to handle this
-            for( guint32 i = 0; i < dwSize; i++ )
-            {
-                BufPtr pBuf;
-                ret = oResp.GetProperty( i, pBuf );
-                if( ERROR( ret ) )
-                    break;
-
-                oRes.push_back( pBuf );
-            }
-        }while( 0 );
-
-        if( ERROR( ret ) )
-            oRes.clear();
-
-        return ret;
-    }
-};
-
-class CSyncCallback :
-    public CGenericCallback
-{
-    sem_t m_semWait;
-
-    public:
-    typedef CGenericCallback super;
-
-    CSyncCallback( const IConfigDb* pCfg = nullptr)
-        : CGenericCallback() 
-    {
-        SetClassId( clsid( CSyncCallback ) );
-        sem_init( &m_semWait, 0, 0 );
-    }
-
-    ~CSyncCallback()
-    {
-        sem_destroy( &m_semWait );
-    }
-
-    gint32 operator()( guint32 dwContext = 0 )
-    {
-        if( dwContext != eventTaskComp )
-            return -ENOTSUP;
-        sem_post( &m_semWait );
-        return 0;
-    }
-
-    gint32 WaitForComplete()
-    {
-        sem_wait( &m_semWait );
-        return 0;
-    }
-
-
-};
-
-class CAsyncCallbackBase :
-    public CGenericCallback
-{
-
-    public:
-    typedef CGenericCallback super;
-
-    CAsyncCallbackBase( const IConfigDb* pCfg = nullptr)
-        : CGenericCallback() 
-
-    {;}
-
-    virtual gint32 Callback(
-        std::vector< BufPtr >& vecParams ) = 0;
-
-    gint32 operator()( guint32 dwContext = 0 )
-    {
-        if( dwContext != eventTaskComp )
-            return -ENOTSUP;
-
-        gint32 ret = 0;
-        do{
-            std::vector< guint32 > vecParams;
-
-            gint32 ret = GetParamList( vecParams );
-
-            if( ERROR( ret ) )
-                break;
-
-            if( vecParams.size() < 4 )
-            {
-                ret = -EINVAL;
-                break;
-            }
-
-            if( ERROR( vecParams[ 1 ] ) )
-            {
-                ret = vecParams[ 1 ];
-                break;
-            }
-
-            CObjBase* pObjBase =
-                reinterpret_cast< CObjBase* >( vecParams[ 3 ] );
-
-            if( pObjBase == nullptr )
-                break;
-
-            CCfgOpenerObj oCfg( pObjBase );
-            ObjPtr pObj;
-
-            ret = oCfg.GetObjPtr( propRespPtr, pObj );
-            if( ERROR( ret ) )
-                break;
-
-            CfgPtr pResp = pObj;
-            if( pResp.IsEmpty()  )
-            {
-                ret = -EFAULT;
-                break;
-            }
-            std::vector< BufPtr > vecRespParams;
-            ret = NormalizeParams( true, pResp, vecRespParams );
-            if( ERROR( ret ) )
-                break;
-
-            ret = Callback( vecRespParams );
+            CfgPtr pCfg = oResp.GetCfg();
+            ret = SetResponse( pCallback, pCfg );
 
         }while( 0 );
 
         return ret;
     }
-};
 
-template< typename T >
-T CastTo( BufPtr& i )
-{
-    return ( T )*i;
-}
-
-// remove the reference or const modifiers from
-// the type list
-#define DFirst typename std::decay< First >::type
-
-template< typename First >
-auto VecToTupleHelper( std::vector< BufPtr >& vec ) -> std::tuple<First>
-{
-    BufPtr& i = vec.back();
-    return std::tuple< DFirst >(
-            std::forward< DFirst >( CastTo< DFirst >( i ) ) );
-}
-
-// generate a tuple from the vector with the
-// proper type set for each element
-template< typename First, typename Second, typename ...Types >
-auto VecToTupleHelper( std::vector< BufPtr >& vec ) -> std::tuple< First, Second, Types... >
-{
-    BufPtr& i = vec[ vec.size() - sizeof...( Types ) + 2 ];
-
-    // to assign right type to the element in the
-    // tuple
-    return std::tuple_cat(
-        std::tuple< DFirst >(
-            std::forward< DFirst >( CastTo< DFirst >( i ) ) ),
-        VecToTupleHelper< Second, Types... >( vec ) );
-}
-
-template< typename ...Types >
-auto VecToTuple( std::vector< BufPtr >& vec ) -> std::tuple< Types... >
-{
-    return VecToTupleHelper< Types...>( vec );
-}
-
-template<>
-auto VecToTuple<>( std::vector< BufPtr >& vec ) -> std::tuple<>; 
-
-// parameter pack generator
-template< int ... >
-struct NumberSequence
-{};
-
-template<>
-struct NumberSequence<>
-{};
-
-template< int N, int ...S >
-struct GenSequence : GenSequence< N - 1, N - 1, S... > {};
-
-template< int ...S >
-struct GenSequence< 0, S... >
-{
-    typedef NumberSequence< S... > type;
-};
-
-template<typename ClassName, typename ...Args>
-class CAsyncCallback :
-    public CAsyncCallbackBase
-{
-    typedef gint32 ( ClassName::* FuncType)( Args... ) ;
-
-    template< int ...S>
-    gint32 CallUserFunc( std::tuple< Args... >& oTuple, NumberSequence< S... > )
-    {
-        if( m_pObj == nullptr || m_pUserFunc == nullptr )
-            return -EINVAL;
-
-        gint32 ret = ( m_pObj->*m_pUserFunc )(
-            std::get< S >( oTuple ) ... );
-
-        return ret;
-    }
-    //---------
-
-    FuncType m_pUserFunc;
-    ClassName* m_pObj;
-
-    public:
-    CAsyncCallback( ClassName* pObj, FuncType pFunc )
-    {
-        // NOTE that the class doesn't have a
-        // class id associated because this is a
-        // template class
-        m_pUserFunc = pFunc;
-        m_pObj = pObj;
-    }
-
-    // well, this is a virtual function in the
-    // template class. 
-    gint32 Callback( std::vector< BufPtr >& vecParams )
-    {
-        if( vecParams.empty() )
-            return -EINVAL;
-
-        if( vecParams.size() != sizeof...( Args ) )
-        {
-            return -EINVAL;
-        }
-
-        std::vector< BufPtr > vecResp;
-
-        vecResp.insert( vecResp.begin(),
-             vecParams.begin(), vecParams.end() );
-
-        std::tuple<Args...> oTuple =
-            VecToTuple< Args... >( vecResp );
-
-        CallUserFunc( oTuple,
-            typename GenSequence< sizeof...( Args ) >::type() );
-
-        return 0;
-    }
-};
-
-/**
-* @name NewCallback
-* @{ */
-/**
-  * helper function to ease the developer's effort
-  * on instanciation of the the CAsyncCallback via
-  * implicit instanciation.
-  *@} */
-
-template < typename C, typename ... Types>
-inline gint32 NewCallback( TaskletPtr& pCallback,
-    bool bAsync, C* pObj, gint32(C::*f)(Types ...) )
-{
-    if( pObj == nullptr || f == nullptr )
-        return -EINVAL;
-
-    gint32 ret = 0;
-    if( bAsync )
-    {
-        try{
-            // we cannot use NewObj for this
-            // template object
-            pCallback = new CAsyncCallback< C, Types... >( pObj, f );
-        }
-        catch( const std::bad_alloc& e )
-        {
-            ret = -ENOMEM;
-        }
-        catch( const std::runtime_error& e )
-        {
-            ret = -EFAULT;
-        }
-        catch( const std::invalid_argument& e )
-        {
-            ret = -EINVAL;
-        }
-    }
-    else
-    {
-        ret = pCallback.NewObj( clsid( CSyncCallback ) );
-    }
-    return ret;
-}
-
-/**
-* @name BIND_CALLBACK 
-* @{ */
-/**
-  * Helper macro for further effort saving note the
-  * `this' pointer, which indicated you should use
-  * the macro only in the context of the  member
-  * method of the same class as pFunc.
-  *
-  * So the pTask is a TaskletPtr to receive the new
-  * callback object, and the pFunc is the member method
-  * as the callback for a specific request
-  *
-  * NOTE: please make sure the first parameter of the
-  * pFunc must be the return value of the call
- * @} */
-
-#define BIND_CALLBACK( pTask, pFunc ) \
-    NewCallback( pTask, true, this, pFunc ) 
-
-class CTaskWrapper :
-    public CGenericCallback
-{
-    TaskletPtr m_pTask;
-    public:
-    typedef CGenericCallback super;
-
-    CTaskWrapper()
-    {
-        SetClassId( clsid( CTaskWrapper ) );
-    }
-
-    gint32 SetTask( IEventSink* pTask )
-    {
-        if( pTask == nullptr )
-            return 0;
-
-        m_pTask = ObjPtr( pTask );
-        return 0;
-    }
-
-    void TransferParams()
-    {
-        CCfgOpener oCfg( ( IConfigDb* )
-            m_pTask->GetConfig() );
-
-        oCfg.MoveProp( propRespPtr, this );
-        oCfg.MoveProp( propMsgPtr, this );
-        oCfg.MoveProp( propReqPtr, this );
-    }
-
-    virtual gint32 OnEvent( EnumEventId iEvent,
-        guint32 dwParam1 = 0,
-        guint32 dwParam2 = 0,
-        guint32* pData = NULL  )
-    {
-        if( m_pTask.IsEmpty() )
-            return 0;
-
-        TransferParams();
-        return m_pTask->OnEvent( iEvent,
-            dwParam1, dwParam2, pData );
-    }
-
-    virtual gint32 operator()(
-        guint32 dwContext )
-    {
-        if( m_pTask.IsEmpty() )
-            return 0;
-
-        TransferParams();
-        return m_pTask->operator()( dwContext );
-    }
-};
-
-class CDelegateBase :
-    public CGenericCallback
-{
-
-    public:
-    typedef CGenericCallback super;
-
-    CDelegateBase( const IConfigDb* pCfg = nullptr)
-        : CGenericCallback() 
-    {;}
-
-    virtual gint32 Delegate(
-        CObjBase* pObj,
+    template< typename ...Args >
+    gint32 SendEvent(
         IEventSink* pCallback,
-        std::vector< BufPtr >& vecParams ) = 0;
-
-    gint32 operator()( guint32 dwContext )
-    {
-        return 0;
-    }
-
-    gint32 operator()(
-        CObjBase* pObj,
-        IEventSink* pCallback,
-        IConfigDb* pParams )
-    {
-        if( pCallback == nullptr ||
-            pParams == nullptr ||
-            pObj == nullptr )
-            return -EINVAL;
-
-        gint32 ret = 0;
-        do{
-            CfgPtr pReq = pParams;
-            if( pReq.IsEmpty()  )
-            {
-                ret = -EFAULT;
-                break;
-            }
-            std::vector< BufPtr > vecRespParams;
-
-            ret = NormalizeParams(
-                false, pReq, vecRespParams );
-
-            if( ERROR( ret ) )
-                break;
-
-            ret = Delegate( pObj, pCallback,
-                vecRespParams );
-
-        }while( 0 );
-
-        return ret;
-    }
+        EnumClsid iid,
+        const std::string& strMethod,
+        const std::string& strDest, // optional
+        Args&&... args );
 };
 
-template<typename ClassName, typename ...Args>
-class CMethodDelegate :
-    public CDelegateBase
-{
-    typedef gint32 ( ClassName::* FuncType)(
-        IEventSink* pCallback, Args... ) ;
-
-    template< int ...S>
-    gint32 CallUserFunc( ClassName* pObj, IEventSink* pCallback,
-        std::tuple< Args... >& oTuple, NumberSequence< S... > )
-    {
-        if( pObj == nullptr || m_pUserFunc == nullptr )
-            return -EINVAL;
-
-        gint32 ret = ( pObj->*m_pUserFunc )( pCallback,
-            std::get< S >( oTuple )... );
-
-        return ret;
-    }
-
-    //---------
-
-    FuncType m_pUserFunc;
-
-    public:
-    typedef CDelegateBase super;
-    CMethodDelegate ( FuncType pFunc )
-    {
-        // NOTE that the class doesn't have a
-        // class id associated because this is a
-        // template class
-        m_pUserFunc = pFunc;
-    }
-
-    // well, this is a virtual function in the
-    // template class. weird? the joint part where
-    // two types of Polymorphisms meet, virtual
-    // functions and template classes
-    gint32 Delegate( 
-        CObjBase* pObj,
-        IEventSink* pCallback,
-        std::vector< BufPtr >& vecParams )
-    {
-        if( vecParams.empty() )
-            return -EINVAL;
-
-        if( pObj == nullptr ||
-            pCallback == nullptr )
-            return -EINVAL;
-
-        ClassName* pClass = static_cast< ClassName* >( pObj );
-        if( vecParams.size() != sizeof...( Args ) )
-        {
-            return -EINVAL;
-        }
-
-        std::vector< BufPtr > vecResp;
-        for( auto& elem : vecParams )
-            vecResp.push_back( elem );
-
-        std::tuple<Args...> oTuple =
-            VecToTuple< Args... >( vecResp );
-
-        CallUserFunc( pClass, pCallback, oTuple,
-            typename GenSequence< sizeof...( Args ) >::type() );
-
-        return 0;
-    }
-};
-
-template < typename C, typename ...Types>
-inline gint32 NewDelegate( TaskletPtr& pDelegate,
-    gint32(C::*f)(IEventSink*, Types ...) )
-{
-    if( f == nullptr )
-        return -EINVAL;
-
-    gint32 ret = 0;
-    try{
-        // we cannot use NewObj for this
-        // template object
-        pDelegate = new CMethodDelegate< C, Types... >( f );
-    }
-    catch( const std::bad_alloc& e )
-    {
-        ret = -ENOMEM;
-    }
-    catch( const std::runtime_error& e )
-    {
-        ret = -EFAULT;
-    }
-    catch( const std::invalid_argument& e )
-    {
-        ret = -EINVAL;
-    }
-    return ret;
-}
-
-#define BEGIN_HANDLER_MAP \
-do{\
-    FUNC_MAP&& _oMap_ = FUNC_MAP(); \
-    FUNC_MAP* _pMap_ = nullptr; \
-    do{ \
-        _pMap_ = GetFuncMap(); \
-        if( _pMap_ != nullptr ) \
-            _oMap_ = *_pMap_; \
-    }while( 0 )
-
-#define END_HANDLER_MAP \
-    do{ \
-        if( _pMap_ == nullptr && \
-            _oMap_.size() > 0 ) \
-            SetFuncMap( _oMap_ ); \
-    }while( 0 ); \
-}while( 0 )
-
-// we have some limitation on the service handler,
-// that is, output parameter is not supported so
-// far, because no one care about it. for the
-// service handler's output, better attach it to
-// the propResp property of the incoming
-// "pCallback"
-#define ADD_SERVICE_HANDLER( f, fname ) \
-do{ \
-    if( _oMap_.size() > 0 && \
-        _oMap_.find( fname ) != _oMap_.end() ) \
-        break; \
-    TaskletPtr pTask; \
-    gint32 ret = NewDelegate( pTask,  &f ); \
-    if( ERROR( ret ) ) \
-    { \
-        std::string strMsg = DebugMsg( ret, \
-            "Error allocaate delegate" ); \
-        throw std::runtime_error( strMsg ); \
-    } \
-    _oMap_.insert( \
-        std::pair< std::string, TaskletPtr >( fname, pTask ) ); \
-    if( ERROR( ret ) ) \
-    { \
-        std::string strMsg = DebugMsg( ret, \
-            "Error allocaate delegate" ); \
-        throw std::runtime_error( strMsg ); \
-    } \
-}while( 0 )
-
-#define ADD_USER_SERVICE_HANDLER( f, fname ) \
-do{ \
-    std::string strHandler = USER_METHOD( fname ); \
-    ADD_SERVICE_HANDLER( f, strHandler ); \
-}while( 0 )
-
-#define ADD_EVENT_HANDLER( f, fname ) \
-	ADD_SERVICE_HANDLER( f, fname )
-
-#define ADD_USER_EVENT_HANDLER( f, fname ) \
-	ADD_USER_SERVICE_HANDLER( f, fname )
-
-template< typename T >
-BufPtr PackageTo( T& i )
-{
-    BufPtr pBuf( true );
-    *pBuf = i;
-    return pBuf;
-}
-
-template< typename ...Args>
-class CMethodProxy :
-    public CObjBase
-{
-    //---------
-    std::string m_strMethod;
-    bool m_bNonDBus;
-    public:
-    CMethodProxy ( bool bNonDBus,
-        const std::string& strMethod )
-        : m_strMethod( strMethod ),
-        m_bNonDBus( bNonDBus )
-    {;}
-
-    template < int N >
-    void TupleToVec( std::tuple< Args...>& oTuple,
-        std::vector< BufPtr >& vec,
-        NumberSequence< N > )
-    {
-        vec[ N ] = ( PackageTo< typename std::decay< decltype( std::get< N >( oTuple ) ) >::type >
-            ( std::get< N >( oTuple ) ) );
-    }
-
-    template < int N, int M, int...S >
-    void TupleToVec( std::tuple< Args...>& oTuple,
-        std::vector< BufPtr >& vec,
-        NumberSequence< N, M, S... > )
-    {
-        vec[ N ] = ( PackageTo< typename std::decay< decltype( std::get< N >( oTuple ) ) >::type >
-            ( std::get< N >( oTuple ) ) );
-        TupleToVec( oTuple, vec, NumberSequence<M, S...>() );
-    }
-
-    gint32 operator()(
-        CInterfaceProxy* pIf,
-        IEventSink* pCallback,
-        guint64& qwIoTaskId,
-        Args... args )
-    {
-        if( pIf == nullptr )
-            return -EINVAL;
-
-        auto oTuple = std::make_tuple( args ... );
-        std::vector< BufPtr > vec;
-
-        if( sizeof...( args ) )
-        {
-            TupleToVec( oTuple, vec,
-                typename GenSequence< sizeof...( Args ) >::type() );
-        }
-
-        return pIf->SendProxyReq( pCallback,
-            m_bNonDBus, m_strMethod, vec, qwIoTaskId );
-    }
-};
-
-#define BEGIN_PROXY_MAP( bNonDBus ) \
-do{ \
-    PROXY_MAP&& _oMapProxies_ = PROXY_MAP(); \
-    bool _bNonBus_ = bNonDBus; \
-    PROXY_MAP* _pMap_ = nullptr; \
-    do{ \
-        _pMap_ = GetProxyMap(); \
-        if( _pMap_ != nullptr ) \
-            _oMapProxies_ = *_pMap_; \
-    }while( 0 )
-
-#define ADD_PROXY_METHOD( MethodName, ... ) \
-do{ \
-    const std::string strName( MethodName ); \
-    if( _oMapProxies_.size() > 0 && \
-        _oMapProxies_.find( strName ) != \
-            _oMapProxies_.end() ) \
-        break; \
-    ObjPtr pObj = new CMethodProxy< __VA_ARGS__ >( \
-        _bNonBus_, strName );\
-    _oMapProxies_[ strName ] = pObj; \
-}while( 0 )
-    
-#define ADD_USER_PROXY_METHOD( MethodName, ... ) \
-do{ \
-    std::string strName = USER_METHOD( MethodName );\
-    ADD_PROXY_METHOD( strName, __VA_ARGS__ ); \
-}while( 0 )
-
-#define END_PROXY_MAP \
-    do{ \
-        if( _pMap_ == nullptr && \
-            _oMapProxies_.size() > 0 ) \
-            SetProxyMap( _oMapProxies_ ); \
-    }while( 0 ); \
-}while( 0 );
-
-template<>
-CObjBase* CastTo< CObjBase* >( BufPtr& i );
-
-template<>
-DBusMessage* CastTo< DBusMessage* >( BufPtr& i );
-
-template<>
-BufPtr CastTo< BufPtr >( BufPtr& i );
-
-template<>
-BufPtr PackageTo< DMsgPtr >( DMsgPtr& pMsg );
-
-template<>
-BufPtr PackageTo< ObjPtr >( ObjPtr& pObj );
-
-template<>
-BufPtr PackageTo< CObjBase* >( CObjBase*& pObj );
-
-template<>
-BufPtr PackageTo< DBusMessage* >( DBusMessage*& pMsg );
-
-template<>
-BufPtr PackageTo< stdstr >( stdstr& str );
-
-template<>
-BufPtr PackageTo< float >( float& pfloat );
 
 #define SET_RMT_TASKID( pReq, oTaskCfg ) \
 do{ \
     CCfgOpener oReq( pReq ); \
     guint64 qwTaskId; \
-    ret = oReq.GetQwordProp( \
+    gint32 ret1 = oReq.GetQwordProp( \
         propTaskId, qwTaskId ); \
-    if( SUCCEEDED( ret ) ) \
+    if( SUCCEEDED( ret1 ) ) \
     { \
         oTaskCfg.SetQwordProp( \
             propRmtTaskId, qwTaskId ); \
     } \
 }while( 0 )
 
-class CDeferredCallBase :
-    public CGenericCallback
+/**
+* @name AsyncCall: to make an asynchronous call to the
+* server with the arguments in args
+* @{ */
+/**
+ * pTask: the callback context
+ * pOptions: the extra options, and currently only
+ *      propIfName is inside
+ *
+ * pResp: the response from the server if this is an
+ * immediate successful request. It will contain a
+ * propTaskId of the CIfIoRequest this call is carried
+ * on if the this method returns STATUS_PENDING
+ * instead. A handle as you can use to cancel the
+ * request in the future. the content of the response
+ * from the server is as follows:
+ *
+ *      propReturnValue: the return code
+ *      0..n : the parameters the server returned if
+ *          propReturnValue contains 0. otherwise,
+ *          these parameters do not exist.
+ *
+ * you can use CInterfaceProxy::FillArgs to assign the
+ * parameters returned to the individual variable
+ * respectively.
+ * 
+ *
+ * strMethod: the name of the method to call on server
+ * side. you can determine the method by the InitUserFuncs,
+ * the propIfName in pOptions as mentioned above.
+ *
+ * args... : the arguments that will be sent to the
+ * server side.
+ *
+ * @} */
+template< typename ...Args >
+gint32 CInterfaceProxy::AsyncCall(
+    IEventSink* pTask,
+    CfgPtr& pOptions,
+    CfgPtr& pResp,
+    const std::string& strMethod,
+    Args&&... args )
 {
+    gint32 ret = 0;
 
-    public:
-    typedef CGenericCallback super;
-
-    CDeferredCallBase( const IConfigDb* pCfg = nullptr)
-        : CGenericCallback()
-    {;}
-
-    virtual gint32 Delegate( CObjBase* pObj,
-        std::vector< BufPtr >& vecParams ) = 0;
-
-    ObjPtr m_pObj;
-    std::vector< BufPtr > m_vecArgs;
-
-    gint32 operator()( guint32 dwContext )
-    {
-        if( m_pObj.IsEmpty() ||
-            m_vecArgs.empty() )
-            return -EINVAL;
-
-        return Delegate( m_pObj, m_vecArgs );
-    }
-};
-
-template<typename ClassName, typename ...Args>
-class CDeferredCall :
-    public CDeferredCallBase
-{
-    typedef gint32 ( ClassName::* FuncType)( Args... ) ;
-
-    template< int ...S>
-    gint32 CallUserFunc( ClassName* pObj, 
-        std::vector< BufPtr >& vecParams, NumberSequence< S... > )
-    {
-        if( pObj == nullptr || m_pUserFunc == nullptr )
-            return -EINVAL;
-
-        gint32 ret = ( pObj->*m_pUserFunc )( *vecParams[ S ]... );
-
-        return ret;
-    }
-
-    template < int N >
-    void TupleToVec( std::tuple< Args...>& oTuple,
-        std::vector< BufPtr >& vec,
-        NumberSequence< N > )
-    {
-        vec[ N ] = ( PackageTo< typename std::decay< decltype( std::get< N >( oTuple ) ) >::type >
-            ( std::get< N >( oTuple ) ) );
-    }
-
-    template < int N, int M, int...S >
-    void TupleToVec( std::tuple< Args...>& oTuple,
-        std::vector< BufPtr >& vec,
-        NumberSequence< N, M, S... > )
-    {
-        vec[ N ] = ( PackageTo< typename std::decay< decltype( std::get< N >( oTuple ) ) >::type >
-            ( std::get< N >( oTuple ) ) );
-        TupleToVec( oTuple, vec, NumberSequence<M, S...>() );
-    }
-    //---------
-
-    FuncType m_pUserFunc;
-
-    public:
-    typedef CDelegateBase super;
-    CDeferredCall( FuncType pFunc, ObjPtr& pObj, Args... args )
-    {
-        // NOTE that the class doesn't have a
-        // class id associated because this is a
-        // template class
-        m_pObj = pObj;
-        m_pUserFunc = pFunc;
-
-        auto oTuple = std::make_tuple( args ... );
-        std::vector< BufPtr > vec;
-
-        if( sizeof...( args ) )
+    do{ 
+        if( pTask == nullptr )
         {
-            TupleToVec( oTuple, m_vecArgs,
-                typename GenSequence< sizeof...( Args ) >::type() );
+            ret = -EINVAL;
+            break;
         }
-    }
 
-    // well, this is a virtual function in the
-    // template class. weird? the joint part where
-    // two types of Polymorphisms meet, virtual
-    // functions and template classes
-    gint32 Delegate( CObjBase* pObj,
-        std::vector< BufPtr >& vecParams )
-    {
-        if( vecParams.empty() )
-            return -EINVAL;
+        if( pResp.IsEmpty() )
+            pResp.NewObj();
 
-        if( pObj == nullptr )
-            return -EINVAL;
+        guint64 qwIoTaskId = 0; 
+        CCfgOpenerObj oCfg( pTask );
+        CParamList oResp( ( IConfigDb* )pResp );
 
-        ClassName* pClass = dynamic_cast< ClassName* >( pObj );
+        oCfg.CopyProp( propIfName,
+            ( CObjBase* )pOptions );
 
-        if( vecParams.size() != sizeof...( Args ) )
-            return -EINVAL;
+        ret = CallUserProxyFunc( pTask, 
+            qwIoTaskId, strMethod, args... ); 
 
-        CallUserFunc( pClass, vecParams,
-            typename GenSequence< sizeof...( Args ) >::type() );
+        if( ret == STATUS_PENDING ) 
+        {
+            // for canceling purpose
+            oResp[ propTaskId ] = qwIoTaskId;
+            break;
+        }
 
-        return 0;
-    }
-};
+        if( ERROR( ret ) ) 
+            break; 
 
-template < typename C, typename ... Types>
-inline gint32 NewDeferredCall( TaskletPtr& pCallback,
-    ObjPtr pObj, gint32(C::*f)(Types ...), Types... args )
-{
-    CTasklet* pDeferredCall =
-        new CDeferredCall< C, Types... >( f, pObj, args... );
-    if( pDeferredCall == nullptr )
-        return -EFAULT;
-    pCallback = pDeferredCall;
-    return 0;
+        ObjPtr pObj; 
+        CCfgOpenerObj oTask( ( CObjBase* )pTask ); 
+        ret = oTask.GetObjPtr( propRespPtr, pObj ); 
+        if( ERROR( ret ) ) 
+            break; 
+
+        pResp = pObj; 
+        CCfgOpener oNewResp( ( IConfigDb*)pResp );
+        if( !oNewResp.exist( propReturnValue ) )
+        {
+            ret = ERROR_FAIL;
+            break;
+        }
+
+        ret = oNewResp[ propReturnValue ];
+
+    }while( 0 );
+
+    return ret;
 }
 
-#define DEFER_CALL( pMgr, pObj, func, ... ) \
-({ \
-    TaskletPtr pTask; \
-    gint32 ret_ = NewDeferredCall( pTask, pObj, func, __VA_ARGS__ ); \
-    if( SUCCEEDED( ret ) ) \
-        ret_ = pMgr->RescheduleTask( pTask ); \
-    ret_; \
-})
+template<typename T, typename T2= typename std::enable_if<
+    !std::is_same<char*, T>::value &&
+    !std::is_same<const char*, T>::value &&
+    !std::is_base_of<IAutoPtr, T>::value, T>::type >
+inline void AssignVal( T& rVal, CBuffer& rBuf )
+{
+    rVal = rBuf;
+}
+
+template<typename T, typename T2= typename std::enable_if<
+    std::is_same<char*, T>::value ||
+    std::is_same<const char*, T>::value, T>::type,
+    typename T3=T2 >
+inline void AssignVal( T& rVal, CBuffer& rBuf )
+{
+    rVal = ( char* )rBuf;
+}
+
+template<typename T, typename T2= typename std::enable_if<
+    std::is_base_of<IAutoPtr, T>::value &&
+    !std::is_same<DMsgPtr, T>::value, T>::type,
+    typename T3=T2,
+    typename T4=T3 >
+inline void AssignVal( T& rVal, CBuffer& rBuf )
+{
+    ObjPtr& pObj = rBuf;
+    rVal = pObj;
+}
+
+#define AC \
+    std::tuple_size<TupleType>::value
+
+
+#define AI( _i ) \
+    ( AC - _i )
+
+template< int N, typename TupleType >
+void AssignValues( TupleType& oTuple,
+    std::deque< BufPtr >& queResp )
+{}
+
+template< int N, typename TupleType, typename First >
+void AssignValues( TupleType& oTuple,
+    std::deque< BufPtr >& queResp )
+{
+
+    CBuffer& oBuf = *queResp[ AI( N ) ];
+    // this assignment serve as a rvalue
+    // storage to avoid the rvalue to go away
+    // unexpectedly
+    DecType( First ) oVal;
+    AssignVal< DecType( First ) >( oVal, oBuf );
+    std::get< AI( N ) >( oTuple ) = oVal;
+}
+
+template< int N, typename TupleType, typename First, typename Second, typename ...Args >
+void AssignValues( TupleType& oTuple,
+        std::deque< BufPtr >& queResp )
+{
+    CBuffer& oBuf = *queResp[ AI( N ) ];
+    DecType( First ) oVal;
+
+    AssignVal< DecType( First ) >( oVal, oBuf );
+
+    std::get< AI( N ) >( oTuple ) = oVal;
+    AssignValues<N-1, TupleType, Second, Args...>( oTuple, queResp );
+}
+
+template< typename ...Args >
+gint32 CInterfaceProxy::FillArgs( CfgPtr& pResp,
+    gint32& iRet, Args&&... args )
+{
+    gint32 ret = 0;
+
+    if( pResp.IsEmpty() )
+        return -EINVAL;
+
+    auto oTuple = std::tuple<Args...>(args...);
+
+    do{
+        CParamList oResp( ( IConfigDb* )pResp );
+        if( !oResp.exist( propReturnValue ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        iRet = oResp[ propReturnValue ];
+
+        if( ERROR( iRet ) )
+            break;
+
+        if( sizeof...(args) > ( size_t )oResp.GetCount() )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        std::deque<BufPtr> queResp;
+        for( size_t i = 0; i < sizeof...( Args ); i++ )
+        {
+            BufPtr pBuf( true );
+            ret = oResp.GetProperty( i, pBuf );
+            if( ERROR( ret ) )
+                return ret;
+
+            queResp.push_back( pBuf );
+        }
+
+        AssignValues<sizeof...(Args), decltype( oTuple ), Args...>(
+             oTuple, queResp );
+
+    }while( 0 );
+
+    return ret;
+}

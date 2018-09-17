@@ -24,16 +24,81 @@
 #include "frmwrk.h"
 #include "emaphelp.h"
 #include "connhelp.h"
-#include "proxy.h"
+#include "ifhelper.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include "jsondef.h"
 
 using namespace std;
 
+CGenericInterface::CGenericInterface(
+    const IConfigDb* pCfg )
+{
+    CCfgOpener oNewCfg;
+    *oNewCfg.GetCfg() = *pCfg;
+
+    if( !oNewCfg.exist( propIfStateClass ) )
+    {
+        throw std::invalid_argument(
+            DebugMsg( -EINVAL, "Error occurs" ) );
+    }
+
+    guint32 iStateClass = 0;
+    if( !oNewCfg.exist( propIfPtr ) )
+        oNewCfg[ propIfPtr ] = this;
+
+    gint32 ret = oNewCfg.GetIntProp(
+        propIfStateClass, iStateClass ) ;
+        
+    ret = m_pIfStat.NewObj( 
+        ( EnumClsid )iStateClass,
+        oNewCfg.GetCfg() );
+
+    if( ERROR( ret ) )
+    {
+        throw std::runtime_error( 
+            DebugMsg( ret, "Error occurs" ) );
+    }
+}
+
+static CfgPtr InitIfProxyCfg(
+    const IConfigDb * pCfg )
+{
+    CCfgOpener oNewCfg;
+    *oNewCfg.GetCfg() = *pCfg;
+
+    string strPortClass;
+    gint32 ret = oNewCfg.GetStrProp(
+        propPortClass, strPortClass );
+
+    if( ERROR( ret ) )
+    {
+        throw std::invalid_argument(
+            DebugMsg( -EINVAL, "Error occurs" ) );
+    }
+
+    EnumClsid iStateClass =
+        clsid( CLocalProxyState );
+
+    if( strPortClass == PORT_CLASS_DBUS_PROXY_PDO ||
+        strPortClass == PORT_CLASS_TCP_STREAM_PDO )
+    {
+        // CRemoteProxyState will have an extra ip
+        // address to match
+        iStateClass = clsid( CRemoteProxyState );
+    }
+
+    oNewCfg.SetIntProp(
+        propIfStateClass,
+        iStateClass );
+
+    return oNewCfg.GetCfg();
+}
+
 CInterfaceProxy::CInterfaceProxy(
     const IConfigDb* pCfg ) :
-    super( pCfg )
+    super( InitIfProxyCfg( pCfg ) )
 {
     gint32 ret = 0;
 
@@ -43,23 +108,6 @@ CInterfaceProxy::CInterfaceProxy(
 
         ret = oCfg.GetStrProp(
             propPortClass, strPortClass );
-
-        if( ERROR( ret ) )
-            break;
-
-        EnumClsid iStateClass =
-            clsid( CLocalProxyState );
-
-        if( strPortClass == PORT_CLASS_DBUS_PROXY_PDO ||
-            strPortClass == PORT_CLASS_TCP_STREAM_PDO )
-        {
-            // CRemoteProxyState will have an ip
-            // address to match
-            iStateClass = clsid( CRemoteProxyState );
-        }
-
-        ret = m_pIfStat.NewObj(
-            iStateClass, pCfg );
 
         if( ERROR( ret ) )
             break;
@@ -116,10 +164,45 @@ CInterfaceProxy::~CInterfaceProxy()
         m_pIfMatch.Clear();
 }
 
+gint32 CRpcBaseOperations::AddPortProps()
+{
+    if( !IsServer() )
+    {
+        // for proxy, we get a sender name from the
+        // port
+        BufPtr pBuf( true );
+        gint32 ret = GetIoMgr()->GetPortProp(
+            GetPortHandle(),
+            propSrcDBusName,
+            pBuf );
+
+        if( SUCCEEDED( ret ) )
+        {
+            CInterfaceState* pStat = m_pIfStat;
+            if( pStat->exist( propSrcDBusName ) )
+                return 0;
+
+            // at least the proxy will have a
+            // meaningful sender name.  on server side,
+            // the propSrcDBusName should be obtained
+            // from the server name and the object name
+            SetProperty(
+                propSrcDBusName, *pBuf );
+        }
+    }
+    return 0;
+}
+
 gint32 CRpcBaseOperations::OpenPort(
     IEventSink* pCallback )
 {
-    return m_pIfStat->OpenPort( pCallback );
+    gint32 ret =
+        m_pIfStat->OpenPort( pCallback );
+
+    if( SUCCEEDED( ret ) )
+        AddPortProps();
+
+    return ret;
 }
 
 gint32 CRpcBaseOperations::ClosePort()
@@ -143,10 +226,22 @@ gint32 CRpcBaseOperations::EnableEventInternal(
         EnumIfState iState =
             m_pIfStat->GetState();
 
-        if( iState != stateStarted )
+        if( bEnable )
         {
-            ret = ERROR_STATE;
-            break;
+            if( iState != stateStarted &&
+                iState != stateRecovery )
+            {
+                ret = ERROR_STATE;
+                break;
+            }
+        }
+        else
+        {
+            if( iState != stateStopping )
+            {
+                ret = ERROR_STATE;
+                break;
+            }
         }
        
         CIoManager* pMgr = GetIoMgr();
@@ -188,7 +283,7 @@ gint32 CRpcBaseOperations::EnableEventInternal(
             break;
         }
 
-        if( pCallback != nullptr )
+        if( pCallback == nullptr )
         {
             ret = -EFAULT;
             break;
@@ -213,22 +308,6 @@ gint32 CRpcBaseOperations::EnableEventInternal(
         pIrp->RemoveTimer();
         pIrp->RemoveCallback();
 
-        if( SUCCEEDED( ret ) )
-        {
-            // run the EnableEventCompletion
-            // immediately
-            IRP* ptrIrp = pIrp;
-            if( ptrIrp == nullptr )
-            {
-                ret = -EFAULT;
-                break;
-            }
-            // use this to tell the task group to
-            // move on to next task
-            pCallback->OnEvent( eventIrpComp,
-                ( guint32 )ptrIrp, 0, nullptr );
-        }
-        
     }while( 0 );
 
     return ret;
@@ -241,9 +320,7 @@ gint32 CRpcBaseOperations::EnableEvent(
     // stop listening the event from the interface
     // server
     if( pMatch == nullptr )
-    {
-        pMatch = m_pIfMatch;
-    }
+        return -EINVAL;
 
     gint32 ret = EnableEventInternal(
         pMatch, true, pCallback );
@@ -258,9 +335,7 @@ gint32 CRpcBaseOperations::DisableEvent(
     // stop listening the event from the interface
     // server
     if( pMatch == nullptr )
-    {
-        pMatch = m_pIfMatch;
-    }
+        return -EINVAL;
 
     gint32 ret = EnableEventInternal(
         pMatch, false, pCallback );
@@ -272,7 +347,8 @@ gint32 CRpcBaseOperations::StartRecvMsg(
     IEventSink* pCompletion,
     IMessageMatch* pMatch )
 {
-    if( pCompletion != nullptr )
+    if( pCompletion == nullptr ||
+        pMatch == nullptr )
         return -EINVAL;
 
     gint32 ret = 0;
@@ -298,14 +374,6 @@ gint32 CRpcBaseOperations::StartRecvMsg(
         ret = pIrp->AllocNextStack( nullptr );
         if( ERROR( ret ) )
             break;
-
-        BufPtr pBuf( true );
-        ObjPtr pObj = ( CObjBase* )m_pIfMatch;
-
-        if( pMatch != nullptr )
-            pObj = pMatch;
-
-        *pBuf = pObj;
 
         CCfgOpenerObj oMatchCfg( pMatch );
 
@@ -364,6 +432,7 @@ gint32 CRpcBaseOperations::StartRecvMsg(
         // set the completion thread
         pIrp->SetIrpThread( pMgr ); 
         pIrp->SetSyncCall( false );
+        pIrp->RemoveTimer();
 
         CInterfaceState* pIfStat = m_pIfStat;
         if( pIfStat == nullptr )
@@ -373,9 +442,8 @@ gint32 CRpcBaseOperations::StartRecvMsg(
         }
 
         // make a copy of the irp for canceling
-        pObj = pIrp;
         ret = oTaskCfg.SetObjPtr(
-            propIrpPtr, pObj );
+            propIrpPtr, ObjPtr( pIrp ) );
 
         HANDLE hPort = GetPortHandle();
 
@@ -398,10 +466,12 @@ gint32 CRpcBaseOperations::StartRecvMsg(
         if( ret == STATUS_PENDING )
             break;
 
+        if( ERROR( ret ) )
+            break;
+
         // clear the irp reference
-        pObj = pCompletion;
         TaskletPtr pTask;
-        pTask =  pObj;
+        pTask = ObjPtr( pCompletion );
         if( !pTask.IsEmpty() )
         {
             pTask->RemoveProperty(
@@ -417,13 +487,9 @@ gint32 CRpcBaseOperations::StartRecvMsg(
             break;
         }
 
-        CIrpCompThread* pIrpThrd = pThrd;
-        if( ERROR( ret ) )
-        {
-            pIrp->RemoveCallback();
-            break;
-        }
+        pIrp->ClearIrpThread();
 
+        CIrpCompThread* pIrpThrd = pThrd;
         // complete the irp in the irp completion
         // thread
         ret = pIrpThrd->AddIrp( pIrp );
@@ -432,6 +498,10 @@ gint32 CRpcBaseOperations::StartRecvMsg(
             pIrp->RemoveCallback();
             break;
         }
+
+        // tell the tasklet to wait for the irp
+        // completion
+        ret = STATUS_PENDING;
 
     }while( 0 );
 
@@ -493,9 +563,15 @@ gint32 CRpcBaseOperations::DoResume(
 gint32 CRpcInterfaceBase::Start()
 {
     TaskletPtr pCallback;
-    guint32 ret = 0;
+    gint32 ret = 0;
     do{
-        ret = pCallback.NewObj( clsid( CSyncCallback ) );
+        ret = SetStateOnEvent( cmdOpenPort );
+        if( ERROR( ret ) )
+            break;
+
+        ret = pCallback.NewObj(
+            clsid( CSyncCallback ) );
+
         if( ERROR( ret ) )
             break;
 
@@ -503,15 +579,19 @@ gint32 CRpcInterfaceBase::Start()
         if( ERROR( ret ) )
             break;
 
-        CSyncCallback* pSyncCallback = pCallback;
-        if( pSyncCallback == nullptr )
+        if( ret == STATUS_PENDING )
         {
-            ret = -EFAULT;
-            break;
+            CSyncCallback* pSyncCb = pCallback;
+            if( pSyncCb == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            pSyncCb->WaitForComplete();
         }
-        pSyncCallback->WaitForComplete();
 
     }while( 0 );
+
     return ret;
 }
 
@@ -528,8 +608,10 @@ gint32 CRpcInterfaceBase::StartEx(
         TaskletPtr pOpenPortTask;
         TaskletPtr pEnableEvtTask;
         TaskletPtr pRecvMsgTask;
+        EnumIfState iState =
+            m_pIfStat->GetState();
 
-        if( m_pIfStat->GetState() != stateStopped )
+        if( iState != stateStarting )
         {
             ret = ERROR_STATE;
             break;
@@ -564,32 +646,36 @@ gint32 CRpcInterfaceBase::StartEx(
         if( ERROR( ret ) )
             break;
 
-        oParams.SetObjPtr( propMatchPtr,
-            ObjPtr( m_pIfMatch ) );
-
-        ret = oParams.Push( true );
-        if( ERROR( ret ) )
-            break;
-
-        ret = pEnableEvtTask.NewObj(
-            clsid( CIfEnableEventTask ),
-            oParams.GetCfg() );
-
-        if( ERROR( ret ) )
-            break;
-
-        bool bEnable = false;
-        oParams.Pop( bEnable );
-
-        ret = pRecvMsgTask.NewObj(
-            clsid( CIfStartRecvMsgTask ),
-            oParams.GetCfg() );
-
-        if( ERROR( ret ) )
-            break;
-
         pTaskGrp->AppendTask( pOpenPortTask );
-        pTaskGrp->AppendTask( pEnableEvtTask );
+
+        // enable or disable event
+        oParams.Push( true );
+
+        // Change Interface state or not
+        oParams.Push( false );
+
+        for( auto pMatch : m_vecMatches )
+        {
+            oParams[ propMatchPtr ] =
+                ObjPtr( pMatch );
+
+            // the last one
+            if( pMatch == m_pIfMatch )
+            {
+                // make sure to change Interface state
+                // to connected
+                oParams[ 1 ] = true;
+            }
+
+            ret = pEnableEvtTask.NewObj(
+                clsid( CIfEnableEventTask ),
+                oParams.GetCfg() );
+
+            if( ERROR( ret ) )
+                break;
+
+            pTaskGrp->AppendTask( pEnableEvtTask );
+        }
         pTaskGrp->SetRelation( logicAND );
 
         CCfgOpenerObj oCfg( ( CObjBase* )pTaskGrp );
@@ -620,58 +706,136 @@ gint32 CRpcInterfaceBase::StartEx(
         if( ERROR( ret ) )
             break;
 
-        // this task will run later when the first
-        // two have done
-        ret = AddAndRun( pRecvMsgTask );
-        if( ERROR( ret ) )
-            break;
+        bool bConnected = false;
+        ret = pTask->GetError();
 
-        ret = pRecvMsgTask->GetError();
+        if( SUCCEEDED( ret ) && 
+            GetState() == stateConnected )
+        {
+            bConnected = true;
+        }
+
+        if( bConnected )
+        {
+            bool bEnable = false;
+            oParams.Pop( bEnable );
+            oParams.Pop( bEnable );
+
+            // we cannot add the recvtask by AddAndRun
+            // at this point, because it requires the
+            // interface to be in the connected state,
+            // while we are still in the stopped state
+            CCfgOpener oRecvCfg;
+
+            ret = oRecvCfg.SetObjPtr(
+                propIfPtr, ObjPtr( this ) );
+
+            if( ERROR( ret  ) )
+                break;
+
+            TaskletPtr pParaTaskGrp;
+            ret = pParaTaskGrp.NewObj(   
+                clsid( CIfParallelTaskGrp ),
+                oRecvCfg.GetCfg() );
+
+            if( ERROR( ret ) )
+                break;
+                
+            CIfParallelTaskGrp* pTaskGrp
+                = pParaTaskGrp;
+
+            for( auto pMatch : m_vecMatches )
+            {
+                oParams[ propMatchPtr ] =
+                    ObjPtr( pMatch );
+
+                ret = pRecvMsgTask.NewObj(
+                    clsid( CIfStartRecvMsgTask ),
+                    oParams.GetCfg() );
+
+                if( ERROR( ret ) )
+                    break;
+
+                ret = pTaskGrp->AppendTask(
+                    pRecvMsgTask );
+
+                if( ERROR( ret ) )
+                    break;
+            }
+
+            if( ERROR( ret ) )
+                break;
+
+            ret = AppendAndRun( pParaTaskGrp );
+            if( ERROR( ret ) )
+                break;
+
+            // the ret does not necessarily indicate
+            // the return value of the receive task. we
+            // need to get the status code from the
+            // task.
+            ret = pRecvMsgTask->GetError();
+            if( ret == STATUS_PENDING )
+                ret = 0;
+        }
 
     }while( 0 );
 
     if( ret == STATUS_MORE_PROCESS_NEEDED )
         ret = STATUS_PENDING;
 
-    if( ret == STATUS_PENDING
-        && pCallback == nullptr )
-    {
-        ret = pTaskGrp->WaitForComplete();    
-    }
-
     return ret;
 }
 
 gint32 CRpcInterfaceBase::Stop()
 {
-    return StopEx( nullptr );
+    gint32 ret = 0;
+    do{
+        ret = SetStateOnEvent( cmdShutdown );
+        if( ERROR( ret ) )
+            break;
+
+        TaskletPtr pTask;
+        ret = pTask.NewObj(
+            clsid( CSyncCallback ) );
+
+        if( ERROR( ret ) )
+            break;
+
+        IEventSink* pCallback = pTask;
+        ret = StopEx( pCallback );
+
+        if( ret == STATUS_PENDING )
+        {
+            CSyncCallback* pSyncTask = pTask;
+            ret = pSyncTask->WaitForComplete();
+        }
+
+    }while( 0 );
+    
+    return ret;
 }
 
 gint32 CRpcInterfaceBase::StopEx(
     IEventSink* pCallback )
 {
-    EnumIfState iState =
-        m_pIfStat->GetState();
-
-    if( iState == stateStopped )
-        return ERROR_STATE;
-
     gint32 ret = 0;
     TaskGrpPtr pTaskGrp;
+    TaskletPtr pCompletion;
+
+    if( pCallback == nullptr )
+        return -EINVAL;
 
     do{
         TaskletPtr pClosePortTask;
         TaskletPtr pDisableEvtTask;
-        TaskletPtr pStopRecvTask;
 
-        if( m_pIfStat->GetState() != stateStopped )
-        {
-            ret = ERROR_STATE;
-            break;
-        }
+        if( stateStopping != GetState() )
+            return ERROR_STATE;
+
+        ClearActiveTasks();
 
         CParamList oParams;
-
         ret = oParams.SetObjPtr(
             propIfPtr, ObjPtr( this ) );
 
@@ -692,34 +856,34 @@ gint32 CRpcInterfaceBase::StopEx(
         if( ERROR( ret ) )
             break;
 
-        bool bEnable = false;
+        // enable or disable event
+        oParams.Push( false );
+        // Change Interface state or not
+        oParams.Push( false );
 
-        ret = oParams.Push( bEnable );
+        for( auto pMatch : m_vecMatches )
+        {
+            oParams[ propMatchPtr ] =
+                ObjPtr( pMatch );
+
+            if( pMatch == m_pIfMatch )
+                oParams[ 1 ] = true;
+
+            ret = pDisableEvtTask.NewObj(
+                clsid( CIfEnableEventTask ),
+                oParams.GetCfg() );
+
+            if( ERROR( ret ) )
+                break;
+
+            pTaskGrp->AppendTask( pDisableEvtTask );
+        }
+
         if( ERROR( ret ) )
             break;
 
-        ret = pDisableEvtTask.NewObj(
-            clsid( CIfEnableEventTask ),
-            oParams.GetCfg() );
-
-        if( ERROR( ret ) )
-            break;
-
-        ret = oParams.Pop( bEnable );
-        if( ERROR( ret ) )
-            break;
-
-        ret = pStopRecvTask.NewObj(
-            clsid( CIfStopRecvMsgTask ),
-            oParams.GetCfg() );
-
-        if( ERROR( ret ) )
-            break;
-
-        pTaskGrp->AppendTask( pStopRecvTask );
-        pTaskGrp->AppendTask( pDisableEvtTask );
         pTaskGrp->AppendTask( pClosePortTask );
-        pTaskGrp->SetRelation( logicOR );
+        pTaskGrp->SetRelation( logicNONE );
 
         CCfgOpenerObj oCfg( ( CObjBase* )pTaskGrp );
 
@@ -739,14 +903,11 @@ gint32 CRpcInterfaceBase::StopEx(
 
         if( pCallback )
         {
-            ret = oCompCfg.SetObjPtr(
-                propEventSink, ObjPtr( pCallback) );
-
-            if( ERROR( ret ) )
-                break;
+            oCompCfg[ propNotifyClient ] = true;
+            oCompCfg[ propEventSink ] =
+                ObjPtr( pCallback);
         }
 
-        TaskletPtr pCompletion;
         ret = pCompletion.NewObj(
             clsid( CIfCleanupTask ),
             oCompCfg.GetCfg() );
@@ -773,11 +934,10 @@ gint32 CRpcInterfaceBase::StopEx(
             break;
 
         ret = pTask->GetError();
-        if( ret != STATUS_PENDING
-            && ret != STATUS_MORE_PROCESS_NEEDED )
+
+        if( ret != STATUS_PENDING )
         {
-            // pCompletion->OnEvent(
-            //     eventTaskComp, ret, 0, 0 );
+            ( *pCompletion )( eventZero );
         }
 
     }while( 0 );
@@ -786,17 +946,6 @@ gint32 CRpcInterfaceBase::StopEx(
     if( ret == STATUS_MORE_PROCESS_NEEDED )
     {
         ret = STATUS_PENDING;
-    }
-
-    if( ret == STATUS_PENDING &&
-        pCallback == nullptr )
-    {
-        ret = pTaskGrp->WaitForComplete();    
-    }
-    else
-    {
-        if( m_pRootTaskGroup->GetTaskCount() > 0 )
-            m_pRootTaskGroup->Clear();
     }
 
     return ret;
@@ -838,6 +987,10 @@ gint32 CRpcInterfaceBase::PauseResume(
             break;
 
         ret = AppendAndRun( pTask );
+        if( ERROR( ret ) )
+            break;
+
+        ret = pTask->GetError();
 
     }while( 0 );
 
@@ -871,6 +1024,12 @@ gint32 CRpcInterfaceBase::Pause(
 gint32 CRpcInterfaceBase::Shutdown(
     IEventSink* pCallback )
 {
+    gint32 ret =
+        SetStateOnEvent( cmdShutdown );
+
+    if( ERROR( ret ) )
+        return ret;
+
     return StopEx( pCallback );
 }
 
@@ -882,6 +1041,10 @@ gint32 CRpcInterfaceBase::OnPortEvent(
 
     if( !IsMyPort( hPort ) )
         return -EINVAL;
+
+    ret = SetStateOnEvent( iEvent );
+    if( ERROR( ret ) )
+        return ret;
 
     switch( iEvent )
     {
@@ -895,8 +1058,19 @@ gint32 CRpcInterfaceBase::OnPortEvent(
             ret = StopEx( pTask );
             break;
         }
-    case eventPortStartFailed:
     case eventPortStarted:
+        {
+            // called from CIfOpenPortTask
+            ret = m_pIfStat->OnPortEvent(
+                iEvent, hPort );
+
+            if( ERROR( ret ) )
+                break;
+
+            AddPortProps();
+            break;
+        }
+    case eventPortStartFailed:
     case eventPortStopped:
     default:
         {
@@ -914,10 +1088,15 @@ gint32 CRpcInterfaceBase::OnModEvent(
     const std::string& strModule )
 {
     gint32 ret = 0;
+
     do{
         TaskletPtr pTask;
 
         if( !IsMyDest( strModule ) )
+            break;
+
+        if( TestSetState( iEvent )
+            == ERROR_STATE )
             break;
 
         CParamList oParams;
@@ -996,6 +1175,10 @@ gint32 CRpcInterfaceBase::OnDBusEvent(
 {
     gint32 ret = 0;
 
+    ret = SetStateOnEvent( iEvent );
+    if( ERROR( ret ) )
+        return ret;
+
     switch( iEvent )
     {
     case eventDBusOffline:
@@ -1072,6 +1255,11 @@ gint32 CRpcInterfaceBase::OnAdminEvent(
 {
     gint32 ret = 0;
 
+    ret = SetStateOnEvent( iEvent );
+
+    if( ERROR( ret ) )
+        return ret;
+
     switch( iEvent )
     {
     case cmdShutdown:
@@ -1088,6 +1276,21 @@ gint32 CRpcInterfaceBase::OnAdminEvent(
             break;
         }
     case cmdPause:
+        {
+            TaskletPtr pTask;
+
+            // to avoid synchronous call
+            // we put  dumb task there
+            ret = pTask.NewObj(
+                clsid( CIfDummyTask ) );
+
+            if( ERROR( ret ) )
+                break;
+
+            ClearActiveTasks();
+            ret = Pause( pTask );
+            break;
+        }
     case cmdResume:
         {
             TaskletPtr pTask;
@@ -1100,14 +1303,7 @@ gint32 CRpcInterfaceBase::OnAdminEvent(
             if( ERROR( ret ) )
                 break;
 
-            if( iEvent == cmdPause )
-            {
-                ret = Pause( pTask );
-            }
-            else
-            {
-                ret = Resume( pTask );
-            }
+            ret = Resume( pTask );
             break;
         }
     default:
@@ -1132,6 +1328,19 @@ gint32 CRpcInterfaceBase::OnEvent(
     case eventPortStartFailed:
         {
             ret = OnPortEvent( iEvent, dwParam1 );
+#ifdef DEBUG
+            if( ERROR( ret ) )
+            {
+                HANDLE hPort = dwParam1;
+                IPort* pPort = HandleToPort( hPort );
+                if( pPort != nullptr )
+                {
+                    string strDump;
+                    pPort->Dump( strDump );
+                    DebugPrint( ret, strDump );
+                }
+            }
+#endif
             break;
         }
     case eventPortStopped:
@@ -1174,9 +1383,8 @@ gint32 CRpcInterfaceBase::OnEvent(
     case eventRmtSvrOffline:
         {
             HANDLE hPort = ( guint32 )pData;
-
-            string strIpAddr =
-                reinterpret_cast< char* >( dwParam1 );
+            string strIpAddr = reinterpret_cast
+                < char* >( dwParam1 );
 
             CInterfaceState* pIfStat = m_pIfStat;
             if( pIfStat == nullptr )
@@ -1193,6 +1401,14 @@ gint32 CRpcInterfaceBase::OnEvent(
 
             break;
         }
+    case cmdPause:
+    case cmdResume:
+    case cmdShutdown:
+        {
+            ret = OnAdminEvent(
+                iEvent, string( "" ) );
+            break;
+        }
     default:
         {
             ret = -ENOTSUP;
@@ -1203,25 +1419,24 @@ gint32 CRpcInterfaceBase::OnEvent(
 #ifdef DEBUG
     if( ERROR( ret ) )
     {
-        string strMsg = DebugMsg( ret,
-            "Error occured in CRpcInterfaceBase::OnEvent" );
-        printf( strMsg.c_str() );
+        DebugPrint( ret,
+            "Error occured on Event %d", iEvent );
     }
 #endif
     return ret;
 }
 
-gint32 CRpcInterfaceBase::DoCleanUp()
+gint32 CRpcInterfaceBase::ClearActiveTasks()
 {
-    if( GetState() != stateStopped )
-        return ERROR_STATE;
+    gint32 ret = 0;
 
-    m_pRootTaskGroup->OnEvent(
-        eventCancelTask, 0, 0, 0 );
+    if( !m_pRootTaskGroup.IsEmpty() )
+    {
+        ret = ( *m_pRootTaskGroup )(
+            eventCancelTask );
+    }
 
-    m_pRootTaskGroup.Clear();
-
-    return 0;
+    return ret;
 }
 
 gint32 CRpcInterfaceBase::AppendAndRun(
@@ -1230,50 +1445,8 @@ gint32 CRpcInterfaceBase::AppendAndRun(
     if( pTask.IsEmpty() )
         return -EINVAL;
 
-    gint32 ret = 0;
-
-    // synchronize with all the client calls
-    CStdRMutex oIfLock( GetLock() );
-    if( m_pRootTaskGroup.IsEmpty() )
-        return ERROR_STATE;
-
-    TaskletPtr pRootTask = m_pRootTaskGroup;
-    
-    do{
-        ret = m_pRootTaskGroup->
-            AppendTask( pTask );
-
-        if( ERROR( ret ) )
-            break;
-
-        guint32 dwCount = 
-            m_pRootTaskGroup->GetTaskCount();
-
-        if( dwCount == 0 )
-        {
-            ret = ERROR_FAIL;
-            break;
-        }
-        // we are the first one
-        if( dwCount == 1 )
-        {
-            oIfLock.Unlock();
-            // FIXME: race condition?
-            // run immediately
-            ( *pRootTask )( eventZero );
-            // no need to lock again for destructor
-            // oIfLock.Lock();
-        }
-        else
-        {
-            // set the status to STATUS_PENDING if
-            // the task is blocked in the queue
-            pTask->SetError( STATUS_PENDING );
-        }
-
-    }while( 0 );
-
-    return ret;
+    return m_pRootTaskGroup->
+        AppendAndRun( pTask );
 }
 
 gint32 CRpcInterfaceBase::AddAndRun(
@@ -1328,7 +1501,7 @@ gint32 CRpcInterfaceBase::AddAndRun(
         if( SUCCEEDED( ret ) )
         {
             CIfParallelTaskGrp* pParaGrp = pTail;
-            if( pParaGrp != nullptr )
+            if( pParaGrp == nullptr )
                 bTail = false;
         }
 
@@ -1394,11 +1567,14 @@ gint32 CRpcInterfaceBase::AddAndRun(
             // run the root task if the Parallel
             // task group is not running yet
             ( *pRootTaskGroup )( eventZero );
+            ret = pRootTaskGroup->GetError();
+        }
+        else
+        {
 
-            if( ERROR( ret ) )
-                break;
-
-            ret = STATUS_PENDING;
+            DebugPrint( GetTid(),
+                "root task not run immediately, dwCount=%d, bRunning=%d",
+                dwCount, bRunning );
         }
 
     }while( 0 );
@@ -1409,6 +1585,83 @@ gint32 CRpcInterfaceBase::AddAndRun(
     // pIoTask->GetError() in case the task is
     // scheduled to run later
     return ret;
+}
+
+gint32 CRpcServices::RebuildMatches()
+{
+    gint32 ret = 0;
+    do{
+        // add interface id to all the matches
+        for( auto pMatch : m_vecMatches )
+        {
+            CCfgOpenerObj oMatchCfg(
+                ( CObjBase* )pMatch );
+
+            string strIfName;
+            ret = oMatchCfg.GetStrProp(
+                propIfName, strIfName );
+
+            if( ERROR( ret ) )
+                continue;
+            
+            string strIfName2 =
+                IF_NAME_FROM_DBUS( strIfName );
+
+            ToInternalName( strIfName );
+            EnumClsid iid =
+                CoGetIidFromIfName( strIfName2 );
+
+            if( iid == clsid( Invalid ) )
+                continue;
+
+            oMatchCfg.SetIntProp( propIid, iid );
+        }
+
+        CCfgOpenerObj oMatchCfg(
+            ( CObjBase* )m_pIfMatch );
+
+        oMatchCfg.SetIntProp( propIid,
+            GetClsid() );
+
+        // also append the match for master interface
+        m_vecMatches.push_back( m_pIfMatch );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CRpcServices::StartEx(
+    IEventSink* pCallback )
+{
+    gint32 ret = OnPreStart( pCallback );
+    if( ERROR( ret ) )
+        return ret;
+
+    return super::StartEx( pCallback );
+}
+
+gint32 CRpcServices::OnPreStart(
+    IEventSink* pCallback )
+{
+    gint32 ret = InitUserFuncs();
+
+    if( ERROR( ret ) )
+        return ret;
+
+    return RebuildMatches();
+}
+
+gint32 CRpcServices::OnPostStop(
+    IEventSink* pCallback )
+{
+    CStdRMutex oIfLock( GetLock() );
+    m_vecMatches.clear();
+    m_mapFuncs.clear();
+    m_mapProxyFuncs.clear();
+    m_pRootTaskGroup.Clear();
+
+    return 0;
 }
 
 typedef std::pair< gint32, BufPtr > ARG_ENTRY;
@@ -1612,395 +1865,6 @@ gint32 CRpcServices::InvokeNextMethod()
     return ret;
 }
 
-CReqBuilder::CReqBuilder(
-    CRpcBaseOperations* pIf )
-    : CParamList()
-{
-    if( pIf == nullptr )
-        return;
-
-    gint32 ret = 0;
-    do{
-        m_pIf = pIf;
-
-        ObjPtr pObj = pIf;
-
-        CopyProp( propIfName, pIf );
-        CopyProp( propObjPath, pIf );
-        CopyProp( propSrcDBusName, pIf );
-
-        CInterfaceProxy* pProxy = pObj;
-        if( pProxy != nullptr )
-        {
-            // a mandatory parameter for proxy
-            ret = CopyProp( propDestDBusName, pIf );
-            if( ERROR( ret ) )
-                break;
-            CopyProp( propUserName, pIf );
-        }
-
-        CopyProp( propTimeoutSec, pIf );
-        CopyProp( propKeepAliveSec, pIf );
-        CopyProp( propIpAddr, pIf );
-
-        CIoManager* pMgr = pIf->GetIoMgr();
-        string strModName = pMgr->GetModName();
-
-        string strSrcDBusName =
-            DBUS_DESTINATION( strModName );
-
-        SetSender( strSrcDBusName );
-
-    }while( 0 );
-}
-
-CReqBuilder::CReqBuilder(
-    const IConfigDb* pCfg )
-    : CParamList()
-{
-    if( pCfg == nullptr )
-        return;
-
-    try{
-        CopyProp( propIfName, pCfg );
-        CopyProp( propObjPath, pCfg );
-        CopyProp( propDestDBusName, pCfg );
-
-        CopyProp( propTimeoutSec, pCfg );
-        CopyProp( propKeepAliveSec, pCfg );
-        CopyProp( propIpAddr, pCfg );
-        CopyProp( propUserName, pCfg );
-        CopyProp( propSrcDBusName, pCfg );
-
-        CopyProp( propMethodName, pCfg );
-        CopyProp( propCallOptions, pCfg );
-        CopyProp( propTaskId, pCfg );
-
-        CopyParams( pCfg );
-    }
-    catch( std::invalid_argument& e )
-    {
-
-    }
-    return;
-}
-
-CReqBuilder::CReqBuilder(
-    IConfigDb* pCfg )
-    : CParamList( pCfg )
-{ return; }
-
-gint32 CReqBuilder::SetIfName(
-    const std::string& strIfName )
-{
-    return SetStrProp(
-        propIfName, strIfName );
-}
-
-gint32 CReqBuilder::SetObjPath(
-    const std::string& strObjPath ) 
-{
-    return SetStrProp(
-        propObjPath, strObjPath );
-}
-gint32 CReqBuilder::SetDestination(
-    const std::string& strDestination ) 
-{
-    return SetStrProp(
-        propDestDBusName, strDestination );
-}
-
-gint32 CReqBuilder::SetSender(
-    const std::string& strSender ) 
-{
-    return SetStrProp(
-        propSrcDBusName, strSender );
-}
-
-gint32 CReqBuilder::SetMethodName(
-    const std::string& strMethodName ) 
-{
-    return SetStrProp(
-        propMethodName, strMethodName );
-}
-
-gint32 CReqBuilder::SetKeepAliveSec(
-    guint32 dwTimeoutSec )
-{
-    CfgPtr pCfg;
-    gint32 ret = GetCallOptions( pCfg );
-    if( ERROR( ret ) )
-        return ret;
-
-    CCfgOpener oCfg( ( IConfigDb* )pCfg );
-
-    return oCfg.SetIntProp(
-        propKeepAliveSec, dwTimeoutSec );
-}
-
-gint32 CReqBuilder::SetTimeoutSec(
-    guint32 dwTimeoutSec)
-{
-
-    CfgPtr pCfg;
-    gint32 ret = GetCallOptions( pCfg );
-    if( ERROR( ret ) )
-        return ret;
-
-    CCfgOpener oCfg( ( IConfigDb* )pCfg );
-
-    return oCfg.SetIntProp(
-        propTimeoutSec, dwTimeoutSec );
-}
-
-gint32 CReqBuilder::SetCallFlags(
-    guint32 dwFlags )
-{
-    CfgPtr pCfg;
-    gint32 ret = GetCallOptions( pCfg );
-    if( ERROR( ret ) )
-        return ret;
-
-    CCfgOpener oCfg( ( IConfigDb* )pCfg );
-
-    return oCfg.SetIntProp(
-        propCallFlags, dwFlags );
-}
-
-gint32 CReqBuilder::SetReturnValue(
-    gint32 iRet )
-{
-    return SetIntProp(
-        propReturnValue, iRet );
-}
-
-gint32 CReqBuilder::SetIpAddr(
-    const string& strIpAddr, bool bSrc )
-{
-    EnumPropId iProp = propIpAddr;
-    return SetStrProp( iProp, strIpAddr );
-}
-
-gint32 CReqBuilder::GetCallOptions(
-    CfgPtr& pCfg )
-{
-    gint32 ret = 0;
-    do{
-        ObjPtr pObj;
-        ret = GetObjPtr(
-            propCallOptions, pObj );
-
-        if( ERROR( ret ) )
-        {
-            ret = pCfg.NewObj();
-            if( ERROR( ret ) )
-                break;
-
-            pObj = pCfg;
-            if( pObj.IsEmpty() )
-            {
-                ret = -EFAULT;
-                break;
-            }
-            ret = SetObjPtr(
-                propCallOptions, pObj );
-
-            if( ERROR( ret ) )
-                break;
-
-            break;
-        }
-
-        CfgPtr pSrcCfg = pObj;
-        if( pSrcCfg.IsEmpty() )
-        {
-            ret = -EFAULT;
-            break;
-        }
-
-        pCfg = pSrcCfg;
-
-    }while( 0 );
-
-    return ret;
-}
-
-gint32 CReqBuilder::SetTaskId(
-    guint64 dwTaskId )
-{
-    return SetQwordProp(
-        propTaskId, dwTaskId );
-}
-
-gint32 CReqOpener::GetIfName(
-    std::string& strIfName ) const
-{
-    return GetStrProp(
-        propIfName, strIfName );
-}
-gint32 CReqOpener::GetObjPath(
-    std::string& strObjPath ) const 
-{
-    return GetStrProp(
-        propObjPath, strObjPath );
-}
-
-gint32 CReqOpener::GetDestination(
-    std::string& strDestination ) const 
-{
-    return GetStrProp(
-        propDestDBusName, strDestination );
-}
-
-gint32 CReqOpener::GetMethodName(
-    std::string& strMethodName ) const
-{
-    return GetStrProp(
-        propMethodName, strMethodName );
-}
-
-gint32 CReqOpener::GetSender(
-    std::string& strSender ) const
-{
-    return GetStrProp(
-        propSrcDBusName, strSender );
-}
-
-gint32 CReqOpener::GetKeepAliveSec(
-    guint32& dwTimeoutSec ) const
-{
-    CfgPtr pCfg;
-    gint32 ret = GetCallOptions( pCfg ); 
-    if( ERROR( ret ) )
-        return ret;
-
-    CCfgOpener oCallOption(
-        ( IConfigDb* ) pCfg );
-
-    return oCallOption.GetIntProp(
-        propKeepAliveSec, dwTimeoutSec );
-
-}
-
-gint32 CReqOpener::GetTimeoutSec(
-    guint32& dwTimeoutSec) const 
-{
-    CfgPtr pCfg;
-    gint32 ret = GetCallOptions( pCfg ); 
-    if( ERROR( ret ) )
-        return ret;
-
-    CCfgOpener oCallOption(
-        ( IConfigDb* ) pCfg );
-
-    return oCallOption.GetIntProp(
-        propTimeoutSec, dwTimeoutSec );
-}
-
-gint32 CReqOpener::GetCallFlags(
-    guint32& dwFlags ) const
-{
-    CfgPtr pCfg;
-    gint32 ret = GetCallOptions( pCfg ); 
-    if( ERROR( ret ) )
-        return ret;
-
-    CCfgOpener oCallOption(
-        ( IConfigDb* ) pCfg );
-
-    return oCallOption.GetIntProp(
-        propCallFlags, dwFlags );
-}
-
-gint32 CReqOpener::GetReturnValue(
-    gint32& iRet ) const
-{
-    guint32 dwRet = ( guint32 ) iRet;
-    return GetIntProp(
-        propReturnValue, dwRet );
-}
-
-gint32 CReqOpener::GetIpAddr(
-    string& strIpAddr, bool bSrc ) const
-{
-    gint32 iProp = propIpAddr;
-    return GetStrProp( iProp, strIpAddr );
-}
-
-bool CReqOpener::HasReply() const
-{
-    guint32 dwFlags;
-    gint32 ret = GetCallFlags( dwFlags );
-    if( ERROR( ret ) )
-    {
-        // default to have a replay
-        return true;
-    }
-    bool bRet =
-        ( ( dwFlags & CF_WITH_REPLY ) != 0 );
-
-    return bRet;
-}
-
-bool CReqOpener::IsKeepAlive() const
-{
-    guint32 dwFlags;
-    gint32 ret = GetCallFlags( dwFlags );
-    if( ERROR( ret ) )
-    {
-        // default to no keep alive
-        return false;
-    }
-    bool bRet =
-        ( ( dwFlags & CF_KEEP_ALIVE ) != 0 );
-
-    return bRet;
-}
-
-gint32 CReqOpener::GetReqType(
-    guint32& dwType ) const
-{
-    guint32 dwFlags;
-    gint32 ret = GetCallFlags( dwFlags );
-    if( ERROR( ret ) )
-        return ret;
-
-    dwType = ( dwFlags & 7 );
-    return 0;
-}
-
-gint32 CReqOpener::GetCallOptions(
-    CfgPtr& pCfg ) const
-{
-    gint32 ret = 0;
-    do{
-        ObjPtr pObj;
-        ret = GetObjPtr(
-            propCallOptions, pObj );
-
-        if( ERROR( ret ) )
-            break;
-
-        CfgPtr pSrcCfg = pObj;
-        if( pSrcCfg.IsEmpty() )
-        {
-            ret = -EFAULT;
-            break;
-        }
-
-        pCfg = pSrcCfg;
-
-    }while( 0 );
-
-    return ret;
-}
-
-gint32 CReqOpener::GetTaskId(
-    guint64& dwTaskId ) const
-{
-    return GetQwordProp(
-        propTaskId, dwTaskId );
-}
 /**
 * @name RunIoTask
 * Schedule a CIfIoReqTask with the parameters in
@@ -2171,7 +2035,6 @@ gint32 CInterfaceProxy::SendFetch_Proxy(
             CParamList oResp;
             bool bFetch = false;
 
-
             CReqBuilder oDesc( this );
             oDesc.Append( pDataDesc );
 
@@ -2260,6 +2123,28 @@ CRpcServices::CRpcServices( const IConfigDb* pCfg )
         {
             oCfg.SetIntProp( propKeepAliveSec,
                 IFSTATE_DEFAULT_IOREQ_TIMEOUT / 2 );
+        }
+
+        if( oCfg.exist( propObjList ) )
+        {
+            ObjPtr pObj;
+            ret = oCfg.GetObjPtr( propObjList, pObj );
+            if( ERROR( ret ) )
+                break;
+
+            ObjVecPtr pObjVec( pObj );
+            if( pObjVec.IsEmpty() )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            for( auto pElem : ( *pObjVec )() )
+            {
+                MatchPtr pMatch( pElem );
+                m_vecMatches.push_back( pMatch );
+            }
+
+            RemoveProperty( propObjList );
         }
 
     }while( 0 );
@@ -2360,7 +2245,7 @@ gint32 CRpcServices::BuildBufForIrp(
 
         // let's build a message
         DMsgPtr pMsg;
-        ret = pMsg.NewObj();
+        ret = pMsg.NewObj( ( EnumClsid )iReqType );
 
         string strObjPath;
         ret = oReq.GetObjPath( strObjPath );
@@ -2385,16 +2270,22 @@ gint32 CRpcServices::BuildBufForIrp(
         if( ERROR( ret ) && bRequest )
             break;
 
-        ret = pMsg.SetDestination( strDest );
-        if( ERROR( ret ) && bRequest )
-            break;
+        if( SUCCEEDED( ret ) )
+        {
+            ret = pMsg.SetDestination( strDest );
+            if( ERROR( ret ) && bRequest )
+                break;
+        }
 
-        string strSender = DBUS_DESTINATION(
-            GetIoMgr()->GetModName() );
+        string strSender;
+        ret = oReq.GetSender( strSender );
 
-        ret = pMsg.SetSender( strSender );
-        if( ERROR( ret ) ) 
-            break;
+        if( SUCCEEDED( ret ) )
+        {
+            ret = pMsg.SetSender( strSender );
+            if( ERROR( ret ) ) 
+                break;
+        }
 
         ret = pMsg.SetMember( strMethod );
         if( ERROR( ret ) )
@@ -2407,7 +2298,7 @@ gint32 CRpcServices::BuildBufForIrp(
 
         if( !dbus_message_append_args( pMsg,
             DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
-            pReqBuf->ptr(), pReqBuf->size(),
+            &pReqBuf->ptr(), pReqBuf->size(),
             DBUS_TYPE_INVALID ) )
         {
             ret = -ENOMEM;
@@ -2426,64 +2317,78 @@ gint32 CRpcServices::BuildBufForIrp(
 /**  @} */
 
 gint32 CRpcServices::FillRespData(
-    IRP* pIrp, IConfigDb* pResp )
+    IRP* pIrp, CfgPtr& pResp )
 {
     gint32 ret = 0;
     if( pIrp == nullptr ||
         pIrp->GetStackSize() == 0 )
         return -EINVAL;
 
-    if( pResp == nullptr )
+    if( pResp.IsEmpty() )
         return -EINVAL;
 
-    // retrieve the data from the irp
-    IrpCtxPtr& pCtx = pIrp->GetTopStack();
-
-    guint32 dwDirection = pCtx->GetIoDirection();
-    if( dwDirection == IRP_DIR_OUT )
-        return -ENOTSUP;
-
-    if( pCtx->IsNonDBusReq() )
+    CParamList oParams( ( IConfigDb* )pResp );
+    if( SUCCEEDED( pIrp->GetStatus() ) )
     {
-        CfgPtr pMsg = nullptr;
-        ret = pCtx->GetRespAsCfg( pMsg );
-        if( ERROR( ret ) )
-            return ret;
-
-        *pResp = *pMsg;
-        ret = 0;
-    }
-    else
-    {
-        DMsgPtr pMsg = *pCtx->m_pRespData;
-        if( pMsg.IsEmpty() )
+        // retrieve the data from the irp
+        IrpCtxPtr& pCtx = pIrp->GetTopStack();
+        guint32 dwDirection = pCtx->GetIoDirection();
+        if( dwDirection == IRP_DIR_OUT )
             return -EINVAL;
 
-        ret = FillRespData( pMsg, pResp );
+        if( pCtx->IsNonDBusReq() )
+        {
+            CfgPtr pMsg = nullptr;
+            ret = pCtx->GetRespAsCfg( pMsg );
+            if( SUCCEEDED( ret ) )
+            {
+                pResp = pMsg;
+            }
+            else
+            {
+                oParams[ propReturnValue ] = ret;
+            }
+        }
+        else
+        {
+            BufPtr& pBuf = pCtx->m_pRespData;
+            if( !pBuf.IsEmpty() )
+            {
+                DMsgPtr pMsg = *pBuf;
+                if( !pMsg.IsEmpty() )
+                {
+                    ret = FillRespData( pMsg, pResp );
+                    if( ERROR( ret ) )
+                    {
+                        oParams[ propReturnValue ] = ret;
+                    }
+                }
+            }
+        }
     }
 
-    if( !pResp->exist( propReturnValue ) )
+    if( !oParams.exist( propReturnValue ) )
     {
-        gint32 iRet = pIrp->GetStatus();
-        CParamList oParams( pResp );
-        oParams.SetIntProp(
-            propReturnValue, iRet );
+        // for those cancelled irp or bad response
+        // returned
+        oParams[ propReturnValue ] =
+            pIrp->GetStatus();
     }
     return ret;
 }
 
 gint32 CRpcServices::FillRespData(
-    DMsgPtr& pMsg, IConfigDb* pResp )
+    DMsgPtr& pMsg, CfgPtr& pResp )
 {
     gint32 ret = 0;
-    if( pMsg.IsEmpty() || pResp == nullptr )
+    if( pMsg.IsEmpty() || pResp.IsEmpty() )
         return -EINVAL;
 
+    CCfgOpener oCfg( ( IConfigDb* )pResp );
     if( pMsg.GetType() !=
         DBUS_MESSAGE_TYPE_METHOD_RETURN )
     {
         ret = -EBADMSG;
-        CCfgOpener oCfg( pResp );
         oCfg.SetIntProp(
             propReturnValue, ret );
         return ret;
@@ -2500,7 +2405,6 @@ gint32 CRpcServices::FillRespData(
             if( ERROR( ret ) )
                 break;
 
-            CCfgOpener oCfg( pResp );
             ret = oCfg.SetIntProp(
                 propReturnValue, iRet );
 
@@ -2518,8 +2422,7 @@ gint32 CRpcServices::FillRespData(
             if( ERROR( ret ) )
                 break;
 
-            CCfgOpener oCfg( pResp );
-            ret = oCfg.SetIntProp(
+            ret = oParams.SetIntProp(
                 propReturnValue, iRet );
 
             if( ERROR( ret ) )
@@ -2563,7 +2466,18 @@ gint32 CRpcServices::FillRespData(
             // for the default requests, a
             // configDb ptr is returned
             ObjPtr pObj;
-            ret = pMsg.GetObjArgAt( 0, pObj );
+            gint32 iRet = 0;
+            ret = pMsg.GetIntArgAt( 0, ( guint32& )iRet );
+            if( ERROR( ret ) )
+                break;
+
+            if( ERROR( iRet ) )
+            {
+                oCfg[ propReturnValue ] = iRet;
+                break;
+            }
+
+            ret = pMsg.GetObjArgAt( 1, pObj );
             if( ERROR( ret ) )
                 break;
 
@@ -2573,7 +2487,7 @@ gint32 CRpcServices::FillRespData(
                 ret = -EFAULT;
                 break;
             }
-            ret = pResp->Clone( *pCfg );
+            *pResp = *pCfg;
         }
 
     }while( 0 );
@@ -2622,13 +2536,13 @@ gint32 CRpcServices::SetupReqIrp( IRP* pIrp,
                 IF_METHOD_DISABLEEVT )
             {
                 pIrpCtx->SetCtrlCode(
-                    CTRLCODE_REG_MATCH );
+                    CTRLCODE_UNREG_MATCH );
             }
             else if( strMethod ==
                 IF_METHOD_ENABLEEVT )
             {
                 pIrpCtx->SetCtrlCode(
-                    CTRLCODE_UNREG_MATCH );
+                    CTRLCODE_REG_MATCH );
             }
             else if( strMethod ==
                 IF_METHOD_LISTENING )
@@ -2648,6 +2562,10 @@ gint32 CRpcServices::SetupReqIrp( IRP* pIrp,
             {
                 pIrpCtx->SetCtrlCode(
                     CTRLCODE_SEND_DATA );
+            }
+            else
+            {
+                bSet = false;
             }
         }
 
@@ -2730,8 +2648,26 @@ gint32 CRpcServices::InvokeUserMethod(
             break;
 
         TaskletPtr pTask;
+
+        CCfgOpenerObj oCfg( pCallback );
+        string strIfName;
+
+        ret = oCfg.GetStrProp(
+            propIfName, strIfName );
+        if( ERROR( ret ) ) 
+            break;
+
+        strIfName = IF_NAME_FROM_DBUS( strIfName );
+
+        ToInternalName( strIfName );
+        EnumClsid iid =
+            CoGetIidFromIfName( strIfName );
+
         ret = GetDelegate(
-            strMethod, pTask );
+            strMethod, pTask, iid );
+
+        if( ERROR( ret ) )
+            break;
 
         CDelegateBase* pDelegate = pTask;
         if( pDelegate == nullptr )
@@ -2829,6 +2765,713 @@ gint32 CRpcServices::SendMethodCall(
 
     return ret;
 }
+
+FUNC_MAP* CRpcServices::GetFuncMap(
+    EnumClsid iIfId )
+{
+    EnumClsid iEffectiveId = iIfId;
+    if( iIfId == clsid( Invalid ) )
+        iEffectiveId = GetClsid();
+
+    FUNC_MAP* pMap = nullptr;
+
+    std::map< gint32, FUNC_MAP >::iterator itr = 
+        m_mapFuncs.find( iEffectiveId );
+
+    if( itr == m_mapFuncs.end() )
+        return nullptr;
+
+    pMap = &itr->second;
+    return pMap;
+}
+
+gint32 CRpcServices::SetFuncMap(
+    FUNC_MAP& oMap, EnumClsid iIfId )
+{
+    if( oMap.empty() )
+        return -EINVAL;
+
+    EnumClsid iEffectiveId = iIfId;
+    if( iIfId == clsid( Invalid ) )
+        iEffectiveId = GetClsid();
+
+    FUNC_MAP* pMap = GetFuncMap( iEffectiveId );
+    if( pMap == nullptr )
+    {
+        m_mapFuncs[ iEffectiveId ] = oMap;
+    }
+    else
+    {
+        // to add new or override the existing
+        pMap = &m_mapFuncs[ iEffectiveId ];
+        for( auto elem : oMap )
+            ( *pMap )[ elem.first ] = elem.second;
+    }
+    return 0;
+}
+
+PROXY_MAP* CRpcServices::GetProxyMap(
+    EnumClsid iIfId )
+{
+    EnumClsid iEffectiveId = iIfId;
+    if( iIfId == clsid( Invalid ) )
+        iEffectiveId = GetClsid();
+
+    std::map< gint32, PROXY_MAP >::iterator itr =
+        m_mapProxyFuncs.find( iEffectiveId );
+
+    if( itr == m_mapProxyFuncs.end() )
+        return nullptr;
+
+    PROXY_MAP* pMap = &itr->second;
+    return pMap;
+}
+
+gint32 CRpcServices::SetProxyMap(
+    PROXY_MAP& oMap, EnumClsid iIfId )
+{
+    if( oMap.empty() )
+        return -EINVAL;
+
+    EnumClsid iEffectiveId = iIfId;
+    if( iIfId == clsid( Invalid ) )
+        iEffectiveId = GetClsid();
+
+    PROXY_MAP* pMap = GetProxyMap( iEffectiveId );
+    if( pMap == nullptr )
+    {
+        m_mapProxyFuncs[ iEffectiveId ] = oMap;
+    }
+    else
+    {
+        // to add new or override the existing
+        pMap = &m_mapProxyFuncs[ iEffectiveId ];
+        for( auto elem : oMap )
+            ( *pMap )[ elem.first ] = elem.second;
+    }
+    return 0;
+}
+
+gint32 CRpcServices::GetDelegate(
+    const std::string& strFunc,
+    TaskletPtr& pFunc,
+    EnumClsid iIfId )
+{
+    EnumClsid iEffectiveId = iIfId;
+    if( iIfId == clsid( Invalid ) )
+        iEffectiveId = GetClsid();
+
+    FUNC_MAP* pMap =
+        GetFuncMap( iEffectiveId );
+
+    if( pMap == nullptr )
+        return -ERANGE;
+
+    FUNC_MAP::iterator itrFunc =
+        pMap->find( strFunc );
+
+    if( itrFunc == pMap->end() )
+        return -ERANGE;
+
+    pFunc = itrFunc->second;
+    return 0;
+}
+
+gint32 CRpcServices::GetProxy(
+    const std::string& strFunc,
+    ObjPtr& pProxy,
+    EnumClsid iIfId )
+{
+    EnumClsid iEffectiveId = iIfId;
+    if( iIfId == clsid( Invalid ) )
+        iEffectiveId = GetClsid();
+
+    PROXY_MAP* pMap =
+        GetProxyMap( iEffectiveId );
+
+    if( pMap == nullptr )
+        return -ERANGE;
+
+    PROXY_MAP::iterator itrFunc =
+        pMap->find( strFunc );
+
+    if( itrFunc == pMap->end() )
+        return -ERANGE;
+
+    pProxy = itrFunc->second;
+    return 0;
+}
+
+gint32 CRpcServices::LoadObjDesc(
+    const std::string& strFile,
+    const std::string& strObjName,
+    bool bServer,
+    CfgPtr& pCfg )
+{
+    gint32 ret = 0;
+
+    if( strObjName.empty() ||
+        strFile.empty() )
+        return -EINVAL;
+
+    do{
+        CCfgOpener oCfg( ( IConfigDb* )pCfg );
+
+        // Load the object decription file in json
+        Json::Value valObjDesc;
+        ret = ReadJsonCfg( strFile, valObjDesc );
+        if( ERROR( ret ) )
+            break;
+
+        // get BusName
+        Json::Value& oBusName =
+            valObjDesc[ JSON_ATTR_BUSNAME ];
+
+        if( oBusName == Json::Value::null )
+        {
+            ret = -ENOENT;
+            break;
+        }
+        
+        string strVal = oBusName.asString();
+        strVal = strVal.substr( 0, 255 );
+        oCfg[ propBusName ] = strVal;
+
+        // get PortClass
+        Json::Value& oPortClass =
+            valObjDesc[ JSON_ATTR_PORTCLASS ];
+
+        if( oPortClass == Json::Value::null )
+        {
+            ret = -ENOENT;
+            break;
+        }
+
+        strVal = oPortClass.asString();
+        strVal = strVal.substr( 0, 255 );
+        oCfg[ propPortClass ] = strVal;
+
+        // get PortId
+        Json::Value& oPortId =
+            valObjDesc[ JSON_ATTR_PORTID ];
+
+        if( oPortId == Json::Value::null )
+        {
+            ret = -ENOENT;
+            break;
+        }
+        
+        strVal = oPortId.asString();
+        strVal = strVal.substr( 0, 255 );
+        oCfg[ propPortId ] = std::stoi( strVal );
+
+        // get ipaddr
+        Json::Value& oIpAddr =
+            valObjDesc[ JSON_ATTR_IPADDR ];
+
+        if( oIpAddr != Json::Value::null )
+        {
+            strVal = oIpAddr.asString();
+            if( !strVal.empty() )
+            {
+                strVal = strVal.substr( 0, 16 );
+                oCfg[ propIpAddr ] = strVal;
+            }
+        }
+        
+        // get ServerName
+        Json::Value& oServerName =
+            valObjDesc[ JSON_ATTR_SVRNAME ];
+
+        if( oServerName == Json::Value::null )
+        {
+            ret = -ENOENT;
+            break;
+        }
+        
+        string strSvrName = oServerName.asString();
+        strSvrName = strSvrName.substr( 0, 255 );
+
+        // get object array
+        Json::Value& oObjArray =
+            valObjDesc[ JSON_ATTR_OBJARR ];
+
+        if( oObjArray == Json::Value::null ||
+            !oObjArray.isArray() ||
+            oObjArray.empty() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+
+        size_t i = 0;
+        for( ; i < oObjArray.size(); i++ )
+        {
+            if( oObjArray[ i ].empty() ||
+                !oObjArray[ i ].isObject() )
+                continue;
+
+            Json::Value& oObjElem = oObjArray[ i ];
+            if( !oObjElem.isMember( JSON_ATTR_OBJNAME ) )
+                continue;
+
+            // find the section with `ObjName' is
+            // strObjName
+            if( oObjElem[ JSON_ATTR_OBJNAME ].asString()
+                != strObjName )
+                continue;
+
+            // get the RequestTimeoutSec
+            if( oObjElem.isMember( JSON_ATTR_REQ_TIMEOUT ) &&
+                oObjElem[ JSON_ATTR_REQ_TIMEOUT ].isString() )
+            {
+                strVal = oObjElem[ JSON_ATTR_REQ_TIMEOUT ].asString(); 
+                oCfg[ propTimeoutSec ] = std::stoi( strVal );
+            }
+
+            // get the KeepAliveTimeoutSec
+            if( oObjElem.isMember( JSON_ATTR_KA_TIMEOUT ) &&
+                oObjElem[ JSON_ATTR_KA_TIMEOUT ].isString() )
+            {
+                strVal = oObjElem[ JSON_ATTR_KA_TIMEOUT ].asString(); 
+                oCfg[ propKeepAliveSec ] = std::stoi( strVal );
+            }
+
+            // overwrite the global port class and port
+            // id if PROXY_PORTCLASS and PROXY_PORTID
+            // exist
+            if( oObjElem.isMember( JSON_ATTR_PROXY_PORTCLASS ) &&
+                oObjElem[ JSON_ATTR_PROXY_PORTCLASS ].isString() &&
+                !bServer )
+            {
+                strVal = oObjElem[ JSON_ATTR_PROXY_PORTCLASS ].asString(); 
+                oCfg[ propPortClass ] = strVal;
+            }
+
+            if( oObjElem.isMember( JSON_ATTR_PROXY_PORTID ) &&
+                oObjElem[ JSON_ATTR_PROXY_PORTID ].isString() &&
+                !bServer )
+            {
+                strVal = oObjElem[ JSON_ATTR_PROXY_PORTID ].asString(); 
+                oCfg[ propPortId ] = std::stoi( strVal );
+            }
+
+            Json::Value& oIfArray = 
+                oObjElem[ JSON_ATTR_IFARR ];            
+
+            if( oIfArray == Json::Value::null ||
+                !oIfArray.isArray() ||
+                oIfArray.empty() )
+                ret = -ENOENT;
+
+            break;
+        }
+
+        if( ERROR( ret ) )
+            break;
+
+        if( i == oObjArray.size() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+
+        // Found the object decriptor
+        //
+        // dbus related information
+        string strObjPath = DBUS_OBJ_PATH(
+            strSvrName, strObjName );
+
+        oCfg[ propObjPath ] = strObjPath;
+
+        string strDest( strObjPath );
+
+        std::replace( strDest.begin(),
+            strDest.end(), '/', '.');
+
+        if( strDest[ 0 ] == '.' )
+            strDest = strDest.substr( 1 );
+
+        EnumMatchType iType =
+            bServer ? matchServer : matchClient;
+        oCfg[ propMatchType ] = iType;
+
+        // set the destination dbus name
+        if( bServer )
+        {
+            // useful when sending out event
+            oCfg[ propSrcDBusName ] = strDest;
+        }
+        else
+        {
+            // important for proxy
+            oCfg[ propDestDBusName ] = strDest;
+        }
+
+
+        Json::Value& oIfArray =
+            oObjArray[ i ][JSON_ATTR_IFARR ];
+        
+        i = 0;
+
+        ObjVecPtr pObjVec( true );
+
+        for( ; i < oIfArray.size(); i++ )
+        {
+            Json::Value& oIfDesc = oIfArray[ i ];
+
+            // get the interface name
+            Json::Value& oIfName =
+                oIfDesc[ JSON_ATTR_IFNAME ];
+
+            if( oIfName == Json::Value::null ||
+                !oIfName.isString() )
+                continue;
+            
+            if( oIfDesc.isMember( JSON_ATTR_BIND_CLSID ) &&
+                oIfDesc[ JSON_ATTR_BIND_CLSID ].isString() &&
+                oIfDesc[ JSON_ATTR_BIND_CLSID ].asString() == "true" )
+            {
+                // the master interface
+                strVal = oIfName.asString().substr( 0, 255 );
+                if( strVal.empty() )
+                {
+                    ret = -EINVAL;
+                    break;
+                }
+                oCfg[ propIfName ] = 
+                    DBUS_IF_NAME( oIfName.asString() );
+
+                continue;
+            }
+
+            MatchPtr pMatch;
+            pMatch.NewObj( clsid( CMessageMatch ) );
+
+            CCfgOpenerObj oMatch(
+                ( CObjBase* )pMatch );
+
+            oMatch.SetStrProp(
+                propObjPath, strObjPath );
+
+            oMatch.SetIntProp( propMatchType, iType );
+
+            oMatch.SetStrProp( propIfName,
+                DBUS_IF_NAME( oIfName.asString() ) );
+
+            if( bServer )
+            {
+                oMatch.SetStrProp(
+                    propSrcDBusName, strDest );
+            }
+            else
+            {
+                // this will be required by the 
+                // CRpcPdoPort::SetupDBusSetting
+                oMatch.SetStrProp(
+                    propDestDBusName, strDest );
+            }
+
+            ( *pObjVec )().push_back( pMatch );
+        }
+
+        if( ERROR( ret ) )
+            break;
+
+        if( ( *pObjVec )().size() )
+        {
+            ObjPtr pObj( pObjVec );
+            oCfg.SetObjPtr( propObjList, pObj );
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CRpcServices::PackEvent(
+    EnumEventId iEvent,
+    guint32 dwParam1,
+    guint32 dwParam2,
+    guint32* pData,
+    CfgPtr& pDestCfg  )
+{
+    gint32 ret = 0;
+
+    CParamList oParams;
+    oParams.Push( ( guint32 )iEvent );
+
+    switch( iEvent )
+    {
+    case eventPortStarted:
+    case eventPortStopping:
+    case eventPortStartFailed:
+        {
+            // push the port handle
+            oParams.Push( dwParam1 );
+            break;
+        }
+    case eventPortStopped:
+        {
+            break;
+        }
+    case eventModOnline:
+    case eventModOffline:
+        {
+            oParams.Push( 0 );
+            oParams.Push( 0 );
+
+            string strMod =
+                reinterpret_cast< char* >( pData );
+            oParams.Push( strMod );
+
+            break;
+        }
+    case eventRmtModOnline:
+    case eventRmtModOffline:
+        {
+
+            string strIpAddr =
+                reinterpret_cast< char* >( dwParam1 );
+
+            oParams.Push( strIpAddr );
+            oParams.Push( 0 );
+
+            string strMod =
+                reinterpret_cast< char* >( pData );
+            oParams.Push( strMod );
+
+            break;
+        }
+    case eventDBusOnline:
+    case eventDBusOffline:
+        {
+            break;
+        }
+    case eventRmtDBusOffline:
+    case eventRmtDBusOnline:
+    case eventRmtSvrOnline:
+    case eventRmtSvrOffline:
+        {
+            string strIpAddr = reinterpret_cast
+                < char* >( dwParam1 );
+            oParams.Push( strIpAddr );
+
+            oParams.Push( 0 );
+
+            HANDLE hPort = ( guint32 )pData;
+            oParams.Push( hPort );
+            break;
+        }
+    default:
+        {
+            ret = -ENOTSUP;
+            break;
+        }
+    }
+
+    if( SUCCEEDED( ret ) )
+        pDestCfg = oParams.GetCfg();
+    return ret;
+}
+
+gint32 CRpcServices::UnpackEvent(
+    CfgPtr& pSrcCfg,
+    EnumEventId& iEvent,
+    guint32& dwParam1,
+    guint32& dwParam2,
+    guint32*& pData )
+{
+    gint32 ret = 0;
+
+    CParamList oParams(
+        ( IConfigDb*) pSrcCfg );
+
+    iEvent = oParams[ 0 ];
+    dwParam1 = 0;
+    dwParam2 = 0;
+    pData = nullptr;
+
+    switch( iEvent )
+    {
+    case eventPortStarted:
+    case eventPortStopping:
+    case eventPortStartFailed:
+        {
+            // push the port handle
+            dwParam1 = oParams[ 1 ];
+            break;
+        }
+    case eventPortStopped:
+        {
+            break;
+        }
+    case eventModOnline:
+    case eventModOffline:
+        {
+            BufPtr pBuf;
+            ret = oParams.GetProperty( 3, pBuf );
+            if( ERROR( ret ) )
+                break;
+            pData = ( guint32* )pBuf->ptr();
+
+            break;
+        }
+    case eventRmtModOnline:
+    case eventRmtModOffline:
+        {
+            string strMod =
+                reinterpret_cast< char* >( pData );
+
+            string strIpAddr =
+                reinterpret_cast< char* >( dwParam1 );
+
+            BufPtr pBuf;
+            ret = oParams.GetProperty( 1, pBuf );
+            if( ERROR( ret ) )
+                break;
+            dwParam1 = ( guint32 )pBuf->ptr();
+
+            ret = oParams.GetProperty( 3, pBuf );
+            if( ERROR( ret ) )
+                break;
+
+            pData = ( guint32* )pBuf->ptr();
+            break;
+        }
+    case eventDBusOnline:
+    case eventDBusOffline:
+        {
+            break;
+        }
+    case eventRmtDBusOffline:
+    case eventRmtDBusOnline:
+    case eventRmtSvrOnline:
+    case eventRmtSvrOffline:
+        {
+            BufPtr pBuf;
+            ret = oParams.GetProperty( 1, pBuf );
+            if( ERROR( ret ) )
+                break;
+            dwParam1 = ( guint32 )pBuf->ptr();
+
+            guint32 hPort = oParams[ 3 ];
+            pData = ( guint32* )hPort;
+            break;
+        }
+    default:
+        {
+            ret = -ENOTSUP;
+            break;
+        }
+    }
+    return ret;
+}
+
+gint32 CRpcServices::OnEvent(
+    EnumEventId iEvent,
+    guint32 dwParam1,
+    guint32 dwParam2,
+    guint32* pData  )
+{
+    gint32 ret = 0;
+
+    bool bProcess = false;
+
+    CStdRMutex oIfLock( GetLock() );
+    if( m_queEvents.size() == 0 )
+        bProcess = true;
+
+    CfgPtr pParams;
+    ret = PackEvent( iEvent, dwParam1,
+        dwParam2, pData, pParams );
+
+    if( ERROR( ret ) )
+        return ret;
+
+    m_queEvents.push_back( pParams );
+
+    if( !bProcess )
+        return ret;
+
+    oIfLock.Unlock();
+
+    do{
+        ret = super::OnEvent( iEvent,
+            dwParam1, dwParam2, pData );
+
+        oIfLock.Lock();
+        m_queEvents.pop_front();
+        if( m_queEvents.empty() )
+            break;
+
+        CfgPtr pParams =
+            m_queEvents.front();
+
+        oIfLock.Unlock();
+
+        ret = UnpackEvent( pParams, iEvent,
+            dwParam1, dwParam2, pData );
+
+        if( ERROR( ret ) )
+            break;
+
+    }while( 1 );
+
+    return ret;
+}
+
+gint32 CRpcServices::RestartListening()
+{
+    gint32 ret = 0;
+    CParamList oParams;
+    TaskletPtr pRecvMsgTask;
+
+    oParams[ propIfPtr ] = ObjPtr( this );
+    for( auto pMatch : m_vecMatches )
+    {
+        oParams[ propMatchPtr ] =
+            ObjPtr( pMatch );
+
+        ret = pRecvMsgTask.NewObj(
+            clsid( CIfStartRecvMsgTask ),
+            oParams.GetCfg() );
+
+        if( ERROR( ret ) )
+            break;
+
+        ret = AddAndRun( pRecvMsgTask );
+
+        if( ERROR( ret ) )
+            break;
+    }
+
+    return ret;
+}
+
+gint32 CRpcServices::DoModEvent(
+    EnumEventId iEvent,
+    const std::string& strModule )
+{
+    EnumIfState iOldState = GetState();
+
+    gint32 ret = m_pIfStat->OnModEvent(
+        iEvent, strModule );
+
+    if( SUCCEEDED( ret ) )
+    {
+        EnumIfState iNewState = GetState();
+        if( iNewState == stateConnected &&
+            iOldState == stateRecovery )
+        {
+            // let's send new request to listen on the
+            // events
+            ret = RestartListening();
+        }
+    }
+    return ret;
+}
+
 /**
 * @name DoInvoke
 * find a event handler for the event message
@@ -3131,6 +3774,10 @@ gint32 CInterfaceProxy::SendProxyReq(
 
     do{
         CReqBuilder oReq( this );
+
+        // overwrite the strIfName if exist in the
+        // pCallback
+        oReq.CopyProp( propIfName, pCallback );
         oReq.SetMethodName( strMethod );
 
         for( auto& pBuf: vecParams )
@@ -3171,7 +3818,11 @@ gint32 CInterfaceProxy::SendProxyReq(
                     ret = -EFAULT;
                     break;
                 }
-                pSyncCallback->WaitForComplete();
+                ret = pSyncCallback->WaitForComplete();
+            }
+            else
+            {
+                break;
             }
         }
 
@@ -3184,6 +3835,13 @@ gint32 CInterfaceProxy::SendProxyReq(
         if( ERROR( ret ) )
             break;
 
+        if( !bSync )
+        {
+            CCfgOpenerObj oCallback( pCallback );
+            oCallback.SetObjPtr(
+                propRespPtr, ObjPtr( pResp ) );
+        }
+
         ret = iRet;
 
     }while( 0 );
@@ -3193,9 +3851,18 @@ gint32 CInterfaceProxy::SendProxyReq(
 
 gint32 CInterfaceProxy::InitUserFuncs()
 {
-    BEGIN_PROXY_MAP( false );
+    gint32 ret = super::InitUserFuncs();
+    if( ERROR( ret ) )
+        return ret;
+
+    // since we are contacting the remote
+    // IInterfaceServer, so the interface name should
+    // be IInterfaceServer
+    BEGIN_IFPROXY_MAP( IInterfaceServer, false );
+
     ADD_PROXY_METHOD( SYS_METHOD_USERCANCELREQ, guint64 );
-    END_PROXY_MAP
+
+    END_IFPROXY_MAP;
 
     return 0;
 }
@@ -3209,16 +3876,115 @@ gint32 CInterfaceProxy::UserCancelRequest(
 	if( qwTaskToCancel == 0 )
 		return -EINVAL;
 
+    bool bRemove = false;
+    CCfgOpenerObj oCfg( pCallback );
+    if( !oCfg.exist( propIfName ) )
+    {
+        string strIfName = CoGetIfNameFromIid(
+            iid( IInterfaceServer ) );
+
+        if( strIfName.empty() )
+            return ERROR_FAIL;
+
+        ToPublicName( strIfName );
+
+        // FIXME: not a good solution
+        oCfg.SetStrProp( propIfName,
+            DBUS_IF_NAME( strIfName ) );
+
+        bRemove = true;
+    }
+
     // a sample code snippet
-    return CallProxyFunc( pCallback,
+    gint32 ret =  CallProxyFunc( pCallback,
 		qwThisTaskId,
         SYS_METHOD( __func__ ),
 		qwTaskToCancel );
+
+    if( bRemove )
+    {
+        oCfg.RemoveProperty( propIfName );
+    }
+    return ret;
+}
+
+gint32 CInterfaceProxy::CancelRequest(
+    guint64 qwTaskId )
+{
+    if( qwTaskId == 0 )
+        return -EINVAL;
+
+    gint32 ret = 0;
+
+    do{
+        TaskletPtr pTask; 
+        ret = pTask.NewObj(
+            clsid( CIoReqSyncCallback ) ); 
+
+        if( ERROR( ret ) ) 
+            break; 
+
+        // this is a built-in request
+        guint64 qwThisTask = 0;
+        ret = UserCancelRequest(
+            pTask, qwThisTask, qwTaskId );
+
+        if( ERROR( ret ) )
+            break;
+
+        if( ret == STATUS_PENDING )
+        {
+            CIoReqSyncCallback* pSyncTask = pTask;
+            pSyncTask->WaitForComplete();
+            if( SUCCEEDED( ret ) )
+                ret = pSyncTask->GetError();
+        }
+        if( ERROR( ret ) )
+            break;
+
+        ObjPtr pObj; 
+        CCfgOpenerObj oTask( ( CObjBase* )pTask ); 
+        ret = oTask.GetObjPtr( propRespPtr, pObj ); 
+        if( ERROR( ret ) ) 
+            break; 
+
+        CfgPtr pResp = pObj; 
+        if( pResp.IsEmpty() )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        CParamList oResp( ( IConfigDb* )pResp );
+        if( !oResp.exist( propReturnValue ) )
+        {
+            ret = ERROR_FAIL;
+            break;
+        }
+
+        ret = oResp[ propReturnValue ];
+
+   }while( 0 ); 
+
+   return ret;
+}
+
+static CfgPtr InitIfSvrCfg(
+    const IConfigDb * pCfg )
+{
+    CCfgOpener oNewCfg;
+    *oNewCfg.GetCfg() = *pCfg;
+
+    oNewCfg.SetIntProp(
+        propIfStateClass,
+        clsid( CIfServerState ) );
+
+    return oNewCfg.GetCfg();
 }
 
 CInterfaceServer::CInterfaceServer(
     const IConfigDb* pCfg )
-    : super( pCfg )
+    : super( InitIfSvrCfg( pCfg ) )
 {
     gint32 ret = 0;
 
@@ -3226,20 +3992,11 @@ CInterfaceServer::CInterfaceServer(
         CCfgOpener oCfg( pCfg );
         string strPortClass;
 
-        ret = oCfg.GetStrProp(
-            propPortClass, strPortClass );
-
-        if( ERROR( ret ) )
+        if( !oCfg.exist( propPortClass ) )
+        {
+            ret = -EINVAL;
             break;
-
-        EnumClsid iStateClass =
-            clsid( CIfServerState );
-
-        ret = m_pIfStat.NewObj(
-            iStateClass, pCfg );
-
-        if( ERROR( ret ) )
-            break;
+        }
 
         ret = m_pIfMatch.NewObj(
             clsid( CMessageMatch ), pCfg );
@@ -3294,7 +4051,8 @@ CInterfaceServer::~CInterfaceServer()
         m_pIfMatch.Clear();
 }
 
-// called to send back the response
+// called to hook the response to the task for
+// sending back
 gint32 CInterfaceServer::SetResponse(
     IEventSink* pTask,
     CfgPtr& pRespData )
@@ -3310,7 +4068,7 @@ gint32 CInterfaceServer::SetResponse(
     if( pObj.IsEmpty() )
         return -EFAULT;
 
-    // set the response value
+    // set the response pointer
     ret = oTaskCfg.SetObjPtr(
         propRespPtr, pObj );
 
@@ -3520,14 +4278,18 @@ gint32 CInterfaceServer::DoInvoke(
             CReqOpener oReq( pCfg );
 
             guint32 dwFlags = 0;
-            ret = oReq.GetCallFlags( dwFlags );
+            gint32 iRet = oReq.GetCallFlags( dwFlags );
 
-            if( dwFlags & CF_WITH_REPLY )
+            if( SUCCEEDED( iRet ) && 
+                ( dwFlags & CF_WITH_REPLY ) )
                 bResp = true;
 
             if( ret == STATUS_PENDING )
-                SET_RMT_TASKID( pCfg, oCfg );
-
+            {
+                // for keep-alive purpose
+                CCfgOpenerObj oTaskCfg( pCallback );
+                SET_RMT_TASKID( pCfg, oTaskCfg );
+            }
         }
 
         if( ret == STATUS_PENDING )
@@ -3665,7 +4427,7 @@ gint32 CInterfaceServer::SendResponse(
         {
             
             if( !dbus_message_append_args( pRespMsg,
-                DBUS_TYPE_UINT32, iRet ,
+                DBUS_TYPE_UINT32, &iRet ,
                 DBUS_TYPE_INVALID ) )
             {
                 ret = -ENOMEM;
@@ -3719,12 +4481,12 @@ gint32 CInterfaceServer::SendResponse(
 #endif
 
             if( !dbus_message_append_args( pRespMsg,
-                DBUS_TYPE_UINT32, iRet,
+                DBUS_TYPE_UINT32, &iRet,
                 DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
-                pBuf->ptr(), pBuf->size(),
-                iFdType, iFd,
-                DBUS_TYPE_UINT32, dwOffset,
-                DBUS_TYPE_UINT32, dwSize,
+                &pBuf->ptr(), pBuf->size(),
+                iFdType, &iFd,
+                DBUS_TYPE_UINT32, &dwOffset,
+                DBUS_TYPE_UINT32, &dwSize,
                 DBUS_TYPE_INVALID ) )
             {
                 ret = -ENOMEM;
@@ -3752,9 +4514,9 @@ gint32 CInterfaceServer::SendResponse(
             if( pBuf->size() )
             {
                 if( !dbus_message_append_args( pRespMsg,
-                    DBUS_TYPE_UINT32, iRet,
+                    DBUS_TYPE_UINT32, &iRet,
                     DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
-                    pBuf->ptr(), pBuf->size(),
+                    &pBuf->ptr(), pBuf->size(),
                     DBUS_TYPE_INVALID ) )
                 {
                     ret = -ENOMEM;
@@ -3764,7 +4526,7 @@ gint32 CInterfaceServer::SendResponse(
             else
             {
                 if( !dbus_message_append_args( pRespMsg,
-                    DBUS_TYPE_UINT32, iRet,
+                    DBUS_TYPE_UINT32, &iRet,
                     DBUS_TYPE_INVALID ) )
                 {
                     ret = -ENOMEM;
@@ -3776,7 +4538,7 @@ gint32 CInterfaceServer::SendResponse(
             strMethod == SYS_METHOD_DISABLERMTEVT )
         {
             if( !dbus_message_append_args( pRespMsg,
-                DBUS_TYPE_UINT32, iRet,
+                DBUS_TYPE_UINT32, &iRet,
                 DBUS_TYPE_INVALID ) )
             {
                 ret = -ENOMEM;
@@ -3785,8 +4547,24 @@ gint32 CInterfaceServer::SendResponse(
         }
         else
         {
-            ret = -ENOTSUP;
-            break;
+            TaskletPtr pTask;
+
+            // NOTE: no need to check if the method is
+            // valid or not. It has be done already
+            BufPtr pBuf( true );
+            ret = pRespData->Serialize( *pBuf );  
+            if( ERROR( ret ) )
+                break;
+
+            if( !dbus_message_append_args( pRespMsg,
+                DBUS_TYPE_UINT32, &iRet,
+                DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
+                &pBuf->ptr(), pBuf->size(),
+                DBUS_TYPE_INVALID ) )
+            {
+                ret = -ENOMEM;
+                break;
+            }
         }
 
         CIoManager* pMgr = GetIoMgr();
@@ -4023,13 +4801,13 @@ gint32 CInterfaceServer::InitUserFuncs()
     if( ERROR( ret ) )
         return ret;
 
-    BEGIN_HANDLER_MAP;
+    BEGIN_IFHANDLER_MAP( IInterfaceServer );
 
     ADD_SERVICE_HANDLER(
         CInterfaceServer::UserCancelRequest,
         SYS_METHOD_USERCANCELREQ );
 
-    END_HANDLER_MAP;
+    END_IFHANDLER_MAP;
 
     return ret;
 }
@@ -4040,7 +4818,7 @@ gint32 CInterfaceServer::UserCancelRequest(
 {
     // let's search through the tasks to find the
     // specified task to cancel
-    gint32 ret = -ENOENT;
+    gint32 ret = 0;
     do{
         TaskGrpPtr pTaskGrp = GetTaskGroup();
         if( pTaskGrp.IsEmpty() )
@@ -4073,7 +4851,7 @@ gint32 CInterfaceServer::UserCancelRequest(
             CCfgOpenerObj oCfg( pInvTask ); 
             
             gint32 iType = 0;
-            ret = oCfg.GetCfg()->GetPropertyType(
+            ret = pInvTask->GetPropertyType(
                 propMsgPtr, iType );
 
             if( ERROR( ret ) )
@@ -4135,11 +4913,22 @@ gint32 CInterfaceServer::UserCancelRequest(
 
         if( !pResp.IsEmpty() )
         {
-            ret = OnServiceComplete(
-                pResp, pInvTask );
+            // note we do not use OnServiceComplete to
+            // complete the invoke task, force to
+            // deliver the `cancel event' to the task.
+            SetResponse( pInvTask, pResp );
+            pInvTask->OnEvent( eventCancelTask,
+                -ECANCELED, 0, 0 );
         }
 
     }while( 0 );
+
+    // set the response for this cancel request
+    CParamList oMyResp;
+    oMyResp[ propReturnValue ] = ret;
+
+    SetResponse( pCallback,
+        oMyResp.GetCfg() );
 
     return ret;
 }
@@ -4290,6 +5079,9 @@ gint32 CInterfaceServer::SendData_Server(
         {
             string strSrcFile;
             CCfgOpener oCfg( pDataDesc );
+
+            // FIXME: security loophole, no limit on
+            // where to store the files
             ret = oCfg.GetStrProp(
                 propFilePath, strSrcFile );
 
@@ -4359,7 +5151,11 @@ gint32 CInterfaceServer::FetchData_Server(
             break;
         }
 
+        // delete on close
         unlink( szDestFile );
+
+        // FIXME: Security issue here, no limit for
+        // external access to all the files
 
         fdSrc = open( strSrcFile.c_str(), O_RDONLY );
         if( fdSrc == -1 )
@@ -4367,6 +5163,7 @@ gint32 CInterfaceServer::FetchData_Server(
             ret = -errno;
             break;
         }
+
         ssize_t iSize = lseek( fdSrc, dwOffset, SEEK_END );
         if( iSize == -1 )
         {

@@ -23,20 +23,18 @@
 #include "stlcont.h"
 #include "tasklets.h"
 #include "utils.h"
-#include "proxy.h"
+#include "ifhelper.h"
 #include "port.h"
 #include "frmwrk.h"
 #include "dbusport.h"
+#include "objfctry.h"
+#include "iiddict.h"
 
 #include <dlfcn.h>
 
 using namespace std;
 
-FctryVecPtr g_pFactories;
-
-std::map< gint32, FUNC_MAP > g_mapFuncs;
-std::map< gint32, PROXY_MAP > g_mapProxyFuncs;
-
+CInterfIdDict  g_oIidDict;
 
 // c++11 required
 
@@ -49,7 +47,6 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRY( IoRequestPacket );
     INIT_MAP_ENTRY( IRP_CONTEXT );
     INIT_MAP_ENTRY( CTaskQueue );
-    INIT_MAP_ENTRY( CMainIoLoop );
     INIT_MAP_ENTRY( CStlIrpVector );
     INIT_MAP_ENTRY( CStlIrpVector2 );
     INIT_MAP_ENTRY( CStlPortVector );
@@ -57,6 +54,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRY( COneshotTaskThread );
     INIT_MAP_ENTRY( CTaskWrapper );
 
+    INIT_MAP_ENTRYCFG( CMainIoLoop );
     INIT_MAP_ENTRYCFG( CCancelIrpsTask );
     INIT_MAP_ENTRYCFG( CDBusBusDriver );
     INIT_MAP_ENTRYCFG( CDBusBusPort );
@@ -66,11 +64,11 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CDBusLocalPdo );
     INIT_MAP_ENTRYCFG( CDBusLoopbackMatch );
     INIT_MAP_ENTRYCFG( CDBusLoopbackPdo );
-    INIT_MAP_ENTRYCFG( CDBusPdoListenDBEventTask );
     INIT_MAP_ENTRYCFG( CDBusSysMatch );
     INIT_MAP_ENTRYCFG( CDBusTransLpbkMsgTask );
     INIT_MAP_ENTRYCFG( CDriverManager );
     INIT_MAP_ENTRYCFG( CGenBusPortStopChildTask );
+    INIT_MAP_ENTRYCFG( CIfOpenPortTask );
     INIT_MAP_ENTRYCFG( CIfCleanupTask );
     INIT_MAP_ENTRYCFG( CIfCpEventTask );
     INIT_MAP_ENTRYCFG( CIfDummyTask );
@@ -92,6 +90,8 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CIoMgrStopTask );
     INIT_MAP_ENTRYCFG( CIrpThreadPool );
     INIT_MAP_ENTRYCFG( CLocalProxyState );
+    INIT_MAP_ENTRYCFG( CIfServerState );
+    INIT_MAP_ENTRYCFG( CRemoteProxyState );
     INIT_MAP_ENTRYCFG( CMessageMatch );
     INIT_MAP_ENTRYCFG( CPnpManager );
     INIT_MAP_ENTRYCFG( CPnpMgrDoStopNoMasterIrp );
@@ -104,12 +104,12 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CPortState );
     INIT_MAP_ENTRYCFG( CPortStateResumeSubmitTask );
     INIT_MAP_ENTRYCFG( CProxyMsgMatch );
-    INIT_MAP_ENTRYCFG( CRemoteProxyState );
     INIT_MAP_ENTRYCFG( CSyncCallback );
     INIT_MAP_ENTRYCFG( CTaskThreadPool );
     INIT_MAP_ENTRYCFG( CTimerService );
     INIT_MAP_ENTRYCFG( CUtilities );
     INIT_MAP_ENTRYCFG( CWorkitemManager );
+    INIT_MAP_ENTRYCFG( CIoReqSyncCallback );
 
     END_FACTORY_MAPS;
 };
@@ -122,4 +122,30 @@ gint32 DllLoadFactory( FactoryPtr& pFactory )
         return -EFAULT;
 
     return 0;
+}
+
+extern "C"
+gint32 DllUnload()
+{
+    return 0;
+}
+
+const std::string& CoGetIfNameFromIid(
+    EnumClsid Iid )
+{
+    return g_oIidDict.GetName( Iid );
+}
+
+EnumClsid CoGetIidFromIfName(
+    const std::string& strName )
+{
+    return g_oIidDict.GetIid( strName );
+}
+
+gint32 CoAddIidName(
+    const std::string& strName,
+    EnumClsid Iid )
+{
+    return g_oIidDict.AddIid(
+        strName, Iid );
 }

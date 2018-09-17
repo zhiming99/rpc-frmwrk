@@ -134,6 +134,8 @@ class CCarrierPacket :
 
     public:
 
+    typedef CObjBase super;
+
     CCarrierPacket();
     ~CCarrierPacket();
 
@@ -385,16 +387,6 @@ class CRpcControlStream :
 
     CRpcControlStream( const IConfigDb* pCfg );
 
-    // return 0 if the packet is sent,
-    // return STATUS_PENDING if the packet is not
-    // sent completely
-    // only when StartSend complete the packet,
-    // can we move to the next stream or next
-    // packet.
-    // the irp is the one to complete if the
-    // packet is sent.
-    gint32 StartSend( gint32 iFd, IrpPtr& pIrp );
-
     gint32 SetRespReadIrp(
         IRP* pIrp, CBuffer* pBuf );
 
@@ -475,10 +467,12 @@ class CRpcSocketBase : public IService
     CRpcSocketBase(
         const IConfigDb* pCfg = nullptr );
 
-    ~CRpcSocketBase();
+    ~CRpcSocketBase()
+    {
+    }
     
     // commands
-    gint32 Start();
+    // gint32 Start()
     gint32 Stop();
 
     gint32 GetSockFd( gint32& iFd ) const
@@ -584,7 +578,6 @@ class CRpcListeningSock :
 
     // commands
     gint32 Start();
-    gint32 Stop();
 
     // new connection comes
     virtual gint32 OnConnected();
@@ -617,8 +610,8 @@ class CRpcStreamSock :
     gint32 GetCtrlStmFromIrp(
         IRP* pIrp, StmPtr& pStm );
 
-	virtual gint32 CancelStartIrp(
-        IRP* pIrp, bool bForce = true );
+	// virtual gint32 CancelStartIrp(
+    //     IRP* pIrp, bool bForce = true );
 
     public:
 
@@ -964,7 +957,8 @@ class CTcpStreamPdo : public CPort
         guint32* pData );
 
     gint32 AllocIrpCtxExt(
-        IrpCtxPtr& pIrpCtx ) const;
+        IrpCtxPtr& pIrpCtx,
+        void* pContext = nullptr ) const;
 
     static gint32 GetIoctlReqState(
         IRP* pIrp, EnumIoctlStat& iState );

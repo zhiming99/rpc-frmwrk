@@ -15,18 +15,17 @@ $(TARGET) : $(OBJS)
 	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
 	$(CC) -o $(OUTPUT_DIR)/$(TARGET) $(LINKER_OPTION) $(OBJS)
 
-#-include $(OBJS:.o=.d)
+-include $(OBJS:.o=.d)
 
 %.o : %.cpp
 	@echo Building file: $<
-	$(CPP) $(C_DEFINES) $(CPP_FLAGS) $(C_INCLUDE) -o $@ $(CUR_DIR)/$<
+	$(CPP) $(C_DEFINES) $(C_FLAGS ) $(CPP_FLAGS) $(C_INCLUDE) -o $@ $(CUR_DIR)/$<
 	@echo
-
-#@$(CPP) $(C_DEFINES) $(CPP_FLAGS) $(C_INCLUDE) -MM $*.cpp > $*.d
-#@mv -f $*.d $*.d.tmp
-#@sed -e 's|.*:|$*.o:|' < $*.d.tmp > $*.d
-#@sed -e 's/.*://' -e 's/\\$$//' < $*.d.tmp | fmt -1 | sed -e 's/^ *//' -e 's/$$/:/' >> $*.d
-#@rm -f $*.d.tmp
+	@$(CPP) $(C_DEFINES) $(C_FLAGS ) $(CPP_FLAGS) $(C_INCLUDE) -MM $*.cpp > $*.d
+	@mv -f $*.d $*.d.tmp
+	@sed -e 's|.*:|$*.o:|' < $*.d.tmp > $*.d
+	@sed -e 's/.*://' -e 's/\\$$//' < $*.d.tmp | fmt -1 | sed -e 's/^ *//' -e 's/$$/:/' >> $*.d
+	@rm -f $*.d.tmp
 
 dllexp.o	: dllexp.cpp
 dbusprxy.o : dbusprxy.cpp

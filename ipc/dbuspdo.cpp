@@ -76,6 +76,8 @@ gint32 CDBusLocalPdo::SetupDBusSetting(
 
         std::replace( strObjPath.begin(),
             strObjPath.end(), '/', '.');
+        if( strObjPath[ 0 ] == '.' )
+            strObjPath = strObjPath.substr( 1 );
        
         CStdRMutex oPortLock( GetLock() );
         if( m_mapRegObjs.find( strObjPath )
@@ -93,50 +95,25 @@ gint32 CDBusLocalPdo::SetupDBusSetting(
         // registered, so that it can be safely
         // called, without extra steps from the
         // dbus message callback
-        ret = dbus_bus_request_name(
-            m_pDBusConn,
-            strObjPath.c_str(),
-            0, dbusError );
+        CDBusBusPort *pBusPort = static_cast
+            < CDBusBusPort* >( m_pBusPort );
+
+        ret = pBusPort->RegBusName(
+            strObjPath, 0 );
 
         oPortLock.Lock();
 
-        if( ret == -1 ) 
-        {
-            // register this object
-            if( dbusError.GetName() != nullptr )
-            {
-                ret = dbusError.Errno();
-                break;
-            }
-            else
-            {
-                ret = ERROR_FAIL;
-                break;
-            }
-        }
+        if( ERROR( ret ) ) 
+            break;
 
-        // otherwise, return TRUE or FALSE
-        if( ret == 0 )
-        {
-            ret = ENOTCONN;
-        }
-        else if( ret == 1 )
-        {
-            // register this object in the memory
-            if( m_mapRegObjs.find( strObjPath )
-                == m_mapRegObjs.end() )
-                m_mapRegObjs[ strObjPath ] = 1;
-            else
-                m_mapRegObjs[ strObjPath ]++;
-
-            ret = 0;
-        }
+        // register this object in the memory
+        if( m_mapRegObjs.find( strObjPath )
+            == m_mapRegObjs.end() )
+            m_mapRegObjs[ strObjPath ] = 1;
         else
-        {
-            ret = ERROR_FAIL;
-        }
-    }
-    while( 0 );
+            m_mapRegObjs[ strObjPath ]++;
+
+    }while( 0 );
 
     // the user interface will register itself
     // with the registry
@@ -184,6 +161,9 @@ gint32 CDBusLocalPdo::ClearDBusSetting(
 
         std::replace( strObjPath.begin(),
             strObjPath.end(), '/', '.');
+
+        if( strObjPath[ 0 ] == '.' )
+            strObjPath = strObjPath.substr( 1 );
        
         CStdRMutex oPortLock( GetLock() );
         bool bRelease = false;
@@ -196,15 +176,15 @@ gint32 CDBusLocalPdo::ClearDBusSetting(
                 m_mapRegObjs.erase( strObjPath );
                 bRelease = true;
             }
-            break;
         }
 
         if( bRelease )
         {
-            dbus_bus_release_name(
-                m_pDBusConn,
-                strObjPath.c_str(),
-                dbusError );
+            CDBusBusPort *pBusPort = static_cast
+                < CDBusBusPort* >( m_pBusPort );
+
+            ret = pBusPort->
+                ReleaseBusName( strObjPath );
         }
 
     }while( 0 );
@@ -252,7 +232,9 @@ CDBusLocalPdo::CDBusLocalPdo( const IConfigDb* pCfg )
 
     if( ERROR( ret ) )
     {
-        dbus_connection_unref( m_pDBusConn );
+        if( m_pDBusConn != nullptr )
+            dbus_connection_unref( m_pDBusConn );
+
         m_pDBusConn = nullptr;
 
         string strMsg =
@@ -271,6 +253,116 @@ CDBusLocalPdo::~CDBusLocalPdo()
         dbus_connection_unref( m_pDBusConn );
         m_pDBusConn = nullptr;
     }
+}
+
+gint32 CDBusLocalPdo::OnModOnOffline(
+    DBusMessage* pDBusMsg )
+{
+    gint32 ret = 0;
+
+    if( pDBusMsg == nullptr )
+        return -EINVAL;
+
+    vector< IrpPtr > vecIrpsToCancel;
+
+    do{
+        bool bOnline = false;
+        char* pszModName = nullptr;
+        CDBusError oError;
+        DMsgPtr pMsg( pDBusMsg );
+
+        if( pMsg.GetMember() == "NameOwnerChanged" )
+        {
+            // remote module online/offline
+            char* pszOldOwner = nullptr;
+            char* pszNewOwner = nullptr; 
+
+            if( !dbus_message_get_args(
+                pDBusMsg, oError,
+                DBUS_TYPE_STRING, &pszModName,
+                DBUS_TYPE_STRING, &pszOldOwner,
+                DBUS_TYPE_STRING, &pszNewOwner,
+                DBUS_TYPE_INVALID ) )
+            {
+                ret = oError.Errno();
+                break;
+            }
+
+            if( pszNewOwner[ 0 ] != 0 )
+            {
+                // the name has been assigned to
+                // some process
+                bOnline = true;
+            }
+        }
+        /*else if( pMsg.GetMember() == "NameLost" )
+        {
+            // local module offline
+            if( !dbus_message_get_args(
+                pDBusMsg, oError,
+                DBUS_TYPE_STRING, &pszModName,
+                DBUS_TYPE_INVALID ) )
+            {
+                ret = oError.Errno();
+                break;
+            }
+        }
+        else if( pMsg.GetMember() == "NameAcquired" )
+        {
+            // local module online
+            if( !dbus_message_get_args(
+                pDBusMsg, oError,
+                DBUS_TYPE_STRING, &pszModName,
+                DBUS_TYPE_INVALID ) )
+            {
+                ret = oError.Errno();
+                break;
+            }
+            bOnline = true;
+        }*/
+        else
+        {
+            break;
+        }
+
+        ret = super::OnModOnOffline( pMsg,
+            bOnline, std::string( pszModName ) );
+
+    }while( 0 );
+
+    return ret;
+}
+
+DBusHandlerResult CDBusLocalPdo::DispatchDBusSysMsg(
+    DBusMessage* pMessage )
+{
+    DBusHandlerResult ret =
+        DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+
+    if( pMessage == nullptr )
+        return ret;
+
+    DMsgPtr pMsg( pMessage );
+    string strMember = pMsg.GetMember();
+
+    if( strMember.empty() )
+        return ret;
+
+    if( strMember == "NameOwnerChanged" ||
+        strMember == "NameLost" ||
+        strMember == "NameAcquired" )
+    {
+        if( SUCCEEDED( OnModOnOffline( pMsg ) ) )
+        {
+            ret = DBUS_HANDLER_RESULT_HANDLED;
+        }
+    }
+    else
+    {
+        ret = DBUS_HANDLER_RESULT_HALT;
+    }
+
+    return ret;
 }
 
 DBusHandlerResult CDBusLocalPdo::PreDispatchMsg(
@@ -430,6 +522,8 @@ gint32 CDBusLocalPdo::Stop( IRP *pIrp )
         return -EINVAL;
 
     gint32 ret = super::Stop( pIrp );
+
+    ClearDBusSetting( m_matchDBus );
     m_matchDBus.Clear();
 
     return ret;
@@ -440,18 +534,19 @@ gint32 CDBusLocalPdo::PostStart(
 {
     gint32 ret = 0;
 
-    if( pIrp == nullptr
-        || pIrp->GetStackSize() == 0 )
+    if( pIrp == nullptr ||
+        pIrp->GetStackSize() == 0 )
         return -EINVAL;
 
-    do{
-        ret = m_matchDBus.NewObj(
-            clsid( CDBusSysMatch ) );
+    ret = m_matchDBus.NewObj(
+        clsid( CDBusSysMatch ) );
 
-        if( ERROR( ret ) )
-            break;
+    if( ERROR( ret ) )
+        return ret;
 
-    }while( 0 );
+    ret = SetupDBusSetting( m_matchDBus );
+    if( ERROR( ret ) )
+        return ret;
 
     ret = super::PostStart( pIrp );
 
@@ -462,6 +557,21 @@ CDBusLoopbackPdo::CDBusLoopbackPdo (
     const IConfigDb* pCfg )
     : super( pCfg )
 {
+    SetClassId( clsid( CDBusLoopbackPdo ) );
+
+    gint32 ret = m_matchDBus.NewObj(
+        clsid( CDBusSysMatch ) );
+    if( ERROR( ret ) )
+    {
+        string strMsg = DebugMsg( ret,
+            "Error in CDBusLoopbackPdo initialization" );
+        throw std::runtime_error( strMsg );
+    }
+}
+
+CDBusLoopbackPdo::~CDBusLoopbackPdo()
+{
+    m_matchDBus.Clear();
 }
 
 gint32 CDBusLoopbackPdo::SendDBusMsg(
@@ -479,12 +589,79 @@ gint32 CDBusLoopbackPdo::SendDBusMsg(
         CDBusBusPort* pBus = static_cast
             < CDBusBusPort* >( m_pBusPort );
 
+        DMsgPtr pMsgPtr( pMsg );
+
+        pMsgPtr.SetSender(
+            LOOPBACK_DESTINATION );
+
         ret = pBus->SendLpbkMsg( pMsg,
             pdwSerial );
     }
     else
     {
         ret = -EINVAL;
+    }
+
+    return ret;
+}
+
+gint32 CDBusLoopbackPdo::SetupDBusSetting(
+        IMessageMatch* pMsgMatch )
+{
+    if( pMsgMatch == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    CDBusError dbusError;
+    do{
+        EnumMatchType iMatchType =
+            pMsgMatch->GetType();
+
+        // test if the local server is ready
+        if( iMatchType != matchClient )
+            break;
+
+        string strDest =
+            pMsgMatch->GetDest();
+
+        if( strDest.empty() )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        CDBusBusPort *pBusPort = static_cast
+            < CDBusBusPort* >( m_pBusPort );
+
+        ret = pBusPort->IsDBusSvrOnline( strDest );
+        // NOTE: we don't have AddRules here, and all
+        // the signals from this server will be looped
+        // back
+
+    }while( 0 );
+
+    return ret;
+}
+
+DBusHandlerResult CDBusLoopbackPdo::PreDispatchMsg(
+    gint32 iType, DBusMessage* pMsg )
+{
+
+    DBusHandlerResult ret =
+        DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+
+    gint32 ret1 =
+        m_matchDBus->IsMyMsgIncoming( pMsg );
+
+    if( SUCCEEDED( ret1  ) )
+    {
+        // dbus system message
+        ret = DispatchDBusSysMsg( pMsg );
+    }
+
+    if( ret == DBUS_HANDLER_RESULT_NOT_YET_HANDLED )
+    {
+        ret = super::PreDispatchMsg( iType, pMsg );
     }
 
     return ret;

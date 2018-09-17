@@ -32,54 +32,48 @@ using namespace std;
 #define STATEMAP_ENTRY( iState, iEvent, iNewState ) \
   { STATEMAP_KEY( iState, iEvent ), iNewState }
 
-std::map< STATEMAP_KEY, EnumIfState > m_mapState =
+std::map< STATEMAP_KEY, EnumIfState > CInterfaceState::m_mapState =
 {
+    STATEMAP_ENTRY( stateStopped,   cmdOpenPort,            stateStarting ),
     STATEMAP_ENTRY( stateStarting,  eventPortStarted,       stateStarted ),
     STATEMAP_ENTRY( stateStarting,  eventPortStartFailed,   stateStopped ),
     STATEMAP_ENTRY( stateStarting,  eventPortStopping,      stateStopped ),
-    STATEMAP_ENTRY( stateStarted,   eventPortStopping,      stateStopped ),
-    STATEMAP_ENTRY( stateConnected, eventPortStopping,      stateStopped ),
-    STATEMAP_ENTRY( stateRecovery,  eventPortStopping,      stateStopped ),
-    STATEMAP_ENTRY( statePaused,    eventPortStopping,      stateStopped ),
-    STATEMAP_ENTRY( stateConnected, eventModOffline,        stateRecovery ),
-    STATEMAP_ENTRY( statePaused,    eventModOffline,        statePaused ),
-    STATEMAP_ENTRY( stateRecovery,  eventModOnline,         stateConnected ),
-    STATEMAP_ENTRY( statePaused,    eventModOnline,         statePaused ),
     STATEMAP_ENTRY( stateStarting,  eventDBusOffline,       stateStopped ),
-    STATEMAP_ENTRY( stateStarted,   eventDBusOffline,       stateStopped ),
-    STATEMAP_ENTRY( stateConnected, eventDBusOffline,       stateStopped ),
-    STATEMAP_ENTRY( stateRecovery,  eventDBusOffline,       stateStopped ),
-    STATEMAP_ENTRY( statePaused,    eventDBusOffline,       stateStopped ),
-    STATEMAP_ENTRY( stateConnected, eventRmtModOffline,     stateRecovery ),
-    STATEMAP_ENTRY( statePaused,    eventRmtModOffline,     statePaused ),
-    STATEMAP_ENTRY( stateRecovery,  eventRmtModOnline,      stateConnected ),
-    STATEMAP_ENTRY( statePaused,    eventRmtModOnline,      statePaused ),
     STATEMAP_ENTRY( stateStarting,  eventRmtSvrOffline,     stateStopped ),
-    STATEMAP_ENTRY( stateStarted,   eventRmtSvrOffline,     stateStopped ),
-    STATEMAP_ENTRY( stateConnected, eventRmtSvrOffline,     stateStopped ),
-    STATEMAP_ENTRY( stateRecovery,  eventRmtSvrOffline,     stateStopped ),
-    STATEMAP_ENTRY( statePaused,    eventRmtSvrOffline,     stateStopped ),
-    STATEMAP_ENTRY( stateStopped,   cmdOpenPort,            stateStarting ),
-    STATEMAP_ENTRY( stateStarting,  cmdClosePort,           stateStopped ),
-    STATEMAP_ENTRY( stateStarted,   cmdClosePort,           stateStopped ),
-    STATEMAP_ENTRY( stateConnected, cmdClosePort,           stateStopped ),
-    STATEMAP_ENTRY( stateRecovery,  cmdClosePort,           stateStopped ),
-    STATEMAP_ENTRY( statePaused,    cmdClosePort,           stateStopped ),
-    STATEMAP_ENTRY( stateStarted,   cmdEnableEvent,         stateConnected ),
-    STATEMAP_ENTRY( stateConnected, cmdDisableEvent,        stateStarted ),
-    STATEMAP_ENTRY( stateRecovery,  cmdDisableEvent,        stateStarted ),
-    STATEMAP_ENTRY( statePaused,    cmdDisableEvent,        stateStarted ),
     STATEMAP_ENTRY( stateStarting,  cmdShutdown,            stateStopped ),
-    STATEMAP_ENTRY( stateStarted,   cmdShutdown,            stateStopped ),
-    STATEMAP_ENTRY( stateConnected, cmdShutdown,            stateStopped ),
-    STATEMAP_ENTRY( stateRecovery,  cmdShutdown,            stateStopped ),
-    STATEMAP_ENTRY( statePaused,    cmdShutdown,            stateStopped ),
-    STATEMAP_ENTRY( stateConnected, cmdPause,               statePaused ),
+    STATEMAP_ENTRY( stateStarted,   eventPortStopping,      stateStopping ),
+    STATEMAP_ENTRY( stateStarted,   eventDBusOffline,       stateStopping ),
+    STATEMAP_ENTRY( stateStarted,   eventRmtSvrOffline,     stateStopping ),
+    STATEMAP_ENTRY( stateStarted,   cmdShutdown,            stateStopping ),
+    STATEMAP_ENTRY( stateStarted,   cmdEnableEvent,         stateConnected ),
+    STATEMAP_ENTRY( stateStarted,   eventModOffline,        stateRecovery ),
+    STATEMAP_ENTRY( stateConnected, eventPortStopping,      stateStopping ),
+    STATEMAP_ENTRY( stateConnected, eventModOffline,        stateRecovery ),
+    STATEMAP_ENTRY( stateConnected, eventDBusOffline,       stateStopped ),
+    STATEMAP_ENTRY( stateConnected, eventRmtModOffline,     stateRecovery ),
+    STATEMAP_ENTRY( stateConnected, eventRmtSvrOffline,     stateStopped ),
+    STATEMAP_ENTRY( stateConnected, cmdShutdown,            stateStopping ),
+    STATEMAP_ENTRY( stateConnected, cmdPause,               statePausing ),
+    STATEMAP_ENTRY( stateRecovery,  eventPortStopping,      stateStopping ),
+    STATEMAP_ENTRY( stateRecovery,  eventModOffline,        stateRecovery ),
+    STATEMAP_ENTRY( stateRecovery,  cmdEnableEvent,         stateRecovery ),
+    STATEMAP_ENTRY( stateRecovery,  eventModOnline,         stateUnknown ),
+    STATEMAP_ENTRY( stateRecovery,  eventRmtModOnline,      stateUnknown ),
+    STATEMAP_ENTRY( stateRecovery,  eventDBusOffline,       stateStopping ),
+    STATEMAP_ENTRY( stateRecovery,  eventRmtSvrOffline,     stateStopping ),
+    STATEMAP_ENTRY( stateRecovery,  cmdShutdown,            stateStopping ),
+    STATEMAP_ENTRY( statePaused,    eventPortStopping,      stateStopping ),
+    STATEMAP_ENTRY( statePaused,    eventModOffline,        stateRecovery ),
+    STATEMAP_ENTRY( statePaused,    eventDBusOffline,       stateStopping ),
+    STATEMAP_ENTRY( statePaused,    eventRmtModOffline,     stateRecovery ),
+    STATEMAP_ENTRY( statePaused,    eventRmtSvrOffline,     stateStopped ),
+    STATEMAP_ENTRY( statePaused,    cmdShutdown,            stateStopping ),
+    STATEMAP_ENTRY( statePaused,    cmdResume,              stateResuming ),
+    STATEMAP_ENTRY( statePausing,   eventPaused,            statePaused ),
+    STATEMAP_ENTRY( stateStopping,  cmdClosePort,           stateStopped ),
+    STATEMAP_ENTRY( stateResuming,  eventResumed,           stateConnected ),
 
     // unknown means the value depends on the m_iResumeState
-    STATEMAP_ENTRY( statePaused,    cmdSendData,            stateUnknown ), 
-    STATEMAP_ENTRY( stateConnected, cmdFetchData,           stateConnected ),
-    STATEMAP_ENTRY( stateConnected, cmdSendReq,             stateConnected )
 };
 
 CRpcInterfaceBase* CInterfaceState::GetInterface()
@@ -112,7 +106,7 @@ CInterfaceState::CInterfaceState(
 
         ObjPtr pObj;
         ret = oCfg.GetObjPtr(
-            propObjPtr, pObj );
+            propIfPtr, pObj );
 
         if( ERROR( ret ) )
             break;
@@ -125,7 +119,7 @@ CInterfaceState::CInterfaceState(
         }
 
         m_pIfCfgDb->RemoveProperty( propIoMgr );
-        m_pIfCfgDb->RemoveProperty( propObjPtr );
+        m_pIfCfgDb->RemoveProperty( propIfPtr );
 
         // mandatory properties
         //
@@ -157,51 +151,67 @@ CInterfaceState::CInterfaceState(
 
 CInterfaceState::~CInterfaceState()
 {
-    ClosePort();
+    // ClosePort();
+}
+
+gint32 CInterfaceState::TestSetState(
+    EnumEventId iEvent )
+{
+    CStdRMutex oStateLock( GetLock() );
+    STATEMAP_KEY oKey( GetState(), iEvent );
+    std::map< STATMAP_KEY, EnumIfState >::iterator
+        itr = m_mapState.find( oKey ); 
+
+    if( itr == m_mapState.end() )
+        return ERROR_STATE;
+
+    return 0;
 }
 
 gint32 CInterfaceState::SetStateOnEvent(
     EnumEventId iEvent )
 {
     // state switch table
-    gint32 ret = ERROR_STATE;
+    gint32 ret = 0;
     CStdRMutex oStateLock( GetLock() );
 
-    switch( iEvent )
+    STATEMAP_KEY oKey( GetState(), iEvent );
+    std::map< STATMAP_KEY, EnumIfState >::iterator
+        itr = m_mapState.find( oKey ); 
+
+    if( itr != m_mapState.end() )
     {
-    case cmdEnableEvent:
-    case cmdRegSvr:
+        switch( itr->second )
         {
-            if( GetState() == stateStarted )
+        case stateUnknown:
             {
-                SetStateInternal( stateConnected );
+                SetStateInternal( m_iResumeState );
                 ret = 0;
-            }
-            break;
-        }
-    case cmdUnregSvr:
-    case cmdDisableEvent:
-        {
-            EnumIfState iState = GetState();
-            switch( iState )
-            {
-            case stateConnected:
-            case stateRecovery:
-            case statePaused:
-                {
-                    SetStateInternal( stateStarted );
-                    ret = 0;
-                    break;
-                }
-            default:
                 break;
             }
-            break;
+        case stateRecovery:
+            {
+                if( GetState() != stateRecovery )
+                    m_iResumeState = GetState();
+
+                if( m_iResumeState == stateStarted )
+                {
+                    // a special state transfer
+                    m_iResumeState = stateConnected;
+                }
+                // fall through
+            }
+        default:
+            {
+                SetStateInternal( m_mapState[ oKey ] );
+                ret = 0;
+                break;
+            }
         }
-    default:
-        {
-            break;
-        }
+    }
+    else
+    {
+        ret = ERROR_STATE;
     }
     return ret;
 }
@@ -212,6 +222,13 @@ bool CInterfaceState::IsMyPort(
     if( hPort == 0 )
         return false;
 
+    if( m_hPort == hPort )
+        return true;
+
+    if( m_hPort != 0 )
+        return false;
+
+    // we are waiting for such a port
     gint32 ret = 0;
     CIoManager* pMgr = GetIoMgr();
 
@@ -258,8 +275,8 @@ gint32 CInterfaceState::OnPortEvent(
     gint32 ret = 0;
 
     do{
-        if( hPort == 0
-            || iEvent == eventInvalid )
+        if( hPort == 0 ||
+            iEvent == eventInvalid )
         {
             ret = -EINVAL;
             break;
@@ -271,37 +288,40 @@ gint32 CInterfaceState::OnPortEvent(
         {
         case eventPortStartFailed:
             {
-                if( true )
-                {
-                    CStdRMutex oStatLock( GetLock() );
-                    if( GetState() != stateStarting )
-                        break;
-
-                    SetStateInternal( stateStopped );
-                }
-
+                ret = SetStateOnEvent(
+                    eventPortStartFailed );
                 break;
             }
         case eventPortStarted:
             {
-                CRpcInterfaceBase* pIf = GetInterface();
+                CRpcInterfaceBase* pIf =
+                    GetInterface();
 
-                CStdRMutex oStatLock( GetLock() );
-
-                // out of sync
-                if( GetState() != stateStarting )
+                //BUGBUG: the lock relies on the
+                //implementation of OpenPortByRef
+                CStdRMutex oStateLock( GetLock() );
+                ret = TestSetState( eventPortStarted );
+                if( ERROR( ret ) )
                     break;
 
                 ret = pMgr->OpenPortByRef(
                     hPort, pIf );
 
                 if( ERROR( ret ) )
+                {
+                    ret = SetStateOnEvent(
+                        eventPortStartFailed );
                     break;
+                }
 
                 m_hPort = hPort;
+                ret = SetStateOnEvent(
+                    eventPortStarted );
 
-                SetStateInternal( stateStarted );
+                if( ERROR( ret ) )
+                    break;
 
+                ret = SubscribeEvents();
                 break;
             }
         case eventPortStopping:
@@ -312,8 +332,6 @@ gint32 CInterfaceState::OnPortEvent(
                     ret = -ENOENT;
                     break;
                 }
-
-                CStdRMutex oStatLock( GetLock() );
 
                 EnumIfState iState = GetState();
                 switch( iState )
@@ -366,54 +384,10 @@ gint32 CInterfaceState::OnModEvent(
         {
         case eventRmtModOffline:
         case eventModOffline:
-            {
-                CStdRMutex oStatLock( GetLock() );
-                // out of sync
-                if( GetState() == stateConnected )
-                {
-                    // FIXME: should we schedule a
-                    // task for more actions?
-                    SetStateInternal( stateRecovery );
-                    break;
-                }
-                else if( GetState() == statePaused )
-                {
-                    m_iResumeState = stateStarted;
-                }
-                else
-                {
-                    ret = ERROR_STATE;
-                }
-
-                // we don't have things to do
-                break;
-            }
         case eventRmtModOnline:
         case eventModOnline:
             {
-                CStdRMutex oStatLock( GetLock() );
-                EnumIfState iState = GetState();
-                switch( iState )
-                {
-                case stateStarted:
-                case stateRecovery:
-                    {
-                        // what else can we do?
-                        SetStateInternal( stateConnected ); 
-                        break;
-                    }
-                case statePaused:
-                    {
-                        m_iResumeState = stateConnected;
-                        break;
-                    }
-                default:
-                    {
-                        ret = ERROR_STATE;
-                        break;
-                    }
-                }
-
+                SetStateOnEvent( iEvent );
                 break;
             }
         default:
@@ -431,7 +405,6 @@ gint32 CInterfaceState::OnDBusEvent(
     gint32 ret = 0;
 
     do{
-
         if( iEvent >= eventInvalid )
         {
             ret = -EINVAL;
@@ -443,14 +416,9 @@ gint32 CInterfaceState::OnDBusEvent(
         case eventRmtSvrOffline:
         case eventDBusOffline:
             {
-                CStdRMutex oStatLock( GetLock() );
                 switch( GetState() )
                 {
-                case stateStarted:
-                case stateConnected:
-                case stateRecovery:
-                case statePaused:
-                case stateStarting:
+                case stateStopping:
                     {
                         ClosePort();
                         break;
@@ -495,63 +463,31 @@ gint32 CInterfaceState::OnAdminEvent(
         {
         case cmdShutdown:
             {
-                CStdRMutex oStatLock( GetLock() );
                 switch( GetState() )
                 {
-                case stateStarted:
-                case stateConnected:
-                case stateRecovery:
-                case statePaused:
-                case stateStarting:
+                case stateStopping:
                     {
                         ClosePort();
                         break;
                     }
-                case stateStopped:
                 default:
-                    break;
+                    {
+                        ret = ERROR_STATE;
+                        break;
+                    }
                 }
 
                 break;
             }
         case cmdPause:
             {
-                CStdRMutex oStatLock( GetLock() );
-
-                switch( GetState() )
-                {
-                case stateConnected:
-                    {
-                        SetStateInternal( statePaused );
-                        m_iResumeState = stateConnected;
-                        break;
-                    }
-                default:
-                    ret = ERROR_STATE;
-                    break;
-                }
-
-                break;
+                ret = SetStateOnEvent(
+                    eventPaused );
             }
         case cmdResume:
             {
-                if( true )
-                {
-                    CStdRMutex oStatLock( GetLock() );
-                    switch( GetState() )
-                    {
-                    case statePaused:
-                        {
-                            if( m_iResumeState != stateInvalid )
-                                SetStateInternal( m_iResumeState );
-                            break;
-                        }
-                    default:
-                        ret = ERROR_STATE;
-                        break;
-                    }
-                }
-
+                ret = SetStateOnEvent(
+                    eventResumed );
                 break;
             }
         default:
@@ -569,67 +505,7 @@ gint32 CInterfaceState::OnEvent(
     guint32 dwParam2,
     guint32* pData )
 {
-    gint32 ret = 0;
-
-    switch( iEvent )
-    {
-    case eventPortStarted:
-    case eventPortStartFailed:
-    case eventPortStopped:
-    case eventPortStopping:
-        {
-            ret = OnPortEvent( iEvent, dwParam1 );
-            break;
-        }
-    case eventModOnline:
-    case eventModOffline:
-        {
-            if( pData == nullptr )
-                break;
-            string strModName = ( char* )pData;
-            ret = OnModEvent( iEvent, strModName );
-            break;
-        }
-    case eventDBusOnline: 
-    case eventDBusOffline:
-        {
-            ret = OnDBusEvent( iEvent );
-            break;
-        }
-    case cmdShutdown:
-    case cmdPause:
-    case cmdResume:
-        {
-            if( pData == nullptr )
-                break;
-
-            string strParams = ( char* )pData;
-            ret = OnAdminEvent( iEvent, strParams );
-            break;
-        }
-    case eventRmtModOffline:
-    case eventRmtModOnline:
-        {
-            if( pData == nullptr )
-                break;
-            string strIpAddr = ( char* )dwParam1;
-            string strModName = ( char* )pData;
-            ret = OnRmtModEvent(
-                iEvent, strModName, strIpAddr );
-            break;
-        }
-    case eventRmtSvrOffline:
-    case eventRmtSvrOnline:
-        {
-            string strIpAddr = ( char* )dwParam1;
-            ret = OnRmtSvrEvent(
-                iEvent, strIpAddr );
-            break;
-        }
-    default:
-        break;
-    }
-    return ret;
+    return 0;
 }
 
 gint32 CInterfaceState::OpenPortInternal(
@@ -641,18 +517,17 @@ gint32 CInterfaceState::OpenPortInternal(
         return -EINVAL;
 
     do{
-        CStdRMutex oStateLock( GetLock() );
-
-        if( GetState() != stateStopped )
-            return ERROR_STATE;
-
-        ret = SubscribeEvents();
-
-        if( ERROR( ret ) )
-            return ret;
+        if( true )
+        {
+            CStdRMutex oStateLock( GetLock() );
+            if( GetState() != stateStarting )
+            {
+                ret = ERROR_STATE;
+                break;
+            }
+        }
 
         CParamList oParams;
-
         // let's prepare the parameters
         ret = oParams.CopyProp(
             propBusName, this );
@@ -678,20 +553,13 @@ gint32 CInterfaceState::OpenPortInternal(
         if( ERROR( ret ) )
             break;
 
-        SetStateInternal( stateStarting );
-
-        oStateLock.Unlock();
+        // if the port is created, we will use this ptr
+        // to register to the Handle map
+        oParams[ propIfPtr ] =
+            ObjPtr( GetInterface() );
 
         ret = GetIoMgr()->OpenPort(
             oParams.GetCfg(), m_hPort );
-
-        oStateLock.Lock();
-
-        if( GetState() != stateStarting )
-        {
-            ret = ERROR_STATE;
-            break;
-        }
 
         if( ret == STATUS_PENDING )
         {
@@ -702,27 +570,28 @@ gint32 CInterfaceState::OpenPortInternal(
 
         if( SUCCEEDED( ret ) )
         {
-            SetStateInternal( stateStarted );
+            ret = SetStateOnEvent(
+                eventPortStarted );
+
+            if( ERROR( ret ) )
+                return ret;
+
+            ret = SubscribeEvents();
             break;
         }
 
         if( ret == -EAGAIN )
         {
+            // return to stopped state
             // retry will happen from outside
             // rollback the state
-            SetStateInternal( stateStopped );
-            UnsubscribeEvents();
+            SetStateOnEvent(
+                eventPortStartFailed );
             break;
         }
-
         // unrecoverable error
-        
+ 
     }while( 0 );
-
-    if( ERROR( ret ) )
-    {
-        UnsubscribeEvents();
-    }
 
     return ret;
 }
@@ -739,8 +608,8 @@ gint32 CInterfaceState::ClosePort()
         m_hPort = 0;
     }
 
-    CStdRMutex oStateLock( GetLock() );
-    SetStateInternal( stateStopped );
+    UnsubscribeEvents();
+    SetStateOnEvent( cmdClosePort );
     return ret;
 }
 
@@ -786,8 +655,30 @@ gint32 CInterfaceState::Start(
 
 gint32 CInterfaceState::Stop()
 {
-    UnsubscribeEvents();
     return ClosePort();
+}
+
+gint32 CInterfaceState::EnumProperties(
+    std::vector< gint32 >& vecProps ) const
+{
+    gint32 ret = super::EnumProperties( vecProps );
+    if( ERROR( ret ) )
+        return ret;
+
+    return m_pIfCfgDb->EnumProperties( vecProps );
+}
+
+bool CInterfaceState::exist(
+    gint32 iProp ) const
+{
+    std::vector< gint32 > vecProps; 
+    EnumProperties( vecProps );
+    for( auto i : vecProps )
+    {
+        if( iProp == i )
+            return true;
+    }
+    return false;
 }
 
 CLocalProxyState::CLocalProxyState(
@@ -887,14 +778,8 @@ gint32 CLocalProxyState::SubscribeEvents()
 gint32 CLocalProxyState::OpenPort(
     IEventSink* pCallback )
 {
-    // FIXME: not adaptable port path
-    // generation
-    gint32 ret = 0;
-
     // let's prepare the parameters
-    ret = OpenPortInternal( pCallback );
-
-    return ret;
+    return OpenPortInternal( pCallback );
 }
 
 CRemoteProxyState::CRemoteProxyState(
@@ -1059,14 +944,8 @@ gint32 CIfServerState::SubscribeEvents()
 gint32 CIfServerState::OpenPort(
     IEventSink* pCallback )
 {
-    // FIXME: not adaptable port path
-    // generation
-    gint32 ret = 0;
-
     // let's prepare the parameters
-    ret = OpenPortInternal( pCallback );
-
-    return ret;
+    return OpenPortInternal( pCallback );
 }
 
 bool CIfServerState::IsMyDest(

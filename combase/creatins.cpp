@@ -20,7 +20,7 @@
 #include "stlcont.h"
 #include "objfctry.h"
 
-FctryVecPtr g_pFactories( true );
+FctryVecPtr g_pFactories;
 
 /**
 * @name CoCreateInstance create an instance
@@ -43,7 +43,7 @@ gint32 CoCreateInstance(
 {
     gint32 ret = 0;
 
-    if( pObj == nullptr )
+    if( iClsid == clsid( Invalid ) )
         return -EINVAL;
 
     try

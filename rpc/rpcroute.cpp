@@ -51,6 +51,10 @@ CRpcRouter::CRpcRouter(
     }
 }
 
+CRpcRouter::~CRpcRouter()
+{
+}
+
 gint32 CRpcRouter::GetBridgeProxy(
     const std::string& strIpAddr,
     InterfPtr& pIf )

@@ -22,6 +22,7 @@
 #include "port.h"
 #include "dbusport.h"
 #include "emaphelp.h"
+// #include "iftasks.h"
 
 
 using namespace std;
@@ -121,10 +122,19 @@ gint32 CGenBusDriver::Stop()
         if( ERROR( ret ) )
             break;
 
+        CPnpManager& oPnpMgr =
+            GetIoMgr()->GetPnpMgr();
+
         for( guint32 i = 0; i < vecPorts.size(); i++ )
         {
-            ret = GetIoMgr()->GetPnpMgr().StopPortStack(
+            ret = oPnpMgr.StopPortStack(
                 vecPorts[ i ] );
+
+            if( SUCCEEDED( ret ) )
+            {
+                ret = oPnpMgr.DestroyPortStack(
+                    vecPorts[ i ] );
+            }
         }
 
         // stopping the child ports is done
@@ -153,9 +163,7 @@ gint32 CGenBusDriver::CreatePort(
         }
 
         if( pConfig != nullptr )
-        {
-            pCfg->Clone( *pConfig );
-        }
+            *pCfg = *pConfig;
 
         CCfgOpener a( ( IConfigDb* )pCfg );
         ObjPtr objPtr( GetIoMgr() );
@@ -254,39 +262,66 @@ gint32 CDBusBusDriver::Probe(
 {
     gint32 ret = 0;
 
-    // we don't have dynamic bus yet
-    CfgPtr pCfg( true );
-    *pCfg = *pConfig;
+    do{
+        // we don't have dynamic bus yet
+        CfgPtr pCfg( true );
 
-    CCfgOpener oCfg( ( IConfigDb* )pCfg );
+        // make a copy of the input args
+        if( pConfig != nullptr )
+            *pCfg = *pConfig;
 
-    ret = oCfg.SetStrProp( propPortClass,
-        PORT_CLASS_LOCALDBUS );
+        CCfgOpener oCfg( ( IConfigDb* )pCfg );
 
-    if( ERROR( ret ) )
-        return ret;
+        ret = oCfg.SetStrProp( propPortClass,
+            PORT_CLASS_LOCALDBUS );
 
-    ret = oCfg.SetIntProp( propClsid,
-        clsid( CDBusBusPort ) );
+        if( ERROR( ret ) )
+            break;
 
-    ret = CreatePort( pNewPort, pCfg );
-    if( ERROR( ret ) )
-        return ret;
+        ret = oCfg.SetIntProp( propClsid,
+            clsid( CDBusBusPort ) );
 
-    if( pLowerPort != nullptr )
-    {
-        ret = pNewPort->AttachToPort( pLowerPort );
-    }
+        // FIXME: we need a better task to receive the
+        // notification of the port start events
+        TaskletPtr pTask;
+        ret = pTask.NewObj( clsid( CSyncCallback ) );
+        if( ERROR( ret ) )
+            break;
 
-    if( SUCCEEDED( ret ) )
-    {
-        CEventMapHelper< CPortDriver > a( this );
-        a.BroadcastEvent(
-            eventPnp,
-            eventPortAttached,
-            PortToHandle( pNewPort ),
-            nullptr );
-    }
+        // we don't care the event sink to bind
+        ret = oCfg.SetObjPtr( propEventSink,
+            ObjPtr( pTask ) );
+
+        if( ERROR( ret ) )
+            break;
+
+        ret = CreatePort( pNewPort, pCfg );
+        if( ERROR( ret ) )
+            break;
+
+        if( pLowerPort != nullptr )
+        {
+            ret = pNewPort->AttachToPort( pLowerPort );
+        }
+
+        if( SUCCEEDED( ret ) )
+        {
+            CEventMapHelper< CPortDriver > a( this );
+            a.BroadcastEvent(
+                eventPnp,
+                eventPortAttached,
+                PortToHandle( pNewPort ),
+                nullptr );
+        }
+
+        // waiting for the start to complete
+        CSyncCallback* pSyncTask = pTask;
+        if( pSyncTask != nullptr )
+        {
+            pSyncTask->WaitForComplete();
+        }
+
+    }while( 0 );
 
     return ret;
 }

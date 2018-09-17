@@ -26,14 +26,10 @@
 #include "prxyport.h"
 #include "rpcroute.h"
 #include "tcpport.h"
+#include "objfctry.h"
 
 
 using namespace std;
-
-FctryVecPtr g_pFactories;
-
-std::map< gint32, FUNC_MAP > g_mapFuncs;
-std::map< gint32, PROXY_MAP > g_mapProxyFuncs;
 
 // c++11 required
 

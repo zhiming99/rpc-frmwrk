@@ -21,7 +21,13 @@
     Clsid_ ## __classname__
 
 #define clsid( classname ) \
-    DECL_CLSID( classname )
+    ( ( EnumClsid )DECL_CLSID( classname ) )
+
+#define DECL_IID( __interface_name__ ) \
+    Iid_ ##  __interface_name__
+
+#define iid( interface_name ) \
+    ( ( EnumClsid )DECL_IID( interface_name  ) )
 
 /**
 * @name Class id declarations
@@ -31,7 +37,7 @@
  * the order must be kept the same in favor of
  * binary search @} */
 
-typedef enum 
+typedef enum : guint32
 {
     DECL_CLSID( MinClsid ) = 0x0823,
     DECL_CLSID( CObjBase ),
@@ -96,7 +102,6 @@ typedef enum
     DECL_CLSID( CProxyMsgMatch ),
     DECL_CLSID( CDBusDisconnMatch ),
     DECL_CLSID( CDBusSysMatch ),
-    DECL_CLSID( CDBusPdoListenDBEventTask ),
     DECL_CLSID( CPortStateResumeSubmitTask ),
     DECL_CLSID( CDBusBusPortDBusOfflineTask ),
     DECL_CLSID( CRpcBasePortModOnOfflineTask ),
@@ -163,11 +168,23 @@ typedef enum
     DECL_CLSID( CSyncCallback ),
     DECL_CLSID( CTaskWrapper ),
     DECL_CLSID( CClassFactory ),
+    DECL_CLSID( CDirEntry ),
+    DECL_CLSID( CPortInterfaceMap ),
+    DECL_CLSID( CMethodProxy ),
+    DECL_CLSID( CMethodServer ),
+    DECL_CLSID( CAsyncCallback ),
+    DECL_CLSID( CDeferredCall ),
+    DECL_CLSID( CIoReqSyncCallback ),
+    DECL_CLSID( CStlObjVector ),
+    DECL_CLSID( CStlStringSet ),
     DECL_CLSID( MaxClsid ),
     DECL_CLSID( ReservedClsidEnd ) = 0x0FFFFFFF,
-    DECL_CLSID( UserClsidStart ) = 0x10000000,
+    DECL_CLSID( ReservedIidStart ) = 0x10000000,
+    DECL_IID( IInterfaceServer ),
+    DECL_CLSID( ReservedIidEnd ) = 0x1FFFFFFF,
+    DECL_CLSID( UserClsidStart ) = 0x20000000,
 
-    DECL_CLSID( Invalid ) = 0x7FFFFFFF
+    DECL_CLSID( Invalid ) = 0xFFFFFFFF
 
 }EnumClsid;
 

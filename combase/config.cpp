@@ -16,7 +16,7 @@
  * =====================================================================================
  */
 
-#include <map>
+#include <unordered_map>
 #include <string>
 #include <algorithm>
 #include <vector>
@@ -24,8 +24,6 @@
 #include "configdb.h"
 
 using namespace std;
-
-const BufPtr g_pNullBuf( true );
 
 CConfigDb::CConfigDb( const IConfigDb* pCfg )
 {
@@ -48,7 +46,7 @@ void CConfigDb::BuildConfig(
 }
 
 void CConfigDb::BuildConfig(
-    const std::map<gint32, std::string>& strPropValues )
+    const std::hashmap<gint32, std::string>& strPropValues )
 {
 
 }
@@ -56,6 +54,11 @@ void CConfigDb::BuildConfig(
 gint32 CConfigDb::SetProperty(
     gint32 iProp, const BufPtr& pBuf )
 {
+    if( pBuf.IsEmpty() )
+    {
+        m_mapProps.erase( iProp );
+        return 0;
+    }
     m_mapProps[ iProp ] = pBuf;
     return 0;
 }
@@ -65,7 +68,10 @@ gint32 CConfigDb::GetProperty(
 {
     gint32 ret = -ENOENT;
     
-    map<gint32, BufPtr>::const_iterator itr =
+    if( pBuf.IsEmpty() )
+        pBuf.NewObj();
+
+    hashmap<gint32, BufPtr>::const_iterator itr =
         m_mapProps.find( iProp );
 
     if( itr != m_mapProps.cend() )
@@ -81,7 +87,7 @@ gint32 CConfigDb::GetProperty(
 {
     gint32 ret = -ENOENT;
     
-    map<gint32, BufPtr>::const_iterator itr =
+    hashmap<gint32, BufPtr>::const_iterator itr =
         m_mapProps.find( iProp );
 
     if( itr != m_mapProps.cend() )
@@ -103,7 +109,7 @@ gint32 CConfigDb::GetPropertyType(
 {
     gint32 ret = -ENOENT;
     
-    map<gint32, BufPtr>::const_iterator itr =
+    hashmap<gint32, BufPtr>::const_iterator itr =
         m_mapProps.find( iProp );
 
     if( itr != m_mapProps.cend() )
@@ -142,15 +148,14 @@ gint32 CConfigDb::SetProperty(
 
 CBuffer& CConfigDb::operator[]( gint32 iProp )
 {
-    map<gint32, BufPtr>::iterator itr
+    hashmap<gint32, BufPtr>::iterator itr
         = m_mapProps.find( iProp );
 
     if( itr == m_mapProps.end() )
     {
-        // make an empty entry
-        string strMsg = DebugMsg(
-            -ENOENT, "no such element" );
-        throw std::out_of_range( strMsg );
+        BufPtr pBuf( true );
+        m_mapProps[ iProp ] = pBuf;
+        itr = m_mapProps.find( iProp );
     }
 
     return *itr->second;
@@ -159,7 +164,7 @@ CBuffer& CConfigDb::operator[]( gint32 iProp )
 const CBuffer& CConfigDb::operator[](
     gint32 iProp ) const
 {
-    map<gint32, BufPtr>::const_iterator itr
+    hashmap<gint32, BufPtr>::const_iterator itr
         = m_mapProps.find( iProp );
 
     if( itr == m_mapProps.cend() )
@@ -176,8 +181,6 @@ const CBuffer& CConfigDb::operator[](
 #define RESIZE_BUF( _Size, _Ret ) \
 do{ \
     guint32 dwLocOff = pLoc - oBuf.ptr(); \
-    guint32 dwEndOff = pEnd - oBuf.ptr(); \
- \
     oBuf.Resize( ( _Size ) ); \
     if( oBuf.ptr() == nullptr ) \
     { \
@@ -185,7 +188,7 @@ do{ \
         break; \
     } \
     pLoc = ( dwLocOff + oBuf.ptr() ); \
-    pEnd = ( dwEndOff + oBuf.ptr() ); \
+    pEnd = ( oBuf.size() + oBuf.ptr() ); \
  \
 }while( 0 ) 
 
@@ -194,15 +197,16 @@ gint32 CConfigDb::Serialize( CBuffer& oBuf ) const
     struct SERI_HEADER oHeader;
     gint32 ret = 0;
 
-    map<gint32, BufPtr>::const_iterator itr
+    hashmap<gint32, BufPtr>::const_iterator itr
         = m_mapProps.cbegin();
 
     oHeader.dwClsid = clsid( CConfigDb );
     oHeader.dwCount = m_mapProps.size();
+    oHeader.bVersion = 1;
 
     for( auto oPair : m_mapProps )
     {
-        // reserve room for offset values
+        // reserve room for key and size values
         oHeader.dwSize += sizeof( gint32 ) * 2;
         oHeader.dwSize += oPair.second->size();
     }
@@ -257,7 +261,8 @@ gint32 CConfigDb::Serialize( CBuffer& oBuf ) const
             if( ERROR( ret ) )
                 break;
 
-            memcpy( pLoc, pValBuf->ptr(), pValBuf->size() );
+            memcpy( pLoc, pValBuf->ptr(),
+                pValBuf->size() );
         }
 
         // make sure the buffer element are on the
@@ -279,7 +284,7 @@ gint32 CConfigDb::Serialize( CBuffer& oBuf ) const
     if( SUCCEEDED( ret ) )
     {
         SERI_HEADER* pHeader =
-            ( SERI_HEADER* )( oBuf.ptr() - sizeof( oHeader ) );
+            ( SERI_HEADER* )oBuf.ptr();
 
         pHeader->dwSize = htonl( pLoc - oBuf.ptr() );
         RESIZE_BUF( pLoc - oBuf.ptr(), ret );
@@ -298,15 +303,15 @@ gint32 CConfigDb::Deserialize(
         reinterpret_cast< const SERI_HEADER* >( pBuf );
 
     SERI_HEADER oHeader( *pHeader );
-    // memcpy( &oHeader, pHeader, sizeof( oHeader ) );
     oHeader.ntoh();
 
     gint32 ret = 0;
 
     do{
-        if( oHeader.dwClsid != clsid( CConfigDb )
-            || oHeader.dwCount > CFGDB_MAX_ITEM
-            || oHeader.dwSize > CFGDB_MAX_SIZE )
+        if( oHeader.dwClsid != clsid( CConfigDb ) ||
+            oHeader.dwCount > CFGDB_MAX_ITEM ||
+            oHeader.dwSize > dwSize ||
+            oHeader.dwSize > CFGDB_MAX_SIZE )
         {
             ret = -EINVAL;
             break;
@@ -349,9 +354,12 @@ gint32 CConfigDb::Deserialize(
     return Deserialize( oBuf.ptr(), oBuf.size() );
 }
 
-gint32 CConfigDb::GetPropIds( std::vector<gint32>& vecIds ) const
+gint32 CConfigDb::GetPropIds(
+    std::vector<gint32>& vecIds ) const
 {
-    map<gint32, BufPtr>::const_iterator itr = m_mapProps.cbegin();
+    hashmap<gint32, BufPtr>::const_iterator itr =
+        m_mapProps.cbegin();
+
     while( itr != m_mapProps.cend() )
     {
         vecIds.push_back( itr->first );
@@ -360,37 +368,39 @@ gint32 CConfigDb::GetPropIds( std::vector<gint32>& vecIds ) const
     return vecIds.size();
 }
 
-const IConfigDb& CConfigDb::operator=( const IConfigDb& rhs )
+const IConfigDb& CConfigDb::operator=(
+    const IConfigDb& rhs )
 {
     if( rhs.GetClsid() == clsid( CConfigDb ) )
     {
         // we are sure the rhs referencing a
         // CConfigDb object
-        const CConfigDb* pSrc =
-            static_cast< const CConfigDb* >( &rhs );
+        const CConfigDb* pSrc = static_cast
+            < const CConfigDb* >( &rhs );
 
         if( pSrc != nullptr )
         {
             m_mapProps.clear();
 
-            map<gint32, BufPtr>::const_iterator itrSrc =
-                pSrc->m_mapProps.begin();
+            hashmap<gint32, BufPtr>::const_iterator
+                itrSrc = pSrc->m_mapProps.begin();
 
             while( itrSrc != pSrc->m_mapProps.end() )
             {
                 BufPtr pBuf( true );
                 // NOTE: we will clone all the
-                // properties of simple types. for
-                // the objptr, we only copy the
+                // properties of simple types. for the
+                // objptr or dmsgptr, we only copy the
                 // pointer
                 *pBuf = *itrSrc->second;
                 m_mapProps[ itrSrc->first ] = pBuf;
+                ++itrSrc;
             }
         }
     }
     else
     {
-        throw std::invalid_argument(
+        throw invalid_argument(
             "the rhs is not derived from CConfigDb" );
     }
     return *this;
@@ -435,9 +445,10 @@ void CConfigDb::RemoveAll()
 gint32 CConfigDb::EnumProperties(
     vector< gint32 >& vecProps ) const
 {
-    gint32 ret = super::EnumProperties( vecProps );
-    if( ERROR( ret ) )
-        return ret;
+
+    // we don't enum the underlying properties from the
+    // objbase
+    gint32 ret = 0;
 
     for( auto& oElem : m_mapProps )
     {
@@ -448,35 +459,6 @@ gint32 CConfigDb::EnumProperties(
     return ret;
 }
 
-template<>
-gint32 CParamList::Push( CBuffer&& val  )
-{
-    gint32 ret = 0;
-    do{
-        gint32 iPos = GetPos();
-        if( iPos != -1 && ERROR( iPos ) )
-        {
-            ret = iPos;
-            break;
-        }
-
-        ++iPos;
-
-        try{
-            ret = GetCfg()->SetProperty(
-                iPos, val );
-
-            if( SUCCEEDED( ret ) )
-                SetPos( iPos );
-        }
-        catch( std::invalid_argument& e )
-        {
-            ret = -EINVAL;
-        }
-
-    }while( 0 );
-    return ret;
-}
 
 #include <endian.h>
 guint64 htonll(guint64 iVal )
@@ -486,4 +468,36 @@ guint64 htonll(guint64 iVal )
 guint64 ntohll(guint64 iVal )
 {
     return be64toh( iVal );
+}
+
+template<>
+gint32 CParamList::Push< BufPtr& > ( BufPtr& val  )
+{
+    gint32 ret = 0;
+    do{
+        gint32 iPos = GetCount();
+        if( ERROR( iPos ) )
+        {
+            ret = iPos;
+            break;
+        }
+
+        BufPtr pBuf = val;
+        try{
+
+            pBuf = val;
+            ret = GetCfg()->SetProperty(
+                iPos, pBuf );
+
+            if( SUCCEEDED( ret ) )
+                SetCount( iPos + 1 );
+        }
+        catch( std::invalid_argument& e )
+        {
+            ret = -EINVAL;
+        }
+
+    }while( 0 );
+
+    return ret;
 }

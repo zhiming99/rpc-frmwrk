@@ -37,58 +37,76 @@ CDBusLoopbackMatch::CDBusLoopbackMatch(
             break;
         }
 
-        CCfgOpener matchCfg(
-            ( IConfigDb* )m_pCfg );
-
         CCfgOpener oInitCfg( pCfg );
+        std::string strUniqName;
 
-        CIoManager* pMgr = nullptr;
-        ret = oInitCfg.GetPointer( propIoMgr, pMgr );
-        if( ERROR( ret ) )
-            break;
-
-        std::string strDestName =
-            DBUS_DESTINATION( pMgr->GetModName() );
-
-        ret = matchCfg.SetStrProp(
-            propDestDBusName, strDestName );
+        ret = oInitCfg.GetStrProp(
+            propSrcUniqName, strUniqName );
 
         if( ERROR( ret ) )
             break;
 
-        ret = matchCfg.SetStrProp(
-            propSrcDBusName, strDestName );
-
-        if( ERROR( ret ) )
-            break;
-        
-        ret = matchCfg.CopyProp(
-            propSrcUniqName, pCfg );
-
+        ret = AddBusName( strUniqName );
         if( ERROR( ret ) )
             break;
 
-        matchCfg.CopyProp( propDestUniqName, pCfg );
+        guint32* pMatchType =
+            ( guint32* )&m_iMatchType;
+
+        ret = oInitCfg.GetIntProp(
+            propMatchType, *pMatchType );
 
         if( ERROR( ret ) )
             break;
 
-        ret = matchCfg.CopyProp(
-            propMatchType, pCfg );
-        
     }while( 0 );
 
     if( ERROR( ret ) )
     {
         std::string strMsg = DebugMsg( ret,
             "error in CDBusLoopbackMatch's ctor" );
-
         throw std::runtime_error( strMsg );
     }
 }
 
-gint32 CDBusLoopbackMatch::Filter1(
-    DBusMessage* pDBusMsg ) const
+gint32 CDBusLoopbackMatch::IsRegBusName(
+    const std::string& strBusName ) const
+{
+    gint32 ret = 0;
+    do{
+        ObjPtr pObj;
+        CCfgOpenerObj oMatch( this );
+
+        ret = oMatch.GetObjPtr(
+            propValList, pObj );
+
+        if( ERROR( ret ) )
+            break;
+
+        StrSetPtr pDestSet( pObj );
+        if( pDestSet.IsEmpty() )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        std::set< std::string >& oStrSet =
+            ( *pDestSet )();
+
+        if( oStrSet.find( strBusName ) ==
+            oStrSet.end() )
+        {
+            ret = ERROR_FALSE;
+            break;
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CDBusLoopbackMatch::FilterMsgS2P(
+    DBusMessage* pDBusMsg, bool bIncoming ) const
 {
     if( pDBusMsg == nullptr )
         return -EINVAL;
@@ -106,93 +124,57 @@ gint32 CDBusLoopbackMatch::Filter1(
             break;
         }
 
-        if( iType == DBUS_MESSAGE_TYPE_ERROR
-            || iType == DBUS_MESSAGE_TYPE_METHOD_RETURN )
+        std::string strName;
+        if( iType == DBUS_MESSAGE_TYPE_ERROR ||
+            iType == DBUS_MESSAGE_TYPE_METHOD_RETURN )
         {
-            std::string strDestName =
-                pMsg.GetDestination();
-
-            if( strDestName.empty() )
+            // server side
+            strName = pMsg.GetDestination();
+            if( strName.empty() )
             {
                 ret = -EBADMSG;
                 break;
             }
 
-            std::string strDestMatch;
-            CCfgOpenerObj oMatch( this );
-            ret = oMatch.GetStrProp(
-                propDestDBusName, strDestMatch );
-
-            if( ERROR( ret ) )
-                break;
-
-            if( strDestMatch != strDestName )
-            {
+            if( strName != LOOPBACK_DESTINATION )
                 ret = ERROR_FALSE;
-                break;
-            }
-
-            ret = oMatch.GetStrProp(
-                propDestUniqName, strDestMatch );
-
-            if( ERROR( ret ) )
-                break;
-            
-            if( strDestMatch != strDestName )
-            {
-                ret = ERROR_FALSE;
-                break;
-            }
         }
         else if( iType == DBUS_MESSAGE_TYPE_SIGNAL )
         {
-            std::string strSender =
-                pMsg.GetSender();
-
-            if( strSender.empty() )
+            if( bIncoming )
             {
-                ret = -EBADMSG;
-                break;
+                // proxy side
+                strName = pMsg.GetSender();
+                if( strName.empty() )
+                {
+                    ret = -EBADMSG;
+                    break;
+                }
+                ret = IsRegBusName( strName );
             }
-
-            std::string strSrcMatch;
-            CCfgOpenerObj oMatch( this );
-            ret = oMatch.GetStrProp(
-                propSrcDBusName, strSrcMatch );
-
-            if( ERROR( ret ) )
-                break;
-
-            if( strSrcMatch != strSender )
+            else
             {
-                ret = ERROR_FALSE;
-                break;
-            }
-
-            ret = oMatch.GetStrProp(
-                propSrcUniqName, strSrcMatch );
-
-            if( ERROR( ret ) )
-                break;
-            
-            if( strSrcMatch != strSender )
-            {
-                ret = ERROR_FALSE;
-                break;
+                // for outgoing signal,always let pass
+                // the check, that is, the signal
+                // message will go through the loopback
+                // path 
+                return 0;
             }
         }
         else
         {
             ret = ERROR_FALSE;
+            break;
         }
+
 
     }while( 0 );
 
     return ret;
 }
 
-gint32 CDBusLoopbackMatch::Filter2(
-    DBusMessage* pDBusMsg ) const
+gint32 CDBusLoopbackMatch::FilterMsgP2S(
+    DBusMessage* pDBusMsg, bool bIncoming ) const
 {
     if( pDBusMsg == nullptr )
         return -EINVAL;
@@ -208,40 +190,17 @@ gint32 CDBusLoopbackMatch::Filter2(
             break;
         }
 
-        std::string strDestName =
-            pMsg.GetDestination();
+        std::string strName;
 
-        if( strDestName.empty() )
+        strName = pMsg.GetSender();
+        if( strName.empty() )
         {
             ret = -EBADMSG;
             break;
         }
 
-        std::string strDestMatch;
-        CCfgOpenerObj oMatch( this );
-        ret = oMatch.GetStrProp(
-            propDestDBusName, strDestMatch );
-
-        if( ERROR( ret ) )
-            break;
-
-        if( strDestMatch != strDestName )
-        {
+        if( strName != LOOPBACK_DESTINATION )
             ret = ERROR_FALSE;
-            break;
-        }
-
-        ret = oMatch.GetStrProp(
-            propDestUniqName, strDestMatch );
-
-        if( ERROR( ret ) )
-            break;
-        
-        if( strDestMatch != strDestName )
-        {
-            ret = ERROR_FALSE;
-            break;
-        }
 
     }while( 0 );
 
@@ -254,12 +213,94 @@ gint32 CDBusLoopbackMatch::IsMyMsgIncoming(
     gint32 ret = 0;
     if( GetType() == matchClient )
     {
-        ret = Filter1( pDBusMsg );
+        ret = FilterMsgS2P( pDBusMsg, true );
     }
     else if( GetType() == matchServer )
     {
-        ret = Filter2( pDBusMsg );
+        ret = FilterMsgP2S( pDBusMsg, true );
     }
+    else
+    {
+        ret = -ENOTSUP;
+    }
+    return ret;
+}
+
+gint32 CDBusLoopbackMatch::AddBusName(
+    const std::string& strName )
+{
+    return AddRemoveBusName( strName, false );
+}
+
+gint32 CDBusLoopbackMatch::RemoveBusName(
+    const std::string& strName )
+{
+    return AddRemoveBusName( strName, true );
+}
+
+gint32 CDBusLoopbackMatch::AddRemoveBusName(
+    const std::string& strName, bool bRemove )
+{
+    gint32 ret = 0;
+    do{
+        CCfgOpener oCfg( ( IConfigDb*) GetCfg() );
+        if( unlikely( !oCfg.exist( propValList ) ) )
+        {
+            if( bRemove )
+            {
+                ret = -ENOENT;
+            }
+            else
+            {
+                StrSetPtr pStrSet( true );
+                ( *pStrSet )().insert( strName );
+                oCfg[ propValList ] = ObjPtr( pStrSet );
+            }
+        }
+        else
+        {
+            ObjPtr pObj = oCfg[ propValList ];
+            if( pObj.IsEmpty() )
+            {
+                ret = -EFAULT;
+                break;
+            }
+
+            StrSetPtr pStrSet;
+            pStrSet = pObj;
+            if( pStrSet.IsEmpty() )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            if( bRemove )
+            {
+                if( ( *pStrSet )().find( strName ) !=
+                    ( *pStrSet )().end() )
+                {
+                    (*pStrSet)().erase( strName );
+                }
+                else
+                {
+                    ret = -ENOENT;
+                }
+            }
+            else
+            {
+                if( ( *pStrSet )().find( strName ) ==
+                    ( *pStrSet )().end() )
+                {
+                    (*pStrSet)().insert( strName );
+                }
+                else
+                {
+                    ret = -EEXIST;
+                }
+            }
+        }
+
+    }while( 0 );
+
     return ret;
 }
 
@@ -269,11 +310,15 @@ gint32 CDBusLoopbackMatch::IsMyMsgOutgoing(
     gint32 ret = 0;
     if( GetType() == matchClient )
     {
-        ret = Filter2( pDBusMsg );
+        ret = FilterMsgP2S( pDBusMsg, false );
+    }
+    else if( GetType() == matchServer )
+    {
+        ret = FilterMsgS2P( pDBusMsg, false );
     }
     else
     {
-        ret = Filter1( pDBusMsg );
+        ret = -ENOTSUP;
     }
     return ret;
 }

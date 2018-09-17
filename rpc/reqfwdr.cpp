@@ -671,9 +671,26 @@ gint32 CRpcReqForwarder::CheckMatch(
     return -ENOENT;
 }
 
+gint32 CRpcReqForwarder::DisableRemoteEvent(
+    IMessageMatch* pMatch,
+    IEventSink* pCallback )
+{
+    return EnableDisableEvent(
+        pMatch, pCallback, false );
+}
+
 gint32 CRpcReqForwarder::EnableRemoteEvent(
     IMessageMatch* pMatch,
     IEventSink* pCallback )
+{
+    return EnableDisableEvent(
+        pMatch, pCallback, true );
+}
+
+gint32 CRpcReqForwarder::EnableDisableEvent(
+    IMessageMatch* pMatch,
+    IEventSink* pCallback,
+    bool bEnable )
 {
     if( pMatch == nullptr ||
         pCallback == nullptr )
@@ -719,7 +736,7 @@ gint32 CRpcReqForwarder::EnableRemoteEvent(
         oParams.CopyProp( propIpAddr, pMatch );
 
         oParams.Push( ObjPtr( pMatch ) );
-        oParams.Push( true );
+        oParams.Push( bEnable );
 
         TaskletPtr pTask;
         ret = pTask.NewObj(
@@ -1331,10 +1348,11 @@ gint32 CRpcReqForwarder::BuildBufForIrpFwrdEvt(
 
         pFwrdMsg.SetDestination( strVal );
 
+        const char* pszIp = strSrcIp.c_str();
         if( !dbus_message_append_args( pFwrdMsg,
-            DBUS_TYPE_STRING, strSrcIp.c_str(),
+            DBUS_TYPE_STRING, &pszIp,
             DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
-            pEvtBuf->ptr(), pEvtBuf->size(),
+            &pEvtBuf->ptr(), pEvtBuf->size(),
             DBUS_TYPE_INVALID ) )
         {
             ret = -ENOMEM;
@@ -1692,6 +1710,10 @@ CRpcReqForwarderProxy::CRpcReqForwarderProxy(
     }
 }
 
+CRpcReqForwarderProxy::~CRpcReqForwarderProxy()
+{
+}
+
 gint32 CRpcReqForwarderProxy::SetupReqIrpFwrdReq(
     IRP* pIrp,
     IConfigDb* pReqCall,
@@ -1885,14 +1907,14 @@ gint32 CRpcReqForwarderProxy::SetupReqIrp(
 }
 
 gint32 CRpcReqForwarderProxy::FillRespData(
-    IRP* pIrp, IConfigDb* pResp )
+    IRP* pIrp, CfgPtr& pResp )
 {
     gint32 ret = 0;
     if( pIrp == nullptr ||
         pIrp->GetStackSize() == 0 )
         return -EINVAL;
 
-    if( pResp == nullptr )
+    if( pResp.IsEmpty() )
         return -EINVAL;
 
     // retrieve the data from the irp
@@ -1903,7 +1925,7 @@ gint32 CRpcReqForwarderProxy::FillRespData(
 
     guint32 dwCtrlCode = pCtx->GetCtrlCode();
 
-    CParamList oParams( pResp );
+    CParamList oParams( (IConfigDb*) pResp );
     oParams.SetIntProp( propReturnValue,
         pIrp->GetStatus() );
 

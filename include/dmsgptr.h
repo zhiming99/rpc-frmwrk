@@ -18,7 +18,6 @@
 #pragma once
 #include <dbus/dbus.h>
 #include "defines.h"
-#include "buffer.h"
 #include "autoptr.h"
 #include "dbuserr.h"
 
@@ -26,8 +25,10 @@
 #define DMSG_FIX_TYPE_SIZE  8
 #define DMSG_MAX_ARGS       16
 
+typedef CAutoPtr< clsid( Invalid ), DBusMessage >  DMsgPtr;
+
 template<>
-class CAutoPtr< Clsid_Invalid, DBusMessage >
+class CAutoPtr< Clsid_Invalid, DBusMessage > : public IAutoPtr
 {
     private:
 
@@ -354,7 +355,7 @@ class CAutoPtr< Clsid_Invalid, DBusMessage >
         return 0; 
     }
 
-    std::string GetSignature()
+    std::string GetSignature() const
     {
         if( IsEmpty() )
             return std::string( "" ); 
@@ -367,7 +368,7 @@ class CAutoPtr< Clsid_Invalid, DBusMessage >
         return std::string( pszSignature ); 
     }
 
-    gint32 GetErrno()
+    gint32 GetErrno() const
     {
         if( IsEmpty() )
             return -EFAULT;
@@ -381,12 +382,21 @@ class CAutoPtr< Clsid_Invalid, DBusMessage >
         return ErrnoFromDbusErr( pszError );
     }
 
-    gint32 GetSerial( guint32& dwSerial )
+    gint32 GetSerial( guint32& dwSerial ) const
     {
         if( IsEmpty() )
             return -EFAULT; 
 
         dwSerial = dbus_message_get_serial( m_pObj );
+        return 0;
+    }
+
+    gint32 GetReplySerial( guint32& dwSerial ) const
+    {
+        if( IsEmpty() )
+            return -EFAULT; 
+
+        dwSerial = dbus_message_get_reply_serial( m_pObj );
         return 0;
     }
 
@@ -431,367 +441,27 @@ class CAutoPtr< Clsid_Invalid, DBusMessage >
     typedef std::pair< gint32, BufPtr > ARG_ENTRY;
 
     gint32 GetArgs(
-        std::vector< ARG_ENTRY >& vecArgs )
-    {
-        gint32 ret = 0;
-        CDBusError oError;
+        std::vector< ARG_ENTRY >& vecArgs ) const;
 
-        DBusMessageIter itr;
-        if( !dbus_message_iter_init( m_pObj, &itr ) )
-            return 0;
-
-        // let's get the first argument, which should
-        do{
-
-            BufPtr pBuf( true );
-            if( pBuf.IsEmpty() )
-            {
-                ret = -EFAULT;
-                break;
-            }
-
-            gint32 iType = DBUS_TYPE_INVALID;
-
-            ret = GetValue( itr, pBuf, iType );
-            if( ERROR( ret ) )
-                break;
-
-            ARG_ENTRY ae;
-            ae.first = iType;
-            ae.second = pBuf;
-            vecArgs.push_back( ae );
-
-            if( dbus_message_iter_next( &itr ) )
-                continue;
-
-            break;
-
-        }while( 1 );
-
-        if( ERROR( ret ) )
-            vecArgs.clear();
-
-        return ret;
-    }
-
-    gint32 GetIntArgAt( gint32 iIndex, guint32& val )
-    {
-        BufPtr pBuf( true );
-        gint32 iType = 0;
-        gint32 ret = GetArgAt( iIndex, pBuf, iType );
-        if( ERROR( ret ) )
-            return ret;
-
-        if( iType != DBUS_TYPE_UINT32
-            && iType != DBUS_TYPE_INT32 )
-        {
-            ret = -EINVAL;
-            return ret;
-        }
-        val = ( guint32& )*pBuf;
-        return 0;
-    }
-
-    gint32 GetFdArgAt( gint32 iIndex, gint32& val )
-    {
-        BufPtr pBuf( true );
-        gint32 iType = 0;
-        gint32 ret = GetArgAt( iIndex, pBuf, iType );
-        if( ERROR( ret ) )
-            return ret;
-
-        if( iType != DBUS_TYPE_UNIX_FD )
-        {
-            ret = -EINVAL;
-            return ret;
-        }
-        val = ( gint32& )*pBuf;
-        return 0;
-    }
-
-    gint32 GetByteArgAt( gint32 iIndex, guint8& val )
-    {
-        BufPtr pBuf( true );
-        gint32 iType = 0;
-        gint32 ret = GetArgAt( iIndex, pBuf, iType );
-        if( ERROR( ret ) )
-            return ret;
-
-        if( iType != DBUS_TYPE_BYTE )
-        {
-            ret = -EINVAL;
-            return ret;
-        }
-        val = ( gint8& )*pBuf;
-        return 0;
-    }
-
-    gint32 GetBoolArgAt( gint32 iIndex, bool& val )
-    {
-        BufPtr pBuf( true );
-        gint32 iType = 0;
-        gint32 ret = GetArgAt( iIndex, pBuf, iType );
-        if( ERROR( ret ) )
-            return ret;
-
-        if( iType != DBUS_TYPE_BOOLEAN )
-        {
-            ret = -EINVAL;
-            return ret;
-        }
-        val = ( bool& )*pBuf;
-        return 0;
-    }
-
-    gint32 GetDoubleArgAt( gint32 iIndex, double& val )
-    {
-        BufPtr pBuf( true );
-        gint32 iType = 0;
-        gint32 ret = GetArgAt( iIndex, pBuf, iType );
-        if( ERROR( ret ) )
-            return ret;
-
-        if( iType != DBUS_TYPE_DOUBLE )
-        {
-            ret = -EINVAL;
-            return ret;
-        }
-        val = ( double& )*pBuf;
-        return 0;
-    }
-
-    gint32 GetInt64ArgAt( gint32 iIndex, guint64& val )
-    {
-        BufPtr pBuf( true );
-        gint32 iType = 0;
-        gint32 ret = GetArgAt( iIndex, pBuf, iType );
-        if( ERROR( ret ) )
-            return ret;
-
-        if( iType != DBUS_TYPE_INT64
-            && iType != DBUS_TYPE_UINT64 )
-        {
-            ret = -EINVAL;
-            return ret;
-        }
-        val = ( guint64& )*pBuf;
-        return 0;
-    }
-
-    gint32 GetStrArgAt( gint32 iIndex, std::string& val )
-    {
-        BufPtr pBuf( true );
-        gint32 iType = 0;
-        gint32 ret = GetArgAt( iIndex, pBuf, iType );
-        if( ERROR( ret ) )
-            return ret;
-
-        if( iType != DBUS_TYPE_STRING )
-        {
-            ret = -EINVAL;
-            return ret;
-        }
-        val = *pBuf;
-        return 0;
-    }
-
-    gint32 GetMsgArgAt( gint32 iIndex, DMsgPtr& val )
-    {
-        BufPtr pBuf( true );
-        gint32 iType = 0;
-        gint32 ret = GetArgAt( iIndex, pBuf, iType );
-        if( ERROR( ret ) )
-            return ret;
-
-        if( iType != DBUS_TYPE_ARRAY )
-        {
-            ret = -EINVAL;
-            return ret;
-        }
-
-        DMsgPtr pMsg;
-        ret = pMsg.Deserialize( *pBuf );
-        if( ERROR( ret ) )
-            return ret;
-
-        val = pMsg;
-
-        if( val.IsEmpty() )
-            return -EFAULT;
-
-        return 0;
-    }
-
-    gint32 GetObjArgAt( gint32 iIndex, ObjPtr& val )
-    {
-        BufPtr pBuf( true );
-        gint32 iType = 0;
-        gint32 ret = GetArgAt( iIndex, pBuf, iType );
-        if( ERROR( ret ) )
-            return ret;
-
-        if( iType != DBUS_TYPE_ARRAY )
-        {
-            ret = -EINVAL;
-            return ret;
-        }
-
-        BufPtr pObjBuf( true );
-        ret = pObjBuf->Deserialize( *pBuf );
-        if( ERROR( ret ) )
-            return ret;
-
-        if( pObjBuf->type() != DataTypeObjPtr )
-            return -EFAULT;
-
-        val = ( ObjPtr& )*pObjBuf;
-
-        if( val.IsEmpty() )
-            return -EFAULT;
-
-        return 0;
-    }
+    gint32 GetIntArgAt( gint32 iIndex, guint32& val );
+    gint32 GetFdArgAt( gint32 iIndex, gint32& val );
+    gint32 GetByteArgAt( gint32 iIndex, guint8& val );
+    gint32 GetBoolArgAt( gint32 iIndex, bool& val );
+    gint32 GetDoubleArgAt( gint32 iIndex, double& val );
+    gint32 GetInt64ArgAt( gint32 iIndex, guint64& val );
+    gint32 GetStrArgAt( gint32 iIndex, std::string& val );
+    gint32 GetMsgArgAt( gint32 iIndex, DMsgPtr& val );
+    gint32 GetObjArgAt( gint32 iIndex, ObjPtr& val );
 
     gint32 GetArgAt( gint32 iIndex,
-        BufPtr& pArg, gint32& iType )
-    {
+        BufPtr& pArg, gint32& iType );
 
-        // get one single argument
-        gint32 ret = 0;
-        CDBusError oError;
-
-        if( IsEmpty() || pArg.IsEmpty() )
-            return -EINVAL;
-
-        if( iIndex < 0 || iIndex > DMSG_MAX_ARGS )
-            return -EINVAL;
-
-        DBusMessageIter itr;
-        if( !dbus_message_iter_init( m_pObj, &itr ) )
-            return -ENOENT;
-
-        gint32 i = 0;
-
-        // let's get the first argument, which should
-        do{
-            BufPtr pBuf( true );
-
-            if( i < iIndex )
-            {
-                if( dbus_message_iter_next( &itr ) )
-                {
-                    ++i;
-                    continue;
-                }
-
-                // index exceeds the max args in
-                // this message
-                ret = -ERANGE;
-                break;
-            }
-
-            if( i == iIndex )
-            {
-                ret = GetValue( itr, pBuf, iType );
-                if( ERROR( ret ) )
-                {
-                    pBuf->Resize( 0 );
-                    break;
-                }
-
-                pArg = pBuf;
-            }
-
-            break;
-        }while( 1 );
-
-        return ret;
-    }
+    std::string DumpMsg() const;
 
     protected:
 
     gint32 GetValue( DBusMessageIter& itr,
-        BufPtr& pBuf, gint32& iType )
-    {
-        gint32 ret = 0;
-
-        do{
-            iType =
-                dbus_message_iter_get_arg_type( &itr );
-            
-            if( iType == DBUS_TYPE_INVALID )
-            {
-                ret = -ENOENT;
-                break;
-            }
-
-            if( iType == DBUS_TYPE_STRING )
-            {
-                char* pszVal = nullptr;
-                dbus_message_iter_get_basic( &itr, &pszVal );
-                if( pszVal == nullptr )
-                {
-                    ret = -EFAULT;
-                    break;
-                }
-
-                *pBuf = std::string( pszVal );
-            }
-            else if( IsBasicType( iType ) )
-            {
-                pBuf->Resize( DMSG_FIX_TYPE_SIZE );
-
-                if( pBuf->size() != DMSG_FIX_TYPE_SIZE )
-                {
-                    ret = -ENOMEM;
-                    break;
-                }
-
-                dbus_message_iter_get_basic( &itr, pBuf->ptr() );
-            }
-            else if( iType == DBUS_TYPE_ARRAY )
-            {
-                gint32 iElemType =
-                    dbus_message_iter_get_element_type( &itr );
-
-                if( !IsFixedType( iElemType ) )
-                {
-                    ret = -ENOTSUP;
-                    break;
-                }
-
-                guint32 dwElemSize = GetTypeBytes( iElemType );
-
-                DBusMessageIter oArrItr;
-                const char* pData = nullptr;
-                guint32 dwCount = 0;
-
-                dbus_message_iter_recurse(
-                    &itr, &oArrItr );
-
-                dbus_message_iter_get_fixed_array(
-                    &oArrItr, &pData, ( int* )&dwCount);
-
-                if( pData == nullptr )
-                {
-                    ret = -EFAULT;
-                    break;
-                }
-
-                guint32 dwSize = dwCount * dwElemSize;
-                pBuf->Resize( dwSize );
-                memcpy( pBuf->ptr(), pData, dwSize );
-            }
-            else
-            {
-                ret = -ENOTSUP;
-                break;
-            }
-
-        }while( 0 );
-
-        return ret;
-    }
+        BufPtr& pBuf, gint32& iType ) const;
 
     /**
      * Gets the alignment requirement for the
@@ -801,51 +471,6 @@ class CAutoPtr< Clsid_Invalid, DBusMessage >
      * @returns alignment of 1, 4, or 8
      */
     int
-    GetTypeBytes( int typecode )
-    {
-      switch (typecode)
-        {
-        case DBUS_TYPE_BYTE:
-        case DBUS_TYPE_VARIANT:
-        case DBUS_TYPE_SIGNATURE:
-          return 1;
-        case DBUS_TYPE_INT16:
-        case DBUS_TYPE_UINT16:
-          return 2;
-        case DBUS_TYPE_BOOLEAN:
-        case DBUS_TYPE_INT32:
-        case DBUS_TYPE_UINT32:
-        case DBUS_TYPE_UNIX_FD:
-          /* this stuff is 4 since it starts with
-           * a length */
-        case DBUS_TYPE_STRING:
-        case DBUS_TYPE_OBJECT_PATH:
-        case DBUS_TYPE_ARRAY:
-          return 4;
-        case DBUS_TYPE_INT64:
-        case DBUS_TYPE_UINT64:
-        case DBUS_TYPE_DOUBLE:
-          /* struct is 8 since it could contain an
-           * 8-aligned item and it's simpler to
-           * just always align structs to 8; we
-           * want the amount of padding in a
-           * struct of a given type to be
-           * predictable, not location-dependent.
-           * DICT_ENTRY is always the same as
-           * struct.
-           */
-        case DBUS_TYPE_STRUCT:
-        case DBUS_TYPE_DICT_ENTRY:
-          return 8;
-
-        default:
-            {
-                std::string strMsg =
-                    DebugMsg( -EINVAL, "Unknown dataType" );
-                throw std::invalid_argument( strMsg );
-            }
-          return 0;
-        }
-    }
+    GetTypeBytes( int typecode ) const;
 };
 

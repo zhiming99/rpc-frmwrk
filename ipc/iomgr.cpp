@@ -18,7 +18,6 @@
 
 #include <sys/types.h>
 #include <unistd.h>
-#include <syscall.h>
 #include <vector>
 #include <string>
 #include "defines.h"
@@ -30,7 +29,7 @@
 
 using namespace std;
 
-atomic< bool > CIoManager::m_atmInit( false );
+bool CIoManager::m_bInit( false );
 
 gint32 CIoManager::SubmitIrpInternal(
     IPort* pPort,
@@ -67,6 +66,7 @@ gint32 CIoManager::SubmitIrpInternal(
             // make this irp unaccessable
             pIrp->SetState(
                 IRP_STATE_READY, IRP_STATE_COMPLETED );
+            pIrp->SetStatus( ret );
         }
 
     }while( 0 );
@@ -107,14 +107,13 @@ gint32 CIoManager::CompleteAssocIrp(
     if( pSlave == nullptr )
         return -EINVAL;
 
-    // let's check if it has accociated irp
-    // we don't check the slaves, because the
-    // slaves must complete before the master
-    // completes
+    // let's check if it has accociated irp we don't
+    // check the slaves, because the slaves must
+    // complete before the master completes
     do
     {
-        IRP* pMaster = pSlave->GetMasterIrp();
-        if( pMaster == nullptr )
+        IrpPtr pMaster = pSlave->GetMasterIrp();
+        if( pMaster.IsEmpty()  )
         {
             ret = -EFAULT;
             break;
@@ -127,9 +126,6 @@ gint32 CIoManager::CompleteAssocIrp(
         {
             ret = pPort->CompleteAssocIrp( pMaster, pSlave );
         }
-
-        // recover the original value
-        ret = pSlave->m_iStatus;
 
     }while( 0 );
 
@@ -183,7 +179,7 @@ gint32 CIoManager::CancelAssocIrp( IRP* pSlave )
         pSlave->SetMasterIrp( nullptr );
 
         // recover the original value
-        ret = pSlave->m_iStatus;
+        ret = pSlave->GetStatus();
 
     }while( 0 );
 
@@ -202,7 +198,7 @@ gint32 CIoManager::PostCompleteIrp( IRP* pIrp, bool bCancel )
         // synchronous call, it implies that the
         // caller must hold a reference count to
         // the irp till the call finished
-        sem_post( &pIrp->m_semWait );
+        Sem_Post( &pIrp->m_semWait );
     }
     else if( pIrp->IsSyncCall() && !pIrp->IsPending() )
     {
@@ -280,7 +276,6 @@ gint32 CIoManager::CompleteIrp( IRP* pIrpComp )
 
     gint32 ret = 0;
 
-
     do{
         IrpPtr pIrp( pIrpComp );
 
@@ -348,21 +343,14 @@ gint32 CIoManager::CompleteIrp( IRP* pIrpComp )
 
             }while( itr-- != pIrp->m_vecCtxStack.begin() );
 
-            // we don't want to complete the first io stack
+            // we should not pop out the first io stack
             // because it is owned by the user land
+            itr = pIrp->m_vecCtxStack.begin();
             pIrp->SetStatus( itr->second->GetStatus() );
         }
         else
         {
             pIrp->SetStatus( -ENOENT );
-        }
-
-        if( pIrp->m_vecCtxStack.size() )
-        {
-            // we need to remove port reference at the
-            // bottom of the port stack
-            itr = pIrp->m_vecCtxStack.begin();
-            itr->first = nullptr; ;
         }
 
         // remove the timer if any
@@ -379,14 +367,22 @@ gint32 CIoManager::CompleteIrp( IRP* pIrpComp )
             a.Unlock();
 
             this->CompleteAssocIrp( pIrp );
+            // we don't care the return value from
+            // CompleteAssocIrp
 
             a.Lock();
             // no one else should touch this irp
             // because it is already marked as completed
         }
 
-        // we don't care the return value from
-        // CompleteAssocIrp
+        if( pIrp->m_vecCtxStack.size() )
+        {
+            // we need to remove port reference at the
+            // bottom of the port stack
+            itr = pIrp->m_vecCtxStack.begin();
+            itr->first = nullptr; ;
+        }
+
 
         ret = PostCompleteIrp( pIrp );
         // till now, the irp will go out of
@@ -403,7 +399,7 @@ gint32 CIoMgrIrpCompleteTask::operator()(
     gint32 ret = 0;
 
     do{
-        CCfgOpener a( ( IConfigDb* )m_pCtx );
+        CCfgOpener a( ( IConfigDb* )GetConfig() );
         ObjPtr objPtr;
 
         // get the pointer to the bus port
@@ -455,6 +451,19 @@ gint32 CIoManager::CancelSlaves(
 
         if( pIrp->GetSlaveCount() == 0 )
         {
+            pIrp->SetState(
+                IRP_STATE_CANCEL_SLAVE, IRP_STATE_READY );
+
+            break;
+        }
+
+        if( pIrp->m_mapSlaveIrps.size() == 0 )
+        {
+            // no active slave irps in the map
+            // lift the bar to complete the master irp
+            pIrp->SetMinSlaves( 0 );
+            pIrp->SetState(
+                IRP_STATE_CANCEL_SLAVE, IRP_STATE_READY );
             break;
         }
 
@@ -474,24 +483,26 @@ gint32 CIoManager::CancelSlaves(
             // let's cancel slave irps
             if( pSlave != nullptr )
             {
-                // to avoid deadlock, we release the
+                // to avoid nested locking, we release the
                 // marster irp's lock
                 a.Unlock();
                 CancelIrp( pSlave, bForce, iRet );
-                a.Lock();
             }
             continue;
         }
         else if( pIrp->GetSlaveCount() == 0 )
         {
-            IRP* pSlave = pIrp->m_mapSlaveIrps.begin()->first;
-            // add a dummy irp to prevent the completion of master
-            // irp in CancelAssocIrp, because we are going to cancel
-            // it
+            // add a dummy irp to prevent the
+            // completion of master irp in
+            // CancelAssocIrp, because we are going to
+            // cancel it. CancelAssocIrp happens when
+            // the slave irp is being canceled from
+            // somewhere else
             if( pSlave != nullptr )
             {
-                // add a dummy slave to prevent the CompleteIrp
-                // from being called in CPort::CompleteAssocIrp
+                // add a dummy slave to prevent the
+                // CompleteIrp from being called in
+                // CPort::CompleteAssocIrp
                 pIrp->AddSlaveIrp( ( IRP* )nullptr );
 
                 // reset the state to allow others to touch this
@@ -503,8 +514,6 @@ gint32 CIoManager::CancelSlaves(
                 // let's cancel slave irps
                 a.Unlock();
                 CancelIrp( pSlave, bForce, iRet );
-                a.Lock();
-
                 continue;
             }
             else
@@ -593,6 +602,7 @@ gint32 CIoManager::CancelIrp(
 
             }while( itr-- != pIrp->m_vecCtxStack.begin() );
 
+            itr = pIrp->m_vecCtxStack.begin();
             pIrp->SetStatus( itr->second->GetStatus() );
         }
         else
@@ -769,7 +779,7 @@ gint32 CIoManager::OpenPortByPath(
 
     ObjPtr objPtr;
     do{
-        gint32 ret = this->GetObject( strPath, objPtr );
+        ret = this->GetObject( strPath, objPtr );
         if( ret )
             break;
 
@@ -863,10 +873,28 @@ gint32 CIoManager::MakeBusRegPath(
     std::string& strPath,
     const std::string& strBusName )
 {
+
+    size_t pos;
+    pos = strBusName.rfind( '.' );
+    string strBusPort;
+    if( pos == string::npos )
+    {
+        strBusPort = strBusName;
+    }
+    else if( pos + 1 < strBusName.size() )
+    {
+        strBusPort =
+            strBusName.substr( pos + 1 );
+    }
+    else
+    {
+        return -EINVAL;
+    }
+
     strPath = string( "/port/" )
         + GetModName()
         + "/bus/"
-        + strBusName;
+        + strBusPort;
 
     return 0;
 }
@@ -902,6 +930,13 @@ gint32 CIoManager::OpenPortByCfg(
             // get the pointer to the bus port
             ObjPtr objPtr;
             ret = this->GetObject( strPath, objPtr );
+            if( ret == -ENOENT )
+            {
+                // possibly the driver and port are not
+                // loaded yet
+                ret = -EAGAIN;
+                break;
+            }
             if( ERROR( ret ) )
                 break;
 
@@ -912,7 +947,23 @@ gint32 CIoManager::OpenPortByCfg(
                 ret = -EFAULT;
                 break;
             }
+            else
+            {
+                CStdRMutex oPortLock( pBus->GetLock() );
 
+                guint32 dwState = pBus->GetPortState();
+                if( dwState == PORT_STATE_STARTING )
+                {
+                    // try it later
+                    ret = -EAGAIN;
+                    break;
+                }
+                else if( dwState != PORT_STATE_READY )
+                {
+                    ret = ERROR_STATE;
+                    break;
+                }
+            }
             // create the pdo port or open the
             // existing pdo port
             ret = pBus->OpenPdoPort( pCfg, pPort );
@@ -953,7 +1004,7 @@ gint32 CIoManager::OpenPort(
         }
 
         // FIXME: what is the ref count of pPort
-        gint32 ret = this->OpenPortByCfg( pCfg, pPort );
+        ret = this->OpenPortByCfg( pCfg, pPort );
 
         if( SUCCEEDED( ret ) || ret == EEXIST )
         {
@@ -980,10 +1031,11 @@ gint32 CIoManager::OpenPort(
                     break;
                 }
             }
+
             // the new port is created 
             ObjPtr pObj;
             CCfgOpener a( pCfg );
-            ret = a.GetObjPtr( propEventSink, pObj );
+            ret = a.GetObjPtr( propIfPtr, pObj );
             if( ERROR( ret ) )
             {
                 // it is required to bind event
@@ -1046,10 +1098,10 @@ gint32 CIoManager::OnEvent( EnumEventId iEvent,
                         break;
 
                     ret = GetDrvMgr().Start();
+
                     if( ERROR( ret ) )
-                    {
                         GetPnpMgr().Stop();
-                    }
+
                     break;
                 }
             default:
@@ -1159,15 +1211,15 @@ gint32 CIoManager::Start()
 {
     gint32 ret = 0;
     do{
-        bool bExpected = false;
-        if( !m_atmInit.compare_exchange_strong(
-                bExpected, true ) )
+        if( m_bInit )
         {
             // well, it is already initialized,
             // let's fail
             ret = ERROR_STATE;
             break;
         }
+
+        m_bInit = true;
 
         ret = GetUtils().Start();
         if( ERROR( ret ) )
@@ -1176,11 +1228,13 @@ gint32 CIoManager::Start()
         GetTaskThreadPool().Start();
         GetIrpThreadPool().Start();
 
-        ret = ScheduleWorkitem(
-            eventStart, this, 0, true );
+        // the return value is the workitem id, and we
+        // don't want it here
+        ret = 0;
 
-        if( ERROR( ret ) )
-            break;
+        // let's enter the main loop. The whole
+        // system begin to run
+        GetMainIoLoop().Start();
 
         // this task will be executed in the
         // mainloop
@@ -1191,9 +1245,8 @@ gint32 CIoManager::Start()
             clsid( CIoMgrPostStartTask ),
             a.GetCfg() );
 
-        // let's enter the main loop. The whole
-        // system begin to run
-        GetMainIoLoop().Start();
+        this->OnEvent( eventWorkitem,
+            eventStart, 0, nullptr );
 
     }while( 0 );
 
@@ -1212,9 +1265,23 @@ gint32 CIoManager::ScheduleTaskMainLoop(
         if( ERROR( ret ) )
             break;
 
+        pTask->MarkPending();
         GetMainIoLoop().AddTask( pTask );
 
+        if( !pTask->IsAsync() )
+        {
+            CTaskletSync* pSyncTask =
+                static_cast< CTaskletSync* >( ( CTasklet* )pTask );
+
+            if( pSyncTask != nullptr )
+            {
+                pSyncTask->WaitForComplete();
+                ret = pSyncTask->GetError();
+            }
+        }
+
     }while( 0 );
+
     return ret;
 }
 
@@ -1225,6 +1292,8 @@ gint32 CIoManager::ClearStandAloneThreads()
     gint32 iSize =
         ( gint32 )m_vecStandAloneThread.size();
 
+    size_t iStopTask = 0;
+
     vector< ThreadPtr >::iterator itr =
         m_vecStandAloneThread.begin();
 
@@ -1232,9 +1301,23 @@ gint32 CIoManager::ClearStandAloneThreads()
     {
         if( !m_vecStandAloneThread[ i ]->IsRunning() )
             m_vecStandAloneThread.erase( itr + i );
+
+        CCfgOpenerObj oThrdCfg(
+            ( CObjBase* )m_vecStandAloneThread[ i ] );
+
+        if( oThrdCfg.exist( propClsid ) )
+        {
+            // if there is a task CIoMgrStopTask in the
+            // array, we don't need to count that
+            // thread
+            guint32 dwClsid;
+            oThrdCfg.GetIntProp( propClsid, dwClsid );
+            if( dwClsid == clsid( CIoMgrStopTask ) )
+                iStopTask = 1;
+        }
     }
 
-    if( m_vecStandAloneThread.size() )
+    if( m_vecStandAloneThread.size() > iStopTask )
         return -EEXIST;
 
     return 0;
@@ -1249,12 +1332,21 @@ void CIoManager::WaitThreadsQuit()
 }
 
 gint32 CIoManager::StartStandAloneThread(
-    ThreadPtr& pThread )
+    ThreadPtr& pThread, EnumClsid iTaskClsid )
 {
     gint32 ret = 0;
     
     ret = pThread.NewObj(
         clsid( COneshotTaskThread ) );
+
+    if( ERROR( ret ) )
+        return ret;
+
+    CCfgOpenerObj oThrdCfg(
+        ( CObjBase*) pThread );
+
+    ret = oThrdCfg.SetIntProp(
+        propClsid, iTaskClsid );
 
     if( ERROR( ret ) )
         return ret;
@@ -1304,29 +1396,34 @@ gint32 CIoManager::ScheduleTask(
         if( bOneshot )
         {
             ThreadPtr pThread;
-            ret = StartStandAloneThread( pThread );
+
+            ret = StartStandAloneThread(
+                pThread, iClsid );
+
             if( ERROR( ret ) )
                 break;
 
+            pTask->MarkPending();
+
             CTaskThread* pTaskThread = pThread;
             pTaskThread->AddTask( pTask );
-
-            break;
         }
-
-        ThreadPtr pThread;
-        ret = GetTaskThreadPool().GetThread( pThread, true );
-        if( ERROR( ret ) )
-            break;
-
-        CTaskThread* pgth =
-            static_cast< CTaskThread* >( pThread );
-
-        if( pgth )
+        else
         {
-            pTask->MarkPending();
-            pTask->SetError( STATUS_PENDING );
-            pgth->AddTask( pTask );
+
+            ThreadPtr pThread;
+            ret = GetTaskThreadPool().GetThread( pThread, true );
+            if( ERROR( ret ) )
+                break;
+
+            CTaskThread* pgth =
+                static_cast< CTaskThread* >( pThread );
+
+            if( pgth )
+            {
+                pTask->MarkPending();
+                pgth->AddTask( pTask );
+            }
         }
 
         if( !pTask->IsAsync() )
@@ -1406,101 +1503,115 @@ CIoManager::CIoManager( const std::string& strModName ) :
 {
     gint32 ret = 0;
     SetClassId( clsid( CIoManager ) );
-    CfgPtr pCfg( true );
 
-    CCfgOpener a( ( IConfigDb* )pCfg );
-    a.SetPointer( propIoMgr, this );
-    a.SetStrProp( propConfigPath, string( CONFIG_FILE ) );
+    do{
+        CParamList a;
+        a.SetPointer( propIoMgr, this );
+        a.SetStrProp( propConfigPath, string( CONFIG_FILE ) );
 
-    ret = m_pReg.NewObj();
-    if( ERROR( ret ) )
-    {
-        throw std::runtime_error(
-            "CRegistry failed to initialize" );
-    }
+        CfgPtr pCfg = a.GetCfg();
 
-    ret = m_pUtils.NewObj(
-        clsid( CUtilities ), pCfg );
-    if( ERROR( ret ) )
-    {
-        throw std::runtime_error(
-            "CUtilities failed to initialize" );
-    }
+        ret = m_pReg.NewObj();
+        if( ERROR( ret ) )
+        {
+            throw std::runtime_error(
+                "CRegistry failed to initialize" );
+        }
 
-    ret = m_pPnpMgr.NewObj(
-        clsid( CPnpManager ), pCfg );
+        ret = m_pUtils.NewObj(
+            clsid( CUtilities ), pCfg );
+        if( ERROR( ret ) )
+        {
+            throw std::runtime_error(
+                "CUtilities failed to initialize" );
+        }
 
-    if( ERROR( ret ) )
-    {
-        throw std::runtime_error(
-            "CPnpManager failed to initialize" );
-    }
+        ret = m_pPnpMgr.NewObj(
+            clsid( CPnpManager ), pCfg );
 
-    ret = m_pLoop.NewObj(
-        clsid( CMainIoLoop ), pCfg );
+        if( ERROR( ret ) )
+        {
+            throw std::runtime_error(
+                "CPnpManager failed to initialize" );
+        }
 
-    if( ERROR( ret ) )
-    {
-        throw std::runtime_error(
-            "CMainIoLoop failed to initialize" );
-    }
+        ret = m_pLoop.NewObj(
+            clsid( CMainIoLoop ), pCfg );
 
-    ret = m_pDrvMgr.NewObj(
-        clsid( CDriverManager ), pCfg );
+        if( ERROR( ret ) )
+        {
+            throw std::runtime_error(
+                "CMainIoLoop failed to initialize" );
+        }
 
-    if( ERROR( ret ) )
-    {
-        throw std::runtime_error(
-            "CDriverManager failed to initialize" );
-    }
+        ret = m_pDrvMgr.NewObj(
+            clsid( CDriverManager ), pCfg );
 
-    a.SetIntProp( 0, 1 );
-    a.SetIntProp( 1, 2 );
-    ret = m_pIrpThrdPool.NewObj(
-        clsid( CIrpThreadPool ), pCfg );
-    if( ERROR( ret ) )
-    {
-        throw std::runtime_error(
-            "CIrpThreadPool failed to initialize" );
-    }
+        if( ERROR( ret ) )
+        {
+            throw std::runtime_error(
+                "CDriverManager failed to initialize" );
+        }
 
-    a.SetIntProp( 0, 1 );
-    a.SetIntProp( 1, 3 );
-    ret = m_pTaskThrdPool.NewObj(
-        clsid( CTaskThreadPool ), pCfg );
-    if( ERROR( ret ) )
-    {
-        throw std::runtime_error(
-            "CTaskThreadPool failed to initialize" );
-    }
+        guint32 dwThreadCount = 1;
+        guint32 dwThreadMax = 2;
+        a.Push( dwThreadCount );
+        a.Push( dwThreadMax );
+        a.Push( ( guint32 )clsid( CIrpThreadPool ) );
 
-    sem_init( &m_semSync, 0, 0 );
+        ret = m_pIrpThrdPool.NewObj(
+            clsid( CIrpThreadPool ), pCfg );
+        if( ERROR( ret ) )
+        {
+            throw std::runtime_error(
+                "CIrpThreadPool failed to initialize" );
+        }
 
-    Json::Value& oCfg = m_pDrvMgr->GetJsonCfg();
-    if( oCfg == Json::Value::null )
-    {
-        throw std::invalid_argument(
-            "No config" );
-    }
-    Json::Value& oArch = oCfg[ JSON_ATTR_ARCH ];
-    if( oArch == Json::Value::null )
-    {
-        throw std::invalid_argument(
-            "No Arch Configs" );
-    }
-    Json::Value& oCores = oArch[ JSON_ATTR_NUM_CORE ];
-    if( oCores == Json::Value::null )
-    {
-        throw std::invalid_argument(
-            "No Processors" );
-    }
-    m_dwNumCores = oCores.asInt();
-    
+        a.SetIntProp( 0, dwThreadCount );
+        dwThreadMax = 3;
+        a.SetIntProp( 1, dwThreadMax );
+        a.SetIntProp( 2,
+            ( guint32 )clsid( CTaskThreadPool ) );
+
+        ret = m_pTaskThrdPool.NewObj(
+            clsid( CTaskThreadPool ), pCfg );
+        if( ERROR( ret ) )
+        {
+            throw std::runtime_error(
+                "CTaskThreadPool failed to initialize" );
+        }
+
+        Sem_Init( &m_semSync, 0, 0 );
+
+        Json::Value& oCfg = m_pDrvMgr->GetJsonCfg();
+        if( oCfg == Json::Value::null )
+        {
+            throw std::invalid_argument(
+                "No config" );
+        }
+        Json::Value& oArch = oCfg[ JSON_ATTR_ARCH ];
+        if( oArch == Json::Value::null )
+        {
+            throw std::invalid_argument(
+                "No Arch Configs" );
+        }
+        Json::Value& oCores = oArch[ JSON_ATTR_NUM_CORE ];
+        if( oCores == Json::Value::null )
+        {
+            throw std::invalid_argument(
+                "No Processors" );
+        }
+
+        string strVal = oCores.asString();
+        m_dwNumCores = std::strtol(
+            strVal.c_str(), nullptr, 10 );
+
+    }while( 0 );
 
     return;
 }
 
-static inline string ExtraceModNameIoMgr(
+static inline string ExtractModNameIoMgr(
     const IConfigDb* pCfg )
 {
 
@@ -1528,7 +1639,7 @@ static inline string ExtraceModNameIoMgr(
 
 CIoManager::CIoManager(
     const IConfigDb* pCfg )
-   :CIoManager( ExtraceModNameIoMgr( pCfg ) )
+   :CIoManager( ExtractModNameIoMgr( pCfg ) )
 {
 }
 
@@ -1537,6 +1648,10 @@ CIoManager::~CIoManager()
     sem_destroy( &m_semSync );
 }
 
+std::recursive_mutex& CIoManager::GetLock() const
+{
+    return m_oGrandLock;
+}
 gint32 CIoManager::ScheduleWorkitem(
     guint32 dwFlags,
     IEventSink* pCallback,
@@ -1576,8 +1691,8 @@ gint32 CIoMgrStopTask::operator()(
 {
     gint32 ret = 0;
     CIoManager* pMgr;
-    CCfgOpenerObj a( this );
-    ret = a.GetPointer( propIoMgr, pMgr );
+    CCfgOpenerObj oCfg( this );
+    ret = oCfg.GetPointer( propIoMgr, pMgr );
     if( ERROR( ret ) )
         return ret;
 
@@ -1585,13 +1700,17 @@ gint32 CIoMgrStopTask::operator()(
     {
         // NOTE: we cannot stop task
         // thread pool here
+        ret = pMgr->GetMainIoLoop().Stop();
         ret = pMgr->GetDrvMgr().Stop();
         ret = pMgr->GetPnpMgr().Stop();
         ret = pMgr->GetUtils().Stop();
         ret = pMgr->GetIrpThreadPool().Stop();
         ret = pMgr->GetTaskThreadPool().Stop();
-        pMgr->GetMainIoLoop().Stop();
     }
+
+    if( dwContext == eventOneShotTaskThrdCtx )
+        Sem_Post( &m_semSync );
+
     return SetError( ret );
 }
 
@@ -1599,20 +1718,19 @@ gint32 CIoMgrPostStartTask::operator()(
     guint32 dwContext )
 {
     gint32 ret = 0;
-    if( m_pCtx.IsEmpty() )
+    if( GetConfig().IsEmpty() )
         return SetError( -EFAULT );
 
     ObjPtr pObj;
-    CCfgOpenerObj a( this );
+    CCfgOpenerObj oCfg( this );
     CIoManager* pMgr = nullptr;
-    ret = a.GetPointer( propIoMgr, pMgr );
+    ret = oCfg.GetPointer( propIoMgr, pMgr );
     if( ERROR( ret ) )
         return ret;
 
     if( pMgr )
-    {
-        sem_post( pMgr->GetSyncSem() );
-    }
+        Sem_Post( pMgr->GetSyncSem() );
+
     return SetError( ret );
 }
 

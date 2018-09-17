@@ -17,6 +17,7 @@
  */
 #pragma once
 #include "defines.h"
+#include "stlcont.h"
 
 class CObjMakerBase
 {
@@ -37,7 +38,9 @@ class CObjMakerCfg :
     virtual CObjBase* operator()(
         const IConfigDb* pCfg = nullptr )
     {
-        return new T( pCfg );
+        CObjBase* pObj = new T( pCfg );
+        pObj->DecRef();
+        return pObj;
     }
 
     ~CObjMakerCfg()
@@ -53,22 +56,13 @@ class CObjMaker :
     virtual CObjBase* operator()(
         const IConfigDb* pCfg = nullptr )
     {
-        return new T();
+        CObjBase* pObj = new T();
+        pObj->DecRef();
+        return pObj;
     }
     ~CObjMaker()
     {;}
 };
-
-extern const char* CoGetClassName( EnumClsid iClsid );
-extern EnumClsid CoGetClassId( const char* szClassName );
-extern gint32 CoLoadClassFactory( const char* pszPath );
-extern gint32 CoLoadClassFactories( const char* dir );
-
-extern gint32 CoCreateInstance( EnumClsid clsid,
-    CObjBase*& pObj, const IConfigDb* pCfg = nullptr ); 
-
-extern gint32 CoInitialize( guint32 dwContext = 0 );
-extern gint32 CoUninitialize();
 
 class IClassFactory : public CObjBase
 {
@@ -91,8 +85,16 @@ class IClassFactory : public CObjBase
         std::vector< EnumClsid >& vecClsIds ) = 0;
 };
 
+struct cmp_str
+{
+    bool operator()(char const *a, char const *b)
+    {
+        return strcmp(a, b) < 0;
+    }
+};
+
 typedef std::map< EnumClsid, const char* > ID2NAME_MAP;
-typedef std::map< const char*, EnumClsid > NAME2ID_MAP;
+typedef std::map< const char*, EnumClsid, cmp_str > NAME2ID_MAP;
 typedef std::map< EnumClsid, CObjMakerBase* > OBJMAKER_MAP;
 
 #define OBJMAKER_ENTRY( name ) \
@@ -102,7 +104,7 @@ do{ oMapObjMakers[ clsid( name) ] = ( new CObjMaker< name >()  ); }while( 0 )
 do{ oMapObjMakers[ clsid( name) ] = ( new CObjMakerCfg< name >()  ); }while( 0 )
 
 #define BEGIN_FACTORY_MAPS \
-do{ \
+{ \
     ID2NAME_MAP oMapId2Name; \
     NAME2ID_MAP oMapName2Id; \
     OBJMAKER_MAP oMapObjMakers; \
@@ -122,10 +124,10 @@ do{ \
 }while( 0 )
 
 #define END_FACTORY_MAPS \
-    FactoryPtr pFactory = new CClassFactory( \
-        oMapId2Name, oMapName2Id, oMapObjMakers ); \
-    return pFactory; \
-}while( 0 );
+    FactoryPtr pFactory( FactoryPtr( new CClassFactory( \
+        oMapId2Name, oMapName2Id, oMapObjMakers ), false ) ); \
+   return pFactory; \
+}\
 
 class CClassFactory : public IClassFactory
 {
@@ -172,10 +174,53 @@ class CClassFactory : public IClassFactory
         std::vector< EnumClsid >& vecClsIds );
 };
 
-// c++11 required
-template <typename R, typename C, typename ... Types>
-inline constexpr size_t GetArgCount( R(C::*f)(Types ...) )
+typedef CAutoPtr< clsid( Invalid ), IClassFactory >    FactoryPtr;
+
+typedef std::pair< void*, FactoryPtr > ELEM_CLASSFACTORIES;
+struct CClassFactories: public CStlVector< ELEM_CLASSFACTORIES >
 {
-   return sizeof...(Types);
+    public:
+    typedef CStlVector< ELEM_CLASSFACTORIES > super;
+
+    CClassFactories();
+    ~CClassFactories();
+
+    /**
+    * @name CreateInstance similiar to
+    * CoCreateInstance, except the name.
+    * @{ */
+    /**  @} */
+    gint32 CreateInstance( 
+        EnumClsid clsid,
+        CObjBase*& pObj,
+        const IConfigDb* pCfg );
+
+    const char* GetClassName(
+        EnumClsid iClsid );
+
+    EnumClsid GetClassId(
+        const char* pszClassName );
+
+    gint32 AddFactory(
+        const FactoryPtr& pFactory, void* hDll );
+
+    gint32 RemoveFactory(
+        FactoryPtr& pFactory );
+
+    void EnumClassIds(
+        std::vector< EnumClsid >& vecClsIds );
+
+    void Clear();
 };
+
+typedef CAutoPtr< clsid( CClassFactories ), CClassFactories > FctryVecPtr;
+
+extern const char* CoGetClassName( EnumClsid iClsid );
+extern EnumClsid CoGetClassId( const char* szClassName );
+extern gint32 CoLoadClassFactory( const char* pszPath );
+extern gint32 CoLoadClassFactories( const char* dir );
+extern gint32 CoAddClassFactory( const FactoryPtr& pFactory );
+
+extern gint32 CoInitialize( guint32 dwContext = 0 );
+extern gint32 CoUninitialize();
 

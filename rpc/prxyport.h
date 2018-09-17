@@ -77,19 +77,17 @@ class CDBusProxyPdo : public CRpcPdoPort
 
     ~CDBusProxyPdo();
 
-    virtual gint32 DispatchData( CBuffer* pData );
+    // virtual gint32 DispatchData( CBuffer* pData );
 
     virtual gint32 SubmitIoctlCmd( IRP* pIrp );
-
-    // during start, we will send out a connect
-    // request to the router to make a connection
-    // to the target machine
-    virtual gint32 Start( IRP* pIrp );
 
 	virtual gint32 CanContinue( IRP* pIrp,
         guint32 dwNewState = PORT_STATE_INVALID,
         guint32* pdwOldState = nullptr );
 
+    // during start, we will send out a connect
+    // request to the router to make a connection
+    // to the target machine
     virtual gint32 OnPortReady( IRP* pIrp );
     virtual gint32 CompleteIoctlIrp( IRP* pIrp );
 
@@ -186,8 +184,8 @@ class CDBusProxyFdo : public IRpcFdoPort
 
     virtual gint32 OnPortReady( IRP* pIrp );
 
-    virtual gint32 DispatchRespMsg(
-        DBusMessage* pMsg );
+    // virtual gint32 DispatchRespMsg(
+    //     DBusMessage* pMsg );
 
     gint32 CompleteConnReq( IRP* pIrp );
 

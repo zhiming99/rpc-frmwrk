@@ -4,7 +4,7 @@ DONE    To add IoCtlCompletion for CDBusLocalPdo, CDBusProxyPdo
 DONE    To change the port-state filter in DispatchData, which is not right yet
 DONE    To make sure the cached irp in portstat removed before the port stops
 
-PDON    To Remove WaitForComplete in the StartPortInternal and StopPortInternal,
+PDON    To Remove WaitForComplete in the StartPortsInternal and StopPortsInternal,
             and make them completely asynchronous --- partially done
 
 DONE    To handle events from DBus system in the
@@ -93,3 +93,4 @@ DONE    To add support to cancel SendData/FetchData gracefully
 
         To dispatch the Remote Server Offline/Online and Remote Module Offline/Online events from the CRpcTcpBridgeProxy to the CRpcReqForwarder
 
+        To debug and test the ipc/rpc modules and write test code

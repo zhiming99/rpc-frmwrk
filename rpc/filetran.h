@@ -18,7 +18,7 @@
 
 #include "configdb.h"
 #include "defines.h"
-#include "proxy.h"
+#include "ifhelper.h"
 #include <exception>
 
 gint32 CopyFile( gint32 iFdDest,
@@ -66,6 +66,7 @@ class CFileTransferProxy :
     // it serializable, an subclass of CObject or
     // a dbus message
     gint32 DownloadFile_Callback(
+        IEventSink* pContext,
         gint32 iRet,
         gint32 fd,
         guint32 dwOffset,

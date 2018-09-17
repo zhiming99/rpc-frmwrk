@@ -21,6 +21,7 @@
 #include "defines.h"
 #include "registry.h"
 #include "stlcont.h"
+#include "namespc.h"
 
 class CConnPointHelper
 {
@@ -132,8 +133,7 @@ class CConnPointHelper
             if( ERROR( ret ) )
                 break;
 
-            ObjPtr pObj;
-            ret = oReg.GetObject( iConnId, pObj );
+            ret = oReg.GetObject( iConnId, pEvtMap );
 
         }while( 0 );
 

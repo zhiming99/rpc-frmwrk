@@ -50,13 +50,18 @@ class CTaskThread : public IThread
     bool                        m_bExit;
     TaskQuePtr                  m_pTaskQue;
     sem_t                       m_semSync;
+    gint32                      m_iMyTid;
 
     gint32 PopHead( TaskletPtr& pTask );
 
     void ThreadProcWraper( void* context )
     { this->ThreadProc( context ); }
 
+    gint32 ProcessTask( guint32 dwContext );
+
     public:
+    typedef IThread super;
+
     CTaskThread();
     ~CTaskThread();
 
@@ -67,7 +72,7 @@ class CTaskThread : public IThread
     gint32 Stop();
 
     // test if the thread is running
-    bool IsRunning();
+    bool IsRunning() const;
 
     virtual void ThreadProc( void* context );
 
@@ -80,16 +85,51 @@ class CTaskThread : public IThread
     gint32 OnEvent( EnumEventId iEvent,
             guint32 dwParam1 = 0,
             guint32 dwParam2 = 0,
-            guint32* pData = NULL  );
+            guint32* pData = NULL  )
+    {
+        return ENOTSUP;
+    }
+
+    gint32 GetTid() const
+    { return m_iMyTid; }
+
+    void SetTid( const gint32 iTid )
+    { m_iMyTid = iTid; }
+
+    virtual gint32 GetProperty(
+        gint32 iProp, CBuffer& oBuf ) const;
+
+    virtual gint32 SetProperty(
+        gint32 iProp, const CBuffer& oBuf );
+
+    virtual gint32 EnumProperties(
+        std::vector< gint32 >& vecProps ) const;
+
+    gint32 SetThreadName(
+        const char* szName = nullptr );
 };
 
 class COneshotTaskThread : public CTaskThread
 {
     bool m_bTaskDone;
+    EnumClsid m_iTaskClsid;
     public:
+
+    typedef CTaskThread super;
+
     COneshotTaskThread();
     virtual void ThreadProc( void* context );
     gint32 Start();
+    gint32 Stop();
+
+    gint32 GetProperty(
+        gint32 iProp, CBuffer& oBuf ) const;
+
+    gint32 SetProperty(
+        gint32 iProp, const CBuffer& oBuf );
+
+    gint32 EnumProperties(
+        std::vector< gint32 >& vecProps ) const;
 };
 
 class CThreadPool : public IService
@@ -100,6 +140,7 @@ class CThreadPool : public IService
     gint32                  m_iLoadLimit;
     gint32                  m_iMaxThreads;
     EnumClsid               m_iThreadClass;
+    gint32                  m_iThreadCount;
 
     protected:
     std::vector< ThreadPtr > m_vecThreads;
@@ -194,6 +235,9 @@ class CIrpCompThread : public IThread
     // the thread stoped
     gint32 Stop();
 
+    // test if the thread is running
+    bool IsRunning() const;
+
     // we will use AddRef and Release to
     // manange the reference count.
     gint32 AddIf( IGenericInterface* pif );
@@ -262,18 +306,19 @@ class CTimerService : public IService
             m_qwTicks = 0;
             m_dwParam = 0;
         }
+
         TIMER_ENTRY( const TIMER_ENTRY& te )
+        {
+            *this = te;
+        }
+
+        TIMER_ENTRY& operator=( const TIMER_ENTRY& te )
         {
             m_iTimerId = te.m_iTimerId;
             m_qwIntervalMs = te.m_qwIntervalMs;
             m_qwTicks = te.m_qwTicks;
             m_dwParam = te.m_dwParam;
             m_pCallback = te.m_pCallback;
-        }
-
-        TIMER_ENTRY& operator=( const TIMER_ENTRY& te )
-        {
-            new( this ) TIMER_ENTRY( te );
             return *this;
         }
 	};
@@ -328,7 +373,8 @@ class CTimerService : public IService
     gint32 OnEvent( EnumEventId iEvent,
             guint32 dwParam1,
             guint32 dwParam2,
-            guint32* pData );
+            guint32* pData )
+    { return -ENOTSUP; }
 
     inline CIoManager* GetIoMgr() const
     { return m_pIoMgr; }
@@ -363,15 +409,17 @@ class CWorkitemManager : public CObjBase
         {
             // we won't increase workitem if it 
             // is a copy constructor
-            m_iWorkitemId = wi.m_iWorkitemId;
-            m_dwFlags = wi.m_dwFlags;
-            m_pEventSink = wi.m_pEventSink;
-            m_dwContext = wi.m_dwContext;
+            *this = wi;
         }
 
         WORK_ITEM& operator=( const WORK_ITEM& rhs )
         {
-            new ( this ) WORK_ITEM( rhs );
+            // we won't increase workitem id if it 
+            // is a copy constructor
+            m_iWorkitemId = rhs.m_iWorkitemId;
+            m_dwFlags = rhs.m_dwFlags;
+            m_pEventSink = rhs.m_pEventSink;
+            m_dwContext = rhs.m_dwContext;
             return *this;
         }
     };
@@ -397,7 +445,7 @@ class CWorkitemManager : public CObjBase
         guint32 dwFlags,
         IEventSink* pWorkitem,
         guint32 dwContext,
-        bool bLongWait );
+        bool bLongWait = false );
 
 	gint32 CancelWorkitem(
         gint32 iWorkitemId );

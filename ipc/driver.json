@@ -106,6 +106,76 @@
     "Modules" :
     [
         {
+            "ModName" : "smoketest",
+            "DriversToLoad" :
+            [
+                "DBusBusDriver"
+            ]
+        },
+        {
+            "ModName" : "ifsvrsmk",
+            "DriversToLoad" :
+            [
+                "DBusBusDriver"
+            ]
+        },
+        {
+            "ModName" : "ifclismk",
+            "DriversToLoad" :
+            [
+                "DBusBusDriver"
+            ]
+        },
+        {
+            "ModName" : "asyncsvrsmk",
+            "DriversToLoad" :
+            [
+                "DBusBusDriver"
+            ]
+        },
+        {
+            "ModName" : "asynclismk",
+            "DriversToLoad" :
+            [
+                "DBusBusDriver"
+            ]
+        },
+        {
+            "ModName" : "actcsvrtst",
+            "DriversToLoad" :
+            [
+                "DBusBusDriver"
+            ]
+        },
+        {
+            "ModName" : "actclitst",
+            "DriversToLoad" :
+            [
+                "DBusBusDriver"
+            ]
+        },
+        {
+            "ModName" : "evtsvrtst",
+            "DriversToLoad" :
+            [
+                "DBusBusDriver"
+            ]
+        },
+        {
+            "ModName" : "evtclitst",
+            "DriversToLoad" :
+            [
+                "DBusBusDriver"
+            ]
+        },
+        {
+            "ModName" : "inproctst",
+            "DriversToLoad" :
+            [
+                "DBusBusDriver"
+            ]
+        },
+        {
             "ModName" : "Mod_RpcRouter_0",
             "DriversToLoad" :
             [

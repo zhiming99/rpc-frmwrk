@@ -4,14 +4,18 @@
 #include <vector>
 #include <unistd.h>
 #include <sys/syscall.h>
+#include "namespc.h"
 #include "defines.h"
 #include "registry.h"
 #include "tasklets.h"
 #include "utils.h"
 #include "port.h"
 #include "portdrv.h"
-#include "proxy.h"
 
+
+extern gint32 ReadJsonCfg(
+    const std::string& strFile,
+    Json::Value& valConfig );
 
 class CIoManager;
 
@@ -29,6 +33,9 @@ class CMainIoLoop : public IService
     GSource                         *m_pTaskSrc;
     TaskQuePtr                      m_queTasks;
     std::thread                     *m_pThread;
+
+    mutable stdmutex                m_oLock;
+
 	public:
 
     CMainIoLoop( const IConfigDb* pCfg = nullptr );
@@ -68,6 +75,8 @@ class CMainIoLoop : public IService
 
     inline CIoManager* GetIoMgr() const
     { return m_pIoMgr; }
+
+    gint32 InstallTaskSource();
 };
 
 typedef CAutoPtr< clsid( CMainIoLoop ), CMainIoLoop > MainLoopPtr;
@@ -169,7 +178,8 @@ class CDriverManager : public IService
     gint32 OnEvent( EnumEventId iEvent,
             guint32 dwParam1 = 0,
             guint32 dwParam2 = 0,
-            guint32* pData = NULL  );
+            guint32* pData = NULL  )
+    { return -ENOTSUP; }
 
     inline CIoManager* GetIoMgr() const
     {  return m_pIoMgr; }
@@ -244,8 +254,8 @@ class CPnpManager : public IService
      * 
      *  @} */
     gint32 StartPortStack(
-        IPort* pPort,
-        IRP* pMaster = nullptr );
+        ObjPtr pPort,
+        ObjPtr pMasterIrp );
 
     /**
     * @name StopPortStack
@@ -344,13 +354,13 @@ class CPortInterfaceMap : public CObjBase
         IEventSink* pEvent, std::vector< PortPtr >* pvecVals = nullptr ) const;
 };
 
-#define CONFIG_FILE "/etc/driver.json"
+#define CONFIG_FILE "./driver.json"
 
 class CIoManager : public IService
 {
     DrvMgrPtr                   m_pDrvMgr;
     MainLoopPtr                 m_pLoop;
-    std::recursive_mutex        m_oGrandLock;
+    mutable std::recursive_mutex        m_oGrandLock;
     RegPtr                      m_pReg;
     UtilsPtr                    m_pUtils;
     PnpMgrPtr                   m_pPnpMgr;
@@ -358,8 +368,8 @@ class CIoManager : public IService
 
     // currently we allow only one instance of
     // CIoManager in a process. we use
-    // `m_atmInit' to control this.
-    static std::atomic< bool >  m_atmInit;
+    // `m_bInit' to control this.
+    static bool                 m_bInit;
 
     CPortInterfaceMap           m_oPortIfMap;
 
@@ -397,7 +407,7 @@ class CIoManager : public IService
         IRP* pIrp, bool bCancel = false );
 
     gint32 StartStandAloneThread(
-        ThreadPtr& pThread );
+        ThreadPtr& pThread, EnumClsid iTaskClsid );
 
     gint32 ClearStandAloneThreads();
 
@@ -553,11 +563,6 @@ class CIoManager : public IService
         guint32 dwParam2,
         guint32* pData);
 
-    static guint32 GetTid()
-    {
-        return ( guint32 )syscall( SYS_gettid );
-    }
-
     gint32 GetPortProp(
         HANDLE hPort,
         gint32 iProp,
@@ -581,3 +586,4 @@ public:
     CRegPreloadable( CIoManager* pMgr,
         CObjBase* pObj, bool bReg = true );
 };
+

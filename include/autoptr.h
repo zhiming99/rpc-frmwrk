@@ -17,15 +17,26 @@
  */
 
 #pragma once
-#include "objfctry.h"
 #include <dbus/dbus.h>
+#include "defines.h"
+
+extern gint32 CoCreateInstance( EnumClsid clsid,
+    CObjBase*& pObj, const IConfigDb* pCfg = nullptr ); 
+
+extern gint32 CreateObjFast( EnumClsid iClsid,
+    CObjBase*& pObj, const IConfigDb* pCfg = nullptr );
+
+struct IAutoPtr{};
+// typedef DBusMessage* DMSGPTR;
 
 // note: class T must be a class inherited from CObjBase
 // c++11 required
 template< EnumClsid iClsid, class T >
-//    typename T = typename std::enable_if< std::is_base_of<CObjBase, B>::value, B >::type >
-
-class CAutoPtr
+    // typename TFilter = typename std::enable_if<
+    //     std::is_base_of<CObjBase, T>::value ||
+    //     std::is_same<DMSGPTR, T>::value,
+    //       T>::type >
+class CAutoPtr : public IAutoPtr
 {
     private:
 
@@ -41,10 +52,7 @@ class CAutoPtr
 
         if( bNew )
         {
-            CObjBase* pObj;
-            gint32 ret = CoCreateInstance(
-                iClsid, pObj, pCfg );
-
+            gint32 ret = NewObj( iClsid, pCfg );
             if( ERROR( ret ) )
             {
                 std::string strMsg = DebugMsg(
@@ -52,7 +60,6 @@ class CAutoPtr
 
                 throw std::invalid_argument( strMsg );
             }
-            m_pObj = static_cast< T* >( pObj );
         }
     }
 
@@ -72,6 +79,7 @@ class CAutoPtr
         }
     }
 
+    // copy constructor
     template< EnumClsid iClsid2, class U,
         class T1 = typename std::enable_if<
         std::is_base_of< T, U >::value ||
@@ -87,6 +95,31 @@ class CAutoPtr
         {
             // we allow empty initialization
         }
+    }
+
+    // defult copy constructor 
+    CAutoPtr( const CAutoPtr& oInitPtr ) 
+    {
+        m_pObj = oInitPtr.m_pObj;
+        if( m_pObj )
+        {
+            m_pObj->AddRef();
+        }
+    }
+
+    // move constructor
+    template< EnumClsid iClsid2, class U,
+        class T1 = typename std::enable_if<
+        std::is_base_of< T, U >::value ||
+        std::is_base_of< U, T >::value, U >::type >
+    CAutoPtr( CAutoPtr< iClsid2, U >&& oInitPtr )
+    {
+        m_pObj = dynamic_cast< T* >( ( U* )oInitPtr );
+        if( m_pObj )
+        {
+            m_pObj->AddRef();
+        }
+        oInitPtr.Clear();
     }
 
     ~CAutoPtr()
@@ -185,6 +218,75 @@ class CAutoPtr
         throw std::runtime_error( strMsg );
     }
 
+    CAutoPtr& operator=( const CAutoPtr& rhs )
+    {
+        if( rhs.IsEmpty() )
+        {
+            Clear();
+            return *this;
+        }
+        // self assignment
+        if( m_pObj != nullptr
+            && m_pObj->GetObjId() == rhs->GetObjId() )
+        {
+            return *this;
+        }
+
+        Clear();
+        const T* pObj = rhs.m_pObj;
+        if( pObj != nullptr )
+        {
+            // well, the data content is not changed,
+            // and the change in ref count is not that
+            // much concerned
+            m_pObj = const_cast< T* >( pObj );
+            m_pObj->AddRef();
+            return *this;
+        }
+        std::string strMsg = DebugMsg(
+            -EFAULT, "bad cast in operator=" );
+        throw std::runtime_error( strMsg );
+    }
+
+    template< EnumClsid iClsid2, typename U,
+        class T2 = typename std::enable_if<
+            std::is_base_of< T, U >::value ||
+            std::is_base_of< U, T >::value, U >::type >
+    CAutoPtr< iClsid, T >& operator=( CAutoPtr< iClsid2, U >&& rhs )
+    {
+        static_assert( std::is_base_of<CObjBase, U>::value );
+        if( rhs.IsEmpty() )
+        {
+            Clear();
+            return *this;
+        }
+
+        // self assignment
+        if( m_pObj != nullptr
+            && m_pObj->GetObjId() == rhs->GetObjId() )
+        {
+            rhs.Clear();
+            return *this;
+        }
+
+        Clear();
+        const T* pObj = dynamic_cast< const T* >( ( U* )rhs );
+        if( pObj != nullptr )
+        {
+            // well, the data content is not changed,
+            // and the change in ref count is not that
+            // much concerned
+            m_pObj = const_cast< T* >( pObj );
+            m_pObj->AddRef();
+            rhs.Clear();
+            return *this;
+        }
+        std::string strMsg = DebugMsg(
+            -EFAULT, "bad cast in operator=" );
+        throw std::runtime_error( strMsg );
+    }
+
+
     bool operator==( const CAutoPtr& rhs ) const noexcept
     {
         if(rhs.IsEmpty() )
@@ -259,9 +361,23 @@ class CAutoPtr
 
         CObjBase* pObj = nullptr;
 
-        gint32 ret = CoCreateInstance( iEffective, pObj, pCfg );
+        gint32 ret = CreateObjFast(
+            iEffective, pObj, pCfg );
 
-        if( ret == 0 )
+        if( SUCCEEDED( ret ) )
+        {
+            m_pObj = dynamic_cast< T* >( pObj );
+            if( m_pObj == nullptr )
+            {
+                pObj->Release();
+                ret = -EFAULT;
+            }
+            return ret;
+        }
+ 
+        ret = CoCreateInstance( iEffective, pObj, pCfg );
+
+        if( SUCCEEDED( ret ) )
         {
             m_pObj = dynamic_cast< T* >( pObj );
             if( m_pObj == nullptr )
@@ -276,6 +392,23 @@ class CAutoPtr
         }
         return ret;
     }
+
+    gint32 Deserialize( const CBuffer& oBuf )
+    {
+        const SERI_HEADER_BASE* pHeader = oBuf;
+
+        SERI_HEADER_BASE oHeader( *pHeader );
+        oHeader.ntoh();
+        if( oHeader.dwClsid != iClsid )
+            return -ENOTSUP;
+        
+        Clear();
+        gint32 ret = NewObj( iClsid );
+        if( ERROR( ret ) )
+            return ret;
+
+        return m_pObj->Deserialize( oBuf );
+    }
 };
 
 typedef CAutoPtr< clsid( Invalid ), CObjBase >         ObjPtr;
@@ -285,7 +418,6 @@ typedef CAutoPtr< clsid( CConfigDb ), IConfigDb >      CfgPtr;
 typedef CAutoPtr< clsid( Invalid ), IEventSink >       EventPtr;
 typedef CAutoPtr< clsid( Invalid ), IThread >          ThreadPtr;
 typedef CAutoPtr< clsid( Invalid ), DBusMessage >      DMsgPtr;
-typedef CAutoPtr< clsid( Invalid ), IClassFactory >    FactoryPtr;
 
 
 #include "dmsgptr.h"
@@ -296,20 +428,41 @@ namespace std {
     struct less<ObjPtr>
     {
         bool operator()(const ObjPtr& k1, const ObjPtr& k2) const
-            {
-                return ( reinterpret_cast< unsigned long >( ( CObjBase* )k1  )
-                        < reinterpret_cast< unsigned long >( ( CObjBase* )k2 ) );
-            }
+        {
+            if( k2.IsEmpty() )
+                return false;
+
+            if( k1.IsEmpty() )
+                return true;
+
+            return k1->GetObjId() < k2->GetObjId();
+        }
     };
 
     template<>
     struct less<EventPtr>
     {
         bool operator()(const EventPtr& k1, const EventPtr& k2) const
-            {
-              return ( reinterpret_cast< unsigned long >( ( IEventSink* )k1  )
-                        < reinterpret_cast< unsigned long >( ( IEventSink* )k2 ) );
-            }
+        {
+            if( k2.IsEmpty() )
+                return false;
+
+            if( k1.IsEmpty() )
+                return true;
+
+            return k1->GetObjId() < k2->GetObjId();
+        }
     };
 
 };
+
+// c++11 required
+template <typename R, typename C, typename ... Types>
+inline constexpr size_t GetArgCount( R(C::*f)(Types ...) )
+{
+   return sizeof...(Types);
+};
+
+extern gint32 DeserializeObj(
+    const CBuffer& oBuf, ObjPtr& pObj );
+

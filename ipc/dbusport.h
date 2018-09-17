@@ -21,6 +21,7 @@
 #include "defines.h"
 #include "port.h"
 #include "autoptr.h"
+#include "msgmatch.h"
 
 #define MAX_PENDING_MSG             20
 #define DBUS_HANDLER_RESULT_HALT    ( ( DBusHandlerResult )100 )
@@ -95,6 +96,7 @@ class CRpcBasePort : public CPort
         }
     };
 
+    IrpPtr m_pTestIrp;
     //
 	// event/request listening irps
 
@@ -105,8 +107,7 @@ class CRpcBasePort : public CPort
     MatchMap m_mapEvtTable;
 
 
-	// the map for outgoing request IRPs waiting
-    // for resp
+	// the map for responst of the outgoing request IRPs 
 	std::map< guint32, IrpPtr >     m_mapSerial2Resp;
 
     gint32 FindIrpForResp(
@@ -155,7 +156,7 @@ class CRpcBasePort : public CPort
 
     virtual gint32 HandleSendData( IRP* pIrp ) = 0;
 
-    virtual gint32 HandleFetchData( IRP* pIrp );
+    // virtual gint32 HandleFetchData( IRP* pIrp );
 
     gint32 AddMatch( MatchMap& oMap, MatchPtr& pMatch );
 
@@ -166,6 +167,9 @@ class CRpcBasePort : public CPort
     gint32 ClearReqIrpsOnDest(
         const std::string& strDestination,
         std::vector< IrpPtr >& vecIrpsToCancel );
+
+    gint32 OnModOnOffline( DMsgPtr& pMsg, bool bOnline,
+        const std::string& strModName );
 
     virtual gint32 OnModOnOffline( DBusMessage* pMsg );
 
@@ -349,6 +353,11 @@ class CDBusLocalPdo : public CRpcPdoPort
     virtual DBusHandlerResult PreDispatchMsg(
         gint32 iMsgType, DBusMessage* pMsg );
 
+    virtual DBusHandlerResult DispatchDBusSysMsg(
+        DBusMessage* pMsg );
+
+    virtual gint32 OnModOnOffline(
+        DBusMessage* pMsg );
 };
 
 typedef CAutoPtr< clsid( CDBusLocalPdo ), CDBusLocalPdo > LocPdoPtr;
@@ -365,8 +374,10 @@ class CDBusLoopbackPdo : public CRpcPdoPort
     { return 0; }
 
     virtual gint32 SetupDBusSetting(
-        IMessageMatch* pMatch )
-    { return 0; }
+        IMessageMatch* pMatch );
+
+    // match table for dbus sys message
+    MatchPtr                m_matchDBus;
 
     public:
 
@@ -379,12 +390,18 @@ class CDBusLoopbackPdo : public CRpcPdoPort
 
     virtual gint32 SendDBusMsg(
         DBusMessage* pMsg, guint32* pdwSerial );
+
+    virtual DBusHandlerResult PreDispatchMsg(
+        gint32 iMsgType, DBusMessage* pMsg );
+};
+
+struct CStartStopPdoCtx
+{
+    std::map< gint32, gint32 > m_mapIdToRes;
 };
 
 class CDBusBusPort : public CGenericBusPort
 {
-
-    protected:
     // the pending calls waiting for dispatching
     // only calls to registered interface will
     // enter this queue. others are discarded
@@ -422,6 +439,27 @@ class CDBusBusPort : public CGenericBusPort
 
     virtual gint32 GetChildPorts(
         std::vector< PortPtr >& vecChildPdo );
+
+    void ReleaseDBus();
+
+    gint32 SchedulePortsAttachNotifTask(
+        std::vector< PortPtr >& vecChildPdo,
+        guint32 dwEventId,
+        IRP* pMasterIrp = nullptr );
+
+    gint32 AddRemoveBusNameLpbk(
+        const std::string& strName,
+        bool bRemove );
+
+    gint32 AddBusNameLpbk(
+        const std::string& strName );
+
+    gint32 RemoveBusNameLpbk(
+        const std::string& strName );
+
+    gint32 BuildModOnlineMsgLpbk(
+        const std::string& strModName,
+        bool bOnline, DMsgPtr& pMsg );
 
     public:
 
@@ -471,10 +509,13 @@ class CDBusBusPort : public CGenericBusPort
             guint32* pData = NULL  );
 
     // handler of the func irps
-    gint32 OnSubmitIrp( IRP* pIrp );
+    gint32 OnSubmitIrp( IRP* pIrp )
+    { return -ENOTSUP; }
 
     gint32 PostStart( IRP* pIrp );
     gint32 OnPortReady( IRP* pIrp );
+    void   OnPortStartFailed(
+        IRP* pIrp, gint32 ret );
 
     gint32 HandleDBusDisconn();
 
@@ -490,6 +531,46 @@ class CDBusBusPort : public CGenericBusPort
 
     DBusHandlerResult OnLpbkMsgArrival(
         DBusMessage* pMsg );
+
+    // methods from CObjBase
+    gint32 GetProperty(
+            gint32 iProp,
+            CBuffer& oBuf ) const;
+
+    gint32 SetProperty(
+            gint32 iProp,
+            const CBuffer& oBuf );
+
+    gint32 EnumProperties(
+        std::vector< gint32 >& vecProps ) const;
+
+    virtual gint32 AllocIrpCtxExt(
+        IrpCtxPtr& pIrpCtx,
+        void* pContext = nullptr ) const;
+
+    virtual gint32 ReleaseIrpCtxExt(
+        IrpCtxPtr& pIrpCtx,
+        void* pContext = nullptr );
+
+    virtual gint32 OnCompleteSlaveIrp(
+        IRP* pMaster, IRP* pSlave );
+
+    gint32 RegBusName(
+        const std::string& strName,
+        guint32 dwFlags );
+
+    gint32 ReleaseBusName(
+        const std::string& strName );
+
+    gint32 AddRules(
+        const std::string& strRules );
+
+    gint32 RemoveRules(
+        const std::string& strRules );
+
+    gint32 IsDBusSvrOnline(
+        const std::string& strDest );
+
 };
 
 class CGenBusDriver : public IBusDriver

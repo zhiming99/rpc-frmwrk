@@ -100,12 +100,13 @@ class CPort;
 
 typedef gint32 ( CPort::* ReSubmitPtr )( IRP* );
 
+#define PORTSTAT_MAP_LEN        11
 class CPortState : public CObjBase
 {
     IrpPtr                      m_pExclIrp;
     std::vector< guint8 >       m_vecStates;
     stdrmutex                   m_oLock;
-    static const gint8          m_arrStatMap[ 10 ][ 10 ];
+    static const gint8          m_arrStatMap[ PORTSTAT_MAP_LEN ][ PORTSTAT_MAP_LEN ];
     sem_t                       m_semWaitForReady;
     IPort*                      m_pPort;
 
@@ -251,7 +252,6 @@ class CPort : public IPort
 
     // port lock for concurrent access
     std::recursive_mutex       m_oLock;
-	sem_t			m_semWaitForReady;
 
     // the irps which is not finished yet
     std::map<IrpPtr, gint32> m_mapIrpIn;
@@ -304,6 +304,8 @@ class CPort : public IPort
     { return 0; }
     virtual gint32 OnPortStackDestroy( IRP* pIrp );
     virtual gint32 OnPortStackBuilt( IRP* pIrp );
+    virtual void OnPortStartFailed(
+        IRP* pIrp, gint32 ret );
 
     virtual gint32 OnPortReady( IRP* pIrp );
     virtual void OnPortStopped();
@@ -346,7 +348,7 @@ class CPort : public IPort
     // methods from CObjBase
     gint32 GetProperty(
             gint32 iProp,
-            CBuffer& oBuf );
+            CBuffer& oBuf ) const;
 
     gint32 SetProperty(
             gint32 iProp,
@@ -395,7 +397,14 @@ class CPort : public IPort
     inline bool IsPortReady()
     { return m_pPortState->IsPortReady(); }
 
-    gint32 AllocIrpCtxExt( IrpCtxPtr& pIrpCtx ) const;
+    gint32 AllocIrpCtxExt(
+        IrpCtxPtr& pIrpCtx,
+        void* pContext = nullptr ) const;
+
+    gint32 ReleaseIrpCtxExt(
+        IrpCtxPtr& pIrpCtx,
+        void* pContext = nullptr )
+    { return 0; }
 
     gint32 OnEvent( EnumEventId iEvent,
         guint32 dwParam1, guint32 dwParam2, guint32* pData );
@@ -425,7 +434,11 @@ class CIrpGateKeeper
     CPort* m_pPort;
 
     public:
-    CIrpGateKeeper( CPort* pPort );
+    CIrpGateKeeper( CPort* pPort )
+    {
+        if( pPort != nullptr )
+            m_pPort = pPort;
+    }
 
     bool IsTopPort( IRP* pIrp )
     {
@@ -582,10 +595,12 @@ class CGenericBusPort : public CPort
     gint32 SchedulePortAttachNotifTask(
         IPort* pNewPort,
         guint32 dwEventId,
+        IRP* pMasterIrp = nullptr,
         bool bImmediately = false );
 
     gint32 AllocIrpCtxExt(
-        IrpCtxPtr& pIrpCtx ) const;
+        IrpCtxPtr& pIrpCtx,
+        void* pContext = nullptr ) const;
 };
 
 typedef CAutoPtr< Clsid_Invalid, CGenericBusPort > BusPortPtr;

@@ -77,7 +77,17 @@ CBuffer::operator ObjPtr*() const
     return reinterpret_cast< ObjPtr* >( ptr() );
 }
 
-template<> const CBuffer&
+CBuffer::operator char*() const
+{
+    return ptr();
+}
+
+CBuffer::operator const char*() const
+{
+    return ( const char* )ptr();
+}
+
+template<> CBuffer&
 CBuffer::operator=<stdstr>( const stdstr& rhs )
 {
 
@@ -97,7 +107,7 @@ CBuffer::operator=<stdstr>( const stdstr& rhs )
     return *this;
 }
 
-template<> const CBuffer&
+template<> CBuffer&
 CBuffer::operator=<CObjBase>( const CObjBase& rhs )
 {
     // specilization for CObjBase
@@ -114,15 +124,8 @@ CBuffer::operator=<CObjBase>( const CObjBase& rhs )
     return *this;
 }
 
-template<> const CBuffer&
-CBuffer::operator=<CBuffer>( const CBuffer& rhs )
-{
-    Resize( 0 );
-    new ( this ) CBuffer( rhs );
-    return *this;
-}
 
-template<> const CBuffer&
+template<> CBuffer&
 CBuffer::operator=<ObjPtr>( const ObjPtr& rhs )
 {
     // for smart pointer
@@ -147,7 +150,7 @@ CBuffer::operator=<ObjPtr>( const ObjPtr& rhs )
     return *this;
 }
 
-template<> const CBuffer&
+template<> CBuffer&
 CBuffer::operator=<DMsgPtr>( const DMsgPtr& rhs )
 {
     // for smart pointer
@@ -173,7 +176,7 @@ CBuffer::operator=<DMsgPtr>( const DMsgPtr& rhs )
 }
 
 template<> cchar*
-CBuffer::operator=<cchar>( cchar* rhs )
+CBuffer::operator=<char>( cchar* rhs )
 {
 
     // specilization of T*
@@ -181,35 +184,56 @@ CBuffer::operator=<cchar>( cchar* rhs )
     Resize( len );
     if( ptr() )
     {
-        memcpy( ptr(), &rhs, len );
+        memcpy( ptr(), rhs, len );
         SetExDataType( typeString );
     }
     return ptr();
     // return *this;
 }
 
-CBuffer::CBuffer( guint32 dwSize )
-    : m_dwType( 0 )
+CBuffer& CBuffer::operator=( const CBuffer& rhs )
 {
-    SetClassId( clsid( CBuffer ) );
+    Resize( rhs.size() );
+    if( size() == 0 )
+        return *this;
 
-    SetDataType( DataTypeMem );
-    SetExDataType( typeNone );
-
-    m_pData = nullptr;
-    m_dwSize = 0;
-
-    if( dwSize > 0 )
+    if( ptr() == nullptr )
     {
-        m_pData = ( char* )calloc( 1, dwSize );
-        if( m_pData != NULL )
+        throw std::runtime_error(
+            "no memory" );
+    }
+    switch( rhs.GetDataType() )
+    {
+    case DataTypeMem:
         {
-            m_dwSize = dwSize;
+            memcpy( ptr(), rhs.ptr(), size() );   
+            SetExDataType( rhs.GetExDataType() );
+            break;
+        }
+    case DataTypeMsgPtr:
+        {
+            DMsgPtr pMsg;
+            pMsg = ( DMsgPtr& )rhs;
+            *this = pMsg;
+            break;
+        }
+    case DataTypeObjPtr:
+        {
+            ObjPtr pObj;
+            pObj = ( ObjPtr& )rhs;
+            *this = pObj;
+            break;
+        }
+    default:
+        {
+            throw std::invalid_argument(
+                "the source type is not supported" );
         }
     }
+    return *this;
 }
 
-CBuffer::CBuffer( const char* pData, guint32 dwSize )
+CBuffer::CBuffer( guint32 dwSize )
     : m_dwType( 0 )
 {
     SetClassId( clsid( CBuffer ) );
@@ -225,13 +249,17 @@ CBuffer::CBuffer( const char* pData, guint32 dwSize )
 
     if( dwSize > 0 )
     {
-        ptr() = ( char* )malloc( dwSize );
+        ptr() = ( char* )calloc( 1, dwSize );
         if( ptr() != NULL )
         {
             size() = dwSize;
         }
     }
+}
 
+CBuffer::CBuffer( const char* pData, guint32 dwSize )
+    : CBuffer( dwSize )
+{
     if( pData == nullptr )
         return;
 
@@ -271,50 +299,7 @@ CBuffer::CBuffer( const DMsgPtr& rhs )
 CBuffer::CBuffer( const CBuffer& rhs )
     : CObjBase()
 {
-    if( this == &rhs )
-        return;
-
-    if( !rhs.empty() )
-    {
-        // assignment only take effect if rhs is valid
-        Resize( rhs.size() );
-        m_dwType = rhs.m_dwType;
-
-        switch( GetDataType() )
-        {
-        case DataTypeMem:
-            {
-                if( nullptr != ptr() )
-                {
-                    memcpy( ptr(), rhs.ptr(), size() );
-                }
-                else
-                {
-                    size() = 0;
-                }
-                break;
-            }
-        case DataTypeObjPtr:
-            {
-                new ( ptr() )ObjPtr( ( ObjPtr& )rhs );
-                break;
-            }
-        case DataTypeMsgPtr:
-            {
-                new( ptr() )DMsgPtr( ( DMsgPtr& )rhs );
-                break;
-            }
-        default:
-            {
-                Resize( 0 );
-                break;
-            }
-        }
-    }
-    else
-    {
-        Resize( 0 );
-    }
+    *this = rhs;
 }
 
 char*& CBuffer::ptr() const
@@ -425,9 +410,12 @@ gint32 CBuffer::Serialize( CBuffer& toBuf ) const
     {
         // empty buffer
         pheader = reinterpret_cast< SERI_HEADER* >( toBuf.ptr() );
-        // memset( pheader, 0, sizeof( *pheader ) );
-        new ( pheader )SERI_HEADER();
-        pheader->dwClsid = htonl( clsid( CBuffer ) );
+
+        oHeader.dwClsid = htonl( clsid( CBuffer ) );
+        oHeader.dwSize = 0;
+        oHeader.dwType = DataTypeMem;
+        oHeader.hton();
+        *pheader = oHeader;
 
         return 0;
     }
@@ -457,14 +445,14 @@ gint32 CBuffer::Serialize( CBuffer& toBuf ) const
             oHeader.dwSize = pNewBuf->size();
             oHeader.dwType = m_dwType;
             oHeader.dwObjClsid = pMsg.GetType();
+
             oHeader.hton();
-            // memcpy( pheader, &oHeader, sizeof( oHeader ) );
             *pheader = oHeader;
 
             if( pNewBuf->size() > 0 )
             {
                 memcpy( ( void* )&pheader[ 1 ],
-                    pNewBuf->ptr(), size() );
+                    pNewBuf->ptr(), pNewBuf->size() );
             }
             break;
         }
@@ -493,13 +481,12 @@ gint32 CBuffer::Serialize( CBuffer& toBuf ) const
             oHeader.dwObjClsid = ( guint32 )pObj->GetClsid();
 
             oHeader.hton();
-            // memcpy( pheader, &oHeader, sizeof( oHeader ) );
             *pheader = oHeader;
 
             if( pNewBuf->size() > 0 )
             {
                 memcpy( ( void* )&pheader[ 1 ],
-                    pNewBuf->ptr(), size() );
+                    pNewBuf->ptr(), pNewBuf->size() );
             }
 
             break;
@@ -513,8 +500,8 @@ gint32 CBuffer::Serialize( CBuffer& toBuf ) const
             oHeader.dwType = m_dwType;
 
             oHeader.hton();
-            // memcpy( pheader, &oHeader, sizeof( oHeader ) );
             *pheader = oHeader;
+
             ret = SerializePrimeType( ( guint8* )&pheader[ 1 ] );
 
             break;
@@ -639,8 +626,7 @@ gint32 CBuffer::Deserialize( const CBuffer& oBuf )
     // if( oBuf.GetDataType() != DataTypeMem )
     //     return -EINVAL;
 
-    Deserialize( oBuf.ptr() );
-    return 0;
+    return Deserialize( oBuf.ptr() );
 }
 
 gint32 CBuffer::Deserialize( const char* pBuf )

@@ -21,8 +21,11 @@
 #include "dbusport.h"
 #include "tcpport.h"
 #include "emaphelp.h"
+#include "reqopen.h"
 
 using namespace std;
+
+std::atomic< guint32 > CRpcTcpFido::m_atmSeqNo;
 
 CRpcTcpFido::CRpcTcpFido(
     const IConfigDb* pCfg  )
@@ -47,6 +50,10 @@ CRpcTcpFido::CRpcTcpFido(
 
         throw runtime_error( strMsg );
     }
+}
+
+CRpcTcpFido::~CRpcTcpFido()
+{
 }
 
 gint32 CRpcTcpFido::OnSubmitIrp(

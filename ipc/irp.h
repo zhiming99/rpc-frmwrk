@@ -187,7 +187,13 @@ class IPort : public IEventSink
 
     virtual gint32 AttachToPort( IPort* pLowerPort ) = 0 ;
 
-    virtual gint32 AllocIrpCtxExt( IrpCtxPtr& pIrpCtx ) const = 0;
+    virtual gint32 AllocIrpCtxExt(
+        IrpCtxPtr& pIrpCtx,
+        void* pContext = nullptr ) const = 0;
+
+    virtual gint32 ReleaseIrpCtxExt(
+        IrpCtxPtr& pIrpCtx,
+        void* pContext = nullptr ) = 0;
 
 	virtual guint32 GetPortState() const = 0;
     virtual IPort* GetUpperPort() const = 0;
@@ -284,6 +290,7 @@ struct IRP_CONTEXT : CObjBase
 class CIoManager;
 typedef CAutoPtr< clsid( CIrpCompThread ), IThread >   IrpThrdPtr;
 
+typedef CAutoPtr< clsid( IoRequestPacket ), IoRequestPacket > IrpPtr;
 struct IoRequestPacket : public IEventSink
 {
     //
@@ -336,6 +343,7 @@ struct IoRequestPacket : public IEventSink
 
     gint32              m_iTimerId;
 
+
     CIoManager*         m_pMgr;
 
     // used for cancel and completion to indicate where
@@ -349,8 +357,15 @@ struct IoRequestPacket : public IEventSink
     // by providing associated irps, we can support
     // calling from one driver stack to another
     // or we can fork the irp to multiple requests
-    IRP*                m_pMasterIrp;
+    IrpPtr               m_pMasterIrp;
     std::map< IoRequestPacket*, int > m_mapSlaveIrps;
+
+    // minimum slave irps to associate before the
+    // master irp can be completed
+    //
+    // NOTE: it combines the m_mapSlaveIrps to decide
+    // wether to complete the master irp
+    guint16             m_wMinSlaves;
 
     IoRequestPacket();
 
@@ -418,6 +433,7 @@ struct IoRequestPacket : public IEventSink
 
     void SetMasterIrp( IRP* pMaster );
     IRP* GetMasterIrp() const;
+    void SetMinSlaves( guint16 wCount );
     void AddSlaveIrp( IRP* pSlave );
     bool FindSlaveIrp( IRP* pSlave ) const;
     guint32 GetSlaveCount() const;
@@ -454,7 +470,6 @@ struct IoRequestPacket : public IEventSink
     guint32 CtrlCode() const;
     guint32 IoDirection() const;
 };
-typedef CAutoPtr< clsid( IoRequestPacket ), IoRequestPacket > IrpPtr;
 
 namespace std
 {

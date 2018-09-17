@@ -26,8 +26,80 @@
 #include "frmwrk.h"
 #include "jsondef.h"
 #include "stlcont.h"
+#include "objfctry.h"
 
 using namespace std;
+
+gint32 ReadJsonCfg(
+    const std::string& strFile,
+    Json::Value& valConfig )
+{
+
+    gint32 ret = 0;
+    FILE* fp = NULL;
+    size_t iLen = 0;
+    do{
+        fp = fopen( strFile.c_str(), "rb" );
+        if( fp == NULL )
+        {
+            ret = -errno;
+            break;
+        }
+        ret = fseek( fp, 0, SEEK_END );
+        if( ERROR( ret ) )
+        {
+            ret = -errno;
+            break;
+        }
+        iLen = ( size_t )ftell( fp );
+        if( ERROR( iLen ) )
+        {
+            ret = -errno;
+            break;
+        }
+
+        if( iLen < 100
+            || iLen > 1024 * 1024 )
+        {
+            ret = -EBADMSG;
+            break;
+        }
+
+        fseek( fp, 0, SEEK_SET );
+
+        BufPtr buf( true );
+        buf->Resize( iLen + 16 );
+        size_t iSize = fread( buf->ptr(), 1, iLen, fp );
+        if( iSize < iLen )
+        {
+            ret = -EBADF;
+            break;
+        }
+
+        Json::CharReaderBuilder oBuilder;
+        Json::CharReader* pReader = nullptr;
+        pReader = oBuilder.newCharReader();
+        if( pReader == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        if( !pReader->parse( buf->ptr(),
+            buf->ptr() + buf->size(),
+            &valConfig, nullptr ) )
+        {
+            ret = -EBADMSG;
+        }
+
+    }while( 0 );
+
+    if( fp != nullptr )
+    {
+        fclose( fp );
+    }
+
+    return ret;
+}
 
 CDriverManager::CDriverManager(
     const IConfigDb* pCfg )
@@ -35,6 +107,7 @@ CDriverManager::CDriverManager(
     if( pCfg == nullptr )
         return;
 
+    SetClassId( clsid( CDriverManager ) );
     BufPtr bufPtr( true );
 
     CCfgOpener a( pCfg );
@@ -102,7 +175,7 @@ gint32 CDriverManager::Start()
 
         // load all the class factories
         ret = LoadClassFactories();
-        if( ERROR( ret ) )
+        if( ret != -ENOPKG && ERROR( ret ) )
             break;
 
         // load all the bus drivers
@@ -110,7 +183,8 @@ gint32 CDriverManager::Start()
         if( ERROR( ret ) )
             break;
 
-        ret = CreatePreloadable();
+        ret = 0;
+        CreatePreloadable();
 
     }while( 0 );
     return ret;
@@ -175,8 +249,14 @@ gint32 CDriverManager::Stop()
 {
     gint32 ret = StopPreloadable();
     if( ERROR( ret ) )
-        return ret;
+    {
+        if( ret != -ENOENT &&
+            ret != -ENOPKG )
+            return ret;
+    }
+
     ret = StopDrivers();
+
     return ret;
 }
 
@@ -235,6 +315,7 @@ gint32 CDriverManager::LoadClassFactories()
             || oClsToLoad.size() == 0 )
         {
             ret = -ENOPKG;
+            break;
         }
 
         for( guint32 i = 0; i < oClsToLoad.size(); i++ )
@@ -253,9 +334,12 @@ gint32 CDriverManager::LoadClassFactories()
                 break;
             }
         }
+
     }while( 0 );
+
     return ret;
 }
+
 gint32 CDriverManager::LoadStaticDrivers()
 {
 
@@ -312,6 +396,7 @@ gint32 CDriverManager::LoadStaticDrivers()
             || oDrvToLoad.size() == 0 )
         {
             ret = -ENOPKG;
+            break;
         }
 
         for( guint32 i = 0; i < oDrvToLoad.size(); i++ )
@@ -327,6 +412,7 @@ gint32 CDriverManager::LoadStaticDrivers()
             }
         }
     }while( 0 );
+
     return ret;
 }
 
@@ -380,10 +466,23 @@ gint32 CDriverManager::CreatePreloadable()
             break;
         }
 
-        if( !oObjToLoad.isArray()
-            || oObjToLoad.size() == 0 )
+        if( !oObjToLoad.isArray() ||
+            oObjToLoad.size() == 0 )
         {
             ret = -ENOPKG;
+            break;
+        }
+        else
+        {
+            CRegistry& oReg = GetIoMgr()->GetRegistry();
+
+            string strPath = string( REG_PRELOADABLE_ROOT )
+                + string( "/" )
+                + GetIoMgr()->GetModName();
+
+            ret = oReg.MakeDir( strPath );
+            if( ERROR( ret ) )
+                break;
         }
 
         for( guint32 i = 0; i < oObjToLoad.size(); i++ )
@@ -402,6 +501,7 @@ gint32 CDriverManager::CreatePreloadable()
         }
 
     }while( 0 );
+
     return ret;
 }
 
@@ -442,12 +542,35 @@ gint32 CDriverManager::CreateObject(
             ret = -EFAULT;
             break;
         }
-        //NOTE: if the preloadable object failed
-        //to register itself somewhere, or keep a
-        //reference to itself after the Start, it
-        //will be removed when this methods
-        //returns.
-        pService->Start();
+
+        //NOTE: if the preloadable object failed to
+        //start, or keep a reference to itself after
+        //the Start, it will be removed when this
+        //methods returns.
+
+        ret = pService->Start();
+        if( ERROR( ret ) )
+            break;
+
+        string strPath = string( REG_PRELOADABLE_ROOT )
+            + string( "/" )
+            + GetIoMgr()->GetModName();
+
+        if( strPath.size() )
+        {
+            CRegistry& oReg = GetIoMgr()->GetRegistry();
+            CStdRMutex a( oReg.GetLock() );
+            ret = oReg.ChangeDir( strPath );
+            if( ERROR( ret ) )
+                break;
+
+            ret = oReg.MakeDir( strObjName );
+            if( ERROR( ret ) )
+                break;
+
+            ret = oReg.SetObject(
+                propObjPtr, pObj );
+        }
 
     }while( 0 );
 
@@ -692,6 +815,24 @@ gint32 CDriverManager::RegDrvInternal(
             // set the reg path for this driver object
             CCfgOpenerObj a( pDrv );
             ret = a.SetStrProp( propRegPath, strRegPath );
+            if( ERROR( ret ) )
+                break;
+
+            // add a event map to the driver's registry
+            ObjPtr pEvtMap;
+            ret = pEvtMap.NewObj(
+                clsid( CStlEventMap ) );
+
+            if( ERROR( ret ) )
+                break;
+            
+            ret = oReg.ChangeDir( strRegPath );
+            if( ERROR( ret ) )
+                break;
+
+            ret = oReg.SetObject(
+                propEventMapPtr, pEvtMap );
+
         }
     }while( 0 );
 
@@ -825,61 +966,8 @@ gint32 CDriverManager::UnRegPortDrv(
 gint32 CDriverManager::ReadConfig(
     Json::Value& valConfig ) const
 {
-
-    gint32 ret = 0;
-    FILE* fp = NULL;
-    size_t iLen = 0;
-    do{
-        fp = fopen( m_strCfgPath.c_str(), "rb" );
-        if( fp == NULL )
-        {
-            ret = -errno;
-            break;
-        }
-        ret = fseek( fp, 0, SEEK_END );
-        if( ERROR( ret ) )
-        {
-            ret = -errno;
-            break;
-        }
-        iLen = ( size_t )ftell( fp );
-        if( ERROR( iLen ) )
-        {
-            ret = -errno;
-            break;
-        }
-
-        if( iLen < 100
-            || iLen > 1024 * 1024 )
-        {
-            ret = -EBADMSG;
-            break;
-        }
-
-        BufPtr buf( true );
-        buf->Resize( iLen + 16 );
-        ret = fread( buf->ptr(), 1, iLen, fp );
-        if( ERROR( ret ) )
-        {
-            ret = -errno;
-            break;
-        }
-
-        Json::Reader oReader;
-
-        if( !oReader.parse( buf->ptr(), valConfig ) )
-        {
-            ret = -EBADMSG;
-        }
-
-    }while( 0 );
-
-    if( fp != nullptr )
-    {
-        fclose( fp );
-    }
-
-    return ret;
+    return ReadJsonCfg(
+        m_strCfgPath, valConfig );
 }
 
 gint32 CDriverManager::BuildPortStack(

@@ -22,7 +22,7 @@ ifeq ($(MODE),Release)
 	OUTPUT_DIR := ./release
 endif
 
-TARGETS := $(OUTPUT_DIR)/libcombase.so $(OUTPUT_DIR)/libipc.so $(OUTPUT_DIR)/librpc.so
+TARGETS := $(OUTPUT_DIR)/libcombase.so $(OUTPUT_DIR)/libipc.so $(OUTPUT_DIR)/librpc.so test
 
 all: $(TARGETS)
 debug: $(TARGETS)
@@ -39,4 +39,7 @@ $(OUTPUT_DIR)/libipc.so :
 $(OUTPUT_DIR)/librpc.so :
 	-make -C ./rpc $(mygoal)
 
-.PHONY: $(TARGETS)
+test:
+	-make -C test
+
+.PHONY: $(TARGETS) test

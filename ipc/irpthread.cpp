@@ -21,13 +21,75 @@
 #include <algorithm>
 #include <vector>
 #include <deque>
+#include <sys/prctl.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <sys/syscall.h>
 
 #include "defines.h"
 #include "tasklets.h"
 #include "proxy.h"
 #include "stlcont.h"
+#include "objfctry.h"
+#include "frmwrk.h"
 
 using namespace std;
+
+// set the name of the current thread
+string GetThreadName()
+{
+    gint32 ret = 0;
+    char szBuf[ 32 ] = { 0 };
+
+    ret = prctl( PR_GET_NAME, szBuf, 0, 0, 0 );
+
+    if( ret == -1 )
+        return string( "Unknown" );
+
+    return string( szBuf );
+}
+
+// set the name of the current thread
+gint32 SetThreadName(
+    const string& strName )
+{
+    gint32 ret = 0;
+    if( strName.size() == 0 )
+        return -EINVAL;
+
+    ret = prctl( PR_SET_NAME,
+        strName.c_str(), 0, 0, 0 );
+
+    if( ret == -1 )
+        ret = -errno;
+
+    return ret;
+}
+
+gint32 IThread::SetThreadName(
+    const char* szName )
+{
+    gint32 ret = 0;
+    string strName;
+
+    if( szName != nullptr )
+    {
+        strName = szName;
+    }
+    else
+    {
+        strName = CoGetClassName(
+            GetClsid() );
+
+        gint32 iTid = GetTid();
+        strName += "-";
+        strName += std::to_string( iTid );
+    }
+
+    ret = ::SetThreadName( strName );
+
+    return ret;
+}
 
 CTaskQueue::CTaskQueue()
     : CObjBase()
@@ -37,10 +99,11 @@ CTaskQueue::CTaskQueue()
 
 void CTaskQueue::AddTask( TaskletPtr& pTask )
 {
-    if( pTask.IsEmpty() )
+    bool bAdd = true;
+
+    CStdRMutex a( m_oLock );
+    if( !pTask.IsEmpty() )
     {
-        bool bAdd = true;
-        CStdRMutex a( m_oLock );
         for( auto& pElem : m_queTasks )
         {
             if( pElem == pTask )
@@ -49,9 +112,9 @@ void CTaskQueue::AddTask( TaskletPtr& pTask )
                 break;
             }
         }
-        if( bAdd )
-            m_queTasks.push_back( pTask ); 
     }
+    if( bAdd )
+        m_queTasks.push_back( pTask ); 
 }
 
 gint32 CTaskQueue::RemoveTask( TaskletPtr& pTask )
@@ -104,7 +167,7 @@ CTaskThread::CTaskThread() :
     SetClassId( clsid( CTaskThread ) );
     m_pServiceThread = nullptr;
     m_bExit = false;
-    sem_init( &m_semSync, 0, 0 );
+    Sem_Init( &m_semSync, 0, 0 );
 }
 
 CTaskThread::~CTaskThread()
@@ -113,7 +176,7 @@ CTaskThread::~CTaskThread()
 }
 
 // test if the thread is running
-bool CTaskThread::IsRunning()
+bool CTaskThread::IsRunning() const
 {
     return ( m_pServiceThread != nullptr
         && m_pServiceThread->joinable() );
@@ -143,7 +206,7 @@ gint32 CTaskThread::Stop()
     {
         m_bExit = true;
 
-        sem_post( &m_semSync );
+        Sem_Post( &m_semSync );
 
         // waiting till it ends
         m_pServiceThread->join();
@@ -155,39 +218,73 @@ gint32 CTaskThread::Stop()
     return 0;
 }
 
+gint32 CTaskThread::SetThreadName(
+    const char* szName )
+{
+    string strName;
+
+    if( szName != nullptr )
+    {
+        strName = szName;
+    }
+    else
+    {
+        strName = CoGetClassName(
+            GetClsid() );
+
+        gint32 iTid = this->GetTid(); 
+        strName += "-";
+        strName += std::to_string( iTid );
+    }
+
+    return super::SetThreadName(
+        strName.c_str() );
+}
+
+gint32 CTaskThread::ProcessTask(
+    guint32 dwContext )
+{
+    gint32 ret = 0;
+    TaskletPtr pTask;
+    ret = PopHead( pTask );
+
+    if( ERROR( ret ) )
+        return ret;
+
+    if( pTask.IsEmpty() )
+        return -EFAULT;
+
+#ifdef DEBUG
+    ( *pTask )( ( guint32 )dwContext );
+    gint32 iTaskRet = pTask->GetError();
+
+    if( ERROR( iTaskRet ) )
+    {
+        string strTaskName =
+            CoGetClassName( pTask->GetClsid() );
+
+        DebugPrint( iTaskRet,
+            strTaskName + " failed" ); 
+    }
+#else
+    ( *pTask )( ( guint32 )dwContext );
+#endif
+
+    // to exhaust the queue before
+    // sleep
+    return 0;
+}
+
 void CTaskThread::ThreadProc(
     void* dwContext )
 {
     gint32 ret = 0;
 
-#ifdef DEBUG
-    gint32 iTaskRet = 0;
-#endif
-
+    this->SetThreadName();
     while( !m_bExit )
     {
         do{
-            TaskletPtr pTask;
-            ret = PopHead( pTask );
-            if( SUCCEEDED( ret ) && !pTask.IsEmpty() )
-            {
-#ifdef DEBUG
-                iTaskRet =
-                    ( *pTask )( ( guint32 )dwContext );
-                if( ERROR( iTaskRet ) )
-                {
-                    string strTaskName =
-                        CoGetClassName( pTask->GetClsid() );
-
-                    string strMsg = DebugMsg(
-                        iTaskRet, strTaskName + " failed" ); 
-
-                    printf( strMsg.c_str() );
-                }
-#else
-                ( *pTask )( ( guint32 )dwContext );
-#endif
-            }
+            ret = ProcessTask( ( guint32 )dwContext );
 
             // to exhaust the queue before
             // sleep
@@ -195,9 +292,30 @@ void CTaskThread::ThreadProc(
                 continue;
 
             break;
+
         }while( 1 );
 
-        sem_wait( &m_semSync );
+        while( !m_bExit )
+        {
+            ret = Sem_TimedwaitSec( &m_semSync,
+                THREAD_WAKEUP_INTERVAL );
+
+            if( ERROR( ret ) )
+            {
+                if( ret == -EAGAIN )
+                    continue;
+            }
+            break;
+        }
+    }
+
+    while( m_bExit )
+    {
+        // process all the tasks in the queue before we
+        // quit
+        ret = ProcessTask( ( guint32 )dwContext );
+        if( ERROR( ret ) )
+            break;
     }
 
     return;
@@ -207,7 +325,7 @@ void CTaskThread::AddTask(
     TaskletPtr& pTask )
 {
     m_pTaskQue->AddTask( pTask );
-    sem_post( &m_semSync );
+    Sem_Post( &m_semSync );
 }
 
 gint32 CTaskThread::RemoveTask(
@@ -222,17 +340,64 @@ gint32 CTaskThread::PopHead(
     return  m_pTaskQue->PopHead( pTask );
 }
 
+gint32 CTaskThread::GetProperty(
+    gint32 iProp, CBuffer& oBuf ) const
+{
+    gint32 ret = 0;
+    switch( iProp )
+    {
+    case propThreadId:
+        oBuf = GetTid();
+        break;
+
+    default:
+        ret = super::GetProperty(
+            iProp, oBuf );
+        break;
+    }
+    return ret;
+}
+
+gint32 CTaskThread::SetProperty(
+    gint32 iProp, const CBuffer& oBuf )
+{
+    gint32 ret = 0;
+    switch( iProp )
+    {
+    case propThreadId:
+        SetTid( oBuf );
+        break;
+
+    default:
+        ret = super::SetProperty(
+            iProp, oBuf );
+        break;
+    }
+    return ret;
+}
+
+gint32 CTaskThread::EnumProperties(
+    std::vector< gint32 >& vecProps ) const
+{
+    super::EnumProperties( vecProps );
+    vecProps.push_back( propThreadId );
+    return 0;
+}
+
 COneshotTaskThread::COneshotTaskThread()
     : CTaskThread()
 {
     SetClassId( clsid( COneshotTaskThread ) );
     m_bTaskDone = false;
+    m_iTaskClsid = clsid( Invalid );
 }
 
 void COneshotTaskThread::ThreadProc(
     void* dwContext )
 {
     gint32 ret = 0;
+
+    this->SetThreadName();
 
     while( !m_bTaskDone )
     {
@@ -244,8 +409,20 @@ void COneshotTaskThread::ThreadProc(
             m_bTaskDone = true;
         }
 
-        if( !m_bTaskDone )
-            sem_wait( &m_semSync );
+        while( !m_bTaskDone )
+        {
+            ret = Sem_TimedwaitSec( &m_semSync,
+                THREAD_WAKEUP_INTERVAL );
+
+            if( ret == -EAGAIN )
+                continue;
+
+            if( ERROR( ret ) )
+                return;
+
+            // there comes the task to handle
+            break;
+        }
     }
 
     return;
@@ -264,12 +441,68 @@ gint32 COneshotTaskThread::Start()
     return 0;
 }
 
+gint32 COneshotTaskThread::Stop()
+{
+    m_bTaskDone = true;
+    m_pServiceThread->join();
+    delete m_pServiceThread;
+    m_pServiceThread = nullptr;
+
+    return 0;
+}
+
+gint32 COneshotTaskThread::GetProperty(
+    gint32 iProp, CBuffer& oBuf ) const
+{
+    gint32 ret = 0;
+    switch( iProp )
+    {
+    case propClsid:
+        oBuf = ( guint32 )m_iTaskClsid;
+        break;
+
+    default:
+        ret = super::GetProperty(
+            iProp, oBuf );
+        break;
+    }
+    return ret;
+}
+
+gint32 COneshotTaskThread::SetProperty(
+    gint32 iProp, const CBuffer& oBuf )
+{
+    gint32 ret = 0;
+    switch( iProp )
+    {
+    case propClsid:
+        {
+            guint32 dwClsid = oBuf;
+            m_iTaskClsid = ( EnumClsid )dwClsid;
+            break;
+        }
+    default:
+        ret = super::SetProperty(
+            iProp, oBuf );
+        break;
+    }
+    return ret;
+}
+
+gint32 COneshotTaskThread::EnumProperties(
+    std::vector< gint32 >& vecProps ) const
+{
+    super::EnumProperties( vecProps );
+    vecProps.push_back( propClsid );
+    return 0;
+}
+
 CIrpCompThread::CIrpCompThread()
 {
     SetClassId( Clsid_CIrpCompThread );
 
-    sem_init( &m_semIrps, 0, 0 );
-    sem_init( &m_semSlots, 0, ICT_MAX_IRPS );
+    Sem_Init( &m_semIrps, 0, 0 );
+    Sem_Init( &m_semSlots, 0, ICT_MAX_IRPS );
 }
 
 gint32 CIrpCompThread::AddIrp( IRP* pirp )
@@ -286,7 +519,7 @@ gint32 CIrpCompThread::AddIrp( IRP* pirp )
         CStdMutex a( m_oMutex );
         // we will held an irp reference count here
         m_quePendingIrps.push_back( IrpPtr( pirp ) );
-        sem_post( &m_semIrps );
+        Sem_Post( &m_semIrps );
 
     }while( 0 );
     return 0;
@@ -306,14 +539,34 @@ gint32 CIrpCompThread::Start()
     return 0;
 }
 
+bool CIrpCompThread::IsRunning() const
+{
+    return ( m_pServiceThread != nullptr
+        && m_pServiceThread->joinable() );
+}
+
 void CIrpCompThread::ThreadProc( void* context )
 {
-    do
+    IrpPtr pIrp;
+    bool bEmpty = true;
+    gint32 ret = 0;
+
+    this->SetThreadName();
+
+    while( !m_bExit )
     {
-        IrpPtr pIrp;
-        bool bEmpty = true;
-        do{
-            sem_wait( &m_semIrps );
+        bEmpty = true;
+        ret = Sem_TimedwaitSec( &m_semIrps,
+            THREAD_WAKEUP_INTERVAL );
+
+        if( ret == -EAGAIN )
+            continue;
+
+        if( ERROR( ret ) )
+            break;
+
+        if( true )
+        {
             CStdMutex a( m_oMutex );
             if( m_quePendingIrps.size() )
             {
@@ -321,19 +574,20 @@ void CIrpCompThread::ThreadProc( void* context )
                 m_quePendingIrps.pop_front();
             }
             bEmpty = m_quePendingIrps.empty();
-            sem_post( &m_semSlots );
-
-        }while( 0 );
+            Sem_Post( &m_semSlots );
+        }
 
         if( !pIrp.IsEmpty() )
         {
             CompleteIrp( pIrp );
         }
+
+        pIrp.Clear();
+
         // pIrp destroyed
         if( !bEmpty )
             continue;
-
-    }while( !m_bExit );
+    }
     
 }
 
@@ -399,7 +653,7 @@ gint32 CIrpCompThread::Stop()
         m_bExit = true;
 
         // wake up the thread
-        sem_post( &m_semIrps );
+        Sem_Post( &m_semIrps );
 
         // waiting till it ends
         m_pServiceThread->join();
@@ -443,6 +697,11 @@ gint32 CThreadPool::GetThread(
                 break;
             }
 
+            CCfgOpenerObj oCfg( ( CObjBase* )thptr );
+
+            oCfg.SetIntProp( propThreadId,
+                m_iThreadCount++ );
+
             if( bStart )
                 thptr->Start();
 
@@ -450,8 +709,9 @@ gint32 CThreadPool::GetThread(
             {
                 m_vecThreads.push_back( thptr );
             }
-            pThread = thptr;
         }
+        pThread = thptr;
+
     }while( 0 );
 
     return ret;
@@ -520,6 +780,12 @@ CThreadPool::CThreadPool( const IConfigDb* pCfg )
             "thread class is not given" );
 
     m_iThreadClass = ( EnumClsid )dwValue;
+    m_iThreadCount = 0;
+}
+
+CThreadPool::~CThreadPool()
+{
+
 }
 
 gint32 CThreadPool::Start()

@@ -31,6 +31,7 @@
 #include "autoptr.h"
 #include "defines.h"
 #include "dlfcn.h"
+#include "buffer.h"
 
 using stdstr = std::string;
 using cchar = const char;
@@ -192,160 +193,18 @@ class CStlBufVector : public CStlVector< BufPtr >
 
 typedef CAutoPtr< clsid( CStlBufVector ), CStlBufVector > BufVecPtr;
 
-typedef std::pair< void*, FactoryPtr > ELEM_CLASSFACTORIES;
-
-struct CClassFactories: public CStlVector< ELEM_CLASSFACTORIES >
+class CStlObjVector : public CStlVector< ObjPtr >
 {
+
     public:
-    CClassFactories()
-        :CStlVector<ELEM_CLASSFACTORIES>()
+    typedef CStlVector<ObjPtr> super;
+    CStlObjVector()
+        :CStlVector<ObjPtr>()
     {
-        SetClassId( clsid( CClassFactories  ) );
+        SetClassId( clsid( CStlObjVector  ) );
     }
-
-    ~CClassFactories()
-    {
-        Clear();
-    }
-
-    /**
-    * @name CreateInstance similiar to
-    * CoCreateInstance, except the name.
-    * @{ */
-    /**  @} */
-    
-    gint32 CreateInstance( 
-        EnumClsid clsid,
-        CObjBase*& pObj,
-        const IConfigDb* pCfg )
-    {
-        gint32 ret = -ENOTSUP;
-
-        CStdRMutex oLock( GetLock() );
-        MyType& vecFactories = ( *this )();
-        MyItr itr = vecFactories.begin();
-        while( itr != vecFactories.end() )
-        {
-            ret = ( itr->second )->CreateInstance(
-                    clsid, pObj, pCfg );
-
-            if( SUCCEEDED( ret ) )
-                break;
-
-            ++itr;
-        }
-        return ret;
-
-    }
-    
-    const char* GetClassName(
-        EnumClsid iClsid )
-    {
-        CStdRMutex oLock( GetLock() );
-
-        const char* pszName = nullptr;
-        MyType& vecFactories = ( *this )();
-        MyItr itr = vecFactories.begin();
-
-        while( itr != vecFactories.end() )
-        {
-            pszName = ( itr->second )->GetClassName( iClsid );
-            if( pszName != nullptr )
-                return pszName;
-
-            ++itr;
-        }
-        return nullptr;
-    }
-
-    EnumClsid GetClassId(
-        const char* pszClassName )
-    {
-        if( pszClassName == nullptr )
-            return clsid( Invalid );
-
-        CStdRMutex oLock( GetLock() );
-        EnumClsid iClsid = clsid( Invalid );
-        MyType& vecFactories = ( *this )();
-        MyItr itr = vecFactories.begin();
-
-        while( itr != vecFactories.end() )
-        {
-            iClsid = ( itr->second )->GetClassId( pszClassName );
-            if( iClsid != clsid( Invalid ) )
-                return iClsid;
-
-            ++itr;
-        }
-        return clsid( Invalid );
-    }
-
-    gint32 AddFactory(
-        FactoryPtr& pFactory, void* hDll )
-    {
-        if( pFactory.IsEmpty() )
-            return -EINVAL;
-
-        if( hDll == nullptr )
-        {
-            // that's fine, indicating this
-            // factory is from current module
-        }
-
-        CStdRMutex oLock( GetLock() );
-        MyType& vecFactories = ( *this) ();
-
-        vecFactories.push_back(
-            ELEM_CLASSFACTORIES( hDll, pFactory ) );
-
-        return 0;
-    }
-
-    gint32 RemoveFactory(
-        FactoryPtr& pFactory )
-    {
-
-        CStdRMutex oLock( GetLock() );
-        MyType& vecFactories = ( *this) ();
-        MyItr itr = vecFactories.begin();
-
-        while( itr != vecFactories.end() )
-        {
-            if( itr->second->GetObjId()
-                == pFactory->GetObjId() )
-            {
-                if( itr->first != nullptr )
-                    dlclose( itr->first );
-                vecFactories.erase( itr );
-                return 0;
-            }
-
-            ++itr;
-        }
-        return -ENOENT;
-
-    }
-
-    void Clear()
-    {
-        CStdRMutex oLock( GetLock() );
-        MyType& vecFactories = ( *this) ();
-        MyItr itr = vecFactories.begin();
-
-        while( itr != vecFactories.end() )
-        {
-            if( itr->first != nullptr )
-            {
-                dlclose( itr->first );
-                itr->first = nullptr;
-            }
-            ++itr;
-        }
-        vecFactories.clear();
-    }
-
 };
-typedef CAutoPtr< clsid( CClassFactories ), CClassFactories > FctryVecPtr;
+typedef CAutoPtr< clsid( CStlObjVector ), CStlObjVector > ObjVecPtr;
 
 template< typename Key_, typename Val_ >
 class CStlMap : public CObjBase
@@ -521,7 +380,8 @@ class CStlEventMap:
 
         for( guint32 i = 0; i < vecEvents.size(); i++ )
         {
-            vecEvents[ i ]->OnEvent(
+            EventPtr& pEvt = vecEvents[ i ];
+            pEvt->OnEvent(
                 iEvent, dwParam1, dwParam2, pData );
         }
 
@@ -580,3 +440,17 @@ public:
 };
 
 typedef CAutoPtr< clsid( CStlObjSet ), CStlObjSet > ObjSetPtr;
+
+class CStlStringSet : public CStlSet< std::string >
+{
+public:
+    typedef std::string ElemType;
+
+    CStlStringSet() :CStlSet< std::string >()
+    { SetClassId( clsid( CStlStringSet ) ); }
+
+    ~CStlStringSet()
+    {;}
+};
+
+typedef CAutoPtr< clsid( CStlStringSet ), CStlStringSet > StrSetPtr;

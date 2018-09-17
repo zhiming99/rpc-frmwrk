@@ -193,9 +193,15 @@ gint32 Ip4AddrToByteStr(
 
 CDBusBusPort::CDBusBusPort( const IConfigDb* pConfig )
     : super( pConfig ),
-    m_pDBusConn( nullptr )
+    m_pDBusConn( nullptr ),
+    m_iLocalPortId( -1 ),
+    m_iLpbkPortId( -1 )
 {
     SetClassId( clsid( CDBusBusPort ) );
+}
+
+CDBusBusPort::~CDBusBusPort()
+{ 
 }
 
 gint32 CDBusBusPort::BuildPdoPortName(
@@ -362,7 +368,8 @@ gint32 CDBusBusPort::CreateRpcProxyPdo(
         string strPortName;
         guint32 dwPortId = 0;
 
-        CCfgOpener oExtCfg( ( IConfigDb* )pCfg );
+        CCfgOpener oExtCfg;
+        *oExtCfg.GetCfg() = *pCfg;
 
         ret = oExtCfg.GetIntProp(
             propPortId, dwPortId );
@@ -387,6 +394,7 @@ gint32 CDBusBusPort::CreateRpcProxyPdo(
                 break;
 
             dwPortId = *( guint32* )( pBuf );
+            oExtCfg[ propPortId ] = dwPortId;
         }
 
         // verify if the port already exists
@@ -421,29 +429,28 @@ gint32 CDBusBusPort::CreateLocalDBusPdo(
         string strPortName;
         guint32 dwPortId = 0;
 
-        CCfgOpener oExtCfg( ( IConfigDb* )pCfg );
+        CCfgOpener oExtCfg;
+        *oExtCfg.GetCfg() = *pCfg;
 
         if( this->PortExist( dwPortId ) )
-        {
-            ret = -EEXIST;
-            break;
-        }
+            dwPortId = NewPdoId();
 
         // must-have properties in creation
-        dwPortId = NewPdoId();
         if( dwPortId > 0 )
         {
             // we support just one
             ret = -ERANGE;
             break;
         }
-        oExtCfg.SetIntProp( propPortId, dwPortId );
 
-        PortPtr portPtr;
-        portPtr.NewObj(
-            clsid( CDBusLocalPdo ), pCfg );
+        oExtCfg[ propPortId ] = dwPortId;
 
-        pNewPort = ( IPort* )portPtr;
+        ret = pNewPort.NewObj(
+            clsid( CDBusLocalPdo ), oExtCfg.GetCfg() );
+
+        if( ERROR( ret ) )
+            break;
+
         m_iLocalPortId = dwPortId;
         // the pdo port `Start()' will be deferred
         // till the complete port stack is built.
@@ -467,7 +474,20 @@ gint32 CDBusBusPort::CreateLoopbackPdo(
         string strPortName;
         guint32 dwPortId = 0;
 
-        CCfgOpener oExtCfg( ( IConfigDb* )pCfg );
+        CCfgOpener oExtCfg;
+        *oExtCfg.GetCfg() = *pCfg;
+
+        ret = oExtCfg.GetIntProp(
+            propPortId, dwPortId );
+
+        if( ERROR( ret ) )
+        {
+            dwPortId = NewPdoId();
+
+            // must-have properties in creation
+            oExtCfg[ propPortId ] = dwPortId;
+            ret = 0;
+        }
 
         if( this->PortExist( dwPortId ) )
         {
@@ -475,15 +495,13 @@ gint32 CDBusBusPort::CreateLoopbackPdo(
             break;
         }
 
-        // must-have properties in creation
-        dwPortId = NewPdoId();
-        oExtCfg.SetIntProp( propPortId, dwPortId );
+        ret = pNewPort.NewObj(
+            clsid( CDBusLoopbackPdo ),
+            oExtCfg.GetCfg() );
 
-        PortPtr portPtr;
-        portPtr.NewObj(
-            clsid( CDBusLoopbackPdo ), pCfg );
+        if( ERROR( ret ) )
+            break;
 
-        pNewPort = ( IPort* )portPtr;
         m_iLpbkPortId = dwPortId;
         // the pdo port `Start()' will be deferred
         // till the complete port stack is built.
@@ -516,21 +534,20 @@ gint32 CDBusBusPort::Start( IRP *pIrp )
 
         strModName = GetIoMgr()->GetModName();
 
-        CCfgOpener a( ( IConfigDb* )m_pCfgDb );
-        ret = a.GetStrProp(
+        CCfgOpener oCfg( ( IConfigDb* )m_pCfgDb );
+        ret = oCfg.GetStrProp(
             propPortName, strPortName );
 
         if( ERROR( ret ) )
             break;
 
-        // NOTE: c++11 needed for to_string
         string strBusName = string( DBUS_NAME_PREFIX )
             + strModName
             + string( "." )
             + strPortName;
 
         m_pDBusConn = dbus_bus_get_private(
-            DBUS_BUS_SYSTEM, error );
+            DBUS_BUS_SESSION, error );
 
         if ( nullptr == m_pDBusConn )
         {
@@ -540,39 +557,44 @@ gint32 CDBusBusPort::Start( IRP *pIrp )
             break;
         }
         
+        ret = oCfg.SetStrProp(
+            propBusName, strBusName );
+
+        BufPtr pBuf( true );
+        *pBuf = strBusName;
+        ret = this->SetProperty(
+            propSrcDBusName, *pBuf );
+        
+        ret = InitLpbkMatch();
+        if( ERROR( ret ) )
+            break;
+
+        // request the name for this connection
+        ret = RegBusName(
+            strBusName.c_str(),
+            DBUS_NAME_FLAG_REPLACE_EXISTING
+            | DBUS_NAME_FLAG_DO_NOT_QUEUE );
+
+        if( ERROR( ret ) )
+            break;
+
         // don't exit on disconnection, we need to
         // do some clean-up work
         dbus_connection_set_exit_on_disconnect(
             m_pDBusConn, FALSE );
 
-        error.Reset();
-
-        // request the name for this connection
-        ret = dbus_bus_request_name(
+        // add the master callback for this connection
+        ret = dbus_connection_add_filter(
             m_pDBusConn,
-            strBusName.c_str(),
-            ( DBUS_NAME_FLAG_REPLACE_EXISTING
-            | DBUS_NAME_FLAG_DO_NOT_QUEUE ),
-            error );
+            DBusMessageCallback,
+            this, NULL );
 
-        if( ERROR( ret ) )
+        if( FALSE == ret )
         {
-            ret = error.Errno();
+            // according dbus's document
+            ret = -ENOMEM;
             break;
         }
-        
-        // add the default entry for this connection
-        if( FALSE == dbus_connection_add_filter( 
-            m_pDBusConn, DBusMessageCallback, this, NULL ) )
-        {
-            break;
-        }
-
-        GMainContext* pCtx =
-            GetIoMgr()->GetMainIoLoop().GetMainCtx();
-
-        dbus_connection_setup_with_g_main(
-            m_pDBusConn, pCtx );
 
     }while( 0 );
 
@@ -581,6 +603,7 @@ gint32 CDBusBusPort::Start( IRP *pIrp )
     {
         if( m_pDBusConn )
         {
+            dbus_connection_close( m_pDBusConn );
             dbus_connection_unref( m_pDBusConn );
             m_pDBusConn = nullptr;
         }
@@ -616,7 +639,7 @@ gint32 CDBusBusPortDBusOfflineTask::operator()(
     guint32 dwContext )
 {
     gint32 ret = 0;
-    CCfgOpener a( ( IConfigDb* )m_pCtx );
+    CCfgOpener a( ( IConfigDb* )GetConfig() );
     CIoManager* pMgr = nullptr;
     ObjPtr pObj;
 
@@ -770,7 +793,7 @@ DBusHandlerResult CDBusBusPort::OnMessageArrival(
             }
 
             // place the localdbus port at the
-            // last. give some certainty in the
+            // last. To guarantee the
             // order of the message processing
             vecPorts.push_back(
                 m_mapId2Pdo[ m_iLocalPortId ] );
@@ -823,6 +846,12 @@ DBusHandlerResult CDBusBusPort::OnMessageArrival(
                 {
                     if( SUCCEEDED( ret1 ) || ret1 != -ENOENT)
                         ret = DBUS_HANDLER_RESULT_HANDLED;
+
+                    if( ERROR( ret1 ) )
+                    {
+                        DebugPrint( ret1,
+                            "Error handling return values" );
+                    }
                     break;
                 }
             default:
@@ -867,20 +896,39 @@ gint32 CDBusBusPort::SendDBusMsg(
     return ret;
 }
 
+void CDBusBusPort::ReleaseDBus()
+{
+    if( m_pDBusConn )
+    {
+        CCfgOpener oCfg( ( IConfigDb* )m_pCfgDb );
+        string strBusName;
+        if( oCfg.exist( propBusName ) )
+            strBusName = oCfg[ propBusName ];
+
+        ReleaseBusName( strBusName );
+
+        dbus_connection_remove_filter( m_pDBusConn,
+            DBusMessageCallback, this );
+
+        dbus_connection_close( m_pDBusConn );
+        dbus_connection_unref( m_pDBusConn );
+
+        m_pDBusConn = nullptr;
+    }
+
+    return;
+}
+
 gint32 CDBusBusPort::Stop( IRP *pIrp )
 {
     gint32 ret = super::Stop( pIrp );
     // TODO: stop all the pdo's created by this port
-    if( m_pDBusConn )
-    {
-        dbus_connection_unref( m_pDBusConn );
-        m_pDBusConn = nullptr;
-    }
 
-    if( !m_pMatchDisconn.IsEmpty() )
-    {
-        m_pMatchDisconn.Clear();
-    }
+    ReleaseDBus();
+    m_pMatchDisconn.Clear();
+
+    m_pMatchLpbkServer.Clear();
+    m_pMatchLpbkProxy.Clear();
     return ret;
 }
 
@@ -888,11 +936,21 @@ gint32 CDBusBusPort::GetChildPorts(
         vector< PortPtr >& vecChildPorts )
 {
     PortPtr pPort;
-    GetPdoPort( m_iLocalPortId, pPort );
+    PortPtr pLpbkPort;
+
+    gint32 ret = GetPdoPort(
+        m_iLocalPortId, pPort );
+
+    if( SUCCEEDED( ret ) )
+        vecChildPorts.push_back( pPort );
+
+    ret = GetPdoPort( m_iLpbkPortId, pLpbkPort );
 
     // add the local dbus port
-    vecChildPorts.push_back( pPort );
-    gint32 ret = 0;
+    if( SUCCEEDED( ret ) )
+        vecChildPorts.push_back( pLpbkPort );
+
+    ret = 0;
 
     for( guint32 i = 0; i < m_vecProxyPortIds.size(); i++ )
     {
@@ -906,12 +964,149 @@ gint32 CDBusBusPort::GetChildPorts(
     return ret;
 }
 
+gint32 CDBusBusPort::SchedulePortsAttachNotifTask(
+    std::vector< PortPtr >& vecChildPdo,
+    guint32 dwEventId,
+    IRP* pMasterIrp )
+{
+    gint32 ret = 0;
+
+    do{
+        if( pMasterIrp != nullptr  )
+        {
+            if( pMasterIrp->IsPending() )
+            {
+                CStdRMutex oIrpLock(
+                    pMasterIrp->GetLock() );
+
+                ret = pMasterIrp->CanContinue(
+                    IRP_STATE_READY );
+
+                if( ERROR( ret ) )
+
+                pMasterIrp->SetMinSlaves(
+                    vecChildPdo.size() );
+            }
+            else
+            {
+                pMasterIrp->SetMinSlaves(
+                    vecChildPdo.size() );
+            }
+        }
+
+        for( auto pNewPort : vecChildPdo ) 
+        {
+            CParamList oAttachArgs;
+
+            // NOTE: at this moment, the pNewPort is
+            // not registered in the registry so no
+            // event map for it yet.  we will
+            // broadcast the event via the event map
+            // from the bus port
+            ObjPtr pObj( pNewPort );
+            oAttachArgs.Push( dwEventId );
+            oAttachArgs.Push( pObj );
+
+            CEventMapHelper< CGenericBusPort > b( this );
+            ret = b.GetEventMap( pObj );
+
+            if( ERROR( ret ) )
+                break;
+
+            oAttachArgs.Push( pObj );
+            if( pMasterIrp != nullptr )
+            {
+                oAttachArgs.SetPointer(
+                    propMasterIrp, pMasterIrp );
+            }
+
+            TaskletPtr pTask;
+            ret = pTask.NewObj(
+                clsid( CPortAttachedNotifTask ),
+                oAttachArgs.GetCfg() );
+
+            if( ERROR( ret ) )
+                break;
+
+            ( *pTask )( dwEventId );
+        }
+
+        if( pMasterIrp != nullptr )
+        {
+            if( pMasterIrp->IsPending() )
+            {
+                CStdRMutex oIrpLock(
+                    pMasterIrp->GetLock() );
+
+                ret = pMasterIrp->CanContinue(
+                    IRP_STATE_READY );
+
+                if( ERROR( ret ) )
+                {
+                    ret = 0;
+                    break;
+                }
+
+                // NOTE: the master irp will finally be
+                // timed out if the slave count cannot
+                // drop to zero
+                if( pMasterIrp->GetSlaveCount() > 0 )
+                {
+                    // the irp will be complete by some
+                    // other people
+                    ret = STATUS_PENDING;
+                }
+                else
+                {
+                    // we won't complete it here,
+                    // someone else will do the job,
+                    // but not now.
+                }
+            }
+            else
+            {
+                if( pMasterIrp->GetSlaveCount() > 0 )
+                    ret = STATUS_PENDING;
+            }
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CDBusBusPort::OnPortReady( IRP* pIrp )
 {
     if( pIrp == nullptr )
         return -EINVAL;
 
-    return super::OnPortReady( pIrp );
+    gint32 ret = super::OnPortReady( pIrp );
+    vector< PortPtr > vecChildren;
+    
+    {
+        CStdRMutex oPortLock( GetLock() );
+        GetChildPorts( vecChildren );
+    }
+
+    // the message is allowed to come in
+    GMainContext* pCtx =
+        GetIoMgr()->GetMainIoLoop().GetMainCtx();
+
+    dbus_connection_setup_with_g_main(
+        m_pDBusConn, pCtx );
+
+    ret = SchedulePortsAttachNotifTask(
+        vecChildren, eventPortAttached, pIrp );
+
+    return ret;
+}
+
+void CDBusBusPort::OnPortStartFailed(
+    IRP* pIrp, gint32 ret )
+{
+    super::OnPortStartFailed( pIrp, ret );
+    ReleaseDBus();
+    return;
 }
 
 gint32 CDBusBusPortCreatePdoTask::operator()(
@@ -920,13 +1115,13 @@ gint32 CDBusBusPortCreatePdoTask::operator()(
 
     // no ref increment, to match the
     // addref before schedule this event
-    CCfgOpener oCfg( ( IConfigDb* )m_pCtx );
+    CCfgOpener oCfg( ( IConfigDb* )GetConfig() );
 
     PortPtr pNewPort;
     ObjPtr pObj;
 
-    gint32 ret =
-        oCfg.GetObjPtr( propBusPortPtr, pObj );
+    gint32 ret = oCfg.GetObjPtr(
+        propBusPortPtr, pObj );
 
     if( ERROR( ret ) )
         return ret;
@@ -935,7 +1130,7 @@ gint32 CDBusBusPortCreatePdoTask::operator()(
     if( pPort )
     {
         ret = pPort->OpenPdoPort(
-            oCfg.GetCfg(), pNewPort );
+            GetConfig(), pNewPort );
     }
     else
     {
@@ -1008,6 +1203,14 @@ gint32 CDBusBusPort::PostStart( IRP* pIrp )
         if( ERROR( ret ) )
             break;
 
+        ObjPtr pEvent;
+        ret = pEvent.NewObj( clsid( CIfDummyTask ) );
+        if( ERROR( ret ) )
+            break;
+
+        newCfg.SetObjPtr(
+            propEventSink, pEvent );
+
         // no driver ptr because this is a 
         // pdo
 
@@ -1038,8 +1241,26 @@ gint32 CDBusBusPort::PostStart( IRP* pIrp )
         if( ERROR( ret ) )
             break;
 
+        pTask.Clear();
+
+        ret = pEvent.NewObj( clsid( CIfDummyTask ) );
+        if( ERROR( ret ) )
+            break;
+
+        newCfg.SetObjPtr(
+            propEventSink, pEvent );
+
+        ret = pTask.NewObj(
+            clsid( CDBusBusPortCreatePdoTask ),
+            newCfg.GetCfg() );
+
+        if( ERROR( ret ) )
+            break;
+
         ( *pTask )( eventZero );
         ret = pTask->GetError();
+        if( ret == STATUS_PENDING )
+            ret = 0;
 
     }while( 0 );
 
@@ -1068,17 +1289,12 @@ gint32 CDBusBusPort::InitLpbkMatch()
         oParams.SetPointer( propIoMgr, pMgr );
 
         string strUniqName;
-        const char* pszName =
-            dbus_bus_get_unique_name( m_pDBusConn );
-        
-        if( pszName != nullptr )
-            strUniqName = pszName;
+        CCfgOpenerObj oPortCfg( this );
+        ret = oPortCfg.GetStrProp(
+            propSrcUniqName, strUniqName );
 
-        if( strUniqName.empty()  )
-        {
-            ret = -EFAULT;
+        if( ERROR( ret ) )
             break;
-        }
 
         ret = oParams.SetStrProp(
             propDestUniqName, strUniqName );
@@ -1086,11 +1302,14 @@ gint32 CDBusBusPort::InitLpbkMatch()
         if( ERROR( ret ) )
             break;
 
-        ret = oParams.SetIntProp(
-            propMatchType, matchClient );
-
         ret = oParams.SetStrProp(
             propSrcUniqName, strUniqName );
+
+        if( ERROR( ret ) )
+            break;
+
+        ret = oParams.SetIntProp(
+            propMatchType, matchClient );
 
         if( ERROR( ret ) )
             break;
@@ -1112,6 +1331,8 @@ gint32 CDBusBusPort::InitLpbkMatch()
         if( ERROR( ret ) )
             break;
 
+        ret = AddBusNameLpbk( strUniqName );
+
     }while( 0 );
 
     return ret;
@@ -1122,7 +1343,7 @@ gint32 CDBusTransLpbkMsgTask::operator()(
 {
     gint32 ret = 0;
     do{
-        CParamList oParams( m_pCtx );
+        CParamList oParams( GetConfig() );
 
         bool bReq = false;
         ret = oParams.Pop( bReq );
@@ -1137,7 +1358,7 @@ gint32 CDBusTransLpbkMsgTask::operator()(
 
         ObjPtr pObj;
         ret = oParams.GetObjPtr(
-            propObjPtr, pObj );
+            propPortPtr, pObj );
 
         if( ERROR( ret ) )
             break;
@@ -1168,12 +1389,16 @@ gint32 CDBusBusPort::ScheduleLpbkTask(
     DBusMessage *pDBusMsg,
     guint32* pdwSerial )
 {
-
     gint32 ret = 0;
     do{
-        ret = pFilter->IsMyMsgOutgoing( pDBusMsg );
-        if( ERROR( ret ) )
-            break;
+        gint32 iType = pFilter->GetType();
+        if( true )
+        {
+            CStdRMutex oPortLock( GetLock() );
+            ret = pFilter->IsMyMsgOutgoing( pDBusMsg );
+            if( ERROR( ret ) )
+                break;
+        }
 
         CParamList oParams;
         ret = oParams.SetObjPtr(
@@ -1188,7 +1413,6 @@ gint32 CDBusBusPort::ScheduleLpbkTask(
         if( ERROR( ret ) )
             break;
 
-        gint32 iType = pFilter->GetType();
         bool bReq = true;
 
         if( iType == matchServer )
@@ -1305,12 +1529,566 @@ gint32 CDBusBusPort::FilterLpbkMsg(
     gint32 ret = ScheduleLpbkTask(
         pFilter, pDBusMsg, pdwSerial );
 
-    if( pMsg.GetType()
-        == DBUS_MESSAGE_TYPE_SIGNAL )
+    if( pMsg.GetType() ==
+        DBUS_MESSAGE_TYPE_SIGNAL )
     {
-        // for signal, always not handled
         ret = ERROR_NOT_HANDLED;
     }
+
+    return ret;
+}
+
+// methods from CObjBase
+
+gint32 CDBusBusPort::EnumProperties(
+    std::vector< gint32 >& vecProps ) const
+{
+    vecProps.push_back( propSrcUniqName );
+    return super::EnumProperties( vecProps );
+}
+
+gint32 CDBusBusPort::GetProperty(
+        gint32 iProp,
+        CBuffer& oBuf ) const
+{
+    gint32 ret = 0;
+    switch( iProp )
+    {
+    case propSrcUniqName:
+        {
+            if( m_pDBusConn == nullptr )
+            {
+                ret = ERROR_STATE;
+                break;
+            }
+            const char* szName =
+                dbus_bus_get_unique_name( m_pDBusConn );
+
+            oBuf = szName;
+            break;
+        }
+    default:
+        {
+            ret = super::GetProperty( iProp, oBuf );
+            break;
+        }
+    }
+    return ret;
+}
+
+gint32 CDBusBusPort::SetProperty(
+        gint32 iProp,
+        const CBuffer& oBuf )
+{
+    gint32 ret = 0;
+    switch( iProp )
+    {
+    case propSrcUniqName:
+        {
+            ret = -ENOTSUP;
+            break;
+        }
+    default:
+        {
+            ret = super::SetProperty(
+                iProp, oBuf );
+            break;
+        }
+    }
+    return ret;
+}
+
+gint32 CDBusBusPort::AllocIrpCtxExt(
+    IrpCtxPtr& pIrpCtx,
+    void* pContext ) const
+{
+    gint32 ret = 0;
+    switch( pIrpCtx->GetMajorCmd() )
+    {
+    case IRP_MJ_ASSOC:
+        {
+            switch( pIrpCtx->GetMinorCmd() )
+            {
+            case IRP_MN_ASSOC_RUN:
+                {
+                    CStartStopPdoCtx* pExt = nullptr;
+
+                    BufPtr pBuf( true );
+
+                     pBuf->Resize( 4 +
+                        sizeof( CStartStopPdoCtx ) );
+
+                    if( ERROR( ret ) )
+                        break;
+
+                    pExt = new (pBuf->ptr() ) CStartStopPdoCtx;
+                    if( pExt == nullptr )
+                    {
+                        ret = -ENOMEM;
+                        break;
+                    }
+
+                    ret = pIrpCtx->SetExtBuf( pBuf );
+                    break;
+                }
+            default:
+                {   
+                    ret = -ENOTSUP;
+                    break;
+                }
+            }
+            break;
+        }
+    default:
+        ret = -ENOTSUP;
+        break;
+    }
+
+    if( ret == -ENOTSUP )
+    {
+        ret = super::AllocIrpCtxExt(
+            pIrpCtx, pContext );
+    }
+
+    return ret;
+}
+
+gint32 CDBusBusPort::ReleaseIrpCtxExt(
+    IrpCtxPtr& pIrpCtx,
+    void* pContext )
+{
+    gint32 ret = 0;
+    switch( pIrpCtx->GetMajorCmd() )
+    {
+    case IRP_MJ_ASSOC:
+        {
+            switch( pIrpCtx->GetMinorCmd() )
+            {
+            case IRP_MN_ASSOC_RUN:
+                {
+
+                    BufPtr pBuf;
+                    pIrpCtx->GetExtBuf( pBuf );
+                    if( pBuf.IsEmpty() )
+                        break;
+
+                    CStartStopPdoCtx* pspc =
+                        ( CStartStopPdoCtx* )pBuf->ptr();
+
+                    pspc->~CStartStopPdoCtx();
+                    break;
+                }
+            default:
+                {   
+                    ret = -ENOTSUP;
+                    break;
+                }
+            }
+            break;
+        }
+    default:
+        ret = -ENOTSUP;
+        break;
+    }
+
+    if( ret == -ENOTSUP )
+    {
+        ret = super::ReleaseIrpCtxExt(
+            pIrpCtx, pContext );
+    }
+
+    return ret;
+}
+
+gint32 CDBusBusPort::OnCompleteSlaveIrp(
+    IRP* pMaster, IRP* pSlave )
+{
+    if( pMaster == nullptr )
+        return -EINVAL;
+
+    IrpCtxPtr& pIrpCtx =
+        pMaster->GetTopStack();
+
+    bool bLast = false;
+    if( pMaster->GetSlaveCount() == 0 )
+        bLast = true;
+
+    gint32 ret = 0;
+
+    do{
+        size_t iCount =
+            pMaster->m_vecCtxStack.size();
+
+        if( iCount < 2 )
+        {
+            // bad stack layout
+            ret = -EINVAL;
+            break;
+        }
+
+        BufPtr pBuf;
+        pIrpCtx->GetExtBuf( pBuf );
+        if( pBuf.IsEmpty() )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        CStartStopPdoCtx* pspc = reinterpret_cast
+            < CStartStopPdoCtx* >( pBuf->ptr() );
+
+        IPort* pPdo = pSlave->GetTopPort();
+        if( pPdo == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        guint32 dwPortId = 0xFFFFFFFF;
+
+        CCfgOpenerObj oPortCfg( pPdo );
+        ret = oPortCfg.GetIntProp(
+            propPortId, dwPortId );
+
+        if( ERROR( ret ) )
+            break;
+
+        pspc->m_mapIdToRes[ dwPortId ] =
+            pSlave->GetStatus();
+
+        if( !bLast )
+        {
+            ret = STATUS_PENDING;
+            break;
+        }
+
+        if( pspc->m_mapIdToRes.find( m_iLocalPortId )
+            == pspc->m_mapIdToRes.end() )
+        {
+            ret = ERROR_FAIL;
+            break;
+        }
+        
+        ret = pspc->m_mapIdToRes[ m_iLocalPortId ];
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CDBusBusPort::AddRemoveBusNameLpbk(
+    const std::string& strName, bool bRemove )
+{
+    gint32 ret = 0;
+    if( strName.empty() )
+        return -EINVAL;
+
+    do{
+        CStdRMutex oIfLock( GetLock() );
+
+        CDBusLoopbackMatch* pMatch =
+            m_pMatchLpbkProxy;
+
+        CDBusLoopbackMatch* pMatchSvr =
+            m_pMatchLpbkServer;
+
+        if( unlikely( pMatch == nullptr ||
+            pMatchSvr == nullptr ) )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        if( bRemove )
+        {
+            ret = pMatch->RemoveBusName( strName );
+            pMatchSvr->RemoveBusName( strName );
+        }
+        else
+        {
+            ret = pMatch->AddBusName( strName );
+            if( ERROR( ret ) && ret != -EEXIST )
+                break;
+
+            ret = 0;
+            pMatchSvr->AddBusName( strName );
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CDBusBusPort::AddBusNameLpbk(
+    const std::string& strName )
+{
+    return AddRemoveBusNameLpbk(
+        strName, false );
+}
+
+gint32 CDBusBusPort::RemoveBusNameLpbk(
+    const std::string& strName )
+{
+    return AddRemoveBusNameLpbk(
+        strName, true );
+}
+
+gint32 CDBusBusPort::RegBusName(
+    const std::string& strName,
+    guint32 dwFlags )
+{
+    gint32 ret = 0;
+
+    do{
+
+        if( m_pDBusConn == nullptr )
+            return ERROR_STATE;
+
+        CDBusError error;
+        // request the name for this connection
+        ret = dbus_bus_request_name(
+            m_pDBusConn,
+            strName.c_str(),
+            dwFlags,
+            error );
+
+        if( ret == -1 )
+        {
+            ret = error.Errno();
+            break;
+        }
+
+        switch( ret )
+        {
+        case DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER:
+        case DBUS_REQUEST_NAME_REPLY_ALREADY_OWNER:
+            ret = 0;
+            break;
+
+        case DBUS_REQUEST_NAME_REPLY_IN_QUEUE:
+        case DBUS_REQUEST_NAME_REPLY_EXISTS:
+            {
+                ret = -EAGAIN;
+                break;
+            }
+        default:
+            {
+                ret = ERROR_FAIL;
+                break;
+            }
+        }
+
+        if( ERROR( ret ) )
+            break;
+
+        AddBusNameLpbk( strName );
+
+        DMsgPtr pMsg;
+        ret = BuildModOnlineMsgLpbk(
+            strName, true, pMsg );
+        if( ERROR( ret ) )
+            break;
+
+        guint32 dwSerial = 0;
+        ret = FilterLpbkMsg( pMsg, &dwSerial );
+        if( ret == ERROR_NOT_HANDLED )
+            ret = 0;
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CDBusBusPort::BuildModOnlineMsgLpbk(
+    const std::string& strModName,
+    bool bOnline, DMsgPtr& pMsg )
+{
+    gint32 ret = 0;
+    do{
+        ret = pMsg.NewObj(
+            ( EnumClsid )DBUS_MESSAGE_TYPE_SIGNAL );
+
+        if( ERROR( ret ) )
+        {
+            ret = 0;
+            break;
+        }
+
+        MatchPtr pMatch;
+        pMatch.NewObj(
+            clsid( CDBusSysMatch ) );
+
+        CCfgOpenerObj matchCfg(
+            ( CObjBase*) pMatch );
+
+        string strObjPath;
+
+        matchCfg.GetStrProp(
+            propObjPath, strObjPath );
+
+        pMsg.SetPath( strObjPath );
+
+        string strIfName;
+        matchCfg.GetStrProp(
+            propIfName, strIfName );
+
+        pMsg.SetInterface( strIfName );
+        pMsg.SetMember( "NameOwnerChanged" );
+        
+        CCfgOpenerObj oPortCfg( this );
+
+        string strUniqName;
+        ret = oPortCfg.GetStrProp(
+            propSrcUniqName, strUniqName );
+
+        if( ERROR( ret ) )
+            break;
+
+        string strSender;
+        ret = oPortCfg.GetStrProp(
+            propSrcDBusName, strSender );
+
+        if( ERROR( ret ) )
+            strSender = strUniqName;
+
+        pMsg.SetSender( strSender );
+        pMsg.SetDestination( strUniqName );
+        pMsg.SetSerial( 10 );
+
+        string strNewOwner = "";
+
+        const char* pszModName = strModName.c_str();
+        const char* pszOldOwner = strUniqName.c_str();
+        const char* pszNewOwner = ""; 
+
+        if( bOnline )
+        {
+            pszOldOwner = "";
+            pszNewOwner = strUniqName.c_str();
+        }
+
+        if( !dbus_message_append_args( pMsg,
+            DBUS_TYPE_STRING, &pszModName,
+            DBUS_TYPE_STRING, &pszOldOwner,
+            DBUS_TYPE_STRING, &pszNewOwner,
+            DBUS_TYPE_INVALID ) )
+        {
+            ret = -ENOMEM;
+            break;
+        }
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+        pMsg.Clear();
+
+    return ret;
+}
+
+gint32 CDBusBusPort::ReleaseBusName(
+    const std::string& strName )
+{
+    gint32 ret = 0;
+
+    do{
+        CDBusError dbusError;
+        ret = dbus_bus_release_name(
+            m_pDBusConn,
+            strName.c_str(),
+            dbusError );
+
+        if( ret == DBUS_RELEASE_NAME_REPLY_RELEASED )
+        {
+            ret = 0;
+        }
+        else
+        {
+            ret = ERROR_FAIL;
+            break;
+        }
+        RemoveBusNameLpbk( strName );
+
+        DMsgPtr pMsg;
+
+        ret = BuildModOnlineMsgLpbk(
+            strName, false, pMsg );
+        if( ERROR( ret ) )
+            break;
+
+        guint32 dwSerial = 0;
+        ret = FilterLpbkMsg( pMsg, &dwSerial );
+        if( ret == ERROR_NOT_HANDLED )
+            ret = 0;
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CDBusBusPort::AddRules(
+    const std::string& strRules )
+{
+    gint32 ret = 0;
+    do{
+        CDBusError dbusError;
+        dbus_bus_add_match(
+            m_pDBusConn,
+            strRules.c_str(),
+            dbusError );
+
+        if( dbusError.GetName() != nullptr )
+            ret = dbusError.Errno();
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CDBusBusPort::RemoveRules(
+    const std::string& strRules )
+{
+    gint32 ret = 0;
+
+    do{
+        CDBusError dbusError;
+        dbus_bus_remove_match( 
+            m_pDBusConn,
+            strRules.c_str(),
+            dbusError );
+
+        if( dbusError.GetName() != nullptr )
+            ret = dbusError.Errno();
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CDBusBusPort::IsDBusSvrOnline(
+    const std::string& strDest )
+{
+    gint32 ret = 0;
+    do{
+        CDBusError dbusError;
+        if( !dbus_bus_name_has_owner(
+            m_pDBusConn,
+            strDest.c_str(),
+            dbusError ) )
+        {
+            // detect if the server is online
+            // or not
+            if( dbusError.GetName() == nullptr )
+            {
+                ret = ENOTCONN;
+            }
+            else
+            {
+                ret = dbusError.Errno();
+            }
+            break;
+        }
+
+    }while( 0 );
 
     return ret;
 }

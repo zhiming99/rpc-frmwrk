@@ -82,7 +82,7 @@ namespace std
                 if( strVal1.empty() || strVal2.empty() )
                     return false;
 
-                if( strVal1 == strVal2 )
+                if( strVal1 < strVal2 )
                     return true;
 
                 return false;
@@ -127,19 +127,16 @@ class CMessageMatch : public IMessageMatch
     };
 
     CMessageMatch() : m_pCfg( true )
-    {;}
+    {
+        SetClassId( clsid( CMessageMatch ) );
+    }
 
     CMessageMatch( const IConfigDb* pCfg ) :
-        m_pCfg( true )
+        CMessageMatch()
     {
         gint32 ret = 0;
 
-        if( pCfg == nullptr )
-            return;
-
         do{
-            SetClassId( clsid( CMessageMatch ) );
-
             if( pCfg == nullptr )
             {
                 // maybe user want to setup the
@@ -360,7 +357,7 @@ class CMessageMatch : public IMessageMatch
         if( strObjPath == strMyObjPath )
             return true;
 
-        return true;
+        return false;
     }
 
     bool IsMyDest(
@@ -374,6 +371,8 @@ class CMessageMatch : public IMessageMatch
                 strMyDest.c_str(),
                 strDest.c_str(),
                 strDest.size() );
+            if( ret != 0 )
+                return false;
         }
         else
         {
@@ -486,35 +485,35 @@ class CMessageMatch : public IMessageMatch
             strMatch = strRule;
 
         CCfgOpenerObj oCfg( this );
-        if( m_pCfg->exist( propIfName ) )
+        if( oCfg.exist( propIfName ) )
         {
             ret = oCfg.GetStrProp( propIfName, strRule );
             if( SUCCEEDED( ret ) && !strRule.empty() )
             {
-                strMatch += std::string( ",interface=\"" )
-                    + strRule + std::string( "\"" );
+                strMatch += std::string( ",interface='" )
+                    + strRule + std::string( "'" );
             }
         }
 
-        if( m_pCfg->exist( propObjPath ) )
+        if( oCfg.exist( propObjPath ) )
         {
             ret = oCfg.GetStrProp( propObjPath, strRule );
 
             if( SUCCEEDED( ret ) && !strRule.empty() )
             {
-                strMatch += std::string( ",path=\"" )
-                    + strRule + std::string( "\"" );
+                strMatch += std::string( ",path='" )
+                    + strRule + std::string( "'" );
             }
         }
 
-        if( m_pCfg->exist( propMethodName ) )
+        if( oCfg.exist( propMethodName ) )
         {
             ret = oCfg.GetStrProp( propMethodName, strRule );
 
             if( SUCCEEDED( ret ) && !strRule.empty() )
             {
-                strMatch += std::string( ",member=" )
-                    + strRule + std::string( "\"" );
+                strMatch += std::string( ",member='" )
+                    + strRule + std::string( "'" );
             }
         }
 
@@ -539,8 +538,78 @@ class CMessageMatch : public IMessageMatch
         return strAll;
     }
 
+    virtual gint32 EnumProperties(
+        std::vector< gint32 >& vecProps ) const 
+    {
+        gint32 ret =
+            super::EnumProperties( vecProps );
+
+        if( ERROR( ret ) )
+            return ret;
+
+        vecProps.push_back( propObjPath );
+        vecProps.push_back( propIfName );
+        vecProps.push_back( propMatchType );
+
+        ret = m_pCfg->EnumProperties( vecProps );
+
+        if( ERROR( ret ) )
+            return ret;
+
+        return 0;
+    }
+
+    gint32 GetPropertyType(
+        gint32 iProp, gint32& iType ) const
+    {
+
+        gint32 ret = 0;
+        switch( iProp )
+        {
+        case propObjPath:
+        case propIfName:
+            {
+                iType = typeString;
+                break;
+            }
+        case propMatchType:
+            {
+                iType = typeUInt32;
+                break;
+            }
+        default:
+            {
+                ret = m_pCfg->GetPropertyType(
+                    iProp, iType );
+                break;
+            }
+        }
+        return ret;
+    }
+
+    bool exist( gint32 iProp ) const
+    {
+        gint32 ret = 0;
+        switch( iProp )
+        {
+        case propObjPath:
+        case propIfName:
+        case propMatchType:
+            {
+                ret = true;
+                break;
+            }
+        default:
+            {
+                ret = m_pCfg->exist( iProp );
+                break;
+            }
+        }
+        return ret;
+    }
+
     gint32 GetProperty(
-        gint32 iProp, CBuffer& oBuf )
+        gint32 iProp, CBuffer& oBuf ) const
     {
         gint32 ret = 0;
         switch( iProp )
@@ -588,7 +657,8 @@ class CMessageMatch : public IMessageMatch
             }
         case propMatchType:
             {
-                SetType( ( EnumMatchType& )oBuf );
+                guint32 dwType = oBuf;
+                SetType( ( EnumMatchType )dwType );
                 break;
             }
         default:
@@ -718,6 +788,12 @@ class CMessageMatch : public IMessageMatch
 
         return ret;
     }
+
+    const CfgPtr& GetCfg() const
+    { return m_pCfg; }
+
+    CfgPtr& GetCfg()
+    { return m_pCfg; }
 };
 
 class CProxyMsgMatch : public CMessageMatch
@@ -867,7 +943,7 @@ class CDBusDisconnMatch : public CMessageMatch
     }
 
     virtual gint32 IsMyMsgIncoming(
-        DBusMessage* pMessage )
+        DBusMessage* pMessage ) const
     {
         DMsgPtr pMsg( pMessage );
 
@@ -937,6 +1013,13 @@ class CDBusSysMatch : public CMessageMatch
             if( ERROR( ret ) )
                 break;
 
+            ret = matchCfg.SetStrProp(
+                propDestDBusName, 
+                DBUS_SERVICE_DBUS );
+
+            if( ERROR( ret ) )
+                break;
+
         }while( 0 );
 
         if( ERROR( ret ) )
@@ -951,11 +1034,18 @@ class CDBusSysMatch : public CMessageMatch
 
 class CDBusLoopbackMatch : public CMessageMatch
 {
-    gint32 Filter1(
-        DBusMessage* pDBusMsg ) const;
+    gint32 FilterMsgS2P(
+        DBusMessage* pDBusMsg, bool bIncoming ) const;
 
-    gint32 Filter2(
-        DBusMessage* pDBusMsg ) const;
+    gint32 FilterMsgP2S(
+        DBusMessage* pDBusMsg, bool bIncoming ) const;
+
+    gint32 IsRegBusName(
+        const std::string& strBusName ) const;
+
+    gint32 AddRemoveBusName(
+        const std::string& strName, bool bRemove );
+
     public:
     typedef CMessageMatch super;
     CDBusLoopbackMatch ( const IConfigDb* pCfg );
@@ -965,6 +1055,12 @@ class CDBusLoopbackMatch : public CMessageMatch
 
     virtual gint32 IsMyMsgOutgoing(
         DBusMessage* pDBusMsg ) const;
+
+    gint32 AddBusName(
+        const std::string& strName );
+
+    gint32 RemoveBusName(
+        const std::string& strName );
 };
 
 

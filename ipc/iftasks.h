@@ -58,6 +58,7 @@ class CIfRetryTask
     //
     protected:
     sem_t               m_semWait;
+    CTasklet*           m_pParentTask;
 
     // although we provided the task scope lock here,
     // no locking is performed in this class. If you
@@ -109,6 +110,21 @@ class CIfRetryTask
         guint32 dwParam1,
         guint32 dwParam2,
         guint32* pData );
+
+    gint32 GetProperty( gint32 iProp,
+            CBuffer& oBuf ) const;
+
+    gint32 SetProperty( gint32 iProp,
+        const CBuffer& oBuf );
+
+    gint32 RemoveProperty( gint32 iProp );
+
+    gint32 EnumProperties(
+        std::vector< gint32 >& vecProps ) const;
+
+    gint32 GetPropertyType(
+        gint32 iProp, gint32& iType ) const;
+
 };
 
 class CIfParallelTask
@@ -147,7 +163,7 @@ class CIfParallelTask
     { return -ENOTSUP; }
 
     gint32 GetProperty( gint32 iProp,
-            CBuffer& oBuf )
+            CBuffer& oBuf ) const
     {
         CStdRTMutex oTaskLock( GetLock() );
         return super::GetProperty( iProp, oBuf );
@@ -285,7 +301,8 @@ class CIfCleanupTask
 typedef enum 
 {
     logicAND,
-    logicOR
+    logicOR,
+    logicNONE
 
 } EnumLogicOp;
 
@@ -295,13 +312,15 @@ class CIfTaskGroup
     EnumLogicOp m_iTaskRel;
 
     protected:
-    void PopTask()
-    {
-        CStdRTMutex oLock( GetLock() );
-        m_queTasks.pop_front();
-    }
+    void PopTask();
+
+    gint32 CancelRemainingTasks();
+
+    gint32 WaitingToCancel(
+        TaskletPtr& pTask );
 
     std::deque< TaskletPtr > m_queTasks;
+    std::vector< gint32 > m_vecRetVals;
 
     public:
     typedef CIfRetryTask super;
@@ -315,16 +334,21 @@ class CIfTaskGroup
 
     virtual gint32 RunTask();
     virtual gint32 OnChildComplete(
-        gint32 ret, guint32 dwContext );
+        gint32 ret, CTasklet* pChild );
 
     bool exist( TaskletPtr& pTask );
+
+    bool IsRunning() const;
+    void SetRunning( bool bRun );
+
+    bool IsCanceling() const;
+    void SetCanceling( bool bCancel );
 
     virtual gint32 AppendTask( TaskletPtr& pTask );
     gint32 AppendAndRun( TaskletPtr& pTask );
 
     virtual guint32 GetTaskCount() 
     {
-        CStdRTMutex oLock( GetLock() );
         return m_queTasks.size();
     }
 
@@ -334,10 +358,10 @@ class CIfTaskGroup
         m_queTasks.clear();
         return 0;
     }
-    gint32 FindTask( guint64 iTaskId,
+    virtual gint32 FindTask( guint64 iTaskId,
         TaskletPtr& pTask );
 
-    gint32 FindTaskByRmtId(
+    virtual gint32 FindTaskByRmtId(
         guint64 iTaskId, TaskletPtr& pRet );
 
     // the tasks have two types of relation,
@@ -351,6 +375,7 @@ class CIfTaskGroup
     virtual gint32 Process( guint32 dwContext );
     virtual gint32 OnCancel( guint32 dwContext );
     virtual gint32 RemoveTask( TaskletPtr& pTask );
+
 };
 
 typedef CAutoPtr< Clsid_Invalid, CIfTaskGroup > TaskGrpPtr;
@@ -369,29 +394,25 @@ class CIfRootTaskGroup
     //  ( RunTask, OnCancel, OnChildComplete )
     // 
     virtual gint32 OnComplete( gint32 iRet );
-    virtual gint32 OnCancel( guint32 dwContext );
     gint32 GetHeadTask( TaskletPtr& pHead );
     gint32 GetTailTask( TaskletPtr& pTail );
 };
 
 
 class CIfDummyTask
-    : public CIfParallelTask
+    : public CTasklet
 {
     public:
-    typedef CIfParallelTask super;
-    CIfDummyTask( const IConfigDb* pCfg )
-       : super( pCfg ) 
-    {
-        SetClassId( clsid( CIfDummyTask ) );
-    }
-    virtual gint32 RunTask()
-    {
-        std::string strMsg =
-            DebugMsg( 0, "CIfDummyTask is called" );
-        printf( strMsg.c_str() );
-        return 0;
-    }
+    typedef CTasklet super;
+
+    CIfDummyTask( const IConfigDb* pCfg );
+    virtual gint32 RunTask();
+    gint32 operator()( guint32 dwContext );
+    virtual gint32 OnEvent(
+        EnumEventId iEvent,
+        guint32 dwParam1,
+        guint32 dwParam2,
+        guint32* pData );
 };
 
 class CIfServiceNextMsgTask
@@ -422,20 +443,25 @@ class CIfParallelTaskGrp
        : super( pCfg ) 
     {
         SetClassId( clsid( CIfParallelTaskGrp ) );
-        SetRelation( logicOR );
+        SetRelation( logicNONE );
     }
 
     virtual gint32 RunTask();
     virtual gint32 OnChildComplete(
-        gint32 ret, guint32 dwContext );
+        gint32 ret, CTasklet* pChild );
 
     gint32 AddAndRun( TaskletPtr& pTask );
     bool IsRunning();
     gint32 AppendTask( TaskletPtr& pTask );
 
+    gint32 FindTask( guint64 iTaskId,
+        TaskletPtr& pTask );
+
+    gint32 FindTaskByRmtId(
+        guint64 iTaskId, TaskletPtr& pRet );
+
     virtual guint32 GetTaskCount() 
     {
-        CStdRTMutex oLock( GetLock() );
         return m_setTasks.size() +
             m_setPendingTasks.size();
     }
@@ -450,23 +476,10 @@ class CIfParallelTaskGrp
 
     guint32 GetPendingCount()
     {
-        CStdRTMutex oLock( GetLock() );
         return m_setPendingTasks.size();
     }
 
-    virtual gint32 RemoveTask( TaskletPtr& pTask )
-    {
-        gint32 ret = 0;
-        CStdRTMutex oLock( GetLock() );
-        ret = m_setTasks.erase( pTask );
-        if( ret == 0 )
-            m_setPendingTasks.erase( pTask );
-
-        if( ret == 0 )
-            return -ENOENT;
-        return 0;
-    }
-    
+    virtual gint32 RemoveTask( TaskletPtr& pTask );
     gint32 OnCancel( guint32 dwContext );
 };
 
@@ -479,12 +492,13 @@ class CIfStartRecvMsgTask
     CIfStartRecvMsgTask( const IConfigDb* pCfg );
     virtual gint32 OnIrpComplete( PIRP pIrp );
     virtual gint32 RunTask();
+    virtual gint32 OnCancel( guint32 dwContext );
 
     template< typename T1, 
         typename T=typename std::enable_if<
             std::is_same<T1, CfgPtr>::value ||
             std::is_same<T1, DMsgPtr>::value, T1 >::type >
-    gint32 HandleIncomingMsg( ObjPtr& ifPtr,  T& pMsg );
+    gint32 HandleIncomingMsg( ObjPtr& ifPtr,  T1& pMsg );
 };
 
 
@@ -504,7 +518,7 @@ class CIfIoReqTask
     gint32 SubmitIoRequest();
 
     virtual gint32 RunTask();
-    virtual gint32 WaitForComplete();
+    // virtual gint32 WaitForComplete();
 
     virtual gint32 OnKeepAlive(
         guint32 dwContext );
@@ -540,7 +554,7 @@ class CIfInvokeMethodTask
     virtual gint32 RunTask();
     virtual gint32 OnCancel( guint32 dwContext );
     virtual gint32 OnTaskComplete( gint32 iRetVal );
-    gint32 operator()( guint32 dwContext );
+    // gint32 operator()( guint32 dwContext );
     virtual gint32 OnComplete( gint32 iRetVal );
 
     // helper methods for request options

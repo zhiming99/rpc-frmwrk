@@ -26,6 +26,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include "reqopen.h"
 
 using namespace std;
 
@@ -1360,7 +1361,8 @@ gint32 CTcpStreamPdo::OnEvent(
 }
 
 gint32 CTcpStreamPdo::AllocIrpCtxExt(
-    IrpCtxPtr& pIrpCtx ) const
+    IrpCtxPtr& pIrpCtx,
+    void* pContext ) const
 {
     gint32 ret = 0;
     switch( pIrpCtx->GetMajorCmd() )

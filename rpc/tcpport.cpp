@@ -25,6 +25,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include "reqopen.h"
 
 //#include <linux/compiler.h>
 
@@ -2254,6 +2255,11 @@ gint32 CRpcStreamSock::GetCtrlStmFromIrp(
 }
 
 CCarrierPacket::CCarrierPacket()
+    : super()
+{
+}
+
+CCarrierPacket::~CCarrierPacket()
 {
 }
 

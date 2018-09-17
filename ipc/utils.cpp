@@ -30,28 +30,46 @@ std::atomic<gint32> CTimerService::TIMER_ENTRY::m_atmTimerId( 1 );
 
 CUtilities::CUtilities( const IConfigDb* pCfg ) :
     m_pWorkerThread( nullptr ),
+    m_pWorkerThreadLongWait( nullptr ),
     m_bExit( false )
 {
     gint32 ret = 0;
     SetClassId( Clsid_CUtilities );
-    sem_init( &m_semWaitingLock, 0, 0 );
-    sem_init( &m_semWaitingLockLongWait, 0, 0 );
 
-    CCfgOpener a( pCfg );
-    ret = a.GetPointer( propIoMgr, m_pIoMgr );
+    ret = Sem_Init( &m_semWaitingLock, 0, 0 );
     if( ERROR( ret ) )
-        throw std::invalid_argument(
-            "the pointer to IoManager does not exist" );
+    {
+        std::string strMsg = DebugMsg( errno,
+            "sem init failed" );
+        throw std::runtime_error( strMsg );
+    }
 
-    CCfgOpener b;
-    b.SetPointer( propIoMgr, GetIoMgr() );
-    b.SetObjPtr( propParentPtr, this );
+    ret = Sem_Init( &m_semWaitingLockLongWait, 0, 0 );
+    if( ERROR( ret ) )
+    {
+        std::string strMsg = DebugMsg( errno,
+            "sem init failed" );
+        throw std::runtime_error( strMsg );
+    }
 
-    m_pTimerSvc.NewObj(
-        clsid( CTimerService ), b.GetCfg() );
+    do{
+        CCfgOpener a( pCfg );
+        ret = a.GetPointer( propIoMgr, m_pIoMgr );
+        if( ERROR( ret ) )
+            throw std::invalid_argument(
+                "the pointer to IoManager does not exist" );
 
-    m_pWiMgr.NewObj(
-        clsid( CWorkitemManager ), b.GetCfg() );
+        CCfgOpener b;
+        b.SetPointer( propIoMgr, GetIoMgr() );
+        b.SetObjPtr( propParentPtr, this );
+
+        m_pTimerSvc.NewObj(
+            clsid( CTimerService ), b.GetCfg() );
+
+        m_pWiMgr.NewObj(
+            clsid( CWorkitemManager ), b.GetCfg() );
+
+    }while( 0 );
 }
 
 CUtilities::~CUtilities()
@@ -64,41 +82,40 @@ gint32 CUtilities::ThreadProc( gint32 iThreadIdx )
 {
 
     gint32 ret = 0;
-    timespec sInterval;
-    sInterval.tv_sec = 1;
-    sInterval.tv_nsec = 0;
 
     sem_t* pSem = nullptr;
+
+    if( iThreadIdx > 1 )
+        return -EINVAL;
+
     if( iThreadIdx == 0 )
         pSem = &m_semWaitingLock;
 
     else if( iThreadIdx == 1 )
         pSem = &m_semWaitingLockLongWait;
 
-    if( pSem == nullptr )
-        return -EFAULT;
+    string strName = "Utilities-";
+    strName += std::to_string( iThreadIdx );
+    SetThreadName( strName );
 
     while( !m_bExit )
     {
-        ret = sem_timedwait( pSem, &sInterval );
-        if( ret == -1 )
-        {
-            if( errno == EINTR || errno == ETIMEDOUT )
-            {
-                continue;
-            }
+        ret = Sem_TimedwaitSec( pSem,
+            THREAD_WAKEUP_INTERVAL );
+
+        if( ret == -EAGAIN )
+            continue;
+
+        if( ERROR( ret ) )
             break;
+
+        if( iThreadIdx == 0 )
+        {
+            // timers only processed on thread 0
+            m_pTimerSvc->ProcessTimers();
         }
 
-        if( ret == 0 )
-        {
-            if( iThreadIdx == 0 )
-            {
-                // timers only processed on thread 0
-                m_pTimerSvc->ProcessTimers();
-            }
-            m_pWiMgr->ProcessWorkItems( iThreadIdx );
-        }
+        m_pWiMgr->ProcessWorkItems( iThreadIdx );
     }
     return ret;
 }
@@ -129,10 +146,12 @@ gint32 CUtilities::Stop()
     if( m_pWorkerThread )
     {
         m_bExit = true;
+        Wakeup( 0 );
         m_pWorkerThread->join();
         delete m_pWorkerThread;
         m_pWorkerThread = NULL;
 
+        Wakeup( 1 );
         m_pWorkerThreadLongWait->join();
         delete m_pWorkerThreadLongWait;
         m_pWorkerThreadLongWait = NULL;
@@ -143,9 +162,11 @@ gint32 CUtilities::Stop()
 void CUtilities::Wakeup( gint32 iThreadIdx )
 {
     if( iThreadIdx == 0 )
-        sem_post( &m_semWaitingLock );
+        Sem_Post( &m_semWaitingLock );
     else
-        sem_post( &m_semWaitingLockLongWait );
+    {
+        Sem_Post( &m_semWaitingLockLongWait );
+    }
 
 }
 
@@ -165,13 +186,13 @@ gint32 CWorkitemManager::ScheduleWorkitem(
     guint32 dwFlags,
     IEventSink* pCallback,
     guint32 dwContext,
-    bool bLongWait = false )
+    bool bLongWait )
 {
-    CStdMutex oMutex( m_oQueLock );
-    WORK_ITEM wi;
-
     if( pCallback == nullptr )
         return -EINVAL;
+
+    CStdMutex oMutex( m_oQueLock );
+    WORK_ITEM wi;
 
     wi.m_dwFlags = dwFlags;
     wi.m_pEventSink = EventPtr( pCallback );
@@ -438,34 +459,21 @@ gint32 CTimerService::RemoveTimer(
     else
     {
         vector<TIMER_ENTRY>::iterator itr =
-                m_vecTimers.end() - 1;
+                m_vecTimers.begin();
 
-        while( itr != m_vecTimers.begin() )
+        while( itr != m_vecTimers.end() )
         {
-            TIMER_ENTRY& te = *itr;
-            --itr;
-
-            if( te.m_iTimerId == iTimerId )
-            {
-                m_vecTimers.erase( itr + 1 );
-                bFound = true;
-                break;
-            }
-        }
-
-        if( !bFound && itr == m_vecTimers.begin() )
-        {
-            TIMER_ENTRY& te = *itr;
-            if( te.m_iTimerId == iTimerId )
+            if( itr->m_iTimerId == iTimerId )
             {
                 m_vecTimers.erase( itr );
                 bFound = true;
+                break;
             }
-            else
-            {
-                ret = -ENOENT;
-            }
+            itr++;
         }
+
+        if( !bFound )
+            ret = -ENOENT;
     }
 
     if( m_vecPendingTimeouts.size() )
@@ -495,36 +503,35 @@ gint32 CTimerService::TickTimers()
     do{
         CStdMutex oMutex( m_oMapLock );
         vector<TIMER_ENTRY>::iterator itr =
-                m_vecTimers.end();
+                m_vecTimers.begin();
 
         // performance call
         guint64 qwNow = g_get_monotonic_time();
-        guint32 dwInterval = ( guint32 )( qwNow - m_qwTimeStamp );
-        m_qwTimeStamp = qwNow;
 
-        while( itr != m_vecTimers.begin() )
+        guint32 dwInterval = ( guint32 )
+            ( ( qwNow - m_qwTimeStamp ) / 1000 );
+
+        m_qwTimeStamp = qwNow;
+        vector< gint32 > vecRemove;
+
+        while( itr != m_vecTimers.end() )
         {
             itr->m_qwTicks += dwInterval;
 
             if( itr->m_qwTicks
                     >= itr->m_qwIntervalMs )
             {
-                vector<TIMER_ENTRY>::iterator itrPrev;
-                itrPrev = itr - 1;
                 m_vecPendingTimeouts.push_back( *itr );
-                m_vecTimers.erase( itr );
-                itr = itrPrev;
-                continue;
+                vecRemove.push_back(
+                    itr - m_vecTimers.begin() );
             }
-            --itr;
+            ++itr;
         }
-        if( itr == m_vecTimers.begin())
+        
+        for( gint32 i = vecRemove.size() - 1; i >= 0; --i )
         {
-            if( itr->m_qwTicks >= itr->m_qwIntervalMs )
-            {
-                m_vecPendingTimeouts.push_back( *itr );
-                m_vecTimers.erase( itr );
-            }
+            m_vecTimers.erase(
+                m_vecTimers.begin() + vecRemove[ i ] );
         }
 
         if( m_vecPendingTimeouts.size() )
@@ -554,20 +561,17 @@ gint32 CTimerService::ProcessTimers()
             m_vecPendingTimeouts.clear();
         }
 
-        vector<TIMER_ENTRY>::iterator itr =
-                tempPending.begin();
-
-        while( itr != tempPending.end() )
+        while( !tempPending.empty() )
         {
-            TIMER_ENTRY& te = *itr;
-            if( !te.m_pCallback.IsEmpty() )
+            TIMER_ENTRY* pte = &tempPending.back();
+            if( !pte->m_pCallback.IsEmpty() )
             {
-                te.m_pCallback->OnEvent(
+                pte->m_pCallback->OnEvent(
                     eventTimeout,
-                    te.m_dwParam,
+                    pte->m_dwParam,
                     ( guint32 )GetIoMgr() );
             }
-            ++itr;
+            tempPending.pop_back();
         }
         tempPending.clear();
 
@@ -579,7 +583,7 @@ gint32 CTimerService::ProcessTimers()
 gint32 CTimerService::Start()
 {
     // setup the connection to the glib source
-    m_pTimeSrc = g_timeout_source_new( 1 );
+    m_pTimeSrc = g_timeout_source_new( 500 );
     if( m_pTimeSrc == nullptr )
         return -EFAULT;
 

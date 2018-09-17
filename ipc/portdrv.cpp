@@ -71,6 +71,7 @@ gint32 CPortDriver::EnumPorts(
     while( itr != m_mapIdToPort.end() )
     {
         vecPorts.push_back( itr->second );
+        ++itr;
     }
     return 0;
 }

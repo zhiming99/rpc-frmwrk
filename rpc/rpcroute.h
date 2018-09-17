@@ -416,6 +416,11 @@ class CRpcReqForwarder :
     virtual gint32 OnKeepAliveRelay(
         IEventSink* pInvokeTask );
 
+    gint32 EnableDisableEvent(
+        IMessageMatch* pMatch,
+        IEventSink* pCallback,
+        bool bEnable );
+
     public:
 
     static CfgPtr InitCfg( const IConfigDb* pCfg );
@@ -460,7 +465,8 @@ class CRpcReqForwarder :
     // active disconnecting
     virtual gint32 CloseRemotePort(
         const IConfigDb* pCfg,
-        IEventSink* pCallback );
+        IEventSink* pCallback )
+    { return -ENOTSUP; }
 
     // mandatory properties within the pMatch
     //
@@ -530,12 +536,6 @@ class CRpcReqForwarderProxy :
     CRpcReqForwarderProxy( const IConfigDb* pCfg );
     ~CRpcReqForwarderProxy();
 
-
-    virtual gint32 OnEvent( EnumEventId iEvent,
-        guint32 dwParam1,
-        guint32 dwParam2,
-        guint32* pData );
-
     virtual gint32 SetupReqIrp( IRP* pIrp,
         IConfigDb* pReqCall,
         IEventSink* pCallback );
@@ -577,15 +577,11 @@ class CRpcReqForwarderProxy :
         IEventSink* pCallback );
 
     gint32 FillRespData(
-        IRP* pIrp, IConfigDb* pResp );
+        IRP* pIrp, CfgPtr& pResp );
 
     gint32 DoInvoke(
         DBusMessage* pEvtMsg,
         IEventSink* pCallback );
-
-    virtual gint32 OnKeepAlive(
-        IEventSink* pInvokeTask,
-        EnumKAPhase bOrigin );
 };
 
 struct CRpcTcpBridgeShared
@@ -798,7 +794,7 @@ class CRpcTcpBridgeProxy :
         bool bEnable );
 
     gint32 FillRespDataFwrdReq(
-        IRP* pIrp, IConfigDb* pResp );
+        IRP* pIrp, CfgPtr& pResp );
 
     gint32 BuildBufForIrpFwrdReq(
         BufPtr& pBuf,
@@ -867,7 +863,7 @@ class CRpcTcpBridgeProxy :
         IEventSink* pCallback );
 
     virtual gint32 FillRespData(
-        IRP* pIrp, IConfigDb* pResp );
+        IRP* pIrp, CfgPtr& pResp );
 
     virtual gint32 BuildBufForIrp(
         BufPtr& pBuf,

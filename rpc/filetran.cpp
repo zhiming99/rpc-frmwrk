@@ -80,6 +80,7 @@ gint32 CFileTransferProxy::UploadFile_Proxy(
 }
 
 gint32 CFileTransferProxy::DownloadFile_Callback(
+    IEventSink* pTask,
     gint32 iRet,
     gint32 fd,
     guint32 dwOffset,

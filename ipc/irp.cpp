@@ -100,14 +100,17 @@ guint32 IRP_CONTEXT::GetCtrlCode() const
 
 void IRP_CONTEXT::SetMajorCmd( guint32 dwMajorCmd )
 {
+    m_dwMajorCmd &= ( ~IRP_MAJOR_MASK );
     m_dwMajorCmd |= ( dwMajorCmd & IRP_MAJOR_MASK );
 }
 void IRP_CONTEXT::SetMinorCmd( guint32 dwMinorCmd )
 {
+    m_dwMinorCmd &= ( ~IRP_MINOR_MASK );
     m_dwMinorCmd |= ( dwMinorCmd & IRP_MINOR_MASK );
 }
 void IRP_CONTEXT::SetCtrlCode( guint32 dwCtrlCode )
 {
+    m_dwCtrlCmd &= ( ~IRP_CTRLCODE_MASK );
     m_dwCtrlCmd |= ( dwCtrlCode & IRP_CTRLCODE_MASK );
 }
 
@@ -258,10 +261,12 @@ IoRequestPacket::IoRequestPacket() :
     m_dwContext( 0 ),
     m_IrpThrdPtr( nullptr ),
     m_iTimerId( -1 ),
-    m_pMasterIrp( nullptr )
+    m_pMasterIrp( nullptr ),
+    m_wMinSlaves( 0 )
 
 {
-    sem_init( &m_semWait, 0, 1 );
+    SetClassId( clsid( IoRequestPacket ) );
+    Sem_Init( &m_semWait, 0, 0 );
 }
 
 bool IoRequestPacket::SetState(
@@ -274,12 +279,27 @@ bool IoRequestPacket::SetState(
 }
 IoRequestPacket::~IoRequestPacket()
 {
+    while( m_vecCtxStack.size() )
+        PopCtxStack();
     RemoveTimer();
     sem_destroy( &m_semWait );
 }
 
 void IoRequestPacket::PopCtxStack()
 {
+    if( GetStackSize() == 0 )
+        return;
+
+    IPort* pPort = GetTopPort();
+    IrpCtxPtr& pCtx = GetTopStack();
+
+    if( pPort != nullptr )
+    {
+        // free the irp extension
+        pPort->ReleaseIrpCtxExt(
+            pCtx, nullptr );
+    }
+
     m_vecCtxStack.pop_back(); 
 }
 
@@ -441,10 +461,22 @@ gint32 IoRequestPacket::WaitForComplete()
     return ret;
 }
 
+void IoRequestPacket::SetMinSlaves(
+    guint16 wCount )
+{
+    m_wMinSlaves = wCount;
+}
+
 void IoRequestPacket::AddSlaveIrp(
     IRP* pSlave )
 {
+    if( m_mapSlaveIrps.find( pSlave ) !=
+        m_mapSlaveIrps.end() )
+        return;
+
     m_mapSlaveIrps[ pSlave ] = STATUS_PENDING;
+    if( m_wMinSlaves > 0 )
+        --m_wMinSlaves;
 }
 
 bool IoRequestPacket::FindSlaveIrp(
@@ -478,7 +510,7 @@ IRP* IoRequestPacket::GetMasterIrp() const
 
 guint32 IoRequestPacket::GetSlaveCount() const
 {
-    return m_mapSlaveIrps.size();
+    return m_mapSlaveIrps.size() + m_wMinSlaves;
 }
 
 void IoRequestPacket::SetTimer(
@@ -624,7 +656,7 @@ void IoRequestPacket::RemoveCallback()
 
 bool IoRequestPacket::CanComplete()
 {
-    return ( m_dwTid != CIoManager::GetTid()
+    return ( m_dwTid != GetTid()
         || IsPending() );
 }
 
@@ -640,7 +672,7 @@ guint32 IoRequestPacket::MinorCmd() const
     if( GetStackSize() == 0 )
         return IRP_MN_INVALID;
 
-    return GetCurCtx()->GetMajorCmd();
+    return GetCurCtx()->GetMinorCmd();
 }
 guint32 IoRequestPacket::CtrlCode() const
 {

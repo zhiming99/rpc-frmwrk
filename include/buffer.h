@@ -28,6 +28,7 @@
 #include "defines.h"
 #include "autoptr.h"
 #include <dbus/dbus.h>
+#include "dmsgptr.h"
 
 using cchar = const char;
 
@@ -61,7 +62,17 @@ enum EnumTypeId
 
 template< class T >
 inline gint32 GetTypeId( T* pT )
-{ return 0; }
+{ return typeNone; }
+
+template<>
+inline gint32 GetTypeId( EnumEventId* pT )
+{ return typeUInt32; }
+
+inline gint32 GetTypeId( EnumClsid* pT )
+{ return typeUInt32; }
+
+inline gint32 GetTypeId( EnumPropId* pT )
+{ return typeUInt32; }
 
 template<>
 inline gint32 GetTypeId( bool* pT )
@@ -81,7 +92,7 @@ inline gint32 GetTypeId( guint32* pT )
 
 template<>
 inline gint32 GetTypeId( guint64* pT )
-{ return typeUInt32; }
+{ return typeUInt64; }
 
 template<>
 inline gint32 GetTypeId( float* pT )
@@ -189,6 +200,12 @@ class CBuffer : public CObjBase
         return ( size() == 0 || ptr() == nullptr );
     }
 
+    operator stdstr() const;
+    operator DMsgPtr*() const;
+    operator DMsgPtr&() const;
+    operator ObjPtr&() const;
+    operator ObjPtr*() const;
+
     template<typename T,
         typename T2= typename std::decay< T >::type,
         typename T3=typename std::enable_if<
@@ -198,17 +215,21 @@ class CBuffer : public CObjBase
             || std::is_same<T2, guint64>::value
             || std::is_same<T2, gint64>::value
             || std::is_same<T2, EnumEventId >::value
+            || std::is_same<T2, EnumClsid >::value
+            || std::is_same<T2, EnumPropId >::value
             || std::is_same<T2, double >::value
             || std::is_same<T2, float >::value
             || std::is_same<T2, int >::value
             || std::is_same<T2, unsigned int >::value
-            || std::is_same<T, guint8 >::value
-            || std::is_same<T, gint8 >::value,
+            || std::is_same<T2, bool >::value
+            || std::is_same<T2, guint8 >::value
+            || std::is_same<T2, gint8 >::value,
              T2 >::type,
         typename forbidden=typename std::enable_if< 
             !std::is_same<T2, const char* >::value
             && !std::is_same<T2, std::initializer_list<char> >::value
-            && !std::is_same<T2, std::allocator<char> >::value,
+            && !std::is_same<T2, std::allocator<char> >::value
+            && !std::is_base_of<IAutoPtr, T2 >::value,
             T2 >::type >
     operator T&() const 
     {
@@ -226,30 +247,25 @@ class CBuffer : public CObjBase
             "The type is not `mem' type" );
     }
 
-
-    // c++11 required
-    /*template<typename T,
-        typename T2=std::remove_cv<T>,
-        typename T3=typename std::enable_if<
-            !std::is_same<T2, stdstr>::value
-            && !std::is_same<T2, CObjBase>::value
-            && !std::is_same<T2, ObjPtr>::value
-            && !std::is_same<T2, DMsgPtr >::value, T2 >::type >
-    operator T&() const
+    template<typename T, 
+        typename T2 = typename std::enable_if<
+            std::is_base_of< IAutoPtr, T >::value, T >::type,
+        typename exclude_dmsg = class std::enable_if<
+            !std::is_same< DMsgPtr, T >::value &&
+            !std::is_same< ObjPtr, T >::value >::type,
+        typename T4=T >
+    operator T()
     {
         if( empty() )
         {
             throw std::invalid_argument(
-                "the object is empty" );
+                "The object is empty" );
         }
 
-        if( GetDataType() == DataTypeMem )
-        {
-            return *( reinterpret_cast< T* >( ptr() ) );
-        }
-        throw std::invalid_argument(
-            "The type is not `mem' type" );
-    }*/
+        ObjPtr* ppObj = ( ObjPtr* )ptr();
+        T oPtr( *ppObj );
+        return oPtr;
+    }
 
     template<typename T, 
         typename T3 = class std::enable_if<
@@ -280,6 +296,11 @@ class CBuffer : public CObjBase
             }
         }
         return nullptr;
+    }
+
+    inline operator CBuffer*()
+    {
+        return this;
     }
 
     template<typename T, 
@@ -321,15 +342,14 @@ class CBuffer : public CObjBase
         return nullptr;
     }
 
-    operator stdstr() const;
-    operator DMsgPtr*() const;
-    operator DMsgPtr&() const;
-    operator ObjPtr&() const;
-    operator ObjPtr*() const;
+    explicit operator char*() const;
+    explicit operator const char*() const;
 
-
-    template<typename T >
-    const CBuffer& operator=( const T& rhs )
+    template<typename T,
+        typename T2 = typename std::enable_if<
+            !std::is_base_of< IAutoPtr, T >::value &&
+            !std::is_base_of< CObjBase, T >::value, T >::type >
+    CBuffer& operator=( const T& rhs )
     {
         // for plain object only. If you want a
         // type-specific destructor to be called,
@@ -362,11 +382,13 @@ class CBuffer : public CObjBase
         return *this;
     }
 
-    template<typename T, EnumClsid N,
-        typename T2 = CAutoPtr< N, T >,
+    template<typename T, 
+        typename T2 = typename std::enable_if<
+            std::is_base_of< IAutoPtr, T >::value, T >::type,
         typename exclude_dmsg = class std::enable_if<
-            !std::is_same< DBusMessage, T >::value, T >::type >
-    CBuffer& operator=( T2& rhs )
+            !std::is_same< DMsgPtr, T >::value, T >::type,
+        typename T4=T >
+    CBuffer& operator=( const T& rhs )
     {
         ObjPtr pObj = rhs;
         *this = pObj;
@@ -375,10 +397,24 @@ class CBuffer : public CObjBase
 
     template< typename T,
         typename only_dmsg = typename std::enable_if<
-            std::is_same< T, DMsgPtr >::value, T >::type >
-    CBuffer& operator=( only_dmsg& rhs )
+            std::is_same< T, DMsgPtr >::value, T >::type,
+        typename pad1 = T,
+        typename pad2 = T,
+        typename pad3 = T >
+    CBuffer& operator=( const T& rhs )
     {
         *this = rhs;
+        return *this;
+    }
+
+    template<typename T, 
+        typename T2 = typename std::enable_if<
+            std::is_base_of< CObjBase, T >::value, T >::type,
+        typename T3=T2 >
+    CBuffer& operator=( const T& rhs )
+    {
+        ObjPtr pObj( ( const CObjBase* )&rhs );
+        *this = pObj;
         return *this;
     }
 
@@ -406,6 +442,11 @@ class CBuffer : public CObjBase
         *this = DMsgPtr( rhs );
         return rhs;
     }
+
+    // default copy assignment, we cannot replace it
+    // with template version copy assignment, let's
+    // override it.
+    CBuffer& operator=( const CBuffer& rhs );
 
     template< typename T,
         typename FundamentalObj = typename std::enable_if<
@@ -437,16 +478,21 @@ class CBuffer : public CObjBase
         // plain object only
         // NOTE: c++11 required
         gint32 ret = 0;
-        BufPtr bufPtr( true );
-        ret = rhs.Serialize( *bufPtr );
+        // BufPtr bufPtr( true );
+
+        CBuffer* pBuf = new CBuffer();
+        ret = rhs.Serialize( pBuf );
         if( SUCCEEDED( ret ) )
         {
             guint32 dwOldSize = size();
-            Resize( size() + bufPtr->size() );
+            Resize( size() + pBuf->size() );
 
             memcpy( ptr() + dwOldSize,
-                bufPtr->ptr(), bufPtr->size() );
+                pBuf->ptr(), pBuf->size() );
         }
+
+        if( pBuf )
+            delete pBuf;
 
         return ret;
     }
@@ -475,10 +521,157 @@ class CBuffer : public CObjBase
     }
 };
 
-template<> const CBuffer& CBuffer::operator=<stdstr>( const stdstr& rhs );
-template<> const CBuffer& CBuffer::operator=<CObjBase>( const CObjBase& rhs );
-template<> const CBuffer& CBuffer::operator=<CBuffer>( const CBuffer& rhs );
-template<> const CBuffer& CBuffer::operator=<ObjPtr>( const ObjPtr& rhs );
-template<> const CBuffer& CBuffer::operator=<DMsgPtr>( const DMsgPtr& rhs );
-template<> cchar* CBuffer::operator=<cchar>( cchar* rhs );
+template<> CBuffer& CBuffer::operator=<stdstr>( const stdstr& rhs );
+template<> CBuffer& CBuffer::operator=<CObjBase>( const CObjBase& rhs );
+// template<> CBuffer& CBuffer::operator=<CBuffer>( const CBuffer& rhs );
+template<> CBuffer& CBuffer::operator=<ObjPtr>( const ObjPtr& rhs );
+template<> CBuffer& CBuffer::operator=<DMsgPtr>( const DMsgPtr& rhs );
+template<> cchar* CBuffer::operator=<char>( cchar* rhs );
+
+template< class T,
+    class allowed = typename std::enable_if<
+    std::is_scalar< T >::value ||
+    std::is_same< stdstr, T >::value ||
+    std::is_base_of< IAutoPtr, T >::value,
+    T >::type >
+inline BufPtr GetDefault( T* pT )
+{
+    BufPtr pBuf( true );
+    pBuf->Resize( sizeof( T ) );
+    memset( pBuf->ptr(), 0, sizeof( T ) );
+    return pBuf;
+}
+
+template<>
+inline BufPtr GetDefault<EnumEventId>( EnumEventId* pT )
+{
+    BufPtr pBuf( true );
+    *pBuf = eventInvalid;
+    return pBuf;
+}
+
+template<>
+inline BufPtr GetDefault<EnumClsid>( EnumClsid* pT )
+{
+    BufPtr pBuf( true );
+    *pBuf = clsid( Invalid );
+    return pBuf;
+}
+
+template<>
+inline BufPtr GetDefault<EnumPropId>( EnumPropId* pT )
+{
+    BufPtr pBuf( true );
+    *pBuf = propInvalid;
+    return pBuf;
+}
+
+template<>
+inline BufPtr GetDefault<bool>( bool* pT )
+{
+    BufPtr pBuf( true );
+    *pBuf = false;
+    return pBuf;
+}
+
+template<>
+inline BufPtr GetDefault<char>( char* pT )
+{
+    BufPtr pBuf( true );
+    *pBuf = ( char )0;
+    return pBuf;
+}
+
+template<>
+inline BufPtr GetDefault<guint8>( guint8* pT )
+{
+    BufPtr pBuf( true );
+    *pBuf = ( guint8 )0;
+    return pBuf;
+}
+
+template<>
+inline BufPtr GetDefault<guint16>( guint16* pT )
+{
+    BufPtr pBuf( true );
+    *pBuf = ( guint16 )0;
+    return pBuf;
+}
+
+template<>
+inline BufPtr GetDefault<guint32>( guint32* pT )
+{
+    BufPtr pBuf( true );
+    *pBuf = ( guint32 )0;
+    return pBuf;
+}
+
+template<>
+inline BufPtr GetDefault<guint64>( guint64* pT )
+{
+    BufPtr pBuf( true );
+    *pBuf = ( guint64 )0;
+    return pBuf;
+}
+
+template<>
+inline BufPtr GetDefault<float>( float* pT )
+{
+    BufPtr pBuf( true );
+    *pBuf = ( float )0;
+    return pBuf;
+}
+
+template<>
+inline BufPtr GetDefault<double>( double* pT )
+{
+    BufPtr pBuf( true );
+    *pBuf = ( double )0;
+    return pBuf;
+}
+
+template<>
+inline BufPtr GetDefault<stdstr>( stdstr* pT )
+{
+    BufPtr pBuf( true );
+    *pBuf = std::string( "none" );
+    return pBuf;
+}
+
+template<>
+inline BufPtr GetDefault<DMsgPtr>( DMsgPtr* pT )
+{
+    BufPtr pBuf( true );
+    pBuf->Resize( sizeof( DMsgPtr ) );
+    memset( pBuf->ptr(), 0, sizeof( DMsgPtr ) );
+    pBuf->SetDataType( DataTypeMsgPtr );
+    pBuf->SetExDataType( typeDMsg );
+    return pBuf;
+}
+
+template<>
+inline BufPtr GetDefault<ObjPtr>( ObjPtr* pT )
+{
+    BufPtr pBuf( true );
+    pBuf->Resize( sizeof( ObjPtr ) );
+    memset( pBuf->ptr(), 0, sizeof( DMsgPtr ) );
+    pBuf->SetDataType( DataTypeObjPtr );
+    pBuf->SetExDataType( typeObj );
+    return pBuf;
+}
+
+template< class T,
+    class allowed = typename std::enable_if<
+    std::is_base_of< CObjBase*, T >::value,
+    T >::type,
+    class T2 = T >
+inline BufPtr GetDefault( T* pT )
+{
+    BufPtr pBuf( true );
+    pBuf->Resize( sizeof( ObjPtr ) );
+    memset( pBuf->ptr(), 0, sizeof( DMsgPtr ) );
+    pBuf->SetDataType( DataTypeObjPtr );
+    pBuf->SetExDataType( typeObj );
+    return pBuf;
+}
 

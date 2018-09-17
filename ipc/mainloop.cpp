@@ -40,16 +40,12 @@ CMainIoLoop::CMainIoLoop( const IConfigDb* pCfg ) :
     a.GetObjPtr( propIoMgr, pObj );
     m_pIoMgr = pObj;
 
+    m_dwTid = 0;
+    m_pTaskSrc = nullptr;
+
     m_pMainCtx = g_main_context_new();
     m_pMainLoop = g_main_loop_new( m_pMainCtx, false );
-    m_dwTid = 0;
-    // a source to run tasklets
-    m_pTaskSrc = g_idle_source_new();
-    if( m_pTaskSrc )
-    {
-        g_source_set_callback(
-            m_pTaskSrc, TaskCallback, ( gpointer )this, nullptr );
-    }
+
 }
 
 CMainIoLoop::~CMainIoLoop()
@@ -57,7 +53,7 @@ CMainIoLoop::~CMainIoLoop()
 
     if( m_pTaskSrc )
     {
-        g_source_destroy( m_pTaskSrc );
+        // g_source_destroy( m_pTaskSrc );
         g_source_unref( m_pTaskSrc );
     }
 
@@ -81,6 +77,7 @@ gint32 CMainIoLoop::Stop()
 void CMainIoLoop::AddTask( TaskletPtr& pTask )
 {
     m_queTasks->AddTask( pTask );
+    InstallTaskSource();
 }
 
 gboolean CMainIoLoop::TaskCallback( gpointer pdata )
@@ -88,23 +85,20 @@ gboolean CMainIoLoop::TaskCallback( gpointer pdata )
     CMainIoLoop* pLoop =
         reinterpret_cast< CMainIoLoop* >( pdata );
 
-    do{
+    while( 1 )
+    {
         gint32 ret = 0;
         TaskletPtr pTask;
+
         ret = pLoop->GetTaskQue()->PopHead( pTask );
-        if( SUCCEEDED( ret ) && !pTask.IsEmpty() )
-        {
-            ( *pTask )( ( guint32 )pdata );
-        }
 
-        // till the queue is empty
-        if( SUCCEEDED( ret ) )
-            continue;
+        if( ERROR( ret ) )
+            break;
 
-        break;
-    }while( 1 );
+        ( *pTask )( ( guint32 )pdata );
+    }
 
-    return TRUE;
+    return G_SOURCE_REMOVE;
 }
 
 gint32 CMainIoLoop::ThreadProc()
@@ -112,11 +106,15 @@ gint32 CMainIoLoop::ThreadProc()
 
     gint32 ret = 0;
 
-    m_dwTid = CIoManager::GetTid();
+    SetThreadName( "MainLoop" );
 
-    g_source_attach( m_pTaskSrc, m_pMainCtx );
+    m_dwTid = GetTid();
+
     // now we have a way to inject the command
     // to the main loop
+
+    // for the tasks added before start
+    InstallTaskSource();
 
     g_main_context_push_thread_default( m_pMainCtx );
     g_main_loop_run( m_pMainLoop );
@@ -139,5 +137,54 @@ gint32 CMainIoLoop::Start()
     {
         ret = -EFAULT;
     }
+    return ret;
+}
+
+gint32 CMainIoLoop::InstallTaskSource()
+{
+    gint32 ret = 0;
+
+    if( m_pMainLoop == nullptr ||
+        m_pMainCtx == nullptr )
+        return ERROR_STATE;
+
+    CStdMutex oLock( m_oLock );
+    bool bDestroied = false;
+    if( m_pTaskSrc != nullptr )
+    {
+        bDestroied =
+            g_source_is_destroyed( m_pTaskSrc );
+    }
+
+    gint32 iCount = GetTaskQue()->GetSize();
+
+    if( m_pTaskSrc == nullptr )
+    {
+        m_pTaskSrc = g_idle_source_new();
+    }
+    else if( ( bDestroied && iCount > 0 ) ||
+        ( !bDestroied && iCount == 0 ) )
+    {
+        // FIXME: we have the chance to install one
+        // new idle handler while the old one has not
+        // quit yet
+        g_source_unref( m_pTaskSrc );
+        m_pTaskSrc = g_idle_source_new();
+    }
+    else
+    {
+        return 0;
+    }
+
+    if( m_pTaskSrc == nullptr )
+        return -ENOMEM;
+
+    g_source_set_callback(
+        m_pTaskSrc, TaskCallback,
+        ( gpointer )this, nullptr );
+
+    g_source_attach(
+        m_pTaskSrc, m_pMainCtx );
+
     return ret;
 }

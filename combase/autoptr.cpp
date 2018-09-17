@@ -23,99 +23,68 @@
 #include <map>
 #include "defines.h"
 #include "autoptr.h"
-// #include "port.h"
-// #include "dbusport.h"
+#include "buffer.h"
+#include "configdb.h"
 
-gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
-    ::Serialize( CBuffer* pBuf )
+gint32 CreateObjFast( EnumClsid iClsid,
+    CObjBase*& pObj, const IConfigDb* pCfg ) 
 {
-    if( IsEmpty() || pBuf == nullptr )
-        return -EINVAL;
-
-    guint32 dwSize = 0;
-    guint8 *pData = nullptr;
-    gint32 ret = 0;
-            
-    do{
-
-        if( !dbus_message_marshal(
-            m_pObj, ( char** )&pData, ( int* )&dwSize ) )
-        {
-            ret = -ENOMEM;
-            break;
-        }
-
-        if( dwSize > DMSG_MAX_SIZE )
-        {
-            ret = -ENOMEM;
-            break;
-        }
-
-        pBuf->Resize( 0 );
-
-        ret = pBuf->Append(
-            ( guint8* )&dwSize, sizeof( dwSize ) );
-
-        if( ERROR( ret ) )
-            break;
-
-        ret = pBuf->Append( pData, dwSize );
-        if( ERROR( ret ) )
-            break;
-
-    }while( 0 );
-
-    if( pData != nullptr )
+    gint32 ret = -ENOTSUP;
+    if( iClsid == clsid( CBuffer ) &&
+        pCfg == nullptr )
     {
-        dbus_free( pData );
+        pObj = new( std::nothrow ) CBuffer();
+    }
+    else if( iClsid == clsid( CConfigDb ) )
+    {
+        pObj = new( std::nothrow ) CConfigDb( pCfg );    
+    }
+
+    // NOTE: we have a reference count already, no need
+    // to AddRef again
+    if( pObj != nullptr )
+        ret = 0;
+
+    return ret;
+}
+
+gint32 DeserializeObj( const CBuffer& oBuf, ObjPtr& pObj )
+{
+    const SERI_HEADER_BASE* pHeader = oBuf;
+
+    SERI_HEADER_BASE oHeader( *pHeader );
+    oHeader.ntoh();
+
+    gint32 ret = 0;
+
+    switch( oHeader.dwClsid )
+    {
+    case clsid( CBuffer ): 
+        {
+            BufPtr pObjBuf( true );
+            ret = pObjBuf->Deserialize( oBuf );
+            if( SUCCEEDED( ret ) )
+            {
+                if( pObjBuf->type() != DataTypeObjPtr )
+                    ret = -EFAULT;
+                pObj = ( ObjPtr& )*pObjBuf;
+            }
+            break;
+        }
+    case clsid( CConfigDb ):
+        {
+            CfgPtr pCfg( true );
+            ret = pCfg->Deserialize( oBuf );
+            if( ERROR( ret ) )
+                break;
+
+            pObj = pCfg;
+            break;
+        }
+    default:
+        ret = -ENOTSUP;    
+        break;
     }
 
     return ret;
-}
-
-gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
-    ::Deserialize( CBuffer* pBuf )
-{
-    gint32 ret = 0;
-
-    if( pBuf == nullptr
-        || pBuf->size() == 0 )
-        return -EINVAL;
-
-    do{
-        Clear();
-
-        guint32 dwSize =
-            *( guint32* )pBuf->ptr();
-
-        guint8* pMsg =
-            ( guint8* )pBuf->ptr() + sizeof( guint32 );
-
-        CDBusError dbusError;
-
-        m_pObj = dbus_message_demarshal(
-            ( char* )pMsg, dwSize, dbusError );
-
-        if( m_pObj == nullptr )
-        {
-            ret = dbusError.Errno();
-            break;
-        }
-
-    }while( 0 );
-
-    return ret;
-}
-
-gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
-    ::Clone( DBusMessage* pSrcMsg )
-{
-    if( pSrcMsg == nullptr )
-        return -EINVAL;
-
-    m_pObj = dbus_message_copy( pSrcMsg );
-    if( m_pObj == nullptr )
-        return -EFAULT;
-
-    return 0;
 }

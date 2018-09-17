@@ -19,6 +19,7 @@
 #pragma once
 
 #include <dbus/dbus.h>
+#include <objfctry.h>
 
 
 #define REG_DRV_ROOT                     "/drivers"
@@ -70,20 +71,39 @@ inline std::string REG_IO_EVENTMAP_DIR(
     return strRet;
 }
 
-#define DBUS_NAME_PREFIX                "org.emrsn.SS."
-#define DBUS_IF_NAME_FMT                DBUS_NAME_PREFIX"%s.%s."
-#define DBUS_DEST_PREFIX_FMT            DBUS_NAME_PREFIX".%s"
+#define DBUS_NAME_PREFIX                "org.rpcfrmwrk."
+#define DBUS_IF_NAME_FMT                DBUS_NAME_PREFIX"%s.%s"
+#define DBUS_DEST_PREFIX_FMT            DBUS_NAME_PREFIX"%s"
 
 inline std::string DBUS_IF_NAME(
     const std::string& strIfName )
 {
     std::string strRet;
-    std::string strIfSpc = std::string( "Interf." );
+    std::string strIfSpc = std::string( "Interf" );
 
     BUILD_STRING2( DBUS_IF_NAME_FMT,
         strIfSpc , strIfName, strRet );
 
     return strRet;
+}
+
+inline std::string IF_NAME_FROM_DBUS(
+    const std::string& strIfName )
+{
+    // reverse of DBUS_IF_NAME
+    std::string strRet;
+    std::string strIfSpc = DBUS_NAME_PREFIX;
+    strIfSpc += std::string( "Interf." );
+
+    size_t pos = strIfName.find( strIfSpc, 0 );
+    if( pos == std::string::npos )
+        return strIfName;
+
+    if( pos + strIfSpc.size() >= strIfName.size() )
+        return strIfName;
+
+    return strIfName.substr( pos + strIfSpc.size(),
+        255 - strIfSpc.size() );
 }
 
 inline std::string DBUS_DESTINATION(
@@ -95,6 +115,8 @@ inline std::string DBUS_DESTINATION(
 
     return strRet;
 }
+
+#define LOOPBACK_DESTINATION   "org.rpcfrmwrk.loopback"
 
 /**
 * @name Modue name module name is used to register
@@ -136,7 +158,7 @@ inline std::string DBUS_DESTINATION(
 
 #define DBUS_DEF_OBJ                    OBJNAME_IOMANAGER
 
-#define DBUS_DEFAULT_OBJ_PATH_FMT       "/org/emrsn/SS/%s/%s"
+#define DBUS_DEFAULT_OBJ_PATH_FMT       "/org/rpcfrmwrk/%s/objs/%s"
 
 #define DBUS_RESP_KEEP_ALIVE            "KeepAlive"
 
@@ -144,7 +166,7 @@ inline std::string DBUS_DESTINATION(
 
 // obj path consists of three part, one is the
 // fixed part, and the modname, and then the
-// objname. The fixed part must be consistant with
+// objname. The prefix must be consistant with
 // the DBUS_DESTINATION, except that all '.' are
 // replaced with '/' 
 inline std::string DBUS_OBJ_PATH(
@@ -191,6 +213,24 @@ inline std::string DBUS_OBJ_PATH(
 
 #define USER_METHOD_PREFIX              "UserMethod_"
 #define SYS_METHOD_PREFIX              	"RpcCall_"
+#define USER_EVENT_PREFIX               "UserEvent_"
+#define SYS_EVENT_PREFIX                "RpcEvt_"
+
+inline std::string SYS_EVENT(
+    const std::string& strMethod )
+{
+    std::string strName = SYS_EVENT_PREFIX;
+    strName += strMethod; 
+    return strName;
+}
+
+inline std::string USER_EVENT(
+    const std::string& strMethod )
+{
+    std::string strName = USER_EVENT_PREFIX;
+    strName += strMethod; 
+    return strName;
+}
 
 inline std::string USER_METHOD(
     const std::string& strMethod )

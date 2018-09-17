@@ -22,81 +22,73 @@
 #include <string>
 #include "defines.h"
 #include "frmwrk.h"
-#include "proxy.h"
 #include "dmsgptr.h"
+#include "ifhelper.h"
 
-template<>
-CObjBase* CastTo< CObjBase* >( BufPtr& i )
+stdstr CastTo( BufPtr& pBuf )
 {
-    return ( CObjBase* )*i;
+    std::string strVal( pBuf->ptr() );
+    return strVal;
 }
 
 template<>
-DBusMessage* CastTo< DBusMessage* >( BufPtr& i )
-{
-    return ( ( DMsgPtr& )*i );
-}
-
-template<>
-BufPtr CastTo< BufPtr >( BufPtr& i )
+BufPtr& CastTo< BufPtr >( BufPtr& i )
 {
     return i;
 }
 
 template<>
-BufPtr PackageTo< DMsgPtr >( DMsgPtr& pMsg )
+BufPtr PackageTo< DMsgPtr >( const DMsgPtr& pMsg )
 {
     BufPtr pBuf( true );
-    if( !pMsg.IsEmpty() )
-        *pBuf = pMsg;
+    *pBuf = pMsg;
     return pBuf;
 }
 
 template<>
-BufPtr PackageTo< ObjPtr >( ObjPtr& pObj )
+BufPtr PackageTo< ObjPtr >( const ObjPtr& pObj )
 {
     BufPtr pBuf( true );
-    if( !pObj.IsEmpty() )
-        *pBuf = pObj;
+    *pBuf = pObj;
     return pBuf;
 }
 
 template<>
-BufPtr PackageTo< CObjBase* >( CObjBase*& pObj )
+BufPtr PackageTo< BufPtr >( const BufPtr& pObj )
+{
+    return const_cast<BufPtr&>( pObj );
+}
+
+template<>
+BufPtr PackageTo< CObjBase >( const CObjBase* pObj )
 {
     BufPtr pBuf( true );
-    if( pObj != nullptr )
-        *pBuf = ObjPtr( pObj );
+    ObjPtr ptrObj( const_cast< CObjBase* >( pObj ) );
+    *pBuf = ptrObj;
     return pBuf;
 }
 
 template<>
-BufPtr PackageTo< DBusMessage* >( DBusMessage*& pMsg )
+BufPtr PackageTo< DBusMessage >( const DBusMessage* pMsg )
 {
     BufPtr pBuf( true );
-    if( pMsg != nullptr )
-        *pBuf = DMsgPtr( pMsg );
+    *pBuf = DMsgPtr( const_cast< DBusMessage*>( pMsg ) );
     return pBuf;
 }
 
 template<>
-BufPtr PackageTo< stdstr >( stdstr& str )
+BufPtr PackageTo< char >( const char* pText )
 {
     BufPtr pBuf( true );
-    if( !str.empty() )
-        *pBuf = str;
+    *pBuf = stdstr( pText );
     return pBuf;
 }
 
 template<>
-BufPtr PackageTo< float >( float& fVal )
+BufPtr PackageTo< stdstr >( const stdstr& str )
 {
     BufPtr pBuf( true );
-    guint64 val = 0;
-    guint32* pSrcVal = ( guint32* )&fVal;
-    guint32* pDestVal = ( guint32* )&val;
-    *pDestVal = *pSrcVal;
-    *pBuf = val;
+    *pBuf = str;
     return pBuf;
 }
 

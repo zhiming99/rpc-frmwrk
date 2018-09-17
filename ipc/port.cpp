@@ -64,6 +64,7 @@ CPort::CPort( const IConfigDb* pCfg )
 
 	m_pDriver = nullptr;
 
+    m_pCfgDb.NewObj();
     *m_pCfgDb = *pCfg;
 
     CCfgOpener a( ( IConfigDb* )m_pCfgDb );
@@ -142,44 +143,52 @@ do{\
 gint32 CPort::EnumProperties(
     std::vector< gint32 >& vecProps ) const
 {
-    vector< gint32 > vecProps1 = { propPortState,
-        propPortId,
-        propPortName,
-        propPortClass,
+    vecProps = {
+        propPortState,
+        // propPortId,
+        // propPortName,
+        // propPortClass,
         propLowerPortPtr,
         propUpperPortPtr,
         propPortType,
         propIsBusPort,
         propDrvPtr,
         propBusPortPtr,
-        propFdoId,
-        propFdoName,
-        propFdoClass,
-        propPdoId,
-        propPdoName,
-        propPdoClass,
-        propBusId,
-        propBusName,
-        propBusClass };
-
-    vecProps = vecProps1;
+        // propFdoId,
+        // propFdoName,
+        // propFdoClass,
+        // propPdoId,
+        // propPdoName,
+        // propPdoClass,
+        // propBusId,
+        // propBusName,
+        // propBusClass
+        };
 
     gint32 ret = super::EnumProperties( vecProps );
     if( ERROR( ret ) )
+    {
+        vecProps.clear();
         return ret;
+    }
 
-    std::sort( vecProps.begin(), vecProps.end() );
+    CStdRMutex oPortLock( GetLock() );
+    if( !m_pCfgDb.IsEmpty() )
+    {
+        m_pCfgDb->EnumProperties( vecProps );
+    }
+    else
+    {
+        std::sort( vecProps.begin(), vecProps.end() );
+    }
     return 0;
 }
 
-gint32 CPort::GetProperty( gint32 iProp, CBuffer& oBuf )
+gint32 CPort::GetProperty( gint32 iProp, CBuffer& oBuf ) const
 {
     gint32 ret = 0;
 
     CStdRMutex oPortLock( GetLock() );
-    if( !m_pCfgDb->exist( iProp ) )
-        return -ENOENT;
-
     switch( PropIdFromInt( iProp ) )
     {
     case propPortState:
@@ -235,21 +244,26 @@ gint32 CPort::GetProperty( gint32 iProp, CBuffer& oBuf )
         }
     case propBusPortPtr:
         {
-            if( PortType( m_dwFlags ) != PORTFLG_TYPE_PDO )
-             {
-                 if( m_pLowerPort != nullptr )
-                 {
-                     ret = m_pLowerPort->GetProperty( iProp, oBuf );
-                 }
-                 else
-                 {
-                     ret = ERROR_FAIL;
-                 }
-             }
-             else
-             {
-                 oBuf = ObjPtr( this );
-             }
+            if( PortType( m_dwFlags ) == PORTFLG_TYPE_BUS )
+            {
+                oBuf = ObjPtr( ( CPort* )this );
+            }
+            else if( PortType( m_dwFlags ) == PORTFLG_TYPE_PDO )
+            {
+                if( m_pBusPort != nullptr )
+                 oBuf = ObjPtr( m_pBusPort );
+            }
+            else
+            {
+                if( m_pLowerPort != nullptr )
+                {
+                    ret = m_pLowerPort->GetProperty( iProp, oBuf );
+                }
+                else
+                {
+                    ret = ERROR_FAIL;
+                }
+            }
             break;
         }
     case propFdoId:
@@ -297,6 +311,12 @@ gint32 CPort::GetProperty( gint32 iProp, CBuffer& oBuf )
             RetrieveBusValue( propPortClass );
             break;
         }
+    case propSrcDBusName:
+    case propSrcUniqName:
+        {
+            RetrieveBusValue( iProp );
+            break;
+        }
     default:
         {
             ret = m_pCfgDb->GetProperty(
@@ -312,8 +332,6 @@ gint32 CPort::SetProperty( gint32 iProp, const CBuffer& oBuf )
     gint32 ret = 0;
 
     CStdRMutex oPortLock( GetLock() );
-    if( !m_pCfgDb->exist( iProp ) )
-        return -ENOENT;
 
     switch( PropIdFromInt( iProp ) )
     {
@@ -394,36 +412,43 @@ gint32 CPort::StartEx( IRP* pIrp )
     // PNP_STATE_START_POST_SELF --->
     // PNP_STATE_START_PORT_RDY
     gint32 ret = 0;
+    do{
+        if( GetPnpState( pIrp ) == PNP_STATE_START_LOWER )
+        {
+            SetPnpState( pIrp, PNP_STATE_START_PRE_SELF );
+            ret = PreStart( pIrp );
 
-    if( GetPnpState( pIrp ) == PNP_STATE_START_LOWER )
+            if( ERROR( ret ) )
+                break;
+
+            if( ret == STATUS_PENDING )
+                break;
+        }
+
+        // no else in case prestart can return successfully
+        // immediately
+        if( GetPnpState( pIrp ) == PNP_STATE_START_PRE_SELF )
+        {
+            SetPnpState( pIrp, PNP_STATE_START_SELF );
+            ret = Start( pIrp );
+            if( ERROR( ret ) )
+                break;
+
+            if( ret == STATUS_PENDING )
+                break;
+        }
+
+        if( GetPnpState( pIrp ) == PNP_STATE_START_SELF )
+        {
+            SetPnpState( pIrp, PNP_STATE_START_POST_SELF );
+            ret = PostStart( pIrp );
+        }
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
     {
-        SetPnpState( pIrp, PNP_STATE_START_PRE_SELF );
-        ret = PreStart( pIrp );
-
-        if( ERROR( ret ) )
-            return ret;
-
-        if( ret == STATUS_PENDING )
-            return ret;
-    }
-
-    // no else in case prestart can return successfully
-    // immediately
-    if( GetPnpState( pIrp ) == PNP_STATE_START_PRE_SELF )
-    {
-        SetPnpState( pIrp, PNP_STATE_START_SELF );
-        ret = Start( pIrp );
-        if( ERROR( ret ) )
-            return ret;
-
-        if( ret == STATUS_PENDING )
-            return ret;
-    }
-
-    if( GetPnpState( pIrp ) == PNP_STATE_START_SELF )
-    {
-        SetPnpState( pIrp, PNP_STATE_START_POST_SELF );
-        ret = PostStart( pIrp );
+        OnPortStartFailed( pIrp, ret );
     }
     return ret;
 }
@@ -615,6 +640,10 @@ gint32 CPort::OnPortReady( IRP* pIrp )
     return 0;
 }
 
+void CPort::OnPortStartFailed(
+    IRP* pIrp, gint32 ret )
+{ return; }
+
 void CPort::OnPortStopped()
 {
     // FIXME: not symetric with OnPortStarted
@@ -700,7 +729,7 @@ gint32 CPort::PreStop( IRP* pIrp )
 {
     // if you want to do something in the PreStop
     // override this method and execute your logics
-    // and call this method at last
+    // and call this method at the end
     //
     // one scenario is the port spawned IRP, which
     // won't be monitored by the GateKeeper, so it
@@ -809,7 +838,8 @@ static guint32 GetPnpState(
 }
 
 gint32 CPort::AllocIrpCtxExt(
-    IrpCtxPtr& pIrpCtx ) const
+    IrpCtxPtr& pIrpCtx,
+    void* pContext ) const
 {
     gint32 ret = 0;
     switch( pIrpCtx->GetMajorCmd() )
@@ -874,14 +904,14 @@ gint32 CPort::SubmitStartIrp( IRP* pIrp )
 
     do{
 
-        if( GetLowerPort() )
+        // in this way, we do not need to lock the
+        // port from top down to the bottom
+
+        IPort* pLowerPort = GetLowerPort();
+        SetPnpState( pIrp, PNP_STATE_START_LOWER );
+
+        if( pLowerPort != nullptr )
         {
-            // in this way, we do not need to lock the
-            // port from top down to the bottom
-
-            PortPtr pLowerPort( GetLowerPort() );
-            SetPnpState( pIrp, PNP_STATE_START_LOWER );
-
             // alloc the irp stack
             ret = pIrp->AllocNextStack(
                 pLowerPort, IOSTACK_ALLOC_COPY );
@@ -923,8 +953,6 @@ gint32 CPort::SubmitStartIrp( IRP* pIrp )
             {
                 // failed to start lower port
                 ret = ERROR_FAIL;
-                pIrpCtx->SetStatus( ret );
-
                 break;
             }
 
@@ -950,8 +978,6 @@ gint32 CPort::SubmitStartIrp( IRP* pIrp )
                 ret = ERROR_STATE;
                 break;
             }
-
-            SetPnpState( pIrp, PNP_STATE_START_SELF );
 
             oPortLock.Unlock();
             ret = StartEx( pIrp );
@@ -988,6 +1014,8 @@ gint32 CPort::SubmitStartIrp( IRP* pIrp )
 
     if( ERROR( ret ) )
     {
+        IrpCtxPtr& pIrpCtx = pIrp->GetCurCtx();
+        pIrpCtx->SetStatus( ret );
         SetPortState( PORT_STATE_STOPPED );
     }
 
@@ -1262,15 +1290,19 @@ gint32 CPort::SubmitPortStackIrp( IRP* pIrp )
                     if( ERROR( ret ) )
                     {
                         // no reg path, not a big deal
-                        ret = 0;
                         break;
                     }
 
                     CRegistry& oReg = GetIoMgr()->GetRegistry();
                     CStdRMutex oLock( oReg.GetLock() );
 
-                    if( !oReg.ExistingDir( strPath ) )
-                        oReg.MakeDir( strPath );
+                    ret = oReg.ExistingDir( strPath );
+                    if( ERROR( ret ) )
+                    {
+                        ret = oReg.MakeDir( strPath );
+                        if( ERROR( ret ) )
+                            break;
+                    }
                     else
                     {
                         ret = oReg.ChangeDir( strPath );
@@ -1321,7 +1353,8 @@ gint32 CPort::SubmitPortStackIrp( IRP* pIrp )
                     // remove the registry entry for this port
                     CRegistry& oReg = GetIoMgr()->GetRegistry();
                     CStdRMutex( oReg.GetLock() );
-                    if( oReg.ExistingDir( strPath ) )
+                    ret = oReg.ExistingDir( strPath );
+                    if( SUCCEEDED( ret ) )
                     {
                         ret = oReg.RemoveDir( strPath );
                     }
@@ -1812,21 +1845,31 @@ gint32 CPort::CompleteStartIrp( IRP* pIrp )
 
     if( ERROR( ret ) )
     {
-        SetPortStateWake(
-            PORT_STATE_STARTING,
-            PORT_STATE_STOPPED );
+        guint32 dwPortState =
+            GetPortState();
 
-        // BUGBUG: what if the lower port has
-        // entered the started state when this
-        // port failed to start. Actually the
-        // bottom port is in Started state when
-        // the event subscriber will receive the
-        // event it is stopped
-        //
-        // NOTE: we support state switching from
-        // STARTING to STOPPED, but don't accept
-        // STOP irp while starting
-        OnPortStopped();
+        if( SetPortStateWake( dwPortState,
+            PORT_STATE_STOPPED ) )
+        {
+
+            // BUGBUG: what if the lower port has entered
+            // the started state when this port failed to
+            // start. Actually the bottom port is in
+            // Started state when the event subscriber will
+            // receive the event it is stopped
+            //
+            // NOTE: we support state switching from
+            // STARTING to STOPPED, but don't accept STOP
+            // irp while starting
+            OnPortStopped();
+        }
+        else if( dwPortState == PORT_STATE_READY )
+        {
+            // Don't know what happens. For a bus port,
+            // it may be the child port fails to
+            // start. Just return the error, let the
+            // pnpmgr to stop this port
+        }
     }
     return ret;
 }
@@ -1934,8 +1977,8 @@ gint32 CPort::CompleteStopIrp( IRP* pIrp )
 
     if( ret != STATUS_PENDING )
     {
-        if( !SetPortStateWake(
-            PORT_STATE_STOPPING,
+        guint32 dwPortState = GetPortState();
+        if( !SetPortStateWake( dwPortState,
             PORT_STATE_STOPPED ) )
         {
             throw std::runtime_error(
@@ -2053,10 +2096,9 @@ gint32 CPort::MakeAssocIrp(
             break;
         }
 
-
-        IrpCtxPtr& pCtx = pMaster->GetTopStack();
-        if( pCtx->GetMajorCmd() != IRP_MJ_ASSOC
-            && pCtx->GetMinorCmd() != IRP_MN_ASSOC_RUN )
+        IrpCtxPtr pCtx = pMaster->GetTopStack();
+        if( pCtx->GetMajorCmd() != IRP_MJ_ASSOC ||
+            pCtx->GetMinorCmd() != IRP_MN_ASSOC_RUN )
         {
             // let's make a context stack for association
             IPort* pPort = pMaster->GetTopPort();
@@ -2073,7 +2115,8 @@ gint32 CPort::MakeAssocIrp(
             pCtx->SetMinorCmd( IRP_MN_ASSOC_RUN );
 
             this->AllocIrpCtxExt(
-                pMaster->GetTopStack() );
+                pMaster->GetTopStack(),
+                pMaster );
 
             pCtx->SetIoDirection( IRP_DIR_IN );
         }
@@ -2125,7 +2168,8 @@ gint32 CPort::CompleteAssocIrp(
 
         // give the subclass an opportunity 
         // to do some port specific things.
-        OnCompleteSlaveIrp( pMaster, pSlave );
+        gint32 iRet = OnCompleteSlaveIrp(
+            pMaster, pSlave );
 
         if( pMaster->GetSlaveCount() > 0 )
         {
@@ -2133,16 +2177,20 @@ gint32 CPort::CompleteAssocIrp(
             break;
         }
 
-        // don't touch other guy's irp in
-        // this port pMaster->PopCtxStack();
+        // don't touch other guy's irp ctx in
+        // this port
+        IPort* pTopPort = pMaster->GetTopPort();
+        if( pTopPort == ( IPort* )this )
+            pMaster->PopCtxStack();
 
         // set the return code
-        pMaster->GetTopStack()->SetStatus( STATUS_SUCCESS );
+        pMaster->GetTopStack()->SetStatus( iRet );
 
         // the irp state should go back to ready
         // before completion
         pMaster->SetState(
-            IRP_STATE_COMPLETING_ASSOC, IRP_STATE_READY );
+            IRP_STATE_COMPLETING_ASSOC,
+            IRP_STATE_READY );
 
         // let's complete the master irp
         a.Unlock();
@@ -2152,7 +2200,6 @@ gint32 CPort::CompleteAssocIrp(
         //
         ret = GetIoMgr()->CompleteIrp( pMaster );
         bRollback = false;
-        a.Lock();
 
     }while( 0 );
 
@@ -2161,7 +2208,8 @@ gint32 CPort::CompleteAssocIrp(
         if( bRollback )
         {
             pMaster->SetState(
-                IRP_STATE_COMPLETING_ASSOC, IRP_STATE_READY );
+                IRP_STATE_COMPLETING_ASSOC,
+                IRP_STATE_READY );
         }
     }
     else if( SUCCEEDED( ret ) )
@@ -2291,6 +2339,10 @@ gint32 CPort::CompleteIrp( IRP* pIrp )
                     {
                         // the next port will clear
                         // this ctx
+                        // we should not come here
+                        // normally, and the
+                        // CompleteAssocIrp will pop
+                        // the stack
                         ret = 0;     
                         break;
                     }
@@ -2618,27 +2670,8 @@ bool CPort::SetPortStateWake(
     guint32 dwNewState,
     bool bWakeAll )
 {
-    bool bRet = true;
-	do{
-        CStdRMutex oPortLock( GetLock() );
-        if( ( ( guint32 )dwCurState )
-            == GetPortState() )
-        {
-            bRet = false;
-            break;
-        }
-		SetPortState( dwNewState );
-        if( !bWakeAll ) 
-        {
-            SEM_WAKEUP_SINGLE( m_semWaitForReady );
-        }
-        else
-        {
-            SEM_WAKEUP_ALL( m_semWaitForReady );
-        }
-	}while( 0 );
-
-    return bRet;
+    return m_pPortState->SetPortStateWake(
+        dwCurState, dwNewState, bWakeAll );
 }
 
 gint32 CPort::OnEvent(
@@ -2711,10 +2744,10 @@ IPort* CPort::GetBottomPort() const
 gint32 CPort::OnPortStackDestroy( IRP* pIrp )
 {
     gint32 ret = 0;
-    if( GetLowerPort() == nullptr )
+    /*if( GetLowerPort() == nullptr )
     {
         ret = GetIoMgr()->RemoveFromHandleMap( this );    
-    }
+    }*/
     return ret;
 }
 
@@ -2759,7 +2792,7 @@ bool CPort::CanAcceptMsg(
 CGenericBusPort::CGenericBusPort(
     const IConfigDb* pConfig )
     :super( pConfig ),
-     m_atmPdoId( 0 )
+     m_atmPdoId( 1 )
 {
     gint32 ret = 0;
 
@@ -2818,7 +2851,6 @@ void CGenericBusPort::RemovePdoPort(
 
     PortPtr& pPort = m_mapId2Pdo[ iPortId ];
 
-    ClosePdoPort( pPort );
     CCfgOpenerObj a( ( IPort* )pPort );
 
     // lable the port is removed
@@ -2889,6 +2921,8 @@ gint32 CGenericBusPort::OnPortStackDestroy(
     {
         GetIoMgr()->GetPnpMgr().DestroyPortStack(
             vecChildPorts.back() );
+
+        vecChildPorts.pop_back();
     }
 
     super::OnPortStackDestroy( pIrp );
@@ -2926,6 +2960,17 @@ gint32 CPortAttachedNotifTask::operator()(
         if( ERROR( ret ) )
             break;
 
+        if( a.exist( propMasterIrp) )
+        {
+            CCfgOpenerObj oPortCfg(
+                ( CObjBase* )pNewPort );
+
+            oPortCfg.CopyProp(
+                propMasterIrp, m_pCtx );
+
+            a.RemoveProperty( propMasterIrp );
+        }
+
         pEventMap->BroadcastEvent(
             eventPnp,
             dwEventId,
@@ -2940,6 +2985,7 @@ gint32 CPortAttachedNotifTask::operator()(
 gint32 CGenericBusPort::SchedulePortAttachNotifTask(
     IPort* pNewPort,
     guint32 dwEventId,
+    IRP* pMasterIrp,
     bool bImmediately )
 {
     gint32 ret = 0;
@@ -2955,7 +3001,7 @@ gint32 CGenericBusPort::SchedulePortAttachNotifTask(
         a.Push( dwEventId );
         a.Push( pObj );
 
-        CEventMapHelper< CPort > b( this );
+        CEventMapHelper< CGenericBusPort > b( this );
         ret = b.GetEventMap( pObj );
 
         if( ERROR( ret ) )
@@ -2963,10 +3009,17 @@ gint32 CGenericBusPort::SchedulePortAttachNotifTask(
 
         a.Push( pObj );
 
+        if( pMasterIrp != nullptr )
+        {
+            a.SetPointer( propMasterIrp,
+                pMasterIrp );
+        }
+
         if( !bImmediately )
         {
             ret = GetIoMgr()->ScheduleTask(
-                clsid( CPortAttachedNotifTask ), a.GetCfg() );
+                clsid( CPortAttachedNotifTask ),
+                a.GetCfg() );
 
             if( SUCCEEDED( ret ) )
                 ret = STATUS_PENDING;
@@ -2982,6 +3035,7 @@ gint32 CGenericBusPort::SchedulePortAttachNotifTask(
         }
 
     }while( 0 );
+
     return ret;
 }
 
@@ -3050,6 +3104,23 @@ gint32 CGenericBusPort::PreStop( IRP* pIrp )
         if( pExt->m_dwExtState == 2 )
         {
             // move forward the stop state machine
+            CIoManager* pMgr = GetIoMgr();
+            CPnpManager& oPnpMgr = pMgr->GetPnpMgr();
+            // destroy the child port stack
+            vector< PortPtr > vecChildPorts;
+
+            {
+                CStdRMutex oPortLock( GetLock() );
+                ret = GetChildPorts( vecChildPorts );
+            }
+
+            for( auto pChildPort : vecChildPorts )
+            {
+                // FIXME: what if the method return
+                // STATUS_PENDING?
+                oPnpMgr.DestroyPortStack( pChildPort );
+            }
+            
             SetPnpState( pIrp,
                 PNP_STATE_STOP_PRE );
             ret = 0;
@@ -3269,7 +3340,8 @@ gint32 CGenericBusPort::StopChild( IRP* pIrp )
 }
 
 gint32 CGenericBusPort::AllocIrpCtxExt(
-    IrpCtxPtr& pIrpCtx ) const 
+    IrpCtxPtr& pIrpCtx,
+    void* pContext ) const 
 {
     gint32 ret = -ENOTSUP;
     switch( pIrpCtx->GetMajorCmd() )
@@ -3304,7 +3376,8 @@ gint32 CGenericBusPort::AllocIrpCtxExt(
     if( ERROR( ret ) )
     {
         // let's try it on CPort
-        ret = super::AllocIrpCtxExt( pIrpCtx );
+        ret = super::AllocIrpCtxExt(
+            pIrpCtx, pContext );
     }
 
     return ret;
@@ -3336,7 +3409,9 @@ gint32 CGenericBusPort::OpenPdoPort(
             string strPortName;
 
             CStdRMutex oPortLock( GetLock() );
-            if( GetPortState() != PORT_STATE_READY )
+            guint32 dwState = GetPortState();
+            if( dwState != PORT_STATE_READY &&
+                dwState != PORT_STATE_STARTING )
             {
                 ret = ERROR_STATE;
                 break;
@@ -3344,15 +3419,13 @@ gint32 CGenericBusPort::OpenPdoPort(
 
             HANDLE hPort = 0;
 
-            *pCfg = *pConstCfg;
-
-            CCfgOpener oExtCfg(
-                ( IConfigDb* )pCfg );
+            CCfgOpener oExtCfg;
+            *oExtCfg.GetCfg() = *pConstCfg;
 
             // first let's try if we can open the
             // port with the port name
             ret = BuildPdoPortName(
-                pCfg, strPortName );
+                pConstCfg, strPortName );
 
             if( ERROR( ret ) )
                 break;
@@ -3389,8 +3462,12 @@ gint32 CGenericBusPort::OpenPdoPort(
                 break;
             }
 
-            // let's expand the config with some
-            // must-have properties
+            // prevent the interface ptr to go into
+            // port's config.
+            oExtCfg.RemoveProperty( propIfPtr );
+
+            // let's retrieve some must-have properties
+            // from the config
             ret = oExtCfg.SetStrProp(
                 propPortName, strPortName );
 
@@ -3417,49 +3494,55 @@ gint32 CGenericBusPort::OpenPdoPort(
 
             if( SUCCEEDED( ret ) )
             {
-                guint32 dwPortId;
 
-                ret = oExtCfg.GetIntProp(
-                    propPortId, dwPortId );
+                CCfgOpenerObj oPortCfg( ( CObjBase* )pNewPort );
+                if( oPortCfg.exist( propPortId ) )
+                {
+                    guint32 dwPortId = -1;
+                    oPortCfg.GetIntProp( propPortId,
+                        dwPortId );
+                    
+                    // attach the port to the bus port
+                    PortPtr portPtr( pNewPort );
+                    this->AddPdoPort( dwPortId, portPtr );
+                }
 
-                // attach the port to the bus port
-                PortPtr portPtr( pNewPort );
-                this->AddPdoPort( dwPortId, portPtr );
+                if( dwState == PORT_STATE_READY )
+                {
+                    oPortLock.Unlock();
 
-                oPortLock.Unlock();
+                    // at this moment, we are OK to
+                    // release the lock so that if
+                    // `pnp stop' comes, it can find
+                    // this port and stop the children
+                    // port. trigger an event to pnp
+                    // manager
+                    //
+                    // and possibly we are on a
+                    // calling task thread 
+                    // 
+                    // Removed immediate call of the
+                    // task because which makes the
+                    // situation complicated for the
+                    // interface to handle when the
+                    // port is started. one delimma is
+                    // that the in the immediate case,
+                    // the eventPortStarted is sent
+                    // before success is returned,
+                    // which makes the interface
+                    // weired.
+                    //
+                    // so for now if the port is not
+                    // created, the OpenPortByCfg will
+                    // always return STATUS_PENDING
+                    // and waiting for the portStarted
+                    // Event
+                    ret = SchedulePortAttachNotifTask(
+                        pNewPort,
+                        eventPortAttached );
 
-                // at this moment, we are OK to
-                // release the lock so that if
-                // `pnp stop' comes, it can find
-                // this port and stop the children
-                // port. trigger an event to pnp
-                // manager
-                //
-                // and possibly we are on a
-                // calling task thread 
-                // 
-                // Removed immediate call of the
-                // task because which makes the
-                // situation complicated for the
-                // interface to handle when the
-                // port is started. one delimma is
-                // that the in the immediate case,
-                // the eventPortStarted is sent
-                // before success is returned,
-                // which makes the interface
-                // weired.
-                //
-                // so for now if the port is not
-                // created, the OpenPortByCfg will
-                // always return STATUS_PENDING
-                // and waiting for the portStarted
-                // Event
-                ret = SchedulePortAttachNotifTask(
-                    pNewPort,
-                    eventPortAttached,
-                    false );
-
-                oPortLock.Lock();
+                    oPortLock.Lock();
+                }
 
                 break;
             }

@@ -19,10 +19,12 @@
 #include <map>
 #include <vector>
 #include "defines.h"
+#include "buffer.h"
 #include "configdb.h"
 #include "registry.h"
 #include "stlcont.h"
 #include <dlfcn.h>
+#include "objfctry.h"
 
 using namespace std;
 
@@ -36,15 +38,17 @@ static FactoryPtr InitClassFactory()
     BEGIN_FACTORY_MAPS;
 
     INIT_MAP_ENTRY( CBuffer );
-    INIT_MAP_ENTRY( CConfigDb );
     INIT_MAP_ENTRY( CRegistry );
     INIT_MAP_ENTRY( CStlIntVector );
     INIT_MAP_ENTRY( CStlIntQueue );
     INIT_MAP_ENTRY( CStlBufVector );
-    INIT_MAP_ENTRY( CClassFactories );
     INIT_MAP_ENTRY( CStlEventMap );
     INIT_MAP_ENTRY( CStlIntMap );
     INIT_MAP_ENTRY( CStlObjSet );
+    INIT_MAP_ENTRY( CStlObjVector );
+    INIT_MAP_ENTRY( CStlStringSet );
+
+    INIT_MAP_ENTRYCFG( CConfigDb );
 
     END_FACTORY_MAPS;
 };
@@ -52,6 +56,8 @@ static FactoryPtr InitClassFactory()
 const char* CoGetClassName( EnumClsid iClsid )
 {
     map< EnumClsid, const char* >::iterator itr;
+    if( iClsid == clsid( Invalid ) )
+        return "Invalid";
 
     // the search is said to be optimized
     // Let's assume it as a binary search
@@ -116,6 +122,17 @@ gint32 CoLoadClassFactory( const char* pszPath  )
     return ret;
 }
 
+gint32 CoAddClassFactory(
+    const FactoryPtr& pFactory )
+{
+
+    if( pFactory.IsEmpty() )
+        return -EINVAL;
+
+    return g_pFactories->AddFactory(
+        pFactory, nullptr );
+}
+
 /**
 * @name Load all the class factory from the
 * directory pszDir, and put them to vector
@@ -139,6 +156,7 @@ gint32 CoLoadClassFactories( const char* dir )
         return -errno;
 
     string strPrefix( pszAbPath );
+    strPrefix += "/";
 
     free( pszAbPath );
     pszAbPath = nullptr;
@@ -160,9 +178,8 @@ gint32 CoLoadClassFactories( const char* dir )
         {
             // we don't handle subdirectory yet
             /*  Found a directory, but ignore . and .. */
-            if(strcmp(".",entry->d_name) == 0
-                || strcmp("..",entry->d_name) == 0);
-
+            if( strcmp(".",entry->d_name) == 0 ||
+                strcmp("..",entry->d_name) == 0 )
             continue;
 
             // printf("%*s%s/\n",depth,"",entry->d_name);
@@ -171,6 +188,9 @@ gint32 CoLoadClassFactories( const char* dir )
         }
         else
         {
+            if( strcmp("libcombase.so",entry->d_name) == 0 )
+                continue;
+
             string strPath = strPrefix + entry->d_name;
             CoLoadClassFactory( strPath.c_str() );
         }
@@ -182,10 +202,39 @@ gint32 CoLoadClassFactories( const char* dir )
     return 0;
 }
 
+#ifdef DEBUG
+std::unordered_map<EnumClsid, std::string> g_mapId2Name;
+
+static gint32 CoInitClsidNames()
+{
+    vector<EnumClsid> vecIds;
+    g_pFactories->EnumClassIds( vecIds );
+    for( auto iClsid : vecIds )
+    {
+        const char* pszName = CoGetClassName( iClsid );
+        if( pszName != nullptr )
+        {
+            g_mapId2Name[ iClsid ] = string( pszName );
+        }
+    }
+    return 0;
+}
+
+#endif
 // call this method before anything else is
 // called
 gint32 CoInitialize( guint32 dwContext )
 {
+    if( g_pFactories.IsEmpty() )
+    {
+        g_pFactories = new CClassFactories(); 
+        if( g_pFactories.IsEmpty() )
+            return -EFAULT;
+
+        g_pFactories->DecRef();
+    }
+    // load the class factory of combase ahead of 
+    // any of the rest libraires
     FactoryPtr pBaseFactory = InitClassFactory();
     if( pBaseFactory.IsEmpty() )
         return -EFAULT;
@@ -196,7 +245,12 @@ gint32 CoInitialize( guint32 dwContext )
     if( ERROR( ret ) )
         return ret;
 
-    return CoLoadClassFactories( "." );
+    ret = CoLoadClassFactories( "." );
+#ifdef DEBUG
+    if( SUCCEEDED( ret ) )
+        CoInitClsidNames();        
+#endif
+    return ret;
 }
 
 gint32 CoUninitialize()
@@ -205,3 +259,14 @@ gint32 CoUninitialize()
     g_pFactories.Clear();
     return 0;
 }
+
+extern "C"
+gint32 DllLoadFactory( FactoryPtr& pFactory )
+{
+    pFactory = InitClassFactory();
+    if( pFactory.IsEmpty() )
+        return -EFAULT;
+
+    return 0;
+}
+

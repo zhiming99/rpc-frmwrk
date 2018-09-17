@@ -33,7 +33,15 @@ class has_GetIoMgr
 
     public:
     // static bool const value = sizeof(Test<T>(0)) == sizeof(Yes);
-    static bool const value = sizeof(Test<T>(0)) == sizeof(char);
+    static bool const value = ( sizeof(Test<T>(0)) == sizeof(char) ||
+        has_GetIoMgr<class T::super>::value == sizeof( char ) );
+};
+
+template<>
+class has_GetIoMgr< CObjBase >
+{
+    public:
+    static bool const value =  sizeof(int);
 };
 
 template< class B,
@@ -154,8 +162,8 @@ class CEventMapHelper
             if( ERROR( ret ) )
                 break;
 
-            ObjPtr pObj;
-            ret = oReg.GetObject( propEventMapPtr, pObj );
+            ret = oReg.GetObject(
+                propEventMapPtr, pEvtMap );
 
         }while( 0 );
 

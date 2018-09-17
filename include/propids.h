@@ -18,7 +18,7 @@
 
 #pragma once
 
-enum EnumPropId
+enum EnumPropId : gint32
 {
     // the lower 0x100 for
     // positional parameters
@@ -96,6 +96,7 @@ enum EnumPropId
     propTimerParamList, // type: ObjPtr to CStlIntVector, used to pass parameters in CTasklet::OnEvent for eventTimeout
     propNotifyParamList, // type: ObjPtr to CStlIntVector, used to pass parameters in CTasklet::OnEvent for eventRpcNotify
     propIrpPtr,         // type: ObjPtr to Irp
+    propMasterIrp,      // type: ObjPtr to the Master Irp
     propPortPtrs,       // type: ObjPtr to CStlPortVector
     propEventId,        // type: guint32
     propOtherThread,    // type: bool
@@ -121,8 +122,10 @@ enum EnumPropId
     // if task control bits
     propNotifyClient,   // type: bool value to indicate whether to notify the client
     propContext,        // type: guint32 for a context param
-    propRunning,        // type: bool value to indicate a tasklet is running
+    propRunning,        // type: bool value to indicate a tasklet is running, that is whether the runtask is called
     propNoResched,      // type: bool value to indicate no Reschedule after the sub-task completed
+    propCanceling,      // type: bool value to indicate a taskis being canceled
+    propCancelTid,      // type: bool value to indicate which thread the cancel method is running on
 
     propReturnValue,    // type: gint32 value as the return value of a request
     propCallFlags,      // type: guint32 contains flags for the call
@@ -147,8 +150,14 @@ enum EnumPropId
     propSockPtr,        // type: ObjPtr, contains a pointer to the socket
     propUserName,       // type: ObjPtr, contains a string of user name
     propNonFd,          // type: bool for non file descriptor in SendData/FetchData transfer
-    propPasswd,         // type: ObjPtr, contains a string of password hash
-    propInvalid,
+    propPasswd,         // type: string, contains a string of password hash
+    propThreadId,       // type: gint32, contains a thread id
+    propIfStateClass,   // type: class id of the interface-state
+    propObjList,        // type: ObjPtr to a CStlObjVector object
+    propValList,        // type: ObjPtr to whatever list
+    propIid,            // type: an interface id of EnumClsid type, used in CMessageMatch
+    propReseredEnd = 0x10000000,
+    propInvalid = -1, 
 };
 
 #define PropIdFromInt( intid ) ( static_cast< EnumPropId >( intid ) )

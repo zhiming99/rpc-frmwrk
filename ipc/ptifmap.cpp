@@ -26,8 +26,9 @@ using namespace std;
 
 CPortInterfaceMap::CPortInterfaceMap()
 {
-
+    SetClassId( clsid( CPortInterfaceMap ) );
 }
+
 CPortInterfaceMap::~CPortInterfaceMap()
 {
 
@@ -58,8 +59,7 @@ gint32 CPortInterfaceMap::AddToHandleMap(
             // we need to make sure the port has
             // already registered at least with <
             // PortPtr, nullptr >
-            PEPAIR result = m_mapPort2If.equal_range( portPtr );
-            if( std::distance( result.second, result.first ) == 0 )
+            if( m_mapPort2If.find( portPtr ) == m_mapPort2If.end() )
             {
                 // the port is not registered yet,
                 // and cannot be used
@@ -209,11 +209,12 @@ gint32 CPortInterfaceMap::PortExist(
         }
         CStdRMutex a( GetLock() );
         PortPtr portPtr( pPort );
-        CPEPAIR result = m_mapPort2If.equal_range( portPtr );
-        if( std::distance( result.second, result.first ) == 0 )
+        if( m_mapPort2If.find( portPtr ) == m_mapPort2If.end() )
         {
             ret = -ENOENT;
+            break;
         }
+        CPEPAIR result = m_mapPort2If.equal_range( portPtr );
         if( pvecVals != nullptr )
         {
             multimap< PortPtr, EventPtr >::const_iterator itr;
@@ -237,11 +238,13 @@ gint32 CPortInterfaceMap::InterfaceExist(
         CStdRMutex a( GetLock() );
         EventPtr evtPtr( pEvent );
 
-        CEPPAIR result = m_mapIf2Port.equal_range( evtPtr );
-        if( distance( result.second, result.first ) > 0 )
+        if( m_mapIf2Port.find( evtPtr ) == m_mapIf2Port.end() ) 
         {
             ret = -ENOENT;
+            break;
         }
+
+        CEPPAIR result = m_mapIf2Port.equal_range( evtPtr );
         if( pvecVals != nullptr )
         {
             multimap< EventPtr, PortPtr >::const_iterator itr;
