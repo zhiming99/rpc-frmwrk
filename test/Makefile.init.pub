@@ -1,0 +1,55 @@
+CROSS:= $(CROSS_COMPILE)
+ARCH := arm
+
+mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
+
+BASE:=$(abspath $(dir $(mkfile_path) ).. )
+
+CC := $(CROSS_COMPILE)gcc
+CPP := $(CROSS_COMPILE)g++
+LD := $(CROSS_COMPILE)ld
+AR := $(CROSS_COMPILE)ar
+AS := $(CROSS_COMPILE)as
+STRIP := $(CROSS_COMPILE)strip
+CUR_DIR := $(shell pwd)
+
+C_FLAGS :=  -Wall -c -m32 -D_GNU_SOURCE -pthread
+C_DEFINES :=
+
+DEBUG_FLAGS := -DDEBUG -ggdb
+RELEASE_FLAGS := -O2
+
+C_INCLUDE := -I$(BASE)/include \
+	-I$(BASE)/ipc \
+	-I$(BASE)/rpc \
+	-I/usr/include/glib-2.0 \
+	-I/usr/lib/glib-2.0/include \
+	-I/usr/include/dbus-1.0 \
+	-I/usr/lib/dbus-1.0/include \
+	-I/usr/local/include\
+	-I/home/zhiming/mywork/jsoncpp-src-0.6.0-rc2/include \
+
+OUTPUT_DIR := $(BASE)/test/debug
+
+CPP_FLAGS := $(C_FLAGS) -std=c++11
+LINKER_OPTION := -m32 -ldl -lstdc++ -lpthread -L/usr/lib/ -Wl,-rpath=/user/lib -L/lib -Wl,-rpath=/lib -lglib-2.0 -ldbus-1 -ljsoncpp -ldbus-glib-1 -lcppunit -L/usr/local/lib
+
+ifeq ($(MAKECMDGOALS),) 
+	C_FLAGS += $(DEBUG_FLAGS)
+else ifeq ($(MAKECMDGOALS),debug) 
+	C_FLAGS += $(DEBUG_FLAGS)
+else ifeq ($(MAKECMDGOALS),all) 
+	C_FLAGS += $(DEBUG_FLAGS)
+endif
+
+ifeq ($(MAKECMDGOALS),release)
+	C_FLAGS += $(RELEASE_FLAGS)
+	C_DEFINES += $(C_DEFINES) -DPRODUCTION 
+	OUTPUT_DIR := $(BASE)/test/release
+else ifeq ($(MAKECMDGOALS),clean)
+	OUTPUT_DIR := $(BASE)/test/release
+endif
+
+ifeq ($(MODE),Release)
+	OUTPUT_DIR := $(BASE)/test/release
+endif

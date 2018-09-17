@@ -2487,6 +2487,25 @@ gint32 CRpcServices::FillRespData(
                 ret = -EFAULT;
                 break;
             }
+
+            /* Fixed a bug by copying the response data
+             * from GetObjArgAt to CIfIoReqTask's
+             * propRespPtr, which was so but changed to
+             * copying ptr sometimes for performance
+             * consideration. Now there are chances the
+             * CIfIoReqTask can complete immediately,
+             * that is the CRpcServices::AddAndRun can
+             * return successfully some times, which
+             * requires the the response data in the
+             * CIfIoReqTask to be filled with
+             * meaningful return value, instead of
+             * replacing the given response data ptr
+             * from the top request caller with a newly
+             * allocated response data. So we have to
+             * copy the content from the config db
+             * created by DMsgPtr::GetObjArgAt to the
+             * pResp held by the CIfIoReqTask.
+            */
             *pResp = *pCfg;
         }
 
@@ -3837,9 +3856,11 @@ gint32 CInterfaceProxy::SendProxyReq(
 
         if( !bSync )
         {
+            // sometimes we can land here successfully
+            // in the highly concurrent environment
             CCfgOpenerObj oCallback( pCallback );
-            oCallback.SetObjPtr(
-                propRespPtr, ObjPtr( pResp ) );
+            oCallback.SetObjPtr( propRespPtr,
+                ObjPtr( pResp ) );
         }
 
         ret = iRet;
