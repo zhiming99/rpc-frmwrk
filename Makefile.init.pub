@@ -47,5 +47,5 @@ ifeq ($(MODE),Release)
 endif
 
 CPP_FLAGS := $(C_FLAGS) -std=c++11
-LINKER_OPTION := -shared -m32 -ldl -lstdc++ -lpthread -L/usr/lib/ -Wl,-rpath=/user/lib -L/lib -Wl,-rpath=/lib
+LINKER_OPTION := -shared -m32 -ldl -lstdc++ -lpthread -L/usr/lib/ -Wl,-rpath=/user/lib -L/lib -Wl,-rpath=/lib -lglib-2.0 -ldbus-1 -ljsoncpp -ldbus-glib-1
 
