@@ -40,6 +40,6 @@ $(OUTPUT_DIR)/librpc.so :
 	-make -C ./rpc $(mygoal)
 
 test:
-	-make -C test
+	-make -C test $(mygoal)
 
 .PHONY: $(TARGETS) test

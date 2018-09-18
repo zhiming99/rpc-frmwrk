@@ -1669,9 +1669,7 @@ typedef std::pair< gint32, BufPtr > ARG_ENTRY;
 bool CRpcServices::IsQueuedReq()
 {
 
-    CStdRMutex oIfLock( GetLock() );
     bool bQueuedReq = false;
-
     CCfgOpenerObj oCfg( this );
     gint32 ret = oCfg.GetBoolProp(
         propQueuedReq, bQueuedReq );
