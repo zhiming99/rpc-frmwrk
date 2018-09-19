@@ -88,6 +88,12 @@ void CIfSmokeTest::testSvrStartStop()
 
     CPPUNIT_ASSERT( !m_pMgr.IsEmpty() );
 
+    CfgPtr pCfg = oCfg.GetCfg();
+    ret = CRpcServices::LoadObjDesc(
+        "./echodesc.json",
+        OBJNAME_ECHOSVR,
+        true, pCfg );
+
     oCfg.SetObjPtr( propIoMgr, m_pMgr );
     ret = pIf.NewObj(
         clsid( CEchoServer ),
@@ -115,6 +121,12 @@ void CIfSmokeTest::testCliStartStop()
     InterfPtr pIf;
 
     CPPUNIT_ASSERT( !m_pMgr.IsEmpty() );
+
+    CfgPtr pCfg = oCfg.GetCfg();
+    ret = CRpcServices::LoadObjDesc(
+        "./echodesc.json",
+        OBJNAME_ECHOSVR,
+        false, pCfg );
 
     oCfg.SetObjPtr( propIoMgr, m_pMgr );
     ret = pIf.NewObj(

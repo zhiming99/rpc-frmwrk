@@ -25,56 +25,8 @@
 
 using namespace std;
 
-
-static CfgPtr InitSvrCfg( const IConfigDb* pCfg )
-{
-    CParamList oParams;
-    *oParams.GetCfg() = *pCfg;
-
-    // port related information
-    if( !oParams.exist( propPortClass ) )
-        oParams[ propPortClass ] =
-            PORT_CLASS_LOCALDBUS_PDO;
-
-    if( !oParams.exist( propPortId ) )
-        oParams[ propPortId ] = 0;
-
-    string strBusName = PORT_CLASS_LOCALDBUS;
-    strBusName += "_0";
-
-    if( !oParams.exist( propBusName ) )
-        oParams[ propBusName ] = strBusName;
-
-    // dbus related information
-    if( !oParams.exist( propDestDBusName ) )
-        oParams[ propDestDBusName ] =
-            DBUS_DESTINATION( MOD_SERVER_NAME );
-
-    if( !oParams.exist( propMatchType ) )
-        oParams[ propMatchType ] = matchServer;
-
-    if( !oParams.exist( propIfName ) )
-        oParams[ propIfName ] =
-            DBUS_IF_NAME( OBJNAME_ECHOSVR  );
-
-    if( !oParams.exist( propObjPath ) )
-        oParams[ propObjPath ] = DBUS_OBJ_PATH(
-            MOD_SERVER_NAME, OBJNAME_ECHOSVR );
-
-    // timer information
-    if( !oParams.exist( propTimeoutSec ) )
-        oParams[ propTimeoutSec ] =
-            IFSTATE_DEFAULT_IOREQ_TIMEOUT;
-
-    if( !oParams.exist( propKeepAliveSec ) )
-        oParams[ propKeepAliveSec ] =
-            IFSTATE_DEFAULT_IOREQ_TIMEOUT;
-
-    return oParams.GetCfg();
-}
-
 CEchoServer::CEchoServer( const IConfigDb* pCfg )
-    : super( InitSvrCfg( pCfg ) )
+    : super( pCfg )
 {
     SetClassId( clsid( CEchoServer ) );
 }

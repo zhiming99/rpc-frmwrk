@@ -28,67 +28,9 @@
 using namespace std;
 
 
-static CfgPtr InitClientCfg( const IConfigDb* pCfg )
-{
-    CParamList oParams;
-    *oParams.GetCfg() = *pCfg;
-
-    // port related information
-    oParams[ propPortClass ] =
-        PORT_CLASS_LOCALDBUS_PDO;
-
-    oParams[ propPortId ] = 0;
-
-    string strBusName = PORT_CLASS_LOCALDBUS;
-    strBusName += "_0";
-
-    if( !oParams.exist( propBusName ) )
-        oParams[ propBusName ] = strBusName;
-
-    if( !oParams.exist( propSrcDBusName ) )
-        oParams[ propSrcDBusName ] =
-            DBUS_DESTINATION( MOD_CLIENT_NAME );
-
-    // dbus related information
-    string strObjPath = DBUS_OBJ_PATH(
-        MOD_SERVER_NAME, OBJNAME_ECHOSVR );
-
-    string strDest( strObjPath );
-
-    std::replace( strDest.begin(),
-        strDest.end(), '/', '.');
-
-    if( strDest[ 0 ] == '.' )
-        strDest = strDest.substr( 1 );
-
-    if( !oParams.exist( propDestDBusName ) )
-        oParams[ propDestDBusName ] = strDest;
-
-    if( !oParams.exist( propMatchType ) )
-        oParams[ propMatchType ] = matchClient;
-
-    if( !oParams.exist( propIfName ) )
-        oParams[ propIfName ] =
-            DBUS_IF_NAME( OBJNAME_ECHOSVR );
-
-    if( !oParams.exist( propObjPath ) )
-        oParams[ propObjPath ] = strObjPath;
-
-    // timer information
-    if( !oParams.exist( propTimeoutSec ) )
-        oParams[ propTimeoutSec ] =
-            IFSTATE_DEFAULT_IOREQ_TIMEOUT;
-
-    if( !oParams.exist( propKeepAliveSec ) )
-        oParams[ propKeepAliveSec ] =
-            IFSTATE_DEFAULT_IOREQ_TIMEOUT;
-
-    return oParams.GetCfg();
-}
-
 CEchoClient::CEchoClient(
     const IConfigDb* pCfg )
-    : super( InitClientCfg( pCfg ) )
+    : super( pCfg )
 {
     SetClassId( clsid( CEchoClient ) );
 }
