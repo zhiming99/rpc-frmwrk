@@ -12,4 +12,4 @@ This framework depends on the following packags:
 3. `libjson-cpp`  
 4. `libdbus-glib-1`  
   
-I will soon replace the glib with `libev` to reduce the resource footprint on the target system.
+I will soon replace the `glib` with `libev` to reduce the resource footprint on the target system.
