@@ -5,7 +5,7 @@ TARGET:=smoketest
 OBJS:= main.o
 LIB_DIR:=$(lastword $(OUTPUT_DIR) )
 
-LINKER_OPTION += -ldl -lstdc++ -L$(BASE)/debug/ -lipc -lrpc -lcombase
+LINKER_OPTION += -ldl -lstdc++ -L$(RPCLIB_DIR) -lipc -lcombase -L$(OUTPUT_DIR)
 
 all: $(TARGET)
 debug: $(TARGET)

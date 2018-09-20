@@ -1310,7 +1310,7 @@ gint32 CIoManager::ClearStandAloneThreads()
             // if there is a task CIoMgrStopTask in the
             // array, we don't need to count that
             // thread
-            guint32 dwClsid;
+            guint32 dwClsid = clsid( Invalid );
             oThrdCfg.GetIntProp( propClsid, dwClsid );
             if( dwClsid == clsid( CIoMgrStopTask ) )
                 iStopTask = 1;

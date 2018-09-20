@@ -6,6 +6,14 @@ all:
 	make -C evtest
 	make -C inproc
 
+release:
+	make -C iftest release
+	make -C asynctst release
+	make -C smoketest release
+	make -C actcancel release
+	make -C evtest release
+	make -C inproc release
+
 clean:
 	make -C iftest clean
 	make -C asynctst clean
@@ -14,3 +22,4 @@ clean:
 	make -C evtest clean
 	make -C inproc clean
 
+.PHONY: release clean

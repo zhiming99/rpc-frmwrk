@@ -150,7 +150,9 @@ do{\
     DebugMsg( ret, strFmt, ##__VA_ARGS__ ).c_str() );} )
 #else
 
-#define DebugPrint( ret, strFmt, ... )
+#define DebugPrint( ret, strFmt, ... ) \
+({ printf( "%s\n", \
+    DebugMsg( ret, strFmt, ##__VA_ARGS__ ).c_str() );} )
 
 #endif
 

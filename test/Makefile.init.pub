@@ -3,7 +3,7 @@ ARCH := arm
 
 mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
 
-BASE:=$(abspath $(dir $(mkfile_path) ).. )
+BASE:=$(abspath $(dir $(mkfile_path)).. )
 
 CC := $(CROSS_COMPILE)gcc
 CPP := $(CROSS_COMPILE)g++
@@ -28,10 +28,13 @@ C_INCLUDE := -I$(BASE)/include \
 	-I/usr/lib/dbus-1.0/include \
 	-I/usr/local/include\
 
-OUTPUT_DIR := $(BASE)/test/debug
 
-CPP_FLAGS := $(C_FLAGS) -std=c++11
+CPP_FLAGS := -std=c++11
 LINKER_OPTION := -m32 -ldl -lstdc++ -lpthread -L/usr/lib/ -Wl,-rpath=/user/lib -L/lib -Wl,-rpath=/lib -lcppunit
+
+OUTPUT_DIR := $(BASE)/test/debug
+RPCLIB_DIR := $(BASE)/debug
+OBJ_DIR:=./debug
 
 ifeq ($(MAKECMDGOALS),) 
 	C_FLAGS += $(DEBUG_FLAGS)
@@ -45,10 +48,29 @@ ifeq ($(MAKECMDGOALS),release)
 	C_FLAGS += $(RELEASE_FLAGS)
 	C_DEFINES += $(C_DEFINES) -DPRODUCTION 
 	OUTPUT_DIR := $(BASE)/test/release
-else ifeq ($(MAKECMDGOALS),clean)
+	RPCLIB_DIR := $(BASE)/release
+	OBJ_DIR := ./release
+else ifeq ($(MAKECMDGOALS),debug_clean)
+	OUTPUT_DIR := $(BASE)/test/debug
+	OBJ_DIR := ./debug
+else ifeq ($(MAKECMDGOALS),release_clean)
 	OUTPUT_DIR := $(BASE)/test/release
+	OBJ_DIR := ./release
+	RPCLIB_DIR := $(BASE)/release
 endif
 
-ifeq ($(MODE),Release)
-	OUTPUT_DIR := $(BASE)/test/release
-endif
+$(OBJ_DIR)/%.o : %.cpp
+	@echo Building file: $@
+	@if [ ! -d $(OBJ_DIR) ]; then mkdir -p $(OBJ_DIR);fi
+	$(CPP) $(C_DEFINES) $(C_FLAGS) $(CPP_FLAGS) $(C_INCLUDE) -o $@ $<
+
+$(OBJ_DIR)/%.d : %.cpp
+	@if [ ! -d $(OBJ_DIR) ]; then mkdir -p $(OBJ_DIR);fi
+	@$(CPP) $(C_DEFINES) $(C_FLAGS) $(CPP_FLAGS) $(C_INCLUDE) -MM $*.cpp > $@
+	@mv -f $@ $@.tmp
+	@sed -e 's|.*:|$(OBJ_DIR)/$*.o:|' < $@.tmp > $@
+	@sed -e 's/.*://' -e 's/\\$$//' < $@.tmp | fmt -1 | sed -e 's/^ *//' -e 's/$$/:/' >> $@
+	@rm -f $@.tmp
+
+LINKER_OPTION += -L$(RPCLIB_DIR) -lipc -lcombase -L$(OUTPUT_DIR)
+MUTE_CLEAN := 2>/dev/null || true

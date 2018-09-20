@@ -1698,6 +1698,7 @@ gint32 CIfStopTask::RunTask()
             break;
         }
 
+#ifdef DEBUG
         guint32 dwServer = 0;
         if( pIf->IsServer() )
             dwServer = 1;
@@ -1705,6 +1706,7 @@ gint32 CIfStopTask::RunTask()
         DebugPrint( dwServer,
             "About to close port, %d", GetTid() );
 
+#endif
         ret = pIf->ClosePort();
 
     }while( 0 );

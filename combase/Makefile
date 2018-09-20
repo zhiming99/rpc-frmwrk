@@ -1,49 +1,37 @@
 include ../Makefile.init.pub
 
 TARGET:=libcombase.so
-OBJS:= clsids.o autoptr.o buffer.o \
-	config.o objbase.o \
-	registry.o \
-	creatins.o \
-	serial.o \
-	dbuserr.o \
-	objfctry.o \
-	dmsgptr.o \
+SOURCES:= clsids.cpp autoptr.cpp buffer.cpp \
+	config.cpp objbase.cpp \
+	registry.cpp \
+	creatins.cpp \
+	serial.cpp \
+	dbuserr.cpp \
+	objfctry.cpp \
+	dmsgptr.cpp \
 
-all: $(TARGET)
-debug: $(TARGET)
-release: $(TARGET)
+OBJS:=$(SOURCES:%.cpp=$(OBJ_DIR)/%.o)
 
-$(TARGET) : $(OBJS)
+all: $(OUTPUT_DIR)/$(TARGET)
+debug: $(OUTPUT_DIR)/$(TARGET)
+release: $(OUTPUT_DIR)/$(TARGET)
+
+$(OUTPUT_DIR)/$(TARGET) : $(OBJS)
 	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
 	$(CC) -o $(OUTPUT_DIR)/$(TARGET) $(LINKER_OPTION) $(OBJS)
 
--include $(OBJS:.o=.d)
+-include $(OBJS:%.o=%.d)
 
-%.o : %.cpp
-	@echo Building file: $<
-	$(CPP) $(C_DEFINES) $(C_FLAGS ) $(CPP_FLAGS) $(C_INCLUDE) -o $@ $(CUR_DIR)/$<
-	@echo
-	@$(CPP) $(C_DEFINES) $(C_FLAGS ) $(CPP_FLAGS) $(C_INCLUDE) -MM $*.cpp > $*.d
-	@mv -f $*.d $*.d.tmp
-	@sed -e 's|.*:|$*.o:|' < $*.d.tmp > $*.d
-	@sed -e 's/.*://' -e 's/\\$$//' < $*.d.tmp | fmt -1 | sed -e 's/^ *//' -e 's/$$/:/' >> $*.d
-	@rm -f $*.d.tmp
-
-clsids.o : clsids.cpp
-autoptr.o : autoptr.cpp
-buffer.o : buffer.cpp
-config.o : config.cpp
-objbase.o : objbase.cpp
-registry.o : registry.cpp
-creatins.o : creatins.cpp
-serial.o : serial.cpp
-dbuserr.o : dbuserr.cpp
-objfctry.o : objfctry.cpp
-dmsgptr.o : dmsgptr.cpp
+debug_clean: do_clean
+release_clean: do_clean
 
 clean:
-	@rm *.o *.d
-	@rm $(OUTPUT_DIR)/$(TARGET)
+	make debug_clean
+	make release_clean
+
+do_clean:
+	-@rm $(OBJ_DIR)/*.d $(MUTE_CLEAN)
+	-@rm $(OUTPUT_DIR)/$(TARGET) $(MUTE_CLEAN)
+	-@rm $(OBJS) $(MUTE_CLEAN)
 
 .PHONY: sync

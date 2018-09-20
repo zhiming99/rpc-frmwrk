@@ -2,46 +2,34 @@ include ../Makefile.init.pub
 C_INCLUDE += -I../ipc
 
 TARGET:=librpc.so
-OBJS:= dbusprxy.o prxyfdo.o fdodrv.o \
-	tcpport.o stmpdo.o tcpfido.o reqfwdr.o \
-	rpcroute.o bridge.o filetran.o dllexp.o \
-	senddata.o
+SOURCES:= dbusprxy.cpp prxyfdo.cpp fdodrv.cpp \
+	tcpport.cpp stmpdo.cpp tcpfido.cpp reqfwdr.cpp \
+	rpcroute.cpp bridge.cpp filetran.cpp dllexp.cpp \
+	senddata.cpp
 
-all: $(TARGET)
-debug: $(TARGET)
-release: $(TARGET)
+OBJS:=$(SOURCES:%.cpp=$(OBJ_DIR)/%.o)
 
-$(TARGET) : $(OBJS)
+all: $(OUTPUT_DIR)/$(TARGET)
+debug: $(OUTPUT_DIR)/$(TARGET)
+release: $(OUTPUT_DIR)/$(TARGET)
+
+$(OUTPUT_DIR)/$(TARGET) : $(OBJS)
 	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
 	$(CC) -o $(OUTPUT_DIR)/$(TARGET) $(LINKER_OPTION) $(OBJS)
 
--include $(OBJS:.o=.d)
+-include $(OBJS:%.o=%.d)
 
-%.o : %.cpp
-	@echo Building file: $<
-	$(CPP) $(C_DEFINES) $(C_FLAGS ) $(CPP_FLAGS) $(C_INCLUDE) -o $@ $(CUR_DIR)/$<
-	@echo
-	@$(CPP) $(C_DEFINES) $(C_FLAGS ) $(CPP_FLAGS) $(C_INCLUDE) -MM $*.cpp > $*.d
-	@mv -f $*.d $*.d.tmp
-	@sed -e 's|.*:|$*.o:|' < $*.d.tmp > $*.d
-	@sed -e 's/.*://' -e 's/\\$$//' < $*.d.tmp | fmt -1 | sed -e 's/^ *//' -e 's/$$/:/' >> $*.d
-	@rm -f $*.d.tmp
-
-dllexp.o	: dllexp.cpp
-dbusprxy.o : dbusprxy.cpp
-prxyfdo.o : prxyfdo.cpp
-fdodrv.o : fdodrv.cpp
-tcpport.o : tcpport.cpp
-stmpdo.o : stmpdo.cpp
-tcpfido.o : tcpfido.cpp
-reqfwdr.o : reqfwdr.cpp
-rpcroute.o : rpcroute.cpp
-bridge.o : bridge.cpp
-filetran.o: filetran.cpp
-senddata.o: senddata.cpp
+debug_clean: do_clean
+release_clean: do_clean
 
 clean:
-	@rm *.o *.d
+	make debug_clean
+	make release_clean
+
+do_clean:
+	-@rm $(OBJ_DIR)/*.d $(MUTE_CLEAN)
+	-@rm $(OUTPUT_DIR)/$(TARGET) $(MUTE_CLEAN)
+	-@rm $(OBJS) $(MUTE_CLEAN)
 
 sync:
 	bash ./sync-up.sh

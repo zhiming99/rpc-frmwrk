@@ -1,60 +1,52 @@
-#!make
 include ../Makefile.init.pub
 
 TARGET_SVR:=inproctst
+CLASS_LIB:=libinproc.so
+CLASS_LINK:=inproc
 
-TARGET:=$(TARGET_SVR)
+TARGET:=$(OUTPUT_DIR)/$(TARGET_SVR)
 OBJS_SVR:= inproctst.o
 
-InProcLib:=libinproc.so
-OBJS2:= inprocsvr.o inprocli.o
-
-LIB_DIR:=$(lastword $(OUTPUT_DIR) )
-
-LINKER_OPTION += -ldl -lstdc++ -L$(BASE)/debug/ -lipc -lcombase -L$(BASE)/test/debug/ 
+SOURCES:= inprocsvr.cpp inprocli.cpp
+OBJS2:=$(SOURCES:%.cpp=$(OBJ_DIR)/%.o)
 
 all: $(TARGET)
 debug: $(TARGET)
 release: $(TARGET)
 
--include $(OBJS2:.o=.d)
--include $(OBJS_SVR:.o=.d)
-
-$(TARGET_SVR) : $(InProcLib) $(OBJS_SVR)
-	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
-	$(CC) -o $(OUTPUT_DIR)/$(TARGET_SVR) $(LINKER_OPTION) -linproc $(OBJS_SVR)
-
-$(InProcLib) : $(OBJS2)
-	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
-	$(CC) -o $(OUTPUT_DIR)/$(InProcLib) $(LINKER_OPTION) -shared $(OBJS2)
-
-%.o : %.cpp
-	@echo Building file: $<
-	$(CPP) $(C_DEFINES) $(C_FLAGS) $(CPP_FLAGS) $(C_INCLUDE) -o $@ $(CUR_DIR)/$<
-	@echo
-	@$(CPP) $(C_DEFINES) $(C_FLAGS ) $(CPP_FLAGS) $(C_INCLUDE) -MM $*.cpp > $*.d
-	@mv -f $*.d $*.d.tmp
-	@sed -e 's|.*:|$*.o:|' < $*.d.tmp > $*.d
-	@sed -e 's/.*://' -e 's/\\$$//' < $*.d.tmp | fmt -1 | sed -e 's/^ *//' -e 's/$$/:/' >> $*.d
-	@rm -f $*.d.tmp
-
-inproctst.o : inproctst.cpp
-	@echo Building file: $<
-	$(CPP) $(C_DEFINES) $(C_FLAGS) $(CPP_FLAGS) $(C_INCLUDE) -o $@ $(CUR_DIR)/$<
-	@echo
-	@$(CPP) $(C_DEFINES) $(C_FLAGS ) $(CPP_FLAGS) $(C_INCLUDE) -MM inproctst.cpp > $*.d
-	@mv -f $*.d $*.d.tmp
-	@sed -e 's|.*:|$*.o:|' < $*.d.tmp > $*.d
-	@sed -e 's/.*://' -e 's/\\$$//' < $*.d.tmp | fmt -1 | sed -e 's/^ *//' -e 's/$$/:/' >> $*.d
-	@rm -f $*.d.tmp
-
-inprocli.o : inprocli.cpp
-inprocsvr.o : inprocsvr.cpp 
-
-
 clean:
-	-@rm *.o *.d
-	-@rm $(OUTPUT_DIR)/$(TARGET_SVR)
-	-@rm $(OUTPUT_DIR)/$(InProcLib)
+	make debug_clean
+	make release_clean
 
-.PHONY: sync TARGET
+debug_clean: do_clean
+release_clean: do_clean
+
+do_clean:
+	-@rm $(OBJ_DIR)/*.d $(MUTE_CLEAN)
+	-@rm $(OUTPUT_DIR)/$(TARGET_SVR) $(MUTE_CLEAN)
+	-@rm $(OUTPUT_DIR)/$(CLASS_LIB) $(MUTE_CLEAN)
+	-@rm $(SOURCES:%.cpp=$(OBJ_DIR)/%.o) $(MUTE_CLEAN)
+	-@rm $(OBJ_DIR)/$(OBJS_SVR) $(MUTE_CLEAN)
+
+-include $(OBJS2:%.o=%.d) $(OBJS_SVR:%.o=(OBJ_DIR)/%.d)
+
+$(OUTPUT_DIR)/$(TARGET_SVR) : $(OUTPUT_DIR)/$(CLASS_LIB) $(OBJ_DIR)/$(OBJS_SVR)
+	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
+	$(CC) -o $@ $(LINKER_OPTION) -l$(CLASS_LINK) $(OBJ_DIR)/$(OBJS_SVR)
+
+$(OUTPUT_DIR)/$(CLASS_LIB) : $(OBJS2)
+	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
+	$(CC) -o $@ $(LINKER_OPTION) -shared $(OBJS2)
+
+
+$(OBJ_DIR)/inproctst.o : inproctst.cpp
+	@echo Building file: $@
+	$(CPP) $(C_DEFINES) $(C_FLAGS) $(CPP_FLAGS) $(C_INCLUDE) -o $@ $(CUR_DIR)/$<
+	@$(CPP) $(C_DEFINES) $(C_FLAGS) $(CPP_FLAGS) $(C_INCLUDE) -MM $< > $@.d
+	@mv -f $@.d $@.tmp
+	@sed -e 's|.*:|$*.o:|' < $@.tmp > $@.d
+	@sed -e 's/.*://' -e 's/\\$$//' < $@.tmp | fmt -1 | sed -e 's/^ *//' -e 's/$$/:/' >> $@.d
+	@mv -f $@.d $*.d
+	@rm -f $@.tmp
+
+.PHONY: sync TARGET clean

@@ -1610,11 +1610,11 @@ gint32 CInterfaceServer::SendEvent(
             MatchPtr pIfMatch;
             for( auto pMatch : m_vecMatches )
             {
-                EnumClsid iidMatch = clsid( Invalid );
+                guint32 iidMatch = clsid( Invalid );
                 CCfgOpenerObj oMatch( ( CObjBase* )pMatch );
 
                 ret = oMatch.GetIntProp(
-                    propIid, ( guint32& )iidMatch );
+                    propIid, iidMatch );
 
                 if( ERROR( ret ) )
                     continue;

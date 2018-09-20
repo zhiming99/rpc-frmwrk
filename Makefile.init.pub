@@ -25,6 +25,7 @@ C_INCLUDE := -I../include \
 	-I/usr/include \
 
 OUTPUT_DIR := ../debug
+OBJ_DIR := ./debug
 
 ifeq ($(MAKECMDGOALS),) 
 	C_FLAGS += $(DEBUG_FLAGS)
@@ -38,14 +39,31 @@ ifeq ($(MAKECMDGOALS),release)
 	C_FLAGS += $(RELEASE_FLAGS)
 	C_DEFINES += $(C_DEFINES) -DPRODUCTION 
 	OUTPUT_DIR := ../release
-else ifeq ($(MAKECMDGOALS),rclean)
+	OBJ_DIR := ./release
+else ifeq ($(MAKECMDGOALS),debug_clean)
+	OUTPUT_DIR := ../debug
+	OBJ_DIR := ./debug
+else ifeq ($(MAKECMDGOALS),release_clean)
 	OUTPUT_DIR := ../release
-endif
-
-ifeq ($(MODE),Release)
-	OUTPUT_DIR := ../release
+	OBJ_DIR := ./release
 endif
 
 CPP_FLAGS := $(C_FLAGS) -std=c++11
+
 LINKER_OPTION := -shared -m32 -ldl -lstdc++ -lpthread -L/usr/lib/ -Wl,-rpath=/user/lib -L/lib -Wl,-rpath=/lib -lglib-2.0 -ldbus-1 -ljsoncpp -ldbus-glib-1
+
+MUTE_CLEAN := 2>/dev/null || true
+
+$(OBJ_DIR)/%.o : %.cpp
+	@echo Building file: $@
+	@if [ ! -d $(OBJ_DIR) ]; then mkdir -p $(OBJ_DIR);fi
+	$(CPP) $(C_DEFINES) $(C_FLAGS) $(CPP_FLAGS) $(C_INCLUDE) -o $@ $<
+
+$(OBJ_DIR)/%.d : %.cpp
+	@if [ ! -d $(OBJ_DIR) ]; then mkdir -p $(OBJ_DIR);fi
+	@$(CPP) $(C_DEFINES) $(C_FLAGS) $(CPP_FLAGS) $(C_INCLUDE) -MM $*.cpp > $@
+	@mv -f $@ $@.tmp
+	@sed -e 's|.*:|$(OBJ_DIR)/$*.o:|' < $@.tmp > $@
+	@sed -e 's/.*://' -e 's/\\$$//' < $@.tmp | fmt -1 | sed -e 's/^ *//' -e 's/$$/:/' >> $@
+	@rm -f $@.tmp
 
