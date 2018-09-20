@@ -11,5 +11,6 @@ This framework depends on the following packags:
 2. `dbus-1.0`  
 3. `libjson-cpp`  
 4. `libdbus-glib-1`  
+5. `cppunit-1 (for test only)`
   
 I will soon replace the `glib` with `libev` to reduce the resource footprint on the target system.
