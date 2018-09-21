@@ -1497,10 +1497,9 @@ do{ \
         ( *pTask )( eventZero ); \
 }while( 0 )
 
+
 class CIoReqSyncCallback : public CSyncCallback
 {
-
-    sem_t m_semSync;
     public:
     typedef CSyncCallback super;
 
@@ -1508,14 +1507,7 @@ class CIoReqSyncCallback : public CSyncCallback
         : super( pCfg ) 
     {
         SetClassId( clsid( CIoReqSyncCallback ) );
-        Sem_Init( &m_semSync, 0, 0 );
     }
-
-    ~CIoReqSyncCallback()
-    {
-        sem_destroy( &m_semSync );
-    }
-
     gint32 operator()( guint32 dwContext = 0 );
 };
 

@@ -587,11 +587,11 @@ gint32 CTimerService::Start()
     if( m_pTimeSrc == nullptr )
         return -EFAULT;
 
-    g_source_set_callback(
-        m_pTimeSrc, TimerCallback, ( gpointer )this, nullptr );
+    g_source_set_callback( m_pTimeSrc,
+        TimerCallback, ( gpointer )this, nullptr );
 
-    m_dwTimerId = g_source_attach(
-        m_pTimeSrc, GetIoMgr()->GetMainIoLoop().GetMainCtx() );
+    m_dwTimerId = g_source_attach( m_pTimeSrc,
+        GetIoMgr()->GetMainIoLoop().GetMainCtx() );
 
     m_qwTimeStamp = g_get_monotonic_time();
     return 0;

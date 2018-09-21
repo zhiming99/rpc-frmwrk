@@ -29,6 +29,37 @@
 #include "frmwrk.h"
 
 using namespace std;
+class IMainLoop: public IService
+{
+public:
+
+    // io watcher + timer
+    virtual gint32 HookDBusConn(
+        DBusConnection* pConn ) = 0;
+
+    // timer
+    virtual gint32 AddTimer(
+        guint32 dwIntervalMs,
+        guint32 dwFlags,
+        TaskletPtr& pCallback ) = 0;
+
+    virtual gint32 RemoveTimer(
+        TaskletPtr& pCallback ) = 0;
+
+    virtual guint64 GetMonotonicTime() = 0;
+
+    // io watcher
+    virtual gint32 AddIoWatcher(
+        int fd, guint32 dwFlags,
+        IEventSink* pCallback ) = 0;
+
+    virtual gint32 RemoveIoWatcher(
+        IEventSink* pCallback ) = 0;
+
+    // idle watcher
+    virtual gint32 ScheduleTask(
+        TaskletPtr& pTask ) = 0;
+};
 
 CMainIoLoop::CMainIoLoop( const IConfigDb* pCfg ) :
     m_queTasks( true )

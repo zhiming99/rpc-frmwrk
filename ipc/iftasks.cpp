@@ -420,14 +420,14 @@ gint32 CIfRetryTask::OnEvent(
     ( *pVec )().push_back( ( guint32 )pData);
 
     CStdRTMutex oTaskLock( GetLock() );
-    CCfgOpenerObj oCfg( this );
+    CCfgOpener oCfg( ( IConfigDb* )GetConfig() );
     oCfg.SetObjPtr( iPropId, ObjPtr( pVec ) );
     oTaskLock.Unlock();
 
     ( *this )( iEvent );
 
     oTaskLock.Lock();
-    RemoveProperty( iPropId );
+    oCfg.RemoveProperty( iPropId );
 
     return GetError();
 }

@@ -119,6 +119,10 @@ gint32 CTasklet::OnEvent(
 
     ( *this )( iEvent );
 
+    // NOTE: here there is slim chance of risk the
+    // removal can conflict with external synchronized
+    // threads who is wakeup in the operatr(), and
+    // begin to read property on this task.
     this->RemoveProperty( propParamList );
     return GetError();
 }
@@ -494,6 +498,40 @@ CTaskletRetriable::CTaskletRetriable(
             TASKLET_RETRY_DEF_INTERVALSEC );
 }
 
+gint32 CThreadSafeTask::OnEvent(
+    EnumEventId iEvent,
+    guint32 dwParam1,
+    guint32 dwParam2,
+    guint32* pData )
+{ 
+    // an trigger from event interface
+    IntVecPtr pVec( true );
+    ( *pVec )().push_back( ( guint32 )iEvent );
+    ( *pVec )().push_back( ( guint32 )dwParam1 );
+    ( *pVec )().push_back( ( guint32 )dwParam2 );
+    ( *pVec )().push_back( ( guint32 )pData);
+
+
+    // NOTE: propParamList is used here to pass
+    // the event parameters. so don't use
+    // propParamList when passing parameters to
+    // tasklet.
+    CStdRTMutex oLock( GetLock() );
+    CCfgOpener oCfg( ( IConfigDb* )GetConfig() );
+    oCfg.SetObjPtr( propParamList, ObjPtr( pVec ) );
+    oLock.Unlock();
+
+    ( *this )( iEvent );
+
+    // NOTE: here there is slim chance of risk the
+    // removal can conflict with external synchronized
+    // threads who is wakeup in the operatr(), and
+    // begin to read property on this task.
+    oLock.Lock();
+    oCfg.RemoveProperty( propParamList );
+    return GetError();
+}
+
 gint32 CSyncCallback::operator()(
     guint32 dwContext )
 {
@@ -522,3 +560,4 @@ gint32 CSyncCallback::WaitForComplete()
 
     return ret;
 }
+

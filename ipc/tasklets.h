@@ -643,17 +643,71 @@ class CFidoRecvDataTask
     gint32 Process( guint32 dwContext );
 };
 
+class CThreadSafeTask : public CTaskletRetriable
+{
+
+    mutable stdrtmutex  m_oLock;
+    public:
+    typedef CTaskletRetriable super;
+
+    CThreadSafeTask( const IConfigDb* pCfg )
+        : super( pCfg )
+    {;}
+
+    inline stdrtmutex& GetLock() const
+    { return m_oLock; }
+
+    gint32 GetProperty( gint32 iProp,
+            CBuffer& oBuf ) const
+    {
+        CStdRTMutex oTaskLock( GetLock() );
+        return super::GetProperty( iProp, oBuf );
+    }
+
+    gint32 SetProperty( gint32 iProp,
+        const CBuffer& oBuf )
+    {
+        CStdRTMutex oTaskLock( GetLock() );
+        return super::SetProperty( iProp, oBuf );
+    }
+
+    gint32 RemoveProperty( gint32 iProp )
+    {
+        CStdRTMutex oTaskLock( GetLock() );
+        return super::RemoveProperty( iProp );
+    }
+
+    gint32 EnumProperties(
+        std::vector< gint32 >& vecProps ) const
+    {
+        CStdRTMutex oTaskLock( GetLock() );
+        return super::EnumProperties( vecProps );
+    }
+
+    gint32 GetPropertyType(
+        gint32 iProp, gint32& iType ) const
+    {
+        CStdRTMutex oTaskLock( GetLock() );
+        return super::GetPropertyType( iProp, iType );
+    }
+
+    gint32 OnEvent( EnumEventId iEvent,
+            guint32 dwParam1,
+            guint32 dwParam2,
+            guint32* pData );
+};
+
 class CSyncCallback :
-    public CTasklet
+    public CThreadSafeTask
 {
     protected:
     sem_t m_semWait;
 
     public:
-    typedef  CTasklet super;
+    typedef  CThreadSafeTask super;
 
     CSyncCallback( const IConfigDb* pCfg = nullptr)
-        : CTasklet( pCfg ) 
+        : CThreadSafeTask( pCfg ) 
     {
         SetClassId( clsid( CSyncCallback ) );
         Sem_Init( &m_semWait, 0, 0 );
@@ -666,5 +720,7 @@ class CSyncCallback :
 
     gint32 operator()( guint32 dwContext = 0 );
     gint32 WaitForComplete();
+    gint32 Process( guint32 dwContext )
+    { return -ENOTSUP; }
 };
 
