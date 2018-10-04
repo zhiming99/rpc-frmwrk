@@ -4,7 +4,7 @@ An effort for embedded RPC framework, and hope it could find its usage in IOT or
 ---
 [ Thu Oct  4 12:24:00 CST 2018 ]   
 1. After some tests, I cannot find a way to put `libev` in the concurrent environment flawlessly.
-So `libev` is abandoned.   
+So `libev` is abandoned. [(Reason)](https://github.com/zhiming99/rpc-frmwrk/wiki/Why-libev-cannot-be-used-in-rpc-frmwrk%3F)  
 2. I will write a simple mainloop with `poll` to fix it.   
 
 [ Thu 20 Sep 2018 10:35:23 AM CST ]
