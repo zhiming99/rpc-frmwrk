@@ -658,11 +658,7 @@ class CThreadSafeTask : public CTaskletRetriable
     { return m_oLock; }
 
     gint32 GetProperty( gint32 iProp,
-            CBuffer& oBuf ) const
-    {
-        CStdRTMutex oTaskLock( GetLock() );
-        return super::GetProperty( iProp, oBuf );
-    }
+            CBuffer& oBuf ) const;
 
     gint32 SetProperty( gint32 iProp,
         const CBuffer& oBuf )

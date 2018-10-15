@@ -161,7 +161,8 @@ gint32 CTaskQueue::GetSize()
     return m_queTasks.size();
 }
 
-CTaskThread::CTaskThread() :
+CTaskThread::CTaskThread(
+    const IConfigDb* pCfg ) :
     m_pTaskQue( true )
 {
     SetClassId( clsid( CTaskThread ) );
@@ -669,46 +670,59 @@ gint32 CThreadPool::GetThread(
     ThreadPtr& pThread, bool bStart )
 {
     gint32 ret = 0;
-
     do{
-
         ThreadPtr thptr;
         CStdRMutex oLock( m_oLock ); 
         vector<ThreadPtr>::iterator itr =
             m_vecThreads.begin();
 
+        gint32 iLeastLoad = 10000;
+        ThreadPtr thLeast;
+
         while( itr != m_vecThreads.end() ) 
         {
-            // a simple load balance
-            if( ( *itr )->GetLoadCount() < m_iLoadLimit )
+            // a simple thread choosing strategy
+            gint32 iLoad =
+                ( *itr )->GetLoadCount();
+
+            if( iLoad < iLeastLoad )
             {
-                thptr = *itr;
-                break;
+                iLeastLoad = iLoad;
+                thLeast = *itr;
             }
             ++itr;
         }
 
-        bool bEmpty = thptr.IsEmpty();
-        if( bEmpty || !thptr->IsRunning() )
+        if( iLeastLoad <= 0 )
+        {
+            pThread = thLeast;
+            break;
+        }
+
+        if( m_vecThreads.size() <
+            ( guint32 )m_iMaxThreads )
         {
             ret = thptr.NewObj( m_iThreadClass );
             if( ERROR( ret ) )
-            {
                 break;
-            }
 
             CCfgOpenerObj oCfg( ( CObjBase* )thptr );
-
             oCfg.SetIntProp( propThreadId,
                 m_iThreadCount++ );
 
             if( bStart )
                 thptr->Start();
-
-            if( bEmpty )
-            {
-                m_vecThreads.push_back( thptr );
-            }
+            m_vecThreads.push_back( thptr );
+        }
+        else if( m_vecThreads.size() >
+            ( guint32 )m_iMaxThreads )
+        {
+            thptr = thLeast;
+        }
+        else
+        {
+           ret = ERROR_FAIL;
+           break;
         }
         pThread = thptr;
 
@@ -779,6 +793,11 @@ CThreadPool::CThreadPool( const IConfigDb* pCfg )
         throw std::invalid_argument(
             "thread class is not given" );
 
+    ret = a.GetPointer( propIoMgr, m_pMgr );
+    if( ERROR( ret ) )
+        throw std::invalid_argument(
+            "iomgr is not given" );
+
     m_iThreadClass = ( EnumClsid )dwValue;
     m_iThreadCount = 0;
 }
@@ -847,4 +866,22 @@ gint32 CTaskThreadPool::RemoveTask(
     }while( 0 );
 
     return ret;
+}
+
+namespace std {
+
+    template<>
+    struct less<ThreadPtr>
+    {
+        bool operator()(const ThreadPtr& k1, const ThreadPtr& k2) const
+        {
+            if( k2.IsEmpty() )
+                return false;
+
+            if( k1.IsEmpty() )
+                return true;
+
+            return k1->GetLoadCount() < k2->GetLoadCount();
+        }
+    };
 }

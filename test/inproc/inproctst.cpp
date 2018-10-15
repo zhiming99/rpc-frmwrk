@@ -122,7 +122,8 @@ void CIfSmokeTest::testSvrStartStop(
     while( pIf->GetState() == stateConnected &&
         !bExit )
     {
-        ret = pSvr->OnHelloWorld( "Hello, World from server!" );
+        ret = pSvr->OnHelloWorld(
+            "Hello, World from server!" );
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
         sleep( 1 );
     }

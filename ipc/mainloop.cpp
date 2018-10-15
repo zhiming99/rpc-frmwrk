@@ -23,199 +23,97 @@
 #include <functional>
 #include  <sys/syscall.h>
 #include "configdb.h"
-#include "irp.h"
-#include "port.h"
-#include "dbusport.h"
 #include "frmwrk.h"
+#include "mainloop.h"
 
-using namespace std;
-class IMainLoop: public IService
+gint32 CSchedTaskCallback::operator()(
+    guint32 dwContext )
 {
-public:
+    gint32 ret = 0;
+    do{
+        CCfgOpener oCfg(
+            ( IConfigDb* )GetConfig() );
+        CIoManager* pMgr = nullptr;
 
-    // io watcher + timer
-    virtual gint32 HookDBusConn(
-        DBusConnection* pConn ) = 0;
-
-    // timer
-    virtual gint32 AddTimer(
-        guint32 dwIntervalMs,
-        guint32 dwFlags,
-        TaskletPtr& pCallback ) = 0;
-
-    virtual gint32 RemoveTimer(
-        TaskletPtr& pCallback ) = 0;
-
-    virtual guint64 GetMonotonicTime() = 0;
-
-    // io watcher
-    virtual gint32 AddIoWatcher(
-        int fd, guint32 dwFlags,
-        IEventSink* pCallback ) = 0;
-
-    virtual gint32 RemoveIoWatcher(
-        IEventSink* pCallback ) = 0;
-
-    // idle watcher
-    virtual gint32 ScheduleTask(
-        TaskletPtr& pTask ) = 0;
-};
-
-CMainIoLoop::CMainIoLoop( const IConfigDb* pCfg ) :
-    m_queTasks( true )
-{
-    SetClassId( clsid( CMainIoLoop ) );
-    CCfgOpener a( pCfg );
-
-    ObjPtr pObj;
-    a.GetObjPtr( propIoMgr, pObj );
-    m_pIoMgr = pObj;
-
-    m_dwTid = 0;
-    m_pTaskSrc = nullptr;
-
-    m_pMainCtx = g_main_context_new();
-    m_pMainLoop = g_main_loop_new( m_pMainCtx, false );
-
-}
-
-CMainIoLoop::~CMainIoLoop()
-{
-
-    if( m_pTaskSrc )
-    {
-        // g_source_destroy( m_pTaskSrc );
-        g_source_unref( m_pTaskSrc );
-    }
-
-    g_main_context_unref( m_pMainCtx );
-    g_main_loop_unref( m_pMainLoop );
-}
-
-gint32 CMainIoLoop::Stop()
-{
-    g_main_loop_quit( m_pMainLoop );
-    if( m_pThread  )
-    {
-        m_pThread->join();
-        delete m_pThread;
-        m_pThread = nullptr;
-    }
-    m_dwTid = 0;
-    return 0;
-}
-
-void CMainIoLoop::AddTask( TaskletPtr& pTask )
-{
-    m_queTasks->AddTask( pTask );
-    InstallTaskSource();
-}
-
-gboolean CMainIoLoop::TaskCallback( gpointer pdata )
-{
-    CMainIoLoop* pLoop =
-        reinterpret_cast< CMainIoLoop* >( pdata );
-
-    while( 1 )
-    {
-        gint32 ret = 0;
-        TaskletPtr pTask;
-
-        ret = pLoop->GetTaskQue()->PopHead( pTask );
+        ret = oCfg.GetPointer(
+            propIoMgr, pMgr );
 
         if( ERROR( ret ) )
             break;
 
-        ( *pTask )( ( guint32 )pdata );
-    }
+        MloopPtr pLoop =
+            pMgr->GetMainIoLoop();
 
-    return G_SOURCE_REMOVE;
+        CMainIoLoop* pMainLoop = pLoop;
+        if( pMainLoop == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        ret = CMainIoLoop::TaskCallback(
+            ( gpointer )pMainLoop );
+
+    }while( 0 );
+
+#ifndef _USE_LIBEV
+    // for glib, this is an idle source, and it
+    // must be removed to aovid running
+    // repeatedly without tasks.
+    return SetError( ret );
+#else
+    // for libev, this is an async source, and
+    // unless the loop is signaled, it will not be
+    // run repeatedly
+    return SetError( G_SOURCE_CONTINUE );
+#endif
 }
 
-gint32 CMainIoLoop::ThreadProc()
-{
-
-    gint32 ret = 0;
-
-    SetThreadName( "MainLoop" );
-
-    m_dwTid = GetTid();
-
-    // now we have a way to inject the command
-    // to the main loop
-
-    // for the tasks added before start
-    InstallTaskSource();
-
-    g_main_context_push_thread_default( m_pMainCtx );
-    g_main_loop_run( m_pMainLoop );
-
-    // wait for those thread to quit
-    GetIoMgr()->WaitThreadsQuit();
-    return ret;
-}
-
-gint32 CMainIoLoop::Start()
-{
-    gint32 ret = 0;
-
-    // c++11 required for std::bind
-    function<gint32()> oThreadProc =
-        std::bind( &CMainIoLoop::ThreadProc, this );
-
-    m_pThread = new std::thread( oThreadProc );
-    if( m_pThread == nullptr )
-    {
-        ret = -EFAULT;
-    }
-    return ret;
-}
-
+template<>
 gint32 CMainIoLoop::InstallTaskSource()
 {
     gint32 ret = 0;
+    do{
+        TaskletPtr pTask;
 
-    if( m_pMainLoop == nullptr ||
-        m_pMainCtx == nullptr )
-        return ERROR_STATE;
+        if( m_pSchedCb.IsEmpty() )
+        {
+            CParamList oCfg;
+            ret = oCfg.SetPointer(
+               propIoMgr, this->GetIoMgr() );
 
-    CStdMutex oLock( m_oLock );
-    bool bDestroied = false;
-    if( m_pTaskSrc != nullptr )
-    {
-        bDestroied =
-            g_source_is_destroyed( m_pTaskSrc );
-    }
+            if( ERROR( ret ) )
+                break;
 
-    gint32 iCount = GetTaskQue()->GetSize();
+            // to start immediately
+            oCfg.Push( true ); 
+            ret = m_pSchedCb.NewObj(
+                clsid( CSchedTaskCallback ),
+                oCfg.GetCfg() );
+        
+            if( ERROR( ret ) )
+                break;
 
-    if( m_pTaskSrc == nullptr )
-    {
-        m_pTaskSrc = g_idle_source_new();
-    }
-    else if( ( bDestroied && iCount > 0 ) ||
-        ( !bDestroied && iCount == 0 ) )
-    {
-        // FIXME: we have the chance to install one
-        // new idle handler while the old one has not
-        // quit yet
-        g_source_unref( m_pTaskSrc );
-        m_pTaskSrc = g_idle_source_new();
-    }
-    else
-    {
-        return 0;
-    }
+#ifndef _USE_LIBEV
+        }
 
-    if( m_pTaskSrc == nullptr )
-        return -ENOMEM;
+        // m_pSchedCb is already active, no
+        // need to install it again
+        if( !IsTaskDone() )
+            break;
+        SetTaskDone( false );
+        ret = this->AddIdleWatch(
+            m_pSchedCb, m_hTaskWatch );
 
-    g_source_set_callback(
-        m_pTaskSrc, TaskCallback,
-        ( gpointer )this, nullptr );
+#else
+            // nothing to do here
+        }
 
-    g_source_attach(
-        m_pTaskSrc, m_pMainCtx );
+        if( !IsTaskDone() )
+            break;
+        SetTaskDone( false );
+        this->WakeupLoop( aevtRunSched );
+#endif
+    }while( 0 );
 
     return ret;
 }

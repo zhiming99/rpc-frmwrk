@@ -907,13 +907,25 @@ inline gint32 NewDeferredCall( TaskletPtr& pCallback,
 ({ \
     TaskletPtr pTask; \
     gint32 ret_ = NewDeferredCall( pTask, pObj, func, __VA_ARGS__ ); \
-    if( SUCCEEDED( ret ) ) \
+    if( SUCCEEDED( ret_ ) ) \
+        ret_ = pMgr->RescheduleTask( pTask ); \
+    ret_; \
+})
+
+#define DEFER_CALL_NOARG( pMgr, pObj, func ) \
+({ \
+    TaskletPtr pTask; \
+    gint32 ret_ = NewDeferredCall( pTask, pObj, func ); \
+    if( SUCCEEDED( ret_ ) ) \
         ret_ = pMgr->RescheduleTask( pTask ); \
     ret_; \
 })
 
 #define DEFER_CALL_NOSCHED( pTask, pObj, func, ... ) \
-    NewDeferredCall( pTask, pObj, func, __VA_ARGS__ ); \
+    NewDeferredCall( pTask, pObj, func, __VA_ARGS__ )
+
+#define DEFER_CALL_NOSCHED_NOARG( pTask, pObj, func ) \
+    NewDeferredCall( pTask, pObj, func )
 
 template<typename ClassName, typename ...Args>
 class CDeferredCallOneshot :
@@ -1560,9 +1572,18 @@ gint32 CInterfaceProxy::SyncCallEx(
             break; 
 
         ObjPtr pObj; 
-        CCfgOpenerObj oTask( ( CObjBase* )pTask ); 
+        CStdRTMutex oLock( pSyncCall->GetLock() );
+        // CCfgOpener is faster than CCfgOpenerObj
+        CCfgOpener oTask(
+            ( IConfigDb* )pTask->GetConfig() ); 
         ret = oTask.GetObjPtr( propRespPtr, pObj ); 
-
+        oLock.Unlock();
+        if( ERROR( ret ) )
+        {
+            DebugPrint( ret, "fatal error, about to quit, tid=%d\n",
+                ::GetTid() );
+            break;
+        }
         pResp = pObj; 
         CParamList oNewResp( ( IConfigDb* )pResp );
         if( !oNewResp.exist( propReturnValue ) )

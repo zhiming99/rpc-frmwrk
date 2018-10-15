@@ -25,7 +25,6 @@
 #include <atomic>
 #include <algorithm>
 #include <set>
-#include <glib.h>
 #include "clsids.h"
 #include "propids.h"
 #include "autoptr.h"

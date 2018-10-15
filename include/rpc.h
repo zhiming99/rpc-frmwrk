@@ -16,7 +16,6 @@
  * =====================================================================================
  */
 #pragma once
-#include <glib.h>
 #include <type_traits>
 #include <string.h>
 #include <dbus/dbus.h>

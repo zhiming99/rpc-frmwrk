@@ -1122,9 +1122,9 @@ gint32 CIoManager::OnEvent( EnumEventId iEvent,
     return ret;
 }
 
-CMainIoLoop& CIoManager::GetMainIoLoop() const
+CMainIoLoop* CIoManager::GetMainIoLoop() const
 {
-    return *m_pLoop;
+    return m_pLoop;
 }
 
 const string& CIoManager::GetModName() const
@@ -1157,8 +1157,16 @@ gint32 CIoManager::PortExist(
 
 bool CIoManager::RunningOnMainThread() const
 {
+
+    CMainIoLoop* pMainLoop = GetMainIoLoop();
+    if( pMainLoop == nullptr )
+    {
+        throw std::runtime_error(
+            "Mainloop bad address" );
+    }
+
     guint32 dwMainTid =
-        GetMainIoLoop().GetThreadId();
+        pMainLoop->GetThreadId();
 
     return GetTid() == dwMainTid;
 }
@@ -1221,20 +1229,12 @@ gint32 CIoManager::Start()
 
         m_bInit = true;
 
-        ret = GetUtils().Start();
-        if( ERROR( ret ) )
-            break;
-
         GetTaskThreadPool().Start();
         GetIrpThreadPool().Start();
 
-        // the return value is the workitem id, and we
-        // don't want it here
+        // the return value is the workitem id,
+        // and we don't want it here
         ret = 0;
-
-        // let's enter the main loop. The whole
-        // system begin to run
-        GetMainIoLoop().Start();
 
         // this task will be executed in the
         // mainloop
@@ -1244,6 +1244,20 @@ gint32 CIoManager::Start()
         ScheduleTaskMainLoop(
             clsid( CIoMgrPostStartTask ),
             a.GetCfg() );
+
+        // let's enter the main loop. The whole
+        // system begin to run.
+        //
+        // NOTE: it is OK for gmain loop to start
+        // either before or after the
+        // ScheduleTaskMainLoop is called. but for
+        // ev loop, it has to start after because
+        // of the bad multithreading support
+        GetMainIoLoop()->Start();
+
+        ret = GetUtils().Start();
+        if( ERROR( ret ) )
+            break;
 
         this->OnEvent( eventWorkitem,
             eventStart, 0, nullptr );
@@ -1264,9 +1278,26 @@ gint32 CIoManager::ScheduleTaskMainLoop(
         ret = pTask.NewObj( iClsid, pCfg );
         if( ERROR( ret ) )
             break;
+        RescheduleTaskMainLoop( pTask );
 
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CIoManager::RescheduleTaskMainLoop(
+    TaskletPtr& pTask )
+{
+
+    gint32 ret = 0;
+    do{
+        if( pTask.IsEmpty() )
+        {
+            ret = -EINVAL;
+            break;
+        }
         pTask->MarkPending();
-        GetMainIoLoop().AddTask( pTask );
+        GetMainIoLoop()->AddTask( pTask );
 
         if( !pTask->IsAsync() )
         {
@@ -1410,7 +1441,6 @@ gint32 CIoManager::ScheduleTask(
         }
         else
         {
-
             ThreadPtr pThread;
             ret = GetTaskThreadPool().GetThread( pThread, true );
             if( ERROR( ret ) )
@@ -1700,7 +1730,7 @@ gint32 CIoMgrStopTask::operator()(
     {
         // NOTE: we cannot stop task
         // thread pool here
-        ret = pMgr->GetMainIoLoop().Stop();
+        ret = pMgr->GetMainIoLoop()->Stop();
         ret = pMgr->GetDrvMgr().Stop();
         ret = pMgr->GetPnpMgr().Stop();
         ret = pMgr->GetUtils().Stop();

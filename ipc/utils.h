@@ -21,27 +21,10 @@
 #include <thread>
 #include "configdb.h"
 #include "tasklets.h"
+#include "mainloop.h"
 
 #define MAX_THREAD_LOAD     5
 #define MAX_THREADS         10
-
-class CTaskQueue : public CObjBase
-{
-    protected:
-
-    std::deque< TaskletPtr >    m_queTasks;
-    std::recursive_mutex        m_oLock;
-
-    public:
-
-    CTaskQueue();
-    void AddTask( TaskletPtr& pTask );
-    gint32 RemoveTask( TaskletPtr& pTask );
-    gint32 PopHead( TaskletPtr& pTask );
-    gint32 GetSize();
-};
-
-typedef CAutoPtr< Clsid_CTaskQueue, CTaskQueue > TaskQuePtr;
 
 class CTaskThread : public IThread
 {
@@ -62,7 +45,7 @@ class CTaskThread : public IThread
     public:
     typedef IThread super;
 
-    CTaskThread();
+    CTaskThread( const IConfigDb* pCfg = nullptr );
     ~CTaskThread();
 
     // the thread started
@@ -141,16 +124,20 @@ class CThreadPool : public IService
     gint32                  m_iMaxThreads;
     EnumClsid               m_iThreadClass;
     gint32                  m_iThreadCount;
+    CIoManager*             m_pMgr;
 
     protected:
     std::vector< ThreadPtr > m_vecThreads;
 
     public:
-
+    typedef IService super;
     CThreadPool(
         const IConfigDb* pCfg = nullptr );
 
     ~CThreadPool();
+
+    inline CIoManager* GetIoMgr()
+    { return m_pMgr; }
 
     stdrmutex& GetLock()
     { return m_oLock; }
@@ -191,6 +178,7 @@ class CTaskThreadPool : public CThreadPool
         {
             a.CopyProp( 0, pCfg );
             a.CopyProp( 1, pCfg );
+            a.CopyProp( propIoMgr, pCfg );
             a.SetIntProp( 2, clsid( CTaskThread ) );
         }
         return a.GetCfg();
@@ -266,6 +254,7 @@ class CIrpThreadPool : public CThreadPool
             a.CopyProp( 0, pCfg );
             // max threads
             a.CopyProp( 1, pCfg );
+            a.CopyProp( propIoMgr, pCfg );
 
             a.SetIntProp( 2, clsid( CIrpCompThread ) );
         }
@@ -332,8 +321,7 @@ class CTimerService : public IService
     CIoManager* m_pIoMgr;
     CUtilities* m_pUtils;
     std::mutex  m_oMapLock;
-    GSource*    m_pTimeSrc;
-    guint       m_dwTimerId;
+    HANDLE      m_dwTimerId;
     gint64      m_qwTimeStamp;
 
 	public:
@@ -345,7 +333,8 @@ class CTimerService : public IService
     CTimerService(
         const IConfigDb* pCfg );
 
-    ~CTimerService();
+    ~CTimerService()
+    {;}
 
 	gint32 AddTimer(
         guint32 dwIntervalMs,
@@ -381,6 +370,20 @@ class CTimerService : public IService
 };
 
 typedef CAutoPtr< clsid( CTimerService ), CTimerService > TimerSvcPtr;
+
+class CTimerWatchCallback : public CTasklet
+{
+    public:
+
+    typedef CTasklet super;
+    CTimerWatchCallback( const IConfigDb* pCfg )
+        : super( pCfg )
+    {
+        SetClassId( clsid( CTimerWatchCallback ) );
+    }
+    gint32 operator()( guint32 dwContext );
+};
+
 
 class CWorkitemManager : public CObjBase
 {

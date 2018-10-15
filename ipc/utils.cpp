@@ -327,6 +327,7 @@ gint32 CWorkitemManager::ProcessWorkItems(
 
 CTimerService::CTimerService(
     const IConfigDb* pCfg )
+    : m_dwTimerId( 0 )
 {
     SetClassId( Clsid_CTimerService );
     CCfgOpener a( pCfg );
@@ -334,11 +335,6 @@ CTimerService::CTimerService(
     ObjPtr pObj;
     a.GetObjPtr( propParentPtr, pObj );
     m_pUtils = pObj;
-}
-
-CTimerService::~CTimerService()
-{
-    g_source_unref( m_pTimeSrc );
 }
 
 gint32 CTimerService::AddTimer(
@@ -501,45 +497,36 @@ gboolean CTimerService::TimerCallback(
 gint32 CTimerService::TickTimers()
 {
     do{
+        MloopPtr pLoop =
+            GetIoMgr()->GetMainIoLoop();
+
         CStdMutex oMutex( m_oMapLock );
         vector<TIMER_ENTRY>::iterator itr =
                 m_vecTimers.begin();
 
         // performance call
-        guint64 qwNow = g_get_monotonic_time();
-
+        guint64 qwNow = pLoop->NowUs();
         guint32 dwInterval = ( guint32 )
             ( ( qwNow - m_qwTimeStamp ) / 1000 );
-
         m_qwTimeStamp = qwNow;
-        vector< gint32 > vecRemove;
-
+        // printf( "Interval is %d ms\n", dwInterval );
         while( itr != m_vecTimers.end() )
         {
             itr->m_qwTicks += dwInterval;
-
             if( itr->m_qwTicks
                     >= itr->m_qwIntervalMs )
             {
+                // due time
                 m_vecPendingTimeouts.push_back( *itr );
-                vecRemove.push_back(
-                    itr - m_vecTimers.begin() );
+                itr = m_vecTimers.erase( itr );
+                continue;
             }
             ++itr;
         }
-        
-        for( gint32 i = vecRemove.size() - 1; i >= 0; --i )
-        {
-            m_vecTimers.erase(
-                m_vecTimers.begin() + vecRemove[ i ] );
-        }
-
         if( m_vecPendingTimeouts.size() )
             m_pUtils->Wakeup( 0 );
 
-        break;
-
-    }while( 1 );
+    }while( 0 );
 
     return 0;
 }
@@ -580,30 +567,78 @@ gint32 CTimerService::ProcessTimers()
     return ret;
 }
 
+gint32 CTimerWatchCallback::operator()(
+    guint32 dwContext )
+{
+    gint32 ret = 0;
+    do{
+        CCfgOpener oCfg(
+            ( IConfigDb* )GetConfig() );
+        CIoManager* pMgr = nullptr;
+
+        ret = oCfg.GetPointer(
+            propIoMgr, pMgr );
+
+        if( ERROR( ret ) )
+            break;
+
+        CTimerService& oTimerSvc =
+            pMgr->GetUtils().GetTimerSvc();
+
+        ret = CTimerService::TimerCallback(
+            ( gpointer )&oTimerSvc );
+
+    }while( 0 );
+
+    return SetError( ret );
+}
+
 gint32 CTimerService::Start()
 {
-    // setup the connection to the glib source
-    m_pTimeSrc = g_timeout_source_new( 500 );
-    if( m_pTimeSrc == nullptr )
-        return -EFAULT;
+    gint32 ret = 0;
+    do{
+        // setup the connection to the glib source
+        CParamList oParams;
+        oParams.SetPointer(
+            propIoMgr, GetIoMgr() );
 
-    g_source_set_callback( m_pTimeSrc,
-        TimerCallback, ( gpointer )this, nullptr );
+        oParams.Push( 500 ); // interval in ms
+        oParams.Push( true ); // repeatable timer
+        oParams.Push( true ); // start immediately
 
-    m_dwTimerId = g_source_attach( m_pTimeSrc,
-        GetIoMgr()->GetMainIoLoop().GetMainCtx() );
+        TaskletPtr pCallback;
+        gint32 ret = pCallback.NewObj(
+            clsid( CTimerWatchCallback ),
+            oParams.GetCfg() );
 
-    m_qwTimeStamp = g_get_monotonic_time();
-    return 0;
+        MloopPtr pLoop =
+            GetIoMgr()->GetMainIoLoop();
+
+        ret = pLoop->AddTimerWatch(
+            pCallback, m_dwTimerId );
+
+        if( ERROR( ret ) )
+            break;
+
+        m_qwTimeStamp = pLoop->NowUs();
+
+    }while( 0 );
+
+    return ret;
 }
 
 gint32 CTimerService::Stop()
 {
-    if( m_pTimeSrc )
+    if( m_dwTimerId )
     {
-        g_source_destroy( m_pTimeSrc );
-        g_source_unref( m_pTimeSrc );
+        MloopPtr pLoop =
+            GetIoMgr()->GetMainIoLoop();
+
+        pLoop->RemoveTimerWatch(
+            m_dwTimerId );
+
         m_dwTimerId = 0;
     }
     return 0;
 }
+

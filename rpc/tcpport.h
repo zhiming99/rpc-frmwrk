@@ -19,6 +19,7 @@
 
 #include "defines.h"
 #include "port.h"
+#include "mainloop.h"
 
 #define RPC_SVR_PORTNUM         0x1024
 #define RPC_MAX_BYTES_PACKET    ( 65536 - sizeof( CPacketHeader ) - 32 )
@@ -420,6 +421,19 @@ class CRpcControlStream :
         CCarrierPacket* pPacketToRecv );
 };
 
+class CRpcSockWatchCallback : public CTasklet
+{
+    public:
+
+    typedef CTasklet super;
+    CRpcSockWatchCallback( const IConfigDb* pCfg )
+        : super( pCfg )
+    {
+        SetClassId( clsid( CRpcSockWatchCallback ) );
+    }
+    gint32 operator()( guint32 dwContext );
+};
+
 #define SOCK_TIMER_SEC      100
 #define SOCK_LIFE_SEC       1800
 
@@ -439,8 +453,7 @@ class CRpcSocketBase : public IService
     IPort*              m_pParentPort;
     // glib structure for event watching from
     // mainloop
-    GIOChannel*         m_pIoChannel;
-    GSource*            m_pSource;
+    HANDLE              m_hIoWatch;
 
     gint32 AttachMainloop();
     gint32 DetachMainloop();

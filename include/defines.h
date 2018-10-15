@@ -23,7 +23,6 @@
 #include <vector>
 #include <atomic>
 #include <algorithm>
-#include <glib.h>
 #include <semaphore.h>
 #include <chrono>
 #include <sys/types.h>
@@ -41,6 +40,7 @@
 #define HANDLE                  guint32
 #define PortToHandle( ptr )     reinterpret_cast<HANDLE>( ( IPort* )ptr )
 #define HandleToPort( handle )  reinterpret_cast< IPort* >( handle )
+#define INVALID_HANDLE          0
 
 #define IPV6_ADDR_BYTES         16 
 #define IPV4_ADDR_BYTES         4
@@ -187,7 +187,7 @@ inline guint32 GetTid()
 using stdstr = std::string;
 
 // Event ids for the IEventSink
-enum EnumEventId
+enum EnumEventId : guint32
 {
     // the irp is completed, the pData contains the pointer to the irp
     // and the dwParam1 holds an extra specific event code the caller 
@@ -483,6 +483,8 @@ class ICancellableTask : public IEventSink
 class IService : public IEventSink 
 {
     public:
+    typedef IEventSink super;
+
     virtual gint32 Start() = 0;
     virtual gint32 Stop() = 0;
 };

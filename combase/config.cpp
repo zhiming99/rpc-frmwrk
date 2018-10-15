@@ -93,6 +93,12 @@ gint32 CConfigDb::GetProperty(
     if( itr != m_mapProps.cend() )
     {
         oBuf = (*itr->second);
+        if( oBuf.ptr() == nullptr )
+        {
+            DebugPrint( -EFAULT,
+                "oBuf contains nothing, thread=%d",
+                ::GetTid() );
+        }
         ret = 0;
     }
 

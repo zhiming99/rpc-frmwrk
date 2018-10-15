@@ -19,7 +19,6 @@
 
 #include <dbus/dbus.h>
 #include <dbus/dbus-glib-lowlevel.h>
-#include <glib.h>
 #include <vector>
 #include <string>
 #include <regex>
@@ -1089,11 +1088,11 @@ gint32 CDBusBusPort::OnPortReady( IRP* pIrp )
     }
 
     // the message is allowed to come in
-    GMainContext* pCtx =
-        GetIoMgr()->GetMainIoLoop().GetMainCtx();
+    MloopPtr pLoop = GetIoMgr()->GetMainIoLoop();
+    ret = pLoop->SetupDBusConn( m_pDBusConn );
 
-    dbus_connection_setup_with_g_main(
-        m_pDBusConn, pCtx );
+    if( ERROR( ret ) )
+        return ret;
 
     ret = SchedulePortsAttachNotifTask(
         vecChildren, eventPortAttached, pIrp );
@@ -1840,7 +1839,6 @@ gint32 CDBusBusPort::RegBusName(
     gint32 ret = 0;
 
     do{
-
         if( m_pDBusConn == nullptr )
             return ERROR_STATE;
 

@@ -59,6 +59,12 @@ class CSmokeTest :
 
             CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 
+            while( true )
+            {
+                sleep( 2 );
+                break;
+            }
+
             ret = pSvc->Stop();
             CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 

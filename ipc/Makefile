@@ -1,8 +1,8 @@
 include ../Makefile.init.pub
 
 TARGET:=libipc.so
-SOURCES:= ifstat.cpp rpcif.cpp \
-	mainloop.cpp dllexp.cpp\
+SOURCES:= ifstat.cpp rpcif.cpp gmloop.cpp sevpoll.cpp\
+	mainloop.cpp dllexp.cpp evloop.cpp dbushook.cpp \
 	irp.cpp irpthread.cpp port.cpp portstat.cpp \
 	drvmgr.cpp utils.cpp iomgr.cpp ptifmap.cpp \
 	pnpmgr.cpp dbusdrv.cpp dbusport.cpp portdrv.cpp \
@@ -10,7 +10,12 @@ SOURCES:= ifstat.cpp rpcif.cpp \
 	iftasks.cpp lpbkmtch.cpp ifhelper.cpp \
 	iiddict.cpp reqopen.cpp
 
+
+# uncomment the line if _USE_LIB_EV is not defined
+#LINKER_OPTION += -lglib-2.0 -ldbus-glib-1
+
 OBJS := $(SOURCES:%.cpp=$(OBJ_DIR)/%.o)
+C_DEFINES += -D_USE_LIBEV=1
 
 all: $(OUTPUT_DIR)/$(TARGET)
 debug: $(OUTPUT_DIR)/$(TARGET)

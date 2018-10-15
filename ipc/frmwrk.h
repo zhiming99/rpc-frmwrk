@@ -11,75 +11,13 @@
 #include "utils.h"
 #include "port.h"
 #include "portdrv.h"
+#include "mainloop.h"
 
 
 extern gint32 ReadJsonCfg(
     const std::string& strFile,
     Json::Value& valConfig );
 
-class CIoManager;
-
-class CMainIoLoop : public IService
-{
-    protected:
-
-	std::map<gint32, IEventSink*>   m_mapFd2EventSink;
-    GMainLoop                       *m_pMainLoop;
-    GMainContext                    *m_pMainCtx;
-
-    CIoManager*                     m_pIoMgr;
-    guint32                         m_dwTid;
-
-    GSource                         *m_pTaskSrc;
-    TaskQuePtr                      m_queTasks;
-    std::thread                     *m_pThread;
-
-    mutable stdmutex                m_oLock;
-
-	public:
-
-    CMainIoLoop( const IConfigDb* pCfg = nullptr );
-    ~CMainIoLoop();
-
-	virtual void OnIdle(){;}
-    guint32 GetTid() const { return m_dwTid; }
-
-    GMainContext* GetMainCtx() const
-    { return m_pMainCtx; }
-
-    GMainLoop* GetMainLoop() const
-    { return m_pMainLoop; }
-
-    guint32 GetThreadId() const
-    { return m_dwTid; }
-
-    TaskQuePtr& GetTaskQue() const
-    {
-        return ( TaskQuePtr& )m_queTasks;
-    }
-
-    gint32 Start();
-    gint32 Stop();
-
-    static gboolean TaskCallback( gpointer pdata );
-    void AddTask( TaskletPtr& pTask );
-
-    // the main thread function
-    gint32 ThreadProc();
-
-    gint32 OnEvent( EnumEventId iEvent,
-            guint32 dwParam1 = 0,
-            guint32 dwParam2 = 0,
-            guint32* pData = NULL  )
-    { return 0;}
-
-    inline CIoManager* GetIoMgr() const
-    { return m_pIoMgr; }
-
-    gint32 InstallTaskSource();
-};
-
-typedef CAutoPtr< clsid( CMainIoLoop ), CMainIoLoop > MainLoopPtr;
 
 class CDriverManager : public IService
 {
@@ -359,7 +297,7 @@ class CPortInterfaceMap : public CObjBase
 class CIoManager : public IService
 {
     DrvMgrPtr                   m_pDrvMgr;
-    MainLoopPtr                 m_pLoop;
+    MloopPtr                    m_pLoop;
     mutable std::recursive_mutex        m_oGrandLock;
     RegPtr                      m_pReg;
     UtilsPtr                    m_pUtils;
@@ -483,7 +421,7 @@ class CIoManager : public IService
 
     // helpers
     CUtilities& GetUtils() const;
-    CMainIoLoop& GetMainIoLoop() const;
+    CMainIoLoop* GetMainIoLoop() const;
     CPnpManager& GetPnpMgr() const;
     CDriverManager& GetDrvMgr() const;
     CRegistry& GetRegistry() const;
@@ -554,6 +492,9 @@ class CIoManager : public IService
 
     gint32 ScheduleTaskMainLoop(
         EnumClsid iClsid, CfgPtr& pCfg );
+
+    gint32 RescheduleTaskMainLoop(
+        TaskletPtr& pTask );
 
     gint32 Start();
     gint32 Stop();

@@ -16,7 +16,6 @@
  */
 
 #include <dbus/dbus.h>
-#include <glib.h>
 #include <vector>
 #include <string>
 #include <string.h>

@@ -298,14 +298,15 @@ gint32 CTaskletRetriable::operator()(
         {
             ret = oErr.code().value();
             bExcept = true;
-            DebugPrint( ret,
-                "hit the reentrence lock, %d", GetTid() );
         }
 
         if( bExcept )
         {
             // reschedule
             usleep( dwTimeWaitUs );
+            DebugPrint( ret,
+                "hit the reentrence lock, %d, sleep %d us, task 0x%08x",
+                GetTid(), dwTimeWaitUs, this );
 
             if( dwTimeWaitUs < ( 1024 ^ 2 ) )
                 dwTimeWaitUs <<= 1;
@@ -532,6 +533,17 @@ gint32 CThreadSafeTask::OnEvent(
     return GetError();
 }
 
+gint32 CThreadSafeTask::GetProperty( gint32 iProp,
+        CBuffer& oBuf ) const
+{
+    CStdRTMutex oTaskLock( GetLock() );
+    gint32 ret = super::GetProperty( iProp, oBuf );
+    if( ERROR( ret ) )
+    {
+        printf( "haha\n" );
+    }
+    return ret;
+}
 gint32 CSyncCallback::operator()(
     guint32 dwContext )
 {

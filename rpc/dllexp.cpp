@@ -15,7 +15,6 @@
  *
  * =====================================================================================
  */
-#include <glib.h>
 #include <map>
 #include <vector>
 #include "clsids.h"
@@ -86,6 +85,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CBdgeProxyStartSendTask );
     INIT_MAP_ENTRYCFG( CBdgeStartRecvDataTask );
     INIT_MAP_ENTRYCFG( CBdgeStartFetchDataTask );
+    INIT_MAP_ENTRYCFG( CRpcSockWatchCallback );
 
     END_FACTORY_MAPS;
 };

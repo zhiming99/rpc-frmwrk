@@ -22,7 +22,6 @@
 #include <vector>
 #include <atomic>
 #include <algorithm>
-#include <glib.h>
 #include <type_traits>
 #include <string.h>
 #include "defines.h"

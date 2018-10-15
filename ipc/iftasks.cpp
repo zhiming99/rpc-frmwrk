@@ -486,8 +486,6 @@ gint32 CIfRetryTask::OnComplete(
         ObjPtr pObj;
         bool bNotify = false;
 
-        SetError( iRetVal );
-
         ret = oParams.GetBoolProp(
             propNotifyClient, bNotify );
 
@@ -548,6 +546,31 @@ gint32 CIfRetryTask::OnComplete(
     RemoveProperty( propNotifyClient );
     RemoveProperty( propIrpPtr );
 
+    // NOTE: Moved task status change to the
+    // bottom due to a concurrent bug, when the
+    // client is hoping the synchronization occur
+    // in the OnEvent. But the whole thing happens
+    // in a weird order that the async caller gets
+    // the task status even after this OnComplete
+    // is entered, but before the OnEvent is
+    // called. ( Usually the async caller should
+    // get a pending status very fast before the
+    // server side enters OnComplete.)
+    //
+    // If the task status is set at the very
+    // beginning of this method, the caller will
+    // not wait for the sync signal, but proceed
+    // to handle the call as an immediate return
+    // instead, while the response is yet to set
+    // in the upcoming OnEvent call. Thus the
+    // client code will grab an empty response
+    // sometimes, in CInterfaceProxy::SyncCallEx.
+    //
+    // This situation usually happens when the
+    // client and server are both in a single
+    // process
+    // 
+    SetError( iRetVal );
     return ret; 
 }
 
@@ -4042,6 +4065,7 @@ gint32 CIoReqSyncCallback::operator()(
 
                 if( !oParams.exist( propRespPtr ) )
                 {
+                    DebugPrint( -ENOENT, "no Resp ptr" );
                     ret = -EINVAL;
                     break;
                 }

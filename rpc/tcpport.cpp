@@ -37,7 +37,8 @@ CRpcSocketBase::CRpcSocketBase(
     m_iFd( -1 ),
     m_dwRtt( 0 ),
     m_dwAgeSec( 0 ),
-    m_iTimerId( 0 )
+    m_iTimerId( 0 ),
+    m_hIoWatch( 0 )
 {
     gint32 ret = 0;
     do{
@@ -131,6 +132,32 @@ gint32 CRpcSocketBase::SetKeepAlive( bool bKeep )
     return ret;
 }
 
+gint32 CRpcSockWatchCallback::operator()(
+    guint32 dwContext )
+{
+    gint32 ret = 0;
+    do{
+        CCfgOpener oCfg(
+            ( IConfigDb* )GetConfig() );
+
+        CRpcSocketBase* pSock = nullptr;
+        ret = oCfg.GetPointer(
+            propObjPtr, pSock );
+
+        if( ERROR( ret ) )
+            break;
+
+        GIOCondition dwCond =
+            ( GIOCondition )dwContext;
+
+        ret = pSock->SockEventCallback(
+            nullptr, dwCond, pSock );
+
+    }while( 0 );
+
+    return SetError( ret );
+}
+
 gint32 CRpcSocketBase::AttachMainloop()
 {
     if( m_iFd <= 0 )
@@ -139,77 +166,48 @@ gint32 CRpcSocketBase::AttachMainloop()
     gint32 ret = 0;
 
     do{
-        // PORTING ALERT: linux specific
-        m_pIoChannel =
-            g_io_channel_unix_new( m_iFd );
-
-        if( m_pIoChannel == nullptr )
-        {
-            ret = -ENOMEM;
-            break;
-        }
-        
         // poll
         guint32 dwOpt = ( guint32 )
             ( G_IO_IN | G_IO_OUT | G_IO_HUP );
 
-        m_pSource = g_io_create_watch(
-            m_pIoChannel,
-            ( GIOCondition )dwOpt );
-
-        if( m_pSource == nullptr )
-        {
-            ret = -ENOMEM;
-            break;
-        }
-
         CIoManager* pMgr = GetIoMgr();
-        CMainIoLoop& oMainLoop = pMgr->GetMainIoLoop();
-        GMainContext* pCtx = oMainLoop.GetMainCtx();
-        if( pCtx == nullptr )
-        {
-            ret = -EFAULT;
+        CMainIoLoop* pMainLoop =
+            pMgr->GetMainIoLoop();
+
+        CParamList oParams;
+
+        oParams.Push( m_iFd );
+        oParams.Push( dwOpt );
+        oParams.Push( true );
+
+        oParams[ propObjPtr ] =
+            ObjPtr( this );
+
+        TaskletPtr pCallback;
+        ret = pCallback.NewObj(
+            clsid( CRpcSockWatchCallback ),
+            oParams.GetCfg() );
+
+        if( ERROR( ret ) )
             break;
-        }
 
-        g_source_set_callback( m_pSource,
-            (GSourceFunc)SockEventCallback, this, nullptr );
-
-        g_source_attach( m_pSource, pCtx );
+        ret = pMainLoop->AddIoWatch(
+            pCallback, m_hIoWatch );
 
     }while( 0 );
 
-    if( ERROR( ret ) )
-    {
-        if( m_pIoChannel != nullptr )
-        {
-            g_io_channel_unref( m_pIoChannel );
-            m_pIoChannel = nullptr;
-        }
-        if( m_pSource != nullptr )
-        {
-            g_source_destroy( m_pSource );
-            g_source_unref( m_pSource );
-            m_pSource = nullptr;
-        }
-    }
-    
     return ret;
 }
 
 gint32 CRpcSocketBase::DetachMainloop()
 {
-    if( m_pSource != nullptr )
-    {
-        g_source_destroy( m_pSource );
-        g_source_unref( m_pSource );
-        m_pSource = nullptr;
-    }
-    if( m_pIoChannel != nullptr )
-    {
-        g_io_channel_unref( m_pIoChannel );
-        m_pIoChannel = nullptr;
-    }
+    if( m_hIoWatch == 0 )
+        return ERROR_STATE;
+
+    CIoManager* pMgr = GetIoMgr();
+    CMainIoLoop* pLoop = pMgr->GetMainIoLoop();
+    pLoop->RemoveIoWatch( m_hIoWatch );
+    m_hIoWatch = 0;
 
     return 0;
 }
@@ -232,12 +230,12 @@ gboolean CRpcSocketBase::SockEventCallback(
         < CRpcSocketBase* >( data );
 
     if( pThis == nullptr )
-        return false;
+        return G_SOURCE_REMOVE;
 
     pThis->OnEvent( eventSocket,
         ( guint32 ) condition, 0, nullptr );
 
-    return true;
+    return G_SOURCE_CONTINUE;
 }
 
 gint32 CRpcSocketBase::UpdateRttTimeMs()

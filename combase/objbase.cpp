@@ -263,7 +263,6 @@ CObjBase::CObjBase()
 
 #ifdef DEBUG
     m_dwMagic = *( guint32* )"ObjB";
-
     CStdMutex oLock( g_oObjListLock );
     g_vecObjs.insert( this );
 #endif

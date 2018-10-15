@@ -17,6 +17,8 @@
  */
 #pragma once
 
+#include "glib.h"
+
 #define DECL_CLSID( __classname__ ) \
     Clsid_ ## __classname__
 
@@ -177,6 +179,16 @@ typedef enum : guint32
     DECL_CLSID( CIoReqSyncCallback ),
     DECL_CLSID( CStlObjVector ),
     DECL_CLSID( CStlStringSet ),
+    DECL_CLSID( CSchedTaskCallback ),
+    DECL_CLSID( CTimerWatchCallback ),
+    DECL_CLSID( CRpcSockWatchCallback ),
+    DECL_CLSID( CDBusLoopHooks ),
+    DECL_CLSID( CDBusTimerCallback ),
+    DECL_CLSID( CDBusIoCallback ),
+    DECL_CLSID( CDBusDispatchCallback ),
+    DECL_CLSID( CDBusWakeupCallback ),
+    DECL_CLSID( CEvLoopStopCb ),
+    DECL_CLSID( CEvLoopAsyncCallback ),
     DECL_CLSID( MaxClsid ),
     DECL_CLSID( ReservedClsidEnd ) = 0x0FFFFFFF,
     DECL_CLSID( ReservedIidStart ) = 0x10000000,

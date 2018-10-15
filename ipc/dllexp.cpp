@@ -15,7 +15,6 @@
  *
  * =====================================================================================
  */
-#include <glib.h>
 #include <map>
 #include <vector>
 #include "clsids.h"
@@ -50,10 +49,10 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRY( CStlIrpVector );
     INIT_MAP_ENTRY( CStlIrpVector2 );
     INIT_MAP_ENTRY( CStlPortVector );
-    INIT_MAP_ENTRY( CTaskThread );
     INIT_MAP_ENTRY( COneshotTaskThread );
     INIT_MAP_ENTRY( CTaskWrapper );
 
+    INIT_MAP_ENTRYCFG( CTaskThread );
     INIT_MAP_ENTRYCFG( CMainIoLoop );
     INIT_MAP_ENTRYCFG( CCancelIrpsTask );
     INIT_MAP_ENTRYCFG( CDBusBusDriver );
@@ -110,6 +109,19 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CUtilities );
     INIT_MAP_ENTRYCFG( CWorkitemManager );
     INIT_MAP_ENTRYCFG( CIoReqSyncCallback );
+    INIT_MAP_ENTRYCFG( CSchedTaskCallback );
+    INIT_MAP_ENTRYCFG( CTimerWatchCallback );
+
+#ifdef _USE_LIBEV
+    INIT_MAP_ENTRYCFG( CDBusLoopHooks );
+    INIT_MAP_ENTRYCFG( CDBusTimerCallback );
+    INIT_MAP_ENTRYCFG( CDBusIoCallback );
+    INIT_MAP_ENTRYCFG( CDBusDispatchCallback );
+    INIT_MAP_ENTRYCFG( CDBusWakeupCallback );
+    INIT_MAP_ENTRYCFG( CDBusLoopHooks );
+    INIT_MAP_ENTRYCFG( CEvLoopStopCb );
+    INIT_MAP_ENTRYCFG( CEvLoopAsyncCallback );
+#endif
 
     END_FACTORY_MAPS;
 };
