@@ -3143,8 +3143,6 @@ gint32 CIfInvokeMethodTask::RunTask()
             }
 
             std::string strMethod = pMsg.GetMember();
-            DebugPrint( 0, "New req arrival: %s",
-                strMethod.c_str() );
 
             // set the interface name in case the
             // method be called via the handler map
@@ -3452,7 +3450,8 @@ gint32 CIfInvokeMethodTask::OnComplete(
     // servicing the next incoming request or
     // event message
     do{
-        CCfgOpener oCfg( ( IConfigDb* )GetConfig() );
+        CCfgOpener oCfg(
+            ( IConfigDb* )GetConfig() );
         CRpcServices* pIf = nullptr;
         
         ObjPtr pObj;
@@ -3467,16 +3466,7 @@ gint32 CIfInvokeMethodTask::OnComplete(
             break;
         }
 
-        bool bQueuedReq = pIf->IsQueuedReq();
-        if( pIf->GetState() != stateConnected )
-        {
-            // NOTE: this is not a serious
-            // state check
-            ret = ERROR_STATE;
-            break;
-        }
-
-        if( bQueuedReq )
+        if( pIf->IsQueuedReq() )
         {
             if( pIf->GetQueueSize() == 0 )
                 break;
@@ -3535,7 +3525,8 @@ gint32 CIfInvokeMethodTask::OnKeepAliveOrig()
     // and return status_pending for the next
     do{
         ObjPtr pObj;
-        CCfgOpener oTaskCfg( ( IConfigDb* )GetConfig() );
+        CCfgOpener oTaskCfg(
+            ( IConfigDb* )GetConfig() );
         guint32 dwTimeoutSec = 0;
 
         if( !IsKeepAlive() )

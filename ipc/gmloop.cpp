@@ -548,7 +548,7 @@ gint32 CGMainLoop::AddIdleWatch(
             break;
         }
 
-        bool bStart = ( bool& )oParams[ 2 ];
+        bool bStart = ( bool& )oParams[ 0 ];
 
         ret = AddSource( pIdle );
         if( ERROR( ret ) )

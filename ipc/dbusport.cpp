@@ -532,6 +532,13 @@ gint32 CDBusBusPort::Start( IRP *pIrp )
         string strPortName;
 
         strModName = GetIoMgr()->GetModName();
+        CMainIoLoop* pMloop =
+            GetIoMgr()->GetMainIoLoop();
+
+        // NOTE: at this point, the mainloop is
+        // already started
+        string strInstNo = std::to_string(
+            pMloop->GetThreadId() );
 
         CCfgOpener oCfg( ( IConfigDb* )m_pCfgDb );
         ret = oCfg.GetStrProp(
@@ -542,6 +549,8 @@ gint32 CDBusBusPort::Start( IRP *pIrp )
 
         string strBusName = string( DBUS_NAME_PREFIX )
             + strModName
+            + string( "-" )
+            + strInstNo
             + string( "." )
             + strPortName;
 
@@ -891,7 +900,11 @@ gint32 CDBusBusPort::SendDBusMsg(
     ret = 0;
     if( !dbus_connection_send(
         m_pDBusConn, pDBusMsg, pdwSerial ) )
+    {
         ret = -ENOMEM;
+        DebugPrint( ret,
+            "dbus_connection_send failed" );
+    }
     return ret;
 }
 

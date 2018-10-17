@@ -276,13 +276,6 @@ gint32 CRpcBaseOperations::EnableEventInternal(
         if( ERROR( ret ) )
             break;
 
-        CInterfaceState* pIfState = m_pIfStat;
-        if( pIfState == nullptr )
-        {
-            ret = -EFAULT;
-            break;
-        }
-
         if( pCallback == nullptr )
         {
             ret = -EFAULT;
@@ -1716,7 +1709,6 @@ gint32 CRpcServices::InvokeMethod(
     gint32 ret1 = 0;
     CCfgOpenerObj oCfg( this );
 
-    bool bQueuedReq = IsQueuedReq();
     if( pReqMsg == nullptr ||
         pCallback == nullptr )
         return -EINVAL;
@@ -1724,7 +1716,7 @@ gint32 CRpcServices::InvokeMethod(
     do{
         do{
 
-            if( bQueuedReq )
+            if( IsQueuedReq() )
             {
                 CStdRMutex oIfLock( GetLock() );
                 bool bWait = true;
@@ -1773,10 +1765,13 @@ gint32 CRpcServices::InvokeMethod(
 
         }while( 0 );
 
+        CIfInvokeMethodTask* pInvokeTask = 
+            ObjPtr( pCallback );
         if( ret1 == STATUS_PENDING )
         {
             // the task is not activated, so we
             // skip SetAsyncCall().
+            //
             // Note that the timer for this task
             // is not activated too, so probably
             // not a good idea.
@@ -1785,15 +1780,36 @@ gint32 CRpcServices::InvokeMethod(
         }
         else if( ERROR( ret1 ) )
         {
+            // tell the client we are in trouble
             ret = ret1;
+            if( pInvokeTask == nullptr )
+                break;
+
+            if( !pInvokeTask->HasReply() )
+                break;
+
+            // set the return code for response
+            CParamList oParams;
+            oParams[ propReturnValue ] = ret;
+
+            CCfgOpener oTaskCfg( ( IConfigDb* )
+                pInvokeTask->GetConfig() );
+
+            oTaskCfg.SetObjPtr( propRespPtr,
+                oParams.GetCfg() );
+
+            break;
         }
 
         if( ret == STATUS_PENDING )
         {
-            // this is an async call
-            CIfInvokeMethodTask* pInvokeTask = 
-                ObjPtr( pCallback );
-
+            // for async call, we have timer and
+            // keep-alive to set
+            if( pInvokeTask == nullptr )
+                break;
+            // no need to lock, since we are
+            // already within the lock of
+            // pInvokeTask
             if( pInvokeTask != nullptr )
                 pInvokeTask->SetAsyncCall();
 
@@ -1816,10 +1832,8 @@ gint32 CRpcServices::InvokeMethod<IConfigDb>(
 gint32 CRpcServices::InvokeNextMethod()
 {
     gint32 ret = 0;
-    bool bQueuedReq = IsQueuedReq();
-
     do{
-        if( !bQueuedReq )
+        if( !IsQueuedReq() )
             break;
 
         CStdRMutex oIfLock( GetLock() );
@@ -1843,12 +1857,10 @@ gint32 CRpcServices::InvokeNextMethod()
             }
             oIfLock.Unlock();
             ret = ( *pTask )( eventZero );
-            oIfLock.Lock();
-
             if( ret == STATUS_PENDING )
                 break;
 
-            // exhaust the msg queue
+            // till the msg queue exhausted
             continue;
         }
         else
@@ -2733,12 +2745,6 @@ gint32 CRpcServices::SendMethodCall(
         if( ERROR( ret ) )
             break;
 
-        CInterfaceState* pIfState = m_pIfStat;
-        if( pIfState == nullptr )
-        {
-            ret = -EFAULT;
-            break;
-        }
         guint32 hPort = GetPortHandle();
         if( hPort == 0 )
         {
@@ -4609,13 +4615,6 @@ gint32 CInterfaceServer::SendResponse(
         BufPtr pBuf( true );
         *pBuf = pRespMsg;
         pIrpCtx->SetReqData( pBuf );
-
-        CInterfaceState* pIfState = m_pIfStat;
-        if( pIfState == nullptr )
-        {
-            ret = -EFAULT;
-            break;
-        }
 
         TaskletPtr pTask;
         ret = pTask.NewObj( clsid( CIfDummyTask ) );

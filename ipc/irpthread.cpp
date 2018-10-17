@@ -643,7 +643,7 @@ gint32 CIrpCompThread::RemoveIf( IGenericInterface* pif )
 gint32 CIrpCompThread::GetLoadCount() const
 {
     CStdMutex a( m_oMutex );
-    return m_mapIfs.size();
+    return m_quePendingIrps.size();
 
 }
 
@@ -714,7 +714,7 @@ gint32 CThreadPool::GetThread(
                 thptr->Start();
             m_vecThreads.push_back( thptr );
         }
-        else if( m_vecThreads.size() >
+        else if( m_vecThreads.size() >=
             ( guint32 )m_iMaxThreads )
         {
             thptr = thLeast;

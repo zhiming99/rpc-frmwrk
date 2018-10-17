@@ -492,13 +492,13 @@ void CDBusIoCallback::ToggleWatch(
 gint32 CDBusIoCallback::operator()(
     guint32 events )
 {
-
     guint32 dwFlags = 0;
-
     DBusDispatchStatus ret =
         DBUS_DISPATCH_COMPLETE;
+
     ret = dbus_connection_get_dispatch_status(
             m_pParent->GetDBusConn() );
+
     if( ret == DBUS_DISPATCH_DATA_REMAINS )
         m_pParent->WakeupDispatch( ret );
 
@@ -512,6 +512,9 @@ gint32 CDBusIoCallback::operator()(
         dwFlags |= DBUS_WATCH_HANGUP;
 
     dbus_watch_handle( m_pDT, dwFlags );
+    dbus_connection_flush(
+        m_pParent->GetDBusConn() );
+
     return SetError( G_SOURCE_CONTINUE );
 }
 
@@ -564,16 +567,14 @@ gint32 CDBusDispatchCallback::DoDispatch()
 {
     DBusConnection* pConn =
         m_pParent->GetDBusConn();
- 
-    if( !m_pParent->IsSetupDone() )
-        return ERROR_STATE;
-
     do{
         DBusDispatchStatus iRet =
             dbus_connection_dispatch( pConn );
+
         if( iRet == DBUS_DISPATCH_DATA_REMAINS )
             continue;
         break;
+
     }while( 1 );
 
     return 0;
@@ -583,9 +584,13 @@ gint32 CDBusDispatchCallback::DoDispatch()
 gint32 CDBusDispatchCallback::operator()(
     guint32 dwContext )
 {
+    if( !m_pParent->IsSetupDone() )
+        return ERROR_STATE;
+
     gint32 ret = DoDispatch();
     if( ret == ERROR_STATE )
         return SetError( G_SOURCE_REMOVE );
+
     return SetError( G_SOURCE_CONTINUE );
 }
 

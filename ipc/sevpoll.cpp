@@ -709,9 +709,15 @@ gint32 CSimpleEvPoll::RunLoop()
 
         }while( 1 );
 
-        // fatal error
         if( ERROR( ret ) )
-            break;
+        {
+            //NOTE: we cannot quit here,
+            //otherwise, the system cannot receive
+            //external commands
+            //
+            DebugPrint( ret,
+                "Fatal error in mainloop" );
+        }
 
         NowUs();
         HandleTimeout( mapActTimers );
