@@ -512,9 +512,6 @@ gint32 CDBusIoCallback::operator()(
         dwFlags |= DBUS_WATCH_HANGUP;
 
     dbus_watch_handle( m_pDT, dwFlags );
-    dbus_connection_flush(
-        m_pParent->GetDBusConn() );
-
     return SetError( G_SOURCE_CONTINUE );
 }
 

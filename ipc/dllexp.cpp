@@ -111,6 +111,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CIoReqSyncCallback );
     INIT_MAP_ENTRYCFG( CSchedTaskCallback );
     INIT_MAP_ENTRYCFG( CTimerWatchCallback );
+    INIT_MAP_ENTRYCFG( CDBusConnFlushTask );
 
 #ifdef _USE_LIBEV
     INIT_MAP_ENTRYCFG( CDBusLoopHooks );

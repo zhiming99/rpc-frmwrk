@@ -409,6 +409,7 @@ class CDBusBusPort : public CGenericBusPort
 
     // the dbus connection
     DBusConnection      *m_pDBusConn;
+    TaskletPtr          m_pFlushTask;
 
     // local port attached to this bus
     gint32              m_iLocalPortId;
@@ -572,6 +573,24 @@ class CDBusBusPort : public CGenericBusPort
         const std::string& strDest );
 
 };
+
+class CDBusConnFlushTask 
+    : public CTasklet
+{
+    CIoManager* m_pMgr;
+    CDBusBusPort* m_pBusPort;
+    DBusConnection* m_pDBusConn;
+    guint32     m_dwIntervalMs;
+    HANDLE      m_hTimer;
+
+    public:
+    typedef CTasklet super;
+    CDBusConnFlushTask( const IConfigDb* pCfg );
+    ~CDBusConnFlushTask();
+    gint32 operator()( guint32 dwContext );
+    gint32 Stop();
+};
+
 
 class CGenBusDriver : public IBusDriver
 {

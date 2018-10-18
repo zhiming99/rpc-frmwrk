@@ -604,8 +604,23 @@ gint32 CDBusBusPort::Start( IRP *pIrp )
             break;
         }
 
-    }while( 0 );
+        CParamList oParams;
 
+        oParams.SetPointer(
+            propIoMgr, GetIoMgr() );
+        oParams.SetPointer(
+            propPortPtr, this );
+        oParams.SetIntProp( propDBusConn,
+            ( guint32 )m_pDBusConn );
+
+        // flush connection every 500ms
+        oParams.Push( 500 );
+
+        ret = m_pFlushTask.NewObj(
+            clsid( CDBusConnFlushTask ),
+            oParams.GetCfg() );
+
+    }while( 0 );
 
     if( ERROR( ret ) )
     {
@@ -933,6 +948,11 @@ void CDBusBusPort::ReleaseDBus()
 
 gint32 CDBusBusPort::Stop( IRP *pIrp )
 {
+    CDBusConnFlushTask* pTask = m_pFlushTask;
+    if( pTask )
+        pTask->Stop();
+    m_pFlushTask.Clear();
+
     gint32 ret = super::Stop( pIrp );
     // TODO: stop all the pdo's created by this port
 
@@ -2102,4 +2122,97 @@ gint32 CDBusBusPort::IsDBusSvrOnline(
     }while( 0 );
 
     return ret;
+}
+
+CDBusConnFlushTask::CDBusConnFlushTask(
+    const IConfigDb* pCfg )
+    : m_pMgr( nullptr ),
+    m_pBusPort( nullptr ),
+    m_pDBusConn( nullptr ),
+    m_dwIntervalMs( 0 ),
+    m_hTimer( INVALID_HANDLE )
+{
+    gint32 ret = 0;
+    SetClassId( clsid( CDBusConnFlushTask ) );
+    do{
+        if( pCfg == nullptr )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        CCfgOpener oCfg( pCfg );
+        ret = oCfg.GetPointer(
+            propIoMgr, m_pMgr );
+        if( ERROR( ret ) )
+            break;
+
+        ret = oCfg.GetIntProp( propDBusConn,
+            ( guint32& )m_pDBusConn );
+        if( ERROR( ret ) )
+            break;
+
+        ret = oCfg.GetPointer(
+            propPortPtr, m_pBusPort );
+        if( ERROR( ret ) )
+            break;
+
+        ret = oCfg.GetIntProp(
+            0, m_dwIntervalMs );
+        if( ERROR( ret ) )
+            break;
+
+        CMainIoLoop* pMloop =
+            m_pMgr->GetMainIoLoop();
+
+        CParamList oParams(
+            ( IConfigDb* )GetConfig() );
+
+        // interval in MS
+        oParams.Push( m_dwIntervalMs );
+        // true to repeat the timer
+        oParams.Push( true );
+        // true to start immediately
+        oParams.Push( true );
+
+        TaskletPtr pTask( this );
+        ret = pMloop->AddTimerWatch(
+            pTask, m_hTimer );
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+    {
+        string strMsg = DebugMsg( ret,
+            "Error in CInterfaceServer ctor" );
+        throw std::runtime_error( strMsg );
+    }
+}
+
+gint32 CDBusConnFlushTask::operator()(
+    guint32 dwContext )
+{
+    if( dwContext != eventTimeout )
+        return SetError( -EINVAL );
+    dbus_connection_flush( m_pDBusConn );
+
+    return G_SOURCE_CONTINUE;
+}
+
+CDBusConnFlushTask::~CDBusConnFlushTask()
+{
+    Stop();
+}
+gint32 CDBusConnFlushTask::Stop()
+{
+    if( m_hTimer != INVALID_HANDLE &&
+        m_pMgr != nullptr )
+    {
+        CMainIoLoop* pMloop =
+            m_pMgr->GetMainIoLoop();
+        if( pMloop == nullptr )
+            return -EFAULT;
+        pMloop->RemoveTimerWatch( m_hTimer );
+        m_hTimer = INVALID_HANDLE;
+    }
+    return 0;
 }
