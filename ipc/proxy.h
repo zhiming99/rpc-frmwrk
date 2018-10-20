@@ -467,9 +467,11 @@ class CRpcServices :
     std::map< gint32, PROXY_MAP > m_mapProxyFuncs;
     std::map< gint32, FUNC_MAP > m_mapFuncs;
 
-    std::deque< EventPtr > m_queTasks;
+    // the queue of pending invoke tasks, for queued
+    // task processing
+    std::deque< EventPtr > m_queInvTasks;
 
-    gint32 InvokeNextMethod();
+    gint32 InvokeNextMethod( TaskletPtr& pLastInvoke );
 
     virtual gint32 SetupReqIrp( IRP* pIrp,
         IConfigDb* pReqCall, IEventSink* pCallback );

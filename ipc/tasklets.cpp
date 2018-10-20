@@ -33,6 +33,7 @@ CTasklet::CTasklet( const IConfigDb* pCfg )
     m_iRet = 0;
     m_bPending = false;
     m_bInProcess = false;
+    Sem_Init( &m_semReentSync, 0, 0 );
 }
 
 gint32 CTasklet::GetProperty(
@@ -262,7 +263,6 @@ gint32 CTaskletRetriable::operator()(
     // dwContext = eventTimeout, this is a retry 
     gint32 ret = 0;
     bool bExcept = false;
-    guint32 dwTimeWaitUs = 1024;
 
     do{
         try{
@@ -303,15 +303,8 @@ gint32 CTaskletRetriable::operator()(
         if( bExcept )
         {
             // reschedule
-            usleep( dwTimeWaitUs );
-            DebugPrint( ret,
-                "hit the reentrence lock, %d, sleep %d us, task 0x%08x",
-                GetTid(), dwTimeWaitUs, this );
-
-            if( dwTimeWaitUs < ( 1024 ^ 2 ) )
-                dwTimeWaitUs <<= 1;
+            sem_wait( &m_semReentSync );
             bExcept = false;
-
             continue;
         }
         break;

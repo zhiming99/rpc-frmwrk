@@ -88,6 +88,7 @@
 #define ERROR_PREMATURE         ( ( gint32 )0x80010008 )
 #define ERROR_NOT_HANDLED       ( ( gint32 )0x80010009 )
 #define ERROR_CANNOT_COMP       ( ( gint32 )0x8001000a )
+#define ERROR_USER_CANCEL       ( ( gint32 )0x8001000b )
 
 #define AlignDword( val )    ( ( val + 3 ) & ~( sizeof( guint32 ) - 1 ) )
 
@@ -315,6 +316,7 @@ enum EnumEventId : guint32
     eventAgeSec,
     eventCeiling,
     eventTimeoutCancel,
+    eventUserCancel,
 
     eventMaxReserved = 0x10000,
     eventUserStart = 0x10001,

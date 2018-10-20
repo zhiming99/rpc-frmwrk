@@ -164,29 +164,9 @@ typedef CAutoPtr< Clsid_Invalid, CThreadPool > ThrdPoolPtr;
 
 class CTaskThreadPool : public CThreadPool
 {
-    static CfgPtr InitCfg( const IConfigDb* pCfg )
-    {
-        CCfgOpener a;
-        if( pCfg == nullptr )
-        {
-            // load limit
-            a.SetIntProp( 0, 2 );
-            // max threads
-            a.SetIntProp( 1, 2 );
-        }
-        else
-        {
-            a.CopyProp( 0, pCfg );
-            a.CopyProp( 1, pCfg );
-            a.CopyProp( propIoMgr, pCfg );
-            a.SetIntProp( 2, clsid( CTaskThread ) );
-        }
-        return a.GetCfg();
-    }
     public:
-
     CTaskThreadPool( const IConfigDb* pCfg ) :
-        CThreadPool( ( IConfigDb* )InitCfg( pCfg ) )
+        CThreadPool( pCfg )
     {
         SetClassId( clsid( CTaskThreadPool ) );
     }
@@ -237,33 +217,9 @@ class CIrpCompThread : public IThread
 
 class CIrpThreadPool : public CThreadPool
 {
-    static CfgPtr InitCfg( const IConfigDb* pCfg )
-    {
-        CCfgOpener a;
-
-        if( pCfg == nullptr )
-        {
-            // load limit
-            a.SetIntProp( 0, 5 );
-            // max threads
-            a.SetIntProp( 1, 20 );
-        }
-        else
-        {
-            // load limit
-            a.CopyProp( 0, pCfg );
-            // max threads
-            a.CopyProp( 1, pCfg );
-            a.CopyProp( propIoMgr, pCfg );
-
-            a.SetIntProp( 2, clsid( CIrpCompThread ) );
-        }
-        return a.GetCfg();
-    }
-
     public:
     CIrpThreadPool( const IConfigDb* pCfg ) :
-        CThreadPool( ( IConfigDb* )InitCfg( pCfg ) )
+        CThreadPool( pCfg )
     {
         SetClassId( clsid( CIrpThreadPool ) );
     }

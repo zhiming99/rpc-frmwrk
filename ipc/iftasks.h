@@ -493,6 +493,7 @@ class CIfStartRecvMsgTask
     virtual gint32 OnIrpComplete( PIRP pIrp );
     virtual gint32 RunTask();
     virtual gint32 OnCancel( guint32 dwContext );
+    gint32 StartNewRecv( ObjPtr& pCfg );
 
     template< typename T1, 
         typename T=typename std::enable_if<

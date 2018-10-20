@@ -104,8 +104,8 @@ gint32 CIfStartRecvMsgTask::HandleIncomingMsg(
             break;
 
         // put the InvokeMethod in a managed
-        // environment instead of letting it run
-        // randomly
+        // environment instead of letting it
+        // running untracked
         ret = pIf->AddAndRun( pTask );
         if( ERROR( ret ) )
             break;
@@ -121,6 +121,58 @@ gint32 CIfStartRecvMsgTask::HandleIncomingMsg(
     }while( 0 );
 
     return ret; 
+}
+
+gint32 CIfStartRecvMsgTask::StartNewRecv(
+    ObjPtr& pCfg )
+{
+    gint32 ret = 0;
+    if( pCfg.IsEmpty() )
+        return -EINVAL;
+
+    CParamList oParams( ( IConfigDb* )pCfg );
+    ObjPtr pInterface = oParams[ propIfPtr ];
+    CRpcServices* pIf = pInterface;
+    if( pIf == nullptr )
+        return -EFAULT;
+
+    do{
+        if( pIf->GetState() != stateConnected )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+        // start another recvmsg request
+        TaskletPtr pTask;
+        ret = pTask.NewObj(
+            clsid( CIfStartRecvMsgTask ),
+            pCfg );
+
+        // add an concurrent task
+        ret = pIf->AddAndRun( pTask );
+        if( ERROR( ret ) )
+            break;
+
+        ret = pTask->GetError();
+        // succeeded, let's repeat by spawning
+        // new CIfStartRecvMsgTask for the
+        // next pending message in the port
+        if( SUCCEEDED( ret ) )
+            continue;
+
+        if( ERROR( ret ) )
+        {
+            DebugPrint( ret,
+                "The new RecvMsgTask failed" );
+        }
+
+        // whether error or pending, we stop
+        // further receiving
+        break;
+
+   }while( 1 );
+
+   return ret;
 }
 
 gint32 CIfStartRecvMsgTask::OnIrpComplete(
@@ -177,35 +229,12 @@ gint32 CIfStartRecvMsgTask::OnIrpComplete(
             oParams[ propIfPtr ] = pObj;
             oParams.CopyProp( propMatchPtr, this );
 
-            // start another recvmsg request
-            TaskletPtr pTask;
-            ret = pTask.NewObj(
-                clsid( CIfStartRecvMsgTask ),
-                oParams.GetCfg() );
+            ObjPtr pObj = oParams.GetCfg();
+            ret = DEFER_CALL( pMgr, ObjPtr( this ),
+                &CIfStartRecvMsgTask::StartNewRecv,
+                pObj );
 
-            // add an concurrent task
-            ret = pIf->AddAndRun( pTask );
-
-            if( ERROR( ret ) )
-                break;
-
-            ret = pTask->GetError();
-
-            // succeeded, let's repeat by spawning
-            // new CIfStartRecvMsgTask for the
-            // next pending message in the port
-            if( SUCCEEDED( ret ) )
-                continue;
-
-            if( ERROR( ret ) )
-            {
-                DebugPrint( ret, "The new RecvMsgTask failed" );
-            }
-            // whether error or pending, we stop
-            // further receiving
-            break;
-
-        }while( 1 );
+        }while( 0 );
 
         if( ret == ERROR_STATE )
         {
@@ -633,10 +662,21 @@ gint32 CIfRetryTask::Process( guint32 dwContext )
                 break;
             }
         case eventTimeoutCancel:
+            {   
+                OnCancel( iEvent );
+                ret = ERROR_TIMEOUT;
+                break;
+            }
         case eventCancelTask:
             {
                 OnCancel( iEvent );
-                ret = -ECANCELED;
+                ret = ERROR_CANCEL;
+                break;
+            }
+        case eventUserCancel:
+            {
+                OnCancel( iEvent );
+                ret = ERROR_USER_CANCEL;
                 break;
             }
         default:
@@ -2010,6 +2050,7 @@ gint32 CIfParallelTaskGrp::RunTask()
     gint32 ret = 0;
     CStdRTMutex oTaskLock( GetLock() );
     do{
+
         std::set< TaskletPtr > setTasksToRun;
         CCfgOpener oCfg( ( IConfigDb* )GetConfig() );
 
@@ -2030,10 +2071,10 @@ gint32 CIfParallelTaskGrp::RunTask()
 
         while( !setTasksToRun.empty() )
         {
-            CTasklet* pTask =
+            TaskletPtr pTask =
                 *setTasksToRun.begin(); 
 
-            if( pTask != nullptr )
+            if( !pTask.IsEmpty() )
                 ( *pTask )( eventZero );
 
             setTasksToRun.erase(
@@ -2473,6 +2514,8 @@ gint32 CIfParallelTask::operator()(
                 }
             case eventTaskComp:
             case eventCancelTask:
+            case eventTimeoutCancel:
+            case eventUserCancel:
             default:
                 {
                     break;
@@ -2492,8 +2535,9 @@ gint32 CIfParallelTask::operator()(
 gint32 CIfParallelTask::OnComplete(
     gint32 iRet )
 {
+    gint32 ret = super::OnComplete( iRet );
     m_iTaskState = stateStopped;
-    return super::OnComplete( iRet );
+    return ret;
 }
 
 gint32 CIfParallelTask::OnCancel(
@@ -2638,8 +2682,7 @@ gint32 CIfParallelTask::Process(
                 ret = OnKeepAlive( eventTimeout );
                 break;
             }
-            else if( vecParams[ 1 ] == eventTimeoutCancel ||
-                vecParams[ 1 ] == eventCancelTask )
+            else if( vecParams[ 1 ] == eventTimeoutCancel )
             {
                 // redirect to CIfRetryTask::Process
                 dwContext = vecParams[ 1 ];
@@ -2846,7 +2889,8 @@ gint32 CIfIoReqTask::OnCancel(
     gint32 ret = 0;
 
     do{
-        CCfgOpener oCfg( ( IConfigDb* )GetConfig() );
+        CCfgOpener oCfg(
+            ( IConfigDb* )GetConfig() );
         CRpcServices* pIf = nullptr;
         
         ObjPtr pObj;
@@ -3300,7 +3344,14 @@ gint32 CIfInvokeMethodTask::OnCancel(
             break;
         }
 
-        OnTaskComplete( -ECANCELED );
+        ret = ERROR_CANCEL;
+
+        if( dwContext == eventTimeoutCancel )
+            ret = -ETIMEDOUT;
+        else if( dwContext == eventUserCancel )
+            ret = ERROR_USER_CANCEL;
+
+        OnTaskComplete( ret );
 
     }while( 0 );
 
@@ -3466,27 +3517,30 @@ gint32 CIfInvokeMethodTask::OnComplete(
             break;
         }
 
-        if( pIf->IsQueuedReq() )
+        // NOTE: ERROR_CANCEL indicates the
+        // parallel group is canceling this task,
+        // no need to invoke the next task.
+        if( pIf->IsQueuedReq() &&
+            iRetVal != ERROR_CANCEL )
         {
             if( pIf->GetQueueSize() == 0 )
                 break;
 
             CParamList oParams;
             oParams.CopyProp( propIfPtr, this );
+            oParams.Push( ObjPtr( this ) );
 
             // move on to the next request if
             // incoming requests are queued
             CIoManager* pMgr = pIf->GetIoMgr();
+
+            // fatal error, cannot recover
             if( pMgr == nullptr )
-            {
-                // fatal error, cannot recover
                 break;
-            }
 
             // NOTE: we use another task instead
             // of InvokeMethod in this context to
-            // avoid the parallel tasks nested in
-            // each other's context
+            // avoid the parallel tasks nesting
             ret = pMgr->ScheduleTask(
                 clsid( CIfServiceNextMsgTask ),
                 oParams.GetCfg() );
@@ -3841,20 +3895,38 @@ gint32 CIfInvokeMethodTask::SetAsyncCall(
 gint32 CIfServiceNextMsgTask::RunTask()
 {
     gint32 ret = 0;
-    CCfgOpener oCfg( ( IConfigDb* )GetConfig() );
+    CParamList oCfg( ( IConfigDb* )GetConfig() );
     ObjPtr pObj;
     
-    ret = oCfg.GetObjPtr( propIfPtr, pObj );
-    if( ERROR( ret ) )
-        return ret;
+    do{
+        ret = oCfg.GetObjPtr( propIfPtr, pObj );
+        if( ERROR( ret ) )
+            break;
 
-    CRpcServices* pIf = pObj;
-    if( pIf == nullptr )
-        return -EFAULT;
+        CRpcServices* pIf = pObj;
+        if( pIf == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
 
-    pIf->InvokeNextMethod();
+        ret = oCfg.Pop( pObj );
+        if( ERROR( ret ) )
+            break;
 
-    return 0;
+        // the last invoke task
+        TaskletPtr pInvTask = pObj;
+        if( pInvTask.IsEmpty() )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        ret = pIf->InvokeNextMethod( pInvTask );
+
+    }while( 0 );
+
+    return SetError( ret );
 }
 
 gint32 CopyFile( gint32 iFdSrc, gint32 iFdDest, ssize_t& iSize );

@@ -1424,7 +1424,7 @@ gint32 CIoManager::ScheduleTask(
         if( ERROR( ret ) )
             break;
 
-        if( bOneshot )
+        if( unlikely( bOneshot ) )
         {
             ThreadPtr pThread;
 
@@ -1583,11 +1583,11 @@ CIoManager::CIoManager( const std::string& strModName ) :
                 "CDriverManager failed to initialize" );
         }
 
-        guint32 dwThreadCount = 1;
-        guint32 dwThreadMax = 2;
-        a.Push( dwThreadCount );
-        a.Push( dwThreadMax );
-        a.Push( ( guint32 )clsid( CIrpThreadPool ) );
+        // load count
+        a.Push( 1 );
+        // max thread
+        a.Push( 2 );
+        a.Push( ( guint32 )clsid( CIrpCompThread ) );
 
         ret = m_pIrpThrdPool.NewObj(
             clsid( CIrpThreadPool ), pCfg );
@@ -1597,11 +1597,12 @@ CIoManager::CIoManager( const std::string& strModName ) :
                 "CIrpThreadPool failed to initialize" );
         }
 
-        a.SetIntProp( 0, dwThreadCount );
-        dwThreadMax = 3;
-        a.SetIntProp( 1, dwThreadMax );
-        a.SetIntProp( 2,
-            ( guint32 )clsid( CTaskThreadPool ) );
+        a.ClearParams();
+        // load count
+        a.Push( 1 );
+        // max thread
+        a.Push( 1 );
+        a.Push( ( guint32 )clsid( CTaskThread ) );
 
         ret = m_pTaskThrdPool.NewObj(
             clsid( CTaskThreadPool ), pCfg );

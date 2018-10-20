@@ -1,13 +1,13 @@
 include ../Makefile.init.pub
 
 TARGET:=libipc.so
-SOURCES:= ifstat.cpp rpcif.cpp gmloop.cpp sevpoll.cpp\
+SOURCES:= iftasks.cpp ifstat.cpp rpcif.cpp gmloop.cpp sevpoll.cpp\
 	mainloop.cpp dllexp.cpp evloop.cpp dbushook.cpp \
 	irp.cpp irpthread.cpp port.cpp portstat.cpp \
 	drvmgr.cpp utils.cpp iomgr.cpp ptifmap.cpp \
 	pnpmgr.cpp dbusdrv.cpp dbusport.cpp portdrv.cpp \
 	rpcpdo.cpp dbuspdo.cpp tasklets.cpp \
-	iftasks.cpp lpbkmtch.cpp ifhelper.cpp \
+	lpbkmtch.cpp ifhelper.cpp \
 	iiddict.cpp reqopen.cpp
 
 

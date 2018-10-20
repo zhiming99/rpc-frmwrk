@@ -1536,7 +1536,7 @@ gint32 CRpcInterfaceBase::AddAndRun(
         CIfParallelTaskGrp* pParaTaskGrp =
             pParaTask;
 
-        if( pParaTaskGrp == nullptr )
+        if( unlikely( pParaTaskGrp == nullptr ) )
         {
             // rollback
             pRootTaskGroup->
@@ -1653,6 +1653,7 @@ gint32 CRpcServices::OnPostStop(
     m_mapFuncs.clear();
     m_mapProxyFuncs.clear();
     m_pRootTaskGroup.Clear();
+    m_queInvTasks.clear();
 
     return 0;
 }
@@ -1676,7 +1677,7 @@ bool CRpcServices::IsQueuedReq()
 guint32 CRpcServices::GetQueueSize() const
 {
     CStdRMutex oIfLock( GetLock() );
-    return m_queTasks.size();
+    return m_queInvTasks.size();
 }
 
 /**
@@ -1720,19 +1721,13 @@ gint32 CRpcServices::InvokeMethod(
             {
                 CStdRMutex oIfLock( GetLock() );
                 bool bWait = true;
-                if( m_queTasks.size() > 20 )
+                guint32 dwTaskCount = m_queInvTasks.size();
+                if( dwTaskCount > 0 )
                 {
-                    ret1 = -ENOMEM;
-                    break;
-                }
-                else if( m_queTasks.size() > 0 )
-                {
-
-                    if( ( ( IEventSink* )m_queTasks.front() )
+                    if( ( ( IEventSink* )m_queInvTasks.front() )
                         == pCallback )
                     {
-                        // already the first one
-                        // to run, no need to wait
+                        // time to run this task
                         bWait = false;
                     }
                     else
@@ -1740,7 +1735,14 @@ gint32 CRpcServices::InvokeMethod(
                         // some other task is
                         // running, and wait in
                         // the queue
-                        m_queTasks.push_back(
+                        if( dwTaskCount > 20 )
+                        {
+                            ret1 = -ENOMEM;
+                            DebugPrint( ret, 
+                                "TaskQue has reached limit" );
+                            break;
+                        }
+                        m_queInvTasks.push_back(
                             EventPtr( pCallback ) );
                     }
                 }
@@ -1749,7 +1751,7 @@ gint32 CRpcServices::InvokeMethod(
                     // this msg is the first to
                     // service, go on to run it
                     // and no wait
-                    m_queTasks.push_back(
+                    m_queInvTasks.push_back(
                         EventPtr( pCallback ) );
                     bWait = false;
                 }
@@ -1829,48 +1831,74 @@ template
 gint32 CRpcServices::InvokeMethod<IConfigDb>(
     IConfigDb* pReqMsg, IEventSink* pCallback );
 
-gint32 CRpcServices::InvokeNextMethod()
+gint32 CRpcServices::InvokeNextMethod(
+    TaskletPtr& pLastInvoke )
 {
     gint32 ret = 0;
-    do{
-        if( !IsQueuedReq() )
-            break;
 
+    if( !IsQueuedReq() )
+        return 0;
+
+    if( pLastInvoke.IsEmpty() )
+        return -EINVAL;
+
+    do{
         CStdRMutex oIfLock( GetLock() );
         if( GetState() != stateConnected )
         {
-            m_queTasks.clear();
+            // the canceling of the queued tasks
+            // will be done by the parallel
+            // taskgroup.
             ret = ERROR_STATE;
             break;
         }
 
-        m_queTasks.pop_front();
-        if( m_queTasks.size() )
+        if( m_queInvTasks.empty() )
+            break;
+
+        std::deque< EventPtr >::iterator itr =
+            m_queInvTasks.begin();
+
+        while( ( *itr )->GetObjId() != 
+            pLastInvoke->GetObjId() )
+            ++itr;
+
+        // a fake invoke, ignore and return
+        if( itr == m_queInvTasks.end() )
+            break;
+
+        if( itr != m_queInvTasks.begin() )
+        {
+            // a task waiting in the queue is
+            // being canceled
+            m_queInvTasks.erase( itr );
+            break;
+        }
+
+        // the head task is done, move on to next
+        m_queInvTasks.pop_front();
+
+        ret = -ENOENT;
+        while( !m_queInvTasks.empty() )
         {
             TaskletPtr pTask =
-                ObjPtr( m_queTasks.front() );
+                ObjPtr( m_queInvTasks.front() );
 
+            // next request
             if( pTask.IsEmpty() )
             {
-                // next message
+                m_queInvTasks.pop_front();
                 continue;
             }
             oIfLock.Unlock();
             ret = ( *pTask )( eventZero );
-            if( ret == STATUS_PENDING )
-                break;
 
-            // till the msg queue exhausted
-            continue;
-        }
-        else
-        {
-            ret = -ENOENT;
+            // next call will come when pTask
+            // completes
+            break;
         }
 
-        break;
-
-    }while( 1 );
+    }while( 0 );
 
     return ret;
 }
@@ -3077,6 +3105,17 @@ gint32 CRpcServices::LoadObjDesc(
             {
                 strVal = oObjElem[ JSON_ATTR_PROXY_PORTID ].asString(); 
                 oCfg[ propPortId ] = std::stoi( strVal );
+            }
+
+            if( oObjElem.isMember( JSON_ATTR_QUEUED_REQ ) &&
+                oObjElem[ JSON_ATTR_QUEUED_REQ ].isString() &&
+                bServer )
+            {
+                strVal = oObjElem[ JSON_ATTR_QUEUED_REQ  ].asString(); 
+                if( strVal == "false" )
+                    oCfg[ propQueuedReq ] = false;
+                else if( strVal == "true" )
+                    oCfg[ propQueuedReq ] = true;
             }
 
             Json::Value& oIfArray = 
@@ -4935,8 +4974,15 @@ gint32 CInterfaceServer::UserCancelRequest(
             // complete the invoke task, force to
             // deliver the `cancel event' to the task.
             SetResponse( pInvTask, pResp );
-            pInvTask->OnEvent( eventCancelTask,
-                -ECANCELED, 0, 0 );
+            if( pInvTask->IsInProcess() )
+            {
+                // the task is running, and we
+                // cannot cancel it
+                ret = ERROR_FAIL;
+                break;
+            }
+            pInvTask->OnEvent( eventUserCancel,
+                ERROR_USER_CANCEL, 0, 0 );
         }
 
     }while( 0 );

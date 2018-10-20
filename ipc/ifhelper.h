@@ -853,8 +853,7 @@ class CDeferredCall :
         m_pUserFunc = pFunc;
         this->SetClassId( clsid( CDeferredCall ) );
 
-        std::tuple< Args...> oTuple =
-            std::make_tuple( args ... );
+        std::tuple< Args...> oTuple( args ... );
 
         std::vector< BufPtr > vec;
 
@@ -1045,9 +1044,12 @@ inline gint32 NewDeferredCallOneshot(
     return 0;
 }
 
+// NOTE: it is required to provide at least one
+// argument in the variadic parameter pack
 #define DEFER_CALL_ONESHOT( pTask, pEvent, pObj, func, ... ) \
 do{ \
-    NewDeferredCallOneshot( pEvent, pTask, pObj, func, __VA_ARGS__ ); \
+    NewDeferredCallOneshot( \
+        pEvent, pTask, pObj, func, __VA_ARGS__ ); \
     if( !pTask.IsEmpty() ) \
         ( *pTask )( eventZero ); \
 }while( 0 )

@@ -59,3 +59,4 @@
 #define JSON_ATTR_REQ_TIMEOUT   "RequestTimeoutSec"
 #define JSON_ATTR_KA_TIMEOUT    "KeepAliveTimeoutSec"
 #define JSON_ATTR_BIND_CLSID    "BindToClsid"
+#define JSON_ATTR_QUEUED_REQ     "QueuedRequests"

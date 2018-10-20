@@ -39,6 +39,7 @@ class CTasklet : public ICancellableTask
 
     protected:
     CfgPtr m_pCtx;
+    sem_t m_semReentSync;
 
     public:
 
@@ -147,8 +148,9 @@ class CTasklet : public ICancellableTask
                 continue;
             }
             // already cleared?
-            usleep( 100000 );
+            usleep( 10000 );
         }
+        Sem_Post( &m_semReentSync );
     }
 
     bool IsInProcess()

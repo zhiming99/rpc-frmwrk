@@ -133,7 +133,7 @@ gint32 CUtilities::Start()
         std::bind( &CUtilities::ThreadProc, this, _1 );
 
     m_pWorkerThread = new thread( oThreadProc, 0 );
-    m_pWorkerThreadLongWait = new thread( oThreadProc, 1 );
+    // m_pWorkerThreadLongWait = new thread( oThreadProc, 1 );
 
     m_pTimerSvc->Start();
 
@@ -151,10 +151,13 @@ gint32 CUtilities::Stop()
         delete m_pWorkerThread;
         m_pWorkerThread = NULL;
 
-        Wakeup( 1 );
-        m_pWorkerThreadLongWait->join();
-        delete m_pWorkerThreadLongWait;
-        m_pWorkerThreadLongWait = NULL;
+        if( m_pWorkerThreadLongWait != nullptr )
+        {
+            Wakeup( 1 );
+            m_pWorkerThreadLongWait->join();
+            delete m_pWorkerThreadLongWait;
+            m_pWorkerThreadLongWait = NULL;
+        }
     }
     return 0;
 }

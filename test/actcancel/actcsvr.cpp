@@ -147,13 +147,12 @@ gint32 CActcServer::LongWait(
     // CTimerService object, together with the deferred
     // call above
     //
-    // DEFER_CALL_ONESHOT will always be called
+    // OnLongWaitCanceled will always be called
     // wheather LongWait succeeds, failed or canceled,
     // by intercepting before the CIfInvokeMethodTask
     // is about to complete, unlike the
     // OnLongWaitComplete, which will only be called
-    // along the branch the business logic get
-    // returned.
+    // when the user logics completes and returns.
     // 
     // So to determine whether or not the task is
     // canceled, you need to retrieve the

@@ -570,21 +570,20 @@ void CIrpCompThread::ThreadProc( void* context )
         {
             CStdMutex a( m_oMutex );
             if( m_quePendingIrps.size() )
-            {
                 pIrp = m_quePendingIrps.front();
-                m_quePendingIrps.pop_front();
-            }
-            bEmpty = m_quePendingIrps.empty();
-            Sem_Post( &m_semSlots );
         }
 
         if( !pIrp.IsEmpty() )
         {
             CompleteIrp( pIrp );
+
+            CStdMutex a( m_oMutex );
+            m_quePendingIrps.pop_front();
+            bEmpty = m_quePendingIrps.empty();
+            Sem_Post( &m_semSlots );
         }
 
         pIrp.Clear();
-
         // pIrp destroyed
         if( !bEmpty )
             continue;

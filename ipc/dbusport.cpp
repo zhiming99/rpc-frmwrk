@@ -949,12 +949,13 @@ void CDBusBusPort::ReleaseDBus()
 gint32 CDBusBusPort::Stop( IRP *pIrp )
 {
     CDBusConnFlushTask* pTask = m_pFlushTask;
-    if( pTask )
+    if( pTask != nullptr )
         pTask->Stop();
     m_pFlushTask.Clear();
 
     gint32 ret = super::Stop( pIrp );
-    // TODO: stop all the pdo's created by this port
+    // NOTE: the child ports are stopped ahead of
+    // this method is called
 
     ReleaseDBus();
     m_pMatchDisconn.Clear();
