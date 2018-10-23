@@ -148,8 +148,12 @@ class CIfParallelTask
     virtual gint32 OnComplete( gint32 iRet );
     gint32 CancelIrp();
     virtual gint32 OnCancel( guint32 dwContext );
-    EnumTaskState GetTaskState() const
+
+    inline EnumTaskState GetTaskState() const
     { return m_iTaskState; }
+
+    inline void SetTaskState( EnumTaskState iState )
+    { m_iTaskState = iState; }
 
     // helper methods
     gint32 SetReqCall( IConfigDb* pReq );
@@ -163,44 +167,27 @@ class CIfParallelTask
     { return -ENOTSUP; }
 
     gint32 GetProperty( gint32 iProp,
-            CBuffer& oBuf ) const
-    {
-        CStdRTMutex oTaskLock( GetLock() );
-        return super::GetProperty( iProp, oBuf );
-    }
+            CBuffer& oBuf ) const;
 
     gint32 SetProperty( gint32 iProp,
-        const CBuffer& oBuf )
-    {
-        CStdRTMutex oTaskLock( GetLock() );
-        return super::SetProperty( iProp, oBuf );
-    }
+        const CBuffer& oBuf );
 
-    gint32 RemoveProperty( gint32 iProp )
-    {
-        CStdRTMutex oTaskLock( GetLock() );
-        return super::RemoveProperty( iProp );
-    }
+    gint32 RemoveProperty( gint32 iProp );
 
     gint32 EnumProperties(
-        std::vector< gint32 >& vecProps ) const
-    {
-        CStdRTMutex oTaskLock( GetLock() );
-        return super::EnumProperties( vecProps );
-    }
+        std::vector< gint32 >& vecProps ) const;
 
     gint32 GetPropertyType(
-        gint32 iProp, gint32& iType ) const
-    {
-        CStdRTMutex oTaskLock( GetLock() );
-        return super::GetPropertyType( iProp, iType );
-    }
+        gint32 iProp, gint32& iType ) const;
 
     virtual gint32 OnNotify( guint32 event,
         guint32 dwParam1,
         guint32 dwParam2,
         guint32* pData )
     { return STATUS_PENDING; }
+
+    virtual bool IsMultiThreadSafe()
+    { return true; }
 };
 
 class CIfEnableEventTask
@@ -332,6 +319,9 @@ class CIfTaskGroup
         SetRelation( logicAND );
     }
 
+    virtual bool IsMultiThreadSafe()
+    { return true; }
+
     virtual gint32 RunTask();
     virtual gint32 OnChildComplete(
         gint32 ret, CTasklet* pChild );
@@ -438,6 +428,9 @@ class CIfParallelTaskGrp
 
     public:
 
+    virtual bool IsMultiThreadSafe()
+    { return true; }
+
     typedef CIfTaskGroup super;
     CIfParallelTaskGrp( const IConfigDb* pCfg )
        : super( pCfg ) 
@@ -450,6 +443,7 @@ class CIfParallelTaskGrp
     virtual gint32 OnChildComplete(
         gint32 ret, CTasklet* pChild );
 
+    gint32 RunTaskDirect( TaskletPtr& pTask );
     gint32 AddAndRun( TaskletPtr& pTask );
     bool IsRunning();
     gint32 AppendTask( TaskletPtr& pTask );

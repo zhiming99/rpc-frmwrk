@@ -48,6 +48,8 @@ class CTasklet : public ICancellableTask
     CTasklet( const IConfigDb* pCfg = nullptr );
 
     virtual gint32 operator()( guint32 dwContext ) = 0;
+    virtual bool IsMultiThreadSafe()
+    { return false; }
 
     operator IConfigDb*()
     { return ( IConfigDb* )m_pCtx; }
@@ -104,9 +106,10 @@ class CTasklet : public ICancellableTask
     class CReentrancyGuard
     {
         CTasklet* m_pTask;
+
         public:
         CReentrancyGuard( CTasklet* pTask )
-        : m_pTask( pTask )
+            : m_pTask( pTask )
         {
             if( pTask != nullptr )
                 pTask->MarkInProcess();
@@ -121,6 +124,12 @@ class CTasklet : public ICancellableTask
     void MarkInProcess()
     {
         bool bExpected = false;
+        if( IsMultiThreadSafe() )
+        {
+            m_bInProcess = true;
+            return;
+        }
+
         while( m_bInProcess.compare_exchange_weak(
             bExpected, true ) == false )
         {
@@ -138,6 +147,11 @@ class CTasklet : public ICancellableTask
     void ClearInProcess()
     {
         bool bExpected = true;
+        if( IsMultiThreadSafe() )
+        {
+            m_bInProcess = false;
+            return;
+        }
         while( m_bInProcess.compare_exchange_weak(
             bExpected, false ) == false )
         {

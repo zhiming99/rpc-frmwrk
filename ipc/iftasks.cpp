@@ -126,6 +126,7 @@ gint32 CIfStartRecvMsgTask::HandleIncomingMsg(
 gint32 CIfStartRecvMsgTask::StartNewRecv(
     ObjPtr& pCfg )
 {
+    // NOTE: no touch of *this, so no locking
     gint32 ret = 0;
     if( pCfg.IsEmpty() )
         return -EINVAL;
@@ -148,12 +149,14 @@ gint32 CIfStartRecvMsgTask::StartNewRecv(
             clsid( CIfStartRecvMsgTask ),
             pCfg );
 
-        // add an concurrent task
-        ret = pIf->AddAndRun( pTask );
+        // add an concurrent task, and run it
+        // directly.
+        ret = pIf->AddAndRun( pTask, true );
         if( ERROR( ret ) )
             break;
 
         ret = pTask->GetError();
+
         // succeeded, let's repeat by spawning
         // new CIfStartRecvMsgTask for the
         // next pending message in the port
@@ -164,11 +167,35 @@ gint32 CIfStartRecvMsgTask::StartNewRecv(
         {
             DebugPrint( ret,
                 "The new RecvMsgTask failed" );
+            break;
         }
 
-        // whether error or pending, we stop
-        // further receiving
-        break;
+        // ret == STATUS_PENDING
+        CCfgOpenerObj oTaskCfg(
+            ( CObjBase* )pTask );
+
+        EnumTaskState dwState = stateInvalid;
+        ret = oTaskCfg.GetIntProp(
+            propTaskState, ( guint32& )dwState );
+
+        if( ERROR( ret ) )
+        {
+            ret = 0;
+            break;
+        }
+
+        if( dwState == stateStarted )
+            break;
+
+        if( !( dwState == stateStopped ||
+            dwState == stateIoDone ) )
+            break;
+
+        // the task has finished IO, and is
+        // waiting for OnIrpComplete. Or has
+        // completed already. Let's start a new
+        // receive task
+        DebugPrint( ret, "issue next receive" );
 
    }while( 1 );
 
@@ -228,29 +255,27 @@ gint32 CIfStartRecvMsgTask::OnIrpComplete(
             // task
             oParams[ propIfPtr ] = pObj;
             oParams.CopyProp( propMatchPtr, this );
-
             ObjPtr pObj = oParams.GetCfg();
+
+            // offload the output tasks to the
+            // task threads
             ret = DEFER_CALL( pMgr, ObjPtr( this ),
                 &CIfStartRecvMsgTask::StartNewRecv,
                 pObj );
 
         }while( 0 );
 
+        // interface is not working, don't continue
         if( ret == ERROR_STATE )
-        {
-            // interface is not working, don't continue
             break;
-        }
 
-        // whether error or not, we don't care. we need
-        // to handle the incoming irp now
-
-        // proceed to complete the irp
+        // whether error or not receiving, we
+        // proceed to handle the incoming irp now
         ret = pIrp->GetStatus();
         if( ret == -EAGAIN )
         {
-            // no valid information to handle, just
-            // quit
+            // no valid information to handle,
+            // just return
             ret = 0;
             break;
         }
@@ -287,8 +312,9 @@ gint32 CIfStartRecvMsgTask::RunTask()
 {
     gint32 ret = 0;
     do{
-        CCfgOpener oCfg( ( IConfigDb* )GetConfig() );
         ObjPtr pObj;
+        CCfgOpener oCfg(
+            ( IConfigDb* )GetConfig() );
         
         ret = oCfg.GetObjPtr( propIfPtr, pObj );
         if( ERROR( ret ) )
@@ -2102,6 +2128,60 @@ gint32 CIfParallelTaskGrp::RunTask()
     return ret;
 }
 
+gint32 CIfParallelTaskGrp::RunTaskDirect(
+    TaskletPtr& pTask )
+{
+    if( pTask.IsEmpty() )
+        return -EINVAL;
+
+    gint32 ret = 0;
+
+    do{
+        CStdRTMutex oTaskLock( GetLock() );
+        CCfgOpener oCfg(
+            ( IConfigDb* )GetConfig() );
+
+        ObjPtr pIf;
+        ret = oCfg.GetObjPtr( propIfPtr, pIf );
+        if( ERROR( ret ) )
+            break;
+
+        CRpcServices* pService = pIf;
+        if( pService == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        bool bRunning = IsRunning();
+
+        CCfgOpenerObj oChildCfg(
+            ( CObjBase* )pTask );
+
+        oChildCfg.SetObjPtr(
+            propParentTask, ObjPtr( this ) );
+
+        if( !bRunning )
+            m_setPendingTasks.insert( pTask );
+        else
+            m_setTasks.insert( pTask );
+        oTaskLock.Unlock();
+
+        if( bRunning )
+        {
+            // run this task immediately
+            ( *pTask )( eventZero );
+            break;
+        }
+        else
+        {
+            ret = STATUS_PENDING;
+        }
+
+    }while( 0 );
+
+    return 0;
+}
 gint32 CIfParallelTaskGrp::AddAndRun(
     TaskletPtr& pTask )
 {
@@ -2496,10 +2576,10 @@ gint32 CIfParallelTask::operator()(
     try{
         CStdRTMutex oTaskLock( GetLock(), dwTryMs );
 
-        if( m_iTaskState == stateStopped )
+        if( GetTaskState() == stateStopped )
             return ERROR_STATE;
 
-        if( m_iTaskState == stateStarting )
+        if( GetTaskState() == stateStarting )
         {
             switch( dwContext )
             {
@@ -2509,7 +2589,7 @@ gint32 CIfParallelTask::operator()(
             case eventIrpComp:
             case eventTimeout:
                 {
-                    m_iTaskState = stateStarted;
+                    SetTaskState( stateStarted );
                     break;
                 }
             case eventTaskComp:
@@ -2536,14 +2616,14 @@ gint32 CIfParallelTask::OnComplete(
     gint32 iRet )
 {
     gint32 ret = super::OnComplete( iRet );
-    m_iTaskState = stateStopped;
+    SetTaskState( stateStopped );
     return ret;
 }
 
 gint32 CIfParallelTask::OnCancel(
     guint32 dwContext )
 {
-    if( m_iTaskState == stateStopped )
+    if( GetTaskState() == stateStopped )
         return 0;
 
     CancelIrp();
@@ -2753,6 +2833,60 @@ gint32 CIfParallelTask::Process(
     return ret;
 }
 
+gint32 CIfParallelTask::GetProperty( gint32 iProp,
+        CBuffer& oBuf ) const
+{
+    CStdRTMutex oTaskLock( GetLock() );
+    if( iProp == propTaskState )
+    {
+        oBuf = GetTaskState();
+        return 0;
+    }
+    return super::GetProperty( iProp, oBuf );
+}
+
+gint32 CIfParallelTask::SetProperty( gint32 iProp,
+    const CBuffer& oBuf )
+{
+    CStdRTMutex oTaskLock( GetLock() );
+    if( iProp == propTaskState )
+    {
+        guint32 dwState = oBuf;
+        SetTaskState( ( EnumTaskState )dwState );
+        return 0;
+    }
+    return super::SetProperty( iProp, oBuf );
+}
+
+gint32 CIfParallelTask::RemoveProperty( gint32 iProp )
+{
+    if( iProp == propTaskState )
+        return -ENOTSUP;
+
+    CStdRTMutex oTaskLock( GetLock() );
+    return super::RemoveProperty( iProp );
+}
+
+gint32 CIfParallelTask::EnumProperties(
+    std::vector< gint32 >& vecProps ) const
+{
+    vecProps.push_back( propTaskState );
+    CStdRTMutex oTaskLock( GetLock() );
+    return super::EnumProperties( vecProps );
+}
+
+gint32 CIfParallelTask::GetPropertyType(
+    gint32 iProp, gint32& iType ) const
+{
+    if( iProp == propTaskState )
+    {
+        iType = typeUInt32;
+        return 0;
+    }
+    CStdRTMutex oTaskLock( GetLock() );
+    return super::GetPropertyType( iProp, iType );
+}
+
 /**
 * @name SubmitIoRequest: build the dbus message
 * with the pReq and send an irp down to the
@@ -2883,7 +3017,7 @@ gint32 CIfIoReqTask::SubmitIoRequest()
 gint32 CIfIoReqTask::OnCancel(
     guint32 dwContext )
 {
-    if( m_iTaskState != stateStarted )
+    if( GetTaskState() != stateStarted )
         return 0;
 
     gint32 ret = 0;
@@ -3344,8 +3478,9 @@ gint32 CIfInvokeMethodTask::OnCancel(
             break;
         }
 
+        // NOTE: the error is not exactly the one
+        // in the response. it is used internally.
         ret = ERROR_CANCEL;
-
         if( dwContext == eventTimeoutCancel )
             ret = -ETIMEDOUT;
         else if( dwContext == eventUserCancel )

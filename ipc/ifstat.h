@@ -40,7 +40,7 @@ do{ \
     } \
 }while( 0 ) 
 
-typedef enum
+typedef enum : guint32
 {
     stateStopped = 0,
     stateStarting,
@@ -52,7 +52,8 @@ typedef enum
     stateStopping,
     statePausing,
     stateResuming,
-    stateInvalid
+    stateInvalid,
+    stateIoDone,    // for the task state
 
 }EnumIfState;
 

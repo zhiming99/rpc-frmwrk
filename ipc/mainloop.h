@@ -120,7 +120,8 @@ class CTaskQueue : public CObjBase
     CTaskQueue();
     void AddTask( TaskletPtr& pTask );
     gint32 RemoveTask( TaskletPtr& pTask );
-    gint32 PopHead( TaskletPtr& pTask );
+    gint32 PopHead();
+    gint32 GetHead( TaskletPtr& pTask );
     gint32 GetSize();
 };
 
@@ -211,12 +212,13 @@ class CMainIoLoopT : public T
             TaskQuePtr& pQue =
                 pLoop->GetTaskQue();
 
-            ret = pQue->PopHead( pTask );
+            ret = pQue->GetHead( pTask );
             if( ERROR( ret ) )
             {
                 pLoop->SetTaskDone( true );
                 break;
             }
+            pQue->PopHead();
             oLock.Unlock();
 
             ( *pTask )( ( guint32 )pdata );

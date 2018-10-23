@@ -139,8 +139,6 @@ gint32 CActcServer::LongWait(
     if( iTimer < 0 )
         return iTimer;
 
-    // we need to handle the canceling operation
-    TaskletPtr pCancelTask;
 
     // bind a cancel callback to release the timer
     // otherwise, the resouce will piled up in the
@@ -150,9 +148,10 @@ gint32 CActcServer::LongWait(
     // OnLongWaitCanceled will always be called
     // wheather LongWait succeeds, failed or canceled,
     // by intercepting before the CIfInvokeMethodTask
-    // is about to complete, unlike the
-    // OnLongWaitComplete, which will only be called
-    // when the user logics completes and returns.
+    // is about to complete ( caller of this method ),
+    // unlike the OnLongWaitComplete, which will only
+    // be called when the user logics completes and
+    // returns.
     // 
     // So to determine whether or not the task is
     // canceled, you need to retrieve the
@@ -160,7 +159,11 @@ gint32 CActcServer::LongWait(
     //
     // please see the OnLongWaitCanceled for detail
     // 
-    DEFER_CALL_ONESHOT( pCancelTask,
+    // BTW, you can stack several HANDLERS, by calling
+    // the MACRO several times if you like. the call
+    // order is the reverse of the installation order.
+    // 
+    INSTALL_COMPLETE_HANDLER(
         pCallback, this,
         &CActcServer::OnLongWaitCanceled,
         pCallback, iTimer );    
@@ -192,7 +195,7 @@ gint32 CActcServer::OnLongWaitCanceled(
                 "hello, the method is canceled" );
         }
     }
-    
+
     CUtilities& oUtils =
         GetIoMgr()->GetUtils();
 

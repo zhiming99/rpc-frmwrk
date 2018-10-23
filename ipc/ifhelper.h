@@ -931,6 +931,7 @@ class CDeferredCallOneshot :
     public CDeferredCall< CIfParallelTask, ClassName, Args... >
 {
     typedef gint32 ( ClassName::* FuncType)( Args... ) ;
+    TaskletPtr m_pTask;
 
     gint32 CallOrigCallback(
         CObjBase* pCallback, gint32 iRet )
@@ -986,7 +987,10 @@ class CDeferredCallOneshot :
         FuncType pFunc, ObjPtr& pObj, Args... args )
         : super( pFunc, pObj, args... )
     {
+        if( pCallback == nullptr )
+            return;
         InterceptCallback( pCallback );
+        m_pTask = ObjPtr( pCallback );
     }
 
     virtual gint32 operator()( guint32 dwContext = 0 )
@@ -1003,19 +1007,27 @@ class CDeferredCallOneshot :
     virtual gint32 OnTaskComplete( gint32 iRet ) 
     {
         gint32 ret = 0;
-        CObjBase* pObjBase = nullptr;
+        CObjBase* pObjBase = m_pTask;
 
-        if( this->m_pObj.IsEmpty() )
-            return -EINVAL;
+        do{
+            if( this->m_pObj.IsEmpty() )
+            {
+                ret = -EINVAL;
+                break;
+            }
 
-        ret = this->Delegate(
-            this->m_pObj, this->m_vecArgs );
+            ret = this->Delegate(
+                this->m_pObj, this->m_vecArgs );
 
-        if( ret == STATUS_PENDING )
-            return ret;
+            if( ret == STATUS_PENDING )
+                break;
 
-        if( pObjBase != nullptr )
-            CallOrigCallback( pObjBase, iRet );
+            if( pObjBase != nullptr )
+                CallOrigCallback( pObjBase, iRet );
+
+        }while( 0 );
+
+        m_pTask.Clear();
 
         return ret;
     }
@@ -1046,8 +1058,9 @@ inline gint32 NewDeferredCallOneshot(
 
 // NOTE: it is required to provide at least one
 // argument in the variadic parameter pack
-#define DEFER_CALL_ONESHOT( pTask, pEvent, pObj, func, ... ) \
+#define INSTALL_COMPLETE_HANDLER( pEvent, pObj, func, ... ) \
 do{ \
+    TaskletPtr pTask; \
     NewDeferredCallOneshot( \
         pEvent, pTask, pObj, func, __VA_ARGS__ ); \
     if( !pTask.IsEmpty() ) \

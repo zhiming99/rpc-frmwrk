@@ -10,7 +10,7 @@
             "ObjectName": "CEchoServer",
             "RequestTimeoutSec" : "120",
             "KeepAliveTimeoutSec" : "60",
-
+            "QueuedRequests" : "false",
             "Interfaces" :
             [
                 {

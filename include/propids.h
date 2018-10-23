@@ -156,6 +156,7 @@ enum EnumPropId : gint32
     propObjList,        // type: ObjPtr to a CStlObjVector object
     propValList,        // type: ObjPtr to whatever list
     propIid,            // type: an interface id of EnumClsid type, used in CMessageMatch
+    propTaskState,      // type: an integer of EnumTaskState type, in CIfParallelTask
     propReseredEnd = 0x10000000,
     propInvalid = -1, 
 };

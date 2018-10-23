@@ -76,15 +76,6 @@ void CIfSmokeTest::tearDown()
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
         m_pMgr.Clear();
 
-        // NOTE: in rare condition, the dwCount drops
-        // to zero after GetActCount is called. The
-        // reason is unknown. let's sleep 1 second to
-        // let the test pass.
-        guint32 dwCount = CObjBase::GetActCount();
-        if( dwCount > 0 )
-        {
-            sleep( 1 );
-        }
         CPPUNIT_ASSERT( CObjBase::GetActCount() == 0 );
 
     }while( 0 );

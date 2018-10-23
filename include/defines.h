@@ -527,6 +527,7 @@ class IThread : public IService
     virtual bool IsRunning() const = 0;
     virtual gint32 SetThreadName(
         const char* szName = nullptr );
+    virtual void Join() = 0;
 };
 
 class IoRequestPacket;

@@ -35,7 +35,8 @@ class CTaskThread : public IThread
     sem_t                       m_semSync;
     gint32                      m_iMyTid;
 
-    gint32 PopHead( TaskletPtr& pTask );
+    gint32 GetHead( TaskletPtr& pTask );
+    gint32 PopHead();
 
     void ThreadProcWraper( void* context )
     { this->ThreadProc( context ); }
@@ -90,6 +91,8 @@ class CTaskThread : public IThread
 
     gint32 SetThreadName(
         const char* szName = nullptr );
+
+    void Join();
 };
 
 class COneshotTaskThread : public CTaskThread
@@ -125,6 +128,7 @@ class CThreadPool : public IService
     EnumClsid               m_iThreadClass;
     gint32                  m_iThreadCount;
     CIoManager*             m_pMgr;
+    bool                    m_bAscend;
 
     protected:
     std::vector< ThreadPtr > m_vecThreads;
@@ -205,6 +209,8 @@ class CIrpCompThread : public IThread
 
     // test if the thread is running
     bool IsRunning() const;
+
+    void Join();
 
     // we will use AddRef and Release to
     // manange the reference count.

@@ -1319,36 +1319,18 @@ gint32 CIoManager::RescheduleTaskMainLoop(
 gint32 CIoManager::ClearStandAloneThreads()
 {
     CStdRMutex oLock( GetLock() );
-
-    gint32 iSize =
-        ( gint32 )m_vecStandAloneThread.size();
-
-    size_t iStopTask = 0;
-
     vector< ThreadPtr >::iterator itr =
         m_vecStandAloneThread.begin();
 
-    for( gint32 i = iSize - 1; i >= 0 ; --i )
+    while( itr != m_vecStandAloneThread.end() ) 
     {
-        if( !m_vecStandAloneThread[ i ]->IsRunning() )
-            m_vecStandAloneThread.erase( itr + i );
-
-        CCfgOpenerObj oThrdCfg(
-            ( CObjBase* )m_vecStandAloneThread[ i ] );
-
-        if( oThrdCfg.exist( propClsid ) )
-        {
-            // if there is a task CIoMgrStopTask in the
-            // array, we don't need to count that
-            // thread
-            guint32 dwClsid = clsid( Invalid );
-            oThrdCfg.GetIntProp( propClsid, dwClsid );
-            if( dwClsid == clsid( CIoMgrStopTask ) )
-                iStopTask = 1;
-        }
+        if( !( *itr )->IsRunning() )
+            itr = m_vecStandAloneThread.erase( itr );
+        else
+            ++itr;
     }
 
-    if( m_vecStandAloneThread.size() > iStopTask )
+    if( !m_vecStandAloneThread.empty() )
         return -EEXIST;
 
     return 0;
@@ -1358,7 +1340,15 @@ void CIoManager::WaitThreadsQuit()
 {
     while( ClearStandAloneThreads() == -EEXIST )
     {
-        sleep( 1 );
+        CStdRMutex oLock( GetLock() );
+        if( m_vecStandAloneThread.empty() )
+            break;
+        ThreadPtr pThread =
+            m_vecStandAloneThread.front();
+
+        oLock.Unlock();
+        if( !pThread.IsEmpty() )
+            pThread->Join();
     }
 }
 
@@ -1384,10 +1374,9 @@ gint32 CIoManager::StartStandAloneThread(
 
     pThread->Start(); 
 
-    ClearStandAloneThreads();
-
     CStdRMutex oLock( GetLock() );
     m_vecStandAloneThread.push_back( pThread );
+    ClearStandAloneThreads();
 
     return ret;
 }
@@ -1524,7 +1513,7 @@ gint32 CIoManager::Stop()
         clsid( CIoMgrStopTask ),
         a.GetCfg(),
         true );
-
+    WaitThreadsQuit();
     return ret;
 }
 
@@ -1601,7 +1590,7 @@ CIoManager::CIoManager( const std::string& strModName ) :
         // load count
         a.Push( 1 );
         // max thread
-        a.Push( 1 );
+        a.Push( 2 );
         a.Push( ( guint32 )clsid( CTaskThread ) );
 
         ret = m_pTaskThrdPool.NewObj(

@@ -142,14 +142,24 @@ gint32 CTaskQueue::RemoveTask( TaskletPtr& pTask )
     return ret;
 }
 
-gint32 CTaskQueue::PopHead( TaskletPtr& pTask )
+gint32 CTaskQueue::PopHead()
+{
+    gint32 ret = -ENOENT;
+    CStdRMutex a( m_oLock );
+    if( !m_queTasks.empty() )
+    {
+        m_queTasks.pop_front();
+        ret = 0;
+    }
+    return ret;
+}
+gint32 CTaskQueue::GetHead( TaskletPtr& pTask )
 {
     gint32 ret = -ENOENT;
     CStdRMutex a( m_oLock );
     if( !m_queTasks.empty() )
     {
         pTask = m_queTasks.front();
-        m_queTasks.pop_front();
         ret = 0;
     }
     return ret;
@@ -210,13 +220,18 @@ gint32 CTaskThread::Stop()
         Sem_Post( &m_semSync );
 
         // waiting till it ends
-        m_pServiceThread->join();
-
+        Join();
         delete m_pServiceThread;
 
         m_pServiceThread = nullptr;
     }
     return 0;
+}
+
+void CTaskThread::Join()
+{
+    if( IsRunning() )
+        m_pServiceThread->join();
 }
 
 gint32 CTaskThread::SetThreadName(
@@ -247,8 +262,8 @@ gint32 CTaskThread::ProcessTask(
 {
     gint32 ret = 0;
     TaskletPtr pTask;
-    ret = PopHead( pTask );
 
+    ret = GetHead( pTask );
     if( ERROR( ret ) )
         return ret;
 
@@ -271,6 +286,7 @@ gint32 CTaskThread::ProcessTask(
     ( *pTask )( ( guint32 )dwContext );
 #endif
 
+    PopHead();
     // to exhaust the queue before
     // sleep
     return 0;
@@ -335,10 +351,15 @@ gint32 CTaskThread::RemoveTask(
     return m_pTaskQue->RemoveTask( pTask );
 }
 
-gint32 CTaskThread::PopHead(
+gint32 CTaskThread::PopHead()
+{
+    return  m_pTaskQue->PopHead();
+}
+
+gint32 CTaskThread::GetHead(
     TaskletPtr& pTask )
 {
-    return  m_pTaskQue->PopHead( pTask );
+    return  m_pTaskQue->GetHead( pTask );
 }
 
 gint32 CTaskThread::GetProperty(
@@ -403,13 +424,13 @@ void COneshotTaskThread::ThreadProc(
     while( !m_bTaskDone )
     {
         TaskletPtr pTask;
-        ret = PopHead( pTask );
+        ret = GetHead( pTask );
         if( SUCCEEDED( ret ) && !pTask.IsEmpty() )
         {
             ( *pTask )( ( guint32 )dwContext );
             m_bTaskDone = true;
         }
-
+        PopHead();
         while( !m_bTaskDone )
         {
             ret = Sem_TimedwaitSec( &m_semSync,
@@ -665,6 +686,12 @@ gint32 CIrpCompThread::Stop()
     return 0;
 }
 
+void CIrpCompThread::Join()
+{
+    if( IsRunning() )
+        m_pServiceThread->join();
+}
+
 gint32 CThreadPool::GetThread(
     ThreadPtr& pThread, bool bStart )
 {
@@ -672,24 +699,43 @@ gint32 CThreadPool::GetThread(
     do{
         ThreadPtr thptr;
         CStdRMutex oLock( m_oLock ); 
-        vector<ThreadPtr>::iterator itr =
-            m_vecThreads.begin();
 
         gint32 iLeastLoad = 10000;
         ThreadPtr thLeast;
 
-        while( itr != m_vecThreads.end() ) 
+        if( m_bAscend )
         {
-            // a simple thread choosing strategy
-            gint32 iLoad =
-                ( *itr )->GetLoadCount();
-
-            if( iLoad < iLeastLoad )
+            vector<ThreadPtr>::iterator itr =
+                m_vecThreads.begin();
+            while( itr != m_vecThreads.end() ) 
             {
-                iLeastLoad = iLoad;
-                thLeast = *itr;
+                // a simple thread choosing strategy
+                gint32 iLoad =
+                    ( *itr )->GetLoadCount();
+
+                if( iLoad < iLeastLoad )
+                {
+                    iLeastLoad = iLoad;
+                    thLeast = *itr;
+                }
+                ++itr;
             }
-            ++itr;
+        }
+        else
+        {
+            int iNumElems = m_vecThreads.size();
+            for( int i = iNumElems - 1; i >= 0; --i )
+            {
+                // a simple thread choosing strategy
+                gint32 iLoad =
+                    m_vecThreads[ i ]->GetLoadCount();
+
+                if( iLoad < iLeastLoad )
+                {
+                    iLeastLoad = iLoad;
+                    thLeast = m_vecThreads[ i ];
+                }
+            }
         }
 
         if( iLeastLoad <= 0 )
@@ -726,6 +772,7 @@ gint32 CThreadPool::GetThread(
         pThread = thptr;
 
     }while( 0 );
+    m_bAscend = !m_bAscend;
 
     return ret;
 }
@@ -799,6 +846,7 @@ CThreadPool::CThreadPool( const IConfigDb* pCfg )
 
     m_iThreadClass = ( EnumClsid )dwValue;
     m_iThreadCount = 0;
+    m_bAscend = true;
 }
 
 CThreadPool::~CThreadPool()

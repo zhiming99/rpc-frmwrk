@@ -469,8 +469,18 @@ gint32 CRpcBaseOperations::StartRecvMsg(
         {
             pTask->RemoveProperty(
                 propIrpPtr );
-        }
 
+            if( pTask->GetClsid() ==
+                clsid( CIfStartRecvMsgTask ) )
+            {
+                // mark the task to have done the IO
+                IConfigDb* pTaskCfg =
+                    pTask->GetConfig();
+                CCfgOpener oTaskCfg( pTaskCfg );
+                oTaskCfg.SetIntProp(
+                    propTaskState, stateIoDone );
+            }
+        }
         ThreadPtr pThrd;
         ret = pIrp->GetIrpThread( pThrd );
         if( ERROR( ret ) )
@@ -1443,7 +1453,7 @@ gint32 CRpcInterfaceBase::AppendAndRun(
 }
 
 gint32 CRpcInterfaceBase::AddAndRun(
-    TaskletPtr& pIoTask )
+    TaskletPtr& pIoTask, bool bImmediate )
 {
     // usually I/O tasks are the task that will
     // run concurrently parallelly
@@ -1547,27 +1557,37 @@ gint32 CRpcInterfaceBase::AddAndRun(
 
         // add the task to the pending queue or
         // run it immediately
-        ret = pParaTaskGrp->AppendTask( pIoTask );
         bool bRunning = pParaTaskGrp->IsRunning();
-
-        oTaskLock.Unlock();
-
-        if( ERROR( ret ) )
-            break;
-
-        if( dwCount == 0 || bRunning )
+        if( !bImmediate ||
+            ( !bRunning || dwCount == 0 ) )
         {
-            // run the root task if the Parallel
-            // task group is not running yet
-            ( *pRootTaskGroup )( eventZero );
-            ret = pRootTaskGroup->GetError();
+            ret = pParaTaskGrp->AppendTask( pIoTask );
+            oTaskLock.Unlock();
+
+            if( ERROR( ret ) )
+                break;
+
+            if( dwCount == 0 || bRunning )
+            {
+                // run the root task if the Parallel
+                // task group is not running yet
+                ( *pRootTaskGroup )( eventZero );
+                ret = pRootTaskGroup->GetError();
+            }
+            else
+            {
+
+                DebugPrint( GetTid(),
+                    "root task not run immediately, dwCount=%d, bRunning=%d",
+                    dwCount, bRunning );
+            }
         }
         else
         {
-
-            DebugPrint( GetTid(),
-                "root task not run immediately, dwCount=%d, bRunning=%d",
-                dwCount, bRunning );
+            // force to run the task is running on
+            // the current thread
+            oTaskLock.Unlock();
+            ret = pParaTaskGrp->RunTaskDirect( pIoTask );
         }
 
     }while( 0 );
@@ -1715,8 +1735,9 @@ gint32 CRpcServices::InvokeMethod(
         return -EINVAL;
 
     do{
+        CIfInvokeMethodTask* pInvokeTask = 
+            ObjPtr( pCallback );
         do{
-
             if( IsQueuedReq() )
             {
                 CStdRMutex oIfLock( GetLock() );
@@ -1758,17 +1779,26 @@ gint32 CRpcServices::InvokeMethod(
 
                 if( bWait )
                 {
-                    // let's wait in the queue
+                    // this gives hint to the
+                    // cancel handler if the task
+                    // is waiting for execution or
+                    // has been already started
+                    pInvokeTask->SetTaskState(
+                        statePaused );
                     ret1 = STATUS_PENDING;
                     break;
                 }
+                else
+                {
+                    pInvokeTask->SetTaskState(
+                        stateStarted );
+                }
             }
+
             ret = DoInvoke( pReqMsg, pCallback );
 
         }while( 0 );
 
-        CIfInvokeMethodTask* pInvokeTask = 
-            ObjPtr( pCallback );
         if( ret1 == STATUS_PENDING )
         {
             // the task is not activated, so we
@@ -1878,7 +1908,6 @@ gint32 CRpcServices::InvokeNextMethod(
         // the head task is done, move on to next
         m_queInvTasks.pop_front();
 
-        ret = -ENOENT;
         while( !m_queInvTasks.empty() )
         {
             TaskletPtr pTask =
@@ -1897,6 +1926,7 @@ gint32 CRpcServices::InvokeNextMethod(
             // completes
             break;
         }
+        ret = 0;
 
     }while( 0 );
 
