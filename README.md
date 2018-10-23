@@ -9,7 +9,7 @@ This framework depends on the following packags:
 The dependency of `g_main_loop` from `glib-2.0` is replaced with a simplified `mainloop`. Now the glib headers are still needed at compile time. But the glib shared libraries are not required at deploy time.
 ---
 [ `Tue Oct 23 19:59:39 CST 2018` ]   
-Next week, I will get keep-alive to work and move on to make RPC module to work.   
+1. Next week, I will get keep-alive to work and move on to make RPC module to work.   
    
 [ `Mon Oct 15 18:51:48 CST 2018` ]   
 1. After some tests, I cannot find a way to put `libev` in the concurrent environment flawlessly.
