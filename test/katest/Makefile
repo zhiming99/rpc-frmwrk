@@ -1,0 +1,70 @@
+include ../Makefile.init.pub
+
+TARGET_SVR:=kasvrtst
+TARGET_CLI:=kaclitst
+CLASS_LIB:=libkasvr.so
+CLASS_LINK:=kasvr
+
+TARGET:=$(OUTPUT_DIR)/$(TARGET_SVR) $(OUTPUT_DIR)/$(TARGET_CLI)
+OBJS_SVR:= kasvrtst.o
+OBJS_CLI:= kaclitst.o
+
+SOURCES:= kasvr.cpp kacli.cpp
+OBJS2:=$(SOURCES:%.cpp=$(OBJ_DIR)/%.o)
+
+all: $(TARGET)
+debug: $(TARGET)
+release: $(TARGET)
+
+debug_clean: do_clean
+release_clean: do_clean
+
+clean:
+	make debug_clean
+	make release_clean
+
+do_clean:
+	-@rm $(OBJ_DIR)/*.d $(MUTE_CLEAN)
+	-@rm $(OUTPUT_DIR)/$(TARGET_SVR) $(MUTE_CLEAN)
+	-@rm $(OUTPUT_DIR)/$(TARGET_CLI) $(MUTE_CLEAN)
+	-@rm $(OUTPUT_DIR)/$(CLASS_LIB) $(MUTE_CLEAN)
+	-@rm $(SOURCES:%.cpp=$(OBJ_DIR)/%.o) $(MUTE_CLEAN)
+	-@rm $(OBJ_DIR)/$(OBJS_SVR) $(MUTE_CLEAN)
+	-@rm $(OBJ_DIR)/$(OBJS_CLI) $(MUTE_CLEAN)
+
+-include $(OBJS2:%.o=%.d) $(OBJS_SVR:%.o=$(OBJ_DIR)/%.d) $(OBJS_CLI:%.o=$(OBJ_DIR)/%.d)
+
+$(OUTPUT_DIR)/$(TARGET_SVR) : $(OUTPUT_DIR)/$(CLASS_LIB) $(OBJ_DIR)/$(OBJS_SVR)
+	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
+	$(CC) -o $@ $(LINKER_OPTION) -l$(CLASS_LINK) $(OBJ_DIR)/$(OBJS_SVR)
+
+$(OUTPUT_DIR)/$(TARGET_CLI) : $(OUTPUT_DIR)/$(CLASS_LIB) $(OBJ_DIR)/$(OBJS_CLI)
+	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
+	$(CC) -o $@ $(LINKER_OPTION) -l$(CLASS_LINK) $(OBJ_DIR)/$(OBJS_CLI)
+
+$(OUTPUT_DIR)/$(CLASS_LIB) : $(OBJS2)
+	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
+	$(CC) -o $@ $(LINKER_OPTION) -shared $(OBJS2)
+
+
+$(OBJ_DIR)/kasvrtst.o : katest.cpp
+	@echo Building file: $@
+	$(CPP) $(C_DEFINES) $(C_FLAGS) $(CPP_FLAGS) $(C_INCLUDE) -DSERVER -o $@ $(CUR_DIR)/$<
+	@$(CPP) $(C_DEFINES) $(C_FLAGS) $(CPP_FLAGS) $(C_INCLUDE) -MM $< > $@.d
+	@mv -f $@.d $@.tmp
+	@sed -e 's|.*:|$*.o:|' < $@.tmp > $@.d
+	@sed -e 's/.*://' -e 's/\\$$//' < $@.tmp | fmt -1 | sed -e 's/^ *//' -e 's/$$/:/' >> $@.d
+	@mv -f $@.d $*.d
+	@rm -f $@.tmp
+
+$(OBJ_DIR)/kaclitst.o : katest.cpp
+	@echo Building file: $@
+	$(CPP) $(C_DEFINES) $(C_FLAGS) $(CPP_FLAGS) $(C_INCLUDE) -DCLIENT -o $@ $(CUR_DIR)/$<
+	@$(CPP) $(C_DEFINES) $(C_FLAGS) $(CPP_FLAGS) $(C_INCLUDE) -MM $< > $@.d
+	@mv -f $@.d $@.tmp
+	@sed -e 's|.*:|$*.o:|' < $@.tmp > $@.d
+	@sed -e 's/.*://' -e 's/\\$$//' < $@.tmp | fmt -1 | sed -e 's/^ *//' -e 's/$$/:/' >> $@.d
+	@mv -f $@.d $*.d
+	@rm -f $@.tmp
+
+.PHONY: sync TARGET clean_objs debug_clean release_clean do_clean

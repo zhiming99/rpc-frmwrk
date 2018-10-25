@@ -5,6 +5,7 @@ all:
 	make -C actcancel
 	make -C evtest
 	make -C inproc
+	make -C katest
 
 release:
 	make -C iftest release
@@ -13,6 +14,7 @@ release:
 	make -C actcancel release
 	make -C evtest release
 	make -C inproc release
+	make -C katest release
 
 clean:
 	make -C iftest clean
@@ -21,5 +23,6 @@ clean:
 	make -C actcancel clean
 	make -C evtest clean
 	make -C inproc clean
+	make -C katest clean
 
 .PHONY: release clean

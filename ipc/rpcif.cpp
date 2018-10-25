@@ -3877,7 +3877,7 @@ gint32 CInterfaceProxy::SendProxyReq(
 
         guint32 dwFlags = CF_ASYNC_CALL |
             DBUS_MESSAGE_TYPE_METHOD_CALL |
-            CF_WITH_REPLY;
+            CF_WITH_REPLY | CF_KEEP_ALIVE;
 
         if( bNonDBus )
         {
@@ -4190,6 +4190,8 @@ gint32 CInterfaceServer::DoInvoke(
             break;
         }
 
+        string strSender = pMsg.GetSender();
+
         vector< ARG_ENTRY > vecArgs;
         ret = pMsg.GetArgs( vecArgs );
         if( ERROR( ret ) )
@@ -4366,11 +4368,14 @@ gint32 CInterfaceServer::DoInvoke(
                 break;
             }
 
+            GetConnMgr()->OnInvokeMethod(
+                ( HANDLE )( ( CObjBase* )pCallback ),
+                strSender );
+
             ret = InvokeUserMethod(
                 pCfg, pCallback );
 
             CReqOpener oReq( pCfg );
-
             guint32 dwFlags = 0;
             gint32 iRet = oReq.GetCallFlags( dwFlags );
 
@@ -4383,6 +4388,11 @@ gint32 CInterfaceServer::DoInvoke(
                 // for keep-alive purpose
                 CCfgOpenerObj oTaskCfg( pCallback );
                 SET_RMT_TASKID( pCfg, oTaskCfg );
+
+                // copy the request for reference
+                // later
+                oTaskCfg.SetObjPtr(
+                    propReqPtr, ObjPtr( pCfg ) );
             }
         }
 
@@ -4757,18 +4767,22 @@ gint32 CInterfaceServer::BroadcastEvent(
 
         if( SUCCEEDED( ret ) )
         {
-            CCfgOpener oCfg(
-                ( IConfigDb* )pRespCfg );
+            CReqOpener oReq( pReqCall );
+            if( oReq.HasReply() )
+            {
+                CCfgOpener oCfg(
+                    ( IConfigDb* )pRespCfg );
 
-            gint32 iRet = 0;
-            ret = oCfg.GetIntProp(
-                propReturnValue,
-                ( guint32& )iRet );
+                gint32 iRet = 0;
+                ret = oCfg.GetIntProp(
+                    propReturnValue,
+                    ( guint32& )iRet );
 
-            if( ERROR( ret ) )
-                break;
+                if( ERROR( ret ) )
+                    break;
 
-            ret = iRet;
+                ret = iRet;
+            }
         }
 
     }while( 0 );
@@ -4861,10 +4875,23 @@ gint32 CInterfaceServer::OnKeepAliveOrig(
         okaReq.SetSender( strVal );
 
         strVal = pMsg.GetSender( );
+
+        // NOTE: if the connection is gone, we can
+        // only stop the keep-alive heart beat
+        // here, but the invoke request is still
+        // in process.
+        SvrConnPtr pConnMgr = GetConnMgr();
+        ret = pConnMgr->CanResponse( strVal );
+        if( ret == ERROR_FALSE )
+        {
+            ret = -ENOTCONN;
+            break;
+        }
+
         okaReq.SetDestination( strVal );
 
         okaReq.Push( iTaskId );
-        okaReq.Push( ( guint32 )KAOrigin );
+        okaReq.Push( ( guint32 )KATerm );
 
         TaskletPtr pDummyTask;
 
@@ -5348,3 +5375,36 @@ gint32 CInterfaceServer::FetchData_Server(
     return ret;
 }
 
+gint32 CInterfaceServer::OnModEvent(
+    EnumEventId iEvent,
+    const std::string& strModule )
+{
+    if( iEvent == eventModOffline )
+        GetConnMgr()->OnDisconn( strModule );
+
+    return super::OnModEvent(
+        iEvent, strModule );
+}
+
+gint32 CInterfaceServer::OnPostStop(
+    IEventSink* pCallback )
+{
+    gint32 ret = super::OnPostStop( pCallback );
+    m_pConnMgr.Clear();
+    return ret;
+}
+
+gint32 CInterfaceServer::OnPreStart(
+    IEventSink* pCallback )
+{
+    CParamList oParams;
+    oParams[ propIfPtr ] = ObjPtr( this );
+    gint32 ret = m_pConnMgr.NewObj(
+        clsid( CIfSvrConnMgr ),
+        oParams.GetCfg() );
+
+    if( ERROR( ret ) )
+        return ret;
+
+    return super::OnPreStart( pCallback );
+}

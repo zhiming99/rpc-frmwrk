@@ -22,8 +22,8 @@
 #include <rpc.h>
 #include <proxy.h>
 
-#include "asynctest.h"
-#include "asyncsvr.h"
+#include "katest.h"
+#include "kasvr.h"
 
 #include <cppunit/extensions/TestFactoryRegistry.h>
 #include <cppunit/ui/text/TestRunner.h>
@@ -93,7 +93,7 @@ void CIfSmokeTest::testSvrStartStop()
 
     CfgPtr pCfg = oCfg.GetCfg();
     ret = CRpcServices::LoadObjDesc(
-        "./asyndesc.json",
+        "./kadesc.json",
         OBJNAME_ECHOSVR,
         true, pCfg );
 
@@ -101,7 +101,7 @@ void CIfSmokeTest::testSvrStartStop()
         return;
 
     ret = pIf.NewObj(
-        clsid( CAsyncServer ),
+        clsid( CKeepAliveServer ),
         oCfg.GetCfg() );
     
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );
@@ -133,7 +133,7 @@ void CIfSmokeTest::testCliStartStop()
 
     CfgPtr pCfg = oCfg.GetCfg();
     ret = CRpcServices::LoadObjDesc(
-        "./objdesc.json",
+        "./kadesc.json",
         OBJNAME_ECHOSVR,
         false, pCfg );
 
@@ -142,7 +142,7 @@ void CIfSmokeTest::testCliStartStop()
         return;
 
     ret = pIf.NewObj(
-        clsid( CAsyncClient ),
+        clsid( CKeepAliveClient ),
         oCfg.GetCfg() );
     
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );
@@ -154,7 +154,7 @@ void CIfSmokeTest::testCliStartStop()
     while( pIf->GetState() != stateConnected )
         sleep( 1 );
 
-    CAsyncClient* pCli = pIf;
+    CKeepAliveClient* pCli = pIf;
     if( pCli != nullptr )
     {
         std::string strText( "Hello world!" );
@@ -166,12 +166,6 @@ void CIfSmokeTest::testCliStartStop()
         DebugPrint( 0, "Completed" );
         if( strText + " 2" != strReply )
             CPPUNIT_ASSERT( false );
-
-        ret = pCli->LongWaitNoParam();
-        CPPUNIT_ASSERT( ret == STATUS_PENDING );
-        ret = pCli->WaitForComplete();
-        DebugPrint( 0, "Completed" );
-
     }
     else
     {

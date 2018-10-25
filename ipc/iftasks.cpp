@@ -195,7 +195,6 @@ gint32 CIfStartRecvMsgTask::StartNewRecv(
         // waiting for OnIrpComplete. Or has
         // completed already. Let's start a new
         // receive task
-        DebugPrint( ret, "issue next receive" );
 
    }while( 1 );
 
@@ -601,25 +600,31 @@ gint32 CIfRetryTask::OnComplete(
     RemoveProperty( propNotifyClient );
     RemoveProperty( propIrpPtr );
 
-    // NOTE: Moved task status change to the
+    // NOTE: Moved setting task status to the
     // bottom due to a concurrent bug, when the
-    // client is hoping the synchronization occur
-    // in the OnEvent. But the whole thing happens
-    // in a weird order that the async caller gets
-    // the task status even after this OnComplete
-    // is entered, but before the OnEvent is
-    // called. ( Usually the async caller should
-    // get a pending status very fast before the
-    // server side enters OnComplete.)
+    // client caller is expecting the
+    // synchronization of get/set response to take
+    // effect in the CIoReqSyncCallback's task
+    // complete handler(TCH). But the whole things
+    // happens in an unexpected sequence that the
+    // client caller could possibly get the return
+    // code even after this OnComplete of
+    // CIfIoReqTask is entered, but before the TCH
+    // ( the sync point) is called. ( Usually the
+    // client caller should get a STATUS_PENDING
+    // very quickly before the server side enters
+    // OnComplete.)
     //
     // If the task status is set at the very
-    // beginning of this method, the caller will
-    // not wait for the sync signal, but proceed
-    // to handle the call as an immediate return
-    // instead, while the response is yet to set
-    // in the upcoming OnEvent call. Thus the
-    // client code will grab an empty response
-    // sometimes, in CInterfaceProxy::SyncCallEx.
+    // beginning of this method, the client caller
+    // may not wait for the sync signal due to the
+    // task has a non-pending return code, and
+    // proceed to handle its request as an
+    // immediate successful req instead, while the
+    // response is yet to set in the upcoming TCH
+    // call. Thus the client code may grab an
+    // empty response sometimes, in
+    // CInterfaceProxy::SyncCallEx.
     //
     // This situation usually happens when the
     // client and server are both in a single
@@ -3152,10 +3157,10 @@ gint32 CIfIoReqTask::OnKeepAlive(
 {
     gint32 ret = 0;
     do{
-        CCfgOpener oCfg( ( IConfigDb* )GetConfig() );
-        ObjPtr pObj;
+        CCfgOpener oCfg(
+            ( IConfigDb* )GetConfig() );
 
-        
+        ObjPtr pObj;
         vector< guint32 > vecParams;
         ret = GetParamList( vecParams );
         if( ERROR( ret ) )
@@ -3176,6 +3181,8 @@ gint32 CIfIoReqTask::OnKeepAlive(
                 ret = -EFAULT;
                 break;
             }
+            DebugPrint( 0,
+                "the timer is reset on the keep-alive signal" );
             pIrp->ResetTimer();
         }
         else if( vecParams[ 1 ] ==
@@ -3205,7 +3212,7 @@ gint32 CIfIoReqTask::OnKeepAlive(
 
     }while( 0 );
 
-    return ret;
+    return STATUS_PENDING;
 }
 
 gint32 CIfIoReqTask::OnNotify( guint32 event,
@@ -3557,8 +3564,28 @@ gint32 CIfInvokeMethodTask::OnTaskComplete(
                 }
             case DBUS_MESSAGE_TYPE_METHOD_CALL:
                 {
-                    ret = pIf->SendResponse(
-                        pMsg, pResp );
+                    if( !bServer )
+                    {
+                        ret = -EINVAL;
+                        break;
+                    }
+
+                    SvrConnPtr pConnMgr =
+                        pServer->GetConnMgr();
+
+                    ret = pConnMgr->CanResponse(
+                        ( HANDLE )( ( CObjBase* )this ) );
+
+                    if( ret != ERROR_FALSE )
+                    {
+                        ret = pIf->SendResponse(
+                            pMsg, pResp );
+                    }
+
+                    // the connection record can be removed
+                    pConnMgr->OnInvokeComplete(
+                        ( HANDLE )( ( CObjBase* )this ) );
+
                     break;
                 }
             default:
@@ -3688,6 +3715,7 @@ gint32 CIfInvokeMethodTask::OnComplete(
     RemoveProperty( propMsgPtr );
     RemoveProperty( propCallFlags );
     RemoveProperty( propRespPtr );
+    RemoveProperty( propReqPtr );
     RemoveProperty( propMatchPtr );
 
     return ret;
@@ -3746,9 +3774,10 @@ gint32 CIfInvokeMethodTask::OnKeepAliveOrig()
         ret = pIf->OnKeepAlive( this,
             CRpcServices::KAOrigin ); 
 
-        if( ret != STATUS_PENDING )
+        if( ERROR( ret ) )
             break;
 
+        DebugPrint( ret, "Schedule next keep-alive" );
         // schedule the next keep-alive event
         CIoManager* pMgr = pIf->GetIoMgr();
         CUtilities& oUtils = pMgr->GetUtils();
@@ -3768,7 +3797,7 @@ gint32 CIfInvokeMethodTask::OnKeepAliveOrig()
     }while( 0 );
 
     // return status_pending to avoid the task
-    // from completed
+    // being completed
     return STATUS_PENDING;
 }
 
@@ -3811,12 +3840,18 @@ gint32 CIfInvokeMethodTask::GetCallOptions(
     CfgPtr& pCfg ) const
 {
     const IConfigDb* pcCfg = GetConfig();
-
     CCfgOpener oCfg( pcCfg );
     gint32 ret = 0;
     do{
         ObjPtr pObj;
-        ret = oCfg.GetObjPtr(
+        ret = oCfg.GetObjPtr( propReqPtr, pObj );
+        if( ERROR( ret ) )
+            break;
+
+        IConfigDb* pReqCfg = pObj;
+        CCfgOpener oReqCfg( pReqCfg );
+
+        ret = oReqCfg.GetObjPtr(
             propCallOptions, pObj );
 
         if( ERROR( ret ) )

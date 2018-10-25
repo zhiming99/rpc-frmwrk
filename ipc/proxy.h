@@ -927,6 +927,44 @@ class CInterfaceProxy :
         gint32& iRet, Args&&... args );
 };
 
+class CInterfaceServer;
+class CIfSvrConnMgr : public CObjBase
+{
+    std::map< HANDLE, std::string >
+        m_mapTaskToAddr;
+
+    std::map< HANDLE, bool > m_mapTaskStates;
+
+    std::multimap< std::string, HANDLE >
+        m_mapAddrToTask;
+
+    CInterfaceServer* m_pIfSvr;
+
+    typedef std::pair<std::multimap<std::string, HANDLE>::iterator, std::multimap<std::string, HANDLE>::iterator>
+        AddrRange;
+
+    public:
+    CIfSvrConnMgr( const IConfigDb* pCfg );
+    ~CIfSvrConnMgr();
+
+    // a new invoke task comes
+    gint32 OnInvokeMethod( HANDLE hTask,
+        const std::string& strSrc );
+
+    // the invoke task is done, and can be removed
+    gint32 OnInvokeComplete( HANDLE hTask );
+
+    // received a disconnection event
+    gint32 OnDisconn( const std::string& strDest );
+
+    // test if the task can send a response to the
+    // client
+    gint32 CanResponse( HANDLE hTask );
+    gint32 CanResponse( const std::string& strSrc );
+};
+
+typedef CAutoPtr< clsid( CIfSvrConnMgr ), CIfSvrConnMgr > SvrConnPtr;
+
 class CInterfaceServer :
     public CRpcServices
 {
@@ -935,6 +973,8 @@ class CInterfaceServer :
     // Typically one port per interface. sometimes
     // you can open more than one port if you are
     // aware of what you are doing
+
+    SvrConnPtr m_pConnMgr;
 
     virtual gint32 SendData_Server(
         IConfigDb* pDataDesc,           // [in]
@@ -1123,6 +1163,19 @@ class CInterfaceServer :
         const std::string& strMethod,
         const std::string& strDest, // optional
         Args&&... args );
+
+    virtual gint32 OnModEvent(
+        EnumEventId iEvent,
+        const std::string& strModule );
+
+    virtual gint32 OnPostStop(
+        IEventSink* pCallback );
+
+    virtual gint32 OnPreStart(
+        IEventSink* pCallback );
+
+    inline SvrConnPtr GetConnMgr()
+    { return m_pConnMgr; }
 };
 
 

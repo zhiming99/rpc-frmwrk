@@ -1362,7 +1362,7 @@ gint32 CRpcBasePort::OnModOnOffline(
                 strModName, vecIrpsToCancel );
         }
 
-        if( bInterested )
+        if( true )
         {
             // finally, schedule a task to send out
             // the module online/offline message

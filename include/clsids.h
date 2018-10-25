@@ -190,6 +190,7 @@ typedef enum : guint32
     DECL_CLSID( CEvLoopStopCb ),
     DECL_CLSID( CEvLoopAsyncCallback ),
     DECL_CLSID( CDBusConnFlushTask ),
+    DECL_CLSID( CIfSvrConnMgr ),
     DECL_CLSID( MaxClsid ),
     DECL_CLSID( ReservedClsidEnd ) = 0x0FFFFFFF,
     DECL_CLSID( ReservedIidStart ) = 0x10000000,

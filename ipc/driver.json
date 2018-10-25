@@ -176,6 +176,20 @@
             ]
         },
         {
+            "ModName" : "kasvrtst",
+            "DriversToLoad" :
+            [
+                "DBusBusDriver"
+            ]
+        },
+        {
+            "ModName" : "kaclitst",
+            "DriversToLoad" :
+            [
+                "DBusBusDriver"
+            ]
+        },
+        {
             "ModName" : "Mod_RpcRouter_0",
             "DriversToLoad" :
             [
@@ -188,13 +202,6 @@
             ],
             "ClassFactories" :
             [
-            ]
-        },
-        {
-            "ModName" : "Mod_StreamSvr_0",
-            "DriversToLoad" :
-            [
-                "DBusBusDriver"
             ]
         }
     ],

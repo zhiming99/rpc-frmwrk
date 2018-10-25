@@ -910,6 +910,14 @@ gint32 CIfServerState::SubscribeEvents()
     vector< EnumPropId > vecEvents;
 
     do{
+        ret = oCpHelper.SubscribeEvent(
+            propDBusModEvent, pEvent );
+
+        if( ERROR( ret ) )
+            break;
+
+        vecEvents.push_back( propDBusModEvent );
+
         ret = oCpHelper.SubscribeEvent( 
             propStartStopEvent, pEvent );
 
