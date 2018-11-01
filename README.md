@@ -14,7 +14,7 @@ This framework depends on the following packags:
 5. `Keep-alive for time-consuming request.`   
 6. `Pausable/Resumable interface.`
 7. `Support RPC from remote machine, local system, and in-process.` 
-8. `Transparent remote transportation layer.`
+8. `Transparent support for different kinds of remote communications.`
 9. `File/Big data transfer.`
 10. `Peer online/offline awareness.`
 
