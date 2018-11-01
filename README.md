@@ -16,7 +16,7 @@ This framework depends on the following packags:
 7. `Support RPC from remote machine, local system, and in-process.` 
 8. `Transparent remote transportation layer.`
 9. `File/Big data transfer.`
-
+10. `Peer online/offline awareness.`
 
 ---
 [ `Tue Oct 23 19:59:39 CST 2018` ]   
