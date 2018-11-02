@@ -19,6 +19,10 @@ This framework depends on the following packags:
 10. `Peer online/offline awareness.`
 
 ---
+[`Fri Nov  2 18:24:51 CST 2018`]   
+1. This week, the `keep-alive` and `Pause/Resume` works.
+2. Next week, I will try to get `Send/Fetch file` to work, before I can move on to RPC module.   
+   
 [ `Tue Oct 23 19:59:39 CST 2018` ]   
 1. This week, I will get keep-alive to work and move on to make RPC module to work.   
    
