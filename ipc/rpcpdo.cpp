@@ -246,11 +246,11 @@ gint32 CRpcBasePort::FindIrpForResp(
             else if( pMsg.GetType()
                 == DBUS_MESSAGE_TYPE_ERROR )
             {
-                ret = pMsg.GetErrno();
-                if( ret == 0 )
-                    ret = ERROR_FAIL;
+                gint32 iRet = pMsg.GetErrno();
+                if( iRet == 0 )
+                    iRet = ERROR_FAIL;
 
-                pIrpCtx->SetStatus( ret );
+                pIrpCtx->SetStatus( iRet );
             }
 
             pReqIrp = pIrp;
@@ -278,8 +278,10 @@ gint32 CRpcBasePort::DispatchRespMsg(
         ret = FindIrpForResp( pMsg, pIrp );
         if( ERROR( ret ) )
         {
+            DMsgPtr pDumpMsg( pMsg );
             DebugPrint( ret,
-                "Error dispatching response messages" );
+                "Error dispatching response messages\n%s\n",
+                pDumpMsg.DumpMsg().c_str() );
             return ret;
         }
 
@@ -507,6 +509,10 @@ gint32 CRpcBasePort::DispatchData(
         // a channel to stop processing the signal
         // further
         ret = ERROR_PREMATURE;
+    }
+    else if( ret2 == DBUS_HANDLER_RESULT_NOT_YET_HANDLED )
+    {
+        ret = -ENOENT;
     }
     
     return ret;
@@ -1315,8 +1321,6 @@ gint32 CRpcBasePort::OnModOnOffline(
     gint32 ret = 0;
     vector< IrpPtr > vecIrpsToCancel;
     do{
-        bool bInterested = false;
-
         CStdRMutex oPortLock( GetLock() );
 
         guint32 dwPortState = GetPortState();
@@ -1334,7 +1338,6 @@ gint32 CRpcBasePort::OnModOnOffline(
             if( itr->first->IsMyDest( strModName ) ||
                 itr->first->IsMyObjPath( strModName ) )
             {
-                bInterested = true;
                 MATCH_ENTRY& oMe = itr->second;
                 oMe.SetConnected( bOnline );
                 if( !bOnline &&
@@ -1520,6 +1523,7 @@ gint32 CRpcBasePortEx::DispatchReqMsg(
 
     IrpPtr pIrpToComplete;
     vector< IrpPtr > vecIrpsError;
+    bool bQueued = false;
 
     while( itr != m_mapReqTable.end() )
     {
@@ -1529,6 +1533,24 @@ gint32 CRpcBasePortEx::DispatchReqMsg(
         if( SUCCEEDED( ret ) )
         {
             do{
+                // test if the match is allowed to
+                // receive requests
+                CCfgOpenerObj oMatch(
+                    ( CObjBase* )( itr->first ) );
+                guint32 dwQueSize = 0;
+
+                ret = oMatch.GetIntProp(
+                    propQueSize, dwQueSize );
+
+                if( ERROR( ret ) )
+                    dwQueSize = MAX_PENDING_MSG;
+
+                if( dwQueSize == 0 )
+                {
+                    bDone = true;
+                    break;
+                }
+
                 MATCH_ENTRY& ome = itr->second;
                 if( !ome.IsConnected() )
                 {
@@ -1552,6 +1574,7 @@ gint32 CRpcBasePortEx::DispatchReqMsg(
                         // discard the oldest msg
                         ome.m_quePendingMsgs.pop_front();
                     }
+                    bQueued = true;
                     bDone = true;
                 }
                 else
@@ -1597,14 +1620,14 @@ gint32 CRpcBasePortEx::DispatchReqMsg(
     }
     oPortLock.Unlock();
 
-    if( pIrpToComplete.IsEmpty() )
-    {
-        ret = -ENOENT;
-    }
-    else
+    if( !pIrpToComplete.IsEmpty() )
     {
         ret = GetIoMgr()->CompleteIrp(
             pIrpToComplete );
+    }
+    else if( !bQueued )
+    {
+        ret = -ENOENT;
     }
 
     for( auto&& pIrpErr : vecIrpsError )
@@ -1612,8 +1635,6 @@ gint32 CRpcBasePortEx::DispatchReqMsg(
         GetIoMgr()->CancelIrp(
             pIrpErr, true, -EINVAL );
     }
-
-    // oPortLock.Lock();
 
     return ret;
 }
@@ -2112,5 +2133,98 @@ gint32 CRpcPdoPort::OnEvent(
             break;
         }
     }
+    return ret;
+}
+
+gint32 CRpcPdoPort::SubmitIoctlCmd(
+    IRP* pIrp )
+{
+    if( pIrp == nullptr ||
+        pIrp->GetStackSize() == 0 )
+    {
+        return -EINVAL;
+    }
+
+    gint32 ret = 0;
+
+    // let's process the func irps
+    IrpCtxPtr& pCtx = pIrp->GetCurCtx();
+
+    do{
+
+        if( pIrp->MajorCmd() != IRP_MJ_FUNC
+            || pIrp->MinorCmd() != IRP_MN_IOCTL )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        switch( pIrp->CtrlCode() )
+        {
+        case CTRLCODE_SET_REQUE_SIZE:
+            {
+                // server side I/O
+                ret = HandleSetReqQueSize( pIrp );
+                break;
+            }
+        default:
+            {
+                ret = super::SubmitIoctlCmd( pIrp );
+                break;
+            }
+        }
+    }while( 0 );
+
+    pCtx->SetStatus( ret );
+
+    return ret;
+}
+
+gint32 CRpcPdoPort::HandleSetReqQueSize( IRP* pIrp )
+{
+    if( pIrp == nullptr ||
+        pIrp->GetStackSize() == 0 )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        IrpCtxPtr& pCtx = pIrp->GetCurCtx();
+        CStdRMutex oPortLock( GetLock() );
+        IConfigDb* pCfg =
+            ( ObjPtr& )( *pCtx->m_pReqData );
+
+        if( pCfg == nullptr ) 
+        {
+            ret = -EFAULT;
+            break;
+        }
+        CParamList oCfg( pCfg );
+        guint32 dwQueSize = 0;;
+        ret = oCfg.GetIntProp(
+            propQueSize, dwQueSize );
+
+        if( ERROR( ret ) )
+            break;
+
+        IMessageMatch* pMatch = nullptr;
+        ret = oCfg.GetPointer(
+            propMatchPtr, pMatch );
+
+        if( ERROR( ret ) )
+            break;
+
+        MatchMap* pMatchMap = nullptr;
+        // check if the match exist in the match
+        // map
+        ret = GetMatchMap( pMatch, pMatchMap );
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpenerObj oMatch( pMatch );
+        oMatch.SetIntProp(
+            propQueSize, dwQueSize );
+
+    }while( 0 );
+
     return ret;
 }

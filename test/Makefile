@@ -6,6 +6,7 @@ all:
 	make -C evtest
 	make -C inproc
 	make -C katest
+	make -C prtest
 
 release:
 	make -C iftest release
@@ -15,6 +16,7 @@ release:
 	make -C evtest release
 	make -C inproc release
 	make -C katest release
+	make -C prtest release
 
 clean:
 	make -C iftest clean
@@ -24,5 +26,6 @@ clean:
 	make -C evtest clean
 	make -C inproc clean
 	make -C katest clean
+	make -C prtest clean
 
 .PHONY: release clean

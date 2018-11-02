@@ -47,6 +47,7 @@ std::map< STATEMAP_KEY, EnumIfState > CInterfaceState::m_mapState =
     STATEMAP_ENTRY( stateStarted,   cmdShutdown,            stateStopping ),
     STATEMAP_ENTRY( stateStarted,   cmdEnableEvent,         stateConnected ),
     STATEMAP_ENTRY( stateStarted,   eventModOffline,        stateRecovery ),
+    STATEMAP_ENTRY( stateStarted,   eventPaused,            statePaused ),
     STATEMAP_ENTRY( stateConnected, eventPortStopping,      stateStopping ),
     STATEMAP_ENTRY( stateConnected, eventModOffline,        stateRecovery ),
     STATEMAP_ENTRY( stateConnected, eventDBusOffline,       stateStopped ),
@@ -483,6 +484,7 @@ gint32 CInterfaceState::OnAdminEvent(
             {
                 ret = SetStateOnEvent(
                     eventPaused );
+                break;
             }
         case cmdResume:
             {

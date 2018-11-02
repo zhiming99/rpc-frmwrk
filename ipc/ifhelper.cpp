@@ -98,3 +98,7 @@ auto VecToTuple<>( std::vector< BufPtr >& vec ) -> std::tuple<>
     return std::tuple<>();
 }
 
+void AssignVal( DMsgPtr& rVal, CBuffer& rBuf )
+{
+    rVal = ( DMsgPtr& )rBuf;
+}

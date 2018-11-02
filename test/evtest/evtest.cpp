@@ -107,7 +107,7 @@ void CIfSmokeTest::testSvrStartStop()
     CEventServer* pSvr = pIf;
     CPPUNIT_ASSERT( pSvr != nullptr );
 
-    while( pIf->GetState() == stateConnected )
+    while( pSvr->IsConnected() )
     {
         ret = pSvr->OnHelloWorld( "Hello, World!" );
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
@@ -145,12 +145,12 @@ void CIfSmokeTest::testCliStartStop()
     ret = pIf->Start();
     // CPPUNIT_ASSERT( SUCCEEDED( ret ) );
     
-    while( pIf->GetState() != stateConnected )
-        sleep( 1 );
-
     CEventClient* pCli = pIf;
     if( pCli != nullptr )
     {
+        while( !pCli->IsConnected() )
+            sleep( 1 );
+
         sem_t semWait;
         Sem_Init( &semWait, 0, 0 );
 

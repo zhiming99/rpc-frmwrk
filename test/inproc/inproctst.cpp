@@ -119,7 +119,7 @@ void CIfSmokeTest::testSvrStartStop(
     CInProcServer* pSvr = pIf;
     CPPUNIT_ASSERT( pSvr != nullptr );
 
-    while( pIf->GetState() == stateConnected &&
+    while( pSvr->IsConnected() &&
         !bExit )
     {
         ret = pSvr->OnHelloWorld(
@@ -199,12 +199,12 @@ void CIfSmokeTest::testCliStartStop()
     ret = pIf->Start();
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );
     
-    while( pIf->GetState() != stateConnected )
-        sleep( 1 );
-
     CInProcClient* pCli = pIf;
     if( pCli != nullptr )
     {
+        while( !pCli->IsConnected() )
+            sleep( 1 );
+
         sem_t semWait;
         Sem_Init( &semWait, 0, 0 );
         gint32 i = 0;

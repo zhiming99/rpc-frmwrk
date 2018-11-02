@@ -194,6 +194,8 @@ inline std::string DBUS_OBJ_PATH(
 
 
 #define SYS_METHOD_USERCANCELREQ        "RpcCall_UserCancelRequest"
+#define SYS_METHOD_PAUSE                "RpcCall_Pause"
+#define SYS_METHOD_RESUME               "RpcCall_Resume"
 
 #define SYS_EVENT_KEEPALIVE             "RpcEvt_KeepAlive"
 #define SYS_EVENT_FORWARDEVT            "RpcEvt_ForwardEvent"

@@ -348,14 +348,8 @@ gint32 CRpcBaseOperations::StartRecvMsg(
     do{
 
         IrpPtr pIrp;
-        if( m_pIfStat->GetState() != stateConnected )
-        {
-            ret = ERROR_STATE;
-            break;
-        }
 
         CIoManager* pMgr = GetIoMgr();
-
         CCfgOpenerObj oTaskCfg(
             ( CObjBase* ) pCompletion );
 
@@ -384,7 +378,7 @@ gint32 CRpcBaseOperations::StartRecvMsg(
             ret = 0;
             break;
         }
-        
+
         string strObjPath;
         string strObjPath2;
 
@@ -712,11 +706,8 @@ gint32 CRpcInterfaceBase::StartEx(
         bool bConnected = false;
         ret = pTask->GetError();
 
-        if( SUCCEEDED( ret ) && 
-            GetState() == stateConnected )
-        {
+        if( SUCCEEDED( ret ) && IsConnected() )
             bConnected = true;
-        }
 
         if( bConnected )
         {
@@ -962,7 +953,7 @@ gint32 CRpcInterfaceBase::PauseResume(
 
     do{
         CParamList oParams;
-        oParams.Push( false );
+        oParams.Push( bResume );
 
         ret = oParams.SetObjPtr(
             propIfPtr, ObjPtr( this ) );
@@ -971,7 +962,7 @@ gint32 CRpcInterfaceBase::PauseResume(
             break;
 
         ret = oParams.SetBoolProp(
-            propNotifyClient, bResume );
+            propNotifyClient, true );
 
         if( ERROR( ret ))
             break;
@@ -989,7 +980,8 @@ gint32 CRpcInterfaceBase::PauseResume(
         if( ERROR( ret ) )
             break;
 
-        ret = AppendAndRun( pTask );
+        // force to run on this thread
+        ret = AddAndRun( pTask, true );
         if( ERROR( ret ) )
             break;
 
@@ -1000,27 +992,26 @@ gint32 CRpcInterfaceBase::PauseResume(
     if( ret == STATUS_MORE_PROCESS_NEEDED )
         ret = STATUS_PENDING;
 
-    if( ret == STATUS_PENDING
-        && pCallback == nullptr )
-    {
-        CIfRetryTask* pRetryTask = pTask;
-
-        if( pRetryTask != nullptr )
-            pRetryTask->WaitForComplete();
-    }
-
     return ret;
 }
 
 gint32 CRpcInterfaceBase::Resume(
     IEventSink* pCallback )
 {
+    gint32 ret = SetStateOnEvent( cmdResume );
+    if( ERROR( ret ) )
+        return ret;
+    // the interface is in Resuming state
     return PauseResume( true, pCallback );
 }
 
 gint32 CRpcInterfaceBase::Pause(
     IEventSink* pCallback )
 {
+    gint32 ret = SetStateOnEvent( cmdPause );
+    if( ERROR( ret ) )
+        return ret;
+    // the interface is in Pausing state
     return PauseResume( false, pCallback );
 }
 
@@ -1290,7 +1281,6 @@ gint32 CRpcInterfaceBase::OnAdminEvent(
             if( ERROR( ret ) )
                 break;
 
-            ClearActiveTasks();
             ret = Pause( pTask );
             break;
         }
@@ -1442,6 +1432,115 @@ gint32 CRpcInterfaceBase::ClearActiveTasks()
     return ret;
 }
 
+
+gint32 CRpcInterfaceBase::SetReqQueSize(
+    IMessageMatch* pMatch, guint32 dwSize )
+{
+    gint32 ret = 0;
+    if( pMatch == nullptr )
+        return -EINVAL;
+
+    if( dwSize > MAX_PENDING_MSG )
+        return -EINVAL;
+
+    do{
+        CIoManager* pMgr = GetIoMgr();
+        IrpPtr pIrp;
+
+        ret = pIrp.NewObj();
+        if( ERROR( ret ) )
+            break;
+
+        ret = pIrp->AllocNextStack( nullptr );
+        if( ERROR( ret ) )
+            break;
+
+        guint32 dwCtrlCode = CTRLCODE_SET_REQUE_SIZE;
+        IrpCtxPtr& pIrpCtx = pIrp->GetTopStack(); 
+
+        pIrpCtx->SetMajorCmd( IRP_MJ_FUNC );
+        pIrpCtx->SetMinorCmd( IRP_MN_IOCTL );
+        pIrpCtx->SetCtrlCode( dwCtrlCode );
+        pIrpCtx->SetIoDirection( IRP_DIR_OUT ); 
+
+        CParamList oParams;
+        oParams[ propQueSize ] = dwSize;
+        oParams[ propMatchPtr ] = ObjPtr( pMatch );
+
+        BufPtr pBuf( true );
+        *pBuf = oParams.GetCfg();
+        pIrpCtx->SetReqData( pBuf );
+
+        // an immediate request
+        ret = pMgr->SubmitIrp(
+            GetPortHandle(), pIrp );
+
+    }while( 0 );
+
+    return ret;
+}
+// clear those CIfStartRecvMsgTask on the paused
+// interfaces
+gint32 CRpcInterfaceBase::ClearPausedTasks()
+{
+    gint32 ret = 0;
+    do{
+        TaskletPtr pTask;
+        CIfRootTaskGroup* pRoot = m_pRootTaskGroup;
+        if( pRoot == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        ret = pRoot->GetHeadTask( pTask );
+        if( ERROR( ret ) )
+            break;
+
+        CIfParallelTaskGrp* pParaTaskGrp = pTask;
+        if( unlikely( pParaTaskGrp == nullptr ) )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        std::vector< TaskletPtr > vecTasks;
+        ret = pParaTaskGrp->FindTaskByClsid(
+            clsid( CIfStartRecvMsgTask ),
+            vecTasks );
+        if( ERROR( ret ) )
+            break;
+
+        for( auto elem : vecTasks )
+        {
+            CCfgOpenerObj oTaskCfg(
+                ( CObjBase* )elem );
+
+            CMessageMatch* pMatch;
+            ret = oTaskCfg.GetPointer(
+                propMatchPtr, pMatch );
+
+            if( ERROR( ret ) )
+                continue;
+
+            bool bPausable = false;
+            CCfgOpenerObj oMatchCfg( pMatch );
+            ret = oMatchCfg.GetBoolProp(
+                propPausable, bPausable );
+
+            if( ERROR( ret ) )
+                continue;
+
+            if( bPausable )
+            {
+                SetReqQueSize( pMatch, 0 );
+            }
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CRpcInterfaceBase::AppendAndRun(
     TaskletPtr& pTask )
 {
@@ -1464,21 +1563,15 @@ gint32 CRpcInterfaceBase::AddAndRun(
     CIfRootTaskGroup* pRootTaskGroup = nullptr;
     if( true )
     {
-        CStdRMutex oIfLock( GetLock() );
-        if( GetState() != stateConnected )
+        // CStdRMutex oIfLock( GetLock() );
+        if( !IsConnected() )
         {
+            // concurrent tasks are only allowed when the
+            // state is stateConnected 
             return ERROR_STATE;
         }
+
         pRootTaskGroup = GetTaskGroup();
-
-        if( m_pRootTaskGroup.IsEmpty() )
-            return -EFAULT;
-
-        // concurrent tasks are only allowed when the
-        // state is stateConnected 
-        if( GetState() != stateConnected )
-            return ERROR_STATE;
-
         if( pRootTaskGroup == nullptr )
             return -EFAULT;
 
@@ -1516,8 +1609,8 @@ gint32 CRpcInterfaceBase::AddAndRun(
         else if( !bTail || dwCount == 0 )
         {
             // add a new parallel task group
-            CStdRMutex oIfLock( GetLock() );
-            if( GetState() != stateConnected )
+            // CStdRMutex oIfLock( GetLock() );
+            if( !IsConnected() )
             {
                 ret = ERROR_STATE;
                 break;
@@ -1600,11 +1693,46 @@ gint32 CRpcInterfaceBase::AddAndRun(
     return ret;
 }
 
+gint32 CRpcServices::GetIidFromIfName(
+    const std::string& strIfName,
+    EnumClsid& iid )
+{
+    string strIfName2 =
+        IF_NAME_FROM_DBUS( strIfName );
+
+    ToInternalName( strIfName2 );
+    iid = CoGetIidFromIfName( strIfName2 );
+
+    if( iid == clsid( Invalid ) )
+        return -ENOENT;
+
+    return 0;
+}
+
 gint32 CRpcServices::RebuildMatches()
 {
     gint32 ret = 0;
     do{
         // add interface id to all the matches
+        CCfgOpenerObj oIfCfg( this );
+        bool bPauseOnStart = false;
+        if( IsServer() )
+        {
+            ret = oIfCfg.GetBoolProp(
+                propPauseOnStart, bPauseOnStart );
+
+            if( ERROR( ret ) )
+                bPauseOnStart = false;
+        }
+        else
+        {
+            oIfCfg.RemoveProperty(
+                propPauseOnStart );
+        }
+        
+        bool bPausable = false;
+        guint32 dwQueSize = MAX_PENDING_MSG;
+
         for( auto pMatch : m_vecMatches )
         {
             CCfgOpenerObj oMatchCfg(
@@ -1617,31 +1745,61 @@ gint32 CRpcServices::RebuildMatches()
             if( ERROR( ret ) )
                 continue;
             
-            string strIfName2 =
-                IF_NAME_FROM_DBUS( strIfName );
+            EnumClsid iid = clsid( Invalid );
 
-            ToInternalName( strIfName );
-            EnumClsid iid =
-                CoGetIidFromIfName( strIfName2 );
+            ret = GetIidFromIfName(
+                strIfName, iid );
 
-            if( iid == clsid( Invalid ) )
+            if( ERROR( ret ) )
                 continue;
 
             oMatchCfg.SetIntProp( propIid, iid );
+
+            // set the request que size
+            ret = oMatchCfg.GetBoolProp(
+                propPausable, bPausable );
+
+            if( ERROR( bPausable ) )
+                bPausable = false;
+
+            dwQueSize = MAX_PENDING_MSG;
+
+            if( bPausable && bPauseOnStart )
+                dwQueSize = 0;
+
+            oMatchCfg.SetIntProp(
+                propQueSize, dwQueSize );
         }
 
+        // set the interface id for this match
         CCfgOpenerObj oMatchCfg(
             ( CObjBase* )m_pIfMatch );
 
         oMatchCfg.SetIntProp( propIid,
             GetClsid() );
 
+        dwQueSize = MAX_PENDING_MSG;
+
+        // set the request que size for the
+        // interface
+        ret = oMatchCfg.GetBoolProp(
+            propPausable, bPausable );
+
+        if( ERROR( ret ) )
+            bPausable = false;
+
+        if( bPausable && bPauseOnStart )
+            dwQueSize = 0;
+
+        oMatchCfg.SetIntProp(
+            propQueSize, dwQueSize );
+
         // also append the match for master interface
         m_vecMatches.push_back( m_pIfMatch );
 
     }while( 0 );
 
-    return ret;
+    return 0;
 }
 
 gint32 CRpcServices::StartEx(
@@ -1874,7 +2032,7 @@ gint32 CRpcServices::InvokeNextMethod(
 
     do{
         CStdRMutex oIfLock( GetLock() );
-        if( GetState() != stateConnected )
+        if( !IsConnected() )
         {
             // the canceling of the queued tasks
             // will be done by the parallel
@@ -2192,6 +2350,9 @@ CRpcServices::CRpcServices( const IConfigDb* pCfg )
             oCfg.SetIntProp( propKeepAliveSec,
                 IFSTATE_DEFAULT_IOREQ_TIMEOUT / 2 );
         }
+
+        ret = oCfg.CopyProp(
+            propPauseOnStart, pCfg );
 
         if( oCfg.exist( propObjList ) )
         {
@@ -2744,11 +2905,13 @@ gint32 CRpcServices::InvokeUserMethod(
         if( ERROR( ret ) ) 
             break;
 
-        strIfName = IF_NAME_FROM_DBUS( strIfName );
+        EnumClsid iid = clsid( Invalid );
 
-        ToInternalName( strIfName );
-        EnumClsid iid =
-            CoGetIidFromIfName( strIfName );
+        ret = GetIidFromIfName(
+            strIfName, iid );
+
+        if( ERROR( ret ) )
+            break;
 
         ret = GetDelegate(
             strMethod, pTask, iid );
@@ -2786,7 +2949,7 @@ gint32 CRpcServices::SendMethodCall(
 
     do{
         CStdRMutex oIfLock( GetLock() );
-        if( GetState() != stateConnected )
+        if( !IsConnected() )
         {
             ret = ERROR_STATE;
             break;
@@ -3118,6 +3281,16 @@ gint32 CRpcServices::LoadObjDesc(
                 oCfg[ propKeepAliveSec ] = std::stoi( strVal );
             }
 
+            if( oObjElem.isMember( JSON_ATTR_PAUSE_START ) &&
+                oObjElem[ JSON_ATTR_PAUSE_START ].isString() )
+            {
+                strVal = oObjElem[ JSON_ATTR_PAUSE_START ].asString(); 
+                if( strVal == "true" )
+                    oCfg[ propPauseOnStart ] = true;
+                else if( strVal == "false" )
+                    oCfg[ propPauseOnStart ] = false;
+            }
+
             // overwrite the global port class and port
             // id if PROXY_PORTCLASS and PROXY_PORTID
             // exist
@@ -3220,6 +3393,14 @@ gint32 CRpcServices::LoadObjDesc(
                 !oIfName.isString() )
                 continue;
             
+            bool bPausable = false;
+            if( oIfDesc.isMember( JSON_ATTR_PAUSABLE ) &&
+                oIfDesc[ JSON_ATTR_PAUSABLE ].isString() &&
+                oIfDesc[ JSON_ATTR_PAUSABLE ].asString() == "true" )
+            {
+                bPausable = true;
+            }
+
             if( oIfDesc.isMember( JSON_ATTR_BIND_CLSID ) &&
                 oIfDesc[ JSON_ATTR_BIND_CLSID ].isString() &&
                 oIfDesc[ JSON_ATTR_BIND_CLSID ].asString() == "true" )
@@ -3234,6 +3415,8 @@ gint32 CRpcServices::LoadObjDesc(
                 oCfg[ propIfName ] = 
                     DBUS_IF_NAME( oIfName.asString() );
 
+                if( bPausable )
+                    oCfg[ propPausable ] = bPausable;
                 continue;
             }
 
@@ -3250,6 +3433,9 @@ gint32 CRpcServices::LoadObjDesc(
 
             oMatch.SetStrProp( propIfName,
                 DBUS_IF_NAME( oIfName.asString() ) );
+
+            oMatch.SetBoolProp(
+                propPausable, bPausable );
 
             if( bServer )
             {
@@ -3513,29 +3699,63 @@ gint32 CRpcServices::OnEvent(
     return ret;
 }
 
-gint32 CRpcServices::RestartListening()
+gint32 CRpcServices::RestartListening(
+    EnumIfState iStateOld  )
 {
     gint32 ret = 0;
     CParamList oParams;
     TaskletPtr pRecvMsgTask;
 
-    oParams[ propIfPtr ] = ObjPtr( this );
+    EnumIfState iState = GetState();
+    gint32 iStartType = 0;
+    if( iState == stateConnected && 
+        iStateOld == statePaused )
+        iStartType = 1;
+
+    else if( iState == stateConnected &&
+        iStateOld == stateRecovery )
+        iStartType = 2;
+
+    else if( iState == statePaused &&
+        iStateOld == stateRecovery )
+        iStartType = 3;
+    else
+    {
+        return  -ENOTSUP;
+    }
+
     for( auto pMatch : m_vecMatches )
     {
-        oParams[ propMatchPtr ] =
-            ObjPtr( pMatch );
+        CMessageMatch* pMsgMatch = pMatch;
+        if( pMsgMatch == nullptr )
+            continue;
 
-        ret = pRecvMsgTask.NewObj(
-            clsid( CIfStartRecvMsgTask ),
-            oParams.GetCfg() );
+            // check if propPausable exist
+        if( pMsgMatch->exist( propPausable ) )
+        {
+            bool bPausable = false;
 
-        if( ERROR( ret ) )
-            break;
+            CCfgOpenerObj oMatch(
+                ( CObjBase* ) pMatch );
 
-        ret = AddAndRun( pRecvMsgTask );
-
-        if( ERROR( ret ) )
-            break;
+            oMatch.GetBoolProp(
+                propPausable, bPausable );
+            if( iStartType == 1 && !bPausable )
+            {
+                // start paused listening
+                continue;
+            }
+            else if( iStartType == 3 && bPausable )
+            {
+                // start unpausable interfaces
+                continue;
+            }
+            else
+            {
+                // start all the interfaces
+            }
+        }
+        SetReqQueSize( pMsgMatch, MAX_PENDING_MSG );
     }
 
     return ret;
@@ -3553,12 +3773,14 @@ gint32 CRpcServices::DoModEvent(
     if( SUCCEEDED( ret ) )
     {
         EnumIfState iNewState = GetState();
-        if( iNewState == stateConnected &&
+        if( ( iNewState == stateConnected ||
+                iNewState == statePaused ) &&
             iOldState == stateRecovery )
         {
             // let's send new request to listen on the
             // events
-            ret = RestartListening();
+            ret = RestartListening(
+                stateRecovery );
         }
     }
     return ret;
@@ -3737,14 +3959,6 @@ gint32 CInterfaceProxy::OnKeepAliveTerm(
             break;
         }
 
-        if( GetState() != stateConnected )
-        {
-            // NOTE: this is not a serious state
-            // check
-            ret = ERROR_STATE;
-            break;
-        }
-
         ObjPtr pObj;
         ret = pMsg.GetObjArgAt( 0, pObj );
         if( ERROR( ret ) )
@@ -3780,7 +3994,7 @@ gint32 CInterfaceProxy::OnKeepAliveTerm(
         if( true )
         {
             CStdRMutex oIfLock( GetLock() );
-            if( GetState() != stateConnected )
+            if( !IsConnected() )
             {
                 ret = ERROR_STATE;
                 break;
@@ -3791,7 +4005,6 @@ gint32 CInterfaceProxy::OnKeepAliveTerm(
                 ret = -ENOENT;    
                 break;
             }
-
         }
 
         ret = pRootGrp->FindTask(
@@ -3955,6 +4168,8 @@ gint32 CInterfaceProxy::InitUserFuncs()
     BEGIN_IFPROXY_MAP( IInterfaceServer, false );
 
     ADD_PROXY_METHOD( SYS_METHOD_USERCANCELREQ, guint64 );
+    ADD_PROXY_METHOD( SYS_METHOD_PAUSE );
+    ADD_PROXY_METHOD( SYS_METHOD_RESUME );
 
     END_IFPROXY_MAP;
 
@@ -3963,42 +4178,89 @@ gint32 CInterfaceProxy::InitUserFuncs()
 
 // a user-initialized cancel request
 gint32 CInterfaceProxy::UserCancelRequest(
-	IEventSink* pCallback,
 	guint64& qwThisTaskId,
 	guint64 qwTaskToCancel )
 {
 	if( qwTaskToCancel == 0 )
 		return -EINVAL;
 
-    bool bRemove = false;
-    CCfgOpenerObj oCfg( pCallback );
-    if( !oCfg.exist( propIfName ) )
-    {
-        string strIfName = CoGetIfNameFromIid(
-            iid( IInterfaceServer ) );
+    string strIfName = CoGetIfNameFromIid(
+        iid( IInterfaceServer ) );
 
-        if( strIfName.empty() )
-            return ERROR_FAIL;
+    if( strIfName.empty() )
+        return ERROR_FAIL;
 
-        ToPublicName( strIfName );
+    ToPublicName( strIfName );
 
-        // FIXME: not a good solution
-        oCfg.SetStrProp( propIfName,
-            DBUS_IF_NAME( strIfName ) );
+    CParamList oOptions;
+    // FIXME: not a good solution
+    oOptions[ propIfName ] =
+        DBUS_IF_NAME( strIfName );
 
-        bRemove = true;
-    }
+    oOptions[ propSysMethod ] = true;
 
-    // a sample code snippet
-    gint32 ret =  CallProxyFunc( pCallback,
-		qwThisTaskId,
-        SYS_METHOD( __func__ ),
-		qwTaskToCancel );
+    CfgPtr pResp;
+    // make the call
+    std::string strMethod( __func__ );
+    gint32 ret = SyncCallEx(
+        oOptions.GetCfg(),
+        pResp, strMethod,
+        qwTaskToCancel );
 
-    if( bRemove )
-    {
-        oCfg.RemoveProperty( propIfName );
-    }
+    if( ERROR( ret ) )
+        return ret;
+
+    // fill the return code
+    gint32 iRet = 0;
+    ret = FillArgs( pResp, iRet );
+
+    if( SUCCEEDED( ret ) )
+        ret = iRet;
+
+    return ret;
+}
+
+gint32 CInterfaceProxy::Pause_Proxy()
+{
+    return PauseResume_Proxy( "Pause" );
+}
+gint32 CInterfaceProxy::Resume_Proxy()
+{
+    return PauseResume_Proxy( "Resume" );
+}
+
+gint32 CInterfaceProxy::PauseResume_Proxy(
+    const std::string& strMethod )
+{
+    CfgPtr pResp;
+
+    // we are from IInterfaceServer
+    CParamList oOptions;
+
+    std::string strIfName =
+        CoGetIfNameFromIid( iid( IInterfaceServer ) );
+    ToPublicName( strIfName );
+
+    oOptions[ propIfName ] =
+        DBUS_IF_NAME( strIfName );
+
+    oOptions[ propSysMethod ] = true;
+
+    // make the call
+    gint32 ret = SyncCallEx(
+        oOptions.GetCfg(),
+        pResp, strMethod );
+
+    if( ERROR( ret ) )
+        return ret;
+
+    // fill the return code
+    gint32 iRet = 0;
+    ret = FillArgs( pResp, iRet );
+
+    if( SUCCEEDED( ret ) )
+        ret = iRet;
+
     return ret;
 }
 
@@ -4009,54 +4271,14 @@ gint32 CInterfaceProxy::CancelRequest(
         return -EINVAL;
 
     gint32 ret = 0;
-
     do{
-        TaskletPtr pTask; 
-        ret = pTask.NewObj(
-            clsid( CIoReqSyncCallback ) ); 
-
-        if( ERROR( ret ) ) 
-            break; 
-
         // this is a built-in request
         guint64 qwThisTask = 0;
         ret = UserCancelRequest(
-            pTask, qwThisTask, qwTaskId );
+            qwThisTask, qwTaskId );
 
         if( ERROR( ret ) )
             break;
-
-        if( ret == STATUS_PENDING )
-        {
-            CIoReqSyncCallback* pSyncTask = pTask;
-            pSyncTask->WaitForComplete();
-            if( SUCCEEDED( ret ) )
-                ret = pSyncTask->GetError();
-        }
-        if( ERROR( ret ) )
-            break;
-
-        ObjPtr pObj; 
-        CCfgOpenerObj oTask( ( CObjBase* )pTask ); 
-        ret = oTask.GetObjPtr( propRespPtr, pObj ); 
-        if( ERROR( ret ) ) 
-            break; 
-
-        CfgPtr pResp = pObj; 
-        if( pResp.IsEmpty() )
-        {
-            ret = -EFAULT;
-            break;
-        }
-
-        CParamList oResp( ( IConfigDb* )pResp );
-        if( !oResp.exist( propReturnValue ) )
-        {
-            ret = ERROR_FAIL;
-            break;
-        }
-
-        ret = oResp[ propReturnValue ];
 
    }while( 0 ); 
 
@@ -4118,6 +4340,9 @@ CInterfaceServer::CInterfaceServer(
 
         if( ERROR( ret ) )
             break;
+
+        matchCfg.CopyProp(
+            propPausable, pCfg );
 
         ret = matchCfg.SetIntProp(
             propMatchType,
@@ -4828,11 +5053,20 @@ gint32 CInterfaceServer::OnKeepAliveOrig(
             ret = -ENOTSUP;
             break;
         }
-        if( GetState() != stateConnected )
+        string strSender = pMsg.GetSender();
+        if( !IsConnected( strSender.c_str() ) )
         {
             // NOTE: this is not a serious state
             // check
             ret = ERROR_STATE;
+            break;
+        }
+
+        // test if the interface is paused
+        string strIfname = pMsg.GetInterface();
+        if( IsPaused( strIfname ) )
+        {
+            ret = ERROR_PAUSED;
             break;
         }
 
@@ -4920,6 +5154,14 @@ gint32 CInterfaceServer::InitUserFuncs()
     ADD_SERVICE_HANDLER(
         CInterfaceServer::UserCancelRequest,
         SYS_METHOD_USERCANCELREQ );
+
+    ADD_SERVICE_HANDLER(
+        CInterfaceServer::Pause_Server,
+        SYS_METHOD_PAUSE );
+
+    ADD_SERVICE_HANDLER(
+        CInterfaceServer::Resume_Server,
+        SYS_METHOD_RESUME );
 
     END_IFHANDLER_MAP;
 
@@ -5407,4 +5649,176 @@ gint32 CInterfaceServer::OnPreStart(
         return ret;
 
     return super::OnPreStart( pCallback );
+}
+
+bool CInterfaceServer::IsConnected(
+    const char* szDestAddr )
+{
+    EnumIfState iState = GetState();
+    if( iState != stateConnected &&
+        iState != statePaused &&
+        iState != statePausing &&
+        iState != stateResuming )
+        return false;
+
+    if( szDestAddr != nullptr )
+    {
+        gint32 ret = m_pConnMgr->CanResponse(
+            szDestAddr );
+        if( ret == ERROR_FALSE )
+            return false;
+    }
+
+    return true;
+}
+
+bool CInterfaceServer::IsPaused(
+    const std::string& strIfName )
+{
+    EnumIfState iState = GetState();
+    if( iState != statePaused )
+        return false;
+
+    EnumClsid iid = clsid( Invalid );
+    gint32 ret = GetIidFromIfName(
+        strIfName, iid );
+
+    // pause all the unknown interface
+    if( ERROR( ret ) )
+        return true;
+    
+    for( auto pMatch : m_vecMatches )
+    {
+        CMessageMatch* pMsgMatch = pMatch;
+        CfgPtr& pCfg = pMsgMatch->GetCfg();   
+        CCfgOpener oMatch(
+            ( IConfigDb* )pCfg );
+
+        EnumClsid iidMatch = clsid( Invalid );
+        ret = oMatch.GetIntProp(
+            propIid, ( guint32& )iidMatch );
+        if( ERROR( ret ) )
+            continue;
+
+        if( iidMatch == iid )
+        {
+            bool bPausable = false;
+            ret = oMatch.GetBoolProp(
+                propPausable, bPausable );
+            if( ERROR( ret ) )
+                break;
+            if( bPausable )
+                return true;
+            break;
+        }
+    }
+    return false;
+}
+
+bool CInterfaceServer::IsPaused(
+    IMessageMatch* pMatch )
+{
+    if( pMatch == nullptr )
+        return true;
+
+    EnumIfState iState = GetState();
+    if( iState != statePaused )
+        return false;
+
+    CMessageMatch* pMsgMatch = static_cast
+        < CMessageMatch* >( pMatch );
+
+    CfgPtr& pCfg = pMsgMatch->GetCfg();   
+    CCfgOpener oMatch(
+        ( IConfigDb* )pCfg );
+
+    bool bPausable = false;
+    gint32 ret = oMatch.GetBoolProp(
+        propPausable, bPausable );
+
+    if( ERROR( ret ) )
+        return false;
+
+    if( bPausable )
+        return true;
+
+    return false;
+}
+
+gint32 CInterfaceServer::StartRecvMsg(
+    IEventSink* pCompletion,
+    IMessageMatch* pMatch )
+{
+    CMessageMatch* pMsgMatch = static_cast
+        < CMessageMatch* >( pMatch );
+
+    string strIfName;
+    pMsgMatch->GetIfName( strIfName );
+    if( !IsConnected( strIfName.c_str() ) )
+        return ERROR_STATE;
+
+    /*if( IsPaused( strIfName ) )
+        return ERROR_PAUSED; */
+
+    return super::StartRecvMsg(
+        pCompletion, pMatch );
+}
+
+gint32 CInterfaceServer::DoPause(
+    IEventSink* pCallback )
+{
+    gint32 ret = super::DoPause( pCallback );
+
+    if( SUCCEEDED( ret ) )
+        ClearPausedTasks();
+
+    return ret;
+}
+
+gint32 CInterfaceServer::DoResume(
+    IEventSink* pCallback )
+{
+    gint32 ret = super::DoResume( pCallback );
+
+    if( SUCCEEDED( ret ) )
+        RestartListening( statePaused );
+
+    return ret;
+}
+
+gint32 CInterfaceServer::Pause_Server(
+    IEventSink* pCallback )
+{
+    return PauseResume_Server( pCallback, true );
+}
+
+gint32 CInterfaceServer::Resume_Server(
+    IEventSink* pCallback )
+{
+    return PauseResume_Server( pCallback, false );
+}
+
+gint32 CInterfaceServer::PauseResume_Server(
+    IEventSink* pCallback,
+    bool bPause )
+{
+    if( pCallback == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        if( bPause )
+            ret = super::Pause( pCallback );
+        else
+            ret = super::Resume( pCallback );
+
+        if( ret == STATUS_PENDING )
+            break;
+
+        ret = FillAndSetResponse(
+            pCallback, ret );         
+
+    }while( 0 );
+
+    return ret;
 }

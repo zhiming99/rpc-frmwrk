@@ -157,6 +157,10 @@ enum EnumPropId : gint32
     propValList,        // type: ObjPtr to whatever list
     propIid,            // type: an interface id of EnumClsid type, used in CMessageMatch
     propTaskState,      // type: an integer of EnumTaskState type, in CIfParallelTask
+    propPausable,       // type: a bool value to indicate the match is for an interface which can be paused
+    propSysMethod,      // type: a bool value to indicate if the call is from a built-in interface
+    propPauseOnStart,   // type: a bool value to indicate the server to pause on start
+    propQueSize,        // type: guint32 for the pending message size for incoming requests
     propReseredEnd = 0x10000000,
     propInvalid = -1, 
 };

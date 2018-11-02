@@ -190,6 +190,20 @@
             ]
         },
         {
+            "ModName" : "prclitst",
+            "DriversToLoad" :
+            [
+                "DBusBusDriver"
+            ]
+        },
+        {
+            "ModName" : "prsvrtst",
+            "DriversToLoad" :
+            [
+                "DBusBusDriver"
+            ]
+        },
+        {
             "ModName" : "Mod_RpcRouter_0",
             "DriversToLoad" :
             [

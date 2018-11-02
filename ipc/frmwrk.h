@@ -486,7 +486,8 @@ class CIoManager : public IService
         bool bOneshot = false );
 
     gint32 RescheduleTask(
-        TaskletPtr& pTask );
+        TaskletPtr& pTask,
+        bool bOneshot = false );
 
     void WaitThreadsQuit();
 

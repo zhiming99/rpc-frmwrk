@@ -1,7 +1,7 @@
 /*
  * =====================================================================================
  *
- *       Filename:  iftest.cpp
+ *       Filename:  asynctest.cpp
  *
  *    Description:  implementation if the test classes
  *
@@ -22,8 +22,8 @@
 #include <rpc.h>
 #include <proxy.h>
 
-#include "iftest.h"
-#include "ifsvr.h"
+#include "prtest.h"
+#include "prsvr.h"
 
 #include <cppunit/extensions/TestFactoryRegistry.h>
 #include <cppunit/ui/text/TestRunner.h>
@@ -61,7 +61,6 @@ void CIfSmokeTest::setUp()
     }while( 0 );
 }
 
-extern void DumpObjs();
 void CIfSmokeTest::tearDown()
 {
     gint32 ret = 0;
@@ -81,23 +80,27 @@ void CIfSmokeTest::tearDown()
     }while( 0 );
 }
 
+#ifdef SERVER
 void CIfSmokeTest::testSvrStartStop()
 {
     gint32 ret = 0;
-    CCfgOpener oCfg;
     InterfPtr pIf;
 
     CPPUNIT_ASSERT( !m_pMgr.IsEmpty() );
 
+    CCfgOpener oCfg;
+    oCfg.SetObjPtr( propIoMgr, m_pMgr );
+
     CfgPtr pCfg = oCfg.GetCfg();
     ret = CRpcServices::LoadObjDesc(
-        "./echodesc.json",
+        "./prdesc.json",
         OBJNAME_ECHOSVR,
         true, pCfg );
 
-    oCfg.SetObjPtr( propIoMgr, m_pMgr );
+    CPPUNIT_ASSERT( SUCCEEDED( ret ) );
+
     ret = pIf.NewObj(
-        clsid( CEchoServer ),
+        clsid( CPauseResumeServer ),
         oCfg.GetCfg() );
     
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );
@@ -105,7 +108,7 @@ void CIfSmokeTest::testSvrStartStop()
     ret = pIf->Start();
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );
     
-    CEchoServer* pSvr = pIf;
+    CPauseResumeServer* pSvr = pIf;
     while( pSvr->IsConnected() )
         sleep( 1 );
 
@@ -114,33 +117,41 @@ void CIfSmokeTest::testSvrStartStop()
 
     pIf.Clear();
 }
+#endif
 
+#ifdef CLIENT
 void CIfSmokeTest::testCliStartStop()
 {
 
     gint32 ret = 0;
-    CCfgOpener oCfg;
     InterfPtr pIf;
 
     CPPUNIT_ASSERT( !m_pMgr.IsEmpty() );
 
+    CCfgOpener oCfg;
+    oCfg.SetObjPtr( propIoMgr, m_pMgr );
+
     CfgPtr pCfg = oCfg.GetCfg();
     ret = CRpcServices::LoadObjDesc(
-        "./echodesc.json",
+        "./prdesc.json",
         OBJNAME_ECHOSVR,
         false, pCfg );
 
-    oCfg.SetObjPtr( propIoMgr, m_pMgr );
+    CPPUNIT_ASSERT( SUCCEEDED( ret ) );
+    if( ERROR( ret ) )
+        return;
+
     ret = pIf.NewObj(
-        clsid( CEchoClient ),
+        clsid( CPauseResumeClient ),
         oCfg.GetCfg() );
     
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 
     ret = pIf->Start();
+
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );
     
-    CEchoClient* pCli = pIf;
+    CPauseResumeClient* pCli = pIf;
     if( pCli != nullptr )
     {
         while( !pCli->IsConnected() )
@@ -148,9 +159,23 @@ void CIfSmokeTest::testCliStartStop()
 
         std::string strText( "Hello world!" );
         std::string strReply;
-        const char* szReply = nullptr;
 
-        const char*& pszReply = szReply ; 
+        BufPtr pText( true ), pBufReply;
+        *pText = "Hello, World!";
+
+        DebugPrint( 0, "Echo 1st time..." );
+        ret = pCli->Echo( strText, strReply );
+        CPPUNIT_ASSERT( ERROR( ret ) );
+        DebugPrint( 0, "Completed" );
+
+        ret = pCli->EchoUnknown( pText, pBufReply );
+        CPPUNIT_ASSERT( ERROR( ret ) );
+        DebugPrint( 0, "EchoUnknown Completed" );
+
+        DebugPrint( 0, "Resuming the interface" );
+        ret = pCli->Resume_Proxy();
+        CPPUNIT_ASSERT( SUCCEEDED( ret ) );
+
         DebugPrint( 0, "Start..." );
         ret = pCli->Echo( strText, strReply );
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
@@ -158,29 +183,21 @@ void CIfSmokeTest::testCliStartStop()
         if( strText != strReply )
             CPPUNIT_ASSERT( false );
 
-        ret = pCli->EchoPtr( strText.c_str(), pszReply );
-        CPPUNIT_ASSERT( SUCCEEDED( ret ) );
-        DebugPrint( 0, "EchoPtr Completed" );
-        if( strText != strReply )
-            CPPUNIT_ASSERT( false );
-
-        CParamList oParams;
-        oParams.Push( std::string( "Hello, world" ) );
-        oParams[ propClsid ] = Clsid_CEchoServer;
-        gint32 iCount = 0;
-        CfgPtr pCfgReply;
-        ret = pCli->EchoCfg( 2, oParams.GetCfg(), iCount, pCfgReply );
-        CPPUNIT_ASSERT( SUCCEEDED( ret ) );
-        DebugPrint( 0, "EchoCfg Completed" );
-        if( iCount != 2 )
-           CPPUNIT_ASSERT( false );
-
-        BufPtr pText( true ), pBufReply;
-
-        *pText = "Hello, World!";
+        DebugPrint( 0, "Start EchoUnknown... " );
         ret = pCli->EchoUnknown( pText, pBufReply );
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
         DebugPrint( 0, "EchoUnknown Completed" );
+
+        ret = pCli->LongWait( strText, strReply );
+        CPPUNIT_ASSERT( SUCCEEDED( ret ) );
+        DebugPrint( 0, "Completed" );
+        if( strText + " 2" != strReply )
+            CPPUNIT_ASSERT( false );
+
+        DebugPrint( 0, "Pausing the interface" );
+        ret = pCli->Pause_Proxy();
+        CPPUNIT_ASSERT( SUCCEEDED( ret ) );
+
     }
     else
     {
@@ -192,6 +209,7 @@ void CIfSmokeTest::testCliStartStop()
 
     pIf.Clear();
 }
+#endif
 
 int main( int argc, char** argv )
 {

@@ -40,7 +40,7 @@ std::string DebugMsgInternal(
     szBuf[ sizeof( szBuf ) - 1 ] = 0;
     snprintf( szBuf,
         sizeof( szBuf ) - 1,
-        "[%ld.%ld]%s(%d): %s(%d)",
+        "[%ld.%09ld]%s(%d): %s(%d)",
         ts.tv_sec,
         ts.tv_nsec,
         szFunc,

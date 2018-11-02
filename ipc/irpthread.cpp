@@ -425,26 +425,22 @@ void COneshotTaskThread::ThreadProc(
     {
         TaskletPtr pTask;
         ret = GetHead( pTask );
-        if( SUCCEEDED( ret ) && !pTask.IsEmpty() )
+        if( SUCCEEDED( ret ) )
         {
             ( *pTask )( ( guint32 )dwContext );
             m_bTaskDone = true;
-        }
-        PopHead();
-        while( !m_bTaskDone )
-        {
-            ret = Sem_TimedwaitSec( &m_semSync,
-                THREAD_WAKEUP_INTERVAL );
-
-            if( ret == -EAGAIN )
-                continue;
-
-            if( ERROR( ret ) )
-                return;
-
-            // there comes the task to handle
+            PopHead();
             break;
         }
+
+        ret = Sem_TimedwaitSec( &m_semSync,
+            THREAD_WAKEUP_INTERVAL );
+
+        if( ERROR( ret ) )
+            return;
+
+        // either timeout or signaled, let's
+        // check the task again
     }
 
     return;
@@ -539,7 +535,7 @@ gint32 CIrpCompThread::AddIrp( IRP* pirp )
 
         sem_wait( &m_semSlots );
         CStdMutex a( m_oMutex );
-        // we will held an irp reference count here
+        // hold an irp reference count
         m_quePendingIrps.push_back( IrpPtr( pirp ) );
         Sem_Post( &m_semIrps );
 

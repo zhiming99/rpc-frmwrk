@@ -1413,49 +1413,8 @@ gint32 CIoManager::ScheduleTask(
         if( ERROR( ret ) )
             break;
 
-        if( unlikely( bOneshot ) )
-        {
-            ThreadPtr pThread;
-
-            ret = StartStandAloneThread(
-                pThread, iClsid );
-
-            if( ERROR( ret ) )
-                break;
-
-            pTask->MarkPending();
-
-            CTaskThread* pTaskThread = pThread;
-            pTaskThread->AddTask( pTask );
-        }
-        else
-        {
-            ThreadPtr pThread;
-            ret = GetTaskThreadPool().GetThread( pThread, true );
-            if( ERROR( ret ) )
-                break;
-
-            CTaskThread* pgth =
-                static_cast< CTaskThread* >( pThread );
-
-            if( pgth )
-            {
-                pTask->MarkPending();
-                pgth->AddTask( pTask );
-            }
-        }
-
-        if( !pTask->IsAsync() )
-        {
-            CTaskletSync* pSyncTask =
-                static_cast< CTaskletSync* >( ( CTasklet* )pTask );
-
-            if( pSyncTask != nullptr )
-            {
-                pSyncTask->WaitForComplete();
-                ret = pSyncTask->GetError();
-            }
-        }
+        ret = RescheduleTask(
+            pTask, bOneshot );
 
     }while( 0 );
 
@@ -1463,7 +1422,7 @@ gint32 CIoManager::ScheduleTask(
 }
 
 gint32 CIoManager::RescheduleTask(
-    TaskletPtr& pTask )
+    TaskletPtr& pTask, bool bOneshot )
 {
     gint32 ret = 0;
 
@@ -1476,15 +1435,34 @@ gint32 CIoManager::RescheduleTask(
 
         ThreadPtr pThread;
 
-        ret = GetTaskThreadPool().GetThread( pThread, true );
-        if( ERROR( ret ) )
-            break;
+        if( unlikely( bOneshot ) )
+        {
+            ret = StartStandAloneThread(
+                pThread, pTask->GetClsid() );
 
-        CTaskThread* pgth =
-            static_cast< CTaskThread* >( pThread );
+            if( ERROR( ret ) )
+                break;
 
-        if( pgth )
-            pgth->AddTask( pTask );
+            pTask->MarkPending();
+
+            CTaskThread* pTaskThread = pThread;
+            pTaskThread->AddTask( pTask );
+        }
+        else
+        {
+            ret = GetTaskThreadPool().GetThread( pThread, true );
+            if( ERROR( ret ) )
+                break;
+
+            CTaskThread* pgth =
+                static_cast< CTaskThread* >( pThread );
+
+            if( pgth )
+            {
+                pgth->AddTask( pTask );
+                pTask->MarkPending();
+            }
+        }
 
         if( !pTask->IsAsync() )
         {

@@ -186,6 +186,7 @@ class CGenericInterface :
 
         return ERROR_FALSE;
     }
+
 };
 
 class CRpcBaseOperations :
@@ -241,10 +242,10 @@ class CRpcBaseOperations :
 
     gint32 CancelRecvMsg();
 
-    gint32 DoPause(
+    virtual gint32 DoPause(
         IEventSink* pCallback = nullptr );
 
-    gint32 DoResume(
+    virtual gint32 DoResume(
         IEventSink* pCallback = nullptr );
 
     virtual gint32 DoModEvent(
@@ -263,6 +264,13 @@ class CRpcBaseOperations :
     virtual gint32 BuildBufForIrp(
         BufPtr& pBuf,
         IConfigDb* pReqCall ) = 0;
+
+    virtual bool IsConnected(
+        const char* szDestAddr = nullptr )
+    {
+        return GetState() == stateConnected;
+    }
+
 };
 /**
 * @name CRpcInterfaceBase class will provide the
@@ -290,6 +298,9 @@ class CRpcInterfaceBase :
     std::vector< MatchPtr > m_vecMatches;
     TaskGrpPtr              m_pRootTaskGroup;
 
+    gint32 SetReqQueSize(
+        IMessageMatch* pMatch, guint32 dwSize );
+
     public:
 
     typedef CRpcBaseOperations super;
@@ -299,6 +310,7 @@ class CRpcInterfaceBase :
     {;}
 
     gint32 ClearActiveTasks();
+    gint32 ClearPausedTasks();
 
     TaskGrpPtr& GetTaskGroup()
     { return m_pRootTaskGroup; }
@@ -461,7 +473,6 @@ class CRpcServices :
         guint32& dwParam2,
         guint32*& pData );
 
-    gint32 RestartListening();
 
     protected:
 
@@ -499,6 +510,8 @@ class CRpcServices :
 
     gint32 SetProxyMap( PROXY_MAP& oMap,
         EnumClsid iIfId = clsid( Invalid ) );
+
+    gint32 RestartListening( EnumIfState iState );
 
     public:
 
@@ -652,6 +665,10 @@ class CRpcServices :
         IEventSink* pCallback = nullptr )
     { return 0; }
 
+    gint32 GetIidFromIfName(
+        const std::string& strIfName,
+        EnumClsid& iid );
+
     bool IsQueuedReq();
     guint32 GetQueueSize() const;
     
@@ -745,6 +762,9 @@ class CInterfaceProxy :
         guint32& dwSize,                // [out]
         IEventSink* pCallback );
 
+    gint32 PauseResume_Proxy(
+        const std::string& strMethod );
+
     public:
 
     typedef CRpcServices super;
@@ -827,18 +847,6 @@ class CInterfaceProxy :
     { return 0; }
 
     template< typename ...Args >
-    gint32 CallUserProxyFunc(
-        IEventSink* pCallback,
-        guint64& qwIoTaskId,
-        const std::string& strMethod,
-        Args&&... args )
-    {
-        std::string strName = USER_METHOD( strMethod );
-        return CallProxyFunc( pCallback, qwIoTaskId, 
-            strName, args... );
-    }
-
-    template< typename ...Args >
     gint32 CallProxyFunc(
         IEventSink* pCallback,
         guint64& qwIoTaskId,
@@ -878,7 +886,6 @@ class CInterfaceProxy :
 
     // a user-initialized cancel request
     gint32 UserCancelRequest(
-        IEventSink* pCallback,
         guint64& qwThisTaksId,
         guint64 qwTaskToCancel );
 
@@ -886,6 +893,9 @@ class CInterfaceProxy :
     // it is a synchronous call
     gint32 CancelRequest(
         guint64 qwTaskId );
+
+    gint32 Pause_Proxy();
+    gint32 Resume_Proxy();
 
     template< typename ...Args >
     gint32 AsyncCall(
@@ -1018,6 +1028,15 @@ class CInterfaceServer :
     gint32 OnKeepAliveRelay(
         IEventSink* pTask );
 
+    virtual gint32 DoPause(
+        IEventSink* pCallback = nullptr );
+
+    virtual gint32 DoResume(
+        IEventSink* pCallback = nullptr );
+
+    gint32 PauseResume_Server(
+        IEventSink* pCallback, bool bPause );
+
     public:
 
     typedef CRpcServices super;
@@ -1027,6 +1046,12 @@ class CInterfaceServer :
 
     bool IsServer() const
     { return true; }
+
+    virtual bool IsConnected(
+        const char* szDestAddr = nullptr );
+
+    bool IsPaused( const std::string& strIfName );
+    bool IsPaused( IMessageMatch* pMatch );
 
     // called to set the response to send back
     virtual gint32 SetResponse(
@@ -1174,8 +1199,19 @@ class CInterfaceServer :
     virtual gint32 OnPreStart(
         IEventSink* pCallback );
 
+    gint32 StartRecvMsg(
+        IEventSink* pCompletion,
+        IMessageMatch* pMatch );
+
     inline SvrConnPtr GetConnMgr()
     { return m_pConnMgr; }
+
+    // IInterfaceServer handlers
+    gint32 Pause_Server(
+        IEventSink* pCallback );
+
+    gint32 Resume_Server(
+        IEventSink* pCallback );
 };
 
 
@@ -1232,7 +1268,7 @@ gint32 CInterfaceProxy::AsyncCall(
     IEventSink* pTask,
     CfgPtr& pOptions,
     CfgPtr& pResp,
-    const std::string& strMethod,
+    const std::string& strcMethod,
     Args&&... args )
 {
     gint32 ret = 0;
@@ -1254,7 +1290,23 @@ gint32 CInterfaceProxy::AsyncCall(
         oCfg.CopyProp( propIfName,
             ( CObjBase* )pOptions );
 
-        ret = CallUserProxyFunc( pTask, 
+        std::string strMethod( strcMethod );
+        if( !pOptions.IsEmpty() )
+        {
+            bool bSysMethod = false;
+            CCfgOpener oOptions(
+                ( IConfigDb* )pOptions );
+
+            ret = oCfg.GetBoolProp(
+                propSysMethod, bSysMethod );
+
+            if( SUCCEEDED( ret ) && bSysMethod )
+                strMethod = SYS_METHOD( strMethod );
+            else
+                strMethod = USER_METHOD( strMethod );
+        }
+
+        ret = CallProxyFunc( pTask, 
             qwIoTaskId, strMethod, args... ); 
 
         if( ret == STATUS_PENDING ) 
@@ -1308,6 +1360,7 @@ inline void AssignVal( T& rVal, CBuffer& rBuf )
 
 template<typename T, typename T2= typename std::enable_if<
     std::is_base_of<IAutoPtr, T>::value &&
+    !std::is_same<BufPtr, T>::value &&
     !std::is_same<DMsgPtr, T>::value, T>::type,
     typename T3=T2,
     typename T4=T3 >
@@ -1315,6 +1368,27 @@ inline void AssignVal( T& rVal, CBuffer& rBuf )
 {
     ObjPtr& pObj = rBuf;
     rVal = pObj;
+}
+
+template<typename T, typename T2= typename std::enable_if<
+    std::is_same<BufPtr, T>::value, T>::type,
+    typename T3=T2,
+    typename T4=T3,
+    typename T5=T4 >
+inline void AssignVal( BufPtr& rVal, CBuffer& rBuf )
+{
+    rVal = rBuf;
+}
+
+template<typename T, typename T2= typename std::enable_if<
+    std::is_same<DMsgPtr, T>::value, T>::type,
+    typename T3=T2,
+    typename T4=T3,
+    typename T5=T4,
+    typename T6=T5 >
+inline void AssignVal( DMsgPtr& rVal, CBuffer& rBuf )
+{
+    rVal = ( DMsgPtr& )rBuf;
 }
 
 #define AC \

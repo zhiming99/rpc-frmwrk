@@ -109,7 +109,8 @@ void CIfSmokeTest::testSvrStartStop()
     ret = pIf->Start();
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );
     
-    while( pIf->GetState() == stateConnected )
+    CAsyncServer* pSvr = pIf;
+    while( pSvr->IsConnected() )
         sleep( 1 );
 
     ret = pIf->Stop();
@@ -151,12 +152,13 @@ void CIfSmokeTest::testCliStartStop()
 
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );
     
-    while( pIf->GetState() != stateConnected )
-        sleep( 1 );
 
     CAsyncClient* pCli = pIf;
     if( pCli != nullptr )
     {
+        while( !pCli->IsConnected() )
+            sleep( 1 );
+
         std::string strText( "Hello world!" );
         std::string strReply;
 

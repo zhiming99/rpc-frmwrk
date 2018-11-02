@@ -29,7 +29,7 @@
 #include "proxy.h"
 
 class CIfRetryTask
-    : public CTaskletRetriable
+    : public CThreadSafeTask
 {
     // properties:
     //
@@ -60,14 +60,8 @@ class CIfRetryTask
     sem_t               m_semWait;
     CTasklet*           m_pParentTask;
 
-    // although we provided the task scope lock here,
-    // no locking is performed in this class. If you
-    // need concurrency, please lock it explicitly or
-    // use the CIfParallelTask instead
-    mutable stdrtmutex  m_oLock;
-
     public:
-    typedef CTaskletRetriable super;
+    typedef CThreadSafeTask super;
 
     CIfRetryTask( const IConfigDb* pCfg );
     ~CIfRetryTask()
@@ -83,9 +77,6 @@ class CIfRetryTask
     gint32 OnRetry();
     virtual gint32 WaitForComplete();
     gint32 OnCancel( guint32 dwContext );
-
-    virtual stdrtmutex& GetLock() const
-    { return m_oLock; }
 
     bool Retriable( gint32 iRet ) const
     {
@@ -453,6 +444,10 @@ class CIfParallelTaskGrp
 
     gint32 FindTaskByRmtId(
         guint64 iTaskId, TaskletPtr& pRet );
+
+    gint32 FindTaskByClsid(
+        EnumClsid iClsid,
+        std::vector< TaskletPtr >& vecTasks );
 
     virtual guint32 GetTaskCount() 
     {

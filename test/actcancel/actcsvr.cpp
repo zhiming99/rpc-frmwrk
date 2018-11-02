@@ -134,7 +134,7 @@ gint32 CActcServer::LongWait(
     // schedule a timer, when the timer is due, the
     // OnLongWaitComplete will be called
     gint32 iTimer = oTimerSvc.AddTimer(
-        3, pTask, 0 );
+        30, pTask, 0 );
 
     if( iTimer < 0 )
         return iTimer;

@@ -18,7 +18,7 @@
  */
 
 #pragma once
-#include "glib.h"
+#include <glib.h>
 gint32 ErrnoFromDbusErr( const char *error );
 
 class CDBusError

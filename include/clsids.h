@@ -17,7 +17,7 @@
  */
 #pragma once
 
-#include "glib.h"
+#include <glib.h>
 
 #define DECL_CLSID( __classname__ ) \
     Clsid_ ## __classname__

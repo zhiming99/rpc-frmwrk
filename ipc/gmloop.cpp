@@ -23,7 +23,6 @@
 #include <functional>
 #include  <sys/syscall.h>
 #include <dbus/dbus.h>
-#include <dbus/dbus-glib-lowlevel.h>
 #include "configdb.h"
 #include "frmwrk.h"
 

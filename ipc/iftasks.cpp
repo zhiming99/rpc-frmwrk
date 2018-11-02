@@ -71,14 +71,6 @@ gint32 CIfStartRecvMsgTask::HandleIncomingMsg(
         if( pIf == nullptr || pMsg.IsEmpty() )
             return -EFAULT;
 
-        if( pIf->GetState() != stateConnected )
-        {
-            // NOTE: this is not a serious state
-            // check
-            ret = ERROR_STATE;
-            break;
-        }
-
         CParamList oParams;
         ret = oParams.SetObjPtr( propIfPtr, pIf );
         if( ERROR( ret ) )
@@ -138,11 +130,6 @@ gint32 CIfStartRecvMsgTask::StartNewRecv(
         return -EFAULT;
 
     do{
-        if( pIf->GetState() != stateConnected )
-        {
-            ret = ERROR_STATE;
-            break;
-        }
         // start another recvmsg request
         TaskletPtr pTask;
         ret = pTask.NewObj(
@@ -232,12 +219,28 @@ gint32 CIfStartRecvMsgTask::OnIrpComplete(
     if( pIf == nullptr )
         return -EFAULT;
 
+    IMessageMatch* pMatch = nullptr;
+    ret = oCfg.GetPointer( propMatchPtr, pMatch );
+    if( pMatch == nullptr )
+        return -EFAULT;
+
     do{
-        if( pIf->GetState() != stateConnected )
+        if( !pIf->IsConnected() )
         {
             ret = ERROR_STATE;
             break;
         }
+
+        /*if( pIf->IsServer() )
+        {
+            CInterfaceServer* pSvr = static_cast
+                < CInterfaceServer* >( pIf );
+            if( pSvr->IsPaused( pMatch ) )
+            {
+                ret = ERROR_PAUSED;
+                break;
+            }
+        }*/
 
         CIoManager* pMgr = pIf->GetIoMgr();
         if( pMgr == nullptr )
@@ -265,7 +268,8 @@ gint32 CIfStartRecvMsgTask::OnIrpComplete(
         }while( 0 );
 
         // interface is not working, don't continue
-        if( ret == ERROR_STATE )
+        if( ret == ERROR_STATE ||
+            ret == ERROR_PAUSED )
             break;
 
         // whether error or not receiving, we
@@ -327,7 +331,7 @@ gint32 CIfStartRecvMsgTask::RunTask()
             break;
         }
 
-        IMessageMatch* pMatch = nullptr;
+        CMessageMatch* pMatch = nullptr;
 
         ret = oCfg.GetObjPtr(
             propMatchPtr, pObj );
@@ -336,6 +340,23 @@ gint32 CIfStartRecvMsgTask::RunTask()
             break;
 
         pMatch = pObj;
+        if( !pIf->IsConnected() )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+
+        /*if( pIf->IsServer() )
+        {
+            CInterfaceServer* pSvr = static_cast
+                < CInterfaceServer* >( pIf );
+            if( pSvr->IsPaused( pMatch ) )
+            {
+                ret = ERROR_PAUSED;
+                break;
+            }
+        }*/
+
         ret = pIf->StartRecvMsg( this, pMatch );
 
     }while( 0 );
@@ -753,8 +774,9 @@ gint32 CIfRetryTask::Process( guint32 dwContext )
 
 gint32 CIfRetryTask::WaitForComplete()
 {
-    // NOTE: please call this method from a thread
-    // outside of the rpc subsystem
+    // NOTE: please call this method from outside
+    // the rpc-frmwrk's threads for performance
+    // concerns
     gint32 ret = 0; 
 
     // warning: no locking here
@@ -964,8 +986,25 @@ gint32 CIfEnableEventTask::OnIrpComplete( IRP* pIrp )
             {
                 if( dwCtrlCode == CTRLCODE_REG_MATCH )
                 {
-                    ret = pIf->SetStateOnEvent(
-                        cmdEnableEvent );
+                    CCfgOpenerObj oIfCfg( pIf );
+                    bool bPauseOnStart;
+
+                    ret = oIfCfg.GetBoolProp(
+                        propPauseOnStart, bPauseOnStart );
+
+                    if( ERROR( ret ) )
+                        bPauseOnStart = false;
+
+                    if( !bPauseOnStart )
+                    {
+                        ret = pIf->SetStateOnEvent(
+                            cmdEnableEvent );
+                    }
+                    else
+                    {
+                        ret = pIf->SetStateOnEvent(
+                            eventPaused );
+                    }
                 }
                 else
                 {
@@ -1074,8 +1113,25 @@ gint32 CIfEnableEventTask::RunTask()
 
             if( bEnable )
             {
-                ret = pIf->SetStateOnEvent(
-                    cmdEnableEvent );
+                CCfgOpenerObj oIfCfg( pIf );
+                bool bPauseOnStart;
+
+                ret = oIfCfg.GetBoolProp(
+                    propPauseOnStart, bPauseOnStart );
+
+                if( ERROR( ret ) )
+                    bPauseOnStart = false;
+
+                if( !bPauseOnStart )
+                {
+                    ret = pIf->SetStateOnEvent(
+                        cmdEnableEvent );
+                }
+                else
+                {
+                    ret = pIf->SetStateOnEvent(
+                        eventPaused );
+                }
             }
         }
         else if( ERROR( ret ) )
@@ -1839,10 +1895,12 @@ gint32 CIfPauseResumeTask::RunTask()
 {
     gint32 ret = 0;
     do{
-        CParamList oParams( ( IConfigDb* )GetConfig() );
+        CParamList oParams(
+            ( IConfigDb* )GetConfig() );
         ObjPtr pObj;
         
-        ret = oParams.GetObjPtr( propIfPtr, pObj );
+        ret = oParams.GetObjPtr(
+            propIfPtr, pObj );
 
         if( ERROR( ret ) )
             break;
@@ -2170,6 +2228,14 @@ gint32 CIfParallelTaskGrp::RunTaskDirect(
             m_setPendingTasks.insert( pTask );
         else
             m_setTasks.insert( pTask );
+
+        CIfParallelTask* pParaTask = pTask;
+        if( pParaTask == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
         oTaskLock.Unlock();
 
         if( bRunning )
@@ -2391,6 +2457,30 @@ gint32 CIfParallelTaskGrp::FindTaskByRmtId(
     }while( i < 2 );
 
     return ret;
+}
+
+gint32 CIfParallelTaskGrp::FindTaskByClsid(
+    EnumClsid iClsid,
+    std::vector< TaskletPtr >& vecTasks )
+{
+    if( iClsid == clsid( Invalid ) )
+        return -EINVAL;
+
+    CStdRTMutex oTaskLock( GetLock() );
+    for( auto elem : m_setTasks )
+    {
+        if( iClsid == elem->GetClsid() )
+            vecTasks.push_back( elem );
+    }
+    for( auto elem : m_setPendingTasks )
+    {
+        if( iClsid == elem->GetClsid() )
+            vecTasks.push_back( elem );
+    }
+    if( vecTasks.empty() )
+        return -ENOENT;
+
+    return 0;
 }
 
 gint32 CIfParallelTaskGrp::OnCancel(
@@ -2847,6 +2937,13 @@ gint32 CIfParallelTask::GetProperty( gint32 iProp,
         oBuf = GetTaskState();
         return 0;
     }
+
+    gint32 ret = GetConfig()->GetProperty(
+        iProp, oBuf );
+
+    if( SUCCEEDED( ret ) )
+        return ret;
+
     return super::GetProperty( iProp, oBuf );
 }
 
@@ -3319,7 +3416,8 @@ gint32 CIfInvokeMethodTask::RunTask()
                 break;
             }
 
-            if( pIf->GetState() != stateConnected )
+            string strSender = pMsg.GetSender();
+            if( !pIf->IsConnected( strSender.c_str() ) )
             {
                 // NOTE: this is not a serious state
                 // check
@@ -3332,6 +3430,17 @@ gint32 CIfInvokeMethodTask::RunTask()
             // set the interface name in case the
             // method be called via the handler map
             oCfg[ propIfName ] = pMsg.GetInterface();
+            if( pIf->IsServer() )
+            {
+                CInterfaceServer* pSvr = static_cast
+                    < CInterfaceServer* >( pIf );
+                string strIfName = pMsg.GetInterface();
+                if( pSvr->IsPaused( strIfName ) )
+                {
+                    ret = ERROR_PAUSED;
+                    break;
+                }
+            }
 
             // WOW, finally we are about to go to the
             // user code
@@ -3366,7 +3475,7 @@ gint32 CIfInvokeMethodTask::RunTask()
                 break;
             }
 
-            if( pIf->GetState() != stateConnected )
+            if( !pIf->IsConnected() )
             {
                 // NOTE: this is not a serious state
                 // check

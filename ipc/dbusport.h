@@ -23,7 +23,6 @@
 #include "autoptr.h"
 #include "msgmatch.h"
 
-#define MAX_PENDING_MSG             20
 #define DBUS_HANDLER_RESULT_HALT    ( ( DBusHandlerResult )100 )
 
 gint32 Ip4AddrToByteStr(
@@ -306,6 +305,10 @@ class CRpcPdoPort : public IRpcPdoPort
         guint32 dwParam1 = 0,
         guint32 dwParam2 = 0,
         guint32* pData = NULL  );
+
+    
+    gint32 SubmitIoctlCmd( IRP* pIrp );
+    gint32 HandleSetReqQueSize( IRP* pIrp );
 };
 
 class CDBusLocalPdo : public CRpcPdoPort

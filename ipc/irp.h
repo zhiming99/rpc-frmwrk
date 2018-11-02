@@ -94,6 +94,10 @@
 // register the msg match interface
 #define CTRLCODE_REG_MATCH              0x01
 #define CTRLCODE_UNREG_MATCH            0x03
+
+// adjust the sizeo of request queue 
+#define CTRLCODE_SET_REQUE_SIZE         0x04
+
 #define CTRLCODE_LISTENING              0x05
 #define CTRLCODE_SEND_REQ               0x07
 #define CTRLCODE_SEND_RESP              0x08
@@ -120,6 +124,8 @@
 #define CTRLCODE_RMTMOD_OFFLINE_PDO     0x1c
 #define CTRLCODE_GET_LOCAL_STMID        0x1e
 #define CTRLCODE_GET_RMT_STMID          0x1f
+
+
 #define CTRLCODE_INVALID                0xFFFF
 
 // for association irps

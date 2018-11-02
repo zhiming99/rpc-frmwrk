@@ -459,6 +459,10 @@ inline ObjPtr NewMethodProxy( bool bNonDBus,
     return pObj;
 }
 
+// the macro is to accomodate the case of zero
+// argument
+#define VA_ARGS(...) , ##__VA_ARGS__
+
 #define ADD_PROXY_METHOD( MethodName, ... ) \
 do{ \
     std::string strName = MethodName; \
@@ -905,12 +909,13 @@ inline gint32 NewDeferredCall( TaskletPtr& pCallback,
 #define DEFER_CALL( pMgr, pObj, func, ... ) \
 ({ \
     TaskletPtr pTask; \
-    gint32 ret_ = NewDeferredCall( pTask, pObj, func, __VA_ARGS__ ); \
+    gint32 ret_ = NewDeferredCall( pTask, pObj, func VA_ARGS( __VA_ARGS__ ) ); \
     if( SUCCEEDED( ret_ ) ) \
         ret_ = pMgr->RescheduleTask( pTask ); \
     ret_; \
 })
 
+/*
 #define DEFER_CALL_NOARG( pMgr, pObj, func ) \
 ({ \
     TaskletPtr pTask; \
@@ -919,12 +924,15 @@ inline gint32 NewDeferredCall( TaskletPtr& pCallback,
         ret_ = pMgr->RescheduleTask( pTask ); \
     ret_; \
 })
+*/
 
 #define DEFER_CALL_NOSCHED( pTask, pObj, func, ... ) \
-    NewDeferredCall( pTask, pObj, func, __VA_ARGS__ )
+    NewDeferredCall( pTask, pObj, func VA_ARGS( __VA_ARGS__ ) )
 
+/*
 #define DEFER_CALL_NOSCHED_NOARG( pTask, pObj, func ) \
     NewDeferredCall( pTask, pObj, func )
+*/
 
 template<typename ClassName, typename ...Args>
 class CDeferredCallOneshot :
@@ -1062,7 +1070,7 @@ inline gint32 NewDeferredCallOneshot(
 do{ \
     TaskletPtr pTask; \
     NewDeferredCallOneshot( \
-        pEvent, pTask, pObj, func, __VA_ARGS__ ); \
+        pEvent, pTask, pObj, func VA_ARGS( __VA_ARGS__ ) ); \
     if( !pTask.IsEmpty() ) \
         ( *pTask )( eventZero ); \
 }while( 0 )
@@ -1542,7 +1550,7 @@ template< typename ...Args >
 gint32 CInterfaceProxy::SyncCallEx(
     CfgPtr& pOptions,
     CfgPtr& pResp,
-    const std::string& strMethod,
+    const std::string& strcMethod,
     Args&&... args )
 {
     gint32 ret = 0;
@@ -1565,7 +1573,23 @@ gint32 CInterfaceProxy::SyncCallEx(
         oParams.CopyProp( propIfName,
             ( CObjBase* )pOptions );
 
-        ret = CallUserProxyFunc( pTask, 
+        std::string strMethod( strcMethod );
+        if( !pOptions.IsEmpty() )
+        {
+            bool bSysMethod = false;
+            CCfgOpener oOptions(
+                ( IConfigDb* )pOptions );
+
+            ret = oOptions.GetBoolProp(
+                propSysMethod, bSysMethod );
+
+            if( SUCCEEDED( ret ) && bSysMethod )
+                strMethod = SYS_METHOD( strMethod );
+            else
+                strMethod = USER_METHOD( strMethod );
+        }
+
+        ret = CallProxyFunc( pTask, 
             qwIoTaskId, strMethod, args... ); 
 
         CIoReqSyncCallback* pSyncCall = pTask;
@@ -1573,13 +1597,7 @@ gint32 CInterfaceProxy::SyncCallEx(
         { 
             // return the task id for cancel purpose
             oResp[ propTaskId ] = qwIoTaskId;
-            if( pSyncCall == nullptr )
-            {
-                ret = -EFAULT;
-                break;
-            }
             ret = pSyncCall->WaitForComplete(); 
-
             if( SUCCEEDED( ret ) )
                 ret = pSyncCall->GetError();
         } 
@@ -1606,7 +1624,6 @@ gint32 CInterfaceProxy::SyncCallEx(
             ret = ERROR_FAIL;
             break;
         }
-
         ret = oNewResp[ propReturnValue ];
 
     }while( 0 );
@@ -1707,8 +1724,8 @@ gint32 CInterfaceServer::SendEvent(
 }
 
 #define BROADCAST_USER_EVENT( _iid_, ... ) \
-    SendEvent( nullptr, _iid_, USER_EVENT( __func__ ), "", __VA_ARGS__  );
+    SendEvent( nullptr, _iid_, USER_EVENT( __func__ ), "" VA_ARGS( __VA_ARGS__ )  );
 
 #define BROADCAST_SYS_EVENT( _iid_, ... ) \
-    SendEvent( nullptr, _iid_, SYS_EVENT( __func__ ), "", __VA_ARGS__  );
+    SendEvent( nullptr, _iid_, SYS_EVENT( __func__ ), "" VA_ARGS( __VA_ARGS__ )  );
 

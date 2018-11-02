@@ -26,7 +26,7 @@
 #include "defines.h"
 #include "tasklets.h"
 #include "mainloop.h"
-#include "glib.h"
+#include <glib.h>
 
 
 class CIoManager;

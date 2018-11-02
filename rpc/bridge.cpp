@@ -542,7 +542,7 @@ gint32 CRpcTcpBridgeProxy::OnProgressNotify(
 
     gint32 ret = 0;
     do{
-        if( GetState() != stateConnected )
+        if( !IsConnected() )
         {
             // NOTE: this is not a serious state
             // check
@@ -1442,7 +1442,7 @@ gint32 CRpcInterfaceProxy::OnKeepAliveOrig(
             break;
         }
 
-        if( GetState() != stateConnected )
+        if( !IsConnected() )
         {
             // NOTE: this is not a serious state
             // check
@@ -2222,7 +2222,7 @@ gint32 CRpcTcpBridge::OnKeepAliveRelay(
             break;
         }
 
-        if( GetState() != stateConnected )
+        if( !IsConnected() )
         {
             // NOTE: this is not a serious state
             // check
@@ -2691,7 +2691,7 @@ gint32 CRpcTcpBridge::SendFetch_Server(
             break;
         }
 
-        if( GetState() != stateConnected )
+        if( !IsConnected() )
         {
             // NOTE: this is not a serious state
             // check
@@ -3181,7 +3181,7 @@ gint32 CRpcTcpBridge::OpenStream_Server(
     gint32  iNewStm = 0;
 
     do{
-        if( GetState() != stateConnected )
+        if( !IsConnected() )
         {
             // NOTE: this is not a serious state
             // check
@@ -3331,7 +3331,7 @@ gint32 CRpcTcpBridge::OnProgressNotify(
 {
     gint32 ret = 0;
     do{
-        if( GetState() != stateConnected )
+        if( !IsConnected() )
         {
             // NOTE: this is not a serious state
             // check

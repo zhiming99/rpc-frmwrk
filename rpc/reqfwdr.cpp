@@ -1504,18 +1504,24 @@ gint32 CRpcReqForwarder::OnKeepAliveRelay(
             break;
         }
 
-        if( GetState() != stateConnected )
+        string strIfName, strObjPath;
+        string strSender = pMsg.GetSender();
+        if( !IsConnected( strSender.c_str() ) )
         {
-            // NOTE: this is not a serious state
-            // check
             ret = ERROR_STATE;
+            break;
+        }
+
+        strIfName = pMsg.GetInterface();
+        if( IsPaused( strIfName ) )
+        {
+            ret = ERROR_PAUSED;
             break;
         }
 
         CReqBuilder okaReq( this );
 
         guint64 iTaskId = 0;
-        string strIfName, strObjPath;
         if( true )
         {
             // retrieve the task id

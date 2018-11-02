@@ -401,7 +401,7 @@ DBusHandlerResult CRpcBasePortEx::DispatchMsg(
     {
     case DBUS_MESSAGE_TYPE_METHOD_CALL:
         {
-            if( SUCCEEDED( DispatchReqMsg( pMsg ) ) )
+            if( DispatchReqMsg( pMsg ) != -ENOENT )
                 ret = DBUS_HANDLER_RESULT_HANDLED; 
             break;
         }

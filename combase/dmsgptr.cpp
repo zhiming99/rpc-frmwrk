@@ -573,6 +573,12 @@ std::string CAutoPtr< Clsid_Invalid, DBusMessage >::
         strRet += std::string( "Serial: " ) +
             std::to_string( dwSerial ) + "\n\t";
     }
+    ret = GetReplySerial( dwSerial );
+    if( SUCCEEDED( ret ) )
+    {
+        strRet += std::string( "Reply Serial: " ) +
+            std::to_string( dwSerial ) + "\n\t";
+    }
     
     switch( GetType() )
     {

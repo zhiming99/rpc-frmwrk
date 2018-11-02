@@ -110,7 +110,8 @@ void CIfSmokeTest::testSvrStartStop()
     ret = pIf->Start();
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );
     
-    while( pIf->GetState() == stateConnected )
+    CActcServer* pSvr = pIf;
+    while( pSvr->IsConnected() )
         sleep( 1 );
 
     ret = pIf->Stop();
@@ -153,12 +154,12 @@ void CIfSmokeTest::testCliActCancel()
 
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );
     
-    while( pIf->GetState() != stateConnected )
-        sleep( 1 );
-
     CActcClient* pCli = pIf;
     if( pCli != nullptr )
     {
+        while( !pCli->IsConnected() )
+            sleep( 1 );
+
         CfgPtr pResp( true );
 
         CParamList oParams( ( IConfigDb* )pResp );

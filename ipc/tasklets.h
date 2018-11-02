@@ -36,6 +36,7 @@ class CTasklet : public ICancellableTask
     std::atomic<bool> m_bPending;
     // flag to avoid reentrancy
     std::atomic<bool> m_bInProcess;
+    std::atomic<guint32> m_dwCallCount;
 
     protected:
     CfgPtr m_pCtx;
@@ -123,13 +124,13 @@ class CTasklet : public ICancellableTask
 
     void MarkInProcess()
     {
-        bool bExpected = false;
         if( IsMultiThreadSafe() )
         {
-            m_bInProcess = true;
+            ++m_dwCallCount;
             return;
         }
 
+        bool bExpected = false;
         while( m_bInProcess.compare_exchange_weak(
             bExpected, true ) == false )
         {
@@ -146,12 +147,12 @@ class CTasklet : public ICancellableTask
 
     void ClearInProcess()
     {
-        bool bExpected = true;
         if( IsMultiThreadSafe() )
         {
-            m_bInProcess = false;
+            --m_dwCallCount;
             return;
         }
+        bool bExpected = true;
         while( m_bInProcess.compare_exchange_weak(
             bExpected, false ) == false )
         {
@@ -168,7 +169,12 @@ class CTasklet : public ICancellableTask
     }
 
     bool IsInProcess()
-    { return m_bInProcess; }
+    {
+        if( IsMultiThreadSafe() )
+            return m_dwCallCount > 0;
+
+        return m_bInProcess;
+    }
 
     void MarkPending( bool bPending = true )
     { m_bPending = bPending; }
@@ -662,7 +668,9 @@ class CFidoRecvDataTask
 class CThreadSafeTask : public CTaskletRetriable
 {
 
+    protected:
     mutable stdrtmutex  m_oLock;
+
     public:
     typedef CTaskletRetriable super;
 

@@ -18,7 +18,6 @@
 
 
 #include <dbus/dbus.h>
-#include <dbus/dbus-glib-lowlevel.h>
 #include <vector>
 #include <string>
 #include <regex>
@@ -734,6 +733,9 @@ gint32 CDBusBusPort::ReplyWithError(
     string strDest =
         DBUS_DESTINATION( strModName );
 
+    string strIfName =
+        pMsg.GetInterface();
+
     string strError;
     string strDesc;
     if( strPath.substr( 0, strDest.size() ) == strDest )
@@ -749,6 +751,12 @@ gint32 CDBusBusPort::ReplyWithError(
 
     DBusMessage* pReply = dbus_message_new_error(
         pMessage, strError.c_str(), strDesc.c_str() );
+
+    DMsgPtr pReMsg( pReply );
+    pReMsg.SetPath( strPath.c_str() );
+
+    if( !strIfName.empty() )
+        pReMsg.SetInterface( strIfName );
 
     return SendDBusMsg( pReply, nullptr );
 }
@@ -893,6 +901,7 @@ DBusHandlerResult CDBusBusPort::OnMessageArrival(
         {
             // reply with dbus error
             ReplyWithError( pMessage );
+            ret = DBUS_HANDLER_RESULT_HANDLED;
         }
 
     }while( 0 );

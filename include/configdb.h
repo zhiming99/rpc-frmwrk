@@ -332,6 +332,9 @@ class CCfgDbOpener
 
     gint32 CopyProp( gint32 iProp, const CObjBase* pSrcCfg )
     {
+        if( pSrcCfg == nullptr )
+            return -EINVAL;
+
         CCfgDbOpener< CObjBase > a( pSrcCfg );
 
         BufPtr pBuf( true );
@@ -345,6 +348,9 @@ class CCfgDbOpener
 
     gint32 MoveProp( gint32 iProp, CObjBase* pSrcCfg )
     {
+        if( pSrcCfg == nullptr )
+            return -EINVAL;
+
         gint32 ret = CopyProp( iProp, pSrcCfg );
         if( ERROR( ret ) )
             return ret;
@@ -1477,6 +1483,9 @@ class CParamList : public CCfgOpener
 
 template<>
 gint32 CParamList::Push< BufPtr& > ( BufPtr& val  );
+
+template<>
+gint32 CParamList::Push< const BufPtr& > ( const BufPtr& val  );
 
 #define CFGDB_MAX_SIZE  ( 16 * 1024 * 1024 )
 #define CFGDB_MAX_ITEM  1024

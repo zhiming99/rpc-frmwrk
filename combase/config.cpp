@@ -507,3 +507,35 @@ gint32 CParamList::Push< BufPtr& > ( BufPtr& val  )
 
     return ret;
 }
+
+template<>
+gint32 CParamList::Push< const BufPtr& > ( const BufPtr& val  )
+{
+    gint32 ret = 0;
+    do{
+        gint32 iPos = GetCount();
+        if( ERROR( iPos ) )
+        {
+            ret = iPos;
+            break;
+        }
+
+        BufPtr pBuf = const_cast< BufPtr& >( val );
+        try{
+
+            pBuf = val;
+            ret = GetCfg()->SetProperty(
+                iPos, pBuf );
+
+            if( SUCCEEDED( ret ) )
+                SetCount( iPos + 1 );
+        }
+        catch( std::invalid_argument& e )
+        {
+            ret = -EINVAL;
+        }
+
+    }while( 0 );
+
+    return ret;
+}

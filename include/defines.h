@@ -84,11 +84,12 @@
 #define ERROR_PORT_STOPPED      ( ( gint32 )0x80010006 )
 #define ERROR_FALSE             ( ( gint32 )0x80010007 )
 
-#define ERROR_REPEAT            ( ( gint32 )0x80010007 )
-#define ERROR_PREMATURE         ( ( gint32 )0x80010008 )
-#define ERROR_NOT_HANDLED       ( ( gint32 )0x80010009 )
-#define ERROR_CANNOT_COMP       ( ( gint32 )0x8001000a )
-#define ERROR_USER_CANCEL       ( ( gint32 )0x8001000b )
+#define ERROR_REPEAT            ( ( gint32 )0x80010008 )
+#define ERROR_PREMATURE         ( ( gint32 )0x80010009 )
+#define ERROR_NOT_HANDLED       ( ( gint32 )0x8001000a )
+#define ERROR_CANNOT_COMP       ( ( gint32 )0x8001000b )
+#define ERROR_USER_CANCEL       ( ( gint32 )0x8001000c )
+#define ERROR_PAUSED            ( ( gint32 )0x8001000d )
 
 #define AlignDword( val )    ( ( val + 3 ) & ~( sizeof( guint32 ) - 1 ) )
 
@@ -156,6 +157,8 @@ do{\
     DebugMsg( ret, strFmt, ##__VA_ARGS__ ).c_str() );} )
 
 #endif
+
+#define MAX_PENDING_MSG             20
 
 // for Sem_Timedwait interval
 #define THREAD_WAKEUP_INTERVAL      10

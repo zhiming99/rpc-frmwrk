@@ -33,6 +33,7 @@ CTasklet::CTasklet( const IConfigDb* pCfg )
     m_iRet = 0;
     m_bPending = false;
     m_bInProcess = false;
+    m_dwCallCount = 0;
     Sem_Init( &m_semReentSync, 0, 0 );
 }
 
@@ -530,13 +531,9 @@ gint32 CThreadSafeTask::GetProperty( gint32 iProp,
         CBuffer& oBuf ) const
 {
     CStdRTMutex oTaskLock( GetLock() );
-    gint32 ret = super::GetProperty( iProp, oBuf );
-    if( ERROR( ret ) )
-    {
-        printf( "haha\n" );
-    }
-    return ret;
+    return super::GetProperty( iProp, oBuf );
 }
+
 gint32 CSyncCallback::operator()(
     guint32 dwContext )
 {

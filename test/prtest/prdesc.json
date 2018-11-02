@@ -1,0 +1,29 @@
+{
+    "Version" : "1.0",
+    "BusName" : "DBusBusPort_0",
+    "PortClass": "DBusLocalPdo",
+    "PortId" : "0",
+    "ServerName": "PauseResumeServer",
+    "Objects" :
+    [
+        {
+            "ObjectName": "CPauseResumeServer",
+            "RequestTimeoutSec" : "120",
+            "KeepAliveTimeoutSec" : "2",
+            "PauseOnStart" : "true",
+            "Interfaces" :
+            [
+                {
+                    "Comment-0" : "the following attributes are mandatory",
+                    "InterfaceName" : "CPauseResumeServer",
+                    "Comment-1" : "the following is a flag whether to use the object clsid for this interface, usually it indicates this is the major interface of this object, there must be one interface bind to clsid",
+                    "BindToClsid" : "true",
+                    "Pausable" : "true"
+                },
+                {
+                    "InterfaceName" : "IInterfaceServer"
+                }
+            ]
+        }
+    ]
+}
