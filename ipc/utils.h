@@ -108,6 +108,12 @@ class COneshotTaskThread : public CTaskThread
     gint32 Start();
     gint32 Stop();
 
+    // test if the thread is running
+    bool IsRunning() const
+    {
+        return !m_bTaskDone;
+    }
+
     gint32 GetProperty(
         gint32 iProp, CBuffer& oBuf ) const;
 

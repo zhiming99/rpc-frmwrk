@@ -69,8 +69,6 @@ class CPauseResumeServer :
 class CPauseResumeClient :
     public CInterfaceProxy
 {
-    sem_t m_semWait;
-
     public:
     typedef CInterfaceProxy super;
     CPauseResumeClient( const IConfigDb* pCfg );

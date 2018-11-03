@@ -935,6 +935,10 @@ class CInterfaceProxy :
     template< typename ...Args >
     gint32 FillArgs( CfgPtr& pResp,
         gint32& iRet, Args&&... args );
+
+    template< int iNumInput, typename...Args >
+    gint32 ProxyCall( const std::string& strMethod,
+        Args&&... args );
 };
 
 class CInterfaceServer;

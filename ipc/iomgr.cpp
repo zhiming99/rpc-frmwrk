@@ -1325,7 +1325,10 @@ gint32 CIoManager::ClearStandAloneThreads()
     while( itr != m_vecStandAloneThread.end() ) 
     {
         if( !( *itr )->IsRunning() )
+        {
+            ( *itr )->Stop();
             itr = m_vecStandAloneThread.erase( itr );
+        }
         else
             ++itr;
     }

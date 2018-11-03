@@ -31,12 +31,13 @@ CPauseResumeClient::CPauseResumeClient(
     const IConfigDb* pCfg )
     : super( pCfg )
 {
+    // mandatory statement
     SetClassId( clsid( CPauseResumeClient ) );
-    Sem_Init( &m_semWait, 0, 0 );
 }
 
 gint32 CPauseResumeClient::InitUserFuncs()
 {
+    // mandatory statement
     super::InitUserFuncs();
 
     BEGIN_PROXY_MAP( false );
@@ -56,83 +57,37 @@ gint32 CPauseResumeClient::InitUserFuncs()
     return 0;
 }
 
-gint32 CPauseResumeClient::LongWait(
-    const std::string& strText,
-    std::string& strReply )
+gint32 CPauseResumeClient::Echo(
+    const std::string& strText, // [ in ]
+    std::string& strReply ) // [ out ]
 {
-
-    gint32 ret = 0;
-
-    do{
-        CfgPtr pResp;
-
-        // make the call
-        ret = SyncCall( pResp, METHOD_LongWait, strText );
-        if( ERROR( ret ) )
-            break;
-
-        // fill the output parameter
-        gint32 iRet = 0;
-        ret = FillArgs( pResp, iRet, strReply );
-
-        if( SUCCEEDED( ret ) )
-            ret = iRet;
-
-    }while( 0 );
-
-    return ret;
+    // 1: the number of input
+    // the second template parameter is the type of input parameter
+    // the third is the type of the output parameter
+    //
+    // METHOD_Echo is the method name to call
+    // strText is the input parameter
+    // strReply is the output parameter
+    // input comes first, and the output follows
+    //
+    return ProxyCall<1, const std::string&, std::string&  >(
+        METHOD_Echo, strText, strReply  );
 }
 
 gint32 CPauseResumeClient::EchoUnknown(
     const BufPtr& pText,
     BufPtr& pReply )
 {
-
-    gint32 ret = 0;
-
-    do{
-        CfgPtr pResp;
-
-        // make the call
-        ret = SyncCall( pResp, "Unknown", pText );
-        if( ERROR( ret ) )
-            break;
-
-        // fill the output parameter
-        gint32 iRet = 0;
-        ret = FillArgs( pResp, iRet, pReply );
-
-        if( SUCCEEDED( ret ) )
-            ret = iRet;
-
-    }while( 0 );
-
-    return ret;
+    return ProxyCall<1, const BufPtr&, BufPtr&  >(
+        "Unknown", pText, pReply  );
 }
 
-gint32 CPauseResumeClient::Echo(
+gint32 CPauseResumeClient::LongWait(
     const std::string& strText,
     std::string& strReply )
 {
 
-    gint32 ret = 0;
-
-    do{
-        CfgPtr pResp;
-
-        // make the call
-        ret = SyncCall( pResp, METHOD_Echo, strText );
-        if( ERROR( ret ) )
-            break;
-
-        // fill the output parameter
-        gint32 iRet = 0;
-        ret = FillArgs( pResp, iRet, strReply );
-
-        if( SUCCEEDED( ret ) )
-            ret = iRet;
-
-    }while( 0 );
-
-    return ret;
+    return ProxyCall<1, const std::string&, std::string&  >(
+        METHOD_LongWait, strText, strReply  );
 }
+

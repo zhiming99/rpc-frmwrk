@@ -437,8 +437,10 @@ void COneshotTaskThread::ThreadProc(
             THREAD_WAKEUP_INTERVAL );
 
         if( ERROR( ret ) )
-            return;
-
+        {
+            if( ret != -EAGAIN )
+                return;
+        }
         // either timeout or signaled, let's
         // check the task again
     }

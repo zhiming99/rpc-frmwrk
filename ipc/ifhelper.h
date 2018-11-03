@@ -1729,3 +1729,114 @@ gint32 CInterfaceServer::SendEvent(
 #define BROADCAST_SYS_EVENT( _iid_, ... ) \
     SendEvent( nullptr, _iid_, SYS_EVENT( __func__ ), "" VA_ARGS( __VA_ARGS__ )  );
 
+// proxy's side helper
+template< int N, typename...S >
+struct OutputParamTypes;
+
+template< typename T0, typename ...S >
+struct OutputParamTypes< 1, T0, S... >
+{
+    typedef std::tuple< S...> OutputTypes;
+};
+
+template< typename ... S>
+struct OutputParamTypes< 0, S...>
+{
+    typedef std::tuple< S... > OutputTypes;
+};
+
+template< int N, typename T0, typename...S>
+struct OutputParamTypes< N, T0, S...> : OutputParamTypes< N - 1, S... >
+{};
+
+template< int N, typename ...S >
+struct InputParamTypes;
+
+template< typename T0, typename ...S >
+struct InputParamTypes< 1, T0, S... >
+{
+    typedef std::tuple<T0> type;
+};
+
+template< typename ...S >
+struct InputParamTypes< 0, S... >
+{
+    typedef std::tuple<> type;
+};
+
+template< int N, typename T0, typename...S>
+struct InputParamTypes< N, T0, S...> : InputParamTypes< N - 1, S... >
+{
+    typedef InputParamTypes< N-1, S...> super;
+    typedef decltype( std::tuple_cat< std::tuple< T0 >, super::type >() ) type;
+};
+
+template <typename...>
+struct Parameters;
+ 
+template < typename...Types, typename ...Types2 >
+struct Parameters< std::tuple< Types... >, std::tuple< Types2... > >
+{
+    CInterfaceProxy* m_pIf = nullptr;
+    std::string m_strMethod;
+    Parameters( CInterfaceProxy* pProxy, const std::string strMehtod )
+    {
+        m_pIf = pProxy;
+        m_strMethod = strMehtod;
+    }
+
+    gint32 SendReceive(
+        Types&&...inArgs, Types2&&... outArgs )
+    {
+        gint32 ret = 0;
+
+        do{
+            CfgPtr pResp;
+
+            // make the call
+            ret = m_pIf->SyncCall( pResp, m_strMethod, inArgs... );
+            if( ERROR( ret ) )
+                break;
+
+            // fill the output parameter
+            gint32 iRet = 0;
+            ret = m_pIf->FillArgs( pResp, iRet, outArgs... );
+
+            if( SUCCEEDED( ret ) )
+                ret = iRet;
+
+        }while( 0 );
+
+        return ret;
+    }
+};
+
+/**
+* @name ProxyCall: the main-entry for all the methods.
+* @{ */
+/**
+ * Template paramaters:
+ *  iNumInput: number of input arguments
+ *
+ *  Args: The types of each individual input & output parameters
+ *      If a parameter serves as input/output, its type should appear twice in
+ *      the Args. the iNumInput of input parameters comes first and the output
+ *      parameters follows in the order the parameters sent over the network.
+ *
+ * Arguments:
+ *  strMethod: the name of the method, as you have put in the InitUserFuncs
+ *  args : the formal parameter list, corresponding to the types in the template
+ *  parameters.
+ * @} */
+
+template< int iNumInput, typename...Args >
+gint32 CInterfaceProxy::ProxyCall(
+    const std::string& strMethod,
+    Args&&... args )
+{ 
+    using OutTypes = typename OutputParamTypes< iNumInput, Args... >::OutputTypes;
+    using InTypes = typename InputParamTypes< iNumInput, Args... >::type;
+    Parameters< InTypes, OutTypes > a( this, strMethod );
+    return a.SendReceive( args... );
+}
+
