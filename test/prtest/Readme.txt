@@ -4,3 +4,4 @@ Pause/Resume test
 3. test if in pause state, the interface IInterfaceServer still works properly.
 4. test if the server supports pause on start. ( not implemented yet )
 5. test if the keep-alive behave correctly in paused state
+6. introduced helper macro to simplify the logics in proxy/server code.
