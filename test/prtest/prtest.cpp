@@ -188,12 +188,24 @@ void CIfSmokeTest::testCliStartStop()
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
         DebugPrint( 0, "EchoUnknown Completed" );
 
-        ret = pCli->LongWait( strText, strReply );
+        DebugPrint( 0, "Start EchoMany... " );
+        gint32 o1; gint16 o2; gint64 o3; float o4; double o5;
+        ret = pCli->EchoMany(
+            1, 2, 3, 4, 5, strText,
+            o1, o2, o3, o4, o5, strReply );
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
-        DebugPrint( 0, "Completed" );
         if( strText + " 2" != strReply )
             CPPUNIT_ASSERT( false );
 
+        DebugPrint( 0, "o1=%d, o2=%hd, o3=%lld, o4=%f, o5=%g, strReply=%s",
+             o1, o2, o3, o4, o5, strReply.c_str() );
+
+        DebugPrint( 0, "EchoMany Completed" );
+
+        DebugPrint( 0, "Start LongWait 20s ... " );
+        ret = pCli->LongWait( strText, strReply );
+        CPPUNIT_ASSERT( SUCCEEDED( ret ) );
+        DebugPrint( 0, "Completed" );
         DebugPrint( 0, "Pausing the interface" );
         ret = pCli->Pause_Proxy();
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );

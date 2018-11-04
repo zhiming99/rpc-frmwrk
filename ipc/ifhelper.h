@@ -570,9 +570,11 @@ template<typename ClassName, typename ...Args>
 class CMethodServer :
     public CDelegateBase
 {
+    public:
     typedef gint32 ( ClassName::* FuncType)(
         IEventSink* pCallback, Args... ) ;
 
+    protected:
     template< int ...S>
     gint32 CallUserFunc( ClassName* pObj,
         IEventSink* pCallback,
@@ -634,6 +636,206 @@ class CMethodServer :
     }
 };
 
+template< typename ...Args >
+struct InitTupleDefault;
+
+template< typename T0, typename ...Args >
+struct InitTupleDefault< std::tuple< T0, Args... > > :
+    InitTupleDefault< std::tuple< Args... > >
+{
+    typedef InitTupleDefault< std::tuple< Args... > > super;
+    InitTupleDefault( std::vector< BufPtr >& vecDefault )
+        : super( vecDefault )
+    {
+        vecDefault.insert(
+            vecDefault.begin(),
+            GetDefault( ( T0* )nullptr ) );
+    }
+};
+template<typename T0>
+struct InitTupleDefault< std::tuple< T0 > >
+{
+    InitTupleDefault( std::vector< BufPtr >& vecDefault )
+    {
+        vecDefault.insert(
+            vecDefault.begin(),
+            GetDefault( ( T0* )nullptr ) );
+    }
+};
+template<>
+struct InitTupleDefault< std::tuple<> >
+{
+    InitTupleDefault( std::vector< BufPtr >& vecDefault )
+    {}
+};
+
+template< int N, typename...S >
+struct OutputParamTypes;
+
+template< typename T0, typename ...S >
+struct OutputParamTypes< 1, T0, S... >
+{
+    typedef std::tuple< S...> OutputTypes;
+};
+
+template< typename ... S>
+struct OutputParamTypes< 0, S...>
+{
+    typedef std::tuple< S... > OutputTypes;
+};
+
+template< int N, typename T0, typename...S>
+struct OutputParamTypes< N, T0, S...> : OutputParamTypes< N - 1, S... >
+{};
+
+
+template< int iNumInput, typename ClassName, typename ...Args>
+class CMethodServerEx; 
+
+template< int iNumInput, typename ClassName, typename ...Args>
+class CMethodServerEx< iNumInput, gint32 (ClassName::*)(IEventSink*, Args ...) > :
+    public CMethodServer< ClassName, Args... >
+{
+    typedef gint32 ( ClassName::* FuncType)(
+        IEventSink* pCallback, Args... ) ;
+
+    public:
+    typedef CMethodServer< ClassName, Args... > super;
+    CMethodServerEx( FuncType pFunc )
+        :super( pFunc )
+    {
+       // SetClassId( clsid( CMethodServerEx ) );
+    }
+
+    void TupleToVec2( std::tuple<>& oTuple,
+        std::vector< BufPtr >& vec,
+        NumberSequence<> )
+    {}
+
+    template < int N >
+    void TupleToVec2( std::tuple< DecType( Args )...>& oTuple,
+        std::vector< BufPtr >& vec,
+        NumberSequence< N > )
+    {
+        if( N < iNumInput )
+            return;
+
+        vec[ N - iNumInput ] = PackageTo< ValType( decltype( std::get< N >( oTuple ) ) ) >
+            ( std::get< N >( oTuple ) );
+    }
+
+    template < int N, int M, int...S >
+    void TupleToVec2( std::tuple< DecType( Args )...>& oTuple,
+        std::vector< BufPtr >& vec,
+        NumberSequence< N, M, S... > )
+    {
+        if( N >= iNumInput )
+        {
+            vec[ N - iNumInput ] = PackageTo< ValType( decltype( std::get< N >( oTuple ) ) ) >
+                ( std::get< N >( oTuple ) );
+        }
+        TupleToVec2< M, S... >( oTuple, vec, NumberSequence<M, S...>() );
+    }
+
+    // This is a virtual function in the template
+    // class, where two styles of Polymorphisms meet,
+    // virtual functions and template classes
+    gint32 Delegate( 
+        CObjBase* pObj,
+        IEventSink* pCallback,
+        std::vector< BufPtr >& vecParams )
+    {
+        if( pObj == nullptr ||
+            pCallback == nullptr )
+            return -EINVAL;
+
+        ClassName* pClass = static_cast< ClassName* >( pObj );
+        // vecParams contains only the input parameters.
+        // Args contains both the input and output parameters
+        if( vecParams.size() > sizeof...( Args ) )
+            return -EINVAL;
+
+        using OutTupType = typename OutputParamTypes<
+            iNumInput, DecType( Args )... >::OutputTypes;
+
+        std::vector< BufPtr > vecResp;
+        for( auto& elem : vecParams )
+            vecResp.push_back( elem );
+
+        std::vector< BufPtr > vecDefOut;
+
+        // fill the output parameters with fake values
+        InitTupleDefault< OutTupType > a( vecDefOut );
+        vecResp.insert( vecResp.end(),
+            vecDefOut.begin(), vecDefOut.end() );
+
+        // the parameters are ready for the call
+        std::tuple< DecType( Args )...> oTuple =
+            VecToTuple< DecType( Args )... >( vecResp );
+
+        gint32 ret = this->CallUserFunc( pClass, pCallback, oTuple,
+            typename GenSequence< sizeof...( Args ) >::type() );
+
+        if( ret == STATUS_PENDING )
+            return ret;
+
+        do{
+            CParamList oParams;
+            oParams[ propReturnValue ] = ret;
+
+            // error, just return the error code
+            if( ERROR( ret ) )
+                break;
+
+            // fine, no response values
+            if( sizeof...( Args ) == iNumInput )
+                break;
+
+            // fill the output values to the vector
+            TupleToVec2( oTuple, vecResp,
+                typename GenSequence< sizeof...( Args ) >::type() );
+
+            for( auto elem : vecResp )
+                oParams.Push( elem );
+            
+            CTasklet* pTask =
+                static_cast< CTasklet* >( pCallback );
+
+            // we are outside the task's context, let's
+            // complete it 
+            ObjPtr pObj;
+            CCfgOpenerObj oTaskCfg( pTask );
+
+            ret = oTaskCfg.GetObjPtr( propIfPtr, pObj );
+            if( ERROR( ret ) )
+                break;
+
+            CRpcServices* pIf = pObj;
+            if( pIf == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            if( !pIf->IsServer() )
+                break;
+
+            CInterfaceServer* pSvr = pObj;
+            if( pTask->IsInProcess() )
+            {
+                pSvr->SetResponse(
+                    pCallback, oParams.GetCfg() );
+            }
+            else
+            {
+                pSvr->OnServiceComplete(
+                    oParams.GetCfg(), pCallback );
+            }
+        }while( 0 );
+
+        return ret;
+    }
+};
+
 template < typename C, typename ...Types>
 inline gint32 NewMethodServer( TaskletPtr& pDelegate,
     gint32(C::*f)(IEventSink*, Types ...) )
@@ -662,6 +864,46 @@ inline gint32 NewMethodServer( TaskletPtr& pDelegate,
     }
     return ret;
 }
+
+
+template < int iNumInput, typename C, typename ...Types>
+struct NewMethodServerEx;
+
+template < int iNumInput, typename C, typename ...Types>
+struct NewMethodServerEx< iNumInput, gint32(C::*)(IEventSink*, Types ...) >
+{
+    typedef gint32(C::*FuncType)(IEventSink*, Types ...);
+    TaskletPtr pDelegate;
+    NewMethodServerEx( FuncType f )
+    {
+        if( f == nullptr )
+            return;
+
+        gint32 ret = 0;
+        try{
+            pDelegate = new CMethodServerEx< iNumInput, FuncType >( f );
+            pDelegate->DecRef();
+        }
+        catch( const std::bad_alloc& e )
+        {
+            ret = -ENOMEM;
+        }
+        catch( const std::runtime_error& e )
+        {
+            ret = -EFAULT;
+        }
+        catch( const std::invalid_argument& e )
+        {
+            ret = -EINVAL;
+        }
+        if( ERROR( ret ) )
+        {
+            std::string strMsg = DebugMsg( ret, \
+                "Error alloc CMethodServerEx" ); \
+            throw std::runtime_error( strMsg ); \
+        }
+    }
+};
 
 // construction of the major interface handler map 
 
@@ -760,6 +1002,31 @@ do{\
     }while( 0 )
 
 #define END_IFHANDLER_MAP END_HANDLER_MAP
+
+// A more high-level handler macro 
+#define ADD_SERVICE_HANDLER_EX( numArgs, f, fname ) \
+do{ \
+    if( _pCurMap_->size() > 0 && \
+        _pCurMap_->find( fname ) != _pCurMap_->end() ) \
+        break; \
+    TaskletPtr pTask; \
+    NewMethodServerEx< numArgs, decltype( &f ) > a( &f ); \
+    pTask = a.pDelegate;\
+    if( pTask.IsEmpty() ) \
+    { \
+        std::string strMsg = DebugMsg( -ENOMEM, \
+            "Error allocaate delegate" ); \
+        throw std::runtime_error( strMsg ); \
+    } \
+    _pCurMap_->insert( \
+        std::pair< std::string, TaskletPtr >( fname, pTask ) ); \
+}while( 0 )
+
+#define ADD_USER_SERVICE_HANDLER_EX( numArgs, f, fname ) \
+do{ \
+    std::string strHandler = USER_METHOD( fname ); \
+    ADD_SERVICE_HANDLER_EX( numArgs, f, strHandler ); \
+}while( 0 )
 
 template< class T >
 class CDeferredCallBase :
@@ -1730,45 +1997,35 @@ gint32 CInterfaceServer::SendEvent(
     SendEvent( nullptr, _iid_, SYS_EVENT( __func__ ), "" VA_ARGS( __VA_ARGS__ )  );
 
 // proxy's side helper
-template< int N, typename...S >
-struct OutputParamTypes;
-
-template< typename T0, typename ...S >
-struct OutputParamTypes< 1, T0, S... >
-{
-    typedef std::tuple< S...> OutputTypes;
-};
-
-template< typename ... S>
-struct OutputParamTypes< 0, S...>
-{
-    typedef std::tuple< S... > OutputTypes;
-};
-
-template< int N, typename T0, typename...S>
-struct OutputParamTypes< N, T0, S...> : OutputParamTypes< N - 1, S... >
-{};
-
 template< int N, typename ...S >
 struct InputParamTypes;
 
 template< typename T0, typename ...S >
 struct InputParamTypes< 1, T0, S... >
 {
-    typedef std::tuple<T0> type;
+    typedef std::tuple<T0> InputTypes;
 };
 
 template< typename ...S >
 struct InputParamTypes< 0, S... >
 {
-    typedef std::tuple<> type;
+    typedef std::tuple<> InputTypes;
 };
 
 template< int N, typename T0, typename...S>
-struct InputParamTypes< N, T0, S...> : InputParamTypes< N - 1, S... >
+struct InputParamTypes< N, T0, S...>
 {
-    typedef InputParamTypes< N-1, S...> super;
-    typedef decltype( std::tuple_cat< std::tuple< T0 >, super::type >() ) type;
+    typedef std::tuple< T0 > T1;
+    typedef typename InputParamTypes< N-1, S...>::InputTypes T2;
+
+    T0 b;
+    static T2 func()
+    {
+        T2* p=nullptr;
+        return *p;
+    }
+
+    typedef decltype( std::tuple_cat< T1, T2 >( T1( b ), func() ) ) InputTypes;
 };
 
 template <typename...>
@@ -1835,8 +2092,7 @@ gint32 CInterfaceProxy::ProxyCall(
     Args&&... args )
 { 
     using OutTypes = typename OutputParamTypes< iNumInput, Args... >::OutputTypes;
-    using InTypes = typename InputParamTypes< iNumInput, Args... >::type;
+    using InTypes = typename InputParamTypes< iNumInput, Args... >::InputTypes;
     Parameters< InTypes, OutTypes > a( this, strMethod );
     return a.SendReceive( args... );
 }
-

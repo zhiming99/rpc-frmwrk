@@ -43,13 +43,18 @@ gint32 CPauseResumeServer::InitUserFuncs()
         CPauseResumeServer::LongWait,
         METHOD_LongWait );
 
-    ADD_USER_SERVICE_HANDLER(
+    // 1 indicates the input parameter is 1.
+    ADD_USER_SERVICE_HANDLER_EX( 1,
         CPauseResumeServer::EchoUnknown,
         "Unknown" );
 
-    ADD_USER_SERVICE_HANDLER(
+    ADD_USER_SERVICE_HANDLER_EX( 1,
         CPauseResumeServer::Echo,
         METHOD_Echo );
+
+    ADD_USER_SERVICE_HANDLER_EX( 6,
+        CPauseResumeServer::EchoMany,
+        METHOD_EchoMany );
 
     END_HANDLER_MAP;
     return 0;
@@ -106,47 +111,6 @@ gint32 CPauseResumeServer::OnLongWaitComplete(
     return ret;
 }
 
-gint32 CPauseResumeServer::EchoUnknown(
-    IEventSink* pCallback,
-    const BufPtr& pBuf )
-{
-
-    gint32 ret = 0;
-
-    // business logics goes here
-    BufPtr oBufReply = pBuf;
-
-    // make the response
-    gint32 iRet = 0;
-    ret = this->FillAndSetResponse(
-        pCallback, iRet, pBuf );
-
-    if( SUCCEEDED( ret ) )
-        return iRet;
-
-    return ret;
-}
-
-gint32 CPauseResumeServer::Echo(
-    IEventSink* pCallback,
-    const std::string& strText )
-{
-    gint32 ret = 0;
-
-    // business logics goes here
-    std::string strReply( strText );
-
-    // make the response
-    gint32 iRet = 0;
-    ret = this->FillAndSetResponse(
-        pCallback, iRet, strReply );
-
-    if( SUCCEEDED( ret ) )
-        return iRet;
-
-    return ret;
-}
-
 gint32 CPauseResumeServer::LongWait(
     IEventSink* pCallback,
     const std::string& strText )
@@ -171,6 +135,48 @@ gint32 CPauseResumeServer::LongWait(
     GetIoMgr()->RescheduleTask( pTask, true );
 
     return STATUS_PENDING;
+}
+
+gint32 CPauseResumeServer::EchoUnknown(
+    IEventSink* pCallback,
+    const BufPtr& pBuf, // [ in ]
+    BufPtr& pBufReply ) // [ out ]
+{
+
+    gint32 ret = 0;
+
+    // business logics goes here
+    BufPtr oBufReply = pBuf;
+
+    return ret;
+}
+
+gint32 CPauseResumeServer::Echo(
+    IEventSink* pCallback,
+    const std::string& strText, // [ in ]
+    std::string& strReply )     // [ out ]
+{
+    gint32 ret = 0;
+
+    // business logics goes here
+    strReply = strText;
+
+    return ret;
+}
+
+gint32 CPauseResumeServer::EchoMany(
+    IEventSink* pCallback, // mandatory
+    gint32 i1, gint16 i2, gint64 i3, float i4, double i5, const std::string& strText,
+    gint32& o1, gint16& o2, gint64& o3, float& o4, double& o5, std::string& strReply )
+{
+    o1 = i1 + 1;
+    o2 = i2 + 1;
+    o3 = i3 + 1;
+    o4 = i4 + 1;
+    o5 = i5 + 1;
+    strReply = strText + " 2";
+
+    return 0;
 }
 
 static FactoryPtr InitClassFactory()

@@ -23,8 +23,9 @@
 #include <unistd.h>
 #include <ifhelper.h>
 
-#define METHOD_Echo     "Echo"
-#define METHOD_LongWait "LongWait"
+#define METHOD_Echo         "Echo"
+#define METHOD_EchoMany     "EchoMany"
+#define METHOD_LongWait     "LongWait"
 
 #define MOD_SERVER_NAME "PauseResumeServer"
 #define OBJNAME_ECHOSVR "CPauseResumeServer"               
@@ -60,10 +61,19 @@ class CPauseResumeServer :
 
     gint32 EchoUnknown(
         IEventSink* pCallback,  // mandatory
-        const BufPtr& pBuf );   // the input arg
+        const BufPtr& pBuf,     // the input arg
+        BufPtr& pBufReply );    // the output arg
 
-    gint32 Echo( IEventSink* pCallback, // mandatory
-        const std::string& strString ); // the input arg
+    gint32 Echo(
+        IEventSink* pCallback, // mandatory
+        const std::string& strText, // the input
+        std::string& strReply ); // the output
+
+    gint32 EchoMany(
+        IEventSink* pCallback, // mandatory
+        gint32 i1, gint16 i2, gint64 i3, float i4, double i5, const std::string& strText,
+        gint32& o1, gint16& o2, gint64& o3, float& o4, double& o5, std::string& strReply );
+        
 };
 
 class CPauseResumeClient :
@@ -86,4 +96,8 @@ class CPauseResumeClient :
     gint32 Echo(
         const std::string& strEmit, // string to echo
         std::string& strReply );    // string echoed
+
+    gint32 EchoMany(
+        gint32 i1, gint16 i2, gint64 i3, float i4, double i5, const std::string& strText,
+        gint32& o1, gint16& o2, gint64& o3, float& o4, double& o5, std::string& strReply );
 };
