@@ -30,51 +30,121 @@ CEchoServer::CEchoServer( const IConfigDb* pCfg )
 {
     SetClassId( clsid( CEchoServer ) );
 }
-
+/**
+* @name InitUserFuncs
+*    to init the service handler map for this interface
+*    object. It is mandatory to call
+*    super::InitUserFuncs(), otherwise some of the
+*    functions, such as the admin interface for
+*    pause/resume/cancel cannot work.
+* @{ */
+/** 
+ * 
+ * You can use two sets of macro's to to init the
+ * function map, one include ADD_USER_SERVICE_HANDLER
+ * and ADD_SERVICE_HANDLER, and the other includes
+ * ADD_USER_SERVICE_HANDLER_EX and
+ * ADD_SERVICE_HANDLER_EX. Usually it is recommended to
+ * use the EX set of macro's
+ * 
+ * The differences between the two are as following:
+ *
+ * 1. EX macro does not require to call
+ * FillAndSetResponse when the method is done. Just
+ * return the proper error code.
+ *
+ * while the Non-EX macro requires to call
+ * FillAndSetResponse before return, either error or
+ * success. It is not necessary to call this method if
+ * STATUS_PENDING is returned.
+ * 
+ * 2. EX macro requires to have both input and
+ * output parameters in the formal parameter list,
+ * that is, input parameters come first, and then
+ * the output parameters follow. both are in the
+ * same order as the one on the client side.
+ *
+ * While the Non-EX macro's require only the input
+ * parameters besices the pCallback.
+ * 
+ * @} */
 gint32 CEchoServer::InitUserFuncs()
 {
     super::InitUserFuncs();
 
     BEGIN_HANDLER_MAP;
 
-    ADD_USER_SERVICE_HANDLER(
+    ADD_USER_SERVICE_HANDLER_EX( 1,
         CEchoServer::Echo,
         METHOD_Echo );
 
+    // use this macro if you want to pack the response
+    // in a different way from the standard one.
     ADD_USER_SERVICE_HANDLER(
         CEchoServer::EchoPtr,
         METHOD_EchoPtr );
 
     ADD_USER_SERVICE_HANDLER(
+        CEchoServer::EchoUnknown,
+        "Unknown" );
+
+    ADD_USER_SERVICE_HANDLER_EX( 2,
         CEchoServer::EchoCfg,
         METHOD_EchoCfg );
 
-    ADD_USER_SERVICE_HANDLER(
-        CEchoServer::EchoUnknown,
-        "Unknown" );
+    ADD_USER_SERVICE_HANDLER_EX( 0,
+        CEchoServer::Ping,
+        METHOD_Ping );
 
     END_HANDLER_MAP;
     return 0;
 }
 
+/**
+* @name Echo: to send back the string in strText
+*
+* @{ */
+/** 
+ *   Parameters:
+ *
+ *   pCallback: the running context. a mandatory
+ *   parameter. if you don't need it, leave it alone.
+ *   it would be useful when the method wants to do
+ *   some asynchronous things.
+ *
+ *   [ in ]strText: the string received from the client
+ *   side.
+ *
+ *   [ out ]strReply: a string same as strText is sent
+ *   back to the proxy
+ *
+ *   Return Values:
+ *
+ *   STATUS_SUCCESS or 0: the output parameters will be
+ *   packaged and sent back to the proxy
+ * 
+ *   ERROR( ret ) : only the return code will be sent
+ *   back to the proxy.
+ *
+ *   STATUS_PENDING: on return, nothing will be sent
+ *   back to the proxy. you need to call the
+ *   FillAndSetResponse and pCallback's OnEvent(
+ *   eventTaskComp ) sometime later once the method
+ *   have done. It implies you are doing the work
+ *   asynchronously.
+ *
+ * @} */
 
-gint32 CEchoServer::Echo( IEventSink* pCallback,
-    const std::string& strText )
+gint32 CEchoServer::Echo(
+    IEventSink* pCallback,
+    const std::string& strText,
+    std::string& strReply )
 {
-    gint32 ret = 0;
-
     // business logics goes here
-    std::string strReply( strText );
+    strReply = strText;
 
-    // make the response
-    gint32 iRet = 0;
-    ret = this->FillAndSetResponse(
-        pCallback, iRet, strReply );
-
-    if( SUCCEEDED( ret ) )
-        return iRet;
-
-    return ret;
+    // inform to send back the respons
+    return STATUS_SUCCESS;
 }
 
 gint32 CEchoServer::EchoPtr(
@@ -89,27 +159,6 @@ gint32 CEchoServer::EchoPtr(
     gint32 iRet = 0;
     ret = this->FillAndSetResponse(
         pCallback, iRet, szText );
-
-    if( SUCCEEDED( ret ) )
-        return iRet;
-
-    return ret;
-}
-
-gint32 CEchoServer::EchoCfg(
-    IEventSink* pCallback,
-    gint32 iCount,
-    const CfgPtr& pCfg )
-{
-
-    gint32 ret = 0;
-
-    // business logics goes here
-
-    // make the response
-    gint32 iRet = 0;
-    ret = this->FillAndSetResponse(
-        pCallback, iRet, iCount, pCfg );
 
     if( SUCCEEDED( ret ) )
         return iRet;
@@ -137,6 +186,28 @@ gint32 CEchoServer::EchoUnknown(
     return ret;
 }
 
+gint32 CEchoServer::EchoCfg(
+    IEventSink* pCallback,
+    gint32 iCount,
+    const CfgPtr& pCfg, gint32& iCountReply, 
+    CfgPtr& pCfgReply )
+{
+
+    // business logics goes here
+    iCountReply = iCount;
+    pCfgReply = pCfg;
+
+    return 0;
+}
+
+gint32 CEchoServer::Ping(
+    IEventSink* pCallback )
+{
+    // the simplest thing is to do nothing.
+    return 0;
+}
+
+// mandatory part, just copy/paste
 static FactoryPtr InitClassFactory()
 {
     BEGIN_FACTORY_MAPS;

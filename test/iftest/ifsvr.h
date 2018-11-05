@@ -23,9 +23,10 @@
 #include <unistd.h>
 #include <proxy.h>
 
-#define METHOD_Echo "Echo"
-#define METHOD_EchoPtr "EchoPtr"
-#define METHOD_EchoCfg "EchoCfg"
+#define METHOD_Echo     "Echo"
+#define METHOD_EchoPtr  "EchoPtr"
+#define METHOD_EchoCfg  "EchoCfg"
+#define METHOD_Ping     "Ping"
 
 #define MOD_SERVER_NAME "EchoServer"
 #define OBJNAME_ECHOSVR "CEchoServer"               
@@ -51,8 +52,10 @@ class CEchoServer :
 
     gint32 InitUserFuncs();
 
-    gint32 Echo( IEventSink* pCallback,
-        const std::string& strString );
+    gint32 Echo(
+        IEventSink* pCallback,
+        const std::string& strText,
+        std::string& strReply );
 
     gint32 EchoPtr(
         IEventSink* pCallback,
@@ -61,11 +64,15 @@ class CEchoServer :
     gint32 EchoCfg(
         IEventSink* pCallback,
         gint32 iCount,
-        const CfgPtr& pCfg );
+        const CfgPtr& pCfg,
+        gint32& iCountReply,
+        CfgPtr& pCfgReply );
 
     gint32 EchoUnknown(
         IEventSink* pCallback,
         const BufPtr& pBuf );
+
+    gint32 Ping( IEventSink* pCallback );
 };
 
 class CEchoClient :
@@ -91,4 +98,6 @@ class CEchoClient :
     gint32 EchoUnknown(
         const BufPtr& pText,
         BufPtr& pReply );
+
+    gint32 Ping();
 };

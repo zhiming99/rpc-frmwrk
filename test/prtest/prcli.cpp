@@ -26,7 +26,6 @@
 
 using namespace std;
 
-
 CPauseResumeClient::CPauseResumeClient(
     const IConfigDb* pCfg )
     : super( pCfg )
@@ -42,19 +41,21 @@ gint32 CPauseResumeClient::InitUserFuncs()
 
     BEGIN_PROXY_MAP( false );
 
-    ADD_USER_PROXY_METHOD(
-        METHOD_LongWait,
-        const std::string& );
+    ADD_USER_PROXY_METHOD_EX( 1,
+        CPauseResumeClient::LongWait,
+        METHOD_LongWait );
 
-    ADD_USER_PROXY_METHOD(
-        "Unknown", const BufPtr& );
+    ADD_USER_PROXY_METHOD_EX( 1,
+        CPauseResumeClient::EchoUnknown,
+        "Unknown" );
 
-    ADD_USER_PROXY_METHOD(
-        METHOD_Echo, const stdstr& );
+    ADD_USER_PROXY_METHOD_EX( 1,
+        CPauseResumeClient::Echo,
+        METHOD_Echo );
 
-    ADD_USER_PROXY_METHOD(
-        METHOD_EchoMany, 
-        gint32, gint16, gint64, float, double, const std::string& );
+    ADD_USER_PROXY_METHOD_EX( 6,
+        CPauseResumeClient::EchoMany,
+        METHOD_EchoMany );
 
     END_PROXY_MAP;
 
@@ -65,14 +66,17 @@ gint32 CPauseResumeClient::Echo(
     const std::string& strText, // [ in ]
     std::string& strReply ) // [ out ]
 {
-    // 1: the number of input
-    // the second template parameter is the type of input parameter
-    // the third is the type of the output parameter
+    // the first template parameter is the number of
+    // input parameters
     //
-    // METHOD_Echo is the method name to call
-    // strText is the input parameter
-    // strReply is the output parameter
-    // input comes first, and the output follows
+    // the second template parameter is the type of
+    // input parameter the third is the type of the
+    // output parameter
+    //
+    // METHOD_Echo is the method name to call strText
+    // is the input parameter strReply is the output
+    // parameter input comes first, and the output
+    // follows
     //
     return ProxyCall<1, const std::string&, std::string&  >(
         METHOD_Echo, strText, strReply  );

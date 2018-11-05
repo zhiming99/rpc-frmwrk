@@ -509,6 +509,111 @@ do{ \
 
 #define END_IFPROXY_MAP END_PROXY_MAP
 
+// proxy's side helper
+template< int N, typename ...S >
+struct InputParamTypes;
+
+template< typename T0, typename ...S >
+struct InputParamTypes< 1, T0, S... >
+{
+    typedef std::tuple<T0> InputTypes;
+};
+
+template< typename ...S >
+struct InputParamTypes< 0, S... >
+{
+    typedef std::tuple<> InputTypes;
+};
+
+template< int N, typename T0, typename...S>
+struct InputParamTypes< N, T0, S...>
+{
+    private:
+
+    typedef std::tuple< T0 > T1;
+    typedef typename InputParamTypes< N-1, S...>::InputTypes T2;
+    static T1 t1f()
+    { return *( T1* )nullptr; }
+    static T2 t2f()
+    { return *( T2* )nullptr; }
+
+    public:
+    // a tuple type with merged parameter types
+    typedef decltype( std::tuple_cat< T1, T2 >( t1f(), t2f() ) ) InputTypes;
+};
+
+template< typename ...InArgs >
+struct GetProxyType;
+
+template< typename ...InArgs >
+struct GetProxyType< std::tuple< InArgs... > >
+{
+    typedef CMethodProxy< InArgs... > type;
+};
+
+template< int iNumInput >
+struct PlaceHolder
+{};
+
+template< int iNumInput, typename ClassName, typename ...Args>
+class CMethodProxyEx;
+
+template< int iNumInput, typename ClassName, typename ...Args>
+struct CMethodProxyEx< iNumInput, gint32 (ClassName::*)( Args ...) >
+{
+    public:
+    typedef gint32 ( ClassName::* FuncType)( Args... ) ;
+    CMethodProxyEx( bool bNonDBus,
+        const std::string& strMethod, FuncType pFunc, ObjPtr& pProxy )
+    {
+        using InTypes = typename InputParamTypes< iNumInput, DecType( Args )... >::InputTypes;
+        using ProxyType = typename GetProxyType<InTypes>::type;
+        pProxy = new ProxyType( bNonDBus, strMethod );
+        pProxy->DecRef();
+    }
+};
+
+template < int iNumInput, typename C, typename ...Args>
+inline gint32 NewMethodProxyEx(
+    ObjPtr& pProxy, bool bNonDBus,
+    const std::string& strMethod,
+    gint32(C::*f)(Args ...),
+    PlaceHolder< iNumInput >* b )
+{
+    CMethodProxyEx< iNumInput, gint32 (C::*)(Args...)> a( bNonDBus, strMethod, f, pProxy );  
+    if( pProxy.IsEmpty() )
+        return -ENOMEM;
+    return 0;
+}
+
+// NOTE: use this macro if you are ok if the method to
+// have a fixed layout of the parameter list, that is,
+// Input parameters come first and output parameters
+// follow. No other parameters are allowed
+//
+// if you want to have different layout of parameter
+// list, please use ADD_PROXY_METHOD and
+// ADD_USER_PROXY_METHOD instead.
+#define ADD_PROXY_METHOD_EX( iNumInput, _f, MethodName ) \
+do{ \
+    std::string strName = MethodName; \
+    if( _pMapProxies_->size() > 0 && \
+        _pMapProxies_->find( strName ) != \
+            _pMapProxies_->end() ) \
+        break; \
+    ObjPtr pObj;\
+    PlaceHolder< iNumInput > *p = nullptr; \
+    NewMethodProxyEx( \
+          pObj, _bNonBus_, strName, &_f, p );\
+    ( *_pMapProxies_ )[ strName ] = pObj; \
+}while( 0 )
+    
+#define ADD_USER_PROXY_METHOD_EX( iNumInput, _f, MethodName ) \
+do{ \
+    std::string strMethod = USER_METHOD( MethodName );\
+    ADD_PROXY_METHOD_EX( iNumInput, _f, strMethod ); \
+}while( 0 )
+
 // handler related classes
 class CDelegateBase :
     public CGenericCallback< CTasklet >
@@ -703,9 +808,7 @@ class CMethodServerEx< iNumInput, gint32 (ClassName::*)(IEventSink*, Args ...) >
     typedef CMethodServer< ClassName, Args... > super;
     CMethodServerEx( FuncType pFunc )
         :super( pFunc )
-    {
-       // SetClassId( clsid( CMethodServerEx ) );
-    }
+    { this->SetClassId( clsid( CMethodServerEx ) ); }
 
     void TupleToVec2( std::tuple<>& oTuple,
         std::vector< BufPtr >& vec,
@@ -787,16 +890,19 @@ class CMethodServerEx< iNumInput, gint32 (ClassName::*)(IEventSink*, Args ...) >
             if( ERROR( ret ) )
                 break;
 
-            // fine, no response values
-            if( sizeof...( Args ) == iNumInput )
-                break;
+            if( sizeof...( Args ) > iNumInput )
+            {
+                // fill the output values to the vector
+                TupleToVec2( oTuple, vecResp,
+                    typename GenSequence< sizeof...( Args ) >::type() );
 
-            // fill the output values to the vector
-            TupleToVec2( oTuple, vecResp,
-                typename GenSequence< sizeof...( Args ) >::type() );
-
-            for( auto elem : vecResp )
-                oParams.Push( elem );
+                for( auto elem : vecResp )
+                    oParams.Push( elem );
+            }
+            else
+            {
+                // fine, no parameters for response
+            }
             
             CTasklet* pTask =
                 static_cast< CTasklet* >( pCallback );
@@ -1995,38 +2101,6 @@ gint32 CInterfaceServer::SendEvent(
 
 #define BROADCAST_SYS_EVENT( _iid_, ... ) \
     SendEvent( nullptr, _iid_, SYS_EVENT( __func__ ), "" VA_ARGS( __VA_ARGS__ )  );
-
-// proxy's side helper
-template< int N, typename ...S >
-struct InputParamTypes;
-
-template< typename T0, typename ...S >
-struct InputParamTypes< 1, T0, S... >
-{
-    typedef std::tuple<T0> InputTypes;
-};
-
-template< typename ...S >
-struct InputParamTypes< 0, S... >
-{
-    typedef std::tuple<> InputTypes;
-};
-
-template< int N, typename T0, typename...S>
-struct InputParamTypes< N, T0, S...>
-{
-    typedef std::tuple< T0 > T1;
-    typedef typename InputParamTypes< N-1, S...>::InputTypes T2;
-
-    T0 b;
-    static T2 func()
-    {
-        T2* p=nullptr;
-        return *p;
-    }
-
-    typedef decltype( std::tuple_cat< T1, T2 >( T1( b ), func() ) ) InputTypes;
-};
 
 template <typename...>
 struct Parameters;

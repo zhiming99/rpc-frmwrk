@@ -181,6 +181,9 @@ void CIfSmokeTest::testCliStartStop()
         ret = pCli->EchoUnknown( pText, pBufReply );
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
         DebugPrint( 0, "EchoUnknown Completed" );
+        ret = pCli->Ping();
+        CPPUNIT_ASSERT( SUCCEEDED( ret ) );
+        DebugPrint( 0, "Ping Completed" );
     }
     else
     {
