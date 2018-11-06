@@ -728,6 +728,11 @@ class CSyncCallback;
 
 #define DecType( _T ) typename std::decay< _T >::type
 
+template< int iNumInput >
+struct InputCount
+{};
+#define _N( _iCount ) ( ( InputCount< _iCount >* )0 )
+
 class CInterfaceProxy :
     public CRpcServices
 {
@@ -937,7 +942,9 @@ class CInterfaceProxy :
         gint32& iRet, Args&&... args );
 
     template< int iNumInput, typename...Args >
-    gint32 ProxyCall( const std::string& strMethod,
+    gint32 ProxyCall(
+        InputCount< iNumInput >* p,
+        const std::string& strMethod,
         Args&&... args );
 };
 

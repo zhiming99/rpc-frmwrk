@@ -58,14 +58,15 @@ CEchoServer::CEchoServer( const IConfigDb* pCfg )
  * success. It is not necessary to call this method if
  * STATUS_PENDING is returned.
  * 
- * 2. EX macro requires to have both input and
- * output parameters in the formal parameter list,
- * that is, input parameters come first, and then
- * the output parameters follow. both are in the
- * same order as the one on the client side.
+ * 2. EX macro requires to have both input and output
+ * parameters in the formal parameter list of the
+ * handler function, that is, input parameters come
+ * first, and then the output parameters follow. both
+ * are in the same order as the one on the client side.
  *
  * While the Non-EX macro's require only the input
- * parameters besices the pCallback.
+ * parameters following the mandatory parameter,
+ * pCallback.
  * 
  * @} */
 gint32 CEchoServer::InitUserFuncs()

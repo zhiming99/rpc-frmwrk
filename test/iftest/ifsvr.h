@@ -23,10 +23,11 @@
 #include <unistd.h>
 #include <proxy.h>
 
-#define METHOD_Echo     "Echo"
-#define METHOD_EchoPtr  "EchoPtr"
-#define METHOD_EchoCfg  "EchoCfg"
-#define METHOD_Ping     "Ping"
+#define METHOD_Echo             "Echo"
+#define METHOD_EchoPtr          "EchoPtr"
+#define METHOD_EchoCfg          "EchoCfg"
+#define METHOD_EchoUnknown      "EchoUnknown"
+#define METHOD_Ping             "Ping"
 
 #define MOD_SERVER_NAME "EchoServer"
 #define OBJNAME_ECHOSVR "CEchoServer"               

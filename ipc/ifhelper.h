@@ -551,10 +551,6 @@ struct GetProxyType< std::tuple< InArgs... > >
     typedef CMethodProxy< InArgs... > type;
 };
 
-template< int iNumInput >
-struct PlaceHolder
-{};
-
 template< int iNumInput, typename ClassName, typename ...Args>
 class CMethodProxyEx;
 
@@ -578,7 +574,7 @@ inline gint32 NewMethodProxyEx(
     ObjPtr& pProxy, bool bNonDBus,
     const std::string& strMethod,
     gint32(C::*f)(Args ...),
-    PlaceHolder< iNumInput >* b )
+    InputCount< iNumInput >* b )
 {
     CMethodProxyEx< iNumInput, gint32 (C::*)(Args...)> a( bNonDBus, strMethod, f, pProxy );  
     if( pProxy.IsEmpty() )
@@ -602,7 +598,7 @@ do{ \
             _pMapProxies_->end() ) \
         break; \
     ObjPtr pObj;\
-    PlaceHolder< iNumInput > *p = nullptr; \
+    InputCount< iNumInput > *p = nullptr; \
     NewMethodProxyEx( \
           pObj, _bNonBus_, strName, &_f, p );\
     ( *_pMapProxies_ )[ strName ] = pObj; \
@@ -2162,6 +2158,7 @@ struct Parameters< std::tuple< Types... >, std::tuple< Types2... > >
 
 template< int iNumInput, typename...Args >
 gint32 CInterfaceProxy::ProxyCall(
+    InputCount< iNumInput > *p,
     const std::string& strMethod,
     Args&&... args )
 { 
@@ -2170,3 +2167,7 @@ gint32 CInterfaceProxy::ProxyCall(
     Parameters< InTypes, OutTypes > a( this, strMethod );
     return a.SendReceive( args... );
 }
+
+#define FORWARD_CALL( iNumInput, strMethod, ... ) \
+    ProxyCall( _N( iNumInput ), strMethod, ##__VA_ARGS__ )
+

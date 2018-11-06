@@ -54,21 +54,24 @@ CEchoClient::CEchoClient(
  * The differences between the two are as following:
  *
  * 1. EX macro requires the proxy function to call
- * ProxyCall and return the error code.
+ * the macro FORWARD_CALL, and return the error
+ * code.
  *
- * while the Non-EX macro requires to call
- * two steps, SyncCall and FillArgs, which
- * requires you have a better understanding of the
- * system
+ * while the Non-EX macro requires to call in two
+ * steps, SyncCall to send the request and
+ * FillArgs to assign the response to the output
+ * parameters, which requires you have a better
+ * understanding of the system.
  * 
- * 2. EX macro requires to have both input and
- * output parameters in the formal parameter list,
- * that is, input parameters come first, and then
- * the output parameters follow. both are in the
- * same order as the one on the client side.
+ * 2. EX macro strictly requires the proxy
+ * function to have both input and output
+ * parameters in the formal parameter list, that
+ * is, input parameters come first, and then the
+ * output parameters follow.  both are in the same
+ * order as the one on the server side.
  *
- * While the Non-EX macro's require only the input
- * parameters besices the pCallback.
+ * While the Non-EX macro's has no requirement on
+ * the formal parameter list of the proxy method.
  *
  * 3. the macro's argument lists are different.
  * The EX macro requires the method and the number
@@ -76,6 +79,9 @@ CEchoClient::CEchoClient(
  * Non-EX macro requires the types of all the
  * input parameters in the arg list of the macro.
  * 
+ * for example of Non-EX, please refer to other
+ * tests, such as prtest or katest under the
+ * `test' directory.
  * @} */
 gint32 CEchoClient::InitUserFuncs()
 {
@@ -83,14 +89,17 @@ gint32 CEchoClient::InitUserFuncs()
 
     BEGIN_PROXY_MAP( false );
 
-    ADD_USER_PROXY_METHOD(
-        METHOD_EchoPtr, const char* );
+    ADD_USER_PROXY_METHOD_EX( 1,
+        CEchoClient::EchoPtr,
+        METHOD_EchoPtr );
 
-    ADD_USER_PROXY_METHOD(
-        METHOD_EchoCfg, gint32, const CfgPtr& );
+    ADD_USER_PROXY_METHOD_EX( 2,
+        CEchoClient::EchoCfg,
+        METHOD_EchoCfg );
 
-    ADD_USER_PROXY_METHOD(
-        "Unknown", const BufPtr& );
+    ADD_USER_PROXY_METHOD_EX( 1,
+        CEchoClient::EchoUnknown,
+        METHOD_EchoUnknown );
 
     ADD_USER_PROXY_METHOD_EX( 1,
         CEchoClient::Echo,
@@ -100,38 +109,33 @@ gint32 CEchoClient::InitUserFuncs()
         CEchoClient::Ping,
         METHOD_Ping );
 
-
     END_PROXY_MAP;
 
     return 0;
 }
 
 
+gint32 CEchoClient::Echo(
+    const std::string& strText,
+    std::string& strReply )
+{
+    // the first parameter is the number of
+    // input parameters
+    //
+    // METHOD_Echo is the method name to call strText
+    // is the input parameter, and strReply is the output
+    // parameter.
+    // input comes first, and the output follows
+    return FORWARD_CALL( 1, METHOD_Echo,
+        strText, strReply );
+}
+
 gint32 CEchoClient::EchoPtr(
     const char* szText,
     const char*& szReply )
 {
-
-    gint32 ret = 0;
-
-    do{
-        CfgPtr pResp;
-
-        // make the call
-        ret = SyncCall( pResp, METHOD_EchoPtr, szText );
-        if( ERROR( ret ) )
-            break;
-
-        // fill the output parameter
-        gint32 iRet = 0;
-        ret = FillArgs( pResp, iRet, szReply );
-
-        if( SUCCEEDED( ret ) )
-            ret = iRet;
-
-    }while( 0 );
-
-    return ret;
+    return FORWARD_CALL( 1, METHOD_EchoPtr,
+        szText, szReply );
 }
 
 gint32 CEchoClient::EchoCfg(
@@ -140,66 +144,20 @@ gint32 CEchoClient::EchoCfg(
     gint32& iCountReply,
     CfgPtr& pCfgReply )
 {
-
-    gint32 ret = 0;
-
-    do{
-        CfgPtr pResp;
-
-        // make the call
-        ret = SyncCall( pResp, METHOD_EchoCfg, iCount, pCfg );
-        if( ERROR( ret ) )
-            break;
-
-        // fill the output parameter
-        gint32 iRet = 0;
-        ret = FillArgs( pResp, iRet, iCountReply, pCfgReply );
-
-        if( SUCCEEDED( ret ) )
-            ret = iRet;
-
-    }while( 0 );
-
-    return ret;
+    return FORWARD_CALL( 2, METHOD_EchoCfg,
+        iCount, pCfg, iCountReply, pCfgReply );
 }
 
 gint32 CEchoClient::EchoUnknown(
     const BufPtr& pText,
     BufPtr& pReply )
 {
-
-    gint32 ret = 0;
-
-    do{
-        CfgPtr pResp;
-
-        // make the call
-        ret = SyncCall( pResp, "Unknown", pText );
-        if( ERROR( ret ) )
-            break;
-
-        // fill the output parameter
-        gint32 iRet = 0;
-        ret = FillArgs( pResp, iRet, pReply );
-
-        if( SUCCEEDED( ret ) )
-            ret = iRet;
-
-    }while( 0 );
-
-    return ret;
-}
-
-gint32 CEchoClient::Echo(
-    const std::string& strText,
-    std::string& strReply )
-{
-
-    return ProxyCall< 1, const std::string&, std::string&  >
-        ( METHOD_Echo, strText, strReply );
+    return FORWARD_CALL( 1, METHOD_EchoUnknown,
+        pText, pReply );
 }
 
 gint32 CEchoClient::Ping()
 {
-    return ProxyCall< 0 >( METHOD_Ping );
+    return FORWARD_CALL( 0,  METHOD_Ping );
 }
+
