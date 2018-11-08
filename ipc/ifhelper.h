@@ -2145,15 +2145,22 @@ struct Parameters< std::tuple< Types... >, std::tuple< Types2... > >
  * Template paramaters:
  *  iNumInput: number of input arguments
  *
- *  Args: The types of each individual input & output parameters
- *      If a parameter serves as input/output, its type should appear twice in
- *      the Args. the iNumInput of input parameters comes first and the output
- *      parameters follows in the order the parameters sent over the network.
+ *  Args: The types of each individual input & output
+ *      parameters If a parameter serves as input/output,
+ *      its type should appear twice in the Args. the
+ *      iNumInput of input parameters comes first and the
+ *      output parameters follows in the order the
+ *      parameters sent over the network.
  *
  * Arguments:
- *  strMethod: the name of the method, as you have put in the InitUserFuncs
- *  args : the formal parameter list, corresponding to the types in the template
- *  parameters.
+ *  p: a placeholder for template deduction. nullptr is
+ *  fine.
+ *
+ *  strMethod: the name of the method, as you have put
+ *      in the InitUserFuncs
+ *
+ *  args : the formal parameter list, corresponding to
+ *      the types in the template parameters.
  * @} */
 
 template< int iNumInput, typename...Args >

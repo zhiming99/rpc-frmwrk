@@ -39,8 +39,7 @@ CReqBuilder::CReqBuilder(
         CopyProp( propObjPath, pIf );
         CopyProp( propSrcDBusName, pIf );
 
-        CInterfaceProxy* pProxy = pObj;
-        if( pProxy != nullptr )
+        if( !pIf->IsServer() )
         {
             // a mandatory parameter for proxy
             ret = CopyProp( propDestDBusName, pIf );

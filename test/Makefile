@@ -1,5 +1,5 @@
 all:
-	make -C iftest
+	make -C helloworld
 	make -C asynctst
 	make -C smoketest
 	make -C actcancel
@@ -9,7 +9,7 @@ all:
 	make -C prtest
 
 release:
-	make -C iftest release
+	make -C helloworld release
 	make -C asynctst release
 	make -C smoketest release
 	make -C actcancel release
@@ -19,7 +19,7 @@ release:
 	make -C prtest release
 
 clean:
-	make -C iftest clean
+	make -C helloworld clean
 	make -C asynctst clean
 	make -C smoketest clean
 	make -C actcancel clean

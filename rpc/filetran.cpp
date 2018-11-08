@@ -100,7 +100,7 @@ gint32 CFileTransferProxy::DownloadFile_Async(
 {
 
     gint32 ret = 0;
-    gint32 fd = 0;
+    gint32 fd = -1;
 
     do{
         CfgPtr pCfg( true );
