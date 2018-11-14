@@ -20,7 +20,7 @@ This framework depends on the following packags:
 
 ---
 [`Wed Nov 14 11:24:42 CST 2018`]
-1. Local `Send/Fetch` is done. And now it is time to move on to the RPC module.   
+1. Local `Send/Fetch` is done. And now it is time to move on to the RPC module. For security purpose, I will add the authentication interface sometime after the RPC module works.
 
 [`Fri Nov  2 18:24:51 CST 2018`]   
 1. This week, the `keep-alive` and `Pause/Resume` works.
