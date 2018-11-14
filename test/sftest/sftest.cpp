@@ -1,7 +1,7 @@
 /*
  * =====================================================================================
  *
- *       Filename:  iftest.cpp
+ *       Filename:  asynctest.cpp
  *
  *    Description:  implementation if the test classes
  *
@@ -18,13 +18,12 @@
 #include <string>
 #include <iostream>
 #include <unistd.h>
-#include <functional>
 
 #include <rpc.h>
 #include <proxy.h>
 
-#include "inproctst.h"
-#include "inprocsvr.h"
+#include "sftest.h"
+#include "sfsvr.h"
 
 #include <cppunit/extensions/TestFactoryRegistry.h>
 #include <cppunit/ui/text/TestRunner.h>
@@ -32,8 +31,6 @@
 #include <cppunit/extensions/HelperMacros.h>
 
 CPPUNIT_TEST_SUITE_REGISTRATION( CIfSmokeTest );
-
-std::atomic< bool > bExit( false );
 
 void CIfSmokeTest::setUp()
 {
@@ -83,161 +80,113 @@ void CIfSmokeTest::tearDown()
     }while( 0 );
 }
 
-void CIfSmokeTest::testSvrStartStop(
-    IEventSink* pSyncTask )
+#ifdef SERVER
+void CIfSmokeTest::testSvrStartStop()
 {
     gint32 ret = 0;
-    CCfgOpener oCfg;
     InterfPtr pIf;
 
     CPPUNIT_ASSERT( !m_pMgr.IsEmpty() );
 
+    CCfgOpener oCfg;
     oCfg.SetObjPtr( propIoMgr, m_pMgr );
 
+    CfgPtr pCfg = oCfg.GetCfg();
     ret = CRpcServices::LoadObjDesc(
-        OBJDESC_PATH,
-        OBJNAME_SERVER,
-        true, oCfg.GetCfg() );
-    
+        "./sfdesc.json",
+        OBJNAME_ECHOSVR,
+        true, pCfg );
+
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 
     ret = pIf.NewObj(
-        clsid( CInProcServer ),
+        clsid( CSendFetchServer ),
         oCfg.GetCfg() );
-
+    
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 
     ret = pIf->Start();
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );
-
-    CTasklet* pTask =
-        static_cast< CTasklet* >( pSyncTask );
-
-    // let the client to resume
-    ( *pTask )( eventTaskComp );
     
-    CInProcServer* pSvr = pIf;
-    CPPUNIT_ASSERT( pSvr != nullptr );
-
-    while( pSvr->IsConnected() &&
-        !bExit )
-    {
-        ret = pSvr->OnHelloWorld(
-            "Hello, World from server!" );
-        CPPUNIT_ASSERT( SUCCEEDED( ret ) );
+    CSendFetchServer* pSvr = pIf;
+    while( pSvr->IsConnected() )
         sleep( 1 );
-    }
 
     ret = pIf->Stop();
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 
     pIf.Clear();
 }
+#endif
 
-using namespace std::placeholders;
-
-gint32 CIfSmokeTest::startServer(
-    std::thread*& pThread, IEventSink* pCallback )
-{
-    auto fn = std::bind(
-        &CIfSmokeTest::testSvrStartStop,
-        this, pCallback );
-
-    pThread = new std::thread( fn );
-    if( pThread == nullptr )
-        return -ENOMEM;
-
-    return 0;
-}
-
+#ifdef CLIENT
 void CIfSmokeTest::testCliStartStop()
 {
     gint32 ret = 0;
-    CCfgOpener oCfg;
     InterfPtr pIf;
-
-    // start the server on another thread. Sure you can
-    // use a single thread to run server/proxy, which
-    // just needs some more effort.
-    TaskletPtr pTask;
-    ret = pTask.NewObj(
-        clsid( CSyncCallback ) );
-
-    if( ERROR( ret ) )
-        return;
-
-    std::thread* pSvrThrd = nullptr;
-    ret = startServer( pSvrThrd, pTask );
-
-    CPPUNIT_ASSERT( SUCCEEDED( ret ) );
-    CSyncCallback* pSyncTask = 
-        static_cast< CSyncCallback* >( pTask );
-
-    // we need to wait the server to start, otherwise
-    // there could be wired situation, for example, one
-    // interface is connected, and the other interface
-    // is not.
-    ret = pSyncTask->WaitForComplete();
-    CPPUNIT_ASSERT( SUCCEEDED( ret ) );
-
-    ret = pSyncTask->GetError();
-    CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 
     CPPUNIT_ASSERT( !m_pMgr.IsEmpty() );
 
+    CCfgOpener oCfg;
     oCfg.SetObjPtr( propIoMgr, m_pMgr );
 
+    CfgPtr pCfg = oCfg.GetCfg();
     ret = CRpcServices::LoadObjDesc(
-        OBJDESC_PATH,
-        OBJNAME_SERVER,
-        false, oCfg.GetCfg() );
+        "./sfdesc.json",
+        OBJNAME_ECHOSVR,
+        false, pCfg );
 
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );
-    
+    if( ERROR( ret ) )
+        return;
+
     ret = pIf.NewObj(
-        clsid( CInProcClient ),
+        clsid( CSendFetchClient ),
         oCfg.GetCfg() );
     
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 
     ret = pIf->Start();
+
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );
     
-    CInProcClient* pCli = pIf;
+    CSendFetchClient* pCli = pIf;
     if( pCli != nullptr )
     {
         while( !pCli->IsConnected() )
             sleep( 1 );
 
-        sem_t semWait;
-        Sem_Init( &semWait, 0, 0 );
-        gint32 i = 0;
+        std::string strText( "Hello world!" );
+        std::string strReply;
 
-        // wait for event
-        do{
-            ret = Sem_TimedwaitSec( &semWait, 1 );
-            printf( "\t%d\t\n", i++ );
+        // method from interface CEchoServer
+        DebugPrint( 0, "Start..." );
+        ret = pCli->Echo( strText, strReply );
+        CPPUNIT_ASSERT( SUCCEEDED( ret ) );
+        DebugPrint( 0, "Completed" );
+        if( strText != strReply )
+            CPPUNIT_ASSERT( false );
+        CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 
-            std::string strText( "Hello world from client!" );
-            std::string strReply;
+        // method from interface CSendFetchServer
+        IntVecPtr pClsids( true );
+        ret = pCli->EnumInterfaces( pClsids );
+        CPPUNIT_ASSERT( SUCCEEDED( ret ) );
+        DebugPrint( 0, "Completed" );
 
-            // call the Echo method
-            DebugPrint( 0, "Start..." );
-            ret = pCli->Echo( strText, strReply );
-            CPPUNIT_ASSERT( SUCCEEDED( ret ) );
+        system( "echo Hello, World! > ./hello-1.txt" );
+        // method from interface CFileTransferServer
+        ret = pCli->UploadFile(
+            std::string( "./hello-1.txt" ) );
+        CPPUNIT_ASSERT( SUCCEEDED( ret ) );
+        DebugPrint( 0, "Upload Completed" );
 
-            DebugPrint( 0, "Completed" );
-            if( strText != strReply )
-                CPPUNIT_ASSERT( false );
-
-            // call the `EchoUnknown' method
-            BufPtr pText( true ), pBufReply;
-            *pText = "Hello, World from client 2!";
-            ret = pCli->EchoUnknown( pText, pBufReply );
-            CPPUNIT_ASSERT( SUCCEEDED( ret ) );
-            DebugPrint( 0, "EchoUnknown Completed" );
-
-        }while( !bExit );
+        // method from interface CFileTransferServer
+        ret = pCli->DownloadFile(
+            std::string( "./hello-1.txt" ),
+            std::string( "./dload-1.txt" ) );
+        CPPUNIT_ASSERT( SUCCEEDED( ret ) );
+        DebugPrint( 0, "Download Completed" );
     }
     else
     {
@@ -245,14 +194,11 @@ void CIfSmokeTest::testCliStartStop()
     }
 
     ret = pIf->Stop();
-    // CPPUNIT_ASSERT( SUCCEEDED( ret ) );
+    CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 
     pIf.Clear();
-
-    bExit = true;
-    pSvrThrd->join();
-    delete pSvrThrd;
 }
+#endif
 
 int main( int argc, char** argv )
 {

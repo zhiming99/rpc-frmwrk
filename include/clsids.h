@@ -196,6 +196,7 @@ typedef enum : guint32
     DECL_CLSID( ReservedClsidEnd ) = 0x0FFFFFFF,
     DECL_CLSID( ReservedIidStart ) = 0x10000000,
     DECL_IID( IInterfaceServer ),
+    DECL_IID( CFileTransferServer ),
     DECL_CLSID( ReservedIidEnd ) = 0x1FFFFFFF,
     DECL_CLSID( UserClsidStart ) = 0x20000000,
 

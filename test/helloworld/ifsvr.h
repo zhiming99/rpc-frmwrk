@@ -37,7 +37,7 @@
 
 enum EnumMyClsid
 {
-    DECL_CLSID( MyStart ) = clsid( ReservedClsidEnd ) + 1,
+    DECL_CLSID( MyStart ) = clsid( UserClsidStart ) + 1,
     DECL_CLSID( CEchoServer ),
     DECL_CLSID( CEchoClient )
 };

@@ -462,7 +462,7 @@ inline ObjPtr NewMethodProxy( bool bNonDBus,
 // the macro is to accomodate the case of zero
 // argument
 #define VA_ARGS(...) , ##__VA_ARGS__
-
+#define UNREFERENCED( a ) ( a )
 #define ADD_PROXY_METHOD( MethodName, ... ) \
 do{ \
     std::string strName = MethodName; \
@@ -500,6 +500,7 @@ do{ \
     PROXY_MAP _oAnon_; \
     PROXY_MAP* _pMapProxies_ = &_oAnon_; \
     bool _bNonBus_ = bNonDBus; \
+    UNREFERENCED( _bNonBus_ = !!_bNonBus_ ); \
     PROXY_MAP* _pMap_ = nullptr; \
     do{ \
         _pMap_ = GetProxyMap( _iIfId_ ); \
@@ -517,6 +518,12 @@ template< typename T0, typename ...S >
 struct InputParamTypes< 1, T0, S... >
 {
     typedef std::tuple<T0> InputTypes;
+};
+
+template< typename T0, typename ...S >
+struct InputParamTypes< 0, T0, S... >
+{
+    typedef std::tuple<> InputTypes;
 };
 
 template< typename ...S >
@@ -716,7 +723,7 @@ class CMethodServer :
             pCallback == nullptr )
             return -EINVAL;
 
-        ClassName* pClass = static_cast< ClassName* >( pObj );
+        ClassName* pClass = dynamic_cast< ClassName* >( pObj );
         if( vecParams.size() != sizeof...( Args ) )
         {
             return -EINVAL;
@@ -773,10 +780,22 @@ struct InitTupleDefault< std::tuple<> >
 template< int N, typename...S >
 struct OutputParamTypes;
 
+template< int N, typename T0, typename ...S>
+struct OutputParamTypes< N, T0, S...> 
+{
+    using OutputTypes = typename OutputParamTypes< N - 1, S... >::OutputTypes;
+};
+
 template< typename T0, typename ...S >
 struct OutputParamTypes< 1, T0, S... >
 {
     typedef std::tuple< S...> OutputTypes;
+};
+
+template< typename T0, typename ... S>
+struct OutputParamTypes< 0, T0, S...>
+{
+    typedef std::tuple< T0, S... > OutputTypes;
 };
 
 template< typename ... S>
@@ -784,11 +803,6 @@ struct OutputParamTypes< 0, S...>
 {
     typedef std::tuple< S... > OutputTypes;
 };
-
-template< int N, typename T0, typename...S>
-struct OutputParamTypes< N, T0, S...> : OutputParamTypes< N - 1, S... >
-{};
-
 
 template< int iNumInput, typename ClassName, typename ...Args>
 class CMethodServerEx; 
@@ -848,7 +862,7 @@ class CMethodServerEx< iNumInput, gint32 (ClassName::*)(IEventSink*, Args ...) >
             pCallback == nullptr )
             return -EINVAL;
 
-        ClassName* pClass = static_cast< ClassName* >( pObj );
+        ClassName* pClass = dynamic_cast< ClassName* >( pObj );
         // vecParams contains only the input parameters.
         // Args contains both the input and output parameters
         if( vecParams.size() > sizeof...( Args ) )
@@ -1524,11 +1538,11 @@ class CAsyncCallbackBase :
                     break;
                 }
 
-                if( ERROR( vecParams[ 1 ] ) )
+                /*if( ERROR( vecParams[ 1 ] ) )
                 {
                     ret = vecParams[ 1 ];
                     break;
-                }
+                }*/
 
                 CObjBase* pObjBase =
                     reinterpret_cast< CObjBase* >( vecParams[ 3 ] );
@@ -2106,10 +2120,16 @@ struct Parameters< std::tuple< Types... >, std::tuple< Types2... > >
 {
     CInterfaceProxy* m_pIf = nullptr;
     std::string m_strMethod;
-    Parameters( CInterfaceProxy* pProxy, const std::string strMehtod )
+    CfgPtr m_pCfg;
+
+    Parameters( CInterfaceProxy* pProxy,
+        const std::string strMehtod,
+        IConfigDb* pCfg = nullptr )
     {
         m_pIf = pProxy;
         m_strMethod = strMehtod;
+        if( pCfg != nullptr )
+            m_pCfg = pCfg;
     }
 
     gint32 SendReceive(
@@ -2119,9 +2139,37 @@ struct Parameters< std::tuple< Types... >, std::tuple< Types2... > >
 
         do{
             CfgPtr pResp;
+            CParamList oCfg( ( IConfigDb* )m_pCfg );
+            EnumClsid iid = clsid( Invalid );
+            if( m_pCfg.IsEmpty() )
+            {
+                iid = m_pIf->GetClsid();
+            }
+            else
+            {
+                ret = oCfg.GetIntProp(
+                    propIid, ( guint32& )iid );
+                if( ERROR( ret ) )
+                    iid = m_pIf->GetClsid();
+            }
+
+            CParamList oOptions;
+            std::string strIfName =
+                CoGetIfNameFromIid( iid );
+            ToPublicName2( m_pIf, strIfName );
+            oOptions[ propIfName ] =
+                DBUS_IF_NAME( strIfName );
+
+            if( !m_pCfg.IsEmpty() )
+            {
+                oOptions.CopyProp( propSysMethod,
+                    ( IConfigDb* )m_pCfg );
+            }
 
             // make the call
-            ret = m_pIf->SyncCall( pResp, m_strMethod, inArgs... );
+            ret = m_pIf->SyncCallEx( oOptions.GetCfg(),
+                pResp, m_strMethod, inArgs... );
+
             if( ERROR( ret ) )
                 break;
 
@@ -2171,10 +2219,144 @@ gint32 CInterfaceProxy::ProxyCall(
 { 
     using OutTypes = typename OutputParamTypes< iNumInput, Args... >::OutputTypes;
     using InTypes = typename InputParamTypes< iNumInput, Args... >::InputTypes;
-    Parameters< InTypes, OutTypes > a( this, strMethod );
+
+    IConfigDb* pCfg = nullptr;
+    if( p != nullptr && !p->m_pOptions.IsEmpty() )
+        pCfg = p->m_pOptions;
+
+    Parameters< InTypes, OutTypes > a( this, strMethod, pCfg );
     return a.SendReceive( args... );
 }
 
 #define FORWARD_CALL( iNumInput, strMethod, ... ) \
     ProxyCall( _N( iNumInput ), strMethod, ##__VA_ARGS__ )
 
+#define FORWARD_IF_CALL( iid, iNumInput, strMethod, ... ) \
+({  CParamList oParams; \
+    oParams[ propIid ] = iid; \
+    oParams[ propSysMethod ] = false; \
+    InputCount< iNumInput > a( ( oParams.GetCfg() ) ); \
+    ProxyCall( &a, strMethod, ##__VA_ARGS__ );} )
+
+template< typename virtbase, typename...Types >
+struct CAggregatedObject
+    : Types...
+{
+    gint32 TupleInitUserFuncs( NumberSequence<> )
+    { return 0; }
+
+    template < int N >
+    gint32 TupleInitUserFuncs( NumberSequence< N > )
+    {
+        using ClassName = typename std::tuple_element< N, std::tuple<Types...>>::type;
+        return this->ClassName::InitUserFuncs();
+    }
+
+    template < int N, int M, int...S >
+    gint32 TupleInitUserFuncs( NumberSequence< N, M, S... > )
+    {
+        using ClassName = typename std::tuple_element< N, std::tuple<Types...>>::type;
+        gint32 ret = this->ClassName::InitUserFuncs();
+        if( ERROR( ret ) )
+            return ret;
+        return TupleInitUserFuncs( NumberSequence<M, S...>() );
+    }
+
+    CAggregatedObject( const IConfigDb* pCfg )
+    : virtbase( pCfg ), Types( pCfg )...
+    {
+    }
+
+    virtual gint32 InitUserFuncMajor() = 0;
+    virtual gint32 InitUserFuncs()
+    {
+        gint32 ret = virtbase::InitUserFuncs();
+        if( ERROR( ret ) )
+            return ret;
+
+        if( sizeof...( Types ) )
+        {
+            using seq = typename GenSequence< sizeof...( Types ) >::type;
+            ret = TupleInitUserFuncs( seq() );
+            if( ERROR( ret ) )
+                return ret;
+
+            return InitUserFuncMajor();
+        }
+    }
+};
+
+#define METHOD_EnumInterfaces "EnumInterfaces"
+
+#define DECLARE_AGGREGATED_SERVER( ClassName, ... )\
+struct ClassName : CAggregatedObject< CInterfaceServer, ##__VA_ARGS__ >\
+{\
+    typedef CAggregatedObject< CInterfaceServer, ##__VA_ARGS__ > super;\
+    ClassName( const IConfigDb* pCfg )\
+        : CInterfaceServer( pCfg ), CAggregatedObject< CInterfaceServer, ##__VA_ARGS__ >( pCfg )\
+    { this->SetClassId( clsid( ClassName ) ); }\
+    gint32 InitUserFuncMajor()\
+    {\
+        BEGIN_HANDLER_MAP;\
+        ADD_USER_SERVICE_HANDLER_EX( 0,\
+            ClassName::EnumInterfaces,\
+            METHOD_EnumInterfaces );\
+        END_HANDLER_MAP;\
+        return 0; \
+    }\
+    gint32 EnumInterfaces(\
+        IEventSink* pCallback,\
+        IntVecPtr& pClsids )\
+    {\
+        if( pClsids.IsEmpty() )\
+            pClsids.NewObj();\
+        ( *pClsids )().push_back( GetClsid() );\
+        ( *pClsids )().push_back( iid( IInterfaceServer ) );\
+        std::string strClasses = #__VA_ARGS__;\
+        gint32 iLen = strClasses.size();\
+        if( iLen == 0 )\
+            return STATUS_SUCCESS;\
+        if( iLen > 1024 )\
+            return -EINVAL;\
+        char *buf = ( char* )alloca( iLen + sizeof( char ) );\
+        if( buf == nullptr )\
+            return -ENOMEM;\
+        buf[ iLen ] = 0; \
+        strncpy( buf, strClasses.c_str(), iLen ); \
+        char* ptr = buf;\
+        char* szInternal = nullptr;\
+        char* szToken = strtok_r( ptr, ", \r\n", &szInternal );\
+        while( szToken != nullptr )\
+        {\
+            std::string strIfName = szToken;\
+            ToInternalName( strIfName );\
+            EnumClsid iid = CoGetIidFromIfName( strIfName );\
+            if( iid != clsid( Invalid ) )\
+                ( *pClsids )().push_back( iid );\
+            szToken = strtok_r( nullptr, ", \r\n", &szInternal );\
+        } \
+        return 0;\
+    }\
+}
+
+#define DECLARE_AGGREGATED_PROXY( ClassName, ... )\
+struct ClassName : CAggregatedObject< CInterfaceProxy, ##__VA_ARGS__ >\
+{\
+    ClassName( const IConfigDb* pCfg )\
+        : CInterfaceProxy( pCfg ), CAggregatedObject< CInterfaceProxy, ##__VA_ARGS__ >( pCfg )\
+    { this->SetClassId( clsid( ClassName ) ); }\
+    gint32 InitUserFuncMajor()\
+    {\
+        BEGIN_PROXY_MAP( false );\
+        ADD_USER_PROXY_METHOD_EX( 0,\
+            ClassName::EnumInterfaces,\
+            METHOD_EnumInterfaces );\
+        END_PROXY_MAP;\
+        return 0; \
+    }\
+    gint32 EnumInterfaces(\
+        IntVecPtr& pClsids )\
+    {\
+        return FORWARD_CALL( 0, METHOD_EnumInterfaces, pClsids );\
+    }\
+}

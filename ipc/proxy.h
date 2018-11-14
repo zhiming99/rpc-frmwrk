@@ -431,6 +431,20 @@ do{ \
     } \
 }while( 0 )
 
+#define ToInternalName2( _pIf, _strIfName ) \
+do{ \
+    if( ( _pIf )->IsServer() ) \
+    { \
+        _strIfName += ":s" + \
+            std::to_string( ( _pIf )->GetObjId() ); \
+    } \
+    else \
+    { \
+        _strIfName += ":p" + \
+            std::to_string( ( _pIf )->GetObjId() ); \
+    } \
+}while( 0 )
+
 #define ToPublicName( _strIfName ) \
 do{ \
     std::string strSuffix= ":p"; \
@@ -438,6 +452,19 @@ do{ \
         strSuffix= ":s"; \
     strSuffix += \
         std::to_string( GetObjId() ); \
+    size_t pos = _strIfName.find( strSuffix ); \
+    if( pos == std::string::npos ) \
+        break; \
+    _strIfName = _strIfName.substr( 0, pos ); \
+}while( 0 )
+
+#define ToPublicName2( _pIf, _strIfName ) \
+do{ \
+    std::string strSuffix= ":p"; \
+    if( _pIf->IsServer() ) \
+        strSuffix= ":s"; \
+    strSuffix += \
+        std::to_string( _pIf->GetObjId() ); \
     size_t pos = _strIfName.find( strSuffix ); \
     if( pos == std::string::npos ) \
         break; \
@@ -478,6 +505,8 @@ class CRpcServices :
 
     std::map< gint32, PROXY_MAP > m_mapProxyFuncs;
     std::map< gint32, FUNC_MAP > m_mapFuncs;
+
+    MatchPtr    m_pFtsMatch;
 
     // the queue of pending invoke tasks, for queued
     // task processing
@@ -730,7 +759,14 @@ class CSyncCallback;
 
 template< int iNumInput >
 struct InputCount
-{};
+{
+    CfgPtr m_pOptions;
+    InputCount( IConfigDb* pCfg )
+    {
+        if( pCfg != nullptr )
+            m_pOptions = pCfg;
+    }
+};
 #define _N( _iCount ) ( ( InputCount< _iCount >* )0 )
 
 class CInterfaceProxy :
@@ -804,7 +840,7 @@ class CInterfaceProxy :
         if( pDataDesc == nullptr )
             return -EINVAL;
 
-        return SendData_Proxy( pDataDesc,
+        return FetchData_Proxy( pDataDesc,
             fd, dwOffset, dwSize, pCallback );
     }
 
@@ -1052,6 +1088,7 @@ class CInterfaceServer :
 
     typedef CRpcServices super;
 
+    CInterfaceServer() = delete;
     CInterfaceServer( const IConfigDb* pCfg );
     ~CInterfaceServer();
 

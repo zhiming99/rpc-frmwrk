@@ -4,8 +4,7 @@ C_INCLUDE += -I../ipc
 TARGET:=librpc.so
 SOURCES:= dbusprxy.cpp prxyfdo.cpp fdodrv.cpp \
 	tcpport.cpp stmpdo.cpp tcpfido.cpp reqfwdr.cpp \
-	rpcroute.cpp bridge.cpp filetran.cpp dllexp.cpp \
-	senddata.cpp
+	rpcroute.cpp bridge.cpp dllexp.cpp senddata.cpp
 
 OBJS:=$(SOURCES:%.cpp=$(OBJ_DIR)/%.o)
 

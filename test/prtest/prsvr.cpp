@@ -46,7 +46,7 @@ gint32 CPauseResumeServer::InitUserFuncs()
     // 1 indicates the input parameter is 1.
     ADD_USER_SERVICE_HANDLER_EX( 1,
         CPauseResumeServer::EchoUnknown,
-        "Unknown" );
+        METHOD_EchoUnknown );
 
     ADD_USER_SERVICE_HANDLER_EX( 1,
         CPauseResumeServer::Echo,

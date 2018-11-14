@@ -161,6 +161,7 @@ enum EnumPropId : gint32
     propSysMethod,      // type: a bool value to indicate if the call is from a built-in interface
     propPauseOnStart,   // type: a bool value to indicate the server to pause on start
     propQueSize,        // type: guint32 for the pending message size for incoming requests
+    propStreaming,      // type: a bool value to indicate if current FetchData call is for streaming
     propReseredEnd = 0x10000000,
     propInvalid = -1, 
 };

@@ -47,7 +47,7 @@ gint32 CPauseResumeClient::InitUserFuncs()
 
     ADD_USER_PROXY_METHOD_EX( 1,
         CPauseResumeClient::EchoUnknown,
-        "Unknown" );
+        METHOD_EchoUnknown );
 
     ADD_USER_PROXY_METHOD_EX( 1,
         CPauseResumeClient::Echo,
@@ -74,7 +74,7 @@ gint32 CPauseResumeClient::EchoUnknown(
     const BufPtr& pText,
     BufPtr& pReply )
 {
-    return FORWARD_CALL( 1, "Unknown",
+    return FORWARD_CALL( 1, METHOD_EchoUnknown,
         pText, pReply  );
 }
 

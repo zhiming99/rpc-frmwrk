@@ -33,7 +33,7 @@
 
 enum EnumMyClsid
 {
-    DECL_CLSID( MyStart ) = clsid( ReservedClsidEnd ) + 501,
+    DECL_CLSID( MyStart ) = clsid( UserClsidStart ) + 501,
     DECL_CLSID( CKeepAliveServer ),
     DECL_CLSID( CKeepAliveClient )
 };

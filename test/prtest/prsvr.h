@@ -26,6 +26,7 @@
 #define METHOD_Echo         "Echo"
 #define METHOD_EchoMany     "EchoMany"
 #define METHOD_LongWait     "LongWait"
+#define METHOD_EchoUnknown  "EchoUnknown"
 
 #define MOD_SERVER_NAME "PauseResumeServer"
 #define OBJNAME_ECHOSVR "CPauseResumeServer"               
@@ -35,7 +36,7 @@
 
 enum EnumMyClsid
 {
-    DECL_CLSID( MyStart ) = clsid( ReservedClsidEnd ) + 601,
+    DECL_CLSID( MyStart ) = clsid( UserClsidStart ) + 601,
     DECL_CLSID( CPauseResumeServer ),
     DECL_CLSID( CPauseResumeClient )
 };

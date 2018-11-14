@@ -584,7 +584,9 @@ gint32 CRpcInterfaceBase::Start()
                 ret = -EFAULT;
                 break;
             }
-            pSyncCb->WaitForComplete();
+            ret = pSyncCb->WaitForComplete();
+            if( SUCCEEDED( ret ) )
+                ret = pSyncCb->GetError();
         }
 
     }while( 0 );
@@ -803,6 +805,8 @@ gint32 CRpcInterfaceBase::Stop()
         {
             CSyncCallback* pSyncTask = pTask;
             ret = pSyncTask->WaitForComplete();
+            if( SUCCEEDED( ret ) )
+                ret = pSyncTask->GetError();
         }
 
     }while( 0 );
@@ -1755,6 +1759,9 @@ gint32 CRpcServices::RebuildMatches()
 
             oMatchCfg.SetIntProp( propIid, iid );
 
+            if( iid == iid( CFileTransferServer ) )
+                m_pFtsMatch = pMatch;
+
             // set the request que size
             ret = oMatchCfg.GetBoolProp(
                 propPausable, bPausable );
@@ -1833,6 +1840,8 @@ gint32 CRpcServices::OnPostStop(
     m_pRootTaskGroup.Clear();
     m_queInvTasks.clear();
 
+    m_pFtsMatch.Clear();
+
     return 0;
 }
 
@@ -1840,7 +1849,6 @@ typedef std::pair< gint32, BufPtr > ARG_ENTRY;
 
 bool CRpcServices::IsQueuedReq()
 {
-
     bool bQueuedReq = false;
     CCfgOpenerObj oCfg( this );
     gint32 ret = oCfg.GetBoolProp(
@@ -2252,8 +2260,7 @@ gint32 CInterfaceProxy::SendFetch_Proxy(
 
     gint32 ret = 0;
     if( pDataDesc == nullptr ||
-        pCallback == nullptr ||
-        dwSize == 0 )
+        pCallback == nullptr )
         return -EINVAL;
 
     try{
@@ -2264,13 +2271,43 @@ gint32 CInterfaceProxy::SendFetch_Proxy(
             CReqBuilder oDesc( this );
             oDesc.Append( pDataDesc );
 
+            // Send/Fetch belongs to interface
+            // CFileTransferServer
+            EnumClsid iidFts =
+                iid( CFileTransferServer );
+
+            std::string strIfName =
+                CoGetIfNameFromIid( iidFts  );
+
+            if( strIfName.empty() )
+            {
+                // the interface is not supported by
+                // this object
+                ret = -ENOTSUP;
+                break;
+            }
+
+            ToPublicName( strIfName );
+            oDesc.SetIfName(
+                DBUS_IF_NAME( strIfName ) );
+
             if( string( SYS_METHOD_FETCHDATA ) ==
                 string( oDesc[ propMethodName ] ) )
+            {
                 bFetch = true;
+            }
+            if( !bFetch && dwSize == 0 )
+            {
+                ret = -EINVAL;
+                break;
+            }
 
             CReqBuilder oBuilder( this );
             oBuilder.SetMethodName(
                 oDesc[ propMethodName ] );
+
+            oBuilder.SetIfName(
+                oDesc[ propIfName ] );
 
             oBuilder.SetCallFlags( CF_WITH_REPLY
                | DBUS_MESSAGE_TYPE_METHOD_CALL 
@@ -2292,7 +2329,7 @@ gint32 CInterfaceProxy::SendFetch_Proxy(
             CustomizeRequest(
                 oBuilder.GetCfg(), pCallback );
 
-            gint32 ret = RunIoTask( oBuilder.GetCfg(),
+            ret = RunIoTask( oBuilder.GetCfg(),
                 oResp.GetCfg(), pCallback );
 
             if( ret == STATUS_PENDING )
@@ -2662,29 +2699,30 @@ gint32 CRpcServices::FillRespData(
             guint32 dwSize = 0;
             ObjPtr pObj;
 
-            ret = pMsg.GetObjArgAt( 0, pObj );
+            ret = pMsg.GetObjArgAt( 1, pObj );
             if( ERROR( ret ) )
                 break;
 
             oParams.Push( pObj );
 
-            ret = pMsg.GetFdArgAt( 1, iFd );
+            ret = pMsg.GetFdArgAt( 2, iFd );
 
             if( ERROR( ret ) )
             {
-                ret = pMsg.GetIntArgAt( 1,
+                ret = pMsg.GetIntArgAt( 2,
                     ( guint32& )iFd );
-                break;
+                if( ERROR( ret ) )
+                    break;
             }
 
             oParams.Push( iFd );
 
-            ret = pMsg.GetIntArgAt( 2, dwOffset );
+            ret = pMsg.GetIntArgAt( 3, dwOffset );
             if( ERROR( ret ) )
                 break;
             oParams.Push( dwOffset );
 
-            ret = pMsg.GetIntArgAt( 3, dwSize );
+            ret = pMsg.GetIntArgAt( 4, dwSize );
             if( ERROR( ret ) )
                 break;
 
@@ -4124,6 +4162,8 @@ gint32 CInterfaceProxy::SendProxyReq(
                     break;
                 }
                 ret = pSyncCallback->WaitForComplete();
+                if( SUCCEEDED( ret ) )
+                    ret = pSyncCallback->GetError();
             }
             else
             {
@@ -4422,8 +4462,28 @@ gint32 CInterfaceServer::DoInvoke(
         if( ERROR( ret ) )
             break;
 
-        CfgPtr pDataDesc;
+        CfgPtr pDataDesc( true );
         do{
+            if( strMethod == SYS_METHOD_SENDDATA ||
+                strMethod == SYS_METHOD_FETCHDATA )
+            {
+                // we need further filter to confirm
+                // the SENDDATA is sent to the correct
+                // interface
+                if( m_pFtsMatch.IsEmpty() )
+                {
+                    // the interface is not up
+                    ret = -EBADMSG;
+                    break;
+                }
+                ret = m_pFtsMatch->IsMyMsgIncoming( pReqMsg );
+                if( ERROR( ret  ) )
+                {
+                    ret = -EBADMSG;
+                    break;
+                }
+            }
+
             if( strMethod == SYS_METHOD_SENDDATA )
             {
                 guint32 iArgCount = GetArgCount(
@@ -4436,20 +4496,11 @@ gint32 CInterfaceServer::DoInvoke(
                     break;
                 }
 
-                BufPtr pBuf( true );
-
-                ret = pBuf->Deserialize(
+                ret = pDataDesc->Deserialize(
                     *( CBuffer* )vecArgs[ 0 ].second );
 
                 if( ERROR( ret ) )
                     break;
-
-                pDataDesc = ObjPtr( pBuf );
-                if( pDataDesc.IsEmpty() )
-                {
-                    ret = -EBADMSG;
-                    break;
-                }
 
                 gint32 fd =
                     ( gint32& )*vecArgs[ 1 ].second;
@@ -4486,11 +4537,15 @@ gint32 CInterfaceServer::DoInvoke(
                 ret = oResp.SetIntProp(
                     propReturnValue, ret );
 
+                if( SUCCEEDED( ret ) )
+                {
+                    SetResponse( pCallback,
+                        oResp.GetCfg() );
+                }
                 break;
             }
             else if( strMethod == SYS_METHOD_FETCHDATA )
             {
-
                 guint32 iArgCount = GetArgCount(
                     &CInterfaceServer::FetchData );
 
@@ -4501,20 +4556,11 @@ gint32 CInterfaceServer::DoInvoke(
                     break;
                 }
 
-                BufPtr pBuf( true );
-
-                ret = pBuf->Deserialize(
+                ret = pDataDesc->Deserialize(
                     *( CBuffer* )vecArgs[ 0 ].second );
 
                 if( ERROR( ret ) )
                     break;
-
-                pDataDesc = ObjPtr( pBuf );
-                if( pDataDesc.IsEmpty() )
-                {
-                    ret = -EBADMSG;
-                    break;
-                }
 
                 if( pDataDesc->exist( propCallOptions ) )
                 {
@@ -4558,13 +4604,24 @@ gint32 CInterfaceServer::DoInvoke(
                     oResp.Push( fd );
                     oResp.Push( dwOffset );
                     oResp.Push( dwSize );
-                    bCloseFile = true;
-                    iFd2Close = fd;
+                    // bCloseFile = true;
+                    // iFd2Close = fd;
                     
                 }
                 else if( SUCCEEDED( ret ) )
                 {
                     ret = ret2;
+                }
+
+                if( SUCCEEDED( ret ) )
+                {
+                    SetResponse( pCallback,
+                        oResp.GetCfg() );
+                }
+                else
+                {
+                    if( fd >= 0 )
+                        close( fd );
                 }
                 break;
             }
@@ -4767,7 +4824,7 @@ gint32 CInterfaceServer::SendResponse(
         {
             guint32 dwSize = 0;
             guint32 dwOffset = 0;
-            gint32 iFd = 0;
+            gint32 iFd = -1;
             ObjPtr pDataDesc;
             BufPtr pBuf( true );
 
@@ -4809,17 +4866,31 @@ gint32 CInterfaceServer::SendResponse(
                 iFdType = DBUS_TYPE_UINT32;
 #endif
 
-            if( !dbus_message_append_args( pRespMsg,
-                DBUS_TYPE_UINT32, &iRet,
-                DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
-                &pBuf->ptr(), pBuf->size(),
-                iFdType, &iFd,
-                DBUS_TYPE_UINT32, &dwOffset,
-                DBUS_TYPE_UINT32, &dwSize,
-                DBUS_TYPE_INVALID ) )
+            if( SUCCEEDED( iRet ) )
             {
-                ret = -ENOMEM;
-                break;
+                if( !dbus_message_append_args( pRespMsg,
+                    DBUS_TYPE_UINT32, &iRet,
+                    DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
+                    &pBuf->ptr(), pBuf->size(),
+                    iFdType, &iFd,
+                    DBUS_TYPE_UINT32, &dwOffset,
+                    DBUS_TYPE_UINT32, &dwSize,
+                    DBUS_TYPE_INVALID ) )
+                {
+                    ret = -ENOMEM;
+                    break;
+                }
+                close( iFd );
+            }
+            else
+            {
+                if( !dbus_message_append_args( pRespMsg,
+                    DBUS_TYPE_UINT32, &iRet,
+                    DBUS_TYPE_INVALID ) )
+                {
+                    ret = -ENOMEM;
+                    break;
+                }
             }
         }
         else if( strMethod == SYS_METHOD_FORWARDREQ )
@@ -5296,132 +5367,6 @@ gint32 CInterfaceServer::UserCancelRequest(
     return ret;
 }
 
-gint32 CopyFile( gint32 iFdSrc, gint32 iFdDest, ssize_t& iSize )
-{
-    if( iFdSrc < 0 || iFdDest < 0 )
-        return -EINVAL;
-
-    gint32 ret = 0;
-    ssize_t iBytes = 0;
-    ssize_t iTransferred = 0;
-
-    BufPtr pBuf(true);
-    if( iSize == 0 || iSize > MAX_BYTES_PER_FILE )
-    {
-        pBuf->Resize( MAX_BYTES_PER_TRANSFER );
-    }
-    else
-    {
-        pBuf->Resize( iSize );
-    }
-
-    if( iSize == 0 )
-        iSize = MAX_BYTES_PER_FILE;
-
-    do{
-        iBytes = read( iFdSrc, pBuf->ptr(), pBuf->size() );
-        if( iBytes == -1 )
-        {
-            ret = -errno;
-            break;
-        }
-
-        iBytes = write( iFdDest, pBuf->ptr(), iBytes );
-        if( iBytes == -1 )
-        {
-            ret = -errno;
-            break;
-        }
-
-        iTransferred += iBytes;
-        if( iSize > iBytes )
-        {
-            iSize -= iBytes;
-            if( iSize < MAX_BYTES_PER_TRANSFER )
-            {
-                pBuf->Resize( iSize );
-            }
-        }
-
-    }while( iBytes == MAX_BYTES_PER_TRANSFER );
-
-    if( SUCCEEDED( ret ) )
-        iSize = iTransferred;
-
-    return ret;
-}
-
-gint32 CopyFile( gint32 iFdSrc,
-    const std::string& strDestFile )
-{
-    if( iFdSrc < 0 || strDestFile.empty() )
-        return -EINVAL;
-
-    gint32 ret = 0;
-
-    gint32 iFdDest = open( strDestFile.c_str(),
-        O_CREAT | O_WRONLY );
-
-    if( iFdDest == -1 )
-        return -errno;
-
-    ssize_t iBytes = 0;
-    ret = CopyFile( iFdSrc, iFdDest, iBytes );
-
-    // rollback
-    if( ERROR( ret ) )
-        unlink( strDestFile.c_str() );
-
-    close( iFdDest );
-    return ret;
-}
-
-gint32 CopyFile( const std::string& strSrcFile,
-    gint32 iFdDest )
-{
-    if( iFdDest < 0 || strSrcFile.empty() )
-        return -EINVAL;
-
-    gint32 iFdSrc = open(
-        strSrcFile.c_str(), O_RDONLY );
-
-    if( iFdSrc == -1 )
-        return -errno;
-
-    gint32 ret = 0;
-    do{
-        
-        off_t iOffset =
-            lseek( iFdDest, 0, SEEK_CUR );
-
-        if( iOffset == -1 )
-        {
-            ret = -errno;
-            break;
-        }
-
-        ssize_t iBytes = 0;
-
-        ret = CopyFile( iFdSrc, iFdDest, iBytes );
-
-        if( ERROR( ret ) )
-        {
-            // rollback
-            iBytes = lseek( iFdDest, iOffset, SEEK_SET );
-            if( iBytes != iOffset )
-            {
-                ret = -errno;
-                break;
-            }
-            ftruncate( iFdDest, iOffset );
-        }
-
-    }while( 0 );
-
-    close( iFdSrc );
-    return ret;
-}
-
 gint32 CInterfaceServer::SendData_Server(
     IConfigDb* pDataDesc,           // [in]
     gint32 fd,                      // [in]
@@ -5429,51 +5374,7 @@ gint32 CInterfaceServer::SendData_Server(
     guint32 dwSize,                 // [in]
     IEventSink* pCallback )
 {
-    if( pDataDesc == nullptr
-        || dwOffset > MAX_BYTES_PER_FILE
-        || dwSize > MAX_BYTES_PER_FILE 
-        || pCallback == nullptr )
-        return -EINVAL;
-
-    gint32 ret = 0;
-    bool bClose = false;
-    do{
-        if( fd < 0 )
-        {
-            string strSrcFile;
-            CCfgOpener oCfg( pDataDesc );
-
-            // FIXME: security loophole, no limit on
-            // where to store the files
-            ret = oCfg.GetStrProp(
-                propFilePath, strSrcFile );
-
-            if( ERROR( ret ) )
-                break;
-
-            BufPtr pBuf( true );
-
-            pBuf->Resize( strSrcFile.size() + 16 );
-            *pBuf = strSrcFile;
-
-            // remove the dirname
-            string strFileName = basename( pBuf->ptr() );
-            fd = open( strFileName.c_str(), O_RDONLY );
-            if( fd < 0 )
-            {
-                ret = -errno;
-                break;
-            }
-            bClose = true;
-        }
-        // what to do with this file?
-
-    }while( 0 );
-
-    if( bClose )
-        close( fd );
-
-    return ret;
+    return -ENOTSUP;
 }
 
 gint32 CInterfaceServer::FetchData_Server(
@@ -5483,138 +5384,7 @@ gint32 CInterfaceServer::FetchData_Server(
     guint32& dwSize,                // [in, out]
     IEventSink* pCallback )
 {
-    if( pDataDesc == nullptr )
-        return -EINVAL;
-
-    gint32 ret = 0;
-    gint32 fdDest = -1;
-    gint32 fdSrc = -1;
-
-    do{
-        string strSrcFile;
-        CCfgOpener oCfg( pDataDesc );
-        ret = oCfg.GetStrProp(
-            propFilePath, strSrcFile );
-
-        if( ERROR( ret ) )
-            break;
-
-        char szDestFile[] = "tmpXXXXXX";
-        ret = mkstemp( szDestFile );
-        if( ret == -1 )
-        {
-            ret = -errno;
-            break;
-        }
-
-        gint32 fdDest = open( szDestFile, O_CREAT, 0600 );
-        if( fdDest == -1 )
-        {
-            ret = -errno;
-            break;
-        }
-
-        // delete on close
-        unlink( szDestFile );
-
-        // FIXME: Security issue here, no limit for
-        // external access to all the files
-
-        fdSrc = open( strSrcFile.c_str(), O_RDONLY );
-        if( fdSrc == -1 )
-        {
-            ret = -errno;
-            break;
-        }
-
-        ssize_t iSize = lseek( fdSrc, dwOffset, SEEK_END );
-        if( iSize == -1 )
-        {
-            ret = -errno;
-            break;
-        }
-
-        if ( dwSize > iSize - dwOffset )
-            dwSize = iSize - dwOffset;
-
-        if( lseek( fdSrc, dwOffset, SEEK_SET ) == -1 )
-        {
-            ret = -errno;
-            break;
-        }
-
-        // FIXME: size is not the only factor for
-        // transfer, and the RTT should also be
-        // considered
-        if( dwSize <= 8 * MAX_BYTES_PER_TRANSFER )
-        {
-            ssize_t iSize = dwSize;
-            ret = CopyFile( fdSrc, fdDest, iSize );
-            if( ERROR( ret ) )
-                break;
-
-            dwSize = iSize;
-            ret = dup( fdDest );
-            if( ret == -1 )
-            {
-                ret = -errno;
-                break;
-            }
-            fd = ret;
-        }
-        else
-        {
-            // using a standalone thread for large data
-            // transfer
-            CParamList oParams;
-
-            oParams.Push( ObjPtr( pDataDesc ) );
-            oParams.Push( dwOffset );
-            oParams.Push( dwSize );
-
-            gint32 fdSrc1 = dup( fdSrc );
-            if( fdSrc1 == -1 )
-            {
-                ret = -errno;
-                break;
-            }
-            gint32 fdDest1 = dup( fdDest );
-            if( fdDest1 == -1 )
-            {
-                ret = -errno;
-                close( fdSrc1 );
-                break;
-            }
-
-            oParams.Push( fdSrc1 );
-            oParams.Push( fdDest1 );
-
-            oParams.SetObjPtr(
-                propIfPtr, ObjPtr( this ) );
-
-            oParams.SetObjPtr(
-                propEventSink,
-                ObjPtr( pCallback ) );
-
-            // scheduled a dedicate thread for this
-            // task
-            ret = GetIoMgr()->ScheduleTask(
-                clsid( CIfFetchDataTask ), 
-                oParams.GetCfg(), true );
-
-            if( SUCCEEDED( ret ) )
-                ret = STATUS_PENDING;
-        }
-        
-    }while( 0 );
-
-    if( fdDest >= 0 )
-        close( fdDest );
-
-    if( fdSrc >= 0 )
-        close( fdSrc );
-
-    return ret;
+    return -ENOTSUP;
 }
 
 gint32 CInterfaceServer::OnModEvent(
@@ -5756,9 +5526,6 @@ gint32 CInterfaceServer::StartRecvMsg(
     pMsgMatch->GetIfName( strIfName );
     if( !IsConnected( strIfName.c_str() ) )
         return ERROR_STATE;
-
-    /*if( IsPaused( strIfName ) )
-        return ERROR_PAUSED; */
 
     return super::StartRecvMsg(
         pCompletion, pMatch );

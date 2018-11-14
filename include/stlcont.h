@@ -41,7 +41,7 @@ class CStlQueue : public CObjBase
     protected:
 
     std::deque< T > m_vecElems;
-    std::recursive_mutex   m_oLock;
+    // std::recursive_mutex   m_oLock;
 
     public:
 
@@ -66,8 +66,8 @@ class CStlQueue : public CObjBase
     std::deque< T >& operator()()
     { return m_vecElems; }
 
-    std::recursive_mutex& GetLock() const
-    {  return ( std::recursive_mutex& )m_oLock; }
+    // std::recursive_mutex& GetLock() const
+    // {  return ( std::recursive_mutex& )m_oLock; }
 };
 
 class CStlIntQueue : public CStlQueue< guint32 >

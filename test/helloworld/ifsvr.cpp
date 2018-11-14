@@ -87,7 +87,7 @@ gint32 CEchoServer::InitUserFuncs()
 
     ADD_USER_SERVICE_HANDLER(
         CEchoServer::EchoUnknown,
-        "Unknown" );
+        METHOD_EchoUnknown );
 
     ADD_USER_SERVICE_HANDLER_EX( 2,
         CEchoServer::EchoCfg,

@@ -34,7 +34,7 @@
 
 enum EnumMyClsid
 {
-    DECL_CLSID( MyStart ) = clsid( ReservedClsidEnd ) + 101,
+    DECL_CLSID( MyStart ) = clsid( UserClsidStart ) + 101,
     DECL_CLSID( CAsyncServer ),
     DECL_CLSID( CAsyncClient )
 };

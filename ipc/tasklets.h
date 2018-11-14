@@ -98,11 +98,12 @@ class CTasklet : public ICancellableTask
         return err;
     }
 
-    gint32 GetParamList(
+    virtual gint32 GetParamList(
         std::vector< guint32 >& vecParams,
         EnumPropId iProp = propParamList );
 
-    gint32 GetIrpFromParams( IrpPtr& pIrp );
+    virtual gint32 GetIrpFromParams(
+        IrpPtr& pIrp );
 
     class CReentrancyGuard
     {
@@ -709,6 +710,21 @@ class CThreadSafeTask : public CTaskletRetriable
     {
         CStdRTMutex oTaskLock( GetLock() );
         return super::GetPropertyType( iProp, iType );
+    }
+
+    virtual gint32 GetParamList(
+        std::vector< guint32 >& vecParams,
+        EnumPropId iProp = propParamList )
+    {
+        CStdRTMutex oTaskLock( GetLock() );
+        return super::GetParamList( vecParams, iProp );
+    }
+
+    virtual gint32 GetIrpFromParams(
+        IrpPtr& pIrp )
+    {
+        CStdRTMutex oTaskLock( GetLock() );
+        return super::GetIrpFromParams( pIrp );
     }
 
     gint32 OnEvent( EnumEventId iEvent,

@@ -539,9 +539,35 @@ gint32 CSyncCallback::operator()(
 {
     if( dwContext != eventTaskComp &&
         dwContext != eventIrpComp )
-        return -ENOTSUP;
+        return SetError( -ENOTSUP );
+
+    gint32 ret = 0;
+    switch( dwContext )
+    {
+    case eventTaskComp:
+        {
+            std::vector< guint32 > vecParams;
+            ret = GetParamList( vecParams );
+            if( ERROR( ret ) )
+            {
+                ret = 0;
+                break;
+            }
+            if( vecParams.size() < 
+                GetArgCount( &IEventSink::OnEvent ) )
+                break;
+
+            ret = ( gint32 )vecParams[ 1 ];
+            break;
+        }
+    default:
+        {
+            ret = 0;
+            break;
+        }
+    }
     Sem_Post( &m_semWait );
-    return 0;
+    return SetError( ret );
 }
 
 gint32 CSyncCallback::WaitForComplete()

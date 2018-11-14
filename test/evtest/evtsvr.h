@@ -36,7 +36,7 @@
 
 enum EnumMyClsid
 {
-    DECL_CLSID( MyStart ) = clsid( ReservedClsidEnd ) + 301,
+    DECL_CLSID( MyStart ) = clsid( UserClsidStart ) + 301,
     DECL_CLSID( CEventServer ),
     DECL_CLSID( CEventClient )
 };

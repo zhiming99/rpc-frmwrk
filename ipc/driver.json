@@ -204,6 +204,20 @@
             ]
         },
         {
+            "ModName" : "sfclitst",
+            "DriversToLoad" :
+            [
+                "DBusBusDriver"
+            ]
+        },
+        {
+            "ModName" : "sfsvrtst",
+            "DriversToLoad" :
+            [
+                "DBusBusDriver"
+            ]
+        },
+        {
             "ModName" : "Mod_RpcRouter_0",
             "DriversToLoad" :
             [

@@ -318,7 +318,9 @@ gint32 CDBusBusDriver::Probe(
         CSyncCallback* pSyncTask = pTask;
         if( pSyncTask != nullptr )
         {
-            pSyncTask->WaitForComplete();
+            ret = pSyncTask->WaitForComplete();
+            if( SUCCEEDED( ret ) )
+                ret = pSyncTask->GetError();
         }
 
     }while( 0 );

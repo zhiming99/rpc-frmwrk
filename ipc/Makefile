@@ -2,14 +2,13 @@ include ../Makefile.init.pub
 
 TARGET:=libipc.so
 SOURCES:= iftasks.cpp ifstat.cpp rpcif.cpp gmloop.cpp \
-	sevpoll.cpp connmgr.cpp \
-	mainloop.cpp dllexp.cpp evloop.cpp dbushook.cpp \
-	irp.cpp irpthread.cpp port.cpp portstat.cpp \
-	drvmgr.cpp utils.cpp iomgr.cpp ptifmap.cpp \
-	pnpmgr.cpp dbusdrv.cpp dbusport.cpp portdrv.cpp \
-	rpcpdo.cpp dbuspdo.cpp tasklets.cpp \
-	lpbkmtch.cpp ifhelper.cpp \
-	iiddict.cpp reqopen.cpp
+	sevpoll.cpp connmgr.cpp filetran.cpp mainloop.cpp \
+	dllexp.cpp evloop.cpp dbushook.cpp irp.cpp \
+	irpthread.cpp port.cpp portstat.cpp drvmgr.cpp \
+	utils.cpp iomgr.cpp ptifmap.cpp pnpmgr.cpp \
+	dbusdrv.cpp dbusport.cpp portdrv.cpp rpcpdo.cpp \
+	dbuspdo.cpp tasklets.cpp lpbkmtch.cpp \
+	ifhelper.cpp iiddict.cpp reqopen.cpp
 
 
 # uncomment the line if _USE_LIB_EV is not defined

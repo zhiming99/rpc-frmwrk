@@ -93,10 +93,11 @@ gint32 CStlIntVector::Deserialize(
             break;
         }
 
+        guint32* pElems = ( guint32* )( pHeader + 1 );
         for( guint32 i = 0; i < oHeader.dwCount; ++i )
         {
             m_vecElems.push_back(
-                ntohl( oHeader.arrElems[ i ] ) );
+                ntohl( pElems[ i ] ) );
         }
 
     }while( 0 );

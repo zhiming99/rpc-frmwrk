@@ -7,6 +7,7 @@ all:
 	make -C inproc
 	make -C katest
 	make -C prtest
+	make -C sftest
 
 release:
 	make -C helloworld release
@@ -17,6 +18,7 @@ release:
 	make -C inproc release
 	make -C katest release
 	make -C prtest release
+	make -C sftest release
 
 clean:
 	make -C helloworld clean
@@ -27,5 +29,6 @@ clean:
 	make -C inproc clean
 	make -C katest clean
 	make -C prtest clean
+	make -C sftest clean
 
 .PHONY: release clean
