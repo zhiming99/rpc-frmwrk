@@ -19,6 +19,9 @@ This framework depends on the following packags:
 10. `Peer online/offline awareness.`
 
 ---
+[`Wed Nov 14 11:24:42 CST 2018`]
+1. Local `Send/Fetch` is done. And now it is time to move on to the RPC module. For security purpose, I will add the authentication interface sometime after the RPC module is done.
+
 [`Fri Nov  2 18:24:51 CST 2018`]   
 1. This week, the `keep-alive` and `Pause/Resume` works.
 2. Next week, I will try to get `Send/Fetch file` to work, before I can move on to RPC module.   
