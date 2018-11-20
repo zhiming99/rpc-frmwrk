@@ -17,6 +17,7 @@ This framework depends on the following packags:
 8. `Transparent support for different kinds of remote communications.`
 9. `File/Big data transfer.`
 10. `Peer online/offline awareness.`
+11. `Streaming support to provide double-direction stream transfer`
 
 ---
 [`Tue Nov 20 13:02:20 CST 2018`]
