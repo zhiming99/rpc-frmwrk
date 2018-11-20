@@ -20,7 +20,7 @@ This framework depends on the following packags:
 
 ---
 [`Tue Nov 20 13:02:20 CST 2018`]
-1. Added message filter support and multiple-interface support. Sorry for not start the RPC debugging, because i need dig more in streaming support which will involve RPC modification a bit.   
+1. Added message filter support and multiple-interface support. Sorry for not starting the RPC debugging, because I need to dig more in streaming support which will affect RPC module a bit.   
 
 [`Wed Nov 14 11:24:42 CST 2018`]
 1. Local `Send/Fetch` is done. And now it is time to move on to the RPC module. For security purpose, I will add the authentication interface sometime after the RPC module is done.   
