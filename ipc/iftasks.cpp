@@ -1365,6 +1365,17 @@ gint32 CIfTaskGroup::CancelRemainingTasks()
     return ret;
 }
 
+gint32 CIfTaskGroup::OnRetry()
+{
+    if( true )
+    {
+        // clear the return values if any on retry
+        CStdRTMutex oTaskLock( GetLock() );
+        m_vecRetVals.clear();
+    }
+    return RunTask();
+}
+
 gint32 CIfTaskGroup::RunTask()
 {
     gint32 ret = 0;
@@ -3157,9 +3168,241 @@ gint32 CIfIoReqTask::OnCancel(
     return ret;
 }
 
+gint32 CIfIoReqTask::FilterMessageSend( 
+    IConfigDb* pReqMsg )
+{
+    gint32 ret = 0;
+
+    if( pReqMsg == nullptr )
+        return -EINVAL;
+
+    do{
+        bool bSend = true;
+
+        CCfgOpener oCfg(
+            ( IConfigDb* )GetConfig() );
+
+        CRpcServices* pIf = nullptr;
+        
+        ObjPtr pObj;
+        ret = oCfg.GetObjPtr( propIfPtr, pObj );
+        if( ERROR( ret ) )
+            break;
+
+        pIf = pObj;
+
+        // filter the message
+        if( pIf != nullptr )
+        {
+            IEventSink* pFilter = nullptr;
+            std::vector< guint32 > vecParams;
+
+            ret = GetParamList( vecParams );
+            if( ERROR( ret ) )
+            {
+                ret = 0;
+            }
+            else if( vecParams[ 0 ] == eventFilterComp )
+            {
+                guint32 dwCount = GetArgCount(
+                    &IEventSink::OnEvent );
+
+                if( vecParams.size() >= dwCount )
+                {
+                    ret = vecParams[ 1 ];
+                    CObjBase* pObj =
+                        ( CObjBase* )vecParams[ 3 ];
+                    pFilter = static_cast
+                        < IEventSink* >( pObj );
+                }
+            }
+            else
+            {
+                // maybe a retry happens, not our call
+                ret = 0;
+                break;
+            }
+
+            // the result of the last filter
+            if( ret == ERROR_PREMATURE )
+                bSend = false;
+
+            if( bSend )
+            {
+                ret = pIf->FilterMessage( this,
+                    pReqMsg, false, pFilter ); 
+            }
+
+            // filter is still working
+            if( ret == STATUS_PENDING )
+                break;
+
+            if( ERROR( ret ) )
+                ret = ERROR_PREMATURE;
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CIfIoReqTask::Process(
+    guint32 dwContext )
+{
+    gint32 ret = 0;
+    switch( dwContext )
+    {
+    case eventFilterComp:
+        {
+            // handle eventKeepAlive from a task
+            // call
+            ret = OnFilterComp();
+            break;
+        }
+    default:
+        {
+            ret = -ENOTSUP;
+            break;
+        }
+    }
+
+    if( ret == -ENOTSUP )
+    {
+        return super::Process( dwContext );
+    }
+
+    do{
+        if( ret == STATUS_PENDING )
+        {
+            break;
+        }
+        else if( ret == STATUS_MORE_PROCESS_NEEDED )
+        {
+            if( CanRetry() )
+            {
+                break;
+            }
+            ret = ERROR_FAIL;
+        }
+        else if( ret == -EAGAIN )
+        {
+            if( CanRetry() )
+            {
+                ret = STATUS_MORE_PROCESS_NEEDED;
+                break;
+            }
+            ret = ERROR_FAIL;
+        }
+
+        OnComplete( ret );
+
+    }while( 0 );
+
+    if( ret == STATUS_PENDING ||
+        ret == STATUS_MORE_PROCESS_NEEDED )
+        MarkPending();
+
+    return ret;
+}
+
+gint32 CIfIoReqTask::OnFilterComp()
+{
+    gint32 ret = 0;
+
+    do{
+        vector< guint32 > vecParams;
+        ret = GetParamList( vecParams );
+        if( ERROR( ret ) )
+            break;
+
+        gint32 iRet = ( gint32 )vecParams[ 1 ];
+
+        if( iRet == ERROR_PREMATURE )
+        {
+            ret = iRet;
+            break;
+        }
+
+        if( ERROR( iRet ) )
+        {
+            CCfgOpener oCfg(
+            ( IConfigDb* )GetConfig() );
+
+            ObjPtr pObj;
+            ret = oCfg.GetObjPtr( propMsgPtr, pObj );
+            if( ERROR( ret ) )
+                break;
+
+            IConfigDb* pMsg = pObj;
+            if( pMsg == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+
+            CObjBase* pObjbase =
+                ( CObjBase* )vecParams[ 3 ];
+
+            IEventSink* pFilterTask = static_cast
+                < IEventSink* >( pObjbase );
+
+            IMessageFilter* pMsgFilt = dynamic_cast
+                < IMessageFilter* >( pFilterTask );
+            
+            if( pMsgFilt == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            EnumStrategy iStrat = stratIgnore;
+            pMsgFilt->GetFilterStrategy(
+                this, pMsg, iStrat );
+
+            if( iStrat == stratIgnore )
+            {
+                ret = 0;
+            }
+            else
+            {
+                ret = ERROR_PREMATURE;
+                break;
+            }
+        }
+
+        // continue to the task
+        ret = RunTask();
+
+    }while( 0 );
+
+    if( ret != STATUS_PENDING )
+        OnTaskComplete( ret );
+
+    return ret;
+}
+
 gint32 CIfIoReqTask::RunTask()
 {
-    gint32 ret = SubmitIoRequest();
+    gint32 ret = 0;
+    do{
+        CCfgOpener oCfg(
+            ( IConfigDb* )GetConfig() );
+
+        CfgPtr pReq;
+        ret = GetReqCall( pReq );
+        if( ERROR( ret ) )
+            break;
+
+        ret = FilterMessageSend( pReq );
+        if( ret == STATUS_PENDING )
+            break;
+
+        if( ERROR( ret ) )
+            break;
+
+        ret = SubmitIoRequest();
+
+    }while( 0 );
+
     return ret;
 }
 
@@ -3376,6 +3619,334 @@ CIfInvokeMethodTask::CIfInvokeMethodTask(
 {
     SetClassId( clsid( CIfInvokeMethodTask ) );
 }
+/**
+* @name FilterMessage: filter the message to invoke
+* @{ */
+/**
+ *  Parameters:
+ *
+ *  pReqMsg : the req message in DBusMessage format
+ *
+ *  pReqMsg2 : the req message in IConfigDb format.
+ *
+ *  only one of the two can be non-nullptr. otherwise
+ *  error returns;
+ * @} */
+
+gint32 CIfInvokeMethodTask::FilterMessage( 
+    DBusMessage* pReqMsg,
+    IConfigDb* pReqMsg2 )
+{
+    gint32 ret = 0;
+
+    if( pReqMsg == nullptr &&
+        pReqMsg2 == nullptr )
+        return -EINVAL;
+
+    if( pReqMsg != nullptr &&
+        pReqMsg2 != nullptr )
+        return -EINVAL;
+
+    do{
+        bool bInvoke = true;
+
+        CCfgOpener oCfg(
+            ( IConfigDb* )GetConfig() );
+
+        CRpcServices* pIf = nullptr;
+        
+        ObjPtr pObj;
+        ret = oCfg.GetObjPtr( propIfPtr, pObj );
+        if( ERROR( ret ) )
+            break;
+
+        pIf = pObj;
+
+        // filter the message
+        if( pIf->IsServer() )
+        {
+            IEventSink* pFilter = nullptr;
+            std::vector< guint32 > vecParams;
+
+            ret = GetParamList( vecParams );
+            if( ERROR( ret ) )
+            {
+                ret = 0;
+            }
+            else if( vecParams[ 0 ] == eventFilterComp )
+            {
+                guint32 dwCount = GetArgCount(
+                    &IEventSink::OnEvent );
+
+                if( vecParams.size() >= dwCount )
+                {
+                    ret = vecParams[ 1 ];
+                    CObjBase* pObj =
+                        ( CObjBase* )vecParams[ 3 ];
+                    pFilter = static_cast
+                        < IEventSink* >( pObj );
+                }
+            }
+            else
+            {
+                // maybe a retry happens, not our call
+                ret = 0;
+                break;
+            }
+
+            if( ret == ERROR_PREMATURE )
+                bInvoke = false;
+
+            if( bInvoke )
+            {
+                if( pReqMsg != nullptr )
+                {
+                    ret = pIf->FilterMessage( this,
+                        pReqMsg, true, pFilter ); 
+                }
+                else
+                {
+                    ret = pIf->FilterMessage( this,
+                        pReqMsg2, true, pFilter ); 
+                }
+            }
+
+            // filter is still working
+            if( ret == STATUS_PENDING )
+                break;
+
+            if( ret == ERROR_PREMATURE )
+            {
+                // set the response
+                CCfgOpener oCfg(
+                    ( IConfigDb* )GetConfig() );
+
+                CParamList oParams;
+                oParams[ propReturnValue ] = ret;
+
+                oCfg.SetObjPtr( propRespPtr,
+                    oParams.GetCfg() );
+            }
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+/**
+* @name OnFiltercomp: event handler for the filter
+* completion. The handler should be called by the
+* message filter when it has done its work
+* asynchronously. At this point, the eventTaskComp and
+* eventIrpComp or eventTimeoutCancel cannot be called
+* because none of them are activated yet.
+* eventCancelTask could happen on admin commands.
+* @{ */
+/** 
+ * The filter must call this function via
+ * CIfInvokeMethodTask::OnEvent with:
+ *
+ *  iEvent = eventFilterComp
+ *
+ *  dwParam1 = return code of FilterMsgIncoming
+ *
+ *  dwParam2 = 0
+ *
+ *  pData = ( guint32* )pointer to CObjBase of the
+ *  filter task
+ *
+ * @} */
+
+gint32 CIfInvokeMethodTask::OnFilterComp()
+{
+    gint32 ret = 0;
+    do{
+        vector< guint32 > vecParams;
+        ret = GetParamList( vecParams );
+        if( ERROR( ret ) )
+            break;
+
+        gint32 iRet = ( gint32 )vecParams[ 1 ];
+
+        if( iRet == ERROR_PREMATURE )
+        {
+            // set the response
+            CCfgOpener oCfg(
+                ( IConfigDb* )GetConfig() );
+
+            CParamList oParams;
+            oParams[ propReturnValue ] = iRet;
+
+            oCfg.SetObjPtr( propRespPtr,
+                oParams.GetCfg() );
+
+            ret = iRet;
+            break;
+        }
+
+        if( ERROR( iRet ) )
+        {
+            gint32 iType = 0;
+            ret = GetConfig()->GetPropertyType(
+                propMsgPtr, iType );
+
+            if( ERROR( ret ) )
+                break;
+
+            CCfgOpener oCfg(
+                ( IConfigDb* )GetConfig() );
+
+            if( iType == typeDMsg )
+            {
+                DMsgPtr pMsg;
+                ret = oCfg.GetMsgPtr( propMsgPtr, pMsg );
+                if( ERROR( ret ) )
+                    break;
+
+                CObjBase* pObj =
+                    ( CObjBase* )vecParams[ 3 ];
+
+                IEventSink* pFilterTask = static_cast
+                    < IEventSink* >( pObj );
+
+                IMessageFilter* pMsgFilt = dynamic_cast
+                    < IMessageFilter* >( pFilterTask );
+                
+                if( pMsgFilt == nullptr )
+                {
+                    ret = -EFAULT;
+                    break;
+                }
+
+                EnumStrategy iStrat = stratIgnore;
+                pMsgFilt->GetFilterStrategy(
+                    this, pMsg, iStrat );
+
+                if( iStrat == stratIgnore )
+                {
+                    ret = 0;
+                }
+                else
+                {
+                    ret = ERROR_PREMATURE;
+                    break;
+                }
+            }
+            else
+            {
+
+                ObjPtr pObj;
+                ret = oCfg.GetObjPtr( propMsgPtr, pObj );
+                if( ERROR( ret ) )
+                    break;
+
+                IConfigDb* pMsg = pObj;
+                if( pMsg == nullptr )
+                {
+                    ret = -EFAULT;
+                    break;
+                }
+
+                CObjBase* pObjbase =
+                    ( CObjBase* )vecParams[ 3 ];
+
+                IEventSink* pFilterTask = static_cast
+                    < IEventSink* >( pObjbase );
+
+                IMessageFilter* pMsgFilt = dynamic_cast
+                    < IMessageFilter* >( pFilterTask );
+                
+                if( pMsgFilt == nullptr )
+                {
+                    ret = -EFAULT;
+                    break;
+                }
+                EnumStrategy iStrat = stratIgnore;
+                pMsgFilt->GetFilterStrategy(
+                    this, pMsg, iStrat );
+
+                if( iStrat == stratIgnore )
+                {
+                    ret = 0;
+                }
+                else
+                {
+                    ret = ERROR_PREMATURE;
+                    break;
+                }
+            }
+        }
+
+        // continue to the task
+        ret = RunTask();
+
+    }while( 0 );
+
+    if( ret != STATUS_PENDING )
+        OnTaskComplete( ret );
+
+    return ret;
+}
+
+gint32 CIfInvokeMethodTask::Process(
+    guint32 dwContext )
+{
+    gint32 ret = 0;
+    switch( dwContext )
+    {
+    case eventFilterComp:
+        {
+            // handle eventKeepAlive from a task
+            // call
+            ret = OnFilterComp();
+            break;
+        }
+    default:
+        {
+            ret = -ENOTSUP;
+            break;
+        }
+    }
+
+    if( ret == -ENOTSUP )
+    {
+        return super::Process( dwContext );
+    }
+
+    do{
+        if( ret == STATUS_PENDING )
+        {
+            break;
+        }
+        else if( ret == STATUS_MORE_PROCESS_NEEDED )
+        {
+            if( CanRetry() )
+            {
+                break;
+            }
+            ret = ERROR_FAIL;
+        }
+        else if( ret == -EAGAIN )
+        {
+            if( CanRetry() )
+            {
+                ret = STATUS_MORE_PROCESS_NEEDED;
+                break;
+            }
+            ret = ERROR_FAIL;
+        }
+
+        OnComplete( ret );
+
+    }while( 0 );
+
+    if( ret == STATUS_PENDING ||
+        ret == STATUS_MORE_PROCESS_NEEDED )
+        MarkPending();
+
+    return ret;
+}
 
 gint32 CIfInvokeMethodTask::RunTask()
 {
@@ -3442,6 +4013,15 @@ gint32 CIfInvokeMethodTask::RunTask()
                 }
             }
 
+            bool bInvoke = true;
+            ret = FilterMessage( pMsg, nullptr );
+
+            if( ret == STATUS_PENDING )
+                break;
+
+            if( ERROR( ret ) )
+                bInvoke = false;
+
             // WOW, finally we are about to go to the
             // user code
             //
@@ -3451,8 +4031,11 @@ gint32 CIfInvokeMethodTask::RunTask()
             // multi-processor environment, the Task
             // could be scheduled ahead of the
             // InvokeMethod
-            ret = pIf->InvokeMethod< DBusMessage >
-                ( ( DBusMessage* )pMsg, this );
+            if( bInvoke )
+            {
+                ret = pIf->InvokeMethod< DBusMessage >
+                    ( ( DBusMessage* )pMsg, this );
+            }
         }
         else
         {
@@ -3484,8 +4067,20 @@ gint32 CIfInvokeMethodTask::RunTask()
             }
 
             IConfigDb* pReq = pMsg;
-            ret = pIf->InvokeMethod< IConfigDb >
-                ( pReq, this );
+            bool bInvoke = true;
+            ret = FilterMessage( nullptr, pReq );
+
+            if( ret == STATUS_PENDING )
+                break;
+
+            if( ERROR( ret ) )
+                bInvoke = false;
+
+            if( bInvoke )
+            {
+                ret = pIf->InvokeMethod< IConfigDb >
+                    ( pReq, this );
+            }
 
             if( ret == STATUS_PENDING )
             {
@@ -3687,8 +4282,17 @@ gint32 CIfInvokeMethodTask::OnTaskComplete(
 
                     if( ret != ERROR_FALSE )
                     {
-                        ret = pIf->SendResponse(
-                            pMsg, pResp );
+                        // so far we don't support
+                        // asynchronous filter on
+                        // response
+                        ret = pServer->FilterMessage(
+                            this, ( IConfigDb* )pResp, false );
+
+                        if( ret != ERROR_PREMATURE )
+                        {
+                            ret = pIf->SendResponse(
+                                pMsg, pResp );
+                        }
                     }
 
                     // the connection record can be removed

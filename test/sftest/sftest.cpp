@@ -1,12 +1,14 @@
 /*
  * =====================================================================================
  *
- *       Filename:  asynctest.cpp
+ *       Filename:  sftest.cpp
  *
- *    Description:  implementation if the test classes
+ *    Description:  implementation test for the CSendFetchServer/CSendFetchClient.
+ *                  Note that this object is a multi-if object, unlike the
+ *                  objects of all the earlier tests.
  *
  *        Version:  1.0
- *        Created:  07/15/2018 11:25:09 AM
+ *        Created:  11/1/2018 11:25:09 AM
  *       Revision:  none
  *       Compiler:  gcc
  *
@@ -187,6 +189,19 @@ void CIfSmokeTest::testCliStartStop()
             std::string( "./dload-1.txt" ) );
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
         DebugPrint( 0, "Download Completed" );
+
+        BufPtr pCount( true );
+        ret = pCli->GetCounter(
+            propMsgCount, pCount );
+        CPPUNIT_ASSERT( SUCCEEDED( ret ) );
+        DebugPrint( 0, "GetCounter Completed, recv count is %d",
+            ( guint32 )*pCount  );
+
+        ret = pCli->GetCounter(
+            propMsgRespCount, pCount );
+        CPPUNIT_ASSERT( SUCCEEDED( ret ) );
+        DebugPrint( 0, "GetCounter Completed, resp count is %d",
+            ( guint32 )*pCount  );
     }
     else
     {

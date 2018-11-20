@@ -2,7 +2,7 @@ include ../Makefile.init.pub
 
 TARGET:=libipc.so
 SOURCES:= iftasks.cpp ifstat.cpp rpcif.cpp gmloop.cpp \
-	sevpoll.cpp connmgr.cpp filetran.cpp mainloop.cpp \
+	sevpoll.cpp counters.cpp connmgr.cpp filetran.cpp mainloop.cpp \
 	dllexp.cpp evloop.cpp dbushook.cpp irp.cpp \
 	irpthread.cpp port.cpp portstat.cpp drvmgr.cpp \
 	utils.cpp iomgr.cpp ptifmap.cpp pnpmgr.cpp \

@@ -31,6 +31,10 @@
                 {
                     "InterfaceName" : "CFileTransferServer",
                     "Pausable" : "true"
+                },
+                {
+                    "InterfaceName" : "CStatCounters",
+                    "Pausable" : "true"
                 }
             ]
         }

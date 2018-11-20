@@ -357,6 +357,7 @@ class CIfTaskGroup
     virtual gint32 OnCancel( guint32 dwContext );
     virtual gint32 RemoveTask( TaskletPtr& pTask );
 
+    virtual gint32 OnRetry();
 };
 
 typedef CAutoPtr< Clsid_Invalid, CIfTaskGroup > TaskGrpPtr;
@@ -517,6 +518,14 @@ class CIfIoReqTask
         guint32 dwParam1,
         guint32 dwParam2,
         guint32* pData );
+
+    gint32 FilterMessageSend( 
+        IConfigDb* pReqMsg );
+
+    gint32 Process(
+        guint32 dwContext );
+
+    gint32 OnFilterComp();
 };
 
 class CIfInvokeMethodTask
@@ -561,6 +570,15 @@ class CIfInvokeMethodTask
     bool HasReply() const;
     virtual gint32 OnKeepAlive(
         guint32 dwContext );
+
+    // filter related methods
+    gint32 FilterMessage( 
+        DBusMessage* pReqMsg,
+        IConfigDb* pReqMsg2 );
+
+    gint32 OnFilterComp();
+
+    virtual gint32 Process( guint32 dwContext );
 };
 
 class CIfInterceptTask :

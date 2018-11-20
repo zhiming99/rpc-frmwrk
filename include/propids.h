@@ -162,6 +162,9 @@ enum EnumPropId : gint32
     propPauseOnStart,   // type: a bool value to indicate the server to pause on start
     propQueSize,        // type: guint32 for the pending message size for incoming requests
     propStreaming,      // type: a bool value to indicate if current FetchData call is for streaming
+    propMsgCount,       // type: a invoke message counter for used by CMessageCounter
+    propMsgOutCount,    // type: a send message counter for used by CMessageCounter
+    propMsgRespCount,   // type: a resp message counter for used by CMessageCounter
     propReseredEnd = 0x10000000,
     propInvalid = -1, 
 };

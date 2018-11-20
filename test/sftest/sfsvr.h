@@ -23,6 +23,7 @@
 #include <unistd.h>
 #include <ifhelper.h>
 #include <filetran.h>
+#include <counters.h>
 
 #define METHOD_Echo         "Echo"
 
@@ -32,6 +33,11 @@
 #define MOD_CLIENT_NAME "SendFetchClient"
 #define OBJNAME_ECHOCLIENT "CSendFetchClient"               
 
+// Declare the class id for this object and declare the
+// iid for the interfaces we have implemented for this
+// object.
+// Note that, CFileTransferServer and IInterfaceServer
+// are built-in interfaces
 enum EnumMyClsid
 {
     DECL_CLSID( MyStart ) = clsid( UserClsidStart ) + 611,
@@ -42,6 +48,13 @@ enum EnumMyClsid
     DECL_IID( CEchoServer )
 };
 
+// Declare the interface class
+//
+// Note that unlike the CEchoServer in Helloworld test.
+// this class inherit from a virtual base
+// CInterfaceServer. The reason is simple, multiple
+// interfaces share the same instance of
+// CInterfaceServer.
 class CEchoServer :
     public virtual CInterfaceServer
 { 
@@ -60,6 +73,7 @@ class CEchoServer :
         std::string& strReply );
 };
 
+// Declare the interface class
 class CEchoClient :
     public virtual CInterfaceProxy
 {
@@ -74,13 +88,18 @@ class CEchoClient :
 
 
 
+// Declare the major server/proxy objects. Please note
+// that, the second class to the last one are
+// implementations of the different interfaces
 DECLARE_AGGREGATED_PROXY(
     CSendFetchClient,
     CFileTransferProxy,
-    CEchoClient );
+    CEchoClient,
+    CStatCountersProxy );
 
 DECLARE_AGGREGATED_SERVER(
     CSendFetchServer,
     CFileTransferServer,
-    CEchoServer );
+    CEchoServer,
+    CStatCountersServer );
 

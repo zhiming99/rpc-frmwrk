@@ -3,7 +3,8 @@
  *
  *       Filename:  iftest.cpp
  *
- *    Description:  implementation if the test classes
+ *    Description:  implementation if the unit test classes. This is an example
+ *                  of simple object with single interface.
  *
  *        Version:  1.0
  *        Created:  07/15/2018 11:25:09 AM
@@ -36,6 +37,7 @@ void CIfSmokeTest::setUp()
 {
     gint32 ret = 0;
     do{
+        // initialize the rpc library
         ret = CoInitialize( 0 );
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 
@@ -44,12 +46,14 @@ void CIfSmokeTest::setUp()
         ret = oParams.Push( std::string( MODULE_NAME ) );
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 
+        // create the iomanager
         ret = m_pMgr.NewObj(
             clsid( CIoManager ),
             oParams.GetCfg() );
 
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 
+        // start everything
         IService* pSvc = m_pMgr;
         if( pSvc != nullptr )
             ret = pSvc->Start();
@@ -69,9 +73,11 @@ void CIfSmokeTest::tearDown()
         IService* pSvc = m_pMgr;
         CPPUNIT_ASSERT( pSvc != nullptr );
 
+        // stop everything
         ret = pSvc->Stop();
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 
+        // final call
         ret = CoUninitialize();
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
         m_pMgr.Clear();
@@ -95,6 +101,7 @@ void CIfSmokeTest::testSvrStartStop()
         OBJNAME_ECHOSVR,
         true, pCfg );
 
+    // create the interface server
     oCfg.SetObjPtr( propIoMgr, m_pMgr );
     ret = pIf.NewObj(
         clsid( CEchoServer ),
@@ -102,13 +109,16 @@ void CIfSmokeTest::testSvrStartStop()
     
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 
+    // start the server
     ret = pIf->Start();
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );
     
     CEchoServer* pSvr = pIf;
+    // waiting for requests
     while( pSvr->IsConnected() )
         sleep( 1 );
 
+    // stop the server
     ret = pIf->Stop();
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 
@@ -130,6 +140,7 @@ void CIfSmokeTest::testCliStartStop()
         OBJNAME_ECHOSVR,
         false, pCfg );
 
+    // create the proxy object
     oCfg.SetObjPtr( propIoMgr, m_pMgr );
     ret = pIf.NewObj(
         clsid( CEchoClient ),
@@ -137,12 +148,14 @@ void CIfSmokeTest::testCliStartStop()
     
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 
+    // start the proxy
     ret = pIf->Start();
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );
     
     CEchoClient* pCli = pIf;
     if( pCli != nullptr )
     {
+        // make sure the server is online
         while( !pCli->IsConnected() )
             sleep( 1 );
 
@@ -150,6 +163,7 @@ void CIfSmokeTest::testCliStartStop()
         std::string strReply;
         const char* szReply = nullptr;
 
+        // string echo
         const char*& pszReply = szReply ; 
         DebugPrint( 0, "Start..." );
         ret = pCli->Echo( strText, strReply );
@@ -158,12 +172,14 @@ void CIfSmokeTest::testCliStartStop()
         if( strText != strReply )
             CPPUNIT_ASSERT( false );
 
+        // pointer echo
         ret = pCli->EchoPtr( strText.c_str(), pszReply );
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
         DebugPrint( 0, "EchoPtr Completed" );
         if( strText != strReply )
             CPPUNIT_ASSERT( false );
 
+        // echo an object
         CParamList oParams;
         oParams.Push( std::string( "Hello, world" ) );
         oParams[ propClsid ] = Clsid_CEchoServer;
@@ -177,6 +193,7 @@ void CIfSmokeTest::testCliStartStop()
 
         BufPtr pText( true ), pBufReply;
 
+        // echo a blob
         *pText = "Hello, World!";
         ret = pCli->EchoUnknown( pText, pBufReply );
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
@@ -190,15 +207,18 @@ void CIfSmokeTest::testCliStartStop()
         CPPUNIT_ASSERT( false );
     }
 
+    // stop the proxy
     ret = pIf->Stop();
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 
+    // release all the resources of the proxy
     pIf.Clear();
 }
 
 int main( int argc, char** argv )
 {
 
+    // register test with cppunit 
     CppUnit::TextUi::TestRunner runner;
     CppUnit::TestFactoryRegistry &registry =
         CppUnit::TestFactoryRegistry::getRegistry();

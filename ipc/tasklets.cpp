@@ -511,10 +511,10 @@ gint32 CThreadSafeTask::OnEvent(
     // the event parameters. so don't use
     // propParamList when passing parameters to
     // tasklet.
-    CStdRTMutex oLock( GetLock() );
+    CStdRTMutex oTaskLock( GetLock() );
     CCfgOpener oCfg( ( IConfigDb* )GetConfig() );
     oCfg.SetObjPtr( propParamList, ObjPtr( pVec ) );
-    oLock.Unlock();
+    oTaskLock.Unlock();
 
     ( *this )( iEvent );
 
@@ -522,7 +522,7 @@ gint32 CThreadSafeTask::OnEvent(
     // removal can conflict with external synchronized
     // threads who is wakeup in the operatr(), and
     // begin to read property on this task.
-    oLock.Lock();
+    oTaskLock.Lock();
     oCfg.RemoveProperty( propParamList );
     return GetError();
 }

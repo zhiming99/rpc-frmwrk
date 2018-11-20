@@ -48,6 +48,120 @@ class IGenericInterface :
 
 };
 
+typedef enum {
+    stratIgnore,
+    stratStop
+}EnumStrategy;
+
+struct IMessageFilter
+{
+/**
+* @name FilterMsgIncoming: to filter the incoming
+* messages before being invoked
+* @{ */
+/**
+ * Parameter:
+ *
+ *      pInvTask: current invoke task.
+ *
+ *      pMsg: the message to filter. There are two
+ *      formats of incoming messages, DBusMessage and
+ *      IConfigDb.
+ *
+ * Return Value:
+ *      STATUS_SUCCESS: the message can move on
+ *
+ *      ERROR_PREMATURE: the message cannot move
+ *          forward. error will be returned.
+ *
+ *      STATUS_PENDING: The filter cannot finish the
+ *      task immediately. The invoke task will resume
+ *      after the filter has finished its work
+ *      asynchronously. on complete, the invoke task
+ *      will be resumed by the event `eventFilter' with
+ *      the return value.
+ *
+ *      Other Errors: depends on the strategy to know
+ *      if the message can be invoked or not
+ *      .
+ * @} */
+
+    virtual gint32 FilterMsgIncoming(
+        IEventSink* pInvTask, DBusMessage* pMsg ) = 0;
+
+    virtual gint32 FilterMsgIncoming(
+        IEventSink* pInvTask, IConfigDb* pMsg ) = 0;
+
+/**
+* @name GetFilterStrategy: to query the strategy of the
+* filter when error happens
+* @{ */
+/**
+ * Parameter:
+ *
+ *      pCallback: current task to handle the message,
+ *      could be CIfIoRequest or CIfInvokeMethodTask
+ *
+ *      pMsg: the message to filter. There are two
+ *      formats of outgoing messages, DBusMessage and
+ *      IConfigDb.
+ *
+ * Return Value:
+ *
+ *      stratStop: don't move forward to next filter,
+ *      neither invoke the message.
+ *
+ *      stratIgnore: continue to the next filter, or
+ *      inoke the message immediately.
+ *
+ * @} */
+    virtual gint32 GetFilterStrategy(
+        IEventSink* pCallback,
+        DBusMessage* pMsg,
+        EnumStrategy& iStrategy ) = 0;
+
+    virtual gint32 GetFilterStrategy(
+        IEventSink* pCallback,
+        IConfigDb* pMsg,
+        EnumStrategy& iStrategy ) = 0;
+
+/**
+* @name FilterMsgOutgoing: to filter the messages
+* before being sent out
+* @{ */
+/**
+ * Parameter:
+ *
+ *      pReqTask: current CIfIoRequest task
+ *
+ *      pMsg: the message to filter. There is just one
+ *      format of outgoing messages, DBusMessage and
+ *      IConfigDb.
+ *
+ * Return Value:
+ *      STATUS_SUCCESS: the message can move on
+ *
+ *      ERROR_PREMATURE: the message cannot move
+ *          forward. error will be returned.
+ *
+ *      STATUS_PENDING: The filter cannot finish the
+ *      task immediately. The invoke task will resume
+ *      after the filter has finished its work
+ *      asynchronously. on complete, the invoke task
+ *      will be resumed by the event `eventFilter' with
+ *      the return value.
+ *
+ *      Other Errors: depends on the strategy to know
+ *      if the message can be invoked or not
+ *      .
+ * @} */
+    virtual gint32 FilterMsgOutgoing(
+        IEventSink* pReqTask, IConfigDb* pMsg ) = 0;
+
+    virtual gint32 FilterMsgOutgoing(
+        IEventSink* pReqTask, DBusMessage* pMsg ) = 0;
+};
+
 typedef CAutoPtr< clsid( Invalid ), IGenericInterface > InterfPtr;
 
 #include "iftasks.h"
@@ -748,6 +862,20 @@ class CRpcServices :
 
     virtual gint32 OnPreStart(
         IEventSink* pCallback );
+
+    virtual gint32 FilterMessage(
+        IEventSink* pTask,
+        DBusMessage* pMsg,
+        bool bIncoming,
+        IEventSink* pFilter = nullptr )
+    { return 0; }
+
+    virtual gint32 FilterMessage(
+        IEventSink* pTask,
+        IConfigDb* pMsg,
+        bool bIncoming,
+        IEventSink* pFilter = nullptr )
+    { return 0; }
 };
 
 template< typename ...Args>
@@ -1027,10 +1155,8 @@ class CInterfaceServer :
 {
 
     protected:
-    // Typically one port per interface. sometimes
-    // you can open more than one port if you are
-    // aware of what you are doing
 
+    std::set< TaskletPtr > m_setFilters;
     SvrConnPtr m_pConnMgr;
 
     virtual gint32 SendData_Server(
@@ -1260,6 +1386,144 @@ class CInterfaceServer :
 
     gint32 Resume_Server(
         IEventSink* pCallback );
+
+    gint32 RegisterFilter(
+        IEventSink* pFilterTask )
+    {
+        CStdRMutex oIfLock( GetLock() );
+
+        CTasklet* pTask = static_cast
+            < CTasklet* >( pFilterTask );
+
+        m_setFilters.insert( TaskletPtr( pTask ) );
+        return 0;
+    }
+
+    gint32 UnregisterFilter(
+        IEventSink* pFilterTask )
+    {
+        CStdRMutex oIfLock( GetLock() );
+
+        CTasklet* pTask = static_cast
+            < CTasklet* >( pFilterTask );
+
+        m_setFilters.erase( TaskletPtr( pTask ) );
+        return 0;
+    }
+
+    gint32 GetFilters(
+        std::set< TaskletPtr >& oFilters )
+    {
+        CStdRMutex oIfLock( GetLock() );
+        oFilters = m_setFilters;
+        return 0;
+    }
+
+    virtual gint32 FilterMessage(
+        IEventSink* pTask,
+        DBusMessage* pMsg,
+        bool bIncoming,
+        IEventSink* pFilter = nullptr )
+    {
+        return FilterMessageInternal( pTask,
+            pMsg, bIncoming, pFilter );
+    }
+
+    virtual gint32 FilterMessage(
+        IEventSink* pTask,
+        IConfigDb* pMsg,
+        bool bIncoming,
+        IEventSink* pFilter = nullptr )
+    {
+        return FilterMessageInternal( pTask,
+            pMsg, bIncoming, pFilter );
+    }
+
+    private:
+    template< class T >
+    gint32 FilterMessageInternal(
+        IEventSink* pTask,
+        T* pMsg,
+        bool bIncoming,
+        IEventSink* pFilter = nullptr )
+    {
+        gint32 ret = 0;
+
+        std::set< TaskletPtr > oFilters;
+        GetFilters( oFilters );
+        std::set< TaskletPtr >::iterator itr;
+        if( pFilter == nullptr )
+        {
+            itr = oFilters.begin();
+        }
+        else
+        {
+            CTasklet* pFiltTask = ( CTasklet* )pFilter;
+            TaskletPtr pLastFilt( pFiltTask );
+            itr = oFilters.find( pLastFilt );
+
+            // already the last one
+            if( itr == oFilters.end() )
+                return STATUS_SUCCESS;
+            // skip this one
+            ++itr;
+        }
+
+        for( ; itr != oFilters.end(); ++itr )
+        {
+            IMessageFilter* pFilter =
+                dynamic_cast< IMessageFilter* >(
+                    ( CTasklet* ) *itr );
+
+            if( pFilter == nullptr )
+                continue;
+
+            if( bIncoming )
+            {
+                ret = pFilter->FilterMsgIncoming(
+                    pTask, pMsg );
+            }
+            else
+            {
+                ret = pFilter->FilterMsgOutgoing(
+                    pTask, pMsg );
+            }
+
+            if( SUCCEEDED( ret ) )
+                continue;
+
+            if( ret == ERROR_PREMATURE )
+                break;
+
+            if( ERROR( ret ) )
+            {
+                EnumStrategy iStrategy;
+
+                ret = pFilter->GetFilterStrategy(
+                    pTask, pMsg, iStrategy );
+
+                // stop processing
+                if( ERROR( ret ) )
+                {
+                    ret = ERROR_PREMATURE;
+                    break;
+                }
+
+                if( iStrategy == stratStop )
+                {
+                    ret = ERROR_PREMATURE;
+                    break;
+                }
+                else
+                {
+                    ret = 0;
+                    continue;
+                }
+            }
+        }
+
+        return ret;
+    }
 };
 
 

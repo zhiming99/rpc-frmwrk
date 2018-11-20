@@ -16,6 +16,8 @@
  * =====================================================================================
  */
 
+#pragma once
+
 #include "configdb.h"
 #include "defines.h"
 #include "ifhelper.h"

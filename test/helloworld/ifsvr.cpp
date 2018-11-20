@@ -156,7 +156,8 @@ gint32 CEchoServer::EchoPtr(
 
     // business logics goes here
 
-    // make the response
+    // Non-EX method, requires to explicitly make the
+    // response
     gint32 iRet = 0;
     ret = this->FillAndSetResponse(
         pCallback, iRet, szText );
@@ -176,7 +177,8 @@ gint32 CEchoServer::EchoUnknown(
 
     // business logics goes here
 
-    // make the response
+    // Non-EX method, requires to explicitly make the
+    // response
     gint32 iRet = 0;
     ret = this->FillAndSetResponse(
         pCallback, iRet, pBuf );

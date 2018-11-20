@@ -28,6 +28,7 @@
 #include "dbusport.h"
 #include "objfctry.h"
 #include "iiddict.h"
+#include "counters.h"
 
 #include <dlfcn.h>
 
@@ -113,6 +114,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CTimerWatchCallback );
     INIT_MAP_ENTRYCFG( CDBusConnFlushTask );
     INIT_MAP_ENTRYCFG( CIfSvrConnMgr );
+    INIT_MAP_ENTRYCFG( CMessageCounterTask );
 
 #ifdef _USE_LIBEV
     INIT_MAP_ENTRYCFG( CDBusLoopHooks );

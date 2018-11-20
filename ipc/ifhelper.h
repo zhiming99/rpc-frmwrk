@@ -744,6 +744,35 @@ class CMethodServer :
     }
 };
 
+template < typename C, typename ...Types>
+inline gint32 NewMethodServer( TaskletPtr& pDelegate,
+    gint32(C::*f)(IEventSink*, Types ...) )
+{
+    if( f == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    try{
+        // we cannot use NewObj for this
+        // template object
+        pDelegate = new CMethodServer< C, Types... >( f );
+        pDelegate->DecRef();
+    }
+    catch( const std::bad_alloc& e )
+    {
+        ret = -ENOMEM;
+    }
+    catch( const std::runtime_error& e )
+    {
+        ret = -EFAULT;
+    }
+    catch( const std::invalid_argument& e )
+    {
+        ret = -EINVAL;
+    }
+    return ret;
+}
+
 template< typename ...Args >
 struct InitTupleDefault;
 
@@ -951,36 +980,6 @@ class CMethodServerEx< iNumInput, gint32 (ClassName::*)(IEventSink*, Args ...) >
         return ret;
     }
 };
-
-template < typename C, typename ...Types>
-inline gint32 NewMethodServer( TaskletPtr& pDelegate,
-    gint32(C::*f)(IEventSink*, Types ...) )
-{
-    if( f == nullptr )
-        return -EINVAL;
-
-    gint32 ret = 0;
-    try{
-        // we cannot use NewObj for this
-        // template object
-        pDelegate = new CMethodServer< C, Types... >( f );
-        pDelegate->DecRef();
-    }
-    catch( const std::bad_alloc& e )
-    {
-        ret = -ENOMEM;
-    }
-    catch( const std::runtime_error& e )
-    {
-        ret = -EFAULT;
-    }
-    catch( const std::invalid_argument& e )
-    {
-        ret = -EINVAL;
-    }
-    return ret;
-}
-
 
 template < int iNumInput, typename C, typename ...Types>
 struct NewMethodServerEx;
@@ -2238,52 +2237,125 @@ gint32 CInterfaceProxy::ProxyCall(
     InputCount< iNumInput > a( ( oParams.GetCfg() ) ); \
     ProxyCall( &a, strMethod, ##__VA_ARGS__ );} )
 
+#define DEFINE_HAS_METHOD( MethodName, _rettype, ... ) \
+template< typename T > \
+struct has_##MethodName\
+{\
+    private:\
+    template<typename U, _rettype (U::*)( __VA_ARGS__ ) > struct SFINAE {};\
+    template<typename U> static char Test(SFINAE<U, &U::MethodName>*);\
+    template<typename U> static int Test(...);\
+    public:\
+    static bool const value = ( sizeof(Test<T>(0) ) == sizeof(char) );\
+}
+
+#define VA_LIST(...) __VA_ARGS__
+// this macro serves to define a virtual method to all
+// this macro serves to define a virtual method to all
+// the overridden virtual methods from the interfaces
+// on this object which, in turn, overrides the base
+// class( CInterfaceServer or CInterfaceProxy ) if
+// defined.
+#define DEFINE_VIRT_METHOD_IMPL( _MethodName, rettype, PARAMS, ARGS ) \
+    private: \
+    DEFINE_HAS_METHOD( _MethodName, rettype, PARAMS ); \
+    gint32 Interf##_MethodName( NumberSequence<>  ) \
+    { return 0; } \
+    template < int N > \
+    gint32 Interf##_MethodName( \
+         NumberSequence< N >, PARAMS ) \
+    { \
+        using ClassName = typename std::tuple_element< N, std::tuple<Types...>>::type; \
+        if( has_##_MethodName< ClassName >::value ) \
+            return this->ClassName::_MethodName( ARGS ); \
+        return 0; \
+    } \
+    template < int N, int M, int...S > \
+    gint32 Interf##_MethodName( \
+        NumberSequence< N, M, S... >, PARAMS ) \
+    { \
+        using ClassName = typename std::tuple_element< N, std::tuple<Types...>>::type; \
+        if( has_##_MethodName< ClassName >::value ) \
+        { \
+            gint32 ret = this->ClassName::_MethodName( ARGS ); \
+            if( ERROR( ret ) ) \
+                return ret; \
+        } \
+        return Interf##_MethodName( NumberSequence<M, S...>(), ARGS ); \
+    } \
+    public: \
+    virtual rettype _MethodName( PARAMS ) \
+    { \
+        gint32 ret = virtbase::_MethodName( ARGS ); \
+        if( ERROR( ret ) ) \
+            return ret; \
+        if( sizeof...( Types ) ) \
+        { \
+            using seq = typename GenSequence< sizeof...( Types ) >::type; \
+            ret = Interf##_MethodName( seq(), ARGS ); \
+        } \
+        return ret; \
+    }
+
+#define DEFINE_VIRT_METHOD_IMPL_NOARG( _MethodName, rettype ) \
+    private: \
+    DEFINE_HAS_METHOD( _MethodName, rettype ); \
+    gint32 Interf##_MethodName( \
+        NumberSequence<>  ) \
+    { return 0; } \
+    template < int N > \
+    gint32 Interf##_MethodName( \
+         NumberSequence< N > ) \
+    { \
+        using ClassName = typename std::tuple_element< N, std::tuple<Types...>>::type; \
+        if( has_##_MethodName< ClassName >::value ) \
+            return this->ClassName::_MethodName(); \
+        return 0; \
+    } \
+    template < int N, int M, int...S > \
+    gint32 Interf##_MethodName( \
+        NumberSequence< N, M, S... > ) \
+    { \
+        using ClassName = typename std::tuple_element< N, std::tuple<Types...>>::type; \
+        if( has_##_MethodName< ClassName >::value ) \
+        { \
+            gint32 ret = this->ClassName::_MethodName(); \
+            if( ERROR( ret ) ) \
+                return ret; \
+        } \
+        return Interf##_MethodName( NumberSequence<M, S...>() ); \
+    } \
+    public: \
+    virtual rettype _MethodName() \
+    { \
+        gint32 ret = virtbase::_MethodName(); \
+        if( ERROR( ret ) ) \
+            return ret; \
+        if( sizeof...( Types ) ) \
+        { \
+            using seq = typename GenSequence< sizeof...( Types ) >::type; \
+            ret = Interf##_MethodName( seq() ); \
+        } \
+        return ret; \
+    }
+
 template< typename virtbase, typename...Types >
 struct CAggregatedObject
     : Types...
 {
-    gint32 TupleInitUserFuncs( NumberSequence<> )
-    { return 0; }
-
-    template < int N >
-    gint32 TupleInitUserFuncs( NumberSequence< N > )
-    {
-        using ClassName = typename std::tuple_element< N, std::tuple<Types...>>::type;
-        return this->ClassName::InitUserFuncs();
-    }
-
-    template < int N, int M, int...S >
-    gint32 TupleInitUserFuncs( NumberSequence< N, M, S... > )
-    {
-        using ClassName = typename std::tuple_element< N, std::tuple<Types...>>::type;
-        gint32 ret = this->ClassName::InitUserFuncs();
-        if( ERROR( ret ) )
-            return ret;
-        return TupleInitUserFuncs( NumberSequence<M, S...>() );
-    }
-
+    public:
     CAggregatedObject( const IConfigDb* pCfg )
     : virtbase( pCfg ), Types( pCfg )...
     {
     }
 
-    virtual gint32 InitUserFuncMajor() = 0;
-    virtual gint32 InitUserFuncs()
-    {
-        gint32 ret = virtbase::InitUserFuncs();
-        if( ERROR( ret ) )
-            return ret;
+    DEFINE_VIRT_METHOD_IMPL_NOARG( InitUserFuncs, gint32 )
 
-        if( sizeof...( Types ) )
-        {
-            using seq = typename GenSequence< sizeof...( Types ) >::type;
-            ret = TupleInitUserFuncs( seq() );
-            if( ERROR( ret ) )
-                return ret;
+    DEFINE_VIRT_METHOD_IMPL( OnPreStart, gint32,
+        VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
 
-            return InitUserFuncMajor();
-        }
-    }
+    DEFINE_VIRT_METHOD_IMPL( OnPostStop, gint32,
+        VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
 };
 
 #define METHOD_EnumInterfaces "EnumInterfaces"
@@ -2293,10 +2365,12 @@ struct ClassName : CAggregatedObject< CInterfaceServer, ##__VA_ARGS__ >\
 {\
     typedef CAggregatedObject< CInterfaceServer, ##__VA_ARGS__ > super;\
     ClassName( const IConfigDb* pCfg )\
-        : CInterfaceServer( pCfg ), CAggregatedObject< CInterfaceServer, ##__VA_ARGS__ >( pCfg )\
+        : CInterfaceServer( pCfg ), super( pCfg )\
     { this->SetClassId( clsid( ClassName ) ); }\
-    gint32 InitUserFuncMajor()\
+    gint32 InitUserFuncs()\
     {\
+        gint32 ret = super::InitUserFuncs(); \
+        if( ERROR( ret ) ) return ret; \
         BEGIN_HANDLER_MAP;\
         ADD_USER_SERVICE_HANDLER_EX( 0,\
             ClassName::EnumInterfaces,\
@@ -2342,11 +2416,14 @@ struct ClassName : CAggregatedObject< CInterfaceServer, ##__VA_ARGS__ >\
 #define DECLARE_AGGREGATED_PROXY( ClassName, ... )\
 struct ClassName : CAggregatedObject< CInterfaceProxy, ##__VA_ARGS__ >\
 {\
+    typedef CAggregatedObject< CInterfaceProxy, ##__VA_ARGS__ > super;\
     ClassName( const IConfigDb* pCfg )\
-        : CInterfaceProxy( pCfg ), CAggregatedObject< CInterfaceProxy, ##__VA_ARGS__ >( pCfg )\
+        : CInterfaceProxy( pCfg ), super( pCfg )\
     { this->SetClassId( clsid( ClassName ) ); }\
-    gint32 InitUserFuncMajor()\
+    gint32 InitUserFuncs()\
     {\
+        gint32 ret = super::InitUserFuncs();\
+        if( ERROR( ret ) ) return ret; \
         BEGIN_PROXY_MAP( false );\
         ADD_USER_PROXY_METHOD_EX( 0,\
             ClassName::EnumInterfaces,\
@@ -2360,3 +2437,4 @@ struct ClassName : CAggregatedObject< CInterfaceProxy, ##__VA_ARGS__ >\
         return FORWARD_CALL( 0, METHOD_EnumInterfaces, pClsids );\
     }\
 }
+
