@@ -17,10 +17,14 @@ This framework depends on the following packags:
 8. `Transparent support for different kinds of remote communications.`
 9. `File/Big data transfer.`
 10. `Peer online/offline awareness.`
+11. `Streaming support to provide double-direction stream transfer`
 
 ---
+[`Tue Nov 20 13:02:20 CST 2018`]
+1. Added message filter support and multiple-interface support. Sorry for not starting the RPC debugging still, because I need to dig more in streaming support which will affect RPC module a bit.   
+
 [`Wed Nov 14 11:24:42 CST 2018`]
-1. Local `Send/Fetch` is done. And now it is time to move on to the RPC module. For security purpose, I will add the authentication interface sometime after the RPC module is done.
+1. Local `Send/Fetch` is done. And now it is time to move on to the RPC module. For security purpose, I will add the authentication interface sometime after the RPC module is done.   
 
 [`Fri Nov  2 18:24:51 CST 2018`]   
 1. This week, the `keep-alive` and `Pause/Resume` works.
