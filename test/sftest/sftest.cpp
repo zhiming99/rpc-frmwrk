@@ -112,7 +112,12 @@ void CIfSmokeTest::testSvrStartStop()
     
     CSendFetchServer* pSvr = pIf;
     while( pSvr->IsConnected() )
+    {
         sleep( 1 );
+        std::string strIfName = "CSendFetchServer";
+        if( pSvr->IsPaused( strIfName ) )
+            break;
+    }
 
     ret = pIf->Stop();
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );
@@ -202,6 +207,10 @@ void CIfSmokeTest::testCliStartStop()
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
         DebugPrint( 0, "GetCounter Completed, resp count is %d",
             ( guint32 )*pCount  );
+
+        ret = pCli->Pause_Proxy();
+        CPPUNIT_ASSERT( SUCCEEDED( ret ) );
+        DebugPrint( 0, "Pause interface Completed" );
     }
     else
     {

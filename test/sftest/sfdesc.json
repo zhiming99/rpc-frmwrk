@@ -18,10 +18,14 @@
                     "InterfaceName" : "CSendFetchServer",
                     "Comment-1" : "the following is a flag whether to use the object clsid for this interface, usually it indicates this is the major interface of this object, there must be one interface bind to clsid",
                     "BindToClsid" : "true",
-                    "Pausable" : "false"
+                    "Pausable" : "true"
                 },
                 {
                     "InterfaceName" : "IInterfaceServer",
+                    "Pausable" : "false"
+                },
+                {
+                    "InterfaceName" : "IUnknown",
                     "Pausable" : "false"
                 },
                 {

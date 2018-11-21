@@ -321,8 +321,12 @@ enum EnumEventId : guint32
     eventTimeoutCancel,
     eventUserCancel,
 
-    // a event of filter completion
+    // an event of filter completion
     eventFilterComp,
+
+    // an event for IO watcher
+    eventIoWatch,
+    eventAsyncWatch,
 
     eventMaxReserved = 0x10000,
     eventUserStart = 0x10001,

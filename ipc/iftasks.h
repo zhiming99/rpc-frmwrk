@@ -179,6 +179,12 @@ class CIfParallelTask
 
     virtual bool IsMultiThreadSafe()
     { return true; }
+
+    gint32 OnEvent(
+        EnumEventId iEvent,
+        guint32 dwParam1,
+        guint32 dwParam2,
+        guint32* pData );
 };
 
 class CIfEnableEventTask

@@ -59,7 +59,7 @@ gint32 CSchedTaskCallback::operator()(
     // for glib, this is an idle source, and it
     // must be removed to aovid running
     // repeatedly without tasks.
-    return SetError( ret );
+    return SetError( G_SOURCE_REMOVE );
 #else
     // for libev, this is an async source, and
     // unless the loop is signaled, it will not be

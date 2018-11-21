@@ -132,7 +132,24 @@ gint32 CSimpleEvPoll::RunSource( HANDLE hWatch,
     // that its state has changed from ready to
     // done and behave properly at such a
     // situation.
-    ret = ( *pCallback )( dwContext );
+    if( iType == srcTimer )
+    {
+        CEvLoop::TIMER_SOURCE* pTimerSrc =
+            ( CEvLoop::TIMER_SOURCE* )pSrc;
+        ret = pTimerSrc->TimerCallback( dwContext );
+    }
+    else if( iType == srcIo )
+    {
+        CEvLoop::IO_SOURCE* pIoSrc =
+            ( CEvLoop::IO_SOURCE* )pSrc;
+        ret = pIoSrc->IoCallback( dwContext ); 
+    }
+    else if( iType == srcAsync )
+    {
+        CEvLoop::ASYNC_SOURCE* pAsyncSrc =
+            ( CEvLoop::ASYNC_SOURCE* )pSrc;
+        ret = pAsyncSrc->AsyncCallback( dwContext );
+    }
     return ret;
 }
 

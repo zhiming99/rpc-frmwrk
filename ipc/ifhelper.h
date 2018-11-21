@@ -428,6 +428,7 @@ class CMethodProxy :
     }
 };
 
+#define UNREFERENCED( a ) ( a )
 // construction of the major interface proxy map 
 #define BEGIN_PROXY_MAP( bNonDBus ) \
 do{ \
@@ -441,6 +442,7 @@ do{ \
     PROXY_MAP _oAnon_; \
     PROXY_MAP* _pMapProxies_ = &_oAnon_; \
     bool _bNonBus_ = bNonDBus; \
+    UNREFERENCED( _bNonBus_ = !!_bNonBus_ ); \
     PROXY_MAP* _pMap_ = nullptr; \
     do{ \
         _pMap_ = GetProxyMap( _iIfId_ ); \
@@ -462,7 +464,6 @@ inline ObjPtr NewMethodProxy( bool bNonDBus,
 // the macro is to accomodate the case of zero
 // argument
 #define VA_ARGS(...) , ##__VA_ARGS__
-#define UNREFERENCED( a ) ( a )
 #define ADD_PROXY_METHOD( MethodName, ... ) \
 do{ \
     std::string strName = MethodName; \
@@ -2358,10 +2359,18 @@ struct CAggregatedObject
         VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
 };
 
+// a interface as a start point for interface query
+struct IUnknown
+{
+    virtual gint32 EnumInterfaces(
+        IEventSink* pCallback,
+        IntVecPtr& pClsids ) = 0;
+};
+
 #define METHOD_EnumInterfaces "EnumInterfaces"
 
 #define DECLARE_AGGREGATED_SERVER( ClassName, ... )\
-struct ClassName : CAggregatedObject< CInterfaceServer, ##__VA_ARGS__ >\
+struct ClassName : CAggregatedObject< CInterfaceServer, ##__VA_ARGS__ >, IUnknown\
 {\
     typedef CAggregatedObject< CInterfaceServer, ##__VA_ARGS__ > super;\
     ClassName( const IConfigDb* pCfg )\
@@ -2372,10 +2381,13 @@ struct ClassName : CAggregatedObject< CInterfaceServer, ##__VA_ARGS__ >\
         gint32 ret = super::InitUserFuncs(); \
         if( ERROR( ret ) ) return ret; \
         BEGIN_HANDLER_MAP;\
+        END_HANDLER_MAP;\
+        \
+        BEGIN_IFHANDLER_MAP( IUnknown );\
         ADD_USER_SERVICE_HANDLER_EX( 0,\
             ClassName::EnumInterfaces,\
             METHOD_EnumInterfaces );\
-        END_HANDLER_MAP;\
+        END_IFHANDLER_MAP; \
         return 0; \
     }\
     gint32 EnumInterfaces(\
@@ -2424,17 +2436,21 @@ struct ClassName : CAggregatedObject< CInterfaceProxy, ##__VA_ARGS__ >\
     {\
         gint32 ret = super::InitUserFuncs();\
         if( ERROR( ret ) ) return ret; \
+\
         BEGIN_PROXY_MAP( false );\
+        END_PROXY_MAP;\
+\
+        BEGIN_IFPROXY_MAP( IUnknown, false ); \
         ADD_USER_PROXY_METHOD_EX( 0,\
             ClassName::EnumInterfaces,\
             METHOD_EnumInterfaces );\
-        END_PROXY_MAP;\
+        END_IFPROXY_MAP;\
         return 0; \
     }\
     gint32 EnumInterfaces(\
         IntVecPtr& pClsids )\
     {\
-        return FORWARD_CALL( 0, METHOD_EnumInterfaces, pClsids );\
+        return FORWARD_IF_CALL( iid( IUnknown ), 0, METHOD_EnumInterfaces, pClsids );\
     }\
 }
 

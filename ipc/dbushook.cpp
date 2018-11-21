@@ -490,7 +490,7 @@ void CDBusIoCallback::ToggleWatch(
 
 // callbacks from libev
 gint32 CDBusIoCallback::operator()(
-    guint32 events )
+    guint32 dwContext )
 {
     guint32 dwFlags = 0;
     DBusDispatchStatus ret =
@@ -502,17 +502,30 @@ gint32 CDBusIoCallback::operator()(
     if( ret == DBUS_DISPATCH_DATA_REMAINS )
         m_pParent->WakeupDispatch( ret );
 
-    if( events & POLLIN )
-        dwFlags |= DBUS_WATCH_READABLE;
-    if( events & POLLOUT )
-        dwFlags |= DBUS_WATCH_WRITABLE;
-    if( events & POLLERR )
-        dwFlags |= DBUS_WATCH_ERROR;
-    if( events & POLLHUP )
-        dwFlags |= DBUS_WATCH_HANGUP;
+    std::vector< guint32 > vecParams;
+    gint32 ret2 = GetParamList( vecParams );
+    if( ERROR( ret2 ) )
+        return SetError( G_SOURCE_CONTINUE );
+    guint32 revents = vecParams[ 1 ];
 
+    if( revents & POLLIN )
+        dwFlags |= DBUS_WATCH_READABLE;
+    if( revents & POLLOUT )
+        dwFlags |= DBUS_WATCH_WRITABLE;
+
+    ret2 = G_SOURCE_CONTINUE;
+    if( revents & POLLERR )
+    {
+        dwFlags |= DBUS_WATCH_ERROR;
+        ret2 = G_SOURCE_REMOVE;
+    }
+    if( revents & POLLHUP )
+    {
+        dwFlags |= DBUS_WATCH_HANGUP;
+        ret2 = G_SOURCE_REMOVE;
+    }
     dbus_watch_handle( m_pDT, dwFlags );
-    return SetError( G_SOURCE_CONTINUE );
+    return SetError( ret2 );
 }
 
 CDBusDispatchCallback::CDBusDispatchCallback(
@@ -582,7 +595,7 @@ gint32 CDBusDispatchCallback::operator()(
     guint32 dwContext )
 {
     if( !m_pParent->IsSetupDone() )
-        return ERROR_STATE;
+        return SetError( G_SOURCE_CONTINUE );
 
     gint32 ret = DoDispatch();
     if( ret == ERROR_STATE )

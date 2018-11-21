@@ -101,15 +101,43 @@ CEvLoop::TIMER_SOURCE::~TIMER_SOURCE()
 {
 }
 
-void CEvLoop::TIMER_SOURCE::TimerCallback(
+/**
+* @name TimerCallback : the callback for timer watch,
+* which is called by CSimpleEvPoll::RunSource when the
+* timer is triggered
+* @{ */
+/**
+ *  Parameters:
+ *
+ *  iParams: fixed to be eventTimeout
+ *
+ *  return value:
+ *      the return value can be 
+ *      G_SOURCE_REMOVE, the watcher will be removed
+ *      from the event loop. or
+ *      G_SOURCE_CONTINUE, the watcher will be kept in
+ *      the event loop for the next event.
+ *
+ *      It requires the callback task must also have
+ *      its OnEvent to return the same type of value
+ *      after call .
+ * @} */
+
+gint32 CEvLoop::TIMER_SOURCE::TimerCallback(
     int iParams )
 {
+    gint32 ret = G_SOURCE_CONTINUE;
     if( !m_pCallback.IsEmpty() )
-        ( *m_pCallback )( eventTimeout );
-
+    {
+        ret = m_pCallback->OnEvent( eventTimeout,
+            iParams, 0, nullptr );
+    }
     if( !m_bRepeat )
+    {
         Stop();
-    return;
+        ret = G_SOURCE_REMOVE;
+    }
+    return ret;
 }
 
 gint32 CEvLoop::TIMER_SOURCE::StartStop(
@@ -138,13 +166,40 @@ CEvLoop::IO_SOURCE::~IO_SOURCE()
 {
 }
 
-void CEvLoop::IO_SOURCE::IoCallback(
+/**
+* @name IoCallback : the callback for io watch
+* @{ */
+/**
+ *  Parameters:
+ *
+ *  condition: the events which triggered this callback
+ *  and it could be one of the following:
+ *      POLLIN, POLLOUT, POLLHUP, POLLERR
+ *
+ *  return value:
+ *      the return value can be 
+ *      G_SOURCE_REMOVE, the watcher will be removed
+ *      from the event loop. or
+ *      G_SOURCE_CONTINUE, the watcher will be kept in
+ *      the event loop for the next event.
+ *
+ *      It requires the callback task must also have
+ *      its OnEvent to return the same type of value
+ *      after call .
+ * @} */
+
+gint32 CEvLoop::IO_SOURCE::IoCallback(
     int condition )
 {
+    gint32 ret = G_SOURCE_REMOVE;
     if( !m_pCallback.IsEmpty() )
-        ( *m_pCallback )( condition );
+    {
+        ret = m_pCallback->OnEvent(
+            eventIoWatch, condition,
+            0, nullptr );
+    }
 
-    return;
+    return ret;
 }
 
 CEvLoop::ASYNC_SOURCE::ASYNC_SOURCE(
@@ -158,11 +213,38 @@ CEvLoop::ASYNC_SOURCE::~ASYNC_SOURCE()
 {
 }
 
-void CEvLoop::ASYNC_SOURCE::AsyncCallback(
+/**
+* @name AsyncCallback : the callback for async watch,
+* which is called by CSimpleEvPoll::RunSource when the
+* command pipe has some some command to exec
+* @{ */
+/**
+ *  Parameters:
+ *
+ *  iEvents: fixed to be eventAsyncWatch
+ *
+ *  return value:
+ *      the return value can be 
+ *      G_SOURCE_REMOVE, the watcher will be removed
+ *      from the event loop. or
+ *      G_SOURCE_CONTINUE, the watcher will be kept in
+ *      the event loop for the next event.
+ *
+ *      It requires the callback task must also have
+ *      its OnEvent to return the same type of value
+ *      after call .
+ * @} */
+gint32 CEvLoop::ASYNC_SOURCE::AsyncCallback(
     int iEvents )
 {
+    gint32 ret = G_SOURCE_CONTINUE;
     if( !m_pCallback.IsEmpty() )
-        ( *m_pCallback )( iEvents );
+    {
+        ret = m_pCallback->OnEvent(
+            eventAsyncWatch, 0,
+            0, nullptr );
+    }
+    return ret;
 }
 
 gint32 CEvLoop::ASYNC_SOURCE::Send()
@@ -732,7 +814,7 @@ gint32 CEvLoopAsyncCallback::operator()(
         }
     }while( 1 );
 
-    return ret;
+    return SetError( ret );
 }
 gint32 CEvLoopAsyncCallback::HandleCommand()
 {
@@ -767,7 +849,8 @@ gint32 CEvLoopAsyncCallback::HandleCommand()
             if( ERROR( ret ) )
                 break;
             ret = m_pLoop->RunSource(
-                hWatch, srcAsync, eventZero );
+                hWatch, srcAsync,
+                eventAsyncWatch );
             break;
         }
     case aevtWakeup:

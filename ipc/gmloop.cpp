@@ -100,7 +100,8 @@ gboolean CGMainLoop::TIMER_SOURCE::TimerCallback(
 
     if( !pSrc->m_pCallback.IsEmpty() )
     {
-        ( *pSrc->m_pCallback )( eventTimeout );
+        pSrc->m_pCallback( eventTimeout,
+            0, 0, nullptr );
     }
 
     if( pSrc->m_bRepeat )
@@ -166,7 +167,8 @@ gboolean CGMainLoop::IDLE_SOURCE::IdleCallback(
 
     if( !pSrc->m_pCallback.IsEmpty() )
     {
-        ( *pSrc->m_pCallback )( eventZero );
+        pSrc->m_pCallback->OnEvent(
+            eventAsyncWatch, 0, 0, nullptr );
     }
     pSrc->SetState( srcsDone );
 
@@ -248,8 +250,10 @@ gboolean CGMainLoop::IO_SOURCE::IoCallback(
         ( IO_SOURCE* )data;
     if( !pSrc->m_pCallback.IsEmpty() )
     {
-        ret = ( *pSrc->m_pCallback )(
-            ( guint32 )condition );
+        ret = pSrc->m_pCallback->OnEvent(
+            eventIoWatch,
+            ( guint32 )condition,
+            0, nullptr );
     }
     else
     {

@@ -149,7 +149,7 @@ class CEvLoop :
         ~TIMER_SOURCE();
 
         gint32 StartStop( bool bStart );
-        void TimerCallback(
+        gint32 TimerCallback(
             int iEvents );
 
         TIMER_SOURCE& operator=(
@@ -175,7 +175,7 @@ class CEvLoop :
 
         ~IO_SOURCE();
 
-        void IoCallback(
+        gint32 IoCallback(
             int iEvents );
 
         IO_SOURCE& operator=(
@@ -197,7 +197,7 @@ class CEvLoop :
 
         ~ASYNC_SOURCE();
 
-        void AsyncCallback(
+        gint32 AsyncCallback(
             int iEvents );
 
         gint32 Send();

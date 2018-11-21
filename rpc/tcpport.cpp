@@ -133,10 +133,19 @@ gint32 CRpcSocketBase::SetKeepAlive( bool bKeep )
 }
 
 gint32 CRpcSockWatchCallback::operator()(
-    guint32 dwContext )
+    guint32 event )
 {
     gint32 ret = 0;
     do{
+        std::vector< guint32 > vecParams;
+        ret = GetParamList( vecParams );
+        if( ERROR( ret ) )
+        {
+            ret = G_SOURCE_CONTINUE;
+            break;
+        }
+
+        guint32 dwContext = vecParams[ 1 ];
         CCfgOpener oCfg(
             ( IConfigDb* )GetConfig() );
 
@@ -145,7 +154,10 @@ gint32 CRpcSockWatchCallback::operator()(
             propObjPtr, pSock );
 
         if( ERROR( ret ) )
+        {
+            ret = G_SOURCE_CONTINUE;
             break;
+        }
 
         GIOCondition dwCond =
             ( GIOCondition )dwContext;

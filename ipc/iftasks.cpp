@@ -2651,6 +2651,27 @@ CIfParallelTask::CIfParallelTask(
     }
 }
 
+gint32 CIfParallelTask::OnEvent(
+    EnumEventId iEvent,
+    guint32 dwParam1,
+    guint32 dwParam2,
+    guint32* pData )
+{
+
+    // Lock to prevent re-entrance 
+    gint32 ret = 0;
+    try{
+        CStdRTMutex oTaskLock( GetLock() );
+        ret = super::OnEvent(
+            iEvent, dwParam1, dwParam2, pData );
+    }
+    catch( std::runtime_error& e )
+    {
+        // lock failed
+        ret = -EACCES;
+    }
+    return ret;
+}
 
 /**
 * @name CIfParallelTask::operator()
