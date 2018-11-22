@@ -236,11 +236,12 @@ gint32 CFileTransferProxy::OnFileDownloaded(
     CCfgOpenerObj oTaskCfg( pTask );
 
     do{
-        if( ERROR( iRet ) )
-            break;
-
+        // must go first to get the callback pointer
         oTaskCfg.GetPointer(
             propEventSink, pCallback );
+
+        if( ERROR( iRet ) )
+            break;
 
         if( fd < 0 ||
             dwOffset + dwSize > MAX_BYTES_PER_FILE )

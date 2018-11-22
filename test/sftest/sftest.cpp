@@ -127,6 +127,7 @@ void CIfSmokeTest::testSvrStartStop()
 #endif
 
 #ifdef CLIENT
+bool bPause = false;
 void CIfSmokeTest::testCliStartStop()
 {
     gint32 ret = 0;
@@ -190,8 +191,11 @@ void CIfSmokeTest::testCliStartStop()
 
         // method from interface CFileTransferServer
         ret = pCli->DownloadFile(
-            std::string( "./hello-1.txt" ),
-            std::string( "./dload-1.txt" ) );
+            // server side file to download
+            std::string( "./hello-1.txt" ), 
+            // local file to save to
+            std::string( "./dload-1.txt" ) ); 
+
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
         DebugPrint( 0, "Download Completed" );
 
@@ -208,9 +212,12 @@ void CIfSmokeTest::testCliStartStop()
         DebugPrint( 0, "GetCounter Completed, resp count is %d",
             ( guint32 )*pCount  );
 
-        /*ret = pCli->Pause_Proxy();
-        CPPUNIT_ASSERT( SUCCEEDED( ret ) );
-        DebugPrint( 0, "Pause interface Completed" );*/
+        if( bPause )
+        {
+            ret = pCli->Pause_Proxy();
+            CPPUNIT_ASSERT( SUCCEEDED( ret ) );
+            DebugPrint( 0, "Pause interface Completed" );
+        }
     }
     else
     {
@@ -230,6 +237,11 @@ int main( int argc, char** argv )
     CppUnit::TextUi::TestRunner runner;
     CppUnit::TestFactoryRegistry &registry =
         CppUnit::TestFactoryRegistry::getRegistry();
+
+#ifdef CLIENT
+    if( argc > 1 && strcmp( argv[ 1 ], "p" ) == 0 )
+        bPause = true;
+#endif
 
     runner.addTest( registry.makeTest() );
     bool wasSuccessful = runner.run( "", false );

@@ -2694,6 +2694,9 @@ gint32 CRpcServices::FillRespData(
             if( ERROR( ret ) )
                 break;
 
+            if( ERROR( iRet ) )
+                break;
+
             gint32 iFd = 0;
             guint32 dwOffset = 0;
             guint32 dwSize = 0;
