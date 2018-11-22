@@ -208,9 +208,9 @@ void CIfSmokeTest::testCliStartStop()
         DebugPrint( 0, "GetCounter Completed, resp count is %d",
             ( guint32 )*pCount  );
 
-        ret = pCli->Pause_Proxy();
+        /*ret = pCli->Pause_Proxy();
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
-        DebugPrint( 0, "Pause interface Completed" );
+        DebugPrint( 0, "Pause interface Completed" );*/
     }
     else
     {

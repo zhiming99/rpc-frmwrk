@@ -82,7 +82,7 @@ CSimpleEvPoll::~CSimpleEvPoll()
     m_iPipew = -1;
 }
 
-gint32 CSimpleEvPoll::StartStop(
+gint32 CSimpleEvPoll::StartStopSource(
     HANDLE hWatch,
     EnumSrcType iType,
     bool bStart )
@@ -100,16 +100,56 @@ gint32 CSimpleEvPoll::StartStop(
     return pSrc->StartStop( bStart );
 }
 
+gint32 CSimpleEvPoll::UpdateSource(
+    HANDLE hWatch,
+    EnumSrcType iType,
+    IConfigDb* pCfg )
+{
+    gint32 ret = 0;
+    if( hWatch == 0 || pCfg == nullptr )
+        return -EINVAL;
+
+    do{
+
+        CStdRMutex oLock( GetLock() );
+
+        CEvLoop::SOURCE_HEADER* pSrc = nullptr;
+        gint32 ret = m_pLoop->GetSource(
+            hWatch, iType, pSrc );
+
+        if( ERROR( ret ) )
+            break;
+
+        EnumSrcState iState = pSrc->GetState();
+
+        ret = StopSource( hWatch, iType );
+        if( ERROR( ret ) )
+            break;
+
+        ret = pSrc->UpdateSource( pCfg );
+        if( ERROR( ret ) )
+            break;
+        
+        if( iState == srcsReady )
+            ret = StartSource( hWatch, iType );
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CSimpleEvPoll::StopSource(
     HANDLE hWatch, EnumSrcType iType )
 {
-    return StartStop( hWatch, iType, false );
+    return StartStopSource(
+        hWatch, iType, false );
 }
 
 gint32 CSimpleEvPoll::StartSource(
     HANDLE hWatch, EnumSrcType iType )
 {
-    return StartStop( hWatch, iType, true );
+    return StartStopSource(
+        hWatch, iType, true );
 }
 
 gint32 CSimpleEvPoll::RunSource( HANDLE hWatch,
@@ -549,8 +589,7 @@ gint32 CSimpleEvPoll::HandleTimeout(
             else
             {
                 // internal error, stop the source
-                StopSource( itr->second,
-                    srcTimer );
+                StopSource( itr->second, srcTimer );
             }
             itr = mapActTimers.erase( itr );
         }
@@ -643,10 +682,15 @@ gint32 CSimpleEvPoll::HandleIoEvents(
                 // found
                 mapActFds.erase( iIoKey );
             }
+            else if( ERROR( ret ) )
+            {
+                StopSource( hWatch, srcIo );
+            }
         }
 
         if( IsStopped() )
             return ret;
+
         CStdRMutex oLock( GetLock() );
         UpdateIoMaps( mapActFds );
     }while( 0 );

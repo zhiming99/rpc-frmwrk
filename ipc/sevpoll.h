@@ -64,7 +64,7 @@ class CSimpleEvPoll
     std::deque< guint8 >                m_queReadBuf;
     std::deque< guint8 >                m_queUndoBuf;
 
-    gint32 StartStop( HANDLE hWatch,
+    gint32 StartStopSource( HANDLE hWatch,
         EnumSrcType iType,  bool bStart );
 
     gint32 UpdateTimeMaps(
@@ -114,6 +114,11 @@ class CSimpleEvPoll
 
     gint32 StopSource(
         HANDLE hWatch, EnumSrcType iType );
+
+    gint32 UpdateSource(
+        HANDLE hWatch,
+        EnumSrcType iType,
+        IConfigDb* pCfg );
 
     gint32 RunSource(
         HANDLE hWatch,

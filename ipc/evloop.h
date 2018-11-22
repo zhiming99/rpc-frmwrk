@@ -126,6 +126,7 @@ class CEvLoop :
             return *this;
         }
         virtual gint32 StartStop( bool bStart );
+        virtual gint32 UpdateSource( IConfigDb* ) = 0;
         gint32 Start();
         gint32 Stop();
     };
@@ -159,6 +160,30 @@ class CEvLoop :
             m_dwIntervalMs = rhs.m_dwIntervalMs;
             return *this;
         }
+
+        gint32 UpdateSource(
+            IConfigDb* pCfg )
+        {
+            // please make sure the source is already
+            // stopped.
+            bool bRepeat = false;
+            guint32 dwIntervalMs = 0;
+            CParamList oParams( pCfg );
+
+            gint32 ret = oParams.GetIntProp(
+                0, dwIntervalMs );
+            if( ERROR( ret ) )
+                return ret;
+
+            ret = oParams.GetBoolProp(
+                1, bRepeat );
+            if( ERROR( ret ) )
+                return ret;
+
+            m_bRepeat = bRepeat;
+            m_dwIntervalMs = dwIntervalMs;
+            return 0;
+        }
     };
 
     struct IO_SOURCE:
@@ -185,6 +210,29 @@ class CEvLoop :
             m_dwOpt = rhs.m_dwOpt;
             return *this;
         }
+
+        gint32 UpdateSource(
+            IConfigDb* pCfg )
+        {
+            // please make sure the source is already
+            // stopped.
+            gint32 fd = -1;
+            guint32 dwOpt = 0;
+            CParamList oParams( pCfg );
+            gint32 ret = oParams.GetIntProp(
+                0, ( guint32& )fd );
+            if( ERROR( ret ) )
+                return ret;
+
+            ret = oParams.GetIntProp(
+                1, dwOpt );
+            if( ERROR( ret ) )
+                return ret;
+
+            m_iFd = fd;
+            m_dwOpt = dwOpt;
+            return 0;
+        }
     };
 
     struct ASYNC_SOURCE:
@@ -201,6 +249,10 @@ class CEvLoop :
             int iEvents );
 
         gint32 Send();
+
+        gint32 UpdateSource(
+            IConfigDb* pCfg )
+        { return 0; }
     };
 
     guint32 AddSource( SOURCE_HEADER* pSource );

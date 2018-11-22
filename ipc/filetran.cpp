@@ -36,6 +36,15 @@ gint32 CFileTransferProxy::InitUserFuncs()
     return 0;
 }
 
+gint32 CFileTransferProxy::OnFileUploaded(
+    IEventSink* pTask, gint32 fd ) 
+{
+    if( fd < 0 )
+        return 0;
+
+    return 0;
+}
+
 gint32 CFileTransferProxy::UploadFile_Callback(
     IEventSink* pTask, gint32 iRet ) 
 {
@@ -49,6 +58,12 @@ gint32 CFileTransferProxy::UploadFile_Callback(
     gint32 iFd = -1;
 
     do{
+        if( ERROR( iRet ) )
+        {
+            OnFileUploaded( pTask, iFd );
+            break;
+        }
+
         ret = oTaskCfg.GetPointer(
             propEventSink, pCallback );
 
@@ -57,6 +72,8 @@ gint32 CFileTransferProxy::UploadFile_Callback(
 
         if( ERROR( ret ) )
             break;
+
+        OnFileUploaded( pTask, iFd );
 
         if( iFd >= 0 )
             close( iFd );
@@ -189,8 +206,20 @@ gint32 CFileTransferProxy::UploadFile_Proxy(
     return ret;
 }
 
-// note that fd can be 0 if ERROR( iRet ).
 gint32 CFileTransferProxy::DownloadFile_Callback(
+    IEventSink* pTask,
+    gint32 iRet,
+    ObjPtr& pDataDesc,
+    gint32 fd, 
+    guint32 dwOffset,
+    guint32 dwSize )
+{
+    return OnFileDownloaded( pTask, iRet,
+        pDataDesc, fd, dwOffset, dwSize );
+}
+
+// note that fd can be 0 if ERROR( iRet ).
+gint32 CFileTransferProxy::OnFileDownloaded(
     IEventSink* pTask,
     gint32 iRet,
     ObjPtr& pDataDesc,
@@ -207,11 +236,11 @@ gint32 CFileTransferProxy::DownloadFile_Callback(
     CCfgOpenerObj oTaskCfg( pTask );
 
     do{
-        ret = oTaskCfg.GetPointer(
-            propEventSink, pCallback );
-
         if( ERROR( iRet ) )
             break;
+
+        oTaskCfg.GetPointer(
+            propEventSink, pCallback );
 
         if( fd < 0 ||
             dwOffset + dwSize > MAX_BYTES_PER_FILE )

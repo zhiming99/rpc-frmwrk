@@ -812,6 +812,10 @@ gint32 CEvLoopAsyncCallback::operator()(
             ret = G_SOURCE_CONTINUE;
             break;
         }
+        if( ERROR( ret ) )
+        {
+            ret = G_SOURCE_REMOVE;
+        }
     }while( 1 );
 
     return SetError( ret );
@@ -843,14 +847,22 @@ gint32 CEvLoopAsyncCallback::HandleCommand()
             if( ret == -EAGAIN )
             {
                 // data not arrive completely
+                // FOR EAGAIN, the caller has special
+                // handling
                 m_pLoop->AsyncDataUnwind( 1 );
                 break;
             }
             if( ERROR( ret ) )
+            {
+                // fatal error
+                ret = G_SOURCE_REMOVE;
                 break;
+            }
+
             ret = m_pLoop->RunSource(
                 hWatch, srcAsync,
                 eventAsyncWatch );
+
             break;
         }
     case aevtWakeup:

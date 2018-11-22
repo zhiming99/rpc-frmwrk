@@ -1606,7 +1606,7 @@ gint32 CRpcInterfaceBase::AddAndRun(
         }
 
         TaskletPtr pParaTask;
-        if( bTail )
+        if( bTail && dwCount > 0 )
         {
             pParaTask = pTail;
         }

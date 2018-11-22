@@ -38,13 +38,17 @@ class IFileTransfer
         const std::string& strDestFile ) = 0;
 };
 
-class IStream
+struct IStreamProxy
 {
     public:
     gint32 OpenStream( IConfigDb* pStmCfg, gint32 fd );
     gint32 CloseStream( gint32 fd );
-    gint32 Read( gint32 fd, BufPtr& pBuf );
-    gint32 Write( gint32 fd, const BufPtr& pBuf );
+    gint32 ReadStream( gint32 fd, BufPtr& pBuf );
+    gint32 WriteStream( gint32 fd, BufPtr& pBuf );
+    gint32 OnStmRecv(
+        IEventSink* pCallback, BufPtr& pBuf );
+    gint32 OnStmSend(
+        IEventSink* pCallback, BufPtr& pBuf );
 };
 
 class CFileTransferProxy :
@@ -84,8 +88,7 @@ class CFileTransferProxy :
 
     CFileTransferProxy( const IConfigDb* pCfg )
         :super( pCfg )
-    {
-    }
+    {}
 
     gint32 UploadFile_Proxy(
         const std::string& strSrcFile,
@@ -110,6 +113,20 @@ class CFileTransferProxy :
         return DownloadFile_Proxy(
             strSrcFile, strDestFile );
     }
+
+    // override this method for your own business
+    // logics
+    virtual gint32 OnFileDownloaded(
+        IEventSink* pContext,
+        gint32 iRet,
+        ObjPtr& pDataDesc,
+        gint32 fd,
+        guint32 dwOffset,
+        guint32 dwSize );
+
+    virtual gint32 OnFileUploaded(
+        IEventSink* pContext,
+        gint32 iFd );
 };
 
 class CFileTransferServer :
