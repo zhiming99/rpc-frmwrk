@@ -20,6 +20,9 @@ This framework depends on the following packags:
 11. `Streaming support to provide double-direction stream transfer`
 
 ---
+[`Mon Dec 03 17:47:55 CST 2018`]
+1. Added local stream support. It is yet to debug.   
+
 [`Tue Nov 20 13:02:20 CST 2018`]
 1. Added message filter support and multiple-interface support. Sorry for not starting the RPC debugging still, because I need to dig more in streaming support which will affect RPC module a bit.   
 
