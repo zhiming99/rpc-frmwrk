@@ -1298,24 +1298,70 @@ inline gint32 NewDeferredCall( TaskletPtr& pCallback,
     ret_; \
 })
 
-/*
-#define DEFER_CALL_NOARG( pMgr, pObj, func ) \
-({ \
-    TaskletPtr pTask; \
-    gint32 ret_ = NewDeferredCall( pTask, pObj, func ); \
-    if( SUCCEEDED( ret_ ) ) \
-        ret_ = pMgr->RescheduleTask( pTask ); \
-    ret_; \
-})
-*/
-
 #define DEFER_CALL_NOSCHED( pTask, pObj, func, ... ) \
     NewDeferredCall( pTask, pObj, func VA_ARGS( __VA_ARGS__ ) )
 
-/*
-#define DEFER_CALL_NOSCHED_NOARG( pTask, pObj, func ) \
-    NewDeferredCall( pTask, pObj, func )
-*/
+// to insert the task pInterceptor to the head of
+// completion chain of the task pTarget 
+// please make sure both tasks inherit from the
+// CIfParallelTask
+inline gint32 InterceptCallback(
+    IEventSink* pInterceptor, IEventSink* pTarget )
+{
+    if( pInterceptor == nullptr ||
+        pTarget == nullptr )
+        return -EINVAL;
+
+    CCfgOpenerObj oTarget( pTarget );
+    TaskletPtr pInterceptTask;
+    pInterceptTask = ObjPtr( pInterceptor );
+
+    if( pInterceptTask.IsEmpty() )
+        return -EFAULT;
+
+    CCfgOpener oCfg( ( IConfigDb* )
+        pInterceptTask->GetConfig() );
+
+    oCfg.CopyProp( propNotifyClient, pTarget );
+    oCfg.CopyProp( propEventSink, pTarget );
+
+    oTarget.SetObjPtr(
+        propEventSink, ObjPtr( pInterceptor ) );
+
+    oTarget.SetBoolProp(
+        propNotifyClient, true );
+
+    return 0;
+}
+
+inline gint32 RemoveInterceptCallback(
+    IEventSink* pInterceptor, IEventSink* pTarget )
+{
+    if( pInterceptor == nullptr ||
+        pTarget == nullptr )
+        return -EINVAL;
+
+    CCfgOpenerObj oTarget( pTarget );
+    TaskletPtr pIntceptTask;
+    pIntceptTask = ObjPtr( pIntceptTask );
+
+    if( pIntceptTask.IsEmpty() )
+        return -EFAULT;
+
+    CCfgOpener oCfg( ( IConfigDb* )
+        pIntceptTask->GetConfig() );
+
+    oTarget.CopyProp(
+        propNotifyClient, pInterceptor );
+
+    oTarget.CopyProp(
+        propEventSink, pInterceptor );
+
+    oCfg.RemoveProperty( propEventSink );
+    oCfg.RemoveProperty( propNotifyClient );
+
+    return 0;
+}
 
 template<typename ClassName, typename ...Args>
 class CDeferredCallOneshot :
@@ -1354,20 +1400,7 @@ class CDeferredCallOneshot :
 
     gint32 InterceptCallback( IEventSink* pCallback )
     {
-        // change the propEventSink of the pCallback
-        // with `this' task, and will call the original
-        // propEventSink when we are done
-        CCfgOpenerObj oTaskCfg( pCallback );
-        CCfgOpener oCfg( ( IConfigDb* )this->GetConfig() );
-        oCfg.CopyProp( propEventSink, pCallback );
-
-        oTaskCfg.SetObjPtr(
-            propEventSink, ObjPtr( this ) );
-
-        oTaskCfg.SetBoolProp(
-            propNotifyClient, true );
-
-        return 0;
+        return ::InterceptCallback( this, pCallback );
     }
 
     public:
@@ -1739,20 +1772,7 @@ class CAsyncCallbackOneshot :
 
     gint32 InterceptCallback( IEventSink* pCallback )
     {
-        // change the propEventSink of the pCallback
-        // with `this' task, and will call the original
-        // propEventSink when we are done
-        CCfgOpenerObj oTaskCfg( pCallback );
-        CCfgOpener oCfg( ( IConfigDb* )this->GetConfig() );
-        oCfg.CopyProp( propEventSink, pCallback );
-
-        oTaskCfg.SetObjPtr(
-            propEventSink, ObjPtr( this ) );
-
-        oTaskCfg.SetBoolProp(
-            propNotifyClient, true );
-
-        return 0;
+        return ::InterceptCallback( this, pCallback );
     }
 
     public:
@@ -2340,6 +2360,41 @@ struct has_##MethodName\
         return ret; \
     }
 
+template< typename DesiredType, typename ... Types >
+struct TypeContained;
+
+template< typename DesiredType, typename M, typename...Types >
+struct TypeContained< DesiredType, M, Types... >
+{
+    template < typename, bool >
+    struct BaseType;
+
+    template < typename U >
+    struct BaseType< U, true >
+    {
+        typedef U type;
+    };
+
+    template < typename U >
+    struct BaseType< U, false >
+    {
+        typedef typename TypeContained< U, Types...>::mybasetype::type type;
+    };
+
+    typedef struct BaseType< DesiredType, std::is_same< DesiredType, M >::value > mybasetype;
+};
+
+template< typename DesiredType >
+struct TypeContained< DesiredType >
+{
+    typedef struct BaseType{
+        typedef CInterfaceServer type;
+    } mybasetype;
+};
+
+class CStreamServer;
+class CFileTransferServer;
+
 template< typename virtbase, typename...Types >
 struct CAggregatedObject
     : Types...
@@ -2357,6 +2412,7 @@ struct CAggregatedObject
 
     DEFINE_VIRT_METHOD_IMPL( OnPostStop, gint32,
         VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
+
 };
 
 // a interface as a start point for interface query
@@ -2368,6 +2424,7 @@ struct IUnknown
 };
 
 #define METHOD_EnumInterfaces "EnumInterfaces"
+
 
 #define DECLARE_AGGREGATED_SERVER( ClassName, ... )\
 struct ClassName : CAggregatedObject< CInterfaceServer, ##__VA_ARGS__ >, IUnknown\
@@ -2423,6 +2480,46 @@ struct ClassName : CAggregatedObject< CInterfaceServer, ##__VA_ARGS__ >, IUnknow
         } \
         return 0;\
     }\
+    gint32 FetchData( IConfigDb* pDataDesc, \
+        gint32& fd, guint32& dwOffset, \
+        guint32& dwSize, IEventSink* pCallback ) \
+    { \
+        if( pCallback == nullptr ) \
+            return -EINVAL; \
+        gint32 ret = 0; \
+        do{ \
+            TaskletPtr pTask; \
+            pTask = ObjPtr( pCallback );\
+            CIfInvokeMethodTask* pInvTask = pTask; \
+            if( pInvTask == nullptr ) \
+            { \
+                ret = -EFAULT; \
+                break; \
+            } \
+            EnumClsid iid = clsid( Invalid ); \
+            ret = pInvTask->GetIid( iid ); \
+            if( ERROR( ret ) ) \
+                break; \
+            if( iid == iid( IStream ) ) \
+            { \
+                using StreamClass = typename TypeContained< CStreamServer, ##__VA_ARGS__ >::mybasetype::type; \
+                this->StreamClass::FetchData_Server( pDataDesc, \
+                    fd, dwOffset, dwSize, pCallback ); \
+            } \
+            else if( iid == iid( CFileTransferServer ) ) \
+            { \
+                using FileTransferClass = typename TypeContained< CFileTransferServer, ##__VA_ARGS__ >::mybasetype::type; \
+                this->FileTransferClass::FetchData_Server( pDataDesc, \
+                    fd, dwOffset, dwSize, pCallback ); \
+            } \
+            else \
+            { \
+                this->CInterfaceServer::FetchData_Server( \
+                    pDataDesc, fd, dwOffset, dwSize, pCallback ); \
+            } \
+        }while( 0 ); \
+        return ret; \
+    } \
 }
 
 #define DECLARE_AGGREGATED_PROXY( ClassName, ... )\

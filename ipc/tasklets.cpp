@@ -572,20 +572,6 @@ gint32 CSyncCallback::operator()(
 
 gint32 CSyncCallback::WaitForComplete()
 {
-    gint32 ret = 0;
-    do{
-        ret = sem_wait( &m_semWait );
-
-        if( ret == -1 && errno == EINTR )
-            continue;
-        
-        if( ret == -1 )
-            ret = -errno;
-
-        break;
-
-    }while( 1 );
-
-    return ret;
+    return Sem_Wait( &m_semWait );
 }
 

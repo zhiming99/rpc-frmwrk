@@ -161,6 +161,29 @@ int Sem_Post( sem_t* psem )
     return ret;
 }
 
+int Sem_Wait( sem_t* psem )
+{
+    gint32 ret = 0;
+
+    if( psem == nullptr )
+        return -EINVAL;
+
+    do{
+        ret = sem_wait( psem );
+
+        if( ret == -1 && errno == EINTR )
+            continue;
+        
+        if( ret == -1 )
+            ret = -errno;
+
+        break;
+
+    }while( 1 );
+
+    return ret;
+}
+
 CStdRTMutex::CStdRTMutex( stdrtmutex& oMutex ) :
     CMutex< stdrtmutex >( oMutex )
 {}

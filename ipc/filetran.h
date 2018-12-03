@@ -38,19 +38,6 @@ class IFileTransfer
         const std::string& strDestFile ) = 0;
 };
 
-struct IStreamProxy
-{
-    public:
-    gint32 OpenStream( IConfigDb* pStmCfg, gint32 fd );
-    gint32 CloseStream( gint32 fd );
-    gint32 ReadStream( gint32 fd, BufPtr& pBuf );
-    gint32 WriteStream( gint32 fd, BufPtr& pBuf );
-    gint32 OnStmRecv(
-        IEventSink* pCallback, BufPtr& pBuf );
-    gint32 OnStmSend(
-        IEventSink* pCallback, BufPtr& pBuf );
-};
-
 class CFileTransferProxy :
     public virtual CInterfaceProxy,
     public IFileTransfer

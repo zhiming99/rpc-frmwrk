@@ -1762,6 +1762,9 @@ gint32 CRpcServices::RebuildMatches()
             if( iid == iid( CFileTransferServer ) )
                 m_pFtsMatch = pMatch;
 
+            if( iid == iid( IStream ) )
+                m_pStmMatch = pMatch;
+
             // set the request que size
             ret = oMatchCfg.GetBoolProp(
                 propPausable, bPausable );
@@ -1841,6 +1844,7 @@ gint32 CRpcServices::OnPostStop(
     m_queInvTasks.clear();
 
     m_pFtsMatch.Clear();
+    m_pStmMatch.Clear();
 
     return 0;
 }
@@ -2273,11 +2277,11 @@ gint32 CInterfaceProxy::SendFetch_Proxy(
 
             // Send/Fetch belongs to interface
             // CFileTransferServer
-            EnumClsid iidFts =
-                iid( CFileTransferServer );
+            EnumClsid iid = ( EnumClsid )
+                ( ( guint32& )oDesc[ propIid ] );
 
             std::string strIfName =
-                CoGetIfNameFromIid( iidFts  );
+                CoGetIfNameFromIid( iid );
 
             if( strIfName.empty() )
             {
@@ -2311,7 +2315,8 @@ gint32 CInterfaceProxy::SendFetch_Proxy(
 
             oBuilder.SetCallFlags( CF_WITH_REPLY
                | DBUS_MESSAGE_TYPE_METHOD_CALL 
-               | CF_ASYNC_CALL );
+               | CF_ASYNC_CALL
+               | CF_KEEP_ALIVE );
 
             oBuilder.SetTimeoutSec(
                 IFSTATE_DEFAULT_IOREQ_TIMEOUT ); 
@@ -4466,6 +4471,7 @@ gint32 CInterfaceServer::DoInvoke(
             break;
 
         CfgPtr pDataDesc( true );
+        EnumClsid iid = clsid( Invalid );
         do{
             if( strMethod == SYS_METHOD_SENDDATA ||
                 strMethod == SYS_METHOD_FETCHDATA )
@@ -4473,18 +4479,65 @@ gint32 CInterfaceServer::DoInvoke(
                 // we need further filter to confirm
                 // the SENDDATA is sent to the correct
                 // interface
-                if( m_pFtsMatch.IsEmpty() )
+                if( m_pFtsMatch.IsEmpty() &&
+                    m_pStmMatch.IsEmpty() )
                 {
                     // the interface is not up
                     ret = -EBADMSG;
                     break;
                 }
-                ret = m_pFtsMatch->IsMyMsgIncoming( pReqMsg );
-                if( ERROR( ret  ) )
+
+                if( !m_pFtsMatch.IsEmpty() )
+                {
+                    ret = m_pFtsMatch->
+                        IsMyMsgIncoming( pReqMsg );
+
+                    if( SUCCEEDED( ret ) )
+                    {
+                        CCfgOpenerObj oMatchCfg(
+                            ( CObjBase* )m_pFtsMatch );
+
+                        oMatchCfg.GetIntProp(
+                            propIid, ( guint32& )iid );
+                    }
+                }
+
+                gint32 ret2 = STATUS_SUCCESS;
+
+                if( !m_pStmMatch.IsEmpty() )
+                {
+                    ret2 = m_pStmMatch->
+                        IsMyMsgIncoming( pReqMsg );
+
+                    if( SUCCEEDED( ret2 ) )
+                    {
+                        CCfgOpenerObj oMatchCfg(
+                            ( CObjBase* )m_pStmMatch );
+
+                        oMatchCfg.GetIntProp(
+                            propIid, ( guint32& )iid );
+                    }
+                }
+
+                if( ERROR( ret  ) && ERROR( ret2 ) )
                 {
                     ret = -EBADMSG;
                     break;
                 }
+
+                // uncomment this if it is supported
+                // in the future
+                if( iid == iid( IStream ) &&
+                    strMethod == SYS_METHOD_SENDDATA )
+                {
+                    ret = -ENOTSUP;
+                    break;
+                }
+            }
+            else
+            {
+                ret = -ENOTSUP;
+                break;
             }
 
             if( strMethod == SYS_METHOD_SENDDATA )
@@ -4505,7 +4558,7 @@ gint32 CInterfaceServer::DoInvoke(
                 if( ERROR( ret ) )
                     break;
 
-                gint32 fd =
+                int fd =
                     ( gint32& )*vecArgs[ 1 ].second;
 
                 guint32 dwOffset =
@@ -4576,7 +4629,13 @@ gint32 CInterfaceServer::DoInvoke(
                     }
                 }
 
-                gint32 fd = -1;
+                int fd =
+                    ( guint32& )*vecArgs[ 1 ].second;
+
+                // uncomment this if it become
+                // necessary some day
+                if( iid != iid( IStream ) )
+                    fd = -1;
 
                 guint32 dwOffset =
                     ( guint32& )*vecArgs[ 2 ].second;
@@ -4618,19 +4677,18 @@ gint32 CInterfaceServer::DoInvoke(
 
                 if( SUCCEEDED( ret ) )
                 {
+                    // on success , we need to set the
+                    // response immediately
                     SetResponse( pCallback,
                         oResp.GetCfg() );
                 }
                 else
                 {
+                    // SetResponse at the end and here
+                    // close the fd only
                     if( fd >= 0 )
                         close( fd );
                 }
-                break;
-            }
-            else
-            {
-                ret = -ENOTSUP;
                 break;
             }
 

@@ -237,14 +237,12 @@ class CTaskletSync : public CTasklet
         return ret;
     }
 
-    bool IsAsync() const
+    inline bool IsAsync() const
     { return false; }
 
-    gint32 WaitForComplete()
+    inline gint32 WaitForComplete()
     {
-        while( sem_wait( &m_semSync ) == -1
-            && errno == EINTR );
-        return 0;
+        return Sem_Wait( &m_semSync );
     }
 };
 

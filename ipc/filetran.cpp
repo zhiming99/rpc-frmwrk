@@ -124,6 +124,9 @@ gint32 CFileTransferProxy::UploadFile_Async(
         if( ERROR( ret ) )
             break;
 
+        oDescCfg[ propIid ] =
+            iid( CFileTransferServer );
+
         TaskletPtr pAsync;
         ret = BIND_CALLBACK( pAsync,
             &CFileTransferProxy::UploadFile_Callback );
@@ -310,6 +313,9 @@ gint32 CFileTransferProxy::DownloadFile_Async(
         CParamList oDescCfg;
 
         oDescCfg[ propFilePath ] = strSrcFile;
+
+        oDescCfg[ propIid ] =
+            iid( CFileTransferServer );
 
         guint32 dwOffset = 0;
         // dwSize set to zero to read the whole file

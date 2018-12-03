@@ -130,7 +130,7 @@ gint32 CEvLoop::TIMER_SOURCE::TimerCallback(
     if( !m_pCallback.IsEmpty() )
     {
         ret = m_pCallback->OnEvent( eventTimeout,
-            iParams, 0, nullptr );
+            iParams, ( HANDLE )this, nullptr );
     }
     if( !m_bRepeat )
     {
@@ -194,9 +194,8 @@ gint32 CEvLoop::IO_SOURCE::IoCallback(
     gint32 ret = G_SOURCE_REMOVE;
     if( !m_pCallback.IsEmpty() )
     {
-        ret = m_pCallback->OnEvent(
-            eventIoWatch, condition,
-            0, nullptr );
+        ret = m_pCallback->OnEvent( eventIoWatch,
+            condition, ( HANDLE )this, nullptr );
     }
 
     return ret;
@@ -240,9 +239,8 @@ gint32 CEvLoop::ASYNC_SOURCE::AsyncCallback(
     gint32 ret = G_SOURCE_CONTINUE;
     if( !m_pCallback.IsEmpty() )
     {
-        ret = m_pCallback->OnEvent(
-            eventAsyncWatch, 0,
-            0, nullptr );
+        ret = m_pCallback->OnEvent( eventAsyncWatch,
+            0, ( HANDLE )this, nullptr );
     }
     return ret;
 }

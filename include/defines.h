@@ -36,7 +36,7 @@
 #include <arpa/inet.h>
 #include <dbus/dbus.h>
 
-#define PAGE_SIZE               4096
+#define PAGE_SIZE               ( getpagesize() )
 #define HANDLE                  guint32
 #define PortToHandle( ptr )     reinterpret_cast<HANDLE>( ( IPort* )ptr )
 #define HandleToPort( handle )  reinterpret_cast< IPort* >( handle )
@@ -90,6 +90,9 @@
 #define ERROR_CANNOT_COMP       ( ( gint32 )0x8001000b )
 #define ERROR_USER_CANCEL       ( ( gint32 )0x8001000c )
 #define ERROR_PAUSED            ( ( gint32 )0x8001000d )
+
+// a special error for FETCH_DATA
+#define ERROR_SUCCESS           ( ( gint32 )0x8001000e )
 
 #define AlignDword( val )    ( ( val + 3 ) & ~( sizeof( guint32 ) - 1 ) )
 
@@ -179,6 +182,7 @@ extern int Sem_Init( sem_t* psem, int pshared, unsigned int value );
 extern int Sem_Timedwait( sem_t* psem, const timespec& ts );
 extern int Sem_TimedwaitSec( sem_t* psem, gint32 iSec );
 extern int Sem_Post( sem_t* psem );
+extern int Sem_Wait( sem_t* psem );
 
 // set the name of the current thread
 extern gint32 SetThreadName(const std::string& strName );

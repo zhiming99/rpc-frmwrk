@@ -620,7 +620,10 @@ class CRpcServices :
     std::map< gint32, PROXY_MAP > m_mapProxyFuncs;
     std::map< gint32, FUNC_MAP > m_mapFuncs;
 
+    // message filter for file transfer 
     MatchPtr    m_pFtsMatch;
+    // message filter for stream
+    MatchPtr    m_pStmMatch;
 
     // the queue of pending invoke tasks, for queued
     // task processing

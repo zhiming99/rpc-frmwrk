@@ -3910,6 +3910,31 @@ gint32 CIfInvokeMethodTask::OnFilterComp()
     return ret;
 }
 
+gint32 CIfInvokeMethodTask::GetIid(
+    EnumClsid& iid )
+{
+    // to get the interface id of the invoking method
+    gint32 ret = 0;
+    do{
+        CCfgOpener oCfg(
+            ( IConfigDb* )GetConfig() );
+
+        CObjBase* pObj;
+        ret = oCfg.GetPointer(
+            propMatchPtr, pObj );
+
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpenerObj oMatchCfg( pObj );
+        ret = oMatchCfg.GetIntProp(
+            propIid, ( guint32& )iid );
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CIfInvokeMethodTask::Process(
     guint32 dwContext )
 {
@@ -4737,7 +4762,9 @@ gint32 CIfInvokeMethodTask::SetAsyncCall(
         // required
         
         ObjPtr pObj;
-        CCfgOpener oTaskCfg( ( IConfigDb* )GetConfig() );
+        CCfgOpener oTaskCfg(
+            ( IConfigDb* )GetConfig() );
+
         guint32 dwTimeoutSec = 0;
 
         ret = GetTimeoutSec( dwTimeoutSec );
@@ -4786,6 +4813,10 @@ gint32 CIfInvokeMethodTask::SetAsyncCall(
             ret = 0;
             break;
         }
+
+        if( dwTimeoutSec == 0 )
+            break;
+
         m_iKeepAlive = oTimerSvc.AddTimer(
             dwTimeoutSec, this,
             ( guint32 )eventKeepAlive );
