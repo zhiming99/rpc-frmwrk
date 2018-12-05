@@ -2186,6 +2186,9 @@ gint32 CRpcServices::RunIoTask(
         if( pIoTaskId != nullptr )
             *pIoTaskId = qwTaskId;
 
+        CustomizeRequest(
+            pReqCall, pCallback );
+
         // schedule the task or run it immediately
         ret = AddAndRun( pTask );
 
@@ -2318,31 +2321,38 @@ gint32 CInterfaceProxy::SendFetch_Proxy(
                | CF_ASYNC_CALL
                | CF_KEEP_ALIVE );
 
-            oBuilder.SetTimeoutSec(
-                IFSTATE_DEFAULT_IOREQ_TIMEOUT ); 
-
-            oBuilder.SetKeepAliveSec(
-                IFSTATE_DEFAULT_IOREQ_TIMEOUT / 2 ); 
-
             oBuilder.CopyProp( propNonFd, pDataDesc );
+
+            // well, the call option are required by
+            // keep-alive, and since the content of
+            // oBuilder for SEND/FETCH cannot go over
+            // to the peer side, we have to put it in
+            // the data desc. 
+            oDesc.CopyProp( propCallOptions,
+                ( IConfigDb* )oBuilder.GetCfg() );
 
             oBuilder.Push( ObjPtr( oDesc.GetCfg() ) );
             oBuilder.Push( fd );
             oBuilder.Push( dwOffset );
             oBuilder.Push( dwSize );
 
-            CustomizeRequest(
-                oBuilder.GetCfg(), pCallback );
-
+            guint64 qwTaskId = 0;
             ret = RunIoTask( oBuilder.GetCfg(),
-                oResp.GetCfg(), pCallback );
+                oResp.GetCfg(), pCallback, &qwTaskId );
 
             if( ret == STATUS_PENDING )
+            {
+                // the parameter list does not have a
+                // place for the task id, so put it in
+                // the data desc.
+                CCfgOpener oUserDesc( pDataDesc );
+                oUserDesc[ propTaskId ] = qwTaskId;
                 break;
+            }
 
             gint32 iRet = 0;
-            ret = oResp.GetIntProp( propReturnValue,
-                 ( guint32& )iRet );
+            ret = oResp.GetIntProp(
+                propReturnValue, ( guint32& )iRet );
 
             if( ERROR( ret ) )
                 break;
@@ -4150,7 +4160,6 @@ gint32 CInterfaceProxy::SendProxyReq(
         }
 
         oReq.SetCallFlags( dwFlags );
-        CustomizeRequest( oReq.GetCfg(), pCallback );
 
         CfgPtr pResp( true );
         gint32 iRet = 0;
@@ -4198,6 +4207,52 @@ gint32 CInterfaceProxy::SendProxyReq(
         }
 
         ret = iRet;
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CInterfaceProxy::CustomizeRequest(
+    IConfigDb* pReqCfg,
+    IEventSink* pCallback )
+{
+    // this is the last moment to make changes to the
+    // request before being executed.
+    CParamList oParams( pReqCfg );
+    std::string strMethod;
+
+    gint32 ret = oParams.GetStrProp(
+        propMethodName, strMethod );
+
+    if( ERROR( ret ) )
+        return ret;
+
+    if( strMethod == SYS_METHOD_SENDDATA ||
+        strMethod == SYS_METHOD_FETCHDATA )
+        return CustomizeSendFetch(
+            pReqCfg, pCallback );
+
+    return 0;
+}
+
+gint32 CInterfaceProxy::CustomizeSendFetch(
+    IConfigDb* pReqCfg,
+    IEventSink* pCallback )
+{
+    gint32 ret = 0;
+    do{
+        CParamList oParams( pReqCfg );
+        IConfigDb* pDesc;
+        ret = oParams.GetPointer( 0, pDesc );
+        if( ERROR( ret ) )
+            break;
+
+        // note: the remote handler can only have the
+        // taskid from the parameter desc, but not the
+        // pReqCfg.
+        CCfgOpener oDesc( pDesc );
+        oDesc.CopyProp( propTaskId, pReqCfg );
 
     }while( 0 );
 
@@ -4583,11 +4638,12 @@ gint32 CInterfaceServer::DoInvoke(
 
                 if( ret == STATUS_PENDING )
                 {
+                    // keep-alive settings
                     CCfgOpenerObj oTaskCfg( pCallback );
                     SET_RMT_TASKID(
                         ( IConfigDb* )pDataDesc, oTaskCfg );
-                    // the return value will be send
-                    // in OnSendDataComplete
+                    oTaskCfg.SetObjPtr(
+                        propReqPtr, ObjPtr( pDataDesc ) );
                     break;
                 }
                 ret = oResp.SetIntProp(
@@ -4648,11 +4704,14 @@ gint32 CInterfaceServer::DoInvoke(
 
                 if( ret == STATUS_PENDING )
                 {
-                    // the return value will be send
-                    // in OnFetchDataComplete
+                    // keep-alive settings
                     CCfgOpenerObj oTaskCfg( pCallback );
                     SET_RMT_TASKID(
                         ( IConfigDb* )pDataDesc, oTaskCfg );
+
+                    oTaskCfg.SetObjPtr(
+                        propReqPtr, ObjPtr( pDataDesc ) );
+
                     break;
                 }
 

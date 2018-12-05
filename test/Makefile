@@ -8,6 +8,7 @@ all:
 	make -C katest
 	make -C prtest
 	make -C sftest
+	make -C stmtest
 
 release:
 	make -C helloworld release
@@ -19,6 +20,7 @@ release:
 	make -C katest release
 	make -C prtest release
 	make -C sftest release
+	make -C stmtest release
 
 clean:
 	make -C helloworld clean
@@ -30,5 +32,6 @@ clean:
 	make -C katest clean
 	make -C prtest clean
 	make -C sftest clean
+	make -C stmtest clean
 
 .PHONY: release clean

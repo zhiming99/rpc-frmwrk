@@ -98,6 +98,13 @@ class CSendQue
 
     std::deque< STM_PACKET > m_queBufWrite;
 
+    inline gint32 Send( int iFd,
+        void* pBuf, guint32 dwSize )
+    {
+        return send( iFd, pBuf,
+            dwSize, MSG_NOSIGNAL );
+    }
+
     public:
     enum SendState
     {
@@ -290,6 +297,9 @@ class CIoWatchTaskProxy :
 
     gint32 OnConnected();
 
+    inline void SetReqTask( TaskletPtr pTask )
+    { m_pIoTask = pTask; }
+
     inline TaskletPtr GetReqTask() const
     { return m_pIoTask; }
 
@@ -320,6 +330,8 @@ class CIoWatchTaskProxy :
 
     inline gint32 WaitForComplete()
     { return Sem_Wait( &m_semWait ); }
+
+    gint32 RunTask();
 };
 
 class CIoWatchTaskServer :
@@ -377,7 +389,7 @@ struct IStream
     virtual gint32 CloseChannel(
         HANDLE hChannel ) = 0;
 
-    gint32 Removechannel( HANDLE hChannel );
+    gint32 RemoveChannel( HANDLE hChannel );
 
     gint32 WriteStream(
         HANDLE hChannel, BufPtr& pBuf );
@@ -391,7 +403,8 @@ struct IStream
 
     virtual gint32 OnPingPong(
         HANDLE hChannel,
-        bool bPing = true ) = 0;
+        bool bPing = true )
+    { return 0; }
 
     virtual gint32 OnSendReady(
         HANDLE hChannel )
@@ -402,18 +415,25 @@ struct IStream
     virtual gint32 OnChannelError(
         HANDLE hChannel,
         gint32 iError ) = 0;
+
+    // interface to notify the server/proxy, it is OK
+    // to send data to the peer. Override this method
+    // for the desired action.
+    virtual gint32 OnConnected(
+        HANDLE hChannel ) = 0;
 };
 
 struct IStreamServer : public IStream
 {
     // callback when a close token is received
-    virtual gint32 OnClose( HANDLE hChannel ) = 0;
+    virtual gint32 OnClose(
+        HANDLE hChannel ) = 0;
 };
 
 struct IStreamProxy : public IStream
 {
-    virtual gint32 CancelChannel( HANDLE hChannel ) = 0;
-    virtual gint32 OnConnected( HANDLE hChannel ) = 0;
+    virtual gint32 CancelChannel(
+        HANDLE hChannel ) = 0;
 };
 
 class CStreamProxy :
@@ -446,10 +466,6 @@ class CStreamProxy :
         return 0;
     }
 
-    // data is ready for reading
-    gint32 OnStmRecv(
-        HANDLE hChannel, BufPtr& pBuf );
-
     // note the fd is always -1 for proxy version of
     // implementation and the fd will be created in
     // this method
@@ -474,11 +490,9 @@ class CStreamProxy :
     // fatal error
     gint32 CancelChannel( HANDLE hChannel );
 
-    // interface to notify the client, it is OK for the
-    // proxy to send data. Override this method for the
-    // desired action.
-    gint32 OnConnected( HANDLE hChannel )
-    { return 0; }
+    // call this helper to start a stream channel
+    gint32 StartStream( HANDLE& hChannel,
+        TaskletPtr& pSyncTask );
 };
 
 class CStreamServer :
@@ -502,7 +516,7 @@ class CStreamServer :
     virtual gint32 InitUserFuncs()
     {
         // we are using built-in handlers, so empty map
-        // is enough
+        // is fine
         BEGIN_IFHANDLER_MAP( IStream );
         END_IFHANDLER_MAP;
         return 0;
@@ -514,10 +528,6 @@ class CStreamServer :
         IConfigDb* pDataDesc,
         int& fd, HANDLE& hChannel,
         IEventSink* pCallback );
-
-    // data is ready for reading
-    gint32 OnStmRecv(
-        HANDLE hChannel, BufPtr& pBuf );
 
     gint32 FetchData_Server(
         IConfigDb* pDataDesc,           // [in]

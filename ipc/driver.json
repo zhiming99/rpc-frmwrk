@@ -218,6 +218,20 @@
             ]
         },
         {
+            "ModName" : "stmclitst",
+            "DriversToLoad" :
+            [
+                "DBusBusDriver"
+            ]
+        },
+        {
+            "ModName" : "stmsvrtst",
+            "DriversToLoad" :
+            [
+                "DBusBusDriver"
+            ]
+        },
+        {
             "ModName" : "Mod_RpcRouter_0",
             "DriversToLoad" :
             [

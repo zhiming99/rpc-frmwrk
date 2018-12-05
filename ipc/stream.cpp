@@ -239,17 +239,17 @@ CSendQue::GetSendState() const
 
 gint32 CSendQue::OnIoReady()
 {
-    if( m_queBufWrite.size() == 0 )
-        return 0;
-
     gint32 ret = 0;
     do{
+        if( m_queBufWrite.empty() )
+            break;
+
         STM_PACKET& oPkt =
             m_queBufWrite.front();
 
         if( GetSendState() == sendTok )
         {
-            ret = write( m_iFd, &oPkt.byToken,
+            ret = Send( m_iFd, &oPkt.byToken,
                 sizeof( oPkt.byToken ) );
 
             if( ret == -1 )
@@ -287,10 +287,11 @@ gint32 CSendQue::OnIoReady()
             guint32 iLeft =
                 sizeof( guint32 ) - m_dwOffsetWrite;
 
-            guint8* pos = ( ( guint8* )&oPkt.dwSize ) +
+            guint32 dwSize = htonl( oPkt.dwSize );
+            guint8* pos = ( ( guint8* )&dwSize ) +
                 m_dwOffsetWrite;
 
-            ret = write( m_iFd, pos, iLeft );
+            ret = Send( m_iFd, pos, iLeft );
 
             if( ret == ( gint32 )iLeft )
             {
@@ -351,7 +352,7 @@ gint32 CSendQue::OnIoReady()
             guint8* pos = ( ( guint8* )pBuf->ptr() ) +
                 m_dwOffsetWrite;
 
-            ret = write( m_iFd, pos, iLeft );
+            ret = Send( m_iFd, pos, iLeft );
             if( ret == ( gint32 )iLeft )
             {
                 // the packet is done
@@ -617,7 +618,7 @@ gint32 CIoWatchTask::operator()(
         if( iState == stateStopped )
             return ERROR_STATE;
 
-        if( iState == stateConnected )
+        if( iState == stateStarted )
         {
             switch( dwContext )
             {
@@ -639,6 +640,12 @@ gint32 CIoWatchTask::operator()(
                     
                     guint32 revents = vecParams[ 1 ];
                     ret = OnIoWatchEvent( revents );
+
+                    if( ERROR( ret ) && ret != -EAGAIN )
+                        ret = G_SOURCE_REMOVE;
+                    else
+                        ret = G_SOURCE_CONTINUE;
+
                     return ret;
                 }
             default:
@@ -788,7 +795,10 @@ gint32 CIoWatchTask::OnIoReady( guint32 revent )
                 if( ret == -EAGAIN )
                     StartWatch();
                 else
+                {
+                    // no data to send
                     StopWatch();
+                }
 
                 if( SUCCEEDED( ret ) &&
                     m_oSendQue.GetPendingWrite() == 0 )
@@ -834,6 +844,8 @@ gint32 CIoWatchTask::ReleaseChannel()
         pLoop->RemoveIoWatch( m_hReadWatch );
         pLoop->RemoveIoWatch( m_hWriteWatch );
         m_hReadWatch = m_hWriteWatch = 0;
+        HANDLE hChannel = ( HANDLE )( CObjBase* )this;
+        m_pStream->RemoveChannel( hChannel );
 
     }while( 0 );
 
@@ -893,6 +905,30 @@ gint32 CIoWatchTaskProxy::OnPingPong(
             ret = OnConnected();
             break;
         }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CIoWatchTaskProxy::RunTask()
+{
+    gint32 ret = 0;
+    do{
+        CCfgOpener oCfg( ( IConfigDb* )
+            this->GetConfig() );
+
+        ObjPtr pObj;
+        ret = oCfg.GetObjPtr( 1, pObj );
+        if( ERROR( ret ) )
+            break;
+
+        SetReqTask( pObj );
+        ret = super::RunTask();
+        if( ERROR( ret ) )
+            break;
+
+        ret = STATUS_PENDING;
 
     }while( 0 );
 
@@ -984,7 +1020,7 @@ gint32 IStream::GetWatchTask(
     return ret;
 }
 
-gint32 IStream::Removechannel( HANDLE hChannel )
+gint32 IStream::RemoveChannel( HANDLE hChannel )
 {
     if( hChannel == 0 )
         return -EINVAL;
@@ -1094,6 +1130,11 @@ gint32 CStreamProxy::OnChannelError(
             break;
         }
 
+        // stop watch to prevent duplicated error
+        pTaskProxy->StopWatch( true );
+        // stop watch to prevent duplicated error
+        pTaskProxy->StopWatch( false );
+
         TaskletPtr pReqTask =
             pTaskProxy->GetReqTask();
 
@@ -1188,12 +1229,32 @@ gint32 CStreamProxy::OpenChannel(
         oDesc.SetIntProp(
             propIid, iid( IStream ) );
 
+        ret = SendRequest( pDataDesc,
+            iRemote, pCallback );
+ 
+        if( ret != STATUS_PENDING )
+            break;
+
+        guint64 qwTaskId = 0;
+        ret = oDesc.GetQwordProp(
+            propTaskId, qwTaskId );
+
+        if( ERROR( ret ) )
+            break;
+
+        TaskletPtr pReqTask;
+        ret = m_pRootTaskGroup->FindTask(
+            qwTaskId, pReqTask );
+
+        if( ERROR( ret ) )
+            break;
+
         CParamList oParams;
         oParams[ propIfPtr ] = ObjPtr( this );
         oParams[ propIoMgr ] = ObjPtr( GetIoMgr() );
 
         oParams.Push( iLocal );
-        oParams.Push( ObjPtr( pCallback ) );
+        oParams.Push( ObjPtr( pReqTask ) );
         oParams.Push( ObjPtr( pDataDesc ) );
 
         TaskletPtr pTask;
@@ -1204,8 +1265,8 @@ gint32 CStreamProxy::OpenChannel(
         if( ERROR( ret ) )
             break;
 
-        CObjBase* pWatchTask = pTask;
-        hChannel = ( HANDLE )pWatchTask;
+        CObjBase* pObjBase = pTask;
+        hChannel = ( HANDLE )pObjBase;
         if( true )
         {
             CStdRMutex oIfLock( GetLock() ); 
@@ -1214,7 +1275,7 @@ gint32 CStreamProxy::OpenChannel(
 
         // insert this task to the completion chain of
         // pCallback
-        ret = InterceptCallback( pTask, pCallback );
+        ret = InterceptCallback( pTask, pReqTask );
         if( ERROR( ret ) )
             break;
 
@@ -1222,24 +1283,9 @@ gint32 CStreamProxy::OpenChannel(
         ret = ( *pTask )( eventZero );
         if( ret != STATUS_PENDING )
         {
+            iLocal = -1;
             RemoveInterceptCallback(
                 pTask, pCallback );
-            iLocal = -1;
-            break;
-        }
-
-        ret = SendRequest( pDataDesc,
-            iRemote, pCallback );
- 
-        if( ret != STATUS_PENDING )
-        {
-            RemoveInterceptCallback(
-                pTask, pCallback );
-
-            pTask->OnEvent( eventTaskComp,
-                ret, 0, nullptr );
-
-            iLocal = -1;
             break;
         }
 
@@ -1252,26 +1298,49 @@ gint32 CStreamProxy::OpenChannel(
             close( iLocal );
             iLocal = -1;
         }
+    }
 
-        if( iRemote >= 0 )
-        {
-            close( iRemote );
-            iRemote = -1;
-        }
+    if( iRemote >= 0 )
+    {
+        close( iRemote );
+        iRemote = -1;
     }
 
     return ret;
 }
 
-// data is ready for reading
-gint32 CStreamProxy::OnStmRecv(
-    HANDLE hChannel, BufPtr& pBuf )
+// call this helper to start a stream channel
+gint32 CStreamProxy::StartStream(
+    HANDLE& hChannel, TaskletPtr& pSyncTask )
 {
-    // override this method for customized action
-    DebugPrint( 0, "Received %s bytes\n",
-        pBuf->size() );
+    gint32 ret = 0;
+    do{
+        int fd = -1;
+        CParamList oParams;
+        oParams.SetPointer(
+            propIoMgr, GetIoMgr() );
 
-    return 0;
+        ret = pSyncTask.NewObj(
+            clsid( CSyncCallback ),
+            oParams.GetCfg() );
+
+        if( ERROR( ret ) )
+            break;
+
+        ret = OpenChannel( oParams.GetCfg(),
+            fd, hChannel, pSyncTask );
+
+        if( ERROR( ret ) )
+            break;
+
+        if( ret != STATUS_PENDING )
+            ret = ERROR_FAIL;
+        else
+            ret = 0;
+
+    }while( 0 );
+
+    return ret;
 }
 
 // call this method when the proxy want to end the
@@ -1290,6 +1359,10 @@ gint32 CStreamProxy::CloseChannel(
     CIoWatchTaskProxy* pWatchTask = pTask;
     if( pWatchTask == nullptr )
         return -EFAULT;
+
+    // stop I/O watch
+    pWatchTask->StopWatch( true );
+    pWatchTask->StopWatch( false );
 
     ret = pWatchTask->CloseChannel();
     if( ERROR( ret ) )
@@ -1404,26 +1477,6 @@ gint32 CStreamServer::CanContinue()
     return 0;
 }
 
-gint32 CStreamServer::OnStmRecv(
-    HANDLE hChannel, BufPtr& pBuf )
-{
-    // override this method for customized action
-    if( hChannel == 0 || pBuf.IsEmpty() )
-        return -EINVAL;
-
-    gint32 ret = CanContinue();
-    if( ERROR( ret ) )
-        return ret;
-    
-    std::string strReply( "hello, world" );
-    BufPtr pReply( true );
-    *pReply = strReply;
-
-    ret = WriteStream( hChannel, pReply );
-
-    return 0;
-}
-
 gint32 CStreamServer::OpenChannel(
     IConfigDb* pDataDesc,
     int& fd, HANDLE& hChannel,
@@ -1471,6 +1524,7 @@ gint32 CStreamServer::OpenChannel(
             fd = -1;
             RemoveInterceptCallback(
                 pTask, pCallback );
+            break;
         }
 
     }while( 0 );
@@ -1495,8 +1549,14 @@ gint32 CStreamServer::FetchData_Server(
     IEventSink* pCallback )
 {
     HANDLE hChannel = 0;
-    return OpenChannel( pDataDesc,
+    gint32 ret = OpenChannel( pDataDesc,
         fd, hChannel, pCallback );
+
+    if( ret != STATUS_PENDING )
+        return ret;
+
+    OnConnected( hChannel );
+    return ret;
 }
 
 gint32 CStreamServer::OnClose(

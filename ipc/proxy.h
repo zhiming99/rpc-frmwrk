@@ -879,6 +879,10 @@ class CRpcServices :
         bool bIncoming,
         IEventSink* pFilter = nullptr )
     { return 0; }
+
+    virtual gint32 CustomizeRequest(
+        IConfigDb* pReqCfg,
+        IEventSink* pCallback ) = 0;
 };
 
 template< typename ...Args>
@@ -1015,8 +1019,11 @@ class CInterfaceProxy :
 
     virtual gint32 CustomizeRequest(
         IConfigDb* pReqCfg,
-        IEventSink* pCallback )
-    { return 0; }
+        IEventSink* pCallback );
+
+    virtual gint32 CustomizeSendFetch(
+        IConfigDb* pReqCfg,
+        IEventSink* pCallback );
 
     template< typename ...Args >
     gint32 CallProxyFunc(
@@ -1229,6 +1236,11 @@ class CInterfaceServer :
 
     bool IsPaused( const std::string& strIfName );
     bool IsPaused( IMessageMatch* pMatch );
+
+    virtual gint32 CustomizeRequest(
+        IConfigDb* pReqCfg,
+        IEventSink* pCallback )
+    { return 0; }
 
     // called to set the response to send back
     virtual gint32 SetResponse(

@@ -2360,11 +2360,11 @@ struct has_##MethodName\
         return ret; \
     }
 
-template< typename DesiredType, typename ... Types >
+template< typename DefaultType, typename DesiredType, typename ... Types >
 struct TypeContained;
 
-template< typename DesiredType, typename M, typename...Types >
-struct TypeContained< DesiredType, M, Types... >
+template< typename DefaultType, typename DesiredType, typename M, typename...Types >
+struct TypeContained< DefaultType, DesiredType, M, Types... >
 {
     template < typename, bool >
     struct BaseType;
@@ -2378,17 +2378,18 @@ struct TypeContained< DesiredType, M, Types... >
     template < typename U >
     struct BaseType< U, false >
     {
-        typedef typename TypeContained< U, Types...>::mybasetype::type type;
+        typedef typename TypeContained< DefaultType, U, Types...>::mybasetype::type type;
     };
 
-    typedef struct BaseType< DesiredType, std::is_same< DesiredType, M >::value > mybasetype;
+    typedef struct BaseType< DesiredType, std::is_same< DesiredType, M >::value ||
+        std::is_base_of< DesiredType, M >::value > mybasetype;
 };
 
-template< typename DesiredType >
-struct TypeContained< DesiredType >
+template< typename DefaultType, typename DesiredType >
+struct TypeContained< DefaultType, DesiredType >
 {
     typedef struct BaseType{
-        typedef CInterfaceServer type;
+        typedef DefaultType type;
     } mybasetype;
 };
 
@@ -2415,6 +2416,75 @@ struct CAggregatedObject
 
 };
 
+template< typename...Types >
+struct CAggregatedObject< CInterfaceServer, Types... >
+    : Types...
+{
+    using virtbase = CInterfaceServer;
+    public:
+    CAggregatedObject( const IConfigDb* pCfg )
+    : virtbase( pCfg ), Types( pCfg )...
+    {
+    }
+
+    DEFINE_VIRT_METHOD_IMPL_NOARG( InitUserFuncs, gint32 )
+
+    DEFINE_VIRT_METHOD_IMPL( OnPreStart, gint32,
+        VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
+
+    DEFINE_VIRT_METHOD_IMPL( OnPostStop, gint32,
+        VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
+
+    gint32 FetchData_Server( IConfigDb* pDataDesc,
+        gint32& fd, guint32& dwOffset,
+        guint32& dwSize, IEventSink* pCallback )
+    {
+        if( pCallback == nullptr )
+            return -EINVAL;
+        gint32 ret = 0;
+        do{
+            TaskletPtr pTask;
+            pTask = ObjPtr( pCallback );
+            CIfInvokeMethodTask* pInvTask = pTask;
+            if( pInvTask == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+
+            EnumClsid iid = clsid( Invalid );
+            ret = pInvTask->GetIid( iid );
+            if( ERROR( ret ) )
+                break;
+
+            if( iid == iid( IStream ) )
+            {
+                using StreamClass = typename TypeContained
+                    < virtbase, CStreamServer, Types... >::mybasetype::type;
+
+                ret = this->StreamClass::FetchData_Server(
+                    pDataDesc, fd, dwOffset, dwSize, pCallback );
+            }
+            else if( iid == iid( CFileTransferServer ) )
+            {
+                using FileTransferClass = typename TypeContained
+                    < virtbase, CFileTransferServer, Types... >::mybasetype::type;
+
+                ret = this->FileTransferClass::FetchData_Server(
+                    pDataDesc, fd, dwOffset, dwSize, pCallback );
+            }
+            else
+            {
+                ret = this->virtbase::FetchData_Server(
+                    pDataDesc, fd, dwOffset, dwSize, pCallback );
+            }
+
+        }while( 0 );
+
+        return ret;
+    }
+};
+
 // a interface as a start point for interface query
 struct IUnknown
 {
@@ -2425,13 +2495,13 @@ struct IUnknown
 
 #define METHOD_EnumInterfaces "EnumInterfaces"
 
-
 #define DECLARE_AGGREGATED_SERVER( ClassName, ... )\
 struct ClassName : CAggregatedObject< CInterfaceServer, ##__VA_ARGS__ >, IUnknown\
 {\
-    typedef CAggregatedObject< CInterfaceServer, ##__VA_ARGS__ > super;\
+    using virtbase = CInterfaceServer; \
+    typedef CAggregatedObject< virtbase, ##__VA_ARGS__ > super;\
     ClassName( const IConfigDb* pCfg )\
-        : CInterfaceServer( pCfg ), super( pCfg )\
+        : virtbase( pCfg ), super( pCfg )\
     { this->SetClassId( clsid( ClassName ) ); }\
     gint32 InitUserFuncs()\
     {\
@@ -2480,54 +2550,15 @@ struct ClassName : CAggregatedObject< CInterfaceServer, ##__VA_ARGS__ >, IUnknow
         } \
         return 0;\
     }\
-    gint32 FetchData( IConfigDb* pDataDesc, \
-        gint32& fd, guint32& dwOffset, \
-        guint32& dwSize, IEventSink* pCallback ) \
-    { \
-        if( pCallback == nullptr ) \
-            return -EINVAL; \
-        gint32 ret = 0; \
-        do{ \
-            TaskletPtr pTask; \
-            pTask = ObjPtr( pCallback );\
-            CIfInvokeMethodTask* pInvTask = pTask; \
-            if( pInvTask == nullptr ) \
-            { \
-                ret = -EFAULT; \
-                break; \
-            } \
-            EnumClsid iid = clsid( Invalid ); \
-            ret = pInvTask->GetIid( iid ); \
-            if( ERROR( ret ) ) \
-                break; \
-            if( iid == iid( IStream ) ) \
-            { \
-                using StreamClass = typename TypeContained< CStreamServer, ##__VA_ARGS__ >::mybasetype::type; \
-                this->StreamClass::FetchData_Server( pDataDesc, \
-                    fd, dwOffset, dwSize, pCallback ); \
-            } \
-            else if( iid == iid( CFileTransferServer ) ) \
-            { \
-                using FileTransferClass = typename TypeContained< CFileTransferServer, ##__VA_ARGS__ >::mybasetype::type; \
-                this->FileTransferClass::FetchData_Server( pDataDesc, \
-                    fd, dwOffset, dwSize, pCallback ); \
-            } \
-            else \
-            { \
-                this->CInterfaceServer::FetchData_Server( \
-                    pDataDesc, fd, dwOffset, dwSize, pCallback ); \
-            } \
-        }while( 0 ); \
-        return ret; \
-    } \
 }
 
 #define DECLARE_AGGREGATED_PROXY( ClassName, ... )\
 struct ClassName : CAggregatedObject< CInterfaceProxy, ##__VA_ARGS__ >\
 {\
-    typedef CAggregatedObject< CInterfaceProxy, ##__VA_ARGS__ > super;\
+    using virtbase = CInterfaceProxy; \
+    typedef CAggregatedObject< virtbase, ##__VA_ARGS__ > super;\
     ClassName( const IConfigDb* pCfg )\
-        : CInterfaceProxy( pCfg ), super( pCfg )\
+        : virtbase( pCfg ), super( pCfg )\
     { this->SetClassId( clsid( ClassName ) ); }\
     gint32 InitUserFuncs()\
     {\

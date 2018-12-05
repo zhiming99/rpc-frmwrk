@@ -146,11 +146,4 @@ class CFileTransferServer :
     // override this method for your own purpose
     virtual gint32 HandleIncomingData( gint32 fd );
 
-    virtual gint32 HandleStreaming(
-        IConfigDb* pDataDesc,           // [in]
-        gint32 fd,                      // [in]
-        guint32 dwOffset,               // [in]
-        guint32 dwSize,                 // [in]
-        IEventSink* pCallback )
-    { return -ENOTSUP; }
 };

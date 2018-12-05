@@ -668,17 +668,6 @@ gint32 CFileTransferServer::FetchData_Server(
         std::string strSrcFile;
         CCfgOpener oCfg( pDataDesc );
 
-        bool bStream = false;
-        ret = oCfg.GetBoolProp(
-            propStreaming, bStream );
-
-        if( SUCCEEDED( ret ) && bStream )
-        {
-            ret = HandleStreaming( pDataDesc,
-                fd, dwOffset, dwSize, pCallback );
-            break;
-        }
-
         ret = oCfg.GetStrProp(
             propFilePath, strSrcFile );
 
