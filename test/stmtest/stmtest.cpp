@@ -182,13 +182,13 @@ void CIfSmokeTest::testCliStartStop()
         DebugPrint( 0, "Completed" );
 
         system( "echo Hello, World! > ./hello-1.txt" );
-        // method from interface CStreamingServer
+        // method from interface CFileTransferServer
         ret = pCli->UploadFile(
             std::string( "./hello-1.txt" ) );
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
         DebugPrint( 0, "Upload Completed" );
 
-        // method from interface CStreamingServer
+        // method from interface CFileTransferServer
         ret = pCli->DownloadFile(
             // server side file to download
             std::string( "./hello-1.txt" ), 
@@ -198,6 +198,7 @@ void CIfSmokeTest::testCliStartStop()
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
         DebugPrint( 0, "Download Completed" );
 
+        // IStream implementation test
         HANDLE hChannel = 0;
         TaskletPtr pSyncTask;
         ret = pCli->StartStream( hChannel, pSyncTask );
