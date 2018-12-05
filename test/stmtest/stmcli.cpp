@@ -72,7 +72,7 @@ gint32 CMyStreamProxy::OnStmRecv(
 {
     // note that, the buf just contains a block of data
     // without type, so don't cast the buffer with the
-    // type convertor
+    // CBuffer's type convertor
     std::string strMsg(
         ( char* )pBuf->ptr() );
 
