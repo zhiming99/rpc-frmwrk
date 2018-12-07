@@ -226,6 +226,7 @@ void CIfSmokeTest::testCliStartStop()
         }
         CPPUNIT_ASSERT( SUCCEEDED( ret  ) || ret == -EAGAIN );
 
+        // close the channel gracefully
         ret = pCli->CloseChannel( hChannel );
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
         pSyncTask.Clear();

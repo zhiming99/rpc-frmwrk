@@ -532,6 +532,9 @@ class CIfIoReqTask
         guint32 dwContext );
 
     gint32 OnFilterComp();
+
+    // reset the irp expire timer
+    gint32 ResetTimer();
 };
 
 class CIfInvokeMethodTask
@@ -588,6 +591,9 @@ class CIfInvokeMethodTask
 
     // get interface id of the request method
     gint32 GetIid( EnumClsid& iid );
+
+    // reset the task expire timer
+    gint32 ResetTimer();
 };
 
 class CIfInterceptTask :

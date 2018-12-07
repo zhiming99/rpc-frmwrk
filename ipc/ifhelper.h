@@ -1164,8 +1164,7 @@ class CDeferredCallBase :
 
     virtual gint32 operator()( guint32 dwContext )
     {
-        if( m_pObj.IsEmpty() ||
-            m_vecArgs.empty() )
+        if( m_pObj.IsEmpty() )
             return -EINVAL;
 
         return this->Delegate( m_pObj, m_vecArgs );
@@ -1292,14 +1291,14 @@ inline gint32 NewDeferredCall( TaskletPtr& pCallback,
 #define DEFER_CALL( pMgr, pObj, func, ... ) \
 ({ \
     TaskletPtr pTask; \
-    gint32 ret_ = NewDeferredCall( pTask, pObj, func VA_ARGS( __VA_ARGS__ ) ); \
+    gint32 ret_ = NewDeferredCall( pTask, pObj, func, ##__VA_ARGS__  ); \
     if( SUCCEEDED( ret_ ) ) \
         ret_ = pMgr->RescheduleTask( pTask ); \
     ret_; \
 })
 
 #define DEFER_CALL_NOSCHED( pTask, pObj, func, ... ) \
-    NewDeferredCall( pTask, pObj, func VA_ARGS( __VA_ARGS__ ) )
+    NewDeferredCall( pTask, pObj, func , ##__VA_ARGS__ )
 
 // to insert the task pInterceptor to the head of
 // completion chain of the task pTarget 

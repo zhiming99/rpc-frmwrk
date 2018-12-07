@@ -3513,6 +3513,37 @@ gint32 CIfIoReqTask::OnComplete(
     return iRet;
 }
 
+// reset the irp expire timer, should only be called
+// when not IsInProcess
+gint32 CIfIoReqTask::ResetTimer()
+{
+    gint32 ret = 0;
+    CStdRTMutex oTaskLock( GetLock() );
+    do{
+        CCfgOpener oCfg(
+            ( IConfigDb* )GetConfig() );
+
+        IRP* pIrp = nullptr;
+        ret = oCfg.GetPointer( propIrpPtr, pIrp );
+
+        if( ERROR( ret ) )
+            break;
+
+        if( pIrp == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        DebugPrint( 0,
+            "the irp timer is reset" );
+        pIrp->ResetTimer();
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CIfIoReqTask::OnKeepAlive(
     guint32 dwContext )
 {
@@ -3573,6 +3604,8 @@ gint32 CIfIoReqTask::OnKeepAlive(
 
     }while( 0 );
 
+    // return STATUS_PENDING to avoid io task to
+    // complete
     return STATUS_PENDING;
 }
 
@@ -4544,9 +4577,12 @@ gint32 CIfInvokeMethodTask::OnKeepAliveOrig()
         CTimerService& oTimerSvc =
             oUtils.GetTimerSvc();
 
-        m_iKeepAlive = oTimerSvc.AddTimer(
-            dwTimeoutSec, this,
-            ( guint32 )eventKeepAlive );
+        if( dwTimeoutSec > 0 )
+        {
+            m_iKeepAlive = oTimerSvc.AddTimer(
+                dwTimeoutSec, this,
+                ( guint32 )eventKeepAlive );
+        }
 
         if( m_iTimeoutId > 0 )
         {
@@ -4558,6 +4594,56 @@ gint32 CIfInvokeMethodTask::OnKeepAliveOrig()
     // return status_pending to avoid the task
     // being completed
     return STATUS_PENDING;
+}
+
+// should be called when this task is not IsInProcess
+// ResetTimer, to extend the expire time by rewinding
+// the timer to zero.
+gint32 CIfInvokeMethodTask::ResetTimer()
+{
+    gint32 ret = 0;
+    CStdRTMutex oTaskLock( GetLock() );
+
+    do{
+        ObjPtr pObj;
+        CCfgOpener oTaskCfg(
+            ( IConfigDb* )GetConfig() );
+
+        // for keep-alive active requests,
+        // reset timer is not allowed
+        if( IsKeepAlive() )
+            break;
+
+        CInterfaceServer* pIf = nullptr;
+        ret = oTaskCfg.GetPointer(
+            propIfPtr, pIf );
+
+        if( ERROR( ret ) )
+            break;
+
+        if( pIf == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        // schedule the next keep-alive event
+        CIoManager* pMgr = pIf->GetIoMgr();
+        CUtilities& oUtils = pMgr->GetUtils();
+
+        CTimerService& oTimerSvc =
+            oUtils.GetTimerSvc();
+
+        if( m_iTimeoutId > 0 )
+        {
+            oTimerSvc.ResetTimer( m_iTimeoutId );
+            DebugPrint( ret,
+                "Invoke Request timer is reset" );
+        }
+
+    }while( 0 );
+
+    return ret;
 }
 
 gint32 CIfInvokeMethodTask::OnKeepAliveRelay()

@@ -4086,12 +4086,12 @@ gint32 CInterfaceProxy::OnKeepAliveTerm(
         EnumEventId iEvent = ( EnumEventId )
             ( eventTryLock | eventKeepAlive );
 
-        ret = pTaskToKa->OnEvent( iEvent,
+        pTaskToKa->OnEvent( iEvent,
             ( guint32 )KATerm, 0, nullptr );
 
     }while( 0 );
 
-    return STATUS_PENDING;
+    return ret;
 }
 
 gint32 CInterfaceProxy::SendResponse(
@@ -4251,9 +4251,28 @@ gint32 CInterfaceProxy::CustomizeSendFetch(
         // note: the remote handler can only have the
         // taskid from the parameter desc, but not the
         // pReqCfg.
-        CCfgOpener oDesc( pDesc );
+        CReqOpener oDesc( pDesc );
         oDesc.CopyProp( propTaskId, pReqCfg );
 
+        EnumClsid iid = clsid( Invalid );
+        ret = oDesc.GetIntProp(
+            propIid, ( guint32& )iid );
+
+        if( ERROR( ret ) )
+            break;
+
+        // IStream has different keep-alive method
+        if( iid == iid( IStream ) )
+        {
+            guint32 dwFlags = 0;
+            ret = oDesc.GetCallFlags( dwFlags );
+            if( ERROR( ret ) )
+                break;
+            dwFlags &= ~CF_KEEP_ALIVE;
+            CReqBuilder oBuilder( pDesc );
+            oBuilder.SetCallFlags( dwFlags );
+            break;
+        }
     }while( 0 );
 
     return ret;

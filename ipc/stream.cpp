@@ -895,8 +895,42 @@ gint32 CIoWatchTaskProxy::OnPingPong(
         if( m_dwState == stateConnected &&
             !bConnected )
         {
+            CIfIoReqTask* pIoTask = m_pIoTask;
+            if( pIoTask == nullptr )
+                break;
+
+            // we have the risk to dead-lock, defer the
+            // call out of this lock
+            CRpcServices* pIf = dynamic_cast
+                < CRpcServices* >( m_pStream );
+
+            if( pIf != nullptr )
+            {
+                DEFER_CALL( pIf->GetIoMgr(), pIoTask,
+                    &CIfIoReqTask::ResetTimer );
+            }
+
+            CCfgOpenerObj oIfCfg( pIf );
+            guint32 dwTimeOutSec = 0;
+
+            // reschedule the timer
+            ret = oIfCfg.GetIntProp(
+                propKeepAliveSec, dwTimeOutSec );
+
+            if( ERROR( ret ) || dwTimeOutSec == 0 )
+                break;
+
+            CIoManager* pMgr = pIf->GetIoMgr();
+            CUtilities& oUtils = pMgr->GetUtils();
+            CTimerService& oTimerSvc =
+                oUtils.GetTimerSvc();
+
+            m_iTimerId = oTimerSvc.AddTimer(
+                dwTimeOutSec, this, eventKeepAlive );
+
             ret = m_pStream->OnPingPong(
                 ( HANDLE )this, bPing );
+
             break;
         }
 
@@ -909,6 +943,13 @@ gint32 CIoWatchTaskProxy::OnPingPong(
     }while( 0 );
 
     return ret;
+}
+
+gint32 CIoWatchTaskProxy::OnKeepAlive(
+    guint32 dwContext )
+{
+    SendPingPong();
+    return STATUS_PENDING;
 }
 
 gint32 CIoWatchTaskProxy::RunTask()
@@ -928,6 +969,36 @@ gint32 CIoWatchTaskProxy::RunTask()
         if( ERROR( ret ) )
             break;
 
+        CRpcServices* pIf = nullptr;
+        ret = oCfg.GetPointer(
+            propIfPtr, pIf );
+
+        if( ERROR( ret ) ) 
+            break;
+
+        if( unlikely( pIf == nullptr ) )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        
+        CCfgOpenerObj oIfCfg( pIf );
+        guint32 dwTimeOutSec = 0;
+
+        ret = oIfCfg.GetIntProp(
+            propKeepAliveSec, dwTimeOutSec );
+
+        if( ERROR( ret ) || dwTimeOutSec == 0 )
+            break;
+
+        CIoManager* pMgr = pIf->GetIoMgr();
+        CUtilities& oUtils = pMgr->GetUtils();
+        CTimerService& oTimerSvc =
+            oUtils.GetTimerSvc();
+
+        m_iTimerId = oTimerSvc.AddTimer(
+            dwTimeOutSec, this, eventKeepAlive );
+
         ret = STATUS_PENDING;
 
     }while( 0 );
@@ -935,6 +1006,42 @@ gint32 CIoWatchTaskProxy::RunTask()
     return ret;
 }
 
+gint32 CIoWatchTaskProxy::ReleaseChannel()
+{
+    gint32 ret = super::ReleaseChannel();
+    m_pIoTask.Clear();
+
+    if( m_iTimerId <= 0 )
+        return ret;
+
+    do{
+        CCfgOpener oCfg( ( IConfigDb* )
+            this->GetConfig() );
+
+        CRpcServices* pIf = nullptr;
+        ret = oCfg.GetPointer(
+            propIfPtr, pIf );
+
+        if( ERROR( ret ) ) 
+            break;
+
+        if( unlikely( pIf == nullptr ) )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        CIoManager* pMgr = pIf->GetIoMgr();
+        CUtilities& oUtils = pMgr->GetUtils();
+        CTimerService& oTimerSvc =
+            oUtils.GetTimerSvc();
+
+        oTimerSvc.RemoveTimer( m_iTimerId );
+        m_iTimerId = 0;
+
+    }while( 0 );
+    return ret;
+}
 gint32 CIoWatchTaskServer::RunTask()
 {
     gint32 ret = 0;
@@ -1317,8 +1424,6 @@ gint32 CStreamProxy::StartStream(
     do{
         int fd = -1;
         CParamList oParams;
-        oParams.SetPointer(
-            propIoMgr, GetIoMgr() );
 
         ret = pSyncTask.NewObj(
             clsid( CSyncCallback ),
@@ -1616,6 +1721,35 @@ gint32 CStreamServer::CloseChannel(
 
         ret = this->OnServiceComplete(
             oParams.GetCfg(), pInvTask );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CIoWatchTaskServer::OnPingPong(
+    bool bPing )
+{
+    gint32 ret = 0;
+    do{
+        ret = super::OnPingPong( bPing );
+        if( ERROR( ret ) )
+            break;
+
+        SendPingPong( false );
+        CIfInvokeMethodTask* pInvTask = m_pInvTask;
+
+        if( unlikely( pInvTask == nullptr ) )
+            break;
+        // we have the risk to dead-lock, defer the
+        // call out of this lock
+        CRpcServices* pIf = dynamic_cast
+            < CRpcServices* >( m_pStream );
+        if( pIf != nullptr )
+        {
+            DEFER_CALL( pIf->GetIoMgr(), pInvTask,
+                &CIfInvokeMethodTask::ResetTimer );
+        }
 
     }while( 0 );
 

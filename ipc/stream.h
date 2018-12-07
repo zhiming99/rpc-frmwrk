@@ -196,7 +196,9 @@ class CIoWatchTask:
     inline gint32 OnIoError( guint32 revent )
     {
         OnError( -EIO );
-        return 0;
+        // return error to remove the watch immediately
+        // from the mainloop
+        return -EIO;
     }
 
     // watch handler for I/O events
@@ -281,12 +283,13 @@ class CIoWatchTaskProxy :
     // semaphore for proxy to wait for the IoTask to
     // complete
     sem_t m_semWait;
+    gint32 m_iTimerId;
 
     public:
 
     typedef CIoWatchTask super;
     CIoWatchTaskProxy( const IConfigDb* pCfg )
-        : super( pCfg )
+        : super( pCfg ), m_iTimerId( 0 )
     {
         SetClassId( clsid( CIoWatchTaskProxy ) );
         Sem_Init( &m_semWait, 0, 0 );
@@ -316,12 +319,7 @@ class CIoWatchTaskProxy :
         return 0;
     }
 
-    virtual gint32 ReleaseChannel()
-    {
-        gint32 ret = super::ReleaseChannel();
-        m_pIoTask.Clear();
-        return ret;
-    }
+    virtual gint32 ReleaseChannel();
 
     virtual gint32 CloseChannel()
     { return SendClose(); }
@@ -332,6 +330,7 @@ class CIoWatchTaskProxy :
     { return Sem_Wait( &m_semWait ); }
 
     gint32 RunTask();
+    gint32 OnKeepAlive( guint32 dwContext );
 };
 
 class CIoWatchTaskServer :
@@ -363,6 +362,7 @@ class CIoWatchTaskServer :
     inline TaskletPtr& GetInvokeTask() const
     { return const_cast< TaskletPtr& >( m_pInvTask ); }
 
+    gint32 OnPingPong( bool bPing );
 };
 
 class CIoWatchTaskRelay :
@@ -493,6 +493,7 @@ class CStreamProxy :
     // call this helper to start a stream channel
     gint32 StartStream( HANDLE& hChannel,
         TaskletPtr& pSyncTask );
+
 };
 
 class CStreamServer :
@@ -541,6 +542,7 @@ class CStreamServer :
 
     gint32 OnClose( HANDLE hChannel );
     gint32 CloseChannel( HANDLE hChannel );
+
 };
 
 class CStreamServerRelay :
