@@ -20,6 +20,9 @@ This framework depends on the following packags:
 11. `Streaming support to provide double-direction stream transfer`
 
 ---
+[`Fri Dec  7 22:45:23 CST 2018`]
+1. Finally, I have wrapped up local IPC testing. Now I will proceed to RPC debugging and testing.
+
 [`Mon Dec 03 17:47:55 CST 2018`]
 1. Added local stream support. It is yet to debug.   
 
