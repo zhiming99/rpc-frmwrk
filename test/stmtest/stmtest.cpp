@@ -217,14 +217,14 @@ void CIfSmokeTest::testCliStartStop()
         {
             printf( "Writing to server... \n" );
             ret = pCli->WriteStream( hChannel, pBuf );
-            if( SUCCEEDED( ret ) || ret == -EAGAIN )
+            if( SUCCEEDED( ret ) || ret == STATUS_PENDING )
             {
                 sleep( 1 );
                 continue;
             }
             break;
         }
-        CPPUNIT_ASSERT( SUCCEEDED( ret  ) || ret == -EAGAIN );
+        CPPUNIT_ASSERT( SUCCEEDED( ret  ) || ret == STATUS_PENDING );
 
         // close the channel gracefully
         ret = pCli->CloseChannel( hChannel );
@@ -241,18 +241,22 @@ void CIfSmokeTest::testCliStartStop()
             sleep( 1 );
 
         *pBuf = std::string( "Server, i'm back." );
-        while( dwCount++ < 20 )
+        dwCount = 0;
+        while( dwCount++ < 200 )
         {
             printf( "Writing to server2... \n" );
             ret = pCli->WriteStream( hChannel, pBuf );
-            if( SUCCEEDED( ret ) || ret == -EAGAIN )
+            if( ret == STATUS_PENDING )
             {
-                sleep( 1 );
+                // sleep( 1 );
+                pCli->WaitForWriteReady();
                 continue;
             }
+            if( SUCCEEDED( ret ) )
+                continue;
             break;
         }
-        CPPUNIT_ASSERT( SUCCEEDED( ret  ) || ret == -EAGAIN );
+        CPPUNIT_ASSERT( SUCCEEDED( ret  ) || ret == STATUS_PENDING );
 
         ret = pCli->CancelChannel( hChannel );
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );

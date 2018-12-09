@@ -909,24 +909,9 @@ gint32 CIoWatchTaskProxy::OnPingPong(
                 DEFER_CALL( pIf->GetIoMgr(), pIoTask,
                     &CIfIoReqTask::ResetTimer );
             }
-
-            CCfgOpenerObj oIfCfg( pIf );
-            guint32 dwTimeOutSec = 0;
-
-            // reschedule the timer
-            ret = oIfCfg.GetIntProp(
-                propKeepAliveSec, dwTimeOutSec );
-
-            if( ERROR( ret ) || dwTimeOutSec == 0 )
+            ret = StartTimer();
+            if( ERROR( ret ) )
                 break;
-
-            CIoManager* pMgr = pIf->GetIoMgr();
-            CUtilities& oUtils = pMgr->GetUtils();
-            CTimerService& oTimerSvc =
-                oUtils.GetTimerSvc();
-
-            m_iTimerId = oTimerSvc.AddTimer(
-                dwTimeOutSec, this, eventKeepAlive );
 
             ret = m_pStream->OnPingPong(
                 ( HANDLE )this, bPing );
@@ -969,6 +954,35 @@ gint32 CIoWatchTaskProxy::RunTask()
         if( ERROR( ret ) )
             break;
 
+        ret = StartTimer();
+        if( ERROR( ret ) )
+            break;
+
+        ret = STATUS_PENDING;
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CIoWatchTaskProxy::ReleaseChannel()
+{
+    gint32 ret = super::ReleaseChannel();
+    m_pIoTask.Clear();
+
+    if( m_iTimerId <= 0 )
+        return ret;
+
+    return StopTimer();
+}
+
+gint32 CIoWatchTaskProxy::StartStopTimer( bool bStart )
+{
+    gint32 ret = 0;
+    do{
+        CCfgOpener oCfg( ( IConfigDb* )
+            this->GetConfig() );
+
         CRpcServices* pIf = nullptr;
         ret = oCfg.GetPointer(
             propIfPtr, pIf );
@@ -988,46 +1002,12 @@ gint32 CIoWatchTaskProxy::RunTask()
         ret = oIfCfg.GetIntProp(
             propKeepAliveSec, dwTimeOutSec );
 
-        if( ERROR( ret ) || dwTimeOutSec == 0 )
+        if( ERROR( ret ) )
             break;
 
-        CIoManager* pMgr = pIf->GetIoMgr();
-        CUtilities& oUtils = pMgr->GetUtils();
-        CTimerService& oTimerSvc =
-            oUtils.GetTimerSvc();
-
-        m_iTimerId = oTimerSvc.AddTimer(
-            dwTimeOutSec, this, eventKeepAlive );
-
-        ret = STATUS_PENDING;
-
-    }while( 0 );
-
-    return ret;
-}
-
-gint32 CIoWatchTaskProxy::ReleaseChannel()
-{
-    gint32 ret = super::ReleaseChannel();
-    m_pIoTask.Clear();
-
-    if( m_iTimerId <= 0 )
-        return ret;
-
-    do{
-        CCfgOpener oCfg( ( IConfigDb* )
-            this->GetConfig() );
-
-        CRpcServices* pIf = nullptr;
-        ret = oCfg.GetPointer(
-            propIfPtr, pIf );
-
-        if( ERROR( ret ) ) 
-            break;
-
-        if( unlikely( pIf == nullptr ) )
+        if( dwTimeOutSec == 0 )
         {
-            ret = -EFAULT;
+            ret = -EINVAL;
             break;
         }
 
@@ -1036,12 +1016,22 @@ gint32 CIoWatchTaskProxy::ReleaseChannel()
         CTimerService& oTimerSvc =
             oUtils.GetTimerSvc();
 
-        oTimerSvc.RemoveTimer( m_iTimerId );
-        m_iTimerId = 0;
+        if( bStart )
+        {
+            m_iTimerId = oTimerSvc.AddTimer(
+                dwTimeOutSec, this, eventKeepAlive );
+        }
+        else if( m_iTimerId > 0 )
+        {
+            oTimerSvc.RemoveTimer( m_iTimerId );
+            m_iTimerId = 0;
+        }
 
-    }while( 0 );
+    } while( 0 );
+
     return ret;
 }
+
 gint32 CIoWatchTaskServer::RunTask()
 {
     gint32 ret = 0;
@@ -1152,21 +1142,33 @@ gint32 IStream::WriteStream(
     if( hChannel == 0 || pBuf.IsEmpty() )
         return -EINVAL;
     
-    gint32 ret = GetWatchTask(
-        hChannel, pTask );
+    gint32 ret = 0;
+    do{
+        ret = GetWatchTask(
+            hChannel, pTask );
 
-    if( ERROR( ret ) )
-        return ret;
+        if( ERROR( ret ) )
+            break;
 
-    ret = CanContinue();
-    if( ERROR( ret ) )
-        return ret;
+        ret = CanContinue();
+        if( ERROR( ret ) )
+            break;
 
-    CIoWatchTask* pWatchTask = pTask;
-    if( pWatchTask == nullptr )
-        return -EFAULT;
+        CIoWatchTask* pWatchTask = pTask;
+        if( pWatchTask == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
 
-    return pWatchTask->WriteStream( pBuf );
+        ret = pWatchTask->WriteStream( pBuf );
+
+        if( ret == STATUS_PENDING )
+            pWatchTask->StartWatch();
+
+    }while( 0 );
+
+    return ret;
 }
 
 gint32 IStream::SendPingPong(
@@ -1199,6 +1201,16 @@ gint32 CStreamProxy::CancelReqTask(
     if( pTask == nullptr )
         return -EINVAL;
 
+    CIoWatchTaskProxy* pTaskProxy = static_cast
+        < CIoWatchTaskProxy* >( pWatchTask );
+
+    if( pTaskProxy == nullptr )
+        return 0;
+
+    // stop the keep-alive heartbeat 
+    pTaskProxy->ChangeState( stateStopping );
+    pTaskProxy->StopTimer();
+
     guint64 qwTaskId = pTask->GetObjId();
     guint64 qwThisTaksId = 0;
 
@@ -1210,13 +1222,6 @@ gint32 CStreamProxy::CancelReqTask(
     
     if( pWatchTask == nullptr )
         return 0;
-
-    CIoWatchTaskProxy* pTaskProxy = static_cast
-        < CIoWatchTaskProxy* >( pWatchTask );
-
-    if( pTaskProxy == nullptr )
-        return 0;
-
     return pTaskProxy->WaitForComplete();
 }
 

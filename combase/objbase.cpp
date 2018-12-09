@@ -74,10 +74,9 @@ inline gint64 GetRandom()
 {
     timeval tv;
     gettimeofday( &tv, NULL );
-    gint64 iPid = getpid();
+    gint64 iPid = GetTid();
     iPid <<=32;
-    // don't care if tv initialized or not or
-    // gettimeofday succeeded or not
+    // a fake random number, enough for object id.
     return tv.tv_usec + iPid;
 }
 
@@ -241,7 +240,7 @@ CStdRTMutex::CStdRTMutex( stdrtmutex& oMutex,
 std::atomic<gint32> CObjBase::m_atmObjCount( 0 );
 
 std::atomic< guint64 >
-#ifdef DEBUG
+#if 0
     CObjBase::m_atmObjId( 100 );
 #else
     CObjBase::m_atmObjId( GetRandom() );

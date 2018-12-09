@@ -91,12 +91,15 @@ class CMyStreamProxy :
     public CStreamProxy
 {
     std::atomic< bool > m_bSend;
+    sem_t m_semSync;
     public:
     typedef CStreamProxy super;
     CMyStreamProxy( const IConfigDb* pCfg )
     : CInterfaceProxy( pCfg ), super( pCfg ),
     m_bSend( false )
-    {}
+    {
+        Sem_Init( &m_semSync, 0, 0 );
+    }
 
     // mandatory, otherwise, the proxy map for this
     // interface may not be initialized
@@ -107,6 +110,16 @@ class CMyStreamProxy :
     bool CanSend()
     { return m_bSend; }
 
+    gint32 OnSendReady( HANDLE hChannel )
+    {
+        Sem_Post( &m_semSync );
+        return 0;
+    }
+
+    gint32 WaitForWriteReady()
+    {
+        return Sem_TimedwaitSec( &m_semSync, 2 );
+    }
     // mandatory
     // data is ready for reading
     gint32 OnStmRecv(

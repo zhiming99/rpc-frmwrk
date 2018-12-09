@@ -180,7 +180,7 @@ gint32 CRpcSocketBase::AttachMainloop()
     do{
         // poll
         guint32 dwOpt = ( guint32 )
-            ( G_IO_IN | G_IO_OUT | G_IO_HUP );
+            ( G_IO_IN | G_IO_OUT );
 
         CIoManager* pMgr = GetIoMgr();
         CMainIoLoop* pMainLoop =

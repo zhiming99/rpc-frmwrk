@@ -1176,10 +1176,13 @@ gint32 CRpcBasePortModOnOfflineTask::operator()(
         if( ERROR( ret ) )
             break;
 
-        bool bOnline = false;
-        ret = a.Pop( bOnline );
+        guint32 dwFlags = 0;
+        ret = a.Pop( dwFlags );
         if( ERROR( ret ) )
             break;
+
+        bool bOnline =
+            ( ( dwFlags & 0x01 ) > 0 );
 
         ret = a.GetStrProp(
             propModName, strModName );
@@ -1209,7 +1212,7 @@ gint32 CRpcBasePortModOnOfflineTask::operator()(
 
         ret = oEvtHelper.BroadcastEvent(
             eventConnPoint,
-            eventId, 0,
+            eventId, dwFlags,
             ( guint32* )strModName.c_str() );
 
     }while( 0 );
@@ -1218,7 +1221,7 @@ gint32 CRpcBasePortModOnOfflineTask::operator()(
 }
 
 gint32 CRpcPdoPort::ScheduleModOnOfflineTask(
-    const string strModName, bool bOnline )
+    const string strModName, guint32 dwFlags )
 {
     gint32 ret = 0;
 
@@ -1243,7 +1246,7 @@ gint32 CRpcPdoPort::ScheduleModOnOfflineTask(
         {
             break;
         }
-        ret = oParams.Push( bOnline );
+        ret = oParams.Push( dwFlags );
         if( ERROR( ret ) )
         {
             break;
@@ -1321,6 +1324,7 @@ gint32 CRpcBasePort::OnModOnOffline(
     gint32 ret = 0;
     vector< IrpPtr > vecIrpsToCancel;
     do{
+        bool bInterested = false;
         CStdRMutex oPortLock( GetLock() );
 
         guint32 dwPortState = GetPortState();
@@ -1338,6 +1342,7 @@ gint32 CRpcBasePort::OnModOnOffline(
             if( itr->first->IsMyDest( strModName ) ||
                 itr->first->IsMyObjPath( strModName ) )
             {
+                bInterested = true;
                 MATCH_ENTRY& oMe = itr->second;
                 oMe.SetConnected( bOnline );
                 if( !bOnline &&
@@ -1369,8 +1374,13 @@ gint32 CRpcBasePort::OnModOnOffline(
         {
             // finally, schedule a task to send out
             // the module online/offline message
+            guint32 dwFlags = ( guint32 )bOnline;
+
+            if( bInterested )
+                dwFlags |= MOD_ONOFFLINE_IRRELEVANT;
+
             ret = ScheduleModOnOfflineTask(
-                strModName, bOnline );
+                strModName, dwFlags );
         }
 
     }while( 0 );
@@ -1676,7 +1686,7 @@ CRpcPdoPort::CRpcPdoPort( const IConfigDb* pCfg )
 }
 
 gint32 CRpcBasePort::ScheduleModOnOfflineTask(
-    const std::string strModName, bool bOnline )
+    const std::string strModName, guint32 dwFlags )
 { return -ENOTSUP; }
 
 gint32 CRpcBasePort::BuildSendDataReq(

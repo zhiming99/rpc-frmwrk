@@ -156,7 +156,7 @@ class CDBusProxyFdo : public IRpcFdoPort
     virtual gint32 HandleUnregMatch( IRP* pIrp );
 
     gint32 ScheduleModOnOfflineTask(
-        const std::string strModName, bool bOnline );
+        const std::string strModName, guint32 dwFlags );
 
     virtual gint32 HandleSendData( IRP* pIrp );
 

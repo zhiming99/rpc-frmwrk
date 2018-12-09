@@ -256,7 +256,8 @@ class CIoWatchTask:
     virtual gint32 WriteStream( BufPtr& pBuf )
     {
         m_qwBytesWrite += pBuf->size();
-        return m_oSendQue.WriteStream( pBuf );
+        gint32 ret = m_oSendQue.WriteStream( pBuf );
+        return ret;
     }
 
     // release the watches and fds
@@ -285,8 +286,9 @@ class CIoWatchTaskProxy :
     sem_t m_semWait;
     gint32 m_iTimerId;
 
-    public:
+    gint32 StartStopTimer( bool bStart );
 
+    public:
     typedef CIoWatchTask super;
     CIoWatchTaskProxy( const IConfigDb* pCfg )
         : super( pCfg ), m_iTimerId( 0 )
@@ -309,7 +311,7 @@ class CIoWatchTaskProxy :
     virtual gint32 WriteStream( BufPtr& pBuf )
     {
         if( m_dwState != stateConnected )
-            return -EAGAIN;
+            return STATUS_PENDING;
         return super::WriteStream( pBuf );
     }
 
@@ -331,6 +333,20 @@ class CIoWatchTaskProxy :
 
     gint32 RunTask();
     gint32 OnKeepAlive( guint32 dwContext );
+
+    inline gint32 StartTimer()
+    { return StartStopTimer( true ); }
+
+    inline gint32 StopTimer()
+    { return StartStopTimer( false ); }
+
+    inline gint32 ChangeState(
+        EnumIfState iNewState )
+    {
+        CStdRTMutex oTaskLock( GetLock() );
+        m_dwState = iNewState;
+        return 0;
+    }
 };
 
 class CIoWatchTaskServer :

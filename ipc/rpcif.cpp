@@ -1351,6 +1351,15 @@ gint32 CRpcInterfaceBase::OnEvent(
             string strMod =
                 reinterpret_cast< char* >( pData );
 
+            bool bInterested = false;
+            if( dwParam1 & MOD_ONOFFLINE_IRRELEVANT )
+                bInterested = true;
+
+            // for proxy, filter off those irrelevant
+            // on/offline events
+            if( !IsServer() && !bInterested )
+                return 0;
+
             ret = OnModEvent( iEvent, strMod ); 
             break;
         }
@@ -4339,6 +4348,12 @@ gint32 CInterfaceProxy::UserCancelRequest(
     if( SUCCEEDED( ret ) )
         ret = iRet;
 
+    if( SUCCEEDED( ret ) )
+    {
+        DebugPrint( 0,
+            "Req Task Canceled, 0x%llx",
+            qwTaskToCancel );
+    }
     return ret;
 }
 
@@ -5492,6 +5507,10 @@ gint32 CInterfaceServer::UserCancelRequest(
             }
             pInvTask->OnEvent( eventUserCancel,
                 ERROR_USER_CANCEL, 0, 0 );
+
+            DebugPrint( 0,
+                "Inv Task Canceled, 0x%llx",
+                qwIoTaskId );
         }
 
     }while( 0 );

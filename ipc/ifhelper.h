@@ -2276,7 +2276,7 @@ struct has_##MethodName\
 // on this object which, in turn, overrides the base
 // class( CInterfaceServer or CInterfaceProxy ) if
 // defined.
-#define DEFINE_VIRT_METHOD_IMPL( _MethodName, rettype, PARAMS, ARGS ) \
+#define ITERATE_IF_VIRT_METHODS_IMPL( _MethodName, rettype, PARAMS, ARGS ) \
     private: \
     DEFINE_HAS_METHOD( _MethodName, rettype, PARAMS ); \
     gint32 Interf##_MethodName( NumberSequence<>  ) \
@@ -2317,7 +2317,7 @@ struct has_##MethodName\
         return ret; \
     }
 
-#define DEFINE_VIRT_METHOD_IMPL_NOARG( _MethodName, rettype ) \
+#define ITERATE_IF_VIRT_METHODS_IMPL_NOARG( _MethodName, rettype ) \
     private: \
     DEFINE_HAS_METHOD( _MethodName, rettype ); \
     gint32 Interf##_MethodName( \
@@ -2405,12 +2405,12 @@ struct CAggregatedObject
     {
     }
 
-    DEFINE_VIRT_METHOD_IMPL_NOARG( InitUserFuncs, gint32 )
+    ITERATE_IF_VIRT_METHODS_IMPL_NOARG( InitUserFuncs, gint32 )
 
-    DEFINE_VIRT_METHOD_IMPL( OnPreStart, gint32,
+    ITERATE_IF_VIRT_METHODS_IMPL( OnPreStart, gint32,
         VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
 
-    DEFINE_VIRT_METHOD_IMPL( OnPostStop, gint32,
+    ITERATE_IF_VIRT_METHODS_IMPL( OnPostStop, gint32,
         VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
 
 };
@@ -2426,12 +2426,12 @@ struct CAggregatedObject< CInterfaceServer, Types... >
     {
     }
 
-    DEFINE_VIRT_METHOD_IMPL_NOARG( InitUserFuncs, gint32 )
+    ITERATE_IF_VIRT_METHODS_IMPL_NOARG( InitUserFuncs, gint32 )
 
-    DEFINE_VIRT_METHOD_IMPL( OnPreStart, gint32,
+    ITERATE_IF_VIRT_METHODS_IMPL( OnPreStart, gint32,
         VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
 
-    DEFINE_VIRT_METHOD_IMPL( OnPostStop, gint32,
+    ITERATE_IF_VIRT_METHODS_IMPL( OnPostStop, gint32,
         VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
 
     gint32 FetchData_Server( IConfigDb* pDataDesc,

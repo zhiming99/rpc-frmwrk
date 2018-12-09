@@ -1101,10 +1101,13 @@ gint32 CProxyFdoModOnOfflineTask::operator()(
         if( ERROR( ret ) )
             break;
 
-        bool bOnline = false;
-        ret = a.Pop( bOnline );
+        guint32 dwFlags = 0;
+        ret = a.Pop( dwFlags );
         if( ERROR( ret ) )
             break;
+
+        bool bOnline = 
+            ( ( dwFlags & 0x01 ) > 0 );
 
         ret = a.GetStrProp(
             propModName, strModName );
@@ -1152,7 +1155,7 @@ gint32 CProxyFdoModOnOfflineTask::operator()(
 }
 
 gint32 CDBusProxyFdo::ScheduleModOnOfflineTask(
-    const string strModName, bool bOnline )
+    const string strModName, guint32 dwFlags )
 {
     gint32 ret = 0;
 
@@ -1162,7 +1165,8 @@ gint32 CDBusProxyFdo::ScheduleModOnOfflineTask(
         if( ERROR( ret ) )
             break;
 
-        ret = oParams.Push( bOnline );
+        guint32 dwFlags = 0;
+        ret = oParams.Push( dwFlags );
         if( ERROR( ret ) )
             break;
 

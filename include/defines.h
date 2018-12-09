@@ -141,6 +141,10 @@ do{\
 // or a session
 #define MSG_REQ_CONNECT
 
+// a flag to indicate if the mod event has connection
+// to all the attached object
+#define MOD_ONOFFLINE_IRRELEVANT    0x02
+
 #define REG_MAX_PATH    2048
 #define REG_MAX_NAME    128 
 

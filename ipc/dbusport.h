@@ -176,7 +176,7 @@ class CRpcBasePort : public CPort
         DBusMessage* pMsg );
 
     virtual gint32 ScheduleModOnOfflineTask(
-        const std::string strModName, bool bOnline );
+        const std::string strModName, guint32 dwFlags );
 
     gint32 BuildSendDataReq(
         IConfigDb* pParams, DMsgPtr& pMsg );
@@ -288,7 +288,7 @@ class CRpcPdoPort : public IRpcPdoPort
     virtual gint32 HandleSendData( IRP* pIrp );
 
     gint32 ScheduleModOnOfflineTask(
-        const std::string strModName, bool bOnline );
+        const std::string strModName, guint32 dwFlags );
 
     public:
 
