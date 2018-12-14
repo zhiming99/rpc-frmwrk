@@ -1,9 +1,7 @@
+#PATH :=/usr/local/angstrom/arm/bin/:$(PATH)
+#CROSS_COMPILE := arm-angstrom-linux-gnueabi-
 CROSS:= $(CROSS_COMPILE)
 ARCH := arm
-
-mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
-
-BASE:=$(abspath $(dir $(mkfile_path)).. )
 
 CC := $(CROSS_COMPILE)gcc
 CPP := $(CROSS_COMPILE)g++
@@ -13,28 +11,21 @@ AS := $(CROSS_COMPILE)as
 STRIP := $(CROSS_COMPILE)strip
 CUR_DIR := $(shell pwd)
 
-C_FLAGS :=  -Wall -c -m32 -D_GNU_SOURCE -pthread
-C_DEFINES :=
+C_FLAGS := $(CFLAGS) -Wall -c -D_GNU_SOURCE -pthread
+#C_DEFINES :=
 
 DEBUG_FLAGS := -DDEBUG -ggdb
 RELEASE_FLAGS := -O2
 
-C_INCLUDE := -I$(BASE)/include \
-	-I$(BASE)/ipc \
-	-I$(BASE)/rpc \
+C_INCLUDE := -I../include \
 	-I/usr/include/glib-2.0 \
 	-I/usr/lib/glib-2.0/include \
 	-I/usr/include/dbus-1.0 \
 	-I/usr/lib/dbus-1.0/include \
-	-I/usr/local/include\
+	-I/usr/include \
 
-
-CPP_FLAGS := -std=c++11
-LINKER_OPTION := -m32 -ldl -lstdc++ -lpthread -L/usr/lib/ -Wl,-rpath=/user/lib -L/lib -Wl,-rpath=/lib -lcppunit
-
-OUTPUT_DIR := $(BASE)/test/debug
-RPCLIB_DIR := $(BASE)/debug
-OBJ_DIR:=./debug
+OUTPUT_DIR := ../debug
+OBJ_DIR := ./debug
 
 ifeq ($(MAKECMDGOALS),) 
 	C_FLAGS += $(DEBUG_FLAGS)
@@ -47,17 +38,21 @@ endif
 ifeq ($(MAKECMDGOALS),release)
 	C_FLAGS += $(RELEASE_FLAGS)
 	C_DEFINES += $(C_DEFINES) -DPRODUCTION 
-	OUTPUT_DIR := $(BASE)/test/release
-	RPCLIB_DIR := $(BASE)/release
+	OUTPUT_DIR := ../release
 	OBJ_DIR := ./release
 else ifeq ($(MAKECMDGOALS),debug_clean)
-	OUTPUT_DIR := $(BASE)/test/debug
+	OUTPUT_DIR := ../debug
 	OBJ_DIR := ./debug
 else ifeq ($(MAKECMDGOALS),release_clean)
-	OUTPUT_DIR := $(BASE)/test/release
+	OUTPUT_DIR := ../release
 	OBJ_DIR := ./release
-	RPCLIB_DIR := $(BASE)/release
 endif
+
+CPP_FLAGS := $(CPPFLAGS) -std=c++11 -m32
+
+LINKER_OPTION := -shared -m32 -ldl -lstdc++ -lpthread -L/usr/lib/ -Wl,-rpath=/user/lib -L/lib -Wl,-rpath=/lib -ldbus-1 -ljsoncpp
+
+MUTE_CLEAN := 2>/dev/null || true
 
 $(OBJ_DIR)/%.o : %.cpp
 	@echo Building file: $@
@@ -72,5 +67,3 @@ $(OBJ_DIR)/%.d : %.cpp
 	@sed -e 's/.*://' -e 's/\\$$//' < $@.tmp | fmt -1 | sed -e 's/^ *//' -e 's/$$/:/' >> $@
 	@rm -f $@.tmp
 
-LINKER_OPTION += -L$(RPCLIB_DIR) -lipc -lcombase -L$(OUTPUT_DIR)
-MUTE_CLEAN := 2>/dev/null || true
