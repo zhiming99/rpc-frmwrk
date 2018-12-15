@@ -117,7 +117,7 @@ class CFileTransferProxy :
 };
 
 class CFileTransferServer :
-    public virtual CInterfaceServer
+    public virtual CAggInterfaceServer
 {
     protected:
 
@@ -137,10 +137,14 @@ class CFileTransferServer :
 
     public:
 
-    typedef CInterfaceServer super;
+    typedef CAggInterfaceServer super;
     CFileTransferServer( const IConfigDb* pCfg )
         :super( pCfg )
     {}
+
+    const EnumClsid GetIid() const
+    { return iid( CFileTransferServer ); }
+
     virtual gint32 InitUserFuncs();
 
     // override this method for your own purpose

@@ -513,7 +513,7 @@ class CStreamProxy :
 };
 
 class CStreamServer :
-    public virtual CInterfaceServer,
+    public virtual CAggInterfaceServer,
     public IStreamServer
 {
     gint32 CanContinue();
@@ -526,10 +526,14 @@ class CStreamServer :
     }
 
     public:
-    typedef CInterfaceServer super;
+    typedef CAggInterfaceServer super;
     CStreamServer( const IConfigDb* pCfg )
         :super( pCfg )
     {}
+
+    const EnumClsid GetIid() const
+    { return iid( IStream ); }
+
     virtual gint32 InitUserFuncs()
     {
         // we are using built-in handlers, so empty map

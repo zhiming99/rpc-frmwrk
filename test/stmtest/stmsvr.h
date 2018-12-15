@@ -53,19 +53,21 @@ enum EnumMyClsid
 //
 // Note that unlike the CEchoServer in Helloworld test.
 // this class inherit from a virtual base
-// CInterfaceServer. The reason is simple, multiple
+// CAggInterfaceServer. The reason is simple, multiple
 // interfaces share the same instance of
-// CInterfaceServer.
+// CAggInterfaceServer.
 class CEchoServer :
-    public virtual CInterfaceServer
+    public virtual CAggInterfaceServer
 { 
     public: 
-    typedef CInterfaceServer super;
+    typedef CAggInterfaceServer super;
 
-    CEchoServer(
-        const IConfigDb* pCfg )
+    CEchoServer( const IConfigDb* pCfg )
     : super( pCfg )
     {}
+
+    const EnumClsid GetIid() const
+    { return iid( CEchoServer ); }
 
     gint32 InitUserFuncs();
     gint32 Echo(
@@ -129,11 +131,10 @@ class CMyStreamProxy :
 class CMyStreamServer :
     public CStreamServer
 {
-
     public:
     typedef CStreamServer super;
     CMyStreamServer( const IConfigDb* pCfg )
-    : CInterfaceServer( pCfg ), super( pCfg )
+    : CAggInterfaceServer( pCfg ), super( pCfg )
     {}
 
     // mandatory, otherwise, the proxy map for this

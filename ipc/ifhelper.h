@@ -2359,6 +2359,69 @@ struct has_##MethodName\
         return ret; \
     }
 
+inline EnumClsid _GETIID( IEventSink* pCallback )
+{
+    if( pCallback == nullptr )
+        return clsid( Invalid );
+
+    TaskletPtr pTask;
+    pTask = ObjPtr( pCallback );
+    if( pTask.IsEmpty() )
+        return clsid( Invalid );
+
+    CIfInvokeMethodTask* pInvTask = pTask;
+    if( pInvTask == nullptr )
+        return clsid( Invalid );
+
+    EnumClsid iid = clsid( Invalid );
+    gint32 ret = pInvTask->GetIid( iid );
+    if( ERROR( ret ) )
+        return clsid( Invalid );
+
+    return iid;
+}
+
+// the master handler for overrides of the
+// CInterfaceServer, note that there must be a
+// parameter `IEventSink* pCallback' in the PARAMS list
+#define DEFINE_UNIQUE_HANDLER_IMPL( _MethodName, rettype, PARAMS, ARGS ) \
+    private: \
+    gint32 Handler##_MethodName( NumberSequence<>  ) \
+    { return ERROR_NOT_HANDLED; } \
+    template < int N > \
+    gint32 Handler##_MethodName( \
+         NumberSequence< N >, PARAMS ) \
+    { \
+        EnumClsid iid = _GETIID( pCallback ); \
+        using ClassName = typename std::tuple_element< N, std::tuple<Types...>>::type; \
+        if( ClassName::GetIid() == iid ) \
+            return this->ClassName::_MethodName( ARGS ); \
+        return ERROR_NOT_HANDLED; \
+    } \
+    template < int N, int M, int...S > \
+    gint32 Handler##_MethodName( \
+        NumberSequence< N, M, S... >, PARAMS ) \
+    { \
+        using ClassName = typename std::tuple_element< N, std::tuple<Types...>>::type; \
+        EnumClsid iid = _GETIID( pCallback ); \
+        if( ClassName::GetIid() == iid ) \
+            return this->ClassName::_MethodName( ARGS ); \
+        return Handler##_MethodName( NumberSequence<M, S...>(), ARGS ); \
+    } \
+    public: \
+    virtual rettype _MethodName( PARAMS ) \
+    { \
+        gint32 ret = 0;\
+        if( sizeof...( Types ) ) \
+        { \
+            using seq = typename GenSequence< sizeof...( Types ) >::type; \
+            ret = Handler##_MethodName( seq(), ARGS ); \
+        } \
+        if( ret == ERROR_NOT_HANDLED ) \
+            ret = virtbase::_MethodName( ARGS ); \
+        return ret; \
+    }
+
 template< typename DefaultType, typename DesiredType, typename ... Types >
 struct TypeContained;
 
@@ -2392,6 +2455,17 @@ struct TypeContained< DefaultType, DesiredType >
     } mybasetype;
 };
 
+// Start point for aggregatable interface
+struct CAggInterfaceServer :
+    public CInterfaceServer
+{
+    typedef CInterfaceServer super;
+    CAggInterfaceServer( const IConfigDb* pCfg )
+        : CInterfaceServer( pCfg )
+    {}
+    virtual const EnumClsid GetIid() const = 0;
+};
+
 class CStreamServer;
 class CFileTransferServer;
 
@@ -2416,10 +2490,10 @@ struct CAggregatedObject
 };
 
 template< typename...Types >
-struct CAggregatedObject< CInterfaceServer, Types... >
+struct CAggregatedObject< CAggInterfaceServer, Types... >
     : Types...
 {
-    using virtbase = CInterfaceServer;
+    using virtbase = CAggInterfaceServer;
     public:
     CAggregatedObject( const IConfigDb* pCfg )
     : virtbase( pCfg ), Types( pCfg )...
@@ -2434,7 +2508,10 @@ struct CAggregatedObject< CInterfaceServer, Types... >
     ITERATE_IF_VIRT_METHODS_IMPL( OnPostStop, gint32,
         VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
 
-    gint32 FetchData_Server( IConfigDb* pDataDesc,
+    const EnumClsid GetIid() const
+    { return this->GetClsid(); }
+
+    /*gint32 FetchData_Server( IConfigDb* pDataDesc,
         gint32& fd, guint32& dwOffset,
         guint32& dwSize, IEventSink* pCallback )
     {
@@ -2442,19 +2519,7 @@ struct CAggregatedObject< CInterfaceServer, Types... >
             return -EINVAL;
         gint32 ret = 0;
         do{
-            TaskletPtr pTask;
-            pTask = ObjPtr( pCallback );
-            CIfInvokeMethodTask* pInvTask = pTask;
-            if( pInvTask == nullptr )
-            {
-                ret = -EFAULT;
-                break;
-            }
-
-            EnumClsid iid = clsid( Invalid );
-            ret = pInvTask->GetIid( iid );
-            if( ERROR( ret ) )
-                break;
+            EnumClsid iid = _GETIID( pCallback );
 
             if( iid == iid( IStream ) )
             {
@@ -2481,7 +2546,11 @@ struct CAggregatedObject< CInterfaceServer, Types... >
         }while( 0 );
 
         return ret;
-    }
+    }*/
+
+    DEFINE_UNIQUE_HANDLER_IMPL( FetchData_Server, gint32,
+        VA_LIST( IConfigDb* pDataDesc, gint32& fd, guint32& dwOffset, guint32& dwSize, IEventSink* pCallback ),
+        VA_LIST( pDataDesc, fd, dwOffset, dwSize, pCallback ) )
 };
 
 // a interface as a start point for interface query
@@ -2495,9 +2564,9 @@ struct IUnknown
 #define METHOD_EnumInterfaces "EnumInterfaces"
 
 #define DECLARE_AGGREGATED_SERVER( ClassName, ... )\
-struct ClassName : CAggregatedObject< CInterfaceServer, ##__VA_ARGS__ >, IUnknown\
+struct ClassName : CAggregatedObject< CAggInterfaceServer, ##__VA_ARGS__ >, IUnknown\
 {\
-    using virtbase = CInterfaceServer; \
+    using virtbase = CAggInterfaceServer; \
     typedef CAggregatedObject< virtbase, ##__VA_ARGS__ > super;\
     ClassName( const IConfigDb* pCfg )\
         : virtbase( pCfg ), super( pCfg )\

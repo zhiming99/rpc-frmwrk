@@ -53,7 +53,7 @@ class CStatCountersProxy:
 };
 
 class CStatCountersServer:
-    public virtual CInterfaceServer
+    public virtual CAggInterfaceServer
 {
     // storage for the counters
     CfgPtr m_pCfg;
@@ -62,10 +62,13 @@ class CStatCountersServer:
     TaskletPtr m_pMsgFilter;
 
     public:
-    typedef CInterfaceServer super;
+    typedef CAggInterfaceServer super;
     CStatCountersServer( const IConfigDb* pCfg )
         : super( pCfg )
     {}
+
+    const EnumClsid GetIid() const
+    { return iid( CStatCounters ); }
 
     virtual gint32 InitUserFuncs();
     virtual gint32 OnPreStart( IEventSink* pCallback );

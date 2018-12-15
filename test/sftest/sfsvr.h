@@ -56,15 +56,18 @@ enum EnumMyClsid
 // interfaces share the same instance of
 // CInterfaceServer.
 class CEchoServer :
-    public virtual CInterfaceServer
+    public virtual CAggInterfaceServer
 { 
     public: 
-    typedef CInterfaceServer super;
+    typedef CAggInterfaceServer super;
 
     CEchoServer(
         const IConfigDb* pCfg )
     : super( pCfg )
     {}
+
+    const EnumClsid GetIid() const
+    { return iid( CEchoServer ); }
 
     gint32 InitUserFuncs();
     gint32 Echo(
