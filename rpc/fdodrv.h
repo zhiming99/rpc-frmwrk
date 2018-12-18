@@ -44,5 +44,10 @@ class CProxyFdoDriver : public CPortDriver
         PortPtr& pNewPort,
         const IConfigDb* pConfig = NULL);
 
+    virtual gint32 OnEvent( EnumEventId iEvent,
+        guint32 dwParam1 = 0,
+        guint32 dwParam2 = 0,
+        guint32* pData = NULL  )
+    { return -ENOTSUP; }
 };
 

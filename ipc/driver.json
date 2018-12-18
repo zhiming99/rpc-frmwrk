@@ -123,7 +123,8 @@
             "ModName" : "ifclismk",
             "DriversToLoad" :
             [
-                "DBusBusDriver"
+                "DBusBusDriver",
+                "ProxyFdoDriver"
             ]
         },
         {
@@ -268,7 +269,7 @@
 
     "Arch" :
     {
-        "Processors" : "2"
+        "Processors" : "8"
     }
 }
 

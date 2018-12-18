@@ -68,8 +68,12 @@ gint32 Ip4AddrToBytes(
                 ret = -EINVAL;
                 break;
             }
-            string strComp = strIpAddr.substr( iBegin, iPos );
-            gint32 iRet =( gint32 )atoi( strComp.c_str() );
+            string strComp = strIpAddr.substr(
+                iBegin, iPos - iBegin );
+
+            gint32 iRet =( gint32 )atoi(
+                strComp.c_str() );
+
             // let's do a semantic check
             if( iRet > 255 )
             {
@@ -121,20 +125,20 @@ static void BinToHexChar( guint8 byte, guint8* pRet )
         return;
 
     if( ( byte & 0x0F ) < 0x0A )
-        pRet[ 1 ] = byte + 0x30;
+        pRet[ 1 ] = ( byte & 0x0F ) + 0x30;
     else
-        pRet[ 1 ] = byte + 0x40;
+        pRet[ 1 ] = ( byte & 0x0F ) - 9 + 0x40;
     
     if( ( byte & 0xF0 ) < 0xA0 )
         pRet[ 0 ] = ( byte >> 4 ) + 0x30;
     else
-        pRet[ 0 ] = ( byte >> 4 ) + 0x40;
+        pRet[ 0 ] = ( byte >> 4 ) - 9 + 0x40;
 
     return;
 }
 
 
-static gint32 BytesToString(
+gint32 BytesToString(
     const guint8* bytes,
     guint32 dwSize,
     string& strRet )
@@ -369,31 +373,25 @@ gint32 CDBusBusPort::CreateRpcProxyPdo(
         CCfgOpener oExtCfg;
         *oExtCfg.GetCfg() = *pCfg;
 
-        ret = oExtCfg.GetIntProp(
-            propPortId, dwPortId );
+        string strIpAddr;
+        ret = oExtCfg.GetStrProp(
+            propIpAddr, strIpAddr );
 
         if( ERROR( ret ) )
-        {
-            string strIpAddr;
-            ret = oExtCfg.GetStrProp(
-                propIpAddr, strIpAddr );
+            break;
 
-            if( ERROR( ret ) )
-                break;
+        guint8 arrBuf[ MAX_IPADDR_SIZE * 2 ] = { 0 };
+        guint8* pBuf = arrBuf;
+        guint32 dwSize = sizeof( arrBuf );
 
-            guint8 arrBuf[ sizeof( guint32 ) * 2 ] = { 0 };
-            guint8* pBuf = arrBuf;
-            guint32 dwSize = sizeof( arrBuf );
+        ret = Ip4AddrToBytes(
+            strIpAddr, arrBuf, dwSize );
 
-            ret = Ip4AddrToBytes(
-                strIpAddr, arrBuf, dwSize );
+        if( ERROR( ret ) )
+            break;
 
-            if( ERROR( ret ) )
-                break;
-
-            dwPortId = *( guint32* )( pBuf );
-            oExtCfg[ propPortId ] = dwPortId;
-        }
+        dwPortId = *( guint32* )( pBuf );
+        oExtCfg[ propPortId ] = dwPortId;
 
         // verify if the port already exists
         if( this->PortExist( dwPortId ) )
@@ -402,8 +400,12 @@ gint32 CDBusBusPort::CreateRpcProxyPdo(
             break;
         }
 
+        oExtCfg.SetIntProp( propDBusConn,
+            ( guint32 )m_pDBusConn );
+
         ret = pNewPort.NewObj(
-            clsid( CDBusProxyPdo ), pCfg );
+            clsid( CDBusProxyPdo ),
+            oExtCfg.GetCfg() );
 
         // the pdo port `Start()' will be deferred
         // till the complete port stack is built.
@@ -977,7 +979,7 @@ gint32 CDBusBusPort::Stop( IRP *pIrp )
 gint32 CDBusBusPort::GetChildPorts(
         vector< PortPtr >& vecChildPorts )
 {
-    PortPtr pPort;
+    /*PortPtr pPort;
     PortPtr pLpbkPort;
 
     gint32 ret = GetPdoPort(
@@ -1002,8 +1004,8 @@ gint32 CDBusBusPort::GetChildPorts(
             continue;
 
         vecChildPorts.push_back( pPort );
-    }
-    return ret;
+    }*/
+    return super::GetChildPorts( vecChildPorts );
 }
 
 gint32 CDBusBusPort::SchedulePortsAttachNotifTask(

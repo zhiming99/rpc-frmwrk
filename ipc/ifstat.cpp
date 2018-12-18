@@ -529,7 +529,7 @@ gint32 CInterfaceState::OpenPortInternal(
             }
         }
 
-        CParamList oParams;
+        CReqBuilder oParams( GetInterface() );
         // let's prepare the parameters
         ret = oParams.CopyProp(
             propBusName, this );

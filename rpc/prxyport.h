@@ -81,10 +81,6 @@ class CDBusProxyPdo : public CRpcPdoPort
 
     virtual gint32 SubmitIoctlCmd( IRP* pIrp );
 
-	virtual gint32 CanContinue( IRP* pIrp,
-        guint32 dwNewState = PORT_STATE_INVALID,
-        guint32* pdwOldState = nullptr );
-
     // during start, we will send out a connect
     // request to the router to make a connection
     // to the target machine

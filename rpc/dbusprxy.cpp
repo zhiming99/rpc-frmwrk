@@ -26,8 +26,8 @@
 #include "prxyport.h"
 #include "emaphelp.h"
 
-#define PROXYPDO_CONN_RETRIES       10
-#define PROXYPDO_CONN_INTERVAL      15
+#define PROXYPDO_CONN_RETRIES       0 
+#define PROXYPDO_CONN_INTERVAL      2
 
 using namespace std;
 
@@ -57,6 +57,15 @@ CDBusProxyPdo::CDBusProxyPdo(
             break;
 
         m_pDBusConn = ( DBusConnection* )dwValue;
+        if( m_pDBusConn == nullptr )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        // we did not add ref to the reference in 
+        // the config block, so we explictly add one
+        dbus_connection_ref( m_pDBusConn );
 
         if( !m_pCfgDb->exist( propIpAddr ) )
         {
@@ -92,52 +101,10 @@ CDBusProxyPdo::~CDBusProxyPdo()
 {
     if( m_pDBusConn )
     {
+        dbus_connection_close( m_pDBusConn );
         dbus_connection_unref( m_pDBusConn );
         m_pDBusConn = nullptr;
     }
-}
-
-// we will do extra check to block the
-// func irp if the port is not connected
-gint32 CDBusProxyPdo::CanContinue(
-    IRP* pIrp,
-    guint32 dwNewState,
-    guint32* pdwOldState )
-{
-    gint32 ret = 0;
-    do{
-        if( pIrp == nullptr )
-        {
-            ret = -EINVAL;
-            break;
-        }
-
-        if( pIrp->GetStackSize() == 0 )
-        {
-            ret = -EINVAL;
-            break;
-        }
-
-        CStdRMutex oPortLock( GetLock() );
-
-        if( GetPortState() == PORT_STATE_READY
-            && pIrp->MajorCmd() == IRP_MJ_FUNC
-            && !( pIrp->MinorCmd() == IRP_MN_IOCTL
-                && pIrp->CtrlCode() == CTRLCODE_UNREG_MATCH )
-            && !IsConnected() )
-        {
-            // block the `IRP_MJ_FUNC' command if
-            // the port is not connected, should
-            // try again later
-            ret = -ENOTCONN;
-            break;
-        }
-
-        ret = super::CanContinue(
-            pIrp, dwNewState, pdwOldState );
-
-    }while( 0 );
-    return ret;
 }
 
 gint32 CDBusProxyPdo::CheckConnCmdResp(
@@ -741,8 +708,8 @@ gint32 CDBusProxyPdo::SubmitIoctlCmd( IRP* pIrp )
 {
     gint32 ret = 0;
 
-    if( pIrp == nullptr
-        || pIrp->GetStackSize() == 0 )
+    if( pIrp == nullptr ||
+        pIrp->GetStackSize() == 0 )
     {
         return -EINVAL;
     }
@@ -751,8 +718,8 @@ gint32 CDBusProxyPdo::SubmitIoctlCmd( IRP* pIrp )
     IrpCtxPtr& pCtx = pIrp->GetCurCtx();
 
     do{
-        if( pIrp->MajorCmd() != IRP_MJ_FUNC
-            || pIrp->MinorCmd() != IRP_MN_IOCTL )
+        if( pIrp->MajorCmd() != IRP_MJ_FUNC ||
+            pIrp->MinorCmd() != IRP_MN_IOCTL )
         {
             ret = -EINVAL;
             break;
@@ -780,6 +747,11 @@ gint32 CDBusProxyPdo::SubmitIoctlCmd( IRP* pIrp )
             }
         case CTRLCODE_LISTENING:
             {
+                if( !IsConnected() )
+                {
+                    ret = ERROR_STATE;
+                    break;
+                }
                 // what we can do is to listen to
                 // the CRpcReqForwarder's events
                 // from the rpc router with the ip
@@ -803,6 +775,11 @@ gint32 CDBusProxyPdo::SubmitIoctlCmd( IRP* pIrp )
             }
         case CTRLCODE_FORWARD_REQ:
             {
+                if( !IsConnected() )
+                {
+                    ret = ERROR_STATE;
+                    break;
+                }
                 ret = HandleFwrdReq( pIrp );
                 break;
             }
@@ -811,6 +788,11 @@ gint32 CDBusProxyPdo::SubmitIoctlCmd( IRP* pIrp )
             {
                 bool bReg;
 
+                if( !IsConnected() )
+                {
+                    ret = ERROR_STATE;
+                    break;
+                }
                 if( dwCtrlCode == CTRLCODE_RMT_UNREG_MATCH )
                     bReg = false;
                 else
@@ -827,8 +809,24 @@ gint32 CDBusProxyPdo::SubmitIoctlCmd( IRP* pIrp )
             }
         case CTRLCODE_SEND_DATA:
         case CTRLCODE_FETCH_DATA:
+        case CTRLCODE_SEND_REQ:
             {
+                if( !IsConnected() )
+                {
+                    ret = ERROR_STATE;
+                    break;
+                }
                 ret = super::HandleSendReq( pIrp );
+                break;
+            }
+        case CTRLCODE_SEND_EVENT:
+            {
+                if( !IsConnected() )
+                {
+                    ret = ERROR_STATE;
+                    break;
+                }
+                ret = super::HandleSendEvent( pIrp );
                 break;
             }
         default:
@@ -856,8 +854,10 @@ gint32 CProxyPdoConnectTask::CompleteMasterIrp(
     ObjPtr pObj;
     CCfgOpener oParams( ( const IConfigDb* )m_pCtx );
 
-
     do{
+        ret = oParams.GetPointer( propIoMgr, pMgr );
+        if( ERROR( ret ) )
+            break;
 
         if( pMasterIrp == nullptr )
         {
@@ -922,13 +922,19 @@ gint32 CProxyPdoConnectTask::CompleteMasterIrp(
 
     }while( 0 );
 
-    if( bComplete )
+    if( ret == STATUS_PENDING ||
+        ret == STATUS_MORE_PROCESS_NEEDED )
+        return ret;
+
+    if( !bComplete )
+        return ret;
+
+    if( pMgr != nullptr && pMasterIrp != nullptr )
     {
         ret = pMgr->CompleteIrp( pMasterIrp );
         // finally add a match to listen to the
         // events from routers CRpcReqForwarder
     }
-
     return ret;
 }
 
@@ -1068,13 +1074,23 @@ gint32 CProxyPdoConnectTask::Process(
                 break;
 
             // the port indicates to try again.
-            if( ret == -EAGAIN )
+            if( ret == -EAGAIN || ret == -ENOTCONN )
             {
-                ret = STATUS_MORE_PROCESS_NEEDED;
+                if( CanRetry() )
+                {
+                    DebugPrint( ret,
+                        "Server is not up, retry in %d seconds",
+                        PROXYPDO_CONN_INTERVAL );
+                    ret = STATUS_MORE_PROCESS_NEEDED;
+                }
+                else
+                {
+                    DebugPrint( ret,
+                        "Server is not up, give up",
+                        PROXYPDO_CONN_INTERVAL );
+                }
                 break;
             }
-
-
             // it is possible the port is already
             // connected before this irp is
             // issued. let's further check if the
@@ -1163,11 +1179,12 @@ gint32 CProxyPdoConnectTask::Process(
 
     }while( 0 );
 
-    if( ret != STATUS_PENDING )
-    {
-        ret = CompleteMasterIrp(
-            pMasterIrp, ret, iRetries > 0 );
-    }
+    if( ret == STATUS_PENDING ||
+        ret == STATUS_MORE_PROCESS_NEEDED )
+        return ret;
+
+    ret = CompleteMasterIrp(
+        pMasterIrp, ret, iRetries > 0 );
 
     return SetError( ret );
 }
@@ -1780,6 +1797,7 @@ gint32 CProxyPdoDisconnectTask::operator()(
         }
         else
         {
+            // immediate return
             CStdRMutex oPortLock( pPort->GetLock() );
             CDBusProxyPdo* pProxyPdo =
                 static_cast< CDBusProxyPdo* >( pPort );
@@ -1810,7 +1828,6 @@ gint32 CProxyPdoDisconnectTask::operator()(
 
         oIrpLock.Unlock();
         ret = pMgr->CompleteIrp( pMasterIrp );
-        oIrpLock.Lock();
     }
 
     return ret;

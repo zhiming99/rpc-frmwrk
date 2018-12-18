@@ -32,6 +32,7 @@ CProxyFdoDriver::CProxyFdoDriver(
     : super( pCfg )
 {
     gint32 ret = 0;
+    SetClassId( clsid( CProxyFdoDriver ) );
 
     do{
         if( pCfg == nullptr )
@@ -104,7 +105,7 @@ gint32 CProxyFdoDriver::CreatePort(
 
 /**
 * @name CProxyFdoDriver::Probe
-* @{ to proble the pLowerPort to decide if it is
+* @{ to probe the pLowerPort to decide if it is
 * necessary for the driver to create a fdo driver
 * uppon the pLowerPort. This happens during the
 * pnp manager building the port stack. if it
@@ -202,10 +203,15 @@ gint32 CProxyFdoDriver::Probe(
         if( ERROR( ret ) )
             break;
         
+        string strPortId;
+        ret = BytesToString( ( guint8*)&dwPortId,
+            sizeof( guint32 ),
+            strPortId );
+
         string strPortName =
-            strClass +
+            string( PORT_CLASS_DBUS_PROXY_FDO ) +
             string("_" ) +
-            std::to_string( dwPortId );
+            strPortId;
 
         ret = oNewCfg.SetStrProp(
             propPortName, strPortName );
@@ -231,8 +237,7 @@ gint32 CProxyFdoDriver::Probe(
         if( ERROR( ret ) )
             break;
 
-        ret = CreatePort( pNewPort,
-            oNewCfg.GetCfg() );
+        ret = CreatePort( pNewPort, pNewCfg );
 
         if( ERROR( ret ) )
             break;

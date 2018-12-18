@@ -193,11 +193,11 @@ gint32 CDriverManager::Start()
 gint32 CDriverManager::StopDrivers()
 {
     gint32 ret = 0;
+    string strPath = GetBusDrvRegRoot();
     do{
         // let's walk through the bus port list
         // to stop all the active bus ports
         CRegistry& oReg = GetIoMgr()->GetRegistry();
-        string strPath = GetBusDrvRegRoot();
         vector< string > vecContents;
 
         do{
@@ -233,15 +233,13 @@ gint32 CDriverManager::StopDrivers()
         }
 
         ret = oReg.RemoveDir( strPath );
-        if( ERROR( ret ) )
+
+        if( strPath == GetPortDrvRegRoot() )
             break;
 
         strPath = GetPortDrvRegRoot();
-        ret = oReg.RemoveDir( strPath );
-        if( ERROR( ret ) )
-            break;
         
-    }while( 0 );
+    }while( 1 );
     return ret;
 }
 

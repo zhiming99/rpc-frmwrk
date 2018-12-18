@@ -26,6 +26,7 @@
 #include "rpcroute.h"
 #include "tcpport.h"
 #include "objfctry.h"
+#include "fdodrv.h"
 
 
 using namespace std;
@@ -86,6 +87,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CBdgeStartRecvDataTask );
     INIT_MAP_ENTRYCFG( CBdgeStartFetchDataTask );
     INIT_MAP_ENTRYCFG( CRpcSockWatchCallback );
+    INIT_MAP_ENTRYCFG( CProxyFdoDriver );
 
     END_FACTORY_MAPS;
 };

@@ -3274,20 +3274,6 @@ gint32 CRpcServices::LoadObjDesc(
         strVal = strVal.substr( 0, 255 );
         oCfg[ propPortId ] = std::stoi( strVal );
 
-        // get ipaddr
-        Json::Value& oIpAddr =
-            valObjDesc[ JSON_ATTR_IPADDR ];
-
-        if( oIpAddr != Json::Value::null )
-        {
-            strVal = oIpAddr.asString();
-            if( !strVal.empty() )
-            {
-                strVal = strVal.substr( 0, 16 );
-                oCfg[ propIpAddr ] = strVal;
-            }
-        }
-        
         // get ServerName
         Json::Value& oServerName =
             valObjDesc[ JSON_ATTR_SVRNAME ];
@@ -3365,6 +3351,16 @@ gint32 CRpcServices::LoadObjDesc(
             {
                 strVal = oObjElem[ JSON_ATTR_PROXY_PORTCLASS ].asString(); 
                 oCfg[ propPortClass ] = strVal;
+            }
+
+            // get ipaddr
+            if( oObjElem.isMember( JSON_ATTR_IPADDR ) &&
+                oObjElem[ JSON_ATTR_IPADDR ].isString() &&
+                !bServer )
+            {
+                strVal = oObjElem[ JSON_ATTR_IPADDR ].asString(); 
+                strVal = strVal.substr( 0, 16 );
+                oCfg[ propIpAddr ] = strVal;
             }
 
             if( oObjElem.isMember( JSON_ATTR_PROXY_PORTID ) &&

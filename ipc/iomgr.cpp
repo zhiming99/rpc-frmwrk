@@ -68,6 +68,13 @@ gint32 CIoManager::SubmitIrpInternal(
                 IRP_STATE_READY, IRP_STATE_COMPLETED );
             pIrp->SetStatus( ret );
         }
+        else
+        {
+            // we mark the pending only
+            // when the irp is about to
+            // leave the stack
+            pIrp->MarkPending();
+        }
 
     }while( 0 );
 

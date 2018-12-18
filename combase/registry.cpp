@@ -595,8 +595,8 @@ gint32 CRegistry::RemoveDir(
     const std::string& strPath )
 {
     gint32 ret;
+    CStdRMutex a( m_oLock );
     try{
-        CStdRMutex a( m_oLock );
         ret = ChangeDir( strPath );
         if( ERROR( ret ) )
             return ret;

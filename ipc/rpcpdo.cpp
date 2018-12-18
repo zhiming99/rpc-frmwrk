@@ -471,8 +471,18 @@ gint32 CRpcBasePort::DispatchData(
     }
 
     guint32 dwOldState = 0;
-    ret = CanContinue( m_pTestIrp,
-        PORT_STATE_BUSY_SHARED, &dwOldState );
+    do{
+        ret = CanContinue( m_pTestIrp,
+            PORT_STATE_BUSY_SHARED, &dwOldState );
+
+        if( ret == -EAGAIN )
+        {
+            usleep(100);
+            continue;
+        }
+        break;
+
+    }while( 1 );
 
     if( ERROR( ret ) )
     {

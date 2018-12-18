@@ -397,9 +397,42 @@ gint32 CPort::SetProperty( gint32 iProp, const CBuffer& oBuf )
 
 gint32 CPort::RemoveProperty( gint32 iProp )
 {
-    // we don't remove those specific properties
+    gint32 ret = 0;
     CStdRMutex oPortLock( GetLock() );
-    return m_pCfgDb->RemoveProperty( iProp );
+    switch( iProp )
+    {
+    case propLowerPortPtr:
+        {
+            m_pLowerPort = nullptr;
+            break;
+        }
+    case propUpperPortPtr:
+        {
+            m_pUpperPort = nullptr;
+            break;
+        }
+    case propDrvPtr:
+        {
+            m_pDriver = nullptr;
+            break;
+        }
+    case propBusPortPtr:
+        {
+            if( PortType( m_dwFlags ) == PORTFLG_TYPE_BUS )
+            {
+                ret = -ENOTSUP;
+            }
+            else if( PortType( m_dwFlags ) == PORTFLG_TYPE_PDO )
+            {
+                m_pBusPort = nullptr;
+            }
+            break;
+        }
+    default:
+        ret = m_pCfgDb->RemoveProperty( iProp );
+    }
+
+    return ret;
 }
 
 gint32 CPort::StartEx( IRP* pIrp )
@@ -1144,9 +1177,11 @@ gint32 CPort::SubmitStopIrp( IRP* pIrp )
 
             //FIXME: whether or not succeeded,
             //this port will be marked stop
-            ret = SetPortStateWake(
+            bool bSet = SetPortStateWake(
                 PORT_STATE_STOPPING,
                 PORT_STATE_STOPPED );
+            if( !bSet )
+                ret = ERROR_FAIL;
 
             // if( SUCCEEDED( ret ) )
             {
@@ -1285,7 +1320,7 @@ gint32 CPort::SubmitPortStackIrp( IRP* pIrp )
                     // we now make registry for the pdo port only 
                     //
                     string strPath;
-                    CCfgOpener a( ( IConfigDb* )m_pCfgDb );
+                    CCfgOpenerObj a( this );
                     ret = a.GetStrProp( propRegPath, strPath );
                     if( ERROR( ret ) )
                     {
@@ -1341,7 +1376,7 @@ gint32 CPort::SubmitPortStackIrp( IRP* pIrp )
                 if( pLowerPort == nullptr )
                 {
                     string strPath;
-                    CCfgOpener a( ( IConfigDb* )m_pCfgDb );
+                    CCfgOpenerObj a( this );
                     ret = a.GetStrProp( propRegPath, strPath );
                     if( ERROR( ret ) )
                     {
@@ -1675,19 +1710,6 @@ gint32 CPort::SubmitIrp( IRP* pIrp )
         }
 
     }while( 0 );
-
-    //
-    // Well it is ok to be here because
-    // the irp is locked
-    //
-    if( ret == STATUS_PENDING
-        && GetUpperPort() == nullptr )
-    {
-        // we mark the pending only
-        // when the irp is about to
-        // leave the stack
-        pIrp->MarkPending();
-    }
 
     if( ret != STATUS_PENDING )
     {
@@ -2692,7 +2714,7 @@ gint32 CPort::AttachToPort( IPort* pLowerPort )
         propUpperPortPtr, ObjPtr( this ) );
 
     CCfgOpenerObj b( this );
-    ret = a.SetObjPtr(
+    ret = b.SetObjPtr(
         propLowerPortPtr, ObjPtr( pLowerPort ) );
 
     return ret;
@@ -2704,15 +2726,11 @@ gint32 CPort::DetachFromPort( IPort* pLowerPort )
     if( pLowerPort == nullptr )
         return -EINVAL;
 
-    ObjPtr pObj;
-
     CCfgOpenerObj a( pLowerPort );
-    ret = a.SetObjPtr(
-        propUpperPortPtr, pObj );
+    ret = a.RemoveProperty( propUpperPortPtr );
 
     CCfgOpenerObj b( this );
-    ret = a.SetObjPtr(
-        propLowerPortPtr, pObj );
+    ret = b.RemoveProperty( propLowerPortPtr );
 
     return ret;
 }
@@ -2839,6 +2857,10 @@ CGenericBusPort::CGenericBusPort(
 void CGenericBusPort::AddPdoPort(
     guint32 iPortId, PortPtr& portPtr )
 {
+    if( m_mapId2Pdo.find( iPortId ) !=
+        m_mapId2Pdo.end() )
+        return;
+
     m_mapId2Pdo[ iPortId ] = portPtr;
 }
 

@@ -58,14 +58,17 @@ gint32 CFileTransferProxy::UploadFile_Callback(
     gint32 iFd = -1;
 
     do{
+        // NOTE: must get pCallback first to make sure
+        // whether or not the req succeeded or not, the
+        // callback will be called.
+        ret = oTaskCfg.GetPointer(
+            propEventSink, pCallback );
+
         if( ERROR( iRet ) )
         {
             OnFileUploaded( pTask, iFd );
             break;
         }
-
-        ret = oTaskCfg.GetPointer(
-            propEventSink, pCallback );
 
         ret = oTaskCfg.GetIntProp(
             propFd, ( guint32& )iFd );

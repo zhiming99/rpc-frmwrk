@@ -21,53 +21,47 @@
 #include <string.h>
 #include "defines.h"
 #include "dbuserr.h"
+#include <unordered_map>
 
 /**
 * @name ErrnoFromDbusErr 
 * @{ */
 /** get the errno from the dbus error string @} */
 
+static std::unordered_map< std::string, gint32 > g_mapDBusError =
+{
+    { DBUS_ERROR_FAILED, ERROR_FAIL },
+    { DBUS_ERROR_NO_MEMORY, -ENOMEM },
+    { DBUS_ERROR_SERVICE_UNKNOWN, -ENOTCONN },
+    { DBUS_ERROR_NO_REPLY, -ENOMSG },
+    { DBUS_ERROR_IO_ERROR, -EIO },
+    { DBUS_ERROR_BAD_ADDRESS, ERROR_ADDRESS },
+    { DBUS_ERROR_NOT_SUPPORTED, -ENOTSUP },
+    { DBUS_ERROR_LIMITS_EXCEEDED, -ERANGE },
+    { DBUS_ERROR_ACCESS_DENIED, -EACCES },
+    { DBUS_ERROR_AUTH_FAILED, -ECONNREFUSED },
+    { DBUS_ERROR_NO_SERVER, -ENOSYS },
+    { DBUS_ERROR_TIMEOUT, -ETIMEDOUT },
+    { DBUS_ERROR_NO_NETWORK, -ENETUNREACH },
+    { DBUS_ERROR_ADDRESS_IN_USE, -EADDRINUSE },
+    { DBUS_ERROR_DISCONNECTED, -ECONNRESET },
+    { DBUS_ERROR_INVALID_ARGS, -EINVAL },
+    { DBUS_ERROR_FILE_NOT_FOUND, -ENOENT },
+    { DBUS_ERROR_OBJECT_PATH_IN_USE, -EADDRINUSE  },
+};
+
 gint32 ErrnoFromDbusErr( const char *error )
 {
     if( error == nullptr )
         return 0;
 
-    if (strcmp (error, DBUS_ERROR_FAILED) == 0)
-        return ERROR_FAIL;
-    else if (strcmp (error, DBUS_ERROR_NO_MEMORY) == 0)
-        return -ENOMEM;
-    else if (strcmp (error, DBUS_ERROR_IO_ERROR) == 0)
-        return -EIO;
-    else if (strcmp (error, DBUS_ERROR_BAD_ADDRESS) == 0)
-        return -ERROR_ADDRESS;
-    else if (strcmp (error, DBUS_ERROR_NOT_SUPPORTED) == 0)
-        return -ENOTSUP;
-    else if (strcmp (error, DBUS_ERROR_LIMITS_EXCEEDED) == 0)
-        return -ERANGE;
-    else if (strcmp (error, DBUS_ERROR_ACCESS_DENIED) == 0)
-        return -EACCES;
-    else if (strcmp (error, DBUS_ERROR_AUTH_FAILED) == 0)
-        return -ECONNREFUSED;
-    else if (strcmp (error, DBUS_ERROR_NO_SERVER) == 0)
-        return -ENOSYS;
-    else if (strcmp (error, DBUS_ERROR_TIMEOUT) == 0)
-        return -ETIMEDOUT;
-    else if (strcmp (error, DBUS_ERROR_NO_NETWORK) == 0)
-        return -ENETUNREACH;
-    else if (strcmp (error, DBUS_ERROR_ADDRESS_IN_USE) == 0)
-        return -EADDRINUSE;
-    else if (strcmp (error, DBUS_ERROR_DISCONNECTED) == 0)
-        return -ECONNRESET;
-    else if (strcmp (error, DBUS_ERROR_INVALID_ARGS) == 0)
-        return -EINVAL;
-    else if (strcmp (error, DBUS_ERROR_NO_REPLY) == 0)
-        return -ENOMSG;
-    else if (strcmp (error, DBUS_ERROR_FILE_NOT_FOUND) == 0)
-        return -ENOENT;
-    else if (strcmp (error, DBUS_ERROR_OBJECT_PATH_IN_USE) == 0)
-        return -EADDRINUSE; 
+    std::unordered_map< std::string, gint32 >::iterator
+        itr = g_mapDBusError.find( error );
 
-    return 0;
+    if( itr == g_mapDBusError.end() )
+        return 0;
+
+    return itr->second;
 }
 
 CDBusError::CDBusError()

@@ -219,7 +219,7 @@ gint32 CTaskletRetriable::ScheduleRetry()
             break;
 
         gint32 iRetries = DecRetries();
-        if( iRetries <= 0 )
+        if( iRetries <  0 )
         {
             ret = iRetries;
             break;

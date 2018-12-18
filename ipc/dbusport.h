@@ -34,6 +34,11 @@ gint32 Ip4AddrToBytes(
     guint8* pBytes,
     guint32& dwSize );
 
+gint32 BytesToString(
+    const guint8* bytes,
+    guint32 dwSize,
+    std::string& strRet );
+
 class CRpcBasePort : public CPort
 {
     protected:

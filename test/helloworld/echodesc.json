@@ -11,6 +11,8 @@
             "RequestTimeoutSec" : "120",
             "KeepAliveTimeoutSec" : "60",
             "QueuedRequests" : "false",
+            "ProxyPortClass": "DBusProxyPdo",
+            "IpAddress" : "127.0.0.1",
             "Interfaces" :
             [
                 {

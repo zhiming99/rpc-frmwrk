@@ -1178,19 +1178,26 @@ gint32 CIfOpenPortTask::OnIrpComplete(
         }
 
         HANDLE hPort = 0;
-        EnumEventId iEvent = eventPortStarted;
 
-        if( ERROR( pIrp->GetStatus() ) )
+        gint32 iRet = pIrp->GetStatus();
+        IrpCtxPtr& pCtx = pIrp->GetTopStack();
+
+        if( ERROR( iRet ) )
         {
-            iEvent = eventPortStartFailed;
+            EnumEventId iEvent = eventPortStartFailed;
+            if( !pCtx->m_pRespData.IsEmpty() )
+            {
+                hPort = ( guint32& )*pCtx->m_pRespData;
+                pIf->OnPortEvent( iEvent, hPort );
+            }
+            ret = iRet;
         }
         else
         {
-            IrpCtxPtr& pCtx = pIrp->GetTopStack();
+            EnumEventId iEvent = eventPortStarted;
             hPort = ( guint32& )*pCtx->m_pRespData;
+            ret = pIf->OnPortEvent( iEvent, hPort );
         }
-        
-        ret = pIf->OnPortEvent( iEvent, hPort );
 
     }while( 0 );
     
