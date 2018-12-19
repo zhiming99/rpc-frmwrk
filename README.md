@@ -4,8 +4,8 @@ An effort for embedded RPC framework, and hope it could find its usage in IOT or
 This framework depends on the following packags:  
 1. `dbus-1.0 (dbus-devel.i686)`  
 2. `libjson-cpp (jsoncpp-devel.i686)`  
-3. `cppunit-1 (for the samples, cppunit.i686 and cppunit-devel.i686)`   
-4. `glib-2.0 ( for compile only,glib2-devel.i686 )`   
+3. `cppunit-1 (for the sample code, cppunit.i686 and cppunit-devel.i686)`   
+4. `glib-2.0 (for compile only,glib2-devel.i686)`   
 #### Features:   
 1. `Multiple interfaces on a single object (COM alike).`   
 2. `Synchronous/Asynchronous request and handling.`   
