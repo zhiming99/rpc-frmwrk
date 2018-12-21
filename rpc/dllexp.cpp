@@ -66,13 +66,13 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CRpcBasePortModOnOfflineTask );
     INIT_MAP_ENTRYCFG( CRpcControlStream );
     INIT_MAP_ENTRYCFG( CRpcListeningSock );
-    INIT_MAP_ENTRYCFG( CRpcReqForwarder );
-    INIT_MAP_ENTRYCFG( CRpcReqForwarderProxy );
+    INIT_MAP_ENTRYCFG( CRpcReqForwarderImpl );
+    INIT_MAP_ENTRYCFG( CRpcReqForwarderProxyImpl );
     INIT_MAP_ENTRYCFG( CRpcRfpForwardEventTask );
     INIT_MAP_ENTRYCFG( CRpcStream );
     INIT_MAP_ENTRYCFG( CRpcStreamSock );
-    INIT_MAP_ENTRYCFG( CRpcTcpBridge );
-    INIT_MAP_ENTRYCFG( CRpcTcpBridgeProxy );
+    INIT_MAP_ENTRYCFG( CRpcTcpBridgeImpl );
+    INIT_MAP_ENTRYCFG( CRpcTcpBridgeProxyImpl );
     INIT_MAP_ENTRYCFG( CRpcTcpBusDriver );
     INIT_MAP_ENTRYCFG( CRpcTcpBusPort );
     INIT_MAP_ENTRYCFG( CRpcTcpFido );
@@ -88,6 +88,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CBdgeStartFetchDataTask );
     INIT_MAP_ENTRYCFG( CRpcSockWatchCallback );
     INIT_MAP_ENTRYCFG( CProxyFdoDriver );
+    INIT_MAP_ENTRYCFG( CRpcRouter );
 
     END_FACTORY_MAPS;
 };

@@ -1,17 +1,18 @@
 {
     "Version" : "1.0",
-    "BusName" : "DBusBusPort_0",
-    "PortClass": "DBusLocalPdo",
-    "PortId" : "0",
     "ServerName": "EchoServer",
     "Objects" :
     [
         {
             "ObjectName": "CEchoServer",
+            "BusName" : "DBusBusPort_0",
+            "PortClass": "DBusLocalPdo",
+            "PortId" : "0",
             "RequestTimeoutSec" : "120",
             "KeepAliveTimeoutSec" : "60",
             "QueuedRequests" : "false",
             "ProxyPortClass": "DBusProxyPdo",
+            "comment-1" : "IpAddress is the ip address of the server",
             "IpAddress" : "127.0.0.1",
             "Interfaces" :
             [

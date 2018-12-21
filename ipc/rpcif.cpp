@@ -3232,48 +3232,6 @@ gint32 CRpcServices::LoadObjDesc(
         if( ERROR( ret ) )
             break;
 
-        // get BusName
-        Json::Value& oBusName =
-            valObjDesc[ JSON_ATTR_BUSNAME ];
-
-        if( oBusName == Json::Value::null )
-        {
-            ret = -ENOENT;
-            break;
-        }
-        
-        string strVal = oBusName.asString();
-        strVal = strVal.substr( 0, 255 );
-        oCfg[ propBusName ] = strVal;
-
-        // get PortClass
-        Json::Value& oPortClass =
-            valObjDesc[ JSON_ATTR_PORTCLASS ];
-
-        if( oPortClass == Json::Value::null )
-        {
-            ret = -ENOENT;
-            break;
-        }
-
-        strVal = oPortClass.asString();
-        strVal = strVal.substr( 0, 255 );
-        oCfg[ propPortClass ] = strVal;
-
-        // get PortId
-        Json::Value& oPortId =
-            valObjDesc[ JSON_ATTR_PORTID ];
-
-        if( oPortId == Json::Value::null )
-        {
-            ret = -ENOENT;
-            break;
-        }
-        
-        strVal = oPortId.asString();
-        strVal = strVal.substr( 0, 255 );
-        oCfg[ propPortId ] = std::stoi( strVal );
-
         // get ServerName
         Json::Value& oServerName =
             valObjDesc[ JSON_ATTR_SVRNAME ];
@@ -3299,6 +3257,8 @@ gint32 CRpcServices::LoadObjDesc(
             break;
         }
 
+        string strVal;
+
         size_t i = 0;
         for( ; i < oObjArray.size(); i++ )
         {
@@ -3316,6 +3276,51 @@ gint32 CRpcServices::LoadObjDesc(
                 != strObjName )
                 continue;
 
+            // get BusName
+            if( oObjElem.isMember( JSON_ATTR_BUSNAME ) &&
+                oObjElem[ JSON_ATTR_BUSNAME ].isString() )
+            {
+                Json::Value& oBusName =
+                    oObjElem[ JSON_ATTR_BUSNAME ];
+                strVal = oBusName.asString().substr( 0, 255 );
+                oCfg[ propBusName ] = strVal;
+            }
+            else
+            {
+                ret = -ENOENT;
+                break;
+            }
+            
+            // get PortClass
+            if( oObjElem.isMember( JSON_ATTR_PORTCLASS  ) &&
+                oObjElem[ JSON_ATTR_PORTCLASS ].isString() )
+            {
+                Json::Value& oPortClass =
+                    oObjElem[ JSON_ATTR_PORTCLASS ];
+                strVal = oPortClass.asString().substr( 0, 255 );
+                oCfg[ propPortClass ] = strVal;
+            }
+            else
+            {
+                ret = -ENOENT;
+                break;
+            }
+
+            // get PortId
+            if( oObjElem.isMember( JSON_ATTR_PORTID ) &&
+                oObjElem[ JSON_ATTR_PORTID ].isString() )
+            {
+                Json::Value& oPortId =
+                    oObjElem[ JSON_ATTR_PORTID ];
+                strVal = oPortId.asString().substr( 0, 255 );
+                oCfg[ propPortId ] = std::stoi( strVal );
+            }
+            else
+            {
+                ret = -ENOENT;
+                break;
+            }
+            
             // get the RequestTimeoutSec
             if( oObjElem.isMember( JSON_ATTR_REQ_TIMEOUT ) &&
                 oObjElem[ JSON_ATTR_REQ_TIMEOUT ].isString() )

@@ -1,16 +1,16 @@
 {
     "Version" : "1.0",
-    "BusName" : "DBusBusPort_0",
-    "Comment-0" : "the following is DIFFERENT from normal proxy/svr setup",
-    "PortClass": "DBusLocalPdo",
-    "PortId" : "0",
     "ServerName": "InProcSvr",
-    "Comment-1" : "You want to use it in remote connection",
-    "IpAddress" : "",
     "Objects" :
     [
         {
             "ObjectName": "CInProcServer",
+            "BusName" : "DBusBusPort_0",
+            "Comment-0" : "the following is DIFFERENT from normal proxy/svr setup",
+            "PortClass": "DBusLocalPdo",
+            "PortId" : "0",
+            "Comment-1" : "You want to use it in remote connection",
+            "IpAddress" : "",
             "RequestTimeoutSec" : "120",
             "KeepAliveTimeoutSec" : "60",
             "Comment-0" : "Normally, you don't need the following two fields unless the proxy is connecting to DBusLoopbackPdo port or DBusProxyPdo",

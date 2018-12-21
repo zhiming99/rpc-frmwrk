@@ -68,7 +68,7 @@ CfgPtr CRpcReqForwarder::InitCfg(
             strSender );
 
         string strObjPath = DBUS_OBJ_PATH(
-            strModName, OBJNAME_RPCROUTER );
+            strModName, OBJNAME_REQFWDR );
 
         ret = oCfg.SetStrProp(
             propObjPath, strObjPath );
@@ -99,10 +99,11 @@ CfgPtr CRpcReqForwarder::InitCfg(
 
 CRpcReqForwarder::CRpcReqForwarder(
     const IConfigDb* pCfg )
-    : super( InitCfg( pCfg ) )
+    : CAggInterfaceServer( InitCfg( pCfg ) ),
+    super( InitCfg( pCfg ) )
 {
     gint32 ret = 0;
-    SetClassId( clsid( CRpcReqForwarder ) );
+    // SetClassId( clsid( CRpcReqForwarder ) );
     do{
         ObjPtr pObj;
         CCfgOpener oCfg( pCfg );
@@ -130,6 +131,13 @@ CRpcReqForwarder::CRpcReqForwarder(
     }
 }
 
+gint32 CRpcReqForwarder::InitUserFuncs()
+{
+    BEGIN_IFHANDLER_MAP( CRpcReqForwarder );
+    END_HANDLER_MAP;
+    return 0;
+}
+
 gint32 CRpcReqForwarder::CheckReqToFwrd(
     CRpcRouter* pRouter,
     const string &strIpAddr,
@@ -153,6 +161,9 @@ gint32 CReqFwdrOpenRmtPortTask::CreateInterface(
         if( ERROR( ret ) )
             break;
 
+        bool bServer = true;
+        if( m_iState == stateStartBridgeProxy )
+            bServer = false;
         // ---interface related information---
         //
         // ----open port information----
@@ -172,6 +183,15 @@ gint32 CReqFwdrOpenRmtPortTask::CreateInterface(
         // propRouterPtr
 
         CParamList oParams;
+        ret = CRpcServices::LoadObjDesc(
+            ROUTER_OBJ_DESC,
+            OBJNAME_TCP_BRIDGE,
+            bServer,
+            oParams.GetCfg() );
+
+        if( ERROR( ret ) )
+            break;
+
         ret =oParams.CopyProp( propIpAddr, this );
         if( ERROR( ret ) )
             break;
@@ -184,8 +204,11 @@ gint32 CReqFwdrOpenRmtPortTask::CreateInterface(
 
         oParams.SetObjPtr( propParentPtr, pObj );
 
-        oParams.SetStrProp( propPortClass,
-            PORT_CLASS_TCP_STREAM_PDO );
+        if( !oParams.exist( propPortClass ) )
+        {
+            oParams.SetStrProp( propPortClass,
+                PORT_CLASS_TCP_STREAM_PDO );
+        }
 
         guint8 dwBytes[ IPV4_ADDR_BYTES ];
         guint32 dwSize = sizeof( dwBytes );
@@ -213,7 +236,7 @@ gint32 CReqFwdrOpenRmtPortTask::CreateInterface(
         string strModName = pMgr->GetModName();
 
         string strObjPath = DBUS_OBJ_PATH(
-            strModName, OBJNAME_RPCROUTER );
+            strModName, OBJNAME_TCP_BRIDGE );
 
         ret = oParams.SetStrProp(
             propObjPath, strObjPath );
@@ -239,13 +262,13 @@ gint32 CReqFwdrOpenRmtPortTask::CreateInterface(
         if( m_iState == stateStartBridgeProxy )
         {
             ret = pIf.NewObj(
-                clsid( CRpcTcpBridgeProxy ),
+                clsid( CRpcTcpBridgeProxyImpl ),
                 oParams.GetCfg() );
         }
         else if( m_iState == stateStartBridgeServer )
         {
             ret = pIf.NewObj(
-                clsid( CRpcTcpBridge ),
+                clsid( CRpcTcpBridgeImpl ),
                 oParams.GetCfg() );
         }
 
@@ -1141,7 +1164,6 @@ gint32 CReqFwdrForwardRequestTask::RunTask()
 
         string strIpAddr;
 
-
         oParams.GetStrProp( 0, strIpAddr );
         if( ERROR( ret ) )
             break;
@@ -1154,7 +1176,7 @@ gint32 CReqFwdrForwardRequestTask::RunTask()
         InterfPtr bridgePtr;
 
         if( pIf->GetClsid() ==
-            clsid( CRpcReqForwarder ) )
+            clsid( CRpcReqForwarderImpl ) )
         {
             ret = pRouter->GetBridgeProxy(
                 strIpAddr, bridgePtr );
@@ -1169,7 +1191,7 @@ gint32 CReqFwdrForwardRequestTask::RunTask()
                 strIpAddr, pMsg, pRespMsg, this );
         }
         else if( pIf->GetClsid() ==
-            clsid( CRpcTcpBridge ) )
+            clsid( CRpcTcpBridgeImpl ) )
         {
             ret = pRouter->GetReqFwdrProxy(
                 bridgePtr );
@@ -1685,10 +1707,11 @@ CfgPtr CRpcReqForwarderProxy::InitCfg(
 
 CRpcReqForwarderProxy::CRpcReqForwarderProxy(
     const IConfigDb* pCfg )
-    : super( InitCfg( pCfg ) )
+    : CInterfaceProxy( InitCfg( pCfg ) ),
+    super( InitCfg( pCfg ) )
 {
     gint32 ret = 0;
-    SetClassId( clsid( CRpcReqForwarderProxy ) );
+    // SetClassId( clsid( CRpcReqForwarderProxy ) );
 
     do{
         ObjPtr pObj;
@@ -2235,6 +2258,13 @@ gint32 CRpcReqForwarderProxy::CustomizeRequest(
     return ret;
 }
 
+gint32 CRpcReqForwarderProxy::InitUserFuncs()
+{
+    BEGIN_IFHANDLER_MAP( CRpcReqForwarder );
+    END_HANDLER_MAP;
+    return 0;
+}
+
 gint32 CReqFwdrSendDataTask::RunTask()
 {
     gint32 ret = 0;
@@ -2296,7 +2326,7 @@ gint32 CReqFwdrSendDataTask::RunTask()
         InterfPtr bridgePtr;
 
         if( pIf->GetClsid() ==
-            clsid( CRpcReqForwarder ) )
+            clsid( CRpcReqForwarderImpl ) )
         {
             ret = pRouter->GetBridgeProxy(
                 strIpAddr, bridgePtr );
@@ -2311,7 +2341,7 @@ gint32 CReqFwdrSendDataTask::RunTask()
                 dwFd, dwOffset, dwSize, this );
         }
         else if( pIf->GetClsid() ==
-            clsid( CRpcTcpBridge ) )
+            clsid( CRpcTcpBridgeImpl ) )
         {
             ret = pRouter->GetReqFwdrProxy(
                 bridgePtr );
@@ -2480,7 +2510,7 @@ gint32 CReqFwdrFetchDataTask::RunTask()
         InterfPtr bridgePtr;
 
         if( pIf->GetClsid() ==
-            clsid( CRpcReqForwarder ) )
+            clsid( CRpcReqForwarderImpl ) )
         {
             ret = pRouter->GetBridgeProxy(
                 strIpAddr, bridgePtr );
@@ -2495,7 +2525,7 @@ gint32 CReqFwdrFetchDataTask::RunTask()
                 ( gint32& )dwFd, dwOffset, dwSize, this );
         }
         else if( pIf->GetClsid() ==
-            clsid( CRpcTcpBridge ) )
+            clsid( CRpcTcpBridgeImpl ) )
         {
             ret = pRouter->GetReqFwdrProxy(
                 bridgePtr );

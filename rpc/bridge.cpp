@@ -29,10 +29,10 @@ using namespace std;
 
 CRpcTcpBridgeProxy::CRpcTcpBridgeProxy(
     const IConfigDb* pCfg )
-    : super( pCfg ),
+    :  CInterfaceProxy( pCfg ), super( pCfg ),
     CRpcTcpBridgeShared( this )
 {
-    SetClassId( clsid( CRpcTcpBridgeProxy ) );
+    // SetClassId( clsid( CRpcTcpBridgeProxy ) );
     gint32 ret = 0;
 
     do{
@@ -64,11 +64,7 @@ CRpcTcpBridgeProxy::CRpcTcpBridgeProxy(
 
 gint32 CRpcTcpBridgeProxy::InitUserFuncs()
 {
-    gint32 ret = super::InitUserFuncs();
-    if( ERROR( ret ) )
-        return ret;
-
-    BEGIN_HANDLER_MAP;
+    BEGIN_IFHANDLER_MAP( CRpcTcpBridge );
 
     ADD_EVENT_HANDLER(
         CRpcTcpBridgeProxy::OnRmtSvrOffline,
@@ -82,7 +78,7 @@ gint32 CRpcTcpBridgeProxy::InitUserFuncs()
         CRpcTcpBridgeProxy::OnInvalidStreamId,
         BRIDGE_EVENT_INVALIDSTM );
 
-    END_HANDLER_MAP;
+    END_IFHANDLER_MAP;
 
     return 0;
 }
@@ -250,7 +246,7 @@ gint32 CRpcTcpBridgeProxy::BuildBufForIrpFwrdReq(
             IFNAME_TCP_BRIDGE );
 
         string strObjPath =DBUS_OBJ_PATH(
-            strModName, OBJNAME_RPCROUTER );
+            strModName, OBJNAME_TCP_BRIDGE );
 
         string strSender =
             DBUS_DESTINATION( strModName  );
@@ -1523,10 +1519,10 @@ gint32 CRpcInterfaceProxy::OnKeepAliveRelay(
 //
 CRpcTcpBridge::CRpcTcpBridge(
     const IConfigDb* pCfg )
-    : super( pCfg ),
+    : CAggInterfaceServer( pCfg ), super( pCfg ),
     CRpcTcpBridgeShared( this )
 {
-    SetClassId( clsid( CRpcTcpBridge) );
+    // SetClassId( clsid( CRpcTcpBridge) );
     gint32 ret = 0;
 
     do{
@@ -1879,7 +1875,7 @@ gint32 CRpcTcpBridge::BuildBufForIrpFwrdEvt(
             break;
 
         strVal = DBUS_OBJ_PATH(
-            strModName, OBJNAME_RPCROUTER );
+            strModName, OBJNAME_TCP_BRIDGE );
 
         ret = pMsg.SetPath( strVal );
 
@@ -2527,7 +2523,7 @@ gint32 CRpcInterfaceServer::DoInvoke(
                 string strIpAddr =
                     ( string& )*vecArgs[ 0 ].second;
 
-                if( GetClsid() == clsid( CRpcTcpBridge ) )
+                if( GetClsid() == clsid( CRpcTcpBridgeImpl ) )
                 {
                     // we will use the source ip
                     // address as the input
@@ -2637,8 +2633,8 @@ gint32 CRpcInterfaceServer::DoInvoke(
 
     if( ret == -ENOTSUP )
     {
-        ret = super::DoInvoke( pReqMsg,
-            pCallback );
+        ret = super::DoInvoke(
+            pReqMsg, pCallback );
     }
 
     return ret;
@@ -2853,7 +2849,7 @@ gint32 CRpcTcpBridge::SetupReqIrpOnProgress(
             break;
 
         strVal = DBUS_OBJ_PATH(
-            strModName, OBJNAME_RPCROUTER );
+            strModName, OBJNAME_TCP_BRIDGE );
 
         ret = pMsg.SetPath( strVal );
 
@@ -3183,8 +3179,7 @@ gint32 CRpcTcpBridge::OpenStream_Server(
     do{
         if( !IsConnected() )
         {
-            // NOTE: this is not a serious state
-            // check
+            // NOTE: this is not a serious check
             ret = ERROR_STATE;
             break;
         }
@@ -3235,11 +3230,7 @@ gint32 CRpcTcpBridge::OpenStream_Server(
 
 gint32 CRpcTcpBridge::InitUserFuncs()
 {
-    gint32 ret = super::InitUserFuncs();
-    if( ERROR( ret ) )
-        return ret;
-
-    BEGIN_HANDLER_MAP;
+    BEGIN_IFHANDLER_MAP( CRpcTcpBridge );
 
     ADD_SERVICE_HANDLER(
         CRpcTcpBridge::OpenStream,

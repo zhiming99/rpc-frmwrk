@@ -1,0 +1,34 @@
+include ../Makefile.init.pub
+
+TARGET_IMG:=rpcrouter
+
+TARGET:=$(OUTPUT_DIR)/$(TARGET_IMG)
+ROUTER_OBJ:= routmain.o
+
+SOURCES:= routmain.cpp
+OBJS2:=$(SOURCES:%.cpp=$(OBJ_DIR)/%.o)
+
+all: $(TARGET)
+debug: $(TARGET)
+release: $(TARGET)
+
+debug_clean: do_clean
+release_clean: do_clean
+
+clean:
+	make debug_clean
+	make release_clean
+
+do_clean:
+	-@rm $(OBJ_DIR)/*.d $(MUTE_CLEAN)
+	-@rm $(OUTPUT_DIR)/$(TARGET_IMG) $(MUTE_CLEAN)
+	-@rm $(SOURCES:%.cpp=$(OBJ_DIR)/%.o) $(MUTE_CLEAN)
+	-@rm $(OBJ_DIR)/$(ROUTER_OBJ) $(MUTE_CLEAN)
+
+-include $(OBJS2:%.o=%.d) $(ROUTER_OBJ:%.o=(OBJ_DIR)/%.d)
+
+$(OUTPUT_DIR)/$(TARGET_IMG) : $(OBJ_DIR)/$(ROUTER_OBJ)
+	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
+	$(CC) -o $@ $(LINKER_OPTION) -lrpc $(OBJ_DIR)/$(ROUTER_OBJ)
+
+.PHONY: sync TARGET clean_objs debug_clean release_clean do_clean

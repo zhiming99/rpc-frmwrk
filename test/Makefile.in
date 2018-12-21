@@ -9,6 +9,7 @@ all:
 	make -C prtest
 	make -C sftest
 	make -C stmtest
+	make -C router
 
 release:
 	make -C helloworld release
@@ -21,6 +22,7 @@ release:
 	make -C prtest release
 	make -C sftest release
 	make -C stmtest release
+	make -C router release
 
 clean:
 	make -C helloworld clean
@@ -33,5 +35,6 @@ clean:
 	make -C prtest clean
 	make -C sftest clean
 	make -C stmtest clean
+	make -C router clean
 
 .PHONY: release clean

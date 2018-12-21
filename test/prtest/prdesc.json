@@ -1,13 +1,13 @@
 {
     "Version" : "1.0",
-    "BusName" : "DBusBusPort_0",
-    "PortClass": "DBusLocalPdo",
-    "PortId" : "0",
     "ServerName": "PauseResumeServer",
     "Objects" :
     [
         {
             "ObjectName": "CPauseResumeServer",
+            "BusName" : "DBusBusPort_0",
+            "PortClass": "DBusLocalPdo",
+            "PortId" : "0",
             "RequestTimeoutSec" : "120",
             "KeepAliveTimeoutSec" : "2",
             "PauseOnStart" : "true",

@@ -55,5 +55,6 @@ AC_CONFIG_FILES([Makefile
                  test/katest/Makefile
                  test/sftest/Makefile
                  test/stmtest/Makefile
+                 test/router/Makefile
                  test/smoketest/Makefile])
 AC_OUTPUT

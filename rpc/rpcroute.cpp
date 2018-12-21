@@ -29,6 +29,8 @@ CRpcRouter::CRpcRouter(
     const IConfigDb* pCfg )
 {
     gint32 ret = 0;
+    SetClassId( clsid( CRpcRouter ) );
+
     do{
         if( pCfg == nullptr )
         {
@@ -43,6 +45,7 @@ CRpcRouter::CRpcRouter(
             break;
 
     }while( 0 );
+
     if( ERROR( ret ) )
     {
         string strMsg = DebugMsg(
@@ -194,17 +197,23 @@ gint32 CRpcRouter::StartReqFwder(
         CParamList oParams;
         oParams.SetPointer( propIoMgr, GetIoMgr() );
 
-        oParams.SetObjPtr(
-            propParentPtr, ObjPtr( this ) );
-
-        oParams.SetBoolProp(
-            propQueuedReq, false );
-
         EnumClsid iClsid =
-            clsid( CRpcReqForwarderProxy );
+            clsid( CRpcReqForwarderProxyImpl );
 
         if( !bProxy )
-            iClsid = clsid( CRpcReqForwarder );
+            iClsid = clsid( CRpcReqForwarderImpl );
+
+        ret = CRpcServices::LoadObjDesc(
+            ROUTER_OBJ_DESC,
+            OBJNAME_REQFWDR,
+            !bProxy,
+            oParams.GetCfg() );
+
+        if( ERROR( ret ) )
+            break;
+
+        oParams.SetObjPtr(
+            propParentPtr, ObjPtr( this ) );
 
         ret = pIf.NewObj(
             iClsid, oParams.GetCfg() );
@@ -381,8 +390,7 @@ gint32 CRpcRouter::OnRmtSvrOnline(
             if( ERROR( ret ) )
                 break;
 
-            // RunTask with a event other than
-            // zero.
+            // run this task immediately
             ( *pTask )( eventZero );
             ret = pTask->GetError();
         }

@@ -17,8 +17,11 @@
  */
 #include "defines.h"
 #include "port.h"
-#include "proxy.h"
+#include "ifhelper.h"
 #include "iftasks.h"
+#include "counters.h"
+
+#define ROUTER_OBJ_DESC             "./router.json"
 
 struct IRpcReqProxyAsync
 {
@@ -218,7 +221,7 @@ namespace std {
 }
 
 class CRpcInterfaceProxy :
-    public CInterfaceProxy,
+    virtual public CInterfaceProxy,
     public IRpcReqProxyAsync,
     public IRpcEventRelay
 {
@@ -249,7 +252,7 @@ class CRpcInterfaceProxy :
 };
 
 class CRpcInterfaceServer :
-    public CInterfaceServer,
+    virtual public CAggInterfaceServer,
     public IRpcReqServerAsync,
     public IRpcEventRelay
 {
@@ -294,7 +297,7 @@ class CRpcInterfaceServer :
 
     public:
 
-    typedef CInterfaceServer super;
+    typedef CAggInterfaceServer super;
     CRpcInterfaceServer( const IConfigDb* pCfg ) :
         super( pCfg )
     {;}
@@ -391,7 +394,7 @@ class CRpcInterfaceServer :
 };
 
 class CRpcReqForwarder :
-    public CRpcInterfaceServer
+     public CRpcInterfaceServer
 {
     protected:
 
@@ -429,6 +432,8 @@ class CRpcReqForwarder :
     CRpcReqForwarder(
         const IConfigDb* pCfg );
 
+    gint32 InitUserFuncs();
+
     gint32 AddRefCount(
         const std::string& strIpAddr,
         const std::string& strSrcUniqName,
@@ -439,6 +444,8 @@ class CRpcReqForwarder :
         const std::string& strSrcUniqName,
         const std::string& strSrcDBusName );
 
+    virtual const EnumClsid GetIid() const
+    { return iid( CRpcReqForwarder ); }
     //
     // called by the bus port to create the remote
     // connection before the proxy pdo is created
@@ -532,9 +539,12 @@ class CRpcReqForwarderProxy :
         IEventSink* pCallback );
 
     public:
+
     typedef CRpcInterfaceProxy super;
     CRpcReqForwarderProxy( const IConfigDb* pCfg );
     ~CRpcReqForwarderProxy();
+
+    gint32 InitUserFuncs();
 
     virtual gint32 SetupReqIrp( IRP* pIrp,
         IConfigDb* pReqCall,
@@ -586,7 +596,6 @@ class CRpcReqForwarderProxy :
 
 struct CRpcTcpBridgeShared
 {
-
     CRpcTcpBridgeShared( CRpcServices* pIf )
     { m_pParentIf = pIf; }
 
@@ -680,6 +689,9 @@ class CRpcTcpBridge:
     typedef CRpcInterfaceServer super;
     CRpcTcpBridge( const IConfigDb* pCfg );
     ~CRpcTcpBridge();
+
+    virtual const EnumClsid GetIid() const
+    { return iid( CRpcTcpBridge ); }
 
     virtual gint32 OpenRemotePort(
         const IConfigDb* pCfg,
@@ -928,7 +940,7 @@ class CRpcTcpBridgeProxy :
         guint64 iTaskId );
 };
 
-class CRpcRouter : public IServiceEx
+class CRpcRouter : public IService
 {
     // pair::first is the Proxy interface over the
     // CTcpStreamPdo
@@ -941,8 +953,8 @@ class CRpcRouter : public IServiceEx
     // pair::second is the reference count
     typedef std::pair< std::string, gint32 > IfReference;
 
-    // the key is the ip-addr and the value is the
-    // pair of the network interface
+    // the key is the peer ip-addr and the value is the
+    // pair of the tcp bridge and tcp bridge proxy
     std::map< std::string, NetIfPair > m_mapIp2NetIfs;
 
     // local registered matches
@@ -1527,3 +1539,23 @@ class CBdgeStartFetchDataTask :
     { m_dwTaskState = iState; }
     gint32 RelayFetchData();
 };
+
+DECLARE_AGGREGATED_SERVER(
+    CRpcReqForwarderImpl,
+    CRpcReqForwarder,
+    CStatCountersServer ); 
+
+DECLARE_AGGREGATED_SERVER(
+    CRpcTcpBridgeImpl,
+    CRpcTcpBridge,
+    CStatCountersServer ); 
+
+DECLARE_AGGREGATED_PROXY(
+    CRpcReqForwarderProxyImpl,
+    CRpcReqForwarderProxy,
+    CStatCountersProxy );
+
+DECLARE_AGGREGATED_PROXY(
+    CRpcTcpBridgeProxyImpl,
+    CRpcTcpBridgeProxy,
+    CStatCountersProxy );

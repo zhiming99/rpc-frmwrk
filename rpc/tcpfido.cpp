@@ -901,7 +901,7 @@ gint32 CRpcTcpFido::BuildSendDataMsg(
             break;
 
         string strPath = DBUS_OBJ_PATH(
-            MODNAME_RPCROUTER, OBJNAME_RPCROUTER );
+            MODNAME_RPCROUTER, OBJNAME_TCP_BRIDGE );
 
         pMsg.SetPath( strPath );
 

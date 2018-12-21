@@ -26,11 +26,10 @@ C_INCLUDE := -I$(BASE)/include \
 	-I/usr/lib/glib-2.0/include \
 	-I/usr/include/dbus-1.0 \
 	-I/usr/lib/dbus-1.0/include \
-	-I/usr/local/include\
 
 
 CPP_FLAGS := $(CPPFLAGS) -std=c++11 -m32
-LINKER_OPTION := -m32 -ldl -lstdc++ -lpthread -L/usr/lib/ -Wl,-rpath=/user/lib -L/lib -Wl,-rpath=/lib -lcppunit
+LINKER_OPTION := -m32 -ldl -lstdc++ -lpthread -L/usr/lib/ -Wl,-rpath=/usr/lib -L/lib -Wl,-rpath=/lib -lcppunit
 
 OUTPUT_DIR := $(BASE)/test/debug
 RPCLIB_DIR := $(BASE)/debug

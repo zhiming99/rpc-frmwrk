@@ -531,7 +531,7 @@ gint32 CDBusProxyPdo::HandleConnRequest(
             break;
 
         string strObjPath = DBUS_OBJ_PATH(
-            MODNAME_RPCROUTER, OBJNAME_RPCROUTER );
+            MODNAME_RPCROUTER, OBJNAME_REQFWDR );
 
         ret = pMsg.SetPath( strObjPath );
 
@@ -1202,7 +1202,7 @@ gint32 CDBusProxyPdo::PostStart( IRP* pIrp )
 
         string strPath =
             DBUS_OBJ_PATH( MODNAME_RPCROUTER,
-            OBJNAME_RPCROUTER );
+            OBJNAME_REQFWDR );
 
         string strIfName =
             DBUS_IF_NAME( IFNAME_REQFORWARDER );

@@ -74,7 +74,7 @@ gint32 CDBusProxyFdo::BuildSendDataMsg(
 
         // correct the objpath and if name
         string strPath = DBUS_OBJ_PATH(
-            MODNAME_RPCROUTER, OBJNAME_RPCROUTER );
+            MODNAME_RPCROUTER, OBJNAME_REQFWDR );
 
         pMsg.SetPath( strPath );
 

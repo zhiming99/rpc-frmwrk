@@ -233,7 +233,7 @@
             ]
         },
         {
-            "ModName" : "Mod_RpcRouter_0",
+            "ModName" : "rpcrouter",
             "DriversToLoad" :
             [
                 "DBusBusDriver",

@@ -1,16 +1,15 @@
 {
     "Version" : "1.0",
-    "BusName" : "DBusBusPort_0",
-    "PortClass": "DBusLocalPdo",
-    "PortId" : "0",
     "ServerName": "EventServer",
     "Objects" :
     [
         {
             "ObjectName": "CEventServer",
+            "BusName" : "DBusBusPort_0",
+            "PortClass": "DBusLocalPdo",
+            "PortId" : "0",
             "RequestTimeoutSec" : "120",
             "KeepAliveTimeoutSec" : "60",
-
             "Interfaces" :
             [
                 {

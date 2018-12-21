@@ -137,22 +137,21 @@ inline std::string DBUS_DESTINATION(
 // module name for rpc router which will serve as
 // the dbus destination where the requst to rpc
 // router will send
-#define MODNAME_RPCROUTER               "Mod_RpcRouter_0"
+#define MODNAME_RPCROUTER               "rpcrouter"
 #define MODNAME_INVALID                 "Mod_Invalid"
 
 // the interface that provide req forwarder
 // service
-#define IFNAME_REQFORWARDER \
-    CoGetClassName( clsid( CRpcReqForwarder ) )
-
-#define IFNAME_TCP_BRIDGE \
-    CoGetClassName( clsid( CRpcTcpBridge ) )
+#define IFNAME_REQFORWARDER             "CRpcReqForwarder"
+#define IFNAME_TCP_BRIDGE               "CRpcTcpBridge"
 
 #define IFNAME_INVALID                  "If_Invalid" 
 // the obj name which will provide two interfaces
 // CRpcReqForwarder and CRpcReqForwarderProxy 
 
-#define OBJNAME_RPCROUTER               "Obj_RpcRouter"
+#define OBJNAME_REQFWDR                 "RpcReqForwarderImpl"
+#define OBJNAME_TCP_BRIDGE              "RpcTcpBridgeImpl"
+
 #define OBJNAME_IOMANAGER               "Obj_IoManager"
 #define OBJNAME_INVALID                 "Obj_Invalid"
 

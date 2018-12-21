@@ -1,0 +1,78 @@
+{
+    "Version" : "1.0",
+    "ServerName": "CRpcRouter",
+    "Objects" :
+    [
+        {
+            "ObjectName": "RpcReqForwarderImpl",
+            "BusName" : "DBusBusPort_0",
+            "PortClass": "DBusLocalPdo",
+            "PortId" : "0",
+            "RequestTimeoutSec" : "120",
+            "KeepAliveTimeoutSec" : "60",
+            "QueuedRequests" : "false",
+            "ProxyPortClass": "DBusProxyPdo",
+            "comment-1" : "IpAddress is the ip address of the server for proxy",
+            "Note-1": "proxy's ip address can be overwritten at runtime, before it starts",
+            "IpAddress" : "127.0.0.1",
+            "Interfaces" :
+            [
+                {
+                    "Comment-0" : "the following attributes are mandatory",
+                    "InterfaceName" : "CRpcReqForwarderImpl",
+                    "BindToClsid" : "true"
+                },
+                {
+                    "InterfaceName" : "IInterfaceServer",
+                    "Pausable"  : "false"
+                },
+                {
+                    "InterfaceName" : "IUnknown",
+                    "Pausable" : "false"
+                },
+                {
+                    "InterfaceName" : "CRpcReqForwarder",
+                    "Pausable"  : "true"
+                },
+                {
+                    "InterfaceName" : "CStatCountersServer",
+                    "Pausable"  : "true"
+                }
+            ]
+        },
+        {
+            "ObjectName": "RpcTcpBridgeImpl",
+            "BusName" : "RpcTcpBus_0",
+            "PortClass": "TcpStreamPdo",
+            "RequestTimeoutSec" : "120",
+            "KeepAliveTimeoutSec" : "60",
+            "QueuedRequests" : "false",
+            "Note-1": " bridge's ip address is decided at runtime",
+            "ProxyPortClass": "TcpStreamPdo",
+            "Interfaces" :
+            [
+                {
+                    "Comment-0" : "the following attributes are mandatory",
+                    "InterfaceName" : "CRpcReqForwarderImpl",
+                    "BindToClsid" : "true"
+                },
+                {
+                    "InterfaceName" : "IInterfaceServer",
+                    "Pausable"  : "false"
+                },
+                {
+                    "InterfaceName" : "IUnknown",
+                    "Pausable" : "false"
+                },
+                {
+                    "InterfaceName" : "CRpcReqForwarder",
+                    "Pausable"  : "true"
+                },
+                {
+                    "InterfaceName" : "CStatCountersServer",
+                    "Pausable"  : "true"
+                }
+            ]
+        }
+    ]
+}

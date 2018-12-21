@@ -1638,7 +1638,7 @@ gint32 CStmPdoSvrOfflineNotifyTask::SendNotify()
             DBUS_IF_NAME( IFNAME_TCP_BRIDGE ) );
 
         oParams.SetObjPath(
-            DBUS_OBJ_PATH( OBJNAME_RPCROUTER ) );
+            DBUS_OBJ_PATH( OBJNAME_TCP_BRIDGE ) );
 
         oParams.SetSender(
             DBUS_DESTINATION( pMgr->GetModName() ) );
