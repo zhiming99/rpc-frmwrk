@@ -2,10 +2,10 @@
 An effort for embedded RPC framework, and hope it could find its usage in IOT or other embedded systems.   
 #### Dependency:  
 This framework depends on the following packags:  
-1. `dbus-1.0`  
-2. `libjson-cpp`  
-3. `cppunit-1 (for the sample tests only)`   
-4. `glib-2.0 ( for compile only )`   
+1. `dbus-1.0 (dbus-devel.i686)`  
+2. `libjson-cpp (jsoncpp-devel.i686)`  
+3. `cppunit-1 (for the sample code, cppunit.i686 and cppunit-devel.i686)`   
+4. `glib-2.0 (for compile only,glib2-devel.i686)`   
 #### Features:   
 1. `Multiple interfaces on a single object (COM alike).`   
 2. `Synchronous/Asynchronous request and handling.`   
@@ -20,6 +20,10 @@ This framework depends on the following packags:
 11. `Streaming support to provide double-direction stream transfer`
 
 ---
+[`Tue Dec 18 21:35:54 CST 2018`]   
+1. Made the proxy ports loaded and work. Next step is to get the req-forwarder to run in a stand-alone process.
+2. We have two approaches to deploy the proxy, the compact way, that is, the proxy and the req-forwarder works in the same process, and the normal way, that an rpc-router process runs as a router for all the proxys system-wide. I will first make the normal way work. The significance of compact way is to have better security in communication than the normal way if the device is to deploy in a less trustworthy environment.
+
 [`Fri Dec  7 22:45:23 CST 2018`]
 1. Finally, I have wrapped up local IPC testing. Now I will proceed to RPC debugging and testing.
 
