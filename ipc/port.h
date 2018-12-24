@@ -421,7 +421,10 @@ class CPort : public IPort
     { return m_pIoMgr; }
 
     static std::string ExClassToInClass(
-        const std::string& strPortClass );
+        const std::string& strExternalName );
+
+    static std::string InClassToExClass(
+        const std::string& strInternalName );
 
     static bool CanAcceptMsg(
         guint32 dwPortState );

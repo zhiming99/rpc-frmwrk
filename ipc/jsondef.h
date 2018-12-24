@@ -54,6 +54,7 @@
 #define JSON_ATTR_SVRNAME       "ServerName"
 #define JSON_ATTR_OBJARR        "Objects"
 #define JSON_ATTR_OBJNAME       "ObjectName"
+#define JSON_ATTR_OBJCLASS      "ObjectClass"
 #define JSON_ATTR_IFARR         "Interfaces"
 #define JSON_ATTR_IFNAME        "InterfaceName"
 #define JSON_ATTR_REQ_TIMEOUT   "RequestTimeoutSec"

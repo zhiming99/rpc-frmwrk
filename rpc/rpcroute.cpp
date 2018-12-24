@@ -123,8 +123,6 @@ gint32 CRpcRouter::Start()
     // register this object
     gint32 ret = 0;
     try{
-        CRegPreloadable( GetIoMgr(), this );
-
         do{
             InterfPtr pIf;
             CParamList oParams;
@@ -180,12 +178,6 @@ gint32 CRpcRouter::Stop()
     ret = m_pReqFwdr->Stop();
     ret = m_pReqFwdrProxy->Stop();
 
-    // Unregister the router
-    // NOTE: after this call, there is no known
-    // global reference held. The caller should
-    // make sure the reference count is not zero
-    // if it still want to use this object
-    CRegPreloadable( GetIoMgr(), this, false );
     return ret;
 }
 
@@ -233,7 +225,7 @@ gint32 CRpcRouter::StartReqFwder(
         if( ERROR( ret ) )
             break;
 
-        ret = pIf->StartEx( pTask );
+        ret = pIf->Start();
 
     }while( 0 );
 

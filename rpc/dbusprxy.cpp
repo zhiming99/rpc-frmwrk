@@ -75,6 +75,7 @@ CDBusProxyPdo::CDBusProxyPdo(
 
         SetConnected( false );
 
+        CCfgOpener oMyCfg( ( IConfigDb* )m_pCfgDb );
         if( !m_pCfgDb->exist( propSingleIrp ) )
         {
             // the property indicates one event irp will
@@ -82,9 +83,13 @@ CDBusProxyPdo::CDBusProxyPdo(
             // without this flag, the default behavor is
             // to complete all the waiting irps which is
             // waiting on that interface
-            CCfgOpener oMyCfg( ( IConfigDb* )m_pCfgDb );
             oMyCfg.SetBoolProp( propSingleIrp, true );
         }
+
+        string strModName = GetIoMgr()->GetModName();
+        string strBusName = DBUS_DESTINATION( strModName );
+        oMyCfg.SetStrProp( propSrcDBusName, strBusName );
+        oMyCfg.CopyProp( propSrcUniqName, m_pBusPort );
 
     }while( 0 );
 
@@ -455,30 +460,23 @@ gint32 CDBusProxyPdo::HandleConnRequest(
     gint32 ret = 0;
 
     do{
-        if( pIrp == nullptr )
-        {
-            ret = -EINVAL;
-            break;
-        }
-        if( pIrp->GetStackSize() == 0 )
+        if( pIrp == nullptr ||
+            pIrp->GetStackSize() == 0 )
         {
             ret = -EINVAL;
             break;
         }
 
-        IrpCtxPtr& pIrpCtx = pIrp->GetTopStack();
-
-        string strModName = GetIoMgr()->GetModName();
         if( m_pBusPort == nullptr )
         {
             ret = -EFAULT;
             break;
         }
 
-        string strBusName = DBUS_DESTINATION( strModName );
+        IrpCtxPtr& pIrpCtx = pIrp->GetTopStack();
 
         // bus name
-        oParams.SetStrProp( propSrcDBusName, strBusName );
+        oParams.CopyProp( propSrcDBusName, this );
 
         // ip addr
         oParams.CopyProp( propIpAddr, this );
@@ -523,6 +521,9 @@ gint32 CDBusProxyPdo::HandleConnRequest(
         ret = pMsg.SetMember( strCmd );
         if( ERROR( ret ) )
             break;
+
+        string strModName =
+            GetIoMgr()->GetModName();
 
         ret = pMsg.SetSender(
             DBUS_DESTINATION( strModName ) );
@@ -1682,6 +1683,12 @@ gint32 CDBusProxyPdo::HandleRmtRegMatch(
 
         oMatch.SetStrProp(
             propIpAddr, strIpAddr );
+
+        oMatch.CopyProp(
+            propSrcDBusName, this );
+
+        oMatch.CopyProp(
+            propSrcUniqName, this );
 
         BufPtr pBuf( true );
         ret = pMatchToSend->Serialize( *pBuf );

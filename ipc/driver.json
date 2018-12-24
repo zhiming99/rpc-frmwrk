@@ -241,7 +241,10 @@
             ],
             "PreloadableObjects" :
             [
-                "RpcRouter"
+                {
+                    "ObjectName" : "RpcRouter-0",
+                    "ObjectClass" : "RpcRouter"
+                }
             ],
             "ClassFactories" :
             [

@@ -1444,6 +1444,22 @@ gint32 CRpcReqForwarder::ForwardEvent(
                DBUS_MESSAGE_TYPE_SIGNAL 
                | CF_ASYNC_CALL );
 
+            oBuilder.SetIfName( DBUS_IF_NAME(
+                IFNAME_REQFORWARDER ) );
+
+            CCfgOpenerObj oMatch(
+                ( CObjBase* )pObj );
+
+            std::string strDest;
+            ret = oMatch.GetStrProp(
+                propSrcDBusName, strDest );
+
+            if( ERROR( ret ) )
+                break;
+
+            // set the signal's destination 
+            oBuilder.SetDestination( strDest );
+
             // a tcp default round trip time
             oBuilder.SetTimeoutSec(
                 IFSTATE_DEFAULT_IOREQ_TIMEOUT ); 
@@ -1657,12 +1673,12 @@ CfgPtr CRpcReqForwarderProxy::InitCfg(
         oCfg.SetStrProp( propPortClass,
             PORT_CLASS_LOCALDBUS_PDO );
 
-        oCfg.SetStrProp( propPortId, 0 );
+        oCfg.SetIntProp( propPortId, 0 );
 
         // we don't know the target if name at
         // this point
         oCfg.SetStrProp( propIfName,
-            DBUS_IF_NAME( IFNAME_INVALID ) );
+            DBUS_IF_NAME( IFNAME_REQFORWARDER ) );
 
         string strSrcDBus =
             DBUS_DESTINATION( strModName );
@@ -2098,7 +2114,7 @@ gint32 CRpcReqForwarderProxy::DoInvoke(
             ret = OnKeepAlive( pCallback, KAOrigin ); 
             break;
         }
-        else if( strMethod == SYS_EVENT_FORWARDEVT )
+        else
         {
             CCfgOpenerObj oCfg( pCallback );
             ObjPtr pObj;
@@ -2111,7 +2127,7 @@ gint32 CRpcReqForwarderProxy::DoInvoke(
             CRouterRemoteMatch* pMatch = pObj;
             if( pMatch == nullptr )
             {
-                ret = -EFAULT;
+                ret = -ENOTSUP;
                 break;
             }
             

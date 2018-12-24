@@ -486,11 +486,27 @@ gint32 CDriverManager::CreatePreloadable()
         for( guint32 i = 0; i < oObjToLoad.size(); i++ )
         {
             if( oObjToLoad[ i ].empty() ||
-                !oObjToLoad[ i ].isString() )
+                !oObjToLoad[ i ].isObject() )
                 continue;
 
-            ret = CreateObject(
-                oObjToLoad[ i ].asString() );
+            Json::Value& oObjElem = oObjToLoad[ i ];
+
+            if( !oObjElem.isMember( JSON_ATTR_OBJNAME ) ||
+                !oObjElem[ JSON_ATTR_OBJNAME ].isString() )
+                continue;
+
+            string strObjName =
+                oObjElem[ JSON_ATTR_OBJNAME ].asString();
+
+
+            if( !oObjElem.isMember( JSON_ATTR_OBJCLASS ) ||
+                !oObjElem[ JSON_ATTR_OBJCLASS ].isString() )
+                continue;
+
+            string strClass =
+                oObjElem[ JSON_ATTR_OBJCLASS ].asString();
+
+            ret = CreateObject( strObjName, strClass );
 
             if( ERROR( ret ) )
             {
@@ -505,7 +521,8 @@ gint32 CDriverManager::CreatePreloadable()
 
 // Create an object of the specified of this module
 gint32 CDriverManager::CreateObject(
-    const std::string& strObjName )
+    const std::string& strObjName,
+    const std::string& strClass )
 {
     gint32 ret = 0;
     do{
@@ -514,7 +531,7 @@ gint32 CDriverManager::CreateObject(
         ObjPtr pObj;
         
         string strClassName =
-            CPort::ExClassToInClass( strObjName );
+            CPort::ExClassToInClass( strClass );
 
         EnumClsid iClsid =
             CoGetClassId( strClassName.c_str() );
@@ -563,6 +580,10 @@ gint32 CDriverManager::CreateObject(
                 break;
 
             ret = oReg.MakeDir( strObjName );
+            if( ERROR( ret ) )
+                break;
+
+            ret = oReg.ChangeDir( strObjName );
             if( ERROR( ret ) )
                 break;
 
@@ -620,18 +641,11 @@ gint32 CDriverManager::StopPreloadable()
             if( ERROR( ret ) )
                 continue;
 
-            CStlObjSet* pObjSet = pObj;
-            if( pObjSet == nullptr )
+            IService* pSvc = pObj;
+            if( pSvc == nullptr )
                 continue;
 
-            for( auto&& oElem : ( *pObjSet )() )
-            {
-                IService* pSvc = oElem;
-                if( pSvc == nullptr )
-                    continue;
-
-                pSvc->Stop();
-            }
+            pSvc->Stop();
         }
         ret = oReg.RemoveDir( strPath );
 
@@ -1165,115 +1179,3 @@ gint32 CDriverManager::FindDriver(
     return ret;
 }
 
-gint32 CRegPreloadable::RegPreloadObj(
-    CIoManager* pMgr, CObjBase* pObj )
-{
-    if( pMgr == nullptr ||
-        pObj == nullptr )
-    {
-        return -EINVAL;
-    }
-    gint32 ret = 0;
-    do{
-        CDriverManager& oDrvMgr =
-            pMgr->GetDrvMgr();
-
-        string strPath = oDrvMgr.GetPreloadRegRoot( 
-            string( pObj->GetClassName() ) );
-
-        if( strPath.empty() )
-        {
-            ret = -ENOENT;
-            break;
-        }
-
-        ObjPtr pContainer;
-        ret = pMgr->GetObject( strPath, pContainer );
-        if( ERROR( ret ) )
-        {
-            ret = pContainer.NewObj(
-                clsid( CStlObjSet ) );
-
-            if( ERROR( ret ) )
-                break;
-        }
-
-        CStlObjSet* pObjSet = pContainer;
-        if( pObjSet == nullptr )
-        {
-            ret = -EFAULT;
-            break;
-        }
-        ( *pObjSet )().insert( ObjPtr( pObj ) );
-
-    }while( 0 );
-
-    return ret;
-}
-
-gint32 CRegPreloadable::UnregPreloadObj(
-    CIoManager* pMgr, CObjBase* pObj )
-{
-    if( pMgr == nullptr ||
-        pObj == nullptr )
-    {
-        return -EINVAL;
-    }
-    gint32 ret = 0;
-    do{
-        CDriverManager& oDrvMgr =
-            pMgr->GetDrvMgr();
-
-        string strPath = oDrvMgr.GetPreloadRegRoot( 
-            string( pObj->GetClassName() ) );
-
-        if( strPath.empty() )
-        {
-            ret = -ENOENT;
-            break;
-        }
-
-        ObjPtr pContainer;
-        ret = pMgr->GetObject( strPath, pContainer );
-        if( ERROR( ret ) )
-            break;
-
-        CStlObjSet* pObjSet = pContainer;
-        if( pObjSet == nullptr )
-        {
-            ret = -EFAULT;
-            break;
-        }
-        ( *pObjSet )().erase( ObjPtr( pObj ) );
-
-    }while( 0 );
-
-    return ret;
-}
-
-CRegPreloadable::CRegPreloadable( CIoManager* pMgr,
-    CObjBase* pObj, bool bReg )
-{
-    gint32 ret = 0;
-    do{
-        if( pMgr == nullptr ||
-            pObj == nullptr )
-        {
-            ret = -EINVAL;
-            break;
-        }
-        if( bReg )
-            ret = RegPreloadObj( pMgr, pObj );
-        else
-            ret = UnregPreloadObj( pMgr, pObj );
-
-    }while( 0 );
-
-    if( ERROR( ret ) )
-    {
-        string strMsg = DebugMsg( ret,
-            "Error in CPreloadable's ctor" );
-        error_code ec( ret, generic_category() );
-        throw system_error( ec, strMsg );
-    }
-}

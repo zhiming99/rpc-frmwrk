@@ -75,7 +75,8 @@ class CDriverManager : public IService
     // Create an object of the specified of this
     // module
     gint32 CreateObject(
-        const std::string& strObjName );
+        const std::string& strObjName,
+        const std::string& strClass );
 
     gint32 LoadClassFactories();
 
@@ -515,17 +516,4 @@ class CIoManager : public IService
 };
 
 typedef CAutoPtr< Clsid_CIoManager, CIoManager > IoMgrPtr;
-
-class CRegPreloadable
-{
-    gint32 RegPreloadObj(
-        CIoManager* pMgr, CObjBase* pObj );
-
-    gint32 UnregPreloadObj(
-        CIoManager* pMgr, CObjBase* pObj );
-
-public:
-    CRegPreloadable( CIoManager* pMgr,
-        CObjBase* pObj, bool bReg = true );
-};
 

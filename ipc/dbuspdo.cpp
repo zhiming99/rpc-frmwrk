@@ -75,6 +75,7 @@ gint32 CDBusLocalPdo::SetupDBusSetting(
 
         std::replace( strObjPath.begin(),
             strObjPath.end(), '/', '.');
+
         if( strObjPath[ 0 ] == '.' )
             strObjPath = strObjPath.substr( 1 );
        
@@ -86,7 +87,10 @@ gint32 CDBusLocalPdo::SetupDBusSetting(
             m_mapRegObjs[ strObjPath ]++;
             break;
         }
-
+        else
+        {
+            m_mapRegObjs[ strObjPath ] = 1;
+        }
         oPortLock.Unlock();
 
         // NOTE: Need to verify if the call will
@@ -100,17 +104,12 @@ gint32 CDBusLocalPdo::SetupDBusSetting(
         ret = pBusPort->RegBusName(
             strObjPath, 0 );
 
-        oPortLock.Lock();
-
         if( ERROR( ret ) ) 
-            break;
-
-        // register this object in the memory
-        if( m_mapRegObjs.find( strObjPath )
-            == m_mapRegObjs.end() )
-            m_mapRegObjs[ strObjPath ] = 1;
-        else
-            m_mapRegObjs[ strObjPath ]++;
+        {
+            // rollback
+            oPortLock.Lock();
+            m_mapRegObjs.erase( strObjPath );
+        }
 
     }while( 0 );
 
@@ -176,7 +175,7 @@ gint32 CDBusLocalPdo::ClearDBusSetting(
                 bRelease = true;
             }
         }
-
+        oPortLock.Unlock();
         if( bRelease )
         {
             CDBusBusPort *pBusPort = static_cast

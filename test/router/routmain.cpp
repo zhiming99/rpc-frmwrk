@@ -85,30 +85,9 @@ void CIfRouterTest::testSvrStartStop()
 
     CPPUNIT_ASSERT( !m_pMgr.IsEmpty() );
 
-    CCfgOpener oCfg;
-    oCfg.SetObjPtr( propIoMgr, m_pMgr );
-
-    ObjPtr pRouter;
-
-    ret = pRouter.NewObj( clsid( CRpcRouter ),
-        oCfg.GetCfg() );
-
-    CPPUNIT_ASSERT( SUCCEEDED( ret ) );
-
-    IService* pSvc = pRouter;
-    CPPUNIT_ASSERT( pSvc != nullptr );
-
-    ret = pSvc->Start();
-    CPPUNIT_ASSERT( SUCCEEDED( ret ) );
-
-    while( true )
-    {
-        sleep( 1 );
-    }
-
-    ret = pSvc->Stop();
-    CPPUNIT_ASSERT( SUCCEEDED( ret ) );
-    pRouter.Clear();
+    // the router will be started as a preloadable
+    // object, so we need to do nothing, and just wait.
+    sleep( 1 );
 
     return;
 }

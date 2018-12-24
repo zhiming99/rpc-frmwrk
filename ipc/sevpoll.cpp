@@ -89,6 +89,9 @@ gint32 CSimpleEvPoll::StartStopSource(
 {
     gint32 ret = 0;
 
+    if( hWatch == 0 )
+        return -EINVAL;
+
     CEvLoop::SOURCE_HEADER* pSrc = nullptr;
     CStdRMutex oLock( GetLock() );
     ret = m_pLoop->GetSource(
@@ -328,9 +331,11 @@ gint32 CSimpleEvPoll::WakeupLoop(
 gint32 CSimpleEvPoll::UpdateIoMaps(
     std::map< gint32, HANDLE >& mapActFds )
 {
-    gint32 ret = 0;
     std::map< HANDLE, CEvLoop::SOURCE_HEADER* >*
         pMap = m_pLoop->GetMap( srcIo );
+
+    std::map< HANDLE, CEvLoop::SOURCE_HEADER* >::iterator
+        itrSrc;
 
     if( m_bIoAdd )
     {
@@ -356,27 +361,29 @@ gint32 CSimpleEvPoll::UpdateIoMaps(
     {
         std::map< gint32, HANDLE >::iterator
             itr = mapActFds.begin();
+
         while( itr != mapActFds.end() )
         {
             HANDLE hWatch = itr->second;
-            if( pMap->find( hWatch ) ==
-                pMap->end() )
+            itrSrc = pMap->find( hWatch );
+            if( itrSrc == pMap->end() )
             {
                 itr = mapActFds.erase( itr );
                 continue;
             }
 
-            CEvLoop::SOURCE_HEADER* psh = nullptr;
-            ret = m_pLoop->GetSource(
-                itr->second, srcIo, psh );
-            if( ERROR( ret ) )
+            CEvLoop::SOURCE_HEADER* psh =
+                itrSrc->second;
+
+            if( psh == nullptr )
             {
                 itr = mapActFds.erase( itr );
                 continue;
             }
 
-           CEvLoop::IO_SOURCE* pSrc =
-               ( CEvLoop::IO_SOURCE* )psh;
+            CEvLoop::IO_SOURCE* pSrc = static_cast
+                < CEvLoop::IO_SOURCE* >( psh );
+
             if( pSrc->GetState() != srcsReady )
             {
                 itr = mapActFds.erase( itr );

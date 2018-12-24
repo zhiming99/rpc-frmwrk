@@ -11,10 +11,9 @@
             "RequestTimeoutSec" : "120",
             "KeepAliveTimeoutSec" : "60",
             "QueuedRequests" : "false",
-            "ProxyPortClass": "DBusProxyPdo",
+            "ProxyPortClass": "DBusLocalPdo",
             "comment-1" : "IpAddress is the ip address of the server for proxy",
             "Note-1": "proxy's ip address can be overwritten at runtime, before it starts",
-            "IpAddress" : "127.0.0.1",
             "Interfaces" :
             [
                 {

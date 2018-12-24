@@ -27,8 +27,6 @@
 #include <arpa/inet.h>
 #include "reqopen.h"
 
-//#include <linux/compiler.h>
-
 using namespace std;
 
 CRpcSocketBase::CRpcSocketBase(
@@ -38,7 +36,8 @@ CRpcSocketBase::CRpcSocketBase(
     m_dwRtt( 0 ),
     m_dwAgeSec( 0 ),
     m_iTimerId( 0 ),
-    m_hIoWatch( 0 )
+    m_hIoRWatch( 0 ),
+    m_hIoWWatch( 0 )
 {
     gint32 ret = 0;
     do{
@@ -53,9 +52,11 @@ CRpcSocketBase::CRpcSocketBase(
             break;
 
         CCfgOpener oCfg(
-            ( IConfigDb* )m_pCfg );
+            ( IConfigDb* )pCfg );
 
-        ret = oCfg.GetPointer( propIoMgr, m_pMgr );
+        ret = oCfg.GetPointer(
+            propIoMgr, m_pMgr );
+
         if( ERROR( ret ) )
             break;
 
@@ -170,6 +171,42 @@ gint32 CRpcSockWatchCallback::operator()(
     return SetError( ret );
 }
 
+gint32 CRpcSocketBase::StopWatch( bool bWrite )
+{
+    gint32 ret = 0;
+    CMainIoLoop* pLoop =
+        GetIoMgr()->GetMainIoLoop();
+
+#if _USE_LIBEV
+    if( bWrite )
+        ret = pLoop->StopSource(
+            m_hIoWWatch, srcIo );
+    else
+        ret = pLoop->StopSource(
+            m_hIoRWatch, srcIo );
+#endif
+
+    return ret;
+}
+
+gint32 CRpcSocketBase::StartWatch( bool bWrite )
+{
+    gint32 ret = 0;
+    CMainIoLoop* pLoop =
+        GetIoMgr()->GetMainIoLoop();
+
+#if _USE_LIBEV
+    if( bWrite )
+        ret = pLoop->StartSource(
+            m_hIoWWatch, srcIo );
+    else
+        ret = pLoop->StartSource(
+            m_hIoRWatch, srcIo );
+#endif
+
+    return ret;
+}
+
 gint32 CRpcSocketBase::AttachMainloop()
 {
     if( m_iFd <= 0 )
@@ -179,8 +216,7 @@ gint32 CRpcSocketBase::AttachMainloop()
 
     do{
         // poll
-        guint32 dwOpt = ( guint32 )
-            ( G_IO_IN | G_IO_OUT );
+        guint32 dwOpt = ( guint32 )G_IO_IN;
 
         CIoManager* pMgr = GetIoMgr();
         CMainIoLoop* pMainLoop =
@@ -204,22 +240,50 @@ gint32 CRpcSocketBase::AttachMainloop()
             break;
 
         ret = pMainLoop->AddIoWatch(
-            pCallback, m_hIoWatch );
+            pCallback, m_hIoRWatch );
+
+        if( ERROR( ret ) )
+            break;
+
+        dwOpt = ( guint32 )G_IO_OUT;
+        oParams.SetIntProp( 1, dwOpt );
+        // don't start immediately
+        oParams.SetBoolProp( 2, false );
+
+        ret = pMainLoop->AddIoWatch(
+            pCallback, m_hIoWWatch );
+
+        if( ERROR( ret ) )
+            break;
 
     }while( 0 );
+
+    if( ERROR( ret ) )
+    {
+        // rollback
+        DetachMainloop();
+    }
 
     return ret;
 }
 
 gint32 CRpcSocketBase::DetachMainloop()
 {
-    if( m_hIoWatch == 0 )
-        return ERROR_STATE;
 
     CIoManager* pMgr = GetIoMgr();
     CMainIoLoop* pLoop = pMgr->GetMainIoLoop();
-    pLoop->RemoveIoWatch( m_hIoWatch );
-    m_hIoWatch = 0;
+
+    if( m_hIoRWatch != 0 )
+    {
+        pLoop->RemoveIoWatch( m_hIoRWatch );
+        m_hIoRWatch = 0;
+    }
+
+    if( m_hIoWWatch != 0 )
+    {
+        pLoop->RemoveIoWatch( m_hIoWWatch );
+        m_hIoWWatch = 0;
+    }
 
     return 0;
 }
@@ -1577,7 +1641,12 @@ gint32 CRpcStreamSock::StartSend( IRP* pIrpLocked )
             IrpPtr pIrp;
             ret = pStream->StartSend( m_iFd, pIrp );
             if( ret == STATUS_PENDING )
+            {
+                StartWatch();
                 break;
+            }
+
+            StopWatch();
 
             m_iCurSendStm = -1;
             if( !pIrp.IsEmpty() )

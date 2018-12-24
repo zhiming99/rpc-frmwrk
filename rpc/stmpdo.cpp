@@ -220,8 +220,13 @@ gint32 CRpcTcpBusPort::PostStart(
         CCfgOpener oCfg(
             ( IConfigDb* )pCfg );
 
-        m_pListenSock.NewObj(
+        oCfg.SetPointer( propIoMgr, GetIoMgr() );
+
+        ret = m_pListenSock.NewObj(
             clsid( CRpcListeningSock ), pCfg );
+
+        if( ERROR( ret ) )
+            break;
 
         ret = m_pListenSock->Start();
         if( ERROR( ret ) )
@@ -394,7 +399,9 @@ gint32 CRpcTcpBusDriver::Probe(
     do{
         // we don't have dynamic bus yet
         CfgPtr pCfg( true );
-        *pCfg = *pConfig;
+
+        if( pConfig != nullptr )
+            *pCfg = *pConfig;
 
         CCfgOpener oCfg( ( IConfigDb* )pCfg );
         ret = oCfg.SetStrProp( propPortClass,

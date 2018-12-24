@@ -2787,6 +2787,12 @@ std::string CPort::ExClassToInClass(
     return strClass;
 }
 
+std::string CPort::InClassToExClass(
+    const std::string& strPortName )
+{
+    return strPortName.substr( 1 );
+}
+
 /**
 * @name CPort::CanAcceptMsg @{ test if the
 * port state is valid for receiving incoming

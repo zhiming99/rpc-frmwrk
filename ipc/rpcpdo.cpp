@@ -1582,6 +1582,7 @@ gint32 CRpcBasePortEx::DispatchReqMsg(
                     // online
                     //
                     bDone = true;
+                    ret = -ENOENT;
                     break;
                 }
 

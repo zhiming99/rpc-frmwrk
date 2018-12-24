@@ -451,9 +451,11 @@ class CRpcSocketBase : public IService
     gint32              m_iTimerId;
     PacketPtr           m_pPackReceiving;
     IPort*              m_pParentPort;
-    // glib structure for event watching from
-    // mainloop
-    HANDLE              m_hIoWatch;
+
+    // watch for receiving
+    HANDLE              m_hIoRWatch;
+    // watch for sending
+    HANDLE              m_hIoWWatch;
 
     gint32 AttachMainloop();
     gint32 DetachMainloop();
@@ -573,6 +575,9 @@ class CRpcSocketBase : public IService
         gpointer data);
 
     virtual gint32 Connect() = 0;
+
+    gint32 StartWatch( bool bWrite = true );
+    gint32 StopWatch( bool bWrite = true );
 };
 
 typedef CAutoPtr< Clsid_Invalid, CRpcSocketBase > SockPtr;
