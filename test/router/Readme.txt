@@ -1,5 +1,5 @@
-This is a test case for RPC stand-alone router.  A stand-alone router serves the
-following functions:
+This is a test case for RPC stand-alone router.  A stand-alone router provides the
+following supports:
 
     1. To connect to the remote peer router on demand
 
