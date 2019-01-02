@@ -116,6 +116,25 @@ class CIfRetryTask
     gint32 GetPropertyType(
         gint32 iProp, gint32& iType ) const;
 
+    inline void ClearClientNotify()
+    {
+        CCfgOpener oParams(
+            ( IConfigDb* )GetConfig() );
+        oParams.RemoveProperty( propNotifyClient );
+        oParams.RemoveProperty( propEventSink );
+    }
+
+    inline gint32 SetClientNotify( IEventSink* pCallback )
+    {
+        if( pCallback == nullptr )
+            return -EINVAL;
+        CCfgOpener oParams(
+            ( IConfigDb* )GetConfig() );
+        oParams.SetBoolProp( propNotifyClient, true );
+        oParams.SetObjPtr(
+            propEventSink, ObjPtr( pCallback ) );
+        return 0;
+    }
 };
 
 class CIfParallelTask

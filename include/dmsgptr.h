@@ -409,6 +409,20 @@ class CAutoPtr< Clsid_Invalid, DBusMessage > : public IAutoPtr
         return 0;
     }
 
+    gint32 SetReplySerial( guint32 dwSerial )
+    {
+        if( dwSerial == 0 )
+            return -EINVAL;
+
+        if( IsEmpty() )
+            return -EFAULT; 
+
+        if( !dbus_message_set_reply_serial( m_pObj, dwSerial ) )
+            return -ENOMEM;
+
+        return 0;
+    }
+
     gint32 GetType() const
     {
         if( IsEmpty() )

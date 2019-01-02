@@ -431,6 +431,8 @@ class CDBusBusPort : public CGenericBusPort
     MatchPtr            m_pMatchLpbkProxy;
     MatchPtr            m_pMatchLpbkServer;
 
+    std::map< std::string, gint32 > m_mapRules;
+
     gint32 CreateLocalDBusPdo(
         const IConfigDb* pConfig,
         PortPtr& pNewPort );

@@ -1828,7 +1828,7 @@ gint32 CDBusBusPort::AddRemoveBusNameLpbk(
         return -EINVAL;
 
     do{
-        CStdRMutex oIfLock( GetLock() );
+        CStdRMutex oPortLock( GetLock() );
 
         CDBusLoopbackMatch* pMatch =
             m_pMatchLpbkProxy;
@@ -2073,6 +2073,19 @@ gint32 CDBusBusPort::AddRules(
 {
     gint32 ret = 0;
     do{
+        CStdRMutex oPortLock( GetLock() );
+        std::map< std::string, gint32 >::iterator
+            itr = m_mapRules.find( strRules );
+
+        if( itr != m_mapRules.end() )
+        {
+            itr->second++;
+            break;
+        }
+
+        m_mapRules[ strRules ] = 1;
+        oPortLock.Unlock();
+
         CDBusError dbusError;
         dbus_bus_add_match(
             m_pDBusConn,
@@ -2080,7 +2093,13 @@ gint32 CDBusBusPort::AddRules(
             dbusError );
 
         if( dbusError.GetName() != nullptr )
+        {
             ret = dbusError.Errno();
+            oPortLock.Lock();
+            --m_mapRules[ strRules ];
+            if( m_mapRules[ strRules ] == 0 )
+                m_mapRules.erase( strRules );
+        }
 
     }while( 0 );
 
@@ -2093,6 +2112,20 @@ gint32 CDBusBusPort::RemoveRules(
     gint32 ret = 0;
 
     do{
+        CStdRMutex oPortLock( GetLock() );
+        std::map< std::string, gint32 >::iterator
+            itr = m_mapRules.find( strRules );
+
+        if( itr != m_mapRules.end() )
+        {
+            --itr->second;
+            if( itr->second > 0 )
+                break;
+        }
+
+        m_mapRules.erase( itr );
+        oPortLock.Unlock();
+
         CDBusError dbusError;
         dbus_bus_remove_match( 
             m_pDBusConn,

@@ -35,25 +35,19 @@ using namespace std;
 std::map< STATEMAP_KEY, EnumIfState > CInterfaceState::m_mapState =
 {
     STATEMAP_ENTRY( stateStopped,   cmdOpenPort,            stateStarting ),
-    STATEMAP_ENTRY( stateStarting,  eventPortStarted,       stateStarted ),
+    STATEMAP_ENTRY( stateStarting,  eventPortStarted,       stateConnected ),
     STATEMAP_ENTRY( stateStarting,  eventPortStartFailed,   stateStopped ),
     STATEMAP_ENTRY( stateStarting,  eventPortStopping,      stateStopped ),
     STATEMAP_ENTRY( stateStarting,  eventDBusOffline,       stateStopped ),
     STATEMAP_ENTRY( stateStarting,  eventRmtSvrOffline,     stateStopped ),
     STATEMAP_ENTRY( stateStarting,  cmdShutdown,            stateStopped ),
-    STATEMAP_ENTRY( stateStarted,   eventPortStopping,      stateStopping ),
-    STATEMAP_ENTRY( stateStarted,   eventDBusOffline,       stateStopping ),
-    STATEMAP_ENTRY( stateStarted,   eventRmtSvrOffline,     stateStopping ),
-    STATEMAP_ENTRY( stateStarted,   cmdShutdown,            stateStopping ),
-    STATEMAP_ENTRY( stateStarted,   cmdEnableEvent,         stateConnected ),
-    STATEMAP_ENTRY( stateStarted,   eventModOffline,        stateRecovery ),
-    STATEMAP_ENTRY( stateStarted,   eventPaused,            statePaused ),
+    STATEMAP_ENTRY( stateConnected, eventPaused,            statePaused ),
     STATEMAP_ENTRY( stateConnected, eventPortStopping,      stateStopping ),
-    STATEMAP_ENTRY( stateConnected, eventModOffline,        stateRecovery ),
-    STATEMAP_ENTRY( stateConnected, eventDBusOffline,       stateStopped ),
-    STATEMAP_ENTRY( stateConnected, eventRmtModOffline,     stateRecovery ),
-    STATEMAP_ENTRY( stateConnected, eventRmtSvrOffline,     stateStopped ),
+    STATEMAP_ENTRY( stateConnected, eventDBusOffline,       stateStopping ),
+    STATEMAP_ENTRY( stateConnected, eventRmtSvrOffline,     stateStopping ),
     STATEMAP_ENTRY( stateConnected, cmdShutdown,            stateStopping ),
+    STATEMAP_ENTRY( stateConnected, eventModOffline,        stateRecovery ),
+    STATEMAP_ENTRY( stateConnected, eventRmtModOffline,     stateRecovery ),
     STATEMAP_ENTRY( stateConnected, cmdPause,               statePausing ),
     STATEMAP_ENTRY( stateRecovery,  eventPortStopping,      stateStopping ),
     STATEMAP_ENTRY( stateRecovery,  eventModOffline,        stateRecovery ),
@@ -194,12 +188,9 @@ gint32 CInterfaceState::SetStateOnEvent(
             {
                 if( GetState() != stateRecovery )
                     m_iResumeState = GetState();
+                else
+                    break;
 
-                if( m_iResumeState == stateStarted )
-                {
-                    // a special state transfer
-                    m_iResumeState = stateConnected;
-                }
                 // fall through
             }
         default:
@@ -337,7 +328,6 @@ gint32 CInterfaceState::OnPortEvent(
                 EnumIfState iState = GetState();
                 switch( iState )
                 {
-                case stateStarted:
                 case stateConnected:
                 case stateRecovery:
                 case statePaused:

@@ -26,8 +26,8 @@
 #include "prxyport.h"
 #include "emaphelp.h"
 
-#define PROXYPDO_CONN_RETRIES       0 
-#define PROXYPDO_CONN_INTERVAL      2
+#define PROXYPDO_CONN_RETRIES       12
+#define PROXYPDO_CONN_INTERVAL      30
 
 using namespace std;
 
@@ -457,6 +457,8 @@ gint32 CDBusProxyPdo::HandleConnRequest(
     // physical connection to remote server if
     // necessary, and wait for the response
     CParamList oParams;
+    CCfgOpenerObj oPortCfg( this );
+
     gint32 ret = 0;
 
     do{
@@ -475,7 +477,17 @@ gint32 CDBusProxyPdo::HandleConnRequest(
 
         IrpCtxPtr& pIrpCtx = pIrp->GetTopStack();
 
-        // bus name
+        string strBusName; 
+        ret = oPortCfg.GetStrProp(
+            propSrcUniqName, strBusName );
+
+        if( ERROR( ret ) )
+            break;
+
+        oParams.SetStrProp(
+            propSrcUniqName, strBusName );
+
+        // the uniq name of the dbus connection
         oParams.CopyProp( propSrcDBusName, this );
 
         // ip addr
@@ -522,11 +534,7 @@ gint32 CDBusProxyPdo::HandleConnRequest(
         if( ERROR( ret ) )
             break;
 
-        string strModName =
-            GetIoMgr()->GetModName();
-
-        ret = pMsg.SetSender(
-            DBUS_DESTINATION( strModName ) );
+        ret = pMsg.SetSender( strBusName );
 
         if( ERROR( ret ) )
             break;
@@ -1075,7 +1083,8 @@ gint32 CProxyPdoConnectTask::Process(
                 break;
 
             // the port indicates to try again.
-            if( ret == -EAGAIN || ret == -ENOTCONN )
+            if( ret == -EAGAIN ||
+                ret == -ENOTCONN )
             {
                 if( CanRetry() )
                 {
@@ -1092,6 +1101,11 @@ gint32 CProxyPdoConnectTask::Process(
                 }
                 break;
             }
+
+            if( ret == -ECANCELED ||
+                ret == ERROR_STATE )
+                break;
+
             // it is possible the port is already
             // connected before this irp is
             // issued. let's further check if the

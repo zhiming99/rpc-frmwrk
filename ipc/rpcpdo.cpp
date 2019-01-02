@@ -35,7 +35,7 @@ CRpcBasePort::CRpcBasePort( const IConfigDb* pCfg )
 
 
 gint32 CRpcBasePort::GetMatchMap(
-    IRP* pIrp, CRpcBasePort::MatchMap*& pMap )
+    IRP* pIrp, MatchMap*& pMap )
 {
     pMap = &m_mapEvtTable;
     return 0;
@@ -1465,7 +1465,7 @@ gint32 CRpcBasePort::OnModOnOffline(
 }
 
 gint32 CRpcBasePortEx::GetMatchMap(
-    IRP* pIrp, CDBusLocalPdo::MatchMap*& pMap )
+    IRP* pIrp, MatchMap*& pMap )
 {
     gint32 ret = 0;
 

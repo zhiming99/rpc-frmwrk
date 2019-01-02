@@ -231,17 +231,6 @@ gint32 CIfStartRecvMsgTask::OnIrpComplete(
             break;
         }
 
-        /*if( pIf->IsServer() )
-        {
-            CInterfaceServer* pSvr = static_cast
-                < CInterfaceServer* >( pIf );
-            if( pSvr->IsPaused( pMatch ) )
-            {
-                ret = ERROR_PAUSED;
-                break;
-            }
-        }*/
-
         CIoManager* pMgr = pIf->GetIoMgr();
         if( pMgr == nullptr )
         {
@@ -319,44 +308,35 @@ gint32 CIfStartRecvMsgTask::RunTask()
         CCfgOpener oCfg(
             ( IConfigDb* )GetConfig() );
         
-        ret = oCfg.GetObjPtr( propIfPtr, pObj );
+        CRpcInterfaceBase* pIf = nullptr;
+        ret = oCfg.GetPointer( propIfPtr, pIf );
         if( ERROR( ret ) )
             break;
-
-        CRpcInterfaceBase* pIf = pObj;
-
-        if( pIf == nullptr )
-        {
-            ret = -EFAULT;
-            break;
-        }
 
         CMessageMatch* pMatch = nullptr;
-
-        ret = oCfg.GetObjPtr(
-            propMatchPtr, pObj );
+        ret = oCfg.GetPointer(
+            propMatchPtr, pMatch );
 
         if( ERROR( ret ) )
             break;
 
-        pMatch = pObj;
+        CCfgOpenerObj oMatch( pMatch );
+        bool bDummy = false;
+
+        ret = oMatch.GetBoolProp(
+            propDummyMatch, bDummy );
+
+        if( ERROR( ret ) )
+            bDummy = false;
+
+        if( bDummy )
+            break;
+
         if( !pIf->IsConnected() )
         {
             ret = ERROR_STATE;
             break;
         }
-
-        /*if( pIf->IsServer() )
-        {
-            CInterfaceServer* pSvr = static_cast
-                < CInterfaceServer* >( pIf );
-            if( pSvr->IsPaused( pMatch ) )
-            {
-                ret = ERROR_PAUSED;
-                break;
-            }
-        }*/
-
         ret = pIf->StartRecvMsg( this, pMatch );
 
     }while( 0 );
@@ -916,17 +896,20 @@ CIfEnableEventTask::CIfEnableEventTask(
 {
     gint32 ret = 0;
     SetClassId( clsid( CIfEnableEventTask ) );
-    CParamList oParams( ( IConfigDb* )GetConfig() );
 
+    CParamList oParams(
+        ( IConfigDb* )GetConfig() );
     do{
         ret = oParams.SetIntProp(
-            propRetries, IF_GENERIC_RETIRES ); 
+            propRetries,
+            IF_GENERIC_RETIRES ); 
 
         if( ERROR( ret ) )
             break;
 
         ret = oParams.SetIntProp(
-            propIntervalSec, IF_GENERIC_INTERVAL ); 
+            propIntervalSec,
+            IF_GENERIC_INTERVAL ); 
 
         if( ERROR( ret ) )
             break;
@@ -937,12 +920,12 @@ CIfEnableEventTask::CIfEnableEventTask(
     {
         string strMsg = DebugMsg( ret,
             "Error in CIfEnableEventTask ctro" );
-
         throw std::runtime_error( strMsg );
     }
 }
 
-gint32 CIfEnableEventTask::OnIrpComplete( IRP* pIrp )
+gint32 CIfEnableEventTask::OnIrpComplete(
+    IRP* pIrp )
 {
     if( pIrp == nullptr ||
         pIrp->GetStackSize() == 0 )
@@ -951,77 +934,34 @@ gint32 CIfEnableEventTask::OnIrpComplete( IRP* pIrp )
     gint32 ret = 0;
 
     do{
-        ret = super::OnIrpComplete( pIrp ); 
+        CParamList oParams(
+            ( IConfigDb* )GetConfig() );
 
-        if( SUCCEEDED( ret ) )
+        CRpcInterfaceBase* pIf = nullptr;
+
+        ret = oParams.GetPointer(
+            propIfPtr, pIf );
+
+        if( unlikely( pIf == nullptr ) )
         {
-            ObjPtr pObj;
-            CParamList oParams( ( IConfigDb* )GetConfig() );
-            
-            ret = oParams.GetObjPtr( propIfPtr, pObj );
-            if( ret != -ENOTCONN && ERROR( ret ) )
-                break;
-
-            CRpcInterfaceBase* pIf = pObj;
-            if( pIf == nullptr )
-            {
-                ret = -EFAULT;
-                break;
-            }
-
-            bool bChgStat = true;
-            oParams.GetBoolProp( 1, bChgStat );
-
-            if( !bChgStat )
-                break;
-
-            IrpCtxPtr pCtx = pIrp->GetTopStack();
-            guint32 dwCtrlCode = pCtx->GetCtrlCode();;
-            if( ret == -ENOTCONN )
-            {
-                ret = pIf->SetStateOnEvent(
-                    eventModOffline );
-            }
-            else
-            {
-                if( dwCtrlCode == CTRLCODE_REG_MATCH )
-                {
-                    CCfgOpenerObj oIfCfg( pIf );
-                    bool bPauseOnStart;
-
-                    ret = oIfCfg.GetBoolProp(
-                        propPauseOnStart, bPauseOnStart );
-
-                    if( ERROR( ret ) )
-                        bPauseOnStart = false;
-
-                    if( !bPauseOnStart )
-                    {
-                        ret = pIf->SetStateOnEvent(
-                            cmdEnableEvent );
-                    }
-                    else
-                    {
-                        ret = pIf->SetStateOnEvent(
-                            eventPaused );
-                    }
-                }
-                else
-                {
-                    ret = -ENOTSUP;
-                }
-            }
+            ret = -EFAULT;
+            break;
         }
-        else
+
+        ret = pIrp->GetStatus();
+        if( unlikely( ret == -ENOTCONN ) )
         {
-            if( ret == -EAGAIN )
-            {
-                // schedule to retry
-                ret = ERROR_FAIL;
-                if( CanRetry() )
-                    ret = STATUS_MORE_PROCESS_NEEDED;
-            }
-            // remain in the stateStarted
+            ret = pIf->SetStateOnEvent(
+                eventModOffline );
+        }
+        else if( unlikely( ret == -EAGAIN ) )
+        {
+            // schedule to retry
+            ret = ERROR_FAIL;
+            if( CanRetry() )
+                ret = STATUS_MORE_PROCESS_NEEDED;
+
+            break;
         }
 
     }while( 0 );
@@ -1051,6 +991,7 @@ gint32 CIfEnableEventTask::RunTask()
         }
 
         bool bEnable = true;
+        bool bDummy = false;
 
         // note: we do not use pop, because we want to
         // retry when failed
@@ -1058,37 +999,39 @@ gint32 CIfEnableEventTask::RunTask()
         if( ERROR( ret ) )
             break;
 
-        bool bChgStat = true;
-        oParams.GetBoolProp( 1, bChgStat );
-
         IMessageMatch* pMatch = nullptr;
 
-        ret = oParams.GetObjPtr(
-            propMatchPtr, pObj );
+        ret = oParams.GetPointer(
+            propMatchPtr, pMatch );
 
-        if( SUCCEEDED( ret ) )
-        {
-            pMatch = pObj;
-            if( pMatch == nullptr )
-            {
-                ret = -EINVAL;
-                break;
-            }
-        }
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpenerObj oMatch( pMatch );
+        ret = oMatch.GetBoolProp(
+            propDummyMatch, bDummy );
+
+        if( ERROR( ret ) )
+            bDummy = false;
     
-        if( bEnable )
+        if( !bDummy )
         {
-            ret = pIf->EnableEvent(
-                pMatch, this );
+            if( bEnable )
+            {
+                ret = pIf->EnableEvent(
+                    pMatch, this );
+            }
+            else
+            {
+                ret = pIf->DisableEvent(
+                    pMatch, this );
+            }
         }
         else
         {
-            ret = pIf->DisableEvent(
-                pMatch, this );
+            // this match is for state transition only
+            ret = 0;
         }
-
-        if( ret == STATUS_PENDING )
-            break;
 
         if( ret == -EAGAIN )
         {
@@ -1099,45 +1042,10 @@ gint32 CIfEnableEventTask::RunTask()
         }
         else if( ret == -ENOTCONN )
         {
-            // let the interface enter the recovery
-            // mode, and waiting for the server online
-            // event
+            // note, we don't assume ENOTCONN as an
+            // error and the match still
             ret = pIf->SetStateOnEvent(
                 eventModOffline );
-        }
-        else if( SUCCEEDED( ret ) )
-        {
-            // finished immediately
-            if( !bChgStat )
-                break;
-
-            if( bEnable )
-            {
-                CCfgOpenerObj oIfCfg( pIf );
-                bool bPauseOnStart;
-
-                ret = oIfCfg.GetBoolProp(
-                    propPauseOnStart, bPauseOnStart );
-
-                if( ERROR( ret ) )
-                    bPauseOnStart = false;
-
-                if( !bPauseOnStart )
-                {
-                    ret = pIf->SetStateOnEvent(
-                        cmdEnableEvent );
-                }
-                else
-                {
-                    ret = pIf->SetStateOnEvent(
-                        eventPaused );
-                }
-            }
-        }
-        else if( ERROR( ret ) )
-        {
-            // fatal error
-            break;
         }
 
     }while( 0 );
@@ -4363,8 +4271,11 @@ gint32 CIfInvokeMethodTask::OnTaskComplete(
                     SvrConnPtr pConnMgr =
                         pServer->GetConnMgr();
 
-                    ret = pConnMgr->CanResponse(
-                        ( HANDLE )( ( CObjBase* )this ) );
+                    if( !pConnMgr.IsEmpty() )
+                    {
+                        ret = pConnMgr->CanResponse(
+                            ( HANDLE )( ( CObjBase* )this ) );
+                    }
 
                     if( ret != ERROR_FALSE )
                     {
@@ -4382,9 +4293,11 @@ gint32 CIfInvokeMethodTask::OnTaskComplete(
                     }
 
                     // the connection record can be removed
-                    pConnMgr->OnInvokeComplete(
-                        ( HANDLE )( ( CObjBase* )this ) );
-
+                    if( !pConnMgr.IsEmpty() )
+                    {
+                        pConnMgr->OnInvokeComplete(
+                            ( HANDLE )( ( CObjBase* )this ) );
+                    }
                     break;
                 }
             default:
@@ -4958,7 +4871,7 @@ gint32 CIfServiceNextMsgTask::RunTask()
 
     }while( 0 );
 
-    return SetError( ret );
+    return ret;
 }
 
 gint32 CopyFile( gint32 iFdSrc, gint32 iFdDest, ssize_t& iSize );

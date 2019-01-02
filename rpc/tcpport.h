@@ -603,7 +603,8 @@ class CRpcListeningSock :
     gint32 Connect();
 };
 
-#define STMSOCK_STMID_FLOOR 10
+#define STMSOCK_STMID_FLOOR 0x100
+
 class CRpcStreamSock :
     public CRpcSocketBase
 {

@@ -165,6 +165,9 @@ enum EnumPropId : gint32
     propMsgCount,       // type: a invoke message counter for used by CMessageCounter
     propMsgOutCount,    // type: a send message counter for used by CMessageCounter
     propMsgRespCount,   // type: a resp message counter for used by CMessageCounter
+    propDummyMatch,     // type: the match is for state transition only, not for matching purpose
+    propObjInstName,    // type: the instance name of an object, used to construct the objpath
+    propSvrInstName,    // type: the instance name of a server, used to construct the objpath
     propReseredEnd = 0x10000000,
     propInvalid = -1, 
 };

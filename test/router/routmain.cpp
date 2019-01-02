@@ -80,9 +80,6 @@ void CIfRouterTest::tearDown()
 
 void CIfRouterTest::testSvrStartStop()
 {
-    gint32 ret = 0;
-    InterfPtr pIf;
-
     CPPUNIT_ASSERT( !m_pMgr.IsEmpty() );
 
     // the router will be started as a preloadable

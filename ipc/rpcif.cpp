@@ -166,12 +166,13 @@ CInterfaceProxy::~CInterfaceProxy()
 
 gint32 CRpcBaseOperations::AddPortProps()
 {
+    gint32 ret = 0;
     if( !IsServer() )
     {
         // for proxy, we get a sender name from the
         // port
         BufPtr pBuf( true );
-        gint32 ret = GetIoMgr()->GetPortProp(
+        ret = GetIoMgr()->GetPortProp(
             GetPortHandle(),
             propSrcDBusName,
             pBuf );
@@ -181,27 +182,51 @@ gint32 CRpcBaseOperations::AddPortProps()
             CInterfaceState* pStat = m_pIfStat;
             if( pStat->exist( propSrcDBusName ) )
                 return 0;
-
-            // at least the proxy will have a
-            // meaningful sender name.  on server side,
-            // the propSrcDBusName should be obtained
-            // from the server name and the object name
-            SetProperty(
+            // Now the proxy will have a valid sender
+            // name. And on server side, the
+            // propSrcDBusName should be obtained from
+            // the server name and the object name
+            ret = this->SetProperty(
                 propSrcDBusName, *pBuf );
         }
     }
-    return 0;
+    return ret;
 }
 
 gint32 CRpcBaseOperations::OpenPort(
     IEventSink* pCallback )
 {
+    EnumIfState iState = GetState();
+
     gint32 ret =
         m_pIfStat->OpenPort( pCallback );
 
     if( SUCCEEDED( ret ) )
+    {
         AddPortProps();
 
+        if( IsServer() &&
+            iState == stateStarting )
+        {
+            CCfgOpenerObj oIfCfg( this );
+            bool bPauseOnStart;
+
+            ret = oIfCfg.GetBoolProp(
+                propPauseOnStart, bPauseOnStart );
+
+            if( ERROR( ret ) )
+            {
+                bPauseOnStart = false;
+                ret = 0;
+            }
+
+            if( bPauseOnStart )
+            {
+                ret = SetStateOnEvent(
+                    eventPaused );
+            }
+        }
+    }
     return ret;
 }
 
@@ -217,33 +242,13 @@ gint32 CRpcBaseOperations::EnableEventInternal(
     bool bEnable,
     IEventSink* pCallback )
 {
-    if( pMatch == nullptr )
+    if( pMatch == nullptr ||
+        pCallback == nullptr )
         return -EINVAL;
 
     gint32 ret = 0;
 
     do{
-        EnumIfState iState =
-            m_pIfStat->GetState();
-
-        if( bEnable )
-        {
-            if( iState != stateStarted &&
-                iState != stateRecovery )
-            {
-                ret = ERROR_STATE;
-                break;
-            }
-        }
-        else
-        {
-            if( iState != stateStopping )
-            {
-                ret = ERROR_STATE;
-                break;
-            }
-        }
-       
         CIoManager* pMgr = GetIoMgr();
         IrpPtr pIrp;
 
@@ -276,12 +281,6 @@ gint32 CRpcBaseOperations::EnableEventInternal(
         if( ERROR( ret ) )
             break;
 
-        if( pCallback == nullptr )
-        {
-            ret = -EFAULT;
-            break;
-        }
-
         CCfgOpenerObj oTaskCfg(
             ( CObjBase* ) pCallback );
 
@@ -308,32 +307,40 @@ gint32 CRpcBaseOperations::EnableEventInternal(
 
 gint32 CRpcBaseOperations::EnableEvent(
     IMessageMatch* pMatch,
-    IEventSink* pCallback )
+    IEventSink* pCompletion )
 {
-    // stop listening the event from the interface
-    // server
     if( pMatch == nullptr )
         return -EINVAL;
 
-    gint32 ret = EnableEventInternal(
-        pMatch, true, pCallback );
+    EnumIfState iState = GetState();
 
-    return ret;
+    if( iState == stateStarting ||
+        iState == stateStopping ||
+        iState == stateStopped ||
+        iState == stateInvalid )
+        return ERROR_STATE;
+
+    return EnableEventInternal(
+        pMatch, true, pCompletion );
 }
 
 gint32 CRpcBaseOperations::DisableEvent(
     IMessageMatch* pMatch,
-    IEventSink* pCallback )
+    IEventSink* pCompletion )
 {
-    // stop listening the event from the interface
-    // server
     if( pMatch == nullptr )
         return -EINVAL;
 
-    gint32 ret = EnableEventInternal(
-        pMatch, false, pCallback );
+    EnumIfState iState = GetState();
 
-    return ret;
+    if( iState == stateStarting ||
+        iState == stateStopped ||
+        iState == stateStopping ||
+        iState == stateInvalid )
+        return ERROR_STATE;
+
+    return EnableEventInternal(
+        pMatch, false, pCompletion );
 }
 
 gint32 CRpcBaseOperations::StartRecvMsg(
@@ -467,7 +474,8 @@ gint32 CRpcBaseOperations::StartRecvMsg(
             if( pTask->GetClsid() ==
                 clsid( CIfStartRecvMsgTask ) )
             {
-                // mark the task to have done the IO
+                // mark the task to have done with the
+                // IO
                 IConfigDb* pTaskCfg =
                     pTask->GetConfig();
                 CCfgOpener oTaskCfg( pTaskCfg );
@@ -607,8 +615,8 @@ gint32 CRpcInterfaceBase::StartEx(
         TaskletPtr pOpenPortTask;
         TaskletPtr pEnableEvtTask;
         TaskletPtr pRecvMsgTask;
-        EnumIfState iState =
-            m_pIfStat->GetState();
+
+        EnumIfState iState = GetState();
 
         if( iState != stateStarting )
         {
@@ -650,21 +658,10 @@ gint32 CRpcInterfaceBase::StartEx(
         // enable or disable event
         oParams.Push( true );
 
-        // Change Interface state or not
-        oParams.Push( false );
-
         for( auto pMatch : m_vecMatches )
         {
             oParams[ propMatchPtr ] =
                 ObjPtr( pMatch );
-
-            // the last one
-            if( pMatch == m_pIfMatch )
-            {
-                // make sure to change Interface state
-                // to connected
-                oParams[ 1 ] = true;
-            }
 
             ret = pEnableEvtTask.NewObj(
                 clsid( CIfEnableEventTask ),
@@ -770,7 +767,7 @@ gint32 CRpcInterfaceBase::StartEx(
             // the return value of the receive task. we
             // need to get the status code from the
             // task.
-            ret = pRecvMsgTask->GetError();
+            ret = pParaTaskGrp->GetError();
             if( ret == STATUS_PENDING )
                 ret = 0;
         }
@@ -863,9 +860,6 @@ gint32 CRpcInterfaceBase::StopEx(
         {
             oParams[ propMatchPtr ] =
                 ObjPtr( pMatch );
-
-            if( pMatch == m_pIfMatch )
-                oParams[ 1 ] = true;
 
             ret = pDisableEvtTask.NewObj(
                 clsid( CIfEnableEventTask ),
@@ -1059,6 +1053,8 @@ gint32 CRpcInterfaceBase::OnPortEvent(
     case eventPortStarted:
         {
             // called from CIfOpenPortTask
+            EnumIfState iState = GetState();
+
             ret = m_pIfStat->OnPortEvent(
                 iEvent, hPort );
 
@@ -1066,6 +1062,25 @@ gint32 CRpcInterfaceBase::OnPortEvent(
                 break;
 
             AddPortProps();
+
+            if( IsServer() &&
+                iState == stateStarting )
+            {
+                CCfgOpenerObj oIfCfg( this );
+                bool bPauseOnStart;
+
+                ret = oIfCfg.GetBoolProp(
+                    propPauseOnStart, bPauseOnStart );
+
+                if( ERROR( ret ) )
+                    bPauseOnStart = false;
+
+                if( bPauseOnStart )
+                {
+                    ret = SetStateOnEvent(
+                        eventPaused );
+                }
+            }
             break;
         }
     case eventPortStartFailed:
@@ -3211,6 +3226,38 @@ gint32 CRpcServices::GetProxy(
     return 0;
 }
 
+/**
+* @name Load the object settings from an object
+* description file.
+* @{ */
+/**
+ * Parameters:
+ *
+ *  strFile: [ in ] the path name of the object
+ *  description file.
+ *   
+ *  strObjName: [ in ] the object name, which specify
+ *  the description block in the description to load.
+ *  if there is no instance name in the pCfg, this name
+ *  will be used to build the propObjPath, which is
+ *  registered with the dbus as the dbus-level address.
+ *
+ *  bServer: [ in ] a flag to indicate if the object is
+ *  a a server object to create. 
+ *
+ *  pCfg: 
+ *      [ in ] if propObjInstName is in the pCfg, it
+ *      will be override the objectname from the desc
+ *      file and used to build the propObjPath
+ *
+ *      [ in ] if propSvrInstName is in the pCfg, it
+ *      will be override the server name from the desc
+ *      file and used to build the propObjPath
+ *
+ *      [ out ] it will contain all the settings for
+ *      the object creation.
+ * @} */
+
 gint32 CRpcServices::LoadObjDesc(
     const std::string& strFile,
     const std::string& strObjName,
@@ -3223,8 +3270,27 @@ gint32 CRpcServices::LoadObjDesc(
         strFile.empty() )
         return -EINVAL;
 
+    if( pCfg.IsEmpty() )
+        ret = pCfg.NewObj();
+
+    if( ERROR( ret ) )
+        return ret;
+
+    string strInstName;
     do{
         CCfgOpener oCfg( ( IConfigDb* )pCfg );
+
+        ret = oCfg.GetStrProp(
+            propObjInstName, strInstName );
+
+        if( ERROR( ret ) )
+        {
+            ret = 0;
+            strInstName = strObjName;
+        }
+
+        strInstName = strInstName.substr(
+            0, DBUS_MAXIMUM_NAME_LENGTH );
 
         // Load the object decription file in json
         Json::Value valObjDesc;
@@ -3242,8 +3308,19 @@ gint32 CRpcServices::LoadObjDesc(
             break;
         }
         
-        string strSvrName = oServerName.asString();
-        strSvrName = strSvrName.substr( 0, 255 );
+        string strSvrName;
+
+        ret = oCfg.GetStrProp(
+            propSvrInstName, strSvrName );
+
+        if( ERROR( ret ) )
+        {
+            ret = 0;
+            strSvrName = oServerName.asString();
+        }
+
+        strSvrName = strSvrName.substr(
+            0, DBUS_MAXIMUM_NAME_LENGTH );
 
         // get object array
         Json::Value& oObjArray =
@@ -3258,7 +3335,6 @@ gint32 CRpcServices::LoadObjDesc(
         }
 
         string strVal;
-
         size_t i = 0;
         for( ; i < oObjArray.size(); i++ )
         {
@@ -3282,7 +3358,10 @@ gint32 CRpcServices::LoadObjDesc(
             {
                 Json::Value& oBusName =
                     oObjElem[ JSON_ATTR_BUSNAME ];
-                strVal = oBusName.asString().substr( 0, 255 );
+
+                strVal = oBusName.asString().substr(
+                    0, DBUS_MAXIMUM_NAME_LENGTH );
+
                 oCfg[ propBusName ] = strVal;
             }
             else
@@ -3297,7 +3376,9 @@ gint32 CRpcServices::LoadObjDesc(
             {
                 Json::Value& oPortClass =
                     oObjElem[ JSON_ATTR_PORTCLASS ];
-                strVal = oPortClass.asString().substr( 0, 255 );
+
+                strVal = oPortClass.asString().substr(
+                    0, DBUS_MAXIMUM_NAME_LENGTH );
                 oCfg[ propPortClass ] = strVal;
             }
             else
@@ -3312,7 +3393,8 @@ gint32 CRpcServices::LoadObjDesc(
             {
                 Json::Value& oPortId =
                     oObjElem[ JSON_ATTR_PORTID ];
-                strVal = oPortId.asString().substr( 0, 255 );
+                strVal = oPortId.asString().substr(
+                    0, DBUS_MAXIMUM_NAME_LENGTH );
                 oCfg[ propPortId ] = std::stoi( strVal );
             }
             else
@@ -3411,7 +3493,7 @@ gint32 CRpcServices::LoadObjDesc(
         //
         // dbus related information
         string strObjPath = DBUS_OBJ_PATH(
-            strSvrName, strObjName );
+            strSvrName, strInstName );
 
         oCfg[ propObjPath ] = strObjPath;
 
@@ -3472,7 +3554,8 @@ gint32 CRpcServices::LoadObjDesc(
                 oIfDesc[ JSON_ATTR_BIND_CLSID ].asString() == "true" )
             {
                 // the master interface
-                strVal = oIfName.asString().substr( 0, 255 );
+                strVal = oIfName.asString().substr(
+                    0, DBUS_MAXIMUM_NAME_LENGTH );
                 if( strVal.empty() )
                 {
                     ret = -EINVAL;
@@ -3790,7 +3873,11 @@ gint32 CRpcServices::RestartListening(
         return  -ENOTSUP;
     }
 
-    for( auto pMatch : m_vecMatches )
+    CStdRMutex oIfLock( GetLock() );
+    std::vector< MatchPtr > vecMatches = m_vecMatches;
+    oIfLock.Unlock();
+
+    for( auto pMatch : vecMatches )
     {
         CMessageMatch* pMsgMatch = pMatch;
         if( pMsgMatch == nullptr )
@@ -4805,9 +4892,13 @@ gint32 CInterfaceServer::DoInvoke(
                 break;
             }
 
-            GetConnMgr()->OnInvokeMethod(
-                ( HANDLE )( ( CObjBase* )pCallback ),
-                strSender );
+            SvrConnPtr pConnMgr = GetConnMgr();
+            if( !pConnMgr.IsEmpty() )
+            {
+                pConnMgr->OnInvokeMethod(
+                    ( HANDLE )( ( CObjBase* )pCallback ),
+                    strSender );
+            }
 
             ret = InvokeUserMethod(
                 pCfg, pCallback );
@@ -5134,12 +5225,11 @@ gint32 CInterfaceServer::SendResponse(
         if( ERROR( ret ) )
             break;
 
-        guint32 dwCtrlCode = CTRLCODE_SEND_RESP;
         IrpCtxPtr& pIrpCtx = pIrp->GetTopStack(); 
 
         pIrpCtx->SetMajorCmd( IRP_MJ_FUNC );
         pIrpCtx->SetMinorCmd( IRP_MN_IOCTL );
-        pIrpCtx->SetCtrlCode( dwCtrlCode );
+        pIrpCtx->SetCtrlCode( CTRLCODE_SEND_RESP );
         pIrpCtx->SetIoDirection( IRP_DIR_OUT ); 
 
         BufPtr pBuf( true );
@@ -5341,11 +5431,14 @@ gint32 CInterfaceServer::OnKeepAliveOrig(
         // here, but the invoke request is still
         // in process.
         SvrConnPtr pConnMgr = GetConnMgr();
-        ret = pConnMgr->CanResponse( strVal );
-        if( ret == ERROR_FALSE )
+        if( !pConnMgr.IsEmpty() )
         {
-            ret = -ENOTCONN;
-            break;
+            ret = pConnMgr->CanResponse( strVal );
+            if( ret == ERROR_FALSE )
+            {
+                ret = -ENOTCONN;
+                break;
+            }
         }
 
         okaReq.SetDestination( strVal );
@@ -5551,7 +5644,11 @@ gint32 CInterfaceServer::OnModEvent(
     const std::string& strModule )
 {
     if( iEvent == eventModOffline )
-        GetConnMgr()->OnDisconn( strModule );
+    {
+        SvrConnPtr pConnMgr = GetConnMgr();
+        if( !pConnMgr.IsEmpty() )
+            pConnMgr->OnDisconn( strModule );
+    }
 
     return super::OnModEvent(
         iEvent, strModule );

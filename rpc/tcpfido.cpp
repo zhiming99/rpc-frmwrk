@@ -22,6 +22,7 @@
 #include "tcpport.h"
 #include "emaphelp.h"
 #include "reqopen.h"
+#include <byteswap.h>
 
 using namespace std;
 
@@ -37,9 +38,15 @@ CRpcTcpFido::CRpcTcpFido(
     m_dwFlags = PORTFLG_TYPE_FIDO;
 
     do{
-        timeval tv;
-        ret = gettimeofday( &tv, nullptr );
-        m_atmSeqNo = ( guint32 )tv.tv_usec;
+        timespec ts;
+        ret = clock_gettime( CLOCK_MONOTONIC, &ts );
+        if( ret == -1 )
+        {
+            ret = -errno;
+            break;
+        }
+
+        m_atmSeqNo = bswap_32( ts.tv_nsec );
 
     }while( 0 );
 
@@ -245,7 +252,6 @@ gint32 CRpcTcpFido::HandleSendResp(
 gint32 CRpcTcpFido::HandleSendReq(
     IRP* pIrp )
 {
-
     // the irp carry a buffer to send, it is
     // assumed to be a DMsgPtr
     gint32 ret = 0;
@@ -677,9 +683,8 @@ gint32 CRpcTcpFido::CompleteSendReq(
                 {
                     if( dwOldSeqNo != 0 )
                     {
-                        // recover the old seq
-                        // number
-                        pMsg.SetSerial( dwOldSeqNo );
+                        // recover the old seq number
+                        pMsg.SetReplySerial( dwOldSeqNo );
                     }
                 }
                 BufPtr pRespBuf( true );

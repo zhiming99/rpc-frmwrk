@@ -52,7 +52,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CProxyMsgMatch );
     INIT_MAP_ENTRYCFG( CProxyPdoConnectTask );
     INIT_MAP_ENTRYCFG( CProxyPdoDisconnectTask );
-    INIT_MAP_ENTRYCFG( CRegisteredModule );
+    INIT_MAP_ENTRYCFG( CRegisteredObject );
     INIT_MAP_ENTRYCFG( CRemoteProxyState );
     INIT_MAP_ENTRYCFG( CReqFwdrEnableRmtEventTask );
     INIT_MAP_ENTRYCFG( CReqFwdrForwardRequestTask );
@@ -89,7 +89,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CRpcSockWatchCallback );
     INIT_MAP_ENTRYCFG( CProxyFdoDriver );
     INIT_MAP_ENTRYCFG( CRpcRouter );
-
+    INIT_MAP_ENTRYCFG( CRouterStartReqFwdrProxyTask );
     END_FACTORY_MAPS;
 };
 

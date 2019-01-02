@@ -108,7 +108,14 @@ gint32 CDBusLocalPdo::SetupDBusSetting(
         {
             // rollback
             oPortLock.Lock();
-            m_mapRegObjs.erase( strObjPath );
+            if( m_mapRegObjs.find( strObjPath ) !=
+                m_mapRegObjs.end() )
+            {
+                gint32 iCount =
+                    --m_mapRegObjs[ strObjPath ];
+                if( iCount <= 0 )
+                    m_mapRegObjs.erase( strObjPath );
+            }
         }
 
     }while( 0 );
@@ -165,13 +172,15 @@ gint32 CDBusLocalPdo::ClearDBusSetting(
        
         CStdRMutex oPortLock( GetLock() );
         bool bRelease = false;
-        if( m_mapRegObjs.find( strObjPath )
-            != m_mapRegObjs.end() )
+
+        std::map< std::string, gint32 >::iterator
+            itr = m_mapRegObjs.find( strObjPath );
+        if( itr != m_mapRegObjs.end() )
         {
-            m_mapRegObjs[ strObjPath ]--;
-            if( m_mapRegObjs[ strObjPath ] <= 0 )
+            gint32 iCount = --itr->second;
+            if( iCount <= 0 )
             {
-                m_mapRegObjs.erase( strObjPath );
+                m_mapRegObjs.erase( itr );
                 bRelease = true;
             }
         }

@@ -378,8 +378,8 @@ class CMessageMatch : public IMessageMatch
         {
             // the dest is a prefix of obj path
             strMyDest = m_strObjPath;
-            std::replace(
-                strMyDest.begin(), strMyDest.end(), '/', '.' );
+            std::replace( strMyDest.begin(),
+                strMyDest.end(), '/', '.' );
 
             if( strDest != strMyDest.substr( 0, strDest.size() ) )
                 return false;
@@ -1073,7 +1073,6 @@ class CRouterRemoteMatch : public CMessageMatch
     {
         SetClassId( clsid( CRouterRemoteMatch ) );
         SetType( matchClient );
-
     }
 
     virtual gint32 CopyMatch( IMessageMatch* pMatch )
@@ -1081,14 +1080,26 @@ class CRouterRemoteMatch : public CMessageMatch
         CCfgOpenerObj oCfg( this );
         gint32 ret = 0;
 
-        ret = oCfg.CopyProp( propObjPath, pMatch );
-        if( ERROR( ret ) )
-            return ret;
-        ret = oCfg.CopyProp( propIfName, pMatch );
-        if( ERROR( ret ) )
-            return ret;
+        do{
+            ret = oCfg.CopyProp( propObjPath, pMatch );
+            if( ERROR( ret ) )
+                break;
 
-        ret = oCfg.CopyProp( propIpAddr, pMatch );
+            ret = oCfg.CopyProp( propIfName, pMatch );
+            if( ERROR( ret ) )
+                break;
+
+            ret = oCfg.CopyProp(
+                propDestDBusName, pMatch );
+
+            if( ERROR( ret ) )
+                break;
+
+            ret = oCfg.CopyProp( propIpAddr, pMatch );
+            if( ERROR( ret ) )
+                break;
+
+        }while( 0 );
 
         return ret;
     }
@@ -1110,8 +1121,11 @@ class CRouterRemoteMatch : public CMessageMatch
         strAll += strIpAddr; 
 
         std::string strValue;
-        ret = oCfg.GetStrProp(
+        oCfg.GetStrProp(
             propDestDBusName, strValue );
+
+        strAll += ",Destination=";
+        strAll += strValue;
 
         return strAll;
     }
@@ -1229,11 +1243,6 @@ class CRouterLocalMatch : public CRouterRemoteMatch
             return ret;
 
         ret = oCfg.CopyProp(
-            propDestDBusName, pMatch );
-        if( ERROR( ret ) )
-            return ret;
-
-        ret = oCfg.CopyProp(
             propSrcDBusName, pMatch );
         if( ERROR( ret ) )
             return ret;
@@ -1253,22 +1262,13 @@ class CRouterLocalMatch : public CRouterRemoteMatch
         std::string strValue;
         CCfgOpenerObj oCfg( this );
 
-        gint32 ret = oCfg.GetStrProp(
-            propDestDBusName, strValue );
-
-        if( ERROR( ret ) )
-            return strAll;
-
-        strAll += ",Destination=";
-        strAll += strValue;
-
-        ret = oCfg.GetStrProp(
+        oCfg.GetStrProp(
             propSrcDBusName, strValue );
 
         strAll += ",Sender=";
         strAll += strValue;
 
-        ret = oCfg.GetStrProp(
+        oCfg.GetStrProp(
             propSrcUniqName, strValue );
 
         strAll += ",UniqName=";

@@ -1258,12 +1258,14 @@ class CDeferredCall :
     gint32 Delegate( CObjBase* pObj,
         std::vector< BufPtr >& vecParams )
     {
-        if( pObj == nullptr )
+        if( unlikely( pObj == nullptr ) )
             return -EINVAL;
 
         ClassName* pClass = dynamic_cast< ClassName* >( pObj );
+        if( unlikely( pClass == nullptr ) )
+            return -EFAULT;
 
-        if( vecParams.size() != sizeof...( Args ) )
+        if( unlikely( vecParams.size() != sizeof...( Args ) ) )
             return -EINVAL;
 
         gint32 ret = CallUserFunc( pClass, vecParams,
@@ -1280,7 +1282,7 @@ inline gint32 NewDeferredCall( TaskletPtr& pCallback,
     CTasklet* pDeferredCall =
         new CDeferredCall< CTasklet, C, Types... >( f, pObj, args... );
 
-    if( pDeferredCall == nullptr )
+    if( unlikely( pDeferredCall == nullptr ) )
         return -EFAULT;
 
     pCallback = pDeferredCall;

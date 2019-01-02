@@ -600,7 +600,7 @@ class CRpcServices :
 
 
     std::deque< CfgPtr > m_queEvents;
-    gint32 RebuildMatches();
+    virtual gint32 RebuildMatches();
 
     gint32 PackEvent( EnumEventId iEvent,
         guint32 dwParam1,

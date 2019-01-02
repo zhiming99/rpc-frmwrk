@@ -414,13 +414,7 @@ gint32 CRpcTcpBridgeProxy::FillRespDataFwrdReq(
             break;
 
         oParams.SetIntProp( propReturnValue, iRet );
-
-        DMsgPtr pRespMsg;
-        ret = pFwrdMsg.GetMsgArgAt( 1, pRespMsg );
-        if( SUCCEEDED( ret ) )
-        {
-            oParams.Push( pRespMsg );
-        }
+        oParams.Push( pFwrdMsg );
 
     }while( 0 );
 
@@ -1179,7 +1173,10 @@ gint32 CRpcTcpBridgeShared::ReadWriteStream(
             break;
 
         if( iStreamId == TCP_CONN_DEFAULT_CMD )
-            return -EINVAL;
+        {
+            ret = -EINVAL;
+            break;
+        }
 
         IrpCtxPtr& pCtx = pIrp->GetTopStack(); 
 
@@ -1662,14 +1659,9 @@ gint32 CBridgeAddRemoteMatchTask::AddRemoteMatchInternal(
 
         // add the match to the m_mapRmtMatches
         MatchPtr pRtMatch;
-        ret = pRtMatch.NewObj(
-            clsid( CRouterRemoteMatch ) );
+        ret = pRouter->GetMatchToAdd(
+            pMatch, true, pRtMatch );
 
-        if( ERROR( ret ) )
-            break;
-
-        CRouterRemoteMatch* pRmtMatch = pRtMatch;
-        ret = pRmtMatch->CopyMatch( pMatch );
         if( ERROR( ret ) )
             break;
 
@@ -1692,7 +1684,6 @@ gint32 CBridgeAddRemoteMatchTask::RunTask()
 {
     gint32 ret = 0;
     do{
-
         CParamList oParams( m_pCtx );
         InterfPtr pIf;
         ObjPtr pObj;
@@ -2314,8 +2305,19 @@ gint32 CRpcInterfaceServer::ForwardRequest(
         oParams.SetObjPtr( propRouterPtr,
             ObjPtr( GetParent( ) ) );
 
+        CCfgOpenerObj oMatch(
+            ( CObjBase* )pMatch ); 
+
+        std::string strDest;
+        ret = oMatch.GetStrProp(
+            propDestDBusName, strDest );
+
+        if( ERROR( ret ) )
+            break;
+
         oParams.Push( strIpAddr );
         oParams.Push( fwdrMsg );
+        oParams.Push( strDest );
 
         TaskletPtr pTask;
         ret = pTask.NewObj(
@@ -3270,14 +3272,9 @@ gint32 CRpcTcpBridge::SendResponse(
             DBUS_MESSAGE_TYPE_METHOD_CALL )
             break;
 
-        guint32 dwCmdId = 0;
-        ret = oResp.GetIntProp( propCmdId, dwCmdId );
-        if( ERROR( ret ) )
-            break;
-
-        ObjPtr pObj = pResp;
+        DMsgPtr& pMsg = oResp[ 0 ];
         BufPtr pBuf( true );
-        pObj->Serialize( *pBuf );
+        *pBuf = pMsg;
 
         IrpPtr pIrp( true );
         ret = pIrp->AllocNextStack( nullptr );
@@ -3288,7 +3285,7 @@ gint32 CRpcTcpBridge::SendResponse(
 
         pCtx->SetMajorCmd( IRP_MJ_FUNC );
         pCtx->SetMinorCmd( IRP_MN_IOCTL );
-        pCtx->SetCtrlCode( dwCmdId );
+        pCtx->SetCtrlCode( CTRLCODE_SEND_RESP );
         pCtx->SetIoDirection( IRP_DIR_OUT ); 
 
         pCtx->SetReqData( pBuf );
@@ -3296,8 +3293,8 @@ gint32 CRpcTcpBridge::SendResponse(
         IPort* pPort = GetPort();
         CPort* pPort2 = ( CPort* )pPort;
         CIoManager* pMgr = pPort2->GetIoMgr();
-        ret = pMgr->SubmitIrpInternal(
-            pPort, pIrp, false );
+        ret = pMgr->SubmitIrp(
+            PortToHandle( pPort ), pIrp );
 
         if( ret == STATUS_PENDING )
             break;
