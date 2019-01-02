@@ -2118,12 +2118,13 @@ gint32 CDBusBusPort::RemoveRules(
 
         if( itr != m_mapRules.end() )
         {
-            --itr->second;
+            --( itr->second );
             if( itr->second > 0 )
                 break;
+
+            m_mapRules.erase( itr );
         }
 
-        m_mapRules.erase( itr );
         oPortLock.Unlock();
 
         CDBusError dbusError;

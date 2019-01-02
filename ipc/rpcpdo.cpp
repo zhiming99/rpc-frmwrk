@@ -2113,7 +2113,7 @@ gint32 CRpcPdoPort::ClearDBusSetting(
 
     do{
         string strRules = pMsgMatch->
-            ToDBusRules( DBUS_MESSAGE_TYPE_INVALID );
+            ToDBusRules( DBUS_MESSAGE_TYPE_SIGNAL );
 
         CDBusBusPort *pBusPort = static_cast
             < CDBusBusPort* >( m_pBusPort );
