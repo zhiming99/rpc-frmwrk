@@ -88,7 +88,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CBdgeStartFetchDataTask );
     INIT_MAP_ENTRYCFG( CRpcSockWatchCallback );
     INIT_MAP_ENTRYCFG( CProxyFdoDriver );
-    INIT_MAP_ENTRYCFG( CRpcRouter );
+    INIT_MAP_ENTRYCFG( CRpcRouterImpl );
     INIT_MAP_ENTRYCFG( CRouterStartReqFwdrProxyTask );
     END_FACTORY_MAPS;
 };

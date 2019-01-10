@@ -25,11 +25,47 @@
 
 using namespace std;
 
-CRpcRouter::CRpcRouter(
+CfgPtr CRpcRouter::InitCfg(
     const IConfigDb* pCfg )
 {
+    CfgPtr ptrCfg;
+    if( pCfg == nullptr )
+        return ptrCfg;
+
     gint32 ret = 0;
-    SetClassId( clsid( CRpcRouter ) );
+
+    do{
+        ret = LoadObjDesc(
+            ROUTER_OBJ_DESC,
+            OBJNAME_ROUTER,
+            true, ptrCfg );
+
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpener oCfg( ( IConfigDb* )ptrCfg );
+        ret = oCfg.CopyProp( propIoMgr, pCfg );
+        if( ERROR( ret ) )
+            break;
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+    {
+        string strMsg = DebugMsg( ret,
+            "Error loading file router.json" );
+        throw std::runtime_error( strMsg );
+    }
+
+    return ptrCfg;
+}
+
+CRpcRouter::CRpcRouter(
+    const IConfigDb* pCfg )
+    : super( InitCfg( pCfg ) ),
+    m_dwRole( 3 )
+{
+    gint32 ret = 0;
 
     do{
         if( pCfg == nullptr )
@@ -43,6 +79,11 @@ CRpcRouter::CRpcRouter(
 
         if( ERROR( ret ) )
             break;
+
+        guint32 dwRole = 0;
+        ret = oCfg.GetIntPtr( propRouterRole, dwRole );
+        if( SUCCEEDED( ret ) )
+            m_dwRole = dwRole;
 
     }while( 0 );
 
@@ -83,38 +124,43 @@ gint32 CRpcRouter::GetBridgeIfInternal(
     if( strIpAddr.empty() )
         return -EINVAL;
 
+    std::map< std::string, InterfPtr >* pMap =
+        bProxy ? &m_mapIp2BdgeProxies : &m_mapIp2Bdge;
+    
     CStdRMutex oRouterLock( GetLock() );
-    if( m_mapIp2NetIfs.find( strIpAddr ) ==
-        m_mapIp2NetIfs.end() )
+    std::map< std::string, InterfPtr >::iterator 
+        itr = pMap->find( strIpAddr );
+
+    if( itr == pMap->end() )
         return -ENOENT;
 
-    // get proxy ptr
-    if( bProxy )
-        pIf = m_mapIp2NetIfs[ strIpAddr ].first;
-    else
-        pIf = m_mapIp2NetIfs[ strIpAddr ].second;
+    pIf = itr->second;
 
     return 0;
 }
 
-gint32 CRpcRouter::AddBridgePair( 
+gint32 CRpcRouter::AddBridgeIf( 
     const std::string& strIpAddr,
-    IGenericInterface* pProxy,
-    IGenericInterface* pServer )
+    IGenericInterface* pIf,
+    bool bProxy )
 {
-    if( pProxy == nullptr ||
-        pServer == nullptr )
-    {
+    if( pIf == nullptr )
         return -EINVAL;
-    }
 
+    if( !IsConnected() )
+        return ERROR_STATE;
+
+    std::map< std::string, InterfPtr >* pMap =
+        bProxy ? &m_mapIp2BdgeProxies : &m_mapIp2Bdge;
+    
     CStdRMutex oRouterLock( GetLock() );
-    if( m_mapIp2NetIfs.find( strIpAddr ) !=
-        m_mapIp2NetIfs.end() )
+    std::map< std::string, InterfPtr >::iterator 
+        itr = pMap->find( strIpAddr );
+
+    if( itr != pMap->end() )
         return -EEXIST;
 
-    NetIfPair oPair( pProxy, pServer );
-    m_mapIp2NetIfs[ strIpAddr ] = oPair;
+    ( *pMap )[ strIpAddr ] = InterfPtr( pIf );
     return 0;
 }
 
@@ -124,10 +170,15 @@ gint32 CRpcRouter::Start()
     gint32 ret = 0;
     try{
         do{
+            ret = super::Start();
+
             InterfPtr pIf;
-            ret = StartReqFwdr( pIf, nullptr );
-            if( ERROR( ret ) )
-                break;
+            if( HasReqForwarder() )
+            {
+                ret = StartReqFwdr( pIf, nullptr );
+                if( ERROR( ret ) )
+                    break;
+            }
 
         } while( 0 );
 
@@ -140,37 +191,51 @@ gint32 CRpcRouter::Start()
     return ret;
 }
 
-gint32 CRpcRouter::Stop()
+gint32 CRpcRouter::OnPreStop( IEventSink* pCallback )
 {
     gint32 ret = 0;
-    map< string, NetIfPair > mapIp2NetIfs;
+    map< string, InterfPtr > mapIp2Proxies;
+    map< string, InterfPtr > mapIp2Server;
+    std::map< std::string, InterfPtr > mapReqProxies;
 
-    //FIXME: need more convincable processing
+    // FIXME: need a task to accomodate all the StopEx
+    // completion and then let the pCallback to run
     do{
         CStdRMutex oRouterLock( GetLock() );
-
-        mapIp2NetIfs = m_mapIp2NetIfs;
-        m_mapIp2NetIfs.clear();
+        mapIp2Proxies = m_mapIp2BdgeProxies;
+        m_mapIp2BdgeProxies.clear();
+        mapIp2Server = m_mapIp2Bdge;
+        m_mapIp2Bdge.clear();
+        mapReqProxies = m_mapReqProxies;
+        m_mapReqProxies.clear();
 
     }while( 0 );
 
-    for( auto&& oPairs : mapIp2NetIfs )
+    for( auto&& elem : mapIp2Proxies )
     {
         InterfPtr p;
-        if( !oPairs.second.first.IsEmpty() )
-            oPairs.second.first->Stop();
-        if( !oPairs.second.second.IsEmpty() )
-            oPairs.second.second->Stop();
+        p = elem.second;
+        p->Stop();
     }
-    mapIp2NetIfs.clear();
-    
+    mapIp2Proxies.clear();
+
+    for( auto&& elem : mapIp2Server )
+    {
+        InterfPtr p;
+        p = elem.second;
+        p->Stop();
+    }
+    mapIp2Server.clear(); 
+
     ret = m_pReqFwdr->Stop();
-    for( auto elem : m_mapReqProxies )
+
+    for( auto elem : mapReqProxies )
     {
         gint32 iRet = elem.second->Stop();
         if( ERROR( iRet ) )
             ret = iRet;
     }
+    mapReqProxies.clear();
 
     return ret;
 }
@@ -580,15 +645,14 @@ gint32 CRpcRouter::OnRmtSvrOnline(
     const string& strIpAddr,
     IPort* pPort )
 {
-    if( pPort == nullptr ||
-        strIpAddr.empty() )
+    if( pPort == nullptr || strIpAddr.empty() )
         return -EINVAL;
 
     gint32 ret = 0;
 
     do{
         InterfPtr pIf;
-        ret = GetBridgeProxy( strIpAddr, pIf );
+        ret = GetBridge( strIpAddr, pIf );
         if( SUCCEEDED( ret ) )
             break;
 
@@ -612,9 +676,11 @@ gint32 CRpcRouter::OnRmtSvrOnline(
             if( ERROR( ret ) )
                 break;
 
-            // run this task immediately
-            ( *pTask )( eventZero );
-            ret = pTask->GetError();
+            // must be pending
+            pTask->MarkPending();
+            ret = DEFER_CALL( GetIoMgr(), this,
+                &CRpcServices::RunManagedTask,
+                pTask, false );
         }
         break;
 
@@ -1167,3 +1233,4 @@ gint32 CRouterEnableEventRelayTask::OnTaskComplete(
 
     return ret;
 }
+

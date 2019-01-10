@@ -655,6 +655,10 @@ gint32 CRpcInterfaceBase::StartEx(
 
         pTaskGrp->AppendTask( pOpenPortTask );
 
+        // give a chance for running of customized
+        // tasks immediately after the port is opened
+        AddStartTasks( ( IEventSink* )pTaskGrp );
+
         // enable or disable event
         oParams.Push( true );
 
@@ -814,6 +818,32 @@ gint32 CRpcInterfaceBase::Stop()
 gint32 CRpcInterfaceBase::StopEx(
     IEventSink* pCallback )
 {
+    if( pCallback == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        if( stateStopping != GetState() )
+            return ERROR_STATE;
+
+        ret = OnPreStop( pCallback );
+        if( ret == STATUS_PENDING )
+            break;
+
+        ret = DoStop( pCallback );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CRpcInterfaceBase::OnPreStop(
+    IEventSink* pCallback )
+{ return 0; }
+
+gint32 CRpcInterfaceBase::DoStop(
+    IEventSink* pCallback )
+{
     gint32 ret = 0;
     TaskGrpPtr pTaskGrp;
     TaskletPtr pCompletion;
@@ -829,7 +859,6 @@ gint32 CRpcInterfaceBase::StopEx(
             return ERROR_STATE;
 
         ClearActiveTasks();
-
         CParamList oParams;
         ret = oParams.SetObjPtr(
             propIfPtr, ObjPtr( this ) );
@@ -3035,16 +3064,10 @@ gint32 CRpcServices::SendMethodCall(
             break;
         }
 
-        IrpPtr pIrp( true );
-        ret = pIrp->AllocNextStack( nullptr );
-        if( ERROR( ret ) )
-            break;
-
-        ret = SetupReqIrp(
-            pIrp, pReqCall, pCallback );
-
-        if( ERROR( ret ) )
-            break;
+        CReqOpener oReq( pReqCall );
+        bool bAllStack = true;
+        if( oReq.exist( propSubmitPdo ) )
+            bAllStack = false;
 
         guint32 hPort = GetPortHandle();
         if( hPort == 0 )
@@ -3053,14 +3076,32 @@ gint32 CRpcServices::SendMethodCall(
             break;
         }
 
-        CReqOpener oReq( pReqCall );
+        IPort* pPort = HandleToPort( hPort );
+
+        IrpPtr pIrp( true );
+        ret = pIrp->AllocNextStack( nullptr );
+        if( ERROR( ret ) )
+            break;
+
+        if( bAllStack )
+            pPort = pPort->GetTopmostPort();
+
+        IrpCtxPtr& pIrpCtx = pIrp->GetTopStack(); 
+        pPort->AllocIrpCtxExt(
+            pIrpCtx, ( PIRP )pIrp );
+
+        ret = SetupReqIrp(
+            pIrp, pReqCall, pCallback );
+
+        if( ERROR( ret ) )
+            break;
 
         // set an irp for canceling purpose
         CCfgOpenerObj oCfg( pCallback );
         oCfg.SetObjPtr( propIrpPtr,
             ObjPtr( ( IRP* )pIrp ) );
 
-        if( !oReq.exist( propSubmitPdo ) )
+        if( bAllStack )
         {
             ret = GetIoMgr()->SubmitIrp( hPort, pIrp );
         }
@@ -3467,6 +3508,18 @@ gint32 CRpcServices::LoadObjDesc(
                     oCfg[ propQueuedReq ] = false;
                 else if( strVal == "true" )
                     oCfg[ propQueuedReq ] = true;
+            }
+
+            if( oObjElem.isMember( JSON_ATTR_ROUTER_ROLE ) &&
+                oObjElem[ JSON_ATTR_ROUTER_ROLE ].isString() )
+            {
+                strVal = oObjElem[ JSON_ATTR_ROUTER_ROLE ].asString(); 
+                oCfg[ propRouterRole ] = std::strtol(
+                    strVal.c_str(), nullptr, 10 );
+            }
+            else
+            {
+                oCfg[ propRouterRole ] = 0x03;
             }
 
             Json::Value& oIfArray = 
@@ -3939,6 +3992,35 @@ gint32 CRpcServices::DoModEvent(
     return ret;
 }
 
+// a helper for deferred task to run in the
+// interface's taskgroup
+gint32 CRpcServices::RunManagedTask(
+    IEventSink* pTask, bool bRoot )
+{
+    if( pTask == nullptr )
+        return -EINVAL;
+
+    TaskletPtr ptrTask(
+        ( CTasklet* )pTask );
+
+    if( ptrTask.IsEmpty() )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    if( bRoot )
+    {
+        ret = AppendAndRun( ptrTask );
+    }
+    else
+    {
+        ret = AddAndRun( ptrTask );
+    }
+    
+    if( SUCCEEDED( ret ) )
+        ret = ptrTask->GetError();
+
+    return ret;
+}
 /**
 * @name DoInvoke
 * find a event handler for the event message

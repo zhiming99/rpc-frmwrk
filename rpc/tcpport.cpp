@@ -570,8 +570,7 @@ gint32 CRpcStreamSock::GetStreamByPeerId(
     if( iPeerId < 0 )
         return -EINVAL;
 
-    if( iPeerId == TCP_CONN_DEFAULT_CMD ||
-        iPeerId == TCP_CONN_DEFAULT_STM )
+    if( IsReserveStm( iPeerId ) )
     {
         return GetStream( iPeerId, pStm );
     }
@@ -1989,8 +1988,7 @@ gint32 CRpcStreamSock::HandleIoctlIrp(
                 if( ERROR( ret ) )
                     break;
 
-                if( iStreamId == TCP_CONN_DEFAULT_CMD ||
-                    iStreamId == TCP_CONN_DEFAULT_STM )
+                if( IsReserveStm( iStreamId ) )
                 {
                     ret = -EINVAL;
                     break;
@@ -2089,8 +2087,7 @@ gint32 CRpcStreamSock::HandleIoctlIrp(
                 if( ERROR( ret ) )
                     break;
 
-                if( iRequiredStm == TCP_CONN_DEFAULT_CMD ||
-                    iRequiredStm == TCP_CONN_DEFAULT_STM )
+                if( IsReserveStm( iRequiredStm ) )
                 {
                     ret = -EINVAL;
                     break;
@@ -2200,7 +2197,7 @@ gint32 CRpcStreamSock::HandleIoctlIrp(
         case CTRLCODE_REG_MATCH:
         case CTRLCODE_UNREG_MATCH:
             {
-                ret = 0;
+                ret = pCtrlStm->HandleIoctlIrp( pIrp );
                 break;
             }
         default:
@@ -2482,8 +2479,7 @@ CRpcStream::CRpcStream(
             if( ERROR( ret ) )
                 break;
 
-            if( m_iStmId == TCP_CONN_DEFAULT_CMD ||
-                m_iStmId == TCP_CONN_DEFAULT_STM )
+            if( IsReserveStm( m_iStmId ) )
             {
                 m_iPeerStmId = m_iStmId;
             }
@@ -2491,7 +2487,6 @@ CRpcStream::CRpcStream(
             {
                 m_iPeerStmId = -1;
             }
-
         }
 
         if( oCfg.exist( 1 ) )
@@ -3218,6 +3213,32 @@ gint32 CRpcControlStream::HandleIoctlIrp(
             ret = super::HandleWriteIrp(
                 pIrp, pPayload, dwSeqNo );
 
+            break;
+        }
+    case CTRLCODE_REG_MATCH:
+        {
+            CStdRMutex oSockLock(
+                m_pStmSock->GetLock() );
+
+            if( !m_pStmMatch.IsEmpty() )
+            {
+                // unregister the old match first
+                ret = -EEXIST;
+                break;
+            }
+            m_pStmMatch =
+                ( ObjPtr& )( *pCtx->m_pReqData );
+
+            if( m_pStmMatch.IsEmpty() )
+                ret = -EINVAL;
+
+            break;
+        }
+    case CTRLCODE_UNREG_MATCH:
+        {
+            CStdRMutex oSockLock(
+                m_pStmSock->GetLock() );
+            m_pStmMatch.Clear();
             break;
         }
     default:

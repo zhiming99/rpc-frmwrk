@@ -2489,6 +2489,12 @@ struct CAggregatedObject
     ITERATE_IF_VIRT_METHODS_IMPL( OnPostStop, gint32,
         VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
 
+    ITERATE_IF_VIRT_METHODS_IMPL( AddStartTasks, gint32,
+        VA_LIST( IEventSink* pTaskGrp ), VA_LIST( pTaskGrp ) )
+
+    ITERATE_IF_VIRT_METHODS_IMPL( OnPreStop, gint32,
+        VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
+
 };
 
 template< typename...Types >
@@ -2510,45 +2516,14 @@ struct CAggregatedObject< CAggInterfaceServer, Types... >
     ITERATE_IF_VIRT_METHODS_IMPL( OnPostStop, gint32,
         VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
 
+    ITERATE_IF_VIRT_METHODS_IMPL( AddStartTasks, gint32,
+        VA_LIST( IEventSink* pTaskGrp ), VA_LIST( pTaskGrp ) )
+
+    ITERATE_IF_VIRT_METHODS_IMPL( OnPreStop, gint32,
+        VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
+
     const EnumClsid GetIid() const
     { return this->GetClsid(); }
-
-    /*gint32 FetchData_Server( IConfigDb* pDataDesc,
-        gint32& fd, guint32& dwOffset,
-        guint32& dwSize, IEventSink* pCallback )
-    {
-        if( pCallback == nullptr )
-            return -EINVAL;
-        gint32 ret = 0;
-        do{
-            EnumClsid iid = _GETIID( pCallback );
-
-            if( iid == iid( IStream ) )
-            {
-                using StreamClass = typename TypeContained
-                    < virtbase, CStreamServer, Types... >::mybasetype::type;
-
-                ret = this->StreamClass::FetchData_Server(
-                    pDataDesc, fd, dwOffset, dwSize, pCallback );
-            }
-            else if( iid == iid( CFileTransferServer ) )
-            {
-                using FileTransferClass = typename TypeContained
-                    < virtbase, CFileTransferServer, Types... >::mybasetype::type;
-
-                ret = this->FileTransferClass::FetchData_Server(
-                    pDataDesc, fd, dwOffset, dwSize, pCallback );
-            }
-            else
-            {
-                ret = this->virtbase::FetchData_Server(
-                    pDataDesc, fd, dwOffset, dwSize, pCallback );
-            }
-
-        }while( 0 );
-
-        return ret;
-    }*/
 
     DEFINE_UNIQUE_HANDLER_IMPL( FetchData_Server, gint32,
         VA_LIST( IConfigDb* pDataDesc, gint32& fd, guint32& dwOffset, guint32& dwSize, IEventSink* pCallback ),

@@ -26,12 +26,18 @@
 
 #define TCP_CONN_DEFAULT_CMD    0
 #define TCP_CONN_DEFAULT_STM    1
+#define TCP_CONN_SESS_MGR       2
+
+#define STMSOCK_STMID_FLOOR 0x400
+
+#define IsReserveStm( _iStmId ) \
+( ( _iStmId ) >= 0 && ( _iStmId ) < STMSOCK_STMID_FLOOR )
 
 enum EnumProtoId
 {
     protoDBusRelay,
     protoStream,
-    protoControl,
+    protoControl
 };
 
 enum EnumSockState
@@ -298,8 +304,7 @@ class CRpcStream :
 
     inline void AgeStream( guint32 dwSeconds )
     {
-        if( m_iStmId == TCP_CONN_DEFAULT_STM ||
-            m_iStmId == TCP_CONN_DEFAULT_CMD )
+        if( IsReserveStm( m_iStmId ) )
             return;
         m_dwAgeSec += dwSeconds;
     }
@@ -381,6 +386,8 @@ class CRpcControlStream :
     std::deque< CfgPtr >        m_queBufToRecv2;
 
     gint32 RemoveIoctlRequest( IRP* pIrp );
+
+    MatchPtr                    m_pStmMatch;
 
     public:
 
@@ -603,8 +610,6 @@ class CRpcListeningSock :
     gint32 Connect();
 };
 
-#define STMSOCK_STMID_FLOOR 0x100
-
 class CRpcStreamSock :
     public CRpcSocketBase
 {
@@ -751,6 +756,18 @@ class CRpcStreamSock :
 
 };
 
+struct FIDO_IRP_EXT
+{
+    FIDO_IRP_EXT()
+    {
+        iStmId = -1;
+        iPeerStmId = -1;
+    }
+
+    gint32 iStmId;
+    gint32 iPeerStmId;
+};
+
 /**
 * @name CRpcTcpFido
 * A filter port for dbus-related request handling.
@@ -826,6 +843,10 @@ class CRpcTcpFido: public CRpcBasePortEx
 
     gint32 GetPeerStmId( gint32 iStmId,
         gint32& iPeerId );
+
+    gint32 AllocIrpCtxExt(
+        IrpCtxPtr& pIrpCtx,
+        void* pContext = nullptr ) const;
 };
 
 enum EnumIoctlStat
@@ -1145,3 +1166,45 @@ class CStmSockConnectTask
         gint32 iRetries,
         TaskletPtr& pTask );
 };
+
+inline gint32 GetBdgeIrpStmId(
+    PIRP pIrp, gint32& iStmId )
+{
+    if( pIrp == nullptr )
+        return -EINVAL;
+
+    IrpCtxPtr& pCtx = pIrp->GetTopStack();
+    BufPtr pExtBuf;
+    pCtx->GetExtBuf( pExtBuf );
+    if( pExtBuf.IsEmpty() )
+        return -EINVAL;
+
+    FIDO_IRP_EXT* pExt =
+        ( FIDO_IRP_EXT* )pExtBuf->ptr();    
+
+    iStmId = pExt->iStmId;
+    return 0;
+}
+
+inline gint32 SetBdgeIrpStmId( 
+    PIRP pIrp, gint32 iStmId )
+{
+    if( pIrp == nullptr )
+        return -EINVAL;
+
+    if( iStmId < 0 )
+        return -EINVAL;
+
+    IrpCtxPtr& pCtx = pIrp->GetTopStack();
+    BufPtr pExtBuf;
+    pCtx->GetExtBuf( pExtBuf );
+    if( pExtBuf.IsEmpty() )
+        return -EINVAL;
+
+    FIDO_IRP_EXT* pExt =
+        ( FIDO_IRP_EXT* )pExtBuf->ptr();    
+
+    pExt->iStmId = iStmId;
+    return 0;
+}
+

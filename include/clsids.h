@@ -196,7 +196,7 @@ typedef enum : guint32
     DECL_CLSID( CIoWatchTaskProxy ),
     DECL_CLSID( CIoWatchTaskServer ),
     DECL_CLSID( CProxyFdoDriver ),
-    DECL_CLSID( CRpcRouter ),
+    DECL_CLSID( CRpcRouterImpl ),
     DECL_CLSID( CRouterStartReqFwdrProxyTask ),
     DECL_CLSID( MaxClsid ),
     DECL_CLSID( ReservedClsidEnd ) = 0x0FFFFFFF,
@@ -208,6 +208,7 @@ typedef enum : guint32
     DECL_IID( CStatCounters ),
     DECL_IID( CRpcReqForwarder ),
     DECL_IID( CRpcTcpBridge ),
+    DECL_IID( CRpcRouter ),
     DECL_CLSID( ReservedIidEnd ) = 0x1FFFFFFF,
     DECL_CLSID( UserClsidStart ) = 0x20000000,
 

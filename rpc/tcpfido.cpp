@@ -323,8 +323,9 @@ gint32 CRpcTcpFido::HandleSendReq(
         oParams.Push( pBuf );
         // keep the old serial for response
         // message
-        oParams.SetIntProp( propStreamId,
-            TCP_CONN_DEFAULT_STM );
+        gint32 iStmId = TCP_CONN_DEFAULT_STM;
+        GetBdgeIrpStmId( pIrp, iStmId );
+        oParams.SetIntProp( propStreamId, iStmId );
 
         ret = oParams.SetIntProp(
             propSeqNo2, dwSerial );
@@ -450,9 +451,11 @@ gint32 CRpcTcpFido::HandleListening(
             if( true )
             {
                 // set the stream id to read from
+                gint32 iStmId = TCP_CONN_DEFAULT_STM;
+                GetBdgeIrpStmId( pIrp, iStmId );
                 CCfgOpener oReadReq;
-                oReadReq.SetIntProp( propStreamId,
-                    TCP_CONN_DEFAULT_STM );
+                oReadReq.SetIntProp(
+                    propStreamId, iStmId );
 
                 BufPtr pBuf( true );
                 *pBuf = ObjPtr( oReadReq.GetCfg() );
@@ -794,8 +797,7 @@ gint32 CRpcTcpFido::GetPeerStmId(
     gint32 iStmId, gint32& iPeerId )
 {
     gint32 ret = 0;
-    if( iStmId == TCP_CONN_DEFAULT_STM ||
-        iStmId == TCP_CONN_DEFAULT_CMD )
+    if( IsReserveStm( iStmId ) )
     {
         iPeerId = iStmId;
         return ret;
@@ -1208,5 +1210,45 @@ gint32 CRpcTcpFido::OnPortReady(
 
     }while( 0 );
 
+    return ret;
+}
+
+gint32 CRpcTcpFido::AllocIrpCtxExt(
+    IrpCtxPtr& pIrpCtx,
+    void* pContext ) const
+{
+    gint32 ret = 0;
+    switch( pIrpCtx->GetMajorCmd() )
+    {
+    case IRP_MJ_FUNC:
+        {
+            switch( pIrpCtx->GetMinorCmd() )
+            {
+            case IRP_MN_IOCTL:
+                {
+                    FIDO_IRP_EXT oExt; 
+                    oExt.iStmId = TCP_CONN_DEFAULT_STM;
+                    oExt.iPeerStmId = TCP_CONN_DEFAULT_STM;
+
+                    BufPtr pBuf( true );
+                    if( ERROR( ret ) )
+                        break;
+
+                    *pBuf = oExt;
+                    pIrpCtx->SetExtBuf( pBuf );
+                    break;
+                }
+            default:
+                break;
+            }
+            break;
+        }
+    default:
+        {
+            ret = super::AllocIrpCtxExt(
+                pIrpCtx, pContext );
+        }
+        break;
+    }
     return ret;
 }

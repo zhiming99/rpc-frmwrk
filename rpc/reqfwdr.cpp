@@ -23,84 +23,25 @@
 #include "dbusport.h"
 
 using namespace std;
-CfgPtr CRpcReqForwarder::InitCfg(
-    const IConfigDb* pCfg )
-{
-    gint32 ret = 0;
 
-    // ---interface related information---
-    //
-    // ----open port information----
-    //
-    // propPortClass={DBusLocalPdo/DBusProxyPdo/...}
-    // propPortId={bus_name/ipaddr:bus_name/...}
-    //
-    // ----dbus related information----
-    //
-    // propObjPath=`object path'
-    // propIfName=`interface name'
-    // propDestDBusName=`dest module name'
-    // propSrcDBusName=`src module name'
-
-    CCfgOpener oCfg;
-    do{
-
-        CIoManager* pMgr = nullptr;
-        CCfgOpener oInCfg( pCfg );
-        ret = oInCfg.GetPointer( propIoMgr, pMgr );
-        if( ERROR( ret ) )
-            break;
-
-        string strModName = pMgr->GetModName();
-
-        oCfg.SetStrProp( propPortClass,
-            PORT_CLASS_LOCALDBUS_PDO );
-
-        oCfg.SetStrProp( propPortId, 0 );
-
-        oCfg.SetStrProp( propIfName,
-            DBUS_IF_NAME( IFNAME_REQFORWARDER ) );
-
-        string strSender =
-            DBUS_DESTINATION( strModName );
-
-        oCfg.SetStrProp( propSrcDBusName,
-            strSender );
-
-        string strObjPath = DBUS_OBJ_PATH(
-            strModName, OBJNAME_REQFWDR );
-
-        ret = oCfg.SetStrProp(
-            propObjPath, strObjPath );
-
-
-        oCfg.SetStrProp( propDestDBusName,
-            strSender );
-
-        if( !oCfg.GetCfg()->exist( propQueuedReq ) )
-        {
-            oCfg.SetBoolProp(
-                propQueuedReq, false );
-        }
-
-        oCfg.SetPointer( propIoMgr, pMgr );
-
-    }while( 0 );
-
-    if( ERROR( ret ) )
-    {
-        string strMsg = DebugMsg( ret,
-            "Error occurs in CRpcReqForwarder::InitCfg" );
-        throw runtime_error( strMsg );
-    }
-
-    return CfgPtr( oCfg.GetCfg() );
-}
+// ---interface related information---
+//
+// ----open port information----
+//
+// propPortClass={DBusLocalPdo/DBusProxyPdo/...}
+// propPortId={bus_name/ipaddr:bus_name/...}
+//
+// ----dbus related information----
+//
+// propObjPath=`object path'
+// propIfName=`interface name'
+// propDestDBusName=`dest module name'
+// propSrcDBusName=`src module name'
 
 CRpcReqForwarder::CRpcReqForwarder(
     const IConfigDb* pCfg )
-    : CAggInterfaceServer( InitCfg( pCfg ) ),
-    super( InitCfg( pCfg ) )
+    : CAggInterfaceServer( pCfg ),
+    super( pCfg )
 {
     gint32 ret = 0;
     // SetClassId( clsid( CRpcReqForwarder ) );
@@ -134,6 +75,19 @@ CRpcReqForwarder::CRpcReqForwarder(
 gint32 CRpcReqForwarder::InitUserFuncs()
 {
     BEGIN_IFHANDLER_MAP( CRpcReqForwarder );
+
+    ADD_SERVICE_HANDLER(
+        CRpcReqForwarder::OpenRemotePort,
+        SYS_METHOD_OPENRMTPORT );
+
+    ADD_SERVICE_HANDLER(
+        CRpcReqForwarder::EnableRemoteEvent,
+        SYS_METHOD_ENABLERMTEVT );
+
+    ADD_SERVICE_HANDLER(
+        CRpcReqForwarder::DisableRemoteEvent,
+        SYS_METHOD_DISABLERMTEVT );
+
     END_HANDLER_MAP;
     return 0;
 }
@@ -198,7 +152,6 @@ gint32 CReqFwdrOpenRmtPortTask::CreateInterface(
 
         ObjPtr pObj;
         ret = oCfg.GetObjPtr( propRouterPtr, pObj );
-
         if( ERROR( ret ) )
             break;
 
@@ -255,38 +208,25 @@ gint32 CReqFwdrOpenRmtPortTask::OnServiceComplete(
 
     gint32 ret = 0;
     do{
-        ObjPtr pObj;
-        CCfgOpener oCfg( ( IConfigDb* )GetConfig() );
-        ret = oCfg.GetObjPtr(
-            propEventSink, pObj );
-
+        EventPtr pEvt;
+        ret = GetInterceptTask( pEvt );
         if( ERROR( ret ) )
             break;
 
-        IEventSink* pTask = pObj;
-        if( pTask == nullptr )
-        {
-            ret = -EFAULT;
-            break;
-        }
-        ret = oCfg.GetObjPtr( propIfPtr, pObj );
+        CRpcReqForwarder* pIf = nullptr;
+        CCfgOpener oCfg(
+            ( IConfigDb* )GetConfig() );
+
+        ret = oCfg.GetPointer( propIfPtr, pIf );
 
         if( ERROR( ret ) )
             break;
-
-        CInterfaceServer* pReqFwdr = pObj;
-        if( pReqFwdr == nullptr )
-        {
-            ret = -EFAULT;
-            break;
-        }
 
         CParamList oParams;
-        oParams.SetIntProp(
-            propReturnValue, iRetVal );
+        oParams[ propReturnValue ] = iRetVal;
 
-        ret = pReqFwdr->OnServiceComplete( 
-            CfgPtr( oParams.GetCfg() ), pTask );
+        ret = pIf->SetResponse( 
+            pEvt, oParams.GetCfg() );
 
     }while( 0 );
 
@@ -305,13 +245,13 @@ gint32 CReqFwdrOpenRmtPortTask::OnTaskComplete(
         ret == -EAGAIN )
     {
         if( CanRetry() )
+        {
+            ret = STATUS_MORE_PROCESS_NEEDED;
             return ret;
-
+        }
         ret = ERROR_FAIL;
     }
-
-    if( IsPending() )
-        OnServiceComplete( ret );
+    OnServiceComplete( ret );
 
     return ret;
 }
@@ -333,9 +273,7 @@ gint32 CReqFwdrOpenRmtPortTask::RunTask()
 
         ret = ERROR_FAIL;
     }
-
-    if( IsPending() )
-        OnServiceComplete( ret );
+    OnServiceComplete( ret );
 
     return ret;
 }
@@ -344,7 +282,6 @@ gint32 CReqFwdrOpenRmtPortTask::RunTaskInternal(
     gint32 iRetVal )
 {
     gint32 ret = 0;
-    IEventSink* pCallback = nullptr;
     CCfgOpener oCfg( ( IConfigDb* )GetConfig() );
 
     // five parameters needed:
@@ -367,30 +304,31 @@ gint32 CReqFwdrOpenRmtPortTask::RunTaskInternal(
         CRpcReqForwarder* pReqFwdr = nullptr;
         ObjPtr pObj;
 
-        ret = oCfg.GetObjPtr( propIfPtr, pObj );
-
-        if( SUCCEEDED( ret ) )
-            pReqFwdr = pObj;
-
-        ret = oCfg.GetObjPtr(
-            propRouterPtr, pObj );
-
+        ret = AdvanceState();
         if( ERROR( ret ) )
             break;
 
-        pRouter = pObj;
+        bool bRouter = false;
 
-        if( pReqFwdr == nullptr &&
-            pRouter == nullptr )
+        ret = oCfg.GetPointer(
+            propRouterPtr, pRouter );
+
+        if( SUCCEEDED( ret ) )
+            bRouter = true;
+
+        ret = oCfg.GetPointer(
+            propIfPtr, pReqFwdr );
+
+        if( !bRouter && ERROR( ret ) )
+            break;
+
+        if( ( !bRouter && pReqFwdr == nullptr ) ||
+            ( bRouter && pRouter == nullptr ) )
         {
             // either of them should exist
             ret = -EINVAL;
             break;
         }
-
-        ret = AdvanceState();
-        if( ERROR( ret ) )
-            break;
 
         string strIpAddr;
         ret = oCfg.GetStrProp(
@@ -400,7 +338,7 @@ gint32 CReqFwdrOpenRmtPortTask::RunTaskInternal(
             break;
 
         string strUniqName;
-        if( pReqFwdr != nullptr )
+        if( !bRouter )
         {
             ret = oCfg.GetStrProp(
                 propSrcUniqName, strUniqName );
@@ -411,21 +349,34 @@ gint32 CReqFwdrOpenRmtPortTask::RunTaskInternal(
 
         if( m_iState == stateDone )
         {
-            if( SUCCEEDED( iRetVal ) ||
-                iRetVal == 0x7fffffff )
+            if( bRouter )
             {
-                pRouter->AddBridgePair( strIpAddr,
-                    m_pProxy, m_pServer );
-
-                string strSender;
-                ret = oCfg.GetStrProp(
-                    propSrcDBusName, strSender );
-
-                if( SUCCEEDED( ret ) &&
-                    pReqFwdr != nullptr )
+                if( SUCCEEDED( iRetVal ) ||
+                    iRetVal == 0x7fffffff )
                 {
-                    pReqFwdr->AddRefCount(
-                        strIpAddr, strUniqName, strSender );
+                    pRouter->AddBridgeIf(
+                        strIpAddr, m_pServer, false ); 
+                }
+            }
+            else
+            {
+                if( SUCCEEDED( iRetVal ) ||
+                    iRetVal == 0x7fffffff )
+                {
+                    pRouter->AddBridgeIf(
+                        strIpAddr, m_pProxy, true ); 
+
+                    string strSender;
+                    ret = oCfg.GetStrProp(
+                        propSrcDBusName, strSender );
+
+                    if( SUCCEEDED( ret ) && !bRouter )
+                    {
+                        pReqFwdr->AddRefCount(
+                            strIpAddr,
+                            strUniqName,
+                            strSender );
+                    }
                 }
             }
         }
@@ -454,24 +405,8 @@ gint32 CReqFwdrOpenRmtPortTask::RunTaskInternal(
 
     }while( 1 );
 
-    if( ret != STATUS_PENDING && !Retriable( ret ) )
+    if( ret != STATUS_PENDING )
     {
-        ObjPtr pObj;
-        // notify the client
-        gint32 ret1 = oCfg.GetObjPtr(
-            propEventSink, pObj );
-
-        if( SUCCEEDED( ret1 ) )
-            pCallback = pObj;
-
-        if( pCallback != nullptr && IsPending() )
-        {
-            if( iRetVal == 0x7fffffff )
-                iRetVal = ret;
-
-            pCallback->OnEvent( eventTaskComp,
-                ret, 0, nullptr );
-        }
         m_pProxy.Clear();
         m_pServer.Clear();
     }
@@ -479,9 +414,17 @@ gint32 CReqFwdrOpenRmtPortTask::RunTaskInternal(
     return ret;
 }
 
+// active disconnecting
+gint32 CRpcReqForwarder::CloseRemotePort(
+    IEventSink* pCallback,
+    const IConfigDb* pCfg )
+{
+    return 0;
+}
+
 gint32 CRpcReqForwarder::OpenRemotePort(
-    const IConfigDb* pCfg,
-    IEventSink* pCallback )
+    IEventSink* pCallback,
+    const IConfigDb* pCfg )
 {
     gint32 ret = 0;
     do{
@@ -564,12 +507,25 @@ gint32 CRpcReqForwarder::OpenRemotePort(
             if( ERROR( ret ) )
                 break;
 
-            ( *pTask )( eventZero );
-            ret = pTask->GetError();
+            // must be pending
+            pTask->MarkPending();
+            ret = DEFER_CALL( GetIoMgr(), this,
+                &CRpcServices::RunManagedTask,
+                pTask, false );
+
+            if( SUCCEEDED( ret ) )
+                ret = STATUS_PENDING;
         }
         break;
 
     }while( 0 );
+
+    if( ret != STATUS_PENDING )
+    {
+        CParamList oParams;
+        oParams[ propReturnValue ] = ret;
+        SetResponse( pCallback, oParams.GetCfg() );
+    }
 
     return ret;
 }
@@ -664,24 +620,24 @@ gint32 CRpcReqForwarder::CheckMatch(
 }
 
 gint32 CRpcReqForwarder::DisableRemoteEvent(
-    IMessageMatch* pMatch,
-    IEventSink* pCallback )
+    IEventSink* pCallback,
+    IMessageMatch* pMatch )
 {
     return EnableDisableEvent(
-        pMatch, pCallback, false );
+        pCallback, pMatch, false );
 }
 
 gint32 CRpcReqForwarder::EnableRemoteEvent(
-    IMessageMatch* pMatch,
-    IEventSink* pCallback )
+    IEventSink* pCallback,
+    IMessageMatch* pMatch )
 {
     return EnableDisableEvent(
-        pMatch, pCallback, true );
+        pCallback, pMatch, true );
 }
 
 gint32 CRpcReqForwarder::EnableDisableEvent(
-    IMessageMatch* pMatch,
     IEventSink* pCallback,
+    IMessageMatch* pMatch,
     bool bEnable )
 {
     if( pMatch == nullptr ||
@@ -738,10 +694,22 @@ gint32 CRpcReqForwarder::EnableDisableEvent(
         if( ERROR( ret ) )
             break;
 
-        ( *pTask )( eventZero );
-        ret = pTask->GetError();
+        pTask->MarkPending();
+        ret = DEFER_CALL( GetIoMgr(), this,
+            &CRpcServices::RunManagedTask,
+            pTask, false );
+
+        if( SUCCEEDED( ret ) )
+            ret = STATUS_PENDING;
 
     }while( 0 );
+
+    if( ERROR( ret ) )
+    {
+        CParamList oResp;
+        oResp[ propReturnValue ] = ret;
+        SetResponse( pCallback, oResp.GetCfg() );
+    }
 
     return ret;
 }
@@ -889,12 +857,12 @@ gint32 CReqFwdrEnableRmtEventTask::RunTask()
         if( bEnable )
         {
             ret = pProxy->EnableRemoteEvent(
-                pMatch, this );
+                this, pMatch );
         }
         else
         {
             ret = pProxy->DisableRemoteEvent(
-                pMatch, this );
+                this, pMatch );
         }
 
     }while( 0 );
@@ -976,8 +944,8 @@ gint32 CReqFwdrEnableRmtEventTask::OnTaskComplete(
             
             // the response will finally be sent in
             // this method
-            ret = pReqFwdr->OnServiceComplete(
-               oParams.GetCfg(), pEvent ); 
+            ret = pReqFwdr->SetResponse(
+                pEvent, oParams.GetCfg() ); 
         }
 
     }while( 0 );
@@ -1631,92 +1599,10 @@ gint32 CRpcReqForwarder::OnKeepAliveRelay(
     return ret;
 }
 
-CfgPtr CRpcReqForwarderProxy::InitCfg(
-    const IConfigDb* pCfg )
-{
-    gint32 ret = 0;
-
-    // ---interface related information---
-    //
-    // ----open port information----
-    //
-    // propPortClass={DBusLocalPdo/DBusProxyPdo/...}
-    // propPortId={bus_name/ipaddr:bus_name/...}
-    //
-    // ----dbus related information----
-    //
-    // propObjPath=`object path'
-    // propIfName=`interface name'
-    // propDestDBusName=`dest module name'
-    // propSrcDBusName=`src module name'
-
-    CCfgOpener oCfg;
-
-    do{
-
-        CIoManager* pMgr = nullptr;
-        CCfgOpener oInCfg( pCfg );
-        ret = oInCfg.GetPointer( propIoMgr, pMgr );
-        if( ERROR( ret ) )
-            break;
-
-        string strModName = pMgr->GetModName();
-
-        oCfg.SetStrProp( propPortClass,
-            PORT_CLASS_LOCALDBUS_PDO );
-
-        oCfg.SetIntProp( propPortId, 0 );
-
-        // we don't know the target if name at
-        // this point
-        oCfg.SetStrProp( propIfName,
-            DBUS_IF_NAME( IFNAME_REQFORWARDER ) );
-
-        string strSrcDBus =
-            DBUS_DESTINATION( strModName );
-
-        oCfg.SetStrProp( propSrcDBusName,
-            strSrcDBus );
-
-        // we don't know the target obj name at
-        // this point
-        string strObjPath = DBUS_OBJ_PATH(
-            strModName, OBJNAME_INVALID );
-
-        ret = oCfg.SetStrProp(
-            propObjPath, strObjPath );
-
-        string strDest =
-            DBUS_DESTINATION( MODNAME_INVALID );
-
-        oCfg.SetStrProp( propDestDBusName,
-            strDest );
-
-        if( !oCfg.GetCfg()->exist( propQueuedReq ) )
-        {
-            // default option for queued request
-            oCfg.SetBoolProp(
-                propQueuedReq, false );
-        }
-
-        oCfg.SetPointer( propIoMgr, pMgr );
-
-    }while( 0 );
-
-    if( ERROR( ret ) )
-    {
-        string strMsg = DebugMsg( ret,
-            "Error occurs in CRpcReqForwarderProxy::InitCfg" );
-        throw runtime_error( strMsg );
-    }
-
-    return CfgPtr( oCfg.GetCfg() );
-}
-
 CRpcReqForwarderProxy::CRpcReqForwarderProxy(
     const IConfigDb* pCfg )
-    : CInterfaceProxy( InitCfg( pCfg ) ),
-    super( InitCfg( pCfg ) )
+    : CInterfaceProxy( pCfg ),
+    super( pCfg )
 {
     gint32 ret = 0;
     // SetClassId( clsid( CRpcReqForwarderProxy ) );

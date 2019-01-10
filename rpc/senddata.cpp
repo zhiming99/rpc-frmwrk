@@ -159,9 +159,7 @@ gint32 CBdgeProxyOpenStreamTask::
     EmitSendDataRequest( gint32 iStmId )
 {
     gint32 ret = 0;
-    if( iStmId < 0 ||
-        iStmId == TCP_CONN_DEFAULT_STM || 
-        iStmId == TCP_CONN_DEFAULT_CMD )
+    if( iStmId < 0 || IsReserveStm( iStmId ) )
         return -EINVAL;
 
     do{

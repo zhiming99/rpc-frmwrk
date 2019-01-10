@@ -474,8 +474,16 @@ class CRpcInterfaceBase :
 
     // stop the proxy, called by the interface
     // owner
+    // synchronous version of stop
     virtual gint32 Stop();
+
+    // asynchronous stop
     virtual gint32 StopEx( IEventSink* pCallback );
+    // two stage stop: PreStop and DoStop
+    virtual gint32 OnPreStop( IEventSink* pCallback );
+    // fixed part of stop
+    gint32 DoStop( IEventSink* pCallback );
+
 
     virtual gint32 Pause(
         IEventSink* pCallback = nullptr );
@@ -498,6 +506,9 @@ class CRpcInterfaceBase :
         guint32 dwParam1 = 0,
         guint32 dwParam2 = 0,
         guint32* pData = NULL  );
+
+    virtual gint32 AddStartTasks(
+        IEventSink* pTaskGrp ) = 0;
 };
 
 struct IRpcNonDBusIf
@@ -883,6 +894,19 @@ class CRpcServices :
     virtual gint32 CustomizeRequest(
         IConfigDb* pReqCfg,
         IEventSink* pCallback ) = 0;
+
+    // this method is a point to insert tasks that
+    // need to run before the interface to run in
+    // full swing. They are run sequencially. the
+    // `pTaskGrp' is a pointer to CIfTaskGroup.
+    virtual gint32 AddStartTasks(
+        IEventSink* pTaskGrp )
+    { return 0; }
+
+    // a helper for deferred task to run in the
+    // interface's taskgroup
+    gint32 RunManagedTask(
+        IEventSink* pTask, bool bRoot );
 };
 
 template< typename ...Args>
@@ -1166,7 +1190,7 @@ class CInterfaceServer :
 
     protected:
 
-    std::set< TaskletPtr > m_setFilters;
+    std::deque< TaskletPtr > m_queFilters;
     SvrConnPtr m_pConnMgr;
 
     virtual gint32 SendData_Server(
@@ -1410,27 +1434,40 @@ class CInterfaceServer :
         CTasklet* pTask = static_cast
             < CTasklet* >( pFilterTask );
 
-        m_setFilters.insert( TaskletPtr( pTask ) );
+        m_queFilters.push_back( TaskletPtr( pTask ) );
         return 0;
     }
 
     gint32 UnregisterFilter(
         IEventSink* pFilterTask )
     {
+        gint32 ret = -ENOENT;
         CStdRMutex oIfLock( GetLock() );
 
         CTasklet* pTask = static_cast
             < CTasklet* >( pFilterTask );
 
-        m_setFilters.erase( TaskletPtr( pTask ) );
-        return 0;
+        std::deque< TaskletPtr >::iterator itr =
+            m_queFilters.begin();
+
+        TaskletPtr ptrTask( pTask );
+        for( ; itr < m_queFilters.end(); ++itr )
+        {
+            if( *itr == ptrTask )
+            {
+                m_queFilters.erase( itr );
+                ret = 0;
+                break;
+            }
+        }
+        return ret;
     }
 
     gint32 GetFilters(
-        std::set< TaskletPtr >& oFilters )
+        std::deque< TaskletPtr >& oFilters )
     {
         CStdRMutex oIfLock( GetLock() );
-        oFilters = m_setFilters;
+        oFilters = m_queFilters;
         return 0;
     }
 
@@ -1464,21 +1501,27 @@ class CInterfaceServer :
     {
         gint32 ret = 0;
 
-        std::set< TaskletPtr > oFilters;
+        std::deque< TaskletPtr > oFilters;
         GetFilters( oFilters );
-        std::set< TaskletPtr >::iterator itr;
-        if( pFilter == nullptr )
-        {
+        std::deque< TaskletPtr >::iterator
             itr = oFilters.begin();
-        }
-        else
+
+        if( pFilter != nullptr )
         {
             CTasklet* pFiltTask = ( CTasklet* )pFilter;
             TaskletPtr pLastFilt( pFiltTask );
-            itr = oFilters.find( pLastFilt );
+            bool bFound = false;
+            for( ;itr!= oFilters.end(); ++itr )
+            {
+                if( *itr == pLastFilt )
+                {
+                    bFound = true;
+                    break;
+                }
+            }
 
             // already the last one
-            if( itr == oFilters.end() )
+            if( !bFound )
                 return STATUS_SUCCESS;
             // skip this one
             ++itr;

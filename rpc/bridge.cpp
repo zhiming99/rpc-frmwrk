@@ -29,10 +29,10 @@ using namespace std;
 
 CRpcTcpBridgeProxy::CRpcTcpBridgeProxy(
     const IConfigDb* pCfg )
-    :  CInterfaceProxy( pCfg ), super( pCfg ),
+    : CInterfaceProxy( pCfg ),
+    super( pCfg ),
     CRpcTcpBridgeShared( this )
 {
-    // SetClassId( clsid( CRpcTcpBridgeProxy ) );
     gint32 ret = 0;
 
     do{
@@ -84,32 +84,32 @@ gint32 CRpcTcpBridgeProxy::InitUserFuncs()
 }
 
 gint32 CRpcTcpBridgeProxy::EnableRemoteEvent(
-    IMessageMatch* pMatch,
-    IEventSink* pCallback )
+    IEventSink* pCallback,
+    IMessageMatch* pMatch )
 {
     if( pMatch == nullptr ||
         pCallback == nullptr )
         return -EINVAL;
 
     return EnableRemoteEventInternal(
-        pMatch, pCallback, true );
+        pCallback, pMatch, true );
 }
 
 gint32 CRpcTcpBridgeProxy::DisableRemoteEvent(
-    IMessageMatch* pMatch,
-    IEventSink* pCallback )
+    IEventSink* pCallback,
+    IMessageMatch* pMatch )
 {
     if( pMatch == nullptr ||
         pCallback == nullptr )
         return -EINVAL;
 
     return EnableRemoteEventInternal(
-        pMatch, pCallback, false );
+        pCallback, pMatch, false );
 }
 
 gint32 CRpcTcpBridgeProxy::EnableRemoteEventInternal(
-    IMessageMatch* pMatch,
     IEventSink* pCallback,
+    IMessageMatch* pMatch,
     bool bEnable )
 {
     gint32 ret = 0;
@@ -133,6 +133,11 @@ gint32 CRpcTcpBridgeProxy::EnableRemoteEventInternal(
             oBuilder.SetMethodName(
                 SYS_METHOD_DISABLERMTEVT );
         }
+
+        oBuilder[ propStreamId ] =
+            TCP_CONN_DEFAULT_STM;
+
+        oBuilder[ propProtoId ] = protoDBusRelay;
 
         oBuilder.SetCallFlags( CF_WITH_REPLY
            | DBUS_MESSAGE_TYPE_METHOD_CALL 
@@ -340,6 +345,11 @@ gint32 CRpcTcpBridgeProxy::ForwardRequest(
 
         oBuilder.SetKeepAliveSec(
             IFSTATE_DEFAULT_IOREQ_TIMEOUT / 2 ); 
+
+        oBuilder[ propStreamId ] =
+            TCP_CONN_DEFAULT_STM;
+
+        oBuilder[ propProtoId ] = protoDBusRelay;
 
         CParamList oRespCfg;
         CfgPtr pRespCfg = oRespCfg.GetCfg();
@@ -664,52 +674,6 @@ gint32 CRpcTcpBridgeProxy::DoInvoke(
     return ret;
 }
 
-gint32 CRpcTcpBridgeProxy::SetupReqIrpListening(
-    IRP* pIrp,
-    IConfigDb* pReqCall,
-    IEventSink* pCallback )
-{
-    if( pIrp == nullptr ||
-        pIrp->GetStackSize() == 0 )
-        return -EINVAL;
-
-    if( pCallback == nullptr ||
-        pReqCall == nullptr )
-        return -EINVAL;
-
-    gint32 ret = 0;
-
-    do{
-        IrpCtxPtr& pIrpCtx = pIrp->GetTopStack(); 
-        ret = super::SetupReqIrp(
-            pIrp, pReqCall, pCallback );
-
-        if( ERROR( ret ) )
-            break;
-
-        CReqBuilder oReq( pReqCall );
-        
-        oReq.CopyProp( propStreamId, pCallback );
-        oReq.CopyProp( propProtoId, pCallback );
-        oReq.CopyProp( propCmdId, pCallback );
-        oReq.CopyProp( propMethodName, pCallback );
-
-        oReq.SetIntProp(
-            propMatchType, matchClient );
-
-        BufPtr pBuf( true );
-        *pBuf = ObjPtr( pReqCall );
-        pIrpCtx->SetReqData( pBuf );
-        pIrpCtx->SetIoDirection( IRP_DIR_IN );
-
-        pIrp->SetCallback( pCallback, 0 );
-        pIrp->SetIrpThread( GetIoMgr() );
-
-    }while( 0 );
-
-    return ret;
-}
-
 gint32 CRpcTcpBridgeProxy::SetupReqIrp(
     IRP* pIrp,
     IConfigDb* pReqCall,
@@ -740,24 +704,16 @@ gint32 CRpcTcpBridgeProxy::SetupReqIrp(
             break;
         }
 
-        else if( strMethod == IF_METHOD_ENABLEEVT ||
-            strMethod == IF_METHOD_DISABLEEVT )
+        else if( strMethod == SYS_METHOD_ENABLERMTEVT ||
+            strMethod == SYS_METHOD_DISABLERMTEVT )
         {
-            return super::SetupReqIrp(
-                pIrp, pReqCall, pCallback );
-        }
-        else if( strMethod == BRIDGE_METHOD_OPENSTM ||
-            strMethod == BRIDGE_METHOD_CLOSESTM )
-        {
-            guint32 dwCmdId = 0;
-            ret = oReq.GetIntProp( propCmdId, dwCmdId );
-            if( ERROR( ret ) )
-                break;
-
             IrpCtxPtr& pIrpCtx = pIrp->GetTopStack(); 
             pIrpCtx->SetMajorCmd( IRP_MJ_FUNC );
             pIrpCtx->SetMinorCmd( IRP_MN_IOCTL );
-            pIrpCtx->SetCtrlCode( dwCmdId );
+            pIrpCtx->SetCtrlCode( CTRLCODE_SEND_REQ );
+
+            SetBdgeIrpStmId( pIrp,
+                ( guint32& )oReq[ propStreamId ] );
 
             guint32 dwIoDir = IRP_DIR_OUT;
             if( oReq.HasReply() )
@@ -785,6 +741,59 @@ gint32 CRpcTcpBridgeProxy::SetupReqIrp(
                     dwTimeoutSec, GetIoMgr() );
             }
         }
+        else if( strMethod == BRIDGE_METHOD_OPENSTM ||
+            strMethod == BRIDGE_METHOD_CLOSESTM )
+        {
+            guint32 dwCmdId = 0;
+            ret = oReq.GetIntProp( propCmdId, dwCmdId );
+            if( ERROR( ret ) )
+                break;
+
+            IrpCtxPtr& pIrpCtx = pIrp->GetTopStack(); 
+            pIrpCtx->SetMajorCmd( IRP_MJ_FUNC );
+            pIrpCtx->SetMinorCmd( IRP_MN_IOCTL );
+            pIrpCtx->SetCtrlCode( dwCmdId );
+
+            SetBdgeIrpStmId( pIrp,
+                ( guint32& )oReq[ propStreamId ] );
+
+            guint32 dwIoDir = IRP_DIR_OUT;
+            if( oReq.HasReply() )
+                dwIoDir = IRP_DIR_INOUT;
+
+            pIrpCtx->SetIoDirection( dwIoDir ); 
+
+            BufPtr pBuf( true );
+            *pBuf = ( ObjPtr& )oReq.GetCfg();
+
+            if( ERROR( ret ) )
+                break;
+
+            pIrpCtx->SetReqData( pBuf );
+            pIrp->SetCallback( pCallback, 0 );
+            pIrp->SetIrpThread( GetIoMgr() );
+
+            guint32 dwTimeoutSec = 0;
+            ret = oReq.GetTimeoutSec( dwTimeoutSec );
+
+            if( SUCCEEDED( ret ) &&
+                dwTimeoutSec != 0 )
+            {
+                pIrp->SetTimer(
+                    dwTimeoutSec, GetIoMgr() );
+            }
+        }
+        else if( strMethod == SYS_METHOD_FETCHDATA ||
+            strMethod == SYS_METHOD_SENDDATA )
+        {
+            SetBdgeIrpStmId( pIrp,
+                TCP_CONN_DEFAULT_STM );
+
+            ret = super::SetupReqIrp( pIrp,
+                pReqCall, pCallback );
+
+            break;
+        }
 
     }while( 0 );
 
@@ -802,8 +811,7 @@ gint32 CRpcTcpBridgeProxy::OpenStream_Proxy(
 
         oBuilder.SetCallFlags( CF_WITH_REPLY
            | DBUS_MESSAGE_TYPE_METHOD_CALL 
-           | CF_ASYNC_CALL
-           | CF_NON_DBUS );
+           | CF_ASYNC_CALL );
 
         // a tcp default round trip time
         oBuilder.SetTimeoutSec(
@@ -816,10 +824,12 @@ gint32 CRpcTcpBridgeProxy::OpenStream_Proxy(
             BRIDGE_METHOD_OPENSTM );
 
         oBuilder.SetIntProp(
-            propStreamId, TCP_CONN_DEFAULT_CMD );
+            propStreamId, TCP_CONN_DEFAULT_STM );
+
+        oBuilder[ propProtoId ] = protoDBusRelay;
 
         oBuilder.SetIntProp( propCmdId,
-            CTRLCODE_OPEN_STREAM_PDO );
+            CTRLCODE_SEND_REQ );
 
         oBuilder.Push( ( guint32 )wProtocol );
 
@@ -873,8 +883,7 @@ gint32 CRpcTcpBridgeProxy::CloseStream_Proxy(
 
         oBuilder.SetCallFlags( CF_WITH_REPLY |
             DBUS_MESSAGE_TYPE_METHOD_CALL  |
-            CF_ASYNC_CALL |
-            CF_NON_DBUS );
+            CF_ASYNC_CALL );
 
         // a tcp default round trip time
         oBuilder.SetTimeoutSec(
@@ -891,8 +900,13 @@ gint32 CRpcTcpBridgeProxy::CloseStream_Proxy(
         oBuilder.SetIntProp( propCmdId,
             CTRLCODE_CLOSE_STREAM_PDO );
 
-        oBuilder.SetIntProp( propStreamId,
-            TCP_CONN_DEFAULT_CMD );
+        oBuilder.SetIntProp(
+            propStreamId, TCP_CONN_DEFAULT_STM );
+
+        oBuilder[ propProtoId ] = protoDBusRelay;
+
+        oBuilder.SetIntProp( propCmdId,
+            CTRLCODE_SEND_REQ );
 
         CfgPtr pRespCfg( true );
         ret = RunIoTask( oBuilder.GetCfg(),
@@ -1077,190 +1091,6 @@ gint32 CBdgeProxyReadWriteComplete::OnIrpComplete(
     return ret;
 }
 
-gint32 CRpcTcpBridgeShared::ReadStream(
-    gint32 iStreamId,
-    BufPtr& pDestBuf,
-    guint32 dwSizeToRead,
-    IEventSink* pCallback )
-{
-    BufPtr pBuf( true );
-    gint32 ret = ReadWriteStream( iStreamId,
-        pBuf, dwSizeToRead, pCallback, true );
-    if( ERROR( ret ) )
-        return ret;
-
-    pDestBuf = pBuf;
-    return 0;
-}
-
-gint32 CRpcTcpBridgeShared::WriteStream(
-    gint32 iStreamId,
-    CBuffer* pSrcBuf,
-    guint32 dwSizeToWrite,
-    IEventSink* pCallback )
-{
-    return ReadWriteStream( iStreamId,
-        pSrcBuf, dwSizeToWrite, pCallback, false );
-}
-
-gint32 CRpcTcpBridgeShared::ReadWriteStream(
-    gint32 iStreamId,
-    CBuffer* pSrcBuf,
-    guint32 dwSize,
-    IEventSink* pCallback,
-    bool bRead )
-{
-    gint32 ret = 0;
-    TaskletPtr pCbTask;
-
-    do{
-        CCfgOpener oCfg;
-        CRpcInterfaceBase* pIf = GetIfPtr();
-        if( pIf == nullptr )
-        {
-            ret = -EFAULT;
-            break;
-        }
-
-        guint32 dwCmdId;
-        guint32 dwIoDir;
-
-        if( bRead )
-        {
-            dwCmdId = IRP_MN_READ;
-            dwIoDir = IRP_DIR_IN;
-        }
-        else
-        {
-            dwCmdId = IRP_MN_WRITE;
-            dwIoDir = IRP_DIR_OUT;
-        }
-
-        oCfg.SetObjPtr( propIfPtr,
-            ObjPtr( GetIfPtr() ) );
-
-        oCfg.SetObjPtr( propEventSink,
-            ObjPtr( pCallback ) );
-
-        oCfg.SetIntProp( propCmdId, dwCmdId );
-
-        ret = pCbTask.NewObj(
-            clsid( CBdgeProxyReadWriteComplete ),
-            oCfg.GetCfg() );
-
-        if( ERROR( ret ) )
-            break;
-
-        // activatate the task to a intial state
-        // without actual Read/Write
-        ( *pCbTask )( eventZero );
-
-        guint32 dwTimeoutSec = 0;
-
-        CCfgOpenerObj oIfCfg( pIf ); 
-
-        ret = oIfCfg.GetIntProp(
-            propTimeoutSec, dwTimeoutSec );
-
-        if( ERROR( ret ) )
-            dwTimeoutSec = IFSTATE_DEFAULT_IOREQ_TIMEOUT;
-
-        // start to read from the default
-        // dbus stream
-        IrpPtr pIrp( true );
-        ret = pIrp->AllocNextStack( nullptr );
-        if( ERROR( ret ) )
-            break;
-
-        if( iStreamId == TCP_CONN_DEFAULT_CMD )
-        {
-            ret = -EINVAL;
-            break;
-        }
-
-        IrpCtxPtr& pCtx = pIrp->GetTopStack(); 
-
-        pCtx->SetMajorCmd( IRP_MJ_FUNC );
-        pCtx->SetMinorCmd( dwCmdId );
-        pCtx->SetIoDirection( dwIoDir ); 
-
-        BufPtr pBuf( true );
-        CParamList oReq;
-
-        oReq.SetIntProp(
-            propStreamId, iStreamId );
-
-        oReq.SetIntProp(
-            propByteCount, dwSize );
-
-        if( bRead )
-        {
-            *pBuf = ObjPtr( 
-                ( IConfigDb* )oReq.GetCfg() );
-        }
-        else
-        {
-            oReq.Push( ObjPtr( pSrcBuf ) );
-            *pBuf = ObjPtr( 
-                ( IConfigDb* )oReq.GetCfg() );
-        }
-
-        pCtx->SetReqData( pBuf );
-
-        EventPtr pEvent = pCbTask;
-        pIrp->SetCallback( pEvent, 0 );
-        pIrp->SetIrpThread( pIf->GetIoMgr() );
-        if( dwTimeoutSec != 0 )
-        {
-            pIrp->SetTimer(
-                dwTimeoutSec, pIf->GetIoMgr() );
-        }
-
-        // NOTE: this irp will only go through the
-        // stream pdo, and not come down all the
-        // way from the top of the port stack
-        HANDLE hPort = pIf->GetPortHandle();
-        CIoManager* pMgr = pIf->GetIoMgr();
-
-        CCfgOpenerObj( ( CObjBase* )pCbTask ).
-            SetObjPtr( propIrpPtr, pIrp );
-
-        ret = pMgr->SubmitIrp( hPort, pIrp );
-
-        if( ret == STATUS_PENDING )
-        {
-            if( pCallback != nullptr )
-                break;
-
-            CIfRetryTask* pRetryTask = pCbTask;
-            if( pRetryTask != nullptr )
-            {
-                pRetryTask->WaitForComplete();
-                ret = pRetryTask->GetError();
-                if( SUCCEEDED( ret ) && bRead )
-                {
-                    IrpCtxPtr& pCtx = pIrp->GetTopStack();
-                    pSrcBuf = pCtx->m_pRespData;
-                }
-            }
-            else
-            {
-                ret = -EFAULT;
-            }
-        }
-        else
-        {
-            CCfgOpenerObj( ( CObjBase* )pCbTask ).
-                RemoveProperty( propIrpPtr );
-            pIrp->RemoveCallback();
-            pIrp->RemoveTimer();
-            pIrp->ClearIrpThread();
-        }
-
-    }while( 0 );
-
-    return ret;
-}
 
 gint32 CRpcTcpBridgeProxy::StartEx(
     IEventSink* pCallback )
@@ -1554,30 +1384,30 @@ CRpcTcpBridge::~CRpcTcpBridge()
 }
 
 gint32 CRpcTcpBridge::EnableRemoteEvent(
-    IMessageMatch* pMatch, IEventSink* pCallback )
+    IEventSink* pCallback, IMessageMatch* pMatch )
 {
     if( pMatch == nullptr ||
         pCallback == nullptr )
         return -EINVAL;
 
     return EnableRemoteEventInternal(
-        pMatch, pCallback, true );
+        pCallback, pMatch, true );
 }
 
 gint32 CRpcTcpBridge::DisableRemoteEvent(
-    IMessageMatch* pMatch, IEventSink* pCallback )
+    IEventSink* pCallback, IMessageMatch* pMatch )
 {
     if( pMatch == nullptr ||
         pCallback == nullptr )
         return -EINVAL;
 
     return EnableRemoteEventInternal(
-        pMatch, pCallback, false );
+        pCallback, pMatch, false );
 }
 
 gint32 CRpcTcpBridge::EnableRemoteEventInternal(
-    IMessageMatch* pMatch,
     IEventSink* pCallback,
+    IMessageMatch* pMatch,
     bool bEnable )
 {
     if( pMatch == nullptr ||
@@ -2018,6 +1848,9 @@ gint32 CRpcTcpBridge::ForwardEvent(
         oBuilder.SetKeepAliveSec(
             IFSTATE_DEFAULT_IOREQ_TIMEOUT / 2 ); 
 
+        oBuilder[ propStreamId ] =
+            TCP_CONN_DEFAULT_STM;
+
         CParamList oRespCfg;
         CfgPtr pRespCfg = oRespCfg.GetCfg();
         if( pRespCfg.IsEmpty() )
@@ -2065,6 +1898,10 @@ gint32 CRpcInterfaceServer::SetupReqIrpFwrdEvt(
         // needs a reply, and the flag is set
         // to CF_WITH_REPLY mandatorily
         pIrpCtx->SetIoDirection( IRP_DIR_OUT ); 
+
+        CCfgOpener oReq( pReqCall );
+        SetBdgeIrpStmId( pIrp,
+            ( guint32& )oReq[ propStreamId ] );
 
         // we don't need a timer
         if( pCallback != nullptr )
@@ -2233,6 +2070,9 @@ gint32 CRpcTcpBridge::OnKeepAliveRelay(
         okaReq.SetCallFlags( 
            DBUS_MESSAGE_TYPE_SIGNAL
            | CF_ASYNC_CALL );
+        
+        okaReq[ propStreamId ] =
+            TCP_CONN_DEFAULT_STM;
 
         string strVal = pMsg.GetDestination( );
         if( strVal.empty() )
@@ -2463,53 +2303,8 @@ gint32 CRpcInterfaceServer::DoInvoke(
 
         CfgPtr pCfg( true );
         do{
-            if( strMethod == SYS_METHOD_OPENRMTPORT ||
-                strMethod == SYS_METHOD_CLOSERMTPORT )
+            if( strMethod == SYS_METHOD_FORWARDREQ )
             {
-                guint32 iArgCount = GetArgCount(
-                    &IRpcReqProxyAsync::OpenRemotePort ) - 1;
-
-                if( vecArgs.empty()
-                    || vecArgs.size() != iArgCount )
-                {
-                    ret = -EBADMSG;
-                    break;
-                }
-
-                ret = pCfg->Deserialize(
-                    *( CBuffer* )vecArgs[ 0 ].second );
-
-                if( ERROR( ret ) )
-                    break;
-
-                if( pCfg.IsEmpty() )
-                {
-                    ret = -EBADMSG;
-                    break;
-                }
-
-                if( strMethod == SYS_METHOD_OPENRMTPORT )
-                {
-                    ret = OpenRemotePort( pCfg,
-                        pCallback );
-                }
-                else
-                {
-                    ret = CloseRemotePort( pCfg,
-                        pCallback );
-                }
-
-                if( ret == STATUS_PENDING )
-                    break;
-
-                ret = oResp.SetIntProp(
-                    propReturnValue, ret );
-
-                break;
-            }
-            else if( strMethod == SYS_METHOD_FORWARDREQ )
-            {
-
                 guint32 iArgCount = GetArgCount(
                     &IRpcReqProxyAsync::ForwardRequest );
 
@@ -2562,53 +2357,6 @@ gint32 CRpcInterfaceServer::DoInvoke(
 
                 if( !pRespMsg.IsEmpty() )
                     oResp.Push( pRespMsg );
-
-                break;
-            }
-            else if( strMethod == SYS_METHOD_ENABLERMTEVT ||
-                strMethod == SYS_METHOD_DISABLERMTEVT )
-            {
-
-                guint32 iArgCount = GetArgCount(
-                    &IRpcReqProxyAsync::EnableRemoteEvent );
-
-                iArgCount -= 1;
-
-                if( vecArgs.empty()
-                    || vecArgs.size() != iArgCount )
-                {
-                    ret = -EBADMSG;
-                    break;
-                }
-
-                MatchPtr pMatchPtr;
-                ret = pMatchPtr.NewObj(
-                    clsid( CMessageMatch ) );
-
-                if( ERROR( ret ) )
-                    break;
-
-                ret = pMatchPtr->Deserialize(
-                    *vecArgs[ 0 ].second );
-
-                if( ERROR( ret ) )
-                    break;
-
-                if( strMethod ==
-                    SYS_METHOD_ENABLERMTEVT )
-                {
-                    ret = EnableRemoteEvent(
-                        pMatchPtr, pCallback );
-                }
-                else
-                {
-
-                    ret = DisableRemoteEvent(
-                        pMatchPtr, pCallback );
-                }
-
-                oResp.SetIntProp(
-                    propReturnValue, ret );
 
                 break;
             }
@@ -2754,58 +2502,6 @@ gint32 CRpcTcpBridge::SendFetch_Server(
 
     // the return value indicates if the response
     // message is generated or not.
-    return ret;
-}
-
-gint32 CRpcTcpBridge::SetupReqIrpListening(
-    IRP* pIrp,
-    IConfigDb* pReqCall,
-    IEventSink* pCallback )
-{
-    if( pIrp == nullptr ||
-        pIrp->GetStackSize() == 0 )
-        return -EINVAL;
-
-    if( pCallback == nullptr ||
-        pReqCall == nullptr )
-        return -EINVAL;
-
-    gint32 ret = 0;
-
-    do{
-        IrpCtxPtr& pIrpCtx = pIrp->GetTopStack(); 
-        ret = super::SetupReqIrp(
-            pIrp, pReqCall, pCallback );
-
-        if( ERROR( ret ) )
-            break;
-
-        CReqBuilder oReq( pReqCall );
-        
-        oReq.CopyProp( propStreamId, pCallback );
-        oReq.CopyProp( propProtoId, pCallback );
-        oReq.CopyProp( propCmdId, pCallback );
-        oReq.CopyProp( propMethodName, pCallback );
-
-        oReq.SetIntProp(
-            propMatchType, matchServer );
-
-        oReq.SetCallFlags( CF_WITH_REPLY |
-            CF_NON_DBUS | CF_ASYNC_CALL |
-            DBUS_MESSAGE_TYPE_METHOD_CALL );
-
-        pIrpCtx->SetNonDBusReq( true );
-
-        BufPtr pBuf( true );
-        *pBuf = ObjPtr( pReqCall );
-
-        pIrpCtx->SetReqData( pBuf );
-        pIrpCtx->SetIoDirection( IRP_DIR_IN );
-        pIrp->SetCallback( pCallback, 0 );
-        pIrp->SetIrpThread( GetIoMgr() );
-
-    }while( 0 );
-
     return ret;
 }
 
@@ -3011,12 +2707,12 @@ gint32 CRpcTcpBridge::StartEx(
         oReq2.CopyProp(
             propCmdId, pWrapper );
 
-        oReq2.SetIntProp( propProtoId,
-            protoControl );
-
         ret = oReq2.SetIntProp(
             propStreamId,
             TCP_CONN_DEFAULT_CMD );
+
+        oReq2.SetIntProp( propProtoId,
+            protoControl );
 
         oReq2.SetBoolProp(
             propSubmitPdo, true );
@@ -3119,8 +2815,7 @@ gint32 CRpcTcpBridge::CloseStream_Server(
     gint32 ret = 0;
 
     do{
-        if( iStreamId == TCP_CONN_DEFAULT_CMD ||
-            iStreamId == TCP_CONN_DEFAULT_STM )
+        if( IsReserveStm( iStreamId ) )
         {
             ret = -EINVAL;
             break;
@@ -3242,6 +2937,14 @@ gint32 CRpcTcpBridge::InitUserFuncs()
         CRpcTcpBridge::CloseStream,
         BRIDGE_METHOD_CLOSESTM );
 
+    ADD_SERVICE_HANDLER(
+        CRpcTcpBridge::EnableRemoteEvent,
+        SYS_METHOD_ENABLERMTEVT );
+
+    ADD_SERVICE_HANDLER(
+        CRpcTcpBridge::DisableRemoteEvent,
+        SYS_METHOD_DISABLERMTEVT );
+
     END_HANDLER_MAP;
 
     return 0;
@@ -3276,12 +2979,16 @@ gint32 CRpcTcpBridge::SendResponse(
         BufPtr pBuf( true );
         *pBuf = pMsg;
 
+        IPort* pPort = GetPort();
+        pPort = pPort->GetTopmostPort();
+
         IrpPtr pIrp( true );
         ret = pIrp->AllocNextStack( nullptr );
         if( ERROR( ret ) )
             break;
 
         IrpCtxPtr& pCtx = pIrp->GetTopStack(); 
+        pPort->AllocIrpCtxExt( pCtx, ( PIRP )pIrp );
 
         pCtx->SetMajorCmd( IRP_MJ_FUNC );
         pCtx->SetMinorCmd( IRP_MN_IOCTL );
@@ -3290,7 +2997,6 @@ gint32 CRpcTcpBridge::SendResponse(
 
         pCtx->SetReqData( pBuf );
 
-        IPort* pPort = GetPort();
         CPort* pPort2 = ( CPort* )pPort;
         CIoManager* pMgr = pPort2->GetIoMgr();
         ret = pMgr->SubmitIrp(
@@ -3377,8 +3083,7 @@ gint32 CRpcTcpBridgeShared::OpenLocalStream(
         if( ERROR( ret ) )
             break;
 
-        if( iStreamId == TCP_CONN_DEFAULT_CMD ||
-            iStreamId == TCP_CONN_DEFAULT_STM )
+        if( IsReserveStm( iStreamId ) )
             return -EINVAL;
 
         IrpCtxPtr& pCtx = pIrp->GetTopStack(); 
@@ -3498,6 +3203,281 @@ gint32 CRpcTcpBridgeShared::CloseLocalStream(
 
         if( ERROR( ret ) )
             break;
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CRpcTcpBridgeShared::ReadStream(
+    gint32 iStreamId,
+    BufPtr& pDestBuf,
+    guint32 dwSizeToRead,
+    IEventSink* pCallback )
+{
+    BufPtr pBuf( true );
+    gint32 ret = ReadWriteStream( iStreamId,
+        pBuf, dwSizeToRead, pCallback, true );
+    if( ERROR( ret ) )
+        return ret;
+
+    pDestBuf = pBuf;
+    return 0;
+}
+
+gint32 CRpcTcpBridgeShared::WriteStream(
+    gint32 iStreamId,
+    CBuffer* pSrcBuf,
+    guint32 dwSizeToWrite,
+    IEventSink* pCallback )
+{
+    return ReadWriteStream( iStreamId,
+        pSrcBuf, dwSizeToWrite, pCallback, false );
+}
+
+gint32 CRpcTcpBridgeShared::ReadWriteStream(
+    gint32 iStreamId,
+    CBuffer* pSrcBuf,
+    guint32 dwSize,
+    IEventSink* pCallback,
+    bool bRead )
+{
+    gint32 ret = 0;
+    TaskletPtr pCbTask;
+
+    do{
+        CCfgOpener oCfg;
+        CRpcInterfaceBase* pIf = GetIfPtr();
+        if( pIf == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        guint32 dwCmdId;
+        guint32 dwIoDir;
+
+        if( bRead )
+        {
+            dwCmdId = IRP_MN_READ;
+            dwIoDir = IRP_DIR_IN;
+        }
+        else
+        {
+            dwCmdId = IRP_MN_WRITE;
+            dwIoDir = IRP_DIR_OUT;
+        }
+
+        oCfg.SetObjPtr( propIfPtr,
+            ObjPtr( GetIfPtr() ) );
+
+        oCfg.SetObjPtr( propEventSink,
+            ObjPtr( pCallback ) );
+
+        oCfg.SetIntProp( propCmdId, dwCmdId );
+
+        ret = pCbTask.NewObj(
+            clsid( CBdgeProxyReadWriteComplete ),
+            oCfg.GetCfg() );
+
+        if( ERROR( ret ) )
+            break;
+
+        // activatate the task to a intial state
+        // without actual Read/Write
+        ( *pCbTask )( eventZero );
+
+        guint32 dwTimeoutSec = 0;
+
+        CCfgOpenerObj oIfCfg( pIf ); 
+
+        ret = oIfCfg.GetIntProp(
+            propTimeoutSec, dwTimeoutSec );
+
+        if( ERROR( ret ) )
+            dwTimeoutSec = IFSTATE_DEFAULT_IOREQ_TIMEOUT;
+
+        // start to read from the default
+        // dbus stream
+        IrpPtr pIrp( true );
+        ret = pIrp->AllocNextStack( nullptr );
+        if( ERROR( ret ) )
+            break;
+
+        if( iStreamId == TCP_CONN_DEFAULT_CMD )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        IrpCtxPtr& pCtx = pIrp->GetTopStack(); 
+
+        pCtx->SetMajorCmd( IRP_MJ_FUNC );
+        pCtx->SetMinorCmd( dwCmdId );
+        pCtx->SetIoDirection( dwIoDir ); 
+
+        BufPtr pBuf( true );
+        CParamList oReq;
+
+        oReq.SetIntProp(
+            propStreamId, iStreamId );
+
+        oReq.SetIntProp(
+            propByteCount, dwSize );
+
+        if( bRead )
+        {
+            *pBuf = ObjPtr( 
+                ( IConfigDb* )oReq.GetCfg() );
+        }
+        else
+        {
+            oReq.Push( ObjPtr( pSrcBuf ) );
+            *pBuf = ObjPtr( 
+                ( IConfigDb* )oReq.GetCfg() );
+        }
+
+        pCtx->SetReqData( pBuf );
+
+        EventPtr pEvent = pCbTask;
+        pIrp->SetCallback( pEvent, 0 );
+        pIrp->SetIrpThread( pIf->GetIoMgr() );
+        if( dwTimeoutSec != 0 )
+        {
+            pIrp->SetTimer(
+                dwTimeoutSec, pIf->GetIoMgr() );
+        }
+
+        // NOTE: this irp will only go through the
+        // stream pdo, and not come down all the
+        // way from the top of the port stack
+        HANDLE hPort = pIf->GetPortHandle();
+        CIoManager* pMgr = pIf->GetIoMgr();
+
+        CCfgOpenerObj( ( CObjBase* )pCbTask ).
+            SetObjPtr( propIrpPtr, pIrp );
+
+        ret = pMgr->SubmitIrp( hPort, pIrp );
+
+        if( ret == STATUS_PENDING )
+        {
+            if( pCallback != nullptr )
+                break;
+
+            CIfRetryTask* pRetryTask = pCbTask;
+            if( pRetryTask != nullptr )
+            {
+                pRetryTask->WaitForComplete();
+                ret = pRetryTask->GetError();
+                if( SUCCEEDED( ret ) && bRead )
+                {
+                    IrpCtxPtr& pCtx = pIrp->GetTopStack();
+                    pSrcBuf = pCtx->m_pRespData;
+                }
+            }
+            else
+            {
+                ret = -EFAULT;
+            }
+        }
+        else
+        {
+            CCfgOpenerObj( ( CObjBase* )pCbTask ).
+                RemoveProperty( propIrpPtr );
+            pIrp->RemoveCallback();
+            pIrp->RemoveTimer();
+            pIrp->ClearIrpThread();
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CRpcTcpBridgeShared::SetupReqIrpListeningShared(
+    IRP* pIrp,
+    IConfigDb* pReqCall,
+    IEventSink* pCallback )
+{
+    if( pIrp == nullptr ||
+        pIrp->GetStackSize() == 0 )
+        return -EINVAL;
+
+    if( pCallback == nullptr ||
+        pReqCall == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+
+    do{
+        InterfPtr pIf = GetIfPtr();
+        if( pIf.IsEmpty() )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        CIoManager* pMgr = nullptr;
+        IrpCtxPtr& pIrpCtx = pIrp->GetTopStack(); 
+        if( pIf->IsServer() )
+        {
+            CRpcTcpBridge* pBridge = pIf;
+            ret = pBridge->CRpcTcpBridge::super::SetupReqIrp(
+                pIrp, pReqCall, pCallback );
+            pMgr = pBridge->GetIoMgr();
+        }
+        else
+        {
+            CRpcTcpBridgeProxy* pProxy = pIf;
+            ret = pProxy->CRpcTcpBridgeProxy::super::SetupReqIrp(
+                pIrp, pReqCall, pCallback );
+            pMgr = pProxy->GetIoMgr();
+        }
+
+        if( ERROR( ret ) )
+            break;
+
+        CReqBuilder oReq( pReqCall );
+        
+        oReq.CopyProp( propStreamId, pCallback );
+        oReq.CopyProp( propProtoId, pCallback );
+        oReq.CopyProp( propCmdId, pCallback );
+        oReq.CopyProp( propMethodName, pCallback );
+
+        if( pIf->IsServer() )
+        {
+            oReq.SetIntProp(
+                propMatchType, matchServer );
+        }
+        else
+        {
+            oReq.SetIntProp(
+                propMatchType, matchClient );
+        }
+
+        guint32 dwProtoId = oReq[ propProtoId ];
+        if( dwProtoId == protoDBusRelay )
+        {
+            oReq.SetCallFlags(
+                CF_WITH_REPLY | CF_ASYNC_CALL |
+                DBUS_MESSAGE_TYPE_METHOD_CALL );
+            SetBdgeIrpStmId( pIrp,
+                ( guint32& )oReq[ propStreamId ] );
+        }
+        else if( dwProtoId == protoControl )
+        {
+            oReq.SetCallFlags( CF_WITH_REPLY |
+                CF_NON_DBUS | CF_ASYNC_CALL |
+                DBUS_MESSAGE_TYPE_METHOD_CALL );
+            pIrpCtx->SetNonDBusReq( true );
+        }
+        BufPtr pBuf( true );
+        *pBuf = ObjPtr( pReqCall );
+
+        pIrpCtx->SetReqData( pBuf );
+        pIrpCtx->SetIoDirection( IRP_DIR_IN );
+        pIrp->SetCallback( pCallback, 0 );
+        pIrp->SetIrpThread( pMgr );
 
     }while( 0 );
 

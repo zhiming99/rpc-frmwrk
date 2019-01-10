@@ -72,6 +72,42 @@
                     "Pausable"  : "true"
                 }
             ]
+        },
+        {
+            "ObjectName": "RpcRouterImpl",
+            "BusName" : "DBusBusPort_0",
+            "PortClass": "DBusLocalPdo",
+            "PortId" : "0",
+            "RequestTimeoutSec" : "120",
+            "KeepAliveTimeoutSec" : "60",
+            "QueuedRequests" : "false",
+            "ProxyPortClass": "DBusLocalPdo",
+            "Comment-0": "'Role' is a router-specific prop. 01: as a forwarder, 02: as a server, 03 or not exist: as both forwarder and server",
+            "Role" : "0x02",
+            "Interfaces" :
+            [
+                {
+                    "Comment-0" : "the following attributes are mandatory",
+                    "InterfaceName" : "CRpcRouterImpl",
+                    "BindToClsid" : "true"
+                },
+                {
+                    "InterfaceName" : "IInterfaceServer",
+                    "Pausable"  : "false"
+                },
+                {
+                    "InterfaceName" : "IUnknown",
+                    "Pausable" : "false"
+                },
+                {
+                    "InterfaceName" : "CRpcRouter",
+                    "Pausable"  : "false"
+                },
+                {
+                    "InterfaceName" : "CStatCountersServer",
+                    "Pausable"  : "true"
+                }
+            ]
         }
     ]
 }

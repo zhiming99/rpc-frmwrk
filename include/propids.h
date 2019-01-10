@@ -35,8 +35,8 @@ enum EnumPropId : gint32
     propMatchType,      // type: gint32
     propSrcIpAddr,
     propDestIpAddr,
-    propEnableEvent,
-    propReqTimeout,     // type: guint32
+    propSrcTcpPort,
+    propDestTcpPort,
 
     // Port related property
     propDrvName = 0x2000,
@@ -168,6 +168,8 @@ enum EnumPropId : gint32
     propDummyMatch,     // type: the match is for state transition only, not for matching purpose
     propObjInstName,    // type: the instance name of an object, used to construct the objpath
     propSvrInstName,    // type: the instance name of a server, used to construct the objpath
+    propRouterRole,     // type: gint32, the role of the router instance: 01 as a forwarder, 02 as a server,
+                        //       03 or not exist as both forwarder and server, 
     propReseredEnd = 0x10000000,
     propInvalid = -1, 
 };

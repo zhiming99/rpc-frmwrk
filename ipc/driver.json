@@ -243,7 +243,7 @@
             [
                 {
                     "ObjectName" : "RpcRouter-0",
-                    "ObjectClass" : "RpcRouter"
+                    "ObjectClass" : "RpcRouterImpl"
                 }
             ],
             "ClassFactories" :
