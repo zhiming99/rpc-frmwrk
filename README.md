@@ -20,6 +20,9 @@ This framework depends on the following packags:
 11. `Streaming support to provide double-direction stream transfer`
 
 ---
+[`Fri Jan 11 08:32:13 CST 2019`]   
+1. There are several places in the router to redesign for new requirements/discoveries. And the details have appended to the todo.txt.   
+
 [`Tue Jan 01 20:53:12 CST 2019`]   
 1. This week, I need to redesign the management part of the router for the bridge and reqfwdr's lifecycle management, and add new command to the tcp-level protocol for connection resiliance.   
 2. Note that, if you want to run `helloworld`, please use the earlier version `bf852d55ae2342c5f01cc499c59885f50780c550` of `echodesc.json` instead. The latest version is modified for RPC debugging purpose.
