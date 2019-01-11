@@ -61,12 +61,7 @@ DONE    To implement the match mechanism in the CRpcReqForwarder and CRpcRemoteR
 DONE    To add TcpBusPort and CTcpStreamPdo
 DONE    To add channel management on CTcpStreamPdo 
 
-DONE    To add the CRpcTcpFido and its driver
         To review further the `OnCancel' support for tasks in iftasks.h
-
-        To initiate a eventRmtModOffline notify
-        from the interface-level request. The server side handler is in 
-            CStmPdoListenCtrlReqTask::DispatchDataReceived
 
         To Add baseline interfaces to object
             Obj_IoManager
@@ -79,7 +74,6 @@ DONE    To implement CRpcReqForwarder and CRpcReqForwarderProxy
 DONE    To add support to cancel ForwardRequest gracefully.( added a UserCancelRequest method on both proxy and server for this purpose )
 
 DONE    To add Keep-alive support to the RPC protocol
-        To add authentication support to the RPC framework
 
 DONE    To add SetupReqIrp for CRpcTcpBridgeProxy and CRpcTcpBridge
 DONE    To move the request handling logics from CStmPdoListenCtrlReqTask::DispatchDataReceived to the CRpcTcpBridge/Proxy's DoInvoke
@@ -91,6 +85,21 @@ DONE    To implement WriteStream and ReadStream
 DONE    To implement SendData and FetchData support for RPC interfaces.
 DONE    To add support to cancel SendData/FetchData gracefully 
 
-        To dispatch the Remote Server Offline/Online and Remote Module Offline/Online events from the CRpcTcpBridgeProxy to the CRpcReqForwarder
+DONE    To debug and test the ipc module and write test code
 
-        To debug and test the ipc/rpc modules and write test code
+        To dispatch the Remote Server Offline/Online and Remote Module Offline/Online events from the CRpcTcpBridgeProxy to the CRpcReqForwarder
+        To add authentication support to the RPC framework
+
+        To debug and test the rpc module
+        To add OnCancel and timeout for CReqFwdrOpenRmtPortTask 
+        To add CloseRemotePort handler to CRpcReqForwarder
+        To complete the stream id addition to all the requests via tcpfido
+        To implement the session manager interface with the following methods
+            . Login, Logout, Ping, PingTimeout,
+            OnModOffline( POLLHUP ), OnRmtSvrOffline( Retry failed )
+        To add a tasklet to complete the router stop gracefully
+        To implement the reconnect task in CRpcStreamSock
+        To make it configurable whether or not to open the listening socket
+        To make the bridge to map to ipaddr + port number
+        To add the CRpcTcpFido's driver
+
