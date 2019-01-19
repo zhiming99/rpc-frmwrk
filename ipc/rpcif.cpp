@@ -29,6 +29,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include "jsondef.h"
+#include "dbusport.h"
 
 using namespace std;
 
@@ -81,12 +82,14 @@ static CfgPtr InitIfProxyCfg(
     EnumClsid iStateClass =
         clsid( CLocalProxyState );
 
-    if( strPortClass == PORT_CLASS_DBUS_PROXY_PDO ||
-        strPortClass == PORT_CLASS_TCP_STREAM_PDO )
+    if( strPortClass == PORT_CLASS_DBUS_PROXY_PDO )
     {
         // CRemoteProxyState will have an extra ip
         // address to match
         iStateClass = clsid( CRemoteProxyState );
+    }
+    else if( strPortClass == PORT_CLASS_TCP_STREAM_PDO )
+    {
     }
 
     oNewCfg.SetIntProp(
@@ -1232,7 +1235,11 @@ gint32 CRpcInterfaceBase::OnDBusEvent(
             if( ERROR( ret ) )
                 break;
 
-            ret = StopEx( pTask );
+            ret = DEFER_CALL(
+                GetIoMgr(), this,
+                &CRpcInterfaceBase::StopEx,
+                ( IEventSink* )pTask );
+                
             break;
         }
     case eventDBusOnline:
@@ -1251,7 +1258,8 @@ gint32 CRpcInterfaceBase::OnDBusEvent(
 
 gint32 CRpcInterfaceBase::OnRmtSvrEvent(
     EnumEventId iEvent,
-    const string& strIpAddr )
+    const std::string& strIpAddr,
+    HANDLE hPort )
 {
     gint32 ret = 0;
 
@@ -1297,7 +1305,11 @@ gint32 CRpcInterfaceBase::OnAdminEvent(
 {
     gint32 ret = 0;
 
-    ret = SetStateOnEvent( iEvent );
+    // to avoid synchronous call
+    // we put  dumb task there
+    TaskletPtr pTask;
+    ret = pTask.NewObj(
+        clsid( CIfDummyTask ) );
 
     if( ERROR( ret ) )
         return ret;
@@ -1306,11 +1318,7 @@ gint32 CRpcInterfaceBase::OnAdminEvent(
     {
     case cmdShutdown:
         {
-            TaskletPtr pTask;
-
-            ret = pTask.NewObj(
-                clsid( CIfDummyTask ) );
-
+            ret = SetStateOnEvent( iEvent );
             if( ERROR( ret ) )
                 break;
 
@@ -1319,14 +1327,7 @@ gint32 CRpcInterfaceBase::OnAdminEvent(
         }
     case cmdPause:
         {
-            TaskletPtr pTask;
-
-            // to avoid synchronous call
-            // we put  dumb task there
-            ret = pTask.NewObj(
-                clsid( CIfDummyTask ) );
-
-            if( ERROR( ret ) )
+            if( !IsServer() )
                 break;
 
             ret = Pause( pTask );
@@ -1334,14 +1335,7 @@ gint32 CRpcInterfaceBase::OnAdminEvent(
         }
     case cmdResume:
         {
-            TaskletPtr pTask;
-
-            // to avoid synchronous call
-            // we put  dumb task there
-            ret = pTask.NewObj(
-                clsid( CIfDummyTask ) );
-
-            if( ERROR( ret ) )
+            if( !IsServer() )
                 break;
 
             ret = Resume( pTask );
@@ -1447,7 +1441,7 @@ gint32 CRpcInterfaceBase::OnEvent(
             }
 
             ret = OnRmtSvrEvent(
-                iEvent, strIpAddr ); 
+                iEvent, strIpAddr, hPort ); 
 
             break;
         }
@@ -3487,8 +3481,27 @@ gint32 CRpcServices::LoadObjDesc(
                 !bServer )
             {
                 strVal = oObjElem[ JSON_ATTR_IPADDR ].asString(); 
-                strVal = strVal.substr( 0, 16 );
-                oCfg[ propIpAddr ] = strVal;
+                string strNormVal;
+                ret = NormalizeIpAddr(
+                    AF_INET, strVal, strNormVal );
+
+                if( SUCCEEDED( ret ) )
+                    oCfg[ propIpAddr ] = strNormVal;
+                else
+                    ret = 0;
+            }
+
+            if( oObjElem.isMember( JSON_ATTR_TCPPORT ) &&
+                oObjElem[ JSON_ATTR_TCPPORT ].isString() )
+            {
+                strVal = oObjElem[ JSON_ATTR_TCPPORT ].asString(); 
+                if( !strVal.empty() )
+                {
+                    guint32 dwVal = std::strtol(
+                        strVal.c_str(), nullptr, 10 );
+                    if( dwVal > 0 && dwVal < 0x10000 )
+                        oCfg[ propSrcTcpPort ] = dwVal;
+                }
             }
 
             if( oObjElem.isMember( JSON_ATTR_PROXY_PORTID ) &&
@@ -4005,6 +4018,9 @@ gint32 CRpcServices::RunManagedTask(
 
     if( ptrTask.IsEmpty() )
         return -EINVAL;
+
+    if( !IsConnected() )
+        return ERROR_STATE;
 
     gint32 ret = 0;
     if( bRoot )
@@ -5373,8 +5389,28 @@ gint32 CInterfaceServer::BroadcastEvent(
     gint32 ret = 0;
     do{
 
-        CParamList oRespCfg;
+        // NOTE: if the connection is gone, we can
+        // only stop the keep-alive heart beat
+        // here, but the invoke request is still
+        // in process.
+        string strVal;
+        CReqOpener oReq( pReqCall );
+        ret = oReq.GetDestination( strVal );
+        if( SUCCEEDED( ret ) )
+        {
+            SvrConnPtr pConnMgr = GetConnMgr();
+            if( !pConnMgr.IsEmpty() )
+            {
+                ret = pConnMgr->CanResponse( strVal );
+                if( ret == ERROR_FALSE )
+                {
+                    ret = -ENOTCONN;
+                    break;
+                }
+            }
+        }
 
+        CParamList oRespCfg;
         CfgPtr pRespCfg = oRespCfg.GetCfg();
         if( pRespCfg.IsEmpty() )
         {
@@ -5390,7 +5426,6 @@ gint32 CInterfaceServer::BroadcastEvent(
 
         if( SUCCEEDED( ret ) )
         {
-            CReqOpener oReq( pReqCall );
             if( oReq.HasReply() )
             {
                 CCfgOpener oCfg(
@@ -5507,21 +5542,6 @@ gint32 CInterfaceServer::OnKeepAliveOrig(
         okaReq.SetSender( strVal );
 
         strVal = pMsg.GetSender( );
-
-        // NOTE: if the connection is gone, we can
-        // only stop the keep-alive heart beat
-        // here, but the invoke request is still
-        // in process.
-        SvrConnPtr pConnMgr = GetConnMgr();
-        if( !pConnMgr.IsEmpty() )
-        {
-            ret = pConnMgr->CanResponse( strVal );
-            if( ret == ERROR_FALSE )
-            {
-                ret = -ENOTCONN;
-                break;
-            }
-        }
 
         okaReq.SetDestination( strVal );
 
@@ -5771,8 +5791,8 @@ bool CInterfaceServer::IsConnected(
 
     if( szDestAddr != nullptr )
     {
-        gint32 ret = m_pConnMgr->CanResponse(
-            szDestAddr );
+        gint32 ret = m_pConnMgr->
+            CanResponse( szDestAddr );
         if( ret == ERROR_FALSE )
             return false;
     }
@@ -5857,12 +5877,11 @@ gint32 CInterfaceServer::StartRecvMsg(
     IEventSink* pCompletion,
     IMessageMatch* pMatch )
 {
-    CMessageMatch* pMsgMatch = static_cast
-        < CMessageMatch* >( pMatch );
-
-    string strIfName;
-    pMsgMatch->GetIfName( strIfName );
-    if( !IsConnected( strIfName.c_str() ) )
+    // CMessageMatch* pMsgMatch = static_cast
+    //     < CMessageMatch* >( pMatch );
+    // string strIfName;
+    // pMsgMatch->GetIfName( strIfName );
+    if( !IsConnected() )
         return ERROR_STATE;
 
     return super::StartRecvMsg(

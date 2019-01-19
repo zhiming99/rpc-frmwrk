@@ -1306,6 +1306,12 @@ gint32 CIfTaskGroup::RunTask()
         return STATUS_PENDING;
     }
 
+    CCfgOpener oCfg(
+        ( IConfigDb* )GetConfig() );
+
+    if( oCfg.exist( propNoResched ) )
+        return STATUS_PENDING;
+
     if( !m_vecRetVals.empty() )
     {
         // last task's return value
@@ -1347,11 +1353,9 @@ gint32 CIfTaskGroup::RunTask()
             break;
         }
 
-        CCfgOpener oCfg( ( IConfigDb* )GetConfig() );
-
         // tell this->OnChildComplete not to reschedule
         // this taskgrp because it is running
-        oCfg.SetBoolProp( propNoResched, true );
+        oCfg[ propNoResched ] = true;
 
         // release the lock to avoid nested chain of
         // locking
@@ -1549,7 +1553,7 @@ gint32 CIfTaskGroup::OnCancel(
             return STATUS_PENDING;
         }
 
-        if( GetConfig()->exist( propNoResched ) )
+        if( oCfg.exist( propNoResched ) )
         {
             // RunTask is active
             oTaskLock.Unlock();    
@@ -2063,16 +2067,30 @@ gint32 CIfParallelTaskGrp::OnChildComplete(
 gint32 CIfParallelTaskGrp::RunTask()
 {
     gint32 ret = 0;
+
     CStdRTMutex oTaskLock( GetLock() );
+    if( IsCanceling() )
+    {
+        // canceling is in process, we just quit
+        // quietly
+        return STATUS_PENDING;
+    }
+
+    CCfgOpener oCfg( ( IConfigDb* )GetConfig() );
+    // some other guy is processing the tasks
+    if( oCfg.exist( propNoResched ) )
+        return STATUS_PENDING;
+
+    oCfg[ propNoResched ] = true;
     do{
 
         std::set< TaskletPtr > setTasksToRun;
-        CCfgOpener oCfg( ( IConfigDb* )GetConfig() );
-
-        oCfg[ propNoResched ] = true;
-
         if( !oCfg.exist( propRunning ) )
+        {
+            // this is a one-time flag to indicate the
+            // task group is now scheduled to run.
             oCfg[ propRunning ] = true;
+        }
 
         setTasksToRun = m_setPendingTasks;
 
@@ -2097,12 +2115,19 @@ gint32 CIfParallelTaskGrp::RunTask()
         }
 
         oTaskLock.Lock();
-        ret = oCfg.RemoveProperty( propNoResched );
+
+        if( IsCanceling() )
+        {
+            // don't remove propNoResched here since
+            // the OnCancel has also set it
+            return STATUS_PENDING;
+        }
 
         // new tasks come in
         if( GetPendingCount() > 0 )
             continue;
 
+        ret = oCfg.RemoveProperty( propNoResched );
         // pending means there are tasks running, does
         // not indicate a specific task's return value
         if( GetTaskCount() > 0 )
@@ -2417,8 +2442,11 @@ gint32 CIfParallelTaskGrp::OnCancel(
     dwContext = eventCancelTask;
 
     CStdRTMutex oTaskLock( GetLock() );
-    oCfg[ propNoResched ] = true;
+    if( IsCanceling() )
+        return STATUS_PENDING;
+
     SetCanceling( true );
+    oCfg[ propNoResched ] = true;
 
     do{
         std::vector< TaskletPtr > vecTasks;

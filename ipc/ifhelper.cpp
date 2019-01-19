@@ -102,3 +102,24 @@ void AssignVal( DMsgPtr& rVal, CBuffer& rBuf )
 {
     rVal = ( DMsgPtr& )rBuf;
 }
+
+template< int iInputNum, typename...Types >
+inline void PackOutput(
+    std::vector< BufPtr >& vec, Types&&...args )
+{
+    // note that the last arg is inserted first
+    gint32 iOutputNum = sizeof...( args ) - iInputNum;
+    _DummyClass_::PackExp(
+        ( iOutputNum > vec.size() ? ( vec.insert( vec.begin(), PackageTo( args ) ), 1 ) : 0 ) ... );
+}
+
+template< int iInputNum, typename...Types >
+inline void PackInput(
+    std::vector< BufPtr >& vec, Types&&...args )
+{
+    // note that the last arg is inserted first
+    int iCount = 0;
+    gint32 iOutputNum = sizeof...( args ) - iInputNum;
+    _DummyClass_::PackExp(
+        ( iOutputNum >= iCount++ ? ( vec.insert( vec.begin(), PackageTo( args ) ), 1 ) : 0 ) ... );
+}

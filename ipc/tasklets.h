@@ -758,3 +758,15 @@ class CSyncCallback :
     { return -ENOTSUP; }
 };
 
+class CBusPortStopSingleChildTask
+    : public CThreadSafeTask
+{
+    typedef CThreadSafeTask super;
+    CBusPortStopSingleChildTask( const IConfigDb* pCfg = nullptr )
+        : CThreadSafeTask( pCfg )
+    {
+        SetClassId( clsid( CBusPortStopSingleChildTask ) );
+    }
+    gint32 Process( guint32 dwContext );
+};
+

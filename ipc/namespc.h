@@ -34,7 +34,7 @@
 #define PORT_CLASS_TCP_STREAM_PDO       "TcpStreamPdo"
 #define PORT_CLASS_LOCALDBUS_PDO        "DBusLocalPdo"
 #define PORT_CLASS_LOCALDBUS            "DBusBusPort"
-#define PORT_CLASS_RPC_TCPBUS           "RpcTcpBus"
+#define PORT_CLASS_RPC_TCPBUS           "RpcTcpBusPort"
 #define PORT_CLASS_LOOPBACK_PDO         "DBusLoopbackPdo"
 
 // registry path for event subscription from the
@@ -199,6 +199,7 @@ inline std::string DBUS_OBJ_PATH(
 
 #define SYS_EVENT_KEEPALIVE             "RpcEvt_KeepAlive"
 #define SYS_EVENT_FORWARDEVT            "RpcEvt_ForwardEvent"
+#define SYS_EVENT_RMTSVREVENT           "RpcEvt_RmtSvrEvent"
 
 #define IF_METHOD_ENABLEEVT             "IfReq_EnableEvt"
 #define IF_METHOD_DISABLEEVT            "IfReq_DisableEvt"

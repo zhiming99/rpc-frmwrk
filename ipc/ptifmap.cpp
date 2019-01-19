@@ -74,6 +74,8 @@ gint32 CPortInterfaceMap::AddToHandleMap(
         m_mapIf2Port.insert(
             pair< EventPtr, PortPtr >( evtPtr, portPtr ) );
 
+        m_setHandles.insert( PortToHandle( pPort ) );
+
     }while( 0 );
 
     return ret;
@@ -108,6 +110,7 @@ gint32 CPortInterfaceMap::RemoveFromHandleMap(
         }
         if( bExist1 )
         {
+            m_setHandles.erase( PortToHandle( pPort ) );
             m_mapPort2If.erase( itr1 );
             EPPAIR result2 = m_mapIf2Port.equal_range( evtPtr );
             multimap< EventPtr, PortPtr >::iterator itr2;
@@ -252,6 +255,86 @@ gint32 CPortInterfaceMap::InterfaceExist(
             {
                 pvecVals->push_back( itr->second );
             }
+        }
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CPortInterfaceMap::IsPortNoRef(
+    IPort* pPort, bool& bNoRef ) const
+{
+    if( pPort == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        CStdRMutex a( GetLock() );
+        PortPtr portPtr( pPort );
+        CPEPAIR result = m_mapPort2If.equal_range( portPtr );
+        {
+            multimap< PortPtr, EventPtr >::const_iterator itr;
+            gint32 i = 0;
+            for( itr = result.first; itr != result.second; ++itr, ++i );
+            if( i > 1 )
+            {
+                bNoRef = false;
+                break;
+            }
+            else if( i == 0 )
+            {
+                ret = -ENOENT;
+                break;
+            }
+            else if( ( result.first->second ).IsEmpty() )
+            {
+                bNoRef = true;
+            }
+            else
+            {
+                bNoRef = false;
+            }
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CPortInterfaceMap::PortExist(
+    HANDLE hPort ) const
+{
+    if( hPort == 0 )
+        return -EINVAL;
+
+    gint32 ret = ERROR_FALSE;
+
+    do{
+        CStdRMutex a( GetLock() );
+        if( m_setHandles.find( hPort ) !=
+            m_setHandles.end() )
+            ret = 0;
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CPortInterfaceMap::GetPortPtr(
+    HANDLE hPort, PortPtr& pPort ) const
+{
+    if( hPort == 0 )
+        return -EINVAL;
+
+    gint32 ret = -ENOENT;;
+
+    do{
+        CStdRMutex a( GetLock() );
+        if( m_setHandles.find( hPort ) !=
+            m_setHandles.end() )
+        {
+            pPort = HandleToPort( hPort );
+            ret = 0;
         }
     }while( 0 );
 

@@ -80,7 +80,8 @@ class IInterfaceEvents
 
     virtual gint32 OnRmtSvrEvent(
         EnumEventId iEvent,
-        const std::string& strIpAddr ) = 0;
+        const std::string& strIpAddr,
+        HANDLE hPort ) = 0;
 
     virtual gint32 OnAdminEvent(
         EnumEventId iEvent,
@@ -204,11 +205,7 @@ class CInterfaceState : public IInterfaceState
 
     // subscribe a connection point event
     virtual gint32 GetProperty(
-        gint32 iProp, CBuffer& pVal ) const
-    {
-        CStdRMutex oStatLock( GetLock() );
-        return m_pIfCfgDb->GetProperty( iProp, pVal );
-    }
+        gint32 iProp, CBuffer& pVal ) const;
 
     virtual gint32 SetProperty(
         gint32 iProp, const CBuffer& pVal )
@@ -267,7 +264,8 @@ class CInterfaceState : public IInterfaceState
 
     virtual gint32 OnRmtSvrEvent(
         EnumEventId iEvent,
-        const std::string& strIpAddr )
+        const std::string& strIpAddr,
+        HANDLE hPort )
     {  return -ENOTSUP; }
 
     virtual gint32 Start(
@@ -313,7 +311,8 @@ class CRemoteProxyState : public CLocalProxyState
 
     virtual gint32 OnRmtSvrEvent(
         EnumEventId iEvent,
-        const std::string& strIpAddr );
+        const std::string& strIpAddr,
+        HANDLE hPort );
 };
 
 class CIfServerState : public CInterfaceState

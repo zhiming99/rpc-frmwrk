@@ -169,20 +169,24 @@ gint32 CIfSvrConnMgr::OnDisconn(
 gint32 CIfSvrConnMgr::CanResponse(
     HANDLE hTask )
 {
-    gint32 ret = 0;
-    if( hTask == INVALID_HANDLE )
-        return -EINVAL;
+    gint32 ret = ERROR_FALSE;
+    if( unlikely( hTask == INVALID_HANDLE ) )
+        return ret;
 
-    if( m_pIfSvr == nullptr )
-        return ERROR_STATE;
+    if( unlikely( m_pIfSvr == nullptr ) )
+        return ret;
 
     CStdRMutex oIfLock( m_pIfSvr->GetLock() );
     do{
         if( m_mapTaskStates.find( hTask ) !=
             m_mapTaskStates.end() )
         {
-            if( m_mapTaskStates[ hTask ] == false )
-                ret = ERROR_FALSE;
+            if( m_mapTaskStates[ hTask ] == true )
+                ret = 0;
+        }
+        else
+        {
+            ret = -ENOENT;
         }
 
     }while( 0 );
@@ -195,10 +199,10 @@ gint32 CIfSvrConnMgr::CanResponse(
 gint32 CIfSvrConnMgr::CanResponse(
     const std::string& strSrc )
 {
-    gint32 ret = 0;
+    gint32 ret = ERROR_FALSE;
 
-    if( m_pIfSvr == nullptr )
-        return ERROR_STATE;
+    if( unlikely( m_pIfSvr == nullptr ) )
+        return ret;
 
     CStdRMutex oIfLock( m_pIfSvr->GetLock() );
     do{
@@ -210,8 +214,16 @@ gint32 CIfSvrConnMgr::CanResponse(
             m_mapAddrToTask.end() )
         {
             HANDLE hTask = oRange.first->second;
-            if( m_mapTaskStates[ hTask ] == false )
-                ret = ERROR_FALSE;
+            if( m_mapTaskStates.find( hTask ) ==
+                m_mapTaskStates.end() )
+                break;
+
+            if( m_mapTaskStates[ hTask ] == true )
+                ret = 0;
+        }
+        else
+        {
+            ret = -ENOENT;
         }
 
     }while( 0 );

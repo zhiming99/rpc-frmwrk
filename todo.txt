@@ -87,19 +87,32 @@ DONE    To add support to cancel SendData/FetchData gracefully
 
 DONE    To debug and test the ipc module and write test code
 
-        To dispatch the Remote Server Offline/Online and Remote Module Offline/Online events from the CRpcTcpBridgeProxy to the CRpcReqForwarder
-        To add authentication support to the RPC framework
+        To forward the Remote Server Offline/Online and Remote Module Offline/Online events from the CRpcTcpBridgeProxy to the CRpcReqForwarder
 
         To debug and test the rpc module
-        To add OnCancel and timeout for CReqFwdrOpenRmtPortTask 
+
+        To add OnCancel and timeout for CReqFwdrOpenRmtPortTask and other similiar tasks
         To add CloseRemotePort handler to CRpcReqForwarder
         To complete the stream id addition to all the requests via tcpfido
-        To implement the session manager interface with the following methods
-            . Login, Logout, Ping, PingTimeout,
-            OnModOffline( POLLHUP ), OnRmtSvrOffline( Retry failed )
-        To add a tasklet to complete the router stop gracefully
+
         To implement the reconnect task in CRpcStreamSock
-        To make it configurable whether or not to open the listening socket
-        To make the bridge to map to ipaddr + port number
-        To add the CRpcTcpFido's driver
+
+        To handle OnRmtModOnOffline by removing the match for the specific bridge within the CRpcReqForwarderProxy
+        To handle OnModOnOffline by entering/leaving recovery and forward eventRmtModOffline from CRpcReqForwarderProxy
+        To unload OnRmtSvrOffline after Reconntion failed in both CRpcTcpBridge and CRpcTcpBridgeProxy
+
+        For router to forward OnRmtSvrOffline to CRpcReqForwarderProxy to remove the related matches for the server offline
+        For router to forward OnRmtSvrOffline to CRpcReqForwarder to relay the event to the CDBusProxyPdo
+
+DONE    To unload the CDBusProxyPdo when last interface closed the reference to it.
+DONE    To unload the CTcpStreamPdo when the bridge or bridge proxy has closed the port.
+        To add a tasklet to complete the router stop gracefully
+
+        To implement the session manager interface with the following methods
+            . Login, Logout, Ping, PingTimeout( proxy ), SessionTimeout( server )
+
+
+DONE    To make it configurable whether or not to open the listening socket
+DONE    To make the bridge to map to ipaddr + port number
+DONE    To add the CRpcTcpFido's driver
 

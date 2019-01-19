@@ -201,6 +201,22 @@ class CRegisteredObject
         return 0;
     }
 
+    std::string GetIpAddr()
+    {
+        std::string strIpAddr;
+        CCfgOpener oCfg( this );
+        strIpAddr = oCfg[ propIpAddr ];
+        return strIpAddr;
+    }
+
+    std::string GetUniqName()
+    {
+        std::string strName;
+        CCfgOpener oCfg( this );
+        strName = oCfg[ propSrcUniqName ];
+        return strName;
+    }
+
     // test if the match belongs to this
     // registered interface
     gint32 IsMyMatch( IMessageMatch* pMatch );
@@ -250,6 +266,9 @@ class CRpcInterfaceProxy :
 
     CRpcRouter* GetParent() const
     { return m_pParent; }
+
+    virtual bool IsConnected(
+        const char* szAddr = nullptr );
 };
 
 class CRpcInterfaceServer :
@@ -302,6 +321,9 @@ class CRpcInterfaceServer :
     CRpcInterfaceServer( const IConfigDb* pCfg ) :
         super( pCfg )
     {;}
+
+    virtual bool IsConnected(
+        const char* szAddr = nullptr );
 
     virtual gint32 DoInvoke(
         DBusMessage* pReqMsg,
@@ -426,6 +448,25 @@ class CRpcReqForwarder :
         IMessageMatch* pMatch,
         bool bEnable );
 
+    gint32 OnRmtSvrOnline(
+        const std::string& strIpAddr,
+        HANDLE hPort );
+
+    gint32 OnRmtSvrOffline(
+        const std::string& strIpAddr,
+        HANDLE hPort );
+
+    gint32 BuildBufForIrpRmtSvrEvent(
+        BufPtr& pBuf, IConfigDb* pReqCall );
+
+    virtual gint32 OnRmtSvrEvent(
+        EnumEventId iEvent,
+        const std::string& strIpAddr,
+        HANDLE hPort );
+
+    virtual gint32 BuildBufForIrp(
+        BufPtr& pBuf, IConfigDb* pReqCall );
+
     public:
 
     typedef CRpcInterfaceServer super;
@@ -444,6 +485,10 @@ class CRpcReqForwarder :
         const std::string& strIpAddr,
         const std::string& strSrcUniqName,
         const std::string& strSrcDBusName );
+
+    gint32 ClearRefCountByAddr(
+        const std::string& strIpAddr,
+        std::vector< std::string > vecUniqNames );
 
     virtual const EnumClsid GetIid() const
     { return iid( CRpcReqForwarder ); }
@@ -507,6 +552,7 @@ class CRpcReqForwarder :
         guint32 dwOffset,               // [in]
         guint32 dwSize,                 // [in]
         IEventSink* pCallback );
+
 };
 
 class CRpcRfpForwardEventTask
@@ -538,6 +584,7 @@ class CRpcReqForwarderProxy :
 
     virtual gint32 RebuildMatches();
 
+    using IFREF = std::pair< gint32, gint32 >;
     std::map< MatchPtr, std::pair< gint32, gint32 > > m_mapMatchRefs;
 
     public:
@@ -1045,7 +1092,6 @@ class CRpcTcpBridgeProxy :
 
     virtual gint32 InitUserFuncs();
 
-    gint32 OnRmtSvrOffline( IEventSink* pCallback );
     gint32 OnRmtModOffline( IEventSink* pCallback,
         const std::string& strModName );
 
@@ -1063,26 +1109,47 @@ class CRpcTcpBridgeProxy :
         guint64 iTaskId );
 };
 
+class CRouterStopBridgeProxyTask
+    : public CIfInterceptTaskProxy
+{
+    public:
+    typedef CIfInterceptTaskProxy super;
+    CRouterStopBridgeProxyTask( const IConfigDb* pCfg )
+        : CIfInterceptTaskProxy( pCfg )
+    {
+        SetClassId( clsid( CRouterStopBridgeProxyTask ) );
+    }
+    virtual gint32 RunTask();
+    virtual gint32 OnTaskComplete( gint32 iRetVal );
+    gint32 OnCancel( gint32 dwContext )
+    {  return OnTaskComplete( -ECANCELED ); }
+};
+
+class CRouterStopBridgeTask
+    : public CIfInterceptTaskProxy
+{
+    public:
+    typedef CIfInterceptTaskProxy super;
+    CRouterStopBridgeTask( const IConfigDb* pCfg )
+        : CIfInterceptTaskProxy( pCfg )
+    {
+        SetClassId( clsid( CRouterStopBridgeTask ) );
+    }
+    virtual gint32 RunTask();
+    virtual gint32 OnTaskComplete( gint32 iRetVal );
+    gint32 OnCancel( gint32 dwContext )
+    {  return OnTaskComplete( -ECANCELED ); }
+};
+
 class CRpcRouter :
     public virtual CAggInterfaceServer
 {
-    // pair::first is the Proxy interface over the
-    // CTcpStreamPdo
-    //
-    // pair::second is the server interface over
-    // the CTcpStreamPdo
-    typedef std::pair< InterfPtr, InterfPtr > NetIfPair;
-
-    // pair::first is the ip-addr, and the
-    // pair::second is the reference count
-    typedef std::pair< std::string, gint32 > IfReference;
-
     // the key is the peer ip-addr and the value is the
     // pair of the tcp bridge and tcp bridge proxy
     std::map< std::string, InterfPtr > m_mapIp2BdgeProxies;
 
     // the key is the peer ip-addr plus peer port-number
-    std::map< std::string, InterfPtr > m_mapIp2Bdge;
+    std::map< guint32, InterfPtr > m_mapPortId2Bdge;
 
     // local registered matches
     // to check the validity of the outgoing requests
@@ -1110,11 +1177,6 @@ class CRpcRouter :
     mutable stdrmutex   m_oLock;
     std::vector< EnumPropId >   m_vecTopicList;
 
-    gint32 GetBridgeIfInternal(
-        const std::string& strIpAddr,
-        InterfPtr& pIf,
-        bool bProxy );
-
     gint32 StartStopReqFwdrProxy(
         ObjPtr& pIf,
         IMessageMatch* pMatch,
@@ -1122,6 +1184,7 @@ class CRpcRouter :
         bool bStart );
 
     guint32 m_dwRole;
+
     public:
 
     typedef std::pair< std::multimap<MatchPtr, std::string>::iterator,
@@ -1172,6 +1235,9 @@ class CRpcRouter :
     gint32 RemoveLocalMatch(
         IMessageMatch* pMatch );
 
+    gint32 RemoveLocalMatchByAddr(
+        const std::string& strIpAddr );
+
     gint32 AddRemoteMatch(
         IMessageMatch* pMatch,
         IEventSink* pCallback );
@@ -1180,8 +1246,11 @@ class CRpcRouter :
         IMessageMatch* pMatch,
         IEventSink* pCallback );
 
+    gint32 RemoveRemoteMatchByPortId(
+        guint32 dwPortId );
+
     gint32 GetBridge(
-        const std::string& strIpAddr,
+        guint32 dwPortId,
         InterfPtr& pIf );
 
     gint32 GetBridgeProxy(
@@ -1195,11 +1264,18 @@ class CRpcRouter :
         return 0;
     }
 
-    gint32 AddBridgeIf( 
-        const std::string& strIpAddr,
-        IGenericInterface* pIf,
-        bool bProxy );
+    gint32 AddBridge( 
+        IGenericInterface* pIf );
+
+    gint32 RemoveBridge( 
+        IGenericInterface* pIf );
+
+    gint32 AddBridgeProxy( 
+        IGenericInterface* pIf );
         
+    gint32 RemoveBridgeProxy( 
+        IGenericInterface* pIf );
+
     gint32 StartReqFwdr(
         InterfPtr& pReqFwder,
         IEventSink* pCallback );
@@ -1217,21 +1293,6 @@ class CRpcRouter :
     gint32 UnsubscribeEvents();
 
     gint32 Start();
-
-    gint32 OnEvent( EnumEventId iEvent,
-        guint32 dwParam1,
-        guint32 dwParam2,
-        guint32* pData );
-
-    gint32 OnRmtSvrOnline(
-        EnumEventId iEvent,
-        const std::string& strIpAddr,
-        IPort* pPort );
-
-    gint32 OnRmtSvrOffline(
-        EnumEventId iEvent,
-        const std::string& strIpAddr,
-        IPort* pPort );
 
     // filter the request with the remote side
     // match table. The req cannot make to the
@@ -1324,6 +1385,19 @@ class CRpcRouter :
         return ret;
     }
 
+    gint32 OnRmtSvrOnline(
+        const std::string& strIpAddr,
+        HANDLE hPort );
+
+    gint32 OnRmtSvrOffline(
+        const std::string& strIpAddr,
+        HANDLE hPort );
+
+    virtual gint32 OnRmtSvrEvent(
+        EnumEventId iEvent,
+        const std::string& strIpAddr,
+        HANDLE hPort );
+
     public:
     inline gint32 GetReqFwdrProxy(
         IMessageMatch* pMatch,
@@ -1383,6 +1457,22 @@ class CRpcRouter :
     gint32 OnPreStop( IEventSink* pCallback );
 };
 
+class CReqFwdrCloseRmtPortTask
+    : public CIfInterceptTaskProxy
+{
+    public:
+    typedef CIfInterceptTaskProxy super;
+    CReqFwdrCloseRmtPortTask( const IConfigDb* pCfg )
+        : CIfInterceptTaskProxy( pCfg )
+    {
+        SetClassId( clsid( CReqFwdrCloseRmtPortTask ) );
+    }
+    virtual gint32 RunTask();
+    virtual gint32 OnTaskComplete( gint32 iRetVal );
+    gint32 OnCancel( gint32 dwContext )
+    {  return 0; }
+};
+
 class CReqFwdrOpenRmtPortTask 
     : public CIfInterceptTaskProxy
 {
@@ -1427,7 +1517,8 @@ class CReqFwdrOpenRmtPortTask
                     ( IConfigDb* )GetConfig() );
                 bool bProxy = false;
                 ObjPtr pObj;
-                gint32 ret = oCfg.GetObjPtr(
+
+                ret = oCfg.GetObjPtr(
                     propIfPtr, pObj );
                 if( ERROR( ret ) )
                     bProxy = true;
@@ -1460,6 +1551,7 @@ class CReqFwdrOpenRmtPortTask
     }
     virtual gint32 RunTask();
     virtual gint32 OnTaskComplete( gint32 iRetVal );
+    gint32 OnCancel( gint32 dwContext );
 };
 
 class CRouterOpenRmtPortTask :
@@ -1552,10 +1644,10 @@ class CReqFwdrEnableRmtEventTask :
 };
 
 class CBridgeAddRemoteMatchTask :
-    public CIfInterceptTask
+    public CIfInterceptTaskProxy
 {
     public:
-    typedef CIfInterceptTask super;
+    typedef CIfInterceptTaskProxy super;
 
     // parameters:
     // 0: bAdd
@@ -1879,19 +1971,4 @@ DECLARE_AGGREGATED_PROXY(
     CRpcTcpBridgeProxyImpl,
     CRpcTcpBridgeProxy,
     CStatCountersProxy );
-
-class _DummyClass_
-{
-    static void PackExp( ... )
-    { return; }
-};
-
-template< typename...Types >
-inline CfgPtr PackParams( Types&&...args )
-{
-    gint32 ret = 0;
-    CParamList oParams;
-    _DummyClass_::PackExp( oParams.Push( args )... );
-    return oParams.GetCfg();
-}
 

@@ -1099,6 +1099,17 @@ class CRouterRemoteMatch : public CMessageMatch
             if( ERROR( ret ) )
                 break;
 
+            ret = oCfg.CopyProp( propSrcTcpPort, pMatch );
+            if( ERROR( ret ) )
+                break;
+
+            if( GetClsid() == clsid( CRouterRemoteMatch ) )
+            {
+                ret = oCfg.CopyProp( propPortId, pMatch );
+                if( ERROR( ret ) )
+                    break;
+            }
+
         }while( 0 );
 
         return ret;
@@ -1108,17 +1119,17 @@ class CRouterRemoteMatch : public CMessageMatch
     {
         std::string strAll = super::ToString();
 
-        std::string strIpAddr;
         CCfgOpenerObj oCfg( this );
 
-        gint32 ret = oCfg.GetStrProp(
-            propIpAddr, strIpAddr );
+        guint32 dwPortId = 0;
+        gint32 ret = oCfg.GetIntProp(
+            propPortId, dwPortId );
 
         if( ERROR( ret ) )
-            return "";
+            return strAll;
 
-        strAll += ",IpAddr=";
-        strAll += strIpAddr; 
+        strAll += ",PortId=";
+        strAll += std::to_string( dwPortId );
 
         std::string strValue;
         oCfg.GetStrProp(
@@ -1257,10 +1268,22 @@ class CRouterLocalMatch : public CRouterRemoteMatch
 
     std::string ToString() const
     {
-        std::string strAll = super::ToString();
+        std::string strAll = super::super::ToString();
 
         std::string strValue;
         CCfgOpenerObj oCfg( this );
+
+        oCfg.GetStrProp(
+            propIpAddr, strValue );
+
+        strAll += ",IpAddr=";
+        strAll += strValue;
+
+        oCfg.GetStrProp(
+            propDestDBusName, strValue );
+
+        strAll += ",Destination=";
+        strAll += strValue;
 
         oCfg.GetStrProp(
             propSrcDBusName, strValue );

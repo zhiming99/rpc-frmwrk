@@ -27,6 +27,7 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include "reqopen.h"
+#include "jsondef.h"
 
 using namespace std;
 
@@ -37,9 +38,104 @@ CRpcTcpBusPort::CRpcTcpBusPort(
     SetClassId( clsid( CRpcTcpBusPort ) );
 }
 
+void CRpcTcpBusPort::AddPdoPort(
+        guint32 iPortId, PortPtr& portPtr )
+{
+    super::AddPdoPort( iPortId, portPtr );
+    CCfgOpenerObj oPortCfg(
+        ( CObjBase* )portPtr );
+
+    gint32 ret = 0;
+    do{
+        string strIpAddr;
+
+        ret = oPortCfg.GetStrProp(
+            propIpAddr, strIpAddr );
+
+        if( ERROR( ret ) )
+            break;
+
+        guint32 dwPortNum = 0;
+        ret = oPortCfg.GetIntProp(
+            propDestTcpPort, dwPortNum );
+
+        if( ERROR( ret ) )
+            dwPortNum = 0;
+
+        BindPortIdAndAddr( iPortId,
+            PDOADDR( strIpAddr, dwPortNum ) );
+
+    }while( 0 );
+
+    ( ret == 0 );
+}
+
+gint32 CRpcTcpBusPort::GetPdoAddr(
+    guint32 dwPortId, PDOADDR& oAddr )
+{
+    std::map< guint32, PDOADDR >::iterator
+        itr = m_mapIdToAddr.find( dwPortId );
+    if( itr == m_mapIdToAddr.end() )
+        return -ENOENT;
+    oAddr = itr->second;
+    return 0;
+}
+
+gint32 CRpcTcpBusPort::GetPortId(
+    PDOADDR& oAddr, guint32& dwPortId )
+{
+    std::map< PDOADDR, guint32 >::iterator
+        itr = m_mapAddrToId.find( oAddr );
+    if( itr == m_mapAddrToId.end() )
+        return -ENOENT;
+
+    dwPortId = itr->second;
+    return 0;
+}
+
+gint32 CRpcTcpBusPort::BindPortIdAndAddr(
+    guint32 dwPortId, PDOADDR oAddr )
+{
+    m_mapAddrToId[ oAddr ] = dwPortId;
+    m_mapIdToAddr[ dwPortId ] = oAddr;
+    return 0;
+}
+
+gint32 CRpcTcpBusPort::RemovePortId(
+    guint32 dwPortId )
+{
+    PDOADDR oAddr;
+    gint32 ret = GetPdoAddr( dwPortId, oAddr );
+    if( ERROR( ret ) )
+        return ret;
+
+    m_mapAddrToId.erase( oAddr );
+    m_mapIdToAddr.erase( dwPortId );
+    return 0;
+}
+
+gint32 CRpcTcpBusPort::RemovePortAddr(
+    PDOADDR& oAddr )
+{
+    guint32 dwPortId = 0;
+    gint32 ret = GetPortId( oAddr, dwPortId );
+    if( ERROR( ret ) )
+        return ret;
+
+    m_mapAddrToId.erase( oAddr );
+    m_mapIdToAddr.erase( dwPortId );
+    return 0;
+}
+void CRpcTcpBusPort::RemovePdoPort(
+        guint32 iPortId )
+{
+    super::RemovePdoPort( iPortId );
+    RemovePortId( iPortId );
+}
+
 gint32 CRpcTcpBusPort::BuildPdoPortName(
-    const IConfigDb* pCfg,
-    string& strPortName ) const
+    IConfigDb* pCfg,
+    string& strPortName )
 {
     if( pCfg == nullptr )
         return -EINVAL;
@@ -75,8 +171,26 @@ gint32 CRpcTcpBusPort::BuildPdoPortName(
             break;
         }
 
-        if( pCfg->exist( propIpAddr ) )
+        guint32 dwPortId = ( guint32 )-1;
+        if( pCfg->exist( propPortId ) )
         {
+            ret = oCfgOpener.GetIntProp(
+                propPortId, dwPortId ) ;
+
+            if( ERROR( ret ) )
+                dwPortId = ( guint32 )-1;
+        }
+
+        if( dwPortId != ( guint32 )-1 )
+        {
+            // server side
+            strPortName = strClass + "_" +
+                std::to_string( dwPortId );
+            break;
+        }
+        else if( pCfg->exist( propIpAddr ) )
+        {
+            // proxy side
             // ip addr must exist
             string strIpAddr, strRet;
 
@@ -86,13 +200,28 @@ gint32 CRpcTcpBusPort::BuildPdoPortName(
             if( ERROR( ret ) )
                 break;
 
-            ret = Ip4AddrToByteStr(
-                strIpAddr, strRet );
+            guint32 dwPortNum;
+            ret = oCfgOpener.GetIntProp(
+                propSrcTcpPort, dwPortNum );
 
             if( ERROR( ret ) )
                 break;
 
-            strPortName = strClass + "_" + strRet;
+            PDOADDR oAddr( strIpAddr, dwPortNum );
+            std::map< PDOADDR, guint32 >::iterator
+                itr = m_mapAddrToId.find( oAddr );
+            
+            if( itr != m_mapAddrToId.end() )
+            {
+                dwPortId = itr->second;
+            }
+            else
+            {
+                dwPortId = NewPdoId();
+            }
+            oCfgOpener[ propPortId ] = dwPortId;
+            strPortName = strClass + "_" +
+                std::to_string( dwPortId );
         }
         else
         {
@@ -210,6 +339,35 @@ gint32 CRpcTcpBusPort::CreateTcpStreamPdo(
     return ret;
 }
 
+gint32 CRpcTcpBusPort::LoadPortOptions(
+    IConfigDb* pCfg )
+{
+    if( pCfg == nullptr )
+        return -EINVAL;
+
+    gint32 ret = -ENOENT;
+    do{
+        CIoManager* pMgr = GetIoMgr();
+
+        guint32 dwRole = 0;
+
+        ret = pMgr->GetCmdLineOpt(
+            propRouterRole, dwRole );
+
+        if( ERROR( ret ) )
+            dwRole = 1;
+
+        CCfgOpener oCfg( pCfg );
+        if( dwRole & 0x02 )
+            oCfg[ propListenSock ] = true;
+        else
+            oCfg[ propListenSock ] = false;
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CRpcTcpBusPort::PostStart(
     IRP* pIrp )
 {
@@ -222,15 +380,28 @@ gint32 CRpcTcpBusPort::PostStart(
 
         oCfg.SetPointer( propIoMgr, GetIoMgr() );
 
-        ret = m_pListenSock.NewObj(
-            clsid( CRpcListeningSock ), pCfg );
+        LoadPortOptions( pCfg );
 
-        if( ERROR( ret ) )
-            break;
+        oCfg.CopyProp( propIpAddr, this );
+        oCfg.CopyProp( propSrcTcpPort, this );
 
-        ret = m_pListenSock->Start();
-        if( ERROR( ret ) )
-            break;
+        bool bListening = false;
+
+        if( oCfg.exist( propListenSock ) )
+            bListening = oCfg[ propListenSock ];
+
+        if( bListening )
+        {
+            ret = m_pListenSock.NewObj(
+                clsid( CRpcListeningSock ), pCfg );
+
+            if( ERROR( ret ) )
+                break;
+
+            ret = m_pListenSock->Start();
+            if( ERROR( ret ) )
+                break;
+        }
 
         ret = super::PostStart( pIrp );
         if( ERROR( ret ) )
@@ -335,27 +506,28 @@ gint32 CRpcTcpBusPort::OnNewConnection(
             break;
         }
 
-        string strPortId;
-        ret = Ip4AddrToByteStr(
-            strSrcIp, strPortId );
+        guint32 dwPortNum =
+            ntohs( oAddr.sin_port );
+
+        guint32 dwPortId = NewPdoId();
 
         if( ERROR( ret ) )
             break;
 
-        ret = oCfg.SetStrProp(
-            propPortId, strPortId );
-
-        if( ERROR( ret ) )
-            break;
-
-        ret = oCfg.SetStrProp(
-            propSrcIpAddr, strSrcIp );
+        ret = oCfg.SetIntProp(
+            propPortId, dwPortId );
 
         if( ERROR( ret ) )
             break;
 
         ret = oCfg.SetStrProp(
             propIpAddr, strSrcIp );
+
+        if( ERROR( ret ) )
+            break;
+
+        ret = oCfg.SetIntProp(
+            propSrcTcpPort, dwPortNum );
 
         if( ERROR( ret ) )
             break;
@@ -504,13 +676,13 @@ gint32 CTcpStreamPdo::PostStart(
         CParamList oParams;
 
         ret = oParams.CopyProp(
-            propDestIpAddr, this );
+            propIpAddr, this );
 
         if( ERROR( ret ) )
             break;
 
         ret = oParams.CopyProp(
-            propSrcIpAddr, this );
+            propSrcTcpPort, this );
 
         if( ERROR( ret ) )
             break;
@@ -1281,7 +1453,7 @@ gint32 CTcpStreamPdo::FireRmtModEvent(
             }
 
             ret = oCfg.GetStrProp(
-                propDestIpAddr, strIpAddr );
+                propIpAddr, strIpAddr );
 
             if( ERROR( ret ) )
                 break;
@@ -1319,7 +1491,7 @@ gint32 CTcpStreamPdo::FireRmtSvrEvent(
             CCfgOpenerObj oCfg( this );
 
             ret = oCfg.GetStrProp(
-                propDestIpAddr, strIpAddr );
+                propIpAddr, strIpAddr );
 
             if( ERROR( ret ) )
                 break;
@@ -1327,8 +1499,7 @@ gint32 CTcpStreamPdo::FireRmtSvrEvent(
             // pass on this event to the pnp manager
             CEventMapHelper< CPort > oEvtHelper( this );
             oEvtHelper.BroadcastEvent(
-                eventConnPoint,
-                iEvent,
+                eventConnPoint, iEvent,
                 ( guint32 )strIpAddr.c_str(),
                 ( guint32* )PortToHandle( this ) );
 

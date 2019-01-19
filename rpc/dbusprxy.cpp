@@ -25,6 +25,7 @@
 #include "port.h"
 #include "prxyport.h"
 #include "emaphelp.h"
+#include "ifhelper.h"
 
 #define PROXYPDO_CONN_RETRIES       12
 #define PROXYPDO_CONN_INTERVAL      30
@@ -1215,9 +1216,8 @@ gint32 CDBusProxyPdo::PostStart( IRP* pIrp )
     do{
         CCfgOpener matchCfg;
 
-        string strPath =
-            DBUS_OBJ_PATH( MODNAME_RPCROUTER,
-            OBJNAME_REQFWDR );
+        string strPath = DBUS_OBJ_PATH(
+            MODNAME_RPCROUTER, OBJNAME_REQFWDR );
 
         string strIfName =
             DBUS_IF_NAME( IFNAME_REQFORWARDER );
@@ -1518,7 +1518,6 @@ gint32 CDBusProxyPdo::OnRmtSvrOnOffline(
         return -EINVAL;
 
     gint32 ret = 0;
-
     do{
 
         DBusMessageIter itr;
@@ -1604,7 +1603,7 @@ DBusHandlerResult CDBusProxyPdo::PreDispatchMsg(
         {
             string strMember = pMsg.GetMember();
 
-            if( strMember != "OnRmtSvrOnOffline" )
+            if( strMember != SYS_EVENT_RMTSVREVENT )
                 break;
 
             OnRmtSvrOnOffline( pMsg );
@@ -1804,7 +1803,7 @@ gint32 CProxyPdoDisconnectTask::operator()(
         pIrp->SetCallback( this, 0 );
 
         // set a timer
-        pIrp->SetTimer( PORT_START_TIMEOUT_SEC, pMgr );
+        pIrp->SetTimer( PORT_START_TIMEOUT_SEC / 4, pMgr );
 
         // send this irp to the pdo only
         ret = pMgr->SubmitIrpInternal(
@@ -1901,3 +1900,89 @@ gint32 CDBusProxyPdo::OnQueryStop( IRP* pIrp )
     
     return ret;
 }
+
+gint32 CDBusProxyPdo::NotifyRouterOffline()
+{
+    gint32 ret = 0;
+    do{
+        // send this event to the pnp manager
+        CCfgOpenerObj oCfg( this );
+
+        string strIpAddr;
+        ret = oCfg.GetStrProp(
+            propIpAddr, strIpAddr );
+
+        if( ERROR( ret ) )
+            break;
+
+        CEventMapHelper< CPort > oEvtHelper( this );
+        oEvtHelper.BroadcastEvent(
+            eventConnPoint,
+            eventRmtSvrOffline,
+            ( guint32 )strIpAddr.c_str(),
+            ( guint32* )PortToHandle( this ) );
+
+    }while( 0 );
+
+    return ret;
+}
+gint32 CDBusProxyPdo::OnModOnOffline(
+    DBusMessage* pDBusMsg )
+{
+    if( pDBusMsg == nullptr )
+        return -EINVAL;
+
+    gint32 ret = ERROR_NOT_HANDLED;
+
+    do{
+        bool bOnline = false;
+        char* pszModName = nullptr;
+        CDBusError oError;
+        DMsgPtr pMsg( pDBusMsg );
+
+        if( pMsg.GetMember() == "NameOwnerChanged" )
+        {
+            // remote module online/offline
+            char* pszOldOwner = nullptr;
+            char* pszNewOwner = nullptr; 
+
+            if( !dbus_message_get_args(
+                pDBusMsg, oError,
+                DBUS_TYPE_STRING, &pszModName,
+                DBUS_TYPE_STRING, &pszOldOwner,
+                DBUS_TYPE_STRING, &pszNewOwner,
+                DBUS_TYPE_INVALID ) )
+            {
+                ret = oError.Errno();
+                break;
+            }
+
+            if( pszNewOwner[ 0 ] != 0 )
+            {
+                // the name has been assigned to
+                // some process
+                bOnline = true;
+            }
+
+            // do nothing since it should never happen
+            if( bOnline )
+                break;
+
+            string strModName = pszModName;
+            if( m_pMatchFwder->IsMyDest( strModName ) ||
+                m_pMatchFwder->IsMyObjPath( strModName ) )
+            {
+                DEFER_CALL( GetIoMgr(), this,
+                    &CDBusProxyPdo::NotifyRouterOffline );
+            }
+        }
+        else
+        {
+            break;
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+

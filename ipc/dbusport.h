@@ -25,6 +25,11 @@
 
 #define DBUS_HANDLER_RESULT_HALT    ( ( DBusHandlerResult )100 )
 
+gint32 NormalizeIpAddr(
+    gint32 dwProto,
+    const std::string strIn,
+    std::string& strOut );
+
 gint32 Ip4AddrToByteStr(
     const std::string& strIpAddr,
     std::string& strRet );
@@ -350,6 +355,8 @@ class CDBusLocalPdo : public CRpcPdoPort
 
     ~CDBusLocalPdo();
 
+    virtual bool Unloadable()
+    { return false; }
 
     virtual gint32 PostStart( IRP* pIrp );
 
@@ -401,6 +408,9 @@ class CDBusLoopbackPdo : public CRpcPdoPort
 
     virtual DBusHandlerResult PreDispatchMsg(
         gint32 iMsgType, DBusMessage* pMsg );
+
+    virtual bool Unloadable()
+    { return false; }
 };
 
 struct CStartStopPdoCtx
@@ -432,6 +442,11 @@ class CDBusBusPort : public CGenericBusPort
     MatchPtr            m_pMatchLpbkServer;
 
     std::map< std::string, gint32 > m_mapRules;
+
+    using ADDRID_MAP =
+        std::map< std::string, guint32 >;
+
+    std::map< std::string, guint32 > m_mapAddrToId;
 
     gint32 CreateLocalDBusPdo(
         const IConfigDb* pConfig,
@@ -498,12 +513,15 @@ class CDBusBusPort : public CGenericBusPort
         DBusMessage *pMsg, guint32* pdwSerial );
 
     virtual gint32 BuildPdoPortName(
-        const IConfigDb* pCfg,
-        std::string& strPortName ) const;
+        IConfigDb* pCfg,
+        std::string& strPortName );
 
     virtual gint32 CreatePdoPort(
         IConfigDb* pConfig,
         PortPtr& pNewPort );
+
+    virtual void RemovePdoPort(
+            guint32 iPortId );
 
     // the only exit of dbus message out of
     // this application

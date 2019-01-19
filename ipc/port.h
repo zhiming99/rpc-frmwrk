@@ -295,6 +295,8 @@ class CPort : public IPort
 	virtual gint32 CompleteFuncIrp( IRP* pIrp );
 	virtual gint32 CompleteIoctlIrp( IRP* pIrp );
 
+    virtual bool Unloadable()
+    { return true; }
     // method for user code
 	virtual gint32 OnSubmitIrp( IRP* pIrp )
     { return 0; }
@@ -551,21 +553,27 @@ class CGenericBusPort : public CPort
     typedef CPort super;
     CGenericBusPort( const IConfigDb* pCfg );
 
+	virtual gint32 SubmitPnpIrp( IRP* pIrp );
+	virtual gint32 CompletePnpIrp( IRP* pIrp );
+
+    virtual bool Unloadable()
+    { return false; }
+
     // start point of a driver stack buiding
     virtual gint32 OpenPdoPort(
             const IConfigDb* pConfig,
             PortPtr& pNewPort );
 
     virtual gint32 ClosePdoPort(
-            IPort* pPdoPort )
-    { return 0; }
+            PIRP pMasterIrp,
+            IPort* pPdoPort );
 
     virtual gint32 EnumPdoPorts(
             std::vector<PortPtr>& vecPorts );
 
     virtual gint32 BuildPdoPortName(
-            const IConfigDb* pCfg,
-            std::string& strPortName ) const = 0;
+            IConfigDb* pCfg,
+            std::string& strPortName ) = 0;
 
     virtual gint32 CreatePdoPort(
         IConfigDb* pConfig,
@@ -574,10 +582,11 @@ class CGenericBusPort : public CPort
     inline guint32  NewPdoId()
     { return m_atmPdoId++; }
 
-    void AddPdoPort(
-            guint32 iPortId, PortPtr& portPtr );
+    virtual void AddPdoPort(
+            guint32 iPortId,
+            PortPtr& portPtr );
 
-    void RemovePdoPort(
+    virtual void RemovePdoPort(
             guint32 iPortId );
 
     gint32 GetPdoPort(

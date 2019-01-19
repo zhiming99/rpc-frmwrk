@@ -31,7 +31,60 @@
 
 using namespace std;
 
+gint32 NormalizeIpAddr(
+    gint32 dwProto,
+    const std::string strIn,
+    std::string& strOut )
+{
+    if( dwProto != AF_INET &&
+        dwProto != AF_INET6 )
+        return -EINVAL;
 
+    gint32 ret = 0;
+    do{
+        if( dwProto == AF_INET )
+        {
+            in_addr oAddr;
+            ret = inet_aton(
+                strIn.c_str(), &oAddr );
+            if( ret == 0 )
+            {
+                ret = -EINVAL;
+                break;
+            }
+            strOut = inet_ntoa( oAddr );
+            break;
+        }
+        else
+        {
+            in6_addr oAddr;
+            ret = inet_pton( AF_INET6,
+                strIn.c_str(), &oAddr );
+            if( ret == 0 )
+            {
+                ret = -EINVAL;
+                break;
+            }
+            else if( ret == -1 )
+            {
+                ret = -errno;
+                break;
+            }
+            char szBuf[ INET6_ADDRSTRLEN ] = { 0 };
+            if( nullptr == inet_ntop( AF_INET6, &oAddr,
+                szBuf, sizeof( szBuf ) ) )
+            {
+                ret = -errno;
+                break;
+            }
+            strOut = szBuf;
+            break;
+        }
+
+    }while( 0 );
+
+    return ret;
+}
 gint32 Ip4AddrToBytes(
     const string& strIpAddr,
     guint8* pBytes,
@@ -207,8 +260,8 @@ CDBusBusPort::~CDBusBusPort()
 }
 
 gint32 CDBusBusPort::BuildPdoPortName(
-    const IConfigDb* pCfg,
-    string& strPortName ) const
+    IConfigDb* pCfg,
+    string& strPortName )
 {
     gint32 ret = 0;
     if( pCfg == nullptr )
@@ -220,7 +273,7 @@ gint32 CDBusBusPort::BuildPdoPortName(
         {
             // port name is composed in the following
             // format:
-            // <PortClassName> + "_" + <IPADDR in hex>
+            // <PortClassName> + "_" + <PortId>
             string strClass;
             ret = oCfgOpener.GetStrProp(
                 propPortClass, strClass );
@@ -237,25 +290,36 @@ gint32 CDBusBusPort::BuildPdoPortName(
                 ret = -EINVAL;
                 break;
             }
-            if( strClass == PORT_CLASS_DBUS_PROXY_PDO
-                && pCfg->exist( propIpAddr ) )
+            if( strClass == PORT_CLASS_DBUS_PROXY_PDO )
             {
-                // ip addr must exist
-                string strIpAddr, strRet;
+                guint32 dwPortId = ( guint32 )-1;
+                if( pCfg->exist( propPortId ) )
+                {
+                    dwPortId = oCfgOpener[ propPortId ];
+                }
+                if( dwPortId == ( guint32 )-1 )
+                {
+                    string strIpAddr, strRet;
 
-                ret = oCfgOpener.GetStrProp(
-                    propIpAddr, strIpAddr );
+                    ret = oCfgOpener.GetStrProp(
+                        propIpAddr, strIpAddr );
+                    if( ERROR( ret ) )
+                        break;
 
-                if( ERROR( ret ) )
-                    break;
-
-                ret = Ip4AddrToByteStr(
-                    strIpAddr, strRet );
-
-                if( ERROR( ret ) )
-                    break;
-
-                strPortName = strClass + "_" + strRet;
+                    ADDRID_MAP::const_iterator itr =
+                        m_mapAddrToId.find( strIpAddr );
+                    if( itr != m_mapAddrToId.end() )
+                    {
+                        dwPortId = itr->second;
+                    }
+                    else
+                    {
+                        dwPortId = NewPdoId();
+                    }
+                }
+                oCfgOpener[ propPortId ] = dwPortId;
+                strPortName = strClass + "_" +
+                    std::to_string( dwPortId );
             }
             else if( strClass == PORT_CLASS_LOCALDBUS_PDO
                 || strClass == PORT_CLASS_LOOPBACK_PDO )
@@ -368,38 +432,17 @@ gint32 CDBusBusPort::CreateRpcProxyPdo(
     gint32 ret = 0;
     do{
         string strPortName;
-        guint32 dwPortId = 0;
 
         CCfgOpener oExtCfg;
         *oExtCfg.GetCfg() = *pCfg;
-
-        string strIpAddr;
-        ret = oExtCfg.GetStrProp(
-            propIpAddr, strIpAddr );
-
-        if( ERROR( ret ) )
-            break;
-
-        guint8 arrBuf[ MAX_IPADDR_SIZE * 2 ] = { 0 };
-        guint8* pBuf = arrBuf;
-        guint32 dwSize = sizeof( arrBuf );
-
-        ret = Ip4AddrToBytes(
-            strIpAddr, arrBuf, dwSize );
-
-        if( ERROR( ret ) )
-            break;
-
-        dwPortId = *( guint32* )( pBuf );
-        oExtCfg[ propPortId ] = dwPortId;
-
-        // verify if the port already exists
-        if( this->PortExist( dwPortId ) )
+        guint32 dwPortId = 0;
+        if( !oExtCfg.exist( propPortId ) )
         {
-            ret = -EEXIST;
+            ret = -EINVAL;
             break;
         }
 
+        dwPortId = oExtCfg[ propPortId ];
         oExtCfg.SetIntProp( propDBusConn,
             ( guint32 )m_pDBusConn );
 
@@ -407,11 +450,29 @@ gint32 CDBusBusPort::CreateRpcProxyPdo(
             clsid( CDBusProxyPdo ),
             oExtCfg.GetCfg() );
 
+        if( SUCCEEDED( ret ) )
+        {
+            std::string strIpAddr; 
+            oExtCfg.GetStrProp(
+                propIpAddr, strIpAddr );
+
+            // bind the ip addr and the port-id
+            std::map< std::string, guint32 >::iterator
+                itr = m_mapAddrToId.find( strIpAddr );
+            if( itr != m_mapAddrToId.end() )
+            {
+                if( itr->second != dwPortId )
+                {
+                    ret = -EEXIST;
+                    break;
+                }
+            }
+            m_mapAddrToId[ strIpAddr ] = dwPortId;
+        }
         // the pdo port `Start()' will be deferred
         // till the complete port stack is built.
         //
         // And well, we are done here
-
     }while( 0 );
 
     return ret;
@@ -433,7 +494,7 @@ gint32 CDBusBusPort::CreateLocalDBusPdo(
         *oExtCfg.GetCfg() = *pCfg;
 
         if( this->PortExist( dwPortId ) )
-            dwPortId = NewPdoId();
+            return -EEXIST;
 
         // must-have properties in creation
         if( dwPortId > 0 )
@@ -979,32 +1040,6 @@ gint32 CDBusBusPort::Stop( IRP *pIrp )
 gint32 CDBusBusPort::GetChildPorts(
         vector< PortPtr >& vecChildPorts )
 {
-    /*PortPtr pPort;
-    PortPtr pLpbkPort;
-
-    gint32 ret = GetPdoPort(
-        m_iLocalPortId, pPort );
-
-    if( SUCCEEDED( ret ) )
-        vecChildPorts.push_back( pPort );
-
-    ret = GetPdoPort( m_iLpbkPortId, pLpbkPort );
-
-    // add the local dbus port
-    if( SUCCEEDED( ret ) )
-        vecChildPorts.push_back( pLpbkPort );
-
-    ret = 0;
-
-    for( guint32 i = 0; i < m_vecProxyPortIds.size(); i++ )
-    {
-        gint32 pid = m_vecProxyPortIds[ i ];
-        ret = GetPdoPort( pid, pPort );
-        if( ERROR( ret ) )
-            continue;
-
-        vecChildPorts.push_back( pPort );
-    }*/
     return super::GetChildPorts( vecChildPorts );
 }
 
@@ -2168,6 +2203,29 @@ gint32 CDBusBusPort::IsDBusSvrOnline(
     }while( 0 );
 
     return ret;
+}
+
+void CDBusBusPort::RemovePdoPort(
+        guint32 iPortId )
+{
+    PortPtr pPort;
+    gint32 ret = GetPdoPort( iPortId, pPort );
+    if( ERROR( ret ) )
+        return;
+
+    super::RemovePdoPort( iPortId );
+
+    CCfgOpenerObj oPortCfg(
+        ( IPort* )pPort );
+
+    string strAddr;
+    ret = oPortCfg.GetStrProp(
+        propIpAddr, strAddr );
+
+    if( ERROR( ret ) )
+        return;
+
+    m_mapAddrToId.erase( strAddr );
 }
 
 CDBusConnFlushTask::CDBusConnFlushTask(

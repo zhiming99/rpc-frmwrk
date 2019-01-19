@@ -49,6 +49,7 @@
 #define JSON_ATTR_BUSNAME       "BusName"
 #define JSON_ATTR_PORTID        "PortId"
 #define JSON_ATTR_IPADDR        "IpAddress"
+#define JSON_ATTR_TCPPORT       "PortNumber"
 #define JSON_ATTR_PROXY_PORTID        "ProxyPortId"
 #define JSON_ATTR_PROXY_PORTCLASS     "ProxyPortClass"
 #define JSON_ATTR_SVRNAME       "ServerName"

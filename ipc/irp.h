@@ -136,6 +136,9 @@
 #define IRP_MN_PNP_QUERY_STOP           0x03
 #define IRP_MN_PNP_REATTACH             0x04
 
+// stop a single child pdo port stack of the bus port
+#define IRP_MN_PNP_STOP_CHILD           0x05
+
 // immdiate commands
 // port stack management
 #define IRP_MN_PNP_STACK_BUILT          0x04

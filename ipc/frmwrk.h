@@ -261,6 +261,7 @@ class CPortInterfaceMap : public CObjBase
 {
     std::multimap< PortPtr, EventPtr > m_mapPort2If;
     std::multimap< EventPtr, PortPtr > m_mapIf2Port;
+    std::set< HANDLE > m_setHandles;
     std::recursive_mutex m_oLock;
 
     typedef std::pair< std::multimap<PortPtr, EventPtr>::iterator,
@@ -284,6 +285,8 @@ class CPortInterfaceMap : public CObjBase
     gint32 RemoveFromHandleMap( IPort* pPort, IEventSink* pEvent );
     gint32 RemoveFromHandleMap( IEventSink* pEvent, IPort* pPort );
     gint32 PortExist( IPort* pPort ) const;
+    gint32 PortExist( HANDLE hPort ) const;
+    gint32 GetPortPtr( HANDLE hHandle, PortPtr& pPort ) const;
     gint32 InterfaceExist( IEventSink* pEvent ) const;
 
     gint32 PortExist(
@@ -291,6 +294,8 @@ class CPortInterfaceMap : public CObjBase
 
     gint32 InterfaceExist(
         IEventSink* pEvent, std::vector< PortPtr >* pvecVals = nullptr ) const;
+
+    gint32 IsPortNoRef( IPort* pPort, bool& bNoRef ) const;
 };
 
 #define CONFIG_FILE "./driver.json"
@@ -470,6 +475,12 @@ class CIoManager : public IService
         IPort* pPort,
         std::vector< EventPtr >* pvecEvent = nullptr );
 
+    gint32 GetPortPtr(
+        HANDLE hHandle, PortPtr& pPort ) const;
+
+    gint32 IsPortNoRef(
+        IPort* pPort, bool& bNoRef ) const;
+
     gint32 EnumDBusNames(
         std::vector<std::string>& vecNames );
 
@@ -513,6 +524,48 @@ class CIoManager : public IService
 
     gint32 RemoveTask(
         TaskletPtr& pTask );
+
+    template< class T >
+    gint32 GetCmdLineOpt( EnumPropId iPropId, T& oVal )
+    {
+        gint32 ret = 0;
+        do{
+            BufPtr pBuf( true );
+            CStdRMutex oRegLock( m_pReg->GetLock() );
+            ret = m_pReg->ChangeDir( "/cmdline" );
+            if( ERROR( ret ) )
+                break;
+
+            ret = m_pReg->GetProperty( iPropId, *pBuf );
+            if( ERROR( ret ) )
+                break;
+
+            oVal = *pBuf;
+        }while( 0 );
+
+        return ret;
+    }
+
+    template< class T >
+    gint32 SetCmdLineOpt( EnumPropId iPropId, const T& oVal )
+    {
+        gint32 ret = 0;
+        do{
+            BufPtr pBuf( true );
+            *pBuf = oVal;
+            CStdRMutex oRegLock( m_pReg->GetLock() );
+            ret = m_pReg->ChangeDir( "/cmdline" );
+            if( ERROR( ret ) )
+                break;
+
+            ret = m_pReg->SetProperty( iPropId, *pBuf );
+            if( ERROR( ret ) )
+                break;
+
+        }while( 0 );
+
+        return ret;
+    }
 };
 
 typedef CAutoPtr< Clsid_CIoManager, CIoManager > IoMgrPtr;

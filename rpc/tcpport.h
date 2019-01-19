@@ -1020,14 +1020,41 @@ class CRpcTcpBusPort :
 {
     SockPtr m_pListenSock;
 
+    using PDOADDR = std::pair< std::string, guint16 >;
+
+    std::map< guint32, PDOADDR > m_mapIdToAddr;
+    std::map< PDOADDR, guint32 > m_mapAddrToId;
+
     gint32 CreateTcpStreamPdo(
         IConfigDb* pConfig,
         PortPtr& pNewPort );
 
     gint32 OnNewConnection( gint32 iSockFd );
 
+    gint32 LoadPortOptions(
+        IConfigDb* pCfg );
+
     public:
     typedef CGenericBusPort super;
+
+    gint32 GetPdoAddr(
+        guint32 dwPortId, PDOADDR& oAddr );
+
+    gint32 GetPortId(
+        PDOADDR& oAddr, guint32& dwPortId );
+
+    gint32 BindPortIdAndAddr(
+        guint32 dwPortId, PDOADDR oAddr );
+
+    gint32 RemovePortId( guint32 dwPortId );
+    gint32 RemovePortAddr( PDOADDR& oAddr );
+
+    virtual void AddPdoPort(
+            guint32 iPortId,
+            PortPtr& portPtr );
+
+    virtual void RemovePdoPort(
+        guint32 iPortId );
 
     CRpcTcpBusPort(
         const IConfigDb* pCfg );
@@ -1038,8 +1065,8 @@ class CRpcTcpBusPort :
     virtual gint32 PreStop( IRP* pIrp );
 
     virtual gint32 BuildPdoPortName(
-        const IConfigDb* pCfg,
-        std::string& strPortName ) const;
+        IConfigDb* pCfg,
+        std::string& strPortName );
 
     virtual gint32 CreatePdoPort(
         IConfigDb* pConfig,
@@ -1072,9 +1099,24 @@ class CRpcTcpFidoDrv : public CPortDriver
     // map from port id to port pointer
 	std::map<gint32, PortPtr> m_mapId2Port;
 
+    gint32 CreatePort( PortPtr& pNewPort,
+        const IConfigDb* pConfig );
+
     public:
+    typedef CPortDriver super;
+
     CRpcTcpFidoDrv(
         const IConfigDb* pCfg = nullptr );
+
+	gint32 Probe( IPort* pLowerPort,
+        PortPtr& pNewPort,
+        const IConfigDb* pConfig = NULL );
+
+    virtual gint32 OnEvent( EnumEventId iEvent,
+        guint32 dwParam1 = 0,
+        guint32 dwParam2 = 0,
+        guint32* pData = NULL  )
+    { return -ENOTSUP; }
 };
 
 class CStmSockConnectTask 

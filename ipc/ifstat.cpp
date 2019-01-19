@@ -501,7 +501,7 @@ gint32 CInterfaceState::OnEvent(
 }
 
 gint32 CInterfaceState::OpenPortInternal(
-    IEventSink* pCallback,  bool bRetry )
+    IEventSink* pCallback, bool bRetry )
 {
     gint32 ret = 0;
 
@@ -673,6 +673,50 @@ bool CInterfaceState::exist(
     return false;
 }
 
+gint32 CInterfaceState::GetProperty(
+    gint32 iProp, CBuffer& pVal ) const
+{
+    gint32 ret = 0;
+    CStdRMutex oStatLock( GetLock() );
+    if( unlikely( iProp == propPortId && m_hPort != 0 ) )
+    {
+        guint32 dwPortId = ( guint32 )-1;
+        ret = m_pIfCfgDb->GetProperty( iProp, pVal );
+        if( SUCCEEDED( ret ) )
+            dwPortId = pVal;
+
+        if( dwPortId == ( guint32 )-1 )
+        {
+            PortPtr pPort;
+            CIoManager* pMgr = GetIoMgr();
+            ret = pMgr->GetPortPtr( m_hPort, pPort );
+            if( ERROR( ret ) )
+                return ret;
+
+            CCfgOpenerObj oPortCfg(
+                ( IPort* )pPort );
+
+            ret = oPortCfg.GetIntProp(
+                propPdoId, dwPortId );
+
+            if( ERROR( ret ) )
+                return ret;
+
+            pVal = dwPortId;
+
+            CCfgOpener oIfCfg(
+                ( IConfigDb* )m_pIfCfgDb );
+
+            oIfCfg[ propPortId ] = dwPortId;
+        }
+    }
+    else
+    {
+        ret = m_pIfCfgDb->GetProperty( iProp, pVal );
+    }
+    return ret;
+}
+
 CLocalProxyState::CLocalProxyState(
     const IConfigDb* pCfg )
     : super( pCfg )
@@ -801,6 +845,16 @@ gint32 CRemoteProxyState::SubscribeEvents()
 
         vecEvents.push_back( propStartStopEvent );
 
+        // for router offline
+        ret = oCpHelper.SubscribeEvent(
+            propDBusModEvent, pEvent );
+
+        if( ERROR( ret ) )
+            break;
+
+        vecEvents.push_back( propDBusModEvent );
+
+        // for remote object on/offline
         ret = oCpHelper.SubscribeEvent(
             propRmtModEvent, pEvent );
 
@@ -809,6 +863,7 @@ gint32 CRemoteProxyState::SubscribeEvents()
 
         vecEvents.push_back( propRmtModEvent );
 
+        // for remote server on/offline
         ret = oCpHelper.SubscribeEvent(
             propRmtSvrEvent, pEvent );
 
@@ -817,6 +872,7 @@ gint32 CRemoteProxyState::SubscribeEvents()
 
         vecEvents.push_back( propRmtSvrEvent );
 
+        // for dbus offline
         ret = oCpHelper.SubscribeEvent(
             propDBusSysEvent, pEvent );
 
@@ -851,8 +907,9 @@ gint32 CRemoteProxyState::OnRmtModEvent(
 }
 
 gint32 CRemoteProxyState::OnRmtSvrEvent(
-    EnumEventId iEvent,
-    const string& strIpAddr )
+        EnumEventId iEvent,
+        const std::string& strIpAddr,
+        HANDLE hPort )
 {
     if( iEvent == eventRmtDBusOnline )
     {
@@ -863,7 +920,7 @@ gint32 CRemoteProxyState::OnRmtSvrEvent(
         iEvent = eventRmtSvrOffline;
     }
 
-    return OnDBusEvent( iEvent );
+    return 0;
 }
 
 bool CRemoteProxyState::IsMyDest(

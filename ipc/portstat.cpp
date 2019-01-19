@@ -469,7 +469,13 @@ gint32 CPortState::HandleReady(
                 ret = PushState( dwNewState, false );
             }
 
-            if( dwMinorCmd == IRP_MN_PNP_STOP 
+            else if( dwMinorCmd == IRP_MN_PNP_STOP_CHILD
+                && dwNewState == PORT_STATE_BUSY_SHARED ) 
+            {
+                ret = PushState( dwNewState, false );
+            }
+
+            else if( dwMinorCmd == IRP_MN_PNP_STOP 
                 && dwNewState == PORT_STATE_STOPPING )
             {
                 ret = SetPortState( dwNewState );
@@ -683,6 +689,14 @@ gint32 CPortState::HandleBusyShared(
     case IRP_MJ_PNP:
         {
             if( dwMinorCmd == IRP_MN_PNP_QUERY_STOP
+                && dwNewState == PORT_STATE_BUSY_SHARED )
+            {
+                ret = PushState( dwNewState, false );
+
+                if( SUCCEEDED( ret ) )
+                    break;
+            }
+            else if( dwMinorCmd == IRP_MN_PNP_STOP_CHILD
                 && dwNewState == PORT_STATE_BUSY_SHARED )
             {
                 ret = PushState( dwNewState, false );

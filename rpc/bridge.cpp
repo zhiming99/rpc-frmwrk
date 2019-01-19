@@ -67,10 +67,6 @@ gint32 CRpcTcpBridgeProxy::InitUserFuncs()
     BEGIN_IFHANDLER_MAP( CRpcTcpBridge );
 
     ADD_EVENT_HANDLER(
-        CRpcTcpBridgeProxy::OnRmtSvrOffline,
-        BRIDGE_EVENT_SVROFF );
-
-    ADD_EVENT_HANDLER(
         CRpcTcpBridgeProxy::OnRmtModOffline,
         BRIDGE_EVENT_MODOFF );
 
@@ -527,8 +523,12 @@ gint32 CRpcTcpBridgeProxy::ForwardEvent(
             break;
         }
 
+        // user the server ip instead
+        string strSvrIp;
+        CCfgOpenerObj oCfg( this );
+        oCfg.GetStrProp( propIpAddr, strSvrIp );
         ret = pReqFwdr->ForwardEvent(
-            strSrcIp, pEvtMsg, pCallback );
+            strSvrIp, pEvtMsg, pCallback );
 
     }while( 0 );
 
@@ -1146,39 +1146,6 @@ gint32 CRpcTcpBridgeProxy::StartEx(
     return ret;
 }
 
-gint32 CRpcTcpBridgeProxy::OnRmtSvrOffline(
-    IEventSink* pCallback )
-{
-    if( pCallback == nullptr )
-        return -EINVAL;
-
-    gint32 ret = 0;
-    do{
-
-        string strIpAddr;
-        CCfgOpenerObj oCfg( this );
-
-        ret = oCfg.GetStrProp(
-            propDestIpAddr, strIpAddr );
-
-        if( ERROR( ret ) )
-            break;
-
-        // pass on this event to the pnp manager
-        CEventMapHelper< CGenericInterface >
-            oEvtHelper( this );
-
-        oEvtHelper.BroadcastEvent(
-            eventConnPoint,
-            eventRmtSvrOffline,
-            ( guint32 )strIpAddr.c_str(),
-            ( guint32* )GetPortHandle() );
-
-    }while( 0 );
-
-    return ret;
-}
-
 gint32 CRpcTcpBridgeProxy::OnRmtModOffline(
     IEventSink* pCallback,
     const std::string& strModName )
@@ -1224,6 +1191,14 @@ gint32 CRpcTcpBridgeProxy::OnInvalidStreamId(
         return -EINVAL;
 
     return 0;
+}
+
+bool CRpcInterfaceProxy::IsConnected(
+    const char* szAddr )
+{
+    if( !super::IsConnected( szAddr ) )
+        return false;
+    return  m_pParent->IsConnected( szAddr );
 }
 
 gint32 CRpcInterfaceProxy::OnKeepAlive(
@@ -1420,30 +1395,22 @@ gint32 CRpcTcpBridge::EnableRemoteEventInternal(
         // NOTE: we use the original match for
         // dbus listening
         CParamList oParams;
-        CCfgOpenerObj oCfg( pMatch );
-
-        string strDestIp;
-
-        ret = oCfg.GetStrProp(
-            propIpAddr, strDestIp );
-        if( ERROR( ret ) )
-            break;
-
-        oCfg.SetStrProp(
-            propDestIpAddr, strDestIp );
+        CCfgOpenerObj oMatch( pMatch );
 
         // overwrite the propIpAddr property
         // with the peer ip address, instead
         // ourself's
-        oCfg.CopyProp( propIpAddr, this );
+        oMatch.CopyProp( propIpAddr, this );
+        oMatch.CopyProp( propSrcTcpPort, this );
+        oMatch.CopyProp( propPortId, this );
 
         oParams.Push( bEnable );
         oParams.Push( ObjPtr( pMatch ) );
 
         // this callback is intercepted by
         // CRouterEnableEventRelayTask
-        oParams.SetObjPtr(
-            propEventSink, ObjPtr( pCallback ) );
+        oParams.SetObjPtr( propEventSink,
+            ObjPtr( pCallback ) );
 
         ret = oParams.SetObjPtr(
             propIfPtr, ObjPtr( this ) );
@@ -1622,7 +1589,6 @@ gint32 CBridgeAddRemoteMatchTask::OnTaskComplete(
                     break;
 
                 pMatch = pObj;
-
                 if( bEnable )
                 {
                     // FIXME: unknown side effects.
@@ -1631,9 +1597,6 @@ gint32 CBridgeAddRemoteMatchTask::OnTaskComplete(
                         pBridge->GetParent(),
                         pMatch, false );
                 }
-                else
-                {
-                }
             }
 
         }while( 0 );
@@ -1641,24 +1604,16 @@ gint32 CBridgeAddRemoteMatchTask::OnTaskComplete(
         if( IsPending() )
         {
             CParamList oResp;
-            oResp.SetIntProp( propReturnValue,
-                iRetVal );
-
-            ret = pBridge->OnServiceComplete(
-                oResp.GetCfg(), pEvent );
+            oResp[ propReturnValue ] = iRetVal;
+            ret = pBridge->SetResponse(
+                pEvent, oResp.GetCfg() );
         }
 
     }while( 0 );
 
     if( ret != STATUS_PENDING &&
         ret != STATUS_MORE_PROCESS_NEEDED )
-    {
-        // clear the objects
-        bool bEnable = false;
-        oParams.Pop( bEnable );
-        ObjPtr pObj;
-        oParams.Pop( pObj );
-    }
+        oParams.ClearParams();
 
     return ret;
 }
@@ -1824,14 +1779,17 @@ gint32 CRpcTcpBridge::ForwardEvent(
         pCallback == nullptr )
         return -EINVAL;
 
-    if( strDestIp.empty() )
-        return -EINVAL;
-
     gint32 ret = 0;
     do{
         CReqBuilder oBuilder( this );
 
-        oBuilder.Push( strDestIp );
+        CCfgOpenerObj oCfg( this );
+
+        // the ip addr is just a placeholder
+        std::string strSrcIp;
+        oCfg.GetStrProp( propIpAddr, strSrcIp );
+
+        oBuilder.Push( strSrcIp );
         oBuilder.Push( DMsgPtr( pEvtMsg ) );
 
         oBuilder.SetMethodName(
@@ -1869,6 +1827,7 @@ gint32 CRpcTcpBridge::ForwardEvent(
 
     return ret;
 }
+
 gint32 CRpcInterfaceServer::SetupReqIrpFwrdEvt(
     IRP* pIrp,
     IConfigDb* pReqCall,
@@ -2181,6 +2140,14 @@ gint32 CRpcInterfaceServer::ForwardRequest(
     // the return value indicates if the response
     // message is generated or not.
     return ret;
+}
+
+bool CRpcInterfaceServer::IsConnected(
+    const char* szAddr )
+{
+    if( !super::IsConnected( szAddr ) )
+        return false;
+    return  m_pParent->IsConnected( szAddr );
 }
 
 gint32 CRpcInterfaceServer::SendFetch_Server(

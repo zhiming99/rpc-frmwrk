@@ -76,4 +76,4 @@ port_config/{class_name}/
 					property: fdo_upper_driver_name
 					property: fdo_lower_driver_name
 					property: fdo_driver_name
-
+cmdline/

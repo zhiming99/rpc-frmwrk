@@ -246,9 +246,7 @@ gint32 CProxyFdoDriver::Probe(
             pLowerPort );
 
         if( ERROR( ret ) )
-        {
             break;
-        }
 
     }while( 0 );
 

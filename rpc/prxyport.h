@@ -107,6 +107,10 @@ class CDBusProxyPdo : public CRpcPdoPort
     virtual gint32 PostStart( IRP* pIrp );
     virtual gint32 OnQueryStop( IRP* pIrp );
 
+    gint32 OnModOnOffline(
+        DBusMessage* pDBusMsg );
+
+    gint32 NotifyRouterOffline();
 };
 
 typedef CAutoPtr< clsid( CDBusProxyPdo ), CDBusProxyPdo > ProxyPdoPtr;

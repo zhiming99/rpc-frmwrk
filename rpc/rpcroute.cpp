@@ -63,7 +63,7 @@ CfgPtr CRpcRouter::InitCfg(
 CRpcRouter::CRpcRouter(
     const IConfigDb* pCfg )
     : super( InitCfg( pCfg ) ),
-    m_dwRole( 3 )
+    m_dwRole( 1 )
 {
     gint32 ret = 0;
 
@@ -81,7 +81,15 @@ CRpcRouter::CRpcRouter(
             break;
 
         guint32 dwRole = 0;
-        ret = oCfg.GetIntPtr( propRouterRole, dwRole );
+        ret = m_pIoMgr->GetCmdLineOpt(
+            propRouterRole, dwRole );
+
+        if( ERROR( ret ) )
+        {
+            ret = oCfg.GetIntProp(
+                propRouterRole, dwRole );
+        }
+
         if( SUCCEEDED( ret ) )
             m_dwRole = dwRole;
 
@@ -103,46 +111,70 @@ gint32 CRpcRouter::GetBridgeProxy(
     const std::string& strIpAddr,
     InterfPtr& pIf )
 {
-    return GetBridgeIfInternal(
-        strIpAddr, pIf, true );
+    gint32 ret = 0;
+
+    if( !HasReqForwarder() )
+        return -ENOENT;    
+
+    do{
+        if( strIpAddr.empty() )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        std::map< std::string, InterfPtr >*
+            pMap = &m_mapIp2BdgeProxies;
+        
+        CStdRMutex oRouterLock( GetLock() );
+        std::map< std::string, InterfPtr >::iterator 
+            itr = pMap->find( strIpAddr );
+
+        if( itr == pMap->end() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+
+        pIf = itr->second;
+
+    }while( 0 );
+
+    return ret;
 }
 
 gint32 CRpcRouter::GetBridge(
-    const std::string& strIpAddr,
+    guint32 dwPortId,
     InterfPtr& pIf )
 {
-    return GetBridgeIfInternal(
-        strIpAddr, pIf, false );
-}
+    gint32 ret = 0;
 
-gint32 CRpcRouter::GetBridgeIfInternal(
-    const std::string& strIpAddr,
-    InterfPtr& pIf,
-    bool bProxy )
-{
-
-    if( strIpAddr.empty() )
-        return -EINVAL;
-
-    std::map< std::string, InterfPtr >* pMap =
-        bProxy ? &m_mapIp2BdgeProxies : &m_mapIp2Bdge;
-    
-    CStdRMutex oRouterLock( GetLock() );
-    std::map< std::string, InterfPtr >::iterator 
-        itr = pMap->find( strIpAddr );
-
-    if( itr == pMap->end() )
+    if( !HasBridge() )
         return -ENOENT;
 
-    pIf = itr->second;
+    do{
+        std::map< guint32, InterfPtr >*
+            pMap = &m_mapPortId2Bdge;
+        
+        CStdRMutex oRouterLock( GetLock() );
+        std::map< guint32, InterfPtr >::iterator 
+            itr = pMap->find( dwPortId );
 
-    return 0;
+        if( itr == pMap->end() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+        pIf = itr->second;
+
+    }while( 0 );
+
+    return ret;
 }
 
-gint32 CRpcRouter::AddBridgeIf( 
-    const std::string& strIpAddr,
-    IGenericInterface* pIf,
-    bool bProxy )
+
+gint32 CRpcRouter::AddBridgeProxy( 
+    IGenericInterface* pIf )
 {
     if( pIf == nullptr )
         return -EINVAL;
@@ -150,18 +182,142 @@ gint32 CRpcRouter::AddBridgeIf(
     if( !IsConnected() )
         return ERROR_STATE;
 
-    std::map< std::string, InterfPtr >* pMap =
-        bProxy ? &m_mapIp2BdgeProxies : &m_mapIp2Bdge;
-    
-    CStdRMutex oRouterLock( GetLock() );
-    std::map< std::string, InterfPtr >::iterator 
-        itr = pMap->find( strIpAddr );
+    gint32 ret = 0;
+    do{
+        std::map< std::string, InterfPtr >* pMap =
+            &m_mapIp2BdgeProxies;
+        
+        std::string strIpAddr;
+        CCfgOpenerObj oCfg( pIf );
 
-    if( itr != pMap->end() )
-        return -EEXIST;
+        ret = oCfg.GetStrProp(
+            propIpAddr, strIpAddr );
 
-    ( *pMap )[ strIpAddr ] = InterfPtr( pIf );
-    return 0;
+        CStdRMutex oRouterLock( GetLock() );
+        std::map< std::string, InterfPtr >::iterator 
+            itr = pMap->find( strIpAddr );
+
+        if( itr != pMap->end() )
+        {
+            ret = -EEXIST;
+            break;
+        }
+
+        ( *pMap )[ strIpAddr ] = InterfPtr( pIf );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CRpcRouter::RemoveBridgeProxy( 
+    IGenericInterface* pIf )
+{
+    if( pIf == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        std::map< std::string, InterfPtr >* pMap =
+            &m_mapIp2BdgeProxies;
+        
+        std::string strIpAddr;
+        CCfgOpenerObj oCfg( pIf );
+
+        ret = oCfg.GetStrProp(
+            propIpAddr, strIpAddr );
+
+        CStdRMutex oRouterLock( GetLock() );
+        std::map< std::string, InterfPtr >::iterator 
+            itr = pMap->find( strIpAddr );
+
+        if( itr == pMap->end() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+        pMap->erase( strIpAddr );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CRpcRouter::AddBridge( 
+    IGenericInterface* pIf )
+{
+    if( pIf == nullptr )
+        return -EINVAL;
+
+    if( !IsConnected() )
+        return ERROR_STATE;
+
+    gint32 ret = 0;
+
+    do{
+        std::map< guint32, InterfPtr >* pMap =
+            &m_mapPortId2Bdge;
+
+        guint32 dwPortId = 0;
+        CCfgOpenerObj oCfg( pIf );
+
+        ret = oCfg.GetIntProp(
+            propPortId, dwPortId );
+
+        if( ERROR( ret ) )
+            break;
+
+        CStdRMutex oRouterLock( GetLock() );
+        std::map< guint32, InterfPtr >::iterator 
+            itr = pMap->find( dwPortId );
+
+        if( itr != pMap->end() )
+        {
+            ret = -EEXIST;
+            break;
+        }
+
+        ( *pMap )[ dwPortId ] = InterfPtr( pIf );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CRpcRouter::RemoveBridge( 
+    IGenericInterface* pIf )
+{
+    if( pIf == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+
+    do{
+        std::map< guint32, InterfPtr >* pMap =
+            &m_mapPortId2Bdge;
+
+        guint32 dwPortId = 0;
+        CCfgOpenerObj oCfg( pIf );
+
+        ret = oCfg.GetIntProp(
+            propPortId, dwPortId );
+
+        if( ERROR( ret ) )
+            break;
+
+        CStdRMutex oRouterLock( GetLock() );
+        std::map< guint32, InterfPtr >::iterator 
+            itr = pMap->find( dwPortId );
+        if( itr == pMap->end() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+        pMap->erase( dwPortId );
+
+    }while( 0 );
+
+    return ret;
 }
 
 gint32 CRpcRouter::Start()
@@ -195,7 +351,7 @@ gint32 CRpcRouter::OnPreStop( IEventSink* pCallback )
 {
     gint32 ret = 0;
     map< string, InterfPtr > mapIp2Proxies;
-    map< string, InterfPtr > mapIp2Server;
+    map< guint32, InterfPtr > mapId2Server;
     std::map< std::string, InterfPtr > mapReqProxies;
 
     // FIXME: need a task to accomodate all the StopEx
@@ -204,8 +360,8 @@ gint32 CRpcRouter::OnPreStop( IEventSink* pCallback )
         CStdRMutex oRouterLock( GetLock() );
         mapIp2Proxies = m_mapIp2BdgeProxies;
         m_mapIp2BdgeProxies.clear();
-        mapIp2Server = m_mapIp2Bdge;
-        m_mapIp2Bdge.clear();
+        mapId2Server = m_mapPortId2Bdge;
+        m_mapPortId2Bdge.clear();
         mapReqProxies = m_mapReqProxies;
         m_mapReqProxies.clear();
 
@@ -219,13 +375,13 @@ gint32 CRpcRouter::OnPreStop( IEventSink* pCallback )
     }
     mapIp2Proxies.clear();
 
-    for( auto&& elem : mapIp2Server )
+    for( auto&& elem : mapId2Server )
     {
         InterfPtr p;
         p = elem.second;
         p->Stop();
     }
-    mapIp2Server.clear(); 
+    mapId2Server.clear(); 
 
     ret = m_pReqFwdr->Stop();
 
@@ -608,28 +764,30 @@ gint32 CRpcRouter::SubscribeEvents()
     return ret;
 }
 
-gint32 CRpcRouter::OnEvent(
+gint32 CRpcRouter::OnRmtSvrEvent(
     EnumEventId iEvent,
-    guint32 dwParam1,
-    guint32 dwParam2,
-    guint32* pData )
+    const std::string& strIpAddr,
+    HANDLE hPort )
 {
     gint32 ret = 0;
+    if( hPort == 0 )
+        return -EINVAL;
+
     switch( iEvent )
     {
     case eventRmtSvrOnline:
         {
-            HANDLE hPort = ( guint32 )pData;
-
-            string strIpAddr =
-                reinterpret_cast< char* >( dwParam1 );
-
-            ret = OnRmtSvrOnline( iEvent,
-                strIpAddr, HandleToPort( hPort ) ); 
-
+            ret = OnRmtSvrOnline(
+                strIpAddr, hPort ); 
             break;
         }
     case eventRmtSvrOffline:
+        {
+            ret = OnRmtSvrOffline( 
+                strIpAddr, hPort ); 
+
+            break;
+        }
     default:
         {
             ret = -ENOTSUP;
@@ -641,18 +799,47 @@ gint32 CRpcRouter::OnEvent(
 }
 
 gint32 CRpcRouter::OnRmtSvrOnline(
-    EnumEventId iEvent,
     const string& strIpAddr,
-    IPort* pPort )
+    HANDLE hPort )
 {
-    if( pPort == nullptr || strIpAddr.empty() )
+    if( hPort == INVALID_HANDLE || strIpAddr.empty() )
         return -EINVAL;
 
     gint32 ret = 0;
 
     do{
         InterfPtr pIf;
-        ret = GetBridge( strIpAddr, pIf );
+        if( !IsConnected() )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+
+        if( !HasBridge() )
+        {
+            // odd situation
+            ret = ERROR_FAIL;
+            break;
+        }
+
+        PortPtr pPort;
+        ret = GetIoMgr()->GetPortPtr(
+            hPort, pPort );
+
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpenerObj oPortCfg(
+            ( CObjBase* )pPort );
+
+        guint32 dwPortId = 0;
+        ret = oPortCfg.GetIntProp(
+            propPortId, dwPortId );
+
+        if( ERROR( ret ) )
+            break;
+
+        ret = GetBridge( dwPortId, pIf );
         if( SUCCEEDED( ret ) )
             break;
 
@@ -661,14 +848,15 @@ gint32 CRpcRouter::OnRmtSvrOnline(
             // passive bridge creation
             CParamList oParams;
 
-            oParams.SetStrProp( propIpAddr, strIpAddr );
+            oParams.CopyProp( propIpAddr, pPort );
+            oParams.CopyProp( propSrcTcpPort, pPort );
+            oParams.CopyProp( propPortId, pPort );
             oParams.SetPointer( propIoMgr, GetIoMgr() );
 
             oParams.SetObjPtr(
                 propRouterPtr, ObjPtr( this ) );
 
             TaskletPtr pTask;
-
             ret = pTask.NewObj(
                 clsid( CRouterOpenRmtPortTask  ),
                 oParams.GetCfg() );
@@ -689,12 +877,243 @@ gint32 CRpcRouter::OnRmtSvrOnline(
     return ret;
 }
 
-gint32 CRpcRouter::OnRmtSvrOffline(
-    EnumEventId iEvent,
-    const string& strIpAddr,
-    IPort* pPort )
+gint32 CRouterStopBridgeProxyTask::RunTask()
 {
-    return 0;
+    gint32 ret = 0;    
+    do{
+        CCfgOpener oCfg(
+            ( IConfigDb* )GetConfig() );
+
+        CRpcInterfaceProxy* pProxy = nullptr;
+        ret = oCfg.GetPointer( 0, pProxy );
+        if( ERROR( ret ) )
+            break;
+
+        string strIpAddr;
+        CCfgOpenerObj oIfCfg( pProxy );
+
+        ret = oIfCfg.GetStrProp(
+            propIpAddr, strIpAddr );
+        if( ERROR( ret ) )
+            break;
+
+        CRpcRouter* pRouter =
+            pProxy->GetParent();
+
+        InterfPtr pIf;
+        pRouter->GetReqFwdr( pIf );
+        CRpcReqForwarder* pReqFwdr = pIf;
+
+        // remove all the local matches pointing
+        // to this proxy
+        if( true )
+        {
+            // stop the bridge proxy
+            CStdRMutex oIfLock(
+                pRouter->GetLock() );
+            pRouter->RemoveLocalMatchByAddr(
+                strIpAddr );
+            pRouter->RemoveBridgeProxy( pProxy );
+        }
+
+        pReqFwdr->OnEvent( eventRmtSvrOffline,
+            ( guint32 )strIpAddr.c_str(), 0,
+            ( guint32* )pProxy );
+
+        ret = pProxy->Shutdown( this );
+
+    }while( 0 );
+
+    if( ret != STATUS_PENDING )
+        OnTaskComplete( ret );
+
+    return ret;
+}
+
+gint32 CRouterStopBridgeProxyTask::OnTaskComplete(
+    gint32 iRetVal )
+{
+    CParamList oTaskCfg(
+        ( IConfigDb* )GetConfig() );
+    oTaskCfg.ClearParams();
+    return iRetVal;
+}
+
+gint32 CRouterStopBridgeTask::RunTask()
+{
+    gint32 ret = 0;    
+    do{
+        CCfgOpener oCfg(
+            ( IConfigDb* )GetConfig() );
+
+        CRpcInterfaceServer* pServer = nullptr;
+        ret = oCfg.GetPointer( 0, pServer );
+        if( ERROR( ret ) )
+            break;
+
+        guint32 dwPortId = 0;
+        CCfgOpenerObj oIfCfg( pServer );
+
+        ret = oIfCfg.GetIntProp(
+            propPortId, dwPortId );
+        if( ERROR( ret ) )
+            break;
+
+        CRpcRouter* pRouter =
+            pServer->GetParent();
+
+        CRpcReqForwarder* pReqFwdr = nullptr;
+        ret = oCfg.GetPointer(
+            propIfPtr, pReqFwdr );
+        if( ERROR( ret ) )
+            break;
+
+        // remove all the local matches pointing
+        // to this proxy
+        if( true )
+        {
+            CStdRMutex oIfLock(
+                pRouter->GetLock() );
+            pRouter->RemoveRemoteMatchByPortId(
+                dwPortId );
+            pRouter->RemoveBridge( pServer );
+        }
+        ret = pServer->Shutdown( this );
+
+    }while( 0 );
+
+    if( ret != STATUS_PENDING )
+        OnTaskComplete( ret );
+
+    return ret;
+}
+
+gint32 CRouterStopBridgeTask::OnTaskComplete(
+    gint32 iRetVal )
+{
+    return iRetVal;
+}
+gint32 CRpcRouter::OnRmtSvrOffline(
+    const string& strIpAddr,
+    HANDLE hPort )
+{
+    if( hPort == INVALID_HANDLE ||
+        strIpAddr.empty() )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    CIoManager* pMgr = GetIoMgr();
+    do{
+        InterfPtr pIf;
+        if( !IsConnected() )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+
+        PortPtr pPort;
+        ret = pMgr->GetPortPtr(
+            hPort, pPort );
+
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpenerObj oPortCfg(
+            ( CObjBase* ) pPort );
+
+        guint32 dwPortId = 0;
+        ret = oPortCfg.GetIntProp(
+            propPortId, dwPortId );
+        if( ERROR( ret ) )
+            break;
+
+        bool bBridge = false;
+        if( HasBridge() )
+        {
+            ret = GetBridge( dwPortId, pIf );
+        }
+        else
+        {
+            ret = ERROR_FAIL;
+        }
+
+        if( SUCCEEDED( ret ) )
+        {
+            bBridge = true;
+        }
+        else if( HasReqForwarder() )
+        {
+            ret = GetBridgeProxy(
+                strIpAddr, pIf );
+        }
+         
+        if( ERROR( ret ) )
+            break;
+
+        TaskletPtr pCallback;
+        ret = pCallback.NewObj( 
+            clsid( CIfDummyTask ) );
+
+        if( ERROR( ret ) )
+            break;
+
+        TaskletPtr pTask;
+        CParamList oParams;
+
+        if( HasBridge() )
+        {
+            oParams.CopyProp(
+                propPortId, pPort );
+        }
+        if( HasReqForwarder() )
+        {
+            oParams.SetStrProp(
+                propIpAddr, strIpAddr );
+        }
+
+        oParams.SetObjPtr(
+            propEventSink, pCallback );
+
+        oParams.Push( pIf );
+
+        if( bBridge )
+        {
+            // stop the bridge
+            ret = pTask.NewObj(
+                clsid( CRouterStopBridgeTask ),
+                oParams.GetCfg() );
+
+            if( ERROR( ret ) )
+                break;
+        }
+        else
+        {
+            ret = pTask.NewObj(
+                clsid( CRouterStopBridgeProxyTask  ),
+                oParams.GetCfg() );
+
+            if( ERROR( ret ) )
+                break;
+        }
+
+        // must be pending
+        pTask->MarkPending();
+        TaskletPtr pDeferTask;
+        ret = DEFER_CALL_NOSCHED(
+            pDeferTask, ObjPtr( this ),
+            &CRpcServices::RunManagedTask,
+            pTask, false );
+
+        // this is a long task, run it on a
+        // temporary thread
+        ret = pMgr->RescheduleTask(
+            pDeferTask, true );
+
+        break;
+
+    }while( 0 );
+
+    return ret;
 }
 
 gint32 CRpcRouter::CheckReqToRelay(
@@ -815,7 +1234,11 @@ gint32 CRpcRouter::ScheduleEventRelayTask(
         if( ERROR( ret ) )
             break;
 
-        ret = pMgr->RescheduleTask( pTask );
+        pTask->MarkPending();
+        ret = DEFER_CALL(
+            GetIoMgr(), ObjPtr( this ),
+            &CRpcServices::RunManagedTask,
+            pTask, false );
         if( SUCCEEDED( ret ) )
             ret = STATUS_PENDING;
 
@@ -886,6 +1309,45 @@ gint32 CRpcRouter::RemoveLocalMatch(
 
     return AddRemoveMatch(
         pMatch, false, false, nullptr );
+}
+
+gint32 CRpcRouter::RemoveLocalMatchByAddr(
+    const std::string& strIpAddr )
+{
+    gint32 ret = 0;
+    gint32 iCount = 0;
+
+    do{
+        map< MatchPtr, gint32 >* plm =
+            &m_mapLocMatches;
+
+        CStdRMutex oRouterLock( GetLock() );
+        map< MatchPtr, gint32 >::iterator
+            itr = plm->begin();
+
+        while( itr != plm->end() )
+        {
+            CCfgOpenerObj oMatch(
+                ( CObjBase* )itr->first );
+            std::string strVal;
+            ret = oMatch.GetStrProp(
+                propIpAddr, strVal );
+
+            if( ERROR( ret ) )
+                continue;
+
+            if( strIpAddr == strVal )
+            {
+                itr = plm->erase( itr );
+                iCount++;
+                continue;
+            }
+            itr++;
+        }
+
+    }while( 0 );
+
+    return iCount;
 }
 
 gint32 CRpcRouter::AddRemoveMatch(
@@ -1025,6 +1487,45 @@ gint32 CRpcRouter::AddRemoteMatch(
     }while( 0 );
 
     return ret;
+}
+
+gint32 CRpcRouter::RemoveRemoteMatchByPortId(
+    guint32 dwPortId )
+{
+    if( dwPortId == 0 )
+        return -EINVAL;
+
+    gint32 iCount = 0;
+    gint32 ret = 0;
+    do{
+        map< MatchPtr, gint32 >* plm =
+            &m_mapRmtMatches;
+        CStdRMutex oRouterLock( GetLock() );
+        map< MatchPtr, gint32 >::iterator
+            itr = plm->begin();
+        while( itr != plm->end() )
+        {
+            CCfgOpenerObj oMatch(
+                ( CObjBase* )itr->first );
+
+            guint32 dwVal = 0;
+            ret = oMatch.GetIntProp(
+                propPortId, dwVal );
+            if( ERROR( ret ) )
+                continue;
+
+            if( dwPortId == dwVal )
+            {
+                itr = plm->erase( itr );
+                iCount++;
+                continue;
+            }
+            itr++;
+        }
+
+    }while( 0 );
+
+    return iCount;
 }
 
 gint32 CRouterEnableEventRelayTask::RunTask()
@@ -1199,7 +1700,6 @@ gint32 CRouterEnableEventRelayTask::OnTaskCompleteDisable(
                 // nasty, we have transfered the
                 // callback to another task
                 ClearClientNotify();
-
                 // this task is completed.
                 ret = 0;
             }

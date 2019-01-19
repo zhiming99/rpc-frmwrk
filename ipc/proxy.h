@@ -460,7 +460,8 @@ class CRpcInterfaceBase :
 
     virtual gint32 OnRmtSvrEvent(
         EnumEventId iEvent,
-        const std::string& strIpAddr );
+        const std::string& strIpAddr,
+        HANDLE hPort );
 
     virtual gint32 OnAdminEvent(
         EnumEventId iEvent,

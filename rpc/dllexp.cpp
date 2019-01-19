@@ -59,6 +59,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CReqFwdrSendDataTask );
     INIT_MAP_ENTRYCFG( CReqFwdrFetchDataTask );
     INIT_MAP_ENTRYCFG( CReqFwdrOpenRmtPortTask );
+    INIT_MAP_ENTRYCFG( CReqFwdrCloseRmtPortTask );
     INIT_MAP_ENTRYCFG( CRouterEnableEventRelayTask );
     INIT_MAP_ENTRYCFG( CRouterLocalMatch );
     INIT_MAP_ENTRYCFG( CRouterOpenRmtPortTask );
@@ -90,6 +91,9 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CProxyFdoDriver );
     INIT_MAP_ENTRYCFG( CRpcRouterImpl );
     INIT_MAP_ENTRYCFG( CRouterStartReqFwdrProxyTask );
+    INIT_MAP_ENTRYCFG( CRouterStopBridgeProxyTask );
+    INIT_MAP_ENTRYCFG( CRouterStopBridgeTask );
+    INIT_MAP_ENTRYCFG( CRpcTcpFidoDrv );
     END_FACTORY_MAPS;
 };
 

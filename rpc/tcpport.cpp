@@ -51,14 +51,19 @@ CRpcSocketBase::CRpcSocketBase(
         if( ERROR( ret ) )
             break;
 
+        *m_pCfg = *pCfg;
+
         CCfgOpener oCfg(
             ( IConfigDb* )pCfg );
-
+        
         ret = oCfg.GetPointer(
             propIoMgr, m_pMgr );
 
         if( ERROR( ret ) )
             break;
+
+        m_pCfg->RemoveProperty(
+            propIoMgr );
 
     }while( 0 );
 
@@ -804,7 +809,7 @@ CRpcStreamSock::CRpcStreamSock(
             propIpAddr, pCfg );
 
         ret = oCfg.CopyProp(
-            propDestIpAddr, pCfg );
+            propSrcTcpPort, pCfg );
 
         gint32 iFd = -1;
         ret = oCfg.GetIntProp(
@@ -836,13 +841,23 @@ gint32 CRpcStreamSock::ActiveConnect(
 {
     gint32 ret = 0;
     do{
+        CCfgOpener oCfg(
+            ( IConfigDb* )m_pCfg );
+
+        guint32 dwPortNum = 0;
+        ret = oCfg.GetIntProp(
+            propSrcTcpPort, dwPortNum );
+
+        if( ERROR( ret ) )
+            dwPortNum = RPC_SVR_PORTNUM;
+
         /*  Connect to the remote host. */
         sockaddr_in sin;
 
         memset( &sin, 0, sizeof( sin ) );
         sin.sin_family = AF_INET;
-        sin.sin_port =
-            htons( RPC_SVR_PORTNUM );
+        sin.sin_port = htons(
+            ( guint16 )dwPortNum );
 
         sin.sin_addr.s_addr =
             inet_addr( strIpAddr.c_str() );
@@ -871,7 +886,7 @@ gint32 CRpcStreamSock::ActiveConnect(
 * server with the specified ip addr
 * @{ */
 /**
- * Note that, this is a asynchronous connect, and
+ * Note that, this is an asynchronous connect, and
  * the notification comes from the event
  * OnConnected  @} */
 
@@ -899,7 +914,7 @@ gint32 CRpcStreamSock::Connect()
 
         string strIpAddr;
         ret = oCfg.GetStrProp(
-            propDestIpAddr, strIpAddr );
+            propIpAddr, strIpAddr );
 
         if( ERROR( ret ) )
             break;
@@ -3810,18 +3825,26 @@ gint32 CRpcListeningSock::Connect()
 
         string strIpAddr;
         ret = oCfg.GetStrProp(
-            propSrcIpAddr, strIpAddr );
+            propIpAddr, strIpAddr );
 
         if( ERROR( ret ) )
             strIpAddr = "0.0.0.0";
+
+        guint32 dwPortNum = 0;
+
+        ret = oCfg.GetIntProp(
+            propSrcTcpPort, dwPortNum );
+
+        if( ERROR( ret ) )
+            dwPortNum = RPC_SVR_PORTNUM;
 
         /*  Connect to the remote host. */
         sockaddr_in sin;
 
         memset( &sin, 0, sizeof( sin ) );
         sin.sin_family = AF_INET;
-        sin.sin_port =
-            htons( RPC_SVR_PORTNUM );
+        sin.sin_port = htons(
+            ( gint16 )dwPortNum );
 
         sin.sin_addr.s_addr =
             inet_addr( strIpAddr.c_str() );
@@ -3989,7 +4012,7 @@ gint32 CStmSockConnectTask::Retry()
 
     string strIpAddr;
     ret = oCfg.GetStrProp(
-        propDestIpAddr, strIpAddr );
+        propIpAddr, strIpAddr );
 
     if( ERROR( ret ) )
         return ret;
@@ -4385,7 +4408,7 @@ gint32 CStmSockConnectTask::NewTask(
             break;
 
         ret = oCfg.CopyProp(
-            propDestIpAddr, pSock );    
+            propIpAddr, pSock );    
 
         if( ERROR( ret ) )
             break;

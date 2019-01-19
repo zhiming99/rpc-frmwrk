@@ -365,6 +365,29 @@ BufPtr PackageTo< BufPtr >( const BufPtr& pBuf );
 template<>
 BufPtr PackageTo< ObjPtr >( const ObjPtr& pObj );
 
+struct _DummyClass_
+{
+    static void PackExp( ... )
+    { return; }
+};
+
+template< typename...Types >
+inline CfgPtr PackParams( Types&&...args )
+{
+    gint32 ret = 0;
+    CParamList oParams;
+    _DummyClass_::PackExp( oParams.Push( args )... );
+    return oParams.GetCfg();
+}
+
+template< typename...Types >
+inline void PackParams(
+    std::vector< BufPtr >& vec, Types&&...args )
+{
+    // note that the last arg is inserted first
+    _DummyClass_::PackExp( ( vec.insert( vec.begin(), PackageTo( args ) ), 1 ) ... );
+}
+
 // proxy related classes
 template< typename ...Args>
 class CMethodProxy :
@@ -380,30 +403,6 @@ class CMethodProxy :
         m_bNonDBus( bNonDBus )
     { SetClassId( clsid( CMethodProxy ) ); }
 
-    void TupleToVec( std::tuple<>& oTuple,
-        std::vector< BufPtr >& vec,
-        NumberSequence<> )
-    {}
-
-    template < int N >
-    void TupleToVec( std::tuple< Args...>& oTuple,
-        std::vector< BufPtr >& vec,
-        NumberSequence< N > )
-    {
-        vec[ N ] = PackageTo< ValType( decltype( std::get< N >( oTuple ) ) ) >
-            ( std::get< N >( oTuple ) );
-    }
-
-    template < int N, int M, int...S >
-    void TupleToVec( std::tuple< Args...>& oTuple,
-        std::vector< BufPtr >& vec,
-        NumberSequence< N, M, S... > )
-    {
-        vec[ N ] = PackageTo< ValType( decltype( std::get< N >( oTuple ) ) )>
-            ( std::get< N >( oTuple ) );
-        TupleToVec( oTuple, vec, NumberSequence<M, S...>() );
-    }
-
     gint32 operator()(
         CInterfaceProxy* pIf,
         IEventSink* pCallback,
@@ -413,15 +412,9 @@ class CMethodProxy :
         if( pIf == nullptr )
             return -EINVAL;
 
-        std::tuple<Args...> oTuple( args ... );
         std::vector< BufPtr > vec;
-
         if( sizeof...( Args ) )
-        {
-            vec.resize( sizeof...(Args) );
-            TupleToVec( oTuple, vec,
-                typename GenSequence< sizeof...( Args ) >::type() );
-        }
+            PackParams( vec, args ... );
 
         return pIf->SendProxyReq( pCallback,
             m_bNonDBus, m_strMethod, vec, qwIoTaskId );
@@ -1189,29 +1182,6 @@ class CDeferredCall :
         return ret;
     }
 
-    void TupleToVec( std::tuple<>& oTuple,
-        std::vector< BufPtr >& vec,
-        NumberSequence<> )
-    {}
-
-    template < int N >
-    void TupleToVec( std::tuple< Args...>& oTuple,
-        std::vector< BufPtr >& vec,
-        NumberSequence< N > )
-    {
-        vec[ N ] = PackageTo< ValType( decltype( std::get< N >( oTuple ) ) ) >
-            ( std::get< N >( oTuple ) );
-    }
-
-    template < int N, int M, int...S >
-    void TupleToVec( std::tuple< Args...>& oTuple,
-        std::vector< BufPtr >& vec,
-        NumberSequence< N, M, S... > )
-    {
-        vec[ N ] = PackageTo< ValType( decltype( std::get< N >( oTuple ) ) ) >
-            ( std::get< N >( oTuple ) );
-        TupleToVec( oTuple, vec, NumberSequence<M, S...>() );
-    }
     //---------
 
     FuncType m_pUserFunc;
@@ -1238,17 +1208,8 @@ class CDeferredCall :
         this->m_pObj = pObj;
         m_pUserFunc = pFunc;
         this->SetClassId( clsid( CDeferredCall ) );
-
-        std::tuple< Args...> oTuple( args ... );
-
-        std::vector< BufPtr > vec;
-
         if( sizeof...( args ) )
-        {
-            this->m_vecArgs.resize( sizeof...(Args) );
-            TupleToVec( oTuple, this->m_vecArgs,
-                typename GenSequence< sizeof...( Args ) >::type() );
-        }
+            PackParams( this->m_vecArgs, args... );
     }
 
     // well, this is a virtual function in the
@@ -2105,10 +2066,7 @@ gint32 CInterfaceServer::SendEvent(
             new CMethodProxy< DecType( Args )... >( false, "test" );
 
         std::vector< BufPtr > vecArgs;
-        vecArgs.resize( sizeof...(Args) );
-        std::tuple< DecType( Args )...> oTuple( args ... );
-        pProxy->TupleToVec( oTuple, vecArgs,
-            typename GenSequence< sizeof...( Args ) >::type() );
+        PackParams( vecArgs, args... );
 
         for( auto pBuf : vecArgs )
             oReq.Push<BufPtr&>( pBuf );

@@ -1038,9 +1038,9 @@ gint32 CDriverManager::BuildPortStack(
                 break;
             }
 
-            if( elem[ JSON_ATTR_FDODRIVER ] != Json::Value::null )
+            if( elem[ JSON_ATTR_FIDODRIVER ] != Json::Value::null )
             {
-                strDrvName = elem[ JSON_ATTR_FDODRIVER ].asString();
+                strDrvName = elem[ JSON_ATTR_FIDODRIVER ].asString();
                 break;
             }
         }
@@ -1075,9 +1075,7 @@ gint32 CDriverManager::BuildPortStack(
             pPort, pNewPort, a.GetCfg() );
 
         if( ERROR( ret ) )
-        {
             break;
-        }
 
         // repeat to attach more port on top of pNewPort
         pPort = pNewPort;

@@ -26,7 +26,9 @@
 #include "frmwrk.h"
 #include "tasklets.h"
 #include "jsondef.h"
+#include <algorithm>
 
+#include "ifhelper.h"
 using namespace std;
 
 bool CIoManager::m_bInit( false );
@@ -830,8 +832,30 @@ gint32 CIoManager::ClosePort(
             ret = -EINVAL;
             break;
         }
-        IPort* pPort = HandleToPort( hPort );
+        CPort* pPort = static_cast< CPort* >(
+            HandleToPort( hPort ) );
+
+        PortPtr ptrPort( pPort );
         ret = RemoveFromHandleMap( pPort, pEvent );
+        bool bNoRef = false;
+        ret = IsPortNoRef( pPort, bNoRef );
+        if( ERROR( ret ) )
+        {
+            ret = 0;
+            break;
+        }
+
+        if( !bNoRef )
+            break;
+
+        if( pPort->Unloadable() )
+        {
+            DEFER_CALL( this,
+                &GetPnpMgr(),
+                &CPnpManager::DestroyPortStack,
+                ( ( IPort* )pPort ) );
+        }
+
     }while( 0 );
 
     return ret;
@@ -1160,6 +1184,18 @@ gint32 CIoManager::PortExist(
     IPort* pPort, vector< EventPtr >* pvecEvents )
 {
     return m_oPortIfMap.PortExist( pPort, pvecEvents );
+}
+
+gint32 CIoManager::GetPortPtr(
+    HANDLE hHandle, PortPtr& pPort ) const
+{
+    return m_oPortIfMap.GetPortPtr( hHandle, pPort );
+}
+
+gint32 CIoManager::IsPortNoRef(
+    IPort* pPort, bool& bNoRef ) const
+{
+    return m_oPortIfMap.IsPortNoRef( pPort, bNoRef );
 }
 
 bool CIoManager::RunningOnMainThread() const
@@ -1598,21 +1634,22 @@ CIoManager::CIoManager( const std::string& strModName ) :
                 "No config" );
         }
         Json::Value& oArch = oCfg[ JSON_ATTR_ARCH ];
-        if( oArch == Json::Value::null )
+        if( oArch != Json::Value::null && 
+            oArch.isMember( JSON_ATTR_NUM_CORE ) &&
+            oArch[ JSON_ATTR_NUM_CORE ] != Json::Value::null )
         {
-            throw std::invalid_argument(
-                "No Arch Configs" );
+            Json::Value& oCores = oArch[ JSON_ATTR_NUM_CORE ];
+            string strVal = oCores.asString();
+            m_dwNumCores = std::strtol(
+                strVal.c_str(), nullptr, 10 );
         }
-        Json::Value& oCores = oArch[ JSON_ATTR_NUM_CORE ];
-        if( oCores == Json::Value::null )
+        else
         {
-            throw std::invalid_argument(
-                "No Processors" );
+             m_dwNumCores = std::max( 1U,
+                 std::thread::hardware_concurrency() );
         }
 
-        string strVal = oCores.asString();
-        m_dwNumCores = std::strtol(
-            strVal.c_str(), nullptr, 10 );
+        m_pReg->MakeDir( "/cmdline" );
 
     }while( 0 );
 

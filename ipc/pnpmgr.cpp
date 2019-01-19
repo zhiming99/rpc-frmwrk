@@ -1424,7 +1424,10 @@ void CPnpManager::HandleCPEvent(
             //
             // schedule a task to stop the related
             // proxy port or the TcpStreamPort
-            CParamList oParams;
+            oConnPoint.BroadcastEvent(
+                propDBusModEvent, iEvent, dwParam1, 0, pData );
+            break;
+            /*CParamList oParams;
             oParams.Push( ( guint32 )propRmtSvrEvent );
             oParams.Push( ( guint32 ) iEvent );
             oParams.Push( dwParam1 );
@@ -1434,7 +1437,7 @@ void CPnpManager::HandleCPEvent(
             GetIoMgr()->ScheduleTask(
                 clsid( CPnpMgrStopPortStackTask ),
                 oParams.GetCfg(),
-                true );
+                true );*/
             break;
         }
     case eventRmtModOnline:

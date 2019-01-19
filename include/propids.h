@@ -170,6 +170,7 @@ enum EnumPropId : gint32
     propSvrInstName,    // type: the instance name of a server, used to construct the objpath
     propRouterRole,     // type: gint32, the role of the router instance: 01 as a forwarder, 02 as a server,
                         //       03 or not exist as both forwarder and server, 
+    propListenSock,     // type: bool to indicate whether the tcpbusport need to create the listening socket for incoming requests
     propReseredEnd = 0x10000000,
     propInvalid = -1, 
 };
