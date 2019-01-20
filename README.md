@@ -20,6 +20,9 @@ This framework depends on the following packags:
 11. `Streaming support to provide double-direction stream transfer`
 
 ---
+[`Sat Jan 19 23:43:28 CST 2019`]   
+1. The redesign and refact work are almost done. Next week we can start the debugging of RPC module hopefully.   
+
 [`Fri Jan 11 08:32:13 CST 2019`]   
 1. There are several places in the router to redesign for new requirements/discoveries. And the details have appended to the todo.txt.   
 
