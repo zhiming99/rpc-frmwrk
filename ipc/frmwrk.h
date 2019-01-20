@@ -262,7 +262,7 @@ class CPortInterfaceMap : public CObjBase
     std::multimap< PortPtr, EventPtr > m_mapPort2If;
     std::multimap< EventPtr, PortPtr > m_mapIf2Port;
     std::set< HANDLE > m_setHandles;
-    std::recursive_mutex m_oLock;
+    stdrmutex m_oLock;
 
     typedef std::pair< std::multimap<PortPtr, EventPtr>::iterator,
         std::multimap<PortPtr, EventPtr>::iterator> PEPAIR;

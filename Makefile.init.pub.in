@@ -37,7 +37,7 @@ endif
 
 ifeq ($(MAKECMDGOALS),release)
 	C_FLAGS += $(RELEASE_FLAGS)
-	C_DEFINES += $(C_DEFINES) -DPRODUCTION 
+	C_DEFINES += -DPRODUCTION 
 	OUTPUT_DIR := ../release
 	OBJ_DIR := ./release
 else ifeq ($(MAKECMDGOALS),debug_clean)

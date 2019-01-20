@@ -1642,6 +1642,18 @@ CIoManager::CIoManager( const std::string& strModName ) :
             string strVal = oCores.asString();
             m_dwNumCores = std::strtol(
                 strVal.c_str(), nullptr, 10 );
+            if( m_dwNumCores != 0 )
+            {
+                // the #cores could be bigger than
+                // physical number
+                m_dwNumCores = std::min( m_dwNumCores,
+                     std::thread::hardware_concurrency() );
+            }
+            else
+            {
+                 m_dwNumCores = std::max( 1U,
+                     std::thread::hardware_concurrency() );
+            }
         }
         else
         {
