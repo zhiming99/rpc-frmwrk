@@ -855,6 +855,7 @@ gint32 CRpcReqForwarder::EnableDisableEvent(
 
     gint32 ret = 0;
     bool bUndo = false;
+    CRpcRouter* pRouter = GetParent();
     do{
         CCfgOpenerObj oCfgInvoke( pCallback );
         DMsgPtr pMsg;
@@ -883,7 +884,6 @@ gint32 CRpcReqForwarder::EnableDisableEvent(
             break;
 
         // add the match
-        CRpcRouter* pRouter = GetParent();
         if( bEnable )
         {
             ret = pRouter->AddLocalMatch( pMatch );
@@ -933,13 +933,16 @@ gint32 CRpcReqForwarder::EnableDisableEvent(
 
     if( ret != STATUS_PENDING )
     {
-        if( bEnable && bUndo )
+        if( bUndo )
         {
-            ret = pRouter->RemoveLocalMatch( pMatch );
-        }
-        else if( bUndo )
-        {
-            ret = pRouter->AddLocalMatch( pMatch );
+            if( bEnable )
+            {
+                ret = pRouter->RemoveLocalMatch( pMatch );
+            }
+            else if( bUndo )
+            {
+                ret = pRouter->AddLocalMatch( pMatch );
+            }
         }
         CParamList oResp;
         oResp[ propReturnValue ] = ret;

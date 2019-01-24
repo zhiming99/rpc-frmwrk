@@ -1712,7 +1712,6 @@ class CRouterAddRemoteMatchTask :
     { SetClassId( clsid( CRouterAddRemoteMatchTask ) ); }
 
     virtual gint32 RunTask();
-    virtual gint32 OnTaskComplete( gint32 iRetVal );
     gint32 AddRemoteMatchInternal(
         CRpcRouter* pRouter,
         IMessageMatch* pMatch,

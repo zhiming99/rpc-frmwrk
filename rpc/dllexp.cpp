@@ -63,7 +63,6 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CRouterLocalMatch );
     INIT_MAP_ENTRYCFG( CRouterOpenRmtPortTask );
     INIT_MAP_ENTRYCFG( CRouterRemoteMatch );
-    INIT_MAP_ENTRYCFG( CRpcBasePortModOnOfflineTask );
     INIT_MAP_ENTRYCFG( CRpcControlStream );
     INIT_MAP_ENTRYCFG( CRpcListeningSock );
     INIT_MAP_ENTRYCFG( CRpcReqForwarderImpl );

@@ -120,6 +120,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CIoWatchTaskProxy );
     INIT_MAP_ENTRYCFG( CIoWatchTaskServer );
     INIT_MAP_ENTRYCFG( CIfTransactGroup );
+    INIT_MAP_ENTRYCFG( CRpcBasePortModOnOfflineTask );
 
 #ifdef _USE_LIBEV
     INIT_MAP_ENTRYCFG( CDBusLoopHooks );
