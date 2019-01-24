@@ -1862,7 +1862,22 @@ gint32 CRpcServices::RebuildMatches()
 gint32 CRpcServices::StartEx(
     IEventSink* pCallback )
 {
-    gint32 ret = OnPreStart( pCallback );
+    gint32 ret = 0;
+    if( true )
+    {
+        CStdRMutex oIfLock( GetLock() );
+        if( GetState() == stateStopped )
+        {
+            ret = SetStateOnEvent( cmdOpenPort );
+            if( ERROR( ret ) )
+                return ret;
+        }
+        else if( GetState() != stateStarting )
+        {
+            return ERROR_STATE;
+        }
+    }
+    ret = OnPreStart( pCallback );
     if( ERROR( ret ) )
         return ret;
 
@@ -3885,29 +3900,30 @@ gint32 CRpcServices::OnEvent(
     m_queEvents.push_back( pParams );
 
     if( !bProcess )
-        return ret;
+        return STATUS_PENDING;
 
     oIfLock.Unlock();
 
     do{
-        ret = super::OnEvent( iEvent,
+        super::OnEvent( iEvent,
             dwParam1, dwParam2, pData );
+        do{
+            oIfLock.Lock();
+            m_queEvents.pop_front();
+            if( m_queEvents.empty() )
+                return 0;
 
-        oIfLock.Lock();
-        m_queEvents.pop_front();
-        if( m_queEvents.empty() )
-            break;
+            CfgPtr pParams =
+                m_queEvents.front();
 
-        CfgPtr pParams =
-            m_queEvents.front();
+            oIfLock.Unlock();
+            ret = UnpackEvent( pParams, iEvent,
+                dwParam1, dwParam2, pData );
 
-        oIfLock.Unlock();
+            if( SUCCEEDED( ret ) )
+                break;
 
-        ret = UnpackEvent( pParams, iEvent,
-            dwParam1, dwParam2, pData );
-
-        if( ERROR( ret ) )
-            break;
+        }while( 1 );
 
     }while( 1 );
 

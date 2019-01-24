@@ -420,18 +420,26 @@ class CCfgDbOpener
 
         return ret;
     }
+
     gint32 GetIntPtr( gint32 iProp, guint32*& val ) const
     {
-        guint32 val1;
-        gint32 ret = GetIntProp( iProp, val1 );
+        intptr_t val1;
+        BufPtr pBuf( true );
+        gint32 ret = GetProperty( iProp, *pBuf );
+
         if( ERROR( ret ) )
             return ret;
-        val = reinterpret_cast< guint32* >( val1 );
+
+        val1 = *pBuf;
+        val = ( guint32* )val1;
         return 0;
     }
+
     gint32 SetIntPtr( gint32 iProp, guint32* val )
     {
-        return SetIntProp( iProp, ( guint32 )val );
+        BufPtr pBuf( true );
+        *pBuf = ( intptr_t )val;
+        return SetProperty( iProp, *pBuf );
     }
 
     gint32 GetShortProp( gint32 iProp, guint16& val ) const
@@ -957,18 +965,26 @@ class CCfgDbOpener< IConfigDb >
 
         return ret;
     }
+
     gint32 GetIntPtr( gint32 iProp, guint32*& val ) const
     {
-        guint32 val1;
-        gint32 ret = GetIntProp( iProp, val1 );
+        intptr_t val1;
+        BufPtr pBuf( true );
+        gint32 ret = GetProperty( iProp, *pBuf );
+
         if( ERROR( ret ) )
             return ret;
-        val = reinterpret_cast< guint32* >( val1 );
+
+        val1 = *pBuf;
+        val = ( guint32* )val1;
         return 0;
     }
+
     gint32 SetIntPtr( gint32 iProp, guint32* val )
     {
-        return SetIntProp( iProp, ( guint32 )val );
+        BufPtr pBuf( true );
+        *pBuf = ( intptr_t )val;
+        return SetProperty( iProp, *pBuf );
     }
 
     gint32 GetShortProp( gint32 iProp, guint16& val ) const

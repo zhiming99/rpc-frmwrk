@@ -21,6 +21,7 @@
 #include "ifhelper.h"
 #include "iftasks.h"
 #include "counters.h"
+#include "tractgrp.h"
 
 #define ROUTER_OBJ_DESC             "./router.json"
 
@@ -642,33 +643,6 @@ class CRpcReqForwarderProxy :
         DBusMessage* pEvtMsg,
         IEventSink* pCallback );
 
-    // methods of CRpcBaseOperations
-    virtual gint32 OnModEvent(
-        EnumEventId iEvent,
-        const std::string& strModule )
-    {
-        gint32 ret = super::OnModEvent(
-            iEvent, strModule );
-
-        if( ERROR( ret ) )
-            return ret;
-
-        return ForwardModOnOfflineEvent(
-            iEvent, strModule );
-    }
-
-    virtual gint32 OnDBusEvent(
-        EnumEventId iEvent )
-    {
-        gint32 ret =
-            super::OnDBusEvent( iEvent );
-
-        if( ERROR( ret ) )
-            return ret;
-
-        return ForwardDBusEvent( iEvent );
-    }
-
     gint32 NormalizeMatch(
         IMessageMatch* pMatchExternal,
         MatchPtr& pMatchOut );
@@ -701,14 +675,19 @@ class CRpcReqForwarderProxy :
         return iCount;
     }
 
+    gint32 OnRmtSvrEvent(
+        EnumEventId iEvent,
+        const std::string& strIpAddr,
+        HANDLE hPort );
+
     protected:
 
-    gint32 ForwardModOnOfflineEvent(
-        EnumEventId iEvent,
-        const std::string& strModule );
+    gint32 OnRmtSvrOffline(
+        const std::string& strIpAddr,
+        HANDLE hPort );
 
-    gint32 ForwardDBusEvent(
-        EnumEventId iEvent );
+    gint32 GetParallelGrp(
+        TaskGrpPtr& pParaGrp );
 };
 
 struct CRpcTcpBridgeShared
@@ -1177,12 +1156,6 @@ class CRpcRouter :
     mutable stdrmutex   m_oLock;
     std::vector< EnumPropId >   m_vecTopicList;
 
-    gint32 StartStopReqFwdrProxy(
-        ObjPtr& pIf,
-        IMessageMatch* pMatch,
-        IEventSink* pCallback,
-        bool bStart );
-
     guint32 m_dwRole;
 
     public:
@@ -1246,8 +1219,9 @@ class CRpcRouter :
         IMessageMatch* pMatch,
         IEventSink* pCallback );
 
-    gint32 RemoveRemoteMatchByPortId(
-        guint32 dwPortId );
+    gint32 GetRemoteMatchByPortId(
+        guint32 dwPortId,
+        std::vector< MatchPtr >& vecMatches ) const;
 
     gint32 GetBridge(
         guint32 dwPortId,
@@ -1278,15 +1252,6 @@ class CRpcRouter :
 
     gint32 StartReqFwdr(
         InterfPtr& pReqFwder,
-        IEventSink* pCallback );
-
-    gint32 StartReqFwdrProxy( 
-        IMessageMatch* pMatch,
-        IEventSink* pCallback );
-
-    gint32 StopReqFwdrProxy( 
-        CRpcReqForwarderProxy* pIf,
-        IMessageMatch* pMatch,
         IEventSink* pCallback );
 
     gint32 SubscribeEvents();
@@ -1371,6 +1336,28 @@ class CRpcRouter :
         return ret;
     }
 
+    gint32 OnRmtSvrOnline(
+        const std::string& strIpAddr,
+        HANDLE hPort );
+
+    gint32 OnRmtSvrOffline(
+        const std::string& strIpAddr,
+        HANDLE hPort );
+
+    virtual gint32 OnRmtSvrEvent(
+        EnumEventId iEvent,
+        const std::string& strIpAddr,
+        HANDLE hPort );
+
+    gint32 ForwardModOnOfflineEvent(
+        EnumEventId iEvent,
+        const std::string& strModule );
+
+    gint32 ForwardDBusEvent(
+        EnumEventId iEvent );
+
+    public:
+
     inline gint32 GetObjAddr(
         IMessageMatch* pMatch,
         std::string& strDest )
@@ -1385,20 +1372,6 @@ class CRpcRouter :
         return ret;
     }
 
-    gint32 OnRmtSvrOnline(
-        const std::string& strIpAddr,
-        HANDLE hPort );
-
-    gint32 OnRmtSvrOffline(
-        const std::string& strIpAddr,
-        HANDLE hPort );
-
-    virtual gint32 OnRmtSvrEvent(
-        EnumEventId iEvent,
-        const std::string& strIpAddr,
-        HANDLE hPort );
-
-    public:
     inline gint32 GetReqFwdrProxy(
         IMessageMatch* pMatch,
         InterfPtr& pIf )
@@ -1448,13 +1421,55 @@ class CRpcRouter :
         return RemoveProxy( strDest, pIf );
     }
 
-    gint32 ScheduleEventRelayTask(
-        IMessageMatch* pMatch,
-        IEventSink* pCallback,
-        CRpcReqForwarderProxy* pProxy,
-        bool bAdd );
-
     gint32 OnPreStop( IEventSink* pCallback );
+
+    gint32 BuildStartRecvTask(
+        IMessageMatch* pMatch,
+        TaskletPtr& pTask );
+
+    gint32 BuildStartStopReqFwdrProxy( 
+        IMessageMatch* pMatch,
+        bool bStart,
+        TaskletPtr& pTask );
+
+    gint32 BuildEventRelayTask(
+        IMessageMatch* pMatch,
+        bool bAdd,
+        TaskletPtr& pTask );
+
+    gint32 BuildAddMatchTask(
+        IMessageMatch* pMatch,
+        bool bEnable,
+        TaskletPtr& pTask );
+
+    gint32 RunEnableEventTask(
+        IEventSink* pCallback,
+        IMessageMatch* pMatch );
+
+    gint32 RunDisableEventTask(
+        IEventSink* pCallback,
+        IMessageMatch* pMatch );
+
+    // methods of CRpcBaseOperations
+    virtual gint32 OnModEvent(
+        EnumEventId iEvent,
+        const std::string& strModule )
+    {
+        return ForwardModOnOfflineEvent(
+            iEvent, strModule );
+    }
+
+    virtual gint32 OnDBusEvent(
+        EnumEventId iEvent )
+    {
+        gint32 ret =
+            super::OnDBusEvent( iEvent );
+
+        if( ERROR( ret ) )
+            return ret;
+
+        return ForwardDBusEvent( iEvent );
+    }
 };
 
 class CReqFwdrCloseRmtPortTask
@@ -1571,14 +1586,45 @@ class CRouterOpenRmtPortTask :
     { return 0; }
 };
 
-class CRouterEnableEventRelayTask :
+class CIfRollbackableTask :
     public CIfInterceptTaskProxy
 {
-    gint32 OnTaskCompleteEnable( gint32 iRetVal );
-    gint32 OnTaskCompleteDisable( gint32 iRetVal );
-
     public:
     typedef CIfInterceptTaskProxy super;
+    CIfRollbackableTask( const IConfigDb* pCfg )
+        : super( pCfg )
+    {}
+
+    gint32 AddRollbackTask(
+        TaskletPtr& pTask, bool bBack = true )
+    {
+        CCfgOpener oTaskCfg(
+            ( IConfigDb* ) GetConfig() );
+
+        guint32* intptr = nullptr;
+        gint32 ret = oTaskCfg.GetIntPtr(
+            propTransGrpPtr, intptr );
+        if( ERROR( ret ) )
+            return ret;
+
+        CIfTransactGroup* pTractGrp = reinterpret_cast
+            < CIfTransactGroup* >( intptr );
+        if( pTractGrp == nullptr )
+            return -EFAULT;
+
+        return pTractGrp->AddRollback(
+            pTask, bBack );
+    }
+    
+    gint32 OnCancel( gint32 dwContext )
+    { return OnTaskComplete( -ECANCELED ); }
+};
+
+class CRouterEnableEventRelayTask :
+    public CIfRollbackableTask
+{
+    public:
+    typedef CIfRollbackableTask super;
 
     // we will utilize the
     // CIfRetryTask::OnComplete's notification
@@ -1598,18 +1644,24 @@ class CRouterEnableEventRelayTask :
     virtual gint32 OnTaskComplete( gint32 iRetVal );
 };
 
-class CRouterStartReqFwdrProxyTask :
+class CRouterStartRecvTask :
     public CIfInterceptTaskProxy
 {
-    gint32 OnTaskCompleteStart( gint32 iRetVal );
-    gint32 OnTaskCompleteStop( gint32 iRetVal );
-
-    gint32 RemoveMatch(
-        CRpcReqForwarderProxy* pIf,
-        IMessageMatch* pMatch );
-
     public:
     typedef CIfInterceptTaskProxy super;
+    CRouterStartRecvTask ( const IConfigDb* pCfg )
+        : super( pCfg )
+    { SetClassId( clsid( CRouterStartRecvTask ) ); }
+
+    virtual gint32 RunTask();
+};
+
+class CRouterStartReqFwdrProxyTask :
+    public CIfRollbackableTask
+{
+    gint32 OnTaskCompleteStart( gint32 iRetVal );
+    public:
+    typedef CIfRollbackableTask super;
 
     // we will utilize the
     // CIfRetryTask::OnComplete's notification
@@ -1643,11 +1695,11 @@ class CReqFwdrEnableRmtEventTask :
     virtual gint32 OnTaskComplete( gint32 iRetVal );
 };
 
-class CBridgeAddRemoteMatchTask :
-    public CIfInterceptTaskProxy
+class CRouterAddRemoteMatchTask :
+    public CIfRollbackableTask
 {
     public:
-    typedef CIfInterceptTaskProxy super;
+    typedef CIfRollbackableTask super;
 
     // parameters:
     // 0: bAdd
@@ -1655,9 +1707,9 @@ class CBridgeAddRemoteMatchTask :
     // propIfPtr
     // propEventSink
     // propIoMgr
-    CBridgeAddRemoteMatchTask( const IConfigDb* pCfg )
+    CRouterAddRemoteMatchTask( const IConfigDb* pCfg )
         : super( pCfg )
-    { SetClassId( clsid( CBridgeAddRemoteMatchTask ) ); }
+    { SetClassId( clsid( CRouterAddRemoteMatchTask ) ); }
 
     virtual gint32 RunTask();
     virtual gint32 OnTaskComplete( gint32 iRetVal );
@@ -1665,6 +1717,22 @@ class CBridgeAddRemoteMatchTask :
         CRpcRouter* pRouter,
         IMessageMatch* pMatch,
         bool bEnable );
+};
+
+class CRouterEventRelayRespTask :
+    public CIfInterceptTaskProxy
+{
+    public:
+    typedef CIfInterceptTaskProxy super;
+
+    CRouterEventRelayRespTask( const IConfigDb* pCfg )
+        : super( pCfg )
+    { SetClassId( clsid( CRouterEventRelayRespTask ) ); }
+
+    virtual gint32 RunTask()
+    { return STATUS_PENDING; }
+
+    virtual gint32 OnTaskComplete( gint32 iRetVal );
 };
 
 class CReqFwdrForwardRequestTask :

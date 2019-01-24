@@ -41,7 +41,6 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRY( COutgoingPacket );
     INIT_MAP_ENTRY( CIncomingPacket );
 
-    INIT_MAP_ENTRYCFG( CBridgeAddRemoteMatchTask );
     INIT_MAP_ENTRYCFG( CDBusProxyFdo );
     INIT_MAP_ENTRYCFG( CDBusProxyPdo );
     INIT_MAP_ENTRYCFG( CFidoRecvDataTask );
@@ -93,6 +92,9 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CRouterStartReqFwdrProxyTask );
     INIT_MAP_ENTRYCFG( CRouterStopBridgeProxyTask );
     INIT_MAP_ENTRYCFG( CRouterStopBridgeTask );
+    INIT_MAP_ENTRYCFG( CRouterStartRecvTask );
+    INIT_MAP_ENTRYCFG( CRouterAddRemoteMatchTask );
+    INIT_MAP_ENTRYCFG( CRouterEventRelayRespTask );
     INIT_MAP_ENTRYCFG( CRpcTcpFidoDrv );
     END_FACTORY_MAPS;
 };

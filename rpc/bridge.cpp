@@ -1394,7 +1394,6 @@ gint32 CRpcTcpBridge::EnableRemoteEventInternal(
     do{
         // NOTE: we use the original match for
         // dbus listening
-        CParamList oParams;
         CCfgOpenerObj oMatch( pMatch );
 
         // overwrite the propIpAddr property
@@ -1404,58 +1403,10 @@ gint32 CRpcTcpBridge::EnableRemoteEventInternal(
         oMatch.CopyProp( propSrcTcpPort, this );
         oMatch.CopyProp( propPortId, this );
 
-        oParams.Push( bEnable );
-        oParams.Push( ObjPtr( pMatch ) );
-
-        // this callback is intercepted by
-        // CRouterEnableEventRelayTask
-        oParams.SetObjPtr( propEventSink,
-            ObjPtr( pCallback ) );
-
-        ret = oParams.SetObjPtr(
-            propIfPtr, ObjPtr( this ) );
-
-        if( ERROR( ret ) )
-            break;
-
-        oParams.SetObjPtr(
-            propIoMgr, GetIoMgr() );
-
-        // create a task for this async call
-        TaskletPtr pTask;
-        ret = pTask.NewObj(
-            clsid( CBridgeAddRemoteMatchTask ),
-            oParams.GetCfg() );
-
-        if( ERROR( ret ) )
-            break;
-
-        CBridgeAddRemoteMatchTask*
-            pMatchTask = pTask;
-
-        CfgPtr pResp( true );
-        pMatchTask->SetRespData( pResp );
-
-        ret = ( *pTask )( eventZero );
-
-    }while( 0 );
-
-    return ret;
-}
-
-gint32 CBridgeAddRemoteMatchTask::AddRemoteMatchInternal(
-    CRpcRouter* pRouter,
-    IMessageMatch* pMatch,
-    bool bEnable )
-{
-    gint32 ret = 0;
-    do{
-        if( pRouter == nullptr ||
-            pMatch == nullptr )
-            return false;
-
-        // add the match to the m_mapRmtMatches
+        // trim the match properties to the
+        // necessary ones
         MatchPtr pRtMatch;
+        CRpcRouter* pRouter = GetParent();
         ret = pRouter->GetMatchToAdd(
             pMatch, true, pRtMatch );
 
@@ -1464,156 +1415,17 @@ gint32 CBridgeAddRemoteMatchTask::AddRemoteMatchInternal(
 
         if( bEnable )
         {
-            ret = pRouter->AddRemoteMatch(
-                pMatch, this );
+            ret = pRouter->RunEnableEventTask(
+                pCallback, pRtMatch );
         }
         else
         {
-            ret = pRouter->RemoveRemoteMatch(
-                pMatch, this );
-        }
-    }while( 0 );
 
-    return ret;
-}
-
-gint32 CBridgeAddRemoteMatchTask::RunTask()
-{
-    gint32 ret = 0;
-    do{
-        CParamList oParams( m_pCtx );
-        InterfPtr pIf;
-        ObjPtr pObj;
-        ret = oParams.GetObjPtr( propIfPtr, pObj );
-        if( ERROR( ret ) )
-            break;
-
-        pIf = pObj;
-        if( pIf.IsEmpty() )
-        {
-            ret = -EFAULT;
-            break;
-        }
-
-        CRpcTcpBridge* pBridge = pIf;
-        if( pBridge == nullptr )
-        {
-            ret = -EFAULT;
-            break;
-        }
-
-        CRpcRouter* pRouter = pBridge->GetParent();
-        if( pRouter == nullptr )
-        {
-            ret = -EFAULT;
-            break;
-        }
-
-        bool bEnable = false;
-        MatchPtr pMatch;
-
-        ret = oParams.GetBoolProp( 0, bEnable );
-        if( ERROR( ret ) )
-            break;
-
-        ret = oParams.GetObjPtr( 1, pObj );
-        if( ERROR( ret ) )
-            break;
-        pMatch = pObj;
-
-        ret = AddRemoteMatchInternal(
-            pRouter, pMatch, bEnable );
-
-    }while( 0 );
-
-    if( ret != STATUS_PENDING ||
-        ret != STATUS_MORE_PROCESS_NEEDED )
-    {
-        ret = OnTaskComplete( ret );
-    }
-
-    return ret;
-}
-
-gint32 CBridgeAddRemoteMatchTask::OnTaskComplete(
-    gint32 iRetVal )
-{
-    // OnTaskComplete will be called when the 
-    gint32 ret = 0;
-    CParamList oParams( m_pCtx );
-
-    do{
-        EventPtr pEvent;
-        ret = GetInterceptTask( pEvent );
-        if( ERROR( ret ) )
-            break;
-
-        InterfPtr pIf;
-        CRpcTcpBridge* pBridge = nullptr;
-        
-        do{
-            ObjPtr pObj;
-            ret = oParams.GetObjPtr( propIfPtr, pObj );
-            if( ERROR( ret ) )
-                break;
-
-            pIf = pObj;
-            if( pIf.IsEmpty() )
-            {
-                ret = -EFAULT;
-                break;
-            }
-
-            pBridge = pIf;
-            if( pBridge == nullptr )
-            {
-                ret = -EFAULT;
-                break;
-            }
-
-            if( ERROR( iRetVal ) )
-            {
-                // rollback what we have done
-                bool bEnable = false;
-                MatchPtr pMatch;
-
-                ret = oParams.GetBoolProp(
-                    0, bEnable );
-
-                if( ERROR( ret ) )
-                    break;
-
-                ret = oParams.GetObjPtr( 1, pObj );
-
-                if( ERROR( ret ) )
-                    break;
-
-                pMatch = pObj;
-                if( bEnable )
-                {
-                    // FIXME: unknown side effects.
-                    // remove the failed match
-                    AddRemoteMatchInternal(
-                        pBridge->GetParent(),
-                        pMatch, false );
-                }
-            }
-
-        }while( 0 );
-
-        if( IsPending() )
-        {
-            CParamList oResp;
-            oResp[ propReturnValue ] = iRetVal;
-            ret = pBridge->SetResponse(
-                pEvent, oResp.GetCfg() );
+            ret = pRouter->RunDisableEventTask(
+                pCallback, pRtMatch );
         }
 
     }while( 0 );
-
-    if( ret != STATUS_PENDING &&
-        ret != STATUS_MORE_PROCESS_NEEDED )
-        oParams.ClearParams();
 
     return ret;
 }
@@ -1783,13 +1595,7 @@ gint32 CRpcTcpBridge::ForwardEvent(
     do{
         CReqBuilder oBuilder( this );
 
-        CCfgOpenerObj oCfg( this );
-
-        // the ip addr is just a placeholder
-        std::string strSrcIp;
-        oCfg.GetStrProp( propIpAddr, strSrcIp );
-
-        oBuilder.Push( strSrcIp );
+        oBuilder.Push( strDestIp );
         oBuilder.Push( DMsgPtr( pEvtMsg ) );
 
         oBuilder.SetMethodName(
@@ -2441,6 +2247,8 @@ gint32 CRpcTcpBridge::SendFetch_Server(
 
         oTaskParams[ propEventSink ] =
             ObjPtr( pCallback );
+
+        oTaskParams.CopyProp( propPortId, this );
 
         TaskletPtr pTask;
 

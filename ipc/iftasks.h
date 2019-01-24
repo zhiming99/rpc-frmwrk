@@ -345,7 +345,7 @@ class CIfTaskGroup
     bool exist( TaskletPtr& pTask );
 
     bool IsRunning() const;
-    void SetRunning( bool bRun );
+    void SetRunning();
 
     bool IsCanceling() const;
     void SetCanceling( bool bCancel );
@@ -355,9 +355,11 @@ class CIfTaskGroup
 
     virtual guint32 GetTaskCount() 
     {
+        CStdRTMutex oLock( GetLock() );
         return m_queTasks.size();
     }
 
+    virtual gint32 InsertTask( TaskletPtr& pTask );
     virtual guint32 Clear() 
     {
         CStdRTMutex oLock( GetLock() );
@@ -462,7 +464,6 @@ class CIfParallelTaskGrp
 
     gint32 RunTaskDirect( TaskletPtr& pTask );
     gint32 AddAndRun( TaskletPtr& pTask );
-    bool IsRunning();
     gint32 AppendTask( TaskletPtr& pTask );
 
     gint32 FindTask( guint64 iTaskId,
@@ -477,6 +478,7 @@ class CIfParallelTaskGrp
 
     virtual guint32 GetTaskCount() 
     {
+        CStdRTMutex oLock( GetLock() );
         return m_setTasks.size() +
             m_setPendingTasks.size();
     }

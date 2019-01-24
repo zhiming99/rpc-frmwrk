@@ -512,13 +512,10 @@ gint32 CIfRetryTask::OnIrpComplete(
     else
     {
         ret = pIrp->GetStatus();
-        if( ret == -EAGAIN )
-        {
-            // schedule to retry
+        if( Retriable( ret ) )
+            ret = STATUS_MORE_PROCESS_NEEDED;
+        else if( ret == -EAGAIN )
             ret = ERROR_FAIL;
-            if( CanRetry() )
-                ret = STATUS_MORE_PROCESS_NEEDED;
-        }
     }
 
     return ret;
@@ -722,23 +719,13 @@ gint32 CIfRetryTask::Process( guint32 dwContext )
         {
             break;
         }
-        else if( ret == STATUS_MORE_PROCESS_NEEDED )
+        else if( Retriable( ret ) )
         {
-            if( CanRetry() )
-            {
-                break;
-            }
-            ret = ERROR_FAIL;
+            ret = STATUS_MORE_PROCESS_NEEDED;
+            break;
         }
         else if( ret == -EAGAIN )
-        {
-            if( CanRetry() )
-            {
-                ret = STATUS_MORE_PROCESS_NEEDED;
-                break;
-            }
             ret = ERROR_FAIL;
-        }
 
         OnComplete( ret );
         break;
@@ -954,15 +941,13 @@ gint32 CIfEnableEventTask::OnIrpComplete(
             ret = pIf->SetStateOnEvent(
                 eventModOffline );
         }
-        else if( unlikely( ret == -EAGAIN ) )
+        else if( Retriable( ret ) )
         {
-            // schedule to retry
-            ret = ERROR_FAIL;
-            if( CanRetry() )
-                ret = STATUS_MORE_PROCESS_NEEDED;
-
+            ret = STATUS_MORE_PROCESS_NEEDED;
             break;
         }
+        else if( ret == -EAGAIN )
+            ret = ERROR_FAIL;
 
     }while( 0 );
 
@@ -1135,17 +1120,14 @@ gint32 CIfOpenPortTask::RunTask()
         }
 
         ret = pIf->OpenPort( this );
-        if( ret == -EAGAIN )
+        if( Retriable( ret ) )
         {
-            // possibly the port is starting by someone
-            // else
-            if( CanRetry() )
-            {
-                ret = STATUS_MORE_PROCESS_NEEDED;
-                break;
-            }
-            // otherwise, just quit with error.
+            ret = STATUS_MORE_PROCESS_NEEDED;
+            break;
         }
+        else if( ret == -EAGAIN )
+            ret = ERROR_FAIL;
+        // otherwise, just quit with error.
 
     }while( 0 );
 
@@ -1183,6 +1165,33 @@ void CIfTaskGroup::SetCanceling( bool bCancel )
         oCfg.RemoveProperty( propCanceling );
         oCfg.RemoveProperty( propCancelTid );
     }
+}
+
+gint32 CIfTaskGroup::InsertTask(
+    TaskletPtr& pTask )
+{
+    if( pTask.IsEmpty() )
+        return -EINVAL;
+
+    CStdRTMutex oTaskLock( GetLock() );
+
+    if( IsCanceling() )
+        return ERROR_STATE;
+
+    if( IsRunning() )
+        return ERROR_STATE;
+
+    CCfgOpenerObj oCfg( ( CObjBase* )pTask );
+
+    gint32 ret = oCfg.SetObjPtr(
+        propParentTask, ObjPtr( this ) );
+
+    if( ERROR( ret ) )
+        return ret;
+
+    m_queTasks.push_front( pTask );
+
+    return 0;
 }
 
 gint32 CIfTaskGroup::AppendTask(
@@ -1291,6 +1300,26 @@ gint32 CIfTaskGroup::OnRetry()
     return RunTask();
 }
 
+bool CIfTaskGroup::IsRunning() const
+{
+    CStdRTMutex oTaskLock( GetLock() );
+    return GetConfig()->exist( propRunning );
+}
+
+void CIfTaskGroup::SetRunning()
+{
+
+    CStdRTMutex oTaskLock( GetLock() );
+    CCfgOpener oCfg(
+        ( IConfigDb* ) GetConfig() );
+    if( !oCfg.exist( propRunning ) )
+    {
+        // this is a one-time flag to indicate the
+        // task group is now scheduled to run.
+        oCfg[ propRunning ] = true;
+    }
+    return;
+}
 gint32 CIfTaskGroup::RunTask()
 {
     gint32 ret = 0;
@@ -1306,6 +1335,7 @@ gint32 CIfTaskGroup::RunTask()
         return STATUS_PENDING;
     }
 
+    SetRunning();
     CCfgOpener oCfg(
         ( IConfigDb* )GetConfig() );
 
@@ -2085,12 +2115,7 @@ gint32 CIfParallelTaskGrp::RunTask()
     do{
 
         std::set< TaskletPtr > setTasksToRun;
-        if( !oCfg.exist( propRunning ) )
-        {
-            // this is a one-time flag to indicate the
-            // task group is now scheduled to run.
-            oCfg[ propRunning ] = true;
-        }
+        SetRunning();
 
         setTasksToRun = m_setPendingTasks;
 
@@ -2262,12 +2287,6 @@ gint32 CIfParallelTaskGrp::AddAndRun(
     }while( 0 );
 
     return 0;
-}
-
-bool CIfParallelTaskGrp::IsRunning()
-{
-    CStdRTMutex oTaskLock( GetLock() );
-    return GetConfig()->exist( propRunning );
 }
 
 gint32 CIfParallelTaskGrp::AppendTask(
@@ -2874,23 +2893,13 @@ gint32 CIfParallelTask::Process(
         {
             break;
         }
-        else if( ret == STATUS_MORE_PROCESS_NEEDED )
+        else if( Retriable( ret ) )
         {
-            if( CanRetry() )
-            {
-                break;
-            }
-            ret = ERROR_FAIL;
+            ret = STATUS_MORE_PROCESS_NEEDED;
+            break;
         }
         else if( ret == -EAGAIN )
-        {
-            if( CanRetry() )
-            {
-                ret = STATUS_MORE_PROCESS_NEEDED;
-                break;
-            }
             ret = ERROR_FAIL;
-        }
 
         OnComplete( ret );
 
@@ -3079,12 +3088,10 @@ gint32 CIfIoReqTask::SubmitIoRequest()
         ret = pIf->SendMethodCall(
             pReq, pResp, this );
 
-        if( ret == -EAGAIN )
-        {
+        if( Retriable( ret ) )
+            ret = STATUS_MORE_PROCESS_NEEDED;
+        else if( ret == -EAGAIN )
             ret = ERROR_FAIL;
-            if( CanRetry() )
-                ret = STATUS_MORE_PROCESS_NEEDED;
-        }
 
     }while( 0 );
 
@@ -3240,23 +3247,13 @@ gint32 CIfIoReqTask::Process(
         {
             break;
         }
-        else if( ret == STATUS_MORE_PROCESS_NEEDED )
+        else if( Retriable( ret ) )
         {
-            if( CanRetry() )
-            {
-                break;
-            }
-            ret = ERROR_FAIL;
+            ret = STATUS_MORE_PROCESS_NEEDED;
+            break;
         }
         else if( ret == -EAGAIN )
-        {
-            if( CanRetry() )
-            {
-                ret = STATUS_MORE_PROCESS_NEEDED;
-                break;
-            }
             ret = ERROR_FAIL;
-        }
 
         OnComplete( ret );
 
@@ -3941,23 +3938,13 @@ gint32 CIfInvokeMethodTask::Process(
         {
             break;
         }
-        else if( ret == STATUS_MORE_PROCESS_NEEDED )
+        else if( Retriable( ret ) )
         {
-            if( CanRetry() )
-            {
-                break;
-            }
-            ret = ERROR_FAIL;
+            ret = STATUS_MORE_PROCESS_NEEDED;
+            break;
         }
         else if( ret == -EAGAIN )
-        {
-            if( CanRetry() )
-            {
-                ret = STATUS_MORE_PROCESS_NEEDED;
-                break;
-            }
             ret = ERROR_FAIL;
-        }
 
         OnComplete( ret );
 

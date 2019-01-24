@@ -1162,15 +1162,30 @@ class CRouterRemoteMatch : public CMessageMatch
         const std::string strIpAddr,
         DBusMessage* pReqMsg ) const
     {
-        gint32 ret =
-            super::IsMyMsgOutgoing( pReqMsg );
+        gint32 ret = 0;
+        do{
+            ret = super::IsMyMsgOutgoing( pReqMsg );
 
-        if( ERROR( ret ) )
-            return ret;
+            if( ERROR( ret ) )
+                return ret;
 
-        CCfgOpenerObj oCfg( this );
-        ret = oCfg.IsEqual(
-            propIpAddr, strIpAddr );
+            DMsgPtr pMsg( pReqMsg );
+            CCfgOpenerObj oCfg( this );
+
+            std::string strDest =
+                pMsg.GetDestination();
+
+            ret = oCfg.IsEqual(
+                propDestDBusName, strDest );
+
+            if( ERROR( ret ) )
+                break;
+
+            ret = oCfg.IsEqual(
+                propIpAddr, strIpAddr );
+            break;
+
+        }while( 0 );
 
         return ret;
     }
@@ -1277,12 +1292,6 @@ class CRouterLocalMatch : public CRouterRemoteMatch
             propIpAddr, strValue );
 
         strAll += ",IpAddr=";
-        strAll += strValue;
-
-        oCfg.GetStrProp(
-            propDestDBusName, strValue );
-
-        strAll += ",Destination=";
         strAll += strValue;
 
         oCfg.GetStrProp(
