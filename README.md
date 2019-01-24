@@ -20,6 +20,9 @@ This framework depends on the following packags:
 11. `Streaming support to provide double-direction stream transfer`
 
 ---
+[`Thu Jan 24 17:03:14 CST 2019`]   
+1. Continued to refact part of the CRpcRouter. Now I expect there are some trivial patches need to be done in the coming days of this week before the refact task is done.   
+
 [`Sat Jan 19 23:43:28 CST 2019`]   
 1. The redesign and refact work are almost done. Next week we can start the debugging of RPC module hopefully.   
 
