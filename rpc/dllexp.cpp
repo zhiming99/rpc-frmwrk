@@ -95,6 +95,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CRouterAddRemoteMatchTask );
     INIT_MAP_ENTRYCFG( CRouterEventRelayRespTask );
     INIT_MAP_ENTRYCFG( CRpcTcpFidoDrv );
+    INIT_MAP_ENTRYCFG( CIfRouterState );
     END_FACTORY_MAPS;
 };
 

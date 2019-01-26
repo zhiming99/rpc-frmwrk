@@ -1120,6 +1120,14 @@ class CRouterStopBridgeTask
     {  return OnTaskComplete( -ECANCELED ); }
 };
 
+class CIfRouterState : public CIfServerState
+{
+    public:
+    typedef CIfServerState super;
+    CIfRouterState( const IConfigDb* pCfg );
+    virtual gint32 SubscribeEvents();
+};
+
 class CRpcRouter :
     public virtual CAggInterfaceServer
 {
@@ -1167,8 +1175,6 @@ class CRpcRouter :
 
     CRpcRouter( const IConfigDb* pCfg );
     ~CRpcRouter();
-
-    static CfgPtr InitCfg( const IConfigDb* pCfg );
 
     virtual const EnumClsid GetIid() const
     { return iid( CRpcRouter ); }
@@ -1286,16 +1292,24 @@ class CRpcRouter :
         DMsgPtr& pMsg,
         std::vector< MatchPtr > vecMatches );
 
+    using DEST_IF =
+        std::pair< std::string, InterfPtr >;
+
+    using IFMAP_CITR =
+        std::map< std::string, InterfPtr >::const_iterator;
+
     inline gint32 GetReqFwdrProxy(
         const std::string& strDest,
-        InterfPtr& pIf )
+        InterfPtr& pIf ) const
     {
         CStdRMutex oRouterLock( GetLock() );
-        if( m_mapReqProxies.find( strDest ) ==
-            m_mapReqProxies.end() )
+        IFMAP_CITR citr =
+            m_mapReqProxies.find( strDest );
+
+        if( citr == m_mapReqProxies.cend() )
             return -ENOENT;
 
-        pIf = m_mapReqProxies[ strDest ];
+        pIf = citr->second;
         return 0;
     }
 

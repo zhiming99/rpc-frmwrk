@@ -44,5 +44,6 @@ class CIfRouterTest :
     void tearDown();
     void testSvrStartStop();
     void testCliStartStop();
+    CfgPtr InitRouterCfg();
 };
 

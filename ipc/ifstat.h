@@ -158,6 +158,9 @@ class CInterfaceState : public IInterfaceState
     static std::map< STATMAP_KEY, EnumIfState >
         m_mapState;
 
+    gint32 SubscribeEventsInternal(
+        const std::vector< EnumPropId >& vecEvtToSubscribe );
+
     public:
 
     inline CIoManager* GetIoMgr() const

@@ -1711,7 +1711,8 @@ gint32 CRpcInterfaceServer::SetupReqIrp(
             }
             else
             {
-                ret = -ENOTSUP;
+                ret = super::SetupReqIrp( pIrp,
+                    pReqCall, pCallback );
             }
             break;
         }

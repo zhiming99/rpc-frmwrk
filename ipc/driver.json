@@ -242,8 +242,9 @@
             "PreloadableObjects" :
             [
                 {
-                    "ObjectName" : "RpcRouter-0",
-                    "ObjectClass" : "RpcRouterImpl"
+                    "comment" : "remove the following surfix '-1' to enable the object",
+                    "ObjectName-1" : "RpcRouter-0",
+                    "ObjectClass-1" : "RpcRouterImpl"
                 }
             ],
             "ClassFactories" :

@@ -207,6 +207,7 @@ typedef enum : guint32
     DECL_CLSID( CRouterAddRemoteMatchTask ),
     DECL_CLSID( CRouterEventRelayRespTask ),
     DECL_CLSID( CIfTransactGroup ),
+    DECL_CLSID( CIfRouterState ),
     DECL_CLSID( MaxClsid ),
     DECL_CLSID( ReservedClsidEnd ) = 0x0FFFFFFF,
     DECL_CLSID( ReservedIidStart ) = 0x10000000,

@@ -22,6 +22,8 @@
 
 #include "routmain.h"
 #include <ifhelper.h>
+#include <frmwrk.h>
+#include <rpcroute.h>
 
 #include <cppunit/extensions/TestFactoryRegistry.h>
 #include <cppunit/ui/text/TestRunner.h>
@@ -29,7 +31,10 @@
 
 CPPUNIT_TEST_SUITE_REGISTRATION( CIfRouterTest );
 
-bool bPause = false;
+// router role: 1. reqfwdr, 2. bridge, 3. both
+guint32 dwRole = 1;
+
+
 void CIfRouterTest::setUp()
 {
     gint32 ret = 0;
@@ -48,11 +53,14 @@ void CIfRouterTest::setUp()
 
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 
-        IService* pSvc = m_pMgr;
+        CIoManager* pSvc = m_pMgr;
         if( pSvc != nullptr )
             ret = pSvc->Start();
         else
             ret = -EFAULT;
+
+        pSvc->SetCmdLineOpt(
+            propRouterRole, dwRole );
 
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 
@@ -78,26 +86,96 @@ void CIfRouterTest::tearDown()
     }while( 0 );
 }
 
+CfgPtr CIfRouterTest::InitRouterCfg()
+{
+    CfgPtr ptrCfg;
+    gint32 ret = 0;
+
+    do{
+        ret = CRpcServices::LoadObjDesc(
+            ROUTER_OBJ_DESC,
+            OBJNAME_ROUTER,
+            true, ptrCfg );
+
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpener oCfg( ( IConfigDb* )ptrCfg );
+        oCfg[ propIoMgr ] = m_pMgr;
+        oCfg[ propIfStateClass ] =
+            clsid( CIfRouterState );
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+    {
+        std::string strMsg = DebugMsg(
+            ret, "Error loading file router.json" );
+        throw std::runtime_error( strMsg );
+    }
+
+    return ptrCfg;
+}
+
 void CIfRouterTest::testSvrStartStop()
 {
     CPPUNIT_ASSERT( !m_pMgr.IsEmpty() );
 
-    // the router will be started as a preloadable
-    // object, so we need to do nothing, and just wait.
-    sleep( 1 );
+    CfgPtr pCfg = InitRouterCfg();
+    CPPUNIT_ASSERT( !pCfg.IsEmpty() );
 
+    InterfPtr pIf;
+    gint32 ret = pIf.NewObj(
+        clsid( CRpcRouterImpl ), pCfg );
+    CPPUNIT_ASSERT( SUCCEEDED( ret ) );
+
+    CInterfaceServer* pSvr = pIf;
+    CPPUNIT_ASSERT( pSvr != nullptr );
+
+    CPPUNIT_ASSERT( SUCCEEDED( pIf->Start() ) );
+
+    while( pSvr->IsConnected() )
+        sleep( 1 );
+
+    CPPUNIT_ASSERT( SUCCEEDED( pIf->Stop() ) );
+    
     return;
 }
 
 int main( int argc, char** argv )
 {
-
     CppUnit::TextUi::TestRunner runner;
     CppUnit::TestFactoryRegistry& registry =
         CppUnit::TestFactoryRegistry::getRegistry();
 
-    if( argc > 1 && strcmp( argv[ 1 ], "p" ) == 0 )
-        bPause = true;
+    int opt = 0;
+    int ret = 0;
+    while( ( opt = getopt( argc, argv, "r:" ) ) != -1 )
+    {
+        switch (opt)
+        {
+        case 'r':
+            {
+                dwRole = ( guint32 )atoi( optarg );
+                if( dwRole == 0 || dwRole > 3 )
+                    ret = -EINVAL;
+                break;
+            }
+        default: /*  '?' */
+            ret = -EINVAL;
+            break;
+        }
+        if( ERROR( ret ) )
+            break;
+    }
+
+    if( ERROR( ret ) )
+    {
+        fprintf( stderr,
+            "Usage: %s [-r <role number>]\n",
+            argv[ 0 ] );
+        exit( -ret );
+    }
 
     runner.addTest( registry.makeTest() );
     bool wasSuccessful = runner.run( "", false );

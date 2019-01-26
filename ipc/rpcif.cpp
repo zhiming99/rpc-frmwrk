@@ -66,6 +66,10 @@ CGenericInterface::CGenericInterface(
 static CfgPtr InitIfProxyCfg(
     const IConfigDb * pCfg )
 {
+    CCfgOpener oOldCfg( pCfg );
+    if( oOldCfg.exist( propIfStateClass ) )
+        return CfgPtr( pCfg );
+
     CCfgOpener oNewCfg;
     *oNewCfg.GetCfg() = *pCfg;
 
@@ -4627,6 +4631,11 @@ gint32 CInterfaceProxy::CancelRequest(
 static CfgPtr InitIfSvrCfg(
     const IConfigDb * pCfg )
 {
+    CCfgOpener oOldCfg( pCfg );
+    if( oOldCfg.exist( propIfStateClass ) )
+        return CfgPtr( const_cast
+            < IConfigDb* >( pCfg ) );
+
     CCfgOpener oNewCfg;
     *oNewCfg.GetCfg() = *pCfg;
 

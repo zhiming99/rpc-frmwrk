@@ -146,7 +146,36 @@ CInterfaceState::CInterfaceState(
 
 CInterfaceState::~CInterfaceState()
 {
-    // ClosePort();
+    ClosePort();
+}
+
+gint32 CInterfaceState::SubscribeEventsInternal(
+    const std::vector< EnumPropId >& vecEvtToSubscribe )
+{
+    gint32 ret = 0;
+
+    UnsubscribeEvents();
+
+    CConnPointHelper oCpHelper( GetIoMgr() );
+    CRpcInterfaceBase* pIf = GetInterface();
+    EventPtr pEvent( pIf );
+
+    vector< EnumPropId > vecEvents;
+
+    for( auto elem : vecEvtToSubscribe )
+    {
+        ret = oCpHelper.SubscribeEvent(
+            elem, pEvent );
+
+        if( ERROR( ret ) )
+            break;
+
+        vecEvents.push_back( elem );
+    }
+
+    CLEAR_SUBSCRIPTION_ON_ERROR();
+
+    return ret;
 }
 
 gint32 CInterfaceState::TestSetState(
@@ -591,17 +620,15 @@ gint32 CInterfaceState::OpenPortInternal(
 gint32 CInterfaceState::ClosePort()
 {
     gint32 ret = 0;
-
     if( m_hPort != 0 )
     {
         ret = GetIoMgr()->ClosePort(
             m_hPort, GetInterface() );
 
         m_hPort = 0;
+        UnsubscribeEvents();
+        SetStateOnEvent( cmdClosePort );
     }
-
-    UnsubscribeEvents();
-    SetStateOnEvent( cmdClosePort );
     return ret;
 }
 
@@ -609,9 +636,6 @@ gint32 CInterfaceState::ClosePort()
 gint32 CInterfaceState::UnsubscribeEvents()
 {
     gint32 ret = 0;
-
-    CRpcInterfaceBase* pIf = GetInterface();
-    EventPtr pEvent( pIf );
 
     CConnPointHelper oCpHelper( GetIoMgr() );
     vector< EnumPropId > vecEvents;
@@ -623,10 +647,19 @@ gint32 CInterfaceState::UnsubscribeEvents()
         m_vecTopicList.clear();
     }
 
-    for( guint32 i = 0; i < vecEvents.size(); ++i )
+    // when there is no subscription, the
+    // interface may not be valid, so better stop
+    // here.
+    if( vecEvents.empty() )
+        return ret;
+
+    CRpcInterfaceBase* pIf = GetInterface();
+    EventPtr pEvent( pIf );
+
+    for( auto elem : vecEvents )
     {
         oCpHelper.UnsubscribeEvent(
-            vecEvents[ i ], pEvent );
+            elem, pEvent );
     }
 
     return ret;
@@ -763,52 +796,15 @@ bool CLocalProxyState::IsMyDest(
 
 gint32 CLocalProxyState::SubscribeEvents()
 {
-    gint32 ret = 0;
+    vector< EnumPropId > vecEvtToSubscribe = {
+        propStartStopEvent,
+        propDBusModEvent,
+        propDBusSysEvent,
+        propAdminEvent,
+    };
 
-    CConnPointHelper oCpHelper( GetIoMgr() );
-
-    CRpcInterfaceBase* pIf = GetInterface();
-    EventPtr pEvent( pIf );
-
-    vector< EnumPropId > vecEvents;
-
-    do{
-        ret = oCpHelper.SubscribeEvent( 
-            propStartStopEvent, pEvent );
-
-        if( ERROR( ret ) )
-            break;
-
-        vecEvents.push_back( propStartStopEvent );
-
-        ret = oCpHelper.SubscribeEvent(
-            propDBusModEvent, pEvent );
-
-        if( ERROR( ret ) )
-            break;
-
-        vecEvents.push_back( propDBusModEvent );
-
-        ret = oCpHelper.SubscribeEvent(
-            propDBusSysEvent, pEvent );
-
-        if( ERROR( ret ) )
-            break;
-
-        vecEvents.push_back( propDBusSysEvent );
-
-        ret = oCpHelper.SubscribeEvent(
-            propAdminEvent, pEvent );
-
-        if( ERROR( ret ) )
-            break;
-
-        vecEvents.push_back( propAdminEvent );
-
-    }while( 0 );
-
-    CLEAR_SUBSCRIPTION_ON_ERROR();
-    return ret;
+    return SubscribeEventsInternal(
+        vecEvtToSubscribe );
 }
 
 gint32 CLocalProxyState::OpenPort(
@@ -827,73 +823,17 @@ CRemoteProxyState::CRemoteProxyState(
 
 gint32 CRemoteProxyState::SubscribeEvents()
 {
-    gint32 ret = 0;
+    vector< EnumPropId > vecEvtToSubscribe = {
+        propStartStopEvent,
+        propDBusModEvent,
+        propRmtModEvent,
+        propRmtSvrEvent,
+        propDBusSysEvent,
+        propAdminEvent
+    };
 
-    CConnPointHelper oCpHelper( GetIoMgr() );
-
-    CRpcInterfaceBase* pIf = GetInterface();
-    EventPtr pEvent( pIf );
-
-    vector< EnumPropId > vecEvents;
-
-    do{
-        ret = oCpHelper.SubscribeEvent( 
-            propStartStopEvent, pEvent );
-
-        if( ERROR( ret ) )
-            break;
-
-        vecEvents.push_back( propStartStopEvent );
-
-        // for router offline
-        ret = oCpHelper.SubscribeEvent(
-            propDBusModEvent, pEvent );
-
-        if( ERROR( ret ) )
-            break;
-
-        vecEvents.push_back( propDBusModEvent );
-
-        // for remote object on/offline
-        ret = oCpHelper.SubscribeEvent(
-            propRmtModEvent, pEvent );
-
-        if( ERROR( ret ) )
-            break;
-
-        vecEvents.push_back( propRmtModEvent );
-
-        // for remote server on/offline
-        ret = oCpHelper.SubscribeEvent(
-            propRmtSvrEvent, pEvent );
-
-        if( ERROR( ret ) )
-            break;
-
-        vecEvents.push_back( propRmtSvrEvent );
-
-        // for dbus offline
-        ret = oCpHelper.SubscribeEvent(
-            propDBusSysEvent, pEvent );
-
-        if( ERROR( ret ) )
-            break;
-
-        vecEvents.push_back( propDBusSysEvent );
-
-        ret = oCpHelper.SubscribeEvent(
-            propAdminEvent, pEvent );
-
-        if( ERROR( ret ) )
-            break;
-
-        vecEvents.push_back( propAdminEvent );
-
-    }while( 0 );
-
-    CLEAR_SUBSCRIPTION_ON_ERROR();
-
-    return ret;
+    return SubscribeEventsInternal(
+        vecEvtToSubscribe );
 }
 
 gint32 CRemoteProxyState::OnRmtModEvent(
@@ -950,52 +890,15 @@ CIfServerState::CIfServerState(
 
 gint32 CIfServerState::SubscribeEvents()
 {
-    gint32 ret = 0;
+    vector< EnumPropId > vecEvtToSubscribe = {
+        propDBusModEvent,
+        propStartStopEvent,
+        propDBusSysEvent,
+        propAdminEvent
+    };
 
-    CConnPointHelper oCpHelper( GetIoMgr() );
-
-    CRpcInterfaceBase* pIf = GetInterface();
-    EventPtr pEvent( pIf );
-    vector< EnumPropId > vecEvents;
-
-    do{
-        ret = oCpHelper.SubscribeEvent(
-            propDBusModEvent, pEvent );
-
-        if( ERROR( ret ) )
-            break;
-
-        vecEvents.push_back( propDBusModEvent );
-
-        ret = oCpHelper.SubscribeEvent( 
-            propStartStopEvent, pEvent );
-
-        if( ERROR( ret ) )
-            break;
-
-        vecEvents.push_back( propStartStopEvent );
-
-        ret = oCpHelper.SubscribeEvent(
-            propDBusSysEvent, pEvent );
-
-        if( ERROR( ret ) )
-            break;
-
-        vecEvents.push_back( propDBusSysEvent );
-
-        ret = oCpHelper.SubscribeEvent(
-            propAdminEvent, pEvent );
-
-        if( ERROR( ret ) )
-            break;
-
-        vecEvents.push_back( propAdminEvent );
-
-    }while( 0 );
-
-    CLEAR_SUBSCRIPTION_ON_ERROR();
-
-    return ret;
+    return SubscribeEventsInternal(
+        vecEvtToSubscribe );
 }
 
 gint32 CIfServerState::OpenPort(
@@ -1041,3 +944,4 @@ bool CIfServerState::IsMyDest(
 
     return true;
 }
+

@@ -25,44 +25,9 @@
 
 using namespace std;
 
-CfgPtr CRpcRouter::InitCfg(
-    const IConfigDb* pCfg )
-{
-    CfgPtr ptrCfg;
-    if( pCfg == nullptr )
-        return ptrCfg;
-
-    gint32 ret = 0;
-
-    do{
-        ret = LoadObjDesc(
-            ROUTER_OBJ_DESC,
-            OBJNAME_ROUTER,
-            true, ptrCfg );
-
-        if( ERROR( ret ) )
-            break;
-
-        CCfgOpener oCfg( ( IConfigDb* )ptrCfg );
-        ret = oCfg.CopyProp( propIoMgr, pCfg );
-        if( ERROR( ret ) )
-            break;
-
-    }while( 0 );
-
-    if( ERROR( ret ) )
-    {
-        string strMsg = DebugMsg( ret,
-            "Error loading file router.json" );
-        throw std::runtime_error( strMsg );
-    }
-
-    return ptrCfg;
-}
-
 CRpcRouter::CRpcRouter(
     const IConfigDb* pCfg )
-    : super( InitCfg( pCfg ) ),
+    : super( pCfg ),
     m_dwRole( 1 )
 {
     gint32 ret = 0;
@@ -2215,3 +2180,23 @@ gint32 CRpcRouter::ForwardDBusEvent(
     return ret;
 }
 
+
+CIfRouterState::CIfRouterState(
+    const IConfigDb* pCfg )
+    : super( pCfg )
+{
+    SetClassId( clsid( CIfRouterState ) );
+}
+
+gint32 CIfRouterState::SubscribeEvents()
+{
+    vector< EnumPropId > vecEvtToSubscribe = {
+        propStartStopEvent ,
+        propDBusModEvent,
+        propDBusSysEvent,
+        propRmtSvrEvent,
+        propAdminEvent,
+    };
+    return SubscribeEventsInternal(
+        vecEvtToSubscribe );
+}
