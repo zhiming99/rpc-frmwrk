@@ -21,7 +21,7 @@ This framework depends on the following packags:
 
 ---
 [`Thu Feb 07 21:17:48 CST 2019`]   
-1. Still debugging the CRpcRouter. The OpenRemotePort is almost completed now. And there still need a disconnection handler on the `reqfwdr` side to clean up the context for the unexpectedly disconnected proxy.   
+1. Still debugging the CRpcRouter. The `OpenRemotePort` is almost completed now. And there still need a disconnection handler on the `reqfwdr` side to clean up the context for the unexpectedly disconnected proxy.   
 
 [`Thu Jan 24 17:03:14 CST 2019`]   
 1. Continued to refact part of the CRpcRouter. Now I expect there are some trivial patches need to be done in the coming days of this week before the refact task is done.   
