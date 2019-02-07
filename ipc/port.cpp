@@ -255,7 +255,9 @@ gint32 CPort::GetProperty( gint32 iProp, CBuffer& oBuf ) const
             else if( PortType( m_dwFlags ) == PORTFLG_TYPE_PDO )
             {
                 if( m_pBusPort != nullptr )
-                 oBuf = ObjPtr( m_pBusPort );
+                    oBuf = ObjPtr( m_pBusPort );
+                else
+                    ret = -ENOENT;
             }
             else
             {
@@ -935,12 +937,6 @@ gint32 CPort::SubmitStartIrp( IRP* pIrp )
     gint32 ret = 0;
     guint32 dwOldState = PORT_STATE_INVALID;
 
-    ret = CanContinue(
-        pIrp, PORT_STATE_STARTING, &dwOldState );
-
-    if( ERROR( ret ) )
-        return ret;
-
     do{
 
         // in this way, we do not need to lock the
@@ -1007,6 +1003,12 @@ gint32 CPort::SubmitStartIrp( IRP* pIrp )
         if( SUCCEEDED( ret ) )
         {
             CStdRMutex oPortLock( GetLock() );
+
+            ret = CanContinue(
+                pIrp, PORT_STATE_STARTING, &dwOldState );
+
+            if( ERROR( ret ) )
+                return ret;
 
             // NOTE: we don't use CanContinue here
             // since this is the only thread this port
@@ -1251,6 +1253,7 @@ gint32 CPort::SubmitQueryStopIrp( IRP* pIrp )
             }
         }
 
+        SetPnpState( pIrp, 1 );
         ret = OnQueryStop( pIrp );
         if( ret == STATUS_PENDING )
             break;
@@ -1757,6 +1760,14 @@ gint32 CPort::CompleteStartIrp( IRP* pIrp )
 
         if( ERROR( ret ) )
         {
+            guint32 dwPortState = GetPortState();
+            if( dwPortState == PORT_STATE_ATTACHED )
+            {
+                // switch to starting state so
+                // that the port can swith to
+                // stopped state later
+                SetPortState( PORT_STATE_STARTING );
+            }
             break;
         }
 
@@ -1766,13 +1777,13 @@ gint32 CPort::CompleteStartIrp( IRP* pIrp )
         CStdRMutex a( m_oLock );
         guint32 dwPortState = GetPortState();
 
-        // NOTE: during port start, the port
-        // could be physically detached and
-        // the stop process can occur
-        // simutaneously.
+        // NOTE: during port start, the port could
+        // be physically detached and the stop
+        // process can occur simutaneously.
         //
-        if( dwPortState != PORT_STATE_ATTACHED
-            || dwPortState != PORT_STATE_STARTING )
+        if( dwPortState != PORT_STATE_ATTACHED &&
+            dwPortState != PORT_STATE_STARTING &&
+            dwPortState != PORT_STATE_READY )
         {
             // well, something bad happening,
             // maybe the port has got lost
@@ -1850,6 +1861,9 @@ gint32 CPort::CompleteStartIrp( IRP* pIrp )
             ret = OnPortReady( pIrp );
             a.Lock();
 
+            if( ERROR( ret ) )
+                pCtxPort->SetStatus( ret );
+
             break;
         }
 
@@ -1880,23 +1894,23 @@ gint32 CPort::CompleteStartIrp( IRP* pIrp )
             PORT_STATE_STOPPED ) )
         {
 
-            // BUGBUG: what if the lower port has entered
-            // the started state when this port failed to
-            // start. Actually the bottom port is in
-            // Started state when the event subscriber will
-            // receive the event it is stopped
+            // There could be the situation that
+            // the lower port has entered the
+            // started state when this port failed
+            // to start. And DestroyPortStack will
+            // handle this situation.
             //
-            // NOTE: we support state switching from
-            // STARTING to STOPPED, but don't accept STOP
-            // irp while starting
-            OnPortStopped();
+            // Don't call OnPortStopped here.
+            // eventPortStartFailed will be sent
+            // in the irp's callback
         }
         else if( dwPortState == PORT_STATE_READY )
         {
-            // Don't know what happens. For a bus port,
-            // it may be the child port fails to
-            // start. Just return the error, let the
-            // pnpmgr to stop this port
+            // Don't know what happens. For a bus
+            // port, it may be the child port
+            // fails to start. Just return the
+            // error, let the pnpmgr to stop this
+            // port
         }
     }
     return ret;
@@ -2009,12 +2023,12 @@ gint32 CPort::CompleteStopIrp( IRP* pIrp )
         if( !SetPortStateWake( dwPortState,
             PORT_STATE_STOPPED ) )
         {
-            throw std::runtime_error(
-                "State Machine gone wrong" );
+            DebugMsg( ret, "State Machine gone wrong" );
         }
         else
         {
-            OnPortStopped();
+            if( dwPortState != PORT_STATE_STOPPED )
+                OnPortStopped();
         }
     }
 
@@ -2196,8 +2210,10 @@ gint32 CPort::CompleteAssocIrp(
 
         // give the subclass an opportunity 
         // to do some port specific things.
-        gint32 iRet = OnCompleteSlaveIrp(
-            pMaster, pSlave );
+        gint32 iRet = 0;
+        if( !pMaster->IsCbOnly() )
+            iRet = OnCompleteSlaveIrp(
+                pMaster, pSlave );
 
         if( pMaster->GetSlaveCount() > 0 )
         {
@@ -2768,6 +2784,10 @@ IPort* CPort::GetBottomPort() const
 gint32 CPort::OnPortStackDestroy( IRP* pIrp )
 {
     gint32 ret = 0;
+    if( GetLowerPort() == nullptr )
+    {
+        ret = GetIoMgr()->RemoveFromHandleMap( this );    
+    }
     return ret;
 }
 
@@ -3481,15 +3501,19 @@ gint32 CGenericBusPort::OpenPdoPort(
             {
                 pNewPort = HandleToPort( hPort );
                 // special return code, indicating
-                // something strange, but it works
+                // port is opened already
                 ret = EEXIST;
                 break;
             }
-            else if( ret == ERROR_STATE )
+            else if( ret != -ENOENT )
             {
-                // the port object exists but not
-                // registered
+                // something is wrong
                 break;
+            }
+            else
+            {
+                // start to creat a pdo
+                ret = 0;
             }
 
             // prevent the interface ptr to go into

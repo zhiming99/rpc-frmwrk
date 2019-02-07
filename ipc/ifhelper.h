@@ -1253,15 +1253,15 @@ inline gint32 NewDeferredCall( TaskletPtr& pCallback,
 
 #define DEFER_CALL( pMgr, pObj, func, ... ) \
 ({ \
-    TaskletPtr pTask; \
-    gint32 ret_ = NewDeferredCall( pTask, pObj, func, ##__VA_ARGS__  ); \
+    TaskletPtr __pTask; \
+    gint32 ret_ = NewDeferredCall( __pTask, pObj, func, ##__VA_ARGS__  ); \
     if( SUCCEEDED( ret_ ) ) \
-        ret_ = pMgr->RescheduleTask( pTask ); \
+        ret_ = pMgr->RescheduleTask( __pTask ); \
     ret_; \
 })
 
-#define DEFER_CALL_NOSCHED( pTask, pObj, func, ... ) \
-    NewDeferredCall( pTask, pObj, func , ##__VA_ARGS__ )
+#define DEFER_CALL_NOSCHED( __pTask, pObj, func, ... ) \
+    NewDeferredCall( __pTask, pObj, func , ##__VA_ARGS__ )
 
 // to insert the task pInterceptor to the head of
 // completion chain of the task pTarget 

@@ -423,25 +423,14 @@ void IoRequestPacket::SetSyncCall( bool bSync )
         m_dwFlags &= ~IRP_SYNC_CALL;
 }
 
-bool IoRequestPacket::IsKeepAlive() const
+void IoRequestPacket::SetCbOnly( bool bCbOnly )
 {
-    guint32 ret = ( m_dwFlags & IRP_KEEP_ALIVE );
-
-    if( ret != 0 )
-        return true;
-
-    return false;
+    if( bCbOnly )
+        m_dwFlags |= IRP_CALLBACK_ONLY;
+    else
+        m_dwFlags &= ~IRP_CALLBACK_ONLY;
 }
 
-void IoRequestPacket::SetKeepAlive()
-{
-    m_dwFlags |= IRP_KEEP_ALIVE;
-}
-
-void IoRequestPacket::ClearKeepAlive()
-{
-    m_dwFlags &= ~IRP_KEEP_ALIVE;
-}
 
 gint32 IoRequestPacket::WaitForComplete()
 {

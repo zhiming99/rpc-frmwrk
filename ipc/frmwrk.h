@@ -328,6 +328,8 @@ class CIoManager : public IService
     // module name
     std::string                 m_strModName;
     guint32                     m_dwNumCores;
+    // house clean timer
+    gint32                      m_iHcTimer;
 
     std::vector< ThreadPtr >      m_vecStandAloneThread;
 

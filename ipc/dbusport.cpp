@@ -52,6 +52,7 @@ gint32 NormalizeIpAddr(
                 ret = -EINVAL;
                 break;
             }
+            ret = 0;
             strOut = inet_ntoa( oAddr );
             break;
         }
@@ -70,6 +71,7 @@ gint32 NormalizeIpAddr(
                 ret = -errno;
                 break;
             }
+            ret = 0;
             char szBuf[ INET6_ADDRSTRLEN ] = { 0 };
             if( nullptr == inet_ntop( AF_INET6, &oAddr,
                 szBuf, sizeof( szBuf ) ) )
@@ -297,7 +299,8 @@ gint32 CDBusBusPort::BuildPdoPortName(
                 {
                     dwPortId = oCfgOpener[ propPortId ];
                 }
-                if( dwPortId == ( guint32 )-1 )
+                if( dwPortId == ( guint32 )-1 ||
+                    dwPortId < 2 )
                 {
                     string strIpAddr, strRet;
 
@@ -461,7 +464,7 @@ gint32 CDBusBusPort::CreateRpcProxyPdo(
                 itr = m_mapAddrToId.find( strIpAddr );
             if( itr != m_mapAddrToId.end() )
             {
-                if( itr->second != dwPortId )
+                if( itr->second == dwPortId )
                 {
                     ret = -EEXIST;
                     break;

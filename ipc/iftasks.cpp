@@ -1077,13 +1077,20 @@ gint32 CIfOpenPortTask::OnIrpComplete(
 
         if( ERROR( iRet ) )
         {
-            EnumEventId iEvent = eventPortStartFailed;
-            if( !pCtx->m_pRespData.IsEmpty() )
-            {
-                hPort = ( guint32& )*pCtx->m_pRespData;
-                pIf->OnPortEvent( iEvent, hPort );
-            }
             ret = iRet;
+            if( !Retriable( ret ) )
+            {
+                EnumEventId iEvent = eventPortStartFailed;
+                if( !pCtx->m_pRespData.IsEmpty() )
+                {
+                    hPort = ( guint32& )*pCtx->m_pRespData;
+                    pIf->OnPortEvent( iEvent, hPort );
+                }
+            }
+            else if( ret == -EAGAIN )
+            {
+                ret = STATUS_MORE_PROCESS_NEEDED;
+            }
         }
         else
         {
@@ -1122,6 +1129,7 @@ gint32 CIfOpenPortTask::RunTask()
         ret = pIf->OpenPort( this );
         if( Retriable( ret ) )
         {
+            pIf->SetStateOnEvent( eventRetry );
             ret = STATUS_MORE_PROCESS_NEEDED;
             break;
         }
@@ -1263,6 +1271,12 @@ gint32 CIfTaskGroup::CancelRemainingTasks()
     CStdRTMutex oTaskLock( GetLock() );
     CCfgOpener oCfg( ( IConfigDb* )GetConfig() );
 
+    if( IsCanceling() )
+        return STATUS_PENDING;
+
+    if( oCfg.exist( propNoResched ) )
+        return STATUS_PENDING;
+
     oCfg[ propContext ] = eventCancelTask;
     oCfg[ propNoResched ] = true;
 
@@ -1352,15 +1366,20 @@ gint32 CIfTaskGroup::RunTask()
         {
 
             oTaskLock.Unlock();
-            CancelRemainingTasks();
+            ret = CancelRemainingTasks();
+            if( ret == STATUS_PENDING )
+                return ret;
             return iRet;
         }
 
         if( SUCCEEDED( iRet ) &&
             GetRelation() == logicOR )
         {
-            m_queTasks.clear();
-            return 0;
+            oTaskLock.Unlock();
+            ret = CancelRemainingTasks();
+            if( ret == STATUS_PENDING )
+                return ret;
+            return iRet;
         }
     }
 
@@ -1421,7 +1440,9 @@ gint32 CIfTaskGroup::RunTask()
             if( m_queTasks.size() > 0 )
             {
                 oTaskLock.Unlock();
-                CancelRemainingTasks();
+                gint32 iRet = CancelRemainingTasks();
+                if( iRet == STATUS_PENDING )
+                    ret = iRet;
             }
             break;
         }
@@ -1429,7 +1450,10 @@ gint32 CIfTaskGroup::RunTask()
         if( SUCCEEDED( ret ) &&
             GetRelation() == logicOR )
         {
-            m_queTasks.clear();
+            oTaskLock.Unlock();
+            gint32 iRet = CancelRemainingTasks();
+            if( iRet == STATUS_PENDING )
+                ret = iRet;
             break;
         }
     }

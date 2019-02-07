@@ -269,6 +269,9 @@ void DumpObjs()
         std::string strObj;
         if( pObj != nullptr )
         {
+            if( pObj->GetClsid() == clsid( CBuffer ) ||
+                pObj->GetClsid() == clsid( CConfigDb ) )
+                continue;
             pObj->Dump( strObj );
             printf( "%s\n", strObj.c_str() );
         }

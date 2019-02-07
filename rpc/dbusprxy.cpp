@@ -87,9 +87,7 @@ CDBusProxyPdo::CDBusProxyPdo(
             oMyCfg.SetBoolProp( propSingleIrp, true );
         }
 
-        string strModName = GetIoMgr()->GetModName();
-        string strBusName = DBUS_DESTINATION( strModName );
-        oMyCfg.SetStrProp( propSrcDBusName, strBusName );
+        oMyCfg.CopyProp( propSrcDBusName, m_pBusPort );
         oMyCfg.CopyProp( propSrcUniqName, m_pBusPort );
 
     }while( 0 );
@@ -144,7 +142,7 @@ gint32 CDBusProxyPdo::CheckConnCmdResp(
 
         if( !dbus_message_get_args(
             pMsg, oError,
-            DBUS_TYPE_INT32, &iMethodReturn,
+            DBUS_TYPE_UINT32, &iMethodReturn,
             DBUS_TYPE_INVALID ) )
         {
             ret = oError.Errno(); 
@@ -485,14 +483,20 @@ gint32 CDBusProxyPdo::HandleConnRequest(
         if( ERROR( ret ) )
             break;
 
-        oParams.SetStrProp(
+        CParamList oMethodArgs;
+        oMethodArgs.SetStrProp(
             propSrcUniqName, strBusName );
 
         // the uniq name of the dbus connection
-        oParams.CopyProp( propSrcDBusName, this );
+        oMethodArgs.CopyProp(
+            propSrcDBusName, this );
 
         // ip addr
-        oParams.CopyProp( propIpAddr, this );
+        oMethodArgs.CopyProp(
+            propIpAddr, this );
+
+        oParams.Push(
+            ObjPtr( oMethodArgs.GetCfg() ) );
 
         string strCmd;
 
@@ -523,8 +527,9 @@ gint32 CDBusProxyPdo::HandleConnRequest(
         if( ERROR( ret ) )
             break;
 
-        string strDest =
-            DBUS_DESTINATION( MODNAME_RPCROUTER );
+        string strDest = DBUS_DESTINATION2(
+                MODNAME_RPCROUTER,
+                OBJNAME_REQFWDR );
 
         ret = pMsg.SetDestination( strDest );
 
@@ -584,11 +589,17 @@ gint32 CDBusProxyPdo::BuildMsgHeader(
         string strIfName;
         string strObjPath;
 
-        string strSender =
-            DBUS_DESTINATION( GetIoMgr()->GetModName() );
+        CCfgOpenerObj oPortCfg( this );
+        string strSender; 
+        ret = oPortCfg.GetStrProp(
+            propSrcDBusName, strSender );
 
-        string strDest =
-            DBUS_DESTINATION( MODNAME_RPCROUTER );
+        if( ERROR( ret ) )
+            break;
+
+        string strDest = DBUS_DESTINATION2(
+            MODNAME_RPCROUTER,
+            OBJNAME_REQFWDR );
 
         if( true )
         {
@@ -1097,27 +1108,22 @@ gint32 CProxyPdoConnectTask::Process(
                 else
                 {
                     DebugPrint( ret,
-                        "Server is not up, give up",
+                        "Retried many times, Give up now",
                         PROXYPDO_CONN_INTERVAL );
                 }
                 break;
             }
 
-            if( ret == -ECANCELED ||
-                ret == ERROR_STATE )
+            if( ERROR( ret ) )
                 break;
-
-            // it is possible the port is already
-            // connected before this irp is
-            // issued. let's further check if the
-            // port is connected
         }
 
-        ret = oParams.GetObjPtr( propPortPtr, pObj );
+        ret = oParams.GetPointer(
+            propPortPtr, pProxyPort );
+
         if( ERROR( ret ) )
             break;
 
-        pProxyPort = pObj;
         if( pProxyPort != nullptr )
         {
             CStdRMutex oPortLock(
@@ -1225,8 +1231,9 @@ gint32 CDBusProxyPdo::PostStart( IRP* pIrp )
         // any match going to the event map or req
         // map must have propDestDBusName set to
         // handle the module online/offline
-        string strDest =
-            DBUS_DESTINATION( MODNAME_RPCROUTER );
+        string strDest = DBUS_DESTINATION2(
+                MODNAME_RPCROUTER,
+                OBJNAME_REQFWDR );
 
         ret = matchCfg.SetStrProp(
             propDestDBusName, strDest );

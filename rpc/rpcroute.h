@@ -491,6 +491,10 @@ class CRpcReqForwarder :
         const std::string& strIpAddr,
         std::vector< std::string > vecUniqNames );
 
+    gint32 ClearRefCountByUniqName(
+        const std::string& strUniqName,
+        std::vector< std::string > vecIpAddrs );
+
     virtual const EnumClsid GetIid() const
     { return iid( CRpcReqForwarder ); }
     //
@@ -1549,13 +1553,15 @@ class CReqFwdrOpenRmtPortTask
 
                 ret = oCfg.GetObjPtr(
                     propIfPtr, pObj );
-                if( ERROR( ret ) )
+                if( SUCCEEDED( ret ) )
                     bProxy = true;
 
                 ret = oCfg.GetObjPtr(
                     propRouterPtr, pObj );
-                if( ERROR( ret ) )
+                if( ERROR( ret ) && !bProxy )
                     break;
+
+                ret = 0;
 
                 if( bProxy )
                     m_iState = stateStartBridgeProxy;

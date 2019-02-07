@@ -118,7 +118,7 @@ gint32 CPortDriver::RemovePort( IPort* pPort )
     a.SetIntProp(
         propPortState, PORT_STATE_REMOVED );
 
-    m_mapIdToPort.erase( propPortId );
+    m_mapIdToPort.erase( dwPortId );
     return ret;
 }
 

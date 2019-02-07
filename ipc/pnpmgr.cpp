@@ -657,13 +657,14 @@ gint32 CPnpMgrQueryStopCompletion::operator()(
         // reuse the irp
         if( dwContext == eventIrpComp )
         {
-            if( pIrp->SetState(
+            if( !pIrp->SetState(
                 IRP_STATE_COMPLETED,
                 IRP_STATE_READY ) )
             {
                 ret = -EINVAL;
                 break;
             }
+            pIrp->SetStatus( 0 );
             pIrp->SetMasterIrp( nullptr );
             pIrp->PopCtxStack();
             pIrp->AllocNextStack( pPort );
@@ -925,7 +926,9 @@ gint32 CPnpMgrStopPortAndDestroyTask::OnScheduledTask(
         pMasterIrp->SetSyncCall( false );
 
         pMasterIrp->SetTimer(
-            PORT_START_TIMEOUT_SEC + 4, pMgr );
+            PORT_START_TIMEOUT_SEC * 4, pMgr );
+
+        pMasterIrp->SetCbOnly( true );
 
         CPnpManager& oPnpMgr = pMgr->GetPnpMgr();
 
@@ -940,7 +943,10 @@ gint32 CPnpMgrStopPortAndDestroyTask::OnScheduledTask(
             pPort, pMasterIrp );
 
         if( ret == STATUS_PENDING )
+        {
+            pMasterIrp->MarkPending();
             break;
+        }
 
         pMasterIrp->SetState( IRP_STATE_READY,
             IRP_STATE_COMPLETED );
@@ -1425,7 +1431,7 @@ void CPnpManager::HandleCPEvent(
             // schedule a task to stop the related
             // proxy port or the TcpStreamPort
             oConnPoint.BroadcastEvent(
-                propDBusModEvent, iEvent, dwParam1, 0, pData );
+                propRmtSvrEvent, iEvent, dwParam1, 0, pData );
             break;
             /*CParamList oParams;
             oParams.Push( ( guint32 )propRmtSvrEvent );

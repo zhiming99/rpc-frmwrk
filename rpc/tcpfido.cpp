@@ -35,7 +35,8 @@ CRpcTcpFido::CRpcTcpFido(
     gint32 ret = 0;
 
     SetClassId( clsid( CRpcTcpFido ) );
-    m_dwFlags = PORTFLG_TYPE_FIDO;
+    m_dwFlags &= ~PORTFLG_TYPE_MASK;
+    m_dwFlags |= PORTFLG_TYPE_FIDO;
 
     do{
         timespec ts;
@@ -1184,29 +1185,10 @@ gint32 CRpcTcpFido::OnPortReady(
     gint32 ret = 0;
     do{
         if( GetUpperPort() != nullptr )
-        {
-            // no need to send the event
             return 0;
-        }
-        string strIpAddr;
-        CCfgOpenerObj oCfg( this );
 
-        ret = oCfg.GetStrProp(
-            propDestIpAddr, strIpAddr );
-
-        if( ERROR( ret ) )
-            break;
-
-        // pass on this event to the pnp manager
-        IPort* pPort = GetBottomPort();
-        CEventMapHelper< CPort > oEvtHelper(
-            ( CPort* )pPort );
-
-        oEvtHelper.BroadcastEvent(
-            eventConnPoint,
-            eventPortStarted,
-            ( guint32 )strIpAddr.c_str(),
-            ( guint32* )PortToHandle( pPort ) );
+        ret = FireRmtSvrEvent(
+            this, eventRmtSvrOnline );
 
     }while( 0 );
 

@@ -60,7 +60,10 @@ void CRpcTcpBusPort::AddPdoPort(
             propDestTcpPort, dwPortNum );
 
         if( ERROR( ret ) )
-            dwPortNum = 0;
+        {
+            dwPortNum = RPC_SVR_PORTNUM;
+            ret = 0;
+        }
 
         BindPortIdAndAddr( iPortId,
             PDOADDR( strIpAddr, dwPortNum ) );
@@ -205,7 +208,12 @@ gint32 CRpcTcpBusPort::BuildPdoPortName(
                 propSrcTcpPort, dwPortNum );
 
             if( ERROR( ret ) )
-                break;
+            {
+                dwPortNum = RPC_SVR_PORTNUM;
+                oCfgOpener.SetIntProp(
+                    propSrcTcpPort, dwPortNum );
+                ret = 0;
+            }
 
             PDOADDR oAddr( strIpAddr, dwPortNum );
             std::map< PDOADDR, guint32 >::iterator
@@ -379,6 +387,7 @@ gint32 CRpcTcpBusPort::PostStart(
             ( IConfigDb* )pCfg );
 
         oCfg.SetPointer( propIoMgr, GetIoMgr() );
+        oCfg.SetPointer( propPortPtr, this );
 
         LoadPortOptions( pCfg );
 
@@ -387,8 +396,14 @@ gint32 CRpcTcpBusPort::PostStart(
 
         bool bListening = false;
 
-        if( oCfg.exist( propListenSock ) )
-            bListening = oCfg[ propListenSock ];
+        ret = oCfg.GetBoolProp(
+            propListenSock, bListening );
+
+        if( ERROR( ret ) )
+        {
+            bListening = false;
+            ret = 0;
+        }
 
         if( bListening )
         {
@@ -554,6 +569,54 @@ gint32 CRpcTcpBusPort::OnNewConnection(
     return ret;
 }
 
+// methods from CObjBase
+gint32 CRpcTcpBusPort::GetProperty(
+        gint32 iProp,
+        CBuffer& oBuf ) const
+{
+    gint32 ret = 0;
+    switch( iProp )
+    {
+    case propSrcDBusName:
+    case propSrcUniqName:
+        {
+            ret = -ENOENT;
+            break;
+        }
+    default:
+        {
+            ret = super::GetProperty(
+                iProp, oBuf );
+            break;
+        }
+    }
+    return ret;
+}
+
+gint32 CRpcTcpBusPort::SetProperty(
+        gint32 iProp,
+        const CBuffer& oBuf )
+{
+    gint32 ret = 0;
+    switch( iProp )
+    {
+    case propSrcDBusName:
+    case propSrcUniqName:
+        {
+            ret = -ENOTSUP;
+            break;
+        }
+    default:
+        {
+            ret = super::SetProperty(
+                iProp, oBuf );
+            break;
+        }
+    }
+    return ret;
+}
+
+
 CRpcTcpBusDriver::CRpcTcpBusDriver(
     const IConfigDb* pCfg )
     : super( pCfg )
@@ -618,7 +681,26 @@ CTcpStreamPdo::CTcpStreamPdo(
     : super( pCfg )
 {
     SetClassId( clsid( CTcpStreamPdo ) );
+    m_dwFlags &= ~PORTFLG_TYPE_MASK;
     m_dwFlags |= PORTFLG_TYPE_PDO;
+
+    CCfgOpener oCfg( pCfg );
+    gint32 ret = 0;
+
+    do{
+        ret = oCfg.GetPointer(
+            propBusPortPtr, m_pBusPort );
+
+        if( ERROR( ret ) )
+            break;
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+    {
+        throw std::runtime_error(
+            "Error in CTcpStreamPdo ctor" );
+    }
 }
 
 gint32 CTcpStreamPdo::PreStop(
@@ -690,7 +772,9 @@ gint32 CTcpStreamPdo::PostStart(
         ret = oParams.CopyProp(
             propFd, this );
 
-        oParams.SetPointer( propIoMgr, GetIoMgr() );
+        oParams.SetPointer(
+            propIoMgr, GetIoMgr() );
+
         oParams.SetObjPtr(
             propPortPtr, ObjPtr( this ) );
 
@@ -1427,9 +1511,10 @@ gint32 CTcpStreamPdo::OnPortReady(
     IRP* pIrp )
 {
     if( GetUpperPort() == nullptr )
-        FireRmtSvrEvent( eventRmtSvrOnline );
+        return 0;
 
-    return 0;
+    return FireRmtSvrEvent(
+        this, eventRmtSvrOnline );
 }
 
 gint32 CTcpStreamPdo::FireRmtModEvent(
@@ -1475,8 +1560,8 @@ gint32 CTcpStreamPdo::FireRmtModEvent(
     return ret;
 }
 
-gint32 CTcpStreamPdo::FireRmtSvrEvent(
-    EnumEventId iEvent )
+gint32 FireRmtSvrEvent(
+    IPort* pPort, EnumEventId iEvent )
 {
     // this is an event detected by the
     // socket
@@ -1488,7 +1573,7 @@ gint32 CTcpStreamPdo::FireRmtSvrEvent(
     case eventRmtSvrOnline:
         {
             string strIpAddr;
-            CCfgOpenerObj oCfg( this );
+            CCfgOpenerObj oCfg( pPort );
 
             ret = oCfg.GetStrProp(
                 propIpAddr, strIpAddr );
@@ -1496,12 +1581,21 @@ gint32 CTcpStreamPdo::FireRmtSvrEvent(
             if( ERROR( ret ) )
                 break;
 
-            // pass on this event to the pnp manager
-            CEventMapHelper< CPort > oEvtHelper( this );
+            CPort* pcPort = static_cast
+                < CPort* >( pPort );
+
+            // pass on this event to the pnp
+            // manager
+            CEventMapHelper< CPort >
+                oEvtHelper( pcPort );
+
+            HANDLE hPort =
+                PortToHandle( pPort );
+
             oEvtHelper.BroadcastEvent(
                 eventConnPoint, iEvent,
                 ( guint32 )strIpAddr.c_str(),
-                ( guint32* )PortToHandle( this ) );
+                ( guint32* )hPort );
 
             break;
         }
@@ -1527,7 +1621,8 @@ gint32 CTcpStreamPdo::OnEvent(
     case eventDisconn:
         {
             // passive disconnection detected
-            FireRmtSvrEvent( eventRmtSvrOffline );
+            ret = FireRmtSvrEvent(
+                this, eventRmtSvrOffline );
             break;
         }
     default:
@@ -1594,6 +1689,14 @@ gint32 CTcpStreamPdo::AllocIrpCtxExt(
             break;
         }
     }
+
+    if( ret == -ENOTSUP )
+    {
+        // let's try it on CPort
+        ret = super::AllocIrpCtxExt(
+            pIrpCtx, pContext );
+    }
+
     return ret;
 }
 
@@ -1756,6 +1859,7 @@ gint32 CStmPdoSvrOfflineNotifyTask::Process(
     switch( dwContext )
     {
     case 0:
+    case eventTaskThrdCtx:
         {
             ret = SendNotify();
             break;

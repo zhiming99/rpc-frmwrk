@@ -945,12 +945,6 @@ gint32 CRouterStopBridgeTask::RunTask()
         CRpcRouter* pRouter =
             pBridge->GetParent();
 
-        CRpcReqForwarder* pReqFwdr = nullptr;
-        ret = oCfg.GetPointer(
-            propIfPtr, pReqFwdr );
-        if( ERROR( ret ) )
-            break;
-
         // put the bridge to the stopping state to
         // prevent further incoming requests
         ret = pBridge->SetStateOnEvent(
@@ -1113,9 +1107,11 @@ gint32 CRpcRouter::OnRmtSvrOffline(
         CParamList oParams;
 
         oParams[ propEventSink ] =
-             ObjPtr( pCallback );
+            ObjPtr( pCallback );
 
         oParams.Push( pIf );
+        oParams[ propIfPtr ] =
+            ObjPtr( this );
 
         if( bBridge )
         {
@@ -2179,7 +2175,6 @@ gint32 CRpcRouter::ForwardDBusEvent(
 
     return ret;
 }
-
 
 CIfRouterState::CIfRouterState(
     const IConfigDb* pCfg )

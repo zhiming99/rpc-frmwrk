@@ -574,7 +574,7 @@ gint32 CEvLoop::AddIoWatch(
         }
 
         guint32 dwFd = oParams[ 0 ];
-        EnumClsid dwOpt = oParams[ 1 ];
+        guint32 dwOpt = oParams[ 1 ];
         bool bStart = ( bool& )oParams[ 2 ];
 
         IO_SOURCE* pIow = new IO_SOURCE(

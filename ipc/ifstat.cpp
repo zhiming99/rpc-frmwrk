@@ -36,7 +36,7 @@ std::map< STATEMAP_KEY, EnumIfState > CInterfaceState::m_mapState =
 {
     STATEMAP_ENTRY( stateStopped,   cmdOpenPort,            stateStarting ),
     STATEMAP_ENTRY( stateStarting,  eventPortStarted,       stateConnected ),
-    STATEMAP_ENTRY( stateStarting,  eventPortStartFailed,   stateStopped ),
+    STATEMAP_ENTRY( stateStarting,  eventPortStartFailed,   stateStopping ),
     STATEMAP_ENTRY( stateStarting,  eventPortStopping,      stateStopped ),
     STATEMAP_ENTRY( stateStarting,  eventDBusOffline,       stateStopped ),
     STATEMAP_ENTRY( stateStarting,  eventRmtSvrOffline,     stateStopped ),
@@ -66,6 +66,7 @@ std::map< STATEMAP_KEY, EnumIfState > CInterfaceState::m_mapState =
     STATEMAP_ENTRY( statePaused,    cmdResume,              stateResuming ),
     STATEMAP_ENTRY( statePausing,   eventPaused,            statePaused ),
     STATEMAP_ENTRY( stateStopping,  cmdClosePort,           stateStopped ),
+    STATEMAP_ENTRY( stateStopping,  eventRetry,             stateStarting ),
     STATEMAP_ENTRY( stateResuming,  eventResumed,           stateConnected ),
 
     // unknown means the value depends on the m_iResumeState

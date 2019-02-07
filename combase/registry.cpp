@@ -146,15 +146,14 @@ gint32 CDirEntry::RemoveAllChildren()
 {
     
     gint32 ret = 0;
-    map< string, CDirEntry* >::iterator itr =
-                        m_mapChilds.begin();
+    map< string, CDirEntry* >::iterator
+        itr = m_mapChilds.begin();
 
     while( itr != m_mapChilds.end() )
     {
         delete itr->second;
         itr->second = NULL;
-        m_mapChilds.erase( itr );
-        itr = m_mapChilds.begin();
+        itr = m_mapChilds.erase( itr );
     }
 
     return ret;
@@ -608,14 +607,6 @@ gint32 CRegistry::RemoveDir(
             // rollback?
             return ret;
         }
-        string strName = m_pCurDir->GetName();
-        ChangeDir( ".." );
-        ret = m_pCurDir->RemoveChild( strName );
-        if( ret == -ENOENT )
-        {
-            // weird, fine
-            ret = 0;
-        }
         m_pCurDir->m_mapProps.Clear();
     }
     catch( std::out_of_range& e )
@@ -628,8 +619,10 @@ gint32 CRegistry::RemoveDir(
 
     if( pParent != nullptr )
     {
-        pParent->RemoveChild(
-            m_pCurDir->GetName() );
+        string strName =
+            m_pCurDir->GetName();
+        ChangeDir( ".." );
+        pParent->RemoveChild( strName );
     }
 
     return ret;

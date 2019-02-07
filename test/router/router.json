@@ -41,7 +41,7 @@
         },
         {
             "ObjectName": "RpcTcpBridgeImpl",
-            "BusName" : "RpcTcpBus_0",
+            "BusName" : "RpcTcpBusPort_0",
             "PortClass": "TcpStreamPdo",
             "RequestTimeoutSec" : "120",
             "KeepAliveTimeoutSec" : "60",

@@ -333,6 +333,8 @@ enum EnumEventId : guint32
     eventIoWatch,
     eventAsyncWatch,
 
+    eventHouseClean,
+
     eventMaxReserved = 0x10000,
     eventUserStart = 0x10001,
     eventInvalid = 0x100000,

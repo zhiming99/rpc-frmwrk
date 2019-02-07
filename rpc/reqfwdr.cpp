@@ -209,38 +209,28 @@ gint32 CReqFwdrOpenRmtPortTask::CreateInterface(
             break;
 
         oParams.CopyProp( propSrcTcpPort, this );
-
-        bool bNoPortId = true;
-        ret = oParams.CopyProp( propPortId, this );
-        if( SUCCEEDED( ret ) )
-            bNoPortId =false;
+        oParams.CopyProp( propPortId, this );
 
         ObjPtr pObj;
         ret = oCfg.GetObjPtr( propRouterPtr, pObj );
-        if( ERROR( ret ) )
-            break;
-
-        oParams.SetObjPtr( propParentPtr, pObj );
-
-        if( bNoPortId )
+        if( SUCCEEDED( ret ) )
         {
-            guint32 dwAddr = 0;
-            string strIpAddr;
-
-            oParams.GetStrProp(
-                propIpAddr, strIpAddr );
-
-            dwAddr = ntohl(
-                inet_addr( strIpAddr.c_str() ) );
-
-            oParams[ propPortId ] = dwAddr;
+            oParams.SetObjPtr( propParentPtr, pObj );
+        }
+        else
+        {
+            ret = oCfg.GetObjPtr( propIfPtr, pObj );
+            CRpcInterfaceServer* pReqFwdr = pObj;
+            if( pReqFwdr == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            pObj = pReqFwdr->GetParent();
+            oParams.SetObjPtr( propParentPtr, pObj );
         }
 
-        if( ERROR( ret ) )
-            break;
-
         oParams.SetPointer( propIoMgr, pMgr );
-
         pIf.Clear();
 
         if( m_iState == stateStartBridgeProxy )
@@ -388,6 +378,17 @@ gint32 CReqFwdrOpenRmtPortTask::RunTaskInternal(
             break;
         }
 
+        if( pRouter == nullptr &&
+            pReqFwdr != nullptr )
+        {
+            pRouter = pReqFwdr->GetParent();
+            if( pRouter == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+        }
+
         string strIpAddr;
         ret = oCfg.GetStrProp(
             propIpAddr, strIpAddr );
@@ -407,6 +408,13 @@ gint32 CReqFwdrOpenRmtPortTask::RunTaskInternal(
 
         if( m_iState == stateDone )
         {
+            TaskletPtr pDummyTask;
+            ret = pDummyTask.NewObj(
+                clsid( CIfDummyTask ) );
+
+            if( ERROR( ret ) )
+                break;
+
             if( bRouter )
             {
                 if( SUCCEEDED( iRetVal ) ||
@@ -414,6 +422,11 @@ gint32 CReqFwdrOpenRmtPortTask::RunTaskInternal(
                 {
                     ret = pRouter->
                         AddBridge( m_pServer ); 
+                }
+                else
+                {
+                    m_pServer->StopEx( pDummyTask );
+                    ret = iRetVal;
                 }
             }
             else
@@ -438,6 +451,11 @@ gint32 CReqFwdrOpenRmtPortTask::RunTaskInternal(
                         strIpAddr,
                         strUniqName,
                         strSender );
+                }
+                else
+                {
+                    m_pProxy->StopEx( pDummyTask );
+                    ret = iRetVal;
                 }
             }
         }
@@ -665,9 +683,6 @@ gint32 CRpcReqForwarder::OpenRemotePort(
             oParams.SetStrProp(
                 propSrcDBusName, strSender );
 
-            oParams.SetObjPtr( propRouterPtr,
-                ObjPtr( GetParent( ) ) );
-
             oParams.SetStrProp(
                 propSrcUniqName, strSrcUniqName );
 
@@ -768,7 +783,7 @@ gint32 CRpcReqForwarder::DecRefCount(
     gint32 ret = 0;
 
     CStdRMutex oIfLock( GetLock() );
-    if( m_mapRefCount.find( pRegObj ) !=
+    if( m_mapRefCount.find( pRegObj ) ==
         m_mapRefCount.end() )
     {
         return -ENOENT;
@@ -793,6 +808,28 @@ gint32 CRpcReqForwarder::DecRefCount(
     return ret;
 }
 
+// for local proxy offline
+gint32 CRpcReqForwarder::ClearRefCountByUniqName(
+    const string& strUniqName,
+    vector< string > vecIpAddrs )
+{
+    CStdRMutex oIfLock( GetLock() );
+    auto itr = m_mapRefCount.begin();
+    while( itr != m_mapRefCount.end() )
+    {
+        if( itr->first->GetUniqName() == strUniqName )
+        {
+            vecIpAddrs.push_back(
+                itr->first->GetIpAddr() );
+            itr = m_mapRefCount.erase( itr );
+            continue;
+        }
+        itr++;
+    }
+    return vecIpAddrs.size();
+}
+
+// for CRpcTcpBridgeProxyImpl offline
 gint32 CRpcReqForwarder::ClearRefCountByAddr(
     const string& strIpAddr,
     vector< string > vecUniqNames )
@@ -2001,9 +2038,6 @@ gint32 CRpcReqForwarder::OnRmtSvrEvent(
     const std::string& strIpAddr,
     HANDLE hPort )
 {
-    if( hPort == INVALID_HANDLE )
-        return -EINVAL;
-
     if( iEvent != eventRmtSvrOffline )
         return super::OnRmtSvrEvent(
             iEvent, strIpAddr, hPort );

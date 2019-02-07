@@ -342,7 +342,6 @@ gint32 CRpcBaseOperations::DisableEvent(
 
     if( iState == stateStarting ||
         iState == stateStopped ||
-        iState == stateStopping ||
         iState == stateInvalid )
         return ERROR_STATE;
 
@@ -434,13 +433,6 @@ gint32 CRpcBaseOperations::StartRecvMsg(
         pIrp->SetIrpThread( pMgr ); 
         pIrp->SetSyncCall( false );
         pIrp->RemoveTimer();
-
-        CInterfaceState* pIfStat = m_pIfStat;
-        if( pIfStat == nullptr )
-        {
-            ret = -EFAULT;
-            break;
-        }
 
         // make a copy of the irp for canceling
         ret = oTaskCfg.SetObjPtr(
@@ -711,7 +703,10 @@ gint32 CRpcInterfaceBase::StartEx(
 
         ret = AppendAndRun( pTask );
         if( ERROR( ret ) )
+        {
+            ( *pTask )( eventCancelTask );
             break;
+        }
 
         bool bConnected = false;
         ret = pTask->GetError();
@@ -787,6 +782,12 @@ gint32 CRpcInterfaceBase::StartEx(
 
     if( ret == STATUS_MORE_PROCESS_NEEDED )
         ret = STATUS_PENDING;
+
+    if( ERROR( ret ) )
+    {
+        ClearActiveTasks();
+        m_pRootTaskGroup.Clear();
+    }
 
     return ret;
 }
@@ -887,29 +888,36 @@ gint32 CRpcInterfaceBase::DoStop(
         if( ERROR( ret ) )
             break;
 
-        // enable or disable event
-        oParams.Push( false );
-        // Change Interface state or not
-        oParams.Push( false );
-
-        for( auto pMatch : m_vecMatches )
+        HANDLE hPort = GetPortHandle();
+        if( hPort != 0 )
         {
-            oParams[ propMatchPtr ] =
-                ObjPtr( pMatch );
+            // NOTE that, when stopping, we may
+            // have a partialized interface due to
+            // a failed start
+            //
+            // disable event
+            oParams.Push( false );
+            // Change Interface state or not
+            oParams.Push( false );
 
-            ret = pDisableEvtTask.NewObj(
-                clsid( CIfEnableEventTask ),
-                oParams.GetCfg() );
+            for( auto pMatch : m_vecMatches )
+            {
+                oParams[ propMatchPtr ] =
+                    ObjPtr( pMatch );
+
+                ret = pDisableEvtTask.NewObj(
+                    clsid( CIfEnableEventTask ),
+                    oParams.GetCfg() );
+
+                if( ERROR( ret ) )
+                    break;
+
+                pTaskGrp->AppendTask( pDisableEvtTask );
+            }
 
             if( ERROR( ret ) )
                 break;
-
-            pTaskGrp->AppendTask( pDisableEvtTask );
         }
-
-        if( ERROR( ret ) )
-            break;
-
         pTaskGrp->AppendTask( pClosePortTask );
         pTaskGrp->SetRelation( logicNONE );
 
@@ -1070,10 +1078,6 @@ gint32 CRpcInterfaceBase::OnPortEvent(
     if( !IsMyPort( hPort ) )
         return -EINVAL;
 
-    ret = SetStateOnEvent( iEvent );
-    if( ERROR( ret ) )
-        return ret;
-
     switch( iEvent )
     {
     case eventPortStopping:
@@ -1081,6 +1085,10 @@ gint32 CRpcInterfaceBase::OnPortEvent(
             TaskletPtr pTask;
             ret = pTask.NewObj(
                 clsid( CIfDummyTask ) );
+
+            ret = SetStateOnEvent( iEvent );
+            if( ERROR( ret ) )
+                break;
 
             // we need an asynchronous call
             ret = StopEx( pTask );
@@ -1434,19 +1442,8 @@ gint32 CRpcInterfaceBase::OnEvent(
             string strIpAddr = reinterpret_cast
                 < char* >( dwParam1 );
 
-            CInterfaceState* pIfStat = m_pIfStat;
-            if( pIfStat == nullptr )
-                break;
-
-            if( hPort != GetPortHandle() )
-            {
-                ret = ERROR_ADDRESS;
-                break;
-            }
-
             ret = OnRmtSvrEvent(
                 iEvent, strIpAddr, hPort ); 
-
             break;
         }
     case cmdPause:
@@ -3453,7 +3450,8 @@ gint32 CRpcServices::LoadObjDesc(
             }
             else
             {
-                ret = -ENOENT;
+
+                oCfg[ propPortId ] = ( guint32 )-1;
                 break;
             }
             
@@ -3486,12 +3484,15 @@ gint32 CRpcServices::LoadObjDesc(
             // overwrite the global port class and port
             // id if PROXY_PORTCLASS and PROXY_PORTID
             // exist
+            bool bProxyPdo = false;
             if( oObjElem.isMember( JSON_ATTR_PROXY_PORTCLASS ) &&
                 oObjElem[ JSON_ATTR_PROXY_PORTCLASS ].isString() &&
                 !bServer )
             {
                 strVal = oObjElem[ JSON_ATTR_PROXY_PORTCLASS ].asString(); 
                 oCfg[ propPortClass ] = strVal;
+                if( strVal == PORT_CLASS_DBUS_PROXY_PDO )
+                    bProxyPdo = true;
             }
 
             // get ipaddr
@@ -3506,8 +3507,13 @@ gint32 CRpcServices::LoadObjDesc(
 
                 if( SUCCEEDED( ret ) )
                     oCfg[ propIpAddr ] = strNormVal;
-                else
+                else if( !bProxyPdo )
                     ret = 0;
+                else
+                {
+                    ret = -EINVAL;
+                    break;
+                }
             }
 
             if( oObjElem.isMember( JSON_ATTR_TCPPORT ) &&
@@ -4028,7 +4034,8 @@ gint32 CRpcServices::DoModEvent(
 // a helper for deferred task to run in the
 // interface's taskgroup
 gint32 CRpcServices::RunManagedTask(
-    IEventSink* pTask, bool bRoot )
+    IEventSink* pTask,
+    const bool& bRoot )
 {
     if( pTask == nullptr )
         return -EINVAL;

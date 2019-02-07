@@ -907,7 +907,8 @@ class CRpcServices :
     // a helper for deferred task to run in the
     // interface's taskgroup
     gint32 RunManagedTask(
-        IEventSink* pTask, bool bRoot );
+        IEventSink* pTask,
+        const bool& bRoot );
 };
 
 template< typename ...Args>

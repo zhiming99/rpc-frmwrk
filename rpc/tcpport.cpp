@@ -65,6 +65,15 @@ CRpcSocketBase::CRpcSocketBase(
         m_pCfg->RemoveProperty(
             propIoMgr );
 
+        ret = oCfg.GetPointer(
+            propPortPtr, m_pParentPort );
+
+        if( ERROR( ret ) )
+            break;
+
+        m_pCfg->RemoveProperty(
+            propPortPtr );
+
     }while( 0 );
 
     if( ERROR( ret ) )
@@ -231,7 +240,8 @@ gint32 CRpcSocketBase::AttachMainloop()
 
         oParams.Push( m_iFd );
         oParams.Push( dwOpt );
-        oParams.Push( true );
+        // don't start immediately
+        oParams.Push( false );
 
         oParams[ propObjPtr ] =
             ObjPtr( this );
@@ -250,10 +260,12 @@ gint32 CRpcSocketBase::AttachMainloop()
         if( ERROR( ret ) )
             break;
 
+        CCfgOpenerObj oTaskCfg(
+            ( CObjBase* )pCallback );
         dwOpt = ( guint32 )G_IO_OUT;
-        oParams.SetIntProp( 1, dwOpt );
+        oTaskCfg.SetIntProp( 1, dwOpt );
         // don't start immediately
-        oParams.SetBoolProp( 2, false );
+        oTaskCfg.SetBoolProp( 2, false );
 
         ret = pMainLoop->AddIoWatch(
             pCallback, m_hIoWWatch );
@@ -516,6 +528,7 @@ gint32 CRpcSocketBase::CloseSocket()
         if( m_iFd < 0 )
             ret = -ENOTSOCK;
 
+        shutdown( m_iFd, SHUT_RDWR );
         ret = close( m_iFd );
 
         if( ret == -1 && errno == EINTR )
@@ -762,7 +775,7 @@ gint32 CRpcStreamSock::AddStream(
 gint32 CRpcStreamSock::RemoveStream(
     gint32 iStream )
 {
-   if( iStream < 2 )
+   if( iStream < 0 )
        return -EINVAL;
 
     gint32 ret = 0;
@@ -815,14 +828,13 @@ CRpcStreamSock::CRpcStreamSock(
         ret = oCfg.GetIntProp(
             propFd, ( guint32& )iFd );
 
+        // passive connection
         if( SUCCEEDED( ret ) )
-        {
-            // so we don't need the active connect
             m_iFd = iFd;
+        else
+        {
+            ret = 0;
         }
-
-        if( ERROR( ret ) )
-            break;
 
         m_itrCurStm = m_mapStreams.begin();
 
@@ -840,6 +852,7 @@ gint32 CRpcStreamSock::ActiveConnect(
     const string& strIpAddr )
 {
     gint32 ret = 0;
+
     do{
         CCfgOpener oCfg(
             ( IConfigDb* )m_pCfg );
@@ -870,6 +883,9 @@ gint32 CRpcStreamSock::ActiveConnect(
 
         if( errno == EINPROGRESS )
         {
+            // watching if the socket can write,
+            // indicating the connect is done
+            StartWatch();
             ret = STATUS_PENDING;
         }
         else
@@ -877,7 +893,15 @@ gint32 CRpcStreamSock::ActiveConnect(
             ret = -errno;
             break;
         }
+
     }while( 0 );
+
+    if( ret != STATUS_PENDING )
+    {
+        StopWatch();
+        if( SUCCEEDED( ret ) )
+            StartWatch( false );
+    }
 
     return ret;
 }
@@ -1013,6 +1037,7 @@ gint32 CRpcStreamSock::Start_bh()
         if( ERROR( ret ) )
             break;
 
+        StartWatch( false );
         SetState( sockStarted );
         
     }while( 0 );
@@ -1167,7 +1192,7 @@ gint32 CRpcStreamSock::DispatchSockEvent(
 
     if( ERROR( ret ) )
     {
-        ret = OnError( ret );
+        OnError( ret );
         return ret;
     }
 
@@ -1175,7 +1200,7 @@ gint32 CRpcStreamSock::DispatchSockEvent(
     {
     case sockInit:
         {
-
+            StopWatch();
             if( m_pStartTask.IsEmpty() )
             {
                 ret = -EFAULT;
@@ -1190,19 +1215,22 @@ gint32 CRpcStreamSock::DispatchSockEvent(
         }
     case sockStarted:
         {
-            if( dwCondition == G_IO_IN )
+            if( dwCondition & G_IO_HUP )
+            {
+                OnDisconnected();
+            }
+            else if( dwCondition & G_IO_IN )
             {
                 m_dwAgeSec = 0;
-                OnReceive();
+                ret = OnReceive();
+                if( ret == -ENOTCONN || 
+                    ret == -EPIPE )
+                    OnDisconnected();
             }
-            else if( dwCondition == G_IO_OUT )
+            else if( dwCondition & G_IO_OUT )
             {
                 m_dwAgeSec = 0;
                 OnSendReady();
-            }
-            else if( dwCondition == G_IO_HUP )
-            {
-                OnDisconnected();
             }
             else
             {
@@ -2369,6 +2397,7 @@ gint32 CIncomingPacket::FillPacket(
         return -EINVAL;
 
     gint32 ret = 0;
+    bool bFirst = true;
     do{
         guint32 dwSize = m_dwBytesToRecv; 
 
@@ -2387,6 +2416,9 @@ gint32 CIncomingPacket::FillPacket(
 
         if( m_pBuf.IsEmpty() )
         {
+            ret = m_pBuf.NewObj();
+            if( ERROR( ret ) )
+                break;
             m_pBuf->Resize(
                 sizeof( CPacketHeader ) );
         }
@@ -2400,14 +2432,20 @@ gint32 CIncomingPacket::FillPacket(
             ret = STATUS_PENDING;
             break;
         }
-
-        if( ret == -1 )
+        else if( ret == -1 )
         {
             // asynchronous error
             ret = -errno;
             break;
         }
+        else if( ret == 0 && bFirst )
+        {
+            // connection lost
+            ret = -ENOTCONN;
+            break;
+        }
 
+        bFirst = false;
         m_dwOffset += ret;
         if( m_dwOffset < sizeof( CPacketHeader ) )
         {
@@ -2475,6 +2513,7 @@ CRpcStream::CRpcStream(
     // 0: an integer as Stream Id
     // 1: protocol id
     // propIoMgr: pointer to the io manager
+    SetClassId( clsid( CRpcStream ) );
     do{
         if( pCfg == nullptr )
         {
@@ -3868,6 +3907,7 @@ gint32 CRpcListeningSock::Connect()
             ret = -errno;
             break;
         }
+        StartWatch( false );
 
     }while( 0 );
 
@@ -3917,6 +3957,7 @@ gint32 CRpcListeningSock::OnConnected()
             }
             break;
         }
+        StartWatch();
         // let's schedule a task to start the port
         // building process
         m_pParentPort->OnEvent(
@@ -3975,6 +4016,70 @@ gint32 CRpcListeningSock::DispatchSockEvent(
     return ret;
 }
 
+gint32 CStmSockConnectTask::RemoveConnTimer()
+{
+    gint32 ret = 0;
+    do{
+        if( m_iTimerId == 0 )
+            break;
+
+        CIoManager* pMgr = GetIoMgr();
+        if( unlikely( pMgr == nullptr ) )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        CTimerService& otsvc =
+            pMgr->GetUtils().GetTimerSvc();
+
+        otsvc.RemoveTimer( m_iTimerId );
+        m_iTimerId = 0;
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CStmSockConnectTask::AddConnTimer()
+{
+    gint32 ret = 0;
+    do{
+        // the connection could be long, restart
+        // the irp timer.
+        PIRP pIrp = nullptr;
+        CCfgOpener oCfg(
+            ( IConfigDb* )GetConfig() );
+
+        ret = oCfg.GetPointer( propIrpPtr, pIrp );
+        if( ERROR( ret ) )
+            break;
+
+        pIrp->ResetTimer();
+        CIoManager* pMgr = GetIoMgr();
+        if( unlikely( pMgr == nullptr ) )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        guint32 dwTimeWait =
+            pIrp->m_dwTimeoutSec;
+
+        if( unlikely( dwTimeWait == 0 ) )
+            dwTimeWait = PORT_START_TIMEOUT_SEC - 5;
+
+        CTimerService& otsvc =
+            pMgr->GetUtils().GetTimerSvc();
+
+        m_iTimerId = otsvc.AddTimer(
+            dwTimeWait, this, eventRetry );
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CStmSockConnectTask::OnStart(
     IRP* pIrp )
 {
@@ -3994,7 +4099,16 @@ gint32 CStmSockConnectTask::OnStart(
         ret = GetSockPtr( pSock );
         if( ERROR( ret ) )
             break;
+
+        ret = AddConnTimer();
+        if( ERROR( ret ) )
+            break;
+
         ret = pSock->Start();
+        if( ret != STATUS_PENDING )
+        {
+            RemoveConnTimer();
+        }
 
     }while( 0 );
     
@@ -4022,7 +4136,12 @@ gint32 CStmSockConnectTask::Retry()
     if( ERROR( ret ) )
         return ret;
 
+    AddConnTimer();
     ret = pSock->ActiveConnect( strIpAddr );
+    if( ret != STATUS_PENDING )
+    {
+        RemoveConnTimer();
+    }
 
     return ret;
 }
@@ -4031,9 +4150,13 @@ gint32 CStmSockConnectTask::OnError(
     gint32 iRet )
 {
     gint32 ret = 0;
-    switch( iRet )
+    switch( -iRet )
     {
     case ETIMEDOUT:
+        {
+            ret = Retry();
+            break;
+        }
     /* Connection refused */
     case ECONNREFUSED:
     /* Host is down */
@@ -4042,7 +4165,7 @@ gint32 CStmSockConnectTask::OnError(
     case EHOSTUNREACH:
         {
             // retry
-            ret = Retry();
+            ret = iRet;
             break;
         }
     /* Operation already in progress */
@@ -4055,7 +4178,7 @@ gint32 CStmSockConnectTask::OnError(
         }
     default:
         {
-            ret = ERROR_FAIL;
+            ret = iRet;
         }
         break;;
     }
@@ -4175,6 +4298,7 @@ gint32 CStmSockConnectTask::CompleteTask(
         return ERROR_STATE;
 
     do{
+        RemoveConnTimer();
         ret = GetMasterIrp( pIrp );
         if( ERROR( ret ) )
             break;
@@ -4304,8 +4428,7 @@ gint32 CStmSockConnectTask::operator()(
                 ret = ERROR_STATE;
                 break;
             }
-            guint32 dwConnFlags =
-                ( G_IO_OUT | G_IO_IN );
+            guint32 dwConnFlags = ( G_IO_OUT );
 
             vector< guint32 > vecParams;
             ret = GetParamList( vecParams );
@@ -4343,6 +4466,25 @@ gint32 CStmSockConnectTask::operator()(
     case eventStop:
         {
             ret = ERROR_PORT_STOPPED;
+            break;
+        }
+    case eventTimeout:
+        {
+            m_iTimerId = 0;
+            vector< guint32 > vecParams;
+            ret = GetParamList( vecParams );
+            if( ERROR( ret ) )
+                break;
+
+            EnumEventId iSubEvt =
+                ( EnumEventId )vecParams[ 1 ];
+            if( iSubEvt != eventRetry )
+            {
+                ret = -ENOTSUP;
+                break;
+            }
+
+            ret = -ETIMEDOUT;
             break;
         }
     // only from CTcpStreamPdo::CancelStartIrp
