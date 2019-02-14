@@ -82,7 +82,7 @@ gint32 CRpcReqForwarder::InitUserFuncs()
 
     ADD_SERVICE_HANDLER(
         CRpcReqForwarder::CloseRemotePort,
-        SYS_METHOD_OPENRMTPORT );
+        SYS_METHOD_CLOSERMTPORT );
 
     ADD_SERVICE_HANDLER(
         CRpcReqForwarder::EnableRemoteEvent,
@@ -811,28 +811,124 @@ gint32 CRpcReqForwarder::DecRefCount(
 // for local proxy offline
 gint32 CRpcReqForwarder::ClearRefCountByUniqName(
     const string& strUniqName,
-    vector< string > vecIpAddrs )
+    std::set< string >& setIpAddrs )
 {
     CStdRMutex oIfLock( GetLock() );
     auto itr = m_mapRefCount.begin();
     while( itr != m_mapRefCount.end() )
     {
-        if( itr->first->GetUniqName() == strUniqName )
+        string strUniqName =
+            itr->first->GetUniqName();
+
+        if( strUniqName == strUniqName )
         {
-            vecIpAddrs.push_back(
+            setIpAddrs.insert(
                 itr->first->GetIpAddr() );
             itr = m_mapRefCount.erase( itr );
-            continue;
         }
-        itr++;
+        else
+        {
+            ++itr;
+        }
     }
-    return vecIpAddrs.size();
+    return setIpAddrs.size();
+}
+
+gint32 CRpcReqForwarder::OnModEvent(
+    EnumEventId iEvent,
+    const std::string& strModule )
+{
+    if( strModule.empty() )
+        return -EINVAL;
+
+    if( iEvent == eventModOnline )
+        return 0;
+
+    // not uniq name, not our call
+    if( strModule[ 0 ] != ':' )
+        return 0;
+
+    // remove the registered objects
+    set< string > setIpAddrs;
+    gint32 ret = ClearRefCountByUniqName(
+        strModule, setIpAddrs );
+
+    if( setIpAddrs.size() == 0 )
+        return 0;
+
+    std::vector< MatchPtr > vecMatches;
+
+    // find all the local matches to remove
+    CRpcRouter* pRouter = GetParent();
+    ret = pRouter->RemoveLocalMatchByUniqName(
+        strModule, vecMatches );
+
+    if( ret == 0 )
+        return 0;
+
+    // disable the events on the bridge side
+    for( auto strIpAddr : setIpAddrs )
+    {
+        ObjVecPtr pMatches;
+        ret = pMatches.NewObj(
+            clsid( CStlObjVector ) );
+
+        if( ERROR( ret ) )
+            return ret;
+
+        for( auto pMatch : vecMatches )
+        {
+            CCfgOpenerObj oMatch(
+                ( CObjBase* )pMatch );
+
+            std::string strVal;
+
+            ret = oMatch.GetStrProp(
+                propIpAddr, strVal );
+
+            if( ERROR( ret ) )
+                continue;
+
+            if( strVal == strIpAddr )
+            {
+                ( *pMatches )().push_back(
+                    ObjPtr( pMatch ) );
+            }
+        }
+        if( ( *pMatches )().size() )
+        {
+            InterfPtr pProxy;
+            ret = pRouter->GetBridgeProxy(
+                strIpAddr, pProxy );
+
+            if( ERROR( ret ) )
+                continue;
+
+            CRpcTcpBridgeProxyImpl* pBdgePrxy =
+                pProxy;
+
+            if( pBdgePrxy == nullptr )
+                continue;
+
+            TaskletPtr pDummyTask;
+
+            pDummyTask.NewObj(
+                clsid( CIfDummyTask ) );
+
+            ObjPtr pObj( pMatches );
+            ret = pBdgePrxy->ClearRemoteEvents(
+                pObj, pDummyTask );   
+        }
+
+    }
+
+    return ret;
 }
 
 // for CRpcTcpBridgeProxyImpl offline
 gint32 CRpcReqForwarder::ClearRefCountByAddr(
     const string& strIpAddr,
-    vector< string > vecUniqNames )
+    vector< string >& vecUniqNames )
 {
     CStdRMutex oIfLock( GetLock() );
     auto itr = m_mapRefCount.begin();
@@ -932,6 +1028,10 @@ gint32 CRpcReqForwarder::EnableDisableEvent(
         if( ret == EEXIST )
         {
             ret = 0;
+            break;
+        }
+        else if( ERROR( ret ) )
+        {
             break;
         }
 
@@ -1352,6 +1452,8 @@ bool CRegisteredObject::operator<(
             break;
         }
 
+        ret = ERROR_FALSE;
+
     }while( 0 );
 
     if( SUCCEEDED( ret ) )
@@ -1581,9 +1683,10 @@ gint32 CRpcReqForwarder::BuildBufForIrpRmtSvrEvent(
         pOfflineMsg.SetDestination( strVal );
 
         const char* pszIp = strSrcIp.c_str();
+        guint32 dwOnline = bOnline;
         if( !dbus_message_append_args( pOfflineMsg,
             DBUS_TYPE_STRING, &pszIp,
-            DBUS_TYPE_BOOLEAN, &bOnline,
+            DBUS_TYPE_BOOLEAN, &dwOnline,
             DBUS_TYPE_INVALID ) )
         {
             ret = -ENOMEM;

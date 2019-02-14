@@ -76,7 +76,79 @@ gint32 CRpcTcpBridgeProxy::InitUserFuncs()
 
     END_IFHANDLER_MAP;
 
+    BEGIN_IFPROXY_MAP( CRpcTcpBridge, false );
+
+    ADD_PROXY_METHOD_EX( 1,
+        CRpcTcpBridgeProxy::ClearRemoteEvents,
+        SYS_METHOD_CLEARRMTEVTS );
+
+    END_IFPROXY_MAP;
+
     return 0;
+}
+
+gint32 CRpcTcpBridgeProxy::ClearRemoteEvents(
+    ObjPtr& pVecMatches,
+    IEventSink* pCallback )
+{
+    // NOTE: pCallback is not an output parameter
+    // from the server.
+    //
+    // this is an async call
+    gint32 ret = 0;
+
+    if( unlikely( pVecMatches.IsEmpty() ||
+        pCallback == nullptr ) )
+        return -EINVAL;
+
+    ObjVecPtr pMatches( pVecMatches );
+    if( unlikely( pMatches.IsEmpty() ) )
+        return -EINVAL;
+
+    if( unlikely( ( *pMatches )().size() == 0 ) )
+        return -EINVAL;
+
+    if( unlikely( !IsConnected() ) )
+        return ERROR_STATE;
+
+    do{
+        CParamList oOptions;
+        CParamList oResp;
+        EnumClsid iid = iid( CRpcTcpBridge );
+        string strIfName =
+            CoGetIfNameFromIid( iid );
+
+        if( strIfName.empty() )
+        {
+            ret = -ENOTSUP;
+            break;
+        }
+
+        ToPublicName( strIfName );
+        oOptions[ propIfName ] = 
+            DBUS_IF_NAME( strIfName );
+
+        oOptions[ propSysMethod ] = true;
+
+        ret = AsyncCall( pCallback,
+            oOptions.GetCfg(), oResp.GetCfg(),
+            __func__, pVecMatches );
+
+        if( ret == STATUS_PENDING )
+            break;
+        
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpenerObj oTask(
+            ( CObjBase* )pCallback ); 
+
+        ret = oTask.SetObjPtr(
+            propRespPtr, oResp.GetCfg() );
+
+    }while( 0 );
+
+    return ret;
 }
 
 gint32 CRpcTcpBridgeProxy::EnableRemoteEvent(
@@ -741,6 +813,36 @@ gint32 CRpcTcpBridgeProxy::SetupReqIrp(
                     dwTimeoutSec, GetIoMgr() );
             }
         }
+        else if( strMethod == SYS_METHOD_CLEARRMTEVTS )
+        {
+            IrpCtxPtr& pIrpCtx = pIrp->GetTopStack(); 
+            pIrpCtx->SetMajorCmd( IRP_MJ_FUNC );
+            pIrpCtx->SetMinorCmd( IRP_MN_IOCTL );
+            pIrpCtx->SetCtrlCode( CTRLCODE_SEND_REQ );
+
+            SetBdgeIrpStmId( pIrp, TCP_CONN_DEFAULT_STM );
+            pIrpCtx->SetIoDirection( IRP_DIR_INOUT ); 
+
+            BufPtr pBuf( true );
+            *pBuf = ( ObjPtr& )oReq.GetCfg();
+
+            if( ERROR( ret ) )
+                break;
+
+            pIrpCtx->SetReqData( pBuf );
+            pIrp->SetCallback( pCallback, 0 );
+            pIrp->SetIrpThread( GetIoMgr() );
+
+            guint32 dwTimeoutSec = 0;
+            ret = oReq.GetTimeoutSec( dwTimeoutSec );
+
+            if( SUCCEEDED( ret ) &&
+                dwTimeoutSec != 0 )
+            {
+                pIrp->SetTimer(
+                    dwTimeoutSec, GetIoMgr() );
+            }
+        }
         else if( strMethod == BRIDGE_METHOD_OPENSTM ||
             strMethod == BRIDGE_METHOD_CLOSESTM )
         {
@@ -1122,7 +1224,7 @@ gint32 CRpcTcpBridgeProxy::StartEx(
             IF_METHOD_LISTENING );
 
         oReq.SetIntProp( propStreamId,
-            TCP_CONN_DEFAULT_CMD );
+            TCP_CONN_DEFAULT_STM );
 
         oReq.SetIntProp( propProtoId,
             protoControl );
@@ -1356,6 +1458,98 @@ CRpcTcpBridge::CRpcTcpBridge(
 
 CRpcTcpBridge::~CRpcTcpBridge()
 {
+}
+
+gint32 CRpcTcpBridge::ClearRemoteEvents(
+    IEventSink* pCallback, ObjPtr& pVecMatches )
+{
+    if( unlikely( pVecMatches.IsEmpty() ||
+        pCallback == nullptr ) )
+        return -EINVAL;
+
+    ObjVecPtr pMatches( pVecMatches );
+    if( unlikely( pMatches.IsEmpty() ) )
+        return -EINVAL;
+
+    if( unlikely( ( *pMatches )().size() == 0 ) )
+        return -EINVAL;
+
+    if( unlikely( !IsConnected() ) )
+        return ERROR_STATE;
+
+    gint32 ret = 0;
+    CRpcRouter* pRouter = GetParent();
+
+    do{
+        std::vector< ObjPtr >& vecMatches =
+            ( *pMatches )();
+
+        CParamList oParams;
+        oParams[ propEventSink ] =
+            ObjPtr( pCallback );
+
+        TaskletPtr pRespTask;
+        ret = pRespTask.NewObj(
+            clsid( CRouterEventRelayRespTask ),
+            oParams.GetCfg() );
+
+        if( ERROR( ret ) )
+            break;
+
+        // run the task to set it to a proper
+        // state
+        ( *pRespTask )( eventZero );
+
+        oParams[ propIfPtr ] = ObjPtr( this );
+        oParams[ propNotifyClient ] = true;
+
+        oParams[ propEventSink ] =
+            ObjPtr( pRespTask );
+
+        TaskGrpPtr pTaskGrp;
+        ret = pTaskGrp.NewObj(
+            clsid( CIfTaskGroup ),
+            oParams.GetCfg() );
+
+        if( ERROR( ret ) )
+            break;
+
+        for( auto pObj : vecMatches )
+        {
+            MatchPtr pMatch( pObj );
+            TaskletPtr pDisEvtTask;
+            ret = pRouter->BuildDisEvtTaskGrp(
+                nullptr, pMatch, pDisEvtTask );
+            if( ERROR( ret ) )
+                break;
+
+            ret = pTaskGrp->AppendTask(
+                pDisEvtTask );
+
+            if( ERROR( ret ) )
+                break;
+        }
+
+        if( ERROR( ret ) )
+            break;
+
+        if( pTaskGrp->GetTaskCount() == 0 )
+        {
+            // do nothing
+            ret = 0;
+            break;
+        }
+
+        TaskletPtr pGrpTask = pTaskGrp;
+        ret = pRouter->AddAndRun( pGrpTask );
+        if( ERROR( ret ) )
+            break;
+
+        ret = pTaskGrp->GetError();
+
+    }while( 0 );
+
+    return ret;
 }
 
 gint32 CRpcTcpBridge::EnableRemoteEvent(
@@ -2721,6 +2915,10 @@ gint32 CRpcTcpBridge::InitUserFuncs()
         CRpcTcpBridge::DisableRemoteEvent,
         SYS_METHOD_DISABLERMTEVT );
 
+    ADD_SERVICE_HANDLER(
+        CRpcTcpBridge::ClearRemoteEvents,
+        SYS_METHOD_CLEARRMTEVTS );
+
     END_HANDLER_MAP;
 
     return 0;
@@ -3215,10 +3413,10 @@ gint32 CRpcTcpBridgeShared::SetupReqIrpListeningShared(
 
         CReqBuilder oReq( pReqCall );
         
-        oReq.CopyProp( propStreamId, pCallback );
-        oReq.CopyProp( propProtoId, pCallback );
-        oReq.CopyProp( propCmdId, pCallback );
-        oReq.CopyProp( propMethodName, pCallback );
+        oReq[ propStreamId ] = TCP_CONN_DEFAULT_STM;
+        oReq[ propProtoId ] = protoDBusRelay;
+        oReq[ propCmdId ] = CTRLCODE_LISTENING;
+        oReq[ propMethodName ] = IF_METHOD_LISTENING;
 
         if( pIf->IsServer() )
         {

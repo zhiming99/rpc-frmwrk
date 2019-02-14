@@ -44,6 +44,8 @@ class CDBusProxyPdo : public CRpcPdoPort
     // match table for dbus sys message
     MatchPtr            m_pMatchDBus;
 
+    bool                m_bStopReady = false;
+
     gint32 CheckConnCmdResp(
         DBusMessage* pMsg, gint32& iMethodReturn );
 

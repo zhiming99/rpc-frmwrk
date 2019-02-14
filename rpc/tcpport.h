@@ -917,6 +917,7 @@ class CTcpStreamPdo : public CPort
 {
 
     SockPtr     m_pStmSock;
+    bool        m_bStopReady = true;
 
     gint32 SubmitReadIrp( IRP* pIrp );
     gint32 SubmitWriteIrp( IRP* pIrp );

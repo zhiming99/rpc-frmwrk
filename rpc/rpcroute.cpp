@@ -1159,6 +1159,22 @@ gint32 CRpcRouter::OnRmtSvrOffline(
     return ret;
 }
 
+gint32 CRpcRouter::OnModEvent(
+    EnumEventId iEvent,
+    const std::string& strModule )
+{
+    if( strModule.empty() )
+        return -EINVAL;
+
+    if( strModule[ 0 ] == ':' )
+    {
+        // uniq name, not our call
+        return 0;
+    }
+    return ForwardModOnOfflineEvent(
+        iEvent, strModule );
+}
+
 gint32 CRpcRouter::CheckReqToRelay(
     const std::string &strIpAddr,
     DMsgPtr& pMsg,
@@ -1386,6 +1402,48 @@ gint32 CRpcRouter::RemoveLocalMatchByAddr(
     return iCount;
 }
 
+gint32 CRpcRouter::RemoveLocalMatchByUniqName(
+    const std::string& strUniqName,
+    std::vector< MatchPtr >& vecMatches )
+{
+    gint32 ret = 0;
+
+    do{
+        map< MatchPtr, gint32 >* plm =
+            &m_mapLocMatches;
+
+        CStdRMutex oRouterLock( GetLock() );
+        map< MatchPtr, gint32 >::iterator
+            itr = plm->begin();
+
+        while( itr != plm->end() )
+        {
+            CCfgOpenerObj oMatch(
+                ( CObjBase* )itr->first );
+
+            std::string strVal;
+            ret = oMatch.GetStrProp(
+                propSrcUniqName, strVal );
+
+            if( ERROR( ret ) )
+                continue;
+
+            if( strUniqName == strVal )
+            {
+                vecMatches.push_back( itr->first );
+                itr = plm->erase( itr );
+            }
+            else
+            {
+                ++itr;
+            }
+        }
+
+    }while( 0 );
+
+    return vecMatches.size();
+}
+
 gint32 CRpcRouter::AddRemoveMatch(
     IMessageMatch* pMatch,
     bool bAdd, bool bRemote,
@@ -1603,11 +1661,18 @@ gint32 CRouterAddRemoteMatchTask::AddRemoteMatchInternal(
                 pMatch, true, true, nullptr );
 
             if( ret == EEXIST )
+            {
+                ret = 0;
+                // stop further actions in this
+                // transaction
+                ChangeRelation( logicOR );
                 break;
+            }
             else if( ERROR( ret ) )
                 break;
 
-            // in case the transaction failed
+            // in case the rest transaction failed
+            // add a rollback task
             TaskletPtr pRbTask;
             ret = pRouter->BuildAddMatchTask(
                 pMatch, false, pRbTask );
@@ -1621,7 +1686,11 @@ gint32 CRouterAddRemoteMatchTask::AddRemoteMatchInternal(
                 pMatch, false, true, nullptr );
 
             if( ret == EEXIST )
+            {
+                ret = 0;
+                ChangeRelation( logicOR );
                 break;
+            }
             else if( ERROR( ret ) )
                 break;
         }
@@ -1800,7 +1869,7 @@ gint32 CRouterEventRelayRespTask::OnTaskComplete(
     EventPtr pTask;
     ret = GetInterceptTask( pTask );
     if( ERROR( ret ) )
-        return ret;
+        return 0;
 
     return pRouter->SetResponse(
         pTask, oResp.GetCfg() );
@@ -1883,13 +1952,13 @@ gint32 CRpcRouter::RunEnableEventTask(
     return ret;
 }
 
-gint32 CRpcRouter::RunDisableEventTask(
+gint32 CRpcRouter::BuildDisEvtTaskGrp(
     IEventSink* pCallback,
-    IMessageMatch* pMatch )
+    IMessageMatch* pMatch,
+    TaskletPtr& pTask )
 {
     gint32 ret = 0;
-    if( pCallback == nullptr ||
-        pMatch == nullptr )
+    if( pMatch == nullptr )
         return -EINVAL;
 
     do{
@@ -1897,27 +1966,33 @@ gint32 CRpcRouter::RunDisableEventTask(
         CParamList oParams;
         oParams[ propIfPtr ] = ObjPtr( this );
 
-        oParams[ propEventSink ] =
-            ObjPtr( pCallback );
+        if( pCallback != nullptr )
+        {
+            oParams[ propEventSink ] =
+                ObjPtr( pCallback );
 
-        ret = pRespTask.NewObj(
-            clsid( CRouterEventRelayRespTask ),
-            oParams.GetCfg() );
+            ret = pRespTask.NewObj(
+                clsid( CRouterEventRelayRespTask ),
+                oParams.GetCfg() );
 
-        // run the task to set it to a proper
-        // state
-        ( *pRespTask )( eventZero );
+            if( ERROR( ret ) )
+                break;
 
-        oParams[ propEventSink ] =
-            ObjPtr( pRespTask );
+            // run the task to set it to a proper
+            // state
+            ( *pRespTask )( eventZero );
 
-        oParams[ propNotifyClient ] = true;
-        oParams[ propEventSink ] =
-            ObjPtr( pRespTask );
+            oParams[ propEventSink ] =
+                ObjPtr( pRespTask );
+
+            oParams[ propNotifyClient ] = true;
+            oParams[ propEventSink ] =
+                ObjPtr( pRespTask );
+        }
 
         TaskGrpPtr pTaskGrp;
         ret = pTaskGrp.NewObj(
-            clsid( CIfTaskGroup ),
+            clsid( CIfTransactGroup ),
             oParams.GetCfg() );
 
         if( ERROR( ret ) )
@@ -1955,10 +2030,36 @@ gint32 CRpcRouter::RunDisableEventTask(
         pTaskGrp->AppendTask( pDisableTask );
         pTaskGrp->AppendTask( pStopProxyTask );
 
-        TaskletPtr pGrpTask = pTaskGrp;
-        ret = this->AddAndRun( pGrpTask );
+        pTask = pTaskGrp;
+        if( pTask.IsEmpty() )
+            ret = -EFAULT;
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CRpcRouter::RunDisableEventTask(
+    IEventSink* pCallback,
+    IMessageMatch* pMatch )
+{
+    gint32 ret = 0;
+    if( pCallback == nullptr ||
+        pMatch == nullptr )
+        return -EINVAL;
+
+    do{
+        TaskletPtr pTask;
+
+        ret = BuildDisEvtTaskGrp(
+            pCallback, pMatch, pTask );
+
+        if( ERROR( ret ) )
+            break;
+
+        ret = this->AddAndRun( pTask );
         if( SUCCEEDED( ret ) )
-            ret = pTaskGrp->GetError();
+            ret = pTask->GetError();
         
     }while( 0 );
 

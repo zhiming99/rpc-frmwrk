@@ -375,6 +375,9 @@ gint32 CRpcSocketBase::StartTimer()
 {
     gint32 ret = 0;
     do{
+        if( GetState() == sockStopped )
+            return ERROR_STATE;
+
         CIoManager *pMgr = GetIoMgr();
         if( pMgr == nullptr )
         {
@@ -3859,6 +3862,12 @@ gint32 CRpcListeningSock::Connect()
         }
 
         m_iFd = ret;
+
+        gint32 dwReuseAddr = 1;
+        ret = setsockopt( m_iFd, SOL_SOCKET,
+            SO_REUSEADDR, &dwReuseAddr,
+            sizeof( dwReuseAddr ) );
+
         CCfgOpener oCfg(
             ( IConfigDb* )m_pCfg );
 

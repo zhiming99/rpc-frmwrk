@@ -1705,8 +1705,6 @@ gint32 CInterfaceProxy::AsyncCall(
             break;
         }
 
-        ret = oNewResp[ propReturnValue ];
-
     }while( 0 );
 
     return ret;

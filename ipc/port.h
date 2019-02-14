@@ -20,6 +20,7 @@
 #include "frmwrk.h"
 #include "portdrv.h"
 
+#define PORT_MAX_GENERATIONS         4
 #define PORT_START_TIMEOUT_SEC       120
 
 // port type mask
@@ -90,6 +91,7 @@
 #define PNP_STATE_START_CHILD           ( ( guint32 )0x05 )
 #define PNP_STATE_START_PORT_RDY        ( ( guint32 )0x06 )
 
+#define PNP_STATE_STOP_PRELOCK          ( ( guint32 )0x08 )
 #define PNP_STATE_STOP_BEGIN            ( ( guint32 )0x00 )
 #define PNP_STATE_STOP_PRE              ( ( guint32 )0x03 )
 #define PNP_STATE_STOP_SELF             ( ( guint32 )0x04 )
@@ -266,6 +268,9 @@ class CPort : public IPort
 	gint32 SubmitStopIrp( IRP* pIrp );
 	gint32 CompleteStopIrp( IRP* pIrp );
 
+	gint32 SubmitStopIrpEx( IRP* pIrp );
+	gint32 CompleteStopIrpEx( IRP* pIrp );
+
 	gint32 SubmitQueryStopIrp( IRP* pIrp );
 	virtual gint32 CompleteQueryStopIrp( IRP* pIrp );
 
@@ -371,6 +376,9 @@ class CPort : public IPort
     virtual gint32 Start( IRP* irp )
     { return 0; }
     gint32 PostStart( IRP* irp );
+
+    virtual gint32 OnPrepareStop( IRP* irp )
+    { return 0; }
 
     gint32 StopEx( IRP* irp );
     gint32 PreStop( IRP* irp );
@@ -596,6 +604,8 @@ class CGenericBusPort : public CPort
             std::vector< PortPtr >& vecChildPdo );
 
     bool PortExist( guint32 iPortId ) const;
+
+    virtual gint32 OnPrepareStop( IRP* irp );
 
     virtual gint32 StopChild( IRP* pIrp );
 

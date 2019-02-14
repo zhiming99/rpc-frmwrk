@@ -208,6 +208,7 @@ inline std::string DBUS_DESTINATION2(
 #define SYS_METHOD_CLOSERMTPORT         "RpcCall_CloseRemotePort"
 #define SYS_METHOD_ENABLERMTEVT         "RpcCall_EnableRemoteEvent"
 #define SYS_METHOD_DISABLERMTEVT        "RpcCall_DisableRemoteEvent"
+#define SYS_METHOD_CLEARRMTEVTS         "RpcCall_ClearRemoteEvents"
 
 
 #define SYS_METHOD_USERCANCELREQ        "RpcCall_UserCancelRequest"

@@ -262,20 +262,20 @@ gint32 CDBusProxyFdo::HandleListeningFdo(
 
         ret = -EINVAL;
 
-        if( dwIoDir == IRP_DIR_IN )
+        if( unlikely( dwIoDir != IRP_DIR_IN ) )
         {
             // wrong direction
             break;
         }
 
         IPort* pPdoPort = GetLowerPort();
-        if( pPdoPort == nullptr )
+        if( unlikely( pPdoPort == nullptr ) )
         {
             ret = -EFAULT;
             break;
         }
-        ret = pIrp->AllocNextStack( pPdoPort );
 
+        ret = pIrp->AllocNextStack( pPdoPort );
         IrpCtxPtr& pNextIrpCtx = pIrp->GetTopStack(); 
 
         // send down as a forward request 
@@ -477,7 +477,7 @@ gint32 CDBusProxyFdo::HandleRegMatchInternal(
         }
         
         // let's start a full register
-        IrpCtxPtr& pCtx = pIrp->GetCurCtx();
+        IrpCtxPtr pCtx = pIrp->GetCurCtx();
 
         IPort* pPdoPort = GetLowerPort();
         if( pPdoPort == nullptr )
@@ -487,10 +487,11 @@ gint32 CDBusProxyFdo::HandleRegMatchInternal(
         }
 
         ret = pIrp->AllocNextStack( pPdoPort );
-        IrpCtxPtr& pNextIrpCtx = pIrp->GetTopStack(); 
+        IrpCtxPtr pNextIrpCtx = pIrp->GetTopStack(); 
         pNextIrpCtx->SetMajorCmd( IRP_MJ_FUNC );
         pNextIrpCtx->SetMinorCmd( IRP_MN_IOCTL );
         pNextIrpCtx->SetIoDirection( IRP_DIR_INOUT );
+        pNextIrpCtx->SetReqData( pCtx->m_pReqData );
 
         if( bReg )
         {
@@ -833,6 +834,11 @@ gint32 CProxyFdoListenTask::Process(
         case STATUS_PENDING:
             break;
 
+        case -ENOTCONN:
+            {
+                DebugPrint( 0,
+                    "The server is not online?, retry scheduled..." );
+            }
         case -EAGAIN:
             {
                 ret = STATUS_MORE_PROCESS_NEEDED;
@@ -841,7 +847,6 @@ gint32 CProxyFdoListenTask::Process(
 
         case ERROR_PORT_STOPPED:
         case -ECANCELED:
-        case -ENOTCONN:
             {
                 // if canncelled, or disconned, no
                 // need to continue

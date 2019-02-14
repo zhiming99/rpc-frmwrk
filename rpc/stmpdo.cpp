@@ -2002,14 +2002,22 @@ gint32 CTcpStreamPdo::OnQueryStop(
     // test if the sock is already stopped. it
     // could be a case if the socket is detected
     // to be disconnected
-    gint32 ret = super::OnQueryStop( pIrp );
-
     EnumSockState iState =
         m_pStmSock->GetState();
 
     if( iState != sockStarted )
-        return ret;
+        return ERROR_STATE;
 
+    if( true )
+    {
+        // query stop has be done once
+        CStdRMutex oPortLock( GetLock() );
+        if( m_bStopReady )
+            return 0;
+        m_bStopReady = true;
+    }
+
+    gint32 ret = 0;
     // if the socket is still OK, the PreStop
     // should either be triggered from remote
     // server's OFFLINE notification, or a call

@@ -32,6 +32,7 @@
 using namespace std;
 
 bool CIoManager::m_bInit( false );
+bool CIoManager::m_bStop( false );
 
 gint32 CIoManager::SubmitIrpInternal(
     IPort* pPort,
@@ -856,11 +857,12 @@ gint32 CIoManager::ClosePort(
 
         if( pPort->Unloadable() )
         {
-            ret = RemoveFromHandleMap( pPort, nullptr );
+            /*ret = RemoveFromHandleMap( pPort, nullptr );
             DEFER_CALL( this,
                 &GetPnpMgr(),
                 &CPnpManager::DestroyPortStack,
                 ( ( IPort* )pPort ) );
+            */
         }
 
     }while( 0 );
@@ -1293,6 +1295,7 @@ gint32 CIoManager::Start()
         }
 
         m_bInit = true;
+        m_bStop = false;
 
         GetTaskThreadPool().Start();
         GetIrpThreadPool().Start();
@@ -1557,11 +1560,19 @@ gint32 CIoManager::Stop()
     gint32 ret = 0;
     CCfgOpener a;
     a.SetPointer( propIoMgr, this );
+    if( true )
+    {
+        CStdRMutex oMgrLock( GetLock() );
+        if( m_bStop )
+            return ERROR_STATE;
+        m_bStop = true;
+    }
 
     if( m_iHcTimer != 0 )
     {
         GetUtils().GetTimerSvc().
             RemoveTimer( m_iHcTimer );
+        m_iHcTimer = 0;
     }
 
     ret = ScheduleTask(
@@ -1789,12 +1800,12 @@ gint32 CIoMgrStopTask::operator()(
     {
         // NOTE: we cannot stop task
         // thread pool here
-        ret = pMgr->GetMainIoLoop()->Stop();
         ret = pMgr->GetDrvMgr().Stop();
         ret = pMgr->GetPnpMgr().Stop();
-        ret = pMgr->GetUtils().Stop();
-        ret = pMgr->GetIrpThreadPool().Stop();
         ret = pMgr->GetTaskThreadPool().Stop();
+        ret = pMgr->GetIrpThreadPool().Stop();
+        ret = pMgr->GetMainIoLoop()->Stop();
+        ret = pMgr->GetUtils().Stop();
     }
 
     if( dwContext == eventOneShotTaskThrdCtx )

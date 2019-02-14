@@ -489,11 +489,11 @@ class CRpcReqForwarder :
 
     gint32 ClearRefCountByAddr(
         const std::string& strIpAddr,
-        std::vector< std::string > vecUniqNames );
+        std::vector< std::string >& vecUniqNames );
 
     gint32 ClearRefCountByUniqName(
         const std::string& strUniqName,
-        std::vector< std::string > vecIpAddrs );
+        std::set< std::string >& setIpAddrs );
 
     virtual const EnumClsid GetIid() const
     { return iid( CRpcReqForwarder ); }
@@ -558,6 +558,10 @@ class CRpcReqForwarder :
         guint32 dwSize,                 // [in]
         IEventSink* pCallback );
 
+    // methods of CRpcBaseOperations
+    virtual gint32 OnModEvent(
+        EnumEventId iEvent,
+        const std::string& strModule );
 };
 
 class CRpcRfpForwardEventTask
@@ -940,6 +944,11 @@ class CRpcTcpBridge:
             pCallback, -ENOTSUP );         
         return -ENOTSUP;
     }
+
+    gint32 ClearRemoteEvents(
+        IEventSink* pCallback,
+        ObjPtr& pVecMatches );
+
 };
 
 class CRpcTcpBridgeProxy :
@@ -1006,6 +1015,12 @@ class CRpcTcpBridgeProxy :
         IEventSink* pCallback,
         const IConfigDb* pCfg )
     { return -ENOTSUP; }
+
+    // the method to do cleanup when the client is
+    // down
+    gint32 ClearRemoteEvents(
+        ObjPtr& pVecMatches, // [ in ]
+        IEventSink* pCallback );
 
     virtual gint32 EnableRemoteEvent(
         IEventSink* pCallback,
@@ -1220,6 +1235,10 @@ class CRpcRouter :
 
     gint32 RemoveLocalMatchByAddr(
         const std::string& strIpAddr );
+
+    gint32 RemoveLocalMatchByUniqName(
+        const std::string& strUniqName,
+        std::vector< MatchPtr >& vecMatches );
 
     gint32 AddRemoteMatch(
         IMessageMatch* pMatch,
@@ -1464,6 +1483,11 @@ class CRpcRouter :
         IEventSink* pCallback,
         IMessageMatch* pMatch );
 
+    gint32 BuildDisEvtTaskGrp(
+        IEventSink* pCallback,
+        IMessageMatch* pMatch,
+        TaskletPtr& pTask );
+
     gint32 RunDisableEventTask(
         IEventSink* pCallback,
         IMessageMatch* pMatch );
@@ -1471,11 +1495,7 @@ class CRpcRouter :
     // methods of CRpcBaseOperations
     virtual gint32 OnModEvent(
         EnumEventId iEvent,
-        const std::string& strModule )
-    {
-        return ForwardModOnOfflineEvent(
-            iEvent, strModule );
-    }
+        const std::string& strModule );
 
     virtual gint32 OnDBusEvent(
         EnumEventId iEvent )
@@ -1615,25 +1635,53 @@ class CIfRollbackableTask :
         : super( pCfg )
     {}
 
-    gint32 AddRollbackTask(
-        TaskletPtr& pTask, bool bBack = true )
+    gint32 GetTractGrp( CIfTransactGroup*& pTractGrp )
     {
         CCfgOpener oTaskCfg(
             ( IConfigDb* ) GetConfig() );
 
-        guint32* intptr = nullptr;
+        intptr_t intptr;
         gint32 ret = oTaskCfg.GetIntPtr(
-            propTransGrpPtr, intptr );
+            propTransGrpPtr, ( guint32*& )intptr );
+
         if( ERROR( ret ) )
             return ret;
 
-        CIfTransactGroup* pTractGrp = reinterpret_cast
+        pTractGrp = reinterpret_cast
             < CIfTransactGroup* >( intptr );
+
+        if( pTractGrp == nullptr )
+            return -EFAULT;
+
+        return 0;
+    }
+
+    gint32 AddRollbackTask(
+        TaskletPtr& pTask, bool bBack = true )
+    {
+        CIfTransactGroup* pTractGrp = nullptr;
+        gint32 ret = GetTractGrp( pTractGrp );
+        if( ERROR( ret ) )
+            return ret;
+
         if( pTractGrp == nullptr )
             return -EFAULT;
 
         return pTractGrp->AddRollback(
             pTask, bBack );
+    }
+
+    gint32 ChangeRelation( EnumLogicOp iOp )
+    {
+        CIfTransactGroup* pTractGrp = nullptr;
+        gint32 ret = GetTractGrp( pTractGrp );
+        if( ERROR( ret ) )
+            return ret;
+
+        if( pTractGrp == nullptr )
+            return -EFAULT;
+
+        return pTractGrp->SetTaskRelation( iOp );
     }
     
     gint32 OnCancel( gint32 dwContext )

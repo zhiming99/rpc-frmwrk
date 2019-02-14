@@ -82,6 +82,9 @@ void CIfSmokeTest::tearDown()
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
         m_pMgr.Clear();
 
+        DebugPrint( 0, "#Leaked objects is %d",
+            CObjBase::GetActCount() );
+
         CPPUNIT_ASSERT( CObjBase::GetActCount() == 0 );
 
     }while( 0 );

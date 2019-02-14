@@ -736,7 +736,7 @@ gint32 CDBusProxyPdo::SubmitIoctlCmd( IRP* pIrp )
     }
 
     // let's process the func irps
-    IrpCtxPtr& pCtx = pIrp->GetCurCtx();
+    IrpCtxPtr pCtx = pIrp->GetCurCtx();
 
     do{
         if( pIrp->MajorCmd() != IRP_MJ_FUNC ||
@@ -788,7 +788,8 @@ gint32 CDBusProxyPdo::SubmitIoctlCmd( IRP* pIrp )
                 ObjPtr pObj;
                 pObj = m_pMatchFwder;
 
-                BufPtr pBuf( pObj );
+                BufPtr pBuf( true );
+                *pBuf = pObj;
                 pCtx->m_pReqData = pBuf;
                 ret = HandleListening( pIrp );
 
@@ -1757,29 +1758,17 @@ gint32 CProxyPdoDisconnectTask::operator()(
     if( ERROR( ret ) )
         return ret;
 
-    ObjPtr pObj;
-    ret = oParams.GetObjPtr( propIrpPtr, pObj );
+    IRP* pMasterIrp = nullptr;
+    ret = oParams.GetPointer( propIrpPtr, pMasterIrp );
     if( ERROR( ret ) )
         return ret;
 
-    IRP* pMasterIrp = pObj;
-    if( pMasterIrp == nullptr )
-    {
-        return -EFAULT;
-    }
-
     do{
 
-        ret = oParams.GetObjPtr( propPortPtr, pObj );
+        CPort* pPort = nullptr;
+        ret = oParams.GetPointer( propPortPtr, pPort );
         if( ERROR( ret ) )
             break;
-
-        CPort* pPort = pObj;
-        if( pPort == nullptr )
-        {
-            ret = -EFAULT;
-            break;
-        }
 
         if( dwContext == eventIrpComp )
         {
@@ -1841,9 +1830,12 @@ gint32 CProxyPdoDisconnectTask::operator()(
 
     if( ret != STATUS_PENDING )
     {
-
         CStdRMutex oIrpLock( pMasterIrp->GetLock() );
-        if( !pMasterIrp->CanContinue( IRP_STATE_READY ) )
+
+        gint32 ret2 = pMasterIrp->
+            CanContinue( IRP_STATE_READY );
+
+        if( ERROR( ret2 ) )
         {
             // irp is not available
             return ERROR_STATE;
@@ -1867,6 +1859,15 @@ gint32 CDBusProxyPdo::OnQueryStop( IRP* pIrp )
         return -EINVAL;
 
     gint32 ret = 0;
+
+    if( true )
+    {
+        // query stop has be done once
+        CStdRMutex oPortLock( GetLock() );
+        if( m_bStopReady )
+            return 0;
+        m_bStopReady = true;
+    }
 
     do{
 

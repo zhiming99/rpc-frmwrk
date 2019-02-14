@@ -441,11 +441,12 @@ gint32 CPnpManager::QueryStop(
             ret = -EINVAL;
             break;
         }
-        IrpCtxPtr& pIrpCtx = pIrp->GetTopStack(); 
+        IrpCtxPtr pIrpCtx = pIrp->GetTopStack(); 
 
         // star the port
         pIrpCtx->SetMajorCmd( IRP_MJ_PNP );
         pIrpCtx->SetMinorCmd( IRP_MN_PNP_QUERY_STOP );
+        pPort->AllocIrpCtxExt( pIrpCtx );
 
         // we will wait 2 minutes for
         // a query stop operation
@@ -926,7 +927,8 @@ gint32 CPnpMgrStopPortAndDestroyTask::OnScheduledTask(
         pMasterIrp->SetSyncCall( false );
 
         pMasterIrp->SetTimer(
-            PORT_START_TIMEOUT_SEC * 4, pMgr );
+            PORT_START_TIMEOUT_SEC *
+            PORT_MAX_GENERATIONS, pMgr );
 
         pMasterIrp->SetCbOnly( true );
 
@@ -944,6 +946,7 @@ gint32 CPnpMgrStopPortAndDestroyTask::OnScheduledTask(
 
         if( ret == STATUS_PENDING )
         {
+            pMasterIrp->ResetTimer();
             pMasterIrp->MarkPending();
             break;
         }
@@ -1398,7 +1401,20 @@ void CPnpManager::HandleCPEvent(
                 propAdminEvent, iEvent, dwParam1, 0, pData );
 
             // graceful shutdown
-            GetIoMgr()->Stop();
+            TaskletPtr pTask;
+            gint32 ret = DEFER_CALL_NOSCHED(
+                pTask, this, &CIoManager::Stop );
+
+            if( ERROR( ret ) )
+                break;
+
+            // schedule a new thread for this
+            // call, otherwise there is risk of
+            // endless wait
+            ret = GetIoMgr()->RescheduleTask(
+                pTask, true );
+
+            break;
         }
     case eventDBusOffline:
         {
@@ -1406,7 +1422,23 @@ void CPnpManager::HandleCPEvent(
                 propDBusSysEvent, iEvent, dwParam1, 0, pData );
 
             // graceful shutdown
-            GetIoMgr()->Stop();
+            TaskletPtr pTask;
+
+            gint32 ret = DEFER_CALL_NOSCHED(
+                pTask, this, &CIoManager::Stop );
+
+            if( ERROR( ret ) )
+                break;
+
+            // schedule a new thread for this
+            // call, otherwise there is risk of
+            // endless wait
+            ret = GetIoMgr()->RescheduleTask(
+                pTask, true );
+
+            DebugPrint( ret,
+                "DBusOffline triggered a full stop" );
+
             break;
         }
     case eventModOnline:
@@ -1432,18 +1464,6 @@ void CPnpManager::HandleCPEvent(
             // proxy port or the TcpStreamPort
             oConnPoint.BroadcastEvent(
                 propRmtSvrEvent, iEvent, dwParam1, 0, pData );
-            break;
-            /*CParamList oParams;
-            oParams.Push( ( guint32 )propRmtSvrEvent );
-            oParams.Push( ( guint32 ) iEvent );
-            oParams.Push( dwParam1 );
-            oParams.Push( ( guint32 )pData );
-            oParams.SetPointer( propIoMgr, GetIoMgr() );
-
-            GetIoMgr()->ScheduleTask(
-                clsid( CPnpMgrStopPortStackTask ),
-                oParams.GetCfg(),
-                true );*/
             break;
         }
     case eventRmtModOnline:

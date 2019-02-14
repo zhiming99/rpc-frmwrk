@@ -668,6 +668,7 @@ gint32 CDBusBusPort::Start( IRP *pIrp )
             ret = -ENOMEM;
             break;
         }
+        this->AddRef();
 
         CParamList oParams;
 
@@ -1016,6 +1017,7 @@ void CDBusBusPort::ReleaseDBus()
         dbus_connection_unref( m_pDBusConn );
 
         m_pDBusConn = nullptr;
+        this->Release();
     }
 
     return;

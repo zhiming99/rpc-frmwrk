@@ -1112,11 +1112,31 @@ gint32 CPort::StopLowerPort( IRP* pIrp )
     return ret;
 }
 
+gint32 CPort::SubmitStopIrpEx( IRP* pIrp )
+{
+    gint32 ret = 0;
+    if( pIrp == nullptr ||
+        pIrp->GetStackSize() == 0 )
+        return -EINVAL;
+
+    // PNP_STATE_STOP_PRELOCK is a state before
+    // the port switch to PORT_STATE_STOPPING,
+    // that is the I/O is still available at this
+    // stage.
+    SetPnpState( pIrp, PNP_STATE_STOP_PRELOCK );
+    ret = OnPrepareStop( pIrp );
+    if( ret == STATUS_PENDING )
+        return ret;
+
+    return SubmitStopIrp( pIrp );
+}
+
 gint32 CPort::SubmitStopIrp( IRP* pIrp )
 {
 
     gint32 ret = 0;
-    if( pIrp == nullptr )
+    if( pIrp == nullptr ||
+        pIrp->GetStackSize() == 0 )
         return -EINVAL;
 
     // let's first stop this port before send
@@ -1142,7 +1162,6 @@ gint32 CPort::SubmitStopIrp( IRP* pIrp )
         //
         // PORT_STATE_STOPPING serve as a roadblock to
         // block further irp submission
-        //
         ret = CanContinue( pIrp, PORT_STATE_STOPPING );
 
         if( ERROR( ret ) )
@@ -1576,7 +1595,7 @@ gint32 CPort::SubmitPnpIrp( IRP* pIrp )
             }
         case IRP_MN_PNP_STOP:
             {
-                ret = SubmitStopIrp( pIrp );
+                ret = SubmitStopIrpEx( pIrp );
                 break;
             }
 
@@ -1941,6 +1960,48 @@ gint32 CPort::CompleteStartIrp( IRP* pIrp )
     } \
 } 
 
+gint32 CPort::CompleteStopIrpEx( IRP* pIrp )
+{
+    gint32 ret = 0;
+
+    do{
+        if( pIrp == nullptr )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        IrpCtxPtr pCtxPort =
+            pIrp->GetCurCtx();;
+
+        if( !pIrp->IsIrpHolder() )
+        {
+            IrpCtxPtr pCtxLower = pIrp->GetTopStack();
+            ret = pCtxLower->GetStatus();
+            pCtxPort->SetStatus( ret );
+            pIrp->PopCtxStack();
+        }
+        else
+        {
+            ret = pCtxPort->GetStatus();
+        }
+        
+        guint32 dwState = GetPnpState( pIrp );
+        if( dwState == PNP_STATE_STOP_PRELOCK )
+        {
+            pCtxPort->SetStatus( 0 );
+            ret = SubmitStopIrp( pIrp );
+        }
+        else
+        {
+            ret = CompleteStopIrp( pIrp );
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CPort::CompleteStopIrp( IRP* pIrp )
 {
     gint32 ret = 0;
@@ -1952,12 +2013,12 @@ gint32 CPort::CompleteStopIrp( IRP* pIrp )
             break;
         }
 
-        IrpCtxPtr& pCtxPort =
-            pIrp->GetCurCtx();;
+        IrpCtxPtr pCtxPort =
+            pIrp->GetCurCtx();
 
         if( !pIrp->IsIrpHolder() )
         {
-            IrpCtxPtr& pCtxLower = pIrp->GetTopStack();
+            IrpCtxPtr pCtxLower = pIrp->GetTopStack();
             ret = pCtxLower->GetStatus();
             pCtxPort->SetStatus( ret );
             pIrp->PopCtxStack();
@@ -2097,7 +2158,7 @@ gint32 CPort::CompletePnpIrp( IRP* pIrp )
             }
         case IRP_MN_PNP_STOP:
             {
-                ret = CompleteStopIrp( pIrp );
+                ret = CompleteStopIrpEx( pIrp );
                 break;
             }
 
@@ -2835,6 +2896,16 @@ bool CPort::CanAcceptMsg(
         || dwPortState == PORT_STATE_BUSY_RESUME );
 }
 
+// this route is called before the port goes to
+// stopping state
+gint32 CGenericBusPort::OnPrepareStop( IRP* pIrp )
+{
+    if( pIrp == nullptr ||
+        pIrp->GetStackSize() == 0 )
+        return -EINVAL;
+    return StopChild( pIrp );
+}
+
 CGenericBusPort::CGenericBusPort(
     const IConfigDb* pConfig )
     :super( pConfig ),
@@ -3124,9 +3195,9 @@ gint32 CGenericBusPort::PreStop( IRP* pIrp )
 
         if( pExt->m_dwExtState == 0 )
         {
-            ret = StopChild( pIrp );
-            if( ERROR( ret ) )
-                break;
+            // ret = StopChild( pIrp );
+            // if( ERROR( ret ) )
+            //     break;
 
             pExt->m_dwExtState = 1;
             if( ret == STATUS_PENDING )
@@ -3227,7 +3298,7 @@ gint32 CGenBusPortStopChildTask::Process(
         }
         m_pCtx->RemoveProperty( propParamList );
 
-        CStdRMutex oLock( pIrp->GetLock() );
+        CStdRMutex oIrpLock( pIrp->GetLock() );
         ret = pIrp->CanContinue( IRP_STATE_READY );
         if( ERROR( ret ) )
         {
@@ -3237,7 +3308,7 @@ gint32 CGenBusPortStopChildTask::Process(
         // a dumb irp to prevent the master irp
         // from going away unexpectedly
         pIrp->AddSlaveIrp( nullptr );
-        oLock.Unlock();
+        oIrpLock.Unlock();
 
         // we don't check the port state because we
         // are sure in the stopping port state, an
@@ -3280,7 +3351,7 @@ gint32 CGenBusPortStopChildTask::Process(
             ret = STATUS_MORE_PROCESS_NEEDED;
         }
 
-        oLock.Lock();
+        oIrpLock.Lock();
         ret = pIrp->CanContinue( IRP_STATE_READY );
         if( ERROR( ret ) )
         {
@@ -3295,15 +3366,15 @@ gint32 CGenBusPortStopChildTask::Process(
             if( pIrp->GetStackSize() )
             {
                 pIrp->GetTopStack()->SetStatus( 0 );
-                oLock.Unlock();
+                oIrpLock.Unlock();
                 pMgr->CompleteIrp( pIrp ); 
-                oLock.Lock();
             }
             ret = STATUS_SUCCESS;
             break;
         }
         else
         {
+            pIrp->ResetTimer();
             // we will wait till all the associated
             // irps completed and this master will
             // be completed afterward
@@ -3402,6 +3473,7 @@ gint32 CGenericBusPort::AllocIrpCtxExt(
             {
             case IRP_MN_PNP_START:
             case IRP_MN_PNP_STOP:
+            case IRP_MN_PNP_QUERY_STOP:
                 {
                     CGenBusPnpExt oExt;
 
