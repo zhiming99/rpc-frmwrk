@@ -20,6 +20,9 @@ This framework depends on the following packags:
 11. `Streaming support to provide double-direction stream transfer`
 
 ---
+[`Sun Feb 24 14:52:28 CST 2019`]   
+1. This week, I had some emergency thing to handle. I will get back next week.   
+
 [`Sat Feb 16 17:35:54 CST 2019`]   
 1. `OpenRemotePort` is done now. The CDBusProxyPdo and CDBusProxyFdo are found lack of the `online/offline` handler for both remote server and remote module, and need to add some code next week. And after that, we can move on to debug `EnableEvent` related stuffs.   
 
