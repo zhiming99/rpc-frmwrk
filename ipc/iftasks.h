@@ -372,6 +372,10 @@ class CIfTaskGroup
     virtual gint32 FindTaskByRmtId(
         guint64 iTaskId, TaskletPtr& pRet );
 
+    gint32 FindTaskByClsid(
+        EnumClsid iClsid,
+        std::vector< TaskletPtr >& vecTasks );
+
     // the tasks have two types of relation,
     // AND and OR
     void SetRelation( EnumLogicOp iOp )
@@ -786,4 +790,23 @@ class CIfFetchDataTask : public CIfRetryTask
         }
         return ret;
     }
+};
+
+class CIfStartExCompletion :
+    public CIfInterceptTaskProxy
+{
+    public:
+    typedef CIfInterceptTaskProxy super;
+    CIfStartExCompletion( const IConfigDb* pCfg )
+        : CIfInterceptTaskProxy( pCfg )
+    {
+        SetClassId( clsid( CIfStartExCompletion ) );
+    }
+    virtual gint32 RunTask()
+    { return STATUS_PENDING; }
+
+    virtual gint32 OnTaskComplete( gint32 iRetVal );
+
+    gint32 OnCancel( gint32 dwContext )
+    {  return OnTaskComplete( -ECANCELED ); }
 };

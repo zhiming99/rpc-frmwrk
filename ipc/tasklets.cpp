@@ -566,8 +566,15 @@ gint32 CSyncCallback::operator()(
             break;
         }
     }
+
+    // NOTE: don't SetError after post the signal.
+    // it could happen that the signal receiver
+    // get stale error code before SetError was
+    // done
+    SetError( ret );
     Sem_Post( &m_semWait );
-    return SetError( ret );
+
+    return ret;
 }
 
 gint32 CSyncCallback::WaitForComplete()

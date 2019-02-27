@@ -93,8 +93,7 @@ class CDBusProxyPdo : public CRpcPdoPort
     inline bool IsConnected()
     { return m_bConnected; }
 
-    inline void SetConnected( bool bConnected )
-    { m_bConnected = bConnected; }
+    void SetConnected( bool bConnected );
 
     virtual void OnPortStopped();
 
@@ -142,6 +141,9 @@ class CDBusProxyFdo : public IRpcFdoPort
     // to filter for remote dbus online/offline
     // event
     MatchPtr            m_matchDBusOff;
+    MatchPtr            m_matchRmtSvrEvt;
+
+    bool                m_bConnected = false;
 
     gint32 HandleListeningFdo( IRP* pIrp );
 
@@ -185,6 +187,12 @@ class CDBusProxyFdo : public IRpcFdoPort
     virtual gint32 CompleteIoctlIrp( IRP* pIrp );
 
     virtual gint32 OnPortReady( IRP* pIrp );
+
+    inline void SetConnected( bool bConnected )
+    { m_bConnected = bConnected; }
+
+    inline bool IsConnected()
+    { return m_bConnected; }
 
     // virtual gint32 DispatchRespMsg(
     //     DBusMessage* pMsg );

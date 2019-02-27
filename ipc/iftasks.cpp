@@ -347,34 +347,7 @@ gint32 CIfStartRecvMsgTask::RunTask()
 gint32 CIfStartRecvMsgTask::OnCancel(
     guint32 dwContext )
 {
-    gint32 ret = 0;
-    do{
-        CCfgOpener oCfg( ( IConfigDb* )GetConfig() );
-        ObjPtr pObj;
-
-        ret = oCfg.GetObjPtr( propIrpPtr, pObj );
-        if( ERROR( ret ) )
-            break;
-
-        IrpPtr pIrp = pObj;
-
-        ret = oCfg.GetObjPtr( propIfPtr, pObj );
-        if( ERROR( ret ) )
-            break;
-
-        CRpcInterfaceBase* pIf = pObj;
-        if( unlikely( pIf == nullptr ) )
-        {
-            ret = -EFAULT;
-            break;
-        }
-
-        CIoManager* pMgr = pIf->GetIoMgr();
-        pMgr->CancelIrp( pIrp );
-
-    }while( 0 );
-
-    return ret;
+    return super::OnCancel( dwContext );
 }
 
 CIfRetryTask::CIfRetryTask(
@@ -1513,22 +1486,24 @@ gint32 CIfTaskGroup::OnChildComplete(
         if( bSync )
             break;
 
-        ObjPtr pObj;
-        ret = oCfg.GetObjPtr( propIfPtr, pObj );
+        CRpcInterfaceBase* pIf = nullptr;
+        CIoManager* pMgr = nullptr;
 
+        ret = oCfg.GetPointer( propIfPtr, pIf );
         if( ERROR( ret ) )
-            break;
-
-        CRpcInterfaceBase* pIf = pObj;
-        if( pIf == nullptr )
         {
-            ret = -EFAULT;
-            break;
+            ret = oCfg.GetPointer(
+                propIoMgr, pMgr );
+
+            if( ERROR( ret ) )
+                break;
+        }
+        else
+        {
+            pMgr = pIf->GetIoMgr();
         }
 
         oTaskLock.Unlock();
-
-        CIoManager* pMgr = pIf->GetIoMgr();
 
         // regain control by rescheduling this task
         TaskletPtr pThisTask( this );
@@ -1776,6 +1751,30 @@ gint32 CIfTaskGroup::FindTask(
         }
     }
     return ret;
+}
+
+gint32 CIfTaskGroup::FindTaskByClsid(
+    EnumClsid iClsid,
+    std::vector< TaskletPtr >& vecTasks )
+{
+    if( iClsid == clsid( Invalid ) )
+        return -EINVAL;
+
+    bool bFound = false;
+    CStdRTMutex oTaskLock( GetLock() );
+    for( auto elem : m_queTasks )
+    {
+        if( iClsid == elem->GetClsid() )
+        {
+            vecTasks.push_back( elem );
+            bFound = true;
+        }
+    }
+
+    if( !bFound )
+        return -ENOENT;
+
+    return 0;
 }
 
 gint32 CIfRootTaskGroup::OnComplete(
@@ -2216,6 +2215,12 @@ gint32 CIfParallelTaskGrp::RunTaskDirect(
             break;
         }
 
+        if( IsCanceling() )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+
         bool bRunning = IsRunning();
 
         CCfgOpenerObj oChildCfg(
@@ -2244,15 +2249,12 @@ gint32 CIfParallelTaskGrp::RunTaskDirect(
             ( *pTask )( eventZero );
             break;
         }
-        else
-        {
-            ret = STATUS_PENDING;
-        }
 
     }while( 0 );
 
-    return 0;
+    return ret;
 }
+
 gint32 CIfParallelTaskGrp::AddAndRun(
     TaskletPtr& pTask )
 {
@@ -2460,18 +2462,25 @@ gint32 CIfParallelTaskGrp::FindTaskByClsid(
     if( iClsid == clsid( Invalid ) )
         return -EINVAL;
 
+    bool bFound = false;
     CStdRTMutex oTaskLock( GetLock() );
     for( auto elem : m_setTasks )
     {
         if( iClsid == elem->GetClsid() )
+        {
             vecTasks.push_back( elem );
+            bFound = true;
+        }
     }
     for( auto elem : m_setPendingTasks )
     {
         if( iClsid == elem->GetClsid() )
+        {
             vecTasks.push_back( elem );
+            bFound = true;
+        }
     }
-    if( vecTasks.empty() )
+    if( !bFound )
         return -ENOENT;
 
     return 0;

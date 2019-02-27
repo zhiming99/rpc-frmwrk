@@ -456,10 +456,11 @@ gint32 CRpcBasePort::DispatchData(
     DMsgPtr& pMsg = *pData;
     gint32 iType = pMsg.GetType();
     DBusHandlerResult ret2; 
+    guint32 dwPortState = 0;
     if( true )
     {
         CStdRMutex oPortLock( GetLock() );
-        guint32 dwPortState = GetPortState();
+        dwPortState = GetPortState();
 
         if( !( dwPortState == PORT_STATE_READY
              || dwPortState == PORT_STATE_BUSY_SHARED
@@ -490,8 +491,9 @@ gint32 CRpcBasePort::DispatchData(
         string strDump = pMsg.DumpMsg();
 
         DebugPrint( ret, 
-            "Error, dmsg cannot be processed, %s",
-            strDump.c_str() );
+            "Error, dmsg cannot be processed, %s, portstate =%d",
+            strDump.c_str(),
+            dwPortState );
 #endif
 
         return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
@@ -1007,8 +1009,6 @@ gint32 CRpcBasePort::CancelAllIrps( gint32 iErrno )
             ++itrIrp;
         }
 
-        oPortLock.Lock();
-
     }while( 0 );
 
     return ret;
@@ -1162,10 +1162,6 @@ DBusHandlerResult CRpcBasePort::DispatchDBusSysMsg(
         {
             ret = DBUS_HANDLER_RESULT_HANDLED;
         }
-    }
-    else
-    {
-        ret = DBUS_HANDLER_RESULT_HALT;
     }
 
     return ret;

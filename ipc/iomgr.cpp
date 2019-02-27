@@ -618,13 +618,9 @@ gint32 CIoManager::CancelIrp(
                 }while( itr-- != pIrp->m_vecCtxStack.begin() );
 
                 itr = pIrp->m_vecCtxStack.begin();
-                pIrp->SetStatus( itr->second->GetStatus() );
-            }
-            else
-            {
-                pIrp->SetStatus( -ECANCELED );
             }
         }
+        pIrp->SetStatus( iRet );
 
         if( pIrp->GetStackSize() > 0 )
         {

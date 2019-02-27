@@ -601,6 +601,155 @@ gint32 CRpcInterfaceBase::Start()
     return ret;
 }
 
+gint32 CRpcInterfaceBase::GetParallelGrp(
+    TaskGrpPtr& pParaGrp )
+{
+    TaskGrpPtr pRootTaskGrp;
+    CIfRootTaskGroup* pRootGrp = nullptr;
+
+    if( true )
+    {
+        pRootTaskGrp = GetTaskGroup();
+        if( pRootTaskGrp.IsEmpty() )
+            return -ENOENT;
+
+        // as a guard to the root group
+        pRootGrp = pRootTaskGrp;
+    }
+
+    gint32 ret = 0;
+
+    do{
+        std::vector< TaskletPtr > vecTasks;
+        ret = pRootGrp->FindTaskByClsid(
+            clsid( CIfParallelTaskGrp ),
+            vecTasks );
+        if( ERROR( ret ) )
+            break;
+
+        // return the first one
+        pParaGrp = vecTasks.front();
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CRpcInterfaceBase::StartRecvTasks(
+    std::vector< MatchPtr >& vecMatches )
+{
+    gint32 ret = 0;
+
+    if( vecMatches.empty() )
+        return -EINVAL;
+
+    do{
+        // we cannot add the recvtask by AddAndRun
+        // at this point, because it requires the
+        // interface to be in the connected state,
+        // while we may still in the starting or
+        // stopped state
+        CParamList oParams;
+
+        ret = oParams.SetObjPtr(
+            propIfPtr, ObjPtr( this ) );
+
+        if( ERROR( ret  ) )
+            break;
+
+        TaskGrpPtr pParaTaskGrp;
+        ret = GetParallelGrp( pParaTaskGrp );
+        if( ERROR( ret ) )
+        {
+            ret = pParaTaskGrp.NewObj(   
+                clsid( CIfParallelTaskGrp ),
+                oParams.GetCfg() );
+
+            if( ERROR( ret ) )
+                break;
+        }
+            
+        CIfParallelTaskGrp* pTaskGrp
+            = pParaTaskGrp;
+
+        TaskletPtr pRecvMsgTask;
+        for( auto pMatch : vecMatches )
+        {
+            oParams[ propMatchPtr ] =
+                ObjPtr( pMatch );
+
+            ret = pRecvMsgTask.NewObj(
+                clsid( CIfStartRecvMsgTask ),
+                oParams.GetCfg() );
+
+            if( ERROR( ret ) )
+                break;
+
+            ret = pTaskGrp->AppendTask(
+                pRecvMsgTask );
+
+            if( ERROR( ret ) )
+                break;
+        }
+
+        if( ERROR( ret ) )
+            break;
+
+        TaskletPtr pTask = pParaTaskGrp;
+        ret = AppendAndRun( pTask );
+
+        if( ERROR( ret ) )
+            break;
+
+        // the ret does not necessarily indicate
+        // the return value of the receive task.
+        // we need to get the status code from the
+        // task.
+        ret = pParaTaskGrp->GetError();
+        if( ret == STATUS_PENDING )
+            ret = 0;
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CIfStartExCompletion::OnTaskComplete(
+    gint32 iRet )
+{
+    if( ERROR( iRet ) )
+        return iRet;
+
+    gint32 ret = 0;
+    do{
+        CParamList oParams(
+            ( IConfigDb*)GetConfig() );
+
+        CRpcInterfaceBase* pIf = nullptr;
+
+        ret = oParams.GetPointer(
+            propIfPtr, pIf );
+
+        if( ERROR( ret ) )
+            break;
+
+        intptr_t ptrMatches = oParams[ 0 ];
+        std::vector< MatchPtr >* pMatches =
+            ( std::vector< MatchPtr >* ) ptrMatches;
+
+        if( unlikely( pMatches == nullptr ) )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        ret = pIf->StartRecvTasks( *pMatches );
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CRpcInterfaceBase::StartEx(
     IEventSink* pCallback )
 {
@@ -613,7 +762,6 @@ gint32 CRpcInterfaceBase::StartEx(
     do{
         TaskletPtr pOpenPortTask;
         TaskletPtr pEnableEvtTask;
-        TaskletPtr pRecvMsgTask;
 
         EnumIfState iState = GetState();
 
@@ -685,14 +833,37 @@ gint32 CRpcInterfaceBase::StartEx(
         if( ERROR( ret ) )
             break;
 
+        CParamList oTaskParam;
+        TaskletPtr pStartComp;
         if( pCallback != nullptr )
         {
-            ret = oCfg.SetObjPtr(
-                propEventSink, ObjPtr( pCallback) );
-
-            if( ERROR( ret ) )
-                break;
+            oTaskParam[ propEventSink ] =
+                ObjPtr( pCallback );
         }
+
+        oTaskParam[ propIfPtr ] =
+            ObjPtr( this );
+
+        ret = oTaskParam.Push(
+            ( intptr_t )&m_vecMatches );
+
+        if( ERROR( ret ) )
+            break;
+
+        ret = pStartComp.NewObj(
+            clsid( CIfStartExCompletion ),
+            oTaskParam.GetCfg() );
+
+        if( ERROR( ret ) )
+            break;
+
+         ( *pStartComp )( eventZero );
+
+        ret = oCfg.SetObjPtr(
+            propEventSink, ObjPtr( pStartComp ) );
+
+        if( ERROR( ret ) )
+            break;
 
         TaskletPtr pTask = pTaskGrp;
         if( pTask.IsEmpty() )
@@ -708,75 +879,12 @@ gint32 CRpcInterfaceBase::StartEx(
             break;
         }
 
-        bool bConnected = false;
         ret = pTask->GetError();
+        if( ret == STATUS_PENDING )
+            break;
 
         if( SUCCEEDED( ret ) && IsConnected() )
-            bConnected = true;
-
-        if( bConnected )
-        {
-            bool bEnable = false;
-            oParams.Pop( bEnable );
-            oParams.Pop( bEnable );
-
-            // we cannot add the recvtask by AddAndRun
-            // at this point, because it requires the
-            // interface to be in the connected state,
-            // while we are still in the stopped state
-            CCfgOpener oRecvCfg;
-
-            ret = oRecvCfg.SetObjPtr(
-                propIfPtr, ObjPtr( this ) );
-
-            if( ERROR( ret  ) )
-                break;
-
-            TaskletPtr pParaTaskGrp;
-            ret = pParaTaskGrp.NewObj(   
-                clsid( CIfParallelTaskGrp ),
-                oRecvCfg.GetCfg() );
-
-            if( ERROR( ret ) )
-                break;
-                
-            CIfParallelTaskGrp* pTaskGrp
-                = pParaTaskGrp;
-
-            for( auto pMatch : m_vecMatches )
-            {
-                oParams[ propMatchPtr ] =
-                    ObjPtr( pMatch );
-
-                ret = pRecvMsgTask.NewObj(
-                    clsid( CIfStartRecvMsgTask ),
-                    oParams.GetCfg() );
-
-                if( ERROR( ret ) )
-                    break;
-
-                ret = pTaskGrp->AppendTask(
-                    pRecvMsgTask );
-
-                if( ERROR( ret ) )
-                    break;
-            }
-
-            if( ERROR( ret ) )
-                break;
-
-            ret = AppendAndRun( pParaTaskGrp );
-            if( ERROR( ret ) )
-                break;
-
-            // the ret does not necessarily indicate
-            // the return value of the receive task. we
-            // need to get the status code from the
-            // task.
-            ret = pParaTaskGrp->GetError();
-            if( ret == STATUS_PENDING )
-                ret = 0;
-        }
+            ret = StartRecvTasks( m_vecMatches );
 
     }while( 0 );
 
@@ -1721,7 +1829,7 @@ gint32 CRpcInterfaceBase::AddAndRun(
             }
             else
             {
-
+                ret = pIoTask->GetError();
                 DebugPrint( GetTid(),
                     "root task not run immediately, dwCount=%d, bRunning=%d",
                     dwCount, bRunning );
@@ -1729,10 +1837,13 @@ gint32 CRpcInterfaceBase::AddAndRun(
         }
         else
         {
-            // force to run the task is running on
-            // the current thread
+            // force to run the task on the
+            // current thread
             oTaskLock.Unlock();
             ret = pParaTaskGrp->RunTaskDirect( pIoTask );
+            if( ERROR( ret ) )
+                break;
+            ret = pIoTask->GetError();
         }
 
     }while( 0 );

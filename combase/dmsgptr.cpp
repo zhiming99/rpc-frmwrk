@@ -143,8 +143,16 @@ gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
         ret = -EINVAL;
         return ret;
     }
-    val = ( bool& )*pBuf;
-    return 0;
+    guint32 dwVal = *pBuf;
+
+    if( dwVal == 1 )
+        val = true;
+    else if( dwVal == 0 )
+        val = false;
+    else
+        ret = -ERANGE;
+
+    return ret;
 }
 
 gint32 CAutoPtr< Clsid_Invalid, DBusMessage >

@@ -655,20 +655,18 @@ gint32 CPnpMgrQueryStopCompletion::operator()(
             break;
         }
  
-        // reuse the irp
+        IrpPtr pIrpOld;
         if( dwContext == eventIrpComp )
         {
-            if( !pIrp->SetState(
-                IRP_STATE_COMPLETED,
-                IRP_STATE_READY ) )
-            {
-                ret = -EINVAL;
+            pIrpOld = pIrp;
+            ret = pIrp.NewObj();
+
+            if( ERROR( ret ) )
                 break;
-            }
-            pIrp->SetStatus( 0 );
-            pIrp->SetMasterIrp( nullptr );
-            pIrp->PopCtxStack();
-            pIrp->AllocNextStack( pPort );
+
+            ret = pIrp->AllocNextStack( pPort );
+            if( ERROR( ret ) )
+                break;
         }
 
         IrpCtxPtr& pIrpCtx = pIrp->GetTopStack();
@@ -680,17 +678,16 @@ gint32 CPnpMgrQueryStopCompletion::operator()(
             if( ERROR( ret ) )
                 break;
 
-            pMasterIrp->RemoveSlaveIrp( pIrp );
+            if( dwContext == eventIrpComp && !pIrpOld.IsEmpty() )
+                pMasterIrp->RemoveSlaveIrp( pIrpOld );
+
             // we don't care if the irp is
             // succeeded or not
             pIrpCtx->SetMajorCmd( IRP_MJ_PNP );
             pIrpCtx->SetMinorCmd( IRP_MN_PNP_STOP );
             pPort->AllocIrpCtxExt( pIrpCtx, ( PIRP )pIrp );
 
-            pIrp->SetSyncCall( false );
-
             // clear the callback if any
-            pIrp->RemoveCallback();
             IPort* pMasterPort = pMasterIrp->GetTopPort();
 
             ret = static_cast< CPort* >

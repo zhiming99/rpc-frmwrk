@@ -105,7 +105,6 @@ CDBusProxyPdo::~CDBusProxyPdo()
 {
     if( m_pDBusConn )
     {
-        dbus_connection_close( m_pDBusConn );
         dbus_connection_unref( m_pDBusConn );
         m_pDBusConn = nullptr;
     }
@@ -1519,6 +1518,21 @@ gint32 CDBusProxyPdo::UnpackFwrdEventMsg(
     return ret;
 }
 
+void CDBusProxyPdo::SetConnected(
+    bool bConnected )
+{
+    m_bConnected = bConnected;
+    if( !m_pMatchFwder.IsEmpty() )
+    {
+        if( m_mapEvtTable.find( m_pMatchFwder ) ==
+            m_mapEvtTable.end() )
+            return;
+        MATCH_ENTRY& oMe =
+            m_mapEvtTable[ m_pMatchFwder ];
+        oMe.SetConnected( bConnected );
+    }
+}
+
 gint32 CDBusProxyPdo::OnRmtSvrOnOffline(
     DBusMessage* pMsg )
 {
@@ -1528,36 +1542,61 @@ gint32 CDBusProxyPdo::OnRmtSvrOnOffline(
     gint32 ret = 0;
     do{
 
-        DBusMessageIter itr;
-        dbus_message_iter_init( pMsg, &itr );
-
-        // NOTE: ipaddr check is done in the
-        // message match
-
-        if( !dbus_message_iter_next( &itr ) )
-        {
-            ret = -EINVAL;
-            break;
-        }
-
+        DMsgPtr ptrMsg( pMsg );
         bool bOnline = false;
 
-        gint32 iType =
-            dbus_message_iter_get_arg_type( &itr );
-
-        if( iType != DBUS_TYPE_BOOLEAN )
-        {
-            ret = -EINVAL;
+        ret = ptrMsg.GetBoolArgAt( 1, bOnline );
+        if( ERROR( ret ) )
             break;
-        }
-
-        dbus_message_iter_get_basic( &itr, &bOnline );
 
         // block the io message or resume the IO requests
-        if( true )
+        CStdRMutex oPortLock( GetLock() );
+        SetConnected( bOnline );
+
+        // notify the upper port
+        IrpPtr pIrp;
+        if( !bOnline )
         {
-            CStdRMutex oPortLock( GetLock() );
-            SetConnected( bOnline );
+            MatchMap* pMatchMap = nullptr;
+            ret = GetMatchMap(
+                m_pMatchFwder, pMatchMap );
+            if( ERROR( ret ) )
+                break;
+
+            if( !pMatchMap->empty() )
+            {
+                MatchMap::iterator itr =
+                    pMatchMap->find( m_pMatchFwder );
+
+                if( itr != pMatchMap->end() )
+                {
+                    deque< IrpPtr >& irpQue =
+                        itr->second.m_queWaitingIrps;
+                    if( !irpQue.empty() )
+                    {
+                        pIrp = irpQue.front();
+                        irpQue.pop_front();
+                    }
+                }
+            }
+        }
+
+        oPortLock.Unlock();
+
+        if( !pIrp.IsEmpty() )
+        {
+            CStdRMutex oIrpLock( pIrp->GetLock() );
+            ret = pIrp->CanContinue( IRP_STATE_READY );
+            if( SUCCEEDED( ret ) && pIrp->GetStackSize() > 0 )
+            {
+               IrpCtxPtr& pCtx = pIrp->GetTopStack(); 
+               BufPtr pBuf( true );
+               *pBuf = ptrMsg;
+               pCtx->SetRespData( pBuf );
+               pCtx->SetStatus( 0 );
+            }
+            oIrpLock.Unlock();
+            GetIoMgr()->CompleteIrp( pIrp );
         }
 
         // clear all the pending irps

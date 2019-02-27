@@ -415,6 +415,9 @@ class CRpcInterfaceBase :
     gint32 SetReqQueSize(
         IMessageMatch* pMatch, guint32 dwSize );
 
+    gint32 GetParallelGrp(
+        TaskGrpPtr& pParaGrp );
+
     public:
 
     typedef CRpcBaseOperations super;
@@ -472,6 +475,9 @@ class CRpcInterfaceBase :
     // owner
     virtual gint32 Start();
     virtual gint32 StartEx( IEventSink* pCallback );
+
+    gint32 StartRecvTasks(
+        std::vector< MatchPtr >& vecMatches );
 
     // stop the proxy, called by the interface
     // owner

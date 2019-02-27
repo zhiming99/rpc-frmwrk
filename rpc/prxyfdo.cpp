@@ -29,8 +29,8 @@
 
 using namespace std;
 
-#define PROXYFDO_LISTEN_INTERVAL 1
-#define PROXYFDO_LISTEN_RETIRES  3
+#define PROXYFDO_LISTEN_INTERVAL 15
+#define PROXYFDO_LISTEN_RETIRES  12
 
 CDBusProxyFdo::CDBusProxyFdo( const IConfigDb* pCfg )
     : super( pCfg )
@@ -48,6 +48,8 @@ gint32 CDBusProxyFdo::ClearDBusSetting(
 gint32 CDBusProxyFdo::SetupDBusSetting(
     IMessageMatch* pMatch )
 {
+    if( !IsConnected() )
+        return ENOTCONN;
     return 0;
 }
 
@@ -455,6 +457,7 @@ gint32 CDBusProxyFdo::HandleRegMatchInternal(
             || ( ret == 1 && !bReg ) )
         {
             // move on
+            // full register/unregister
         }
         else if( ERROR( ret ) )
         {
@@ -779,10 +782,38 @@ gint32 CProxyFdoDispEvtTask::operator()(
 gint32 CProxyFdoListenTask::Process(
     guint32 dwContext )
 {
-    CCfgOpener oParams( ( IConfigDb* )m_pCtx );
+    CCfgOpener oParams(
+        ( IConfigDb* )GetConfig() );
     gint32 ret = 0;
 
     do{
+        if( dwContext == eventIrpComp )
+        {
+            IrpPtr pIrp;
+            ret = GetIrpFromParams( pIrp );
+            if( ERROR( ret ) )
+                break;
+
+            if( pIrp.IsEmpty() ||
+                pIrp->GetStackSize() == 0 )   
+                break;
+
+            ret = pIrp->GetStatus();
+            if( ret == -EAGAIN ||
+                ret == -ENOTCONN ||
+                ret == -ETIMEDOUT ||
+                ret == STATUS_MORE_PROCESS_NEEDED )
+            {
+                if( CanRetry() )
+                    ret = STATUS_MORE_PROCESS_NEEDED;
+                else if( ret == STATUS_MORE_PROCESS_NEEDED ) 
+                    ret = -ETIMEDOUT;
+                break;
+            }
+            if( ERROR( ret ) )
+                break;
+        }
+
         CIoManager* pMgr;
         ret = oParams.GetPointer( propIoMgr, pMgr );
         if( ERROR( ret ) )
@@ -806,6 +837,8 @@ gint32 CProxyFdoListenTask::Process(
         pIrp->AllocNextStack( pPort );
 
         IrpCtxPtr& pCtx = pIrp->GetTopStack();
+        pPort->AllocIrpCtxExt( pCtx );
+
         pCtx->SetMajorCmd( IRP_MJ_FUNC );
         pCtx->SetMinorCmd( IRP_MN_IOCTL );
         pCtx->SetCtrlCode( CTRLCODE_LISTENING_FDO );
@@ -834,6 +867,7 @@ gint32 CProxyFdoListenTask::Process(
         case STATUS_PENDING:
             break;
 
+        case -ETIMEDOUT:
         case -ENOTCONN:
             {
                 DebugPrint( 0,
@@ -858,6 +892,7 @@ gint32 CProxyFdoListenTask::Process(
         }
 
         break;
+
     }while( 1 );
 
     return SetError( ret );
@@ -873,34 +908,86 @@ gint32 CDBusProxyFdo::PostStart(
     gint32 ret = 0;
     do{
 
-        CCfgOpener matchCfg;
+        if( true )
+        {
+            CCfgOpener matchCfg;
 
-        ret = matchCfg.SetStrProp(
-            propObjPath, DBUS_SYS_OBJPATH );
+            ret = matchCfg.SetStrProp(
+                propObjPath, DBUS_SYS_OBJPATH );
 
-        if( ERROR( ret ) )
-            break;
+            if( ERROR( ret ) )
+                break;
 
-        ret = matchCfg.SetStrProp(
-            propIfName, DBUS_SYS_INTERFACE );
+            ret = matchCfg.SetStrProp(
+                propIfName, DBUS_SYS_INTERFACE );
 
-        if( ERROR( ret ) )
-            break;
+            if( ERROR( ret ) )
+                break;
 
-        ret = matchCfg.SetIntProp(
-            propMatchType, matchClient );
+            ret = matchCfg.SetIntProp(
+                propMatchType, matchClient );
 
-        if( ERROR( ret ) )
-            break;
+            if( ERROR( ret ) )
+                break;
 
-        m_matchModOnOff.NewObj(
-            clsid( CMessageMatch ),
-            matchCfg.GetCfg() );
+            m_matchModOnOff.NewObj(
+                clsid( CMessageMatch ),
+                matchCfg.GetCfg() );
+        }
 
         m_matchDBusOff.NewObj(
             clsid( CDBusDisconnMatch ),
             nullptr );
         
+        if( true )
+        {
+            CCfgOpener matchRmtEvt;
+
+            string strPath = DBUS_OBJ_PATH(
+                MODNAME_RPCROUTER, OBJNAME_REQFWDR );
+
+            string strIfName =
+                DBUS_IF_NAME( IFNAME_REQFORWARDER );
+
+            ret = matchRmtEvt.SetStrProp(
+                propObjPath, strPath );
+
+            if( ERROR( ret ) )
+                break;
+
+            ret = matchRmtEvt.SetStrProp(
+                propIfName, strIfName );
+
+            if( ERROR( ret ) )
+                break;
+
+            ret = matchRmtEvt.SetStrProp(
+                propMethodName,
+                string( SYS_EVENT_RMTSVREVENT ) );
+
+            if( ERROR( ret ) )
+                break;
+
+            ret = matchRmtEvt.SetIntProp(
+                propMatchType, matchClient );
+
+            if( ERROR( ret ) )
+                break;
+
+            ret = matchRmtEvt.CopyProp(
+                propIpAddr, this );
+
+            if( ERROR( ret ) )
+                break;
+
+            ret = m_matchRmtSvrEvt.NewObj(
+                clsid( CProxyMsgMatch ),
+                matchRmtEvt.GetCfg() );
+
+            if( ERROR( ret ) )
+                break;
+        }
+
     }while( 0 );
     
     ret = super::PostStart( pIrp );
@@ -913,6 +1000,7 @@ gint32 CDBusProxyFdo::PreStop(
 {
     m_matchModOnOff.Clear();
     m_matchDBusOff.Clear();
+    m_matchRmtSvrEvt.Clear();
 
     return super::PreStop( pIrp );
 }
@@ -1036,57 +1124,104 @@ CDBusProxyFdo::PreDispatchMsg(
     if( !CanAcceptMsg( dwPortState ) )
         return DBUS_HANDLER_RESULT_HANDLED;
 
-    gint32 ret1 =
-        m_matchModOnOff->IsMyMsgIncoming( pMsg );
+    oPortLock.Unlock();
 
-    if( SUCCEEDED( ret1 ) )
-    {
-        ret = DispatchDBusSysMsg( pMsg );
-
-        if( ret != DBUS_HANDLER_RESULT_NOT_YET_HANDLED )
-            return ret;
-
-        return super::PreDispatchMsg(
-            iMsgType, pMsg );
-    }
-
-    ret1 = m_matchDBusOff->IsMyMsgIncoming( pMsg );
-    if( ERROR( ret1 ) )
-    {
-        return super::PreDispatchMsg(
-            iMsgType, pMsg );
-    }
-
-    // remote dbus system is about to shut down,
-    // let's notify the pnp manager
-    ret1 = 0;
     do{
+        gint32 ret1 =
+            m_matchModOnOff->IsMyMsgIncoming( pMsg );
 
-        CParamList oParams;
-        ret1 = oParams.SetPointer( propIoMgr, GetIoMgr() );
-        if( ERROR( ret1 ) )
+        if( SUCCEEDED( ret1 ) )
+        {
+            ret = DispatchDBusSysMsg( pMsg );
+
+            if( ret != DBUS_HANDLER_RESULT_NOT_YET_HANDLED )
+                break;
+
+            ret = super::PreDispatchMsg(
+                iMsgType, pMsg );
+
             break;
+        }
 
-        ret1 = oParams.SetObjPtr(
-            propPortPtr, ObjPtr( this ) );
+        ret1 = m_matchDBusOff->IsMyMsgIncoming( pMsg );
+        if( SUCCEEDED( ret1 ) )
+        {
+            // remote dbus system is about to shut down,
+            // let's notify the pnp manager
+            ret1 = 0;
+            do{
 
-        if( ERROR( ret1 ) )
+                CParamList oParams;
+                ret1 = oParams.SetPointer( propIoMgr, GetIoMgr() );
+                if( ERROR( ret1 ) )
+                    break;
+
+                ret1 = oParams.SetObjPtr(
+                    propPortPtr, ObjPtr( this ) );
+
+                if( ERROR( ret1 ) )
+                    break;
+
+                ret1 = oParams.CopyProp(
+                    propIpAddr, this );
+
+                if( ERROR( ret1 ) )
+                    break;
+
+                ret1 = GetIoMgr()->ScheduleTask(
+                    clsid( CProxyFdoRmtDBusOfflineTask ),
+                    oParams.GetCfg() );
+
+            }while( 0 );
+
+            if( SUCCEEDED( ret1 ) )
+                ret = DBUS_HANDLER_RESULT_HALT;
+
             break;
+        }
 
-        ret1 = oParams.CopyProp(
-            propIpAddr, this );
+        ret1 = m_matchRmtSvrEvt->IsMyMsgIncoming( pMsg );
+        if( SUCCEEDED( ret1 ) )
+        {
+            DMsgPtr ptrMsg( pMsg );
+            std::string strMethod = ptrMsg.GetMember();
+            if( strMethod != SYS_EVENT_RMTSVREVENT )
+                break;
 
-        if( ERROR( ret1 ) )
-            break;
+            BufPtr pBuf( true );
+            bool bOnline = false;
+            ret1 = ptrMsg.GetBoolArgAt(
+                1, bOnline );
 
-        ret1 = GetIoMgr()->ScheduleTask(
-            clsid( CProxyFdoRmtDBusOfflineTask ),
-            oParams.GetCfg() );
+            if( ERROR( ret1 ) )
+                break;
+
+            oPortLock.Lock();
+            SetConnected( bOnline );
+            if( !bOnline )
+            {
+                // all the matches are offline now
+                MatchMap* pMatchMap;
+                ret1 = GetMatchMap(
+                    nullptr, pMatchMap );
+
+                if( ERROR( ret1 ) )
+                    break;
+
+                for( auto oMe : *pMatchMap )
+                {
+                    oMe.second.SetConnected(
+                        bOnline );
+                }
+            }
+        }
+        else
+        {
+            ret = super::PreDispatchMsg(
+                iMsgType, pMsg );
+        }
 
     }while( 0 );
-
-    if( SUCCEEDED( ret1 ) )
-        ret = DBUS_HANDLER_RESULT_HALT;
 
     return ret;
 }

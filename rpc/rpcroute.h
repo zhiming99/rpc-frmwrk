@@ -694,8 +694,6 @@ class CRpcReqForwarderProxy :
         const std::string& strIpAddr,
         HANDLE hPort );
 
-    gint32 GetParallelGrp(
-        TaskGrpPtr& pParaGrp );
 };
 
 struct CRpcTcpBridgeShared

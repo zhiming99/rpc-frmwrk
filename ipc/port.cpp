@@ -695,6 +695,9 @@ void CPort::OnPortStopped()
     ScheduleStartStopNotifTask(
         eventPortStopped,
         !GetIoMgr()->RunningOnMainThread() );
+
+    DebugPrint( 0, "%s is stopped...",
+        CoGetClassName( GetClsid() ) );
 }
 
 gint32 CCancelIrpsTask::operator()(
@@ -1119,6 +1122,8 @@ gint32 CPort::SubmitStopIrpEx( IRP* pIrp )
         pIrp->GetStackSize() == 0 )
         return -EINVAL;
 
+    DebugPrint( 0, "Stopping %s...",
+        CoGetClassName( GetClsid() ) );
     // PNP_STATE_STOP_PRELOCK is a state before
     // the port switch to PORT_STATE_STOPPING,
     // that is the I/O is still available at this

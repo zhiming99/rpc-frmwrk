@@ -569,7 +569,7 @@ gint32 IoRequestPacket::OnEvent(
             IrpCtxPtr& pCtx = GetTopStack();
             ret = -ETIMEDOUT;
             pCtx->SetStatus( ret );
-            pMgr->CompleteIrp( this );
+            pMgr->CancelIrp( this, true, ret );
             break;
         }
     default:

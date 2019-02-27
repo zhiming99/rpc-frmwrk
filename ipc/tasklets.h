@@ -29,7 +29,7 @@
 
 class CTasklet : public ICancellableTask
 {
-    gint32 m_iRet;
+    std::atomic<guint32> m_iRet;
     static std::atomic< guint32 > m_atmTid;
     guint32 m_dwTid;
 

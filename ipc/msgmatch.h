@@ -840,7 +840,7 @@ class CProxyMsgMatch : public CMessageMatch
 
         char* pszIpAddr = nullptr;
 
-        dbus_message_iter_get_basic( &itr, pszIpAddr );
+        dbus_message_iter_get_basic( &itr, &pszIpAddr );
 
         if( pszIpAddr == nullptr
             && !m_pCfg->exist( propIpAddr ) )

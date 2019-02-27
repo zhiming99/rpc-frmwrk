@@ -637,7 +637,7 @@ gint32 CRpcStreamSock::GetStreamFromIrp(
            
             gint32 iStmId;
             ret = oCfg.GetIntProp(
-                0, ( guint32& )iStmId );
+                propStreamId, ( guint32& )iStmId );
 
             if( ERROR( ret ) )
                 break;

@@ -122,7 +122,7 @@ gint32 CRpcTcpFido::SubmitReadWriteCmd(
     gint32 ret = 0;
 
     // let's process the func irps
-    IrpCtxPtr& pCtx = pIrp->GetCurCtx();
+    IrpCtxPtr pCtx = pIrp->GetCurCtx();
 
     ret = HandleReadWriteReq( pIrp );
 
@@ -144,7 +144,7 @@ gint32 CRpcTcpFido::SubmitIoctlCmd(
     gint32 ret = 0;
 
     // let's process the func irps
-    IrpCtxPtr& pCtx = pIrp->GetCurCtx();
+    IrpCtxPtr pCtx = pIrp->GetCurCtx();
 
     do{
 
@@ -236,7 +236,7 @@ gint32 CRpcTcpFido::HandleSendResp(
     do{
 
         // let's process the func irps
-        IrpCtxPtr& pCtx = pIrp->GetCurCtx();
+        IrpCtxPtr pCtx = pIrp->GetCurCtx();
         guint32 dwIoDir = pCtx->GetIoDirection();
 
         if( dwIoDir != IRP_DIR_OUT )
@@ -265,7 +265,7 @@ gint32 CRpcTcpFido::HandleSendReq(
 
     do{
         // let's process the func irps
-        IrpCtxPtr& pCtx = pIrp->GetCurCtx();
+        IrpCtxPtr pCtx = pIrp->GetCurCtx();
         guint32 dwIoDir = pCtx->GetIoDirection();
 
         if( dwIoDir == IRP_DIR_IN )
@@ -332,7 +332,7 @@ gint32 CRpcTcpFido::HandleSendReq(
             propSeqNo2, dwSerial );
 
         *pBuf = ObjPtr( oParams.GetCfg() );
-        IrpCtxPtr& pNewCtx = pIrp->GetTopStack();
+        IrpCtxPtr pNewCtx = pIrp->GetTopStack();
         pNewCtx->SetMajorCmd( IRP_MJ_FUNC );
         pNewCtx->SetMinorCmd( IRP_MN_WRITE );
         pNewCtx->SetIoDirection( IRP_DIR_OUT );
@@ -418,7 +418,7 @@ gint32 CRpcTcpFido::HandleListening(
 
     do{
         // let's process the func irps
-        IrpCtxPtr& pCtx = pIrp->GetCurCtx();
+        IrpCtxPtr pCtx = pIrp->GetCurCtx();
         guint32 dwIoDir = pCtx->GetIoDirection();
 
         if( dwIoDir != IRP_DIR_IN )
@@ -442,7 +442,7 @@ gint32 CRpcTcpFido::HandleListening(
             if( ERROR( ret ) )
                 break;
 
-            IrpCtxPtr& pNewCtx = pIrp->GetTopStack();
+            IrpCtxPtr pNewCtx = pIrp->GetTopStack();
 
             pNewCtx->SetMajorCmd( IRP_MJ_FUNC );
             pNewCtx->SetMinorCmd( IRP_MN_READ );
@@ -536,8 +536,8 @@ gint32 CRpcTcpFido::CompleteListening(
     // error occurs
     do{
         // let's process the func irps
-        IrpCtxPtr& pCtx = pIrp->GetCurCtx();
-        IrpCtxPtr& pTopCtx = pIrp->GetTopStack();
+        IrpCtxPtr pCtx = pIrp->GetCurCtx();
+        IrpCtxPtr pTopCtx = pIrp->GetTopStack();
         BufVecPtr pVecBuf( true );
 
         ret = pTopCtx->GetStatus();
@@ -592,12 +592,12 @@ gint32 CRpcTcpFido::CompleteSendReq(
 
     do{
         // let's process the func irps
-        IrpCtxPtr& pCtx = pIrp->GetCurCtx();
+        IrpCtxPtr pCtx = pIrp->GetCurCtx();
         guint32 dwIoDir = pCtx->GetIoDirection();
 
         if( !pIrp->IsIrpHolder() )
         {
-            IrpCtxPtr& pTopCtx = pIrp->GetTopStack();
+            IrpCtxPtr pTopCtx = pIrp->GetTopStack();
             if( pTopCtx == pCtx )
             {
                 // unknown situation
@@ -737,7 +737,7 @@ gint32 CRpcTcpFido::HandleReadWriteReq(
 
     do{
         // let's process the func irps
-        IrpCtxPtr& pCtx = pIrp->GetCurCtx();
+        IrpCtxPtr pCtx = pIrp->GetCurCtx();
         guint32 dwIoDir = pCtx->GetIoDirection();
 
         if( dwIoDir != IRP_DIR_IN &&
@@ -766,7 +766,7 @@ gint32 CRpcTcpFido::HandleReadWriteReq(
         if( ret == STATUS_PENDING )
             break;
 
-        IrpCtxPtr& pTopCtx =
+        IrpCtxPtr pTopCtx =
             pIrp->GetTopStack();
 
         ret = pTopCtx->GetStatus();
@@ -817,7 +817,7 @@ gint32 CRpcTcpFido::GetPeerStmId(
         if( ERROR( ret ) )
             break;
 
-        IrpCtxPtr& pNewCtx = pIrp->GetTopStack();
+        IrpCtxPtr pNewCtx = pIrp->GetTopStack();
         pNewCtx->SetMajorCmd( IRP_MJ_FUNC );
         pNewCtx->SetMinorCmd( IRP_MN_IOCTL );
         pNewCtx->SetCtrlCode( CTRLCODE_GET_RMT_STMID );
@@ -859,7 +859,7 @@ gint32 CRpcTcpFido::BuildSendDataMsg(
         pMsg.Clear();
 
     gint32 ret = 0;
-    IrpCtxPtr& pCtx = pIrp->GetCurCtx();
+    IrpCtxPtr pCtx = pIrp->GetCurCtx();
 
     do{
         // there is a CfgPtr in the buffer
@@ -945,7 +945,7 @@ gint32 CRpcTcpFido::HandleSendData(
         if( ERROR( ret ) )
             break;
 
-        IrpCtxPtr& pCtx = pIrp->GetCurCtx();
+        IrpCtxPtr pCtx = pIrp->GetCurCtx();
         BufPtr pBuf( true );
         *pBuf = pMsg;
 
@@ -984,8 +984,8 @@ gint32 CRpcTcpFido::CompleteReadWriteReq(
 
     do{
         // let's process the func irps
-        IrpCtxPtr& pCtx = pIrp->GetCurCtx();
-        IrpCtxPtr& pTopCtx = pIrp->GetTopStack();
+        IrpCtxPtr pCtx = pIrp->GetCurCtx();
+        IrpCtxPtr pTopCtx = pIrp->GetTopStack();
 
         ret = pTopCtx->GetStatus();
         pCtx->SetStatus( ret );
@@ -1033,7 +1033,7 @@ gint32 CRpcTcpFido::CompleteIoctlIrp(
             break;
         }
         
-        IrpCtxPtr& pCtx = pIrp->GetCurCtx();
+        IrpCtxPtr pCtx = pIrp->GetCurCtx();
 
         switch( pIrp->CtrlCode() )
         {
@@ -1057,7 +1057,7 @@ gint32 CRpcTcpFido::CompleteIoctlIrp(
                 // stack for unknown irps
                 if( !pIrp->IsIrpHolder() )
                 {
-                    IrpCtxPtr& pTopCtx =
+                    IrpCtxPtr pTopCtx =
                         pIrp->GetTopStack();
 
                     ret = pTopCtx->GetStatus();

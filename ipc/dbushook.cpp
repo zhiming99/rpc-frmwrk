@@ -623,7 +623,13 @@ gint32 CDBusDispatchCallback::operator()(
         return SetError( G_SOURCE_CONTINUE );
 
     if( m_pParent->IsDBusWatchRemoved() )
+    {
+        // the last message is eventDBusOffline,
+        // ignore it, because the shutdown is
+        // going on already
+        DebugPrint( 0, "The last message arrives" );
         return SetError( G_SOURCE_REMOVE );
+    }
 
     gint32 ret = DoDispatch();
     if( ret == ERROR_STATE )
@@ -889,7 +895,6 @@ gint32 CDBusLoopHooks::Stop()
             pCb->Stop();
     }
 
-    dbus_connection_close( m_pConn );
     dbus_connection_unref( m_pConn );
     m_pConn = nullptr;
 

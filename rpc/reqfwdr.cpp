@@ -869,13 +869,7 @@ gint32 CRpcReqForwarder::OnModEvent(
     // disable the events on the bridge side
     for( auto strIpAddr : setIpAddrs )
     {
-        ObjVecPtr pMatches;
-        ret = pMatches.NewObj(
-            clsid( CStlObjVector ) );
-
-        if( ERROR( ret ) )
-            return ret;
-
+        ObjVecPtr pMatches( true );
         for( auto pMatch : vecMatches )
         {
             CCfgOpenerObj oMatch(
@@ -2815,54 +2809,6 @@ gint32 CRpcReqForwarderProxy::OnRmtSvrEvent(
             iEvent, strIpAddr, hPort );
 
     return OnRmtSvrOffline( strIpAddr, hPort );
-}
-
-gint32 CRpcReqForwarderProxy::GetParallelGrp(
-    TaskGrpPtr& pParaGrp )
-{
-    TaskGrpPtr pRootGrp;
-    CIfRootTaskGroup* pRootTaskGroup = nullptr;
-
-    if( true )
-    {
-        pRootTaskGroup = GetTaskGroup();
-        if( pRootTaskGroup == nullptr )
-            return -ENOENT;
-
-        // as a guard to the root group
-        pRootGrp = pRootTaskGroup;
-    }
-
-    gint32 ret = 0;
-
-    do{
-        TaskletPtr pHead;
-        CStdRTMutex oTaskLock(
-            pRootTaskGroup->GetLock() );
-
-        guint32 dwCount =
-            pRootTaskGroup->GetTaskCount();
-
-        if( dwCount == 0 )
-        {
-            ret = -ENOENT;
-            break;
-        }
-        ret = pRootTaskGroup->GetHeadTask( pHead );
-        if( ERROR( ret ) )
-            break;
-
-        CIfParallelTaskGrp* pTaskRet = pHead;
-        if( pTaskRet == nullptr )
-        {
-            ret = -ENOENT;
-            break;
-        }
-        pParaGrp = pTaskRet;
-
-    }while( 0 );
-
-    return ret;
 }
 
 gint32 CRpcReqForwarderProxy::OnRmtSvrOffline(
