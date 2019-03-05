@@ -267,7 +267,7 @@ gint32 CDBusProxyPdo::CompleteRmtRegMatch(
 
             if( !dbus_message_get_args(
                 pRespMsg, dbusError,
-                DBUS_TYPE_INT32, &iMethodReturn,
+                DBUS_TYPE_UINT32, &iMethodReturn,
                 DBUS_TYPE_INVALID ) )
             {
                 ret = dbusError.Errno();
@@ -373,6 +373,10 @@ gint32 CDBusProxyPdo::CompleteListening(
         if( strMember == SYS_EVENT_FORWARDEVT )
         {
             ret = UnpackFwrdEventMsg( pIrp );
+        }
+        else if( strMember == SYS_EVENT_RMTSVREVENT )
+        {
+            break;
         }
         else
         {
@@ -1589,14 +1593,18 @@ gint32 CDBusProxyPdo::OnRmtSvrOnOffline(
             ret = pIrp->CanContinue( IRP_STATE_READY );
             if( SUCCEEDED( ret ) && pIrp->GetStackSize() > 0 )
             {
-               IrpCtxPtr& pCtx = pIrp->GetTopStack(); 
-               BufPtr pBuf( true );
-               *pBuf = ptrMsg;
-               pCtx->SetRespData( pBuf );
-               pCtx->SetStatus( 0 );
+                IrpCtxPtr& pCtx = pIrp->GetTopStack(); 
+                BufPtr pBuf( true );
+                *pBuf = ptrMsg;
+                pCtx->SetRespData( pBuf );
+                pCtx->SetStatus( 0 );
+                oIrpLock.Unlock();
+                GetIoMgr()->CompleteIrp( pIrp );
             }
-            oIrpLock.Unlock();
-            GetIoMgr()->CompleteIrp( pIrp );
+            else
+            {
+                //NOTE: what can I do?
+            }
         }
 
         // clear all the pending irps
@@ -1750,10 +1758,8 @@ gint32 CDBusProxyPdo::HandleRmtRegMatch(
         oMatch.CopyProp(
             propSrcUniqName, this );
 
-        BufPtr pBuf( true );
-        ret = pMatchToSend->Serialize( *pBuf );
-        if( ERROR( ret ) )
-            break;
+        CParamList oParams;
+        oParams.Push( ObjPtr( pMatchToSend ) );
 
         DMsgPtr pMsg;
         ret = pMsg.NewObj();
@@ -1768,6 +1774,24 @@ gint32 CDBusProxyPdo::HandleRmtRegMatch(
             strMember = SYS_METHOD_DISABLERMTEVT;
 
         pMsg.SetMember( strMember );
+
+        oParams[ propMethodName ] = strMember;
+        oParams.CopyProp(
+            propSrcUniqName, pMatchToSend );
+
+        // the uniq name of the dbus connection
+        oParams.CopyProp(
+            propSrcDBusName, this );
+
+        // ip addr
+        oParams.CopyProp(
+            propIpAddr, this );
+
+        BufPtr pBuf( true );
+        ret = oParams.GetCfg()->Serialize( *pBuf );
+        if( ERROR( ret ) )
+            break;
+
 
         if( !dbus_message_append_args( pMsg,
             DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,

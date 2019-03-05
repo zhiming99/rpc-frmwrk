@@ -851,14 +851,13 @@ gint32 CIoManager::ClosePort(
         if( !bNoRef )
             break;
 
-        if( pPort->Unloadable() )
+        if( pPort->Unloadable() && !m_bStop )
         {
-            /*ret = RemoveFromHandleMap( pPort, nullptr );
+            ret = RemoveFromHandleMap( pPort, nullptr );
             DEFER_CALL( this,
                 &GetPnpMgr(),
                 &CPnpManager::DestroyPortStack,
                 ( ( IPort* )pPort ) );
-            */
         }
 
     }while( 0 );

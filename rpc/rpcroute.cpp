@@ -58,6 +58,10 @@ CRpcRouter::CRpcRouter(
         if( SUCCEEDED( ret ) )
             m_dwRole = dwRole;
 
+        CParamList oParams;
+        oParams[ propIoMgr ] = 
+            ObjPtr( GetIoMgr() );
+
     }while( 0 );
 
     if( ERROR( ret ) )
@@ -742,6 +746,7 @@ gint32 CRpcRouter::OnRmtSvrEvent(
     if( hPort == 0 )
         return -EINVAL;
 
+    TaskletPtr pDeferTask;
     switch( iEvent )
     {
     case eventRmtSvrOnline:
@@ -752,9 +757,24 @@ gint32 CRpcRouter::OnRmtSvrEvent(
         }
     case eventRmtSvrOffline:
         {
-            ret = OnRmtSvrOffline( 
-                strIpAddr, hPort ); 
+            ObjPtr pObj;
+            ret = DEFER_IFCALL_NOSCHED(
+                pDeferTask,
+                ObjPtr( this ),
+                &CRpcRouter::OnRmtSvrOffline,
+                pObj, strIpAddr, hPort );
 
+            if( ERROR( ret ) )
+                break;
+
+            CIfDeferCallTask* pTask = pDeferTask;
+            BufPtr pBuf( true );
+            *pBuf = ObjPtr( pTask );
+
+            // fill the empty callback pointer to
+            // this defer task
+            pTask->UpdateParamAt( 0, pBuf );
+            AddSeqTask( pDeferTask, true );
             break;
         }
     default:
@@ -833,16 +853,13 @@ gint32 CRpcRouter::OnRmtSvrOnline(
             if( ERROR( ret ) )
                 break;
 
-            // must be pending
-            pTask->MarkPending();
-            ret = DEFER_CALL( GetIoMgr(), this,
-                &CRpcServices::RunManagedTask,
-                pTask, false );
+            ret = AddSeqTask( pTask, false );
         }
         break;
 
     }while( 0 );
 
+    // return code ignored
     return ret;
 }
 
@@ -1040,6 +1057,7 @@ gint32 CRouterStopBridgeTask::OnTaskComplete(
 }
 
 gint32 CRpcRouter::OnRmtSvrOffline(
+    IEventSink* pCallback,
     const string& strIpAddr,
     HANDLE hPort )
 {
@@ -1096,13 +1114,6 @@ gint32 CRpcRouter::OnRmtSvrOffline(
         if( ERROR( ret ) )
             break;
 
-        TaskletPtr pCallback;
-        ret = pCallback.NewObj( 
-            clsid( CIfDummyTask ) );
-
-        if( ERROR( ret ) )
-            break;
-
         TaskletPtr pTask;
         CParamList oParams;
 
@@ -1139,24 +1150,12 @@ gint32 CRpcRouter::OnRmtSvrOffline(
                 break;
         }
 
-        // must be pending
-        pTask->MarkPending();
-        TaskletPtr pDeferTask;
-        ret = DEFER_CALL_NOSCHED(
-            pDeferTask, ObjPtr( this ),
-            &CRpcServices::RunManagedTask,
-            pTask, false );
-
-        // this is a long task, run it on a
-        // temporary thread
-        ret = pMgr->RescheduleTask(
-            pDeferTask, true );
-
-        break;
+        ret = ( *pTask )( eventZero );
 
     }while( 0 );
 
-    return ret;
+    // return code ignored for event handler
+    return 0;
 }
 
 gint32 CRpcRouter::OnModEvent(
@@ -1449,8 +1448,7 @@ gint32 CRpcRouter::AddRemoveMatch(
     bool bAdd, bool bRemote,
     IEventSink* pCallback )
 {
-    if( pMatch == nullptr ||
-        pCallback == nullptr )
+    if( pMatch == nullptr )
         return -EINVAL;
 
     gint32 ret = 0;

@@ -1843,7 +1843,7 @@ gint32 CRpcStreamSock::HandleWriteIrp(
             if( ERROR( ret ) )
                 break;
 
-            BufPtr pPayload;
+            BufPtr pPayload( true );
             ret = oCfg.GetProperty(
                 0, *pPayload );
 
@@ -2533,6 +2533,7 @@ CRpcStream::CRpcStream(
         {
             ret = oCfg.GetIntProp( 0,
                 ( guint32& )m_iStmId );
+
             if( ERROR( ret ) )
                 break;
 

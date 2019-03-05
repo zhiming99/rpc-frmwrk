@@ -949,8 +949,10 @@ gint32 CRpcReqForwarder::CheckMatch(
     CStdRMutex oIfLock( GetLock() );
     for( auto&& oPair : m_mapRefCount )
     {
-        if( oPair.first->IsMyMatch( pMatch ) )
-            return 0;
+        RegObjPtr pRegObj = oPair.first;
+        gint32 ret = pRegObj->IsMyMatch( pMatch );
+        if( SUCCEEDED( ret ) )
+            return ret;
     }
     return -ENOENT;
 }

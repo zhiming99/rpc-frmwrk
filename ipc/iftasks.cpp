@@ -362,28 +362,25 @@ CIfRetryTask::CIfRetryTask(
     do{
         CCfgOpener oCfg( ( IConfigDb* )GetConfig() );
 
-        ObjPtr pObj;
-        ret = oCfg.GetObjPtr( propIfPtr, pObj );
-        if( ERROR( ret ) )
-            break;
+        CRpcInterfaceBase* pIf = nullptr;
+        CIoManager* pMgr = nullptr;
 
-        CRpcInterfaceBase* pIf = pObj;
-        if( pIf == nullptr )
+        // either propIfPtr or propIoMgr must
+        // exist to pass the construction
+        ret = oCfg.GetPointer( propIfPtr, pIf );
+        if( SUCCEEDED( ret ) )
         {
-            ret = -EFAULT;
-            break;
+            pMgr = pIf->GetIoMgr();
+            ret = oCfg.SetPointer( propIoMgr, pMgr );
+            if( ERROR( ret ) )
+                break;
         }
-
-        CIoManager* pMgr = pIf->GetIoMgr();
-        if( pMgr == nullptr )
+        else
         {
-            ret = -EFAULT;
-            break;
+            ret = oCfg.GetPointer( propIoMgr, pMgr );
+            if( ERROR( ret ) )
+                break;
         }
-
-        ret = oCfg.SetPointer( propIoMgr, pMgr );
-        if( ERROR( ret ) )
-            break;
 
         if( !oCfg.exist( propRetries ) )
         {
@@ -781,7 +778,11 @@ gint32 CIfRetryTask::SetProperty(
     {
     case propParentTask:
         {
-            m_pParentTask = ( ObjPtr& )oBuf;
+            ObjPtr& pObj = oBuf;
+            if( pObj.IsEmpty() )
+                m_pParentTask = nullptr;
+            else
+                m_pParentTask = pObj;
             break;
         }
     default:
@@ -1194,6 +1195,15 @@ gint32 CIfTaskGroup::AppendTask(
     if( IsCanceling() )
         return ERROR_STATE;
 
+    // canceling or cleanup is going on
+    EnumTaskState iStat = GetTaskState();
+
+    if( unlikely( iStat == stateStopped ) )
+        return ERROR_STATE;
+
+    if( iStat == stateStarted && !IsRunning() )
+        return ERROR_STATE;
+
     m_queTasks.push_back( pTask );
 
     return 0;
@@ -1249,7 +1259,7 @@ gint32 CIfTaskGroup::CancelRemainingTasks()
 
     if( oCfg.exist( propNoResched ) )
         return STATUS_PENDING;
-
+    SetCanceling( true );
     oCfg[ propContext ] = eventCancelTask;
     oCfg[ propNoResched ] = true;
 
@@ -1272,6 +1282,7 @@ gint32 CIfTaskGroup::CancelRemainingTasks()
 
     oCfg.RemoveProperty( propNoResched );
     oCfg.RemoveProperty( propContext );
+    SetCanceling( false );
 
     return ret;
 }
@@ -1293,22 +1304,34 @@ bool CIfTaskGroup::IsRunning() const
     return GetConfig()->exist( propRunning );
 }
 
-void CIfTaskGroup::SetRunning()
+void CIfTaskGroup::SetRunning( bool bRunning )
 {
-
     CStdRTMutex oTaskLock( GetLock() );
     CCfgOpener oCfg(
         ( IConfigDb* ) GetConfig() );
-    if( !oCfg.exist( propRunning ) )
+    if( bRunning )
     {
-        // this is a one-time flag to indicate the
-        // task group is now scheduled to run.
-        oCfg[ propRunning ] = true;
+        if( !oCfg.exist( propRunning ) )
+        {
+            // this is a one-time flag to indicate the
+            // task group is now scheduled to run.
+            oCfg[ propRunning ] = true;
+        }
+    }
+    else
+    {
+        oCfg.RemoveProperty( propRunning );
     }
     return;
 }
+
 gint32 CIfTaskGroup::RunTask()
 {
+    // So far, except the first call of RunTask is
+    // from AddAndRun, AppendAndRun or direct
+    // call, the rest RunTask has to be called
+    // from the OnChildComplete.
+
     gint32 ret = 0;
     guint32 dwContext = eventZero;
 
@@ -1322,12 +1345,22 @@ gint32 CIfTaskGroup::RunTask()
         return STATUS_PENDING;
     }
 
-    SetRunning();
     CCfgOpener oCfg(
         ( IConfigDb* )GetConfig() );
 
     if( oCfg.exist( propNoResched ) )
         return STATUS_PENDING;
+
+    EnumTaskState iState = GetTaskState();
+    if( iState == stateStarting )
+    {
+        SetTaskState( stateStarted );
+        SetRunning();
+    }
+    else if( iState == stateStopped )
+    {
+        return ERROR_STATE;
+    }
 
     if( !m_vecRetVals.empty() )
     {
@@ -1337,7 +1370,7 @@ gint32 CIfTaskGroup::RunTask()
         if( ERROR( iRet ) &&
             GetRelation() == logicAND )
         {
-
+            SetRunning( false );
             oTaskLock.Unlock();
             ret = CancelRemainingTasks();
             if( ret == STATUS_PENDING )
@@ -1348,6 +1381,7 @@ gint32 CIfTaskGroup::RunTask()
         if( SUCCEEDED( iRet ) &&
             GetRelation() == logicOR )
         {
+            SetRunning( false );
             oTaskLock.Unlock();
             ret = CancelRemainingTasks();
             if( ret == STATUS_PENDING )
@@ -1412,6 +1446,7 @@ gint32 CIfTaskGroup::RunTask()
             // task group will be canceled
             if( m_queTasks.size() > 0 )
             {
+                SetRunning( false );
                 oTaskLock.Unlock();
                 gint32 iRet = CancelRemainingTasks();
                 if( iRet == STATUS_PENDING )
@@ -1423,12 +1458,20 @@ gint32 CIfTaskGroup::RunTask()
         if( SUCCEEDED( ret ) &&
             GetRelation() == logicOR )
         {
+            SetRunning( false );
             oTaskLock.Unlock();
             gint32 iRet = CancelRemainingTasks();
             if( iRet == STATUS_PENDING )
                 ret = iRet;
             break;
         }
+    }
+
+    if( ret != STATUS_PENDING )
+    {
+        // for those Unlock'd condition, this call
+        // does not have effect
+        SetRunning( false );
     }
 
     return ret;
@@ -1575,6 +1618,9 @@ gint32 CIfTaskGroup::OnCancel(
         CCfgOpener oCfg(
             ( IConfigDb* )GetConfig() );
 
+        if( GetTaskState() == stateStopped )
+            return ERROR_STATE;
+
         if( IsCanceling() )
         {
             // reentrancy, possibly a reschedule
@@ -1641,11 +1687,19 @@ gint32 CIfTaskGroup::OnCancel(
         oCfg.RemoveProperty( propContext );
 
         SetCanceling( false );
+        SetRunning( false );
         break;
 
     }while( 1 );
 
     return -ECANCELED;
+}
+
+gint32 CIfTaskGroup::OnComplete( gint32 iRet )
+{
+    gint32 ret = super::OnComplete( iRet );
+    SetTaskState( stateStopped );
+    return ret;
 }
 
 bool CIfTaskGroup::exist( TaskletPtr& pTask )
@@ -1780,6 +1834,7 @@ gint32 CIfTaskGroup::FindTaskByClsid(
 gint32 CIfRootTaskGroup::OnComplete(
     gint32 iRetVal )
 {
+    SetRunning( true );
     return 0;
 }
 
@@ -2138,7 +2193,17 @@ gint32 CIfParallelTaskGrp::RunTask()
     do{
 
         std::set< TaskletPtr > setTasksToRun;
-        SetRunning();
+        EnumTaskState iState = GetTaskState();
+        if( iState == stateStarting )
+        {
+            SetTaskState( stateStarted );
+            SetRunning();
+        }
+        else if( iState == stateStopped )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
 
         setTasksToRun = m_setPendingTasks;
 
@@ -2280,6 +2345,12 @@ gint32 CIfParallelTaskGrp::AddAndRun(
         }
 
         CIoManager* pMgr = pService->GetIoMgr();
+
+        if( IsCanceling() )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
 
         bool bRunning = IsRunning();
 
@@ -2550,6 +2621,7 @@ gint32 CIfParallelTaskGrp::OnCancel(
     }while( 0 );
     RemoveProperty( propNoResched );
     SetCanceling( false );
+    SetRunning( false );
 
     return ret;
 }
@@ -2633,6 +2705,7 @@ CIfParallelTask::CIfParallelTask(
 
     // parameter in the config is
     // propIfPtr: the pointer the interface object
+    // or propIoMgr, either must exist
     gint32 ret = 0;
     CCfgOpener oCfg( ( IConfigDb* )GetConfig() );
 

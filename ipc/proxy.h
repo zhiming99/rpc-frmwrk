@@ -646,6 +646,7 @@ class CRpcServices :
     // the queue of pending invoke tasks, for queued
     // task processing
     std::deque< EventPtr > m_queInvTasks;
+    TaskGrpPtr             m_pSeqTasks;
 
     gint32 InvokeNextMethod( TaskletPtr& pLastInvoke );
 
@@ -915,6 +916,10 @@ class CRpcServices :
     gint32 RunManagedTask(
         IEventSink* pTask,
         const bool& bRoot );
+
+    gint32 AddSeqTask(
+        TaskletPtr& pTask,
+        bool bLong );
 };
 
 template< typename ...Args>

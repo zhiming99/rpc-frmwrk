@@ -584,7 +584,6 @@ gint32 CDBusProxyFdo::CompleteIoctlIrp(
             pIrp->GetTopStack();
 
         ret = pTopCtx->GetStatus();
-
         guint32 dwCtrlCode = pIrp->CtrlCode();
 
         switch( dwCtrlCode )
@@ -603,7 +602,10 @@ gint32 CDBusProxyFdo::CompleteIoctlIrp(
             {
                 // schedule a task to dispatch the
                 // event
-                DMsgPtr pMsg = *pTopCtx->m_pReqData;
+                if( ERROR( ret ) )
+                    break;
+
+                DMsgPtr pMsg = *pTopCtx->m_pRespData;
                 if( !pMsg.IsEmpty() )
                 {
                     ret = ScheduleDispEvtTask( pMsg );
@@ -637,31 +639,27 @@ gint32 CDBusProxyFdo::CompleteIoctlIrp(
                 if( ERROR( ret ) )
                     break;
 
-                DMsgPtr pRespMsg = *pTopCtx->m_pRespData;
+                DMsgPtr pRespMsg =
+                    *pTopCtx->m_pRespData;
+
                 if( !pRespMsg.IsEmpty() )
                 {
+                    guint32 dwVal = 0;
+                    ret = pRespMsg.GetIntArgAt(
+                        0, dwVal );
 
-                    BufPtr pRetVal( true );
-                    gint32 iType = DBUS_TYPE_INVALID;
-
-                    ret = pRespMsg.GetArgAt( 0, pRetVal, iType );
                     if( ERROR( ret ) )
                         break;
 
-                    if( iType != DBUS_TYPE_INT32 )
+                    ret = ( gint32& )dwVal;
+                    if( ERROR( ret ) )
                     {
-                        ret = -EINVAL;
                         break;
                     }
 
-                    ret = ( guint32& )*pRetVal;
-                    if( ERROR( ret ) )
-                        break;
-
-                    // return the response
-                    // message
-                    *pCtx->m_pRespData =
-                        *pTopCtx->m_pRespData;
+                    // return the response message
+                    pCtx->m_pRespData =
+                        pTopCtx->m_pRespData;
 
                     break;
                 }
@@ -680,10 +678,11 @@ gint32 CDBusProxyFdo::CompleteIoctlIrp(
 
         pCtx->SetStatus( ret );
 
-        // for FUNC IRP, the stack will be poped
-        // in CompleteFuncIrp, so we do not need
-        // to pop it here
-
+        // to prevent the caller to copy the
+        // return code from the pTopCtx, pop the
+        // top stack here.
+        if( pIrp->IsIrpHolder() )
+            pIrp->PopCtxStack();
 
     }while( 0 );
 
@@ -906,12 +905,28 @@ gint32 CDBusProxyFdo::PostStart(
         return -EINVAL;
 
     gint32 ret = 0;
+
+    ret = super::PostStart( pIrp );
+    if( ERROR( ret ) )
+        return ret;
     do{
+        IPort* pPdoPort = GetLowerPort();
+        if( unlikely( pPdoPort == nullptr ) )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        CCfgOpenerObj oPortCfg( this );
+        ret = oPortCfg.CopyProp(
+            propIpAddr, pPdoPort );
+
+        if( ERROR( ret ) )
+            break;
 
         if( true )
         {
             CCfgOpener matchCfg;
-
             ret = matchCfg.SetStrProp(
                 propObjPath, DBUS_SYS_OBJPATH );
 
@@ -978,7 +993,9 @@ gint32 CDBusProxyFdo::PostStart(
                 propIpAddr, this );
 
             if( ERROR( ret ) )
+            {
                 break;
+            }
 
             ret = m_matchRmtSvrEvt.NewObj(
                 clsid( CProxyMsgMatch ),
@@ -989,8 +1006,6 @@ gint32 CDBusProxyFdo::PostStart(
         }
 
     }while( 0 );
-    
-    ret = super::PostStart( pIrp );
 
     return ret;
 }

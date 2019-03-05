@@ -939,9 +939,20 @@ gint32 CRpcInterfaceBase::StopEx(
 
     gint32 ret = 0;
     do{
+        CStdRMutex oIfLock( GetLock() );
+        EnumIfState iState = GetState();
+        if( iState != stateStopping )
+        {
+            ret = SetStateOnEvent( cmdShutdown );
+            if( ERROR( ret ) )
+                break;
+
+            iState = GetState();
+        }
         if( stateStopping != GetState() )
             return ERROR_STATE;
 
+        oIfLock.Unlock();
         ret = OnPreStop( pCallback );
         if( ret == STATUS_PENDING )
             break;
@@ -1548,7 +1559,7 @@ gint32 CRpcInterfaceBase::OnEvent(
         {
             HANDLE hPort = ( guint32 )pData;
             string strIpAddr = reinterpret_cast
-                < char* >( dwParam1 );
+                < const char* >( dwParam1 );
 
             ret = OnRmtSvrEvent(
                 iEvent, strIpAddr, hPort ); 
@@ -2019,6 +2030,7 @@ gint32 CRpcServices::OnPostStop(
 
     m_pFtsMatch.Clear();
     m_pStmMatch.Clear();
+    m_pSeqTasks.Clear(); 
 
     return 0;
 }
@@ -4172,6 +4184,75 @@ gint32 CRpcServices::RunManagedTask(
     
     if( SUCCEEDED( ret ) )
         ret = ptrTask->GetError();
+
+    return ret;
+}
+
+gint32 CRpcServices::AddSeqTask(
+    TaskletPtr& pTask, bool bLong )
+{
+    if( pTask.IsEmpty() )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    bool bNew = false;
+    do{
+        CStdRMutex oIfLock( GetLock() );
+        if( m_pSeqTasks.IsEmpty() )
+        {
+            CParamList oParams;
+            oParams[ propIoMgr ] = 
+                ObjPtr( GetIoMgr() );
+
+            m_pSeqTasks.NewObj(
+                clsid( CIfTaskGroup ),
+                oParams.GetCfg() );
+
+            bNew = true;
+        }
+
+        m_pSeqTasks->SetRelation( logicNONE );
+        ret = m_pSeqTasks->AppendTask( pTask );
+        if( ERROR( ret ) && !bNew )
+        {
+            // the old seqTask is completed
+            m_pSeqTasks.Clear();
+            continue;
+        }
+
+        if( ERROR( ret ) && bNew )
+        {
+            // something bad happened
+            break;
+        }
+
+        if( SUCCEEDED( ret ) && bNew )
+        {
+            // a new m_pSeqTasks, add and run
+            oIfLock.Unlock();
+
+            TaskletPtr pDeferTask;
+            ret = DEFER_CALL_NOSCHED( pDeferTask,
+                ObjPtr( this ),
+                &CRpcServices::RunManagedTask,
+                m_pSeqTasks, false );
+
+            if( ERROR( ret ) )
+                break;
+
+            ret = GetIoMgr()->RescheduleTask(
+                pDeferTask, bLong );
+
+            break;
+        }
+        if( SUCCEEDED( ret ) && !bNew )
+        {
+            // m_pSeqTasks is already running
+            DebugPrint( ret, "a task is queued..." );
+        }
+        break;
+
+    }while( 1 );
 
     return ret;
 }

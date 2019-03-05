@@ -327,8 +327,9 @@ gint32 CPortState::PopState( guint32& dwState )
             // all the on-going busy_shared requests
             // are gone. let's enter the resume
             // state, and schedule the resume task
-            if( m_pExclIrp.IsEmpty()
-                || m_pResume == nullptr )
+            if( m_pExclIrp.IsEmpty() ||
+                m_pExclIrp->GetStackSize() == 0 ||
+                m_pResume == nullptr )
             {
                 // there should be one irp pending
                 // otherwise, something wrong
@@ -340,10 +341,10 @@ gint32 CPortState::PopState( guint32& dwState )
             }
 
             guint32 dwMajorCmd =
-                m_pExclIrp->MajorCmd();
+                m_pExclIrp->GetTopStack()->GetMajorCmd();
 
             guint32 dwMinorCmd =
-                m_pExclIrp->MinorCmd();
+                m_pExclIrp->GetTopStack()->GetMinorCmd();
 
             if( dwMajorCmd == IRP_MJ_PNP
                 && dwMinorCmd == IRP_MN_PNP_STOP )
@@ -455,8 +456,11 @@ gint32 CPortState::HandleReady(
 
     gint32 ret = ERROR_STATE;
 
-    guint32 dwMajorCmd = pIrp->MajorCmd();
-    guint32 dwMinorCmd = pIrp->MinorCmd();
+    guint32 dwMajorCmd =
+        pIrp->GetTopStack()->GetMajorCmd();
+
+    guint32 dwMinorCmd =
+        pIrp->GetTopStack()->GetMinorCmd();
 
     switch( dwMajorCmd )
     {
@@ -512,8 +516,12 @@ gint32 CPortState::HandleAttached(
         || pIrp->GetStackSize() == 0 )
         return -EINVAL;
 
-    guint32 dwMajorCmd = pIrp->MajorCmd();
-    guint32 dwMinorCmd = pIrp->MinorCmd();
+    guint32 dwMajorCmd =
+        pIrp->GetTopStack()->GetMajorCmd();
+
+    guint32 dwMinorCmd =
+        pIrp->GetTopStack()->GetMinorCmd();
+
 
     switch( dwMajorCmd )
     {
@@ -554,8 +562,12 @@ gint32 CPortState::HandleStarting(
 
     gint32 ret = ERROR_STATE;
 
-    guint32 dwMajorCmd = pIrp->MajorCmd();
-    guint32 dwMinorCmd = pIrp->MinorCmd();
+    guint32 dwMajorCmd =
+        pIrp->GetTopStack()->GetMajorCmd();
+
+    guint32 dwMinorCmd =
+        pIrp->GetTopStack()->GetMinorCmd();
+
 
     switch( dwMajorCmd )
     {
@@ -601,8 +613,12 @@ gint32 CPortState::HandleStopped(
         || pIrp->GetStackSize() == 0 )
         return -EINVAL;
 
-    guint32 dwMajorCmd = pIrp->MajorCmd();
-    guint32 dwMinorCmd = pIrp->MinorCmd();
+    guint32 dwMajorCmd =
+        pIrp->GetTopStack()->GetMajorCmd();
+
+    guint32 dwMinorCmd =
+        pIrp->GetTopStack()->GetMinorCmd();
+
     switch( dwMajorCmd )
     {
     case IRP_MJ_PNP:
@@ -681,8 +697,12 @@ gint32 CPortState::HandleBusyShared(
         || pIrp->GetStackSize() == 0 )
         return -EINVAL;
 
-    guint32 dwMajorCmd = pIrp->MajorCmd();
-    guint32 dwMinorCmd = pIrp->MinorCmd();
+    guint32 dwMajorCmd =
+        pIrp->GetTopStack()->GetMajorCmd();
+
+    guint32 dwMinorCmd =
+        pIrp->GetTopStack()->GetMinorCmd();
+
 
     switch( dwMajorCmd )
     {

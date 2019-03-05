@@ -81,8 +81,21 @@ gint32 DeserializeObj( const CBuffer& oBuf, ObjPtr& pObj )
             break;
         }
     default:
-        ret = -ENOTSUP;    
-        break;
+        {
+            ObjPtr pObjTemp;
+            ret = pObjTemp.NewObj(
+                ( EnumClsid )oHeader.dwClsid );
+
+            if( ERROR( ret ) )
+                break;
+
+            ret = pObjTemp->Deserialize( oBuf );
+            if( ERROR( ret ) )
+                break;
+
+            pObj = pObjTemp;
+            break;
+        }
     }
 
     return ret;

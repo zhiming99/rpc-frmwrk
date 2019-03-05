@@ -248,7 +248,7 @@ gint32 CPort::GetProperty( gint32 iProp, CBuffer& oBuf ) const
         }
     case propBusPortPtr:
         {
-            if( PortType( m_dwFlags ) == PORTFLG_TYPE_BUS )
+            if( IsBusPort( m_dwFlags ) == PORTFLG_TYPE_BUS )
             {
                 oBuf = ObjPtr( ( CPort* )this );
             }
@@ -1251,7 +1251,7 @@ gint32 CPort::SubmitQueryStopIrp( IRP* pIrp )
         }
 
 
-        IrpCtxPtr& pCurCtx = pIrp->GetCurCtx();
+        IrpCtxPtr pCurCtx = pIrp->GetCurCtx();
         IPort* pLowerPort = GetLowerPort();
 
         if( pLowerPort )
@@ -1271,8 +1271,8 @@ gint32 CPort::SubmitQueryStopIrp( IRP* pIrp )
             {
                 // ignore the status on the
                 // context stack
-                pIrp->PopCtxStack();
                 pCurCtx->SetStatus( ret );
+                pIrp->PopCtxStack();
                 break;
             }
         }
@@ -1766,7 +1766,7 @@ gint32 CPort::CompleteStartIrp( IRP* pIrp )
             break;
         }
 
-        IrpCtxPtr& pCtxPort =
+        IrpCtxPtr pCtxPort =
             pIrp->GetCurCtx();
 
         if( !pIrp->IsIrpHolder() )
@@ -2762,6 +2762,64 @@ IPort* CPort::GetLowerPort() const
         return nullptr;
 
     return pObj;
+}
+
+gint32 CPort::FindPortByType(
+    guint32 dwPortType,
+    PortPtr& pPortRet )
+{
+    gint32 ret = -ENOENT;
+    CPort* pPort = nullptr;
+    do{
+        if( dwPortType == PORTFLG_TYPE_PDO ||
+            dwPortType == PORTFLG_TYPE_FDO )
+        {
+            pPort = static_cast< CPort* >
+                ( GetBottomPort() );
+
+            while( pPort != nullptr )
+            {
+                guint32 dwType =
+                    pPort->GetPortType();    
+                if( dwType == dwPortType )
+                {
+                    pPortRet = pPort;
+                    ret = 0;
+                    break;
+                }
+                pPort = static_cast< CPort* >
+                    ( pPort->GetUpperPort() );
+            }
+        }
+        else if( dwPortType == PORTFLG_TYPE_BUS )
+        {
+            pPort = static_cast< CPort* >
+                ( GetBottomPort() );
+
+            CCfgOpenerObj oPortCfg( pPort );
+            ObjPtr pBus;
+
+            ret = oPortCfg.GetObjPtr(
+                propBusPortPtr, pBus );
+            if( ERROR( ret ) )
+                break;
+
+            pPortRet = pBus;
+            if( !pPortRet.IsEmpty() )
+                ret = 0;
+        }
+        else if( dwPortType == PORTFLG_TYPE_FIDO )
+        {
+            ret = -ENOTSUP;
+        }
+        else if( dwPortType == PORTFLG_TYPE_INVALID )
+        {
+            ret = -EINVAL;
+        }
+
+    }while( 0 );
+
+    return ret;
 }
 
 gint32 CPort::CanContinue(
@@ -3786,15 +3844,15 @@ gint32 CGenericBusPort::ClosePdoPort(
         {
             CCfgOpenerObj oPortCfg( pPdoPort ); 
 
-            guint32 dwPortType = 0;
-            ret = oPortCfg.GetIntProp(
-                propPortType, dwPortType );
-            if( ERROR( ret ) )
-                break;
-
+            guint32 dwPortType = GetPortType();
             if( dwPortType == PORTFLG_TYPE_PDO )
             {
                 bPdo = true;
+                break;
+            }
+            if( dwPortType == PORTFLG_TYPE_INVALID )
+            {
+                ret = -EINVAL;
                 break;
             }
             pPdoPort = pPdoPort->GetUpperPort();

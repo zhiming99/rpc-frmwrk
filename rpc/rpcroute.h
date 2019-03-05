@@ -1376,6 +1376,7 @@ class CRpcRouter :
         HANDLE hPort );
 
     gint32 OnRmtSvrOffline(
+        IEventSink* pCallback,
         const std::string& strIpAddr,
         HANDLE hPort );
 

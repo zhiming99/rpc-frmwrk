@@ -36,7 +36,10 @@ CRpcTcpFido::CRpcTcpFido(
 
     SetClassId( clsid( CRpcTcpFido ) );
     m_dwFlags &= ~PORTFLG_TYPE_MASK;
-    m_dwFlags |= PORTFLG_TYPE_FIDO;
+
+    // actually this port serves an fdo function,
+    // not a filter anymore
+    m_dwFlags |= PORTFLG_TYPE_FDO;
 
     do{
         timespec ts;
@@ -70,8 +73,8 @@ gint32 CRpcTcpFido::OnSubmitIrp(
     gint32 ret = 0;
 
     do{
-        if( pIrp == nullptr
-            || pIrp->GetStackSize() == 0 )
+        if( pIrp == nullptr ||
+            pIrp->GetStackSize() == 0 )
         {
             ret = -EINVAL;
             break;
@@ -147,7 +150,6 @@ gint32 CRpcTcpFido::SubmitIoctlCmd(
     IrpCtxPtr pCtx = pIrp->GetCurCtx();
 
     do{
-
         if( pIrp->MajorCmd() != IRP_MJ_FUNC
             || pIrp->MinorCmd() != IRP_MN_IOCTL )
         {
@@ -188,18 +190,23 @@ gint32 CRpcTcpFido::SubmitIoctlCmd(
                 // succeed the
                 // EnableEvent/DisableEvent
                 // immediately from the interface
-                ret = 0;
+                ret = HandleRegMatch( pIrp );
                 break;
             }
         case CTRLCODE_LISTENING:
             {
-                ret = HandleListening( pIrp );
+                ret = super::HandleListening( pIrp );
                 break;
             }
         case CTRLCODE_SEND_DATA:
         case CTRLCODE_FETCH_DATA:
             {
                 ret = HandleSendData( pIrp );
+                break;
+            }
+        case CTRLCODE_LISTENING_FDO:
+            {
+                ret = HandleListening( pIrp );
                 break;
             }
         default:
@@ -331,12 +338,13 @@ gint32 CRpcTcpFido::HandleSendReq(
         ret = oParams.SetIntProp(
             propSeqNo2, dwSerial );
 
-        *pBuf = ObjPtr( oParams.GetCfg() );
+        BufPtr pBufNew( true );
+        *pBufNew = ObjPtr( oParams.GetCfg() );
         IrpCtxPtr pNewCtx = pIrp->GetTopStack();
         pNewCtx->SetMajorCmd( IRP_MJ_FUNC );
         pNewCtx->SetMinorCmd( IRP_MN_WRITE );
         pNewCtx->SetIoDirection( IRP_DIR_OUT );
-        pNewCtx->SetReqData( pBuf );
+        pNewCtx->SetReqData( pBufNew );
 
         ret = pLowerPort->SubmitIrp( pIrp );
         if(  ret == STATUS_PENDING )
@@ -662,10 +670,11 @@ gint32 CRpcTcpFido::CompleteSendReq(
         else
         {
             ret = pCtx->GetStatus();
-
             // the response data 
-            while( SUCCEEDED( ret ) )
-            {
+            if( ERROR( ret ) )
+                break;
+
+            do{
                 if( dwIoDir != IRP_DIR_INOUT )
                 {
                     // the response and event request
@@ -694,8 +703,8 @@ gint32 CRpcTcpFido::CompleteSendReq(
                 BufPtr pRespBuf( true );
                 *pRespBuf = pMsg;
                 pCtx->SetRespData( pRespBuf );
-                break;
-            }
+
+            }while( 0 );
         }
 
     }while( 0 );
@@ -1044,7 +1053,7 @@ gint32 CRpcTcpFido::CompleteIoctlIrp(
                 ret = CompleteSendReq( pIrp );
                 break;
             }
-        case CTRLCODE_LISTENING:
+        case CTRLCODE_LISTENING_FDO:
             {
                 // copy the response data to the upper
                 // stack for unknown irps
@@ -1182,17 +1191,47 @@ gint32 CRpcTcpFido::CancelFuncIrp(
 gint32 CRpcTcpFido::OnPortReady(
     IRP* pIrp )
 {
-    gint32 ret = 0;
-    do{
-        if( GetUpperPort() != nullptr )
-            return 0;
+    gint32 ret = super::OnPortReady( pIrp );
+    if( ERROR( ret ) )
+        return ret;
 
-        ret = FireRmtSvrEvent(
-            this, eventRmtSvrOnline );
+    do{
+        CParamList oCfg;
+
+        ret = oCfg.SetPointer(
+            propIoMgr, GetIoMgr() );
+
+        if( ERROR( ret ) )
+            break;
+
+        ret = oCfg.SetObjPtr(
+            propPortPtr, ObjPtr( this ) );
+
+        if( ERROR( ret ) )
+            break;
+
+        ret = GetIoMgr()->ScheduleTask(
+            clsid( CTcpFidoListenTask ),
+            oCfg.GetCfg() );
 
     }while( 0 );
 
-    return ret;
+    if( ERROR( ret ) )
+        return ret;
+
+    if( GetUpperPort() != nullptr )
+        return 0;
+
+    PortPtr pPdoPort;
+
+    ret = FindPortByType(
+        PORTFLG_TYPE_PDO, pPdoPort );
+
+    if( ERROR( ret ) )
+        return ret;
+
+    return FireRmtSvrEvent(
+        pPdoPort, eventRmtSvrOnline );
 }
 
 gint32 CRpcTcpFido::AllocIrpCtxExt(
@@ -1233,4 +1272,133 @@ gint32 CRpcTcpFido::AllocIrpCtxExt(
         break;
     }
     return ret;
+}
+
+gint32 CTcpFidoListenTask::Process(
+    guint32 dwContext )
+{
+    CCfgOpener oParams(
+        ( IConfigDb* )GetConfig() );
+    gint32 ret = 0;
+
+    do{
+        if( dwContext == eventIrpComp )
+        {
+            IrpPtr pIrp;
+            ret = GetIrpFromParams( pIrp );
+            if( ERROR( ret ) )
+                break;
+
+            if( pIrp.IsEmpty() ||
+                pIrp->GetStackSize() == 0 )   
+                break;
+
+            ret = pIrp->GetStatus();
+            if( ret == -EAGAIN ||
+                ret == STATUS_MORE_PROCESS_NEEDED )
+            {
+                if( CanRetry() )
+                    ret = STATUS_MORE_PROCESS_NEEDED;
+                else if( ret == STATUS_MORE_PROCESS_NEEDED ) 
+                    ret = -ETIMEDOUT;
+                break;
+            }
+            if( ERROR( ret ) )
+                break;
+        }
+
+        CIoManager* pMgr;
+
+        ret = oParams.GetPointer(
+            propIoMgr, pMgr );
+
+        if( ERROR( ret ) )
+            break;
+
+        ObjPtr portPtr;
+        ret = oParams.GetObjPtr(
+            propPortPtr, portPtr );
+
+        if( ERROR( ret ) )
+            break;
+
+        IPort* pPort = portPtr;
+        if( pPort == nullptr )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        IrpPtr pIrp( true );
+        pIrp->AllocNextStack( pPort );
+
+        IrpCtxPtr& pCtx = pIrp->GetTopStack();
+
+        // the stream id to listen to is in.
+        pPort->AllocIrpCtxExt( pCtx );
+
+        pCtx->SetMajorCmd( IRP_MJ_FUNC );
+        pCtx->SetMinorCmd( IRP_MN_IOCTL );
+        pCtx->SetCtrlCode( CTRLCODE_LISTENING_FDO );
+
+        pCtx->SetIoDirection( IRP_DIR_IN ); 
+        pIrp->SetSyncCall( false );
+
+        // NOTE: no timer here
+        //
+        // set a callback
+        pIrp->SetCallback( this, 0 );
+
+        ret = pMgr->SubmitIrp(
+            PortToHandle( pPort ),
+            pIrp, false );
+
+        if( ret != STATUS_PENDING )
+            pIrp->RemoveCallback();
+
+        // continue to get next event message
+        if( SUCCEEDED( ret ) )
+            continue;
+
+        switch( ret )
+        {
+
+        case STATUS_PENDING:
+            break;
+
+        case -ETIMEDOUT:
+        case -ENOTCONN:
+            {
+                DebugPrint( 0,
+                    "The server is not online?, retry scheduled..." );
+            }
+        case -EAGAIN:
+            {
+                ret = STATUS_MORE_PROCESS_NEEDED;
+                break;
+            }
+
+        case ERROR_PORT_STOPPED:
+        case -ECANCELED:
+            {
+                // if canncelled, or disconned, no
+                // need to continue
+                break;
+            }
+
+        // otherwise something must be wrong and
+        // stop emitting irps
+        }
+
+        break;
+
+    }while( 1 );
+
+    if( ret != STATUS_PENDING )
+    {
+        oParams.RemoveProperty(
+            propPortPtr );
+    }
+
+    return SetError( ret );
 }

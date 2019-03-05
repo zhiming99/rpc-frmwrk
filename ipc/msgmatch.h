@@ -753,16 +753,19 @@ class CMessageMatch : public IMessageMatch
             oHeader = *pHeader;
             oHeader.ntoh();
 
-            // NOTE: we DON'T use the 
-            // clsid( CMessageMatch )
+            // NOTE: we DON'T hardcode the clsid(
+            // CMessageMatch )
             if( oHeader.dwClsid != GetClsid() )
             {
                 ret = -EINVAL;
                 break;
             }
 
-            m_pCfg.Clear();
-            gint32 ret = m_pCfg->Deserialize(
+            gint32 ret = m_pCfg.NewObj();
+            if( ERROR( ret ) )
+                break;
+
+            ret = m_pCfg->Deserialize(
                 oBuf.ptr() + sizeof( oHeader ),
                 oHeader.dwSize );
 
@@ -1099,9 +1102,7 @@ class CRouterRemoteMatch : public CMessageMatch
             if( ERROR( ret ) )
                 break;
 
-            ret = oCfg.CopyProp( propSrcTcpPort, pMatch );
-            if( ERROR( ret ) )
-                break;
+            oCfg.CopyProp( propSrcTcpPort, pMatch );
 
             if( GetClsid() == clsid( CRouterRemoteMatch ) )
             {

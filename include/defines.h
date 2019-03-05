@@ -98,6 +98,9 @@ do{\
     int iCount;\
     if( 0 == sem_getvalue( &sem_, &iCount ) )\
     {\
+        iCount = -iCount; \
+        if( iCount <= 0 ) \
+            break; \
         for( int i = 0; i < iCount; ++i )\
         {\
             Sem_Post( &sem_ );\
@@ -110,8 +113,10 @@ do{\
     int iCount;\
     if( 0 == sem_getvalue( &sem_, &iCount ) )\
     {\
-        if( iCount > 0 )\
-            Sem_Post( &sem_ );\
+        iCount = -iCount; \
+        if( iCount <= 0 ) \
+            break; \
+        Sem_Post( &sem_ );\
     }\
 }while( 0 )
 

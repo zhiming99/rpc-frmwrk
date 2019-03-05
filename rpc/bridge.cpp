@@ -794,8 +794,8 @@ gint32 CRpcTcpBridgeProxy::SetupReqIrp(
             pIrpCtx->SetIoDirection( dwIoDir ); 
 
             BufPtr pBuf( true );
-            *pBuf = ( ObjPtr& )oReq.GetCfg();
 
+            ret = BuildBufForIrp( pBuf, pReqCall );
             if( ERROR( ret ) )
                 break;
 
@@ -824,8 +824,7 @@ gint32 CRpcTcpBridgeProxy::SetupReqIrp(
             pIrpCtx->SetIoDirection( IRP_DIR_INOUT ); 
 
             BufPtr pBuf( true );
-            *pBuf = ( ObjPtr& )oReq.GetCfg();
-
+            ret = BuildBufForIrp( pBuf, pReqCall );
             if( ERROR( ret ) )
                 break;
 
@@ -887,6 +886,16 @@ gint32 CRpcTcpBridgeProxy::SetupReqIrp(
         }
         else if( strMethod == SYS_METHOD_FETCHDATA ||
             strMethod == SYS_METHOD_SENDDATA )
+        {
+            SetBdgeIrpStmId( pIrp,
+                TCP_CONN_DEFAULT_STM );
+
+            ret = super::SetupReqIrp( pIrp,
+                pReqCall, pCallback );
+
+            break;
+        }
+        else
         {
             SetBdgeIrpStmId( pIrp,
                 TCP_CONN_DEFAULT_STM );
@@ -2659,17 +2668,15 @@ gint32 CRpcTcpBridge::StartEx(
         if( ERROR( ret ) )
             break;
 
-        ret = oReq.SetObjPtr(
-            propIfPtr, ObjPtr( this ) );
-
-        if( ERROR( ret ) )
+        if( ret == STATUS_PENDING )
             break;
 
         // one more listening task on the default
         // command stream
-        CfgPtr pCfg( true );
-        CCfgOpener oReq2(
-            ( IConfigDb* )pCfg );
+        CCfgOpener oReq2;
+
+        oReq2.SetObjPtr(
+            propIfPtr, ObjPtr( this ) );
 
         oReq2.CopyProp(
             propMethodName, pWrapper );
@@ -2677,7 +2684,7 @@ gint32 CRpcTcpBridge::StartEx(
         oReq2.CopyProp(
             propCmdId, pWrapper );
 
-        ret = oReq2.SetIntProp(
+        oReq2.SetIntProp(
             propStreamId,
             TCP_CONN_DEFAULT_CMD );
 
@@ -2688,17 +2695,25 @@ gint32 CRpcTcpBridge::StartEx(
             propSubmitPdo, true );
 
         TaskletPtr pRecvMsgTask;
-        ret = pRecvMsgTask.NewObj(
+        gint32 ret2 = pRecvMsgTask.NewObj(
             clsid( CIfStartRecvMsgTask ),
             oReq2.GetCfg() );
 
-        if( ERROR( ret ) )
+        if( ERROR( ret2 ) &&
+            ret != STATUS_PENDING )
             break;
 
         // this task will run later when the first
         // two have done
-        ret = AddAndRun( pRecvMsgTask );
-        if( ERROR( ret ) )
+        ret2 = AddAndRun( pRecvMsgTask );
+        if( ERROR( ret2 ) &&
+            ret != STATUS_PENDING )
+        {
+            ret = ret2;
+            break;
+        }
+
+        if( ret2 == STATUS_PENDING )
             break;
 
     }while( 0 );

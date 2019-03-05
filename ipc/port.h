@@ -35,6 +35,8 @@
 // filter port
 #define PORTFLG_TYPE_FIDO               ( ( guint32 )0x03 )
 
+// filter port
+#define PORTFLG_TYPE_INVALID            ( ( guint32 )0x07 )
 // bus port
 #define PORTFLG_TYPE_BUS                ( ( guint32 )0x08 )
 
@@ -406,6 +408,20 @@ class CPort : public IPort
 
     inline bool IsPortReady()
     { return m_pPortState->IsPortReady(); }
+
+    inline guint32 GetPortType()
+    {
+        CCfgOpenerObj oPortCfg( this );
+        guint32 dwVal = PORTFLG_TYPE_INVALID;
+        oPortCfg.GetIntProp(
+            propPortType, dwVal );
+
+        return dwVal;
+    }
+
+    gint32 FindPortByType(
+        guint32 dwPortType,
+        PortPtr& pPort );
 
     gint32 AllocIrpCtxExt(
         IrpCtxPtr& pIrpCtx,

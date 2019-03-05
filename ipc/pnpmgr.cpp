@@ -1447,6 +1447,8 @@ void CPnpManager::HandleCPEvent(
         }
     case eventRmtDBusOffline:
     case eventRmtSvrOffline:
+    case eventRmtSvrOnline:
+    case eventRmtDBusOnline:
         {
             // the connection point broadcast will
             // be sent in the tasklet
@@ -1472,8 +1474,6 @@ void CPnpManager::HandleCPEvent(
                 propRmtModEvent, iEvent, dwParam1, 0, pData );
             break;
         }
-    case eventRmtSvrOnline:
-    case eventRmtDBusOnline:
     case eventDBusOnline:
     default:
         break;

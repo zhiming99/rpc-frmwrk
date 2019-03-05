@@ -261,6 +261,7 @@ IoRequestPacket::IoRequestPacket() :
     m_dwContext( 0 ),
     m_IrpThrdPtr( nullptr ),
     m_iTimerId( -1 ),
+    m_dwCurPos( 0 ),
     m_pMasterIrp( nullptr ),
     m_wMinSlaves( 0 )
 

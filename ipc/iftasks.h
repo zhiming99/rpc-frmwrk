@@ -137,12 +137,12 @@ class CIfRetryTask
     }
 };
 
+typedef EnumIfState EnumTaskState;
 class CIfParallelTask
     : public CIfRetryTask
 {
 
     protected:
-    typedef EnumIfState EnumTaskState;
     EnumTaskState m_iTaskState;
 
     public:
@@ -313,6 +313,7 @@ class CIfTaskGroup
     : public CIfRetryTask
 {
     EnumLogicOp m_iTaskRel;
+    EnumTaskState m_iTaskState = stateStarting;
 
     protected:
     void PopTask();
@@ -345,10 +346,22 @@ class CIfTaskGroup
     bool exist( TaskletPtr& pTask );
 
     bool IsRunning() const;
-    void SetRunning();
+    void SetRunning( bool bRun = true );
 
     bool IsCanceling() const;
     void SetCanceling( bool bCancel );
+
+    inline EnumTaskState GetTaskState() const
+    {
+        CStdRTMutex oTaskLock( GetLock() );
+        return m_iTaskState;
+    }
+
+    inline void SetTaskState( EnumTaskState iState )
+    {
+        CStdRTMutex oTaskLock( GetLock() );
+        m_iTaskState = iState;
+    }
 
     virtual gint32 AppendTask( TaskletPtr& pTask );
     gint32 AppendAndRun( TaskletPtr& pTask );
@@ -389,6 +402,7 @@ class CIfTaskGroup
     virtual gint32 RemoveTask( TaskletPtr& pTask );
 
     virtual gint32 OnRetry();
+    virtual gint32 OnComplete( gint32 iRet );
 };
 
 typedef CAutoPtr< Clsid_Invalid, CIfTaskGroup > TaskGrpPtr;
@@ -810,3 +824,4 @@ class CIfStartExCompletion :
     gint32 OnCancel( gint32 dwContext )
     {  return OnTaskComplete( -ECANCELED ); }
 };
+

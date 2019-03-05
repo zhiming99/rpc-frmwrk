@@ -849,6 +849,19 @@ class CRpcTcpFido: public CRpcBasePortEx
         void* pContext = nullptr ) const;
 };
 
+class CTcpFidoListenTask
+    : public CTaskletRetriable
+{
+    public:
+    typedef CTasklet super;
+    CTcpFidoListenTask( const IConfigDb* pCfg = nullptr )
+        : CTaskletRetriable( pCfg )
+    {
+        SetClassId( clsid( CTcpFidoListenTask ) );
+    }
+    virtual gint32 Process( guint32 dwContext );
+};
+
 enum EnumIoctlStat
 {
     reqStatInvalid = 0,
@@ -917,7 +930,7 @@ class CTcpStreamPdo : public CPort
 {
 
     SockPtr     m_pStmSock;
-    bool        m_bStopReady = true;
+    bool        m_bStopReady = false;
 
     gint32 SubmitReadIrp( IRP* pIrp );
     gint32 SubmitWriteIrp( IRP* pIrp );

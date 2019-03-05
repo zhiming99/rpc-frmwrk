@@ -1510,7 +1510,7 @@ gint32 CTcpStreamPdo::OnSubmitIrp(
 gint32 CTcpStreamPdo::OnPortReady(
     IRP* pIrp )
 {
-    if( GetUpperPort() == nullptr )
+    if( GetUpperPort() != nullptr )
         return 0;
 
     return FireRmtSvrEvent(
@@ -2023,7 +2023,8 @@ gint32 CTcpStreamPdo::OnQueryStop(
     // server's OFFLINE notification, or a call
     // from the local PORT_STOP request
     CParamList oParams;
-    ret = oParams.SetPointer( propIoMgr, GetIoMgr() );
+    ret = oParams.SetPointer(
+        propIoMgr, GetIoMgr() );
 
     ret = oParams.SetObjPtr(
         propPortPtr, ObjPtr( this ) );
