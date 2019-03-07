@@ -20,6 +20,10 @@ This framework depends on the following packags:
 11. `Streaming support to provide double-direction stream transfer`
 
 ---
+[`Tue Mar 05 14:05:40 CST 2019`]   
+1. Encountered and fixed some bugs in the `CRpcRouter`. There are still some memory leaks to fix. One known bug is that, the `OpenRemotePort` and `CloseRemotePort` need to be sequentially executed rather than in random order. Otherwise, the `CRpcTcpBridgeProxyImpl` and the `CTcpStreamPdo` may not be able to be released properly.   
+2. After the leaks are fixed, I will get `EnableRemoteEvent` to work.   
+
 [`Sun Feb 24 14:52:28 CST 2019`]   
 1. This week, I had some emergency thing to handle. I will get back next week.   
 
