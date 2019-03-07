@@ -765,7 +765,7 @@ gint32 CRpcBasePort::SubmitIoctlCmd( IRP* pIrp )
     }
 
     // let's process the func irps
-    IrpCtxPtr& pCtx = pIrp->GetCurCtx();
+    IrpCtxPtr pCtx = pIrp->GetCurCtx();
 
     do{
 

@@ -1214,24 +1214,47 @@ gint32 CRpcTcpFido::OnPortReady(
             clsid( CTcpFidoListenTask ),
             oCfg.GetCfg() );
 
+        if( ERROR( ret ) )
+            break;
+
+        // we are done
+        if( GetUpperPort() != nullptr )
+            break;
+
+        // notify the stack all the ports are
+        // ready
+        if( !pIrp->IsIrpHolder() )
+            pIrp->PopCtxStack();
+
+        IPort* pLowerPort = GetLowerPort();
+        if( pLowerPort == nullptr )
+            break;
+            
+        pIrp->AllocNextStack( pLowerPort );
+        IrpCtxPtr pCtx = pIrp->GetTopStack();
+        pCtx->SetMajorCmd( IRP_MJ_PNP );
+        pCtx->SetMinorCmd( IRP_MN_PNP_STACK_READY );
+        pLowerPort->AllocIrpCtxExt( pCtx );
+
+        pCtx->SetIoDirection( IRP_DIR_OUT ); 
+        pIrp->SetSyncCall( false );
+
+        ret = pLowerPort->SubmitIrp( pIrp );
+        pIrp->PopCtxStack();
+
+        if(  ret == STATUS_PENDING )
+        {
+            // pending is not allowed
+            ret = ERROR_FAIL;
+            break;
+        }
+
+        pCtx = pIrp->GetCurCtx();
+        pCtx->SetStatus( ret );
+
     }while( 0 );
 
-    if( ERROR( ret ) )
-        return ret;
-
-    if( GetUpperPort() != nullptr )
-        return 0;
-
-    PortPtr pPdoPort;
-
-    ret = FindPortByType(
-        PORTFLG_TYPE_PDO, pPdoPort );
-
-    if( ERROR( ret ) )
-        return ret;
-
-    return FireRmtSvrEvent(
-        pPdoPort, eventRmtSvrOnline );
+    return ret;
 }
 
 gint32 CRpcTcpFido::AllocIrpCtxExt(

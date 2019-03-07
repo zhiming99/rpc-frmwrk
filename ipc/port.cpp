@@ -1051,7 +1051,6 @@ gint32 CPort::SubmitStartIrp( IRP* pIrp )
 
             oPortLock.Unlock();
             ret = OnPortReady( pIrp );
-            oPortLock.Lock();
         }
 
     }while( 0 );
@@ -1401,7 +1400,7 @@ gint32 CPort::SubmitPortStackIrp( IRP* pIrp )
                 ret = OnPortStackBuilt( pIrp );
                 PopState( dwOldState );
             }
-            else
+            else if( dwMinorCmd == IRP_MN_PNP_STACK_DESTROY )
             {
                 // IRP_MN_PNP_STACK_DESTROY
                 ret = OnPortStackDestroy( pIrp );
@@ -1431,6 +1430,16 @@ gint32 CPort::SubmitPortStackIrp( IRP* pIrp )
                 PopState( dwOldState );
                 SetPortStateWake( PORT_STATE_STOPPED,
                     PORT_STATE_REMOVED );
+            }
+            else if( dwMinorCmd == IRP_MN_PNP_STACK_READY )
+            {
+                // IRP_MN_PNP_STACK_DESTROY
+                ret = OnPortStackReady( pIrp );
+                PopState( dwOldState );
+            }
+            else
+            {
+                ret = -ENOTSUP;
             }
 
         }while( 0 );
@@ -1613,6 +1622,7 @@ gint32 CPort::SubmitPnpIrp( IRP* pIrp )
             }
         case IRP_MN_PNP_STACK_BUILT:
         case IRP_MN_PNP_STACK_DESTROY:
+        case IRP_MN_PNP_STACK_READY:
             {
                 // NOTE: this is an immediate request
                 ret = SubmitPortStackIrp( pIrp );

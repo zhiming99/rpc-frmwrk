@@ -145,6 +145,7 @@
 // stop a single child pdo port stack of the bus port
 #define IRP_MN_PNP_STOP_CHILD           0x06
 #define IRP_MN_PNP_REATTACH             0x07
+#define IRP_MN_PNP_STACK_READY          0x08
 
 #define IRP_DIR_IN                      0x00
 #define IRP_DIR_OUT                     0x01

@@ -751,8 +751,24 @@ gint32 CRpcRouter::OnRmtSvrEvent(
     {
     case eventRmtSvrOnline:
         {
-            ret = OnRmtSvrOnline(
-                strIpAddr, hPort ); 
+            ObjPtr pObj;
+            ret = DEFER_IFCALL_NOSCHED(
+                pDeferTask,
+                ObjPtr( this ),
+                &CRpcRouter::OnRmtSvrOnline,
+                pObj, strIpAddr, hPort );
+
+            if( ERROR( ret ) )
+                break;
+
+            CIfDeferCallTask* pTask = pDeferTask;
+            BufPtr pBuf( true );
+            *pBuf = ObjPtr( pTask );
+
+            // fill the empty callback pointer to
+            // this defer task
+            pTask->UpdateParamAt( 0, pBuf );
+            AddSeqTask( pDeferTask, true );
             break;
         }
     case eventRmtSvrOffline:
@@ -788,6 +804,7 @@ gint32 CRpcRouter::OnRmtSvrEvent(
 }
 
 gint32 CRpcRouter::OnRmtSvrOnline(
+    IEventSink* pCallback,
     const string& strIpAddr,
     HANDLE hPort )
 {
@@ -828,6 +845,10 @@ gint32 CRpcRouter::OnRmtSvrOnline(
         if( ERROR( ret ) )
             break;
 
+        // we need to sequentially GetBridge.
+        // it could be possible, two
+        // OpenRemotePort requests for the same ip
+        // connection arrive at the same time.
         ret = GetBridge( dwPortId, pIf );
         if( SUCCEEDED( ret ) )
             break;
@@ -853,7 +874,9 @@ gint32 CRpcRouter::OnRmtSvrOnline(
             if( ERROR( ret ) )
                 break;
 
-            ret = AddSeqTask( pTask, false );
+            // ret = AddSeqTask( pTask, false );
+            ( *pTask )( eventZero );
+            ret = pTask->GetError();
         }
         break;
 

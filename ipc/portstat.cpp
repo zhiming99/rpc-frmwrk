@@ -472,6 +472,11 @@ gint32 CPortState::HandleReady(
             {
                 ret = PushState( dwNewState, false );
             }
+            else if( dwMinorCmd == IRP_MN_PNP_STACK_READY
+                && dwNewState == PORT_STATE_BUSY ) 
+            {
+                ret = PushState( dwNewState, false );
+            }
 
             else if( dwMinorCmd == IRP_MN_PNP_STOP_CHILD
                 && dwNewState == PORT_STATE_BUSY_SHARED ) 

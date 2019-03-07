@@ -123,7 +123,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CRpcBasePortModOnOfflineTask );
     INIT_MAP_ENTRYCFG( CIfStartExCompletion );
     INIT_MAP_ENTRYCFG( CIfDeferCallTask );
-
+    INIT_MAP_ENTRYCFG( CIfDeferredHandler );
 #ifdef _USE_LIBEV
     INIT_MAP_ENTRYCFG( CDBusLoopHooks );
     INIT_MAP_ENTRYCFG( CDBusTimerCallback );

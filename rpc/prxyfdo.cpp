@@ -494,7 +494,11 @@ gint32 CDBusProxyFdo::HandleRegMatchInternal(
         pNextIrpCtx->SetMajorCmd( IRP_MJ_FUNC );
         pNextIrpCtx->SetMinorCmd( IRP_MN_IOCTL );
         pNextIrpCtx->SetIoDirection( IRP_DIR_INOUT );
-        pNextIrpCtx->SetReqData( pCtx->m_pReqData );
+
+        BufPtr pReqData( true );
+        *pReqData = *pCtx->m_pReqData;
+
+        pNextIrpCtx->SetReqData( pReqData );
 
         if( bReg )
         {

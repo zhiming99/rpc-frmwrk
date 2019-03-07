@@ -183,6 +183,8 @@ gint32 CIfStartRecvMsgTask::StartNewRecv(
         // completed already. Let's start a new
         // receive task
 
+        break;
+
    }while( 1 );
 
    return ret;
@@ -5237,3 +5239,90 @@ gint32 CIoReqSyncCallback::operator()(
     return ret;
 }
 
+gint32 CIfDeferredHandler::RunTask()
+{
+    EventPtr pEvt;
+    gint32 ret = GetInterceptTask( pEvt );
+    if( ERROR( ret ) )
+        return ret;
+
+    CCfgOpenerObj oCfg( this );
+    oCfg.CopyProp( propRespPtr, pEvt );
+    oCfg.CopyProp( propMsgPtr, pEvt );
+    oCfg.CopyProp( propReqPtr, pEvt );
+
+    if( m_pDeferCall.IsEmpty() )
+        return 0;
+
+    ret = ( *m_pDeferCall )( 0 );
+    if( ret == STATUS_PENDING )
+        return ret;
+
+    OnTaskComplete( ret );
+
+    return SetError(
+        m_pDeferCall->GetError() );
+}
+
+gint32 CIfDeferredHandler::UpdateParamAt(
+    guint32 i, BufPtr pBuf )
+{
+    CDeferredCallBase< CTasklet >* pTask =
+        m_pDeferCall;
+    if( pTask == nullptr )
+        return -EINVAL;
+
+    return pTask->UpdateParamAt( i, pBuf );
+}
+
+gint32 CIfDeferredHandler::OnTaskComplete( gint32 iRet ) 
+{
+    gint32 ret = 0;
+    do{
+        // set the response data
+        EventPtr pEvtPtr;
+        ret = GetInterceptTask( pEvtPtr );
+        if( ERROR( ret ) )
+            break;
+
+        if( ERROR( iRet ) ) 
+        {
+            CParamList oParams;
+            oParams[ propReturnValue ] = iRet;
+            CInterfaceServer* pIf = nullptr;
+
+            CCfgOpenerObj oTaskCfg( this );
+            ret = oTaskCfg.GetPointer(
+                propIfPtr, pIf );
+            if( ERROR( ret ) )
+                break;
+
+            pIf->SetResponse( pEvtPtr,
+                oParams.GetCfg() );
+        }
+        else
+        {
+            CCfgOpenerObj oTaskCfg(
+                ( CObjBase* ) pEvtPtr );    
+
+            ret = oTaskCfg.MoveProp(
+                propRespPtr, this );
+
+            if( ERROR( ret ) )
+                iRet = ret;
+        }
+
+    }while( 0 );
+
+    return iRet;
+}
+
+gint32 CIfDeferredHandler::OnComplete( gint32 iRetVal )
+{
+    gint32 ret = super::OnComplete( iRetVal );
+    m_pDeferCall.Clear();
+    RemoveProperty( propRespPtr );
+    RemoveProperty( propMsgPtr );
+    RemoveProperty( propReqPtr );
+    return ret;
+}

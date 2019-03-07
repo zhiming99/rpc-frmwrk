@@ -505,6 +505,38 @@ gint32 CRpcReqForwarder::CloseRemotePort(
     const IConfigDb* pCfg )
 {
     gint32 ret = 0;
+    if( pCallback == nullptr ||
+        pCfg == nullptr )
+        return -EINVAL;
+
+    do{
+        TaskletPtr pDeferTask;
+        ret = DEFER_HANDLER_NOSCHED(
+            pDeferTask, ObjPtr( this ),
+            &CRpcReqForwarder::CloseRemotePortInternal,
+            pCallback, const_cast< IConfigDb* >( pCfg ) );
+
+        if( ERROR( ret ) )
+            break;
+
+        pDeferTask->MarkPending();
+
+        ret = GetParent()->AddSeqTask(
+            pDeferTask, true );
+
+        if( SUCCEEDED( ret ) )
+            ret = STATUS_PENDING;
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CRpcReqForwarder::CloseRemotePortInternal(
+    IEventSink* pCallback,
+    IConfigDb* pCfg )
+{
+    gint32 ret = 0;
     do{
         if( pCfg == nullptr ||
             pCallback == nullptr )
@@ -593,11 +625,8 @@ gint32 CRpcReqForwarder::CloseRemotePort(
             if( ERROR( ret ) )
                 break;
 
-            // must be pending
-            pTask->MarkPending();
-            ret = GetIoMgr()->RescheduleTask( pTask );
-            if( SUCCEEDED( ret ) )
-                ret = STATUS_PENDING;
+            ( *pTask )( eventZero );
+            ret = pTask->GetError();
         }
         break;
 
@@ -616,6 +645,36 @@ gint32 CRpcReqForwarder::CloseRemotePort(
 gint32 CRpcReqForwarder::OpenRemotePort(
     IEventSink* pCallback,
     const IConfigDb* pCfg )
+{
+    gint32 ret = 0;
+    if( pCallback == nullptr ||
+        pCfg == nullptr )
+        return -EINVAL;
+
+    do{
+        TaskletPtr pDeferTask;
+        ret = DEFER_HANDLER_NOSCHED(
+            pDeferTask, ObjPtr( this ),
+            &CRpcReqForwarder::OpenRemotePortInternal,
+            pCallback, const_cast< IConfigDb* >( pCfg ) );
+
+        if( ERROR( ret ) )
+            break;
+
+        pDeferTask->MarkPending();
+        ret = GetParent()->AddSeqTask(
+            pDeferTask, true );
+
+        if( SUCCEEDED( ret ) )
+            ret = STATUS_PENDING;
+
+    }while( 0 );
+
+    return ret;
+}
+gint32 CRpcReqForwarder::OpenRemotePortInternal(
+    IEventSink* pCallback,
+    IConfigDb* pCfg )
 {
     gint32 ret = 0;
     do{
@@ -696,13 +755,8 @@ gint32 CRpcReqForwarder::OpenRemotePort(
                 break;
 
             // must be pending
-            pTask->MarkPending();
-            ret = DEFER_CALL( GetIoMgr(), this,
-                &CRpcServices::RunManagedTask,
-                pTask, false );
-
-            if( SUCCEEDED( ret ) )
-                ret = STATUS_PENDING;
+            ( *pTask )( eventZero );
+            ret = pTask->GetError();
         }
         break;
 

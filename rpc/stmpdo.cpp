@@ -1476,20 +1476,24 @@ gint32 CTcpStreamPdo::OnSubmitIrp(
             }
         case IRP_MN_IOCTL:
             {
-                if( pIrp->CtrlCode() ==
-                        CTRLCODE_OPEN_STREAM_PDO ||
-                    pIrp->CtrlCode() ==
-                        CTRLCODE_CLOSE_STREAM_PDO || 
-                    pIrp->CtrlCode() ==
-                        CTRLCODE_LISTENING ||
-                    pIrp->CtrlCode() ==
-                        CTRLCODE_INVALID_STREAM_ID_PDO )
+                switch( pIrp->CtrlCode() )
                 {
-                    ret = SubmitIoctlCmd( pIrp );
-                    break;
+                case CTRLCODE_INVALID_STREAM_ID_PDO:
+                case CTRLCODE_OPEN_STREAM_PDO:
+                case CTRLCODE_CLOSE_STREAM_PDO:
+                case CTRLCODE_RMTSVR_OFFLINE_PDO:
+                case CTRLCODE_RMTMOD_OFFLINE_PDO:
+                case CTRLCODE_LISTENING:
+                    {
+                        ret = SubmitIoctlCmd( pIrp );
+                        break;
+                    }
+                default:
+                    {
+                        ret = -ENOTSUP;
+                        break;
+                    }
                 }
-                ret = -ENOTSUP;
-                break;
             }
         default:
             {
@@ -1510,11 +1514,7 @@ gint32 CTcpStreamPdo::OnSubmitIrp(
 gint32 CTcpStreamPdo::OnPortReady(
     IRP* pIrp )
 {
-    if( GetUpperPort() != nullptr )
-        return 0;
-
-    return FireRmtSvrEvent(
-        this, eventRmtSvrOnline );
+    return super::OnPortReady( pIrp );
 }
 
 gint32 CTcpStreamPdo::FireRmtModEvent(
@@ -1621,8 +1621,13 @@ gint32 CTcpStreamPdo::OnEvent(
     case eventDisconn:
         {
             // passive disconnection detected
-            ret = FireRmtSvrEvent(
-                this, eventRmtSvrOffline );
+            CStdRMutex oPortLock( GetLock() );
+            if( m_bSvrOnline == true )
+            {
+                oPortLock.Unlock();
+                ret = FireRmtSvrEvent(
+                    this, eventRmtSvrOffline );
+            }
             break;
         }
     default:
@@ -2006,7 +2011,16 @@ gint32 CTcpStreamPdo::OnQueryStop(
         m_pStmSock->GetState();
 
     if( iState != sockStarted )
-        return ERROR_STATE;
+    {
+        gint32 ret = ERROR_STATE;
+        DebugPrint( ret,
+            "OnQueryStop: The socket is not working and"
+            " unable to send notification to peer..." );
+
+        IrpCtxPtr& pCtx = pIrp->GetCurCtx();
+        pCtx->SetStatus( ret );
+        return ret;
+    }
 
     if( true )
     {
@@ -2049,3 +2063,48 @@ gint32 CTcpStreamPdo::OnQueryStop(
     return ret;
 }
 
+gint32 CTcpStreamPdo::OnPortStackReady(
+    IRP* pIrp )
+{
+    if( pIrp == nullptr ||
+        pIrp->GetStackSize() == 0 )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        CStdRMutex oPortLock( GetLock() );
+
+        EnumSockState iState =
+            m_pStmSock->GetState();
+
+        if( iState != sockStarted )
+        {
+            // the connection get lost during the
+            // port stack building period, this
+            // will fail the IRP_MN_PNP_START
+            // request from the pnpmgr, and cause
+            // the port to unload
+            ret = ERROR_PORT_STOPPED;
+            break;
+        }
+
+        m_bSvrOnline = true;
+        oPortLock.Unlock();
+
+        ret = FireRmtSvrEvent(
+            this, eventRmtSvrOnline );
+
+        if( ERROR( ret ) )
+        {
+            oPortLock.Lock();
+            m_bSvrOnline = false;
+            // a flag to notify the
+            // eventRmtSvrOffline can be sent out
+        }
+
+    }while( 0 );
+
+    pIrp->GetCurCtx()->SetStatus( ret );
+
+    return ret;
+}

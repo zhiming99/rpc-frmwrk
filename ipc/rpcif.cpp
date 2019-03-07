@@ -961,6 +961,15 @@ gint32 CRpcInterfaceBase::StopEx(
 
     }while( 0 );
 
+#ifdef DEBUG
+    {
+        DebugPrint( ret, "interface stopping" );
+        string strDump;
+        this->Dump( strDump );
+        DebugPrint( ret, strDump );
+    }
+#endif
+
     return ret;
 }
 

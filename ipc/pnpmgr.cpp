@@ -106,9 +106,9 @@ void CPnpManager::OnPortAttached(
 
         oEvtMap.SubscribeEvent( pEvent );
 
-        // using deferred call to avoid the callback
-        // from the StartPortsInternal to happen before
-        // caller quits
+        // using the deferred call to prevent the
+        // callback from the StartPortsInternal to
+        // happen before the caller quits
         ObjPtr pPortObj( pPort );
         ObjPtr pIrpObj( ( CObjBase*) pMasterIrp );
 
@@ -314,6 +314,15 @@ gint32 CPnpManager::StartPortsInternal(
             ObjPtr pObj;
 
             ret = oCfg.GetObjPtr( propEventSink, pObj );
+            if( ERROR( ret ) )
+            {
+                // for CTcpStreamPdo, the port
+                // might be opened first on the
+                // connection, when the
+                // propEventSink is missing
+                ret = pObj.NewObj(
+                    clsid( CIfDummyTask ) );
+            }
 
             if( SUCCEEDED( ret ) )
             {
@@ -1012,9 +1021,7 @@ gint32 CPnpManager::StopPortsInternal(
         if( ret == STATUS_PENDING )
             break;
 
-        if( ERROR( ret ) )
-            break;
-
+        // ignore whether the QueryStop failed or not
         IrpPtr pStopIrp( true );
         pStopIrp->AllocNextStack( pPort );
 

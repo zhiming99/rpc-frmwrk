@@ -931,6 +931,7 @@ class CTcpStreamPdo : public CPort
 
     SockPtr     m_pStmSock;
     bool        m_bStopReady = false;
+    bool        m_bSvrOnline = false;
 
     gint32 SubmitReadIrp( IRP* pIrp );
     gint32 SubmitWriteIrp( IRP* pIrp );
@@ -1028,6 +1029,8 @@ class CTcpStreamPdo : public CPort
 
     gint32 FireRmtModEvent( EnumEventId iEvent,
         const std::string& strModName );
+
+    gint32 OnPortStackReady( IRP* pIrp );
 
 };
 

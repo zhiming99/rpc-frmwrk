@@ -468,6 +468,14 @@ class CRpcReqForwarder :
     virtual gint32 BuildBufForIrp(
         BufPtr& pBuf, IConfigDb* pReqCall );
 
+    gint32 OpenRemotePortInternal(
+        IEventSink* pCallback,
+        IConfigDb* pCfg );
+
+    gint32 CloseRemotePortInternal(
+        IEventSink* pCallback,
+        IConfigDb* pCfg );
+
     public:
 
     typedef CRpcInterfaceServer super;
@@ -1372,6 +1380,7 @@ class CRpcRouter :
     }
 
     gint32 OnRmtSvrOnline(
+        IEventSink* pCallback,
         const std::string& strIpAddr,
         HANDLE hPort );
 

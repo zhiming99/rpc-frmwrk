@@ -1344,6 +1344,75 @@ inline gint32 NewIfDeferredCall( TaskletPtr& pCallback,
 #define DEFER_IFCALL_NOSCHED( __pTask, pObj, func, ... ) \
     NewIfDeferredCall( __pTask, pObj, func , ##__VA_ARGS__ )
 
+class CIfDeferredHandler :
+    public CIfInterceptTaskProxy
+{
+    TaskletPtr m_pDeferCall;
+    public:
+    typedef CIfInterceptTaskProxy super;
+    CIfDeferredHandler( const IConfigDb* pCfg )
+        :super( pCfg )
+    { SetClassId( clsid( CIfDeferredHandler ) );}
+
+    void SetDeferCall( TaskletPtr& pTask )
+    { m_pDeferCall = pTask; }
+
+    // just as a place holder
+    gint32 RunTask();
+    gint32 UpdateParamAt( guint32 i, BufPtr pBuf );
+    gint32 OnTaskComplete( gint32 iRet );
+    gint32 OnComplete( gint32 iRetVal );
+};
+
+template < typename C, typename ... Types, typename ...Args>
+inline gint32 NewDeferredHandler( TaskletPtr& pCallback,
+    ObjPtr pIf, gint32(C::*f)(Types ...),
+    IEventSink* pTaskToIntercept, Args&&... args )
+{
+    TaskletPtr pWrapper;
+    if( pTaskToIntercept == nullptr ||
+        pIf.IsEmpty() )
+        return -EINVAL;
+
+    gint32 ret = NewDeferredCall(
+        pWrapper, pIf, f, pTaskToIntercept, args... );
+
+    if( ERROR( ret ) )
+        return ret;
+
+    TaskletPtr pIfTask;
+    CParamList oParams;
+    oParams[ propIfPtr ] = pIf;
+
+    oParams[ propEventSink ] =
+        ObjPtr( pTaskToIntercept );
+
+    ret = pIfTask.NewObj(
+        clsid( CIfDeferredHandler ),
+        oParams.GetCfg() );
+    if( ERROR( ret ) )
+        return ret;
+
+    CIfDeferredHandler* pDeferTask = pIfTask;
+    pDeferTask->SetDeferCall( pWrapper );
+
+    BufPtr pBuf( true );
+    *pBuf = ObjPtr( pDeferTask );
+
+    // for the handler method, pass the pDeferTask
+    // as the callback
+    ret = pDeferTask->UpdateParamAt( 0, pBuf );
+    if( ERROR( ret ) )
+        return ret;
+
+    pCallback = pDeferTask;
+
+    return 0;
+}
+
+#define DEFER_HANDLER_NOSCHED( __pTask, pObj, func, pCallback, ... ) \
+    NewDeferredHandler( __pTask, pObj, func , pCallback, ##__VA_ARGS__ )
+
 // to insert the task pInterceptor to the head of
 // completion chain of the task pTarget 
 // please make sure both tasks inherit from the
