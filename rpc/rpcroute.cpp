@@ -858,6 +858,9 @@ gint32 CRpcRouter::OnRmtSvrOnline(
             // passive bridge creation
             CParamList oParams;
 
+            oParams[ propEventSink ] =
+                ObjPtr( pCallback );
+
             oParams.CopyProp( propIpAddr, pPort );
             oParams.CopyProp( propSrcTcpPort, pPort );
             oParams.CopyProp( propPortId, pPort );
@@ -1905,8 +1908,10 @@ gint32 CRpcRouter::RunEnableEventTask(
         pMatch == nullptr )
         return -EINVAL;
 
+    TaskletPtr pRespTask;
+    TaskGrpPtr pTransGrp;
+
     do{
-        TaskletPtr pRespTask;
         CParamList oParams;
         oParams[ propIfPtr ] = ObjPtr( this );
 
@@ -1925,7 +1930,6 @@ gint32 CRpcRouter::RunEnableEventTask(
             ObjPtr( pRespTask );
         oParams[ propNotifyClient ] = true;
 
-        TaskGrpPtr pTransGrp;
         ret = pTransGrp.NewObj(
             clsid( CIfTransactGroup ),
             oParams.GetCfg() );
@@ -1965,10 +1969,22 @@ gint32 CRpcRouter::RunEnableEventTask(
 
         TaskletPtr pGrpTask = pTransGrp;
         ret = this->AddAndRun( pGrpTask );
-        if( SUCCEEDED( ret ) )
-            ret = pTransGrp->GetError();
         
     }while( 0 );
+
+    if( ERROR( ret ) )
+    {
+        if( !pRespTask.IsEmpty() )
+        {
+            CIfInterceptTaskProxy* pIcpt = pRespTask;
+            if( pIcpt != nullptr )
+                pIcpt->SetInterceptTask( nullptr );
+        }
+        if( !pTransGrp.IsEmpty() )
+        {
+            ( *pTransGrp )( eventCancelTask );
+        }
+    }
 
     return ret;
 }

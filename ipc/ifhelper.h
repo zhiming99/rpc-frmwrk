@@ -1158,9 +1158,10 @@ class CDeferredCallBase :
     virtual gint32 operator()( guint32 dwContext )
     {
         if( m_pObj.IsEmpty() )
-            return -EINVAL;
+            return this->SetError( -EINVAL );
 
-        return this->Delegate( m_pObj, m_vecArgs );
+        gint32 ret = this->Delegate( m_pObj, m_vecArgs );
+        return this->SetError( ret );
     }
 
     gint32 UpdateParamAt( guint32 i, BufPtr& pBuf )
@@ -1290,12 +1291,7 @@ class CIfDeferCallTask :
         if( m_pDeferCall.IsEmpty() )
             return 0;
 
-        gint32 ret = ( *m_pDeferCall )( 0 );
-        if( ret == STATUS_PENDING )
-            return ret;
-
-        return SetError(
-            m_pDeferCall->GetError() );
+        return ( *m_pDeferCall )( 0 );
     }
 
     gint32 UpdateParamAt(

@@ -358,7 +358,6 @@ CIfRetryTask::CIfRetryTask(
 {
     gint32 ret = 0;
     Sem_Init( &m_semWait, 0, 0 );
-    m_pParentTask = nullptr;
     SetError( STATUS_PENDING );
 
     do{
@@ -548,12 +547,13 @@ gint32 CIfRetryTask::OnComplete(
             }
         }
 
-        if( m_pParentTask != nullptr )
+        if( !m_pParentTask.IsEmpty() )
         {
+            ObjPtr pObj( m_pParentTask );
             CIfTaskGroup* pTaskGrp = static_cast
                 < CIfTaskGroup* >( m_pParentTask );
 
-            m_pParentTask = nullptr;
+            m_pParentTask.Clear();
             if( pTaskGrp != nullptr )
             {
                 pTaskGrp->OnChildComplete(
@@ -754,7 +754,7 @@ gint32 CIfRetryTask::GetProperty( gint32 iProp,
     {
     case propParentTask:
         {
-            if( m_pParentTask == nullptr )
+            if( m_pParentTask.IsEmpty() )
             {
                 ret = -ENOENT;
                 break;
@@ -782,7 +782,7 @@ gint32 CIfRetryTask::SetProperty(
         {
             ObjPtr& pObj = oBuf;
             if( pObj.IsEmpty() )
-                m_pParentTask = nullptr;
+                m_pParentTask.Clear();
             else
                 m_pParentTask = pObj;
             break;
@@ -805,7 +805,7 @@ gint32 CIfRetryTask::RemoveProperty(
     {
     case propParentTask:
         {
-            m_pParentTask = nullptr;
+            m_pParentTask.Clear();
             break;
         }
     default:
@@ -1243,6 +1243,7 @@ gint32 CIfTaskGroup::AppendAndRun(
     else if( SUCCEEDED( ret ) )
     {
         // there is some other tasks running
+        pTask->MarkPending();
         ret = STATUS_PENDING;
     }
     
@@ -1425,18 +1426,17 @@ gint32 CIfTaskGroup::RunTask()
         oTaskLock.Lock();
         oCfg.RemoveProperty( propNoResched );
 
-        if( ret == STATUS_PENDING )
-            break;
-
-        if( ret == STATUS_MORE_PROCESS_NEEDED )
+        if( unlikely( ret ==
+            STATUS_MORE_PROCESS_NEEDED ) )
         {
             // retry will happen on the child task,
             // let's pending
             // Taskgroup will not return
             // STATUS_MORE_PROCESS_NEEDED
             ret = STATUS_PENDING;
-            break;
         }
+        if( ret == STATUS_PENDING )
+            break;
 
         if( ERROR( ret ) &&
             GetRelation() == logicAND )
@@ -2373,6 +2373,7 @@ gint32 CIfParallelTaskGrp::AddAndRun(
             if( ret == -EDEADLK )
             {
                 TaskletPtr pThisGrp( this );
+                pTask->MarkPending();
                 pMgr->RescheduleTask( pThisGrp );
                 ret = STATUS_PENDING;
             }
@@ -2380,6 +2381,7 @@ gint32 CIfParallelTaskGrp::AddAndRun(
         }
         else
         {
+            pTask->MarkPending();
             ret = STATUS_PENDING;
         }
 
@@ -5157,9 +5159,6 @@ gint32 CIfDummyTask::OnEvent(
 gint32 CIoReqSyncCallback::operator()(
     guint32 dwContext )
 {
-    if( dwContext != eventTaskComp )
-        return -ENOTSUP;
-
     gint32 ret = 0;
     switch( ( EnumEventId )dwContext )
     {
@@ -5232,6 +5231,11 @@ gint32 CIoReqSyncCallback::operator()(
     default:
         {
             ret = -ENOTSUP;
+            SetError( ret );
+            Sem_Post( &m_semWait );
+            DebugPrint( ret,
+                "CIoReqSyncCallback completed with error %d",
+                 dwContext );
             break;
         }
     }
@@ -5259,9 +5263,7 @@ gint32 CIfDeferredHandler::RunTask()
         return ret;
 
     OnTaskComplete( ret );
-
-    return SetError(
-        m_pDeferCall->GetError() );
+    return ret;
 }
 
 gint32 CIfDeferredHandler::UpdateParamAt(

@@ -202,6 +202,20 @@ gint32 CRpcTcpBridgeProxy::EnableRemoteEventInternal(
                 SYS_METHOD_DISABLERMTEVT );
         }
 
+        EnumClsid iid = iid( CRpcTcpBridge );
+        string strIfName =
+            CoGetIfNameFromIid( iid );
+
+        if( strIfName.empty() )
+        {
+            ret = -ENOTSUP;
+            break;
+        }
+
+        ToPublicName( strIfName );
+        oBuilder[ propIfName ] = 
+            DBUS_IF_NAME( strIfName );
+
         oBuilder[ propStreamId ] =
             TCP_CONN_DEFAULT_STM;
 
@@ -769,14 +783,15 @@ gint32 CRpcTcpBridgeProxy::SetupReqIrp(
         if( ERROR( ret ) )
             break;
 
-        if( strMethod == IF_METHOD_LISTENING )
+        /*if( strMethod == IF_METHOD_LISTENING )
         {
-            ret = SetupReqIrpListening(
-                pIrp, pReqCall, pCallback ); 
+            // ret = SetupReqIrpListening(
+            //     pIrp, pReqCall, pCallback ); 
             break;
         }
 
-        else if( strMethod == SYS_METHOD_ENABLERMTEVT ||
+        else */
+        if( strMethod == SYS_METHOD_ENABLERMTEVT ||
             strMethod == SYS_METHOD_DISABLERMTEVT )
         {
             IrpCtxPtr& pIrpCtx = pIrp->GetTopStack(); 
@@ -2595,8 +2610,9 @@ gint32 CRpcTcpBridge::SetupReqIrp(
 
         if( strMethod == IF_METHOD_LISTENING )
         {
-            ret = SetupReqIrpListening(
-                pIrp, pReqCall, pCallback );
+            // ret = SetupReqIrpListening(
+            //    pIrp, pReqCall, pCallback );
+            ret = -ENOTSUP;
         }
         else if( strMethod == IF_EVENT_PROGRESS )
         {

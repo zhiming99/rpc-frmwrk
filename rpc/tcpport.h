@@ -784,9 +784,8 @@ class CRpcTcpFido: public CRpcBasePortEx
 {
     protected:
 
-    MatchPtr    m_matchFwdr;
-    MatchPtr    m_matchRelay;
     static std::atomic< guint32 > m_atmSeqNo;
+    TaskletPtr  m_pListenTask;
 
     public:
 
@@ -847,6 +846,8 @@ class CRpcTcpFido: public CRpcBasePortEx
     gint32 AllocIrpCtxExt(
         IrpCtxPtr& pIrpCtx,
         void* pContext = nullptr ) const;
+
+    virtual gint32 PostStop( IRP* irp );
 };
 
 class CTcpFidoListenTask

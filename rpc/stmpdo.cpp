@@ -903,6 +903,8 @@ gint32 CTcpStreamPdo::SubmitWriteIrp(
             break;
         }
         ret = pSock->HandleWriteIrp( pIrp );
+        if( ERROR( ret ) )
+            break;
 
         // don't check the return code here
         ret = CheckAndSend( pIrp, ret );
@@ -946,11 +948,13 @@ gint32 CTcpStreamPdo::CheckAndSend(
             // trigger a send operation to see if
             // the irp's state got changed
             ret = pSock->StartSend( pIrp );
-            if( ret == STATUS_PENDING ||
-                ERROR( ret ) )
+            if( ret == STATUS_PENDING )
+                break;
+
+            if( ERROR( ret ) )
                 break;
         }
-        
+
         EnumIoctlStat iState = reqStatInvalid;
         IrpCtxPtr& pCtx = pIrp->GetCurCtx();
         ret = GetIoctlReqState( pIrp, iState );
@@ -2072,11 +2076,11 @@ gint32 CTcpStreamPdo::OnPortStackReady(
 
     gint32 ret = 0;
     do{
-        CStdRMutex oPortLock( GetLock() );
-
+        // this test to save extra work to create
+        // the CRpcTcpBridgeImpl if the connection
+        // is lost
         EnumSockState iState =
             m_pStmSock->GetState();
-
         if( iState != sockStarted )
         {
             // the connection get lost during the
@@ -2088,18 +2092,21 @@ gint32 CTcpStreamPdo::OnPortStackReady(
             break;
         }
 
+        FireRmtSvrEvent( this, eventRmtSvrOnline );
+
+        CStdRMutex oPortLock( GetLock() );
         m_bSvrOnline = true;
-        oPortLock.Unlock();
 
-        ret = FireRmtSvrEvent(
-            this, eventRmtSvrOnline );
-
-        if( ERROR( ret ) )
+        // test again, this test is to prevent the
+        // leaking of the port object if the
+        // disconnection happens around
+        // FireRmtSvrEvent, when the
+        // eventRmtSvrOffline event is surpressed.
+        iState = m_pStmSock->GetState();
+        if( iState != sockStarted )
         {
-            oPortLock.Lock();
-            m_bSvrOnline = false;
-            // a flag to notify the
-            // eventRmtSvrOffline can be sent out
+            ret = ERROR_PORT_STOPPED;
+            break;
         }
 
     }while( 0 );

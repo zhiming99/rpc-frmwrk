@@ -26,6 +26,7 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include "reqopen.h"
+#include <fcntl.h>
 
 using namespace std;
 
@@ -987,6 +988,10 @@ gint32 CRpcStreamSock::Start()
         else
         {
             // we are already connected
+            int iFlags = fcntl( m_iFd, F_GETFL );
+            fcntl( m_iFd, F_SETFL,
+                iFlags | O_NONBLOCK );
+
             ret = AttachMainloop();
         }
 
@@ -1424,6 +1429,8 @@ gint32 CRpcStreamSock::GetStreamToSend(
         --dwLeft;
 
     };
+    if( dwLeft == 0 )
+        ret = -ENOENT;
 
     return ret;
 }
@@ -1698,6 +1705,9 @@ gint32 CRpcStreamSock::StartSend( IRP* pIrpLocked )
             {
                 if( pIrpLocked == pIrp )
                 {
+                    IrpCtxPtr& pCtx =
+                        pIrp->GetTopStack();
+                    pCtx->SetStatus( ret );
                     retLocked = ret;
                 }
                 else
@@ -1721,7 +1731,10 @@ gint32 CRpcStreamSock::StartSend( IRP* pIrpLocked )
         {
             ret = GetStreamToSend( pStream );
             if( ERROR( ret ) )
+            {
+                ret = 0;
                 break;
+            }
             m_iCurSendStm =
                 pStream->GetStreamId();
             continue;
@@ -1732,6 +1745,8 @@ gint32 CRpcStreamSock::StartSend( IRP* pIrpLocked )
 
     if( pIrpLocked == nullptr )
     {
+        // the context is an io event from main
+        // loop
         if( !vecIrpComplete.empty() )
         {
             ret = ScheduleCompleteIrpTask(
@@ -1740,12 +1755,16 @@ gint32 CRpcStreamSock::StartSend( IRP* pIrpLocked )
     }
     else
     {
+        // the context is a synchronous call to
+        // SubmitIrp
         if( !vecIrpComplete.empty() )
         {
-            ScheduleCompleteIrpTask(
+            ret = ScheduleCompleteIrpTask(
                 pIrpVec, false );
         }
-        ret = retLocked;
+
+        if( SUCCEEDED( ret ) )
+            ret = retLocked;
     }
     return ret;
 }
@@ -2401,6 +2420,7 @@ gint32 CIncomingPacket::FillPacket(
 
     gint32 ret = 0;
     bool bFirst = true;
+    guint32 dwBufOffset = 0;
     do{
         guint32 dwSize = m_dwBytesToRecv; 
 
@@ -2426,8 +2446,14 @@ gint32 CIncomingPacket::FillPacket(
                 sizeof( CPacketHeader ) );
         }
 
+        if( m_dwOffset < sizeof( CPacketHeader ) )
+            dwBufOffset = m_dwOffset;
+        else
+            dwBufOffset = m_dwOffset -
+                sizeof( CPacketHeader );
+
         ret = read( iFd,
-            m_pBuf->ptr() + m_dwOffset, dwSize );
+            m_pBuf->ptr() + dwBufOffset, dwSize );
 
         if( ret == -1 && errno == EWOULDBLOCK )
         {
@@ -2468,19 +2494,8 @@ gint32 CIncomingPacket::FillPacket(
             if( ERROR( ret ) )
                 break;
 
-            /*if( m_oHeader.m_dwSize
-                > RPC_MAX_BYTES_PACKET )
-            {
-                ret = -EMSGSIZE;
-                break;
-            }*/
-
             m_dwBytesToRecv = m_oHeader.m_dwSize;
-
-            guint32 dwNewSize = 
-                sizeof( CPacketHeader )
-                + m_dwBytesToRecv;
-
+            guint32 dwNewSize = m_dwBytesToRecv;
             m_pBuf->Resize( dwNewSize );
 
             // continue to read payload data
@@ -2672,6 +2687,8 @@ gint32 CRpcStream::HandleReadIrp(
         PacketPtr ptrPacket =
             m_queBufToRecv.front();
 
+        m_queBufToRecv.pop_front();
+
         CIncomingPacket* pPacket = ptrPacket;
         if( pPacket == nullptr )
         {
@@ -2692,7 +2709,17 @@ gint32 CRpcStream::HandleReadIrp(
             break;
 
         CParamList oReq( ( IConfigDb* )pCfg );
-        guint32 dwReqSize = oReq[ propByteCount ];
+        guint32 dwReqSize = 0;
+
+        ret = oReq.GetIntProp(
+            propByteCount, dwReqSize );
+
+        if( ERROR( ret ) )
+        {
+            dwReqSize = pBuf->size();
+            ret = 0;
+        }
+
         if( dwReqSize < pBuf->size() )
         {
             ret = -EBADMSG;
@@ -2793,8 +2820,15 @@ gint32 CRpcStream::GetReadIrpsToComp(
         CParamList oReq(
             ( IConfigDb* )pReq );
 
-        guint32 dwReqSize =
-            oReq[ propByteCount ];
+        guint32 dwReqSize = 0;
+        ret = oReq.GetIntProp(
+            propByteCount, dwReqSize );
+
+        if( ERROR( ret ) )
+        {
+            dwReqSize = pBuf->size();
+            ret = 0;
+        }
 
         guint32 dwRecvSize = pBuf->size();
         if( !pCtx->m_pRespData.IsEmpty() )
@@ -2805,6 +2839,7 @@ gint32 CRpcStream::GetReadIrpsToComp(
         if( dwReqSize < dwRecvSize )
         {
             ret = -EBADMSG;
+            break;
         }
         else if( dwReqSize > dwRecvSize )
         {
@@ -3701,7 +3736,10 @@ gint32 COutgoingPacket::SetHeader(
 
     m_oHeader.m_iStmId = pHeader->m_iStmId;
     m_oHeader.m_dwFlags = pHeader->m_dwFlags;
+    m_oHeader.m_iPeerStmId = pHeader->m_iPeerStmId;
+    m_oHeader.m_dwSeqNo = pHeader->m_dwSeqNo;
     m_oHeader.m_wProtoId = pHeader->m_wProtoId;
+    m_oHeader.m_wReserved = pHeader->m_wReserved;
 
     return 0;
 }
@@ -3728,6 +3766,7 @@ gint32 COutgoingPacket::SetBufToSend(
     m_dwBytesToSend =  m_oHeader.m_dwSize
         + sizeof( CPacketHeader );
 
+    m_dwOffset = 0;
     m_oHeader.hton();
     
     return 0;
@@ -3740,16 +3779,13 @@ gint32 COutgoingPacket::StartSend(
         return -EINVAL;
 
     gint32 ret = 0;
+    if( m_dwBytesToSend == 0 )
+        return 0;
+
+    if( m_dwBytesToSend > MAX_BYTES_PER_TRANSFER )
+        return -EINVAL;
+
     do{
-        if( m_dwBytesToSend == 0 )
-            break;
-
-        if( m_dwBytesToSend > MAX_BYTES_PER_TRANSFER )
-        {
-            ret = -EINVAL;
-            break;
-        }
-
         if( m_dwOffset < sizeof( CPacketHeader ) )
         {
             guint32 dwSize = 
@@ -3777,8 +3813,10 @@ gint32 COutgoingPacket::StartSend(
                 // recover from the eariler hton
                 m_oHeader.ntoh();
             }
+            ret = 0;
         }
-        else
+
+        if( m_dwOffset >= sizeof( CPacketHeader ) )
         {
             guint32 dwActOffset = m_dwOffset
                 - sizeof( CPacketHeader );
@@ -3789,7 +3827,7 @@ gint32 COutgoingPacket::StartSend(
             if( dwSize > RPC_MAX_BYTES_PACKET )
                 dwSize = RPC_MAX_BYTES_PACKET;
 
-            char* pStart = ( ( char* )&m_oHeader )
+            char* pStart = ( ( char* )m_pBuf->ptr() )
                 + dwActOffset;
 
             ret = send( iFd, pStart, dwSize, 0 );
@@ -3806,18 +3844,20 @@ gint32 COutgoingPacket::StartSend(
 
             m_dwOffset += ret;
             m_dwBytesToSend -= ret;
+            ret = 0;
         }
 
         if( m_dwBytesToSend > 0 )
         {
-            ret = STATUS_PENDING;
+            continue;
         }
         else
         {
             // succeeded
         }
+        break;
 
-    }while( 0 );
+    }while( 1 );
 
     return ret;
 }

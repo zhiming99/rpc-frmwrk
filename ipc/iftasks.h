@@ -58,7 +58,7 @@ class CIfRetryTask
     //
     protected:
     sem_t               m_semWait;
-    CTasklet*           m_pParentTask;
+    TaskletPtr          m_pParentTask;
 
     public:
     typedef CThreadSafeTask super;
@@ -766,11 +766,17 @@ class CIfInterceptTaskProxy :
         {
             oCfg.SetObjPtr( propEventSink,
                 ObjPtr( pEvent ) );
+
+            oCfg.SetBoolProp(
+                propNotifyClient, true );
+        }
+        else
+        {
+            oCfg.RemoveProperty( propEventSink );
+            oCfg.RemoveProperty(
+                propNotifyClient );
         }
 
-        oCfg.SetBoolProp(
-            propNotifyClient, true );
-        
         return 0;
     }
 };

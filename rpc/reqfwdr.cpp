@@ -519,8 +519,9 @@ gint32 CRpcReqForwarder::CloseRemotePort(
         if( ERROR( ret ) )
             break;
 
-        pDeferTask->MarkPending();
-
+        // using the rpcrouter's sequential task,
+        // because the eventRmtSvrOffline comes
+        // from the rpcrouter.
         ret = GetParent()->AddSeqTask(
             pDeferTask, true );
 
@@ -661,7 +662,6 @@ gint32 CRpcReqForwarder::OpenRemotePort(
         if( ERROR( ret ) )
             break;
 
-        pDeferTask->MarkPending();
         ret = GetParent()->AddSeqTask(
             pDeferTask, true );
 
@@ -725,6 +725,9 @@ gint32 CRpcReqForwarder::OpenRemotePortInternal(
         {
             AddRefCount( strIpAddr,
                 strSrcUniqName, strSender );
+
+            DebugPrint( ret,
+                "The bridge proxy already exists..." );
         }
         else if( ret == -ENOENT )
         {
@@ -1015,16 +1018,58 @@ gint32 CRpcReqForwarder::DisableRemoteEvent(
     IEventSink* pCallback,
     IMessageMatch* pMatch )
 {
-    return EnableDisableEvent(
-        pCallback, pMatch, false );
+    gint32 ret = 0;
+    if( pCallback == nullptr ||
+        pMatch == nullptr )
+        return -EINVAL;
+
+    do{
+        TaskletPtr pDeferTask;
+        ret = DEFER_HANDLER_NOSCHED(
+            pDeferTask, ObjPtr( this ),
+            &CRpcReqForwarder::EnableDisableEvent,
+            pCallback, pMatch, false );
+
+        if( ERROR( ret ) )
+            break;
+
+        // using the reqfwdr's sequential
+        // taskgroup
+        ret = AddSeqTask( pDeferTask, true );
+        if( SUCCEEDED( ret ) )
+            ret = STATUS_PENDING;
+
+    }while( 0 );
+
+    return ret;
 }
 
 gint32 CRpcReqForwarder::EnableRemoteEvent(
     IEventSink* pCallback,
     IMessageMatch* pMatch )
 {
-    return EnableDisableEvent(
-        pCallback, pMatch, true );
+    gint32 ret = 0;
+    if( pCallback == nullptr ||
+        pMatch == nullptr )
+        return -EINVAL;
+
+    do{
+        TaskletPtr pDeferTask;
+        ret = DEFER_HANDLER_NOSCHED(
+            pDeferTask, ObjPtr( this ),
+            &CRpcReqForwarder::EnableDisableEvent,
+            pCallback, pMatch, true );
+
+        if( ERROR( ret ) )
+            break;
+
+        ret = AddSeqTask( pDeferTask, true );
+        if( SUCCEEDED( ret ) )
+            ret = STATUS_PENDING;
+
+    }while( 0 );
+
+    return ret;
 }
 
 gint32 CRpcReqForwarder::EnableDisableEvent(
@@ -1109,12 +1154,8 @@ gint32 CRpcReqForwarder::EnableDisableEvent(
             break;
 
         pTask->MarkPending();
-        ret = DEFER_CALL( GetIoMgr(), this,
-            &CRpcServices::RunManagedTask,
-            pTask, false );
-
-        if( SUCCEEDED( ret ) )
-            ret = STATUS_PENDING;
+        ( *pTask )( eventZero );
+        ret = pTask->GetError();
 
     }while( 0 );
 
@@ -1349,7 +1390,54 @@ gint32 CReqFwdrEnableRmtEventTask::OnTaskComplete(
             break;
         }
 
-        if( FAILED( iRetVal ) )
+        if( SUCCEEDED( iRetVal ) )
+        {
+            // check to see the response from the
+            // remote server
+            do{
+                vector< guint32 > vecParams;
+                ret = GetParamList( vecParams );
+                if( ERROR( ret ) )
+                    break;
+                CObjBase* pObj = reinterpret_cast
+                    < CObjBase* >( vecParams[ 3 ] );
+
+                if( pObj == nullptr )
+                {
+                    ret = -EFAULT;
+                    break;
+                }
+
+                CCfgOpenerObj oTaskCfg( pObj );
+                CConfigDb* pResp = nullptr;
+                ret = oTaskCfg.GetPointer(
+                    propRespPtr, pResp );
+
+                if( ERROR( ret ) )
+                    break;
+
+                CCfgOpener oResp( pResp );
+                ret = oResp.GetIntProp(
+                    propReturnValue,
+                    ( guint32& )iRetVal );
+
+                if( ERROR( ret ) )
+                    break;
+
+                if( ERROR( iRetVal ) )
+                {
+                    ret = iRetVal;
+                    break;
+                }
+                        
+            }while( 0 );
+        }
+        else
+        {
+            ret = iRetVal;
+        }
+
+        if( ERROR( ret ) )
         {
             // undo Add/RemoveLocalMatch
             CRpcRouter* pRouter =
@@ -1369,7 +1457,7 @@ gint32 CReqFwdrEnableRmtEventTask::OnTaskComplete(
         {
             CParamList oParams;
             oParams.SetIntProp(
-                propReturnValue, iRetVal );
+                propReturnValue, ret );
             
             // the response will finally be sent in
             // this method

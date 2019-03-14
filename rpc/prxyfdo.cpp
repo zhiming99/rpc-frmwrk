@@ -257,7 +257,7 @@ gint32 CDBusProxyFdo::HandleListeningFdo(
     gint32 ret = 0;
 
     do{
-        IrpCtxPtr& pCtx = pIrp->GetCurCtx();
+        IrpCtxPtr pCtx = pIrp->GetCurCtx();
 
         // client side I/O
         guint32 dwIoDir = pCtx->GetIoDirection();

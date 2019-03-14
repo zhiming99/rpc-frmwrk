@@ -1840,16 +1840,46 @@ gint32 CRpcInterfaceBase::AddAndRun(
             if( ERROR( ret ) )
                 break;
 
+            // actually the taskgroup can also run
+            // on the parallel taskgroup
+            CIfRetryTask* pParaTask = pIoTask;
+            if( pParaTask == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+
             if( dwCount == 0 || bRunning )
             {
-                // run the root task if the Parallel
+                // run the root task if the io
                 // task group is not running yet
-                ( *pRootTaskGroup )( eventZero );
-                ret = pRootTaskGroup->GetError();
+                ret = ( *pRootTaskGroup )( eventZero );
+                CStdRTMutex oTaskLock(
+                    pParaTask->GetLock() );
+                if( pIoTask->GetError() ==
+                    STATUS_PENDING )
+                {
+                    // there are chances the task
+                    // is not run because the
+                    // taskgroup is running on
+                    // other thread at the same
+                    // time, and we need to mark
+                    // pending explicitly. it
+                    // should be redudant
+                    // operation if the task's
+                    // RunTask is called.
+                    pIoTask->MarkPending();
+                }
             }
             else
             {
+                CStdRTMutex oTaskLock(
+                    pParaTask->GetLock() );
+
                 ret = pIoTask->GetError();
+                if( ret == STATUS_PENDING )
+                    pIoTask->MarkPending();
+
                 DebugPrint( GetTid(),
                     "root task not run immediately, dwCount=%d, bRunning=%d",
                     dwCount, bRunning );
@@ -3265,7 +3295,10 @@ gint32 CRpcServices::SendMethodCall(
 
         if( oReq.HasReply() ) 
         {
-            ret = FillRespData( pIrp, pRespData );
+            gint32 iRet = FillRespData(
+                pIrp, pRespData );
+            if( ERROR( iRet ) && SUCCEEDED( ret ) )
+                ret = iRet;
         }
 
     }while( 0 );
@@ -4235,6 +4268,7 @@ gint32 CRpcServices::AddSeqTask(
             break;
         }
 
+        pTask->MarkPending();
         if( SUCCEEDED( ret ) && bNew )
         {
             // a new m_pSeqTasks, add and run
@@ -6022,7 +6056,8 @@ bool CInterfaceServer::IsConnected(
         iState != stateResuming )
         return false;
 
-    if( szDestAddr != nullptr )
+    if( szDestAddr != nullptr &&
+        !m_pConnMgr.IsEmpty() )
     {
         gint32 ret = m_pConnMgr->
             CanResponse( szDestAddr );

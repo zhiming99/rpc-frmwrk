@@ -195,6 +195,34 @@ gint32 CRpcTcpFido::SubmitIoctlCmd(
             }
         case CTRLCODE_LISTENING:
             {
+                if( m_pListenTask.IsEmpty() )
+                {
+                    CParamList oCfg;
+                    ret = oCfg.SetPointer(
+                        propIoMgr, GetIoMgr() );
+
+                    if( ERROR( ret ) )
+                        break;
+
+                    ret = oCfg.SetObjPtr(
+                        propPortPtr, ObjPtr( this ) );
+
+                    if( ERROR( ret ) )
+                        break;
+
+                    ret = m_pListenTask.NewObj(
+                        clsid( CTcpFidoListenTask ),
+                        oCfg.GetCfg() );
+
+                    if( ERROR( ret ) )
+                        break;
+
+                    ret = GetIoMgr()->RescheduleTask(
+                        m_pListenTask );
+
+                    if( ERROR( ret ) )
+                        break;
+                }
                 ret = super::HandleListening( pIrp );
                 break;
             }
@@ -294,17 +322,19 @@ gint32 CRpcTcpFido::HandleSendReq(
         guint32 dwOldSerial = 0;
         guint32 dwCtrlCode = pCtx->GetCtrlCode();
 
+        dwSerial = m_atmSeqNo++;
+        if( dwSerial == 0 )
+            dwSerial = 1;
+
         if( dwCtrlCode == CTRLCODE_SEND_REQ )
         {
-            dwSerial = m_atmSeqNo++;
-
-            if( dwSerial == 0 )
-                dwSerial = 1;
-
             ret = pReq.GetSerial( dwOldSerial );
-
             if( dwOldSerial == 0 )
                 pReq.SetSerial( dwSerial );
+        }
+        else
+        {
+            pReq.SetSerial( dwSerial );
         }
 
         ret = pReq.Serialize( pBuf );
@@ -350,11 +380,14 @@ gint32 CRpcTcpFido::HandleSendReq(
         if(  ret == STATUS_PENDING )
             break;
 
+        pCtx->SetStatus( 
+            pNewCtx->GetStatus() );
+
+        // the response is yet to come
+        pIrp->PopCtxStack();
+
         if( ERROR( ret ) )
-        {
-            pCtx->SetStatus( ret );
             break;
-        }
 
         // move the irp to the waiting queue
         if( dwSerial != 0 &&
@@ -723,7 +756,9 @@ gint32 CRpcTcpFido::DispatchData(
     if( ERROR( ret ) )
         return ret;
 
-    return super::DispatchData( pData );
+    BufPtr pBuf( true );
+    *pBuf = pMsg;
+    return super::DispatchData( pBuf );
 }
 
 gint32 CRpcTcpFido::HandleReadWriteReq(
@@ -1196,27 +1231,6 @@ gint32 CRpcTcpFido::OnPortReady(
         return ret;
 
     do{
-        CParamList oCfg;
-
-        ret = oCfg.SetPointer(
-            propIoMgr, GetIoMgr() );
-
-        if( ERROR( ret ) )
-            break;
-
-        ret = oCfg.SetObjPtr(
-            propPortPtr, ObjPtr( this ) );
-
-        if( ERROR( ret ) )
-            break;
-
-        ret = GetIoMgr()->ScheduleTask(
-            clsid( CTcpFidoListenTask ),
-            oCfg.GetCfg() );
-
-        if( ERROR( ret ) )
-            break;
-
         // we are done
         if( GetUpperPort() != nullptr )
             break;
@@ -1424,4 +1438,13 @@ gint32 CTcpFidoListenTask::Process(
     }
 
     return SetError( ret );
+}
+
+gint32 CRpcTcpFido::PostStop(
+    IRP* pIrp )
+{
+    if( !m_pListenTask.IsEmpty() )
+        m_pListenTask.Clear();
+
+    return super::PostStop( pIrp );
 }
