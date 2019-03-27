@@ -1272,6 +1272,22 @@ inline gint32 NewDeferredCall( TaskletPtr& pCallback,
 #define DEFER_CALL_NOSCHED( __pTask, pObj, func, ... ) \
     NewDeferredCall( __pTask, pObj, func , ##__VA_ARGS__ )
 
+#define DEFER_CALL_DELAY( pMgr, iSec, pObj, func, ... ) \
+({ \
+    TaskletPtr __pTask; \
+    gint32 ret_ = NewDeferredCall( __pTask, pObj, func, ##__VA_ARGS__  ); \
+    if( SUCCEEDED( ret_ ) ) \
+    { \
+        CTimerService& oTimerSvc = pMgr->GetUtils().GetTimerSvc();\
+        IEventSink* pEvent = __pTask;\
+        if( pEvent != nullptr )\
+            ret_ = oTimerSvc.AddTimer( iSec, pEvent, 0 );\
+        else\
+            ret_ = -EFAULT;\
+    }\
+    ret_; \
+})
+
 class CIfDeferCallTask :
     public CIfRetryTask
 {

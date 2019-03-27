@@ -164,8 +164,6 @@ struct IMessageFilter
 
 typedef CAutoPtr< clsid( Invalid ), IGenericInterface > InterfPtr;
 
-#include "iftasks.h"
-
 class IInterfaceCommands
 {
     public:
@@ -336,7 +334,8 @@ class CRpcBaseOperations :
     virtual gint32 OpenPort(
         IEventSink* pCallback );
 
-    virtual gint32 ClosePort();
+    virtual gint32 ClosePort(
+        IEventSink* pCallback = nullptr );
 
     // start listening the event from the
     // interface server
@@ -386,6 +385,9 @@ class CRpcBaseOperations :
     }
 
 };
+
+#include "iftasks.h"
+
 /**
 * @name CRpcInterfaceBase class will provide the
 * the interface state mangement and task

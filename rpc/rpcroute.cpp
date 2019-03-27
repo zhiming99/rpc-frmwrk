@@ -386,7 +386,7 @@ gint32 CRpcRouter::StartReqFwdr(
             break;
 
         oParams.SetObjPtr(
-            propParentPtr, ObjPtr( this ) );
+            propRouterPtr, ObjPtr( this ) );
 
         ret = pIf.NewObj(
             iClsid, oParams.GetCfg() );
@@ -427,37 +427,37 @@ gint32 CRouterStartReqFwdrProxyTask::
 
         InterfPtr pIfPtr( pIf );
         ret = pRouter->AddProxy( pMatch, pIfPtr );
-        if( ERROR( ret ) )
+        if( ERROR( ret ) && ret != -EEXIST )
         {
-            // duplicated, stop/remove the proxy
-            // this could happen if two `enable
-            // Event' request arrives at the same
-            // time for the same object
-            TaskletPtr pDummyCb;
-            ret = pDummyCb.NewObj( 
-                clsid( CIfDummyTask ) );
-
-            if( ERROR( ret ) )
-                break;
-
-            DEFER_CALL( ( pIf->GetIoMgr() ),
-                ObjPtr( pIf ),
-                &CRpcReqForwarderProxy::Shutdown,
-                pDummyCb );
+            DebugPrint( ret,
+                "CRouterStartReqFwdrProxyTask bug "
+                "cannot add newly created proxy!" );
+            break;
         }
-        else
+
+        ret = pIf->AddInterface( pMatch );
+        if( ret == EEXIST )
         {
-            pIf->AddInterface( pMatch );
-            if( iRetVal == EEXIST )
-                break;
+            // something wrong, don't move further
+            pIf->RemoveInterface( pMatch );
+            ret = -ret;
+            break;
+        }
+        else if( ERROR( ret ) )
+        {
+            break;
+        }
 
-            // in case the transaction failed
-            TaskletPtr pRbTask;
-            ret = pRouter->BuildStartStopReqFwdrProxy(
-                pMatch, false, pRbTask );
+        // in case the transaction failed
+        TaskletPtr pRbTask;
+        ret = pRouter->BuildStartStopReqFwdrProxy(
+            pMatch, false, pRbTask );
 
-            if( SUCCEEDED( ret ) )
-                AddRollbackTask( pRbTask, false );
+        if( SUCCEEDED( ret ) )
+        {
+            // it won't run if all the whole
+            // tasks
+            AddRollbackTask( pRbTask );
         }
 
     }while( 0 );
@@ -470,7 +470,7 @@ gint32 CRouterStartReqFwdrProxyTask::
 {
     CParamList oTaskCfg(
         ( IConfigDb* )GetConfig() );
-    bool bStart = oTaskCfg[ 0 ];
+    bool bStart = ( bool& )oTaskCfg[ 0 ];
 
     if( bStart )
         return OnTaskCompleteStart( iRetVal );
@@ -496,7 +496,7 @@ gint32 CRouterStartReqFwdrProxyTask::RunTask()
             break;
 
         IMessageMatch* pMatch = nullptr;
-        bool bStart = oParams[ 0 ];
+        bool bStart = ( bool& )oParams[ 0 ];
 
         ret = oParams.GetPointer( 1, pMatch );
         if( ERROR( ret ) )
@@ -509,9 +509,14 @@ gint32 CRouterStartReqFwdrProxyTask::RunTask()
             pMatch, pProxy );
 
         //already exist
-        if( SUCCEEDED( ret ) )
+        if( SUCCEEDED( ret ) && bStart )
         {
             ret = EEXIST;
+            break;
+        }
+        else if( ERROR( ret ) && !bStart )
+        {
+            ret = -ENOENT;
             break;
         }
 
@@ -524,12 +529,11 @@ gint32 CRouterStartReqFwdrProxyTask::RunTask()
             CRpcRouter* pRouter =
                 pIf->GetParent();
 
+            CStdRMutex oIfLock( pIf->GetLock() );
             CStdRMutex oRouterLock(
                 pRouter->GetLock() );
 
             pIf->RemoveInterface( pMatch );
-
-            // nested locking
             if( pIf->GetActiveIfCount() == 0 )
             {
                 CRouterRemoteMatch*
@@ -546,6 +550,7 @@ gint32 CRouterStartReqFwdrProxyTask::RunTask()
                     pMatch, pIfPtr );
 
                 oRouterLock.Unlock();
+                oIfLock.Unlock();
                 ret = pIf->StopEx( this );
             }
             else
@@ -556,10 +561,7 @@ gint32 CRouterStartReqFwdrProxyTask::RunTask()
 
     }while( 0 );
 
-    if( ret == STATUS_PENDING )
-        return ret;
-
-    if( SUCCEEDED( ret ) )
+    if( SUCCEEDED( ret ) || ret == EEXIST )
         OnTaskComplete( ret );
 
     return ret;
@@ -575,67 +577,83 @@ gint32 CRpcRouter::BuildStartStopReqFwdrProxy(
         return -EINVAL;
 
     do{
-        CParamList oParams;
-        oParams.SetPointer( propIoMgr, GetIoMgr() );
+        CParamList oIfParams;
+        oIfParams.SetPointer( propIoMgr, GetIoMgr() );
         CParamList oTaskCfg;
 
-        InterfPtr pProxy;
-        ret = GetReqFwdrProxy( pMatch, pProxy );
+        InterfPtr pIf;
+        CInterfaceProxy* pProxy = nullptr;
+        // this call is probably to succeed, and
+        // the task to build will check it again.
+        ret = GetReqFwdrProxy( pMatch, pIf );
         if( !bStart )
         {
             if( ERROR( ret ) )
                 break;
+            oTaskCfg[ propIfPtr ] = ObjPtr( pIf );
         }
         else
         {
             if( SUCCEEDED( ret ) )
             {
-                ret = -EEXIST;
-                break;
+                pProxy = pIf;
+                if( pProxy == nullptr )
+                {
+                    ret = -EFAULT;
+                    break;
+                }
+
+                if( !pProxy->IsConnected() &&
+                    pProxy->GetState() != stateRecovery )
+                {
+                    ret = ERROR_STATE;
+                    break;
+                }
+                // although the interface is
+                // already started, we still need
+                // to add the match to the
+                // interface before the
+                // EnableEvent can happen, so the
+                // task still needs to run
+                oTaskCfg[ propIfPtr ] = ObjPtr( pIf );
             }
-        }
+            else
+            {
+                ret = CRpcServices::LoadObjDesc(
+                    ROUTER_OBJ_DESC,
+                    OBJNAME_REQFWDR,
+                    false,
+                    oIfParams.GetCfg() );
 
-        InterfPtr pIf;
-        if( bStart )
-        {
-            EnumClsid iClsid =
-                clsid( CRpcReqForwarderProxyImpl );
+                if( ERROR( ret ) )
+                    break;
 
-            ret = CRpcServices::LoadObjDesc(
-                ROUTER_OBJ_DESC,
-                OBJNAME_REQFWDR,
-                false,
-                oParams.GetCfg() );
+                oIfParams.SetObjPtr(
+                    propRouterPtr, ObjPtr( this ) );
 
-            if( ERROR( ret ) )
-                break;
+                ret = oIfParams.CopyProp(
+                    propObjPath, pMatch );
 
-            oParams.SetObjPtr(
-                propParentPtr, ObjPtr( this ) );
+                if( ERROR( ret ) )
+                    break;
 
-            ret = oParams.CopyProp(
-                propObjPath, pMatch );
+                ret = oIfParams.CopyProp(
+                    propDestDBusName, pMatch );
 
-            if( ERROR( ret ) )
-                break;
+                if( ERROR( ret ) )
+                    break;
 
-            ret = oParams.CopyProp(
-                propDestDBusName, pMatch );
+                EnumClsid iClsid =
+                    clsid( CRpcReqForwarderProxyImpl );
 
-            if( ERROR( ret ) )
-                break;
+                ret = pIf.NewObj( iClsid,
+                    oIfParams.GetCfg() );
 
-            ret = pIf.NewObj(
-                iClsid, oParams.GetCfg() );
+                if( ERROR( ret ) )
+                    break;
 
-            if( ERROR( ret ) )
-                break;
-
-            oTaskCfg[ propIfPtr ] = ObjPtr( pIf );
-        }
-        else
-        {
-            oTaskCfg[ propIfPtr ] = ObjPtr( pProxy );
+                oTaskCfg[ propIfPtr ] = ObjPtr( pIf );
+            }
         }
 
         oTaskCfg.SetPointer(
@@ -877,7 +895,6 @@ gint32 CRpcRouter::OnRmtSvrOnline(
             if( ERROR( ret ) )
                 break;
 
-            // ret = AddSeqTask( pTask, false );
             ( *pTask )( eventZero );
             ret = pTask->GetError();
         }
@@ -919,7 +936,7 @@ gint32 CRouterStopBridgeProxyTask::RunTask()
             ret = pProxy->Shutdown( this );
 
             // stop the bridge proxy
-            CStdRMutex oIfLock(
+            CStdRMutex oRouterLock(
                 pRouter->GetLock() );
 
             pRouter->RemoveLocalMatchByAddr(
@@ -997,14 +1014,14 @@ gint32 CRouterStopBridgeTask::RunTask()
         // to this bridge
         vector< MatchPtr > vecMatches;
 
-        CStdRMutex oIfLock(
+        CStdRMutex oRouterLock(
             pRouter->GetLock() );
 
         pRouter->RemoveBridge( pBridge );
         pRouter->GetRemoteMatchByPortId(
             dwPortId, vecMatches );
 
-        oIfLock.Unlock();
+        oRouterLock.Unlock();
 
         // find all the proxies with matches
         // referring to this bridge
@@ -1298,18 +1315,31 @@ gint32 CRpcRouter::BuildEventRelayTask(
 {
     gint32 ret = 0;
     do{
-        InterfPtr pIf;
-        ret = GetReqFwdrProxy( pMatch, pIf );
-        if( ERROR( ret ) )
-            break;
-
         CParamList oParams;
+
+        InterfPtr pIf;
+
+        // this call could fail if the reqfwdr
+        // proxy is not created yet. But the proxy
+        // should be ready when the task starts to
+        // run
+        ret = GetReqFwdrProxy( pMatch, pIf );
+        if( SUCCEEDED( ret ) )
+        {
+            oParams[ propIfPtr ] = ObjPtr( pIf );
+        }
+        else if( ERROR( ret ) && !bAdd )
+        {
+            // nothing to disable
+            break;
+        }
+
         CIoManager* pMgr = GetIoMgr();
 
         oParams.Push( bAdd );
         oParams.Push( ObjPtr( pMatch ) );
 
-        oParams[ propIfPtr ] = ObjPtr( pIf );
+        oParams[ propRouterPtr ] = ObjPtr( this );
         oParams[ propIoMgr ] = ObjPtr( pMgr );
 
         ret = pTask.NewObj(
@@ -1586,12 +1616,31 @@ gint32 CRouterEnableEventRelayTask::RunTask()
         if( ERROR( ret ) )
             break;
 
+        CRpcRouter* pRouter = nullptr;
+        ret = oTaskCfg.GetPointer(
+            propRouterPtr, pRouter );
+        if( ERROR( ret ) )
+            break;
+
         CRpcReqForwarderProxy* pProxy = nullptr;
+
         ret = oTaskCfg.GetPointer(
             propIfPtr, pProxy );
 
-        if( ERROR( ret ) )
+        if( ERROR( ret ) && !bEnable )
+        {
             break;
+        }
+        else if( ERROR( ret ) && bEnable )
+        {
+            InterfPtr pIf;
+            ret = pRouter->GetReqFwdrProxy(
+                pMatch, pIf );
+            if( ERROR( ret ) )
+                break;
+
+            pProxy = pIf;
+        }
 
         // enable or disable event
         oParams.Push( bEnable );
@@ -1606,11 +1655,9 @@ gint32 CRouterEnableEventRelayTask::RunTask()
             clsid( CIfEnableEventTask ),
             oParams.GetCfg() );
 
-        ret = pProxy->AddAndRun( pEnableEvtTask );
-
+        ret = ( *pEnableEvtTask )( eventZero );
         if( ERROR( ret ) )
             break;
-
         ret = pEnableEvtTask->GetError();
 
     }while( 0 );
@@ -1637,8 +1684,19 @@ gint32 CRouterEnableEventRelayTask::OnTaskComplete(
         if( ERROR( iRetVal ) )
             break;
 
+        bool bEnable = false;
+        ret = oParams.GetBoolProp( 0, bEnable );
+        if( ERROR( ret ) )
+            break;
+
         IMessageMatch* pMatch = nullptr;
         ret = oParams.GetPointer( 1, pMatch );
+        if( ERROR( ret ) )
+            break;
+
+        CRpcRouter* pRouter = nullptr;
+        ret = oParams.GetPointer(
+            propRouterPtr, pRouter );
         if( ERROR( ret ) )
             break;
 
@@ -1646,17 +1704,28 @@ gint32 CRouterEnableEventRelayTask::OnTaskComplete(
         ret = oParams.GetPointer(
             propIfPtr, pProxy );
 
-        if( ERROR( ret ) )
+        if( ERROR( ret ) && !bEnable )
+        {
             break;
+        }
+        else if( ERROR( ret ) && bEnable )
+        {
+            InterfPtr pIf;
+            ret = pRouter->GetReqFwdrProxy(
+                pMatch, pIf );
+            if( ERROR( ret ) )
+                break;
+            pProxy = pIf;
+        }
 
-        CRpcRouter* pRouter = pProxy->GetParent();
         // in case somewhere the transaction failed,
         // add a rollback task
         TaskletPtr pRbTask;
         ret = pRouter->BuildEventRelayTask(
             pMatch, false, pRbTask );
+
         if( SUCCEEDED( ret ) )
-            AddRollbackTask( pRbTask, false );
+            AddRollbackTask( pRbTask );
 
     }while( 0 );
 
@@ -1732,15 +1801,12 @@ gint32 CRouterAddRemoteMatchTask::RunTask()
     do{
         CParamList oParams( m_pCtx );
 
-        CRpcTcpBridge* pBridge = nullptr;
+        CRpcRouter* pRouter = nullptr;
         ret = oParams.GetPointer(
-            propIfPtr, pBridge );
+            propIfPtr, pRouter );
 
         if( ERROR( ret ) )
             break;
-
-        CRpcRouter* pRouter =
-            pBridge->GetParent();
 
         bool bEnable = false;
         IMessageMatch* pMatch;
@@ -1820,13 +1886,19 @@ gint32 CRpcRouter::BuildStartRecvTask(
     do{
         CParamList oParams;
 
+        ret = oParams.SetPointer(
+            propIoMgr, GetIoMgr() );
+
         InterfPtr pIf;
         ret = GetReqFwdrProxy( pMatch, pIf );
-        if( ERROR( ret ) )
-            break;
+        if( SUCCEEDED( ret ) )
+        {
+            ret = oParams.SetObjPtr(
+                propIfPtr, pIf );
+        }
 
-        ret = oParams.SetObjPtr(
-            propIfPtr, pIf );
+        ret = oParams.SetPointer(
+            propRouterPtr, this );
 
         ret = oParams.SetPointer(
             propMatchPtr, pMatch );
@@ -1846,29 +1918,63 @@ gint32 CRpcRouter::BuildStartRecvTask(
 gint32 CRouterStartRecvTask::RunTask()
 {
     gint32 ret = 0;
-    do{
-        CParamList oParams(
-            ( IConfigDb* )GetConfig() );
+    CParamList oParams(
+        ( IConfigDb* )GetConfig() );
 
+    do{
+        IMessageMatch* pMatch = nullptr;
+        ret = oParams.GetPointer(
+            propMatchPtr, pMatch );
+        if( ERROR( ret ) )
+            break;
+    
         CRpcReqForwarderProxy* pProxy = nullptr;
         ret = oParams.GetPointer(
             propIfPtr, pProxy );
         if( ERROR( ret ) )
+        {
+            CRpcRouter* pRouter = nullptr;
+            ret = oParams.GetPointer(
+                propRouterPtr, pRouter );
+            if( ERROR( ret ) )
+                break;
+
+            InterfPtr pIf;
+            ret = pRouter->GetReqFwdrProxy(
+                pMatch, pIf );
+            if( ERROR( ret ) )
+                break;
+
+            pProxy = pIf;
+        }
+
+        CParamList oRecvParams;
+        oRecvParams[ propMatchPtr ] =
+            ObjPtr( pMatch );
+
+        oRecvParams[ propIfPtr ] =
+            ObjPtr( pProxy );
+
+        TaskletPtr pRecvTask;
+        pRecvTask.NewObj(
+            clsid( CIfStartRecvMsgTask ),
+            oRecvParams.GetCfg() );
+
+        if( pProxy->GetState() == stateRecovery )
+        {
+            // server is not up
+            ret = 0;
             break;
+        }
+        // transfer the control to the proxy
+        ret = pProxy->AddAndRun( pRecvTask );
 
-        do{
-            TaskletPtr pRecvTask;
-            pRecvTask.NewObj(
-                clsid( CIfStartRecvMsgTask ),
-                oParams.GetCfg() );
-
-            // transfer the control to the proxy
-            ret = pProxy->AddAndRun( pRecvTask );
-
-        }while( 0 );
-
-        
     }while( 0 );
+
+    oParams.ClearParams();
+    oParams.RemoveProperty( propIfPtr );
+    oParams.RemoveProperty( propRouterPtr );
+    oParams.RemoveProperty( propMatchPtr );
 
     return ret;
 }
@@ -1922,6 +2028,10 @@ gint32 CRpcRouter::RunEnableEventTask(
             clsid( CRouterEventRelayRespTask ),
             oParams.GetCfg() );
 
+        CRouterEventRelayRespTask* prerrt =
+            ( CRouterEventRelayRespTask* )pRespTask;
+        prerrt->SetEnable( true );   
+
         // run the task to set it to a proper
         // state
         ( *pRespTask )( eventZero );
@@ -1946,7 +2056,7 @@ gint32 CRpcRouter::RunEnableEventTask(
         TaskletPtr pStartProxyTask;
         ret = BuildStartStopReqFwdrProxy(
             pMatch, true, pStartProxyTask );
-        if( ERROR( ret ) )
+        if( ERROR( ret ) && ret != -EEXIST )
             break;
 
         TaskletPtr pEnableTask;
@@ -1968,7 +2078,9 @@ gint32 CRpcRouter::RunEnableEventTask(
         pTransGrp->AppendTask( pRecvTask );
 
         TaskletPtr pGrpTask = pTransGrp;
-        ret = this->AddAndRun( pGrpTask );
+        ret = AddSeqTask( pGrpTask, false );
+        if( SUCCEEDED( ret ) )
+            ret = pTransGrp->GetError();
         
     }while( 0 );
 
@@ -2014,6 +2126,9 @@ gint32 CRpcRouter::BuildDisEvtTaskGrp(
 
             if( ERROR( ret ) )
                 break;
+            CRouterEventRelayRespTask* prerrt =
+                ( CRouterEventRelayRespTask* )pRespTask;
+            prerrt->SetEnable( false );   
 
             // run the task to set it to a proper
             // state
@@ -2094,7 +2209,7 @@ gint32 CRpcRouter::RunDisableEventTask(
         if( ERROR( ret ) )
             break;
 
-        ret = this->AddAndRun( pTask );
+        ret = AddSeqTask( pTask, false );
         if( SUCCEEDED( ret ) )
             ret = pTask->GetError();
         
@@ -2175,7 +2290,7 @@ gint32 CRpcRouter::ForwardModOnOfflineEvent(
             &m_mapRmtMatches;
 
         std::set< guint32 > setPortIds;
-        CStdRMutex oIfLock( GetLock() );
+        CStdRMutex oRouterLock( GetLock() );
         for( auto elem : *plm )
         {
             IMessageMatch* pMatch = elem.first;
@@ -2200,7 +2315,7 @@ gint32 CRpcRouter::ForwardModOnOfflineEvent(
                 setPortIds.insert( dwPortId );
             }
         }
-        oIfLock.Unlock();
+        oRouterLock.Unlock();
 
         if( setPortIds.empty() )
             break;
@@ -2277,12 +2392,12 @@ gint32 CRpcRouter::ForwardDBusEvent(
 
         // notify through all the tcp bridges
         std::vector< InterfPtr > vecBridges;
-        CStdRMutex oIfLock( GetLock() );
+        CStdRMutex oRouterLock( GetLock() );
         std::map< guint32, InterfPtr >* pMap =
             &m_mapPortId2Bdge;
         for( auto elem : *pMap )
             vecBridges.push_back( elem.second );
-        oIfLock.Unlock();
+        oRouterLock.Unlock();
 
         TaskletPtr pDummyTask;
         ret = pDummyTask.NewObj(

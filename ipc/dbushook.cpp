@@ -515,7 +515,10 @@ gint32 CDBusIoCallback::operator()(
         DBUS_DISPATCH_COMPLETE;
 
     if( m_hWatch == INVALID_HANDLE )
-        return G_SOURCE_REMOVE;
+        return SetError( G_SOURCE_REMOVE );
+
+    if( !m_pParent->IsSetupDone() )
+        return SetError( G_SOURCE_CONTINUE );
 
     ret = dbus_connection_get_dispatch_status(
             m_pParent->GetDBusConn() );
@@ -895,8 +898,11 @@ gint32 CDBusLoopHooks::Stop()
             pCb->Stop();
     }
 
-    dbus_connection_unref( m_pConn );
-    m_pConn = nullptr;
+    if( m_pConn != nullptr )
+    {
+        dbus_connection_unref( m_pConn );
+        m_pConn = nullptr;
+    }
 
     CStdRMutex oLock( GetLock() );
     for( auto pCallback : m_setIoCbs )

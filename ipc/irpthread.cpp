@@ -270,20 +270,21 @@ gint32 CTaskThread::ProcessTask(
     if( pTask.IsEmpty() )
         return -EFAULT;
 
-#ifdef DEBUG
     ( *pTask )( ( guint32 )dwContext );
-    gint32 iTaskRet = pTask->GetError();
 
+#ifdef DEBUG
+    gint32 iTaskRet = pTask->GetError();
     if( ERROR( iTaskRet ) )
     {
+        EnumClsid iClsid = pTask->GetClsid();
         const char* pName =
-            CoGetClassName( pTask->GetClsid() );
+            CoGetClassName( iClsid );
 
         string strTaskName;
         if( pName == nullptr )
         {
-            strTaskName = std::to_string(
-                pTask->GetClsid() );
+            strTaskName =
+                std::to_string( iClsid );
         }
         else
         {
@@ -293,8 +294,6 @@ gint32 CTaskThread::ProcessTask(
         DebugPrint( iTaskRet,
             strTaskName + " failed" ); 
     }
-#else
-    ( *pTask )( ( guint32 )dwContext );
 #endif
 
     PopHead();
@@ -425,6 +424,15 @@ COneshotTaskThread::COneshotTaskThread()
     m_iTaskClsid = clsid( Invalid );
 }
 
+COneshotTaskThread::~COneshotTaskThread()
+{
+    if( m_pServiceThread != nullptr )
+    {
+        delete m_pServiceThread;
+        m_pServiceThread = nullptr;
+    }
+}
+
 void COneshotTaskThread::ThreadProc(
     void* dwContext )
 {
@@ -475,7 +483,8 @@ gint32 COneshotTaskThread::Start()
 gint32 COneshotTaskThread::Stop()
 {
     m_bTaskDone = true;
-    m_pServiceThread->join();
+    if( m_pServiceThread->joinable() )
+        m_pServiceThread->join();
     delete m_pServiceThread;
     m_pServiceThread = nullptr;
 

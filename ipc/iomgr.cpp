@@ -390,10 +390,13 @@ gint32 CIoManager::CompleteIrp( IRP* pIrpComp )
 
         if( pIrp->m_vecCtxStack.size() )
         {
-            // we need to remove port reference at the
-            // bottom of the port stack
-            itr = pIrp->m_vecCtxStack.begin();
-            itr->first = nullptr; ;
+            // we cannot remove the port reference
+            // here, since the AllocIrpCtxExt need
+            // a ReleaseIrpCtxExt to release the
+            // resources in the irp's destructor
+            //
+            // itr = pIrp->m_vecCtxStack.begin();
+            // itr->first = nullptr; ;
         }
 
 
@@ -626,8 +629,9 @@ gint32 CIoManager::CancelIrp(
         {
             // we need to remove port reference at the
             // bottom of the port stack
-            itr = pIrp->m_vecCtxStack.begin();
-            itr->first = nullptr;
+            //
+            // itr = pIrp->m_vecCtxStack.begin();
+            // itr->first = nullptr;
         }
 
         // we leave the last IRP_CONTEXT for the io manager
@@ -821,8 +825,58 @@ gint32 CIoManager::OpenPortByPath(
     return ret;
 }
 
+gint32 CIoManager::CloseChildPort(
+    IPort* pBusPort,
+    IPort* pPort,
+    IEventSink* pCallback )
+{
+    if( pPort == nullptr ||
+        pBusPort == nullptr ||
+        pCallback == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        IrpPtr pIrp( true );
+        pIrp->AllocNextStack( nullptr );
+        IrpCtxPtr& pIrpCtx = pIrp->GetTopStack(); 
+
+        // stop the child port
+        pIrpCtx->SetMajorCmd( IRP_MJ_PNP );
+        pIrpCtx->SetMinorCmd( IRP_MN_PNP_STOP_CHILD );
+        pIrpCtx->SetIoDirection( IRP_DIR_OUT );
+        pBusPort->AllocIrpCtxExt( pIrpCtx );
+
+        BufPtr pBuf( true );
+        *pBuf = ObjPtr( pPort );
+        pIrpCtx->SetReqData( pBuf );
+
+        pIrp->SetCallback( pCallback, 0 );
+        pIrp->SetTimer(
+            PORT_START_TIMEOUT_SEC, this );
+
+        HANDLE hBusPort =
+            PortToHandle( pBusPort );
+
+        pIrp->SetIrpThread( this );
+
+        ret = SubmitIrp( hBusPort, pIrp, false );
+        if( ret != STATUS_PENDING )
+        {
+            pIrp->RemoveTimer();
+            pIrp->RemoveCallback();
+            pIrp->ClearIrpThread();
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CIoManager::ClosePort(
-    HANDLE hPort, IEventSink* pEvent )
+    HANDLE hPort,
+    IEventSink* pEvent, // the registered interface
+    IEventSink* pCallback ) // the callback for complete stop
 {
     // Note: we need to make sure all the irps are
     // completed or canceled and the interface
@@ -853,11 +907,31 @@ gint32 CIoManager::ClosePort(
 
         if( pPort->Unloadable() && !m_bStop )
         {
-            ret = RemoveFromHandleMap( pPort, nullptr );
-            DEFER_CALL( this,
-                &GetPnpMgr(),
-                &CPnpManager::DestroyPortStack,
-                ( ( IPort* )pPort ) );
+            IPort* pBusPort = nullptr;
+
+            CCfgOpenerObj oPortCfg( pPort );
+            ret = oPortCfg.GetPointer(
+                propBusPortPtr, pBusPort );
+
+            if( ERROR( ret ) )
+            {
+                ret = DEFER_CALL( this,
+                    &GetPnpMgr(),
+                    &CPnpManager::DestroyPortStack,
+                    ( ( IPort* )pPort ) );
+                if( SUCCEEDED( ret ) )
+                {
+                    // the notification will be
+                    // via the OnPortEvent method
+                    // on the interface object
+                    ret = STATUS_PENDING;
+                }
+            }
+            else
+            {
+                ret = CloseChildPort( pBusPort,
+                    pPort, pCallback );
+            }
         }
 
     }while( 0 );

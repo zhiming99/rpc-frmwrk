@@ -120,6 +120,13 @@ gint32 CRpcBasePort::DispatchSignalMsg(
 
             oMe.m_queWaitingIrps.pop_front();
 
+            oPortLock.Unlock();
+            CStdRMutex oIrpLock( pIrp->GetLock() );
+            oPortLock.Lock();
+            ret = pIrp->CanContinue( IRP_STATE_READY );
+            if( ERROR( ret ) )
+                break;
+
             if( pIrp->GetStackSize() == 0 )
             {
                 // bad irp
@@ -562,7 +569,9 @@ gint32 CRpcBasePort::HandleRegMatch(
         if( ERROR( ret ) )
             break;
 
-        if( pMap->find( matchPtr ) == pMap->end() )
+        MatchMap::iterator itr = 
+            pMap->find( matchPtr );
+        if( itr == pMap->end() )
         {
             MATCH_ENTRY oMe;
             // add a dbus match rule
@@ -590,7 +599,9 @@ gint32 CRpcBasePort::HandleRegMatch(
         }
         else
         {
-            ( *pMap )[ matchPtr ].AddRef();
+            itr->second.AddRef();
+            if( !itr->second.IsConnected() )
+                ret = -ENOTCONN;
         }
 
     }while( 0 );
@@ -1601,6 +1612,16 @@ gint32 CRpcBasePortEx::DispatchReqMsg(
                         ome.m_queWaitingIrps.front();
 
                     ome.m_queWaitingIrps.pop_front();
+                    oPortLock.Unlock();
+
+                    CStdRMutex oIrpLock( pIrp->GetLock() );
+                    oPortLock.Lock();
+                    ret = pIrp->CanContinue( IRP_STATE_READY );
+                    if( ERROR( ret ) )
+                    {
+                        bDone = true;
+                        break;
+                    }
 
                     IrpCtxPtr& pCtx = pIrp->GetCurCtx();
 
@@ -1610,8 +1631,9 @@ gint32 CRpcBasePortEx::DispatchReqMsg(
                     {
                         BufPtr bufPtr( true );
                         *bufPtr = pMsg;
+                        ret = 0;
                         pCtx->SetRespData( bufPtr );
-                        pCtx->SetStatus( 0 );
+                        pCtx->SetStatus( ret );
                         pIrpToComplete = pIrp;
                         bDone = true;
                         break;
@@ -2165,7 +2187,7 @@ gint32 CRpcPdoPort::SubmitIoctlCmd(
     gint32 ret = 0;
 
     // let's process the func irps
-    IrpCtxPtr& pCtx = pIrp->GetCurCtx();
+    IrpCtxPtr pCtx = pIrp->GetCurCtx();
 
     do{
 
@@ -2192,7 +2214,8 @@ gint32 CRpcPdoPort::SubmitIoctlCmd(
         }
     }while( 0 );
 
-    pCtx->SetStatus( ret );
+    if( ret != STATUS_PENDING )
+        pCtx->SetStatus( ret );
 
     return ret;
 }

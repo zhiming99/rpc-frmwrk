@@ -117,14 +117,10 @@ class CIfTransactGroup :
         return 0;
     }
 
-    gint32 OnCancel( guint32 dwContext )
+    gint32 OnComplete( gint32 iRet )
     {
-        gint32 ret = super::OnCancel( dwContext );
-
-        TaskletPtr pTask( m_pRbackGrp );
-        RemoveTask( pTask );
-        pTask = m_pTaskGrp;
-        RemoveTask( pTask );
+        iRet = m_pTaskGrp->GetError();
+        super::OnComplete( iRet );
 
         m_pRbackGrp->RemoveProperty(
             propParentTask );
@@ -132,6 +128,11 @@ class CIfTransactGroup :
         m_pTaskGrp->RemoveProperty(
             propParentTask );
 
-        return ret;
+        TaskletPtr pTask( m_pRbackGrp );
+        RemoveTask( pTask );
+        pTask = m_pTaskGrp;
+        RemoveTask( pTask );
+
+        return iRet;
     }
 };

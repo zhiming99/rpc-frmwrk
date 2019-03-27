@@ -564,7 +564,17 @@ gint32 CRpcTcpBusPort::OnNewConnection(
         ret = OpenPdoPort(
             oCfg.GetCfg(), pPort );
 
-    }while( 0 );
+        if( ret == -EAGAIN )        
+        {
+            // Performance Alert: running on the
+            // dispatching thread
+            usleep( 1000 );
+        }
+        else
+        {
+            break;
+        }
+    }while( 1 );
 
     return ret;
 }
@@ -1054,7 +1064,7 @@ gint32 CTcpStreamPdo::CompleteOpenStmIrp(
         return -EINVAL;
 
     gint32 ret = 0;
-    IrpCtxPtr& pCtx = pIrp->GetCurCtx();
+    IrpCtxPtr pCtx = pIrp->GetCurCtx();
     CRpcStreamSock* pSock = m_pStmSock;
     if( pSock == nullptr )
         return -EFAULT;

@@ -49,6 +49,9 @@ public:
     virtual gint32 SetupDBusConn(
         DBusConnection* pConn ) = 0;
 
+    // io watcher + timer
+    virtual gint32 StopDBusConn() = 0;
+
     // timer
     virtual gint32 AddTimerWatch(
         TaskletPtr& pCallback,

@@ -40,7 +40,7 @@ CRpcTcpBridgeProxy::CRpcTcpBridgeProxy(
         CCfgOpener oCfg( pCfg );
 
         ret = oCfg.GetObjPtr(
-            propParentPtr, pObj );
+            propRouterPtr, pObj );
 
         if( ERROR( ret ) )
             break;
@@ -51,6 +51,7 @@ CRpcTcpBridgeProxy::CRpcTcpBridgeProxy(
             ret = -EFAULT;
             break;
         }
+        RemoveProperty( propRouterPtr );
 
     }while( 0 );
 
@@ -1458,7 +1459,7 @@ CRpcTcpBridge::CRpcTcpBridge(
         CCfgOpener oCfg( pCfg );
 
         ret = oCfg.GetObjPtr(
-            propParentPtr, pObj );
+            propRouterPtr, pObj );
 
         if( ERROR( ret ) )
             break;
@@ -1469,6 +1470,7 @@ CRpcTcpBridge::CRpcTcpBridge(
             ret = -EFAULT;
             break;
         }
+        RemoveProperty( propRouterPtr );
 
     }while( 0 );
 
@@ -2725,7 +2727,7 @@ gint32 CRpcTcpBridge::StartEx(
         if( ERROR( ret2 ) &&
             ret != STATUS_PENDING )
         {
-            ret = ret2;
+            // ret = ret2;
             break;
         }
 
@@ -2796,7 +2798,7 @@ gint32 CRpcTcpBridge::SetResponse(
         }
 
         oResp.CopyProp( propSeqNo, pReq );
-        oResp.SetCallFlags( CF_NON_DBUS |
+        oResp.SetCallFlags( 
             DBUS_MESSAGE_TYPE_METHOD_RETURN );
 
         super::SetResponse( pCallback,
@@ -3091,7 +3093,7 @@ gint32 CRpcTcpBridgeShared::OpenLocalStream(
         if( IsReserveStm( iStreamId ) )
             return -EINVAL;
 
-        IrpCtxPtr& pCtx = pIrp->GetTopStack(); 
+        IrpCtxPtr pCtx = pIrp->GetTopStack(); 
 
         pCtx->SetMajorCmd( IRP_MJ_FUNC );
         pCtx->SetMinorCmd( IRP_MN_IOCTL );
@@ -3175,7 +3177,7 @@ gint32 CRpcTcpBridgeShared::CloseLocalStream(
         if( ERROR( ret ) )
             break;
 
-        IrpCtxPtr& pCtx = pIrp->GetTopStack(); 
+        IrpCtxPtr pCtx = pIrp->GetTopStack(); 
 
         pCtx->SetMajorCmd( IRP_MJ_FUNC );
         pCtx->SetMinorCmd( IRP_MN_IOCTL );
@@ -3315,7 +3317,7 @@ gint32 CRpcTcpBridgeShared::ReadWriteStream(
             break;
         }
 
-        IrpCtxPtr& pCtx = pIrp->GetTopStack(); 
+        IrpCtxPtr pCtx = pIrp->GetTopStack(); 
 
         pCtx->SetMajorCmd( IRP_MJ_FUNC );
         pCtx->SetMinorCmd( dwCmdId );
@@ -3376,7 +3378,7 @@ gint32 CRpcTcpBridgeShared::ReadWriteStream(
                 ret = pRetryTask->GetError();
                 if( SUCCEEDED( ret ) && bRead )
                 {
-                    IrpCtxPtr& pCtx = pIrp->GetTopStack();
+                    IrpCtxPtr pCtx = pIrp->GetTopStack();
                     pSrcBuf = pCtx->m_pRespData;
                 }
             }

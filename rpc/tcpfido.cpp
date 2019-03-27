@@ -1369,7 +1369,7 @@ gint32 CTcpFidoListenTask::Process(
         IrpPtr pIrp( true );
         pIrp->AllocNextStack( pPort );
 
-        IrpCtxPtr& pCtx = pIrp->GetTopStack();
+        IrpCtxPtr pCtx = pIrp->GetTopStack();
 
         // the stream id to listen to is in.
         pPort->AllocIrpCtxExt( pCtx );

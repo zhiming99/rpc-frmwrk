@@ -68,9 +68,6 @@ gint32 CConfigDb::GetProperty(
 {
     gint32 ret = -ENOENT;
     
-    if( pBuf.IsEmpty() )
-        pBuf.NewObj();
-
     hashmap<gint32, BufPtr>::const_iterator itr =
         m_mapProps.find( iProp );
 

@@ -33,6 +33,27 @@
 
 using namespace std;
 
+#define GET_IOMGR( _oCfg, _pMgr ) \
+({ \
+    gint32 ret = 0;\
+    do{\
+        CRpcInterfaceBase* pIf = nullptr;\
+        ret = _oCfg.GetPointer( propIfPtr, pIf );\
+        if( ERROR( ret ) )\
+        {\
+            ret = _oCfg.GetPointer(\
+                propIoMgr, _pMgr );\
+            if( ERROR( ret ) )\
+                break;\
+        }\
+        else\
+        {\
+            _pMgr = pIf->GetIoMgr();\
+        }\
+    }while( 0 );\
+    ret;\
+})
+
 CIfStartRecvMsgTask::CIfStartRecvMsgTask(
     const IConfigDb* pCfg ) :
     super( pCfg )
@@ -123,32 +144,49 @@ gint32 CIfStartRecvMsgTask::StartNewRecv(
     if( pCfg.IsEmpty() )
         return -EINVAL;
 
-    CParamList oParams( ( IConfigDb* )pCfg );
-    ObjPtr pInterface = oParams[ propIfPtr ];
-    CRpcServices* pIf = pInterface;
-    if( pIf == nullptr )
-        return -EFAULT;
+    CCfgOpener oCfg( ( IConfigDb* )pCfg );
+
+    CRpcServices* pIf = nullptr;
+    ret = oCfg.GetPointer( propIfPtr, pIf );
+    if( ERROR( ret ) )
+        return -EINVAL;
+
+    ObjPtr pMatch;
+    ret = oCfg.GetObjPtr( propMatchPtr, pMatch );
+    if( ERROR( ret ) )
+        return -EINVAL;
 
     do{
+        CParamList oParams;
+
+        oParams[ propIfPtr ] = ObjPtr( pIf );
+        oParams[ propMatchPtr ] = pMatch;
+
         // start another recvmsg request
         TaskletPtr pTask;
         ret = pTask.NewObj(
             clsid( CIfStartRecvMsgTask ),
-            pCfg );
+            oParams.GetCfg() );
+
+        if( ERROR( ret ) )
+            break;
 
         // add an concurrent task, and run it
         // directly.
         ret = pIf->AddAndRun( pTask, true );
         if( ERROR( ret ) )
+        {
+            DebugPrint( ret,
+                "The new RecvMsgTask failed to AddAndRun" );
             break;
-
+        }
         ret = pTask->GetError();
 
         // succeeded, let's repeat by spawning
         // new CIfStartRecvMsgTask for the
         // next pending message in the port
-        if( SUCCEEDED( ret ) )
-            continue;
+        if( ret == STATUS_PENDING )
+            break;
 
         if( ERROR( ret ) )
         {
@@ -156,34 +194,7 @@ gint32 CIfStartRecvMsgTask::StartNewRecv(
                 "The new RecvMsgTask failed" );
             break;
         }
-
-        // ret == STATUS_PENDING
-        CCfgOpenerObj oTaskCfg(
-            ( CObjBase* )pTask );
-
-        EnumTaskState dwState = stateInvalid;
-        ret = oTaskCfg.GetIntProp(
-            propTaskState, ( guint32& )dwState );
-
-        if( ERROR( ret ) )
-        {
-            ret = 0;
-            break;
-        }
-
-        if( dwState == stateStarted )
-            break;
-
-        if( !( dwState == stateStopped ||
-            dwState == stateIoDone ) )
-            break;
-
-        // the task has finished IO, and is
-        // waiting for OnIrpComplete. Or has
-        // completed already. Let's start a new
-        // receive task
-
-        break;
+        // succeeded, issue the next recv req
 
    }while( 1 );
 
@@ -363,25 +374,13 @@ CIfRetryTask::CIfRetryTask(
     do{
         CCfgOpener oCfg( ( IConfigDb* )GetConfig() );
 
-        CRpcInterfaceBase* pIf = nullptr;
         CIoManager* pMgr = nullptr;
+        ret = GET_IOMGR( oCfg, pMgr );
+        if( ERROR( ret ) )
+            break;
 
-        // either propIfPtr or propIoMgr must
-        // exist to pass the construction
-        ret = oCfg.GetPointer( propIfPtr, pIf );
-        if( SUCCEEDED( ret ) )
-        {
-            pMgr = pIf->GetIoMgr();
-            ret = oCfg.SetPointer( propIoMgr, pMgr );
-            if( ERROR( ret ) )
-                break;
-        }
-        else
-        {
-            ret = oCfg.GetPointer( propIoMgr, pMgr );
-            if( ERROR( ret ) )
-                break;
-        }
+        if( !oCfg.exist( propIoMgr ) )
+            oCfg.SetPointer( propIoMgr, pMgr );
 
         if( !oCfg.exist( propRetries ) )
         {
@@ -456,6 +455,41 @@ gint32 CIfRetryTask::OnEvent(
     oCfg.RemoveProperty( iPropId );
 
     return GetError();
+}
+
+template< class ClassName >
+gint32 CIfRetryTask::DelayRun(
+    guint32 dwSecsDelay,
+    EnumEventId iEvent,
+    guint32 dwParam1,
+    guint32 dwParam2,
+    guint32* pdata )
+{
+    // some thread is working on this object
+    // let's do it later
+    CIoManager* pMgr = nullptr;
+    CCfgOpenerObj oCfg( this );
+    gint32 ret = GET_IOMGR( oCfg, pMgr );
+    if( ERROR( ret ) )
+        return ret;
+
+    if( dwSecsDelay > 0 )
+    {
+        ret = DEFER_CALL_DELAY( pMgr,
+            dwSecsDelay,
+            ObjPtr( this ),
+            &ClassName::OnEvent,
+            iEvent, dwParam1, dwParam2, pdata );
+    }
+    else
+    {
+        ret = DEFER_CALL( pMgr,
+            ObjPtr( this ),
+            &ClassName::OnEvent,
+            iEvent, dwParam1, dwParam2, pdata );
+    }
+
+    return ret;
 }
 
 gint32 CIfRetryTask::OnRetry()
@@ -1315,11 +1349,7 @@ void CIfTaskGroup::SetRunning( bool bRunning )
     if( bRunning )
     {
         if( !oCfg.exist( propRunning ) )
-        {
-            // this is a one-time flag to indicate the
-            // task group is now scheduled to run.
             oCfg[ propRunning ] = true;
-        }
     }
     else
     {
@@ -1364,6 +1394,12 @@ gint32 CIfTaskGroup::RunTask()
     {
         return ERROR_STATE;
     }
+    else if( !IsRunning() &&
+        iState == stateStarted )
+    {
+        // the taskgroup is about to complete
+        return ERROR_STATE;
+    }
 
     if( !m_vecRetVals.empty() )
     {
@@ -1391,6 +1427,10 @@ gint32 CIfTaskGroup::RunTask()
                 return ret;
             return iRet;
         }
+        
+        // in case queue is empty or relation is
+        // logicNONE
+        ret = iRet;
     }
 
     while( !m_queTasks.empty() )
@@ -1460,11 +1500,14 @@ gint32 CIfTaskGroup::RunTask()
         if( SUCCEEDED( ret ) &&
             GetRelation() == logicOR )
         {
-            SetRunning( false );
-            oTaskLock.Unlock();
-            gint32 iRet = CancelRemainingTasks();
-            if( iRet == STATUS_PENDING )
-                ret = iRet;
+            if( m_queTasks.size() > 0 )
+            {
+                SetRunning( false );
+                oTaskLock.Unlock();
+                gint32 iRet = CancelRemainingTasks();
+                if( iRet == STATUS_PENDING )
+                    ret = iRet;
+            }
             break;
         }
     }
@@ -1531,22 +1574,11 @@ gint32 CIfTaskGroup::OnChildComplete(
         if( bSync )
             break;
 
-        CRpcInterfaceBase* pIf = nullptr;
         CIoManager* pMgr = nullptr;
 
-        ret = oCfg.GetPointer( propIfPtr, pIf );
+        ret = GET_IOMGR( oCfg, pMgr );
         if( ERROR( ret ) )
-        {
-            ret = oCfg.GetPointer(
-                propIoMgr, pMgr );
-
-            if( ERROR( ret ) )
-                break;
-        }
-        else
-        {
-            pMgr = pIf->GetIoMgr();
-        }
+            break;
 
         oTaskLock.Unlock();
 
@@ -1632,10 +1664,16 @@ gint32 CIfTaskGroup::OnCancel(
 
         if( oCfg.exist( propNoResched ) )
         {
-            // RunTask is active
-            oTaskLock.Unlock();    
-            usleep( 100000 );
-            continue;
+            // some thread is working on this object
+            // let's do it later
+            gint32 ret = DelayRun< super >( 1,
+                eventCancelTask, 0, 0, nullptr );
+            if( ERROR( ret ) )
+            {
+                DebugPrint( ret,
+                    "Failed to delay the cancel call" );
+            }
+            return STATUS_PENDING;
         }
 
         if( m_queTasks.empty() )
@@ -1653,7 +1691,7 @@ gint32 CIfTaskGroup::OnCancel(
         if( m_queTasks.front()->IsInProcess() )
         {
             pHead = m_queTasks.front();
-            m_queTasks.pop_front();
+            PopTask();
         }
 
         do{
@@ -1861,6 +1899,16 @@ gint32 CIfRootTaskGroup::GetTailTask(
     return 0;
 }
 
+gint32 CIfStopTask::OnIrpComplete(
+    PIRP pIrp )
+{
+    if( pIrp == nullptr ||
+        pIrp->GetStackSize() == 0 )
+        return -EINVAL;
+
+    return pIrp->GetStatus();
+}
+
 gint32 CIfStopTask::RunTask()
 {
     gint32 ret = 0;
@@ -1869,13 +1917,11 @@ gint32 CIfStopTask::RunTask()
         CCfgOpener oCfg(
             ( IConfigDb* )GetConfig() );
 
-        ObjPtr pObj;
-
-        ret = oCfg.GetObjPtr( propIfPtr, pObj );
+        CRpcInterfaceBase* pIf = nullptr;
+        ret = oCfg.GetPointer( propIfPtr, pIf );
         if( ERROR( ret ) )
             break;
 
-        CRpcInterfaceBase* pIf = pObj;
         if( unlikely( pIf == nullptr ) )
         {
             ret = -EFAULT;
@@ -1897,7 +1943,7 @@ gint32 CIfStopTask::RunTask()
             "About to close port, %d", GetTid() );
 
 #endif
-        ret = pIf->ClosePort();
+        ret = pIf->ClosePort( this );
 
     }while( 0 );
 
@@ -2149,20 +2195,11 @@ gint32 CIfParallelTaskGrp::OnChildComplete(
             break;
         }
 
-        ObjPtr pObj;
-        ret = oCfg.GetObjPtr( propIfPtr, pObj );
+        CIoManager* pMgr = nullptr;
 
+        ret = GET_IOMGR( oCfg, pMgr );
         if( ERROR( ret ) )
             break;
-
-        CRpcInterfaceBase* pIf = pObj;
-        if( pIf == nullptr )
-        {
-            ret = -EFAULT;
-            break;
-        }
-
-        CIoManager* pMgr = pIf->GetIoMgr();
 
         // regain control by rescheduling this
         // task
@@ -2193,7 +2230,6 @@ gint32 CIfParallelTaskGrp::RunTask()
 
     oCfg[ propNoResched ] = true;
     do{
-
         std::set< TaskletPtr > setTasksToRun;
         EnumTaskState iState = GetTaskState();
         if( iState == stateStarting )
@@ -2203,6 +2239,14 @@ gint32 CIfParallelTaskGrp::RunTask()
         }
         else if( iState == stateStopped )
         {
+            oCfg.RemoveProperty( propNoResched );
+            ret = ERROR_STATE;
+            break;
+        }
+        else if( !IsRunning() &&
+            iState == stateStarted )
+        {
+            oCfg.RemoveProperty( propNoResched );
             ret = ERROR_STATE;
             break;
         }
@@ -2233,8 +2277,8 @@ gint32 CIfParallelTaskGrp::RunTask()
 
         if( IsCanceling() )
         {
-            // don't remove propNoResched here since
-            // the OnCancel has also set it
+            oCfg.RemoveProperty( propNoResched );
+            SetRunning( false );
             return STATUS_PENDING;
         }
 
@@ -2251,6 +2295,9 @@ gint32 CIfParallelTaskGrp::RunTask()
         break;
 
     }while( 1 );
+
+    if( ret != STATUS_PENDING )
+        SetRunning( false );
 
     // we will be removed from the root task
     // group
@@ -2288,7 +2335,20 @@ gint32 CIfParallelTaskGrp::RunTaskDirect(
             break;
         }
 
+        EnumTaskState iState = GetTaskState();
+        if( iState == stateStopped )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+
         bool bRunning = IsRunning();
+        if( !bRunning && iState == stateStarted )
+        {
+            // the taskgroup is about to complete
+            ret = ERROR_STATE;
+            break;
+        }
 
         CCfgOpenerObj oChildCfg(
             ( CObjBase* )pTask );
@@ -2296,17 +2356,17 @@ gint32 CIfParallelTaskGrp::RunTaskDirect(
         oChildCfg.SetObjPtr(
             propParentTask, ObjPtr( this ) );
 
-        if( !bRunning )
-            m_setPendingTasks.insert( pTask );
-        else
-            m_setTasks.insert( pTask );
-
-        CIfParallelTask* pParaTask = pTask;
-        if( pParaTask == nullptr )
+        CIfRetryTask* pRetryTask = pTask;
+        if( pRetryTask == nullptr )
         {
             ret = -EFAULT;
             break;
         }
+
+        if( !bRunning )
+            m_setPendingTasks.insert( pTask );
+        else
+            m_setTasks.insert( pTask );
 
         oTaskLock.Unlock();
 
@@ -2401,6 +2461,17 @@ gint32 CIfParallelTaskGrp::AppendTask(
     do{
         CStdRTMutex oTaskLock( GetLock() );
         if( IsCanceling() )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+        EnumTaskState iState = GetTaskState();
+        if( iState == stateStopped )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+        if( !IsRunning() && iState == stateStarted )
         {
             ret = ERROR_STATE;
             break;
@@ -2571,6 +2642,20 @@ gint32 CIfParallelTaskGrp::OnCancel(
     CStdRTMutex oTaskLock( GetLock() );
     if( IsCanceling() )
         return STATUS_PENDING;
+
+    if( oCfg.exist( propNoResched ) )
+    {
+        // some thread is working on this object
+        // let's do it later
+        ret = DelayRun< super >( 1,
+            eventCancelTask, 0, 0, nullptr );
+        if( ERROR( ret ) )
+        {
+            DebugPrint( ret,
+                "Failed to delay the cancel call" );
+        }
+        return STATUS_PENDING;
+    }
 
     SetCanceling( true );
     oCfg[ propNoResched ] = true;
@@ -2850,7 +2935,7 @@ gint32 CIfParallelTask::CancelIrp()
             }
 
             CIoManager* pMgr = nullptr;
-            ret = oCfg.GetPointer( propIoMgr, pMgr );
+            ret = GET_IOMGR( oCfg, pMgr );
             if( ERROR( ret ) )
                 break;
 
@@ -5328,3 +5413,149 @@ gint32 CIfDeferredHandler::OnComplete( gint32 iRetVal )
     RemoveProperty( propReqPtr );
     return ret;
 }
+
+gint32 CBusPortStopSingleChildTask::OnComplete(
+    gint32 iRetVal )
+{
+    gint32 ret = super::OnComplete( iRetVal );
+    return ret;
+}
+
+gint32 CBusPortStopSingleChildTask::OnIrpComplete(
+    PIRP pIrp )
+{
+    gint32 ret = 0;
+    CParamList oCfg(
+        ( IConfigDb* )GetConfig() );
+    do{
+        CIoManager* pMgr = nullptr;
+        ret = oCfg.GetPointer(
+            propIoMgr, pMgr );
+
+        if( ERROR( ret ) )
+            break;
+
+        IPort* pPort = nullptr;
+        ret = oCfg.GetPointer( 0, pPort );
+        if( ERROR( ret ) )
+            break;
+
+        CPnpManager& oPnpMgr = pMgr->GetPnpMgr();
+        ret = oPnpMgr.DestroyPortStack( pPort );
+        if( ret == STATUS_PENDING )
+        {
+            DebugPrint( ERROR_FAIL,
+            "Unable to stop the port gracefully "
+            "proceed to complete the master irp "
+            "anyway" );
+        }
+
+        IEventSink* pCallback = nullptr;
+        ret = oCfg.GetPointer( 2, pCallback );
+        if( ERROR( ret ) )
+            break;
+
+        guint32 dwParam2 = 0;
+        ret = oCfg.GetIntProp( 3, dwParam2 );
+        if( ERROR( ret ) )
+            break;
+
+        guint32 dwParam1 =
+            ( guint32 )( ( IRP* )pIrp );
+
+        // run the original callback
+        pCallback->OnEvent( eventIrpComp,
+            dwParam1, dwParam2, nullptr );
+
+    }while( 0 );
+
+    oCfg.ClearParams();
+    return ret;
+}
+
+gint32 CBusPortStopSingleChildTask::RunTask()
+{
+    // this is a retriable task
+    gint32 ret = 0;
+    CParamList oCfg(
+        ( IConfigDb* )GetConfig() );
+
+    do{
+        CIoManager* pMgr = nullptr;
+
+        ret = oCfg.GetPointer(
+            propIoMgr, pMgr );
+
+        if( ERROR( ret ) )
+            break;
+
+        IPort* pPort = nullptr;
+        ret = oCfg.GetPointer( 0, pPort );
+        if( ERROR( ret ) )
+            break;
+
+        PIRP pIrp = nullptr; 
+        ret = oCfg.GetPointer( 1, pIrp );
+        if( ERROR( ret ) )
+            break;
+
+        CStdRMutex oIrpLock( pIrp->GetLock() );
+        ret = pIrp->CanContinue( IRP_STATE_READY );
+        if( ERROR( ret ) )
+            break;
+
+        EventPtr pIrpCb = pIrp->m_pCallback;
+        guint32 dwContext = pIrp->m_dwContext;
+
+        oCfg.Push( ObjPtr( pIrpCb ) );
+        oCfg.Push( dwContext );
+
+        // intercept the callback
+        pIrp->SetCallback( this, 0 );
+
+        CPnpManager& oPnpMgr = pMgr->GetPnpMgr();
+        ret = oPnpMgr.StopPortStack(
+            pPort, pIrp );
+
+        // to avoid other contender to complete or
+        // cancel the irp before we are done
+        oIrpLock.Unlock();
+
+        // the irp completion will be called
+        if( SUCCEEDED( ret ) ||
+            ret == STATUS_PENDING )
+            break;
+
+        ret = oPnpMgr.DestroyPortStack( pPort );
+        if( ret == STATUS_PENDING )
+        {
+            DebugPrint( ERROR_FAIL,
+            "Unable to stop the port gracefully "
+            "proceed to complete the master irp "
+            "anyway" );
+        }
+
+        oIrpLock.Lock();
+        ret = pIrp->CanContinue( IRP_STATE_READY );
+        if( ERROR( ret ) )
+        {
+            ret = 0;
+            break;
+        }
+
+        // recover the original callback
+        pIrp->SetCallback( pIrpCb, dwContext );
+        IrpCtxPtr& pIrpCtx =
+            pIrp->GetTopStack();
+
+        pIrpCtx->SetStatus( ret );
+        oIrpLock.Unlock();
+
+        pMgr->CompleteIrp( pIrp );
+        break;
+
+    }while( 0 );
+
+    return ret;
+}
+

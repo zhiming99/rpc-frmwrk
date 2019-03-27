@@ -1428,8 +1428,11 @@ gint32 CDBusProxyPdo::UnpackFwrdRespMsg( IRP* pIrp )
         if( ERROR( ret ) )
             break;
 
-        pCtx->m_pRespData.NewObj();
-        *pCtx->m_pRespData = pUserResp;
+        // replace the carrier dbus message with
+        // the payload dbus message
+        BufPtr pNewBuf( true );
+        *pNewBuf = pUserResp;
+        pCtx->SetRespData( pNewBuf );
 
     }while( 0 );
 
@@ -1512,8 +1515,9 @@ gint32 CDBusProxyPdo::UnpackFwrdEventMsg(
             break;
         }
 
-        pCtx->m_pRespData.NewObj();
-        *pCtx->m_pRespData = pUserEvent;
+        BufPtr pNewBuf( true );
+        *pNewBuf = pUserEvent;
+        pCtx->SetRespData( pNewBuf );
 
     }while( 0 );
 

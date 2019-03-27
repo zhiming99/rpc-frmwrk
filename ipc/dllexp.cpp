@@ -101,6 +101,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CPnpMgrStartPortCompletionTask );
     INIT_MAP_ENTRYCFG( CPnpMgrStopPortAndDestroyTask );
     INIT_MAP_ENTRYCFG( CPnpMgrStopPortStackTask );
+    INIT_MAP_ENTRYCFG( CBusPortStopSingleChildTask );
     INIT_MAP_ENTRYCFG( CPortAttachedNotifTask );
     INIT_MAP_ENTRYCFG( CPortStartStopNotifTask );
     INIT_MAP_ENTRYCFG( CPortState );

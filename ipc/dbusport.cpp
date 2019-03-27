@@ -1030,6 +1030,10 @@ gint32 CDBusBusPort::Stop( IRP *pIrp )
         pTask->Stop();
     m_pFlushTask.Clear();
 
+    // the message is allowed to come in
+    MloopPtr pLoop = GetIoMgr()->GetMainIoLoop();
+    pLoop->StopDBusConn();
+
     gint32 ret = super::Stop( pIrp );
     // NOTE: the child ports are stopped ahead of
     // this method is called

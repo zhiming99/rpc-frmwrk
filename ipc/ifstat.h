@@ -107,7 +107,8 @@ class IInterfaceState :
     virtual gint32 OpenPort(
         IEventSink* pCallback ) = 0;
 
-    virtual gint32 ClosePort() = 0;
+    virtual gint32 ClosePort(
+        IEventSink* pCallback ) = 0;
 
     virtual gint32 SetStateOnEvent(
         EnumEventId iEvent ) = 0;
@@ -204,7 +205,8 @@ class CInterfaceState : public IInterfaceState
         EnumEventId iEvent,
         const std::string& strParams );
 
-    virtual gint32 ClosePort();
+    virtual gint32 ClosePort(
+        IEventSink* pCallback = nullptr );
 
     // subscribe a connection point event
     virtual gint32 GetProperty(

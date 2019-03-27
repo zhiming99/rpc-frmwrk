@@ -376,6 +376,12 @@ gint32 CInterfaceState::OnPortEvent(
                 break;
             }
         case eventPortStopped:
+            {
+                m_hPort = 0;
+                UnsubscribeEvents();
+                ret = SetStateOnEvent( cmdClosePort );
+                break;
+            }
         default:
             {
                 break;
@@ -618,13 +624,17 @@ gint32 CInterfaceState::OpenPortInternal(
     return ret;
 }
 
-gint32 CInterfaceState::ClosePort()
+gint32 CInterfaceState::ClosePort(
+    IEventSink* pCallback )
 {
     gint32 ret = 0;
     if( m_hPort != 0 )
     {
-        ret = GetIoMgr()->ClosePort(
-            m_hPort, GetInterface() );
+        ret = GetIoMgr()->ClosePort( m_hPort,
+            GetInterface(), pCallback );
+
+        if( ret == STATUS_PENDING )
+            return ret;
 
         m_hPort = 0;
         UnsubscribeEvents();

@@ -109,7 +109,7 @@ gint32 CDBusProxyFdo::HandleSendData( IRP* pIrp )
     gint32 ret = 0;
 
     guint32 dwCtrlCode = pIrp->CtrlCode();
-    IrpCtxPtr& pCtx = pIrp->GetCurCtx();
+    IrpCtxPtr pCtx = pIrp->GetCurCtx();
 
     do{
         DMsgPtr pMsg;
@@ -175,6 +175,8 @@ gint32 CDBusProxyFdo::SubmitIoctlCmd( IRP* pIrp )
         return -EINVAL;
 
     gint32 ret = 0;
+    // let's process the func irps
+    IrpCtxPtr pCtx = pIrp->GetCurCtx();
 
     switch( pIrp->CtrlCode() )
     {
@@ -203,6 +205,10 @@ gint32 CDBusProxyFdo::SubmitIoctlCmd( IRP* pIrp )
             break;
         }
     }
+
+    if( ret != STATUS_PENDING )
+        pCtx->SetStatus( ret );
+
     return ret;
 }
 
@@ -338,7 +344,7 @@ gint32 CDBusProxyFdo::HandleSendReq(
     gint32 ret = 0;
 
     do{
-        IrpCtxPtr& pCtx = pIrp->GetCurCtx();
+        IrpCtxPtr pCtx = pIrp->GetCurCtx();
 
         // client side I/O
         guint32 dwIoDir = pCtx->GetIoDirection();
@@ -581,7 +587,7 @@ gint32 CDBusProxyFdo::CompleteIoctlIrp(
             break;
         }
         
-        IrpCtxPtr& pCtx =
+        IrpCtxPtr pCtx =
             pIrp->GetCurCtx();
 
         IrpCtxPtr& pTopCtx =

@@ -516,7 +516,14 @@ gint32 CRpcSocketBase::Stop()
         }
         DetachMainloop();
         StopTimer();
-        CloseSocket();
+        ret = CloseSocket();
+
+        if( ERROR( ret ) )
+        {
+            DebugPrint( ret,
+                "Error close socket..." );
+        }
+
         SetState( sockStopped );
 
     }while( 0 );
@@ -532,7 +539,13 @@ gint32 CRpcSocketBase::CloseSocket()
         if( m_iFd < 0 )
             ret = -ENOTSOCK;
 
-        shutdown( m_iFd, SHUT_RDWR );
+        ret = shutdown( m_iFd, SHUT_RDWR );
+        if( ERROR( ret ) )
+        {
+            DebugPrint( ret,
+                "Error shutdown socket[%d]",
+                m_iFd );
+        }
         ret = close( m_iFd );
 
         if( ret == -1 && errno == EINTR )
@@ -1484,7 +1497,7 @@ gint32 CRpcStreamSock::OnEvent(
             }
             else if( iState == sockStarted )
             {
-                Stop();
+                ret = Stop();
             }
             else if( iState == sockStopped ) 
             {

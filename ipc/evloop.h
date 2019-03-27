@@ -336,6 +336,8 @@ class CEvLoop :
     gint32 Start();
     gint32 Stop();
 
+    gint32 StopDBusConn();
+
     gint32 AsyncSend( HANDLE hWatch );
     void WakeupLoop();
     using CSimpleEvPoll::WakeupLoop;

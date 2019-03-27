@@ -370,6 +370,13 @@ gint32 CEvLoop::SetupDBusConn(
     return m_pDBusHook->Start( pConn );
 }
 
+gint32 CEvLoop::StopDBusConn()
+{
+    if( m_pDBusHook.IsEmpty() )
+        return -EFAULT;
+    return m_pDBusHook->Stop();
+}
+
 CEvLoop::~CEvLoop()
 {
     ClearAll();

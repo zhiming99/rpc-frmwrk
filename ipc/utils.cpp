@@ -345,9 +345,9 @@ gint32 CTimerService::AddTimer(
     IEventSink* pEvent,
     guint32 dwParam )
 {
-    gint32 ret = 0;
-    if( pEvent == NULL )
-        ret = -EINVAL;
+    gint32 ret = -EINVAL;
+    if( pEvent == nullptr )
+        return ret;
 
     do{
         TIMER_ENTRY te;

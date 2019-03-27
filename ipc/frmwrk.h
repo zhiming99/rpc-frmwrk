@@ -358,6 +358,10 @@ class CIoManager : public IService
 
     gint32 ClearStandAloneThreads();
 
+    gint32 CloseChildPort(
+        IPort* pBusPort,
+        IPort* pPort,
+        IEventSink* pCallback );
 
     public:
 
@@ -405,7 +409,8 @@ class CIoManager : public IService
     // a non-mainloop thread, synchronous
     gint32 ClosePort(
         HANDLE hPort,
-        IEventSink* pEvent );
+        IEventSink* pEvent,
+        IEventSink* pCallback = nullptr );
 
     // irp helper
     gint32 SubmitIrp(

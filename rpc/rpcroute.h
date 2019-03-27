@@ -447,7 +447,7 @@ class CRpcReqForwarder :
     gint32 EnableDisableEvent(
         IEventSink* pCallback,
         IMessageMatch* pMatch,
-        bool bEnable );
+        bool& bEnable );
 
     gint32 OnRmtSvrOnline(
         const std::string& strIpAddr,
@@ -1321,9 +1321,6 @@ class CRpcRouter :
         DMsgPtr& pMsg,
         std::vector< MatchPtr > vecMatches );
 
-    using DEST_IF =
-        std::pair< std::string, InterfPtr >;
-
     using IFMAP_CITR =
         std::map< std::string, InterfPtr >::const_iterator;
 
@@ -1665,7 +1662,7 @@ class CIfRollbackableTask :
     }
 
     gint32 AddRollbackTask(
-        TaskletPtr& pTask, bool bBack = true )
+        TaskletPtr& pTask, bool bBack = false )
     {
         CIfTransactGroup* pTractGrp = nullptr;
         gint32 ret = GetTractGrp( pTractGrp );
@@ -1797,6 +1794,7 @@ class CRouterAddRemoteMatchTask :
 class CRouterEventRelayRespTask :
     public CIfInterceptTaskProxy
 {
+    bool m_bEnable = true;
     public:
     typedef CIfInterceptTaskProxy super;
 
@@ -1808,6 +1806,9 @@ class CRouterEventRelayRespTask :
     { return STATUS_PENDING; }
 
     virtual gint32 OnTaskComplete( gint32 iRetVal );
+    void SetEnable( bool bEnable )
+    { m_bEnable = bEnable; }
+
 };
 
 class CReqFwdrForwardRequestTask :
