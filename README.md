@@ -21,7 +21,7 @@ This framework depends on the following packags:
 
 ---
 [`Wed Mar 27 17:56:33 CST 2019`]   
-1. Fixed some bugs in the code. There are still some memory leak and concurrency bugs to fix.
+1. Fixed some bugs in the code. There are still some memory leak and concurrency bugs to fix in the `EnableRemoteEvent` and connection setup.
 
 [`Thu Mar 14 20:47:45 CST 2019`]   
 1. The `EnableRemoteEvent` works on the `Forwarder` side. and The bridge side has successfully received the request. Move on to get the `Bridge` side `EnableRemoteEvent` to work. This should be the last part work before getting through the whole request/response path.   
