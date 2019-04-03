@@ -4449,7 +4449,7 @@ fi
 done
 
 
-ac_config_files="$ac_config_files Makefile Makefile.init.pub combase/Makefile ipc/Makefile rpc/Makefile test/Makefile test/Makefile.init.pub test/actcancel/Makefile test/asynctst/Makefile test/evtest/Makefile test/helloworld/Makefile test/inproc/Makefile test/prtest/Makefile test/katest/Makefile test/sftest/Makefile test/stmtest/Makefile test/smoketest/Makefile"
+ac_config_files="$ac_config_files Makefile Makefile.init.pub combase/Makefile ipc/Makefile rpc/Makefile test/Makefile test/Makefile.init.pub test/actcancel/Makefile test/asynctst/Makefile test/evtest/Makefile test/helloworld/Makefile test/inproc/Makefile test/prtest/Makefile test/katest/Makefile test/sftest/Makefile test/stmtest/Makefile test/router/Makefile test/smoketest/Makefile"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -5157,6 +5157,7 @@ do
     "test/katest/Makefile") CONFIG_FILES="$CONFIG_FILES test/katest/Makefile" ;;
     "test/sftest/Makefile") CONFIG_FILES="$CONFIG_FILES test/sftest/Makefile" ;;
     "test/stmtest/Makefile") CONFIG_FILES="$CONFIG_FILES test/stmtest/Makefile" ;;
+    "test/router/Makefile") CONFIG_FILES="$CONFIG_FILES test/router/Makefile" ;;
     "test/smoketest/Makefile") CONFIG_FILES="$CONFIG_FILES test/smoketest/Makefile" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
