@@ -270,20 +270,30 @@ gint32 CTaskThread::ProcessTask(
     if( pTask.IsEmpty() )
         return -EFAULT;
 
-#ifdef DEBUG
     ( *pTask )( ( guint32 )dwContext );
-    gint32 iTaskRet = pTask->GetError();
 
+#ifdef DEBUG
+    gint32 iTaskRet = pTask->GetError();
     if( ERROR( iTaskRet ) )
     {
-        string strTaskName =
-            CoGetClassName( pTask->GetClsid() );
+        EnumClsid iClsid = pTask->GetClsid();
+        const char* pName =
+            CoGetClassName( iClsid );
+
+        string strTaskName;
+        if( pName == nullptr )
+        {
+            strTaskName =
+                std::to_string( iClsid );
+        }
+        else
+        {
+            strTaskName = pName;
+        }
 
         DebugPrint( iTaskRet,
             strTaskName + " failed" ); 
     }
-#else
-    ( *pTask )( ( guint32 )dwContext );
 #endif
 
     PopHead();
@@ -414,6 +424,15 @@ COneshotTaskThread::COneshotTaskThread()
     m_iTaskClsid = clsid( Invalid );
 }
 
+COneshotTaskThread::~COneshotTaskThread()
+{
+    if( m_pServiceThread != nullptr )
+    {
+        delete m_pServiceThread;
+        m_pServiceThread = nullptr;
+    }
+}
+
 void COneshotTaskThread::ThreadProc(
     void* dwContext )
 {
@@ -464,7 +483,8 @@ gint32 COneshotTaskThread::Start()
 gint32 COneshotTaskThread::Stop()
 {
     m_bTaskDone = true;
-    m_pServiceThread->join();
+    if( m_pServiceThread->joinable() )
+        m_pServiceThread->join();
     delete m_pServiceThread;
     m_pServiceThread = nullptr;
 
@@ -859,21 +879,19 @@ gint32 CThreadPool::Start()
 
 gint32 CThreadPool::Stop()
 {
-
     gint32 ret = 0;
     do{
         CStdRMutex oLock( m_oLock ); 
         ThreadPtr thptr;
 
-        vector<ThreadPtr>::iterator itr =
-            m_vecThreads.begin();
+        vector< ThreadPtr > vecThreads =
+            m_vecThreads;
 
-        while( itr != m_vecThreads.end() ) 
-        {
-            ( *itr )->Stop();
-            ++itr;
-        }
         m_vecThreads.clear();
+        oLock.Unlock();
+
+        for( auto pThread : vecThreads ) 
+            pThread->Stop();
 
     }while( 0 );
 
@@ -886,7 +904,6 @@ gint32 CTaskThreadPool::RemoveTask(
     gint32 ret = 0;
 
     do{
-
         ThreadPtr thptr;
         CStdRMutex oLock( GetLock() ); 
         vector<ThreadPtr>::iterator itr =

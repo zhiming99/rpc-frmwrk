@@ -58,7 +58,7 @@ class CIfRetryTask
     //
     protected:
     sem_t               m_semWait;
-    CTasklet*           m_pParentTask;
+    TaskletPtr          m_pParentTask;
 
     public:
     typedef CThreadSafeTask super;
@@ -74,7 +74,7 @@ class CIfRetryTask
     virtual gint32 OnTaskComplete( gint32 iRetVal )
     { return -ENOTSUP; }
 
-    gint32 OnRetry();
+    virtual gint32 OnRetry();
     virtual gint32 WaitForComplete();
     gint32 OnCancel( guint32 dwContext );
 
@@ -135,14 +135,22 @@ class CIfRetryTask
             propEventSink, ObjPtr( pCallback ) );
         return 0;
     }
+
+    template< class ClassName >
+    gint32 DelayRun(
+        guint32 dwSecsDelay,
+        EnumEventId iEvent = eventZero,
+        guint32 dwParam1 = 0,
+        guint32 dwParam2 = 0,
+        guint32* pdata = nullptr );
 };
 
+typedef EnumIfState EnumTaskState;
 class CIfParallelTask
     : public CIfRetryTask
 {
 
     protected:
-    typedef EnumIfState EnumTaskState;
     EnumTaskState m_iTaskState;
 
     public:
@@ -240,6 +248,7 @@ class CIfStopTask
     { SetClassId( clsid( CIfStopTask ) ); }
 
     virtual gint32 RunTask();
+    virtual gint32 OnIrpComplete( PIRP pIrp );
 };
 
 class CIfPauseResumeTask
@@ -313,6 +322,7 @@ class CIfTaskGroup
     : public CIfRetryTask
 {
     EnumLogicOp m_iTaskRel;
+    EnumTaskState m_iTaskState = stateStarting;
 
     protected:
     void PopTask();
@@ -345,10 +355,22 @@ class CIfTaskGroup
     bool exist( TaskletPtr& pTask );
 
     bool IsRunning() const;
-    void SetRunning();
+    void SetRunning( bool bRun = true );
 
     bool IsCanceling() const;
     void SetCanceling( bool bCancel );
+
+    inline EnumTaskState GetTaskState() const
+    {
+        CStdRTMutex oTaskLock( GetLock() );
+        return m_iTaskState;
+    }
+
+    inline void SetTaskState( EnumTaskState iState )
+    {
+        CStdRTMutex oTaskLock( GetLock() );
+        m_iTaskState = iState;
+    }
 
     virtual gint32 AppendTask( TaskletPtr& pTask );
     gint32 AppendAndRun( TaskletPtr& pTask );
@@ -372,6 +394,10 @@ class CIfTaskGroup
     virtual gint32 FindTaskByRmtId(
         guint64 iTaskId, TaskletPtr& pRet );
 
+    gint32 FindTaskByClsid(
+        EnumClsid iClsid,
+        std::vector< TaskletPtr >& vecTasks );
+
     // the tasks have two types of relation,
     // AND and OR
     void SetRelation( EnumLogicOp iOp )
@@ -385,6 +411,11 @@ class CIfTaskGroup
     virtual gint32 RemoveTask( TaskletPtr& pTask );
 
     virtual gint32 OnRetry();
+    virtual gint32 OnComplete( gint32 iRet );
+
+    inline void GetRetVals(
+        std::vector< gint32 >& vecRet ) const
+    { vecRet = m_vecRetVals; }
 };
 
 typedef CAutoPtr< Clsid_Invalid, CIfTaskGroup > TaskGrpPtr;
@@ -399,12 +430,14 @@ class CIfRootTaskGroup
     {
         SetClassId( clsid( CIfRootTaskGroup ) );
     }
-    // the mutal exclusion can happen between 
+    // the race condtion can happen between 
     //  ( RunTask, OnCancel, OnChildComplete )
     // 
     virtual gint32 OnComplete( gint32 iRet );
     gint32 GetHeadTask( TaskletPtr& pHead );
     gint32 GetTailTask( TaskletPtr& pTail );
+    virtual gint32 OnChildComplete(
+        gint32 iRet, CTasklet* pChild );
 };
 
 
@@ -748,11 +781,17 @@ class CIfInterceptTaskProxy :
         {
             oCfg.SetObjPtr( propEventSink,
                 ObjPtr( pEvent ) );
+
+            oCfg.SetBoolProp(
+                propNotifyClient, true );
+        }
+        else
+        {
+            oCfg.RemoveProperty( propEventSink );
+            oCfg.RemoveProperty(
+                propNotifyClient );
         }
 
-        oCfg.SetBoolProp(
-            propNotifyClient, true );
-        
         return 0;
     }
 };
@@ -787,3 +826,38 @@ class CIfFetchDataTask : public CIfRetryTask
         return ret;
     }
 };
+
+class CIfStartExCompletion :
+    public CIfInterceptTaskProxy
+{
+    public:
+    typedef CIfInterceptTaskProxy super;
+    CIfStartExCompletion( const IConfigDb* pCfg )
+        : CIfInterceptTaskProxy( pCfg )
+    {
+        SetClassId( clsid( CIfStartExCompletion ) );
+    }
+    virtual gint32 RunTask()
+    { return STATUS_PENDING; }
+
+    virtual gint32 OnTaskComplete( gint32 iRetVal );
+
+    gint32 OnCancel( gint32 dwContext )
+    {  return OnTaskComplete( -ECANCELED ); }
+};
+
+class CBusPortStopSingleChildTask
+    : public CIfRetryTask
+{
+    public:
+    typedef CIfRetryTask super;
+    CBusPortStopSingleChildTask( const IConfigDb* pCfg = nullptr )
+        : CIfRetryTask( pCfg )
+    {
+        SetClassId( clsid( CBusPortStopSingleChildTask ) );
+    }
+    virtual gint32 RunTask();
+    virtual gint32 OnIrpComplete( PIRP pIrp );
+    virtual gint32 OnComplete( gint32 iRetVal );
+};
+

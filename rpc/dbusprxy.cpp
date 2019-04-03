@@ -87,9 +87,7 @@ CDBusProxyPdo::CDBusProxyPdo(
             oMyCfg.SetBoolProp( propSingleIrp, true );
         }
 
-        string strModName = GetIoMgr()->GetModName();
-        string strBusName = DBUS_DESTINATION( strModName );
-        oMyCfg.SetStrProp( propSrcDBusName, strBusName );
+        oMyCfg.CopyProp( propSrcDBusName, m_pBusPort );
         oMyCfg.CopyProp( propSrcUniqName, m_pBusPort );
 
     }while( 0 );
@@ -107,7 +105,6 @@ CDBusProxyPdo::~CDBusProxyPdo()
 {
     if( m_pDBusConn )
     {
-        dbus_connection_close( m_pDBusConn );
         dbus_connection_unref( m_pDBusConn );
         m_pDBusConn = nullptr;
     }
@@ -144,7 +141,7 @@ gint32 CDBusProxyPdo::CheckConnCmdResp(
 
         if( !dbus_message_get_args(
             pMsg, oError,
-            DBUS_TYPE_INT32, &iMethodReturn,
+            DBUS_TYPE_UINT32, &iMethodReturn,
             DBUS_TYPE_INVALID ) )
         {
             ret = oError.Errno(); 
@@ -270,7 +267,7 @@ gint32 CDBusProxyPdo::CompleteRmtRegMatch(
 
             if( !dbus_message_get_args(
                 pRespMsg, dbusError,
-                DBUS_TYPE_INT32, &iMethodReturn,
+                DBUS_TYPE_UINT32, &iMethodReturn,
                 DBUS_TYPE_INVALID ) )
             {
                 ret = dbusError.Errno();
@@ -376,6 +373,10 @@ gint32 CDBusProxyPdo::CompleteListening(
         if( strMember == SYS_EVENT_FORWARDEVT )
         {
             ret = UnpackFwrdEventMsg( pIrp );
+        }
+        else if( strMember == SYS_EVENT_RMTSVREVENT )
+        {
+            break;
         }
         else
         {
@@ -485,14 +486,20 @@ gint32 CDBusProxyPdo::HandleConnRequest(
         if( ERROR( ret ) )
             break;
 
-        oParams.SetStrProp(
+        CParamList oMethodArgs;
+        oMethodArgs.SetStrProp(
             propSrcUniqName, strBusName );
 
         // the uniq name of the dbus connection
-        oParams.CopyProp( propSrcDBusName, this );
+        oMethodArgs.CopyProp(
+            propSrcDBusName, this );
 
         // ip addr
-        oParams.CopyProp( propIpAddr, this );
+        oMethodArgs.CopyProp(
+            propIpAddr, this );
+
+        oParams.Push(
+            ObjPtr( oMethodArgs.GetCfg() ) );
 
         string strCmd;
 
@@ -523,8 +530,9 @@ gint32 CDBusProxyPdo::HandleConnRequest(
         if( ERROR( ret ) )
             break;
 
-        string strDest =
-            DBUS_DESTINATION( MODNAME_RPCROUTER );
+        string strDest = DBUS_DESTINATION2(
+                MODNAME_RPCROUTER,
+                OBJNAME_REQFWDR );
 
         ret = pMsg.SetDestination( strDest );
 
@@ -584,11 +592,17 @@ gint32 CDBusProxyPdo::BuildMsgHeader(
         string strIfName;
         string strObjPath;
 
-        string strSender =
-            DBUS_DESTINATION( GetIoMgr()->GetModName() );
+        CCfgOpenerObj oPortCfg( this );
+        string strSender; 
+        ret = oPortCfg.GetStrProp(
+            propSrcDBusName, strSender );
 
-        string strDest =
-            DBUS_DESTINATION( MODNAME_RPCROUTER );
+        if( ERROR( ret ) )
+            break;
+
+        string strDest = DBUS_DESTINATION2(
+            MODNAME_RPCROUTER,
+            OBJNAME_REQFWDR );
 
         if( true )
         {
@@ -725,7 +739,7 @@ gint32 CDBusProxyPdo::SubmitIoctlCmd( IRP* pIrp )
     }
 
     // let's process the func irps
-    IrpCtxPtr& pCtx = pIrp->GetCurCtx();
+    IrpCtxPtr pCtx = pIrp->GetCurCtx();
 
     do{
         if( pIrp->MajorCmd() != IRP_MJ_FUNC ||
@@ -777,7 +791,8 @@ gint32 CDBusProxyPdo::SubmitIoctlCmd( IRP* pIrp )
                 ObjPtr pObj;
                 pObj = m_pMatchFwder;
 
-                BufPtr pBuf( pObj );
+                BufPtr pBuf( true );
+                *pBuf = pObj;
                 pCtx->m_pReqData = pBuf;
                 ret = HandleListening( pIrp );
 
@@ -1097,27 +1112,22 @@ gint32 CProxyPdoConnectTask::Process(
                 else
                 {
                     DebugPrint( ret,
-                        "Server is not up, give up",
+                        "Retried many times, Give up now",
                         PROXYPDO_CONN_INTERVAL );
                 }
                 break;
             }
 
-            if( ret == -ECANCELED ||
-                ret == ERROR_STATE )
+            if( ERROR( ret ) )
                 break;
-
-            // it is possible the port is already
-            // connected before this irp is
-            // issued. let's further check if the
-            // port is connected
         }
 
-        ret = oParams.GetObjPtr( propPortPtr, pObj );
+        ret = oParams.GetPointer(
+            propPortPtr, pProxyPort );
+
         if( ERROR( ret ) )
             break;
 
-        pProxyPort = pObj;
         if( pProxyPort != nullptr )
         {
             CStdRMutex oPortLock(
@@ -1225,8 +1235,9 @@ gint32 CDBusProxyPdo::PostStart( IRP* pIrp )
         // any match going to the event map or req
         // map must have propDestDBusName set to
         // handle the module online/offline
-        string strDest =
-            DBUS_DESTINATION( MODNAME_RPCROUTER );
+        string strDest = DBUS_DESTINATION2(
+                MODNAME_RPCROUTER,
+                OBJNAME_REQFWDR );
 
         ret = matchCfg.SetStrProp(
             propDestDBusName, strDest );
@@ -1417,8 +1428,11 @@ gint32 CDBusProxyPdo::UnpackFwrdRespMsg( IRP* pIrp )
         if( ERROR( ret ) )
             break;
 
-        pCtx->m_pRespData.NewObj();
-        *pCtx->m_pRespData = pUserResp;
+        // replace the carrier dbus message with
+        // the payload dbus message
+        BufPtr pNewBuf( true );
+        *pNewBuf = pUserResp;
+        pCtx->SetRespData( pNewBuf );
 
     }while( 0 );
 
@@ -1501,14 +1515,30 @@ gint32 CDBusProxyPdo::UnpackFwrdEventMsg(
             break;
         }
 
-        pCtx->m_pRespData.NewObj();
-        *pCtx->m_pRespData = pUserEvent;
+        BufPtr pNewBuf( true );
+        *pNewBuf = pUserEvent;
+        pCtx->SetRespData( pNewBuf );
 
     }while( 0 );
 
     pCtx->SetStatus( ret );
 
     return ret;
+}
+
+void CDBusProxyPdo::SetConnected(
+    bool bConnected )
+{
+    m_bConnected = bConnected;
+    if( !m_pMatchFwder.IsEmpty() )
+    {
+        if( m_mapEvtTable.find( m_pMatchFwder ) ==
+            m_mapEvtTable.end() )
+            return;
+        MATCH_ENTRY& oMe =
+            m_mapEvtTable[ m_pMatchFwder ];
+        oMe.SetConnected( bConnected );
+    }
 }
 
 gint32 CDBusProxyPdo::OnRmtSvrOnOffline(
@@ -1520,36 +1550,65 @@ gint32 CDBusProxyPdo::OnRmtSvrOnOffline(
     gint32 ret = 0;
     do{
 
-        DBusMessageIter itr;
-        dbus_message_iter_init( pMsg, &itr );
-
-        // NOTE: ipaddr check is done in the
-        // message match
-
-        if( !dbus_message_iter_next( &itr ) )
-        {
-            ret = -EINVAL;
-            break;
-        }
-
+        DMsgPtr ptrMsg( pMsg );
         bool bOnline = false;
 
-        gint32 iType =
-            dbus_message_iter_get_arg_type( &itr );
-
-        if( iType != DBUS_TYPE_BOOLEAN )
-        {
-            ret = -EINVAL;
+        ret = ptrMsg.GetBoolArgAt( 1, bOnline );
+        if( ERROR( ret ) )
             break;
-        }
-
-        dbus_message_iter_get_basic( &itr, &bOnline );
 
         // block the io message or resume the IO requests
-        if( true )
+        CStdRMutex oPortLock( GetLock() );
+        SetConnected( bOnline );
+
+        // notify the upper port
+        IrpPtr pIrp;
+        if( !bOnline )
         {
-            CStdRMutex oPortLock( GetLock() );
-            SetConnected( bOnline );
+            MatchMap* pMatchMap = nullptr;
+            ret = GetMatchMap(
+                m_pMatchFwder, pMatchMap );
+            if( ERROR( ret ) )
+                break;
+
+            if( !pMatchMap->empty() )
+            {
+                MatchMap::iterator itr =
+                    pMatchMap->find( m_pMatchFwder );
+
+                if( itr != pMatchMap->end() )
+                {
+                    deque< IrpPtr >& irpQue =
+                        itr->second.m_queWaitingIrps;
+                    if( !irpQue.empty() )
+                    {
+                        pIrp = irpQue.front();
+                        irpQue.pop_front();
+                    }
+                }
+            }
+        }
+
+        oPortLock.Unlock();
+
+        if( !pIrp.IsEmpty() )
+        {
+            CStdRMutex oIrpLock( pIrp->GetLock() );
+            ret = pIrp->CanContinue( IRP_STATE_READY );
+            if( SUCCEEDED( ret ) && pIrp->GetStackSize() > 0 )
+            {
+                IrpCtxPtr& pCtx = pIrp->GetTopStack(); 
+                BufPtr pBuf( true );
+                *pBuf = ptrMsg;
+                pCtx->SetRespData( pBuf );
+                pCtx->SetStatus( 0 );
+                oIrpLock.Unlock();
+                GetIoMgr()->CompleteIrp( pIrp );
+            }
+            else
+            {
+                //NOTE: what can I do?
+            }
         }
 
         // clear all the pending irps
@@ -1703,10 +1762,8 @@ gint32 CDBusProxyPdo::HandleRmtRegMatch(
         oMatch.CopyProp(
             propSrcUniqName, this );
 
-        BufPtr pBuf( true );
-        ret = pMatchToSend->Serialize( *pBuf );
-        if( ERROR( ret ) )
-            break;
+        CParamList oParams;
+        oParams.Push( ObjPtr( pMatchToSend ) );
 
         DMsgPtr pMsg;
         ret = pMsg.NewObj();
@@ -1721,6 +1778,24 @@ gint32 CDBusProxyPdo::HandleRmtRegMatch(
             strMember = SYS_METHOD_DISABLERMTEVT;
 
         pMsg.SetMember( strMember );
+
+        oParams[ propMethodName ] = strMember;
+        oParams.CopyProp(
+            propSrcUniqName, pMatchToSend );
+
+        // the uniq name of the dbus connection
+        oParams.CopyProp(
+            propSrcDBusName, this );
+
+        // ip addr
+        oParams.CopyProp(
+            propIpAddr, this );
+
+        BufPtr pBuf( true );
+        ret = oParams.GetCfg()->Serialize( *pBuf );
+        if( ERROR( ret ) )
+            break;
+
 
         if( !dbus_message_append_args( pMsg,
             DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
@@ -1750,29 +1825,17 @@ gint32 CProxyPdoDisconnectTask::operator()(
     if( ERROR( ret ) )
         return ret;
 
-    ObjPtr pObj;
-    ret = oParams.GetObjPtr( propIrpPtr, pObj );
+    IRP* pMasterIrp = nullptr;
+    ret = oParams.GetPointer( propIrpPtr, pMasterIrp );
     if( ERROR( ret ) )
         return ret;
 
-    IRP* pMasterIrp = pObj;
-    if( pMasterIrp == nullptr )
-    {
-        return -EFAULT;
-    }
-
     do{
 
-        ret = oParams.GetObjPtr( propPortPtr, pObj );
+        CPort* pPort = nullptr;
+        ret = oParams.GetPointer( propPortPtr, pPort );
         if( ERROR( ret ) )
             break;
-
-        CPort* pPort = pObj;
-        if( pPort == nullptr )
-        {
-            ret = -EFAULT;
-            break;
-        }
 
         if( dwContext == eventIrpComp )
         {
@@ -1834,9 +1897,12 @@ gint32 CProxyPdoDisconnectTask::operator()(
 
     if( ret != STATUS_PENDING )
     {
-
         CStdRMutex oIrpLock( pMasterIrp->GetLock() );
-        if( !pMasterIrp->CanContinue( IRP_STATE_READY ) )
+
+        gint32 ret2 = pMasterIrp->
+            CanContinue( IRP_STATE_READY );
+
+        if( ERROR( ret2 ) )
         {
             // irp is not available
             return ERROR_STATE;
@@ -1860,6 +1926,15 @@ gint32 CDBusProxyPdo::OnQueryStop( IRP* pIrp )
         return -EINVAL;
 
     gint32 ret = 0;
+
+    if( true )
+    {
+        // query stop has be done once
+        CStdRMutex oPortLock( GetLock() );
+        if( m_bStopReady )
+            return 0;
+        m_bStopReady = true;
+    }
 
     do{
 

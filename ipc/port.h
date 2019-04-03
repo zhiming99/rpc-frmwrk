@@ -20,6 +20,7 @@
 #include "frmwrk.h"
 #include "portdrv.h"
 
+#define PORT_MAX_GENERATIONS         4
 #define PORT_START_TIMEOUT_SEC       120
 
 // port type mask
@@ -34,6 +35,8 @@
 // filter port
 #define PORTFLG_TYPE_FIDO               ( ( guint32 )0x03 )
 
+// filter port
+#define PORTFLG_TYPE_INVALID            ( ( guint32 )0x07 )
 // bus port
 #define PORTFLG_TYPE_BUS                ( ( guint32 )0x08 )
 
@@ -76,8 +79,8 @@
 #define PORT_STATE_EXCLUDE_PENDING      ( ( guint32 )0x08 )
 
 // two transiant state 
-#define PORT_STATE_STOP_RESUME          ( ( guint32 )0x0a )
-#define PORT_STATE_BUSY_RESUME          ( ( guint32 )0x0b )
+#define PORT_STATE_STOP_RESUME          ( ( guint32 )0x09 )
+#define PORT_STATE_BUSY_RESUME          ( ( guint32 )0x0a )
 
 
 #define PORT_STATE_MASK                 ( ( guint32 )0x0F )
@@ -90,6 +93,7 @@
 #define PNP_STATE_START_CHILD           ( ( guint32 )0x05 )
 #define PNP_STATE_START_PORT_RDY        ( ( guint32 )0x06 )
 
+#define PNP_STATE_STOP_PRELOCK          ( ( guint32 )0x08 )
 #define PNP_STATE_STOP_BEGIN            ( ( guint32 )0x00 )
 #define PNP_STATE_STOP_PRE              ( ( guint32 )0x03 )
 #define PNP_STATE_STOP_SELF             ( ( guint32 )0x04 )
@@ -110,7 +114,7 @@ class CPortState : public CObjBase
     sem_t                       m_semWaitForReady;
     IPort*                      m_pPort;
 
-    ReSubmitPtr                 m_pResume;
+    TaskletPtr                  m_pResume;
 
     bool IsValidSubmit( guint32 dwNewState ) const;
     guint32 PushState( guint32 dwState, bool bCheckLimit = true );
@@ -129,7 +133,7 @@ class CPortState : public CObjBase
         guint32 dwNewState = PORT_STATE_INVALID,
         guint32* pdwOldState = nullptr );
 
-    void SetResumePoint( ReSubmitPtr pFunc );
+    void SetResumePoint( TaskletPtr& pFunc );
     gint32 SetPortState( guint32 state );
 
     // return the poped state
@@ -142,7 +146,8 @@ class CPortState : public CObjBase
 
     bool IsPortReady();
 
-    gint32 ScheduleResumeTask();
+    gint32 ScheduleResumeTask(
+        TaskletPtr& pTask, IrpPtr& pIrp );
 
     gint32 HandleReady( IRP* pIrp,
         guint32 dwNewState,
@@ -177,6 +182,14 @@ class CPortState : public CObjBase
         guint32* pdwOldState );
 
     gint32 HandleExclPending( IRP* pIrp,
+        guint32 dwNewState,
+        guint32* pdwOldState );
+
+    gint32 HandleStopResume( IRP* pIrp,
+        guint32 dwNewState,
+        guint32* pdwOldState );
+
+    gint32 HandleBusyResume( IRP* pIrp,
         guint32 dwNewState,
         guint32* pdwOldState );
 };
@@ -266,6 +279,9 @@ class CPort : public IPort
 	gint32 SubmitStopIrp( IRP* pIrp );
 	gint32 CompleteStopIrp( IRP* pIrp );
 
+	gint32 SubmitStopIrpEx( IRP* pIrp );
+	gint32 CompleteStopIrpEx( IRP* pIrp );
+
 	gint32 SubmitQueryStopIrp( IRP* pIrp );
 	virtual gint32 CompleteQueryStopIrp( IRP* pIrp );
 
@@ -279,6 +295,8 @@ class CPort : public IPort
         bool bImmediately = false );
 
 	gint32 SubmitGetPropIrp( IRP* pIrp );
+    gint32 GetStopResumeTask(
+        PIRP pIrp, TaskletPtr& pTask );
 
 	public:
     typedef IPort   super;
@@ -306,6 +324,9 @@ class CPort : public IPort
     { return 0; }
     virtual gint32 OnPortStackDestroy( IRP* pIrp );
     virtual gint32 OnPortStackBuilt( IRP* pIrp );
+    virtual gint32 OnPortStackReady( IRP* pIrp )
+    { return 0; }
+
     virtual void OnPortStartFailed(
         IRP* pIrp, gint32 ret );
 
@@ -372,6 +393,9 @@ class CPort : public IPort
     { return 0; }
     gint32 PostStart( IRP* irp );
 
+    virtual gint32 OnPrepareStop( IRP* irp )
+    { return 0; }
+
     gint32 StopEx( IRP* irp );
     gint32 PreStop( IRP* irp );
     gint32 PostStop( IRP* irp );
@@ -398,6 +422,20 @@ class CPort : public IPort
 
     inline bool IsPortReady()
     { return m_pPortState->IsPortReady(); }
+
+    inline guint32 GetPortType()
+    {
+        CCfgOpenerObj oPortCfg( this );
+        guint32 dwVal = PORTFLG_TYPE_INVALID;
+        oPortCfg.GetIntProp(
+            propPortType, dwVal );
+
+        return dwVal;
+    }
+
+    gint32 FindPortByType(
+        guint32 dwPortType,
+        PortPtr& pPort );
 
     gint32 AllocIrpCtxExt(
         IrpCtxPtr& pIrpCtx,
@@ -533,7 +571,7 @@ struct CGenBusPnpExt :
     guint32 m_dwExtState;
 };
 
-#define BUSPORT_STOP_RETRY_SEC     3
+#define BUSPORT_STOP_RETRY_SEC     1
 #define BUSPORT_STOP_RETRY_TIMES   3
 
 class CGenericBusPort : public CPort
@@ -596,6 +634,8 @@ class CGenericBusPort : public CPort
             std::vector< PortPtr >& vecChildPdo );
 
     bool PortExist( guint32 iPortId ) const;
+
+    virtual gint32 OnPrepareStop( IRP* irp );
 
     virtual gint32 StopChild( IRP* pIrp );
 

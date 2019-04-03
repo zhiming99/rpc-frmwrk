@@ -29,7 +29,7 @@
 
 class CTasklet : public ICancellableTask
 {
-    gint32 m_iRet;
+    std::atomic<guint32> m_iRet;
     static std::atomic< guint32 > m_atmTid;
     guint32 m_dwTid;
 
@@ -756,17 +756,5 @@ class CSyncCallback :
     gint32 WaitForComplete();
     gint32 Process( guint32 dwContext )
     { return -ENOTSUP; }
-};
-
-class CBusPortStopSingleChildTask
-    : public CThreadSafeTask
-{
-    typedef CThreadSafeTask super;
-    CBusPortStopSingleChildTask( const IConfigDb* pCfg = nullptr )
-        : CThreadSafeTask( pCfg )
-    {
-        SetClassId( clsid( CBusPortStopSingleChildTask ) );
-    }
-    gint32 Process( guint32 dwContext );
 };
 

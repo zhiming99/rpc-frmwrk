@@ -254,13 +254,14 @@ void IRP_CONTEXT::SetNonDBusReq( bool bNonDBus )
 }
 
 IoRequestPacket::IoRequestPacket() :
-    m_iStatus( 0 ),
+    m_iStatus( STATUS_PENDING ),
     m_dwFlags( 0 ),
     m_atmState( IRP_STATE_READY ),
     m_pCallback( nullptr ),
     m_dwContext( 0 ),
     m_IrpThrdPtr( nullptr ),
     m_iTimerId( -1 ),
+    m_dwCurPos( 0 ),
     m_pMasterIrp( nullptr ),
     m_wMinSlaves( 0 )
 
@@ -423,25 +424,14 @@ void IoRequestPacket::SetSyncCall( bool bSync )
         m_dwFlags &= ~IRP_SYNC_CALL;
 }
 
-bool IoRequestPacket::IsKeepAlive() const
+void IoRequestPacket::SetCbOnly( bool bCbOnly )
 {
-    guint32 ret = ( m_dwFlags & IRP_KEEP_ALIVE );
-
-    if( ret != 0 )
-        return true;
-
-    return false;
+    if( bCbOnly )
+        m_dwFlags |= IRP_CALLBACK_ONLY;
+    else
+        m_dwFlags &= ~IRP_CALLBACK_ONLY;
 }
 
-void IoRequestPacket::SetKeepAlive()
-{
-    m_dwFlags |= IRP_KEEP_ALIVE;
-}
-
-void IoRequestPacket::ClearKeepAlive()
-{
-    m_dwFlags &= ~IRP_KEEP_ALIVE;
-}
 
 gint32 IoRequestPacket::WaitForComplete()
 {
@@ -580,7 +570,7 @@ gint32 IoRequestPacket::OnEvent(
             IrpCtxPtr& pCtx = GetTopStack();
             ret = -ETIMEDOUT;
             pCtx->SetStatus( ret );
-            pMgr->CompleteIrp( this );
+            pMgr->CancelIrp( this, true, ret );
             break;
         }
     default:

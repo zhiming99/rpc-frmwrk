@@ -1158,9 +1158,18 @@ class CDeferredCallBase :
     virtual gint32 operator()( guint32 dwContext )
     {
         if( m_pObj.IsEmpty() )
-            return -EINVAL;
+            return this->SetError( -EINVAL );
 
-        return this->Delegate( m_pObj, m_vecArgs );
+        gint32 ret = this->Delegate( m_pObj, m_vecArgs );
+        return this->SetError( ret );
+    }
+
+    gint32 UpdateParamAt( guint32 i, BufPtr& pBuf )
+    {
+        if( i >= m_vecArgs.size() || i < 0 )
+            return -EINVAL;
+        m_vecArgs[ i ] = pBuf;
+        return 0;
     }
 };
 
@@ -1253,15 +1262,168 @@ inline gint32 NewDeferredCall( TaskletPtr& pCallback,
 
 #define DEFER_CALL( pMgr, pObj, func, ... ) \
 ({ \
-    TaskletPtr pTask; \
-    gint32 ret_ = NewDeferredCall( pTask, pObj, func, ##__VA_ARGS__  ); \
+    TaskletPtr __pTask; \
+    gint32 ret_ = NewDeferredCall( __pTask, pObj, func, ##__VA_ARGS__  ); \
     if( SUCCEEDED( ret_ ) ) \
-        ret_ = pMgr->RescheduleTask( pTask ); \
+        ret_ = pMgr->RescheduleTask( __pTask ); \
     ret_; \
 })
 
-#define DEFER_CALL_NOSCHED( pTask, pObj, func, ... ) \
-    NewDeferredCall( pTask, pObj, func , ##__VA_ARGS__ )
+#define DEFER_CALL_NOSCHED( __pTask, pObj, func, ... ) \
+    NewDeferredCall( __pTask, pObj, func , ##__VA_ARGS__ )
+
+#define DEFER_CALL_DELAY( pMgr, iSec, pObj, func, ... ) \
+({ \
+    TaskletPtr __pTask; \
+    gint32 ret_ = NewDeferredCall( __pTask, pObj, func, ##__VA_ARGS__  ); \
+    if( SUCCEEDED( ret_ ) ) \
+    { \
+        CTimerService& oTimerSvc = pMgr->GetUtils().GetTimerSvc();\
+        IEventSink* pEvent = __pTask;\
+        if( pEvent != nullptr )\
+            ret_ = oTimerSvc.AddTimer( iSec, pEvent, 0 );\
+        else\
+            ret_ = -EFAULT;\
+    }\
+    ret_; \
+})
+
+class CIfDeferCallTask :
+    public CIfRetryTask
+{
+    TaskletPtr m_pDeferCall;
+    public:
+    typedef CIfRetryTask super;
+    CIfDeferCallTask( const IConfigDb* pCfg )
+        :super( pCfg )
+    { SetClassId( clsid( CIfDeferCallTask ) );}
+
+    void SetDeferCall( TaskletPtr& pTask )
+    { m_pDeferCall = pTask; }
+
+    // just as a place holder
+    virtual gint32 RunTask()
+    {
+        if( m_pDeferCall.IsEmpty() )
+            return 0;
+
+        return ( *m_pDeferCall )( 0 );
+    }
+
+    gint32 UpdateParamAt(
+        guint32 i, BufPtr pBuf )
+    {
+        CDeferredCallBase< CTasklet >* pTask =
+            m_pDeferCall;
+        if( pTask == nullptr )
+            return -EINVAL;
+
+        return pTask->UpdateParamAt( i, pBuf );
+    }
+
+    gint32 OnComplete( gint32 iRetVal )
+    {
+        gint32 ret = super::OnComplete( iRetVal );
+        m_pDeferCall.Clear();
+        return ret;
+    }
+};
+
+template < typename C, typename ... Types, typename ...Args>
+inline gint32 NewIfDeferredCall( TaskletPtr& pCallback,
+    ObjPtr pIf, gint32(C::*f)(Types ...), Args&&... args )
+{
+    TaskletPtr pWrapper;
+    gint32 ret = NewDeferredCall( pWrapper, pIf, f, args... );
+    if( ERROR( ret ) )
+        return ret;
+
+    TaskletPtr pIfTask;
+    CParamList oParams;
+    oParams[ propIfPtr ] = pIf;
+    ret = pIfTask.NewObj(
+        clsid( CIfDeferCallTask ),
+        oParams.GetCfg() );
+    if( ERROR( ret ) )
+        return ret;
+
+    CIfDeferCallTask* pDeferTask = pIfTask;
+    pDeferTask->SetDeferCall( pWrapper );
+    pCallback = pDeferTask;
+    return 0;
+}
+
+#define DEFER_IFCALL_NOSCHED( __pTask, pObj, func, ... ) \
+    NewIfDeferredCall( __pTask, pObj, func , ##__VA_ARGS__ )
+
+class CIfDeferredHandler :
+    public CIfInterceptTaskProxy
+{
+    TaskletPtr m_pDeferCall;
+    public:
+    typedef CIfInterceptTaskProxy super;
+    CIfDeferredHandler( const IConfigDb* pCfg )
+        :super( pCfg )
+    { SetClassId( clsid( CIfDeferredHandler ) );}
+
+    void SetDeferCall( TaskletPtr& pTask )
+    { m_pDeferCall = pTask; }
+
+    // just as a place holder
+    gint32 RunTask();
+    gint32 UpdateParamAt( guint32 i, BufPtr pBuf );
+    gint32 OnTaskComplete( gint32 iRet );
+    gint32 OnComplete( gint32 iRetVal );
+};
+
+template < typename C, typename ... Types, typename ...Args>
+inline gint32 NewDeferredHandler( TaskletPtr& pCallback,
+    ObjPtr pIf, gint32(C::*f)(Types ...),
+    IEventSink* pTaskToIntercept, Args&&... args )
+{
+    TaskletPtr pWrapper;
+    if( pTaskToIntercept == nullptr ||
+        pIf.IsEmpty() )
+        return -EINVAL;
+
+    gint32 ret = NewDeferredCall(
+        pWrapper, pIf, f, pTaskToIntercept, args... );
+
+    if( ERROR( ret ) )
+        return ret;
+
+    TaskletPtr pIfTask;
+    CParamList oParams;
+    oParams[ propIfPtr ] = pIf;
+
+    oParams[ propEventSink ] =
+        ObjPtr( pTaskToIntercept );
+
+    ret = pIfTask.NewObj(
+        clsid( CIfDeferredHandler ),
+        oParams.GetCfg() );
+    if( ERROR( ret ) )
+        return ret;
+
+    CIfDeferredHandler* pDeferTask = pIfTask;
+    pDeferTask->SetDeferCall( pWrapper );
+
+    BufPtr pBuf( true );
+    *pBuf = ObjPtr( pDeferTask );
+
+    // for the handler method, pass the pDeferTask
+    // as the callback
+    ret = pDeferTask->UpdateParamAt( 0, pBuf );
+    if( ERROR( ret ) )
+        return ret;
+
+    pCallback = pDeferTask;
+
+    return 0;
+}
+
+#define DEFER_HANDLER_NOSCHED( __pTask, pObj, func, pCallback, ... ) \
+    NewDeferredHandler( __pTask, pObj, func , pCallback, ##__VA_ARGS__ )
 
 // to insert the task pInterceptor to the head of
 // completion chain of the task pTarget 

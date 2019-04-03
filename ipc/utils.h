@@ -104,6 +104,8 @@ class COneshotTaskThread : public CTaskThread
     typedef CTaskThread super;
 
     COneshotTaskThread();
+    ~COneshotTaskThread();
+
     virtual void ThreadProc( void* context );
     gint32 Start();
     gint32 Stop();

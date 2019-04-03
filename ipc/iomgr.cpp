@@ -32,6 +32,7 @@
 using namespace std;
 
 bool CIoManager::m_bInit( false );
+bool CIoManager::m_bStop( false );
 
 gint32 CIoManager::SubmitIrpInternal(
     IPort* pPort,
@@ -59,10 +60,8 @@ gint32 CIoManager::SubmitIrpInternal(
         oStackEntry.first = pPort;
         pPort->AllocIrpCtxExt( oStackEntry.second );
 
-
         CStdRMutex a( pIrp->GetLock() );
         ret = pPort->SubmitIrp( pIrp );
-
         if( ret != STATUS_PENDING )
         {
             // make this irp unaccessable
@@ -322,44 +321,47 @@ gint32 CIoManager::CompleteIrp( IRP* pIrpComp )
             break;
 
         // walk through the irp context stack
-        vector< pair< PortPtr, IrpCtxPtr > >::iterator itr ;
+        vector< pair< PortPtr, IrpCtxPtr > >::iterator itr;
 
-        if( pIrp->GetStackSize() > 0 )
+        if( !pIrp->IsCbOnly() )
         {
-            itr = pIrp->m_vecCtxStack.end() - 1;
-            do{
-                if( !itr->first.IsEmpty()  )
-                {
-                    pIrp->SetCurPos( itr - pIrp->m_vecCtxStack.begin() );
-                    ret = itr->first->CompleteIrp( pIrp );
-                    if( ret == STATUS_PENDING )
+            if( pIrp->GetStackSize() > 0 )
+            {
+                itr = pIrp->m_vecCtxStack.end() - 1;
+                do{
+                    if( !itr->first.IsEmpty()  )
                     {
-                        // FIXME: Is it the responsibility of the
-                        // guy who returns STATUS_PENDING to set the
-                        // irp to the proper state
-                        // 
-                        pIrp->SetState(
-                            IRP_STATE_COMPLETING, IRP_STATE_READY );
+                        pIrp->SetCurPos( itr - pIrp->m_vecCtxStack.begin() );
+                        ret = itr->first->CompleteIrp( pIrp );
+                        if( ret == STATUS_PENDING )
+                        {
+                            // FIXME: Is it the responsibility of the
+                            // guy who returns STATUS_PENDING to set the
+                            // irp to the proper state
+                            // 
+                            pIrp->SetState(
+                                IRP_STATE_COMPLETING, IRP_STATE_READY );
 
-                        // NOTE: the user will have to reset
-                        // the irp state to a proper value
-                        //
-                        // we need to stop the completion and
-                        // return immediately
-                        return ret;
+                            // NOTE: the user will have to reset
+                            // the irp state to a proper value
+                            //
+                            // we need to stop the completion and
+                            // return immediately
+                            return ret;
+                        }
                     }
-                }
 
-            }while( itr-- != pIrp->m_vecCtxStack.begin() );
+                }while( itr-- != pIrp->m_vecCtxStack.begin() );
 
-            // we should not pop out the first io stack
-            // because it is owned by the user land
-            itr = pIrp->m_vecCtxStack.begin();
-            pIrp->SetStatus( itr->second->GetStatus() );
-        }
-        else
-        {
-            pIrp->SetStatus( -ENOENT );
+                // we should not pop out the first io stack
+                // because it is owned by the user land
+                itr = pIrp->m_vecCtxStack.begin();
+                pIrp->SetStatus( itr->second->GetStatus() );
+            }
+            else
+            {
+                pIrp->SetStatus( -ENOENT );
+            }
         }
 
         // remove the timer if any
@@ -386,10 +388,13 @@ gint32 CIoManager::CompleteIrp( IRP* pIrpComp )
 
         if( pIrp->m_vecCtxStack.size() )
         {
-            // we need to remove port reference at the
-            // bottom of the port stack
-            itr = pIrp->m_vecCtxStack.begin();
-            itr->first = nullptr; ;
+            // we cannot remove the port reference
+            // here, since the AllocIrpCtxExt need
+            // a ReleaseIrpCtxExt to release the
+            // resources in the irp's destructor
+            //
+            // itr = pIrp->m_vecCtxStack.begin();
+            // itr->first = nullptr; ;
         }
 
 
@@ -579,52 +584,52 @@ gint32 CIoManager::CancelIrp(
         vector< pair< PortPtr, IrpCtxPtr > >::iterator itr =
             pIrp->m_vecCtxStack.end() - 1;
 
-        if( pIrp->GetStackSize() > 0 )
+        if( !pIrp->IsCbOnly() )
         {
-            bool bFirst = true;
-            do{
-                if( !itr->first.IsEmpty() )
-                {
-                    // set the status for the top stack
-                    if( bFirst )
+            if( pIrp->GetStackSize() > 0 )
+            {
+                bool bFirst = true;
+                do{
+                    if( !itr->first.IsEmpty() )
                     {
-                        itr->second->SetStatus(
-                            iRet == 0 ? -ECANCELED : iRet );
+                        // set the status for the top stack
+                        if( bFirst )
+                        {
+                            itr->second->SetStatus(
+                                iRet == 0 ? -ECANCELED : iRet );
 
-                        bFirst = false;
+                            bFirst = false;
+                        }
+
+                        pIrp->SetCurPos( itr - pIrp->m_vecCtxStack.begin() );
+                        itr->first->CancelIrp( pIrp, bForce );
                     }
 
-                    pIrp->SetCurPos( itr - pIrp->m_vecCtxStack.begin() );
-                    itr->first->CancelIrp( pIrp, bForce );
-                }
+                    // the context stack will be popped by the
+                    // Port's CancelIrp
+                    //
+                    // Note that the top most IRP_CONTEXT will
+                    // not be popped by the port at the bottom of
+                    // the port stack
+                    //
+                    // the rest non-bottom ports will
+                    // face the IRP_CONTEXT it prepared for
+                    // the its lower port
 
-                // the context stack will be popped by the
-                // Port's CancelIrp
-                //
-                // Note that the top most IRP_CONTEXT will
-                // not be popped by the port at the bottom of
-                // the port stack
-                //
-                // the rest non-bottom ports will
-                // face the IRP_CONTEXT it prepared for
-                // the its lower port
+                }while( itr-- != pIrp->m_vecCtxStack.begin() );
 
-            }while( itr-- != pIrp->m_vecCtxStack.begin() );
-
-            itr = pIrp->m_vecCtxStack.begin();
-            pIrp->SetStatus( itr->second->GetStatus() );
+                itr = pIrp->m_vecCtxStack.begin();
+            }
         }
-        else
-        {
-            pIrp->SetStatus( -ECANCELED );
-        }
+        pIrp->SetStatus( iRet );
 
         if( pIrp->GetStackSize() > 0 )
         {
             // we need to remove port reference at the
             // bottom of the port stack
-            itr = pIrp->m_vecCtxStack.begin();
-            itr->first = nullptr;
+            //
+            // itr = pIrp->m_vecCtxStack.begin();
+            // itr->first = nullptr;
         }
 
         // we leave the last IRP_CONTEXT for the io manager
@@ -818,8 +823,58 @@ gint32 CIoManager::OpenPortByPath(
     return ret;
 }
 
+gint32 CIoManager::CloseChildPort(
+    IPort* pBusPort,
+    IPort* pPort,
+    IEventSink* pCallback )
+{
+    if( pPort == nullptr ||
+        pBusPort == nullptr ||
+        pCallback == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        IrpPtr pIrp( true );
+        pIrp->AllocNextStack( nullptr );
+        IrpCtxPtr& pIrpCtx = pIrp->GetTopStack(); 
+
+        // stop the child port
+        pIrpCtx->SetMajorCmd( IRP_MJ_PNP );
+        pIrpCtx->SetMinorCmd( IRP_MN_PNP_STOP_CHILD );
+        pIrpCtx->SetIoDirection( IRP_DIR_OUT );
+        pBusPort->AllocIrpCtxExt( pIrpCtx );
+
+        BufPtr pBuf( true );
+        *pBuf = ObjPtr( pPort );
+        pIrpCtx->SetReqData( pBuf );
+
+        pIrp->SetCallback( pCallback, 0 );
+        pIrp->SetTimer(
+            PORT_START_TIMEOUT_SEC, this );
+
+        HANDLE hBusPort =
+            PortToHandle( pBusPort );
+
+        pIrp->SetIrpThread( this );
+
+        ret = SubmitIrp( hBusPort, pIrp, false );
+        if( ret != STATUS_PENDING )
+        {
+            pIrp->RemoveTimer();
+            pIrp->RemoveCallback();
+            pIrp->ClearIrpThread();
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CIoManager::ClosePort(
-    HANDLE hPort, IEventSink* pEvent )
+    HANDLE hPort,
+    IEventSink* pEvent, // the registered interface
+    IEventSink* pCallback ) // the callback for complete stop
 {
     // Note: we need to make sure all the irps are
     // completed or canceled and the interface
@@ -848,12 +903,33 @@ gint32 CIoManager::ClosePort(
         if( !bNoRef )
             break;
 
-        if( pPort->Unloadable() )
+        if( pPort->Unloadable() && !m_bStop )
         {
-            DEFER_CALL( this,
-                &GetPnpMgr(),
-                &CPnpManager::DestroyPortStack,
-                ( ( IPort* )pPort ) );
+            IPort* pBusPort = nullptr;
+
+            CCfgOpenerObj oPortCfg( pPort );
+            ret = oPortCfg.GetPointer(
+                propBusPortPtr, pBusPort );
+
+            if( ERROR( ret ) )
+            {
+                ret = DEFER_CALL( this,
+                    &GetPnpMgr(),
+                    &CPnpManager::DestroyPortStack,
+                    ( ( IPort* )pPort ) );
+                if( SUCCEEDED( ret ) )
+                {
+                    // the notification will be
+                    // via the OnPortEvent method
+                    // on the interface object
+                    ret = STATUS_PENDING;
+                }
+            }
+            else
+            {
+                ret = CloseChildPort( pBusPort,
+                    pPort, pCallback );
+            }
         }
 
     }while( 0 );
@@ -1147,6 +1223,21 @@ gint32 CIoManager::OnEvent( EnumEventId iEvent,
                 break;
             }
         }
+    case eventTimeout:
+        {
+            switch( ( EnumEventId )dwParam1 )
+            {
+            case eventHouseClean:
+                {
+                    ClearStandAloneThreads();
+                    m_iHcTimer = GetUtils().GetTimerSvc().
+                        AddTimer( 30, this, eventHouseClean );
+                    break;
+                }
+            default:
+                break;
+            }
+        }
     default:
         break;
     }
@@ -1271,6 +1362,7 @@ gint32 CIoManager::Start()
         }
 
         m_bInit = true;
+        m_bStop = false;
 
         GetTaskThreadPool().Start();
         GetIrpThreadPool().Start();
@@ -1304,6 +1396,9 @@ gint32 CIoManager::Start()
 
         this->OnEvent( eventWorkitem,
             eventStart, 0, nullptr );
+
+        m_iHcTimer = GetUtils().GetTimerSvc().
+            AddTimer( 30, this, eventHouseClean );
 
     }while( 0 );
 
@@ -1505,8 +1600,8 @@ gint32 CIoManager::RescheduleTask(
 
             if( pgth )
             {
-                pgth->AddTask( pTask );
                 pTask->MarkPending();
+                pgth->AddTask( pTask );
             }
         }
 
@@ -1532,6 +1627,20 @@ gint32 CIoManager::Stop()
     gint32 ret = 0;
     CCfgOpener a;
     a.SetPointer( propIoMgr, this );
+    if( true )
+    {
+        CStdRMutex oMgrLock( GetLock() );
+        if( m_bStop )
+            return ERROR_STATE;
+        m_bStop = true;
+    }
+
+    if( m_iHcTimer != 0 )
+    {
+        GetUtils().GetTimerSvc().
+            RemoveTimer( m_iHcTimer );
+        m_iHcTimer = 0;
+    }
 
     ret = ScheduleTask(
         clsid( CIoMgrStopTask ),
@@ -1662,6 +1771,7 @@ CIoManager::CIoManager( const std::string& strModName ) :
         }
 
         m_pReg->MakeDir( "/cmdline" );
+        m_iHcTimer = 0;
 
     }while( 0 );
 
@@ -1757,12 +1867,12 @@ gint32 CIoMgrStopTask::operator()(
     {
         // NOTE: we cannot stop task
         // thread pool here
-        ret = pMgr->GetMainIoLoop()->Stop();
         ret = pMgr->GetDrvMgr().Stop();
         ret = pMgr->GetPnpMgr().Stop();
-        ret = pMgr->GetUtils().Stop();
-        ret = pMgr->GetIrpThreadPool().Stop();
         ret = pMgr->GetTaskThreadPool().Stop();
+        ret = pMgr->GetIrpThreadPool().Stop();
+        ret = pMgr->GetMainIoLoop()->Stop();
+        ret = pMgr->GetUtils().Stop();
     }
 
     if( dwContext == eventOneShotTaskThrdCtx )

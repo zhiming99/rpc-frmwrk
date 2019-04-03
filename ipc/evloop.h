@@ -77,6 +77,12 @@ class CDBusLoopHooks : public CObjBase
 
     void WakeupDispatch(
         DBusDispatchStatus iStat );
+
+    inline bool IsDBusWatchRemoved()
+    {
+        CStdRMutex oLock( GetLock() );
+        return m_setIoCbs.empty();
+    }
 };
 
 typedef CAutoPtr< clsid( CDBusLoopHooks ), CDBusLoopHooks > DHookPtr;
@@ -329,6 +335,8 @@ class CEvLoop :
     // IService
     gint32 Start();
     gint32 Stop();
+
+    gint32 StopDBusConn();
 
     gint32 AsyncSend( HANDLE hWatch );
     void WakeupLoop();

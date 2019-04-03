@@ -143,8 +143,16 @@ gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
         ret = -EINVAL;
         return ret;
     }
-    val = ( bool& )*pBuf;
-    return 0;
+    guint32 dwVal = *pBuf;
+
+    if( dwVal == 1 )
+        val = true;
+    else if( dwVal == 0 )
+        val = false;
+    else
+        ret = -ERANGE;
+
+    return ret;
 }
 
 gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
@@ -449,6 +457,9 @@ int CAutoPtr< Clsid_Invalid, DBusMessage >
     }
 }
 
+#define DUMP_DMSG 1
+
+
 gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
     ::Serialize( CBuffer* pBuf )
 {
@@ -485,6 +496,21 @@ gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
         ret = pBuf->Append( pData, dwSize );
         if( ERROR( ret ) )
             break;
+#ifdef DUMP_DMSG
+        do{
+            static bool bWritten = false;
+            if( !bWritten )
+            {
+                FILE* fp = fopen( "dmsgdmp", "a+" );
+                if( fp != nullptr )
+                {
+                    fwrite( pData, 1, dwSize, fp );
+                    fclose( fp );
+                    bWritten = true;
+                }
+            }
+        }while( 0 );
+#endif
 
     }while( 0 );
 

@@ -184,6 +184,23 @@ inline std::string DBUS_OBJ_PATH(
     return strRet;
 }
 
+inline std::string DBUS_DESTINATION2(
+    const std::string& strModName,
+    const std::string& strObjName )
+{
+    std::string strRet =
+        DBUS_OBJ_PATH( strModName, strObjName );
+
+    std::replace( strRet.begin(),
+        strRet.end(), '/', '.' );
+
+    while( strRet.size() > 0 &&
+        strRet[ 0 ] == '.' )
+        strRet.erase( strRet.begin() );
+
+    return strRet;
+}
+
 #define SYS_METHOD_SENDDATA             "RpcCall_SendData"
 #define SYS_METHOD_FETCHDATA            "RpcCall_FetchData"
 #define SYS_METHOD_FORWARDREQ           "RpcCall_ForwardRequest"
@@ -191,6 +208,7 @@ inline std::string DBUS_OBJ_PATH(
 #define SYS_METHOD_CLOSERMTPORT         "RpcCall_CloseRemotePort"
 #define SYS_METHOD_ENABLERMTEVT         "RpcCall_EnableRemoteEvent"
 #define SYS_METHOD_DISABLERMTEVT        "RpcCall_DisableRemoteEvent"
+#define SYS_METHOD_CLEARRMTEVTS         "RpcCall_ClearRemoteEvents"
 
 
 #define SYS_METHOD_USERCANCELREQ        "RpcCall_UserCancelRequest"

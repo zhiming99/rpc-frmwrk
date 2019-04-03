@@ -36,7 +36,7 @@ std::map< STATEMAP_KEY, EnumIfState > CInterfaceState::m_mapState =
 {
     STATEMAP_ENTRY( stateStopped,   cmdOpenPort,            stateStarting ),
     STATEMAP_ENTRY( stateStarting,  eventPortStarted,       stateConnected ),
-    STATEMAP_ENTRY( stateStarting,  eventPortStartFailed,   stateStopped ),
+    STATEMAP_ENTRY( stateStarting,  eventPortStartFailed,   stateStopping ),
     STATEMAP_ENTRY( stateStarting,  eventPortStopping,      stateStopped ),
     STATEMAP_ENTRY( stateStarting,  eventDBusOffline,       stateStopped ),
     STATEMAP_ENTRY( stateStarting,  eventRmtSvrOffline,     stateStopped ),
@@ -66,6 +66,7 @@ std::map< STATEMAP_KEY, EnumIfState > CInterfaceState::m_mapState =
     STATEMAP_ENTRY( statePaused,    cmdResume,              stateResuming ),
     STATEMAP_ENTRY( statePausing,   eventPaused,            statePaused ),
     STATEMAP_ENTRY( stateStopping,  cmdClosePort,           stateStopped ),
+    STATEMAP_ENTRY( stateStopping,  eventRetry,             stateStarting ),
     STATEMAP_ENTRY( stateResuming,  eventResumed,           stateConnected ),
 
     // unknown means the value depends on the m_iResumeState
@@ -375,6 +376,12 @@ gint32 CInterfaceState::OnPortEvent(
                 break;
             }
         case eventPortStopped:
+            {
+                m_hPort = 0;
+                UnsubscribeEvents();
+                ret = SetStateOnEvent( cmdClosePort );
+                break;
+            }
         default:
             {
                 break;
@@ -617,19 +624,27 @@ gint32 CInterfaceState::OpenPortInternal(
     return ret;
 }
 
-gint32 CInterfaceState::ClosePort()
+gint32 CInterfaceState::ClosePort(
+    IEventSink* pCallback )
 {
     gint32 ret = 0;
     if( m_hPort != 0 )
     {
-        ret = GetIoMgr()->ClosePort(
-            m_hPort, GetInterface() );
-
-        m_hPort = 0;
+        // cut off the feedback the underlying
+        // port could emit on port unloading
         UnsubscribeEvents();
+        HANDLE hPort = m_hPort;
+        m_hPort = 0;
+
+        ret = GetIoMgr()->ClosePort( hPort,
+            GetInterface(), pCallback );
+
+        if( ret == STATUS_PENDING )
+            return ret;
+
         SetStateOnEvent( cmdClosePort );
     }
-    return ret;
+    return -EINVAL;
 }
 
 

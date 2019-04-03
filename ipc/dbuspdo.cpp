@@ -257,7 +257,6 @@ CDBusLocalPdo::~CDBusLocalPdo()
 {
     if( m_pDBusConn )
     {
-        dbus_connection_close( m_pDBusConn );
         dbus_connection_unref( m_pDBusConn );
         m_pDBusConn = nullptr;
     }
@@ -364,10 +363,6 @@ DBusHandlerResult CDBusLocalPdo::DispatchDBusSysMsg(
         {
             ret = DBUS_HANDLER_RESULT_HANDLED;
         }
-    }
-    else
-    {
-        ret = DBUS_HANDLER_RESULT_HALT;
     }
 
     return ret;
@@ -489,7 +484,7 @@ gint32 CDBusLocalPdo::SubmitIoctlCmd(
     gint32 ret = 0;
 
     // let's process the func irps
-    IrpCtxPtr& pCtx = pIrp->GetCurCtx();
+    IrpCtxPtr pCtx = pIrp->GetCurCtx();
 
     do{
 

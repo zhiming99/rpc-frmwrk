@@ -237,9 +237,10 @@ gint32 CRpcBaseOperations::OpenPort(
     return ret;
 }
 
-gint32 CRpcBaseOperations::ClosePort()
+gint32 CRpcBaseOperations::ClosePort(
+    IEventSink* pCallback )
 {
-    return m_pIfStat->ClosePort();
+    return m_pIfStat->ClosePort( pCallback );
 }
 
 // start listening the event from the interface
@@ -342,7 +343,6 @@ gint32 CRpcBaseOperations::DisableEvent(
 
     if( iState == stateStarting ||
         iState == stateStopped ||
-        iState == stateStopping ||
         iState == stateInvalid )
         return ERROR_STATE;
 
@@ -434,13 +434,6 @@ gint32 CRpcBaseOperations::StartRecvMsg(
         pIrp->SetIrpThread( pMgr ); 
         pIrp->SetSyncCall( false );
         pIrp->RemoveTimer();
-
-        CInterfaceState* pIfStat = m_pIfStat;
-        if( pIfStat == nullptr )
-        {
-            ret = -EFAULT;
-            break;
-        }
 
         // make a copy of the irp for canceling
         ret = oTaskCfg.SetObjPtr(
@@ -609,6 +602,155 @@ gint32 CRpcInterfaceBase::Start()
     return ret;
 }
 
+gint32 CRpcInterfaceBase::GetParallelGrp(
+    TaskGrpPtr& pParaGrp )
+{
+    TaskGrpPtr pRootTaskGrp;
+    CIfRootTaskGroup* pRootGrp = nullptr;
+
+    if( true )
+    {
+        pRootTaskGrp = GetTaskGroup();
+        if( pRootTaskGrp.IsEmpty() )
+            return -ENOENT;
+
+        // as a guard to the root group
+        pRootGrp = pRootTaskGrp;
+    }
+
+    gint32 ret = 0;
+
+    do{
+        std::vector< TaskletPtr > vecTasks;
+        ret = pRootGrp->FindTaskByClsid(
+            clsid( CIfParallelTaskGrp ),
+            vecTasks );
+        if( ERROR( ret ) )
+            break;
+
+        // return the first one
+        pParaGrp = vecTasks.front();
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CRpcInterfaceBase::StartRecvTasks(
+    std::vector< MatchPtr >& vecMatches )
+{
+    gint32 ret = 0;
+
+    if( vecMatches.empty() )
+        return -EINVAL;
+
+    do{
+        // we cannot add the recvtask by AddAndRun
+        // at this point, because it requires the
+        // interface to be in the connected state,
+        // while we may still in the starting or
+        // stopped state
+        CParamList oParams;
+
+        ret = oParams.SetObjPtr(
+            propIfPtr, ObjPtr( this ) );
+
+        if( ERROR( ret  ) )
+            break;
+
+        TaskGrpPtr pParaTaskGrp;
+        ret = GetParallelGrp( pParaTaskGrp );
+        if( ERROR( ret ) )
+        {
+            ret = pParaTaskGrp.NewObj(   
+                clsid( CIfParallelTaskGrp ),
+                oParams.GetCfg() );
+
+            if( ERROR( ret ) )
+                break;
+        }
+            
+        CIfParallelTaskGrp* pTaskGrp
+            = pParaTaskGrp;
+
+        TaskletPtr pRecvMsgTask;
+        for( auto pMatch : vecMatches )
+        {
+            oParams[ propMatchPtr ] =
+                ObjPtr( pMatch );
+
+            ret = pRecvMsgTask.NewObj(
+                clsid( CIfStartRecvMsgTask ),
+                oParams.GetCfg() );
+
+            if( ERROR( ret ) )
+                break;
+
+            ret = pTaskGrp->AppendTask(
+                pRecvMsgTask );
+
+            if( ERROR( ret ) )
+                break;
+        }
+
+        if( ERROR( ret ) )
+            break;
+
+        TaskletPtr pTask = pParaTaskGrp;
+        ret = AppendAndRun( pTask );
+
+        if( ERROR( ret ) )
+            break;
+
+        // the ret does not necessarily indicate
+        // the return value of the receive task.
+        // we need to get the status code from the
+        // task.
+        ret = pParaTaskGrp->GetError();
+        if( ret == STATUS_PENDING )
+            ret = 0;
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CIfStartExCompletion::OnTaskComplete(
+    gint32 iRet )
+{
+    if( ERROR( iRet ) )
+        return iRet;
+
+    gint32 ret = 0;
+    do{
+        CParamList oParams(
+            ( IConfigDb*)GetConfig() );
+
+        CRpcInterfaceBase* pIf = nullptr;
+
+        ret = oParams.GetPointer(
+            propIfPtr, pIf );
+
+        if( ERROR( ret ) )
+            break;
+
+        intptr_t ptrMatches = oParams[ 0 ];
+        std::vector< MatchPtr >* pMatches =
+            ( std::vector< MatchPtr >* ) ptrMatches;
+
+        if( unlikely( pMatches == nullptr ) )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        ret = pIf->StartRecvTasks( *pMatches );
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CRpcInterfaceBase::StartEx(
     IEventSink* pCallback )
 {
@@ -621,7 +763,6 @@ gint32 CRpcInterfaceBase::StartEx(
     do{
         TaskletPtr pOpenPortTask;
         TaskletPtr pEnableEvtTask;
-        TaskletPtr pRecvMsgTask;
 
         EnumIfState iState = GetState();
 
@@ -693,14 +834,37 @@ gint32 CRpcInterfaceBase::StartEx(
         if( ERROR( ret ) )
             break;
 
+        CParamList oTaskParam;
+        TaskletPtr pStartComp;
         if( pCallback != nullptr )
         {
-            ret = oCfg.SetObjPtr(
-                propEventSink, ObjPtr( pCallback) );
-
-            if( ERROR( ret ) )
-                break;
+            oTaskParam[ propEventSink ] =
+                ObjPtr( pCallback );
         }
+
+        oTaskParam[ propIfPtr ] =
+            ObjPtr( this );
+
+        ret = oTaskParam.Push(
+            ( intptr_t )&m_vecMatches );
+
+        if( ERROR( ret ) )
+            break;
+
+        ret = pStartComp.NewObj(
+            clsid( CIfStartExCompletion ),
+            oTaskParam.GetCfg() );
+
+        if( ERROR( ret ) )
+            break;
+
+         ( *pStartComp )( eventZero );
+
+        ret = oCfg.SetObjPtr(
+            propEventSink, ObjPtr( pStartComp ) );
+
+        if( ERROR( ret ) )
+            break;
 
         TaskletPtr pTask = pTaskGrp;
         if( pTask.IsEmpty() )
@@ -711,82 +875,28 @@ gint32 CRpcInterfaceBase::StartEx(
 
         ret = AppendAndRun( pTask );
         if( ERROR( ret ) )
+        {
+            ( *pTask )( eventCancelTask );
+            break;
+        }
+
+        ret = pTask->GetError();
+        if( ret == STATUS_PENDING )
             break;
 
-        bool bConnected = false;
-        ret = pTask->GetError();
-
         if( SUCCEEDED( ret ) && IsConnected() )
-            bConnected = true;
-
-        if( bConnected )
-        {
-            bool bEnable = false;
-            oParams.Pop( bEnable );
-            oParams.Pop( bEnable );
-
-            // we cannot add the recvtask by AddAndRun
-            // at this point, because it requires the
-            // interface to be in the connected state,
-            // while we are still in the stopped state
-            CCfgOpener oRecvCfg;
-
-            ret = oRecvCfg.SetObjPtr(
-                propIfPtr, ObjPtr( this ) );
-
-            if( ERROR( ret  ) )
-                break;
-
-            TaskletPtr pParaTaskGrp;
-            ret = pParaTaskGrp.NewObj(   
-                clsid( CIfParallelTaskGrp ),
-                oRecvCfg.GetCfg() );
-
-            if( ERROR( ret ) )
-                break;
-                
-            CIfParallelTaskGrp* pTaskGrp
-                = pParaTaskGrp;
-
-            for( auto pMatch : m_vecMatches )
-            {
-                oParams[ propMatchPtr ] =
-                    ObjPtr( pMatch );
-
-                ret = pRecvMsgTask.NewObj(
-                    clsid( CIfStartRecvMsgTask ),
-                    oParams.GetCfg() );
-
-                if( ERROR( ret ) )
-                    break;
-
-                ret = pTaskGrp->AppendTask(
-                    pRecvMsgTask );
-
-                if( ERROR( ret ) )
-                    break;
-            }
-
-            if( ERROR( ret ) )
-                break;
-
-            ret = AppendAndRun( pParaTaskGrp );
-            if( ERROR( ret ) )
-                break;
-
-            // the ret does not necessarily indicate
-            // the return value of the receive task. we
-            // need to get the status code from the
-            // task.
-            ret = pParaTaskGrp->GetError();
-            if( ret == STATUS_PENDING )
-                ret = 0;
-        }
+            ret = StartRecvTasks( m_vecMatches );
 
     }while( 0 );
 
     if( ret == STATUS_MORE_PROCESS_NEEDED )
         ret = STATUS_PENDING;
+
+    if( ERROR( ret ) )
+    {
+        ClearActiveTasks();
+        m_pRootTaskGroup.Clear();
+    }
 
     return ret;
 }
@@ -829,10 +939,29 @@ gint32 CRpcInterfaceBase::StopEx(
         return -EINVAL;
 
     gint32 ret = 0;
+#ifdef DEBUG
+    {
+        DebugPrint( ret, "interface stopping" );
+        string strDump;
+        this->Dump( strDump );
+        DebugPrint( ret, strDump );
+    }
+#endif
     do{
+        CStdRMutex oIfLock( GetLock() );
+        EnumIfState iState = GetState();
+        if( iState != stateStopping )
+        {
+            ret = SetStateOnEvent( cmdShutdown );
+            if( ERROR( ret ) )
+                break;
+
+            iState = GetState();
+        }
         if( stateStopping != GetState() )
             return ERROR_STATE;
 
+        oIfLock.Unlock();
         ret = OnPreStop( pCallback );
         if( ret == STATUS_PENDING )
             break;
@@ -887,29 +1016,36 @@ gint32 CRpcInterfaceBase::DoStop(
         if( ERROR( ret ) )
             break;
 
-        // enable or disable event
-        oParams.Push( false );
-        // Change Interface state or not
-        oParams.Push( false );
-
-        for( auto pMatch : m_vecMatches )
+        HANDLE hPort = GetPortHandle();
+        if( hPort != 0 )
         {
-            oParams[ propMatchPtr ] =
-                ObjPtr( pMatch );
+            // NOTE that, when stopping, we may
+            // have a partialized interface due to
+            // a failed start
+            //
+            // disable event
+            oParams.Push( false );
+            // Change Interface state or not
+            oParams.Push( false );
 
-            ret = pDisableEvtTask.NewObj(
-                clsid( CIfEnableEventTask ),
-                oParams.GetCfg() );
+            for( auto pMatch : m_vecMatches )
+            {
+                oParams[ propMatchPtr ] =
+                    ObjPtr( pMatch );
+
+                ret = pDisableEvtTask.NewObj(
+                    clsid( CIfEnableEventTask ),
+                    oParams.GetCfg() );
+
+                if( ERROR( ret ) )
+                    break;
+
+                pTaskGrp->AppendTask( pDisableEvtTask );
+            }
 
             if( ERROR( ret ) )
                 break;
-
-            pTaskGrp->AppendTask( pDisableEvtTask );
         }
-
-        if( ERROR( ret ) )
-            break;
-
         pTaskGrp->AppendTask( pClosePortTask );
         pTaskGrp->SetRelation( logicNONE );
 
@@ -957,6 +1093,7 @@ gint32 CRpcInterfaceBase::DoStop(
             break;
         }
 
+        pCompletion->MarkPending();
         ret = AppendAndRun( pTask );
         if( ERROR( ret ) )
             break;
@@ -965,6 +1102,8 @@ gint32 CRpcInterfaceBase::DoStop(
 
         if( ret != STATUS_PENDING )
         {
+            // the callback won't get called
+            pCompletion->MarkPending( false );
             ( *pCompletion )( eventZero );
         }
 
@@ -1070,10 +1209,6 @@ gint32 CRpcInterfaceBase::OnPortEvent(
     if( !IsMyPort( hPort ) )
         return -EINVAL;
 
-    ret = SetStateOnEvent( iEvent );
-    if( ERROR( ret ) )
-        return ret;
-
     switch( iEvent )
     {
     case eventPortStopping:
@@ -1081,6 +1216,10 @@ gint32 CRpcInterfaceBase::OnPortEvent(
             TaskletPtr pTask;
             ret = pTask.NewObj(
                 clsid( CIfDummyTask ) );
+
+            ret = SetStateOnEvent( iEvent );
+            if( ERROR( ret ) )
+                break;
 
             // we need an asynchronous call
             ret = StopEx( pTask );
@@ -1365,6 +1504,7 @@ gint32 CRpcInterfaceBase::OnEvent(
     case eventPortStarted:
     case eventPortStopping:
     case eventPortStartFailed:
+    case eventPortStopped:
         {
             ret = OnPortEvent( iEvent, dwParam1 );
 #ifdef DEBUG
@@ -1380,11 +1520,6 @@ gint32 CRpcInterfaceBase::OnEvent(
                 }
             }
 #endif
-            break;
-        }
-    case eventPortStopped:
-        {
-            ret = ERROR_STATE;
             break;
         }
     case eventModOnline:
@@ -1432,21 +1567,10 @@ gint32 CRpcInterfaceBase::OnEvent(
         {
             HANDLE hPort = ( guint32 )pData;
             string strIpAddr = reinterpret_cast
-                < char* >( dwParam1 );
-
-            CInterfaceState* pIfStat = m_pIfStat;
-            if( pIfStat == nullptr )
-                break;
-
-            if( hPort != GetPortHandle() )
-            {
-                ret = ERROR_ADDRESS;
-                break;
-            }
+                < const char* >( dwParam1 );
 
             ret = OnRmtSvrEvent(
                 iEvent, strIpAddr, hPort ); 
-
             break;
         }
     case cmdPause:
@@ -1478,11 +1602,21 @@ gint32 CRpcInterfaceBase::ClearActiveTasks()
 {
     gint32 ret = 0;
 
-    if( !m_pRootTaskGroup.IsEmpty() )
-    {
+    do{
         ret = ( *m_pRootTaskGroup )(
             eventCancelTask );
-    }
+        if( ret == STATUS_PENDING )
+        {
+            // sometimes, the system is busy and
+            // the root task group could also runs
+            // on another thread, wait for it to
+            // be available
+            usleep( 1000 );
+            continue;
+        }
+        break;
+
+    }while( 1 );
 
     return ret;
 }
@@ -1602,6 +1736,10 @@ gint32 CRpcInterfaceBase::AppendAndRun(
     if( pTask.IsEmpty() )
         return -EINVAL;
 
+    // possibly the initialization failed
+    if( m_pRootTaskGroup.IsEmpty() )
+        return -EFAULT;
+
     return m_pRootTaskGroup->
         AppendAndRun( pTask );
 }
@@ -1638,9 +1776,9 @@ gint32 CRpcInterfaceBase::AddAndRun(
 
     do{
         TaskletPtr pTail;
-        bool bTail = true;
+        bool bTail = false;
 
-        CStdRTMutex oTaskLock(
+        CStdRTMutex oRootLock(
             pRootTaskGroup->GetLock() );
 
         guint32 dwCount =
@@ -1649,22 +1787,39 @@ gint32 CRpcInterfaceBase::AddAndRun(
         ret = pRootTaskGroup->
             GetTailTask( pTail );
 
+        stdrtmutex* pParaLock = nullptr;
+        CIfParallelTaskGrp* pParaGrp = nullptr;
         if( SUCCEEDED( ret ) )
         {
-            CIfParallelTaskGrp* pParaGrp = pTail;
-            if( pParaGrp == nullptr )
+            pParaGrp = pTail;
+            if( pParaGrp != nullptr )
+                bTail = true;
+        }
+
+        if( bTail )
+        {
+            pParaLock = &pParaGrp->GetLock();
+            pParaLock->lock();
+            EnumTaskState iTaskState =
+                pParaGrp->GetTaskState();
+            if( iTaskState == stateStopped ||
+                ( iTaskState == stateStarted &&
+                    !pParaGrp->IsRunning() ) )
+            {
                 bTail = false;
+                pParaLock->unlock();
+            }
         }
 
         TaskletPtr pParaTask;
-        if( bTail && dwCount > 0 )
+        if( bTail )
         {
             pParaTask = pTail;
         }
-        else if( !bTail || dwCount == 0 )
+        else
         {
             // add a new parallel task group
-            // CStdRMutex oIfLock( GetLock() );
+            CStdRMutex oIfLock( GetLock() );
             if( !IsConnected() )
             {
                 ret = ERROR_STATE;
@@ -1685,57 +1840,104 @@ gint32 CRpcInterfaceBase::AddAndRun(
             if( ERROR( ret ) )
                 break;
                 
-            pRootTaskGroup->
+            ret = pRootTaskGroup->
                 AppendTask( pParaTask );
+            if( ERROR( ret ) )
+            {
+                DebugPrint( ret, "Fatal error, "
+                "can not add parallel task group" );
+                break;
+            }
 
-            pTail = pParaTask;
+            pParaGrp = pParaTask;
+            pParaLock= &pParaGrp->GetLock();
+            pParaLock->lock();
         }
 
-        CIfParallelTaskGrp* pParaTaskGrp =
-            pParaTask;
-
-        if( unlikely( pParaTaskGrp == nullptr ) )
-        {
-            // rollback
-            pRootTaskGroup->
-                RemoveTask( pParaTask );
-            ret = -EFAULT;
-            break;
-        }
+        bool bRunning = pParaGrp->IsRunning();
 
         // add the task to the pending queue or
         // run it immediately
-        bool bRunning = pParaTaskGrp->IsRunning();
-        if( !bImmediate ||
-            ( !bRunning || dwCount == 0 ) )
+        // immediate  running  dwcount
+        //     0       0       0       run root
+        //     0       0       1       pending
+        //     0       1       0       error
+        //     0       1       1       run root
+        //     1       0       0       run root
+        //     1       0       1       error
+        //     1       1       0       error
+        //     1       1       1       run direct
+        if( !bImmediate || ( !bRunning && dwCount == 0 ) )
         {
-            ret = pParaTaskGrp->AppendTask( pIoTask );
-            oTaskLock.Unlock();
-
+            ret = pParaGrp->AppendTask( pIoTask );
             if( ERROR( ret ) )
-                break;
-
-            if( dwCount == 0 || bRunning )
             {
-                // run the root task if the Parallel
-                // task group is not running yet
-                ( *pRootTaskGroup )( eventZero );
-                ret = pRootTaskGroup->GetError();
+                pParaLock->unlock();
+                break;
+            }
+
+            // actually the taskgroup can also run
+            // on the parallel taskgroup
+            CIfRetryTask* pRetryTask = pIoTask;
+            if( unlikely( pRetryTask == nullptr ) )
+            {
+                pParaLock->unlock();
+                ret = -EFAULT;
+                break;
+            }
+
+            if( dwCount == 0 && bRunning )
+            {
+                pParaLock->unlock();
+                ret = ERROR_STATE;
+                DebugPrint( GetTid(),
+                    "root task cannot run immediately, dwCount=%d, bRunning=%d",
+                    dwCount, bRunning );
+                break;
+            }
+            else if( dwCount > 0 && !bRunning )
+            {
+                // don't lock the io task, because
+                // it could cause deadlock
+                pIoTask->MarkPending();
+
+                pParaLock->unlock();
+                oRootLock.Unlock();
+                ret = STATUS_PENDING;
+
+                DebugPrint( GetTid(),
+                    "root task not run immediately 1, dwCount=%d, bRunning=%d",
+                    dwCount, bRunning );
             }
             else
             {
+                pIoTask->MarkPending();
+                pParaLock->unlock();
+                oRootLock.Unlock();
 
-                DebugPrint( GetTid(),
-                    "root task not run immediately, dwCount=%d, bRunning=%d",
-                    dwCount, bRunning );
+                // NOTE: there could be deep
+                // nesting. Reschedule can fix,
+                // but performance hurts
+                ( *pParaGrp )( eventZero );
+                ret = pIoTask->GetError();
             }
+        }
+        else if( bImmediate && bRunning && dwCount > 0 )
+        {
+            pParaLock->unlock();
+            oRootLock.Unlock();
+            // force to run the task on the
+            // current thread
+            ret = pParaGrp->RunTaskDirect( pIoTask );
+            if( ERROR( ret ) )
+                break;
+            ret = pIoTask->GetError();
         }
         else
         {
-            // force to run the task is running on
-            // the current thread
-            oTaskLock.Unlock();
-            ret = pParaTaskGrp->RunTaskDirect( pIoTask );
+            pParaLock->unlock();
+            oRootLock.Unlock();
+            ret = ERROR_STATE;
         }
 
     }while( 0 );
@@ -1755,8 +1957,19 @@ gint32 CRpcServices::GetIidFromIfName(
     string strIfName2 =
         IF_NAME_FROM_DBUS( strIfName );
 
-    ToInternalName( strIfName2 );
-    iid = CoGetIidFromIfName( strIfName2 );
+    char szBuf[ 256 ];
+    if( IsServer() )
+    {
+        sprintf( szBuf, "%s:s%lld",
+            strIfName2.c_str(), GetObjId() );
+    }
+    else
+    {
+        sprintf( szBuf, "%s:p%lld",
+            strIfName2.c_str(), GetObjId() );
+    }
+
+    iid = CoGetIidFromIfName( string( szBuf ) );
 
     if( iid == clsid( Invalid ) )
         return -ENOENT;
@@ -1911,6 +2124,7 @@ gint32 CRpcServices::OnPostStop(
 
     m_pFtsMatch.Clear();
     m_pStmMatch.Clear();
+    m_pSeqTasks.Clear(); 
 
     return 0;
 }
@@ -2349,10 +2563,10 @@ gint32 CInterfaceProxy::SendFetch_Proxy(
             EnumClsid iid = ( EnumClsid )
                 ( ( guint32& )oDesc[ propIid ] );
 
-            std::string strIfName =
+            const std::string strInName =
                 CoGetIfNameFromIid( iid );
 
-            if( strIfName.empty() )
+            if( strInName.empty() )
             {
                 // the interface is not supported by
                 // this object
@@ -2360,7 +2574,8 @@ gint32 CInterfaceProxy::SendFetch_Proxy(
                 break;
             }
 
-            ToPublicName( strIfName );
+            std::string strIfName;
+            ToPublicName_NoStr( strInName, strIfName );
             oDesc.SetIfName(
                 DBUS_IF_NAME( strIfName ) );
 
@@ -3136,7 +3351,10 @@ gint32 CRpcServices::SendMethodCall(
 
         if( oReq.HasReply() ) 
         {
-            ret = FillRespData( pIrp, pRespData );
+            gint32 iRet = FillRespData(
+                pIrp, pRespData );
+            if( ERROR( iRet ) && SUCCEEDED( ret ) )
+                ret = iRet;
         }
 
     }while( 0 );
@@ -3453,7 +3671,8 @@ gint32 CRpcServices::LoadObjDesc(
             }
             else
             {
-                ret = -ENOENT;
+
+                oCfg[ propPortId ] = ( guint32 )-1;
                 break;
             }
             
@@ -3486,12 +3705,15 @@ gint32 CRpcServices::LoadObjDesc(
             // overwrite the global port class and port
             // id if PROXY_PORTCLASS and PROXY_PORTID
             // exist
+            bool bProxyPdo = false;
             if( oObjElem.isMember( JSON_ATTR_PROXY_PORTCLASS ) &&
                 oObjElem[ JSON_ATTR_PROXY_PORTCLASS ].isString() &&
                 !bServer )
             {
                 strVal = oObjElem[ JSON_ATTR_PROXY_PORTCLASS ].asString(); 
                 oCfg[ propPortClass ] = strVal;
+                if( strVal == PORT_CLASS_DBUS_PROXY_PDO )
+                    bProxyPdo = true;
             }
 
             // get ipaddr
@@ -3506,8 +3728,13 @@ gint32 CRpcServices::LoadObjDesc(
 
                 if( SUCCEEDED( ret ) )
                     oCfg[ propIpAddr ] = strNormVal;
-                else
+                else if( !bProxyPdo )
                     ret = 0;
+                else
+                {
+                    ret = -EINVAL;
+                    break;
+                }
             }
 
             if( oObjElem.isMember( JSON_ATTR_TCPPORT ) &&
@@ -4028,7 +4255,8 @@ gint32 CRpcServices::DoModEvent(
 // a helper for deferred task to run in the
 // interface's taskgroup
 gint32 CRpcServices::RunManagedTask(
-    IEventSink* pTask, bool bRoot )
+    IEventSink* pTask,
+    const bool& bRoot )
 {
     if( pTask == nullptr )
         return -EINVAL;
@@ -4054,6 +4282,90 @@ gint32 CRpcServices::RunManagedTask(
     
     if( SUCCEEDED( ret ) )
         ret = ptrTask->GetError();
+
+    return ret;
+}
+
+gint32 CRpcServices::AddSeqTask(
+    TaskletPtr& pTask, bool bLong )
+{
+    if( pTask.IsEmpty() )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    bool bNew = false;
+    do{
+        if( true )
+        {
+            CStdRMutex oIfLock( GetLock() );
+            if( m_pSeqTasks.IsEmpty() )
+            {
+                CParamList oParams;
+                oParams[ propIoMgr ] = 
+                    ObjPtr( GetIoMgr() );
+
+                m_pSeqTasks.NewObj(
+                    clsid( CIfTaskGroup ),
+                    oParams.GetCfg() );
+
+                m_pSeqTasks->SetRelation( logicNONE );
+                bNew = true;
+            }
+        }
+
+        CIfRetryTask* pSeqTask = m_pSeqTasks;
+        CStdRTMutex oTaskLock( pSeqTask->GetLock() );
+        CStdRMutex oIfLock( GetLock() );
+
+        ret = m_pSeqTasks->AppendTask( pTask );
+        if( ERROR( ret ) && !bNew )
+        {
+            // the old seqTask is completed
+            m_pSeqTasks.Clear();
+            continue;
+        }
+        else if( ERROR( ret ) && bNew )
+        {
+            // something bad happened
+            DebugPrint( ret, "a fatal error happens on sequential queue..." );
+            m_pSeqTasks.Clear();
+            break;
+        }
+
+        pTask->MarkPending();
+        if( SUCCEEDED( ret ) && bNew )
+        {
+            // a new m_pSeqTasks, add and run
+            oIfLock.Unlock();
+            oTaskLock.Unlock();
+
+            TaskletPtr pDeferTask;
+            ret = DEFER_CALL_NOSCHED( pDeferTask,
+                ObjPtr( this ),
+                &CRpcServices::RunManagedTask,
+                m_pSeqTasks, false );
+
+            if( ERROR( ret ) )
+                break;
+
+            ret = GetIoMgr()->RescheduleTask(
+                pDeferTask, bLong );
+
+            break;
+        }
+        if( SUCCEEDED( ret ) && !bNew )
+        {
+            // m_pSeqTasks is already running
+#ifdef DEBUG
+            DebugPrint( ret, "a task is queued..." );
+            std::string strDump;
+            this->Dump( strDump );
+            DebugPrint( ret, "for class %s", strDump.c_str() );
+#endif
+        }
+        break;
+
+    }while( 1 );
 
     return ret;
 }
@@ -4521,13 +4833,14 @@ gint32 CInterfaceProxy::UserCancelRequest(
 	if( qwTaskToCancel == 0 )
 		return -EINVAL;
 
-    string strIfName = CoGetIfNameFromIid(
+    const string& strInName = CoGetIfNameFromIid(
         iid( IInterfaceServer ) );
 
-    if( strIfName.empty() )
+    if( strInName.empty() )
         return ERROR_FAIL;
 
-    ToPublicName( strIfName );
+    string strIfName;
+    ToPublicName_NoStr( strInName, strIfName );
 
     CParamList oOptions;
     // FIXME: not a good solution
@@ -4580,9 +4893,11 @@ gint32 CInterfaceProxy::PauseResume_Proxy(
     // we are from IInterfaceServer
     CParamList oOptions;
 
-    std::string strIfName =
+    const std::string& strInName =
         CoGetIfNameFromIid( iid( IInterfaceServer ) );
-    ToPublicName( strIfName );
+
+    std::string strIfName;
+    ToPublicName_NoStr( strInName, strIfName );
 
     oOptions[ propIfName ] =
         DBUS_IF_NAME( strIfName );
@@ -5303,17 +5618,6 @@ gint32 CInterfaceServer::SendResponse(
                 }
             }
         }
-        else if( strMethod == SYS_METHOD_ENABLERMTEVT ||
-            strMethod == SYS_METHOD_DISABLERMTEVT )
-        {
-            if( !dbus_message_append_args( pRespMsg,
-                DBUS_TYPE_UINT32, &iRet,
-                DBUS_TYPE_INVALID ) )
-            {
-                ret = -ENOMEM;
-                break;
-            }
-        }
         else
         {
             TaskletPtr pTask;
@@ -5814,7 +6118,8 @@ bool CInterfaceServer::IsConnected(
         iState != stateResuming )
         return false;
 
-    if( szDestAddr != nullptr )
+    if( szDestAddr != nullptr &&
+        !m_pConnMgr.IsEmpty() )
     {
         gint32 ret = m_pConnMgr->
             CanResponse( szDestAddr );

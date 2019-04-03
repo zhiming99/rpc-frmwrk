@@ -164,8 +164,6 @@ struct IMessageFilter
 
 typedef CAutoPtr< clsid( Invalid ), IGenericInterface > InterfPtr;
 
-#include "iftasks.h"
-
 class IInterfaceCommands
 {
     public:
@@ -336,7 +334,8 @@ class CRpcBaseOperations :
     virtual gint32 OpenPort(
         IEventSink* pCallback );
 
-    virtual gint32 ClosePort();
+    virtual gint32 ClosePort(
+        IEventSink* pCallback = nullptr );
 
     // start listening the event from the
     // interface server
@@ -386,6 +385,9 @@ class CRpcBaseOperations :
     }
 
 };
+
+#include "iftasks.h"
+
 /**
 * @name CRpcInterfaceBase class will provide the
 * the interface state mangement and task
@@ -414,6 +416,9 @@ class CRpcInterfaceBase :
 
     gint32 SetReqQueSize(
         IMessageMatch* pMatch, guint32 dwSize );
+
+    gint32 GetParallelGrp(
+        TaskGrpPtr& pParaGrp );
 
     public:
 
@@ -472,6 +477,9 @@ class CRpcInterfaceBase :
     // owner
     virtual gint32 Start();
     virtual gint32 StartEx( IEventSink* pCallback );
+
+    gint32 StartRecvTasks(
+        std::vector< MatchPtr >& vecMatches );
 
     // stop the proxy, called by the interface
     // owner
@@ -545,30 +553,30 @@ gint32 CoAddIidName(
 
 #define ToInternalName( _strIfName ) \
 do{ \
+    char* szBuf = ( char* )alloca( 512 );\
     if( IsServer() ) \
     { \
-        _strIfName += ":s" + \
-            std::to_string( GetObjId() ); \
+        sprintf( szBuf, "%s:s%lld", _strIfName.c_str(), GetObjId() );\
     } \
     else \
     { \
-        _strIfName += ":p" + \
-            std::to_string( GetObjId() ); \
+        sprintf( szBuf, "%s:p%lld", _strIfName.c_str(), GetObjId() );\
     } \
+    _strIfName = szBuf; \
 }while( 0 )
 
 #define ToInternalName2( _pIf, _strIfName ) \
 do{ \
+    char* szBuf = ( char* )alloca( 512 );\
     if( ( _pIf )->IsServer() ) \
     { \
-        _strIfName += ":s" + \
-            std::to_string( ( _pIf )->GetObjId() ); \
+        sprintf( szBuf, "%s:s%lld", _strIfName.c_str(), _pIf->GetObjId() );\
     } \
     else \
     { \
-        _strIfName += ":p" + \
-            std::to_string( ( _pIf )->GetObjId() ); \
+        sprintf( szBuf, "%s:p%lld", _strIfName.c_str(), _pIf->GetObjId() );\
     } \
+    _strIfName = szBuf; \
 }while( 0 )
 
 #define ToPublicName( _strIfName ) \
@@ -582,6 +590,20 @@ do{ \
     if( pos == std::string::npos ) \
         break; \
     _strIfName = _strIfName.substr( 0, pos ); \
+}while( 0 )
+
+// less malloc
+#define ToPublicName_NoStr( _strIfName, _strRet ) \
+do{ \
+    char *szBuf = ( char* )alloca( 512 );\
+    if( IsServer() ) \
+        sprintf( szBuf, ":s%lld", GetObjId() );\
+    else \
+        sprintf( szBuf, ":p%lld", GetObjId() );\
+    size_t pos = _strIfName.find( szBuf ); \
+    if( pos == std::string::npos ) \
+        break; \
+    _strRet = _strIfName.substr( 0, pos ); \
 }while( 0 )
 
 #define ToPublicName2( _pIf, _strIfName ) \
@@ -640,6 +662,7 @@ class CRpcServices :
     // the queue of pending invoke tasks, for queued
     // task processing
     std::deque< EventPtr > m_queInvTasks;
+    TaskGrpPtr             m_pSeqTasks;
 
     gint32 InvokeNextMethod( TaskletPtr& pLastInvoke );
 
@@ -907,7 +930,12 @@ class CRpcServices :
     // a helper for deferred task to run in the
     // interface's taskgroup
     gint32 RunManagedTask(
-        IEventSink* pTask, bool bRoot );
+        IEventSink* pTask,
+        const bool& bRoot );
+
+    gint32 AddSeqTask(
+        TaskletPtr& pTask,
+        bool bLong );
 };
 
 template< typename ...Args>
@@ -1123,9 +1151,13 @@ class CInterfaceProxy :
         Args&&... args )
     {
         CParamList oOptions;
-        std::string strIfName =
+        const std::string& strInName =
             CoGetIfNameFromIid( GetClsid() );
-        ToPublicName( strIfName );
+
+        std::string strIfName;
+        ToPublicName_NoStr(
+            strInName, strIfName );
+
         oOptions[ propIfName ] =
             DBUS_IF_NAME( strIfName );
 
@@ -1703,8 +1735,6 @@ gint32 CInterfaceProxy::AsyncCall(
             ret = ERROR_FAIL;
             break;
         }
-
-        ret = oNewResp[ propReturnValue ];
 
     }while( 0 );
 

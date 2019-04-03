@@ -134,10 +134,6 @@
 #define IRP_MN_PNP_START                0x01
 #define IRP_MN_PNP_STOP                 0x02
 #define IRP_MN_PNP_QUERY_STOP           0x03
-#define IRP_MN_PNP_REATTACH             0x04
-
-// stop a single child pdo port stack of the bus port
-#define IRP_MN_PNP_STOP_CHILD           0x05
 
 // immdiate commands
 // port stack management
@@ -145,6 +141,11 @@
 // the last command before the
 // port is removed
 #define IRP_MN_PNP_STACK_DESTROY        0x05
+
+// stop a single child pdo port stack of the bus port
+#define IRP_MN_PNP_STOP_CHILD           0x06
+#define IRP_MN_PNP_REATTACH             0x07
+#define IRP_MN_PNP_STACK_READY          0x08
 
 #define IRP_DIR_IN                      0x00
 #define IRP_DIR_OUT                     0x01
@@ -164,6 +165,11 @@
 // This is a requests not from dbus, indicating
 // the request and response are in IConfigDb
 #define IRP_NON_DBUS                    0x20
+
+// the flag to tell CompleteIrp to call the
+// callback only. no need to go through the port
+// stack
+#define IRP_CALLBACK_ONLY               0x40
 
 // state flags of the irp
 #define IRP_STATE_READY                 0x01
@@ -421,13 +427,13 @@ struct IoRequestPacket : public IEventSink
     void SetSyncCall( bool bSync = true ) ;
 
     bool IsPending() const;
-
     void MarkPending();
     void RemovePending();
 
-    bool IsKeepAlive() const;
-    void SetKeepAlive();
-    void ClearKeepAlive();
+    void SetCbOnly( bool bCbOnly );
+
+    inline bool IsCbOnly() const
+    { return ( ( m_dwFlags & IRP_CALLBACK_ONLY ) != 0 ); }
 
     bool SetState( gint32 iCurState, gint32 iNewState );
 

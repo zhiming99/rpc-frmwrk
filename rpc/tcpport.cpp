@@ -26,6 +26,7 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include "reqopen.h"
+#include <fcntl.h>
 
 using namespace std;
 
@@ -64,6 +65,15 @@ CRpcSocketBase::CRpcSocketBase(
 
         m_pCfg->RemoveProperty(
             propIoMgr );
+
+        ret = oCfg.GetPointer(
+            propPortPtr, m_pParentPort );
+
+        if( ERROR( ret ) )
+            break;
+
+        m_pCfg->RemoveProperty(
+            propPortPtr );
 
     }while( 0 );
 
@@ -231,7 +241,8 @@ gint32 CRpcSocketBase::AttachMainloop()
 
         oParams.Push( m_iFd );
         oParams.Push( dwOpt );
-        oParams.Push( true );
+        // don't start immediately
+        oParams.Push( false );
 
         oParams[ propObjPtr ] =
             ObjPtr( this );
@@ -250,10 +261,12 @@ gint32 CRpcSocketBase::AttachMainloop()
         if( ERROR( ret ) )
             break;
 
+        CCfgOpenerObj oTaskCfg(
+            ( CObjBase* )pCallback );
         dwOpt = ( guint32 )G_IO_OUT;
-        oParams.SetIntProp( 1, dwOpt );
+        oTaskCfg.SetIntProp( 1, dwOpt );
         // don't start immediately
-        oParams.SetBoolProp( 2, false );
+        oTaskCfg.SetBoolProp( 2, false );
 
         ret = pMainLoop->AddIoWatch(
             pCallback, m_hIoWWatch );
@@ -363,6 +376,9 @@ gint32 CRpcSocketBase::StartTimer()
 {
     gint32 ret = 0;
     do{
+        if( GetState() == sockStopped )
+            return ERROR_STATE;
+
         CIoManager *pMgr = GetIoMgr();
         if( pMgr == nullptr )
         {
@@ -500,7 +516,14 @@ gint32 CRpcSocketBase::Stop()
         }
         DetachMainloop();
         StopTimer();
-        CloseSocket();
+        ret = CloseSocket();
+
+        if( ERROR( ret ) )
+        {
+            DebugPrint( ret,
+                "Error close socket..." );
+        }
+
         SetState( sockStopped );
 
     }while( 0 );
@@ -516,6 +539,13 @@ gint32 CRpcSocketBase::CloseSocket()
         if( m_iFd < 0 )
             ret = -ENOTSOCK;
 
+        ret = shutdown( m_iFd, SHUT_RDWR );
+        if( ERROR( ret ) )
+        {
+            DebugPrint( ret,
+                "Error shutdown socket[%d]",
+                m_iFd );
+        }
         ret = close( m_iFd );
 
         if( ret == -1 && errno == EINTR )
@@ -621,7 +651,7 @@ gint32 CRpcStreamSock::GetStreamFromIrp(
            
             gint32 iStmId;
             ret = oCfg.GetIntProp(
-                0, ( guint32& )iStmId );
+                propStreamId, ( guint32& )iStmId );
 
             if( ERROR( ret ) )
                 break;
@@ -762,7 +792,7 @@ gint32 CRpcStreamSock::AddStream(
 gint32 CRpcStreamSock::RemoveStream(
     gint32 iStream )
 {
-   if( iStream < 2 )
+   if( iStream < 0 )
        return -EINVAL;
 
     gint32 ret = 0;
@@ -815,14 +845,13 @@ CRpcStreamSock::CRpcStreamSock(
         ret = oCfg.GetIntProp(
             propFd, ( guint32& )iFd );
 
+        // passive connection
         if( SUCCEEDED( ret ) )
-        {
-            // so we don't need the active connect
             m_iFd = iFd;
+        else
+        {
+            ret = 0;
         }
-
-        if( ERROR( ret ) )
-            break;
 
         m_itrCurStm = m_mapStreams.begin();
 
@@ -840,6 +869,7 @@ gint32 CRpcStreamSock::ActiveConnect(
     const string& strIpAddr )
 {
     gint32 ret = 0;
+
     do{
         CCfgOpener oCfg(
             ( IConfigDb* )m_pCfg );
@@ -870,6 +900,9 @@ gint32 CRpcStreamSock::ActiveConnect(
 
         if( errno == EINPROGRESS )
         {
+            // watching if the socket can write,
+            // indicating the connect is done
+            StartWatch();
             ret = STATUS_PENDING;
         }
         else
@@ -877,7 +910,15 @@ gint32 CRpcStreamSock::ActiveConnect(
             ret = -errno;
             break;
         }
+
     }while( 0 );
+
+    if( ret != STATUS_PENDING )
+    {
+        StopWatch();
+        if( SUCCEEDED( ret ) )
+            StartWatch( false );
+    }
 
     return ret;
 }
@@ -960,6 +1001,10 @@ gint32 CRpcStreamSock::Start()
         else
         {
             // we are already connected
+            int iFlags = fcntl( m_iFd, F_GETFL );
+            fcntl( m_iFd, F_SETFL,
+                iFlags | O_NONBLOCK );
+
             ret = AttachMainloop();
         }
 
@@ -1013,6 +1058,7 @@ gint32 CRpcStreamSock::Start_bh()
         if( ERROR( ret ) )
             break;
 
+        StartWatch( false );
         SetState( sockStarted );
         
     }while( 0 );
@@ -1167,7 +1213,7 @@ gint32 CRpcStreamSock::DispatchSockEvent(
 
     if( ERROR( ret ) )
     {
-        ret = OnError( ret );
+        OnError( ret );
         return ret;
     }
 
@@ -1175,7 +1221,7 @@ gint32 CRpcStreamSock::DispatchSockEvent(
     {
     case sockInit:
         {
-
+            StopWatch();
             if( m_pStartTask.IsEmpty() )
             {
                 ret = -EFAULT;
@@ -1190,19 +1236,22 @@ gint32 CRpcStreamSock::DispatchSockEvent(
         }
     case sockStarted:
         {
-            if( dwCondition == G_IO_IN )
+            if( dwCondition & G_IO_HUP )
+            {
+                OnDisconnected();
+            }
+            else if( dwCondition & G_IO_IN )
             {
                 m_dwAgeSec = 0;
-                OnReceive();
+                ret = OnReceive();
+                if( ret == -ENOTCONN || 
+                    ret == -EPIPE )
+                    OnDisconnected();
             }
-            else if( dwCondition == G_IO_OUT )
+            else if( dwCondition & G_IO_OUT )
             {
                 m_dwAgeSec = 0;
                 OnSendReady();
-            }
-            else if( dwCondition == G_IO_HUP )
-            {
-                OnDisconnected();
             }
             else
             {
@@ -1393,6 +1442,8 @@ gint32 CRpcStreamSock::GetStreamToSend(
         --dwLeft;
 
     };
+    if( dwLeft == 0 )
+        ret = -ENOENT;
 
     return ret;
 }
@@ -1446,7 +1497,7 @@ gint32 CRpcStreamSock::OnEvent(
             }
             else if( iState == sockStarted )
             {
-                Stop();
+                ret = Stop();
             }
             else if( iState == sockStopped ) 
             {
@@ -1667,6 +1718,9 @@ gint32 CRpcStreamSock::StartSend( IRP* pIrpLocked )
             {
                 if( pIrpLocked == pIrp )
                 {
+                    IrpCtxPtr& pCtx =
+                        pIrp->GetTopStack();
+                    pCtx->SetStatus( ret );
                     retLocked = ret;
                 }
                 else
@@ -1690,7 +1744,10 @@ gint32 CRpcStreamSock::StartSend( IRP* pIrpLocked )
         {
             ret = GetStreamToSend( pStream );
             if( ERROR( ret ) )
+            {
+                ret = 0;
                 break;
+            }
             m_iCurSendStm =
                 pStream->GetStreamId();
             continue;
@@ -1701,6 +1758,8 @@ gint32 CRpcStreamSock::StartSend( IRP* pIrpLocked )
 
     if( pIrpLocked == nullptr )
     {
+        // the context is an io event from main
+        // loop
         if( !vecIrpComplete.empty() )
         {
             ret = ScheduleCompleteIrpTask(
@@ -1709,12 +1768,16 @@ gint32 CRpcStreamSock::StartSend( IRP* pIrpLocked )
     }
     else
     {
+        // the context is a synchronous call to
+        // SubmitIrp
         if( !vecIrpComplete.empty() )
         {
-            ScheduleCompleteIrpTask(
+            ret = ScheduleCompleteIrpTask(
                 pIrpVec, false );
         }
-        ret = retLocked;
+
+        if( SUCCEEDED( ret ) )
+            ret = retLocked;
     }
     return ret;
 }
@@ -1812,7 +1875,7 @@ gint32 CRpcStreamSock::HandleWriteIrp(
             if( ERROR( ret ) )
                 break;
 
-            BufPtr pPayload;
+            BufPtr pPayload( true );
             ret = oCfg.GetProperty(
                 0, *pPayload );
 
@@ -2369,6 +2432,8 @@ gint32 CIncomingPacket::FillPacket(
         return -EINVAL;
 
     gint32 ret = 0;
+    bool bFirst = true;
+    guint32 dwBufOffset = 0;
     do{
         guint32 dwSize = m_dwBytesToRecv; 
 
@@ -2387,12 +2452,21 @@ gint32 CIncomingPacket::FillPacket(
 
         if( m_pBuf.IsEmpty() )
         {
+            ret = m_pBuf.NewObj();
+            if( ERROR( ret ) )
+                break;
             m_pBuf->Resize(
                 sizeof( CPacketHeader ) );
         }
 
+        if( m_dwOffset < sizeof( CPacketHeader ) )
+            dwBufOffset = m_dwOffset;
+        else
+            dwBufOffset = m_dwOffset -
+                sizeof( CPacketHeader );
+
         ret = read( iFd,
-            m_pBuf->ptr() + m_dwOffset, dwSize );
+            m_pBuf->ptr() + dwBufOffset, dwSize );
 
         if( ret == -1 && errno == EWOULDBLOCK )
         {
@@ -2400,14 +2474,20 @@ gint32 CIncomingPacket::FillPacket(
             ret = STATUS_PENDING;
             break;
         }
-
-        if( ret == -1 )
+        else if( ret == -1 )
         {
             // asynchronous error
             ret = -errno;
             break;
         }
+        else if( ret == 0 && bFirst )
+        {
+            // connection lost
+            ret = -ENOTCONN;
+            break;
+        }
 
+        bFirst = false;
         m_dwOffset += ret;
         if( m_dwOffset < sizeof( CPacketHeader ) )
         {
@@ -2427,19 +2507,8 @@ gint32 CIncomingPacket::FillPacket(
             if( ERROR( ret ) )
                 break;
 
-            /*if( m_oHeader.m_dwSize
-                > RPC_MAX_BYTES_PACKET )
-            {
-                ret = -EMSGSIZE;
-                break;
-            }*/
-
             m_dwBytesToRecv = m_oHeader.m_dwSize;
-
-            guint32 dwNewSize = 
-                sizeof( CPacketHeader )
-                + m_dwBytesToRecv;
-
+            guint32 dwNewSize = m_dwBytesToRecv;
             m_pBuf->Resize( dwNewSize );
 
             // continue to read payload data
@@ -2475,6 +2544,7 @@ CRpcStream::CRpcStream(
     // 0: an integer as Stream Id
     // 1: protocol id
     // propIoMgr: pointer to the io manager
+    SetClassId( clsid( CRpcStream ) );
     do{
         if( pCfg == nullptr )
         {
@@ -2491,6 +2561,7 @@ CRpcStream::CRpcStream(
         {
             ret = oCfg.GetIntProp( 0,
                 ( guint32& )m_iStmId );
+
             if( ERROR( ret ) )
                 break;
 
@@ -2560,6 +2631,7 @@ gint32 CRpcStream::RecvPacket(
     m_queBufToRecv.push_back( pPacket );
     guint32 dwSize = m_queBufToRecv.size();
 
+    m_atmSeqNo++;
     // we need to consider better flow control
     // method, like leaky bucket?
     if( dwSize > STM_MAX_RECV_PACKETS )
@@ -2593,8 +2665,10 @@ gint32 CRpcStream::SetRespReadIrp(
                 pCtx->SetRespData( pBuf );
             else
             {
+                guint8* pData =
+                    ( guint8* )pBuf->ptr();
                 pCtx->m_pRespData->Append(
-                    ( guint8* )pBuf->ptr(), pBuf->size() );
+                    pData, pBuf->size() );
             }
             pCtx->SetStatus( 0 );
         }
@@ -2625,9 +2699,17 @@ gint32 CRpcStream::HandleReadIrp(
             ret = STATUS_PENDING;
             break;
         }
+        else if( m_queReadIrps.size() > 0 )
+        {
+            m_queReadIrps.push_back( pIrp );
+            ret = STATUS_PENDING;
+            break;
+        }
 
         PacketPtr ptrPacket =
             m_queBufToRecv.front();
+
+        m_queBufToRecv.pop_front();
 
         CIncomingPacket* pPacket = ptrPacket;
         if( pPacket == nullptr )
@@ -2649,7 +2731,17 @@ gint32 CRpcStream::HandleReadIrp(
             break;
 
         CParamList oReq( ( IConfigDb* )pCfg );
-        guint32 dwReqSize = oReq[ propByteCount ];
+        guint32 dwReqSize = 0;
+
+        ret = oReq.GetIntProp(
+            propByteCount, dwReqSize );
+
+        if( ERROR( ret ) )
+        {
+            dwReqSize = pBuf->size();
+            ret = 0;
+        }
+
         if( dwReqSize < pBuf->size() )
         {
             ret = -EBADMSG;
@@ -2663,19 +2755,24 @@ gint32 CRpcStream::HandleReadIrp(
         else
         {
             pCtx->m_pRespData->Append(
-                ( guint8* )pBuf->ptr(), pBuf->size() );
+                ( guint8* )pBuf->ptr(),
+                pBuf->size() );
         }
 
-        if( pCtx->m_pRespData->size() > dwReqSize )
+        guint32 dwCurSize =
+            pCtx->m_pRespData->size();
+
+        if( dwCurSize > dwReqSize )
         {
             ret = -EBADMSG;
             break;
         }
+        else if( dwCurSize == dwReqSize )
+            break;
 
-        if( pCtx->m_pRespData->size() < dwReqSize )
-            continue;
+        continue;
 
-    }while( 0 );
+    }while( 1 );
 
     return ret;
 }
@@ -2722,18 +2819,31 @@ gint32 CRpcStream::GetReadIrpsToComp(
     vector< pair< IrpPtr, BufPtr > >& vecIrps )
 {
     gint32 ret = 0;
-    if( m_queReadIrps.size() == 0 ||
-        m_queBufToRecv.size() == 0 )
-    {
-        return -ENOENT;
-    }
 
-    while( m_queReadIrps.size() != 0
-        && m_queBufToRecv.size() != 0 )
-    {
+    do{
+        CStdRMutex oSockLock(
+            m_pStmSock->GetLock() );
+
+        if( m_queReadIrps.size() == 0 ||
+            m_queBufToRecv.size() == 0 )
+            break;
+
         IrpPtr pIrp = m_queReadIrps.front();
-        PacketPtr pPacket = m_queBufToRecv.front();
         m_queReadIrps.pop_front();
+        oSockLock.Unlock();
+
+        CStdRMutex oIrpLock( pIrp->GetLock() );
+        ret = pIrp->CanContinue( IRP_STATE_READY );
+
+        // discard the irp
+        if( ERROR( ret ) )
+            continue;
+
+        oSockLock.Lock();
+        if( m_queBufToRecv.empty() )
+            break;
+
+        PacketPtr pPacket = m_queBufToRecv.front();
         m_queBufToRecv.pop_front();
 
         BufPtr pBuf;
@@ -2750,24 +2860,42 @@ gint32 CRpcStream::GetReadIrpsToComp(
         CParamList oReq(
             ( IConfigDb* )pReq );
 
-        guint32 dwReqSize =
-            oReq[ propByteCount ];
+        guint32 dwReqSize = 0;
+        ret = oReq.GetIntProp(
+            propByteCount, dwReqSize );
 
-        guint32 dwRecvSize = pBuf->size();
-        if( !pCtx->m_pRespData.IsEmpty() )
+        if( ERROR( ret ) )
         {
-            dwRecvSize = pCtx->m_pRespData->size();
+            // no size reqeust, just return the
+            // current packet
+            dwReqSize = pBuf->size();
+            ret = 0;
         }
 
+        guint32 dwRecvSize = pBuf->size();
         if( dwReqSize < dwRecvSize )
         {
             ret = -EBADMSG;
+            break;
         }
-        else if( dwReqSize > dwRecvSize )
+        else if( dwReqSize == dwRecvSize )
         {
+            // move on
+        }
+        else
+        {
+            // dwReqSize > dwRecvSize
             if( pCtx->m_pRespData.IsEmpty() )
+            {
                 pCtx->SetRespData( pBuf );
-            else
+                m_queReadIrps.push_front( pIrp );
+                continue;
+            }
+
+            guint32 dwSizeToRecv = dwReqSize -
+                pCtx->m_pRespData->size();
+
+            if( dwSizeToRecv >= dwRecvSize )
             {
                 ret = pCtx->m_pRespData->Append(
                     ( guint8* )pBuf->ptr(),
@@ -2775,15 +2903,48 @@ gint32 CRpcStream::GetReadIrpsToComp(
 
                 if( ERROR( ret ) )
                     break;
-            }
-            // put the irp back
-            m_queReadIrps.push_front( pIrp );
-            continue;
-        }
 
-        vecIrps.push_back( pair< IrpPtr, BufPtr >
-            ( pIrp, pBuf ) );
-    }
+                if( dwSizeToRecv == dwRecvSize )
+                {
+                    pBuf = pCtx->m_pRespData;
+                    pCtx->m_pRespData.Clear();
+                }
+                else
+                {
+                    // put the irp back
+                    m_queReadIrps.push_front( pIrp );
+                    continue;
+                }
+            }
+            else
+            {
+                // dwSizeToRecv < dwRecvSize,
+                // split the recv buffer
+                ret = pCtx->m_pRespData->Append(
+                    ( guint8* )pBuf->ptr(),
+                    dwRecvSize );
+
+                if( ERROR( ret ) )
+                    break;
+
+                guint32 dwResidual = 
+                    pBuf->size() - dwRecvSize;
+
+                memmove( pBuf->ptr() + dwRecvSize,
+                    pBuf->ptr(), dwResidual );
+
+                pBuf->Resize( dwResidual );
+                pPacket->SetPayload( pBuf );
+                m_queBufToRecv.push_front( pPacket );
+
+                pBuf = pCtx->m_pRespData;
+                pCtx->m_pRespData.Clear();
+            }
+        }
+        vecIrps.push_back(
+            pair< IrpPtr, BufPtr >( pIrp, pBuf ) );
+
+    }while( 1 );
 
     return ret;
 }
@@ -2892,8 +3053,6 @@ gint32 CRpcStream::DispatchDataIncoming(
         vector< pair< IrpPtr, BufPtr > > vecIrps;
         if( true )
         {
-            CStdRMutex oSockLock(
-                pParentSock->GetLock() );
             ret = GetReadIrpsToComp( vecIrps );
         }
 
@@ -3334,6 +3493,10 @@ gint32 CRpcControlStream::GetReadIrpsToComp(
     // scan the req map to find the irp to match
     // the incoming packet
     gint32 ret = 0;
+
+    CStdRMutex oSockLock(
+        m_pStmSock->GetLock() );
+
     if( m_queReadIrps.size() +
         m_queReadIrpsEvt.size() == 0 ||
         m_queBufToRecv2.size() == 0 )
@@ -3658,7 +3821,10 @@ gint32 COutgoingPacket::SetHeader(
 
     m_oHeader.m_iStmId = pHeader->m_iStmId;
     m_oHeader.m_dwFlags = pHeader->m_dwFlags;
+    m_oHeader.m_iPeerStmId = pHeader->m_iPeerStmId;
+    m_oHeader.m_dwSeqNo = pHeader->m_dwSeqNo;
     m_oHeader.m_wProtoId = pHeader->m_wProtoId;
+    m_oHeader.m_wReserved = pHeader->m_wReserved;
 
     return 0;
 }
@@ -3685,6 +3851,7 @@ gint32 COutgoingPacket::SetBufToSend(
     m_dwBytesToSend =  m_oHeader.m_dwSize
         + sizeof( CPacketHeader );
 
+    m_dwOffset = 0;
     m_oHeader.hton();
     
     return 0;
@@ -3697,16 +3864,13 @@ gint32 COutgoingPacket::StartSend(
         return -EINVAL;
 
     gint32 ret = 0;
+    if( m_dwBytesToSend == 0 )
+        return 0;
+
+    if( m_dwBytesToSend > MAX_BYTES_PER_TRANSFER )
+        return -EINVAL;
+
     do{
-        if( m_dwBytesToSend == 0 )
-            break;
-
-        if( m_dwBytesToSend > MAX_BYTES_PER_TRANSFER )
-        {
-            ret = -EINVAL;
-            break;
-        }
-
         if( m_dwOffset < sizeof( CPacketHeader ) )
         {
             guint32 dwSize = 
@@ -3734,8 +3898,10 @@ gint32 COutgoingPacket::StartSend(
                 // recover from the eariler hton
                 m_oHeader.ntoh();
             }
+            ret = 0;
         }
-        else
+
+        if( m_dwOffset >= sizeof( CPacketHeader ) )
         {
             guint32 dwActOffset = m_dwOffset
                 - sizeof( CPacketHeader );
@@ -3746,7 +3912,7 @@ gint32 COutgoingPacket::StartSend(
             if( dwSize > RPC_MAX_BYTES_PACKET )
                 dwSize = RPC_MAX_BYTES_PACKET;
 
-            char* pStart = ( ( char* )&m_oHeader )
+            char* pStart = ( ( char* )m_pBuf->ptr() )
                 + dwActOffset;
 
             ret = send( iFd, pStart, dwSize, 0 );
@@ -3763,18 +3929,20 @@ gint32 COutgoingPacket::StartSend(
 
             m_dwOffset += ret;
             m_dwBytesToSend -= ret;
+            ret = 0;
         }
 
         if( m_dwBytesToSend > 0 )
         {
-            ret = STATUS_PENDING;
+            continue;
         }
         else
         {
             // succeeded
         }
+        break;
 
-    }while( 0 );
+    }while( 1 );
 
     return ret;
 }
@@ -3820,6 +3988,12 @@ gint32 CRpcListeningSock::Connect()
         }
 
         m_iFd = ret;
+
+        gint32 dwReuseAddr = 1;
+        ret = setsockopt( m_iFd, SOL_SOCKET,
+            SO_REUSEADDR, &dwReuseAddr,
+            sizeof( dwReuseAddr ) );
+
         CCfgOpener oCfg(
             ( IConfigDb* )m_pCfg );
 
@@ -3868,6 +4042,7 @@ gint32 CRpcListeningSock::Connect()
             ret = -errno;
             break;
         }
+        StartWatch( false );
 
     }while( 0 );
 
@@ -3917,6 +4092,7 @@ gint32 CRpcListeningSock::OnConnected()
             }
             break;
         }
+        StartWatch();
         // let's schedule a task to start the port
         // building process
         m_pParentPort->OnEvent(
@@ -3975,6 +4151,70 @@ gint32 CRpcListeningSock::DispatchSockEvent(
     return ret;
 }
 
+gint32 CStmSockConnectTask::RemoveConnTimer()
+{
+    gint32 ret = 0;
+    do{
+        if( m_iTimerId == 0 )
+            break;
+
+        CIoManager* pMgr = GetIoMgr();
+        if( unlikely( pMgr == nullptr ) )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        CTimerService& otsvc =
+            pMgr->GetUtils().GetTimerSvc();
+
+        otsvc.RemoveTimer( m_iTimerId );
+        m_iTimerId = 0;
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CStmSockConnectTask::AddConnTimer()
+{
+    gint32 ret = 0;
+    do{
+        // the connection could be long, restart
+        // the irp timer.
+        PIRP pIrp = nullptr;
+        CCfgOpener oCfg(
+            ( IConfigDb* )GetConfig() );
+
+        ret = oCfg.GetPointer( propIrpPtr, pIrp );
+        if( ERROR( ret ) )
+            break;
+
+        pIrp->ResetTimer();
+        CIoManager* pMgr = GetIoMgr();
+        if( unlikely( pMgr == nullptr ) )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        guint32 dwTimeWait =
+            pIrp->m_dwTimeoutSec;
+
+        if( unlikely( dwTimeWait == 0 ) )
+            dwTimeWait = PORT_START_TIMEOUT_SEC - 5;
+
+        CTimerService& otsvc =
+            pMgr->GetUtils().GetTimerSvc();
+
+        m_iTimerId = otsvc.AddTimer(
+            dwTimeWait, this, eventRetry );
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CStmSockConnectTask::OnStart(
     IRP* pIrp )
 {
@@ -3994,7 +4234,16 @@ gint32 CStmSockConnectTask::OnStart(
         ret = GetSockPtr( pSock );
         if( ERROR( ret ) )
             break;
+
+        ret = AddConnTimer();
+        if( ERROR( ret ) )
+            break;
+
         ret = pSock->Start();
+        if( ret != STATUS_PENDING )
+        {
+            RemoveConnTimer();
+        }
 
     }while( 0 );
     
@@ -4022,7 +4271,12 @@ gint32 CStmSockConnectTask::Retry()
     if( ERROR( ret ) )
         return ret;
 
+    AddConnTimer();
     ret = pSock->ActiveConnect( strIpAddr );
+    if( ret != STATUS_PENDING )
+    {
+        RemoveConnTimer();
+    }
 
     return ret;
 }
@@ -4031,9 +4285,13 @@ gint32 CStmSockConnectTask::OnError(
     gint32 iRet )
 {
     gint32 ret = 0;
-    switch( iRet )
+    switch( -iRet )
     {
     case ETIMEDOUT:
+        {
+            ret = Retry();
+            break;
+        }
     /* Connection refused */
     case ECONNREFUSED:
     /* Host is down */
@@ -4042,7 +4300,7 @@ gint32 CStmSockConnectTask::OnError(
     case EHOSTUNREACH:
         {
             // retry
-            ret = Retry();
+            ret = iRet;
             break;
         }
     /* Operation already in progress */
@@ -4055,7 +4313,7 @@ gint32 CStmSockConnectTask::OnError(
         }
     default:
         {
-            ret = ERROR_FAIL;
+            ret = iRet;
         }
         break;;
     }
@@ -4175,6 +4433,7 @@ gint32 CStmSockConnectTask::CompleteTask(
         return ERROR_STATE;
 
     do{
+        RemoveConnTimer();
         ret = GetMasterIrp( pIrp );
         if( ERROR( ret ) )
             break;
@@ -4304,8 +4563,7 @@ gint32 CStmSockConnectTask::operator()(
                 ret = ERROR_STATE;
                 break;
             }
-            guint32 dwConnFlags =
-                ( G_IO_OUT | G_IO_IN );
+            guint32 dwConnFlags = ( G_IO_OUT );
 
             vector< guint32 > vecParams;
             ret = GetParamList( vecParams );
@@ -4343,6 +4601,25 @@ gint32 CStmSockConnectTask::operator()(
     case eventStop:
         {
             ret = ERROR_PORT_STOPPED;
+            break;
+        }
+    case eventTimeout:
+        {
+            m_iTimerId = 0;
+            vector< guint32 > vecParams;
+            ret = GetParamList( vecParams );
+            if( ERROR( ret ) )
+                break;
+
+            EnumEventId iSubEvt =
+                ( EnumEventId )vecParams[ 1 ];
+            if( iSubEvt != eventRetry )
+            {
+                ret = -ENOTSUP;
+                break;
+            }
+
+            ret = -ETIMEDOUT;
             break;
         }
     // only from CTcpStreamPdo::CancelStartIrp

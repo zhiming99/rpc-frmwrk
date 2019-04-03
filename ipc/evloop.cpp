@@ -370,6 +370,13 @@ gint32 CEvLoop::SetupDBusConn(
     return m_pDBusHook->Start( pConn );
 }
 
+gint32 CEvLoop::StopDBusConn()
+{
+    if( m_pDBusHook.IsEmpty() )
+        return -EFAULT;
+    return m_pDBusHook->Stop();
+}
+
 CEvLoop::~CEvLoop()
 {
     ClearAll();
@@ -574,7 +581,7 @@ gint32 CEvLoop::AddIoWatch(
         }
 
         guint32 dwFd = oParams[ 0 ];
-        EnumClsid dwOpt = oParams[ 1 ];
+        guint32 dwOpt = oParams[ 1 ];
         bool bStart = ( bool& )oParams[ 2 ];
 
         IO_SOURCE* pIow = new IO_SOURCE(

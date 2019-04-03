@@ -60,7 +60,10 @@ void CRpcTcpBusPort::AddPdoPort(
             propDestTcpPort, dwPortNum );
 
         if( ERROR( ret ) )
-            dwPortNum = 0;
+        {
+            dwPortNum = RPC_SVR_PORTNUM;
+            ret = 0;
+        }
 
         BindPortIdAndAddr( iPortId,
             PDOADDR( strIpAddr, dwPortNum ) );
@@ -205,7 +208,12 @@ gint32 CRpcTcpBusPort::BuildPdoPortName(
                 propSrcTcpPort, dwPortNum );
 
             if( ERROR( ret ) )
-                break;
+            {
+                dwPortNum = RPC_SVR_PORTNUM;
+                oCfgOpener.SetIntProp(
+                    propSrcTcpPort, dwPortNum );
+                ret = 0;
+            }
 
             PDOADDR oAddr( strIpAddr, dwPortNum );
             std::map< PDOADDR, guint32 >::iterator
@@ -379,6 +387,7 @@ gint32 CRpcTcpBusPort::PostStart(
             ( IConfigDb* )pCfg );
 
         oCfg.SetPointer( propIoMgr, GetIoMgr() );
+        oCfg.SetPointer( propPortPtr, this );
 
         LoadPortOptions( pCfg );
 
@@ -387,8 +396,14 @@ gint32 CRpcTcpBusPort::PostStart(
 
         bool bListening = false;
 
-        if( oCfg.exist( propListenSock ) )
-            bListening = oCfg[ propListenSock ];
+        ret = oCfg.GetBoolProp(
+            propListenSock, bListening );
+
+        if( ERROR( ret ) )
+        {
+            bListening = false;
+            ret = 0;
+        }
 
         if( bListening )
         {
@@ -549,10 +564,68 @@ gint32 CRpcTcpBusPort::OnNewConnection(
         ret = OpenPdoPort(
             oCfg.GetCfg(), pPort );
 
-    }while( 0 );
+        if( ret == -EAGAIN )        
+        {
+            // Performance Alert: running on the
+            // dispatching thread
+            usleep( 1000 );
+        }
+        else
+        {
+            break;
+        }
+    }while( 1 );
 
     return ret;
 }
+
+// methods from CObjBase
+gint32 CRpcTcpBusPort::GetProperty(
+        gint32 iProp,
+        CBuffer& oBuf ) const
+{
+    gint32 ret = 0;
+    switch( iProp )
+    {
+    case propSrcDBusName:
+    case propSrcUniqName:
+        {
+            ret = -ENOENT;
+            break;
+        }
+    default:
+        {
+            ret = super::GetProperty(
+                iProp, oBuf );
+            break;
+        }
+    }
+    return ret;
+}
+
+gint32 CRpcTcpBusPort::SetProperty(
+        gint32 iProp,
+        const CBuffer& oBuf )
+{
+    gint32 ret = 0;
+    switch( iProp )
+    {
+    case propSrcDBusName:
+    case propSrcUniqName:
+        {
+            ret = -ENOTSUP;
+            break;
+        }
+    default:
+        {
+            ret = super::SetProperty(
+                iProp, oBuf );
+            break;
+        }
+    }
+    return ret;
+}
+
 
 CRpcTcpBusDriver::CRpcTcpBusDriver(
     const IConfigDb* pCfg )
@@ -618,7 +691,26 @@ CTcpStreamPdo::CTcpStreamPdo(
     : super( pCfg )
 {
     SetClassId( clsid( CTcpStreamPdo ) );
+    m_dwFlags &= ~PORTFLG_TYPE_MASK;
     m_dwFlags |= PORTFLG_TYPE_PDO;
+
+    CCfgOpener oCfg( pCfg );
+    gint32 ret = 0;
+
+    do{
+        ret = oCfg.GetPointer(
+            propBusPortPtr, m_pBusPort );
+
+        if( ERROR( ret ) )
+            break;
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+    {
+        throw std::runtime_error(
+            "Error in CTcpStreamPdo ctor" );
+    }
 }
 
 gint32 CTcpStreamPdo::PreStop(
@@ -690,7 +782,9 @@ gint32 CTcpStreamPdo::PostStart(
         ret = oParams.CopyProp(
             propFd, this );
 
-        oParams.SetPointer( propIoMgr, GetIoMgr() );
+        oParams.SetPointer(
+            propIoMgr, GetIoMgr() );
+
         oParams.SetObjPtr(
             propPortPtr, ObjPtr( this ) );
 
@@ -819,6 +913,8 @@ gint32 CTcpStreamPdo::SubmitWriteIrp(
             break;
         }
         ret = pSock->HandleWriteIrp( pIrp );
+        if( ERROR( ret ) )
+            break;
 
         // don't check the return code here
         ret = CheckAndSend( pIrp, ret );
@@ -862,11 +958,13 @@ gint32 CTcpStreamPdo::CheckAndSend(
             // trigger a send operation to see if
             // the irp's state got changed
             ret = pSock->StartSend( pIrp );
-            if( ret == STATUS_PENDING ||
-                ERROR( ret ) )
+            if( ret == STATUS_PENDING )
+                break;
+
+            if( ERROR( ret ) )
                 break;
         }
-        
+
         EnumIoctlStat iState = reqStatInvalid;
         IrpCtxPtr& pCtx = pIrp->GetCurCtx();
         ret = GetIoctlReqState( pIrp, iState );
@@ -966,7 +1064,7 @@ gint32 CTcpStreamPdo::CompleteOpenStmIrp(
         return -EINVAL;
 
     gint32 ret = 0;
-    IrpCtxPtr& pCtx = pIrp->GetCurCtx();
+    IrpCtxPtr pCtx = pIrp->GetCurCtx();
     CRpcStreamSock* pSock = m_pStmSock;
     if( pSock == nullptr )
         return -EFAULT;
@@ -1392,20 +1490,24 @@ gint32 CTcpStreamPdo::OnSubmitIrp(
             }
         case IRP_MN_IOCTL:
             {
-                if( pIrp->CtrlCode() ==
-                        CTRLCODE_OPEN_STREAM_PDO ||
-                    pIrp->CtrlCode() ==
-                        CTRLCODE_CLOSE_STREAM_PDO || 
-                    pIrp->CtrlCode() ==
-                        CTRLCODE_LISTENING ||
-                    pIrp->CtrlCode() ==
-                        CTRLCODE_INVALID_STREAM_ID_PDO )
+                switch( pIrp->CtrlCode() )
                 {
-                    ret = SubmitIoctlCmd( pIrp );
-                    break;
+                case CTRLCODE_INVALID_STREAM_ID_PDO:
+                case CTRLCODE_OPEN_STREAM_PDO:
+                case CTRLCODE_CLOSE_STREAM_PDO:
+                case CTRLCODE_RMTSVR_OFFLINE_PDO:
+                case CTRLCODE_RMTMOD_OFFLINE_PDO:
+                case CTRLCODE_LISTENING:
+                    {
+                        ret = SubmitIoctlCmd( pIrp );
+                        break;
+                    }
+                default:
+                    {
+                        ret = -ENOTSUP;
+                        break;
+                    }
                 }
-                ret = -ENOTSUP;
-                break;
             }
         default:
             {
@@ -1426,10 +1528,7 @@ gint32 CTcpStreamPdo::OnSubmitIrp(
 gint32 CTcpStreamPdo::OnPortReady(
     IRP* pIrp )
 {
-    if( GetUpperPort() == nullptr )
-        FireRmtSvrEvent( eventRmtSvrOnline );
-
-    return 0;
+    return super::OnPortReady( pIrp );
 }
 
 gint32 CTcpStreamPdo::FireRmtModEvent(
@@ -1475,8 +1574,8 @@ gint32 CTcpStreamPdo::FireRmtModEvent(
     return ret;
 }
 
-gint32 CTcpStreamPdo::FireRmtSvrEvent(
-    EnumEventId iEvent )
+gint32 FireRmtSvrEvent(
+    IPort* pPort, EnumEventId iEvent )
 {
     // this is an event detected by the
     // socket
@@ -1488,7 +1587,7 @@ gint32 CTcpStreamPdo::FireRmtSvrEvent(
     case eventRmtSvrOnline:
         {
             string strIpAddr;
-            CCfgOpenerObj oCfg( this );
+            CCfgOpenerObj oCfg( pPort );
 
             ret = oCfg.GetStrProp(
                 propIpAddr, strIpAddr );
@@ -1496,12 +1595,21 @@ gint32 CTcpStreamPdo::FireRmtSvrEvent(
             if( ERROR( ret ) )
                 break;
 
-            // pass on this event to the pnp manager
-            CEventMapHelper< CPort > oEvtHelper( this );
+            CPort* pcPort = static_cast
+                < CPort* >( pPort );
+
+            // pass on this event to the pnp
+            // manager
+            CEventMapHelper< CPort >
+                oEvtHelper( pcPort );
+
+            HANDLE hPort =
+                PortToHandle( pPort );
+
             oEvtHelper.BroadcastEvent(
                 eventConnPoint, iEvent,
                 ( guint32 )strIpAddr.c_str(),
-                ( guint32* )PortToHandle( this ) );
+                ( guint32* )hPort );
 
             break;
         }
@@ -1527,7 +1635,13 @@ gint32 CTcpStreamPdo::OnEvent(
     case eventDisconn:
         {
             // passive disconnection detected
-            FireRmtSvrEvent( eventRmtSvrOffline );
+            CStdRMutex oPortLock( GetLock() );
+            if( m_bSvrOnline == true )
+            {
+                oPortLock.Unlock();
+                ret = FireRmtSvrEvent(
+                    this, eventRmtSvrOffline );
+            }
             break;
         }
     default:
@@ -1594,6 +1708,14 @@ gint32 CTcpStreamPdo::AllocIrpCtxExt(
             break;
         }
     }
+
+    if( ret == -ENOTSUP )
+    {
+        // let's try it on CPort
+        ret = super::AllocIrpCtxExt(
+            pIrpCtx, pContext );
+    }
+
     return ret;
 }
 
@@ -1756,6 +1878,7 @@ gint32 CStmPdoSvrOfflineNotifyTask::Process(
     switch( dwContext )
     {
     case 0:
+    case eventTaskThrdCtx:
         {
             ret = SendNotify();
             break;
@@ -1898,20 +2021,38 @@ gint32 CTcpStreamPdo::OnQueryStop(
     // test if the sock is already stopped. it
     // could be a case if the socket is detected
     // to be disconnected
-    gint32 ret = super::OnQueryStop( pIrp );
-
     EnumSockState iState =
         m_pStmSock->GetState();
 
     if( iState != sockStarted )
-        return ret;
+    {
+        gint32 ret = ERROR_STATE;
+        DebugPrint( ret,
+            "OnQueryStop: The socket is not working and"
+            " unable to send notification to peer..." );
 
+        IrpCtxPtr& pCtx = pIrp->GetCurCtx();
+        pCtx->SetStatus( ret );
+        return ret;
+    }
+
+    if( true )
+    {
+        // query stop has be done once
+        CStdRMutex oPortLock( GetLock() );
+        if( m_bStopReady )
+            return 0;
+        m_bStopReady = true;
+    }
+
+    gint32 ret = 0;
     // if the socket is still OK, the PreStop
     // should either be triggered from remote
     // server's OFFLINE notification, or a call
     // from the local PORT_STOP request
     CParamList oParams;
-    ret = oParams.SetPointer( propIoMgr, GetIoMgr() );
+    ret = oParams.SetPointer(
+        propIoMgr, GetIoMgr() );
 
     ret = oParams.SetObjPtr(
         propPortPtr, ObjPtr( this ) );
@@ -1936,3 +2077,51 @@ gint32 CTcpStreamPdo::OnQueryStop(
     return ret;
 }
 
+gint32 CTcpStreamPdo::OnPortStackReady(
+    IRP* pIrp )
+{
+    if( pIrp == nullptr ||
+        pIrp->GetStackSize() == 0 )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        // this test to save extra work to create
+        // the CRpcTcpBridgeImpl if the connection
+        // is lost
+        EnumSockState iState =
+            m_pStmSock->GetState();
+        if( iState != sockStarted )
+        {
+            // the connection get lost during the
+            // port stack building period, this
+            // will fail the IRP_MN_PNP_START
+            // request from the pnpmgr, and cause
+            // the port to unload
+            ret = ERROR_PORT_STOPPED;
+            break;
+        }
+
+        FireRmtSvrEvent( this, eventRmtSvrOnline );
+
+        CStdRMutex oPortLock( GetLock() );
+        m_bSvrOnline = true;
+
+        // test again, this test is to prevent the
+        // leaking of the port object if the
+        // disconnection happens around
+        // FireRmtSvrEvent, when the
+        // eventRmtSvrOffline event is surpressed.
+        iState = m_pStmSock->GetState();
+        if( iState != sockStarted )
+        {
+            ret = ERROR_PORT_STOPPED;
+            break;
+        }
+
+    }while( 0 );
+
+    pIrp->GetCurCtx()->SetStatus( ret );
+
+    return ret;
+}

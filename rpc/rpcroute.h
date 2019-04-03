@@ -447,7 +447,7 @@ class CRpcReqForwarder :
     gint32 EnableDisableEvent(
         IEventSink* pCallback,
         IMessageMatch* pMatch,
-        bool bEnable );
+        bool& bEnable );
 
     gint32 OnRmtSvrOnline(
         const std::string& strIpAddr,
@@ -467,6 +467,14 @@ class CRpcReqForwarder :
 
     virtual gint32 BuildBufForIrp(
         BufPtr& pBuf, IConfigDb* pReqCall );
+
+    gint32 OpenRemotePortInternal(
+        IEventSink* pCallback,
+        IConfigDb* pCfg );
+
+    gint32 CloseRemotePortInternal(
+        IEventSink* pCallback,
+        IConfigDb* pCfg );
 
     public:
 
@@ -489,7 +497,11 @@ class CRpcReqForwarder :
 
     gint32 ClearRefCountByAddr(
         const std::string& strIpAddr,
-        std::vector< std::string > vecUniqNames );
+        std::vector< std::string >& vecUniqNames );
+
+    gint32 ClearRefCountByUniqName(
+        const std::string& strUniqName,
+        std::set< std::string >& setIpAddrs );
 
     virtual const EnumClsid GetIid() const
     { return iid( CRpcReqForwarder ); }
@@ -554,6 +566,10 @@ class CRpcReqForwarder :
         guint32 dwSize,                 // [in]
         IEventSink* pCallback );
 
+    // methods of CRpcBaseOperations
+    virtual gint32 OnModEvent(
+        EnumEventId iEvent,
+        const std::string& strModule );
 };
 
 class CRpcRfpForwardEventTask
@@ -686,8 +702,6 @@ class CRpcReqForwarderProxy :
         const std::string& strIpAddr,
         HANDLE hPort );
 
-    gint32 GetParallelGrp(
-        TaskGrpPtr& pParaGrp );
 };
 
 struct CRpcTcpBridgeShared
@@ -936,6 +950,11 @@ class CRpcTcpBridge:
             pCallback, -ENOTSUP );         
         return -ENOTSUP;
     }
+
+    gint32 ClearRemoteEvents(
+        IEventSink* pCallback,
+        ObjPtr& pVecMatches );
+
 };
 
 class CRpcTcpBridgeProxy :
@@ -1002,6 +1021,12 @@ class CRpcTcpBridgeProxy :
         IEventSink* pCallback,
         const IConfigDb* pCfg )
     { return -ENOTSUP; }
+
+    // the method to do cleanup when the client is
+    // down
+    gint32 ClearRemoteEvents(
+        ObjPtr& pVecMatches, // [ in ]
+        IEventSink* pCallback );
 
     virtual gint32 EnableRemoteEvent(
         IEventSink* pCallback,
@@ -1217,6 +1242,10 @@ class CRpcRouter :
     gint32 RemoveLocalMatchByAddr(
         const std::string& strIpAddr );
 
+    gint32 RemoveLocalMatchByUniqName(
+        const std::string& strUniqName,
+        std::vector< MatchPtr >& vecMatches );
+
     gint32 AddRemoteMatch(
         IMessageMatch* pMatch,
         IEventSink* pCallback );
@@ -1292,9 +1321,6 @@ class CRpcRouter :
         DMsgPtr& pMsg,
         std::vector< MatchPtr > vecMatches );
 
-    using DEST_IF =
-        std::pair< std::string, InterfPtr >;
-
     using IFMAP_CITR =
         std::map< std::string, InterfPtr >::const_iterator;
 
@@ -1351,10 +1377,12 @@ class CRpcRouter :
     }
 
     gint32 OnRmtSvrOnline(
+        IEventSink* pCallback,
         const std::string& strIpAddr,
         HANDLE hPort );
 
     gint32 OnRmtSvrOffline(
+        IEventSink* pCallback,
         const std::string& strIpAddr,
         HANDLE hPort );
 
@@ -1460,6 +1488,11 @@ class CRpcRouter :
         IEventSink* pCallback,
         IMessageMatch* pMatch );
 
+    gint32 BuildDisEvtTaskGrp(
+        IEventSink* pCallback,
+        IMessageMatch* pMatch,
+        TaskletPtr& pTask );
+
     gint32 RunDisableEventTask(
         IEventSink* pCallback,
         IMessageMatch* pMatch );
@@ -1467,11 +1500,7 @@ class CRpcRouter :
     // methods of CRpcBaseOperations
     virtual gint32 OnModEvent(
         EnumEventId iEvent,
-        const std::string& strModule )
-    {
-        return ForwardModOnOfflineEvent(
-            iEvent, strModule );
-    }
+        const std::string& strModule );
 
     virtual gint32 OnDBusEvent(
         EnumEventId iEvent )
@@ -1549,13 +1578,15 @@ class CReqFwdrOpenRmtPortTask
 
                 ret = oCfg.GetObjPtr(
                     propIfPtr, pObj );
-                if( ERROR( ret ) )
+                if( SUCCEEDED( ret ) )
                     bProxy = true;
 
                 ret = oCfg.GetObjPtr(
                     propRouterPtr, pObj );
-                if( ERROR( ret ) )
+                if( ERROR( ret ) && !bProxy )
                     break;
+
+                ret = 0;
 
                 if( bProxy )
                     m_iState = stateStartBridgeProxy;
@@ -1609,25 +1640,53 @@ class CIfRollbackableTask :
         : super( pCfg )
     {}
 
-    gint32 AddRollbackTask(
-        TaskletPtr& pTask, bool bBack = true )
+    gint32 GetTractGrp( CIfTransactGroup*& pTractGrp )
     {
         CCfgOpener oTaskCfg(
             ( IConfigDb* ) GetConfig() );
 
-        guint32* intptr = nullptr;
+        intptr_t intptr;
         gint32 ret = oTaskCfg.GetIntPtr(
-            propTransGrpPtr, intptr );
+            propTransGrpPtr, ( guint32*& )intptr );
+
         if( ERROR( ret ) )
             return ret;
 
-        CIfTransactGroup* pTractGrp = reinterpret_cast
+        pTractGrp = reinterpret_cast
             < CIfTransactGroup* >( intptr );
+
+        if( pTractGrp == nullptr )
+            return -EFAULT;
+
+        return 0;
+    }
+
+    gint32 AddRollbackTask(
+        TaskletPtr& pTask, bool bBack = false )
+    {
+        CIfTransactGroup* pTractGrp = nullptr;
+        gint32 ret = GetTractGrp( pTractGrp );
+        if( ERROR( ret ) )
+            return ret;
+
         if( pTractGrp == nullptr )
             return -EFAULT;
 
         return pTractGrp->AddRollback(
             pTask, bBack );
+    }
+
+    gint32 ChangeRelation( EnumLogicOp iOp )
+    {
+        CIfTransactGroup* pTractGrp = nullptr;
+        gint32 ret = GetTractGrp( pTractGrp );
+        if( ERROR( ret ) )
+            return ret;
+
+        if( pTractGrp == nullptr )
+            return -EFAULT;
+
+        return pTractGrp->SetTaskRelation( iOp );
     }
     
     gint32 OnCancel( gint32 dwContext )
@@ -1735,6 +1794,7 @@ class CRouterAddRemoteMatchTask :
 class CRouterEventRelayRespTask :
     public CIfInterceptTaskProxy
 {
+    bool m_bEnable = true;
     public:
     typedef CIfInterceptTaskProxy super;
 
@@ -1746,6 +1806,9 @@ class CRouterEventRelayRespTask :
     { return STATUS_PENDING; }
 
     virtual gint32 OnTaskComplete( gint32 iRetVal );
+    void SetEnable( bool bEnable )
+    { m_bEnable = bEnable; }
+
 };
 
 class CReqFwdrForwardRequestTask :

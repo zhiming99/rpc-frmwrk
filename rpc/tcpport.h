@@ -183,7 +183,13 @@ class CCarrierPacket :
         if( m_pBuf.IsEmpty() )
             return -EFAULT;
         pBuf = m_pBuf;
+        m_pBuf.Clear();
         return 0;
+    }
+
+    inline void SetPayload( BufPtr& pBuf )
+    {
+        m_pBuf = pBuf;
     }
         
 };
@@ -784,9 +790,8 @@ class CRpcTcpFido: public CRpcBasePortEx
 {
     protected:
 
-    MatchPtr    m_matchFwdr;
-    MatchPtr    m_matchRelay;
     static std::atomic< guint32 > m_atmSeqNo;
+    TaskletPtr  m_pListenTask;
 
     public:
 
@@ -819,6 +824,7 @@ class CRpcTcpFido: public CRpcBasePortEx
 
     virtual gint32 HandleSendData( IRP* pIrp );
 
+    gint32 LoopbackTest( DMsgPtr& pReqMsg );
     public:
 
     virtual gint32 OnSubmitIrp( IRP* pIrp );
@@ -847,6 +853,21 @@ class CRpcTcpFido: public CRpcBasePortEx
     gint32 AllocIrpCtxExt(
         IrpCtxPtr& pIrpCtx,
         void* pContext = nullptr ) const;
+
+    virtual gint32 PostStop( IRP* irp );
+};
+
+class CTcpFidoListenTask
+    : public CTaskletRetriable
+{
+    public:
+    typedef CTasklet super;
+    CTcpFidoListenTask( const IConfigDb* pCfg = nullptr )
+        : CTaskletRetriable( pCfg )
+    {
+        SetClassId( clsid( CTcpFidoListenTask ) );
+    }
+    virtual gint32 Process( guint32 dwContext );
 };
 
 enum EnumIoctlStat
@@ -910,10 +931,15 @@ struct STMPDO_IRP_EXT
 *   10. interface with the GIO module.
 * @} */
 
+gint32 FireRmtSvrEvent(
+    IPort* pPort, EnumEventId iEvent );
+
 class CTcpStreamPdo : public CPort
 {
 
     SockPtr     m_pStmSock;
+    bool        m_bStopReady = false;
+    bool        m_bSvrOnline = false;
 
     gint32 SubmitReadIrp( IRP* pIrp );
     gint32 SubmitWriteIrp( IRP* pIrp );
@@ -1009,9 +1035,10 @@ class CTcpStreamPdo : public CPort
     gint32 CancelStartIrp(
         IRP* pIrp, bool bForce );
 
-    gint32 FireRmtSvrEvent( EnumEventId iEvent );
     gint32 FireRmtModEvent( EnumEventId iEvent,
         const std::string& strModName );
+
+    gint32 OnPortStackReady( IRP* pIrp );
 
 };
 
@@ -1077,6 +1104,16 @@ class CRpcTcpBusPort :
         guint32 dwParam1,
         guint32 dwParam2,
         guint32* pData );
+
+    // methods from CObjBase
+    gint32 GetProperty(
+            gint32 iProp,
+            CBuffer& oBuf ) const;
+
+    gint32 SetProperty(
+            gint32 iProp,
+            const CBuffer& oBuf );
+
 };
 
 class CRpcTcpBusDriver : public CGenBusDriver
@@ -1095,10 +1132,6 @@ class CRpcTcpBusDriver : public CGenBusDriver
 class CRpcTcpFidoDrv : public CPortDriver
 {
     protected:
-
-    // map from port id to port pointer
-	std::map<gint32, PortPtr> m_mapId2Port;
-
     gint32 CreatePort( PortPtr& pNewPort,
         const IConfigDb* pConfig );
 
@@ -1142,6 +1175,7 @@ class CStmSockConnectTask
 
     ConnStat m_iState;
     mutable stdrmutex m_oLock;
+    gint32 m_iTimerId;
 
     // eventStart from Pdo's PreStart
     gint32 OnStart( IRP* pIrp );
@@ -1172,6 +1206,9 @@ class CStmSockConnectTask
         return 0;
     }
 
+    gint32 RemoveConnTimer();
+    gint32 AddConnTimer();
+
     ConnStat GetTaskState()
     { return m_iState; }
 
@@ -1183,6 +1220,7 @@ class CStmSockConnectTask
     {
         SetClassId( clsid( CStmSockConnectTask ) );
         m_iState = connInit;
+        m_iTimerId = 0;
     }
 
     stdrmutex& GetLock() const

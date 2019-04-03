@@ -247,14 +247,7 @@ CBuffer::CBuffer( guint32 dwSize )
     if( dwSize > BUF_MAX_SIZE )
         return;
 
-    if( dwSize > 0 )
-    {
-        ptr() = ( char* )calloc( 1, dwSize );
-        if( ptr() != NULL )
-        {
-            size() = dwSize;
-        }
-    }
+    Resize( dwSize );
 }
 
 CBuffer::CBuffer( const char* pData, guint32 dwSize )
@@ -353,32 +346,49 @@ void CBuffer::Resize( guint32 dwSize )
         {
             if( dwSize == 0 )
             {
-                if( ptr() != nullptr )
-                {
+                if( ptr() != nullptr && ptr() != m_arrBuf )
                     free( ptr() );
-                    ptr() = nullptr;
-                }
+
+                ptr() = nullptr;
                 size() = 0;
                 break;
             }
 
-            if( dwSize > size() ||
-                ( dwSize * 2 < size() ) )
+            if( dwSize == size() )
+                break;
+
+            if( sizeof( m_arrBuf ) >= dwSize &&
+                sizeof( m_arrBuf ) >= size() )
+            {
+                ptr() = m_arrBuf;
+            }
+            else if( dwSize > sizeof( m_arrBuf ) &&
+                sizeof( m_arrBuf ) >= size() )
+            {
+                ptr() = ( char* )calloc( 1, dwSize );
+                if( size() > 0 )
+                    memcpy( ptr(), m_arrBuf, size() );
+            }
+            else if( size() > sizeof( m_arrBuf ) &&
+                sizeof( m_arrBuf ) >= dwSize )
+            {
+                memcpy( m_arrBuf, ptr(), dwSize );
+                free( ptr() );
+                ptr() = m_arrBuf;
+            }
+            else if( ( dwSize > size() && size() > sizeof( m_arrBuf ) ) ||
+                ( size() > dwSize && dwSize > sizeof( m_arrBuf ) ) )
             {
                 char* pNewBuf = ( char* )realloc( ptr(), dwSize );
-                if( pNewBuf == nullptr )
-                {
-                    size() = 0;
-                    ptr() = nullptr;
-                }
-                else
+                if( pNewBuf != nullptr )
                 {
                     ptr() = pNewBuf;
                 }
-            }
-            else
-            {
-                // otherwise, we just use the original buffer
+                else
+                {
+                    // keep the old pointer
+                    break;
+                }
             }
 
             if( ptr() )
@@ -391,6 +401,8 @@ void CBuffer::Resize( guint32 dwSize )
 
             break;
         }
+    default:
+        break;
     }
 
     return;

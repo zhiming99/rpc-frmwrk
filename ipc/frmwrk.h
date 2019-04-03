@@ -304,7 +304,7 @@ class CIoManager : public IService
 {
     DrvMgrPtr                   m_pDrvMgr;
     MloopPtr                    m_pLoop;
-    mutable std::recursive_mutex        m_oGrandLock;
+    mutable stdrmutex           m_oGrandLock;
     RegPtr                      m_pReg;
     UtilsPtr                    m_pUtils;
     PnpMgrPtr                   m_pPnpMgr;
@@ -314,6 +314,7 @@ class CIoManager : public IService
     // CIoManager in a process. we use
     // `m_bInit' to control this.
     static bool                 m_bInit;
+    static bool                 m_bStop;
 
     CPortInterfaceMap           m_oPortIfMap;
 
@@ -328,6 +329,8 @@ class CIoManager : public IService
     // module name
     std::string                 m_strModName;
     guint32                     m_dwNumCores;
+    // house clean timer
+    gint32                      m_iHcTimer;
 
     std::vector< ThreadPtr >      m_vecStandAloneThread;
 
@@ -355,6 +358,10 @@ class CIoManager : public IService
 
     gint32 ClearStandAloneThreads();
 
+    gint32 CloseChildPort(
+        IPort* pBusPort,
+        IPort* pPort,
+        IEventSink* pCallback );
 
     public:
 
@@ -402,7 +409,8 @@ class CIoManager : public IService
     // a non-mainloop thread, synchronous
     gint32 ClosePort(
         HANDLE hPort,
-        IEventSink* pEvent );
+        IEventSink* pEvent,
+        IEventSink* pCallback = nullptr );
 
     // irp helper
     gint32 SubmitIrp(

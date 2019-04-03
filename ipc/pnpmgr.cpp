@@ -106,9 +106,9 @@ void CPnpManager::OnPortAttached(
 
         oEvtMap.SubscribeEvent( pEvent );
 
-        // using deferred call to avoid the callback
-        // from the StartPortsInternal to happen before
-        // caller quits
+        // using the deferred call to prevent the
+        // callback from the StartPortsInternal to
+        // happen before the caller quits
         ObjPtr pPortObj( pPort );
         ObjPtr pIrpObj( ( CObjBase*) pMasterIrp );
 
@@ -314,6 +314,15 @@ gint32 CPnpManager::StartPortsInternal(
             ObjPtr pObj;
 
             ret = oCfg.GetObjPtr( propEventSink, pObj );
+            if( ERROR( ret ) )
+            {
+                // for CTcpStreamPdo, the port
+                // might be opened first on the
+                // connection, when the
+                // propEventSink is missing
+                ret = pObj.NewObj(
+                    clsid( CIfDummyTask ) );
+            }
 
             if( SUCCEEDED( ret ) )
             {
@@ -441,11 +450,12 @@ gint32 CPnpManager::QueryStop(
             ret = -EINVAL;
             break;
         }
-        IrpCtxPtr& pIrpCtx = pIrp->GetTopStack(); 
+        IrpCtxPtr pIrpCtx = pIrp->GetTopStack(); 
 
         // star the port
         pIrpCtx->SetMajorCmd( IRP_MJ_PNP );
         pIrpCtx->SetMinorCmd( IRP_MN_PNP_QUERY_STOP );
+        pPort->AllocIrpCtxExt( pIrpCtx );
 
         // we will wait 2 minutes for
         // a query stop operation
@@ -654,19 +664,18 @@ gint32 CPnpMgrQueryStopCompletion::operator()(
             break;
         }
  
-        // reuse the irp
+        IrpPtr pIrpOld;
         if( dwContext == eventIrpComp )
         {
-            if( pIrp->SetState(
-                IRP_STATE_COMPLETED,
-                IRP_STATE_READY ) )
-            {
-                ret = -EINVAL;
+            pIrpOld = pIrp;
+            ret = pIrp.NewObj();
+
+            if( ERROR( ret ) )
                 break;
-            }
-            pIrp->SetMasterIrp( nullptr );
-            pIrp->PopCtxStack();
-            pIrp->AllocNextStack( pPort );
+
+            ret = pIrp->AllocNextStack( pPort );
+            if( ERROR( ret ) )
+                break;
         }
 
         IrpCtxPtr& pIrpCtx = pIrp->GetTopStack();
@@ -678,17 +687,16 @@ gint32 CPnpMgrQueryStopCompletion::operator()(
             if( ERROR( ret ) )
                 break;
 
-            pMasterIrp->RemoveSlaveIrp( pIrp );
+            if( dwContext == eventIrpComp && !pIrpOld.IsEmpty() )
+                pMasterIrp->RemoveSlaveIrp( pIrpOld );
+
             // we don't care if the irp is
             // succeeded or not
             pIrpCtx->SetMajorCmd( IRP_MJ_PNP );
             pIrpCtx->SetMinorCmd( IRP_MN_PNP_STOP );
             pPort->AllocIrpCtxExt( pIrpCtx, ( PIRP )pIrp );
 
-            pIrp->SetSyncCall( false );
-
             // clear the callback if any
-            pIrp->RemoveCallback();
             IPort* pMasterPort = pMasterIrp->GetTopPort();
 
             ret = static_cast< CPort* >
@@ -925,7 +933,10 @@ gint32 CPnpMgrStopPortAndDestroyTask::OnScheduledTask(
         pMasterIrp->SetSyncCall( false );
 
         pMasterIrp->SetTimer(
-            PORT_START_TIMEOUT_SEC + 4, pMgr );
+            PORT_START_TIMEOUT_SEC *
+            PORT_MAX_GENERATIONS, pMgr );
+
+        pMasterIrp->SetCbOnly( true );
 
         CPnpManager& oPnpMgr = pMgr->GetPnpMgr();
 
@@ -940,7 +951,11 @@ gint32 CPnpMgrStopPortAndDestroyTask::OnScheduledTask(
             pPort, pMasterIrp );
 
         if( ret == STATUS_PENDING )
+        {
+            pMasterIrp->ResetTimer();
+            pMasterIrp->MarkPending();
             break;
+        }
 
         pMasterIrp->SetState( IRP_STATE_READY,
             IRP_STATE_COMPLETED );
@@ -1006,9 +1021,7 @@ gint32 CPnpManager::StopPortsInternal(
         if( ret == STATUS_PENDING )
             break;
 
-        if( ERROR( ret ) )
-            break;
-
+        // ignore whether the QueryStop failed or not
         IrpPtr pStopIrp( true );
         pStopIrp->AllocNextStack( pPort );
 
@@ -1392,7 +1405,20 @@ void CPnpManager::HandleCPEvent(
                 propAdminEvent, iEvent, dwParam1, 0, pData );
 
             // graceful shutdown
-            GetIoMgr()->Stop();
+            TaskletPtr pTask;
+            gint32 ret = DEFER_CALL_NOSCHED(
+                pTask, this, &CIoManager::Stop );
+
+            if( ERROR( ret ) )
+                break;
+
+            // schedule a new thread for this
+            // call, otherwise there is risk of
+            // endless wait
+            ret = GetIoMgr()->RescheduleTask(
+                pTask, true );
+
+            break;
         }
     case eventDBusOffline:
         {
@@ -1400,7 +1426,23 @@ void CPnpManager::HandleCPEvent(
                 propDBusSysEvent, iEvent, dwParam1, 0, pData );
 
             // graceful shutdown
-            GetIoMgr()->Stop();
+            TaskletPtr pTask;
+
+            gint32 ret = DEFER_CALL_NOSCHED(
+                pTask, this, &CIoManager::Stop );
+
+            if( ERROR( ret ) )
+                break;
+
+            // schedule a new thread for this
+            // call, otherwise there is risk of
+            // endless wait
+            ret = GetIoMgr()->RescheduleTask(
+                pTask, true );
+
+            DebugPrint( ret,
+                "DBusOffline triggered a full stop" );
+
             break;
         }
     case eventModOnline:
@@ -1412,6 +1454,8 @@ void CPnpManager::HandleCPEvent(
         }
     case eventRmtDBusOffline:
     case eventRmtSvrOffline:
+    case eventRmtSvrOnline:
+    case eventRmtDBusOnline:
         {
             // the connection point broadcast will
             // be sent in the tasklet
@@ -1425,19 +1469,7 @@ void CPnpManager::HandleCPEvent(
             // schedule a task to stop the related
             // proxy port or the TcpStreamPort
             oConnPoint.BroadcastEvent(
-                propDBusModEvent, iEvent, dwParam1, 0, pData );
-            break;
-            /*CParamList oParams;
-            oParams.Push( ( guint32 )propRmtSvrEvent );
-            oParams.Push( ( guint32 ) iEvent );
-            oParams.Push( dwParam1 );
-            oParams.Push( ( guint32 )pData );
-            oParams.SetPointer( propIoMgr, GetIoMgr() );
-
-            GetIoMgr()->ScheduleTask(
-                clsid( CPnpMgrStopPortStackTask ),
-                oParams.GetCfg(),
-                true );*/
+                propRmtSvrEvent, iEvent, dwParam1, 0, pData );
             break;
         }
     case eventRmtModOnline:
@@ -1449,8 +1481,6 @@ void CPnpManager::HandleCPEvent(
                 propRmtModEvent, iEvent, dwParam1, 0, pData );
             break;
         }
-    case eventRmtSvrOnline:
-    case eventRmtDBusOnline:
     case eventDBusOnline:
     default:
         break;

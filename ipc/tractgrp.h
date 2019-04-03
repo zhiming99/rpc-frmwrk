@@ -33,6 +33,8 @@ class CIfTransactGroup :
     {
         gint32 ret = 0;
         do{
+            SetClassId( clsid( CIfTransactGroup ) );
+
             ret = m_pTaskGrp.NewObj(
                 clsid( CIfTaskGroup ),
                 pCfg );
@@ -46,10 +48,10 @@ class CIfTransactGroup :
             m_pRbackGrp->SetRelation( logicNONE );
 
             TaskletPtr pTask = m_pTaskGrp;
-            AppendTask( pTask );
+            super::AppendTask( pTask );
 
             pTask = m_pRbackGrp;
-            AppendTask( pTask );
+            super::AppendTask( pTask );
 
         }while( 0 );
 
@@ -113,5 +115,24 @@ class CIfTransactGroup :
             return ERROR_STATE;
         m_pRbackGrp->SetRelation( iop );
         return 0;
+    }
+
+    gint32 OnComplete( gint32 iRet )
+    {
+        iRet = m_pTaskGrp->GetError();
+        super::OnComplete( iRet );
+
+        m_pRbackGrp->RemoveProperty(
+            propParentTask );
+
+        m_pTaskGrp->RemoveProperty(
+            propParentTask );
+
+        TaskletPtr pTask( m_pRbackGrp );
+        RemoveTask( pTask );
+        pTask = m_pTaskGrp;
+        RemoveTask( pTask );
+
+        return iRet;
     }
 };

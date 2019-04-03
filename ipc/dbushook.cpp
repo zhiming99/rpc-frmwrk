@@ -186,6 +186,9 @@ gint32 CDBusTimerCallback::DoRemoveWatch()
         m_pParent->RemoveWatch( pTask, srcTimer );
         ret = pLoop->RemoveSource(
             m_hWatch, srcTimer );
+        m_hWatch = INVALID_HANDLE;
+        m_pDT = nullptr;
+
     }while( 0 );
 
     return ret;
@@ -250,6 +253,9 @@ gint32 CDBusTimerCallback::DoToggleWatch(
 
                 ret = pLoop->RemoveTimerWatch(
                     m_hWatch );
+
+                m_hWatch = INVALID_HANDLE;
+                m_pDT = nullptr;
                 // possibly this object is gone,
                 // don't touch it anymore
             }
@@ -298,7 +304,9 @@ void CDBusTimerCallback::ToggleWatch(
 gint32 CDBusTimerCallback::operator()(
     guint32 dwContext )
 {
-    dbus_timeout_handle( m_pDT );
+    if( m_pDT != nullptr )
+        dbus_timeout_handle( m_pDT );
+
     return SetError( G_SOURCE_CONTINUE );
 }
 
@@ -378,6 +386,9 @@ dbus_bool_t CDBusIoCallback::AddWatch(
         dbus_watch_set_data(ptw, pThis, NULL);
         ret = pThis->DoAddWatch( bEnabled );
 
+        // AddRef for dbus_watch_set_data
+        pThis->AddRef();
+
     }while( 0 );
 
     if( ERROR( ret ) )
@@ -391,13 +402,18 @@ gint32 CDBusIoCallback::DoRemoveWatch()
     gint32 ret = 0;
     do{
         CEvLoop* pLoop = m_pParent->GetLoop();
-        pLoop->StopSource( m_hWatch, srcIo );
+
+        HANDLE hWatch = m_hWatch;
+        m_hWatch = INVALID_HANDLE;
+        m_pDT = nullptr;
+
+        pLoop->StopSource( hWatch, srcIo );
 
         TaskletPtr pTask( this );
         m_pParent->RemoveWatch( pTask, srcIo );
 
         ret = pLoop->RemoveSource(
-            m_hWatch, srcIo );
+            hWatch, srcIo );
 
     }while( 0 );
 
@@ -424,6 +440,8 @@ void CDBusIoCallback::RemoveWatch(
         if( pThis == nullptr )
             break;
 
+        ObjPtr pObj( pThis );
+        pThis->Release();
         ret = pThis->DoRemoveWatch();
         if( ERROR( ret ) )
             break;
@@ -496,6 +514,12 @@ gint32 CDBusIoCallback::operator()(
     DBusDispatchStatus ret =
         DBUS_DISPATCH_COMPLETE;
 
+    if( m_hWatch == INVALID_HANDLE )
+        return SetError( G_SOURCE_REMOVE );
+
+    if( !m_pParent->IsSetupDone() )
+        return SetError( G_SOURCE_CONTINUE );
+
     ret = dbus_connection_get_dispatch_status(
             m_pParent->GetDBusConn() );
 
@@ -524,7 +548,11 @@ gint32 CDBusIoCallback::operator()(
         dwFlags |= DBUS_WATCH_HANGUP;
         ret2 = G_SOURCE_REMOVE;
     }
-    dbus_watch_handle( m_pDT, dwFlags );
+
+    DBusWatch* pWat = m_pDT;
+    if( pWat != nullptr )
+        dbus_watch_handle( pWat, dwFlags );
+
     return SetError( ret2 );
 }
 
@@ -596,6 +624,15 @@ gint32 CDBusDispatchCallback::operator()(
 {
     if( !m_pParent->IsSetupDone() )
         return SetError( G_SOURCE_CONTINUE );
+
+    if( m_pParent->IsDBusWatchRemoved() )
+    {
+        // the last message is eventDBusOffline,
+        // ignore it, because the shutdown is
+        // going on already
+        DebugPrint( 0, "The last message arrives" );
+        return SetError( G_SOURCE_REMOVE );
+    }
 
     gint32 ret = DoDispatch();
     if( ret == ERROR_STATE )
@@ -754,6 +791,8 @@ gint32 CDBusLoopHooks::Start(
         return -EINVAL;
 
     m_pConn = pConn;
+    dbus_connection_ref( m_pConn );
+
     gint32 ret = 0;
     do{
         if( dbus_connection_set_watch_functions(
@@ -857,6 +896,12 @@ gint32 CDBusLoopHooks::Stop()
         pCb = m_pWakeupCb;
         if( pCb != nullptr )
             pCb->Stop();
+    }
+
+    if( m_pConn != nullptr )
+    {
+        dbus_connection_unref( m_pConn );
+        m_pConn = nullptr;
     }
 
     CStdRMutex oLock( GetLock() );
