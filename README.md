@@ -20,6 +20,28 @@ This framework depends on the following packags:
 11. `Streaming support to provide double-direction stream transfer`
 
 ---
+[`Wed Mar 27 17:56:33 CST 2019`]   
+1. Fixed some bugs in the code. There are still some memory leak and concurrency bugs to fix in the `EnableRemoteEvent` and connection setup.
+
+[`Thu Mar 14 20:47:45 CST 2019`]   
+1. The `EnableRemoteEvent` works on the `Forwarder` side. and The bridge side has successfully received the request. Move on to get the `Bridge` side `EnableRemoteEvent` to work. This should be the last part work before getting through the whole request/response path.   
+
+[`Thu Mar 07 23:35:20 CST 2019`]   
+1. Fixed the memory leak issues. Move on the get the CRpcControlStream to work.   
+
+[`Tue Mar 05 14:05:40 CST 2019`]   
+1. Encountered and fixed some bugs in the `CRpcRouter`. There are still some memory leaks to fix. One known bug is that, the `OpenRemotePort` and `CloseRemotePort` need to be sequentially executed rather than in random order. Otherwise, the `CRpcTcpBridgeProxyImpl` and the `CTcpStreamPdo` may not be able to be released properly.   
+2. After the leaks are fixed, I will get `EnableRemoteEvent` to work.   
+
+[`Sun Feb 24 14:52:28 CST 2019`]   
+1. This week, I had some emergency thing to handle. I will get back next week.   
+
+[`Sat Feb 16 17:35:54 CST 2019`]   
+1. `OpenRemotePort` is done now. The CDBusProxyPdo and CDBusProxyFdo are found lack of the `online/offline` handler for both remote server and remote module, and need to add some code next week. And after that, we can move on to debug `EnableEvent` related stuffs.   
+
+[`Thu Feb 07 21:17:48 CST 2019`]   
+1. Still debugging the CRpcRouter. The `OpenRemotePort` is almost completed now. And there still need a disconnection handler on the `reqfwdr` side to clean up the context for the unexpectedly disconnected proxy.   
+
 [`Thu Jan 24 17:03:14 CST 2019`]   
 1. Continued to refact part of the CRpcRouter. Now I expect there are some trivial patches need to be done in the coming days of this week before the refact task is done.   
 
