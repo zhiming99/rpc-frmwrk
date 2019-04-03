@@ -2631,6 +2631,7 @@ gint32 CRpcStream::RecvPacket(
     m_queBufToRecv.push_back( pPacket );
     guint32 dwSize = m_queBufToRecv.size();
 
+    m_atmSeqNo++;
     // we need to consider better flow control
     // method, like leaky bucket?
     if( dwSize > STM_MAX_RECV_PACKETS )
@@ -2664,8 +2665,10 @@ gint32 CRpcStream::SetRespReadIrp(
                 pCtx->SetRespData( pBuf );
             else
             {
+                guint8* pData =
+                    ( guint8* )pBuf->ptr();
                 pCtx->m_pRespData->Append(
-                    ( guint8* )pBuf->ptr(), pBuf->size() );
+                    pData, pBuf->size() );
             }
             pCtx->SetStatus( 0 );
         }
@@ -2691,6 +2694,12 @@ gint32 CRpcStream::HandleReadIrp(
         // NOTE: no locking of IRP
         IrpPtr ptrIrp( pIrp );
         if( m_queBufToRecv.empty() )
+        {
+            m_queReadIrps.push_back( pIrp );
+            ret = STATUS_PENDING;
+            break;
+        }
+        else if( m_queReadIrps.size() > 0 )
         {
             m_queReadIrps.push_back( pIrp );
             ret = STATUS_PENDING;
@@ -2746,19 +2755,24 @@ gint32 CRpcStream::HandleReadIrp(
         else
         {
             pCtx->m_pRespData->Append(
-                ( guint8* )pBuf->ptr(), pBuf->size() );
+                ( guint8* )pBuf->ptr(),
+                pBuf->size() );
         }
 
-        if( pCtx->m_pRespData->size() > dwReqSize )
+        guint32 dwCurSize =
+            pCtx->m_pRespData->size();
+
+        if( dwCurSize > dwReqSize )
         {
             ret = -EBADMSG;
             break;
         }
+        else if( dwCurSize == dwReqSize )
+            break;
 
-        if( pCtx->m_pRespData->size() < dwReqSize )
-            continue;
+        continue;
 
-    }while( 0 );
+    }while( 1 );
 
     return ret;
 }
@@ -2805,18 +2819,31 @@ gint32 CRpcStream::GetReadIrpsToComp(
     vector< pair< IrpPtr, BufPtr > >& vecIrps )
 {
     gint32 ret = 0;
-    if( m_queReadIrps.size() == 0 ||
-        m_queBufToRecv.size() == 0 )
-    {
-        return -ENOENT;
-    }
 
-    while( m_queReadIrps.size() != 0
-        && m_queBufToRecv.size() != 0 )
-    {
+    do{
+        CStdRMutex oSockLock(
+            m_pStmSock->GetLock() );
+
+        if( m_queReadIrps.size() == 0 ||
+            m_queBufToRecv.size() == 0 )
+            break;
+
         IrpPtr pIrp = m_queReadIrps.front();
-        PacketPtr pPacket = m_queBufToRecv.front();
         m_queReadIrps.pop_front();
+        oSockLock.Unlock();
+
+        CStdRMutex oIrpLock( pIrp->GetLock() );
+        ret = pIrp->CanContinue( IRP_STATE_READY );
+
+        // discard the irp
+        if( ERROR( ret ) )
+            continue;
+
+        oSockLock.Lock();
+        if( m_queBufToRecv.empty() )
+            break;
+
+        PacketPtr pPacket = m_queBufToRecv.front();
         m_queBufToRecv.pop_front();
 
         BufPtr pBuf;
@@ -2839,26 +2866,36 @@ gint32 CRpcStream::GetReadIrpsToComp(
 
         if( ERROR( ret ) )
         {
+            // no size reqeust, just return the
+            // current packet
             dwReqSize = pBuf->size();
             ret = 0;
         }
 
         guint32 dwRecvSize = pBuf->size();
-        if( !pCtx->m_pRespData.IsEmpty() )
-        {
-            dwRecvSize = pCtx->m_pRespData->size();
-        }
-
         if( dwReqSize < dwRecvSize )
         {
             ret = -EBADMSG;
             break;
         }
-        else if( dwReqSize > dwRecvSize )
+        else if( dwReqSize == dwRecvSize )
         {
+            // move on
+        }
+        else
+        {
+            // dwReqSize > dwRecvSize
             if( pCtx->m_pRespData.IsEmpty() )
+            {
                 pCtx->SetRespData( pBuf );
-            else
+                m_queReadIrps.push_front( pIrp );
+                continue;
+            }
+
+            guint32 dwSizeToRecv = dwReqSize -
+                pCtx->m_pRespData->size();
+
+            if( dwSizeToRecv >= dwRecvSize )
             {
                 ret = pCtx->m_pRespData->Append(
                     ( guint8* )pBuf->ptr(),
@@ -2866,15 +2903,48 @@ gint32 CRpcStream::GetReadIrpsToComp(
 
                 if( ERROR( ret ) )
                     break;
-            }
-            // put the irp back
-            m_queReadIrps.push_front( pIrp );
-            continue;
-        }
 
-        vecIrps.push_back( pair< IrpPtr, BufPtr >
-            ( pIrp, pBuf ) );
-    }
+                if( dwSizeToRecv == dwRecvSize )
+                {
+                    pBuf = pCtx->m_pRespData;
+                    pCtx->m_pRespData.Clear();
+                }
+                else
+                {
+                    // put the irp back
+                    m_queReadIrps.push_front( pIrp );
+                    continue;
+                }
+            }
+            else
+            {
+                // dwSizeToRecv < dwRecvSize,
+                // split the recv buffer
+                ret = pCtx->m_pRespData->Append(
+                    ( guint8* )pBuf->ptr(),
+                    dwRecvSize );
+
+                if( ERROR( ret ) )
+                    break;
+
+                guint32 dwResidual = 
+                    pBuf->size() - dwRecvSize;
+
+                memmove( pBuf->ptr() + dwRecvSize,
+                    pBuf->ptr(), dwResidual );
+
+                pBuf->Resize( dwResidual );
+                pPacket->SetPayload( pBuf );
+                m_queBufToRecv.push_front( pPacket );
+
+                pBuf = pCtx->m_pRespData;
+                pCtx->m_pRespData.Clear();
+            }
+        }
+        vecIrps.push_back(
+            pair< IrpPtr, BufPtr >( pIrp, pBuf ) );
+
+    }while( 1 );
 
     return ret;
 }
@@ -2983,8 +3053,6 @@ gint32 CRpcStream::DispatchDataIncoming(
         vector< pair< IrpPtr, BufPtr > > vecIrps;
         if( true )
         {
-            CStdRMutex oSockLock(
-                pParentSock->GetLock() );
             ret = GetReadIrpsToComp( vecIrps );
         }
 
@@ -3425,6 +3493,10 @@ gint32 CRpcControlStream::GetReadIrpsToComp(
     // scan the req map to find the irp to match
     // the incoming packet
     gint32 ret = 0;
+
+    CStdRMutex oSockLock(
+        m_pStmSock->GetLock() );
+
     if( m_queReadIrps.size() +
         m_queReadIrpsEvt.size() == 0 ||
         m_queBufToRecv2.size() == 0 )

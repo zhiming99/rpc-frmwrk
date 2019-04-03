@@ -28,8 +28,8 @@
 
 using namespace std;
 
-static guint32 GetPnpState( IRP* pIrp );
-static void SetPnpState( IRP* pIrp, guint32 state );
+guint32 GetPnpState( IRP* pIrp );
+void SetPnpState( IRP* pIrp, guint32 state );
 
 CPort::CPort( const IConfigDb* pCfg )
 {
@@ -851,7 +851,7 @@ gint32 CPort::PreStop( IRP* pIrp )
     return ret;
 }
 
-static void SetPnpState(
+void SetPnpState(
     IRP* pIrp, guint32 state )
 {
     BufPtr pBuf;
@@ -866,7 +866,7 @@ static void SetPnpState(
     psse->m_dwState = state;
 }
 
-static guint32 GetPnpState(
+guint32 GetPnpState(
     IRP* pIrp )
 {
     BufPtr pBuf;
@@ -1166,23 +1166,32 @@ gint32 CPort::SubmitStopIrp( IRP* pIrp )
         //
         // PORT_STATE_STOPPING serve as a roadblock to
         // block further irp submission
-        ret = CanContinue( pIrp, PORT_STATE_STOPPING );
-
-        if( ERROR( ret ) )
-            break;
-
-        if( ret == STATUS_PENDING )
+        if( true )
         {
-            // It is possible CanContinue could be
-            // blocked in an heavy traffic situation,
-            // it will be resumed later
-            //
-            // to support resume, you should not rely
-            // too much on whether the code is running
-            // in the submit-irp context
-            m_pPortState->SetResumePoint(
-                &CPort::SubmitStopIrp );
-            break;
+            CStdRMutex oStatLock( m_pPortState->GetLock() );
+            ret = CanContinue( pIrp, PORT_STATE_STOPPING );
+
+            if( ERROR( ret ) )
+                break;
+
+            if( ret == STATUS_PENDING )
+            {
+                // It is possible CanContinue could be
+                // blocked in an heavy traffic situation,
+                // it will be resumed later
+                //
+                // to support resume, you should not rely
+                // too much on whether the code is running
+                // in the submit-irp context
+                TaskletPtr pTask;
+                ret = GetStopResumeTask( pIrp, pTask );
+                if( ERROR( ret ) )
+                    break;
+
+                m_pPortState->SetResumePoint( pTask );
+                ret = STATUS_PENDING;
+                break;
+            }
         }
 
         SetPnpState( pIrp, PNP_STATE_STOP_BEGIN );
@@ -1225,6 +1234,17 @@ gint32 CPort::SubmitStopIrp( IRP* pIrp )
 
 
     }while( 0 );
+
+    if( ERROR( ret ) )
+    {
+        string strObjDump;
+        this->Dump( strObjDump );
+        DebugPrint( ret, "SubmitStopIrp failed "
+            "portstate=%d, pnpstate=%d,\n%s",
+            GetPortState(),
+            GetPnpState( pIrp ),
+            strObjDump.c_str() );
+    }
 
     return ret;
 }
@@ -3390,41 +3410,37 @@ gint32 CGenBusPortStopChildTask::Process(
         vector< PortPtr >& vecChildPorts = ( *pPorts )();
         gint32 iPortCount = vecChildPorts.size();
 
+        vector< PortPtr > vecPortRevisit;
+
         for( gint32 i = iPortCount - 1; i >= 0; --i )
         {
-            // let's do some dirty work to stop all the
-            // child ports
-
-            PortPtr pSlavePort = vecChildPorts.back();
-            pSlavePort = pSlavePort->GetTopmostPort();
+            // iterate to stop all the child ports
+            PortPtr pChildPort = vecChildPorts.back();
+            pChildPort = pChildPort->GetTopmostPort();
             CPnpManager& oPnpMgr = pMgr->GetPnpMgr();
 
             if( !bRetry )
             {
                 ret = oPnpMgr.StopPortStack(
-                        pSlavePort, pIrp );
+                        pChildPort, pIrp );
             }
             else
             {
                 ret = oPnpMgr.StopPortStack(
-                        pSlavePort, pIrp, false );
+                        pChildPort, pIrp, false );
             }
 
-            if( ret != -EAGAIN )
+            if( ret == -EAGAIN )
             {
-                // either done or pending, we don't
-                // need to keep track on those ports
-                vecChildPorts.pop_back();
+                // NOTE: revisit is not an
+                // effective solution if the port
+                // has changed to non-ready state
+                vecPortRevisit.push_back( pChildPort );
             }
-        }
-        if( vecChildPorts.size() )
-        {
-            // there are a few ports requiring revisit
-            // let's do it again
-            bRevisit = true;
-            pIrp->ResetTimer();
+            vecChildPorts.pop_back();
         }
 
+        vecChildPorts = vecPortRevisit;
         oIrpLock.Lock();
         ret = pIrp->CanContinue( IRP_STATE_READY );
         if( ERROR( ret ) )
@@ -3436,15 +3452,24 @@ gint32 CGenBusPortStopChildTask::Process(
             break;
         }
 
+        if( vecPortRevisit.size() )
+        {
+            // there are a few ports requiring revisit
+            // let's do it again
+            bRevisit = true;
+            pIrp->ResetTimer();
+            // reserve the slave count for revisit
+            // in the future
+            pIrp->SetMinSlaves( vecPortRevisit.size() );
+        }
+
         pIrp->RemoveSlaveIrp( nullptr );
+
         if( pIrp->GetSlaveCount() == 0 )
         {
-            if( pIrp->GetStackSize() )
-            {
-                pIrp->GetTopStack()->SetStatus( 0 );
-                oIrpLock.Unlock();
-                pMgr->CompleteIrp( pIrp ); 
-            }
+            pIrp->GetTopStack()->SetStatus( 0 );
+            oIrpLock.Unlock();
+            pMgr->CompleteIrp( pIrp ); 
         }
         else
         {
@@ -3457,9 +3482,7 @@ gint32 CGenBusPortStopChildTask::Process(
     }while( 0 );
 
     if( bRevisit )
-    {
         ret = STATUS_MORE_PROCESS_NEEDED;
-    }
 
     return ret;
 }

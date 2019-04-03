@@ -32,33 +32,37 @@ const gint8  CPortState::m_arrStatMap[ PORTSTAT_MAP_LEN ][ PORTSTAT_MAP_LEN ] =
     // 3: poped from stack
     // 4: switched directly
     //
+    // -1: an error code other than ERROR_STATE
+    // will be returned
+    //
     // row: current state
     // col: target state
     //
-    //    0  1  2  3  4  5  6  7  8  9  10
+    //    0  1  2   3  4  5  6  7  8  9  10
     // 0: READY
-        { 1, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, },
+        { 1, 0, 0,  1, 0, 0, 1, 1, 0, 0, 0, },
     // 1: ATTACHED                        
-        { 0, 2, 1, 0, 0, 0, 1, 0, 0, 0, 0, },
+        { 0, 2, 1,  0, 0, 0, 1, 0, 0, 0, 0, },
     // 2: STARTING                        
-        { 4, 3, 2, 0, 2, 0, 0, 0, 0, 0, 0, },
+        { 4, 3, 2,  0, 2, 0, 0, 0, 0, 0, 0, },
     // 3: STOPPING                        
-        { 0, 0, 0, 2, 4, 0, 0, 0, 0, 0, 0, },
+        { 0, 0, 0,  2, 4, 0, 0, 0, 0, 0, 0, },
     // 4: STOPPED                         
-        { 0, 1, 0, 0, 2, 1, 1, 0, 0, 0, 0, },
+        { 0, 1, 0,  0, 2, 1, 1, 0, 0, 0, 0, },
     // 5: REMOVED                         
-        { 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, },
+        { 0, 0, 0,  0, 0, 2, 0, 0, 0, 0, 0, },
     // 6: BUSY                            
-        { 3, 3, 0, 0, 3, 0, 2, 0, 0, 0, 0, },
+        { 3, 3, 0,  0, 3, 0, 2, 0, 0, 0, 0, },
     // 7: BUSY SHARED                     
-        { 3, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, },
+        { 3, 0, 0, -1, 0, 0, 0, 1, 1, 0, 0, },
     // 8: EXECLUDE_PENDING                
-        { 0, 0, 0, 0, 0, 0, 0, 0, 2, 3, 3, },
+        { 0, 0, 0,  0, 0, 0, 0, 0, 0, 4, 4, },
     // 9: STOP_RESUME                     
-        { 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, },
+        { 0, 0, 0,  1, 0, 0, 0, 0, 0, 0, 0, },
     // 10: BUSY_RESUME                     
-        { 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, },
+        { 0, 0, 0,  0, 0, 0, 1, 0, 0, 4, 0, },
 };
+#define MAX_PORT_STATE 10
 
 CPortState::CPortState(
     const IConfigDb* pCfg )
@@ -105,6 +109,9 @@ guint32 CPortState::GetPortState() const
 bool CPortState::IsValidSubmit(
     guint32 dwNewState ) const
 {
+    if( dwNewState > MAX_PORT_STATE )
+        return -EINVAL;
+
     guint32 dwCurState = m_vecStates.back();
 
     const gint8* pMapActions =
@@ -114,10 +121,13 @@ bool CPortState::IsValidSubmit(
         pMapActions[ dwNewState ];
 
     // prohibitted transition
-    if( bAction != 1 )
-        return false;
+    if( bAction == 1 )
+        return true;
 
-    return true;
+    if( bAction == -1 )
+        return true;
+
+    return false;
 }
 
 stdrmutex& CPortState::GetLock() const
@@ -200,6 +210,18 @@ gint32 CPortState::CanContinue(
                     pIrp, dwNewState, pdwOldState );
                 break;
             }
+        case PORT_STATE_STOP_RESUME:
+            {
+                ret = HandleStopResume(
+                    pIrp, dwNewState, pdwOldState );
+                break;
+            }
+        case PORT_STATE_BUSY_RESUME:
+            {
+                ret = HandleBusyResume(
+                    pIrp, dwNewState, pdwOldState );
+                break;
+            }
         default:
             {
                 ret = ERROR_STATE;        
@@ -218,6 +240,12 @@ gint32 CPortState::CanContinue(
 
         break;
     }while( 1 );
+
+    if( ERROR( ret ) )
+    {
+        DebugPrint( ret,
+            "Failed to change port state" );
+    }
     
     return ret;
 }
@@ -240,7 +268,7 @@ gint32 CPortState::CanContinue(
  * @} */
 
 void CPortState::SetResumePoint(
-    ReSubmitPtr pFunc )
+    TaskletPtr& pFunc )
 {
     CStdRMutex a( GetLock() );
     m_pResume = pFunc;
@@ -249,6 +277,9 @@ void CPortState::SetResumePoint(
 gint32 CPortState::SetPortState(
     guint32 dwNewState )
 {
+    if( dwNewState > MAX_PORT_STATE )
+        return -EINVAL;
+
     CStdRMutex a( GetLock() );
 
     if( m_vecStates.empty() )
@@ -267,7 +298,21 @@ gint32 CPortState::SetPortState(
     if( bAction == 0 )
         return ERROR_STATE;
 
-    m_vecStates.back() = ( guint8 )dwNewState;
+    if( dwNewState != PORT_STATE_STOP_RESUME )
+    {
+        m_vecStates.back() = ( guint8 )dwNewState;
+    }
+    else
+    {
+        guint32 dwCurState = m_vecStates.back();
+        if( dwCurState != PORT_STATE_BUSY_RESUME )
+            return ERROR_STATE;
+
+        m_vecStates.pop_back();
+        if( m_vecStates.back() != PORT_STATE_READY )
+            return ERROR_STATE;
+        m_vecStates.back() = dwNewState;
+    }
 
     return 0;
 }
@@ -277,11 +322,11 @@ gint32 CPortState::PopState( guint32& dwState )
 {
     gint32 ret = 0;
 
-    CStdRMutex a( GetLock() );
-    if( m_vecStates.empty() )
-        return ERROR_STATE;
-
     do{
+        CStdRMutex oStatLock( GetLock() );
+        if( m_vecStates.empty() )
+            return ERROR_STATE;
+
         dwState = m_vecStates.back();
         m_vecStates.pop_back();
 
@@ -306,20 +351,21 @@ gint32 CPortState::PopState( guint32& dwState )
             // check the second top to see if it
             // is the bottom of the stack
             dwState = m_vecStates.back();
+            if( dwState != PORT_STATE_BUSY_SHARED )
+            {
+                // the state machine gone wild
+                ret = ERROR_STATE;
+                break;
+            }
             m_vecStates.pop_back();
 
             if( m_vecStates.back() == 
                 PORT_STATE_BUSY_SHARED )
             {
+                // continue to wait
                 m_vecStates.push_back(
                     PORT_STATE_EXCLUDE_PENDING );
                 ret = 0;
-                break;
-            }
-
-            if( m_vecStates.size() > 1 )
-            {
-                ret = ERROR_STATE;
                 break;
             }
 
@@ -329,7 +375,7 @@ gint32 CPortState::PopState( guint32& dwState )
             // state, and schedule the resume task
             if( m_pExclIrp.IsEmpty() ||
                 m_pExclIrp->GetStackSize() == 0 ||
-                m_pResume == nullptr )
+                m_pResume.IsEmpty()  )
             {
                 // there should be one irp pending
                 // otherwise, something wrong
@@ -340,29 +386,25 @@ gint32 CPortState::PopState( guint32& dwState )
                 break;
             }
 
-            guint32 dwMajorCmd =
-                m_pExclIrp->GetTopStack()->GetMajorCmd();
+            TaskletPtr pTask = m_pResume;
+            m_pResume.Clear();
 
-            guint32 dwMinorCmd =
-                m_pExclIrp->GetTopStack()->GetMinorCmd();
+            IrpPtr pIrp = m_pExclIrp;
 
-            if( dwMajorCmd == IRP_MJ_PNP
-                && dwMinorCmd == IRP_MN_PNP_STOP )
-            {
-                ret = SetPortState(
-                    PORT_STATE_STOP_RESUME );
-                break;
-            }
-
-            // FIXME: we did not check the
-            // irp's commands to verify
+            // whether or not STOP_RESUME or
+            // BUSY_RESUME, we will determine it
+            // later. here set to BUSY RESUME to
+            // block any other further requests
+            m_vecStates.push_back( 
+                PORT_STATE_EXCLUDE_PENDING );
             ret = SetPortState(
                 PORT_STATE_BUSY_RESUME );
-            
             if( ERROR( ret ) )
                 break;
 
-            ret = ScheduleResumeTask();
+            oStatLock.Unlock();
+
+            ret = ScheduleResumeTask( pTask, pIrp );
 
         }while( 0 );
 
@@ -773,7 +815,7 @@ gint32 CPortState::HandleBusyShared(
         }
     default:
         {
-            ret = ERROR_STATE;
+            ret = -EAGAIN;
             break;
         }
     }
@@ -795,6 +837,28 @@ gint32 CPortState::HandleExclPending(
     return ERROR_STATE;
 }
 
+gint32 CPortState::HandleStopResume(
+    IRP* pIrp,
+    guint32 dwNewState,
+    guint32* pdwOldState )
+{
+    if( dwNewState != PORT_STATE_STOPPING )
+        return ERROR_STATE;
+
+    return SetPortState( dwNewState );
+}
+
+gint32 CPortState::HandleBusyResume(
+    IRP* pIrp,
+    guint32 dwNewState,
+    guint32* pdwOldState )
+{
+    if( dwNewState != PORT_STATE_BUSY )
+        return ERROR_STATE;
+
+    return SetPortState( dwNewState );
+}
+
 gint32 CPortStateResumeSubmitTask::operator()(
     guint32 dwContext )
 {
@@ -802,88 +866,59 @@ gint32 CPortStateResumeSubmitTask::operator()(
     do{
         CCfgOpener oParams( ( IConfigDb* )m_pCtx );
 
-        CIoManager* pMgr;
-        ret = oParams.GetPointer( propIoMgr, pMgr );
+        CPort* pPort = nullptr;
+        ret = oParams.GetPointer( propPortPtr, pPort );
         if( ERROR( ret ) )
             break;
 
-        IPort* pPort = nullptr;
-        ObjPtr pObj;
-        ret = oParams.GetObjPtr( propPortPtr, pObj );
-
+        CTasklet* pTask = nullptr;
+        ret = oParams.GetPointer( propFuncAddr, pTask );
         if( ERROR( ret ) )
             break;
 
-        pPort = pObj;
-        if( pPort == nullptr )
-        {
-            ret = -EINVAL;
-            break;
-        }
-
-        ret = oParams.GetObjPtr( propFuncAddr, pObj );
-
-        if( ERROR( ret ) )
-        {
-            break;
-        }
-
-        CBuffer* pBuf = pObj;
-        if( pBuf == nullptr )
-        {
-            ret = -EINVAL;
-            break;
-        }
-
-        ReSubmitPtr& pFunc = ( ReSubmitPtr& )*pBuf;
-        CPort* pPort2 = static_cast< CPort* >( pPort );
-
-        if( pFunc == nullptr || pPort2 == nullptr )
-        {
-            ret = -EINVAL;
-            break;
-        }
-
-        ret = oParams.GetObjPtr( propIrpPtr, pObj );
-
+        PIRP pIrp = nullptr;
+        ret = oParams.GetPointer( propIrpPtr, pIrp );
         if( ERROR( ret ) )
             break;
 
-        IRP* pIrp = pObj;
-        if( pIrp == nullptr
-            || pIrp->GetStackSize() == 0 )
+        if( true )
         {
-            ret = -EINVAL;
-            break;
-        }
-
-        do{
-            CStdRMutex a( pIrp->GetLock() );
+            CStdRMutex oIrpLock( pIrp->GetLock() );
             ret = pIrp->CanContinue( IRP_STATE_READY );
-
-            // the irp is done
             if( ERROR( ret ) )
                 break;
 
-            ret = ( pPort2->*pFunc )( pIrp );
-            if( ret == STATUS_PENDING )
-                break;
-
-            if( pIrp->CanComplete() )
+            if( pIrp->GetStackSize() == 0 )
             {
-                a.Unlock();
-                pMgr->CompleteIrp( pIrp );
-                a.Lock();
+                ret = -EFAULT;
+                break;
             }
+            CStdRMutex oPortLock( pPort->GetLock() );
+            IrpCtxPtr pIrpCtx = pIrp->GetTopStack();
+            guint32 dwMajorCmd = pIrpCtx->GetMajorCmd();
+            guint32 dwMinorCmd = pIrpCtx->GetMinorCmd();
 
-        }while( 0 );
-        
+            if( dwMajorCmd == IRP_MJ_PNP
+                && dwMinorCmd == IRP_MN_PNP_STOP )
+            {
+                // change the port state from
+                // BUSY_RESUME to STOP_RESUME
+                ret = pPort->SetPortState(
+                    PORT_STATE_STOP_RESUME );
+
+                if( ERROR( ret ) )
+                    break;
+            }
+        }
+        ret = ( *pTask )( eventZero );
+
     }while( 0 );
 
     return ret;
 }
 
-gint32 CPortState::ScheduleResumeTask()
+gint32 CPortState::ScheduleResumeTask(
+    TaskletPtr& pTask, IrpPtr& pIrp )
 {
     gint32 ret = 0;
     CParamList a;
@@ -892,31 +927,18 @@ gint32 CPortState::ScheduleResumeTask()
         static_cast< CPort* >( m_pPort );
 
     do{
-        ret = a.SetPointer( propIoMgr, pPort->GetIoMgr() );
-        if( ERROR( ret ) )
-            break;
-
-        ObjPtr pIrp( m_pExclIrp );
+        // it is safe to use m_pExeclIrp here
         ret = a.SetObjPtr( propIrpPtr, pIrp );
         if( ERROR( ret ) )
             break;
-
-        m_pExclIrp.Clear();
 
         ObjPtr pObj( m_pPort );
         ret = a.SetObjPtr( propPortPtr, pObj );
         if( ERROR( ret ) )
             break;
 
-        BufPtr pBuf( true );
-        pBuf->Resize( sizeof( ReSubmitPtr ) );
-
-        ( ReSubmitPtr& )( *pBuf ) = m_pResume;
-
-        pObj = ( ( CBuffer* )pBuf );
-
         ret = a.SetObjPtr(
-            propFuncAddr, pObj );
+            propFuncAddr, ObjPtr( pTask ) );
     
         if( ERROR( ret ) )
             break;

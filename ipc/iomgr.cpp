@@ -60,10 +60,8 @@ gint32 CIoManager::SubmitIrpInternal(
         oStackEntry.first = pPort;
         pPort->AllocIrpCtxExt( oStackEntry.second );
 
-
         CStdRMutex a( pIrp->GetLock() );
         ret = pPort->SubmitIrp( pIrp );
-
         if( ret != STATUS_PENDING )
         {
             // make this irp unaccessable
@@ -1602,8 +1600,8 @@ gint32 CIoManager::RescheduleTask(
 
             if( pgth )
             {
-                pgth->AddTask( pTask );
                 pTask->MarkPending();
+                pgth->AddTask( pTask );
             }
         }
 

@@ -119,6 +119,7 @@ class CBuffer : public CObjBase
 	char* m_pData;
 	guint32 m_dwSize;
     guint32 m_dwType;
+    char m_arrBuf[ 64 ] __attribute__( ( aligned ( 8 ) ) );
 
 	public:
 

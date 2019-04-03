@@ -553,30 +553,30 @@ gint32 CoAddIidName(
 
 #define ToInternalName( _strIfName ) \
 do{ \
+    char* szBuf = ( char* )alloca( 512 );\
     if( IsServer() ) \
     { \
-        _strIfName += ":s" + \
-            std::to_string( GetObjId() ); \
+        sprintf( szBuf, "%s:s%lld", _strIfName.c_str(), GetObjId() );\
     } \
     else \
     { \
-        _strIfName += ":p" + \
-            std::to_string( GetObjId() ); \
+        sprintf( szBuf, "%s:p%lld", _strIfName.c_str(), GetObjId() );\
     } \
+    _strIfName = szBuf; \
 }while( 0 )
 
 #define ToInternalName2( _pIf, _strIfName ) \
 do{ \
+    char* szBuf = ( char* )alloca( 512 );\
     if( ( _pIf )->IsServer() ) \
     { \
-        _strIfName += ":s" + \
-            std::to_string( ( _pIf )->GetObjId() ); \
+        sprintf( szBuf, "%s:s%lld", _strIfName.c_str(), _pIf->GetObjId() );\
     } \
     else \
     { \
-        _strIfName += ":p" + \
-            std::to_string( ( _pIf )->GetObjId() ); \
+        sprintf( szBuf, "%s:p%lld", _strIfName.c_str(), _pIf->GetObjId() );\
     } \
+    _strIfName = szBuf; \
 }while( 0 )
 
 #define ToPublicName( _strIfName ) \
@@ -590,6 +590,20 @@ do{ \
     if( pos == std::string::npos ) \
         break; \
     _strIfName = _strIfName.substr( 0, pos ); \
+}while( 0 )
+
+// less malloc
+#define ToPublicName_NoStr( _strIfName, _strRet ) \
+do{ \
+    char *szBuf = ( char* )alloca( 512 );\
+    if( IsServer() ) \
+        sprintf( szBuf, ":s%lld", GetObjId() );\
+    else \
+        sprintf( szBuf, ":p%lld", GetObjId() );\
+    size_t pos = _strIfName.find( szBuf ); \
+    if( pos == std::string::npos ) \
+        break; \
+    _strRet = _strIfName.substr( 0, pos ); \
 }while( 0 )
 
 #define ToPublicName2( _pIf, _strIfName ) \
@@ -1137,9 +1151,13 @@ class CInterfaceProxy :
         Args&&... args )
     {
         CParamList oOptions;
-        std::string strIfName =
+        const std::string& strInName =
             CoGetIfNameFromIid( GetClsid() );
-        ToPublicName( strIfName );
+
+        std::string strIfName;
+        ToPublicName_NoStr(
+            strInName, strIfName );
+
         oOptions[ propIfName ] =
             DBUS_IF_NAME( strIfName );
 

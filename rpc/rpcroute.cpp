@@ -786,7 +786,7 @@ gint32 CRpcRouter::OnRmtSvrEvent(
             // fill the empty callback pointer to
             // this defer task
             pTask->UpdateParamAt( 0, pBuf );
-            AddSeqTask( pDeferTask, true );
+            AddSeqTask( pDeferTask, false );
             break;
         }
     case eventRmtSvrOffline:
@@ -808,7 +808,7 @@ gint32 CRpcRouter::OnRmtSvrEvent(
             // fill the empty callback pointer to
             // this defer task
             pTask->UpdateParamAt( 0, pBuf );
-            AddSeqTask( pDeferTask, true );
+            AddSeqTask( pDeferTask, false );
             break;
         }
     default:

@@ -528,7 +528,7 @@ gint32 CRpcReqForwarder::CloseRemotePort(
         // because the eventRmtSvrOffline comes
         // from the rpcrouter.
         ret = GetParent()->AddSeqTask(
-            pDeferTask, true );
+            pDeferTask, false );
 
         if( SUCCEEDED( ret ) )
             ret = STATUS_PENDING;
@@ -668,7 +668,7 @@ gint32 CRpcReqForwarder::OpenRemotePort(
             break;
 
         ret = GetParent()->AddSeqTask(
-            pDeferTask, true );
+            pDeferTask, false );
 
         if( SUCCEEDED( ret ) )
             ret = STATUS_PENDING;

@@ -430,12 +430,14 @@ class CIfRootTaskGroup
     {
         SetClassId( clsid( CIfRootTaskGroup ) );
     }
-    // the mutal exclusion can happen between 
+    // the race condtion can happen between 
     //  ( RunTask, OnCancel, OnChildComplete )
     // 
     virtual gint32 OnComplete( gint32 iRet );
     gint32 GetHeadTask( TaskletPtr& pHead );
     gint32 GetTailTask( TaskletPtr& pTail );
+    virtual gint32 OnChildComplete(
+        gint32 iRet, CTasklet* pChild );
 };
 
 

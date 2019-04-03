@@ -470,7 +470,6 @@ extern std::unordered_map<EnumClsid, std::string> g_mapId2Name;
 void CObjBase::Dump( std::string& strDump )
 {
     char szBuf[ 128 ];
-    strDump += "@";
     sprintf( szBuf, "0x%08X: ", (int)this );
     strDump += szBuf;
     strDump += ", clsid: ";

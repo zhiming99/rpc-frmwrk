@@ -939,6 +939,14 @@ gint32 CRpcInterfaceBase::StopEx(
         return -EINVAL;
 
     gint32 ret = 0;
+#ifdef DEBUG
+    {
+        DebugPrint( ret, "interface stopping" );
+        string strDump;
+        this->Dump( strDump );
+        DebugPrint( ret, strDump );
+    }
+#endif
     do{
         CStdRMutex oIfLock( GetLock() );
         EnumIfState iState = GetState();
@@ -961,15 +969,6 @@ gint32 CRpcInterfaceBase::StopEx(
         ret = DoStop( pCallback );
 
     }while( 0 );
-
-#ifdef DEBUG
-    {
-        DebugPrint( ret, "interface stopping" );
-        string strDump;
-        this->Dump( strDump );
-        DebugPrint( ret, strDump );
-    }
-#endif
 
     return ret;
 }
@@ -1603,11 +1602,21 @@ gint32 CRpcInterfaceBase::ClearActiveTasks()
 {
     gint32 ret = 0;
 
-    if( !m_pRootTaskGroup.IsEmpty() )
-    {
+    do{
         ret = ( *m_pRootTaskGroup )(
             eventCancelTask );
-    }
+        if( ret == STATUS_PENDING )
+        {
+            // sometimes, the system is busy and
+            // the root task group could also runs
+            // on another thread, wait for it to
+            // be available
+            usleep( 1000 );
+            continue;
+        }
+        break;
+
+    }while( 1 );
 
     return ret;
 }
@@ -1888,15 +1897,13 @@ gint32 CRpcInterfaceBase::AddAndRun(
             }
             else if( dwCount > 0 && !bRunning )
             {
+                // don't lock the io task, because
+                // it could cause deadlock
+                pIoTask->MarkPending();
+
                 pParaLock->unlock();
                 oRootLock.Unlock();
-
-                CStdRTMutex oTaskLock(
-                    pRetryTask->GetLock() );
-
-                ret = pIoTask->GetError();
-                if( ret == STATUS_PENDING )
-                    pIoTask->MarkPending();
+                ret = STATUS_PENDING;
 
                 DebugPrint( GetTid(),
                     "root task not run immediately 1, dwCount=%d, bRunning=%d",
@@ -1904,30 +1911,15 @@ gint32 CRpcInterfaceBase::AddAndRun(
             }
             else
             {
+                pIoTask->MarkPending();
                 pParaLock->unlock();
                 oRootLock.Unlock();
-                // run the para group task
-                // directly 
-                ret = ( *pParaGrp )( eventZero );
-                if( ERROR( ret ) )
-                    break;
 
-                CStdRTMutex oTaskLock(
-                    pRetryTask->GetLock() );
+                // NOTE: there could be deep
+                // nesting. Reschedule can fix,
+                // but performance hurts
+                ( *pParaGrp )( eventZero );
                 ret = pIoTask->GetError();
-                if( ret == STATUS_PENDING )
-                {
-                    // there are chances the task
-                    // is not run because the
-                    // taskgroup is running on
-                    // other thread at the same
-                    // time, and we need to mark
-                    // pending explicitly. it
-                    // should be a necessary
-                    // operation if the task's
-                    // RunTask is not called yet.
-                    pIoTask->MarkPending();
-                }
             }
         }
         else if( bImmediate && bRunning && dwCount > 0 )
@@ -1965,8 +1957,19 @@ gint32 CRpcServices::GetIidFromIfName(
     string strIfName2 =
         IF_NAME_FROM_DBUS( strIfName );
 
-    ToInternalName( strIfName2 );
-    iid = CoGetIidFromIfName( strIfName2 );
+    char szBuf[ 256 ];
+    if( IsServer() )
+    {
+        sprintf( szBuf, "%s:s%lld",
+            strIfName2.c_str(), GetObjId() );
+    }
+    else
+    {
+        sprintf( szBuf, "%s:p%lld",
+            strIfName2.c_str(), GetObjId() );
+    }
+
+    iid = CoGetIidFromIfName( string( szBuf ) );
 
     if( iid == clsid( Invalid ) )
         return -ENOENT;
@@ -2560,10 +2563,10 @@ gint32 CInterfaceProxy::SendFetch_Proxy(
             EnumClsid iid = ( EnumClsid )
                 ( ( guint32& )oDesc[ propIid ] );
 
-            std::string strIfName =
+            const std::string strInName =
                 CoGetIfNameFromIid( iid );
 
-            if( strIfName.empty() )
+            if( strInName.empty() )
             {
                 // the interface is not supported by
                 // this object
@@ -2571,7 +2574,8 @@ gint32 CInterfaceProxy::SendFetch_Proxy(
                 break;
             }
 
-            ToPublicName( strIfName );
+            std::string strIfName;
+            ToPublicName_NoStr( strInName, strIfName );
             oDesc.SetIfName(
                 DBUS_IF_NAME( strIfName ) );
 
@@ -4829,13 +4833,14 @@ gint32 CInterfaceProxy::UserCancelRequest(
 	if( qwTaskToCancel == 0 )
 		return -EINVAL;
 
-    string strIfName = CoGetIfNameFromIid(
+    const string& strInName = CoGetIfNameFromIid(
         iid( IInterfaceServer ) );
 
-    if( strIfName.empty() )
+    if( strInName.empty() )
         return ERROR_FAIL;
 
-    ToPublicName( strIfName );
+    string strIfName;
+    ToPublicName_NoStr( strInName, strIfName );
 
     CParamList oOptions;
     // FIXME: not a good solution
@@ -4888,9 +4893,11 @@ gint32 CInterfaceProxy::PauseResume_Proxy(
     // we are from IInterfaceServer
     CParamList oOptions;
 
-    std::string strIfName =
+    const std::string& strInName =
         CoGetIfNameFromIid( iid( IInterfaceServer ) );
-    ToPublicName( strIfName );
+
+    std::string strIfName;
+    ToPublicName_NoStr( strInName, strIfName );
 
     oOptions[ propIfName ] =
         DBUS_IF_NAME( strIfName );

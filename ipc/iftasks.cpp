@@ -704,8 +704,9 @@ gint32 CIfRetryTask::Process( guint32 dwContext )
             }
         case eventCancelTask:
             {
-                OnCancel( iEvent );
-                ret = ERROR_CANCEL;
+                ret = OnCancel( iEvent );
+                if( ret != STATUS_PENDING )
+                    ret = ERROR_CANCEL;
                 break;
             }
         case eventUserCancel:
@@ -1254,9 +1255,8 @@ gint32 CIfTaskGroup::AppendAndRun(
     gint32 ret = 0;
     bool bImmediate = false;
 
+    CStdRTMutex oTaskLock( GetLock() );
     do{
-        CStdRTMutex oTaskLock( GetLock() );
-
         ret = AppendTask( pTask );
         if( ERROR( ret ) )
             break;
@@ -1272,6 +1272,7 @@ gint32 CIfTaskGroup::AppendAndRun(
     if( SUCCEEDED( ret ) &&
         bImmediate == true )
     {
+        oTaskLock.Unlock();
         ret = ( *this )( eventZero );
     }
     else if( SUCCEEDED( ret ) )
@@ -1666,13 +1667,6 @@ gint32 CIfTaskGroup::OnCancel(
         {
             // some thread is working on this object
             // let's do it later
-            gint32 ret = DelayRun< super >( 1,
-                eventCancelTask, 0, 0, nullptr );
-            if( ERROR( ret ) )
-            {
-                DebugPrint( ret,
-                    "Failed to delay the cancel call" );
-            }
             return STATUS_PENDING;
         }
 
@@ -1897,6 +1891,80 @@ gint32 CIfRootTaskGroup::GetTailTask(
 
     pTail = m_queTasks.back();
     return 0;
+}
+
+gint32 CIfRootTaskGroup::OnChildComplete(
+    gint32 iRet, CTasklet* pChild )
+{
+    gint32 ret = 0;
+    if( pChild == nullptr )
+        return -EINVAL;
+
+    do{
+        bool bSync = false;
+
+        CStdRTMutex oTaskLock( GetLock() );
+
+        CfgPtr pCfg = GetConfig();
+        CCfgOpener oCfg(
+            ( IConfigDb* )pCfg );
+
+        if( IsCanceling() )
+        {
+            guint32 dwTid = oCfg[ propCancelTid ];
+            if( dwTid != GetTid() )
+            {
+                // an active canceling is going on from
+                // anther thread while an async task
+                // completion happens
+                ret = ERROR_STATE;
+                break;
+            }
+            else
+            {
+                // we are within the canceling process
+                // just move on
+            }
+        }
+
+        TaskletPtr pHead = m_queTasks.front();
+        if( pHead->GetObjId() != pChild->GetObjId() )
+        {
+            // Possibly racing in this function between
+            // a canceling thread and an async task
+            // completion.
+            return -ENOENT;
+        }
+
+        if( pCfg->exist( propNoResched ) )
+            bSync = true;
+
+        PopTask();
+        m_vecRetVals.push_back( iRet );
+
+        if( bSync )
+            break;
+
+        // don't reschedule on empty task queue,
+        // otherwise, the child task/taskgroup
+        // could be run twice in the extreme
+        // situation.
+        if( m_queTasks.empty() )
+            break;
+
+        CIoManager* pMgr = nullptr;
+        ret = GET_IOMGR( oCfg, pMgr );
+        if( ERROR( ret ) )
+            break;
+
+        oTaskLock.Unlock();
+        // regain control by rescheduling this task
+        TaskletPtr pThisTask( this );
+        ret = pMgr->RescheduleTask( pThisTask );
+
+    }while( 0 );
+
+    return ret;
 }
 
 gint32 CIfStopTask::OnIrpComplete(
@@ -2647,13 +2715,6 @@ gint32 CIfParallelTaskGrp::OnCancel(
     {
         // some thread is working on this object
         // let's do it later
-        ret = DelayRun< super >( 1,
-            eventCancelTask, 0, 0, nullptr );
-        if( ERROR( ret ) )
-        {
-            DebugPrint( ret,
-                "Failed to delay the cancel call" );
-        }
         return STATUS_PENDING;
     }
 

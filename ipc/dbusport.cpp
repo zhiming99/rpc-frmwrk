@@ -27,6 +27,7 @@
 #include "stlcont.h"
 //#include "connhelp.h"
 #include "emaphelp.h"
+#include "ifhelper.h"
 
 
 using namespace std;
@@ -1023,6 +1024,54 @@ void CDBusBusPort::ReleaseDBus()
     return;
 }
 
+extern void SetPnpState( IRP* pIrp, guint32 state );
+gint32 CDBusBusPort::AsyncStopDBusConn(
+    IRP* pIrp, gint32 dwPos )
+{
+    gint32 ret = 0;
+
+    // the message is allowed to come in
+    CIoManager* pMgr = GetIoMgr();
+    MloopPtr pLoop = pMgr->GetMainIoLoop();
+    pLoop->StopDBusConn();
+    ReleaseDBus();
+    if( true )
+    {
+        CStdRMutex oIrpLock(
+            pIrp->GetLock() );
+        ret = pIrp->CanContinue(
+            IRP_STATE_READY );
+        if( ERROR( ret ) )
+            return ret;
+
+        if( pIrp->GetStackSize() > 1 )
+        {
+            DebugPrint( -EINVAL,
+                "Irp stack should not be more than one" );
+        }
+        pIrp->SetCurPos( dwPos );
+        SetPnpState( pIrp, PNP_STATE_STOP_PRE );
+    }
+
+    return pMgr->CompleteIrp( pIrp );
+}
+
+gint32 CDBusBusPort::PreStop( IRP* pIrp )
+{
+    // graceful shutdown
+    TaskletPtr pTask;
+    gint32 ret = DEFER_CALL_NOSCHED( pTask, this,
+        &CDBusBusPort::AsyncStopDBusConn,
+        pIrp, pIrp->GetCurPos() );
+
+    CIoManager* pMgr = GetIoMgr();
+    ret = pMgr->RescheduleTaskMainLoop( pTask );
+    if( SUCCEEDED( ret ) )
+        return STATUS_MORE_PROCESS_NEEDED;
+
+    return ret;
+}
+
 gint32 CDBusBusPort::Stop( IRP *pIrp )
 {
     CDBusConnFlushTask* pTask = m_pFlushTask;
@@ -1030,17 +1079,11 @@ gint32 CDBusBusPort::Stop( IRP *pIrp )
         pTask->Stop();
     m_pFlushTask.Clear();
 
-    // the message is allowed to come in
-    MloopPtr pLoop = GetIoMgr()->GetMainIoLoop();
-    pLoop->StopDBusConn();
-
     gint32 ret = super::Stop( pIrp );
     // NOTE: the child ports are stopped ahead of
     // this method is called
 
-    ReleaseDBus();
     m_pMatchDisconn.Clear();
-
     m_pMatchLpbkServer.Clear();
     m_pMatchLpbkProxy.Clear();
     return ret;
@@ -1071,6 +1114,7 @@ gint32 CDBusBusPort::SchedulePortsAttachNotifTask(
                     IRP_STATE_READY );
 
                 if( ERROR( ret ) )
+                    break;
 
                 pMasterIrp->SetMinSlaves(
                     vecChildPdo.size() );

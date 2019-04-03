@@ -630,17 +630,21 @@ gint32 CInterfaceState::ClosePort(
     gint32 ret = 0;
     if( m_hPort != 0 )
     {
-        ret = GetIoMgr()->ClosePort( m_hPort,
+        // cut off the feedback the underlying
+        // port could emit on port unloading
+        UnsubscribeEvents();
+        HANDLE hPort = m_hPort;
+        m_hPort = 0;
+
+        ret = GetIoMgr()->ClosePort( hPort,
             GetInterface(), pCallback );
 
         if( ret == STATUS_PENDING )
             return ret;
 
-        m_hPort = 0;
-        UnsubscribeEvents();
         SetStateOnEvent( cmdClosePort );
     }
-    return ret;
+    return -EINVAL;
 }
 
 

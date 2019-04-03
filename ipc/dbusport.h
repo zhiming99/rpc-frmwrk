@@ -487,6 +487,9 @@ class CDBusBusPort : public CGenericBusPort
         const std::string& strModName,
         bool bOnline, DMsgPtr& pMsg );
 
+    gint32 AsyncStopDBusConn(
+        IRP* pIrp, gint32 iPos );
+
     public:
 
     typedef CGenericBusPort super;
@@ -600,6 +603,7 @@ class CDBusBusPort : public CGenericBusPort
     gint32 IsDBusSvrOnline(
         const std::string& strDest );
 
+	virtual gint32 PreStop( IRP* pIrp );
 };
 
 class CDBusConnFlushTask 

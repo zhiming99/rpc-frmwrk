@@ -183,7 +183,13 @@ class CCarrierPacket :
         if( m_pBuf.IsEmpty() )
             return -EFAULT;
         pBuf = m_pBuf;
+        m_pBuf.Clear();
         return 0;
+    }
+
+    inline void SetPayload( BufPtr& pBuf )
+    {
+        m_pBuf = pBuf;
     }
         
 };
@@ -818,6 +824,7 @@ class CRpcTcpFido: public CRpcBasePortEx
 
     virtual gint32 HandleSendData( IRP* pIrp );
 
+    gint32 LoopbackTest( DMsgPtr& pReqMsg );
     public:
 
     virtual gint32 OnSubmitIrp( IRP* pIrp );

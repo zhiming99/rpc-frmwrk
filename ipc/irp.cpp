@@ -254,7 +254,7 @@ void IRP_CONTEXT::SetNonDBusReq( bool bNonDBus )
 }
 
 IoRequestPacket::IoRequestPacket() :
-    m_iStatus( 0 ),
+    m_iStatus( STATUS_PENDING ),
     m_dwFlags( 0 ),
     m_atmState( IRP_STATE_READY ),
     m_pCallback( nullptr ),

@@ -79,8 +79,8 @@
 #define PORT_STATE_EXCLUDE_PENDING      ( ( guint32 )0x08 )
 
 // two transiant state 
-#define PORT_STATE_STOP_RESUME          ( ( guint32 )0x0a )
-#define PORT_STATE_BUSY_RESUME          ( ( guint32 )0x0b )
+#define PORT_STATE_STOP_RESUME          ( ( guint32 )0x09 )
+#define PORT_STATE_BUSY_RESUME          ( ( guint32 )0x0a )
 
 
 #define PORT_STATE_MASK                 ( ( guint32 )0x0F )
@@ -114,7 +114,7 @@ class CPortState : public CObjBase
     sem_t                       m_semWaitForReady;
     IPort*                      m_pPort;
 
-    ReSubmitPtr                 m_pResume;
+    TaskletPtr                  m_pResume;
 
     bool IsValidSubmit( guint32 dwNewState ) const;
     guint32 PushState( guint32 dwState, bool bCheckLimit = true );
@@ -133,7 +133,7 @@ class CPortState : public CObjBase
         guint32 dwNewState = PORT_STATE_INVALID,
         guint32* pdwOldState = nullptr );
 
-    void SetResumePoint( ReSubmitPtr pFunc );
+    void SetResumePoint( TaskletPtr& pFunc );
     gint32 SetPortState( guint32 state );
 
     // return the poped state
@@ -146,7 +146,8 @@ class CPortState : public CObjBase
 
     bool IsPortReady();
 
-    gint32 ScheduleResumeTask();
+    gint32 ScheduleResumeTask(
+        TaskletPtr& pTask, IrpPtr& pIrp );
 
     gint32 HandleReady( IRP* pIrp,
         guint32 dwNewState,
@@ -181,6 +182,14 @@ class CPortState : public CObjBase
         guint32* pdwOldState );
 
     gint32 HandleExclPending( IRP* pIrp,
+        guint32 dwNewState,
+        guint32* pdwOldState );
+
+    gint32 HandleStopResume( IRP* pIrp,
+        guint32 dwNewState,
+        guint32* pdwOldState );
+
+    gint32 HandleBusyResume( IRP* pIrp,
         guint32 dwNewState,
         guint32* pdwOldState );
 };
@@ -286,6 +295,8 @@ class CPort : public IPort
         bool bImmediately = false );
 
 	gint32 SubmitGetPropIrp( IRP* pIrp );
+    gint32 GetStopResumeTask(
+        PIRP pIrp, TaskletPtr& pTask );
 
 	public:
     typedef IPort   super;
@@ -560,7 +571,7 @@ struct CGenBusPnpExt :
     guint32 m_dwExtState;
 };
 
-#define BUSPORT_STOP_RETRY_SEC     3
+#define BUSPORT_STOP_RETRY_SEC     1
 #define BUSPORT_STOP_RETRY_TIMES   3
 
 class CGenericBusPort : public CPort

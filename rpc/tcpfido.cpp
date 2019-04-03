@@ -26,7 +26,7 @@
 
 using namespace std;
 
-std::atomic< guint32 > CRpcTcpFido::m_atmSeqNo;
+std::atomic< guint32 > CRpcTcpFido::m_atmSeqNo( 0 );
 
 CRpcTcpFido::CRpcTcpFido(
     const IConfigDb* pCfg  )
@@ -745,6 +745,71 @@ gint32 CRpcTcpFido::CompleteSendReq(
     return ret;
 }
 
+gint32 CRpcTcpFido::LoopbackTest(
+    DMsgPtr& pReqMsg )
+{
+    gint32 ret = 0;
+    do{
+        DMsgPtr pRespMsg;
+        if( pReqMsg.GetType() !=
+            DBUS_MESSAGE_TYPE_METHOD_CALL )
+        {
+            DebugPrint( 0, "unexpected messages received:\n"
+            "%s", pReqMsg.DumpMsg().c_str() );
+            return 0;
+        }
+
+        ret = pRespMsg.NewResp( pReqMsg );
+
+        if( ERROR( ret ) )
+            break;
+
+        CParamList oParams;
+        oParams[ propReturnValue ] = 0;
+
+        BufPtr pBuf( true );
+        ret = oParams.GetCfg()->Serialize( *pBuf );
+
+        dbus_message_append_args( pRespMsg,
+            DBUS_TYPE_UINT32, &ret,
+            DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
+            &pBuf->ptr(), pBuf->size(),
+            DBUS_TYPE_INVALID );
+
+        IrpPtr pIrp( true );
+        pIrp->AllocNextStack( this );
+
+        IrpCtxPtr pCtx = pIrp->GetTopStack();
+        BufPtr pReqBuf( true );
+        *pReqBuf = pRespMsg;
+
+        // the stream id to listen to is in.
+        this->AllocIrpCtxExt( pCtx );
+
+        pCtx->SetMajorCmd( IRP_MJ_FUNC );
+        pCtx->SetMinorCmd( IRP_MN_IOCTL );
+        pCtx->SetCtrlCode( CTRLCODE_SEND_RESP );
+        pCtx->SetReqData( pReqBuf );
+
+        pCtx->SetIoDirection( IRP_DIR_OUT ); 
+        pIrp->SetSyncCall( false );
+
+        // NOTE: no timer here
+        //
+        // set a callback
+        TaskletPtr pTask;
+        pTask.NewObj( clsid( CIfDummyTask ) );
+        pIrp->SetCallback( pTask, 0 );
+
+        ret = GetIoMgr()->SubmitIrp(
+            PortToHandle( this ),
+            pIrp, false );
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CRpcTcpFido::DispatchData(
     CBuffer* pData )
 {
@@ -758,7 +823,12 @@ gint32 CRpcTcpFido::DispatchData(
 
     BufPtr pBuf( true );
     *pBuf = pMsg;
+
+#ifdef LOOP_TEST
+    return LoopbackTest( pMsg );
+#else
     return super::DispatchData( pBuf );
+#endif
 }
 
 gint32 CRpcTcpFido::HandleReadWriteReq(
