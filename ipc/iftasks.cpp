@@ -1974,9 +1974,6 @@ gint32 CIfStopTask::OnIrpComplete(
         pIrp->GetStackSize() == 0 )
         return -EINVAL;
 
-#ifdef DEBUG
-    m_bIrpComp = true;
-#endif
     return pIrp->GetStatus();
 }
 
