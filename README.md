@@ -20,6 +20,9 @@ This framework depends on the following packags:
 11. `Streaming support to provide double-direction stream transfer`
 
 ---
+[`Thu Apr 11 14:06:43 CST 2019`]   
+1. Fixed some fatal memory leaks and concurrency bugs. Hopefully, the biggest memory leak will be fixed in the next check-in. But the progress is a bit lagging :(    
+
 [`Wed Mar 27 17:56:33 CST 2019`]   
 1. Fixed some bugs in the code. There are still some memory leak and concurrency bugs to fix in the `EnableRemoteEvent` and connection setup.
 
