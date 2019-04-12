@@ -430,7 +430,6 @@ do{ \
     std::string strIfName; \
     oCfg.GetStrProp( propIfName, strIfName ); \
     strIfName = IF_NAME_FROM_DBUS( strIfName ); \
-    ToInternalName( strIfName );\
     CoAddIidName( strIfName, _iIfId_ ); \
     PROXY_MAP _oAnon_; \
     PROXY_MAP* _pMapProxies_ = &_oAnon_; \
@@ -488,7 +487,6 @@ do{ \
 do{ \
     EnumClsid _iIfId_ = iid( _InterfName_ ); \
     std::string strIfName = #_InterfName_; \
-    ToInternalName( strIfName ); \
     CoAddIidName( strIfName, _iIfId_ ); \
 \
     PROXY_MAP _oAnon_; \
@@ -1023,7 +1021,6 @@ do{\
     CCfgOpenerObj oCfg( this ); \
     oCfg.GetStrProp( propIfName, strIfName ); \
     strIfName = IF_NAME_FROM_DBUS( strIfName ); \
-    ToInternalName( strIfName ); \
     CoAddIidName( strIfName, _iIfId_ ); \
 \
     FUNC_MAP _oAnon_; \
@@ -1098,7 +1095,6 @@ do{ \
 do{\
     EnumClsid _iIfId_ = iid( _iInterfName_ );\
     std::string strIfName = #_iInterfName_; \
-    ToInternalName( strIfName ); \
     CoAddIidName( strIfName, _iIfId_ ); \
 \
     FUNC_MAP _oAnon_; \
@@ -2297,7 +2293,6 @@ struct Parameters< std::tuple< Types... >, std::tuple< Types2... > >
             CParamList oOptions;
             std::string strIfName =
                 CoGetIfNameFromIid( iid );
-            ToPublicName2( m_pIf, strIfName );
             oOptions[ propIfName ] =
                 DBUS_IF_NAME( strIfName );
 
@@ -2707,7 +2702,6 @@ struct ClassName : CAggregatedObject< CAggInterfaceServer, ##__VA_ARGS__ >, IUnk
         while( szToken != nullptr )\
         {\
             std::string strIfName = szToken;\
-            ToInternalName( strIfName );\
             EnumClsid iid = CoGetIidFromIfName( strIfName );\
             if( iid != clsid( Invalid ) )\
                 ( *pClsids )().push_back( iid );\

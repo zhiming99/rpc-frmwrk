@@ -91,13 +91,16 @@ gint32 CIoManager::SubmitIrp(
         return -EINVAL;
 
     do{
-        IPort* pPort = HandleToPort( hPort );
+        PortPtr pPort;
         if( bCheckExist )
         {
-            // let's find if the port existing
-            ret = PortExist( pPort );
+            ret = GetPortPtr( hPort, pPort );
             if( ERROR( ret ) )
                 break;
+        }
+        else
+        {
+            pPort = HandleToPort( hPort );
         }
 
         ret = SubmitIrpInternal( pPort, pIrp );
@@ -321,18 +324,21 @@ gint32 CIoManager::CompleteIrp( IRP* pIrpComp )
             break;
 
         // walk through the irp context stack
-        vector< pair< PortPtr, IrpCtxPtr > >::iterator itr;
-
         if( !pIrp->IsCbOnly() )
         {
-            if( pIrp->GetStackSize() > 0 )
+            gint32 iSize = ( gint32 )pIrp->GetStackSize();
+            if( iSize > 0 )
             {
-                itr = pIrp->m_vecCtxStack.end() - 1;
-                do{
-                    if( !itr->first.IsEmpty()  )
+                vector< pair< PortPtr, IrpCtxPtr > >&
+                    vecStack = pIrp->m_vecCtxStack;
+
+               for( gint32 i = iSize - 1; i >= 0; --i )
+               {
+                    pair< PortPtr, IrpCtxPtr >& oElem = vecStack[ i ];
+                    if( !oElem.first.IsEmpty() )
                     {
-                        pIrp->SetCurPos( itr - pIrp->m_vecCtxStack.begin() );
-                        ret = itr->first->CompleteIrp( pIrp );
+                        pIrp->SetCurPos( i );
+                        ret = oElem.first->CompleteIrp( pIrp );
                         if( ret == STATUS_PENDING )
                         {
                             // FIXME: Is it the responsibility of the
@@ -350,18 +356,23 @@ gint32 CIoManager::CompleteIrp( IRP* pIrpComp )
                             return ret;
                         }
                     }
-
-                }while( itr-- != pIrp->m_vecCtxStack.begin() );
+                }
 
                 // we should not pop out the first io stack
                 // because it is owned by the user land
-                itr = pIrp->m_vecCtxStack.begin();
-                pIrp->SetStatus( itr->second->GetStatus() );
+                IrpCtxPtr& pCtxPtr = vecStack.begin()->second;
+                pIrp->SetStatus( pCtxPtr->GetStatus() );
             }
             else
             {
-                pIrp->SetStatus( -ENOENT );
+                pIrp->SetStatus( -EINVAL );
             }
+        }
+        else
+        {
+            IrpCtxPtr& pCtxPtr =
+                pIrp->m_vecCtxStack.begin()->second;
+            pIrp->SetStatus( pCtxPtr->GetStatus() );
         }
 
         // remove the timer if any
@@ -385,18 +396,6 @@ gint32 CIoManager::CompleteIrp( IRP* pIrpComp )
             // no one else should touch this irp
             // because it is already marked as completed
         }
-
-        if( pIrp->m_vecCtxStack.size() )
-        {
-            // we cannot remove the port reference
-            // here, since the AllocIrpCtxExt need
-            // a ReleaseIrpCtxExt to release the
-            // resources in the irp's destructor
-            //
-            // itr = pIrp->m_vecCtxStack.begin();
-            // itr->first = nullptr; ;
-        }
-
 
         ret = PostCompleteIrp( pIrp );
         // till now, the irp will go out of
@@ -581,28 +580,30 @@ gint32 CIoManager::CancelIrp(
         }
 
         // walk through the irp context stack
-        vector< pair< PortPtr, IrpCtxPtr > >::iterator itr =
-            pIrp->m_vecCtxStack.end() - 1;
-
         if( !pIrp->IsCbOnly() )
         {
             if( pIrp->GetStackSize() > 0 )
             {
+                gint32 iSize = ( gint32 )pIrp->GetStackSize();
+                vector< pair< PortPtr, IrpCtxPtr > >&
+                    vecStack = pIrp->m_vecCtxStack;
+
                 bool bFirst = true;
-                do{
-                    if( !itr->first.IsEmpty() )
+                for( gint32 i = iSize - 1; i >= 0; --i )
+                {
+                    pair< PortPtr, IrpCtxPtr >& oElem = vecStack[ i ];
+                    if( !oElem.first.IsEmpty() )
                     {
                         // set the status for the top stack
                         if( bFirst )
                         {
-                            itr->second->SetStatus(
+                            oElem.second->SetStatus(
                                 iRet == 0 ? -ECANCELED : iRet );
-
                             bFirst = false;
                         }
 
-                        pIrp->SetCurPos( itr - pIrp->m_vecCtxStack.begin() );
-                        itr->first->CancelIrp( pIrp, bForce );
+                        pIrp->SetCurPos( i );
+                        oElem.first->CancelIrp( pIrp, bForce );
                     }
 
                     // the context stack will be popped by the
@@ -616,21 +617,10 @@ gint32 CIoManager::CancelIrp(
                     // face the IRP_CONTEXT it prepared for
                     // the its lower port
 
-                }while( itr-- != pIrp->m_vecCtxStack.begin() );
-
-                itr = pIrp->m_vecCtxStack.begin();
+                }
             }
         }
         pIrp->SetStatus( iRet );
-
-        if( pIrp->GetStackSize() > 0 )
-        {
-            // we need to remove port reference at the
-            // bottom of the port stack
-            //
-            // itr = pIrp->m_vecCtxStack.begin();
-            // itr->first = nullptr;
-        }
 
         // we leave the last IRP_CONTEXT for the io manager
         // or the attached interface, at this point
@@ -887,12 +877,16 @@ gint32 CIoManager::ClosePort(
             ret = -EINVAL;
             break;
         }
+        bool bNoRef = false;
+        PortPtr ptrPort;
+        ret = GetPortPtr( hPort, ptrPort );
+        if( ERROR( ret ) )
+            break;
+
         CPort* pPort = static_cast< CPort* >(
             HandleToPort( hPort ) );
 
-        PortPtr ptrPort( pPort );
         ret = RemoveFromHandleMap( pPort, pEvent );
-        bool bNoRef = false;
         ret = IsPortNoRef( pPort, bNoRef );
         if( ERROR( ret ) )
         {
@@ -944,14 +938,12 @@ gint32 CIoManager::OpenPortByRef(
     if( hPort == 0 || pEventSink == nullptr )
         return -EINVAL;
 
-    IPort* pPort = HandleToPort( hPort );
-    gint32 ret = PortExist( pPort );
-
+    PortPtr pPort;
+    gint32 ret = GetPortPtr( hPort, pPort );
     if( ERROR( ret ) )
         return ret;
 
-    return AddToHandleMap(
-        pPort, pEventSink );
+    return AddToHandleMap( pPort, pEventSink );
 }
 
 gint32 CIoManager::GetPortProp(
@@ -959,19 +951,15 @@ gint32 CIoManager::GetPortProp(
     gint32 iProp,
     BufPtr& pBuf )
 {
-    IPort* pPort = HandleToPort( hPort );
-
-    if( pPort == nullptr )
+    if( hPort == 0 )
         return -EINVAL;
 
-    gint32 ret = PortExist( pPort );
+    PortPtr pPort;
+    gint32 ret = GetPortPtr( hPort, pPort );
     if( ERROR( ret ) )
         return ret;
 
-    CPort* pCPort =
-        static_cast< CPort* >( pPort );
-
-    ret = pCPort->GetProperty( iProp, *pBuf );
+    ret = pPort->GetProperty( iProp, *pBuf );
 
     return ret;
 }

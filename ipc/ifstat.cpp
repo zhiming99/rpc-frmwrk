@@ -36,7 +36,7 @@ std::map< STATEMAP_KEY, EnumIfState > CInterfaceState::m_mapState =
 {
     STATEMAP_ENTRY( stateStopped,   cmdOpenPort,            stateStarting ),
     STATEMAP_ENTRY( stateStarting,  eventPortStarted,       stateConnected ),
-    STATEMAP_ENTRY( stateStarting,  eventPortStartFailed,   stateStopping ),
+    STATEMAP_ENTRY( stateStarting,  eventPortStartFailed,   stateStartFailed ),
     STATEMAP_ENTRY( stateStarting,  eventPortStopping,      stateStopped ),
     STATEMAP_ENTRY( stateStarting,  eventDBusOffline,       stateStopped ),
     STATEMAP_ENTRY( stateStarting,  eventRmtSvrOffline,     stateStopped ),
@@ -66,7 +66,8 @@ std::map< STATEMAP_KEY, EnumIfState > CInterfaceState::m_mapState =
     STATEMAP_ENTRY( statePaused,    cmdResume,              stateResuming ),
     STATEMAP_ENTRY( statePausing,   eventPaused,            statePaused ),
     STATEMAP_ENTRY( stateStopping,  cmdClosePort,           stateStopped ),
-    STATEMAP_ENTRY( stateStopping,  eventRetry,             stateStarting ),
+    STATEMAP_ENTRY( stateStartFailed, cmdCleanup,           stateStopping ),
+    STATEMAP_ENTRY( stateStartFailed, eventRetry,           stateStarting ),
     STATEMAP_ENTRY( stateResuming,  eventResumed,           stateConnected ),
 
     // unknown means the value depends on the m_iResumeState
@@ -608,7 +609,7 @@ gint32 CInterfaceState::OpenPortInternal(
             break;
         }
 
-        if( ret == -EAGAIN )
+        if( ERROR( ret ) )
         {
             // return to stopped state
             // retry will happen from outside
@@ -627,26 +628,15 @@ gint32 CInterfaceState::OpenPortInternal(
 gint32 CInterfaceState::ClosePort(
     IEventSink* pCallback )
 {
-    gint32 ret = 0;
-    if( m_hPort != 0 )
-    {
-        // cut off the feedback the underlying
-        // port could emit on port unloading
-        UnsubscribeEvents();
-        HANDLE hPort = m_hPort;
-        m_hPort = 0;
+    if( m_hPort == 0 )
+        return -EINVAL;
 
-        ret = GetIoMgr()->ClosePort( hPort,
-            GetInterface(), pCallback );
-
-        if( ret == STATUS_PENDING )
-            return ret;
-
-        SetStateOnEvent( cmdClosePort );
-    }
-    return -EINVAL;
+    // cut off the feedback the underlying
+    // port could emit on port unloading
+    UnsubscribeEvents();
+    return GetIoMgr()->ClosePort(
+        m_hPort, GetInterface(), pCallback );
 }
-
 
 gint32 CInterfaceState::UnsubscribeEvents()
 {

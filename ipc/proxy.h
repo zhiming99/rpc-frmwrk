@@ -551,74 +551,6 @@ gint32 CoAddIidName(
     const std::string& strName,
     EnumClsid Iid );
 
-#define ToInternalName( _strIfName ) \
-do{ \
-    char* szBuf = ( char* )alloca( 512 );\
-    if( IsServer() ) \
-    { \
-        sprintf( szBuf, "%s:s%lld", _strIfName.c_str(), GetObjId() );\
-    } \
-    else \
-    { \
-        sprintf( szBuf, "%s:p%lld", _strIfName.c_str(), GetObjId() );\
-    } \
-    _strIfName = szBuf; \
-}while( 0 )
-
-#define ToInternalName2( _pIf, _strIfName ) \
-do{ \
-    char* szBuf = ( char* )alloca( 512 );\
-    if( ( _pIf )->IsServer() ) \
-    { \
-        sprintf( szBuf, "%s:s%lld", _strIfName.c_str(), _pIf->GetObjId() );\
-    } \
-    else \
-    { \
-        sprintf( szBuf, "%s:p%lld", _strIfName.c_str(), _pIf->GetObjId() );\
-    } \
-    _strIfName = szBuf; \
-}while( 0 )
-
-#define ToPublicName( _strIfName ) \
-do{ \
-    std::string strSuffix= ":p"; \
-    if( IsServer() ) \
-        strSuffix= ":s"; \
-    strSuffix += \
-        std::to_string( GetObjId() ); \
-    size_t pos = _strIfName.find( strSuffix ); \
-    if( pos == std::string::npos ) \
-        break; \
-    _strIfName = _strIfName.substr( 0, pos ); \
-}while( 0 )
-
-// less malloc
-#define ToPublicName_NoStr( _strIfName, _strRet ) \
-do{ \
-    char *szBuf = ( char* )alloca( 512 );\
-    if( IsServer() ) \
-        sprintf( szBuf, ":s%lld", GetObjId() );\
-    else \
-        sprintf( szBuf, ":p%lld", GetObjId() );\
-    size_t pos = _strIfName.find( szBuf ); \
-    if( pos == std::string::npos ) \
-        break; \
-    _strRet = _strIfName.substr( 0, pos ); \
-}while( 0 )
-
-#define ToPublicName2( _pIf, _strIfName ) \
-do{ \
-    std::string strSuffix= ":p"; \
-    if( _pIf->IsServer() ) \
-        strSuffix= ":s"; \
-    strSuffix += \
-        std::to_string( _pIf->GetObjId() ); \
-    size_t pos = _strIfName.find( strSuffix ); \
-    if( pos == std::string::npos ) \
-        break; \
-    _strIfName = _strIfName.substr( 0, pos ); \
-}while( 0 )
-
 /**
 * @name CRpcServices as an interface to provide
 * the transport layer interface for an rpc
@@ -1097,8 +1029,6 @@ class CInterfaceProxy :
             return ret;
 
         strIfName = IF_NAME_FROM_DBUS( strIfName );
-        ToInternalName( strIfName );
-
         EnumClsid iid =
             CoGetIidFromIfName( strIfName );
 
@@ -1151,12 +1081,8 @@ class CInterfaceProxy :
         Args&&... args )
     {
         CParamList oOptions;
-        const std::string& strInName =
+        const std::string& strIfName =
             CoGetIfNameFromIid( GetClsid() );
-
-        std::string strIfName;
-        ToPublicName_NoStr(
-            strInName, strIfName );
 
         oOptions[ propIfName ] =
             DBUS_IF_NAME( strIfName );

@@ -54,6 +54,7 @@ typedef enum : guint32
     stateResuming,
     stateInvalid,
     stateIoDone,    // for the task state
+    stateStartFailed,
 
 }EnumIfState;
 

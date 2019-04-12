@@ -47,6 +47,7 @@ class CIfSmokeTest :
 #ifdef CLIENT
     CPPUNIT_TEST( testCliStartStop );
     // CPPUNIT_TEST( testDBusLeak );
+    // CPPUNIT_TEST( testObjAlloc );
 #endif
     CPPUNIT_TEST_SUITE_END();
 
@@ -57,6 +58,7 @@ class CIfSmokeTest :
     void testCliStartStop();
 #ifdef CLIENT
     void testDBusLeak();
+    void testObjAlloc();
 #endif
 };
 

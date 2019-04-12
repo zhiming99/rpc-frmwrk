@@ -116,17 +116,15 @@ gint32 CRpcTcpBridgeProxy::ClearRemoteEvents(
         CParamList oOptions;
         CParamList oResp;
         EnumClsid iid = iid( CRpcTcpBridge );
-        const string& strInName =
+        const string& strIfName =
             CoGetIfNameFromIid( iid );
 
-        if( strInName.empty() )
+        if( strIfName.empty() )
         {
             ret = -ENOTSUP;
             break;
         }
 
-        string strIfName;
-        ToPublicName_NoStr( strInName, strIfName );
         oOptions[ propIfName ] = 
             DBUS_IF_NAME( strIfName );
 
@@ -205,17 +203,13 @@ gint32 CRpcTcpBridgeProxy::EnableRemoteEventInternal(
         }
 
         EnumClsid iid = iid( CRpcTcpBridge );
-        const string& strInName =
+        const string& strIfName =
             CoGetIfNameFromIid( iid );
-
-        if( strInName.empty() )
+        if( strIfName.empty() )
         {
             ret = -ENOTSUP;
             break;
         }
-
-        string strIfName;
-        ToPublicName_NoStr( strInName, strIfName );
 
         oBuilder[ propIfName ] = 
             DBUS_IF_NAME( strIfName );

@@ -542,7 +542,7 @@ gint32 CRpcSocketBase::CloseSocket()
         ret = shutdown( m_iFd, SHUT_RDWR );
         if( ERROR( ret ) )
         {
-            DebugPrint( ret,
+            DebugPrint( -errno,
                 "Error shutdown socket[%d]",
                 m_iFd );
         }
@@ -1794,7 +1794,7 @@ gint32 CRpcStreamSock::HandleReadIrp(
         CStdRMutex oSockLock( GetLock() );
         if( GetState() != sockStarted )
         {
-            ret = ERROR_STATE;
+            ret = -ENETDOWN;
             break;
         }
         
@@ -1851,7 +1851,7 @@ gint32 CRpcStreamSock::HandleWriteIrp(
         CStdRMutex oSockLock( GetLock() );
         if( GetState() != sockStarted )
         {
-            ret = ERROR_STATE;
+            ret = -ENETDOWN;
             break;
         }
         
@@ -1939,7 +1939,7 @@ gint32 CRpcStreamSock::HandleIoctlIrp(
         CStdRMutex oSockLock( GetLock() );
         if( GetState() != sockStarted )
         {
-            ret = ERROR_STATE;
+            ret = -ENETDOWN;
             break;
         }
         

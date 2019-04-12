@@ -1501,7 +1501,8 @@ gint32 CTcpFidoListenTask::Process(
 
     }while( 1 );
 
-    if( ret != STATUS_PENDING )
+    if( ret != STATUS_PENDING &&
+        ret != STATUS_MORE_PROCESS_NEEDED )
     {
         oParams.RemoveProperty(
             propPortPtr );

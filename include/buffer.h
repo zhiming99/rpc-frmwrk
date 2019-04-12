@@ -366,6 +366,7 @@ class CBuffer : public CObjBase
         !std::is_same<T, DMsgPtr >::value &&
         !std::is_same<T, ObjPtr>::value );
 
+        SetDataType( DataTypeMem );
         Resize( sizeof( T ) );
         if( ptr() )
         {

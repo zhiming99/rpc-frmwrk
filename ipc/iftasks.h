@@ -82,15 +82,15 @@ class CIfRetryTask
     {
         bool ret = false;
         do{
+            if( iRet != STATUS_MORE_PROCESS_NEEDED &&
+                iRet != -EAGAIN )
+                break;
+
             if( !CanRetry() )
                 break;
 
-            if( iRet == STATUS_MORE_PROCESS_NEEDED ||
-                iRet == -EAGAIN )
-            {
-                ret = true;
-                break;
-            }
+            ret = true;
+
         }while( 0 );
 
         return ret;

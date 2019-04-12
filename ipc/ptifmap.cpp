@@ -97,21 +97,26 @@ gint32 CPortInterfaceMap::RemoveFromHandleMap(
         CStdRMutex a( GetLock() );
         PortPtr portPtr( pPort );
         EventPtr evtPtr( pEvent );
+        HANDLE hPort = PortToHandle( pPort );
 
         PEPAIR result = m_mapPort2If.equal_range( portPtr );
         multimap< PortPtr, EventPtr >::iterator itr1;
+        guint32 dwCount = 0;
         for( itr1 = result.first; itr1 != result.second; ++itr1 )
         {
             if( ( ( IEventSink* )itr1->second ) == pEvent )
             {
                 bExist1 = true;
+                dwCount = std::distance( result.first, result.second );
                 break;
             }
         }
         if( bExist1 )
         {
-            m_setHandles.erase( PortToHandle( pPort ) );
             m_mapPort2If.erase( itr1 );
+            if( dwCount == 1 )
+                m_setHandles.erase( hPort );
+
             EPPAIR result2 = m_mapIf2Port.equal_range( evtPtr );
             multimap< EventPtr, PortPtr >::iterator itr2;
             for( itr2 = result2.first; itr2 != result2.second; ++itr2 )
@@ -210,16 +215,22 @@ gint32 CPortInterfaceMap::PortExist(
             ret = -EINVAL;
             break;
         }
+
         CStdRMutex a( GetLock() );
+        HANDLE hPort = PortToHandle( pPort );
+        ret = PortExist( hPort );
+        if( ERROR( ret ) )
+            return -ENOENT;
+
         PortPtr portPtr( pPort );
         if( m_mapPort2If.find( portPtr ) == m_mapPort2If.end() )
         {
             ret = -ENOENT;
             break;
         }
-        CPEPAIR result = m_mapPort2If.equal_range( portPtr );
         if( pvecVals != nullptr )
         {
+            CPEPAIR result = m_mapPort2If.equal_range( portPtr );
             multimap< PortPtr, EventPtr >::const_iterator itr;
             for( itr = result.first; itr != result.second; ++itr )
             {

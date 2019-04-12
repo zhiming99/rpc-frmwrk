@@ -1095,12 +1095,14 @@ gint32 CIfOpenPortTask::OnIrpComplete(
                 if( !pCtx->m_pRespData.IsEmpty() )
                 {
                     hPort = ( guint32& )*pCtx->m_pRespData;
-                    pIf->OnPortEvent( iEvent, hPort );
                 }
+                pIf->OnPortEvent( iEvent, hPort );
             }
-            else if( ret == -EAGAIN )
+            else 
             {
-                ret = STATUS_MORE_PROCESS_NEEDED;
+                pIf->SetStateOnEvent( eventRetry );
+                if( ret == -EAGAIN )
+                    ret = STATUS_MORE_PROCESS_NEEDED;
             }
         }
         else
@@ -1273,7 +1275,7 @@ gint32 CIfTaskGroup::AppendAndRun(
         bImmediate == true )
     {
         oTaskLock.Unlock();
-        ret = ( *this )( eventZero );
+        ( *this )( eventZero );
     }
     else if( SUCCEEDED( ret ) )
     {
@@ -1536,8 +1538,7 @@ gint32 CIfTaskGroup::OnChildComplete(
         CStdRTMutex oTaskLock( GetLock() );
 
         CfgPtr pCfg = GetConfig();
-        CCfgOpener oCfg(
-            ( IConfigDb* )pCfg );
+        CCfgOpener oCfg( ( IConfigDb* )pCfg );
 
         if( IsCanceling() )
         {
@@ -1775,16 +1776,10 @@ gint32 CIfTaskGroup::FindTaskByRmtId(
     CStdRTMutex oTaskLock( GetLock() );
     for( auto&& pTask : m_queTasks )
     {
-        const IConfigDb* pTaskCfg =
-            ( IConfigDb* )*pTask;
-
-        if( pTaskCfg == nullptr )
-            continue;
-
+        CCfgOpenerObj oCfg( ( CObjBase* )pTask );
         if( pTask->GetClsid() ==
             clsid( CIfInvokeMethodTask ) )
         {
-            CCfgOpener oCfg( pTaskCfg );
             guint64 qwRmtId = 0;
 
             ret = oCfg.GetQwordProp(
@@ -1801,7 +1796,6 @@ gint32 CIfTaskGroup::FindTaskByRmtId(
             continue;
         }
         
-        CCfgOpener oCfg( pTaskCfg );
         CIfTaskGroup* pGrp = pTask;
         if( pGrp != nullptr )
         {
@@ -1974,7 +1968,24 @@ gint32 CIfStopTask::OnIrpComplete(
         pIrp->GetStackSize() == 0 )
         return -EINVAL;
 
-    return pIrp->GetStatus();
+    gint32 iRet = pIrp->GetStatus();
+    gint32 ret = 0;
+
+    do{
+        CCfgOpener oCfg(
+            ( IConfigDb* )GetConfig() );
+
+        CRpcInterfaceBase* pIf = nullptr;
+        ret = oCfg.GetPointer( propIfPtr, pIf );
+        if( ERROR( ret ) )
+            break;
+
+        pIf->OnPortEvent( eventPortStopped,
+            pIf->GetPortHandle() );
+
+    }while( 0 );
+
+    return iRet;
 }
 
 gint32 CIfStopTask::RunTask()
@@ -2012,6 +2023,11 @@ gint32 CIfStopTask::RunTask()
 
 #endif
         ret = pIf->ClosePort( this );
+        if( ret == STATUS_PENDING )
+            break;
+
+        pIf->OnPortEvent( eventPortStopped,
+            pIf->GetPortHandle() );
 
     }while( 0 );
 
@@ -2781,31 +2797,6 @@ gint32 CIfCleanupTask::OnIrpComplete(
 {
     gint32 ret = 0;
     do{
-        CCfgOpener oCfg( ( IConfigDb* )GetConfig() );
-        ObjPtr pObj;
-        
-        ret = oCfg.GetObjPtr( propIfPtr, pObj );
-
-        if( ERROR( ret ) )
-            break;
-
-        CRpcServices* pIf = pObj;
-
-        if( pIf == nullptr )
-        {
-            ret = -EFAULT;
-            break;
-        }
-
-        oCfg.GetObjPtr( propEventSink, pObj );
-        IEventSink* pEvent = pObj;
-
-        // call the user's callback
-        if( pEvent != nullptr && IsPending() )
-        {
-            pEvent->OnEvent(
-                eventTaskComp, ret, 0, nullptr );
-        }
         ret = RunTask();
 
     }while( 0 );
@@ -5590,7 +5581,7 @@ gint32 CBusPortStopSingleChildTask::RunTask()
         ret = oPnpMgr.DestroyPortStack( pPort );
         if( ret == STATUS_PENDING )
         {
-            DebugPrint( ERROR_FAIL,
+            DebugPrint( ret,
             "Unable to stop the port gracefully "
             "proceed to complete the master irp "
             "anyway" );

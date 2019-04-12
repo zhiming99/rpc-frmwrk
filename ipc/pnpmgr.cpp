@@ -368,7 +368,8 @@ gint32 CPnpManager::StartPortsInternal(
             }
         }
 
-        if( !pMasterIrp.IsEmpty() )
+        ret = 0;
+        while( !pMasterIrp.IsEmpty() )
         {
             // FIXME: not a serious handling of pMasterIrp
             // for master irp, we don't need a callback
@@ -381,14 +382,13 @@ gint32 CPnpManager::StartPortsInternal(
             IPort* pMasterPort = pMasterIrp->GetTopPort();
             CPort* pCPort = static_cast< CPort* >( pMasterPort );
             ret = pCPort->MakeAssocIrp( pMasterIrp, pIrp );
-
-            if( ERROR( ret ) )
-                break;
+            break;
         }
 
         // no check of the port existance, because
         // we are sure it exists
-        ret = GetIoMgr()->SubmitIrpInternal( pPort, pIrp );
+        if( SUCCEEDED( ret ) )
+            ret = GetIoMgr()->SubmitIrpInternal( pPort, pIrp );
 
         if( ret == STATUS_PENDING )
             break;
@@ -414,6 +414,16 @@ gint32 CPnpManager::StartPortsInternal(
         }
 
     }while( 0 );
+
+    if( ERROR( ret ) )
+    {
+        guint32 dwState = pPort->GetPortState();
+        if( dwState != PORT_STATE_REMOVED )
+        {
+            GetIoMgr()->ClosePort(
+                PortToHandle( pPort ), nullptr );
+        }
+    }
 
     return ret;
 }
@@ -1241,7 +1251,7 @@ gint32 CPnpManager::DestroyPortStack(
                 ret = GetIoMgr()->ScheduleTask(
                     clsid( CPnpMgrStopPortAndDestroyTask ),
                     oCfg.GetCfg(),
-                    true );
+                    false );
 
                 if( SUCCEEDED( ret ) )
                     ret = STATUS_PENDING;

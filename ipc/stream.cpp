@@ -1576,11 +1576,11 @@ gint32 CStreamServer::CanContinue()
     
     EnumClsid iid = iid( IStream );
 
-    const std::string& strInName =
+    const std::string& strIfName =
         CoGetIfNameFromIid( iid );
 
-    std::string strIfName;
-    ToPublicName_NoStr( strInName, strIfName );
+    if( strIfName.empty() )
+        return -ENOTSUP;
 
     if( IsPaused( strIfName ) )
         return ERROR_STATE;

@@ -319,6 +319,9 @@ gint32 CReqFwdrOpenRmtPortTask::RunTask()
     return ret;
 }
 
+#ifdef DEBUG
+static guint32 dwFailedCount = 0;
+#endif
 gint32 CReqFwdrOpenRmtPortTask::RunTaskInternal(
     gint32 iRetVal )
 {
@@ -408,15 +411,15 @@ gint32 CReqFwdrOpenRmtPortTask::RunTaskInternal(
                 break;
         }
 
+        TaskletPtr pDummyTask;
+        ret = pDummyTask.NewObj(
+            clsid( CIfDummyTask ) );
+
+        if( ERROR( ret ) )
+            break;
+
         if( m_iState == stateDone )
         {
-            TaskletPtr pDummyTask;
-            ret = pDummyTask.NewObj(
-                clsid( CIfDummyTask ) );
-
-            if( ERROR( ret ) )
-                break;
-
             if( bRouter )
             {
                 if( SUCCEEDED( iRetVal ) ||
@@ -427,7 +430,37 @@ gint32 CReqFwdrOpenRmtPortTask::RunTaskInternal(
                 }
                 else
                 {
-                    m_pServer->StopEx( pDummyTask );
+                    CGenericInterface* pIf = m_pServer;
+                    if( unlikely( pIf == nullptr ) )
+                        break;
+
+                    EnumEventId iEvent = cmdShutdown;
+                    EnumIfState iState = pIf->GetState();
+                    if( iState == stateStartFailed )
+                        iEvent = cmdCleanup;
+
+                    ret = pIf->SetStateOnEvent(
+                        iEvent );
+
+                    if( ERROR( ret ) )
+                        break;
+
+                    dwFailedCount++;
+
+                    // NOTE: Cannot call StopEx
+                    // directly which may result
+                    // in reentering this task,
+                    // when ClearActiveTasks is
+                    // trying to cancel the
+                    // `start' taskgroup, whose
+                    // callback finally hooks to
+                    // this task to send back the
+                    // response when the start is
+                    // done.
+                    DEFER_CALL( pMgr, ObjPtr( pIf ),
+                        &CInterfaceServer::StopEx,
+                        pDummyTask );
+
                     ret = iRetVal;
                 }
             }
@@ -456,7 +489,27 @@ gint32 CReqFwdrOpenRmtPortTask::RunTaskInternal(
                 }
                 else
                 {
-                    m_pProxy->StopEx( pDummyTask );
+                    CGenericInterface* pIf = m_pProxy;
+                    if( unlikely( pIf == nullptr ) )
+                        break;
+
+                    EnumEventId iEvent = cmdShutdown;
+                    EnumIfState iState = pIf->GetState();
+                    if( iState == stateStartFailed )
+                        iEvent = cmdCleanup;
+
+                    ret = pIf->SetStateOnEvent(
+                        iEvent );
+
+                    if( ERROR( ret ) )
+                        break;
+
+                    dwFailedCount++;
+
+                    DEFER_CALL( pMgr, ObjPtr( pIf ),
+                        &CInterfaceProxy::StopEx,
+                        pDummyTask );
+
                     ret = iRetVal;
                 }
             }
@@ -478,11 +531,11 @@ gint32 CReqFwdrOpenRmtPortTask::RunTaskInternal(
             }
 
             ret = pBridgeIf->StartEx( this );
-            if( SUCCEEDED( ret ) )
-                continue;
+            if( ret == STATUS_PENDING )
+                break;
 
-            if( ERROR( ret ) )
-                pBridgeIf->StopEx( this );
+            iRetVal = ret;
+            continue;
         }
         break;
 
@@ -1089,6 +1142,13 @@ gint32 CRpcReqForwarder::EnableDisableEvent(
         return -EINVAL;
 
     gint32 ret = 0;
+#define LOOP_TEST
+#ifdef LOOP_TEST
+    CParamList oParams;
+    oParams[ propReturnValue ] = ret;
+    SetResponse( pCallback, oParams.GetCfg() );
+    return ret;
+#endif
     bool bUndo = false;
     CRpcRouter* pRouter = GetParent();
     do{

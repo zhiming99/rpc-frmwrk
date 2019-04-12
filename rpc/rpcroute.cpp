@@ -282,7 +282,7 @@ gint32 CRpcRouter::RemoveBridge(
             ret = -ENOENT;
             break;
         }
-        pMap->erase( dwPortId );
+        pMap->erase( itr );
 
     }while( 0 );
 
@@ -551,6 +551,12 @@ gint32 CRouterStartReqFwdrProxyTask::RunTask()
 
                 oRouterLock.Unlock();
                 oIfLock.Unlock();
+
+                ret = pIf->SetStateOnEvent(
+                    cmdShutdown );
+                if( ERROR( ret ) )
+                    break;
+
                 ret = pIf->StopEx( this );
             }
             else
@@ -1009,6 +1015,8 @@ gint32 CRouterStopBridgeTask::RunTask()
         // prevent further incoming requests
         ret = pBridge->SetStateOnEvent(
             cmdShutdown );
+        if( ERROR( ret ) )
+            break;
 
         // remove all the local matches pointing
         // to this bridge
@@ -1076,6 +1084,11 @@ gint32 CRouterStopBridgeTask::RunTask()
         }
 
         ret = pBridge->StopEx( this );
+        if( ERROR( ret ) )
+        {
+            DebugPrint( ret, "StopBridge failed" );
+            break;
+        }
 
     }while( 0 );
 
@@ -1155,7 +1168,9 @@ gint32 CRpcRouter::OnRmtSvrOffline(
         }
          
         if( ERROR( ret ) )
+        {
             break;
+        }
 
         TaskletPtr pTask;
         CParamList oParams;
@@ -1196,6 +1211,12 @@ gint32 CRpcRouter::OnRmtSvrOffline(
         ret = ( *pTask )( eventZero );
 
     }while( 0 );
+
+    if( ERROR( ret ) )
+    {
+        // close the port if exists
+        pMgr->ClosePort( hPort, nullptr );
+    }
 
     // return code ignored for event handler
     return 0;

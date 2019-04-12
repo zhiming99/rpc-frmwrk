@@ -272,6 +272,15 @@ void CIfSmokeTest::testDBusLeak()
 
     return;
 }
+void CIfSmokeTest::testObjAlloc()
+{
+    for( int i = 0; i < 10000000; i++ )
+    {
+        BufPtr pBuf( true );
+        pBuf->Resize( 128 );
+        pBuf.Clear();
+    }
+}
 #endif
 
 bool test()

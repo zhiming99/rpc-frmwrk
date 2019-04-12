@@ -150,6 +150,8 @@ gint32 CPortState::CanContinue(
             return ERROR_STATE;
 
         guint32 dwCurState = m_vecStates.back();
+        if( pdwOldState != nullptr )
+            *pdwOldState = dwCurState;
 
         if( !IsValidSubmit( dwNewState ) )
             return ERROR_STATE;
@@ -520,6 +522,12 @@ gint32 CPortState::HandleReady(
                 ret = PushState( dwNewState, false );
             }
 
+            /*else if( dwMinorCmd == IRP_MN_PNP_STACK_DESTROY
+                && dwNewState == PORT_STATE_BUSY ) 
+            {
+                ret = PushState( dwNewState, false );
+            }*/
+
             else if( dwMinorCmd == IRP_MN_PNP_STOP_CHILD
                 && dwNewState == PORT_STATE_BUSY_SHARED ) 
             {
@@ -581,10 +589,17 @@ gint32 CPortState::HandleAttached(
                 break;
             }
 
-            if( dwMinorCmd == IRP_MN_PNP_STACK_BUILT
+            else if( dwMinorCmd == IRP_MN_PNP_STACK_BUILT
                 && dwNewState == PORT_STATE_BUSY )
             {
                 ret = PushState( dwNewState );
+                break;
+            }
+
+            else if( dwMinorCmd == IRP_MN_PNP_STACK_DESTROY
+                && dwNewState == PORT_STATE_BUSY ) 
+            {
+                ret = PushState( dwNewState, false );
                 break;
             }
         }

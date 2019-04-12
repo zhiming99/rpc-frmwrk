@@ -962,6 +962,8 @@ class CTcpStreamPdo : public CPort
     gint32 CheckAndSend(
         IRP* pIrp, gint32 ret );
 
+    sem_t   m_semFireSync;
+
     public:
 
     typedef CPort super;
@@ -989,6 +991,7 @@ class CTcpStreamPdo : public CPort
     // connection
     //
     CTcpStreamPdo( const IConfigDb* pCfg );
+    ~CTcpStreamPdo();
 
     bool IsImmediateReq( IRP* pIrp );
     gint32 RemoveIrpFromMap(

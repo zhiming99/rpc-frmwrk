@@ -431,16 +431,11 @@ gint32 CRpcTcpBusPort::PreStop(
     IRP* pIrp )
 {
     // 
-    // NOTE: this routine could be entered many
-    // times due to different state if the last
-    // call returns STATUS_MORE_PROCESS_NEEDED
+    // NOTE: this routine could be repeated many
+    // times till it returns
+    // STATUS_MORE_PROCESS_NEEDED
     //
     gint32 ret = super::PreStop( pIrp );
-
-    // It is OK to stop the socket here, since if
-    // PreStop does not return
-    // STATUS_MORE_PROCESS_NEEDED, PreStop is done
-    // and let's stop the socket.
     if( ret != STATUS_MORE_PROCESS_NEEDED )
     {
         if( !m_pListenSock.IsEmpty() )
@@ -449,7 +444,7 @@ gint32 CRpcTcpBusPort::PreStop(
             m_pListenSock.Clear();
         }
     }
-    return 0;
+    return ret;
 }
 
 gint32 CRpcTcpBusPort::OnEvent(
@@ -704,6 +699,9 @@ CTcpStreamPdo::CTcpStreamPdo(
         if( ERROR( ret ) )
             break;
 
+        ret = Sem_Init(
+            &m_semFireSync, 0, 0 );
+
     }while( 0 );
 
     if( ERROR( ret ) )
@@ -711,6 +709,11 @@ CTcpStreamPdo::CTcpStreamPdo(
         throw std::runtime_error(
             "Error in CTcpStreamPdo ctor" );
     }
+}
+
+CTcpStreamPdo::~CTcpStreamPdo()
+{
+    sem_destroy( &m_semFireSync );
 }
 
 gint32 CTcpStreamPdo::PreStop(
@@ -1639,6 +1642,7 @@ gint32 CTcpStreamPdo::OnEvent(
             if( m_bSvrOnline == true )
             {
                 oPortLock.Unlock();
+                Sem_Wait( &m_semFireSync );
                 ret = FireRmtSvrEvent(
                     this, eventRmtSvrOffline );
             }
@@ -2086,38 +2090,29 @@ gint32 CTcpStreamPdo::OnPortStackReady(
 
     gint32 ret = 0;
     do{
-        // this test to save extra work to create
-        // the CRpcTcpBridgeImpl if the connection
-        // is lost
-        EnumSockState iState =
-            m_pStmSock->GetState();
-        if( iState != sockStarted )
+        if( true )
         {
-            // the connection get lost during the
-            // port stack building period, this
-            // will fail the IRP_MN_PNP_START
-            // request from the pnpmgr, and cause
-            // the port to unload
-            ret = ERROR_PORT_STOPPED;
-            break;
+            CStdRMutex oPortLock( GetLock() );
+
+            EnumSockState iState =
+                m_pStmSock->GetState();
+
+            if( iState != sockStarted )
+            {
+                ret = ERROR_PORT_STOPPED;
+                break;
+            }
+            m_bSvrOnline = true;
         }
 
         FireRmtSvrEvent( this, eventRmtSvrOnline );
-
-        CStdRMutex oPortLock( GetLock() );
-        m_bSvrOnline = true;
-
-        // test again, this test is to prevent the
-        // leaking of the port object if the
-        // disconnection happens around
-        // FireRmtSvrEvent, when the
-        // eventRmtSvrOffline event is surpressed.
-        iState = m_pStmSock->GetState();
-        if( iState != sockStarted )
-        {
-            ret = ERROR_PORT_STOPPED;
-            break;
-        }
+        // Note: using the semaphore to enforce
+        // the online event to happen strictly
+        // ahead of the offline event. It could
+        // happen occationally offline before
+        // online otherwise and causes memory leak
+        // or unexpected behavior.
+        Sem_Post( &m_semFireSync );
 
     }while( 0 );
 

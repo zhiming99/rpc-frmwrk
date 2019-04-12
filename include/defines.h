@@ -311,6 +311,7 @@ enum EnumEventId : guint32
     cmdResume,
     eventResumed,
     eventPaused,
+    cmdCleanup,
     
     eventTaskThrdCtx, 
     eventOneShotTaskThrdCtx,

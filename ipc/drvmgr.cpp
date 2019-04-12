@@ -91,6 +91,8 @@ gint32 ReadJsonCfg(
             ret = -EBADMSG;
         }
 
+        delete pReader;
+
     }while( 0 );
 
     if( fp != nullptr )

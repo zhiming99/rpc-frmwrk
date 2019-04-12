@@ -905,7 +905,12 @@ gint32 CRpcInterfaceBase::Stop()
 {
     gint32 ret = 0;
     do{
-        ret = SetStateOnEvent( cmdShutdown );
+        EnumEventId iEvent = cmdShutdown;
+        EnumIfState iState = GetState();
+        if( iState == stateStartFailed )
+            iEvent = cmdCleanup;
+
+        ret = SetStateOnEvent( iEvent );
         if( ERROR( ret ) )
             break;
 
@@ -931,6 +936,11 @@ gint32 CRpcInterfaceBase::Stop()
     
     return ret;
 }
+
+#ifdef DEBUG
+static guint32 dwStartCount( 0 );
+static guint32 dwStopCount( 0 );
+#endif
 
 gint32 CRpcInterfaceBase::StopEx(
     IEventSink* pCallback )
@@ -961,12 +971,32 @@ gint32 CRpcInterfaceBase::StopEx(
         if( stateStopping != GetState() )
             return ERROR_STATE;
 
+        TaskGrpPtr pRoot = m_pRootTaskGroup;
+        if( pRoot.IsEmpty() )
+        {
+            CParamList oParams;
+            ret = oParams.SetObjPtr(
+                propIfPtr, ObjPtr( this ) );
+
+            if( ERROR( ret ) )
+                break;
+
+            ret = m_pRootTaskGroup.NewObj(
+                clsid( CIfRootTaskGroup ),
+                oParams.GetCfg() ); 
+
+            if( ERROR( ret ) )
+                break;
+        }
         oIfLock.Unlock();
+
         ret = OnPreStop( pCallback );
         if( ret == STATUS_PENDING )
             break;
 
         ret = DoStop( pCallback );
+        if( ERROR( ret ) )
+            break;
 
     }while( 0 );
 
@@ -1020,8 +1050,8 @@ gint32 CRpcInterfaceBase::DoStop(
         if( hPort != 0 )
         {
             // NOTE that, when stopping, we may
-            // have a partialized interface due to
-            // a failed start
+            // have a partially initialized
+            // interface due to a failed start
             //
             // disable event
             oParams.Push( false );
@@ -1049,28 +1079,12 @@ gint32 CRpcInterfaceBase::DoStop(
         pTaskGrp->AppendTask( pClosePortTask );
         pTaskGrp->SetRelation( logicNONE );
 
-        CCfgOpenerObj oCfg( ( CObjBase* )pTaskGrp );
-
-        ret = oCfg.SetBoolProp(
-            propNotifyClient, true );
-
-        if( ERROR( ret ) )
-            break;
-
         CCfgOpener oCompCfg;
-
         ret = oCompCfg.SetObjPtr(
             propIfPtr, ObjPtr( this ) );
 
         if( ERROR( ret ) )
             break;
-
-        if( pCallback )
-        {
-            oCompCfg[ propNotifyClient ] = true;
-            oCompCfg[ propEventSink ] =
-                ObjPtr( pCallback);
-        }
 
         ret = pCompletion.NewObj(
             clsid( CIfCleanupTask ),
@@ -1079,30 +1093,29 @@ gint32 CRpcInterfaceBase::DoStop(
         if( ERROR( ret ) )
             break;
 
-        ret = oCfg.SetObjPtr(
-            propEventSink, pCompletion );
+        if( pCallback )
+        {
+            CIfRetryTask* pCompTask = pCompletion;
+            pCompTask->SetClientNotify( pCallback );
+            pCompTask->MarkPending();
+        }
 
-        if( ERROR( ret ) )
-            break;
-
+        pTaskGrp->SetClientNotify( pCompletion );
         TaskletPtr pTask = pTaskGrp;
-
-        if( pTask.IsEmpty() )
+        if( unlikely( pTask.IsEmpty() ) )
         {
             ret = -EFAULT;
             break;
         }
 
-        pCompletion->MarkPending();
         ret = AppendAndRun( pTask );
         if( ERROR( ret ) )
             break;
 
         ret = pTask->GetError();
-
         if( ret != STATUS_PENDING )
         {
-            // the callback won't get called
+            // the callback is not got called
             pCompletion->MarkPending( false );
             ( *pCompletion )( eventZero );
         }
@@ -1603,8 +1616,11 @@ gint32 CRpcInterfaceBase::ClearActiveTasks()
     gint32 ret = 0;
 
     do{
-        ret = ( *m_pRootTaskGroup )(
-            eventCancelTask );
+        TaskGrpPtr pRoot = m_pRootTaskGroup;
+        if( pRoot.IsEmpty() )
+            break;
+
+        ret = ( *pRoot )( eventCancelTask );
         if( ret == STATUS_PENDING )
         {
             // sometimes, the system is busy and
@@ -1675,12 +1691,13 @@ gint32 CRpcInterfaceBase::ClearPausedTasks()
     gint32 ret = 0;
     do{
         TaskletPtr pTask;
-        CIfRootTaskGroup* pRoot = m_pRootTaskGroup;
-        if( pRoot == nullptr )
+        TaskGrpPtr pRootGrp = m_pRootTaskGroup;
+        if( pRootGrp.IsEmpty() )
         {
             ret = -EFAULT;
             break;
         }
+        CIfRootTaskGroup* pRoot = m_pRootTaskGroup;
 
         ret = pRoot->GetHeadTask( pTask );
         if( ERROR( ret ) )
@@ -1737,11 +1754,11 @@ gint32 CRpcInterfaceBase::AppendAndRun(
         return -EINVAL;
 
     // possibly the initialization failed
-    if( m_pRootTaskGroup.IsEmpty() )
+    TaskGrpPtr pRoot = m_pRootTaskGroup;
+    if( pRoot.IsEmpty() )
         return -EFAULT;
 
-    return m_pRootTaskGroup->
-        AppendAndRun( pTask );
+    return pRoot->AppendAndRun( pTask );
 }
 
 gint32 CRpcInterfaceBase::AddAndRun(
@@ -1957,19 +1974,7 @@ gint32 CRpcServices::GetIidFromIfName(
     string strIfName2 =
         IF_NAME_FROM_DBUS( strIfName );
 
-    char szBuf[ 256 ];
-    if( IsServer() )
-    {
-        sprintf( szBuf, "%s:s%lld",
-            strIfName2.c_str(), GetObjId() );
-    }
-    else
-    {
-        sprintf( szBuf, "%s:p%lld",
-            strIfName2.c_str(), GetObjId() );
-    }
-
-    iid = CoGetIidFromIfName( string( szBuf ) );
+    iid = CoGetIidFromIfName( strIfName2 );
 
     if( iid == clsid( Invalid ) )
         return -ENOENT;
@@ -2098,6 +2103,7 @@ gint32 CRpcServices::StartEx(
     if( ERROR( ret ) )
         return ret;
 
+    dwStartCount++;
     return super::StartEx( pCallback );
 }
 
@@ -2125,6 +2131,7 @@ gint32 CRpcServices::OnPostStop(
     m_pFtsMatch.Clear();
     m_pStmMatch.Clear();
     m_pSeqTasks.Clear(); 
+    dwStopCount++;
 
     return 0;
 }
@@ -2563,10 +2570,10 @@ gint32 CInterfaceProxy::SendFetch_Proxy(
             EnumClsid iid = ( EnumClsid )
                 ( ( guint32& )oDesc[ propIid ] );
 
-            const std::string strInName =
+            const std::string strIfName =
                 CoGetIfNameFromIid( iid );
 
-            if( strInName.empty() )
+            if( strIfName.empty() )
             {
                 // the interface is not supported by
                 // this object
@@ -2574,8 +2581,6 @@ gint32 CInterfaceProxy::SendFetch_Proxy(
                 break;
             }
 
-            std::string strIfName;
-            ToPublicName_NoStr( strInName, strIfName );
             oDesc.SetIfName(
                 DBUS_IF_NAME( strIfName ) );
 
@@ -4833,14 +4838,11 @@ gint32 CInterfaceProxy::UserCancelRequest(
 	if( qwTaskToCancel == 0 )
 		return -EINVAL;
 
-    const string& strInName = CoGetIfNameFromIid(
+    const string& strIfName = CoGetIfNameFromIid(
         iid( IInterfaceServer ) );
 
-    if( strInName.empty() )
+    if( strIfName.empty() )
         return ERROR_FAIL;
-
-    string strIfName;
-    ToPublicName_NoStr( strInName, strIfName );
 
     CParamList oOptions;
     // FIXME: not a good solution
@@ -4893,11 +4895,11 @@ gint32 CInterfaceProxy::PauseResume_Proxy(
     // we are from IInterfaceServer
     CParamList oOptions;
 
-    const std::string& strInName =
+    const std::string& strIfName =
         CoGetIfNameFromIid( iid( IInterfaceServer ) );
 
-    std::string strIfName;
-    ToPublicName_NoStr( strInName, strIfName );
+    if( strIfName.empty() )
+        return -ENOTSUP;
 
     oOptions[ propIfName ] =
         DBUS_IF_NAME( strIfName );

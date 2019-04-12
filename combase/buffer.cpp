@@ -206,6 +206,7 @@ CBuffer& CBuffer::operator=( const CBuffer& rhs )
     {
     case DataTypeMem:
         {
+            SetDataType( DataTypeMem );
             memcpy( ptr(), rhs.ptr(), size() );   
             SetExDataType( rhs.GetExDataType() );
             break;
@@ -391,7 +392,7 @@ void CBuffer::Resize( guint32 dwSize )
                 }
             }
 
-            if( ptr() )
+            if( nullptr != ptr() )
                 size() = dwSize;
 
             if( dwSize > 0 )
