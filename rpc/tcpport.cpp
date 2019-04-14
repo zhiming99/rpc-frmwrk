@@ -1058,7 +1058,7 @@ gint32 CRpcStreamSock::Start_bh()
         if( ERROR( ret ) )
             break;
 
-        StartWatch( false );
+        ret = StartWatch( false );
         SetState( sockStarted );
         
     }while( 0 );
@@ -1478,25 +1478,26 @@ gint32 CRpcStreamSock::OnEvent(
     case eventStop:
         {
             EnumSockState iState;
-            if( true )
-            {
-                CStdRMutex oSockLock( GetLock() );
-                iState = GetState();
-            }
+
+            CStdRMutex oSockLock( GetLock() );
+            iState = GetState();
             if( iState == sockInit )
             {
-                // it should be impossible to be
-                // in this state, because we are
-                // called from CPort::PreStop,
-                // when there is no other active
-                // request (esp. START request )
-                // is pending. That is, the socket
-                // must not be in sockInit state.
-                // so no business to m_pStartTask
-                ret = ERROR_STATE;
+
+                TaskletPtr pTask = m_pStartTask;
+                oSockLock.Unlock();
+                // we could be here if the start
+                // irp is canceled or timed out.
+                if( !pTask.IsEmpty() )
+                {
+                    pTask->OnEvent( iEvent,
+                        dwParam1, dwParam2, pData );
+                }
+                ret = Stop();
             }
             else if( iState == sockStarted )
             {
+                oSockLock.Unlock();
                 ret = Stop();
             }
             else if( iState == sockStopped ) 
@@ -1507,9 +1508,6 @@ gint32 CRpcStreamSock::OnEvent(
             {
                 ret = ERROR_STATE;
             }
-
-            if( !m_pStartTask.IsEmpty() )
-                m_pStartTask.Clear();
 
             break;
         }
@@ -1524,10 +1522,9 @@ gint32 CRpcStreamSock::OnEvent(
             if( ERROR( ret ) )
                 break;
 
-            m_pStartTask->OnEvent( iEvent,
+            ret = m_pStartTask->OnEvent( iEvent,
                 dwParam1, 0, nullptr );
 
-            ret = m_pStartTask->GetError();
             break;
         }
     default:
@@ -4222,7 +4219,7 @@ gint32 CStmSockConnectTask::OnStart(
         pIrp->GetStackSize() == 0 )
         return -EINVAL;
 
-    SetTaskState( connProcess );
+    SetConnState( connProcess );
 
     gint32 ret = 0;
     do{
@@ -4429,7 +4426,7 @@ gint32 CStmSockConnectTask::CompleteTask(
     IRP* pIrp = nullptr;
     gint32 ret = 0;
 
-    if( GetTaskState() != connProcess )
+    if( GetConnState() != connProcess )
         return ERROR_STATE;
 
     do{
@@ -4471,7 +4468,11 @@ gint32 CStmSockConnectTask::CompleteTask(
 
     }while( 0 );
 
-    SetTaskState( connCompleted );
+    if( SUCCEEDED( iRet ) )
+        SetConnState( connCompleted );
+    else
+        SetConnState( connStopped );
+
     m_pCtx->RemoveProperty( propIrpPtr );
     m_pCtx->RemoveProperty( propSockPtr );
     m_pCtx->RemoveProperty( propIoMgr );
@@ -4482,7 +4483,7 @@ gint32 CStmSockConnectTask::CompleteTask(
 gint32 CStmSockConnectTask::StopTask(
     gint32 iRet )
 {
-    if( GetTaskState() != connProcess )
+    if( GetConnState() != connProcess )
         return ERROR_STATE;
 
     CRpcStreamSock* pSock = nullptr;
@@ -4494,7 +4495,6 @@ gint32 CStmSockConnectTask::StopTask(
     }
 
     CompleteTask( iRet );
-    SetTaskState( connStopped );
     return 0;
 }
 
@@ -4523,7 +4523,7 @@ gint32 CStmSockConnectTask::operator()(
 
     CStdRMutex oTaskLock( GetLock() );
 
-    gint32 iState = GetTaskState();
+    gint32 iState = GetConnState();
 
     if( iState == connStopped ||
         iState == connCompleted )
@@ -4619,7 +4619,7 @@ gint32 CStmSockConnectTask::operator()(
                 break;
             }
 
-            ret = -ETIMEDOUT;
+            ret = OnError( -ETIMEDOUT );
             break;
         }
     // only from CTcpStreamPdo::CancelStartIrp
@@ -4652,6 +4652,10 @@ gint32 CStmSockConnectTask::operator()(
         StopTask( ret );
     }
 
+    // BUGBUG: even STATE_PENDING needs to be set
+    // to let the caller know the call result. the
+    // return value is not passed on by
+    // CTasklet::OnEvent 
     return SetError( ret );
 }
 

@@ -1176,7 +1176,7 @@ class CStmSockConnectTask
         connStopped,
     };
 
-    ConnStat m_iState;
+    ConnStat m_iConnState;
     mutable stdrmutex m_oLock;
     gint32 m_iTimerId;
 
@@ -1203,17 +1203,17 @@ class CStmSockConnectTask
     gint32 GetRetries( guint32& dwRetries );
     gint32 GetSockPtr( CRpcStreamSock*& pSock );
 
-    gint32 SetTaskState( ConnStat iStat )
+    gint32 SetConnState( ConnStat iStat )
     {
-        m_iState = iStat;
+        m_iConnState = iStat;
         return 0;
     }
 
     gint32 RemoveConnTimer();
     gint32 AddConnTimer();
 
-    ConnStat GetTaskState()
-    { return m_iState; }
+    ConnStat GetConnState()
+    { return m_iConnState; }
 
     public:
     typedef CTasklet super;
@@ -1222,7 +1222,7 @@ class CStmSockConnectTask
         : CTasklet( pCfg )
     {
         SetClassId( clsid( CStmSockConnectTask ) );
-        m_iState = connInit;
+        m_iConnState = connInit;
         m_iTimerId = 0;
     }
 

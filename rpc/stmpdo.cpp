@@ -28,6 +28,7 @@
 #include <arpa/inet.h>
 #include "reqopen.h"
 #include "jsondef.h"
+#include "ifhelper.h"
 
 using namespace std;
 
@@ -716,43 +717,121 @@ CTcpStreamPdo::~CTcpStreamPdo()
     sem_destroy( &m_semFireSync );
 }
 
+static gint32 GetPreStopStep(
+    PIRP pIrp, guint32& dwStepNo )
+{
+    BufPtr pBuf;
+    pIrp->GetCurCtx()->GetExtBuf( pBuf );
+    if( 0 == pBuf->size() )
+        return -EINVAL;
+
+    PORT_START_STOP_EXT* psse =
+        ( PORT_START_STOP_EXT* )pBuf->ptr();
+
+    dwStepNo = *( guint32* )&psse[ 1 ];
+    return 0;
+}
+
+static gint32 SetPreStopStep(
+    PIRP pIrp, guint32 dwStepNo )
+{
+    BufPtr pBuf;
+    pIrp->GetCurCtx()->GetExtBuf( pBuf );
+    if( 0 == pBuf->size() )
+        return -EINVAL;
+
+    PORT_START_STOP_EXT* psse =
+        ( PORT_START_STOP_EXT* )pBuf->ptr();
+
+    *( guint32* )&psse[ 1 ] = dwStepNo;
+    return 0;
+}
+
 gint32 CTcpStreamPdo::PreStop(
     IRP* pIrp )
 {
-    if( pIrp == nullptr
-        || pIrp->GetStackSize() == 0 )
+    if( pIrp == nullptr ||
+        pIrp->GetStackSize() == 0 )
         return -EINVAL;
 
     gint32 ret = 0;
-
     do{
-        SockPtr pSock;
-
-        if( true )
+        CIoManager* pMgr = GetIoMgr();
+        guint32 dwStepNo = 0;
+        GetPreStopStep( pIrp, dwStepNo );
+        while( dwStepNo == 0 )
         {
-            CStdRMutex oPortLock( GetLock() );
+            SockPtr pSock;
+            CStdRMutex oSockLock(
+                m_pStmSock->GetLock() );
 
             EnumSockState iState =
                 m_pStmSock->GetState();
 
             if( iState == sockStopped )
+            {
+                SetPreStopStep( pIrp, 1 );
                 break;
+            }
 
             pSock = m_pStmSock;
-            m_pStmSock.Clear();
+            if( pSock.IsEmpty() )
+            {
+                SetPreStopStep( pIrp, 1 );
+                break;
+            }
+
+            if( pMgr->RunningOnMainThread() )
+            {
+                // we need to run on the mainloop
+                m_pStmSock.Clear();
+                oSockLock.Unlock();
+                SetPreStopStep( pIrp, 1 );
+                ret = pSock->OnEvent(
+                    eventStop, 0, 0, nullptr );
+            }
+            else
+            {
+                TaskletPtr pTask;
+                DEFER_CALL_NOSCHED(
+                    pTask, ObjPtr( pMgr ),
+                    &CIoManager::CompleteIrp,
+                    pIrp );
+
+                ret = pMgr->RescheduleTaskMainLoop( pTask );
+                if( SUCCEEDED( ret ) )
+                    ret = STATUS_PENDING;
+            }
+            break;
         }
-        if( !pSock.IsEmpty() )
+
+        // don't move away from PreStop
+        if( ret == STATUS_PENDING )
+            ret = STATUS_MORE_PROCESS_NEEDED;
+
+        if( ret == STATUS_MORE_PROCESS_NEEDED )
+            break;
+
+        GetPreStopStep( pIrp, dwStepNo );
+        if( dwStepNo == 1 )
         {
-            pSock->OnEvent(
-                eventStop, 0, 0, nullptr );
+            SetPreStopStep( pIrp, 2 );
+            ret = super::PreStop( pIrp );
         }
+
+        if( ret == STATUS_PENDING ||
+            ret == STATUS_MORE_PROCESS_NEEDED )
+            break;
+
+        GetPreStopStep( pIrp, dwStepNo );
+        if( dwStepNo == 2 )
+            break;
 
     }while( 0 );
 
-    ret = super::PreStop( pIrp );
-
     return ret;
 }
+
 gint32 CTcpStreamPdo::PostStart(
     IRP* pIrp )
 {
@@ -1697,6 +1776,31 @@ gint32 CTcpStreamPdo::AllocIrpCtxExt(
 
                     BufPtr pBuf( true );
                     *pBuf = oExt;
+                    pIrpCtx->SetExtBuf( pBuf );
+                    break;
+                }
+            default:
+                ret = -ENOTSUP;
+                break;
+            }
+            break;
+        }
+    case IRP_MJ_PNP:
+        {
+            switch( pIrpCtx->GetMinorCmd() )
+            {
+            case IRP_MN_PNP_STOP:
+                {
+                    BufPtr pBuf( true );
+                    if( ERROR( ret ) )
+                        break;
+
+                    pBuf->Resize( sizeof( guint32 ) +
+                        sizeof( PORT_START_STOP_EXT ) );
+
+                    memset( pBuf->ptr(),
+                        0, pBuf->size() ); 
+
                     pIrpCtx->SetExtBuf( pBuf );
                     break;
                 }

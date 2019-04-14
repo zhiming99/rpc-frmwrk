@@ -797,6 +797,7 @@ gint32 CPnpMgrDoStopNoMasterIrp::operator()(
         // succeeded or not
         pIrpCtx->SetMajorCmd( IRP_MJ_PNP );
         pIrpCtx->SetMinorCmd( IRP_MN_PNP_STOP );
+        pPort->AllocIrpCtxExt( pIrpCtx, ( PIRP )pIrp );
         pIrp->SetSyncCall( true );
 
         // clear the callback if any

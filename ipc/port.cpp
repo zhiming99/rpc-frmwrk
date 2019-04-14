@@ -576,30 +576,28 @@ gint32 CPortStartStopNotifTask::operator()(
     guint32 dwContext )
 {
     gint32 ret = 0;
+    CParamList oTaskCfg( ( IConfigDb*)GetConfig() );
 
     do{
         ObjPtr pObj;
-        CParamList a( m_pCtx );
 
-        ret = a.Pop( pObj );
+        CStlEventMap *pEventMap = nullptr;
+        ret = oTaskCfg.GetPointer( 2, pEventMap );
         if( ERROR( ret ) )
             break;
 
-        EvtMapPtr pEventMap = ( CStlEventMap* )( pObj );
-
-        ret = a.Pop( pObj );
+        IPort* pBottomPort = nullptr;
+        ret = oTaskCfg.GetPointer( 1, pBottomPort );
         if( ERROR( ret ) )
             break;
-
-        IPort* pBottomPort = pObj;
-        pBottomPort = pBottomPort->GetBottomPort();
 
         guint32 dwEventId;
-        ret = a.Pop( dwEventId );
+        ret = oTaskCfg.GetIntProp( 0, dwEventId );
         if( ERROR( ret ) )
             break;
 
-        if( !pEventMap.IsEmpty() && pBottomPort != nullptr )
+        if( pEventMap != nullptr &&
+            pBottomPort != nullptr )
         {
             pEventMap->BroadcastEvent(
                 eventPnp,
@@ -607,7 +605,10 @@ gint32 CPortStartStopNotifTask::operator()(
                 PortToHandle( pBottomPort ),
                 nullptr );
         }
+
     }while( 0 );
+
+    oTaskCfg.ClearParams();
 
     return ret;
 }
@@ -627,15 +628,13 @@ gint32 CPort::ScheduleStartStopNotifTask(
             // param 1, event id
             a.Push( dwEventId );
 
-            pObj = this;
+            pObj = GetBottomPort();
 
             // param 2 this port
             a.Push( pObj );
 
-            IPort* pBottom = GetBottomPort();
-
             CEventMapHelper< CPort >
-                b( static_cast< CPort* >( pBottom ) );
+                b( ( CPort* )pObj );
 
             ret = b.GetEventMap( pObj ); 
 
