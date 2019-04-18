@@ -1254,9 +1254,9 @@ class CRpcRouter :
         IMessageMatch* pMatch,
         IEventSink* pCallback );
 
-    gint32 GetRemoteMatchByPortId(
+    gint32 RemoveRemoteMatchByPortId(
         guint32 dwPortId,
-        std::vector< MatchPtr >& vecMatches ) const;
+        std::vector< MatchPtr >& vecMatches );
 
     gint32 GetBridge(
         guint32 dwPortId,

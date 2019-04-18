@@ -35,15 +35,15 @@ using namespace std;
 
 #define GET_IOMGR( _oCfg, _pMgr ) \
 ({ \
-    gint32 ret = 0;\
+    gint32 ret_ = 0;\
     do{\
         CRpcInterfaceBase* pIf = nullptr;\
-        ret = _oCfg.GetPointer( propIfPtr, pIf );\
-        if( ERROR( ret ) )\
+        ret_ = _oCfg.GetPointer( propIfPtr, pIf );\
+        if( ERROR( ret_ ) )\
         {\
-            ret = _oCfg.GetPointer(\
+            ret_ = _oCfg.GetPointer(\
                 propIoMgr, _pMgr );\
-            if( ERROR( ret ) )\
+            if( ERROR( ret_ ) )\
                 break;\
         }\
         else\
@@ -51,7 +51,7 @@ using namespace std;
             _pMgr = pIf->GetIoMgr();\
         }\
     }while( 0 );\
-    ret;\
+    ret_;\
 })
 
 CIfStartRecvMsgTask::CIfStartRecvMsgTask(
@@ -1584,6 +1584,7 @@ gint32 CIfTaskGroup::OnChildComplete(
 
         oTaskLock.Unlock();
 
+        DebugPrint( ret, "Reschedule TaskGroup %lld", GetObjId() );
         // regain control by rescheduling this task
         TaskletPtr pThisTask( this );
         ret = pMgr->RescheduleTask( pThisTask );

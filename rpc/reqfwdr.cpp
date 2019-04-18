@@ -1142,7 +1142,6 @@ gint32 CRpcReqForwarder::EnableDisableEvent(
         return -EINVAL;
 
     gint32 ret = 0;
-#define LOOP_TEST
 #ifdef LOOP_TEST
     CParamList oParams;
     oParams[ propReturnValue ] = ret;

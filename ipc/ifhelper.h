@@ -1288,6 +1288,7 @@ class CIfDeferCallTask :
     public CIfRetryTask
 {
     TaskletPtr m_pDeferCall;
+    EnumIfState m_iTaskState = stateStarting;
     public:
     typedef CIfRetryTask super;
     CIfDeferCallTask( const IConfigDb* pCfg )
@@ -1300,11 +1301,15 @@ class CIfDeferCallTask :
     // just as a place holder
     virtual gint32 RunTask()
     {
+        m_iTaskState = stateStarted;
         if( m_pDeferCall.IsEmpty() )
             return 0;
 
         return ( *m_pDeferCall )( 0 );
     }
+
+    gint32 OnTaskComplete( gint32 iRet )
+    { return iRet; }
 
     gint32 UpdateParamAt(
         guint32 i, BufPtr pBuf )

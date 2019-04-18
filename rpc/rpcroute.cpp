@@ -456,7 +456,7 @@ gint32 CRouterStartReqFwdrProxyTask::
         if( SUCCEEDED( ret ) )
         {
             // it won't run if all the whole
-            // tasks
+            // tasks succeeds
             AddRollbackTask( pRbTask );
         }
 
@@ -908,7 +908,6 @@ gint32 CRpcRouter::OnRmtSvrOnline(
 
     }while( 0 );
 
-    // return code ignored
     return ret;
 }
 
@@ -1007,7 +1006,6 @@ gint32 CRouterStopBridgeTask::RunTask()
         if( ERROR( ret ) )
             break;
 
-
         CRpcRouter* pRouter =
             pBridge->GetParent();
 
@@ -1018,15 +1016,15 @@ gint32 CRouterStopBridgeTask::RunTask()
         if( ERROR( ret ) )
             break;
 
-        // remove all the local matches pointing
-        // to this bridge
+        // remove all the remote matches
+        // registered via this bridge
         vector< MatchPtr > vecMatches;
 
         CStdRMutex oRouterLock(
             pRouter->GetLock() );
 
         pRouter->RemoveBridge( pBridge );
-        pRouter->GetRemoteMatchByPortId(
+        pRouter->RemoveRemoteMatchByPortId(
             dwPortId, vecMatches );
 
         oRouterLock.Unlock();
@@ -1218,8 +1216,7 @@ gint32 CRpcRouter::OnRmtSvrOffline(
         pMgr->ClosePort( hPort, nullptr );
     }
 
-    // return code ignored for event handler
-    return 0;
+    return ret;
 }
 
 gint32 CRpcRouter::OnModEvent(
@@ -1462,7 +1459,10 @@ gint32 CRpcRouter::RemoveLocalMatchByAddr(
                 propIpAddr, strVal );
 
             if( ERROR( ret ) )
+            {
+                itr++;
                 continue;
+            }
 
             if( strIpAddr == strVal )
             {
@@ -1502,7 +1502,10 @@ gint32 CRpcRouter::RemoveLocalMatchByUniqName(
                 propSrcUniqName, strVal );
 
             if( ERROR( ret ) )
+            {
+                ++itr;
                 continue;
+            }
 
             if( strUniqName == strVal )
             {
@@ -1578,20 +1581,20 @@ gint32 CRpcRouter::AddRemoveMatch(
     return ret;
 }
 
-gint32 CRpcRouter::GetRemoteMatchByPortId(
+gint32 CRpcRouter::RemoveRemoteMatchByPortId(
     guint32 dwPortId,
-    std::vector< MatchPtr >& vecMatches ) const
+    std::vector< MatchPtr >& vecMatches )
 {
     if( dwPortId == 0 )
         return -EINVAL;
 
     gint32 ret = 0;
     do{
-        const map< MatchPtr, gint32 >* plm =
+        map< MatchPtr, gint32 >* plm =
             &m_mapRmtMatches;
 
         CStdRMutex oRouterLock( GetLock() );
-        map< MatchPtr, gint32 >::const_iterator
+        map< MatchPtr, gint32 >::iterator
             itr = plm->begin();
         while( itr != plm->end() )
         {
@@ -1602,21 +1605,30 @@ gint32 CRpcRouter::GetRemoteMatchByPortId(
             ret = oMatch.GetIntProp(
                 propPortId, dwVal );
             if( ERROR( ret ) )
+            {
+                ++itr;
                 continue;
+            }
 
             if( dwPortId == dwVal )
             {
                 vecMatches.push_back(
                     itr->first );
-                continue;
+                itr = plm->erase( itr );
             }
-            itr++;
+            else
+            {
+                ++itr;
+            }
         }
 
     }while( 0 );
 
     return vecMatches.size();
 }
+
+static guint32 dwAddCount = 0;
+static guint32 dwRemoveCount = 0;
 
 gint32 CRouterEnableEventRelayTask::RunTask()
 {
@@ -1677,9 +1689,11 @@ gint32 CRouterEnableEventRelayTask::RunTask()
             oParams.GetCfg() );
 
         ret = ( *pEnableEvtTask )( eventZero );
-        if( ERROR( ret ) )
-            break;
-        ret = pEnableEvtTask->GetError();
+        if( SUCCEEDED( ret ) )
+        {
+            bEnable ? dwAddCount++ : dwRemoveCount++;
+        }
+
 
     }while( 0 );
 
@@ -1702,12 +1716,20 @@ gint32 CRouterEnableEventRelayTask::OnTaskComplete(
         ( IConfigDb* )GetConfig() );
 
     do{
-        if( ERROR( iRetVal ) )
-            break;
-
         bool bEnable = false;
+
         ret = oParams.GetBoolProp( 0, bEnable );
         if( ERROR( ret ) )
+            break;
+
+        if( ERROR( iRetVal ) )
+        {
+            DebugPrint( iRetVal,
+                "Enable=%d, failed", bEnable );
+            break;
+        }
+
+        if( !bEnable )
             break;
 
         IMessageMatch* pMatch = nullptr;
@@ -1725,11 +1747,7 @@ gint32 CRouterEnableEventRelayTask::OnTaskComplete(
         ret = oParams.GetPointer(
             propIfPtr, pProxy );
 
-        if( ERROR( ret ) && !bEnable )
-        {
-            break;
-        }
-        else if( ERROR( ret ) && bEnable )
+        if( ERROR( ret ) )
         {
             InterfPtr pIf;
             ret = pRouter->GetReqFwdrProxy(
@@ -1757,6 +1775,7 @@ gint32 CRouterEnableEventRelayTask::OnTaskComplete(
 
     return iRetVal;
 }
+
 
 gint32 CRouterAddRemoteMatchTask::AddRemoteMatchInternal(
     CRpcRouter* pRouter,
@@ -1796,6 +1815,7 @@ gint32 CRouterAddRemoteMatchTask::AddRemoteMatchInternal(
         }
         else
         {
+            // a DisableEvent request
             ret = pRouter->AddRemoveMatch(
                 pMatch, false, true, nullptr );
 
@@ -1805,8 +1825,6 @@ gint32 CRouterAddRemoteMatchTask::AddRemoteMatchInternal(
                 ChangeRelation( logicOR );
                 break;
             }
-            else if( ERROR( ret ) )
-                break;
         }
 
     }while( 0 );
@@ -1861,15 +1879,6 @@ gint32 CRpcRouter::BuildAddMatchTask(
     do{
         // NOTE: we use the original match for
         // dbus listening
-        CCfgOpenerObj oMatch( pMatch );
-
-        // overwrite the propIpAddr property
-        // with the peer ip address, instead
-        // ourself's
-        oMatch.CopyProp( propIpAddr, this );
-        oMatch.CopyProp( propSrcTcpPort, this );
-        oMatch.CopyProp( propPortId, this );
-
         CParamList oParams;
 
         oParams.Push( bEnable );
@@ -2131,6 +2140,7 @@ gint32 CRpcRouter::BuildDisEvtTaskGrp(
     if( pMatch == nullptr )
         return -EINVAL;
 
+    TaskGrpPtr pTaskGrp;
     do{
         TaskletPtr pRespTask;
         CParamList oParams;
@@ -2155,15 +2165,11 @@ gint32 CRpcRouter::BuildDisEvtTaskGrp(
             // state
             ( *pRespTask )( eventZero );
 
-            oParams[ propEventSink ] =
-                ObjPtr( pRespTask );
-
             oParams[ propNotifyClient ] = true;
             oParams[ propEventSink ] =
                 ObjPtr( pRespTask );
         }
 
-        TaskGrpPtr pTaskGrp;
         ret = pTaskGrp.NewObj(
             clsid( CIfTransactGroup ),
             oParams.GetCfg() );
@@ -2208,6 +2214,14 @@ gint32 CRpcRouter::BuildDisEvtTaskGrp(
             ret = -EFAULT;
 
     }while( 0 );
+
+    if( pTask.IsEmpty() || ERROR( ret ) )
+    {
+        // free the resources the pTaskGrp claimed
+        if( !pTaskGrp.IsEmpty() )
+            ( *pTaskGrp )( eventCancelTask );
+
+    }
 
     return ret;
 }

@@ -103,16 +103,12 @@ class CIfTransactGroup :
 
     gint32 SetTaskRelation( EnumLogicOp iop )
     {
-        if( m_pTaskGrp->IsRunning() )
-            return ERROR_STATE;
         m_pTaskGrp->SetRelation( iop );
         return 0;
     }
 
     gint32 SetRbRelation( EnumLogicOp iop )
     {
-        if( m_pRbackGrp->IsRunning() )
-            return ERROR_STATE;
         m_pRbackGrp->SetRelation( iop );
         return 0;
     }

@@ -1453,8 +1453,8 @@ gint32 CPort::SubmitPortStackIrp( IRP* pIrp )
             else if( dwMinorCmd == IRP_MN_PNP_STACK_READY )
             {
                 // IRP_MN_PNP_STACK_DESTROY
-                ret = OnPortStackReady( pIrp );
                 PopState( dwOldState );
+                ret = OnPortStackReady( pIrp );
             }
             else
             {
@@ -1472,9 +1472,6 @@ gint32 CPort::SubmitFuncIrp( IRP* pIrp )
 {
     gint32 ret = 0;
 
-    // FIXME: possibly bad for concurrency
-    // especially in multi-processor environment
-    // we better have a rw lock implementation
     guint32 dwOldState;
 
     ret = CanContinue(
@@ -1484,13 +1481,10 @@ gint32 CPort::SubmitFuncIrp( IRP* pIrp )
         return ret;
 
     do{
-
 	    ret = OnSubmitIrp( pIrp );
 
     }while( 0 );
 
-    // SetPortStateWake(
-    //   PORT_STATE_BUSY_SHARED, dwOldState );
     PopState( dwOldState );
 
     return ret;
