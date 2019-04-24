@@ -21,7 +21,7 @@ This framework depends on the following packags:
 
 ---
 [`Wed Apr 24 18:10:46 CST 2019`]   
-1. The bridge side is now in a good shape now. Next I will take some time to clear some of the forwarder side bugs, before moving on to run the helloworld over the tcp connection.   
+1. The `bridge` side is now in a good shape now. Next I will take some time to clear some of the `forwarder` side bugs, before moving on to run the helloworld over the tcp connection.   
 
 [`Sun Apr 21 12:36:37 CST 2019`]   
 1. There is one last memory leak to fix yet. After done, we can wrap up the `EnableRemoteEvent` and move on to debugging client requests.   
