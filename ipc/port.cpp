@@ -1416,8 +1416,8 @@ gint32 CPort::SubmitPortStackIrp( IRP* pIrp )
                     }
                 }
 
-                ret = OnPortStackBuilt( pIrp );
                 PopState( dwOldState );
+                ret = OnPortStackBuilt( pIrp );
             }
             else if( dwMinorCmd == IRP_MN_PNP_STACK_DESTROY )
             {

@@ -1281,7 +1281,6 @@ gint32 CIfTaskGroup::AppendAndRun(
     {
         // there is some other tasks running
         pTask->MarkPending();
-        ret = STATUS_PENDING;
     }
     
     return ret;
@@ -1455,6 +1454,21 @@ gint32 CIfTaskGroup::RunTask()
             break;
         }
 
+        CCfgOpenerObj oChildCfg(
+            ( CObjBase* )pTask );
+
+        ObjPtr pTaskObj;
+        ret = oChildCfg.GetObjPtr(
+            propParentTask, pTaskObj );
+
+        if( ERROR( ret ) )
+        {
+            // if no parent task, the taskgroup
+            // cannot move forward
+            m_queTasks.pop_front();
+            continue;
+        }
+
         // tell this->OnChildComplete not to reschedule
         // this taskgrp because it is running
         oCfg[ propNoResched ] = true;
@@ -1584,7 +1598,7 @@ gint32 CIfTaskGroup::OnChildComplete(
 
         oTaskLock.Unlock();
 
-        DebugPrint( ret, "Reschedule TaskGroup %lld", GetObjId() );
+        // DebugPrint( ( intptr_t )this, "Reschedule TaskGroup" );
         // regain control by rescheduling this task
         TaskletPtr pThisTask( this );
         ret = pMgr->RescheduleTask( pThisTask );
@@ -2561,7 +2575,6 @@ gint32 CIfParallelTaskGrp::AppendTask(
             ret = ERROR_STATE;
             break;
         }
-        CCfgOpener oCfg( ( IConfigDb* )GetConfig() );
 
         CCfgOpenerObj oChildCfg(
             ( CObjBase* )pTask );

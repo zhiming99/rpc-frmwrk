@@ -427,7 +427,17 @@ gint32 CRouterStartReqFwdrProxyTask::
 
         InterfPtr pIfPtr( pIf );
         ret = pRouter->AddProxy( pMatch, pIfPtr );
-        if( ERROR( ret ) && ret != -EEXIST )
+        if( ret == -EEXIST )
+        {
+            // some other guy has created this
+            // interface. the one held by pIfPtr will
+            // be released silentely.
+            ret = pRouter->GetReqFwdrProxy(
+                pMatch, pIfPtr );
+            if( ERROR( ret ) )
+                break;
+        }
+        else if( ERROR( ret ) )
         {
             DebugPrint( ret,
                 "CRouterStartReqFwdrProxyTask bug "
@@ -1694,7 +1704,6 @@ gint32 CRouterEnableEventRelayTask::RunTask()
             bEnable ? dwAddCount++ : dwRemoveCount++;
         }
 
-
     }while( 0 );
 
     if( ret == STATUS_PENDING )
@@ -1723,11 +1732,7 @@ gint32 CRouterEnableEventRelayTask::OnTaskComplete(
             break;
 
         if( ERROR( iRetVal ) )
-        {
-            DebugPrint( iRetVal,
-                "Enable=%d, failed", bEnable );
             break;
-        }
 
         if( !bEnable )
             break;

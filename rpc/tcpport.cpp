@@ -1227,6 +1227,11 @@ gint32 CRpcStreamSock::DispatchSockEvent(
                 ret = -EFAULT;
                 break;
             }
+
+            CStmSockConnectTask*
+                pConnTask = m_pStartTask;
+
+            pConnTask->WaitInitDone();
             ret = m_pStartTask->OnEvent(
                 eventNewConn,
                 dwCondition,
@@ -1524,6 +1529,13 @@ gint32 CRpcStreamSock::OnEvent(
 
             ret = m_pStartTask->OnEvent( iEvent,
                 dwParam1, 0, nullptr );
+
+            if( ERROR( ret ) ) 
+                break;
+                
+            CStmSockConnectTask*
+                pConnTask = m_pStartTask;
+            pConnTask->SetInitDone();
 
             break;
         }

@@ -13,7 +13,7 @@
             "QueuedRequests" : "false",
             "ProxyPortClass": "DBusProxyPdo",
             "comment-1" : "IpAddress is the ip address of the server",
-            "IpAddress" : "192.168.3.41",
+            "IpAddress" : "192.168.3.3",
             "Interfaces" :
             [
                 {

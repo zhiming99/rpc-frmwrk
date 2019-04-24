@@ -1179,6 +1179,7 @@ class CStmSockConnectTask
     ConnStat m_iConnState;
     mutable stdrmutex m_oLock;
     gint32 m_iTimerId;
+    sem_t  m_semInitSync;
 
     // eventStart from Pdo's PreStart
     gint32 OnStart( IRP* pIrp );
@@ -1224,6 +1225,14 @@ class CStmSockConnectTask
         SetClassId( clsid( CStmSockConnectTask ) );
         m_iConnState = connInit;
         m_iTimerId = 0;
+        Sem_Init( &m_semInitSync, 0, 0 );
+        SetError( STATUS_PENDING );
+    }
+    ~CStmSockConnectTask()
+    {
+        if( m_iTimerId != 0 )
+            RemoveConnTimer();
+        sem_destroy( &m_semInitSync );
     }
 
     stdrmutex& GetLock() const
@@ -1248,6 +1257,13 @@ class CStmSockConnectTask
         CRpcStreamSock* pSock,
         gint32 iRetries,
         TaskletPtr& pTask );
+
+    void SetInitDone()
+    { Sem_Post( &m_semInitSync ); }
+
+    void WaitInitDone()
+    { Sem_Wait( &m_semInitSync ); }
+
 };
 
 inline gint32 GetBdgeIrpStmId(

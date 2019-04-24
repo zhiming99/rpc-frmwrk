@@ -825,7 +825,17 @@ gint32 CTcpStreamPdo::PreStop(
 
         GetPreStopStep( pIrp, dwStepNo );
         if( dwStepNo == 2 )
+        {
+            CCfgOpenerObj oPortCfg( this );
+
+            guint32 dwPortId = 0;
+            oPortCfg.GetIntProp(
+                propPortId, dwPortId );
+
+            DebugPrint( ret,
+                "CTcpStreamPdo PreStop, portid=%d", dwPortId );
             break;
+        }
 
     }while( 0 );
 

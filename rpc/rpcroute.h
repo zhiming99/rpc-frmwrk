@@ -1348,11 +1348,17 @@ class CRpcRouter :
             return ERROR_STATE;
 
         CStdRMutex oRouterLock( GetLock() );
-        if( m_mapReqProxies.find( strDest ) ==
-            m_mapReqProxies.end() )
+        std::map< std::string, InterfPtr >::iterator
+            itr = m_mapReqProxies.find( strDest );
+        if( itr == m_mapReqProxies.end() )
         {
             m_mapReqProxies[ strDest ] = pIf;
             return 0;
+        }
+        else
+        {
+            if( itr->second == pIf )
+                return EEXIST;
         }
         return -EEXIST;
     }

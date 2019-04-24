@@ -4300,6 +4300,7 @@ gint32 CRpcServices::AddSeqTask(
     gint32 ret = 0;
     bool bNew = false;
     do{
+        TaskGrpPtr ptrSeqTasks;
         if( true )
         {
             CStdRMutex oIfLock( GetLock() );
@@ -4309,18 +4310,27 @@ gint32 CRpcServices::AddSeqTask(
                 oParams[ propIoMgr ] = 
                     ObjPtr( GetIoMgr() );
 
-                m_pSeqTasks.NewObj(
+                ret = m_pSeqTasks.NewObj(
                     clsid( CIfTaskGroup ),
                     oParams.GetCfg() );
+
+                if( ERROR( ret ) )
+                    break;
 
                 m_pSeqTasks->SetRelation( logicNONE );
                 bNew = true;
             }
+            ptrSeqTasks = m_pSeqTasks;
         }
 
-        CIfRetryTask* pSeqTask = m_pSeqTasks;
-        CStdRTMutex oTaskLock( pSeqTask->GetLock() );
+        CIfRetryTask* pSeqTasks = ptrSeqTasks;
+        CStdRTMutex oTaskLock( pSeqTasks->GetLock() );
         CStdRMutex oIfLock( GetLock() );
+        if( m_pSeqTasks.IsEmpty() )
+            continue;
+
+        if( !( m_pSeqTasks == ptrSeqTasks ) )
+            continue;
 
         ret = m_pSeqTasks->AppendTask( pTask );
         if( ERROR( ret ) && !bNew )
