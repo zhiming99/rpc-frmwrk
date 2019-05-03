@@ -498,9 +498,10 @@ gint32 CRpcBasePort::DispatchData(
         string strDump = pMsg.DumpMsg();
 
         DebugPrint( ret, 
-            "Error, dmsg cannot be processed, %s, portstate =%d",
+            "Error, dmsg cannot be processed, %s, curstate = %d, requested state =%d",
             strDump.c_str(),
-            dwPortState );
+            dwOldState,
+            PORT_STATE_BUSY_SHARED );
 #endif
 
         return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;

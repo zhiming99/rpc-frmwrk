@@ -30,8 +30,7 @@
 class CTasklet : public ICancellableTask
 {
     std::atomic<guint32> m_iRet;
-    static std::atomic< guint32 > m_atmTid;
-    guint32 m_dwTid;
+    std::atomic<guint32> m_dwTid;
 
     std::atomic<bool> m_bPending;
     // flag to avoid reentrancy
@@ -51,6 +50,12 @@ class CTasklet : public ICancellableTask
     virtual gint32 operator()( guint32 dwContext ) = 0;
     virtual bool IsMultiThreadSafe()
     { return false; }
+
+    void SetTid()
+    { m_dwTid = ::GetTid(); }
+
+    guint32 GetTid()
+    { return m_dwTid; }
 
     operator IConfigDb*()
     { return ( IConfigDb* )m_pCtx; }

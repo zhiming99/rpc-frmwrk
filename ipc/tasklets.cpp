@@ -23,13 +23,10 @@
 
 using namespace std;
 
-atomic< guint32 > CTasklet::m_atmTid(
-    ( guint32 )random() );
-
 CTasklet::CTasklet( const IConfigDb* pCfg )
 {
     m_pCtx.NewObj( Clsid_CConfigDb, pCfg );
-    m_dwTid = m_atmTid++;
+    m_dwTid = ::GetTid();
     m_iRet = 0;
     m_bPending = false;
     m_bInProcess = false;

@@ -300,10 +300,10 @@ class CRpcInterfaceServer :
         BufPtr& pBuf,
         IConfigDb* pReqCall ) = 0;
 
-    gint32 SetupReqIrpFwrdEvt(
+    virtual gint32 SetupReqIrpFwrdEvt(
         IRP* pIrp,
         IConfigDb* pReqCall,
-        IEventSink* pCallback );
+        IEventSink* pCallback ) = 0;
 
     virtual gint32 OnKeepAliveRelay(
         IEventSink* pInvokeTask ) = 0;
@@ -475,6 +475,11 @@ class CRpcReqForwarder :
     gint32 CloseRemotePortInternal(
         IEventSink* pCallback,
         IConfigDb* pCfg );
+
+    virtual gint32 SetupReqIrpFwrdEvt(
+        IRP* pIrp,
+        IConfigDb* pReqCall,
+        IEventSink* pCallback );
 
     public:
 
@@ -803,6 +808,12 @@ class CRpcTcpBridge:
         gint32& fd,                     // [out]
         guint32& dwOffset,              // [in,out]
         guint32& dwSize,                // [in,out]
+        IEventSink* pCallback );
+
+    protected:
+    virtual gint32 SetupReqIrpFwrdEvt(
+        IRP* pIrp,
+        IConfigDb* pReqCall,
         IEventSink* pCallback );
 
     public:
@@ -1190,6 +1201,7 @@ class CRpcRouter :
     std::vector< EnumPropId >   m_vecTopicList;
 
     guint32 m_dwRole;
+    MatchPtr            m_pDBusSysMatch;
 
     public:
 
@@ -1216,7 +1228,7 @@ class CRpcRouter :
     gint32 GetMatchToAdd(
         IMessageMatch* pMatch,
         bool bRemote,
-        MatchPtr& pMatchAdd );
+        MatchPtr& pMatchAdd ) const;
 
     inline gint32 GetMatchToRemove(
         IMessageMatch* pMatch,
@@ -1319,7 +1331,7 @@ class CRpcRouter :
     gint32 CheckEvtToFwrd(
         const std::string& strIpAddr,
         DMsgPtr& pMsg,
-        std::vector< MatchPtr > vecMatches );
+        std::vector< MatchPtr >& vecMatches );
 
     using IFMAP_CITR =
         std::map< std::string, InterfPtr >::const_iterator;
@@ -1519,6 +1531,13 @@ class CRpcRouter :
 
         return ForwardDBusEvent( iEvent );
     }
+
+    // local match operation
+    gint32 SetMatchOnline(
+        IMessageMatch* pMatch, bool bOnline );
+
+    gint32 IsMatchOnline( IMessageMatch* pMatch,
+        bool& bOnline ) const;
 };
 
 class CReqFwdrCloseRmtPortTask

@@ -62,6 +62,9 @@ CRpcRouter::CRpcRouter(
         oParams[ propIoMgr ] = 
             ObjPtr( GetIoMgr() );
 
+        ret = m_pDBusSysMatch.NewObj(
+            clsid( CDBusSysMatch ) );
+
     }while( 0 );
 
     if( ERROR( ret ) )
@@ -1310,28 +1313,83 @@ gint32 CRpcRouter::CheckReqToFwrd(
 gint32 CRpcRouter::CheckEvtToFwrd(
     const string &strIpAddr,
     DMsgPtr& pMsg,
-    vector< MatchPtr > vecMatches )
+    vector< MatchPtr >& vecMatches )
 {
     gint32 ret = ERROR_FALSE;
 
-    CStdRMutex oRouterLock( GetLock() );
-    for( auto&& oPair : m_mapLocMatches )
-    {
-        CRouterLocalMatch* pMatch =
-            oPair.first;
-
-        if( pMatch == nullptr )
-            continue;
-
-        ret = pMatch->IsMyEvtToForward(
-            strIpAddr, pMsg );
-
+    do{
+        CStdRMutex oRouterLock( GetLock() );
+        ret = m_pDBusSysMatch->IsMyMsgIncoming( pMsg );
         if( SUCCEEDED( ret ) )
         {
-            vecMatches.push_back( pMatch );
+            string strDest;
+            string strMember;
+            strMember = pMsg.GetMember();
+            if( strMember != "NameOwnerChanged" )
+            {
+                // currently we don't support other
+                // messages.
+                break;
+            }
+
+            std::set< string > setSrcAddr;
+            ret = pMsg.GetStrArgAt( 0, strDest );
+            if( ERROR( ret ) )
+                break;
+
+            for( auto&& oPair : m_mapLocMatches )
+            {
+                CRouterLocalMatch* pMatch =
+                    oPair.first;
+
+                if( unlikely( pMatch == nullptr ) )
+                    continue;
+
+                CCfgOpener oMatch(
+                    ( IConfigDb* )pMatch->GetCfg() );
+
+                ret = oMatch.IsEqual(
+                    propIpAddr, strIpAddr );
+
+                if( ERROR( ret ) )
+                    continue;
+
+                ret = oMatch.IsEqual(
+                    propDestDBusName, strDest );
+
+                if( ERROR( ret ) )
+                    continue;
+
+                string strUniqName =
+                    oMatch[ propSrcUniqName ];
+
+                if( setSrcAddr.find( strUniqName ) ==
+                    setSrcAddr.end() )
+                {
+                    setSrcAddr.insert( strUniqName );
+                    vecMatches.push_back( pMatch );
+                }
+            }
             break;
         }
-    }
+
+        for( auto&& oPair : m_mapLocMatches )
+        {
+            CRouterLocalMatch* pMatch =
+                oPair.first;
+
+            if( pMatch == nullptr )
+                continue;
+
+            ret = pMatch->IsMyEvtToForward(
+                strIpAddr, pMsg );
+
+            if( SUCCEEDED( ret ) )
+            {
+                vecMatches.push_back( pMatch );
+            }
+        }
+    }while( 0 );
 
     return ret;
 }
@@ -1385,7 +1443,7 @@ gint32 CRpcRouter::BuildEventRelayTask(
 gint32 CRpcRouter::GetMatchToAdd(
     IMessageMatch* pMatch,
     bool bRemote,
-    MatchPtr& pMatchAdd )
+    MatchPtr& pMatchAdd ) const
 {
     gint32 ret = 0;
     CRouterRemoteMatch* prlm = nullptr;
@@ -1418,6 +1476,112 @@ gint32 CRpcRouter::GetMatchToAdd(
     return ret;
 }
 
+gint32 CRpcRouter::IsMatchOnline(
+    IMessageMatch* pMatch, bool& bOnline ) const
+{
+    MatchPtr ptrMatch;
+
+    if( pMatch == nullptr )
+        return -EINVAL;
+
+    gint32 ret = GetMatchToAdd(
+        pMatch, false, ptrMatch );
+
+    if( ERROR( ret ) )
+        return ret;
+
+    const map< MatchPtr, gint32 >*
+        plm = &m_mapLocMatches;
+
+    do{
+        CStdRMutex oRouterLock( GetLock() );
+        map< MatchPtr, gint32 >::const_iterator
+            itr = plm->find( ptrMatch );
+
+        if( itr != plm->end() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+
+        CMessageMatch* pDstMat = itr->first;
+        CCfgOpener oMatchCfg(
+            ( IConfigDb* )pDstMat->GetCfg() );
+
+        ret = oMatchCfg.GetBoolProp(
+            propOnline, bOnline );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CRpcRouter::SetMatchOnline(
+    IMessageMatch* pMatch, bool bOnline )
+{
+    MatchPtr ptrMatch;
+    if( pMatch == nullptr )
+        return -EINVAL;
+
+    CMessageMatch* pSrcMat =
+        static_cast< CMessageMatch* >( pMatch );
+    CCfgOpener oSrcMatch(
+        ( IConfigDb* )pSrcMat->GetCfg() );
+
+    gint32 ret = 0;
+    do{
+        std::string strIpAddr;
+        ret = oSrcMatch.GetStrProp(
+            propIpAddr, strIpAddr );
+        if( ERROR( ret ) )
+            break;
+
+        std::string strDest;
+        ret = oSrcMatch.GetStrProp(
+            propDestDBusName, strDest );
+        if( ERROR( ret ) )
+            break;
+
+        std::string strPath;
+        ret = oSrcMatch.GetStrProp(
+            propObjPath, strPath );
+        if( ERROR( ret ) )
+            break;
+
+        CStdRMutex oRouterLock( GetLock() );
+        for( auto oElem : m_mapLocMatches )
+        {
+            CMessageMatch* pDstMat = oElem.first;
+            CCfgOpener oMatchCfg(
+                ( IConfigDb* )pDstMat->GetCfg() );
+
+            ret = oMatchCfg.IsEqual(
+                propObjPath, strPath );
+
+            if( ERROR( ret ) )
+                continue;
+
+            ret = oMatchCfg.IsEqual(
+                propDestDBusName, strDest );
+
+            if( ERROR( ret ) )
+                continue;
+
+            ret = oMatchCfg.IsEqual(
+                propIpAddr, strIpAddr );
+
+            if( ERROR( ret ) )
+                continue;
+
+            oMatchCfg.SetBoolProp(
+                propOnline, bOnline );
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CRpcRouter::AddLocalMatch(
     IMessageMatch* pMatch )
 {
@@ -1429,7 +1593,7 @@ gint32 CRpcRouter::AddLocalMatch(
         return ret;
 
     return AddRemoveMatch(
-        pMatch, true, false, nullptr );
+        ptrMatch, true, false, nullptr );
 }
 
 gint32 CRpcRouter::RemoveLocalMatch(
@@ -1443,7 +1607,7 @@ gint32 CRpcRouter::RemoveLocalMatch(
         return ret;
 
     return AddRemoveMatch(
-        pMatch, false, false, nullptr );
+        ptrMatch, false, false, nullptr );
 }
 
 gint32 CRpcRouter::RemoveLocalMatchByAddr(
@@ -1699,7 +1863,7 @@ gint32 CRouterEnableEventRelayTask::RunTask()
             oParams.GetCfg() );
 
         ret = ( *pEnableEvtTask )( eventZero );
-        if( SUCCEEDED( ret ) )
+        if( !ERROR( ret ) )
         {
             bEnable ? dwAddCount++ : dwRemoveCount++;
         }
@@ -1801,6 +1965,15 @@ gint32 CRouterAddRemoteMatchTask::AddRemoteMatchInternal(
             if( ret == EEXIST )
             {
                 ret = 0;
+                InterfPtr pIf;
+                ret = pRouter->GetReqFwdrProxy(
+                    pMatch, pIf );
+
+                if( ERROR( ret ) )
+                    break;
+
+                if( pIf->GetState() == stateRecovery )
+                    ret = ENOTCONN;
                 // stop further actions in this
                 // transaction
                 ChangeRelation( logicOR );
@@ -1998,11 +2171,26 @@ gint32 CRouterStartRecvTask::RunTask()
         if( pProxy->GetState() == stateRecovery )
         {
             // server is not up
-            ret = 0;
+            ret = ENOTCONN;
             break;
         }
         // transfer the control to the proxy
         ret = pProxy->AddAndRun( pRecvTask );
+        if( ERROR( ret ) )
+            break;
+
+        ret = pRecvTask->GetError();
+        if( ret == STATUS_PENDING )
+        {
+            ret = 0;
+            break;
+        }
+        if( ret == -ENOTCONN )
+        {
+            // server is not up
+            ret = ENOTCONN;
+            break;
+        }
 
     }while( 0 );
 
@@ -2283,12 +2471,12 @@ gint32 CRpcRouter::ForwardModOnOfflineEvent(
             break;
 
         ret = pMsg.SetPath(
-            DBUS_PATH_LOCAL );
+            DBUS_PATH_DBUS );
         if( ERROR( ret ) )
             break;
 
         ret = pMsg.SetInterface(
-            DBUS_INTERFACE_LOCAL );
+            DBUS_INTERFACE_DBUS );
         if( ERROR( ret ) )
             break;
 
@@ -2296,6 +2484,14 @@ gint32 CRpcRouter::ForwardModOnOfflineEvent(
             "NameOwnerChanged" );
         if( ERROR( ret ) )
             break;
+
+        string strModName =
+            GetIoMgr()->GetModName();
+
+        ret = pMsg.SetSender(
+            DBUS_DESTINATION( strModName ) );
+
+        pMsg.SetSerial( iEvent );
 
         const char* szUnknown = "unknown";
         const char* szEmpty = "";
@@ -2416,12 +2612,12 @@ gint32 CRpcRouter::ForwardDBusEvent(
             break;
 
         ret = pMsg.SetPath(
-            DBUS_PATH_LOCAL );
+            DBUS_SYS_OBJPATH );
         if( ERROR( ret ) )
             break;
 
         ret = pMsg.SetInterface(
-            DBUS_INTERFACE_LOCAL );
+            DBUS_SYS_INTERFACE );
         if( ERROR( ret ) )
             break;
 

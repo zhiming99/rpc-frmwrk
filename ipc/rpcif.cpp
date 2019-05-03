@@ -328,6 +328,11 @@ gint32 CRpcBaseOperations::EnableEvent(
         iState == stateInvalid )
         return ERROR_STATE;
 
+    // iState == stateRecovery does not prevent further
+    // EnableEvent request to send. the request is
+    // rather to setup a communication channel for the
+    // match, and it is not quite important whether the
+    // server is online or not
     return EnableEventInternal(
         pMatch, true, pCompletion );
 }
@@ -734,6 +739,13 @@ gint32 CIfStartExCompletion::OnTaskComplete(
         if( ERROR( ret ) )
             break;
 
+        if( !pIf->IsConnected() )
+        {
+            // FIXME: if we need to return ENOTCONN to
+            // indicate the status?
+            break;
+        }
+
         intptr_t ptrMatches = oParams[ 0 ];
         std::vector< MatchPtr >* pMatches =
             ( std::vector< MatchPtr >* ) ptrMatches;
@@ -826,14 +838,6 @@ gint32 CRpcInterfaceBase::StartEx(
         }
         pTaskGrp->SetRelation( logicAND );
 
-        CCfgOpenerObj oCfg( ( CObjBase* )pTaskGrp );
-
-        ret = oCfg.SetBoolProp(
-            propNotifyClient, true );
-
-        if( ERROR( ret ) )
-            break;
-
         CParamList oTaskParam;
         TaskletPtr pStartComp;
         if( pCallback != nullptr )
@@ -860,8 +864,8 @@ gint32 CRpcInterfaceBase::StartEx(
 
          ( *pStartComp )( eventZero );
 
-        ret = oCfg.SetObjPtr(
-            propEventSink, ObjPtr( pStartComp ) );
+        ret = pTaskGrp->SetClientNotify(
+            pStartComp );
 
         if( ERROR( ret ) )
             break;
@@ -1873,8 +1877,9 @@ gint32 CRpcInterfaceBase::AddAndRun(
 
         bool bRunning = pParaGrp->IsRunning();
 
-        // add the task to the pending queue or
-        // run it immediately
+        // add the task to the pending queue or run it
+        // immediately
+        //
         // immediate  running  dwcount
         //     0       0       0       run root
         //     0       0       1       pending
@@ -1893,8 +1898,8 @@ gint32 CRpcInterfaceBase::AddAndRun(
                 break;
             }
 
-            // actually the taskgroup can also run
-            // on the parallel taskgroup
+            // actually the taskgroup can also run on
+            // the parallel taskgroup
             CIfRetryTask* pRetryTask = pIoTask;
             if( unlikely( pRetryTask == nullptr ) )
             {
@@ -1908,14 +1913,14 @@ gint32 CRpcInterfaceBase::AddAndRun(
                 pParaLock->unlock();
                 ret = ERROR_STATE;
                 DebugPrint( GetTid(),
-                    "root task cannot run immediately, dwCount=%d, bRunning=%d",
+                    "root task is in wrong state, dwCount=%d, bRunning=%d",
                     dwCount, bRunning );
                 break;
             }
             else if( dwCount > 0 && !bRunning )
             {
-                // don't lock the io task, because
-                // it could cause deadlock
+                // don't lock the io task, because it
+                // could cause deadlock
                 pIoTask->MarkPending();
 
                 pParaLock->unlock();
@@ -1923,32 +1928,33 @@ gint32 CRpcInterfaceBase::AddAndRun(
                 ret = STATUS_PENDING;
 
                 DebugPrint( GetTid(),
-                    "root task not run immediately 1, dwCount=%d, bRunning=%d",
+                    "root task not run immediately, dwCount=%d, bRunning=%d",
                     dwCount, bRunning );
             }
             else
             {
-                pIoTask->MarkPending();
                 pParaLock->unlock();
                 oRootLock.Unlock();
 
-                // NOTE: there could be deep
-                // nesting. Reschedule can fix,
-                // but performance hurts
-                ( *pParaGrp )( eventZero );
-                ret = pIoTask->GetError();
+                // NOTE: there could be deep nesting.
+                // Reschedule can fix, but performance
+                // hurts
+                ret = ( *pParaGrp )( eventZero );
+                if( ret == STATUS_PENDING )
+                {
+                    // in case the io task is scheduled
+                    // on the this thread.
+                    pIoTask->MarkPending();
+                }
             }
         }
         else if( bImmediate && bRunning && dwCount > 0 )
         {
             pParaLock->unlock();
             oRootLock.Unlock();
-            // force to run the task on the
-            // current thread
+            // force to run the task on the current
+            // thread
             ret = pParaGrp->RunTaskDirect( pIoTask );
-            if( ERROR( ret ) )
-                break;
-            ret = pIoTask->GetError();
         }
         else
         {

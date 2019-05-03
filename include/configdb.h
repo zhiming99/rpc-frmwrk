@@ -514,14 +514,14 @@ class CCfgDbOpener
         // static_assert( !std::is_base_of< CObjBase, PrimType >::value );
         gint32 ret = 0;
         do{
-            if( m_pCfg == nullptr )
+            if( m_pConstCfg== nullptr )
             {
                 ret = -EFAULT;
                 break;
             }
 
             BufPtr pBuf( true );
-            ret = m_pCfg->GetProperty( iProp, *pBuf );
+            ret = m_pConstCfg->GetProperty( iProp, *pBuf );
             if( ERROR( ret ) )
                 break;
 
@@ -1059,14 +1059,14 @@ class CCfgDbOpener< IConfigDb >
         // static_assert( !std::is_base_of< CObjBase, PrimType >::value );
         gint32 ret = 0;
         do{
-            if( m_pCfg == nullptr )
+            if( m_pConstCfg == nullptr )
             {
                 ret = -EFAULT;
                 break;
             }
 
             BufPtr pBuf( true );
-            ret = m_pCfg->GetProperty( iProp, pBuf );
+            ret = m_pConstCfg->GetProperty( iProp, pBuf );
             if( ERROR( ret ) )
                 break;
 

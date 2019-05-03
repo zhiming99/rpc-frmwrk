@@ -161,8 +161,18 @@ void CIfSmokeTest::testCliStartStop()
     if( pCli != nullptr )
     do{
         // make sure the server is online
-        while( !pCli->IsConnected() )
-            sleep( 1 );
+        while( 1 )
+        {
+            if( pCli->GetState() == stateRecovery )
+            {
+                sleep( 1 );
+                continue;
+            }
+            break;
+        }
+
+        if( !pCli->IsConnected() )
+            break;
 
         std::string strText( "Hello world!" );
         std::string strReply;

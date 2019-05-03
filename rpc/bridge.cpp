@@ -336,6 +336,9 @@ gint32 CRpcTcpBridgeProxy::BuildBufForIrpFwrdReq(
         string strSender =
             DBUS_DESTINATION( strModName  );
 
+        ret = pMsg.NewObj();
+        if( ERROR( ret ) )
+            break;
 
         ret = pMsg.SetPath( strObjPath );
         if( ERROR( ret ) )
@@ -345,8 +348,9 @@ gint32 CRpcTcpBridgeProxy::BuildBufForIrpFwrdReq(
         if( ERROR( ret ) )
             break;
 
-        // set to the obj path deliberately
-        ret = pMsg.SetDestination( strObjPath );
+        ret = pMsg.SetDestination( 
+            DBUS_DESTINATION2( strModName,
+                OBJNAME_TCP_BRIDGE ) );
         if( ERROR( ret ) )
             break;
 
@@ -359,6 +363,8 @@ gint32 CRpcTcpBridgeProxy::BuildBufForIrpFwrdReq(
 
         if( ERROR( ret ) )
             break;
+
+        pMsg.SetSerial( 0 );
 
         BufPtr pReqMsgBuf( true );
         ret = pMsgToFwrd.Serialize( *pReqMsgBuf );
@@ -486,13 +492,6 @@ gint32 CRpcTcpBridgeProxy::FillRespDataFwrdReq(
             break;
         }
 
-        guint32 dwCtrlCode = pCtx->GetCtrlCode();
-        if( dwCtrlCode != CTRLCODE_FORWARD_REQ )
-        {
-            ret = -EINVAL;
-            break;
-        }
-
         CParamList oParams( ( IConfigDb* )pResp );
 
         DMsgPtr pFwrdMsg;
@@ -503,8 +502,13 @@ gint32 CRpcTcpBridgeProxy::FillRespDataFwrdReq(
         if( ERROR( ret ) )
             break;
 
+        DMsgPtr pRespMsg;
+        ret = pFwrdMsg.GetMsgArgAt( 1, pRespMsg );
+        if( ERROR( ret ) )
+            break;
+
         oParams.SetIntProp( propReturnValue, iRet );
-        oParams.Push( pFwrdMsg );
+        oParams.Push( pRespMsg );
 
     }while( 0 );
 
@@ -536,12 +540,6 @@ gint32 CRpcTcpBridgeProxy::FillRespData(
 
     switch( dwCtrlCode )
     {
-    case CTRLCODE_FORWARD_REQ:
-        {
-            // we received a forward req message
-            FillRespDataFwrdReq( pIrp, pResp );
-            break;
-        }
     case CTRLCODE_OPEN_STREAM_PDO:
         {
             CfgPtr pCfg;
@@ -573,6 +571,29 @@ gint32 CRpcTcpBridgeProxy::FillRespData(
                 break;
 
             break;
+        }
+    case CTRLCODE_SEND_REQ:
+        {
+            // FIXME: ugly method to know if the resp is for
+            // ForwardRequest
+            TaskletPtr pTask = pIrp->m_pCallback;
+            CCfgOpenerObj oTaskCfg( ( CObjBase* )pTask );
+            CTasklet* pParentTask = nullptr;
+            ret = oTaskCfg.GetPointer(
+                propEventSink, pParentTask );
+            if( SUCCEEDED( ret ) )
+            {
+                gint32 iClsid =
+                    pParentTask->GetClsid();
+
+                if( clsid( CReqFwdrForwardRequestTask )
+                    == iClsid )
+                {
+                    FillRespDataFwrdReq( pIrp, pResp );
+                    break;
+                }
+            }
+            // fall through
         }
     default:
         {
@@ -1674,7 +1695,7 @@ gint32 CRpcTcpBridge::BuildBufForIrpFwrdEvt(
             GetIoMgr()->GetModName();
 
         ret = pMsg.SetSender(
-            DBUS_DESTINATION( strVal ) );
+            DBUS_DESTINATION( strModName ) );
 
         if( ERROR( ret ) )
             break;
@@ -1845,52 +1866,6 @@ gint32 CRpcTcpBridge::ForwardEvent(
 
         if( ERROR( ret ) )
             break;
-
-    }while( 0 );
-
-    return ret;
-}
-
-gint32 CRpcInterfaceServer::SetupReqIrpFwrdEvt(
-    IRP* pIrp,
-    IConfigDb* pReqCall,
-    IEventSink* pCallback )
-{
-    if( pIrp == nullptr ||
-        pIrp->GetStackSize() == 0 )
-        return -EINVAL;
-
-    if( pReqCall == nullptr )
-        return -EINVAL;
-
-    gint32 ret = 0;
-    do{
-        ret = super::SetupReqIrp(
-            pIrp, pReqCall, pCallback );
-
-        if( ERROR( ret ) )
-            break;
-
-        // make correction to the control code and
-        // the io direction
-        IrpCtxPtr& pIrpCtx = pIrp->GetTopStack(); 
-        pIrpCtx->SetCtrlCode( CTRLCODE_SEND_EVENT );
-
-        // FIXME: we don't know if the request
-        // needs a reply, and the flag is set
-        // to CF_WITH_REPLY mandatorily
-        pIrpCtx->SetIoDirection( IRP_DIR_OUT ); 
-
-        CCfgOpener oReq( pReqCall );
-        SetBdgeIrpStmId( pIrp,
-            ( guint32& )oReq[ propStreamId ] );
-
-        // we don't need a timer
-        if( pCallback != nullptr )
-        {
-            pIrp->SetCallback( pCallback, 0 );
-            pIrp->SetIrpThread( GetIoMgr() );
-        }
 
     }while( 0 );
 
@@ -2292,6 +2267,8 @@ gint32 CRpcInterfaceServer::DoInvoke(
         if( ERROR( ret ) )
             break;
 
+        bool bResp = false;
+
         CfgPtr pCfg( true );
         do{
             if( strMethod == SYS_METHOD_FORWARDREQ )
@@ -2301,21 +2278,22 @@ gint32 CRpcInterfaceServer::DoInvoke(
 
                 iArgCount -= 2;
 
-                if( vecArgs.empty()
-                    || vecArgs.size() != iArgCount )
+                if( vecArgs.empty() ||
+                    vecArgs.size() < iArgCount )
                 {
                     ret = -EBADMSG;
                     break;
                 }
 
                 string strIpAddr =
-                    ( string& )*vecArgs[ 0 ].second;
+                    ( string )*vecArgs[ 0 ].second;
 
-                if( GetClsid() == clsid( CRpcTcpBridgeImpl ) )
+                bool bBridge = 
+                    GetClsid() == clsid( CRpcTcpBridgeImpl );
+                if( bBridge )
                 {
                     // we will use the source ip
-                    // address as the input
-                    // parameter
+                    // address as the input parameter
                     ret = oCfg.GetStrProp(
                         propIpAddr, strIpAddr );
 
@@ -2330,25 +2308,93 @@ gint32 CRpcInterfaceServer::DoInvoke(
                 if( ERROR( ret ) )
                     break;
 
+                guint64 qwFwdrTaskId = 0;
+                if( bBridge && vecArgs.size() >
+                    iArgCount + 1 )
+                {
+                    ret = -EINVAL;
+                    break;
+                }
+                else if( bBridge )
+                {
+                    qwFwdrTaskId =
+                        ( guint64& )*vecArgs[ 2 ].second;
+                }
+
                 DMsgPtr pRespMsg;
                 ret = ForwardRequest( strIpAddr,
                     pFwdrMsg, pRespMsg, pCallback );
 
                 if( ret == STATUS_PENDING )
                 {
-                    // the return value will be send
-                    // in OnFetchDataComplete
+                    ObjPtr pObj;
+
+                    gint32 iRet =
+                        pFwdrMsg.GetObjArgAt( 0, pObj );
+
+                    if( ERROR( iRet ) )
+                        break;
+
+                    CReqOpener oOrigReq(
+                        ( IConfigDb* )pObj );
+
+                    CReqBuilder oNewReq( this );
+                    oNewReq.SetMethodName( SYS_METHOD_FORWARDREQ );
+
+                    guint32 dwTimeout = 0;
+                    iRet = oOrigReq.GetTimeoutSec( dwTimeout );
+                    if( SUCCEEDED( iRet ) )
+                    {
+                        if( dwTimeout < 7200 )
+                            oNewReq.SetTimeoutSec( dwTimeout );
+                    }
+
+                    iRet = oOrigReq.GetKeepAliveSec( dwTimeout );
+                    if( SUCCEEDED( iRet ) )
+                    {
+                        if( dwTimeout < 7200 )
+                            oNewReq.SetKeepAliveSec( dwTimeout );
+                    }
+
+                    guint32 dwCallFalgs = 0;
+                    iRet = oOrigReq.GetCallFlags( dwCallFalgs );
+                    if( SUCCEEDED( iRet ) )
+                    {
+                        oNewReq.SetCallFlags( dwCallFalgs );
+                        if( dwCallFalgs & CF_WITH_REPLY )
+                            bResp = true;
+                    }
+
+                    // keep-alive settings
+                    CCfgOpenerObj oTaskCfg( pCallback );
+
+                    if( bBridge )
+                    {
+                        oTaskCfg.SetQwordProp(
+                            propRmtTaskId, qwFwdrTaskId );
+                    }
+                    else
+                    {
+                        SET_RMT_TASKID(
+                            ( IConfigDb* )pObj, oTaskCfg );
+                    }
+
+                    oTaskCfg.SetPointer( propReqPtr,
+                        ( IConfigDb* )oNewReq.GetCfg() );
+
                     break;
                 }
 
                 // whether successful or not, we
                 // put the result in the response
-                oResp.SetIntProp(
-                    propReturnValue, ret );
+                if( bResp )
+                {
+                    oResp.SetIntProp(
+                        propReturnValue, ret );
 
-                if( !pRespMsg.IsEmpty() )
-                    oResp.Push( pRespMsg );
-
+                    if( !pRespMsg.IsEmpty() )
+                        oResp.Push( pRespMsg );
+                }
                 break;
             }
             else
@@ -2362,7 +2408,7 @@ gint32 CRpcInterfaceServer::DoInvoke(
         if( ret == STATUS_PENDING )
             break;
 
-        if( ret != -ENOTSUP )
+        if( ret != -ENOTSUP && bResp )
         {
             // for not supported commands we will
             // try to handle them in the base
@@ -2534,7 +2580,7 @@ gint32 CRpcTcpBridge::SetupReqIrpOnProgress(
             GetIoMgr()->GetModName();
 
         ret = pMsg.SetSender(
-            DBUS_DESTINATION( strVal ) );
+            DBUS_DESTINATION( strModName ) );
 
         if( ERROR( ret ) )
             break;
@@ -3063,6 +3109,52 @@ gint32 CRpcTcpBridge::OnProgressNotify(
 
         if( ret == STATUS_PENDING )
             ret = 0;
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CRpcTcpBridge::SetupReqIrpFwrdEvt(
+    IRP* pIrp,
+    IConfigDb* pReqCall,
+    IEventSink* pCallback )
+{
+    if( pIrp == nullptr ||
+        pIrp->GetStackSize() == 0 )
+        return -EINVAL;
+
+    if( pReqCall == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        ret = super::super::SetupReqIrp(
+            pIrp, pReqCall, pCallback );
+
+        if( ERROR( ret ) )
+            break;
+
+        // make correction to the control code and
+        // the io direction
+        IrpCtxPtr& pIrpCtx = pIrp->GetTopStack(); 
+        pIrpCtx->SetCtrlCode( CTRLCODE_SEND_EVENT );
+
+        // FIXME: we don't know if the request
+        // needs a reply, and the flag is set
+        // to CF_WITH_REPLY mandatorily
+        pIrpCtx->SetIoDirection( IRP_DIR_OUT ); 
+
+        CCfgOpener oReq( pReqCall );
+        SetBdgeIrpStmId( pIrp,
+            ( guint32& )oReq[ propStreamId ] );
+
+        // we don't need a timer
+        if( pCallback != nullptr )
+        {
+            pIrp->SetCallback( pCallback, 0 );
+            pIrp->SetIrpThread( GetIoMgr() );
+        }
 
     }while( 0 );
 

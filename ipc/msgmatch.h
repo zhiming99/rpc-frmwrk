@@ -380,8 +380,12 @@ class CMessageMatch : public IMessageMatch
             strMyDest = m_strObjPath;
             std::replace( strMyDest.begin(),
                 strMyDest.end(), '/', '.' );
+            gint32 iIdx = 0;
 
-            if( strDest != strMyDest.substr( 0, strDest.size() ) )
+            if( strMyDest[ 0 ] == '.' )
+                iIdx = 1;
+
+            if( strDest != strMyDest.substr( iIdx, strDest.size() ) )
                 return false;
 
             // FIXME: it is not a right solution.

@@ -40,18 +40,11 @@ CDBusProxyFdo::CDBusProxyFdo( const IConfigDb* pCfg )
 
 gint32 CDBusProxyFdo::ClearDBusSetting(
     IMessageMatch* pMatch )
-{
-    // we don't touch dbus things
-    return 0;
-}
+{ return 0; }
 
 gint32 CDBusProxyFdo::SetupDBusSetting(
     IMessageMatch* pMatch )
-{
-    if( !IsConnected() )
-        return ENOTCONN;
-    return 0;
-}
+{ return 0; }
 
 gint32 CDBusProxyFdo::BuildSendDataMsg(
     IRP* pIrp, DMsgPtr& pMsg )
@@ -348,10 +341,7 @@ gint32 CDBusProxyFdo::HandleSendReq(
 
         // client side I/O
         guint32 dwIoDir = pCtx->GetIoDirection();
-
-        ret = -EINVAL;
         DMsgPtr pMsg = *pCtx->m_pReqData;
-
         if( pMsg.IsEmpty() )
             break;
 
@@ -369,6 +359,10 @@ gint32 CDBusProxyFdo::HandleSendReq(
             // wrong direction
             break;
         }
+
+        // set the serial before forwarding
+        // for message deserialization only.
+        pMsg.SetSerial( ( guint32 )pIrp );
 
         IPort* pPdoPort = GetLowerPort();
         if( pPdoPort == nullptr )
@@ -435,6 +429,56 @@ gint32 CDBusProxyFdo::MatchExist( IRP* pIrp )
         ret = ( *pMap )[ pMatch ].RefCount();
     }
         
+    return ret;
+}
+
+gint32 CDBusProxyFdo::HandleRegMatchLocal(
+    IRP* pIrp )
+{
+    gint32 ret = 0;
+    if( pIrp == nullptr ||
+        pIrp->GetStackSize() == 0 )
+        return -EINVAL;
+
+    do{
+        IrpCtxPtr& pTopCtx =
+            pIrp->GetTopStack();
+
+        ret = pTopCtx->GetStatus();
+        if( ERROR( ret ) )
+            break;
+
+        MatchMap* pMap;
+        IrpCtxPtr& pCtx = pIrp->GetCurCtx();
+        GetMatchMap( pIrp, pMap );
+        MatchPtr pMatch =
+            ( ObjPtr& )*pCtx->m_pReqData;
+
+        CStdRMutex oPortLock( GetLock() );
+        MatchMap::iterator itr =
+            pMap->find( pMatch );
+
+        bool bConnected = true;
+        if( ret == ENOTCONN )
+            bConnected = false;
+
+        if( itr == pMap->end() )
+        {
+            MATCH_ENTRY oMe;
+            oMe.SetConnected( bConnected );
+            oMe.AddRef();
+            ( *pMap )[ pMatch ] = oMe;
+        }
+        else
+        {
+            MATCH_ENTRY& oMe = itr->second;
+            oMe.AddRef();
+            oMe.SetConnected( bConnected );
+        }
+        ret = -ret;
+
+    }while( 0 );
+
     return ret;
 }
 
@@ -520,19 +564,16 @@ gint32 CDBusProxyFdo::HandleRegMatchInternal(
 
         pPdoPort->AllocIrpCtxExt( pNextIrpCtx );
         ret = pPdoPort->SubmitIrp( pIrp );
-        if(  ret == STATUS_PENDING )
+        if( likely( ret == STATUS_PENDING ) )
             break;
 
-        if( SUCCEEDED( ret ) )
+        if( bReg )
         {
-            if( bReg )
-            {
-                ret = super::HandleRegMatch( pIrp );
-            }
-            else
-            {
-                ret = super::HandleUnregMatch( pIrp );
-            }
+            ret = HandleRegMatchLocal( pIrp );
+        }
+        else
+        {
+            ret = super::HandleUnregMatch( pIrp );
         }
 
         pIrp->PopCtxStack();
@@ -598,11 +639,15 @@ gint32 CDBusProxyFdo::CompleteIoctlIrp(
 
         switch( dwCtrlCode )
         {
-        case CTRLCODE_FORWARD_REQ:
+        case CTRLCODE_SEND_REQ:
             {
                 // the data has been prepared in
                 // the DispatchRespMsg, we don't
                 // need further actions
+                if( pTopCtx->GetCtrlCode() !=
+                    CTRLCODE_FORWARD_REQ )
+                    break;
+
                 if( SUCCEEDED( ret ) )
                     pCtx->SetRespData( pTopCtx->m_pRespData );
                 
@@ -628,18 +673,15 @@ gint32 CDBusProxyFdo::CompleteIoctlIrp(
             }
         case CTRLCODE_REG_MATCH:
             {
-                if( SUCCEEDED( ret ) )
-                {
-                    ret = super::HandleRegMatch( pIrp );
-                }
+                ret = HandleRegMatchLocal( pIrp );
                 break;
             }
         case CTRLCODE_UNREG_MATCH:
             {
-                if( SUCCEEDED( ret ) )
-                {
-                    ret = super::HandleUnregMatch( pIrp );
-                }
+                // this is a request of best efforts
+                // whether error or not  from remote.
+                // the unregistration process moves on
+                ret = super::HandleUnregMatch( pIrp );
                 break;
             }
 
@@ -691,7 +733,7 @@ gint32 CDBusProxyFdo::CompleteIoctlIrp(
         // to prevent the caller to copy the
         // return code from the pTopCtx, pop the
         // top stack here.
-        if( pIrp->IsIrpHolder() )
+        if( !pIrp->IsIrpHolder() )
             pIrp->PopCtxStack();
 
     }while( 0 );
@@ -1225,15 +1267,9 @@ CDBusProxyFdo::PreDispatchMsg(
             SetConnected( bOnline );
             if( !bOnline )
             {
-                // all the matches are offline now
-                MatchMap* pMatchMap;
-                ret1 = GetMatchMap(
-                    nullptr, pMatchMap );
-
-                if( ERROR( ret1 ) )
-                    break;
-
-                for( auto oMe : *pMatchMap )
+                // all the event matches are offline now
+                MatchMap& oMatchMap = m_mapEvtTable;
+                for( auto oMe : oMatchMap )
                 {
                     oMe.second.SetConnected(
                         bOnline );
@@ -1306,7 +1342,7 @@ gint32 CProxyFdoModOnOfflineTask::operator()(
 
         guint32 eventId = eventRmtModOnline;
 
-        if( bOnline )
+        if( !bOnline )
             eventId = eventRmtModOffline;
 
         ret = oEvtHelper.BroadcastEvent(
@@ -1330,7 +1366,6 @@ gint32 CDBusProxyFdo::ScheduleModOnOfflineTask(
         if( ERROR( ret ) )
             break;
 
-        guint32 dwFlags = 0;
         ret = oParams.Push( dwFlags );
         if( ERROR( ret ) )
             break;
@@ -1340,8 +1375,9 @@ gint32 CDBusProxyFdo::ScheduleModOnOfflineTask(
         if( ERROR( ret ) )
             break;
 
+        IPort* pPdoPort = GetBottomPort();
         ret = oParams.SetObjPtr(
-            propPortPtr, ObjPtr( this ) );
+            propPortPtr, ObjPtr( pPdoPort ) );
 
         if( ERROR( ret ) )
             break;

@@ -773,7 +773,7 @@ gint32 CDBusProxyPdo::SubmitIoctlCmd( IRP* pIrp )
             {
                 if( !IsConnected() )
                 {
-                    ret = ERROR_STATE;
+                    ret = -ENOTCONN;
                     break;
                 }
                 // what we can do is to listen to
@@ -802,7 +802,7 @@ gint32 CDBusProxyPdo::SubmitIoctlCmd( IRP* pIrp )
             {
                 if( !IsConnected() )
                 {
-                    ret = ERROR_STATE;
+                    ret = -ENOTCONN;
                     break;
                 }
                 ret = HandleFwrdReq( pIrp );
@@ -815,7 +815,7 @@ gint32 CDBusProxyPdo::SubmitIoctlCmd( IRP* pIrp )
 
                 if( !IsConnected() )
                 {
-                    ret = ERROR_STATE;
+                    ret = -ENOTCONN;
                     break;
                 }
                 if( dwCtrlCode == CTRLCODE_RMT_UNREG_MATCH )
@@ -838,7 +838,7 @@ gint32 CDBusProxyPdo::SubmitIoctlCmd( IRP* pIrp )
             {
                 if( !IsConnected() )
                 {
-                    ret = ERROR_STATE;
+                    ret = -ENOTCONN;
                     break;
                 }
                 ret = super::HandleSendReq( pIrp );
@@ -848,7 +848,7 @@ gint32 CDBusProxyPdo::SubmitIoctlCmd( IRP* pIrp )
             {
                 if( !IsConnected() )
                 {
-                    ret = ERROR_STATE;
+                    ret = -ENOTCONN;
                     break;
                 }
                 ret = super::HandleSendEvent( pIrp );
@@ -1374,57 +1374,34 @@ gint32 CDBusProxyPdo::UnpackFwrdRespMsg( IRP* pIrp )
 {
     // unpackage the message to retrieve the
     // response message from the remote client
-    gint32 ret = 0;
-
-    if( pIrp == nullptr
-        || pIrp->GetStackSize() == 0 )
+    if( pIrp == nullptr ||
+        pIrp->GetStackSize() == 0 )
         return -EINVAL;
 
+    gint32 ret = 0;
     IrpCtxPtr& pCtx = pIrp->GetTopStack();
 
     do{
-        DBusError dbusError;
-        guint32 dwSize = 0;
-        guint8* pBytes = nullptr;
         DMsgPtr pMsg = *pCtx->m_pRespData;
         gint32 iMethodReturn = 0;
 
-        if( !dbus_message_get_args(
-            pMsg, &dbusError,
-            DBUS_TYPE_INT32, &iMethodReturn,
-            DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
-            &pBytes,&dwSize,
-            DBUS_TYPE_INVALID ) )
+        ret = pMsg.GetIntArgAt( 0,
+            ( guint32& )iMethodReturn );
+
+        if( ERROR( ret ) )
         {
-            ret = ErrnoFromDbusErr( dbusError.name );
-
-            if( ret == 0 )
-                ret = ERROR_FAIL;
-
+            ret = -EBADMSG;
             break;
         }
 
         if( ERROR( iMethodReturn ) )
         {
-            // the request faild in the RpcRouter
             ret = iMethodReturn;
             break;
         }
 
-        if( dwSize == 0 )
-        {
-            // don't know what happend
-            ret = ERROR_FAIL;
-            break;
-        }
-
-        BufPtr pBuf( true );
-        pBuf->Resize( dwSize );
-
-        memcpy( pBuf->ptr(), pBytes, dwSize );
-
         DMsgPtr pUserResp;
-        ret = pUserResp.Deserialize( pBuf );
+        ret = pMsg.GetMsgArgAt( 1, pUserResp );
         if( ERROR( ret ) )
             break;
 
@@ -1649,13 +1626,23 @@ DBusHandlerResult CDBusProxyPdo::PreDispatchMsg(
     if( pMessage == nullptr )
         return ret;
 
+    if( iType != DBUS_MESSAGE_TYPE_SIGNAL )
+        return ret;
+
     DMsgPtr pMsg( pMessage );
 
     do{
-        if( iType != DBUS_MESSAGE_TYPE_SIGNAL )
-            return ret;
-
         gint32 ret1 =
+            m_pMatchDBus->IsMyMsgIncoming( pMsg );
+
+        if( SUCCEEDED( ret1 ) )
+        {
+            ret = DispatchDBusSysMsg( pMsg );
+            if( ret == DBUS_HANDLER_RESULT_HANDLED )
+                break;
+        }
+
+        ret1 =
             m_pMatchFwder->IsMyMsgIncoming( pMsg );
 
         if( SUCCEEDED( ret1 ) )
@@ -1677,12 +1664,6 @@ DBusHandlerResult CDBusProxyPdo::PreDispatchMsg(
             // don't continue on this port
             ret = DBUS_HANDLER_RESULT_HANDLED;
             break;
-        }
-
-        ret1 = m_pMatchDBus->IsMyMsgIncoming( pMsg );
-        if( SUCCEEDED( ret1 ) )
-        {
-            ret = DispatchDBusSysMsg( pMsg );
         }
 
     }while( 0 );

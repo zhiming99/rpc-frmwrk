@@ -269,21 +269,14 @@ gint32 CIfStartRecvMsgTask::OnIrpComplete(
 
         }while( 0 );
 
-        // interface is not working, don't continue
-        if( ret == ERROR_STATE ||
-            ret == ERROR_PAUSED )
+        if( ERROR( ret ) )
             break;
 
         // whether error or not receiving, we
         // proceed to handle the incoming irp now
         ret = pIrp->GetStatus();
         if( ret == -EAGAIN )
-        {
-            // no valid information to handle,
-            // just return
-            ret = 0;
             break;
-        }
 
         IrpCtxPtr& pCtx = pIrp->GetTopStack();
         if( !pCtx->IsNonDBusReq() )
@@ -642,6 +635,8 @@ gint32 CIfRetryTask::Process( guint32 dwContext )
 {
     gint32 ret = 0;
     EnumEventId iEvent = ( EnumEventId )dwContext;
+    if( this->GetTid() != ::GetTid() )
+        MarkPending();
 
     do{
         switch( iEvent )
@@ -1039,7 +1034,8 @@ gint32 CIfEnableEventTask::RunTask()
         else if( ret == -ENOTCONN )
         {
             // note, we don't assume ENOTCONN as an
-            // error and the match still
+            // error and the match is valid and
+            // the communication channel is kept.
             ret = pIf->SetStateOnEvent(
                 eventModOffline );
         }
@@ -1419,7 +1415,10 @@ gint32 CIfTaskGroup::RunTask()
             return iRet;
         }
 
-        if( SUCCEEDED( iRet ) &&
+        // using not ERROR instead of SUCCEEDED in
+        // case iRet contains some information
+        // other than error besides success
+        if( !ERROR( iRet ) &&
             GetRelation() == logicOR )
         {
             SetRunning( false );
@@ -1514,7 +1513,7 @@ gint32 CIfTaskGroup::RunTask()
             break;
         }
 
-        if( SUCCEEDED( ret ) &&
+        if( !ERROR( ret ) &&
             GetRelation() == logicOR )
         {
             if( m_queTasks.size() > 0 )
@@ -2475,6 +2474,10 @@ gint32 CIfParallelTaskGrp::RunTaskDirect(
             ( *pTask )( eventZero );
             break;
         }
+        else
+        {
+            ret = STATUS_PENDING;
+        }
 
     }while( 0 );
 
@@ -3124,16 +3127,17 @@ gint32 CIfParallelTask::Process(
         {
             vector< guint32 > vecParams;
             ret = GetParamList( vecParams,
-                propTimerParamList );
+                propNotifyParamList );
 
             if( ERROR( ret ) )
                 break;
 
-            return OnNotify( eventRpcNotify,
+            OnNotify( eventRpcNotify,
                 vecParams[ 1 ],
                 vecParams[ 2 ],
                 ( guint32* ) vecParams[ 3 ]);
 
+            ret = STATUS_PENDING;
             // we don't mean to complete
             break;
         }

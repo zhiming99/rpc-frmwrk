@@ -172,6 +172,8 @@ class CDBusProxyFdo : public IRpcFdoPort
     gint32 BuildSendDataMsg(
         IRP* pIrp, DMsgPtr& pMsg );
 
+    gint32 HandleRegMatchLocal( IRP* pIrp );
+
     public:
 
     typedef IRpcFdoPort super;

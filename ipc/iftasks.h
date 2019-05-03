@@ -354,6 +354,10 @@ class CIfTaskGroup
 
     bool exist( TaskletPtr& pTask );
 
+    inline const std::vector< gint32 >&
+        GetRetVals() const
+    { return m_vecRetVals; }
+
     bool IsRunning() const;
     void SetRunning( bool bRun = true );
 
