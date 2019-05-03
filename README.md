@@ -23,7 +23,7 @@ This framework depends on the following packags:
 [`Fri May 03 13:15:23 CST 2019`]   
 1. Now the `helloworld` can work now over the tcp connection. Great!   
 2. There are some crash bugs and wrong behavor to fix.   
-3. Happy holiday.   
+3. Happy International Labour Day 2019.   
 
 [`Wed Apr 24 18:10:46 CST 2019`]   
 1. The `bridge` side is now in good shape. Next I will take some time to clear some bugs on the `forwarder` side, before moving on to run the helloworld over the tcp connection.   
