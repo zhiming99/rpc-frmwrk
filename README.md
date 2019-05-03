@@ -21,7 +21,7 @@ This framework depends on the following packags:
 
 ---
 [`Fri May 03 13:15:23 CST 2019`]   
-1. Now the `helloworld` can work now over the tcp connection. ###Great!   
+1. Now the `helloworld` can work now over the tcp connection. **Great!**   
 2. There are some crash bugs and wrong behavor to fix yet.   
 3. Happy International Labour Day 2019.   
 
