@@ -20,6 +20,9 @@ This framework depends on the following packags:
 11. `Streaming support to provide double-direction stream transfer`
 
 ---
+[`Wed Apr 24 18:10:46 CST 2019`]   
+1. The `bridge` side is now in good shape. Next I will take some time to clear some bugs on the `forwarder` side, before moving on to run the helloworld over the tcp connection.   
+
 [`Sun Apr 21 12:36:37 CST 2019`]   
 1. There is one last memory leak to fix yet. After done, we can wrap up the `EnableRemoteEvent` and move on to debugging client requests.   
 
