@@ -20,6 +20,11 @@ This framework depends on the following packags:
 11. `Streaming support to provide double-direction stream transfer`
 
 ---
+[`Sun May 12 14:03:47 CST 2019`]   
+1. The `communication channel setup` (`EnableRemoteEvent`) is almost OK for tcp connection. There should still be a lot of bug to fix in the testing. However the `helloworld` can now work more stable and faster. And both the `bridge` and `forwarder` are more torlerable on the error condtion.   
+2. Next I will try to get `File/Big data transfer` work. It should be the last big section of un-debugged part so far.   
+3. I will also get the other examples to run over TCP connection.   
+
 [`Fri May 03 13:15:23 CST 2019`]   
 1. Now the `helloworld` can work over the tcp connection. **Great!**   
 2. There are some crash bugs and wrong behavor to fix yet.   
