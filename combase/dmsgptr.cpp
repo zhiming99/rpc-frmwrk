@@ -487,8 +487,9 @@ gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
 
         pBuf->Resize( 0 );
 
+        guint32 dwNetSize = htonl( dwSize );
         ret = pBuf->Append(
-            ( guint8* )&dwSize, sizeof( dwSize ) );
+            ( guint8* )&dwNetSize, sizeof( dwNetSize ) );
 
         if( ERROR( ret ) )
             break;
@@ -536,6 +537,8 @@ gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
 
         guint32 dwSize =
             *( guint32* )pBuf->ptr();
+
+        dwSize = ntohl( dwSize );
 
         guint8* pMsg =
             ( guint8* )pBuf->ptr() + sizeof( guint32 );

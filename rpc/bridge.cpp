@@ -128,7 +128,7 @@ gint32 CRpcTcpBridgeProxy::ClearRemoteEvents(
         oOptions[ propIfName ] = 
             DBUS_IF_NAME( strIfName );
 
-        oOptions[ propSysMethod ] = true;
+        oOptions[ propSysMethod ] = ( bool )true;
 
         ret = AsyncCall( pCallback,
             oOptions.GetCfg(), oResp.GetCfg(),
@@ -574,8 +574,8 @@ gint32 CRpcTcpBridgeProxy::FillRespData(
         }
     case CTRLCODE_SEND_REQ:
         {
-            // FIXME: ugly method to know if the resp is for
-            // ForwardRequest
+            // FIXME: ugly way to check if the resp is
+            // for ForwardRequest
             TaskletPtr pTask = pIrp->m_pCallback;
             CCfgOpenerObj oTaskCfg( ( CObjBase* )pTask );
             CTasklet* pParentTask = nullptr;
@@ -1532,6 +1532,8 @@ gint32 CRpcTcpBridge::ClearRemoteEvents(
         oParams[ propEventSink ] =
             ObjPtr( pCallback );
 
+        oParams[ propIfPtr ] = ObjPtr( pRouter );
+
         TaskletPtr pRespTask;
         ret = pRespTask.NewObj(
             clsid( CRouterEventRelayRespTask ),
@@ -1544,9 +1546,7 @@ gint32 CRpcTcpBridge::ClearRemoteEvents(
         // state
         ( *pRespTask )( eventZero );
 
-        oParams[ propIfPtr ] = ObjPtr( this );
         oParams[ propNotifyClient ] = true;
-
         oParams[ propEventSink ] =
             ObjPtr( pRespTask );
 
@@ -1561,11 +1561,26 @@ gint32 CRpcTcpBridge::ClearRemoteEvents(
         for( auto pObj : vecMatches )
         {
             MatchPtr pMatch( pObj );
+            MatchPtr pRmtMatch;
+
+            CCfgOpenerObj oMatch(
+                ( CObjBase* )pObj );
+
+            oMatch.CopyProp( propIpAddr, this );
+            oMatch.CopyProp( propSrcTcpPort, this );
+            oMatch.CopyProp( propPortId, this );
+
+            ret = pRouter->GetMatchToAdd(
+                pMatch, true, pRmtMatch );
+
+            if( ERROR( ret ) )
+                continue;
+
             TaskletPtr pDisEvtTask;
             ret = pRouter->BuildDisEvtTaskGrp(
-                nullptr, pMatch, pDisEvtTask );
+                nullptr, pRmtMatch, pDisEvtTask );
             if( ERROR( ret ) )
-                break;
+                continue;
 
             ret = pTaskGrp->AppendTask(
                 pDisEvtTask );
@@ -1585,7 +1600,7 @@ gint32 CRpcTcpBridge::ClearRemoteEvents(
         }
 
         TaskletPtr pGrpTask = pTaskGrp;
-        ret = pRouter->AddAndRun( pGrpTask );
+        ret = pRouter->AddSeqTask( pGrpTask, false );
         if( ERROR( ret ) )
             break;
 

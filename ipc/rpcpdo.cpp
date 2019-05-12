@@ -225,7 +225,9 @@ gint32 CRpcBasePort::FindIrpForResp(
 
             if( itr == m_mapSerial2Resp.end() )
             {
-                ret = -ENOENT;
+                ret = OnRespMsgNoIrp( pMessage );
+                if( ret == -ENOTSUP )
+                    ret = -ENOENT;
                 break;
             }
 
@@ -283,14 +285,18 @@ gint32 CRpcBasePort::DispatchRespMsg(
 
     do{
         ret = FindIrpForResp( pMsg, pIrp );
-        if( ERROR( ret ) )
+        if( ret == -ENOENT )
         {
             DMsgPtr pDumpMsg( pMsg );
             DebugPrint( ret,
-                "Error dispatching response messages\n%s\n",
-                pDumpMsg.DumpMsg().c_str() );
-            return ret;
+                "Error dispatching response messages\n%s\n, port=%s, 0x%x",
+                pDumpMsg.DumpMsg().c_str(),
+                CoGetClassName( GetClsid() ), 
+                ( guint32 )this );
         }
+
+        if( ERROR( ret ) )
+            return ret;
 
     }while( 0 );
 

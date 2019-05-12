@@ -740,17 +740,27 @@ class CMessageMatch : public IMessageMatch
     virtual gint32 Deserialize(
         const CBuffer& oBuf )
     {
+        if( oBuf.empty() )
+            return -EINVAL;
+
+        return Deserialize(
+            oBuf.ptr(), oBuf.size() );
+    }
+
+    virtual gint32 Deserialize(
+        const char* pBuf, guint32 dwSize )
+    {
         gint32 ret = 0;
 
         do{
-            if( oBuf.empty() )
+            if( pBuf == nullptr )
             {
                 ret = -EINVAL;
                 break;
             }
 
             SERI_HEADER* pHeader =
-                ( SERI_HEADER* )oBuf.ptr();
+                ( SERI_HEADER* )pBuf;
             
             SERI_HEADER oHeader;
             // memcpy( &oHeader, pHeader, sizeof( oHeader ) );
@@ -770,7 +780,7 @@ class CMessageMatch : public IMessageMatch
                 break;
 
             ret = m_pCfg->Deserialize(
-                oBuf.ptr() + sizeof( oHeader ),
+                pBuf + sizeof( oHeader ),
                 oHeader.dwSize );
 
             if( ERROR( ret ) )

@@ -591,6 +591,76 @@ gint32 CRpcReqForwarder::CloseRemotePort(
     return ret;
 }
 
+gint32 CRpcReqForwarder::StopBridgeProxy(
+    IEventSink* pCallback,
+    const std::string& strIpAddr,
+    const std::string& strSrcUniqName,
+    const std::string& strSrcDBusName )
+{
+    gint32 ret = 0;
+
+    do{
+        InterfPtr pIf;
+        CRpcRouter* pRouter = GetParent();
+        ret = pRouter->GetBridgeProxy(
+            strIpAddr, pIf );
+
+        if( ERROR( ret ) )
+            break;
+
+        ret = DecRefCount( strIpAddr,
+            strSrcUniqName, strSrcDBusName );
+        if( ERROR( ret ) )
+            break;
+
+        if( ret > 0 )
+        {
+            ret = 0;
+            break;
+        }
+
+        // no reference to this proxy, start
+        // the stop process.
+        if( true )
+        {
+            pRouter->RemoveBridgeProxy( pIf );
+            pRouter->RemoveLocalMatchByAddr(
+                strIpAddr );
+        }
+
+        CParamList oParams;
+
+        oParams.SetStrProp(
+            propIpAddr, strIpAddr );
+
+        oParams.SetPointer(
+            propIoMgr, GetIoMgr() );
+
+        if( pCallback != nullptr )
+        {
+            oParams.SetPointer(
+                propEventSink, pCallback );
+        }
+
+        oParams.SetPointer( propIfPtr, this );
+        oParams.Push( ObjPtr( pIf ) );
+
+        TaskletPtr pTask;
+        ret = pTask.NewObj(
+            clsid( CReqFwdrCloseRmtPortTask ),
+            oParams.GetCfg() );
+
+        if( ERROR( ret ) )
+            break;
+
+        ( *pTask )( eventZero );
+        ret = pTask->GetError();
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CRpcReqForwarder::CloseRemotePortInternal(
     IEventSink* pCallback,
     IConfigDb* pCfg )
@@ -635,58 +705,11 @@ gint32 CRpcReqForwarder::CloseRemotePortInternal(
             break;
         }
 
-        InterfPtr pIf;
-        CRpcRouter* pRouter = GetParent();
-        ret = pRouter->GetBridgeProxy(
-            strIpAddr, pIf );
+        ret = StopBridgeProxy(
+            pCallback, strIpAddr,
+            strSrcUniqName,
+            strSender );
 
-        if( ERROR( ret ) )
-            break;
-
-        bool bStopProxy = false;
-        ret = DecRefCount( strIpAddr,
-            strSrcUniqName, strSender );
-        if( ERROR( ret ) )
-            break;
-
-        if( ret == 0 )
-            bStopProxy = true;
-        else
-            ret = 0;
-
-        if( bStopProxy )
-        {
-            // no reference to this proxy, start
-            // the stop process.
-            if( true )
-            {
-                CStdRMutex oIfLock(
-                    pRouter->GetLock() );
-                pRouter->RemoveBridgeProxy( pIf );
-                pRouter->RemoveLocalMatchByAddr(
-                    strIpAddr );
-            }
-
-            CParamList oParams;
-            oParams.CopyProp( propIpAddr, pCfg );
-            oParams.SetPointer( propIoMgr, GetIoMgr() );
-            oParams.SetObjPtr( propEventSink,
-                ObjPtr( pCallback ) );
-
-            oParams.SetPointer( propIfPtr, this );
-            oParams.Push( ObjPtr( pIf ) );
-
-            TaskletPtr pTask;
-            ret = pTask.NewObj(
-                clsid( CReqFwdrCloseRmtPortTask ),
-                oParams.GetCfg() );
-
-            if( ERROR( ret ) )
-                break;
-
-            ( *pTask )( eventZero );
-            ret = pTask->GetError();
-        }
         break;
 
     }while( 0 );
@@ -781,11 +804,17 @@ gint32 CRpcReqForwarder::OpenRemotePortInternal(
 
         if( SUCCEEDED( ret ) )
         {
-            AddRefCount( strIpAddr,
+            ret = AddRefCount( strIpAddr,
                 strSrcUniqName, strSender );
 
             DebugPrint( ret,
-                "The bridge proxy already exists..." );
+                "The bridge proxy already exists...,"\
+                "ip=%s, uniqName=%s, sender=%s",
+                strIpAddr.c_str(),
+                strSrcUniqName.c_str(),
+                strSender.c_str() );
+
+            ret = 0;
         }
         else if( ret == -ENOENT )
         {
@@ -843,6 +872,7 @@ gint32 CRpcReqForwarder::AddRefCount(
         strSrcUniqName.empty() )
         return -EINVAL;
        
+    gint32 ret = 0;
     RegObjPtr pRegObj( true );
 
     CCfgOpener oCfg( ( IConfigDb* )pRegObj );
@@ -860,13 +890,13 @@ gint32 CRpcReqForwarder::AddRefCount(
     if( m_mapRefCount.find( pRegObj ) !=
         m_mapRefCount.end() )
     {
-        ++m_mapRefCount[ pRegObj ];
+        ret = ++m_mapRefCount[ pRegObj ];
     }
     else
     {
-        m_mapRefCount[ pRegObj ] = 1;
+        ret = m_mapRefCount[ pRegObj ] = 1;
     }
-    return 0;
+    return ret;
 }
 
 // NOTE: the return value on success is the
@@ -923,7 +953,7 @@ gint32 CRpcReqForwarder::DecRefCount(
     return ret;
 }
 
-// for local proxy offline
+// for local client offline
 gint32 CRpcReqForwarder::ClearRefCountByUniqName(
     const string& strUniqName,
     std::set< string >& setIpAddrs )
@@ -932,10 +962,10 @@ gint32 CRpcReqForwarder::ClearRefCountByUniqName(
     auto itr = m_mapRefCount.begin();
     while( itr != m_mapRefCount.end() )
     {
-        string strUniqName =
+        string strUniqName2 =
             itr->first->GetUniqName();
 
-        if( strUniqName == strUniqName )
+        if( strUniqName2 == strUniqName )
         {
             setIpAddrs.insert(
                 itr->first->GetIpAddr() );
@@ -949,6 +979,25 @@ gint32 CRpcReqForwarder::ClearRefCountByUniqName(
     return setIpAddrs.size();
 }
 
+// for local client offline
+gint32 CRpcReqForwarder::GetRefCountByIpAddr(
+    const string& strIpAddr,
+    guint32& dwRefCount ) 
+{
+    dwRefCount = 0;
+    CStdRMutex oIfLock( GetLock() );
+    for( auto elem : m_mapRefCount )
+    {
+        string strIpAddr2 =
+            elem.first->GetIpAddr();
+
+        if( strIpAddr2 == strIpAddr )
+            dwRefCount += elem.second;
+    }
+
+    return dwRefCount;
+}
+
 gint32 CRpcReqForwarder::OnModEvent(
     EnumEventId iEvent,
     const std::string& strModule )
@@ -956,80 +1005,207 @@ gint32 CRpcReqForwarder::OnModEvent(
     if( strModule.empty() )
         return -EINVAL;
 
-    if( iEvent == eventModOnline )
-        return 0;
+    gint32 ret = 0;
+    do{
+        if( iEvent == eventModOnline )
+            break;
 
-    // not uniq name, not our call
-    if( strModule[ 0 ] != ':' )
-        return 0;
+        // not uniq name, not our call
+        if( strModule[ 0 ] != ':' )
+            break;
 
+        ObjPtr pObj;
+        TaskletPtr pDeferTask;
+        ret = DEFER_IFCALL_NOSCHED(
+            pDeferTask, ObjPtr( this ),
+            &CRpcReqForwarder::OnModOfflineInternal,
+            ( IEventSink* )pObj, iEvent, strModule );
+
+        if( ERROR( ret ) )
+            break;
+
+        BufPtr pBuf( true );
+        *pBuf = ObjPtr( pDeferTask );
+        CIfDeferCallTask* pTask = pDeferTask;
+        pTask->UpdateParamAt( 0, pBuf );
+
+        // using the reqfwdr's sequential
+        // taskgroup
+        ret = GetParent()->AddSeqTask(
+            pDeferTask, false );
+
+        if( SUCCEEDED( ret ) )
+            ret = STATUS_PENDING;
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CRpcReqForwarder::OnModOfflineInternal(
+    IEventSink* pCallback,
+    EnumEventId iEvent,
+    std::string strUniqName )
+{
     // remove the registered objects
     set< string > setIpAddrs;
-    gint32 ret = ClearRefCountByUniqName(
-        strModule, setIpAddrs );
+    gint32 ret = 0;
 
-    if( setIpAddrs.size() == 0 )
-        return 0;
+    do{
+        ret = ClearRefCountByUniqName(
+            strUniqName, setIpAddrs );
+        if( ret == 0 )
+            break;
 
-    std::vector< MatchPtr > vecMatches;
+        std::vector< MatchPtr > vecMatches;
 
-    // find all the local matches to remove
-    CRpcRouter* pRouter = GetParent();
-    ret = pRouter->RemoveLocalMatchByUniqName(
-        strModule, vecMatches );
+        // find all the local matches to remove
+        CRpcRouter* pRouter = GetParent();
+        ret = pRouter->RemoveLocalMatchByUniqName(
+            strUniqName, vecMatches );
 
-    if( ret == 0 )
-        return 0;
+        if( ret == 0 )
+            break;
 
-    // disable the events on the bridge side
-    for( auto strIpAddr : setIpAddrs )
-    {
-        ObjVecPtr pMatches( true );
-        for( auto pMatch : vecMatches )
+        TaskletPtr pDummyTask;
+        ret = pDummyTask.NewObj(
+            clsid( CIfDummyTask ) );
+
+        if( ERROR( ret ) )
+            break;
+
+        TaskGrpPtr pTaskGrp;
+        CCfgOpener oTaskCfg;
+        oTaskCfg.SetPointer( propIfPtr, this ); 
+        oTaskCfg.SetPointer( propIoMgr, GetIoMgr() );
+
+        ret = pTaskGrp.NewObj(
+            clsid( CIfTaskGroup ),
+            oTaskCfg.GetCfg() );
+
+        if( ERROR( ret ) )
+            return ret;
+
+        pTaskGrp->SetRelation( logicNONE );
+        pTaskGrp->SetClientNotify( pCallback );
+
+        // disable the events on the bridge side
+        for( auto& strIpAddr : setIpAddrs )
         {
-            CCfgOpenerObj oMatch(
-                ( CObjBase* )pMatch );
-
-            std::string strVal;
-
-            ret = oMatch.GetStrProp(
-                propIpAddr, strVal );
-
-            if( ERROR( ret ) )
-                continue;
-
-            if( strVal == strIpAddr )
+            ObjVecPtr pMatches( true );
+            for( auto pMatch : vecMatches )
             {
-                ( *pMatches )().push_back(
-                    ObjPtr( pMatch ) );
+                CCfgOpenerObj oMatch(
+                    ( CObjBase* )pMatch );
+
+                std::string strVal;
+
+                ret = oMatch.GetStrProp(
+                    propIpAddr, strVal );
+
+                if( ERROR( ret ) )
+                    continue;
+
+                if( strVal == strIpAddr )
+                {
+                    ( *pMatches )().push_back(
+                        ObjPtr( pMatch ) );
+                }
+            }
+
+            if( ( *pMatches )().size() )
+            {
+                InterfPtr pProxy;
+                ret = pRouter->GetBridgeProxy(
+                    strIpAddr, pProxy );
+
+                if( ERROR( ret ) )
+                    continue;
+
+                CRpcTcpBridgeProxyImpl* pBdgePrxy =
+                    pProxy;
+
+                if( pBdgePrxy == nullptr )
+                    continue;
+
+                ObjPtr pObj = pMatches;
+
+                ObjPtr pEmptyCb;
+                TaskletPtr pDeferTask;
+                ret = DEFER_IFCALL_NOSCHED(
+                    pDeferTask, ObjPtr( pBdgePrxy ),
+                    &CRpcTcpBridgeProxy::ClearRemoteEvents,
+                    pObj, pEmptyCb );
+
+                if( ERROR( ret ) )
+                    break;
+
+                BufPtr pBuf( true );
+                *pBuf = ObjPtr( pDeferTask );
+                CIfDeferCallTask* pTask = pDeferTask;
+                pTask->UpdateParamAt( 1, pBuf );
+                pTaskGrp->AppendTask( pDeferTask );
             }
         }
-        if( ( *pMatches )().size() )
+
+        // to close the bridge proxy with zero refcount
+        for( auto& strIpAddr : setIpAddrs )
         {
+            guint32 dwRefCount = 0;
+            GetRefCountByIpAddr(
+                strIpAddr, dwRefCount );            
+
+            if( dwRefCount > 0 )
+                continue;
+
             InterfPtr pProxy;
             ret = pRouter->GetBridgeProxy(
                 strIpAddr, pProxy );
 
             if( ERROR( ret ) )
+            {
+                ret = 0;
                 continue;
+            }
 
-            CRpcTcpBridgeProxyImpl* pBdgePrxy =
-                pProxy;
+            pRouter->RemoveBridgeProxy( pProxy );
 
-            if( pBdgePrxy == nullptr )
+            CParamList oParams;
+            oParams.SetStrProp(
+                propIpAddr, strIpAddr );
+
+            oParams.SetPointer(
+                propIoMgr, GetIoMgr() );
+
+            oParams.SetPointer( propIfPtr, this );
+            oParams.Push( ObjPtr( pProxy ) );
+
+            TaskletPtr pTask;
+            ret = pTask.NewObj(
+                clsid( CReqFwdrCloseRmtPortTask ),
+                oParams.GetCfg() );
+
+            if( ERROR( ret ) )
+            {
+                ret = 0;
                 continue;
+            }
 
-            TaskletPtr pDummyTask;
-
-            pDummyTask.NewObj(
-                clsid( CIfDummyTask ) );
-
-            ObjPtr pObj( pMatches );
-            ret = pBdgePrxy->ClearRemoteEvents(
-                pObj, pDummyTask );   
+            pTaskGrp->AppendTask( pTask );
         }
 
-    }
+        if( pTaskGrp->GetTaskCount() == 0 )
+            break;
+
+        // run the task
+        TaskletPtr pGrpTask( pTaskGrp );
+        ret = GetIoMgr()->
+            RescheduleTask( pGrpTask );
+
+        if( SUCCEEDED( ret ) )
+            ret = STATUS_PENDING;
+
+    }while( 0 );
 
     return ret;
 }
@@ -1094,7 +1270,8 @@ gint32 CRpcReqForwarder::DisableRemoteEvent(
 
         // using the reqfwdr's sequential
         // taskgroup
-        ret = AddSeqTask( pDeferTask, false );
+        ret = GetParent()->AddSeqTask(
+            pDeferTask, false );
         if( SUCCEEDED( ret ) )
             ret = STATUS_PENDING;
 
@@ -1123,7 +1300,8 @@ gint32 CRpcReqForwarder::EnableRemoteEvent(
         if( ERROR( ret ) )
             break;
 
-        ret = AddSeqTask( pDeferTask, false );
+        ret = GetParent()->AddSeqTask(
+            pDeferTask, false );
         if( SUCCEEDED( ret ) )
             ret = STATUS_PENDING;
 
@@ -1240,15 +1418,15 @@ gint32 CRpcReqForwarder::EnableDisableEvent(
 
     if( ret != STATUS_PENDING )
     {
-        if( bUndo )
+        if( bUndo && ERROR( ret ) )
         {
             if( bEnable )
             {
-                ret = pRouter->RemoveLocalMatch( pMatch );
+                pRouter->RemoveLocalMatch( pMatch );
             }
-            else if( bUndo )
+            else
             {
-                ret = pRouter->AddLocalMatch( pMatch );
+                pRouter->AddLocalMatch( pMatch );
             }
         }
         CParamList oResp;
@@ -2173,27 +2351,8 @@ gint32 CRpcReqForwarder::ForwardEvent(
             if( ERROR( ret ) )
                 break;
 
-            ret = RunIoTask( oBuilder.GetCfg(),
+            RunIoTask( oBuilder.GetCfg(),
                 pRespCfg, pTask );
-
-            if( ERROR( ret ) )
-                break;
-
-            if( SUCCEEDED( ret ) )
-            {
-                CCfgOpener oCfg(
-                    ( IConfigDb* )pRespCfg );
-
-                gint32 iRet = 0;
-                ret = oCfg.GetIntProp(
-                    propReturnValue,
-                    ( guint32& )iRet );
-
-                if( ERROR( ret ) )
-                    break;
-
-                ret = iRet;
-            }
         }
 
         ret = 0;

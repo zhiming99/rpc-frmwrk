@@ -30,13 +30,18 @@
 
 using namespace std;
 
+#define RETRIABLE( iRet_ ) \
+    ( iRet_ == EWOULDBLOCK || iRet_ == EAGAIN )
+
 CRpcSocketBase::CRpcSocketBase(
     const IConfigDb* pCfg )
     : m_iState( sockInit ),
     m_iFd( -1 ),
+    m_pMgr( nullptr ),
     m_dwRtt( 0 ),
     m_dwAgeSec( 0 ),
     m_iTimerId( 0 ),
+    m_pParentPort( nullptr ),
     m_hIoRWatch( 0 ),
     m_hIoWWatch( 0 )
 {
@@ -140,6 +145,21 @@ gint32 CRpcSocketBase::SetKeepAlive( bool bKeep )
             TCP_KEEPCNT, &val, sizeof(val) ) == -1 )
         {
             ret = -errno; 
+            break;
+        }
+
+        // Disabling TCP_NODELAY could cause a 100ms
+        // overall delay ( forwarder and bridge, each
+        // contribute about 50ms ), when the traffic
+        // load is low.  However the latency can drop
+        // to less than 6ms when the traffic becomes
+        // heavy. Enabling TCP_NODELAY can yield a
+        // constant latency of 6ms.
+        val = 1;
+        if( setsockopt( m_iFd, IPPROTO_TCP,
+            TCP_NODELAY, (void *)&val, sizeof(val) ) == -1 )
+        {
+            ret = -errno;
             break;
         }
 
@@ -1660,7 +1680,7 @@ gint32 CRpcStreamSock::ScheduleCompleteIrpTask(
 * @name CRpcStreamSock::StartSend: to physically
 * put the data to the socket's send buffer, till
 * the send buffer is full or the queued the
-* packets are all gone.
+* packets are all sent.
 * @{ */
 /** Parameter:
  * pIrpLocked: the irp current in processing if it
@@ -1713,14 +1733,11 @@ gint32 CRpcStreamSock::StartSend( IRP* pIrpLocked )
             }
 
             IrpPtr pIrp;
+
+            StartWatch();
             ret = pStream->StartSend( m_iFd, pIrp );
             if( ret == STATUS_PENDING )
-            {
-                StartWatch();
                 break;
-            }
-
-            StopWatch();
 
             m_iCurSendStm = -1;
             if( !pIrp.IsEmpty() )
@@ -1764,6 +1781,9 @@ gint32 CRpcStreamSock::StartSend( IRP* pIrpLocked )
         break;
 
     }while( 1 );
+
+    if( ret != STATUS_PENDING )
+        StopWatch();
 
     if( pIrpLocked == nullptr )
     {
@@ -2477,7 +2497,7 @@ gint32 CIncomingPacket::FillPacket(
         ret = read( iFd,
             m_pBuf->ptr() + dwBufOffset, dwSize );
 
-        if( ret == -1 && errno == EWOULDBLOCK )
+        if( ret == -1 && RETRIABLE( errno ) )
         {
             // no bytes to read
             ret = STATUS_PENDING;
@@ -2517,8 +2537,7 @@ gint32 CIncomingPacket::FillPacket(
                 break;
 
             m_dwBytesToRecv = m_oHeader.m_dwSize;
-            guint32 dwNewSize = m_dwBytesToRecv;
-            m_pBuf->Resize( dwNewSize );
+            m_pBuf->Resize( m_dwBytesToRecv );
 
             // continue to read payload data
             continue;
@@ -2526,7 +2545,6 @@ gint32 CIncomingPacket::FillPacket(
         else if( ret < ( gint32 )dwSize )
         {
             m_dwBytesToRecv -= ret;
-            m_dwOffset += ret;
             ret = STATUS_PENDING;
             break;
         }
@@ -2674,16 +2692,26 @@ gint32 CRpcStream::SetRespReadIrp(
                 pCtx->SetRespData( pBuf );
             else
             {
-                guint8* pData =
-                    ( guint8* )pBuf->ptr();
-                pCtx->m_pRespData->Append(
-                    pData, pBuf->size() );
+                if( pBuf->GetObjId() !=
+                    pCtx->m_pRespData->GetObjId() )
+                {
+                    guint8* pData =
+                        ( guint8* )pBuf->ptr();
+                    pCtx->m_pRespData->Append(
+                        pData, pBuf->size() );
+                }
+                else
+                {
+                    // the resp is already set in
+                    // GetReadIrpsToComp
+                }
             }
             pCtx->SetStatus( 0 );
         }
         else
         {
             pCtx->SetStatus( -ENOTSUP );
+            ret = -ENOTSUP;
         }
 
     }while( 0 );
@@ -2815,7 +2843,10 @@ gint32 CRpcStream::HandleWriteIrp(
 
         pOp->SetHeader( &oHeader );
         pOp->SetIrp( pIrp );
-        pOp->SetBufToSend( pPayload );
+
+        ret = pOp->SetBufToSend( pPayload );
+        if( ERROR( ret ) )
+            break;
 
         ret = QueuePacketOutgoing( pOp );
 
@@ -2833,8 +2864,8 @@ gint32 CRpcStream::GetReadIrpsToComp(
         CStdRMutex oSockLock(
             m_pStmSock->GetLock() );
 
-        if( m_queReadIrps.size() == 0 ||
-            m_queBufToRecv.size() == 0 )
+        if( m_queReadIrps.empty() ||
+            m_queBufToRecv.empty() )
             break;
 
         IrpPtr pIrp = m_queReadIrps.front();
@@ -3854,8 +3885,11 @@ gint32 COutgoingPacket::SetBufToSend(
     if( pBuf == nullptr )
         return -EINVAL;
 
-    m_pBuf = pBuf;
+    if( pBuf->empty() ||
+        pBuf->size() > MAX_BYTES_PER_TRANSFER )
+        return -EINVAL;
 
+    m_pBuf = pBuf;
     m_oHeader.m_dwSize = m_pBuf->size();
     m_dwBytesToSend =  m_oHeader.m_dwSize
         + sizeof( CPacketHeader );
@@ -3879,6 +3913,7 @@ gint32 COutgoingPacket::StartSend(
     if( m_dwBytesToSend > MAX_BYTES_PER_TRANSFER )
         return -EINVAL;
 
+    DebugPrint( ret, "Start sending..." );
     do{
         if( m_dwOffset < sizeof( CPacketHeader ) )
         {
@@ -3889,7 +3924,7 @@ gint32 COutgoingPacket::StartSend(
                 ( ( char* )&m_oHeader ) + m_dwOffset;
 
             ret = send( iFd, pStart, dwSize, 0 );
-            if( ret == -1 && errno == EWOULDBLOCK )
+            if( ret == -1 && RETRIABLE( errno ) )
             {
                 ret = STATUS_PENDING;
                 break;
@@ -3902,11 +3937,14 @@ gint32 COutgoingPacket::StartSend(
 
             m_dwOffset += ret;
             m_dwBytesToSend -= ret;
-            if( m_dwOffset >= sizeof( CPacketHeader ) )
+            if( m_dwOffset == sizeof( CPacketHeader ) )
             {
                 // recover from the eariler hton
                 m_oHeader.ntoh();
             }
+            else if( m_dwOffset < sizeof( CPacketHeader ) )
+                 continue;
+
             ret = 0;
         }
 
@@ -3925,7 +3963,7 @@ gint32 COutgoingPacket::StartSend(
                 + dwActOffset;
 
             ret = send( iFd, pStart, dwSize, 0 );
-            if( ret == -1 && errno == EWOULDBLOCK )
+            if( ret == -1 && RETRIABLE( errno ) )
             {
                 ret = STATUS_PENDING;
                 break;
@@ -4090,7 +4128,7 @@ gint32 CRpcListeningSock::OnConnected()
         newFd = accept( m_iFd, NULL, NULL );
         if( newFd == -1 )
         {
-            if (errno != EWOULDBLOCK)
+            if( !RETRIABLE( errno ) )
             {
                 ret = -errno;
                 break;

@@ -481,6 +481,17 @@ class CRpcReqForwarder :
         IConfigDb* pReqCall,
         IEventSink* pCallback );
 
+    gint32 StopBridgeProxy(
+        IEventSink* pCallback,
+        const std::string& strIpAddr,
+        const std::string& strSrcUniqName,
+        const std::string& strSrcDBusName );
+
+    gint32 OnModOfflineInternal(
+        IEventSink* pCallback,
+        EnumEventId iEvent,
+        std::string strUniqName );
+
     public:
 
     typedef CRpcInterfaceServer super;
@@ -507,6 +518,10 @@ class CRpcReqForwarder :
     gint32 ClearRefCountByUniqName(
         const std::string& strUniqName,
         std::set< std::string >& setIpAddrs );
+
+    gint32 GetRefCountByIpAddr(
+        const std::string& strIpAddr,
+        guint32& dwRefCount );
 
     virtual const EnumClsid GetIid() const
     { return iid( CRpcReqForwarder ); }
@@ -1036,7 +1051,7 @@ class CRpcTcpBridgeProxy :
     // the method to do cleanup when the client is
     // down
     gint32 ClearRemoteEvents(
-        ObjPtr& pVecMatches, // [ in ]
+        ObjPtr& pVecMatches , // [ in ]
         IEventSink* pCallback );
 
     virtual gint32 EnableRemoteEvent(
@@ -1202,6 +1217,9 @@ class CRpcRouter :
 
     guint32 m_dwRole;
     MatchPtr            m_pDBusSysMatch;
+
+    protected:
+    gint32 RebuildMatches();
 
     public:
 
@@ -1538,6 +1556,7 @@ class CRpcRouter :
 
     gint32 IsMatchOnline( IMessageMatch* pMatch,
         bool& bOnline ) const;
+
 };
 
 class CReqFwdrCloseRmtPortTask

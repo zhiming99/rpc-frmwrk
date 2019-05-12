@@ -793,6 +793,10 @@ class CRpcTcpFido: public CRpcBasePortEx
     static std::atomic< guint32 > m_atmSeqNo;
     TaskletPtr  m_pListenTask;
 
+    std::hashmap< guint32, DMsgPtr > m_mapRespMsgs;
+    virtual gint32 OnRespMsgNoIrp(
+        DBusMessage* pDBusMsg );
+
     public:
 
     typedef CRpcBasePortEx super;

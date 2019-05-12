@@ -32,6 +32,9 @@ using namespace std;
 #define PROXYFDO_LISTEN_INTERVAL 15
 #define PROXYFDO_LISTEN_RETIRES  12
 
+extern gint64 GetRandom();
+static std::atomic< int > s_atmSeqNo( GetRandom() );
+
 CDBusProxyFdo::CDBusProxyFdo( const IConfigDb* pCfg )
     : super( pCfg )
 {
@@ -295,7 +298,7 @@ gint32 CDBusProxyFdo::HandleListeningFdo(
         {
             // let's dispatch this message to
             // all the listeners
-            DMsgPtr pMsg = *pNextIrpCtx->m_pReqData;
+            DMsgPtr pMsg = *pNextIrpCtx->m_pRespData;
             if( !pMsg.IsEmpty() )
             {
                 ret = ScheduleDispEvtTask( pMsg );
@@ -362,7 +365,7 @@ gint32 CDBusProxyFdo::HandleSendReq(
 
         // set the serial before forwarding
         // for message deserialization only.
-        pMsg.SetSerial( ( guint32 )pIrp );
+        pMsg.SetSerial( s_atmSeqNo++ );
 
         IPort* pPdoPort = GetLowerPort();
         if( pPdoPort == nullptr )
@@ -918,12 +921,13 @@ gint32 CProxyFdoListenTask::Process(
         case STATUS_PENDING:
             break;
 
-        case -ETIMEDOUT:
         case -ENOTCONN:
             {
                 DebugPrint( 0,
                     "The server is not online?, retry scheduled..." );
+                // fall through
             }
+        case -ETIMEDOUT:
         case -EAGAIN:
             {
                 ret = STATUS_MORE_PROCESS_NEEDED;

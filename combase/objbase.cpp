@@ -72,12 +72,19 @@ std::string DebugMsgEx(
 
 inline gint64 GetRandom()
 {
-    timeval tv;
-    gettimeofday( &tv, NULL );
+    static bool bInit = false;
+    timespec ts;
+    clock_gettime( CLOCK_MONOTONIC, &ts );
+    if( !bInit )
+    {
+        bInit = true;
+        srand( ts.tv_nsec );
+    }
     gint64 iPid = GetTid();
-    iPid <<=32;
     // a fake random number, enough for object id.
-    return tv.tv_usec + iPid;
+    return ( iPid << 32 )  +
+        ( ts.tv_nsec << 2 ) +
+        ( rand() & 0x3 ) ;
 }
 
 int Sem_Init( sem_t* psem, int pshared, unsigned int value )
@@ -240,11 +247,7 @@ CStdRTMutex::CStdRTMutex( stdrtmutex& oMutex,
 std::atomic<gint32> CObjBase::m_atmObjCount( 0 );
 
 std::atomic< guint64 >
-#if 0
-    CObjBase::m_atmObjId( 100 );
-#else
-    CObjBase::m_atmObjId( GetRandom() );
-#endif
+CObjBase::m_atmObjId( GetRandom() );
 
 #ifdef DEBUG
 struct cmp_obj
@@ -285,9 +288,9 @@ CObjBase::CObjBase()
     m_dwClsid = Clsid_Invalid;
     m_qwObjId = ++m_atmObjId;
     ++m_atmObjCount;
+    m_dwMagic = *( guint32* )"ObjB";
 
 #ifdef DEBUG
-    m_dwMagic = *( guint32* )"ObjB";
     CStdMutex oLock( g_oObjListLock );
     g_vecObjs.insert( this );
 #endif

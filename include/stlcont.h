@@ -35,6 +35,8 @@
 using stdstr = std::string;
 using cchar = const char;
 
+#define MAX_ELEM_CONTAINER  10000
+
 template< typename T >
 class CStlQueue : public CObjBase
 {
@@ -202,7 +204,92 @@ class CStlObjVector : public CStlVector< ObjPtr >
     {
         SetClassId( clsid( CStlObjVector  ) );
     }
+
+    struct SERI_HEADER : public SERI_HEADER_BASE
+    {
+        typedef SERI_HEADER_BASE super;
+        guint32 dwCount;
+        // dwCount is sizeof( arrOffsets ) - 1, the
+        // last offset is the size of the payload
+        // section.
+        //
+        // arroffsets is followed by the payload
+        // section for each serialized objects
+        guint32 arrOffsets[ 0 ];
+
+        SERI_HEADER() : super()
+        {
+            dwClsid = clsid( CStlObjVector );
+            dwCount = 0; 
+        }
+
+        SERI_HEADER( const SERI_HEADER& oSrc )
+            : super( oSrc )
+        {
+            *this = oSrc;
+        }
+
+        SERI_HEADER& operator=(
+            const SERI_HEADER& oSrc )
+        {
+            super::operator=( oSrc );
+
+            dwCount = oSrc.dwCount;
+            if( oSrc.dwCount > MAX_ELEM_CONTAINER )
+                dwCount = 1;
+
+            memcpy( arrOffsets,
+                oSrc.arrOffsets,
+                dwCount * sizeof( guint32 ) );
+
+            return *this;
+        }
+
+        void ntoh()
+        {
+            super::ntoh();
+            dwCount = ntohl( dwCount );
+
+            if( dwCount > MAX_ELEM_CONTAINER )
+                return;
+
+            guint32* pOffset = arrOffsets;
+            guint32 dwVal;
+            for( guint32 i = 0; i < dwCount; i++ )
+            {
+                dwVal = ntohl( pOffset[ i ] );
+                pOffset[ i ] = dwVal;
+            }
+        }
+
+        void hton()
+        {
+            if( dwCount > MAX_ELEM_CONTAINER )
+                return;
+
+            guint32* pOffset = arrOffsets;
+            guint32 dwVal;
+            for( guint32 i = 0; i < dwCount; i++ )
+            {
+                dwVal = htonl( pOffset[ i ] );
+                pOffset[ i ] = dwVal;
+            }
+
+            dwCount = htonl( dwCount );
+            super::hton();
+        }
+    };
+
+    gint32 Serialize(
+        CBuffer& oBuf ) const;
+
+    gint32 Deserialize(
+        const CBuffer& obuf );
+    
+    gint32 Deserialize(
+        const char* pBuf, guint32 dwBufSize );
 };
+
 typedef CAutoPtr< clsid( CStlObjVector ), CStlObjVector > ObjVecPtr;
 
 template< typename Key_, typename Val_ >

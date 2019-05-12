@@ -487,6 +487,9 @@ gint32 CIfRetryTask::DelayRun(
 
 gint32 CIfRetryTask::OnRetry()
 {
+    DebugPrint( 0, "Retrying task %s @0x%x",
+        CoGetClassName( GetClsid() ),
+        ( intptr_t )this );
     return RunTask();
 }
 
@@ -3874,7 +3877,8 @@ gint32 CIfIoReqTask::OnNotify( guint32 event,
 
 CIfInvokeMethodTask::CIfInvokeMethodTask(
     const IConfigDb* pCfg ) : super( pCfg ),
-    m_iKeepAlive( 0 )
+    m_iKeepAlive( 0 ),
+    m_iTimeoutId( 0 )
 {
     SetClassId( clsid( CIfInvokeMethodTask ) );
 }
@@ -5107,9 +5111,11 @@ gint32 CIfInvokeMethodTask::SetAsyncCall(
             dwTimeoutSec, this,
             ( guint32 )eventKeepAlive );
 
+#ifdef _DEBUG
         DebugPrint( ret,
             "KeepAliveTimer started in %d seconds",
             dwTimeoutSec );
+#endif
 
         break;
     }

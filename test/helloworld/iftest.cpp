@@ -158,6 +158,8 @@ void CIfSmokeTest::testCliStartStop()
     if( ERROR( ret ) )
         pCli = nullptr;
 
+    gint32 i = 0;
+
     if( pCli != nullptr )
     do{
         // make sure the server is online
@@ -219,7 +221,8 @@ void CIfSmokeTest::testCliStartStop()
         ret = pCli->Ping();
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
         DebugPrint( 0, "Ping Completed" );
-    }while( 0 );
+
+    }while( ++i < 1000 );
 
     // stop the proxy
     ret = pIf->Stop();

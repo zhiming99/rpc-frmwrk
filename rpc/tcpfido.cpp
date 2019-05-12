@@ -394,8 +394,28 @@ gint32 CRpcTcpFido::HandleSendReq(
             dwIoDir == IRP_DIR_INOUT )
         {
             CStdRMutex oPortLock( GetLock() );
-            m_mapSerial2Resp[ dwSerial ] = pIrp;
-            ret = STATUS_PENDING;
+            std::hashmap< guint32, DMsgPtr >::iterator
+                itr = m_mapRespMsgs.find( dwSerial );
+            if( itr == m_mapRespMsgs.end() )
+            {
+                m_mapSerial2Resp[ dwSerial ] = pIrp;
+                ret = STATUS_PENDING;
+            }
+            else
+            {
+                // the message arrives before
+                // the irp arrives here
+                DebugPrint( ret, "respmsg arrives before reqmsg" );
+                DMsgPtr pRespMsg = itr->second;
+                m_mapRespMsgs.erase( itr );
+
+                pRespMsg.SetReplySerial( dwOldSerial );
+
+                BufPtr pRespBuf( true );
+                *pRespBuf = pRespMsg;
+                pCtx->SetRespData( pRespBuf );
+                pCtx->SetStatus( ret );
+            }
         }
     }while( 0 );
 
@@ -651,7 +671,7 @@ gint32 CRpcTcpFido::CompleteSendReq(
             pIrp->PopCtxStack();
 
             // well, we are done
-            if( dwIoDir == IRP_DIR_OUT )
+            if( dwIoDir != IRP_DIR_INOUT )
                 break;
 
             if( ERROR( ret ) )
@@ -682,19 +702,43 @@ gint32 CRpcTcpFido::CompleteSendReq(
 
             if( dwSerial != 0 )
             {
-                // put the irp to the reading
-                // queue for the response
-                // we need to check if the port is
-                // still in the valid state for
+                // put the irp to the reading queue for
+                // the response we need to check if the
+                // port is still in the valid state for
                 // io request
                 guint32 dwOldState = 0;
+
+                CStdRMutex oPortLock( GetLock() );
+
                 ret = CanContinue( pIrp,
                     PORT_STATE_BUSY_SHARED, &dwOldState );
+
                 if( SUCCEEDED( ret ) )
                 {
-                    CStdRMutex oPortLock( GetLock() );
-                    m_mapSerial2Resp[ dwSerial ] = pIrp;
-                    ret = STATUS_PENDING;
+                    std::hashmap< guint32, DMsgPtr >::iterator
+                        itr = m_mapRespMsgs.find( dwSerial );
+                    if( itr == m_mapRespMsgs.end() )
+                    {
+                        m_mapSerial2Resp[ dwSerial ] = pIrp;
+                        ret = STATUS_PENDING;
+                    }
+                    else
+                    {
+                        // the message arrives before
+                        // the irp arrives here
+                        DMsgPtr pRespMsg = itr->second;
+                        m_mapRespMsgs.erase( itr );
+
+                        DMsgPtr& pReqMsg = *pCtx->m_pReqData;
+                        guint32 dwOldSeqNo = 0;
+                        pReqMsg.GetSerial( dwOldSeqNo );
+                        pRespMsg.SetReplySerial( dwOldSeqNo );
+
+                        BufPtr pRespBuf( true );
+                        *pRespBuf = pRespMsg;
+                        pCtx->SetRespData( pRespBuf );
+                        pCtx->SetStatus( ret );
+                    }
                 }
                 PopState( dwOldState );
             }
@@ -1518,4 +1562,35 @@ gint32 CRpcTcpFido::PostStop(
         m_pListenTask.Clear();
 
     return super::PostStop( pIrp );
+}
+
+gint32 CRpcTcpFido::OnRespMsgNoIrp(
+    DBusMessage* pDBusMsg )
+{
+    // this method is guarded by the port lock
+    //
+    // return -ENOTSUP or ENOENT will tell the dispatch
+    // routine to move on to next port
+    if( pDBusMsg == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        DMsgPtr pMsg( pDBusMsg );
+        guint32 dwSerial = 0;
+        ret = pMsg.GetReplySerial( dwSerial );
+        if( ERROR( ret ) )
+            break;
+
+        if( dwSerial == 0 )
+        {
+            ret = -EBADMSG;
+            break;
+        }
+
+        m_mapRespMsgs[ dwSerial ] = pMsg;
+
+    }while( 0 );
+
+    return ret;
 }

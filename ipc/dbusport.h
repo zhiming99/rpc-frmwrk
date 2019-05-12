@@ -129,6 +129,10 @@ class CRpcBasePort : public CPort
     virtual gint32 DispatchSignalMsg(
         DBusMessage* pMsg );
 
+    virtual gint32 OnRespMsgNoIrp(
+        DBusMessage* pDBusMsg )
+    { return -ENOTSUP; }
+
     virtual gint32 DispatchRespMsg(
         DBusMessage* pMsg );
 

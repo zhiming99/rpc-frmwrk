@@ -249,7 +249,9 @@ gint32 CConfigDb::Serialize( CBuffer& oBuf ) const
         }
 
         BufPtr pValBuf( true );
-        itr->second->Serialize( *pValBuf );
+        ret = itr->second->Serialize( *pValBuf );
+        if( ERROR( ret ) )
+            break;
 
         if( pEnd - pLoc >= ( gint32 )pValBuf->size() )
         {

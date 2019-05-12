@@ -566,7 +566,6 @@ class CRpcServices :
 
 
     std::deque< CfgPtr > m_queEvents;
-    virtual gint32 RebuildMatches();
 
     gint32 PackEvent( EnumEventId iEvent,
         guint32 dwParam1,
@@ -625,6 +624,8 @@ class CRpcServices :
         EnumClsid iIfId = clsid( Invalid ) );
 
     gint32 RestartListening( EnumIfState iState );
+
+    virtual gint32 RebuildMatches();
 
     public:
 
@@ -1626,7 +1627,7 @@ gint32 CInterfaceProxy::AsyncCall(
             CCfgOpener oOptions(
                 ( IConfigDb* )pOptions );
 
-            ret = oCfg.GetBoolProp(
+            ret = oOptions.GetBoolProp(
                 propSysMethod, bSysMethod );
 
             if( SUCCEEDED( ret ) && bSysMethod )

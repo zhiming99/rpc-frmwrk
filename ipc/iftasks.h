@@ -686,7 +686,7 @@ class CIfInterceptTask :
     gint32 GetInterceptTask( EventPtr& ptr ) const
     {
         CCfgOpener oCfg(
-            ( const IConfigDb* )m_pCtx );
+            ( const IConfigDb* )GetConfig() );
 
         ObjPtr pObj;
 
@@ -773,7 +773,9 @@ class CIfInterceptTaskProxy :
         : super( pCfg )
     {
         EventPtr pEvt;
-        GetInterceptTask( pEvt );
+        gint32 ret = GetInterceptTask( pEvt );
+        if( ERROR( ret ) )
+            return;
         SetInterceptTask( pEvt );
     };
 
@@ -783,17 +785,11 @@ class CIfInterceptTaskProxy :
         CCfgOpener oCfg( ( IConfigDb* )m_pCtx );
         if( pEvent != nullptr )
         {
-            oCfg.SetObjPtr( propEventSink,
-                ObjPtr( pEvent ) );
-
-            oCfg.SetBoolProp(
-                propNotifyClient, true );
+            SetClientNotify( pEvent );
         }
         else
         {
-            oCfg.RemoveProperty( propEventSink );
-            oCfg.RemoveProperty(
-                propNotifyClient );
+            ClearClientNotify();
         }
 
         return 0;

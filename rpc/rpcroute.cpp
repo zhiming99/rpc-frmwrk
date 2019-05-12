@@ -299,6 +299,8 @@ gint32 CRpcRouter::Start()
     try{
         do{
             ret = super::Start();
+            if( ERROR( ret ) )
+                break;
 
             InterfPtr pIf;
             if( HasReqForwarder() )
@@ -355,7 +357,8 @@ gint32 CRpcRouter::OnPreStop( IEventSink* pCallback )
     }
     mapId2Server.clear(); 
 
-    ret = m_pReqFwdr->Stop();
+    if( !m_pReqFwdr.IsEmpty() )
+        ret = m_pReqFwdr->Stop();
 
     for( auto elem : mapReqProxies )
     {
@@ -2388,17 +2391,8 @@ gint32 CRpcRouter::BuildDisEvtTaskGrp(
         if( ERROR( ret ) )
             break;
 
-        ret = ( *pAddMatchTask )( eventZero );
-        if( ERROR( ret ) )
-            break;
-
-        if( ret == EEXIST )
-        {
-            ret = 0;
-            break;
-        }
-
         pTaskGrp->SetRelation( logicNONE );
+        pTaskGrp->AppendTask( pAddMatchTask );
         pTaskGrp->AppendTask( pDisableTask );
         pTaskGrp->AppendTask( pStopProxyTask );
 
@@ -2683,4 +2677,62 @@ gint32 CIfRouterState::SubscribeEvents()
     };
     return SubscribeEventsInternal(
         vecEvtToSubscribe );
+}
+
+gint32 CRpcRouter::RebuildMatches()
+{
+    gint32 ret = super::RebuildMatches();
+    if( ERROR( ret ) )
+        return ret;
+
+    do{
+        CIoManager* pMgr = GetIoMgr();
+
+        guint32 dwRole = 0;
+        ret = pMgr->GetCmdLineOpt(
+            propRouterRole, dwRole );
+        if( ERROR( ret ) )
+            break;
+        
+        std::string strSurffix;
+        if( dwRole == 1 )
+            strSurffix = "_1";
+        else if( dwRole == 2 )
+            strSurffix = "_2";
+
+        std::string strObjPath;
+        CCfgOpenerObj oCfg( this );
+
+        ret = oCfg.GetStrProp(
+            propObjPath, strObjPath );
+        if( ERROR( ret ) )
+            break;
+
+        strObjPath += strSurffix;
+        string strDest;
+        for( auto pMatch : m_vecMatches )
+        {
+            CCfgOpenerObj oMatch(
+                ( CObjBase* )pMatch );
+
+            oMatch.SetStrProp(
+                propObjPath, strObjPath );
+
+            ret = oMatch.GetStrProp(
+                propSrcDBusName, strDest );
+            if( SUCCEEDED( ret ) )
+            {
+                strDest += strSurffix;
+                oMatch.SetStrProp(
+                    propSrcDBusName, strDest );
+            }
+            else
+            {
+                ret = 0;
+            }
+        }
+
+    }while( 0 );
+
+    return ret;
 }
