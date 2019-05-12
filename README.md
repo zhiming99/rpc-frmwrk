@@ -1,5 +1,8 @@
 # rpc-frmwrk
-An effort for embedded RPC framework, and hope it could find its usage in IOT or other embedded systems.   
+
+这是一个嵌入式的RPC框架项目，希望它可以在IOT系统中找到用武之地   
+An effort for embedded RPC framework, and hope it could find its usage in IOT or other embedded systems.  
+
 #### Dependency:  
 This framework depends on the following packags:  
 1. `dbus-1.0 (dbus-devel.i686)`  
