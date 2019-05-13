@@ -3913,7 +3913,6 @@ gint32 COutgoingPacket::StartSend(
     if( m_dwBytesToSend > MAX_BYTES_PER_TRANSFER )
         return -EINVAL;
 
-    DebugPrint( ret, "Start sending..." );
     do{
         if( m_dwOffset < sizeof( CPacketHeader ) )
         {

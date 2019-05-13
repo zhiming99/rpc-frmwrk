@@ -90,6 +90,14 @@ inline gint32 GetTypeId( guint32* pT )
 { return typeUInt32; }
 
 template<>
+inline gint32 GetTypeId( int* pT )
+{ return typeUInt32; }
+
+template<>
+inline gint32 GetTypeId( long* pT )
+{ return typeUInt32; }
+
+template<>
 inline gint32 GetTypeId( guint64* pT )
 { return typeUInt64; }
 

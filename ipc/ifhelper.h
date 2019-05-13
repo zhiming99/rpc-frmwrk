@@ -924,6 +924,7 @@ class CMethodServerEx< iNumInput, gint32 (ClassName::*)(IEventSink*, Args ...) >
             if( sizeof...( Args ) > iNumInput )
             {
                 // fill the output values to the vector
+                vecResp.resize( sizeof...( Args ) - iNumInput );
                 TupleToVec2( oTuple, vecResp,
                     typename GenSequence< sizeof...( Args ) >::type() );
 
