@@ -464,6 +464,12 @@ gint32 CRpcTcpBridgeProxy::ForwardRequest(
             if( ERROR( ret ) )
                 break;
 
+            ret = oCfg.GetMsgPtr(
+                0, pRespMsg );
+
+            if( ERROR( ret ) )
+                break;
+
             ret = iRet;
         }
 
@@ -502,13 +508,21 @@ gint32 CRpcTcpBridgeProxy::FillRespDataFwrdReq(
         if( ERROR( ret ) )
             break;
 
+        if( ERROR( iRet ) )
+        {
+            ret = iRet;
+            break;
+        }
+
         DMsgPtr pRespMsg;
         ret = pFwrdMsg.GetMsgArgAt( 1, pRespMsg );
         if( ERROR( ret ) )
             break;
 
         oParams.SetIntProp( propReturnValue, iRet );
-        oParams.Push( pRespMsg );
+        ret = oParams.Push( pRespMsg );
+        if( ERROR( ret ) )
+            break;
 
     }while( 0 );
 
@@ -589,7 +603,13 @@ gint32 CRpcTcpBridgeProxy::FillRespData(
                 if( clsid( CReqFwdrForwardRequestTask )
                     == iClsid )
                 {
-                    FillRespDataFwrdReq( pIrp, pResp );
+                    ret = FillRespDataFwrdReq(
+                        pIrp, pResp );
+                    if( ERROR( ret ) )
+                    {
+                        DebugPrint( ret,
+                            "FillRespDataFwrdReq failed" );
+                    }
                     break;
                 }
             }
@@ -2336,20 +2356,24 @@ gint32 CRpcInterfaceServer::DoInvoke(
                         ( guint64& )*vecArgs[ 2 ].second;
                 }
 
+                // NOTE: bring the retrieving of the
+                // req from the message ahead of the
+                // ForwardRequest to avoid race
+                // condition of pFwrdMsg between this
+                // thread and CRpcReqForwarderProxy's
+                // ForwardRequest. It could cause
+                // dbus_message_iter_init to fail.
+                ObjPtr pObj;
+                ret =  pFwdrMsg.GetObjArgAt( 0, pObj );
+                if( ERROR( ret ) )
+                    break;
+
                 DMsgPtr pRespMsg;
                 ret = ForwardRequest( strIpAddr,
                     pFwdrMsg, pRespMsg, pCallback );
 
                 if( ret == STATUS_PENDING )
                 {
-                    ObjPtr pObj;
-
-                    gint32 iRet =
-                        pFwdrMsg.GetObjArgAt( 0, pObj );
-
-                    if( ERROR( iRet ) )
-                        break;
-
                     CReqOpener oOrigReq(
                         ( IConfigDb* )pObj );
 
@@ -2357,7 +2381,8 @@ gint32 CRpcInterfaceServer::DoInvoke(
                     oNewReq.SetMethodName( SYS_METHOD_FORWARDREQ );
 
                     guint32 dwTimeout = 0;
-                    iRet = oOrigReq.GetTimeoutSec( dwTimeout );
+                    gint32 iRet =
+                        oOrigReq.GetTimeoutSec( dwTimeout );
                     if( SUCCEEDED( iRet ) )
                     {
                         if( dwTimeout < 7200 )
@@ -2371,12 +2396,18 @@ gint32 CRpcInterfaceServer::DoInvoke(
                             oNewReq.SetKeepAliveSec( dwTimeout );
                     }
 
-                    guint32 dwCallFalgs = 0;
-                    iRet = oOrigReq.GetCallFlags( dwCallFalgs );
+                    guint32 dwCallFlags = 0;
+                    iRet = oOrigReq.GetCallFlags( dwCallFlags );
                     if( SUCCEEDED( iRet ) )
                     {
-                        oNewReq.SetCallFlags( dwCallFalgs );
-                        if( dwCallFalgs & CF_WITH_REPLY )
+                        oNewReq.SetCallFlags( dwCallFlags );
+                        // no keep alive. the
+                        // keep-alive should be
+                        // initiated from the server
+                        // side, but not from within
+                        // the router
+                        dwCallFlags &= ( ~CF_KEEP_ALIVE );
+                        if( dwCallFlags & CF_WITH_REPLY )
                             bResp = true;
                     }
 

@@ -416,22 +416,6 @@ class CIoMgrIrpCompleteTask
     gint32 operator()( guint32 dwContext );
 };
 
-class CProxyPdoConnectTask
-    : public CTaskletRetriable
-{
-    public:
-    typedef CTaskletRetriable super;
-    CProxyPdoConnectTask( const IConfigDb* pCfg = nullptr )
-        : CTaskletRetriable( pCfg )
-    {
-        SetClassId( clsid( CProxyPdoConnectTask ) );
-    }
-    gint32 Process( guint32 dwContext );
-    gint32 ExtendIrpTimer( IRP* pIrp );
-    gint32 CompleteMasterIrp(
-        IRP* pIrp, gint32 ret2, bool bRetry );
-};
-
 class CProxyPdoDisconnectTask
     : public CTasklet
 {
@@ -761,5 +745,22 @@ class CSyncCallback :
     gint32 WaitForComplete();
     gint32 Process( guint32 dwContext )
     { return -ENOTSUP; }
+};
+
+class CProxyPdoConnectTask
+    : public CThreadSafeTask
+{
+    public:
+    typedef CThreadSafeTask super;
+    CProxyPdoConnectTask( const IConfigDb* pCfg = nullptr )
+        : CThreadSafeTask( pCfg )
+    {
+        SetClassId( clsid( CProxyPdoConnectTask ) );
+    }
+    gint32 Process( guint32 dwContext );
+    gint32 ExtendIrpTimer( IRP* pIrp );
+    gint32 CompleteMasterIrp(
+        IRP* pIrp, gint32 ret2, bool bRetry );
+    gint32 CompleteReconnect( gint32 iRet );
 };
 

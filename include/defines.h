@@ -37,10 +37,10 @@
 #include <dbus/dbus.h>
 
 #define PAGE_SIZE               ( getpagesize() )
-#define HANDLE                  guint32
+#define HANDLE                  uintptr_t
 #define PortToHandle( ptr )     reinterpret_cast<HANDLE>( ( IPort* )ptr )
 #define HandleToPort( handle )  reinterpret_cast< IPort* >( handle )
-#define INVALID_HANDLE          0
+#define INVALID_HANDLE          ( ( HANDLE )-1 )
 
 #define IPV6_ADDR_BYTES         16 
 #define IPV4_ADDR_BYTES         4

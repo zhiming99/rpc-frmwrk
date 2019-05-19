@@ -90,10 +90,10 @@ public:
     // async watcher
     virtual gint32 AddAsyncWatch(
         TaskletPtr& pCallback,
-        guint32& hWatch ) = 0;
+        HANDLE& hWatch ) = 0;
 
     virtual gint32 RemoveAsyncWatch(
-        guint32 hWatch ) = 0;
+        HANDLE hWatch ) = 0;
 };
 
 typedef CAutoPtr< clsid( Invalid ), IMainLoop > MloopPtr;

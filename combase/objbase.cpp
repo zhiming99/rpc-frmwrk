@@ -26,6 +26,7 @@
 #include "buffer.h"
 #include "objfctry.h"
 #include <unordered_map>
+#include <byteswap.h>
 
 #define MAX_DUMP_SIZE 512
 
@@ -80,11 +81,21 @@ inline gint64 GetRandom()
         bInit = true;
         srand( ts.tv_nsec );
     }
-    gint64 iPid = GetTid();
-    // a fake random number, enough for object id.
-    return ( iPid << 32 )  +
+
+    guint32 iPid = GetTid();
+    guint32 dwRand = rand();
+
+    // swap the bytes to increase the differences
+    // between the two adjacent Get less than one
+    // second.
+    guint64 dwLowVal = bswap_32(
         ( ts.tv_nsec << 2 ) +
-        ( rand() & 0x3 ) ;
+        ( dwRand & 0x3 ) ) ;
+
+    guint64 qwHighVal =
+        ( ( dwRand & 0xFFFF0000 ) | iPid );
+
+    return ( qwHighVal << 32 )  + dwLowVal;
 }
 
 int Sem_Init( sem_t* psem, int pshared, unsigned int value )

@@ -291,7 +291,7 @@ class CEvLoop :
     // timer
     virtual gint32 AddTimerWatch(
         TaskletPtr& pCallback,
-        guint32& hTimer );
+        HANDLE& hTimer );
 
     virtual gint32 RemoveTimerWatch(
         HANDLE hTimer );
@@ -301,20 +301,20 @@ class CEvLoop :
     // io watcher
     virtual gint32 AddIoWatch(
         TaskletPtr& pCallback,
-        guint32& hWatch );
+        HANDLE& hWatch );
 
     virtual gint32 RemoveIoWatch(
-        guint32 hWatch );
+        HANDLE hWatch );
 
     virtual gint32 IsWatchDone(
         HANDLE hWatch, EnumSrcType iType );
 
     virtual gint32 AddAsyncWatch(
         TaskletPtr& pCallback,
-        guint32& hWatch );
+        HANDLE& hWatch );
 
     virtual gint32 RemoveAsyncWatch(
-        guint32 hWatch );
+        HANDLE hWatch );
 
     virtual gint32 AddIdleWatch(
        TaskletPtr& pCallback,

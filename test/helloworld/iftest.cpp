@@ -176,6 +176,8 @@ void CIfSmokeTest::testCliStartStop()
         if( !pCli->IsConnected() )
             break;
 
+        DebugPrint( 0, "loop %d:", i );
+
         std::string strText( "Hello world!" );
         std::string strReply;
         const char* szReply = nullptr;
@@ -194,7 +196,8 @@ void CIfSmokeTest::testCliStartStop()
 
         // pointer echo
         ret = pCli->EchoPtr( strText.c_str(), pszReply );
-        CPPUNIT_ASSERT( SUCCEEDED( ret ) );
+        if( ERROR( ret ) )
+            break;
         DebugPrint( 0, "EchoPtr Completed" );
         if( strText != strReply )
             CPPUNIT_ASSERT( false );
@@ -206,24 +209,35 @@ void CIfSmokeTest::testCliStartStop()
         gint32 iCount = 0;
         CfgPtr pCfgReply;
         ret = pCli->EchoCfg( 2, oParams.GetCfg(), iCount, pCfgReply );
-        CPPUNIT_ASSERT( SUCCEEDED( ret ) );
+        if( ERROR( ret ) )
+            break;
         DebugPrint( 0, "EchoCfg Completed" );
         if( iCount != 2 )
-           CPPUNIT_ASSERT( false );
+        {
+            ret = ERROR_FAIL;
+            DebugPrint( ret, "EchoCfg data dose not match" );
+            break;
+        }
 
         BufPtr pText( true ), pBufReply;
 
         // echo a blob
         *pText = "Hello, World!";
         ret = pCli->EchoUnknown( pText, pBufReply );
-        CPPUNIT_ASSERT( SUCCEEDED( ret ) );
+        if( ERROR( ret ) )
+            break;
         DebugPrint( 0, "EchoUnknown Completed" );
         ret = pCli->Ping();
-        CPPUNIT_ASSERT( SUCCEEDED( ret ) );
+        if( ERROR( ret ) )
+            break;
         DebugPrint( 0, "Ping Completed" );
 
     }while( ++i < 1000 );
 
+    if( ERROR( ret ) )
+    {
+        DebugPrint( ret, "Error, quit loop" );
+    }
     // stop the proxy
     ret = pIf->Stop();
     if( ret == STATUS_PENDING )

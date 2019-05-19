@@ -33,7 +33,7 @@
 CDBusLoopHookCb::CDBusLoopHookCb(
     const IConfigDb* pCfg )
     : super( pCfg ),
-    m_hWatch( 0 )
+    m_hWatch( INVALID_HANDLE )
 {
     gint32 ret = 0;
     do{
@@ -232,19 +232,19 @@ gint32 CDBusTimerCallback::DoToggleWatch(
         if( bEnabled )
         {
             ret = pLoop->StopSource(
-                m_hWatch, srcAsync );
+                m_hWatch, srcTimer );
             if( ERROR( ret ) )
                 break;
 
             ret = pLoop->StartSource(
-                m_hWatch, srcAsync );
+                m_hWatch, srcTimer );
             if( ERROR( ret ) )
                 break;
         }
         else
         {
             pLoop->StopSource(
-                m_hWatch, srcAsync );
+                m_hWatch, srcTimer );
             if( SUCCEEDED( ret ) )
             {
                 TaskletPtr pTask( this );
@@ -304,10 +304,13 @@ void CDBusTimerCallback::ToggleWatch(
 gint32 CDBusTimerCallback::operator()(
     guint32 dwContext )
 {
+    gint32 ret = G_SOURCE_REMOVE;
     if( m_pDT != nullptr )
+    {
         dbus_timeout_handle( m_pDT );
-
-    return SetError( G_SOURCE_CONTINUE );
+        ret = G_SOURCE_CONTINUE;
+    }
+    return SetError( ret );
 }
 
 gint32 CDBusIoCallback::DoAddWatch(

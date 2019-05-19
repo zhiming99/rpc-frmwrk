@@ -347,12 +347,12 @@ gint32 CSimpleEvPoll::UpdateIoMaps(
             {
                 gint32 iIoKey = IO_KEY(
                     pSrc->m_iFd, pSrc->m_dwOpt );
-                if( mapActFds.find( iIoKey ) ==
+
+                if( mapActFds.find( iIoKey ) !=
                     mapActFds.end() )
-                {
-                    mapActFds[ iIoKey ] =
-                        ( HANDLE )pSrc;
-                }
+                    continue;
+
+                mapActFds[ iIoKey ] = elem.first;
             }
         }
         m_bIoAdd = false;
@@ -418,7 +418,7 @@ gint32 CSimpleEvPoll::UpdateTimeMaps(
                 {
                     mapActTimers.insert( 
                     std::pair< guint64, HANDLE >
-                    ( qwAbsTime, ( HANDLE )pSrc ) );
+                    ( qwAbsTime, elem.first ) );
                 }
             }
         }
@@ -476,8 +476,6 @@ gint32 CSimpleEvPoll::CalcWaitTime(
     if( qwLeastTo > qwNow )
     {
         dwIntervalMs = ( qwLeastTo - qwNow + 999 ) / 1000;
-        // printf( "last time %lld, now time %lld, next time %lld \n",
-        //     qwLeastTo, qwNow, qwNow + dwIntervalMs * 1000 );
         return 0;
     }
     return -ETIMEDOUT;

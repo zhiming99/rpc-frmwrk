@@ -45,6 +45,7 @@ class CDBusProxyPdo : public CRpcPdoPort
     MatchPtr            m_pMatchDBus;
 
     bool                m_bStopReady = false;
+    TaskletPtr          m_pConnTask;
 
     gint32 CheckConnCmdResp(
         DBusMessage* pMsg, gint32& iMethodReturn );
@@ -69,6 +70,7 @@ class CDBusProxyPdo : public CRpcPdoPort
     gint32 CompleteRmtRegMatch( IRP* pIrp );
 
     virtual gint32 HandleListening( IRP* pIrp );
+    gint32 Reconnect();
 
     public:
 
@@ -112,6 +114,12 @@ class CDBusProxyPdo : public CRpcPdoPort
         DBusMessage* pDBusMsg );
 
     gint32 NotifyRouterOffline();
+
+    inline void ClearConnTask()
+    {
+        CStdRMutex oPortLock( GetLock() );
+        m_pConnTask.Clear();
+    }
 };
 
 typedef CAutoPtr< clsid( CDBusProxyPdo ), CDBusProxyPdo > ProxyPdoPtr;

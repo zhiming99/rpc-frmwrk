@@ -439,9 +439,9 @@ guint32 CEvLoop::RemoveSource(
         return -EFAULT;
 
     // there is a chance the RemoveSource can be
-    // reentered in the delete, and therefore, it
-    // is necessary to remove the source from the
-    // map before the source get deleted
+    // reentered in pSource's dtor, and it is safe to
+    // remove the source from the map before it get
+    // detroyed
     if( pMap->find( hKey ) == pMap->end() )
         return -ENOENT;
 
@@ -496,7 +496,7 @@ guint32 CEvLoop::RemoveSource(
 // timer
 gint32 CEvLoop::AddTimerWatch(
     TaskletPtr& pCallback,
-    guint32& hTimer )
+    HANDLE& hTimer )
 {
     gint32 ret = 0;
     do{
@@ -519,7 +519,7 @@ gint32 CEvLoop::AddTimerWatch(
         bool bRepeat = ( bool& )oParams[ 1 ];
         bool bStart = true;
         if( oParams.exist( 2 ) )
-            bStart = oParams[ 2 ];
+            bStart = ( bool& )oParams[ 2 ];
 
         TIMER_SOURCE* pTimer = new TIMER_SOURCE(
             this, dwIntervalMs,
@@ -562,7 +562,7 @@ guint64 CEvLoop::NowUs()
 // io watcher
 gint32 CEvLoop::AddIoWatch(
     TaskletPtr& pCallback,
-    guint32& hWatch )
+    HANDLE& hWatch )
 {
     gint32 ret = 0;
     do{
@@ -613,7 +613,7 @@ gint32 CEvLoop::AddIoWatch(
 }
 
 gint32 CEvLoop::RemoveIoWatch(
-    guint32 hWatch )
+    HANDLE hWatch )
 {
     return RemoveSource( hWatch, srcIo );
 }

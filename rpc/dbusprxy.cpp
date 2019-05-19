@@ -27,8 +27,8 @@
 #include "emaphelp.h"
 #include "ifhelper.h"
 
-#define PROXYPDO_CONN_RETRIES       12
-#define PROXYPDO_CONN_INTERVAL      30
+#define PROXYPDO_CONN_RETRIES       ( ( guint32 )12 )
+#define PROXYPDO_CONN_INTERVAL      ( ( guint32 )30 )
 
 using namespace std;
 
@@ -203,6 +203,10 @@ gint32 CDBusProxyPdo::CompleteConnReq(
                 // let the upper software to retry
                 // NOTE: it is an interface definition
                 ret = -EAGAIN;
+            }
+            else
+            {
+                ret = iMethodReturn;
             }
 
         }while( 0 );
@@ -774,15 +778,15 @@ gint32 CDBusProxyPdo::SubmitIoctlCmd( IRP* pIrp )
                 if( !IsConnected() )
                 {
                     ret = -ENOTCONN;
+                    Reconnect();
                     break;
                 }
-                // what we can do is to listen to
-                // the CRpcReqForwarder's events
-                // from the rpc router with the ip
-                // address as is assigned to this
-                // proxy pdo. So we don't need
-                // external match object as event
-                // filter
+                // what we can do is to listen to the
+                // CRpcReqForwarder's events from the
+                // rpc router with the ip address as is
+                // assigned to this proxy pdo. So we
+                // don't need external match object as
+                // event filter
                 if( !pCtx->m_pReqData.IsEmpty() )
                 {
                     ret = -EINVAL;
@@ -868,6 +872,70 @@ gint32 CDBusProxyPdo::SubmitIoctlCmd( IRP* pIrp )
     return ret;
 }
 
+gint32 CProxyPdoConnectTask::CompleteReconnect(
+    gint32 iRet )
+{
+    if( ERROR( iRet ) )
+        return iRet;
+
+    gint32 ret = 0;
+    do{
+
+        CParamList oParams(
+            ( IConfigDb*)GetConfig() );
+
+        // build a svr online message
+        DMsgPtr pMsg;
+        ret = pMsg.NewObj(
+            ( EnumClsid )DBUS_MESSAGE_TYPE_SIGNAL );
+
+        if( ERROR( ret ) )
+            break;
+
+        CDBusProxyPdo* pPdo = nullptr;
+        ret = oParams.GetPointer(
+            propPortPtr, pPdo );
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpenerObj oPortCfg( pPdo );
+        std::string strDest;
+        ret = oPortCfg.GetStrProp(
+            propSrcUniqName, strDest );
+
+        std::string strIpAddr;
+        ret = oPortCfg.GetStrProp(
+            propIpAddr, strIpAddr );
+
+        pMsg.SetInterface( DBUS_IF_NAME(
+            IFNAME_REQFORWARDER ) );
+
+        pMsg.SetMember(
+            SYS_EVENT_RMTSVREVENT );
+
+        pMsg.SetDestination( strDest );
+        pMsg.SetSerial( 131 );
+        pMsg.SetSender( strDest );
+
+        guint32 dwOnline = true;
+        const char* pszIp = strIpAddr.c_str();
+
+        if( !dbus_message_append_args( pMsg,
+            DBUS_TYPE_STRING, &pszIp,
+            DBUS_TYPE_BOOLEAN, &dwOnline,
+            DBUS_TYPE_INVALID ) )
+        {
+            ret = -ENOMEM;
+            break;
+        }
+
+        ret = pPdo->OnRmtSvrOnOffline( pMsg );
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CProxyPdoConnectTask::CompleteMasterIrp(
     IRP* pMasterIrp, gint32 iRetConn, bool bRetry )
 {
@@ -942,7 +1010,10 @@ gint32 CProxyPdoConnectTask::CompleteMasterIrp(
             // not be accessable here
             //
             if( pProxyPort != nullptr )
-                ret = pProxyPort->super::OnPortReady( pMasterIrp );
+            {
+                ret = pProxyPort->
+                    super::OnPortReady( pMasterIrp );
+            }
         }
 
     }while( 0 );
@@ -1047,7 +1118,11 @@ gint32 CProxyPdoConnectTask::Process(
     CDBusProxyPdo* pProxyPort   = nullptr; 
 
     ObjPtr pObj;
-    CCfgOpener oParams( ( IConfigDb* )m_pCtx );
+
+    CStdRTMutex oTaskLock( GetLock() );
+
+    CParamList oParams(
+        ( IConfigDb* )GetConfig() );
 
     ret = oParams.GetPointer( propIoMgr, pMgr );
     if( ERROR( ret ) )
@@ -1071,13 +1146,6 @@ gint32 CProxyPdoConnectTask::Process(
             return SetError( ret );
         }
     }
-    else
-    {
-        // no master irp, the major task to
-        // complete this irp is void
-        return SetError( -EINVAL );
-    }
-
 
     do{
         if( dwContext == eventIrpComp )
@@ -1085,22 +1153,22 @@ gint32 CProxyPdoConnectTask::Process(
             // we are called from irp completion.
             // Extract the irp and let's inspect
             // the return value of the irp
-            IrpPtr pIrpPtr;
-            ret = GetIrpFromParams( pIrpPtr );
+            IRP* pIrp = nullptr;
+            ret = oParams.GetPointer( 0, pIrp );
             if( ERROR( ret ) )
                 break;
 
-            IRP* pIrp = pIrpPtr;
             ret = pIrp->GetStatus();
 
-            // The earlier irp succeeded. The port
+            // The request irp succeeded. The port
             // should be in good shape.
             if( SUCCEEDED( ret ) )
                 break;
 
             // the port indicates to try again.
             if( ret == -EAGAIN ||
-                ret == -ENOTCONN )
+                ret == -ENOTCONN ||
+                ret == -ETIMEDOUT )
             {
                 if( CanRetry() )
                 {
@@ -1115,33 +1183,36 @@ gint32 CProxyPdoConnectTask::Process(
                         "Retried many times, Give up now",
                         PROXYPDO_CONN_INTERVAL );
                 }
-                break;
             }
 
+            break;
+        }
+        else if( dwContext == eventCancelTask )
+        {
+            IRP* pIrp = nullptr;
+            ret = oParams.GetPointer( 0, pIrp );
             if( ERROR( ret ) )
                 break;
+
+            ret = pMgr->CancelIrp(
+                pIrp, true, -ECANCELED );
+
+            break;
         }
 
         ret = oParams.GetPointer(
             propPortPtr, pProxyPort );
 
-        if( ERROR( ret ) )
-            break;
-
-        if( pProxyPort != nullptr )
+        if( SUCCEEDED( ret ) )
         {
             CStdRMutex oPortLock(
                 pProxyPort->GetLock() );
 
             if( pProxyPort->IsConnected() )
-            {
-                // connected, return
                 break;
-            }
         }
         else
         {
-            ret = -EINVAL;
             break;
         }
 
@@ -1175,27 +1246,26 @@ gint32 CProxyPdoConnectTask::Process(
         pIrp->SetTimer( PORT_START_TIMEOUT_SEC, pMgr );
         pIrp->SetCallback( this, eventTimeout );
 
-        // NOTE: we don't use association here
-        // because it could cause to lock both the
-        // master irp and the slave irp in the
-        // completion, which is not necessarily
-        // problemic, but it is possible. Current
-        // implementation avoids this
+        // NOTE: we don't use association here because
+        // it could cause to lock both the master irp
+        // and the slave irp in the completion, which
+        // is not necessarily problemic, but it is
+        // possible. Current implementation avoids this
         //
-        // using SubmitIrpInternal to shortcut the
-        // upper ports above this port if any
-        // which remain in PORT_STATE_STARTING
-        // waiting for masterirp to complete and
-        // cannot let this request pass
+        // using SubmitIrpInternal to bypass the upper
+        // ports over this port if any which remain in
+        // PORT_STATE_STARTING waiting for masterirp to
+        // complete and cannot let this request pass
 
+        // keep a copy for canceling purpose
+        oParams.Push( ObjPtr( pIrp ) );
         ret = pMgr->SubmitIrpInternal(
             pProxyPort, pIrp, false );
 
         if( ret == STATUS_PENDING )
         {
             // we will rely on the irp callback to
-            // retry if error occurs in the
-            // completion
+            // retry if error occurs in the completion
             break;
         }
             
@@ -1209,8 +1279,27 @@ gint32 CProxyPdoConnectTask::Process(
         ret == STATUS_MORE_PROCESS_NEEDED )
         return ret;
 
-    ret = CompleteMasterIrp(
-        pMasterIrp, ret, iRetries > 0 );
+    if( pMasterIrp != nullptr )
+    {
+        ret = CompleteMasterIrp(
+            pMasterIrp, ret, iRetries > 0 );
+    }
+    else
+    {
+        ret = CompleteReconnect( ret );
+    }
+
+    ret = oParams.GetPointer(
+        propPortPtr, pProxyPort );
+
+    if( SUCCEEDED( ret ) )
+    {
+        pProxyPort->ClearConnTask();
+    }
+
+    RemoveProperty( propIrpPtr );
+    RemoveProperty( propPortPtr );
+    RemoveProperty( 0 );
 
     return SetError( ret );
 }
@@ -1327,6 +1416,7 @@ gint32 CDBusProxyPdo::OnPortReady( IRP* pIrp )
             break;
         }
 
+        CIoManager* pMgr = GetIoMgr();
         CParamList oParams;
 
         // retry parameters
@@ -1337,20 +1427,22 @@ gint32 CDBusProxyPdo::OnPortReady( IRP* pIrp )
             propIntervalSec, PROXYPDO_CONN_INTERVAL );
         
         // context parameters
-        oParams.SetObjPtr(
-            propIrpPtr, ObjPtr( pIrp ) );
+        oParams.SetPointer( propIrpPtr, pIrp );
+        oParams.SetPointer( propPortPtr, this );
+        oParams.SetPointer( propIoMgr, pMgr );
 
-        oParams.SetObjPtr(
-            propPortPtr, ObjPtr( this ) );
+        ret = m_pConnTask.NewObj(
+            clsid( CProxyPdoConnectTask ),
+            oParams.GetCfg() );
 
-        oParams.SetPointer( propIoMgr, GetIoMgr() );
+        if( ERROR( ret ) ) 
+            break;
 
         // to avoid the complexity, we schedule a
         // task for reconnection, instead of
         // immediately exec the task
-        ret = GetIoMgr()->ScheduleTask(
-            clsid( CProxyPdoConnectTask ),
-            oParams.GetCfg() );
+        ret = GetIoMgr()->RescheduleTask(
+            m_pConnTask );
 
         if( SUCCEEDED( ret ) )
             ret = STATUS_PENDING;
@@ -1362,11 +1454,8 @@ gint32 CDBusProxyPdo::OnPortReady( IRP* pIrp )
 
 void CDBusProxyPdo::OnPortStopped()
 {
-    RemoveMatch(
-        m_mapEvtTable, m_pMatchFwder );
-
+    RemoveMatch( m_mapEvtTable, m_pMatchFwder );
     m_pMatchFwder.Clear();
-
     super::OnPortStopped();
 }
 
@@ -1612,8 +1701,63 @@ gint32 CDBusProxyPdo::OnRmtSvrOnOffline(
             ( guint32 )strIpAddr.c_str(),
             ( guint32* )PortToHandle( this ) );
 
+
     }while( 0 );
 
+    return ret;
+}
+
+gint32 CDBusProxyPdo::Reconnect()
+{
+    gint32 ret = 0;
+
+    do{
+        // reconnect
+        CStdRMutex oPortLock( GetLock() );
+        if( !m_pConnTask.IsEmpty() )
+        {
+            // a connect task is already
+            // running
+            break;
+        }
+        if( m_bStopReady )
+            break;
+
+        guint32 dwPortState = GetPortState();
+        if( dwPortState != PORT_STATE_READY &&
+            dwPortState != PORT_STATE_BUSY_SHARED )
+            break;
+
+        CParamList oParams;
+        CIoManager* pMgr = GetIoMgr();
+
+        oParams[ propRetries ] =
+            PROXYPDO_CONN_RETRIES;
+
+        oParams[ propIntervalSec ] =
+            PROXYPDO_CONN_INTERVAL;
+        
+        oParams[ propPortPtr ] =
+            ObjPtr( this );
+
+        oParams[ propIoMgr ] =
+            ObjPtr( pMgr );
+
+        ret = m_pConnTask.NewObj(
+            clsid( CProxyPdoConnectTask ),
+            oParams.GetCfg() );
+
+        if( ERROR( ret ) ) 
+            break;
+
+        // to avoid the complexity, we
+        // schedule a task for
+        // reconnection, instead of
+        // immediately exec the task
+        pMgr->RescheduleTask( m_pConnTask );
+
+    }while( 0 );
+    
     return ret;
 }
 
@@ -1908,25 +2052,31 @@ gint32 CDBusProxyPdo::OnQueryStop( IRP* pIrp )
 
     gint32 ret = 0;
 
-    if( true )
-    {
-        // query stop has be done once
-        CStdRMutex oPortLock( GetLock() );
-        if( m_bStopReady )
-            return 0;
-        m_bStopReady = true;
-    }
-
     do{
-
-        // we need to disconnect with the remote
-        // req forwader if we have an active
-        // connection
-
         CStdRMutex oPortLock( GetLock() );
+
+        if( m_bStopReady )
+            break;
+        m_bStopReady = true;
+
+        if( !m_pConnTask.IsEmpty() )
+        {
+            TaskletPtr pConnTask = m_pConnTask;
+            ClearConnTask();
+            oPortLock.Unlock();
+
+            // cancel the ongoing connect task
+            ( *pConnTask )( eventCancelTask );
+
+            oPortLock.Lock();
+        }
+
         if( !IsConnected() )
             break;
 
+        // we need to disconnect with the local
+        // forwader and remote bridge if we have an
+        // active connection
         CCfgOpener oCfg;
         ret = oCfg.SetPointer( propIoMgr, GetIoMgr() );
         if( ERROR( ret ) )

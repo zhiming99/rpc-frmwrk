@@ -2021,6 +2021,15 @@ gint32 CReqFwdrForwardRequestTask::OnTaskComplete(
             if( ERROR( ret ) )
                 break;
 
+            CCfgOpener oResp(
+                ( IConfigDb* )pObj );
+
+            oResp[ propReturnValue ] = iRetVal;
+            if( !oResp.exist( 0 ) )
+            {
+                DebugPrint( iRetVal,
+                    "No response message" );
+            }
             // the response will finally be sent
             // in this method
             ret = pIfSvr->OnServiceComplete(
@@ -2926,6 +2935,12 @@ gint32 CRpcReqForwarderProxy::ForwardRequest(
             ret = oCfg.GetIntProp(
                 propReturnValue,
                 ( guint32& )iRet );
+
+            if( ERROR( ret ) )
+                break;
+
+            ret = oCfg.GetMsgPtr(
+                0, pRespMsg );
 
             if( ERROR( ret ) )
                 break;

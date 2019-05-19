@@ -3354,11 +3354,13 @@ gint32 CRpcServices::SendMethodCall(
             break;
 
         oCfg.RemoveProperty( propIrpPtr );
-        pIrp->RemoveCallback();
         pIrp->RemoveTimer();
 
         if( ret == -EAGAIN )
+        {
+            pIrp->RemoveCallback();
             break;
+        }
 
         if( oReq.HasReply() ) 
         {
@@ -3367,6 +3369,10 @@ gint32 CRpcServices::SendMethodCall(
             if( ERROR( iRet ) && SUCCEEDED( ret ) )
                 ret = iRet;
         }
+        // on success, the callback carries the
+        // response, so it should be the last one to be
+        // removed
+        pIrp->RemoveCallback();
 
     }while( 0 );
 

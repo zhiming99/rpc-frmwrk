@@ -1102,7 +1102,7 @@ gint32 CRpcBasePort::RemoveMatch(
     gint32 ret = 0;
     do{
         CStdRMutex oPortLock( GetLock() );
-        m_mapEvtTable.erase( pMatch );
+        mapMatch.erase( pMatch );
 
     }while( 0 );
  
