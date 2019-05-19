@@ -100,7 +100,7 @@ void CIfSmokeTest::testSvrStartStop()
 
     CfgPtr pCfg = oCfg.GetCfg();
     ret = CRpcServices::LoadObjDesc(
-        "./echodesc.json",
+        "./hwdesc.json",
         OBJNAME_ECHOSVR,
         true, pCfg );
 
@@ -132,18 +132,18 @@ void CIfSmokeTest::testCliStartStop()
 {
 
     gint32 ret = 0;
-    CCfgOpener oCfg;
-    InterfPtr pIf;
-
     CPPUNIT_ASSERT( !m_pMgr.IsEmpty() );
 
+    // load the configuration
+    CCfgOpener oCfg;
     CfgPtr pCfg = oCfg.GetCfg();
     ret = CRpcServices::LoadObjDesc(
-        "./echodesc.json",
+        "./hwdesc.json",
         OBJNAME_ECHOSVR,
         false, pCfg );
 
     // create the proxy object
+    InterfPtr pIf;
     oCfg.SetObjPtr( propIoMgr, m_pMgr );
     ret = pIf.NewObj(
         clsid( CEchoClient ),
@@ -151,32 +151,22 @@ void CIfSmokeTest::testCliStartStop()
     
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 
-    // start the proxy
-    ret = pIf->Start();
-    
-    CEchoClient* pCli = pIf;
-    if( ERROR( ret ) )
-        pCli = nullptr;
-
-    gint32 i = 0;
-
-    if( pCli != nullptr )
     do{
-        // make sure the server is online
-        while( 1 )
+        // start the proxy
+        ret = pIf->Start();
+        if( ERROR( ret ) )
+            break;
+        
+        CEchoClient* pCli = pIf;
+        if( unlikely( pCli == nullptr ) )
         {
-            if( pCli->GetState() == stateRecovery )
-            {
-                sleep( 1 );
-                continue;
-            }
+            ret = -EFAULT;
             break;
         }
 
+        // test if the server is online
         if( !pCli->IsConnected() )
             break;
-
-        DebugPrint( 0, "loop %d:", i );
 
         std::string strText( "Hello world!" );
         std::string strReply;
@@ -186,7 +176,6 @@ void CIfSmokeTest::testCliStartStop()
         const char*& pszReply = szReply ; 
         DebugPrint( 0, "Start..." );
         ret = pCli->Echo( strText, strReply );
-        // CPPUNIT_ASSERT( SUCCEEDED( ret ) );
         if( ERROR( ret ) )
             break;
 
@@ -198,6 +187,7 @@ void CIfSmokeTest::testCliStartStop()
         ret = pCli->EchoPtr( strText.c_str(), pszReply );
         if( ERROR( ret ) )
             break;
+
         DebugPrint( 0, "EchoPtr Completed" );
         if( strText != strReply )
             CPPUNIT_ASSERT( false );
@@ -207,11 +197,17 @@ void CIfSmokeTest::testCliStartStop()
         oParams.Push( std::string( "Hello, world" ) );
         oParams[ propClsid ] = Clsid_CEchoServer;
         gint32 iCount = 0;
+
+        // the pointer to hold the object echoed
+        // back
         CfgPtr pCfgReply;
-        ret = pCli->EchoCfg( 2, oParams.GetCfg(), iCount, pCfgReply );
+        ret = pCli->EchoCfg( 2,
+            oParams.GetCfg(), iCount, pCfgReply );
         if( ERROR( ret ) )
             break;
+
         DebugPrint( 0, "EchoCfg Completed" );
+        // check the result
         if( iCount != 2 )
         {
             ret = ERROR_FAIL;
@@ -226,18 +222,30 @@ void CIfSmokeTest::testCliStartStop()
         ret = pCli->EchoUnknown( pText, pBufReply );
         if( ERROR( ret ) )
             break;
-        DebugPrint( 0, "EchoUnknown Completed" );
+
+        strReply = ( std::string )*pBufReply;
+        if( strReply != ( const char* )*pText )
+        {
+            DebugPrint( 0, "EchoUnknown response"\
+                "different from the original text" );
+        }
+        else
+        {
+            DebugPrint( 0, "EchoUnknown Completed" );
+        }
+
         ret = pCli->Ping();
         if( ERROR( ret ) )
             break;
         DebugPrint( 0, "Ping Completed" );
 
-    }while( ++i < 1000 );
+    }while( 0 );
 
     if( ERROR( ret ) )
     {
         DebugPrint( ret, "Error, quit loop" );
     }
+
     // stop the proxy
     ret = pIf->Stop();
     if( ret == STATUS_PENDING )
@@ -251,64 +259,9 @@ void CIfSmokeTest::testCliStartStop()
         ret = 0;
     }
 
-    CPPUNIT_ASSERT( SUCCEEDED( ret ) );
-
     // release all the resources of the proxy
     pIf.Clear();
 }
-
-#ifdef CLIENT
-void CIfSmokeTest::testDBusLeak()
-{
-    FILE* fp = fopen( "dmsgdmp", "rb" );
-    if( fp == nullptr )
-        return;
-
-    gint32 ret = 0;
-    do{
-        fseek( fp, 0, SEEK_END );
-        guint32 iSize = ( guint32 )ftell( fp );
-        rewind( fp );
-
-        BufPtr pBuf( true );
-        pBuf->Resize( iSize + sizeof( guint32 ) );
-
-        *( ( gint32* )pBuf->ptr() ) = iSize;
-        ret = fread( pBuf->ptr() + sizeof( guint32 ), 1, iSize, fp );
-        if( ret == 0 )
-        {
-            ret = ERROR_FAIL;
-            break;
-        }
-
-        for( int i = 0; i < 1000000; i++ )
-        {
-            DMsgPtr pMsg;
-            ret = pMsg.Deserialize( pBuf );
-            if( ERROR( ret ) )
-                break;
-
-            printf( "%s\n", pMsg.DumpMsg().c_str() );
-            pMsg.Clear();
-        }
-
-    }while( 0 );
-
-    if( fp != nullptr )
-        fclose( fp );
-
-    return;
-}
-void CIfSmokeTest::testObjAlloc()
-{
-    for( int i = 0; i < 10000000; i++ )
-    {
-        BufPtr pBuf( true );
-        pBuf->Resize( 128 );
-        pBuf.Clear();
-    }
-}
-#endif
 
 bool test()
 {

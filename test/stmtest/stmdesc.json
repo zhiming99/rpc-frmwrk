@@ -42,5 +42,9 @@
                 }
             ]
         }
+    ],
+    "ClassFactories":
+    [
+        "./libstmsvr.so"
     ]
 }

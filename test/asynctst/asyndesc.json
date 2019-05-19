@@ -1,21 +1,21 @@
 {
     "Version" : "1.0",
-    "ServerName": "KeepAliveServer",
+    "ServerName": "AsyncServer",
     "Objects" :
     [
         {
-            "ObjectName": "CKeepAliveServer",
+            "ObjectName": "CAsyncServer",
             "BusName" : "DBusBusPort_0",
             "PortClass": "DBusLocalPdo",
             "PortId" : "0",
             "RequestTimeoutSec" : "120",
-            "KeepAliveTimeoutSec" : "2",
+            "KeepAliveTimeoutSec" : "60",
 
             "Interfaces" :
             [
                 {
                     "Comment-0" : "the following attributes are mandatory",
-                    "InterfaceName" : "CKeepAliveServer",
+                    "InterfaceName" : "CAsyncServer",
                     "Comment-1" : "the following is a flag whether to use the object clsid for this interface, usually it indicates this is the major interface of this object, there must be one interface bind to clsid",
                     "BindToClsid" : "true"
                 },
@@ -25,8 +25,8 @@
             ]
         }
     ],
-    "ClassFactories":
+    "ClassFactories" :
     [
-        "./libkasvr.so"
+        "./libascsvr.so"
     ]
 }

@@ -42,5 +42,9 @@
                 }
             ]
         }
+    ],
+    "ClassFactories":
+    [
+        "./libsfsvr.so"
     ]
 }

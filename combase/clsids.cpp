@@ -175,23 +175,19 @@ gint32 CoLoadClassFactories( const char* dir )
         lstat(entry->d_name,&statbuf);
         if(S_ISDIR(statbuf.st_mode))
         {
-            // we don't handle subdirectory yet
-            /*  Found a directory, but ignore . and .. */
-            if( strcmp(".",entry->d_name) == 0 ||
-                strcmp("..",entry->d_name) == 0 )
             continue;
-
-            // printf("%*s%s/\n",depth,"",entry->d_name);
-            /*  Recurse at a new indent level */
-            // WalkDir(entry->d_name,depth+4);
         }
         else
         {
             if( strcmp("libcombase.so",entry->d_name) == 0 )
                 continue;
 
-            string strPath = strPrefix + entry->d_name;
-            CoLoadClassFactory( strPath.c_str() );
+            if( strcmp( "libipc.so", entry->d_name ) == 0 ||
+                strcmp( "librpc.so", entry->d_name ) == 0 )
+            {
+                string strPath = strPrefix + entry->d_name;
+                CoLoadClassFactory( strPath.c_str() );
+            }
         }
     }
 

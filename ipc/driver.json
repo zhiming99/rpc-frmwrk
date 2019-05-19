@@ -128,6 +128,21 @@
             ]
         },
         {
+            "ModName" : "hwsvrsmk",
+            "DriversToLoad" :
+            [
+                "DBusBusDriver"
+            ]
+        },
+        {
+            "ModName" : "hwclismk",
+            "DriversToLoad" :
+            [
+                "DBusBusDriver",
+                "ProxyFdoDriver"
+            ]
+        },
+        {
             "ModName" : "asyncsvrsmk",
             "DriversToLoad" :
             [

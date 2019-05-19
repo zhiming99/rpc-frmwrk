@@ -54,6 +54,7 @@
 #define JSON_ATTR_PROXY_PORTCLASS     "ProxyPortClass"
 #define JSON_ATTR_SVRNAME       "ServerName"
 #define JSON_ATTR_OBJARR        "Objects"
+#define JSON_ATTR_FACTORIES     "ClassFactories"
 #define JSON_ATTR_OBJNAME       "ObjectName"
 #define JSON_ATTR_OBJCLASS      "ObjectClass"
 #define JSON_ATTR_IFARR         "Interfaces"

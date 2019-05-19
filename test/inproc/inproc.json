@@ -31,5 +31,9 @@
                 }
             ]
         }
+    ],
+    "ClassFactories":
+    [
+        "./libinproc.so"
     ]
 }

@@ -37,7 +37,7 @@ AC_TYPE_SSIZE_T
 AC_FUNC_ALLOCA
 AC_FUNC_LSTAT_FOLLOWS_SLASHED_SYMLINK
 AC_FUNC_REALLOC
-AC_CHECK_FUNCS([clock_gettime ftruncate getcwd gettimeofday inet_ntoa memset realpath socket strerror strtol])
+AC_CHECK_FUNCS([clock_gettime memmove ftruncate getcwd gettimeofday inet_ntoa memset realpath socket strerror strtol])
 
 AC_CONFIG_FILES([Makefile
                  Makefile.init.pub
@@ -56,5 +56,6 @@ AC_CONFIG_FILES([Makefile
                  test/sftest/Makefile
                  test/stmtest/Makefile
                  test/router/Makefile
+                 test/iftest/Makefile
                  test/smoketest/Makefile])
 AC_OUTPUT

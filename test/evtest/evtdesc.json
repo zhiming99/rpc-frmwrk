@@ -24,5 +24,9 @@
                 }
             ]
         }
+    ],
+    "ClassFactories" :
+    [
+        "./libevtst.so"
     ]
 }

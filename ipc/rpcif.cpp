@@ -3940,6 +3940,27 @@ gint32 CRpcServices::LoadObjDesc(
             oCfg.SetObjPtr( propObjList, pObj );
         }
 
+
+        // get object array
+        Json::Value& oFactores =
+            valObjDesc[ JSON_ATTR_FACTORIES ];
+
+        if( oFactores == Json::Value::null ||
+            !oFactores.isArray() ||
+            oFactores.empty() )
+            break;
+
+        string strLibPath;
+        for( i = 0; i < oFactores.size(); i++ )
+        {
+            if( oFactores[ i ].empty() ||
+                !oFactores[ i ].isString() )
+                continue;
+
+            strLibPath = oFactores[ i ].asString();
+            CoLoadClassFactory( strLibPath.c_str() );
+        }
+
     }while( 0 );
 
     return ret;

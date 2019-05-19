@@ -26,11 +26,11 @@
 #include <cppunit/extensions/HelperMacros.h>
 
 #ifdef SERVER
-#define MODULE_NAME "ifsvrsmk"
+#define MODULE_NAME "hwsvrsmk"
 #endif
 
 #ifdef CLIENT
-#define MODULE_NAME "ifclismk"
+#define MODULE_NAME "hwclismk"
 #endif
 
 class CIfSmokeTest :
@@ -46,8 +46,6 @@ class CIfSmokeTest :
 #endif
 #ifdef CLIENT
     CPPUNIT_TEST( testCliStartStop );
-    // CPPUNIT_TEST( testDBusLeak );
-    // CPPUNIT_TEST( testObjAlloc );
 #endif
     CPPUNIT_TEST_SUITE_END();
 
@@ -56,9 +54,5 @@ class CIfSmokeTest :
     void tearDown();
     void testSvrStartStop();
     void testCliStartStop();
-#ifdef CLIENT
-    void testDBusLeak();
-    void testObjAlloc();
-#endif
 };
 
