@@ -398,7 +398,7 @@ class CIfTaskGroup
     virtual gint32 FindTaskByRmtId(
         guint64 iTaskId, TaskletPtr& pRet );
 
-    gint32 FindTaskByClsid(
+    virtual gint32 FindTaskByClsid(
         EnumClsid iClsid,
         std::vector< TaskletPtr >& vecTasks );
 
@@ -746,6 +746,9 @@ class CIfInterceptTask :
 
         return ret;
     }
+
+    virtual gint32 OnKeepAlive(
+        guint32 dwContext );
 };
 
 class CIfInterceptTaskProxy :

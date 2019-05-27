@@ -134,7 +134,7 @@ void CIfSmokeTest::testCliStartStop()
 
     CfgPtr pCfg = oCfg.GetCfg();
     ret = CRpcServices::LoadObjDesc(
-        "./objdesc.json",
+        "./asyndesc.json",
         OBJNAME_ECHOSVR,
         false, pCfg );
 

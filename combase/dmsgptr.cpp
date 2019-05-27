@@ -539,6 +539,11 @@ gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
             *( guint32* )pBuf->ptr();
 
         dwSize = ntohl( dwSize );
+        if( dwSize > 1024 * 1024 )
+        {
+            ret = -EINVAL;
+            break;
+        }
 
         guint8* pMsg =
             ( guint8* )pBuf->ptr() + sizeof( guint32 );

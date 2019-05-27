@@ -186,13 +186,34 @@ void CIfSmokeTest::testCliActCancel()
             qwTaskId = oParams[ propTaskId ];
         }
 
+        //FIXME: if the system is too busy, there is
+        //risk the cancel command can arrive ahead of
+        //the request to cancel.
+
         // we are about to actively cancel this request
         CPPUNIT_ASSERT( qwTaskId != 0 );
-        ret = pCli->CancelRequest( qwTaskId );
-        CPPUNIT_ASSERT( SUCCEEDED( ret ) );
-        if( SUCCEEDED( ret ) )
-            DebugPrint( 0, "Request is successfully cancelled" );
-
+        for( int i = 0; i < 2; i++ )
+        {
+            ret = pCli->CancelRequest( qwTaskId );
+            if( SUCCEEDED( ret ) )
+            {
+                DebugPrint( 0, "Request is successfully cancelled" );
+                break;
+            }
+            else
+            {
+                if( ret == -ENOENT )
+                {
+                    sleep( 3 );
+                    DebugPrint( 0, "Request is not found to cancel" );
+                }
+                else
+                {
+                    DebugPrint( 0, "canceling failed" );
+                    break;
+                }
+            }
+        }
         oParams.Clear();
     }
     else

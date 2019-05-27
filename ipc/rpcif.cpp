@@ -5913,11 +5913,20 @@ gint32 CInterfaceServer::OnKeepAliveOrig(
             ret = -EINVAL;
             break;
         }
+
         okaReq.SetSender( strVal );
-
         strVal = pMsg.GetSender( );
-
         okaReq.SetDestination( strVal );
+
+        guint32 dwSerial = 0;
+        pMsg.GetSerial( dwSerial );
+        if( dwSerial != 0 )
+        {
+            // the serial number is for the router to
+            // find the task for the request to KA
+            okaReq.SetIntProp(
+                propSeqNo, dwSerial );
+        }
 
         okaReq.Push( iTaskId );
         okaReq.Push( ( guint32 )KATerm );

@@ -782,7 +782,7 @@ gint32 CProxyFdoDispEvtTask::operator()(
         if( ERROR( ret ) )
             break;
 
-        string strMethod =
+        /*string strMethod =
             pEvtMsg.GetMember();
 
         if( strMethod == SYS_EVENT_KEEPALIVE )
@@ -813,7 +813,7 @@ gint32 CProxyFdoDispEvtTask::operator()(
 
             pEvtMsg.SetInterface( strIfName );
             pEvtMsg.SetPath( strObjPath );
-        }
+        }*/
 
         *pBuf = pEvtMsg;
         ret = pPort->DispatchData( *pBuf );

@@ -252,7 +252,7 @@ class CRpcInterfaceProxy :
     //gint32 OnKeepAliveTerm(
      //   IEventSink* pTask );
 
-    gint32 OnKeepAliveOrig(
+    virtual gint32 OnKeepAliveOrig(
         IEventSink* pTask );
 
     public:
@@ -492,6 +492,9 @@ class CRpcReqForwarder :
         EnumEventId iEvent,
         std::string strUniqName );
 
+    gint32 BuildKeepAliveMessage(
+        IConfigDb* pCfg, DMsgPtr& pkaMsg );
+
     public:
 
     typedef CRpcInterfaceServer super;
@@ -722,6 +725,8 @@ class CRpcReqForwarderProxy :
         const std::string& strIpAddr,
         HANDLE hPort );
 
+    gint32 OnKeepAliveOrig(
+        IEventSink* pTask );
 };
 
 struct CRpcTcpBridgeShared

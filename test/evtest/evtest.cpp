@@ -111,7 +111,7 @@ void CIfSmokeTest::testSvrStartStop()
     {
         ret = pSvr->OnHelloWorld( "Hello, World!" );
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
-        sleep( 10 );
+        sleep( 1 );
     }
 
     ret = pIf->Stop();
@@ -157,6 +157,8 @@ void CIfSmokeTest::testCliStartStop()
         // wait for event
         do{
             ret = Sem_TimedwaitSec( &semWait, 3 );
+            if( !pCli->IsConnected() )
+                break;
 
         }while( ret == -EAGAIN );
     }

@@ -409,12 +409,18 @@ gint32 CIfRetryTask::OnEvent(
     guint32* pData )
 { 
     gint32 iPropId = 0;
-    switch( iEvent )
+
+    // FIXME: this ease the issue of paramlist race
+    // condition, but not fixed it
+    switch( iEvent & ~eventTryLock )
     {
+    case eventKeepAlive:
+        {
+            iPropId = propKAParamList;
+            break;
+        }
     case eventTimeout:
         {
-            // FIXME: this ease the issue of paramlist race
-            // condition, but not fixed it
             iPropId = propTimerParamList;
             break;
         }
@@ -3493,8 +3499,6 @@ gint32 CIfIoReqTask::Process(
     {
     case eventFilterComp:
         {
-            // handle eventKeepAlive from a task
-            // call
             ret = OnFilterComp();
             break;
         }
@@ -3658,9 +3662,11 @@ gint32 CIfIoReqTask::OnIrpComplete(
                 ( IConfigDb* )pResp );
 
             oRespCfg[ propReturnValue ] = iRet;
-
             if( ERROR( iRet ) )
+            {
+                ret = iRet;
                 break;
+            }
         }
         else
         {
@@ -3762,7 +3768,10 @@ gint32 CIfIoReqTask::OnKeepAlive(
 
         ObjPtr pObj;
         vector< guint32 > vecParams;
-        ret = GetParamList( vecParams );
+
+        ret = GetParamList(
+            vecParams, propKAParamList );
+
         if( ERROR( ret ) )
             break;
 
@@ -4185,8 +4194,6 @@ gint32 CIfInvokeMethodTask::Process(
     {
     case eventFilterComp:
         {
-            // handle eventKeepAlive from a task
-            // call
             ret = OnFilterComp();
             break;
         }
@@ -4720,11 +4727,31 @@ gint32 CIfInvokeMethodTask::OnComplete(
 gint32 CIfInvokeMethodTask::OnKeepAlive(
     guint32 dwContext )
 {
-    if( dwContext == eventTimeout )
-        OnKeepAliveOrig();
+    do{
+        if( dwContext == eventTimeout )
+        {
+            OnKeepAliveOrig();
+        }
+        else if( dwContext == eventKeepAlive )
+        {
+            gint32 ret = 0;
+            CCfgOpener oCfg(
+                ( IConfigDb*)GetConfig() );
+            CIoManager* pMgr = nullptr;
 
-    else if( dwContext == eventKeepAlive )
-        OnKeepAliveRelay();
+            ret = GET_IOMGR( oCfg, pMgr );
+            if( ERROR( ret ) )
+                break;
+
+            // there could be a chain of nested locks
+            // of the tasks along the way, let's
+            // schedule a task to lower the risk of
+            // deadlock
+            DEFER_CALL( pMgr, ObjPtr( this ),
+                &CIfInvokeMethodTask::OnKeepAliveRelay );
+        }
+
+    }while( 0 );
 
     return STATUS_PENDING;
 }
@@ -4857,8 +4884,14 @@ gint32 CIfInvokeMethodTask::OnKeepAliveRelay()
     // along the forward-request path, this method
     // is called
     do{
+        CStdRTMutex oTaskLock( GetLock() );
+
+        if( GetTaskState() == stateStopped )
+            return ERROR_STATE;
+
         ObjPtr pObj;
-        CCfgOpener oTaskCfg( ( IConfigDb* )GetConfig() );
+        CCfgOpener oTaskCfg(
+            ( IConfigDb* )GetConfig() );
 
         ret = oTaskCfg.GetObjPtr(
             propIfPtr, pObj );
@@ -4880,9 +4913,7 @@ gint32 CIfInvokeMethodTask::OnKeepAliveRelay()
                 
     }while( 0 );
 
-    // return status_pending to avoid the task
-    // from completed
-    return STATUS_PENDING;
+    return ret;
 }
 
 gint32 CIfInvokeMethodTask::GetCallOptions(
@@ -5635,3 +5666,30 @@ gint32 CBusPortStopSingleChildTask::RunTask()
     return ret;
 }
 
+gint32 CIfInterceptTask::OnKeepAlive(
+    guint32 dwContext )
+{
+    EventPtr pEvt;
+    gint32 ret = GetInterceptTask( pEvt );
+    if( ERROR( ret ) )
+        return ret;
+
+    vector< guint32 > vecParams;
+    ret = GetParamList(
+        vecParams, propKAParamList );
+    if( ERROR( ret ) )
+        return ret;
+
+    EnumEventId iEvent = ( EnumEventId )
+        ( eventTryLock | eventKeepAlive );
+
+    CCfgOpener oCfg(
+        ( IConfigDb* )GetConfig() );
+    CIoManager* pMgr = nullptr;
+    ret = GET_IOMGR( oCfg, pMgr );
+    if( ERROR( ret ) )
+        return ret;
+
+    return pEvt->OnEvent( iEvent,
+        vecParams[ 1 ], 0, 0 );
+}

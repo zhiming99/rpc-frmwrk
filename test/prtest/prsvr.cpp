@@ -61,7 +61,7 @@ gint32 CPauseResumeServer::InitUserFuncs()
 }
 /**
 * @name OnLongWaitComplete: the callback of the async
-* hander `LongWait'.
+* handler `LongWait'.
 *
 * @{ */
 /**
@@ -146,7 +146,7 @@ gint32 CPauseResumeServer::EchoUnknown(
     gint32 ret = 0;
 
     // business logics goes here
-    BufPtr oBufReply = pBuf;
+    *pBufReply = *pBuf;
 
     return ret;
 }

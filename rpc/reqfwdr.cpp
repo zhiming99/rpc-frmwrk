@@ -2371,6 +2371,77 @@ gint32 CRpcReqForwarder::ForwardEvent(
     return ret;
 }
 
+gint32 CRpcReqForwarder::BuildKeepAliveMessage(
+    IConfigDb* pCfg, DMsgPtr& pkaMsg )
+{
+    if( pCfg == nullptr )
+        return -EINVAL;
+
+    CReqOpener oReq( pCfg );
+    gint32 ret = 0;
+    do{
+        ret = pkaMsg.NewObj( ( EnumClsid )
+            DBUS_MESSAGE_TYPE_SIGNAL );
+
+        if( ERROR( ret ) )
+            break;
+
+        std::string strVal;
+        // ifname
+        ret = oReq.GetStrProp( 2, strVal );
+        if( ERROR( ret ) )
+            break;
+        pkaMsg.SetInterface( strVal );
+
+        ret = oReq.GetStrProp( 3, strVal );
+        if( ERROR( ret ) )
+            break;
+        pkaMsg.SetPath( strVal );
+
+        pkaMsg.SetMember( SYS_EVENT_KEEPALIVE );
+
+        ret = oReq.GetSender( strVal );
+        if( ERROR( ret ) )
+            break;
+        pkaMsg.SetSender( strVal );
+
+        ret = oReq.GetDestination( strVal );
+        if( ERROR( ret ) )
+            break;
+        pkaMsg.SetDestination( strVal );
+
+        guint64 qwTaskId = 0;
+        ret = oReq.GetQwordProp( 0, qwTaskId );
+        if( ERROR( ret ) )
+            break;
+
+        guint32 dwKAFlag = 0;
+        ret = oReq.GetIntProp( 1, dwKAFlag );
+        if( ERROR( ret ) )
+            break;
+
+        CParamList oParams;
+        oParams.Push( qwTaskId );
+        oParams.Push( dwKAFlag );
+
+        BufPtr pBuf( true );
+        ret = oParams.GetCfg()->Serialize( *pBuf );
+        if( ERROR( ret ) )
+            break;
+
+        pkaMsg.SetSerial( clsid( MinClsid ) );
+
+        if( !dbus_message_append_args( pkaMsg,
+            DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
+            &pBuf->ptr(), pBuf->size(),
+            DBUS_TYPE_INVALID ) )
+            ret = -ENOMEM;
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CRpcReqForwarder::OnKeepAliveRelay(
     IEventSink* pTask )
 {
@@ -2401,24 +2472,30 @@ gint32 CRpcReqForwarder::OnKeepAliveRelay(
             break;
         }
 
-        string strIfName, strObjPath;
-        string strSender = pMsg.GetSender();
+        
+        std::string strIfName, strObjPath;
+        std::string strFwrdIfName, strIpAddr;
+        std::string strSender = pMsg.GetSender();
+
         if( !IsConnected( strSender.c_str() ) )
         {
             ret = ERROR_STATE;
             break;
         }
 
-        strIfName = pMsg.GetInterface();
-        if( IsPaused( strIfName ) )
+        strFwrdIfName = pMsg.GetInterface();
+        if( IsPaused( strFwrdIfName ) )
         {
             ret = ERROR_PAUSED;
             break;
         }
 
         CReqBuilder okaReq( this );
+        okaReq.SetIfName( strFwrdIfName );
 
-        guint64 iTaskId = 0;
+        strObjPath = pMsg.GetPath();
+        okaReq.SetObjPath( strObjPath );
+
         if( true )
         {
             // retrieve the task id
@@ -2445,27 +2522,31 @@ gint32 CRpcReqForwarder::OnKeepAliveRelay(
                 break;
             }
 
+            guint64 iTaskId = 0;
             CReqOpener oOrigReq( pOrigReq );
             ret = oOrigReq.GetTaskId( iTaskId );
             if( ERROR( ret ) )
                 break;
+            okaReq.Push( iTaskId );
+
+            okaReq.Push( ( guint32 )KATerm );
 
             ret = oOrigReq.GetIfName( strIfName );
             if( ERROR( ret ) )
                 break;
+            okaReq.Push( strIfName );
 
             ret = oOrigReq.GetObjPath( strObjPath );
             if( ERROR( ret ) )
                 break;
+            okaReq.Push( strObjPath );
+
+            okaReq.CopyProp(
+                propIpAddr, pOrigReq );
         }
 
-        okaReq.Push( iTaskId );
-        okaReq.Push( ( guint32 )KATerm );
-        okaReq.Push( strIfName );
-        okaReq.Push( strObjPath );
-
         okaReq.SetMethodName(
-            SYS_EVENT_KEEPALIVE );
+            SYS_EVENT_FORWARDEVT );
 
         okaReq.SetCallFlags( 
            DBUS_MESSAGE_TYPE_SIGNAL
@@ -2481,6 +2562,29 @@ gint32 CRpcReqForwarder::OnKeepAliveRelay(
 
         strVal = pMsg.GetSender( );
         okaReq.SetDestination( strVal );
+
+        DMsgPtr pkaMsg;
+        ret = BuildKeepAliveMessage(
+            okaReq.GetCfg(), pkaMsg );
+
+        if( ERROR( ret ) )
+            break;
+
+        okaReq.ClearParams();
+
+        ret = okaReq.GetStrProp(
+            propIpAddr, strIpAddr );
+        if( ERROR( ret ) )
+            break;
+
+        okaReq.Push( strIpAddr );
+
+        BufPtr pMarshaledMsg( true );
+        ret = pkaMsg.Serialize( pMarshaledMsg );
+        if( ERROR( ret ) )
+            break;
+
+        okaReq.Push( pMarshaledMsg );
 
         TaskletPtr pDummyTask;
 
@@ -2639,6 +2743,25 @@ gint32 CRpcReqForwarderProxy::SetupReqIrpFwrdReq(
 
         BufPtr pBuf( true );
         *pBuf = pReqMsg;
+
+        guint32 dwFlags = 0;
+        bool bKeepAlive = false;
+        ret = oReq.GetCallFlags( dwFlags );
+        if( SUCCEEDED( ret ) && 
+            ( dwFlags & ~CF_KEEP_ALIVE ) )
+            bKeepAlive = true;
+
+        if( bKeepAlive )
+        {
+            guint32 dwSerial = 0;
+            pReqMsg.GetSerial( dwSerial );
+            if( dwSerial != 0 )
+            {
+                // set the serial for keep-alive usage
+                oReq.SetIntProp(
+                    propSeqNo, dwSerial );
+            }
+        }
 
         pIrpCtx->SetReqData( pBuf );
         pIrp->SetCallback( pCallback, 0 );
@@ -3083,6 +3206,9 @@ gint32 CRpcReqForwarderProxy::ForwardEvent(
         oParams.SetMsgPtr(
             propMsgPtr, DMsgPtr( pEventMsg ) );
 
+        oParams.SetPointer(
+            propIfPtr, this );
+
         CCfgOpenerObj oCfg( pCallback );
         CRouterRemoteMatch* pMatch = nullptr;
         gint32 ret = oCfg.GetPointer(
@@ -3350,6 +3476,125 @@ gint32 CRpcReqForwarderProxy::OnRmtSvrOffline(
     }while( 0 );
 
     return ret;
+}
+
+gint32 CRpcReqForwarderProxy::OnKeepAliveOrig(
+    IEventSink* pTask )
+{
+    gint32 ret = 0;
+
+    if( unlikely( pTask == nullptr ) )
+        return -EINVAL;
+
+    // servicing the incoming request/event
+    // message
+    do{
+        DMsgPtr pMsg;
+        CCfgOpenerObj oCfg( pTask );
+
+        ret = oCfg.GetMsgPtr( propMsgPtr, pMsg );
+        if( ERROR( ret ) )
+            break;
+
+        if( pMsg.IsEmpty() )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        if( !IsConnected() )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+
+        ObjPtr pObj;
+        ret = pMsg.GetObjArgAt( 0, pObj );
+        if( ERROR( ret ) )
+            break;
+
+        
+        IConfigDb* pCfg = pObj;
+        if( pCfg == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        CReqOpener oEvent( pCfg );
+        guint32 iSeqNo = 0;
+
+        ret = oEvent.GetIntProp(
+            propSeqNo, iSeqNo );
+
+        if( ERROR( ret ) )
+            break;
+
+        TaskletPtr pTaskToKa;
+
+        TaskGrpPtr pTaskGrp;
+        GetParallelGrp( pTaskGrp );
+        if( pTaskGrp.IsEmpty() )
+        {
+            ret = -ENOENT;    
+            break;
+        }
+
+        std::vector< TaskletPtr > vecIoReqs;
+        ret = pTaskGrp->FindTaskByClsid(
+            clsid( CIfIoReqTask ), vecIoReqs );
+
+        if( ERROR( ret ) )
+            break;
+
+        for( auto elem : vecIoReqs )
+        {
+            CCfgOpenerObj oTaskCfg(
+                ( CObjBase* )elem );
+
+            IConfigDb* pReq = nullptr;
+            ret = oTaskCfg.GetPointer(
+                propReqPtr, pReq );
+
+            if( ERROR( ret ) )
+                continue;
+
+            CCfgOpener oReq( pReq );
+            ret = oReq.IsEqual(
+                propSeqNo, iSeqNo );
+
+            if( ERROR( ret ) )
+                continue;
+
+            pTaskToKa = elem;
+            break;
+        }
+
+        if( pTaskToKa.IsEmpty() )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        CIfIoReqTask* pReqTask = pTaskToKa;
+        if( pReqTask == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        // send a keepalive event
+        EnumEventId iEvent = ( EnumEventId )
+            ( eventTryLock | eventKeepAlive );
+
+        ret = pTaskToKa->OnEvent( iEvent,
+            KARelay, 0, nullptr );
+
+    }while( 0 );
+
+    // whether or not succeeded, we return pending
+    // state to avoid the task get completed
+    return STATUS_PENDING;
 }
 
 gint32 CReqFwdrSendDataTask::RunTask()

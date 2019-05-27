@@ -1373,6 +1373,7 @@ gint32 CRpcRouter::CheckEvtToFwrd(
                     vecMatches.push_back( pMatch );
                 }
             }
+            ret = 0;
             break;
         }
 
@@ -1390,6 +1391,10 @@ gint32 CRpcRouter::CheckEvtToFwrd(
             if( SUCCEEDED( ret ) )
             {
                 vecMatches.push_back( pMatch );
+            }
+            else
+            {
+                ret = 0;
             }
         }
     }while( 0 );
