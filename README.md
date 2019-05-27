@@ -23,6 +23,11 @@ This framework depends on the following packags:
 11. `Streaming support to provide double-direction stream transfer`
 
 ---
+[`Mon 27 May 2019 08:13:24 PM CST`]   
+1. Got sick last week, so long time no update.
+2. The test cases, `Event broadcasting`, `KEEP-ALIVE`, `Pause-resume`, `Active-canceling`, and `Async call` are working now over both IRC and RPC, as well as `helloworld`.
+3. Next move on to the SendData/FetchData RPC support. 
+
 [`Sun May 12 14:03:47 CST 2019`]   
 1. The `communication channel setup` (`EnableRemoteEvent`) is almost OK for tcp connection. There should still be a few `hidden` bugs to fix in the future testing. Anyway the `helloworld` can now work more stable and faster. And both the `bridge` and `forwarder` are more torlerable on the error condtion.   
 2. Next I will try to get `File/Big data transfer` work. It should be the last big section of un-debugged part so far.   
