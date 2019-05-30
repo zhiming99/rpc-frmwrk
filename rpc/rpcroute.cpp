@@ -46,14 +46,11 @@ CRpcRouter::CRpcRouter(
             break;
 
         guint32 dwRole = 0;
-        ret = m_pIoMgr->GetCmdLineOpt(
+        ret = oCfg.GetIntProp(
             propRouterRole, dwRole );
 
         if( ERROR( ret ) )
-        {
-            ret = oCfg.GetIntProp(
-                propRouterRole, dwRole );
-        }
+            break;
 
         if( SUCCEEDED( ret ) )
             m_dwRole = dwRole;
@@ -696,86 +693,6 @@ gint32 CRpcRouter::BuildStartStopReqFwdrProxy(
     return ret;
 }
 
-gint32 CRpcRouter::UnsubscribeEvents()
-{
-    gint32 ret = 0;
-
-    EventPtr pEvent( this );
-
-    CConnPointHelper oCpHelper( GetIoMgr() );
-    vector< EnumPropId > vecEvents;
-
-    if( true )
-    {
-        CStdRMutex oRouterLock( GetLock() );
-        vecEvents = m_vecTopicList;
-        m_vecTopicList.clear();
-    }
-
-    for( guint32 i = 0; i < vecEvents.size(); ++i )
-    {
-        oCpHelper.UnsubscribeEvent(
-            vecEvents[ i ], pEvent );
-    }
-
-    return ret;
-}
-
-gint32 CRpcRouter::SubscribeEvents()
-{
-    gint32 ret = 0;
-
-    CConnPointHelper oCpHelper( GetIoMgr() );
-    EventPtr pEvent( this );
-
-    vector< EnumPropId > vecEvents;
-
-    do{
-        ret = oCpHelper.SubscribeEvent(
-            propRmtSvrEvent, pEvent );
-
-        if( ERROR( ret ) )
-            break;
-
-        vecEvents.push_back( propRmtSvrEvent );
-
-        ret = oCpHelper.SubscribeEvent(
-            propAdminEvent, pEvent );
-
-        if( ERROR( ret ) )
-            break;
-
-        vecEvents.push_back( propAdminEvent );
-
-        ret = oCpHelper.SubscribeEvent(
-            propRmtModEvent, pEvent );
-
-        if( ERROR( ret ) )
-            break;
-
-        vecEvents.push_back( propRmtModEvent );
-
-    }while( 0 );
-
-    do{
-        if( ERROR( ret ) )
-        {
-            for( guint32 i = 0; i < vecEvents.size(); i++ )
-            {
-                oCpHelper.UnsubscribeEvent(
-                    vecEvents[ i ], pEvent );
-            }
-            vecEvents.clear();
-        }
-        else 
-        {
-            CStdRMutex oRouterLock( GetLock() );
-            m_vecTopicList = vecEvents;
-        }
-    }while( 0 );
-
-    return ret;
-}
 
 gint32 CRpcRouter::OnRmtSvrEvent(
     EnumEventId iEvent,
@@ -883,6 +800,17 @@ gint32 CRpcRouter::OnRmtSvrOnline(
             propPortId, dwPortId );
 
         if( ERROR( ret ) )
+            break;
+
+        bool bServer = false;
+        ret = oPortCfg.GetBoolProp(
+            propIsServer, bServer );
+        if( ERROR( ret ) )
+            break;
+
+        // false call
+        if( ( !bServer && m_dwRole == 0x02 ) ||
+            ( bServer && m_dwRole == 0x01 ) )
             break;
 
         // we need to sequentially GetBridge.
@@ -2463,6 +2391,41 @@ gint32 CRpcRouter::ForwardModOnOfflineEvent(
             break;
         }
 
+        // find all the interested bridges
+        std::map< MatchPtr, gint32 >* plm =
+            &m_mapRmtMatches;
+
+        std::set< guint32 > setPortIds;
+        CStdRMutex oRouterLock( GetLock() );
+        for( auto elem : *plm )
+        {
+            IMessageMatch* pMatch = elem.first;
+            if( unlikely( pMatch == nullptr ) )
+                continue;
+
+            CCfgOpenerObj oMatchCfg( pMatch );
+            string strDest;
+            ret = oMatchCfg.GetStrProp(
+                propDestDBusName, strDest );
+            if( ERROR( ret ) )
+                continue;
+
+            if( strModule == strDest )
+            {
+                guint32 dwPortId = 0;
+                ret = oMatchCfg.GetIntProp(
+                    propPortId, dwPortId );
+                if( ERROR( ret ) )
+                    continue;
+
+                setPortIds.insert( dwPortId );
+            }
+        }
+        oRouterLock.Unlock();
+
+        if( setPortIds.empty() )
+            break;
+
         DMsgPtr pMsg;
         ret = pMsg.NewObj(
             ( EnumClsid )DBUS_MESSAGE_TYPE_SIGNAL );
@@ -2519,41 +2482,6 @@ gint32 CRpcRouter::ForwardModOnOfflineEvent(
                 break;
             }
         }
-
-        // find all the interested bridges
-        std::map< MatchPtr, gint32 >* plm =
-            &m_mapRmtMatches;
-
-        std::set< guint32 > setPortIds;
-        CStdRMutex oRouterLock( GetLock() );
-        for( auto elem : *plm )
-        {
-            IMessageMatch* pMatch = elem.first;
-            if( unlikely( pMatch == nullptr ) )
-                continue;
-
-            CCfgOpenerObj oMatchCfg( pMatch );
-            string strDest;
-            ret = oMatchCfg.GetStrProp(
-                propDestDBusName, strDest );
-            if( ERROR( ret ) )
-                continue;
-
-            if( strModule == strDest )
-            {
-                guint32 dwPortId = 0;
-                ret = oMatchCfg.GetIntProp(
-                    propPortId, dwPortId );
-                if( ERROR( ret ) )
-                    continue;
-
-                setPortIds.insert( dwPortId );
-            }
-        }
-        oRouterLock.Unlock();
-
-        if( setPortIds.empty() )
-            break;
 
         TaskletPtr pDummyTask;
         ret = pDummyTask.NewObj(
@@ -2691,10 +2619,9 @@ gint32 CRpcRouter::RebuildMatches()
         return ret;
 
     do{
-        CIoManager* pMgr = GetIoMgr();
-
+        CCfgOpenerObj oCfg( this );
         guint32 dwRole = 0;
-        ret = pMgr->GetCmdLineOpt(
+        ret = oCfg.GetIntProp(
             propRouterRole, dwRole );
         if( ERROR( ret ) )
             break;
@@ -2706,7 +2633,6 @@ gint32 CRpcRouter::RebuildMatches()
             strSurffix = "_2";
 
         std::string strObjPath;
-        CCfgOpenerObj oCfg( this );
 
         ret = oCfg.GetStrProp(
             propObjPath, strObjPath );

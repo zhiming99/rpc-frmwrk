@@ -858,20 +858,27 @@ CRpcStreamSock::CRpcStreamSock(
         ret = oCfg.CopyProp(
             propIpAddr, pCfg );
 
-        ret = oCfg.CopyProp(
-            propSrcTcpPort, pCfg );
-
         gint32 iFd = -1;
         ret = oCfg.GetIntProp(
             propFd, ( guint32& )iFd );
 
         // passive connection
         if( SUCCEEDED( ret ) )
+        {
             m_iFd = iFd;
+            oCfg.CopyProp(
+                propSrcTcpPort, pCfg );
+            ret = oCfg.CopyProp(
+                propDestTcpPort, pCfg );
+        }
         else
         {
-            ret = 0;
+            ret = oCfg.CopyProp(
+                propDestTcpPort, pCfg );
         }
+
+        if( ERROR( ret ) )
+            break;
 
         m_itrCurStm = m_mapStreams.begin();
 
@@ -896,7 +903,7 @@ gint32 CRpcStreamSock::ActiveConnect(
 
         guint32 dwPortNum = 0;
         ret = oCfg.GetIntProp(
-            propSrcTcpPort, dwPortNum );
+            propDestTcpPort, dwPortNum );
 
         if( ERROR( ret ) )
             dwPortNum = RPC_SVR_PORTNUM;

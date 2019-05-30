@@ -32,7 +32,7 @@
 CPPUNIT_TEST_SUITE_REGISTRATION( CIfRouterTest );
 
 // router role: 1. reqfwdr, 2. bridge, 3. both
-guint32 dwRole = 1;
+guint32 g_dwRole = 1;
 
 
 void CIfRouterTest::setUp()
@@ -60,7 +60,7 @@ void CIfRouterTest::setUp()
             ret = -EFAULT;
 
         pSvc->SetCmdLineOpt(
-            propRouterRole, dwRole );
+            propRouterRole, g_dwRole );
 
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 
@@ -86,7 +86,8 @@ void CIfRouterTest::tearDown()
     }while( 0 );
 }
 
-CfgPtr CIfRouterTest::InitRouterCfg()
+CfgPtr CIfRouterTest::InitRouterCfg(
+    guint32 dwRole )
 {
     CfgPtr ptrCfg;
     gint32 ret = 0;
@@ -105,6 +106,8 @@ CfgPtr CIfRouterTest::InitRouterCfg()
         oCfg[ propIfStateClass ] =
             clsid( CIfRouterState );
 
+        oCfg[ propRouterRole ] = dwRole;
+
     }while( 0 );
 
     if( ERROR( ret ) )
@@ -121,24 +124,89 @@ void CIfRouterTest::testSvrStartStop()
 {
     CPPUNIT_ASSERT( !m_pMgr.IsEmpty() );
 
-    CfgPtr pCfg = InitRouterCfg();
-    CPPUNIT_ASSERT( !pCfg.IsEmpty() );
+    CfgPtr pCfgFwdr;
+    CfgPtr pCfgBdge;
 
-    InterfPtr pIf;
-    gint32 ret = pIf.NewObj(
-        clsid( CRpcRouterImpl ), pCfg );
+    if( g_dwRole & 0x01 )
+        pCfgFwdr = InitRouterCfg( 0x01 );
+
+    if( g_dwRole & 0x02 )
+        pCfgBdge = InitRouterCfg( 0x02 );
+
+    InterfPtr pIfFwdr;
+    InterfPtr pIfBdge;
+
+    gint32 ret = 0;
+    do{
+        if( !pCfgFwdr.IsEmpty() )
+        {
+            ret =  pIfFwdr.NewObj(
+                clsid( CRpcRouterImpl ),
+                pCfgFwdr );
+
+            if( ERROR( ret ) )
+                break;
+                
+            CInterfaceServer* pSvrFwdr = pIfFwdr;
+            if( unlikely( pSvrFwdr == nullptr ) )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            ret = pIfFwdr->Start();
+            if( ERROR( ret ) )
+                break;
+        }
+
+        if( !pCfgBdge.IsEmpty() )
+        {
+            ret =  pIfBdge.NewObj(
+                clsid( CRpcRouterImpl ), pCfgBdge );
+
+            CInterfaceServer* pSvrBdge = pIfBdge;
+            if( unlikely( pSvrBdge == nullptr ) )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            ret = pIfBdge->Start();
+            if( ERROR( ret ) )
+                break;
+        }
+
+
+        if( g_dwRole == 0x01 )
+        {
+            CInterfaceServer* pSvr = pIfFwdr;
+            while( pSvr->IsConnected() )
+                sleep( 1 );
+
+        }
+        else if( g_dwRole == 0x02 )
+        {
+            CInterfaceServer* pSvr = pIfBdge;
+            while( pSvr->IsConnected() )
+                sleep( 1 );
+        }
+        else
+        {
+            CInterfaceServer* pSvrFwdr = pIfFwdr;
+            CInterfaceServer* pSvrBdge = pIfBdge;
+            while( pSvrFwdr->IsConnected() &&
+                pSvrBdge->IsConnected() )
+                sleep( 1 );
+        }
+
+    }while( 0 );
+
+    if( !pIfFwdr.IsEmpty() )
+        ret = pIfFwdr->Stop();
+
+    if( !pIfBdge.IsEmpty() )
+        ret = pIfBdge->Stop();
+
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 
-    CInterfaceServer* pSvr = pIf;
-    CPPUNIT_ASSERT( pSvr != nullptr );
-
-    CPPUNIT_ASSERT( SUCCEEDED( pIf->Start() ) );
-
-    while( pSvr->IsConnected() )
-        sleep( 1 );
-
-    CPPUNIT_ASSERT( SUCCEEDED( pIf->Stop() ) );
-    
     return;
 }
 
@@ -156,8 +224,8 @@ int main( int argc, char** argv )
         {
         case 'r':
             {
-                dwRole = ( guint32 )atoi( optarg );
-                if( dwRole == 0 || dwRole > 3 )
+                g_dwRole = ( guint32 )atoi( optarg );
+                if( g_dwRole == 0 || g_dwRole > 3 )
                     ret = -EINVAL;
                 break;
             }

@@ -210,7 +210,6 @@ gint32 CReqFwdrOpenRmtPortTask::CreateInterface(
         if( ERROR( ret ) )
             break;
 
-        oParams.CopyProp( propSrcTcpPort, this );
         oParams.CopyProp( propPortId, this );
 
         ObjPtr pObj;
@@ -954,8 +953,28 @@ gint32 CRpcReqForwarder::DecRefCount(
 }
 
 // for local client offline
+gint32 CRpcReqForwarder::GetRefCountByUniqName(
+    const std::string& strUniqName )
+{
+    gint32 iCount = 0;
+    CStdRMutex oIfLock( GetLock() );
+    auto itr = m_mapRefCount.begin();
+    while( itr != m_mapRefCount.end() )
+    {
+        string strUniqName2 =
+            itr->first->GetUniqName();
+
+        if( strUniqName2 == strUniqName )
+            iCount++;
+
+        ++itr;
+    }
+    return iCount;
+}
+
+// for local client offline
 gint32 CRpcReqForwarder::ClearRefCountByUniqName(
-    const string& strUniqName,
+    const std::string& strUniqName,
     std::set< string >& setIpAddrs )
 {
     CStdRMutex oIfLock( GetLock() );
@@ -981,10 +1000,9 @@ gint32 CRpcReqForwarder::ClearRefCountByUniqName(
 
 // for local client offline
 gint32 CRpcReqForwarder::GetRefCountByIpAddr(
-    const string& strIpAddr,
-    guint32& dwRefCount ) 
+    const string& strIpAddr )
 {
-    dwRefCount = 0;
+    gint32 iRefCount = 0;
     CStdRMutex oIfLock( GetLock() );
     for( auto elem : m_mapRefCount )
     {
@@ -992,10 +1010,10 @@ gint32 CRpcReqForwarder::GetRefCountByIpAddr(
             elem.first->GetIpAddr();
 
         if( strIpAddr2 == strIpAddr )
-            dwRefCount += elem.second;
+            iRefCount += ( gint32 )elem.second;
     }
 
-    return dwRefCount;
+    return iRefCount;
 }
 
 gint32 CRpcReqForwarder::OnModEvent(
@@ -1012,6 +1030,10 @@ gint32 CRpcReqForwarder::OnModEvent(
 
         // not uniq name, not our call
         if( strModule[ 0 ] != ':' )
+            break;
+
+        ret = GetRefCountByUniqName( strModule );
+        if( ret <= 0 )
             break;
 
         ObjPtr pObj;
@@ -1151,12 +1173,13 @@ gint32 CRpcReqForwarder::OnModOfflineInternal(
         // to close the bridge proxy with zero refcount
         for( auto& strIpAddr : setIpAddrs )
         {
-            guint32 dwRefCount = 0;
-            GetRefCountByIpAddr(
-                strIpAddr, dwRefCount );            
+            ret = GetRefCountByIpAddr( strIpAddr );            
 
-            if( dwRefCount > 0 )
+            if( ret > 0 )
+            {
+                ret = 0;
                 continue;
+            }
 
             InterfPtr pProxy;
             ret = pRouter->GetBridgeProxy(
@@ -1211,7 +1234,7 @@ gint32 CRpcReqForwarder::OnModOfflineInternal(
 }
 
 // for CRpcTcpBridgeProxyImpl offline
-gint32 CRpcReqForwarder::ClearRefCountByAddr(
+gint32 CRpcReqForwarder::ClearRefCountByIpAddr(
     const string& strIpAddr,
     vector< string >& vecUniqNames )
 {
@@ -1575,8 +1598,11 @@ gint32 CReqFwdrEnableRmtEventTask::RunTask()
             break;
 
         CCfgOpenerObj oMatch( pMatch );
-        oMatch.CopyProp(
-            propSrcTcpPort, pProxy );
+        // for local match only
+        ret = oMatch.CopyProp(
+            propDestTcpPort, pProxy );
+        if( ERROR( ret ) )
+            break;
 
         if( bEnable )
         {
@@ -2609,7 +2635,7 @@ gint32 CRpcReqForwarder::OnRmtSvrOffline(
     gint32 ret = 0;
     do{
         vector< string > vecUniqNames;
-        ret = ClearRefCountByAddr(
+        ret = ClearRefCountByIpAddr(
             strIpAddr, vecUniqNames );
 
         // no client referring this addr

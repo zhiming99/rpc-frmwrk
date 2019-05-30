@@ -3749,8 +3749,10 @@ gint32 CIfIoReqTask::ResetTimer()
             break;
         }
 
+#ifdef _DEBUG
         DebugPrint( 0,
             "the irp timer is reset" );
+#endif
         pIrp->ResetTimer();
 
     }while( 0 );
@@ -3775,27 +3777,17 @@ gint32 CIfIoReqTask::OnKeepAlive(
         if( ERROR( ret ) )
             break;
 
-        if( vecParams[ 1 ] ==
-            CRpcServices::KATerm )
+        guint32 iKaFlag = vecParams[ 1 ];
+
+        if( iKaFlag == CRpcServices::KATerm ||
+            iKaFlag == CRpcServices::KARelay )
         {
-            ret = oCfg.GetObjPtr(
-                propIrpPtr, pObj );
-
-            if( ERROR( ret ) )
-                break;
-
-            IRP* pIrp = pObj;
-            if( pIrp == nullptr )
-            {
-                ret = -EFAULT;
-                break;
-            }
             DebugPrint( 0,
                 "the timer is reset on the keep-alive signal" );
-            pIrp->ResetTimer();
+            ResetTimer();
         }
-        else if( vecParams[ 1 ] ==
-            CRpcServices::KARelay )
+
+        if( iKaFlag == CRpcServices::KARelay )
         {
             ret = oCfg.GetObjPtr(
                 propEventSink, pObj );
@@ -4840,11 +4832,6 @@ gint32 CIfInvokeMethodTask::ResetTimer()
         CCfgOpener oTaskCfg(
             ( IConfigDb* )GetConfig() );
 
-        // for keep-alive active requests,
-        // reset timer is not allowed
-        if( IsKeepAlive() )
-            break;
-
         CInterfaceServer* pIf = nullptr;
         ret = oTaskCfg.GetPointer(
             propIfPtr, pIf );
@@ -4868,8 +4855,10 @@ gint32 CIfInvokeMethodTask::ResetTimer()
         if( m_iTimeoutId > 0 )
         {
             oTimerSvc.ResetTimer( m_iTimeoutId );
+#ifdef _DEBUG
             DebugPrint( ret,
                 "Invoke Request timer is reset" );
+#endif
         }
 
     }while( 0 );
@@ -4911,6 +4900,8 @@ gint32 CIfInvokeMethodTask::OnKeepAliveRelay()
         ret = pIf->OnKeepAlive(
             this, CRpcServices::KARelay );
                 
+        ResetTimer();
+
     }while( 0 );
 
     return ret;

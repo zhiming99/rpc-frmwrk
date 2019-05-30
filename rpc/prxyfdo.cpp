@@ -782,39 +782,6 @@ gint32 CProxyFdoDispEvtTask::operator()(
         if( ERROR( ret ) )
             break;
 
-        /*string strMethod =
-            pEvtMsg.GetMember();
-
-        if( strMethod == SYS_EVENT_KEEPALIVE )
-        {
-            // fix the obj path and interface name
-            ObjPtr pObj;
-            string strIfName, strObjPath;
-            ret = pEvtMsg.GetObjArgAt( 0, pObj );
-            if( ERROR( ret ) )
-                break;
-
-            IConfigDb* pReq = pObj;
-            if( pReq == nullptr )
-            {
-                ret = -EFAULT;
-                break;
-            }
-
-            CReqOpener oReq( pReq );
-            ret = oReq.GetStrProp(
-                2, strIfName );
-
-            if( ERROR( ret ) )
-                break;
-
-            ret = oReq.GetStrProp(
-                3, strObjPath );
-
-            pEvtMsg.SetInterface( strIfName );
-            pEvtMsg.SetPath( strObjPath );
-        }*/
-
         *pBuf = pEvtMsg;
         ret = pPort->DispatchData( *pBuf );
 

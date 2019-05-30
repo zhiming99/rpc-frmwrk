@@ -46,9 +46,16 @@ CReqBuilder::CReqBuilder(
             if( ERROR( ret ) )
                 break;
             CopyProp( propUserName, pIf );
+            SetBoolProp( propIsServer, false );
+        }
+        else
+        {
+            SetBoolProp( propIsServer, true );
         }
 
         CopyProp( propIpAddr, pIf );
+        CopyProp( propSrcTcpPort, pIf );
+        CopyProp( propDestTcpPort, pIf );
 
         CIoManager* pMgr = pIf->GetIoMgr();
         string strModName = pMgr->GetModName();

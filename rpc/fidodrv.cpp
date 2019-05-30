@@ -78,7 +78,7 @@ gint32 CRpcTcpFidoDrv::Probe(
             propIpAddr, pLowerPort );
 
         oNewCfg.CopyProp(
-            propSrcTcpPort, pLowerPort );
+            propDestTcpPort, pLowerPort );
 
         oNewCfg.SetPointer(
             propIoMgr, GetIoMgr() );

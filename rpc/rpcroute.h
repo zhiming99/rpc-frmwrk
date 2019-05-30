@@ -514,7 +514,7 @@ class CRpcReqForwarder :
         const std::string& strSrcUniqName,
         const std::string& strSrcDBusName );
 
-    gint32 ClearRefCountByAddr(
+    gint32 ClearRefCountByIpAddr(
         const std::string& strIpAddr,
         std::vector< std::string >& vecUniqNames );
 
@@ -523,8 +523,10 @@ class CRpcReqForwarder :
         std::set< std::string >& setIpAddrs );
 
     gint32 GetRefCountByIpAddr(
-        const std::string& strIpAddr,
-        guint32& dwRefCount );
+        const std::string& strIpAddr );
+
+    gint32 GetRefCountByUniqName(
+        const std::string& strUniqName );
 
     virtual const EnumClsid GetIid() const
     { return iid( CRpcReqForwarder ); }

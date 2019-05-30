@@ -62,8 +62,8 @@ void CRpcTcpBusPort::AddPdoPort(
 
         if( ERROR( ret ) )
         {
-            dwPortNum = RPC_SVR_PORTNUM;
-            ret = 0;
+            DebugPrint( ret,
+                "Failed to AddPdoPort" );
         }
 
         BindPortIdAndAddr( iPortId,
@@ -164,14 +164,9 @@ gint32 CRpcTcpBusPort::BuildPdoPortName(
         ret = oCfgOpener.GetStrProp(
             propPortClass, strClass );
 
-        if( ERROR( ret ) )
-            strClass = PORT_CLASS_TCP_STREAM_PDO;
-
         if( strClass != PORT_CLASS_TCP_STREAM_PDO )
         {
-            // We only support to port classes
-            // RpcProxy and LocalDBusPdo
-            ret = -EINVAL;
+            ret = -ENOTSUP;
             break;
         }
 
@@ -206,14 +201,13 @@ gint32 CRpcTcpBusPort::BuildPdoPortName(
 
             guint32 dwPortNum;
             ret = oCfgOpener.GetIntProp(
-                propSrcTcpPort, dwPortNum );
+                propDestTcpPort, dwPortNum );
 
             if( ERROR( ret ) )
             {
-                dwPortNum = RPC_SVR_PORTNUM;
-                oCfgOpener.SetIntProp(
-                    propSrcTcpPort, dwPortNum );
-                ret = 0;
+                DebugPrint( ret,
+                    "Failed to find the tcp port number" );
+                break;
             }
 
             PDOADDR oAddr( strIpAddr, dwPortNum );
@@ -517,6 +511,13 @@ gint32 CRpcTcpBusPort::OnNewConnection(
             break;
         }
 
+        guint32 dwDestPortNum =
+            ntohs( oAddr.sin_port );
+
+        iSize = sizeof( oAddr );
+        ret = getsockname( iSockFd,
+            ( sockaddr* )&oAddr, &iSize );
+
         guint32 dwPortNum =
             ntohs( oAddr.sin_port );
 
@@ -538,10 +539,19 @@ gint32 CRpcTcpBusPort::OnNewConnection(
             break;
 
         ret = oCfg.SetIntProp(
+            propDestTcpPort, dwDestPortNum );
+
+        if( ERROR( ret ) )
+            break;
+
+        ret = oCfg.SetIntProp(
             propSrcTcpPort, dwPortNum );
 
         if( ERROR( ret ) )
             break;
+
+        oCfg.SetBoolProp(
+            propIsServer, true );
 
         ret = oCfg.SetStrProp(
             propPortClass,
@@ -865,8 +875,11 @@ gint32 CTcpStreamPdo::PostStart(
         if( ERROR( ret ) )
             break;
 
-        ret = oParams.CopyProp(
+        oParams.CopyProp(
             propSrcTcpPort, this );
+
+        ret = oParams.CopyProp(
+            propDestTcpPort, this );
 
         if( ERROR( ret ) )
             break;

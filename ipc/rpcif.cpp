@@ -3356,7 +3356,7 @@ gint32 CRpcServices::SendMethodCall(
         oCfg.RemoveProperty( propIrpPtr );
         pIrp->RemoveTimer();
 
-        if( ret == -EAGAIN )
+        if( ERROR( ret ) )
         {
             pIrp->RemoveCallback();
             break;
@@ -3688,9 +3688,7 @@ gint32 CRpcServices::LoadObjDesc(
             }
             else
             {
-
                 oCfg[ propPortId ] = ( guint32 )-1;
-                break;
             }
             
             // get the RequestTimeoutSec
@@ -3754,17 +3752,31 @@ gint32 CRpcServices::LoadObjDesc(
                 }
             }
 
+            // tcp port number for router setting
             if( oObjElem.isMember( JSON_ATTR_TCPPORT ) &&
                 oObjElem[ JSON_ATTR_TCPPORT ].isString() )
             {
                 strVal = oObjElem[ JSON_ATTR_TCPPORT ].asString(); 
+                guint32 dwVal = 0;
                 if( !strVal.empty() )
                 {
-                    guint32 dwVal = std::strtol(
+                    dwVal = std::strtol(
                         strVal.c_str(), nullptr, 10 );
-                    if( dwVal > 0 && dwVal < 0x10000 )
-                        oCfg[ propSrcTcpPort ] = dwVal;
                 }
+                if( dwVal > 1024 && dwVal < 0x10000 )
+                {
+                    EnumPropId iProp = propSrcTcpPort;
+                    if( !bServer )
+                        iProp = propDestTcpPort;
+                    oCfg[ iProp ] = dwVal;
+                }
+                else
+                {
+                    ret = -EINVAL;
+                    break;
+                }
+                oCfg.SetBoolProp(
+                    propIsServer, bServer );
             }
 
             if( oObjElem.isMember( JSON_ATTR_PROXY_PORTID ) &&

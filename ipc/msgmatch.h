@@ -1116,7 +1116,7 @@ class CRouterRemoteMatch : public CMessageMatch
             if( ERROR( ret ) )
                 break;
 
-            oCfg.CopyProp( propSrcTcpPort, pMatch );
+            oCfg.CopyProp( propDestTcpPort, pMatch );
 
             if( GetClsid() == clsid( CRouterRemoteMatch ) )
             {

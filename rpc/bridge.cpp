@@ -1470,9 +1470,9 @@ gint32 CRpcInterfaceProxy::OnKeepAliveOrig(
 
     }while( 0 );
 
-    // whether or not succeeded, we return pending
-    // state to avoid the task get completed
-    return STATUS_PENDING;
+    // whether or not succeeded, we complete the invoke
+    // task.
+    return 0;
 }
 
 gint32 CRpcInterfaceProxy::OnKeepAliveRelay(
@@ -1587,7 +1587,7 @@ gint32 CRpcTcpBridge::ClearRemoteEvents(
                 ( CObjBase* )pObj );
 
             oMatch.CopyProp( propIpAddr, this );
-            oMatch.CopyProp( propSrcTcpPort, this );
+            oMatch.CopyProp( propDestTcpPort, this );
             oMatch.CopyProp( propPortId, this );
 
             ret = pRouter->GetMatchToAdd(
@@ -1673,7 +1673,7 @@ gint32 CRpcTcpBridge::EnableRemoteEventInternal(
         // with the peer ip address, instead
         // ourself's
         oMatch.CopyProp( propIpAddr, this );
-        oMatch.CopyProp( propSrcTcpPort, this );
+        oMatch.CopyProp( propDestTcpPort, this );
         oMatch.CopyProp( propPortId, this );
 
         // trim the match properties to the

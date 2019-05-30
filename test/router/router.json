@@ -43,6 +43,7 @@
             "ObjectName": "RpcTcpBridgeImpl",
             "BusName" : "RpcTcpBusPort_0",
             "PortClass": "TcpStreamPdo",
+            "PortNumber" : "4132",
             "RequestTimeoutSec" : "120",
             "KeepAliveTimeoutSec" : "60",
             "QueuedRequests" : "false",
