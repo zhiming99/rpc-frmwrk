@@ -191,6 +191,10 @@ class CInterfaceState : public IInterfaceState
         IEventSink* pCallback,
         bool bRetry = true );
 
+    virtual gint32 SetupOpenPortParams(
+        IConfigDb* pcfg )
+    { return 0; }
+
     virtual gint32 OnPortEvent(
         EnumEventId iEvent,
         HANDLE hPort );
@@ -339,3 +343,17 @@ class CIfServerState : public CInterfaceState
 
 };
 
+class CTcpBdgePrxyState : public CLocalProxyState
+{
+
+    public:
+    typedef CLocalProxyState super;
+    CTcpBdgePrxyState( const IConfigDb* pCfg )
+        :super( pCfg )
+    {
+        SetClassId( clsid( CTcpBdgePrxyState ) );    
+    }
+    
+    gint32 SetupOpenPortParams(
+        IConfigDb* pCfg );
+};

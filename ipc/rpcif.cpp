@@ -94,6 +94,7 @@ static CfgPtr InitIfProxyCfg(
     }
     else if( strPortClass == PORT_CLASS_TCP_STREAM_PDO )
     {
+        iStateClass = clsid( CTcpBdgePrxyState );
     }
 
     oNewCfg.SetIntProp(

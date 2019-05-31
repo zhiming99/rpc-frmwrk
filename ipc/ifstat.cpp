@@ -587,6 +587,13 @@ gint32 CInterfaceState::OpenPortInternal(
         oParams[ propIfPtr ] =
             ObjPtr( GetInterface() );
 
+        // give subclass a chance to customize the
+        // parameters
+        ret = SetupOpenPortParams(
+            oParams.GetCfg() );
+        if( ERROR( ret ) )
+            break;
+
         ret = GetIoMgr()->OpenPort(
             oParams.GetCfg(), m_hPort );
 
@@ -950,3 +957,14 @@ bool CIfServerState::IsMyDest(
     return true;
 }
 
+gint32 CTcpBdgePrxyState::SetupOpenPortParams(
+    IConfigDb* pCfg )
+{
+    CCfgOpener oCfg( pCfg );
+
+    oCfg.CopyProp( propDestTcpPort, this );
+    oCfg.CopyProp( propSrcTcpPort, this );
+    oCfg.CopyProp( propIsServer, this );
+
+    return 0;
+}

@@ -97,6 +97,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CRpcTcpFidoDrv );
     INIT_MAP_ENTRYCFG( CIfRouterState );
     INIT_MAP_ENTRYCFG( CTcpFidoListenTask );
+    INIT_MAP_ENTRYCFG( CTcpBdgePrxyState );
     END_FACTORY_MAPS;
 };
 
