@@ -23,6 +23,9 @@ This framework depends on the following packags:
 11. `Streaming support to provide double-direction stream transfer`
 
 ---
+[`Sat 01 Jun 2019 05:48:48 PM CST`]   
+1. Added a Wiki page for performance description.   
+
 [`Mon 27 May 2019 08:13:24 PM CST`]   
 1. Got sick last week, so long time no update.
 2. The test cases, `Event broadcasting`, `KEEP-ALIVE`, `Pause-resume`, `Active-canceling`, and `Async call` are working now over both IRC and RPC, as well as `helloworld`.
