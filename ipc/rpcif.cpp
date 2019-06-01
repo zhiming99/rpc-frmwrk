@@ -1610,7 +1610,11 @@ gint32 CRpcInterfaceBase::OnEvent(
     if( ERROR( ret ) )
     {
         DebugPrint( ret,
-            "Error occured on Event %d", iEvent );
+            "Error occured on Event %d, %s@0x%x",
+            iEvent,
+            CoGetClassName( GetClsid() ),
+            this );
+        
     }
 #endif
     return ret;

@@ -2618,6 +2618,13 @@ struct CAggregatedObject
 
 };
 
+template< typename Type >
+gint32 GetIidOfType( std::vector< guint32 >& vecIids, Type* pType )
+{
+    vecIids.push_back( pType->Type::GetIid() );
+    return 0;
+}
+
 template< typename...Types >
 struct CAggregatedObject< CAggInterfaceServer, Types... >
     : Types...
@@ -2645,6 +2652,14 @@ struct CAggregatedObject< CAggInterfaceServer, Types... >
 
     const EnumClsid GetIid() const
     { return this->GetClsid(); }
+
+    const gint32 GetIids( std::vector< guint32 >& vecIids ) const
+    {
+        std::make_tuple( GetIidOfType( vecIids, static_cast< const Types* >( this ) )... );
+        if( vecIids.empty() )
+            return -ENOENT;
+        return 0;
+    }
 
     DEFINE_UNIQUE_HANDLER_IMPL( FetchData_Server, gint32,
         VA_LIST( IConfigDb* pDataDesc, gint32& fd, guint32& dwOffset, guint32& dwSize, IEventSink* pCallback ),
@@ -2691,28 +2706,8 @@ struct ClassName : CAggregatedObject< CAggInterfaceServer, ##__VA_ARGS__ >, IUnk
             pClsids.NewObj();\
         ( *pClsids )().push_back( GetClsid() );\
         ( *pClsids )().push_back( iid( IInterfaceServer ) );\
-        std::string strClasses = #__VA_ARGS__;\
-        gint32 iLen = strClasses.size();\
-        if( iLen == 0 )\
-            return STATUS_SUCCESS;\
-        if( iLen > 1024 )\
-            return -EINVAL;\
-        char *buf = ( char* )alloca( iLen + sizeof( char ) );\
-        if( buf == nullptr )\
-            return -ENOMEM;\
-        buf[ iLen ] = 0; \
-        strncpy( buf, strClasses.c_str(), iLen ); \
-        char* ptr = buf;\
-        char* szInternal = nullptr;\
-        char* szToken = strtok_r( ptr, ", \r\n", &szInternal );\
-        while( szToken != nullptr )\
-        {\
-            std::string strIfName = szToken;\
-            EnumClsid iid = CoGetIidFromIfName( strIfName );\
-            if( iid != clsid( Invalid ) )\
-                ( *pClsids )().push_back( iid );\
-            szToken = strtok_r( nullptr, ", \r\n", &szInternal );\
-        } \
+        ( *pClsids )().push_back( iid( IUnknown ) );\
+        GetIids( ( *pClsids)() );\
         return 0;\
     }\
 }

@@ -159,8 +159,9 @@ void CIfSmokeTest::testCliStartStop()
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );
     
     CSendFetchClient* pCli = pIf;
-    if( pCli != nullptr )
-    {
+    CPPUNIT_ASSERT( pCli != nullptr );
+
+    do{
         while( !pCli->IsConnected() )
             sleep( 1 );
 
@@ -171,23 +172,51 @@ void CIfSmokeTest::testCliStartStop()
         DebugPrint( 0, "Start..." );
         ret = pCli->Echo( strText, strReply );
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
-        DebugPrint( 0, "Completed" );
+        DebugPrint( 0, "Echo Completed" );
         if( strText != strReply )
             CPPUNIT_ASSERT( false );
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 
         // method from interface CSendFetchServer
+        DebugPrint( 0, "Enumerate intefaces..." );
         IntVecPtr pClsids( true );
         ret = pCli->EnumInterfaces( pClsids );
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
-        DebugPrint( 0, "Completed" );
+        DebugPrint( 0, "Found %d interfaces",
+            ( *pClsids )().size() );
+
+        for( auto iClsid : ( *pClsids )() )
+        {
+            const std::string& strName =
+                CoGetIfNameFromIid( ( EnumClsid )iClsid );
+            if( strName.empty() )
+            {
+                const char* pName =
+                    CoGetClassName( ( EnumClsid )iClsid );
+                if( pName == nullptr )
+                    continue;
+
+                DebugPrint( 0, "Find interface: %s", pName );
+            }
+            else
+            {
+                DebugPrint( 0, "Find interface: %s",
+                    strName.c_str() );
+            }
+        }
+
+        DebugPrint( 0, "EnumInterfaces Completed" );
 
         system( "echo Hello, World! > ./hello-1.txt" );
         // method from interface CFileTransferServer
         ret = pCli->UploadFile(
             std::string( "./hello-1.txt" ) );
-        CPPUNIT_ASSERT( SUCCEEDED( ret ) );
-        DebugPrint( 0, "Upload Completed" );
+
+        if( ERROR( ret ) )
+            break;
+
+        if( SUCCEEDED( ret ) );
+            DebugPrint( 0, "Upload Completed" );
 
         // method from interface CFileTransferServer
         ret = pCli->DownloadFile(
@@ -218,11 +247,8 @@ void CIfSmokeTest::testCliStartStop()
             CPPUNIT_ASSERT( SUCCEEDED( ret ) );
             DebugPrint( 0, "Pause interface Completed" );
         }
-    }
-    else
-    {
-        CPPUNIT_ASSERT( false );
-    }
+
+    }while( 0 );
 
     ret = pIf->Stop();
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );
