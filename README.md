@@ -28,7 +28,7 @@ This framework depends on the following packags:
 *    Security problem with `SEND_DATA`. That is the server cannot filter the request before all the data has already uploaded to the server.
 *    Both `SEND_DATA` and `FETCH_DATA` are difficult to cancel if the request is still on the way to the server, which is likely to happen over a slow connection.
 *    `KEEP_ALIVE` and `OnNotify` becomes complicated.
-2. The solution is to use the streaming interface to implement the `SEND_DATA/FETCH_DATA`, so that the server and the proxy can control the data transfer all the time.   
+2. The solution is to use the streaming interface to implement the `SEND_DATA/FETCH_DATA`, so that both the server and the proxy can control the traffic all the time.   
    
 
 [`Sat 01 Jun 2019 05:48:48 PM CST`]   
