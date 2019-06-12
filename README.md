@@ -23,6 +23,9 @@ This framework depends on the following packags:
 11. `Streaming support to provide double-direction stream transfer`
 
 ---
+[`Thu 13 Jun 2019 06:53:01 AM CST`]   
+1. the CStreamServer and CStreamProxy are undergoing rewritten now. The unix socket operations will be put into a new port object, and all the I/O related stuffs will go to the port object. and the CStreamServer and CStreamProxy are no longing watching all the unix sockets, and instead, associate with a unix socket port object. The port object handles all the events related to the socket.   
+
 [`Mon 03 Jun 2019 02:24:31 PM CST`]   
 1. The earlier implementaion of `SEND/FETCH DATA` does not work for `TCP` connection. I need to tear it apart and rewrite it. The issues are:
 *    Security problem with `SEND_DATA`. That is the server cannot filter the request before all the data has already uploaded to the server.
