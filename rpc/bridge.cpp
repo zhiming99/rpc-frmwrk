@@ -1107,7 +1107,7 @@ gint32 CRpcTcpBridgeProxy::CloseStream_Proxy(
     return ret;
 }
 
-gint32 CRpcTcpBridgeProxy::SendFetch_Proxy(
+gint32 CRpcTcpBridgeProxy::SendFetch_TcpProxy(
         IConfigDb* pDataDesc,           // [in, out]
         gint32& fd,                      // [out]
         guint32& dwOffset,               // [in, out]
@@ -1193,7 +1193,7 @@ gint32 CRpcTcpBridgeProxy::SendData_Proxy(
         dwSize == 0 )
         return -EINVAL;
 
-    return SendFetch_Proxy( pDataDesc,
+    return SendFetch_TcpProxy( pDataDesc,
         fd, dwOffset, dwSize, pCallback );
 }
 
@@ -1209,7 +1209,7 @@ gint32 CRpcTcpBridgeProxy::FetchData_Proxy(
         dwSize == 0 )
         return -EINVAL;
 
-    return SendFetch_Proxy( pDataDesc,
+    return SendFetch_TcpProxy( pDataDesc,
         fd, dwOffset, dwSize, pCallback );
 }
 

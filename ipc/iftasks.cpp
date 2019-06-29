@@ -70,7 +70,7 @@ CIfStartRecvMsgTask::CIfStartRecvMsgTask(
     if( ERROR( ret ) )
     {
         string strMsg = DebugMsg( ret,
-            "Error in CIfStartRecvMsgTask ctro" );
+            "Error in CIfStartRecvMsgTask ctor" );
         throw std::runtime_error( strMsg );
     }
 }
@@ -386,7 +386,7 @@ CIfRetryTask::CIfRetryTask(
         if( !oCfg.exist( propIntervalSec ) )
         {
             ret = oCfg.SetIntProp(
-                propRetries, IF_GENERIC_INTERVAL );
+                propIntervalSec, IF_GENERIC_INTERVAL );
         }
         if( ERROR( ret ) )
             break;
@@ -921,7 +921,7 @@ CIfEnableEventTask::CIfEnableEventTask(
     if( ERROR( ret ) )
     {
         string strMsg = DebugMsg( ret,
-            "Error in CIfEnableEventTask ctro" );
+            "Error in CIfEnableEventTask ctor" );
         throw std::runtime_error( strMsg );
     }
 }
@@ -2878,6 +2878,7 @@ CIfParallelTask::CIfParallelTask(
 
     // retry after one second
     ret = oCfg.SetIntProp( propIntervalSec, 3 ); 
+
     if( ERROR( ret ) )
     {
         string strMsg = DebugMsg( ret,

@@ -1,0 +1,2179 @@
+/*
+ * =====================================================================================
+ *
+ *       Filename:  uxport.cpp
+ *
+ *    Description:  implementation of unix sock bus port and unix sock stream pdo
+ *
+ *        Version:  1.0
+ *        Created:  06/11/2019 05:02:09 PM
+ *       Revision:  none
+ *       Compiler:  gcc
+ *
+ *         Author:  Ming Zhi(woodhead99@gmail.com )
+ *   Organization:  
+ *
+ * =====================================================================================
+ */
+#include "defines.h"
+#include "stlcont.h"
+#include "dbusport.h"
+#include "ifhelper.h"
+#include "emaphelp.h"
+#include "uxport.h"
+
+CRecvFilter::RecvState
+CRecvFilter::GetRecvState() const
+{
+    if( m_dwBytesToRead == 0 )
+    {
+        if( m_dwOffsetRead == ( ( guint32 )-1 ) )
+            return recvTok;
+        return recvSize; 
+    }
+    return recvData;
+}
+
+gint32 CRecvFilter::OnIoReady()
+{
+    gint32 ret = 0;
+    do{
+        // read the header
+        BufPtr pBuf;
+        RecvState iStat = GetRecvState();
+        bool bFirst = true;
+        guint8 byToken = tokInvalid;
+
+        if( iStat == recvTok )
+        {
+            ret = read( m_iFd, &byToken, sizeof( byToken ) );
+            if( ERROR( ret ) )
+            {
+                if( errno == EAGAIN || errno == EWOULDBLOCK )
+                {
+                    ret = -EAGAIN;
+                    break;
+                }
+            }
+            if( ret == 0 || bFirst )
+            {
+                ret = -ENOTCONN;
+                break;
+            }
+            bFirst = false;
+
+            if( byToken == tokPing ||
+                byToken == tokPong ||
+                byToken == tokClose )
+            {
+                ret = byToken;
+                break;
+            }
+
+            if( byToken != tokData &&
+                byToken != tokProgress )
+            {
+                ret = -EBADMSG;
+                break;
+            }
+
+            // read the size of the packet
+            ret = pBuf.NewObj();
+            if( ERROR( ret ) )
+                break;
+
+            m_dwOffsetRead = 0;
+            pBuf->Resize( sizeof( guint32 ) );
+            m_queBufRead.push_back( pBuf );
+        }
+
+        while( GetRecvState() == recvSize )
+        {
+            pBuf = m_queBufRead.back();
+            if( pBuf.IsEmpty() )
+            {
+                ret = -EFAULT;
+                break;
+            }
+
+            guint32 iLeft =
+                sizeof( guint32 ) - m_dwOffsetRead;
+
+            guint8* pos = ( ( guint8* )pBuf->ptr() ) +
+                m_dwOffsetRead;
+
+            ret = read( m_iFd, pos, iLeft );
+
+            if( ret == ( gint32 )iLeft )
+            {
+                m_dwBytesToRead = ntohl(
+                    *( ( guint32* )pBuf->ptr() ) );
+                if( m_dwBytesToRead >
+                    STM_MAX_BYTES_PER_BUF || 
+                    m_dwBytesToRead == 0 )
+                {
+                    ret = -EBADMSG;
+                    break;
+                }
+                pBuf->Resize( m_dwBytesToRead );
+                m_dwOffsetRead = 0;
+                // fall through
+            }
+            else if( ret > 0 )
+            {
+                m_dwOffsetRead += ret;
+                continue;
+            }
+            else if( ret == -1 )
+            {
+                if( errno == EAGAIN ||
+                    errno == EWOULDBLOCK )
+                {
+                    ret = -EAGAIN;
+                    break;
+                }
+                ret = -errno;
+                break;
+            }
+            else if( ret == 0 && bFirst )
+            {
+                ret = -ENOTCONN;
+                break;
+            }
+        }
+
+        if( ERROR( ret ) )
+            break;
+
+        if( GetRecvState() != recvData )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+
+        while( m_dwBytesToRead > 0 )
+        {
+            if( m_queBufRead.empty() )
+            {
+                ret = -EFAULT;
+                break;
+            }
+
+            if( pBuf.IsEmpty() )
+                pBuf = m_queBufRead.back();
+
+            if( pBuf.IsEmpty() )
+            {
+                ret = -EFAULT;
+                break;
+            }
+
+            if( m_dwBytesToRead >
+                pBuf->size() - m_dwOffsetRead )
+            {
+                ret = -ERANGE;
+                break;
+            }
+
+            guint32 iLeft =
+                pBuf->size() - m_dwOffsetRead;
+
+            guint8* pos = ( guint8* )pBuf->ptr() +
+                m_dwOffsetRead;
+
+            ret = read( m_iFd, pos, iLeft );
+
+            if( ret == ( gint32 )iLeft )
+            {
+                // the packet is done
+                m_dwOffsetRead = ( guint32 )-1;
+                m_dwBytesToRead = 0;
+                m_dwBytesPending += pBuf->size();
+                ret = byToken;
+                break;
+            }
+            else if( ret > 0 )
+            {
+                m_dwBytesToRead -= ret;
+                m_dwOffsetRead += ret;
+                continue;
+            }
+            else if( ret == -1 )
+            {
+                if( errno == EAGAIN ||
+                    errno == EWOULDBLOCK )
+                {
+                    ret = -EAGAIN;
+                    break;
+                }
+                ret = -errno;
+                break;
+            }
+            else if( ret == 0 && bFirst )
+            {
+                ret = -ENOTCONN;
+                break;
+            }
+        }
+
+    }while( 0 );
+
+    if( ERROR( ret ) && ret != -EAGAIN )
+    {
+        m_dwBytesToRead = 0;
+        m_dwOffsetRead = ( guint32 )-1;
+    }
+
+    return ret;
+}
+
+gint32 CRecvFilter::ReadStream(
+    BufPtr& pBuf )
+{
+    if( m_queBufRead.empty() )
+        return -ENOENT;
+
+    // the read is not complete yet
+    if( m_queBufRead.size() == 1 &&
+        GetRecvState() != recvTok )
+        return -ENOENT;
+
+    pBuf = m_queBufRead.front();
+    m_queBufRead.pop_front();
+    m_dwBytesPending -= pBuf->size();
+    return 0;
+}
+
+CSendQue::SendState
+CSendQue::GetSendState() const
+{
+    if( m_dwBytesToWrite == 0 )
+    {
+        if( m_dwOffsetWrite == ( ( guint32 )-1 ) )
+            return sendTok;
+        return sendSize; 
+    }
+    return sendPayload;
+}
+
+gint32 CSendQue::OnIoReady()
+{
+    gint32 ret = 0;
+    do{
+        if( m_queBufWrite.empty() )
+            break;
+
+        STM_PACKET& oPkt =
+            m_queBufWrite.front();
+
+        if( m_dwRestBytes == 0 )
+            m_dwRestBytes = oPkt.pData->size();
+
+        guint8 byToken = oPkt.byToken;
+
+        if( GetSendState() == sendTok )
+        {
+            ret = Send( m_iFd, &byToken,
+                sizeof( byToken ) );
+
+            if( ret == -1 )
+            {
+                if( errno == EAGAIN ||
+                    errno == EWOULDBLOCK )
+                {
+                    ret = -EAGAIN;
+                    break;
+                }
+                ret = -errno;
+                break;
+            }
+
+            if( byToken == tokPing ||
+                byToken == tokPong ||
+                byToken == tokClose )
+            {
+                // next packet
+                --m_dwBytesPending;
+                m_queBufWrite.pop_front();
+                ret = 0;
+                continue;
+            }
+
+            if( byToken != tokData && 
+                byToken != tokProgress )
+            {
+                ret = -EBADMSG;
+                break;
+            }
+
+            if( byToken != tokData &&
+                oPkt.dwSize > STM_MAX_BYTES_PER_BUF )
+            {
+                // only data packet can have bigger
+                // size than STM_MAX_BYTES_PER_BUF
+                ret = -EBADMSG;
+                break;
+            }
+            m_dwOffsetWrite = 0;
+        }
+
+        guint32 dwPktSize = m_dwRestBytes -
+            STM_MAX_BYTES_PER_BUF * m_dwBlockSent;
+
+        if( dwPktSize > STM_MAX_BYTES_PER_BUF )
+            dwPktSize = STM_MAX_BYTES_PER_BUF;
+
+        while( GetSendState() == sendSize )
+        {
+            guint32 iLeft =
+                sizeof( guint32 ) - m_dwOffsetWrite;
+
+            guint32 dwSize = htonl( dwPktSize );
+            guint8* pos = ( ( guint8* )&dwSize ) +
+                m_dwOffsetWrite;
+
+            ret = Send( m_iFd, pos, iLeft );
+
+            if( ret == ( gint32 )iLeft )
+            {
+                // setup the parameters for payload
+                // transfer
+                m_dwOffsetWrite = 0;
+                m_dwBytesToWrite = dwPktSize;
+                ret = 0;
+                // fall through
+            }
+            else if( ret > 0 )
+            {
+                m_dwOffsetWrite += ret;
+                ret = 0;
+                continue;
+            }
+            else if( ret == -1 )
+            {
+                if( errno == EAGAIN ||
+                    errno == EWOULDBLOCK )
+                {
+                    ret = -EAGAIN;
+                    break;
+                }
+                ret = -errno;
+                break;
+            }
+        }
+
+        if( ERROR( ret ) )
+            break;
+
+        if( GetSendState() != sendPayload )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+
+        BufPtr pBuf;
+
+        while( m_dwBytesToWrite > 0 )
+        {
+            if( pBuf.IsEmpty() )
+                pBuf = oPkt.pData;
+
+            if( pBuf.IsEmpty() )
+            {
+                ret = -EFAULT;
+                break;
+            }
+
+            if( m_dwBytesToWrite >
+                dwPktSize - m_dwOffsetWrite )
+            {
+                ret = -ERANGE;
+                break;
+            }
+
+            guint32 iLeft =
+                dwPktSize - m_dwOffsetWrite;
+
+            guint8* pos = ( ( guint8* )pBuf->ptr() ) +
+                m_dwBlockSent * STM_MAX_BYTES_PER_BUF +
+                m_dwOffsetWrite;
+
+            ret = Send( m_iFd, pos, iLeft );
+            if( ret == ( gint32 )iLeft )
+            {
+                // current packet is done
+                // reset the working params
+                m_dwOffsetWrite = ( guint32 )-1;
+                m_dwBytesToWrite = 0;
+
+                m_dwBytesPending -= ( 1 +
+                    sizeof( guint32 ) + dwPktSize );
+
+                m_dwRestBytes -= dwPktSize;
+                if( m_dwRestBytes > 0 )
+                {
+                    ++m_dwBlockSent;
+                    continue;
+                }
+                m_queBufWrite.pop_front();
+                ret = 0;
+                break;
+            }
+            else if( ret > 0 )
+            {
+                m_dwBytesToWrite -= ret;
+                m_dwOffsetWrite += ret;
+                ret = 0;
+                continue;
+            }
+            else if( ret == -1 )
+            {
+                if( errno == EAGAIN ||
+                    errno == EWOULDBLOCK )
+                {
+                    ret = -EAGAIN;
+                    break;
+                }
+                ret = -errno;
+                break;
+            }
+        }
+
+        if( ERROR( ret ) )
+            break;
+
+    }while( m_dwRestBytes > 0 );
+
+    return ret;
+}
+
+gint32 CSendQue::SendPingPong( bool bPing )
+{
+    STM_PACKET oPkt;
+    oPkt.byToken =
+        bPing ? tokPing : tokPong;
+
+    m_queBufWrite.push_back( oPkt );
+    ++m_dwBytesPending;
+
+    gint32 ret = OnIoReady();
+    if( ret == -EAGAIN )
+        ret = STATUS_PENDING;
+
+    return ret;
+}
+
+gint32 CSendQue::SendClose()
+{
+    STM_PACKET oPkt;
+    oPkt.byToken = tokClose;
+    m_queBufWrite.push_back( oPkt );
+    ++m_dwBytesPending;
+
+    gint32 ret = OnIoReady();
+    if( ret == -EAGAIN )
+        ret = STATUS_PENDING;
+
+    return ret;
+}
+
+gint32 CSendQue::WriteStream(
+    BufPtr& pBuf, guint8 byToken )
+{
+    STM_PACKET oPkt;
+    oPkt.byToken = byToken;
+    oPkt.dwSize = pBuf->size();
+    oPkt.pData = pBuf;
+    m_queBufWrite.push_back( oPkt );
+
+    m_dwBytesPending += ( 1 +
+        sizeof( guint32 ) + pBuf->size() );
+
+    if( m_queBufWrite.size() > 1 )
+        return STATUS_PENDING;
+
+    gint32 ret = OnIoReady();
+
+    if( ret == -EAGAIN )
+        ret = STATUS_PENDING;
+
+    return ret;
+}
+
+CIoWatchTask::CIoWatchTask( const IConfigDb* pCfg )
+    :super( pCfg ),
+    m_iFd( -1 ),
+    m_hReadWatch( 0 ),
+    m_hWriteWatch( 0 ),
+    m_oRecvFilter( GetFd( pCfg ) ),
+    m_oSendQue( GetFd( pCfg ) ),
+    m_qwBytesRead( 0 ),
+    m_qwBytesWrite( 0 ),
+    m_dwState( stateStarting ),
+    m_iWatTimerId( 0 )
+{
+    SetClassId( clsid( CIoWatchTask ) );
+    CCfgOpener oCfg( ( IConfigDb* )GetConfig() );
+
+    gint32 ret = 0;
+    do{
+        ret = oCfg.GetIntProp( propFd,
+            ( guint32& )m_iFd );
+        if( ERROR( ret ) )
+            break;
+
+        IPort* pPort = nullptr;
+        ret = oCfg.GetPointer(
+            propPortPtr, pPort );
+        if( ERROR( ret ) )
+            break;
+
+        m_pPort = pPort;
+        if( m_pPort.IsEmpty() )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        oCfg.RemoveProperty( propPortPtr );
+        oCfg.RemoveProperty( propFd );
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+    {
+        std::string strMsg = DebugMsg( ret,
+            "Error in CIoWatchTask ctor" );
+        throw std::runtime_error( strMsg );
+    }
+}
+
+// new data arrived
+gint32 CIoWatchTask::OnProgress(
+    BufPtr& pBuf )
+{
+    gint32 ret = 0;
+    if( m_pPort.IsEmpty() )
+        return -EFAULT;
+
+    CUnixSockStmPdo* pPort = m_pPort;
+    if( pPort == nullptr )
+        return -EFAULT;
+
+    ret = pPort->OnUxSockEvent(
+        tokProgress, pBuf );
+
+    if( ERROR( ret ) )
+        return ret;
+
+    return -EAGAIN;
+}
+
+// new data arrived
+gint32 CIoWatchTask::OnDataReady(
+    BufPtr pBuf )
+{
+    gint32 ret = 0;
+    if( m_pPort.IsEmpty() )
+        return -EFAULT;
+
+    CUnixSockStmPdo* pPort = m_pPort;
+    if( pPort == nullptr )
+        return -EFAULT;
+
+    m_qwBytesRead += pBuf->size();
+    ret = pPort->OnStmRecv( pBuf );
+
+    if( ERROR( ret ) )
+        return ret;
+
+    return -EAGAIN;
+}
+
+gint32 CIoWatchTask::OnSendReady()
+{
+    gint32 ret = 0;
+    if( m_pPort.IsEmpty() )
+        return -EFAULT;
+
+    CUnixSockStmPdo* pPort = m_pPort;
+    if( pPort == nullptr )
+        return -EFAULT;
+
+    ret = pPort->OnSendReady();
+
+    if( ERROR( ret ) )
+        return ret;
+
+    return -EAGAIN;
+}
+
+// ping/pong packets
+gint32 CIoWatchTask::OnPingPong( bool bPing )
+{
+    gint32 ret = 0;
+    if( m_pPort.IsEmpty()  )
+        return -EFAULT;
+
+    CUnixSockStmPdo* pPort = m_pPort;
+    if( pPort == nullptr )
+        return -EFAULT;
+
+    BufPtr pBuf;
+    ret = pPort->OnUxSockEvent(
+        bPing ? tokPing : tokPong, pBuf );
+
+    if( ERROR( ret ) )
+        return ret;
+
+    return -EAGAIN;
+}
+
+// received by server to notify a client initiated
+// close
+gint32 CIoWatchTask::OnClose()
+{
+    if( m_pPort.IsEmpty() )
+        return -EFAULT;
+
+    CUnixSockStmPdo* pPort = m_pPort;
+    if( pPort == nullptr )
+        return -EFAULT;
+
+    BufPtr pBuf;
+    pPort->OnUxSockEvent( tokClose, pBuf );
+
+    // return 0 to complete the task
+    return 0;
+}
+
+void CIoWatchTask::OnError( gint32 iError )
+{
+    if( m_pPort.IsEmpty() )
+        return;
+
+    CUnixSockStmPdo* pPort = m_pPort;
+    if( pPort == nullptr )
+        return;
+
+    BufPtr pBuf( true );
+    *pBuf = ( guint32 )iError;
+    pPort->OnUxSockEvent( tokError, pBuf );
+
+    // return 0 to complete the task
+    return;
+}
+
+gint32 CIoWatchTask::OnIoWatchEvent(
+    guint32 revents )
+{
+    gint32 ret = 0;
+    do{
+        if( revents & POLLERR ||
+            revents & POLLHUP )
+        {
+            ret = OnIoError( revents );
+        }
+        else if( revents & POLLIN ||
+            revents == POLLOUT )
+        {
+            ret = OnIoReady( revents ); 
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CIoWatchTask::RunTask()
+{
+    gint32 ret = 0;
+    do{
+        IConfigDb* pCfg = GetConfig();
+        CParamList oCfg( pCfg );
+
+        CPort* pPort = m_pPort;
+        if( unlikely( pPort == nullptr ) )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        
+        CIoManager* pMgr = pPort->GetIoMgr();
+        CMainIoLoop* pLoop = pMgr->GetMainIoLoop();
+        if( unlikely( pLoop == nullptr ) )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        oCfg.Push( m_iFd );
+        oCfg.Push( ( guint32 )POLLIN );
+        oCfg.Push( false );
+
+        TaskletPtr pTask( this );
+
+        ret = pLoop->AddIoWatch(
+            pTask, m_hReadWatch );
+
+        if( ERROR( ret ) )
+            break;
+
+        oCfg[ 1 ] = ( guint32 )POLLOUT;
+
+        ret = pLoop->AddIoWatch(
+            pTask, m_hWriteWatch );
+
+        if( ERROR( ret ) )
+        {
+            pLoop->RemoveIoWatch(
+                m_hReadWatch );
+            m_hReadWatch = 0;
+            break;
+        }
+
+        // pLoop->StartSource( m_hReadWatch, srcIo );
+        
+        // return STATUS_PENDING to wait for IO
+        ret = STATUS_PENDING;
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CIoWatchTask::operator()(
+    guint32 dwContext )
+{
+    gint32 ret = 0;
+    try{
+        EnumTaskState iState = GetTaskState();
+
+        if( iState == stateStopped )
+            return ERROR_STATE;
+
+        if( iState == stateStarted )
+        {
+            switch( dwContext )
+            {
+            case eventIoWatch:
+                {
+                    std::vector< guint32 > vecParams;
+                    ret = GetParamList( vecParams );
+                    if( ERROR( ret ) )
+                        break;
+
+                    guint32 dwCount = GetArgCount(
+                        &IEventSink::OnEvent );
+
+                    if( vecParams.size() < dwCount )
+                    {
+                        ret = -EINVAL;
+                        break;
+                    }
+                    
+                    guint32 revents = vecParams[ 1 ];
+                    ret = OnIoWatchEvent( revents );
+
+                    if( ERROR( ret ) && ret != -EAGAIN )
+                        ret = G_SOURCE_REMOVE;
+                    else
+                        ret = G_SOURCE_CONTINUE;
+
+                    return ret;
+                }
+            default:
+                {
+                    break;
+                }
+            }
+        }
+        ret = super::operator()( dwContext );
+    }
+    catch( std::runtime_error& e )
+    {
+        // lock failed
+        ret = -EACCES;
+    }
+    return ret;
+}
+
+gint32 CIoWatchTask::OnEvent(
+    EnumEventId iEvent,
+    guint32 dwParam1,
+    guint32 dwParam2,
+    guint32* pData )
+{
+    // Lock to prevent re-entrance 
+    gint32 ret = 0;
+    try{
+        CStdRTMutex oTaskLock( GetLock() );
+        switch( iEvent )
+        {
+        case eventIoWatch:
+            {
+                // we have some special processing for
+                // eventIoWatch to bypass the normal
+                // CIfParallelTask's process flow.
+                IntVecPtr pVec( true );
+                std::vector< guint32 >& oVec = ( *pVec )();
+                oVec.push_back( ( guint32 )iEvent );
+                oVec.push_back( ( guint32 )dwParam1 );
+                oVec.push_back( ( guint32 )dwParam2 );
+                oVec.push_back( ( guint32 )pData);
+
+                CCfgOpener oCfg(
+                    ( IConfigDb* )GetConfig() );
+
+                oCfg.SetObjPtr(
+                    propParamList, ObjPtr( pVec ) );
+
+                // note: the return value won't not be
+                // set by SetError
+                ret = ( *this )( iEvent );
+                oCfg.RemoveProperty( propParamList );
+
+                break;
+                
+            }
+        default:
+            {
+                ret = super::OnEvent( iEvent,
+                    dwParam1, dwParam2, pData );
+                break;
+            }
+        }
+    }
+    catch( std::runtime_error& e )
+    {
+        // lock failed
+        ret = -EACCES;
+    }
+    return ret;
+}
+
+gint32 CIoWatchTask::StartStopWatch(
+    bool bStop, bool bWrite )
+{
+    gint32 ret = 0;
+    CPort* pPort = m_pPort;
+
+    if( pPort == nullptr )
+        return -EFAULT;
+
+    CIoManager* pMgr = pPort->GetIoMgr();
+    CMainIoLoop* pLoop = pMgr->GetMainIoLoop();
+#ifdef _USE_LIBEV
+    HANDLE hWatch = m_hWriteWatch;
+    if( unlikely( bWrite == false ) )
+        hWatch = m_hReadWatch;
+
+    if( bStop )
+        ret = pLoop->StopSource( hWatch, srcIo );
+    else
+        ret = pLoop->StartSource( hWatch, srcIo );
+#else
+    // not implemented yet
+
+#endif
+    return ret;
+}
+
+// watch handler
+gint32 CIoWatchTask::OnIoReady( guint32 revent )
+{
+    gint32 ret = 0;
+    do{
+        if( revent & POLLIN )
+        {
+            do{
+                ret = m_oRecvFilter.OnIoReady();
+                if( ERROR( ret ) )
+                    break;
+
+                switch( ret )
+                {
+                case tokPong: 
+                case tokPing:
+                    {
+                        OnPingPong( ret == tokPing );
+                        ret = -EAGAIN;
+                        break;
+                    }
+                case tokClose:
+                    {
+                        OnClose();
+                        ret = -EAGAIN;
+                        break;
+                    }
+                case tokData:
+                    {
+                        BufPtr pBuf;
+                        ret = m_oRecvFilter.ReadStream( pBuf );
+                        if( ERROR( ret ) )
+                        {
+                            ret = -EAGAIN;
+                            break;
+                        }
+                        ret = OnDataReady( pBuf );
+                        break;
+                    }
+                case tokProgress:
+                    {
+                        BufPtr pBuf;
+                        ret = m_oRecvFilter.ReadStream( pBuf );
+                        if( ERROR( ret ) )
+                        {
+                            ret = -EAGAIN;
+                            break;
+                        }
+                        ret = OnProgress( pBuf );
+                        break;
+                    }
+                default:
+                    break;
+                }
+
+                // till exhause all the data in the buffer
+            }while( ret > 0 );
+
+            if( ret == -EAGAIN )
+                ret = 0;
+
+            break;
+        }
+        else if( revent & POLLOUT )
+        {
+            do{
+                ret = m_oSendQue.OnIoReady();
+                if( ret == -EAGAIN )
+                    StartWatch();
+                else
+                {
+                    // no data to send
+                    StopWatch();
+                }
+
+                if( SUCCEEDED( ret ) &&
+                    m_oSendQue.GetPendingWrite() == 0 )
+                    ret = OnSendReady();
+
+            }while( 0 );
+        }
+        else
+        {
+            ret = -ENOTSUP;
+        }
+
+    }while( 0 );
+
+    if( ERROR( ret ) && ret != -EAGAIN )
+        OnError( ret );
+
+    return ret;
+}
+
+gint32 CIoWatchTask::ReleaseChannel()
+{
+    do{
+        CPort* pPort = m_pPort;
+        if( pPort == nullptr )
+            break;
+
+        CIoManager* pMgr = pPort->GetIoMgr();
+        CMainIoLoop* pLoop =
+            pMgr->GetMainIoLoop();
+
+        if( unlikely( pLoop == nullptr ) )
+            break;
+
+        pLoop->RemoveIoWatch( m_hReadWatch );
+        pLoop->RemoveIoWatch( m_hWriteWatch );
+        m_hReadWatch = m_hWriteWatch = 0;
+        StopTimer();
+
+    }while( 0 );
+
+    if( m_iFd > 0 )
+    {
+        close( m_iFd );
+        m_iFd = -1;
+    }
+
+    return 0;
+}
+
+gint32 CIoWatchTask::StartStopTimer( bool bStart )
+{
+    gint32 ret = 0;
+    do{
+        CCfgOpener oCfg( ( IConfigDb* )
+            this->GetConfig() );
+
+        CPort* pPort = nullptr;
+        ret = oCfg.GetPointer(
+            propPortPtr, pPort );
+
+        if( ERROR( ret ) ) 
+            break;
+
+        if( unlikely( pPort == nullptr ) )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        
+        CCfgOpenerObj oPortCfg( pPort );
+        guint32 dwTimeOutSec = 0;
+
+        ret = oPortCfg.GetIntProp(
+            propKeepAliveSec, dwTimeOutSec );
+
+        if( ERROR( ret ) )
+            break;
+
+        if( dwTimeOutSec == 0 )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        CIoManager* pMgr = pPort->GetIoMgr();
+        CUtilities& oUtils = pMgr->GetUtils();
+
+        CTimerService& oTimerSvc =
+            oUtils.GetTimerSvc();
+
+        if( bStart )
+        {
+            m_iWatTimerId = oTimerSvc.AddTimer(
+                dwTimeOutSec, this,
+                eventKeepAlive );
+        }
+        else if( m_iWatTimerId > 0 )
+        {
+            oTimerSvc.RemoveTimer( m_iWatTimerId );
+            m_iWatTimerId = 0;
+        }
+
+    } while( 0 );
+
+    return ret;
+}
+
+CUnixSockStmPdo::CUnixSockStmPdo(
+    const IConfigDb* pCfg ) :
+    super( pCfg )
+{
+    SetClassId( clsid( CUnixSockStmPdo ) );
+    m_dwFlags &= ~PORTFLG_TYPE_MASK;
+    m_dwFlags |= PORTFLG_TYPE_PDO;
+
+    CCfgOpener oCfg( pCfg );
+    gint32 ret = 0;
+
+    do{
+        ret = oCfg.GetPointer(
+            propBusPortPtr, m_pBusPort );
+
+        if( ERROR( ret ) )
+            break;
+
+        RemoveProperty( propBusPortPtr );
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+    {
+        throw std::runtime_error(
+            "Error in CUnixSockStmPdo ctor" );
+    }
+}
+
+gint32 CUnixSockStmPdo::PostStart( IRP* pIrp )
+{
+    CParamList oParams;
+
+    oParams.SetPointer( propPortPtr, this );
+    oParams.SetPointer( propIoMgr, GetIoMgr() );
+    oParams.CopyProp( propFd, this );
+
+    gint32 ret = 0;
+    do{
+        ret = m_pIoWatch.NewObj(
+            clsid( CIoWatchTask ),
+            oParams.GetCfg() );
+
+        if( ERROR( ret ) )
+            break;
+
+        ret = ( *m_pIoWatch )( eventZero );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CUnixSockStmPdo::PreStop( IRP* pIrp )
+{
+    if( !m_pIoWatch.IsEmpty() )
+    {
+        // stop the watch
+        m_pIoWatch->OnEvent( eventTaskComp,
+            ERROR_PORT_STOPPED, 0, nullptr );
+    }
+    return super::PreStop( pIrp );
+}
+
+gint32 CUnixSockStmPdo::RemoveIrpFromMap( IRP* pIrp )
+{
+    // NOTE: you should make sure the irp is
+    // locked from outside
+    if( pIrp == nullptr )
+        return -EINVAL;
+
+    IrpCtxPtr pCtx = pIrp->GetTopStack();
+    if( pCtx->GetMajorCmd() != IRP_MJ_FUNC )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        CStdRMutex oPortLock( GetLock() );
+        std::deque< IrpPtr >* pQueue = nullptr;
+
+        switch( pCtx->GetMinorCmd() )
+        {
+        case IRP_MN_WRITE:
+            {
+                pQueue = &m_queWritingIrps;
+                break;
+            }
+        case IRP_MN_READ:
+            {
+                pQueue = &m_queReadingIrps;
+                break;
+            }
+        case IRP_MN_IOCTL:
+            {
+                ret = -ENOENT;
+                if( pCtx->GetCtrlCode() !=
+                    CTRLCODE_LISTENING )
+                    break;
+
+                pQueue = &m_queListeningIrps;
+                break;
+            }
+        default:
+            ret = -ENOTSUP; 
+            break;
+        }
+
+        if( ERROR( ret ) )
+            break;
+
+        std::deque< IrpPtr >::iterator itr =
+            pQueue->begin();
+
+        ret = -ENOENT;
+        while( itr != pQueue->end() )
+        {
+            if( pIrp->GetObjId() ==
+                ( *itr )->GetObjId() )
+            {
+                pQueue->erase( itr );
+                ret = 0;
+                break;
+            }
+            ++itr;
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CUnixSockStmPdo::CancelFuncIrp(
+    IRP* pIrp, bool bForce )
+{
+    if( pIrp == nullptr ||
+        pIrp->GetStackSize() == 0 )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        ret = RemoveIrpFromMap( pIrp );
+        if( ERROR( ret ) )
+            break;
+
+        CStdRMutex oIrpLock( pIrp->GetLock() );
+        ret = pIrp->CanContinue( IRP_STATE_READY );
+        if( ERROR( ret ) )
+            break;
+
+        IrpCtxPtr& pCtx = pIrp->GetTopStack();
+        pCtx->SetStatus( ret = ERROR_CANCEL );
+
+        oIrpLock.Unlock();
+        super::CancelFuncIrp( pIrp, bForce );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CUnixSockStmPdo::SubmitIoctlCmd(
+    IRP* pIrp )
+{
+    if( pIrp == nullptr ||
+        pIrp->GetStackSize() == 0 )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    // let's process the func irps
+    IrpCtxPtr pCtx = pIrp->GetCurCtx();
+    do{
+        if( pIrp->MajorCmd() != IRP_MJ_FUNC
+            || pIrp->MinorCmd() != IRP_MN_IOCTL )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        switch( pIrp->CtrlCode() )
+        {
+        case CTRLCODE_LISTENING:
+            {
+                // server side I/O
+                ret = HandleListening( pIrp );
+                break;
+            }
+        case CTRLCODE_STREAM_CMD:
+            {
+                ret = HandleStreamCommand( pIrp );
+                break;
+            }
+        default:
+            {
+                ret = -ENOTSUP;
+                break;
+            }
+        }
+
+    }while( 0 );
+
+    if( ret != STATUS_PENDING )
+        pCtx->SetStatus( ret );
+
+    return ret;
+}
+
+gint32 CUnixSockStmPdo::HandleListening(
+    IRP* pIrp )
+{
+    if( pIrp == nullptr ||
+        pIrp->GetStackSize() == 0 )
+        return -EINVAL;
+
+    gint32 ret = 0;
+
+    // let's process the func irps
+    IrpCtxPtr& pCtx = pIrp->GetTopStack();
+    do{
+        CStdRMutex oPortLock( GetLock() );
+        std::deque< BufPtr >& oEvtQue =
+            m_queEventPackets;
+        if( !oEvtQue.empty() )
+        {
+            BufPtr pBuf = oEvtQue.front();        
+            pCtx->m_pRespData = pBuf;
+            oEvtQue.pop_front();
+            ret = STATUS_SUCCESS;
+            break;
+        }
+
+        if( m_queListeningIrps.size() >
+            STM_MAX_QUEUE_SIZE )
+        {
+            // why send read request so many times
+            ret = ERROR_QUEUE_FULL;
+            break;
+        }
+        m_queListeningIrps.push_back( pIrp );
+        ret = STATUS_PENDING;
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CUnixSockStmPdo::HandleStreamCommand(
+    IRP* pIrp )
+{
+    if( pIrp == nullptr ||
+        pIrp->GetStackSize() == 0 )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    bool bNotify = false;
+
+    // let's process the func irps
+    do{
+        CIoWatchTask* pTask = m_pIoWatch;
+        if( pTask == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        CStdRTMutex oTaskLock( pTask->GetLock() );
+        CStdRMutex oPortLock( GetLock() );
+        IrpCtxPtr& pCtx = pIrp->GetTopStack();
+
+        bool bOut = true;
+        if( pCtx->GetIoDirection() == IRP_DIR_IN )
+            bOut = false;
+
+        if( bOut && m_queWritingIrps.size() >=
+            STM_MAX_QUEUE_SIZE )
+            return ERROR_QUEUE_FULL;
+
+        if( bOut && !m_queWritingIrps.empty() )
+        {
+            m_queWritingIrps.push_back( pIrp );
+            if( m_queWritingIrps.size() ==
+                STM_MAX_QUEUE_SIZE )
+                bNotify = true;
+            ret = STATUS_PENDING;
+            break;
+        }
+            
+        BufPtr pBuf = pCtx->m_pReqData;
+        if( pBuf.IsEmpty() )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        guint8 cToken = pBuf->ptr()[ 0 ];
+        switch( cToken )
+        {
+        case tokPong:
+            ret = pTask->SendPingPong( false );
+            break;
+
+        case tokPing:
+            ret = pTask->SendPingPong( true );
+            break;
+
+        case tokProgress:
+            {
+                BufPtr pNewBuf( true );
+                pNewBuf->Resize( pBuf->size()
+                    - 1 - sizeof( guint32 ) );
+
+                if( ERROR( ret ) )
+                    break;
+
+                memcpy( pNewBuf->ptr(),
+                    pBuf->ptr() + 1 + sizeof( guint32 ), 
+                    pNewBuf->size() );
+
+                ret = pTask->WriteStream(
+                    pNewBuf, tokProgress );
+
+                break;
+            }
+        case tokLift:
+            {
+                m_bFlowControl = false;
+                if( m_queDataPackets.size() >=
+                    STM_MAX_QUEUE_SIZE )
+                {
+                    ret = ERROR_FAIL;
+                    break;
+                }
+                pTask->StartWatch( false );
+                break;
+            }
+        case tokFlowCtrl:
+            {
+                m_bFlowControl = true;
+                pTask->StopWatch( false );
+                break;
+            }
+        default:
+            {
+                ret = -EINVAL;
+                break;
+            }
+        }
+
+        if( ret == STATUS_PENDING )
+        {
+            m_queWritingIrps.push_back( pIrp );
+            if( m_queWritingIrps.size() ==
+                STM_MAX_QUEUE_SIZE )
+                bNotify = true;
+        }
+
+    }while( 0 );
+
+    if( bNotify )
+    {
+        BufPtr pNullBuf;
+        SendNotify( tokFlowCtrl, pNullBuf );
+    }
+
+    return ret;
+}
+
+gint32 CUnixSockStmPdo::OnSubmitIrp(
+    IRP* pIrp )
+{
+
+    gint32 ret = 0;
+    do{
+        if( pIrp == nullptr ||
+            pIrp->GetStackSize() == 0 )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        // let's process the func irps
+        if( pIrp->MajorCmd() != IRP_MJ_FUNC )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        switch( pIrp->MinorCmd() )
+        {
+        case IRP_MN_READ:
+            {
+                ret = SubmitReadIrp( pIrp );
+                break;
+            }
+        case IRP_MN_WRITE:
+            {
+                ret = SubmitWriteIrp( pIrp );
+                break;
+            }
+        case IRP_MN_IOCTL:
+            {
+                switch( pIrp->CtrlCode() )
+                {
+                case CTRLCODE_LISTENING:
+                case CTRLCODE_STREAM_CMD:
+                    {
+                        ret = SubmitIoctlCmd( pIrp );
+                        break;
+                    }
+                default:
+                    {
+                        ret = -ENOTSUP;
+                        break;
+                    }
+                }
+                // fall through
+            }
+        default:
+            {
+                ret = PassUnknownIrp( pIrp );
+                break;
+            }
+        }
+
+    }while( 0 );
+
+    if( ret != STATUS_PENDING )
+    {
+        pIrp->GetCurCtx()->SetStatus( ret );
+    }
+
+    return ret;
+}
+
+gint32 CUnixSockStmPdo::SubmitReadIrp(
+    PIRP pIrp )
+{
+    gint32 ret = 0;
+    do{
+        if( pIrp == nullptr ||
+            pIrp->GetStackSize() == 0 )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        CIoWatchTask* pTask = m_pIoWatch;
+        if( pTask == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        CStdRTMutex oTaskLock( pTask->GetLock() );
+        CStdRMutex oPortLock( GetLock() );
+        if( !m_queReadingIrps.empty() )
+        {
+            m_queReadingIrps.push_back( pIrp );
+            ret = STATUS_PENDING;
+            break;
+        }
+        else if( m_queDataPackets.empty() )
+        {
+            m_queReadingIrps.push_back( pIrp );
+            ret = STATUS_PENDING;
+            break;
+        }
+        else
+        {
+            guint32 dwSize = m_queDataPackets.size();
+            IrpCtxPtr& pCtx = pIrp->GetCurCtx();
+            pCtx->SetRespData(
+                m_queDataPackets.front() );
+            m_queDataPackets.pop_front();
+            ret = STATUS_SUCCESS;
+
+            // allow incoming data if the queue size
+            // below the threshold
+            if( m_bFlowControl )
+                break;
+
+            if( dwSize == STM_MAX_QUEUE_SIZE )
+                pTask->StartWatch( false );
+
+            break;
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CUnixSockStmPdo::SubmitWriteIrp(
+    PIRP pIrp )
+{
+    gint32 ret = 0;
+    bool bNotify = false;
+    do{
+        if( pIrp == nullptr ||
+            pIrp->GetStackSize() == 0 )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        CIoWatchTask* pTask = m_pIoWatch;
+        if( pTask == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        CStdRTMutex oTaskLock(
+            pTask->GetLock() );
+        CStdRMutex oPortLock( GetLock() );
+        if( m_queWritingIrps.size() >
+            STM_MAX_QUEUE_SIZE )
+        {
+            ret = ERROR_QUEUE_FULL;
+            break;
+        }
+        else if( !m_queWritingIrps.empty() )
+        {
+            m_queWritingIrps.push_back( pIrp );
+            if( m_queWritingIrps.size() ==
+                STM_MAX_QUEUE_SIZE )
+                bNotify = true;
+            ret = STATUS_PENDING;
+            break;
+        }
+        else
+        {
+            IrpCtxPtr& pCtx = pIrp->GetCurCtx();
+            if( pCtx->m_pReqData.IsEmpty() )
+            {
+                ret = -EINVAL;
+                break;
+            }
+            ret = pTask->WriteStream(
+                pCtx->m_pReqData );
+
+            if( ret == STATUS_PENDING )
+            {
+                m_queWritingIrps.push_back( pIrp );
+                if( m_queWritingIrps.size() ==
+                    STM_MAX_QUEUE_SIZE )
+                    bNotify = true;
+            }
+
+            break;
+        }
+
+    }while( 0 );
+
+    if( bNotify )
+    {
+        BufPtr pNullBuf;
+        SendNotify( tokFlowCtrl, pNullBuf );
+    }
+
+    return ret;
+}
+
+gint32 CUnixSockStmPdo::SendNotify(
+    guint8 byToken, BufPtr& pBuf )
+{
+    gint32 ret = 0;
+    IrpPtr pEventIrp;
+
+    CStdRMutex oPortLock( GetLock() );
+    guint32 dwPortState = GetPortState();
+    if( !( dwPortState == PORT_STATE_READY
+         || dwPortState == PORT_STATE_BUSY_SHARED ) )
+        return ERROR_STATE;
+        
+    if( !m_queListeningIrps.empty() )
+    {
+        pEventIrp = m_queListeningIrps.front(); 
+        m_queListeningIrps.pop_front();
+    }
+    else
+    {
+        // waiting for the event irp
+        BufPtr pEvtBuf( true );
+        *pEvtBuf = tokLift;
+        m_queEventPackets.push_back( pEvtBuf );
+        pEvtBuf.Clear();
+    }
+    oPortLock.Unlock();
+
+    if( pEventIrp.IsEmpty() )
+        return 0;
+
+    CStdRMutex oIrpLock(
+        pEventIrp->GetLock() );
+    ret = pEventIrp->CanContinue(
+        IRP_STATE_READY );
+    if( ERROR( ret ) )
+        return ret;
+
+    BufPtr pRespBuf( true );
+    switch( byToken )
+    {
+    case tokPing:
+    case tokPong:
+    case tokFlowCtrl:
+    case tokLift:
+        {
+            *pRespBuf = byToken;
+            IrpCtxPtr pCtx =
+                pEventIrp->GetTopStack();
+
+            pCtx->SetRespData( pRespBuf );
+            pCtx->SetStatus( ret = 0 );
+        }
+    case tokError:
+        {
+            *pRespBuf = tokError;
+
+            pRespBuf->Append(
+                ( guint8* )pBuf->ptr(),
+                pBuf->size() );
+
+            IrpCtxPtr pCtx =
+                pEventIrp->GetTopStack();
+
+            pCtx->SetRespData( pRespBuf );
+            pCtx->SetStatus( ret = 0 );
+            break;
+        }
+    case tokProgress:
+        {
+            pRespBuf->Resize( sizeof( guint8 ) +
+                sizeof( guint32 ) );
+
+            pRespBuf->ptr()[ 0 ] = tokError;
+            guint32 dwSize = pBuf->size();
+            dwSize = htonl( dwSize );
+
+            memcpy( pRespBuf->ptr() + 1, 
+                &dwSize, sizeof( dwSize ) );
+
+            pRespBuf->Append(
+                ( guint8* )pBuf->ptr(),
+                pBuf->size() );
+
+            IrpCtxPtr pCtx =
+                pEventIrp->GetTopStack();
+
+            pCtx->SetRespData( pRespBuf );
+            pCtx->SetStatus( ret = 0 );
+            break;
+        }
+    default:
+        {
+            ret = -ENOTSUP;
+        }
+    }
+
+    if( ERROR( ret ) )
+    {
+        oPortLock.Lock();
+        guint32 dwPortState = GetPortState();
+        if( !( dwPortState == PORT_STATE_READY
+             || dwPortState == PORT_STATE_BUSY_SHARED ) )
+        {
+            IrpCtxPtr pCtx =
+                pEventIrp->GetTopStack();
+            pCtx->SetStatus( ERROR_STATE );
+        }
+        else
+        {
+            // no notify on error
+            m_queListeningIrps.push_back( pEventIrp );
+            pEventIrp.Clear();
+        }
+        oPortLock.Unlock();
+    }
+
+    oIrpLock.Unlock();
+    if( !pEventIrp.IsEmpty() )
+    {
+        ret = DEFER_CALL( GetIoMgr(),
+            GetIoMgr(),
+            &CIoManager::CompleteIrp,
+            pEventIrp );
+    }
+
+    return ret;
+}
+
+gint32 CUnixSockStmPdo::OnStmRecv(
+    BufPtr& pBuf )
+{
+    if( pBuf.IsEmpty() )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        CIoWatchTask* pTask = m_pIoWatch;
+        if( pTask == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        CStdRTMutex oTaskLock( pTask->GetLock() );
+        CStdRMutex oPortLock( GetLock() );
+        if( !m_queDataPackets.empty() )
+        {
+            m_queDataPackets.push_back( pBuf );
+            if( m_queDataPackets.size() >
+                STM_MAX_QUEUE_SIZE )
+            {
+                // stop reading from the unix sock
+                pTask->StopWatch( false );
+            }
+        }
+        else if( m_queReadingIrps.empty() )
+        {
+            m_queDataPackets.push_back( pBuf );
+        }
+        else
+        {
+            IrpPtr pIrp = m_queReadingIrps.front();
+            m_queReadingIrps.pop_front();
+            oPortLock.Unlock();
+            oTaskLock.Unlock();
+
+            CStdRMutex oIrpLock( pIrp->GetLock() );
+            ret = pIrp->CanContinue( IRP_STATE_READY );
+            if( ERROR( ret ) )
+                break;
+
+            IrpCtxPtr& pCtx = pIrp->GetTopStack();
+            pCtx->m_pRespData = pBuf;
+            ret = 0;
+            pCtx->SetStatus( ret );
+            oIrpLock.Unlock();
+
+            GetIoMgr()->CompleteIrp( pIrp );
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CUnixSockStmPdo::OnSendReady()
+{
+    gint32 ret = 0;
+    bool bPending = false;
+    do{
+        CIoWatchTask* pTask = m_pIoWatch;
+        if( pTask == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        std::vector< IrpPtr > vecIrpToComp;
+        IrpPtr pEventIrp;
+        bool bNotify = false;
+
+        CStdRTMutex oTaskLock( pTask->GetLock() );
+        CStdRMutex oPortLock( GetLock() );
+        if( IsConnected() == false )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+
+        if( !m_queWritingIrps.empty() )
+        {
+            bool bFirst = true;
+            while( !m_queWritingIrps.empty() )
+            {
+                guint32 dwSize = m_queWritingIrps.size();
+                IrpPtr pHeadIrp = m_queWritingIrps.front();
+                m_queWritingIrps.pop_front();
+
+                if( bFirst )
+                {
+                    pHeadIrp->GetTopStack()->SetStatus( 0 );
+                    bFirst = false;
+                }
+
+                vecIrpToComp.push_back( pHeadIrp );
+
+                if( dwSize == 1 )
+                {
+                    break;
+                }
+                else if( dwSize == STM_MAX_QUEUE_SIZE )
+                {
+                    // notify the write control is released
+                    bNotify = true;
+                }
+
+                IrpPtr pIrpToWrite =
+                    m_queWritingIrps.front();
+
+                oTaskLock.Unlock();
+                oPortLock.Unlock();
+
+                CStdRMutex oIrpLock(
+                    pIrpToWrite->GetLock() );
+                ret = pIrpToWrite->CanContinue(
+                    IRP_STATE_READY );
+                if( ERROR( ret ) )
+                    break;
+
+                oTaskLock.Lock();
+                oPortLock.Lock();
+                if( !( m_queWritingIrps.front() ==
+                    pIrpToWrite ) )
+                {
+                    // the queue is changed during
+                    // re-locking
+                    continue;
+                }
+
+                IrpCtxPtr pCtx =
+                    pIrpToWrite->GetTopStack();
+
+                if( pCtx->m_pReqData.IsEmpty() )
+                {
+                    pCtx->SetStatus( -EINVAL );
+                }
+                else
+                {
+                    ret = pTask->WriteStream(
+                        pCtx->m_pReqData );
+                    if( ret == STATUS_PENDING )
+                    {
+                        pTask->StartWatch();
+                        bPending = true;
+                        break;
+                    }
+                    pCtx->SetStatus( ret );
+                }
+            }
+        }
+        else
+        {
+            DebugPrint( ERROR_STATE,
+                "no irp to complete!" );
+            pTask->StopWatch();
+        }
+
+        oPortLock.Unlock();
+        oTaskLock.Unlock();
+
+        for( auto pIrpToComp : vecIrpToComp )
+        {
+            CStdRMutex oIrpLock(
+                pIrpToComp->GetLock() );
+
+            ret = pIrpToComp->CanContinue(
+                IRP_STATE_READY );
+
+            if( ERROR( ret ) )
+            {
+                ret = 0;
+                continue;
+            }
+
+            IrpCtxPtr& pCtx = pIrpToComp->GetTopStack();
+            pCtx->SetStatus( ret = 0 );
+            oIrpLock.Unlock();
+
+            GetIoMgr()->CompleteIrp( pIrpToComp );
+        }
+
+        if( bNotify )
+        {
+            BufPtr pNullBuf;
+            SendNotify( tokLift, pNullBuf );
+        }
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+        return ret;
+
+    if( bPending )
+        ret = STATUS_PENDING;
+
+    return ret;
+}
+
+gint32 CUnixSockStmPdo::OnUxSockEvent(
+    guint8 byToken, BufPtr& pBuf )
+{
+    return SendNotify( byToken, pBuf );
+}
+
+CUnixSockBusDriver::CUnixSockBusDriver(
+    const IConfigDb* pCfg )
+    : super( pCfg )
+{
+    SetClassId( clsid( CUnixSockBusDriver ) );
+}
+
+gint32 CUnixSockBusDriver::Probe(
+        IPort* pLowerPort,
+        PortPtr& pNewPort,
+        const IConfigDb* pConfig )
+{
+    gint32 ret = 0;
+
+    do{
+        // we don't have dynamic bus yet
+        CfgPtr pCfg( true );
+
+        if( pConfig != nullptr )
+            *pCfg = *pConfig;
+
+        CCfgOpener oCfg( ( IConfigDb* )pCfg );
+        ret = oCfg.SetStrProp( propPortClass,
+            PORT_CLASS_UXSOCK_BUS );
+
+        if( ERROR( ret ) )
+            break;
+
+        ret = oCfg.SetIntProp( propClsid,
+            clsid( CUnixSockBusPort ) );
+
+        if( ERROR( ret ) )
+            break;
+
+        ret = CreatePort( pNewPort, pCfg );
+        if( ERROR( ret ) )
+            break;
+
+        if( pLowerPort != nullptr )
+        {
+            ret = pNewPort->AttachToPort(
+                pLowerPort );
+        }
+
+        if( SUCCEEDED( ret ) )
+        {
+            CEventMapHelper< CPortDriver >
+                oEvtHelper( this );
+
+            oEvtHelper.BroadcastEvent(
+                eventPnp,
+                eventPortAttached,
+                PortToHandle( pNewPort ),
+                nullptr );
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CUnixSockBusPort::CreatePdoPort(
+    IConfigDb* pCfg,
+    PortPtr& pNewPort )
+{
+    gint32 ret = 0;
+
+    // Note that we are within a port lock
+    do{
+        if( pCfg == nullptr )
+            return -EINVAL;
+
+        if( !pCfg->exist( propPortClass ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        std::string strPortClass;
+        CCfgOpener oExtCfg( ( IConfigDb* )pCfg );
+
+        ret = oExtCfg.GetStrProp(
+            propPortClass, strPortClass );
+
+        // by default, we creaete the tcp stream
+        // pdo, and the only pdo we support
+        if( ERROR( ret ) )
+        {
+            strPortClass =
+                PORT_CLASS_UXSOCK_STM_PDO;
+        }
+
+        if( strPortClass
+            == PORT_CLASS_TCP_STREAM_PDO )
+        {
+            ret = CreateUxStreamPdo(
+                pCfg, pNewPort );
+        }
+        else
+        {
+            ret = -ENOTSUP;
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CUnixSockBusPort::BuildPdoPortName(
+    IConfigDb* pCfg,
+    std::string& strPortName )
+{
+    if( pCfg == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        CCfgOpener oCfgOpener( pCfg );
+        if( pCfg->exist( propPortClass ) )
+        {
+            // port name is composed in the following
+            // format:
+            // <PortClassName> + "_" + <PortId>
+            std::string strClass;
+            ret = oCfgOpener.GetStrProp(
+                propPortClass, strClass );
+
+            if( ERROR( ret ) )
+                break;
+
+            if( strClass != PORT_CLASS_UXSOCK_STM_PDO )
+            {
+                ret = -EINVAL;
+                break;
+            }
+
+            guint32 dwPortId = 0;
+            if( pCfg->exist( propPortId ) )
+            {
+                ret = oCfgOpener.GetIntProp(
+                    propPortId, dwPortId );
+                if( ERROR( ret ) )
+                    break;
+            }
+            else if( pCfg->exist( propFd ) )
+            {
+                ret = oCfgOpener.GetIntProp(
+                    propFd, dwPortId );
+                if( ERROR( ret ) )
+                    break;
+            }
+
+            strPortName = strClass +
+                std::string( "_" )
+                + std::to_string( dwPortId );
+        }
+        else if( pCfg->exist( propPortName ) )
+        {
+            ret = oCfgOpener.GetStrProp(
+                propPortName, strPortName );
+
+            if( ERROR( ret ) )
+                break;
+        }
+        else
+        {
+            ret = ERROR_FAIL;
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CUnixSockBusPort::CreateUxStreamPdo(
+    IConfigDb* pCfg,
+    PortPtr& pNewPort )
+{
+    if( pCfg == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        std::string strPortName;
+        guint32 dwPortId = 0;
+
+        CCfgOpener oExtCfg(
+            ( IConfigDb* )pCfg );
+
+        ret = oExtCfg.GetIntProp(
+            propPortId, dwPortId );
+
+        if( ERROR( ret ) )
+        {
+            ret = oExtCfg.GetIntProp(
+                propFd, dwPortId );
+
+            if( ERROR( ret ) )
+                break;
+        }
+
+        // verify if the port already exists
+        if( this->PortExist( dwPortId ) )
+        {
+            ret = -EEXIST;
+            break;
+        }
+
+        ret = pNewPort.NewObj(
+            clsid( CUnixSockStmPdo ), pCfg );
+
+        // the pdo port `Start()' will be deferred
+        // till the complete port stack is built.
+        //
+        // And well, we are done here
+
+    }while( 0 );
+
+    return ret;
+}

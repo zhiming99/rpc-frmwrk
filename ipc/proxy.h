@@ -864,11 +864,11 @@ class CRpcServices :
     // interface's taskgroup
     gint32 RunManagedTask(
         IEventSink* pTask,
-        const bool& bRoot );
+        const bool& bRoot = false );
 
     gint32 AddSeqTask(
         TaskletPtr& pTask,
-        bool bLong );
+        bool bLong = false );
 };
 
 template< typename ...Args>

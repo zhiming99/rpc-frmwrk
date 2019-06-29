@@ -96,6 +96,10 @@ static CfgPtr InitIfProxyCfg(
     {
         iStateClass = clsid( CTcpBdgePrxyState );
     }
+    else if( strPortClass == PORT_CLASS_UXSOCK_STM_PDO )
+    {
+        iStateClass = clsid( CUnixSockStmState );
+    }
 
     oNewCfg.SetIntProp(
         propIfStateClass,
@@ -648,7 +652,7 @@ gint32 CRpcInterfaceBase::StartRecvTasks(
     gint32 ret = 0;
 
     if( vecMatches.empty() )
-        return -EINVAL;
+        return 0;
 
     do{
         // we cannot add the recvtask by AddAndRun
@@ -1424,6 +1428,9 @@ gint32 CRpcInterfaceBase::OnRmtSvrEvent(
 {
     gint32 ret = 0;
 
+    if( strIpAddr.empty() )
+        return -EINVAL;
+
     CCfgOpenerObj oCfg( this );
     string strDestIp;
 
@@ -2105,7 +2112,7 @@ gint32 CRpcServices::StartEx(
             if( ERROR( ret ) )
                 return ret;
         }
-        else if( GetState() != stateStarting )
+        if( GetState() != stateStarting )
         {
             return ERROR_STATE;
         }
@@ -5013,12 +5020,34 @@ static CfgPtr InitIfSvrCfg(
         return CfgPtr( const_cast
             < IConfigDb* >( pCfg ) );
 
+    gint32 ret = 0;
     CCfgOpener oNewCfg;
-    *oNewCfg.GetCfg() = *pCfg;
+    do{
+        *oNewCfg.GetCfg() = *pCfg;
 
-    oNewCfg.SetIntProp(
-        propIfStateClass,
-        clsid( CIfServerState ) );
+        string strPortClass;
+        ret = oNewCfg.GetStrProp(
+            propPortClass, strPortClass );
+
+        if( ERROR( ret ) )
+            break;
+
+        guint32 iStateClass = clsid( CIfServerState );
+        if( strPortClass == PORT_CLASS_UXSOCK_STM_PDO )
+            iStateClass = clsid( CUnixSockStmState );
+
+        oNewCfg.SetIntProp(
+            propIfStateClass,
+            iStateClass );
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+    {
+        string strMsg = DebugMsg( ret,
+            "Error in InitIfSvrCfg ctor" );
+        throw std::runtime_error( strMsg );
+    }
 
     return oNewCfg.GetCfg();
 }
@@ -5592,6 +5621,20 @@ gint32 CInterfaceServer::SendResponse(
                 if( ERROR( ret ) )
                     break;
 
+                CCfgOpener oDesc(
+                    ( IConfigDb* )pDataDesc );
+
+                bool bStreaming = false;
+
+                oDesc.GetBoolProp(
+                    propStreaming, bStreaming );
+
+                if( bStreaming )
+                {
+                    iFd = 0;
+                    dwOffset = 0;
+                }
+
                 ret = pDataDesc->Serialize( *pBuf );
                 if( ERROR( ret ) )
                     break;
@@ -5608,7 +5651,7 @@ gint32 CInterfaceServer::SendResponse(
                 break;
             }
 #else
-            if( iFd < 0 )
+            if( iFd <= 0 )
                 iFdType = DBUS_TYPE_UINT32;
 #endif
 

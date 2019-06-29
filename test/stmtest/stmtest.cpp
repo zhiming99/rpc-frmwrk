@@ -200,8 +200,7 @@ void CIfSmokeTest::testCliStartStop()
 
         // IStream implementation test
         HANDLE hChannel = 0;
-        TaskletPtr pSyncTask;
-        ret = pCli->StartStream( hChannel, pSyncTask );
+        ret = pCli->StartStream( hChannel );
         CPPUNIT_ASSERT( SUCCEEDED( ret  ) );
 
         guint32 dwCount = 0;
@@ -226,15 +225,13 @@ void CIfSmokeTest::testCliStartStop()
         }
         CPPUNIT_ASSERT( SUCCEEDED( ret  ) || ret == STATUS_PENDING );
 
-        // close the channel gracefully
-        ret = pCli->CloseChannel( hChannel );
+        ret = pCli->CancelChannel( hChannel );
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
-        pSyncTask.Clear();
 
         printf( "Testing stream creation, \
             double-direction communication and active cancel\n" );
 
-        ret = pCli->StartStream( hChannel, pSyncTask );
+        ret = pCli->StartStream( hChannel );
         CPPUNIT_ASSERT( SUCCEEDED( ret  ) );
 
         while( !pCli->CanSend() )
@@ -249,7 +246,6 @@ void CIfSmokeTest::testCliStartStop()
             if( ret == STATUS_PENDING )
             {
                 // sleep( 1 );
-                pCli->WaitForWriteReady();
                 continue;
             }
             if( SUCCEEDED( ret ) )

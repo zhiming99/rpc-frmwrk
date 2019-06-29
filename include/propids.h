@@ -175,6 +175,8 @@ enum EnumPropId : gint32
     propOnline,         // type: bool to tell if the remote module for the CRouterLocalMatch is online on the forwarder side
     propKAParamList,    // type: ObjPtr to CStlIntVector, used to pass parameters in CTasklet::OnEvent for eventKeepAlive
     propIsServer,       // type: bool to indicate if the stream pdo is on server side or proxy side
+    propRxBytes,        // type: guint64 of bytes received
+    propTxBytes,        // type: guint64 of bytes sent
     propReseredEnd = 0x10000000,
     propInvalid = -1, 
 };

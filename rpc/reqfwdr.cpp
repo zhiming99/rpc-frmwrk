@@ -2633,6 +2633,9 @@ gint32 CRpcReqForwarder::OnRmtSvrOffline(
     HANDLE hPort )
 {
     gint32 ret = 0;
+    if( strIpAddr.empty() )
+        return -EINVAL;
+
     do{
         vector< string > vecUniqNames;
         ret = ClearRefCountByIpAddr(
@@ -3415,7 +3418,8 @@ gint32 CRpcReqForwarderProxy::OnRmtSvrEvent(
     const std::string& strIpAddr,
     HANDLE hPort )
 {
-    if( hPort == INVALID_HANDLE )
+    if( hPort == INVALID_HANDLE ||
+        strIpAddr.empty() )
         return -EINVAL;
 
     if( iEvent != eventRmtSvrOffline )

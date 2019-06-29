@@ -557,6 +557,16 @@ gint32 CSyncCallback::operator()(
             ret = ( gint32 )vecParams[ 1 ];
             break;
         }
+    case eventIrpComp:
+        {
+            IrpPtr pIrp;
+            ret = GetIrpFromParams( pIrp );
+            if( ERROR( ret ) )
+                break;
+
+            ret = pIrp->GetStatus();
+            break;
+        }
     default:
         {
             ret = 0;

@@ -308,10 +308,6 @@ gint32 CBdgeProxyStartSendTask::RunTask()
         return ret;
     }
 
-    // this request should not complete immediately
-    if( SUCCEEDED( ret ) )
-        ret = ERROR_FAIL;
-
     OnTaskComplete( ret );
 
     return ret;

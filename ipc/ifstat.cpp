@@ -968,3 +968,15 @@ gint32 CTcpBdgePrxyState::SetupOpenPortParams(
 
     return 0;
 }
+
+gint32 CUnixSockStmState::SetupOpenPortParams(
+        IConfigDb* pCfg )
+{
+    CCfgOpener oCfg( pCfg );
+
+    oCfg.CopyProp( propFd, this );
+    oCfg.CopyProp( propTimeoutSec, this );
+    oCfg.CopyProp( propKeepAliveSec, this );
+
+    return 0;
+}

@@ -125,6 +125,9 @@
 #define CTRLCODE_GET_LOCAL_STMID        0x1e
 #define CTRLCODE_GET_RMT_STMID          0x1f
 
+// ioctl code for CUnixSockStmPdo
+#define CTRLCODE_STREAM_CMD             0x20
+
 
 #define CTRLCODE_INVALID                0xFFFF
 

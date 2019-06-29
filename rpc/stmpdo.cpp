@@ -1552,16 +1552,11 @@ gint32 CTcpStreamPdo::CompleteFuncIrp(
 gint32 CTcpStreamPdo::OnSubmitIrp(
     IRP* pIrp )
 {
-
-    if( pIrp == nullptr
-        || pIrp->GetStackSize() == 0 )
-        return -EINVAL;
-
     gint32 ret = 0;
     do{
 
-        if( pIrp == nullptr
-            || pIrp->GetStackSize() == 0 )
+        if( pIrp == nullptr ||
+            pIrp->GetStackSize() == 0 )
         {
             ret = -EINVAL;
             break;

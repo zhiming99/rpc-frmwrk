@@ -1025,7 +1025,7 @@ class CRpcTcpBridgeProxy :
     gint32 CloseStream_Proxy( gint32 iStreamId,
         IEventSink* pCallback );
 
-    gint32 SendFetch_Proxy(
+    gint32 SendFetch_TcpProxy(
         IConfigDb* pDataDesc,           // [in, out]
         gint32& fd,                     // [out]
         guint32& dwOffset,              // [out]

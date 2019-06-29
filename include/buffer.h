@@ -231,7 +231,8 @@ class CBuffer : public CObjBase
             || std::is_same<T2, unsigned int >::value
             || std::is_same<T2, bool >::value
             || std::is_same<T2, guint8 >::value
-            || std::is_same<T2, gint8 >::value,
+            || std::is_same<T2, gint8 >::value
+            || std::is_same<T2, intptr_t >::value,
              T2 >::type,
         typename forbidden=typename std::enable_if< 
             !std::is_same<T2, const char* >::value

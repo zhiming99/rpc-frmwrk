@@ -700,7 +700,7 @@ gint32 CRpcRouter::OnRmtSvrEvent(
     HANDLE hPort )
 {
     gint32 ret = 0;
-    if( hPort == 0 )
+    if( hPort == 0 || strIpAddr.empty() )
         return -EINVAL;
 
     TaskletPtr pDeferTask;

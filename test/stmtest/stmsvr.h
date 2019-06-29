@@ -112,16 +112,6 @@ class CMyStreamProxy :
     bool CanSend()
     { return m_bSend; }
 
-    gint32 OnSendReady( HANDLE hChannel )
-    {
-        Sem_Post( &m_semSync );
-        return 0;
-    }
-
-    gint32 WaitForWriteReady()
-    {
-        return Sem_TimedwaitSec( &m_semSync, 2 );
-    }
     // mandatory
     // data is ready for reading
     gint32 OnStmRecv(
@@ -141,9 +131,6 @@ class CMyStreamServer :
     // interface may not be initialized
     gint32 InitUserFuncs()
     { return super::InitUserFuncs(); }
-
-    gint32 OnSendReady( HANDLE hChannel )
-    { return 0; }
 
     // mandatory
     gint32 OnConnected( HANDLE hChannel );

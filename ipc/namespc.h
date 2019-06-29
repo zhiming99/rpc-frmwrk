@@ -36,6 +36,8 @@
 #define PORT_CLASS_LOCALDBUS            "DBusBusPort"
 #define PORT_CLASS_RPC_TCPBUS           "RpcTcpBusPort"
 #define PORT_CLASS_LOOPBACK_PDO         "DBusLoopbackPdo"
+#define PORT_CLASS_UXSOCK_BUS           "UnixSockBusPort"
+#define PORT_CLASS_UXSOCK_STM_PDO       "UnixSockStmPdo"
 
 // registry path for event subscription from the
 // IoManager

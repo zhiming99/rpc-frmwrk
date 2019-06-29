@@ -23,379 +23,83 @@
 #include "ifhelper.h"
 #include <exception>
 
-#define STM_MAX_BYTES_PER_BUF ( 32 * 1024 )
-
-enum EnumPktToken : guint8
-{
-    tokInvalid = 255,
-    tokData = 1,
-    tokPing,
-    tokPong,
-    tokClose
-};
-
-// Packet format:
-//
-// Data Packet:
-// tokData( guint8 ), size( guint32 ), <payload>
-//
-// command packets:
-// [ tokPing | tokPong | tokClose ]
-
-struct STM_PACKET
-{
-    guint8 byToken;
-    guint32 dwSize;
-    BufPtr pData;
-    STM_PACKET() :
-    byToken( tokInvalid ),
-    dwSize( 0 )
-    {}
-};
-
-class CRecvFilter
-{
-    int m_iFd;
-    // the last byte readin in the tail buf of the
-    // queue, each non-tail buffer has the size of 
-    // STM_MAX_BYTES_PER_BUF
-    guint32 m_dwBytesToRead;
-    guint32  m_dwOffsetRead;
-    guint32 m_dwBytesPending;
-    std::deque< BufPtr > m_queBufRead;
-
-    public:
-    enum RecvState
-    {
-        recvTok,
-        recvSize,
-        recvData
-    };
-    // query the bytes waiting for reading
-    CRecvFilter( int iFd ) :
-        m_iFd( iFd ),
-        m_dwBytesToRead( 0 ),
-        m_dwOffsetRead( ( guint32 ) -1 ),
-        m_dwBytesPending( 0 )
-    {}
-
-    RecvState GetRecvState() const;
-    inline guint32 GetPendingRead() const
-    { return m_dwBytesPending; }
-
-    gint32 OnIoReady();
-    gint32 ReadStream( BufPtr& pBuf );
-};
-
-class CSendQue
-{
-    int m_iFd;
-    // the last bytes written in the head buf of the
-    // queue.
-    guint32 m_dwBytesToWrite;
-    guint32 m_dwOffsetWrite;
-    guint32 m_dwBytesPending;
-
-    std::deque< STM_PACKET > m_queBufWrite;
-
-    inline gint32 Send( int iFd,
-        void* pBuf, guint32 dwSize )
-    {
-        return send( iFd, pBuf,
-            dwSize, MSG_NOSIGNAL );
-    }
-
-    public:
-    enum SendState
-    {
-        sendTok,
-        sendSize,
-        sendData
-    };
-
-    // query the bytes waiting for reading
-
-    CSendQue( int iFd ) :
-        m_iFd( iFd ),
-        m_dwBytesToWrite( 0 ),
-        m_dwOffsetWrite( ( guint32 )-1 ),
-        m_dwBytesPending( 0 )
-    {}
-
-    SendState GetSendState() const;
-    // query the bytes waiting for writing
-    guint32 GetPendingWrite() const
-    { return m_dwBytesPending; }
-
-    gint32 OnIoReady();
-
-    gint32 WriteStream( BufPtr& pBuf );
-    gint32 SendPingPong( bool bPing = true );
-    gint32 SendClose();
-};
-
-class IStream;
-
-class CIoWatchTask:
-    public CIfParallelTask
-{
-    protected:
-
-    int m_iFd;
-    HANDLE m_hReadWatch;
-    HANDLE m_hWriteWatch;
-
-    IStream*    m_pStream;
-    CRecvFilter m_oRecvFilter;
-    CSendQue    m_oSendQue;
-    guint64     m_qwBytesRead;
-    guint64     m_qwBytesWrite;
-
-    // using interface state for stream state three
-    // states used:
-    //
-    // stateStarting, connecting in process, the server
-    // will send a  handshake via the stream to notify
-    // the connection is ok
-    //
-    // stateConnected, connected
-    //
-    // stateStopped, the stream is closed
-    std::atomic< EnumIfState > m_dwState;
-
-    gint32 StartStopWatch(
-        bool bStop, bool bWrite );
-
-    public:
-    typedef CIfParallelTask super;
-    CIoWatchTask( const IConfigDb* pCfg ) :
-    super( pCfg ),
-    m_iFd( -1 ),
-    m_hReadWatch( 0 ),
-    m_hWriteWatch( 0 ),
-    m_pStream( nullptr ),
-    m_oRecvFilter( GetFd( pCfg ) ),
-    m_oSendQue( GetFd( pCfg ) ),
-    m_qwBytesRead( 0 ),
-    m_qwBytesWrite( 0 ),
-    m_dwState( stateStarting )
-    {}
-
-    static int GetFd( const IConfigDb* pCfg )
-    {
-        gint32 ret = 0;
-        CCfgOpener oCfg( pCfg );
-        guint32 dwFd = 0;
-        ret = oCfg.GetIntProp( 0, dwFd );
-        if( ERROR( ret ) )
-            return -1;
-        return dwFd;
-    }
-
-    // watch handler for error
-    inline gint32 OnIoError( guint32 revent )
-    {
-        OnError( -EIO );
-        // return error to remove the watch immediately
-        // from the mainloop
-        return -EIO;
-    }
-
-    // watch handler for I/O events
-    gint32 OnIoReady( guint32 revent );
-
-    // new data arrived
-    gint32 OnDataReady( BufPtr pBuf );
-
-    gint32 OnSendReady();
-
-    // ping/pong packets
-    virtual gint32 OnPingPong( bool bPing );
-
-    // received by server to notify a client initiated
-    // close
-    gint32 OnClose();
-
-    void OnError( gint32 iError );
-
-    inline gint32 StartWatch( bool bWrite = true )
-    { return StartStopWatch( false, bWrite ); }
-
-    inline gint32 StopWatch( bool bWrite = true )
-    { return StartStopWatch( true, bWrite ); }
-
-    // CIfParallelTask's methods
-    virtual gint32 OnComplete( gint32 iRet )
-    {
-        ReleaseChannel();
-        return super::OnComplete( iRet );
-    }
-
-    virtual gint32 RunTask();
-
-    // we have some special processing for eventIoWatch
-    // to bypass the normal CIfParallelTask's process
-    // flow.
-    virtual gint32 OnEvent(
-        EnumEventId iEvent,
-        guint32 dwParam1,
-        guint32 dwParam2,
-        guint32* pData );
-
-    gint32 operator()( guint32 dwContext );
-    gint32 OnIoWatchEvent( guint32 dwContext );
-
-    // query the bytes waiting for writing
-    guint32 GetPendingWrite()
-    { return m_oSendQue.GetPendingWrite(); }
-
-    // query the bytes waiting for reading
-    guint32 GetPendingRead()
-    { return m_oRecvFilter.GetPendingRead(); }
-
-    virtual gint32 WriteStream( BufPtr& pBuf )
-    {
-        m_qwBytesWrite += pBuf->size();
-        gint32 ret = m_oSendQue.WriteStream( pBuf );
-        return ret;
-    }
-
-    // release the watches and fds
-    virtual gint32 ReleaseChannel();
-
-    inline gint32 SendPingPong( bool bPing = true )
-    { return m_oSendQue.SendPingPong( bPing ); }
-
-    inline gint32 SendClose()
-    { return m_oSendQue.SendClose(); }
-
-    inline guint64 GetBytesRead()
-    { return m_qwBytesRead; }
-
-    inline guint64 GetBytesWrite()
-    { return m_qwBytesWrite; }
-};
-
-class CIoWatchTaskProxy :
-    public CIoWatchTask
-{
-    TaskletPtr m_pIoTask;
-
-    // semaphore for proxy to wait for the IoTask to
-    // complete
-    sem_t m_semWait;
-    gint32 m_iTimerId;
-
-    gint32 StartStopTimer( bool bStart );
-
-    public:
-    typedef CIoWatchTask super;
-    CIoWatchTaskProxy( const IConfigDb* pCfg )
-        : super( pCfg ), m_iTimerId( 0 )
-    {
-        SetClassId( clsid( CIoWatchTaskProxy ) );
-        Sem_Init( &m_semWait, 0, 0 );
-    }
-
-    ~CIoWatchTaskProxy()
-    { sem_destroy( &m_semWait ); }
-
-    gint32 OnConnected();
-
-    inline void SetReqTask( TaskletPtr pTask )
-    { m_pIoTask = pTask; }
-
-    inline TaskletPtr GetReqTask() const
-    { return m_pIoTask; }
-
-    virtual gint32 WriteStream( BufPtr& pBuf )
-    {
-        if( m_dwState != stateConnected )
-            return STATUS_PENDING;
-        return super::WriteStream( pBuf );
-    }
-
-    virtual gint32 OnTaskComplete( gint32 iRet )
-    {
-        Sem_Post( &m_semWait );
-        return 0;
-    }
-
-    virtual gint32 ReleaseChannel();
-
-    virtual gint32 CloseChannel()
-    { return SendClose(); }
-
-    virtual gint32 OnPingPong( bool bPing );
-
-    inline gint32 WaitForComplete()
-    { return Sem_Wait( &m_semWait ); }
-
-    gint32 RunTask();
-    gint32 OnKeepAlive( guint32 dwContext );
-
-    inline gint32 StartTimer()
-    { return StartStopTimer( true ); }
-
-    inline gint32 StopTimer()
-    { return StartStopTimer( false ); }
-
-    inline gint32 ChangeState(
-        EnumIfState iNewState )
-    {
-        CStdRTMutex oTaskLock( GetLock() );
-        m_dwState = iNewState;
-        return 0;
-    }
-};
-
-class CIoWatchTaskServer :
-    public CIoWatchTask
-{
-    TaskletPtr m_pInvTask;
-    CfgPtr m_pDataDesc;
-
-    public:
-    typedef CIoWatchTask super;
-    CIoWatchTaskServer( const IConfigDb* pCfg )
-        : super( pCfg )
-    {
-        SetClassId( clsid( CIoWatchTaskServer ) );
-        // set to connected at the very beginning
-        m_dwState = stateConnected;
-    }
-
-    gint32 ReleaseChannel()
-    {
-        gint32 ret = super::ReleaseChannel();
-        m_pInvTask.Clear();
-        m_pDataDesc.Clear();
-        return ret;
-    }
-
-    virtual gint32 RunTask();
-
-    inline TaskletPtr& GetInvokeTask() const
-    { return const_cast< TaskletPtr& >( m_pInvTask ); }
-
-    gint32 OnPingPong( bool bPing );
-};
-
-class CIoWatchTaskRelay :
-    public CIoWatchTask
-{
-    TaskletPtr m_pInvTask;
-};
+#include "uxport.h"
 
 struct IStream
 {
-    typedef std::map< guint32, TaskletPtr > WATCH_MAP;
-    WATCH_MAP m_mapWatches;
+    protected:
+    gint32 OnUxStmEvtWrapper(
+        HANDLE hChannel,
+        IConfigDb* pCfg );
+
+    public:
+    typedef std::map< HANDLE, InterfPtr > UXSTREAM_MAP;
+    UXSTREAM_MAP m_mapUxStreams;
 
     virtual gint32 CanContinue() = 0;
 
-    gint32 GetWatchTask( HANDLE hChannel,
-        TaskletPtr& pTask ) const;
+    inline CRpcServices* GetInterface()
+    { return dynamic_cast< CRpcServices* >( this ); }
+
+    inline gint32 GetUxStream(
+        HANDLE hChannel, InterfPtr& pIf )
+    {
+        CRpcServices* pThis =
+            dynamic_cast< CRpcServices* >( this );
+
+        CStdRMutex oIfLock( pThis->GetLock() );
+        UXSTREAM_MAP::iterator itr =
+            m_mapUxStreams.find( hChannel );
+
+        if( itr == m_mapUxStreams.end() )
+            return -ENOENT;
+        pIf = itr->second;
+
+        return STATUS_SUCCESS;
+    }
+
+    inline gint32 AddUxStream(
+        HANDLE hChannel, InterfPtr& pIf )
+    {
+        CRpcServices* pThis =
+            dynamic_cast< CRpcServices* >( this );
+
+        if( pIf.IsEmpty() )
+            return -EFAULT;
+
+        CStdRMutex oIfLock( pThis->GetLock() );
+
+        UXSTREAM_MAP::iterator itr =
+            m_mapUxStreams.find( hChannel );
+
+        if( itr != m_mapUxStreams.end() )
+            return -EEXIST;
+
+        m_mapUxStreams.insert(
+            std::pair< HANDLE, InterfPtr >
+                ( hChannel, pIf ) );
+
+        return STATUS_SUCCESS;
+    }
+
+    inline gint32 RemoveUxStream(
+        HANDLE hChannel )
+    {
+        CRpcServices* pThis =
+            dynamic_cast< CRpcServices* >( this );
+
+        CStdRMutex oIfLock( pThis->GetLock() );
+
+        UXSTREAM_MAP::iterator itr =
+            m_mapUxStreams.find( hChannel );
+
+        if( itr != m_mapUxStreams.end() )
+            return -EEXIST;
+
+        m_mapUxStreams.erase( itr );
+
+        return STATUS_SUCCESS;
+    }
 
     virtual gint32 OpenChannel(
         IConfigDb* pDataDesc,
@@ -403,15 +107,21 @@ struct IStream
         IEventSink* pCallback ) = 0; 
 
     virtual gint32 CloseChannel(
-        HANDLE hChannel ) = 0;
+        HANDLE hChannel,
+        IEventSink* pCallback );
 
-    gint32 RemoveChannel( HANDLE hChannel );
+    gint32 WriteStream( HANDLE hChannel,
+        BufPtr& pBuf );
 
-    gint32 WriteStream(
-        HANDLE hChannel, BufPtr& pBuf );
+    gint32 WriteStream( HANDLE hChannel,
+        BufPtr& pBuf, IEventSink* pCallback );
 
     gint32 SendPingPong( HANDLE hChannel,
         bool bPing = true );
+
+    gint32 SendPingPong(
+        HANDLE hChannel, bool bPing,
+        IEventSink* pCallback );
 
     // data is ready for reading
     virtual gint32 OnStmRecv(
@@ -420,10 +130,6 @@ struct IStream
     virtual gint32 OnPingPong(
         HANDLE hChannel,
         bool bPing = true )
-    { return 0; }
-
-    virtual gint32 OnSendReady(
-        HANDLE hChannel )
     { return 0; }
 
     // callback from the watch task when a fatal error
@@ -437,13 +143,19 @@ struct IStream
     // for the desired action.
     virtual gint32 OnConnected(
         HANDLE hChannel ) = 0;
+
+    virtual gint32 OnUxStreamEvent(
+        HANDLE hChannel,
+        guint8 byToken,
+        CBuffer* pBuf );
+
+    // callback when a close token is received
+    virtual gint32 OnClose(
+        HANDLE hChannel );
 };
 
 struct IStreamServer : public IStream
 {
-    // callback when a close token is received
-    virtual gint32 OnClose(
-        HANDLE hChannel ) = 0;
 };
 
 struct IStreamProxy : public IStream
@@ -457,9 +169,6 @@ class CStreamProxy :
     public IStreamProxy
 {
 
-    gint32 CreateSocket(
-        int& fdlocal, int& fdRemote );
-
     // send the FETCH_DATA request to the server
     gint32 SendRequest(
         IConfigDb* pDataDesc,
@@ -467,6 +176,11 @@ class CStreamProxy :
 
     public:
     typedef CInterfaceProxy super;
+    typedef CInterfaceProxy _MyVirtBase;
+
+    using IStream::OnUxStreamEvent;
+    using IStream::OnStmRecv;
+    using IStream::OnChannelError;
 
     CStreamProxy( const IConfigDb* pCfg )
         :super( pCfg )
@@ -494,22 +208,21 @@ class CStreamProxy :
     virtual gint32 OnChannelError(
         HANDLE hChannel, gint32 iError );
 
-    // call this method when the proxy want to end the
-    // stream actively
-    virtual gint32 CloseChannel(
-        HANDLE hChannel );
-
-    gint32 CancelReqTask( IEventSink* pTask,
-        IEventSink* pWatchTask );
-
     // call this method when the proxy encounters
     // fatal error
     gint32 CancelChannel( HANDLE hChannel );
 
     // call this helper to start a stream channel
-    gint32 StartStream( HANDLE& hChannel,
-        TaskletPtr& pSyncTask );
+    gint32 StartStream( HANDLE& hChannel );
 
+    gint32 OnUxStreamEvent(
+        HANDLE hChannel,
+        guint8 byToken,
+        CBuffer* pBuf )
+    {
+        return IStream::OnUxStreamEvent(
+            hChannel, byToken, pBuf );
+    }
 };
 
 class CStreamServer :
@@ -518,15 +231,16 @@ class CStreamServer :
 {
     gint32 CanContinue();
 
-    gint32 CompleteInvokeTask(
-        IConfigDb* pResp, IEventSink* pInvTask )
-    {
-        return this->OnServiceComplete(
-            pResp, pInvTask );
-    }
+    gint32 CreateSocket(
+        int& fdlocal, int& fdRemote );
 
     public:
     typedef CAggInterfaceServer super;
+    typedef CAggInterfaceServer _MyVirtBase;
+
+    using IStream::OnUxStreamEvent;
+    using IStream::OnStmRecv;
+
     CStreamServer( const IConfigDb* pCfg )
         :super( pCfg )
     {}
@@ -560,21 +274,180 @@ class CStreamServer :
     virtual gint32 OnChannelError(
         HANDLE hChannel, gint32 iError );
 
-    gint32 OnClose( HANDLE hChannel );
-    gint32 CloseChannel( HANDLE hChannel );
-
+    gint32 OnUxStreamEvent(
+        HANDLE hChannel,
+        guint8 byToken,
+        CBuffer* pBuf )
+    {
+        return IStream::OnUxStreamEvent(
+            hChannel, byToken, pBuf );
+    }
 };
 
+template< class T >
+class CStreamRelayBase :
+    public T
+{
+    protected:
+
+    // the parent object, the CRpcTcpBridgeProxy or
+    // CRpcTcpBridge
+    InterfPtr m_pParent;
+
+    // maps between the stream id and the stream handle
+    std::map< HANDLE, gint32 > m_mapHandleToStmId;
+    std::map< gint32, HANDLE > m_mapStmIdToHandle;
+
+    // the irps to receive the packet from a stream
+    std::map< gint32, guint32 > m_mapStmPendingBytes;
+
+
+    public:
+
+    typedef enum{
+        stmevtFdClosed,
+        stmevtStmClosed,
+        stmevtKATimeout,
+        stmevtPipeError,     // internal error
+        stmevtNetError,      // internal error
+
+    }EnumStmEvt;
+
+    typedef T super;
+    CStreamRelayBase( const IConfigDb* pCfg )
+        : super::_MyVirtBase( pCfg ), super( pCfg )
+    {}
+
+    // stream over unix sock
+    guint32 GetPendingWrite(
+        HANDLE hWatch ) const;
+
+    // data received from local sock
+    virtual gint32 OnStmRecv(
+        HANDLE hChannel, BufPtr& pBuf );
+
+    // the local sock is closed
+    virtual gint32 OnClose(
+        HANDLE hChannel );
+
+    // error happens on the local sock 
+    virtual gint32 OnChannelError(
+        HANDLE hChannel, gint32 iError );
+
+    // data received from remote( tcp ) sock
+    gint32 OnStmRecv(
+        gint32 iStmId, BufPtr& pBuf );
+
+    // the remote( tcp ) sock is closed
+    gint32 OnClose(
+        gint32 iStmId );
+
+    // error happens on the remote( tcp ) sock 
+    gint32 OnChannelError(
+        gint32 iStmId, gint32 iError );
+
+    gint32 OpenChannel(
+        IConfigDb* pDataDesc,
+        int& fd, HANDLE& hChannel,
+        IEventSink* pCallback );
+
+    // stream over tcp sock
+    guint32 GetPendingWrite(
+        gint32 iStmId ) const
+    {
+        CStdRMutex oIfLock( this->GetLock() );
+        std::map< gint32, guint32 >::iterator
+            itr = m_mapStmPendingBytes.find( iStmId );
+        if( itr != m_mapStmPendingBytes.end() )
+            return itr->second;
+        return 0;
+    }
+
+    // stream over tcp sock
+    gint32 AddPendingWrite(
+        gint32 iStmId, guint32 dwBytes )
+    {
+        CStdRMutex oIfLock( this->GetLock() );
+        std::map< gint32, guint32 >::iterator
+            itr = m_mapStmPendingBytes.find( iStmId );
+        if( itr == m_mapStmPendingBytes.end() )
+            return -ENOENT;
+        itr->second += dwBytes;
+        return 0;
+    }
+
+    gint32 SubPendingWrite(
+        gint32 iStmId, guint32 dwBytes )
+    {
+        CStdRMutex oIfLock( this->GetLock() );
+        std::map< gint32, guint32 >::iterator
+            itr = m_mapStmPendingBytes.find( iStmId );
+        if( itr == m_mapStmPendingBytes.end() )
+            return -ENOENT;
+        itr->second -= dwBytes;
+        return 0;
+    }
+
+    gint32 OnStreamEvent(
+        EnumEventId iEvent,
+        guint32 dwStmId,
+        guint32 dwContext,
+        guint32* pData );
+
+    using IStream::OnConnected;
+    gint32 OnConnected( HANDLE hChannel )
+    { return 0; }
+};
+
+// this interface will be hosted by
+// CRpcTcpBridgeImpl
 class CStreamServerRelay :
-    public CStreamServer
+    public CStreamRelayBase< CStreamServer >
 {
+    protected:
+    gint32 FetchData_Server(
+        IConfigDb* pDataDesc,           // [in]
+        gint32& fd,                     // [out]
+        guint32& dwOffset,              // [in, out]
+        guint32& dwSize,                // [in, out]
+        IEventSink* pCallback );
+
     public:
-    virtual gint32 CloseChannel( HANDLE hChannel );
+
+    using IStream::OnPingPong;
+
+    typedef CStreamRelayBase super;
+    CStreamServerRelay( const IConfigDb* pCfg )
+        : super::_MyVirtBase( pCfg ), super( pCfg )
+    {;}
+
+    virtual gint32 OnPingPong(
+        HANDLE hChannel,
+        bool bPing = true );
 };
 
+// this interface will be hosted by
+// CRpcTcpBridgeProxyImpl
 class CStreamProxyRelay :
-    public CStreamProxy
+    public CStreamRelayBase< CStreamProxy >
 {
+    protected:
+    gint32 FetchData_Proxy(
+        IConfigDb* pDataDesc,           // [in, out]
+        gint32& fd,                     // [out]
+        guint32& dwOffset,              // [in, out]
+        guint32& dwSize,                // [in, out]
+        IEventSink* pCallback );
+
     public:
-    virtual gint32 CloseChannel( HANDLE hChannel );
+
+    typedef CStreamRelayBase< CStreamProxy > super;
+    CStreamProxyRelay( const IConfigDb* pCfg )
+        : super::_MyVirtBase( pCfg ), super( pCfg )
+    {;}
+
+    virtual gint32 OnPingPong(
+        HANDLE hChannel,
+        bool bPing = true );
 };
+

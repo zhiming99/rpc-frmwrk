@@ -357,3 +357,17 @@ class CTcpBdgePrxyState : public CLocalProxyState
     gint32 SetupOpenPortParams(
         IConfigDb* pCfg );
 };
+
+class CUnixSockStmState : public CLocalProxyState
+{
+    public:
+    typedef CLocalProxyState super;
+    CUnixSockStmState( const IConfigDb* pCfg )
+        :super( pCfg )
+    {
+        SetClassId( clsid( CUnixSockStmState ) );    
+    }
+    
+    gint32 SetupOpenPortParams(
+        IConfigDb* pCfg );
+};

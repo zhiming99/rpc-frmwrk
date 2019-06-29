@@ -43,6 +43,16 @@
             [
                 "RpcTcpFido"
             ]
+        },
+        {
+            "DriverName"    : "UnixSockBusDriver",
+            "DriverType"    : "BusDriver",
+            "BusClass"      : "UnixSockBus",
+            "Description"   : "This is a bus driver for unix stream sock, and the port it creats is the UnixSockBusPort",
+            "PortClasses"   :
+            [
+                "UnixSockBusPort"
+            ]
         }
     ],
 
@@ -100,6 +110,19 @@
             "PortClass"     : "RpcTcpBusPort",
             "PortDriver"    : "RpcTcpBusDriver",
             "InternalClass" : "CTcpRpcBusPort"
+        },
+        {
+            "PortType"      : "Pdo",
+            "PortClass"     : "UnixSockStmPdo",
+            "InternalClass" : "CUnixSockStmPdo",
+            "PortDriver"    : "",
+            "BusPortClass"  : "UnixSockBusPort"
+        },
+        {
+            "PortType"      : "Fdo",
+            "PortClass"     : "UnixSockBusPort",
+            "PortDriver"    : "UnixSockBusDriver",
+            "InternalClass" : "CUnixSockBusPort"
         }
     ],
 
@@ -237,14 +260,16 @@
             "ModName" : "stmclitst",
             "DriversToLoad" :
             [
-                "DBusBusDriver"
+                "DBusBusDriver",
+                "UnixSockBusDriver"
             ]
         },
         {
             "ModName" : "stmsvrtst",
             "DriversToLoad" :
             [
-                "DBusBusDriver"
+                "DBusBusDriver",
+                "UnixSockBusDriver"
             ]
         },
         {
@@ -252,12 +277,13 @@
             "DriversToLoad" :
             [
                 "DBusBusDriver",
-                "RpcTcpBusDriver"
+                "RpcTcpBusDriver",
+                "UnixSockBusDriver"
             ],
             "PreloadableObjects" :
             [
                 {
-                    "comment" : "remove the following surfix '-1' to enable the object",
+                    "comment" : "remove the surfix '-1' of the field name to enable the object",
                     "ObjectName-1" : "RpcRouter-0",
                     "ObjectClass-1" : "RpcRouterImpl"
                 }
@@ -283,6 +309,10 @@
             "PortClass" : "TcpStreamPdo",
             "FidoDriver" : "RpcTcpFidoDrv",
             "Description" : "This match provides a binding between the pdo and the uppper fido"
+        },
+        {
+            "PortClass" : "UnixSockStmPdo",
+            "FdoDriver" : ""
         }
     ],
 

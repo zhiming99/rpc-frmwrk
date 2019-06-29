@@ -31,6 +31,8 @@
 #include "counters.h"
 #include "stream.h"
 #include "tractgrp.h"
+#include "uxport.h"
+#include "uxstream.h"
 
 #include <dlfcn.h>
 
@@ -118,13 +120,30 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CDBusConnFlushTask );
     INIT_MAP_ENTRYCFG( CIfSvrConnMgr );
     INIT_MAP_ENTRYCFG( CMessageCounterTask );
-    INIT_MAP_ENTRYCFG( CIoWatchTaskProxy );
-    INIT_MAP_ENTRYCFG( CIoWatchTaskServer );
+    INIT_MAP_ENTRYCFG( CIoWatchTask );
     INIT_MAP_ENTRYCFG( CIfTransactGroup );
     INIT_MAP_ENTRYCFG( CRpcBasePortModOnOfflineTask );
     INIT_MAP_ENTRYCFG( CIfStartExCompletion );
     INIT_MAP_ENTRYCFG( CIfDeferCallTask );
     INIT_MAP_ENTRYCFG( CIfDeferredHandler );
+    INIT_MAP_ENTRYCFG( CUnixSockBusDriver );
+    INIT_MAP_ENTRYCFG( CUnixSockBusPort );
+    INIT_MAP_ENTRYCFG( CUnixSockStmPdo );
+    INIT_MAP_ENTRYCFG( CUnixSockStmState );
+    INIT_MAP_ENTRYCFG( CUnixSockStmProxy );
+    INIT_MAP_ENTRYCFG( CUnixSockStmProxyRelay );
+    INIT_MAP_ENTRYCFG( CUnixSockStmServer );
+    INIT_MAP_ENTRYCFG( CUnixSockStmServerRelay );
+    INIT_MAP_ENTRYCFG( CIfCallbackInterceptor );
+    INIT_MAP_ENTRYCFG( CIfUxPingTask );
+    INIT_MAP_ENTRYCFG( CIfUxPingTicker );
+    INIT_MAP_ENTRYCFG( CIfUxSockTransTask );
+    INIT_MAP_ENTRYCFG( CIfUxListeningTask );
+    INIT_MAP_ENTRYCFG( CIfCreateUxSockStmTask );
+    INIT_MAP_ENTRYCFG( CIfStartUxSockStmTask );
+    INIT_MAP_ENTRYCFG( CIfStopUxSockStmTask );
+    // INIT_MAP_ENTRYCFG( CStreamProxyRelay );
+    // INIT_MAP_ENTRYCFG( CStreamServerRelay );
 #ifdef _USE_LIBEV
     INIT_MAP_ENTRYCFG( CDBusLoopHooks );
     INIT_MAP_ENTRYCFG( CDBusTimerCallback );
@@ -134,6 +153,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CDBusLoopHooks );
     INIT_MAP_ENTRYCFG( CEvLoopStopCb );
     INIT_MAP_ENTRYCFG( CEvLoopAsyncCallback );
+
 #endif
 
     END_FACTORY_MAPS;

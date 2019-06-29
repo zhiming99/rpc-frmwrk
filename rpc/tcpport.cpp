@@ -3028,7 +3028,7 @@ gint32 CRpcStream::RemoveIrpFromMap(
     IRP* pIrp )
 {
     // NOTE: you should make sure the irp is
-    // locked from outside
+    // locked ahead of this call
     if( pIrp == nullptr )
         return -EINVAL;
 
