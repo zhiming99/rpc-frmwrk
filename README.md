@@ -23,6 +23,9 @@ This framework depends on the following packags:
 11. `Streaming support to provide double-direction stream transfer`
 
 ---
+[`Wed 10 Jul 2019 04:02:20 PM CST`]
+1. Almost code complete with the streaming support, remaining start/stop logics for the streaming channel in the bridge object. 
+
 [`Sat 22 Jun 2019 02:03:53 PM CST`]   
 1. Still busy designing the `flow control` for the streaming support. It turns out to be more complicated than expected. Just swaying between a simple solution and a complex one.   
 
