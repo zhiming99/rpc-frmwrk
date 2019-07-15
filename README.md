@@ -23,6 +23,9 @@ This framework depends on the following packags:
 11. `Streaming support to provide double-direction stream transfer`
 
 ---
+[`Mon 15 Jul 2019 06:02:27 PM CST`]
+1. The last piece of code for streaming support is growing complicated than expected. Still trying to weld the two ends between tcp sock and unix sock gracefully inside the router. And struggling with many duplicated code with trivial differences.   
+
 [`Wed 10 Jul 2019 04:02:20 PM CST`]
 1. Almost code complete with the streaming support, remaining start/stop logics for the streaming channel in the bridge object. 
 
