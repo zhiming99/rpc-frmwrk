@@ -1826,9 +1826,10 @@ gint32 CRpcBasePort::BuildSendDataReq(
         if( iFd < 0 || bNonFd )
             iFdType = DBUS_TYPE_UINT32;
 
+        const char* pData = pCfgBuf->ptr();
         if( !dbus_message_append_args( pMsg,
             DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
-            &pCfgBuf->ptr(), pCfgBuf->size(),
+            &pData, pCfgBuf->size(),
             iFdType, &iFd,
             DBUS_TYPE_UINT32, &dwOffset,
             DBUS_TYPE_UINT32, &dwSize,

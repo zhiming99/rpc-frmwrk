@@ -560,9 +560,10 @@ gint32 CDBusProxyPdo::HandleConnRequest(
         if( ERROR( ret ) )
             break;
 
+        const char* pData = pBuf->ptr();
         if( !dbus_message_append_args( pMsg,
                 DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
-                &pBuf->ptr(), pBuf->size(),
+                &pData, pBuf->size(),
                 DBUS_TYPE_INVALID ) )
         {
             ret = ERROR_FAIL;
@@ -679,10 +680,11 @@ gint32 CDBusProxyPdo::PackupReqMsg(
             break;
 
         const char* pszIp = strIpAddr.c_str();
+        const char* pData = pBuf->ptr();
         if( !dbus_message_append_args( pOutMsg,
             DBUS_TYPE_STRING, &pszIp,
             DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
-            &pBuf->ptr(), pBuf->size(),
+            &pData, pBuf->size(),
             DBUS_TYPE_INVALID ) )
         {
             ret = ERROR_FAIL;
@@ -1921,10 +1923,10 @@ gint32 CDBusProxyPdo::HandleRmtRegMatch(
         if( ERROR( ret ) )
             break;
 
-
+        const char* pData = pBuf->ptr();
         if( !dbus_message_append_args( pMsg,
             DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
-            &pBuf->ptr(), pBuf->size(),
+            &pData, pBuf->size(),
             DBUS_TYPE_INVALID ) ) 
         {
             ret = ERROR_FAIL;

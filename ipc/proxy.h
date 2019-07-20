@@ -627,6 +627,8 @@ class CRpcServices :
 
     virtual gint32 RebuildMatches();
 
+    gint32 StartEx2( IEventSink* pCallback );
+
     public:
 
     gint32 GetDelegate(
@@ -833,6 +835,10 @@ class CRpcServices :
 
     virtual gint32 OnPreStart(
         IEventSink* pCallback );
+
+    virtual gint32 OnPostStart(
+        IEventSink* pCallback )
+    { return 0; }
 
     virtual gint32 FilterMessage(
         IEventSink* pTask,

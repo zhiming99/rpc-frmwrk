@@ -39,7 +39,7 @@ class IFileTransfer
 };
 
 class CFileTransferProxy :
-    public virtual CInterfaceProxy,
+    public virtual CAggInterfaceProxy,
     public IFileTransfer
 {
     protected:
@@ -71,11 +71,14 @@ class CFileTransferProxy :
     public:
 
     virtual gint32 InitUserFuncs();
-    typedef CInterfaceProxy super;
+    typedef CAggInterfaceProxy super;
 
     CFileTransferProxy( const IConfigDb* pCfg )
         :super( pCfg )
     {}
+
+    const EnumClsid GetIid() const
+    { return iid( CFileTransferServer ); }
 
     gint32 UploadFile_Proxy(
         const std::string& strSrcFile,

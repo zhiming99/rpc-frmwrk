@@ -78,10 +78,13 @@ class CEchoServer :
 
 // Declare the interface class
 class CEchoClient :
-    public virtual CInterfaceProxy
+    public virtual CAggInterfaceProxy
 {
     public:
-    typedef CInterfaceProxy super;
+    typedef CAggInterfaceProxy super;
+
+    const EnumClsid GetIid() const
+    { return iid( CEchoServer ); }
 
     CEchoClient( const IConfigDb* pCfg );
     gint32 InitUserFuncs();
@@ -97,7 +100,7 @@ class CMyStreamProxy :
     public:
     typedef CStreamProxy super;
     CMyStreamProxy( const IConfigDb* pCfg )
-    : CInterfaceProxy( pCfg ), super( pCfg ),
+    : CAggInterfaceProxy( pCfg ), super( pCfg ),
     m_bSend( false )
     {
         Sem_Init( &m_semSync, 0, 0 );

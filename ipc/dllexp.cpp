@@ -131,9 +131,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CUnixSockStmPdo );
     INIT_MAP_ENTRYCFG( CUnixSockStmState );
     INIT_MAP_ENTRYCFG( CUnixSockStmProxy );
-    INIT_MAP_ENTRYCFG( CUnixSockStmProxyRelay );
     INIT_MAP_ENTRYCFG( CUnixSockStmServer );
-    INIT_MAP_ENTRYCFG( CUnixSockStmServerRelay );
     INIT_MAP_ENTRYCFG( CIfCallbackInterceptor );
     INIT_MAP_ENTRYCFG( CIfUxPingTask );
     INIT_MAP_ENTRYCFG( CIfUxPingTicker );
@@ -142,8 +140,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CIfCreateUxSockStmTask );
     INIT_MAP_ENTRYCFG( CIfStartUxSockStmTask );
     INIT_MAP_ENTRYCFG( CIfStopUxSockStmTask );
-    // INIT_MAP_ENTRYCFG( CStreamProxyRelay );
-    // INIT_MAP_ENTRYCFG( CStreamServerRelay );
+    INIT_MAP_ENTRYCFG( CIfResponseHandler );
 #ifdef _USE_LIBEV
     INIT_MAP_ENTRYCFG( CDBusLoopHooks );
     INIT_MAP_ENTRYCFG( CDBusTimerCallback );

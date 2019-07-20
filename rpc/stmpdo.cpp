@@ -1264,6 +1264,7 @@ gint32 CTcpStreamPdo::CompleteOpenStmIrp(
             // this is the returned parameter
             // oCfg.ClearParams();
             // swap the local and peer id
+            // that is, local is at 0, and peer at 2
             oCfg.SwapProp( 0, 2 );
 
         }while( 0 );

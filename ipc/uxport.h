@@ -319,7 +319,7 @@ class CUnixSockStmPdo : public CPort
 {
     bool    m_bStopReady = false;
     // flag to allow or deny incoming data
-    bool    m_bFlowControl = false;
+    bool    m_bFlowCtrl = false;
 
     protected:
 

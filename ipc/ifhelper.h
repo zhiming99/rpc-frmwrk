@@ -703,9 +703,6 @@ class CMethodServer :
         SetClassId( clsid( CMethodServer ) );
     }
 
-    // This is a virtual function in the template
-    // class, where two styles of Polymorphisms meet,
-    // virtual functions and template classes
     gint32 Delegate( 
         CObjBase* pObj,
         IEventSink* pCallback,
@@ -871,9 +868,6 @@ class CMethodServerEx< iNumInput, gint32 (ClassName::*)(IEventSink*, Args ...) >
         TupleToVec2< M, S... >( oTuple, vec, NumberSequence<M, S...>() );
     }
 
-    // This is a virtual function in the template
-    // class, where two styles of Polymorphisms meet,
-    // virtual functions and template classes
     gint32 Delegate( 
         CObjBase* pObj,
         IEventSink* pCallback,
@@ -1218,10 +1212,6 @@ class CDeferredCall :
             PackParams( this->m_vecArgs, args... );
     }
 
-    // well, this is a virtual function in the
-    // template class. weird? the joint part where
-    // two types of Polymorphisms meet, virtual
-    // functions and template classes
     gint32 Delegate( CObjBase* pObj,
         std::vector< BufPtr >& vecParams )
     {
@@ -1329,6 +1319,14 @@ class CIfDeferCallTask :
         m_pDeferCall.Clear();
         return ret;
     }
+
+    gint32 OnCancel( guint32 dwContext )
+    {
+        gint32 ret = super::OnCancel( dwContext );
+        if( m_iTaskState == stateStarting )
+            m_pDeferCall.Clear();
+        return ret;
+    }
 };
 
 template < typename C, typename ... Types, typename ...Args>
@@ -1361,7 +1359,9 @@ inline gint32 NewIfDeferredCall( TaskletPtr& pCallback,
 class CIfDeferredHandler :
     public CIfInterceptTaskProxy
 {
+    protected:
     TaskletPtr m_pDeferCall;
+
     public:
     typedef CIfInterceptTaskProxy super;
     CIfDeferredHandler( const IConfigDb* pCfg )
@@ -1379,7 +1379,8 @@ class CIfDeferredHandler :
 };
 
 template < typename C, typename ... Types, typename ...Args>
-inline gint32 NewDeferredHandler( TaskletPtr& pCallback,
+inline gint32 NewDeferredHandler(
+    TaskletPtr& pCallback,
     ObjPtr pIf, gint32(C::*f)(Types ...),
     IEventSink* pTaskToIntercept, Args&&... args )
 {
@@ -1401,7 +1402,7 @@ inline gint32 NewDeferredHandler( TaskletPtr& pCallback,
     oParams[ propEventSink ] =
         ObjPtr( pTaskToIntercept );
 
-    ret = pIfTask.NewObj(
+    ret = pIfTask.NewObj( 
         clsid( CIfDeferredHandler ),
         oParams.GetCfg() );
     if( ERROR( ret ) )
@@ -1426,6 +1427,61 @@ inline gint32 NewDeferredHandler( TaskletPtr& pCallback,
 
 #define DEFER_HANDLER_NOSCHED( __pTask, pObj, func, pCallback, ... ) \
     NewDeferredHandler( __pTask, pObj, func , pCallback, ##__VA_ARGS__ )
+
+class CIfResponseHandler :
+    public CIfDeferredHandler
+{
+    public:
+    typedef CIfDeferredHandler super;
+    CIfResponseHandler( const IConfigDb* pCfg )
+        :super( pCfg )
+    { SetClassId( clsid( CIfResponseHandler ) );}
+
+    // just as a place holder
+    gint32 RunTask()
+    { return STATUS_PENDING; }
+
+    gint32 OnTaskComplete( gint32 iRet );
+};
+
+template< class C >
+inline gint32 NewResponseHandler(
+    TaskletPtr& pRespHandler,
+    ObjPtr pIf, gint32(C::* f)( IEventSink*, IEventSink*, IConfigDb* ),
+    IEventSink* pCallback, IConfigDb* pContext )
+{
+    TaskletPtr pWrapper;
+    if( pCallback == nullptr ||
+        pIf.IsEmpty() )
+        return -EINVAL;
+
+    gint32 ret = NewDeferredCall(
+        pWrapper, pIf, f, pCallback,
+        ( IEventSink* )nullptr, pContext );
+
+    if( ERROR( ret ) )
+        return ret;
+
+    TaskletPtr pIfTask;
+
+    CParamList oParams;
+    oParams[ propIfPtr ] = pIf;
+
+    ret = pIfTask.NewObj( 
+        clsid( CIfResponseHandler ),
+        oParams.GetCfg() );
+    if( ERROR( ret ) )
+        return ret;
+
+    CIfResponseHandler* pNewTask = pIfTask;
+    pNewTask->SetDeferCall( pWrapper );
+    pRespHandler = pNewTask;
+
+    return 0;
+}
+
+#define NEW_PROXY_RESP_HANDLER( __pTask, pObj, func, pCallback, pContext ) \
+    NewResponseHandler( __pTask, pObj, func , pCallback, pContext )
 
 // to insert the task pInterceptor to the head of
 // completion chain of the task pTarget 
@@ -2482,28 +2538,6 @@ struct has_##MethodName\
         return ret; \
     }
 
-inline EnumClsid _GETIID( IEventSink* pCallback )
-{
-    if( pCallback == nullptr )
-        return clsid( Invalid );
-
-    TaskletPtr pTask;
-    pTask = ObjPtr( pCallback );
-    if( pTask.IsEmpty() )
-        return clsid( Invalid );
-
-    CIfInvokeMethodTask* pInvTask = pTask;
-    if( pInvTask == nullptr )
-        return clsid( Invalid );
-
-    EnumClsid iid = clsid( Invalid );
-    gint32 ret = pInvTask->GetIid( iid );
-    if( ERROR( ret ) )
-        return clsid( Invalid );
-
-    return iid;
-}
-
 // the master handler for overrides of the
 // CInterfaceServer, note that there must be a
 // parameter `IEventSink* pCallback' in the PARAMS list
@@ -2607,6 +2641,9 @@ struct CAggregatedObject
     ITERATE_IF_VIRT_METHODS_IMPL( OnPreStart, gint32,
         VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
 
+    ITERATE_IF_VIRT_METHODS_IMPL( OnPostStart, gint32,
+        VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
+
     ITERATE_IF_VIRT_METHODS_IMPL( OnPostStop, gint32,
         VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
 
@@ -2641,6 +2678,9 @@ struct CAggregatedObject< CAggInterfaceServer, Types... >
     ITERATE_IF_VIRT_METHODS_IMPL( OnPreStart, gint32,
         VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
 
+    ITERATE_IF_VIRT_METHODS_IMPL( OnPostStart, gint32,
+        VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
+
     ITERATE_IF_VIRT_METHODS_IMPL( OnPostStop, gint32,
         VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
 
@@ -2659,6 +2699,28 @@ struct CAggregatedObject< CAggInterfaceServer, Types... >
         if( vecIids.empty() )
             return -ENOENT;
         return 0;
+    }
+
+    inline EnumClsid _GETIID( IEventSink* pCallback )
+    {
+        if( pCallback == nullptr )
+            return clsid( Invalid );
+
+        TaskletPtr pTask;
+        pTask = ObjPtr( pCallback );
+        if( pTask.IsEmpty() )
+            return clsid( Invalid );
+
+        CIfInvokeMethodTask* pInvTask = pTask;
+        if( pInvTask == nullptr )
+            return clsid( Invalid );
+
+        EnumClsid iid = clsid( Invalid );
+        gint32 ret = pInvTask->GetIid( iid );
+        if( ERROR( ret ) )
+            return clsid( Invalid );
+
+        return iid;
     }
 
     DEFINE_UNIQUE_HANDLER_IMPL( FetchData_Server, gint32,
@@ -2712,10 +2774,112 @@ struct ClassName : CAggregatedObject< CAggInterfaceServer, ##__VA_ARGS__ >, IUnk
     }\
 }
 
+#define DEFINE_UNIQUE_PROXY_IMPL( _MethodName, rettype, PARAMS, ARGS ) \
+    private: \
+    gint32 Handler##_MethodName( NumberSequence<>  ) \
+    { return ERROR_NOT_HANDLED; } \
+    template < int N > \
+    gint32 Handler##_MethodName( \
+         NumberSequence< N >, PARAMS ) \
+    { \
+        EnumClsid iid = _GETIID( pDataDesc ); \
+        using ClassName = typename std::tuple_element< N, std::tuple<Types...>>::type; \
+        if( ClassName::GetIid() == iid ) \
+            return this->ClassName::_MethodName( ARGS ); \
+        return ERROR_NOT_HANDLED; \
+    } \
+    template < int N, int M, int...S > \
+    gint32 Handler##_MethodName( \
+        NumberSequence< N, M, S... >, PARAMS ) \
+    { \
+        using ClassName = typename std::tuple_element< N, std::tuple<Types...>>::type; \
+        EnumClsid iid = _GETIID( pDataDesc ); \
+        if( ClassName::GetIid() == iid ) \
+            return this->ClassName::_MethodName( ARGS ); \
+        return Handler##_MethodName( NumberSequence<M, S...>(), ARGS ); \
+    } \
+    public: \
+    virtual rettype _MethodName( PARAMS ) \
+    { \
+        gint32 ret = 0;\
+        if( sizeof...( Types ) ) \
+        { \
+            using seq = typename GenSequence< sizeof...( Types ) >::type; \
+            ret = Handler##_MethodName( seq(), ARGS ); \
+        } \
+        if( ret == ERROR_NOT_HANDLED ) \
+            ret = virtbase::_MethodName( ARGS ); \
+        return ret; \
+    }
+// Start point for aggregatable interface
+struct CAggInterfaceProxy :
+    public CInterfaceProxy
+{
+    typedef CInterfaceProxy super;
+    CAggInterfaceProxy( const IConfigDb* pCfg )
+        : CInterfaceProxy( pCfg )
+    {}
+    virtual const EnumClsid GetIid() const = 0;
+};
+
+template< typename...Types >
+struct CAggregatedObject< CAggInterfaceProxy, Types... >
+    : Types...
+{
+    using virtbase = CAggInterfaceProxy;
+    public:
+    CAggregatedObject( const IConfigDb* pCfg )
+    : virtbase( pCfg ), Types( pCfg )...
+    {
+    }
+
+    ITERATE_IF_VIRT_METHODS_IMPL_NOARG( InitUserFuncs, gint32 )
+
+    ITERATE_IF_VIRT_METHODS_IMPL( OnPreStart, gint32,
+        VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
+
+    ITERATE_IF_VIRT_METHODS_IMPL( OnPostStart, gint32,
+        VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
+
+    ITERATE_IF_VIRT_METHODS_IMPL( OnPostStop, gint32,
+        VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
+
+    ITERATE_IF_VIRT_METHODS_IMPL( AddStartTasks, gint32,
+        VA_LIST( IEventSink* pTaskGrp ), VA_LIST( pTaskGrp ) )
+
+    ITERATE_IF_VIRT_METHODS_IMPL( OnPreStop, gint32,
+        VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
+
+    const EnumClsid GetIid() const
+    { return this->GetClsid(); }
+
+    const gint32 GetIids( std::vector< guint32 >& vecIids ) const
+    {
+        std::make_tuple( GetIidOfType( vecIids, static_cast< const Types* >( this ) )... );
+        if( vecIids.empty() )
+            return -ENOENT;
+        return 0;
+    }
+
+    private:
+    inline EnumClsid _GETIID( IConfigDb* pDataDesc )
+    {
+        CCfgOpener oDataDesc( pDataDesc );
+        EnumClsid iid = clsid( Invalid );
+        oDataDesc.GetIntProp( propIid, ( guint32& )iid );
+        return iid;
+    }
+
+    public:
+    DEFINE_UNIQUE_PROXY_IMPL( FetchData_Proxy, gint32,
+        VA_LIST( IConfigDb* pDataDesc, gint32& fd, guint32& dwOffset, guint32& dwSize, IEventSink* pCallback ),
+        VA_LIST( pDataDesc, fd, dwOffset, dwSize, pCallback ) )
+};
+
 #define DECLARE_AGGREGATED_PROXY( ClassName, ... )\
-struct ClassName : CAggregatedObject< CInterfaceProxy, ##__VA_ARGS__ >\
+struct ClassName : CAggregatedObject< CAggInterfaceProxy, ##__VA_ARGS__ >\
 {\
-    using virtbase = CInterfaceProxy; \
+    using virtbase = CAggInterfaceProxy; \
     typedef CAggregatedObject< virtbase, ##__VA_ARGS__ > super;\
     ClassName( const IConfigDb* pCfg )\
         : virtbase( pCfg ), super( pCfg )\

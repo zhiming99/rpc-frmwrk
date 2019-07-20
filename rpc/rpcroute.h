@@ -239,7 +239,7 @@ namespace std {
 }
 
 class CRpcInterfaceProxy :
-    virtual public CInterfaceProxy,
+    virtual public CAggInterfaceProxy,
     public IRpcReqProxyAsync,
     public IRpcEventRelay
 {
@@ -256,7 +256,7 @@ class CRpcInterfaceProxy :
         IEventSink* pTask );
 
     public:
-    typedef CInterfaceProxy super;
+    typedef CAggInterfaceProxy super;
     CRpcInterfaceProxy( const IConfigDb* pCfg ) :
         super( pCfg )
     {;}
@@ -637,6 +637,9 @@ class CRpcReqForwarderProxy :
 
     gint32 InitUserFuncs();
 
+    virtual const EnumClsid GetIid() const
+    { return iid( CRpcReqForwarder ); }
+
     virtual gint32 SetupReqIrp( IRP* pIrp,
         IConfigDb* pReqCall,
         IEventSink* pCallback );
@@ -766,6 +769,15 @@ struct CRpcTcpBridgeShared
         BufPtr& pResp,
         IEventSink* pCallback );
 
+    gint32 RegMatchCtrlStream(
+        gint32 iStreamId,
+        MatchPtr& pMatch,
+        bool bReg );
+
+    gint32 OnPostStart(
+        IEventSink* pContext,
+        MatchPtr& pMatch );
+
     protected:
     CRpcServices* m_pParentIf;
 
@@ -782,7 +794,7 @@ struct CRpcTcpBridgeShared
         IEventSink* pCallback );
 };
 
-class CRpcTcpBridge:
+class CRpcTcpBridge :
     public CRpcInterfaceServer,
     public CRpcTcpBridgeShared
 {
@@ -837,6 +849,11 @@ class CRpcTcpBridge:
         IRP* pIrp,
         IConfigDb* pReqCall,
         IEventSink* pCallback );
+
+    using CRpcTcpBridgeShared::OnPostStart;
+
+    gint32 OnPostStart(
+        IEventSink* pContext );
 
     public:
     typedef CRpcInterfaceServer super;
@@ -904,10 +921,6 @@ class CRpcTcpBridge:
         return CloseStream_Server(
             pCallback, iStreamId );
     }
-
-    // CRpcInterfaceBase methods
-    virtual gint32 StartEx(
-        IEventSink* pCallback );
 
     virtual gint32 SendResponse(
         IConfigDb* pReqMsg,
@@ -1048,6 +1061,9 @@ class CRpcTcpBridgeProxy :
         const IConfigDb* pCfg )
     { return -ENOTSUP; }
 
+    const EnumClsid GetIid() const
+    { return iid( CRpcTcpBridge ); }
+
     // RPC methods
     // active disconnecting
     virtual gint32 CloseRemotePort(
@@ -1089,10 +1105,6 @@ class CRpcTcpBridgeProxy :
 
     virtual gint32 DoInvoke(
         DBusMessage* pEvtMsg,
-        IEventSink* pCallback );
-
-    // CRpcInterfaceBase methods
-    virtual gint32 StartEx(
         IEventSink* pCallback );
 
     virtual gint32 SendData_Proxy(
@@ -1144,6 +1156,12 @@ class CRpcTcpBridgeProxy :
     gint32 OnProgressNotify(
         guint32 dwProgress,
         guint64 iTaskId );
+
+    using CRpcTcpBridgeShared::OnPostStart;
+
+    gint32 OnPostStart(
+        IEventSink* pContext );
+
 };
 
 class CRouterStopBridgeProxyTask

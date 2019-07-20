@@ -28,6 +28,27 @@
 #include "ifstat.h"
 #include "proxy.h"
 
+#define GET_IOMGR( _oCfg, _pMgr ) \
+({ \
+    gint32 ret_ = 0;\
+    do{\
+        CRpcInterfaceBase* pIf = nullptr;\
+        ret_ = _oCfg.GetPointer( propIfPtr, pIf );\
+        if( ERROR( ret_ ) )\
+        {\
+            ret_ = _oCfg.GetPointer(\
+                propIoMgr, _pMgr );\
+            if( ERROR( ret_ ) )\
+                break;\
+        }\
+        else\
+        {\
+            _pMgr = pIf->GetIoMgr();\
+        }\
+    }while( 0 );\
+    ret_;\
+})
+
 class CIfRetryTask
     : public CThreadSafeTask
 {
@@ -864,3 +885,52 @@ class CBusPortStopSingleChildTask
     virtual gint32 OnComplete( gint32 iRetVal );
 };
 
+class CIfCallbackInterceptor :
+    public CIfInterceptTaskProxy
+{
+    TaskletPtr m_pCallAhead;
+    TaskletPtr m_pCallAfter;
+    public: 
+    typedef CIfInterceptTaskProxy super;
+
+    CIfCallbackInterceptor( const IConfigDb* pCfg ) :
+        super( pCfg )
+    { SetClassId( clsid( CIfCallbackInterceptor ) ); }
+
+    // for those tasks such as DEFER_CALL's output, who
+    // cannot call propEventSink on complete
+    //
+    // Run pTask ahead of propEventSink
+    void InsertCall( TaskletPtr& pTask )
+    { m_pCallAhead = pTask; }
+
+    // Run pTask after propEventSink 
+    void InsertCallAfter( TaskletPtr& pTask )
+    { m_pCallAfter = pTask; }
+
+    gint32 RunTask()
+    { return STATUS_PENDING; }
+
+    gint32 OnTaskComplete( gint32 iRet )
+    {
+        if( ERROR( iRet ) )
+            return iRet;
+
+        if( m_pCallAhead.IsEmpty() )
+            return iRet;
+
+        ( *m_pCallAhead )( eventZero );
+
+        return iRet;
+    }
+
+    gint32 OnComplete( gint32 iRet )
+    {
+        super::OnComplete( iRet );
+
+        if( !m_pCallAhead.IsEmpty() )
+            ( *m_pCallAfter )( eventZero );
+
+        return iRet;
+    }
+};

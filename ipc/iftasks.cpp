@@ -33,27 +33,6 @@
 
 using namespace std;
 
-#define GET_IOMGR( _oCfg, _pMgr ) \
-({ \
-    gint32 ret_ = 0;\
-    do{\
-        CRpcInterfaceBase* pIf = nullptr;\
-        ret_ = _oCfg.GetPointer( propIfPtr, pIf );\
-        if( ERROR( ret_ ) )\
-        {\
-            ret_ = _oCfg.GetPointer(\
-                propIoMgr, _pMgr );\
-            if( ERROR( ret_ ) )\
-                break;\
-        }\
-        else\
-        {\
-            _pMgr = pIf->GetIoMgr();\
-        }\
-    }while( 0 );\
-    ret_;\
-})
-
 CIfStartRecvMsgTask::CIfStartRecvMsgTask(
     const IConfigDb* pCfg ) :
     super( pCfg )
@@ -162,6 +141,10 @@ gint32 CIfStartRecvMsgTask::StartNewRecv(
         oParams[ propIfPtr ] = ObjPtr( pIf );
         oParams[ propMatchPtr ] = pMatch;
 
+        // to pass some more information to the new
+        // task
+        oParams.CopyProp( propExtInfo, pCfg );
+
         // start another recvmsg request
         TaskletPtr pTask;
         ret = pTask.NewObj(
@@ -259,6 +242,7 @@ gint32 CIfStartRecvMsgTask::OnIrpComplete(
             // task
             oParams[ propIfPtr ] = pObj;
             oParams.CopyProp( propMatchPtr, this );
+            oParams.CopyProp( propExtInfo, this );
             ObjPtr pObj = oParams.GetCfg();
 
             // offload the output tasks to the
@@ -1586,6 +1570,8 @@ gint32 CIfTaskGroup::OnChildComplete(
             // Possibly racing in this function between
             // a canceling thread and an async task
             // completion.
+            // or a task in the queue is timeout before
+            // get chance to run.
             return -ENOENT;
         }
 
@@ -5510,6 +5496,51 @@ gint32 CIfDeferredHandler::OnComplete( gint32 iRetVal )
     RemoveProperty( propRespPtr );
     RemoveProperty( propMsgPtr );
     RemoveProperty( propReqPtr );
+    return ret;
+}
+
+gint32 CIfResponseHandler::OnTaskComplete( gint32 iRet ) 
+{
+    gint32 ret = 0;
+    do{
+        // set the response data
+        BufPtr pBuf( true );
+        std::vector< guint32 > vecParams;
+        ret = GetParamList( vecParams );
+        if( SUCCEEDED( ret ) )
+        {
+            if( vecParams.size() < 
+                GetArgCount( &IEventSink::OnEvent ) )
+            {
+                ret = -EINVAL;
+            }
+            else
+            {
+                CObjBase* pIoReq =
+                    ( CObjBase* )vecParams[ 3 ];
+                *pBuf = ObjPtr( pIoReq );
+            }
+        }
+        if( ERROR( ret ) )
+        {
+            CParamList oParams;
+            oParams[ propReturnValue ] = iRet;
+            TaskletPtr pTask;
+            pTask.NewObj(
+                clsid( CIfDummyTask ),
+                oParams.GetCfg() );
+            *pBuf = ObjPtr( pTask );
+        }
+        UpdateParamAt( 1, pBuf );
+
+    }while( 0 );
+
+    if( m_pDeferCall.IsEmpty() )
+        return 0;
+
+    ret = ( *m_pDeferCall )( 0 );
+    ClearClientNotify();
+
     return ret;
 }
 

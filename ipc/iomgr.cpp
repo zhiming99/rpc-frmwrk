@@ -55,10 +55,15 @@ gint32 CIoManager::SubmitIrpInternal(
         pair< PortPtr, IrpCtxPtr >& oStackEntry =
             pIrp->m_vecCtxStack.back();
 
-        // Fix the invalid port ptr with the topmost port
+        // set the port ptr if not already set
         // on the port object stack
         oStackEntry.first = pPort;
-        pPort->AllocIrpCtxExt( oStackEntry.second );
+
+        IrpCtxPtr& pCtx = oStackEntry.second;
+        BufPtr pExtBuf;
+        pCtx->GetExtBuf( pExtBuf );
+        if( pExtBuf.IsEmpty() || pExtBuf->empty() )
+            pPort->AllocIrpCtxExt( pCtx, pIrp1 );
 
         CStdRMutex a( pIrp->GetLock() );
         ret = pPort->SubmitIrp( pIrp );

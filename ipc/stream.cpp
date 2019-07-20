@@ -23,6 +23,54 @@
 #include "stream.h"
 #include "uxstream.h"
 
+gint32 IStream::CreateUxStream(
+    IConfigDb* pDataDesc,
+    gint32 iFd, EnumClsid iClsid,
+    bool bServer,
+    InterfPtr& pIf )
+{
+    if( pDataDesc == nullptr ||
+        iClsid == clsid( Invalid ) ||
+        iFd < 0 )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        CParamList oNewCfg;
+
+        oNewCfg.SetBoolProp(
+            propIsServer, bServer );
+
+        oNewCfg.SetIntProp(
+            propFd, ( guint32& )iFd );
+
+        oNewCfg.SetPointer( propIfPtr,
+            ( CObjBase* )pIf ); 
+
+        ret = oNewCfg.CopyProp(
+            propKeepAliveSec, pDataDesc );
+
+        if( ERROR( ret ) )
+            break;
+
+        oNewCfg.CopyProp(
+            propTimeoutSec, pDataDesc );
+
+        if( ERROR( ret ) )
+            break;
+
+        InterfPtr pUxIf;
+        ret = pUxIf.NewObj( iClsid,
+            oNewCfg.GetCfg() );
+
+        if( ERROR( ret ) )
+            break;
+
+    }while( 0 );
+    
+    return ret;
+}
+
 gint32 IStream::OnUxStreamEvent(
     HANDLE hChannel,
     guint8 byToken,
@@ -255,7 +303,7 @@ gint32 CStreamProxy::OnChannelError(
         hChannel, pDummyTask );
 }
 
-gint32 CStreamProxy::SendRequest(
+gint32 CStreamProxy::SendSetupReq(
     IConfigDb* pDataDesc,
     int fd, IEventSink* pCallback )
 {
@@ -389,83 +437,32 @@ gint32 CIfCreateUxSockStmTask::OnTaskComplete(
             break;
         }
 
-        CCfgOpener oNewCfg;
         bool bServer = m_bServer;
+        ret = oCfg.GetBoolProp(
+            propIsServer, bServer );
 
-        bool bRouter = false;
         if( ERROR( ret ) )
-        {
-            EnumClsid iClsid = pIf->GetClsid();
-            if( iClsid ==
-                clsid( CRpcTcpBridgeImpl ) )
-            {
-                bServer = false;
-                bRouter = true;
-            }
-            else if( iClsid ==
-                clsid( CRpcTcpBridgeProxyImpl ) )
-            {
-                bServer = true;
-                bRouter = true;
-            }
+            break;
 
-            oNewCfg.SetBoolProp(
-                propIsServer, bServer );
-        }
-        else
-        {
-            oNewCfg.SetBoolProp(
-                propIsServer, bServer );
-        }
+        EnumClsid iClsid =
+            clsid( CUnixSockStmProxy );
 
-        EnumClsid iClsid = clsid( Invalid );
         if( bServer )
-        {
-            if( bRouter )
-                iClsid =
-                    clsid( CUnixSockStmServerRelay );
-            else
-                iClsid =
-                    clsid( CUnixSockStmServer );
-        }
-        else
-        {
-            if( bRouter )
-            {
-                iClsid = 
-                    clsid( CUnixSockStmProxyRelay );
-            }
-            else
-            {
-                iClsid =
-                    clsid( CUnixSockStmProxy );
-            }
-        }
+            iClsid = clsid( CUnixSockStmServer );
+
         guint32 dwFd = 0;
         ret = oCfg.GetIntProp( propFd, dwFd );
         if( ERROR( ret ) )
             break;
 
-        oNewCfg.SetIntProp( propFd, dwFd );
-        oNewCfg.SetPointer( propIfPtr, pIf ); 
-        ObjPtr pObj;
-        ret = oCfg.GetObjPtr( 0, pObj );
-        if( ERROR( ret ) )
-            break;
-
-        ret = oNewCfg.CopyProp(
-            propKeepAliveSec, pObj );
-        if( ERROR( ret ) )
-            break;
-
-        oNewCfg.CopyProp(
-            propTimeoutSec, pObj );
+        IConfigDb* pDataDesc;
+        ret = oCfg.GetPointer( 0, pDataDesc );
         if( ERROR( ret ) )
             break;
 
         InterfPtr pUxIf;
-        ret = pUxIf.NewObj( iClsid,
-            oNewCfg.GetCfg() );
+        ret = pStream->CreateUxStream( pDataDesc,
+            dwFd, iClsid, bServer, pUxIf );
 
         if( ERROR( ret ) )
             break;
@@ -483,7 +480,8 @@ gint32 CIfCreateUxSockStmTask::OnTaskComplete(
                 break;
 
             // dataDesc for response
-            oStartParams.Push( pObj );
+            oStartParams.Push(
+                ObjPtr( pDataDesc ) );
         }
 
         oStartParams[ propFd ] = dwFd;
@@ -509,6 +507,8 @@ gint32 CIfCreateUxSockStmTask::OnTaskComplete(
         }
         else
         {
+            // for server side, it is already on a
+            // seq task context.
             pStartTask->MarkPending();
             ret = ( *pStartTask )( 0 );
         }
@@ -656,7 +656,7 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
             oResp.Push( ( HANDLE )pSvc );
 
             TaskletPtr pConnTask;
-            ret = DEFER_CALL_NOSCHED(
+            ret = DEFER_IFCALL_NOSCHED(
                 pConnTask,
                 ObjPtr( pParent ),
                 &IStream::OnConnected,
@@ -798,6 +798,8 @@ gint32 CStreamProxy::OpenChannel(
 
         oParams.Push( ObjPtr( pDataDesc ) );
 
+        // creation will happen when the FETCH_DATA
+        // request succeeds
         TaskletPtr pTask;
         ret = pTask.NewObj(
             clsid( CIfCreateUxSockStmTask ),
@@ -812,7 +814,7 @@ gint32 CStreamProxy::OpenChannel(
             break;
 
         // send the request
-        ret = SendRequest(
+        ret = SendSetupReq(
             pDataDesc, fd, pTask );
  
     }while( 0 );
@@ -967,7 +969,7 @@ gint32 CStreamProxy::CancelChannel(
     return ret;
 }
 
-gint32 CStreamServer::CreateSocket(
+gint32 IStream::CreateSocket(
     int& fdLocal, int& fdRemote )
 {
     gint32 ret = 0;
@@ -1069,7 +1071,6 @@ gint32 CStreamServer::OpenChannel(
             close( iLocal );
             iLocal = -1;
         }
-
     }
 
     if( ret != STATUS_PENDING )
@@ -1100,6 +1101,7 @@ gint32 CStreamServer::FetchData_Server(
     if( ERROR( ret ) )
         return ret;
 
+    // notify subclass the connection is setup
     OnConnected( hChannel );
     return 0;
 }

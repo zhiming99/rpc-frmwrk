@@ -47,6 +47,13 @@ gint32 CIfUxPingTask::RunTask()
     return ret;
 }
 
+gint32 CIfUxPingTask::OnCancel(
+    guint32 dwContext )
+{
+    RemoveTimer();
+    return super::OnCancel( dwContext );
+}
+
 gint32 CIfUxPingTask::OnRetry()
 {
     // Note: we start a ping request in this
@@ -111,6 +118,13 @@ gint32 CIfUxPingTask::OnRetry()
     return ret;
 }
 
+gint32 CIfUxPingTicker::OnCancel(
+    guint32 dwContext )
+{
+    RemoveTimer();
+    return super::OnCancel( dwContext );
+}
+
 gint32 CIfUxPingTicker::RunTask()
 {
     gint32 ret = 0;
@@ -145,7 +159,7 @@ gint32 CIfUxPingTicker::OnRetry()
 {
     // Note: we terminate the stream in this
     // OnRetry method. Don't get confused
-    // literally.
+    // by the method name.
     // 
     gint32 ret = 0;
     do{
@@ -223,7 +237,55 @@ CIfUxSockTransTask::CIfUxSockTransTask(
     }
 }
 
-gint32 CIfUxSockTransTask::OnIrpComplete( IRP* pIrp )
+gint32 CIfUxSockTransTask::OnTaskComplete(
+    gint32 iRet )
+{
+    gint32 ret = 0;
+    if( ERROR( iRet ) )
+        return iRet;
+
+    CCfgOpenerObj oCallback( this );
+    do{
+        IConfigDb* pResp = nullptr;
+        ret = oCallback.GetPointer(
+            propRespPtr, pResp );
+
+        if( ERROR( ret ) )
+            break;
+
+        CParamList oResp( pResp );
+        BufPtr pPayload;
+        oResp.GetProperty( 0, pPayload );
+        if( ERROR( ret ) )
+            break;
+        
+        if( pPayload.IsEmpty() ||
+            pPayload->empty() )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        if( m_pUxStream->IsServer() )
+        {
+            CUnixSockStmServer* pSvr = m_pUxStream;
+            pSvr->PostUxSockEvent(
+                tokData, pPayload );
+        }
+        else
+        {
+            CUnixSockStmProxy* pProxy = m_pUxStream;
+            pProxy->PostUxSockEvent(
+                tokData, pPayload );
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CIfUxSockTransTask::HandleResponse(
+    IRP* pIrp )
 {
     gint32 ret = 0;
 
@@ -236,22 +298,35 @@ gint32 CIfUxSockTransTask::OnIrpComplete( IRP* pIrp )
         return ret;
 
     do{
-        IrpCtxPtr& pCtx =
-            pIrp->GetTopStack();
-        m_pPayload = pCtx->m_pRespData;
+        IrpCtxPtr& pCtx = pIrp->GetTopStack();
+        BufPtr pPayload = pCtx->m_pRespData;
 
         if( m_pUxStream->IsServer() )
         {
             CUnixSockStmServer* pSvr = m_pUxStream;
             pSvr->PostUxSockEvent(
-                tokData, m_pPayload );
+                tokData, pPayload );
         }
         else
         {
             CUnixSockStmProxy* pProxy = m_pUxStream;
             pProxy->PostUxSockEvent(
-                tokData, m_pPayload );
+                tokData, pPayload );
         }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CIfUxSockTransTask::OnIrpComplete( IRP* pIrp )
+{
+    gint32 ret = 0;
+
+    do{
+        ret = HandleResponse( pIrp );
+        if( ERROR( ret ) )
+            break;
 
         // start another listening task
         CParamList oParams;
@@ -298,7 +373,15 @@ gint32 CIfUxSockTransTask::RunTask()
         {
             CUnixSockStmServer* pSvr = m_pUxStream;
             if( m_bIn )
-                pSvr->StartReading( this );
+            {
+                ret = pSvr->StartReading( this );
+                if( SUCCEEDED( ret ) )
+                {
+                    ret = OnTaskComplete( ret );
+                    if( SUCCEEDED( ret ) )
+                        continue;
+                }
+            }
             else
             {
                 if( m_pPayload.IsEmpty() ||
@@ -307,14 +390,23 @@ gint32 CIfUxSockTransTask::RunTask()
                     ret = ERROR_STATE;
                     break;
                 }
-                pSvr->WriteStream( m_pPayload, this );
+                ret = pSvr->WriteStream(
+                    m_pPayload, this );
             }
         }
         else
         {
             CUnixSockStmProxy* pProxy = m_pUxStream;
             if( m_bIn )
-                pProxy->StartReading( this );
+            {
+                ret = pProxy->StartReading( this );
+                if( SUCCEEDED( ret ) )
+                {
+                    ret = OnTaskComplete( ret );
+                    if( SUCCEEDED( ret ) )
+                        continue;
+                }
+            }
             else
             {
                 if( m_pPayload.IsEmpty() ||
@@ -323,11 +415,13 @@ gint32 CIfUxSockTransTask::RunTask()
                     ret = ERROR_STATE;
                     break;
                 }
-                pProxy->WriteStream( m_pPayload, this );
+                ret = pProxy->WriteStream(
+                    m_pPayload, this );
             }
         }
+        break;
 
-    }while( 0 );
+    }while( 1 );
 
     return ret;
 }
@@ -356,7 +450,17 @@ gint32 CIfUxListeningTask::RunTask()
             ret = pProxy->StartListening( this );
         }
 
-    }while( 0 );
+        if( ret == STATUS_PENDING )
+            break;
+
+        if( ERROR( ret ) )
+            break;
+
+        ret = OnTaskComplete( ret );
+        if( ERROR( ret ) )
+            break;
+
+    }while( 1 );
 
     return ret;
 }
@@ -451,6 +555,49 @@ gint32 CIfUxListeningTask::PostEvent(
     return ret;
 }
 
+gint32 CIfUxListeningTask::OnTaskComplete(
+    gint32 iRet )
+{
+    gint32 ret = 0;
+    if( ERROR( iRet ) )
+        return iRet;
+
+    do{
+        IConfigDb* pCfg = GetConfig();
+        CCfgOpener oCfg( pCfg );
+
+        ObjPtr pIf;
+        ret = oCfg.GetObjPtr( propIfPtr, pIf );
+        if( ERROR( ret ) )
+            break;
+
+        IConfigDb* pResp = nullptr;
+        ret = oCfg.GetPointer(
+            propRespPtr, pResp );
+
+        if( ERROR( ret ) )
+            break;
+
+        CParamList oResp( pResp );
+        BufPtr pPayload;
+        oResp.GetProperty( 0, pPayload );
+        if( ERROR( ret ) )
+            break;
+        
+        if( pPayload.IsEmpty() ||
+            pPayload->empty() )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        ret = PostEvent( pPayload );
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CIfUxListeningTask::OnIrpComplete( IRP* pIrp )
 {
     gint32 ret = 0;
@@ -461,8 +608,8 @@ gint32 CIfUxListeningTask::OnIrpComplete( IRP* pIrp )
 
     do{
         IConfigDb* pCfg = GetConfig();
-        CRpcServices* pIf = nullptr;
         CCfgOpener oCfg( pCfg );
+        CRpcServices* pIf = nullptr;
         ret = oCfg.GetPointer( propIfPtr, pIf );
         if( ERROR( ret ) )
             break;
@@ -476,6 +623,13 @@ gint32 CIfUxListeningTask::OnIrpComplete( IRP* pIrp )
             break;
         }
         IrpCtxPtr& pCtx = pIrp->GetTopStack();
+        BufPtr pPayload = pCtx->m_pRespData;
+        if( pPayload.IsEmpty() ||
+            pPayload->empty() )
+        {
+            ret = -EFAULT;
+            break;
+        }
         ret = PostEvent( pCtx->m_pRespData );
         if( ERROR( ret ) )
             break;

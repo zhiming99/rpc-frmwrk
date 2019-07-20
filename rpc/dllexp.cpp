@@ -27,6 +27,7 @@
 #include "tcpport.h"
 #include "objfctry.h"
 #include "fdodrv.h"
+#include "stmrelay.h"
 
 
 using namespace std;
@@ -98,6 +99,14 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CIfRouterState );
     INIT_MAP_ENTRYCFG( CTcpFidoListenTask );
     INIT_MAP_ENTRYCFG( CTcpBdgePrxyState );
+    INIT_MAP_ENTRYCFG( CIfStartUxSockStmRelayTask );
+    INIT_MAP_ENTRYCFG( CStreamProxyRelay );
+    INIT_MAP_ENTRYCFG( CStreamServerRelay );
+    INIT_MAP_ENTRYCFG( CUnixSockStmProxyRelay );
+    INIT_MAP_ENTRYCFG( CUnixSockStmServerRelay );
+    INIT_MAP_ENTRYCFG( CIfUxListeningRelayTask );
+    INIT_MAP_ENTRYCFG( CIfUxSockTransRelayTask );
+    INIT_MAP_ENTRYCFG( CIfTcpStmTransTask );
     END_FACTORY_MAPS;
 };
 

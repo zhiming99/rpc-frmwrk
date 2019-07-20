@@ -64,7 +64,9 @@ gint32 CRecvFilter::OnIoReady()
 
             if( byToken == tokPing ||
                 byToken == tokPong ||
-                byToken == tokClose )
+                byToken == tokClose ||
+                byToken == tokFlowCtrl ||
+                byToken == tokLift )
             {
                 ret = byToken;
                 break;
@@ -115,7 +117,11 @@ gint32 CRecvFilter::OnIoReady()
                     ret = -EBADMSG;
                     break;
                 }
-                pBuf->Resize( m_dwBytesToRead );
+                // leave some room for later usage
+                guint32 dwBufOffset = 16;
+                pBuf->Resize(
+                    m_dwBytesToRead + dwBufOffset );
+                pBuf->SetOffset( dwBufOffset );
                 m_dwOffsetRead = 0;
                 // fall through
             }
@@ -290,7 +296,9 @@ gint32 CSendQue::OnIoReady()
 
             if( byToken == tokPing ||
                 byToken == tokPong ||
-                byToken == tokClose )
+                byToken == tokClose ||
+                byToken == tokFlowCtrl ||
+                byToken == tokLift )
             {
                 // next packet
                 --m_dwBytesPending;
@@ -1385,7 +1393,7 @@ gint32 CUnixSockStmPdo::HandleStreamCommand(
             }
         case tokLift:
             {
-                m_bFlowControl = false;
+                m_bFlowCtrl = false;
                 if( m_queDataPackets.size() >=
                     STM_MAX_QUEUE_SIZE )
                 {
@@ -1397,7 +1405,7 @@ gint32 CUnixSockStmPdo::HandleStreamCommand(
             }
         case tokFlowCtrl:
             {
-                m_bFlowControl = true;
+                m_bFlowCtrl = true;
                 pTask->StopWatch( false );
                 break;
             }
@@ -1538,7 +1546,7 @@ gint32 CUnixSockStmPdo::SubmitReadIrp(
 
             // allow incoming data if the queue size
             // below the threshold
-            if( m_bFlowControl )
+            if( m_bFlowCtrl )
                 break;
 
             if( dwSize == STM_MAX_QUEUE_SIZE )
@@ -1575,7 +1583,7 @@ gint32 CUnixSockStmPdo::SubmitWriteIrp(
         CStdRTMutex oTaskLock(
             pTask->GetLock() );
         CStdRMutex oPortLock( GetLock() );
-        if( m_queWritingIrps.size() >
+        if( m_queWritingIrps.size() >=
             STM_MAX_QUEUE_SIZE )
         {
             ret = ERROR_QUEUE_FULL;

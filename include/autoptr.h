@@ -342,21 +342,20 @@ class CAutoPtr : public IAutoPtr
     {
         Clear();
 
-        // with clsid invalid, we don't 
-        // support object creation dynamically.
+        // if clsid is Clsid_Invalid, the object cannot
+        // be created dynamically.
 
-        EnumClsid iEffective = Clsid_Invalid;
-        if( iClsid != Clsid_Invalid )
+        EnumClsid iEffective = clsid( Invalid );
+        if( iNewClsid != clsid( Invalid ) )
+        {
+            iEffective = iNewClsid;
+        }
+        else if( iClsid != clsid( Invalid ) )
         {
             iEffective = iClsid;
         }
-        else
-        {
-            if( iNewClsid != Clsid_Invalid )
-                iEffective = iNewClsid;
-        }
 
-        if( iEffective == Clsid_Invalid )
+        if( iEffective == clsid( Invalid ) )
             return 0;
 
         CObjBase* pObj = nullptr;

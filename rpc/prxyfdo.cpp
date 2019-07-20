@@ -858,11 +858,11 @@ gint32 CProxyFdoListenTask::Process(
         pIrp->AllocNextStack( pPort );
 
         IrpCtxPtr& pCtx = pIrp->GetTopStack();
-        pPort->AllocIrpCtxExt( pCtx );
 
         pCtx->SetMajorCmd( IRP_MJ_FUNC );
         pCtx->SetMinorCmd( IRP_MN_IOCTL );
         pCtx->SetCtrlCode( CTRLCODE_LISTENING_FDO );
+        pPort->AllocIrpCtxExt( pCtx );
 
         pCtx->SetIoDirection( IRP_DIR_IN ); 
         pIrp->SetSyncCall( false );

@@ -359,6 +359,7 @@ gint32 CBdgeProxyStartSendTask::
 gint32 CBdgeProxyStartSendTask::
     OnTaskComplete( gint32 iRetVal )
 {
+
     if( ERROR( iRetVal ) )
     {
         OnTaskCompleteWithError( iRetVal );
@@ -1166,7 +1167,6 @@ gint32 CBdgeStartFetchDataTask ::RunTask()
     OnTaskComplete( ret );
 
     return ret;
-
 }
 
 gint32 CBdgeStartFetchDataTask::

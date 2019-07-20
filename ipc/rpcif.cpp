@@ -2099,6 +2099,55 @@ gint32 CRpcServices::RebuildMatches()
     return 0;
 }
 
+gint32 CRpcServices::StartEx2(
+    IEventSink* pCallback )
+{
+    gint32 ret = 0;
+
+    if( pCallback == nullptr )
+        return -EINVAL;
+        
+    do{
+        TaskletPtr pWrapper;
+        CParamList oParams;
+        oParams[ propIfPtr ] = ObjPtr( this );
+        oParams[ propEventSink ] = pCallback;
+
+        ret = pWrapper.NewObj(
+            clsid( CIfCallbackInterceptor ),
+            oParams.GetCfg() );
+
+        if( ERROR( ret ) )
+            break;
+
+        TaskletPtr pPostStart;
+        ret = DEFER_CALL_NOSCHED( pPostStart,
+            ObjPtr( this ),
+            &CRpcServices::OnPostStart,
+            pCallback );
+
+        if( ERROR( ret ) )
+            break;
+
+        CIfCallbackInterceptor* pcbi = pWrapper;
+        pcbi->InsertCall( pPostStart );
+        ( *pcbi )( 0 );
+
+        ret = super::StartEx( pWrapper );
+
+        if( ERROR( ret ) )
+            break;
+
+        if( ret == STATUS_PENDING )
+            break;
+
+        ret = OnPostStart( pCallback );
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CRpcServices::StartEx(
     IEventSink* pCallback )
 {
@@ -2121,8 +2170,10 @@ gint32 CRpcServices::StartEx(
     if( ERROR( ret ) )
         return ret;
 
+#ifdef DEBUG
     dwStartCount++;
-    return super::StartEx( pCallback );
+#endif
+    return StartEx2( pCallback );
 }
 
 gint32 CRpcServices::OnPreStart(
@@ -2584,7 +2635,7 @@ gint32 CInterfaceProxy::SendFetch_Proxy(
             oDesc.Append( pDataDesc );
 
             // Send/Fetch belongs to interface
-            // CFileTransferServer
+            // CFileTransferServer or CStreamServer
             EnumClsid iid = ( EnumClsid )
                 ( ( guint32& )oDesc[ propIid ] );
 
@@ -2881,9 +2932,10 @@ gint32 CRpcServices::BuildBufForIrp(
         if( ERROR( ret ) )
             break;
 
+        const char* pData = pReqBuf->ptr();
         if( !dbus_message_append_args( pMsg,
             DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
-            &pReqBuf->ptr(), pReqBuf->size(),
+            &pData, pReqBuf->size(),
             DBUS_TYPE_INVALID ) )
         {
             ret = -ENOMEM;
@@ -5657,10 +5709,11 @@ gint32 CInterfaceServer::SendResponse(
 
             if( SUCCEEDED( iRet ) )
             {
+                const char* pData = pBuf->ptr();
                 if( !dbus_message_append_args( pRespMsg,
                     DBUS_TYPE_UINT32, &iRet,
                     DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
-                    &pBuf->ptr(), pBuf->size(),
+                    &pData, pBuf->size(),
                     iFdType, &iFd,
                     DBUS_TYPE_UINT32, &dwOffset,
                     DBUS_TYPE_UINT32, &dwSize,
@@ -5702,10 +5755,11 @@ gint32 CInterfaceServer::SendResponse(
 
             if( pBuf->size() )
             {
+                const char* pData = pBuf->ptr();
                 if( !dbus_message_append_args( pRespMsg,
                     DBUS_TYPE_UINT32, &iRet,
                     DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
-                    &pBuf->ptr(), pBuf->size(),
+                    &pData, pBuf->size(),
                     DBUS_TYPE_INVALID ) )
                 {
                     ret = -ENOMEM;
@@ -5734,10 +5788,11 @@ gint32 CInterfaceServer::SendResponse(
             if( ERROR( ret ) )
                 break;
 
+            const char* pData = pBuf->ptr();
             if( !dbus_message_append_args( pRespMsg,
                 DBUS_TYPE_UINT32, &iRet,
                 DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
-                &pBuf->ptr(), pBuf->size(),
+                &pData, pBuf->size(),
                 DBUS_TYPE_INVALID ) )
             {
                 ret = -ENOMEM;

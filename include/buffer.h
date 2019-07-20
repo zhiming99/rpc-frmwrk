@@ -123,11 +123,15 @@ inline gint32 GetTypeId( ObjPtr* pT )
 
 class CBuffer : public CObjBase
 {
-	protected:
 	char* m_pData;
 	guint32 m_dwSize;
     guint32 m_dwType;
-    char m_arrBuf[ 64 ] __attribute__( ( aligned ( 8 ) ) );
+    guint32 m_dwOffset = 0;
+    char m_arrBuf[ 48 ] __attribute__( ( aligned ( 8 ) ) );
+
+    protected:
+
+    gint32 ResizeWithOffset( guint32 dwSize );
 
 	public:
 
@@ -185,12 +189,37 @@ class CBuffer : public CObjBase
 
     CBuffer( const CBuffer& oInit );
 
-	char*& ptr() const;
-	guint32& size() const;
+    inline void SetBuffer(
+        char* pData,
+        guint32 dwSize,
+        guint32 dwOffset = 0 )
+    {
+        m_pData = pData;
+        m_dwSize = dwSize;
+        m_dwOffset = dwOffset;
+    }
+
+	char* ptr() const;
+	guint32 size() const;
     guint32 type() const;
     void SetDataType( EnumDataType dt );
     EnumDataType GetDataType() const;
 	void Resize( guint32 dwSize );
+
+    inline gint32 SetOffset( guint32 dwOffset )
+    {
+        if( empty() )
+            return ERROR_STATE;
+
+        if( dwOffset >= size() )
+            return -EINVAL;
+
+        m_dwOffset = dwOffset;
+        return STATUS_SUCCESS;
+    }
+
+    inline guint32 offset() const
+    { return m_dwOffset; }
 
     void SetExDataType( EnumTypeId dt );
     EnumTypeId GetExDataType() const;

@@ -1990,34 +1990,16 @@ gint32 CRpcStreamSock::HandleIoctlIrp(
         CReqOpener oCfg(
             ( IConfigDb* )pCfg );
 
-        gint32 iCmdStm = -1;
         CRpcControlStream* pCtrlStm = nullptr;
-        CTcpStreamPdo* pParentPort =
-            dynamic_cast< CTcpStreamPdo* >( m_pParentPort );
+        ObjPtr pPortObj( m_pParentPort );
+        CTcpStreamPdo* pParentPort = pPortObj;
 
         if( !pParentPort->IsImmediateReq( pIrp ) )
         {
-            // check steam existance
-            ret = oCfg.GetIntProp( propStreamId,
-                ( guint32& )iCmdStm );
-
-            if( ERROR( ret ) )
-            {
-                ret = -EINVAL;
-                break;
-            }
-
+            // check stream existance
             StmPtr pStream;
-            ret = GetStream( iCmdStm, pStream );
-            if( ERROR( ret ) )
-                break;
-
-            guint32 dwProtoId = pStream->GetProtoId();
-            if( dwProtoId != protoControl )
-            {
-                ret = -EPROTO;
-                break;
-            }
+            ret = GetCtrlStmFromIrp(
+                pIrp, pStream );
 
             pCtrlStm = pStream;
             if( pCtrlStm == nullptr )
@@ -2247,23 +2229,35 @@ gint32 CRpcStreamSock::HandleIoctlIrp(
             {   
                 // this command happens only on
                 // proxy side
-                gint32 iLocalStm = 0;
-                ret = oCfg.GetIntProp( 0,
-                    ( guint32& )iLocalStm );
+                guint32 dwType =
+                    DBUS_MESSAGE_TYPE_METHOD_CALL;
 
+                ret = oCfg.GetReqType( dwType );
                 if( ERROR( ret ) )
                     break;
 
-                StmPtr pStm;
-                ret = GetStream( iLocalStm, pStm );
-                if( ERROR( ret ) )
-                    break;
+                if( dwType ==
+                    DBUS_MESSAGE_TYPE_METHOD_CALL )
+                {
+                    gint32 iLocalStm = 0;
+                    ret = oCfg.GetIntProp( 0,
+                        ( guint32& )iLocalStm );
 
-                gint32 iPeerStmId = 0;
-                pStm->GetPeerStmId( iPeerStmId );
-                oCfg.Push( iPeerStmId );
+                    if( ERROR( ret ) )
+                        break;
+
+                    StmPtr pStm;
+                    ret = GetStream( iLocalStm, pStm );
+                    if( ERROR( ret ) )
+                        break;
+
+                    gint32 iPeerStmId = 0;
+                    pStm->GetPeerStmId( iPeerStmId );
+                    oCfg.Push( iPeerStmId );
+                }
 
                 ret = pCtrlStm->HandleIoctlIrp( pIrp );
+
                 break;
             }
         case CTRLCODE_INVALID_STREAM_ID_PDO:
@@ -2286,20 +2280,29 @@ gint32 CRpcStreamSock::HandleIoctlIrp(
                 // the new stream id will be
                 // returned after this call
                 // completes
-                if( !oCfg.exist( 0 ) )
-                {
-                    ret = -EINVAL;
+                guint32 dwType =
+                    DBUS_MESSAGE_TYPE_METHOD_CALL;
+
+                ret = oCfg.GetReqType( dwType );
+                if( ERROR( ret ) )
                     break;
+
+                if( dwType == DBUS_MESSAGE_TYPE_METHOD_CALL )
+                {
+                    if( !oCfg.exist( 0 ) )
+                    {
+                        ret = -EINVAL;
+                        break;
+                    }
+                    gint32 iStreamId = 0;
+                    ret = NewStreamId( iStreamId );
+                    guint32 dwProtocol = 0;
+
+                    // adjust the params to send
+                    oCfg.Pop( dwProtocol );
+                    oCfg.Push( iStreamId );
+                    oCfg.Push( dwProtocol );
                 }
-                gint32 iStreamId = 0;
-                ret = NewStreamId( iStreamId );
-                guint32 dwProtocol = 0;
-
-                // adjust the params to send
-                oCfg.Pop( dwProtocol );
-                oCfg.Push( iStreamId );
-                oCfg.Push( dwProtocol );
-
                 ret = pCtrlStm->HandleIoctlIrp( pIrp );
                 break;
             }
@@ -2847,7 +2850,6 @@ gint32 CRpcStream::HandleWriteIrp(
         else
             oHeader.m_dwSeqNo = GetSeqNo();
 
-
         pOp->SetHeader( &oHeader );
         pOp->SetIrp( pIrp );
 
@@ -3200,12 +3202,23 @@ gint32 CRpcControlStream::HandleListening(
             break;
 
         CCfgOpener oCfg( ( IConfigDb* )pCfg );
-        guint32 dwMatchType = 0;
-        ret = oCfg.GetIntProp(
-            propMatchType, dwMatchType );
+
+        CMessageMatch* pMatch = nullptr;
+        ret = oCfg.GetPointer(
+            propMatchPtr, pMatch );
 
         if( ERROR( ret ) )
             break;
+        
+        if( pMatch->ToString() !=
+            m_pStmMatch->ToString() )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        EnumMatchType dwMatchType =
+            m_pStmMatch->GetType();
 
         std::deque< IrpPtr >* pQueIrp =
             &m_queReadIrps;
@@ -3380,7 +3393,7 @@ gint32 CRpcControlStream::HandleIoctlIrp(
             {
                 dwSeqNo = GetSeqNo();
 
-                // copy the sequence no to the
+                // copy the sequence #NO to the
                 // request cfg for reference in
                 // the future. the SeqNo is only
                 // generatated at this point
@@ -3447,9 +3460,15 @@ gint32 CRpcControlStream::HandleIoctlIrp(
                 ret = -EEXIST;
                 break;
             }
-            m_pStmMatch =
-                ( ObjPtr& )( *pCtx->m_pReqData );
 
+            ObjPtr pMatch;
+            ret = oCfg.GetObjPtr(
+                propMatchPtr, pMatch );
+
+            if( ERROR( ret ) )
+                break;
+
+            m_pStmMatch = pMatch;
             if( m_pStmMatch.IsEmpty() )
                 ret = -EINVAL;
 
@@ -3459,6 +3478,22 @@ gint32 CRpcControlStream::HandleIoctlIrp(
         {
             CStdRMutex oSockLock(
                 m_pStmSock->GetLock() );
+
+            CMessageMatch* pMatch = nullptr;
+            ret = oCfg.GetPointer(
+                propMatchPtr, pMatch );
+
+            if( ERROR( ret ) )
+                break;
+
+            
+            if( pMatch->ToString() !=
+                m_pStmMatch->ToString() )
+            {
+                ret = -EINVAL;
+                break;
+            }
+
             m_pStmMatch.Clear();
             break;
         }
@@ -3492,18 +3527,10 @@ gint32 CRpcControlStream::QueueIrpForResp(
 
     gint32 ret = 0;
     do{
-        CfgPtr pCfg;
-        ret = pCtx->GetReqAsCfg( pCfg );
-        if( ERROR( ret ) )
-            break;
-
-        CCfgOpener oCfg( ( IConfigDb* )pCfg );
         if( dwCtrlCode == CTRLCODE_LISTENING )
         {
-
-            guint32 dwType = 0;
-            ret = oCfg.GetIntProp(
-                propMatchType, dwType );
+            EnumMatchType dwType =
+                m_pStmMatch->GetType();
 
             if( ERROR( ret ) )
                 break;
@@ -3516,7 +3543,12 @@ gint32 CRpcControlStream::QueueIrpForResp(
             break;
         }
 
+        CfgPtr pCfg;
+        ret = pCtx->GetReqAsCfg( pCfg );
+        if( ERROR( ret ) )
+            break;
 
+        CCfgOpener oCfg( ( IConfigDb* )pCfg );
         guint32 dwSeqNo = 0;
         ret = oCfg.GetIntProp(
             propSeqNo, dwSeqNo );
@@ -3799,20 +3831,11 @@ gint32 CRpcControlStream::RemoveIrpFromMap(
             }
         case CTRLCODE_LISTENING:
             {
-                CfgPtr pCfg;
-                ret = pCtx->GetReqAsCfg( pCfg );
+                EnumMatchType dwType =
+                    m_pStmMatch->GetType();
 
-                if( ERROR( ret ) )
-                    break;
-
-                CCfgOpener oCfg(
-                    ( IConfigDb* )pCfg );
-
-                guint32 dwType = 0;
-                ret = oCfg.GetIntProp(
-                    propMatchType, dwType );
-
-                deque< IrpPtr >* pQueIrps = &m_queReadIrps;
+                deque< IrpPtr >* pQueIrps =
+                    &m_queReadIrps;
 
                 if( dwType == matchClient )
                     pQueIrps = &m_queReadIrpsEvt;

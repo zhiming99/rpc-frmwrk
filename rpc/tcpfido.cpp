@@ -814,10 +814,11 @@ gint32 CRpcTcpFido::LoopbackTest(
         BufPtr pBuf( true );
         ret = oParams.GetCfg()->Serialize( *pBuf );
 
+        const char* pData = pBuf->ptr();
         dbus_message_append_args( pRespMsg,
             DBUS_TYPE_UINT32, &ret,
             DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
-            &pBuf->ptr(), pBuf->size(),
+            &pData, pBuf->size(),
             DBUS_TYPE_INVALID );
 
         IrpPtr pIrp( true );
@@ -827,12 +828,13 @@ gint32 CRpcTcpFido::LoopbackTest(
         BufPtr pReqBuf( true );
         *pReqBuf = pRespMsg;
 
-        // the stream id to listen to is in.
-        this->AllocIrpCtxExt( pCtx );
-
         pCtx->SetMajorCmd( IRP_MJ_FUNC );
         pCtx->SetMinorCmd( IRP_MN_IOCTL );
         pCtx->SetCtrlCode( CTRLCODE_SEND_RESP );
+
+        // the stream id to listen to is in.
+        this->AllocIrpCtxExt( pCtx );
+
         pCtx->SetReqData( pReqBuf );
 
         pCtx->SetIoDirection( IRP_DIR_OUT ); 
@@ -1485,12 +1487,12 @@ gint32 CTcpFidoListenTask::Process(
 
         IrpCtxPtr pCtx = pIrp->GetTopStack();
 
-        // the stream id to listen to is in.
-        pPort->AllocIrpCtxExt( pCtx );
-
         pCtx->SetMajorCmd( IRP_MJ_FUNC );
         pCtx->SetMinorCmd( IRP_MN_IOCTL );
         pCtx->SetCtrlCode( CTRLCODE_LISTENING_FDO );
+
+        // the stream id to listen to is in.
+        pPort->AllocIrpCtxExt( pCtx );
 
         pCtx->SetIoDirection( IRP_DIR_IN ); 
         pIrp->SetSyncCall( false );

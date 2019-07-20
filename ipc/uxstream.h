@@ -20,53 +20,141 @@
 
 #include "stream.h"
 
-class CIfCallbackInterceptor :
-    public CIfInterceptTaskProxy
+class CIfUxTaskBase :
+    public CIfParallelTask
 {
-    TaskletPtr m_pCallAhead;
-    TaskletPtr m_pCallAfter;
-    public: 
-    typedef CIfInterceptTaskProxy super;
+    protected:
+    guint32 m_dwFCState = stateStarted;
 
-    CIfCallbackInterceptor( const IConfigDb* pCfg ) :
+    public:
+    typedef CIfParallelTask super;
+
+    CIfUxTaskBase( const IConfigDb* pCfg ) :
         super( pCfg )
-    { SetClassId( clsid( CIfCallbackInterceptor ) ); }
+    {;}
 
-    // for those tasks such as DEFER_CALL's output, who
-    // cannot call propEventSink on complete
-    //
-    // Run pTask ahead of propEventSink
-    void InsertCall( TaskletPtr& pTask )
-    { m_pCallAhead = pTask; }
-
-    // Run pTask after propEventSink 
-    void InsertCallAfter( TaskletPtr& pTask )
-    {m_pCallAfter = pTask; }
-
-    gint32 RunTask()
-    { return STATUS_PENDING; }
-
-    gint32 OnTaskComplete( gint32 iRet )
+    bool IsPaused()
     {
-        if( ERROR( iRet ) )
-            return iRet;
-
-        if( m_pCallAhead.IsEmpty() )
-            return iRet;
-
-        ( *m_pCallAhead )( eventZero );
-
-        return iRet;
+        CStdRTMutex oLock( GetLock() );
+        return m_dwFCState == statePaused;
     }
 
-    gint32 OnComplete( gint32 iRet )
+    virtual gint32 Pause()
     {
-        super::OnComplete( iRet );
+        gint32 ret = 0;
+        do{
+            CStdRTMutex oTaskLock( GetLock() );
+            guint32 dwState = GetTaskState();
+            if( dwState != stateStarted )
+            {
+                ret = ERROR_STATE;
+                break;
+            }
 
-        if( !m_pCallAhead.IsEmpty() )
-            ( *m_pCallAfter )( eventZero );
+            if( IsPaused() )
+                break;
 
-        return iRet;
+            m_dwFCState = statePaused;
+
+            // reset the task state
+            SetTaskState( stateStarting );
+
+            CCfgOpener oCfg(
+                ( IConfigDb* )GetConfig() );
+
+            CIoManager* pMgr = nullptr;
+            ret = GET_IOMGR( oCfg, pMgr );
+            if( ERROR( ret ) )
+                break;
+
+            ObjPtr pIrpObj;
+            ret = oCfg.GetObjPtr(
+                propIrpPtr, pIrpObj );
+
+            if( ERROR( ret ) )
+                break;
+
+            oCfg.RemoveProperty( propIrpPtr );
+            IrpPtr pIrp = pIrpObj;
+
+            oTaskLock.Unlock();
+
+            CStdRMutex oIrpLock( pIrp->GetLock() );
+            ret = pIrp->CanContinue( IRP_STATE_READY );
+            if( ERROR( ret ) )
+                break;
+
+            pIrp->RemoveCallback();
+            pIrp->RemoveTimer();
+
+            oIrpLock.Unlock();
+
+            ret = pMgr->CancelIrp(
+                pIrp, true, -ECANCELED );
+
+        }while( 0 );
+
+        return ret;
+    }
+
+    virtual gint32 Resume()
+    {
+        gint32 ret = 0;
+        do{
+            CStdRTMutex oLock( GetLock() );
+            guint32 dwState = GetTaskState();
+            if( dwState != stateStarting )
+            {
+                ret = ERROR_STATE;
+                break;
+            }
+
+            if( !IsPaused() )
+                break;
+
+            m_dwFCState = stateConnected;
+
+            CCfgOpener oCfg(
+                ( IConfigDb* )GetConfig() );
+
+            CIoManager* pMgr = nullptr;
+            ret = GET_IOMGR( oCfg, pMgr );
+            if( ERROR( ret ) )
+                break;
+            oLock.Unlock();
+
+            TaskletPtr pTask( this );
+            pMgr->RescheduleTask( pTask );
+
+        }while( 0 );
+
+        return ret;
+    }
+
+    gint32 ReRun()
+    {
+        gint32 ret = 0;
+        do{
+            CStdRTMutex oLock( GetLock() );
+            SetTaskState( stateStarting );
+            CCfgOpener oCfg(
+                ( IConfigDb* )GetConfig() );
+
+            if( IsPaused() )
+                break;
+
+            CIoManager* pMgr = nullptr;
+            ret = GET_IOMGR( oCfg, pMgr );
+            if( ERROR( ret ) )
+                break;
+
+            oLock.Unlock();
+            TaskletPtr pTask( this );
+            ret = pMgr->RescheduleTask( pTask );
+
+        }while( 0 );
+
+        return ret;
     }
 };
 
@@ -82,11 +170,7 @@ class CIfUxPingTask :
 
     gint32 RunTask();
     gint32 OnRetry();
-    gint32 OnCancel( guint32 dwContext )
-    {
-        RemoveTimer();
-        return super::OnCancel( dwContext );
-    }
+    gint32 OnCancel( guint32 dwContext );
 };
 
 class CIfUxPingTicker :
@@ -100,10 +184,11 @@ class CIfUxPingTicker :
 
     gint32 RunTask();
     gint32 OnRetry();
+    gint32 OnCancel( guint32 dwContext );
 };
 
 class CIfUxSockTransTask :
-    public CIfParallelTask
+    public CIfUxTaskBase
 {
 
     bool m_bIn = true;
@@ -114,7 +199,7 @@ class CIfUxSockTransTask :
     guint32 m_dwKeepAliveSec;
 
     public:
-    typedef CIfParallelTask super;
+    typedef CIfUxTaskBase super;
 
     CIfUxSockTransTask( const IConfigDb* pCfg );
     gint32 OnIrpComplete( IRP* pIrp );
@@ -126,6 +211,11 @@ class CIfUxSockTransTask :
 
     inline void SetIoDirection( bool bIn )
     { m_bIn = bIn; }
+
+    // whether reading from the uxsock or writing to
+    // the uxsock
+    inline bool IsReading()
+    { return m_bIn; }
 
     inline gint32 SetBufToSend( BufPtr pBuf )
     {
@@ -142,13 +232,15 @@ class CIfUxSockTransTask :
     inline void GetBufReceived( BufPtr pBuf )
     { pBuf = m_pPayload; }
 
+    gint32 OnTaskComplete( gint32 iRet );
+    gint32 HandleResponse( IRP* pIrp );
 };
 
 class CIfUxListeningTask :
-    public CIfParallelTask
+    public CIfUxTaskBase
 {
     public:
-    typedef CIfParallelTask super;
+    typedef CIfUxTaskBase super;
 
     CIfUxListeningTask( const IConfigDb* pCfg ) :
         super( pCfg )
@@ -157,6 +249,7 @@ class CIfUxListeningTask :
     gint32 RunTask();
     gint32 PostEvent( BufPtr& pBuf );
     gint32 OnIrpComplete( IRP* pIrp );
+    gint32 OnTaskComplete( gint32 iRet );
 };
 
 #define UXSOCK_MOD_SERVER_NAME "UnixSockStmServer"
@@ -167,6 +260,7 @@ template< class T >
 class CUnixSockStream:
     public T
 {
+    protected:
     InterfPtr m_pParent;
 
     TaskletPtr m_pPingTicker;
@@ -182,7 +276,6 @@ class CUnixSockStream:
 
     // flag to allow or deny outgoing data
     std::atomic< guint8 > m_byFlowCtrl;
-    std::deque< std::pair< ObjPtr, ObjPtr > > m_queWaitLift;
 
     protected:
     gint32 OnUxSockEventWrapper(
@@ -368,7 +461,10 @@ class CUnixSockStream:
     }
 
     inline IStream* GetParent()
-    { return dynamic_cast< IStream* >( m_pParent ); }
+    {
+        return dynamic_cast< IStream* >
+            ( ( IGenericInterface* )m_pParent );
+    }
 
     virtual gint32 OnUxSockEvent(
         guint8 byToken,
@@ -408,56 +504,7 @@ class CUnixSockStream:
             }
         case tokData:
             {
-                if( pBuf == nullptr || pBuf->empty() )
-                {
-                    ret = -EINVAL;
-                    break;
-                }
-                guint64 qwOldRxBytes = m_qwRxBytes;
-                m_qwRxBytes += pBuf->size();
-                guint64 qwNewRxBytes = m_qwRxBytes;
-
-                BufPtr bufPtr( pBuf );
-                PostUxStreamEvent( tokData, bufPtr );
-
-                guint64 qwThresh = ( qwNewRxBytes &
-                    ~( STM_MAX_PENDING_WRITE - 1 ) );
-
-                if( qwOldRxBytes < qwThresh &&
-                    qwNewRxBytes >= qwThresh )
-                {
-                    // every STM_MAX_PENDING_WRITE
-                    // bytes received, we emit a
-                    // progress report, as a flow
-                    // control hint.
-                    //
-                    // send a progress notification
-                    CParamList oProgress;
-                    oProgress.SetQwordProp(
-                        propRxBytes, m_qwRxBytes );
-
-                    BufPtr pBuf( true );
-                    oProgress.GetCfg()->Serialize( *pBuf );
-
-                    CParamList oReq;
-                    oReq.SetStrProp(
-                        propMethodName, "SendProgress" );
-                    oReq.Push( pBuf );
-
-                    CParamList oCallback;
-
-                    oCallback.CopyProp( propKeepAliveSec, this );
-                    oCallback.SetPointer( propIfPtr, this );
-                    oCallback.SetPointer( propIoMgr, this );
-
-                    TaskletPtr pTask;
-                    pTask.NewObj( clsid( CIfDummyTask ),
-                        oCallback.GetCfg() );
-
-                    ret = SubmitRequest(
-                        oReq.GetCfg(), pTask, true );
-                    
-                }
+                ret = OnDataReceived( pBuf );
                 break;
             }
         case tokClose:
@@ -486,25 +533,26 @@ class CUnixSockStream:
             oParams.Push( ptrBuf );
 
             TaskletPtr pTask;
-            DEFER_CALL_NOSCHED( pTask,
+            DEFER_IFCALL_NOSCHED( pTask,
                 ObjPtr( m_pParent ),
                 &IStream::OnUxStmEvtWrapper,
                 hChannel,
                 ( IConfigDb* )oParams.GetCfg() );
 
-            CRpcServices* pIf = m_pParent;
-            ret = pIf->AddSeqTask( pTask );
+            // NOTE: the istream method is running on
+            // the seqtask of the uxstream
+            ret = this->AddSeqTask( pTask );
 
         }while( 0 );
 
         return ret;
     }
 
-    gint32 PostUxSockEvent(
+    virtual gint32 PostUxSockEvent(
         guint8 byToken, BufPtr& pBuf )
     {
         TaskletPtr pTask;
-        DEFER_CALL_NOSCHED( pTask,
+        DEFER_IFCALL_NOSCHED( pTask,
             ObjPtr( this ),
             &CUnixSockStream::OnUxSockEventWrapper,
             byToken, *pBuf );
@@ -513,9 +561,77 @@ class CUnixSockStream:
     }
 
     // events from the ux port
+    virtual gint32 OnDataReceived( CBuffer* pBuf )
+    {
+        gint32 ret = 0;
+
+        if( !IsConnected() )
+            return ERROR_STATE;
+
+        do{
+            if( pBuf == nullptr || pBuf->empty() )
+            {
+                ret = -EINVAL;
+                break;
+            }
+            guint64 qwOldRxBytes = m_qwRxBytes;
+            m_qwRxBytes += pBuf->size();
+            guint64 qwNewRxBytes = m_qwRxBytes;
+
+            BufPtr bufPtr( pBuf );
+            PostUxStreamEvent( tokData, bufPtr );
+
+            guint64 qwThresh = ( qwNewRxBytes &
+                ~( STM_MAX_PENDING_WRITE - 1 ) );
+
+            if( qwOldRxBytes < qwThresh &&
+                qwNewRxBytes >= qwThresh )
+            {
+                // every STM_MAX_PENDING_WRITE
+                // bytes received, we emit a
+                // progress report, as a flow
+                // control hint.
+                //
+                // send a progress notification
+                CParamList oProgress;
+                oProgress.SetQwordProp(
+                    propRxBytes, m_qwRxBytes );
+
+                BufPtr pBuf( true );
+                oProgress.GetCfg()->Serialize( *pBuf );
+
+                CParamList oReq;
+                oReq.SetStrProp(
+                    propMethodName, "SendProgress" );
+                oReq.Push( pBuf );
+
+                CParamList oCallback;
+
+                oCallback.CopyProp( propKeepAliveSec, this );
+                oCallback.SetPointer( propIfPtr, this );
+                oCallback.SetPointer( propIoMgr, this );
+
+                TaskletPtr pTask;
+                pTask.NewObj( clsid( CIfDummyTask ),
+                    oCallback.GetCfg() );
+
+                ret = SubmitRequest(
+                    oReq.GetCfg(), pTask, true );
+                
+            }
+
+        }while( 0 );
+
+        return ret;
+    }
+    // events from the ux port
     virtual gint32 OnPingPong( bool bPing )
     {
         gint32 ret = 0;
+
+        if( !IsConnected() )
+            return ERROR_STATE;
+
         do{
             ResetPingTicker();
             if( this->IsServer() && bPing )
@@ -610,6 +726,10 @@ class CUnixSockStream:
     gint32 OnProgress( CBuffer* pBuf )
     {
         gint32 ret = 0;
+
+        if( !IsConnected() )
+            return ERROR_STATE;
+
         do{
             CCfgOpener oCfg;
             ret = oCfg.GetCfg()->Deserialize( *pBuf );
@@ -647,43 +767,29 @@ class CUnixSockStream:
         return ret;
     }
 
-    // only happens on the router
-    gint32 OnFlowControl()
+    // only happens on the writing
+    virtual gint32 OnFlowControl()
     {
         m_byFlowCtrl++;
         return 0;
     }
 
-    gint32 OnFCLifted()
+    // only happens on the writing
+    virtual gint32 OnFCLifted()
     {
         gint32 ret = 0;
 
+        if( !IsConnected() )
+            return ERROR_STATE;
+
         do{
-            CStdRMutex oIfLock( this->GetLock() );
             m_byFlowCtrl--;
             if( m_byFlowCtrl > 0 )
                 break;
 
-            // submit those blocked requests
-            while( !m_queWaitLift.empty() )
-            {
-                if( !IsConnected( nullptr ) )
-                    break;
-
-                std::pair< ObjPtr, ObjPtr > 
-                    oFirst = m_queWaitLift.front();
-
-                oIfLock.Unlock();
-
-                ret = SubmitRequest( oFirst.first,
-                    oFirst.second, true );
-
-                if( ret != STATUS_PENDING )
-                    break;
-
-                oIfLock.Lock();
-                m_queWaitLift.pop_front();
-            }
+            BufPtr pBuf( true );
+            PostUxStreamEvent(
+                tokLift, pBuf );
         
         }while( 0 );
 
@@ -723,6 +829,10 @@ class CUnixSockStream:
         gint32 ret = 0;
         if( pCallback == nullptr )
             return -EINVAL;
+
+        if( IsConnected() == false )
+            return ERROR_STATE;
+
         do{
             BufPtr pBuf( true );
             *pBuf = byToken;
@@ -740,6 +850,10 @@ class CUnixSockStream:
     gint32 PauseReading( bool bPause )
     {
         gint32 ret = 0;
+
+        if( IsConnected() == false )
+            return ERROR_STATE;
+
         do{
             CParamList oParams;
             BufPtr pBuf( true );
@@ -772,6 +886,9 @@ class CUnixSockStream:
 
         if( pCallback == nullptr )
             return -EINVAL;
+
+        if( IsConnected() == false )
+            return ERROR_STATE;
 
         do{
             CParamList oParams;
@@ -814,12 +931,20 @@ class CUnixSockStream:
         if( pCallback == nullptr )
             return -EINVAL;
 
+        if( IsConnected() == false )
+            return ERROR_STATE;
+
         do{
             CParamList oParams;
             oParams[ propMethodName ] = __func__;
             oParams.Push( pBuf );
             ret = SubmitRequest( oParams.GetCfg(),
                 pCallback, true );
+
+            if( ERROR( ret ) )
+                break;
+
+            m_qwTxBytes += pBuf->size();
 
         }while( 0 );
 
@@ -833,6 +958,9 @@ class CUnixSockStream:
 
         if( pCallback == nullptr )
             return -EINVAL;
+
+        if( IsConnected() == false )
+            return ERROR_STATE;
 
         do{
             CParamList oParams;
@@ -852,6 +980,9 @@ class CUnixSockStream:
 
         if( pCallback == nullptr )
             return -EINVAL;
+
+        if( IsConnected() == false )
+            return ERROR_STATE;
 
         do{
             CParamList oParams;
@@ -979,31 +1110,6 @@ class CUnixSockStream:
             return -EINVAL;
 
         do{
-            CStdRMutex oIfLock( this->GetLock() );
-            if( bSend && m_byFlowCtrl > 0 )
-            {
-                // those calls will be stored in the queue
-                std::pair< ObjPtr, ObjPtr > oPair;
-                oPair.first = ObjPtr( pReqCall );
-                oPair.second = ObjPtr( pCallback );
-
-                std::pair< ObjPtr, ObjPtr >&
-                    oHead = m_queWaitLift.front();
-
-                if( !( oPair.first == oHead.first ) &&
-                    !( oPair.second == oHead.second ) )
-                {
-                    m_queWaitLift.push_back( oPair );
-                    ret = STATUS_PENDING;
-                }
-                else
-                {
-                    ret = -EAGAIN;
-                }
-                break;
-            }
-            oIfLock.Unlock();
-
             CCfgOpenerObj oCfg( pCallback );
 
             IPort* pPort = this->GetPort();
@@ -1013,9 +1119,6 @@ class CUnixSockStream:
             ret = pIrp->AllocNextStack( nullptr );
             if( ERROR( ret ) )
                 break;
-
-            IrpCtxPtr& pCtx = pIrp->GetTopStack(); 
-            pPort->AllocIrpCtxExt( pCtx, ( PIRP )pIrp );
 
             ret = SetupReqIrp(
                 pIrp, pReqCall, pCallback );
@@ -1034,89 +1137,29 @@ class CUnixSockStream:
             pIrp->RemoveCallback();
             oCfg.RemoveProperty( propIrpPtr );
 
-            if( bSend && ret == ERROR_QUEUE_FULL )
-            {
-                oIfLock.Lock();
-                std::pair< ObjPtr, ObjPtr > oPair;
-
-                oPair.first = ObjPtr( pReqCall );
-                oPair.second = ObjPtr( pCallback );
-
-                std::pair< ObjPtr, ObjPtr >&
-                    oHead = m_queWaitLift.front();
-
-                if( !( oPair.first == oHead.first ) &&
-                    !( oPair.second == oHead.second ) )
-                {
-                    m_queWaitLift.push_back( oPair );
-                    ret = STATUS_PENDING;
-                }
-                else
-                {
-                    ret = -EAGAIN;
-                }
-
-                oIfLock.Unlock();
-                break;
-            }
-
-            if( ret == ERROR_STATE )
-                break;
-
-            if( ret == -EAGAIN )
-                ret = STATUS_MORE_PROCESS_NEEDED;
-
             if( ERROR( ret ) )
                 break;
 
+            if( !bSend )
+            {
+                IrpCtxPtr& pCtx = pIrp->GetTopStack();
+                CCfgOpenerObj oCallback( pCallback );
+                CParamList oParams;
+                oParams[ propReturnValue ] = ret;
+                if( !pCtx->m_pRespData.IsEmpty() &&
+                    !pCtx->m_pRespData->empty() )
+                    oParams.Push( pCtx->m_pRespData );
+
+                oCallback.SetObjPtr( propRespPtr,
+                    ObjPtr( oParams.GetCfg() ) );
+            }
+
         }while( 0 );
 
+        if( ret == -EAGAIN )
+            ret = STATUS_MORE_PROCESS_NEEDED;
+
         return ret;
-    }
-
-    virtual gint32 OnReceiveData( CBuffer* pBuf )
-    { return 0; }
-
-    virtual gint32 StartEx( IEventSink* pCallback )
-    {
-        gint32 ret = 0;
-
-        if( pCallback == nullptr )
-            return -EINVAL;
-
-        TaskletPtr pTask;
-        CParamList oParams;
-        oParams.SetPointer( propIfPtr, this );
-        oParams[ propEventSink ] =
-            ObjPtr( pCallback );
-
-        ret = pTask.NewObj(
-            clsid( CIfCallbackInterceptor ),
-            oParams.GetCfg() );
-
-        if( ERROR( ret ) )
-            return ret;
-
-        TaskletPtr pPostStart;
-        ret = DEFER_CALL_NOSCHED( pPostStart,
-            ObjPtr( this ),
-            &CUnixSockStream::OnPostStart );
-
-        if( ERROR( ret ) )
-            return ret;
-
-        CIfCallbackInterceptor* pCbi = pTask;
-        pCbi->InsertCall( pPostStart );
-
-        ret = this->super::StartEx( pCbi );
-
-        if( ERROR( ret ) )
-            return ret;
-
-        if( ret == STATUS_PENDING )
-            return ret;
-
-        return OnPostStart();
     }
 
     virtual bool IsConnected(
@@ -1132,7 +1175,8 @@ class CUnixSockStream:
         return true;
     }
 
-    virtual gint32 OnPostStart()
+    virtual gint32 StartTicking(
+        IEventSink* pContext )
     {
         gint32 ret = 0;
 
@@ -1157,7 +1201,6 @@ class CUnixSockStream:
             if( ERROR( ret ) )
                 break;
 
-
             // start the ping ticker
             ret = m_pPingTicker.NewObj(
                 clsid( CIfUxPingTicker ),
@@ -1172,7 +1215,26 @@ class CUnixSockStream:
             if( ERROR( ret ) )
                 break;
 
+        }while( 0 );
+
+        return ret;
+    }
+
+    virtual gint32 OnPostStart(
+        IEventSink* pContext )
+    {
+        gint32 ret = 0;
+
+        do{
+            ret = StartTicking( pContext );
+            if( ERROR( ret ) )
+                break;
+
             // start the data reading
+            CParamList oParams;
+            oParams.CopyProp( propIfPtr, this );
+            oParams.CopyProp( propIoMgr, this );
+            oParams.CopyProp( propTimeoutSec, this );
             oParams.CopyProp(
                 propKeepAliveSec, this );
 
@@ -1192,29 +1254,11 @@ class CUnixSockStream:
         return ret;
     }
 
-    virtual gint32 OnPostStop( IEventSink* pCallback ) 
+    virtual gint32 OnPreStop( IEventSink* pCallback ) 
     {
         gint32 ret = 0;
 
         do{
-            CStdRMutex oIfLock( this->GetLock() );
-            std::deque< std::pair< ObjPtr, ObjPtr > >
-                queWaitLift = m_queWaitLift;
-            m_queWaitLift.clear();
-            oIfLock.Unlock();
-
-            // clear the flowcontrol queue
-            if( queWaitLift.empty() )
-                break;
-
-            for( auto oElem : queWaitLift )
-            {
-                TaskletPtr pTask = oElem.second;
-                if( pTask.IsEmpty() )
-                    continue;
-                ( *pTask )( eventCancelTask );
-            }
-
             if( !m_pPingTicker.IsEmpty() )
                 ( *m_pPingTicker )( eventCancelTask );
 
@@ -1239,12 +1283,16 @@ class CUnixSockStmProxy :
         super( pCfg )
     { SetClassId( clsid( CUnixSockStmProxy ) ); }
 
-    virtual gint32 OnPostStart()
+    virtual gint32 OnPostStart(
+        IEventSink* pCallback )
     {
         gint32 ret = 0;
         do{
-            CParamList oParams;
+            ret = super::OnPostStart( pCallback );
+            if( ERROR( ret ) )
+                break;
 
+            CParamList oParams;
             oParams.CopyProp( propIfPtr, this );
             oParams.CopyProp( propIoMgr, this );
             oParams.CopyProp( propKeepAliveSec, this );
@@ -1275,28 +1323,7 @@ class CUnixSockStmServer :
     CUnixSockStmServer( const IConfigDb* pCfg ) :
         super( pCfg )
     { SetClassId( clsid( CUnixSockStmServer ) ); }
-};
 
-class CUnixSockStmServerRelay :
-    public CUnixSockStmServer
-{
-    public:
-    typedef CUnixSockStmServer super;
-
-    CUnixSockStmServerRelay( const IConfigDb* pCfg ) :
-        super( pCfg )
-    { SetClassId( clsid( CUnixSockStmServerRelay ) ); }
-};
-
-class CUnixSockStmProxyRelay :
-    public CUnixSockStmProxy
-{
-    public:
-    typedef CUnixSockStmProxy super;
-
-    CUnixSockStmProxyRelay( const IConfigDb* pCfg ) :
-        super( pCfg )
-    { SetClassId( clsid( CUnixSockStmProxyRelay ) ); }
 };
 
 class CIfCreateUxSockStmTask :

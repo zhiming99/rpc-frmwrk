@@ -177,6 +177,7 @@ enum EnumPropId : gint32
     propIsServer,       // type: bool to indicate if the stream pdo is on server side or proxy side
     propRxBytes,        // type: guint64 of bytes received
     propTxBytes,        // type: guint64 of bytes sent
+    propExtInfo,        // type: ObjPtr to a configdb with extended information
     propReseredEnd = 0x10000000,
     propInvalid = -1, 
 };

@@ -37,15 +37,18 @@ struct IStatCounters
 };
 
 class CStatCountersProxy:
-    public virtual CInterfaceProxy,
+    public virtual CAggInterfaceProxy,
     public IStatCounters
 {
 
     public:
-    typedef CInterfaceProxy super;
+    typedef CAggInterfaceProxy super;
     CStatCountersProxy( const IConfigDb* pCfg )
         : super( pCfg )
     {}
+
+    const EnumClsid GetIid() const
+    { return iid( CStatCounters ); }
 
     virtual gint32 InitUserFuncs();
     gint32 GetCounters( CfgPtr& pCfg );

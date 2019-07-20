@@ -2191,10 +2191,11 @@ gint32 CRpcReqForwarder::BuildBufForIrpFwrdEvt(
         pFwrdMsg.SetMember( strVal );
 
         const char* pszIp = strSrcIp.c_str();
+        const char* pData = pEvtBuf->ptr();
         if( !dbus_message_append_args( pFwrdMsg,
             DBUS_TYPE_STRING, &pszIp,
             DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
-            &pEvtBuf->ptr(), pEvtBuf->size(),
+            &pData, pEvtBuf->size(),
             DBUS_TYPE_INVALID ) )
         {
             ret = -ENOMEM;
@@ -2457,9 +2458,10 @@ gint32 CRpcReqForwarder::BuildKeepAliveMessage(
 
         pkaMsg.SetSerial( clsid( MinClsid ) );
 
+        const char* pData = pBuf->ptr();
         if( !dbus_message_append_args( pkaMsg,
             DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
-            &pBuf->ptr(), pBuf->size(),
+            &pData, pBuf->size(),
             DBUS_TYPE_INVALID ) )
             ret = -ENOMEM;
 
@@ -2696,7 +2698,7 @@ gint32 CRpcReqForwarder::OnRmtSvrEvent(
 
 CRpcReqForwarderProxy::CRpcReqForwarderProxy(
     const IConfigDb* pCfg )
-    : CInterfaceProxy( pCfg ),
+    : CAggInterfaceProxy( pCfg ),
     super( pCfg )
 {
     gint32 ret = 0;
