@@ -1,3 +1,26 @@
+/*
+ * =====================================================================================
+ *
+ *       Filename:  frmwrk.h
+ *
+ *    Description:  declaration of the pnp manager, driver manager, and io manager
+ *
+ *        Version:  1.0
+ *        Created:  01/19/2016 08:30:43 PM
+ *       Revision:  none
+ *       Compiler:  gcc
+ *
+ *         Author:  Ming Zhi(woodhead99@gmail.com )
+ *   Organization:
+ *
+ *      Copyright:  2019 Ming Zhi( woodhead99@gmail.com )
+ *
+ *        License:  Licensed under GPL-3.0. You may not use this file except in
+ *                  compliance with the License. You may find a copy of the
+ *                  License at 'http://www.gnu.org/licenses/gpl-3.0.html'
+ *
+ * =====================================================================================
+ */
 #pragma once
 
 #include <json/json.h>
