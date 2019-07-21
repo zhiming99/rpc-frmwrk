@@ -1297,10 +1297,28 @@ gint32 CRpcReqForwarder::DisableRemoteEvent(
         if( ERROR( ret ) )
             break;
 
-        // using the reqfwdr's sequential
+        // using the bridge proxy's sequential
         // taskgroup
-        ret = GetParent()->AddSeqTask(
+        CCfgOpenerObj oMatch( pMatch );
+        std::string strIpAddr;
+
+        ret = oMatch.GetStrProp(
+            propIpAddr, strIpAddr );
+
+        if( ERROR( ret ) )
+            break;
+
+        InterfPtr bridgePtr;
+        ret = GetParent()->GetBridgeProxy(
+            strIpAddr, bridgePtr );
+
+        if( ERROR( ret ) )
+            break;
+
+        CRpcServices* pProxy = bridgePtr;
+        ret = pProxy->AddSeqTask(
             pDeferTask, false );
+
         if( SUCCEEDED( ret ) )
             ret = STATUS_PENDING;
 
@@ -1329,7 +1347,28 @@ gint32 CRpcReqForwarder::EnableRemoteEvent(
         if( ERROR( ret ) )
             break;
 
-        ret = GetParent()->AddSeqTask(
+        // using the bridge proxy's sequential
+        // taskgroup, in case if the connection is in
+        // problem, it will not affect traffics over
+        // other connections.
+        CCfgOpenerObj oMatch( pMatch );
+        std::string strIpAddr;
+
+        ret = oMatch.GetStrProp(
+            propIpAddr, strIpAddr );
+
+        if( ERROR( ret ) )
+            break;
+
+        InterfPtr bridgePtr;
+        ret = GetParent()->GetBridgeProxy(
+            strIpAddr, bridgePtr );
+
+        if( ERROR( ret ) )
+            break;
+
+        CRpcServices* pProxy = bridgePtr;
+        ret = pProxy->AddSeqTask(
             pDeferTask, false );
         if( SUCCEEDED( ret ) )
             ret = STATUS_PENDING;

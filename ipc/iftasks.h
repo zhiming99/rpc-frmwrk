@@ -934,7 +934,7 @@ class CIfCallbackInterceptor :
     {
         super::OnComplete( iRet );
 
-        if( !m_pCallAhead.IsEmpty() )
+        if( !m_pCallAfter.IsEmpty() )
             ( *m_pCallAfter )( eventZero );
 
         return iRet;

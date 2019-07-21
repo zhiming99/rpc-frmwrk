@@ -2423,6 +2423,8 @@ gint32 CRpcStreamSock::GetCtrlStmFromIrp(
         case CTRLCODE_OPEN_STREAM_PDO:
         case CTRLCODE_CLOSE_STREAM_PDO:
         case CTRLCODE_LISTENING:
+        case CTRLCODE_REG_MATCH:
+        case CTRLCODE_UNREG_MATCH:
             {
                 CfgPtr pCfg;
                 ret = pCtx->GetReqAsCfg( pCfg );

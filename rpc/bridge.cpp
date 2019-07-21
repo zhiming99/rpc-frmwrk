@@ -968,18 +968,29 @@ gint32 CRpcTcpBridgeProxy::SetupReqIrp(
         }
         else
         {
-            ret = super::SetupReqIrp( pIrp,
-                pReqCall, pCallback );
-
-            IrpCtxPtr& pIrpCtx = pIrp->GetTopStack(); 
-            pPort->AllocIrpCtxExt( pIrpCtx );
-            SetBdgeIrpStmId( pIrp,
-                TCP_CONN_DEFAULT_STM );
-
-            break;
+            ret = -ENOTSUP;
         }
 
     }while( 0 );
+
+    if( ret == -ENOTSUP )
+    {
+        ret = super::SetupReqIrp( pIrp,
+            pReqCall, pCallback );
+
+        if( SUCCEEDED( ret ) )
+        {
+            IrpCtxPtr& pIrpCtx = pIrp->GetTopStack(); 
+            ObjPtr pPortObj = GetPort();
+            CPort* pPort = pPortObj;
+            if( pPort == nullptr )
+                return -EFAULT;
+
+            pPort->AllocIrpCtxExt( pIrpCtx );
+            SetBdgeIrpStmId( pIrp,
+                TCP_CONN_DEFAULT_STM );
+        }
+    }
 
     return ret;
 }
@@ -1408,6 +1419,9 @@ gint32 CRpcTcpBridgeShared::OnPostStart(
 
         ret = m_pParentIf->
             RunManagedTask( pTask );
+
+        if( ERROR( ret ) )
+            break;
 
     }while( 0 );
 
@@ -3768,9 +3782,14 @@ gint32 CRpcTcpBridgeShared::RegMatchCtrlStream(
         BufPtr pBuf( true );
 
         // a local request, no need of CReqBuilder
-        CParamList oParams;
+        CReqBuilder oParams;
+
         ret = oParams.Push( iStreamId );
         oParams[ propMatchPtr ] = ObjPtr( pMatch );
+        oParams.SetCallFlags( CF_WITH_REPLY
+           | DBUS_MESSAGE_TYPE_METHOD_CALL 
+           | CF_ASYNC_CALL );
+
         ObjPtr pObj = oParams.GetCfg();
         *pBuf = pObj;
         pCtx->SetReqData( pBuf );

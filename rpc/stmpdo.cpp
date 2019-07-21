@@ -1605,6 +1605,8 @@ gint32 CTcpStreamPdo::OnSubmitIrp(
                 case CTRLCODE_RMTSVR_OFFLINE_PDO:
                 case CTRLCODE_RMTMOD_OFFLINE_PDO:
                 case CTRLCODE_LISTENING:
+                case CTRLCODE_REG_MATCH:
+                case CTRLCODE_UNREG_MATCH:
                     {
                         ret = SubmitIoctlCmd( pIrp );
                         break;
