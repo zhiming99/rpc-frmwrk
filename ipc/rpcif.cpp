@@ -1005,13 +1005,72 @@ gint32 CRpcInterfaceBase::StopEx(
         }
         oIfLock.Unlock();
 
-        ret = OnPreStop( pCallback );
-        if( ret == STATUS_PENDING )
-            break;
+        TaskletPtr pDummyTask;
+        ret = pDummyTask.NewObj(
+            clsid( CIfDummyTask ) );
 
-        ret = DoStop( pCallback );
         if( ERROR( ret ) )
             break;
+
+        TaskletPtr pPreStop;
+        ret = DEFER_IFCALLEX_NOSCHED(
+            pPreStop, ObjPtr( this ),
+            &CRpcInterfaceBase::OnPreStop,
+            pDummyTask );
+
+        if( ERROR( ret ) )
+            break;
+
+        CIfDeferCallTaskEx* pPreStopEx = pPreStop;
+        BufPtr pCb( true );
+        *pCb = ObjPtr( pPreStopEx );
+        pPreStopEx->UpdateParamAt( 0, pCb );
+
+        TaskletPtr pDoStop;
+        ret = DEFER_IFCALLEX_NOSCHED(
+            pDoStop, ObjPtr( this ),
+            &CRpcInterfaceBase::DoStop,
+            pDummyTask );
+
+        if( ERROR( ret ) )
+            break;
+
+        BufPtr pCb2( true );
+        CIfDeferCallTaskEx* pDoStopEx = pDoStop;
+        *pCb2 = ObjPtr( pDoStopEx );
+
+        pDoStopEx->UpdateParamAt( 0, pCb2 );
+        CParamList oParams;
+        ret = oParams.SetObjPtr(
+            propIfPtr, ObjPtr( this ) );
+
+        if( ERROR( ret ) )
+            break;
+
+        TaskGrpPtr pStopTasks;
+        ret = pStopTasks.NewObj(
+            clsid( CIfTaskGroup ),
+            oParams.GetCfg() );
+
+        if( ERROR( ret ) )
+            break;
+
+        pStopTasks->AppendTask( pPreStop );
+        pStopTasks->AppendTask( pDoStop );
+        pStopTasks->SetRelation( logicNONE );
+
+        if( pCallback != nullptr )
+        {
+            CIfRetryTask* pRetryTask = pStopTasks;
+            // in case the DoStop completed immediately
+                pRetryTask->SetClientNotify( pCallback );
+        }
+
+        CIoManager* pMgr = GetIoMgr();
+        TaskletPtr pStopGrp = ObjPtr( pStopTasks );
+        ret = pMgr->RescheduleTask( pStopGrp );
+        if( SUCCEEDED( ret ) )
+            ret = STATUS_PENDING;
 
     }while( 0 );
 
@@ -1130,7 +1189,7 @@ gint32 CRpcInterfaceBase::DoStop(
         ret = pTask->GetError();
         if( ret != STATUS_PENDING )
         {
-            // the callback is not got called
+            // the callback was not called
             pCompletion->MarkPending( false );
             ( *pCompletion )( eventZero );
         }

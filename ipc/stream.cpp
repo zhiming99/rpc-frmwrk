@@ -82,7 +82,7 @@ gint32 IStream::OnUxStreamEvent(
     guint8 byToken,
     CBuffer* pBuf )
 {
-    if( hChannel == 0 )
+    if( hChannel == INVALID_HANDLE )
         return -EINVAL;
 
     gint32 ret = 0;
@@ -141,7 +141,8 @@ gint32 IStream::OnUxStmEvtWrapper(
 gint32 IStream::WriteStream(
     HANDLE hChannel, BufPtr& pBuf )
 {
-    if( hChannel == 0 || pBuf.IsEmpty() )
+    if( hChannel == INVALID_HANDLE ||
+        pBuf.IsEmpty() )
         return -EINVAL;
     
     gint32 ret = 0;
@@ -178,7 +179,8 @@ gint32 IStream::WriteStream(
     BufPtr& pBuf,
     IEventSink* pCallback )
 {
-    if( hChannel == 0 || pBuf.IsEmpty() )
+    if( hChannel == INVALID_HANDLE ||
+        pBuf.IsEmpty() )
         return -EINVAL;
     
     if( pCallback == nullptr )
@@ -222,7 +224,7 @@ gint32 IStream::SendPingPong(
     IEventSink* pCallback )
 {
     TaskletPtr pTask;
-    if( hChannel == 0 ||
+    if( hChannel == INVALID_HANDLE ||
         pCallback == nullptr )
         return -EINVAL;
 
@@ -263,7 +265,7 @@ gint32 IStream::SendPingPong(
 gint32 IStream::SendPingPong(
     HANDLE hChannel, bool bPing )
 {
-    if( hChannel == 0 )
+    if( hChannel == INVALID_HANDLE )
         return -EINVAL;
     
     gint32 ret = 0;
@@ -298,15 +300,10 @@ gint32 IStream::SendPingPong(
 gint32 CStreamProxy::OnChannelError(
     HANDLE hChannel, gint32 iError )
 {
-    if( hChannel == 0 )
+    if( hChannel == INVALID_HANDLE )
         return -EINVAL;
 
-    TaskletPtr pDummyTask;
-    pDummyTask.NewObj(
-        clsid( CIfDummyTask ) );
-
-    return CloseChannel(
-        hChannel, pDummyTask );
+    return OnClose( hChannel  );
 }
 
 gint32 CStreamProxy::SendSetupReq(
@@ -918,12 +915,14 @@ gint32 IStream::CloseChannel(
             break;
         }
 
-
         CParamList oParams;
         oParams.Push( ObjPtr( pIf ) );
         oParams[ propIfPtr ] = ObjPtr( pThisIf );
-        oParams[ propEventSink ] =
-            ObjPtr( pCallback );
+        if( pCallback != nullptr )
+        {
+            oParams[ propEventSink ] =
+                ObjPtr( pCallback );
+        }
 
         TaskletPtr pStopTask;
         pStopTask.NewObj(
@@ -945,7 +944,7 @@ gint32 IStream::CloseChannel(
 gint32 CStreamProxy::CancelChannel(
     HANDLE hChannel )
 {
-    if( hChannel == 0 )
+    if( hChannel == INVALID_HANDLE )
         return -EINVAL;
 
     TaskletPtr pTask;
@@ -1003,7 +1002,7 @@ gint32 CStreamServer::OnChannelError(
 {
     // we will close the channel by complete the
     // invoke task
-    if( hChannel == 0 )
+    if( hChannel == INVALID_HANDLE )
         return -EINVAL;
 
     return OnClose( hChannel );
@@ -1113,17 +1112,11 @@ gint32 CStreamServer::FetchData_Server(
 }
 
 gint32 IStream::OnClose(
-    HANDLE hChannel )
+    HANDLE hChannel,
+    IEventSink* pCallback )
 {
-    TaskletPtr pDummy;
-    gint32 ret = pDummy.NewObj(
-        clsid( CIfDummyTask ) );
-
-    if( ERROR( ret ) )
-        return ret;
-
-    ret = CloseChannel(
-        hChannel, pDummy );
+    gint32 ret = CloseChannel(
+        hChannel, pCallback );
 
     if( ret != STATUS_PENDING )
         return ret;
@@ -1131,3 +1124,8 @@ gint32 IStream::OnClose(
     return 0;
 }
 
+gint32 IStream::OnPreStopShared(
+    IEventSink* pCallback )
+{
+    return 0;
+}

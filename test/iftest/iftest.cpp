@@ -232,7 +232,7 @@ void CIfSmokeTest::testCliStartStop()
             break;
         DebugPrint( 0, "Ping Completed" );
 
-    }while( ++i < 1000 );
+    }while( ++i < 100 );
 
     if( ERROR( ret ) )
     {

@@ -63,34 +63,33 @@ class CStreamRelayBase :
     { return 0; }
 
     // the local sock is closed
-    virtual gint32 OnClose( HANDLE hChannel )
+    virtual gint32 OnClose( HANDLE hChannel,
+        IEventSink* pCallback = nullptr )
     {
         gint32 ret = 0;
-        if( hChannel == 0 )
+        if( hChannel == INVALID_HANDLE )
             return -EINVAL;
 
         do{
             gint32 iStmId = -1;
-            InterfPtr pUxIf;
             CStdRMutex oIfLock( this->GetLock() );
 
             std::map< HANDLE, gint32 >::iterator
                 itr = m_mapHandleToStmId.find( hChannel );
 
             if( itr != m_mapHandleToStmId.end() )
+            {
                 iStmId = itr->second;
-
-            this->GetUxStream( hChannel, pUxIf );
-            RemoveBinding( hChannel, iStmId );
-            this->RemoveUxStream( hChannel );
-
+                RemoveBinding( hChannel, iStmId );
+            }
             oIfLock.Unlock();
 
             if( iStmId >= 0 )
-                CloseTcpStream( iStmId );
-
-            if( !pUxIf.IsEmpty() )
-                CloseUxStream( pUxIf );
+            {
+                CloseTcpStream( iStmId, true );
+                ret = this->CloseChannel(
+                    hChannel, pCallback );
+            }
 
         }while( 0 );
 
@@ -98,7 +97,8 @@ class CStreamRelayBase :
     }
 
     // the peer request to close
-    virtual gint32 OnClose( gint32 iStmId )
+    virtual gint32 OnClose( gint32 iStmId,
+        IEventSink* pCallback = nullptr )
     {
         gint32 ret = 0;
         if( iStmId < 0 )
@@ -109,25 +109,25 @@ class CStreamRelayBase :
             return -EINVAL;
 
         do{
-            HANDLE hChannel = 0;
-            InterfPtr pUxIf;
+            HANDLE hChannel = INVALID_HANDLE;
             CStdRMutex oIfLock( this->GetLock() );
             std::map< gint32, HANDLE >::iterator
                 itr = m_mapStmIdToHandle.find( iStmId );
 
             if( itr != m_mapStmIdToHandle.end() )
+            {
                 hChannel = itr->second;
-
-            this->GetUxStream( hChannel, pUxIf );
-            RemoveBinding( hChannel, iStmId );
-            this->RemoveUxStream( hChannel );
-
+                RemoveBinding( hChannel, iStmId );
+            }
             oIfLock.Unlock();
 
             // no need to send
-            CloseTcpStream( iStmId, false );
-            if( !pUxIf.IsEmpty() )
-                CloseUxStream( pUxIf );
+            if( hChannel != INVALID_HANDLE )
+            {
+                CloseTcpStream( iStmId, false );
+                ret = this->CloseChannel(
+                    hChannel, pCallback );
+            }
 
         }while( 0 );
 
@@ -382,7 +382,7 @@ class CStreamRelayBase :
             if( ERROR( ret ) )
                 break;
      
-            pTaskGrp->SetRelation( logicOR );
+            pTaskGrp->SetRelation( logicNONE );
             pTaskGrp->AppendTask( pSendClose );
             pTaskGrp->AppendTask( pCloseStream );
 
@@ -394,32 +394,6 @@ class CStreamRelayBase :
         return ret;
     }
 
-    gint32 CloseUxStream( InterfPtr& pIf )
-    {
-        gint32 ret = 0;
-        if( pIf.IsEmpty() )
-            return -EINVAL;
-
-        do{
-            TaskletPtr pDummyTask;
-            ret = pDummyTask.NewObj(
-                clsid( CIfDummyTask ) );
-
-            if( ERROR( ret ) )
-                break;
-
-            TaskletPtr pStopTask;
-            DEFER_IFCALL_NOSCHED( pStopTask,
-                ObjPtr( pIf ),
-                &CRpcInterfaceBase::StopEx,
-                ( IEventSink* )pDummyTask );
-
-            ret = this->AddSeqTask( pStopTask );
-
-        }while( 0 );
-
-        return ret;
-    }
 };
 
 // this interface will be hosted by
@@ -516,9 +490,6 @@ class CIfStartUxSockStmRelayTask :
     { return STATUS_PENDING; }
 
     gint32 OnTaskComplete( gint32 iRet );
-    gint32 CloseTcpStream(
-        CRpcServices* pSvc,
-        gint32 iStmId );
 };
 
 template< class T >

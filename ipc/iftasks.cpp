@@ -5423,13 +5423,13 @@ gint32 CIfDeferredHandler::RunTask()
 {
     EventPtr pEvt;
     gint32 ret = GetInterceptTask( pEvt );
-    if( ERROR( ret ) )
-        return ret;
-
-    CCfgOpenerObj oCfg( this );
-    oCfg.CopyProp( propRespPtr, pEvt );
-    oCfg.CopyProp( propMsgPtr, pEvt );
-    oCfg.CopyProp( propReqPtr, pEvt );
+    if( SUCCEEDED( ret ) )
+    {
+        CCfgOpenerObj oCfg( this );
+        oCfg.CopyProp( propRespPtr, pEvt );
+        oCfg.CopyProp( propMsgPtr, pEvt );
+        oCfg.CopyProp( propReqPtr, pEvt );
+    }
 
     if( m_pDeferCall.IsEmpty() )
         return 0;
@@ -5461,7 +5461,10 @@ gint32 CIfDeferredHandler::OnTaskComplete( gint32 iRet )
         EventPtr pEvtPtr;
         ret = GetInterceptTask( pEvtPtr );
         if( ERROR( ret ) )
-            break;
+        {
+            if( SUCCEEDED( iRet ) )
+                iRet = ret;
+        }
 
         if( ERROR( iRet ) ) 
         {

@@ -1281,16 +1281,17 @@ inline gint32 NewDeferredCall( TaskletPtr& pCallback,
     ret_; \
 })
 
-class CIfDeferCallTask :
-    public CIfRetryTask
+template< class T >
+class CIfDeferCallTaskBase :
+    public T
 {
     TaskletPtr m_pDeferCall;
     EnumIfState m_iTaskState = stateStarting;
     public:
-    typedef CIfRetryTask super;
-    CIfDeferCallTask( const IConfigDb* pCfg )
+    typedef T super;
+    CIfDeferCallTaskBase( const IConfigDb* pCfg )
         :super( pCfg )
-    { SetClassId( clsid( CIfDeferCallTask ) );}
+    { this->SetClassId( clsid( CIfDeferCallTask ) );}
 
     void SetDeferCall( TaskletPtr& pTask )
     { m_pDeferCall = pTask; }
@@ -1311,8 +1312,8 @@ class CIfDeferCallTask :
     gint32 UpdateParamAt(
         guint32 i, BufPtr pBuf )
     {
-        CDeferredCallBase< CTasklet >* pTask =
-            m_pDeferCall;
+        CDeferredCallBase< CTasklet >*
+            pTask = m_pDeferCall;
         if( pTask == nullptr )
             return -EINVAL;
 
@@ -1335,9 +1336,22 @@ class CIfDeferCallTask :
     }
 };
 
+typedef CIfDeferCallTaskBase< CIfRetryTask > CIfDeferCallTask;
+class CIfDeferCallTaskEx :
+    public CIfDeferCallTaskBase< CIfInterceptTaskProxy >
+{
+
+    public:
+    typedef CIfDeferCallTaskBase< CIfInterceptTaskProxy > super;
+    CIfDeferCallTaskEx ( const IConfigDb* pCfg )
+        :super( pCfg )
+    { SetClassId( clsid( CIfDeferCallTaskEx ) );}
+};
+
 template < typename C, typename ... Types, typename ...Args>
-inline gint32 NewIfDeferredCall( TaskletPtr& pCallback,
-    ObjPtr pIf, gint32(C::*f)(Types ...), Args&&... args )
+inline gint32 NewIfDeferredCall( EnumClsid iTaskClsid,
+    TaskletPtr& pCallback, ObjPtr pIf, gint32(C::*f)(Types ...),
+    Args&&... args )
 {
     TaskletPtr pWrapper;
     gint32 ret = NewDeferredCall( pWrapper, pIf, f, args... );
@@ -1348,19 +1362,37 @@ inline gint32 NewIfDeferredCall( TaskletPtr& pCallback,
     CParamList oParams;
     oParams[ propIfPtr ] = pIf;
     ret = pIfTask.NewObj(
-        clsid( CIfDeferCallTask ),
+        iTaskClsid,
         oParams.GetCfg() );
     if( ERROR( ret ) )
         return ret;
 
-    CIfDeferCallTask* pDeferTask = pIfTask;
-    pDeferTask->SetDeferCall( pWrapper );
-    pCallback = pDeferTask;
+    if( iTaskClsid == clsid( CIfDeferCallTask ) )
+    {
+        CIfDeferCallTask* pDeferTask = pIfTask;
+        pDeferTask->SetDeferCall( pWrapper );
+        pCallback = pDeferTask;
+    }
+    else if( iTaskClsid == clsid( CIfDeferCallTaskEx ) )
+    {
+        CIfDeferCallTaskEx* pDeferTask = pIfTask;
+        pDeferTask->SetDeferCall( pWrapper );
+        pCallback = pDeferTask;
+    }
+    else
+    {
+        return -ENOTSUP;
+    }
     return 0;
 }
 
 #define DEFER_IFCALL_NOSCHED( __pTask, pObj, func, ... ) \
-    NewIfDeferredCall( __pTask, pObj, func , ##__VA_ARGS__ )
+    NewIfDeferredCall( clsid( CIfDeferCallTask ), \
+        __pTask, pObj, func , ##__VA_ARGS__ )
+
+#define DEFER_IFCALLEX_NOSCHED( __pTask, pObj, func, ... ) \
+    NewIfDeferredCall( clsid( CIfDeferCallTaskEx ), \
+        __pTask, pObj, func , ##__VA_ARGS__ )
 
 class CIfDeferredHandler :
     public CIfInterceptTaskProxy

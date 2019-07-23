@@ -750,6 +750,7 @@ class CIfInterceptTask :
                 break;
             }
 
+            // 64bit incompatible
             CObjBase* pObjBase =
                 ( CObjBase* )vecParams.back();
 

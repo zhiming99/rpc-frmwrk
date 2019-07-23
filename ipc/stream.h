@@ -151,7 +151,8 @@ struct IStream
 
     // callback when a close token is received
     virtual gint32 OnClose(
-        HANDLE hChannel );
+        HANDLE hChannel,
+        IEventSink* pCallback = nullptr );
 
     gint32 CreateUxStream(
         IConfigDb* pDataDesc,
@@ -163,6 +164,9 @@ struct IStream
     // create the ux socket pair
     gint32 CreateSocket(
         int& fdlocal, int& fdRemote );
+
+    gint32 OnPreStopShared(
+        IEventSink* pCallback );
 };
 
 struct IStreamServer : public IStream
@@ -208,6 +212,11 @@ class CStreamProxy :
         BEGIN_IFPROXY_MAP( IStream, false );
         END_IFPROXY_MAP;
         return 0;
+    }
+
+    virtual gint32 OnPreStop( IEventSink* pCallback )
+    {
+        return OnPreStopShared( pCallback );
     }
 
     // note the fd is always -1 for proxy version of
@@ -268,6 +277,11 @@ class CStreamServer :
         return 0;
     }
 
+    virtual gint32 OnPreStop( IEventSink* pCallback )
+    {
+        return OnPreStopShared( pCallback );
+    }
+
     // called by FetchData_Server on new stream request
     // note the fd is from the FETCH_DATA request
     gint32 OpenChannel(
@@ -295,3 +309,49 @@ class CStreamServer :
     }
 };
 
+class CIfCreateUxSockStmTask :
+    public CIfInterceptTaskProxy
+{
+    bool m_bServer = false;
+    public:
+    typedef CIfInterceptTaskProxy super;
+
+    CIfCreateUxSockStmTask( const IConfigDb* pCfg ) :
+        super( pCfg )
+    { SetClassId( clsid( CIfCreateUxSockStmTask ) ); }
+
+    gint32 RunTask();
+    gint32 OnTaskComplete( gint32 iRet );
+    gint32 GetResponse();
+};
+
+class CIfStartUxSockStmTask :
+    public CIfInterceptTaskProxy
+{
+    bool m_bServer = false;
+    public:
+    typedef CIfInterceptTaskProxy super;
+
+    CIfStartUxSockStmTask( const IConfigDb* pCfg ) :
+        super( pCfg )
+    { SetClassId( clsid( CIfStartUxSockStmTask ) ); }
+
+    gint32 RunTask();
+    gint32 OnTaskComplete( gint32 iRet );
+};
+
+class CIfStopUxSockStmTask :
+    public CIfInterceptTaskProxy
+{
+    bool m_bServer = false;
+
+    public:
+    typedef CIfInterceptTaskProxy super;
+
+    CIfStopUxSockStmTask( const IConfigDb* pCfg ) :
+        super( pCfg )
+    { SetClassId( clsid( CIfStopUxSockStmTask ) ); }
+
+    gint32 RunTask();
+    gint32 OnTaskComplete( gint32 iRet );
+};

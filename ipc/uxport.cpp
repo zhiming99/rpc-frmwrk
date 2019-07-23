@@ -517,8 +517,8 @@ gint32 CSendQue::WriteStream(
 CIoWatchTask::CIoWatchTask( const IConfigDb* pCfg )
     :super( pCfg ),
     m_iFd( -1 ),
-    m_hReadWatch( 0 ),
-    m_hWriteWatch( 0 ),
+    m_hReadWatch( INVALID_HANDLE ),
+    m_hWriteWatch( INVALID_HANDLE ),
     m_oRecvFilter( GetFd( pCfg ) ),
     m_oSendQue( GetFd( pCfg ) ),
     m_qwBytesRead( 0 ),
@@ -742,7 +742,7 @@ gint32 CIoWatchTask::RunTask()
         {
             pLoop->RemoveIoWatch(
                 m_hReadWatch );
-            m_hReadWatch = 0;
+            m_hReadWatch = INVALID_HANDLE;
             break;
         }
 
@@ -1003,7 +1003,8 @@ gint32 CIoWatchTask::ReleaseChannel()
 
         pLoop->RemoveIoWatch( m_hReadWatch );
         pLoop->RemoveIoWatch( m_hWriteWatch );
-        m_hReadWatch = m_hWriteWatch = 0;
+        m_hReadWatch = INVALID_HANDLE;
+        m_hWriteWatch = INVALID_HANDLE;
         StopTimer();
 
     }while( 0 );

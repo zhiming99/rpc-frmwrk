@@ -558,33 +558,6 @@ gint32 CStreamProxyRelay::FetchData_Proxy(
     return ret;
 }
 
-gint32 CIfStartUxSockStmRelayTask::CloseTcpStream(
-    CRpcServices* pSvc, gint32 iStmId )
-{
-    if( pSvc == nullptr ||
-        iStmId < 0 )
-        return -EINVAL;
-
-    gint32 ret = 0;
-    do{
-        if( pSvc->IsServer() )
-        {
-            CStreamServerRelay* pSvr =
-                ObjPtr( pSvc );
-            ret = pSvr->CloseTcpStream( iStmId );
-        }
-        else
-        {
-            CStreamServerRelay* pProxy =
-                ObjPtr( pSvc );
-            ret = pProxy->CloseTcpStream( iStmId );
-        }
-
-    }while( 0 );
-
-    return ret;
-}
-
 gint32 CIfStartUxSockStmRelayTask::OnTaskComplete(
     gint32 iRet )
 {
@@ -693,7 +666,7 @@ gint32 CIfStartUxSockStmRelayTask::OnTaskComplete(
         ret = DEFER_IFCALL_NOSCHED( pConnTask,
             ObjPtr( pParent ),
             &IStream::OnConnected,
-            ( HANDLE )pUxSvc );
+            hChannel );
 
         if( ERROR( ret ) )
             break;
@@ -720,18 +693,7 @@ gint32 CIfStartUxSockStmRelayTask::OnTaskComplete(
             if( unlikely( pStream == nullptr ) )
                 break;
 
-            pStream->RemoveBinding(
-                ( HANDLE )pUxSvc, iStmId );
-
-            pStream->RemoveUxStream(
-                ( HANDLE )pUxSvc );
-
-            InterfPtr pIf( pUxSvc );
-            pStream->CloseUxStream( pIf );
-
-            CRpcTcpBridge* pShared = pParentIf;
-            pShared->CloseLocalStream(
-                nullptr, iStmId );
+            pStream->OnClose( iStmId );
         }
         else
         {
@@ -741,16 +703,7 @@ gint32 CIfStartUxSockStmRelayTask::OnTaskComplete(
             if( unlikely( pStream == nullptr ) )
                 break;
 
-            pStream->RemoveBinding(
-                ( HANDLE )pUxSvc, iStmId );
-
-            pStream->RemoveUxStream(
-                ( HANDLE )pUxSvc );
-
-            InterfPtr pIf( pUxSvc );
-            pStream->CloseUxStream( pIf );
-
-            CloseTcpStream( pParent, iStmId );
+            pStream->OnClose( ( HANDLE )pUxSvc );
         }
 
         break;

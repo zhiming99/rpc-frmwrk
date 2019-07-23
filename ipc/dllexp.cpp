@@ -147,6 +147,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CIfStartUxSockStmTask );
     INIT_MAP_ENTRYCFG( CIfStopUxSockStmTask );
     INIT_MAP_ENTRYCFG( CIfResponseHandler );
+    INIT_MAP_ENTRYCFG( CIfDeferCallTaskEx );
 #ifdef _USE_LIBEV
     INIT_MAP_ENTRYCFG( CDBusLoopHooks );
     INIT_MAP_ENTRYCFG( CDBusTimerCallback );
