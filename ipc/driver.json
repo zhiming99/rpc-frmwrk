@@ -47,6 +47,7 @@
         {
             "DriverName"    : "UnixSockBusDriver",
             "DriverType"    : "BusDriver",
+            "InternalClass" : "CUnixSockBusDriver",
             "BusClass"      : "UnixSockBus",
             "Description"   : "This is a bus driver for unix stream sock, and the port it creats is the UnixSockBusPort",
             "PortClasses"   :

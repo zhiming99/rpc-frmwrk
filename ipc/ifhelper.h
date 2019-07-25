@@ -371,6 +371,9 @@ BufPtr PackageTo< BufPtr >( const BufPtr& pBuf );
 template<>
 BufPtr PackageTo< ObjPtr >( const ObjPtr& pObj );
 
+template<>
+BufPtr PackageTo< CBuffer >( CBuffer* pObj );
+
 struct _DummyClass_
 {
     static void PackExp( ... )

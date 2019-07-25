@@ -278,7 +278,8 @@ gint32 CSendQue::OnIoReady()
         STM_PACKET& oPkt =
             m_queBufWrite.front();
 
-        if( m_dwRestBytes == 0 )
+        if( m_dwRestBytes == 0 &&
+            !oPkt.pData.IsEmpty() )
             m_dwRestBytes = oPkt.pData->size();
 
         guint8 byToken = oPkt.byToken;
@@ -671,7 +672,10 @@ void CIoWatchTask::OnError( gint32 iError )
         return;
 
     BufPtr pBuf( true );
-    *pBuf = ( guint32 )iError;
+    pBuf->Resize( sizeof( guint32 ) +
+        UXBUF_OVERHEAD );
+    pBuf->SetOffset( UXBUF_OVERHEAD );
+    *pBuf = ( guint32 ) htonl( iError );
     pPort->OnUxSockEvent( tokError, pBuf );
 
     // return 0 to complete the task
@@ -764,7 +768,11 @@ gint32 CIoWatchTask::operator()(
         EnumTaskState iState = GetTaskState();
 
         if( iState == stateStopped )
+        {
+            if( dwContext == eventIoWatch )
+                return G_SOURCE_REMOVE;
             return ERROR_STATE;
+        }
 
         if( iState == stateStarted )
         {
@@ -1094,8 +1102,6 @@ CUnixSockStmPdo::CUnixSockStmPdo(
         if( ERROR( ret ) )
             break;
 
-        RemoveProperty( propBusPortPtr );
-
     }while( 0 );
 
     if( ERROR( ret ) )
@@ -1123,10 +1129,21 @@ gint32 CUnixSockStmPdo::PostStart( IRP* pIrp )
             break;
 
         ret = ( *m_pIoWatch )( eventZero );
+        if( ret == STATUS_PENDING )
+            ret = 0;
 
     }while( 0 );
 
     return ret;
+}
+
+gint32 CUnixSockStmPdo::OnPortReady( IRP* pIrp )
+{
+    CIoWatchTask* pTask = m_pIoWatch;
+    if( pTask != nullptr )
+        pTask->StartWatch( false );
+
+    return super::OnPortReady( pIrp );
 }
 
 gint32 CUnixSockStmPdo::PreStop( IRP* pIrp )
@@ -1136,6 +1153,8 @@ gint32 CUnixSockStmPdo::PreStop( IRP* pIrp )
         // stop the watch
         m_pIoWatch->OnEvent( eventTaskComp,
             ERROR_PORT_STOPPED, 0, nullptr );
+
+        m_pIoWatch.Clear();
     }
     return super::PreStop( pIrp );
 }
@@ -1170,10 +1189,12 @@ gint32 CUnixSockStmPdo::RemoveIrpFromMap( IRP* pIrp )
             }
         case IRP_MN_IOCTL:
             {
-                ret = -ENOENT;
                 if( pCtx->GetCtrlCode() !=
                     CTRLCODE_LISTENING )
+                {
+                    ret = -EINVAL;
                     break;
+                }
 
                 pQueue = &m_queListeningIrps;
                 break;
@@ -1490,6 +1511,9 @@ gint32 CUnixSockStmPdo::OnSubmitIrp(
                         break;
                     }
                 }
+
+                if( ret != -ENOTSUP )
+                    break;
                 // fall through
             }
         default:
@@ -1659,10 +1683,65 @@ gint32 CUnixSockStmPdo::SendNotify(
     {
         // waiting for the event irp
         BufPtr pEvtBuf( true );
-        *pEvtBuf = tokLift;
+        switch( byToken )
+        {
+        case tokPing:
+        case tokPong:
+        case tokFlowCtrl:
+        case tokLift:
+            {
+                *pEvtBuf = byToken;
+                break;
+            }
+        case tokError:
+            {
+                *pBuf = tokError;
+                pEvtBuf->Append(
+                    ( guint8* )pBuf->ptr(),
+                    pBuf->size() );
+                break;
+            }
+        case tokProgress:
+            {
+                if( pBuf.IsEmpty() || pBuf->empty() )
+                {
+                    ret = -EINVAL;
+                    break;
+                }
+                guint32 dwSize = htonl( pBuf->size() );
+                if( pBuf->offset() >= UXPKT_HEADER_SIZE )
+                {
+                    pBuf->SetOffset( pBuf->offset() -
+                        UXPKT_HEADER_SIZE );
+                    *pBuf = tokProgress;
+                    memcpy( pBuf->ptr() + 1,
+                        &dwSize, sizeof( dwSize ) );
+                    pEvtBuf = pBuf;
+                }
+                else
+                {
+                    pEvtBuf->Resize( UXPKT_HEADER_SIZE );
+                    *pEvtBuf = tokProgress;
+
+                    pEvtBuf->Append( ( guint8* )&dwSize,
+                        sizeof( dwSize ) );
+
+                    pEvtBuf->Append( ( guint8* )pBuf->ptr(),
+                        pBuf->size() );
+                }
+                break;
+            }
+        default:
+            ret = -ENOTSUP;
+            break;
+        }
+
+        if( ERROR( ret ) )
+            return ret;
+
         m_queEventPackets.push_back( pEvtBuf );
-        pEvtBuf.Clear();
     }
+
     oPortLock.Unlock();
 
     if( pEventIrp.IsEmpty() )
@@ -1731,6 +1810,7 @@ gint32 CUnixSockStmPdo::SendNotify(
     default:
         {
             ret = -ENOTSUP;
+            break;
         }
     }
 
@@ -1786,7 +1866,7 @@ gint32 CUnixSockStmPdo::OnStmRecv(
         if( !m_queDataPackets.empty() )
         {
             m_queDataPackets.push_back( pBuf );
-            if( m_queDataPackets.size() >
+            if( m_queDataPackets.size() >=
                 STM_MAX_QUEUE_SIZE )
             {
                 // stop reading from the unix sock
@@ -2065,7 +2145,7 @@ gint32 CUnixSockBusPort::CreatePdoPort(
         }
 
         if( strPortClass
-            == PORT_CLASS_TCP_STREAM_PDO )
+            == PORT_CLASS_UXSOCK_STM_PDO )
         {
             ret = CreateUxStreamPdo(
                 pCfg, pNewPort );

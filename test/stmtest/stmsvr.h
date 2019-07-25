@@ -95,13 +95,11 @@ class CEchoClient :
 class CMyStreamProxy :
     public CStreamProxy
 {
-    std::atomic< bool > m_bSend;
     sem_t m_semSync;
     public:
     typedef CStreamProxy super;
-    CMyStreamProxy( const IConfigDb* pCfg )
-    : CAggInterfaceProxy( pCfg ), super( pCfg ),
-    m_bSend( false )
+    CMyStreamProxy( const IConfigDb* pCfg ) :
+        CAggInterfaceProxy( pCfg ), super( pCfg )
     {
         Sem_Init( &m_semSync, 0, 0 );
     }
@@ -112,8 +110,6 @@ class CMyStreamProxy :
     { return super::InitUserFuncs(); }
 
     gint32 OnConnected( HANDLE hChannel );
-    bool CanSend()
-    { return m_bSend; }
 
     // mandatory
     // data is ready for reading
@@ -126,8 +122,8 @@ class CMyStreamServer :
 {
     public:
     typedef CStreamServer super;
-    CMyStreamServer( const IConfigDb* pCfg )
-    : CAggInterfaceServer( pCfg ), super( pCfg )
+    CMyStreamServer( const IConfigDb* pCfg ) :
+        CAggInterfaceServer( pCfg ), super( pCfg )
     {}
 
     // mandatory, otherwise, the proxy map for this
@@ -150,13 +146,11 @@ class CMyStreamServer :
 // of the different interfaces
 DECLARE_AGGREGATED_PROXY(
     CStreamingClient,
-    CFileTransferProxy,
     CEchoClient,
     CMyStreamProxy );
 
 DECLARE_AGGREGATED_SERVER(
     CStreamingServer,
-    CFileTransferServer,
     CEchoServer,
     CMyStreamServer );
 

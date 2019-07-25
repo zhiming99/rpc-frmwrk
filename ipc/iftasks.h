@@ -915,29 +915,7 @@ class CIfCallbackInterceptor :
     void InsertCallAfter( TaskletPtr& pTask )
     { m_pCallAfter = pTask; }
 
-    gint32 RunTask()
-    { return STATUS_PENDING; }
-
-    gint32 OnTaskComplete( gint32 iRet )
-    {
-        if( ERROR( iRet ) )
-            return iRet;
-
-        if( m_pCallAhead.IsEmpty() )
-            return iRet;
-
-        ( *m_pCallAhead )( eventZero );
-
-        return iRet;
-    }
-
-    gint32 OnComplete( gint32 iRet )
-    {
-        super::OnComplete( iRet );
-
-        if( !m_pCallAfter.IsEmpty() )
-            ( *m_pCallAfter )( eventZero );
-
-        return iRet;
-    }
+    gint32 RunTask();
+    gint32 OnTaskComplete( gint32 iRet );
+    gint32 OnComplete( gint32 iRet );
 };

@@ -969,11 +969,14 @@ gint32 CBuffer::Append(
     if( GetDataType() != DataTypeMem )
         return -EINVAL;
 
-    if( pBlock == nullptr || dwSize > BUF_MAX_SIZE )
+    if( pBlock == nullptr ||
+        dwSize > BUF_MAX_SIZE ||
+        dwSize == 0 )
         return -EINVAL;
 
     guint32 dwOldSize = size();
     Resize( size() + dwSize );
     memcpy( ptr() + dwOldSize, pBlock, dwSize );
+    SetExDataType( typeByteArr );
     return 0;
 }

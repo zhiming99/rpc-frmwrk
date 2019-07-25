@@ -5725,3 +5725,35 @@ gint32 CIfInterceptTask::OnKeepAlive(
     return pEvt->OnEvent( iEvent,
         vecParams[ 1 ], 0, 0 );
 }
+
+gint32 CIfCallbackInterceptor::RunTask()
+{ return STATUS_PENDING; }
+
+gint32 CIfCallbackInterceptor::OnTaskComplete(
+    gint32 iRet )
+{
+    if( ERROR( iRet ) )
+        return iRet;
+
+    if( m_pCallAhead.IsEmpty() )
+        return iRet;
+
+    gint32 ret =
+        ( *m_pCallAhead )( eventZero );
+
+    if( SUCCEEDED( iRet ) && ERROR( ret ) )
+        iRet = ret;
+
+    return iRet;
+}
+
+gint32 CIfCallbackInterceptor::OnComplete(
+    gint32 iRet )
+{
+    super::OnComplete( iRet );
+
+    if( !m_pCallAfter.IsEmpty() )
+        ( *m_pCallAfter )( eventZero );
+
+    return iRet;
+}

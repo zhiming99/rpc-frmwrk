@@ -38,9 +38,6 @@ struct IStream
         HANDLE hChannel,
         IConfigDb* pCfg );
 
-    gint32 WriteStream( HANDLE hChannel,
-        BufPtr& pBuf, IEventSink* pCallback );
-
     public:
     typedef std::map< HANDLE, InterfPtr > UXSTREAM_MAP;
     UXSTREAM_MAP m_mapUxStreams;
@@ -96,8 +93,8 @@ struct IStream
         UXSTREAM_MAP::iterator itr =
             m_mapUxStreams.find( hChannel );
 
-        if( itr != m_mapUxStreams.end() )
-            return -EEXIST;
+        if( itr == m_mapUxStreams.end() )
+            return -ENOENT;
 
         m_mapUxStreams.erase( itr );
 
@@ -116,6 +113,9 @@ struct IStream
     gint32 WriteStream( HANDLE hChannel,
         BufPtr& pBuf );
 
+    gint32 WriteStream( HANDLE hChannel,
+        BufPtr& pBuf, IEventSink* pCallback );
+
     gint32 SendPingPong( HANDLE hChannel,
         bool bPing = true );
 
@@ -130,6 +130,13 @@ struct IStream
     virtual gint32 OnPingPong(
         HANDLE hChannel,
         bool bPing = true )
+    { return 0; }
+
+    // flow control
+    gint32 OnFCLifted( HANDLE hChannel )
+    { return 0; }
+
+    gint32 OnFlowControl( HANDLE hChannel )
     { return 0; }
 
     // callback from the watch task when a fatal error
@@ -167,6 +174,8 @@ struct IStream
 
     gint32 OnPreStopShared(
         IEventSink* pCallback );
+
+    bool CanSend( HANDLE hChannel );
 };
 
 struct IStreamServer : public IStream
@@ -246,6 +255,7 @@ class CStreamProxy :
         return IStream::OnUxStreamEvent(
             hChannel, byToken, pBuf );
     }
+
 };
 
 class CStreamServer :
@@ -260,6 +270,7 @@ class CStreamServer :
 
     using IStream::OnUxStreamEvent;
     using IStream::OnStmRecv;
+    using IStream::CanSend;
 
     CStreamServer( const IConfigDb* pCfg )
         :super( pCfg )

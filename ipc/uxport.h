@@ -33,6 +33,8 @@
 #define STM_MAX_PENDING_WRITE ( 1 * 1024 * 1024 )
 
 #define STM_MAX_QUEUE_SIZE  100
+#define UXPKT_HEADER_SIZE   ( sizeof( guint32 ) + sizeof( guint8 ) )
+#define UXBUF_OVERHEAD      8
 
 enum EnumPktToken : guint8
 {
@@ -217,11 +219,12 @@ class CIoWatchTask:
     {
         gint32 ret = 0;
         CCfgOpener oCfg( pCfg );
-        guint32 dwFd = 0;
-        ret = oCfg.GetIntProp( 0, dwFd );
+        gint32 iFd = 0;
+        ret = oCfg.GetIntProp( propFd,
+            ( guint32& )iFd );
         if( ERROR( ret ) )
             return -1;
-        return dwFd;
+        return iFd;
     }
 
     // watch handler for error
@@ -410,6 +413,8 @@ class CUnixSockStmPdo : public CPort
 
     gint32 SendNotify(
         guint8 byToken, BufPtr& pBuf );
+
+    gint32 OnPortReady( IRP* pIrp );
 };
 
 class CUnixSockBusPort :

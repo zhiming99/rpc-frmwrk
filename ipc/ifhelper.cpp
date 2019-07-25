@@ -99,6 +99,13 @@ BufPtr PackageTo< stdstr >( const stdstr& str )
 }
 
 template<>
+BufPtr PackageTo< CBuffer >( CBuffer* pObj )
+{
+    BufPtr pBuf( pObj );
+    return pBuf;
+}
+
+template<>
 auto VecToTuple<>( std::vector< BufPtr >& vec ) -> std::tuple<> 
 {
     return std::tuple<>();

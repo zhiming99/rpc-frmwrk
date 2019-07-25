@@ -181,7 +181,7 @@ void CIfSmokeTest::testCliStartStop()
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
         DebugPrint( 0, "Completed" );
 
-        system( "echo Hello, World! > ./hello-1.txt" );
+        /*system( "echo Hello, World! > ./hello-1.txt" );
         // method from interface CFileTransferServer
         ret = pCli->UploadFile(
             std::string( "./hello-1.txt" ) );
@@ -197,6 +197,7 @@ void CIfSmokeTest::testCliStartStop()
 
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
         DebugPrint( 0, "Download Completed" );
+        */
 
         // IStream implementation test
         HANDLE hChannel = 0;
@@ -204,7 +205,7 @@ void CIfSmokeTest::testCliStartStop()
         CPPUNIT_ASSERT( SUCCEEDED( ret  ) );
 
         guint32 dwCount = 0;
-        while( !pCli->CanSend() )
+        while( !pCli->CanSend( hChannel ) )
             sleep( 1 );
 
         printf( "Testing stream creation, \
@@ -234,7 +235,7 @@ void CIfSmokeTest::testCliStartStop()
         ret = pCli->StartStream( hChannel );
         CPPUNIT_ASSERT( SUCCEEDED( ret  ) );
 
-        while( !pCli->CanSend() )
+        while( !pCli->CanSend( hChannel ) )
             sleep( 1 );
 
         *pBuf = std::string( "Server, i'm back." );

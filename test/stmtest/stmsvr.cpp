@@ -59,7 +59,7 @@ gint32 CMyStreamServer::OnConnected(
     std::string strGreeting = "Hello, Proxy";
     BufPtr pBuf( true );
     *pBuf = strGreeting;
-    WriteStream( hChannel, pBuf );
+    WriteStream( hChannel, pBuf, nullptr );
     return 0;
 }
 
@@ -77,7 +77,8 @@ gint32 CMyStreamServer::OnStmRecv(
 
     // send a reply, if there is an error, the stream
     // channel will be closed
-    return WriteStream( hChannel, pNewBuf );
+    WriteStream( hChannel, pNewBuf, nullptr );
+    return 0;
 }
 
 static FactoryPtr InitClassFactory()

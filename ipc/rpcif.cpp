@@ -74,7 +74,7 @@ static CfgPtr InitIfProxyCfg(
 {
     CCfgOpener oOldCfg( pCfg );
     if( oOldCfg.exist( propIfStateClass ) )
-        return CfgPtr( pCfg );
+        return CfgPtr( const_cast< IConfigDb* >( pCfg ) );
 
     CCfgOpener oNewCfg;
     *oNewCfg.GetCfg() = *pCfg;
@@ -1335,7 +1335,10 @@ gint32 CRpcInterfaceBase::OnPortEvent(
                     propPauseOnStart, bPauseOnStart );
 
                 if( ERROR( ret ) )
+                {
                     bPauseOnStart = false;
+                    ret = 0;
+                }
 
                 if( bPauseOnStart )
                 {
@@ -4459,9 +4462,6 @@ gint32 CRpcServices::RunManagedTask(
         ret = AddAndRun( ptrTask );
     }
     
-    if( SUCCEEDED( ret ) )
-        ret = ptrTask->GetError();
-
     return ret;
 }
 
@@ -5738,7 +5738,7 @@ gint32 CInterfaceServer::SendResponse(
                 if( ERROR( ret ) )
                     break;
 
-                CCfgOpener oDesc(
+                /*CCfgOpener oDesc(
                     ( IConfigDb* )pDataDesc );
 
                 bool bStreaming = false;
@@ -5750,7 +5750,7 @@ gint32 CInterfaceServer::SendResponse(
                 {
                     iFd = 0;
                     dwOffset = 0;
-                }
+                }*/
 
                 ret = pDataDesc->Serialize( *pBuf );
                 if( ERROR( ret ) )

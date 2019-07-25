@@ -29,6 +29,29 @@
 #include "stream.h"
 #include "uxstream.h"
 
+bool IStream::CanSend( HANDLE hChannel )
+{
+    InterfPtr pIf;
+    gint32 ret = GetUxStream( hChannel, pIf );
+    if( ERROR( ret ) )
+        return false;
+
+    if( pIf->IsServer() )
+    {
+        CUnixSockStmServer* pSvr = ObjPtr( pIf );
+        if( pSvr == nullptr )
+            return false;
+
+        return pSvr->CanSend();
+    }
+
+    CUnixSockStmProxy* pProxy = ObjPtr( pIf );
+    if( pProxy == nullptr )
+        return false;
+
+    return pProxy->CanSend();
+}
+
 gint32 IStream::CreateUxStream(
     IConfigDb* pDataDesc,
     gint32 iFd, EnumClsid iClsid,
@@ -50,8 +73,8 @@ gint32 IStream::CreateUxStream(
         oNewCfg.SetIntProp(
             propFd, ( guint32& )iFd );
 
-        oNewCfg.SetPointer( propIfPtr,
-            ( CObjBase* )pIf ); 
+        oNewCfg.SetPointer( propParentPtr,
+            ( CObjBase* )GetInterface() ); 
 
         ret = oNewCfg.CopyProp(
             propKeepAliveSec, pDataDesc );
@@ -65,8 +88,9 @@ gint32 IStream::CreateUxStream(
         if( ERROR( ret ) )
             break;
 
-        InterfPtr pUxIf;
-        ret = pUxIf.NewObj( iClsid,
+        oNewCfg.Push( ObjPtr( pDataDesc ) );
+
+        ret = pIf.NewObj( iClsid,
             oNewCfg.GetCfg() );
 
         if( ERROR( ret ) )
@@ -91,6 +115,7 @@ gint32 IStream::OnUxStreamEvent(
     case tokClose:
         {
             ret = OnClose( hChannel );
+            break;
         }
     case tokError:
         {
@@ -114,6 +139,16 @@ gint32 IStream::OnUxStreamEvent(
         {
             BufPtr bufPtr( pBuf );
             ret = OnStmRecv( hChannel, bufPtr );
+            break;
+        }
+    case tokFlowCtrl:
+        {
+            ret = OnFlowControl( hChannel );
+            break;
+        }
+    case tokLift:
+        {
+            ret = OnFCLifted( hChannel );
             break;
         }
     default:
@@ -183,8 +218,12 @@ gint32 IStream::WriteStream(
         pBuf.IsEmpty() )
         return -EINVAL;
     
+    TaskletPtr pDummy;
     if( pCallback == nullptr )
-        return -EINVAL;
+    {
+        pDummy.NewObj( clsid( CIfDummyTask ) );
+        pCallback = pDummy;
+    }
 
     gint32 ret = 0;
 
@@ -310,7 +349,7 @@ gint32 CStreamProxy::SendSetupReq(
     IConfigDb* pDataDesc,
     int fd, IEventSink* pCallback )
 {
-    if( pDataDesc == nullptr || fd < 0 ||
+    if( pDataDesc == nullptr ||
         pCallback == nullptr )
         return -EINVAL;
 
@@ -440,12 +479,7 @@ gint32 CIfCreateUxSockStmTask::OnTaskComplete(
             break;
         }
 
-        bool bServer = m_bServer;
-        ret = oCfg.GetBoolProp(
-            propIsServer, bServer );
-
-        if( ERROR( ret ) )
-            break;
+        bool& bServer = m_bServer;
 
         EnumClsid iClsid =
             clsid( CUnixSockStmProxy );
@@ -665,7 +699,7 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
                 &IStream::OnConnected,
                 ( HANDLE )pSvc ); 
 
-            pParent->RunManagedTask(
+            pSvc->RunManagedTask(
                 pConnTask );
         }
 
@@ -1032,7 +1066,7 @@ gint32 CStreamServer::OpenChannel(
     int& fd, HANDLE& hChannel,
     IEventSink* pCallback )
 {
-    if( fd < 0 || pCallback == nullptr )
+    if( pCallback == nullptr )
         return -EINVAL;
 
     gint32 ret = 0;
@@ -1127,5 +1161,68 @@ gint32 IStream::OnClose(
 gint32 IStream::OnPreStopShared(
     IEventSink* pCallback )
 {
-    return 0;
+    gint32 ret = 0;
+    CRpcServices* pThis = GetInterface(); 
+
+    do{
+        CStdRMutex oIfLock( pThis->GetLock() );
+        if( m_mapUxStreams.empty() )
+            break;
+
+        UXSTREAM_MAP mapStreams = m_mapUxStreams;
+        m_mapUxStreams.clear();
+
+        oIfLock.Unlock();
+        CParamList oGrpParams;
+        TaskGrpPtr pTaskGrp;
+        oGrpParams[ propIfPtr ] = ObjPtr( pThis );
+
+        ret = pTaskGrp.NewObj(
+            clsid( CIfTaskGroup ),
+            oGrpParams.GetCfg() );
+
+        if( ERROR( ret ) )
+            break;
+
+        if( pCallback != nullptr )
+            pTaskGrp->SetClientNotify( pCallback );
+
+        for( auto elem : mapStreams )
+        {
+            CParamList oParams;
+            oParams.Push( ObjPtr( elem.second ) );
+            oParams[ propIfPtr ] = ObjPtr( pThis );
+            if( pCallback != nullptr )
+            {
+                oParams[ propEventSink ] =
+                    ObjPtr( pCallback );
+            }
+            TaskletPtr pStopTask;
+            ret = pStopTask.NewObj(
+                clsid( CIfStopUxSockStmTask ),
+                oParams.GetCfg() );
+
+            if( ERROR( ret ) )
+            {
+                ret = -ENOMEM;
+                break;
+            }
+            pTaskGrp->AppendTask( pStopTask );
+        }
+
+        if( ERROR( ret ) )
+            break;
+
+        if( pTaskGrp->GetTaskCount() == 0 )
+            break;
+
+        TaskletPtr pTask = ObjPtr( pTaskGrp );
+        CIoManager* pMgr = pThis->GetIoMgr();
+        ret = pMgr->RescheduleTask( pTask );
+        if( SUCCEEDED( ret ) )
+            ret = STATUS_PENDING;
+
+    }while( 0 );
+
+    return ret;
 }

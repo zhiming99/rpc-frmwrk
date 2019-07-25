@@ -489,7 +489,7 @@ gint32 CIfUxListeningTask::PostEvent(
         return ret;
 
     guint8 byToken = pBuf->ptr()[ 0 ];
-    BufPtr pNewBuf;
+    BufPtr pNewBuf( true );
     switch( byToken )
     {
     case tokPing:
@@ -502,37 +502,16 @@ gint32 CIfUxListeningTask::PostEvent(
         }
     case tokProgress:
         {
-            guint32 dwSize;
-            memcpy( &dwSize, pBuf->ptr() + 1,
-                sizeof( guint32 ) );
-            dwSize = ntohl( dwSize );
-            BufPtr pNewBuf;
-            pNewBuf->Resize( dwSize );
-            if( ERROR( ret ) )
-                break;
-
-            if( dwSize > pBuf->size()- 1 - sizeof( guint32 ) )
-            {
-                ret = -EBADMSG;
-                break;
-            }
-
-            memcpy( pNewBuf->ptr(),
-                pBuf->ptr() + 1 + sizeof( guint32 ),
-                dwSize );
+            pBuf->SetOffset( pBuf->offset() +
+                UXPKT_HEADER_SIZE );
+            pNewBuf = pBuf;
             break;
         }
     case tokError:
         {
-            gint32 iError;
-            memcpy( &iError, pBuf->ptr() + 1,
-                sizeof( gint32 ) );
-
-            iError = ntohl( iError );
-            BufPtr pNewBuf;
-            pNewBuf->Resize( sizeof( gint32 ) );
-            memcpy( pNewBuf->ptr(),
-                &iError, sizeof( iError ) );
+            pBuf->SetOffset(
+                pBuf->offset() + 1 );
+            pNewBuf = pBuf;
             break;
         }
     default:

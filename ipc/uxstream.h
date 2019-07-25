@@ -319,11 +319,12 @@ class CUnixSockStream:
 
             CRpcServices* pIf = nullptr;
             ret = oNewCfg.GetPointer(
-                propIfPtr, pIf );
+                propParentPtr, pIf );
             if( ERROR( ret ) )
                 break;
 
             CIoManager* pMgr = pIf->GetIoMgr();
+            oNewCfg.SetPointer( propIoMgr, pMgr );
 
             std::string strVal;
             if( bServer )
@@ -390,6 +391,16 @@ class CUnixSockStream:
 
                 oNewCfg.SetObjPtr(
                     propObjList, ObjPtr( pObjVec ) );
+
+                // for the creation of CInterfaceState
+                oNewCfg.CopyProp( propIfName,
+                    ( CObjBase* )pMatch );
+
+                oNewCfg.CopyProp( propMatchType,
+                    ( CObjBase* )pMatch );
+
+                oNewCfg.CopyProp( propObjPath,
+                    ( CObjBase* )pMatch );
             }
 
 
@@ -430,7 +441,7 @@ class CUnixSockStream:
         do{
             CCfgOpenerObj oParams( this );
             ObjPtr pObj;
-            oParams.GetObjPtr( propIfPtr, pObj );
+            oParams.GetObjPtr( propParentPtr, pObj );
 
             m_pParent = pObj;
             if( m_pParent.IsEmpty() )
@@ -452,7 +463,7 @@ class CUnixSockStream:
             oParams.CopyProp( propKeepAliveSec,
                 oDataDesc.GetCfg() );
 
-            this->RemoveProperty( propIfPtr );
+            this->RemoveProperty( propParentPtr );
             this->RemoveProperty( 0 );
             this->RemoveProperty( propParamCount );
 
@@ -757,13 +768,13 @@ class CUnixSockStream:
 
             if( m_qwTxBytes - qwTxBytesAcked <
                 STM_MAX_PENDING_WRITE &&
-                m_byFlowCtrl > 0 )
+                !CanSend() )
             {
                 ret = OnFCLifted();
             }
             else if( m_qwTxBytes - qwTxBytesAcked >=
                 STM_MAX_PENDING_WRITE &&
-                m_byFlowCtrl == 0 )
+                CanSend() )
             {
                 ret = OnFlowControl();
             }
@@ -836,7 +847,7 @@ class CUnixSockStream:
         if( pCallback == nullptr )
             return -EINVAL;
 
-        if( IsConnected() == false )
+        if( !IsConnected() )
             return ERROR_STATE;
 
         do{
@@ -857,7 +868,7 @@ class CUnixSockStream:
     {
         gint32 ret = 0;
 
-        if( IsConnected() == false )
+        if( !IsConnected() )
             return ERROR_STATE;
 
         do{
@@ -893,7 +904,7 @@ class CUnixSockStream:
         if( pCallback == nullptr )
             return -EINVAL;
 
-        if( IsConnected() == false )
+        if( !IsConnected() )
             return ERROR_STATE;
 
         do{
@@ -937,7 +948,7 @@ class CUnixSockStream:
         if( pCallback == nullptr )
             return -EINVAL;
 
-        if( IsConnected() == false )
+        if( !IsConnected() )
             return ERROR_STATE;
 
         do{
@@ -965,7 +976,7 @@ class CUnixSockStream:
         if( pCallback == nullptr )
             return -EINVAL;
 
-        if( IsConnected() == false )
+        if( !IsConnected() )
             return ERROR_STATE;
 
         do{
@@ -987,7 +998,7 @@ class CUnixSockStream:
         if( pCallback == nullptr )
             return -EINVAL;
 
-        if( IsConnected() == false )
+        if( !IsConnected() )
             return ERROR_STATE;
 
         do{
@@ -1023,6 +1034,7 @@ class CUnixSockStream:
             if( ERROR( ret ) )
                 break;
 
+            CCfgOpenerObj oIfCfg( this );
             CCfgOpenerObj oCfg( pCallback );
             IrpCtxPtr& pCtx = pIrp->GetTopStack(); 
             pCtx->SetMajorCmd( IRP_MJ_FUNC );
@@ -1042,7 +1054,7 @@ class CUnixSockStream:
                 pCtx->SetReqData( pBuf );
 
                 guint32 dwTimeoutSec = 0;
-                ret = oCfg.GetIntProp(
+                ret = oIfCfg.GetIntProp(
                     propKeepAliveSec, dwTimeoutSec );
                 if( ERROR( ret ) )
                     break;
@@ -1058,7 +1070,7 @@ class CUnixSockStream:
                 pCtx->SetIoDirection( IRP_DIR_IN );
 
                 guint32 dwTimeoutSec = 0;
-                ret = oCfg.GetIntProp(
+                ret = oIfCfg.GetIntProp(
                     propTimeoutSec, dwTimeoutSec );
                 if( ERROR( ret ) )
                     break;
@@ -1077,7 +1089,7 @@ class CUnixSockStream:
                 pCtx->SetReqData( pBuf );
 
                 guint32 dwTimeoutSec = 0;
-                ret = oCfg.GetIntProp(
+                ret = oIfCfg.GetIntProp(
                     propKeepAliveSec, dwTimeoutSec );
                 if( ERROR( ret ) )
                     break;
@@ -1114,6 +1126,9 @@ class CUnixSockStream:
         if( pCallback == nullptr ||
             pReqCall == nullptr )
             return -EINVAL;
+
+        if( bSend && !CanSend() )
+            return ERROR_QUEUE_FULL;
 
         do{
             CCfgOpenerObj oCfg( pCallback );
@@ -1189,9 +1204,11 @@ class CUnixSockStream:
         do{
             // start the event listening
             CParamList oParams;
+            oParams.SetPointer( propIfPtr, this );
 
-            oParams.CopyProp( propIfPtr, this );
-            oParams.CopyProp( propIoMgr, this );
+            oParams.SetPointer(
+                propIoMgr, this->GetIoMgr() );
+
             oParams.CopyProp( propTimeoutSec, this );
 
             ret = m_pListeningTask.NewObj(
@@ -1238,8 +1255,8 @@ class CUnixSockStream:
 
             // start the data reading
             CParamList oParams;
-            oParams.CopyProp( propIfPtr, this );
-            oParams.CopyProp( propIoMgr, this );
+            oParams.SetPointer( propIfPtr, this );
+            oParams.SetPointer( propIoMgr, this );
             oParams.CopyProp( propTimeoutSec, this );
             oParams.CopyProp(
                 propKeepAliveSec, this );
@@ -1254,6 +1271,9 @@ class CUnixSockStream:
 
             ret = this->RunManagedTask(
                 m_pReadingTask );
+
+            if( !ERROR( ret ) )
+                ret = 0;
 
         }while( 0 );
 
@@ -1277,6 +1297,26 @@ class CUnixSockStream:
         }while( 0 );
 
         return ret;
+    }
+
+    gint32 OnPostStop( IEventSink* pCallback )
+    {
+        super::OnPostStop( pCallback );
+        m_pParent.Clear();
+        m_pListeningTask.Clear();
+        m_pPingTicker.Clear();
+        m_pReadingTask.Clear();
+        DebugPrint( 0, "a CUnixSockStream object"
+            "@0x%x is over", this );
+        return 0;
+    }
+
+    inline bool CanSend()
+    {
+        if( !IsConnected() )
+            return false;
+
+        return m_byFlowCtrl == 0;
     }
 };
 
