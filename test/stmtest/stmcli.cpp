@@ -63,6 +63,7 @@ gint32 CMyStreamProxy::OnConnected(
     BufPtr pBuf( true );
     *pBuf = std::string( "Hello, Server" );
     WriteStream( hChannel, pBuf, nullptr );
+    DebugPrint( 0, "say hello to server" );
     return 0;
 }
 

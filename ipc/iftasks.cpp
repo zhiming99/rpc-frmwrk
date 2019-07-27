@@ -5330,7 +5330,21 @@ gint32 CIfDummyTask::OnEvent(
     guint32 dwParam1,
     guint32 dwParam2,
     guint32* pData )
-{ return 0; }
+{
+    switch( iEvent )
+    {
+    case eventIrpComp:
+        {
+            RemoveProperty( propIrpPtr );
+            break;
+        }
+    default:
+        {
+            break;
+        }
+    }
+    return 0;
+}
 
 gint32 CIoReqSyncCallback::operator()(
     guint32 dwContext )

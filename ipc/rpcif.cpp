@@ -2267,7 +2267,12 @@ gint32 CRpcServices::OnPostStop(
 
     m_pFtsMatch.Clear();
     m_pStmMatch.Clear();
-    m_pSeqTasks.Clear(); 
+    if( !m_pSeqTasks.IsEmpty() &&
+        m_pSeqTasks->GetTaskCount() > 0 )
+    {
+        ( *m_pSeqTasks )( eventCancelTask );
+        m_pSeqTasks.Clear(); 
+    }
     dwStopCount++;
 
     return 0;

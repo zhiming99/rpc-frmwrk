@@ -204,6 +204,10 @@ class CIfUxSockTransTask :
     guint32 m_dwTimeoutSec;
     guint32 m_dwKeepAliveSec;
 
+    gint32 HandleResponse( IRP* pIrp );
+    gint32 StartNewListening();
+    gint32 PostData( BufPtr& pPayload );
+
     public:
     typedef CIfUxTaskBase super;
 
@@ -239,7 +243,6 @@ class CIfUxSockTransTask :
     { pBuf = m_pPayload; }
 
     gint32 OnTaskComplete( gint32 iRet );
-    gint32 HandleResponse( IRP* pIrp );
 };
 
 class CIfUxListeningTask :
@@ -528,11 +531,27 @@ class CUnixSockStream:
         case tokError:
             {
                 BufPtr bufPtr( pBuf );
-                ret = PostUxStreamEvent(
+                ret = SendUxStreamEvent(
                     byToken, bufPtr );
                 break;
             }
         }
+
+        return ret;
+    }
+
+    gint32 SendUxStreamEvent(
+        guint8 byToken, BufPtr& pBuf )
+    {
+        // forward to the parent IStream object
+        gint32 ret = 0;
+        do{
+            HANDLE hChannel = ( HANDLE )this;
+            IStream* pStream = GetParent();
+            ret = pStream->OnUxStreamEvent(
+                hChannel, byToken, *pBuf );
+
+        }while( 0 );
 
         return ret;
     }
@@ -596,7 +615,7 @@ class CUnixSockStream:
             guint64 qwNewRxBytes = m_qwRxBytes;
 
             BufPtr bufPtr( pBuf );
-            PostUxStreamEvent( tokData, bufPtr );
+            SendUxStreamEvent( tokData, bufPtr );
 
             guint64 qwThresh = ( qwNewRxBytes &
                 ~( STM_MAX_PENDING_WRITE - 1 ) );
@@ -671,7 +690,7 @@ class CUnixSockStream:
                 else if( ERROR( ret ) )
                 {
                     BufPtr pNullTask;
-                    PostUxSockEvent(
+                    SendUxStreamEvent(
                         tokClose, pNullTask );
                 }
                 else if( m_bFirstPing )
@@ -680,24 +699,8 @@ class CUnixSockStream:
                     HANDLE hChannel = ( HANDLE )
                         ( ( CObjBase* )this );
 
-                    // send the OnConnected event to
-                    // the parent stream object
-                    TaskletPtr pConnTask;
-                    ret = DEFER_CALL_NOSCHED(
-                        pConnTask,
-                        ObjPtr( m_pParent ),
-                        &IStream::OnConnected,
-                        hChannel ); 
-
-                    if( SUCCEEDED( ret ) )
-                    {
-                        CRpcServices* pSvc = m_pParent;
-                        DEFER_CALL( pSvc->GetIoMgr(),
-                            ObjPtr( m_pParent ),
-                            &CRpcServices::RunManagedTask,
-                            pConnTask, false );
-                    }
-
+                    IStream* pStream = GetParent();
+                    pStream->OnConnected( hChannel );
                     ret = 0;
                 }
             }
@@ -729,6 +732,8 @@ class CUnixSockStream:
                     break;
 
                 ret = this->RunManagedTask( pPingTask );
+                if( ret == STATUS_PENDING )
+                    ret = 0;
             }
             else
             {
@@ -805,7 +810,7 @@ class CUnixSockStream:
                 break;
 
             BufPtr pBuf( true );
-            PostUxStreamEvent(
+            SendUxStreamEvent(
                 tokLift, pBuf );
         
         }while( 0 );
@@ -1186,11 +1191,11 @@ class CUnixSockStream:
     virtual bool IsConnected(
         const char* szDestAddr = nullptr )
     {
-        CRpcServices* pIf = m_pParent;
-        if( !pIf->IsConnected( szDestAddr ) )
+        if( this->GetState() != stateConnected )
             return false;
 
-        if( this->GetState() != stateConnected )
+        CRpcServices* pIf = m_pParent;
+        if( !pIf->IsConnected( szDestAddr ) )
             return false;
 
         return true;

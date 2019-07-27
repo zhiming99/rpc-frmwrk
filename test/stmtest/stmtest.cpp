@@ -201,18 +201,19 @@ void CIfSmokeTest::testCliStartStop()
 
         // IStream implementation test
         HANDLE hChannel = 0;
-        ret = pCli->StartStream( hChannel );
+        BufPtr pBuf( true );
+        *pBuf = std::string( "Server, are you ok?" );
+        guint32 dwCount = 0;
+
+        /*ret = pCli->StartStream( hChannel );
         CPPUNIT_ASSERT( SUCCEEDED( ret  ) );
 
-        guint32 dwCount = 0;
         while( !pCli->CanSend( hChannel ) )
             sleep( 1 );
 
         printf( "Testing stream creation, \
             double-direction communication and active close\n" );
 
-        BufPtr pBuf( true );
-        *pBuf = std::string( "Server, are you ok?" );
         while( dwCount++ < 10 )
         {
             printf( "Writing to server... \n" );
@@ -227,7 +228,7 @@ void CIfSmokeTest::testCliStartStop()
         CPPUNIT_ASSERT( SUCCEEDED( ret  ) || ret == STATUS_PENDING );
 
         ret = pCli->CancelChannel( hChannel );
-        CPPUNIT_ASSERT( SUCCEEDED( ret ) );
+        CPPUNIT_ASSERT( SUCCEEDED( ret ) );*/
 
         printf( "Testing stream creation, \
             double-direction communication and active cancel\n" );
@@ -255,6 +256,7 @@ void CIfSmokeTest::testCliStartStop()
         }
         CPPUNIT_ASSERT( SUCCEEDED( ret  ) || ret == STATUS_PENDING );
 
+        // sleep( 5 );
         ret = pCli->CancelChannel( hChannel );
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 

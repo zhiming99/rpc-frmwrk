@@ -9,7 +9,7 @@
             "PortClass": "DBusLocalPdo",
             "PortId" : "0",
             "RequestTimeoutSec" : "120",
-            "KeepAliveTimeoutSec" : "2",
+            "KeepAliveTimeoutSec" : "60",
             "PauseOnStart" : "false",
             "Interfaces" :
             [

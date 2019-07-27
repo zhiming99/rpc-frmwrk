@@ -69,13 +69,19 @@ gint32 CIfUxPingTask::OnRetry()
         CCfgOpener oCfg(
             ( IConfigDb* )GetConfig() );
 
-        CRpcServices* pIf = nullptr;
         ObjPtr pObj;
         ret = oCfg.GetObjPtr(
             propIfPtr, pObj );
 
         if( ERROR( ret ) )
             break;
+
+        CRpcServices* pIf = pObj;
+        if( unlikely( pIf == nullptr ) )
+        {
+            ret = -EFAULT;
+            break;
+        }
 
         CParamList oParams;
         oParams.SetPointer( propIoMgr,
@@ -243,28 +249,12 @@ CIfUxSockTransTask::CIfUxSockTransTask(
     }
 }
 
-gint32 CIfUxSockTransTask::OnTaskComplete(
-    gint32 iRet )
+gint32 CIfUxSockTransTask::PostData(
+    BufPtr& pPayload )
 {
     gint32 ret = 0;
-    if( ERROR( iRet ) )
-        return iRet;
-
     CCfgOpenerObj oCallback( this );
     do{
-        IConfigDb* pResp = nullptr;
-        ret = oCallback.GetPointer(
-            propRespPtr, pResp );
-
-        if( ERROR( ret ) )
-            break;
-
-        CParamList oResp( pResp );
-        BufPtr pPayload;
-        oResp.GetProperty( 0, pPayload );
-        if( ERROR( ret ) )
-            break;
-        
         if( pPayload.IsEmpty() ||
             pPayload->empty() )
         {
@@ -290,6 +280,42 @@ gint32 CIfUxSockTransTask::OnTaskComplete(
     return ret;
 }
 
+gint32 CIfUxSockTransTask::OnTaskComplete(
+    gint32 iRet )
+{
+    gint32 ret = 0;
+    if( ERROR( iRet ) )
+        return iRet;
+
+    CCfgOpenerObj oCallback( this );
+    do{
+        IConfigDb* pResp = nullptr;
+        ret = oCallback.GetPointer(
+            propRespPtr, pResp );
+
+        if( ERROR( ret ) )
+            break;
+
+        CParamList oResp( pResp );
+        BufPtr pPayload;
+        oResp.GetProperty( 0, pPayload );
+        if( ERROR( ret ) )
+            break;
+        
+        ret = PostData( pPayload );
+        if( SUCCEEDED( ret ) )
+        {
+            // don't read immediately, to
+            // let other tasks to have
+            // chance to run
+            ret = StartNewListening();
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CIfUxSockTransTask::HandleResponse(
     IRP* pIrp )
 {
@@ -307,33 +333,17 @@ gint32 CIfUxSockTransTask::HandleResponse(
         IrpCtxPtr& pCtx = pIrp->GetTopStack();
         BufPtr pPayload = pCtx->m_pRespData;
 
-        if( m_pUxStream->IsServer() )
-        {
-            CUnixSockStmServer* pSvr = m_pUxStream;
-            pSvr->PostUxSockEvent(
-                tokData, pPayload );
-        }
-        else
-        {
-            CUnixSockStmProxy* pProxy = m_pUxStream;
-            pProxy->PostUxSockEvent(
-                tokData, pPayload );
-        }
+        ret = PostData( pPayload );
 
     }while( 0 );
 
     return ret;
 }
 
-gint32 CIfUxSockTransTask::OnIrpComplete( IRP* pIrp )
+gint32 CIfUxSockTransTask::StartNewListening()
 {
     gint32 ret = 0;
-
     do{
-        ret = HandleResponse( pIrp );
-        if( ERROR( ret ) )
-            break;
-
         // start another listening task
         CParamList oParams;
         oParams.SetPointer( propIfPtr,
@@ -364,6 +374,22 @@ gint32 CIfUxSockTransTask::OnIrpComplete( IRP* pIrp )
     return ret;
 }
 
+gint32 CIfUxSockTransTask::OnIrpComplete( IRP* pIrp )
+{
+    gint32 ret = 0;
+
+    do{
+        ret = HandleResponse( pIrp );
+        if( ERROR( ret ) )
+            break;
+
+        ret = StartNewListening();
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CIfUxSockTransTask::OnComplete( gint32 iRet )
 {
     super::OnComplete( iRet );
@@ -382,11 +408,7 @@ gint32 CIfUxSockTransTask::RunTask()
             {
                 ret = pSvr->StartReading( this );
                 if( SUCCEEDED( ret ) )
-                {
                     ret = OnTaskComplete( ret );
-                    if( SUCCEEDED( ret ) )
-                        continue;
-                }
             }
             else
             {
@@ -407,11 +429,7 @@ gint32 CIfUxSockTransTask::RunTask()
             {
                 ret = pProxy->StartReading( this );
                 if( SUCCEEDED( ret ) )
-                {
                     ret = OnTaskComplete( ret );
-                    if( SUCCEEDED( ret ) )
-                        continue;
-                }
             }
             else
             {

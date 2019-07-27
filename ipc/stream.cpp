@@ -767,41 +767,7 @@ gint32 CIfStopUxSockStmTask::OnTaskComplete(
     CParamList oParams(
         ( IConfigDb* )GetConfig() );
 
-    do{
-        ObjPtr pIf;
-        ret = oParams.GetObjPtr( propIfPtr, pIf );
-        if( ERROR( ret ) )
-            break;
-        
-        CRpcServices* pParent = pIf;
-        IStream* pStream = 
-            dynamic_cast< IStream* >( pParent );
-
-        if( pStream == nullptr ||
-            pParent == nullptr )
-        {
-            ret = -EFAULT;
-            break;
-        }
-
-        ret = oParams.GetObjPtr( 0, pIf );
-        if( ERROR( ret ) )
-            break;
-
-        CRpcServices* pSvc = pIf;
-        if( pSvc == nullptr )
-        {
-            ret = -EFAULT;
-            break;
-        }
-
-        HANDLE hChannel = ( HANDLE )pSvc;
-        ret = pStream->RemoveUxStream( hChannel );
-
-    }while( 0 );
-
     oParams.ClearParams();
-
     return ret;
 }
 
@@ -939,6 +905,7 @@ gint32 IStream::CloseChannel(
         return ret;
 
     do{
+        RemoveUxStream( hChannel );
         CRpcServices* pSvc = pIf;
         CRpcServices* pThisIf = GetInterface();
 

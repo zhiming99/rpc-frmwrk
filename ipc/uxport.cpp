@@ -61,7 +61,7 @@ gint32 CRecvFilter::OnIoReady()
                     break;
                 }
             }
-            if( ret == 0 || bFirst )
+            if( ret == 0 && bFirst )
             {
                 ret = -ENOTCONN;
                 break;
@@ -970,11 +970,6 @@ gint32 CIoWatchTask::OnIoReady( guint32 revent )
                 ret = m_oSendQue.OnIoReady();
                 if( ret == -EAGAIN )
                     StartWatch();
-                else
-                {
-                    // no data to send
-                    StopWatch();
-                }
 
                 if( SUCCEEDED( ret ) &&
                     m_oSendQue.GetPendingWrite() == 0 )
@@ -1768,11 +1763,11 @@ gint32 CUnixSockStmPdo::SendNotify(
 
             pCtx->SetRespData( pRespBuf );
             pCtx->SetStatus( ret = 0 );
+            break;
         }
     case tokError:
         {
             *pRespBuf = tokError;
-
             pRespBuf->Append(
                 ( guint8* )pBuf->ptr(),
                 pBuf->size() );
@@ -1786,23 +1781,30 @@ gint32 CUnixSockStmPdo::SendNotify(
         }
     case tokProgress:
         {
-            pRespBuf->Resize( sizeof( guint8 ) +
-                sizeof( guint32 ) );
-
-            pRespBuf->ptr()[ 0 ] = tokError;
             guint32 dwSize = pBuf->size();
             dwSize = htonl( dwSize );
-
-            memcpy( pRespBuf->ptr() + 1, 
-                &dwSize, sizeof( dwSize ) );
-
-            pRespBuf->Append(
-                ( guint8* )pBuf->ptr(),
-                pBuf->size() );
+            if( pBuf->offset() > UXPKT_HEADER_SIZE )
+            {
+                pBuf->SetOffset( pBuf->offset() -
+                    UXPKT_HEADER_SIZE );
+                pBuf->ptr()[ 0 ] = tokProgress;
+                memcpy( pBuf->ptr() + 1, 
+                    &dwSize, sizeof( dwSize ) );
+            }
+            else
+            {
+                pRespBuf->Resize( sizeof( guint8 ) +
+                    sizeof( guint32 ) );
+                pRespBuf->ptr()[ 0 ] = tokProgress;
+                memcpy( pRespBuf->ptr() + 1, 
+                    &dwSize, sizeof( dwSize ) );
+                pRespBuf->Append(
+                    ( guint8* )pBuf->ptr(),
+                    pBuf->size() );
+            }
 
             IrpCtxPtr pCtx =
                 pEventIrp->GetTopStack();
-
             pCtx->SetRespData( pRespBuf );
             pCtx->SetStatus( ret = 0 );
             break;
