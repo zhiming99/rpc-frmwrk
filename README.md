@@ -24,7 +24,7 @@ This framework depends on the following packags:
 
 ---
 [`Sat 27 Jul 2019 09:36:00 PM Beijing`]   
-1. Made the local work now. There remains some performance issue to solve. And afterwards to move on to the streaming over the router. It should last longer than local streaming.   
+1. Made the local streaming work now. There remains some performance issue to solve. And afterwards to move on to the streaming over the router. It should last longer than local streaming.   
 
 [`Sun 21 Jul 2019 02:25:01 PM Beijing`]   
 1. Coding is fun and debugging is painful. ...   
