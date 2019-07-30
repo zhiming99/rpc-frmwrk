@@ -513,7 +513,7 @@ struct CUnixSockStmRelayBase :
     inline guint32 QueueLimit()
     { return 5; }
 
-    gint32 PostBdgeStmEvent(
+    gint32 SendBdgeStmEvent(
         guint8 byToken, BufPtr& pBuf )
     {
         // forward to the parent IStream object
@@ -541,25 +541,20 @@ struct CUnixSockStmRelayBase :
 
             if( pSvc->IsServer() )
             {
-                ret = DEFER_IFCALL_NOSCHED( pTask,
-                    ObjPtr( pSvc ),
-                    &CStreamServerRelay::OnBdgeStmEvent,
-                    iStmId, byToken, ( CBuffer* )pBuf );
+                CStreamServerRelay* pRelay =
+                    ObjPtr( pSvc );
+
+                ret = pRelay->OnBdgeStmEvent(
+                    iStmId, byToken, pBuf );
             }
             else
             {
-                ret = DEFER_IFCALL_NOSCHED( pTask,
-                    ObjPtr( pSvc ),
-                    &CStreamProxyRelay::OnBdgeStmEvent,
-                    iStmId, byToken, ( CBuffer* )pBuf );
+                CStreamProxyRelay* pRelay =
+                    ObjPtr( pSvc );
+
+                ret = pRelay->OnBdgeStmEvent(
+                    iStmId, byToken, pBuf );
             }
-
-            if( ERROR( ret ) )
-                break;
-
-            // NOTE: the istream method is running on
-            // the seqtask of the uxstream
-            ret = this->AddSeqTask( pTask );
 
         }while( 0 );
 
@@ -625,10 +620,21 @@ struct CUnixSockStmRelayBase :
             if( bEmpty )
             {
                 // wake up the writer task
-                CIoManager* pMgr = this->GetIoMgr();
-                ret = DEFER_CALL( pMgr,
+                // use defer call to avoid lock nesting
+                // among the tasks
+                TaskletPtr pResumeTask;
+                ret = DEFER_IFCALL_NOSCHED(
+                    pResumeTask,
                     ObjPtr( m_pWritingTask ),
                     &CIfUxTaskBase::Resume );
+                if( ERROR( ret ) )
+                    break;
+
+                ret = this->RunManagedTask(
+                    pResumeTask );
+
+                if( ret == STATUS_PENDING )
+                    ret = 0;
             }
 
         }while( 0 );
@@ -680,8 +686,10 @@ struct CUnixSockStmRelayBase :
 
             if( bEmpty )
             {
-                CIoManager* pMgr = this->GetIoMgr();
                 // wake up the writer task
+                CIoManager* pMgr = this->GetIoMgr();
+                // use defer call to avoid lock nesting
+                // among the tasks
                 ret = DEFER_CALL( pMgr,
                     ObjPtr( m_pWrTcpStmTask ),
                     &CIfUxTaskBase::Resume );
@@ -736,6 +744,10 @@ struct CUnixSockStmRelayBase :
                 ObjPtr( this->m_pListeningTask ) );
 
             ObjPtr pTasks = pvecTasks;
+            oIfLock.Unlock();
+
+            if( ( *pvecTasks )().empty() )
+                break;
 
             // wake up ux stream reader task
             DEFER_CALL( pMgr,
@@ -757,7 +769,7 @@ struct CUnixSockStmRelayBase :
             CStdRMutex oIfLock( this->GetLock() );
             SENDQUE* pQueue = &m_queToLocal;
 
-            if( this->m_byFlowCtrl > 0 ||
+            if( !this->CanSend()  ||
                 pQueue->empty() )
             {
                 ret = -ENOENT;
@@ -813,7 +825,9 @@ struct CUnixSockStmRelayBase :
                 pTaskGrp->AppendTask( pRmtResumeSend );
                 TaskletPtr pTasks = ObjPtr( pTaskGrp );
 
-                ret = this->AddSeqTask( pTasks );
+                ret = this->RunManagedTask( pTasks );
+                if( ret == STATUS_PENDING )
+                    ret = 0;
             }
 
         }while( 0 );
@@ -890,7 +904,7 @@ struct CUnixSockStmRelayBase :
     virtual gint32 OnPingPong( bool bPing )
     {
         // to cloak super::OnPingPong
-        return -ENOTSUP;
+        return 0;
     }
 
     virtual gint32 OnDataReceivedRemote(
@@ -930,29 +944,18 @@ struct CUnixSockStmRelayBase :
                 ObjPtr( m_pWrTcpStmTask ) );
         }
 
+        oIfLock.Unlock();
         ObjPtr pTasks = pvecTasks;
 
         // wake up ux stream reader task
-        TaskletPtr pDeferTask;
-        gint32 ret = DEFER_IFCALL_NOSCHED( 
-            pDeferTask,
-            ObjPtr( this ),
-            &CUnixSockStmRelayBase::PauseResumeTasks,
-            pTasks, ( bool )true );
+        if( ( *pvecTasks )().empty() )
+            return 0;
 
-        if( ERROR( ret ) )
-            return ret;
-
-        ret = this->AddSeqTask( pDeferTask );
-
-        return ret;
+        return PauseResumeTasks( pTasks, true );
     }
 
     virtual gint32 OnDataReceived( CBuffer* pBuf )
     {
-        if( pBuf == nullptr || pBuf->empty() )
-            return -EINVAL;
-        this->m_qwRxBytes += pBuf->size();
         return 0;
     }
 
@@ -964,7 +967,7 @@ struct CUnixSockStmRelayBase :
     virtual gint32 OnProgress( CBuffer* pBuf )
     {
         BufPtr bufPtr( pBuf );
-        return this->PostUxStreamEvent(
+        return this->SendUxStreamEvent(
             tokProgress, bufPtr );
     }
 
@@ -1122,7 +1125,7 @@ class CUnixSockStmServerRelay :
     virtual gint32 OnPingPong( bool bPing )
     {
         BufPtr pBuf( true );
-        return PostUxStreamEvent(
+        return SendUxStreamEvent(
             bPing ? tokPing : tokPong,
             pBuf );
     }
@@ -1133,7 +1136,7 @@ class CUnixSockStmServerRelay :
             ResetPingTicker();
 
         BufPtr pBuf( true );
-        return PostBdgeStmEvent(
+        return SendBdgeStmEvent(
             bPing ? tokPing : tokPong,
             pBuf );
     }
@@ -1155,7 +1158,7 @@ class CUnixSockStmProxyRelay :
             ResetPingTicker();
 
         BufPtr pBuf( true );
-        return PostUxStreamEvent(
+        return SendUxStreamEvent(
             bPing ? tokPing : tokPong,
             pBuf );
     }
@@ -1163,7 +1166,7 @@ class CUnixSockStmProxyRelay :
     virtual gint32 OnPingPongRemote( bool bPing )
     {
         BufPtr pBuf( true );
-        return PostBdgeStmEvent(
+        return SendBdgeStmEvent(
             bPing ? tokPing : tokPong,
             pBuf );
     }
@@ -1271,7 +1274,7 @@ class CIfUxSockTransRelayTask :
         if( IsReading() )
             oHelper.PauseReading( false );
 
-        return super::Pause();
+        return super::Resume();
     }
 };
 

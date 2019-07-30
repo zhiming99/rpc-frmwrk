@@ -265,28 +265,220 @@ class CIfUxListeningTask :
 #define UXSOCK_OBJNAME_SERVER "CUnixSockStmServer"               
 #define UXSOCK_OBJNAME_PROXY  "CUnixSockStmProxy"               
 
+enum EnumFCState : gint32
+{
+    fcsKeep,
+    fcsFlowCtrl,
+    fcsLift,
+    fcsReport,
+};
+
+class CFlowControl
+{
+    // flow control for uxstream only
+    stdrmutex   m_oFCLock;
+
+    guint64     m_qwRxBytes = 0;
+    guint64     m_qwTxBytes = 0;
+    guint64     m_qwAckTxBytes = 0;
+    guint64     m_qwAckRxBytes = 0;
+
+    guint32     m_dwRxPkts = 0;
+    guint32     m_dwTxPkts = 0;
+    guint32     m_dwAckTxPkts = 0;
+    guint32     m_dwAckRxPkts = 0;
+
+    gint8       m_byFlowCtrl = 0;
+
+    EnumFCState OnReportInternal(
+        guint64 qwAckTxBytes, guint32 dwAckTxPkts )
+    {
+        EnumFCState ret = fcsKeep;
+
+        bool bAboveLast = false;
+        bool bAbove = false;
+
+        CStdRMutex oLock( GetLock() );
+        if( qwAckTxBytes <= m_qwAckTxBytes ||
+            dwAckTxPkts <= m_dwAckTxPkts )
+            return ret;
+
+        if( m_qwTxBytes - m_qwAckTxBytes >=
+            STM_MAX_PENDING_WRITE ||
+            m_dwTxPkts - m_dwAckTxPkts >=
+            STM_MAX_PACKATS_REPORT )
+            bAboveLast = true;
+
+        if( m_qwTxBytes - qwAckTxBytes >=
+            STM_MAX_PENDING_WRITE ||
+            m_dwTxPkts - dwAckTxPkts >=
+            STM_MAX_PACKATS_REPORT )
+            bAbove = true;
+
+        m_qwAckTxBytes = qwAckTxBytes;
+        m_dwAckTxPkts = dwAckTxPkts;
+
+        if( bAboveLast != bAbove )
+            ret = DecFCCount();
+
+        return ret;
+    }
+
+    public:
+
+    inline stdrmutex& GetLock()
+    { return m_oFCLock; }
+
+    EnumFCState IncTxBytes( const BufPtr& pBuf )
+    {
+        EnumFCState ret = fcsKeep;
+        bool bAboveLast = false;
+        bool bAbove = false;
+
+        if( pBuf.IsEmpty() || pBuf->empty() )
+            return ret;
+
+        CStdRMutex oLock( GetLock() );
+
+        if( m_qwTxBytes - m_qwAckTxBytes >=
+            STM_MAX_PENDING_WRITE ||
+            m_dwTxPkts - m_dwAckTxPkts >=
+            STM_MAX_PACKATS_REPORT )
+            bAboveLast = true;
+
+        m_qwTxBytes += pBuf->size();
+        m_dwTxPkts++;
+
+        if( m_qwTxBytes - m_qwAckTxBytes >=
+            STM_MAX_PENDING_WRITE ||
+            m_dwTxPkts - m_dwAckTxPkts >=
+            STM_MAX_PACKATS_REPORT )
+            bAbove = true;
+
+        if( bAboveLast != bAbove )
+            ret = IncFCCount();
+
+        return ret;
+    }
+
+    EnumFCState IncRxBytes( const BufPtr& pBuf )
+    {
+        EnumFCState ret = fcsKeep;
+
+        bool bAboveLast = false;
+        bool bAbove = false;
+
+        if( pBuf.IsEmpty() || pBuf->empty() )
+            return ret;
+
+        CStdRMutex oLock( GetLock() );
+
+        if( m_qwRxBytes - m_qwAckRxBytes >=
+            STM_MAX_PENDING_WRITE ||
+            m_dwRxPkts - m_dwAckRxPkts >=
+            STM_MAX_PACKATS_REPORT )
+            bAboveLast = true;
+
+        m_qwRxBytes += pBuf->size();
+        m_dwRxPkts++;
+
+        if( m_qwRxBytes - m_qwAckRxBytes >=
+            STM_MAX_PENDING_WRITE ||
+            m_dwRxPkts - m_dwAckRxPkts >=
+            STM_MAX_PACKATS_REPORT )
+            bAbove = true;
+
+        if( bAboveLast != bAbove )
+        {
+            ret = fcsReport;
+            m_qwAckRxBytes = m_qwRxBytes;
+            m_dwAckRxPkts = m_dwRxPkts;
+        }
+
+        return ret;
+    }
+
+    EnumFCState IncFCCount()
+    {
+        EnumFCState ret = fcsKeep;
+        CStdRMutex oLock( GetLock() );
+        ++m_byFlowCtrl;
+        if( m_byFlowCtrl == 1 )
+            ret = fcsFlowCtrl;
+        return ret;
+    }
+
+    EnumFCState DecFCCount()
+    {
+        EnumFCState ret = fcsKeep;
+        CStdRMutex oLock( GetLock() );
+        --m_byFlowCtrl;
+        if( m_byFlowCtrl == 0 )
+            ret = fcsLift;
+        return ret;
+    }
+
+    EnumFCState OnFCReport( CfgPtr& pReport )
+    {
+        CCfgOpener oCfg(
+            ( IConfigDb* )pReport );
+
+        guint32 dwAckTxPkts = 0;
+        guint64 qwAckTxBytes = 0;
+        gint32 ret = oCfg.GetQwordProp(
+            propRxBytes, qwAckTxBytes );
+        if( ERROR( ret ) )
+            return fcsKeep;
+
+        ret = oCfg.GetIntProp(
+            propRxPkts, dwAckTxPkts );
+        if( ERROR( ret ) )
+            return fcsKeep;
+
+        return OnReportInternal(
+            qwAckTxBytes, dwAckTxPkts );
+    }
+
+    bool CanSend()
+    {
+        CStdRMutex oLock( GetLock() );
+        return m_byFlowCtrl == 0;
+    }
+
+    CfgPtr GetReport()
+    {
+        CParamList oProgress;
+        CStdRMutex oLock( GetLock() );
+        oProgress.SetQwordProp(
+            propRxBytes, m_qwRxBytes );
+
+        oProgress.SetIntProp(
+            propRxPkts, m_dwRxPkts );
+
+        return oProgress.GetCfg();
+    }
+};
+
 template< class T >
 class CUnixSockStream:
     public T
 {
     protected:
-    InterfPtr m_pParent;
+    InterfPtr   m_pParent;
 
-    TaskletPtr m_pPingTicker;
-    TaskletPtr m_pListeningTask;
-    TaskletPtr m_pReadingTask;
+    TaskletPtr  m_pPingTicker;
+    TaskletPtr  m_pListeningTask;
+    TaskletPtr  m_pReadingTask;
 
     // TaskletPtr m_pReadUxStmTask;
     // TaskletPtr m_pWriteUxStmTask;
 
-    std::atomic< guint64 >   m_qwRxBytes;
-    std::atomic< guint64 >   m_qwTxBytes;
-    bool                     m_bFirstPing = true;
+    bool        m_bFirstPing = true;
 
-    // flag to allow or deny outgoing data
-    std::atomic< guint8 > m_byFlowCtrl;
+    CFlowControl m_oFlowCtrl;
 
     protected:
+
     gint32 OnUxSockEventWrapper(
         guint8 byToken,
         CBuffer* pBuf )
@@ -432,10 +624,7 @@ class CUnixSockStream:
     typedef T super;
 
     CUnixSockStream( const IConfigDb* pCfg ) :
-        super( InitCfg( pCfg ) ),
-        m_qwRxBytes( 0 ),
-        m_qwTxBytes( 0 ),
-        m_byFlowCtrl( 0 )
+        super( InitCfg( pCfg ) )
     {
         if( pCfg == nullptr )
             return;
@@ -610,50 +799,30 @@ class CUnixSockStream:
                 ret = -EINVAL;
                 break;
             }
-            guint64 qwOldRxBytes = m_qwRxBytes;
-            m_qwRxBytes += pBuf->size();
-            guint64 qwNewRxBytes = m_qwRxBytes;
+
+            ret = m_oFlowCtrl.IncRxBytes( pBuf );
 
             BufPtr bufPtr( pBuf );
             SendUxStreamEvent( tokData, bufPtr );
 
-            guint64 qwThresh = ( qwNewRxBytes &
-                ~( STM_MAX_PENDING_WRITE - 1 ) );
-
-            if( qwOldRxBytes < qwThresh &&
-                qwNewRxBytes >= qwThresh )
+            if( ret == fcsReport )
             {
-                // every STM_MAX_PENDING_WRITE
-                // bytes received, we emit a
-                // progress report, as a flow
-                // control hint.
-                //
                 // send a progress notification
-                CParamList oProgress;
-                oProgress.SetQwordProp(
-                    propRxBytes, m_qwRxBytes );
+                CfgPtr pProgress =
+                    m_oFlowCtrl.GetReport();
 
                 BufPtr pBuf( true );
-                oProgress.GetCfg()->Serialize( *pBuf );
+                pProgress->Serialize( *pBuf );
 
-                CParamList oReq;
-                oReq.SetStrProp(
-                    propMethodName, "SendProgress" );
-                oReq.Push( pBuf );
-
-                CParamList oCallback;
-
-                oCallback.CopyProp( propKeepAliveSec, this );
-                oCallback.SetPointer( propIfPtr, this );
-                oCallback.SetPointer( propIoMgr, this );
-
-                TaskletPtr pTask;
-                pTask.NewObj( clsid( CIfDummyTask ),
-                    oCallback.GetCfg() );
-
-                ret = SubmitRequest(
-                    oReq.GetCfg(), pTask, true );
-                
+                TaskletPtr pDummy;
+                ret = pDummy.NewObj( clsid( CIfDummyTask ) );
+                if( ERROR( ret ) )
+                    break;
+                ret = SendProgress( pBuf, pDummy );
+            }
+            else
+            {
+                ret = 0;
             }
 
         }while( 0 );
@@ -753,35 +922,26 @@ class CUnixSockStream:
             return ERROR_STATE;
 
         do{
-            CCfgOpener oCfg;
-            ret = oCfg.GetCfg()->Deserialize( *pBuf );
+            CfgPtr pReport( true );
+            ret = pReport->Deserialize( *pBuf );
             if( ERROR( ret ) )
                 break;
 
-            guint64 qwTxBytesAcked = 0;
-            ret = oCfg.GetQwordProp(
-                propRxBytes, qwTxBytesAcked );
-
-            if( ERROR( ret ) )
-                break;
-
-            if( m_qwTxBytes < qwTxBytesAcked )
+            ret = m_oFlowCtrl.OnFCReport( pReport );
+            if( ret == fcsKeep )
             {
-                ret = -ERANGE;
+                ret = 0;
                 break;
             }
-
-            if( m_qwTxBytes - qwTxBytesAcked <
-                STM_MAX_PENDING_WRITE &&
-                !CanSend() )
+            else if( ret == fcsLift )
             {
-                ret = OnFCLifted();
+                BufPtr pBuf( true );
+                ret = SendUxStreamEvent(
+                    tokLift, pBuf );
             }
-            else if( m_qwTxBytes - qwTxBytesAcked >=
-                STM_MAX_PENDING_WRITE &&
-                CanSend() )
+            else
             {
-                ret = OnFlowControl();
+                ret = ERROR_FAIL;
             }
 
         }while( 0 );
@@ -792,7 +952,7 @@ class CUnixSockStream:
     // only happens on the writing
     virtual gint32 OnFlowControl()
     {
-        m_byFlowCtrl++;
+        m_oFlowCtrl.IncFCCount();
         return 0;
     }
 
@@ -805,14 +965,19 @@ class CUnixSockStream:
             return ERROR_STATE;
 
         do{
-            m_byFlowCtrl--;
-            if( m_byFlowCtrl > 0 )
+            ret = m_oFlowCtrl.DecFCCount();
+            if( ret == fcsKeep )
+            {
+                ret = 0;
                 break;
+            }
 
             BufPtr pBuf( true );
             SendUxStreamEvent(
                 tokLift, pBuf );
-        
+
+            ret = 0;
+
         }while( 0 );
 
         return ret;
@@ -916,25 +1081,27 @@ class CUnixSockStream:
             CParamList oParams;
             oParams[ propMethodName ] = __func__;
             BufPtr pNewBuf( true );
-            ret = pNewBuf->Resize(
-                1 + sizeof( guint32 ) + pBuf->size() );
+            pNewBuf->Resize( UXBUF_OVERHEAD +
+                pBuf->size() );
 
             if( ERROR( ret ) )
                 break;
 
+            pNewBuf->SetOffset( UXBUF_OVERHEAD -
+                UXPKT_HEADER_SIZE );
+
             pNewBuf->ptr()[ 0 ] = tokProgress;
             guint32 dwSize = htonl( pBuf->size() );
 
-            pNewBuf->Append( ( guint8* )&dwSize,
+            memcpy( pNewBuf->ptr() + 1,
+                ( guint8* )&dwSize,
                 sizeof( guint32 ) );
 
-            memcpy( pNewBuf->ptr() + 1 + sizeof( guint32 ),
-                pBuf->ptr(), pBuf->size() );
-
-            pNewBuf->Append( ( guint8* )pBuf->ptr(),
+            memcpy( pNewBuf->ptr() + UXPKT_HEADER_SIZE, 
+                ( guint8* )pBuf->ptr(),
                 pBuf->size() );
 
-            oParams.Push( pBuf );
+            oParams.Push( pNewBuf );
             ret = SubmitRequest( oParams.GetCfg(),
                 pCallback, true );
 
@@ -956,17 +1123,28 @@ class CUnixSockStream:
         if( !IsConnected() )
             return ERROR_STATE;
 
+        if( !CanSend() )
+            return ERROR_QUEUE_FULL;
+
         do{
             CParamList oParams;
             oParams[ propMethodName ] = __func__;
             oParams.Push( pBuf );
+
+            CStdRMutex oLock(
+                m_oFlowCtrl.GetLock() );
+
             ret = SubmitRequest( oParams.GetCfg(),
                 pCallback, true );
 
             if( ERROR( ret ) )
                 break;
 
-            m_qwTxBytes += pBuf->size();
+            ret = m_oFlowCtrl.IncTxBytes( pBuf );
+            if( ret == fcsFlowCtrl )
+                ret = ERROR_QUEUE_FULL;
+            else
+                ret = 0;
 
         }while( 0 );
 
@@ -1132,8 +1310,8 @@ class CUnixSockStream:
             pReqCall == nullptr )
             return -EINVAL;
 
-        if( bSend && !CanSend() )
-            return ERROR_QUEUE_FULL;
+        if( !IsConnected() )
+            return ERROR_STATE;
 
         do{
             CCfgOpenerObj oCfg( pCallback );
@@ -1318,10 +1496,7 @@ class CUnixSockStream:
 
     inline bool CanSend()
     {
-        if( !IsConnected() )
-            return false;
-
-        return m_byFlowCtrl == 0;
+        return m_oFlowCtrl.CanSend();
     }
 };
 

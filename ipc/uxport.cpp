@@ -68,6 +68,7 @@ gint32 CRecvFilter::OnIoReady()
             }
             bFirst = false;
 
+            m_byToken = byToken;
             if( byToken == tokPing ||
                 byToken == tokPong ||
                 byToken == tokClose ||
@@ -124,7 +125,7 @@ gint32 CRecvFilter::OnIoReady()
                     break;
                 }
                 // leave some room for later usage
-                guint32 dwBufOffset = 16;
+                guint32 dwBufOffset = UXBUF_OVERHEAD;
                 pBuf->Resize(
                     m_dwBytesToRead + dwBufOffset );
                 pBuf->SetOffset( dwBufOffset );
@@ -163,6 +164,7 @@ gint32 CRecvFilter::OnIoReady()
             break;
         }
 
+        ret = 0;
         while( m_dwBytesToRead > 0 )
         {
             if( m_queBufRead.empty() )
@@ -201,7 +203,8 @@ gint32 CRecvFilter::OnIoReady()
                 m_dwOffsetRead = ( guint32 )-1;
                 m_dwBytesToRead = 0;
                 m_dwBytesPending += pBuf->size();
-                ret = byToken;
+                ret = m_byToken;
+                m_byToken = 0;
                 break;
             }
             else if( ret > 0 )
@@ -329,6 +332,7 @@ gint32 CSendQue::OnIoReady()
                 ret = -EBADMSG;
                 break;
             }
+
             m_dwOffsetWrite = 0;
         }
 
@@ -919,13 +923,12 @@ gint32 CIoWatchTask::OnIoReady( guint32 revent )
                 case tokPing:
                     {
                         OnPingPong( ret == tokPing );
-                        ret = -EAGAIN;
                         break;
                     }
                 case tokClose:
                     {
                         OnClose();
-                        ret = -EAGAIN;
+                        ret = 0;
                         break;
                     }
                 case tokData:
@@ -933,11 +936,9 @@ gint32 CIoWatchTask::OnIoReady( guint32 revent )
                         BufPtr pBuf;
                         ret = m_oRecvFilter.ReadStream( pBuf );
                         if( ERROR( ret ) )
-                        {
-                            ret = -EAGAIN;
                             break;
-                        }
-                        ret = OnDataReady( pBuf );
+                        OnDataReady( pBuf );
+                        ret = tokData;
                         break;
                     }
                 case tokProgress:
@@ -945,11 +946,9 @@ gint32 CIoWatchTask::OnIoReady( guint32 revent )
                         BufPtr pBuf;
                         ret = m_oRecvFilter.ReadStream( pBuf );
                         if( ERROR( ret ) )
-                        {
-                            ret = -EAGAIN;
                             break;
-                        }
-                        ret = OnProgress( pBuf );
+                        OnProgress( pBuf );
+                        ret = tokProgress;
                         break;
                     }
                 default:
@@ -1398,19 +1397,14 @@ gint32 CUnixSockStmPdo::HandleStreamCommand(
 
         case tokProgress:
             {
-                BufPtr pNewBuf( true );
-                pNewBuf->Resize( pBuf->size()
-                    - 1 - sizeof( guint32 ) );
-
-                if( ERROR( ret ) )
-                    break;
-
-                memcpy( pNewBuf->ptr(),
-                    pBuf->ptr() + 1 + sizeof( guint32 ), 
-                    pNewBuf->size() );
+                pBuf->SetOffset( pBuf->offset() +
+                    UXPKT_HEADER_SIZE );
 
                 ret = pTask->WriteStream(
-                    pNewBuf, tokProgress );
+                    pBuf, tokProgress );
+
+                pBuf->SetOffset( pBuf->offset() -
+                    UXPKT_HEADER_SIZE );
 
                 break;
             }
@@ -1708,19 +1702,16 @@ gint32 CUnixSockStmPdo::SendNotify(
                 {
                     pBuf->SetOffset( pBuf->offset() -
                         UXPKT_HEADER_SIZE );
-                    *pBuf = tokProgress;
+                    pBuf->ptr()[ 0 ] = tokProgress;
                     memcpy( pBuf->ptr() + 1,
                         &dwSize, sizeof( dwSize ) );
                     pEvtBuf = pBuf;
                 }
                 else
                 {
-                    pEvtBuf->Resize( UXPKT_HEADER_SIZE );
                     *pEvtBuf = tokProgress;
-
                     pEvtBuf->Append( ( guint8* )&dwSize,
                         sizeof( dwSize ) );
-
                     pEvtBuf->Append( ( guint8* )pBuf->ptr(),
                         pBuf->size() );
                 }
@@ -1790,6 +1781,7 @@ gint32 CUnixSockStmPdo::SendNotify(
                 pBuf->ptr()[ 0 ] = tokProgress;
                 memcpy( pBuf->ptr() + 1, 
                     &dwSize, sizeof( dwSize ) );
+                pRespBuf = pBuf;
             }
             else
             {

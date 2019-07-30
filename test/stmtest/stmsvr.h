@@ -104,6 +104,14 @@ class CMyStreamProxy :
         Sem_Init( &m_semSync, 0, 0 );
     }
 
+    gint32 OnFCLifted( HANDLE hChannel )
+    { return Sem_Post( &m_semSync ); }
+
+    gint32 WaitForWriteAllowed()
+    {
+        return Sem_Wait( &m_semSync );
+    }
+
     // mandatory, otherwise, the proxy map for this
     // interface may not be initialized
     gint32 InitUserFuncs()

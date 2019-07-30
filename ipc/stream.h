@@ -133,10 +133,9 @@ struct IStream
     { return 0; }
 
     // flow control
-    gint32 OnFCLifted( HANDLE hChannel )
-    { return 0; }
+    virtual gint32 OnFCLifted( HANDLE hChannel ) = 0;
 
-    gint32 OnFlowControl( HANDLE hChannel )
+    virtual gint32 OnFlowControl( HANDLE hChannel )
     { return 0; }
 
     // callback from the watch task when a fatal error
@@ -205,6 +204,7 @@ class CStreamProxy :
     using IStream::OnUxStreamEvent;
     using IStream::OnStmRecv;
     using IStream::OnChannelError;
+    using IStream::OnFCLifted;
 
     CStreamProxy( const IConfigDb* pCfg )
         :super( pCfg )
@@ -222,6 +222,9 @@ class CStreamProxy :
         END_IFPROXY_MAP;
         return 0;
     }
+
+    gint32 OnFCLifted( HANDLE hChannel )
+    { return 0; }
 
     virtual gint32 OnPreStop( IEventSink* pCallback )
     {
@@ -271,6 +274,7 @@ class CStreamServer :
     using IStream::OnUxStreamEvent;
     using IStream::OnStmRecv;
     using IStream::CanSend;
+    using IStream::OnFCLifted;
 
     CStreamServer( const IConfigDb* pCfg )
         :super( pCfg )
@@ -287,6 +291,9 @@ class CStreamServer :
         END_IFHANDLER_MAP;
         return 0;
     }
+
+    gint32 OnFCLifted( HANDLE hChannel )
+    { return 0; }
 
     virtual gint32 OnPreStop( IEventSink* pCallback )
     {

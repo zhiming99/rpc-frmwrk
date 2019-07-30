@@ -359,6 +359,9 @@ gint32 CStreamProxyRelay::OnFetchDataComplete(
 
         if( ERROR( ret ) )
             break;
+
+        ( *pStartTask )( 0 );
+        ret = this->AddSeqTask( pStartTask );
         
     }while( 0 );
 

@@ -653,7 +653,6 @@ gint32 CIfUxListeningTask::OnIrpComplete( IRP* pIrp )
 
         pIf->RunManagedTask( pTask );
 
-
     }while( 0 );
 
     return ret;
