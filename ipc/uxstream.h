@@ -1142,9 +1142,15 @@ class CUnixSockStream:
 
             ret = m_oFlowCtrl.IncTxBytes( pBuf );
             if( ret == fcsFlowCtrl )
-                ret = ERROR_QUEUE_FULL;
-            else
-                ret = 0;
+            {
+                BufPtr pEmptyBuf( true );
+                ret = PostUxStreamEvent(
+                    tokFlowCtrl, pEmptyBuf );
+                if( ERROR( ret ) )
+                    break;
+            }
+
+            ret = 0;
 
         }while( 0 );
 

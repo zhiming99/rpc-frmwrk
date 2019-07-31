@@ -205,7 +205,7 @@ void CIfSmokeTest::testCliStartStop()
         *pBuf = std::string( "Server, are you ok?" );
         guint32 dwCount = 0;
 
-        /*ret = pCli->StartStream( hChannel );
+        ret = pCli->StartStream( hChannel );
         CPPUNIT_ASSERT( SUCCEEDED( ret  ) );
 
         while( !pCli->CanSend( hChannel ) )
@@ -228,7 +228,7 @@ void CIfSmokeTest::testCliStartStop()
         CPPUNIT_ASSERT( SUCCEEDED( ret  ) || ret == STATUS_PENDING );
 
         ret = pCli->CancelChannel( hChannel );
-        CPPUNIT_ASSERT( SUCCEEDED( ret ) );*/
+        CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 
         printf( "Testing stream creation, \
             double-direction communication and active cancel\n" );
@@ -246,20 +246,18 @@ void CIfSmokeTest::testCliStartStop()
             std::string strMsg = DebugMsg( dwCount,
                 "a message to server" );
             *pBuf = strMsg;
-            printf( "%s\n", strMsg.c_str() );
             dwCount++;
             ret = pCli->WriteStream( hChannel, pBuf );
-            if( ret == STATUS_PENDING )
-            {
-                // sleep( 1 );
-                continue;
-            }
             if( SUCCEEDED( ret ) )
                 continue;
 
             if( ret == ERROR_QUEUE_FULL )
             {
-                pCli->WaitForWriteAllowed();
+                pCli->WaitForWriteAllowed( hChannel );
+
+                // rollback to resend
+                printf( "Resend the message...\n" );
+                dwCount--;
                 continue;
             }
             break;

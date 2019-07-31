@@ -75,8 +75,17 @@ gint32 CMyStreamServer::OnStmRecv(
     BufPtr pNewBuf( true );
     *pNewBuf = strMsg;
 
-    // send a reply, if there is an error, the stream
-    // channel will be closed
+    // Send a reply, if there is an error, the stream
+    // channel will be closed. The code is for demo
+    // only.
+    //
+    // The return code of ERROR_QUEUE_FULL should be
+    // handled correctly.  that is if this error is
+    // returned, you need to resend the data if
+    // necessary, when the flow control is lifted, as
+    // you can refer to stmcli.cpp and stmtest.cpp
+    // for detail.
+    // 
     WriteStream( hChannel, pNewBuf, nullptr );
     return 0;
 }

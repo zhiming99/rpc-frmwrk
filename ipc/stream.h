@@ -205,6 +205,7 @@ class CStreamProxy :
     using IStream::OnStmRecv;
     using IStream::OnChannelError;
     using IStream::OnFCLifted;
+    using IStream::OnClose;
 
     CStreamProxy( const IConfigDb* pCfg )
         :super( pCfg )
@@ -259,6 +260,14 @@ class CStreamProxy :
             hChannel, byToken, pBuf );
     }
 
+    virtual gint32 OnClose(
+        HANDLE hChannel,
+        IEventSink* pCallback = nullptr )
+    {
+        return IStream::OnClose(
+            hChannel, pCallback );
+    }
+
 };
 
 class CStreamServer :
@@ -275,6 +284,7 @@ class CStreamServer :
     using IStream::OnStmRecv;
     using IStream::CanSend;
     using IStream::OnFCLifted;
+    using IStream::OnClose;
 
     CStreamServer( const IConfigDb* pCfg )
         :super( pCfg )
@@ -324,6 +334,14 @@ class CStreamServer :
     {
         return IStream::OnUxStreamEvent(
             hChannel, byToken, pBuf );
+    }
+
+    virtual gint32 OnClose(
+        HANDLE hChannel,
+        IEventSink* pCallback = nullptr )
+    {
+        return IStream::OnClose(
+            hChannel, pCallback );
     }
 };
 

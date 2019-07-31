@@ -96,6 +96,7 @@ class CMyStreamProxy :
     public CStreamProxy
 {
     sem_t m_semSync;
+
     public:
     typedef CStreamProxy super;
     CMyStreamProxy( const IConfigDb* pCfg ) :
@@ -107,9 +108,18 @@ class CMyStreamProxy :
     gint32 OnFCLifted( HANDLE hChannel )
     { return Sem_Post( &m_semSync ); }
 
-    gint32 WaitForWriteAllowed()
+    // Note: Just for demo purpose. There should be a
+    // map for binding of channel and semaphore
+    gint32 WaitForWriteAllowed( HANDLE hChannel )
+    { return Sem_Wait( &m_semSync ); }
+
+    gint32 OnClose( HANDLE hChannel )
     {
-        return Sem_Wait( &m_semSync );
+        gint32 ret = super::OnClose( hChannel );
+        // in case the client is still waiting for flow
+        // control to lift
+        Sem_Post( &m_semSync );
+        return ret;
     }
 
     // mandatory, otherwise, the proxy map for this
