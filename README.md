@@ -23,6 +23,9 @@ This framework depends on the following packags:
 11. `Streaming support to provide double-direction stream transfer`
 
 ---
+[`Fri 02 Aug 2019 01:25:29 PM Beijing`]   
+1. Start debugging the remote streaming now. Impressed by the streaming performance, and thinking if it is possible to route the RPC traffic via a streaming channel...   
+
 [`Sat 27 Jul 2019 09:36:00 PM Beijing`]   
 1. Made the local streaming work now. There remains some performance issue to solve. And afterwards to move on to the streaming over the router. It should last longer than local streaming.   
 
