@@ -1181,6 +1181,15 @@ class CInterfaceServer :
 
     // invoke a method on subclass via the method
     // name
+    virtual gint32 DoInvoke_SendData(
+        DBusMessage* pReqMsg,
+        IEventSink* pCallback,
+        CParamList& oResp );
+
+    virtual gint32 ValidateRequest_SendData(
+        DBusMessage* pReqMsg,
+        IConfigDb* pDataDesc );
+
     virtual gint32 DoInvoke(
         DBusMessage* pReqMsg,
         IEventSink* pCallback = nullptr );

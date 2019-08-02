@@ -1200,7 +1200,7 @@ gint32 CRpcTcpBridgeProxy::SendFetch_TcpProxy(
         if( ERROR( ret ) )
             break;
 
-        ret = GetIoMgr()->RescheduleTask( pTask );
+        ret = RunManagedTask( pTask );
 
         if( ERROR( ret ) )
             break;
@@ -2344,7 +2344,8 @@ gint32 CRpcInterfaceServer::SendFetch_Server(
         if( ERROR( ret ) )
             break;
 
-        if( iid != iid( CFileTransferServer ) )
+        if( iid != iid( CFileTransferServer ) &&
+            iid != iid( IStream ) )
         {
             ret = -ENOTSUP;
             break;
@@ -2418,6 +2419,57 @@ gint32 CRpcInterfaceServer::SendFetch_Server(
 
     // the return value indicates if the response
     // message is generated or not.
+    return ret;
+}
+
+gint32 CRpcInterfaceServer::ValidateRequest_SendData(
+    DBusMessage* pReqMsg,
+    IConfigDb* pDataDesc )
+{
+    gint32 ret = 0;
+
+    if( pDataDesc == nullptr ||
+        pReqMsg == nullptr )
+        return -EINVAL;
+
+    do{
+        EnumClsid iidClient = clsid( Invalid );
+
+        CCfgOpener oDataDesc(
+            ( IConfigDb* )pDataDesc );
+
+        ret = oDataDesc.GetIntProp(
+            propIid, ( guint32& )iidClient );
+
+        if( ERROR( ret ) )
+            break;
+
+        if( iidClient != iid( IStream ) &&
+            iidClient != iid( CFileTransferServer ) )
+        {
+            ret = -EBADMSG;
+            break;
+        }
+
+        DMsgPtr pMsg( pReqMsg );
+        string strMethod = pMsg.GetMember();
+        if( strMethod.empty() )
+        {
+            ret = -EBADMSG;
+            break;
+        }
+
+        // uncomment this if it is supported
+        // in the future
+        if( iidClient == iid( IStream ) &&
+            strMethod == SYS_METHOD_SENDDATA )
+        {
+            ret = -EBADMSG;
+            break;
+        }
+
+    }while( 0 );
+
     return ret;
 }
 

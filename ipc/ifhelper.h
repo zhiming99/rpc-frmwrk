@@ -1417,6 +1417,14 @@ class CIfDeferredHandler :
     gint32 UpdateParamAt( guint32 i, BufPtr pBuf );
     gint32 OnTaskComplete( gint32 iRet );
     gint32 OnComplete( gint32 iRetVal );
+
+    gint32 OnCancel( guint32 dwContext )
+    {
+        gint32 ret = super::OnCancel( dwContext );
+        if( m_iTaskState == stateStarting )
+            m_pDeferCall.Clear();
+        return ret;
+    }
 };
 
 template < typename C, typename ... Types, typename ...Args>

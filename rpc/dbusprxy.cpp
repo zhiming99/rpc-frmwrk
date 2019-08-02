@@ -1920,6 +1920,15 @@ gint32 CDBusProxyPdo::HandleRmtRegMatch(
         oParams.CopyProp(
             propSrcDBusName, this );
 
+        CCfgOpener oCallOptions;
+        guint32 dwCallFlags = ( CF_WITH_REPLY |
+            DBUS_MESSAGE_TYPE_METHOD_CALL );
+
+        oCallOptions[ propCallFlags ] = dwCallFlags;
+
+        oParams.SetObjPtr( propCallOptions,
+            ObjPtr( oCallOptions.GetCfg() ) );
+
         // ip addr
         oParams.CopyProp(
             propIpAddr, this );

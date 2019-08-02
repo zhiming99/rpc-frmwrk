@@ -322,6 +322,10 @@ class CRpcInterfaceServer :
         guint32& dwSize,                // [in,out]
         IEventSink* pCallback );
 
+    gint32 ValidateRequest_SendData(
+        DBusMessage* pReqMsg,
+        IConfigDb* pDataDesc );
+
     public:
 
     typedef CAggInterfaceServer super;

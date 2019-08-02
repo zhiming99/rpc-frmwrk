@@ -467,9 +467,14 @@ gint32 CStreamProxyRelay::OnOpenStreamComplete(
             &CStreamProxyRelay::OnFetchDataComplete,
             pCallback, oContext.GetCfg() );
 
+        if( ERROR( ret ) )
+            break;
+
+        ( *pWrapper )( eventZero );
+
         guint32 dwSize = 0x20;
         guint32 dwOffset = 0;
-        ret = pProxy->super::FetchData_Proxy(
+        ret = pProxy->CRpcTcpBridgeProxy::FetchData_Proxy(
             pDataDesc, iStmId, dwOffset, dwSize,
             pWrapper );
         
@@ -523,9 +528,6 @@ gint32 CStreamProxyRelay::FetchData_Proxy(
         pCallback == nullptr )
         return -EINVAL;
 
-    if( fd <= 0 )
-        return -EINVAL;
-
     gint32 ret = 0;
     CParamList oContext;
 
@@ -537,7 +539,6 @@ gint32 CStreamProxyRelay::FetchData_Proxy(
             break;
         }
 
-        // save the stream id for use later
         gint32 iStmId = -1;
         oContext.Push( ObjPtr( pDataDesc ) );
 
@@ -549,6 +550,8 @@ gint32 CStreamProxyRelay::FetchData_Proxy(
 
         if( ERROR( ret ) )
             break;
+
+        ( *pWrapper )( eventZero );
 
         ret = pProxy->OpenStream(
             protoStream, iStmId, pWrapper );

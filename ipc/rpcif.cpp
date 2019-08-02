@@ -5270,19 +5270,123 @@ gint32 CInterfaceServer::SetResponse(
     return ret;
 }
 
-gint32 CInterfaceServer::DoInvoke(
+gint32 CInterfaceServer::ValidateRequest_SendData(
+    DBusMessage* pReqMsg, IConfigDb* pDataDesc )
+{
+    gint32 ret = 0;
+
+    if( pDataDesc == nullptr ||
+        pReqMsg == nullptr )
+        return -EINVAL;
+
+    do{
+        EnumClsid iid = clsid( Invalid );
+        EnumClsid iidClient = clsid( Invalid );
+
+        CCfgOpener oDataDesc(
+            ( IConfigDb* )pDataDesc );
+
+        ret = oDataDesc.GetIntProp(
+            propIid, ( guint32& )iidClient );
+
+        if( ERROR( ret ) )
+            break;
+
+        // we need filter further to confirm
+        // the SENDDATA is bound to the correct
+        // interface
+        if( m_pFtsMatch.IsEmpty() &&
+            m_pStmMatch.IsEmpty() )
+        {
+            // the interface is not up
+            ret = -EBADMSG;
+            break;
+        }
+
+        if( !m_pFtsMatch.IsEmpty() )
+        {
+            ret = m_pFtsMatch->
+                IsMyMsgIncoming( pReqMsg );
+
+            if( SUCCEEDED( ret ) )
+            {
+                CCfgOpenerObj oMatchCfg(
+                    ( CObjBase* )m_pFtsMatch );
+
+                oMatchCfg.GetIntProp(
+                    propIid, ( guint32& )iid );
+
+                if( iid != iidClient )
+                {
+                    ret = -EBADMSG;
+                    break;
+                }
+            }
+        }
+
+        gint32 ret2 = STATUS_SUCCESS;
+
+        if( !m_pStmMatch.IsEmpty() )
+        {
+            ret2 = m_pStmMatch->
+                IsMyMsgIncoming( pReqMsg );
+
+            if( SUCCEEDED( ret2 ) )
+            {
+                CCfgOpenerObj oMatchCfg(
+                    ( CObjBase* )m_pStmMatch );
+
+                oMatchCfg.GetIntProp(
+                    propIid, ( guint32& )iid );
+
+                if( iid != iidClient )
+                {
+                    ret = -EBADMSG;
+                    break;
+                }
+            }
+        }
+
+        if( ERROR( ret  ) && ERROR( ret2 ) )
+        {
+            ret = -EBADMSG;
+            break;
+        }
+
+        DMsgPtr pMsg( pReqMsg );
+        string strMethod = pMsg.GetMember();
+        if( strMethod.empty() )
+        {
+            ret = -EBADMSG;
+            break;
+        }
+
+        // uncomment this if it is supported
+        // in the future
+        if( iidClient == iid( IStream ) &&
+            strMethod == SYS_METHOD_SENDDATA )
+        {
+            ret = -EBADMSG;
+            break;
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CInterfaceServer::DoInvoke_SendData(
     DBusMessage* pReqMsg,
-    IEventSink* pCallback )
+    IEventSink* pCallback,
+    CParamList& oResp )
 {
     gint32 ret = 0;
     bool bCloseFile = false;
     gint32 iFd2Close = -1;
 
     do{
-        bool bResp = true;
         CCfgOpenerObj oCfg( this );
         DMsgPtr pMsg( pReqMsg );
-        CParamList oResp;
 
         string strMethod = pMsg.GetMember();
         if( strMethod.empty() )
@@ -5299,74 +5403,19 @@ gint32 CInterfaceServer::DoInvoke(
             break;
 
         CfgPtr pDataDesc( true );
-        EnumClsid iid = clsid( Invalid );
+
+        ret = pDataDesc->Deserialize(
+            *( CBuffer* )vecArgs[ 0 ].second );
+
+        if( ERROR( ret ) )
+            break;
+
         do{
-            if( strMethod == SYS_METHOD_SENDDATA ||
-                strMethod == SYS_METHOD_FETCHDATA )
-            {
-                // we need further filter to confirm
-                // the SENDDATA is sent to the correct
-                // interface
-                if( m_pFtsMatch.IsEmpty() &&
-                    m_pStmMatch.IsEmpty() )
-                {
-                    // the interface is not up
-                    ret = -EBADMSG;
-                    break;
-                }
+            ret = ValidateRequest_SendData(
+                pReqMsg, pDataDesc );
 
-                if( !m_pFtsMatch.IsEmpty() )
-                {
-                    ret = m_pFtsMatch->
-                        IsMyMsgIncoming( pReqMsg );
-
-                    if( SUCCEEDED( ret ) )
-                    {
-                        CCfgOpenerObj oMatchCfg(
-                            ( CObjBase* )m_pFtsMatch );
-
-                        oMatchCfg.GetIntProp(
-                            propIid, ( guint32& )iid );
-                    }
-                }
-
-                gint32 ret2 = STATUS_SUCCESS;
-
-                if( !m_pStmMatch.IsEmpty() )
-                {
-                    ret2 = m_pStmMatch->
-                        IsMyMsgIncoming( pReqMsg );
-
-                    if( SUCCEEDED( ret2 ) )
-                    {
-                        CCfgOpenerObj oMatchCfg(
-                            ( CObjBase* )m_pStmMatch );
-
-                        oMatchCfg.GetIntProp(
-                            propIid, ( guint32& )iid );
-                    }
-                }
-
-                if( ERROR( ret  ) && ERROR( ret2 ) )
-                {
-                    ret = -EBADMSG;
-                    break;
-                }
-
-                // uncomment this if it is supported
-                // in the future
-                if( iid == iid( IStream ) &&
-                    strMethod == SYS_METHOD_SENDDATA )
-                {
-                    ret = -ENOTSUP;
-                    break;
-                }
-            }
-            else
-            {
-                ret = -ENOTSUP;
+            if( ERROR( ret ) )
                 break;
-            }
 
             if( strMethod == SYS_METHOD_SENDDATA )
             {
@@ -5379,12 +5428,6 @@ gint32 CInterfaceServer::DoInvoke(
                     ret = -EBADMSG;
                     break;
                 }
-
-                ret = pDataDesc->Deserialize(
-                    *( CBuffer* )vecArgs[ 0 ].second );
-
-                if( ERROR( ret ) )
-                    break;
 
                 int fd =
                     ( gint32& )*vecArgs[ 1 ].second;
@@ -5427,6 +5470,12 @@ gint32 CInterfaceServer::DoInvoke(
                     SetResponse( pCallback,
                         oResp.GetCfg() );
                 }
+
+                if( fd > 0 )
+                {
+                    close( fd );
+                    fd = -1;
+                }
                 break;
             }
             else if( strMethod == SYS_METHOD_FETCHDATA )
@@ -5441,12 +5490,6 @@ gint32 CInterfaceServer::DoInvoke(
                     break;
                 }
 
-                ret = pDataDesc->Deserialize(
-                    *( CBuffer* )vecArgs[ 0 ].second );
-
-                if( ERROR( ret ) )
-                    break;
-
                 if( pDataDesc->exist( propCallOptions ) )
                 {
                     CfgPtr pCallOpt( true );
@@ -5460,11 +5503,6 @@ gint32 CInterfaceServer::DoInvoke(
 
                 int fd =
                     ( guint32& )*vecArgs[ 1 ].second;
-
-                // uncomment this if it become
-                // necessary some day
-                if( iid != iid( IStream ) )
-                    fd = -1;
 
                 guint32 dwOffset =
                     ( guint32& )*vecArgs[ 2 ].second;
@@ -5525,6 +5563,43 @@ gint32 CInterfaceServer::DoInvoke(
             }
 
         }while( 0 );
+
+    }while( 0 );
+
+    return ret;
+}
+
+
+gint32 CInterfaceServer::DoInvoke(
+    DBusMessage* pReqMsg,
+    IEventSink* pCallback )
+{
+    gint32 ret = 0;
+
+    do{
+        bool bResp = true;
+        DMsgPtr pMsg( pReqMsg );
+        CParamList oResp;
+
+        string strMethod = pMsg.GetMember();
+        if( strMethod.empty() )
+        {
+            ret = -EBADMSG;
+            break;
+        }
+
+        string strSender = pMsg.GetSender();
+
+        if( strMethod == SYS_METHOD_SENDDATA ||
+            strMethod == SYS_METHOD_FETCHDATA )
+        {
+            ret = DoInvoke_SendData(
+                pReqMsg, pCallback, oResp );
+        }
+        else
+        {
+            ret = -ENOTSUP;
+        }
 
         if( ret == -ENOTSUP )
         {
@@ -5589,8 +5664,6 @@ gint32 CInterfaceServer::DoInvoke(
 
     }while( 0 );
 
-    if( bCloseFile )
-        close( iFd2Close );
 
     return ret;
 }

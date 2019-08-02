@@ -1633,12 +1633,12 @@ gint32 CReqFwdrEnableRmtEventTask::RunTask()
 
         bool bEnable = false;
 
-        oParams.GetBoolProp( 1, bEnable );
+        ret = oParams.GetBoolProp( 1, bEnable );
         if( ERROR( ret ) )
             break;
 
         IMessageMatch* pMatch = nullptr;
-        oParams.GetPointer( 0, pMatch );
+        ret = oParams.GetPointer( 0, pMatch );
         if( ERROR( ret ) )
             break;
 
@@ -4065,15 +4065,15 @@ gint32 CReqFwdrFetchDataTask::OnServiceComplete(
 
         TaskletPtr pCallerTask;
         ret = GetCallerTask( pCallerTask );
-        if( ERROR( ret ) )
-            break;
+        if( SUCCEEDED( ret ) )
+        {
+            // get the response
+            CCfgOpenerObj oCallerCfg(
+                ( CObjBase* )pCallerTask );
 
-        // get the response
-        CCfgOpenerObj oCallerCfg(
-            ( CObjBase* )pCallerTask );
-
-        ret = oCallerCfg.GetObjPtr(
-            propRespPtr, pObj );
+            ret = oCallerCfg.GetObjPtr(
+                propRespPtr, pObj );
+        }
 
         if( ERROR( ret ) )
         {
@@ -4085,11 +4085,8 @@ gint32 CReqFwdrFetchDataTask::OnServiceComplete(
             oResp.SetIntProp(
                 propReturnValue, iRetVal );
 
-            oCfg.SetObjPtr( propRespPtr,
-                oResp.GetCfg() );
-
             ret = pReqFwdr->OnServiceComplete( 
-                oCfg.GetCfg(), pTask );
+                oResp.GetCfg(), pTask );
         }
         else
         {
@@ -4097,7 +4094,9 @@ gint32 CReqFwdrFetchDataTask::OnServiceComplete(
             ret = pReqFwdr->OnServiceComplete( 
                 pObj, pTask );
         }
+
         oCfg.RemoveProperty( propRespPtr );
+        ClearClientNotify();
 
     }while( 0 );
 

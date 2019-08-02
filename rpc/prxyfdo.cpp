@@ -87,8 +87,9 @@ gint32 CDBusProxyFdo::BuildSendDataMsg(
 
         pMsg.SetInterface( strIfName );
 
-        string strDest =
-            DBUS_DESTINATION( MODNAME_RPCROUTER );
+        string strDest = DBUS_DESTINATION2(
+                MODNAME_RPCROUTER,
+                OBJNAME_REQFWDR );
 
         pMsg.SetDestination( strDest );
 
@@ -139,6 +140,7 @@ gint32 CDBusProxyFdo::HandleSendData( IRP* pIrp )
         pNextIrpCtx->SetMajorCmd( IRP_MJ_FUNC );
         pNextIrpCtx->SetMinorCmd( IRP_MN_IOCTL );
         pNextIrpCtx->SetCtrlCode( dwCtrlCode );
+        pNextIrpCtx->SetIoDirection( IRP_DIR_INOUT );
         pPdoPort->AllocIrpCtxExt( pNextIrpCtx );
 
         BufPtr pBuf( true );
