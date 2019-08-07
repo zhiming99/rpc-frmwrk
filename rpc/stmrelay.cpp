@@ -435,12 +435,22 @@ gint32 CStreamProxyRelay::OnOpenStreamComplete(
             break;
 
         CCfgOpener oResp( pResp );
-        ret = oResp[ propReturnValue ];
+        ret = oResp.GetIntProp(
+            propReturnValue, ( guint32& )ret );
         if( ERROR( ret ) )
             break;
 
-        iStmId = oResp[ 0 ];
-        guint32 dwProtocol = oResp[ 1 ];
+        ret = oResp.GetIntProp(
+            0, ( guint32& )iStmId );
+        if( ERROR( ret ) )
+            break;
+
+        guint32 dwProtocol;
+        ret = oResp.GetIntProp(
+            1, dwProtocol );
+        if( ERROR( ret ) )
+            break;
+
         if( dwProtocol != protoStream )
         {
             ret = -EPROTO;
@@ -474,7 +484,7 @@ gint32 CStreamProxyRelay::OnOpenStreamComplete(
 
         guint32 dwSize = 0x20;
         guint32 dwOffset = 0;
-        ret = pProxy->CRpcTcpBridgeProxy::FetchData_Proxy(
+        ret = pProxy->super::FetchData_Proxy(
             pDataDesc, iStmId, dwOffset, dwSize,
             pWrapper );
         

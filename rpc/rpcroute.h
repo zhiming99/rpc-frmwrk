@@ -784,10 +784,6 @@ struct CRpcTcpBridgeShared
         MatchPtr& pMatch,
         bool bReg );
 
-    gint32 OnPostStart(
-        IEventSink* pContext,
-        MatchPtr& pMatch );
-
     protected:
     CRpcServices* m_pParentIf;
 
@@ -802,6 +798,11 @@ struct CRpcTcpBridgeShared
         IRP* pIrp,
         IConfigDb* pReqCall,
         IEventSink* pCallback );
+
+    gint32 OnPostStartShared(
+        IEventSink* pContext,
+        MatchPtr& pMatch );
+
 };
 
 class CRpcTcpBridge :
@@ -860,12 +861,12 @@ class CRpcTcpBridge :
         IConfigDb* pReqCall,
         IEventSink* pCallback );
 
-    using CRpcTcpBridgeShared::OnPostStart;
-
-    gint32 OnPostStart(
-        IEventSink* pContext );
 
     public:
+
+    virtual gint32 OnPostStart(
+        IEventSink* pContext );
+
     typedef CRpcInterfaceServer super;
     CRpcTcpBridge( const IConfigDb* pCfg );
     ~CRpcTcpBridge();
@@ -1167,9 +1168,7 @@ class CRpcTcpBridgeProxy :
         guint32 dwProgress,
         guint64 iTaskId );
 
-    using CRpcTcpBridgeShared::OnPostStart;
-
-    gint32 OnPostStart(
+    virtual gint32 OnPostStart(
         IEventSink* pContext );
 
 };

@@ -1019,6 +1019,11 @@ gint32 CRpcTcpBridgeProxy::OpenStream_Proxy(
         oBuilder.SetMethodName(
             BRIDGE_METHOD_OPENSTM );
 
+        string strIfName = DBUS_IF_NAME(
+            IFNAME_TCP_BRIDGE );
+
+        oBuilder.SetIfName( strIfName );
+
         oBuilder.SetIntProp(
             propStreamId, TCP_CONN_DEFAULT_CMD );
 
@@ -1096,6 +1101,11 @@ gint32 CRpcTcpBridgeProxy::CloseStream_Proxy(
 
         oBuilder.SetMethodName(
             BRIDGE_METHOD_CLOSESTM );
+
+        string strIfName = DBUS_IF_NAME(
+            IFNAME_TCP_BRIDGE );
+
+        oBuilder.SetIfName( strIfName );
 
         oBuilder.Push( ( guint32 )iStreamId );
 
@@ -1324,7 +1334,8 @@ gint32 CRpcTcpBridge::OnPostStart(
             break;
         }
 
-        OnPostStart( pContext, pMatch );
+        OnPostStartShared(
+            pContext, pMatch );
 
     }while( 0 );
 
@@ -1362,14 +1373,15 @@ gint32 CRpcTcpBridgeProxy::OnPostStart(
             break;
         }
 
-        OnPostStart( pContext, pMatch );
+        OnPostStartShared(
+            pContext, pMatch );
 
     }while( 0 );
 
     return ret;
 }
 
-gint32 CRpcTcpBridgeShared::OnPostStart(
+gint32 CRpcTcpBridgeShared::OnPostStartShared(
     IEventSink* pContext, MatchPtr& pMatch )
 {
     // add to listen on the command stream
@@ -3774,9 +3786,9 @@ gint32 CRpcTcpBridgeShared::SetupReqIrpListeningShared(
 
         CReqBuilder oReq( pReqCall );
 
-        oReq.Push( dwStreamId );
+        oReq.SetIntProp( propStreamId, dwStreamId );
         oReq.CopyProp( propMatchPtr, pCallback );
-        oReq.SetBoolProp( propSubmitPdo, bPdo );
+        oCbCfg.SetBoolProp( propSubmitPdo, bPdo );
 
         oReq.SetCallFlags( CF_WITH_REPLY |
             CF_NON_DBUS | CF_ASYNC_CALL |
@@ -3836,7 +3848,9 @@ gint32 CRpcTcpBridgeShared::RegMatchCtrlStream(
         // a local request, no need of CReqBuilder
         CReqBuilder oParams;
 
-        ret = oParams.Push( iStreamId );
+        ret = oParams.SetIntProp(
+            propStreamId, iStreamId );
+
         oParams[ propMatchPtr ] = ObjPtr( pMatch );
         oParams.SetCallFlags( CF_WITH_REPLY
            | DBUS_MESSAGE_TYPE_METHOD_CALL 

@@ -49,6 +49,7 @@ class CStreamRelayBase :
 
     typedef T super;
     using IStream::OnClose;
+
     CStreamRelayBase( const IConfigDb* pCfg )
         : super::_MyVirtBase( pCfg ), super( pCfg )
     {}
@@ -419,6 +420,9 @@ class CStreamServerRelay :
 
     CRpcRouter* GetParent() const;
 
+    virtual gint32 InitUserFuncs()
+    { return super::InitUserFuncs(); }
+
     virtual gint32 OpenChannel(
         IConfigDb* pDataDesc,
         int& fd, HANDLE& hChannel,
@@ -456,6 +460,9 @@ class CStreamProxyRelay :
     CRpcRouter* GetParent() const;
     const EnumClsid GetIid() const
     { return iid( IStream ); }
+
+    virtual gint32 InitUserFuncs()
+    { return super::InitUserFuncs(); }
 
     virtual gint32 OpenChannel(
         IConfigDb* pDataDesc,

@@ -2255,6 +2255,10 @@ gint32 CRpcServices::OnPreStart(
     return RebuildMatches();
 }
 
+gint32 CRpcServices::OnPostStart(
+    IEventSink* pCallback )
+{ return 0; }
+
 gint32 CRpcServices::OnPostStop(
     IEventSink* pCallback )
 {

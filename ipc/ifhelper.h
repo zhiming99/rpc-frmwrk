@@ -2685,7 +2685,7 @@ struct CAggregatedObject
     {
     }
 
-    ITERATE_IF_VIRT_METHODS_IMPL_NOARG( InitUserFuncs, gint32 )
+    /*ITERATE_IF_VIRT_METHODS_IMPL_NOARG( InitUserFuncs, gint32 )
 
     ITERATE_IF_VIRT_METHODS_IMPL( OnPreStart, gint32,
         VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
@@ -2700,7 +2700,7 @@ struct CAggregatedObject
         VA_LIST( IEventSink* pTaskGrp ), VA_LIST( pTaskGrp ) )
 
     ITERATE_IF_VIRT_METHODS_IMPL( OnPreStop, gint32,
-        VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
+        VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )*/
 
 };
 

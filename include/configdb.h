@@ -1297,11 +1297,17 @@ class CParamList : public CCfgOpener
 
         do{
             guint32 dwSize = 0;
-            ret =  GetIntProp( propParamCount, dwSize );
+            ret = oCfg.GetIntProp(
+                propParamCount, dwSize );
 
             if( ERROR( ret ) )
                 break;
 
+            if( dwSize > 1024 * 16 )
+            {
+                ret = -ERANGE;
+                break;
+            }
             for( guint32 i = 0; i < dwSize; ++i )
             {
                 ret = CopyProp( i, pCfg );

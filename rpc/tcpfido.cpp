@@ -1084,8 +1084,8 @@ gint32 CRpcTcpFido::BuildSendDataMsg(
 
         pMsg.SetInterface( strIfName );
 
-        string strDest =
-            DBUS_DESTINATION( MODNAME_RPCROUTER );
+        string strDest = DBUS_DESTINATION2( 
+            MODNAME_RPCROUTER, OBJNAME_TCP_BRIDGE );
 
         pMsg.SetDestination( strDest );
 

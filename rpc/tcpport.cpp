@@ -1587,9 +1587,10 @@ gint32 CStmSockCompleteIrpsTask::operator()(
 {
     gint32 ret = 0;
     do{
-        CParamList oCfg( ( IConfigDb* )m_pCtx );
-        ObjPtr pObj;
+        CParamList oCfg(
+            ( IConfigDb* )GetConfig() );
 
+        ObjPtr pObj;
         ret = oCfg.GetObjPtr( 0, pObj );
         if( ERROR( ret ) )
             break;
@@ -1610,41 +1611,7 @@ gint32 CStmSockCompleteIrpsTask::operator()(
             vecIrpsToComplete = ( *pIrpVec )();
 
         for( auto&& oPair : vecIrpsToComplete )
-        {
-            IrpPtr pIrp = oPair.second;
-            gint32 iRet = oPair.first;
-
-            if( true )
-            {
-                CStdRMutex oIrpLock(
-                    pIrp->GetLock() );
-
-                if( pIrp->GetState()
-                    != IRP_STATE_READY )
-                    continue;
-
-                IrpCtxPtr& pCtx = pIrp->GetTopStack();
-                pCtx->SetStatus( iRet );
-                EnumIoctlStat iState = reqStatDone;
-                if( SUCCEEDED( iRet ) ) 
-                {
-                    // set the ioctrl irp to the
-                    // proper state
-                    if( pCtx->GetIoDirection() ==
-                        IRP_DIR_INOUT )
-                    {
-                        iState = reqStatOut;
-                    }
-                }
-
-                CTcpStreamPdo::SetIoctlReqState(
-                    pIrp, iState );
-            }
-            // Note: if the irp is still in the
-            // SubmitIrp context, this completion
-            // will fail
-            iRet = pMgr->CompleteIrp( oPair.second );
-        }
+            pMgr->CompleteIrp( oPair.second );
 
     }while( 0 );
 
@@ -1706,9 +1673,8 @@ gint32 CRpcStreamSock::StartSend( IRP* pIrpLocked )
 {
     gint32 ret = 0;
     gint32 retLocked = STATUS_PENDING;
-    
-    IrpVec2Ptr pIrpVec( true );
 
+    IrpVec2Ptr pIrpVec( true );
     vector< CStlIrpVector2::ElemType >&
         vecIrpComplete = ( *pIrpVec )();
 
@@ -1800,7 +1766,7 @@ gint32 CRpcStreamSock::StartSend( IRP* pIrpLocked )
 
     if( pIrpLocked == nullptr )
     {
-        // the context is an io event from main
+        // the caller is io event handler from main
         // loop
         if( !vecIrpComplete.empty() )
         {
@@ -1810,8 +1776,7 @@ gint32 CRpcStreamSock::StartSend( IRP* pIrpLocked )
     }
     else
     {
-        // the context is a synchronous call to
-        // SubmitIrp
+        // this is an io request from SubmitIrp
         if( !vecIrpComplete.empty() )
         {
             ret = ScheduleCompleteIrpTask(
@@ -1951,11 +1916,11 @@ gint32 CRpcStreamSock::HandleIoctlIrp(
     //
     // properties from irp's m_pReqData
     //
-    // 0:  the stream id via which the command is
-    // sent
+    // 0:               the stream id to open/close
     //
-    // propStreamId:    For CloseStream, the stream id to close
-    //                  For OpenStream, ignored
+    // propStreamId:    For CloseStream and OpenStream, the stream
+    //                  id via which the command is sent
+    //
     //                  For OpenLocalStream, ignored
     //                  For CloseLocalStream, the stream to close 
     //
@@ -2320,6 +2285,16 @@ gint32 CRpcStreamSock::HandleIoctlIrp(
         case CTRLCODE_REG_MATCH:
         case CTRLCODE_UNREG_MATCH:
             {
+                StmPtr pStream;
+                ret = GetCtrlStmFromIrp(
+                    pIrp, pStream );
+
+                pCtrlStm = pStream;
+                if( pCtrlStm == nullptr )
+                {
+                    ret = -EFAULT;
+                    break;
+                }
                 ret = pCtrlStm->HandleIoctlIrp( pIrp );
                 break;
             }
@@ -2383,11 +2358,11 @@ gint32 CRpcStreamSock::QueueIrpForResp(
         CStdRMutex oSockLock( GetLock() );
 
         StmPtr pStm;
-        ret = GetStream(
-            TCP_CONN_DEFAULT_CMD, pStm );
+        ret = GetCtrlStmFromIrp( pIrp, pStm );
+        if( ERROR( ret ) )
+            break;
 
         CRpcControlStream* pCtrlStm = pStm;
-
         if( pCtrlStm == nullptr )
         {
             ret = -EFAULT;
@@ -2435,8 +2410,8 @@ gint32 CRpcStreamSock::GetCtrlStmFromIrp(
                     ( IConfigDb* )pCfg );
                
                 gint32 iStmId = 0;
-                ret = oCfg.GetIntProp(
-                    0, ( guint32& )iStmId );
+                ret = oCfg.GetIntProp( propStreamId,
+                    ( guint32& )iStmId );
 
                 if( ERROR( ret ) )
                     break;
@@ -2581,7 +2556,8 @@ gint32 CIncomingPacket::FillPacket(
 
 CRpcStream::CRpcStream(
     const IConfigDb* pCfg )
-    : m_atmSeqNo( 1 ),
+    : super(),
+    m_atmSeqNo( 1 ),
     m_dwAgeSec( 0 )
 {
     gint32 ret = 0;
@@ -2597,8 +2573,10 @@ CRpcStream::CRpcStream(
             break;
         }
         CCfgOpener oCfg( pCfg );
-        CIoManager* pMgr = nullptr;
-        ret = oCfg.GetPointer( propIoMgr, pMgr );
+
+        ret = oCfg.GetPointer(
+            propIoMgr, m_pMgr );
+
         if( ERROR( ret ) )
             break;
 
@@ -3252,7 +3230,6 @@ gint32 CRpcControlStream::HandleListening(
         deque< CfgPtr >::iterator itr =
             m_queBufToRecv2.begin();
 
-        ret = STATUS_PENDING;
         while( itr != m_queBufToRecv2.end() )
         {
             CfgPtr pCfg =
@@ -3279,6 +3256,12 @@ gint32 CRpcControlStream::HandleListening(
             m_queBufToRecv2.erase( itr );
             ret = 0;
             break;
+        }
+
+        if( itr == m_queBufToRecv2.end() )
+        {
+            ret = STATUS_PENDING;
+            pQueIrp->push_back( pIrp );
         }
 
     }while( 0 );
@@ -3522,8 +3505,8 @@ gint32 CRpcControlStream::QueueIrpForResp(
         return -EINVAL;
 
     IrpCtxPtr pCtx = pIrp->GetTopStack();
-    if( pCtx->GetMajorCmd() != IRP_MJ_FUNC
-        || pCtx->GetMinorCmd() != IRP_MN_IOCTL )
+    if( pCtx->GetMajorCmd() != IRP_MJ_FUNC ||
+        pCtx->GetMinorCmd() != IRP_MN_IOCTL )
         return -EINVAL;
 
     guint32 dwCtrlCode = pCtx->GetCtrlCode();
@@ -3564,8 +3547,48 @@ gint32 CRpcControlStream::QueueIrpForResp(
         if( ERROR( ret ) )
             break;
 
-        m_mapIrpsForResp[ dwSeqNo ] =
-            IrpPtr( pIrp );
+        bool bFound = false;
+        for( auto pCfg : m_queBufToRecv2 )
+        {
+            // it is possible the reply arrives ahead
+            // of this irp geting queued here
+            CReqOpener oCfg( ( IConfigDb* )pCfg );
+
+            guint32 dwType = 0;
+            ret = oCfg.GetReqType( dwType );
+            if( ERROR( ret ) )
+            {
+                ret = 0;
+                continue;
+            }
+
+            if( dwType != DBUS_MESSAGE_TYPE_METHOD_RETURN )
+                continue;
+
+            guint32 dwSeqNo = 0;
+            ret = oCfg.GetIntProp(
+                propSeqNo, dwSeqNo );
+
+            // discard the packet
+            if( ERROR( ret ) )
+            {
+                ret = 0;
+                continue;
+            }
+
+            bFound = true;
+            BufPtr pBuf( true );
+            *pBuf = ObjPtr( pCfg );
+            pCtx->SetRespData( pBuf );
+            pCtx->SetStatus( 0 );
+            break;
+        }
+
+        if( !bFound )
+        {
+            m_mapIrpsForResp[ dwSeqNo ] =
+                IrpPtr( pIrp );
+        }
 
     }while( 0 );
 
@@ -3585,7 +3608,8 @@ gint32 CRpcControlStream::GetReadIrpsToComp(
         m_pStmSock->GetLock() );
 
     if( m_queReadIrps.size() +
-        m_queReadIrpsEvt.size() == 0 ||
+        m_queReadIrpsEvt.size() +
+        m_mapIrpsForResp.size() == 0 ||
         m_queBufToRecv2.size() == 0 )
         return -ENOENT;
 

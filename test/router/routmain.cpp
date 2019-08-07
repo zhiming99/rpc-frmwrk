@@ -40,7 +40,6 @@ CPPUNIT_TEST_SUITE_REGISTRATION( CIfRouterTest );
 // router role: 1. reqfwdr, 2. bridge, 3. both
 guint32 g_dwRole = 1;
 
-
 void CIfRouterTest::setUp()
 {
     gint32 ret = 0;
@@ -60,13 +59,16 @@ void CIfRouterTest::setUp()
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 
         CIoManager* pSvc = m_pMgr;
+
         if( pSvc != nullptr )
+        {
+            pSvc->SetCmdLineOpt(
+                propRouterRole, g_dwRole );
+
             ret = pSvc->Start();
+        }
         else
             ret = -EFAULT;
-
-        pSvc->SetCmdLineOpt(
-            propRouterRole, g_dwRole );
 
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 

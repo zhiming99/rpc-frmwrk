@@ -674,6 +674,7 @@ gint32 CBuffer::SerializePrimeType( guint8* pDest ) const
     switch( GetExDataType() )
     {
     case typeNone:
+    case typeByteArr:
         {
             memcpy( pDest, ptr(), size() );
             break;

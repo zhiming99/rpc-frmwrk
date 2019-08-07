@@ -843,8 +843,7 @@ class CRpcServices :
         IEventSink* pCallback );
 
     virtual gint32 OnPostStart(
-        IEventSink* pCallback )
-    { return 0; }
+        IEventSink* pCallback );
 
     virtual gint32 FilterMessage(
         IEventSink* pTask,

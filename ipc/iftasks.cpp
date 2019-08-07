@@ -283,7 +283,7 @@ gint32 CIfStartRecvMsgTask::OnIrpComplete(
         else
         {
             CfgPtr pCfg;
-            ret = pCtx->GetReqAsCfg( pCfg );
+            ret = pCtx->GetRespAsCfg( pCfg );
             if( ERROR( ret ) )
                 break;
 
@@ -4345,6 +4345,8 @@ gint32 CIfInvokeMethodTask::RunTask()
 
             if( ERROR( ret ) )
                 bInvoke = false;
+
+            oCfg.CopyProp( propIfName, pReq );
 
             if( bInvoke )
             {

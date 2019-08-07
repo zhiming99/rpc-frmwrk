@@ -1049,7 +1049,9 @@ bool CTcpStreamPdo::IsImmediateReq(
         if( dwCtrlCode == CTRLCODE_CLOSE_STREAM_LOCAL_PDO ||
             dwCtrlCode == CTRLCODE_OPEN_STREAM_LOCAL_PDO ||
             dwCtrlCode == CTRLCODE_GET_RMT_STMID || 
-            dwCtrlCode == CTRLCODE_GET_LOCAL_STMID )
+            dwCtrlCode == CTRLCODE_GET_LOCAL_STMID ||
+            dwCtrlCode == CTRLCODE_REG_MATCH ||
+            dwCtrlCode == CTRLCODE_UNREG_MATCH )
             ret = true;
     }while( 0 );
 
@@ -1062,53 +1064,24 @@ gint32 CTcpStreamPdo::CheckAndSend(
     CRpcStreamSock* pSock = m_pStmSock;
     if( pSock == nullptr )
         return -EINVAL;
-
     do{
-        if( SUCCEEDED( ret ) )
-        {
-            // trigger a send operation to see if
-            // the irp's state got changed
-            ret = pSock->StartSend( pIrp );
-            if( ret == STATUS_PENDING )
-                break;
-
-            if( ERROR( ret ) )
-                break;
-        }
-
-        EnumIoctlStat iState = reqStatInvalid;
-        IrpCtxPtr& pCtx = pIrp->GetCurCtx();
-        ret = GetIoctlReqState( pIrp, iState );
         if( ERROR( ret ) )
-        {
-            ret = pCtx->GetStatus();
             break;
-        }
 
-        switch( iState ) 
-        {
-        case reqStatDone:
-            {
-                ret = pCtx->GetStatus();
-                break;
-            }
-        case reqStatIn:
-            {
-                ret = STATUS_PENDING;
-                break;
-            }
-        case reqStatOut:
-            {
-                pSock->QueueIrpForResp( pIrp );
-                ret = STATUS_PENDING;
-                break;
-            }
-        default:
-            {
-                ret = ERROR_STATE;
-                break;
-            }
-        }
+        ret = pSock->StartSend( pIrp );
+        if( ret == STATUS_PENDING )
+            break;
+
+        if( ERROR( ret ) )
+            break;
+
+        IrpCtxPtr& pCtx = pIrp->GetCurCtx();
+        if( pCtx->GetMajorCmd() == IRP_MJ_FUNC &&
+            pCtx->GetMinorCmd() == IRP_MN_WRITE )
+            break;
+
+        ret = CompleteIoctlIrp( pIrp );
+
     }while( 0 );
 
     if( ERROR( ret ) )
@@ -1144,7 +1117,14 @@ gint32 CTcpStreamPdo::SubmitIoctlCmd(
 
         ret = pSock->HandleIoctlIrp( pIrp );
 
+        if( ERROR( ret ) )
+            break;
+
         if( IsImmediateReq( pIrp ) )
+            break;
+
+        IrpCtxPtr pCtx = pIrp->GetCurCtx();
+        if( pCtx->GetIoDirection() == IRP_DIR_IN )
             break;
 
         // start to send the queued buffer
@@ -1386,7 +1366,7 @@ gint32 CTcpStreamPdo::CompleteIoctlIrp(
 
     gint32 ret = 0;
 
-    IrpCtxPtr& pCtx = pIrp->GetCurCtx();
+    IrpCtxPtr pCtx = pIrp->GetCurCtx();
     CRpcStreamSock* pSock = m_pStmSock;
     if( pSock == nullptr )
         return -EFAULT;
@@ -1417,13 +1397,26 @@ gint32 CTcpStreamPdo::CompleteIoctlIrp(
                 if( ERROR( ret ) )
                     break;
 
+                BufPtr pEmpty;
+
+                pCtx->SetRespData( pEmpty );
                 ret = pSock->QueueIrpForResp( pIrp );
                 if( ERROR( ret ) )
                     break;
 
-                // we need to continue waiting for
-                // the response
-                ret = STATUS_PENDING;
+                if( !pCtx->m_pRespData.IsEmpty() &&
+                    !pCtx->m_pRespData->empty() )
+                {
+                    // fantastic, the response has
+                    // arrived
+                    ret = pCtx->GetStatus();
+                }
+                else
+                {
+                    // we need to continue waiting for
+                    // the response
+                    ret = STATUS_PENDING;
+                }
             }
             else if( iState == reqStatOut &&
                 dwIoDir == IRP_DIR_OUT )
@@ -1607,16 +1600,21 @@ gint32 CTcpStreamPdo::OnSubmitIrp(
                 case CTRLCODE_LISTENING:
                 case CTRLCODE_REG_MATCH:
                 case CTRLCODE_UNREG_MATCH:
+                case CTRLCODE_OPEN_STREAM_LOCAL_PDO:
+                case CTRLCODE_CLOSE_STREAM_LOCAL_PDO:
+                case CTRLCODE_GET_LOCAL_STMID:
+                case CTRLCODE_GET_RMT_STMID:
                     {
                         ret = SubmitIoctlCmd( pIrp );
                         break;
                     }
                 default:
                     {
-                        ret = -ENOTSUP;
+                        ret = PassUnknownIrp( pIrp );
                         break;
                     }
                 }
+                break;
             }
         default:
             {
@@ -1858,12 +1856,8 @@ gint32 CTcpStreamPdo::GetIoctlReqState(
     IRP* pIrp, EnumIoctlStat& iState )
 {
     // please make sure the irp is locked
-    if( pIrp == nullptr
-        || pIrp->GetStackSize() == 0 )
-        return -EINVAL;
-
-    if( iState <= reqStatInvalid 
-        || iState >= reqStatMax )
+    if( pIrp == nullptr ||
+        pIrp->GetStackSize() == 0 )
         return -EINVAL;
 
     gint32 ret = 0;
@@ -1880,9 +1874,14 @@ gint32 CTcpStreamPdo::GetIoctlReqState(
                 pIrp->GetCurCtx();
             BufPtr pBuf;
             pCtx->GetExtBuf( pBuf );
-            STMPDO_IRP_EXT& oExt =
-                ( STMPDO_IRP_EXT& )*pBuf;
-            iState = oExt.m_iState;
+            if( pBuf.IsEmpty() || pBuf->empty() )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            STMPDO_IRP_EXT* pExt =
+                ( STMPDO_IRP_EXT* )pBuf->ptr();
+            iState = pExt->m_iState;
             break;
         }
     default:
@@ -1922,9 +1921,14 @@ gint32 CTcpStreamPdo::SetIoctlReqState(
             {
                 BufPtr pBuf;
                 pCtx->GetExtBuf( pBuf );
-                STMPDO_IRP_EXT& oExt =
-                   ( STMPDO_IRP_EXT& )*pBuf;
-                oExt.m_iState = iState;
+                if( pBuf.IsEmpty() || pBuf->empty() )
+                {
+                    ret = -EFAULT;
+                    break;
+                }
+                STMPDO_IRP_EXT* pExt =
+                   ( STMPDO_IRP_EXT* )pBuf->ptr();
+                pExt->m_iState = iState;
                 break;
             }
         default:
