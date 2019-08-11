@@ -23,6 +23,9 @@ This framework depends on the following packags:
 11. `Streaming support to provide double-direction stream transfer`
 
 ---
+[`Sun 11 Aug 2019 07:11:55 PM Beijing`]
+1. FetchData works now. And moving on to the streaming data transfer over the tcp connection. I can see the light at the end of the tunnel...   
+
 [`Wed 07 Aug 2019 09:48:22 PM Beijing`]   
 1. OpenStream works now. Next to get the FetchData to work over the Tcp connection. It should be ok very soon...
 
