@@ -4071,18 +4071,7 @@ gint32 CReqFwdrFetchDataTask::OnServiceComplete(
             break;
         }
 
-        TaskletPtr pCallerTask;
-        ret = GetCallerTask( pCallerTask );
-        if( SUCCEEDED( ret ) )
-        {
-            // get the response
-            CCfgOpenerObj oCallerCfg(
-                ( CObjBase* )pCallerTask );
-
-            ret = oCallerCfg.GetObjPtr(
-                propRespPtr, pObj );
-        }
-
+        ret = oCfg.GetObjPtr( propRespPtr, pObj );
         if( ERROR( ret ) )
         {
             if( SUCCEEDED( iRetVal ) )
@@ -4098,7 +4087,6 @@ gint32 CReqFwdrFetchDataTask::OnServiceComplete(
         }
         else
         {
-            oCfg.SetObjPtr( propRespPtr, pObj );
             ret = pReqFwdr->OnServiceComplete( 
                 pObj, pTask );
         }

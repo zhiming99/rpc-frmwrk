@@ -3552,6 +3552,9 @@ gint32 CRpcTcpBridgeShared::ReadStream(
     if( ERROR( ret ) )
         return ret;
 
+    if( ret == STATUS_PENDING )
+        return ret;
+
     pDestBuf = pBuf;
     return 0;
 }

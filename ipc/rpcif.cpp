@@ -5783,6 +5783,7 @@ gint32 CInterfaceServer::SendResponse(
         if( ERROR( ret ) )
             break;
 
+        bool bNonFd = false;
         if( strMethod == SYS_METHOD_SENDDATA )
         {
             
@@ -5820,23 +5821,12 @@ gint32 CInterfaceServer::SendResponse(
                 if( ERROR( ret ) )
                     break;
 
-                /*CCfgOpener oDesc(
-                    ( IConfigDb* )pDataDesc );
-
-                bool bStreaming = false;
-
-                oDesc.GetBoolProp(
-                    propStreaming, bStreaming );
-
-                if( bStreaming )
-                {
-                    iFd = 0;
-                    dwOffset = 0;
-                }*/
-
                 ret = pDataDesc->Serialize( *pBuf );
                 if( ERROR( ret ) )
                     break;
+
+                oParams.GetBoolProp(
+                    propNonFd, bNonFd );
             }
 
             gint32 iFdType = DBUS_TYPE_UNIX_FD;
@@ -5850,7 +5840,7 @@ gint32 CInterfaceServer::SendResponse(
                 break;
             }
 #else
-            if( iFd <= 0 )
+            if( iFd <= 0 || bNonFd )
                 iFdType = DBUS_TYPE_UINT32;
 #endif
 

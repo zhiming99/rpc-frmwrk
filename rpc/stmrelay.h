@@ -1037,8 +1037,10 @@ struct CUnixSockStmRelayBase :
             // start the event listening
             CParamList oParams;
 
-            oParams.CopyProp( propIfPtr, this );
-            oParams.CopyProp( propIoMgr, this );
+            oParams.SetPointer( propIfPtr, this );
+            oParams.SetPointer( propIoMgr,
+                this->GetIoMgr() );
+
             oParams.CopyProp( propTimeoutSec, this );
 
             ret = this->m_pListeningTask.NewObj(
@@ -1086,8 +1088,10 @@ struct CUnixSockStmRelayBase :
 
             // start the data reading
             CParamList oParams;
-            oParams.CopyProp( propIfPtr, this );
-            oParams.CopyProp( propIoMgr, this );
+            oParams.SetPointer( propIfPtr, this );
+            oParams.SetPointer(
+                propIoMgr, this->GetIoMgr() );
+
             oParams.CopyProp( propTimeoutSec, this );
             oParams.CopyProp(
                 propKeepAliveSec, this );
@@ -1117,6 +1121,7 @@ struct CUnixSockStmRelayBase :
             if( ERROR( ret ) )
                 break;
 
+            oParams.CopyProp( propStreamId, this );
             // tcp stream writer
             ret = m_pWrTcpStmTask.NewObj(
                 clsid( CIfTcpStmTransTask ),

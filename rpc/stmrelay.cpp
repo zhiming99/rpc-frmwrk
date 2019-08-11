@@ -714,6 +714,7 @@ gint32 CIfStartUxSockStmRelayTask::OnTaskComplete(
         {
             // push the tcp stream id
             oResp.Push( ( guint32 )iStmId );
+            oResp.SetBoolProp( propNonFd, true );
         }
         else
         {
@@ -910,7 +911,7 @@ gint32 CIfUxListeningRelayTask::PostEvent(
             memcpy( &dwSize, pBuf->ptr() + 1,
                 sizeof( guint32 ) );
             dwSize = ntohl( dwSize );
-            BufPtr pNewBuf;
+            BufPtr pNewBuf( true );
             pNewBuf->Resize( dwSize );
             if( ERROR( ret ) )
                 break;
@@ -937,7 +938,7 @@ gint32 CIfUxListeningRelayTask::PostEvent(
                 sizeof( gint32 ) );
 
             iError = ntohl( iError );
-            BufPtr pNewBuf;
+            BufPtr pNewBuf( true );
             pNewBuf->Resize( sizeof( gint32 ) );
             memcpy( pNewBuf->ptr(),
                 &iError, sizeof( iError ) );
@@ -1459,10 +1460,6 @@ gint32 CIfTcpStmTransTask::LocalToRemote(
     BufPtr& pRemote )
 {
     gint32 ret = 0;
-    if( pLocal.IsEmpty() ||
-        pLocal->empty() )
-        return -EINVAL;
-
     BufPtr pBuf = pLocal;
     guint32 dwHdrSize =
         sizeof( guint8 ) + sizeof( guint32 );
@@ -1472,6 +1469,13 @@ gint32 CIfTcpStmTransTask::LocalToRemote(
     case tokData:
     case tokProgress:
         {
+            if( pBuf.IsEmpty() ||
+                pBuf->empty() )
+            {
+                ret = -EINVAL;
+                break;
+            }
+
             guint32 dwSize = htonl( pBuf->size() );
             if( pBuf->offset() >= dwHdrSize )
             {

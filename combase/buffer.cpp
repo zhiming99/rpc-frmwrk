@@ -460,7 +460,8 @@ void CBuffer::Resize( guint32 dwSize )
             SetDataType( DataTypeMem );
             SetExDataType( typeNone );
             Resize( 0 );
-            Resize( dwSize );
+            if( dwSize > 0 )
+                Resize( dwSize );
             break;
         }
     case DataTypeObjPtr:
@@ -474,7 +475,8 @@ void CBuffer::Resize( guint32 dwSize )
             SetDataType( DataTypeMem );
             SetExDataType( typeNone );
             Resize( 0 );
-            Resize( dwSize );
+            if( dwSize > 0 )
+                Resize( dwSize );
             break;
         }
     case DataTypeMem:

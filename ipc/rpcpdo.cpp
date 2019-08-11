@@ -294,8 +294,8 @@ gint32 CRpcBasePort::DispatchRespMsg(
         if( ret == -ENOENT )
         {
             DMsgPtr pDumpMsg( pMsg );
-            DebugPrint( ret,
-                "Error dispatching response messages\n%s\n, port=%s, 0x%x",
+            DebugPrint( GetPortState(),
+                "Error cannot find irp for response messages\n%s\n, port=%s, 0x%x",
                 pDumpMsg.DumpMsg().c_str(),
                 CoGetClassName( GetClsid() ), 
                 ( guint32 )this );
