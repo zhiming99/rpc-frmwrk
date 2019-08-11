@@ -23,6 +23,9 @@ This framework depends on the following packags:
 11. `Streaming support to provide double-direction stream transfer`
 
 ---
+[`Wed 07 Aug 2019 09:48:22 PM Beijing`]   
+1. OpenStream works now. Next to get the FetchData to work over the Tcp connection. It should be ok very soon...
+
 [`Fri 02 Aug 2019 01:25:29 PM Beijing`]   
 1. Start debugging the remote streaming now. Impressed by the streaming performance, and thinking if it is possible to route the RPC traffic via a streaming channel...   
 
