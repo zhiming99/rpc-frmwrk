@@ -1228,6 +1228,8 @@ class CUnixSockStream:
             IrpCtxPtr& pCtx = pIrp->GetTopStack(); 
             pCtx->SetMajorCmd( IRP_MJ_FUNC );
             pIrp->SetCallback( pCallback, 0 );
+            pIrp->SetIrpThread(
+                this->GetIoMgr() );
 
             if( strMethod == "StartReading" )
             {
@@ -1248,8 +1250,8 @@ class CUnixSockStream:
                 if( ERROR( ret ) )
                     break;
 
-                pIrp->SetTimer(
-                    dwTimeoutSec, this->GetIoMgr() );
+                pIrp->SetTimer( dwTimeoutSec,
+                    this->GetIoMgr() );
             }
             else if( strMethod == "StartListening" )
             {
@@ -1264,8 +1266,8 @@ class CUnixSockStream:
                 if( ERROR( ret ) )
                     break;
 
-                pIrp->SetTimer(
-                    dwTimeoutSec, this->GetIoMgr() );
+                pIrp->SetTimer( dwTimeoutSec,
+                    this->GetIoMgr() );
             }
             else if( strMethod == "SendPingPong" ||
                 strMethod== "SendProgress" )
@@ -1283,8 +1285,8 @@ class CUnixSockStream:
                 if( ERROR( ret ) )
                     break;
 
-                pIrp->SetTimer(
-                    dwTimeoutSec, this->GetIoMgr() );
+                pIrp->SetTimer( dwTimeoutSec,
+                    this->GetIoMgr() );
             }
             else if( strMethod == "PauseReading" )
             {

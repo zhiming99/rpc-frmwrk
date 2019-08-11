@@ -1067,6 +1067,24 @@ gint32 CRpcTcpFido::BuildSendDataMsg(
         if( ERROR( ret ) )
             break;
 
+        // the pDataDesc will be removed after
+        // BuildSendDataReq.
+        IConfigDb* pDataDesc = nullptr;
+        ret = oParams.GetPointer( 0, pDataDesc );
+        if( ERROR( ret ) )
+            break;
+
+        string strIfName;
+        CCfgOpener oDataDesc( pDataDesc );
+        ret = oDataDesc.GetStrProp(
+            propIfName, strIfName );
+        if( ERROR( ret ) )
+            break;
+
+        string strDest = DBUS_DESTINATION2( 
+            MODNAME_RPCROUTER, OBJNAME_TCP_BRIDGE );
+
+        pMsg.SetDestination( strDest );
         ret = oParams.SetIntProp(
             1, ( guint32 )iPeerId );
 
@@ -1078,16 +1096,7 @@ gint32 CRpcTcpFido::BuildSendDataMsg(
             MODNAME_RPCROUTER, OBJNAME_TCP_BRIDGE );
 
         pMsg.SetPath( strPath );
-
-        string strIfName =
-            DBUS_IF_NAME( IFNAME_TCP_BRIDGE );
-
         pMsg.SetInterface( strIfName );
-
-        string strDest = DBUS_DESTINATION2( 
-            MODNAME_RPCROUTER, OBJNAME_TCP_BRIDGE );
-
-        pMsg.SetDestination( strDest );
 
     }while( 0 );
 

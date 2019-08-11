@@ -1675,7 +1675,7 @@ gint32 CDBusProxyPdo::OnRmtSvrOnOffline(
                 BufPtr pBuf( true );
                 *pBuf = ptrMsg;
                 pCtx->SetRespData( pBuf );
-                pCtx->SetStatus( 0 );
+                pCtx->SetStatus( -ENOTCONN );
                 oIrpLock.Unlock();
                 GetIoMgr()->CompleteIrp( pIrp );
             }

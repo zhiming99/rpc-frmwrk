@@ -83,12 +83,8 @@ gint32 CStreamServerRelay::FetchData_Server(
         // save the stream id for use later
         gint32 iStmId = fd;
         ret = IsTcpStmExist( iStmId );
-        if( SUCCEEDED( ret ) )
-        {
-            // already exist. don't go further
-            ret = -EEXIST;
+        if( ERROR( ret ) )
             break;
-        }
 
         CParamList oContext;
         oContext.Push( iStmId );
@@ -148,7 +144,13 @@ gint32 CStreamServerRelay::OnFetchDataComplete(
             break;
 
         CCfgOpener oResp( pResp );
-        gint32 iRet = oResp[ propReturnValue ];
+        gint32 iRet = 0;
+        ret = oResp.GetIntProp( propReturnValue,
+            ( guint32& ) iRet );
+
+        if( ERROR( ret ) )
+            break;
+
         if( ERROR( iRet ) )
         {
             ret = iRet;
@@ -207,7 +209,6 @@ gint32 CStreamServerRelay::OnFetchDataComplete(
         if( ERROR( ret ) )
             break;
 
-        ( *pStartTask )( 0 );
         ret = this->AddSeqTask( pStartTask );
         //
         // 2. bind the uxport and the the tcp stream
@@ -308,12 +309,24 @@ gint32 CStreamProxyRelay::OnFetchDataComplete(
             break;
 
         CCfgOpener oResp( pResp );
-        ret = oResp[ propReturnValue ];
+        gint32 iRet = 0;
+        ret = oResp.GetIntProp( propReturnValue,
+            ( guint32& )iRet );
         if( ERROR( ret ) )
             break;
 
+        if( ERROR( iRet ) )
+        {
+            ret = iRet;
+            break;
+        }
+
         // time to create uxstream object
-        iStmId = oResp[ 1 ];
+        ret = oResp.GetIntProp(
+            1, ( guint32& )iStmId );
+        if( ERROR( ret ) )
+            break;
+
         ret = CreateSocket( iLocal, iRemote );
         if( ERROR( ret ) )
             break;
@@ -360,7 +373,6 @@ gint32 CStreamProxyRelay::OnFetchDataComplete(
         if( ERROR( ret ) )
             break;
 
-        ( *pStartTask )( 0 );
         ret = this->AddSeqTask( pStartTask );
         
     }while( 0 );
@@ -570,6 +582,43 @@ gint32 CStreamProxyRelay::FetchData_Proxy(
 
     if( ret != STATUS_PENDING )
         oContext.ClearParams();
+
+    return ret;
+}
+
+gint32 CIfStartUxSockStmRelayTask::RunTask()
+{
+    gint32 ret = 0;
+
+    do{
+        ObjPtr pIf;
+        CParamList oParams(
+            ( IConfigDb* )GetConfig() );
+
+        ret = oParams.GetObjPtr( 0, pIf );
+        if( ERROR( ret ) )
+            break;
+
+        CRpcServices* pSvc = pIf;
+        if( pSvc == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        ret = pSvc->StartEx( this );
+        if( ERROR( ret ) )
+            break;
+
+        if( ret == STATUS_PENDING )
+            break;
+
+    }while( 0 );
+
+    if( ret == STATUS_PENDING )
+        return ret;
+
+    OnTaskComplete( ret );
 
     return ret;
 }
@@ -1160,7 +1209,7 @@ gint32 CIfUxSockTransRelayTask::RunTask()
         {
             guint8 byToken = 0;
             BufPtr pPayload;
-            ret = oHelper.GetReqToLocal(
+            ret = oHelper.PeekReqToLocal(
                 byToken, pPayload );
 
             if( ret == -ENOENT )
@@ -1170,14 +1219,57 @@ gint32 CIfUxSockTransRelayTask::RunTask()
                 break;
             }
 
-            if( byToken == tokData )
+            switch( byToken )
             {
-                ret = oHelper.WriteStream(
-                    pPayload, this );
-            }
-            else
-            {
+            case tokData:
+                {
+                    ret = oHelper.WriteStream(
+                        pPayload, this );
 
+                    break;
+                }
+            case tokPing:
+            case tokPong:
+                {
+                    ret = oHelper.SendPingPong(
+                        byToken, this );
+                    break;
+                }
+            case tokProgress:
+                {
+                    ret = oHelper.SendProgress(
+                        pPayload, this );
+                    break;
+                }
+            default:
+                {
+                    ret = -EBADMSG;
+                    break;
+                }
+            }
+
+            // note that this flow control comes from
+            // uxport rather than the uxstream.
+            if( ERROR_QUEUE_FULL == ret )
+                break;
+
+            // remove the packet from the queue
+            BufPtr pBuf;
+            guint8 byToken2 = 0;
+            gint32 iRet = oHelper.GetReqToLocal(
+                byToken2, pBuf );
+
+            if( ERROR( iRet ) && SUCCEEDED( ret ) )
+                ret = iRet;
+
+            else if( byToken != byToken2 )
+                ret = -EBADMSG;
+
+            else if( byToken == tokData ||
+                byToken == tokProgress )
+            {
+                if( !( pBuf == pPayload ) )
+                    ret = -EBADMSG;
             }
         }
 
@@ -1191,8 +1283,6 @@ gint32 CIfUxSockTransRelayTask::RunTask()
 
     return ret;
 }
-
-
 
 CIfTcpStmTransTask::CIfTcpStmTransTask(
     const IConfigDb* pCfg ) :
@@ -1660,6 +1750,28 @@ gint32 CIfUxRelayTaskHelper::GetReqToRemote(
     return ret;
 }
 
+gint32 CIfUxRelayTaskHelper::PeekReqToLocal(
+    guint8& byToken, BufPtr& pBuf )
+{
+    gint32 ret = 0;
+    if( m_pSvc->IsServer() )
+    {
+        CUnixSockStmServerRelay*
+            pUxStm = ObjPtr( m_pSvc );
+        ret = pUxStm->PeekReqToLocal(
+            byToken, pBuf );
+    }
+    else
+    {
+        CUnixSockStmProxyRelay*
+            pUxStm = ObjPtr( m_pSvc );
+        ret = pUxStm->PeekReqToLocal(
+            byToken, pBuf );
+    }
+
+    return ret;
+}
+
 gint32 CIfUxRelayTaskHelper::GetReqToLocal(
     guint8& byToken, BufPtr& pBuf )
 {
@@ -1764,6 +1876,48 @@ gint32 CIfUxRelayTaskHelper::StartReading(
             pUxStm = ObjPtr( m_pSvc );
         ret = pUxStm->StartReading(
             pCallback );
+    }
+    return ret;
+}
+
+gint32 CIfUxRelayTaskHelper::SendProgress(
+    CBuffer* pBuf, IEventSink* pCallback )
+{
+    gint32 ret = 0;
+    if( m_pSvc->IsServer() )
+    {
+        CUnixSockStmServerRelay*
+            pUxStm = ObjPtr( m_pSvc );
+        ret = pUxStm->SendProgress(
+            pBuf, pCallback );
+    }
+    else
+    {
+        CUnixSockStmProxyRelay*
+            pUxStm = ObjPtr( m_pSvc );
+        ret = pUxStm->SendProgress(
+            pBuf, pCallback );
+    }
+    return ret;
+}
+
+gint32 CIfUxRelayTaskHelper::SendPingPong(
+    guint8 byToken, IEventSink* pCallback )
+{
+    gint32 ret = 0;
+    if( m_pSvc->IsServer() )
+    {
+        CUnixSockStmServerRelay*
+            pUxStm = ObjPtr( m_pSvc );
+        ret = pUxStm->SendPingPong(
+            byToken, pCallback );
+    }
+    else
+    {
+        CUnixSockStmProxyRelay*
+            pUxStm = ObjPtr( m_pSvc );
+        ret = pUxStm->SendPingPong(
+            byToken, pCallback );
     }
     return ret;
 }

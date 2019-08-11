@@ -1956,7 +1956,7 @@ gint32 CRpcTcpBridge::CheckSendDataToFwrd(
 
         if( iid != iid( CFileTransferServer ) )
         {
-            ret = -ENOTSUP;
+            ret = -EINVAL;
             break;
         }
 

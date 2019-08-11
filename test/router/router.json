@@ -65,6 +65,10 @@
                     "Pausable" : "false"
                 },
                 {
+                    "InterfaceName" : "IStream",
+                    "Pausable" : "false"
+                },
+                {
                     "InterfaceName" : "CRpcTcpBridge",
                     "Pausable"  : "true"
                 },

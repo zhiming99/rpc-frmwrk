@@ -2491,11 +2491,19 @@ struct has_##MethodName\
 {\
     private:\
     template<typename U, _rettype (U::*)( __VA_ARGS__ ) > struct SFINAE {};\
-    template<typename U> static char Test(SFINAE<U, &U::MethodName>*);\
+    template<typename U > static char Test(SFINAE<U, &U::MethodName>*);\
     template<typename U> static int Test(...);\
+    template< typename U, typename V = typename std::enable_if<std::is_base_of< virtbase, U >::value, U >::type > \
+    static constexpr bool InitValue() {\
+        return ( ( sizeof(Test<T>(0) ) == sizeof(char) ) || \
+            sizeof( char ) == has_##MethodName< typename T::super >::value  ); \
+    }\
+    template< typename U, typename V = typename std::enable_if<!std::is_base_of< virtbase, U >::value, U >::type, typename W=U > \
+    static constexpr bool InitValue() { return false; }\
     public:\
-    static bool const value = ( sizeof(Test<T>(0) ) == sizeof(char) );\
-}
+    static bool const value = InitValue< T >();\
+}; \
+
 
 #define VA_LIST(...) __VA_ARGS__
 // this macro serves to define a virtual method to all
@@ -2685,23 +2693,6 @@ struct CAggregatedObject
     {
     }
 
-    /*ITERATE_IF_VIRT_METHODS_IMPL_NOARG( InitUserFuncs, gint32 )
-
-    ITERATE_IF_VIRT_METHODS_IMPL( OnPreStart, gint32,
-        VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
-
-    ITERATE_IF_VIRT_METHODS_IMPL( OnPostStart, gint32,
-        VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
-
-    ITERATE_IF_VIRT_METHODS_IMPL( OnPostStop, gint32,
-        VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
-
-    ITERATE_IF_VIRT_METHODS_IMPL( AddStartTasks, gint32,
-        VA_LIST( IEventSink* pTaskGrp ), VA_LIST( pTaskGrp ) )
-
-    ITERATE_IF_VIRT_METHODS_IMPL( OnPreStop, gint32,
-        VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )*/
-
 };
 
 template< typename Type >
@@ -2716,7 +2707,9 @@ struct CAggregatedObject< CAggInterfaceServer, Types... >
     : Types...
 {
     using virtbase = CAggInterfaceServer;
+
     public:
+    typedef virtbase super;
     CAggregatedObject( const IConfigDb* pCfg )
     : virtbase( pCfg ), Types( pCfg )...
     {
@@ -2850,7 +2843,7 @@ struct ClassName : CAggregatedObject< CAggInterfaceServer, ##__VA_ARGS__ >, IUnk
     public: \
     virtual rettype _MethodName( PARAMS ) \
     { \
-        gint32 ret = 0;\
+        gint32 ret = ERROR_NOT_HANDLED;\
         if( sizeof...( Types ) ) \
         { \
             using seq = typename GenSequence< sizeof...( Types ) >::type; \
@@ -2877,6 +2870,7 @@ struct CAggregatedObject< CAggInterfaceProxy, Types... >
 {
     using virtbase = CAggInterfaceProxy;
     public:
+    typedef virtbase super;
     CAggregatedObject( const IConfigDb* pCfg )
     : virtbase( pCfg ), Types( pCfg )...
     {

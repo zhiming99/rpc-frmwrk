@@ -403,14 +403,6 @@ class CRpcRouter;
 class CStreamServerRelay :
     public CStreamRelayBase< CStreamServer >
 {
-    protected:
-    gint32 FetchData_Server(
-        IConfigDb* pDataDesc,           // [in]
-        gint32& fd,                     // [out]
-        guint32& dwOffset,              // [in, out]
-        guint32& dwSize,                // [in, out]
-        IEventSink* pCallback );
-
     public:
 
     typedef CStreamRelayBase super;
@@ -420,14 +412,18 @@ class CStreamServerRelay :
 
     CRpcRouter* GetParent() const;
 
-    virtual gint32 InitUserFuncs()
-    { return super::InitUserFuncs(); }
-
     virtual gint32 OpenChannel(
         IConfigDb* pDataDesc,
         int& fd, HANDLE& hChannel,
         IEventSink* pCallback ) 
     { return 0; }
+
+    gint32 FetchData_Server(
+        IConfigDb* pDataDesc,           // [in]
+        gint32& fd,                     // [out]
+        guint32& dwOffset,              // [in, out]
+        guint32& dwSize,                // [in, out]
+        IEventSink* pCallback );
 
     // request to the remote server completed
     gint32 OnFetchDataComplete(
@@ -461,9 +457,6 @@ class CStreamProxyRelay :
     const EnumClsid GetIid() const
     { return iid( IStream ); }
 
-    virtual gint32 InitUserFuncs()
-    { return super::InitUserFuncs(); }
-
     virtual gint32 OpenChannel(
         IConfigDb* pDataDesc,
         int& fd, HANDLE& hChannel,
@@ -493,9 +486,7 @@ class CIfStartUxSockStmRelayTask :
         super( pCfg )
     { SetClassId( clsid( CIfStartUxSockStmRelayTask ) ); }
 
-    gint32 RunTask()
-    { return STATUS_PENDING; }
-
+    gint32 RunTask();
     gint32 OnTaskComplete( gint32 iRet );
 };
 
@@ -767,7 +758,7 @@ struct CUnixSockStmRelayBase :
         return ret;
     }
 
-    inline gint32 GetReqToLocal(
+    gint32 PeekReqToLocal(
         guint8& byToken, BufPtr& pBuf )
     {
         gint32 ret = 0;
@@ -780,6 +771,31 @@ struct CUnixSockStmRelayBase :
                 pQueue->empty() )
             {
                 ret = -ENOENT;
+                break;
+            }
+
+            byToken = pQueue->front().first;
+            pBuf = pQueue->front().second;
+
+        }while( 0 );
+
+        return ret;
+    }
+
+    gint32 GetReqToLocal(
+        guint8& byToken, BufPtr& pBuf )
+    {
+        gint32 ret = 0;
+
+        do{
+            CStdRMutex oIfLock( this->GetLock() );
+            SENDQUE* pQueue = &m_queToLocal;
+
+            if( !this->CanSend()  ||
+                pQueue->empty() )
+            {
+                ret = -ENOENT;
+                break;
             }
 
             bool bFull =
@@ -916,8 +932,42 @@ struct CUnixSockStmRelayBase :
 
     virtual gint32 OnDataReceivedRemote(
         CBuffer* pBuf )
+    { return 0; }
+
+    virtual gint32 OnFlowControl()
     {
-        return 0;
+        // this event comes over tcp stream
+
+        CStdRMutex oIfLock( this->GetLock() );
+        ObjPtr pObj = m_pWritingTask;
+        if( pObj.IsEmpty() )
+            return -EFAULT;
+
+        CIfUxTaskBase* pTask =
+            m_pWritingTask;
+
+        if( pTask == nullptr )
+            return -EFAULT;
+
+        oIfLock.Unlock();
+        return pTask->Pause();
+    }
+
+    virtual gint32 OnFCLifted()
+    {
+        CStdRMutex oIfLock( this->GetLock() );
+        ObjPtr pObj = m_pWritingTask;
+        if( pObj.IsEmpty() )
+            return -EFAULT;
+
+        CIfUxTaskBase* pTask =
+            m_pWritingTask;
+
+        if( pTask == nullptr )
+            return -EFAULT;
+
+        oIfLock.Unlock();
+        return pTask->Resume();
     }
 
     virtual gint32 OnFlowControlRemote()
@@ -1117,6 +1167,33 @@ struct CUnixSockStmRelayBase :
 
         return 0;
     }
+
+    gint32 WriteStream( BufPtr& pBuf,
+        IEventSink* pCallback )
+    {
+        // this is a version without flow-control
+        gint32 ret = 0;
+        if( pBuf.IsEmpty() || pBuf->empty() )
+            return -EINVAL;
+
+        if( pCallback == nullptr )
+            return -EINVAL;
+
+        if( !this->IsConnected() )
+            return ERROR_STATE;
+
+        do{
+            CParamList oParams;
+            oParams[ propMethodName ] = __func__;
+            oParams.Push( pBuf );
+
+            ret = this->SubmitRequest(
+                oParams.GetCfg(), pCallback, true );
+
+        }while( 0 );
+
+        return ret;
+    }
 };
 
 class CUnixSockStmServerRelay :
@@ -1197,6 +1274,9 @@ struct CIfUxRelayTaskHelper
     gint32 GetReqToRemote(
         guint8& byToken, BufPtr& pBuf );
 
+    gint32 PeekReqToLocal(
+        guint8& byToken, BufPtr& pBuf );
+
     gint32 GetReqToLocal(
         guint8& byToken, BufPtr& pBuf );
 
@@ -1214,6 +1294,12 @@ struct CIfUxRelayTaskHelper
         IEventSink* pCallback );
 
     gint32 WriteStream( BufPtr& pBuf,
+        IEventSink* pCallback );
+
+    gint32 SendProgress( CBuffer* pBuf,
+        IEventSink* pCallback );
+
+    gint32 SendPingPong( guint8 byToken,
         IEventSink* pCallback );
 
     // CRpcTcpBridgeShared method
@@ -1266,14 +1352,45 @@ class CIfUxSockTransRelayTask :
     {
         CIfUxRelayTaskHelper oHelper( this );
 
-        // stop watching the uxsock and
-        // uxsock's buffer will do the
-        // rest work
+        // stop watching the uxsock and uxsock's buffer
+        // will do the rest work
         if( IsReading() )
             oHelper.PauseReading( true );
+        else
+        {
+            // remove the irp which is still in the
+            // port driver.
+            ObjPtr pIrpObj;
+
+            CStdRTMutex oTaskLock( GetLock() );
+            CCfgOpener oCfg(
+                ( IConfigDb* )GetConfig() );
+
+            gint32 ret = oCfg.GetObjPtr(
+                propIrpPtr, pIrpObj );
+
+            if( SUCCEEDED( ret ) )
+            {
+                oCfg.RemoveProperty( propIrpPtr );
+                IrpPtr pIrp = pIrpObj;
+                RemoveProperty( propIrpPtr );
+
+                CStdRMutex oIrpLock( pIrp->GetLock() );
+                ret = pIrp->CanContinue(
+                    IRP_STATE_READY );
+
+                if( SUCCEEDED( ret ) )
+                {
+                    // remove the callback pointing to
+                    // this task.
+                    pIrp->RemoveCallback();
+                }
+            }
+        }
 
         return super::Pause();
     }
+
     gint32 Resume()
     {
         CIfUxRelayTaskHelper oHelper( this );

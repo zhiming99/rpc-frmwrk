@@ -1286,9 +1286,9 @@ gint32 CRpcReqForwarder::DisableRemoteEvent(
         pMatch == nullptr )
         return -EINVAL;
 
+    TaskletPtr pDeferTask;
     do{
         bool bEnable = false;
-        TaskletPtr pDeferTask;
         ret = DEFER_HANDLER_NOSCHED(
             pDeferTask, ObjPtr( this ),
             &CRpcReqForwarder::EnableDisableEvent,
@@ -1324,6 +1324,9 @@ gint32 CRpcReqForwarder::DisableRemoteEvent(
 
     }while( 0 );
 
+    if( ERROR( ret ) && !pDeferTask.IsEmpty() )
+        ( *pDeferTask )( eventCancelTask );
+
     return ret;
 }
 
@@ -1336,8 +1339,8 @@ gint32 CRpcReqForwarder::EnableRemoteEvent(
         pMatch == nullptr )
         return -EINVAL;
 
+    TaskletPtr pDeferTask;
     do{
-        TaskletPtr pDeferTask;
         bool bEnable = true;
         ret = DEFER_HANDLER_NOSCHED(
             pDeferTask, ObjPtr( this ),
@@ -1374,6 +1377,9 @@ gint32 CRpcReqForwarder::EnableRemoteEvent(
             ret = STATUS_PENDING;
 
     }while( 0 );
+
+    if( ERROR( ret ) && !pDeferTask.IsEmpty() )
+        ( *pDeferTask )( eventCancelTask );
 
     return ret;
 }
@@ -2329,7 +2335,9 @@ gint32 CRpcReqForwarder::SetupReqIrpFwrdEvt(
         if( pCallback != nullptr )
         {
             pIrp->SetCallback( pCallback, 0 );
-            pIrp->SetIrpThread( GetIoMgr() );
+            // already done in the base class's
+            // SetupReqIrp
+            // pIrp->SetIrpThread( GetIoMgr() );
         }
 
     }while( 0 );

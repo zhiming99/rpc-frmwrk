@@ -1644,7 +1644,7 @@ gint32 CUnixSockStmPdo::SubmitWriteIrp(
 
     if( bNotify )
     {
-        BufPtr pNullBuf;
+        BufPtr pNullBuf( true );
         SendNotify( tokFlowCtrl, pNullBuf );
     }
 
