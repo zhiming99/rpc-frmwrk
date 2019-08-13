@@ -113,9 +113,12 @@ class CMyStreamProxy :
     gint32 WaitForWriteAllowed( HANDLE hChannel )
     { return Sem_Wait( &m_semSync ); }
 
-    gint32 OnClose( HANDLE hChannel )
+    virtual gint32 OnClose(
+        HANDLE hChannel,
+        IEventSink* pCallback = nullptr )
     {
-        gint32 ret = super::OnClose( hChannel );
+        gint32 ret = super::OnClose(
+            hChannel, pCallback );
         // in case the client is still waiting for flow
         // control to lift
         Sem_Post( &m_semSync );

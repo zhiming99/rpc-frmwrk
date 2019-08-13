@@ -737,7 +737,9 @@ gint32 CIfStartUxSockStmRelayTask::OnTaskComplete(
         if( ERROR( ret ) )
             break;
 
-        pParent->RunManagedTask( pConnTask );
+        ret = pParent->RunManagedTask( pConnTask );
+        if( ERROR( ret ) )
+            ( *pConnTask )( eventCancelTask );
 
     }while( 0 );
 
@@ -1405,7 +1407,7 @@ gint32 CIfTcpStmTransTask::RunTask()
 
         if( IsReading() )
         {
-            BufPtr pBuf( true );
+            BufPtr pBuf;
             ret = oHelper.ReadTcpStream(
                 iStmId, pBuf, 20, this );
 
@@ -2010,7 +2012,7 @@ gint32 CIfUxRelayTaskHelper::WriteTcpStream(
 
 gint32 CIfUxRelayTaskHelper::ReadTcpStream(
     gint32 iStreamId,
-    CBuffer* pSrcBuf,
+    BufPtr& pSrcBuf,
     guint32 dwSizeToWrite,
     IEventSink* pCallback )
 {
@@ -2022,14 +2024,13 @@ gint32 CIfUxRelayTaskHelper::ReadTcpStream(
     if( pIf.IsEmpty() )
         return -EFAULT;
 
-    BufPtr pBuf( pSrcBuf );
     if( pIf->IsServer() )
     {
         CRpcTcpBridge*
             pBdge = ObjPtr( pIf );
 
         ret = pBdge->ReadStream(
-            iStreamId, pBuf,
+            iStreamId, pSrcBuf,
             dwSizeToWrite, pCallback );
     }
     else
@@ -2038,7 +2039,7 @@ gint32 CIfUxRelayTaskHelper::ReadTcpStream(
             pBdge = ObjPtr( pIf );
 
         ret = pBdge->ReadStream(
-            iStreamId, pBuf,
+            iStreamId, pSrcBuf,
             dwSizeToWrite, pCallback );
     }
 

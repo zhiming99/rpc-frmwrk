@@ -389,6 +389,10 @@ class CStreamRelayBase :
 
             TaskletPtr pTask( pTaskGrp );
             ret = this->AddSeqTask( pTask );
+            if( ERROR( ret ) )
+            {
+                ( *pTask )( eventCancelTask );
+            }
 
         }while( 0 );
 
@@ -559,6 +563,26 @@ struct CUnixSockStmRelayBase :
         return ret;
     }
 
+    gint32 PauseResumeTask(
+        IEventSink* pTask, bool bResume )
+    {
+        if( pTask == nullptr )
+            return -EINVAL;
+
+        CIfUxTaskBase* pTaskBase =
+            ObjPtr( pTask );
+
+        if( pTaskBase == nullptr )
+            return -EFAULT;
+
+        if( bResume )
+            pTaskBase->Resume();
+        else
+            pTaskBase->Pause();
+
+        return 0;
+    }
+
     gint32 PauseResumeTasks(
         ObjPtr pTasks, bool bResume )
     {
@@ -568,13 +592,8 @@ struct CUnixSockStmRelayBase :
 
         for( auto elem : ( *pvecTasks )() )
         {
-            CIfUxTaskBase* pTask = elem;
-            if( pTask == nullptr )
-                continue;
-            if( bResume )
-                pTask->Resume();
-            else
-                pTask->Pause();
+            IEventSink* pTask = elem;
+            PauseResumeTask( pTask, bResume );
         }
 
         return 0;
@@ -609,7 +628,10 @@ struct CUnixSockStmRelayBase :
 
                 ret = this->AddSeqTask( pTask );
                 if( ERROR( ret ) )
+                {
+                    ( *pTask )( eventCancelTask );
                     break;
+                }
 
                 ret = ERROR_QUEUE_FULL;
                 break;
@@ -623,13 +645,18 @@ struct CUnixSockStmRelayBase :
                 TaskletPtr pResumeTask;
                 ret = DEFER_IFCALL_NOSCHED(
                     pResumeTask,
-                    ObjPtr( m_pWritingTask ),
-                    &CIfUxTaskBase::Resume );
+                    ObjPtr( this ),
+                    &CUnixSockStmRelayBase::PauseResumeTask,
+                    ( IEventSink* )m_pWritingTask, true );
+
                 if( ERROR( ret ) )
                     break;
 
                 ret = this->RunManagedTask(
                     pResumeTask );
+
+                if( ERROR( ret ) )
+                    ( *pResumeTask )( eventCancelTask );
 
                 if( ret == STATUS_PENDING )
                     ret = 0;
@@ -837,9 +864,9 @@ struct CUnixSockStmRelayBase :
                 // wake up the writer task
                 TaskletPtr pResumeRead;
                 ret = DEFER_IFCALL_NOSCHED(
-                    pResumeRead,
-                    ObjPtr( m_pRdTcpStmTask ),
-                    &CIfUxTaskBase::Resume );
+                    pResumeRead, pThis,
+                    &CUnixSockStmRelayBase::PauseResumeTask,
+                    ( IEventSink* )m_pRdTcpStmTask, true );
 
                 if( ERROR( ret ) )
                     break;
@@ -849,6 +876,9 @@ struct CUnixSockStmRelayBase :
                 TaskletPtr pTasks = ObjPtr( pTaskGrp );
 
                 ret = this->RunManagedTask( pTasks );
+                if( ERROR( ret ) )
+                    ( *pTasks )( eventCancelTask );
+
                 if( ret == STATUS_PENDING )
                     ret = 0;
             }
@@ -865,13 +895,21 @@ struct CUnixSockStmRelayBase :
     gint32 PostTcpStmEvent(
         guint8 byToken, BufPtr& pBuf )
     {
+        gint32 ret = 0;
         TaskletPtr pTask;
-        DEFER_IFCALL_NOSCHED( pTask,
+        ret = DEFER_IFCALL_NOSCHED( pTask,
             ObjPtr( this ),
             &CUnixSockStmRelayBase::OnTcpStmEvent,
             byToken, ( CBuffer* )pBuf );
 
-        return this->AddSeqTask( pTask );
+        if( ERROR( ret ) )
+            return ret;
+
+        ret = this->AddSeqTask( pTask );
+        if( ERROR( ret ) )
+            ( *pTask )( eventCancelTask );
+
+        return ret;
     }
 
     virtual gint32 OnPingPongRemote(
@@ -1316,7 +1354,7 @@ struct CIfUxRelayTaskHelper
 
     gint32 ReadTcpStream(
         gint32 iStreamId,
-        CBuffer* pSrcBuf,
+        BufPtr& pSrcBuf,
         guint32 dwSizeToWrite,
         IEventSink* pCallback );
 

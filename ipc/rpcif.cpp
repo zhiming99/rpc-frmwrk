@@ -1069,6 +1069,10 @@ gint32 CRpcInterfaceBase::StopEx(
         CIoManager* pMgr = GetIoMgr();
         TaskletPtr pStopGrp = ObjPtr( pStopTasks );
         ret = pMgr->RescheduleTask( pStopGrp );
+        if( ERROR( ret ) )
+        {
+            ( *pStopGrp )( eventCancelTask );
+        }
         if( SUCCEEDED( ret ) )
             ret = STATUS_PENDING;
 

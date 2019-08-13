@@ -1062,6 +1062,9 @@ gint32 CRpcReqForwarder::OnModEvent(
         ret = GetParent()->AddSeqTask(
             pDeferTask, false );
 
+        if( ERROR( ret ) )
+            ( *pDeferTask )( eventCancelTask );
+
         if( SUCCEEDED( ret ) )
             ret = STATUS_PENDING;
 

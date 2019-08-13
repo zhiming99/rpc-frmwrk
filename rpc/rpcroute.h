@@ -789,7 +789,7 @@ struct CRpcTcpBridgeShared
 
     gint32 ReadWriteStream(
         gint32 iStreamId,
-        CBuffer* pSrcBuf,
+        BufPtr& pSrcBuf,
         guint32 dwSize,
         IEventSink* pCallback,
         bool bRead );

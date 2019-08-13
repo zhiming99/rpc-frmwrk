@@ -1298,6 +1298,8 @@ gint32 CBdgeProxyReadWriteComplete::OnIrpComplete(
                 ( guint32 )pIrp, 0, 0 );
         }
 
+        ClearClientNotify();
+
     }while( 0 );
 
     return ret;
@@ -3546,17 +3548,11 @@ gint32 CRpcTcpBridgeShared::ReadStream(
     guint32 dwSizeToRead,
     IEventSink* pCallback )
 {
-    BufPtr pBuf( true );
-    gint32 ret = ReadWriteStream( iStreamId,
-        pBuf, dwSizeToRead, pCallback, true );
-    if( ERROR( ret ) )
-        return ret;
+    if( pCallback == nullptr )
+        return -EINVAL;
 
-    if( ret == STATUS_PENDING )
-        return ret;
-
-    pDestBuf = pBuf;
-    return 0;
+    return ReadWriteStream( iStreamId,
+        pDestBuf, dwSizeToRead, pCallback, true );
 }
 
 gint32 CRpcTcpBridgeShared::WriteStream(
@@ -3565,19 +3561,53 @@ gint32 CRpcTcpBridgeShared::WriteStream(
     guint32 dwSizeToWrite,
     IEventSink* pCallback )
 {
-    return ReadWriteStream( iStreamId,
-        pSrcBuf, dwSizeToWrite, pCallback, false );
+    if( pSrcBuf == nullptr || pSrcBuf->empty() )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        bool bSync = false;
+        TaskletPtr pCbTask;
+        if( pCallback == nullptr )
+        {
+            bSync = true;
+            ret = pCbTask.NewObj(
+                clsid( CSyncCallback ) );
+
+            if( ERROR( ret ) )
+                break;
+
+            pCallback = pCbTask;
+        }
+
+        BufPtr pBuf( pSrcBuf );
+        ret = ReadWriteStream( iStreamId,
+            pBuf, dwSizeToWrite,
+            pCallback, false );
+
+        if( ret == STATUS_PENDING && bSync )
+        {
+            CSyncCallback* pSyncCb = pCbTask;
+            pSyncCb->WaitForComplete();
+        }
+
+    }while( 0 );
+
+    return ret;
 }
 
 gint32 CRpcTcpBridgeShared::ReadWriteStream(
     gint32 iStreamId,
-    CBuffer* pSrcBuf,
+    BufPtr& pSrcBuf,
     guint32 dwSize,
     IEventSink* pCallback,
     bool bRead )
 {
     gint32 ret = 0;
     TaskletPtr pCbTask;
+
+    if( pCallback == nullptr )
+        return -EINVAL;
 
     do{
         CCfgOpener oCfg;
@@ -3666,7 +3696,7 @@ gint32 CRpcTcpBridgeShared::ReadWriteStream(
         }
         else
         {
-            oReq.Push( ObjPtr( pSrcBuf ) );
+            oReq.Push( pSrcBuf );
             *pBuf = ObjPtr( 
                 ( IConfigDb* )oReq.GetCfg() );
         }
@@ -3688,36 +3718,23 @@ gint32 CRpcTcpBridgeShared::ReadWriteStream(
         HANDLE hPort = pIf->GetPortHandle();
         CIoManager* pMgr = pIf->GetIoMgr();
 
-        CCfgOpenerObj( ( CObjBase* )pCbTask ).
-            SetObjPtr( propIrpPtr, pIrp );
+        CCfgOpenerObj oCbCfg( ( CObjBase* )pCbTask  );
+        oCbCfg.SetObjPtr( propIrpPtr, pIrp );
 
         ret = pMgr->SubmitIrp( hPort, pIrp );
 
         if( ret == STATUS_PENDING )
         {
-            if( pCallback != nullptr )
-                break;
-
-            CIfRetryTask* pRetryTask = pCbTask;
-            if( pRetryTask != nullptr )
-            {
-                pRetryTask->WaitForComplete();
-                ret = pRetryTask->GetError();
-                if( SUCCEEDED( ret ) && bRead )
-                {
-                    IrpCtxPtr pCtx = pIrp->GetTopStack();
-                    pSrcBuf = pCtx->m_pRespData;
-                }
-            }
-            else
-            {
-                ret = -EFAULT;
-            }
+            break;
         }
         else
         {
-            CCfgOpenerObj( ( CObjBase* )pCbTask ).
-                RemoveProperty( propIrpPtr );
+            if( SUCCEEDED( ret ) && bRead )
+            {
+                IrpCtxPtr pCtx = pIrp->GetTopStack();
+                pSrcBuf = pCtx->m_pRespData;
+            }
+            oCbCfg.RemoveProperty( propIrpPtr );
             pIrp->RemoveCallback();
             pIrp->RemoveTimer();
             pIrp->ClearIrpThread();

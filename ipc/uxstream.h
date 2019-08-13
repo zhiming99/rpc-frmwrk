@@ -767,6 +767,8 @@ class CUnixSockStream:
             // NOTE: the istream method is running on
             // the seqtask of the uxstream
             ret = this->AddSeqTask( pTask );
+            if( ERROR( ret ) )
+                ( *pTask )( eventCancelTask );
 
         }while( 0 );
 
@@ -776,13 +778,21 @@ class CUnixSockStream:
     virtual gint32 PostUxSockEvent(
         guint8 byToken, BufPtr& pBuf )
     {
+        gint32 ret = 0;
         TaskletPtr pTask;
-        DEFER_IFCALL_NOSCHED( pTask,
+        ret = DEFER_IFCALL_NOSCHED( pTask,
             ObjPtr( this ),
             &CUnixSockStream::OnUxSockEventWrapper,
             byToken, *pBuf );
 
-        return this->AddSeqTask( pTask );
+        if( ERROR( ret ) )
+            return ret;
+
+        ret = this->AddSeqTask( pTask );
+        if( ERROR( ret ) )
+            ( *pTask )( eventCancelTask );
+
+        return ret;
     }
 
     // events from the ux port
