@@ -186,6 +186,7 @@ class CIoWatchTask:
     int m_iFd;
     HANDLE m_hReadWatch;
     HANDLE m_hWriteWatch;
+    HANDLE m_hErrWatch;
 
     PortPtr     m_pPort;
     CRecvFilter m_oRecvFilter;
@@ -273,7 +274,9 @@ class CIoWatchTask:
     virtual gint32 OnComplete( gint32 iRet )
     {
         ReleaseChannel();
-        return super::OnComplete( iRet );
+        gint32 ret = super::OnComplete( iRet );
+        m_pPort.Clear();
+        return ret;
     }
 
     virtual gint32 OnTaskComplete( gint32 iRet )

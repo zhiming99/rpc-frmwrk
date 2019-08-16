@@ -741,6 +741,9 @@ gint32 CIfStartUxSockStmRelayTask::OnTaskComplete(
         if( ERROR( ret ) )
             ( *pConnTask )( eventCancelTask );
 
+        if( ret == STATUS_PENDING )
+            ret = 0;
+
     }while( 0 );
 
     while( ERROR( ret ) )
@@ -777,18 +780,21 @@ gint32 CIfStartUxSockStmRelayTask::OnTaskComplete(
         break;
     }
 
-    if( ERROR( ret ) )
+    if( ERROR( ret ) && SUCCEEDED( iRet ) )
+    {
         oResp[ propReturnValue ] = ret;
+        iRet = ret;
+    }
 
     EventPtr pEvt;
-    iRet = GetInterceptTask( pEvt );
-    if( SUCCEEDED( iRet ) )
+    ret = GetInterceptTask( pEvt );
+    if( SUCCEEDED( ret ) )
     {
         CCfgOpenerObj oCfg( ( IEventSink* )pEvt );
         oCfg.SetPointer( propRespPtr,
             ( CObjBase* )oResp.GetCfg() );
 
-        pEvt->OnEvent( eventTaskComp, ret, 0, 0 );
+        pEvt->OnEvent( eventTaskComp, iRet, 0, 0 );
     }
 
     if( iRemote > 0 )
@@ -909,25 +915,9 @@ gint32 CIfUxListeningRelayTask::PostEvent(
         }
     case tokProgress:
         {
-            guint32 dwSize;
-            memcpy( &dwSize, pBuf->ptr() + 1,
-                sizeof( guint32 ) );
-            dwSize = ntohl( dwSize );
-            BufPtr pNewBuf( true );
-            pNewBuf->Resize( dwSize );
-            if( ERROR( ret ) )
-                break;
-
-            if( dwSize > pBuf->size()- 1 - sizeof( guint32 ) )
-            {
-                ret = -EBADMSG;
-                break;
-            }
-
-            memcpy( pNewBuf->ptr(),
-                pBuf->ptr() + 1 + sizeof( guint32 ),
-                dwSize );
-
+            pBuf->SetOffset( pBuf->offset() +
+                UXPKT_HEADER_SIZE ); 
+            pNewBuf = pBuf;
             ret = oHelper.ForwardToRemote(
                 byToken, pNewBuf );
 
@@ -996,7 +986,7 @@ gint32 CIfUxListeningRelayTask::OnIrpComplete(
         {
             BufPtr pCloseBuf( true );
             *pCloseBuf = tokClose;
-            ret = PostEvent( pCloseBuf );
+            PostEvent( pCloseBuf );
             break;
         }
         IrpCtxPtr& pCtx = pIrp->GetTopStack();
@@ -1203,9 +1193,6 @@ gint32 CIfUxSockTransRelayTask::RunTask()
             if( ret == STATUS_PENDING )
                 break;
 
-            if( ERROR( ret ) )
-                break;
-
             ret = OnTaskComplete( ret );
         }
         else
@@ -1274,6 +1261,8 @@ gint32 CIfUxSockTransRelayTask::RunTask()
                 if( !( pBuf == pPayload ) )
                     ret = -EBADMSG;
             }
+            if( ERROR( ret ) )
+                break;
         }
 
         if( ERROR( ret ) )
@@ -1285,6 +1274,63 @@ gint32 CIfUxSockTransRelayTask::RunTask()
     }while( 1 );
 
     return ret;
+}
+
+gint32 CIfUxSockTransRelayTask::Pause()
+{
+    if( IsPaused() )
+        return 0;
+
+    CIfUxRelayTaskHelper oHelper( this );
+
+    // stop watching the uxsock and uxsock's buffer
+    // will do the rest work
+    if( IsReading() )
+        oHelper.PauseReading( true );
+    else
+    {
+        // remove the irp which is still in the
+        // port driver.
+        ObjPtr pIrpObj;
+
+        CStdRTMutex oTaskLock( GetLock() );
+        CCfgOpener oCfg(
+            ( IConfigDb* )GetConfig() );
+
+        gint32 ret = oCfg.GetObjPtr(
+            propIrpPtr, pIrpObj );
+
+        if( SUCCEEDED( ret ) )
+        {
+            oCfg.RemoveProperty( propIrpPtr );
+
+            IrpPtr pIrp = pIrpObj;
+            CStdRMutex oIrpLock( pIrp->GetLock() );
+            ret = pIrp->CanContinue(
+                IRP_STATE_READY );
+
+            if( SUCCEEDED( ret ) )
+            {
+                // remove the callback of this task.
+                pIrp->RemoveCallback();
+            }
+        }
+    }
+
+    return super::Pause();
+}
+
+gint32 CIfUxSockTransRelayTask::Resume()
+{
+    if( !IsPaused() )
+        return 0;
+
+    CIfUxRelayTaskHelper oHelper( this );
+    // resume watching the uxsock
+    if( IsReading() )
+        oHelper.PauseReading( false );
+
+    return super::Resume();
 }
 
 CIfTcpStmTransTask::CIfTcpStmTransTask(
@@ -1360,14 +1406,20 @@ gint32 CIfTcpStmTransTask::OnIrpComplete(
     gint32 ret = 0;
 
     do{
+        if( !IsReading() && IsPaused() )
+        {
+            // keep the context and quit
+            // immediately till the task is
+            // resumed
+            ret = STATUS_PENDING;
+            break;
+        }
+
         RemoveProperty( propIrpPtr );
         RemoveProperty( propRespPtr );
 
         ret = HandleIrpResp( pIrp );
         if( ERROR( ret ) )
-            break;
-
-        if( IsPaused() )
             break;
 
         ret = ReRun();
@@ -1381,7 +1433,8 @@ gint32 CIfTcpStmTransTask::OnIrpComplete(
     return ret;
 }
 
-gint32 CIfTcpStmTransTask::OnComplete( gint32 iRet )
+gint32 CIfTcpStmTransTask::OnComplete(
+    gint32 iRet )
 {
     super::OnComplete( iRet );
     m_pUxStream.Clear();
@@ -1463,8 +1516,7 @@ gint32 CIfTcpStmTransTask::LocalToRemote(
 {
     gint32 ret = 0;
     BufPtr pBuf = pLocal;
-    guint32 dwHdrSize =
-        sizeof( guint8 ) + sizeof( guint32 );
+    guint32 dwHdrSize = UXPKT_HEADER_SIZE;
 
     switch( byToken )
     {
@@ -1482,7 +1534,9 @@ gint32 CIfTcpStmTransTask::LocalToRemote(
             if( pBuf->offset() >= dwHdrSize )
             {
                 // add the header ahead of the payload
-                pBuf->SetOffset( pBuf->offset() - dwHdrSize );
+                pBuf->SetOffset(
+                    pBuf->offset() - dwHdrSize );
+
                 pBuf->ptr()[ 0 ] = byToken;
                 memcpy( pBuf->ptr() + 1,
                     &dwSize, sizeof( dwSize ) );
@@ -1543,8 +1597,7 @@ gint32 CIfTcpStmTransTask::RemoteToLocal(
     BufPtr pBuf = pRemote;
     byToken = pBuf->ptr()[ 0 ];
 
-    guint32 dwHdrSize =
-        sizeof( guint8 ) + sizeof( guint32 );
+    guint32 dwHdrSize = UXPKT_HEADER_SIZE;
 
     switch( byToken )
     {
@@ -1610,23 +1663,11 @@ gint32 CIfTcpStmTransTask::PostEvent(
     {
     case tokPing:
     case tokPong:
-        {
-            ret = oHelper.ForwardToLocal(
-                byToken, pNewBuf );
-            break;
-        }
     case tokData:
     case tokProgress:
         {
-            guint32 dwHdrSize = sizeof( guint8 ) +
-                sizeof( guint32 );
-
-            pBuf->SetOffset(
-                pBuf->offset() + dwHdrSize );
-
             ret = oHelper.ForwardToLocal(
-                byToken, pBuf );
-
+                byToken, pNewBuf );
             break;
         }
     case tokClose:
@@ -1652,7 +1693,131 @@ gint32 CIfTcpStmTransTask::PostEvent(
         return ret;
 
     oHelper.PostTcpStmEvent(
-        byToken, pBuf );
+        byToken, pNewBuf );
+
+    return ret;
+}
+
+gint32 CIfTcpStmTransTask::Pause()
+{
+    gint32 ret = 0;
+    if( IsPaused() )
+        return ret;
+
+    do{
+        if( IsReading() )
+        {
+            // cancel the irp immediately if any
+            ret = CIfUxTaskBase::Pause();
+            break;
+        }
+        else
+        {
+            // let the ongoing irp to proceed
+            // till it is completed
+            CStdRTMutex oTaskLock( GetLock() );
+            guint32 dwState = GetTaskState();
+            if( dwState != stateStarted )
+            {
+                ret = ERROR_STATE;
+                break;
+            }
+
+            if( IsPaused() )
+                break;
+
+            m_dwFCState = statePaused;
+
+            // reset the task state
+            SetTaskState( stateStarting );
+            // don't cancel the irp
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CIfTcpStmTransTask::ResumeWriting()
+{
+    gint32 ret = 0;
+    do{
+        // let the ongoing irp to proceed
+        // till it is completed
+        CStdRTMutex oTaskLock( GetLock() );
+        guint32 dwState = GetTaskState();
+        if( dwState == stateStopped )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+
+        if( !IsPaused() )
+            break;
+
+        m_dwFCState = stateStarted;
+
+        CCfgOpener oCfg(
+            ( IConfigDb* )GetConfig() );
+
+        CIoManager* pMgr = nullptr;
+        ret = GET_IOMGR( oCfg, pMgr );
+        if( ERROR( ret ) )
+            break;
+
+        PIRP pIrp = nullptr;
+        gint32 ret = oCfg.GetPointer(
+            propIrpPtr, pIrp );
+
+        if( ERROR( ret ) )
+        {
+            TaskletPtr pTask( ( CTasklet* )this );
+            ret = pMgr->RescheduleTask( pTask );
+        }
+        else
+        {
+            intptr_t irpPtr = ( intptr_t )pIrp;
+            CStdRMutex oIrpLock( pIrp->GetLock() );
+            ret = pIrp->CanContinue(
+                IRP_STATE_READY );
+            if( SUCCEEDED( ret ) )
+            {
+                // the irp is still pending
+                // nothing to do
+                break;
+            }
+
+            // the irp is completed but not
+            // handled yet
+            ret = DEFER_CALL( pMgr, this,
+                &IEventSink::OnEvent,
+                eventIrpComp,
+                ( guint32 )irpPtr,
+                0, nullptr );
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CIfTcpStmTransTask::Resume()
+{
+    gint32 ret = 0;
+    if( !IsPaused() )
+        return 0;
+
+    do{
+        if( IsReading() )
+        {
+            ret = CIfUxTaskBase::Resume();
+        }
+        else
+        {
+            ret = ResumeWriting();
+        }
+
+    }while( 0 );
 
     return ret;
 }

@@ -513,7 +513,7 @@ struct CUnixSockStmRelayBase :
 
     bool  m_bTcpFlowCtrl = false;
     inline guint32 QueueLimit()
-    { return 5; }
+    { return STM_MAX_PACKATS_REPORT; }
 
     gint32 SendBdgeStmEvent(
         guint8 byToken, BufPtr& pBuf )
@@ -612,7 +612,12 @@ struct CUnixSockStmRelayBase :
             pQueue->push_back(
                 QUE_ELEM( byToken, pBuf ) ); 
 
-            if( pQueue->size() >= QueueLimit() )
+            if( pQueue->size() > QueueLimit() )
+            {
+                ret = ERROR_QUEUE_FULL;
+                break;
+            }
+            else if( pQueue->size() == QueueLimit() )
             {
                 // return error, but the request is
                 // queued still.
@@ -621,7 +626,7 @@ struct CUnixSockStmRelayBase :
 
                 // make sure the tokFlowCtrl is sent
                 // ahead of tokLift
-                DEFER_IFCALL_NOSCHED( pTask,
+                /*DEFER_IFCALL_NOSCHED( pTask,
                     ObjPtr( this ),
                     &CUnixSockStmRelayBase::ForwardToRemoteWrapper,
                     tokFlowCtrl, ( CBuffer* )pEmptyBuf );
@@ -631,8 +636,8 @@ struct CUnixSockStmRelayBase :
                 {
                     ( *pTask )( eventCancelTask );
                     break;
-                }
-
+                }*/
+                ForwardToRemote( tokFlowCtrl, pEmptyBuf );
                 ret = ERROR_QUEUE_FULL;
                 break;
             }
@@ -652,14 +657,25 @@ struct CUnixSockStmRelayBase :
                 if( ERROR( ret ) )
                     break;
 
-                ret = this->RunManagedTask(
-                    pResumeTask );
+                // cannot run directly, could deadlock
+                TaskletPtr pDeferTask;
+                ret = DEFER_CALL_NOSCHED( pDeferTask,
+                    ObjPtr( this ),
+                    &CRpcServices::RunManagedTask,
+                    pResumeTask, false );
+
+                if( ERROR( ret ) )
+                {
+                    ( *pResumeTask )( eventCancelTask );
+                    break;
+                }
+
+                ret = this->GetIoMgr()->RescheduleTask(
+                    pDeferTask );
 
                 if( ERROR( ret ) )
                     ( *pResumeTask )( eventCancelTask );
 
-                if( ret == STATUS_PENDING )
-                    ret = 0;
             }
 
         }while( 0 );
@@ -695,12 +711,6 @@ struct CUnixSockStmRelayBase :
             pQueue->push_back(
                 QUE_ELEM( byToken, pBuf ) ); 
 
-            if( m_bTcpFlowCtrl )
-            {
-                ret = ERROR_QUEUE_FULL;
-                break;
-            }
-
             if( pQueue->size() >= QueueLimit() )
             {
                 // return the error, but the request is
@@ -712,6 +722,9 @@ struct CUnixSockStmRelayBase :
             if( bEmpty )
             {
                 // wake up the writer task
+                // use defer call to avoid lock nesting
+                // among the tasks
+                //
                 CIoManager* pMgr = this->GetIoMgr();
                 // use defer call to avoid lock nesting
                 // among the tasks
@@ -850,16 +863,18 @@ struct CUnixSockStmRelayBase :
                 if( ERROR( ret ) )
                     break;
 
-                TaskletPtr pRmtResumeSend;
+                // TaskletPtr pRmtResumeSend;
                 BufPtr pEmptyBuf( true );
                 // send out the tokLift to the peer
-                ret = DEFER_IFCALL_NOSCHED(
+                /*ret = DEFER_IFCALL_NOSCHED(
                     pRmtResumeSend, pThis,
                     &CUnixSockStmRelayBase::ForwardToRemoteWrapper,
                     tokLift, pEmptyBuf );
 
                 if( ERROR( ret ) )
-                    break;
+                    break;*/
+
+                ForwardToRemote( tokLift, pEmptyBuf );
 
                 // wake up the writer task
                 TaskletPtr pResumeRead;
@@ -871,16 +886,15 @@ struct CUnixSockStmRelayBase :
                 if( ERROR( ret ) )
                     break;
 
+                oIfLock.Unlock();
+            
                 pTaskGrp->AppendTask( pResumeRead );
-                pTaskGrp->AppendTask( pRmtResumeSend );
+                // pTaskGrp->AppendTask( pRmtResumeSend );
                 TaskletPtr pTasks = ObjPtr( pTaskGrp );
 
-                ret = this->RunManagedTask( pTasks );
+                ret = this->AddSeqTask( pTasks );
                 if( ERROR( ret ) )
                     ( *pTasks )( eventCancelTask );
-
-                if( ret == STATUS_PENDING )
-                    ret = 0;
             }
 
         }while( 0 );
@@ -953,7 +967,7 @@ struct CUnixSockStmRelayBase :
         case tokError:
             {
                 BufPtr bufPtr( pBuf );
-                ret = PostTcpStmEvent(
+                ret = SendBdgeStmEvent(
                     byToken, bufPtr );
                 break;
             }
@@ -1030,7 +1044,6 @@ struct CUnixSockStmRelayBase :
 
             ( *pvecTasks )().push_back(
                 ObjPtr( this->m_pListeningTask ) );
-
         }
 
         if( !m_queToRemote.empty() )
@@ -1391,58 +1404,8 @@ class CIfUxSockTransRelayTask :
     gint32 OnTaskComplete( gint32 iRet );
     gint32 HandleIrpResp( IRP* pIrp );
 
-    gint32 Pause()
-    {
-        CIfUxRelayTaskHelper oHelper( this );
-
-        // stop watching the uxsock and uxsock's buffer
-        // will do the rest work
-        if( IsReading() )
-            oHelper.PauseReading( true );
-        else
-        {
-            // remove the irp which is still in the
-            // port driver.
-            ObjPtr pIrpObj;
-
-            CStdRTMutex oTaskLock( GetLock() );
-            CCfgOpener oCfg(
-                ( IConfigDb* )GetConfig() );
-
-            gint32 ret = oCfg.GetObjPtr(
-                propIrpPtr, pIrpObj );
-
-            if( SUCCEEDED( ret ) )
-            {
-                oCfg.RemoveProperty( propIrpPtr );
-                IrpPtr pIrp = pIrpObj;
-                RemoveProperty( propIrpPtr );
-
-                CStdRMutex oIrpLock( pIrp->GetLock() );
-                ret = pIrp->CanContinue(
-                    IRP_STATE_READY );
-
-                if( SUCCEEDED( ret ) )
-                {
-                    // remove the callback pointing to
-                    // this task.
-                    pIrp->RemoveCallback();
-                }
-            }
-        }
-
-        return super::Pause();
-    }
-
-    gint32 Resume()
-    {
-        CIfUxRelayTaskHelper oHelper( this );
-        // resume watching the uxsock
-        if( IsReading() )
-            oHelper.PauseReading( false );
-
-        return super::Resume();
-    }
+    gint32 Pause();
+    gint32 Resume();
 };
 
 class CIfUxListeningRelayTask :
@@ -1459,24 +1422,6 @@ class CIfUxListeningRelayTask :
     gint32 OnIrpComplete( IRP* pIrp );
     gint32 PostEvent( BufPtr& pBuf );
     gint32 OnTaskComplete( gint32 iRet );
-
-    gint32 Pause()
-    {
-        CIfUxRelayTaskHelper oHelper( this );
-
-        // stop watching the uxsock and
-        // uxsock's buffer will do the
-        // rest work
-        oHelper.PauseReading( true );
-        return super::Pause();
-    }
-    gint32 Resume()
-    {
-        CIfUxRelayTaskHelper oHelper( this );
-        // resume watching the uxsock
-        oHelper.PauseReading( false );
-        return super::Pause();
-    }
 };
 
 
@@ -1485,6 +1430,9 @@ class CIfTcpStmTransTask :
 {
 
     InterfPtr m_pBdgeIf;
+
+    protected:
+    gint32 ResumeWriting();
 
     public:
     typedef CIfUxSockTransRelayTask super;
@@ -1495,11 +1443,6 @@ class CIfTcpStmTransTask :
     gint32 OnComplete( gint32 iRet );
     gint32 RunTask();
 
-    // whether reading from the uxsock or writing to
-    // the uxsock
-    inline bool IsReading()
-    { return m_bIn; }
-
     gint32 HandleIrpResp( IRP* pIrp );
     gint32 PostEvent( BufPtr& pBuf );
 
@@ -1508,4 +1451,7 @@ class CIfTcpStmTransTask :
 
     gint32 RemoteToLocal( BufPtr& pRemote,
         guint8& byToken, BufPtr& pLocal );
+
+    gint32 Pause();
+    gint32 Resume();
 };

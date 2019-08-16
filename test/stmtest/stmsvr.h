@@ -155,6 +155,10 @@ class CMyStreamServer :
     // mandatory
     gint32 OnConnected( HANDLE hChannel );
 
+    virtual gint32 OnClose(
+        HANDLE hChannel,
+        IEventSink* pCallback = nullptr );
+
     // mandatory
     // data is ready for reading
     gint32 OnStmRecv(

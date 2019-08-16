@@ -524,6 +524,7 @@ CIoWatchTask::CIoWatchTask( const IConfigDb* pCfg )
     m_iFd( -1 ),
     m_hReadWatch( INVALID_HANDLE ),
     m_hWriteWatch( INVALID_HANDLE ),
+    m_hErrWatch( INVALID_HANDLE ),
     m_oRecvFilter( GetFd( pCfg ) ),
     m_oSendQue( GetFd( pCfg ) ),
     m_qwBytesRead( 0 ),
@@ -754,6 +755,18 @@ gint32 CIoWatchTask::RunTask()
             break;
         }
 
+        oCfg[ 1 ] = ( guint32 )0;
+        ret = pLoop->AddIoWatch(
+            pTask, m_hErrWatch );
+
+        if( ERROR( ret ) )
+        {
+            pLoop->RemoveIoWatch(
+                m_hErrWatch );
+            m_hErrWatch = INVALID_HANDLE;
+            break;
+        }
+
         // pLoop->StartSource( m_hReadWatch, srcIo );
         
         // return STATUS_PENDING to wait for IO
@@ -887,17 +900,49 @@ gint32 CIoWatchTask::StartStopWatch(
     if( pPort == nullptr )
         return -EFAULT;
 
-    CIoManager* pMgr = pPort->GetIoMgr();
-    CMainIoLoop* pLoop = pMgr->GetMainIoLoop();
-#ifdef _USE_LIBEV
-    HANDLE hWatch = m_hWriteWatch;
-    if( unlikely( bWrite == false ) )
-        hWatch = m_hReadWatch;
+    do{
+        CIoManager* pMgr = pPort->GetIoMgr();
+        CMainIoLoop* pLoop = pMgr->GetMainIoLoop();
 
-    if( bStop )
-        ret = pLoop->StopSource( hWatch, srcIo );
-    else
-        ret = pLoop->StartSource( hWatch, srcIo );
+#ifdef _USE_LIBEV
+        HANDLE hWatch = m_hWriteWatch;
+        if( unlikely( bWrite == false ) )
+            hWatch = m_hReadWatch;
+
+        if( bWrite )
+        {
+            if( bStop )
+                ret = pLoop->StopSource(
+                    hWatch, srcIo );
+            else
+                ret = pLoop->StartSource(
+                    hWatch, srcIo );
+        }
+        else
+        {
+            HANDLE hStartWatch = INVALID_HANDLE;
+            if( bStop )
+            {
+                hStartWatch = m_hErrWatch;
+                hWatch = m_hReadWatch;
+            }
+            else
+            {
+                hStartWatch = m_hReadWatch;
+                hWatch = m_hErrWatch;
+            }
+
+            ret = pLoop->StopSource(
+                hWatch, srcIo );
+
+            if( ERROR( ret ) )
+                break;
+
+            ret = pLoop->StartSource(
+                hStartWatch, srcIo );
+        }
+
+    }while( 0 );
 #else
     // not implemented yet
 

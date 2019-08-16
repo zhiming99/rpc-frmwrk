@@ -118,7 +118,7 @@ class CIfUxTaskBase :
             if( !IsPaused() )
                 break;
 
-            m_dwFCState = stateConnected;
+            m_dwFCState = stateStarted;
 
             CCfgOpener oCfg(
                 ( IConfigDb* )GetConfig() );
@@ -332,8 +332,10 @@ class CFlowControl
     EnumFCState IncTxBytes( const BufPtr& pBuf )
     {
         EnumFCState ret = fcsKeep;
-        bool bAboveLast = false;
-        bool bAbove = false;
+        bool bAboveLastBytes = false;
+        bool bAboveLastPkts = false;
+        bool bAboveBytes = false;
+        bool bAbovePkts = false;
 
         if( pBuf.IsEmpty() || pBuf->empty() )
             return ret;
@@ -341,21 +343,28 @@ class CFlowControl
         CStdRMutex oLock( GetLock() );
 
         if( m_qwTxBytes - m_qwAckTxBytes >=
-            STM_MAX_PENDING_WRITE ||
-            m_dwTxPkts - m_dwAckTxPkts >=
+            STM_MAX_PENDING_WRITE )
+            bAboveLastBytes = true;
+
+        if( m_dwTxPkts - m_dwAckTxPkts >=
             STM_MAX_PACKATS_REPORT )
-            bAboveLast = true;
+            bAboveLastPkts = true;
 
         m_qwTxBytes += pBuf->size();
         m_dwTxPkts++;
 
         if( m_qwTxBytes - m_qwAckTxBytes >=
-            STM_MAX_PENDING_WRITE ||
-            m_dwTxPkts - m_dwAckTxPkts >=
-            STM_MAX_PACKATS_REPORT )
-            bAbove = true;
+            STM_MAX_PENDING_WRITE )
+            bAboveBytes = true;
 
-        if( bAboveLast != bAbove )
+        if( m_dwTxPkts - m_dwAckTxPkts >=
+            STM_MAX_PACKATS_REPORT )
+            bAbovePkts = true;
+
+        // get the flow control to take effect
+        // immediately
+        if( bAboveLastBytes != bAboveBytes ||
+            bAboveLastPkts != bAbovePkts )
             ret = IncFCCount();
 
         return ret;
@@ -365,8 +374,10 @@ class CFlowControl
     {
         EnumFCState ret = fcsKeep;
 
-        bool bAboveLast = false;
-        bool bAbove = false;
+        bool bAboveLastBytes = false;
+        bool bAboveLastPkts = false;
+        bool bAboveBytes = false;
+        bool bAbovePkts = false;
 
         if( pBuf.IsEmpty() || pBuf->empty() )
             return ret;
@@ -374,21 +385,26 @@ class CFlowControl
         CStdRMutex oLock( GetLock() );
 
         if( m_qwRxBytes - m_qwAckRxBytes >=
-            STM_MAX_PENDING_WRITE ||
-            m_dwRxPkts - m_dwAckRxPkts >=
+            STM_MAX_PENDING_WRITE )
+            bAboveLastBytes = true;
+
+        if( m_dwRxPkts - m_dwAckRxPkts >=
             STM_MAX_PACKATS_REPORT )
-            bAboveLast = true;
+            bAboveLastPkts = true;
 
         m_qwRxBytes += pBuf->size();
         m_dwRxPkts++;
 
         if( m_qwRxBytes - m_qwAckRxBytes >=
-            STM_MAX_PENDING_WRITE ||
-            m_dwRxPkts - m_dwAckRxPkts >=
-            STM_MAX_PACKATS_REPORT )
-            bAbove = true;
+            STM_MAX_PENDING_WRITE  )
+            bAboveBytes = true;
 
-        if( bAboveLast != bAbove )
+        if( m_dwRxPkts - m_dwAckRxPkts >=
+            STM_MAX_PACKATS_REPORT )
+            bAbovePkts = true;
+
+        if( bAboveLastBytes != bAboveBytes ||
+            bAboveLastPkts != bAbovePkts )
         {
             ret = fcsReport;
             m_qwAckRxBytes = m_qwRxBytes;
@@ -821,14 +837,14 @@ class CUnixSockStream:
                 CfgPtr pProgress =
                     m_oFlowCtrl.GetReport();
 
-                BufPtr pBuf( true );
-                pProgress->Serialize( *pBuf );
+                BufPtr pRptBuf( true );
+                pProgress->Serialize( *pRptBuf );
 
                 TaskletPtr pDummy;
                 ret = pDummy.NewObj( clsid( CIfDummyTask ) );
                 if( ERROR( ret ) )
                     break;
-                ret = SendProgress( pBuf, pDummy );
+                ret = SendProgress( pRptBuf, pDummy );
             }
             else
             {
@@ -924,7 +940,7 @@ class CUnixSockStream:
         return ret;
     }
 
-    gint32 OnProgress( CBuffer* pBuf )
+    virtual gint32 OnProgress( CBuffer* pBuf )
     {
         gint32 ret = 0;
 
@@ -1153,6 +1169,7 @@ class CUnixSockStream:
             ret = m_oFlowCtrl.IncTxBytes( pBuf );
             if( ret == fcsFlowCtrl )
             {
+                oLock.Unlock();
                 BufPtr pEmptyBuf( true );
                 ret = PostUxStreamEvent(
                     tokFlowCtrl, pEmptyBuf );

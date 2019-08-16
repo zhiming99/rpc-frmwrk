@@ -90,6 +90,14 @@ gint32 CMyStreamServer::OnStmRecv(
     return 0;
 }
 
+gint32 CMyStreamServer::OnClose(
+    HANDLE hChannel,
+    IEventSink* pCallback )
+{
+    iMsgCount = 0;
+    return 0;
+}
+
 static FactoryPtr InitClassFactory()
 {
     BEGIN_FACTORY_MAPS;
