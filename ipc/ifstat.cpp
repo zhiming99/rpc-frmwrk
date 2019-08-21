@@ -983,6 +983,7 @@ gint32 CUnixSockStmState::SetupOpenPortParams(
     oCfg.CopyProp( propFd, this );
     oCfg.CopyProp( propTimeoutSec, this );
     oCfg.CopyProp( propKeepAliveSec, this );
+    oCfg.CopyProp( propListenOnly, this );
 
     return 0;
 }

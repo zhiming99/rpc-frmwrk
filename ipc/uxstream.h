@@ -62,7 +62,6 @@ class CIfUxTaskBase :
 
             m_dwFCState = statePaused;
 
-            // reset the task state
             SetTaskState( stateStarting );
 
             CCfgOpener oCfg(
@@ -129,8 +128,9 @@ class CIfUxTaskBase :
                 break;
             oLock.Unlock();
 
-            TaskletPtr pTask( this );
-            pMgr->RescheduleTask( pTask );
+            ret = DEFER_CALL( pMgr, this,
+                &IEventSink::OnEvent,
+                eventZero, 0, 0, nullptr );
 
         }while( 0 );
 
@@ -155,8 +155,9 @@ class CIfUxTaskBase :
                 break;
 
             oLock.Unlock();
-            TaskletPtr pTask( this );
-            ret = pMgr->RescheduleTask( pTask );
+            ret = DEFER_CALL( pMgr, this,
+                &IEventSink::OnEvent,
+                eventZero, 0, 0, nullptr );
 
         }while( 0 );
 

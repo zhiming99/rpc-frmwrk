@@ -762,7 +762,9 @@ gint32 CIoWatchTask::RunTask()
         if( ERROR( ret ) )
         {
             pLoop->RemoveIoWatch(
-                m_hErrWatch );
+                m_hReadWatch );
+            pLoop->RemoveIoWatch(
+                m_hWriteWatch );
             m_hErrWatch = INVALID_HANDLE;
             break;
         }
@@ -1050,8 +1052,10 @@ gint32 CIoWatchTask::ReleaseChannel()
 
         pLoop->RemoveIoWatch( m_hReadWatch );
         pLoop->RemoveIoWatch( m_hWriteWatch );
+        pLoop->RemoveIoWatch( m_hErrWatch );
         m_hReadWatch = INVALID_HANDLE;
         m_hWriteWatch = INVALID_HANDLE;
+        m_hErrWatch = INVALID_HANDLE;
         StopTimer();
 
     }while( 0 );
@@ -1140,6 +1144,14 @@ CUnixSockStmPdo::CUnixSockStmPdo(
 
         if( ERROR( ret ) )
             break;
+
+        ret = oCfg.GetBoolProp(
+            propListenOnly, m_bListenOnly );
+
+        if( ERROR( ret ) )
+            m_bListenOnly = false;
+
+        ret = 0;
 
     }while( 0 );
 
@@ -1700,7 +1712,6 @@ gint32 CUnixSockStmPdo::SendNotify(
     guint8 byToken, BufPtr& pBuf )
 {
     gint32 ret = 0;
-    IrpPtr pEventIrp;
 
     CStdRMutex oPortLock( GetLock() );
     guint32 dwPortState = GetPortState();
@@ -1708,6 +1719,11 @@ gint32 CUnixSockStmPdo::SendNotify(
          || dwPortState == PORT_STATE_BUSY_SHARED ) )
         return ERROR_STATE;
         
+    CIoWatchTask* pTask = m_pIoWatch;
+    if( pTask == nullptr )
+        return -EFAULT;
+
+    IrpPtr pEventIrp;
     if( !m_queListeningIrps.empty() )
     {
         pEventIrp = m_queListeningIrps.front(); 
@@ -1735,6 +1751,7 @@ gint32 CUnixSockStmPdo::SendNotify(
                     pBuf->size() );
                 break;
             }
+        case tokData:
         case tokProgress:
             {
                 if( pBuf.IsEmpty() || pBuf->empty() )
@@ -1747,14 +1764,14 @@ gint32 CUnixSockStmPdo::SendNotify(
                 {
                     pBuf->SetOffset( pBuf->offset() -
                         UXPKT_HEADER_SIZE );
-                    pBuf->ptr()[ 0 ] = tokProgress;
+                    pBuf->ptr()[ 0 ] = byToken;
                     memcpy( pBuf->ptr() + 1,
                         &dwSize, sizeof( dwSize ) );
                     pEvtBuf = pBuf;
                 }
                 else
                 {
-                    *pEvtBuf = tokProgress;
+                    *pEvtBuf = byToken;
                     pEvtBuf->Append( ( guint8* )&dwSize,
                         sizeof( dwSize ) );
                     pEvtBuf->Append( ( guint8* )pBuf->ptr(),
@@ -1771,6 +1788,12 @@ gint32 CUnixSockStmPdo::SendNotify(
             return ret;
 
         m_queEventPackets.push_back( pEvtBuf );
+        if( m_queEventPackets.size() >=
+            STM_MAX_QUEUE_SIZE )
+        {
+            // stop reading from the unix sock
+            pTask->StopWatch( false );
+        }
     }
 
     oPortLock.Unlock();
@@ -1815,6 +1838,7 @@ gint32 CUnixSockStmPdo::SendNotify(
             pCtx->SetStatus( ret = 0 );
             break;
         }
+    case tokData:
     case tokProgress:
         {
             guint32 dwSize = pBuf->size();
@@ -1823,7 +1847,7 @@ gint32 CUnixSockStmPdo::SendNotify(
             {
                 pBuf->SetOffset( pBuf->offset() -
                     UXPKT_HEADER_SIZE );
-                pBuf->ptr()[ 0 ] = tokProgress;
+                pBuf->ptr()[ 0 ] = byToken;
                 memcpy( pBuf->ptr() + 1, 
                     &dwSize, sizeof( dwSize ) );
                 pRespBuf = pBuf;
@@ -1832,7 +1856,7 @@ gint32 CUnixSockStmPdo::SendNotify(
             {
                 pRespBuf->Resize( sizeof( guint8 ) +
                     sizeof( guint32 ) );
-                pRespBuf->ptr()[ 0 ] = tokProgress;
+                pRespBuf->ptr()[ 0 ] = byToken;
                 memcpy( pRespBuf->ptr() + 1, 
                     &dwSize, sizeof( dwSize ) );
                 pRespBuf->Append(
@@ -1857,8 +1881,8 @@ gint32 CUnixSockStmPdo::SendNotify(
     {
         oPortLock.Lock();
         guint32 dwPortState = GetPortState();
-        if( !( dwPortState == PORT_STATE_READY
-             || dwPortState == PORT_STATE_BUSY_SHARED ) )
+        if( dwPortState != PORT_STATE_READY &&
+            dwPortState != PORT_STATE_BUSY_SHARED )
         {
             IrpCtxPtr pCtx =
                 pEventIrp->GetTopStack();
@@ -1893,6 +1917,13 @@ gint32 CUnixSockStmPdo::OnStmRecv(
 
     gint32 ret = 0;
     do{
+        if( m_bListenOnly )
+        {
+            // forward the data to the listening queue
+            ret = OnUxSockEvent( tokData, pBuf );
+            break;
+        }
+
         CIoWatchTask* pTask = m_pIoWatch;
         if( pTask == nullptr )
         {

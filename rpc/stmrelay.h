@@ -513,7 +513,7 @@ struct CUnixSockStmRelayBase :
 
     bool  m_bTcpFlowCtrl = false;
     inline guint32 QueueLimit()
-    { return STM_MAX_PACKATS_REPORT; }
+    { return STM_MAX_PACKATS_REPORT + 4; }
 
     gint32 SendBdgeStmEvent(
         guint8 byToken, BufPtr& pBuf )
@@ -599,6 +599,126 @@ struct CUnixSockStmRelayBase :
         return 0;
     }
 
+    gint32 ForwardToRemoteUrgent(
+        guint8 byToken, BufPtr& pBuf )
+    {
+        gint32 ret = 0;
+
+        do{
+            if( byToken != tokFlowCtrl &&
+                byToken != tokLift &&
+                byToken != tokClose )
+            {
+                ret = -EINVAL;
+                break;
+            }
+
+            SENDQUE* pQueue = &m_queToRemote;
+            guint8 byHead = tokInvalid;
+
+            if( !pQueue->empty() )
+                byHead = pQueue->front().first;
+
+            do{
+                ret = 0;
+
+                if( byHead == tokInvalid )
+                    break;
+
+                // continue to queue the token
+                if( byToken == tokClose )
+                    break;
+
+                if( byHead == tokClose )
+                {
+                    // `close' is to send, no need of
+                    // flow control any more
+                    ret = -EEXIST;
+                    break;
+                }
+
+                if( byHead != tokFlowCtrl &&
+                    byHead != tokLift )
+                    break;
+
+                SENDQUE::iterator pre =
+                    pQueue->begin();
+
+                SENDQUE::iterator itr =
+                    pre + 1;
+
+                while( itr != pQueue->end() )
+                {
+                    byHead = itr->first;
+
+                    if( byHead != tokFlowCtrl &&
+                        byHead != tokLift )
+                        break;
+
+                    pre = itr;
+                    ++itr;
+                }
+
+                byHead = pre->first;
+
+                // stop to queue the token
+                if( byHead == byToken )
+                {
+                    ret = -EEXIST;
+                    break;
+                }
+
+                // the two are canceled
+                if( byHead == tokFlowCtrl &&
+                    byToken == tokLift )
+                {
+                    pre = pQueue->erase( pre );
+                    ret = -EEXIST;
+                    break;
+                }
+
+                // insert the token after all the
+                // urgent tokens
+                if( byHead == tokLift &&
+                    byToken == tokFlowCtrl )
+                {
+                    if( itr == pQueue->end() )
+                    {
+                        pQueue->push_back(
+                            QUE_ELEM( byToken, pBuf ) );
+                    }
+                    else
+                    {
+                        pQueue->insert( itr,
+                            QUE_ELEM( byToken, pBuf ) );
+                    }
+                    ret = -EEXIST;
+                    break;
+                }
+
+            }while( 0 );
+
+            if( SUCCEEDED( ret ) )
+            {
+                pQueue->push_front(
+                    QUE_ELEM( byToken, pBuf ) ); 
+            }
+            else if( ret != -EEXIST )
+            {
+                ret = 0;
+                break;
+            }
+
+            CIoManager* pMgr = this->GetIoMgr();
+            ret = DEFER_CALL( pMgr,
+                ObjPtr( m_pWrTcpStmTask ),
+                &CIfUxTaskBase::Resume );
+
+        }while( 0 );
+
+        return ret;
+    }
+
     gint32 ForwardToLocal(
         guint8 byToken, BufPtr& pBuf )
     {
@@ -624,20 +744,7 @@ struct CUnixSockStmRelayBase :
                 TaskletPtr pTask;
                 BufPtr pEmptyBuf( true );
 
-                // make sure the tokFlowCtrl is sent
-                // ahead of tokLift
-                /*DEFER_IFCALL_NOSCHED( pTask,
-                    ObjPtr( this ),
-                    &CUnixSockStmRelayBase::ForwardToRemoteWrapper,
-                    tokFlowCtrl, ( CBuffer* )pEmptyBuf );
-
-                ret = this->AddSeqTask( pTask );
-                if( ERROR( ret ) )
-                {
-                    ( *pTask )( eventCancelTask );
-                    break;
-                }*/
-                ForwardToRemote( tokFlowCtrl, pEmptyBuf );
+                ForwardToRemoteUrgent( tokFlowCtrl, pEmptyBuf );
                 ret = ERROR_QUEUE_FULL;
                 break;
             }
@@ -744,14 +851,14 @@ struct CUnixSockStmRelayBase :
         gint32 ret = 0;
 
         do{
+            CIfUxTaskBase* pReadTask =
+                this->m_pListeningTask;
+
+            CStdRTMutex oTaskLock(
+                pReadTask->GetLock() );
+
             CStdRMutex oIfLock( this->GetLock() );
             SENDQUE* pQueue = &m_queToRemote;
-
-            if( m_bTcpFlowCtrl )
-            {
-                ret = -ENOENT;
-                break;
-            }
 
             if( pQueue->empty() )
             {
@@ -759,39 +866,31 @@ struct CUnixSockStmRelayBase :
                 break;
             }
 
-            bool bFull =
-                pQueue->size() >= QueueLimit();
-
             byToken = pQueue->front().first;
             pBuf = pQueue->front().second;
-            pQueue->pop_front();
 
-            if( !bFull )
-                break;
+            if( m_bTcpFlowCtrl )
+            {
+                if( byToken != tokFlowCtrl &&
+                    byToken != tokLift &&
+                    byToken != tokClose )
+                {
+                    ret = -ENOENT;
+                    break;
+                }
+            }
+
+            pQueue->pop_front();
 
             if( pQueue->size() >= QueueLimit() )
                 break;
 
-            CIoManager* pMgr = this->GetIoMgr();
-            ObjVecPtr pvecTasks( true );
-
-            ( *pvecTasks )().push_back(
-                ObjPtr( this->m_pReadingTask ) );
-
-            ( *pvecTasks )().push_back(
-                ObjPtr( this->m_pListeningTask ) );
-
-            ObjPtr pTasks = pvecTasks;
-            oIfLock.Unlock();
-
-            if( ( *pvecTasks )().empty() )
+            if( !pReadTask->IsPaused() )
                 break;
 
-            // wake up ux stream reader task
-            DEFER_CALL( pMgr,
-                ObjPtr( this ),
-                &CUnixSockStmRelayBase::PauseResumeTasks,
-                pTasks, ( bool )true );
+            oIfLock.Unlock();
+
+            PauseResumeTask( pReadTask, true );
 
         }while( 0 );
 
@@ -828,6 +927,12 @@ struct CUnixSockStmRelayBase :
         gint32 ret = 0;
 
         do{
+            CIfUxTaskBase* pReadTask =
+                m_pRdTcpStmTask;
+
+            CStdRTMutex oReadLock(
+                pReadTask->GetLock() );
+
             CStdRMutex oIfLock( this->GetLock() );
             SENDQUE* pQueue = &m_queToLocal;
 
@@ -865,36 +970,11 @@ struct CUnixSockStmRelayBase :
 
                 // TaskletPtr pRmtResumeSend;
                 BufPtr pEmptyBuf( true );
-                // send out the tokLift to the peer
-                /*ret = DEFER_IFCALL_NOSCHED(
-                    pRmtResumeSend, pThis,
-                    &CUnixSockStmRelayBase::ForwardToRemoteWrapper,
-                    tokLift, pEmptyBuf );
-
-                if( ERROR( ret ) )
-                    break;*/
-
-                ForwardToRemote( tokLift, pEmptyBuf );
-
-                // wake up the writer task
-                TaskletPtr pResumeRead;
-                ret = DEFER_IFCALL_NOSCHED(
-                    pResumeRead, pThis,
-                    &CUnixSockStmRelayBase::PauseResumeTask,
-                    ( IEventSink* )m_pRdTcpStmTask, true );
-
-                if( ERROR( ret ) )
-                    break;
-
+                ForwardToRemoteUrgent( tokLift, pEmptyBuf );
                 oIfLock.Unlock();
-            
-                pTaskGrp->AppendTask( pResumeRead );
-                // pTaskGrp->AppendTask( pRmtResumeSend );
-                TaskletPtr pTasks = ObjPtr( pTaskGrp );
 
-                ret = this->AddSeqTask( pTasks );
-                if( ERROR( ret ) )
-                    ( *pTasks )( eventCancelTask );
+                PauseResumeTask( pReadTask, true );
+
             }
 
         }while( 0 );
@@ -1037,14 +1117,6 @@ struct CUnixSockStmRelayBase :
         m_bTcpFlowCtrl = false;
 
         ObjVecPtr pvecTasks( true );
-        if( m_queToRemote.size() < QueueLimit() )
-        {
-            ( *pvecTasks )().push_back(
-                ObjPtr( this->m_pReadingTask ) );
-
-            ( *pvecTasks )().push_back(
-                ObjPtr( this->m_pListeningTask ) );
-        }
 
         if( !m_queToRemote.empty() )
         {
@@ -1147,19 +1219,8 @@ struct CUnixSockStmRelayBase :
             oParams.CopyProp(
                 propKeepAliveSec, this );
 
-            // ux stream reader
-            oParams.Push( ( bool )true );
-            ret = this->m_pReadingTask.NewObj(
-                clsid( CIfUxSockTransRelayTask ),
-                oParams.GetCfg() );
-            if( ERROR( ret ) )
-                break;
-
-            ret = this->GetIoMgr()->
-                RescheduleTask( this->m_pReadingTask );
-
             // ux stream writer
-            oParams.SetBoolProp( 0, false );
+            oParams.Push( false );
             ret = m_pWritingTask.NewObj(
                 clsid( CIfUxSockTransRelayTask ),
                 oParams.GetCfg() );
@@ -1422,8 +1483,26 @@ class CIfUxListeningRelayTask :
     gint32 OnIrpComplete( IRP* pIrp );
     gint32 PostEvent( BufPtr& pBuf );
     gint32 OnTaskComplete( gint32 iRet );
-};
 
+    gint32 Pause()
+    {
+        CIfUxRelayTaskHelper oHelper( this );
+
+        // stop watching the uxsock and
+        // uxsock's buffer will do the
+        // rest work
+        oHelper.PauseReading( true );
+        return super::Pause();
+    }
+
+    gint32 Resume()
+    {
+        CIfUxRelayTaskHelper oHelper( this );
+        // resume watching the uxsock
+        oHelper.PauseReading( false );
+        return super::Resume();
+    }
+};
 
 class CIfTcpStmTransTask :
     public CIfUxSockTransRelayTask

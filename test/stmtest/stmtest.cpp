@@ -243,7 +243,7 @@ void CIfSmokeTest::testCliStartStop()
 
         dwCount = 0;
         printf( "Writing to server2... \n" );
-        while( dwCount < 2560 )
+        while( dwCount < 100000 )
         {
             std::string strMsg = DebugMsg( dwCount,
                 "a message to server" );

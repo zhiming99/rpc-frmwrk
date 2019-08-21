@@ -173,8 +173,8 @@ gint32 CStreamServerRelay::OnFetchDataComplete(
         if( ERROR( ret ) )
             break;
 
-        // we need to do the following things before
-        // reponse to the remote client
+        // we need to do the following things
+        // before reponse to the remote client
         //
         // 1. create and start the uxstream proxy
         InterfPtr pUxIf;
@@ -191,6 +191,11 @@ gint32 CStreamServerRelay::OnFetchDataComplete(
 
         oUxIf.SetIntProp( propStreamId,
             ( guint32& )iStmId );
+
+        // use CIfUxListeningRelayTask to
+        // receive incoming stream as well as
+        // events.
+        oUxIf.SetBoolProp( propListenOnly, true );
 
         CParamList oParams;
         oParams[ propIfPtr ] = ObjPtr( this );
@@ -353,6 +358,8 @@ gint32 CStreamProxyRelay::OnFetchDataComplete(
 
         oUxIf.SetIntProp( propStreamId,
             ( guint32& )iStmId );
+
+        oUxIf.SetBoolProp( propListenOnly, true );
 
         CParamList oParams;
         oParams[ propIsServer ] = ( bool )true;
@@ -827,9 +834,6 @@ gint32 CIfUxListeningRelayTask::RunTask()
         if( ret == STATUS_PENDING )
             break;
 
-        if( ERROR( ret ) )
-            break;
-
         ret = OnTaskComplete( ret );
         if( ret == STATUS_PENDING )
             break;
@@ -913,6 +917,7 @@ gint32 CIfUxListeningRelayTask::PostEvent(
                 byToken, pEmptyBuf );
             break;
         }
+    case tokData:
     case tokProgress:
         {
             pBuf->SetOffset( pBuf->offset() +
@@ -958,7 +963,7 @@ gint32 CIfUxListeningRelayTask::PostEvent(
     if( ERROR( ret ) )
         return ret;
 
-    ret = oHelper.PostUxSockEvent(
+    oHelper.PostUxSockEvent(
         byToken, pNewBuf );
 
     return ret;
@@ -1000,6 +1005,9 @@ gint32 CIfUxListeningRelayTask::OnIrpComplete(
 
         ret = PostEvent( pCtx->m_pRespData );
         if( ERROR( ret ) )
+            break;
+
+        if( ret == STATUS_PENDING )
             break;
 
         oCfg.RemoveProperty( propIrpPtr );
@@ -1161,7 +1169,7 @@ gint32 CIfUxSockTransRelayTask::OnIrpComplete(
         if( ERROR( ret ) )
             break;
 
-        if( IsPaused() )
+        if( ret == STATUS_PENDING )
             break;
 
         ret = ReRun();
@@ -1420,6 +1428,9 @@ gint32 CIfTcpStmTransTask::OnIrpComplete(
 
         ret = HandleIrpResp( pIrp );
         if( ERROR( ret ) )
+            break;
+
+        if( ret == STATUS_PENDING )
             break;
 
         ret = ReRun();
@@ -1772,7 +1783,12 @@ gint32 CIfTcpStmTransTask::ResumeWriting()
         if( ERROR( ret ) )
         {
             TaskletPtr pTask( ( CTasklet* )this );
-            ret = pMgr->RescheduleTask( pTask );
+            // ret = pMgr->RescheduleTask( pTask );
+            // the irp is completed but not
+            // handled yet
+            ret = DEFER_CALL( pMgr, this,
+                &IEventSink::OnEvent,
+                eventZero, 0, 0, nullptr );
         }
         else
         {

@@ -4559,10 +4559,12 @@ gint32 CRpcServices::AddSeqTask(
         {
             // m_pSeqTasks is already running
 #ifdef DEBUG
+            /*
             DebugPrint( ret, "a task is queued..." );
             std::string strDump;
             this->Dump( strDump );
             DebugPrint( ret, "for class %s", strDump.c_str() );
+            */
 #endif
         }
         break;
@@ -5389,8 +5391,6 @@ gint32 CInterfaceServer::DoInvoke_SendData(
     CParamList& oResp )
 {
     gint32 ret = 0;
-    bool bCloseFile = false;
-    gint32 iFd2Close = -1;
 
     do{
         CCfgOpenerObj oCfg( this );

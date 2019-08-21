@@ -95,7 +95,8 @@ gint32 CMyStreamServer::OnClose(
     IEventSink* pCallback )
 {
     iMsgCount = 0;
-    return 0;
+    return super::OnClose(
+        hChannel, pCallback );
 }
 
 static FactoryPtr InitClassFactory()

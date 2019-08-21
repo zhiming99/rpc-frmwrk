@@ -33,7 +33,7 @@
 #define STM_MAX_PENDING_WRITE ( 1 * 1024 * 1024 )
 #define STM_MAX_PACKATS_REPORT 32
 
-#define STM_MAX_QUEUE_SIZE  100
+#define STM_MAX_QUEUE_SIZE  128
 #define UXPKT_HEADER_SIZE   ( sizeof( guint32 ) + sizeof( guint8 ) )
 #define UXBUF_OVERHEAD      8
 
@@ -334,6 +334,7 @@ class CUnixSockStmPdo : public CPort
     bool    m_bStopReady = false;
     // flag to allow or deny incoming data
     bool    m_bFlowCtrl = false;
+    bool    m_bListenOnly = false;
 
     protected:
 
