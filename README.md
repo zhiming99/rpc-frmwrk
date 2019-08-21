@@ -23,6 +23,12 @@ This framework depends on the following packags:
 11. `Streaming support to provide double-direction stream transfer`
 
 ---
+[`Wed 21 Aug 2019 08:13:14 AM Beijing`]   
+1. Encountered a concurrency problem in the router's stream flow-control these days. However it should be soon to be fixed.
+
+[`Fri 16 Aug 2019 09:04:06 PM Beijing`]   
+1. The stream channel can finally flow smoothly. There should still be some bugs around. Still need sometime to get it stable. Congratulations!   
+
 [`Sun 11 Aug 2019 07:11:55 PM Beijing`]
 1. FetchData works now. And moving on to the streaming data transfer over the tcp connection. I can see the light at the end of the tunnel...   
 
