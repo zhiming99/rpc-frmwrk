@@ -23,6 +23,11 @@ This framework depends on the following packags:
 11. `Streaming support to provide double-direction stream transfer`
 
 ---
+[`Wed 21 Aug 2019 10:21:16 AM Beijing`]   
+1. The major streaming bugs are cleared so far. Next is to improve the stream interface for the proxy/server because current API is raw and difficult for third-party development.
+2. the second task is to rewrite the file upload/download support via the streaming interface.
+3. And the third one is to enable the project 64bit compatible in the next month.
+
 [`Wed 21 Aug 2019 08:13:14 AM Beijing`]   
 1. Encountered a concurrency problem in the router's stream flow-control these days. However it should be soon to be fixed.
 
