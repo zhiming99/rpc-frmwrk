@@ -984,7 +984,7 @@ struct CUnixSockStmRelayBase :
 
     CUnixSockStmRelayBase( const IConfigDb* pCfg ) :
         super( pCfg )
-    {;}
+    { this->m_oFlowCtrl.SetAsMonitor( true ); }
 
     gint32 PostTcpStmEvent(
         guint8 byToken, BufPtr& pBuf )
@@ -1068,8 +1068,7 @@ struct CUnixSockStmRelayBase :
 
     virtual gint32 OnFlowControl()
     {
-        // this event comes over tcp stream
-
+        this->m_oFlowCtrl.IncFCCount();
         CStdRMutex oIfLock( this->GetLock() );
         ObjPtr pObj = m_pWritingTask;
         if( pObj.IsEmpty() )
@@ -1087,6 +1086,7 @@ struct CUnixSockStmRelayBase :
 
     virtual gint32 OnFCLifted()
     {
+        this->m_oFlowCtrl.DecFCCount();
         CStdRMutex oIfLock( this->GetLock() );
         ObjPtr pObj = m_pWritingTask;
         if( pObj.IsEmpty() )
@@ -1136,6 +1136,7 @@ struct CUnixSockStmRelayBase :
 
     virtual gint32 OnDataReceived( CBuffer* pBuf )
     {
+        this->m_oFlowCtrl.IncRxBytes( pBuf );
         return 0;
     }
 
@@ -1173,8 +1174,7 @@ struct CUnixSockStmRelayBase :
             if( ERROR( ret ) )
                 break;
 
-            CIoManager* pMgr = this->GetIoMgr();
-            ret = pMgr->RescheduleTask(
+            ret = this->RunManagedTask(
                 this->m_pListeningTask );
 
             if( ERROR( ret ) )
@@ -1188,7 +1188,14 @@ struct CUnixSockStmRelayBase :
             if( ERROR( ret ) )
                 break;
 
-            ret = pMgr->RescheduleTask(
+            // RunManagedTask makes the
+            // m_pPingTicker as a place holder in
+            // the parallel task group, in order
+            // which can avoid continuously
+            // destroyed when the group is
+            // temporarily empty, and waiting for
+            // new tasks.
+            ret = this->RunManagedTask(
                 this->m_pPingTicker );
 
             if( ERROR( ret ) )
@@ -1306,6 +1313,8 @@ struct CUnixSockStmRelayBase :
 
             ret = this->SubmitRequest(
                 oParams.GetCfg(), pCallback, true );
+
+             this->m_oFlowCtrl.IncTxBytes( pBuf );
 
         }while( 0 );
 

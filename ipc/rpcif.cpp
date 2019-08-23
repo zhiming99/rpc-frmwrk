@@ -2023,6 +2023,15 @@ gint32 CRpcInterfaceBase::AddAndRun(
                 // NOTE: there could be deep nesting.
                 // Reschedule can fix, but performance
                 // hurts
+                //
+                // FIXME: if more than one threads
+                // are running `para group'
+                // simultaneously, ERROR_STATE
+                // could be returned when the task
+                // appended on current thread are
+                // run and completed by other
+                // thread, though the tasks should
+                // run normally.
                 ret = ( *pParaGrp )( eventZero );
                 if( ret == STATUS_PENDING )
                 {

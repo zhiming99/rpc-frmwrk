@@ -70,9 +70,8 @@ gint32 CMyStreamProxy::OnConnected(
 gint32 CMyStreamProxy::OnStmRecv(
     HANDLE hChannel, BufPtr& pBuf )
 {
-    // note that, the buf just contains a block of data
-    // without type, so don't cast the buffer with the
-    // CBuffer's type convertor
+    // note that, the two sides should be aware of
+    // the content of the pBuf
     std::string strMsg(
         ( char* )pBuf->ptr() );
 

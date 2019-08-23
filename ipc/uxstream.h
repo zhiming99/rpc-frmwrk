@@ -290,6 +290,7 @@ class CFlowControl
     guint32     m_dwAckRxPkts = 0;
 
     gint8       m_byFlowCtrl = 0;
+    bool        m_bMonitor = false;
 
     EnumFCState OnReportInternal(
         guint64 qwAckTxBytes, guint32 dwAckTxPkts )
@@ -456,8 +457,14 @@ class CFlowControl
             qwAckTxBytes, dwAckTxPkts );
     }
 
+    void SetAsMonitor( bool bMonitor )
+    { m_bMonitor = bMonitor; }
+
     bool CanSend()
     {
+        if( m_bMonitor )
+            return true;
+
         CStdRMutex oLock( GetLock() );
         return m_byFlowCtrl == 0;
     }
@@ -979,7 +986,16 @@ class CUnixSockStream:
     // only happens on the writing
     virtual gint32 OnFlowControl()
     {
-        m_oFlowCtrl.IncFCCount();
+        gint32 ret =
+            m_oFlowCtrl.IncFCCount();
+
+        if( ret == fcsFlowCtrl )
+        {
+            BufPtr pBuf( true );
+            SendUxStreamEvent(
+                tokFlowCtrl, pBuf );
+        }
+        
         return 0;
     }
 
@@ -994,20 +1010,14 @@ class CUnixSockStream:
         do{
             ret = m_oFlowCtrl.DecFCCount();
             if( ret == fcsKeep )
-            {
-                ret = 0;
                 break;
-            }
 
             BufPtr pBuf( true );
-            SendUxStreamEvent(
-                tokLift, pBuf );
-
-            ret = 0;
+            SendUxStreamEvent( tokLift, pBuf );
 
         }while( 0 );
 
-        return ret;
+        return 0;
     }
 
     gint32 ResetPingTicker()

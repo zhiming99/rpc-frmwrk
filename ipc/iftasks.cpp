@@ -1959,7 +1959,14 @@ gint32 CIfRootTaskGroup::OnChildComplete(
         // could be run twice in the extreme
         // situation.
         if( m_queTasks.empty() )
+        {
+            // there could be too many ret values
+            // if we don't clean up
+            m_vecRetVals.clear();
+
+            // no need to reschedule
             break;
+        }
 
         CIoManager* pMgr = nullptr;
         ret = GET_IOMGR( oCfg, pMgr );
@@ -2350,6 +2357,7 @@ gint32 CIfParallelTaskGrp::RunTask()
             break;
         }
 
+        setTasksToRun.clear();
         setTasksToRun = m_setPendingTasks;
 
         m_setTasks.insert(
@@ -2357,23 +2365,15 @@ gint32 CIfParallelTaskGrp::RunTask()
             m_setPendingTasks.end() );
 
         m_setPendingTasks.clear();
-
         oTaskLock.Unlock();
 
-        while( !setTasksToRun.empty() )
+        for( auto pTask : setTasksToRun )
         {
-            TaskletPtr pTask =
-                *setTasksToRun.begin(); 
-
             if( !pTask.IsEmpty() )
                 ( *pTask )( eventZero );
-
-            setTasksToRun.erase(
-                setTasksToRun.begin() );
         }
 
         oTaskLock.Lock();
-
         if( IsCanceling() )
         {
             oCfg.RemoveProperty( propNoResched );
