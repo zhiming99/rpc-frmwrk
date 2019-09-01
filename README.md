@@ -23,6 +23,9 @@ This framework depends on the following packags:
 11. `Streaming support to provide double-direction stream transfer`
 
 ---
+[`Sun 01 Sep 2019 09:11:20 AM Beijing`]   
+1. Still writing some helper classes for the stream interface.
+
 [`Wed 21 Aug 2019 10:21:16 AM Beijing`]   
 1. The major streaming bugs are cleared so far. Next is to improve the stream interface for the proxy/server because current API is raw and difficult for third-party development.
 2. the second task is to rewrite the file upload/download support via the streaming interface.
