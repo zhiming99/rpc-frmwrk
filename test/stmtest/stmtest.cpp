@@ -20,6 +20,7 @@
 #include <string>
 #include <iostream>
 #include <unistd.h>
+#include <cmath>
 
 #include <rpc.h>
 #include <proxy.h>
@@ -31,6 +32,8 @@
 #include <cppunit/ui/text/TestRunner.h>
 
 #include <cppunit/extensions/HelperMacros.h>
+
+#define NSEC_PER_SEC 1000000000
 
 CPPUNIT_TEST_SUITE_REGISTRATION( CIfSmokeTest );
 
@@ -110,12 +113,10 @@ void CIfSmokeTest::testSvrStartStop()
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );
     
     CStreamingServer* pSvr = pIf;
-    while( pSvr->IsConnected() )
+    ret = pSvr->StartLoop();
+    if( ERROR( ret ) )
     {
-        sleep( 1 );
-        std::string strIfName = "CStreamingServer";
-        if( pSvr->IsPaused( strIfName ) )
-            break;
+        DebugPrint( ret, "Error Quit the loop" );
     }
 
     ret = pIf->Stop();
@@ -182,92 +183,86 @@ void CIfSmokeTest::testCliStartStop()
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
         DebugPrint( 0, "Completed" );
 
-        /*system( "echo Hello, World! > ./hello-1.txt" );
-        // method from interface CFileTransferServer
-        ret = pCli->UploadFile(
-            std::string( "./hello-1.txt" ) );
-        CPPUNIT_ASSERT( SUCCEEDED( ret ) );
-        DebugPrint( 0, "Upload Completed" );
-
-        // method from interface CFileTransferServer
-        ret = pCli->DownloadFile(
-            // server side file to download
-            std::string( "./hello-1.txt" ), 
-            // local file to save to
-            std::string( "./dload-1.txt" ) ); 
-
-        CPPUNIT_ASSERT( SUCCEEDED( ret ) );
-        DebugPrint( 0, "Download Completed" );
-        */
-
         // IStream implementation test
-        HANDLE hChannel = 0;
-        BufPtr pBuf( true );
-        *pBuf = std::string( "Server, are you ok?" );
-        guint32 dwCount = 0;
-
-        /*ret = pCli->StartStream( hChannel );
-        CPPUNIT_ASSERT( SUCCEEDED( ret  ) );
-
-        while( !pCli->CanSend( hChannel ) )
-            sleep( 1 );
-
-        printf( "Testing stream creation, \
-            double-direction communication and active close\n" );
-
-        while( dwCount++ < 10 )
-        {
-            printf( "Writing to server... \n" );
-            ret = pCli->WriteStream( hChannel, pBuf );
-            if( SUCCEEDED( ret ) || ret == STATUS_PENDING )
-            {
-                sleep( 1 );
-                continue;
-            }
-            break;
-        }
-        CPPUNIT_ASSERT( SUCCEEDED( ret  ) || ret == STATUS_PENDING );
-
-        ret = pCli->CancelChannel( hChannel );
-        CPPUNIT_ASSERT( SUCCEEDED( ret ) );*/
-
         printf( "Testing stream creation, \
             double-direction communication and active cancel\n" );
 
-        ret = pCli->StartStream( hChannel );
-        if( ERROR( ret ) )
-            break;
+        timespec ts = { 0 }, ts2={ 0 };
+        clock_gettime( CLOCK_REALTIME, &ts );
 
-        while( !pCli->CanSend( hChannel ) )
-            sleep( 1 );
+        DebugPrint( ret, "MainLoopStart..." );
+        // async call for LOOP_COUNT times
+        ret = pCli->StartLoop();
 
-        dwCount = 0;
-        printf( "Writing to server2... \n" );
-        while( dwCount < 100000 )
+        clock_gettime( CLOCK_REALTIME, &ts2 );
+        int iCarry = 0;
+        double nsec = .0;
+        if( ts2.tv_nsec < ts.tv_nsec )
         {
-            std::string strMsg = DebugMsg( dwCount,
-                "a message to server" );
-            *pBuf = strMsg;
-            dwCount++;
-            ret = pCli->WriteStream( hChannel, pBuf );
-            if( SUCCEEDED( ret ) )
-                continue;
-
-            if( ret == ERROR_QUEUE_FULL )
-            {
-                pCli->WaitForWriteAllowed( hChannel );
-
-                // rollback to resend
-                printf( "Resend the message...\n" );
-                dwCount--;
-                continue;
-            }
-            break;
+            nsec = ts2.tv_nsec + ( 10 ^ 9 ) - ts.tv_nsec;
+            iCarry = 1;
         }
-        CPPUNIT_ASSERT( SUCCEEDED( ret  ) || ret == STATUS_PENDING );
+        else
+        {
+            nsec = ts2.tv_nsec - ts.tv_nsec;
+        }
 
+        double dbTime1 = ( ( double )( ts2.tv_sec - ts.tv_sec - iCarry ) ) +
+            ( nsec ) / NSEC_PER_SEC;
+
+        CPPUNIT_ASSERT( SUCCEEDED( ret  ) || ret == STATUS_PENDING );
         sleep( 1 );
-        ret = pCli->CancelChannel( hChannel );
+
+        HANDLE hChannel = 0; 
+        ret = pCli->StartStream( hChannel );
+        CPPUNIT_ASSERT( SUCCEEDED( ret  ) );
+
+        BufPtr pBuf( true );
+        DebugPrint( ret, "SyncLoopStart..." );
+        clock_gettime( CLOCK_REALTIME, &ts );
+        // sync call for LOOP_COUNT times
+        for( int i = 0; i < LOOP_COUNT; i++ )
+        {
+            std::string strMsg = DebugMsg( i,
+                "a message to server" );
+
+            *pBuf = strMsg;
+            ret = pCli->WriteMsg( hChannel, pBuf );
+            if( ERROR( ret ) )
+                break;
+
+            ret = pCli->ReadMsg( hChannel, pBuf );
+            if( ERROR( ret ) )
+                break;
+
+            printf( "Server says: %s\n", pBuf->ptr() );
+        }
+        clock_gettime( CLOCK_REALTIME, &ts2 );
+
+        iCarry = 0;
+        nsec = .0;
+        if( ts2.tv_nsec < ts.tv_nsec )
+        {
+            nsec = ts2.tv_nsec + NSEC_PER_SEC - ts.tv_nsec;
+            iCarry = 1;
+        }
+        else
+        {
+            nsec = ts2.tv_nsec - ts.tv_nsec;
+        }
+
+        double dbTime2 = ( ( double )( ts2.tv_sec - ts.tv_sec - iCarry ) ) +
+            ( nsec ) / NSEC_PER_SEC;
+
+        // NOTE that the performance is MainLoop
+        // wins when the loop is over 10000, and
+        // below 10000, the SyncLoop could be
+        // better.
+        DebugPrint( ret, "MainLoop takes %g secs", dbTime1 );
+        DebugPrint( ret, "SyncLoop takes %g secs", dbTime2 );
+        DebugPrint( ret, " MainLoop is %g time faster than SyncLoop",
+            dbTime2/dbTime1 );
+
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 
         if( bPause )

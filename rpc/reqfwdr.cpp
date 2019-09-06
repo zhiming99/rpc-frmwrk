@@ -556,7 +556,7 @@ gint32 CReqFwdrOpenRmtPortTask::RunTaskInternal(
 }
 
 gint32 CReqFwdrOpenRmtPortTask::OnCancel(
-    gint32 dwContext )
+    guint32 dwContext )
 {
     OnServiceComplete( -ECANCELED );
     super::OnCancel( dwContext );

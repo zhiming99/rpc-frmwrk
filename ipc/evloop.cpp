@@ -851,7 +851,7 @@ gint32 CEvLoopAsyncCallback::HandleCommand()
         }
     case aevtRunAsync:
         {
-            guint32 hWatch = INVALID_HANDLE;
+            HANDLE hWatch = INVALID_HANDLE;
             ret = m_pLoop->ReadAsyncData(
                 ( guint8* )&hWatch,
                 sizeof( hWatch ) );
@@ -873,6 +873,28 @@ gint32 CEvLoopAsyncCallback::HandleCommand()
             ret = m_pLoop->RunSource(
                 hWatch, srcAsync,
                 eventAsyncWatch );
+
+            break;
+        }
+    case aevtStop:
+        {
+            CParamList oParams;
+            oParams.Push( ObjPtr( m_pLoop ) );
+
+            TaskletPtr pTask;
+
+            ret = pTask.NewObj(
+                clsid( CEvLoopStopCb ),
+                oParams.GetCfg() );
+
+            if( ERROR( ret ) )
+            {
+                ret = G_SOURCE_REMOVE;
+                break;
+            }
+
+            ( *pTask )( eventZero );
+            ret = G_SOURCE_CONTINUE;
 
             break;
         }

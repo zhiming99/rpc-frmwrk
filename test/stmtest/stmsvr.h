@@ -23,7 +23,7 @@
 #include <unistd.h>
 #include <ifhelper.h>
 #include <filetran.h>
-#include <stream.h>
+#include <streamex.h>
 
 #define METHOD_Echo         "Echo"
 
@@ -34,6 +34,7 @@
 #define MOD_CLIENT_NAME "StreamingClient"
 #define OBJNAME_ECHOCLIENT "CStreamingClient"               
 
+#define LOOP_COUNT  30000
 // Declare the class id for this object and declare the
 // iid for the interfaces we have implemented for this
 // object.
@@ -93,76 +94,82 @@ class CEchoClient :
 };
 
 class CMyStreamProxy :
-    public CStreamProxy
+    public CStreamProxySync
 {
-    sem_t m_semSync;
-
     public:
-    typedef CStreamProxy super;
+    typedef CStreamProxySync super;
     CMyStreamProxy( const IConfigDb* pCfg ) :
-        CAggInterfaceProxy( pCfg ), super( pCfg )
+        super::_MyVirtBase( pCfg ), super( pCfg )
     {
-        Sem_Init( &m_semSync, 0, 0 );
     }
 
-    gint32 OnFCLifted( HANDLE hChannel )
-    { return Sem_Post( &m_semSync ); }
+    gint32 SendMessage( HANDLE hChannel );
+    /**
+    * @name OnWriteEnabled_Loop
+    * @{ an event handler called when the channel
+    * `hChannel' is ready for writing. it could be
+    * temporarily blocked if the flowcontrol
+    * happens. The first event to the channel is
+    * also a WiteEnabled event after the channel
+    * is established for read/write. When the flow
+    * control happens, the WriteXXX will return
+    * ERROR_QUEUE_FULL, and you cannot write more
+    * messages to the stream channel.
+    * */
+    /**  @} */
+    
+    virtual gint32 OnWriteEnabled_Loop(
+        HANDLE hChannel );
+    /**
+    * @name OnRecvData_Loop
+    * @{ an event handler called when there is
+    * data arrives to the channel `hChannel'.
+    * */
+    /**  @} */
 
-    // Note: Just for demo purpose. There should be a
-    // map for binding of channel and semaphore
-    gint32 WaitForWriteAllowed( HANDLE hChannel )
-    { return Sem_Wait( &m_semSync ); }
+    virtual gint32 OnRecvData_Loop(
+        HANDLE hChannel );
 
-    virtual gint32 OnClose(
-        HANDLE hChannel,
-        IEventSink* pCallback = nullptr )
-    {
-        gint32 ret = super::OnClose(
-            hChannel, pCallback );
-        // in case the client is still waiting for flow
-        // control to lift
-        Sem_Post( &m_semSync );
-        return ret;
-    }
+    /**
+    * @name OnSendDone_Loop
+    * @{ an event handler called when the last
+    * pending write is done on the channel.
+    * */
+    /**  @} */
 
-    // mandatory, otherwise, the proxy map for this
-    // interface may not be initialized
-    gint32 InitUserFuncs()
-    { return super::InitUserFuncs(); }
+    virtual gint32 OnSendDone_Loop(
+        HANDLE hChannel, gint32 iRet );
 
-    gint32 OnConnected( HANDLE hChannel );
+    virtual gint32 OnStart_Loop();
 
-    // mandatory
-    // data is ready for reading
-    gint32 OnStmRecv(
-        HANDLE hChannel, BufPtr& pBuf );
+    virtual gint32 OnCloseChannel_Loop(
+        HANDLE hChannel );
 };
 
 class CMyStreamServer :
-    public CStreamServer
+    public CStreamServerSync
 {
     public:
-    typedef CStreamServer super;
+    typedef CStreamServerSync super;
     CMyStreamServer( const IConfigDb* pCfg ) :
-        CAggInterfaceServer( pCfg ), super( pCfg )
+        super::_MyVirtBase( pCfg ), super( pCfg )
     {}
 
-    // mandatory, otherwise, the proxy map for this
-    // interface may not be initialized
-    gint32 InitUserFuncs()
-    { return super::InitUserFuncs(); }
+    virtual gint32 OnRecvData_Loop(
+        HANDLE hChannel );
 
-    // mandatory
-    gint32 OnConnected( HANDLE hChannel );
+    virtual gint32 OnSendDone_Loop(
+        HANDLE hChannel, gint32 iRet );
 
-    virtual gint32 OnClose(
-        HANDLE hChannel,
-        IEventSink* pCallback = nullptr );
+    virtual gint32 OnWriteEnabled_Loop(
+        HANDLE hChannel );
 
-    // mandatory
-    // data is ready for reading
-    gint32 OnStmRecv(
-        HANDLE hChannel, BufPtr& pBuf );
+    virtual gint32 OnCloseChannel_Loop(
+        HANDLE hChannel )
+    { return 0; }
+
+    virtual gint32 OnStart_Loop()
+    { return 0; }
 };
 
 // Declare the major server/proxy objects. Please note

@@ -122,7 +122,7 @@ gint32 IStream::OnUxStreamEvent(
             if( pBuf == nullptr || pBuf->empty() )
                 break;
 
-            guint32 dwError = *pBuf;
+            guint32 dwError = ntohl( *pBuf );
             ret = OnChannelError(
                 hChannel, ( gint32 )dwError );
 
@@ -252,6 +252,39 @@ gint32 IStream::WriteStream(
             ret = pProxy->WriteStream(
                 pBuf, pCallback );
         }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 IStream::GetDataDesc(
+    HANDLE hChannel,
+    CfgPtr& pDataDesc ) const
+{
+    if( hChannel == INVALID_HANDLE )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        InterfPtr pIf;
+        ret = GetUxStream( hChannel, pIf );
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpenerObj oCfg(
+            ( const CObjBase* )pIf );
+
+        ObjPtr pObj;
+        ret = oCfg.GetObjPtr(
+            propDataDesc, pObj );
+
+        if( ERROR( ret ) )
+            break;
+
+        pDataDesc = pObj;
+        if( pDataDesc.IsEmpty() )
+            ret = -EFAULT;
 
     }while( 0 );
 
@@ -699,8 +732,8 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
                 &IStream::OnConnected,
                 ( HANDLE )pSvc ); 
 
-            pSvc->RunManagedTask(
-                pConnTask );
+            if( SUCCEEDED( ret ) )
+                ( *pConnTask )( eventZero );
         }
 
     }while( 0 );
@@ -836,13 +869,17 @@ gint32 CStreamProxy::OpenChannel(
 
 // call this helper to start a stream channel
 gint32 CStreamProxy::StartStream(
-    HANDLE& hChannel )
+    HANDLE& hChannel, IConfigDb* pDesc )
 {
     gint32 ret = 0;
     do{
         int fd = -1;
 
-        CParamList oParams;
+        CfgPtr pParams( true );
+        if( pDesc == nullptr )
+            pDesc = pParams;
+
+        CParamList oParams( pDesc );
         oParams.SetPointer( propIoMgr, GetIoMgr() );
 
         TaskletPtr pSyncTask;
@@ -855,8 +892,14 @@ gint32 CStreamProxy::StartStream(
 
         oParams.RemoveProperty( propIoMgr );
 
-        oParams.CopyProp( propKeepAliveSec, this );
-        oParams.CopyProp( propTimeoutSec, this );
+        if( !oParams.exist( propKeepAliveSec ) )
+            oParams.CopyProp(
+                propKeepAliveSec, this );
+
+        if( !oParams.exist( propTimeoutSec ) )
+            oParams.CopyProp(
+                propTimeoutSec, this );
+
 
         ret = OpenChannel( oParams.GetCfg(),
             fd, hChannel, pSyncTask );
@@ -1108,7 +1151,7 @@ gint32 CStreamServer::FetchData_Server(
         return ret;
 
     // notify subclass the connection is setup
-    OnConnected( hChannel );
+    // OnConnected( hChannel );
     return 0;
 }
 

@@ -44,15 +44,18 @@ struct IStream
 
     virtual gint32 CanContinue() = 0;
 
-    inline CRpcServices* GetInterface()
-    { return dynamic_cast< CRpcServices* >( this ); }
+    inline CRpcServices* GetInterface() const
+    { 
+        return dynamic_cast< CRpcServices* >
+        ( const_cast< IStream* >( this ) );
+    }
 
     inline gint32 GetUxStream(
-        HANDLE hChannel, InterfPtr& pIf )
+        HANDLE hChannel, InterfPtr& pIf ) const
     {
         CRpcServices* pThis = GetInterface();
         CStdRMutex oIfLock( pThis->GetLock() );
-        UXSTREAM_MAP::iterator itr =
+        UXSTREAM_MAP::const_iterator itr =
             m_mapUxStreams.find( hChannel );
 
         if( itr == m_mapUxStreams.end() )
@@ -109,6 +112,9 @@ struct IStream
     virtual gint32 CloseChannel(
         HANDLE hChannel,
         IEventSink* pCallback );
+
+    gint32 GetDataDesc( HANDLE hChannel,
+        CfgPtr& pDataDesc ) const;
 
     gint32 WriteStream( HANDLE hChannel,
         BufPtr& pBuf );
@@ -249,7 +255,8 @@ class CStreamProxy :
     gint32 CancelChannel( HANDLE hChannel );
 
     // call this helper to start a stream channel
-    gint32 StartStream( HANDLE& hChannel );
+    gint32 StartStream( HANDLE& hChannel,
+        IConfigDb* pDesc = nullptr );
 
     gint32 OnUxStreamEvent(
         HANDLE hChannel,

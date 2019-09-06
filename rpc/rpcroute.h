@@ -1185,7 +1185,7 @@ class CRouterStopBridgeProxyTask
     }
     virtual gint32 RunTask();
     virtual gint32 OnTaskComplete( gint32 iRetVal );
-    gint32 OnCancel( gint32 dwContext )
+    gint32 OnCancel( guint32 dwContext )
     {  return OnTaskComplete( -ECANCELED ); }
 };
 
@@ -1201,7 +1201,7 @@ class CRouterStopBridgeTask
     }
     virtual gint32 RunTask();
     virtual gint32 OnTaskComplete( gint32 iRetVal );
-    gint32 OnCancel( gint32 dwContext )
+    gint32 OnCancel( guint32 dwContext )
     {  return OnTaskComplete( -ECANCELED ); }
 };
 
@@ -1605,7 +1605,7 @@ class CReqFwdrCloseRmtPortTask
     }
     virtual gint32 RunTask();
     virtual gint32 OnTaskComplete( gint32 iRetVal );
-    gint32 OnCancel( gint32 dwContext )
+    gint32 OnCancel( guint32 dwContext )
     {  return 0; }
 };
 
@@ -1689,7 +1689,7 @@ class CReqFwdrOpenRmtPortTask
     }
     virtual gint32 RunTask();
     virtual gint32 OnTaskComplete( gint32 iRetVal );
-    gint32 OnCancel( gint32 dwContext );
+    gint32 OnCancel( guint32 dwContext );
 };
 
 class CRouterOpenRmtPortTask :
@@ -1767,7 +1767,7 @@ class CIfRollbackableTask :
         return pTractGrp->SetTaskRelation( iOp );
     }
     
-    gint32 OnCancel( gint32 dwContext )
+    gint32 OnCancel( guint32 dwContext )
     { return OnTaskComplete( -ECANCELED ); }
 };
 

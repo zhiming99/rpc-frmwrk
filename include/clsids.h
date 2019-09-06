@@ -243,6 +243,8 @@ typedef enum : guint32
     DECL_CLSID( CIfUxSockTransRelayTask ),
     DECL_CLSID( CIfTcpStmTransTask ),
     DECL_CLSID( CIfDeferCallTaskEx ),
+    DECL_CLSID( CIfStmReadWriteTask ),
+    DECL_CLSID( CReadWriteWatchTask ),
     DECL_CLSID( MaxClsid ),
     DECL_CLSID( ReservedClsidEnd ) = 0x0FFFFFFF,
     DECL_CLSID( ReservedIidStart ) = 0x10000000,

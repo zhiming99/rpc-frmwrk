@@ -28,7 +28,7 @@ C_INCLUDE := -I$(BASE)/include \
 	-I/usr/lib/dbus-1.0/include \
 
 
-CPP_FLAGS := $(CPPFLAGS) -std=c++11 -m32
+CPP_FLAGS := $(CPPFLAGS) -D_USE_LIBEV=1 -std=c++11 -m32
 LINKER_OPTION := -m32 -ldl -lstdc++ -lpthread -L/usr/lib/ -Wl,-rpath=/usr/lib -L/lib -Wl,-rpath=/lib -lcppunit
 
 OUTPUT_DIR := $(BASE)/test/debug

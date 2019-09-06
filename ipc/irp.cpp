@@ -515,6 +515,9 @@ void IoRequestPacket::SetTimer(
     CIoManager* pMgr )
 {
     m_dwTimeoutSec = dwTimeoutSec;
+    if( dwTimeoutSec > 3600 * 72 )
+        return;
+
     if( pMgr != nullptr )
     {
         m_pMgr = pMgr;

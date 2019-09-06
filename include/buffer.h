@@ -97,14 +97,24 @@ inline gint32 GetTypeId( guint32* pT )
 
 template<>
 inline gint32 GetTypeId( int* pT )
-{ return typeUInt32; }
+{ 
+    return ( sizeof( int ) == 4 ?
+        typeUInt32 : typeUInt64 );
+}
 
 template<>
 inline gint32 GetTypeId( long* pT )
-{ return typeUInt32; }
+{ 
+    return ( sizeof( long ) == 4 ?
+        typeUInt32 : typeUInt64 );
+}
 
 template<>
 inline gint32 GetTypeId( guint64* pT )
+{ return typeUInt64; }
+
+template<>
+inline gint32 GetTypeId( gint64* pT )
 { return typeUInt64; }
 
 template<>
@@ -217,7 +227,7 @@ class CBuffer : public CObjBase
         if( empty() )
             return ERROR_STATE;
 
-        if( dwOffset >= size() )
+        if( dwOffset >= m_dwSize )
             return -EINVAL;
 
         m_dwOffset = dwOffset;
@@ -267,7 +277,8 @@ class CBuffer : public CObjBase
             || std::is_same<T2, bool >::value
             || std::is_same<T2, guint8 >::value
             || std::is_same<T2, gint8 >::value
-            || std::is_same<T2, intptr_t >::value,
+            || std::is_same<T2, intptr_t >::value
+            || std::is_same<T2, uintptr_t >::value,
              T2 >::type,
         typename forbidden=typename std::enable_if< 
             !std::is_same<T2, const char* >::value

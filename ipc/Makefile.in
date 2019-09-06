@@ -10,7 +10,7 @@ port.cpp portstat.cpp drvmgr.cpp utils.cpp \
 iomgr.cpp ptifmap.cpp pnpmgr.cpp dbusdrv.cpp \
 dbusport.cpp portdrv.cpp rpcpdo.cpp dbuspdo.cpp \
 tasklets.cpp lpbkmtch.cpp ifhelper.cpp iiddict.cpp \
-reqopen.cpp uxport.cpp uxstream.cpp
+reqopen.cpp uxport.cpp uxstream.cpp streamex.cpp
 
 
 # uncomment the line if _USE_LIB_EV is not defined

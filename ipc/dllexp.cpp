@@ -39,6 +39,7 @@
 #include "tractgrp.h"
 #include "uxport.h"
 #include "uxstream.h"
+#include "streamex.h"
 
 #include <dlfcn.h>
 
@@ -148,6 +149,9 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CIfStopUxSockStmTask );
     INIT_MAP_ENTRYCFG( CIfResponseHandler );
     INIT_MAP_ENTRYCFG( CIfDeferCallTaskEx );
+    INIT_MAP_ENTRYCFG( CIfStmReadWriteTask );
+    INIT_MAP_ENTRYCFG( CReadWriteWatchTask );
+
 #ifdef _USE_LIBEV
     INIT_MAP_ENTRYCFG( CDBusLoopHooks );
     INIT_MAP_ENTRYCFG( CDBusTimerCallback );

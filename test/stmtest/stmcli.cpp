@@ -56,27 +56,192 @@ gint32 CEchoClient::Echo(
         strText, strReply  );
 }
 
-// implementation of proxy for CMyStreamServer
-gint32 CMyStreamProxy::OnConnected(
+gint32 CMyStreamProxy::OnRecvData_Loop(
     HANDLE hChannel )
 {
-    BufPtr pBuf( true );
-    *pBuf = std::string( "Hello, Server" );
-    WriteStream( hChannel, pBuf, nullptr );
-    DebugPrint( 0, "say hello to server" );
-    return 0;
+    BufPtr pBuf;
+    gint32 ret = 0;
+    do{
+        ret = ReadMsg(
+            hChannel, pBuf, -1 );
+
+        if( ret == -EAGAIN )
+        {
+            ret = 0;
+            break;
+        }
+
+        if( ERROR( ret ) )
+            break;
+
+        std::string strMsg(
+            ( char* )pBuf->ptr() );
+
+        printf( "server says: %s\n",
+            strMsg.c_str() );
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+        StopLoop();
+
+    return ret;
 }
 
-gint32 CMyStreamProxy::OnStmRecv(
-    HANDLE hChannel, BufPtr& pBuf )
+gint32 CMyStreamProxy::SendMessage(
+    HANDLE hChannel )
 {
-    // note that, the two sides should be aware of
-    // the content of the pBuf
-    std::string strMsg(
-        ( char* )pBuf->ptr() );
+    gint32 ret = 0;
 
-    printf( "server says: %s\n",
-        strMsg.c_str() );
-    return 0;
+    CfgPtr pCfg;
+
+    // get channel specific context
+    ret = GetContext( hChannel, pCfg );
+    if( ERROR( ret ) )
+        return ret;
+
+    CParamList oCfg( pCfg );
+    guint32 dwCount = 0;
+    BufPtr pBuf( true );
+
+    do{
+        ret = oCfg.GetIntProp( 0, dwCount );
+        if( ERROR( ret ) )
+            break;
+
+        if( dwCount == 300 )
+        {
+            StopLoop();
+            break;
+        }
+
+        std::string strMsg = DebugMsg( dwCount,
+            "a message to server" );
+
+        *pBuf = strMsg;
+        ret = WriteMsg( hChannel, pBuf, -1 );
+        if( ret == ERROR_QUEUE_FULL )
+        {
+            printf( "Queue full the message later...\n" );
+            ret = 0;
+            break;
+        }
+        else if( ret == STATUS_PENDING )
+        {
+            ret = 0;
+            break;
+        }
+
+        if( ERROR( ret ) )
+            break;
+
+        if( SUCCEEDED( ret ) )
+            dwCount++;
+
+    }while( 1 );
+
+
+    if( SUCCEEDED( ret ) )
+    {
+        // update the context for next run
+        oCfg.SetIntProp( 0, dwCount );
+    }
+
+    return ret;
 }
 
+gint32 CMyStreamProxy::OnSendDone_Loop(
+    HANDLE hChannel, gint32 iRet )
+{
+    gint32 ret = 0;
+
+    CfgPtr pCfg;
+    // get channel specific context
+    ret = GetContext( hChannel, pCfg );
+    if( ERROR( ret ) )
+        return ret;
+
+    do{
+        if( ERROR( iRet ) )
+        {
+            ret = iRet;
+            break;
+        }
+
+        CParamList oCfg( pCfg );
+        guint32 dwCount = oCfg[ 0 ];
+        ++dwCount;
+        oCfg[ 0 ] = dwCount;
+
+        ret = SendMessage( hChannel );
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+    {
+        CancelChannel( hChannel );
+        StopLoop();
+    }
+
+    return ret;
+}
+
+gint32 CMyStreamProxy::OnWriteEnabled_Loop(
+    HANDLE hChannel )
+{
+    gint32 ret = 0;
+
+    CfgPtr pCfg;
+    // get channel specific context
+    ret = GetContext( hChannel, pCfg );
+    if( ERROR( ret ) )
+        return ret;
+
+    CParamList oCfg( pCfg );
+    guint32 dwCount = 0;
+
+    do{
+        // this handler will be the first one to
+        // call after the loop starts
+        ret = oCfg.GetIntProp( 0, dwCount );
+        if( ret == -ENOENT )
+        {
+            // the first time, send greetings
+            BufPtr pBuf( true );
+            *pBuf = std::string( "Hello, Server" );
+            WriteMsg( hChannel, pBuf, -1 );
+            DebugPrint( 0, "say hello to server" );
+            oCfg.Push( ++dwCount );
+            ret = 0;
+        }
+        else if( ERROR( ret ) )
+            break;
+
+        ret = SendMessage( hChannel );
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+    {
+        CancelChannel( hChannel );
+        StopLoop();
+    }
+
+    return ret;
+}
+
+gint32 CMyStreamProxy::OnStart_Loop()
+{
+    HANDLE hChannel = INVALID_HANDLE;
+    gint32 ret = StartStream( hChannel );
+    if( ERROR( ret ) )
+        StopLoop();
+
+    return ret;
+}
+
+gint32 CMyStreamProxy::OnCloseChannel_Loop(
+    HANDLE hChannel )
+{
+    return StopLoop();
+}

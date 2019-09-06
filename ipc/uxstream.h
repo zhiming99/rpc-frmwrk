@@ -679,6 +679,9 @@ class CUnixSockStream:
             oParams.CopyProp( propKeepAliveSec,
                 oDataDesc.GetCfg() );
 
+            oParams.SetObjPtr(
+                propDataDesc, pObj );
+
             this->RemoveProperty( propParentPtr );
             this->RemoveProperty( 0 );
             this->RemoveProperty( propParamCount );

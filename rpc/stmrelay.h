@@ -956,19 +956,6 @@ struct CUnixSockStmRelayBase :
             if( bFull )
             {
                 // reading from tcp stream can resume
-                TaskGrpPtr pTaskGrp;
-                CParamList oParams;
-                ObjPtr pThis( this );
-                oParams[ propIfPtr ] = pThis;
-
-                ret = pTaskGrp.NewObj(
-                    clsid( CIfTaskGroup ),
-                    oParams.GetCfg() );
-
-                if( ERROR( ret ) )
-                    break;
-
-                // TaskletPtr pRmtResumeSend;
                 BufPtr pEmptyBuf( true );
                 ForwardToRemoteUrgent( tokLift, pEmptyBuf );
                 oIfLock.Unlock();
@@ -1452,7 +1439,6 @@ class CIfUxSockTransRelayTask :
     bool m_bIn = true;
 
     InterfPtr m_pUxStream;
-    BufPtr m_pPayload;
     guint32 m_dwTimeoutSec = 0;
     guint32 m_dwKeepAliveSec = 0;
 

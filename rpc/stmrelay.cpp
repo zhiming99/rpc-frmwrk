@@ -935,7 +935,11 @@ gint32 CIfUxListeningRelayTask::PostEvent(
                 sizeof( gint32 ) );
 
             iError = ntohl( iError );
-            BufPtr pNewBuf( true );
+
+            ret = pNewBuf.NewObj();
+            if( ERROR( ret ) )
+                break;
+
             pNewBuf->Resize( sizeof( gint32 ) );
             memcpy( pNewBuf->ptr(),
                 &iError, sizeof( iError ) );

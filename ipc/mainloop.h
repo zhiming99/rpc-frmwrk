@@ -146,6 +146,8 @@ class CMainIoLoopT : public T
     HANDLE                          m_hTaskWatch;
     TaskletPtr                      m_pSchedCb;
     std::atomic<bool>               m_bTaskDone;
+    std::string                     m_strName = "MainLoop";
+    bool                            m_bNewThread = true;
 
     public:
 
@@ -158,6 +160,17 @@ class CMainIoLoopT : public T
         m_bTaskDone( true )
     {
         this->SetClassId( clsid( CMainIoLoop ) );
+
+        if( pCfg == nullptr )
+            return;
+
+        CCfgOpener oCfg( pCfg );
+        gint32 ret = oCfg.GetStrProp( 0, m_strName );
+        if( ERROR( ret ) )
+            return;
+
+        oCfg.GetBoolProp( 1, m_bNewThread );
+        return;
     }
 
     TaskQuePtr& GetTaskQue() const
@@ -239,7 +252,7 @@ class CMainIoLoopT : public T
     {
 
         gint32 ret = 0;
-        SetThreadName( "MainLoop" );
+        SetThreadName( m_strName );
         m_dwTid = ::GetTid();
         super::Start();
 
@@ -254,10 +267,16 @@ class CMainIoLoopT : public T
         std::function<gint32()> oThreadProc =
             std::bind( &CMainIoLoopT::ThreadProc, this );
 
-        m_pThread = new std::thread( oThreadProc );
-        if( m_pThread == nullptr )
-            ret = -EFAULT;
-
+        if( m_bNewThread )
+        {
+            m_pThread = new std::thread( oThreadProc );
+            if( m_pThread == nullptr )
+                ret = -EFAULT;
+        }
+        else
+        {
+            ret = ThreadProc();
+        }
         return ret;
     }
 

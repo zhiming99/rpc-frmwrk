@@ -187,6 +187,7 @@ enum EnumPropId : gint32
     propTxPkts,         // type: guint32 of packets sent
     propExtInfo,        // type: ObjPtr to a configdb with extended information
     propListenOnly,     // type: bool to tell if the CUnixSockStmPdo to return both event and data via CTRLCODE_LISTENING req
+    propDataDesc,       // type: Objptr to a configdb for Send/Fetch's data description
     propReseredEnd = 0x10000000,
     propInvalid = -1, 
 };

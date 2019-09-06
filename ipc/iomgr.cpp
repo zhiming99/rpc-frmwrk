@@ -1658,7 +1658,8 @@ CIoManager::CIoManager( const std::string& strModName ) :
     do{
         CParamList a;
         a.SetPointer( propIoMgr, this );
-        a.SetStrProp( propConfigPath, string( CONFIG_FILE ) );
+        a.SetStrProp( propConfigPath,
+            string( CONFIG_FILE ) );
 
         CfgPtr pCfg = a.GetCfg();
 

@@ -52,51 +52,133 @@ gint32 CEchoServer::Echo(
     return ret;
 }
 
+gint32 CMyStreamServer::OnSendDone_Loop(
+    HANDLE hChannel, gint32 iRet )
+{
+    gint32 ret = 0;
+
+    do{
+        // this handler will be the first one to
+        // call after the loop starts
+        PauseReadNotify( hChannel, false );
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+        StopLoop();
+
+    return ret;
+}
+
 // implementation of interface CMyStreamServer
-gint32 CMyStreamServer::OnConnected(
+gint32 CMyStreamServer::OnWriteEnabled_Loop(
     HANDLE hChannel )
 {
-    std::string strGreeting = "Hello, Proxy";
-    BufPtr pBuf( true );
-    *pBuf = strGreeting;
-    WriteStream( hChannel, pBuf, nullptr );
-    return 0;
+    gint32 ret = 0;
+
+    CfgPtr pCfg;
+    // get channel specific context
+    ret = GetContext( hChannel, pCfg );
+    if( ERROR( ret ) )
+        return ret;
+
+    CParamList oCfg( pCfg );
+    guint32 dwCount = 0;
+
+    do{
+        // this handler will be the first one to
+        // call after the loop starts
+        ret = oCfg.GetIntProp( 0, dwCount );
+        if( ret == -ENOENT )
+        {
+            // the first time, send greetings
+            BufPtr pBuf( true );
+            *pBuf = std::string( "Hello, Proxy" );
+            WriteMsg( hChannel, pBuf, -1 );
+            oCfg.Push( dwCount );
+            ret = 0;
+            break;
+        }
+        else if( ERROR( ret ) )
+        {
+            break;
+        }
+
+        PauseReadNotify( hChannel, false );
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+        StopLoop();
+
+    return ret;
 }
 
-static int iMsgCount = 0;
-gint32 CMyStreamServer::OnStmRecv(
-    HANDLE hChannel, BufPtr& pBuf )
+gint32 CMyStreamServer::OnRecvData_Loop(
+    HANDLE hChannel )
 {
-    printf( "Proxy says(%d): %s\n",
-        iMsgCount, ( char* )pBuf->ptr() );
+    BufPtr pBuf;
+    CfgPtr pCfg;
 
-    std::string strMsg = DebugMsg( 0,
-        "this is the %d msg", iMsgCount++ );
-    BufPtr pNewBuf( true );
-    *pNewBuf = strMsg;
+    // get channel specific context
+    gint32 ret = GetContext(
+        hChannel, pCfg );
+    if( ERROR( ret ) )
+        return ret;
 
-    // Send a reply, if there is an error, the stream
-    // channel will be closed. The code is for demo
-    // only.
-    //
-    // The return code of ERROR_QUEUE_FULL should be
-    // handled correctly.  that is if this error is
-    // returned, you need to resend the data if
-    // necessary, when the flow control is lifted, as
-    // you can refer to stmcli.cpp and stmtest.cpp
-    // for detail.
-    // 
-    WriteStream( hChannel, pNewBuf, nullptr );
+    CParamList oCfg( pCfg );
+    guint32 dwCount = oCfg[ 0 ];
+
+    do{
+        ret = ReadMsg( hChannel, pBuf, -1 );
+        if( ret == -EAGAIN )
+        {
+            ret = 0;
+            break;
+        }
+        else if( ERROR( ret ) )
+        {
+            break;
+        }
+
+        printf( "Proxy says(%d): %s\n",
+            dwCount, ( char* )pBuf->ptr() );
+
+        std::string strMsg = DebugMsg( 0,
+            "this is the %d msg", ++dwCount );
+
+        BufPtr pNewBuf( true );
+        *pNewBuf = strMsg;
+
+        ret = WriteMsg( hChannel, pNewBuf, -1 );
+
+        if( ret == ERROR_QUEUE_FULL )
+        {
+            // waiting for flow control to lift
+            PauseReadNotify( hChannel, true );
+            ret = 0;
+            break;
+        }
+        else if( ret == STATUS_PENDING )
+        {
+            // waiting for the write succeeds
+            PauseReadNotify( hChannel, true );
+            ret = 0;
+            break;
+        }
+
+    }while( 1 );
+
+    if( ERROR( ret ) )
+    {
+        StopLoop();
+    }
+    else
+    {
+        oCfg[ 0 ] = dwCount;
+    }
+
     return 0;
-}
-
-gint32 CMyStreamServer::OnClose(
-    HANDLE hChannel,
-    IEventSink* pCallback )
-{
-    iMsgCount = 0;
-    return super::OnClose(
-        hChannel, pCallback );
 }
 
 static FactoryPtr InitClassFactory()
