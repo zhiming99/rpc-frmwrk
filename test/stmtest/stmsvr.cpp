@@ -60,6 +60,9 @@ gint32 CMyStreamServer::OnSendDone_Loop(
     do{
         // this handler will be the first one to
         // call after the loop starts
+        //
+        // Enable incoming data notification via
+        // OnRecvData_Loop
         PauseReadNotify( hChannel, false );
 
     }while( 0 );
@@ -104,6 +107,8 @@ gint32 CMyStreamServer::OnWriteEnabled_Loop(
             break;
         }
 
+        // Enable incoming data notification via
+        // OnRecvData_Loop
         PauseReadNotify( hChannel, false );
 
     }while( 0 );
@@ -151,17 +156,20 @@ gint32 CMyStreamServer::OnRecvData_Loop(
         *pNewBuf = strMsg;
 
         ret = WriteMsg( hChannel, pNewBuf, -1 );
-
         if( ret == ERROR_QUEUE_FULL )
         {
-            // waiting for flow control to lift
+            // Disable incoming data notification
+            // via OnRecvData_Loop till the flow
+            // control is lifted.
             PauseReadNotify( hChannel, true );
             ret = 0;
             break;
         }
         else if( ret == STATUS_PENDING )
         {
-            // waiting for the write succeeds
+            // Disable incoming data notification
+            // via OnRecvData_Loop till the write
+            // complete
             PauseReadNotify( hChannel, true );
             ret = 0;
             break;

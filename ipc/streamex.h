@@ -102,16 +102,38 @@ class CIfStmReadWriteTask :
         return super::Resume();
     }
 
-    // discard the incoming data
+    /**
+    * @name SetDiscard
+    * @{ set whether to discard the incoming
+    * stream data. If you don't want to receive
+    * the incoming data, but keep the stream
+    * channel alive, call SetDiscard with true.
+    * Don't use PauseReading which will block the
+    * management events ping/pong or report to
+    * happen and the channel will lose due to
+    * timeout.
+    * */
+    /**
+     * Parameter(s):
+     *  bDiscard: true to let the task discard all
+     *  the incoming data from OnStmRecv, and
+     *  false to let the task queue the incoming
+     *  data in the queue.
+     * @} */
+
+    // discard the incoming data.
     gint32 SetDiscard( bool bDiscard )
     {
-        if( IsReading() )
+        if( !IsReading() )
             return 0;
 
         CStdRTMutex oTaskLock( GetLock() );
         m_bDiscard = bDiscard;
-        if( m_queBufRead.size() )
-            m_queBufRead.clear();
+        if( bDiscard )
+        {
+            if( m_queBufRead.size() )
+                m_queBufRead.clear();
+        }
 
         // resume the reading task, otherwise the
         // channel could be closed if ping/pong,
@@ -427,19 +449,95 @@ struct CStreamSyncBase :
 
         return ret;
     }
+    /**
+    * @name OnRecvData_Loop @{ an event handler
+    * for the server/proxy to handle the incoming
+    * data. NOTE that, the suffix _Loop indicating
+    * it is a event handler triggered only if
+    * IsLoopStarted is true, that is, this stream
+    * object currently is running a user created
+    * mainloop. And the following XXX_Loop methods
+    * apply to the same condition.
+    * */
+    /**
+     * Parameter(s):
+     * hChannel: the handle to the stream channel.
+     * you can call ReadMsg/ReadBlock with this
+     * parameter to get the buffer containing the
+     * incoming message or data block.
+     *
+     * Return value:
+     * 
+     * @} */
 
     virtual gint32 OnRecvData_Loop(
         HANDLE hChannel ) = 0;
-
+    /**
+    * @name OnSendDone_Loop
+    * @{ an event handler called when the current
+    * WriteMsg/WriteBlock requests are completed.
+    * The WriteMsg/WriteBlock usually return
+    * STATUS_PENDING after the request is
+    * submitted. and when the request is done,
+    * OnSendDone_Loop will be called to indicate
+    * the write request is finished, with the
+    * error code in iRet. All the write requests
+    * are services in the FIFO manner. so if you
+    * submit more than one WriteXXX requests,
+    * which returns pending all the time. The
+    * current OnSendDone_Loop must be the first
+    * write request which is yet to complete.
+    * */
+    /** 
+     * Parameter(s):
+     * hChannel: the handle to the stream channel
+     * on the the Write request happens.
+     * iRet: the error code of the earliest write
+     * requests, which returns pending.
+     * @} */
     virtual gint32 OnSendDone_Loop(
         HANDLE hChannel, gint32 iRet ) = 0;
-
+    /**
+    * @name OnWriteEnabled_Loop
+    * @{ an event handler called since the
+    * latest WriteMsg/WriteBlock returns
+    * ERROR_QUEUE_FULL, a notification to the
+    * caller, whether server/proxy, to resume the
+    * earlier failed request.
+    * */
+    /** 
+     * Parameter(s):
+     * hChannel: the handle to the stream channel
+     * on which the flow control is lifted.
+     * @} */
     virtual gint32 OnWriteEnabled_Loop(
         HANDLE hChannel ) = 0;
 
+    /**
+    * @name OnCloseChannel_Loop
+    * @{ an event handler called to notify that a
+    * stream channel is closing in process. To
+    * give client a chance to do some cleanup
+    * work.
+    * */
+    /** 
+     * Parameter(s):
+     * hChannel: the handle to the stream channel
+     * which will be closed.
+     *
+     * return value:
+     * ignored.
+     * @} */
+    
     virtual gint32 OnCloseChannel_Loop(
         HANDLE hChannel ) = 0;
-
+    /**
+    * @name OnStart_Loop
+    * @{ an event handler which is the first event
+    * to the server/proxy after the loop is
+    * started. For the usage, please refer to
+    * stmcli.cpp. */
+    /**  @} */
     virtual gint32 OnStart_Loop() = 0;
 
 #define HANDLE_RETURN_VALUE( _ret, iErrNoData ) \
@@ -1001,6 +1099,10 @@ struct CStreamSyncBase :
         ret = pReader->OnStmRecv( pBuf );
         bool bPause = false;
         IsReadNotifyPaused( hChannel, bPause );
+
+        // if bPause == true, the client does
+        // not want to receive the stmevtRecvData
+        // event currently.
         if( IsLoopStarted() && !bPause )
         {
             BufPtr pEvtBuf( true );
@@ -1162,6 +1264,30 @@ struct CStreamSyncBase :
         return 0;
     }
 
+    /**
+    * @name PauseReadNotify @{ to prevent the
+    * OnRecvData_Loop to happen if bPause is true.
+    * It does NOT stop receiving and queuing the
+    * incoming stream data, which is important to
+    * keep the ping/pong and report to coming in,
+    * as keep the channel alive. But the queue
+    * size is limited. therefore, if the queue is
+    * full, the stream channel will finally be
+    * blocked and disconnection will happen if
+    * PauseReadNotify cannot be released very
+    * soon. If you don't wont' to receiving the
+    * data, use SetDiscard instead.
+    * */
+    /**
+     * Parameter(s):
+     *  hChannel: the stream channel to deny or
+     *  allowing the incoming stream data.
+     *
+     *  bPause: true to mute the OnRecvData_Loop
+     *  and false to allow OnRecvData_Loop to
+     *  happen.
+     * @} */
+    
     gint32 PauseReadNotify( HANDLE hChannel,
         bool bPause )
     {

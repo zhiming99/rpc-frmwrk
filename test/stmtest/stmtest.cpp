@@ -112,6 +112,9 @@ void CIfSmokeTest::testSvrStartStop()
     ret = pIf->Start();
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );
     
+    // using the mainloop solution is the only way
+    // to handle more than one stream channels as
+    // a server.
     CStreamingServer* pSvr = pIf;
     ret = pSvr->StartLoop();
     if( ERROR( ret ) )
@@ -184,13 +187,21 @@ void CIfSmokeTest::testCliStartStop()
         DebugPrint( 0, "Completed" );
 
         // IStream implementation test
-        printf( "Testing stream creation, \
-            double-direction communication and active cancel\n" );
+        printf( "Testing stream creation, " 
+            "double-direction communication"
+            " and active cancel\n" );
 
         timespec ts = { 0 }, ts2={ 0 };
         clock_gettime( CLOCK_REALTIME, &ts );
 
         DebugPrint( ret, "MainLoopStart..." );
+
+        //
+        // method 1: asynchronous way to
+        // send/receive the stream data from the
+        // server, all the logics are in the
+        // stmcli.cpp
+        //
         // async call for LOOP_COUNT times
         ret = pCli->StartLoop();
 
@@ -210,9 +221,18 @@ void CIfSmokeTest::testCliStartStop()
         double dbTime1 = ( ( double )( ts2.tv_sec - ts.tv_sec - iCarry ) ) +
             ( nsec ) / NSEC_PER_SEC;
 
-        CPPUNIT_ASSERT( SUCCEEDED( ret  ) || ret == STATUS_PENDING );
+        CPPUNIT_ASSERT( SUCCEEDED( ret  ) ||
+            ret == STATUS_PENDING );
+
         sleep( 1 );
 
+        //
+        // method 2: synchronous way to
+        // send/receive stream data from the
+        // server. you don't need the effort in
+        // stmcli.cpp. But the performance could
+        // suffer if the traffic is busy.
+        //
         HANDLE hChannel = 0; 
         ret = pCli->StartStream( hChannel );
         CPPUNIT_ASSERT( SUCCEEDED( ret  ) );
