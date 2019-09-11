@@ -23,6 +23,9 @@ This framework depends on the following packags:
 11. `Streaming support to provide double-direction stream transfer`
 
 ---
+[`Wed 11 Sep 2019 07:16:37 PM Beijing`]   
+1. fixed some bugs in the streaming module. It should be more stable now. There should still be a few to fix.       
+
 [`Sun 01 Sep 2019 09:11:20 AM Beijing`]   
 1. Still writing some helper classes for the stream interface.
 
