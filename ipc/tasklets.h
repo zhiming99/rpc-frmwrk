@@ -143,7 +143,7 @@ class CTasklet : public ICancellableTask
         }
 
         bool bExpected = false;
-        while( m_bInProcess.compare_exchange_weak(
+        while( m_bInProcess.compare_exchange_strong(
             bExpected, true ) == false )
         {
             if( bExpected == false )
@@ -165,7 +165,7 @@ class CTasklet : public ICancellableTask
             return;
         }
         bool bExpected = true;
-        while( m_bInProcess.compare_exchange_weak(
+        while( m_bInProcess.compare_exchange_strong(
             bExpected, false ) == false )
         {
             if( bExpected == true )

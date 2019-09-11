@@ -36,7 +36,17 @@
 #define CTRLCODE_WRITEMSG   0x1002
 #define CTRLCODE_WRITEBLK   0x1003
 
-#define SYNC_STM_MAX_PENDING_PKTS 32
+#define SYNC_STM_MAX_PENDING_PKTS ( STM_MAX_PACKATS_REPORT + 2 )
+
+enum EnumStreamEvent : guint8
+{
+    stmevtInvalid = 0,
+    stmevtRecvData,
+    stmevtLifted,
+    stmevtSendDone,
+    stmevtLoopStart,
+    stmevtCloseChan,
+};
 
 class CIfStmReadWriteTask :
     public CIfUxTaskBase
@@ -268,24 +278,14 @@ class CIfStmReadWriteTask :
             pBuf, dwTimeoutSec );
     }
 
-    gint32 OnFCLifted()
-    { return Resume(); }
-
+    gint32 OnFCLifted();
     gint32 PauseReading( bool bPause );
     gint32 OnStmRecv( BufPtr& pBuf );
     gint32 PostLoopEvent( BufPtr& pBuf );
     bool IsLoopStarted();
+    bool CanSend();
 };
 
-enum EnumStreamEvent : guint8
-{
-    stmevtInvalid = 0,
-    stmevtRecvData,
-    stmevtLifted,
-    stmevtSendDone,
-    stmevtLoopStart,
-    stmevtCloseChan,
-};
 
 class CReadWriteWatchTask : public CTasklet
 {
@@ -449,6 +449,32 @@ struct CStreamSyncBase :
 
         return ret;
     }
+
+    gint32 RemoveIoWatch()
+    {
+        if( m_hEvtWatch == INVALID_HANDLE )
+            return 0;
+
+        CMainIoLoop* pLoop = m_pRdLoop;
+        if( pLoop != nullptr )
+        {
+            pLoop->RemoveIoWatch(
+                m_hEvtWatch );
+
+            m_hEvtWatch = INVALID_HANDLE;
+
+            if( m_iPiper >= 0 )
+                close( m_iPiper );
+
+            if( m_iPipew >= 0 )
+                close( m_iPipew );
+
+            m_iPiper = m_iPipew = -1;
+        }
+
+        return 0;
+    }
+
     /**
     * @name OnRecvData_Loop @{ an event handler
     * for the server/proxy to handle the incoming
@@ -557,6 +583,7 @@ struct CStreamSyncBase :
         _ret = -ENODATA; \
         break; \
     } \
+    else _ret = 0; \
 }
 
     gint32 DispatchReadWriteEvent(
@@ -690,8 +717,12 @@ struct CStreamSyncBase :
                 break;
 
             ret = m_pRdLoop->Start();
+
+            RemoveIoWatch();
+
             if( ERROR( ret ) )
                 break;
+            
             
         }while( 0 );
 
@@ -700,7 +731,12 @@ struct CStreamSyncBase :
 
     bool IsLoopStarted()
     {
+        if( m_pRdLoop.IsEmpty() )
+            return false;
+
         CMainIoLoop* pLoop = m_pRdLoop;
+        if( pLoop == nullptr )
+            return false;
 
         return ( 0 !=
             pLoop->GetThreadId() );
@@ -728,10 +764,13 @@ struct CStreamSyncBase :
 
     gint32 PostLoopEvent( BufPtr& pBuf )
     {
+        if( !IsLoopStarted() && 
+            m_hEvtWatch == INVALID_HANDLE )
+            return ERROR_STATE;
+
         if( pBuf.IsEmpty() || pBuf->empty() )
             return -EINVAL;
 
-        // open fifo
         gint32 ret = write( m_iPipew,
             pBuf->ptr(), pBuf->size() );
 
@@ -788,13 +827,9 @@ struct CStreamSyncBase :
             CStdRTMutex oTaskLock(
                 pWriter->GetLock() );
 
-            if( pWriter->IsPaused() &&
-                pWriter->GetReqCount() )
-            {
-                ret = pWriter->Resume();
-                if( ERROR( ret ) )
-                    break;
-            }
+            ret = pWriter->OnFCLifted();
+            if( ERROR( ret ) )
+                break;
 
         }while( 0 );
 
@@ -896,7 +931,9 @@ struct CStreamSyncBase :
     {
         WORKER_ELEM oWorker;
         gint32 ret = 0;
+        DebugPrint( 0, "OnConnected..." );
 
+        TaskGrpPtr pTaskGrp;
         do{
             CStdRMutex oIfLock( this->GetLock() );
             if( !this->IsConnected( nullptr ) )
@@ -946,13 +983,13 @@ struct CStreamSyncBase :
             if( ERROR( ret ) )
                 break;
 
+            oWorker.bPauseNotify = true;
             m_mapStmWorkers.insert(
                 std::pair< HANDLE, WORKER_ELEM >
                 ( hChannel, oWorker ) );
 
             oIfLock.Unlock();
 
-            TaskGrpPtr pTaskGrp;
             CParamList oGrpCfg;
             oGrpCfg[ propIfPtr ] = ObjPtr( this );
             ret = pTaskGrp.NewObj(
@@ -985,10 +1022,7 @@ struct CStreamSyncBase :
                 false );
 
             if( ERROR( ret ) )
-            {
-                ( *pStartReader )( eventCancelTask );
                 break;
-            }
 
             pTaskGrp->AppendTask( pStartWriter );
 
@@ -1010,14 +1044,26 @@ struct CStreamSyncBase :
                     *pBuf );
 
                 if( ERROR( ret ) )
-                {
-                    ( *pStartReader )( eventCancelTask );
-                    ( *pStartWriter )( eventCancelTask );
                     break;
-                }
+
                 pTaskGrp->AppendTask( pFirstEvent );
+
+                TaskletPtr pEnableRead;
+                bool bPause = false;
+                ret = DEFER_IFCALL_NOSCHED(
+                    pEnableRead,
+                    ObjPtr( this ),
+                    &CStreamSyncBase::PauseReadNotify,
+                    hChannel, bPause );
+
+                if( ERROR( ret ) )
+                    break;
+
+                pTaskGrp->AppendTask( pEnableRead );
             }
 
+            // prevent the OnRecvData_Loop to be
+            // the first event
             TaskletPtr pSeqTasks = pTaskGrp;
             ret = pMgr->RescheduleTask( pSeqTasks );
 
@@ -1025,6 +1071,9 @@ struct CStreamSyncBase :
 
         if( ERROR( ret ) )
         {
+            if( !pTaskGrp.IsEmpty() )
+                ( *pTaskGrp )( eventCancelTask );
+
             CStdRMutex oIfLock( this->GetLock() );
             m_mapStmWorkers.erase( hChannel );
             oIfLock.Unlock();
@@ -1098,7 +1147,13 @@ struct CStreamSyncBase :
 
         ret = pReader->OnStmRecv( pBuf );
         bool bPause = false;
-        IsReadNotifyPaused( hChannel, bPause );
+        ret = IsReadNotifyPaused(
+            hChannel, bPause );
+
+        // It is possible the WORKER_ELEM is not
+        // ready yet
+        if( ret == -ENOENT )
+            return ret;
 
         // if bPause == true, the client does
         // not want to receive the stmevtRecvData
@@ -1106,7 +1161,8 @@ struct CStreamSyncBase :
         if( IsLoopStarted() && !bPause )
         {
             BufPtr pEvtBuf( true );
-            pEvtBuf->Resize( 5 );
+            pEvtBuf->Resize( sizeof( guint8 ) +
+                sizeof( hChannel ) );
             pEvtBuf->ptr()[ 0 ] = stmevtRecvData;
             memcpy( pEvtBuf->ptr() + 1,
                 &hChannel, sizeof( hChannel ) );
@@ -1206,18 +1262,6 @@ struct CStreamSyncBase :
             for( auto elem : vecHandles )
                 OnStmClosing( elem );
 
-            if( m_hEvtWatch != INVALID_HANDLE )
-            {
-                CMainIoLoop* pLoop = m_pRdLoop;
-                if( pLoop != nullptr )
-                {
-                    pLoop->RemoveIoWatch(
-                        m_hEvtWatch );
-
-                    m_hEvtWatch = INVALID_HANDLE;
-                }
-            }
-
             StopLoop();
 
         }while( 0 );
@@ -1244,7 +1288,7 @@ struct CStreamSyncBase :
     }
 
     gint32 IsReadNotifyPaused(
-        HANDLE hChannel, bool bPaused )
+        HANDLE hChannel, bool& bPaused )
     {
         if( hChannel == INVALID_HANDLE )
             return -EINVAL;
@@ -1289,7 +1333,7 @@ struct CStreamSyncBase :
      * @} */
     
     gint32 PauseReadNotify( HANDLE hChannel,
-        bool bPause )
+        const bool& bPause )
     {
         if( hChannel == INVALID_HANDLE )
             return -EINVAL;
@@ -1309,23 +1353,27 @@ struct CStreamSyncBase :
 
         CIfStmReadWriteTask* pReader = pTask;
 
-        if( !bPause )
-        {
-            // post a event to the loop
-            BufPtr pBuf( true );
-            pBuf->Resize( sizeof( guint8 ) +
-                sizeof( HANDLE ) );
+        if( bPause )
+            return 0;
 
-            pBuf->ptr()[ 0 ] = stmevtRecvData;
-            memcpy( pBuf->ptr() + 1, &hChannel,
-                sizeof( hChannel ) );
+        // post a event to the loop
+        BufPtr pBuf( true );
+        pBuf->Resize( sizeof( guint8 ) +
+            sizeof( HANDLE ) );
 
-            CStdRTMutex oTaskLock(
-                pReader->GetLock() );
+        pBuf->ptr()[ 0 ] = stmevtRecvData;
+        memcpy( pBuf->ptr() + 1, &hChannel,
+            sizeof( hChannel ) );
 
-            if( pReader->GetMsgCount() > 0 )
-                return PostLoopEvent( pBuf );
-        }
+        CStdRTMutex oTaskLock(
+            pReader->GetLock() );
+
+        guint32 dwCount = 
+            pReader->GetMsgCount();
+
+        if( dwCount > 0 )
+            return PostLoopEvent( pBuf );
+
         return 0;
     }
 };
@@ -1361,7 +1409,6 @@ class CStreamProxySync :
 
         return ret;
     }
-
 };
 
 class CStreamServerSync :

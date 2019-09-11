@@ -80,7 +80,7 @@ gint32 CMyStreamProxy::OnRecvData_Loop(
         printf( "server says: %s\n",
             strMsg.c_str() );
 
-    }while( 0 );
+    }while( 1 );
 
     if( ERROR( ret ) )
         StopLoop();
@@ -109,14 +109,14 @@ gint32 CMyStreamProxy::SendMessage(
         if( ERROR( ret ) )
             break;
 
-        if( dwCount == 300 )
+        if( dwCount == 30000 )
         {
             StopLoop();
             break;
         }
 
-        std::string strMsg = DebugMsg( dwCount,
-            "a message to server" );
+        std::string strMsg = DebugMsg(
+            dwCount, "a message to server" );
 
         *pBuf = strMsg;
         ret = WriteMsg( hChannel, pBuf, -1 );
@@ -128,7 +128,6 @@ gint32 CMyStreamProxy::SendMessage(
         }
         else if( ret == STATUS_PENDING )
         {
-            ret = 0;
             break;
         }
 
@@ -138,7 +137,7 @@ gint32 CMyStreamProxy::SendMessage(
         if( SUCCEEDED( ret ) )
             dwCount++;
 
-    }while( 1 );
+    }while( 0 );
 
 
     if( SUCCEEDED( ret ) )

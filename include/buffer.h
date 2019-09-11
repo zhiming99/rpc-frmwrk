@@ -290,8 +290,9 @@ class CBuffer : public CObjBase
     {
         if( empty() )
         {
-            throw std::invalid_argument(
-                "the object is empty" );
+            std::string strMsg = DebugMsg(
+                -EFAULT, "The object is empty" );
+            throw std::invalid_argument( strMsg );
         }
 
         if( GetDataType() == DataTypeMem )
@@ -313,8 +314,9 @@ class CBuffer : public CObjBase
     {
         if( empty() )
         {
-            throw std::invalid_argument(
-                "The object is empty" );
+            std::string strMsg = DebugMsg(
+                -EFAULT, "The object is empty" );
+            throw std::invalid_argument( strMsg );
         }
 
         ObjPtr* ppObj = ( ObjPtr* )ptr();
@@ -331,8 +333,9 @@ class CBuffer : public CObjBase
         // this is a version for CObjBase inherited objects
         if( empty() )
         {
-            throw std::invalid_argument(
-                "The object is empty" );
+            std::string strMsg = DebugMsg(
+                -EFAULT, "The object is empty" );
+            throw std::invalid_argument( strMsg );
         }
         switch( GetDataType() )
         {
@@ -374,8 +377,9 @@ class CBuffer : public CObjBase
 
         if( empty() )
         {
-            throw std::invalid_argument(
-                "The object is empty" );
+            std::string strMsg = DebugMsg(
+                -EFAULT, "The object is empty" );
+            throw std::invalid_argument( strMsg );
         }
         switch( GetDataType() )
         {

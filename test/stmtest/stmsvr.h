@@ -172,10 +172,10 @@ class CMyStreamServer :
     { return 0; }
 };
 
-// Declare the major server/proxy objects. Please note
-// that, the first class is the class to declare, and
-// the second class to the last one are implementations
-// of the different interfaces
+// Declare the major server/proxy objects. Please
+// note that, the first class is the class to
+// declare, and the second class to the last one
+// are implementations of the different interfaces
 DECLARE_AGGREGATED_PROXY(
     CStreamingClient,
     CEchoClient,

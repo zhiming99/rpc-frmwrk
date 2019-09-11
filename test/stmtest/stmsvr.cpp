@@ -67,8 +67,8 @@ gint32 CMyStreamServer::OnSendDone_Loop(
 
     }while( 0 );
 
-    if( ERROR( ret ) )
-        StopLoop();
+    // if( ERROR( ret ) )
+    //     StopLoop();
 
     return ret;
 }
@@ -87,6 +87,7 @@ gint32 CMyStreamServer::OnWriteEnabled_Loop(
 
     CParamList oCfg( pCfg );
     guint32 dwCount = 0;
+
 
     do{
         // this handler will be the first one to
@@ -107,14 +108,36 @@ gint32 CMyStreamServer::OnWriteEnabled_Loop(
             break;
         }
 
+        bool bResend = false;
+        ret = oCfg.GetBoolProp( 1, bResend );
+        if( SUCCEEDED( ret ) && bResend )
+        {
+            // a message is blocked
+            std::string strMsg = DebugMsg( 0,
+                "this is the %d msg", dwCount );
+
+            BufPtr pNewBuf( true );
+            *pNewBuf = strMsg;
+            ret = WriteMsg( hChannel, pNewBuf, -1 );
+            if( ret == ERROR_QUEUE_FULL )
+            {
+                ret = 0;
+            }
+            else if( ret == STATUS_PENDING )
+            {
+                // remove the resend flag
+                oCfg.RemoveProperty( 1 ); 
+            }
+            break;
+        }
         // Enable incoming data notification via
         // OnRecvData_Loop
         PauseReadNotify( hChannel, false );
 
     }while( 0 );
 
-    if( ERROR( ret ) )
-        StopLoop();
+    // if( ERROR( ret ) )
+    //     StopLoop();
 
     return ret;
 }
@@ -124,9 +147,20 @@ gint32 CMyStreamServer::OnRecvData_Loop(
 {
     BufPtr pBuf;
     CfgPtr pCfg;
+    gint32 ret = 0;
+
+    bool bPaused = false;
+    ret = IsReadNotifyPaused(
+        hChannel, bPaused );
+
+    if( ERROR( ret ) )
+        return ret;
+
+    if( bPaused )
+        return 0;
 
     // get channel specific context
-    gint32 ret = GetContext(
+    ret = GetContext(
         hChannel, pCfg );
     if( ERROR( ret ) )
         return ret;
@@ -158,6 +192,13 @@ gint32 CMyStreamServer::OnRecvData_Loop(
         ret = WriteMsg( hChannel, pNewBuf, -1 );
         if( ret == ERROR_QUEUE_FULL )
         {
+            // set a flag to resend
+            oCfg.SetBoolProp( 1, true );
+            PauseReadNotify( hChannel, true );
+            ret = 0;
+        }
+        else if( ret == STATUS_PENDING )
+        {
             // Disable incoming data notification
             // via OnRecvData_Loop till the flow
             // control is lifted.
@@ -165,23 +206,13 @@ gint32 CMyStreamServer::OnRecvData_Loop(
             ret = 0;
             break;
         }
-        else if( ret == STATUS_PENDING )
-        {
-            // Disable incoming data notification
-            // via OnRecvData_Loop till the write
-            // complete
-            PauseReadNotify( hChannel, true );
-            ret = 0;
+
+        if( ERROR( ret ) )
             break;
-        }
 
     }while( 1 );
 
-    if( ERROR( ret ) )
-    {
-        StopLoop();
-    }
-    else
+    if( SUCCEEDED( ret ) )
     {
         oCfg[ 0 ] = dwCount;
     }

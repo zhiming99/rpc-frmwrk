@@ -1861,14 +1861,6 @@ gint32 CRpcInterfaceBase::AddAndRun(
     CIfRootTaskGroup* pRootTaskGroup = nullptr;
     if( true )
     {
-        // CStdRMutex oIfLock( GetLock() );
-        if( !IsConnected() )
-        {
-            // concurrent tasks are only allowed when the
-            // state is stateConnected 
-            return ERROR_STATE;
-        }
-
         pRootTaskGroup = GetTaskGroup();
         if( pRootTaskGroup == nullptr )
             return -EFAULT;
@@ -1925,11 +1917,6 @@ gint32 CRpcInterfaceBase::AddAndRun(
         {
             // add a new parallel task group
             CStdRMutex oIfLock( GetLock() );
-            if( !IsConnected() )
-            {
-                ret = ERROR_STATE;
-                break;
-            }
             CCfgOpener oCfg;
 
             ret = oCfg.SetObjPtr(
@@ -4263,12 +4250,6 @@ gint32 CRpcServices::UnpackEvent(
     case eventRmtModOnline:
     case eventRmtModOffline:
         {
-            string strMod =
-                reinterpret_cast< char* >( pData );
-
-            string strIpAddr =
-                reinterpret_cast< char* >( dwParam1 );
-
             BufPtr pBuf;
             ret = oParams.GetProperty( 1, pBuf );
             if( ERROR( ret ) )
@@ -4470,9 +4451,6 @@ gint32 CRpcServices::RunManagedTask(
 
     if( ptrTask.IsEmpty() )
         return -EINVAL;
-
-    if( !IsConnected() )
-        return ERROR_STATE;
 
     gint32 ret = 0;
     if( bRoot )

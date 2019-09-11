@@ -155,6 +155,7 @@ class CMainIoLoopT : public T
     CMainIoLoopT( const IConfigDb* pCfg = nullptr )
         : super( pCfg ),
         m_queTasks( true ),
+        m_pThread( nullptr ),
         m_dwTid( 0 ),
         m_hTaskWatch( 0 ),
         m_bTaskDone( true )
@@ -171,6 +172,15 @@ class CMainIoLoopT : public T
 
         oCfg.GetBoolProp( 1, m_bNewThread );
         return;
+    }
+
+    ~CMainIoLoopT()
+    {
+        if( m_pThread != nullptr )
+        {
+            delete m_pThread;
+            m_pThread = nullptr;
+        }
     }
 
     TaskQuePtr& GetTaskQue() const
@@ -190,24 +200,14 @@ class CMainIoLoopT : public T
 
     gint32 Stop()
     {
-#ifndef _USE_LIBEV
-        this->RemoveIdleWatch(
-            m_hTaskWatch );
-#endif
-
         super::Stop();
-        if( m_pThread  )
+        if( m_pThread != nullptr )
         {
             m_pThread->join();
             delete m_pThread;
             m_pThread = nullptr;
         }
-#ifdef _USE_LIBEV
-        this->RemoveAsyncWatch(
-            m_hTaskWatch );
-#endif
-        m_dwTid = 0;
-        m_pSchedCb.Clear();
+
         return 0;
     }
 
@@ -253,8 +253,15 @@ class CMainIoLoopT : public T
 
         gint32 ret = 0;
         SetThreadName( m_strName );
-        m_dwTid = ::GetTid();
+        SetTid( ::GetTid() );
         super::Start();
+
+        SetTid( 0 );
+
+        this->RemoveAsyncWatch(
+            m_hTaskWatch );
+
+        m_pSchedCb.Clear();
 
         return ret;
     }

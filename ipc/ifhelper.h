@@ -1491,6 +1491,7 @@ class CIfResponseHandler :
     { return STATUS_PENDING; }
 
     gint32 OnTaskComplete( gint32 iRet );
+    gint32 OnCancel( guint32 dwContext );
 };
 
 template< class C >

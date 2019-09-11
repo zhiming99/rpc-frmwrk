@@ -518,6 +518,7 @@ gint32 CIfUxListeningTask::PostEvent(
         {
             break;
         }
+    case tokData:
     case tokProgress:
         {
             pBuf->SetOffset( pBuf->offset() +

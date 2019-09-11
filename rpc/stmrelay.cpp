@@ -112,6 +112,9 @@ gint32 CStreamServerRelay::FetchData_Server(
         ret = pProxy->FetchData( pDataDesc,
             fd, dwOffset, dwSize, pWrapper );
 
+        if( ERROR( ret ) )
+            ( *pWrapper )( eventCancelTask );
+
     }while( 0 );
 
     return ret;
@@ -507,6 +510,9 @@ gint32 CStreamProxyRelay::OnOpenStreamComplete(
             pDataDesc, iStmId, dwOffset, dwSize,
             pWrapper );
         
+        if( ERROR( ret ) )
+            ( *pWrapper )( eventCancelTask );
+
     }while( 0 );
 
     if( ERROR( ret ) )
@@ -584,6 +590,9 @@ gint32 CStreamProxyRelay::FetchData_Proxy(
 
         ret = pProxy->OpenStream(
             protoStream, iStmId, pWrapper );
+
+        if( ERROR( ret ) )
+            ( *pWrapper )( eventCancelTask );
 
     }while( 0 );
 
@@ -836,6 +845,9 @@ gint32 CIfUxListeningRelayTask::RunTask()
 
         ret = OnTaskComplete( ret );
         if( ret == STATUS_PENDING )
+            break;
+
+        if( ERROR( ret ) )
             break;
 
     }while( 1 );

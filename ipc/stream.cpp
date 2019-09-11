@@ -552,7 +552,14 @@ gint32 CIfCreateUxSockStmTask::OnTaskComplete(
             // dataDesc for response
             oStartParams.Push(
                 ObjPtr( pDataDesc ) );
+
         }
+
+        CCfgOpenerObj oIfCfg(
+            ( CObjBase* )pUxIf );
+
+        oIfCfg.SetBoolProp(
+            propListenOnly, true );
 
         oStartParams[ propFd ] = dwFd;
 

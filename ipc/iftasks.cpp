@@ -2139,7 +2139,7 @@ CIfCpEventTask::CIfCpEventTask(
     const IConfigDb* pCfg )
     : super( pCfg )
 {
-
+    SetClassId( clsid( CIfCpEventTask ) );
 }
 
 gint32 CIfCpEventTask::OnIrpComplete(
@@ -5521,6 +5521,15 @@ gint32 CIfDeferredHandler::OnComplete( gint32 iRetVal )
     RemoveProperty( propRespPtr );
     RemoveProperty( propMsgPtr );
     RemoveProperty( propReqPtr );
+    return ret;
+}
+
+gint32 CIfResponseHandler::OnCancel(
+    guint32 dwContext )
+{
+    gint32 ret = super::OnCancel( dwContext );
+    m_pDeferCall.Clear();
+    ClearClientNotify();
     return ret;
 }
 
