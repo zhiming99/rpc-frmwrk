@@ -3984,7 +3984,7 @@ gint32 COutgoingPacket::StartSend(
             char* pStart = 
                 ( ( char* )&m_oHeader ) + m_dwOffset;
 
-            ret = send( iFd, pStart, dwSize, 0 );
+            ret = Send( iFd, pStart, dwSize );
             if( ret == -1 && RETRIABLE( errno ) )
             {
                 ret = STATUS_PENDING;
@@ -4023,7 +4023,7 @@ gint32 COutgoingPacket::StartSend(
             char* pStart = ( ( char* )m_pBuf->ptr() )
                 + dwActOffset;
 
-            ret = send( iFd, pStart, dwSize, 0 );
+            ret = Send( iFd, pStart, dwSize );
             if( ret == -1 && RETRIABLE( errno ) )
             {
                 ret = STATUS_PENDING;

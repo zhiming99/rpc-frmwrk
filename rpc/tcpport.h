@@ -240,6 +240,14 @@ class COutgoingPacket :
     gint32 StartSend( gint32 iFd );
     bool IsSending()
     { return ( m_dwOffset > 0 ); }
+
+    inline gint32 Send( int iFd,
+        void* pBuf, guint32 dwSize )
+    {
+        return send( iFd, pBuf,
+            dwSize, MSG_NOSIGNAL );
+    }
+
 };
 
 class CIncomingPacket:
