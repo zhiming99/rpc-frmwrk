@@ -322,9 +322,9 @@ class CRpcPdoPort : public IRpcPdoPort
     // IEventSink method
     virtual gint32 OnEvent(
         EnumEventId iEvent,
-        guint32 dwParam1 = 0,
-        guint32 dwParam2 = 0,
-        guint32* pData = NULL  );
+        LONGWORD dwParam1 = 0,
+        LONGWORD dwParam2 = 0,
+        LONGWORD* pData = NULL  );
 
     
     gint32 SubmitIoctlCmd( IRP* pIrp );
@@ -546,9 +546,9 @@ class CDBusBusPort : public CGenericBusPort
 
     // IEventSink method
     gint32 OnEvent( EnumEventId iEvent,
-            guint32 dwParam1 = 0,
-            guint32 dwParam2 = 0,
-            guint32* pData = NULL  );
+            LONGWORD dwParam1 = 0,
+            LONGWORD dwParam2 = 0,
+            LONGWORD* pData = NULL  );
 
     // handler of the func irps
     gint32 OnSubmitIrp( IRP* pIrp )
@@ -659,9 +659,9 @@ class CGenBusDriver : public IBusDriver
 
     // IEventSink method
     gint32 OnEvent( EnumEventId iEvent,
-        guint32 dwParam1 = 0,
-        guint32 dwParam2 = 0,
-        guint32* pData = NULL  )
+        LONGWORD dwParam1 = 0,
+        LONGWORD dwParam2 = 0,
+        LONGWORD* pData = NULL  )
     { return 0;}
 };
 

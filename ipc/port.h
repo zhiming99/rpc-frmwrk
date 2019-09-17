@@ -453,7 +453,9 @@ class CPort : public IPort
     { return 0; }
 
     gint32 OnEvent( EnumEventId iEvent,
-        guint32 dwParam1, guint32 dwParam2, guint32* pData );
+        LONGWORD dwParam1,
+        LONGWORD dwParam2,
+        LONGWORD* pData );
 
     gint32 AttachToPort( IPort* pLowerPort );
     gint32 DetachFromPort( IPort* pLowerPort );

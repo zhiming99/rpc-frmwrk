@@ -95,7 +95,7 @@ enum EnumPropId : gint32
     propEventSink,      // type: ObjPtr of pointer to IEventSink
     propConfigPath,     // type: string, for config file path
     propDrvPtr,         // type: ObjPtr of IPortDriver*
-    propDBusConn,       // type: guint32
+    propDBusConn,       // type: intptr to the DBusConnection
     propParamList,      // type: ObjPtr to CStlIntVector, used to pass parameters in CTasklet::OnEvent
     propParamCount,     // type: guint32 sizeof the propParamList
 
@@ -116,7 +116,7 @@ enum EnumPropId : gint32
     propClsid,          // type: guint32 for the class id
     propRefCount,       // type: guint32 for the reference count of the object
     propFuncAddr,       // type: BufPtr for the 32-bit address of a function entry 
-    propHandle,         // type: guint32 for a handle
+    propReserved,       // type: 
     propIfPtr,          // type: ObjPtr of pointer to a IInterfaceState
     propTaskPtr,        // type: ObjPtr of pointer to a tasklet
     propParentTask,     // type: ObjPtr of pointer to a parent tasklet
@@ -188,7 +188,7 @@ enum EnumPropId : gint32
     propExtInfo,        // type: ObjPtr to a configdb with extended information
     propListenOnly,     // type: bool to tell if the CUnixSockStmPdo to return both event and data via CTRLCODE_LISTENING req
     propDataDesc,       // type: Objptr to a configdb for Send/Fetch's data description
-    propReseredEnd = 0x10000000,
+    propReservedEnd = 0x10000000,
     propInvalid = -1, 
 };
 

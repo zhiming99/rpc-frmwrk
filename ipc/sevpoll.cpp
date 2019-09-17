@@ -302,7 +302,7 @@ gint32 CSimpleEvPoll::WriteAsyncData(
 
 gint32 CSimpleEvPoll::WakeupLoop(
     EnumAsyncEvent iEvent,
-    guint32 dwContext )
+    LONGWORD dwContext )
 {
     if( m_iPipew < 0 )
         return ERROR_STATE;

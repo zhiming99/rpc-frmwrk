@@ -42,6 +42,14 @@
 #include <arpa/inet.h>
 #include <dbus/dbus.h>
 
+#if defined(__LP64__) || defined(_LP64)
+#define BUILD_64   1
+#define LONGWORD                guint64
+#else
+#define BUILD_64   0
+#define LONGWORD                guint32
+#endif
+
 #define PAGE_SIZE               ( getpagesize() )
 #define HANDLE                  uintptr_t
 #define PortToHandle( ptr )     reinterpret_cast<HANDLE>( ( IPort* )ptr )
@@ -501,10 +509,11 @@ class IEventSink : public CObjBase
     // admin event
     // workitem
     // fd event
-    virtual gint32 OnEvent( EnumEventId iEvent,
-        guint32 dwParam1 = 0,
-        guint32 dwParam2 = 0,
-        guint32* pData = NULL  ) = 0;
+    virtual gint32 OnEvent(
+        EnumEventId iEvent,
+        LONGWORD    dwParam1 = 0,
+        LONGWORD    dwParam2 = 0,
+        LONGWORD*   pData = NULL  ) = 0;
 };
 
 class ICancellableTask : public IEventSink

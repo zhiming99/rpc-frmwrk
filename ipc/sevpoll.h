@@ -147,7 +147,7 @@ class CSimpleEvPoll
 
     gint32 WakeupLoop(
         EnumAsyncEvent iEvent,
-        guint32 dwContext = 0 );
+        LONGWORD dwContext = 0 );
 
     gint32 WriteAsyncData(
         guint8* pData, gint32 iSize );

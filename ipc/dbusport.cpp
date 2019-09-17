@@ -453,8 +453,8 @@ gint32 CDBusBusPort::CreateRpcProxyPdo(
         }
 
         dwPortId = oExtCfg[ propPortId ];
-        oExtCfg.SetIntProp( propDBusConn,
-            ( guint32 )m_pDBusConn );
+        oExtCfg.SetIntPtr( propDBusConn,
+            ( guint32* )m_pDBusConn );
 
         ret = pNewPort.NewObj(
             clsid( CDBusProxyPdo ),
@@ -683,8 +683,8 @@ gint32 CDBusBusPort::Start( IRP *pIrp )
             propIoMgr, GetIoMgr() );
         oParams.SetPointer(
             propPortPtr, this );
-        oParams.SetIntProp( propDBusConn,
-            ( guint32 )m_pDBusConn );
+        oParams.SetIntPtr( propDBusConn,
+            ( guint32* )m_pDBusConn );
 
         // flush connection every 500ms
         oParams.Push( 500 );
@@ -924,7 +924,7 @@ DBusHandlerResult CDBusBusPort::OnMessageArrival(
             if( pPdoPort == nullptr )
                 continue;
 
-            guint32* pData = ( guint32* )( ( CBuffer* )pBuf );
+            LONGWORD* pData = ( LONGWORD* )( ( CBuffer* )pBuf );
             ret1 = pPdoPort->OnEvent(
                 cmdDispatchData, 0, 0, pData );
 
@@ -1328,8 +1328,8 @@ gint32 CDBusBusPort::PostStart( IRP* pIrp )
             break;
 
         // param dbus connection
-        ret = newCfg.SetIntProp(
-            propDBusConn, ( guint32 )m_pDBusConn );
+        ret = newCfg.SetIntPtr(
+            propDBusConn, ( guint32* )m_pDBusConn );
 
         if( ERROR( ret ) )
             break;
@@ -1406,9 +1406,9 @@ gint32 CDBusBusPort::PostStart( IRP* pIrp )
 }
 
 gint32 CDBusBusPort::OnEvent( EnumEventId iEvent,
-        guint32 dwParam1,
-        guint32 dwParam2,
-        guint32* pData )
+        LONGWORD dwParam1,
+        LONGWORD dwParam2,
+        LONGWORD* pData )
 {
     return super::OnEvent(
         iEvent, dwParam1, dwParam2, pData );
@@ -1565,9 +1565,9 @@ gint32 CDBusBusPort::ScheduleLpbkTask(
         {
             // sending request, a serial number is
             // needed
-            pMsg.SetSerial( ( guint32 )pDBusMsg );
+            pMsg.SetSerial( ( LONGWORD )pDBusMsg );
             if( pdwSerial )
-                *pdwSerial = ( guint32 )pDBusMsg;
+                *pdwSerial = ( LONGWORD )pDBusMsg;
         }
 
         CIoManager* pMgr = GetIoMgr();
@@ -1644,7 +1644,7 @@ CDBusBusPort::OnLpbkMsgArrival(
         if( pPdoPort == nullptr )
             return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 
-        guint32* pData = ( guint32* )( ( CBuffer* )pBuf );
+        LONGWORD* pData = ( LONGWORD* )( ( CBuffer* )pBuf );
 
         ret = pPdoPort->OnEvent(
             cmdDispatchData, 0, 0, pData );
@@ -2309,8 +2309,8 @@ CDBusConnFlushTask::CDBusConnFlushTask(
         if( ERROR( ret ) )
             break;
 
-        ret = oCfg.GetIntProp( propDBusConn,
-            ( guint32& )m_pDBusConn );
+        ret = oCfg.GetIntPtr( propDBusConn,
+            ( guint32*& )m_pDBusConn );
         if( ERROR( ret ) )
             break;
 

@@ -402,7 +402,7 @@ gint32 CIfCreateUxSockStmTask::GetResponse()
 {
     gint32 ret = 0;
     do{
-        std::vector< guint32 > vecParams;
+        std::vector< LONGWORD > vecParams;
         ret = GetParamList( vecParams,
             propParamList );
 
@@ -486,7 +486,10 @@ gint32 CIfCreateUxSockStmTask::OnTaskComplete(
 
     do{
         if( ERROR( iRet ) )
+        {
+            ret = iRet;
             break;
+        }
 
         if( !m_bServer )
         {
@@ -661,6 +664,11 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
         ( IConfigDb* )GetConfig() );
 
     do{
+        if( ERROR( iRet ) )
+        {
+            ret = iRet;
+            break;
+        }
         ObjPtr pIf;
         ret = oParams.GetObjPtr( propIfPtr, pIf );
         if( ERROR( ret ) )

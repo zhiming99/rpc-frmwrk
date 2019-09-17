@@ -77,7 +77,7 @@ std::string DebugMsgEx(
     return DebugMsgInternal( ret, szBuf, szFunc, iLineNum );
 }
 
-inline gint64 GetRandom()
+gint64 GetRandom()
 {
     static bool bInit = false;
     timespec ts;
@@ -490,7 +490,11 @@ extern std::unordered_map<EnumClsid, std::string> g_mapId2Name;
 void CObjBase::Dump( std::string& strDump )
 {
     char szBuf[ 128 ];
+#ifndef __LP64__
     sprintf( szBuf, "0x%08X: ", (int)this );
+#else
+    sprintf( szBuf, "0x%08lX: ", (LONGWORD)this );
+#endif
     strDump += szBuf;
     strDump += ", clsid: ";
     if( g_mapId2Name.find( m_dwClsid ) != g_mapId2Name.end() )

@@ -102,12 +102,14 @@ inline gint32 GetTypeId( int* pT )
         typeUInt32 : typeUInt64 );
 }
 
+#ifndef __LP64__
 template<>
 inline gint32 GetTypeId( long* pT )
 { 
     return ( sizeof( long ) == 4 ?
         typeUInt32 : typeUInt64 );
 }
+#endif
 
 template<>
 inline gint32 GetTypeId( guint64* pT )

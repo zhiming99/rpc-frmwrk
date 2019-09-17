@@ -344,7 +344,7 @@ struct IoRequestPacket : public IEventSink
     EventPtr            m_pCallback;
 
     // the parameter for m_pCallback
-    guint32             m_dwContext;
+    LONGWORD            m_dwContext;
 
     // dedicated irp completion thread if any
     IrpThrdPtr          m_IrpThrdPtr;
@@ -467,9 +467,9 @@ struct IoRequestPacket : public IEventSink
     { return ( stdrmutex& )m_oLock; }
 
     gint32 OnEvent( EnumEventId iEvent,
-            guint32 dwParam1 = 0,
-            guint32 dwParam2 = 0,
-            guint32* pData = NULL  );
+            LONGWORD dwParam1 = 0,
+            LONGWORD dwParam2 = 0,
+            LONGWORD* pData = NULL  );
     
     gint32 WaitForComplete();
     void SetStatus( gint32 iStatus )
@@ -477,7 +477,7 @@ struct IoRequestPacket : public IEventSink
 
     void SetCallback(
         const EventPtr& pEvent,
-        guint32 dwContext );
+        LONGWORD dwContext );
 
     gint32 GetIrpThread( ThreadPtr& pthrd );
     gint32 SetIrpThread( CIoManager* pMgr );

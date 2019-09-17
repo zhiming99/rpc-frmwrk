@@ -1290,12 +1290,12 @@ gint32 CBdgeProxyReadWriteComplete::OnIrpComplete(
         if( dwCmdId == IRP_MN_READ )
         {
             pCallback->OnEvent( eventIrpComp,
-                ( guint32 )pIrp, 0, 0 );
+                ( LONGWORD )pIrp, 0, 0 );
         }
         else if( dwCmdId == IRP_MN_WRITE )
         {
             pCallback->OnEvent( eventIrpComp,
-                ( guint32 )pIrp, 0, 0 );
+                ( LONGWORD )pIrp, 0, 0 );
         }
 
         ClearClientNotify();
@@ -1468,8 +1468,8 @@ gint32 CRpcTcpBridgeProxy::OnRmtModOffline(
         oEvtHelper.BroadcastEvent(
             eventConnPoint,
             eventRmtModOffline,
-            ( guint32 )strIpAddr.c_str(),
-            ( guint32* )strModName.c_str() );
+            ( LONGWORD )strIpAddr.c_str(),
+            ( LONGWORD* )strModName.c_str() );
 
     }while( 0 );
 

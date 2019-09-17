@@ -535,7 +535,7 @@ gint32 CDBusIoCallback::operator()(
     if( ret == DBUS_DISPATCH_DATA_REMAINS )
         m_pParent->WakeupDispatch( ret );
 
-    std::vector< guint32 > vecParams;
+    std::vector< LONGWORD > vecParams;
     gint32 ret2 = GetParamList( vecParams );
     if( ERROR( ret2 ) )
         return SetError( G_SOURCE_CONTINUE );

@@ -171,8 +171,7 @@ class CStlIntVector : public CStlVector< guint32 >
     public:
 
     typedef CStlVector< guint32 > super;
-    CStlIntVector()
-        :CStlVector<guint32>()
+    CStlIntVector() :super()
     {
         SetClassId( clsid( CStlIntVector ) );
     }
@@ -185,6 +184,25 @@ class CStlIntVector : public CStlVector< guint32 >
 };
 
 typedef CAutoPtr< clsid( CStlIntVector ), CStlIntVector > IntVecPtr;
+
+class CStlLongWordVector : public CStlVector< LONGWORD >
+{
+    public:
+
+    typedef CStlVector< LONGWORD > super;
+    CStlLongWordVector() :super()
+    {
+        SetClassId( clsid( CStlLongWordVector ) );
+    }
+
+    gint32 Serialize(
+        CBuffer& oBuf ) const;
+
+    gint32 Deserialize(
+        const CBuffer& obuf );
+};
+
+typedef CAutoPtr< clsid( CStlLongWordVector ), CStlLongWordVector  > LwVecPtr;
 
 class CStlBufVector : public CStlVector< BufPtr >
 {
@@ -452,9 +470,9 @@ class CStlEventMap:
 
     gint32 BroadcastEvent(
         EnumEventId iEvent,
-        guint32 dwParam1,
-        guint32 dwParam2,
-        guint32* pData )
+        LONGWORD dwParam1,
+        LONGWORD dwParam2,
+        LONGWORD* pData )
     {
         MyMap& oMap = m_mapElems;
         std::vector<EventPtr> vecEvents;

@@ -675,9 +675,9 @@ struct CStreamSyncBase :
     }
 
     gint32 OnEvent( EnumEventId iEvent,
-            guint32 dwParam1 = 0,
-            guint32 dwParam2 = 0,
-            guint32* pData = NULL  )
+            LONGWORD dwParam1 = 0,
+            LONGWORD dwParam2 = 0,
+            LONGWORD* pData = NULL  )
     {
         if( iEvent == eventIoWatch )
         {

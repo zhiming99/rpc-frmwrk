@@ -524,7 +524,7 @@ void IoRequestPacket::SetTimer(
         CUtilities& oUtils = pMgr->GetUtils();
 
         gint32 iTimerId = oUtils.GetTimerSvc().AddTimer(
-            m_dwTimeoutSec, this, ( guint32 )pMgr );
+            m_dwTimeoutSec, this, ( LONGWORD )pMgr );
 
         if( iTimerId > 0 )
         {
@@ -557,9 +557,9 @@ void IoRequestPacket::ResetTimer()
 
 gint32 IoRequestPacket::OnEvent(
         EnumEventId iEvent,
-        guint32 dwParam1,
-        guint32 dwParam2,
-        guint32* pData )
+        LONGWORD dwParam1,
+        LONGWORD dwParam2,
+        LONGWORD* pData )
 {
 
     gint32 ret = 0;
@@ -642,7 +642,7 @@ IPort* IoRequestPacket::GetPortAt( guint32 dwPos ) const
 
 void IoRequestPacket::SetCallback(
     const EventPtr& pEvent,
-    guint32 dwContext )
+    LONGWORD dwContext )
 {
     m_pCallback = pEvent;
     m_dwContext = dwContext;

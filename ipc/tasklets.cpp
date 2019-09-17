@@ -102,17 +102,17 @@ gint32 CTasklet::GetPropertyType(
 
 gint32 CTasklet::OnEvent(
     EnumEventId iEvent,
-    guint32 dwParam1,
-    guint32 dwParam2,
-    guint32* pData )
+    LONGWORD dwParam1,
+    LONGWORD dwParam2,
+    LONGWORD* pData )
 { 
     // an trigger from event interface
-    IntVecPtr pVec( true );
+    LwVecPtr pVec( true );
 
-    ( *pVec )().push_back( ( guint32 )iEvent );
-    ( *pVec )().push_back( ( guint32 )dwParam1 );
-    ( *pVec )().push_back( ( guint32 )dwParam2 );
-    ( *pVec )().push_back( ( guint32 )pData);
+    ( *pVec )().push_back( iEvent );
+    ( *pVec )().push_back( dwParam1 );
+    ( *pVec )().push_back( dwParam2 );
+    ( *pVec )().push_back( ( LONGWORD )pData);
 
     CCfgOpenerObj oCfg( this );
 
@@ -133,7 +133,7 @@ gint32 CTasklet::OnEvent(
 }
 
 gint32 CTasklet::GetParamList(
-    vector< guint32 >& vecParams, EnumPropId iProp )
+    vector< LONGWORD >& vecParams, EnumPropId iProp )
 {
 
     gint32 ret = 0;
@@ -141,7 +141,7 @@ gint32 CTasklet::GetParamList(
 
     do{
         CCfgOpener oCfg( ( IConfigDb* )m_pCtx );
-        IntVecPtr pVec;
+        LwVecPtr pVec;
 
         ret = oCfg.GetObjPtr( iProp, pParams );
         if( ERROR( ret ) )
@@ -154,7 +154,7 @@ gint32 CTasklet::GetParamList(
             break;
         }
 
-        CStlIntVector::MyType& oIntVec = ( *pVec )();
+        CStlLongWordVector::MyType& oIntVec = ( *pVec )();
 
         guint32 dwArgCount = 
             GetArgCount( &IEventSink::OnEvent );
@@ -179,7 +179,7 @@ gint32 CTasklet::GetIrpFromParams( IrpPtr& pIrp )
     ObjPtr pParams;
 
     do{
-        CStlIntVector::MyType oIntVec;
+        CStlLongWordVector::MyType oIntVec;
         ret = GetParamList( oIntVec );
         if( ERROR( ret ) )
             break;
@@ -276,7 +276,7 @@ gint32 CTaskletRetriable::operator()(
             // test if we are from a retry
             if( dwContext == eventTimeout )
             {
-                vector< guint32 > vecParams;
+                vector< LONGWORD > vecParams;
                 ret = GetParamList( vecParams );
                 if( SUCCEEDED( ret ) )
                 {
@@ -498,16 +498,16 @@ CTaskletRetriable::CTaskletRetriable(
 
 gint32 CThreadSafeTask::OnEvent(
     EnumEventId iEvent,
-    guint32 dwParam1,
-    guint32 dwParam2,
-    guint32* pData )
+    LONGWORD dwParam1,
+    LONGWORD dwParam2,
+    LONGWORD* pData )
 { 
     // an trigger from event interface
-    IntVecPtr pVec( true );
-    ( *pVec )().push_back( ( guint32 )iEvent );
-    ( *pVec )().push_back( ( guint32 )dwParam1 );
-    ( *pVec )().push_back( ( guint32 )dwParam2 );
-    ( *pVec )().push_back( ( guint32 )pData);
+    LwVecPtr pVec( true );
+    ( *pVec )().push_back( iEvent );
+    ( *pVec )().push_back( dwParam1 );
+    ( *pVec )().push_back( dwParam2 );
+    ( *pVec )().push_back( ( LONGWORD )pData);
 
 
     // NOTE: propParamList is used here to pass
@@ -549,7 +549,7 @@ gint32 CSyncCallback::operator()(
     {
     case eventTaskComp:
         {
-            std::vector< guint32 > vecParams;
+            std::vector< LONGWORD > vecParams;
             ret = GetParamList( vecParams );
             if( ERROR( ret ) )
             {
@@ -560,7 +560,7 @@ gint32 CSyncCallback::operator()(
                 GetArgCount( &IEventSink::OnEvent ) )
                 break;
 
-            ret = ( gint32 )vecParams[ 1 ];
+            ret = vecParams[ 1 ];
             break;
         }
     case eventIrpComp:

@@ -84,9 +84,9 @@ class CTasklet : public ICancellableTask
             gint32 iProp );
     // method to hook up the event interface
     gint32 OnEvent( EnumEventId iEvent,
-            guint32 dwParam1,
-            guint32 dwParam2,
-            guint32* pData );
+            LONGWORD dwParam1,
+            LONGWORD dwParam2,
+            LONGWORD* pData );
 
     gint32 OnCancel( guint32 dwContext )
     { return 0;}
@@ -110,7 +110,7 @@ class CTasklet : public ICancellableTask
     }
 
     virtual gint32 GetParamList(
-        std::vector< guint32 >& vecParams,
+        std::vector< LONGWORD >& vecParams,
         EnumPropId iProp = propParamList );
 
     virtual gint32 GetIrpFromParams(
@@ -236,9 +236,9 @@ class CTaskletSync : public CTasklet
 
     // method to hook up the event interface
     gint32 OnEvent( EnumEventId iEvent,
-            guint32 dwParam1,
-            guint32 dwParam2,
-            guint32* pData )
+            LONGWORD dwParam1,
+            LONGWORD dwParam2,
+            LONGWORD* pData )
     {
 
         gint32 ret = CTasklet::OnEvent(
@@ -477,9 +477,9 @@ class CPnpMgrStopPortAndDestroyTask
     gint32 OnScheduledTask( guint32 dwContext );
 
     gint32 OnEvent( EnumEventId iEvent,
-            guint32 dwParam1,
-            guint32 dwParam2,
-            guint32* pData );
+            LONGWORD dwParam1,
+            LONGWORD dwParam2,
+            LONGWORD* pData );
 };
 
 class CPortStateResumeSubmitTask
@@ -706,7 +706,7 @@ class CThreadSafeTask : public CTaskletRetriable
     }
 
     virtual gint32 GetParamList(
-        std::vector< guint32 >& vecParams,
+        std::vector< LONGWORD >& vecParams,
         EnumPropId iProp = propParamList )
     {
         CStdRTMutex oTaskLock( GetLock() );
@@ -721,9 +721,9 @@ class CThreadSafeTask : public CTaskletRetriable
     }
 
     gint32 OnEvent( EnumEventId iEvent,
-            guint32 dwParam1,
-            guint32 dwParam2,
-            guint32* pData );
+            LONGWORD dwParam1,
+            LONGWORD dwParam2,
+            LONGWORD* pData );
 };
 
 class CSyncCallback :

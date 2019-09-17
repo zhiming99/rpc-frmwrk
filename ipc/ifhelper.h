@@ -290,9 +290,9 @@ class CTaskWrapper :
     }
 
     virtual gint32 OnEvent( EnumEventId iEvent,
-        guint32 dwParam1 = 0,
-        guint32 dwParam2 = 0,
-        guint32* pData = NULL  )
+        LONGWORD dwParam1 = 0,
+        LONGWORD dwParam2 = 0,
+        LONGWORD* pData = NULL  )
     {
         if( m_pTask.IsEmpty() )
             return 0;
@@ -1623,7 +1623,7 @@ class CDeferredCallOneshot :
             return -EFAULT;
 
         ret = pEvt->OnEvent( eventTaskComp,
-            iRet, 0, ( guint32* )pCallback );
+            iRet, 0, ( LONGWORD* )pCallback );
 
         oCfg.RemoveProperty( propEventSink );
 
@@ -1790,7 +1790,7 @@ class CAsyncCallbackBase :
             }
         case eventTaskComp:
             {
-                std::vector< guint32 > vecParams;
+                std::vector< LONGWORD > vecParams;
 
                 gint32 ret = this->GetParamList( vecParams );
 
@@ -1802,12 +1802,6 @@ class CAsyncCallbackBase :
                     ret = -EINVAL;
                     break;
                 }
-
-                /*if( ERROR( vecParams[ 1 ] ) )
-                {
-                    ret = vecParams[ 1 ];
-                    break;
-                }*/
 
                 CObjBase* pObjBase =
                     reinterpret_cast< CObjBase* >( vecParams[ 3 ] );
@@ -1995,7 +1989,7 @@ class CAsyncCallbackOneshot :
             return -EFAULT;
 
         ret = pEvt->OnEvent( eventTaskComp,
-            iRet, 0, ( guint32* )pCallback );
+            iRet, 0, ( LONGWORD* )pCallback );
 
         oCfg.RemoveProperty( propEventSink );
 
@@ -2033,7 +2027,7 @@ class CAsyncCallbackOneshot :
         gint32 ret = 0;
         CObjBase* pObjBase = nullptr;
         do{
-            std::vector< guint32 > vecParams;
+            std::vector< LONGWORD > vecParams;
 
             ret = this->GetParamList( vecParams );
 
@@ -2046,8 +2040,8 @@ class CAsyncCallbackOneshot :
                 break;
             }
 
-            pObjBase =
-                reinterpret_cast< CObjBase* >( vecParams[ 3 ] );
+            pObjBase = reinterpret_cast< CObjBase* >
+                ( vecParams[ 3 ] );
 
             if( pObjBase == nullptr )
                 break;

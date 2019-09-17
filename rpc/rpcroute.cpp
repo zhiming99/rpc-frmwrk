@@ -911,8 +911,8 @@ gint32 CRouterStopBridgeProxyTask::RunTask()
 
         pReqFwdr->OnEvent(
             eventRmtSvrOffline,
-            ( guint32 )strIpAddr.c_str(),
-            0, ( guint32* )hPort );
+            ( LONGWORD )strIpAddr.c_str(),
+            0, ( LONGWORD* )hPort );
 
     }while( 0 );
 
@@ -1017,13 +1017,13 @@ gint32 CRouterStopBridgeTask::RunTask()
                 HANDLE hPort = PortToHandle(
                     pIf->GetPort() );
 
-                guint32 dwIpAddr = ( guint32 )
-                    ( guint32 )strIpAddr.c_str();
+                LONGWORD dwIpAddr = ( LONGWORD )
+                    strIpAddr.c_str();
 
                 pProxy->OnEvent(
                     eventRmtSvrOffline,
                     dwIpAddr, 0,
-                    ( guint32* )hPort );
+                    ( LONGWORD* )hPort );
             }
         }
  

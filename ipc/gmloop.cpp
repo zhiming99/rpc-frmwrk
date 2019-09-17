@@ -258,7 +258,7 @@ gboolean CGMainLoop::IO_SOURCE::IoCallback(
     {
         ret = pSrc->m_pCallback->OnEvent(
             eventIoWatch,
-            ( guint32 )condition,
+            ( LONGWORD )condition,
             0, nullptr );
     }
     else
@@ -401,7 +401,7 @@ guint32 CGMainLoop::RemoveSource(
 // timer
 gint32 CGMainLoop::AddTimerWatch(
     TaskletPtr& pCallback,
-    guint32& hTimer )
+    HANDLE& hTimer )
 {
     gint32 ret = 0;
     do{
@@ -438,7 +438,7 @@ gint32 CGMainLoop::AddTimerWatch(
         if( ERROR( ret ) )
             break;
 
-        oParams.Push( ( guint32 )pTimer );
+        oParams.Push( ( LONGWORD )pTimer );
         if( bStart )
         {
             ret = pTimer->Start();
@@ -466,7 +466,7 @@ guint64 CGMainLoop::NowUs()
 // io watcher
 gint32 CGMainLoop::AddIoWatch(
     TaskletPtr& pCallback,
-    guint32& hWatch )
+    HANDLE& hWatch )
 {
     gint32 ret = 0;
     do{
@@ -498,7 +498,7 @@ gint32 CGMainLoop::AddIoWatch(
             break;
         }
 
-        oParams.Push( ( guint32 )pIow );
+        oParams.Push( ( LONGWORD )pIow );
         ret = AddSource( pIow );
         if( ERROR( ret ) )
             break;
@@ -518,7 +518,7 @@ gint32 CGMainLoop::AddIoWatch(
 }
 
 gint32 CGMainLoop::RemoveIoWatch(
-    guint32 hWatch )
+    HANDLE hWatch )
 {
     return RemoveSource( hWatch, srcIo );
 }
@@ -563,7 +563,7 @@ gint32 CGMainLoop::AddIdleWatch(
         if( ERROR( ret ) )
             break;
 
-        oParams.Push( ( guint32 )pIdle );
+        oParams.Push( ( LONGWORD )pIdle );
         if( bStart )
         {
             ret = pIdle->Start();

@@ -178,9 +178,9 @@ class CEventMapHelper
 
     gint32 BroadcastEvent(
         EnumEventId iEvent,
-        guint32 dwParam1,
-        guint32 dwParam2,
-        guint32* pData )
+        LONGWORD dwParam1,
+        LONGWORD dwParam2,
+        LONGWORD* pData )
     {
         ObjPtr pEvtMap;
         gint32 ret = GetEventMap( pEvtMap );

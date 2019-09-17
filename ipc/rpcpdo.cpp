@@ -298,7 +298,7 @@ gint32 CRpcBasePort::DispatchRespMsg(
                 "Error cannot find irp for response messages\n%s\n, port=%s, 0x%x",
                 pDumpMsg.DumpMsg().c_str(),
                 CoGetClassName( GetClsid() ), 
-                ( guint32 )this );
+                ( LONGWORD )this );
         }
 
         if( ERROR( ret ) )
@@ -1243,7 +1243,7 @@ gint32 CRpcBasePortModOnOfflineTask::operator()(
         ret = oEvtHelper.BroadcastEvent(
             eventConnPoint,
             eventId, dwFlags,
-            ( guint32* )strModName.c_str() );
+            ( LONGWORD* )strModName.c_str() );
 
     }while( 0 );
 
@@ -2160,9 +2160,9 @@ gint32 CRpcPdoPort::ClearDBusSetting(
 // IEventSink method
 gint32 CRpcPdoPort::OnEvent(
     EnumEventId iEvent,
-    guint32 dwParam1,
-    guint32 dwParam2,
-    guint32* pData  )
+    LONGWORD dwParam1,
+    LONGWORD dwParam2,
+    LONGWORD* pData  )
 {
     gint32 ret = 0;
 

@@ -5,6 +5,8 @@ mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
 
 BASE:=$(abspath $(dir $(mkfile_path)).. )
 
+BUILD_64:=1
+
 CC := $(CROSS_COMPILE)gcc
 CPP := $(CROSS_COMPILE)g++
 LD := $(CROSS_COMPILE)ld
@@ -16,6 +18,18 @@ CUR_DIR := $(shell pwd)
 C_FLAGS :=  $(CFLAGS) -Wall -c -D_GNU_SOURCE -pthread
 C_DEFINES :=
 
+ifeq ($(BUILD_64),1)
+	WIDTH_FLAG:=-m64
+	LIB_DIR:=lib64
+	DBG_DIR:=debug64
+	RLS_DIR:=release64
+else ifeq ($(BUILD_64),0)
+	WIDTH_FLAG:=-m32
+	LIB_DIR:=lib
+	DBG_DIR:=debug
+	RLS_DIR:=release
+endif
+
 DEBUG_FLAGS := -DDEBUG -ggdb
 RELEASE_FLAGS := -O2
 
@@ -23,21 +37,20 @@ C_INCLUDE := -I$(BASE)/include \
 	-I$(BASE)/ipc \
 	-I$(BASE)/rpc \
 	-I/usr/include/glib-2.0 \
-	-I/usr/lib/glib-2.0/include \
+	-I/usr/$(LIB_DIR)/glib-2.0/include \
 	-I/usr/include/dbus-1.0 \
-	-I/usr/lib/dbus-1.0/include \
+	-I/usr/$(LIB_DIR)/dbus-1.0/include \
 
+CPP_FLAGS := $(CPPFLAGS) -D_USE_LIBEV=1 -std=c++11 $(WIDTH_FLAG)
+LINKER_OPTION := $(WIDTH_FLAG) -ldl -lstdc++ -lpthread -L/usr/$(LIB_DIR)/ -Wl,-rpath=/usr/$(LIB_DIR) -L/$(LIB_DIR) -Wl,-rpath=/$(LIB_DIR) -lcppunit
 
-CPP_FLAGS := $(CPPFLAGS) -D_USE_LIBEV=1 -std=c++11 -m32
-LINKER_OPTION := -m32 -ldl -lstdc++ -lpthread -L/usr/lib/ -Wl,-rpath=/usr/lib -L/lib -Wl,-rpath=/lib -lcppunit
-
-OUTPUT_DIR := $(BASE)/test/debug
-RPCLIB_DIR := $(BASE)/debug
-OBJ_DIR:=./debug
+OUTPUT_DIR := $(BASE)/test/$(DBG_DIR)
+RPCLIB_DIR := $(BASE)/$(DBG_DIR)
+OBJ_DIR:=./$(DBG_DIR)
 
 ifeq ($(MAKECMDGOALS),) 
 	C_FLAGS += $(DEBUG_FLAGS)
-else ifeq ($(MAKECMDGOALS),debug) 
+else ifeq ($(MAKECMDGOALS),$(DBG_DIR)) 
 	C_FLAGS += $(DEBUG_FLAGS)
 else ifeq ($(MAKECMDGOALS),all) 
 	C_FLAGS += $(DEBUG_FLAGS)
@@ -46,16 +59,20 @@ endif
 ifeq ($(MAKECMDGOALS),release)
 	C_FLAGS += $(RELEASE_FLAGS)
 	C_DEFINES += $(C_DEFINES) -DPRODUCTION 
-	OUTPUT_DIR := $(BASE)/test/release
-	RPCLIB_DIR := $(BASE)/release
-	OBJ_DIR := ./release
+	OUTPUT_DIR := $(BASE)/test/$(RLS_DIR)
+	RPCLIB_DIR := $(BASE)/$(RLS_DIR)
+	OBJ_DIR := ./$(RLS_DIR)
 else ifeq ($(MAKECMDGOALS),debug_clean)
-	OUTPUT_DIR := $(BASE)/test/debug
-	OBJ_DIR := ./debug
+	OUTPUT_DIR := $(BASE)/test/$(DBG_DIR)
+	OBJ_DIR := ./$(DBG_DIR)
 else ifeq ($(MAKECMDGOALS),release_clean)
-	OUTPUT_DIR := $(BASE)/test/release
-	OBJ_DIR := ./release
-	RPCLIB_DIR := $(BASE)/release
+	OUTPUT_DIR := $(BASE)/test/$(RLS_DIR)
+	OBJ_DIR := ./$(RLS_DIR)
+	RPCLIB_DIR := $(BASE)/$(RLS_DIR)
+endif
+
+ifeq ($(BUILD_64),1)
+	C_FLAGS += -fPIC
 endif
 
 $(OBJ_DIR)/%.o : %.cpp

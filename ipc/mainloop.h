@@ -243,7 +243,7 @@ class CMainIoLoopT : public T
             pQue->PopHead();
             oLock.Unlock();
 
-            ( *pTask )( ( guint32 )pdata );
+            ( *pTask )( eventZero );
         }
         return G_SOURCE_REMOVE;
     }

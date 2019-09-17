@@ -138,9 +138,9 @@ class CDriverManager : public IService
 
     // IEventSink method
     gint32 OnEvent( EnumEventId iEvent,
-            guint32 dwParam1 = 0,
-            guint32 dwParam2 = 0,
-            guint32* pData = NULL  )
+            LONGWORD dwParam1 = 0,
+            LONGWORD dwParam2 = 0,
+            LONGWORD* pData = NULL  )
     { return -ENOTSUP; }
 
     inline CIoManager* GetIoMgr() const
@@ -181,9 +181,9 @@ class CPnpManager : public IService
 
     void HandleCPEvent(
         EnumEventId iEvent,
-        guint32 dwParam1,
-        guint32 dwParam2,
-        guint32* pData );
+        LONGWORD dwParam1,
+        LONGWORD dwParam2,
+        LONGWORD* pData );
 
     public:
 
@@ -268,9 +268,9 @@ class CPnpManager : public IService
     // IEventSink method
     gint32 OnEvent(
         EnumEventId iEvent,
-        guint32 dwParam1 = 0,
-        guint32 dwParam2 = 0,
-        guint32* pData = NULL  );
+        LONGWORD dwParam1 = 0,
+        LONGWORD dwParam2 = 0,
+        LONGWORD* pData = NULL  );
 
     inline CIoManager* GetIoMgr() const
     { return m_pIoMgr; }
@@ -520,7 +520,7 @@ class CIoManager : public IService
     gint32 ScheduleWorkitem(
         guint32 dwFlags,
         IEventSink* pCallback,
-        guint32 dwContext,
+        LONGWORD dwContext,
         bool bLongWait = false );
 
     gint32 ScheduleTask(
@@ -544,9 +544,9 @@ class CIoManager : public IService
     gint32 Stop();
 
     gint32 OnEvent( EnumEventId iEvent,
-        guint32 dwParam1,
-        guint32 dwParam2,
-        guint32* pData);
+        LONGWORD dwParam1,
+        LONGWORD dwParam2,
+        LONGWORD* pData);
 
     gint32 GetPortProp(
         HANDLE hPort,

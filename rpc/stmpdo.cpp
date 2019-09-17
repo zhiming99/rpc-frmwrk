@@ -450,9 +450,9 @@ gint32 CRpcTcpBusPort::PreStop(
 
 gint32 CRpcTcpBusPort::OnEvent(
     EnumEventId iEvent,
-    guint32 dwParam1,
-    guint32 dwParam2,
-    guint32* pData )
+    LONGWORD dwParam1,
+    LONGWORD dwParam2,
+    LONGWORD* pData )
 {
     gint32 ret = 0;
 
@@ -907,7 +907,7 @@ gint32 CTcpStreamPdo::PostStart(
             break;
 
         ret = m_pStmSock->OnEvent( eventStart,
-            ( guint32 )pIrp, 0, nullptr );
+            ( LONGWORD )pIrp, 0, nullptr );
 
     }while( 0 );
 
@@ -1669,8 +1669,8 @@ gint32 CTcpStreamPdo::FireRmtModEvent(
             CEventMapHelper< CPort > oEvtHelper( this );
             oEvtHelper.BroadcastEvent(
                 eventConnPoint, iEvent,
-                ( guint32 )strIpAddr.c_str(),
-                ( guint32* )strTemp.c_str() );
+                ( LONGWORD )strIpAddr.c_str(),
+                ( LONGWORD* )strTemp.c_str() );
 
             break;
         }
@@ -1715,8 +1715,8 @@ gint32 FireRmtSvrEvent(
 
             oEvtHelper.BroadcastEvent(
                 eventConnPoint, iEvent,
-                ( guint32 )strIpAddr.c_str(),
-                ( guint32* )hPort );
+                ( LONGWORD )strIpAddr.c_str(),
+                ( LONGWORD* )hPort );
 
             break;
         }
@@ -1732,9 +1732,9 @@ gint32 FireRmtSvrEvent(
 // main entry for socket event handler
 gint32 CTcpStreamPdo::OnEvent(
     EnumEventId iEvent,
-    guint32 dwParam1,
-    guint32 dwParam2,
-    guint32* pData )
+    LONGWORD dwParam1,
+    LONGWORD dwParam2,
+    LONGWORD* pData )
 {
     gint32 ret = 0;
     switch( iEvent )

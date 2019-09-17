@@ -3,6 +3,8 @@
 CROSS:= $(CROSS_COMPILE)
 ARCH := arm
 
+BUILD_64 := 1
+
 CC := $(CROSS_COMPILE)gcc
 CPP := $(CROSS_COMPILE)g++
 LD := $(CROSS_COMPILE)ld
@@ -17,19 +19,31 @@ C_FLAGS := $(CFLAGS) -Wall -c -D_GNU_SOURCE -pthread
 DEBUG_FLAGS := -DDEBUG -ggdb
 RELEASE_FLAGS := -O2
 
+ifeq ($(BUILD_64),1)
+	WIDTH_FLAG := -m64
+	LIB_DIR := lib64
+	DBG_DIR := debug64
+	RLS_DIR := release64
+else ifeq ($(BUILD_64),0)
+	WIDTH_FLAG := -m32
+	LIB_DIR := lib
+	DBG_DIR := debug
+	RLS_DIR := release
+endif
+
 C_INCLUDE := -I../include \
 	-I/usr/include/glib-2.0 \
-	-I/usr/lib/glib-2.0/include \
+	-I/usr/$(LIB_DIR)/glib-2.0/include \
 	-I/usr/include/dbus-1.0 \
-	-I/usr/lib/dbus-1.0/include \
+	-I/usr/$(LIB_DIR)/dbus-1.0/include \
 	-I/usr/include \
 
-OUTPUT_DIR := ../debug
-OBJ_DIR := ./debug
+OUTPUT_DIR := ../$(DBG_DIR)
+OBJ_DIR := ./$(DBG_DIR)
 
 ifeq ($(MAKECMDGOALS),) 
 	C_FLAGS += $(DEBUG_FLAGS)
-else ifeq ($(MAKECMDGOALS),debug) 
+else ifeq ($(MAKECMDGOALS),$(DBG_DIR)) 
 	C_FLAGS += $(DEBUG_FLAGS)
 else ifeq ($(MAKECMDGOALS),all) 
 	C_FLAGS += $(DEBUG_FLAGS)
@@ -38,19 +52,22 @@ endif
 ifeq ($(MAKECMDGOALS),release)
 	C_FLAGS += $(RELEASE_FLAGS)
 	C_DEFINES += -DPRODUCTION 
-	OUTPUT_DIR := ../release
-	OBJ_DIR := ./release
+	OUTPUT_DIR := ../$(RLS_DIR)
+	OBJ_DIR := ./$(RLS_DIR)
 else ifeq ($(MAKECMDGOALS),debug_clean)
-	OUTPUT_DIR := ../debug
-	OBJ_DIR := ./debug
+	OUTPUT_DIR := ../$(DBG_DIR)
+	OBJ_DIR := ./$(DBG_DIR)
 else ifeq ($(MAKECMDGOALS),release_clean)
-	OUTPUT_DIR := ../release
-	OBJ_DIR := ./release
+	OUTPUT_DIR := ../$(RLS_DIR)
+	OBJ_DIR := ./$(RLS_DIR)
 endif
 
-CPP_FLAGS := $(CPPFLAGS) -std=c++11 -m32
+ifeq ($(BUILD_64),1)
+	C_FLAGS += -fPIC
+endif
+CPP_FLAGS := $(CPPFLAGS) -std=c++11 $(WIDTH_FLAG)
 
-LINKER_OPTION := -shared -m32 -ldl -lstdc++ -lpthread -L/usr/lib/ -Wl,-rpath=/user/lib -L/lib -Wl,-rpath=/lib -ldbus-1 -ljsoncpp
+LINKER_OPTION := -shared $(WIDTH_FLAG) -ldl -lstdc++ -lpthread -L/usr/$(LIB_DIR)/ -Wl,-rpath=/user/$(LIB_DIR) -L/$(LIB_DIR) -Wl,-rpath=/$(LIB_DIR) -ldbus-1 -ljsoncpp
 
 MUTE_CLEAN := 2>/dev/null || true
 

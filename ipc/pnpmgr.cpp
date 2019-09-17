@@ -233,7 +233,7 @@ gint32 CPnpMgrStartPortCompletionTask::operator()(
         pCtx->SetRespData( pBuf );
 
         pEventSink->OnEvent( eventIrpComp,
-            ( guint32 )( ( IRP* )pIrp ), 0, nullptr );
+            ( LONGWORD )( ( IRP* )pIrp ), 0, nullptr );
 
         oCfg.RemoveProperty( propEventSink );
 
@@ -584,10 +584,10 @@ gint32 CPnpManager::DoStop(
         c.SetObjPtr( propObjPtr, ObjPtr( pPort ) );
         c.SetObjPtr( propIrpPtr, ObjPtr( pMasterIrp ) );
 
-        IntVecPtr pParamList( true );
+        LwVecPtr pParamList( true );
         // the irp to send to the port
         ( *pParamList )().push_back( eventIrpComp );
-        ( *pParamList )().push_back( ( guint32 )pIrp );
+        ( *pParamList )().push_back( ( LONGWORD )pIrp );
         ( *pParamList )().push_back( eventZero );
 
         // a flag to indicate we are in the DoStop
@@ -644,7 +644,7 @@ gint32 CPnpMgrQueryStopCompletion::operator()(
         if( ERROR( ret ) )
             break;
 
-        IntVecPtr pParamList( pObj );
+        LwVecPtr pParamList( pObj );
         a.RemoveProperty( propParamList );
 
         ret = a.GetObjPtr( propIrpPtr, pObj );
@@ -781,7 +781,7 @@ gint32 CPnpMgrDoStopNoMasterIrp::operator()(
         if( ERROR( ret ) )
             break;
 
-        IntVecPtr pParamList( pObj );
+        LwVecPtr pParamList( pObj );
         oCfg.RemoveProperty( propParamList );
 
         // the first parameter is the pointer to
@@ -995,9 +995,9 @@ gint32 CPnpMgrStopPortAndDestroyTask::OnScheduledTask(
 
 gint32 CPnpMgrStopPortAndDestroyTask::OnEvent(
     EnumEventId iEvent,
-    guint32 dwParam1,
-    guint32 dwParam2,
-    guint32* pData )
+    LONGWORD dwParam1,
+    LONGWORD dwParam2,
+    LONGWORD* pData )
 {
     // there is race condition between eventIrpComp
     // from the normal irp completion and the timeout
@@ -1362,12 +1362,13 @@ gint32 CPnpMgrStopPortStackTask::operator()(
         guint32 iEventId = 0;
         guint32 iEvent = 0;
         guint32 dwParam1 = 0;
-        guint32 dwVal = 0;
+        LONGWORD dwVal = 0;
         guint32* pData = nullptr;
         CIoManager* pMgr = nullptr;
 
         CParamList oParams( GetConfig() );
 
+        // FIXME: the value is not right
         oParams.Pop( dwVal );
         pData = ( guint32* )dwVal;
         oParams.Pop( dwParam1 );
@@ -1380,7 +1381,7 @@ gint32 CPnpMgrStopPortStackTask::operator()(
         CConnPointHelper oConnPoint( pMgr );
         oConnPoint.BroadcastEvent( iEventId,
             ( EnumEventId )iEvent,
-            dwParam1, 0, pData );
+            dwParam1, 0, ( LONGWORD* )pData );
 
         if( pData != nullptr )
         {
@@ -1401,9 +1402,9 @@ gint32 CPnpMgrStopPortStackTask::operator()(
 
 void CPnpManager::HandleCPEvent(
     EnumEventId iEvent,
-    guint32 dwParam1,
-    guint32 dwParam2,
-    guint32* pData )
+    LONGWORD dwParam1,
+    LONGWORD dwParam2,
+    LONGWORD* pData )
 {
     CConnPointHelper oConnPoint( GetIoMgr() );
 
@@ -1506,9 +1507,9 @@ void CPnpManager::HandleCPEvent(
 
 gint32 CPnpManager::OnEvent(
         EnumEventId iEvent,
-        guint32 dwParam1,
-        guint32 dwParam2,
-        guint32* pData  )
+        LONGWORD dwParam1,
+        LONGWORD dwParam2,
+        LONGWORD* pData  )
 {
 
     switch( iEvent )

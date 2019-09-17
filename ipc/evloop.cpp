@@ -861,6 +861,7 @@ gint32 CEvLoopAsyncCallback::HandleCommand()
                 // FOR EAGAIN, the caller has special
                 // handling
                 m_pLoop->AsyncDataUnwind( 1 );
+                ret = G_SOURCE_CONTINUE;
                 break;
             }
             if( ERROR( ret ) )

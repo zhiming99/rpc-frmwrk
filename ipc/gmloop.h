@@ -187,9 +187,9 @@ class CGMainLoop : public IMainLoop
     { return m_pIoMgr; }
 
     gint32 OnEvent( EnumEventId iEvent,
-            guint32 dwParam1 = 0,
-            guint32 dwParam2 = 0,
-            guint32* pData = NULL  )
+            LONGWORD dwParam1 = 0,
+            LONGWORD dwParam2 = 0,
+            LONGWORD* pData = NULL  )
     { return 0; }
 
     // io watcher + timer
@@ -199,7 +199,7 @@ class CGMainLoop : public IMainLoop
     // timer
     virtual gint32 AddTimerWatch(
         TaskletPtr& pCallback,
-        guint32& hTimer );
+        HANDLE& hTimer );
 
     virtual gint32 RemoveTimerWatch(
         HANDLE hTimer );
@@ -210,10 +210,10 @@ class CGMainLoop : public IMainLoop
     // io watcher
     virtual gint32 AddIoWatch(
         TaskletPtr& pCallback,
-        guint32& hWatch );
+        HANDLE& hWatch );
 
     virtual gint32 RemoveIoWatch(
-        guint32 hWatch );
+        HANDLE hWatch );
 
     // idle watcher
     // Start a one-shot idle watcher to execute the
@@ -235,7 +235,7 @@ class CGMainLoop : public IMainLoop
     // async watcher
     virtual gint32 AddAsyncWatch(
         TaskletPtr& pCallback,
-        guint32& hWatch )
+        HANDLE& hWatch )
     { return -ENOTSUP; }
 
     virtual gint32 RemoveAsyncWatch(

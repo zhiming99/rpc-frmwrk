@@ -93,7 +93,7 @@ gint32 CFileTransferProxy::UploadFile_Callback(
     {
         void* pData = ( CObjBase* )pTask;
         pCallback->OnEvent( eventTaskComp,
-            iRet, 0, ( guint32* )pData );
+            iRet, 0, ( LONGWORD* )pData );
     }
 
     oTaskCfg.RemoveProperty( propObjPtr );
@@ -294,7 +294,7 @@ gint32 CFileTransferProxy::OnFileDownloaded(
     {
         void* pData = ( CObjBase* )pTask;
         pCallback->OnEvent( eventTaskComp,
-            iRet, 0, ( guint32* )pData );
+            iRet, 0, ( LONGWORD* )pData );
     }
 
     if( fd >= 0 )

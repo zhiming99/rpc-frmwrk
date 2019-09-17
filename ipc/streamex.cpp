@@ -1084,7 +1084,7 @@ gint32 CReadWriteWatchTask::operator()(
 {
     gint32 ret = 0;
     do{
-        std::vector< guint32 > vecParams;
+        std::vector< LONGWORD > vecParams;
         ret = GetParamList( vecParams );
         if( ERROR( ret ) )
         {
@@ -1092,7 +1092,7 @@ gint32 CReadWriteWatchTask::operator()(
             break;
         }
 
-        guint32 dwContext = vecParams[ 1 ];
+        dwContext = vecParams[ 1 ];
         CCfgOpener oCfg(
             ( IConfigDb* )GetConfig() );
 

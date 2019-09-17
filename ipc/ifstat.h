@@ -249,9 +249,9 @@ class CInterfaceState : public IInterfaceState
     bool exist( gint32 iProp ) const;
 
     virtual gint32 OnEvent( EnumEventId iEvent,
-                guint32 dwParam1,
-                guint32 dwParam2,
-                guint32* pData );
+                LONGWORD dwParam1,
+                LONGWORD dwParam2,
+                LONGWORD* pData );
 
     virtual EnumIfState GetState() const
     { return m_iState; }

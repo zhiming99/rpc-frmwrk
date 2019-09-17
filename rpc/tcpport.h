@@ -589,9 +589,9 @@ class CRpcSocketBase : public IService
     // event dispatcher
     gint32 OnEvent(
         EnumEventId iEvent,
-        guint32 dwParam1,
-        guint32 dwParam2,
-        guint32* pData );
+        LONGWORD dwParam1,
+        LONGWORD dwParam2,
+        LONGWORD* pData );
 
     // Callback for socket events. Note that the
     // 3rd param, `data' must be a pointer to
@@ -770,9 +770,9 @@ class CRpcStreamSock :
     // event dispatcher
     gint32 OnEvent(
         EnumEventId iEvent,
-        guint32 dwParam1,
-        guint32 dwParam2,
-        guint32* pData );
+        LONGWORD dwParam1,
+        LONGWORD dwParam2,
+        LONGWORD* pData );
 
 };
 
@@ -1039,9 +1039,9 @@ class CTcpStreamPdo : public CPort
     // packets
     virtual gint32 OnEvent(
         EnumEventId iEvent,
-        guint32 dwParam1,
-        guint32 dwParam2,
-        guint32* pData );
+        LONGWORD dwParam1,
+        LONGWORD dwParam2,
+        LONGWORD* pData );
 
     gint32 AllocIrpCtxExt(
         IrpCtxPtr& pIrpCtx,
@@ -1122,9 +1122,9 @@ class CRpcTcpBusPort :
 
     virtual gint32 OnEvent(
         EnumEventId iEvent,
-        guint32 dwParam1,
-        guint32 dwParam2,
-        guint32* pData );
+        LONGWORD dwParam1,
+        LONGWORD dwParam2,
+        LONGWORD* pData );
 
     // methods from CObjBase
     gint32 GetProperty(
@@ -1167,9 +1167,9 @@ class CRpcTcpFidoDrv : public CPortDriver
         const IConfigDb* pConfig = NULL );
 
     virtual gint32 OnEvent( EnumEventId iEvent,
-        guint32 dwParam1 = 0,
-        guint32 dwParam2 = 0,
-        guint32* pData = NULL  )
+        LONGWORD dwParam1 = 0,
+        LONGWORD dwParam2 = 0,
+        LONGWORD* pData = NULL  )
     { return -ENOTSUP; }
 };
 

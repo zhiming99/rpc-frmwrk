@@ -402,7 +402,7 @@ gint32 CStreamProxyRelay::OnFetchDataComplete(
         oTaskCfg.SetObjPtr( propRespPtr,
             ObjPtr( oResp.GetCfg() ) );
 
-        guint32* pParams = ( guint32* )
+        LONGWORD* pParams = ( LONGWORD* )
             ( ( CObjBase* )pDummy );
 
         if( iStmId > 0 )
@@ -530,7 +530,7 @@ gint32 CStreamProxyRelay::OnOpenStreamComplete(
         oTaskCfg.SetObjPtr( propRespPtr,
             ObjPtr( oResp.GetCfg() ) );
 
-        guint32* pParams = ( guint32* )
+        LONGWORD* pParams = ( LONGWORD* )
             ( ( CObjBase* )pDummy );
 
         if( iStmId > 0 )
@@ -1808,7 +1808,7 @@ gint32 CIfTcpStmTransTask::ResumeWriting()
         }
         else
         {
-            intptr_t irpPtr = ( intptr_t )pIrp;
+            LONGWORD irpPtr = ( LONGWORD )pIrp;
             CStdRMutex oIrpLock( pIrp->GetLock() );
             ret = pIrp->CanContinue(
                 IRP_STATE_READY );
@@ -1823,8 +1823,7 @@ gint32 CIfTcpStmTransTask::ResumeWriting()
             // handled yet
             ret = DEFER_CALL( pMgr, this,
                 &IEventSink::OnEvent,
-                eventIrpComp,
-                ( guint32 )irpPtr,
+                eventIrpComp, irpPtr,
                 0, nullptr );
         }
 

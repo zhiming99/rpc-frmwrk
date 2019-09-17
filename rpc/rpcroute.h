@@ -2059,10 +2059,10 @@ class CBdgeProxyStartSendTask :
 
     gint32 CloseStream();
 
-    virtual gint32 OnNotify( guint32 dwEvent,
-        guint32 dwParam1,
-        guint32 dwParam2,
-        guint32* pData );
+    virtual gint32 OnNotify( LONGWORD dwEvent,
+        LONGWORD dwParam1,
+        LONGWORD dwParam2,
+        LONGWORD* pData );
 
     // to handle the completion from the stream
     // read

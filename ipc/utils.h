@@ -73,9 +73,9 @@ class CTaskThread : public IThread
 
     // IEventSink method
     gint32 OnEvent( EnumEventId iEvent,
-            guint32 dwParam1 = 0,
-            guint32 dwParam2 = 0,
-            guint32* pData = NULL  )
+            LONGWORD dwParam1 = 0,
+            LONGWORD dwParam2 = 0,
+            LONGWORD* pData = NULL  )
     {
         return ENOTSUP;
     }
@@ -172,9 +172,9 @@ class CThreadPool : public IService
     gint32 Stop();
     
     gint32 OnEvent( EnumEventId iEvent,
-            guint32 dwParam1,
-            guint32 dwParam2,
-            guint32* pData )
+            LONGWORD dwParam1,
+            LONGWORD dwParam2,
+            LONGWORD* pData )
     { return 0; }
 };
 
@@ -231,7 +231,7 @@ class CIrpCompThread : public IThread
     gint32 AddIf( IGenericInterface* pif );
     gint32 RemoveIf( IGenericInterface* pif );
     gint32 GetLoadCount() const;
-    gint32 OnEvent(EnumEventId, guint32, guint32, guint32*)
+    gint32 OnEvent(EnumEventId, LONGWORD, LONGWORD, LONGWORD*)
     { return 0;}
 };
 
@@ -256,7 +256,7 @@ class CTimerService : public IService
         gint32 m_iTimerId;
 		guint64 m_qwIntervalMs;
         guint64 m_qwTicks;
-		guint32 m_dwParam;
+		LONGWORD m_dwParam;
         EventPtr m_pCallback;
 
         TIMER_ENTRY()
@@ -315,7 +315,7 @@ class CTimerService : public IService
 	gint32 AddTimer(
         guint32 dwIntervalMs,
         IEventSink* pEvent,
-        guint32 dwParam);
+        LONGWORD dwParam);
 
     gint32 RemoveTimer(
         gint32 iTimerId );
@@ -336,9 +336,9 @@ class CTimerService : public IService
     gint32 Stop();
 
     gint32 OnEvent( EnumEventId iEvent,
-            guint32 dwParam1,
-            guint32 dwParam2,
-            guint32* pData )
+            LONGWORD dwParam1,
+            LONGWORD dwParam2,
+            LONGWORD* pData )
     { return -ENOTSUP; }
 
     inline CIoManager* GetIoMgr() const
@@ -371,7 +371,7 @@ class CWorkitemManager : public CObjBase
         gint32 m_iWorkitemId;
         guint32 m_dwFlags;
         EventPtr m_pEventSink;
-        guint32	m_dwContext;
+        LONGWORD m_dwContext;
         WORK_ITEM()
         {
             m_iWorkitemId = m_atmWorkitemId.fetch_add( 1 );
@@ -423,7 +423,7 @@ class CWorkitemManager : public CObjBase
 	gint32 ScheduleWorkitem(
         guint32 dwFlags,
         IEventSink* pWorkitem,
-        guint32 dwContext,
+        LONGWORD dwContext,
         bool bLongWait = false );
 
 	gint32 CancelWorkitem(
@@ -471,9 +471,9 @@ class CUtilities : public IService
 
     gint32 ThreadProc( gint32 iThreadIdx );
     gint32 OnEvent( EnumEventId iEvent,
-            guint32 dwParam1,
-            guint32 dwParam2,
-            guint32* pData )
+            LONGWORD dwParam1,
+            LONGWORD dwParam2,
+            LONGWORD* pData )
     { return 0;}
 
     inline CIoManager* GetIoMgr() const

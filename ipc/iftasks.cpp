@@ -394,9 +394,9 @@ CIfRetryTask::CIfRetryTask(
 
 gint32 CIfRetryTask::OnEvent(
     EnumEventId iEvent,
-    guint32 dwParam1,
-    guint32 dwParam2,
-    guint32* pData )
+    LONGWORD dwParam1,
+    LONGWORD dwParam2,
+    LONGWORD* pData )
 { 
     gint32 iPropId = 0;
 
@@ -426,12 +426,12 @@ gint32 CIfRetryTask::OnEvent(
         }
     }
 
-    IntVecPtr pVec( true );
+    LwVecPtr pVec( true );
 
-    ( *pVec )().push_back( ( guint32 )iEvent );
-    ( *pVec )().push_back( ( guint32 )dwParam1 );
-    ( *pVec )().push_back( ( guint32 )dwParam2 );
-    ( *pVec )().push_back( ( guint32 )pData);
+    ( *pVec )().push_back( iEvent );
+    ( *pVec )().push_back( dwParam1 );
+    ( *pVec )().push_back( dwParam2 );
+    ( *pVec )().push_back( ( LONGWORD )pData );
 
     CStdRTMutex oTaskLock( GetLock() );
     CCfgOpener oCfg( ( IConfigDb* )GetConfig() );
@@ -450,9 +450,9 @@ template< class ClassName >
 gint32 CIfRetryTask::DelayRun(
     guint32 dwSecsDelay,
     EnumEventId iEvent,
-    guint32 dwParam1,
-    guint32 dwParam2,
-    guint32* pdata )
+    LONGWORD dwParam1,
+    LONGWORD dwParam2,
+    LONGWORD* pdata )
 {
     // some thread is working on this object
     // let's do it later
@@ -559,8 +559,8 @@ gint32 CIfRetryTask::OnComplete(
                 }
 
                 CObjBase* pObjBase = this;
-                guint32* pData =
-                    ( guint32* ) pObjBase;
+                LONGWORD* pData =
+                    ( LONGWORD* ) pObjBase;
                 pEvent->OnEvent( eventTaskComp,
                     iRetVal, 0, pData );
                 
@@ -654,7 +654,7 @@ gint32 CIfRetryTask::Process( guint32 dwContext )
             }
         case eventTaskComp:
             {
-                vector< guint32 > vecParams;
+                vector< LONGWORD > vecParams;
                 ret = GetParamList( vecParams );
                 if( ERROR( ret ) )
                     break;
@@ -677,7 +677,7 @@ gint32 CIfRetryTask::Process( guint32 dwContext )
             }
         case eventTimeout:
             {
-                vector< guint32 > vecParams;
+                vector< LONGWORD > vecParams;
                 ret = GetParamList( vecParams,
                     propTimerParamList );
 
@@ -1089,7 +1089,7 @@ gint32 CIfOpenPortTask::OnIrpComplete(
                 EnumEventId iEvent = eventPortStartFailed;
                 if( !pCtx->m_pRespData.IsEmpty() )
                 {
-                    hPort = ( guint32& )*pCtx->m_pRespData;
+                    hPort = ( HANDLE& )*pCtx->m_pRespData;
                 }
                 pIf->OnPortEvent( iEvent, hPort );
             }
@@ -1103,7 +1103,7 @@ gint32 CIfOpenPortTask::OnIrpComplete(
         else
         {
             EnumEventId iEvent = eventPortStarted;
-            hPort = ( guint32& )*pCtx->m_pRespData;
+            hPort = ( HANDLE& )*pCtx->m_pRespData;
             ret = pIf->OnPortEvent( iEvent, hPort );
         }
 
@@ -2881,9 +2881,9 @@ CIfParallelTask::CIfParallelTask(
 
 gint32 CIfParallelTask::OnEvent(
     EnumEventId iEvent,
-    guint32 dwParam1,
-    guint32 dwParam2,
-    guint32* pData )
+    LONGWORD dwParam1,
+    LONGWORD dwParam2,
+    LONGWORD* pData )
 {
 
     // Lock to prevent re-entrance 
@@ -3098,7 +3098,7 @@ gint32 CIfParallelTask::Process(
         {
             // handle eventKeepAlive on timeout
             // timer expired
-            vector< guint32 > vecParams;
+            vector< LONGWORD > vecParams;
 
             ret = GetParamList( vecParams,
                 propTimerParamList );
@@ -3127,7 +3127,7 @@ gint32 CIfParallelTask::Process(
         }
     case eventRpcNotify:
         {
-            vector< guint32 > vecParams;
+            vector< LONGWORD > vecParams;
             ret = GetParamList( vecParams,
                 propNotifyParamList );
 
@@ -3137,7 +3137,7 @@ gint32 CIfParallelTask::Process(
             OnNotify( eventRpcNotify,
                 vecParams[ 1 ],
                 vecParams[ 2 ],
-                ( guint32* ) vecParams[ 3 ]);
+                ( LONGWORD* ) vecParams[ 3 ]);
 
             ret = STATUS_PENDING;
             // we don't mean to complete
@@ -3433,7 +3433,7 @@ gint32 CIfIoReqTask::FilterMessageSend(
         if( pIf != nullptr )
         {
             IEventSink* pFilter = nullptr;
-            std::vector< guint32 > vecParams;
+            std::vector< LONGWORD > vecParams;
 
             ret = GetParamList( vecParams );
             if( ERROR( ret ) )
@@ -3536,12 +3536,12 @@ gint32 CIfIoReqTask::OnFilterComp()
     gint32 ret = 0;
 
     do{
-        vector< guint32 > vecParams;
+        vector< LONGWORD > vecParams;
         ret = GetParamList( vecParams );
         if( ERROR( ret ) )
             break;
 
-        gint32 iRet = ( gint32 )vecParams[ 1 ];
+        gint32 iRet = ( LONGWORD )vecParams[ 1 ];
 
         if( iRet == ERROR_PREMATURE )
         {
@@ -3762,7 +3762,7 @@ gint32 CIfIoReqTask::OnKeepAlive(
             ( IConfigDb* )GetConfig() );
 
         ObjPtr pObj;
-        vector< guint32 > vecParams;
+        vector< LONGWORD > vecParams;
 
         ret = GetParamList(
             vecParams, propKAParamList );
@@ -3770,7 +3770,7 @@ gint32 CIfIoReqTask::OnKeepAlive(
         if( ERROR( ret ) )
             break;
 
-        guint32 iKaFlag = vecParams[ 1 ];
+        guint32 iKaFlag = ( guint32 )vecParams[ 1 ];
 
         if( iKaFlag == CRpcServices::KATerm ||
             iKaFlag == CRpcServices::KARelay )
@@ -3811,10 +3811,10 @@ gint32 CIfIoReqTask::OnKeepAlive(
     return STATUS_PENDING;
 }
 
-gint32 CIfIoReqTask::OnNotify( guint32 event,
-    guint32 dwParam1,
-    guint32 dwParam2,
-    guint32* pData )
+gint32 CIfIoReqTask::OnNotify( LONGWORD event,
+    LONGWORD dwParam1,
+    LONGWORD dwParam2,
+    LONGWORD* pData )
 {
     gint32 ret = 0;
     switch( ( EnumEventId )event )
@@ -3923,7 +3923,7 @@ gint32 CIfInvokeMethodTask::FilterMessage(
         if( pIf->IsServer() )
         {
             IEventSink* pFilter = nullptr;
-            std::vector< guint32 > vecParams;
+            std::vector< LONGWORD > vecParams;
 
             ret = GetParamList( vecParams );
             if( ERROR( ret ) )
@@ -4019,7 +4019,7 @@ gint32 CIfInvokeMethodTask::OnFilterComp()
 {
     gint32 ret = 0;
     do{
-        vector< guint32 > vecParams;
+        vector< LONGWORD > vecParams;
         ret = GetParamList( vecParams );
         if( ERROR( ret ) )
             break;
@@ -5329,9 +5329,9 @@ gint32 CIfDummyTask::operator()(
 
 gint32 CIfDummyTask::OnEvent(
     EnumEventId iEvent,
-    guint32 dwParam1,
-    guint32 dwParam2,
-    guint32* pData )
+    LONGWORD dwParam1,
+    LONGWORD dwParam2,
+    LONGWORD* pData )
 {
     switch( iEvent )
     {
@@ -5356,7 +5356,7 @@ gint32 CIoReqSyncCallback::operator()(
     {
     case eventTaskComp:
         {
-            std::vector< guint32 > vecParams;
+            std::vector< LONGWORD > vecParams;
             do{
                 ret = GetParamList(
                     vecParams, propParamList );
@@ -5539,7 +5539,7 @@ gint32 CIfResponseHandler::OnTaskComplete( gint32 iRet )
     do{
         // set the response data
         BufPtr pBuf( true );
-        std::vector< guint32 > vecParams;
+        std::vector< LONGWORD > vecParams;
         ret = GetParamList( vecParams );
         if( SUCCEEDED( ret ) )
         {
@@ -5619,13 +5619,19 @@ gint32 CBusPortStopSingleChildTask::OnIrpComplete(
         if( ERROR( ret ) )
             break;
 
-        guint32 dwParam2 = 0;
+        LONGWORD dwParam2 = 0;
+
+#if ( BUILD_64 == 0 )
         ret = oCfg.GetIntProp( 3, dwParam2 );
+#else
+        ret = oCfg.GetQwordProp( 3, dwParam2 );
+#endif
+
         if( ERROR( ret ) )
             break;
 
-        guint32 dwParam1 =
-            ( guint32 )( ( IRP* )pIrp );
+        LONGWORD dwParam1 =
+            ( LONGWORD )( ( IRP* )pIrp );
 
         // run the original callback
         pCallback->OnEvent( eventIrpComp,
@@ -5669,7 +5675,7 @@ gint32 CBusPortStopSingleChildTask::RunTask()
             break;
 
         EventPtr pIrpCb = pIrp->m_pCallback;
-        guint32 dwContext = pIrp->m_dwContext;
+        LONGWORD dwContext = pIrp->m_dwContext;
 
         oCfg.Push( ObjPtr( pIrpCb ) );
         oCfg.Push( dwContext );
@@ -5731,7 +5737,7 @@ gint32 CIfInterceptTask::OnKeepAlive(
     if( ERROR( ret ) )
         return ret;
 
-    vector< guint32 > vecParams;
+    vector< LONGWORD > vecParams;
     ret = GetParamList(
         vecParams, propKAParamList );
     if( ERROR( ret ) )

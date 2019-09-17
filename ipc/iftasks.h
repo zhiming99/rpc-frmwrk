@@ -125,9 +125,9 @@ class CIfRetryTask
 
     gint32 OnEvent(
         EnumEventId iEvent,
-        guint32 dwParam1,
-        guint32 dwParam2,
-        guint32* pData );
+        LONGWORD dwParam1,
+        LONGWORD dwParam2,
+        LONGWORD* pData );
 
     gint32 GetProperty( gint32 iProp,
             CBuffer& oBuf ) const;
@@ -167,9 +167,9 @@ class CIfRetryTask
     gint32 DelayRun(
         guint32 dwSecsDelay,
         EnumEventId iEvent = eventZero,
-        guint32 dwParam1 = 0,
-        guint32 dwParam2 = 0,
-        guint32* pdata = nullptr );
+        LONGWORD dwParam1 = 0,
+        LONGWORD dwParam2 = 0,
+        LONGWORD* pdata = nullptr );
 };
 
 typedef EnumIfState EnumTaskState;
@@ -225,10 +225,10 @@ class CIfParallelTask
     gint32 GetPropertyType(
         gint32 iProp, gint32& iType ) const;
 
-    virtual gint32 OnNotify( guint32 event,
-        guint32 dwParam1,
-        guint32 dwParam2,
-        guint32* pData )
+    virtual gint32 OnNotify( LONGWORD event,
+        LONGWORD dwParam1,
+        LONGWORD dwParam2,
+        LONGWORD* pData )
     { return STATUS_PENDING; }
 
     virtual bool IsMultiThreadSafe()
@@ -236,9 +236,9 @@ class CIfParallelTask
 
     gint32 OnEvent(
         EnumEventId iEvent,
-        guint32 dwParam1,
-        guint32 dwParam2,
-        guint32* pData );
+        LONGWORD dwParam1,
+        LONGWORD dwParam2,
+        LONGWORD* pData );
 };
 
 class CIfEnableEventTask
@@ -483,9 +483,9 @@ class CIfDummyTask
     gint32 operator()( guint32 dwContext );
     virtual gint32 OnEvent(
         EnumEventId iEvent,
-        guint32 dwParam1,
-        guint32 dwParam2,
-        guint32* pData );
+        LONGWORD dwParam1,
+        LONGWORD dwParam2,
+        LONGWORD* pData );
 };
 
 class CIfServiceNextMsgTask
@@ -605,10 +605,10 @@ class CIfIoReqTask
     virtual gint32 OnKeepAlive(
         guint32 dwContext );
 
-    virtual gint32 OnNotify( guint32 event,
-        guint32 dwParam1,
-        guint32 dwParam2,
-        guint32* pData );
+    virtual gint32 OnNotify( LONGWORD event,
+        LONGWORD dwParam1,
+        LONGWORD dwParam2,
+        LONGWORD* pData );
 
     gint32 FilterMessageSend( 
         IConfigDb* pReqMsg );
@@ -736,7 +736,7 @@ class CIfInterceptTask :
         // gets called via IEventSink::OnEvent
         gint32 ret = 0;
         do{
-            std::vector< guint32 > vecParams;
+            std::vector< LONGWORD > vecParams;
             ret = GetParamList( vecParams );
             if( ERROR( ret ) )
             {

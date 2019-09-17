@@ -1242,6 +1242,7 @@ gint32 CPort::SubmitStopIrp( IRP* pIrp )
 
     if( ERROR( ret ) )
     {
+#ifdef DEBUG
         string strObjDump;
         this->Dump( strObjDump );
         DebugPrint( ret, "SubmitStopIrp failed "
@@ -1249,6 +1250,7 @@ gint32 CPort::SubmitStopIrp( IRP* pIrp )
             GetPortState(),
             GetPnpState( pIrp ),
             strObjDump.c_str() );
+#endif
     }
 
     return ret;
@@ -2872,9 +2874,9 @@ bool CPort::SetPortStateWake(
 
 gint32 CPort::OnEvent(
     EnumEventId iEvent,
-    guint32 dwParam1,
-    guint32 dwParam2,
-    guint32* pData )
+    LONGWORD dwParam1,
+    LONGWORD dwParam2,
+    LONGWORD* pData )
 { return 0;}
 
 gint32 CPort::AttachToPort( IPort* pLowerPort )

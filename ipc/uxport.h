@@ -289,9 +289,9 @@ class CIoWatchTask:
     // flow.
     virtual gint32 OnEvent(
         EnumEventId iEvent,
-        guint32 dwParam1,
-        guint32 dwParam2,
-        guint32* pData );
+        LONGWORD dwParam1,
+        LONGWORD dwParam2,
+        LONGWORD* pData );
 
     gint32 operator()( guint32 dwContext );
     gint32 OnIoWatchEvent( guint32 dwContext );

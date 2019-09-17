@@ -256,7 +256,7 @@ class CGenericInterface :
         return m_pIfStat->GetState();
     }
 
-    inline guint32 GetPortHandle() const
+    inline HANDLE GetPortHandle() const
     {
         return m_pIfStat->GetHandle();
     }
@@ -518,9 +518,9 @@ class CRpcInterfaceBase :
         bool bImmediate = false );
 
     virtual gint32 OnEvent( EnumEventId iEvent,
-        guint32 dwParam1 = 0,
-        guint32 dwParam2 = 0,
-        guint32* pData = NULL  );
+        LONGWORD dwParam1 = 0,
+        LONGWORD dwParam2 = 0,
+        LONGWORD* pData = NULL  );
 
     virtual gint32 AddStartTasks(
         IEventSink* pTaskGrp ) = 0;
@@ -574,16 +574,16 @@ class CRpcServices :
     std::deque< CfgPtr > m_queEvents;
 
     gint32 PackEvent( EnumEventId iEvent,
-        guint32 dwParam1,
-        guint32 dwParam2,
-        guint32* pData,
+        LONGWORD dwParam1,
+        LONGWORD dwParam2,
+        LONGWORD* pData,
         CfgPtr& pDestCfg  );
 
     gint32 UnpackEvent( CfgPtr& pSrcCfg,
         EnumEventId& iEvent,
-        guint32& dwParam1,
-        guint32& dwParam2,
-        guint32*& pData );
+        LONGWORD& dwParam1,
+        LONGWORD& dwParam2,
+        LONGWORD*& pData );
 
 
     protected:
@@ -828,9 +828,9 @@ class CRpcServices :
         CfgPtr& pCfg );
 
     virtual gint32 OnEvent( EnumEventId iEvent,
-        guint32 dwParam1 = 0,
-        guint32 dwParam2 = 0,
-        guint32* pData = NULL  );
+        LONGWORD dwParam1 = 0,
+        LONGWORD dwParam2 = 0,
+        LONGWORD* pData = NULL  );
 
     virtual gint32 DoModEvent(
         EnumEventId iEvent,

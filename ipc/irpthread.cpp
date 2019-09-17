@@ -276,7 +276,7 @@ gint32 CTaskThread::ProcessTask(
     if( pTask.IsEmpty() )
         return -EFAULT;
 
-    ( *pTask )( ( guint32 )dwContext );
+    ( *pTask )( dwContext );
 
 #ifdef DEBUG
     gint32 iTaskRet = pTask->GetError();
@@ -309,9 +309,10 @@ gint32 CTaskThread::ProcessTask(
 }
 
 void CTaskThread::ThreadProc(
-    void* dwContext )
+    void* pContext )
 {
     gint32 ret = 0;
+    LONGWORD dwContext = ( LONGWORD )pContext;
 
     this->SetThreadName();
     while( !m_bExit )
@@ -440,9 +441,10 @@ COneshotTaskThread::~COneshotTaskThread()
 }
 
 void COneshotTaskThread::ThreadProc(
-    void* dwContext )
+    void* pContext )
 {
     gint32 ret = 0;
+    LONGWORD lContext = ( LONGWORD )pContext;
 
     this->SetThreadName();
 
@@ -452,7 +454,7 @@ void COneshotTaskThread::ThreadProc(
         ret = GetHead( pTask );
         if( SUCCEEDED( ret ) )
         {
-            ( *pTask )( ( guint32 )dwContext );
+            ( *pTask )( ( guint32 )lContext );
             m_bTaskDone = true;
             PopHead();
             break;
@@ -642,7 +644,7 @@ void CIrpCompThread::CompleteIrp( PIRP pIrp )
     if( !pIrp->m_pCallback.IsEmpty() )
     {
         //FIXME: can I continue
-        guint32 dwParam1 = ( guint32 )pIrp;
+        LONGWORD dwParam1 = ( LONGWORD )pIrp;
         pIrp->m_pCallback->OnEvent(
             eventIrpComp, dwParam1, 0, 0 );
     }

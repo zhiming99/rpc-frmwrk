@@ -1590,9 +1590,9 @@ gint32 CRpcInterfaceBase::OnAdminEvent(
 
 gint32 CRpcInterfaceBase::OnEvent(
     EnumEventId iEvent,
-    guint32 dwParam1,
-    guint32 dwParam2,
-    guint32* pData )
+    LONGWORD dwParam1,
+    LONGWORD dwParam2,
+    LONGWORD* pData )
 {
     gint32 ret = 0;
 
@@ -1662,7 +1662,7 @@ gint32 CRpcInterfaceBase::OnEvent(
     case eventRmtSvrOnline:
     case eventRmtSvrOffline:
         {
-            HANDLE hPort = ( guint32 )pData;
+            HANDLE hPort = ( HANDLE )pData;
             string strIpAddr = reinterpret_cast
                 < const char* >( dwParam1 );
 
@@ -2277,7 +2277,9 @@ gint32 CRpcServices::OnPostStop(
         ( *m_pSeqTasks )( eventCancelTask );
         m_pSeqTasks.Clear(); 
     }
+#ifdef DEBUG
     dwStopCount++;
+#endif
 
     return 0;
 }
@@ -3449,7 +3451,7 @@ gint32 CRpcServices::SendMethodCall(
         if( oReq.exist( propSubmitPdo ) )
             bAllStack = false;
 
-        guint32 hPort = GetPortHandle();
+        HANDLE hPort = GetPortHandle();
         if( hPort == 0 )
         {
             ret = -EFAULT;
@@ -3765,7 +3767,7 @@ gint32 CRpcServices::LoadObjDesc(
         }
 
         string strVal;
-        size_t i = 0;
+        guint32 i = 0;
         for( ; i < oObjArray.size(); i++ )
         {
             if( oObjArray[ i ].empty() ||
@@ -4121,9 +4123,9 @@ gint32 CRpcServices::LoadObjDesc(
 
 gint32 CRpcServices::PackEvent(
     EnumEventId iEvent,
-    guint32 dwParam1,
-    guint32 dwParam2,
-    guint32* pData,
+    LONGWORD dwParam1,
+    LONGWORD dwParam2,
+    LONGWORD* pData,
     CfgPtr& pDestCfg  )
 {
     gint32 ret = 0;
@@ -4189,7 +4191,7 @@ gint32 CRpcServices::PackEvent(
 
             oParams.Push( 0 );
 
-            HANDLE hPort = ( guint32 )pData;
+            HANDLE hPort = ( HANDLE )pData;
             oParams.Push( hPort );
             break;
         }
@@ -4208,9 +4210,9 @@ gint32 CRpcServices::PackEvent(
 gint32 CRpcServices::UnpackEvent(
     CfgPtr& pSrcCfg,
     EnumEventId& iEvent,
-    guint32& dwParam1,
-    guint32& dwParam2,
-    guint32*& pData )
+    LONGWORD& dwParam1,
+    LONGWORD& dwParam2,
+    LONGWORD*& pData )
 {
     gint32 ret = 0;
 
@@ -4243,7 +4245,7 @@ gint32 CRpcServices::UnpackEvent(
             ret = oParams.GetProperty( 3, pBuf );
             if( ERROR( ret ) )
                 break;
-            pData = ( guint32* )pBuf->ptr();
+            pData = ( LONGWORD* )pBuf->ptr();
 
             break;
         }
@@ -4254,13 +4256,13 @@ gint32 CRpcServices::UnpackEvent(
             ret = oParams.GetProperty( 1, pBuf );
             if( ERROR( ret ) )
                 break;
-            dwParam1 = ( guint32 )pBuf->ptr();
+            dwParam1 = ( LONGWORD )pBuf->ptr();
 
             ret = oParams.GetProperty( 3, pBuf );
             if( ERROR( ret ) )
                 break;
 
-            pData = ( guint32* )pBuf->ptr();
+            pData = ( LONGWORD* )pBuf->ptr();
             break;
         }
     case eventDBusOnline:
@@ -4277,10 +4279,10 @@ gint32 CRpcServices::UnpackEvent(
             ret = oParams.GetProperty( 1, pBuf );
             if( ERROR( ret ) )
                 break;
-            dwParam1 = ( guint32 )pBuf->ptr();
+            dwParam1 = ( LONGWORD )pBuf->ptr();
 
-            guint32 hPort = oParams[ 3 ];
-            pData = ( guint32* )hPort;
+            HANDLE hPort = oParams[ 3 ];
+            pData = ( LONGWORD* )hPort;
             break;
         }
     default:
@@ -4294,9 +4296,9 @@ gint32 CRpcServices::UnpackEvent(
 
 gint32 CRpcServices::OnEvent(
     EnumEventId iEvent,
-    guint32 dwParam1,
-    guint32 dwParam2,
-    guint32* pData  )
+    LONGWORD dwParam1,
+    LONGWORD dwParam2,
+    LONGWORD* pData  )
 {
     gint32 ret = 0;
 
@@ -4805,7 +4807,7 @@ gint32 CInterfaceProxy::OnKeepAliveTerm(
             ( eventTryLock | eventKeepAlive );
 
         pTaskToKa->OnEvent( iEvent,
-            ( guint32 )KATerm, 0, nullptr );
+            KATerm, 0, nullptr );
 
     }while( 0 );
 

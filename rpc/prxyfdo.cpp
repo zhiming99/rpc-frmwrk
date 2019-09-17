@@ -1148,7 +1148,7 @@ gint32 CProxyFdoRmtDBusOfflineTask::operator()(
         // port handle to the subscribers
         ret = oEvtHelper.BroadcastEvent(
             eventConnPoint, eventId,
-            hPort, ( guint32* )strIpAddr.c_str() );
+            hPort, ( LONGWORD* )strIpAddr.c_str() );
 
     }while( 0 );
 
@@ -1326,8 +1326,8 @@ gint32 CProxyFdoModOnOfflineTask::operator()(
 
         ret = oEvtHelper.BroadcastEvent(
             eventConnPoint, eventId,
-            ( guint32 )strIpAddr.c_str(),
-            ( guint32* )strModName.c_str() );
+            ( LONGWORD )strIpAddr.c_str(),
+            ( LONGWORD* )strModName.c_str() );
 
     }while( 0 );
 

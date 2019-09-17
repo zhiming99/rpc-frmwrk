@@ -450,7 +450,9 @@ gint32 CReqFwdrOpenRmtPortTask::RunTaskInternal(
                     if( ERROR( ret ) )
                         break;
 
+#ifdef DEBUG
                     dwFailedCount++;
+#endif
 
                     // NOTE: Cannot call StopEx
                     // directly which may result
@@ -509,7 +511,9 @@ gint32 CReqFwdrOpenRmtPortTask::RunTaskInternal(
                     if( ERROR( ret ) )
                         break;
 
+#ifdef DEBUG
                     dwFailedCount++;
+#endif
 
                     DEFER_CALL( pMgr, ObjPtr( pIf ),
                         &CInterfaceProxy::StopEx,
@@ -1729,7 +1733,7 @@ gint32 CReqFwdrEnableRmtEventTask::OnTaskComplete(
             // check to see the response from the
             // remote server
             do{
-                vector< guint32 > vecParams;
+                vector< LONGWORD > vecParams;
                 ret = GetParamList( vecParams );
                 if( ERROR( ret ) )
                     break;

@@ -442,10 +442,10 @@ gint32 CIoMgrIrpCompleteTask::operator()(
 
         if( !pIrp->m_pCallback.IsEmpty() )
         {
-            guint32 dwParam1 =
-                ( guint32 )( ( IRP* )pIrp );
+            LONGWORD dwParam1 =
+                ( LONGWORD )( ( IRP* )pIrp );
 
-            guint32 dwParam2 =
+            LONGWORD dwParam2 =
                 pIrp->m_dwContext;
 
             pIrp->m_pCallback->OnEvent(
@@ -1179,9 +1179,9 @@ gint32 CIoManager::OpenPort(
 }
 
 gint32 CIoManager::OnEvent( EnumEventId iEvent,
-    guint32 dwParam1,
-    guint32 dwParam2,
-    guint32* pData)
+    LONGWORD dwParam1,
+    LONGWORD dwParam2,
+    LONGWORD* pData)
 {
     gint32 ret = 0;
     switch( iEvent )
@@ -1822,7 +1822,7 @@ std::recursive_mutex& CIoManager::GetLock() const
 gint32 CIoManager::ScheduleWorkitem(
     guint32 dwFlags,
     IEventSink* pCallback,
-    guint32 dwContext,
+    LONGWORD dwContext,
     bool bLongWait )
 {
     CWorkitemManager& oWiMgr =

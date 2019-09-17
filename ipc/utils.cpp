@@ -194,7 +194,7 @@ CWorkitemManager::CWorkitemManager(
 gint32 CWorkitemManager::ScheduleWorkitem(
     guint32 dwFlags,
     IEventSink* pCallback,
-    guint32 dwContext,
+    LONGWORD dwContext,
     bool bLongWait )
 {
     if( pCallback == nullptr )
@@ -349,7 +349,7 @@ CTimerService::CTimerService(
 gint32 CTimerService::AddTimer(
     guint32 dwIntervalSec,
     IEventSink* pEvent,
-    guint32 dwParam )
+    LONGWORD dwParam )
 {
     gint32 ret = -EINVAL;
     if( pEvent == nullptr )
@@ -565,7 +565,7 @@ gint32 CTimerService::ProcessTimers()
                 pte->m_pCallback->OnEvent(
                     eventTimeout,
                     pte->m_dwParam,
-                    ( guint32 )GetIoMgr() );
+                    ( LONGWORD )GetIoMgr() );
             }
             tempPending.pop_back();
         }

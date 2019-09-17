@@ -142,7 +142,7 @@ gint32 CBdgeProxyOpenStreamTask::OnTaskComplete(
             oParams.GetCfg();
 
         pEvent->OnEvent( eventTaskComp,
-            ret, 0, ( guint32* )this ); 
+            ret, 0, ( LONGWORD* )this ); 
     }
 
     // remove the event sink
@@ -348,7 +348,7 @@ gint32 CBdgeProxyStartSendTask::
         }
 
         pEvent->OnEvent( eventTaskComp,
-            iRetVal, 0, ( guint32* )this );
+            iRetVal, 0, ( LONGWORD* )this );
 
         CloseStream();
 
@@ -461,7 +461,7 @@ gint32 CBdgeProxyStartSendTask::
         }
 
         pEvent->OnEvent( eventTaskComp,
-            iRetVal, 0, ( guint32* )this );
+            iRetVal, 0, ( LONGWORD* )this );
 
         CloseStream();
 
@@ -477,10 +477,10 @@ gint32 CBdgeProxyStartSendTask::
 }
 
 gint32 CBdgeProxyStartSendTask::OnNotify(
-    guint32 dwEvent,
-    guint32 dwParam1,
-    guint32 dwParam2,
-    guint32* pData )
+    LONGWORD dwEvent,
+    LONGWORD dwParam1,
+    LONGWORD dwParam2,
+    LONGWORD* pData )
 {
     gint32 ret = STATUS_PENDING;
     if( dwParam1 != eventProgress )

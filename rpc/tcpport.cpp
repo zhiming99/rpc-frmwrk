@@ -179,7 +179,7 @@ gint32 CRpcSockWatchCallback::operator()(
 {
     gint32 ret = 0;
     do{
-        std::vector< guint32 > vecParams;
+        std::vector< LONGWORD > vecParams;
         ret = GetParamList( vecParams );
         if( ERROR( ret ) )
         {
@@ -353,7 +353,7 @@ gboolean CRpcSocketBase::SockEventCallback(
         return G_SOURCE_REMOVE;
 
     pThis->OnEvent( eventSocket,
-        ( guint32 ) condition, 0, nullptr );
+        ( LONGWORD ) condition, 0, nullptr );
 
     return G_SOURCE_CONTINUE;
 }
@@ -432,9 +432,9 @@ gint32 CRpcSocketBase::StartTimer()
 
 gint32 CRpcSocketBase::OnEvent(
         EnumEventId iEvent,
-        guint32 dwParam1,
-        guint32 dwParam2,
-        guint32* pData )
+        LONGWORD dwParam1,
+        LONGWORD dwParam2,
+        LONGWORD* pData )
 {
     gint32 ret = 0;
     switch( iEvent )
@@ -1494,9 +1494,9 @@ gint32 CRpcStreamSock::OnSendReady()
 // event dispatcher
 gint32 CRpcStreamSock::OnEvent(
     EnumEventId iEvent,
-    guint32 dwParam1,
-    guint32 dwParam2,
-    guint32* pData )
+    LONGWORD dwParam1,
+    LONGWORD dwParam2,
+    LONGWORD* pData )
 {
     gint32 ret = 0;
     switch( iEvent )
@@ -4676,7 +4676,7 @@ gint32 CStmSockConnectTask::operator()(
             }
             guint32 dwConnFlags = ( G_IO_OUT );
 
-            vector< guint32 > vecParams;
+            vector< LONGWORD > vecParams;
             ret = GetParamList( vecParams );
             if( ERROR( ret ) )
                 break;
@@ -4697,7 +4697,7 @@ gint32 CStmSockConnectTask::operator()(
                 ret = ERROR_STATE;
                 break;
             }
-            vector< guint32 > vecParams;
+            vector< LONGWORD > vecParams;
             ret = GetParamList( vecParams );
             if( ERROR( ret ) )
                 break;
@@ -4717,7 +4717,7 @@ gint32 CStmSockConnectTask::operator()(
     case eventTimeout:
         {
             m_iTimerId = 0;
-            vector< guint32 > vecParams;
+            vector< LONGWORD > vecParams;
             ret = GetParamList( vecParams );
             if( ERROR( ret ) )
                 break;
@@ -4740,7 +4740,7 @@ gint32 CStmSockConnectTask::operator()(
             // the irp from being completed again
             m_pCtx->RemoveProperty( propIrpPtr );
 
-            vector< guint32 > vecParams;
+            vector< LONGWORD > vecParams;
             ret = GetParamList( vecParams );
             if( ERROR( ret ) )
                 break;

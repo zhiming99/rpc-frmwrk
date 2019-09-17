@@ -799,7 +799,7 @@ gint32 CIoWatchTask::operator()(
             {
             case eventIoWatch:
                 {
-                    std::vector< guint32 > vecParams;
+                    std::vector< LONGWORD > vecParams;
                     ret = GetParamList( vecParams );
                     if( ERROR( ret ) )
                         break;
@@ -841,9 +841,9 @@ gint32 CIoWatchTask::operator()(
 
 gint32 CIoWatchTask::OnEvent(
     EnumEventId iEvent,
-    guint32 dwParam1,
-    guint32 dwParam2,
-    guint32* pData )
+    LONGWORD dwParam1,
+    LONGWORD dwParam2,
+    LONGWORD* pData )
 {
     // Lock to prevent re-entrance 
     gint32 ret = 0;
@@ -856,12 +856,12 @@ gint32 CIoWatchTask::OnEvent(
                 // we have some special processing for
                 // eventIoWatch to bypass the normal
                 // CIfParallelTask's process flow.
-                IntVecPtr pVec( true );
-                std::vector< guint32 >& oVec = ( *pVec )();
-                oVec.push_back( ( guint32 )iEvent );
-                oVec.push_back( ( guint32 )dwParam1 );
-                oVec.push_back( ( guint32 )dwParam2 );
-                oVec.push_back( ( guint32 )pData);
+                LwVecPtr pVec( true );
+                std::vector< LONGWORD >& oVec = ( *pVec )();
+                oVec.push_back( iEvent );
+                oVec.push_back( dwParam1 );
+                oVec.push_back( dwParam2 );
+                oVec.push_back( ( LONGWORD )pData );
 
                 CCfgOpener oCfg(
                     ( IConfigDb* )GetConfig() );

@@ -83,6 +83,7 @@ gint32 CMainIoLoop::InstallTaskSource()
 
         if( m_pSchedCb.IsEmpty() )
         {
+#ifndef _USE_LIBEV
             CParamList oCfg;
             ret = oCfg.SetPointer(
                propIoMgr, this->GetIoMgr() );
@@ -99,7 +100,6 @@ gint32 CMainIoLoop::InstallTaskSource()
             if( ERROR( ret ) )
                 break;
 
-#ifndef _USE_LIBEV
         }
 
         // m_pSchedCb is already active, no

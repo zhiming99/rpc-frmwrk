@@ -55,15 +55,15 @@ CDBusProxyPdo::CDBusProxyPdo(
 
         CCfgOpener oCfg( pCfg );
 
-        guint32 dwValue;
+        guint32* pdwValue;
 
-        ret = oCfg.GetIntProp(
-            propDBusConn, dwValue );
+        ret = oCfg.GetIntPtr(
+            propDBusConn, pdwValue );
 
         if( ERROR( ret ) )
             break;
 
-        m_pDBusConn = ( DBusConnection* )dwValue;
+        m_pDBusConn = ( DBusConnection* )pdwValue;
         if( m_pDBusConn == nullptr )
         {
             ret = -EINVAL;
@@ -1706,8 +1706,8 @@ gint32 CDBusProxyPdo::OnRmtSvrOnOffline(
         oEvtHelper.BroadcastEvent(
             eventConnPoint,
             eventId,
-            ( guint32 )strIpAddr.c_str(),
-            ( guint32* )PortToHandle( this ) );
+            ( LONGWORD )strIpAddr.c_str(),
+            ( LONGWORD* )PortToHandle( this ) );
 
 
     }while( 0 );
@@ -2142,8 +2142,8 @@ gint32 CDBusProxyPdo::NotifyRouterOffline()
         oEvtHelper.BroadcastEvent(
             eventConnPoint,
             eventRmtSvrOffline,
-            ( guint32 )strIpAddr.c_str(),
-            ( guint32* )PortToHandle( this ) );
+            ( LONGWORD )strIpAddr.c_str(),
+            ( LONGWORD* )PortToHandle( this ) );
 
     }while( 0 );
 

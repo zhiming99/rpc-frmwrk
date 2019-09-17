@@ -362,3 +362,96 @@ gint32 CStlObjVector::Deserialize(
 
     return ret;
 }
+
+gint32 CStlLongWordVector::Serialize(
+    CBuffer& oBuf ) const
+{
+    SERI_HEADER oHeader;
+
+    guint32 dwSize = 
+        sizeof( ElemType ) * m_vecElems.size();
+
+    oHeader.dwClsid = clsid( CStlLongWordVector );
+    oHeader.dwSize = dwSize ;
+
+    oBuf.Resize(
+        sizeof( oHeader ) + dwSize );
+
+    oHeader.dwCount = m_vecElems.size();
+
+    oHeader.hton();
+    memcpy( oBuf.ptr(), &oHeader, sizeof( oHeader ) );
+
+    LONGWORD *pElem = ( LONGWORD* )
+        ( oBuf.ptr() + sizeof( oHeader ) );
+
+    for( auto i : m_vecElems )
+    {
+#if ( BUILD_64 == 1 )
+            *pElem++ = htonll( i );
+#else
+            *pElem++ = htonl( i );
+#endif
+    }
+
+    return 0;
+}
+
+gint32 CStlLongWordVector::Deserialize(
+    const CBuffer& oBuf )
+{
+    const SERI_HEADER* pHeader =
+        ( SERI_HEADER* )oBuf.ptr();
+
+    if( pHeader == nullptr )
+        return -EINVAL;
+
+    SERI_HEADER oHeader( *pHeader );
+    // memcpy( &oHeader, pHeader, sizeof( oHeader ) );
+    oHeader.ntoh();
+
+    m_vecElems.clear();
+    gint32 ret = 0;
+
+    do{
+        if( oHeader.dwClsid != clsid( CStlLongWordVector ) )
+        {
+            ret = -ENOTSUP;
+            break;
+        }
+
+        if( oHeader.bVersion != 1 )
+        {
+            ret = -ENOTSUP;
+        }
+
+        if( oHeader.dwSize > BUF_MAX_SIZE ) 
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        if( oHeader.dwSize / sizeof( ElemType ) !=
+            oHeader.dwCount )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        LONGWORD* pElems =
+            ( LONGWORD* )( pHeader + 1 );
+        for( guint32 i = 0; i < oHeader.dwCount; ++i )
+        {
+#if( BUILD_64 == 1 )
+                m_vecElems.push_back(
+                    ntohll( pElems[ i ] ) );
+#else
+                m_vecElems.push_back(
+                    ntohl( pElems[ i ] ) );
+#endif
+        }
+
+    }while( 0 );
+
+    return ret;
+}

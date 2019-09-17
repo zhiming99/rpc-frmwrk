@@ -218,15 +218,15 @@ CDBusLocalPdo::CDBusLocalPdo( const IConfigDb* pCfg )
     do{
         CCfgOpener oCfg( pCfg );
 
-        guint32 dwValue;
+        guint32* pdwValue;
 
-        ret = oCfg.GetIntProp(
-            propDBusConn, ( guint32& )dwValue );
+        ret = oCfg.GetIntPtr(
+            propDBusConn, ( guint32*& )pdwValue );
 
         if( ERROR( ret ) )
             break;
 
-        m_pDBusConn = ( DBusConnection* )dwValue;
+        m_pDBusConn = ( DBusConnection* )pdwValue;
 
         if( m_pDBusConn == nullptr )
         {
