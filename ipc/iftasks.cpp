@@ -1586,6 +1586,15 @@ gint32 CIfTaskGroup::OnChildComplete(
 
         PopTask();
         m_vecRetVals.push_back( iRet );
+        if( iRet == STATUS_PENDING )
+        {
+#ifdef DEBUG
+            DebugPrint( iRet, "a task in quitting abnormally..." );
+            std::string strDump;
+            pHead->Dump( strDump );
+            DebugPrint( ret, "for class %s", strDump.c_str() );
+#endif
+        }
 
         if( bSync )
             break;

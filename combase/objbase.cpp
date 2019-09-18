@@ -490,10 +490,10 @@ extern std::unordered_map<EnumClsid, std::string> g_mapId2Name;
 void CObjBase::Dump( std::string& strDump )
 {
     char szBuf[ 128 ];
-#ifndef __LP64__
-    sprintf( szBuf, "0x%08X: ", (int)this );
+#if BUILD_64 == 0
+    sprintf( szBuf, "0x%08X: ", ( LONGWORD )this );
 #else
-    sprintf( szBuf, "0x%08lX: ", (LONGWORD)this );
+    sprintf( szBuf, "0x%08lX: ", ( LONGWORD )this );
 #endif
     strDump += szBuf;
     strDump += ", clsid: ";

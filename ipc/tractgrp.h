@@ -121,7 +121,13 @@ class CIfTransactGroup :
 
     gint32 OnComplete( gint32 iRet )
     {
-        iRet = m_pTaskGrp->GetError();
+        // don't use m_pTaskGrp's GetError here,
+        // because at the moment, the m_pTaskGrp
+        // could still be in its OnComplete call
+        // with the `m_iRet' unset yet if the
+        // process's load is very high.
+        //
+        // iRet = m_pTaskGrp->GetError();
         super::OnComplete( iRet );
 
         m_pRbackGrp->RemoveProperty(
