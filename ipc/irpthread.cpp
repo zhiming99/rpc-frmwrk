@@ -726,6 +726,9 @@ gint32 CThreadPool::GetThread(
         ThreadPtr thptr;
         CStdRMutex oLock( m_oLock ); 
 
+        if( m_iMaxThreads == 0 )
+            return -ENOENT;
+
         gint32 iLeastLoad = 10000;
         ThreadPtr thLeast;
 

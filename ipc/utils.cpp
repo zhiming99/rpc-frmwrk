@@ -138,7 +138,7 @@ gint32 CUtilities::Start()
     function<gint32(gint32)> oThreadProc =
         std::bind( &CUtilities::ThreadProc, this, _1 );
 
-    m_pWorkerThread = new thread( oThreadProc, 0 );
+    // m_pWorkerThread = new thread( oThreadProc, 0 );
     // m_pWorkerThreadLongWait = new thread( oThreadProc, 1 );
 
     m_pTimerSvc->Start();
@@ -498,6 +498,7 @@ gboolean CTimerService::TimerCallback(
         reinterpret_cast< CTimerService* >(dwParams);
 
     pthis->TickTimers();
+    pthis->ProcessTimers();
 
     // don't quit the timer
     return G_SOURCE_CONTINUE;

@@ -1808,6 +1808,36 @@ CIoManager::CIoManager(
     const IConfigDb* pCfg )
    :CIoManager( ExtractModNameIoMgr( pCfg ) )
 {
+    gint32 ret = 0;
+    do{
+        CCfgOpener oCfg( pCfg );
+        guint32 dwMaxThrds = 0;
+        ret = oCfg.GetIntProp(
+            propMaxIrpThrd, dwMaxThrds );
+        if( SUCCEEDED( ret ) )
+        {
+            dwMaxThrds = std::min(
+                dwMaxThrds,GetNumCores() );
+            m_pIrpThrdPool->SetMaxThreads(
+                dwMaxThrds );
+        }
+
+        ret = oCfg.GetIntProp(
+            propMaxTaskThrd, dwMaxThrds );
+        if( SUCCEEDED( ret ) )
+        {
+            dwMaxThrds = std::min(
+                dwMaxThrds,GetNumCores() );
+
+            // task thread count cannot be zero
+            if( dwMaxThrds == 0 )
+                dwMaxThrds = 1;
+
+            m_pTaskThrdPool->SetMaxThreads(
+                dwMaxThrds );
+        }
+
+    }while( 0 );
 }
 
 CIoManager::~CIoManager()

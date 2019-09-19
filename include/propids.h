@@ -105,7 +105,7 @@ enum EnumPropId : gint32
     propMasterIrp,      // type: ObjPtr to the Master Irp
     propPortPtrs,       // type: ObjPtr to CStlPortVector
     propEventId,        // type: guint32
-    propOtherThread,    // type: bool
+    propMaxTaskThrd,    // type: guint32 as the max count of task thread
     propIntervalSec,    // type: guint32 for time interval in second
     propRetries,        // type: guint32 for times to retry
     propRetriesBackup,  // type: guint32 as backup of propRetries
@@ -115,8 +115,8 @@ enum EnumPropId : gint32
     propObjId,          // type: guint64 for a unique object id
     propClsid,          // type: guint32 for the class id
     propRefCount,       // type: guint32 for the reference count of the object
-    propFuncAddr,       // type: BufPtr for the 32-bit address of a function entry 
-    propReserved,       // type: 
+    propFuncAddr,       // type: ObjPtr to a task as a resume point
+    propMaxIrpThrd,     // type: guint32 as the max count of irp complete thread
     propIfPtr,          // type: ObjPtr of pointer to a IInterfaceState
     propTaskPtr,        // type: ObjPtr of pointer to a tasklet
     propParentTask,     // type: ObjPtr of pointer to a parent tasklet

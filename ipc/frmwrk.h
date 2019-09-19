@@ -357,6 +357,9 @@ class CIoManager : public IService
 
     std::vector< ThreadPtr >      m_vecStandAloneThread;
 
+    gint32                      m_iMaxIrpThrd = 2;
+    gint32                      m_iMaxTaskThrd = 2;
+
     protected:
 
     std::recursive_mutex& GetLock() const;
@@ -418,8 +421,6 @@ class CIoManager : public IService
     // propBusName: mandatory
     //
     // propPortName: optional
-    // propOtherThread: optional, whether to call eventPortAttached
-    //      from other thread
     //
     // propPortId : mandatory for local dbus
     // propIpAddr: mandatory for proxy

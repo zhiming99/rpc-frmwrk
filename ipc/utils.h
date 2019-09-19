@@ -171,6 +171,9 @@ class CThreadPool : public IService
     gint32 Start();
     gint32 Stop();
     
+    void SetMaxThreads( guint32 dwMaxThrds )
+    { m_iMaxThreads = dwMaxThrds; }
+
     gint32 OnEvent( EnumEventId iEvent,
             LONGWORD dwParam1,
             LONGWORD dwParam2,
