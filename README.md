@@ -23,6 +23,11 @@ This framework depends on the following packags:
 11. `Streaming support to provide double-direction stream transfer`
 
 ---
+[`Mon 30 Sep 2019 02:53:58 PM Beijing`]
+1. Finished rewriting the `sftest` and `stmtest` tests with the stream interface. And fixed many bugs.   
+2. Next target is to get session manager to work. It is a premise task before the support for the `websocket` connection.   
+3. Happy National Day! :)
+
 [`Tue 17 Sep 2019 09:56:09 PM Beijing`]   
 1. Major improvement! This project supports 64bit X86_64 now. Yeah!   
 
