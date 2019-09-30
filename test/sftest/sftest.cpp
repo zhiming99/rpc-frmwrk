@@ -232,7 +232,8 @@ void CIfSmokeTest::testCliStartStop()
         else
             DebugPrint( ret, "Upload failed, time = %g secs", dbTime1 );
 
-        if( SUCCEEDED( ret ) )
+        if( ERROR( ret ) )
+            break;
 
         DebugPrint( 0, "Downloading test..." );
         clock_gettime( CLOCK_REALTIME, &ts );
