@@ -293,11 +293,11 @@ gint32 CPnpManager::StartPortsInternal(
         }
 
         // we cannot run on the main thread
-        if( GetIoMgr()->RunningOnMainThread() )
+        /*if( GetIoMgr()->RunningOnMainThread() )
         {
             ret = ERROR_WRONG_THREAD;
             break;
-        }
+        }*/
 
         IrpPtr pIrp( true );
         pIrp->AllocNextStack( nullptr );

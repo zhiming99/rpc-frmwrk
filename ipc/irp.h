@@ -179,6 +179,7 @@
 // callback only. no need to go through the port
 // stack
 #define IRP_CALLBACK_ONLY               0x40
+#define IRP_SUBMITED                    0x80
 
 // state flags of the irp
 #define IRP_STATE_READY                 0x01
@@ -438,6 +439,15 @@ struct IoRequestPacket : public IEventSink
     bool IsPending() const;
     void MarkPending();
     void RemovePending();
+
+    inline void SetSubmited()
+    { m_dwFlags |= IRP_SUBMITED; }
+
+    inline void ClearSubmited()
+    { m_dwFlags &= ~IRP_SUBMITED; }
+
+    inline bool IsSubmited() const
+    { return ( ( m_dwFlags & IRP_SUBMITED ) != 0 ); }
 
     void SetCbOnly( bool bCbOnly );
 

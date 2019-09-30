@@ -247,14 +247,16 @@
             "ModName" : "sfclitst",
             "DriversToLoad" :
             [
-                "DBusBusDriver"
+                "DBusBusDriver",
+                "UnixSockBusDriver"
             ]
         },
         {
             "ModName" : "sfsvrtst",
             "DriversToLoad" :
             [
-                "DBusBusDriver"
+                "DBusBusDriver",
+                "UnixSockBusDriver"
             ]
         },
         {

@@ -4034,7 +4034,7 @@ gint32 CReqFwdrFetchDataTask::OnTaskComplete(
     }
     else if( ERROR( iRetVal ) )
     {
-        ret = ERROR_FAIL;
+        ret = iRetVal;
     }
 
     if( IsPending() )

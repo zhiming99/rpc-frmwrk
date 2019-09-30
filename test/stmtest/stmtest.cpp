@@ -189,6 +189,7 @@ void CIfSmokeTest::testCliStartStop()
     CStreamingClient* pCli = pIf;
     if( pCli == nullptr )
         return;
+
     do{
         while( !pCli->IsConnected() )
             sleep( 1 );

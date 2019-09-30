@@ -2603,7 +2603,7 @@ struct has_##MethodName\
     { \
         EnumClsid iid = _GETIID( pCallback ); \
         using ClassName = typename std::tuple_element< N, std::tuple<Types...>>::type; \
-        if( ClassName::GetIid() == iid ) \
+        if( ClassName::GetIid() == iid || ClassName::SupportIid( iid ) ) \
             return this->ClassName::_MethodName( ARGS ); \
         return ERROR_NOT_HANDLED; \
     } \
@@ -2613,7 +2613,7 @@ struct has_##MethodName\
     { \
         using ClassName = typename std::tuple_element< N, std::tuple<Types...>>::type; \
         EnumClsid iid = _GETIID( pCallback ); \
-        if( ClassName::GetIid() == iid ) \
+        if( ClassName::GetIid() == iid || ClassName::SupportIid( iid ) ) \
             return this->ClassName::_MethodName( ARGS ); \
         return Handler##_MethodName( NumberSequence<M, S...>(), ARGS ); \
     } \
@@ -2673,6 +2673,10 @@ struct CAggInterfaceServer :
         : CInterfaceServer( pCfg )
     {}
     virtual const EnumClsid GetIid() const = 0;
+    // for those interface who inherits other
+    // interfaces
+    virtual bool SupportIid( EnumClsid )
+    { return false; }
 };
 
 class CStreamServer;
@@ -2821,7 +2825,7 @@ struct ClassName : CAggregatedObject< CAggInterfaceServer, ##__VA_ARGS__ >, IUnk
     { \
         EnumClsid iid = _GETIID( pDataDesc ); \
         using ClassName = typename std::tuple_element< N, std::tuple<Types...>>::type; \
-        if( ClassName::GetIid() == iid ) \
+        if( ClassName::GetIid() == iid || ClassName::SupportIid( iid ) ) \
             return this->ClassName::_MethodName( ARGS ); \
         return ERROR_NOT_HANDLED; \
     } \
@@ -2831,7 +2835,7 @@ struct ClassName : CAggregatedObject< CAggInterfaceServer, ##__VA_ARGS__ >, IUnk
     { \
         using ClassName = typename std::tuple_element< N, std::tuple<Types...>>::type; \
         EnumClsid iid = _GETIID( pDataDesc ); \
-        if( ClassName::GetIid() == iid ) \
+        if( ClassName::GetIid() == iid || ClassName::SupportIid( iid ) ) \
             return this->ClassName::_MethodName( ARGS ); \
         return Handler##_MethodName( NumberSequence<M, S...>(), ARGS ); \
     } \
@@ -2857,6 +2861,8 @@ struct CAggInterfaceProxy :
         : CInterfaceProxy( pCfg )
     {}
     virtual const EnumClsid GetIid() const = 0;
+    virtual bool SupportIid( EnumClsid )
+    { return false; }
 };
 
 template< typename...Types >

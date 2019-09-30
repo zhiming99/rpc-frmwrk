@@ -730,6 +730,7 @@ gint32 CBuffer::DeserializePrimeType( guint8* pSrc )
     switch( GetExDataType() )
     {
     case typeNone:
+    case typeByteArr:
         {
             memcpy( ptr(), pSrc, size() );
             break;

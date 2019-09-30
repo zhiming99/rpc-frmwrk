@@ -3,7 +3,7 @@
  *
  *       Filename:  sftest.cpp
  *
- *    Description:  implementation test for the CSendFetchServer/CSendFetchClient.
+ *    Description:  implementation test for the CSimpFileServer/CSimpFileClient.
  *                  Note that this object is a multi-if object, unlike the
  *                  objects of all the earlier tests.
  *
@@ -31,6 +31,7 @@
 #include <cppunit/ui/text/TestRunner.h>
 
 #include <cppunit/extensions/HelperMacros.h>
+#define NSEC_PER_SEC 1000000000
 
 CPPUNIT_TEST_SUITE_REGISTRATION( CIfSmokeTest );
 
@@ -102,7 +103,7 @@ void CIfSmokeTest::testSvrStartStop()
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 
     ret = pIf.NewObj(
-        clsid( CSendFetchServer ),
+        clsid( CSimpFileServer ),
         oCfg.GetCfg() );
     
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );
@@ -110,14 +111,8 @@ void CIfSmokeTest::testSvrStartStop()
     ret = pIf->Start();
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );
     
-    CSendFetchServer* pSvr = pIf;
-    while( pSvr->IsConnected() )
-    {
-        sleep( 1 );
-        std::string strIfName = "CSendFetchServer";
-        if( pSvr->IsPaused( strIfName ) )
-            break;
-    }
+    CSimpFileServer* pSvr = pIf;
+    ret = pSvr->StartLoop();
 
     ret = pIf->Stop();
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );
@@ -149,7 +144,7 @@ void CIfSmokeTest::testCliStartStop()
         return;
 
     ret = pIf.NewObj(
-        clsid( CSendFetchClient ),
+        clsid( CSimpFileClient ),
         oCfg.GetCfg() );
     
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );
@@ -158,7 +153,7 @@ void CIfSmokeTest::testCliStartStop()
 
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );
     
-    CSendFetchClient* pCli = pIf;
+    CSimpFileClient* pCli = pIf;
     CPPUNIT_ASSERT( pCli != nullptr );
 
     do{
@@ -177,7 +172,7 @@ void CIfSmokeTest::testCliStartStop()
             CPPUNIT_ASSERT( false );
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 
-        // method from interface CSendFetchServer
+        // method from interface CSimpFileServer
         DebugPrint( 0, "Enumerate intefaces..." );
         IntVecPtr pClsids( true );
         ret = pCli->EnumInterfaces( pClsids );
@@ -208,25 +203,65 @@ void CIfSmokeTest::testCliStartStop()
         DebugPrint( 0, "EnumInterfaces Completed" );
 
         system( "echo Hello, World! > ./hello-1.txt" );
+
+        timespec ts = { 0 }, ts2={ 0 };
+        clock_gettime( CLOCK_REALTIME, &ts );
+
+        DebugPrint( 0, "Uploading test..." );
         // method from interface CFileTransferServer
         ret = pCli->UploadFile(
-            std::string( "./hello-1.txt" ) );
+            std::string( "./f100M.dat" ) );
 
-        if( ERROR( ret ) )
-            break;
+        clock_gettime( CLOCK_REALTIME, &ts2 );
+        int iCarry = 0;
+        double nsec = .0;
+        if( ts2.tv_nsec < ts.tv_nsec )
+        {
+            nsec = ts2.tv_nsec + ( 10 ^ 9 ) - ts.tv_nsec;
+            iCarry = 1;
+        }
+        else
+        {
+            nsec = ts2.tv_nsec - ts.tv_nsec;
+        }
 
-        if( SUCCEEDED( ret ) );
-            DebugPrint( 0, "Upload Completed" );
+        double dbTime1 = ( ( double )( ts2.tv_sec - ts.tv_sec - iCarry ) ) +
+            ( nsec ) / NSEC_PER_SEC;
+        if( SUCCEEDED( ret ) )
+            DebugPrint( 0, "Upload Completed, time = %g secs", dbTime1 );
+        else
+            DebugPrint( ret, "Upload failed, time = %g secs", dbTime1 );
 
-        // method from interface CFileTransferServer
+        if( SUCCEEDED( ret ) )
+
+        DebugPrint( 0, "Downloading test..." );
+        clock_gettime( CLOCK_REALTIME, &ts );
         ret = pCli->DownloadFile(
-            // server side file to download
-            std::string( "./hello-1.txt" ), 
-            // local file to save to
-            std::string( "./dload-1.txt" ) ); 
+            std::string( "./f100M.dat" ) );
 
-        CPPUNIT_ASSERT( SUCCEEDED( ret ) );
-        DebugPrint( 0, "Download Completed" );
+        clock_gettime( CLOCK_REALTIME, &ts2 );
+        iCarry = 0;
+        nsec = .0;
+        if( ts2.tv_nsec < ts.tv_nsec )
+        {
+            nsec = ts2.tv_nsec + ( 10 ^ 9 ) - ts.tv_nsec;
+            iCarry = 1;
+        }
+        else
+        {
+            nsec = ts2.tv_nsec - ts.tv_nsec;
+        }
+
+        double dbTime2 = ( ( double )( ts2.tv_sec - ts.tv_sec - iCarry ) ) +
+            ( nsec ) / NSEC_PER_SEC;
+
+        if( SUCCEEDED( ret ) )
+            DebugPrint( 0, "Download Completed, time = %g secs", dbTime2 );
+        else
+            DebugPrint( ret, "Download failed, time = %g secs", dbTime2 );
+
+        // CPPUNIT_ASSERT( SUCCEEDED( ret ) );
+        DebugPrint( 0, "Upload/Download Completed" );
 
         BufPtr pCount( true );
         ret = pCli->GetCounter(

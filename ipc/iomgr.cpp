@@ -54,6 +54,7 @@ gint32 CIoManager::SubmitIrpInternal(
 
     do{
         pIrp->m_dwTid = GetTid();
+        pIrp->SetSubmited();
 
         if( bTopmost )
             pPort = pPort->GetTopmostPort();
@@ -1101,13 +1102,13 @@ gint32 CIoManager::OpenPort(
             break;
         }
 
-        if( RunningOnMainThread() )
+        /*if( RunningOnMainThread() )
         {
             // we cannot open port on the
             // main IO thread
             ret = ERROR_WRONG_THREAD;
             break;
-        }
+        }*/
 
         // FIXME: what is the ref count of pPort
         ret = this->OpenPortByCfg( pCfg, pPort );

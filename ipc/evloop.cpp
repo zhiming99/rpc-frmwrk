@@ -283,6 +283,8 @@ gint32 CEvLoop::Start()
     ret = AddIoWatch( pTask, hAsync );
     if( ERROR( ret ) )
         return ret;
+
+    OnPreLoop();
     ret = RunLoop();
     RemoveIoWatch( hAsync );
     return ret;
@@ -879,6 +881,28 @@ gint32 CEvLoopAsyncCallback::HandleCommand()
         }
     case aevtStop:
         {
+            LONGWORD lRet = 0;
+            ret = m_pLoop->ReadAsyncData(
+                ( guint8* )&lRet,
+                sizeof( lRet ) );
+            if( ret == -EAGAIN )
+            {
+                // data not arrive completely
+                // FOR EAGAIN, the caller has special
+                // handling
+                m_pLoop->AsyncDataUnwind( 1 );
+                ret = G_SOURCE_CONTINUE;
+                break;
+            }
+            if( ERROR( ret ) )
+            {
+                // fatal error
+                ret = G_SOURCE_REMOVE;
+                break;
+            }
+
+            SetError( ( guint32 )lRet );
+
             CParamList oParams;
             oParams.Push( ObjPtr( m_pLoop ) );
 

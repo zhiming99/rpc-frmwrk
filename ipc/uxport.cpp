@@ -1014,9 +1014,6 @@ gint32 CIoWatchTask::OnIoReady( guint32 revent )
         {
             do{
                 ret = m_oSendQue.OnIoReady();
-                if( ret == -EAGAIN )
-                    StartWatch();
-
                 if( SUCCEEDED( ret ) &&
                     m_oSendQue.GetPendingWrite() == 0 )
                     ret = OnSendReady();
@@ -1688,6 +1685,7 @@ gint32 CUnixSockStmPdo::SubmitWriteIrp(
 
             if( ret == STATUS_PENDING )
             {
+                pTask->StartWatch();
                 m_queWritingIrps.push_back( pIrp );
                 if( m_queWritingIrps.size() ==
                     STM_MAX_QUEUE_SIZE )
@@ -2070,8 +2068,6 @@ gint32 CUnixSockStmPdo::OnSendReady()
         }
         else
         {
-            DebugPrint( ERROR_STATE,
-                "no irp to complete!" );
             pTask->StopWatch();
         }
 

@@ -143,7 +143,7 @@ gint32 CMyStreamServer::OnWriteEnabled_Loop(
 }
 
 gint32 CMyStreamServer::OnRecvData_Loop(
-    HANDLE hChannel )
+    HANDLE hChannel, gint32 iRet )
 {
     BufPtr pBuf;
     CfgPtr pCfg;
@@ -169,6 +169,12 @@ gint32 CMyStreamServer::OnRecvData_Loop(
     guint32 dwCount = oCfg[ 0 ];
 
     do{
+        if( ERROR( iRet ) )
+        {
+            ret = iRet;
+            break;
+        }
+
         ret = ReadMsg( hChannel, pBuf, -1 );
         if( ret == -EAGAIN )
         {

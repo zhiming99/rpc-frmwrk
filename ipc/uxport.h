@@ -29,7 +29,7 @@
 #include "dbusport.h"
 #include "frmwrk.h"
 
-#define STM_MAX_BYTES_PER_BUF ( 32 * 1024 )
+#define STM_MAX_BYTES_PER_BUF ( 63 * 1024 )
 #define STM_MAX_PENDING_WRITE ( 1 * 1024 * 1024 )
 #define STM_MAX_PACKATS_REPORT 32
 

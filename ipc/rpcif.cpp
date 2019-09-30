@@ -5404,6 +5404,13 @@ gint32 CInterfaceServer::DoInvoke_SendData(
         ret = pDataDesc->Deserialize(
             *( CBuffer* )vecArgs[ 0 ].second );
 
+        if( ret == -ENOTSUP )
+        {
+            // ENOTSUP is used for default
+            // handling, and this is not the case
+            ret = -EINVAL;
+        }
+
         if( ERROR( ret ) )
             break;
 
@@ -5598,7 +5605,7 @@ gint32 CInterfaceServer::DoInvoke(
             ret = -ENOTSUP;
         }
 
-        if( ret == -ENOTSUP )
+        while( ret == -ENOTSUP )
         {
             ret = 0;
             ObjPtr pObj;
@@ -5645,6 +5652,7 @@ gint32 CInterfaceServer::DoInvoke(
                 oTaskCfg.SetObjPtr(
                     propReqPtr, ObjPtr( pCfg ) );
             }
+            break;
         }
 
         if( ret == STATUS_PENDING )

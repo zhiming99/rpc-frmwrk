@@ -856,6 +856,8 @@ class CUnixSockStream:
                 if( ERROR( ret ) )
                     break;
                 ret = SendProgress( pRptBuf, pDummy );
+                if( ret == STATUS_PENDING )
+                    ret = 0;
             }
             else
             {
@@ -1180,18 +1182,21 @@ class CUnixSockStream:
             if( ERROR( ret ) )
                 break;
 
-            ret = m_oFlowCtrl.IncTxBytes( pBuf );
-            if( ret == fcsFlowCtrl )
+            gint32 iRet =
+                m_oFlowCtrl.IncTxBytes( pBuf );
+
+            if( iRet == fcsFlowCtrl )
             {
                 oLock.Unlock();
                 BufPtr pEmptyBuf( true );
-                ret = PostUxStreamEvent(
+                iRet = PostUxStreamEvent(
                     tokFlowCtrl, pEmptyBuf );
-                if( ERROR( ret ) )
+                if( ERROR( iRet ) )
+                {
+                    ret = iRet;
                     break;
+                }
             }
-
-            ret = 0;
 
         }while( 0 );
 

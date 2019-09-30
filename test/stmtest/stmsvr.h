@@ -128,7 +128,7 @@ class CMyStreamProxy :
     /**  @} */
 
     virtual gint32 OnRecvData_Loop(
-        HANDLE hChannel );
+        HANDLE hChannel, gint32 iRet );
 
     /**
     * @name OnSendDone_Loop
@@ -156,7 +156,7 @@ class CMyStreamServer :
     {}
 
     virtual gint32 OnRecvData_Loop(
-        HANDLE hChannel );
+        HANDLE hChannel, gint32 iRet );
 
     virtual gint32 OnSendDone_Loop(
         HANDLE hChannel, gint32 iRet );

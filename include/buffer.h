@@ -229,7 +229,7 @@ class CBuffer : public CObjBase
         if( empty() )
             return ERROR_STATE;
 
-        if( dwOffset >= m_dwSize )
+        if( dwOffset > m_dwSize )
             return -EINVAL;
 
         m_dwOffset = dwOffset;

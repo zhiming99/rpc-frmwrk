@@ -38,6 +38,28 @@
 
 #define SYNC_STM_MAX_PENDING_PKTS ( STM_MAX_PACKATS_REPORT + 2 )
 
+#define POST_LOOP_EVENT( _hChannel, _iEvt, _ret ) \
+do{ \
+    gint32 _iRet1 = ( gint32 )( _ret ); \
+    BufPtr pBuf( true ); \
+    pBuf->Resize( sizeof( guint8 ) + \
+        sizeof( _hChannel ) ); \
+    pBuf->ptr()[ 0 ] = _iEvt; \
+    memcpy( pBuf->ptr() + 1, \
+        &_hChannel, \
+        sizeof( _hChannel ) ); \
+    if( _iEvt == stmevtSendDone || \
+        _iEvt == stmevtRecvData ) \
+        pBuf->Append( ( guint8* )&_iRet1, sizeof( _iRet1 ) ); \
+    PostLoopEvent( pBuf ); \
+}while( 0 )
+
+#define POST_SEND_DONE_EVT( _hChannel1, _ret1 ) \
+    POST_LOOP_EVENT( _hChannel1, stmevtSendDone, _ret1 )
+
+#define POST_RECV_DATA_EVT( _hChannel1, _ret1 ) \
+    POST_LOOP_EVENT( _hChannel1, stmevtRecvData, _ret1 )
+
 enum EnumStreamEvent : guint8
 {
     stmevtInvalid = 0,
@@ -354,7 +376,7 @@ struct CStreamSyncBase :
     int m_iPiper = -1, m_iPipew = 1;
     HANDLE m_hEvtWatch = INVALID_HANDLE;
 
-    gint32 StopLoop()
+    gint32 StopLoop( gint32 iRet = 0 )
     {
         guint32 ret = 0;
         if( !IsLoopStarted() )
@@ -364,7 +386,10 @@ struct CStreamSyncBase :
         if( pLoop == nullptr )
             return -EFAULT;
 
-        pLoop->WakeupLoop( aevtStop );
+        if( pLoop->GetError() !=
+            STATUS_PENDING )
+            iRet = pLoop->GetError();
+        pLoop->WakeupLoop( aevtStop, iRet );
         return ret;
     }
 
@@ -497,7 +522,7 @@ struct CStreamSyncBase :
      * @} */
 
     virtual gint32 OnRecvData_Loop(
-        HANDLE hChannel ) = 0;
+        HANDLE hChannel, gint32 iRet ) = 0;
     /**
     * @name OnSendDone_Loop
     * @{ an event handler called when the current
@@ -620,7 +645,15 @@ struct CStreamSyncBase :
 
                     HANDLE_RETURN_VALUE(
                         ret, -EBADMSG );
-                    OnRecvData_Loop( hChannel );
+
+                    gint32 iRet = 0;
+                    ret = read( m_iPiper, &iRet,
+                        sizeof( iRet ) );
+
+                    HANDLE_RETURN_VALUE(
+                        ret, -EBADMSG );
+
+                    OnRecvData_Loop( hChannel, iRet );
                     break;
                 }
             case stmevtCloseChan:
@@ -689,7 +722,8 @@ struct CStreamSyncBase :
             dwParam1, dwParam2, pData );
     }
 
-    gint32 StartLoop()
+    gint32 StartLoop(
+        IEventSink* pStartTask = nullptr )
     {
         gint32 ret = 0;
         do{
@@ -716,14 +750,24 @@ struct CStreamSyncBase :
             if( ERROR( ret ) )
                 break;
 
-            ret = m_pRdLoop->Start();
-
-            RemoveIoWatch();
-
-            if( ERROR( ret ) )
+            CMainIoLoop* pLoop = m_pRdLoop;
+            if( unlikely( pLoop == nullptr ) )
+            {
+                ret = -EFAULT;
                 break;
-            
-            
+            }
+            if( pStartTask != nullptr )
+            {
+                TaskletPtr pTask = 
+                    ObjPtr( pStartTask );
+                pLoop->AddTask( pTask );
+            }
+
+            pLoop->Start();
+            RemoveIoWatch();
+            // get the reason the loop quits
+            ret = pLoop->GetError();
+
         }while( 0 );
 
         return ret;
@@ -1136,6 +1180,9 @@ struct CStreamSyncBase :
         BufPtr& pBuf )
     {
         TaskletPtr pTask;
+        if( hChannel == INVALID_HANDLE )
+            return -EINVAL;
+
         gint32 ret = GetWorker(
             hChannel, true, pTask );
         if( ERROR( ret ) )
@@ -1145,7 +1192,11 @@ struct CStreamSyncBase :
         if( pReader == nullptr )
             return -EFAULT;
 
+        bool bEmitEvt = false;
         ret = pReader->OnStmRecv( pBuf );
+        if( ret == STATUS_MORE_PROCESS_NEEDED )
+            bEmitEvt = true;
+
         bool bPause = false;
         ret = IsReadNotifyPaused(
             hChannel, bPause );
@@ -1158,15 +1209,10 @@ struct CStreamSyncBase :
         // if bPause == true, the client does
         // not want to receive the stmevtRecvData
         // event currently.
-        if( IsLoopStarted() && !bPause )
+        if( IsLoopStarted() &&
+            !bPause && bEmitEvt )
         {
-            BufPtr pEvtBuf( true );
-            pEvtBuf->Resize( sizeof( guint8 ) +
-                sizeof( hChannel ) );
-            pEvtBuf->ptr()[ 0 ] = stmevtRecvData;
-            memcpy( pEvtBuf->ptr() + 1,
-                &hChannel, sizeof( hChannel ) );
-            PostLoopEvent( pEvtBuf );
+            POST_RECV_DATA_EVT( hChannel, 0 );
         }
 
         return ret;
@@ -1351,20 +1397,11 @@ struct CStreamSyncBase :
         pTask = itr->second.pReader;
         oIfLock.Unlock();
 
-        CIfStmReadWriteTask* pReader = pTask;
-
         if( bPause )
             return 0;
 
         // post a event to the loop
-        BufPtr pBuf( true );
-        pBuf->Resize( sizeof( guint8 ) +
-            sizeof( HANDLE ) );
-
-        pBuf->ptr()[ 0 ] = stmevtRecvData;
-        memcpy( pBuf->ptr() + 1, &hChannel,
-            sizeof( hChannel ) );
-
+        CIfStmReadWriteTask* pReader = pTask;
         CStdRTMutex oTaskLock(
             pReader->GetLock() );
 
@@ -1372,7 +1409,7 @@ struct CStreamSyncBase :
             pReader->GetMsgCount();
 
         if( dwCount > 0 )
-            return PostLoopEvent( pBuf );
+           POST_RECV_DATA_EVT( hChannel, 0 );
 
         return 0;
     }

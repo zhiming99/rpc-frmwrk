@@ -316,8 +316,7 @@ gint32 CSimpleEvPoll::WakeupLoop(
         if( ERROR( ret ) )
             break;
 
-        if( iEvent == aevtStop ||
-            iEvent == aevtRunSched ||
+        if( iEvent == aevtRunSched ||
             iEvent == aevtWakeup )
             break;
 

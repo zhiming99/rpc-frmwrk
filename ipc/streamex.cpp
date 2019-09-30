@@ -23,26 +23,9 @@
 #include "uxstream.h"
 #include "streamex.h"
 
-#define POST_LOOP_EVENT( _hChannel, _iEvt, _ret ) \
+#define COMPLETE_SEND_IRP( _pIrp, _ret ) \
 do{ \
-    BufPtr pBuf( true ); \
-    pBuf->Resize( sizeof( guint8 ) + \
-        sizeof( _hChannel ) ); \
-    pBuf->ptr()[ 0 ] = _iEvt; \
-    memcpy( pBuf->ptr() + 1, \
-        &_hChannel, \
-        sizeof( _hChannel ) ); \
-    if( _iEvt == stmevtSendDone ) \
-        pBuf->Append( ( guint8* )&_ret, sizeof( _ret ) ); \
-    PostLoopEvent( pBuf ); \
-}while( 0 )
-
-#define POST_SEND_DONE_EVT( _hChannel1, _ret1 ) \
-    POST_LOOP_EVENT( _hChannel1, stmevtSendDone, _ret1 )
-
-#define COMPLETE_IRP( _pIrp, _ret ) \
-do{ \
-    gint32 _iRet = ( _ret ); \
+    gint32 _iRet = ( gint32 )( _ret ); \
     CStdRMutex oIrpLock( _pIrp->GetLock() ); \
     if( _pIrp->GetState() == IRP_STATE_READY ) \
     { \
@@ -57,6 +40,29 @@ do{ \
         if( IsLoopStarted() && bNoWait ) \
             POST_SEND_DONE_EVT( m_hChannel, _iRet ); \
     } \
+}while( 0 )
+
+#define COMPLETE_RECV_IRP( _pIrp, _ret ) \
+do{ \
+    gint32 _iRet = ( gint32 )( _ret ); \
+    CStdRMutex oIrpLock( _pIrp->GetLock() ); \
+    if( _pIrp->GetState() == IRP_STATE_READY ) \
+    { \
+        _pIrp->RemoveTimer(); \
+        _pIrp->RemoveCallback(); \
+        _pIrp->SetStatus( ( _iRet ) ); \
+        Sem_Post( &_pIrp->m_semWait ); \
+        _pIrp->SetState( IRP_STATE_READY, \
+            IRP_STATE_COMPLETED ); \
+    } \
+}while( 0 )
+
+#define COMPLETE_IRP( _pIrp, _ret ) \
+do{ \
+    if( IsReading() ) \
+        COMPLETE_RECV_IRP( _pIrp, _ret ); \
+    else \
+        COMPLETE_SEND_IRP( _pIrp, _ret ); \
 }while( 0 )
 
 #define GET_STMPTR( _pIf, _pStm ) \
@@ -161,7 +167,6 @@ gint32 CIfStmReadWriteTask::OnFCLifted()
         Resume();
 
     gint32 ret = 0;
-    DebugPrint( ret, "flow control lifted" );
     POST_LOOP_EVENT( m_hChannel, 
         stmevtLifted, ret );
     return 0;
@@ -763,10 +768,16 @@ gint32 CIfStmReadWriteTask::RunTask()
             m_queRequests.pop_front();
             continue;
         }
+        if( pIrp->IsSubmited() )
+        {
+            // the irp is still in processing
+            DebugPrint( 0, "writing unfinished" );
+            ret = STATUS_PENDING;
+            break;
+        }
 
         IrpCtxPtr& pIrpCtx = pIrp->GetTopStack();
 
-        // stop the child port
         guint32 dwMajorCmd =
             pIrpCtx->GetMajorCmd();
 
@@ -800,6 +811,7 @@ gint32 CIfStmReadWriteTask::RunTask()
 
         if( dwCtrlCode == CTRLCODE_WRITEMSG )
         {
+            pIrp->SetSubmited();
             ret = pStm->WriteStream(
                 m_hChannel, pBuf, this );
 
@@ -808,6 +820,7 @@ gint32 CIfStmReadWriteTask::RunTask()
 
             if( ret == ERROR_QUEUE_FULL )
             {
+                pIrp->ClearSubmited();
                 Pause();
                 ret = STATUS_PENDING;
                 break;
@@ -841,6 +854,7 @@ gint32 CIfStmReadWriteTask::RunTask()
                 pTempBuf = pBuf;
             }
 
+            pIrp->SetSubmited();
             ret = pStm->WriteStream(
                 m_hChannel, pTempBuf, this );
 
@@ -849,6 +863,7 @@ gint32 CIfStmReadWriteTask::RunTask()
 
             if( ret == ERROR_QUEUE_FULL )
             {
+                pIrp->ClearSubmited();
                 Pause();
                 ret = STATUS_PENDING;
                 break;
@@ -870,6 +885,7 @@ gint32 CIfStmReadWriteTask::RunTask()
             }
             else
             {
+                pIrp->ClearSubmited();
                 pBuf->SetOffset(
                     pBuf->offset() + dwSize );
             }
@@ -1036,6 +1052,10 @@ gint32 CIfStmReadWriteTask::OnStmRecv(
                 SYNC_STM_MAX_PENDING_PKTS )
             {
                 Pause();
+            }
+            else if( m_queBufRead.size() == 1 )
+            {
+                ret = STATUS_MORE_PROCESS_NEEDED;
             }
             break;
         }

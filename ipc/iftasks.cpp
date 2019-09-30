@@ -5451,7 +5451,7 @@ gint32 CIfDeferredHandler::RunTask()
     if( SUCCEEDED( ret ) )
     {
         CCfgOpenerObj oCfg( this );
-        oCfg.CopyProp( propRespPtr, pEvt );
+        // oCfg.CopyProp( propRespPtr, pEvt );
         oCfg.CopyProp( propMsgPtr, pEvt );
         oCfg.CopyProp( propReqPtr, pEvt );
     }

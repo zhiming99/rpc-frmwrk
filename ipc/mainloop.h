@@ -100,6 +100,9 @@ public:
 
     virtual gint32 RemoveAsyncWatch(
         HANDLE hWatch ) = 0;
+
+    virtual gint32 OnPreLoop() = 0;
+    virtual gint32 OnPostLoop() = 0;
 };
 
 typedef CAutoPtr< clsid( Invalid ), IMainLoop > MloopPtr;
@@ -148,6 +151,7 @@ class CMainIoLoopT : public T
     std::atomic<bool>               m_bTaskDone;
     std::string                     m_strName = "MainLoop";
     bool                            m_bNewThread = true;
+    std::deque< TaskletPtr >        m_queQuitTasks;
 
     public:
 
@@ -218,13 +222,57 @@ class CMainIoLoopT : public T
         InstallTaskSource();
     }
 
+    void AddQuitTask( TaskletPtr& pTask )
+    {
+        CStdRMutex oLock( this->GetLock() );
+        m_queQuitTasks.push_back( pTask );
+    }
+
+    virtual gint32 OnPreLoop() 
+    {
+        // there are already some tasks befor the
+        // loop starts
+        CStdRMutex oLock( this->GetLock() );
+        if( GetTaskQue()->GetSize() > 0 )
+            InstallTaskSource();
+        return 0;
+    }
+
+    virtual gint32 OnPostLoop() 
+    {
+        gint32 ret = 0;
+        std::vector< TaskletPtr > vecTasks;
+        CStdRMutex oLock( this->GetLock() );
+        while( GetTaskQue()->GetSize() > 0 )
+        {
+            TaskletPtr pElem;
+            ret = GetTaskQue()->GetHead( pElem ); 
+            if( SUCCEEDED( ret ) )
+                vecTasks.push_back( pElem );
+            GetTaskQue()->PopHead();
+        }
+
+        std::deque< TaskletPtr > queQuitTasks =
+            m_queQuitTasks;
+        m_queQuitTasks.clear();
+        oLock.Unlock();
+        for( auto elem : vecTasks )
+            ( *elem )( eventCancelTask );
+
+        // run the exit tasks
+        for( auto elem : queQuitTasks )
+            ( *elem )( eventZero );
+
+        return 0;
+    }
+
     static gboolean TaskCallback(
         gpointer pdata )
     {
         CMainIoLoopT* pLoop =
             reinterpret_cast< CMainIoLoopT* >( pdata );
 
-        while( 1 )
+        while( !pLoop->IsStopped() )
         {
             gint32 ret = 0;
             TaskletPtr pTask;
@@ -255,9 +303,11 @@ class CMainIoLoopT : public T
         SetThreadName( m_strName );
         SetTid( ::GetTid() );
         super::Start();
-
         SetTid( 0 );
-
+        // Place OnPostLoop here, because the tid
+        // is cleared, which is used as a flag
+        // whether the loop is running.
+        OnPostLoop();
         this->RemoveAsyncWatch(
             m_hTaskWatch );
 

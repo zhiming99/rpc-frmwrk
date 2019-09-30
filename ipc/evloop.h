@@ -267,6 +267,13 @@ class CEvLoop :
         { return 0; }
     };
 
+    gint32 m_iRet = STATUS_PENDING;
+    inline gint32 GetError() const
+    { return m_iRet; }
+
+    inline gint32 SetError( gint32 iRet )
+    {  return ( m_iRet = iRet ); }
+
     guint32 AddSource( SOURCE_HEADER* pSource );
 
     // remove from the mainloop's notify

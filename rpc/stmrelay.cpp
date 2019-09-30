@@ -392,18 +392,11 @@ gint32 CStreamProxyRelay::OnFetchDataComplete(
         CParamList oResp;
         oResp[ propReturnValue ] = ret;
 
-        TaskletPtr pDummy;
-        pDummy.NewObj(
-            clsid( CIfDummyTask ) );
-
         CCfgOpenerObj oTaskCfg(
-            ( CObjBase* )pDummy );
+            ( CObjBase* )pCallback );
 
         oTaskCfg.SetObjPtr( propRespPtr,
             ObjPtr( oResp.GetCfg() ) );
-
-        LONGWORD* pParams = ( LONGWORD* )
-            ( ( CObjBase* )pDummy );
 
         if( iStmId > 0 )
         {
@@ -413,8 +406,9 @@ gint32 CStreamProxyRelay::OnFetchDataComplete(
             pProxy->CloseLocalStream(
                 nullptr, iStmId );
         }
+        // complete the invoke task
         pCallback->OnEvent( eventTaskComp,
-            ret, 0, pParams );
+            ret, 0, 0 );
 
         if( iLocal >= 0 )
         {
@@ -456,11 +450,18 @@ gint32 CStreamProxyRelay::OnOpenStreamComplete(
         if( ERROR( ret ) )
             break;
 
+        gint32 iRet = 0;
         CCfgOpener oResp( pResp );
         ret = oResp.GetIntProp(
-            propReturnValue, ( guint32& )ret );
+            propReturnValue, ( guint32& )iRet );
         if( ERROR( ret ) )
             break;
+
+        if( ERROR( iRet ) )
+        {
+            ret = iRet;
+            break;
+        }
 
         ret = oResp.GetIntProp(
             0, ( guint32& )iStmId );
@@ -517,21 +518,16 @@ gint32 CStreamProxyRelay::OnOpenStreamComplete(
 
     if( ERROR( ret ) )
     {
+        // complete the invoke task from the
+        // reqfwdr
         CParamList oResp;
         oResp[ propReturnValue ] = ret;
 
-        TaskletPtr pDummy;
-        pDummy.NewObj(
-            clsid( CIfDummyTask ) );
-
         CCfgOpenerObj oTaskCfg(
-            ( CObjBase* )pDummy );
+            ( CObjBase* )pCallback );
 
         oTaskCfg.SetObjPtr( propRespPtr,
             ObjPtr( oResp.GetCfg() ) );
-
-        LONGWORD* pParams = ( LONGWORD* )
-            ( ( CObjBase* )pDummy );
 
         if( iStmId > 0 )
         {
@@ -542,7 +538,7 @@ gint32 CStreamProxyRelay::OnOpenStreamComplete(
                 nullptr, iStmId );
         }
         pCallback->OnEvent( eventTaskComp,
-            ret, 0, pParams );
+            ret, 0, 0 );
     }
 
     return ret;
@@ -937,7 +933,6 @@ gint32 CIfUxListeningRelayTask::PostEvent(
             pNewBuf = pBuf;
             ret = oHelper.ForwardToRemote(
                 byToken, pNewBuf );
-
             break;
         }
     case tokError:

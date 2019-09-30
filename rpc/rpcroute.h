@@ -538,7 +538,7 @@ class CRpcReqForwarder :
     gint32 GetRefCountByUniqName(
         const std::string& strUniqName );
 
-    virtual const EnumClsid GetIid() const
+    const EnumClsid GetIid() const
     { return iid( CRpcReqForwarder ); }
     //
     // called by the bus port to create the remote
@@ -647,7 +647,7 @@ class CRpcReqForwarderProxy :
 
     gint32 InitUserFuncs();
 
-    virtual const EnumClsid GetIid() const
+    const EnumClsid GetIid() const
     { return iid( CRpcReqForwarder ); }
 
     virtual gint32 SetupReqIrp( IRP* pIrp,
@@ -871,7 +871,7 @@ class CRpcTcpBridge :
     CRpcTcpBridge( const IConfigDb* pCfg );
     ~CRpcTcpBridge();
 
-    virtual const EnumClsid GetIid() const
+    const EnumClsid GetIid() const
     { return iid( CRpcTcpBridge ); }
 
     virtual gint32 OpenRemotePort(
@@ -1265,7 +1265,7 @@ class CRpcRouter :
     CRpcRouter( const IConfigDb* pCfg );
     ~CRpcRouter();
 
-    virtual const EnumClsid GetIid() const
+    const EnumClsid GetIid() const
     { return iid( CRpcRouter ); }
 
     inline CIoManager* GetIoMgr() const

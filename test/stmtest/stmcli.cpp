@@ -57,11 +57,17 @@ gint32 CEchoClient::Echo(
 }
 
 gint32 CMyStreamProxy::OnRecvData_Loop(
-    HANDLE hChannel )
+    HANDLE hChannel, gint32 iRet )
 {
     BufPtr pBuf;
     gint32 ret = 0;
     do{
+        if( ERROR( iRet ) )
+        {
+            ret = iRet;
+            break;
+        }
+
         ret = ReadMsg(
             hChannel, pBuf, -1 );
 
@@ -83,7 +89,7 @@ gint32 CMyStreamProxy::OnRecvData_Loop(
     }while( 1 );
 
     if( ERROR( ret ) )
-        StopLoop();
+        StopLoop( ret );
 
     return ret;
 }
@@ -179,7 +185,7 @@ gint32 CMyStreamProxy::OnSendDone_Loop(
     if( ERROR( ret ) )
     {
         CancelChannel( hChannel );
-        StopLoop();
+        StopLoop( ret );
     }
 
     return ret;
@@ -223,7 +229,7 @@ gint32 CMyStreamProxy::OnWriteEnabled_Loop(
     if( ERROR( ret ) )
     {
         CancelChannel( hChannel );
-        StopLoop();
+        StopLoop( ret );
     }
 
     return ret;
@@ -234,7 +240,7 @@ gint32 CMyStreamProxy::OnStart_Loop()
     HANDLE hChannel = INVALID_HANDLE;
     gint32 ret = StartStream( hChannel );
     if( ERROR( ret ) )
-        StopLoop();
+        StopLoop( ret );
 
     return ret;
 }

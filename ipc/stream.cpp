@@ -1217,11 +1217,6 @@ gint32 IStream::OnPreStopShared(
             CParamList oParams;
             oParams.Push( ObjPtr( elem.second ) );
             oParams[ propIfPtr ] = ObjPtr( pThis );
-            if( pCallback != nullptr )
-            {
-                oParams[ propEventSink ] =
-                    ObjPtr( pCallback );
-            }
             TaskletPtr pStopTask;
             ret = pStopTask.NewObj(
                 clsid( CIfStopUxSockStmTask ),

@@ -3111,8 +3111,9 @@ bool CGenericBusPort::PortExist(
 gint32 CGenericBusPort::OnPortStackDestroy(
     IRP* pIrp )
 {
-    if( GetIoMgr()->RunningOnMainThread() )
+    /*if( GetIoMgr()->RunningOnMainThread() )
         return ERROR_WRONG_THREAD;
+        */
 
     vector<PortPtr> vecChildPorts;
     if( pIrp != nullptr )
