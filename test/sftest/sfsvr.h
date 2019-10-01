@@ -9,7 +9,7 @@
  *                  CStreamProxySync. 
  *
  *        Version:  1.0
- *        Created:  08/11/2018 14:32:00 AM
+ *        Created:  08/11/2018 14:32:00 AM Beijing
  *       modified:  09/21/2019 07:41:47 AM Beijing
  *       Revision:  none
  *       Compiler:  gcc
@@ -563,6 +563,23 @@ class CMyFileServerBase :
 
         return ret;
     }
+/**
+* @name OnStreamStarted
+* @{
+* Parameters:
+*   hChannel: the handle to the channel which is
+*   ready for transfer.
+*
+* */
+/**
+ * Actually it is called by the first
+ * OnWriteEnabled_Loop, as the channel is
+ * established, and ready for transfer. It will
+ * initialize the transfer context object for this
+ * channel, including open the local file for
+ * read/write, and setting up the counters and
+ * file pointers.
+ * @} */
 
     virtual gint32 OnStreamStarted( HANDLE hChannel )
     {

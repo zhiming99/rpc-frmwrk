@@ -35,7 +35,6 @@
 
 class CTasklet : public ICancellableTask
 {
-    std::atomic<guint32> m_iRet;
     std::atomic<guint32> m_dwTid;
 
     std::atomic<bool> m_bPending;
@@ -44,6 +43,7 @@ class CTasklet : public ICancellableTask
     std::atomic<guint32> m_dwCallCount;
 
     protected:
+    std::atomic<gint32> m_iRet;
     CfgPtr m_pCtx;
     sem_t m_semReentSync;
 
@@ -674,6 +674,12 @@ class CThreadSafeTask : public CTaskletRetriable
 
     inline stdrtmutex& GetLock() const
     { return m_oLock; }
+
+    gint32 GetErrorLocked() const
+    {
+        CStdRTMutex oTaskLock( GetLock() );
+        return m_iRet;
+    }
 
     gint32 GetProperty( gint32 iProp,
             CBuffer& oBuf ) const;

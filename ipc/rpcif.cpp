@@ -952,11 +952,6 @@ gint32 CRpcInterfaceBase::Stop()
     return ret;
 }
 
-#ifdef DEBUG
-static guint32 dwStartCount( 0 );
-static guint32 dwStopCount( 0 );
-#endif
-
 gint32 CRpcInterfaceBase::StopEx(
     IEventSink* pCallback )
 {
@@ -2234,14 +2229,77 @@ gint32 CRpcServices::StartEx(
             return ERROR_STATE;
         }
     }
-    ret = OnPreStart( pCallback );
-    if( ERROR( ret ) )
-        return ret;
 
-#ifdef DEBUG
-    dwStartCount++;
-#endif
-    return StartEx2( pCallback );
+    do{
+
+        TaskletPtr pPreStart;
+        ret = DEFER_IFCALLEX_NOSCHED(
+            pPreStart, ObjPtr( this ),
+            &CRpcServices::OnPreStart,
+            this ); // last `this' is a placeholder
+
+        if( ERROR( ret ) )
+            break;
+
+        // the correct one.
+        BufPtr pCb( true );
+        CIfDeferCallTaskEx* pPreTask = pPreStart;
+        *pCb = ObjPtr( pPreTask );
+        pPreTask->UpdateParamAt( 0, pCb );
+
+        TaskletPtr pStartEx2;
+        ret = DEFER_IFCALLEX_NOSCHED(
+            pStartEx2, ObjPtr( this ),
+            &CRpcServices::StartEx2,
+            this );
+
+        if( ERROR( ret ) )
+            break;
+
+        // fix the fake parameter pDummyTask with
+        // the correct one.
+        BufPtr pCb2( true );
+        CIfDeferCallTaskEx* pStartTask = pStartEx2;
+        *pCb2 = ObjPtr( pStartTask );
+        pStartTask->UpdateParamAt( 0, pCb2 );
+
+        CParamList oParams;
+        oParams.SetPointer( propIfPtr, this );
+
+        TaskletPtr pTaskGrp;
+        ret = pTaskGrp.NewObj(
+            clsid( CIfTaskGroup ),
+            oParams.GetCfg() );
+
+        if( ERROR( ret ) )
+            break;
+
+        CIfTaskGroup* pGrp = pTaskGrp;
+        if( unlikely( pGrp == nullptr ) )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        pGrp->SetClientNotify( pCallback );
+        pGrp->SetRelation( logicAND );
+        pGrp->AppendTask( pPreStart );
+        pGrp->AppendTask( pStartEx2 );
+        
+        CIoManager* pMgr = GetIoMgr();
+        ret = pMgr->RescheduleTask( pTaskGrp );
+        if( ERROR( ret ) )
+        {
+            ( *pTaskGrp )( eventCancelTask );
+        }
+        else 
+        {
+            ret = pTaskGrp->GetError();
+        }
+
+    }while( 0 );
+
+    return ret;
 }
 
 gint32 CRpcServices::OnPreStart(
@@ -2277,9 +2335,6 @@ gint32 CRpcServices::OnPostStop(
         ( *m_pSeqTasks )( eventCancelTask );
         m_pSeqTasks.Clear(); 
     }
-#ifdef DEBUG
-    dwStopCount++;
-#endif
 
     return 0;
 }

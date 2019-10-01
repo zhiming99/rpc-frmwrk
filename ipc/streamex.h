@@ -189,8 +189,9 @@ class CIfStmReadWriteTask :
     * thing the peer send via a WriteMsg/Write
     * call. it will wait till the message arrives
     * or error occurs on the underlying stream. It
-    * should be fastest, since there is no copy
-    * work to the user specified places.
+    * should be faster than ReadBlock, since there
+    * is zero copy along the path from the `read'
+    * call to the caller.
     * */
     /** 
      * Parameter:

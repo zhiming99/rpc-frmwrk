@@ -820,6 +820,8 @@ gint32 CIfStmReadWriteTask::RunTask()
 
             if( ret == ERROR_QUEUE_FULL )
             {
+                // clear the flag to re-visit the
+                // irp later.
                 pIrp->ClearSubmited();
                 Pause();
                 ret = STATUS_PENDING;

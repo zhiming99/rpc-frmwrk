@@ -54,14 +54,21 @@ gint32 CEchoClient::Echo(
     return FORWARD_IF_CALL( iid( CEchoServer ),
         1, __func__, strText, strReply  );
 }
+/**
+* @name InitUserFuncs
+* @{
+* Init the proxy's proxy method map.
+* */
+/** 
+ *  Usually it is not necessary to call
+ *  super::InitUserFuncs unless this class
+ *  inherits from another interface class. In this
+ *  case, the IStream interface.
+ * @} */
 
 gint32 CMyFileProxy::InitUserFuncs()
 {
     // IStream's interface
-    // usually it is not necessary to call
-    // super::InitUserFuncs unless this class
-    // inherits from another interface class.
-    // in this case, the IStream interface
     super::InitUserFuncs();
     BEGIN_IFPROXY_MAP( CMyFileServer, false );
 
@@ -75,10 +82,22 @@ gint32 CMyFileProxy::InitUserFuncs()
 
 /**
 * @name OnRecvData_Loop
-* @{ an event handler called when there is
-* data arrives to the channel `hChannel'.
+* @{ parameters:
+*   hChannel: handle to the channel on which there
+*   is data ready or event pending.
+*
+*   iRet: STATUS_SUCCESS when there is data ready
+*   for receiving. And an error code if the last
+*   receive request failed.
+*
+* return value: ignored.
 * */
-/**  @} */
+/**
+ * An event handler when there is data arrives
+ * to the channel `hChannel'. It will iterate till
+ * all the data packets in the pending queue are
+ * consumed (written to the storage).
+ * @} */
 gint32 CMyFileProxy::OnRecvData_Loop(
     HANDLE hChannel, gint32 iRet )
 {
@@ -131,6 +150,8 @@ gint32 CMyFileProxy::OnRecvData_Loop(
 
         if( dwRecved == ptctx->m_dwReqSize )
         {
+            // all the data received. we can close
+            // the channel now.
             ret = ptctx->SetError( 0 );
             close( ptctx->m_iFd );
             ptctx->m_iFd = -1;
@@ -139,7 +160,10 @@ gint32 CMyFileProxy::OnRecvData_Loop(
         }
         if( dwRecved > ptctx->m_dwReqSize )
         {
-            DebugPrint( dwRecved - ptctx->m_dwReqSize, "File corrupted " );
+            // more data received beyond the
+            // request.
+            ret = dwRecved - ptctx->m_dwReqSize;
+            DebugPrint( ret, "File corrupted " );
             ret = -EFBIG;
             break;
         }
@@ -157,10 +181,22 @@ gint32 CMyFileProxy::OnRecvData_Loop(
 
 /**
 * @name OnSendDone_Loop
-* @{ an event handler called when the last
-* pending write is done on the channel.
+* @{
+* Parameters:
+*   hChannel: the handle of the stream channel
+*   whose last send request is done.
+*
+*   iRet: the return code for the last send
+*   request. STATUS_SUCCESS for successful
+*   transfer. and error code for failed transfer.
 * */
-/**  @} */
+/**
+ * an event handler called when the last pending
+ * write is done on the channel. All the write
+ * requests are guaranteed to be services in the
+ * FIFO manner. a short transfer indicates the
+ * end of the upload/download.
+ * @} */
 gint32 CMyFileProxy::OnSendDone_Loop(
     HANDLE hChannel, gint32 iRet )
 {
@@ -209,6 +245,8 @@ gint32 CMyFileProxy::OnSendDone_Loop(
 
         ptctx->m_qwCurOffset +=
             STM_MAX_BYTES_PER_BUF;
+
+        // read a block from the file and send out
         ret = ReadAndSend( hChannel, ptctx );
 
     }while( 0 );
@@ -221,6 +259,31 @@ gint32 CMyFileProxy::OnSendDone_Loop(
 
     return ret;
 }
+/**
+* @name OnWriteEnabled_Loop
+* @{
+* Parameters:
+*   hChannel: the handle of the channel, which
+*   resumes sending from the flow control.
+*
+* return value:
+*   ignored.
+* */
+/**
+ * It is called when the flow control is lifted
+ * for the underlying streaming object since the
+ * last ERROR_QUEUE_FULL is returned. It will try
+ * to resend the blocked data buffer as held in
+ * the transfer context.
+ *
+ * On successful return of ReadAndWrite or
+ * ResumeBlockedSend, the sending request should
+ * still in the sending queue waiting for
+ * transmission, or blocked by flowcontrol. In
+ * either case, the method does not attempt to
+ * move on to send another block, unlike what
+ * OnRecvData_Loop does.
+ * @} */
 
 gint32 CMyFileProxy::OnWriteEnabled_Loop(
     HANDLE hChannel )
@@ -236,6 +299,10 @@ gint32 CMyFileProxy::OnWriteEnabled_Loop(
         ret = GetTransCtx( hChannel, pObj );
         if( ret == -ENOENT )
         {
+            // this is the first event after the
+            // stream channel is established.
+            // let's create the transfer context
+            // before the transfer begins.
             ret = OnStreamStarted( hChannel );
             if( ERROR( ret ) )
                 break;
@@ -255,16 +322,20 @@ gint32 CMyFileProxy::OnWriteEnabled_Loop(
         }
 
         // for receiving end, do nothing here
-        if( ptctx->m_bUpload ==
-            this->IsServer() )
+        if( ptctx->m_bUpload == this->IsServer() )
             break;
 
         if( unlikely( bFirst ) )
         {
+            // transfer starts, we don't have
+            // blocked transfer at this moment.
+            //
+            // just send out the first block.
             ret = ReadAndSend( hChannel, pObj );
         }
         else
         {
+            // resend the blocked transfer
             ret = ResumeBlockedSend(
                 hChannel, ptctx );
         }
@@ -305,8 +376,15 @@ void CMyFileProxy::SetErrorAndClose(
         CMainIoLoop* pLoop = m_pRdLoop;
         if( unlikely( pLoop == nullptr ) )
             break;
+
+        // set the error code
         pLoop->SetError( iError );
         ScheduleToClose( hChannel, true );
+
+        // stop the loop ASAP, to prevent handling
+        // the remaining events in the queue,
+        // which could overwrite the error code
+        // due to the on-going stop process.
         StopLoop( iError );
 
     }while( 0 );
