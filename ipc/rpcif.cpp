@@ -2325,7 +2325,6 @@ gint32 CRpcServices::OnPostStop(
     m_mapFuncs.clear();
     m_mapProxyFuncs.clear();
     m_pRootTaskGroup.Clear();
-    m_queInvTasks.clear();
 
     m_pFtsMatch.Clear();
     m_pStmMatch.Clear();
@@ -2340,25 +2339,6 @@ gint32 CRpcServices::OnPostStop(
 }
 
 typedef std::pair< gint32, BufPtr > ARG_ENTRY;
-
-bool CRpcServices::IsQueuedReq()
-{
-    bool bQueuedReq = false;
-    CCfgOpenerObj oCfg( this );
-    gint32 ret = oCfg.GetBoolProp(
-        propQueuedReq, bQueuedReq );
-
-    if( ERROR( ret ) )
-        return false;
-
-    return bQueuedReq;
-}
-
-guint32 CRpcServices::GetQueueSize() const
-{
-    CStdRMutex oIfLock( GetLock() );
-    return m_queInvTasks.size();
-}
 
 /**
 * @name InvokeMethod to invoke the specified
@@ -2387,7 +2367,6 @@ gint32 CRpcServices::InvokeMethod(
     T* pReqMsg, IEventSink* pCallback )
 {
     gint32 ret = 0;
-    gint32 ret1 = 0;
     CCfgOpenerObj oCfg( this );
 
     if( pReqMsg == nullptr ||
@@ -2397,102 +2376,8 @@ gint32 CRpcServices::InvokeMethod(
     do{
         CIfInvokeMethodTask* pInvokeTask = 
             ObjPtr( pCallback );
-        do{
-            if( IsQueuedReq() )
-            {
-                CStdRMutex oIfLock( GetLock() );
-                bool bWait = true;
-                guint32 dwTaskCount = m_queInvTasks.size();
-                if( dwTaskCount > 0 )
-                {
-                    if( ( ( IEventSink* )m_queInvTasks.front() )
-                        == pCallback )
-                    {
-                        // time to run this task
-                        bWait = false;
-                    }
-                    else
-                    {
-                        // some other task is
-                        // running, and wait in
-                        // the queue
-                        if( dwTaskCount > 20 )
-                        {
-                            ret1 = -ENOMEM;
-                            DebugPrint( ret, 
-                                "TaskQue has reached limit" );
-                            break;
-                        }
-                        m_queInvTasks.push_back(
-                            EventPtr( pCallback ) );
-                    }
-                }
-                else
-                {
-                    // this msg is the first to
-                    // service, go on to run it
-                    // and no wait
-                    m_queInvTasks.push_back(
-                        EventPtr( pCallback ) );
-                    bWait = false;
-                }
 
-                if( bWait )
-                {
-                    // this gives hint to the
-                    // cancel handler if the task
-                    // is waiting for execution or
-                    // has been already started
-                    pInvokeTask->SetTaskState(
-                        statePaused );
-                    ret1 = STATUS_PENDING;
-                    break;
-                }
-                else
-                {
-                    pInvokeTask->SetTaskState(
-                        stateStarted );
-                }
-            }
-
-            ret = DoInvoke( pReqMsg, pCallback );
-
-        }while( 0 );
-
-        if( ret1 == STATUS_PENDING )
-        {
-            // the task is not activated, so we
-            // skip SetAsyncCall().
-            //
-            // Note that the timer for this task
-            // is not activated too, so probably
-            // not a good idea.
-            ret = ret1;
-            break;
-        }
-        else if( ERROR( ret1 ) )
-        {
-            // tell the client we are in trouble
-            ret = ret1;
-            if( pInvokeTask == nullptr )
-                break;
-
-            if( !pInvokeTask->HasReply() )
-                break;
-
-            // set the return code for response
-            CParamList oParams;
-            oParams[ propReturnValue ] = ret;
-
-            CCfgOpener oTaskCfg( ( IConfigDb* )
-                pInvokeTask->GetConfig() );
-
-            oTaskCfg.SetObjPtr( propRespPtr,
-                oParams.GetCfg() );
-
-            break;
-        }
-
+        ret = DoInvoke( pReqMsg, pCallback );
         if( ret == STATUS_PENDING )
         {
             // for async call, we have timer and
@@ -2520,78 +2405,6 @@ gint32 CRpcServices::InvokeMethod<DBusMessage>(
 template
 gint32 CRpcServices::InvokeMethod<IConfigDb>(
     IConfigDb* pReqMsg, IEventSink* pCallback );
-
-gint32 CRpcServices::InvokeNextMethod(
-    TaskletPtr& pLastInvoke )
-{
-    gint32 ret = 0;
-
-    if( !IsQueuedReq() )
-        return 0;
-
-    if( pLastInvoke.IsEmpty() )
-        return -EINVAL;
-
-    do{
-        CStdRMutex oIfLock( GetLock() );
-        if( !IsConnected() )
-        {
-            // the canceling of the queued tasks
-            // will be done by the parallel
-            // taskgroup.
-            ret = ERROR_STATE;
-            break;
-        }
-
-        if( m_queInvTasks.empty() )
-            break;
-
-        std::deque< EventPtr >::iterator itr =
-            m_queInvTasks.begin();
-
-        while( ( *itr )->GetObjId() != 
-            pLastInvoke->GetObjId() )
-            ++itr;
-
-        // a fake invoke, ignore and return
-        if( itr == m_queInvTasks.end() )
-            break;
-
-        if( itr != m_queInvTasks.begin() )
-        {
-            // a task waiting in the queue is
-            // being canceled
-            m_queInvTasks.erase( itr );
-            break;
-        }
-
-        // the head task is done, move on to next
-        m_queInvTasks.pop_front();
-
-        while( !m_queInvTasks.empty() )
-        {
-            TaskletPtr pTask =
-                ObjPtr( m_queInvTasks.front() );
-
-            // next request
-            if( pTask.IsEmpty() )
-            {
-                m_queInvTasks.pop_front();
-                continue;
-            }
-            oIfLock.Unlock();
-            ret = ( *pTask )( eventZero );
-
-            // next call will come when pTask
-            // completes
-            break;
-        }
-        ret = 0;
-
-    }while( 0 );
-
-    return ret;
-}
 
 /**
 * @name RunIoTask

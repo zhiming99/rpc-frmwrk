@@ -89,7 +89,6 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CIfParallelTaskGrp );
     INIT_MAP_ENTRYCFG( CIfPauseResumeTask );
     INIT_MAP_ENTRYCFG( CIfRootTaskGroup );
-    INIT_MAP_ENTRYCFG( CIfServiceNextMsgTask );
     INIT_MAP_ENTRYCFG( CIfStartRecvMsgTask );
     INIT_MAP_ENTRYCFG( CIfStopRecvMsgTask );
     INIT_MAP_ENTRYCFG( CIfStopTask );

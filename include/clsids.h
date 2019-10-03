@@ -135,7 +135,7 @@ typedef enum : guint32
     DECL_CLSID( CIfParallelTaskGrp ),
     DECL_CLSID( CIfIoReqTask ),
     DECL_CLSID( CIfInvokeMethodTask ),
-    DECL_CLSID( CIfServiceNextMsgTask ),
+    DECL_CLSID( CReservedClsid_1 ),
     DECL_CLSID( CIfFetchDataTask ),
     DECL_CLSID( CDBusLoopbackPdo ),
     DECL_CLSID( CDBusLoopbackMatch ),

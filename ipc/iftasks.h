@@ -488,19 +488,6 @@ class CIfDummyTask
         LONGWORD* pData );
 };
 
-class CIfServiceNextMsgTask
-    : public CIfParallelTask
-{
-    public:
-    typedef CIfParallelTask super;
-    CIfServiceNextMsgTask( const IConfigDb* pCfg )
-       : super( pCfg ) 
-    {
-        SetClassId( clsid( CIfServiceNextMsgTask ) );
-    }
-    virtual gint32 RunTask();
-};
-
 class CIfParallelTaskGrp
     : public CIfTaskGroup
 {

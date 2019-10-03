@@ -567,10 +567,6 @@ class CRpcServices :
     public CRpcInterfaceBase,
     public IRpcNonDBusIf
 {
-
-    friend class CIfServiceNextMsgTask;
-
-
     std::deque< CfgPtr > m_queEvents;
 
     gint32 PackEvent( EnumEventId iEvent,
@@ -598,10 +594,7 @@ class CRpcServices :
 
     // the queue of pending invoke tasks, for queued
     // task processing
-    std::deque< EventPtr > m_queInvTasks;
     TaskGrpPtr             m_pSeqTasks;
-
-    gint32 InvokeNextMethod( TaskletPtr& pLastInvoke );
 
     virtual gint32 SetupReqIrp( IRP* pIrp,
         IConfigDb* pReqCall, IEventSink* pCallback );
@@ -791,9 +784,6 @@ class CRpcServices :
         const std::string& strIfName,
         EnumClsid& iid );
 
-    bool IsQueuedReq();
-    guint32 GetQueueSize() const;
-    
     // put the request to the task queue and run
     // it immediately if possible
     // main entry from user code into a proxy/stub

@@ -4678,35 +4678,6 @@ gint32 CIfInvokeMethodTask::OnComplete(
             break;
         }
 
-        // NOTE: ERROR_CANCEL indicates the
-        // parallel group is canceling this task,
-        // no need to invoke the next task.
-        if( pIf->IsQueuedReq() &&
-            iRetVal != ERROR_CANCEL )
-        {
-            if( pIf->GetQueueSize() == 0 )
-                break;
-
-            CParamList oParams;
-            oParams.CopyProp( propIfPtr, this );
-            oParams.Push( ObjPtr( this ) );
-
-            // move on to the next request if
-            // incoming requests are queued
-            CIoManager* pMgr = pIf->GetIoMgr();
-
-            // fatal error, cannot recover
-            if( pMgr == nullptr )
-                break;
-
-            // NOTE: we use another task instead
-            // of InvokeMethod in this context to
-            // avoid the parallel tasks nesting
-            ret = pMgr->ScheduleTask(
-                clsid( CIfServiceNextMsgTask ),
-                oParams.GetCfg() );
-        }
-
     }while( 0 );
 
     ret = super::OnComplete( iRetVal );
@@ -5146,43 +5117,6 @@ gint32 CIfInvokeMethodTask::SetAsyncCall(
         break;
     }
     
-    return ret;
-}
-
-gint32 CIfServiceNextMsgTask::RunTask()
-{
-    gint32 ret = 0;
-    CParamList oCfg( ( IConfigDb* )GetConfig() );
-    ObjPtr pObj;
-    
-    do{
-        ret = oCfg.GetObjPtr( propIfPtr, pObj );
-        if( ERROR( ret ) )
-            break;
-
-        CRpcServices* pIf = pObj;
-        if( pIf == nullptr )
-        {
-            ret = -EFAULT;
-            break;
-        }
-
-        ret = oCfg.Pop( pObj );
-        if( ERROR( ret ) )
-            break;
-
-        // the last invoke task
-        TaskletPtr pInvTask = pObj;
-        if( pInvTask.IsEmpty() )
-        {
-            ret = -EFAULT;
-            break;
-        }
-
-        ret = pIf->InvokeNextMethod( pInvTask );
-
-    }while( 0 );
-
     return ret;
 }
 
