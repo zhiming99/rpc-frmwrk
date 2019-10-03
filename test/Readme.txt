@@ -24,3 +24,9 @@ Introduction of the Examples:
 
     prtest: To demonstrate how to pause/resume of a interface and the interface
     response in both states.
+
+    stmtest: To demonstrate the basic chatting function with the local/remote 
+    streaming support.
+
+    sftest: To demonstrate a simple file-server with the local/remote streaming
+    support.
