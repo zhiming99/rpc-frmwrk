@@ -23,6 +23,9 @@ This framework depends on the following packags:
 11. `Streaming support to provide double-direction stream transfer`
 
 ---
+[`Wed 09 Oct 2019 09:11:53 AM Beijing`]   
+1. Upgraded the synchronous proxy code generation with the new macro, before the start of session manager design. It is now an easy task to write a proxy with just a few lines, and help the developers to focus on server side design. For detail information, please refer to test/helloworld.   
+
 [`Mon 30 Sep 2019 02:53:58 PM Beijing`]
 1. Finished rewriting the `sftest` and `stmtest` tests with the stream interface. And fixed many bugs.   
 2. Next target is to get session manager to work. It is a premise task before the support for the `websocket` connection.   
