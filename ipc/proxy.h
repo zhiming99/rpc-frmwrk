@@ -616,12 +616,6 @@ class CRpcServices :
     FUNC_MAP* GetFuncMap(
         EnumClsid iIfId = clsid( Invalid ) );
 
-    PROXY_MAP* GetProxyMap(
-        EnumClsid iIfId = clsid( Invalid ) );
-
-    gint32 SetProxyMap( PROXY_MAP& oMap,
-        EnumClsid iIfId = clsid( Invalid ) );
-
     gint32 RestartListening( EnumIfState iState );
 
     virtual gint32 RebuildMatches();
@@ -629,6 +623,12 @@ class CRpcServices :
     gint32 StartEx2( IEventSink* pCallback );
 
     public:
+
+    PROXY_MAP* GetProxyMap(
+        EnumClsid iIfId = clsid( Invalid ) );
+
+    gint32 SetProxyMap( PROXY_MAP& oMap,
+        EnumClsid iIfId = clsid( Invalid ) );
 
     gint32 GetDelegate(
         const std::string& strFunc,

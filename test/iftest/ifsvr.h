@@ -81,31 +81,31 @@ class CEchoServer :
 
 #include "ifhelper.h"
 // declare the proxy class
-BEGIN_DECLARE_PROXY_CLASS_SYNC( CEchoClient )
+BEGIN_DECL_PROXY_SYNC( CEchoClient, CInterfaceProxy )
 
-    DECL_PROXY_METHOD_SYNC( 0, CEchoClient, Ping );
+    DECL_PROXY_METHOD_SYNC( 0, Ping );
 
-    DECL_PROXY_METHOD_SYNC( 1, CEchoClient, Echo,
+    DECL_PROXY_METHOD_SYNC( 1, Echo,
         const std::string& /* strEmit */,
         std::string& /* strReply */ );
 
-    DECL_PROXY_METHOD_SYNC( 1, CEchoClient, EchoPtr,
+    DECL_PROXY_METHOD_SYNC( 1, EchoPtr,
         const char*, /*szText*/
         const char*& ); /* szReply */
 
-    DECL_PROXY_METHOD_SYNC( 2, CEchoClient, EchoCfg,
+    DECL_PROXY_METHOD_SYNC( 2, EchoCfg,
         gint32, /* iCount */
         const CfgPtr&, /* pCfg */
         gint32&, /* iCountReply */
         CfgPtr& ); /* pCfgReply */
 
-    DECL_PROXY_METHOD_SYNC( 1, CEchoClient, EchoUnknown,
+    DECL_PROXY_METHOD_SYNC( 1, EchoUnknown,
         const BufPtr&, /* pText */
         BufPtr& );  /* pReply */
 
-    DECL_PROXY_METHOD_SYNC( 2, CEchoClient, Echo2,
+    DECL_PROXY_METHOD_SYNC( 2, Echo2,
         const gint32&, /* i1 */
         const double&, /* i2 */
         double& );     /* reply = i1+i2 */
 
-END_DECLARE_PROXY_CLASS_SYNC( CEchoClient );
+END_DECL_PROXY_SYNC( CEchoClient );

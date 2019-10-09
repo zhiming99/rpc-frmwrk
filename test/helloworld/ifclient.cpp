@@ -37,6 +37,10 @@ using namespace std;
 * @{ */
 /** 
  * 
+ * NOTE: when you are using BEGIN_DECL_PROXY_SYNC
+ * or BEGIN_DECL_IF_PROXY_SYNC, you can ignore the
+ * following text. 
+ *
  * You can use two sets of macro's to to init the
  * function map, one include ADD_USER_PROXY_METHOD
  * and ADD_PROXY_METHOD, and the other includes
@@ -75,5 +79,6 @@ using namespace std;
  * for example of Non-EX, please refer to other
  * tests, such as prtest or katest under the
  * `test' directory.
+ *
  * @} */
 

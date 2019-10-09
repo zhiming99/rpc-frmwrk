@@ -26,36 +26,6 @@
 
 using namespace std;
 
-// implementation of proxy for CEchoServer
-CEchoClient::CEchoClient(
-    const IConfigDb* pCfg )
-    : super( pCfg )
-{
-}
-
-gint32 CEchoClient::InitUserFuncs()
-{
-    BEGIN_IFPROXY_MAP( CEchoServer, false );
-
-    ADD_USER_PROXY_METHOD_EX( 1,
-        CEchoClient::Echo,
-        METHOD_Echo );
-
-    END_PROXY_MAP;
-
-    return 0;
-}
-
-gint32 CEchoClient::Echo(
-    const std::string& strText, // [ in ]
-    std::string& strReply ) // [ out ]
-{
-    return FORWARD_IF_CALL(
-        iid( CEchoServer ),
-        1, METHOD_Echo,
-        strText, strReply  );
-}
-
 gint32 CMyStreamProxy::OnRecvData_Loop(
     HANDLE hChannel, gint32 iRet )
 {

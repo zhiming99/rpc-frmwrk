@@ -65,14 +65,9 @@ class CInProcServer :
         const BufPtr& pBuf );
 };
 
-class CInProcClient :
-    public CInterfaceProxy
-{
-    public:
+#include "ifhelper.h"
+BEGIN_DECL_PROXY_SYNC( CInProcClient, CInterfaceProxy )
 
-    typedef CInterfaceProxy super;
-
-    CInProcClient( const IConfigDb* pCfg );
     gint32 InitUserFuncs();
 
     // event handlers
@@ -80,12 +75,12 @@ class CInProcClient :
         IEventSink* pContext,
         const std::string& strEvent );
 
-    // proxies
-    gint32 Echo(
-        const std::string& strText,
-        std::string& strReply );
+    DECL_PROXY_METHOD_SYNC( 1, Echo,
+        const std::string& /* strEmit */,
+        std::string& /* strReply */ );
 
-    gint32 EchoUnknown(
-        const BufPtr& pText,
-        BufPtr& pReply );
-};
+    DECL_PROXY_METHOD_SYNC( 1, EchoUnknown,
+        const BufPtr&, /* pText */
+        BufPtr& );  /* pReply */
+
+END_DECL_PROXY_SYNC( CInProcClient );

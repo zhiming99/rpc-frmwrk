@@ -14,9 +14,8 @@
             "RequestTimeoutSec" : "120",
             "KeepAliveTimeoutSec" : "60",
             "Comment-0" : "Normally, you don't need the following two fields unless the proxy is connecting to DBusLoopbackPdo port or DBusProxyPdo",
-            "ProxyPortClass": "DBusLocalPdo",
+            "ProxyPortClass": "DBusLoopbackPdo",
             "ProxyPortId" : "0",
-            "QueuedRequests" : "false",
             "Interfaces" :
             [
                 {

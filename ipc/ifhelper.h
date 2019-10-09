@@ -431,25 +431,31 @@ class CMethodProxy :
 };
 
 #define UNREFERENCED( a ) ( a )
-// construction of the major interface proxy map 
-#define BEGIN_PROXY_MAP( bNonDBus ) \
+#define BEGIN_PROXY_MAP_COMMON( bNonDBus, _iIfId_, _pIf ) \
 do{ \
-    EnumClsid _iIfId_ = GetClsid();\
-    CCfgOpenerObj oCfg( this ); \
+    CCfgOpenerObj oCfg( _pIf ); \
     std::string strIfName; \
     oCfg.GetStrProp( propIfName, strIfName ); \
     strIfName = IF_NAME_FROM_DBUS( strIfName ); \
-    CoAddIidName( strIfName, _iIfId_ ); \
+    EnumClsid tempIid = CoGetIidFromIfName( strIfName ); \
+    if( tempIid == clsid( Invalid ) ) \
+        CoAddIidName( strIfName, _iIfId_ ); \
     PROXY_MAP _oAnon_; \
     PROXY_MAP* _pMapProxies_ = &_oAnon_; \
     bool _bNonBus_ = bNonDBus; \
     UNREFERENCED( _bNonBus_ = !!_bNonBus_ ); \
     PROXY_MAP* _pMap_ = nullptr; \
     do{ \
-        _pMap_ = GetProxyMap( _iIfId_ ); \
+        _pMap_ = _pIf->GetProxyMap( _iIfId_ ); \
         if( _pMap_ != nullptr ) \
             _pMapProxies_ = _pMap_; \
     }while( 0 )
+
+// construction of the major interface proxy map 
+#define BEGIN_PROXY_MAP( bNonDBus ) \
+do{ EnumClsid _iIfId_ = GetClsid();\
+    CInterfaceProxy* _pIf = this; \
+    BEGIN_PROXY_MAP_COMMON( bNonDBus, _iIfId_, _pIf );\
 
 template< typename...Args >
 inline ObjPtr NewMethodProxy( bool bNonDBus,
@@ -484,30 +490,36 @@ do{ \
 }while( 0 )
 
 #define END_PROXY_MAP \
-    do{ \
-        if( _pMap_ == nullptr && \
-            _pMapProxies_->size() > 0 ) \
-            SetProxyMap( *_pMapProxies_, _iIfId_ ); \
+        do{ \
+            if( _pMap_ == nullptr && \
+                _pMapProxies_->size() > 0 ) \
+                _pIf->SetProxyMap( *_pMapProxies_, _iIfId_ ); \
+        }while( 0 ); \
     }while( 0 ); \
 }while( 0 )
 
 // construction of the normal interface proxy map 
-#define BEGIN_IFPROXY_MAP( _InterfName_, bNonDBus ) \
+#define BEGIN_IFPROXY_MAP_COMMON( _InterfName_, bNonDBus, _pIf ) \
 do{ \
     EnumClsid _iIfId_ = iid( _InterfName_ ); \
     std::string strIfName = #_InterfName_; \
-    CoAddIidName( strIfName, _iIfId_ ); \
-\
+    EnumClsid tempIid = CoGetIidFromIfName( strIfName ); \
+    if( tempIid == clsid( Invalid ) ) \
+        CoAddIidName( strIfName, _iIfId_ ); \
     PROXY_MAP _oAnon_; \
     PROXY_MAP* _pMapProxies_ = &_oAnon_; \
     bool _bNonBus_ = bNonDBus; \
     UNREFERENCED( _bNonBus_ = !!_bNonBus_ ); \
     PROXY_MAP* _pMap_ = nullptr; \
     do{ \
-        _pMap_ = GetProxyMap( _iIfId_ ); \
+        _pMap_ = _pIf->GetProxyMap( _iIfId_ ); \
         if( _pMap_ != nullptr ) \
             _pMapProxies_ = _pMap_; \
     }while( 0 )
+
+#define BEGIN_IFPROXY_MAP( _InterfName_, bNonDBus ) \
+do{ CInterfaceProxy* _pIf = this;\
+    BEGIN_IFPROXY_MAP_COMMON( _InterfName_, bNonDBus, _pIf );
 
 #define END_IFPROXY_MAP END_PROXY_MAP
 
@@ -2953,55 +2965,63 @@ struct ClassName : CAggregatedObject< CAggInterfaceProxy, ##__VA_ARGS__ >\
 }
 
 // declare the synchronous proxy methods
-#define DECL_PROXY_METHOD_SYNC( i, _ClassName, _fname, ... ) \
+#define DECL_PROXY_METHOD_SYNC( i, _fname, ... ) \
     public:\
     template < int iNum, typename ...ARGs > struct Class##_fname { \
-        _ClassName* _pIf;\
-        Class##_fname( const Class##_fname& oIf ) : Class##_fname( oIf._pIf ){} \
-        Class##_fname( _ClassName* pIf ) : _pIf( pIf ){ \
-            do{ EnumClsid _iIfId_ = clsid( _ClassName );\
-                CCfgOpenerObj oCfg( _pIf ); \
-                std::string strIfName; \
-                oCfg.GetStrProp( propIfName, strIfName ); \
-                strIfName = IF_NAME_FROM_DBUS( strIfName ); \
-                EnumClsid tempIid = CoGetIidFromIfName( strIfName ); \
-                if( tempIid == clsid( Invalid ) ) \
-                    CoAddIidName( strIfName, _iIfId_ ); \
-                PROXY_MAP _oAnon_; \
-                PROXY_MAP* _pMapProxies_ = &_oAnon_; \
-                PROXY_MAP* _pMap_ = nullptr; \
-                bool _bNonBus_ = false; \
-                do{ \
-                    _pMap_ = _pIf->GetProxyMap( _iIfId_ ); \
-                    if( _pMap_ != nullptr ) \
-                        _pMapProxies_ = _pMap_; \
-                }while( 0 ); \
-                ADD_USER_PROXY_METHOD_EX( iNum, _ClassName::dummy##_fname, std::string( #_fname ) ); \
-                do{ \
-                    if( _pMap_ == nullptr && \
-                        _pMapProxies_->size() > 0 ) \
-                        _pIf->SetProxyMap( *_pMapProxies_, _iIfId_ ); \
-                }while( 0 ); \
-            }while( 0 ); \
+        _ThisClass* m_pIf;\
+        Class##_fname( const Class##_fname& oIf ) : Class##_fname( oIf.m_pIf ){} \
+        Class##_fname( _ThisClass* pIf ) : m_pIf( pIf ){ \
+            EnumClsid _iIfId_ = m_pIf->_MyClsid();\
+            _ThisClass* _pIf = m_pIf;\
+            do{BEGIN_PROXY_MAP_COMMON( false, _iIfId_, m_pIf ); \
+            ADD_USER_PROXY_METHOD_EX( iNum, _ThisClass::dummy##_fname, std::string( #_fname ) ); \
+            END_PROXY_MAP; \
         }\
         gint32 operator()( ARGs&&... args ) \
-        { return _pIf->ProxyCall( _N( iNum ), std::string( #_fname ), args... ); }\
+        { return m_pIf->ProxyCall( _N( iNum ), std::string( #_fname ), args... ); }\
     };\
-    friend Class##_fname< i, ##__VA_ARGS__ >;\
     using TemplSpec##_fname = Class##_fname< i, ##__VA_ARGS__ >;\
     TemplSpec##_fname _fname = TemplSpec##_fname( this ) ; \
     gint32 dummy##_fname( __VA_ARGS__ ){ return 0; } \
     
-#define BEGIN_DECLARE_PROXY_CLASS_SYNC( _ClassName ) \
-class _ClassName : public CInterfaceProxy { \
+// declare the synchronous proxy methods
+#define DECL_IF_PROXY_METHOD_SYNC( _ifName, i, _fname, ... ) \
+    public:\
+    template < int iNum, typename ...ARGs > struct Class##_fname { \
+        _ThisClass* m_pIf;\
+        Class##_fname( const Class##_fname& oIf ) : Class##_fname( oIf.m_pIf ){} \
+        Class##_fname( _ThisClass* pIf ) : m_pIf( pIf ){ \
+            BEGIN_IFPROXY_MAP( _ifName, false ); \
+            ADD_USER_PROXY_METHOD_EX( iNum, _ThisClass::dummy##_fname, std::string( #_fname ) ); \
+            END_IF_PROXY_MAP;\
+        }\
+        gint32 operator()( ARGs&&... args ) \
+        { return m_pIf->ProxyCall( _N( iNum ), std::string( #_fname ), args... ); }\
+    };\
+    Class##_fname< i, ##__VA_ARGS__ > _fname=Class##_fname< i, ##__VA_ARGS__ >(this);\
+    gint32 dummy##_fname( __VA_ARGS__ ){ return 0; } \
+
+#define BEGIN_DECL_PROXY_SYNC( _ClassName, _SuperClass ) \
+class _ClassName : public _SuperClass{ \
+    EnumClsid _MyClsid() { return clsid( _ClassName ); };\
     public: \
-    typedef CInterfaceProxy super; \
+    typedef _SuperClass super; \
+    using _ThisClass=_ClassName;\
     _ClassName( const IConfigDb* pCfg ) : super( pCfg ) \
     { SetClassId( clsid( _ClassName ) ); } \
-    PROXY_MAP* GetProxyMap( EnumClsid iIfId ) \
-    { return super::GetProxyMap( iIfId ); } \
-    gint32 SetProxyMap( PROXY_MAP& oMap, EnumClsid iIfId ) \
-    { return super::SetProxyMap( oMap, iIfId ); } \
 
-#define END_DECLARE_PROXY_CLASS_SYNC( _ClassName ) \
+#define END_DECL_PROXY_SYNC( _ClassName ) \
 };
+
+#define BEGIN_DECL_IF_PROXY_SYNC( _IfName, _ClassName ) \
+class _ClassName : public virtual CAggInterfaceProxy{ \
+    EnumClsid _MyClsid() { return iid( _IfName ); };\
+    public: \
+    typedef CAggInterfaceProxy super; \
+    using _ThisClass=_ClassName;\
+    _ClassName( const IConfigDb* pCfg ):super( pCfg ){} \
+    const EnumClsid GetIid() const { return iid( _IfName ); };
+
+#define END_DECL_IF_PROXY_SYNC( _ClassName ) \
+    END_DECL_PROXY_SYNC( _ClassName )
+

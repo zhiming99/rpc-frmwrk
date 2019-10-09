@@ -78,20 +78,14 @@ class CEchoServer :
 };
 
 // Declare the interface class
-class CEchoClient :
-    public virtual CAggInterfaceProxy
-{
-    public:
-    typedef CAggInterfaceProxy super;
+#include "ifhelper.h"
+BEGIN_DECL_IF_PROXY_SYNC( CEchoServer, CEchoClient )
 
-    const EnumClsid GetIid() const
-    { return iid( CEchoServer ); }
+    DECL_PROXY_METHOD_SYNC( 1, Echo,
+        const std::string& /* strEmit */,
+        std::string& /* strReply */ );
 
-    CEchoClient( const IConfigDb* pCfg );
-    gint32 InitUserFuncs();
-    gint32 Echo( const std::string& strEmit,
-        std::string& strReply );
-};
+END_DECL_IF_PROXY_SYNC( CEchoClient )
 
 class CMyStreamProxy :
     public CStreamProxySync

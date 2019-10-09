@@ -77,28 +77,24 @@ class CPauseResumeServer :
         
 };
 
-class CPauseResumeClient :
-    public CInterfaceProxy
-{
-    public:
-    typedef CInterfaceProxy super;
-    CPauseResumeClient( const IConfigDb* pCfg );
+#include "ifhelper.h"
+BEGIN_DECL_PROXY_SYNC( CPauseResumeClient, CInterfaceProxy )
 
-    gint32 InitUserFuncs();
+    DECL_PROXY_METHOD_SYNC( 1, Echo,
+        const std::string& /* strEmit */,
+        std::string& /* strReply */ );
 
-    gint32 LongWait(
-        const std::string& strText,
-        std::string& strReply );
+    DECL_PROXY_METHOD_SYNC( 1, LongWait,
+        const std::string& /* strEmit */,
+        std::string& /* strReply */ );
 
-    gint32 EchoUnknown(
-        const BufPtr& pBufToSend, // buf to echo
-        BufPtr& pRemoteReply );     // buf echoed
+    DECL_PROXY_METHOD_SYNC( 1, EchoUnknown,
+        const BufPtr&, /* pText */
+        BufPtr& );  /* pReply */
 
-    gint32 Echo(
-        const std::string& strEmit, // string to echo
-        std::string& strReply );    // string echoed
+    DECL_PROXY_METHOD_SYNC( 6, EchoMany,
+        gint32 /*i1*/, gint16 /*i2*/, gint64 /*i3*/, float /*i4*/, double /*i5*/, const std::string& /*strText*/,
+        gint32& /*o1*/, gint16& /*o2*/, gint64& /*o3*/, float& /*o4*/, double& /*o5*/, std::string& /*strReply*/ );
 
-    gint32 EchoMany(
-        gint32 i1, gint16 i2, gint64 i3, float i4, double i5, const std::string& strText,
-        gint32& o1, gint16& o2, gint64& o3, float& o4, double& o5, std::string& strReply );
-};
+
+END_DECL_PROXY_SYNC( CEchoClient );
