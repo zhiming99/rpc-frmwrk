@@ -46,6 +46,31 @@ void CIfSmokeTest::setUp()
         ret = oParams.Push( std::string( MODULE_NAME ) );
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 
+
+        /**
+        * @brief 
+        * the number is configurable of threads
+        * for irp completion and tasks. For client
+        * side you can specify a memory-saving
+        * settings, and on the server side, you
+        * can specify a performance friendly
+        * settings. Usually, more threads brings
+        * benenfits in perofrmance. but not
+        * always, tweak the numbers suitable for
+        * your hardware settings. And please be
+        * noticed that, the min propMaxTaskThrd is
+        * 1. The max of both numbers cannot
+        * exceeds CIoManager::GetNumCores.
+        *
+        */
+#if defined( CLIENT )
+        oParams[ propMaxIrpThrd ] = 0;
+        oParams[ propMaxTaskThrd ] = 1;
+#elif defined( SERVER )
+        // if server needs more performance
+        oParams[ propMaxIrpThrd ] = 0;
+        oParams[ propMaxTaskThrd ] = 1;
+#endif
         // create the iomanager
         ret = m_pMgr.NewObj(
             clsid( CIoManager ),

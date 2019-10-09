@@ -76,29 +76,28 @@ class CEchoServer :
     gint32 Ping( IEventSink* pCallback );
 };
 
-class CEchoClient :
-    public CInterfaceProxy
-{
-    public:
-    typedef CInterfaceProxy super;
-    CEchoClient( const IConfigDb* pCfg );
-    gint32 InitUserFuncs();
-    gint32 Echo( const std::string& strEmit,
-        std::string& strReply );
+#include "ifhelper.h"
+// declare the proxy class
+BEGIN_DECLARE_PROXY_CLASS_SYNC( CEchoClient )
 
-    gint32 EchoPtr(
-        const char* szText,
-        const char*& szReply );
+    DECL_PROXY_METHOD_SYNC( 0, CEchoClient, Ping );
 
-    gint32 EchoCfg(
-        gint32 iCount,
-        const CfgPtr& pCfg,
-        gint32& iCountReply,
-        CfgPtr& pCfgReply );
+    DECL_PROXY_METHOD_SYNC( 1, CEchoClient, Echo,
+        const std::string& /* strEmit */,
+        std::string& /* strReply */ );
 
-    gint32 EchoUnknown(
-        const BufPtr& pText,
-        BufPtr& pReply );
+    DECL_PROXY_METHOD_SYNC( 1, CEchoClient, EchoPtr,
+        const char*, /*szText*/
+        const char*& ); /* szReply */
 
-    gint32 Ping();
-};
+    DECL_PROXY_METHOD_SYNC( 2, CEchoClient, EchoCfg,
+        gint32, /* iCount */
+        const CfgPtr&, /* pCfg */
+        gint32&, /* iCountReply */
+        CfgPtr& ); /* pCfgReply */
+
+    DECL_PROXY_METHOD_SYNC( 1, CEchoClient, EchoUnknown,
+        const BufPtr&, /* pText */
+        BufPtr& );  /* pReply */
+
+END_DECLARE_PROXY_CLASS_SYNC( CEchoClient );

@@ -1198,8 +1198,6 @@ gint32 CIoManager::OnEvent( EnumEventId iEvent,
                     // the mainloop is started,
                     // which is important for
                     // receiving tcp socket events 
-                    sem_wait( GetSyncSem() );
-
                     ret = GetPnpMgr().Start();
                     if( ERROR( ret ) )
                         break;
@@ -1208,6 +1206,9 @@ gint32 CIoManager::OnEvent( EnumEventId iEvent,
 
                     if( ERROR( ret ) )
                         GetPnpMgr().Stop();
+
+                    m_iHcTimer = GetUtils().GetTimerSvc().
+                        AddTimer( 30, this, eventHouseClean );
 
                     break;
                 }
@@ -1382,23 +1383,9 @@ gint32 CIoManager::Start()
 
         // let's enter the main loop. The whole
         // system begin to run.
-        //
-        // NOTE: it is OK for gmain loop to start
-        // either before or after the
-        // ScheduleTaskMainLoop is called. but for
-        // ev loop, it has to start after because
-        // of the bad multithreading support
         GetMainIoLoop()->Start();
 
-        ret = GetUtils().Start();
-        if( ERROR( ret ) )
-            break;
-
-        this->OnEvent( eventWorkitem,
-            eventStart, 0, nullptr );
-
-        m_iHcTimer = GetUtils().GetTimerSvc().
-            AddTimer( 30, this, eventHouseClean );
+        sem_wait( GetSyncSem() );
 
     }while( 0 );
 
@@ -1922,9 +1909,19 @@ gint32 CIoMgrPostStartTask::operator()(
     ObjPtr pObj;
     CCfgOpenerObj oCfg( this );
     CIoManager* pMgr = nullptr;
-    ret = oCfg.GetPointer( propIoMgr, pMgr );
-    if( ERROR( ret ) )
-        return ret;
+    do{
+        ret = oCfg.GetPointer( propIoMgr, pMgr );
+        if( ERROR( ret ) )
+            break;
+
+        ret = pMgr->GetUtils().Start();
+        if( ERROR( ret ) )
+            break;
+
+        pMgr->OnEvent( eventWorkitem,
+            eventStart, 0, nullptr );
+
+    }while( 0 );
 
     if( pMgr )
         Sem_Post( pMgr->GetSyncSem() );

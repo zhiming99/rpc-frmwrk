@@ -54,9 +54,11 @@ class CIfSmokeTest :
     public:
     void setUp();
     void tearDown();
+#ifdef SERVER
     void testSvrStartStop();
-    void testCliStartStop();
+#endif
 #ifdef CLIENT
+    void testCliStartStop();
     void testDBusLeak();
     void testObjAlloc();
 #endif

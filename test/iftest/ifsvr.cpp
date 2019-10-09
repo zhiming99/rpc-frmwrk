@@ -97,6 +97,10 @@ gint32 CEchoServer::InitUserFuncs()
         CEchoServer::Ping,
         METHOD_Ping );
 
+    ADD_USER_SERVICE_HANDLER_EX( 2,
+        CEchoServer::Echo2,
+        "Echo2" );
+
     END_HANDLER_MAP;
     return 0;
 }
@@ -207,6 +211,14 @@ gint32 CEchoServer::Ping(
     IEventSink* pCallback )
 {
     // the simplest thing is to do nothing.
+    return 0;
+}
+
+gint32 CEchoServer::Echo2(
+    IEventSink* pCallback,
+    gint32 i1, double f2, double& i3 )
+{
+    i3 = i1 + f2;
     return 0;
 }
 

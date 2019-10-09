@@ -90,6 +90,7 @@ void CIfSmokeTest::tearDown()
     }while( 0 );
 }
 
+#ifdef SERVER
 void CIfSmokeTest::testSvrStartStop()
 {
     gint32 ret = 0;
@@ -127,7 +128,9 @@ void CIfSmokeTest::testSvrStartStop()
 
     pIf.Clear();
 }
+#endif
 
+#ifdef CLIENT
 void CIfSmokeTest::testCliStartStop()
 {
 
@@ -232,6 +235,12 @@ void CIfSmokeTest::testCliStartStop()
             break;
         DebugPrint( 0, "Ping Completed" );
 
+        double fret = .0;
+        ret = pCli->Echo2( 2, 4.0, fret );
+        if( ERROR( ret ) )
+            break;
+        DebugPrint( 0, "Echo2 Completed, %g", fret );
+
     }while( ++i < 100 );
 
     if( ERROR( ret ) )
@@ -257,7 +266,6 @@ void CIfSmokeTest::testCliStartStop()
     pIf.Clear();
 }
 
-#ifdef CLIENT
 void CIfSmokeTest::testDBusLeak()
 {
     FILE* fp = fopen( "dmsgdmp", "rb" );

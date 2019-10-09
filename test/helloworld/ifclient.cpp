@@ -27,13 +27,6 @@
 
 using namespace std;
 
-CEchoClient::CEchoClient(
-    const IConfigDb* pCfg )
-    : super( pCfg )
-{
-    SetClassId( clsid( CEchoClient ) );
-}
-
 /**
 * @name InitUserFuncs
 *    to init the service handler map for this interface
@@ -83,81 +76,4 @@ CEchoClient::CEchoClient(
  * tests, such as prtest or katest under the
  * `test' directory.
  * @} */
-gint32 CEchoClient::InitUserFuncs()
-{
-    super::InitUserFuncs();
-
-    BEGIN_PROXY_MAP( false );
-
-    ADD_USER_PROXY_METHOD_EX( 1,
-        CEchoClient::EchoPtr,
-        METHOD_EchoPtr );
-
-    ADD_USER_PROXY_METHOD_EX( 2,
-        CEchoClient::EchoCfg,
-        METHOD_EchoCfg );
-
-    ADD_USER_PROXY_METHOD_EX( 1,
-        CEchoClient::EchoUnknown,
-        METHOD_EchoUnknown );
-
-    ADD_USER_PROXY_METHOD_EX( 1,
-        CEchoClient::Echo,
-        METHOD_Echo );
-
-    ADD_USER_PROXY_METHOD_EX( 0,
-        CEchoClient::Ping,
-        METHOD_Ping );
-
-    END_PROXY_MAP;
-
-    return 0;
-}
-
-
-gint32 CEchoClient::Echo(
-    const std::string& strText,
-    std::string& strReply )
-{
-    // the first parameter is the number of
-    // input parameters
-    //
-    // METHOD_Echo is the method name to call strText
-    // is the input parameter, and strReply is the output
-    // parameter.
-    // input comes first, and the output follows
-    return FORWARD_CALL( 1, METHOD_Echo,
-        strText, strReply );
-}
-
-gint32 CEchoClient::EchoPtr(
-    const char* szText,
-    const char*& szReply )
-{
-    return FORWARD_CALL( 1, METHOD_EchoPtr,
-        szText, szReply );
-}
-
-gint32 CEchoClient::EchoCfg(
-    gint32 iCount,
-    const CfgPtr& pCfg,
-    gint32& iCountReply,
-    CfgPtr& pCfgReply )
-{
-    return FORWARD_CALL( 2, METHOD_EchoCfg,
-        iCount, pCfg, iCountReply, pCfgReply );
-}
-
-gint32 CEchoClient::EchoUnknown(
-    const BufPtr& pText,
-    BufPtr& pReply )
-{
-    return FORWARD_CALL( 1, METHOD_EchoUnknown,
-        pText, pReply );
-}
-
-gint32 CEchoClient::Ping()
-{
-    return FORWARD_CALL( 0,  METHOD_Ping );
-}
 
