@@ -2055,7 +2055,9 @@ gint32 CRpcServices::GetIidFromIfName(
     string strIfName2 =
         IF_NAME_FROM_DBUS( strIfName );
 
-    iid = CoGetIidFromIfName( strIfName2 );
+    string strSuffix = IsServer() ? "s" : "p";
+    iid = CoGetIidFromIfName(
+        strIfName2, strSuffix );
 
     if( iid == clsid( Invalid ) )
         return -ENOENT;
@@ -2587,7 +2589,7 @@ gint32 CInterfaceProxy::SendFetch_Proxy(
                 ( ( guint32& )oDesc[ propIid ] );
 
             const std::string strIfName =
-                CoGetIfNameFromIid( iid );
+                CoGetIfNameFromIid( iid, "p" );
 
             if( strIfName.empty() )
             {
@@ -4895,7 +4897,7 @@ gint32 CInterfaceProxy::UserCancelRequest(
 		return -EINVAL;
 
     const string& strIfName = CoGetIfNameFromIid(
-        iid( IInterfaceServer ) );
+        iid( IInterfaceServer ), "p" );
 
     if( strIfName.empty() )
         return ERROR_FAIL;
@@ -4952,7 +4954,8 @@ gint32 CInterfaceProxy::PauseResume_Proxy(
     CParamList oOptions;
 
     const std::string& strIfName =
-        CoGetIfNameFromIid( iid( IInterfaceServer ) );
+        CoGetIfNameFromIid(
+            iid( IInterfaceServer ), "p" );
 
     if( strIfName.empty() )
         return -ENOTSUP;

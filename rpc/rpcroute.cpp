@@ -324,6 +324,30 @@ gint32 CRpcRouter::Start()
     return ret;
 }
 
+gint32 CRpcRouter::OnPostStart(
+    IEventSink* pContext )
+{
+    string strIfName;
+
+    strIfName = CoGetIfNameFromIid(
+        iid( IStream ), "p" );
+    if( strIfName.empty() )
+    {
+        CoAddIidName( "IStream",
+            iid( IStream ), "p" );
+    }
+
+    strIfName = CoGetIfNameFromIid(
+        iid( IStream ), "s" );
+    if( strIfName.empty() )
+    {
+        CoAddIidName( "IStream",
+            iid( IStream ), "s" );
+    }
+
+    return 0;
+}
+
 gint32 CRpcRouter::OnPreStop( IEventSink* pCallback )
 {
     gint32 ret = 0;

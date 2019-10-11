@@ -49,7 +49,7 @@ gint32 CInProcServer::InitUserFuncs()
 
     ADD_USER_SERVICE_HANDLER(
         CInProcServer::EchoUnknown,
-        "Unknown" );
+        "EchoUnknown" );
 
     END_HANDLER_MAP;
 

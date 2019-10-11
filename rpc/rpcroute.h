@@ -1533,6 +1533,7 @@ class CRpcRouter :
         return RemoveProxy( strDest, pIf );
     }
 
+    gint32 OnPostStart( IEventSink* pContext );
     gint32 OnPreStop( IEventSink* pCallback );
 
     gint32 BuildStartRecvTask(

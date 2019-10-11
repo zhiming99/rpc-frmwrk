@@ -182,22 +182,52 @@ gint32 DllUnload()
     return 0;
 }
 
-const std::string& CoGetIfNameFromIid(
-    EnumClsid Iid )
+std::string CoGetIfNameFromIid(
+    EnumClsid Iid, 
+    const std::string& strSuffix )
 {
-    return g_oIidDict.GetName( Iid );
+    if( strSuffix.empty() )
+        return strSuffix;
+
+    guint64 qwIid = strSuffix[ 0 ] ;
+    qwIid <<= 32;
+    qwIid += Iid;
+
+    std::string strRet =
+        g_oIidDict.GetName( qwIid );
+    if( strRet.empty() )
+        return strRet;
+
+    size_t pos = strRet.rfind( ':' );
+    if( pos == std::string::npos )
+    {
+        strRet.clear();
+        return strRet;
+    }
+    return strRet.substr( 0, pos );
 }
 
 EnumClsid CoGetIidFromIfName(
-    const std::string& strName )
+    const std::string& strName,
+    const std::string& strSuffix )
 {
-    return g_oIidDict.GetIid( strName );
+    guint64 qwIid = g_oIidDict.GetIid(
+        strName + ":" + strSuffix );
+    guint32 dwIid = ( guint32 )qwIid;
+    return ( EnumClsid )dwIid;
 }
 
 gint32 CoAddIidName(
     const std::string& strName,
-    EnumClsid Iid )
+    EnumClsid Iid,
+    const std::string& strSuffix )
 {
+    std::string strNew =
+        strName + ":" + strSuffix;
+    guint64 qwIid = Iid;
+    guint64 qwPrefix = strSuffix[ 0 ];
+    qwIid |= ( qwPrefix << 32 );
+
     return g_oIidDict.AddIid(
-        strName, Iid );
+        strNew, qwIid );
 }

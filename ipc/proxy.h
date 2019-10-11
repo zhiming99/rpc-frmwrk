@@ -547,15 +547,19 @@ typedef std::map< std::string, TaskletPtr > FUNC_MAP;
 typedef std::map< std::string, ObjPtr > PROXY_MAP;
 
 
-const std::string& CoGetIfNameFromIid(
-    EnumClsid Iid );
+std::string CoGetIfNameFromIid(
+    EnumClsid Iid, const std::string& strSuffix );
 
 EnumClsid CoGetIidFromIfName(
-    const std::string& strName );
+    const std::string& strName,
+    const std::string& strSuffix
+    );
 
 gint32 CoAddIidName(
     const std::string& strName,
-    EnumClsid Iid );
+    EnumClsid Iid,
+    const std::string& strSuffix
+    );
 
 /**
 * @name CRpcServices as an interface to provide
@@ -1032,7 +1036,7 @@ class CInterfaceProxy :
 
         strIfName = IF_NAME_FROM_DBUS( strIfName );
         EnumClsid iid =
-            CoGetIidFromIfName( strIfName );
+            CoGetIidFromIfName( strIfName, "p" );
 
         ret = GetProxy( strMethod, pObj, iid );
         if( ERROR( ret ) )
@@ -1084,7 +1088,7 @@ class CInterfaceProxy :
     {
         CParamList oOptions;
         const std::string& strIfName =
-            CoGetIfNameFromIid( GetClsid() );
+            CoGetIfNameFromIid( GetClsid(), "p" );
 
         oOptions[ propIfName ] =
             DBUS_IF_NAME( strIfName );

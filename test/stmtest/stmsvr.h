@@ -81,11 +81,12 @@ class CEchoServer :
 #include "ifhelper.h"
 BEGIN_DECL_IF_PROXY_SYNC( CEchoServer, CEchoClient )
 
-    DECL_PROXY_METHOD_SYNC( 1, Echo,
+    DECL_IF_PROXY_METHOD_SYNC( 1,
+        CEchoServer, Echo,
         const std::string& /* strEmit */,
         std::string& /* strReply */ );
 
-END_DECL_IF_PROXY_SYNC( CEchoClient )
+END_DECL_IF_PROXY_SYNC( CEchoClient );
 
 class CMyStreamProxy :
     public CStreamProxySync

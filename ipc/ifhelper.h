@@ -437,9 +437,9 @@ do{ \
     std::string strIfName; \
     oCfg.GetStrProp( propIfName, strIfName ); \
     strIfName = IF_NAME_FROM_DBUS( strIfName ); \
-    EnumClsid tempIid = CoGetIidFromIfName( strIfName ); \
+    EnumClsid tempIid = CoGetIidFromIfName( strIfName, "p" ); \
     if( tempIid == clsid( Invalid ) ) \
-        CoAddIidName( strIfName, _iIfId_ ); \
+        CoAddIidName( strIfName, _iIfId_, "p" ); \
     PROXY_MAP _oAnon_; \
     PROXY_MAP* _pMapProxies_ = &_oAnon_; \
     bool _bNonBus_ = bNonDBus; \
@@ -503,9 +503,9 @@ do{ \
 do{ \
     EnumClsid _iIfId_ = iid( _InterfName_ ); \
     std::string strIfName = #_InterfName_; \
-    EnumClsid tempIid = CoGetIidFromIfName( strIfName ); \
+    EnumClsid tempIid = CoGetIidFromIfName( strIfName, "p" ); \
     if( tempIid == clsid( Invalid ) ) \
-        CoAddIidName( strIfName, _iIfId_ ); \
+        CoAddIidName( strIfName, _iIfId_, "p" ); \
     PROXY_MAP _oAnon_; \
     PROXY_MAP* _pMapProxies_ = &_oAnon_; \
     bool _bNonBus_ = bNonDBus; \
@@ -1037,8 +1037,12 @@ do{\
     CCfgOpenerObj oCfg( this ); \
     oCfg.GetStrProp( propIfName, strIfName ); \
     strIfName = IF_NAME_FROM_DBUS( strIfName ); \
-    CoAddIidName( strIfName, _iIfId_ ); \
-\
+    std::string strSuffix = \
+        IsServer() ? "s" : "p";\
+    EnumClsid tempIid = CoGetIidFromIfName( \
+        strIfName, strSuffix ); \
+    if( tempIid == clsid( Invalid ) ) \
+        CoAddIidName( strIfName, _iIfId_, strSuffix );\
     FUNC_MAP _oAnon_; \
     FUNC_MAP* _pCurMap_ = &_oAnon_; \
     FUNC_MAP* _pMap_ = nullptr; \
@@ -1111,8 +1115,12 @@ do{ \
 do{\
     EnumClsid _iIfId_ = iid( _iInterfName_ );\
     std::string strIfName = #_iInterfName_; \
-    CoAddIidName( strIfName, _iIfId_ ); \
-\
+    std::string strSuffix = \
+        IsServer() ? "s" : "p";\
+    EnumClsid tempIid = CoGetIidFromIfName( \
+        strIfName, strSuffix ); \
+    if( tempIid == clsid( Invalid ) ) \
+        CoAddIidName( strIfName, _iIfId_, strSuffix ); \
     FUNC_MAP _oAnon_; \
     FUNC_MAP* _pCurMap_ = &_oAnon_; \
     FUNC_MAP* _pMap_ = nullptr; \
@@ -2410,7 +2418,8 @@ struct Parameters< std::tuple< Types... >, std::tuple< Types2... > >
 
             CParamList oOptions;
             std::string strIfName =
-                CoGetIfNameFromIid( iid );
+                CoGetIfNameFromIid( iid, "p" );
+
             oOptions[ propIfName ] =
                 DBUS_IF_NAME( strIfName );
 
@@ -2985,18 +2994,24 @@ struct ClassName : CAggregatedObject< CAggInterfaceProxy, ##__VA_ARGS__ >\
     gint32 dummy##_fname( __VA_ARGS__ ){ return 0; } \
     
 // declare the synchronous proxy methods
-#define DECL_IF_PROXY_METHOD_SYNC( _ifName, i, _fname, ... ) \
+#define DECL_IF_PROXY_METHOD_SYNC( i, _ifName, _fname, ... ) \
     public:\
     template < int iNum, typename ...ARGs > struct Class##_fname { \
         _ThisClass* m_pIf;\
         Class##_fname( const Class##_fname& oIf ) : Class##_fname( oIf.m_pIf ){} \
         Class##_fname( _ThisClass* pIf ) : m_pIf( pIf ){ \
-            BEGIN_IFPROXY_MAP( _ifName, false ); \
+            do{ CInterfaceProxy* _pIf = pIf;\
+            BEGIN_IFPROXY_MAP_COMMON( _ifName, false, _pIf ); \
             ADD_USER_PROXY_METHOD_EX( iNum, _ThisClass::dummy##_fname, std::string( #_fname ) ); \
-            END_IF_PROXY_MAP;\
+            END_IFPROXY_MAP;\
         }\
         gint32 operator()( ARGs&&... args ) \
-        { return m_pIf->ProxyCall( _N( iNum ), std::string( #_fname ), args... ); }\
+        {\
+            CParamList oParams; \
+            oParams.SetIntProp( propIid, iid( _ifName ) ); \
+            InputCount< iNum > p( oParams.GetCfg() ); \
+            return m_pIf->ProxyCall( &p, std::string( #_fname ), args... ); \
+        }\
     };\
     Class##_fname< i, ##__VA_ARGS__ > _fname=Class##_fname< i, ##__VA_ARGS__ >(this);\
     gint32 dummy##_fname( __VA_ARGS__ ){ return 0; } \
@@ -3015,7 +3030,6 @@ class _ClassName : public _SuperClass{ \
 
 #define BEGIN_DECL_IF_PROXY_SYNC( _IfName, _ClassName ) \
 class _ClassName : public virtual CAggInterfaceProxy{ \
-    EnumClsid _MyClsid() { return iid( _IfName ); };\
     public: \
     typedef CAggInterfaceProxy super; \
     using _ThisClass=_ClassName;\

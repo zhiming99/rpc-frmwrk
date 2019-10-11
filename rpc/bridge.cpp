@@ -123,7 +123,7 @@ gint32 CRpcTcpBridgeProxy::ClearRemoteEvents(
         CParamList oResp;
         EnumClsid iid = iid( CRpcTcpBridge );
         const string& strIfName =
-            CoGetIfNameFromIid( iid );
+            CoGetIfNameFromIid( iid, "p" );
 
         if( strIfName.empty() )
         {
@@ -210,7 +210,7 @@ gint32 CRpcTcpBridgeProxy::EnableRemoteEventInternal(
 
         EnumClsid iid = iid( CRpcTcpBridge );
         const string& strIfName =
-            CoGetIfNameFromIid( iid );
+            CoGetIfNameFromIid( iid, "p" );
         if( strIfName.empty() )
         {
             ret = -ENOTSUP;

@@ -41,6 +41,7 @@ CIfSvrConnMgr::CIfSvrConnMgr(
     gint32 ret = 0;
 
     do{
+        SetClassId( clsid( CIfSvrConnMgr ) );
         if( pCfg == nullptr )
         {
             ret = -EINVAL;

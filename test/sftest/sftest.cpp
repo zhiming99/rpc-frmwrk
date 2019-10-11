@@ -183,7 +183,7 @@ void CIfSmokeTest::testCliStartStop()
         for( auto iClsid : ( *pClsids )() )
         {
             const std::string& strName =
-                CoGetIfNameFromIid( ( EnumClsid )iClsid );
+                CoGetIfNameFromIid( ( EnumClsid )iClsid, "p" );
             if( strName.empty() )
             {
                 const char* pName =

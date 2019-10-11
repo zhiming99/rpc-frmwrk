@@ -1075,7 +1075,7 @@ gint32 CStreamServer::CanContinue()
     EnumClsid iid = iid( IStream );
 
     const std::string& strIfName =
-        CoGetIfNameFromIid( iid );
+        CoGetIfNameFromIid( iid, "s" );
 
     if( strIfName.empty() )
         return -ENOTSUP;

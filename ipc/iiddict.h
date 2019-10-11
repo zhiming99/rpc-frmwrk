@@ -27,10 +27,10 @@
 class CInterfIdDict
 {
     typedef std::unordered_map
-        < EnumClsid, std::string > IidMap;
+        < guint64, std::string > IidMap;
 
     typedef std::unordered_map
-        < std::string, EnumClsid > NameMap;
+        < std::string, guint64 > NameMap;
 
     IidMap m_mapIid2Name;
     NameMap m_mapName2Iid;
@@ -39,15 +39,15 @@ class CInterfIdDict
 
     public:
 
-    EnumClsid GetIid(
+    guint64 GetIid(
         const std::string& strIfName );
 
     const std::string& GetName(
-        EnumClsid Iid );
+        guint64 Iid );
 
     gint32 AddIid(
         const std::string& strIfName,
-        EnumClsid Iid );
+        guint64 Iid );
 };
 
 

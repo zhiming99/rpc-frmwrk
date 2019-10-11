@@ -24,7 +24,7 @@
 #include "rpc.h"
 #include "iiddict.h"
 
-EnumClsid CInterfIdDict::GetIid(
+guint64 CInterfIdDict::GetIid(
     const std::string& strIfName )
 {
     CStdMutex oLock( m_oLock );
@@ -37,7 +37,7 @@ EnumClsid CInterfIdDict::GetIid(
 }
 
 const std::string& CInterfIdDict::GetName(
-    EnumClsid Iid )
+    guint64 Iid )
 {
     static std::string strNull( "" );
     CStdMutex oLock( m_oLock );
@@ -51,7 +51,7 @@ const std::string& CInterfIdDict::GetName(
 
 gint32 CInterfIdDict::AddIid(
     const std::string& strIfName,
-    EnumClsid Iid )
+    guint64 Iid )
 {
     if( strIfName.empty() ||
         Iid == clsid( Invalid ) )
