@@ -540,9 +540,10 @@ gint32 CDBusProxyPdo::HandleConnRequest(
         if( ERROR( ret ) )
             break;
 
+        string strRtName;
+        GetIoMgr()->GetRouterName( strRtName );
         string strDest = DBUS_DESTINATION2(
-                MODNAME_RPCROUTER,
-                OBJNAME_REQFWDR );
+                strRtName, OBJNAME_REQFWDR );
 
         ret = pMsg.SetDestination( strDest );
 
@@ -559,7 +560,7 @@ gint32 CDBusProxyPdo::HandleConnRequest(
             break;
 
         string strObjPath = DBUS_OBJ_PATH(
-            MODNAME_RPCROUTER, OBJNAME_REQFWDR );
+            strRtName, OBJNAME_REQFWDR );
 
         ret = pMsg.SetPath( strObjPath );
 
@@ -611,9 +612,10 @@ gint32 CDBusProxyPdo::BuildMsgHeader(
         if( ERROR( ret ) )
             break;
 
+        string strRtName;
+        GetIoMgr()->GetRouterName( strRtName );
         string strDest = DBUS_DESTINATION2(
-            MODNAME_RPCROUTER,
-            OBJNAME_REQFWDR );
+            strRtName, OBJNAME_REQFWDR );
 
         if( true )
         {
@@ -1323,8 +1325,11 @@ gint32 CDBusProxyPdo::PostStart( IRP* pIrp )
     do{
         CCfgOpener matchCfg;
 
+        string strRtName;
+        GetIoMgr()->GetRouterName( strRtName );
+
         string strPath = DBUS_OBJ_PATH(
-            MODNAME_RPCROUTER, OBJNAME_REQFWDR );
+            strRtName, OBJNAME_REQFWDR );
 
         string strIfName =
             DBUS_IF_NAME( IFNAME_REQFORWARDER );
@@ -1333,8 +1338,7 @@ gint32 CDBusProxyPdo::PostStart( IRP* pIrp )
         // map must have propDestDBusName set to
         // handle the module online/offline
         string strDest = DBUS_DESTINATION2(
-                MODNAME_RPCROUTER,
-                OBJNAME_REQFWDR );
+                strRtName, OBJNAME_REQFWDR );
 
         ret = matchCfg.SetStrProp(
             propDestDBusName, strDest );
@@ -2209,3 +2213,45 @@ gint32 CDBusProxyPdo::OnModOnOffline(
     return ret;
 }
 
+gint32 CDBusProxyPdoLpbk::SendDBusMsg(
+    DBusMessage* pMsg,
+    guint32* pdwSerial )
+{
+    if( pMsg == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+
+    if( m_pBusPort->GetClsid()
+        == clsid( CDBusBusPort ) )
+    {
+        CDBusBusPort* pBus = static_cast
+            < CDBusBusPort* >( m_pBusPort );
+
+        DMsgPtr pMsgPtr( pMsg );
+        std::string strSender =
+            LOOPBACK_DESTINATION;
+        strSender += ".Proxy_";
+
+        CCfgOpenerObj oCfg( this );
+        guint32 dwPortId = 0;
+        ret = oCfg.GetIntProp(
+            propPortId, dwPortId );
+
+        if( ERROR( ret ) )
+            return ret;
+
+        strSender += std::to_string(
+            dwPortId );
+
+        pMsgPtr.SetSender( strSender );
+        ret = pBus->SendLpbkMsg( pMsg,
+            pdwSerial );
+    }
+    else
+    {
+        ret = -EINVAL;
+    }
+
+    return ret;
+}

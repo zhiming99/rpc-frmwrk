@@ -202,9 +202,22 @@ gint32 CReqFwdrOpenRmtPortTask::CreateInterface(
         // propIoMgr
         // propRouterPtr
 
+        std::string strObjDesc;
+        ret = pMgr->GetCmdLineOpt(
+            propObjDescPath, strObjDesc );
+
+        if( ERROR( ret ) )
+            strObjDesc = ROUTER_OBJ_DESC;
+
         CParamList oParams;
+
+        string strRtName;
+        pMgr->GetRouterName( strRtName );
+        oParams.SetStrProp(
+            propSvrInstName, strRtName );
+
         ret = CRpcServices::LoadObjDesc(
-            ROUTER_OBJ_DESC,
+            strObjDesc,
             OBJNAME_TCP_BRIDGE,
             bServer,
             oParams.GetCfg() );
@@ -2163,8 +2176,11 @@ gint32 CRpcReqForwarder::BuildBufForIrpRmtSvrEvent(
         pOfflineMsg.SetInterface(
             DBUS_IF_NAME( IFNAME_REQFORWARDER ) );
 
+        string strRtName;
+        GetIoMgr()->GetRouterName( strRtName );
+
         pOfflineMsg.SetPath( DBUS_OBJ_PATH(
-            MODNAME_RPCROUTER, OBJNAME_REQFWDR ) );
+            strRtName, OBJNAME_REQFWDR ) );
 
         pOfflineMsg.SetMember(
             SYS_EVENT_RMTSVREVENT );
@@ -2408,8 +2424,11 @@ gint32 CRpcReqForwarder::ForwardEvent(
             oBuilder.SetIfName( DBUS_IF_NAME(
                 IFNAME_REQFORWARDER ) );
 
+            string strRtName;
+            GetIoMgr()->GetRouterName( strRtName );
+
             oBuilder.SetObjPath(
-                DBUS_OBJ_PATH( MODNAME_RPCROUTER,
+                DBUS_OBJ_PATH( strRtName,
                 OBJNAME_REQFWDR ) );
 
             CCfgOpenerObj oMatch(

@@ -1468,6 +1468,9 @@ class CRpcRouter :
     gint32 ForwardDBusEvent(
         EnumEventId iEvent );
 
+    gint32 OnPreStopLongWait(
+        IEventSink* pCallback );
+
     public:
 
     inline gint32 GetObjAddr(
@@ -1724,9 +1727,9 @@ class CIfRollbackableTask :
         CCfgOpener oTaskCfg(
             ( IConfigDb* ) GetConfig() );
 
-        intptr_t intptr;
+        guint32* intptr = nullptr;
         gint32 ret = oTaskCfg.GetIntPtr(
-            propTransGrpPtr, ( guint32*& )intptr );
+            propTransGrpPtr, intptr );
 
         if( ERROR( ret ) )
             return ret;

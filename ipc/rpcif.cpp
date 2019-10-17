@@ -4845,8 +4845,9 @@ gint32 CInterfaceProxy::CustomizeSendFetch(
         oDesc.CopyProp( propTaskId, pReqCfg );
 
         EnumClsid iid = clsid( Invalid );
+        guint32* piid = ( guint32* )&iid;
         ret = oDesc.GetIntProp(
-            propIid, ( guint32& )iid );
+            propIid, *piid );
 
         if( ERROR( ret ) )
             break;
@@ -5156,8 +5157,9 @@ gint32 CInterfaceServer::ValidateRequest_SendData(
         CCfgOpener oDataDesc(
             ( IConfigDb* )pDataDesc );
 
+        guint32* piid = ( guint32* )&iidClient;
         ret = oDataDesc.GetIntProp(
-            propIid, ( guint32& )iidClient );
+            propIid, *piid );
 
         if( ERROR( ret ) )
             break;
@@ -5183,8 +5185,9 @@ gint32 CInterfaceServer::ValidateRequest_SendData(
                 CCfgOpenerObj oMatchCfg(
                     ( CObjBase* )m_pFtsMatch );
 
+                guint32* piid = ( guint32* )&iid;
                 oMatchCfg.GetIntProp(
-                    propIid, ( guint32& )iid );
+                    propIid, *piid );
 
                 if( iid != iidClient )
                 {
@@ -5206,8 +5209,9 @@ gint32 CInterfaceServer::ValidateRequest_SendData(
                 CCfgOpenerObj oMatchCfg(
                     ( CObjBase* )m_pStmMatch );
 
+                guint32* piid = ( guint32* )&iid;
                 oMatchCfg.GetIntProp(
-                    propIid, ( guint32& )iid );
+                    propIid, *piid );
 
                 if( iid != iidClient )
                 {
@@ -6331,8 +6335,8 @@ bool CInterfaceServer::IsPaused(
             ( IConfigDb* )pCfg );
 
         EnumClsid iidMatch = clsid( Invalid );
-        ret = oMatch.GetIntProp(
-            propIid, ( guint32& )iidMatch );
+        guint32* piid = ( guint32* )&iidMatch;
+        ret = oMatch.GetIntProp( propIid, *piid );
         if( ERROR( ret ) )
             continue;
 

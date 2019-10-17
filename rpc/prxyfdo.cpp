@@ -77,8 +77,11 @@ gint32 CDBusProxyFdo::BuildSendDataMsg(
         // already serialized
 
         // correct the objpath and if name
+        string strRtName;
+        GetIoMgr()->GetRouterName( strRtName );
+
         string strPath = DBUS_OBJ_PATH(
-            MODNAME_RPCROUTER, OBJNAME_REQFWDR );
+            strRtName, OBJNAME_REQFWDR );
 
         pMsg.SetPath( strPath );
 
@@ -88,7 +91,7 @@ gint32 CDBusProxyFdo::BuildSendDataMsg(
         pMsg.SetInterface( strIfName );
 
         string strDest = DBUS_DESTINATION2(
-                MODNAME_RPCROUTER,
+                strRtName,
                 OBJNAME_REQFWDR );
 
         pMsg.SetDestination( strDest );
@@ -989,8 +992,11 @@ gint32 CDBusProxyFdo::PostStart(
         {
             CCfgOpener matchRmtEvt;
 
+            string strRtName;
+            GetIoMgr()->GetRouterName( strRtName );
+
             string strPath = DBUS_OBJ_PATH(
-                MODNAME_RPCROUTER, OBJNAME_REQFWDR );
+                strRtName, OBJNAME_REQFWDR );
 
             string strIfName =
                 DBUS_IF_NAME( IFNAME_REQFORWARDER );

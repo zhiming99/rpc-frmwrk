@@ -52,7 +52,8 @@ CDBusLoopHookCb::CDBusLoopHookCb(
         CParamList oParams(
             ( IConfigDb* )GetConfig() );
 
-        ret = oParams.Pop( ( guint32& )m_iType );
+        guint32* pdwval = ( guint32* )&m_iType;
+        ret = oParams.Pop( *pdwval );
         if( ERROR( ret ) )
             break;
 

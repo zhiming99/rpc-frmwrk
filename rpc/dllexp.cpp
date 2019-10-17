@@ -50,6 +50,7 @@ static FactoryPtr InitClassFactory()
 
     INIT_MAP_ENTRYCFG( CDBusProxyFdo );
     INIT_MAP_ENTRYCFG( CDBusProxyPdo );
+    INIT_MAP_ENTRYCFG( CDBusProxyPdoLpbk );
     INIT_MAP_ENTRYCFG( CFidoRecvDataTask );
     INIT_MAP_ENTRYCFG( CProxyFdoDispEvtTask );
     INIT_MAP_ENTRYCFG( CProxyFdoListenTask );

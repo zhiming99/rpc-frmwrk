@@ -348,7 +348,48 @@ gint32 CRpcRouter::OnPostStart(
     return 0;
 }
 
-gint32 CRpcRouter::OnPreStop( IEventSink* pCallback )
+gint32 CRpcRouter::OnPreStop(
+    IEventSink* pCallback )
+{
+    if( pCallback == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        TaskletPtr pPreStoplw;
+        ret = DEFER_IFCALLEX_NOSCHED(
+            pPreStoplw, ObjPtr( this ),
+            &CRpcRouter::OnPreStopLongWait,
+            nullptr );
+
+        if( ERROR( ret ) )
+            break;
+
+        CIfRetryTask* pRetryTask = pPreStoplw;
+        pRetryTask->SetClientNotify( pCallback ); 
+
+        // this is a long wait task, run it on a
+        // stand-alone thread, otherwise it could
+        // block other tasks.
+        ret = GetIoMgr()->RescheduleTask(
+            pPreStoplw, true );
+
+        if( ERROR( ret ) )
+        {
+            ( *pPreStoplw )( eventCancelTask );
+            break;
+        }
+
+        if( SUCCEEDED( ret ) )
+            ret = STATUS_PENDING;
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CRpcRouter::OnPreStopLongWait(
+    IEventSink* pCallback )
 {
     gint32 ret = 0;
     map< string, InterfPtr > mapIp2Proxies;
@@ -409,8 +450,19 @@ gint32 CRpcRouter::StartReqFwdr(
         EnumClsid iClsid =
             clsid( CRpcReqForwarderImpl );
 
+        std::string strObjDesc;
+        ret = GetIoMgr()->GetCmdLineOpt(
+            propObjDescPath, strObjDesc );
+        if( ERROR( ret ) )
+            strObjDesc = ROUTER_OBJ_DESC;
+
+        string strRtName;
+        GetIoMgr()->GetRouterName( strRtName );
+        oParams.SetStrProp(
+            propSvrInstName, strRtName );
+
         ret = CRpcServices::LoadObjDesc(
-            ROUTER_OBJ_DESC,
+            strObjDesc,
             OBJNAME_REQFWDR,
             true,
             oParams.GetCfg() );
@@ -668,8 +720,19 @@ gint32 CRpcRouter::BuildStartStopReqFwdrProxy(
             }
             else
             {
+                std::string strObjDesc;
+                ret = GetIoMgr()->GetCmdLineOpt(
+                    propObjDescPath, strObjDesc );
+                if( ERROR( ret ) )
+                    strObjDesc = ROUTER_OBJ_DESC;
+
+                string strRtName;
+                GetIoMgr()->GetRouterName( strRtName );
+                oIfParams.SetStrProp(
+                    propSvrInstName, strRtName );
+
                 ret = CRpcServices::LoadObjDesc(
-                    ROUTER_OBJ_DESC,
+                    strObjDesc,
                     OBJNAME_REQFWDR,
                     false,
                     oIfParams.GetCfg() );
@@ -2484,11 +2547,11 @@ gint32 CRpcRouter::ForwardModOnOfflineEvent(
         if( ERROR( ret ) )
             break;
 
-        string strModName =
-            GetIoMgr()->GetModName();
+        string strRtName;
+        GetIoMgr()->GetRouterName( strRtName );
 
         ret = pMsg.SetSender(
-            DBUS_DESTINATION( strModName ) );
+            DBUS_DESTINATION( strRtName ) );
 
         pMsg.SetSerial( iEvent );
 

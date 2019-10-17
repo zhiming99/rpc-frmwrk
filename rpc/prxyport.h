@@ -225,3 +225,15 @@ class CDBusProxyFdo : public IRpcFdoPort
     virtual gint32 PreStop( IRP* pIrp );
 
 };
+
+class CDBusProxyPdoLpbk : public CDBusProxyPdo
+{
+    public:
+    typedef CDBusProxyPdo super;
+    CDBusProxyPdoLpbk( const IConfigDb* pCfg ) :
+        super( pCfg )
+    { SetClassId( clsid( CDBusProxyPdoLpbk ) ); }
+
+    gint32 SendDBusMsg( DBusMessage* pMsg,
+        guint32* pdwSerial );
+};

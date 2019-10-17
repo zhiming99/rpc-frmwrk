@@ -329,14 +329,27 @@ void CEvLoop::ClearAll()
     m_pDBusHook->ClearAll();
     
     CStdRMutex oLock( GetLock() );
-    for( auto elem : m_mapTimWatch )
-        RemoveSource( elem.second );
+    std::map< HANDLE, SOURCE_HEADER* >::iterator itr;
+    itr = m_mapTimWatch.begin();
+    while( itr != m_mapTimWatch.end() )
+    {
+        RemoveSource( itr->second );
+        itr = m_mapTimWatch.begin();
+    }
 
-    for( auto elem : m_mapIoWatch )
-        RemoveSource( elem.second );
+    itr = m_mapIoWatch.begin();
+    while( itr != m_mapIoWatch.end() )
+    {
+        RemoveSource( itr->second );
+        itr = m_mapIoWatch.begin();
+    }
 
-    for( auto elem : m_mapAsyncWatch )
-        RemoveSource( elem.second );
+    itr = m_mapAsyncWatch.begin();
+    while( itr != m_mapAsyncWatch.end() )
+    {
+        RemoveSource( itr->second );
+        itr = m_mapAsyncWatch.begin();
+    }
 }
 
 CEvLoop::CEvLoop( const IConfigDb* pCfg )

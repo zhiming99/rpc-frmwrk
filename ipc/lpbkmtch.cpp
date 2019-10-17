@@ -141,7 +141,11 @@ gint32 CDBusLoopbackMatch::FilterMsgS2P(
                 break;
             }
 
-            if( strName != LOOPBACK_DESTINATION )
+            guint32 dwLen = sizeof(
+                LOOPBACK_DESTINATION );
+
+            if( strName.substr( 0, dwLen - 1 ) !=
+                LOOPBACK_DESTINATION )
                 ret = ERROR_FALSE;
         }
         else if( iType == DBUS_MESSAGE_TYPE_SIGNAL )
@@ -204,7 +208,11 @@ gint32 CDBusLoopbackMatch::FilterMsgP2S(
             break;
         }
 
-        if( strName != LOOPBACK_DESTINATION )
+        guint32 dwLen = sizeof(
+            LOOPBACK_DESTINATION );
+
+        if( strName.substr( 0, dwLen - 1 ) !=
+            LOOPBACK_DESTINATION )
             ret = ERROR_FALSE;
 
     }while( 0 );

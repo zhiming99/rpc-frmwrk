@@ -2410,8 +2410,9 @@ struct Parameters< std::tuple< Types... >, std::tuple< Types2... > >
             }
             else
             {
+                guint32* pIid = ( guint32* )&iid;
                 ret = oCfg.GetIntProp(
-                    propIid, ( guint32& )iid );
+                    propIid, *pIid );
                 if( ERROR( ret ) )
                     iid = m_pIf->GetClsid();
             }
@@ -2933,7 +2934,8 @@ struct CAggregatedObject< CAggInterfaceProxy, Types... >
     {
         CCfgOpener oDataDesc( pDataDesc );
         EnumClsid iid = clsid( Invalid );
-        oDataDesc.GetIntProp( propIid, ( guint32& )iid );
+        guint32* piid = ( guint32* )&iid;
+        oDataDesc.GetIntProp( propIid, *piid );
         return iid;
     }
 

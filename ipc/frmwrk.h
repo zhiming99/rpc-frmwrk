@@ -598,6 +598,22 @@ class CIoManager : public IService
 
         return ret;
     }
+
+    inline gint32 GetRouterName(
+        std::string& strRtName )
+    {
+        gint32 ret = GetCmdLineOpt(
+            propRouterName, strRtName );
+        if( ERROR( ret ) )
+             strRtName = MODNAME_RPCROUTER;
+        return 0;
+    }
+    inline gint32 SetRouterName(
+        const std::string& strRtName )
+    {
+        return SetCmdLineOpt(
+            propRouterName, strRtName );
+    }
 };
 
 typedef CAutoPtr< Clsid_CIoManager, CIoManager > IoMgrPtr;

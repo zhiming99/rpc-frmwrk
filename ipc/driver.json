@@ -81,6 +81,13 @@
             "BusPortClass"  : "DBusBusPort"
         },
         {
+            "PortType"      : "Pdo",
+            "PortClass"     : "DBusProxyPdoLpbk",
+            "InternalClass" : "CDBusProxyPdoLpbk",
+            "PortDriver"    : "",
+            "BusPortClass"  : "DBusBusPort"
+        },
+        {
             "PortType"      : "Fdo",
             "PortClass"     : "DBusProxyFdo",
             "InternalClass" : "CDBusProxyFdo",
@@ -294,6 +301,47 @@
             "ClassFactories" :
             [
             ]
+        },
+        {
+            "ModName" : "btinrtsvr",
+            "DriversToLoad" :
+            [
+                "DBusBusDriver",
+                "RpcTcpBusDriver",
+                "UnixSockBusDriver"
+            ],
+            "PreloadableObjects" :
+            [
+                {
+                    "comment" : "remove the surfix '-1' of the field name to enable the object",
+                    "ObjectName-1" : "RpcRouter-0",
+                    "ObjectClass-1" : "RpcRouterImpl"
+                }
+            ],
+            "ClassFactories" :
+            [
+            ]
+        },
+        {
+            "ModName" : "btinrtcli",
+            "DriversToLoad" :
+            [
+                "DBusBusDriver",
+                "RpcTcpBusDriver",
+                "UnixSockBusDriver",
+                "ProxyFdoDriver"
+            ],
+            "PreloadableObjects" :
+            [
+                {
+                    "comment" : "remove the surfix '-1' of the field name to enable the object",
+                    "ObjectName-1" : "RpcRouter-0",
+                    "ObjectClass-1" : "RpcRouterImpl"
+                }
+            ],
+            "ClassFactories" :
+            [
+            ]
         }
     ],
 
@@ -302,6 +350,11 @@
         {
             "PortClass" : "DBusLocalPdo",
             "FdoDriver" : ""
+        },
+        {
+            "PortClass" : "DBusProxyPdoLpbk",
+            "FdoDriver" : "ProxyFdoDriver",
+            "Description" : "This match provides a binding between the pdo and fdo"
         },
         {
             "PortClass" : "DBusProxyPdo",

@@ -57,5 +57,6 @@ AC_CONFIG_FILES([Makefile
                  test/stmtest/Makefile
                  test/router/Makefile
                  test/iftest/Makefile
+                 test/btinrt/Makefile
                  test/smoketest/Makefile])
 AC_OUTPUT

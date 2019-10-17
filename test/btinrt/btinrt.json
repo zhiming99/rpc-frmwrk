@@ -1,0 +1,147 @@
+{
+    "Version" : "1.0",
+    "ServerName": "EchoServer",
+    "Objects" :
+    [
+        {
+            "ObjectName": "CEchoServer",
+            "BusName" : "DBusBusPort_0",
+            "PortClass": "DBusLocalPdo",
+            "PortId" : "0",
+            "RequestTimeoutSec" : "120",
+            "KeepAliveTimeoutSec" : "60",
+            "QueuedRequests" : "false",
+            "ProxyPortClass": "DBusProxyPdoLpbk",
+            "ProxyPortClass-1": "DBusLocalPdo",
+            "comment-1" : "IpAddress is the ip address of the server",
+            "IpAddress" : "127.0.0.1",
+            "Interfaces" :
+            [
+                {
+                    "Comment-0" : "the following attributes are mandatory",
+                    "InterfaceName" : "CEchoServer",
+                    "Comment-1" : "the following is a flag whether to use the object clsid for this interface, usually it indicates this is the major interface of this object, there must be one interface bind to clsid",
+                    "BindToClsid" : "true"
+                },
+                {
+                    "InterfaceName" : "IInterfaceServer"
+                }
+            ]
+        },
+        {
+            "ObjectName": "RpcReqForwarderImpl",
+            "BusName" : "DBusBusPort_0",
+            "PortClass": "DBusLocalPdo",
+            "PortId" : "0",
+            "RequestTimeoutSec" : "120",
+            "KeepAliveTimeoutSec" : "60",
+            "QueuedRequests" : "false",
+            "ProxyPortClass": "DBusLoopbackPdo",
+            "comment-1" : "IpAddress is the ip address of the server for proxy",
+            "Note-1": "proxy's ip address can be overwritten at runtime, before it starts",
+            "Interfaces" :
+            [
+                {
+                    "Comment-0" : "the following attributes are mandatory",
+                    "InterfaceName" : "CRpcReqForwarderImpl",
+                    "BindToClsid" : "true"
+                },
+                {
+                    "InterfaceName" : "IInterfaceServer",
+                    "Pausable"  : "false"
+                },
+                {
+                    "InterfaceName" : "IUnknown",
+                    "Pausable" : "false"
+                },
+                {
+                    "InterfaceName" : "CRpcReqForwarder",
+                    "Pausable"  : "true"
+                },
+                {
+                    "InterfaceName" : "CStatCountersServer",
+                    "Pausable"  : "true"
+                }
+            ]
+        },
+        {
+            "ObjectName": "RpcTcpBridgeImpl",
+            "BusName" : "RpcTcpBusPort_0",
+            "PortClass": "TcpStreamPdo",
+            "PortNumber" : "4132",
+            "RequestTimeoutSec" : "120",
+            "KeepAliveTimeoutSec" : "60",
+            "QueuedRequests" : "false",
+            "Note-1": " bridge's ip address is decided at runtime",
+            "ProxyPortClass": "TcpStreamPdo",
+            "Interfaces" :
+            [
+                {
+                    "Comment-0" : "the following attributes are mandatory",
+                    "InterfaceName" : "CRpcTcpBridgeImpl",
+                    "BindToClsid" : "true"
+                },
+                {
+                    "InterfaceName" : "IInterfaceServer",
+                    "Pausable"  : "false"
+                },
+                {
+                    "InterfaceName" : "IUnknown",
+                    "Pausable" : "false"
+                },
+                {
+                    "InterfaceName" : "IStream",
+                    "Pausable" : "false"
+                },
+                {
+                    "InterfaceName" : "CRpcTcpBridge",
+                    "Pausable"  : "true"
+                },
+                {
+                    "InterfaceName" : "CStatCountersServer",
+                    "Pausable"  : "true"
+                }
+            ]
+        },
+        {
+            "ObjectName": "RpcRouterImpl",
+            "BusName" : "DBusBusPort_0",
+            "PortClass": "DBusLocalPdo",
+            "PortId" : "0",
+            "RequestTimeoutSec" : "120",
+            "KeepAliveTimeoutSec" : "60",
+            "QueuedRequests" : "false",
+            "ProxyPortClass": "DBusLocalPdo",
+            "Comment-0": "'Role' is a router-specific prop. 01: as a forwarder, 02: as a server, 03 or not exist: as both forwarder and server",
+            "Role" : "0x02",
+            "Interfaces" :
+            [
+                {
+                    "Comment-0" : "the following attributes are mandatory",
+                    "InterfaceName" : "CRpcRouterImpl",
+                    "BindToClsid" : "true"
+                },
+                {
+                    "InterfaceName" : "IInterfaceServer",
+                    "Pausable"  : "false"
+                },
+                {
+                    "InterfaceName" : "IUnknown",
+                    "Pausable" : "false"
+                },
+                {
+                    "InterfaceName" : "CRpcRouter",
+                    "Pausable"  : "false"
+                },
+                {
+                    "InterfaceName" : "CStatCountersServer",
+                    "Pausable"  : "false"
+                }
+            ]
+        }
+    ],
+    "ClassFactories" :
+    [
+        "./libecho.so"
+    ]
+}

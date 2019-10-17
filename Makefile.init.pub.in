@@ -16,8 +16,8 @@ CUR_DIR := $(shell pwd)
 C_FLAGS := $(CFLAGS) -Wall -c -D_GNU_SOURCE -pthread
 #C_DEFINES :=
 
-DEBUG_FLAGS := -DDEBUG -ggdb
-RELEASE_FLAGS := -O2
+DEBUG_FLAGS := -D_DEBUG=1 -DDEBUG -ggdb
+RELEASE_FLAGS := -D_DEBUG=0 -DRELEASE -O2 -ggdb
 
 ifeq ($(BUILD_64),1)
 	WIDTH_FLAG := -m64

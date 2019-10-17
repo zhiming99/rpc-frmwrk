@@ -427,10 +427,12 @@ gint32 CMyFileProxy::OnOpenChanComplete(
         if( ERROR( ret ) )
             break;
 
-        ret = oResp.GetIntPtr( 1,
-            ( guint32*& )hChannel);
+        guint32* pval = nullptr;
+        ret = oResp.GetIntPtr( 1, pval );
         if( ERROR( ret ) )
             break;
+
+        hChannel = ( HANDLE )pval;
 
     }while( 0 );
 

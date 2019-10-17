@@ -10,6 +10,8 @@ all: $(TARGETS)
 debug: $(TARGETS)
 release: $(TARGETS)
 clean: $(TARGETS)
+release_clean: $(TARGETS)
+debug_clean: $(TARGETS)
 
 mygoal:=$(MAKECMDGOALS)
 $(OUTPUT_DIR)/libcombase.so :

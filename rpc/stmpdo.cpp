@@ -2074,14 +2074,17 @@ gint32 CStmPdoSvrOfflineNotifyTask::SendNotify()
 
         CReqBuilder oParams;
 
+        std::string strRtName;
+        pMgr->GetRouterName( strRtName );
+
         oParams.SetIfName(
             DBUS_IF_NAME( IFNAME_TCP_BRIDGE ) );
 
-        oParams.SetObjPath(
-            DBUS_OBJ_PATH( OBJNAME_TCP_BRIDGE ) );
+        oParams.SetObjPath( DBUS_OBJ_PATH(
+            strRtName, OBJNAME_TCP_BRIDGE ) );
 
         oParams.SetSender(
-            DBUS_DESTINATION( pMgr->GetModName() ) );
+            DBUS_DESTINATION( strRtName ) );
 
         oParams.SetMethodName( BRIDGE_EVENT_SVROFF );
 

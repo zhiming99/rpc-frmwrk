@@ -11,6 +11,7 @@ all:
 	make -C sftest
 	make -C stmtest
 	make -C router
+	make -C btinrt
 
 release:
 	make -C helloworld release
@@ -25,6 +26,7 @@ release:
 	make -C sftest release
 	make -C stmtest release
 	make -C router release
+	make -C btinrt release
 
 clean:
 	make -C helloworld clean
@@ -39,5 +41,36 @@ clean:
 	make -C sftest clean
 	make -C stmtest clean
 	make -C router clean
+	make -C btinrt clean
+
+release_clean:
+	make -C helloworld release_clean
+	make -C iftest release_clean
+	make -C asynctst release_clean
+	make -C smoketest release_clean
+	make -C actcancel release_clean
+	make -C evtest release_clean
+	make -C inproc release_clean
+	make -C katest release_clean
+	make -C prtest release_clean
+	make -C sftest release_clean
+	make -C stmtest release_clean
+	make -C router release_clean
+	make -C btinrt release_clean
+
+debug_clean:
+	make -C helloworld debug_clean
+	make -C iftest debug_clean
+	make -C asynctst debug_clean
+	make -C smoketest debug_clean
+	make -C actcancel debug_clean
+	make -C evtest debug_clean
+	make -C inproc debug_clean
+	make -C katest debug_clean
+	make -C prtest debug_clean
+	make -C sftest debug_clean
+	make -C stmtest debug_clean
+	make -C router debug_clean
+	make -C btinrt debug_clean
 
 .PHONY: release clean

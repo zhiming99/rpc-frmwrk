@@ -93,7 +93,7 @@ enum EnumPropId : gint32
 
     propIoMgr,          // type: ObjPtr of pointer to CIoManager
     propEventSink,      // type: ObjPtr of pointer to IEventSink
-    propConfigPath,     // type: string, for config file path
+    propConfigPath,     // type: string, for "driver.json" file path
     propDrvPtr,         // type: ObjPtr of IPortDriver*
     propDBusConn,       // type: intptr to the DBusConnection
     propParamList,      // type: ObjPtr to CStlIntVector, used to pass parameters in CTasklet::OnEvent
@@ -188,6 +188,8 @@ enum EnumPropId : gint32
     propExtInfo,        // type: ObjPtr to a configdb with extended information
     propListenOnly,     // type: bool to tell if the CUnixSockStmPdo to return both event and data via CTRLCODE_LISTENING req
     propDataDesc,       // type: Objptr to a configdb for Send/Fetch's data description
+    propObjDescPath,    // type: a string as the path of the object description file
+    propRouterName,     // type: a string as the router name
     propReservedEnd = 0x10000000,
     propInvalid = -1, 
 };

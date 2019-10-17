@@ -1081,8 +1081,11 @@ gint32 CRpcTcpFido::BuildSendDataMsg(
         if( ERROR( ret ) )
             break;
 
+        string strRtName;
+        GetIoMgr()->GetRouterName( strRtName );
+
         string strDest = DBUS_DESTINATION2( 
-            MODNAME_RPCROUTER, OBJNAME_TCP_BRIDGE );
+            strRtName, OBJNAME_TCP_BRIDGE );
 
         pMsg.SetDestination( strDest );
         ret = oParams.SetIntProp(
@@ -1093,7 +1096,7 @@ gint32 CRpcTcpFido::BuildSendDataMsg(
             break;
 
         string strPath = DBUS_OBJ_PATH(
-            MODNAME_RPCROUTER, OBJNAME_TCP_BRIDGE );
+            strRtName, OBJNAME_TCP_BRIDGE );
 
         pMsg.SetPath( strPath );
         pMsg.SetInterface( strIfName );

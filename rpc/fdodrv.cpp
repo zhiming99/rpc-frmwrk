@@ -143,7 +143,6 @@ gint32 CProxyFdoDriver::Probe(
         }
 
         string strPdoClass;
-        string strClass( PORT_CLASS_DBUS_PROXY_PDO );
 
         CCfgOpenerObj oCfg( pLowerPort );
         ret = oCfg.GetStrProp(
@@ -152,7 +151,8 @@ gint32 CProxyFdoDriver::Probe(
         if( ERROR( ret ) )
             break;
 
-        if( strClass != strPdoClass )
+        if( strPdoClass != PORT_CLASS_DBUS_PROXY_PDO &&
+            strPdoClass != PORT_CLASS_DBUS_PROXY_PDO_LPBK )
         {
             // this is not a port we support
             ret = -ENOTSUP;

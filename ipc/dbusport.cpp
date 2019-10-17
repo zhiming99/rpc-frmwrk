@@ -290,16 +290,18 @@ gint32 CDBusBusPort::BuildPdoPortName(
             if( ERROR( ret ) )
                 break;
 
-            if( strClass != PORT_CLASS_DBUS_PROXY_PDO
-                && strClass != PORT_CLASS_LOCALDBUS_PDO
-                && strClass != PORT_CLASS_LOOPBACK_PDO )
+            if( strClass != PORT_CLASS_DBUS_PROXY_PDO &&
+                strClass != PORT_CLASS_DBUS_PROXY_PDO_LPBK &&
+                strClass != PORT_CLASS_LOCALDBUS_PDO &&
+                strClass != PORT_CLASS_LOOPBACK_PDO )
             {
                 // We only support to port classes
                 // RpcProxy and LocalDBusPdo
                 ret = -EINVAL;
                 break;
             }
-            if( strClass == PORT_CLASS_DBUS_PROXY_PDO )
+            if( strClass == PORT_CLASS_DBUS_PROXY_PDO ||
+                strClass == PORT_CLASS_DBUS_PROXY_PDO_LPBK )
             {
                 guint32 dwPortId = ( guint32 )-1;
                 if( pCfg->exist( propPortId ) )
@@ -404,6 +406,12 @@ gint32 CDBusBusPort::CreatePdoPort(
             break;
 
         if( strPortClass
+            == PORT_CLASS_DBUS_PROXY_PDO_LPBK )
+        {
+            ret = CreateRpcProxyPdoLpbk(
+                pCfg, pNewPort );
+        }
+        else if( strPortClass
             == PORT_CLASS_DBUS_PROXY_PDO )
         {
             ret = CreateRpcProxyPdo(
@@ -432,11 +440,13 @@ gint32 CDBusBusPort::CreatePdoPort(
     return ret;
 }
 
-gint32 CDBusBusPort::CreateRpcProxyPdo(
+gint32 CDBusBusPort::CreateRpcProxyPdoShared(
     const IConfigDb* pCfg,
-    PortPtr& pNewPort )
+    PortPtr& pNewPort,
+    EnumClsid iClsid )
 {
-    if( pCfg == nullptr )
+    if( pCfg == nullptr ||
+        iClsid == clsid( Invalid ) )
         return -EINVAL;
 
     gint32 ret = 0;
@@ -457,8 +467,7 @@ gint32 CDBusBusPort::CreateRpcProxyPdo(
             ( guint32* )m_pDBusConn );
 
         ret = pNewPort.NewObj(
-            clsid( CDBusProxyPdo ),
-            oExtCfg.GetCfg() );
+            iClsid, oExtCfg.GetCfg() );
 
         if( SUCCEEDED( ret ) )
         {
@@ -885,16 +894,19 @@ DBusHandlerResult CDBusBusPort::OnMessageArrival(
                 break;
             }
 
-            map<guint32, PortPtr>::iterator
-                itr = m_mapId2Pdo.begin();
-
-            while( itr != m_mapId2Pdo.end() )
+            for( auto elem : m_mapId2Pdo )
             {
-                guint32 dwPortId = itr->first;
-                if( dwPortId != ( guint32 )m_iLocalPortId
-                    && dwPortId != ( guint32 )m_iLpbkPortId )
-                    vecPorts.push_back( itr->second );
-                ++itr;
+                guint32 dwPortId = elem.first;
+                if( dwPortId == ( guint32 )m_iLocalPortId ||
+                    dwPortId == ( guint32 )m_iLpbkPortId )
+                    continue;
+
+                PortPtr& pPrxyPdo = elem.second;
+                if( pPrxyPdo->GetClsid() != 
+                    clsid( CDBusProxyPdo ) )
+                    continue;
+
+                vecPorts.push_back( elem.second );
             }
 
             // place the localdbus port at the
@@ -1522,6 +1534,8 @@ gint32 CDBusTransLpbkMsgTask::operator()(
     return ret;
 }
 
+extern gint64 GetRandom();
+static std::atomic< guint32 > dwDBusSerial( GetRandom() >> 32 );
 gint32 CDBusBusPort::ScheduleLpbkTask(
     MatchPtr& pFilter,
     DBusMessage *pDBusMsg,
@@ -1558,16 +1572,21 @@ gint32 CDBusBusPort::ScheduleLpbkTask(
 
         oParams.Push( bReq );
         DMsgPtr pMsg( pDBusMsg );
-        
+
+        guint32 dwSerial = dwDBusSerial++;
         if( DBUS_MESSAGE_TYPE_METHOD_CALL
             == pMsg.GetType()
             && iType == matchClient )
         {
             // sending request, a serial number is
             // needed
-            pMsg.SetSerial( ( LONGWORD )pDBusMsg );
+            pMsg.SetSerial( dwSerial );
             if( pdwSerial )
-                *pdwSerial = ( LONGWORD )pDBusMsg;
+                *pdwSerial = dwSerial;
+        }
+        else
+        {
+            pMsg.SetSerial( dwSerial );
         }
 
         CIoManager* pMgr = GetIoMgr();
@@ -1610,8 +1629,15 @@ CDBusBusPort::OnLpbkMsgArrival(
     if( pMsg == nullptr )
         return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 
+    DMsgPtr ptrMsg( pMsg );
+    bool bEvent = false;
+    if( ptrMsg.GetType() ==
+        DBUS_MESSAGE_TYPE_SIGNAL )
+        bEvent = true;
+
     PortPtr pPort;
     BufPtr pBuf( true );
+    std::vector< PortPtr > vecPorts;
 
     do{
         CStdRMutex oPortLock( GetLock() );
@@ -1625,10 +1651,29 @@ CDBusBusPort::OnLpbkMsgArrival(
             break;
         }
 
+        for( auto elem : m_mapId2Pdo )
+        {
+            guint32 dwPortId = elem.first;
+            if( dwPortId == ( guint32 )m_iLocalPortId ||
+                dwPortId == ( guint32 )m_iLpbkPortId )
+                continue;
+
+            PortPtr& pPrxyPdo = elem.second;
+            if( pPrxyPdo->GetClsid() != 
+                clsid( CDBusProxyPdoLpbk ) )
+                continue;
+
+            vecPorts.push_back( elem.second );
+        }
+
+        // place the loopback port at the
+        // last. To guarantee the
+        // order of the message processing
         ret = GetPdoPort( m_iLpbkPortId, pPort );
         if( ERROR( ret ) )
             break;
 
+        vecPorts.push_back( pPort );
         *pBuf = pMsg;
         if( pBuf.IsEmpty() )
         {
@@ -1638,16 +1683,25 @@ CDBusBusPort::OnLpbkMsgArrival(
 
     }while( 0 );
 
-    if( SUCCEEDED( ret ) )
+    if( ERROR( ret ) )
+        return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+
+    for( auto pPort : vecPorts )
     {
         CRpcPdoPort* pPdoPort = pPort;
         if( pPdoPort == nullptr )
-            return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+            continue;
 
         LONGWORD* pData = ( LONGWORD* )( ( CBuffer* )pBuf );
 
         ret = pPdoPort->OnEvent(
             cmdDispatchData, 0, 0, pData );
+
+        if( ret == -ENOENT )
+            continue;
+
+        if( !bEvent )
+            return DBUS_HANDLER_RESULT_HANDLED;
 
         if( ret == ERROR_PREMATURE )
             return DBUS_HANDLER_RESULT_HANDLED;
@@ -2309,10 +2363,13 @@ CDBusConnFlushTask::CDBusConnFlushTask(
         if( ERROR( ret ) )
             break;
 
-        ret = oCfg.GetIntPtr( propDBusConn,
-            ( guint32*& )m_pDBusConn );
+        guint32* pVal = nullptr;
+        ret = oCfg.GetIntPtr( propDBusConn, pVal );
         if( ERROR( ret ) )
             break;
+
+        m_pDBusConn = reinterpret_cast
+            < DBusConnection* >( pVal );
 
         ret = oCfg.GetPointer(
             propPortPtr, m_pBusPort );

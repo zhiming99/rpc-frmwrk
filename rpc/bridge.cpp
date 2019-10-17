@@ -330,17 +330,17 @@ gint32 CRpcTcpBridgeProxy::BuildBufForIrpFwrdReq(
         if( ERROR( ret ) )
             break;
 
-        string strModName =
-            GetIoMgr()->GetModName();
+        string strRtName;
+        GetIoMgr()->GetRouterName( strRtName );
 
         string strIfName = DBUS_IF_NAME(
             IFNAME_TCP_BRIDGE );
 
         string strObjPath =DBUS_OBJ_PATH(
-            strModName, OBJNAME_TCP_BRIDGE );
+            strRtName, OBJNAME_TCP_BRIDGE );
 
-        string strSender =
-            DBUS_DESTINATION( strModName  );
+        string strSender = DBUS_DESTINATION(
+            GetIoMgr()->GetModName() );
 
         ret = pMsg.NewObj();
         if( ERROR( ret ) )
@@ -355,7 +355,7 @@ gint32 CRpcTcpBridgeProxy::BuildBufForIrpFwrdReq(
             break;
 
         ret = pMsg.SetDestination( 
-            DBUS_DESTINATION2( strModName,
+            DBUS_DESTINATION2( strRtName,
                 OBJNAME_TCP_BRIDGE ) );
         if( ERROR( ret ) )
             break;
@@ -1857,17 +1857,17 @@ gint32 CRpcTcpBridge::BuildBufForIrpFwrdEvt(
             break;
 
         string strVal;
-        string strModName =
-            GetIoMgr()->GetModName();
+        string strRtName;
+        GetIoMgr()->GetRouterName( strRtName );
 
         ret = pMsg.SetSender(
-            DBUS_DESTINATION( strModName ) );
+            DBUS_DESTINATION( strRtName ) );
 
         if( ERROR( ret ) )
             break;
 
         strVal = DBUS_OBJ_PATH(
-            strModName, OBJNAME_TCP_BRIDGE );
+            strRtName, OBJNAME_TCP_BRIDGE );
 
         ret = pMsg.SetPath( strVal );
 
@@ -1950,8 +1950,9 @@ gint32 CRpcTcpBridge::CheckSendDataToFwrd(
             break;
 
         EnumClsid iid = clsid( Invalid );
+        guint32* piid = ( guint32* )&iid;
         ret = oParams.GetIntProp(
-            propIid, ( guint32& )iid );
+            propIid, *piid );
 
         if( ERROR( ret ) )
             break;
@@ -2352,8 +2353,9 @@ gint32 CRpcInterfaceServer::SendFetch_Server(
             break;
 
         EnumClsid iid = clsid( Invalid );
+        guint32* piid = ( guint32* )&iid;
         ret = oDataDesc.GetIntProp(
-            propIid, ( guint32& )iid );
+            propIid, *piid );
 
         if( ERROR( ret ) )
             break;
@@ -2452,8 +2454,9 @@ gint32 CRpcInterfaceServer::ValidateRequest_SendData(
         CCfgOpener oDataDesc(
             ( IConfigDb* )pDataDesc );
 
+        guint32* piid = ( guint32* )&iidClient;
         ret = oDataDesc.GetIntProp(
-            propIid, ( guint32& )iidClient );
+            propIid, *piid );
 
         if( ERROR( ret ) )
             break;
@@ -2832,17 +2835,17 @@ gint32 CRpcTcpBridge::SetupReqIrpOnProgress(
             break;
 
         string strVal;
-        string strModName = 
-            GetIoMgr()->GetModName();
+        string strRtName; 
+        GetIoMgr()->GetRouterName( strRtName );
 
         ret = pMsg.SetSender(
-            DBUS_DESTINATION( strModName ) );
+            DBUS_DESTINATION( strRtName ) );
 
         if( ERROR( ret ) )
             break;
 
         strVal = DBUS_OBJ_PATH(
-            strModName, OBJNAME_TCP_BRIDGE );
+            strRtName, OBJNAME_TCP_BRIDGE );
 
         ret = pMsg.SetPath( strVal );
 

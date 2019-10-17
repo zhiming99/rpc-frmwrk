@@ -25,4 +25,12 @@ clean:
 	-@rm $(OBJ_DIR)/*.o $(OBJ_DIR)/*.d
 	-@rm $(OUTPUT_DIR)/$(TARGET)
 
+debug_clean: 
+	-@rm $(OBJ_DIR)/*.o $(OBJ_DIR)/*.d
+	-@rm $(OUTPUT_DIR)/$(TARGET)
+
+release_clean:
+	-@rm $(OBJ_DIR)/*.o $(OBJ_DIR)/*.d
+	-@rm $(OUTPUT_DIR)/$(TARGET)
+
 .PHONY: sync

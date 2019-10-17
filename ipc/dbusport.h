@@ -462,9 +462,28 @@ class CDBusBusPort : public CGenericBusPort
         const IConfigDb* pConfig,
         PortPtr& pNewPort );
 
-    gint32 CreateRpcProxyPdo(
+    gint32 CreateRpcProxyPdoShared(
         const IConfigDb* pConfig,
-        PortPtr& pNewPort );
+        PortPtr& pNewPort,
+        EnumClsid iClsid );
+
+    inline gint32 CreateRpcProxyPdoLpbk(
+        const IConfigDb* pConfig,
+        PortPtr& pNewPort )
+    {
+        return CreateRpcProxyPdoShared(
+            pConfig, pNewPort,
+            clsid( CDBusProxyPdoLpbk ) );
+    }
+
+    inline gint32 CreateRpcProxyPdo(
+        const IConfigDb* pConfig,
+        PortPtr& pNewPort )
+    {
+        return CreateRpcProxyPdoShared(
+            pConfig, pNewPort,
+            clsid( CDBusProxyPdo ) );
+    }
 
     gint32 CreateLoopbackPdo(
         const IConfigDb* pConfig,

@@ -889,9 +889,12 @@ bool CRemoteProxyState::IsMyDest(
     if( bRet )
         return bRet;
 
+    string strRtName;
+    GetIoMgr()->GetRouterName( strRtName );
+
     // if the rpc router is down, we are done too
     string strDest =
-        DBUS_DESTINATION( MODNAME_RPCROUTER );
+        DBUS_DESTINATION( strRtName );
 
     if( strDest == strModName )
         return true;

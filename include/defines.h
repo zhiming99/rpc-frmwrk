@@ -492,9 +492,7 @@ class CObjBase
     static gint32 GetActCount()
     { return m_atmObjCount; }
 
-#ifdef DEBUG
     void Dump( std::string& strDump );
-#endif
 };
 
 class IEventSink : public CObjBase

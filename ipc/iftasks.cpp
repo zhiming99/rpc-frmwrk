@@ -1738,8 +1738,11 @@ gint32 CIfTaskGroup::OnCancel(
             WaitingToCancel( pHead );
 
             oTaskLock.Lock();
-            if( m_queTasks.back() == pHead )
-                m_queTasks.pop_back();
+            if( m_queTasks.size() )
+            {
+                if( m_queTasks.back() == pHead )
+                    m_queTasks.pop_back();
+            }
         }
 
         oCfg.RemoveProperty( propNoResched );
@@ -3751,7 +3754,7 @@ gint32 CIfIoReqTask::ResetTimer()
             break;
         }
 
-#ifdef _DEBUG
+#ifdef DEBUG
         DebugPrint( 0,
             "the irp timer is reset" );
 #endif
@@ -4830,7 +4833,7 @@ gint32 CIfInvokeMethodTask::ResetTimer()
         if( m_iTimeoutId > 0 )
         {
             oTimerSvc.ResetTimer( m_iTimeoutId );
-#ifdef _DEBUG
+#ifdef DEBUG
             DebugPrint( ret,
                 "Invoke Request timer is reset" );
 #endif
@@ -5108,7 +5111,7 @@ gint32 CIfInvokeMethodTask::SetAsyncCall(
             dwTimeoutSec, this,
             ( guint32 )eventKeepAlive );
 
-#ifdef _DEBUG
+#ifdef __DEBUG
         DebugPrint( ret,
             "KeepAliveTimer started in %d seconds",
             dwTimeoutSec );
