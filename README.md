@@ -24,7 +24,7 @@ This framework depends on the following packags:
 
 ---
 [`Thu 17 Oct 2019 07:36:03 PM Beijing`]   
-1. Worked a built-in router version of helloworld as btinrt test, for the curiosity to know the performance of removal of dbus traffic. It can improve the latency from about 1.5ms to about 1ms per echo, as about 30% faster, well worth the effort, in sacrifice of the flexibility. Also fixed a deadlock bug in router and a segment fault bug in taskgroup which cannot reproduce in the stand-alone router setup.
+1. Worked a `helloworld` with built-in router as the `btinrt` test, for the curiosity to know the performance of removal of dbus traffic. It can improve the latency from about 1.5ms to about 1ms per echo, as about 30% faster, well worth the effort, in sacrifice of the flexibility. Also fixed a deadlock bug in router and a segment fault bug in taskgroup which cannot reproduce in the stand-alone router setup.
 
 [`Wed 09 Oct 2019 09:11:53 AM Beijing`]   
 1. Upgraded the synchronous proxy code generation with the new macro, before the start of session manager design. It is now an easy task to write a proxy with just a few lines, and help the developers to focus on server side design. For detail information, please refer to test/helloworld.   
