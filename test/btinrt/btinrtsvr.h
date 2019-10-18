@@ -35,6 +35,8 @@
 #define MOD_CLIENT_NAME "EchoClient"
 #define OBJNAME_ECHOCLIENT "CEchoClient"               
 
+#define EVENT_HelloWorld "OnHelloWorld"
+
 enum EnumMyClsid
 {
     DECL_CLSID( MyStart ) = clsid( UserClsidStart ) + 1,
@@ -77,11 +79,21 @@ class CEchoServer :
 
     gint32 Echo2( IEventSink* pCallback,
         gint32 i1, double f2, double& i3 );
+
+    // event broadcaster
+    gint32 OnHelloWorld(
+        const std::string& strEvent );
 };
 
 #include "ifhelper.h"
 // declare the proxy class
 BEGIN_DECL_PROXY_SYNC( CEchoClient, CInterfaceProxy )
+
+    gint32 InitUserFuncs();
+
+    gint32 OnHelloWorld(
+        IEventSink* pContext,
+        const std::string& strEvent );
 
     DECL_PROXY_METHOD_SYNC( 0, Ping );
 

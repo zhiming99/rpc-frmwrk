@@ -139,8 +139,16 @@ void CIfSmokeTest::testSvrStartStop()
     
     CEchoServer* pSvr = pIf;
     // waiting for requests
+    gint32 dwIndex = 0;
     while( pSvr->IsConnected() )
+    {
+        std::string strMsg = std::to_string( dwIndex++ );
+        strMsg += ": Hello, World!";
+        ret = pSvr->OnHelloWorld( strMsg );
+        if( ERROR( ret ) )
+            break;
         sleep( 1 );
+    }
 
     // stop the server
     ret = pIf->Stop();
@@ -165,6 +173,14 @@ CfgPtr CIfSmokeTest::InitRouterCfg()
     gint32 ret = 0;
 
     do{
+
+        std::string strRtName;
+        CIoManager* pMgr = m_pMgr;
+        pMgr->GetRouterName( strRtName );
+
+        oParams.SetStrProp(
+            propSvrInstName, strRtName );
+
         ret = CRpcServices::LoadObjDesc(
             "./btinrt.json",
             OBJNAME_ROUTER,
@@ -343,7 +359,7 @@ void CIfSmokeTest::testCliStartStop()
             break;
         DebugPrint( 0, "Echo2 Completed, %g", fret );
 
-    }while( ++i < 100 );
+    }while( ++i < 1000 );
 
     if( ERROR( ret ) )
     {

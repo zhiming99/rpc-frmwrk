@@ -1721,10 +1721,17 @@ gint32 CDBusBusPort::FilterLpbkMsg(
     gint32 ret = ScheduleLpbkTask(
         pFilter, pDBusMsg, pdwSerial );
 
+    if( ERROR( ret ) )
+        return ret;
+
     if( pMsg.GetType() ==
         DBUS_MESSAGE_TYPE_SIGNAL )
     {
-        ret = ERROR_NOT_HANDLED;
+        std::string strDest =
+            pMsg.GetDestination();
+
+        if( strDest.empty() )
+            ret = ERROR_NOT_HANDLED;
     }
 
     return ret;

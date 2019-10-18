@@ -129,7 +129,11 @@ gint32 CDBusLoopbackMatch::FilterMsgS2P(
             break;
         }
 
+        guint32 dwLen = sizeof(
+            LOOPBACK_DESTINATION ) - 1;
+
         std::string strName;
+
         if( iType == DBUS_MESSAGE_TYPE_ERROR ||
             iType == DBUS_MESSAGE_TYPE_METHOD_RETURN )
         {
@@ -141,10 +145,8 @@ gint32 CDBusLoopbackMatch::FilterMsgS2P(
                 break;
             }
 
-            guint32 dwLen = sizeof(
-                LOOPBACK_DESTINATION );
 
-            if( strName.substr( 0, dwLen - 1 ) !=
+            if( strName.substr( 0, dwLen ) !=
                 LOOPBACK_DESTINATION )
                 ret = ERROR_FALSE;
         }
@@ -167,7 +169,21 @@ gint32 CDBusLoopbackMatch::FilterMsgS2P(
                 // the check, that is, the signal
                 // message will go through the loopback
                 // path 
-                return 0;
+                strName = pMsg.GetDestination();
+                if( strName.empty() )
+                {
+                    ret = 0;
+                }
+                else if( strName.substr( 0, dwLen ) !=
+                    LOOPBACK_DESTINATION )
+                {
+                    ret = ERROR_FALSE;
+                }
+                else
+                {
+                    ret = 0;
+                }
+                
             }
         }
         else
@@ -209,9 +225,9 @@ gint32 CDBusLoopbackMatch::FilterMsgP2S(
         }
 
         guint32 dwLen = sizeof(
-            LOOPBACK_DESTINATION );
+            LOOPBACK_DESTINATION ) - 1;
 
-        if( strName.substr( 0, dwLen - 1 ) !=
+        if( strName.substr( 0, dwLen ) !=
             LOOPBACK_DESTINATION )
             ret = ERROR_FALSE;
 

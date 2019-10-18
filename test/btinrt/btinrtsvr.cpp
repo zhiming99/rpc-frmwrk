@@ -222,6 +222,14 @@ gint32 CEchoServer::Echo2(
     return 0;
 }
 
+// event broadcaster
+gint32 CEchoServer::OnHelloWorld(
+    const std::string& strEvent )
+{
+    BROADCAST_USER_EVENT( GetClsid(), strEvent );
+    return 0;
+}
+
 // mandatory part, just copy/paste
 static FactoryPtr InitClassFactory()
 {

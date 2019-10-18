@@ -142,6 +142,6 @@
     ],
     "ClassFactories" :
     [
-        "./libecho.so"
+        "./libbtinrt.so"
     ]
 }
