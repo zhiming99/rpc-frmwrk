@@ -2213,6 +2213,26 @@ gint32 CDBusProxyPdo::OnModOnOffline(
     return ret;
 }
 
+gint32 CDBusProxyPdoLpbk::GetSender(
+    std::string& strSender ) const
+{
+    strSender = LOOPBACK_DESTINATION;
+    strSender += ".Proxy_";
+
+    CCfgOpenerObj oCfg( this );
+    guint32 dwPortId = 0;
+    gint32 ret = oCfg.GetIntProp(
+        propPortId, dwPortId );
+
+    if( ERROR( ret ) )
+        return ret;
+
+    strSender += std::to_string(
+        dwPortId );
+
+    return 0;
+}
+
 gint32 CDBusProxyPdoLpbk::SendDBusMsg(
     DBusMessage* pMsg,
     guint32* pdwSerial )
@@ -2229,20 +2249,10 @@ gint32 CDBusProxyPdoLpbk::SendDBusMsg(
             < CDBusBusPort* >( m_pBusPort );
 
         DMsgPtr pMsgPtr( pMsg );
-        std::string strSender =
-            LOOPBACK_DESTINATION;
-        strSender += ".Proxy_";
-
-        CCfgOpenerObj oCfg( this );
-        guint32 dwPortId = 0;
-        ret = oCfg.GetIntProp(
-            propPortId, dwPortId );
-
+        std::string strSender;
+        ret = GetSender( strSender );
         if( ERROR( ret ) )
             return ret;
-
-        strSender += std::to_string(
-            dwPortId );
 
         pMsgPtr.SetSender( strSender );
         ret = pBus->SendLpbkMsg( pMsg,
@@ -2254,4 +2264,20 @@ gint32 CDBusProxyPdoLpbk::SendDBusMsg(
     }
 
     return ret;
+}
+
+gint32 CDBusProxyPdoLpbk::PackupReqMsg(
+    DMsgPtr& pReqMsg,
+    DMsgPtr& pOutMsg ) const
+{
+    // correct the sender of the inner
+    std::string strSender;
+    gint32 ret = GetSender( strSender );
+    if( ERROR( ret ) )
+        return ret;
+
+    pReqMsg.SetSender( strSender );
+
+    return super::PackupReqMsg(
+        pReqMsg, pOutMsg );
 }

@@ -64,7 +64,7 @@ class CDBusProxyPdo : public CRpcPdoPort
 
     gint32 BuildMsgHeader( DMsgPtr& pMsg ) const;
 
-    gint32 PackupReqMsg(
+    virtual gint32 PackupReqMsg(
         DMsgPtr& pReqMsg, DMsgPtr& pOutMsg ) const;
 
     gint32 UnpackFwrdRespMsg( IRP* pIrp );
@@ -236,4 +236,8 @@ class CDBusProxyPdoLpbk : public CDBusProxyPdo
 
     gint32 SendDBusMsg( DBusMessage* pMsg,
         guint32* pdwSerial );
+
+    gint32 GetSender( std::string& strSender ) const;
+    virtual gint32 PackupReqMsg(
+        DMsgPtr& pReqMsg, DMsgPtr& pOutMsg ) const;
 };

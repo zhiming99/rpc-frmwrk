@@ -1148,6 +1148,9 @@ class CRpcTcpBusDriver : public CGenBusDriver
 	gint32 Probe( IPort* pLowerPort,
         PortPtr& pNewPort,
         const IConfigDb* pConfig = NULL );
+
+    gint32 GetTcpSettings(
+        IConfigDb* pCfg ) const;
 };
 
 class CRpcTcpFidoDrv : public CPortDriver

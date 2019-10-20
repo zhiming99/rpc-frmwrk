@@ -1072,6 +1072,10 @@ gint32 CIfStmReadWriteTask::OnStmRecv(
             ret = CompleteReadIrp(
                 pIrp, pBuf );
 
+            // NOTE: this
+            // STATUS_MORE_PROCESS_NEEDED cannot
+            // be returned as OnStmRecv's return
+            // value
             if( ret !=
                 STATUS_MORE_PROCESS_NEEDED )
                 bContinue = false;

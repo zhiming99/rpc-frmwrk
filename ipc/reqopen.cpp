@@ -51,7 +51,6 @@ CReqBuilder::CReqBuilder(
             ret = CopyProp( propDestDBusName, pIf );
             if( ERROR( ret ) )
                 break;
-            CopyProp( propUserName, pIf );
         }
 
         CopyProp( propIpAddr, pIf );
@@ -90,7 +89,6 @@ CReqBuilder::CReqBuilder(
         CopyProp( propDestDBusName, pCfg );
 
         CopyProp( propIpAddr, pCfg );
-        CopyProp( propUserName, pCfg );
         CopyProp( propSrcDBusName, pCfg );
 
         CopyProp( propMethodName, pCfg );

@@ -646,6 +646,96 @@ CRpcTcpBusDriver::CRpcTcpBusDriver(
     SetClassId( clsid( CRpcTcpBusDriver ) );
 }
 
+gint32 CRpcTcpBusDriver::GetTcpSettings(
+    IConfigDb* pCfg ) const
+{
+    if( pCfg == nullptr )
+        return -EINVAL;
+
+    CIoManager* pMgr = GetIoMgr();
+    CDriverManager& oDrvMgr = pMgr->GetDrvMgr();
+    Json::Value& ojc = oDrvMgr.GetJsonCfg();
+    Json::Value& oPorts = ojc[ JSON_ATTR_PORTS ];
+
+    if( oPorts == Json::Value::null )
+        return -ENOENT;
+
+    if( !oPorts.isArray() || oPorts.size() == 0 )
+        return -ENOENT;
+
+    CCfgOpener oCfg( pCfg );
+    gint32 ret = 0;
+
+    do{
+        guint32 i = 0;
+        for( ; i < oPorts.size(); i++ )
+        {
+            Json::Value& elem = oPorts[ i ];
+            if( elem == Json::Value::null )
+                continue;
+
+            string strPortClass =
+                elem[ JSON_ATTR_PORTCLASS ].asString();
+            if( strPortClass != PORT_CLASS_RPC_TCPBUS )
+                continue;
+
+
+            if( !( elem.isMember( JSON_ATTR_PARAMETERS ) &&
+                elem[ JSON_ATTR_PARAMETERS ].isObject() ) )
+            {
+                ret = -ENOENT;
+                break;
+            }
+
+            Json::Value& oParams =
+                elem[ JSON_ATTR_PARAMETERS ];
+
+            // protocol, refer to propProtocol for detail
+            if( oParams.isMember( JSON_ATTR_PROTOCOL ) &&
+                oParams[ JSON_ATTR_PROTOCOL ].isString() )
+            {
+                string strProto =
+                    oParams[ JSON_ATTR_PROTOCOL ].asString();
+                oCfg.SetStrProp( propProtocol, strProto );
+            }
+            // tcp port
+            if( oParams.isMember( JSON_ATTR_TCPPORT ) &&
+                oParams[ JSON_ATTR_TCPPORT ].isString() )
+            {
+                string strPort =
+                    oParams[ JSON_ATTR_TCPPORT ].asString();
+                guint32 dwPort = std::stol( strPort );
+                if( dwPort < 1024 || dwPort >= 0x10000 )
+                {
+                    oCfg.RemoveProperty( propProtocol );
+                    ret = -ENOENT;
+                    break;
+                }
+                oCfg.SetIntProp( propSrcTcpPort, dwPort );
+            }
+            // address to listen on
+            if( oParams.isMember( JSON_ATTR_BINDADDR ) &&
+                oParams[ JSON_ATTR_BINDADDR ].isString() )
+            {
+                string strAddr =
+                    oParams[ JSON_ATTR_BINDADDR ].asString();
+                oCfg.SetStrProp( propIpAddr, strAddr );
+            }
+            // address format, for detail, refer to propAddrFormat
+            if( oParams.isMember( JSON_ATTR_ADDRFORMAT ) &&
+                oParams[ JSON_ATTR_ADDRFORMAT ].isString() )
+            {
+                string strFormat =
+                    oParams[ JSON_ATTR_ADDRFORMAT ].asString();
+                oCfg.SetStrProp( propAddrFormat, strFormat );
+            }
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CRpcTcpBusDriver::Probe(
         IPort* pLowerPort,
         PortPtr& pNewPort,
@@ -660,6 +750,7 @@ gint32 CRpcTcpBusDriver::Probe(
         if( pConfig != nullptr )
             *pCfg = *pConfig;
 
+        GetTcpSettings( pCfg );
         CCfgOpener oCfg( ( IConfigDb* )pCfg );
         ret = oCfg.SetStrProp( propPortClass,
             PORT_CLASS_RPC_TCPBUS );

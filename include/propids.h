@@ -49,7 +49,7 @@ enum EnumPropId : gint32
     propBusName,        // type: string
     propBusClass,       // type: string
     propBusId,          // type: guint32 
-    propProtocol,       // type: string
+    propProtocol,       // type: string as the protocol between the router, include `native', `wss', `http2' ...
     propPortName,
     propPortClass,
     propPortId,         // type: guint32
@@ -190,6 +190,7 @@ enum EnumPropId : gint32
     propDataDesc,       // type: Objptr to a configdb for Send/Fetch's data description
     propObjDescPath,    // type: a string as the path of the object description file
     propRouterName,     // type: a string as the router name
+    propAddrFormat,      // type: a string as the address format, including `ipv4', `ipv6', `dn'( domain name ), `url'
     propReservedEnd = 0x10000000,
     propInvalid = -1, 
 };

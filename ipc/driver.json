@@ -117,7 +117,14 @@
             "PortType"      : "Fdo",
             "PortClass"     : "RpcTcpBusPort",
             "PortDriver"    : "RpcTcpBusDriver",
-            "InternalClass" : "CTcpRpcBusPort"
+            "InternalClass" : "CTcpRpcBusPort",
+            "Parameters" :
+            {
+                "AddrFormat" : "ipv4",
+                "Protocol" : "native",
+                "PortNumber": "4132",
+                "BindAddr" : "0.0.0.0"
+            }
         },
         {
             "PortType"      : "Pdo",

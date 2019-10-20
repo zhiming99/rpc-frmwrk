@@ -72,3 +72,7 @@
 #define JSON_ATTR_PAUSE_START   "PauseOnStart"
 #define JSON_ATTR_QUEUED_REQ    "QueuedRequests"
 #define JSON_ATTR_ROUTER_ROLE   "Role"
+#define JSON_ATTR_PARAMETERS    "Parameters"
+#define JSON_ATTR_BINDADDR      "BindAddr"
+#define JSON_ATTR_PROTOCOL      "Protocol"
+#define JSON_ATTR_ADDRFORMAT    "AddrFormat"

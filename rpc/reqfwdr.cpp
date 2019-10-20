@@ -3077,6 +3077,12 @@ gint32 CRpcReqForwarderProxy::FillRespData(
                 {
                     DMsgPtr pMsg;
                     pMsg = ( DMsgPtr& )*pCtx->m_pRespData;
+                    string strOrigSender;
+                    // recover the original dest name
+                    ret = oParams.GetStrProp(
+                        propSrcDBusName, strOrigSender );
+                    if( SUCCEEDED( ret ) )
+                        pMsg.SetDestination( strOrigSender );
                     oParams.Push( pMsg );
                     break;
                 }
@@ -3108,6 +3114,7 @@ gint32 CRpcReqForwarderProxy::ForwardRequest(
         DMsgPtr pReqMsg( pMsg );
         CReqBuilder oBuilder( this );
 
+        string strOrigSender;
         string strSender;
         ret = oBuilder.GetStrProp(
             propSrcDBusName, strSender );
@@ -3115,15 +3122,27 @@ gint32 CRpcReqForwarderProxy::ForwardRequest(
         if( ERROR( ret ) )
             break;
 
-        // replace the sender with the local sender
+        strOrigSender = pReqMsg.GetSender();
+        // replace the sender with the local
+        // sender.
+        //
+        // NOTE that the sender could be changed
+        // if the underlying port is a loopback
+        // port. However the destination for this
+        // inner message does not matter that much
+        // because the envelop ForwardRequest
+        // message will provide the correct
+        // destination when this message arrives
+        // the reqfwdr side. But at lease, the
+        // proxy side has the true dest info.
         pReqMsg.SetSender( strSender );
+
         ObjPtr pObj;
         ret = pReqMsg.GetObjArgAt( 0, pObj );
         if( ERROR( ret ) )
             break;
 
         CReqOpener oReq( ( IConfigDb* )pObj );
-
         guint32 dwFlags = CF_WITH_REPLY |
             DBUS_MESSAGE_TYPE_METHOD_CALL |
             CF_ASYNC_CALL;
@@ -3152,6 +3171,10 @@ gint32 CRpcReqForwarderProxy::ForwardRequest(
             ret = -EFAULT;
             break;
         }
+
+        // keep a copy of the orignal sender
+        oRespCfg.SetStrProp(
+            propSrcDBusName, strOrigSender );
 
         ret = RunIoTask( oBuilder.GetCfg(),
             pRespCfg, pCallback );

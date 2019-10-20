@@ -359,7 +359,7 @@ void CIfSmokeTest::testCliStartStop()
             break;
         DebugPrint( 0, "Echo2 Completed, %g", fret );
 
-    }while( ++i < 1000 );
+    }while( ++i < 100 );
 
     if( ERROR( ret ) )
     {
