@@ -2876,10 +2876,39 @@ gint32 CRpcServices::BuildBufForIrp(
         if( ERROR( ret ) )
             break;
 
+        // remove redudant information from the
+        // request to send
+        oReq.RemoveProperty( propMethodName );
+        oReq.RemoveProperty( propObjPath );
+        oReq.RemoveProperty( propIfName );
+        oReq.RemoveProperty( propDestDBusName );
+        oReq.RemoveProperty( propSrcDBusName );
+
         BufPtr pReqBuf( true );
         ret = pReqCall->Serialize( *pReqBuf );
         if( ERROR( ret ) )
             break;
+
+        oReq.SetStrProp(
+            propMethodName, strMethod );
+
+        oReq.SetStrProp(
+            propIfName, strIfName );
+
+        oReq.SetStrProp(
+            propObjPath, strObjPath );
+
+        if( !strDest.empty() )
+        {
+            oReq.SetStrProp(
+                propSrcDBusName, strDest );
+        }
+
+        if( !strSender.empty() )
+        {
+            oReq.SetStrProp(
+                propSrcDBusName, strSender );
+        }
 
         const char* pData = pReqBuf->ptr();
         if( !dbus_message_append_args( pMsg,
@@ -4495,6 +4524,35 @@ gint32 CInterfaceProxy::DoInvoke(
             break;
         }
 
+        do{
+            CParamList oParams( pCfg );
+            string strVal;
+            strVal = pMsg.GetMember();
+            if( !strVal.empty() )
+                oParams.SetStrProp(
+                    propMethodName, strVal );
+
+            strVal = pMsg.GetInterface();
+            if( !strVal.empty() )
+                oParams.SetStrProp(
+                    propIfName, strVal );
+
+            strVal = pMsg.GetPath();
+            if( !strVal.empty() )
+                oParams.SetStrProp(
+                    propObjPath, strVal );
+
+            strVal = pMsg.GetSender();
+            if( !strVal.empty() )
+                oParams.SetStrProp(
+                    propSrcDBusName, strVal );
+
+            strVal = pMsg.GetDestination();
+            if( !strVal.empty() )
+                oParams.SetStrProp(
+                    propDestDBusName, strVal );
+        }while( 0 );
+
         ret = InvokeUserMethod(
             pCfg, pCallback );
 
@@ -5504,6 +5562,35 @@ gint32 CInterfaceServer::DoInvoke(
                     ( HANDLE )( ( CObjBase* )pCallback ),
                     strSender );
             }
+
+            do{
+                CParamList oParams( pCfg );
+                string strVal;
+                strVal = pMsg.GetMember();
+                if( !strVal.empty() )
+                    oParams.SetStrProp(
+                        propMethodName, strVal );
+
+                strVal = pMsg.GetInterface();
+                if( !strVal.empty() )
+                    oParams.SetStrProp(
+                        propIfName, strVal );
+
+                strVal = pMsg.GetPath();
+                if( !strVal.empty() )
+                    oParams.SetStrProp(
+                        propObjPath, strVal );
+
+                strVal = pMsg.GetSender();
+                if( !strVal.empty() )
+                    oParams.SetStrProp(
+                        propSrcDBusName, strVal );
+
+                strVal = pMsg.GetDestination();
+                if( !strVal.empty() )
+                    oParams.SetStrProp(
+                        propDestDBusName, strVal );
+            }while( 0 );
 
             ret = InvokeUserMethod(
                 pCfg, pCallback );

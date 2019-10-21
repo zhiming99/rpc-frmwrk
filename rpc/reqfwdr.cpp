@@ -2634,18 +2634,24 @@ gint32 CRpcReqForwarder::OnKeepAliveRelay(
             ret = oOrigReq.GetTaskId( iTaskId );
             if( ERROR( ret ) )
                 break;
-            okaReq.Push( iTaskId );
 
+            okaReq.Push( iTaskId );
             okaReq.Push( ( guint32 )KATerm );
 
-            ret = oOrigReq.GetIfName( strIfName );
-            if( ERROR( ret ) )
+            strIfName = pOrigMsg.GetInterface();
+            if( strIfName.empty() )
+            {
+                ret = -ENOENT;
                 break;
+            }
             okaReq.Push( strIfName );
 
-            ret = oOrigReq.GetObjPath( strObjPath );
-            if( ERROR( ret ) )
+            strObjPath = pOrigMsg.GetPath();
+            if( strObjPath.empty() )
+            {
+                ret = -ENOENT;
                 break;
+            }
             okaReq.Push( strObjPath );
 
             okaReq.CopyProp(
