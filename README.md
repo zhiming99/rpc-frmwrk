@@ -25,7 +25,7 @@ This framework depends on the following packags:
 ---
 [`Mon 21 Oct 2019 05:34:24 PM Beijing`]   
 1. Reduced the size of the request packets, by removing some redudant properties from the request configdb.
-2. Having difficulty making choice between websocket or http/2, as well as the session manager. So let me add the support for IPv6 first as a warm-up execise.   
+2. Having difficulty choosing between websocket or http/2, as well as the session manager. So let me add the support for IPv6 first as a warm-up execise.   
 
 [`Thu 17 Oct 2019 07:36:03 PM Beijing`]   
 1. Worked a `helloworld` with built-in router as the `btinrt` test, for the curiosity to know the performance of removal of dbus traffic. The outcome shows improvement of the latency from about 1.5ms to about 1ms per echo, as about 30% faster, in sacrifice of the flexibility. Anyway, well worth the effort. Also fixed a hanging bug in router and a segment fault in taskgroup which cannot reproduce in the stand-alone router setup.
