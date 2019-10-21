@@ -1,7 +1,7 @@
 # rpc-frmwrk
 
-这是一个嵌入式的RPC框架项目，希望它可以在IOT系统中找到用武之地   
-This is a general purpose RPC framework for embeded system with small footprint. It is targeting at the IOT systems.  
+这是一个嵌入式的RPC框架项目，关注于跨网络的互联互通。
+This is a general purpose RPC framework for embeded system with small footprint. It is targeting at the IOT systems, and accessibility over hybrid network.  
 
 #### Dependency:  
 This framework depends on the following packags:  
