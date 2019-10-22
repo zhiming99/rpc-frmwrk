@@ -1,7 +1,7 @@
 # rpc-frmwrk
 
 这是一个嵌入式的RPC框架项目，关注于跨网络的互联互通。   
-This is a general purpose RPC framework for embeded system with small footprint. It is targeting at the IOT systems, and accessibility over hybrid network.  
+This is an asynchronous and event-driven RPC framework for embeded system with small footprint in the system. It is targeting at the IOT systems, high-throughput, and accessibility over hybrid network.  
 
 #### Dependency:  
 This framework depends on the following packags:  
@@ -21,7 +21,8 @@ This framework depends on the following packags:
 9. `File/Big data transfer.`
 10. `Peer online/offline awareness.`
 11. `Streaming support to provide double-direction stream transfer`
-12. `Http support (to come)`
+12. `Http support`(to come)
+13. `Object-level addressing and access`(to come)
 
 ---
 [`Mon 21 Oct 2019 05:34:24 PM Beijing`]   
