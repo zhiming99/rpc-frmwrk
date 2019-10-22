@@ -30,3 +30,5 @@
 
 * `sftest`: To demonstrate a simple file-server with the local/remote streaming
     support.
+* `btinrt` : To demonstrate a deployment approach with built-in router support,
+    and the performance improvement.
