@@ -1,6 +1,6 @@
 **Introduction of the Examples:**
 
-* `smoketest`: the smoke test of this framework.
+* [`smoketest`](https://github.com/zhiming99/rpc-frmwrk/tree/master/test/smoketest): the smoke test of this framework.
 
 * `helloworld`: To demonstrate the helloworld example as the start-point for a
     new development. It shows how to setup proxy/server, send a call from the
