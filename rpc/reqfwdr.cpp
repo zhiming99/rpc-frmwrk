@@ -1885,7 +1885,7 @@ bool CRegisteredObject::operator<(
             break;
 
         guint32 dwSize = IPV6_ADDR_BYTES;
-        ret = Ip4AddrToBytes(
+        ret = IpAddrToBytes(
             strVal, ip1, dwSize );
 
         if( ERROR( ret ) ||
@@ -1893,20 +1893,44 @@ bool CRegisteredObject::operator<(
             break;
 
         dwSize = IPV6_ADDR_BYTES;
-        ret = Ip4AddrToBytes(
+        ret = IpAddrToBytes(
             strVal2, ip2, dwSize );
 
-        if( ERROR( ret ) ||
-            dwSize < sizeof( guint32 ) )
+        if( ERROR( ret ) )
             break;
 
-        if( *( guint32* )ip1 < *( guint32* )ip2 )
-            break;
-
-        if( *( guint32* )ip1 > *( guint32* )ip2 )
+        if( dwSize == IPV4_ADDR_BYTES )
         {
-            ret = ERROR_FALSE;
-            break;
+            if( *( guint32* )ip1 < *( guint32* )ip2 )
+                break;
+
+            if( *( guint32* )ip1 > *( guint32* )ip2 )
+            {
+                ret = ERROR_FALSE;
+                break;
+            }
+        }
+        else
+        {
+            if( *( guint64* )ip1 < *( guint64* )ip2 )
+                break;
+
+            if( *( guint64* )ip1 > *( guint64* )ip2 )
+            {
+                ret = ERROR_FALSE;
+                break;
+            }
+
+            if( *( ( ( guint64* )ip1 ) + 1 ) <
+                *( ( ( guint64* )ip2 ) + 1 ) )
+                break;
+
+            if( *( ( ( guint64* )ip1 ) + 1 ) >
+                *( ( ( guint64* )ip2 ) + 1 ) )
+            {
+                ret = ERROR_FALSE;
+                break;
+            }
         }
 
         ret = oCfg.GetStrProp(

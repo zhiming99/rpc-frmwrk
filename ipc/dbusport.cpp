@@ -38,6 +38,52 @@
 
 using namespace std;
 
+gint32 IpAddrToBytes(
+    const string& strIpAddr,
+    guint8* pBytes,
+    guint32& dwSize )
+{
+    gint32 ret = 0;
+
+    do{
+        if( pBytes == nullptr ||
+            dwSize < IPV6_ADDR_BYTES ||  // to accomodate the size of ipv6
+            strIpAddr.empty() )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        ret = inet_pton( AF_INET,
+            strIpAddr.c_str(), pBytes );
+        if( ret == 1 )
+        {
+            dwSize = IPV4_ADDR_BYTES;
+            ret = 0;
+            break;
+        }
+
+        ret = inet_pton( AF_INET6,
+            strIpAddr.c_str(), pBytes );
+        if( ret == 1 )
+        {
+            dwSize = IPV6_ADDR_BYTES;
+            ret = 0;
+            break;
+        }
+        else if( ret == -1 )
+        {
+            ret = -errno;
+            break;
+        }
+
+        ret = -EINVAL;
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 NormalizeIpAddr(
     gint32 dwProto,
     const std::string strIn,
@@ -63,107 +109,35 @@ gint32 NormalizeIpAddr(
             strOut = inet_ntoa( oAddr );
             break;
         }
-        else
-        {
-            in6_addr oAddr;
-            ret = inet_pton( AF_INET6,
-                strIn.c_str(), &oAddr );
-            if( ret == 0 )
-            {
-                ret = -EINVAL;
-                break;
-            }
-            else if( ret == -1 )
-            {
-                ret = -errno;
-                break;
-            }
-            ret = 0;
-            char szBuf[ INET6_ADDRSTRLEN ] = { 0 };
-            if( nullptr == inet_ntop( AF_INET6, &oAddr,
-                szBuf, sizeof( szBuf ) ) )
-            {
-                ret = -errno;
-                break;
-            }
-            strOut = szBuf;
-            break;
-        }
 
-    }while( 0 );
-
-    return ret;
-}
-gint32 Ip4AddrToBytes(
-    const string& strIpAddr,
-    guint8* pBytes,
-    guint32& dwSize )
-{
-    gint32 ret = 0;
-
-    do{
-        if( pBytes == nullptr ||
-            dwSize < IPV6_ADDR_BYTES ||  // to accomodate the size of ipv6
-            strIpAddr.empty() )
+        // ipv6
+        in6_addr oAddr;
+        ret = inet_pton( AF_INET6,
+            strIn.c_str(), &oAddr );
+        if( ret == 0 )
         {
             ret = -EINVAL;
             break;
         }
-        // syntax check
-        if( !std::regex_match( strIpAddr,
-            std::regex( "^(?:[0-9]{1,3}\\.){3}[0-9]{1,3}$" ) ) )
+        else if( ret == -1 )
         {
-            // bad format ip address
-            ret = -EINVAL;
+            ret = -errno;
             break;
         }
 
-        memset( pBytes, 0, dwSize );
-        std::size_t iPos = strIpAddr.find( '.' );
-        std::size_t iBegin = 0;
-        gint32 iIdx = 0;
+        constexpr auto iLen =
+            INET6_ADDRSTRLEN;
+        char buf[ iLen ];
+        const char* szRet = inet_ntop(
+            AF_INET6, &oAddr, buf, iLen );
 
-        while( iPos != string::npos )
+        if( szRet == nullptr )
         {
-            if( iBegin == iPos )
-            {
-                ret = -EINVAL;
-                break;
-            }
-            string strComp = strIpAddr.substr(
-                iBegin, iPos - iBegin );
-
-            gint32 iRet =( gint32 )atoi(
-                strComp.c_str() );
-
-            // let's do a semantic check
-            if( iRet > 255 )
-            {
-                ret = -EINVAL;
-                break;
-            }
-            pBytes[ iIdx++ ] = ( guint8 )iRet;
-
-            iBegin = iPos + 1;
-            if( iBegin >= strIpAddr.size() )
-            {
-                ret = -EINVAL;
-            }
-            iPos = strIpAddr.find( '.', iBegin );
-        }
-
-        if( ret < 0 )
+            ret = -errno;
             break;
-
-        pBytes[ iIdx++ ] =
-            atoi( strIpAddr.substr( iBegin ).c_str() );
-
-        // not a valid ip addr if iIdx != 4
-        if( iIdx != IPV4_ADDR_BYTES &&
-            iIdx != IPV6_ADDR_BYTES )
-            ret = -EINVAL;
-
-        dwSize = iIdx;
+        }
+        strOut = szRet;
+        ret = 0;
 
     }while( 0 );
 
@@ -229,7 +203,7 @@ gint32 BytesToString(
     return 0;
 }
 
-gint32 Ip4AddrToByteStr(
+gint32 IpAddrToByteStr(
     const string& strIpAddr,
     string& strRet )
 {
@@ -241,7 +215,7 @@ gint32 Ip4AddrToByteStr(
     gint32 ret = 0;
 
     do{
-        ret = Ip4AddrToBytes(
+        ret = IpAddrToBytes(
             strIpAddr, bytes, dwSize );
 
         if( ret < 0 )

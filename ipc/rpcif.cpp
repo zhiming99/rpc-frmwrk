@@ -3782,6 +3782,11 @@ gint32 CRpcServices::LoadObjDesc(
                 string strNormVal;
                 ret = NormalizeIpAddr(
                     AF_INET, strVal, strNormVal );
+                if( ERROR( ret ) )
+                {
+                    ret = NormalizeIpAddr(
+                        AF_INET6, strVal, strNormVal );
+                }
 
                 if( SUCCEEDED( ret ) )
                     oCfg[ propIpAddr ] = strNormVal;

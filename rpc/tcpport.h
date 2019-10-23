@@ -26,6 +26,9 @@
 #include "defines.h"
 #include "port.h"
 #include "mainloop.h"
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
 
 #define RPC_SVR_PORTNUM         0x1024
 #define RPC_MAX_BYTES_PACKET    ( 65536 - sizeof( CPacketHeader ) - 32 )
@@ -525,6 +528,11 @@ class CRpcSocketBase : public IService
         iFd = m_iFd;
         return 0;
     }
+
+    gint32 GetAddrInfo(
+        const std::string& strIpAddr,
+        guint32 dwPortNum,
+        addrinfo*& res ) const;
 
     gint32 GetAsyncErr() const;
     virtual gint32 SetProperty(

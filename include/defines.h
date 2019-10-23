@@ -56,8 +56,8 @@
 #define HandleToPort( handle )  reinterpret_cast< IPort* >( handle )
 #define INVALID_HANDLE          ( ( HANDLE )-1 )
 
-#define IPV6_ADDR_BYTES         16 
-#define IPV4_ADDR_BYTES         4
+#define IPV6_ADDR_BYTES         ( sizeof( in6_addr ) )
+#define IPV4_ADDR_BYTES         ( sizeof( in_addr ) )
 #define MAX_IPADDR_SIZE         IPV6_ADDR_BYTES
 
 #define likely(x)               __builtin_expect((x),1)

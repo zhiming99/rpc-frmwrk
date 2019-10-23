@@ -299,34 +299,11 @@ gint32 CRpcTcpBusPort::CreateTcpStreamPdo(
     gint32 ret = 0;
     do{
         string strPortName;
-        guint32 dwPortId = 0;
+        guint32 dwPortId = ( guint32 )-1;
 
         CCfgOpener oExtCfg( ( IConfigDb* )pCfg );
-
-        ret = oExtCfg.GetIntProp(
+        oExtCfg.GetIntProp(
             propPortId, dwPortId );
-
-        if( ERROR( ret ) )
-        {
-            string strIpAddr;
-            ret = oExtCfg.GetStrProp(
-                propIpAddr, strIpAddr );
-
-            if( ERROR( ret ) )
-                break;
-
-            guint8 arrBuf[ sizeof( guint32 ) * 4 ] = { 0 };
-            guint8* pBuf = arrBuf;
-            guint32 dwSize = sizeof( arrBuf );
-
-            ret = Ip4AddrToBytes(
-                strIpAddr, arrBuf, dwSize );
-
-            if( ERROR( ret ) )
-                break;
-
-            dwPortId = *( guint32* )( pBuf );
-        }
 
         // verify if the port already exists
         if( this->PortExist( dwPortId ) )
@@ -482,6 +459,7 @@ gint32 CRpcTcpBusPort::OnNewConnection(
 
     gint32 ret = 0;
     do{
+        // passive connection
         CCfgOpener oCfg;
         CCfgOpenerObj oPortCfg( this );
 
@@ -498,7 +476,7 @@ gint32 CRpcTcpBusPort::OnNewConnection(
         if( ERROR( ret ) )
             break;
 
-        sockaddr_in oAddr;
+        sockaddr_in6 oAddr;
         socklen_t iSize = sizeof( oAddr );
         ret = getpeername( iSockFd,
             ( sockaddr* )&oAddr, &iSize );
@@ -508,8 +486,19 @@ gint32 CRpcTcpBusPort::OnNewConnection(
             ret = -errno;
             break;
         }
-        string strSrcIp = 
-            inet_ntoa( oAddr.sin_addr );
+
+        char szNode[ 128 ];
+        char szServ[ 8 ];
+
+        ret = getnameinfo( ( sockaddr* )&oAddr,
+            iSize, szNode, sizeof( szNode ),
+            szServ, sizeof( szServ ),
+            NI_NUMERICHOST | NI_NUMERICSERV );
+
+        if( ret != 0 )
+            break;
+            
+        string strSrcIp = szNode;
 
         if( strSrcIp.empty() )
         {
@@ -518,14 +507,17 @@ gint32 CRpcTcpBusPort::OnNewConnection(
         }
 
         guint32 dwDestPortNum =
-            ntohs( oAddr.sin_port );
+            std::stoi( szServ );
 
         iSize = sizeof( oAddr );
-        ret = getsockname( iSockFd,
-            ( sockaddr* )&oAddr, &iSize );
+        ret = getnameinfo(
+            ( sockaddr* )&oAddr, iSize,
+            nullptr, 0, szServ,
+            sizeof( szServ ),
+            NI_NUMERICSERV );
 
         guint32 dwPortNum =
-            ntohs( oAddr.sin_port );
+            std::stoi( szServ );
 
         guint32 dwPortId = NewPdoId();
 
@@ -586,6 +578,7 @@ gint32 CRpcTcpBusPort::OnNewConnection(
         {
             break;
         }
+
     }while( 1 );
 
     return ret;
@@ -719,7 +712,17 @@ gint32 CRpcTcpBusDriver::GetTcpSettings(
             {
                 string strAddr =
                     oParams[ JSON_ATTR_BINDADDR ].asString();
-                oCfg.SetStrProp( propIpAddr, strAddr );
+
+                string strNormVal;
+                ret = NormalizeIpAddr(
+                    AF_INET, strAddr, strNormVal );
+                if( ERROR( ret ) )
+                {
+                    ret = NormalizeIpAddr(
+                        AF_INET6, strAddr, strNormVal );
+                }
+
+                oCfg.SetStrProp( propIpAddr, strNormVal );
             }
             // address format, for detail, refer to propAddrFormat
             if( oParams.isMember( JSON_ATTR_ADDRFORMAT ) &&

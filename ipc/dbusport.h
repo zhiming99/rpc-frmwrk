@@ -36,11 +36,11 @@ gint32 NormalizeIpAddr(
     const std::string strIn,
     std::string& strOut );
 
-gint32 Ip4AddrToByteStr(
+gint32 IpAddrToByteStr(
     const std::string& strIpAddr,
     std::string& strRet );
 
-gint32 Ip4AddrToBytes(
+gint32 IpAddrToBytes(
     const std::string& strIpAddr,
     guint8* pBytes,
     guint32& dwSize );

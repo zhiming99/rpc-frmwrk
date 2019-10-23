@@ -28,8 +28,6 @@
 #include "tcpport.h"
 #include <netinet/tcp.h>
 #include <netinet/in.h>
-#include <sys/types.h>
-#include <sys/socket.h>
 #include <arpa/inet.h>
 #include "reqopen.h"
 #include <fcntl.h>
@@ -902,6 +900,7 @@ gint32 CRpcStreamSock::ActiveConnect(
     const string& strIpAddr )
 {
     gint32 ret = 0;
+    addrinfo *res = nullptr;
 
     do{
         CCfgOpener oCfg(
@@ -915,18 +914,14 @@ gint32 CRpcStreamSock::ActiveConnect(
             dwPortNum = RPC_SVR_PORTNUM;
 
         /*  Connect to the remote host. */
-        sockaddr_in sin;
+        ret = GetAddrInfo( strIpAddr,
+            dwPortNum, res );
 
-        memset( &sin, 0, sizeof( sin ) );
-        sin.sin_family = AF_INET;
-        sin.sin_port = htons(
-            ( guint16 )dwPortNum );
+        if( ERROR( ret ) )
+            break;
 
-        sin.sin_addr.s_addr =
-            inet_addr( strIpAddr.c_str() );
-
-        ret = connect( m_iFd, ( sockaddr* )&sin,
-            sizeof( sin ) );
+        ret = connect( m_iFd,
+            res->ai_addr, res->ai_addrlen );
 
         if( ret == 0 )
             break;
@@ -945,6 +940,12 @@ gint32 CRpcStreamSock::ActiveConnect(
         }
 
     }while( 0 );
+
+    if( res != nullptr )
+    {
+        freeaddrinfo( res );
+        res = nullptr;
+    }
 
     if( ret != STATUS_PENDING )
     {
@@ -968,7 +969,29 @@ gint32 CRpcStreamSock::Connect()
 {
     gint32 ret = 0;
     do{
-        ret = socket( AF_INET,
+        CCfgOpener oCfg(
+            ( IConfigDb* )m_pCfg );
+
+        string strIpAddr;
+        ret = oCfg.GetStrProp(
+            propIpAddr, strIpAddr );
+
+        if( ERROR( ret ) )
+            break;
+
+        guint8 arrAddrBytes[ IPV6_ADDR_BYTES ];
+        guint32 dwSize = sizeof( arrAddrBytes );
+        ret = IpAddrToBytes( strIpAddr.c_str(),
+            arrAddrBytes, dwSize );
+
+        if( ERROR( ret ) )
+            break;
+
+        int iFamily = AF_INET;
+        if( dwSize == IPV6_ADDR_BYTES )
+            iFamily = AF_INET6;
+
+        ret = socket( iFamily,
             SOCK_STREAM | SOCK_NONBLOCK, 0 );
 
         if ( ret == -1 )
@@ -980,16 +1003,6 @@ gint32 CRpcStreamSock::Connect()
         m_iFd = ret;
 
         ret = AttachMainloop();
-        if( ERROR( ret ) )
-            break;
-
-        CCfgOpener oCfg(
-            ( IConfigDb* )m_pCfg );
-
-        string strIpAddr;
-        ret = oCfg.GetStrProp(
-            propIpAddr, strIpAddr );
-
         if( ERROR( ret ) )
             break;
 
@@ -4080,13 +4093,81 @@ CRpcListeningSock::CRpcListeningSock(
     }
 }
 
+gint32 CRpcSocketBase::GetAddrInfo(
+    const std::string& strIpAddr,
+    guint32 dwPortNum, addrinfo*& res ) const
+{
+    gint32 ret = 0;
+    do{
+        addrinfo  hints ;
+
+        memset(&hints, 0x00, sizeof(hints));
+        hints.ai_flags    = AI_NUMERICSERV;
+        hints.ai_family   = AF_UNSPEC;
+        hints.ai_socktype = SOCK_STREAM;
+
+        guint32 dwSize = IPV6_ADDR_BYTES;
+        guint8 szInetAddr[ IPV6_ADDR_BYTES ] = { 0 };
+
+        ret = IpAddrToBytes( strIpAddr,
+            szInetAddr, dwSize );
+
+        if( ERROR( ret ) )
+            break;
+
+        if( dwSize == IPV4_ADDR_BYTES )
+        {
+            hints.ai_family = AF_INET;
+            hints.ai_flags |= AI_NUMERICHOST;
+        }
+        else
+        {
+            hints.ai_family = AF_INET6;
+            hints.ai_flags |= AI_NUMERICHOST;
+        }
+
+        ret = getaddrinfo( strIpAddr.c_str(),
+            std::to_string( dwPortNum ).c_str(),
+            &hints, &res );
+
+    }while( 0 );
+    
+    return ret;
+}
+
 gint32 CRpcListeningSock::Connect()
 {
     // setup a socket to listen to the connection
     // request
     gint32 ret = 0;
+    addrinfo *res = nullptr;
+
     do{
-        ret = socket( AF_INET,
+        CCfgOpener oCfg(
+            ( IConfigDb* )m_pCfg );
+
+        string strIpAddr;
+        ret = oCfg.GetStrProp(
+            propIpAddr, strIpAddr );
+
+        if( ERROR( ret ) )
+            strIpAddr = "::";
+
+        guint32 dwPortNum = 0;
+
+        ret = oCfg.GetIntProp(
+            propSrcTcpPort, dwPortNum );
+
+        if( ERROR( ret ) )
+            dwPortNum = RPC_SVR_PORTNUM;
+
+        ret = GetAddrInfo( strIpAddr,
+            dwPortNum, res );
+
+        if( ERROR( ret ) )
+            break;
+
+        ret = socket( res->ai_family,
             SOCK_STREAM | SOCK_NONBLOCK, 0 );
 
         if ( ret == -1 )
@@ -4102,37 +4183,9 @@ gint32 CRpcListeningSock::Connect()
             SO_REUSEADDR, &dwReuseAddr,
             sizeof( dwReuseAddr ) );
 
-        CCfgOpener oCfg(
-            ( IConfigDb* )m_pCfg );
-
-        string strIpAddr;
-        ret = oCfg.GetStrProp(
-            propIpAddr, strIpAddr );
-
-        if( ERROR( ret ) )
-            strIpAddr = "0.0.0.0";
-
-        guint32 dwPortNum = 0;
-
-        ret = oCfg.GetIntProp(
-            propSrcTcpPort, dwPortNum );
-
-        if( ERROR( ret ) )
-            dwPortNum = RPC_SVR_PORTNUM;
-
         /*  Connect to the remote host. */
-        sockaddr_in sin;
-
-        memset( &sin, 0, sizeof( sin ) );
-        sin.sin_family = AF_INET;
-        sin.sin_port = htons(
-            ( gint16 )dwPortNum );
-
-        sin.sin_addr.s_addr =
-            inet_addr( strIpAddr.c_str() );
-
-        ret = bind( m_iFd,
-            ( sockaddr* ) &sin, sizeof( sin ) );
+        ret = bind( m_iFd, res->ai_addr,
+            res->ai_addrlen  );
 
         if( ret == -1 )
         {
@@ -4153,6 +4206,12 @@ gint32 CRpcListeningSock::Connect()
         StartWatch( false );
 
     }while( 0 );
+
+    if( res != nullptr )
+    {
+        freeaddrinfo( res );
+        res = nullptr;
+    }
 
     if( ERROR( ret ) )
     {

@@ -1654,8 +1654,8 @@ gint32 CIfTaskGroup::WaitingToCancel(
         gint32 iRetry = 3;
         while( pTask->IsInProcess() && iRetry > 0 )
         {
-            // wait for 3 seconds before canceling
-            sleep( 1 );
+            // wait for 3ms before canceling
+            usleep( 1000 );
             iRetry--;
         }
 
