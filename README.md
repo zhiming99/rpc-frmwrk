@@ -22,9 +22,16 @@ This framework depends on the following packags:
 10. `Peer online/offline awareness.`
 11. `Streaming support to provide double-direction stream transfer`
 12. `Http support`(to come)
-13. `Object-level addressing and accessibility`(to come)
 
 ---
+[`Thu 24 Oct 2019 10:31:14 AM Beijing`]   
+1. IPv6 support is done.
+2. It turns out http support depends on the presence of some new features. It needs some time to have a full understanding of the task.
+   * Object addressing mechanism
+   * multi-hop routing
+   * Session management and access control
+   * Site registration and discovery.
+
 [`Mon 21 Oct 2019 05:34:24 PM Beijing`]   
 1. Reduced the size of the request packets, by removing some redudant properties from the request configdb.
 2. Having difficulty choosing between websocket or http/2, as well as the session manager. So let me add the support for IPv6 first as a warm-up execise.   
