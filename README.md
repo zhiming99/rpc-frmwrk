@@ -24,6 +24,9 @@ This framework depends on the following packags:
 12. `Http support`(to come)
 
 ---
+[`Fri 01 Nov 2019 04:47:07 PM Beijing`]   
+1. Changes for Raspberry PI/2 PI is commited. An ARM platform is supported!   
+
 [`Thu 31 Oct 2019 07:36:50 PM Beijing`]   
 1. Just get the Raspberry PI/2 to work. the performance is about 15ms per request. Anyway the ARM support is coming soon.
 2. The ideal http support is not a trivial task. It may take two months to get it run. Preparing to get hand dirty...
