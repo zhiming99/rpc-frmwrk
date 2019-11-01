@@ -205,7 +205,9 @@ gint32 CoLoadClassFactories( const char* dir )
 }
 
 #ifdef DEBUG
-std::unordered_map<EnumClsid, std::string> g_mapId2Name;
+// using guint32 instead of EnumClsid for
+// compability with GCC-4.9.3
+std::unordered_map<guint32, std::string> g_mapId2Name;
 
 static gint32 CoInitClsidNames()
 {

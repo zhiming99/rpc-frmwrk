@@ -212,7 +212,7 @@ gint32 CTaskThread::Start()
     // definition
     m_pServiceThread = new std::thread(
             &CTaskThread::ThreadProcWraper,
-            std::ref(*this),
+            this,
             ( void* )( eventTaskThrdCtx ) );
     return 0;
 }
@@ -483,7 +483,7 @@ gint32 COneshotTaskThread::Start()
     // definition
     m_pServiceThread = new std::thread(
             &COneshotTaskThread::ThreadProc,
-            std::ref(*this),
+            this,
             ( void* )( eventOneShotTaskThrdCtx ) );
     return 0;
 }
@@ -582,7 +582,7 @@ gint32 CIrpCompThread::Start()
     // definition
     m_pServiceThread = new std::thread(
             &CIrpCompThread::ThreadProc,
-            std::ref(*this),
+            this,
             ( void* )( eventIrpCompThrdCtx ) );
     return 0;
 }

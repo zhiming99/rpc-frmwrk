@@ -60,10 +60,7 @@ CIfStartRecvMsgTask::CIfStartRecvMsgTask(
     }
 }
 
-template< typename T1, 
-    typename T=typename std::enable_if<
-        std::is_same<T1, CfgPtr>::value ||
-        std::is_same<T1, DMsgPtr>::value, T1 >::type >
+template< typename T1, typename T >
 gint32 CIfStartRecvMsgTask::HandleIncomingMsg(
     ObjPtr& ifPtr, T1& pMsg )
 {

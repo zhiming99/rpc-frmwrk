@@ -176,7 +176,7 @@ int Sem_Post( sem_t* psem )
         ret = -errno;
         DebugPrint( ret, 
             "@%s: Sem_Post failed with %s",
-            GetThreadName(),
+            GetThreadName().c_str(),
             strerror( -ret )
             );
     }
@@ -486,7 +486,7 @@ gint32 CObjBase::Intitialize(
 }
 
 #ifdef DEBUG
-extern std::unordered_map<EnumClsid, std::string> g_mapId2Name;
+extern std::unordered_map<guint32, std::string> g_mapId2Name;
 void CObjBase::Dump( std::string& strDump )
 {
     char szBuf[ 128 ];

@@ -374,27 +374,38 @@ BufPtr PackageTo< ObjPtr >( const ObjPtr& pObj );
 template<>
 BufPtr PackageTo< CBuffer >( CBuffer* pObj );
 
+#include <stdarg.h>
+
+template< int N >
 struct _DummyClass_
 {
-    static void PackExp( ... )
-    { return; }
+    static void PackExp( std::vector< BufPtr >& vec, ... )
+    { 
+        va_list va;
+        CBuffer* pBuf = nullptr;
+        // NOTE: this is an approach to make both
+        // X86 and ARM happy, since the evaluation
+        // of parameters of the parameter pack is
+        // done in the opposite order on X86 to
+        // that on the ARM.
+        va_start( va, vec );
+        for( int i = 0; i < N; ++i )
+        {
+            pBuf = va_arg( va, CBuffer* );
+            vec.push_back( BufPtr( pBuf ) );
+        }
+        va_end( va );
+        return;
+    }
 };
-
-template< typename...Types >
-inline CfgPtr PackParams( Types&&...args )
-{
-    gint32 ret = 0;
-    CParamList oParams;
-    _DummyClass_::PackExp( oParams.Push( args )... );
-    return oParams.GetCfg();
-}
 
 template< typename...Types >
 inline void PackParams(
     std::vector< BufPtr >& vec, Types&&...args )
 {
     // note that the last arg is inserted first
-    _DummyClass_::PackExp( ( vec.insert( vec.begin(), PackageTo( args ) ), 1 ) ... );
+    _DummyClass_< sizeof...( args )>::PackExp(
+        vec, ( ( CBuffer* ) PackageTo( args ) ) ... );
 }
 
 // proxy related classes

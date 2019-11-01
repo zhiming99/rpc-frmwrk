@@ -388,9 +388,9 @@ class CBuffer : public CObjBase
         case DataTypeMem:
             {
                 // c++11 required
-                // objects inherited from CObjBase are not allowed
                 static_assert(
-                    !std::is_base_of< CObjBase, T >::value );
+                    !std::is_base_of< CObjBase, T >::value,
+                    "objects inherited from CObjBase are not allowed" );
 
                 return  reinterpret_cast< T* >( ptr() );
             }
@@ -425,7 +425,8 @@ class CBuffer : public CObjBase
         static_assert(
         !std::is_base_of< CObjBase, T >::value &&
         !std::is_same<T, DMsgPtr >::value &&
-        !std::is_same<T, ObjPtr>::value );
+        !std::is_same<T, ObjPtr>::value,
+        "The rhs must not inherit from CObjBase."  );
 
         SetDataType( DataTypeMem );
         Resize( sizeof( T ) );

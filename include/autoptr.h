@@ -54,7 +54,8 @@ class CAutoPtr : public IAutoPtr
     {
         m_pObj = nullptr;
 
-        static_assert( iClsid != Clsid_Invalid );
+        static_assert( iClsid != Clsid_Invalid,
+            "class id cannot be invalid" );
 
         if( bNew )
         {
@@ -73,7 +74,9 @@ class CAutoPtr : public IAutoPtr
     // classes
     CAutoPtr( T* pObj = nullptr, bool bAddRef = true )
     {
-        static_assert( std::is_base_of< CObjBase, T >::value );
+        static_assert( std::is_base_of< CObjBase, T >::value,
+            "CObjBase must be the super class"  );
+
         m_pObj = nullptr;
         if( pObj != nullptr )
         {
@@ -150,7 +153,8 @@ class CAutoPtr : public IAutoPtr
     {
         // U must be either the base class of T or
         // super class of T
-        static_assert( std::is_base_of< CObjBase, U >::value );
+        static_assert( std::is_base_of< CObjBase, U >::value,
+            "CObjBase must be the base class of the type to cast" );
         return dynamic_cast< U* >( m_pObj );
     }
 
@@ -161,7 +165,8 @@ class CAutoPtr : public IAutoPtr
     {
         // T1 must be either the base class of T or
         // super class of T
-        static_assert( std::is_base_of< CObjBase, U >::value );
+        static_assert( std::is_base_of< CObjBase, U >::value,
+            "CObjBase must be the base class of the type to cast" );
         U* ptr = dynamic_cast< U* >( m_pObj );
         if( ptr == nullptr )
         {
@@ -193,7 +198,8 @@ class CAutoPtr : public IAutoPtr
     CAutoPtr< iClsid, T >& operator=( const CAutoPtr< iClsid2, U >& rhs )
     {
 
-        static_assert( std::is_base_of<CObjBase, U>::value );
+        static_assert( std::is_base_of<CObjBase, U>::value,
+            "CObjBase must be the base class of the type to cast" );
 
         if( rhs.IsEmpty() )
         {
@@ -260,7 +266,9 @@ class CAutoPtr : public IAutoPtr
             std::is_base_of< U, T >::value, U >::type >
     CAutoPtr< iClsid, T >& operator=( CAutoPtr< iClsid2, U >&& rhs )
     {
-        static_assert( std::is_base_of<CObjBase, U>::value );
+        static_assert( std::is_base_of<CObjBase, U>::value,
+            "CObjBase must be the base class of the type to cast" );
+
         if( rhs.IsEmpty() )
         {
             Clear();

@@ -2361,10 +2361,7 @@ typedef std::pair< gint32, BufPtr > ARG_ENTRY;
 * @{ */
 /**  @} */
 
-template< typename T1, 
-    typename T = typename std::enable_if<
-        std::is_same<T1, DBusMessage>::value ||
-        std::is_same<T1, IConfigDb>::value, T1 >::type >
+template< typename T1, typename T >
 gint32 CRpcServices::InvokeMethod(
     T* pReqMsg, IEventSink* pCallback )
 {

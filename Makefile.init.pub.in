@@ -1,9 +1,20 @@
-#PATH :=/usr/local/angstrom/arm/bin/:$(PATH)
-#CROSS_COMPILE := arm-angstrom-linux-gnueabi-
-CROSS:= $(CROSS_COMPILE)
-ARCH := arm
+#Set ARCH to `arm' for ARM target. This make file
+#assumes you are running on a raspberry pi desktop
+ARCH := 
 
+#Set BUILD_64 to `0' for 32-bit target
+#Note it does not work for 64-bit arm yet, always
+#set to `0' for arm
 BUILD_64 := 1
+
+#####
+ifeq ($(ARCH),arm)
+	ARCH_STR := arm-linux-gnueabihf
+	CROSS_COMPILE := $(ARCH_STR)-
+	CROSS:= $(CROSS_COMPILE)
+	ROOTFS := $(HOME)/mywork/raspberry/rootfs
+	DIR_SUFFIX_ARCH := /$(ARCH_STR)
+endif
 
 CC := $(CROSS_COMPILE)gcc
 CPP := $(CROSS_COMPILE)g++
@@ -30,13 +41,24 @@ else ifeq ($(BUILD_64),0)
 	DBG_DIR := debug
 	RLS_DIR := release
 endif
+USER_LIB_PREFIX := $(ROOTFS)/usr/$(LIB_DIR)$(DIR_SUFFIX_ARCH)
+LIB_PREFIX := $(ROOTFS)/$(LIB_DIR)$(DIR_SUFFIX_ARCH)
 
 C_INCLUDE := -I../include \
-	-I/usr/include/glib-2.0 \
-	-I/usr/$(LIB_DIR)/glib-2.0/include \
-	-I/usr/include/dbus-1.0 \
-	-I/usr/$(LIB_DIR)/dbus-1.0/include \
-	-I/usr/include \
+	-I$(ROOTFS)/usr/include/glib-2.0 \
+	-I$(USER_LIB_PREFIX)/glib-2.0/include \
+	-I$(ROOTFS)/usr/include/dbus-1.0 \
+	-I$(USER_LIB_PREFIX)/dbus-1.0/include \
+	-I$(ROOTFS)/usr/include \
+
+ifeq ($(ARCH),arm)
+	WIDTH_FLAG := -marm
+	C_INCLUDE += -I$(ROOTFS)/usr/include$(DIR_SUFFIX_ARCH) \
+		-I$(ROOTFS)/usr/include/jsoncpp/ \
+
+	C_DEFINES += -DARM
+#-D_GLIBCXX_USE_CXX11_ABI=1
+endif
 
 OUTPUT_DIR := ../$(DBG_DIR)
 OBJ_DIR := ./$(DBG_DIR)
@@ -64,10 +86,16 @@ endif
 
 ifeq ($(BUILD_64),1)
 	C_FLAGS += -fPIC
+else ifeq ($(ARCH), arm)
+	C_FLAGS += -fPIC
 endif
-CPP_FLAGS := $(CPPFLAGS) -std=c++11 $(WIDTH_FLAG)
 
-LINKER_OPTION := -shared $(WIDTH_FLAG) -ldl -lstdc++ -lpthread -L/usr/$(LIB_DIR)/ -Wl,-rpath=/user/$(LIB_DIR) -L/$(LIB_DIR) -Wl,-rpath=/$(LIB_DIR) -ldbus-1 -ljsoncpp
+CPP_FLAGS := $(CPPFLAGS) -std=c++11 $(WIDTH_FLAG) -Wno-psabi
+LINKER_OPTION := -shared $(WIDTH_FLAG) -L$(USER_LIB_PREFIX) -L$(LIB_PREFIX) -Wl,-rpath=$(USER_LIB_PREFIX) -Wl,-rpath=$(LIB_PREFIX) -ldbus-1 -ljsoncpp -ldl -lstdc++ -lpthread
+
+ifeq ($(ARCH),arm)
+LINKER_OPTION += --sysroot=$(ROOTFS)
+endif
 
 MUTE_CLEAN := 2>/dev/null || true
 
