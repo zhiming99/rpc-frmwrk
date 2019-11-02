@@ -21,7 +21,7 @@ This framework depends on the following packags:
 9. `File/Big data transfer.`
 10. `Peer online/offline awareness.`
 11. `Streaming support to provide double-direction stream transfer`
-12. `Http support`(to come)
+12. `Websocket support`(to come)
 
 ---
 [`Fri 01 Nov 2019 04:47:07 PM Beijing`]   
