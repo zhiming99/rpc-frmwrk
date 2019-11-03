@@ -25,7 +25,7 @@ This framework depends on the following packags:
 
 ---
 [`Sun 03 Nov 2019 02:05:39 PM Beijing`]   
-1. To add the websocket, SSL support and other unknown protocols, I need to refact the current tcp port implementation, for the present design is too closely coupled without room for the new protocols. It is a bitter decision, but it should worth the effort. The good part is that the tcp port implementation is relatively isolated and there are little changes to other part.
+1. To add the support for websocket, SSL and other unknown protocols, I need to refact the current tcp port implementation, because the present design is too closely coupled without room for the new protocols. It is a bitter decision, but it should worth the effort to make the project reach further places. The good part is that the tcp port implementation is relatively isolated with little changes to other functions.
 
 [`Fri 01 Nov 2019 04:47:07 PM Beijing`]   
 1. Changes for Raspberry PI/2 PI is commited. An ARM platform is supported!   
