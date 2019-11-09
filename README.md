@@ -21,9 +21,14 @@ This framework depends on the following packags:
 9. `File/Big data transfer.`
 10. `Peer online/offline awareness.`
 11. `Streaming support to provide double-direction stream transfer`
-12. `Websocket support`(to come)
+12. `Websocket/http support`(to come)
 
 ---
+[`Sat 09 Nov 2019 10:09:12 AM Beijing`]   
+1. Refacting the tcpport. I did not realize that through the days, the tcpport has grown to a big module with about 10000 loc.
+2. Continue the design of the support for websock/http.
+3. Object addressing and multi-router hopping are also in the research.
+
 [`Sun 03 Nov 2019 02:05:39 PM Beijing`]   
 1. To add the support for websocket, SSL and other unknown protocols, I need to refact the current tcp port implementation, because the present design is too closely coupled without room for the new protocols. It is a bitter decision, but it should worth the effort. Sometime, you may need one step back for 2 steps forward. The good part is that the tcp port implementation is relatively isolated with little changes to other functions.
 
