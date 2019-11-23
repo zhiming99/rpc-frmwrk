@@ -25,7 +25,9 @@ This framework depends on the following packags:
 
 ---
 [`Sat 23 Nov 2019 01:38:46 PM Beijing`]   
-1. Finally, it tooks 20 days to make the new tcpport stack in place. Now we can move on to add the following features, compression, SSL, websocket/http2 support.
+1. Finally, it took 20 days to make the new `tcp port stack` in place. Both the old `tcp port stack` and the new stack can be useful in different use cases. And therefore let's keep both alive for a period.
+2. the lesson learned is that it is always better to make full research in advance than to rewrite afterward.
+3. Now we can move on to add the following features, compression, SSL, websocket/http2 support.
 
 [`Sat 09 Nov 2019 10:09:12 AM Beijing`]   
 1. Refacting the tcpport. I did not realize that through the days, the tcpport has grown to a big module with about 10000 loc.
