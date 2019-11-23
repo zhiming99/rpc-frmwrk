@@ -45,6 +45,16 @@
             ]
         },
         {
+            "DriverName"    : "RpcNatProtoFdoDrv",
+            "DriverType"    : "PortDriver",
+            "InternalClass" : "CRpcNatProtoFdoDrv",
+            "Description"   : "This is a FDO port driver, and the port it creats is the CRpcNativeProtoFdo",
+            "PortClasses"   :
+            [
+                "RpcNativeProtoFdo"
+            ]
+        },
+        {
             "DriverName"    : "UnixSockBusDriver",
             "DriverType"    : "BusDriver",
             "InternalClass" : "CUnixSockBusDriver",
@@ -97,13 +107,29 @@
             "PortType"      : "Fido",
             "PortClass"     : "RpcTcpFido",
             "InternalClass" : "CRpcTcpFido",
-            "PortDriver"    : "",
-            "BusPortClass"  : "RpcTcpBusPort"
+            "PortDriver"    : "RpcTcpFidoDrv"
+        },
+        {
+            "PortType"      : "Fdo",
+            "PortClass"     : "RpcNativeProtoFdo",
+            "InternalClass" : "CRpcNativeProtoFdo",
+            "PortDriver"    : "RpcNatProtoFdoDrv",
+            "Parameters":
+            {
+                "Compression" : "0"
+            }
         },
         {
             "PortType"      : "Pdo",
             "PortClass"     : "TcpStreamPdo",
             "InternalClass" : "CTcpStreamPdo",
+            "PortDriver"    : "",
+            "BusPortClass"  : "RpcTcpBusPort"
+        },
+        {
+            "PortType"      : "Pdo",
+            "PortClass"     : "TcpStreamPdo2",
+            "InternalClass" : "CTcpStreamPdo2",
             "PortDriver"    : "",
             "BusPortClass"  : "RpcTcpBusPort"
         },
@@ -123,7 +149,8 @@
                 "AddrFormat" : "ipv4",
                 "Protocol" : "native",
                 "PortNumber": "4132",
-                "BindAddr" : "0.0.0.0"
+                "BindAddr" : "0.0.0.0",
+                "PdoClass" : "TcpStreamPdo2"
             }
         },
         {
@@ -372,6 +399,13 @@
             "PortClass" : "TcpStreamPdo",
             "FidoDriver" : "RpcTcpFidoDrv",
             "Description" : "This match provides a binding between the pdo and the uppper fido"
+        },
+        {
+            "PortClass" : "TcpStreamPdo2",
+            "comment" : "ProbeSequence specify the order of the drivers' Probe to call to build the port stack",
+            "ProbeSequence" : [ "RpcNatProtoFdoDrv", "RpcTcpFidoDrv" ],
+            "Description" : "This match provides a binding between the pdo and the uppper fdo and fido",
+            "comment-1" : "this is a new fork of the TcpStreamPdo, with better flexibility and extensibility"
         },
         {
             "PortClass" : "UnixSockStmPdo",

@@ -1073,7 +1073,7 @@ gint32 CIfOpenPortTask::OnIrpComplete(
             break;
         }
 
-        HANDLE hPort = 0;
+        HANDLE hPort = INVALID_HANDLE;
 
         gint32 iRet = pIrp->GetStatus();
         IrpCtxPtr& pCtx = pIrp->GetTopStack();

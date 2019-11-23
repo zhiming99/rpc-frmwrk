@@ -54,7 +54,7 @@
 #define HANDLE                  uintptr_t
 #define PortToHandle( ptr )     reinterpret_cast<HANDLE>( ( IPort* )ptr )
 #define HandleToPort( handle )  reinterpret_cast< IPort* >( handle )
-#define INVALID_HANDLE          ( ( HANDLE )-1 )
+#define INVALID_HANDLE          ( ( HANDLE )0 )
 
 #define IPV6_ADDR_BYTES         ( sizeof( in6_addr ) )
 #define IPV4_ADDR_BYTES         ( sizeof( in_addr ) )
@@ -212,6 +212,13 @@ extern gint32 SetThreadName(const std::string& strName );
 extern std::string GetThreadName();
 inline guint32 GetTid()
 { return ( guint32 )syscall( SYS_gettid ); }
+
+inline gint32 SendBytesNoSig( int iFd,
+    void* pBuf, guint32 dwSize )
+{
+    return send( iFd, pBuf,
+        dwSize, MSG_NOSIGNAL );
+}
 
 
 

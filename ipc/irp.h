@@ -194,6 +194,9 @@ class IRP_CONTEXT;
 
 typedef CAutoPtr< clsid( IRP_CONTEXT ), IRP_CONTEXT > IrpCtxPtr;
 
+class IPort;
+typedef CAutoPtr< Clsid_Invalid, IPort > PortPtr;
+
 class IPort : public IEventSink
 {
 	public:
@@ -221,16 +224,14 @@ class IPort : public IEventSink
         void* pContext = nullptr ) = 0;
 
 	virtual guint32 GetPortState() const = 0;
-    virtual IPort* GetUpperPort() const = 0;
-    virtual IPort* GetLowerPort() const = 0;
-    virtual IPort* GetTopmostPort() const = 0;
-    virtual IPort* GetBottomPort() const = 0;
+    virtual PortPtr GetUpperPort() const = 0;
+    virtual PortPtr GetLowerPort() const = 0;
+    virtual PortPtr GetTopmostPort() const = 0;
+    virtual PortPtr GetBottomPort() const = 0;
 
     virtual gint32 CompleteAssocIrp(
         IRP* pMaster, IRP* pSlave ) = 0;
 };
-
-typedef CAutoPtr< Clsid_Invalid, IPort > PortPtr;
 
 class CStlPortVector : public CStlVector< PortPtr >
 {

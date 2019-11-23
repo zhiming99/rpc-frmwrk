@@ -42,13 +42,13 @@
         {
             "ObjectName": "RpcTcpBridgeImpl",
             "BusName" : "RpcTcpBusPort_0",
-            "PortClass": "TcpStreamPdo",
+            "PortClass": "TcpStreamPdo2",
             "PortNumber" : "4132",
             "RequestTimeoutSec" : "120",
             "KeepAliveTimeoutSec" : "60",
             "QueuedRequests" : "false",
             "Note-1": " bridge's ip address is decided at runtime",
-            "ProxyPortClass": "TcpStreamPdo",
+            "ProxyPortClass": "TcpStreamPdo2",
             "Interfaces" :
             [
                 {

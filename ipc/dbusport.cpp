@@ -571,7 +571,7 @@ gint32 CDBusBusPort::Start( IRP *pIrp )
 {
 
     gint32 ret = 0;
-    if( GetLowerPort() )
+    if( !GetLowerPort().IsEmpty() )
     {
         // nothing to do here if it is
         // sitting on some other port

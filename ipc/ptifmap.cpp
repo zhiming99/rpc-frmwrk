@@ -321,7 +321,7 @@ gint32 CPortInterfaceMap::IsPortNoRef(
 gint32 CPortInterfaceMap::PortExist(
     HANDLE hPort ) const
 {
-    if( hPort == 0 )
+    if( hPort == INVALID_HANDLE )
         return -EINVAL;
 
     gint32 ret = ERROR_FALSE;
@@ -340,7 +340,7 @@ gint32 CPortInterfaceMap::PortExist(
 gint32 CPortInterfaceMap::GetPortPtr(
     HANDLE hPort, PortPtr& pPort ) const
 {
-    if( hPort == 0 )
+    if( hPort == INVALID_HANDLE )
         return -EINVAL;
 
     gint32 ret = -ENOENT;;

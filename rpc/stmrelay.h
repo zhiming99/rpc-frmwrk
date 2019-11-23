@@ -234,8 +234,13 @@ class CStreamRelayBase :
 
         gint32 ret = 0;
         do{
-            ObjPtr pPortObj = this->GetPort();
-            CPort* pPort = pPortObj;
+            PortPtr ptrPort;
+            CCfgOpener oReq;
+            oReq.SetBoolProp( propSubmitPdo, true );
+            ret = this->GetPortToSubmit(
+                oReq.GetCfg(), ptrPort );
+
+            CPort* pPort = ptrPort;
             if( unlikely( pPort == nullptr ) )
             {
                 ret = -EFAULT;

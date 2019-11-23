@@ -508,6 +508,12 @@ gint32 CRpcTcpBridgeProxy::FillRespDataFwrdReq(
         CParamList oParams( ( IConfigDb* )pResp );
 
         DMsgPtr pFwrdMsg;
+        if( pCtx->m_pRespData.IsEmpty() ||
+            pCtx->m_pRespData->empty() )
+        {
+            ret = -EBADMSG;
+            break;
+        }
         pFwrdMsg = ( DMsgPtr& )*pCtx->m_pRespData;
 
         gint32 iRet;
@@ -1304,6 +1310,24 @@ gint32 CBdgeProxyReadWriteComplete::OnIrpComplete(
 
     return ret;
 }
+
+#define GET_TARGET_PORT_SHARED( pPort ) \
+do{ \
+        CCfgOpener oReq; \
+        bool _bPdo = false; \
+        oReq.SetBoolProp( propSubmitPdo, true ); \
+        ret = m_pParentIf->GetPortToSubmit( \
+            oReq.GetCfg(), pPort, _bPdo ); \
+}while( 0 ) 
+
+#define GET_TARGET_PORT( pPort ) \
+do{ \
+        CCfgOpener oReq; \
+        bool _bPdo = false; \
+        oReq.SetBoolProp( propSubmitPdo, true ); \
+        ret = this->GetPortToSubmit( \
+            oReq.GetCfg(), pPort, _bPdo ); \
+}while( 0 ) 
 
 gint32 CRpcTcpBridge::OnPostStart(
     IEventSink* pContext )
@@ -3030,12 +3054,10 @@ gint32 CRpcTcpBridge::CloseStream_Server(
             break;
         }
 
-        IPort* pPort = GetPort();
-        if( pPort == nullptr )
-        {
-            ret = -EFAULT;
+        PortPtr pPort;
+        GET_TARGET_PORT( pPort );
+        if( ERROR( ret ) )
             break;
-        }
 
         gint32 iRet = CloseLocalStream(
             pPort, iStreamId );
@@ -3103,7 +3125,10 @@ gint32 CRpcTcpBridge::OpenStream_Server(
             break;
         }
 
-        IPort* pPort = GetPort();
+        PortPtr pPort;
+        GET_TARGET_PORT( pPort );
+        if( ERROR( ret ) )
+            break;
 
         gint32 iRet = OpenLocalStream( pPort,
             iPeerStm, wProtocol, iNewStm );
@@ -3144,12 +3169,12 @@ gint32 CRpcTcpBridge::OpenStream_Server(
                 CF_ASYNC_CALL );
 
             oResp.ClearParams();
-            if( ERROR( iRet ) )
-                break;
-
-            oResp.Push( iNewStm );
-            oResp.Push( ( guint32 )wProtocol );
-            oResp.Push( iPeerStm );
+            if( SUCCEEDED( iRet ) )
+            {
+                oResp.Push( iNewStm );
+                oResp.Push( ( guint32 )wProtocol );
+                oResp.Push( iPeerStm );
+            }
 
             ret = SetResponse(
                 pCallback, oResp.GetCfg() );
@@ -3214,7 +3239,14 @@ gint32 CRpcTcpBridge::SendResponse(
             DBUS_MESSAGE_TYPE_METHOD_CALL )
             break;
 
-        bool bPdo = false;
+        bool bPdo = true;
+        PortPtr pPort;
+        ret = GetPortToSubmit(
+            pReq, pPort, bPdo );
+
+        if( ERROR( ret ) )
+            break;
+
         guint32 dwCmdId = 0;
         BufPtr pBuf( true );
         if( dwFlags & CF_NON_DBUS )
@@ -3225,21 +3257,12 @@ gint32 CRpcTcpBridge::SendResponse(
 
             if( ERROR( ret ) )
                 break;
-
-            ret = oReq.GetBoolProp(
-                propSubmitPdo, bPdo );
-
         }
         else
         {
             DMsgPtr& pMsg = oResp[ 0 ];
             *pBuf = pMsg;
         }
-
-        IPort* pPort = GetPort();
-
-        if( !bPdo )
-            pPort = pPort->GetTopmostPort();
 
         IrpPtr pIrp( true );
         ret = pIrp->AllocNextStack( nullptr );
@@ -3272,17 +3295,11 @@ gint32 CRpcTcpBridge::SendResponse(
         CPort* pPort2 = ( CPort* )pPort;
         CIoManager* pMgr = pPort2->GetIoMgr();
 
-        if( bPdo )
-        {
-            ret = pMgr->SubmitIrpInternal(
-                pPort, pIrp, false );
-        }
-        else
-        {
-            HANDLE hPort = PortToHandle( pPort );
+        if( !bPdo )
             SetBdgeIrpStmId( pIrp, iStreamId );
-            ret = pMgr->SubmitIrp( hPort, pIrp );
-        }
+
+        ret = pMgr->SubmitIrpInternal(
+            pPort, pIrp, false );
 
         if( ret == STATUS_PENDING )
             break;
@@ -3386,6 +3403,75 @@ gint32 CRpcTcpBridge::SetupReqIrpFwrdEvt(
         {
             pIrp->SetCallback( pCallback, 0 );
             pIrp->SetIrpThread( GetIoMgr() );
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+guint32 CRpcTcpBridgeShared::GetPortToSubmitShared(
+    CObjBase* pCfg,
+    PortPtr& pTarget,
+    bool& bPdo )
+{
+    if( pCfg == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        PortPtr ptrPort = m_pParentIf->GetPort();
+        CPort* pPort = ptrPort;
+        if( pPort == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        ret = m_pParentIf->CRpcServices::
+            GetPortToSubmit( pCfg, pTarget, bPdo );
+
+        std::string strPortClass;
+        CCfgOpenerObj oPortCfg( pPort );
+
+        ret = oPortCfg.GetStrProp(
+            propPdoClass, strPortClass );
+        if( ERROR( ret ) )
+            break;
+
+        if( strPortClass ==
+            PORT_CLASS_TCP_STREAM_PDO )
+            break;
+
+        if( strPortClass !=
+            PORT_CLASS_TCP_STREAM_PDO2 )
+        {
+            ret = -ENOTSUP;
+            break;
+        }
+
+        if( !bPdo )
+        {
+            // pTarget is the desired port.
+            break;
+        }
+        else
+        {
+            CCfgOpenerObj oCfg( pCfg );
+
+            HANDLE hPort = INVALID_HANDLE;
+            ret = oCfg.GetIntPtr( propSubmitTo,
+                ( guint32*& )hPort );
+
+            // pTarget holds the desired port.
+            if( SUCCEEDED( ret ) )
+                break;
+
+            // for TcpStreamPdo2, the fdo has
+            // the interface rather than pdo
+            ret = pPort->GetFdoPort( pTarget );
+
+            break;
         }
 
     }while( 0 );
@@ -3883,10 +3969,12 @@ gint32 CRpcTcpBridgeShared::RegMatchCtrlStream(
         *pBuf = pObj;
         pCtx->SetReqData( pBuf );
 
-        CPort* pPort =
-            ObjPtr( m_pParentIf->GetPort() );
+        PortPtr pPort;
+        GET_TARGET_PORT_SHARED( pPort );
+        if( ERROR( ret ) )
+            break;
 
-        CIoManager* pMgr = pPort->GetIoMgr();
+        CIoManager* pMgr = m_pParentIf->GetIoMgr();
         pIrp->SetSyncCall( true );
 
         // NOTE: this irp will only go through the

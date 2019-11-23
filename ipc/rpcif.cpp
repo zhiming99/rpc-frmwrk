@@ -69,6 +69,22 @@ CGenericInterface::CGenericInterface(
     }
 }
 
+PortPtr CGenericInterface::GetPort() const
+{
+    HANDLE hPort = GetPortHandle();
+    if( hPort == INVALID_HANDLE )
+        return PortPtr();
+
+    PortPtr pPort;
+    gint32 ret = GetIoMgr()->GetPortPtr(
+        hPort, pPort );
+
+    if( SUCCEEDED( ret ) )
+        return pPort;
+
+    return PortPtr();
+}
+
 static CfgPtr InitIfProxyCfg(
     const IConfigDb * pCfg )
 {
@@ -98,7 +114,8 @@ static CfgPtr InitIfProxyCfg(
         // address to match
         iStateClass = clsid( CRemoteProxyState );
     }
-    else if( strPortClass == PORT_CLASS_TCP_STREAM_PDO )
+    else if( strPortClass == PORT_CLASS_TCP_STREAM_PDO ||
+        strPortClass == PORT_CLASS_TCP_STREAM_PDO2 )
     {
         iStateClass = clsid( CTcpBdgePrxyState );
     }
@@ -366,6 +383,101 @@ gint32 CRpcBaseOperations::DisableEvent(
         pMatch, false, pCompletion );
 }
 
+guint32 CRpcBaseOperations::GetPortToSubmit(
+    CObjBase* pCfg, PortPtr& pPort )
+{
+    if( pCfg == nullptr )
+        return -EINVAL;
+    bool bPdo = false;
+    return GetPortToSubmit( pCfg, pPort, bPdo );
+}
+
+guint32 CRpcBaseOperations::GetPortToSubmit(
+    CObjBase* pCfg, PortPtr& pPort, bool& bPdo )
+{
+    if( pCfg == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        CCfgOpenerObj oCfg( pCfg );
+
+        bPdo = false;
+        ret = oCfg.GetBoolProp(
+            propSubmitPdo, bPdo );
+
+        if( ERROR( ret ) )
+        {
+            bPdo = false;
+            ret = 0;
+        }
+
+        PortPtr pPdoPort;
+        PortPtr pThisPort = GetPort();
+        CPort* pThis = pThisPort;
+        HANDLE hThis = PortToHandle( pThis );
+
+        if( pThisPort.IsEmpty() )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        if( !bPdo )
+        {
+            // OK with any port on the port stack
+            pPort = pThis->GetTopmostPort();
+            break;
+        }
+
+        HANDLE hPort = INVALID_HANDLE;
+        ret = oCfg.GetIntPtr( propSubmitTo,
+            ( guint32*& )hPort );
+
+        if( SUCCEEDED( ret ) && hPort != hThis )
+        {
+            PortPtr pTopmost =
+                pThis->GetTopmostPort();
+
+            PortPtr pTargetPort = pTopmost;
+            do{
+                HANDLE hVal =
+                    PortToHandle( pTargetPort );
+                if( hVal == hPort )
+                    break;
+                pTargetPort =
+                    pTargetPort->GetLowerPort();
+
+            }while( !pTargetPort.IsEmpty() );
+
+            if( pTargetPort.IsEmpty() )
+                ret = -EFAULT;
+            else
+                pPort = pTargetPort;
+
+            break;
+        }
+        else if( SUCCEEDED( ret ) )
+        {
+            pPort = pThis;
+            break;
+        }
+
+        ret = 0;
+        if( pThis->GetPortType() ==
+            PORTFLG_TYPE_PDO )
+        {
+            pPort = pThis;
+            break;
+        }
+
+        pPort = pThis->GetBottomPort(); 
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CRpcBaseOperations::StartRecvMsg(
     IEventSink* pCompletion,
     IMessageMatch* pMatch )
@@ -452,26 +564,16 @@ gint32 CRpcBaseOperations::StartRecvMsg(
         pIrp->RemoveTimer();
 
         // make a copy of the irp for canceling
-        ret = oTaskCfg.SetObjPtr(
+        oTaskCfg.SetObjPtr(
             propIrpPtr, ObjPtr( pIrp ) );
 
-        HANDLE hPort = GetPortHandle();
+        PortPtr pPort;
+        ret = GetPortToSubmit( pCompletion, pPort );
+        if( ERROR( ret ) )
+            break;
 
-        bool bPdo = false;
-        ret = oTaskCfg.GetBoolProp(
-            propSubmitPdo, bPdo );
-
-        if( ERROR( ret ) || !bPdo )
-        {
-            ret = pMgr->SubmitIrp( hPort, pIrp );
-        }
-        else
-        {
-            IPort* pPort = HandleToPort( hPort );
-            IPort* pPdo = pPort->GetBottomPort();
-            ret = pMgr->SubmitIrpInternal(
-                pPdo, pIrp, false );
-        }
+        ret = pMgr->SubmitIrpInternal(
+            pPort, pIrp, false );
 
         if( ret == STATUS_PENDING )
             break;
@@ -1120,7 +1222,7 @@ gint32 CRpcInterfaceBase::DoStop(
             break;
 
         HANDLE hPort = GetPortHandle();
-        if( hPort != 0 )
+        if( hPort != INVALID_HANDLE )
         {
             // NOTE that, when stopping, we may
             // have a partially initialized
@@ -3342,27 +3444,15 @@ gint32 CRpcServices::SendMethodCall(
             break;
         }
 
-        CReqOpener oReq( pReqCall );
-        bool bAllStack = true;
-        if( oReq.exist( propSubmitPdo ) )
-            bAllStack = false;
-
-        HANDLE hPort = GetPortHandle();
-        if( hPort == 0 )
-        {
-            ret = -EFAULT;
+        PortPtr pPort;
+        ret = GetPortToSubmit( pReqCall, pPort );
+        if( ERROR( ret ) )
             break;
-        }
-
-        IPort* pPort = HandleToPort( hPort );
 
         IrpPtr pIrp( true );
         ret = pIrp->AllocNextStack( nullptr );
         if( ERROR( ret ) )
             break;
-
-        if( bAllStack )
-            pPort = pPort->GetTopmostPort();
 
         IrpCtxPtr& pIrpCtx = pIrp->GetTopStack(); 
         pPort->AllocIrpCtxExt(
@@ -3379,15 +3469,8 @@ gint32 CRpcServices::SendMethodCall(
         oCfg.SetObjPtr( propIrpPtr,
             ObjPtr( ( IRP* )pIrp ) );
 
-        if( bAllStack )
-        {
-            ret = GetIoMgr()->SubmitIrp( hPort, pIrp );
-        }
-        else
-        {
-            ret = GetIoMgr()->SubmitIrpInternal(
-                HandleToPort( hPort ), pIrp, false );
-        }
+        ret = GetIoMgr()->SubmitIrpInternal(
+            pPort, pIrp, false );
 
         if( ret == STATUS_PENDING )
             break;
@@ -3401,6 +3484,7 @@ gint32 CRpcServices::SendMethodCall(
             break;
         }
 
+        CReqOpener oReq( pReqCall );
         if( oReq.HasReply() ) 
         {
             gint32 iRet = FillRespData(

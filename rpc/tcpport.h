@@ -42,6 +42,9 @@
 #define IsReserveStm( _iStmId ) \
 ( ( _iStmId ) >= 0 && ( _iStmId ) < STMSOCK_STMID_FLOOR )
 
+#define RETRIABLE( iRet_ ) \
+    ( iRet_ == EWOULDBLOCK || iRet_ == EAGAIN )
+
 enum EnumProtoId
 {
     protoDBusRelay,
@@ -70,18 +73,18 @@ struct CPacketHeader
     guint32     m_dwSize;
     gint32      m_iStmId;
     gint32      m_iPeerStmId;
-    guint32     m_dwFlags;
+    guint16     m_wFlags;
     guint16     m_wProtoId;
-    guint16     m_wReserved;
+    guint32     m_dwSessId;
     guint32     m_dwSeqNo;
 
     CPacketHeader() :
         m_dwSize( 0 ),
         m_iStmId( 0 ),
         m_iPeerStmId( 0 ),
-        m_dwFlags( 0 ),
+        m_wFlags( 0 ),
         m_wProtoId( 0 ),
-        m_wReserved( 0 ),
+        m_dwSessId( 0 ),
         m_dwSeqNo( 0 )
     {
         m_dwMagic = RPC_PACKET_MAGIC;
@@ -93,9 +96,9 @@ struct CPacketHeader
         m_dwSize = ntohl( m_dwSize );
         m_iStmId = ntohl( m_iStmId );
         m_iPeerStmId = ntohl( m_iPeerStmId );
-        m_dwFlags = ntohl( m_dwFlags );
+        m_wFlags = ntohs( m_wFlags );
         m_wProtoId = ntohs( m_wProtoId );
-        m_wReserved = ntohs( m_wReserved );
+        m_dwSessId = ntohl( m_dwSessId );
         m_dwSeqNo = ntohl( m_dwSeqNo );
     }
 
@@ -105,9 +108,9 @@ struct CPacketHeader
         m_dwSize = htonl( m_dwSize );
         m_iStmId = htonl( m_iStmId );
         m_iPeerStmId = htonl( m_iPeerStmId );
-        m_dwFlags = htonl( m_dwFlags );
+        m_wFlags = htons( m_wFlags );
         m_wProtoId = htons( m_wProtoId );
-        m_wReserved = htons( m_wReserved );
+        m_dwSessId = htonl( m_dwSessId );
         m_dwSeqNo = htonl( m_dwSeqNo );
     }
 
@@ -126,14 +129,38 @@ struct CPacketHeader
 
         m_dwMagic       = pHeader->m_dwMagic;
         m_dwSize        = pHeader->m_dwSize;
-        m_dwFlags       = pHeader->m_dwFlags;
+        m_wFlags        = pHeader->m_wFlags;
         m_iStmId        = pHeader->m_iStmId;
         m_iPeerStmId    = pHeader->m_iPeerStmId;
         m_wProtoId      = pHeader->m_wProtoId;
-        m_dwSeqNo      =  pHeader->m_dwSeqNo;
+        m_dwSeqNo       =  pHeader->m_dwSeqNo;
+        m_dwSessId      = pHeader->m_dwSessId;
 
         ntoh();
 
+        return 0;
+    }
+
+    gint32 Serialize( CBuffer& oBuf )
+    {
+        oBuf.Resize( sizeof( CPacketHeader ) );
+
+        CPacketHeader* pHeader =
+            ( CPacketHeader* )oBuf.ptr();
+
+        if( pHeader == nullptr )
+            return -EFAULT;
+
+        pHeader->m_dwMagic       = m_dwMagic;
+        pHeader->m_dwSize        = m_dwSize;
+        pHeader->m_wFlags        = m_wFlags;
+        pHeader->m_iStmId        = m_iStmId;
+        pHeader->m_iPeerStmId    = m_iPeerStmId;
+        pHeader->m_wProtoId      = m_wProtoId;
+        pHeader->m_dwSeqNo       = m_dwSeqNo;
+        pHeader->m_dwSessId      = m_dwSessId;
+
+        pHeader->hton();
         return 0;
     }
 };
@@ -244,13 +271,6 @@ class COutgoingPacket :
     bool IsSending()
     { return ( m_dwOffset > 0 ); }
 
-    inline gint32 Send( int iFd,
-        void* pBuf, guint32 dwSize )
-    {
-        return send( iFd, pBuf,
-            dwSize, MSG_NOSIGNAL );
-    }
-
 };
 
 class CIncomingPacket:
@@ -264,6 +284,7 @@ class CIncomingPacket:
 
     CIncomingPacket();
     gint32 FillPacket( gint32 iFd );
+    gint32 FillPacket( BufPtr& pBuf );
 };
 
 class CRpcSocketBase;
@@ -486,6 +507,7 @@ class CRpcSocketBase : public IService
     HANDLE              m_hIoRWatch;
     // watch for sending
     HANDLE              m_hIoWWatch;
+    HANDLE              m_hErrWatch;
 
     gint32 AttachMainloop();
     gint32 DetachMainloop();
@@ -574,10 +596,6 @@ class CRpcSocketBase : public IService
     gint32 SetKeepAlive( bool bKeep );
     bool IsKeepAlive() const;
 
-    // socket buffer settings
-    gint32 GetSendBufSize() const;
-    gint32 GetRecvBufSize() const;
-
     gint32 GetRttTimeMs( guint32 dwMilSec);
 
     // active connect/disconnect
@@ -641,19 +659,12 @@ class CRpcListeningSock :
 class CRpcStreamSock :
     public CRpcSocketBase
 {
-    friend class CStmSockConnectTask;
-
     std::map< gint32, StmPtr > m_mapStreams;
     std::map< gint32, StmPtr >::iterator m_itrCurStm;
     gint32  m_iCurSendStm;
     gint32  m_iStmCounter;
 
     TaskletPtr m_pStartTask;
-
-    gint32 Start_bh();
-
-    gint32 ActiveConnect(
-        const std::string& strIpAddr );
 
     virtual gint32 DispatchSockEvent(
         GIOCondition );
@@ -675,6 +686,11 @@ class CRpcStreamSock :
     // properties
     CRpcStreamSock(
         const IConfigDb* pCfg );
+
+    gint32 Start_bh();
+    gint32 ActiveConnect(
+        const std::string& strIpAddr );
+
 
     virtual gint32 Start();
     virtual gint32 Stop();
@@ -744,9 +760,6 @@ class CRpcStreamSock :
     gint32 CancelAllIrps( gint32 iErrno );
     gint32 GetStreamFromIrp(
         IRP* pIrp, StmPtr& pStm );
-
-    gint32 ScheduleCompleteIrpTask(
-        IrpVec2Ptr& pIrpVec, bool bSync );
 
     // stream management
     gint32 AddStream(
@@ -979,9 +992,6 @@ class CTcpStreamPdo : public CPort
     gint32 CompleteOpenStmIrp( IRP* pIrp );
     gint32 CompleteCloseStmIrp( IRP* pIrp );
 
-    gint32 CompleteOpenCloseStmIrp(
-        IRP* pIrp, bool bOpen );
-
     gint32 CompleteInvalStmIrp( IRP* pIrp );
 
     gint32 OpenCloseStreamLocal( IRP* pIrp );
@@ -1083,7 +1093,8 @@ class CRpcTcpBusPort :
 
     gint32 CreateTcpStreamPdo(
         IConfigDb* pConfig,
-        PortPtr& pNewPort );
+        PortPtr& pNewPort,
+        const EnumClsid& iClsid ) const;
 
     gint32 OnNewConnection( gint32 iSockFd );
 
@@ -1184,155 +1195,27 @@ class CRpcTcpFidoDrv : public CPortDriver
     { return -ENOTSUP; }
 };
 
-class CStmSockConnectTask 
-    : public CTasklet
+#include "conntask.h"
+class CStmSockConnectTask :
+    public CStmSockConnectTaskBase< CRpcStreamSock >
 {
-    // NOTE: this task is not meant to be
-    // scheduled. it is an object for all the
-    // related resources to play when the
-    // connection is being established
-    //
-    // parameters:
-    // propIoMgr
-    // propSockPtr
-    // propRetries
-    // propIrpPtr
-    enum ConnStat
-    {
-        connInit,
-        connProcess,
-        connCompleted,
-        connStopped,
-    };
-
-    ConnStat m_iConnState;
-    mutable stdrmutex m_oLock;
-    gint32 m_iTimerId;
-    sem_t  m_semInitSync;
-
-    // eventStart from Pdo's PreStart
-    gint32 OnStart( IRP* pIrp );
-
-    // request from the CRpcStreamSock::OnError
-    gint32 OnError( gint32 iRet );
-
-    // eventNewConn from the
-    // CRpcStreamSock::DispatchSockEvent
-    gint32 OnConnected();
-
-    // internal helpers
-    gint32 Retry();
-    gint32 SetSockState(
-        EnumSockState iState );
-
-    gint32 CompleteTask( gint32 iRet );
-    gint32 StopTask( gint32 iRet );
-
-    gint32 GetMasterIrp( IRP*& pIrp );
-    gint32 DecRetries( guint32* pdwRetries );
-    gint32 GetRetries( guint32& dwRetries );
-    gint32 GetSockPtr( CRpcStreamSock*& pSock );
-
-    gint32 SetConnState( ConnStat iStat )
-    {
-        m_iConnState = iStat;
-        return 0;
-    }
-
-    gint32 RemoveConnTimer();
-    gint32 AddConnTimer();
-
-    ConnStat GetConnState()
-    { return m_iConnState; }
-
     public:
-    typedef CTasklet super;
-
-    CStmSockConnectTask( const IConfigDb* pCfg = nullptr )
-        : CTasklet( pCfg )
-    {
-        SetClassId( clsid( CStmSockConnectTask ) );
-        m_iConnState = connInit;
-        m_iTimerId = 0;
-        Sem_Init( &m_semInitSync, 0, 0 );
-        SetError( STATUS_PENDING );
-    }
-    ~CStmSockConnectTask()
-    {
-        if( m_iTimerId != 0 )
-            RemoveConnTimer();
-        sem_destroy( &m_semInitSync );
-    }
-
-    stdrmutex& GetLock() const
-    { return m_oLock; }
-
-    CIoManager* GetIoMgr();
-
-    // event accepted:
-    //  ---pdo events---
-    //  eventStart
-    //  eventCancelTask
-    //  eventStop
-    //
-    // ---libc socket events ---
-    //  eventConnErr
-    //  eventNewConn
-    //
-    gint32 operator()( guint32 dwContext );
-
-    static gint32 NewTask(
-        CIoManager* pMgr,
-        CRpcStreamSock* pSock,
-        gint32 iRetries,
-        TaskletPtr& pTask );
-
-    void SetInitDone()
-    { Sem_Post( &m_semInitSync ); }
-
-    void WaitInitDone()
-    { Sem_Wait( &m_semInitSync ); }
-
+    typedef CStmSockConnectTaskBase< CRpcStreamSock > super;
+    CStmSockConnectTask( const IConfigDb* pCfg ) :
+        super( pCfg )
+    { SetClassId( clsid( CStmSockConnectTask ) ); }
 };
 
-inline gint32 GetBdgeIrpStmId(
-    PIRP pIrp, gint32& iStmId )
-{
-    if( pIrp == nullptr )
-        return -EINVAL;
+gint32 SetBdgeIrpStmId( 
+    PIRP pIrp, gint32 iStmId );
 
-    IrpCtxPtr& pCtx = pIrp->GetTopStack();
-    BufPtr pExtBuf;
-    pCtx->GetExtBuf( pExtBuf );
-    if( pExtBuf.IsEmpty() )
-        return -EINVAL;
+gint32 ScheduleCompleteIrpTask(
+    CIoManager* pMgr,
+    IrpVec2Ptr& pIrpVec,
+    bool bSync );
 
-    FIDO_IRP_EXT* pExt =
-        ( FIDO_IRP_EXT* )pExtBuf->ptr();    
+gint32 GetPreStopStep(
+    PIRP pIrp, guint32& dwStepNo );
 
-    iStmId = pExt->iStmId;
-    return 0;
-}
-
-inline gint32 SetBdgeIrpStmId( 
-    PIRP pIrp, gint32 iStmId )
-{
-    if( pIrp == nullptr )
-        return -EINVAL;
-
-    if( iStmId < 0 )
-        return -EINVAL;
-
-    IrpCtxPtr& pCtx = pIrp->GetTopStack();
-    BufPtr pExtBuf;
-    pCtx->GetExtBuf( pExtBuf );
-    if( pExtBuf.IsEmpty() )
-        return -EINVAL;
-
-    FIDO_IRP_EXT* pExt =
-        ( FIDO_IRP_EXT* )pExtBuf->ptr();    
-
-    pExt->iStmId = iStmId;
-    return 0;
-}
-
+gint32 SetPreStopStep(
+    PIRP pIrp, guint32 dwStepNo );

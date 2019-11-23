@@ -34,6 +34,7 @@
 #include "objfctry.h"
 #include "fdodrv.h"
 #include "stmrelay.h"
+#include "tcportex.h"
 
 
 using namespace std;
@@ -114,6 +115,14 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CIfUxListeningRelayTask );
     INIT_MAP_ENTRYCFG( CIfUxSockTransRelayTask );
     INIT_MAP_ENTRYCFG( CIfTcpStmTransTask );
+    INIT_MAP_ENTRYCFG( CTcpStreamPdo2 );
+    INIT_MAP_ENTRYCFG( CRpcConnSock );
+    INIT_MAP_ENTRYCFG( CRpcNativeProtoFdo );
+    INIT_MAP_ENTRYCFG( CRpcStream2 );
+    INIT_MAP_ENTRYCFG( CRpcControlStream2 );
+    INIT_MAP_ENTRYCFG( CFdoListeningTask );
+    INIT_MAP_ENTRYCFG( CStmSockConnectTask2 );
+    INIT_MAP_ENTRYCFG( CRpcNatProtoFdoDrv );
     END_FACTORY_MAPS;
 };
 

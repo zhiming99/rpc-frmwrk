@@ -45,6 +45,7 @@
 #define JSON_ATTR_MATCH         "Match"
 #define JSON_ATTR_FDODRIVER     "FdoDriver"
 #define JSON_ATTR_FIDODRIVER    "FidoDriver"
+#define JSON_ATTR_PROBESEQ      "ProbeSequence"
 #define JSON_ATTR_PORTCLASS     "PortClass"
 
 #define JSON_ATTR_ARCH          "Arch"
@@ -74,5 +75,6 @@
 #define JSON_ATTR_ROUTER_ROLE   "Role"
 #define JSON_ATTR_PARAMETERS    "Parameters"
 #define JSON_ATTR_BINDADDR      "BindAddr"
+#define JSON_ATTR_PDOCLASS      "PdoClass"
 #define JSON_ATTR_PROTOCOL      "Protocol"
 #define JSON_ATTR_ADDRFORMAT    "AddrFormat"

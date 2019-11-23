@@ -3567,7 +3567,7 @@ gint32 CRpcReqForwarderProxy::OnRmtSvrOffline(
     const std::string& strIpAddr,
     HANDLE hPort )
 {
-    if( hPort == 0 )
+    if( hPort == INVALID_HANDLE )
         return -EINVAL;
 
     gint32 ret = 0;

@@ -138,7 +138,7 @@ CInterfaceState::CInterfaceState(
         // optional properties
         // propIpAddr if subclass is CRemoteProxyState
 
-        m_hPort = 0;
+        m_hPort = INVALID_HANDLE;
         SetStateInternal( stateStopped );
         m_iResumeState = stateInvalid;
 
@@ -248,13 +248,13 @@ gint32 CInterfaceState::SetStateOnEvent(
 bool CInterfaceState::IsMyPort(
     HANDLE hPort )
 {
-    if( hPort == 0 )
+    if( hPort == INVALID_HANDLE )
         return false;
 
     if( m_hPort == hPort )
         return true;
 
-    if( m_hPort != 0 )
+    if( m_hPort != INVALID_HANDLE )
         return false;
 
     // we are waiting for such a port
@@ -304,7 +304,7 @@ gint32 CInterfaceState::OnPortEvent(
     gint32 ret = 0;
 
     do{
-        if( hPort == 0 ||
+        if( hPort == INVALID_HANDLE ||
             iEvent == eventInvalid )
         {
             ret = -EINVAL;
@@ -384,7 +384,7 @@ gint32 CInterfaceState::OnPortEvent(
             }
         case eventPortStopped:
             {
-                m_hPort = 0;
+                m_hPort = INVALID_HANDLE;
                 UnsubscribeEvents();
                 ret = SetStateOnEvent( cmdClosePort );
                 break;
@@ -641,7 +641,7 @@ gint32 CInterfaceState::OpenPortInternal(
 gint32 CInterfaceState::ClosePort(
     IEventSink* pCallback )
 {
-    if( m_hPort == 0 )
+    if( m_hPort == INVALID_HANDLE )
         return -EINVAL;
 
     // cut off the feedback the underlying
@@ -729,7 +729,8 @@ gint32 CInterfaceState::GetProperty(
 {
     gint32 ret = 0;
     CStdRMutex oStatLock( GetLock() );
-    if( unlikely( iProp == propPortId && m_hPort != 0 ) )
+    if( unlikely( iProp == propPortId &&
+        m_hPort != INVALID_HANDLE ) )
     {
         guint32 dwPortId = ( guint32 )-1;
         ret = m_pIfCfgDb->GetProperty( iProp, pVal );

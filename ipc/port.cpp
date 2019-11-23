@@ -133,7 +133,7 @@ do{\
 do{\
     if( PortType( m_dwFlags ) == Type_ )\
     {\
-        oBuf = ( *m_pCfgDb )[ iSelf_ ];\
+        ret = this->GetProperty( iSelf_, oBuf );\
         break;\
     }\
     else\
@@ -205,6 +205,12 @@ gint32 CPort::GetProperty( gint32 iProp, CBuffer& oBuf ) const
         {
             // this is a read-only property
             oBuf = GetPortState();
+            break;
+        }
+    case propSelfPtr:
+        {
+            // this is a read-only property
+            oBuf = ObjPtr( ( CObjBase* )this );
             break;
         }
     case propPortId:
@@ -295,6 +301,11 @@ gint32 CPort::GetProperty( gint32 iProp, CBuffer& oBuf ) const
             RetrieveValue( PORTFLG_TYPE_FDO, propPortClass );
             break;
         }
+    case propFdoPtr:
+        {
+            RetrieveValue( PORTFLG_TYPE_FDO, propSelfPtr );
+            break;
+        }
     case propPdoId:
         {
             RetrieveValue( PORTFLG_TYPE_PDO, propPortId );
@@ -308,6 +319,11 @@ gint32 CPort::GetProperty( gint32 iProp, CBuffer& oBuf ) const
     case propPdoClass:
         {
             RetrieveValue( PORTFLG_TYPE_PDO, propPortClass );
+            break;
+        }
+    case propPdoPtr:
+        {
+            RetrieveValue( PORTFLG_TYPE_PDO, propSelfPtr );
             break;
         }
     case propBusId:
@@ -625,7 +641,7 @@ gint32 CPort::ScheduleStartStopNotifTask(
     gint32 ret = 0;
     do{
         // trigger a port started event
-        if( GetUpperPort() == nullptr )
+        if( GetUpperPort().IsEmpty() )
         {
             CParamList a;
 
@@ -1084,7 +1100,7 @@ gint32 CPort::StopLowerPort( IRP* pIrp )
         }
 
         // stop the lower irp
-        if( GetLowerPort() )
+        if( !GetLowerPort().IsEmpty() )
         {
             PortPtr pLowerPort( GetLowerPort() );
             SetPnpState( pIrp, PNP_STATE_STOP_LOWER );
@@ -1411,7 +1427,7 @@ gint32 CPort::SubmitPortStackIrp( IRP* pIrp )
                     if( ERROR( ret ) )
                         break;
 
-                    if( GetLowerPort() == nullptr )
+                    if( GetLowerPort().IsEmpty() )
                     {
                         // for pdo port or the bottom port, we have a
                         // notification point for subscribers to register
@@ -1482,11 +1498,20 @@ gint32 CPort::SubmitFuncIrp( IRP* pIrp )
 
     guint32 dwOldState;
 
-    ret = CanContinue(
-        pIrp, PORT_STATE_BUSY_SHARED, &dwOldState );
+    ret = CanContinue( pIrp,
+        PORT_STATE_BUSY_SHARED, &dwOldState );
 
     if( ERROR( ret ) )
+    {
+        DebugPrint( ret,
+            "CPort::SubmitFuncIrp error, portstate = %d",
+            GetPortState() );
+
+        IrpCtxPtr& pCtx = pIrp->GetTopStack();
+        pCtx->SetStatus( ret );
+
         return ret;
+    }
 
     do{
 	    ret = OnSubmitIrp( pIrp );
@@ -2090,13 +2115,13 @@ gint32 CPort::CompleteStopIrp( IRP* pIrp )
                 PNP_STATE_STOP_BEGIN );
 
             STOP_PORT_STEP( PNP_STATE_STOP_PRE,
-                PNP_STATE_STOP_LOWER );
+                PNP_STATE_STOP_PRE );
 
             STOP_PORT_STEP( PNP_STATE_STOP_LOWER,
-                PNP_STATE_STOP_SELF );
+                PNP_STATE_STOP_LOWER );
 
             STOP_PORT_STEP( PNP_STATE_STOP_SELF,
-                PNP_STATE_STOP_POST );
+                PNP_STATE_STOP_SELF );
 
             dwPortState = GetPortState();
             if( dwPortState == PORT_STATE_STOPPING
@@ -2766,7 +2791,7 @@ gint32 CPort::GetStackPos() const
     return iPos;
 }
 
-IPort* CPort::GetUpperPort() const
+PortPtr CPort::GetUpperPort() const
 {
     CCfgOpenerObj a( this );
 
@@ -2775,12 +2800,12 @@ IPort* CPort::GetUpperPort() const
         propUpperPortPtr, pObj );
 
     if( ERROR( ret ) )
-        return nullptr;
+        return PortPtr();
 
-    return pObj;
+    return PortPtr( pObj );
 }
 
-IPort* CPort::GetLowerPort() const
+PortPtr CPort::GetLowerPort() const
 {
     CCfgOpenerObj a( this );
 
@@ -2789,14 +2814,14 @@ IPort* CPort::GetLowerPort() const
         propLowerPortPtr, pObj );
 
     if( ERROR( ret ) )
-        return nullptr;
+        return PortPtr();
 
-    return pObj;
+    return PortPtr( pObj );
 }
 
 gint32 CPort::FindPortByType(
     guint32 dwPortType,
-    PortPtr& pPortRet )
+    PortPtr& pPortRet ) const
 {
     gint32 ret = -ENOENT;
     CPort* pPort = nullptr;
@@ -2911,11 +2936,11 @@ gint32 CPort::DetachFromPort( IPort* pLowerPort )
     return ret;
 }
 
-IPort* CPort::GetTopmostPort() const
+PortPtr CPort::GetTopmostPort() const
 {
-    IPort* pCur = const_cast< CPort* >( this );
-    IPort* pNext = pCur;
-    while( pNext != nullptr )
+    PortPtr pCur( ( IPort* ) this );
+    PortPtr pNext = pCur;
+    while( !pNext.IsEmpty() )
     {
         pCur = pNext;
         pNext = pCur->GetUpperPort();
@@ -2923,11 +2948,11 @@ IPort* CPort::GetTopmostPort() const
     return pCur;
 }
 
-IPort* CPort::GetBottomPort() const
+PortPtr CPort::GetBottomPort() const
 {
-    IPort* pCur = const_cast< CPort* >( this );
-    IPort* pNext = pCur;
-    while( pNext != nullptr )
+    PortPtr pCur( ( IPort* ) this );
+    PortPtr pNext = pCur;
+    while( !pNext.IsEmpty() )
     {
         pCur = pNext;
         pNext = pCur->GetLowerPort();
@@ -2938,7 +2963,7 @@ IPort* CPort::GetBottomPort() const
 gint32 CPort::OnPortStackDestroy( IRP* pIrp )
 {
     gint32 ret = 0;
-    if( GetLowerPort() == nullptr )
+    if( GetLowerPort().IsEmpty() )
     {
         ret = GetIoMgr()->RemoveFromHandleMap( this );    
     }
@@ -2948,7 +2973,7 @@ gint32 CPort::OnPortStackDestroy( IRP* pIrp )
 gint32 CPort::OnPortStackBuilt( IRP* pIrp )
 {
     gint32 ret = 0;
-    if( GetLowerPort() == nullptr )
+    if( GetLowerPort().IsEmpty() )
     {
         ret = GetIoMgr()->AddToHandleMap( this );    
     }
@@ -3650,7 +3675,7 @@ gint32 CGenericBusPort::OpenPdoPort(
                 break;
             }
 
-            HANDLE hPort = 0;
+            HANDLE hPort = INVALID_HANDLE;
 
             CCfgOpener oExtCfg;
             *oExtCfg.GetCfg() = *pConstCfg;

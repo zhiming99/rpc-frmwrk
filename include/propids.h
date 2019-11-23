@@ -58,7 +58,7 @@ enum EnumPropId : gint32
     propFdoClass,
     propFdoId,          // type: guint32
     propPdoName,
-    propPdoClass,
+    propPdoClass,       // type: a string as the pdo port class
     propPdoId,          // type: guint32
     propIpAddr,         // type: string
     propPortType,       // type: guint32
@@ -83,6 +83,10 @@ enum EnumPropId : gint32
     propRmtSvrEvent,    // type: a connection point for online/offline of the remote server
     propRmtModEvent,    // type: a connection point for online/offline of the remote module
     propAdminEvent,     // type: a connection point for online/offline of the remote module
+
+    propSelfPtr,        // type: ObjPtr as the current port itslef
+    propPdoPtr,         // type: ObjPtr to th pdo port
+    propFdoPtr,         // type: ObjPtr to the fdo port
 
     // misc
     propRpcSvrPortNum = 0x3000,  // type: integer
@@ -190,7 +194,9 @@ enum EnumPropId : gint32
     propDataDesc,       // type: Objptr to a configdb for Send/Fetch's data description
     propObjDescPath,    // type: a string as the path of the object description file
     propRouterName,     // type: a string as the router name
-    propAddrFormat,      // type: a string as the address format, including `ipv4', `ipv6', `dn'( domain name ), `url'
+    propAddrFormat,     // type: a string as the address format, including `ipv4', `ipv6', `dn'( domain name ), `url'
+    propChildPdoClass,  // type: a string as the child pdo port class to create
+    propSubmitTo,       // type: an handle to the port the irp to submit. only valid when propSubmitPdo is true.
     propReservedEnd = 0x10000000,
     propInvalid = -1, 
 };

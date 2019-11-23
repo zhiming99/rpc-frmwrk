@@ -289,7 +289,7 @@ gint32 CSendQue::OnIoReady()
 
         if( GetSendState() == sendTok )
         {
-            ret = Send( m_iFd, &byToken,
+            ret = SendBytesNoSig( m_iFd, &byToken,
                 sizeof( byToken ) );
 
             if( ret == -1 )
@@ -351,7 +351,7 @@ gint32 CSendQue::OnIoReady()
             guint8* pos = ( ( guint8* )&dwSize ) +
                 m_dwOffsetWrite;
 
-            ret = Send( m_iFd, pos, iLeft );
+            ret = SendBytesNoSig( m_iFd, pos, iLeft );
 
             if( ret == ( gint32 )iLeft )
             {
@@ -417,7 +417,7 @@ gint32 CSendQue::OnIoReady()
                 m_dwBlockSent * STM_MAX_BYTES_PER_BUF +
                 m_dwOffsetWrite;
 
-            ret = Send( m_iFd, pos, iLeft );
+            ret = SendBytesNoSig( m_iFd, pos, iLeft );
             if( ret == ( gint32 )iLeft )
             {
                 // current packet is done

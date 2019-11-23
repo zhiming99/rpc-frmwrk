@@ -793,7 +793,8 @@ gint32 CRpcRouter::OnRmtSvrEvent(
     HANDLE hPort )
 {
     gint32 ret = 0;
-    if( hPort == 0 || strIpAddr.empty() )
+    if( hPort == INVALID_HANDLE ||
+        strIpAddr.empty() )
         return -EINVAL;
 
     TaskletPtr pDeferTask;
@@ -865,7 +866,8 @@ gint32 CRpcRouter::OnRmtSvrOnline(
     const string& strIpAddr,
     HANDLE hPort )
 {
-    if( hPort == INVALID_HANDLE || strIpAddr.empty() )
+    if( hPort == INVALID_HANDLE ||
+        strIpAddr.empty() )
         return -EINVAL;
 
     gint32 ret = 0;
@@ -880,7 +882,7 @@ gint32 CRpcRouter::OnRmtSvrOnline(
 
         if( !HasBridge() )
         {
-            // odd situation
+            // this is a forwarder
             ret = ERROR_FAIL;
             break;
         }

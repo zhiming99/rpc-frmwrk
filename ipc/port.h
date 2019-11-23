@@ -388,8 +388,22 @@ class CPort : public IPort
 
     gint32 RemoveProperty( gint32 iProp );
 
-    IPort* GetUpperPort() const;
-    IPort* GetLowerPort() const;
+    PortPtr GetUpperPort() const;
+    PortPtr GetLowerPort() const;
+
+    inline gint32 GetPdoPort(
+        PortPtr& portPtr ) const
+    {
+        return FindPortByType(
+            PORTFLG_TYPE_PDO, portPtr );
+    }
+
+    inline gint32 GetFdoPort(
+        PortPtr& portPtr ) const
+    {
+        return FindPortByType(
+            PORTFLG_TYPE_FDO, portPtr );
+    }
 
     gint32 GetStackPos() const;
 
@@ -441,7 +455,7 @@ class CPort : public IPort
 
     gint32 FindPortByType(
         guint32 dwPortType,
-        PortPtr& pPort );
+        PortPtr& pPort ) const;
 
     gint32 AllocIrpCtxExt(
         IrpCtxPtr& pIrpCtx,
@@ -462,8 +476,8 @@ class CPort : public IPort
 
     gint32 PassUnknownIrp( IRP* pIrp );
 
-    IPort* GetTopmostPort() const;
-    IPort* GetBottomPort() const;
+    PortPtr GetTopmostPort() const;
+    PortPtr GetBottomPort() const;
 
     inline CIoManager* GetIoMgr() const
     { return m_pIoMgr; }

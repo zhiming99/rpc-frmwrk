@@ -803,6 +803,10 @@ struct CRpcTcpBridgeShared
         IEventSink* pContext,
         MatchPtr& pMatch );
 
+    guint32 GetPortToSubmitShared(
+        CObjBase* pCfg,
+        PortPtr& pPort,
+        bool& bPdo );
 };
 
 class CRpcTcpBridge :
@@ -1012,6 +1016,16 @@ class CRpcTcpBridge :
         IEventSink* pCallback,
         ObjPtr& pVecMatches );
 
+    using CRpcBaseOperations::GetPortToSubmit;
+
+    virtual guint32 GetPortToSubmit(
+        CObjBase* pCfg,
+        PortPtr& pPort,
+        bool& bPdo )
+    {
+        return GetPortToSubmitShared(
+            pCfg, pPort, bPdo );
+    }
 };
 
 class CRpcTcpBridgeProxy :
@@ -1171,6 +1185,15 @@ class CRpcTcpBridgeProxy :
     virtual gint32 OnPostStart(
         IEventSink* pContext );
 
+    using CRpcBaseOperations::GetPortToSubmit;
+    virtual guint32 GetPortToSubmit(
+        CObjBase* pCfg,
+        PortPtr& pPort,
+        bool& bPdo )
+    {
+        return GetPortToSubmitShared(
+            pCfg, pPort, bPdo );
+    }
 };
 
 class CRouterStopBridgeProxyTask

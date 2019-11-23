@@ -261,12 +261,8 @@ class CGenericInterface :
         return m_pIfStat->GetHandle();
     }
 
-    inline IPort* GetPort() const
-    {
-        HANDLE hPort = GetPortHandle();
-        IPort* pPort = HandleToPort( hPort );
-        return pPort;
-    }
+    PortPtr GetPort() const;
+
     // Set the default request timeout for an
     // interface . The outgoing requests with
     // reply afterwards will all follow this
@@ -390,6 +386,14 @@ class CRpcBaseOperations :
         return GetState() == stateConnected;
     }
 
+    virtual guint32 GetPortToSubmit(
+        CObjBase* pCfg,
+        PortPtr& pPort,
+        bool& bPdo );
+
+    guint32 GetPortToSubmit(
+        CObjBase* pCfg,
+        PortPtr& pPort );
 };
 
 #include "iftasks.h"

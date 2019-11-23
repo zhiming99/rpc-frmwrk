@@ -99,7 +99,8 @@ gint32 CIoManager::SubmitIrp(
 {
     gint32 ret = 0;
 
-    if( pIrp == nullptr || hPort == 0 )
+    if( pIrp == nullptr ||
+        hPort == INVALID_HANDLE )
         return -EINVAL;
 
     do{
@@ -884,7 +885,8 @@ gint32 CIoManager::ClosePort(
     // otherwise unexpected things would happen
     gint32 ret = 0;
     do{
-        if( hPort == 0 || pEvent == nullptr )
+        if( hPort == INVALID_HANDLE ||
+            pEvent == nullptr )
         {
             ret = -EINVAL;
             break;
@@ -947,7 +949,8 @@ gint32 CIoManager::OpenPortByRef(
     HANDLE hPort,
     IEventSink* pEventSink )
 {
-    if( hPort == 0 || pEventSink == nullptr )
+    if( hPort == INVALID_HANDLE ||
+        pEventSink == nullptr )
         return -EINVAL;
 
     PortPtr pPort;
@@ -963,7 +966,7 @@ gint32 CIoManager::GetPortProp(
     gint32 iProp,
     BufPtr& pBuf )
 {
-    if( hPort == 0 )
+    if( hPort == INVALID_HANDLE )
         return -EINVAL;
 
     PortPtr pPort;

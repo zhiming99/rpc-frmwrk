@@ -56,8 +56,6 @@ gint32 CRpcTcpFidoDrv::Probe(
         }
 
         string strPdoClass;
-        string strClass =
-            PORT_CLASS_TCP_STREAM_PDO;
 
         CCfgOpenerObj oCfg( pLowerPort );
         ret = oCfg.GetStrProp(
@@ -66,7 +64,8 @@ gint32 CRpcTcpFidoDrv::Probe(
         if( ERROR( ret ) )
             break;
 
-        if( strClass != strPdoClass )
+        if( PORT_CLASS_TCP_STREAM_PDO != strPdoClass &&
+            PORT_CLASS_TCP_STREAM_PDO2 != strPdoClass )
         {
             // this is not a port we support
             ret = -ENOTSUP;
@@ -92,7 +91,6 @@ gint32 CRpcTcpFidoDrv::Probe(
         oNewCfg.SetPointer(
             propDrvPtr, this );
 
-        PortPtr pNewPort;
         ret = CreatePort( pNewPort,
             oNewCfg.GetCfg() );
 

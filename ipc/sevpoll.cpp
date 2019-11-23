@@ -95,7 +95,7 @@ gint32 CSimpleEvPoll::StartStopSource(
 {
     gint32 ret = 0;
 
-    if( hWatch == 0 )
+    if( hWatch == INVALID_HANDLE )
         return -EINVAL;
 
     CEvLoop::SOURCE_HEADER* pSrc = nullptr;
@@ -115,7 +115,8 @@ gint32 CSimpleEvPoll::UpdateSource(
     IConfigDb* pCfg )
 {
     gint32 ret = 0;
-    if( hWatch == 0 || pCfg == nullptr )
+    if( hWatch == INVALID_HANDLE ||
+        pCfg == nullptr )
         return -EINVAL;
 
     do{

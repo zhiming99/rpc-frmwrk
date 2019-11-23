@@ -38,6 +38,8 @@
 #define PORT_CLASS_DBUS_PROXY_FDO       "DBusProxyFdo"
 #define PORT_CLASS_RPC_TCP_FIDO         "RpcTcpFido"
 #define PORT_CLASS_TCP_STREAM_PDO       "TcpStreamPdo"
+#define PORT_CLASS_TCP_STREAM_PDO2      "TcpStreamPdo2"
+#define PORT_CLASS_RPC_NATPROTO_FDO     "RpcNativeProtoFdo"
 #define PORT_CLASS_LOCALDBUS_PDO        "DBusLocalPdo"
 #define PORT_CLASS_LOCALDBUS            "DBusBusPort"
 #define PORT_CLASS_RPC_TCPBUS           "RpcTcpBusPort"

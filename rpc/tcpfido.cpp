@@ -34,6 +34,47 @@ using namespace std;
 
 std::atomic< guint32 > CRpcTcpFido::m_atmSeqNo( 0 );
 
+static gint32 GetBdgeIrpStmId(
+    PIRP pIrp, gint32& iStmId )
+{
+    if( pIrp == nullptr )
+        return -EINVAL;
+
+    IrpCtxPtr& pCtx = pIrp->GetTopStack();
+    BufPtr pExtBuf;
+    pCtx->GetExtBuf( pExtBuf );
+    if( pExtBuf.IsEmpty() )
+        return -EINVAL;
+
+    FIDO_IRP_EXT* pExt =
+        ( FIDO_IRP_EXT* )pExtBuf->ptr();    
+
+    iStmId = pExt->iStmId;
+    return 0;
+}
+
+gint32 SetBdgeIrpStmId( 
+    PIRP pIrp, gint32 iStmId )
+{
+    if( pIrp == nullptr )
+        return -EINVAL;
+
+    if( iStmId < 0 )
+        return -EINVAL;
+
+    IrpCtxPtr& pCtx = pIrp->GetTopStack();
+    BufPtr pExtBuf;
+    pCtx->GetExtBuf( pExtBuf );
+    if( pExtBuf.IsEmpty() )
+        return -EINVAL;
+
+    FIDO_IRP_EXT* pExt =
+        ( FIDO_IRP_EXT* )pExtBuf->ptr();    
+
+    pExt->iStmId = iStmId;
+    return 0;
+}
+
 CRpcTcpFido::CRpcTcpFido(
     const IConfigDb* pCfg  )
     : super( pCfg )
@@ -386,8 +427,11 @@ gint32 CRpcTcpFido::HandleSendReq(
         if(  ret == STATUS_PENDING )
             break;
 
-        pCtx->SetStatus( 
-            pNewCtx->GetStatus() );
+        if( dwIoDir == IRP_DIR_OUT )
+        {
+            pCtx->SetStatus( 
+                pNewCtx->GetStatus() );
+        }
 
         // the response is yet to come
         pIrp->PopCtxStack();
@@ -767,7 +811,10 @@ gint32 CRpcTcpFido::CompleteSendReq(
                 }
                 BufPtr& pBuf = pCtx->m_pRespData;
                 if( pBuf.IsEmpty() )
+                {
+                    ret = -ENODATA;
                     break;
+                }
 
                 DMsgPtr pMsg = *pBuf;
                 DMsgPtr& pReqMsg = *pCtx->m_pReqData;
@@ -1218,6 +1265,8 @@ gint32 CRpcTcpFido::CompleteIoctlIrp(
         case CTRLCODE_SEND_REQ:
         case CTRLCODE_SEND_RESP:
         case CTRLCODE_SEND_EVENT:
+        case CTRLCODE_SEND_DATA:
+        case CTRLCODE_FETCH_DATA:
             {
                 ret = CompleteSendReq( pIrp );
                 break;
@@ -1366,7 +1415,7 @@ gint32 CRpcTcpFido::OnPortReady(
 
     do{
         // we are done
-        if( GetUpperPort() != nullptr )
+        if( !GetUpperPort().IsEmpty() )
             break;
 
         // notify the stack all the ports are

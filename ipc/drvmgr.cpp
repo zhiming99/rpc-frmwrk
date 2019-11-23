@@ -1022,7 +1022,7 @@ gint32 CDriverManager::BuildPortStack(
         CCfgOpenerObj oPortCfg( pPort );
 
         string strPortClass;
-        string strDrvName;
+        vector< string > vecDrivers;
 
         ret = oPortCfg.GetStrProp(
             propPortClass, strPortClass );
@@ -1033,7 +1033,7 @@ gint32 CDriverManager::BuildPortStack(
         guint32 i = 0;
         for( ; i < oMatchArray.size(); i++ )
         {
-            Json::Value elem = oMatchArray[ i ];
+            Json::Value& elem = oMatchArray[ i ];
             if( elem == Json::Value::null )
                 continue;
 
@@ -1042,13 +1042,32 @@ gint32 CDriverManager::BuildPortStack(
 
             if( elem[ JSON_ATTR_FDODRIVER ] != Json::Value::null )
             {
-                strDrvName = elem[ JSON_ATTR_FDODRIVER ].asString();
+                vecDrivers.push_back( 
+                    elem[ JSON_ATTR_FDODRIVER ].asString() );
                 break;
             }
 
             if( elem[ JSON_ATTR_FIDODRIVER ] != Json::Value::null )
             {
-                strDrvName = elem[ JSON_ATTR_FIDODRIVER ].asString();
+                vecDrivers.push_back( 
+                    elem[ JSON_ATTR_FIDODRIVER ].asString() );
+                break;
+            }
+
+            if( elem[ JSON_ATTR_PROBESEQ ] != Json::Value::null )
+            {
+                Json::Value& oDrvArray = elem[ JSON_ATTR_PROBESEQ ];
+                if( !oDrvArray.isArray() 
+                    || oDrvArray.size() == 0 )
+                    continue;
+
+                for( guint32 j = 0; j < oDrvArray.size(); j++ )
+                {
+                    Json::Value& oDrvName = oDrvArray[ j ];
+                    if( oDrvName.empty() || !oDrvName.isString() )
+                        continue;
+                    vecDrivers.push_back( oDrvName.asString() );
+                }
                 break;
             }
         }
@@ -1058,37 +1077,43 @@ gint32 CDriverManager::BuildPortStack(
         // filter drivers in both the config file
         // and the code if needed
         //
-        if( i == oMatchArray.size() )
+        if( i == oMatchArray.size() ||
+            vecDrivers.empty() )
         {
             // driver not installed
             ret = -ENOPKG;
             break;
         }
 
-        IPortDriver* pDrv = nullptr;
-        ret = FindDriver( strDrvName, pDrv ); 
-        if( ERROR( ret ) )
+        for( auto strDrvName : vecDrivers )
         {
-            ret = LoadDriver( strDrvName );
+            IPortDriver* pDrv = nullptr;
+            ret = FindDriver( strDrvName, pDrv ); 
+            if( ERROR( ret ) )
+            {
+                // not loaded yet
+                ret = LoadDriver( strDrvName );
+                if( ERROR( ret ) )
+                    break;
+
+                ret = FindDriver( strDrvName, pDrv );
+                if( ERROR( ret ) )
+                    break;
+            }
+
+            PortPtr pNewPort;
+            ret = pDrv->Probe(
+                pPort, pNewPort, a.GetCfg() );
+
             if( ERROR( ret ) )
                 break;
 
-            ret = FindDriver( strDrvName, pDrv );
-            if( ERROR( ret ) )
-                break;
+            // repeat to attach more port on top of pNewPort
+            pPort = pNewPort;
         }
 
-        PortPtr pNewPort;
-        ret = pDrv->Probe(
-            pPort, pNewPort, a.GetCfg() );
+    }while( 0 );
 
-        if( ERROR( ret ) )
-            break;
-
-        // repeat to attach more port on top of pNewPort
-        pPort = pNewPort;
-
-    }while( 1 );
     ret = 0;
     return ret;
 }

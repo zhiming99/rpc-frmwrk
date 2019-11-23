@@ -226,7 +226,7 @@ class CBuffer : public CObjBase
 
     inline gint32 SetOffset( guint32 dwOffset )
     {
-        if( empty() )
+        if( m_pData == nullptr )
             return ERROR_STATE;
 
         if( dwOffset > m_dwSize )

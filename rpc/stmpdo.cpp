@@ -170,7 +170,8 @@ gint32 CRpcTcpBusPort::BuildPdoPortName(
         ret = oCfgOpener.GetStrProp(
             propPortClass, strClass );
 
-        if( strClass != PORT_CLASS_TCP_STREAM_PDO )
+        if( strClass != PORT_CLASS_TCP_STREAM_PDO &&
+            strClass != PORT_CLASS_TCP_STREAM_PDO2 )
         {
             ret = -ENOTSUP;
             break;
@@ -259,25 +260,32 @@ gint32 CRpcTcpBusPort::CreatePdoPort(
             break;
         }
 
-        string strPortClass;
+        string strClass;
         CCfgOpener oExtCfg( ( IConfigDb* )pCfg );
 
         ret = oExtCfg.GetStrProp(
-            propPortClass, strPortClass );
+            propPortClass, strClass );
 
-        // by default, we creaete the tcp stream
-        // pdo, and the only pdo we support
+        // by default, we create the tcp stream pdo
         if( ERROR( ret ) )
         {
-            strPortClass =
-                PORT_CLASS_TCP_STREAM_PDO;
+            ret = -EINVAL;
+            break;
         }
 
-        if( strPortClass
-            == PORT_CLASS_TCP_STREAM_PDO )
+        if( strClass ==
+            PORT_CLASS_TCP_STREAM_PDO )
         {
             ret = CreateTcpStreamPdo(
-                pCfg, pNewPort );
+                pCfg, pNewPort,
+                clsid( CTcpStreamPdo ) );
+        }
+        else if( strClass ==
+            PORT_CLASS_TCP_STREAM_PDO2 )
+        {
+            ret = CreateTcpStreamPdo(
+                pCfg, pNewPort,
+                clsid( CTcpStreamPdo2 ) );
         }
         else
         {
@@ -291,7 +299,8 @@ gint32 CRpcTcpBusPort::CreatePdoPort(
 
 gint32 CRpcTcpBusPort::CreateTcpStreamPdo(
     IConfigDb* pCfg,
-    PortPtr& pNewPort )
+    PortPtr& pNewPort,
+    const EnumClsid& iClsid ) const
 {
     if( pCfg == nullptr )
         return -EINVAL;
@@ -313,7 +322,7 @@ gint32 CRpcTcpBusPort::CreateTcpStreamPdo(
         }
 
         ret = pNewPort.NewObj(
-            clsid( CTcpStreamPdo ), pCfg );
+            iClsid, pCfg );
 
         // the pdo port `Start()' will be deferred
         // till the complete port stack is built.
@@ -551,9 +560,17 @@ gint32 CRpcTcpBusPort::OnNewConnection(
         oCfg.SetBoolProp(
             propIsServer, true );
 
+        std::string strClass;
+
+        ret = oPortCfg.GetStrProp(
+            propChildPdoClass, strClass );
+
+        if( ERROR( ret ) )
+            strClass = PORT_CLASS_TCP_STREAM_PDO;
+
         ret = oCfg.SetStrProp(
             propPortClass,
-            PORT_CLASS_TCP_STREAM_PDO );
+            strClass );
 
         if( ERROR( ret ) )
             break;
@@ -732,6 +749,15 @@ gint32 CRpcTcpBusDriver::GetTcpSettings(
                     oParams[ JSON_ATTR_ADDRFORMAT ].asString();
                 oCfg.SetStrProp( propAddrFormat, strFormat );
             }
+
+            // 
+            if( oParams.isMember( JSON_ATTR_PDOCLASS ) &&
+                oParams[ JSON_ATTR_PDOCLASS ].isString() )
+            {
+                string strClass =
+                    oParams[ JSON_ATTR_PDOCLASS ].asString();
+                oCfg.SetStrProp( propChildPdoClass, strClass );
+            }
         }
 
     }while( 0 );
@@ -827,7 +853,7 @@ CTcpStreamPdo::~CTcpStreamPdo()
     sem_destroy( &m_semFireSync );
 }
 
-static gint32 GetPreStopStep(
+gint32 GetPreStopStep(
     PIRP pIrp, guint32& dwStepNo )
 {
     BufPtr pBuf;
@@ -842,7 +868,7 @@ static gint32 GetPreStopStep(
     return 0;
 }
 
-static gint32 SetPreStopStep(
+gint32 SetPreStopStep(
     PIRP pIrp, guint32 dwStepNo )
 {
     BufPtr pBuf;
