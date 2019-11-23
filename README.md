@@ -24,6 +24,9 @@ This framework depends on the following packags:
 12. `Websocket/http support`(to come)
 
 ---
+[`Sat 23 Nov 2019 01:38:46 PM Beijing`]   
+1. Finally, it tooks 20 days to make the new tcpport stack in place. Now we can move on to add the following features, compression, SSL, websocket/http2 support.
+
 [`Sat 09 Nov 2019 10:09:12 AM Beijing`]   
 1. Refacting the tcpport. I did not realize that through the days, the tcpport has grown to a big module with about 10000 loc.
 2. Continue the design of the support for websock/http.
