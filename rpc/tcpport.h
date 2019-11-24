@@ -70,8 +70,14 @@ enum EnumSockState
 struct CPacketHeader
 {
     guint32     m_dwMagic;
+
+    // byte count of the payload after this header
     guint32     m_dwSize;
+
+    // the sender's stream id
     gint32      m_iStmId;
+
+    // the receiver's stream id
     gint32      m_iPeerStmId;
     guint16     m_wFlags;
     guint16     m_wProtoId;

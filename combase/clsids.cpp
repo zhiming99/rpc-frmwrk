@@ -95,10 +95,15 @@ gint32 CoLoadClassFactory( const char* pszPath  )
         if( hDll == nullptr )
         {
             ret = -EBADF;
+            char* pszError = dlerror();
+            if( pszError )
+            {
+                fprintf( stderr,
+                    "Fail to load dll: %s\n", pszError );
+            }
+
             break;
         }
-
-        dlerror();
 
         PLOADCLASSFACTORY pFunc =
             ( PLOADCLASSFACTORY )dlsym( hDll, "DllLoadFactory" );

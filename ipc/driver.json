@@ -123,14 +123,12 @@
             "PortType"      : "Pdo",
             "PortClass"     : "TcpStreamPdo",
             "InternalClass" : "CTcpStreamPdo",
-            "PortDriver"    : "",
             "BusPortClass"  : "RpcTcpBusPort"
         },
         {
             "PortType"      : "Pdo",
             "PortClass"     : "TcpStreamPdo2",
             "InternalClass" : "CTcpStreamPdo2",
-            "PortDriver"    : "",
             "BusPortClass"  : "RpcTcpBusPort"
         },
         {
@@ -150,6 +148,7 @@
                 "Protocol" : "native",
                 "PortNumber": "4132",
                 "BindAddr" : "0.0.0.0",
+                "comment"  : "Change 'PdoClass' to 'TcpStreamPdo' when in a trusted and stable environment",
                 "PdoClass" : "TcpStreamPdo2"
             }
         },

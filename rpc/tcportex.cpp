@@ -608,10 +608,12 @@ gint32 CRpcStream2::SetupIrpForLowerPort(
             if( ERROR( ret ) )
                 break;
 
+            // less network traffic
             oParams.Push( pHeader );
         }
         else
         {
+            // less memory and copies
             // a scatter-gather list
             oParams.Push( pHeader );
             oParams.Push( pPayload );

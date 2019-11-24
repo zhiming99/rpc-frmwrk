@@ -266,7 +266,6 @@ gint32 CRpcTcpBusPort::CreatePdoPort(
         ret = oExtCfg.GetStrProp(
             propPortClass, strClass );
 
-        // by default, we create the tcp stream pdo
         if( ERROR( ret ) )
         {
             ret = -EINVAL;
