@@ -24,6 +24,10 @@ This framework depends on the following packags:
 12. `Websocket/http support`(to come)
 
 ---
+[`Mon 25 Nov 2019 03:58:57 PM Beijing`]   
+1. added LZ4 compression option to the router traffic. the `rpcrouter` now accepts option `-c` to enable compression on the outbound packets from the CRpcNativeProtoFdo port.
+2. SSL support next...
+
 [`Sat 23 Nov 2019 01:38:46 PM Beijing`]   
 1. Finally, it took 20 days to make the new `tcp port stack` in place. Both the old `tcp port stack` and the new stack can be useful in different use cases. And therefore let's keep both alive for a period.
 2. the lesson learned is that it is always better to make full research in advance than to rewrite afterward.
