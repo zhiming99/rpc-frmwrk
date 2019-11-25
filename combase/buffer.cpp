@@ -984,3 +984,45 @@ gint32 CBuffer::Append(
     SetExDataType( typeByteArr );
     return 0;
 }
+
+#include <lz4.h>
+gint32 CBuffer::Compress(
+    guint8* pDest, guint32& dwSize ) const
+{
+    guint32 dwMaxSize =
+        LZ4_compressBound( size() );
+
+    if( pDest == nullptr )
+    {
+        dwSize = dwMaxSize;
+        return 0;
+    }
+    if( dwSize < dwMaxSize )
+        return -EOVERFLOW;
+   
+    gint32 dwActSize = LZ4_compress_default(
+        ptr(), ( char* )pDest,
+        size(), dwMaxSize ); 
+
+    if( dwActSize <= 0 )
+        return ERROR_FAIL;
+
+    dwSize = dwActSize;
+    return 0;
+}
+
+gint32 CBuffer::Decompress(
+    guint8* pDest, guint32 dwOrigSize ) const
+{
+    guint32 dwActSize = LZ4_decompress_safe(
+        ptr(), ( char* )pDest,
+        size(), dwOrigSize );
+
+    if( dwActSize <= 0 )
+        return ERROR_FAIL;
+
+    if( dwActSize != dwOrigSize )
+        return ERROR_FAIL;
+
+    return 0;
+}

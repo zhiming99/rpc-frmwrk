@@ -907,7 +907,20 @@ gint32 CBytesSender::OnSendReady(
         CfgPtr pCfg;
         ret = pCtx->GetReqAsCfg( pCfg );
         if( ERROR( ret ) )
-            break;
+        {
+            BufPtr pPayload = pCtx->m_pReqData;
+            if( pPayload.IsEmpty() ||
+                pPayload->empty() )
+            {
+                ret = -EFAULT;
+                break;
+            }
+
+            // a single buffer to send
+            CParamList oParams;
+            oParams.Push( pPayload );
+            pCfg = oParams.GetCfg();
+        }
 
         CParamList oParams( pCfg );
         gint32 iCount = 0;

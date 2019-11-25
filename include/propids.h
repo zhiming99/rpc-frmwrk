@@ -197,6 +197,7 @@ enum EnumPropId : gint32
     propAddrFormat,     // type: a string as the address format, including `ipv4', `ipv6', `dn'( domain name ), `url'
     propChildPdoClass,  // type: a string as the child pdo port class to create
     propSubmitTo,       // type: an handle to the port the irp to submit. only valid when propSubmitPdo is true.
+    propCompress,       // type: a boolean value to indicate whether to compress the data packet over the tcp connection.
     propReservedEnd = 0x10000000,
     propInvalid = -1, 
 };

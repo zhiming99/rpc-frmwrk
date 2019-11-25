@@ -582,6 +582,9 @@ class CBuffer : public CObjBase
 
         return ret;
     }
+
+    gint32 Compress( guint8* pDest, guint32& dwSize ) const;
+    gint32 Decompress( guint8* pDest, guint32 dwOrigSize ) const;
 };
 
 template<> CBuffer& CBuffer::operator=<stdstr>( const stdstr& rhs );

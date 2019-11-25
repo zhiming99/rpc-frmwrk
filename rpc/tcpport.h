@@ -67,6 +67,8 @@ enum EnumSockState
 };
 
 #define RPC_PACKET_MAGIC    ( *( ( guint32* )"PHdr" ) )
+#define RPC_PACKET_FLG_COMPRESS       1
+
 struct CPacketHeader
 {
     guint32     m_dwMagic;
@@ -233,7 +235,12 @@ class CCarrierPacket :
     {
         m_pBuf = pBuf;
     }
-        
+
+    inline guint32 GetFlags()
+    { return m_oHeader.m_wFlags; }
+
+    inline const CPacketHeader& GetHeader() const
+    { return m_oHeader; }
 };
 
 typedef CAutoPtr< Clsid_Invalid, CCarrierPacket > PacketPtr;

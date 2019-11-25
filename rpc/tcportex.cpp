@@ -501,6 +501,99 @@ gint32 CRpcStream2::StartSendDeferred(
     return ret;
 }
 
+gint32 CompressDataLZ4(
+    const BufPtr& pPayload, BufPtr& pCompressed )
+{
+    gint32 ret = 0;
+    if( pPayload.IsEmpty() || pPayload->empty() )
+        return -EINVAL;
+
+    do{
+        if( pCompressed.IsEmpty() )
+        {
+            ret = pCompressed.NewObj();
+            if( ERROR( ret ) )
+                break;
+        }
+
+        guint32 dwMaxSize = 0;
+        ret = pPayload->Compress(
+            nullptr, dwMaxSize );
+
+        if( ERROR( ret ) )
+            break;
+
+        pCompressed->Resize(
+            sizeof( guint32 ) + dwMaxSize );
+
+        guint32 dwActSize = dwMaxSize;
+        guint8* pDest = ( guint8* )
+            pCompressed->ptr();
+
+        pDest += sizeof( guint32 );
+
+        ret = pPayload->Compress(
+            pDest, dwActSize );
+
+        if( ERROR( ret ) )
+            break;
+
+        if( dwActSize < dwMaxSize )
+        {
+            guint32 dwFinSize =
+                sizeof( guint32 ) + dwActSize;
+            pCompressed->Resize( dwFinSize );
+            *( ( guint32* )pCompressed->ptr() ) =
+                htonl( pPayload->size() );
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 DecompressDataLZ4(
+    BufPtr& pPayload, BufPtr& pDecompressed )
+{
+    gint32 ret = 0;
+    if( pPayload.IsEmpty() || pPayload->empty() )
+        return -EINVAL;
+
+    do{
+        guint32 dwOrigSize = 0;
+        if( pDecompressed.IsEmpty() )
+        {
+            ret = pDecompressed.NewObj();
+            if( ERROR( ret ) )
+                break;
+        }
+
+        dwOrigSize = ntohl(
+            *( guint32* )pPayload->ptr() );
+        
+        if( dwOrigSize == 0 ||
+            dwOrigSize > MAX_BYTES_PER_TRANSFER )
+        {
+            ret = -EBADMSG;
+            break;
+        }
+
+        pDecompressed->Resize( dwOrigSize );
+
+        pPayload->SetOffset( pPayload->offset() +
+            sizeof( guint32 ) );
+
+        ret = pPayload->Decompress( ( guint8* )
+            pDecompressed->ptr(), dwOrigSize );
+
+        pPayload->SetOffset( pPayload->offset() -
+            sizeof( guint32 ) );
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CRpcStream2::SetupIrpForLowerPort(
     IPort* pLowerPort, PIRP pIrp ) const
 {
@@ -569,16 +662,31 @@ gint32 CRpcStream2::SetupIrpForLowerPort(
                 break;
         }
 
+        if( m_pParentPort->IsCompress() )
+        {
+            BufPtr pCompressed;
+            ret = CompressDataLZ4(
+                pPayload, pCompressed );
+            if( ERROR( ret ) )
+                break;
+            pPayload = pCompressed;
+        }
+
         guint32 dwSeqNo = 0;
         oCfg.GetIntProp( propSeqNo, dwSeqNo );
         
         CPacketHeader oHeader;
         oHeader.m_iStmId    = m_iStmId;
         oHeader.m_iPeerStmId = m_iPeerStmId;
-        oHeader.m_wFlags    = 0;
         oHeader.m_wProtoId  = m_wProtoId;
         oHeader.m_dwSize    = pPayload->size();
         oHeader.m_dwSessId  = 0;
+
+        if( m_pParentPort->IsCompress() )
+        {
+            oHeader.m_wFlags =
+                RPC_PACKET_FLG_COMPRESS ;
+        }
 
         if( dwSeqNo != 0 )
             oHeader.m_dwSeqNo = dwSeqNo;
@@ -1543,9 +1651,23 @@ CRpcNativeProtoFdo::CRpcNativeProtoFdo(
     : super( pCfg ),
     m_iStmCounter( STMSOCK_STMID_FLOOR )
 {
-    SetClassId( clsid( CRpcNativeProtoFdo ) );
-    m_dwFlags &= ~PORTFLG_TYPE_MASK;
-    m_dwFlags |= PORTFLG_TYPE_FDO;
+    gint32 ret = 0;
+    do{
+        SetClassId( clsid( CRpcNativeProtoFdo ) );
+        m_dwFlags &= ~PORTFLG_TYPE_MASK;
+        m_dwFlags |= PORTFLG_TYPE_FDO;
+
+        ret = GetIoMgr()->GetCmdLineOpt(
+            propCompress, m_bCompress );
+
+        if( ERROR( ret ) )
+            m_bCompress = false;
+
+        ret = 0;
+
+    }while( 0 );
+
+    return;
 }
 
 gint32 CRpcNativeProtoFdo::AddStream(
@@ -3463,6 +3585,24 @@ gint32 CRpcNativeProtoFdo::OnReceive(
 
                 guint32 dwSeqNo = 0;
                 pIn->GetSeqNo( dwSeqNo );
+
+                if( pIn->GetFlags() &
+                    RPC_PACKET_FLG_COMPRESS )
+                {
+                    BufPtr pDecompressed;
+                    BufPtr pBuf;
+                    ret = pIn->GetPayload( pBuf );
+                    if( ERROR( ret ) )
+                        break;
+
+                    ret = DecompressDataLZ4(
+                        pBuf, pDecompressed );
+                    if( ERROR( ret ) )
+                        break;
+
+                    pIn->SetPayload(
+                        pDecompressed );
+                }
 
                 ret = GetStream( iStmId, pStm );
                 if( ERROR( ret ) )

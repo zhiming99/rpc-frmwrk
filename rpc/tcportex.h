@@ -258,6 +258,8 @@ class CRpcNativeProtoFdo: public CPort
     // the stream whose irp for sending is in process
     bool    m_bStopReady = false;
     bool    m_bSending = false;
+    bool    m_bCompress = false;
+
     Stm2Ptr m_pCurStm;
     PacketPtr m_pPackReceiving;
 
@@ -394,6 +396,9 @@ class CRpcNativeProtoFdo: public CPort
     gint32 AllocIrpCtxExt(
         IrpCtxPtr& pIrpCtx,
         void* pContext ) const;
+
+    inline bool IsCompress() const
+    { return m_bCompress; }
 };
 
 class CFdoListeningTask :

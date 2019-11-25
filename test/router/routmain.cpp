@@ -39,6 +39,7 @@ CPPUNIT_TEST_SUITE_REGISTRATION( CIfRouterTest );
 
 // router role: 1. reqfwdr, 2. bridge, 3. both
 guint32 g_dwRole = 1;
+bool g_bCompress = false;
 
 void CIfRouterTest::setUp()
 {
@@ -68,6 +69,12 @@ void CIfRouterTest::setUp()
 
             pSvc->SetCmdLineOpt(
                 propRouterRole, g_dwRole );
+
+            if( g_bCompress )
+            {
+                pSvc->SetCmdLineOpt(
+                    propCompress, g_bCompress );
+            }
 
             ret = pSvc->Start();
         }
@@ -230,10 +237,16 @@ int main( int argc, char** argv )
 
     int opt = 0;
     int ret = 0;
-    while( ( opt = getopt( argc, argv, "r:" ) ) != -1 )
+    while( ( opt = getopt( argc, argv, "cr:" ) ) != -1 )
     {
         switch (opt)
         {
+        case 'c':
+            {
+                // compression required
+                g_bCompress = true;
+                break;
+            }
         case 'r':
             {
                 g_dwRole = ( guint32 )atoi( optarg );
