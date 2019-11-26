@@ -5,10 +5,11 @@ This is an asynchronous and event-driven RPC framework for embeded system with s
 
 #### Dependency:  
 This framework depends on the following packags:  
-1. `dbus-1.0 (dbus-devel.i686)`  
-2. `libjson-cpp (jsoncpp-devel.i686)`  
-3. `cppunit-1 (for the sample code, cppunit.i686 and cppunit-devel.i686)`   
-4. `glib-2.0 (for compile only,glib2-devel.i686)`   
+1. `dbus-1.0 (dbus-devel)`  
+2. `libjson-cpp (jsoncpp-devel)` 
+3. `lz4 (lz4-devel)`   
+4. `cppunit-1 (for the sample code, cppunit and cppunit-devel)`   
+5. `glib-2.0 (for compile only,glib2-devel)`   
 #### Features:   
 1. `Multiple interfaces on a single object (COM alike).`   
 2. `Synchronous/Asynchronous request and handling.`   
@@ -25,7 +26,7 @@ This framework depends on the following packags:
 
 ---
 [`Mon 25 Nov 2019 03:58:57 PM Beijing`]   
-1. added LZ4 compression option to the router traffic. the `rpcrouter` now accepts option `-c` to enable compression on the outbound packets from the CRpcNativeProtoFdo port.
+1. added LZ4 compression option to the router traffic. the `rpcrouter` now accepts command line option `-c` to enable compression on the outbound packets from the CRpcNativeProtoFdo port.
 2. SSL support next...
 
 [`Sat 23 Nov 2019 01:38:46 PM Beijing`]   
