@@ -25,6 +25,9 @@ This framework depends on the following packags:
 12. `Websocket/http support`(to come)
 
 ---
+[`Sat 30 Nov 2019 02:33:06 PM Beijing`]   
+1. Still writing openssl support, and stucked with the SSL's renegotiation. It should be done next week.   
+
 [`Mon 25 Nov 2019 03:58:57 PM Beijing`]   
 1. added LZ4 compression option to the router traffic. the `rpcrouter` now accepts command line option `-c` to enable compression on the outbound packets from the CRpcNativeProtoFdo port.
 2. SSL support next...
