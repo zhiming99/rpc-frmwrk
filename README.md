@@ -5,13 +5,14 @@ This is an asynchronous and event-driven RPC framework for embeded system with s
 
 #### Dependency:  
 This framework depends on the following packags:  
-1. `dbus-1.0 (dbus-devel.i686)`  
-2. `libjson-cpp (jsoncpp-devel.i686)`  
-3. `cppunit-1 (for the sample code, cppunit.i686 and cppunit-devel.i686)`   
-4. `glib-2.0 (for compile only,glib2-devel.i686)`   
+1. `dbus-1.0 (dbus-devel)`
+2. `libjson-cpp (jsoncpp-devel)` 
+3. `lz4 (lz4-devel)`   
+4. `cppunit-1 (for the sample code, cppunit and cppunit-devel)`   
+5. `glib-2.0 (for compile only,glib2-devel)`   
 #### Features:   
-1. `Multiple interfaces on a single object (COM alike).`   
-2. `Synchronous/Asynchronous request and handling.`   
+1. `Support for multiple interfaces on a single object (COM alike).`   
+2. `Support for synchronous/Asynchronous requests and handling.`   
 3. `Active canceling.`   
 4. `Server side event broadcasting.`   
 5. `Keep-alive for time-consuming request.`   
@@ -24,6 +25,13 @@ This framework depends on the following packags:
 12. `Websocket/http support`(to come)
 
 ---
+[`Sat 30 Nov 2019 02:33:06 PM Beijing`]   
+1. Still writing openssl support, and stucked with the SSL's renegotiation. It should be done next week.   
+
+[`Mon 25 Nov 2019 03:58:57 PM Beijing`]   
+1. added LZ4 compression option to the router traffic. the `rpcrouter` now accepts command line option `-c` to enable compression on the outbound packets from the CRpcNativeProtoFdo port.
+2. SSL support next...
+
 [`Sat 23 Nov 2019 01:38:46 PM Beijing`]   
 1. Finally, it took 20 days to make the new `tcp port stack` in place. Both the old `tcp port stack` and the new stack can be useful in different use cases. And therefore let's keep both alive for a period.
 2. the lesson learned is that it is always better to make full research in advance than to rewrite afterward.
