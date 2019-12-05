@@ -987,11 +987,6 @@ gint32 CTcpStreamPdo::PostStart(
     gint32 ret = 0;
 
     do{
-        // FIXME: what if it returns
-        // STATUS_PENDING truely
-        if( ret == STATUS_PENDING )
-            break;
-
         CParamList oParams;
 
         ret = oParams.CopyProp(

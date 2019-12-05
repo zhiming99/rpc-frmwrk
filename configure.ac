@@ -44,6 +44,7 @@ AC_CONFIG_FILES([Makefile
                  combase/Makefile
                  ipc/Makefile
                  rpc/Makefile
+                 rpc/sslport/Makefile
                  test/Makefile
                  test/Makefile.init.pub
                  test/actcancel/Makefile

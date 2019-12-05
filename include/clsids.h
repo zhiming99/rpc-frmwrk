@@ -256,6 +256,7 @@ typedef enum : guint32
     DECL_CLSID( CStmSockConnectTask2 ),
     DECL_CLSID( CRpcNatProtoFdoDrv ),
     DECL_CLSID( MaxClsid ),
+    DECL_CLSID( ClassFactoryStart ) = 0x02000000,
     DECL_CLSID( ReservedClsidEnd ) = 0x0FFFFFFF,
     DECL_CLSID( ReservedIidStart ) = 0x10000000,
     DECL_IID( IInterfaceServer ),

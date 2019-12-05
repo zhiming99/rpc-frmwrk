@@ -435,6 +435,7 @@ class CRpcConnSock :
     public CRpcSocketBase
 {
     TaskletPtr m_pStartTask;
+    bool m_bClient = false;
 
     public:
 
@@ -471,6 +472,9 @@ class CRpcConnSock :
 
     gint32 Connect();
     gint32 Disconnect();
+
+    inline bool IsClient() const
+    { return m_bClient; }
 
     gint32 StartSend( IRP* pIrp = nullptr );
     virtual gint32 OnError( gint32 ret );
@@ -555,6 +559,9 @@ class CBytesSender
         return 0;
     }
 };
+
+// port specific ctrl code
+#define CTRLCODE_IS_CLIENT 0x31
 /**
 * @name CTcpStreamPdo2 
 * @{ */
@@ -607,6 +614,7 @@ class CTcpStreamPdo2 : public CPort
 
     gint32 SubmitWriteIrp( IRP* pIrp );
     gint32 SubmitIoctlCmd( IRP* pIrp );
+    gint32 SubmitListeningCmd( IRP* pIrp );
 
     // gint32 CompleteWriteIrp( IRP* pIrp );
     // gint32 CompleteFuncIrp( IRP* pIrp );

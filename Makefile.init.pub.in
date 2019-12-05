@@ -7,6 +7,9 @@ ARCH :=
 #set to `0' for arm
 BUILD_64 := 1
 
+mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
+BASE:=$(abspath $(dir $(mkfile_path)) )
+
 #####
 ifeq ($(ARCH),arm)
 	ARCH_STR := arm-linux-gnueabihf
@@ -44,7 +47,7 @@ endif
 USER_LIB_PREFIX := $(ROOTFS)/usr/$(LIB_DIR)$(DIR_SUFFIX_ARCH)
 LIB_PREFIX := $(ROOTFS)/$(LIB_DIR)$(DIR_SUFFIX_ARCH)
 
-C_INCLUDE := -I../include \
+C_INCLUDE := -I$(BASE)/include \
 	-I$(ROOTFS)/usr/include/glib-2.0 \
 	-I$(USER_LIB_PREFIX)/glib-2.0/include \
 	-I$(ROOTFS)/usr/include/dbus-1.0 \
@@ -60,7 +63,7 @@ ifeq ($(ARCH),arm)
 #-D_GLIBCXX_USE_CXX11_ABI=1
 endif
 
-OUTPUT_DIR := ../$(DBG_DIR)
+OUTPUT_DIR := $(BASE)/$(DBG_DIR)
 OBJ_DIR := ./$(DBG_DIR)
 
 ifeq ($(MAKECMDGOALS),) 
@@ -74,13 +77,13 @@ endif
 ifeq ($(MAKECMDGOALS),release)
 	C_FLAGS += $(RELEASE_FLAGS)
 	C_DEFINES += -DPRODUCTION 
-	OUTPUT_DIR := ../$(RLS_DIR)
+	OUTPUT_DIR := $(BASE)/$(RLS_DIR)
 	OBJ_DIR := ./$(RLS_DIR)
 else ifeq ($(MAKECMDGOALS),debug_clean)
-	OUTPUT_DIR := ../$(DBG_DIR)
+	OUTPUT_DIR := $(BASE)/$(DBG_DIR)
 	OBJ_DIR := ./$(DBG_DIR)
 else ifeq ($(MAKECMDGOALS),release_clean)
-	OUTPUT_DIR := ../$(RLS_DIR)
+	OUTPUT_DIR := $(BASE)/$(RLS_DIR)
 	OBJ_DIR := ./$(RLS_DIR)
 endif
 

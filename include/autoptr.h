@@ -318,6 +318,9 @@ class CAutoPtr : public IAutoPtr
         return ( m_pObj->GetObjId() == qwId );
     }
 
+    bool operator!=( const CAutoPtr& rhs ) const noexcept
+    { return !operator==( rhs ); }
+
     bool operator==( const T* rhs ) const noexcept
     {
         if(rhs == nullptr )
@@ -335,6 +338,9 @@ class CAutoPtr : public IAutoPtr
         guint64 qwId = rhs.m_pObj->GetObjId();
         return ( m_pObj->GetObjId() == qwId );
     }
+
+    bool operator!=( const T* rhs ) const noexcept
+    { return !operator==( rhs ); }
 
     inline bool IsEmpty() const
     {

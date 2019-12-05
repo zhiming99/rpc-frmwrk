@@ -11,13 +11,16 @@ SOURCES:= dbusprxy.cpp prxyfdo.cpp fdodrv.cpp \
 OBJS:=$(SOURCES:%.cpp=$(OBJ_DIR)/%.o)
 C_DEFINES += -D_USE_LIBEV=1
 
-all: $(OUTPUT_DIR)/$(TARGET)
-debug: $(OUTPUT_DIR)/$(TARGET)
-release: $(OUTPUT_DIR)/$(TARGET)
+all: $(OUTPUT_DIR)/$(TARGET) SSLPort
+debug: $(OUTPUT_DIR)/$(TARGET) SSLPort
+release: $(OUTPUT_DIR)/$(TARGET) SSLPort
 
 $(OUTPUT_DIR)/$(TARGET) : $(OBJS)
 	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
 	$(CC) -o $(OUTPUT_DIR)/$(TARGET) $(LINKER_OPTION) $(OBJS)
+
+SSLPort:
+	make -C ./sslport
 
 -include $(OBJS:%.o=%.d)
 

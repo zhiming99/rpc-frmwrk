@@ -55,6 +55,16 @@
             ]
         },
         {
+            "DriverName"    : "RpcOpenSSLFidoDrv",
+            "DriverType"    : "PortDriver",
+            "InternalClass" : "CRpcOpenSSLFidoDrv",
+            "Description"   : "This is a filter port driver, and the port it creats is the CRpcOpenSSLFido",
+            "PortClasses"   :
+            [
+                "RpcOpenSSLFido"
+            ]
+        },
+        {
             "DriverName"    : "UnixSockBusDriver",
             "DriverType"    : "BusDriver",
             "InternalClass" : "CUnixSockBusDriver",
@@ -110,14 +120,22 @@
             "PortDriver"    : "RpcTcpFidoDrv"
         },
         {
+            "PortType"      : "Fido",
+            "PortClass"     : "RpcOpenSSLFido",
+            "InternalClass" : "CRpcOpenSSLFido",
+            "PortDriver"    : "RpcOpenSSLFidoDrv",
+            "Parameters":
+            {
+                "comments"  : "Certificate and private key file paths",
+                "CertFile"  : "./server.crt",
+                "KeyFile"   : "./server.key"
+            }
+        },
+        {
             "PortType"      : "Fdo",
             "PortClass"     : "RpcNativeProtoFdo",
             "InternalClass" : "CRpcNativeProtoFdo",
-            "PortDriver"    : "RpcNatProtoFdoDrv",
-            "Parameters":
-            {
-                "Compression" : "0"
-            }
+            "PortDriver"    : "RpcNatProtoFdoDrv"
         },
         {
             "PortType"      : "Pdo",

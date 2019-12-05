@@ -190,6 +190,7 @@ gint32 CRpcConnSock::Connect()
             break;
 
         /*  Connect to the remote host. */
+        m_bClient = true;
         ret = ActiveConnect( strIpAddr );
 
     }while( 0 );
@@ -562,8 +563,19 @@ gint32 CRpcConnSock::OnEvent(
                 
             CStmSockConnectTask2*
                 pConnTask = m_pStartTask;
-            pConnTask->SetInitDone();
 
+            // NOTE: SetInitDone does not mean the
+            // connection is done. It just
+            // notifies the reentrancy is allowed
+            // to the `connection task'. Possibly
+            // the socket's initialization could
+            // have been waiting to call
+            // eventNewConn on this task before
+            // OnEvent returns. The sync here
+            // serves to prevent the task's
+            // propParamList overwritten due to
+            // reentrancy.
+            pConnTask->SetInitDone();
             break;
         }
     default:
@@ -1083,18 +1095,13 @@ gint32 CTcpStreamPdo2::OnSendReady(
 gint32 CTcpStreamPdo2::PostStart(
     IRP* pIrp )
 {
-    if( pIrp == nullptr
-        || pIrp->GetStackSize() == 0 )
+    if( pIrp == nullptr ||
+        pIrp->GetStackSize() == 0 )
         return -EINVAL;
 
     gint32 ret = 0;
 
     do{
-        // FIXME: what if it returns
-        // STATUS_PENDING truely
-        if( ret == STATUS_PENDING )
-            break;
-
         CParamList oParams;
 
         ret = oParams.CopyProp(
@@ -1375,6 +1382,7 @@ gint32 CTcpStreamPdo2::OnSubmitIrp(
                 switch( pIrp->CtrlCode() )
                 {
                 case CTRLCODE_LISTENING:
+                case CTRLCODE_IS_CLIENT:
                     {
                         ret = SubmitIoctlCmd( pIrp );
                         break;
@@ -1404,6 +1412,50 @@ gint32 CTcpStreamPdo2::OnSubmitIrp(
 }
 
 gint32 CTcpStreamPdo2::SubmitIoctlCmd(
+    IRP* pIrpLocked )
+{
+    if( pIrpLocked == nullptr ||
+        pIrpLocked->GetStackSize() == 0 )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    switch( pIrpLocked->CtrlCode() )
+    {
+    case CTRLCODE_LISTENING:
+        {   
+            ret = SubmitListeningCmd(
+                pIrpLocked );
+            break;
+        }
+    case CTRLCODE_IS_CLIENT:
+        {
+            CRpcConnSock* pSock = m_pConnSock;
+            if( pSock == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            if( pSock->IsClient() )
+            {
+                ret = 0;
+            }
+            else
+            {
+                ret = ERROR_FALSE;
+            }
+            break;
+        }
+    default:
+        {
+            ret = -EINVAL;
+            break;
+        }
+    }
+
+    return ret;
+}
+
+gint32 CTcpStreamPdo2::SubmitListeningCmd(
     IRP* pIrpLocked )
 {
     if( pIrpLocked == nullptr ||
@@ -1605,49 +1657,6 @@ gint32 CTcpStreamPdo2::AllocIrpCtxExt(
     gint32 ret = 0;
     switch( pIrpCtx->GetMajorCmd() )
     {
-    case IRP_MJ_FUNC:
-        {
-            switch( pIrpCtx->GetMinorCmd() )
-            {
-            case IRP_MN_IOCTL:
-                {
-                    STMPDO_IRP_EXT oExt; 
-                    guint32 dwCtrlCode =
-                        pIrpCtx->GetCtrlCode();
-
-                    switch( dwCtrlCode )
-                    {
-                    case CTRLCODE_OPEN_STREAM_PDO:
-                    case CTRLCODE_CLOSE_STREAM_PDO:
-                    case CTRLCODE_INVALID_STREAM_ID_PDO:
-                        {
-                            oExt.m_iState = reqStatOut;
-                            break;
-                        }
-                    case CTRLCODE_LISTENING:
-                        {
-                            oExt.m_iState = reqStatIn;
-                            break;
-                        }
-                    default:
-                        ret = -ENOTSUP;
-                        break;
-                    }
-
-                    if( ERROR( ret ) )
-                        break;
-
-                    BufPtr pBuf( true );
-                    *pBuf = oExt;
-                    pIrpCtx->SetExtBuf( pBuf );
-                    break;
-                }
-            default:
-                ret = -ENOTSUP;
-                break;
-            }
-            break;
-        }
     case IRP_MJ_PNP:
         {
             switch( pIrpCtx->GetMinorCmd() )

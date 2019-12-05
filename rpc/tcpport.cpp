@@ -1603,9 +1603,12 @@ gint32 CRpcStreamSock::OnEvent(
 
             if( ERROR( ret ) ) 
                 break;
+
+            ret = m_pStartTask->GetError();
                 
             CStmSockConnectTask*
                 pConnTask = m_pStartTask;
+
             pConnTask->SetInitDone();
 
             break;
