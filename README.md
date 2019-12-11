@@ -27,7 +27,8 @@ This framework depends on the following packags:
 ---
 [`Wed 11 Dec 2019 09:48:08 AM Beijing`]   
 1. OpenSSL support is almost done. And there are some minor bugs to fix. 
-2. Next task is websocket support.
+2. Next task is websocket support.   
+
 [`Sat 30 Nov 2019 02:33:06 PM Beijing`]   
 1. Still writing openssl support, and stucked with the SSL's renegotiation. It should be done next week.   
 
