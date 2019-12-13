@@ -351,6 +351,7 @@
             ],
             "ClassFactories" :
             [
+                "./libsslpt.so"
             ]
         },
         {
@@ -420,7 +421,7 @@
         {
             "PortClass" : "TcpStreamPdo2",
             "comment" : "ProbeSequence specify the order of the drivers' Probe to call to build the port stack",
-            "ProbeSequence" : [ "RpcNatProtoFdoDrv", "RpcTcpFidoDrv" ],
+            "ProbeSequence" : [ "RpcOpenSSLFidoDrv", "RpcNatProtoFdoDrv", "RpcTcpFidoDrv" ],
             "Description" : "This match provides a binding between the pdo and the uppper fdo and fido",
             "comment-1" : "this is a new fork of the TcpStreamPdo, with better flexibility and extensibility"
         },

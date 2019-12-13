@@ -857,7 +857,7 @@ gint32 GetPreStopStep(
 {
     BufPtr pBuf;
     pIrp->GetCurCtx()->GetExtBuf( pBuf );
-    if( 0 == pBuf->size() )
+    if( pBuf.IsEmpty() || pBuf->empty() )
         return -EINVAL;
 
     PORT_START_STOP_EXT* psse =
@@ -872,7 +872,7 @@ gint32 SetPreStopStep(
 {
     BufPtr pBuf;
     pIrp->GetCurCtx()->GetExtBuf( pBuf );
-    if( 0 == pBuf->size() )
+    if( pBuf.IsEmpty() || pBuf->empty() )
         return -EINVAL;
 
     PORT_START_STOP_EXT* psse =

@@ -503,7 +503,12 @@ void CObjBase::Dump( std::string& strDump )
     }
     else
     {
-        strDump += std::to_string( m_dwClsid );
+        const char* pszName =
+            CoGetClassName( m_dwClsid );
+        if( pszName == nullptr )
+            strDump += std::to_string( m_dwClsid );
+        else
+            strDump += pszName;
     }
     strDump += ", refcount: ";
     strDump += std::to_string( m_atmRefCount );

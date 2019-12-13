@@ -50,6 +50,16 @@ gint32 GetSSLError( SSL* pssl, int n )
             break;
         }
     case SSL_ERROR_ZERO_RETURN:
+        {
+            // the SSL connection is down
+            ret = -ENOTCONN;
+            break;
+        }
+    case SSL_ERROR_SSL:
+        {
+            ret = -EPROTO;
+            break;
+        }
     default:
         {
             ret = ERROR_FAIL;
@@ -60,11 +70,12 @@ gint32 GetSSLError( SSL* pssl, int n )
     return ret;
 }
 
-gint32 CRpcOpenSSLFidoDrv::InitSSLContext()
+gint32 CRpcOpenSSLFidoDrv::InitSSLContext(
+    bool bServer )
 {
     gint32 ret = 0;
     do{
-        DebugPrint( 0, "initialising SSL\n");
+        DebugPrint( 0, "initialising SSL...\n");
 
         /*  SSL library initialisation */
         SSL_library_init();
@@ -73,10 +84,19 @@ gint32 CRpcOpenSSLFidoDrv::InitSSLContext()
         ERR_load_BIO_strings();
         ERR_load_crypto_strings();
 
-        /*  create the SSL server
-        *  context */
-        m_pSSLCtx = SSL_CTX_new( SSLv23_method() );
-        if (!m_pSSLCtx)
+        /* create the SSL server context */
+        if( bServer )
+        {
+            m_pSSLCtx = SSL_CTX_new(
+                TLS_method() );
+        }
+        else
+        {
+            m_pSSLCtx = SSL_CTX_new(
+                TLS_client_method() );
+        }
+
+        if( m_pSSLCtx == nullptr )
         {
             ret = ERROR_FAIL;
             break;
@@ -85,39 +105,42 @@ gint32 CRpcOpenSSLFidoDrv::InitSSLContext()
 
         /*  Load certificate and private key
          *  files, and check consistency */
-        if( SSL_CTX_use_certificate_file(
-            m_pSSLCtx, m_strCertPath.c_str(),
-            SSL_FILETYPE_PEM) != 1 )
+        if( bServer )
         {
-            ret = -ENOTSUP;
-            DebugPrint( ret,
-                "SSL_CTX_use_certificate_file failed");
-            break;
-        }
+            if( SSL_CTX_use_certificate_file(
+                m_pSSLCtx, m_strCertPath.c_str(),
+                SSL_FILETYPE_PEM) != 1 )
+            {
+                ret = -ENOTSUP;
+                DebugPrint( ret,
+                    "SSL_CTX_use_certificate_file failed");
+                break;
+            }
 
-        if( SSL_CTX_use_PrivateKey_file(
-            m_pSSLCtx, m_strKeyPath.c_str(),
-            SSL_FILETYPE_PEM ) != 1 )
-        {
-            ret = -ENOENT;
-            DebugPrint( ret,
-                "SSL_CTX_use_PrivateKey_file failed" );
-            break;
-        }
+            if( SSL_CTX_use_PrivateKey_file(
+                m_pSSLCtx, m_strKeyPath.c_str(),
+                SSL_FILETYPE_PEM ) != 1 )
+            {
+                ret = -ENOENT;
+                DebugPrint( ret,
+                    "SSL_CTX_use_PrivateKey_file failed" );
+                break;
+            }
 
-        //  Make sure the key and certificate
-        //  file match.
-        if( SSL_CTX_check_private_key(
-            m_pSSLCtx ) != 1 )
-        {
-            ret = ERROR_FAIL;
-            DebugPrint( ret,
-                "SSL_CTX_check_private_key failed" );
-            break;
-        }
+            //  Make sure the key and certificate
+            //  file match.
+            if( SSL_CTX_check_private_key(
+                m_pSSLCtx ) != 1 )
+            {
+                ret = ERROR_FAIL;
+                DebugPrint( ret,
+                    "SSL_CTX_check_private_key failed" );
+                break;
+            }
 
-        DebugPrint( 0, "certificate and private"
-            "key loaded and verified");
+            DebugPrint( 0, "certificate and private"
+                "key loaded and verified");
+        }
 
         /*  Recommended to avoid SSLv2 & SSLv3 */
         SSL_CTX_set_options( m_pSSLCtx, SSL_OP_ALL
@@ -144,7 +167,13 @@ gint32 CRpcOpenSSLFido::InitSSL()
             ret = -ENOMEM;
             break;
         }
+
+        CPortDriver* pPortDrv =
+        static_cast< CPortDriver* >( m_pDriver );
+
+        CStdRMutex oLock( pPortDrv->GetLock() );
         m_pSSL = SSL_new( m_pSSLCtx );
+
         if( IsClient() )
         {
             SSL_set_connect_state( m_pSSL );
@@ -154,7 +183,8 @@ gint32 CRpcOpenSSLFido::InitSSL()
             SSL_set_accept_state( m_pSSL );
         }
 
-        SSL_set_bio( m_pSSL, m_prbio, m_pwbio );
+        SSL_set0_rbio( m_pSSL, m_prbio );
+        SSL_set0_wbio( m_pSSL, m_pwbio );
 
     }while( 0 );
 

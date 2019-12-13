@@ -107,8 +107,6 @@ class COpenSSLResumeWriteTask :
     gint32 GetIrp( IrpPtr& pIrp );
     gint32 RemoveIrp();
     gint32 RunTask();
-    gint32 OnIrpComplete( IRP* pIrp );
-    gint32 OnTaskComplete( gint32 iRet );
 };
 
 class CRpcOpenSSLFido : public CPort
@@ -123,6 +121,7 @@ class CRpcOpenSSLFido : public CPort
     bool        m_bStopReady = false;
     bool        m_bSvrOnline = false;
     bool        m_bClient = false;
+    bool        m_bFirstRead = true;
 
     SSL_CTX     *m_pSSLCtx = nullptr;
     SSL         *m_pSSL = nullptr;
@@ -156,6 +155,19 @@ class CRpcOpenSSLFido : public CPort
     gint32 RemoveIrpFromMap( IRP* pIrp );
     gint32 InitSSL();
 
+    gint32 BuildResumeTask(
+        TaskletPtr& pResumeTask, PIRP pIrp,
+        gint32 iIdx, guint32 dwOffset,
+        guint32 dwTotal );
+
+    gint32 AdvanceHandshake(
+         IEventSink* pCallback,
+         BufPtr& pHandshake );
+
+    gint32 AdvanceShutdown(
+         IEventSink* pCallback,
+         BufPtr& pHandshake );
+
     public:
 
     typedef CPort super;
@@ -178,12 +190,17 @@ class CRpcOpenSSLFido : public CPort
     gint32 DoHandshake( IEventSink* pCallback,
         BufPtr& pHandshake );
 
-    gint32 DoShutdown( IEventSink* pCallback );
+    gint32 DoShutdown( IEventSink* pCallback,
+        BufPtr& pHandshake );
 
-    gint32 EncryptAndSend( TaskletPtr& pTask,
-        PIRP pIrp, CfgPtr pCfg, gint32& iIdx,
-        guint32& dwTotal, guint32& dwOffset );
+    gint32 EncryptAndSend( PIRP pIrp,
+        CfgPtr pCfg, gint32 iIdx,
+        guint32 dwTotal, guint32 dwOffset,
+        bool bResume );
 
+    gint32 AllocIrpCtxExt(
+        IrpCtxPtr& pIrpCtx,
+        void* pContext ) const;
 };
 
 class CRpcOpenSSLFidoDrv : public CRpcTcpFidoDrv
@@ -205,6 +222,6 @@ class CRpcOpenSSLFidoDrv : public CRpcTcpFidoDrv
         const IConfigDb* pConfig = NULL );
 
     gint32 LoadSSLSettings();
-    gint32 InitSSLContext();
+    gint32 InitSSLContext( bool bServer );
 };
 

@@ -735,6 +735,8 @@ gint32 CRpcStream2::SetupIrpForLowerPort(
         pNewCtx->SetMinorCmd( IRP_MN_WRITE );
         pNewCtx->SetIoDirection( IRP_DIR_OUT );
         pNewCtx->SetReqData( pBufNew );
+        pLowerPort->AllocIrpCtxExt(
+            pNewCtx, pIrp );
 
     }while( 0 );
 
@@ -3261,10 +3263,29 @@ gint32 CRpcNativeProtoFdo::StartListeningTask()
 
 gint32 CRpcNativeProtoFdo::StopListeningTask()
 {
+    CStdRMutex oPortLock( GetLock() );
     if( m_pListeningTask.IsEmpty() )
         return 0;
-    ( *m_pListeningTask )( eventCancelTask );
+
+    TaskletPtr pTask = m_pListeningTask;
     m_pListeningTask.Clear();
+    oPortLock.Unlock();
+
+    ( *pTask )( eventCancelTask );
+    return 0;
+}
+
+gint32 CRpcNativeProtoFdo::SetListeningTask(
+    TaskletPtr& pTask )
+{
+    CStdRMutex oPortLock( GetLock() );
+
+    guint32 dwPortState = GetPortState();
+    if( dwPortState != PORT_STATE_BUSY_SHARED &&
+        dwPortState != PORT_STATE_READY )
+        return ERROR_STATE;
+
+    m_pListeningTask = pTask;
     return 0;
 }
 
@@ -3309,6 +3330,18 @@ gint32 CRpcNativeProtoFdo::OnQueryStop(
         ret = STATUS_PENDING;
     }
     return ret;
+}
+
+gint32 CRpcNativeProtoFdo::PreStop(
+    IRP* pIrp )
+{
+    // remove all the pending irps. It is
+    // preferable to do this here, to allow lower
+    // port ( still ready ) to do wrapup work in a
+    // clean environment
+    StopListeningTask();
+    CancelAllIrps( ERROR_PORT_STOPPED );
+    return super::PreStop( pIrp );
 }
 
 gint32 CRpcNativeProtoFdo::CancelAllIrps(
@@ -3378,9 +3411,6 @@ gint32 CRpcNativeProtoFdo::Stop(
     if( pIrp == nullptr ||
         pIrp->GetStackSize() == 0 )
         return -EINVAL;
-
-    StopListeningTask();
-    CancelAllIrps( ERROR_PORT_STOPPED );
 
     std::vector< gint32 > vecStmIds;
 
@@ -3955,9 +3985,10 @@ gint32 CFdoListeningTask::OnTaskComplete(
         return iRet;
     }
 
+    IConfigDb* pCfg = GetConfig();
+    CCfgOpener oCfg( pCfg );
+
     do{
-        IConfigDb* pCfg = GetConfig();
-        CCfgOpener oCfg( pCfg );
 
         CRpcNativeProtoFdo* pPort = nullptr;
 
@@ -3972,11 +4003,22 @@ gint32 CFdoListeningTask::OnTaskComplete(
         oParams.SetPointer( propIoMgr, pMgr );
         oParams.SetPointer( propPortPtr, pPort );
 
-        ret = pMgr->ScheduleTask(
+        TaskletPtr pTask;
+        ret = pTask.NewObj(
             clsid( CFdoListeningTask ),
             oParams.GetCfg() );
+        if( ERROR( ret ) )
+            break;
+
+        ret = pPort->SetListeningTask( pTask );
+        if( ERROR( ret ) )
+            break;
+
+        ret = pMgr->RescheduleTask( pTask );
 
     }while( 0 );
+
+    oCfg.RemoveProperty( propPortPtr );
 
     return ret;
 }

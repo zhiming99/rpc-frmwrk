@@ -290,6 +290,7 @@ class CRpcNativeProtoFdo: public CPort
         IRP* pIrp, bool bForce );
 
     gint32 AddStmToSendQue( Stm2Ptr& pStm );
+    virtual gint32 PreStop( IRP* pIrp );
 
     public:
 
@@ -399,6 +400,9 @@ class CRpcNativeProtoFdo: public CPort
 
     inline bool IsCompress() const
     { return m_bCompress; }
+
+    gint32 SetListeningTask(
+        TaskletPtr& pTask );
 };
 
 class CFdoListeningTask :
@@ -529,7 +533,7 @@ class CBytesSender
         return 0;
     }
 
-    gint32 SetSendDone();
+    gint32 SetSendDone( gint32 iRet = 0 );
     bool IsSendDone() const;
     IrpPtr GetIrp() const
     {
@@ -620,6 +624,7 @@ class CTcpStreamPdo2 : public CPort
     // gint32 CompleteFuncIrp( IRP* pIrp );
     gint32 CompleteIoctlIrp( IRP* pIrp );
     gint32 StartSend( IRP* pIrpLocked  );
+    gint32 CancelAllIrps( gint32 iErrno );
 
     SockPtr m_pConnSock;
 
@@ -664,20 +669,14 @@ class CTcpStreamPdo2 : public CPort
     virtual gint32 CancelFuncIrp(
         IRP* pIrp, bool bForce );
 
-    virtual gint32 OnSubmitIrp(
-        IRP* pIrp );
+    virtual gint32 OnSubmitIrp( IRP* pIrp );
 
     // make the active connection if not connected
     // yet. Note that, within the PostStart, the
     // eventPortStarted is not sent yet
-    virtual gint32 PostStart(
-        IRP* pIrp );
-
-    virtual gint32 PreStop(
-        IRP* pIrp );
-
-    virtual gint32 Stop(
-        IRP* pIrp );
+    virtual gint32 PostStart( IRP* pIrp );
+    virtual gint32 PreStop( IRP* pIrp );
+    virtual gint32 Stop( IRP* pIrp );
 
     gint32 AllocIrpCtxExt(
         IrpCtxPtr& pIrpCtx,

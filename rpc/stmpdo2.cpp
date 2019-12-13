@@ -824,19 +824,36 @@ gint32 CTcpStreamPdo2::OnReceive(
     return ret;
 }
 
-gint32 CBytesSender::SetSendDone()
+gint32 CBytesSender::SetSendDone(
+    gint32 iRet )
 {
     CTcpStreamPdo2* pPdo = m_pPort;
     if( pPdo == nullptr )
         return -EFAULT;
 
     CStdRMutex oPortLock( pPdo->GetLock() );
+    if( m_pIrp.IsEmpty() )
+        return 0;
     IrpPtr pIrp = m_pIrp;
     m_pIrp.Clear();
     m_iBufIdx = -1;
     m_iOffset = -1;
     oPortLock.Unlock();
 
+    if( pIrp.IsEmpty() ||
+        pIrp->GetStackSize() == 0 )
+        return 0;
+
+    CStdRMutex oIrpLock( pIrp->GetLock() );
+
+    gint32 ret = pIrp->CanContinue(
+        IRP_STATE_READY );
+
+    if( ERROR( ret ) )
+        return 0;
+
+    IrpCtxPtr& pCtx = pIrp->GetTopStack();
+    pCtx->SetStatus( iRet );
     CIoManager* pMgr = pPdo->GetIoMgr();
     pMgr->CompleteIrp( pIrp );
 
@@ -1024,7 +1041,7 @@ gint32 CBytesSender::OnSendReady(
     }while( 0 );
 
     if( ret != STATUS_PENDING )
-        SetSendDone();
+        SetSendDone( ret );
 
     return ret;
 }
@@ -1347,6 +1364,7 @@ gint32 CTcpStreamPdo2::PreStop(
 gint32 CTcpStreamPdo2::Stop(
     IRP* pIrp )
 {
+    CancelAllIrps( ERROR_PORT_STOPPED );
     m_oSender.Clear();
     return super::Stop( pIrp );
 }
@@ -1739,6 +1757,71 @@ gint32 CTcpStreamPdo2::CompleteIoctlIrp(
         {
             ret = -ENOTSUP;
         }
+    }
+
+    return ret;
+}
+
+gint32 CTcpStreamPdo2::CancelAllIrps(
+    gint32 iErrno )
+{
+    gint32 ret = 0;
+
+    CStdRMutex oPortLock( GetLock() );
+    IrpVecPtr pIrpVec( true );
+    CParamList oParams;
+    std::vector< IrpPtr >& vecIrps =
+        ( *pIrpVec )();
+
+    for( auto&& elem : m_queWriteIrps )
+        vecIrps.push_back( elem );
+
+    m_queWriteIrps.clear();
+
+    for( auto&& elem : m_queListeningIrps )
+        vecIrps.push_back( elem );
+    m_queListeningIrps.clear();
+
+    CIoManager* pMgr = GetIoMgr();
+    oPortLock.Unlock();
+
+    m_oSender.SetSendDone( iErrno );
+
+    while( !vecIrps.empty() )
+    {
+        ret = oParams.Push(
+            *( guint32* )&iErrno );
+
+        if( ERROR( ret ) )
+            break;
+
+        ObjPtr pObj;
+
+        if( !vecIrps.empty() )
+        {
+            pObj = pIrpVec;
+            ret = oParams.Push( pObj );
+            if( ERROR( ret ) )
+                break;
+        }
+
+        oParams.SetPointer( propIoMgr, pMgr );
+
+        // NOTE: this is a double check of the
+        // remaining IRPs before the STOP begins.
+  
+        TaskletPtr pTask;
+        pTask.NewObj(
+            clsid( CCancelIrpsTask ),
+            oParams.GetCfg() );
+
+        // NOTE: Assumes there is no pending
+        // completion. And the irp's callback
+        // is still yet to be called when this
+        // method returns.
+        ( *pTask )( eventZero );
+        ret = pTask->GetError();
+        break;
     }
 
     return ret;
