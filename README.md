@@ -25,6 +25,9 @@ This framework depends on the following packags:
 12. `Websocket/http support`(to come)
 
 ---
+[`Fri 13 Dec 2019 07:47:35 PM Beijing`]   
+1. Stucked with a bug that SSL randomly failed to decrypt the message and kill the SSL session. It is a bit difficult to fix...    
+
 [`Wed 11 Dec 2019 09:48:08 AM Beijing`]   
 1. OpenSSL support is almost done. And there are some minor bugs to fix. 
 2. Next task is websocket support.   
