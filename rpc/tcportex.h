@@ -508,8 +508,7 @@ class CBytesSender
 {
     IrpPtr m_pIrp;
     gint32 m_iBufIdx = -1;
-    gint32 m_iOffset = -1;
-    gint32 m_iOrigOffset = -1;
+    guint32 m_dwOffset = 0;
     PortPtr m_pPort;
 
     public:
@@ -528,8 +527,7 @@ class CBytesSender
 
         m_pIrp = ObjPtr( pIrp );
         m_iBufIdx = 0;
-        m_iOffset = 0;
-        m_iOrigOffset = 0;
+        m_dwOffset = 0;
         return 0;
     }
 

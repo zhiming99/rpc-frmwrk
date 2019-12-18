@@ -38,6 +38,7 @@
 
 #include "clsids.h"
 #include "propids.h"
+#include "sys/user.h"
 
 #include <arpa/inet.h>
 #include <dbus/dbus.h>
@@ -50,7 +51,7 @@
 #define LONGWORD                guint32
 #endif
 
-#define PAGE_SIZE               ( getpagesize() )
+// #define PAGE_SIZE               ( getpagesize() )
 #define HANDLE                  uintptr_t
 #define PortToHandle( ptr )     reinterpret_cast<HANDLE>( ( IPort* )ptr )
 #define HandleToPort( handle )  reinterpret_cast< IPort* >( handle )

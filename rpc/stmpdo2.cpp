@@ -837,7 +837,7 @@ gint32 CBytesSender::SetSendDone(
     IrpPtr pIrp = m_pIrp;
     m_pIrp.Clear();
     m_iBufIdx = -1;
-    m_iOffset = -1;
+    m_dwOffset = 0;
     oPortLock.Unlock();
 
     if( pIrp.IsEmpty() ||
@@ -874,7 +874,7 @@ gint32 CBytesSender::CancelSend(
     IrpPtr pIrp = m_pIrp;
     m_pIrp.Clear();
     m_iBufIdx = -1;
-    m_iOffset = -1;
+    m_dwOffset = 0;
     oPortLock.Unlock();
 
     if( !bCancelIrp )
@@ -958,14 +958,18 @@ gint32 CBytesSender::OnSendReady(
         if( ERROR( ret ) )
             break;
 
-        if( dwCount > STMPDO2_MAX_IDX_PER_REQ )
+        if( unlikely( dwCount == 0  ||
+            dwCount > STMPDO2_MAX_IDX_PER_REQ ) )
         {
             ret = -EINVAL;
             break;
         }
 
         if( m_iBufIdx >= iCount )
+        {
+            // send done
             break;
+        }
 
         BufPtr pBuf;
         ret = oParams.GetProperty(
@@ -974,21 +978,24 @@ gint32 CBytesSender::OnSendReady(
         if( ERROR( ret ) )
             break;
 
-        if( m_iOffset == 0 )
-            m_iOrigOffset = pBuf->offset();
+        if( unlikely( m_dwOffset >=
+            pBuf->size() ) )
+        {
+            ret = -ERANGE;
+            break;
+        }
 
         do{
-            gint32 iMaxBytes = 
+            guint32 dwMaxBytes =
                 MAX_BYTES_PER_TRANSFER;
 
             guint32 dwSize = std::min(
-                ( guint32 )iMaxBytes,
-                pBuf->size() );
+                pBuf->size() - m_dwOffset,
+                dwMaxBytes );
 
-            char* pData = pBuf->ptr();
-
-            ret = SendBytesNoSig(
-                iFd, pData, dwSize );
+            ret = SendBytesNoSig( iFd,
+                pBuf->ptr() + m_dwOffset,
+                dwSize );
 
             if( ret == -1 && RETRIABLE( errno ) )
             {
@@ -1001,23 +1008,26 @@ gint32 CBytesSender::OnSendReady(
                 break;
             }
 
-            dwSize = ret;
+            guint32 dwMaxSize = pBuf->size();
+            guint32 dwNewOff = m_dwOffset + ret;
+
             ret = 0;
-            if( pBuf->size() == dwSize )
+            if( dwMaxSize == dwNewOff )
             {
                 // done with this buf
-                ret = 0;
-                pBuf->SetOffset( m_iOrigOffset );
+                m_dwOffset = 0;
+                ++m_iBufIdx;
 
-                // done with the irp
-                if( ++m_iBufIdx >= iCount ) 
+                if( m_iBufIdx == iCount ) 
                 {
-                    m_iBufIdx = STMPDO2_MAX_IDX_PER_REQ + 1;
                     break;
                 }
-
-                m_iOrigOffset = 0;
-                m_iOffset = 0;
+                else if( unlikely(
+                    m_iBufIdx > iCount ) )
+                {
+                    ret = -EOVERFLOW;
+                    break;
+                }
 
                 ret = oParams.GetProperty(
                     m_iBufIdx, pBuf );
@@ -1027,14 +1037,13 @@ gint32 CBytesSender::OnSendReady(
 
                 continue;
             }
-            else if( pBuf->size() < dwSize )
+            else if( dwMaxSize < dwNewOff )
             {
                 ret = -EOVERFLOW;
                 break;
             }
 
-            pBuf->SetOffset(
-                pBuf->offset() + dwSize );
+            m_dwOffset = dwNewOff;
 
         }while( 1 );
 
@@ -1048,15 +1057,7 @@ gint32 CBytesSender::OnSendReady(
 
 bool CBytesSender::IsSendDone() const
 {
-    CPort* pPort = m_pPort;
-
-    if( pPort == nullptr )
-        return -EFAULT;
-
     if( m_pIrp.IsEmpty() )
-        return true;
-
-    if( m_iBufIdx > STMPDO2_MAX_IDX_PER_REQ )
         return true;
 
     return false;
@@ -1085,12 +1086,14 @@ gint32 CTcpStreamPdo2::OnSendReady(
                     pSock->StopWatch();
                     break;
                 }
-                continue;
             }
-            IrpPtr pIrp =
-                m_queWriteIrps.front();
-            m_oSender.SetIrpToSend( pIrp );
-            m_queWriteIrps.pop_front();
+            else if( m_oSender.IsSendDone() )
+            {
+                IrpPtr pIrp =
+                    m_queWriteIrps.front();
+                m_oSender.SetIrpToSend( pIrp );
+                m_queWriteIrps.pop_front();
+            }
             continue;
         }
         else if( ret == STATUS_PENDING )

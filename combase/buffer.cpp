@@ -371,7 +371,10 @@ gint32 CBuffer::ResizeWithOffset( guint32 dwSize )
             char* pData = nullptr;
             if( bArrBuf )
             {
-                pData = ( char* )calloc( 1, dwSize );
+                if( dwSize > 1024 )
+                    pData = ( char* )calloc( 1, dwSize );
+                else
+                    pData = ( char* )malloc( dwSize );
                 if( size() > 0 )
                     memcpy( pData, ptr(), size() );
             }
@@ -507,7 +510,12 @@ void CBuffer::Resize( guint32 dwSize )
             else if( dwSize > sizeof( m_arrBuf ) &&
                 sizeof( m_arrBuf ) >= size() )
             {
-                char* pData = ( char* )calloc( 1, dwSize );
+                char* pData;
+                if( dwSize > 1024 )
+                    pData = ( char* )calloc( 1, dwSize );
+                else
+                    pData = ( char* )malloc( dwSize );
+
                 if( pData == nullptr )
                     break;
 

@@ -78,6 +78,23 @@ CRpcOpenSSLFido::~CRpcOpenSSLFido()
     sem_destroy( &m_semReadSync );
 }
 
+static guint8 g_arrOutBuf[ 4 ][ STM_MAX_BYTES_PER_BUF + 1024 ];
+static guint32 g_dwBufIdx = 0;
+static guint32 g_dwNumSent = 0;
+
+static char* GetOutBuf()
+{
+    char* pBuf = ( char* )
+        g_arrOutBuf[ g_dwBufIdx ];
+    g_dwBufIdx += 1;
+    g_dwBufIdx &= 3;
+    ++g_dwNumSent;
+    return pBuf;
+}
+
+constexpr static guint32 GetOutSize() 
+{ return sizeof( g_arrOutBuf[ 0 ] ); }
+
 gint32 CRpcOpenSSLFido::EncryptAndSend(
     PIRP pIrp, CfgPtr pCfg,
     gint32 iIdx, guint32 dwTotal,
@@ -115,16 +132,24 @@ gint32 CRpcOpenSSLFido::EncryptAndSend(
                 break;
             }
 
+            guint32 dwMagic =
+                *( ( guint32* )pBuf->ptr() );
+
+            if( iIdx == 0 && dwMagic !=
+                ntohl( RPC_PACKET_MAGIC ) )
+            {
+                DebugPrint( 0, "Bad header magic" );
+                ret = -EBADMSG;
+                break;
+            }
+
             gint32 n = SSL_write( m_pSSL,
                 pBuf->ptr() + dwOffset,
                 pBuf->size() - dwOffset );
 
-            if( n <= 0 )
-            {
-                ret = GetSSLError( m_pSSL, n );
-                if( ERROR( ret ) )
-                    break;
-            }
+            ret = GetSSLError( m_pSSL, n );
+            if( ERROR( ret ) )
+                break;
 
             if( ret == SSL_ERROR_WANT_READ )
             {
@@ -195,6 +220,9 @@ gint32 CRpcOpenSSLFido::EncryptAndSend(
                 dwOffset += n;
             }
 
+            DebugPrint( 0,
+                "Move on to encrypt the next buffer" );
+
         }while( 1 );
 
         if( ret == STATUS_PENDING )
@@ -205,34 +233,29 @@ gint32 CRpcOpenSSLFido::EncryptAndSend(
 
         // the least size
         guint32 dwExpSize = std::min(
-            ( dwTotal + PAGE_SIZE ),
+            ( dwTotal + ( guint32 )PAGE_SIZE ),
             ( guint32 )STM_MAX_BYTES_PER_BUF );
 
         // make the tail align to the page
         // boundary
         dwExpSize &= ~( PAGE_SIZE - 1 );
 
-        BufPtr pOutBuf( true );
-        pOutBuf->Resize( dwExpSize );
         guint32 dwOutOff = 0;
+        char* pHoldBuf = GetOutBuf();
+        const guint32 dwHoldSize = GetOutSize();
 
         do{
             ret = BIO_read( m_pwbio,
-                pOutBuf->ptr() + dwOutOff,
-                pOutBuf->size() - dwOutOff );
+                pHoldBuf + dwOutOff,
+                dwHoldSize - dwOutOff );
 
             if( ret > 0 )
             {
                 dwOutOff += ret;
-                if( dwOutOff == pOutBuf->size() )
+                if( dwOutOff == dwHoldSize )
                 {
-                    guint32 dwNewSize =
-                        dwOutOff + 2 * PAGE_SIZE;
-
-                    dwNewSize &=
-                        ~( PAGE_SIZE - 1 );
-
-                    pOutBuf->Resize( dwNewSize );
+                    ret = -EOVERFLOW;
+                    break;
                 }
                 continue;
             }
@@ -242,10 +265,6 @@ gint32 CRpcOpenSSLFido::EncryptAndSend(
                 ret = ERROR_FAIL;
                 break;
             }
-
-            // so much this time
-            if( pOutBuf->size() > dwOutOff )
-                pOutBuf->Resize( dwOutOff );
 
             ret = 0;
             break;
@@ -257,7 +276,7 @@ gint32 CRpcOpenSSLFido::EncryptAndSend(
         if( ERROR( ret ) )
             break;
 
-        if( pOutBuf->empty() )
+        if( dwOutOff == 0 )
         {
             // all the data has been held by the
             // SSL without output, complete this
@@ -268,6 +287,10 @@ gint32 CRpcOpenSSLFido::EncryptAndSend(
                 dwTotal );
             break;
         }
+
+        BufPtr pOutBuf( true );
+        pOutBuf->Resize( dwOutOff );
+        memcpy( pOutBuf->ptr(), pHoldBuf, dwOutOff );
 
         // send the encrypted copy down 
         PortPtr pLowerPort = GetLowerPort();
@@ -618,6 +641,10 @@ gint32 CRpcOpenSSLFido::StartSSLHandshake(
         oParams.SetPointer(
             propIrpPtr, pIrp );
 
+        oParams.SetIntProp(
+            propTimeoutSec,
+            PORT_START_TIMEOUT_SEC - 20 );
+
         ret = GetIoMgr()->ScheduleTask(
             clsid( COpenSSLHandshakeTask ),
             oParams.GetCfg() );
@@ -640,6 +667,8 @@ gint32 CRpcOpenSSLFido::StartSSLShutdown(
         oParams.SetPointer( propIoMgr, pMgr );
         oParams.SetPointer( propIrpPtr,  pIrp );
         oParams.SetPointer( propPortPtr, this );
+        oParams.SetIntProp( propTimeoutSec,
+            PORT_START_TIMEOUT_SEC - 20 );
 
         ret = pMgr->ScheduleTask(
             clsid( COpenSSLShutdownTask ),
@@ -1071,6 +1100,12 @@ gint32 CRpcOpenSSLFido::SendWriteReq(
         pBuf.IsEmpty() || pBuf->empty() )
         return -EINVAL;
 
+    CCfgOpenerObj oTaskCfg( pCallback );
+    guint32 dwTimeoutSec = 0;
+
+    gint32 ret = oTaskCfg.GetIntProp(
+        propTimeoutSec, dwTimeoutSec );
+
     IrpPtr pIrp( true );
     PortPtr pLowerPort = GetLowerPort();
     pIrp->AllocNextStack( pLowerPort );
@@ -1086,13 +1121,22 @@ gint32 CRpcOpenSSLFido::SendWriteReq(
     pLowerPort->AllocIrpCtxExt(
         pCtx, ( PIRP )pIrp );
 
+    CIoManager* pMgr = GetIoMgr();
+    if( dwTimeoutSec > 0 && dwTimeoutSec < 7200 )
+        pIrp->SetTimer( dwTimeoutSec, pMgr );
+
     CParamList oParams;
     oParams.Push( pBuf );
     BufPtr pReqBuf( true );
     *pReqBuf = ObjPtr( oParams.GetCfg() );
 
-    return GetIoMgr()->SubmitIrpInternal(
+    ret = GetIoMgr()->SubmitIrpInternal(
         pLowerPort, pIrp, false );
+
+    if( ret != STATUS_PENDING )
+        pIrp->RemoveTimer();
+
+    return ret;
 }
 
 gint32 CRpcOpenSSLFido::SendListenReq(
@@ -1100,6 +1144,11 @@ gint32 CRpcOpenSSLFido::SendListenReq(
 {
     if( pCallback == nullptr )
         return -EINVAL;
+
+    CCfgOpenerObj oTaskCfg( pCallback );
+    guint32 dwTimeoutSec = 0;
+    gint32 ret = oTaskCfg.GetIntProp(
+        propTimeoutSec, dwTimeoutSec );
 
     IrpPtr pIrp( true );
     PortPtr pLowerPort = GetLowerPort();
@@ -1116,8 +1165,15 @@ gint32 CRpcOpenSSLFido::SendListenReq(
     pLowerPort->AllocIrpCtxExt(
         pCtx, ( PIRP )pIrp );
 
-    gint32 ret = GetIoMgr()->SubmitIrpInternal(
+    CIoManager* pMgr = GetIoMgr();
+    if( dwTimeoutSec > 0 && dwTimeoutSec < 7200 )
+        pIrp->SetTimer( dwTimeoutSec, pMgr );
+
+    ret = pMgr->SubmitIrpInternal(
         pLowerPort, pIrp, false );
+
+    if( ret != STATUS_PENDING )
+        pIrp->RemoveTimer();
 
     if( SUCCEEDED( ret ) )
     {
@@ -1170,7 +1226,11 @@ gint32 CRpcOpenSSLFido::AdvanceHandshake(
         if( ERROR( ret ) )
             break;
 
-        if( !IsWantIo( ret ) )
+        if( SUCCEEDED( ret ) )
+        {
+            // the handshake is done
+        }
+        else if( !IsWantIo( ret ) )
         {
             if( ret > 0 )
             {

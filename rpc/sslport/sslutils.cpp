@@ -105,7 +105,7 @@ gint32 CRpcOpenSSLFidoDrv::InitSSLContext(
 
         /*  Load certificate and private key
          *  files, and check consistency */
-        if( bServer )
+        if( 1 )
         {
             if( SSL_CTX_use_certificate_file(
                 m_pSSLCtx, m_strCertPath.c_str(),
@@ -146,6 +146,9 @@ gint32 CRpcOpenSSLFidoDrv::InitSSLContext(
         SSL_CTX_set_options( m_pSSLCtx, SSL_OP_ALL
             | SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
 
+        // uncomment this for debugging purpose
+        // SSL_CTX_set_cipher_list( m_pSSLCtx,
+        //     "AES128-SHA:AES256-SHA" );
    }while( 0 );
 
    return ret;
