@@ -10,8 +10,17 @@
  *       Revision:  none
  *       Compiler:  gcc
  *
- *         Author:  Ming Zhi( woodhead99@gmail.com )
- *   Organization:
+ *         Author:  Ming Zhi( woodhead99@gmail.com ), 
+ *
+ *      /*
+ *       this file is adapted from Darren Smith's project
+ *       @https://github.com/darrenjs/openssl_examples
+ *
+ *       Copyright (c) 2017 Darren Smith ssl_examples is free software; you can
+ *       redistribute it and/or modify it under the terms of the MIT license.
+ *       See LICENSE for details.
+ *      */
+ */
  *
  * =====================================================================================
  */
