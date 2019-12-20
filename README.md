@@ -22,9 +22,14 @@ This framework depends on the following packags:
 9. `File/Big data transfer.`
 10. `Peer online/offline awareness.`
 11. `Streaming support to provide double-direction stream transfer`
-12. `Websocket/http support`(to come)
+12. `Secure Socket Layer (SSL) support`
+13. `Websocket/http support`(to come)
+14. `Object access via Multi-hop routing` (to come)
 
 ---
+[`Wed 18 Dec 2019 11:08:13 AM Beijing`]   
+1. Finally, get over the last major bug in SSL support. It turned out to be a random packet loss in the CTcpStreamPdo2.  But the error report from OpenSSL as `mac failed`, was confusing and misleading for bug fixing. And most of the time was taken to find out why OpenSSL cannot work multi-threaded, in vain.
+
 [`Fri 13 Dec 2019 07:47:35 PM Beijing`]   
 1. Stucked with a bug that SSL randomly failed to decrypt the message and kill the SSL session. It is a bit difficult to fix...    
 
