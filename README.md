@@ -28,7 +28,7 @@ This framework depends on the following packags:
 
 ---
 [`Wed 18 Dec 2019 11:08:13 AM Beijing`]   
-1. Finally, get over the last major bug in SSL support. It turned out to be a random packet loss in the CTcpStreamPdo2.  But the report from SSL as a `mac failed` error, was confusing and misleading for bug fixing. Most of the time was taken to find out why OpenSSL cannot work multi-threaded, in vain.
+1. Finally, get over the last major bug in SSL support. It turned out to be a random packet loss in the CTcpStreamPdo2.  But the error report from OpenSSL as `mac failed`, was confusing and misleading for bug fixing. And most of the time was taken to find out why OpenSSL cannot work multi-threaded, in vain.
 
 [`Fri 13 Dec 2019 07:47:35 PM Beijing`]   
 1. Stucked with a bug that SSL randomly failed to decrypt the message and kill the SSL session. It is a bit difficult to fix...    
