@@ -10,6 +10,8 @@ This framework depends on the following packags:
 3. `lz4 (lz4-devel)`   
 4. `cppunit-1 (for the sample code, cppunit and cppunit-devel)`   
 5. `glib-2.0 (for compile only,glib2-devel)`   
+6. `openssl-1.1 for SSL transfer. ( optional )`
+
 #### Features:   
 1. `Support for multiple interfaces on a single object (COM alike).`   
 2. `Support for synchronous/Asynchronous requests and handling.`   
