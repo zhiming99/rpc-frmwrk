@@ -27,6 +27,9 @@ This framework depends on the following packags:
 14. `Object access via Multi-hop routing` (to come)
 
 ---
+[`Fri 20 Dec 2019 10:29:02 PM Beijing`]   
+1. Now there should still be some bugs in `sslfido`, related to the renegotiation. And there are some optimization and enhancement to do. But it does not matter that we can move on the add the websocket port.   
+
 [`Wed 18 Dec 2019 11:08:13 AM Beijing`]   
 1. Finally, get over the last major bug in SSL support. It turned out to be a random packet loss in the CTcpStreamPdo2.  But the error report from OpenSSL as `mac failed`, was confusing and misleading for bug fixing. And most of the time was taken to find out why OpenSSL cannot work multi-threaded, in vain.
 
