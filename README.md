@@ -25,7 +25,7 @@ This framework depends on the following packags:
 10. `Peer online/offline awareness.`
 11. `Streaming support to provide double-direction stream transfer`
 12. `Secure Socket Layer (SSL) support`
-13. `Websocket/http support`(to come)
+13. `Websocket/http2 support`(to come)
 14. `Object access via Multi-hop routing` (to come)
 
 ---
