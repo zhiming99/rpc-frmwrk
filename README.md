@@ -30,7 +30,7 @@ This framework depends on the following packags:
 
 ---
 [`Fri 20 Dec 2019 10:29:02 PM Beijing`]   
-1. Now there should still be some bugs in `sslfido`, related to the renegotiation. And there are some optimization and enhancement to do. But it does not matter that we can move on the add the websocket port.   
+1. Now there should still be some minor bugs in `sslfido`, related to the renegotiation. And there are some optimization and enhancement to do. But it does not matter that we can move on the add the support for websocket.   
 
 [`Wed 18 Dec 2019 11:08:13 AM Beijing`]   
 1. Finally, get over the last major bug in SSL support. It turned out to be a random packet loss in the CTcpStreamPdo2.  But the error report from OpenSSL as `mac failed`, was confusing and misleading for bug fixing. And most of the time was taken to find out why OpenSSL cannot work multi-threaded, in vain.
