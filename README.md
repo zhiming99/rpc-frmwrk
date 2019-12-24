@@ -10,6 +10,8 @@ This framework depends on the following packags:
 3. `lz4 (lz4-devel)`   
 4. `cppunit-1 (for the sample code, cppunit and cppunit-devel)`   
 5. `glib-2.0 (for compile only,glib2-devel)`   
+6. `openssl-1.1 for SSL transfer. ( optional )`
+
 #### Features:   
 1. `Support for multiple interfaces on a single object (COM alike).`   
 2. `Support for synchronous/Asynchronous requests and handling.`   
@@ -23,10 +25,13 @@ This framework depends on the following packags:
 10. `Peer online/offline awareness.`
 11. `Streaming support to provide double-direction stream transfer`
 12. `Secure Socket Layer (SSL) support`
-13. `Websocket/http support`(to come)
+13. `Websocket/http2 support`(to come)
 14. `Object access via Multi-hop routing` (to come)
 
 ---
+[`Fri 20 Dec 2019 10:29:02 PM Beijing`]   
+1. Now there should still be some minor bugs in `sslfido`, related to the renegotiation. And there are some optimization and enhancement to do. But it does not matter that we can move on the add the support for websocket.   
+
 [`Wed 18 Dec 2019 11:08:13 AM Beijing`]   
 1. Finally, get over the last major bug in SSL support. It turned out to be a random packet loss in the CTcpStreamPdo2.  But the error report from OpenSSL as `mac failed`, was confusing and misleading for bug fixing. And most of the time was taken to find out why OpenSSL cannot work multi-threaded, in vain.
 
