@@ -32,7 +32,8 @@
 
 using namespace std;
 
-std::atomic< guint32 > CRpcTcpFido::m_atmSeqNo( 0 );
+std::atomic< guint32 > CRpcTcpFido::m_atmSeqNo(
+    ( guint32 )GetRandom() );
 
 static gint32 GetBdgeIrpStmId(
     PIRP pIrp, gint32& iStmId )
@@ -813,6 +814,7 @@ gint32 CRpcTcpFido::CompleteSendReq(
                 if( pBuf.IsEmpty() )
                 {
                     ret = -ENODATA;
+                    pCtx->SetStatus( ret );
                     break;
                 }
 

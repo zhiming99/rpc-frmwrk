@@ -168,8 +168,8 @@
 // STATUS_PENDING on the return of SubmitIrp
 #define IRP_PENDING                     0x08
 
-// to send keep-alive message to the caller
-#define IRP_KEEP_ALIVE                  0x10
+// don't complet the irp for now
+#define IRP_NO_COMPLETE                 0x10
 
 // This is a requests not from dbus, indicating
 // the request and response are in IConfigDb
@@ -454,6 +454,11 @@ struct IoRequestPacket : public IEventSink
 
     inline bool IsCbOnly() const
     { return ( ( m_dwFlags & IRP_CALLBACK_ONLY ) != 0 ); }
+
+    void SetNoComplete( bool bNoComplete );
+
+    inline bool IsNoComplete() const
+    { return ( ( m_dwFlags & IRP_NO_COMPLETE ) != 0 ); }
 
     bool SetState( gint32 iCurState, gint32 iNewState );
 

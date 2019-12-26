@@ -412,6 +412,9 @@ gint32 CRpcConnSock::OnError(
         {
             if( !m_pStartTask.IsEmpty() )
             {
+                CStmSockConnectTask2*
+                    pConnTask = m_pStartTask;
+                pConnTask->WaitInitDone();
                 ret = m_pStartTask->OnEvent(
                     eventConnErr, iError, 0, nullptr );
             }
@@ -1623,6 +1626,7 @@ gint32 CTcpStreamPdo2::StartSend(
     if( pIrpLocked == nullptr ||
         pIrpLocked->GetStackSize() == 0 )
         return -EINVAL;
+
     gint32 ret = 0;
     do{
         IrpCtxPtr& pCtx = pIrpLocked->GetCurCtx();
@@ -1640,19 +1644,18 @@ gint32 CTcpStreamPdo2::StartSend(
             break;
         }
 
-        if( m_queWriteIrps.size() == 1 )
+        if( pIrpLocked == m_queWriteIrps.front() )
         {
             if( m_oSender.IsSendDone() )
             {
-                // start the send immediately
-                gint32 iFd = 0;
-                ret = pSock->GetSockFd( iFd );
-                if( ERROR( ret ) )
-                    break;
+                // start sending immediately
                 m_oSender.SetIrpToSend(
                     m_queWriteIrps.front() );
                 m_queWriteIrps.pop_front();
                 oPortLock.Unlock();
+                ret = pSock->OnSendReady();
+                if( ret != STATUS_PENDING )
+                    break;
             }
         }
 

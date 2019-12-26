@@ -1072,11 +1072,6 @@ gint32 CDriverManager::BuildPortStack(
             }
         }
 
-        //
-        // TODO: we need to add support for
-        // filter drivers in both the config file
-        // and the code if needed
-        //
         if( i == oMatchArray.size() ||
             vecDrivers.empty() )
         {

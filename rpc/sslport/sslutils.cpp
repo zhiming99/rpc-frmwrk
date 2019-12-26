@@ -152,11 +152,15 @@ gint32 CRpcOpenSSLFidoDrv::InitSSLContext(
 
         /*  Recommended to avoid SSLv2 & SSLv3 */
         SSL_CTX_set_options( m_pSSLCtx, SSL_OP_ALL
-            | SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
+             | SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
 
-        // uncomment this for debugging purpose
-        // SSL_CTX_set_cipher_list( m_pSSLCtx,
-        //     "AES128-SHA:AES256-SHA" );
+        // uncomment this for wireshark
+        // decryption, that is, wireshark support
+        // decode of rsa+aes ciphers. Many other
+        // ciphers, especially Diffie–Hellman
+        // ciphers cannot be decoded by wireshark.
+        SSL_CTX_set_cipher_list( m_pSSLCtx,
+            "AES128-SHA:AES256-SHA" );
    }while( 0 );
 
    return ret;

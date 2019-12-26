@@ -32,7 +32,7 @@
 // future addition.
 //
 // rpc-frmwrk components
-#define CLSIDS_ALLOCATED    ( clsid( ClassFactoryStart ) + 10 )
+#define CLSIDS_ALLOCATED    ( clsid( ClassFactoryStart ) + 20 )
 #define PROPIDS_ALLOCATED   ( propReservedEnd + 100 )
 
 // iid allocated

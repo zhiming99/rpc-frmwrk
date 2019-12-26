@@ -439,6 +439,14 @@ void IoRequestPacket::SetCbOnly( bool bCbOnly )
         m_dwFlags &= ~IRP_CALLBACK_ONLY;
 }
 
+void IoRequestPacket::SetNoComplete(
+    bool bNoComplete )
+{
+    if( bNoComplete )
+        m_dwFlags |= IRP_NO_COMPLETE;
+    else
+        m_dwFlags &= ~IRP_NO_COMPLETE;
+}
 
 gint32 IoRequestPacket::WaitForComplete()
 {
@@ -656,6 +664,9 @@ void IoRequestPacket::RemoveCallback()
 
 bool IoRequestPacket::CanComplete()
 {
+    if( IsNoComplete() )
+        return false;
+
     return ( m_dwTid != GetTid()
         || IsPending() );
 }

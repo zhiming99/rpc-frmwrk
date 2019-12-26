@@ -38,7 +38,8 @@
 CRpcStream2::CRpcStream2(
     const IConfigDb* pCfg )
     : super(),
-    m_atmSeqNo( 1 ),
+    m_atmSeqNo( ( guint32 )
+        GetRandom() ),
     m_dwAgeSec( 0 )
 {
     gint32 ret = 0;
@@ -458,7 +459,14 @@ gint32 CRpcStream2::StartSendDeferred(
         if( ERROR( ret ) )
             break;
 
+        // don't complete this irp from within the
+        // submitIrp
+        pIrp->SetNoComplete( true );
+
         ret = plowp->SubmitIrp( pIrp );
+
+        pIrp->SetNoComplete( false );
+
         if( ret == STATUS_PENDING )
         {
             ret = 0;
@@ -767,6 +775,7 @@ gint32 CRpcStream2::StartSend(
 
         if( plowp == nullptr )
         {
+            pIrpToComp = pIrp;
             ret = -EFAULT;
             break;
         }
@@ -2231,10 +2240,16 @@ gint32 CRpcNativeProtoFdo::StartSend(
         return -EFAULT;
 
     IrpCtxPtr pCtx;
-    bool bAsyncComp = false;
+    bool bHandled = false;
+    bool bControl = false;
 
     if( pIrpLocked != nullptr )
+    {
         pCtx = pIrpLocked->GetCurCtx();
+        guint32 dwMinorCmd = pCtx->GetMinorCmd();
+        if( dwMinorCmd == IRP_MN_IOCTL )
+            bControl = true;
+    }
 
     // ALERT: complicated section ahead
     do{
@@ -2248,6 +2263,7 @@ gint32 CRpcNativeProtoFdo::StartSend(
             // completion handler. Let them move
             // on.
             ret = STATUS_PENDING;
+            DebugPrint( 0, "stream is busy" );
             break;
         }
         else if( ret == -ENOENT )
@@ -2255,6 +2271,7 @@ gint32 CRpcNativeProtoFdo::StartSend(
             // this irp disappers in the thin air
             // should be impossible. the irp is
             // toxic, and don't touch it any more.
+            // DebugPrint( 0, "no stream to send" );
             ret = STATUS_PENDING;
             break;
         }
@@ -2270,46 +2287,81 @@ gint32 CRpcNativeProtoFdo::StartSend(
         }
 
         IrpPtr pIrp = pIrpLocked;
+        // NOTE: pIrp is not necessarily the irp
+        // to send, just a hint for the stream as
+        // the irp is currently locked. The
+        // returned pIrp is the one currently
+        // being send out
         ret = pStream->StartSend( pIrp );
         if( ret == STATUS_PENDING )
             break;
 
         if( pIrp.IsEmpty() )
+        {
+            // find next stream to send
+            ret = 0;
             continue;
+        }
 
         if( pIrpLocked == pIrp )
         {
             pCtx->SetStatus( ret );
             retLocked = ret;
-            bAsyncComp = true;
+            bHandled = true;
         }
 
         CStlIrpVector2::ElemType e( ret, pIrp );
         vecIrpComplete.push_back( e );
 
+        // fatal error
+        if( ERROR( ret ) )
+            break;
+
     }while( 1 );
 
-    if( vecIrpComplete.size() == 1 &&
-        pIrpLocked == vecIrpComplete.front().second )
-        return retLocked;
+    do{
+        if( vecIrpComplete.empty() )
+            break;
 
-    if( !vecIrpComplete.empty() )
-    {
         bool bSync = ( pIrpLocked == nullptr );
-        gint32 iRet = ScheduleCompleteIrpTask(
+        if( !bHandled )
+        {
+            goto LBL_SCHEDCOMP;
+        }
+        else if( pIrpLocked !=
+            vecIrpComplete.front().second )
+        {
+            goto LBL_SCHEDCOMP;
+        }
+        else if( vecIrpComplete.size() > 1 )
+        {
+            goto LBL_SCHEDCOMP;
+        }
+        else if( !bControl )
+        {
+            ret = retLocked;
+            break;
+        }
+        else if( SUCCEEDED( retLocked ) )
+        {
+            goto LBL_SCHEDCOMP;
+        }
+
+        // bControl && ( pending or error )
+        ret = retLocked;
+        break;
+
+LBL_SCHEDCOMP:
+        ret = ScheduleCompleteIrpTask(
             GetIoMgr(), pIrpVec, bSync );
-
-        if( SUCCEEDED( iRet ) && bAsyncComp )
-            return STATUS_PENDING;
-
         if( SUCCEEDED( ret ) )
-            ret = iRet;
-    }
+            ret = STATUS_PENDING;
 
-    if( pIrpLocked == nullptr )
-        return ret;
+        break;
 
-    return retLocked;
+    }while( 0 );
+
+    return ret;
 }
 
 gint32 CRpcNativeProtoFdo::SubmitReadIrp(

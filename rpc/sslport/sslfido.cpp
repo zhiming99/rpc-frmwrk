@@ -78,16 +78,13 @@ CRpcOpenSSLFido::~CRpcOpenSSLFido()
     sem_destroy( &m_semReadSync );
 }
 
-static guint8 g_arrOutBuf[ 4 ][ STM_MAX_BYTES_PER_BUF + 1024 ];
-static guint32 g_dwBufIdx = 0;
+static guint8 g_arrOutBuf[ 1 ][ STM_MAX_BYTES_PER_BUF + 1024 ];
+// static guint32 g_dwBufIdx = 0;
 static guint32 g_dwNumSent = 0;
 
 static char* GetOutBuf()
 {
-    char* pBuf = ( char* )
-        g_arrOutBuf[ g_dwBufIdx ];
-    g_dwBufIdx += 1;
-    g_dwBufIdx &= 3;
+    char* pBuf = ( char* )g_arrOutBuf[ 0 ];
     ++g_dwNumSent;
     return pBuf;
 }
@@ -1635,6 +1632,20 @@ gint32 CRpcOpenSSLFidoDrv::Probe(
 {
     gint32 ret = 0;
     do{
+        CIoManager* pMgr = GetIoMgr();
+
+        bool bEnableSSL = false;
+
+        ret = pMgr->GetCmdLineOpt(
+            propEnableSSL, bEnableSSL );
+
+        if( ERROR( ret ) || !bEnableSSL )
+        {
+            ret = 0;
+            pNewPort = pLowerPort;
+            break;
+        }
+
         if( pLowerPort == nullptr )
         {
             ret = -EINVAL;
@@ -1704,7 +1715,7 @@ gint32 CRpcOpenSSLFidoDrv::Probe(
             propDestTcpPort, pLowerPort );
 
         oNewCfg.SetPointer(
-            propIoMgr, GetIoMgr() );
+            propIoMgr, pMgr );
 
         oNewCfg.SetPointer(
             propDrvPtr, this );

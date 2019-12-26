@@ -40,6 +40,8 @@ CPPUNIT_TEST_SUITE_REGISTRATION( CIfRouterTest );
 // router role: 1. reqfwdr, 2. bridge, 3. both
 guint32 g_dwRole = 1;
 bool g_bCompress = false;
+bool g_bWebSocket = false;
+bool g_bSSL = false;
 
 void CIfRouterTest::setUp()
 {
@@ -74,6 +76,18 @@ void CIfRouterTest::setUp()
             {
                 pSvc->SetCmdLineOpt(
                     propCompress, g_bCompress );
+            }
+
+            if( g_bSSL )
+            {
+                pSvc->SetCmdLineOpt(
+                    propEnableSSL, true );
+            }
+
+            if( g_bWebSocket )
+            {
+                pSvc->SetCmdLineOpt(
+                    propEnableWebSock, true );
             }
 
             ret = pSvc->Start();
@@ -241,6 +255,16 @@ int main( int argc, char** argv )
     {
         switch (opt)
         {
+        case 'w':
+            {
+                g_bWebSocket = true;
+                break;
+            }
+        case 's':
+            {
+                g_bSSL = true;
+                break;
+            }
         case 'c':
             {
                 // compression required

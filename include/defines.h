@@ -221,7 +221,7 @@ inline gint32 SendBytesNoSig( int iFd,
         dwSize, MSG_NOSIGNAL );
 }
 
-
+gint64 GetRandom();
 
 using stdstr = std::string;
 
