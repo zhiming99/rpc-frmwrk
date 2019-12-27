@@ -29,6 +29,10 @@ This framework depends on the following packags:
 14. `Object access via Multi-hop routing` (to come)
 
 ---
+[`Thu 26 Dec 2019 08:17:28 PM Beijing`]   
+1. Further testing between virtual machines revealed a significant performance issue and a SSL bug. The performance issue is fixed. the SSL bug is yet to fix, which should be a concurrent problem.   
+2. Websocket support has to put off for several days. 
+
 [`Fri 20 Dec 2019 10:29:02 PM Beijing`]   
 1. Now there should still be some minor bugs in `sslfido`, related to the renegotiation. And there are some optimization and enhancement to do. But it does not matter that we can move on the add the support for websocket.   
 
