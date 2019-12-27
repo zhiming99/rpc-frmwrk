@@ -3692,9 +3692,9 @@ gint32 CRpcControlStream::QueueIrpForResp(
             break;
 
         CCfgOpener oCfg( ( IConfigDb* )pCfg );
-        guint32 dwSeqNo = 0;
+        guint32 dwReqSeqNo = 0;
         ret = oCfg.GetIntProp(
-            propSeqNo, dwSeqNo );
+            propSeqNo, dwReqSeqNo );
 
         if( ERROR( ret ) )
             break;
@@ -3717,9 +3717,9 @@ gint32 CRpcControlStream::QueueIrpForResp(
             if( dwType != DBUS_MESSAGE_TYPE_METHOD_RETURN )
                 continue;
 
-            guint32 dwSeqNo = 0;
+            guint32 dwRespSeqNo = 0;
             ret = oCfg.GetIntProp(
-                propSeqNo, dwSeqNo );
+                propSeqNo, dwRespSeqNo );
 
             // discard the packet
             if( ERROR( ret ) )
@@ -3727,6 +3727,9 @@ gint32 CRpcControlStream::QueueIrpForResp(
                 ret = 0;
                 continue;
             }
+
+            if( dwRespSeqNo != dwReqSeqNo )
+                continue;
 
             bFound = true;
             BufPtr pBuf( true );
@@ -3738,7 +3741,7 @@ gint32 CRpcControlStream::QueueIrpForResp(
 
         if( !bFound )
         {
-            m_mapIrpsForResp[ dwSeqNo ] =
+            m_mapIrpsForResp[ dwReqSeqNo ] =
                 IrpPtr( pIrp );
         }
 
@@ -3812,12 +3815,16 @@ gint32 CRpcControlStream::GetReadIrpsToComp(
             if( ERROR( ret ) )
                 continue;
 
-            // discard the packet, since no irp is
-            // waiting for it, probably the irp is
-            // canceled
+            // maybe we have arrived very soon,
+            // and right before the irp is put to
+            // this map because the system is
+            // heavily loaded
             if( m_mapIrpsForResp.find( dwSeqNo )
                 == m_mapIrpsForResp.end() )
+            {
+                quePktPutback.push_back( pCfg );
                 continue;
+            }
 
             pIrp = m_mapIrpsForResp[ dwSeqNo ];
             m_mapIrpsForResp.erase( dwSeqNo );

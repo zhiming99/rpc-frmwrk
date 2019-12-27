@@ -348,7 +348,7 @@ class CStreamRelayBase :
         }
 
         do{
-            IPort* pPort = this->GetPort();
+            IPort* pPort = nullptr;
             TaskletPtr pCloseStream;
             ret = DEFER_IFCALL_NOSCHED(
                 pCloseStream, ObjPtr( this ),

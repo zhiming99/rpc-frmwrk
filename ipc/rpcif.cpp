@@ -601,12 +601,30 @@ gint32 CRpcBaseOperations::StartRecvMsg(
                     propTaskState, stateIoDone );
             }
         }
+
+        if( pIrp->m_pCallback.IsEmpty() )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
         ThreadPtr pThrd;
         ret = pIrp->GetIrpThread( pThrd );
         if( ERROR( ret ) )
         {
-            pIrp->RemoveCallback();
-            ret = -EFAULT;
+            // in case some server does not have
+            // dedicated irp completion thread 
+            CCfgOpener oCfg;
+            oCfg.SetPointer( propIrpPtr,
+                ( PIRP )pIrp );
+
+            ret = pMgr->ScheduleTask(
+                clsid( CIoMgrIrpCompleteTask ),
+                oCfg.GetCfg() );
+
+            if( SUCCEEDED( ret ) )
+                ret = STATUS_PENDING;
+
             break;
         }
 

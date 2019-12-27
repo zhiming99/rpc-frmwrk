@@ -1028,12 +1028,16 @@ gint32 CRpcControlStream2::GetReadIrpsToComp(
             if( ERROR( ret ) )
                 continue;
 
-            // discard the packet, since no irp is
-            // waiting for it, probably the irp is
-            // canceled
+            // maybe we have arrived very soon,
+            // and right before the irp is put to
+            // this map because the system is
+            // heavily loaded
             if( m_mapIrpsForResp.find( dwSeqNo )
                 == m_mapIrpsForResp.end() )
+            {
+                quePktPutback.push_back( pCfg );
                 continue;
+            }
 
             pIrp = m_mapIrpsForResp[ dwSeqNo ];
             m_mapIrpsForResp.erase( dwSeqNo );
@@ -1096,9 +1100,9 @@ gint32 CRpcControlStream2::QueueIrpForResp(
             break;
 
         CCfgOpener oCfg( ( IConfigDb* )pCfg );
-        guint32 dwSeqNo = 0;
+        guint32 dwReqSeqNo = 0;
         ret = oCfg.GetIntProp(
-            propSeqNo, dwSeqNo );
+            propSeqNo, dwReqSeqNo );
 
         if( ERROR( ret ) )
             break;
@@ -1121,9 +1125,9 @@ gint32 CRpcControlStream2::QueueIrpForResp(
             if( dwType != DBUS_MESSAGE_TYPE_METHOD_RETURN )
                 continue;
 
-            guint32 dwSeqNo = 0;
+            guint32 dwRespSeqNo = 0;
             ret = oCfg.GetIntProp(
-                propSeqNo, dwSeqNo );
+                propSeqNo, dwRespSeqNo );
 
             // discard the packet
             if( ERROR( ret ) )
@@ -1131,6 +1135,9 @@ gint32 CRpcControlStream2::QueueIrpForResp(
                 ret = 0;
                 continue;
             }
+
+            if( dwRespSeqNo != dwReqSeqNo )
+                continue;
 
             bFound = true;
             BufPtr pBuf( true );
@@ -1142,7 +1149,7 @@ gint32 CRpcControlStream2::QueueIrpForResp(
 
         if( !bFound )
         {
-            m_mapIrpsForResp[ dwSeqNo ] =
+            m_mapIrpsForResp[ dwReqSeqNo ] =
                 IrpPtr( pIrp );
         }
 
@@ -1874,10 +1881,6 @@ gint32 CRpcNativeProtoFdo::CompleteCloseStmIrp(
 
     gint32 ret = 0;
     IrpCtxPtr& pCtx = pIrp->GetCurCtx();
-
-    ret = pCtx->GetStatus();
-    if( ERROR( ret ) )
-        return ret;
 
     do{
         CfgPtr pReqCfg;
@@ -3766,7 +3769,11 @@ gint32 CRpcNativeProtoFdo::OnReceive(
     }while( 1 );
 
     if( ERROR( ret ) )
+    {
+        DebugPrint( ret,
+            "Error receiving packets" );
         m_pPackReceiving.Clear();
+    }
 
     if( pBuf->size() > 0 )
         return -EFAULT;

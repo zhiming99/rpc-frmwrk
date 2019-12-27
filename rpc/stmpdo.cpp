@@ -1390,10 +1390,6 @@ gint32 CTcpStreamPdo::CompleteCloseStmIrp(
     if( pSock == nullptr )
         return -EFAULT;
 
-    ret = pCtx->GetStatus();
-    if( ERROR( ret ) )
-        return ret;
-
     do{
         CfgPtr pReqCfg;
         ret = pCtx->GetReqAsCfg( pReqCfg );

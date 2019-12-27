@@ -3578,12 +3578,23 @@ gint32 CRpcTcpBridgeShared::CloseLocalStream(
     if( IsReserveStm( iStreamId ) )
         return -EINVAL;
 
+    gint32 ret = 0;
+    PortPtr pTargetPort;
     if( pPort == nullptr )
     {
-        pPort = m_pParentIf->GetPort();
+        GET_TARGET_PORT_SHARED( pTargetPort );
+        if( ERROR( ret ) )
+            return ret;
+
+        pPort = pTargetPort;
+        if( unlikely( pPort == nullptr ) )
+            return ERROR_FAIL;
+    }
+    else
+    {
+        pTargetPort = pPort;
     }
         
-    gint32 ret = 0;
     do{
         // start to read from the default
         // dbus stream
