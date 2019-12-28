@@ -132,6 +132,8 @@ class CRpcOpenSSLFido : public CPort
     EnumRenegStat m_dwRenegStat = rngstatNormal;
     sem_t       m_semWriteSync;
     sem_t       m_semReadSync;
+    BufPtr      m_pOutBuf;
+    guint32     m_dwNumSent = 0;
 
     gint32 ResumeWriteTasks();
     gint32 SubmitWriteIrp( IRP* pIrp );
@@ -167,6 +169,19 @@ class CRpcOpenSSLFido : public CPort
     gint32 AdvanceShutdown(
          IEventSink* pCallback,
          BufPtr& pHandshake );
+
+    inline char* GetOutBuf()
+    {
+        char* pBuf;
+        if( unlikely( m_pOutBuf.IsEmpty() ) )
+            return nullptr;
+        pBuf = ( char* )m_pOutBuf->ptr();
+        m_dwNumSent++;
+        return pBuf;
+    }
+
+    inline guint32 GetOutSize() 
+    { return m_pOutBuf->size(); }
 
     public:
 

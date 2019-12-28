@@ -900,6 +900,168 @@ gint32 CBytesSender::CancelSend(
 
 #define STMPDO2_MAX_IDX_PER_REQ 1024
 
+gint32 CBytesSender::SendImmediate(
+    gint32 iFd, PIRP pIrpLocked )
+{
+    if( iFd < 0 )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        IrpPtr pIrp;
+        CPort* pPort = m_pPort;
+        if( unlikely( pPort == nullptr ) )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        CStdRMutex oPortLock( pPort->GetLock() );
+        if( m_pIrp.IsEmpty() )
+        {
+            ret = ERROR_NOT_HANDLED;
+            break;
+        }
+        pIrp = m_pIrp;
+        oPortLock.Unlock();
+
+        CStdRMutex oIrpLock( pIrp->GetLock() );
+        oPortLock.Lock();
+
+        if( !( pIrp == m_pIrp ) )
+            continue;
+
+        if( pIrpLocked != pIrp )
+        {
+            ret = -ENOENT;
+            break;
+        }
+
+        IrpCtxPtr& pCtx = m_pIrp->GetTopStack();
+        CfgPtr pCfg;
+        ret = pCtx->GetReqAsCfg( pCfg );
+        if( ERROR( ret ) )
+        {
+            BufPtr pPayload = pCtx->m_pReqData;
+            if( pPayload.IsEmpty() ||
+                pPayload->empty() )
+            {
+                ret = -EFAULT;
+                break;
+            }
+
+            // a single buffer to send
+            CParamList oParams;
+            oParams.Push( pPayload );
+            pCfg = oParams.GetCfg();
+        }
+
+        CParamList oParams( pCfg );
+        gint32 iCount = 0;
+        guint32& dwCount = ( guint32& )iCount;
+        ret = oParams.GetSize( dwCount );
+        if( ERROR( ret ) )
+            break;
+
+        if( unlikely( dwCount == 0  ||
+            dwCount > STMPDO2_MAX_IDX_PER_REQ ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        if( m_iBufIdx >= iCount )
+        {
+            // send done
+            break;
+        }
+
+        BufPtr pBuf;
+        ret = oParams.GetProperty(
+            m_iBufIdx, pBuf );
+
+        if( ERROR( ret ) )
+            break;
+
+        if( unlikely( m_dwOffset >=
+            pBuf->size() ) )
+        {
+            ret = -ERANGE;
+            break;
+        }
+
+        do{
+            guint32 dwMaxBytes =
+                MAX_BYTES_PER_TRANSFER;
+
+            guint32 dwSize = std::min(
+                pBuf->size() - m_dwOffset,
+                dwMaxBytes );
+
+            ret = SendBytesNoSig( iFd,
+                pBuf->ptr() + m_dwOffset,
+                dwSize );
+
+            if( ret == -1 && RETRIABLE( errno ) )
+            {
+                ret = STATUS_PENDING;
+                break;
+            }
+            else if( ret == -1 )
+            {
+                ret = -errno;
+                break;
+            }
+
+            guint32 dwMaxSize = pBuf->size();
+            guint32 dwNewOff = m_dwOffset + ret;
+
+            ret = 0;
+            if( dwMaxSize == dwNewOff )
+            {
+                // done with this buf
+                m_dwOffset = 0;
+                ++m_iBufIdx;
+
+                if( m_iBufIdx == iCount ) 
+                {
+                    break;
+                }
+                else if( unlikely(
+                    m_iBufIdx > iCount ) )
+                {
+                    ret = -EOVERFLOW;
+                    break;
+                }
+
+                ret = oParams.GetProperty(
+                    m_iBufIdx, pBuf );
+
+                if( ERROR( ret ) )
+                    break;
+
+                continue;
+            }
+            else if( dwMaxSize < dwNewOff )
+            {
+                ret = -EOVERFLOW;
+                break;
+            }
+
+            m_dwOffset = dwNewOff;
+
+        }while( 1 );
+
+    }while( 0 );
+
+    if( ret == ERROR_NOT_HANDLED ||
+        ret == -ENOENT ||
+        ret == STATUS_PENDING )
+        return ret;
+
+    SetSendDone( ret );
+    return ret;
+}
+
 gint32 CBytesSender::OnSendReady(
     gint32 iFd )
 {
@@ -1064,6 +1226,15 @@ bool CBytesSender::IsSendDone() const
         return true;
 
     return false;
+}
+
+gint32 CTcpStreamPdo2::SendImmediate(
+    gint32 iFd, PIRP pIrp )
+{
+    if( iFd < 0 || pIrp == nullptr )
+        return -EINVAL;
+
+    return m_oSender.SendImmediate( iFd, pIrp );
 }
 
 gint32 CTcpStreamPdo2::OnSendReady(
@@ -1649,11 +1820,20 @@ gint32 CTcpStreamPdo2::StartSend(
             if( m_oSender.IsSendDone() )
             {
                 // start sending immediately
+                gint32 iFd = -1;
+                ret = pSock->GetSockFd( iFd );
                 m_oSender.SetIrpToSend(
                     m_queWriteIrps.front() );
                 m_queWriteIrps.pop_front();
                 oPortLock.Unlock();
-                ret = pSock->OnSendReady();
+                ret = SendImmediate( iFd, pIrpLocked );
+                if( ret == ERROR_NOT_HANDLED ||
+                    ret == -ENOENT )
+                {
+                    // the irp is gone
+                    ret = STATUS_PENDING;
+                    break;
+                }
                 if( ret != STATUS_PENDING )
                     break;
             }

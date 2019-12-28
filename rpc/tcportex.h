@@ -531,6 +531,7 @@ class CBytesSender
         return 0;
     }
 
+    gint32 SendImmediate( gint32 iFd, PIRP pIrp );
     gint32 SetSendDone( gint32 iRet = 0 );
     bool IsSendDone() const;
     IrpPtr GetIrp() const
@@ -631,6 +632,8 @@ class CTcpStreamPdo2 : public CPort
     std::deque< STREAM_SOCK_EVENT > m_queEvtToRecv;
 
     CBytesSender m_oSender;
+
+    gint32 SendImmediate( gint32 iFd, PIRP pIrp );
 
     public:
 

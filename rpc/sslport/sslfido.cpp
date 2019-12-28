@@ -53,9 +53,15 @@ CRpcOpenSSLFido::CRpcOpenSSLFido(
 
         if( ERROR( ret ) )
             break;
-
         Sem_Init( &m_semWriteSync, 0, 1 );
         Sem_Init( &m_semReadSync, 0, 1 );
+
+        ret = m_pOutBuf.NewObj();
+        if( ERROR( ret ) )
+            break;
+
+        m_pOutBuf->Resize(
+            STM_MAX_BYTES_PER_BUF + 512 );
 
     }while( 0 );
     if( ERROR( ret ) )
@@ -78,19 +84,6 @@ CRpcOpenSSLFido::~CRpcOpenSSLFido()
     sem_destroy( &m_semReadSync );
 }
 
-static guint8 g_arrOutBuf[ 1 ][ STM_MAX_BYTES_PER_BUF + 1024 ];
-// static guint32 g_dwBufIdx = 0;
-static guint32 g_dwNumSent = 0;
-
-static char* GetOutBuf()
-{
-    char* pBuf = ( char* )g_arrOutBuf[ 0 ];
-    ++g_dwNumSent;
-    return pBuf;
-}
-
-constexpr static guint32 GetOutSize() 
-{ return sizeof( g_arrOutBuf[ 0 ] ); }
 
 gint32 CRpcOpenSSLFido::EncryptAndSend(
     PIRP pIrp, CfgPtr pCfg,
@@ -217,9 +210,6 @@ gint32 CRpcOpenSSLFido::EncryptAndSend(
                 dwOffset += n;
             }
 
-            DebugPrint( 0,
-                "Move on to encrypt the next buffer" );
-
         }while( 1 );
 
         if( ret == STATUS_PENDING )
@@ -239,7 +229,7 @@ gint32 CRpcOpenSSLFido::EncryptAndSend(
 
         guint32 dwOutOff = 0;
         char* pHoldBuf = GetOutBuf();
-        const guint32 dwHoldSize = GetOutSize();
+        guint32 dwHoldSize = GetOutSize();
 
         do{
             ret = BIO_read( m_pwbio,
@@ -251,8 +241,10 @@ gint32 CRpcOpenSSLFido::EncryptAndSend(
                 dwOutOff += ret;
                 if( dwOutOff == dwHoldSize )
                 {
-                    ret = -EOVERFLOW;
-                    break;
+                    m_pOutBuf->Resize(
+                        dwHoldSize * 2  );
+                    dwHoldSize = GetOutSize();
+                    pHoldBuf = GetOutBuf();
                 }
                 continue;
             }
@@ -267,8 +259,6 @@ gint32 CRpcOpenSSLFido::EncryptAndSend(
             break;
 
         }while( 1 );
-
-        oPortLock.Unlock();
 
         if( ERROR( ret ) )
             break;
@@ -288,6 +278,8 @@ gint32 CRpcOpenSSLFido::EncryptAndSend(
         BufPtr pOutBuf( true );
         pOutBuf->Resize( dwOutOff );
         memcpy( pOutBuf->ptr(), pHoldBuf, dwOutOff );
+
+        oPortLock.Unlock();
 
         // send the encrypted copy down 
         PortPtr pLowerPort = GetLowerPort();

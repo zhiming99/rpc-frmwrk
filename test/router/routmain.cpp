@@ -251,7 +251,7 @@ int main( int argc, char** argv )
 
     int opt = 0;
     int ret = 0;
-    while( ( opt = getopt( argc, argv, "cr:" ) ) != -1 )
+    while( ( opt = getopt( argc, argv, "wscr:" ) ) != -1 )
     {
         switch (opt)
         {
