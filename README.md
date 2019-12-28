@@ -29,6 +29,10 @@ This framework depends on the following packags:
 14. `Object access via Multi-hop routing` (to come)
 
 ---
+[`Fri 27 Dec 2019 08:51:54 PM Beijing`]   
+1. Fixed a bug related to streaming channel setup, which could drop the reponse message and, thus, caused the proxy to wait till timeout. It happens only when the system load is very high.   
+2. Also fixed two regression bugs due to earlier code changes, one is caused by no dedicated `irp completion thread` and the other is because the newly added `CTcpStreamPdo2` with incompitable interface to the old `CTcpStreamPdo`. It seems to take a longer time to make the new `tcp port stack` stable.
+
 [`Thu 26 Dec 2019 08:17:28 PM Beijing`]   
 1. Further testing between virtual machines revealed a significant performance issue and a SSL bug. The performance issue is fixed. the SSL bug is yet to fix, which should be a concurrent problem.   
 2. Websocket support has to put off for several days. 
