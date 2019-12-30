@@ -29,6 +29,9 @@ This framework depends on the following packags:
 14. `Object access via Multi-hop routing` (to come)
 
 ---
+[`Mon 30 Dec 2019 12:57:19 PM Beijing`]   
+1. Obosoleted some bad code.
+
 [`Sat 28 Dec 2019 04:11:29 PM Beijing`]   
 1. The SSL related bug turns out to be the usage of global buffer without protection. 
 2. Now all the known bugs in `sslfido` are fixed, and it should be safe to say the SSL support is more stable than yesterday. :)   
