@@ -29,6 +29,10 @@ This framework depends on the following packags:
 14. `Object access via Multi-hop routing` (to come)
 
 ---
+[`Sat 28 Dec 2019 04:11:29 PM Beijing`]   
+1. The SSL related bug turns out to be the usage of global buffer without protection. 
+2. Now all the known bugs in `sslfido` are fixed, and it should be safe to say the SSL support is more stable than yesterday. :)   
+
 [`Fri 27 Dec 2019 08:51:54 PM Beijing`]   
 1. Fixed a bug related to streaming channel setup, which could drop the reponse message and, thus, caused the proxy to wait till timeout. It happens only when the system load is very high.   
 2. Also fixed two regression bugs due to earlier code changes, one is caused by no dedicated `irp completion thread` and the other is because the newly added `CTcpStreamPdo2` with incompitable interface to the old `CTcpStreamPdo`. It seems to take a longer time to make the new `tcp port stack` stable.
