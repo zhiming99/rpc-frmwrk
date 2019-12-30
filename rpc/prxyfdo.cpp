@@ -219,46 +219,6 @@ gint32 CDBusProxyFdo::SubmitIoctlCmd( IRP* pIrp )
     return ret;
 }
 
-gint32 CDBusProxyFdo::ScheduleDispEvtTask(
-    DBusMessage* pMsg )
-{
-    if( pMsg == nullptr )
-        return -EINVAL;
-    // TODO: let's schedule a task to send out
-    // an irp to listen to the event from
-    // the remote server. this irp is 
-    // maintained by the fdo
- 
-    gint32 ret = 0;
-    do{
-        CParamList oCfg;
-
-        ret = oCfg.SetPointer( propIoMgr, GetIoMgr() );
-        if( ERROR( ret ) )
-            break;
-
-        ret = oCfg.SetObjPtr(
-            propPortPtr, ObjPtr( this ) );
-
-        if( ERROR( ret ) )
-            break;
-
-        ret = oCfg.SetMsgPtr(
-            propMsgPtr, DMsgPtr( pMsg ) );
-
-        if( ERROR( ret ) )
-            break;
-
-        ret = GetIoMgr()->ScheduleTask(
-            clsid( CProxyFdoDispEvtTask ), 
-            oCfg.GetCfg() );
-
-    }while( 0 );
-
-    return ret;
-}
-
-
 gint32 CDBusProxyFdo::HandleListeningFdo(
     IRP* pIrp )
 {
@@ -309,11 +269,8 @@ gint32 CDBusProxyFdo::HandleListeningFdo(
         {
             // let's dispatch this message to
             // all the listeners
-            DMsgPtr pMsg = *pNextIrpCtx->m_pRespData;
-            if( !pMsg.IsEmpty() )
-            {
-                ret = ScheduleDispEvtTask( pMsg );
-            }
+            pCtx->SetRespData(
+                pNextIrpCtx->m_pRespData );
         }
 
         pIrp->PopCtxStack();
@@ -677,7 +634,8 @@ gint32 CDBusProxyFdo::CompleteIoctlIrp(
                 DMsgPtr pMsg = *pTopCtx->m_pRespData;
                 if( !pMsg.IsEmpty() )
                 {
-                    ret = ScheduleDispEvtTask( pMsg );
+                    pCtx->SetRespData(
+                        pTopCtx->m_pRespData );
                 }
                 else
                 {
@@ -755,52 +713,6 @@ gint32 CDBusProxyFdo::CompleteIoctlIrp(
     return ret;
 }
 
-gint32 CProxyFdoDispEvtTask::operator()(
-    guint32 dwContext )
-{
-    CCfgOpener oParams( ( IConfigDb* )m_pCtx );
-
-    gint32 ret = 0;
-
-    do{
-        CIoManager* pMgr;
-        ret = oParams.GetPointer( propIoMgr, pMgr );
-        if( ERROR( ret ) )
-            break;
-
-        ObjPtr portPtr;
-        ret = oParams.GetObjPtr(
-            propPortPtr, portPtr );
-
-        if( ERROR( ret ) )
-            break;
-
-        CDBusProxyFdo* pPort = portPtr;
-
-        if( pPort == nullptr )
-        {
-            ret = -EINVAL;
-            break;
-        }
-
-        BufPtr pBuf( true );
-
-        DMsgPtr pEvtMsg;
-
-        ret = oParams.GetMsgPtr(
-            propMsgPtr, pEvtMsg );
-
-        if( ERROR( ret ) )
-            break;
-
-        *pBuf = pEvtMsg;
-        ret = pPort->DispatchData( *pBuf );
-
-    }while( 0 );
-
-    return SetError( ret );
-}
-
 /*
  *--------------------------------------------------------------------------------------
  *       Class:  CProxyFdoListenTask
@@ -817,6 +729,25 @@ gint32 CProxyFdoListenTask::Process(
     CCfgOpener oParams(
         ( IConfigDb* )GetConfig() );
     gint32 ret = 0;
+
+    CIoManager* pMgr;
+    ret = oParams.GetPointer( propIoMgr, pMgr );
+    if( ERROR( ret ) )
+        return SetError( ret );
+
+    ObjPtr portPtr;
+    ret = oParams.GetObjPtr(
+        propPortPtr, portPtr );
+
+    if( ERROR( ret ) )
+        return SetError( ret );
+
+    CDBusProxyFdo* pPort = portPtr;
+    if( pPort == nullptr )
+    {
+        ret = -EINVAL;
+        return SetError( ret );
+    }
 
     do{
         if( dwContext == eventIrpComp )
@@ -844,31 +775,26 @@ gint32 CProxyFdoListenTask::Process(
             }
             if( ERROR( ret ) )
                 break;
-        }
 
-        CIoManager* pMgr;
-        ret = oParams.GetPointer( propIoMgr, pMgr );
-        if( ERROR( ret ) )
-            break;
-
-        ObjPtr portPtr;
-        ret = oParams.GetObjPtr(
-            propPortPtr, portPtr );
-
-        if( ERROR( ret ) )
-            break;
-
-        IPort* pPort = portPtr;
-        if( pPort == nullptr )
-        {
-            ret = -EINVAL;
-            break;
+            IrpCtxPtr& pCtx = pIrp->GetTopStack();
+            DMsgPtr pMsg = *pCtx->m_pRespData;
+            if( !pMsg.IsEmpty() )
+            {
+                ret = pPort->DispatchData(
+                    pCtx->m_pRespData );
+                if( ERROR( ret ) )
+                {
+                    DebugPrint( ret,
+                        "Failed to Dispatch Incoming event" );
+                    ret = 0;
+                }
+            }
         }
 
         IrpPtr pIrp( true );
         pIrp->AllocNextStack( pPort );
 
-        IrpCtxPtr& pCtx = pIrp->GetTopStack();
+        IrpCtxPtr pCtx = pIrp->GetTopStack();
 
         pCtx->SetMajorCmd( IRP_MJ_FUNC );
         pCtx->SetMinorCmd( IRP_MN_IOCTL );
@@ -891,7 +817,26 @@ gint32 CProxyFdoListenTask::Process(
 
         // continue to get next event message
         if( SUCCEEDED( ret ) )
+        {
+            DMsgPtr pMsg = *pCtx->m_pRespData;
+            if( !pMsg.IsEmpty() )
+            {
+                ret = pPort->DispatchData(
+                    pCtx->m_pRespData );
+                if( ERROR( ret ) )
+                {
+                    DebugPrint( ret,
+                        "Failed to Dispatch Incoming event" );
+                    ret = 0;
+                }
+            }
+            else
+            {
+                ret = -EBADMSG;
+                break;
+            }
             continue;
+        }
 
         switch( ret )
         {

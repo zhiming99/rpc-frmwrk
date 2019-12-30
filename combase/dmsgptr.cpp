@@ -463,9 +463,6 @@ int CAutoPtr< Clsid_Invalid, DBusMessage >
     }
 }
 
-#define DUMP_DMSG 1
-
-
 gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
     ::Serialize( CBuffer* pBuf )
 {

@@ -548,19 +548,6 @@ class CProxyFdoListenTask
     virtual gint32 Process( guint32 dwContext );
 };
 
-class CProxyFdoDispEvtTask
-    : public CTasklet
-{
-    public:
-    typedef CTasklet super;
-    CProxyFdoDispEvtTask( const IConfigDb* pCfg = nullptr )
-        : CTasklet( pCfg )
-    {
-        SetClassId( clsid( CProxyFdoDispEvtTask ) );
-    }
-    gint32 operator()( guint32 dwContext );
-};
-
 class CProxyFdoRmtDBusOfflineTask
     : public CTasklet
 {

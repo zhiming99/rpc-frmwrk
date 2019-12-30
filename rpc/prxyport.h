@@ -145,9 +145,6 @@ class IRpcFdoPort : public CRpcBasePort
 
 class CDBusProxyFdo : public IRpcFdoPort
 {
-    gint32 ScheduleDispEvtTask(
-        DBusMessage* pMsg );
-
     // to filter for remote interface
     // online/offline event
     MatchPtr            m_matchModOnOff;
