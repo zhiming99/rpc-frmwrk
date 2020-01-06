@@ -29,6 +29,9 @@ This framework depends on the following packags:
 14. `Object access via Multi-hop routing` (to come)
 
 ---
+[`Mon 06 Jan 2020 12:04:26 PM Beijing`]   
+1. I need to replace the `ip address` with a opaque `connection handle` for the upcoming support of websocket, since `ip address` is no longer the only address format to locate the server. It is the bottom half of an earlier change which replaced `ip address` with the `port id` on the `bridge` side. The `reqfwdr` and `dbusprxy` are the target modules for this time.   
+
 [`Wed 01 Jan 2020 09:05:21 AM Beijing`]   
 1. Happy New Year! 2020!   
 
