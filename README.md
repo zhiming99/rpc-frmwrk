@@ -30,7 +30,7 @@ This framework depends on the following packags:
 
 ---
 [`Tue 21 Jan 2020 06:53:13 PM Beijing`]   
-1. The replacement of `ip address` with `connection handle` has turned out not a trivial change, and has escalated to a major change. I need to bring the pirority of `multi-hop routing` ahead of the `websocket` support for now. This is a major upgrade of the router modules, which enables associations of two or more devices/controlers in a hierarchical tree, and enable the client to `RPC` to a number of remote servers via a `path` string.
+1. The replacement of `ip address` with `connection handle` has turned out not a trivial change, and has escalated to a major change. I need to bring the pirority of `multi-hop routing` ahead of the `websocket` support for now. This is a major upgrade of the router module, which enables associations of two or more devices/controlers in a hierarchical tree, and enable the client to `RPC` to a number of remote servers via a `path` string.
 
 [`Mon 06 Jan 2020 12:04:26 PM Beijing`]   
 1. I need to replace the `ip address` with a opaque `connection handle` for the upcoming support of websocket, since `ip address` is no longer the only address format to locate the server. It is the bottom half of an earlier change which replaced `ip address` with the `port id` on the `bridge` side. The `reqfwdr` and `dbusprxy` are the target modules for this time.   
