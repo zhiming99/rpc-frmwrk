@@ -411,11 +411,6 @@ gint32 CIfRetryTask::OnEvent(
             iPropId = propTimerParamList;
             break;
         }
-    case eventRpcNotify:
-        {
-            iPropId = propNotifyParamList;
-            break; 
-        }
     default:
         {
             iPropId = propParamList;
@@ -2219,18 +2214,15 @@ gint32 CIfCpEventTask::RunTask()
                 if( ERROR( ret ) )
                     break;
 
-                // FIXME: we don't need to check
-                // ip addr at this point
-                CCfgOpenerObj oCfg( pIf );
-                string strIpAddr;
-                ret = oCfg.GetStrProp(
-                    propIpAddr, strIpAddr );
+                IConfigDb* pEvtCtx = nullptr;
+                ret = oParams.GetPointer(
+                    2, pEvtCtx );
 
                 if( ERROR( ret ) )
                     break;
 
                 ret = pIf->DoRmtModEvent(
-                    iEvent, strModName, strIpAddr );
+                    iEvent, strModName, pEvtCtx );
                 break;
             }
         default:
@@ -3134,24 +3126,6 @@ gint32 CIfParallelTask::Process(
             ret = -ENOTSUP;
             break;
         }
-    case eventRpcNotify:
-        {
-            vector< LONGWORD > vecParams;
-            ret = GetParamList( vecParams,
-                propNotifyParamList );
-
-            if( ERROR( ret ) )
-                break;
-
-            OnNotify( eventRpcNotify,
-                vecParams[ 1 ],
-                vecParams[ 2 ],
-                ( LONGWORD* ) vecParams[ 3 ]);
-
-            ret = STATUS_PENDING;
-            // we don't mean to complete
-            break;
-        }
     default:
         {
             ret = -ENOTSUP;
@@ -3817,64 +3791,6 @@ gint32 CIfIoReqTask::OnKeepAlive(
 
     // return STATUS_PENDING to avoid io task to
     // complete
-    return STATUS_PENDING;
-}
-
-gint32 CIfIoReqTask::OnNotify( LONGWORD event,
-    LONGWORD dwParam1,
-    LONGWORD dwParam2,
-    LONGWORD* pData )
-{
-    gint32 ret = 0;
-    switch( ( EnumEventId )event )
-    {
-    case eventRpcNotify:
-        {
-            CCfgOpener oCfg(
-                ( IConfigDb* )GetConfig() );
-
-            ObjPtr pObj;
-
-            ret = oCfg.GetObjPtr(
-                propEventSink, pObj );
-
-            if( ERROR( ret ) )
-                break;
-
-            IEventSink* pEvent = pObj;
-            if( pEvent == nullptr )
-                break;
-
-            ObjPtr pIf;
-            ret = oCfg.GetObjPtr( propIfPtr, pIf );
-            if( ERROR( ret ) )
-                break;
-
-            CRpcServices* pService = pIf;
-            if( pService == nullptr )
-            {
-                ret = -EFAULT;
-                break;
-            }
-            CIoManager* pMgr = pService->GetIoMgr();
-
-            // forward this notification
-            // NOTE: to avoid the lock nesting between
-            // the tasks we defer the call
-            //
-            ret = DEFER_CALL( pMgr,
-                ObjPtr( pEvent ),
-                &IEventSink::OnEvent,
-                ( EnumEventId )event,
-                dwParam1,
-                dwParam2,
-                pData );
-
-            break;
-        }
-    default:
-        break;
-    }
     return STATUS_PENDING;
 }
 

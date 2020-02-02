@@ -66,6 +66,26 @@ gint32 CStreamServerRelay::FetchData_Server(
             break;
         }
 
+        IConfigDb* pTransCtx = nullptr;
+        ret = oDataDesc.GetPointer(
+            propTransCtx, pTransCtx );
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpener oTransCtx( pTransCtx );
+        std::string strPath;
+        ret = oTransCtx.GetStrProp(
+            propRouterPath, strPath );
+        if( ERROR( ret ) )
+            break;
+
+        if( strPath != "/" )
+        {
+            // TODO: implement it
+            ret = ERROR_NOT_IMPL;
+            break;
+        }
+
         InterfPtr pIf;
         ret= pRouter->GetReqFwdrProxy(
             strDest, pIf );

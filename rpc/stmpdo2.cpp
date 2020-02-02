@@ -44,30 +44,15 @@ CRpcConnSock::CRpcConnSock(
         CCfgOpener oCfg(
             ( IConfigDb* )m_pCfg );
 
-        ret = oCfg.CopyProp(
-            propIpAddr, pCfg );
-
         gint32 iFd = -1;
         ret = oCfg.GetIntProp(
             propFd, ( guint32& )iFd );
 
         // passive connection
         if( SUCCEEDED( ret ) )
-        {
             m_iFd = iFd;
-            oCfg.CopyProp(
-                propSrcTcpPort, pCfg );
-            ret = oCfg.CopyProp(
-                propDestTcpPort, pCfg );
-        }
-        else
-        {
-            ret = oCfg.CopyProp(
-                propDestTcpPort, pCfg );
-        }
 
-        if( ERROR( ret ) )
-            break;
+        ret = 0;
 
     }while( 0 );
 
@@ -79,8 +64,7 @@ CRpcConnSock::CRpcConnSock(
     }
 }
 
-gint32 CRpcConnSock::ActiveConnect(
-    const std::string& strIpAddr )
+gint32 CRpcConnSock::ActiveConnect()
 {
     gint32 ret = 0;
     addrinfo *res = nullptr;
@@ -89,12 +73,18 @@ gint32 CRpcConnSock::ActiveConnect(
         CCfgOpener oCfg(
             ( IConfigDb* )m_pCfg );
 
-        guint32 dwPortNum = 0;
-        ret = oCfg.GetIntProp(
-            propDestTcpPort, dwPortNum );
-
+        IConfigDb* pConnParams = nullptr;
+        ret = oCfg.GetPointer(
+            propConnParams, pConnParams );
         if( ERROR( ret ) )
-            dwPortNum = RPC_SVR_PORTNUM;
+            break;
+
+        CConnParams oConnParams( pConnParams );
+        std::string strIpAddr =
+            oConnParams.GetDestIpAddr();
+
+        guint32 dwPortNum =
+            oConnParams.GetDestPortNum();
 
         /*  Connect to the remote host. */
         ret = GetAddrInfo( strIpAddr,
@@ -155,12 +145,15 @@ gint32 CRpcConnSock::Connect()
         CCfgOpener oCfg(
             ( IConfigDb* )m_pCfg );
 
-        std::string strIpAddr;
-        ret = oCfg.GetStrProp(
-            propIpAddr, strIpAddr );
-
+        IConfigDb* pConnParams = nullptr;
+        ret = oCfg.GetPointer(
+            propConnParams, pConnParams );
         if( ERROR( ret ) )
             break;
+
+        CConnParams oConnParams( pConnParams );
+        std::string strIpAddr =
+            oConnParams.GetDestIpAddr();
 
         guint8 arrAddrBytes[ IPV6_ADDR_BYTES ];
         guint32 dwSize = sizeof( arrAddrBytes );
@@ -191,7 +184,7 @@ gint32 CRpcConnSock::Connect()
 
         /*  Connect to the remote host. */
         m_bClient = true;
-        ret = ActiveConnect( strIpAddr );
+        ret = ActiveConnect();
 
     }while( 0 );
 
@@ -247,6 +240,64 @@ gint32 CRpcConnSock::Start()
 
     return ret;
 }
+
+gint32 CRpcConnSock::OnConnected()
+{
+    gint32 ret = 0;
+    do{
+        CCfgOpener oCfg(
+            ( IConfigDb* )m_pCfg );
+
+        IConfigDb* pConnParams = nullptr;
+        ret = oCfg.GetPointer(
+            propConnParams, pConnParams );
+        if( ERROR( ret ) )
+            break;
+
+        CConnParams oConnParams( pConnParams );
+        if( oConnParams.IsServer() )
+            break;
+
+        sockaddr_in6 oAddr;
+        socklen_t iSize = sizeof( oAddr );
+        ret = getsockname( m_iFd,
+            ( sockaddr* )&oAddr, &iSize );
+
+        if( ret == -1 )
+        {
+            ret = -errno;
+            break;
+        }
+
+        char szNode[ 32 ];
+        char szServ[ 8 ];
+
+        ret = getnameinfo( ( sockaddr* )&oAddr,
+            iSize, szNode, sizeof( szNode ),
+            szServ, sizeof( szServ ),
+            NI_NUMERICHOST | NI_NUMERICSERV );
+
+        if( ret != 0 )
+            break;
+            
+        std::string strSrcIp = szNode;
+        if( strSrcIp.empty() )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        guint32 dwSrcPortNum =
+            std::stoi( szServ );
+
+        // fill the abscent the connection parameters
+        oConnParams.SetSrcIpAddr( strSrcIp );
+        oConnParams.SetSrcPortNum( dwSrcPortNum );
+
+    }while( 0 );
+
+    return ret;
+}
 /**
 * @name Start_bh
 * the bottom half of the Start process
@@ -280,6 +331,13 @@ gint32 CRpcConnSock::Start_bh()
             break;
 
         ret = StartWatch( false );
+        if( ERROR( ret ) )
+            break;
+
+        ret = this->OnConnected();
+        if( ERROR( ret ) )
+            break;
+
         SetState( sockStarted );
         
     }while( 0 );
@@ -1298,17 +1356,10 @@ gint32 CTcpStreamPdo2::PostStart(
     do{
         CParamList oParams;
 
+        // share the conn parameters with the sock
+        // object
         ret = oParams.CopyProp(
-            propIpAddr, this );
-
-        if( ERROR( ret ) )
-            break;
-
-        oParams.CopyProp(
-            propSrcTcpPort, this );
-
-        ret = oParams.CopyProp(
-            propDestTcpPort, this );
+            propConnParams, this );
 
         if( ERROR( ret ) )
             break;
@@ -1336,6 +1387,64 @@ gint32 CTcpStreamPdo2::PostStart(
     }while( 0 );
 
     return ret;
+}
+
+gint32 CTcpStreamPdo2::OnPortReady(
+    IRP* pIrp )
+{
+    gint32 ret = 0;
+    do{
+        guint32 dwPortId = 0;
+        CCfgOpenerObj oPortCfg( this );
+        ret = oPortCfg.GetIntProp(
+            propPortId, dwPortId );
+
+        if( ERROR( ret ) )
+            break;
+
+        IConfigDb* pcp = nullptr;
+
+        // update the connparams
+        ret = oPortCfg.CopyProp(
+            propConnParams,
+            ( CObjBase* )m_pConnSock );
+
+        if( ERROR( ret ) )
+            break;
+
+        ret = oPortCfg.GetPointer(
+            propConnParams, pcp );
+        if( ERROR( ret ) )
+            break;
+
+        CConnParams oConnParams( pcp );
+        if( m_pBusPort == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        CRpcTcpBusPort* pBus =
+            ObjPtr( m_pBusPort );
+
+        if( pBus == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        // for client side, the connection
+        // information is complete at this
+        // point
+        ret = pBus->BindPortIdAndAddr(
+            dwPortId, oConnParams );
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+        return ret;
+
+    return super::OnPortReady( pIrp );
 }
 
 gint32 CTcpStreamPdo2::RemoveIrpFromMap(
@@ -2011,4 +2120,11 @@ gint32 CTcpStreamPdo2::CancelAllIrps(
     }
 
     return ret;
+}
+
+void CTcpStreamPdo2::OnPortStartFailed(
+        IRP* pIrp, gint32 ret )
+{
+    m_oSender.Clear();
+    return;
 }

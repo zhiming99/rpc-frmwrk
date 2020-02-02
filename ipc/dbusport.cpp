@@ -285,15 +285,17 @@ gint32 CDBusBusPort::BuildPdoPortName(
                 if( dwPortId == ( guint32 )-1 ||
                     dwPortId < 2 )
                 {
-                    string strIpAddr, strRet;
 
-                    ret = oCfgOpener.GetStrProp(
-                        propIpAddr, strIpAddr );
+                    IConfigDb* pConnParams = nullptr;
+                    ret = oCfgOpener.GetPointer(
+                        propConnParams, pConnParams );
                     if( ERROR( ret ) )
                         break;
 
+                    CConnParamsProxy ocps( pConnParams );
+
                     ADDRID_MAP::const_iterator itr =
-                        m_mapAddrToId.find( strIpAddr );
+                        m_mapAddrToId.find( ocps );
                     if( itr != m_mapAddrToId.end() )
                     {
                         dwPortId = itr->second;
@@ -445,13 +447,17 @@ gint32 CDBusBusPort::CreateRpcProxyPdoShared(
 
         if( SUCCEEDED( ret ) )
         {
-            std::string strIpAddr; 
-            oExtCfg.GetStrProp(
-                propIpAddr, strIpAddr );
+            IConfigDb* pConnParams;
+            ret = oExtCfg.GetPointer(
+                propConnParams, pConnParams );
+            if( ERROR( ret ) )
+                break;
+
+            CConnParamsProxy ocp( pConnParams );
 
             // bind the ip addr and the port-id
-            std::map< std::string, guint32 >::iterator
-                itr = m_mapAddrToId.find( strIpAddr );
+            ADDRID_MAP::iterator
+                itr = m_mapAddrToId.find( ocp );
             if( itr != m_mapAddrToId.end() )
             {
                 if( itr->second == dwPortId )
@@ -460,7 +466,7 @@ gint32 CDBusBusPort::CreateRpcProxyPdoShared(
                     break;
                 }
             }
-            m_mapAddrToId[ strIpAddr ] = dwPortId;
+            m_mapAddrToId[ ocp ] = dwPortId;
         }
         // the pdo port `Start()' will be deferred
         // till the complete port stack is built.
@@ -2312,14 +2318,15 @@ void CDBusBusPort::RemovePdoPort(
     CCfgOpenerObj oPortCfg(
         ( IPort* )pPort );
 
-    string strAddr;
-    ret = oPortCfg.GetStrProp(
-        propIpAddr, strAddr );
+    IConfigDb* pConnParams;
+    ret = oPortCfg.GetPointer(
+        propConnParams, pConnParams );
 
     if( ERROR( ret ) )
         return;
 
-    m_mapAddrToId.erase( strAddr );
+    CConnParamsProxy ocps( pConnParams );
+    m_mapAddrToId.erase( ocps );
 }
 
 CDBusConnFlushTask::CDBusConnFlushTask(

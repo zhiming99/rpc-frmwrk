@@ -428,6 +428,576 @@ struct CStartStopPdoCtx
     std::map< gint32, gint32 > m_mapIdToRes;
 };
 
+struct IConnParams
+{
+    CfgPtr m_pParams;
+
+    IConnParams( const IConfigDb* pCfg )
+    { m_pParams = const_cast< IConfigDb* >( pCfg ); }
+
+    IConnParams( const CfgPtr& pCfg )
+    { m_pParams = const_cast< CfgPtr& >( pCfg ); }
+
+    IConnParams()
+    {};
+
+    IConnParams( const IConnParams& rhs )
+    { m_pParams = const_cast< CfgPtr& >( rhs.m_pParams ); }
+
+    void SetCfg( IConfigDb* pCfg )
+    { m_pParams = pCfg; }
+
+    IConfigDb* GetCfg() const
+    { return m_pParams; }
+
+    inline bool IsEmpty() const
+    { return m_pParams.IsEmpty(); }
+};
+
+class CConnParams : public IConnParams
+{
+    public:
+    typedef IConnParams super;
+    CConnParams()
+    {}
+
+    CConnParams( const IConfigDb* pCfg ) :
+        super( pCfg )
+    {}
+
+    CConnParams( const CfgPtr& pCfg ) :
+        super( pCfg )
+    {}
+    CConnParams( const CConnParams& rhs ) :
+        super( rhs )
+    {}
+
+    bool less(const CConnParams& rhs ) const
+    {
+        bool ret = false;
+        do{
+            bool bServer = false;
+            guint32 bVal1 = 0, bVal2 = 0;
+            bVal1 = bServer = IsServer();
+            bVal2 = rhs.IsServer();
+            if( bVal1 < bVal2 )
+            {
+                ret = true;
+                break;
+            }
+
+            if( bVal2 < bVal1 )
+            {
+                ret = false;
+                break;
+            }
+
+            std::string strVal1, strVal2;
+
+            strVal1 = GetSrcIpAddr();
+            strVal2 = rhs.GetSrcIpAddr();
+
+            if( strVal1 < strVal2 )
+            {
+                ret = true;
+                break;
+            }
+
+            if( strVal2 < strVal1 )
+            {
+                ret = false;
+                break;
+            }
+
+            bVal1 = GetSrcPortNum();
+            bVal2 = rhs.GetSrcPortNum();
+
+            if( bVal1 < bVal2 )
+            {
+                ret = true;
+                break;
+            }
+
+            if( bVal2 < bVal1 )
+            {
+                ret = false;
+                break;
+            }
+
+            strVal1 = GetDestIpAddr();
+            strVal2 = rhs.GetDestIpAddr();
+
+            if( strVal1 < strVal2 )
+            {
+                ret = true;
+                break;
+            }
+
+            if( strVal2 < strVal1 )
+            {
+                ret = false;
+                break;
+            }
+
+            bVal1 = GetDestPortNum();
+            bVal2 = rhs.GetDestPortNum();
+
+            if( bVal1 < bVal2 )
+            {
+                ret = true;
+                break;
+            }
+
+            if( bVal2 < bVal1 )
+            {
+                ret = false;
+                break;
+            }
+
+            bVal1 = IsWebSocket();
+            if( bVal1 > 0 && !bServer )
+            {
+                // reverse proxy
+                std::string strUrl1, strUrl2;
+                strUrl1 = GetUrl();
+                strUrl2 = rhs.GetUrl();
+                if( strUrl1 < strUrl2 )
+                {
+                    ret = true;
+                    break;
+                }
+            }
+
+            ret = false;
+
+        }while( 0 );
+
+        return ret;
+    }
+
+    bool operator==( const CConnParams& rhs ) const
+    {
+        bool ret = false;
+        do{
+            bool bServer = false;
+            guint32 bVal1 = 0, bVal2 = 0;
+            bVal1 = bServer = IsServer();
+            bVal2 = rhs.IsServer();
+            if( bVal1 != bVal2 )
+            {
+                ret = false;
+                break;
+            }
+
+            std::string strVal1, strVal2;
+            if( bServer )
+            {
+                strVal1 = GetSrcIpAddr();
+                strVal2 = rhs.GetSrcIpAddr();
+
+                if( strVal1 != strVal2 )
+                {
+                    ret = false;
+                    break;
+                }
+
+                bVal1 = GetSrcPortNum();
+                bVal2 = rhs.GetSrcPortNum();
+
+                if( bVal1 != bVal2 )
+                {
+                    ret = false;
+                    break;
+                }
+            }
+
+            strVal1 = GetDestIpAddr();
+            strVal2 = rhs.GetDestIpAddr();
+
+            if( strVal1 != strVal2 )
+            {
+                ret = false;
+                break;
+            }
+
+            bVal1 = GetDestPortNum();
+            bVal2 = rhs.GetDestPortNum();
+
+            if( bVal1 != bVal2 )
+            {
+                ret = false;
+                break;
+            }
+
+            bVal1 = IsWebSocket();
+            if( bVal1 > 0 )
+            {
+                // reverse proxy
+                std::string strUrl1, strUrl2;
+                strUrl1 = GetUrl();
+                strUrl2 = rhs.GetUrl();
+                if( strUrl1 != strUrl2 )
+                {
+                    ret = false;
+                    break;
+                }
+            }
+
+            ret = true;
+
+        }while( 0 );
+
+        return ret;
+    }
+
+    bool operator!=( const CConnParams& rhs )
+    { return !operator==(rhs); }
+
+    inline guint32 GetSrcPortNum() const
+    {
+        CCfgOpener lhs(
+            ( const IConfigDb* )m_pParams );
+        guint32 dwPortNum = 0;
+        lhs.GetIntProp(
+            propSrcTcpPort, dwPortNum );
+        return dwPortNum;
+    }
+
+    inline void SetSrcPortNum( guint32 dwPortNum )
+    {
+        CCfgOpener lhs(
+            ( IConfigDb* )m_pParams );
+        lhs.SetIntProp(
+            propSrcTcpPort, dwPortNum );
+    }
+
+    inline guint32 GetDestPortNum() const
+    {
+        CCfgOpener lhs(
+            ( const IConfigDb* )m_pParams );
+        guint32 dwPortNum = 0;
+        lhs.GetIntProp(
+            propDestTcpPort, dwPortNum );
+        return dwPortNum;
+    }
+
+    inline void SetDestPortNum( guint32 dwPortNum )
+    {
+        CCfgOpener lhs(
+            ( IConfigDb* )m_pParams );
+        lhs.SetIntProp(
+            propDestTcpPort, dwPortNum );
+    }
+
+    inline std::string GetSrcIpAddr() const
+    {
+        CCfgOpener lhs(
+            ( const IConfigDb* )m_pParams );
+        std::string strIpAddr;
+        lhs.GetStrProp(
+            propSrcIpAddr, strIpAddr );
+        return strIpAddr;
+    }
+
+    inline void SetSrcIpAddr(
+        const std::string& strIpAddr )
+    {
+        CCfgOpener lhs(
+            ( IConfigDb* )m_pParams );
+        lhs.SetStrProp(
+            propSrcIpAddr, strIpAddr );
+    }
+
+    inline std::string GetDestIpAddr() const
+    {
+        CCfgOpener lhs(
+            ( const IConfigDb* )m_pParams );
+        std::string strIpAddr;
+        lhs.GetStrProp(
+            propDestIpAddr, strIpAddr );
+        return strIpAddr;
+    }
+
+    inline void SetDestIpAddr(
+        const std::string& strIpAddr )
+    {
+        CCfgOpener lhs(
+            ( IConfigDb* )m_pParams );
+        lhs.SetStrProp(
+            propDestIpAddr, strIpAddr );
+    }
+
+    inline std::string GetRouterPath() const
+    {
+        CCfgOpener lhs(
+            ( const IConfigDb* )m_pParams );
+        std::string strVal;
+        lhs.GetStrProp(
+            propRouterPath, strVal );
+        return strVal;
+    }
+
+    inline void SetRouterPath( const std::string& strVal)
+    {
+        CCfgOpener lhs(
+            ( IConfigDb* )m_pParams );
+        lhs.SetStrProp(
+            propRouterPath, strVal );
+    }
+
+    inline bool IsSSL() const
+    {
+        CCfgOpener lhs(
+            ( const IConfigDb* )m_pParams );
+        bool bVal = false;
+        lhs.GetBoolProp( propEnableSSL, bVal );
+        return bVal;
+    }
+
+    inline void SetSSL( bool bEnable )
+    {
+        CCfgOpener lhs(
+            ( IConfigDb* )m_pParams );
+        lhs.SetBoolProp(
+            propEnableSSL, bEnable );
+    }
+
+    inline bool IsWebSocket() const
+    {
+        CCfgOpener lhs(
+            ( const IConfigDb* )m_pParams );
+        bool bVal = false;
+        lhs.GetBoolProp(
+            propEnableWebSock, bVal );
+        return bVal;
+    }
+
+    inline void SetWebSocket( bool bEnable )
+    {
+        CCfgOpener lhs(
+            ( IConfigDb* )m_pParams );
+        lhs.SetBoolProp(
+            propEnableWebSock, bEnable );
+    }
+
+    inline bool IsCompression() const
+    {
+        CCfgOpener lhs(
+            ( const IConfigDb* )m_pParams );
+        bool bVal = false;
+        lhs.GetBoolProp( propCompress, bVal );
+        return bVal;
+    }
+
+    inline void SetCompression( bool bEnable )
+    {
+        CCfgOpener lhs(
+            ( IConfigDb* )m_pParams );
+        lhs.SetBoolProp(
+            propCompress, bEnable );
+    }
+
+
+    inline bool IsConnRecover() const
+    {
+        CCfgOpener lhs(
+            ( const IConfigDb* )m_pParams );
+        bool bVal = false;
+        lhs.GetBoolProp(
+            propConnRecover, bVal );
+        return bVal;
+    }
+
+    inline void SetConnRecover( bool bEnable )
+    {
+        CCfgOpener lhs(
+            ( IConfigDb* )m_pParams );
+        lhs.SetBoolProp(
+            propConnRecover, bEnable );
+    }
+
+    inline bool IsServer() const
+    {
+        CCfgOpener lhs(
+            ( const IConfigDb* )m_pParams );
+        bool bVal = false;
+        lhs.GetBoolProp( propIsServer, bVal );
+        return bVal;
+    }
+
+    inline void SetServer( bool bServer )
+    {
+        CCfgOpener lhs(
+            ( IConfigDb* )m_pParams );
+        lhs.SetBoolProp(
+            propIsServer, bServer );
+    }
+
+    inline std::string GetUrl() const
+    {
+        CCfgOpener lhs(
+            ( const IConfigDb* )m_pParams );
+        std::string strVal;
+        lhs.GetStrProp( propDestUrl, strVal );
+        return strVal;
+    }
+
+    inline void SetUrl( const std::string& strVal)
+    {
+        CCfgOpener lhs(
+            ( IConfigDb* )m_pParams );
+        lhs.SetStrProp(
+            propDestUrl, strVal );
+    }
+};
+
+class CConnParamsProxy : public CConnParams
+{
+    public:
+    typedef CConnParams super;
+
+    CConnParamsProxy( const IConfigDb* pCfg ) :
+        super( pCfg )
+    {}
+
+    CConnParamsProxy( const CfgPtr& pCfg ) :
+        super( pCfg )
+    {}
+
+    CConnParamsProxy( const CConnParamsProxy& rhs ) :
+        super( rhs )
+    {}
+
+    bool less(const CConnParamsProxy& rhs ) const
+    {
+        bool ret = false;
+        do{
+            bool bServer = false;
+            guint32 bVal1 = 0, bVal2 = 0;
+            bVal1 = bServer = IsServer();
+            bVal2 = rhs.IsServer();
+            if( bVal1 < bVal2 )
+            {
+                ret = true;
+                break;
+            }
+
+            if( bVal2 < bVal1 )
+            {
+                ret = false;
+                break;
+            }
+
+            std::string strVal1 =
+                GetDestIpAddr();
+
+            std::string strVal2 =
+                rhs.GetDestIpAddr();
+
+            if( strVal1 < strVal2 )
+            {
+                ret = true;
+                break;
+            }
+
+            if( strVal2 < strVal1 )
+            {
+                ret = false;
+                break;
+            }
+
+            bVal1 = GetDestPortNum();
+            bVal2 = rhs.GetDestPortNum();
+
+            if( bVal1 < bVal2 )
+            {
+                ret = true;
+                break;
+            }
+
+            if( bVal2 < bVal1 )
+            {
+                ret = false;
+                break;
+            }
+
+            strVal1 = GetDestIpAddr();
+            strVal2 = rhs.GetDestIpAddr();
+
+            if( strVal1 < strVal2 )
+            {
+                ret = true;
+                break;
+            }
+
+            if( strVal2 < strVal1 )
+            {
+                ret = false;
+                break;
+            }
+
+            strVal1 = GetRouterPath();
+            strVal2 = rhs.GetRouterPath();
+
+            if( strVal1 < strVal2 )
+            {
+                ret = true;
+                break;
+            }
+
+            if( strVal2 < strVal1 )
+            {
+                ret = false;
+                break;
+            }
+
+            bVal1 = IsWebSocket();
+            if( bVal1 > 0 )
+            {
+                // reverse proxy
+                std::string strUrl1, strUrl2;
+                strUrl1 = GetUrl();
+                strUrl2 = rhs.GetUrl();
+                if( strUrl1 < strUrl2 )
+                {
+                    ret = true;
+                    break;
+                }
+                if( strUrl2 < strUrl1)
+                {
+                    ret = false;
+                    break;
+                }
+            }
+            ret = false;
+
+        }while( 0 );
+
+        return ret;
+    }
+};
+
+namespace std
+{
+    template<>
+    struct less<CConnParamsProxy>
+    {
+        bool operator()( const CConnParamsProxy& k1,  const CConnParamsProxy& k2) const
+        {
+            return k1.less( k2 );
+        }
+    };
+
+    template<>
+    struct less<CConnParams>
+    {
+        bool operator()(const CConnParams& k1, const CConnParams& k2) const
+        {
+            return k1.less( k2 );
+        }
+    };
+}
+
 class CDBusBusPort : public CGenericBusPort
 {
     // the pending calls waiting for dispatching
@@ -454,9 +1024,9 @@ class CDBusBusPort : public CGenericBusPort
     std::map< std::string, gint32 > m_mapRules;
 
     using ADDRID_MAP =
-        std::map< std::string, guint32 >;
+        std::map< CConnParamsProxy, guint32 >;
 
-    std::map< std::string, guint32 > m_mapAddrToId;
+    ADDRID_MAP m_mapAddrToId;
 
     gint32 CreateLocalDBusPdo(
         const IConfigDb* pConfig,

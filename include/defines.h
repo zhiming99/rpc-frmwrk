@@ -105,6 +105,7 @@
 #define ERROR_CANNOT_COMP       ( ( gint32 )0x8001000b )
 #define ERROR_USER_CANCEL       ( ( gint32 )0x8001000c )
 #define ERROR_PAUSED            ( ( gint32 )0x8001000d )
+#define ERROR_NOT_IMPL          ( ( gint32 )0x8001000e )
 
 // for flow control
 #define ERROR_QUEUE_FULL        ( ( gint32 )0x8001000e )
@@ -189,6 +190,7 @@ do{\
 
 // for Sem_Timedwait interval
 #define THREAD_WAKEUP_INTERVAL      10
+#define RPC_SVR_DEFAULT_PORTNUM         0x1024
 
 extern std::string DebugMsgInternal(
     gint32 ret, const std::string& strMsg,

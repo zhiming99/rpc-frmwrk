@@ -1669,19 +1669,10 @@ CRpcNativeProtoFdo::CRpcNativeProtoFdo(
     : super( pCfg ),
     m_iStmCounter( STMSOCK_STMID_FLOOR )
 {
-    gint32 ret = 0;
     do{
         SetClassId( clsid( CRpcNativeProtoFdo ) );
         m_dwFlags &= ~PORTFLG_TYPE_MASK;
         m_dwFlags |= PORTFLG_TYPE_FDO;
-
-        ret = GetIoMgr()->GetCmdLineOpt(
-            propCompress, m_bCompress );
-
-        if( ERROR( ret ) )
-            m_bCompress = false;
-
-        ret = 0;
 
     }while( 0 );
 
@@ -3272,6 +3263,17 @@ gint32 CRpcNativeProtoFdo::PostStart(
 
     gint32 ret = 0;
     do{
+        CCfgOpenerObj oPortCfg(
+            ( CObjBase* )this );
+        IConfigDb* pConnParams = nullptr;
+        ret = oPortCfg.GetPointer(
+            propConnParams, pConnParams );
+        if( ERROR( ret ) )
+            break;
+
+        CConnParams oConn( pConnParams );
+        m_bCompress = oConn.IsCompression();
+
         IrpCtxPtr& pCtx = pIrp->GetTopStack();
         ret = pCtx->GetStatus();
         if( ERROR( ret ) )
@@ -4126,9 +4128,16 @@ gint32 CRpcNatProtoFdoDrv::Probe(
         std::string strClass =
             PORT_CLASS_TCP_STREAM_PDO2;
 
-        CCfgOpenerObj oCfg( pLowerPort );
+        PortPtr pPdoPort; 
+        ret = ( ( CPort* )pLowerPort )->
+            GetPdoPort( pPdoPort );
+        if( ERROR( ret ) )
+            break;
+
+        CPort* pPdo = pPdoPort;
+        CCfgOpenerObj oCfg( pPdo );
         ret = oCfg.GetStrProp(
-            propPdoClass, strPdoClass );
+            propPortClass, strPdoClass );
 
         if( ERROR( ret ) )
             break;
@@ -4148,11 +4157,11 @@ gint32 CRpcNatProtoFdoDrv::Probe(
         oNewCfg.SetIntProp(
             propPortId, dwPortId );
 
-        oNewCfg.CopyProp(
-            propIpAddr, pLowerPort );
+        ret = oNewCfg.CopyProp( propConnParams,
+            ( CObjBase* )pPdoPort );
 
-        oNewCfg.CopyProp(
-            propDestTcpPort, pLowerPort );
+        if( ERROR( ret ) )
+            break;
 
         oNewCfg.SetPointer(
             propIoMgr, GetIoMgr() );

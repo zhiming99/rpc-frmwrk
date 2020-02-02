@@ -49,7 +49,7 @@ enum EnumPropId : gint32
     propBusName,        // type: string
     propBusClass,       // type: string
     propBusId,          // type: guint32 
-    propProtocol,       // type: string as the protocol between the router, include `native', `wss', `http2' ...
+    propProtocol,       // type: string as the protocol between the router, include `native', `ws', `http2' ...
     propPortName,
     propPortClass,
     propPortId,         // type: guint32
@@ -200,6 +200,20 @@ enum EnumPropId : gint32
     propCompress,       // type: a boolean value to indicate whether to compress the data packet over the tcp connection.
     propEnableSSL,      // type: a boolean value to indicate whether to enable SSL ssession
     propEnableWebSock,  // type: a boolean value to indicate whether to enable Websocket
+    propDestUrl,        // type: a string value as the location of the server.
+    propConnRecover,    // type: a boolean value to indicate whether to recover the lost connection for websocket or http2
+    propConnParams,     // type: an objptr to a configdb object containing the tcp connection settings
+    propConnHandle,     // type: an guint32 to a connnection handle to the CRpcTcpBridgeProxy on the client side
+    propTransCtx,       // type: a pointer to the configdb as are the context
+                        // information for transferring requests or events,
+                        // which could include propConnHandle, propRouterPath,
+                        // propSid. It is adhere with evey ForwardRequest/ForwardEvent/FetchData
+    propSid,            // type: a string as the session id
+    propRouterPath,     // type: an string as the routing path to the destination server
+    propPrxyPortId,     // type: a guint32 as the portid for a proxy to forward
+                        // the request, 0xfffffff stands for a CRpcReqForwarderProxy, and other values
+                        // for a CRpcTcpBridgeProxy
+    propNodeName,       // type: a string as the node name for a bridge proxy
     propReservedEnd = 0x10000000,
     propInvalid = -1, 
 };

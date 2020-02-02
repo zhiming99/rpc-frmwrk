@@ -52,6 +52,7 @@ class CDBusProxyPdo : public CRpcPdoPort
 
     bool                m_bStopReady = false;
     TaskletPtr          m_pConnTask;
+    std::atomic< bool > m_atmInitDone;
 
     gint32 CheckConnCmdResp(
         DBusMessage* pMsg, gint32& iMethodReturn );
@@ -97,6 +98,11 @@ class CDBusProxyPdo : public CRpcPdoPort
     virtual gint32 OnPortReady( IRP* pIrp );
     virtual gint32 CompleteIoctlIrp( IRP* pIrp );
 
+    inline bool IsInitDone()
+    { return m_atmInitDone; }
+
+    inline void SetInitDone()
+    { m_atmInitDone = true; }
 
     inline bool IsConnected()
     { return m_bConnected; }
@@ -153,6 +159,8 @@ class CDBusProxyFdo : public IRpcFdoPort
     // event
     MatchPtr            m_matchDBusOff;
     MatchPtr            m_matchRmtSvrEvt;
+
+    TaskletPtr          m_pListenTask;
 
     bool                m_bConnected = false;
 

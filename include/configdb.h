@@ -336,7 +336,8 @@ class CCfgDbOpener
         return ret;
     }
 
-    gint32 CopyProp( gint32 iProp, const CObjBase* pSrcCfg )
+    gint32 CopyProp( gint32 iProp, gint32 iSrcProp,
+        const CObjBase* pSrcCfg )
     {
         if( pSrcCfg == nullptr )
             return -EINVAL;
@@ -344,13 +345,17 @@ class CCfgDbOpener
         CCfgDbOpener< CObjBase > a( pSrcCfg );
 
         BufPtr pBuf( true );
-        gint32 ret = a.GetProperty( iProp, *pBuf );
+        gint32 ret = a.GetProperty( iSrcProp, *pBuf );
 
         if( ERROR( ret ) )
             return ret;
 
         return SetProperty( iProp, *pBuf );
     }
+
+    gint32 CopyProp( gint32 iProp, const CObjBase* pSrcCfg )
+    { return CopyProp( iProp, iProp, pSrcCfg ); }
+
 
     gint32 MoveProp( gint32 iProp, CObjBase* pSrcCfg )
     {
@@ -553,7 +558,7 @@ class CCfgDbOpener
                 ret = -EINVAL;
                 break;
             }
-            if( m_pCfg == nullptr )
+            if( m_pConstCfg == nullptr )
             {
                 ret = -EFAULT;
                 break;
@@ -887,17 +892,22 @@ class CCfgDbOpener< IConfigDb >
         return ret;
     }
 
-    gint32 CopyProp( gint32 iProp, const CObjBase* pSrcCfg )
+    gint32 CopyProp( gint32 iProp, gint32 iSrcProp, const CObjBase* pSrcCfg )
     {
         CCfgDbOpener< CObjBase > a( pSrcCfg );
 
         BufPtr pBuf( true );
-        gint32 ret = a.GetProperty( iProp, *pBuf );
+        gint32 ret = a.GetProperty( iSrcProp, *pBuf );
 
         if( ERROR( ret ) )
             return ret;
 
         return SetProperty( iProp, pBuf );
+    }
+
+    gint32 CopyProp( gint32 iProp, const CObjBase* pSrcCfg )
+    {
+        return CopyProp( iProp, iProp, pSrcCfg );
     }
 
     gint32 MoveProp( gint32 iProp, CObjBase* pSrcCfg )
@@ -1098,7 +1108,7 @@ class CCfgDbOpener< IConfigDb >
                 ret = -EINVAL;
                 break;
             }
-            if( m_pCfg == nullptr )
+            if( m_pConstCfg == nullptr )
             {
                 ret = -EFAULT;
                 break;

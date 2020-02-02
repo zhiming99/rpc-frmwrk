@@ -270,8 +270,8 @@ gint32 CTaskletRetriable::operator()(
 
     do{
         try{
-            // no allow of reentrency from concurrency or
-            // the cyclic call
+            // no allow of reentrency from concurrent or
+            // cyclic calls
             CReentrancyGuard oTaskEntered( this );
             // test if we are from a retry
             if( dwContext == eventTimeout )

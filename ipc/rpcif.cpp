@@ -680,11 +680,11 @@ gint32 CRpcBaseOperations::DoModEvent(
 gint32 CRpcBaseOperations::DoRmtModEvent(
     EnumEventId iEvent,
     const std::string& strModule,
-    const std::string& strIpAddr )
+    IConfigDb* pEvtCtx )
 {
 
     return m_pIfStat->OnRmtModEvent(
-        iEvent, strModule, strIpAddr );
+        iEvent, strModule, pEvtCtx );
 }
 
 gint32 CRpcBaseOperations::DoPause(
@@ -1520,15 +1520,77 @@ gint32 CRpcInterfaceBase::OnModEvent(
         if( ERROR( ret ) )
             break;
 
-        ObjPtr pObj = pDummyTask;
-        ret = oParams.SetObjPtr(
-            propEventSink, pObj );
+        ret = pTask.NewObj(
+            clsid( CIfCpEventTask ),
+            oParams.GetCfg() );
 
         if( ERROR( ret ) )
             break;
 
-        oParams.SetBoolProp(
-            propNotifyClient, true );
+        ( ( CIfRetryTask* )pTask )->
+            SetClientNotify( pDummyTask );
+
+        ret = AppendAndRun( pTask );
+
+    }while( 0 );
+
+    return ret;
+}
+
+#define FILTER_RMT_EVT( _pEvtCtx ) \
+do{ \
+    CCfgOpenerObj oCfg( this ); \
+    ret = oCfg.IsEqualProp( \
+        propConnHandle, _pEvtCtx ); \
+    if( ERROR( ret ) ) \
+        break; \
+    IConfigDb* pConnParams = nullptr; \
+    ret = oCfg.GetPointer( \
+        propConnParams, pConnParams ); \
+    if( ERROR( ret ) ) \
+        break; \
+    CCfgOpener oEvtCtx( _pEvtCtx ); \
+    ret = oEvtCtx.IsEqualProp( \
+        propRouterPath, pConnParams ); \
+    if( ERROR( ret ) ) \
+        break; \
+}while( 0 )
+
+gint32 CRpcInterfaceBase::OnRmtModEvent(
+    EnumEventId iEvent,
+    const std::string& strModule,
+    IConfigDb* pEvtCtx )
+{
+    gint32 ret = 0;
+
+    FILTER_RMT_EVT( pEvtCtx );
+    if( ERROR( ret ) )
+        return ret;
+
+    do{
+        TaskletPtr pTask;
+
+        if( !IsMyDest( strModule ) )
+            break;
+
+        if( TestSetState( iEvent )
+            == ERROR_STATE )
+            break;
+
+        CParamList oParams;
+        oParams.Push( iEvent );
+        oParams.Push( strModule );
+        oParams.Push( pEvtCtx );
+
+        ret = oParams.SetObjPtr(
+            propIfPtr, ObjPtr( this ) );
+
+        if( ERROR( ret  ) )
+            break;
+
+        TaskletPtr pDummyTask;
+        ret = pDummyTask.NewObj(
+            clsid( CIfDummyTask ) );
 
         if( ERROR( ret ) )
             break;
@@ -1540,31 +1602,14 @@ gint32 CRpcInterfaceBase::OnModEvent(
         if( ERROR( ret ) )
             break;
 
+        ( ( CIfRetryTask* )pTask )->
+            SetClientNotify( pDummyTask );
+
         ret = AppendAndRun( pTask );
 
     }while( 0 );
 
     return ret;
-}
-
-gint32 CRpcInterfaceBase::OnRmtModEvent(
-    EnumEventId iEvent,
-    const std::string& strModule,
-    const std::string& strIpAddr )
-{
-    CCfgOpenerObj oCfg( this );
-    string strDestIp;
-
-    gint32 ret = oCfg.GetStrProp(
-        propIpAddr, strDestIp );
-
-    if( ERROR( ret ) )
-        return ret;
-
-    if( strDestIp != strIpAddr )
-        return ERROR_FAIL;
-
-    return OnModEvent( iEvent, strModule );
 }
 
 gint32 CRpcInterfaceBase::OnDBusEvent(
@@ -1607,28 +1652,58 @@ gint32 CRpcInterfaceBase::OnDBusEvent(
     return ret;
 }
 
+#define FILTER_RMT_EVT2( _pEvtCtx ) \
+do{ \
+    CCfgOpenerObj oCfg( this ); \
+    ret = oCfg.IsEqualProp( \
+        propConnHandle, _pEvtCtx ); \
+    if( ERROR( ret ) ) \
+        break; \
+    IConfigDb* pConnParams = nullptr; \
+    ret = oCfg.GetPointer( \
+        propConnParams, pConnParams ); \
+    if( ERROR( ret ) ) \
+        break; \
+    CCfgOpener oEvtCtx( _pEvtCtx ); \
+    std::string strVal1, strVal2; \
+    ret = oEvtCtx.GetStrProp( \
+        propRouterPath, strVal1 ); \
+    if( ERROR( ret ) ) \
+        break; \
+    CConnParams oConn( pConnParams ); \
+    strVal2 = oConn.GetRouterPath(); \
+    if( strVal1 == strVal2 || \
+        strVal1 == "/" ) \
+    { \
+        break; \
+    } \
+    else if( strVal1 > strVal2 ) \
+    { \
+        ret = ERROR_FALSE; \
+        break; \
+    } \
+    else  \
+    { \
+        guint32 ch = strVal2[ strVal1.size() ]; \
+        if( ch != '/' ) \
+            ret = ERROR_FALSE; \
+        break; \
+    } \
+}while( 0 )
 
 gint32 CRpcInterfaceBase::OnRmtSvrEvent(
     EnumEventId iEvent,
-    const std::string& strIpAddr,
+    IConfigDb* pEvtCtx,
     HANDLE hPort )
 {
     gint32 ret = 0;
 
-    if( strIpAddr.empty() )
+    if( pEvtCtx == nullptr )
         return -EINVAL;
 
-    CCfgOpenerObj oCfg( this );
-    string strDestIp;
-
-    ret = oCfg.GetStrProp(
-        propIpAddr, strDestIp );
-
+    FILTER_RMT_EVT2( pEvtCtx );
     if( ERROR( ret ) )
         return ret;
-
-    if( strDestIp != strIpAddr )
-        return ERROR_ADDRESS;
 
     switch( iEvent )
     {
@@ -1737,8 +1812,8 @@ gint32 CRpcInterfaceBase::OnEvent(
     case eventModOnline:
     case eventModOffline:
         {
-            string strMod =
-                reinterpret_cast< char* >( pData );
+            string strMod = reinterpret_cast
+                < const char* >( pData );
 
             bool bInterested = false;
             if( dwParam1 & MOD_ONOFFLINE_IRRELEVANT )
@@ -1755,14 +1830,14 @@ gint32 CRpcInterfaceBase::OnEvent(
     case eventRmtModOnline:
     case eventRmtModOffline:
         {
-            string strMod =
-                reinterpret_cast< char* >( pData );
+            string strMod = reinterpret_cast
+                < const char* >( pData );
 
-            string strIpAddr =
-                reinterpret_cast< char* >( dwParam1 );
+            IConfigDb* pEvtCtx = reinterpret_cast
+                < IConfigDb* >( dwParam1 );
 
             ret = OnRmtModEvent(
-                iEvent, strMod, strIpAddr ); 
+                iEvent, strMod, pEvtCtx ); 
 
             break;
         }
@@ -1778,11 +1853,11 @@ gint32 CRpcInterfaceBase::OnEvent(
     case eventRmtSvrOffline:
         {
             HANDLE hPort = ( HANDLE )pData;
-            string strIpAddr = reinterpret_cast
-                < const char* >( dwParam1 );
+            IConfigDb* pEvtCtx = reinterpret_cast
+                < IConfigDb* >( dwParam1 );
 
             ret = OnRmtSvrEvent(
-                iEvent, strIpAddr, hPort ); 
+                iEvent, pEvtCtx, hPort ); 
             break;
         }
     case cmdPause:
@@ -2453,8 +2528,10 @@ gint32 CRpcServices::OnPostStop(
     if( !m_pSeqTasks.IsEmpty() &&
         m_pSeqTasks->GetTaskCount() > 0 )
     {
-        ( *m_pSeqTasks )( eventCancelTask );
+        TaskGrpPtr pSeqTasks = m_pSeqTasks;
         m_pSeqTasks.Clear(); 
+        oIfLock.Unlock();
+        ( *pSeqTasks )( eventCancelTask );
     }
 
     return 0;
@@ -2464,10 +2541,7 @@ typedef std::pair< gint32, BufPtr > ARG_ENTRY;
 
 /**
 * @name InvokeMethod to invoke the specified
-* method in the pReqMsg. if pReqMsg is nullptr and
-* propQueuedReq is set, the method will aussume
-* the caller knows the current task is done and
-* pop the first entry and proceed to the next
+* method in the pReqMsg. 
 *
 * parameter:
 *   pReqMsg: the incoming method call or the event
@@ -2639,6 +2713,53 @@ gint32 CRpcServices::RunIoTask(
         }
 
     }while( 0 );
+
+    return ret;
+}
+
+gint32 CInterfaceProxy::RestartListening(
+    EnumIfState iStateOld  )
+{
+    gint32 ret = 0;
+    CParamList oParams;
+    TaskletPtr pRecvMsgTask;
+
+    EnumIfState iState = GetState();
+    gint32 iStartType = 0;
+    if( iState == stateConnected && 
+        iStateOld == statePaused )
+        iStartType = 1;
+
+    else if( iState == stateConnected &&
+        iStateOld == stateRecovery )
+        iStartType = 2;
+
+    else if( iState == statePaused &&
+        iStateOld == stateRecovery )
+        iStartType = 3;
+    else
+    {
+        return 0;
+    }
+
+    if( iStartType == 3 )
+        return 0;
+
+    oParams[ propIfPtr ] = ObjPtr( this );
+    for( auto pMatch : m_vecMatches )
+    {
+        oParams[ propMatchPtr ] =
+            ObjPtr( pMatch );
+
+        ret = pRecvMsgTask.NewObj(
+        clsid( CIfStartRecvMsgTask ),
+        oParams.GetCfg() );
+
+        if( ERROR( ret ) )
+            break;
+
+        AddAndRun( pRecvMsgTask );
+    }
 
     return ret;
 }
@@ -3868,7 +3989,8 @@ gint32 CRpcServices::LoadObjDesc(
             {
                 strVal = oObjElem[ JSON_ATTR_PROXY_PORTCLASS ].asString(); 
                 oCfg[ propPortClass ] = strVal;
-                if( strVal == PORT_CLASS_DBUS_PROXY_PDO )
+                if( strVal == PORT_CLASS_DBUS_PROXY_PDO ||
+                    strVal == PORT_CLASS_DBUS_PROXY_PDO_LPBK )
                     bProxyPdo = true;
             }
 
@@ -3888,7 +4010,7 @@ gint32 CRpcServices::LoadObjDesc(
                 }
 
                 if( SUCCEEDED( ret ) )
-                    oCfg[ propIpAddr ] = strNormVal;
+                    oCfg[ propDestIpAddr ] = strNormVal;
                 else if( !bProxyPdo )
                     ret = 0;
                 else
@@ -3899,6 +4021,7 @@ gint32 CRpcServices::LoadObjDesc(
             }
 
             // tcp port number for router setting
+            guint32 dwPortNum = 0xFFFFFFFF;
             if( oObjElem.isMember( JSON_ATTR_TCPPORT ) &&
                 oObjElem[ JSON_ATTR_TCPPORT ].isString() )
             {
@@ -3911,10 +4034,8 @@ gint32 CRpcServices::LoadObjDesc(
                 }
                 if( dwVal > 1024 && dwVal < 0x10000 )
                 {
-                    EnumPropId iProp = propSrcTcpPort;
-                    if( !bServer )
-                        iProp = propDestTcpPort;
-                    oCfg[ iProp ] = dwVal;
+                    oCfg[ propDestTcpPort ] = dwVal;
+                    dwPortNum = dwVal;
                 }
                 else
                 {
@@ -3931,6 +4052,91 @@ gint32 CRpcServices::LoadObjDesc(
             {
                 strVal = oObjElem[ JSON_ATTR_PROXY_PORTID ].asString(); 
                 oCfg[ propPortId ] = std::stoi( strVal );
+            }
+
+            CCfgOpener oConnParams;
+
+            // set the default parameters
+            if( bProxyPdo )
+            {
+                oConnParams[ propEnableSSL ] = false;
+                oConnParams[ propEnableWebSock ] = false;
+                oConnParams[ propCompress ] = true;
+                oConnParams[ propConnRecover ] = false;
+                oConnParams[ propRouterPath ] = std::string( "/" );
+
+                if( dwPortNum == 0xFFFFFFFF )
+                    dwPortNum = RPC_SVR_DEFAULT_PORTNUM;
+
+                oConnParams[ propDestTcpPort ] = dwPortNum;
+
+                if( oObjElem.isMember( JSON_ATTR_ENABLE_SSL ) &&
+                    oObjElem[ JSON_ATTR_ENABLE_SSL ].isString() &&
+                    !bServer )
+                {
+                    strVal = oObjElem[ JSON_ATTR_ENABLE_SSL  ].asString(); 
+                    if( strVal == "false" )
+                        oConnParams[ propEnableSSL ] = false;
+                    else if( strVal == "true" )
+                    {
+                        oConnParams[ propEnableSSL ] = true;
+                    }
+                }
+
+                if( oObjElem.isMember( JSON_ATTR_ENABLE_WEBSOCKET ) &&
+                    oObjElem[ JSON_ATTR_ENABLE_WEBSOCKET ].isString() &&
+                    !bServer )
+                {
+                    strVal = oObjElem[ JSON_ATTR_ENABLE_WEBSOCKET  ].asString(); 
+                    if( strVal == "false" )
+                        oConnParams[ propEnableWebSock ] = false;
+                    else if( strVal == "true" )
+                        oConnParams[ propEnableWebSock ] = true;
+                }
+
+                if( oObjElem.isMember( JSON_ATTR_ENABLE_COMPRESS ) &&
+                    oObjElem[ JSON_ATTR_ENABLE_COMPRESS ].isString() &&
+                    !bServer )
+                {
+                    strVal = oObjElem[ JSON_ATTR_ENABLE_COMPRESS  ].asString(); 
+                    if( strVal == "false" )
+                        oConnParams[ propCompress ] = false;
+                    else if( strVal == "true" )
+                        oConnParams[ propCompress ] = true;
+                }
+
+                if( oObjElem.isMember( JSON_ATTR_CONN_RECOVER ) &&
+                    oObjElem[ JSON_ATTR_CONN_RECOVER ].isString() &&
+                    !bServer )
+                {
+                    strVal = oObjElem[ JSON_ATTR_CONN_RECOVER  ].asString(); 
+                    if( strVal == "false" )
+                        oConnParams[ propConnRecover ] = false;
+                    else if( strVal == "true" )
+                        oConnParams[ propConnRecover ] = true;
+                }
+
+                if( oObjElem.isMember( JSON_ATTR_DEST_URL ) &&
+                    oObjElem[ JSON_ATTR_DEST_URL ].isString() &&
+                    !bServer )
+                {
+                    strVal = oObjElem[ JSON_ATTR_DEST_URL  ].asString(); 
+                    oConnParams[ propDestUrl ] = strVal;
+                }
+
+                if( oObjElem.isMember( JSON_ATTR_ROUTER_PATH ) &&
+                    oObjElem[ JSON_ATTR_DEST_URL ].isString() &&
+                    !bServer )
+                {
+                    strVal = oObjElem[ JSON_ATTR_ROUTER_PATH  ].asString(); 
+                    oConnParams[ propRouterPath ] = strVal;
+                }
+
+                oConnParams.CopyProp( propDestIpAddr, ( IConfigDb* )pCfg );
+                oConnParams.CopyProp( propIsServer, ( IConfigDb* )pCfg );
+
+                oCfg[ propConnParams ] =
+                    ObjPtr( oConnParams.GetCfg() );
             }
 
             if( oObjElem.isMember( JSON_ATTR_QUEUED_REQ ) &&
@@ -4166,10 +4372,10 @@ gint32 CRpcServices::PackEvent(
     case eventRmtModOffline:
         {
 
-            string strIpAddr =
-                reinterpret_cast< char* >( dwParam1 );
+            IConfigDb* pEvtCtx = reinterpret_cast
+                < IConfigDb* >( dwParam1 );
 
-            oParams.Push( strIpAddr );
+            oParams.Push( pEvtCtx );
             oParams.Push( 0 );
 
             string strMod =
@@ -4188,9 +4394,9 @@ gint32 CRpcServices::PackEvent(
     case eventRmtSvrOnline:
     case eventRmtSvrOffline:
         {
-            string strIpAddr = reinterpret_cast
-                < char* >( dwParam1 );
-            oParams.Push( strIpAddr );
+            IConfigDb* pEvtCtx = reinterpret_cast
+                < IConfigDb* >( dwParam1 );
+            oParams.Push( pEvtCtx );
 
             oParams.Push( 0 );
 
@@ -4255,16 +4461,16 @@ gint32 CRpcServices::UnpackEvent(
     case eventRmtModOnline:
     case eventRmtModOffline:
         {
-            BufPtr pBuf;
-            ret = oParams.GetProperty( 1, pBuf );
+            IConfigDb* pEvtCtx = nullptr;
+            ret = oParams.GetPointer( 1, pEvtCtx );
             if( ERROR( ret ) )
                 break;
-            dwParam1 = ( LONGWORD )pBuf->ptr();
 
+            dwParam1 = ( LONGWORD )pEvtCtx;
+            BufPtr pBuf;
             ret = oParams.GetProperty( 3, pBuf );
             if( ERROR( ret ) )
                 break;
-
             pData = ( LONGWORD* )pBuf->ptr();
             break;
         }
@@ -4278,11 +4484,12 @@ gint32 CRpcServices::UnpackEvent(
     case eventRmtSvrOnline:
     case eventRmtSvrOffline:
         {
-            BufPtr pBuf;
-            ret = oParams.GetProperty( 1, pBuf );
+            IConfigDb* pEvtCtx = nullptr;
+            ret = oParams.GetPointer( 1, pEvtCtx );
             if( ERROR( ret ) )
                 break;
-            dwParam1 = ( LONGWORD )pBuf->ptr();
+
+            dwParam1 = ( LONGWORD )pEvtCtx;
 
             HANDLE hPort = oParams[ 3 ];
             pData = ( LONGWORD* )hPort;
@@ -4351,72 +4558,6 @@ gint32 CRpcServices::OnEvent(
     return ret;
 }
 
-gint32 CRpcServices::RestartListening(
-    EnumIfState iStateOld  )
-{
-    gint32 ret = 0;
-    CParamList oParams;
-    TaskletPtr pRecvMsgTask;
-
-    EnumIfState iState = GetState();
-    gint32 iStartType = 0;
-    if( iState == stateConnected && 
-        iStateOld == statePaused )
-        iStartType = 1;
-
-    else if( iState == stateConnected &&
-        iStateOld == stateRecovery )
-        iStartType = 2;
-
-    else if( iState == statePaused &&
-        iStateOld == stateRecovery )
-        iStartType = 3;
-    else
-    {
-        return  -ENOTSUP;
-    }
-
-    CStdRMutex oIfLock( GetLock() );
-    std::vector< MatchPtr > vecMatches = m_vecMatches;
-    oIfLock.Unlock();
-
-    for( auto pMatch : vecMatches )
-    {
-        CMessageMatch* pMsgMatch = pMatch;
-        if( pMsgMatch == nullptr )
-            continue;
-
-            // check if propPausable exist
-        if( pMsgMatch->exist( propPausable ) )
-        {
-            bool bPausable = false;
-
-            CCfgOpenerObj oMatch(
-                ( CObjBase* ) pMatch );
-
-            oMatch.GetBoolProp(
-                propPausable, bPausable );
-            if( iStartType == 1 && !bPausable )
-            {
-                // start paused listening
-                continue;
-            }
-            else if( iStartType == 3 && bPausable )
-            {
-                // start unpausable interfaces
-                continue;
-            }
-            else
-            {
-                // start all the interfaces
-            }
-        }
-        SetReqQueSize( pMsgMatch, MAX_PENDING_MSG );
-    }
-
-    return ret;
-}
-
 gint32 CRpcServices::DoModEvent(
     EnumEventId iEvent,
     const std::string& strModule )
@@ -4425,6 +4566,33 @@ gint32 CRpcServices::DoModEvent(
 
     gint32 ret = m_pIfStat->OnModEvent(
         iEvent, strModule );
+
+    if( SUCCEEDED( ret ) )
+    {
+        EnumIfState iNewState = GetState();
+        if( ( iNewState == stateConnected ||
+                iNewState == statePaused ) &&
+            iOldState == stateRecovery )
+        {
+            // let's send new request to listen on the
+            // events
+            ret = RestartListening(
+                stateRecovery );
+        }
+    }
+    return ret;
+}
+
+gint32 CRpcServices::DoRmtModEvent(
+    EnumEventId iEvent,
+    const std::string& strModule,
+    IConfigDb* pEvtCtx )
+{
+
+    EnumIfState iOldState = GetState();
+
+    gint32 ret = m_pIfStat->OnRmtModEvent(
+        iEvent, strModule, pEvtCtx );
 
     if( SUCCEEDED( ret ) )
     {
@@ -5205,6 +5373,70 @@ static CfgPtr InitIfSvrCfg(
     }
 
     return oNewCfg.GetCfg();
+}
+
+gint32 CInterfaceServer::RestartListening(
+    EnumIfState iStateOld  )
+{
+    gint32 ret = 0;
+
+    EnumIfState iState = GetState();
+    gint32 iStartType = 0;
+    if( iState == stateConnected && 
+        iStateOld == statePaused )
+        iStartType = 1;
+
+    else if( iState == stateConnected &&
+        iStateOld == stateRecovery )
+        iStartType = 2;
+
+    else if( iState == statePaused &&
+        iStateOld == stateRecovery )
+        iStartType = 3;
+    else
+    {
+        return  -ENOTSUP;
+    }
+
+    CStdRMutex oIfLock( GetLock() );
+    std::vector< MatchPtr > vecMatches = m_vecMatches;
+    oIfLock.Unlock();
+
+    for( auto pMatch : vecMatches )
+    {
+        CMessageMatch* pMsgMatch = pMatch;
+        if( pMsgMatch == nullptr )
+            continue;
+
+            // check if propPausable exist
+        if( pMsgMatch->exist( propPausable ) )
+        {
+            bool bPausable = false;
+
+            CCfgOpenerObj oMatch(
+                ( CObjBase* ) pMatch );
+
+            oMatch.GetBoolProp(
+                propPausable, bPausable );
+            if( iStartType == 1 && !bPausable )
+            {
+                // start paused listening
+                continue;
+            }
+            else if( iStartType == 3 && bPausable )
+            {
+                // start unpausable interfaces
+                continue;
+            }
+            else
+            {
+                // start all the interfaces
+            }
+        }
+        SetReqQueSize( pMsgMatch, MAX_PENDING_MSG );
+    }
+
+    return ret;
 }
 
 CInterfaceServer::CInterfaceServer(

@@ -668,10 +668,8 @@ gint32 CRpcBasePort::HandleUnregMatch( IRP* pIrp )
                     break;
 
                 if( oEntry.m_quePendingMsgs.size() )
-                {
                     oEntry.m_quePendingMsgs.clear();
-                    break;
-                }
+
                 MATCH_ENTRY tempEnt = oEntry;
                 pMap->erase( matchPtr );
                 oPortLock.Unlock();

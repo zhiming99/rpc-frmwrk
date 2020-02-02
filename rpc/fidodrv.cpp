@@ -76,14 +76,10 @@ gint32 CRpcTcpFidoDrv::Probe(
         oNewCfg[ propPortClass ] =
             PORT_CLASS_RPC_TCP_FIDO;
 
-        oNewCfg.CopyProp(
-            propPortId, pLowerPort );
+        oNewCfg[ propPortId ] = NewPortId();
 
         oNewCfg.CopyProp(
-            propIpAddr, pLowerPort );
-
-        oNewCfg.CopyProp(
-            propDestTcpPort, pLowerPort );
+            propConnParams, pLowerPort );
 
         oNewCfg.SetPointer(
             propIoMgr, GetIoMgr() );
