@@ -1156,12 +1156,6 @@ gint32 CRouterStopBridgeProxyTask::RunTask()
         if( ERROR( ret ) )
             break;
 
-        guint32 dwPortId = 0;
-        ret = oCfg.GetIntProp(
-            propPortId, dwPortId );
-        if( ERROR( ret ) )
-            break;
-
         CRpcRouter* pRouter =
             pProxy->GetParent();
 
@@ -1174,19 +1168,11 @@ gint32 CRouterStopBridgeProxyTask::RunTask()
         if( ERROR( ret ) )
             break;
 
-        if( true )
-        {
-            ret = pProxy->Shutdown( this );
+        // remove the proxy to prevent further
+        // reference
+        pRouter->RemoveBridgeProxy( pProxy );
+        ret = pProxy->Shutdown( this );
 
-            // stop the bridge proxy
-            CStdRMutex oRouterLock(
-                pRouter->GetLock() );
-
-            pRouter->RemoveLocalMatchByPortId(
-                dwPortId );
-
-            pRouter->RemoveBridgeProxy( pProxy );
-        }
         HANDLE hPort =
             PortToHandle( pProxy->GetPort() );
 
@@ -1206,8 +1192,32 @@ gint32 CRouterStopBridgeProxyTask::RunTask()
 gint32 CRouterStopBridgeProxyTask::OnTaskComplete(
     gint32 iRetVal )
 {
+    gint32 ret = 0;
     CParamList oTaskCfg(
         ( IConfigDb* )GetConfig() );
+
+    do{
+        CCfgOpener oCfg(
+            ( IConfigDb* )GetConfig() );
+
+        CRpcInterfaceProxy* pProxy = nullptr;
+        ret = oCfg.GetPointer( 0, pProxy );
+        if( ERROR( ret ) )
+            break;
+
+        guint32 dwPortId = 0;
+        ret = oCfg.GetIntProp(
+            propPortId, dwPortId );
+        if( ERROR( ret ) )
+            break;
+
+        CRpcRouter* pRouter =
+            pProxy->GetParent();
+
+        pRouter->RemoveLocalMatchByPortId(
+            dwPortId );
+
+    }while( 0 );
 
     oTaskCfg.ClearParams();
     oTaskCfg.RemoveProperty( propIfPtr );

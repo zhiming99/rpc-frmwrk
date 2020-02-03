@@ -124,11 +124,15 @@ gint32 CReqFwdrCloseRmtPortTask::RunTask()
         CCfgOpener oCfg(
             ( IConfigDb* )GetConfig() );
 
-        CRpcInterfaceProxy* pProxy = nullptr;
+        CRpcTcpBridgeProxy* pProxy = nullptr;
         ret = oCfg.GetPointer( 0, pProxy );
         if( ERROR( ret ) )
             break;
 
+        CRpcRouter* pRouter =
+            pProxy->GetParent();
+
+        pRouter->RemoveBridgeProxy( pProxy );
         ret = pProxy->Shutdown( this );
 
     }while( 0 );
@@ -151,10 +155,25 @@ gint32 CReqFwdrCloseRmtPortTask::OnTaskComplete(
         CParamList oParams;
         oParams[ propReturnValue ] = iRetVal;
 
-        CInterfaceServer* pIf = nullptr;
-        ret = oTaskCfg.GetPointer( propIfPtr, pIf );
+        CRpcReqForwarder* pIf = nullptr;
+
+        ret = oTaskCfg.GetPointer(
+            propIfPtr, pIf );
+
         if( ERROR( ret ) )
             break;
+
+        guint32 dwPortId = 0;
+        ret = oTaskCfg.GetIntProp(
+            propPortId, dwPortId );
+
+        if( SUCCEEDED( ret ) )
+        {
+            CRpcRouter* pRouter =
+                pIf->GetParent();
+            pRouter->RemoveLocalMatchByPortId(
+                dwPortId );
+        }
 
         EventPtr pEvt;
         ret = GetInterceptTask( pEvt );
@@ -751,24 +770,7 @@ gint32 CRpcReqForwarder::StopBridgeProxy(
             break;
         }
 
-        // no reference to this proxy, start
-        // the stop process.
-        if( true )
-        {
-            // stop the bridge proxy
-            CStdRMutex oRouterLock(
-                pRouter->GetLock() );
-            pRouter->RemoveBridgeProxy( pIf );
-            ret = pRouter->RemoveLocalMatchByPortId(
-                dwPortId );
-            DebugPrint( ret, "#Removed local matches" );
-        }
-
         CParamList oParams;
-
-        oParams.SetPointer(
-            propIoMgr, GetIoMgr() );
-
         if( pCallback != nullptr )
         {
             oParams.SetPointer(
@@ -777,6 +779,7 @@ gint32 CRpcReqForwarder::StopBridgeProxy(
 
         oParams.SetPointer( propIfPtr, this );
         oParams.Push( ObjPtr( pIf ) );
+        oParams[ propPortId ] = dwPortId;
 
         TaskletPtr pTask;
         ret = pTask.NewObj(
@@ -1359,15 +1362,10 @@ gint32 CRpcReqForwarder::OnModOfflineInternal(
                 continue;
             }
 
-            pRouter->RemoveBridgeProxy( pProxy );
-
             CParamList oParams;
-
-            oParams.SetPointer(
-                propIoMgr, GetIoMgr() );
-
             oParams.SetPointer( propIfPtr, this );
             oParams.Push( ObjPtr( pProxy ) );
+            oParams[ propPortId ] = dwPortId;
 
             TaskletPtr pTask;
             ret = pTask.NewObj(
@@ -1652,7 +1650,7 @@ gint32 CRpcReqForwarder::EnableDisableEvent(
 
     if( ret != STATUS_PENDING )
     {
-        if( bUndo && ret == -EAGAIN )
+        if( bUndo && ERROR( ret ) )
         {
             // only undo if the operation is
             // recoverable
@@ -1856,7 +1854,7 @@ gint32 CReqFwdrEnableRmtEventTask::OnTaskComplete(
             ret = iRetVal;
         }
 
-        if( ret == -EAGAIN )
+        if( ERROR( ret ) )
         {
             // undo Add/RemoveLocalMatch only if
             // the operation is recoverable.

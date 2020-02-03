@@ -1188,8 +1188,10 @@ gint32 CRpcInterfaceBase::StopEx(
         {
             ( *pStopGrp )( eventCancelTask );
         }
-        if( SUCCEEDED( ret ) )
-            ret = STATUS_PENDING;
+        else
+        {
+            ret = pStopGrp->GetError();
+        }
 
     }while( 0 );
 

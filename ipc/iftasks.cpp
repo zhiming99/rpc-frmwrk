@@ -4407,9 +4407,12 @@ gint32 CIfInvokeMethodTask::OnTaskComplete(
     gint32 ret = 0;
 
     do{
-        CCfgOpener oCfg( ( IConfigDb* )GetConfig() );
+        CCfgOpener oCfg(
+            ( IConfigDb* )GetConfig() );
+
         ObjPtr pObj;
-        ret = oCfg.GetObjPtr( propRespPtr, pObj );
+        ret = oCfg.GetObjPtr(
+            propRespPtr, pObj );
 
         if( ERROR( ret ) )
             break;
@@ -4422,24 +4425,12 @@ gint32 CIfInvokeMethodTask::OnTaskComplete(
             break;
         }
 
-        ret = oCfg.GetObjPtr( propIfPtr, pObj );
+        CRpcServices* pIf = nullptr;
+        ret = oCfg.GetPointer( propIfPtr, pIf );
         if( ERROR( ret ) )
             break;
 
-        CRpcServices* pIf = pObj;
-        if( pIf == nullptr )
-        {
-            ret = -EFAULT;
-            break;
-        }
-        
-        CInterfaceServer *pServer =
-            dynamic_cast< CInterfaceServer* >( pIf );
-
-        bool bServer = true;
-
-        if( pServer == nullptr )
-            bServer = false;
+        bool bServer = pIf->IsServer();
 
         gint32 iType = 0;
         ret = GetConfig()->GetPropertyType(
@@ -4470,6 +4461,9 @@ gint32 CIfInvokeMethodTask::OnTaskComplete(
                         ret = -EINVAL;
                         break;
                     }
+
+                    CInterfaceServer *pServer =
+                        ObjPtr( pIf );
 
                     SvrConnPtr pConnMgr =
                         pServer->GetConnMgr();
@@ -4512,19 +4506,12 @@ gint32 CIfInvokeMethodTask::OnTaskComplete(
         }
         else if( iType == typeObj )
         {
-            ObjPtr pObj;
-            ret = oCfg.GetObjPtr(
-                propMsgPtr, pObj );
+            IConfigDb* pMsg = nullptr;
+            ret = oCfg.GetPointer(
+                propMsgPtr, pMsg );
 
             if( ERROR( ret ) )
                 break;
-
-            IConfigDb* pMsg = pObj;
-            if( pMsg == nullptr )
-            {
-                ret = -EFAULT;
-                break;
-            }
 
             CReqOpener oCfg( pMsg );
             ret = oCfg.GetReqType(
