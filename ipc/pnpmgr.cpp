@@ -1304,7 +1304,6 @@ gint32 CPnpManager::DestroyPortStack(
                     if( ERROR( ret ) )
                         break;
 
-                    CStdRMutex oPortLock( pBus->GetLock() );
                     pBus->RemovePdoPort( dwPortId );
                     break;
                 }

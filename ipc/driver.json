@@ -180,7 +180,7 @@
                     "BindAddr" : "192.168.3.13",
                     "PdoClass" : "TcpStreamPdo2",
                     "Compression" : "true",
-                    "EnableWS":  "true",
+                    "EnableWS":  "false",
                     "EnableSSL": "true",
                     "ConnRecover" : "false"
                 }

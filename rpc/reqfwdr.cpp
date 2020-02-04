@@ -177,10 +177,12 @@ gint32 CReqFwdrCloseRmtPortTask::OnTaskComplete(
 
         EventPtr pEvt;
         ret = GetInterceptTask( pEvt );
-        if( ERROR( ret ) )
-            break;
+        if( SUCCEEDED( ret ) )
+        {
+            pIf->SetResponse(
+                pEvt, oParams.GetCfg() );
+        }
 
-        pIf->SetResponse( pEvt, oParams.GetCfg() );
 
     }while( 0 );
 
@@ -1650,7 +1652,7 @@ gint32 CRpcReqForwarder::EnableDisableEvent(
 
     if( ret != STATUS_PENDING )
     {
-        if( bUndo && ERROR( ret ) )
+        if( bUndo && ret == -EAGAIN )
         {
             // only undo if the operation is
             // recoverable
@@ -1854,7 +1856,7 @@ gint32 CReqFwdrEnableRmtEventTask::OnTaskComplete(
             ret = iRetVal;
         }
 
-        if( ERROR( ret ) )
+        if( ret == -EAGAIN )
         {
             // undo Add/RemoveLocalMatch only if
             // the operation is recoverable.
@@ -2814,14 +2816,14 @@ gint32 CRpcReqForwarder::OnRmtSvrOffline(
 
     do{
         vector< string > vecUniqNames;
-        std::string strRouterPath;
+        std::string strPath;
         CCfgOpener oEvtCtx( pEvtCtx );
         ret = oEvtCtx.GetStrProp(
-            propRouterPath, strRouterPath );
+            propRouterPath, strPath );
         if( ERROR( ret ) )
             break;
 
-        if( strRouterPath != "/" )
+        if( strPath != "/" )
         {
             // TODO: Implement it
             ret = ERROR_NOT_IMPL;

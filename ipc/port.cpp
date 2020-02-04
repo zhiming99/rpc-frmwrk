@@ -217,7 +217,8 @@ gint32 CPort::GetProperty( gint32 iProp, CBuffer& oBuf ) const
     case propPortName:
     case propPortClass:
         {
-            oBuf = ( *m_pCfgDb )[ iProp ];
+            ret = m_pCfgDb->GetProperty(
+                iProp, oBuf );
             break;
         }
     case propLowerPortPtr:

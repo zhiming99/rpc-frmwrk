@@ -1159,27 +1159,10 @@ gint32 CRouterStopBridgeProxyTask::RunTask()
         CRpcRouter* pRouter =
             pProxy->GetParent();
 
-        InterfPtr pIf;
-        pRouter->GetReqFwdr( pIf );
-        CRpcReqForwarder* pReqFwdr = pIf;
-
-        IConfigDb* pEvtCtx = nullptr;
-        ret = oCfg.GetPointer( 1, pEvtCtx );
-        if( ERROR( ret ) )
-            break;
-
         // remove the proxy to prevent further
         // reference
         pRouter->RemoveBridgeProxy( pProxy );
         ret = pProxy->Shutdown( this );
-
-        HANDLE hPort =
-            PortToHandle( pProxy->GetPort() );
-
-        pReqFwdr->OnEvent(
-            eventRmtSvrOffline,
-            ( LONGWORD )pEvtCtx,
-            0, ( LONGWORD* )hPort );
 
     }while( 0 );
 
@@ -1216,6 +1199,21 @@ gint32 CRouterStopBridgeProxyTask::OnTaskComplete(
 
         pRouter->RemoveLocalMatchByPortId(
             dwPortId );
+
+        IConfigDb* pEvtCtx = nullptr;
+        ret = oCfg.GetPointer( 1, pEvtCtx );
+        if( ERROR( ret ) )
+            break;
+
+        HANDLE hPort =
+            PortToHandle( pProxy->GetPort() );
+        InterfPtr pIf;
+        pRouter->GetReqFwdr( pIf );
+        CRpcReqForwarder* pReqFwdr = pIf;
+        pReqFwdr->OnEvent(
+            eventRmtSvrOffline,
+            ( LONGWORD )pEvtCtx,
+            0, ( LONGWORD* )hPort );
 
     }while( 0 );
 
