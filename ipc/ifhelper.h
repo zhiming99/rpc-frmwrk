@@ -2636,7 +2636,7 @@ struct has_##MethodName\
     gint32 Handler##_MethodName( \
          NumberSequence< N >, PARAMS ) \
     { \
-        EnumClsid iid = _GETIID( pCallback ); \
+        EnumClsid iid = _GETIID_INV( pCallback ); \
         using ClassName = typename std::tuple_element< N, std::tuple<Types...>>::type; \
         if( ClassName::GetIid() == iid || ClassName::SupportIid( iid ) ) \
             return this->ClassName::_MethodName( ARGS ); \
@@ -2647,7 +2647,7 @@ struct has_##MethodName\
         NumberSequence< N, M, S... >, PARAMS ) \
     { \
         using ClassName = typename std::tuple_element< N, std::tuple<Types...>>::type; \
-        EnumClsid iid = _GETIID( pCallback ); \
+        EnumClsid iid = _GETIID_INV( pCallback ); \
         if( ClassName::GetIid() == iid || ClassName::SupportIid( iid ) ) \
             return this->ClassName::_MethodName( ARGS ); \
         return Handler##_MethodName( NumberSequence<M, S...>(), ARGS ); \
@@ -2656,6 +2656,44 @@ struct has_##MethodName\
     virtual rettype _MethodName( PARAMS ) \
     { \
         gint32 ret = 0;\
+        if( sizeof...( Types ) ) \
+        { \
+            using seq = typename GenSequence< sizeof...( Types ) >::type; \
+            ret = Handler##_MethodName( seq(), ARGS ); \
+        } \
+        if( ret == ERROR_NOT_HANDLED ) \
+            ret = virtbase::_MethodName( ARGS ); \
+        return ret; \
+    }
+
+#define DEFINE_UNIQUE_FETCH_IMPL( _MethodName, rettype, PARAMS, ARGS ) \
+    private: \
+    gint32 Handler##_MethodName( NumberSequence<>  ) \
+    { return ERROR_NOT_HANDLED; } \
+    template < int N > \
+    gint32 Handler##_MethodName( \
+         NumberSequence< N >, PARAMS ) \
+    { \
+        EnumClsid iid = _GETIID( pDataDesc ); \
+        using ClassName = typename std::tuple_element< N, std::tuple<Types...>>::type; \
+        if( ClassName::GetIid() == iid || ClassName::SupportIid( iid ) ) \
+            return this->ClassName::_MethodName( ARGS ); \
+        return ERROR_NOT_HANDLED; \
+    } \
+    template < int N, int M, int...S > \
+    gint32 Handler##_MethodName( \
+        NumberSequence< N, M, S... >, PARAMS ) \
+    { \
+        using ClassName = typename std::tuple_element< N, std::tuple<Types...>>::type; \
+        EnumClsid iid = _GETIID( pDataDesc ); \
+        if( ClassName::GetIid() == iid || ClassName::SupportIid( iid ) ) \
+            return this->ClassName::_MethodName( ARGS ); \
+        return Handler##_MethodName( NumberSequence<M, S...>(), ARGS ); \
+    } \
+    public: \
+    virtual rettype _MethodName( PARAMS ) \
+    { \
+        gint32 ret = ERROR_NOT_HANDLED;\
         if( sizeof...( Types ) ) \
         { \
             using seq = typename GenSequence< sizeof...( Types ) >::type; \
@@ -2777,7 +2815,8 @@ struct CAggregatedObject< CAggInterfaceServer, Types... >
         return 0;
     }
 
-    inline EnumClsid _GETIID( IEventSink* pCallback )
+    private:
+    inline EnumClsid _GETIID_INV( IEventSink* pCallback )
     {
         if( pCallback == nullptr )
             return clsid( Invalid );
@@ -2799,7 +2838,17 @@ struct CAggregatedObject< CAggInterfaceServer, Types... >
         return iid;
     }
 
-    DEFINE_UNIQUE_HANDLER_IMPL( FetchData_Server, gint32,
+    inline EnumClsid _GETIID( IConfigDb* pDataDesc )
+    {
+        CCfgOpener oDataDesc( pDataDesc );
+        EnumClsid iid = clsid( Invalid );
+        guint32* piid = ( guint32* )&iid;
+        oDataDesc.GetIntProp( propIid, *piid );
+        return iid;
+    }
+
+    protected:
+    DEFINE_UNIQUE_FETCH_IMPL( FetchData_Server, gint32,
         VA_LIST( IConfigDb* pDataDesc, gint32& fd, guint32& dwOffset, guint32& dwSize, IEventSink* pCallback ),
         VA_LIST( pDataDesc, fd, dwOffset, dwSize, pCallback ) )
 };
@@ -2850,43 +2899,6 @@ struct ClassName : CAggregatedObject< CAggInterfaceServer, ##__VA_ARGS__ >, IUnk
     }\
 }
 
-#define DEFINE_UNIQUE_PROXY_IMPL( _MethodName, rettype, PARAMS, ARGS ) \
-    private: \
-    gint32 Handler##_MethodName( NumberSequence<>  ) \
-    { return ERROR_NOT_HANDLED; } \
-    template < int N > \
-    gint32 Handler##_MethodName( \
-         NumberSequence< N >, PARAMS ) \
-    { \
-        EnumClsid iid = _GETIID( pDataDesc ); \
-        using ClassName = typename std::tuple_element< N, std::tuple<Types...>>::type; \
-        if( ClassName::GetIid() == iid || ClassName::SupportIid( iid ) ) \
-            return this->ClassName::_MethodName( ARGS ); \
-        return ERROR_NOT_HANDLED; \
-    } \
-    template < int N, int M, int...S > \
-    gint32 Handler##_MethodName( \
-        NumberSequence< N, M, S... >, PARAMS ) \
-    { \
-        using ClassName = typename std::tuple_element< N, std::tuple<Types...>>::type; \
-        EnumClsid iid = _GETIID( pDataDesc ); \
-        if( ClassName::GetIid() == iid || ClassName::SupportIid( iid ) ) \
-            return this->ClassName::_MethodName( ARGS ); \
-        return Handler##_MethodName( NumberSequence<M, S...>(), ARGS ); \
-    } \
-    public: \
-    virtual rettype _MethodName( PARAMS ) \
-    { \
-        gint32 ret = ERROR_NOT_HANDLED;\
-        if( sizeof...( Types ) ) \
-        { \
-            using seq = typename GenSequence< sizeof...( Types ) >::type; \
-            ret = Handler##_MethodName( seq(), ARGS ); \
-        } \
-        if( ret == ERROR_NOT_HANDLED ) \
-            ret = virtbase::_MethodName( ARGS ); \
-        return ret; \
-    }
 // Start point for aggregatable interface
 struct CAggInterfaceProxy :
     public CInterfaceProxy
@@ -2951,7 +2963,7 @@ struct CAggregatedObject< CAggInterfaceProxy, Types... >
     }
 
     public:
-    DEFINE_UNIQUE_PROXY_IMPL( FetchData_Proxy, gint32,
+    DEFINE_UNIQUE_FETCH_IMPL( FetchData_Proxy, gint32,
         VA_LIST( IConfigDb* pDataDesc, gint32& fd, guint32& dwOffset, guint32& dwSize, IEventSink* pCallback ),
         VA_LIST( pDataDesc, fd, dwOffset, dwSize, pCallback ) )
 };

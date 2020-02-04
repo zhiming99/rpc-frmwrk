@@ -136,7 +136,6 @@ CInterfaceState::CInterfaceState(
         // propSrcDBusName
         //
         // optional properties
-        // propIpAddr if subclass is CRemoteProxyState
 
         m_hPort = INVALID_HANDLE;
         SetStateInternal( stateStopped );
@@ -858,7 +857,7 @@ gint32 CRemoteProxyState::SubscribeEvents()
 gint32 CRemoteProxyState::OnRmtModEvent(
     EnumEventId iEvent,
     const string& strModule,
-    const string& strIpAddr )
+    IConfigDb* pEvtCtx )
 {
     // Maybe in the future, we will split the 
     // OnModEvent to two different methods
@@ -867,7 +866,7 @@ gint32 CRemoteProxyState::OnRmtModEvent(
 
 gint32 CRemoteProxyState::OnRmtSvrEvent(
         EnumEventId iEvent,
-        const std::string& strIpAddr,
+        IConfigDb* pEvtCtx,
         HANDLE hPort )
 {
     if( iEvent == eventRmtDBusOnline )
@@ -967,18 +966,6 @@ bool CIfServerState::IsMyDest(
     return true;
 }
 
-gint32 CTcpBdgePrxyState::SetupOpenPortParams(
-    IConfigDb* pCfg )
-{
-    CCfgOpener oCfg( pCfg );
-
-    oCfg.CopyProp( propDestTcpPort, this );
-    oCfg.CopyProp( propSrcTcpPort, this );
-    oCfg.CopyProp( propIsServer, this );
-
-    return 0;
-}
-
 gint32 CUnixSockStmState::SetupOpenPortParams(
         IConfigDb* pCfg )
 {
@@ -991,3 +978,214 @@ gint32 CUnixSockStmState::SetupOpenPortParams(
 
     return 0;
 }
+
+gint32 CRemoteProxyState::SetupOpenPortParams(
+        IConfigDb* pCfg )
+{
+    CParamList oCfg( pCfg );
+    return oCfg.CopyProp( propConnParams, this );
+}
+
+gint32 CRemoteProxyState::OnPortEvent(
+        EnumEventId iEvent,
+        HANDLE hPort )
+{
+    gint32 ret = 0;
+
+    do{
+        if( hPort == INVALID_HANDLE ||
+            iEvent == eventInvalid )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        switch( iEvent )
+        {
+        case eventPortStarted:
+            {
+                ret = super::OnPortEvent(
+                    iEvent, hPort );
+
+                if( ERROR( ret ) )
+                    break;
+
+                PortPtr pPort;
+                ret = GetIoMgr()->GetPortPtr(
+                    hPort, pPort );
+
+                if( ERROR( ret ) )
+                    break;
+
+                CPort* pcp = pPort;
+                PortPtr pPdo;
+                ret = pcp->GetPdoPort( pPdo );
+                if( ERROR( ret ) )
+                    break;
+
+                ret = CopyProp( propConnHandle,
+                    ( CObjBase*)pPdo );
+                if( ERROR( ret ) )
+                    break;
+
+                ret = CopyProp( propConnParams,
+                    ( CObjBase*)pPdo );
+
+                break;
+            }
+        default:
+            {
+                ret = super::OnPortEvent(
+                    iEvent, hPort );
+                break;
+            }
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CRemoteProxyState::OpenPort(
+    IEventSink* pCallback )
+{
+    // let's prepare the parameters
+    gint32 ret = OpenPortInternal( pCallback );
+    if( ret == STATUS_PENDING || ERROR( ret ) )
+        return ret;
+    do{
+
+        PortPtr pPort;
+        ret = GetIoMgr()->GetPortPtr(
+            GetHandle(), pPort );
+
+        if( ERROR( ret ) )
+            break;
+
+        CPort* pcp = pPort;
+        PortPtr pPdo;
+        ret = pcp->GetPdoPort( pPdo );
+        if( ERROR( ret ) )
+            break;
+
+        ret = CopyProp( propConnHandle,
+            ( CObjBase*)pPdo );
+        if( ERROR( ret ) )
+            break;
+
+        ret = CopyProp( propConnParams,
+            ( CObjBase*)pPdo );
+        if( ERROR( ret ) )
+            break;
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CTcpBdgePrxyState::SetupOpenPortParams(
+    IConfigDb* pCfg )
+{
+    CParamList oCfg( pCfg );
+    return oCfg.CopyProp( propConnParams, this );
+}
+
+gint32 CTcpBdgePrxyState::OnPortEvent(
+        EnumEventId iEvent,
+        HANDLE hPort )
+{
+    gint32 ret = 0;
+    do{
+        if( hPort == INVALID_HANDLE ||
+            iEvent == eventInvalid )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        switch( iEvent )
+        {
+        case eventPortStarted:
+            {
+                ret = super::OnPortEvent(
+                    iEvent, hPort );
+
+                if( ERROR( ret ) )
+                    break;
+
+                PortPtr pPort;
+                ret = GetIoMgr()->GetPortPtr(
+                    hPort, pPort );
+
+                if( ERROR( ret ) )
+                    break;
+
+                CPort* pcp = pPort;
+                PortPtr pPdo;
+                ret = pcp->GetPdoPort( pPdo );
+                if( ERROR( ret ) )
+                    break;
+
+                ret = CopyProp( propPortId,
+                    ( CObjBase*)pPdo );
+                if( ERROR( ret ) )
+                    break;
+
+                ret = CopyProp( propConnParams,
+                    ( CObjBase*)pPdo );
+
+                break;
+            }
+        default:
+            {
+                ret = super::OnPortEvent(
+                    iEvent, hPort );
+                break;
+            }
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CTcpBdgePrxyState::OpenPort(
+    IEventSink* pCallback )
+{
+    // let's prepare the parameters
+    gint32 ret = OpenPortInternal( pCallback );
+    if( ret == STATUS_PENDING || ERROR( ret ) )
+        return ret;
+    do{
+
+        PortPtr pPort;
+        ret = GetIoMgr()->GetPortPtr(
+            GetHandle(), pPort );
+
+        if( ERROR( ret ) )
+            break;
+
+        CPort* pcp = pPort;
+        PortPtr pPdo;
+        ret = pcp->GetPdoPort( pPdo );
+        if( ERROR( ret ) )
+            break;
+
+        ret = CopyProp( propPortId,
+            ( CObjBase*)pPdo );
+        if( ERROR( ret ) )
+            break;
+
+        // update the conn params, the
+        // propSrcTcpPort and propSrcIpAddr should
+        // be present now
+        ret = CopyProp( propConnParams,
+            ( CObjBase*)pPdo );
+        if( ERROR( ret ) )
+            break;
+
+    }while( 0 );
+
+    return ret;
+}
+

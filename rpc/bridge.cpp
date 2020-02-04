@@ -74,10 +74,6 @@ gint32 CRpcTcpBridgeProxy::InitUserFuncs()
     BEGIN_IFHANDLER_MAP( CRpcTcpBridge );
 
     ADD_EVENT_HANDLER(
-        CRpcTcpBridgeProxy::OnRmtModOffline,
-        BRIDGE_EVENT_MODOFF );
-
-    ADD_EVENT_HANDLER(
         CRpcTcpBridgeProxy::OnInvalidStreamId,
         BRIDGE_EVENT_INVALIDSTM );
 
@@ -319,10 +315,10 @@ gint32 CRpcTcpBridgeProxy::BuildBufForIrpFwrdReq(
     gint32 ret = 0;
     do{
         DMsgPtr pMsg, pMsgToFwrd;
-        string strIpAddr;
         CReqOpener oReq( pReqCall );
 
-        ret = oReq.GetStrProp( 0, strIpAddr );
+        IConfigDb* pReqCtx = nullptr;
+        ret = oReq.GetPointer( 0, pReqCtx );
         if( ERROR( ret ) )
             break;
 
@@ -384,10 +380,32 @@ gint32 CRpcTcpBridgeProxy::BuildBufForIrpFwrdReq(
 
         // NOTE: the task id is for keep-alive
         // purpose
-        const char* pszIp = strIpAddr.c_str();
+        CCfgOpener oReqCtx( pReqCtx );
+        guint32 dwPortId = 0;
+        bool bExist = false;
+        ret = oReqCtx.GetIntProp(
+            propConnHandle, dwPortId );
+        if( SUCCEEDED( ret ) )
+            bExist = true;
+
+        oReqCtx.RemoveProperty( propConnHandle );
+
+        BufPtr pCtxBuf( true );
+        ret = pReqCtx->Serialize( *pCtxBuf );
+        if( ERROR( ret ) )
+            break;
+
+        if( bExist )
+        {
+            oReqCtx.SetIntProp(
+                propConnHandle, dwPortId );
+        }
+
+        const char* pCtx = pCtxBuf->ptr();
         const char* pData = pReqMsgBuf->ptr();
         if( !dbus_message_append_args( pMsg,
-            DBUS_TYPE_STRING, &pszIp,
+            DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
+            &pCtx, pCtxBuf->size(),
             DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
             &pData, pReqMsgBuf->size(),
             DBUS_TYPE_UINT64, &qwTaskId,
@@ -404,7 +422,7 @@ gint32 CRpcTcpBridgeProxy::BuildBufForIrpFwrdReq(
 }
 
 gint32 CRpcTcpBridgeProxy::ForwardRequest(
-    const std::string& strDestIp,   // [ in ]
+    IConfigDb* pReqCtx,
     DBusMessage* pReqMsg,           // [ in ]
     DMsgPtr& pRespMsg,              // [ out ]
     IEventSink* pCallback )
@@ -413,16 +431,22 @@ gint32 CRpcTcpBridgeProxy::ForwardRequest(
         pCallback == nullptr )
         return -EINVAL;
 
-    if( strDestIp.empty() )
+    if( pReqCtx == nullptr )
         return -EINVAL;
 
     gint32 ret = 0;
     do{
         CReqBuilder oBuilder( this );
+        CCfgOpener oReqCtx;
+        ret = oReqCtx.CopyProp(
+            propRouterPath, pReqCtx );
+        if( ERROR( ret ) )
+            break;
 
-        // redudent information `strDestIp'
         // just to conform to the rule
-        oBuilder.Push( strDestIp );
+        oBuilder.Push( ( IConfigDb* )
+            oReqCtx.GetCfg() );
+
         oBuilder.Push( DMsgPtr( pReqMsg ) );
 
         oBuilder.SetMethodName(
@@ -640,7 +664,7 @@ gint32 CRpcTcpBridgeProxy::FillRespData(
 }
 
 gint32 CRpcTcpBridgeProxy::ForwardEvent(
-    const string& strSrcIp,
+    IConfigDb* pEvtCtx,
     DBusMessage* pEvtMsg,
     IEventSink* pCallback )
 {
@@ -649,7 +673,6 @@ gint32 CRpcTcpBridgeProxy::ForwardEvent(
         return -EINVAL;
 
     gint32 ret = 0;
-
     do{
         InterfPtr pIf;
         CRpcRouter* pRouter = GetParent();
@@ -661,61 +684,76 @@ gint32 CRpcTcpBridgeProxy::ForwardEvent(
             break;
         }
 
-        // user the server ip instead
-        string strSvrIp;
-        CCfgOpenerObj oCfg( this );
-        oCfg.GetStrProp( propIpAddr, strSvrIp );
+        // TODO: need a taskgroup to glue the two
+        // tasks together.
+        CCfgOpener oEvtCtx( pEvtCtx );
+        ret = oEvtCtx.CopyProp(
+            propConnHandle, propPortId, this );
+        if( ERROR( ret ) )
+            break;
+
         ret = pReqFwdr->ForwardEvent(
-            strSvrIp, pEvtMsg, pCallback );
-
-    }while( 0 );
-
-    return ret;
-}
-
-gint32 CRpcTcpBridgeProxy::OnProgressNotify(
-    guint32 dwProgress,
-    guint64 iTaskId )
-{
-
-    gint32 ret = 0;
-    do{
-        if( !IsConnected() )
+            pEvtCtx, pEvtMsg, pCallback );
+        if( ERROR( ret ) )
         {
-            // NOTE: this is not a serious state
-            // check
-            ret = ERROR_STATE;
+            DebugPrint( ret,
+                "CRpcReqForwarder's "
+                "ForwardEvent failed" );
+        }
+
+        std::string strPath;
+        oEvtCtx.GetStrProp(
+            propRouterPath, strPath );
+
+        // dispatch the event to the remote
+        // listeners
+        CCfgOpener oEvtCtx2;
+
+        oEvtCtx2.CopyProp(
+            propConnHandle, propPortId, this );
+
+        string strNodeName;
+        CCfgOpenerObj oIfCfg( this );
+        ret = oIfCfg.GetStrProp(
+            propNodeName, strNodeName );
+        if( ERROR( ret ) )
+        {
+            ret = 0;
             break;
         }
 
-        TaskletPtr pTaskToNotify;
-        if( true )
-        {
-            TaskGrpPtr pTaskGrp = GetTaskGroup();
-            if( pTaskGrp.IsEmpty() )
-            {
-                ret = -ENOENT;    
-                break;
-            }
-            ret = pTaskGrp->FindTask(
-                iTaskId, pTaskToNotify );
+        // prepend the node name to the router
+        strPath = string( "/" ) +
+            strNodeName + strPath;
 
+        oEvtCtx2.SetStrProp(
+            propRouterPath, strPath );
+
+        DMsgPtr fwdrMsg( pEvtMsg );
+        std::set< guint32 > setPortIds;
+        ret = pRouter->CheckEvtToFwrd(
+            oEvtCtx2.GetCfg(), fwdrMsg,
+            setPortIds );
+
+        if( ERROR( ret ) )
+            break;
+
+        for( auto elem : setPortIds )
+        {
+            InterfPtr pIf;
+            ret = pRouter->GetBridge(
+                elem, pIf );
             if( ERROR( ret ) )
-                break;
+                continue;
+
+            CRpcTcpBridge* pBdge = pIf;
+            if( pBdge == nullptr )
+                continue;
+
+            pBdge->ForwardEvent(
+                oEvtCtx2.GetCfg(), 
+                pEvtMsg, pCallback );
         }
-
-        if( pTaskToNotify.IsEmpty() )
-        {
-            ret = -EFAULT;
-            break;
-        }
-
-        // send a keepalive event
-        EnumEventId iEvent = ( EnumEventId )
-            ( eventTryLock | eventRpcNotify );
-
-        pTaskToNotify->OnEvent( iEvent,
-            eventProgress, dwProgress, nullptr );
 
     }while( 0 );
 
@@ -759,19 +797,13 @@ gint32 CRpcTcpBridgeProxy::DoInvoke(
         }
         else if( strMethod == SYS_EVENT_FORWARDEVT )
         {
-            string strSrcIp;
-            CCfgOpenerObj oCfg( this );
-            ret = oCfg.GetStrProp(
-                propIpAddr, strSrcIp );
-
+            ObjPtr pObj;
+            ret = pMsg.GetObjArgAt(
+                0, pObj );
             if( ERROR( ret ) )
                 break;
 
-            if( strSrcIp.empty() )
-            {
-                ret = -EINVAL;
-                break;
-            }
+            IConfigDb* pEvtCtx = pObj;
 
             DMsgPtr pUserEvtMsg;
             ret = pMsg.GetMsgArgAt(
@@ -780,26 +812,8 @@ gint32 CRpcTcpBridgeProxy::DoInvoke(
             if( ERROR( ret ) )
                 break;
 
-            ret = ForwardEvent( strSrcIp,
+            ret = ForwardEvent( pEvtCtx,
                 pUserEvtMsg, pCallback );
-        }
-        else if( strMethod == IF_EVENT_PROGRESS )
-        {
-            guint32 dwProgress;
-            ret = pMsg.GetIntArgAt(
-                0, dwProgress );
-
-            if( ERROR( ret ) )
-                break;
-
-            guint64 qwTaskId;
-            ret = pMsg.GetInt64ArgAt(
-                1, qwTaskId );
-
-            if( ERROR( ret ) )
-                break;
-            OnProgressNotify(
-                dwProgress, qwTaskId );
         }
         else
         {
@@ -1160,112 +1174,6 @@ gint32 CRpcTcpBridgeProxy::CloseStream_Proxy(
     return ret;
 }
 
-gint32 CRpcTcpBridgeProxy::SendFetch_TcpProxy(
-        IConfigDb* pDataDesc,           // [in, out]
-        gint32& fd,                      // [out]
-        guint32& dwOffset,               // [in, out]
-        guint32& dwSize,                 // [in, out]
-        IEventSink* pCallback )
-{
-    if( pDataDesc == nullptr ||
-        pCallback == nullptr ||
-        dwSize == 0 )
-        return -EINVAL;
-
-    gint32 ret = 0;
-    do{
-        CParamList oParams;
-        oParams.SetObjPtr(
-            propIoMgr, GetIoMgr() );
-        oParams.SetObjPtr(
-            propEventSink, pCallback );
-        oParams.SetObjPtr(
-            propIfPtr, this );
-
-        CCfgOpener oDesc( pDataDesc );
-        string strMethod =
-            oDesc[ propMethodName ];
-
-        bool bFetch = false;
-        if( strMethod == SYS_METHOD_FETCHDATA )
-            bFetch = true;
-        else if( strMethod == SYS_METHOD_SENDDATA )
-            bFetch = false;
-        else
-        {
-            ret = -EINVAL;
-            break;
-        }
-        
-        CParamList oCallArgs;
-
-
-        oCallArgs.Push( ObjPtr( pDataDesc ) );
-        oCallArgs.Push( fd );
-        oCallArgs.Push( dwOffset );
-        oCallArgs.Push( dwSize );
-
-        oParams.SetObjPtr( propReqPtr,
-            oCallArgs.GetCfg() );
-
-        TaskletPtr pTask;
-        ret = pTask.NewObj(
-            clsid( CBdgeProxyOpenStreamTask ),
-            oParams.GetCfg() );
-
-        if( ERROR( ret ) )
-            break;
-
-        ret = RunManagedTask( pTask );
-
-        if( ERROR( ret ) )
-            break;
-
-        ret = pTask->GetError();
-        if( SUCCEEDED( ret ) && bFetch )
-        {
-            // it should be impossible to success
-            // immediately
-            ret = ERROR_FAIL;
-        }
-
-    }while( 0 );
-
-    return ret;
-}
-
-gint32 CRpcTcpBridgeProxy::SendData_Proxy(
-        IConfigDb* pDataDesc,           // [in]
-        gint32 fd,                      // [in]
-        guint32 dwOffset,               // [in]
-        guint32 dwSize,                 // [in]
-        IEventSink* pCallback )
-{
-    if( pDataDesc == nullptr ||
-        pCallback == nullptr ||
-        dwSize == 0 )
-        return -EINVAL;
-
-    return SendFetch_TcpProxy( pDataDesc,
-        fd, dwOffset, dwSize, pCallback );
-}
-
-gint32 CRpcTcpBridgeProxy::FetchData_Proxy(
-        IConfigDb* pDataDesc,           // [in, out]
-        gint32& fd,                      // [out]
-        guint32& dwOffset,               // [in, out]
-        guint32& dwSize,                 // [in, out]
-        IEventSink* pCallback )
-{
-    if( pDataDesc == nullptr ||
-        pCallback == nullptr ||
-        dwSize == 0 )
-        return -EINVAL;
-
-    return SendFetch_TcpProxy( pDataDesc,
-        fd, dwOffset, dwSize, pCallback );
-}
-
 gint32 CBdgeProxyReadWriteComplete::OnIrpComplete(
     PIRP pIrp )
 {
@@ -1460,40 +1368,6 @@ gint32 CRpcTcpBridgeShared::OnPostStartShared(
 
         if( ERROR( ret ) )
             break;
-
-    }while( 0 );
-
-    return ret;
-}
-
-gint32 CRpcTcpBridgeProxy::OnRmtModOffline(
-    IEventSink* pCallback,
-    const std::string& strModName )
-{
-    if( pCallback == nullptr )
-        return -EINVAL;
-
-    gint32 ret = 0;
-
-    do{
-        string strIpAddr;
-        CCfgOpenerObj oCfg( this );
-
-        ret = oCfg.GetStrProp(
-            propDestIpAddr, strIpAddr );
-
-        if( ERROR( ret ) )
-            break;
-
-        // pass on this event to the pnp manager
-        CEventMapHelper< CGenericInterface >
-            oEvtHelper( this );
-
-        oEvtHelper.BroadcastEvent(
-            eventConnPoint,
-            eventRmtModOffline,
-            ( LONGWORD )strIpAddr.c_str(),
-            ( LONGWORD* )strModName.c_str() );
 
     }while( 0 );
 
@@ -1741,8 +1615,6 @@ gint32 CRpcTcpBridge::ClearRemoteEvents(
             CCfgOpenerObj oMatch(
                 ( CObjBase* )pObj );
 
-            oMatch.CopyProp( propIpAddr, this );
-            oMatch.CopyProp( propDestTcpPort, this );
             oMatch.CopyProp( propPortId, this );
 
             ret = pRouter->GetMatchToAdd(
@@ -1824,12 +1696,45 @@ gint32 CRpcTcpBridge::EnableRemoteEventInternal(
         // dbus listening
         CCfgOpenerObj oMatch( pMatch );
 
-        // overwrite the propIpAddr property
-        // with the peer ip address, instead
-        // ourself's
-        oMatch.CopyProp( propIpAddr, this );
-        oMatch.CopyProp( propDestTcpPort, this );
+        // add the propPortId property of this
+        // object's port
         oMatch.CopyProp( propPortId, this );
+        // remove propPrxyPortId if any
+        oMatch.RemoveProperty( propPrxyPortId );
+
+        std::string strPath;
+        ret = oMatch.GetStrProp(
+            propRouterPath, strPath );
+        if( ERROR( ret ) )
+            break;
+
+        bool bRelay = false;
+        if( strPath > "/" )
+        {
+            InterfPtr pIf;
+            CRpcRouter* pRouter = GetParent();
+            ret = pRouter->GetBridgeProxy(
+                strPath, pIf );
+            if( ERROR( ret ) )
+            {
+                ret = -ENOTDIR;
+                break;
+            }
+
+            ret = oMatch.CopyProp(
+                propPrxyPortId,
+                propPortId, pIf );
+
+            if( ERROR( ret ) )
+                break;
+
+            bRelay = true;
+        }
+        else if( strPath != "/" )
+        {
+            ret = -EINVAL;
+            break;
+        }
 
         // trim the match properties to the
         // necessary ones
@@ -1840,6 +1745,12 @@ gint32 CRpcTcpBridge::EnableRemoteEventInternal(
 
         if( ERROR( ret ) )
             break;
+
+        if( bRelay )
+        {
+            // TODO: implement it
+            break;
+        }
 
         if( bEnable )
         {
@@ -1910,20 +1821,27 @@ gint32 CRpcTcpBridge::BuildBufForIrpFwrdEvt(
         if( ERROR( ret ) )
             break;
 
-        string strIpAddr;
-        ret = oReq.GetStrProp( 0, strIpAddr );
+        IConfigDb* pEvtCtx;
+        ret = oReq.GetPointer( 0, pEvtCtx );
         if( ERROR( ret ) )
             break;
+
+        BufPtr pCtxBuf( true );
+        ret = pEvtCtx->Serialize( *pCtxBuf );
+        if( ERROR( ret ) )
+            break;
+
+        const char* pCtx = pCtxBuf->ptr();
 
         BufPtr pMsgBuf( true );
         ret = pEvtMsg.Serialize( pMsgBuf ); 
         if( ERROR( ret ) )
             break;
 
-        const char* pszIp = strIpAddr.c_str();
         const char* pData = pMsgBuf->ptr();
         if( !dbus_message_append_args( pMsg,
-            DBUS_TYPE_STRING, &pszIp,
+            DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
+            &pCtx, pCtxBuf->size(),
             DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
             &pData, pMsgBuf->size(),
             DBUS_TYPE_INVALID ) )
@@ -1939,94 +1857,20 @@ gint32 CRpcTcpBridge::BuildBufForIrpFwrdEvt(
     return ret;
 }
 
-gint32 CRpcTcpBridge::CheckReqToFwrd(
-    CRpcRouter* pRouter,
-    const string &strIpAddr,
+gint32 CRpcTcpBridge::CheckReqToRelay(
+    IConfigDb* pReqCtx,
     DMsgPtr& pMsg,
     MatchPtr& pMatchHit )
 {
+    CRpcRouter* pRouter = GetParent();
     gint32 ret = pRouter->CheckReqToRelay(
-        strIpAddr, pMsg, pMatchHit );
-
-    return ret;
-}
-
-gint32 CRpcTcpBridge::CheckSendDataToFwrd(
-    IConfigDb* pDataDesc )
-{
-    gint32 ret = 0;
-    if( pDataDesc == nullptr )
-        return -EINVAL;
-
-    do{
-        CRpcRouter* pRouter = GetParent();
-        if( pRouter == nullptr )
-        {
-            ret = -EFAULT;
-            break;
-        }
-
-        CCfgOpener oParams( pDataDesc );
-        string strIpAddr;
-        ret = oParams.GetStrProp(
-            propIpAddr, strIpAddr );
-        if( ERROR( ret ) )
-            break;
-
-        EnumClsid iid = clsid( Invalid );
-        guint32* piid = ( guint32* )&iid;
-        ret = oParams.GetIntProp(
-            propIid, *piid );
-
-        if( ERROR( ret ) )
-            break;
-
-        if( iid != iid( CFileTransferServer ) )
-        {
-            ret = -EINVAL;
-            break;
-        }
-
-        DMsgPtr pMsgToCheck;
-        ret = pMsgToCheck.NewObj();
-        if( ERROR( ret ) )
-            break;
-
-        string strObjPath;
-        ret = oParams.GetStrProp(
-            propObjPath, strObjPath );
-
-        if( ERROR( ret ) )
-            break;
-        pMsgToCheck.SetPath( strObjPath );
-
-        string strIf;
-        ret = oParams.GetStrProp(
-            propIfName, strIf );
-        if( ERROR( ret ) )
-            break;
-        pMsgToCheck.SetInterface( strIf );
-
-        string strSender;
-        ret = oParams.GetStrProp(
-            propSrcDBusName, strSender );
-
-        if( ERROR( ret ) )
-            break;
-
-        pMsgToCheck.SetSender( strIf );
-
-        MatchPtr pMatch;
-        ret = pRouter->CheckReqToRelay(
-            strIpAddr, pMsgToCheck, pMatch );
-
-    }while( 0 );
+        pReqCtx, pMsg, pMatchHit );
 
     return ret;
 }
 
 gint32 CRpcTcpBridge::ForwardEvent(
-    const string& strDestIp,
+    IConfigDb* pEvtCtx,
     DBusMessage* pEvtMsg,
     IEventSink* pCallback )
 {
@@ -2037,8 +1881,22 @@ gint32 CRpcTcpBridge::ForwardEvent(
     gint32 ret = 0;
     do{
         CReqBuilder oBuilder( this );
+        CCfgOpener oEvtCtx;
+        ret = oEvtCtx.CopyProp(
+            propRouterPath, pEvtCtx );
+        if( ERROR( ret ) )
+            break;
 
-        oBuilder.Push( strDestIp );
+        string strRouterPath;
+        ret = oEvtCtx.GetStrProp(
+            propRouterPath, strRouterPath );
+
+        if( ERROR( ret ) )
+            break;
+
+        oBuilder.Push( ( IConfigDb* )
+            oEvtCtx.GetCfg() );
+
         oBuilder.Push( DMsgPtr( pEvtMsg ) );
 
         oBuilder.SetMethodName(
@@ -2264,15 +2122,15 @@ gint32 CRpcTcpBridge::OnKeepAliveRelay(
     return ret;
 }
 
-gint32 CRpcInterfaceServer::ForwardRequest(
-    const string& strIpAddr,
+gint32 CRpcTcpBridge::ForwardRequest(
+    IConfigDb* pReqCtx,
     DBusMessage* pFwdrMsg,
     DMsgPtr& pRespMsg,
     IEventSink* pCallback )
 {
     if( pFwdrMsg == nullptr ||
         pCallback == nullptr ||
-        strIpAddr.empty() )
+        pReqCtx == nullptr )
         return -EINVAL;
 
     gint32 ret = 0;
@@ -2282,9 +2140,32 @@ gint32 CRpcInterfaceServer::ForwardRequest(
         DMsgPtr fwdrMsg( pFwdrMsg );
         CRpcRouter* pRouter = GetParent();
 
+        CCfgOpener oReqCtx;
+        oReqCtx.CopyProp(
+            propRouterPath, pReqCtx );
+
+        std::string strRouterPath;
+        ret = oReqCtx.GetStrProp(
+            propRouterPath, strRouterPath );
+        if( ERROR( ret ) )
+            break;
+
+        bool bRelay = true;
+        if( strRouterPath == "/" )
+            bRelay = false;
+
+        guint32 dwPortId = 0;
+        CCfgOpenerObj oIfCfg( this );
+        ret = oIfCfg.GetIntProp(
+            propPortId, dwPortId );
+        if( ERROR( ret ) )
+            break;
+
+        oReqCtx[ propConnHandle ] = dwPortId;
+
         MatchPtr pMatch;
-        ret = CheckReqToFwrd( pRouter,
-            strIpAddr, fwdrMsg, pMatch );
+        ret = CheckReqToRelay(
+            oReqCtx.GetCfg(), fwdrMsg, pMatch );
 
         // invalid request
         if( ERROR( ret ) )
@@ -2314,11 +2195,25 @@ gint32 CRpcInterfaceServer::ForwardRequest(
         std::string strDest;
         ret = oMatch.GetStrProp(
             propDestDBusName, strDest );
-
         if( ERROR( ret ) )
             break;
 
-        oParams.Push( strIpAddr );
+        // replace the conn handle with the tcp
+        // proxy's portid
+        if( bRelay )
+        {
+            InterfPtr pIf;
+            ret = pRouter->GetBridgeProxy(
+                strRouterPath, pIf );
+
+            if( ERROR( ret ) )
+                break;
+
+            oReqCtx.CopyProp( propConnHandle,
+                propPortId, pIf );
+        }
+
+        oParams.Push( pReqCtx );
         oParams.Push( fwdrMsg );
         oParams.Push( strDest );
 
@@ -2330,7 +2225,6 @@ gint32 CRpcInterfaceServer::ForwardRequest(
         if( ERROR( ret ) )
             break;
 
-        // ( *pTask )( eventZero );
         ret = GetIoMgr()->RescheduleTask( pTask );
         if( ERROR( ret ) )
             break;
@@ -2352,114 +2246,6 @@ bool CRpcInterfaceServer::IsConnected(
     if( !super::IsConnected( szAddr ) )
         return false;
     return  m_pParent->IsConnected( szAddr );
-}
-
-gint32 CRpcInterfaceServer::SendFetch_Server(
-    IConfigDb* pDataDesc,           // [in, out]
-    gint32& fd,                     // [out]
-    guint32& dwOffset,              // [in,out]
-    guint32& dwSize,                // [in,out]
-    IEventSink* pCallback )
-{
-    gint32 ret = 0;
-
-    if( pDataDesc == nullptr ||
-        pCallback == nullptr )
-        return -EINVAL;
-
-    do{
-        CCfgOpener oDataDesc( pDataDesc );
-        string strIpAddr;
-        ret = oDataDesc.GetStrProp(
-            propIpAddr, strIpAddr );
-
-        if( ERROR( ret ) )
-            break;
-
-        EnumClsid iid = clsid( Invalid );
-        guint32* piid = ( guint32* )&iid;
-        ret = oDataDesc.GetIntProp(
-            propIid, *piid );
-
-        if( ERROR( ret ) )
-            break;
-
-        if( iid != iid( CFileTransferServer ) &&
-            iid != iid( IStream ) )
-        {
-            ret = -ENOTSUP;
-            break;
-        }
-
-        string strMethod =
-            oDataDesc[ propMethodName ];
-
-        bool bSend = false;
-        if( strMethod == SYS_METHOD_SENDDATA )
-        {
-            bSend = true;
-        }
-        else if( strMethod != SYS_METHOD_FETCHDATA )
-        {
-            ret = -EINVAL;
-            break;
-        }
-
-        CParamList oParams;
-        oParams.SetObjPtr(
-            propIoMgr, GetIoMgr() );
-
-        // key property for intercept task
-        oParams.SetObjPtr(
-            propEventSink, ObjPtr( pCallback ) );
-
-        oParams.SetObjPtr(
-            propIfPtr, ObjPtr( this ) );
-
-        CParamList oResp;
-
-        oParams.SetObjPtr(
-            propRespPtr, oResp.GetCfg() );
-
-        oParams.SetObjPtr( propRouterPtr,
-            ObjPtr( GetParent() ) );
-
-        oParams.Push( strIpAddr );
-        oParams.Push( ObjPtr( pDataDesc ) );
-        oParams.Push( ( guint32 )fd );
-        oParams.Push( dwOffset );
-        oParams.Push( dwSize );
-
-        TaskletPtr pTask;
-        if( bSend )
-        {
-            ret = pTask.NewObj(
-                clsid( CReqFwdrSendDataTask ),
-                oParams.GetCfg() );
-        }
-        else
-        {
-            ret = pTask.NewObj(
-                clsid( CReqFwdrFetchDataTask ),
-                oParams.GetCfg() );
-        }
-
-        if( ERROR( ret ) )
-            break;
-
-        ret = GetIoMgr()->RescheduleTask( pTask );
-        if( ERROR( ret ) )
-            break;
-
-        ret = pTask->GetError();
-        if( ret == STATUS_PENDING )
-            break;
-
-    }while( 0 );
-
-    // the return value indicates if the response
-    // message is generated or not.
-    return ret;
 }
 
 gint32 CRpcInterfaceServer::ValidateRequest_SendData(
@@ -2557,21 +2343,14 @@ gint32 CRpcInterfaceServer::DoInvoke(
                     break;
                 }
 
-                string strIpAddr =
-                    ( string )*vecArgs[ 0 ].second;
+                CfgPtr pReqCtx;
+                ret = pReqCtx.Deserialize(
+                    *vecArgs[ 0 ].second );
+                if( ERROR( ret ) )
+                    break;
 
                 bool bBridge = 
                     GetClsid() == clsid( CRpcTcpBridgeImpl );
-                if( bBridge )
-                {
-                    // we will use the source ip
-                    // address as the input parameter
-                    ret = oCfg.GetStrProp(
-                        propIpAddr, strIpAddr );
-
-                    if( ERROR( ret ) )
-                        break;
-                }
 
                 DMsgPtr pFwdrMsg;
                 ret = pFwdrMsg.Deserialize(
@@ -2606,7 +2385,7 @@ gint32 CRpcInterfaceServer::DoInvoke(
                     break;
 
                 DMsgPtr pRespMsg;
-                ret = ForwardRequest( strIpAddr,
+                ret = ForwardRequest( pReqCtx,
                     pFwdrMsg, pRespMsg, pCallback );
 
                 if( ret == STATUS_PENDING )
@@ -2710,218 +2489,6 @@ gint32 CRpcInterfaceServer::DoInvoke(
     return ret;
 }
 
-gint32 CRpcTcpBridge::SendFetch_Server(
-    IConfigDb* pDataDesc,           // [in, out]
-    gint32& fd,                      // [out]
-    guint32& dwOffset,               // [in, out]
-    guint32& dwSize,                 // [in, out]
-    IEventSink* pCallback )
-{
-    gint32 ret = 0;
-
-    if( pDataDesc == nullptr ||
-        pCallback == nullptr )
-        return -EINVAL;
-
-    do{
-        ret = CheckSendDataToFwrd( pDataDesc );
-        if( ERROR( ret ) )
-            break;
-
-        CCfgOpenerObj oCfg( pCallback );
-        DMsgPtr pMsg;
-
-        ret = oCfg.GetMsgPtr( propMsgPtr, pMsg );
-        if( ERROR( ret ) )
-            break;
-
-        if( pMsg.GetType() !=
-            DBUS_MESSAGE_TYPE_METHOD_CALL )
-        {
-            ret = -ENOTSUP;
-            break;
-        }
-
-        // note that we only do keep-alive for
-        // FORWARD_REQUEST
-
-        bool bSend = true;
-        string strCall = pMsg.GetMember();
-        if( strCall == SYS_METHOD_FETCHDATA )
-        {
-            bSend = false;
-        }
-        else if( strCall != SYS_METHOD_SENDDATA )
-        {
-            ret = -EINVAL;
-            break;
-        }
-
-        if( !IsConnected() )
-        {
-            // NOTE: this is not a serious state
-            // check
-            ret = ERROR_STATE;
-            break;
-        }
-
-        guint64 iTaskId = 0;
-        ret = pMsg.GetInt64ArgAt( 4, iTaskId );
-        if( ERROR( ret ) )
-            break;
-
-        // notify the client, we are in progress
-        ret = OnProgressNotify( 0, iTaskId );
-        if( ERROR( ret ) )
-            break;
-
-        // we need to receive the data before
-        // forwarding to the proxy
-        CParamList oSendArg;
-        oSendArg.Push( ObjPtr( pDataDesc ) );
-        oSendArg.Push( fd );
-        oSendArg.Push( dwOffset );
-        oSendArg.Push( dwSize );
-
-        CParamList oTaskParams;
-        oTaskParams[ propReqPtr ] =
-            oSendArg.GetCfg();
-
-        oTaskParams[ propIfPtr ] =
-            ObjPtr( this );
-
-        oTaskParams[ propTaskId ] = iTaskId;
-
-        oTaskParams[ propEventSink ] =
-            ObjPtr( pCallback );
-
-        oTaskParams.CopyProp( propPortId, this );
-
-        TaskletPtr pTask;
-
-        if( bSend )
-        {
-            ret = pTask.NewObj( 
-                clsid( CBdgeStartRecvDataTask ),
-                oTaskParams.GetCfg() );
-        }
-        else
-        {
-            ret = pTask.NewObj(
-                clsid( CBdgeStartFetchDataTask ),
-                oTaskParams.GetCfg() );
-        }
-
-        if( ERROR( ret ) )
-            break;
-
-        ret = GetIoMgr()->RescheduleTask( pTask );
-
-        if( SUCCEEDED( ret ) )
-            ret = pTask->GetError();
-
-    }while( 0 );
-
-    // the return value indicates if the response
-    // message is generated or not.
-    return ret;
-}
-
-gint32 CRpcTcpBridge::SetupReqIrpOnProgress(
-    IRP* pIrp,
-    IConfigDb* pReqCall,
-    IEventSink* pCallback )
-{
-    if( pIrp == nullptr ||
-        pIrp->GetStackSize() == 0 )
-        return -EINVAL;
-
-    if( pCallback == nullptr ||
-        pReqCall == nullptr )
-        return -EINVAL;
-
-    gint32 ret = 0;
-
-    do{
-        IrpCtxPtr& pIrpCtx = pIrp->GetTopStack(); 
-
-        DMsgPtr pMsg;
-        ret = pMsg.NewObj( ( EnumClsid )
-            DBUS_MESSAGE_TYPE_SIGNAL );
-
-        if( ERROR( ret ) )
-            break;
-
-        ret = pMsg.SetMember(
-            SYS_EVENT_FORWARDEVT );
-
-        if( ERROR( ret ) )
-            break;
-
-        string strVal;
-        string strRtName; 
-        GetIoMgr()->GetRouterName( strRtName );
-
-        ret = pMsg.SetSender(
-            DBUS_DESTINATION( strRtName ) );
-
-        if( ERROR( ret ) )
-            break;
-
-        strVal = DBUS_OBJ_PATH(
-            strRtName, OBJNAME_TCP_BRIDGE );
-
-        ret = pMsg.SetPath( strVal );
-
-        if( ERROR( ret ) )
-            break;
-
-        strVal = DBUS_IF_NAME(
-            IFNAME_TCP_BRIDGE );
-
-        pMsg.SetInterface( strVal );
-
-        CParamList oReq( pReqCall ); 
-        guint64 qwTaskId = oReq[ 0 ];
-        guint32 dwProgress = oReq[ 1 ];
-
-        // NOTE: the task id is for keep-alive
-        // purpose
-        if( !dbus_message_append_args( pMsg,
-            DBUS_TYPE_UINT64, &qwTaskId,
-            DBUS_TYPE_UINT32, &dwProgress,
-            DBUS_TYPE_INVALID ) )
-        {
-            ret = -ENOMEM;
-            break;
-        }
-
-        BufPtr pBuf( true );
-        *pBuf = pMsg;
-
-        pIrpCtx->SetReqData( pBuf );
-        pIrpCtx->SetMajorCmd( IRP_MJ_FUNC );
-        pIrpCtx->SetMinorCmd( IRP_MN_IOCTL );
-        pIrpCtx->SetCtrlCode( CTRLCODE_SEND_EVENT );
-
-        ObjPtr pPortObj( GetPort() );
-        CPort* pPort = pPortObj;
-        pPort = static_cast< CPort* >(
-            pPort->GetTopmostPort() );
-
-        pPort->AllocIrpCtxExt( pIrpCtx );
-        SetBdgeIrpStmId( pIrp,
-            TCP_CONN_DEFAULT_STM );
-
-        pIrpCtx->SetIoDirection( IRP_DIR_OUT );
-        pIrp->SetCallback( pCallback, 0 );
-        pIrp->SetIrpThread( GetIoMgr() );
-
-    }while( 0 );
-
-    return ret;
-}
-
 gint32 CRpcTcpBridge::SetupReqIrp(
     IRP* pIrp,
     IConfigDb* pReqCall,
@@ -2948,12 +2515,6 @@ gint32 CRpcTcpBridge::SetupReqIrp(
         if( strMethod == IF_METHOD_LISTENING )
         {
             ret = SetupReqIrpListening(
-                pIrp, pReqCall, pCallback );
-        }
-        else if( strMethod == IF_EVENT_PROGRESS )
-        {
-
-            ret = SetupReqIrpOnProgress(
                 pIrp, pReqCall, pCallback );
         }
         else
@@ -3312,52 +2873,6 @@ gint32 CRpcTcpBridge::SendResponse(
 
         if( ERROR( ret ) )
             break;
-
-    }while( 0 );
-
-    return ret;
-}
-
-gint32 CRpcTcpBridge::OnProgressNotify(
-    guint32 dwProgress,
-    guint64 iTaskId )
-{
-    gint32 ret = 0;
-    do{
-        if( !IsConnected() )
-        {
-            // NOTE: this is not a serious state
-            // check
-            ret = ERROR_STATE;
-            break;
-        }
-
-        CReqBuilder oNotifyReq( this );
-
-        oNotifyReq.Push( iTaskId );
-        oNotifyReq.Push( dwProgress );
-
-        oNotifyReq.SetStrProp( propMethodName,
-            IF_EVENT_PROGRESS );
-
-        oNotifyReq.SetCallFlags( 
-           DBUS_MESSAGE_TYPE_SIGNAL
-           | CF_ASYNC_CALL );
-
-        // no response 
-        TaskletPtr pDummyTask;
-
-        ret = pDummyTask.NewObj(
-            clsid( CIfDummyTask ) );
-
-        if( ERROR( ret ) )
-            break;
-
-        ret = BroadcastEvent(
-            oNotifyReq.GetCfg(), pDummyTask );
-
-        if( ret == STATUS_PENDING )
-            ret = 0;
 
     }while( 0 );
 

@@ -30,7 +30,6 @@
 #include <sys/socket.h>
 #include <netdb.h>
 
-#define RPC_SVR_PORTNUM         0x1024
 #define RPC_MAX_BYTES_PACKET    ( 65536 - sizeof( CPacketHeader ) - 32 )
 
 #define TCP_CONN_DEFAULT_CMD    0
@@ -573,6 +572,7 @@ class CRpcSocketBase : public IService
     virtual gint32 SetProperty(
         gint32 iProp, const CBuffer& oBuf )
     {
+        CStdRMutex oSockLock( GetLock() );
         if( m_pCfg.IsEmpty() )
             return -EFAULT;
 
@@ -583,6 +583,7 @@ class CRpcSocketBase : public IService
     virtual gint32 GetProperty(
         gint32 iProp, CBuffer& oBuf ) const
     {
+        CStdRMutex oSockLock( GetLock() );
         if( m_pCfg.IsEmpty() )
             return -EFAULT;
 
@@ -593,6 +594,7 @@ class CRpcSocketBase : public IService
     virtual gint32 RemoveProperty(
         gint32 iProp )
     {
+        CStdRMutex oSockLock( GetLock() );
         return m_pCfg->RemoveProperty( iProp );
     }
 
@@ -701,21 +703,14 @@ class CRpcStreamSock :
         const IConfigDb* pCfg );
 
     gint32 Start_bh();
-    gint32 ActiveConnect(
-        const std::string& strIpAddr );
-
+    gint32 ActiveConnect();
 
     virtual gint32 Start();
     virtual gint32 Stop();
 
     virtual gint32 OnSendReady();
     virtual gint32 OnReceive();
-    virtual gint32 OnConnected()
-    {
-        // we will use StartTask's OnConnected
-        // instead of this one
-        return -ENOTSUP;
-    }
+    virtual gint32 OnConnected();
     gint32 OnDisconnected();
 
     gint32 Connect();
@@ -1087,9 +1082,6 @@ class CTcpStreamPdo : public CPort
     gint32 CancelStartIrp(
         IRP* pIrp, bool bForce );
 
-    gint32 FireRmtModEvent( EnumEventId iEvent,
-        const std::string& strModName );
-
     gint32 OnPortStackReady( IRP* pIrp );
 
 };
@@ -1098,9 +1090,9 @@ class CRpcTcpBusPort :
     public CGenericBusPort
 {
     SockPtr m_pListenSock;
+    std::vector< SockPtr > m_vecListenSocks;
 
-    using PDOADDR = std::pair< std::string, guint16 >;
-
+    using PDOADDR = CConnParams;
     std::map< guint32, PDOADDR > m_mapIdToAddr;
     std::map< PDOADDR, guint32 > m_mapAddrToId;
 
@@ -1109,7 +1101,8 @@ class CRpcTcpBusPort :
         PortPtr& pNewPort,
         const EnumClsid& iClsid ) const;
 
-    gint32 OnNewConnection( gint32 iSockFd );
+    gint32 OnNewConnection( gint32 iSockFd,
+        CRpcListeningSock* pSock );
 
     gint32 LoadPortOptions(
         IConfigDb* pCfg );
@@ -1128,10 +1121,6 @@ class CRpcTcpBusPort :
 
     gint32 RemovePortId( guint32 dwPortId );
     gint32 RemovePortAddr( PDOADDR& oAddr );
-
-    virtual void AddPdoPort(
-            guint32 iPortId,
-            PortPtr& portPtr );
 
     virtual void RemovePdoPort(
         guint32 iPortId );

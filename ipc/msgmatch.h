@@ -842,69 +842,91 @@ class CProxyMsgMatch : public CMessageMatch
     // listening to
 
     gint32 IsMyMsgIncoming(
-        DBusMessage* pMsg ) const 
+        DBusMessage* pDBusMsg ) const 
     {
         gint32 ret =
-            super::IsMyMsgIncoming( pMsg );
+            super::IsMyMsgIncoming( pDBusMsg );
 
         if( ERROR( ret ) )
             return ret;
 
-        DBusMessageIter itr;
-        dbus_message_iter_init( pMsg, &itr );
-
-        // let's get the first argument, which
-        // should be an ip address
-        gint32 iType =
-            dbus_message_iter_get_arg_type( &itr );
-
-        if( iType != DBUS_TYPE_STRING )
-            return -EBADMSG;
-
-        char* pszIpAddr = nullptr;
-
-        dbus_message_iter_get_basic( &itr, &pszIpAddr );
-
-        if( pszIpAddr == nullptr
-            && !m_pCfg->exist( propIpAddr ) )
-            return -EINVAL;
-
-        
-        std::string strIpAddr;
+        DMsgPtr pMsg( pDBusMsg );
+        ObjPtr pTransCtx;
+        ret = pMsg.GetObjArgAt( 0, pTransCtx );
+        if( ERROR( ret ) )
+            return ret;
 
         CCfgOpenerObj oCfg( this );
-
-        ret = oCfg.GetStrProp( propIpAddr, strIpAddr );
+        ret = oCfg.IsEqualProp(
+            propConnHandle, pTransCtx );
 
         if( ERROR( ret ) )
             return ret;
 
-        // NOTE: we have made an implicit rule
-        // that all the event from the
-        // CRpcReqForwarder are assumed to have
-        // its first argument as the ip address in
-        // string format
-        if( strIpAddr != pszIpAddr )
-            return ERROR_FALSE;
+        std::string strEvtPath;
+        CCfgOpener oTransCtx(
+            ( IConfigDb* )pTransCtx );
 
-        return 0;
+        ret = oTransCtx.GetStrProp(
+            propRouterPath, strEvtPath );
+
+        if( ERROR( ret ) )
+            return ret;
+
+        std::string strExpPath;
+        ret = oCfg.GetStrProp(
+            propRouterPath, strExpPath );
+
+        if( ERROR( ret ) )
+            return ret;
+        
+        if( strEvtPath == strExpPath )
+            return STATUS_SUCCESS;
+
+        ret = ERROR_FALSE;
+        if( strEvtPath.size() > strExpPath.size() )
+            return ret;
+
+        guint32 dwLen = strEvtPath.size();
+        if( dwLen < strExpPath.size() )
+        {
+            std::string strVal =
+                strExpPath.substr( 0, dwLen );
+
+            if( pMsg.GetMember() != 
+                "SYS_EVENT_RMTSVREVENT" )
+                return ret;
+
+            if( strVal == strEvtPath )
+                return STATUS_SUCCESS;
+        }
+        return ERROR_FALSE;
     }
 
     std::string ToString() const
     {
         std::string strAll = super::ToString();
 
-        std::string strIpAddr;
         CCfgOpenerObj oCfg( this );
 
-        gint32 ret = oCfg.GetStrProp(
-            propIpAddr, strIpAddr );
+        guint32 dwConnHandle = 0;
+        gint32 ret = oCfg.GetIntProp(
+            propConnHandle, dwConnHandle );
 
         if( ERROR( ret ) )
-            return "";
+            return strAll;
 
-        strAll += ",IpAddr=";
-        strAll += strIpAddr; 
+        strAll += ",ConnHandle=";
+        strAll += std::to_string( dwConnHandle );
+
+        std::string strValue;
+        ret = oCfg.GetStrProp(
+            propRouterPath, strValue );
+        if( ERROR( ret ) )
+            return strAll;
+
+        strAll += ",RouterPath=";
+        strAll += strValue; 
 
         return strAll;
     }
@@ -1118,18 +1140,17 @@ class CRouterRemoteMatch : public CMessageMatch
             if( ERROR( ret ) )
                 break;
 
-            ret = oCfg.CopyProp( propIpAddr, pMatch );
+            ret = oCfg.CopyProp( propRouterPath, pMatch );
             if( ERROR( ret ) )
                 break;
 
-            oCfg.CopyProp( propDestTcpPort, pMatch );
+            ret = oCfg.CopyProp( propPortId, pMatch );
+            if( oCfg.IsEqual( propRouterPath,
+                std::string( "/" ) ) )
+                break;
 
-            if( GetClsid() == clsid( CRouterRemoteMatch ) )
-            {
-                ret = oCfg.CopyProp( propPortId, pMatch );
-                if( ERROR( ret ) )
-                    break;
-            }
+            // optional
+            oCfg.CopyProp( propPrxyPortId, pMatch );
 
         }while( 0 );
 
@@ -1159,37 +1180,27 @@ class CRouterRemoteMatch : public CMessageMatch
         strAll += ",Destination=";
         strAll += strValue;
 
+        ret = oCfg.GetStrProp(
+            propRouterPath, strValue );
+        if( ERROR( ret ) )
+            return strAll;
+
+        strAll += ",RouterPath=";
+        strAll += strValue; 
+
         return strAll;
     }
 
-    gint32 IsMyEvtToForward(
-        const std::string strIpAddr,
-        DBusMessage* pEvtMsg ) const
+    gint32 IsMyReqToRelay(
+        IConfigDb* pReqCtx,
+        DBusMessage* pReqMsg ) const
     {
         gint32 ret =
-            super::IsMyMsgIncoming( pEvtMsg );
+            super::IsMyMsgOutgoing( pReqMsg );
 
         if( ERROR( ret ) )
             return ret;
-
-        CCfgOpenerObj oCfg( this );
-        ret = oCfg.IsEqual(
-            propIpAddr, strIpAddr );
-
-        return ret;
-    }
-
-    virtual gint32 IsMyReqToForward(
-        const std::string strIpAddr,
-        DBusMessage* pReqMsg ) const
-    {
-        gint32 ret = 0;
         do{
-            ret = super::IsMyMsgOutgoing( pReqMsg );
-
-            if( ERROR( ret ) )
-                return ret;
-
             DMsgPtr pMsg( pReqMsg );
             CCfgOpenerObj oCfg( this );
 
@@ -1202,11 +1213,57 @@ class CRouterRemoteMatch : public CMessageMatch
             if( ERROR( ret ) )
                 break;
 
+            ret = oCfg.IsEqualProp(
+                propRouterPath, pReqCtx );
+
+            if( ERROR( ret ) )
+                break;
+
+            guint32 dwPortId = 0;
+            CCfgOpener oReqCtx( pReqCtx );
+            ret = oReqCtx.GetIntProp(
+                propConnHandle, dwPortId );
+            if( ERROR( ret ) )
+                break;
+
             ret = oCfg.IsEqual(
-                propIpAddr, strIpAddr );
+                propPortId, dwPortId );
+
             break;
 
         }while( 0 );
+
+        return ret;
+    }
+
+    gint32 IsMyEvtToForward(
+        IConfigDb* pEvtCtx,
+        DBusMessage* pEvtMsg ) const
+    {
+        gint32 ret =
+            super::IsMyMsgIncoming( pEvtMsg );
+
+        if( ERROR( ret ) )
+            return ret;
+
+        CCfgOpenerObj oCfg( this );
+
+        ret = oCfg.IsEqualProp(
+            propRouterPath, pEvtCtx );
+
+        if( ERROR( ret ) )
+            return ret;
+
+        CCfgOpener oEvtCtx( pEvtCtx );
+
+        guint32 dwPortId = 0;
+        ret = oEvtCtx.GetIntProp(
+            propConnHandle, dwPortId );
+        if( ERROR( ret ) )
+            return ret;
+
+        ret = oCfg.IsEqual(
+            propPortId, dwPortId );
 
         return ret;
     }
@@ -1254,18 +1311,12 @@ class CRouterRemoteMatch : public CMessageMatch
         return 0;
     }
 
-    std::string GetIpAddr()
+    guint32 GetPortId()
     {
         CCfgOpenerObj oCfg( this );
-
-        std::string strIpAddr;
-        gint32 ret = oCfg.GetStrProp(
-            propIpAddr, strIpAddr );
-
-        if( ERROR( ret ) )
-            return std::string( "" );
-
-        return strIpAddr;
+        guint32 dwPortId = 0;
+        oCfg.GetIntProp( propPortId, dwPortId );
+        return dwPortId;
     }
 };
 
@@ -1285,41 +1336,53 @@ class CRouterLocalMatch : public CRouterRemoteMatch
         CCfgOpenerObj oCfg( this );
         gint32 ret = 0;
 
-        ret = super::CopyMatch( pMatch );
-        if( ERROR( ret ) )
-            return ret;
+        do{
+            ret = oCfg.CopyProp(
+                propObjPath, pMatch );
+            if( ERROR( ret ) )
+                break;
 
-        ret = oCfg.CopyProp(
-            propSrcDBusName, pMatch );
-        if( ERROR( ret ) )
-            return ret;
+            ret = oCfg.CopyProp(
+                propIfName, pMatch );
+            if( ERROR( ret ) )
+                break;
 
-        ret = oCfg.CopyProp(
-            propSrcUniqName, pMatch );
-        if( ERROR( ret ) )
-            return ret;
+            ret = oCfg.CopyProp(
+                propDestDBusName, pMatch );
+
+            if( ERROR( ret ) )
+                break;
+
+            ret = oCfg.CopyProp(
+                propRouterPath, pMatch );
+            if( ERROR( ret ) )
+                break;
+
+            ret = oCfg.CopyProp(
+                propSrcDBusName, pMatch );
+            if( ERROR( ret ) )
+                break;
+
+            ret = oCfg.CopyProp(
+                propSrcUniqName, pMatch );
+            if( ERROR( ret ) )
+                break;
+
+            oCfg.CopyProp(
+                propPrxyPortId, pMatch );
+
+        }while( 0 );
 
         return ret;
     }
 
     std::string ToString() const
     {
-        std::string strAll = super::super::ToString();
+        std::string strAll =
+            super::super::ToString();
 
         std::string strValue;
         CCfgOpenerObj oCfg( this );
-
-        oCfg.GetStrProp(
-            propIpAddr, strValue );
-
-        strAll += ",IpAddr=";
-        strAll += strValue;
-
-        oCfg.GetStrProp(
-            propSrcDBusName, strValue );
-
-        strAll += ",Sender=";
-        strAll += strValue;
 
         oCfg.GetStrProp(
             propSrcUniqName, strValue );
@@ -1327,11 +1390,24 @@ class CRouterLocalMatch : public CRouterRemoteMatch
         strAll += ",UniqName=";
         strAll += strValue;
 
+        guint32 dwPortId = 0;
+        oCfg.GetIntProp(
+            propPrxyPortId, dwPortId );
+
+        strAll += ",PrxyPortId=";
+        strAll += std::to_string( dwPortId );
+
+        oCfg.GetStrProp(
+            propRouterPath, strValue );
+
+        strAll += ",RouterPath=";
+        strAll += strValue;
+
         return strAll;
     }
 
-    virtual gint32 IsMyReqToForward(
-        const std::string strIpAddr,
+    gint32 IsMyReqToForward(
+        IConfigDb* pReqCtx,
         DBusMessage* pReqMsg ) const
     {
         gint32 ret =
@@ -1340,10 +1416,11 @@ class CRouterLocalMatch : public CRouterRemoteMatch
         if( ERROR( ret ) )
             return ret;
 
+        CCfgOpener oReqCtx( pReqCtx );
         CCfgOpenerObj oCfg( this );
 
-        ret = oCfg.IsEqual(
-            propIpAddr, strIpAddr );
+        ret = oCfg.IsEqualProp(
+            propRouterPath, pReqCtx );
         if( ERROR( ret ) )
             return ret;
         
@@ -1355,7 +1432,8 @@ class CRouterLocalMatch : public CRouterRemoteMatch
 
         if( ERROR( ret ) )
         {
-            ret = oCfg.IsEqual( propSrcUniqName, 
+            ret = oCfg.IsEqual(
+                propSrcUniqName, 
                 pMsg.GetSender() );
         }
 
@@ -1363,6 +1441,43 @@ class CRouterLocalMatch : public CRouterRemoteMatch
             return ret;
 
         return 0;
+    }
+
+    gint32 IsMyEvtToRelay(
+        IConfigDb* pEvtCtx,
+        DBusMessage* pEvtMsg ) const
+    {
+        gint32 ret = 0;
+
+        do{
+            ret = super::IsMyMsgIncoming(
+                pEvtMsg );
+
+            if( ERROR( ret ) )
+                break;
+
+            CCfgOpenerObj oCfg( this );
+
+            ret = oCfg.IsEqualProp(
+                propRouterPath, pEvtCtx );
+
+            if( ERROR( ret ) )
+                break;
+
+            CCfgOpener oEvtCtx( pEvtCtx );
+
+            guint32 dwPortId = 0;
+            ret = oEvtCtx.GetIntProp(
+                propConnHandle, dwPortId );
+            if( ERROR( ret ) )
+                break;
+
+            ret = oCfg.IsEqual(
+                propPrxyPortId, dwPortId );
+
+        }while( 0 );
+
+        return ret;
     }
 
     virtual gint32 IsMyModule(

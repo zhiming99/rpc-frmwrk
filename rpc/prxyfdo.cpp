@@ -40,6 +40,8 @@ using namespace std;
 
 extern gint64 GetRandom();
 static std::atomic< int > s_atmSeqNo( GetRandom() );
+extern CConnParamsProxy GetConnParams(
+    const CObjBase* pObj );
 
 CDBusProxyFdo::CDBusProxyFdo( const IConfigDb* pCfg )
     : super( pCfg )
@@ -68,7 +70,42 @@ gint32 CDBusProxyFdo::BuildSendDataMsg(
     gint32 ret = 0;
 
     do{
-        ret = super::BuildSendDataMsg( pIrp, pMsg );
+        IrpCtxPtr& pCtx = pIrp->GetCurCtx();
+        CfgPtr pCfg;
+        ret = pCtx->GetReqAsCfg( pCfg );
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpener oParams( ( IConfigDb* )pCfg );
+        IConfigDb* pDataDesc = nullptr;
+        ret = oParams.GetPointer( 0, pDataDesc );
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpener oDataDesc( pDataDesc );
+
+        // transfer context provides some
+        // transportation and security related
+        // information.
+        //
+        CCfgOpener oTransCtx;
+        ret = oTransCtx.CopyProp(
+            propConnHandle, this );
+        if( ERROR( ret ) )
+            break;
+
+        CConnParamsProxy oConn =
+            GetConnParams( this );
+
+        oTransCtx.CopyProp(
+            propRouterPath, oConn.GetCfg() );
+
+        oDataDesc.SetPointer( propTransCtx,
+            ( IConfigDb* )oTransCtx.GetCfg() );
+
+        ret = super::BuildSendDataMsg(
+            pIrp, pMsg );
+
         if( ERROR( ret ) )
             break;
 
@@ -778,17 +815,48 @@ gint32 CProxyFdoListenTask::Process(
 
             IrpCtxPtr& pCtx = pIrp->GetTopStack();
             DMsgPtr pMsg = *pCtx->m_pRespData;
+            bool bEvent = false;
+            if( pMsg.GetType() ==
+                DBUS_MESSAGE_TYPE_SIGNAL )
+                bEvent = true;
+
             if( !pMsg.IsEmpty() )
             {
                 ret = pPort->DispatchData(
                     pCtx->m_pRespData );
-                if( ERROR( ret ) )
+                if( ERROR( ret ) && !bEvent )
                 {
                     DebugPrint( ret,
                         "Failed to Dispatch Incoming event" );
                     ret = 0;
                 }
             }
+        }
+        else if( dwContext == eventCancelTask )
+        {
+            IRP* pIrp = nullptr;
+            ret = oParams.GetPointer(
+                propIrpPtr, pIrp );
+            if( SUCCEEDED( ret ) )
+            {
+                CStdRMutex oIrpLock(
+                    pIrp->GetLock() );
+                ret = pIrp->CanContinue(
+                    IRP_STATE_READY );
+                if( SUCCEEDED( ret ) )
+                {
+                    pIrp->RemoveCallback();
+                    oIrpLock.Unlock();
+                    pMgr->CancelIrp( pIrp,
+                        true, -ECANCELED );
+                }
+            }
+            oParams.RemoveProperty(
+                propPortPtr );
+            oParams.RemoveProperty(
+                propIoMgr );
+            ret = -ECANCELED;
+            break;
         }
 
         IrpPtr pIrp( true );
@@ -808,6 +876,8 @@ gint32 CProxyFdoListenTask::Process(
         //
         // set a callback
         pIrp->SetCallback( this, 0 );
+        oParams.SetPointer( propIrpPtr,
+            ( PIRP )pIrp );
 
         ret = pMgr->SubmitIrpInternal(
             pPort, pIrp, false );
@@ -821,9 +891,14 @@ gint32 CProxyFdoListenTask::Process(
             DMsgPtr pMsg = *pCtx->m_pRespData;
             if( !pMsg.IsEmpty() )
             {
+                bool bEvent = false;
+                if( pMsg.GetType() ==
+                    DBUS_MESSAGE_TYPE_SIGNAL )
+                    bEvent = true;
+
                 ret = pPort->DispatchData(
                     pCtx->m_pRespData );
-                if( ERROR( ret ) )
+                if( ERROR( ret ) && !bEvent )
                 {
                     DebugPrint( ret,
                         "Failed to Dispatch Incoming event" );
@@ -873,6 +948,12 @@ gint32 CProxyFdoListenTask::Process(
 
     }while( 1 );
 
+    if( ret != STATUS_PENDING )
+    {
+        oParams.RemoveProperty(
+            propIrpPtr );
+    }
+
     return SetError( ret );
 }
 
@@ -889,7 +970,12 @@ gint32 CDBusProxyFdo::PostStart(
     if( ERROR( ret ) )
         return ret;
     do{
-        IPort* pPdoPort = GetLowerPort();
+        PortPtr pPdo;
+        ret = GetPdoPort( pPdo );
+        if( ERROR( ret ) )
+            break;
+
+        IPort* pPdoPort = pPdo;
         if( unlikely( pPdoPort == nullptr ) )
         {
             ret = -EFAULT;
@@ -897,8 +983,15 @@ gint32 CDBusProxyFdo::PostStart(
         }
 
         CCfgOpenerObj oPortCfg( this );
+
         ret = oPortCfg.CopyProp(
-            propIpAddr, pPdoPort );
+            propConnHandle, pPdoPort );
+
+        if( ERROR( ret ) )
+            break;
+
+        ret = oPortCfg.CopyProp(
+            propConnParams, pPdoPort );
 
         if( ERROR( ret ) )
             break;
@@ -972,12 +1065,19 @@ gint32 CDBusProxyFdo::PostStart(
                 break;
 
             ret = matchRmtEvt.CopyProp(
-                propIpAddr, this );
+                propConnHandle, this );
 
             if( ERROR( ret ) )
-            {
                 break;
-            }
+
+            CConnParamsProxy oConn =
+                GetConnParams( this );
+
+            ret = matchRmtEvt.CopyProp(
+                propRouterPath, oConn.GetCfg() );
+
+            if( ERROR( ret ) )
+                break;
 
             ret = m_matchRmtSvrEvt.NewObj(
                 clsid( CProxyMsgMatch ),
@@ -998,6 +1098,8 @@ gint32 CDBusProxyFdo::PreStop(
     m_matchModOnOff.Clear();
     m_matchDBusOff.Clear();
     m_matchRmtSvrEvt.Clear();
+
+    ( *m_pListenTask )( eventCancelTask );
 
     return super::PreStop( pIrp );
 }
@@ -1040,9 +1142,15 @@ gint32 CDBusProxyFdo::OnPortReady(
         if( ERROR( ret ) )
             break;
 
-        GetIoMgr()->ScheduleTask(
+        ret = m_pListenTask.NewObj(
             clsid( CProxyFdoListenTask ),
             oCfg.GetCfg() );
+
+        if( ERROR( ret ) )
+            break;
+
+        GetIoMgr()->RescheduleTask(
+            m_pListenTask );
 
     }while( 0 );
 
@@ -1056,50 +1164,52 @@ gint32 CProxyFdoRmtDBusOfflineTask::operator()(
 {
 
     gint32 ret = 0;
-
-    CParamList a( ( IConfigDb* )m_pCtx );
-    CIoManager* pMgr = nullptr;
-    string strIfName;
+    CParamList oTaskCfg(
+        ( IConfigDb* )GetConfig() );
 
     do{
-        ret = a.GetPointer( propIoMgr, pMgr );
+        CPort* pPort = nullptr;
+        ret = oTaskCfg.GetPointer(
+            propPortPtr, pPort );
         if( ERROR( ret ) )
             break;
 
-        ObjPtr pObj;
-        ret = a.GetObjPtr(
-            propPortPtr, pObj );
+        CConnParamsProxy oConn =
+            GetConnParams( pPort );
+
+        guint32 eventId = eventRmtDBusOffline;
+        PortPtr pPdoPort;
+        ret =pPort->GetPdoPort( pPdoPort );
         if( ERROR( ret ) )
             break;
 
-        CPort* pPort = pObj;
-        if( pPort == nullptr )
-        {
-            ret = -EINVAL;
+        HANDLE hPort = PortToHandle( pPdoPort );
+
+        CCfgOpener oTransCtx;
+        ret = oTransCtx.CopyProp(
+            propConnHandle, pPort );
+        if( ERROR( ret ) )
             break;
-        }
 
-        string strIpAddr;
-        ret = a.GetStrProp(
-            propIpAddr, strIpAddr );
-
+        ret = oTransCtx.CopyProp(
+            propRouterPath, oConn.GetCfg() );
         if( ERROR( ret ) )
             break;
 
         // broadcast this event the pnp manager
         // will stop all the ports
-        CEventMapHelper< CPort > oEvtHelper( pPort );
+        CEventMapHelper< CPort >
+            oEvtHelper( pPdoPort );
 
-        guint32 eventId = eventRmtDBusOffline;
-
-        guint32 hPort =
-            PortToHandle( ( ( IPort* )this ) );
+        IConfigDb* pTransCtx =
+            oTransCtx.GetCfg();
 
         // we will pass the ip address and the
         // port handle to the subscribers
         ret = oEvtHelper.BroadcastEvent(
-            eventConnPoint, eventId,
-            hPort, ( LONGWORD* )strIpAddr.c_str() );
+            eventConnPoint, eventId, 
+            ( LONGWORD )pTransCtx,
+            ( LONGWORD* )hPort );
 
     }while( 0 );
 
@@ -1155,12 +1265,6 @@ CDBusProxyFdo::PreDispatchMsg(
 
                 ret1 = oParams.SetObjPtr(
                     propPortPtr, ObjPtr( this ) );
-
-                if( ERROR( ret1 ) )
-                    break;
-
-                ret1 = oParams.CopyProp(
-                    propIpAddr, this );
 
                 if( ERROR( ret1 ) )
                     break;
@@ -1222,45 +1326,47 @@ gint32 CProxyFdoModOnOfflineTask::operator()(
 {
 
     gint32 ret = 0;
+    CParamList oTaskCfg(
+        ( IConfigDb* )GetConfig() );
 
-    CParamList a( ( IConfigDb* )m_pCtx );
-    CIoManager* pMgr = nullptr;
     string strModName;
-
     do{
-        ret = a.GetPointer( propIoMgr, pMgr );
-        if( ERROR( ret ) )
-            break;
-
         guint32 dwFlags = 0;
-        ret = a.Pop( dwFlags );
+        ret = oTaskCfg.Pop( dwFlags );
         if( ERROR( ret ) )
             break;
 
         bool bOnline = 
             ( ( dwFlags & 0x01 ) > 0 );
 
-        ret = a.GetStrProp(
+        ret = oTaskCfg.GetStrProp(
             propModName, strModName );
         if( ERROR( ret ) )
             break;
 
-        ObjPtr pObj;
-        ret = a.GetObjPtr(
-            propPortPtr, pObj );
+        CPort* pPort = nullptr;
+        ret = oTaskCfg.GetPointer(
+            propPortPtr, pPort );
         if( ERROR( ret ) )
             break;
 
-        CPort* pPort = pObj;
-        if( pPort == nullptr )
-        {
-            ret = -EINVAL;
+        PortPtr pPdoPort;
+        ret = pPort->GetPdoPort( pPdoPort );
+        if( ERROR( ret ) )
             break;
-        }
 
-        string strIpAddr;
-        ret = a.GetStrProp(
-            propIpAddr, strIpAddr );
+        CCfgOpener oTransCtx;
+        ret = oTransCtx.CopyProp(
+            propConnHandle, pPort );
+        if( ERROR( ret ) )
+            break;
+
+        CConnParamsProxy oConn =
+            GetConnParams( pPort );
+
+        ret = oTransCtx.CopyProp(
+            propRouterPath,
+            ( IConfigDb* )oConn.GetCfg() );
 
         if( ERROR( ret ) )
             break;
@@ -1268,16 +1374,20 @@ gint32 CProxyFdoModOnOfflineTask::operator()(
         // broadcast this event
         // the pnp manager will stop all the
         // ports
-        CEventMapHelper< CPort > oEvtHelper( pPort );
+        CEventMapHelper< CPort >
+            oEvtHelper( pPdoPort );
 
         guint32 eventId = eventRmtModOnline;
 
         if( !bOnline )
             eventId = eventRmtModOffline;
 
+        IConfigDb* pTransCtx =
+            oTransCtx.GetCfg();
+
         ret = oEvtHelper.BroadcastEvent(
             eventConnPoint, eventId,
-            ( LONGWORD )strIpAddr.c_str(),
+            ( LONGWORD )pTransCtx,
             ( LONGWORD* )strModName.c_str() );
 
     }while( 0 );
@@ -1309,12 +1419,6 @@ gint32 CDBusProxyFdo::ScheduleModOnOfflineTask(
         ret = oParams.SetObjPtr(
             propPortPtr, ObjPtr( pPdoPort ) );
 
-        if( ERROR( ret ) )
-            break;
-
-        ret = oParams.CopyProp(
-            propIpAddr, this );
-        
         if( ERROR( ret ) )
             break;
 

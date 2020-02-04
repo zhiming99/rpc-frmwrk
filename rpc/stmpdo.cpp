@@ -45,41 +45,6 @@ CRpcTcpBusPort::CRpcTcpBusPort(
     SetClassId( clsid( CRpcTcpBusPort ) );
 }
 
-void CRpcTcpBusPort::AddPdoPort(
-        guint32 iPortId, PortPtr& portPtr )
-{
-    super::AddPdoPort( iPortId, portPtr );
-    CCfgOpenerObj oPortCfg(
-        ( CObjBase* )portPtr );
-
-    gint32 ret = 0;
-    do{
-        string strIpAddr;
-
-        ret = oPortCfg.GetStrProp(
-            propIpAddr, strIpAddr );
-
-        if( ERROR( ret ) )
-            break;
-
-        guint32 dwPortNum = 0;
-        ret = oPortCfg.GetIntProp(
-            propDestTcpPort, dwPortNum );
-
-        if( ERROR( ret ) )
-        {
-            DebugPrint( ret,
-                "Failed to AddPdoPort" );
-        }
-
-        BindPortIdAndAddr( iPortId,
-            PDOADDR( strIpAddr, dwPortNum ) );
-
-    }while( 0 );
-
-    ( ret == 0 );
-}
-
 gint32 CRpcTcpBusPort::GetPdoAddr(
     guint32 dwPortId, PDOADDR& oAddr )
 {
@@ -194,30 +159,18 @@ gint32 CRpcTcpBusPort::BuildPdoPortName(
                 std::to_string( dwPortId );
             break;
         }
-        else if( pCfg->exist( propIpAddr ) )
+        else if( pCfg->exist( propConnParams ) )
         {
             // proxy side
             // ip addr must exist
-            string strIpAddr, strRet;
-
-            ret = oCfgOpener.GetStrProp(
-                propIpAddr, strIpAddr );
-
+            IConfigDb* pcp = nullptr;
+            ret = oCfgOpener.GetPointer(
+                propConnParams, pcp );
             if( ERROR( ret ) )
                 break;
 
-            guint32 dwPortNum;
-            ret = oCfgOpener.GetIntProp(
-                propDestTcpPort, dwPortNum );
-
-            if( ERROR( ret ) )
-            {
-                DebugPrint( ret,
-                    "Failed to find the tcp port number" );
-                break;
-            }
-
-            PDOADDR oAddr( strIpAddr, dwPortNum );
+            CConnParams ocps( pcp );
+            PDOADDR oAddr( ocps );
             std::map< PDOADDR, guint32 >::iterator
                 itr = m_mapAddrToId.find( oAddr );
             
@@ -367,43 +320,65 @@ gint32 CRpcTcpBusPort::PostStart(
 {
     gint32 ret = 0;
     do{
-        CfgPtr pCfg( true );
-
-        CCfgOpener oCfg(
-            ( IConfigDb* )pCfg );
-
-        oCfg.SetPointer( propIoMgr, GetIoMgr() );
-        oCfg.SetPointer( propPortPtr, this );
-
-        LoadPortOptions( pCfg );
-
-        oCfg.CopyProp( propIpAddr, this );
-        oCfg.CopyProp( propSrcTcpPort, this );
-
-        bool bListening = false;
-
-        ret = oCfg.GetBoolProp(
-            propListenSock, bListening );
+        ObjPtr pObj;
+        CCfgOpenerObj oPortCfg( this );
+        ret = oPortCfg.GetObjPtr(
+            propConnParams, pObj );
 
         if( ERROR( ret ) )
+            break;
+
+        ObjVecPtr pParams = pObj;
+        if( pParams.IsEmpty() ||
+            ( *pParams )().empty() )
         {
-            bListening = false;
-            ret = 0;
+            ret = -EINVAL;
+            break;
         }
 
-        if( bListening )
+        CCfgOpener oOptions;
+        LoadPortOptions( oOptions.GetCfg() );
+
+        bool bListening = false;
+        oOptions.GetBoolProp(
+            propListenSock, bListening );
+
+        if( !bListening )
+            break;
+
+        CStlObjVector::MyType& vecParams =
+            ( *pParams )();
+
+        for( auto elem : vecParams )
         {
-            ret = m_pListenSock.NewObj(
+            CfgPtr pCfg( true );
+            SockPtr pListenSock;
+
+            CCfgOpener oCfg(
+                ( IConfigDb* )pCfg );
+
+            oCfg.SetPointer( propIoMgr, GetIoMgr() );
+            oCfg.SetPointer( propPortPtr, this );
+            oCfg.SetObjPtr( propConnParams, elem );
+
+            ret = pListenSock.NewObj(
                 clsid( CRpcListeningSock ), pCfg );
 
             if( ERROR( ret ) )
                 break;
 
-            ret = m_pListenSock->Start();
+            ret = pListenSock->Start();
             if( ERROR( ret ) )
                 break;
+
+            m_vecListenSocks.push_back(
+                pListenSock );
         }
 
+        if( ERROR( ret ) )
+            break;
+
+        oPortCfg.RemoveProperty( propConnParams );
         ret = super::PostStart( pIrp );
         if( ERROR( ret ) )
             break;
@@ -424,10 +399,10 @@ gint32 CRpcTcpBusPort::PreStop(
     gint32 ret = super::PreStop( pIrp );
     if( ret != STATUS_MORE_PROCESS_NEEDED )
     {
-        if( !m_pListenSock.IsEmpty() )
+        for( auto elem : m_vecListenSocks )
         {
-            ret = m_pListenSock->Stop();
-            m_pListenSock.Clear();
+            ret = elem->Stop();
+            elem.Clear();
         }
     }
     return ret;
@@ -445,7 +420,13 @@ gint32 CRpcTcpBusPort::OnEvent(
     {
     case eventNewConn:
         {
-            ret = OnNewConnection( dwParam1 );
+            CRpcListeningSock* pSock;
+            pSock = reinterpret_cast
+                < CRpcListeningSock* >( pData );
+
+            ret = OnNewConnection(
+                dwParam1, pSock );
+
             break;
         }
     default:
@@ -460,9 +441,9 @@ gint32 CRpcTcpBusPort::OnEvent(
 }
 
 gint32 CRpcTcpBusPort::OnNewConnection(
-    gint32 iSockFd )
+    gint32 iSockFd, CRpcListeningSock* pSock )
 {
-    if( iSockFd < 0 )
+    if( iSockFd < 0 || pSock == nullptr )
         return -EINVAL;
 
     gint32 ret = 0;
@@ -470,6 +451,16 @@ gint32 CRpcTcpBusPort::OnNewConnection(
         // passive connection
         CCfgOpener oCfg;
         CCfgOpenerObj oPortCfg( this );
+        CCfgOpenerObj oSockCfg( pSock );
+
+        IConfigDb* pConnParams;
+        ret = oSockCfg.GetPointer(
+            propConnParams, pConnParams );
+        if( ERROR( ret ) )
+            break;
+
+        CParamList oNewConn;
+        oNewConn.Append( pConnParams );
 
         string strPortName;
         ret = oPortCfg.GetStrProp(
@@ -495,7 +486,7 @@ gint32 CRpcTcpBusPort::OnNewConnection(
             break;
         }
 
-        char szNode[ 128 ];
+        char szNode[ 32 ];
         char szServ[ 8 ];
 
         ret = getnameinfo( ( sockaddr* )&oAddr,
@@ -507,24 +498,13 @@ gint32 CRpcTcpBusPort::OnNewConnection(
             break;
             
         string strSrcIp = szNode;
-
         if( strSrcIp.empty() )
         {
             ret = -EFAULT;
             break;
         }
 
-        guint32 dwDestPortNum =
-            std::stoi( szServ );
-
-        iSize = sizeof( oAddr );
-        ret = getnameinfo(
-            ( sockaddr* )&oAddr, iSize,
-            nullptr, 0, szServ,
-            sizeof( szServ ),
-            NI_NUMERICSERV );
-
-        guint32 dwPortNum =
+        guint32 dwSrcPortNum =
             std::stoi( szServ );
 
         guint32 dwPortId = NewPdoId();
@@ -538,26 +518,17 @@ gint32 CRpcTcpBusPort::OnNewConnection(
         if( ERROR( ret ) )
             break;
 
-        ret = oCfg.SetStrProp(
-            propIpAddr, strSrcIp );
+        ret = oNewConn.SetStrProp(
+            propSrcIpAddr, strSrcIp );
 
         if( ERROR( ret ) )
             break;
 
-        ret = oCfg.SetIntProp(
-            propDestTcpPort, dwDestPortNum );
+        ret = oNewConn.SetIntProp(
+            propSrcTcpPort, dwSrcPortNum );
 
         if( ERROR( ret ) )
             break;
-
-        ret = oCfg.SetIntProp(
-            propSrcTcpPort, dwPortNum );
-
-        if( ERROR( ret ) )
-            break;
-
-        oCfg.SetBoolProp(
-            propIsServer, true );
 
         std::string strClass;
 
@@ -565,7 +536,7 @@ gint32 CRpcTcpBusPort::OnNewConnection(
             propChildPdoClass, strClass );
 
         if( ERROR( ret ) )
-            strClass = PORT_CLASS_TCP_STREAM_PDO;
+            strClass = PORT_CLASS_TCP_STREAM_PDO2;
 
         ret = oCfg.SetStrProp(
             propPortClass,
@@ -579,6 +550,9 @@ gint32 CRpcTcpBusPort::OnNewConnection(
 
         if( ERROR( ret ) )
             break;
+
+        oCfg.SetPointer( propConnParams,
+            ( IConfigDb* )oNewConn.GetCfg() );
 
         PortPtr pPort;
         ret = OpenPdoPort(
@@ -690,73 +664,134 @@ gint32 CRpcTcpBusDriver::GetTcpSettings(
 
 
             if( !( elem.isMember( JSON_ATTR_PARAMETERS ) &&
-                elem[ JSON_ATTR_PARAMETERS ].isObject() ) )
+                elem[ JSON_ATTR_PARAMETERS ].isArray() ) &&
+                elem[ JSON_ATTR_PARAMETERS ].size() > 0 )
             {
                 ret = -ENOENT;
                 break;
             }
 
-            Json::Value& oParams =
+            Json::Value& arrParams =
                 elem[ JSON_ATTR_PARAMETERS ];
 
-            // protocol, refer to propProtocol for detail
-            if( oParams.isMember( JSON_ATTR_PROTOCOL ) &&
-                oParams[ JSON_ATTR_PROTOCOL ].isString() )
+            ObjVecPtr pParams( true );
+            CStlObjVector::MyType& vecParams = ( *pParams )();
+            for( guint32 j = 0; j < arrParams.size(); j++ )
             {
-                string strProto =
-                    oParams[ JSON_ATTR_PROTOCOL ].asString();
-                oCfg.SetStrProp( propProtocol, strProto );
-            }
-            // tcp port
-            if( oParams.isMember( JSON_ATTR_TCPPORT ) &&
-                oParams[ JSON_ATTR_TCPPORT ].isString() )
-            {
-                string strPort =
-                    oParams[ JSON_ATTR_TCPPORT ].asString();
-                guint32 dwPort = std::stol( strPort );
-                if( dwPort < 1024 || dwPort >= 0x10000 )
-                {
-                    oCfg.RemoveProperty( propProtocol );
-                    ret = -ENOENT;
-                    break;
-                }
-                oCfg.SetIntProp( propSrcTcpPort, dwPort );
-            }
-            // address to listen on
-            if( oParams.isMember( JSON_ATTR_BINDADDR ) &&
-                oParams[ JSON_ATTR_BINDADDR ].isString() )
-            {
-                string strAddr =
-                    oParams[ JSON_ATTR_BINDADDR ].asString();
+                CCfgOpener oElemCfg;
+                Json::Value& oParams = arrParams[ j ];
 
-                string strNormVal;
-                ret = NormalizeIpAddr(
-                    AF_INET, strAddr, strNormVal );
-                if( ERROR( ret ) )
+                // protocol, refer to propProtocol for detail
+                if( oParams.isMember( JSON_ATTR_PROTOCOL ) &&
+                    oParams[ JSON_ATTR_PROTOCOL ].isString() )
                 {
+                    string strProto =
+                        oParams[ JSON_ATTR_PROTOCOL ].asString();
+                    oElemCfg.SetStrProp( propProtocol, strProto );
+                }
+                // tcp port
+                guint32 dwPort = 0xFFFFFFFF;
+                if( oParams.isMember( JSON_ATTR_TCPPORT ) &&
+                    oParams[ JSON_ATTR_TCPPORT ].isString() )
+                {
+                    string strPort =
+                        oParams[ JSON_ATTR_TCPPORT ].asString();
+                    dwPort = std::stol( strPort );
+                    if( dwPort < 1024 || dwPort >= 0x10000 )
+                    {
+                        oElemCfg.RemoveProperty( propProtocol );
+                        ret = -ENOENT;
+                        break;
+                    }
+                    oElemCfg.SetIntProp( propDestTcpPort, dwPort );
+                }
+                else
+                {
+                    dwPort = RPC_SVR_DEFAULT_PORTNUM;
+                    oElemCfg.SetIntProp( propDestTcpPort, dwPort );
+                }
+
+                // address to listen on
+                if( oParams.isMember( JSON_ATTR_BINDADDR ) &&
+                    oParams[ JSON_ATTR_BINDADDR ].isString() )
+                {
+                    string strAddr =
+                        oParams[ JSON_ATTR_BINDADDR ].asString();
+
+                    string strNormVal;
                     ret = NormalizeIpAddr(
-                        AF_INET6, strAddr, strNormVal );
+                        AF_INET, strAddr, strNormVal );
+                    if( ERROR( ret ) )
+                    {
+                        ret = NormalizeIpAddr(
+                            AF_INET6, strAddr, strNormVal );
+                    }
+
+                    oElemCfg.SetStrProp( propDestIpAddr, strNormVal );
                 }
 
-                oCfg.SetStrProp( propIpAddr, strNormVal );
-            }
-            // address format, for detail, refer to propAddrFormat
-            if( oParams.isMember( JSON_ATTR_ADDRFORMAT ) &&
-                oParams[ JSON_ATTR_ADDRFORMAT ].isString() )
-            {
-                string strFormat =
-                    oParams[ JSON_ATTR_ADDRFORMAT ].asString();
-                oCfg.SetStrProp( propAddrFormat, strFormat );
+                // address format, for detail, refer to propAddrFormat
+                if( oParams.isMember( JSON_ATTR_ADDRFORMAT ) &&
+                    oParams[ JSON_ATTR_ADDRFORMAT ].isString() )
+                {
+                    string strFormat =
+                        oParams[ JSON_ATTR_ADDRFORMAT ].asString();
+                    oElemCfg.SetStrProp( propAddrFormat, strFormat );
+                }
+
+                if( oParams.isMember( JSON_ATTR_PDOCLASS ) &&
+                    oParams[ JSON_ATTR_PDOCLASS ].isString() )
+                {
+                    string strClass =
+                        oParams[ JSON_ATTR_PDOCLASS ].asString();
+                    oElemCfg.SetStrProp( propChildPdoClass, strClass );
+                }
+
+                oElemCfg.SetBoolProp( propEnableWebSock, false );
+                oElemCfg.SetBoolProp( propEnableSSL, false );
+                oElemCfg.SetBoolProp( propCompress, false );
+                oElemCfg.SetBoolProp( propConnRecover, false );
+                oElemCfg.SetBoolProp( propIsServer, true );
+
+                if( oParams.isMember( JSON_ATTR_ENABLE_SSL ) &&
+                    oParams[ JSON_ATTR_ENABLE_SSL ].isString() )
+                {
+                    string strVal =
+                        oParams[ JSON_ATTR_ENABLE_SSL ].asString();
+                    if( strVal == "true" )
+                    {
+                        oElemCfg.SetBoolProp( propEnableSSL, true );
+                    }
+                }
+                if( oParams.isMember( JSON_ATTR_ENABLE_WEBSOCKET ) &&
+                    oParams[ JSON_ATTR_ENABLE_WEBSOCKET ].isString() )
+                {
+                    string strVal =
+                        oParams[ JSON_ATTR_ENABLE_WEBSOCKET ].asString();
+                    if( strVal == "true" )
+                        oElemCfg.SetBoolProp( propEnableWebSock, true );
+                }
+                if( oParams.isMember( JSON_ATTR_ENABLE_COMPRESS ) &&
+                    oParams[ JSON_ATTR_ENABLE_COMPRESS ].isString() )
+                {
+                    string strVal =
+                        oParams[ JSON_ATTR_ENABLE_COMPRESS ].asString();
+                    if( strVal == "true" )
+                        oElemCfg.SetBoolProp( propCompress, true );
+                }
+                if( oParams.isMember( JSON_ATTR_CONN_RECOVER ) &&
+                    oParams[ JSON_ATTR_CONN_RECOVER ].isString() )
+                {
+                    string strVal =
+                        oParams[ JSON_ATTR_CONN_RECOVER ].asString();
+                    if( strVal == "true" )
+                        oElemCfg.SetBoolProp( propConnRecover, true );
+                }
+
+                vecParams.push_back( ObjPtr( oElemCfg.GetCfg() ) );
             }
 
-            // 
-            if( oParams.isMember( JSON_ATTR_PDOCLASS ) &&
-                oParams[ JSON_ATTR_PDOCLASS ].isString() )
-            {
-                string strClass =
-                    oParams[ JSON_ATTR_PDOCLASS ].asString();
-                oCfg.SetStrProp( propChildPdoClass, strClass );
-            }
+            oCfg.SetObjPtr( propConnParams, ObjPtr( pParams ) );
         }
 
     }while( 0 );
@@ -988,18 +1023,9 @@ gint32 CTcpStreamPdo::PostStart(
 
     do{
         CParamList oParams;
-
+        CCfgOpenerObj oPortCfg( this );
         ret = oParams.CopyProp(
-            propIpAddr, this );
-
-        if( ERROR( ret ) )
-            break;
-
-        oParams.CopyProp(
-            propSrcTcpPort, this );
-
-        ret = oParams.CopyProp(
-            propDestTcpPort, this );
+            propConnParams, this );
 
         if( ERROR( ret ) )
             break;
@@ -1745,50 +1771,52 @@ gint32 CTcpStreamPdo::OnSubmitIrp(
 gint32 CTcpStreamPdo::OnPortReady(
     IRP* pIrp )
 {
-    return super::OnPortReady( pIrp );
-}
-
-gint32 CTcpStreamPdo::FireRmtModEvent(
-    EnumEventId iEvent, const string& strModName )
-{
-    // this is an event detected by the
-    // socket
     gint32 ret = 0;
-    switch( iEvent )
-    {
-    case eventRmtModOffline:
-    case eventRmtModOnline:
+    do{
+        CCfgOpenerObj oPortCfg( this );
+
+        guint32 dwPortId = 0;
+        ret = oPortCfg.GetIntProp(
+            propPortId, dwPortId );
+
+        if( ERROR( ret ) )
+            break;
+
+        IConfigDb* pcp = nullptr;
+        ret = oPortCfg.GetPointer(
+            propConnParams, pcp );
+        
+        if( ERROR( ret ) )
+            break;
+
+        CConnParams oConnParams( pcp );
+        if( m_pBusPort == nullptr )
         {
-            string strIpAddr;
-            CCfgOpenerObj oCfg( this );
-
-            if( strModName.empty() )
-            {
-                ret = -EINVAL;
-                break;
-            }
-
-            ret = oCfg.GetStrProp(
-                propIpAddr, strIpAddr );
-
-            if( ERROR( ret ) )
-                break;
-
-            // pass on this event to the pnp manager
-            string strTemp = strModName;
-            CEventMapHelper< CPort > oEvtHelper( this );
-            oEvtHelper.BroadcastEvent(
-                eventConnPoint, iEvent,
-                ( LONGWORD )strIpAddr.c_str(),
-                ( LONGWORD* )strTemp.c_str() );
-
+            ret = -EFAULT;
             break;
         }
-    default:
-        ret = -EINVAL;
-        break;
-    }
-    return ret;
+
+        CRpcTcpBusPort* pBus =
+            ObjPtr( m_pBusPort );
+
+        if( pBus == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        // at this moment the connection
+        // information is complete, especially for
+        // client side pdo.
+        ret = pBus->BindPortIdAndAddr(
+            dwPortId, oConnParams );
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+        return ret;
+
+    return super::OnPortReady( pIrp );
 }
 
 gint32 FireRmtSvrEvent(
@@ -1803,17 +1831,23 @@ gint32 FireRmtSvrEvent(
     case eventRmtSvrOffline:
     case eventRmtSvrOnline:
         {
-            string strIpAddr;
             CCfgOpenerObj oCfg( pPort );
-
-            ret = oCfg.GetStrProp(
-                propIpAddr, strIpAddr );
-
-            if( ERROR( ret ) )
-                break;
-
             CPort* pcPort = static_cast
                 < CPort* >( pPort );
+
+            guint32 dwPortId = 0;
+            ret = oCfg.GetIntProp( propPdoId,
+                dwPortId );
+
+            CCfgOpener oEvtCtx;
+            oEvtCtx[ propRouterPath ] =
+                std::string( "/" );
+
+            oEvtCtx[ propConnHandle ] =
+                dwPortId;
+
+            IConfigDb* pEvtExt =
+                oEvtCtx.GetCfg();
 
             // pass on this event to the pnp
             // manager
@@ -1825,7 +1859,7 @@ gint32 FireRmtSvrEvent(
 
             oEvtHelper.BroadcastEvent(
                 eventConnPoint, iEvent,
-                ( LONGWORD )strIpAddr.c_str(),
+                ( LONGWORD )pEvtExt,
                 ( LONGWORD* )hPort );
 
             break;

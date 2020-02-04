@@ -63,7 +63,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CRemoteProxyState );
     INIT_MAP_ENTRYCFG( CReqFwdrEnableRmtEventTask );
     INIT_MAP_ENTRYCFG( CReqFwdrForwardRequestTask );
-    INIT_MAP_ENTRYCFG( CReqFwdrSendDataTask );
+    // INIT_MAP_ENTRYCFG( CReqFwdrSendDataTask );
     INIT_MAP_ENTRYCFG( CReqFwdrFetchDataTask );
     INIT_MAP_ENTRYCFG( CReqFwdrOpenRmtPortTask );
     INIT_MAP_ENTRYCFG( CReqFwdrCloseRmtPortTask );
@@ -76,6 +76,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CRpcReqForwarderImpl );
     INIT_MAP_ENTRYCFG( CRpcReqForwarderProxyImpl );
     INIT_MAP_ENTRYCFG( CRpcRfpForwardEventTask );
+    INIT_MAP_ENTRYCFG( CRfpModEventRespTask );
     INIT_MAP_ENTRYCFG( CRpcStream );
     INIT_MAP_ENTRYCFG( CRpcStreamSock );
     INIT_MAP_ENTRYCFG( CRpcTcpBridgeImpl );
@@ -89,10 +90,10 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CStmSockInvalStmNotifyTask );
     INIT_MAP_ENTRYCFG( CTcpStreamPdo );
     INIT_MAP_ENTRYCFG( CBdgeProxyReadWriteComplete );
-    INIT_MAP_ENTRYCFG( CBdgeProxyOpenStreamTask );
-    INIT_MAP_ENTRYCFG( CBdgeProxyStartSendTask );
-    INIT_MAP_ENTRYCFG( CBdgeStartRecvDataTask );
-    INIT_MAP_ENTRYCFG( CBdgeStartFetchDataTask );
+    // INIT_MAP_ENTRYCFG( CBdgeProxyOpenStreamTask );
+    // INIT_MAP_ENTRYCFG( CBdgeProxyStartSendTask );
+    // INIT_MAP_ENTRYCFG( CBdgeStartRecvDataTask );
+    // INIT_MAP_ENTRYCFG( CBdgeStartFetchDataTask );
     INIT_MAP_ENTRYCFG( CRpcSockWatchCallback );
     INIT_MAP_ENTRYCFG( CProxyFdoDriver );
     INIT_MAP_ENTRYCFG( CRpcRouterImpl );

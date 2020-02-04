@@ -84,7 +84,6 @@ CRpcOpenSSLFido::~CRpcOpenSSLFido()
     sem_destroy( &m_semReadSync );
 }
 
-
 gint32 CRpcOpenSSLFido::EncryptAndSend(
     PIRP pIrp, CfgPtr pCfg,
     gint32 iIdx, guint32 dwTotal,
@@ -119,17 +118,6 @@ gint32 CRpcOpenSSLFido::EncryptAndSend(
             if( pBuf->size() <= dwOffset )
             {
                 ret = -EINVAL;
-                break;
-            }
-
-            guint32 dwMagic =
-                *( ( guint32* )pBuf->ptr() );
-
-            if( iIdx == 0 && dwMagic !=
-                ntohl( RPC_PACKET_MAGIC ) )
-            {
-                DebugPrint( 0, "Bad header magic" );
-                ret = -EBADMSG;
                 break;
             }
 
@@ -1624,20 +1612,6 @@ gint32 CRpcOpenSSLFidoDrv::Probe(
 {
     gint32 ret = 0;
     do{
-        CIoManager* pMgr = GetIoMgr();
-
-        bool bEnableSSL = false;
-
-        ret = pMgr->GetCmdLineOpt(
-            propEnableSSL, bEnableSSL );
-
-        if( ERROR( ret ) || !bEnableSSL )
-        {
-            ret = 0;
-            pNewPort = pLowerPort;
-            break;
-        }
-
         if( pLowerPort == nullptr )
         {
             ret = -EINVAL;
@@ -1660,6 +1634,22 @@ gint32 CRpcOpenSSLFidoDrv::Probe(
         // started.
         CCfgOpenerObj oPdoPort(
             ( CObjBase* )pPdoPort );
+
+        IConfigDb* pConnParams = nullptr;
+        ret = oPdoPort.GetPointer(
+            propConnParams, pConnParams );
+        if( ERROR( ret ) )
+            break;
+
+        bool bEnableSSL = false;
+        CConnParams oConn( pConnParams );
+        bEnableSSL = oConn.IsSSL();
+        if( !bEnableSSL )
+        {
+            ret = 0;
+            pNewPort = pLowerPort;
+            break;
+        }
 
         guint32 dwFd = 0;
         ret = oPdoPort.GetIntProp(
@@ -1696,18 +1686,12 @@ gint32 CRpcOpenSSLFidoDrv::Probe(
         oNewCfg[ propPortClass ] =
             PORT_CLASS_OPENSSL_FIDO;
 
-        oNewCfg.CopyProp(
-            propPortId, pLowerPort );
-
         // destination ip addr
         oNewCfg.CopyProp(
-            propIpAddr, pLowerPort );
-
-        oNewCfg.CopyProp(
-            propDestTcpPort, pLowerPort );
+            propConnParams, pLowerPort );
 
         oNewCfg.SetPointer(
-            propIoMgr, pMgr );
+            propIoMgr, GetIoMgr() );
 
         oNewCfg.SetPointer(
             propDrvPtr, this );

@@ -83,11 +83,11 @@ class IInterfaceEvents
     virtual gint32 OnRmtModEvent(
         EnumEventId iEvent,
         const std::string& strModule,
-        const std::string& strIpAddr ) = 0;
+        IConfigDb* pEvtCtx ) = 0;
 
     virtual gint32 OnRmtSvrEvent(
         EnumEventId iEvent,
-        const std::string& strIpAddr,
+        IConfigDb* pEvtCtx,
         HANDLE hPort ) = 0;
 
     virtual gint32 OnAdminEvent(
@@ -238,7 +238,7 @@ class CInterfaceState : public IInterfaceState
 
     gint32 CopyProp( gint32 iProp, CObjBase* pObj )
     {
-        CStdRMutex oStatLock( GetLock() );
+        // CStdRMutex oStatLock( GetLock() );
         CCfgOpenerObj oCfg( this );
         return oCfg.CopyProp( iProp, pObj );
     }
@@ -275,12 +275,12 @@ class CInterfaceState : public IInterfaceState
     virtual gint32 OnRmtModEvent(
         EnumEventId iEvent,
         const std::string& strModule,
-        const std::string& strIpAddr )
+        IConfigDb* pEvtCtx )
     {  return -ENOTSUP; }
 
     virtual gint32 OnRmtSvrEvent(
         EnumEventId iEvent,
-        const std::string& strIpAddr,
+        IConfigDb* pEvtCtx,
         HANDLE hPort )
     {  return -ENOTSUP; }
 
@@ -323,11 +323,21 @@ class CRemoteProxyState : public CLocalProxyState
     virtual gint32 OnRmtModEvent(
         EnumEventId iEvent,
         const std::string& strModule,
-        const std::string& strIpAddr );
+        IConfigDb* pEvtCtx );
 
     virtual gint32 OnRmtSvrEvent(
         EnumEventId iEvent,
-        const std::string& strIpAddr,
+        IConfigDb* pEvtCtx,
+        HANDLE hPort );
+
+    virtual gint32 SetupOpenPortParams(
+        IConfigDb* pCfg );
+
+    virtual gint32 OpenPort(
+        IEventSink* pCallback );
+
+    virtual gint32 OnPortEvent(
+        EnumEventId iEvent,
         HANDLE hPort );
 };
 
@@ -360,8 +370,15 @@ class CTcpBdgePrxyState : public CLocalProxyState
         SetClassId( clsid( CTcpBdgePrxyState ) );    
     }
     
-    gint32 SetupOpenPortParams(
+    virtual gint32 SetupOpenPortParams(
         IConfigDb* pCfg );
+
+    virtual gint32 OpenPort(
+        IEventSink* pCallback );
+
+    virtual gint32 OnPortEvent(
+        EnumEventId iEvent,
+        HANDLE hPort );
 };
 
 class CUnixSockStmState : public CLocalProxyState

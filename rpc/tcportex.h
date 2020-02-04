@@ -454,8 +454,7 @@ class CRpcConnSock :
 
     gint32 Start_bh();
 
-    gint32 ActiveConnect(
-        const std::string& strIpAddr );
+    gint32 ActiveConnect();
 
     virtual gint32 DispatchSockEvent(
         GIOCondition );
@@ -465,12 +464,7 @@ class CRpcConnSock :
 
     virtual gint32 OnSendReady();
     virtual gint32 OnReceive();
-    virtual gint32 OnConnected()
-    {
-        // we will use StartTask's OnConnected
-        // instead of this one
-        return -ENOTSUP;
-    }
+    virtual gint32 OnConnected();
 
     gint32 OnDisconnected();
 
@@ -676,6 +670,7 @@ class CTcpStreamPdo2 : public CPort
     // yet. Note that, within the PostStart, the
     // eventPortStarted is not sent yet
     virtual gint32 PostStart( IRP* pIrp );
+    virtual gint32 OnPortReady( IRP* pIrp );
     virtual gint32 PreStop( IRP* pIrp );
     virtual gint32 Stop( IRP* pIrp );
 
@@ -690,4 +685,7 @@ class CTcpStreamPdo2 : public CPort
         STREAM_SOCK_EVENT& sse );
 
     gint32 OnDisconnected();
+
+    void OnPortStartFailed(
+        IRP* pIrp, gint32 ret );
 };

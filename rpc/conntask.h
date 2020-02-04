@@ -51,7 +51,7 @@ class CStmSockConnectTaskBase
     gint32 m_iTimerId;
     sem_t  m_semInitSync;
 
-    // eventStart from Pdo's PreStart
+    // eventStart from Pdo's PostStart
     gint32 OnStart( IRP* pIrp )
     {
         if( pIrp == nullptr ||
@@ -145,22 +145,13 @@ class CStmSockConnectTaskBase
         if( ERROR( ret ) )
             return -ETIMEDOUT;
 
-        CCfgOpener oCfg( ( IConfigDb* )m_pCtx );
-
-        std::string strIpAddr;
-        ret = oCfg.GetStrProp(
-            propIpAddr, strIpAddr );
-
-        if( ERROR( ret ) )
-            return ret;
-        
         SockClass* pSock = nullptr;
         ret = GetSockPtr( pSock );
         if( ERROR( ret ) )
             return ret;
 
         AddConnTimer();
-        ret = pSock->ActiveConnect( strIpAddr );
+        ret = pSock->ActiveConnect();
         if( ret != STATUS_PENDING )
         {
             RemoveConnTimer();
@@ -168,6 +159,7 @@ class CStmSockConnectTaskBase
 
         return ret;
     }
+
     gint32 SetSockState(
         EnumSockState iState )
     {
@@ -619,12 +611,6 @@ class CStmSockConnectTaskBase
 
             ret = oCfg.SetIntProp(
                 propRetries, iRetries );
-
-            if( ERROR( ret ) )
-                break;
-
-            ret = oCfg.CopyProp(
-                propIpAddr, pSock );    
 
             if( ERROR( ret ) )
                 break;

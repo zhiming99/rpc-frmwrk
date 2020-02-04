@@ -53,8 +53,6 @@ CReqBuilder::CReqBuilder(
                 break;
         }
 
-        CopyProp( propIpAddr, pIf );
-
         CIoManager* pMgr = pIf->GetIoMgr();
         string strModName = pMgr->GetModName();
 
@@ -87,8 +85,6 @@ CReqBuilder::CReqBuilder(
         CopyProp( propIfName, pCfg );
         CopyProp( propObjPath, pCfg );
         CopyProp( propDestDBusName, pCfg );
-
-        CopyProp( propIpAddr, pCfg );
         CopyProp( propSrcDBusName, pCfg );
 
         CopyProp( propMethodName, pCfg );
@@ -205,13 +201,6 @@ gint32 CReqBuilder::SetReturnValue(
 {
     return SetIntProp(
         propReturnValue, iRet );
-}
-
-gint32 CReqBuilder::SetIpAddr(
-    const string& strIpAddr, bool bSrc )
-{
-    EnumPropId iProp = propIpAddr;
-    return SetStrProp( iProp, strIpAddr );
 }
 
 gint32 CReqBuilder::GetCallOptions(
@@ -351,13 +340,6 @@ gint32 CReqOpener::GetReturnValue(
     guint32 dwRet = ( guint32 ) iRet;
     return GetIntProp(
         propReturnValue, dwRet );
-}
-
-gint32 CReqOpener::GetIpAddr(
-    string& strIpAddr, bool bSrc ) const
-{
-    gint32 iProp = propIpAddr;
-    return GetStrProp( iProp, strIpAddr );
 }
 
 bool CReqOpener::HasReply() const

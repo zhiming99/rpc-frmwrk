@@ -161,14 +161,30 @@
             "PortDriver"    : "RpcTcpBusDriver",
             "InternalClass" : "CTcpRpcBusPort",
             "Parameters" :
-            {
-                "AddrFormat" : "ipv4",
-                "Protocol" : "native",
-                "PortNumber": "4132",
-                "BindAddr" : "0.0.0.0",
-                "comment"  : "Change 'PdoClass' to 'TcpStreamPdo' when in a trusted and stable environment",
-                "PdoClass" : "TcpStreamPdo2"
-            }
+            [
+                {
+                    "AddrFormat" : "ipv4",
+                    "Protocol" : "native",
+                    "PortNumber": "4132",
+                    "BindAddr" : "127.0.0.1",
+                    "comment"  : "inter-changable with 'TcpStreamPdo' when in a trusted and stable environment",
+                    "PdoClass" : "TcpStreamPdo2",
+                    "Compression" : "true",
+                    "EnableWS":  "false",
+                    "EnableSSL": "false"
+                },
+                {
+                    "AddrFormat" : "ipv4",
+                    "Protocol" : "native",
+                    "PortNumber": "4132",
+                    "BindAddr" : "192.168.3.13",
+                    "PdoClass" : "TcpStreamPdo2",
+                    "Compression" : "true",
+                    "EnableWS":  "true",
+                    "EnableSSL": "true",
+                    "ConnRecover" : "false"
+                }
+            ]
         },
         {
             "PortType"      : "Pdo",

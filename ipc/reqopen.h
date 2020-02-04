@@ -57,8 +57,6 @@ class CReqOpener : public CParamList
     gint32 GetTimeoutSec( guint32& dwTimeoutSec) const; 
     gint32 GetCallFlags( guint32& dwFlags ) const; 
     gint32 GetReturnValue( gint32& iRet ) const;
-    gint32 GetIpAddr( std::string& strIpAddr,
-        bool bSrc ) const;
     gint32 GetTaskId( guint64& dwTaskid ) const;
 
     bool HasReply() const;
@@ -86,8 +84,6 @@ class CReqBuilder : public CParamList
     gint32 SetTimeoutSec( guint32 dwTimeoutSec); 
     gint32 SetCallFlags( guint32 dwFlags );
     gint32 SetReturnValue( gint32 iRet );
-    gint32 SetIpAddr(
-        const std::string& strIpAddr, bool bSrc );
     gint32 SetTaskId( guint64 dwTaskid );
 };
 

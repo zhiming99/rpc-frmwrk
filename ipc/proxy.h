@@ -367,10 +367,10 @@ class CRpcBaseOperations :
         EnumEventId iEvent,
         const std::string& strModule );
 
-    gint32 DoRmtModEvent(
+    virtual gint32 DoRmtModEvent(
         EnumEventId iEvent,
         const std::string& strModule,
-        const std::string& strIpAddr );
+        IConfigDb* pEvtCtx );
 
     virtual gint32 SetupReqIrp( IRP* pIrp,
         IConfigDb* pReqCall,
@@ -471,11 +471,11 @@ class CRpcInterfaceBase :
     virtual gint32 OnRmtModEvent(
         EnumEventId iEvent,
         const std::string& strModule,
-        const std::string& strIpAddr );
+        IConfigDb* pEvtCtx );
 
     virtual gint32 OnRmtSvrEvent(
         EnumEventId iEvent,
-        const std::string& strIpAddr,
+        IConfigDb* pEvtCtx,
         HANDLE hPort );
 
     virtual gint32 OnAdminEvent(
@@ -624,7 +624,8 @@ class CRpcServices :
     FUNC_MAP* GetFuncMap(
         EnumClsid iIfId = clsid( Invalid ) );
 
-    gint32 RestartListening( EnumIfState iState );
+    virtual gint32 RestartListening(
+        EnumIfState iState ) = 0;
 
     virtual gint32 RebuildMatches();
 
@@ -727,6 +728,23 @@ class CRpcServices :
         guint32 dwOffset,               // [in]
         guint32 dwSize,                 // [in]
         IEventSink* pCallback = nullptr ) = 0;
+
+    // caller provide the following info in the
+    //
+    // pDataDesc: at least file name. and
+    // operation commands if necessary
+    //
+    // pDataDesc, before going into the port
+    // stack, includes information for
+    // DBusMessage:
+    //
+    // propIfName
+    // propObjPath
+    // propDestDBusName
+    // propSrcDBusName
+    //
+    // They are provided by the underlying
+    // interface support methods.
 
     virtual gint32 FetchData(
         IConfigDb* pDataDesc,           // [in, out]
@@ -834,6 +852,11 @@ class CRpcServices :
         EnumEventId iEvent,
         const std::string& strModule );
 
+    virtual gint32 DoRmtModEvent(
+        EnumEventId iEvent,
+        const std::string& strModule,
+        IConfigDb* pEvtCtx );
+
     virtual gint32 OnPostStop(
         IEventSink* pCallback );
 
@@ -935,6 +958,9 @@ class CInterfaceProxy :
 
     gint32 PauseResume_Proxy(
         const std::string& strMethod );
+
+    gint32 RestartListening(
+        EnumIfState iStateOld  );
 
     public:
 
@@ -1221,6 +1247,9 @@ class CInterfaceServer :
 
     gint32 PauseResume_Server(
         IEventSink* pCallback, bool bPause );
+
+    virtual gint32 RestartListening(
+        EnumIfState iState );
 
     public:
 

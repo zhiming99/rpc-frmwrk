@@ -91,41 +91,11 @@ struct IRpcReqProxyAsync
     // pCallback's propRespPtr.
 
     virtual gint32 ForwardRequest(
-        const std::string& strDestIp,   // [ in ]
+        IConfigDb* pReqCtx,
         DBusMessage* pReqMsg,           // [ in ]
         DMsgPtr& pRespMsg,              // [ out ]
         IEventSink* pCallback ) = 0;
 
-    // client provide the following info in the
-    //
-    // pDataDesc: at least file name. and
-    // operation commands if necessary
-    //
-    // pDataDesc, before going into the port
-    // stack, includes information for
-    // DBusMessage:
-    //
-    // propIfName
-    // propObjPath
-    // propDestDBusName
-    // propSrcDBusName
-    //
-    // They are provided by the underlying
-    // interface support methods.
-    //
-    /*virtual gint32 SendData(
-        IConfigDb* pDataDesc,           // [in]
-        gint32 fd,                      // [in]
-        guint32 dwOffset,               // [in]
-        guint32 dwSize,                 // [in]
-        IEventSink* pCallback ) = 0;
-
-    virtual gint32 FetchData(
-        IConfigDb* pDataDesc,           // [in, out]
-        gint32& fd,                     // [out]
-        guint32& dwOffset,              // [out]
-        guint32& dwSize,                // [out]
-        IEventSink* pCallback ) = 0; */
 };
 
 class IRpcReqServerAsync
@@ -171,7 +141,7 @@ class IRpcEventRelay
     // the process
 
     virtual gint32 ForwardEvent(
-        const std::string& strSrcIp,
+        IConfigDb* pEvtCtx,
         DBusMessage* pEventMsg,
         IEventSink* pCallback ) = 0;
 
@@ -192,7 +162,7 @@ class CRegisteredObject
     gint32 SetProperties(
         const std::string& strSrcDBusName,
         const std::string& strSrcUniqName,
-        const std::string& strIpAddr )
+        guint32 dwPortId )
     {
         CCfgOpener oCfg( this );
 
@@ -202,18 +172,18 @@ class CRegisteredObject
         oCfg.SetStrProp(
             propSrcDBusName, strSrcDBusName );
 
-        oCfg.SetStrProp(
-            propIpAddr, strIpAddr );
+        oCfg.SetIntProp(
+            propPrxyPortId, dwPortId );
 
         return 0;
     }
 
-    std::string GetIpAddr()
+    guint32 GetPortId()
     {
-        std::string strIpAddr;
         CCfgOpener oCfg( this );
-        strIpAddr = oCfg[ propIpAddr ];
-        return strIpAddr;
+        guint32 dwPortId =
+            oCfg[ propPrxyPortId ];
+        return dwPortId;
     }
 
     std::string GetUniqName()
@@ -289,19 +259,6 @@ class CRpcInterfaceServer :
     protected:
     CRpcRouter  *m_pParent;
 
-    virtual gint32 CheckReqToFwrd(
-        CRpcRouter* pRouter,
-        const std::string& strIpAddr,
-        DMsgPtr& pMsg,
-        MatchPtr& pMatchHit ) = 0;
-
-    virtual gint32 CheckSendDataToFwrd(
-        IConfigDb* pDataDesc ) = 0;
-
-    inline gint32 CheckFetchDatToFwrd(
-        IConfigDb* pDataDesc )
-    { return CheckSendDataToFwrd( pDataDesc ); }
-
     virtual gint32 BuildBufForIrpFwrdEvt(
         BufPtr& pBuf,
         IConfigDb* pReqCall ) = 0;
@@ -313,14 +270,6 @@ class CRpcInterfaceServer :
 
     virtual gint32 OnKeepAliveRelay(
         IEventSink* pInvokeTask ) = 0;
-
-    // CRpcInterfaceServer
-    gint32 SendFetch_Server(
-        IConfigDb* pDataDesc,           // [in, out]
-        gint32& fd,                     // [out]
-        guint32& dwOffset,              // [in,out]
-        guint32& dwSize,                // [in,out]
-        IEventSink* pCallback );
 
     gint32 ValidateRequest_SendData(
         DBusMessage* pReqMsg,
@@ -340,12 +289,6 @@ class CRpcInterfaceServer :
         DBusMessage* pReqMsg,
         IEventSink* pCallback );
 
-    gint32 ForwardRequest(
-        const std::string& strIpAddr,
-        DBusMessage* pFwdrMsg,
-        DMsgPtr& pRespMsg,
-        IEventSink* pCallback );
-
     CRpcRouter* GetParent() const
     { return m_pParent; }
 
@@ -361,70 +304,6 @@ class CRpcInterfaceServer :
     virtual gint32 OnKeepAlive(
         IEventSink* pInvokeTask,
         EnumKAPhase bOrigin );
-
-    // CRpcInterfaceServer
-    virtual gint32 SendData_Server(
-        IConfigDb* pDataDesc,           // [in]
-        gint32 fd,                      // [in]
-        guint32 dwOffset,               // [in]
-        guint32 dwSize,                 // [in]
-        IEventSink* pCallback )
-    {
-        return SendFetch_Server( pDataDesc,
-            fd, dwOffset, dwSize, pCallback );
-    }
-
-    // CRpcInterfaceServer
-    virtual gint32 FetchData_Server(
-        IConfigDb* pDataDesc,           // [in, out]
-        gint32& fd,                     // [out]
-        guint32& dwOffset,              // [in,out]
-        guint32& dwSize,                // [in,out]
-        IEventSink* pCallback )
-    {
-        return SendFetch_Server( pDataDesc,
-            fd, dwOffset, dwSize, pCallback );
-    }
-
-    // CRpcInterfaceServer
-    virtual gint32 SendData(
-        IConfigDb* pDataDesc,           // [in]
-        gint32 fd,                      // [in]
-        guint32 dwOffset,               // [in]
-        guint32 dwSize,                 // [in]
-        IEventSink* pCallback = nullptr )
-    {
-        if( pDataDesc == nullptr )
-            return -EINVAL;
-
-        CCfgOpener oCfg( pDataDesc );
-
-        oCfg[ propMethodName ] =
-            std::string( SYS_METHOD_SENDDATA );
-
-        return SendData_Server( pDataDesc,
-            fd, dwOffset, dwSize, pCallback );
-    }
-
-    // CRpcInterfaceServer
-    virtual gint32 FetchData(
-        IConfigDb* pDataDesc,           // [in, out]
-        gint32& fd,                     // [out]
-        guint32& dwOffset,              // [in,out]
-        guint32& dwSize,                // [in,out]
-        IEventSink* pCallback = nullptr )
-    {
-        if( pDataDesc == nullptr )
-            return -EINVAL;
-
-        CCfgOpener oCfg( pDataDesc );
-
-        oCfg[ propMethodName ] =
-            std::string( SYS_METHOD_FETCHDATA );
-
-        return FetchData_Server( pDataDesc,
-            fd, dwOffset, dwSize, pCallback );
-    }
 };
 
 class CRpcReqForwarder :
@@ -435,7 +314,7 @@ class CRpcReqForwarder :
     // the cfgptr contains the following
     // properties
     //
-    // propIpAddr
+    // propPortId
     // propSrcUniqName
     // propSrcDBusName
     std::map< RegObjPtr, guint32 > m_mapRefCount;
@@ -448,9 +327,6 @@ class CRpcReqForwarder :
         BufPtr& pBuf,
         IConfigDb* pReqCall );
 
-    virtual gint32 CheckSendDataToFwrd(
-        IConfigDb* pDataDesc );
-
     virtual gint32 OnKeepAliveRelay(
         IEventSink* pInvokeTask );
 
@@ -460,11 +336,11 @@ class CRpcReqForwarder :
         bool& bEnable );
 
     gint32 OnRmtSvrOnline(
-        const std::string& strIpAddr,
+        IConfigDb* pEvtCtx,
         HANDLE hPort );
 
     gint32 OnRmtSvrOffline(
-        const std::string& strIpAddr,
+        IConfigDb* pEvtCtx,
         HANDLE hPort );
 
     gint32 BuildBufForIrpRmtSvrEvent(
@@ -472,7 +348,7 @@ class CRpcReqForwarder :
 
     virtual gint32 OnRmtSvrEvent(
         EnumEventId iEvent,
-        const std::string& strIpAddr,
+        IConfigDb* pEvtCtx,
         HANDLE hPort );
 
     virtual gint32 BuildBufForIrp(
@@ -493,7 +369,7 @@ class CRpcReqForwarder :
 
     gint32 StopBridgeProxy(
         IEventSink* pCallback,
-        const std::string& strIpAddr,
+        guint32 dwPortId,
         const std::string& strSrcUniqName,
         const std::string& strSrcDBusName );
 
@@ -505,6 +381,21 @@ class CRpcReqForwarder :
     gint32 BuildKeepAliveMessage(
         IConfigDb* pCfg, DMsgPtr& pkaMsg );
 
+    // CRpcInterfaceServer
+    gint32 SendFetch_Server(
+        IConfigDb* pDataDesc,           // [in, out]
+        gint32& fd,                     // [out]
+        guint32& dwOffset,              // [in,out]
+        guint32& dwSize,                // [in,out]
+        IEventSink* pCallback );
+
+    bool SupportIid( EnumClsid iIfId ) const
+    {
+        if( iIfId == iid( IStream ) )
+            return true;
+        return false;
+    }
+
     public:
 
     typedef CRpcInterfaceServer super;
@@ -515,25 +406,25 @@ class CRpcReqForwarder :
     gint32 InitUserFuncs();
 
     gint32 AddRefCount(
-        const std::string& strIpAddr,
+        guint32 dwPortId,
         const std::string& strSrcUniqName,
         const std::string& strSrcDBusName );
 
     gint32 DecRefCount(
-        const std::string& strIpAddr,
+        guint32 dwPortId,
         const std::string& strSrcUniqName,
         const std::string& strSrcDBusName );
 
-    gint32 ClearRefCountByIpAddr(
-        const std::string& strIpAddr,
+    gint32 ClearRefCountByPortId(
+        guint32 dwPortId,
         std::vector< std::string >& vecUniqNames );
 
     gint32 ClearRefCountByUniqName(
         const std::string& strUniqName,
-        std::set< std::string >& setIpAddrs );
+        std::set< guint32 >& setPortIds );
 
-    gint32 GetRefCountByIpAddr(
-        const std::string& strIpAddr );
+    gint32 GetRefCountByPortId(
+        guint32 dwPortId );
 
     gint32 GetRefCountByUniqName(
         const std::string& strUniqName );
@@ -550,7 +441,7 @@ class CRpcReqForwarder :
     //
     // make a connection to the remote target
     //
-    // propIpAddr: the remote address the
+    // propConnParams: the remote address the
     // connection will be made
     //
     // propSrcDBusName: the local source who send
@@ -570,7 +461,7 @@ class CRpcReqForwarder :
 
     // mandatory properties within the pMatch
     //
-    // propIpAddr: address of the remote server
+    // propRouterPath: address of the remote server
     // propIfName: interface name
     // propObjPath: object path
     // propDestDBusName: destination dbus name
@@ -584,27 +475,37 @@ class CRpcReqForwarder :
         IMessageMatch* pMatch );
 
     virtual gint32 ForwardEvent(
-        const std::string& strSrcIp,
+        IConfigDb* pEvtCtx,
         DBusMessage* pEventMsg,
         IEventSink* pCallback );
 
-    virtual gint32 CheckReqToFwrd(
-        CRpcRouter* pRouter,
-        const std::string& strIpAddr,
+    gint32 CheckReqToFwrd(
+        IConfigDb* pReqCtx,
         DMsgPtr& pMsg,
         MatchPtr& pMatchHit );
-
-    gint32 SendData_Server(
-        IConfigDb* pDataDesc,           // [in]
-        gint32 fd,                      // [in]
-        guint32 dwOffset,               // [in]
-        guint32 dwSize,                 // [in]
-        IEventSink* pCallback );
 
     // methods of CRpcBaseOperations
     virtual gint32 OnModEvent(
         EnumEventId iEvent,
         const std::string& strModule );
+
+    gint32 ForwardRequest(
+        IConfigDb* pReqCtx,
+        DBusMessage* pFwdrMsg,
+        DMsgPtr& pRespMsg,
+        IEventSink* pCallback );
+
+    virtual gint32 FetchData_Server(
+        IConfigDb* pDataDesc,           // [in]
+        gint32 fd,                      // [in]
+        guint32 dwOffset,               // [in]
+        guint32 dwSize,                 // [in]
+        IEventSink* pCallback )
+    {
+        return SendFetch_Server( pDataDesc,
+            fd, dwOffset, dwSize, pCallback );
+    }
+
 };
 
 class CRpcRfpForwardEventTask
@@ -618,6 +519,22 @@ class CRpcRfpForwardEventTask
         SetClassId( clsid( CRpcRfpForwardEventTask ) );
     }
     virtual gint32 RunTask();
+};
+
+class CRfpModEventRespTask :
+    public CIfInterceptTaskProxy
+{
+    public:
+    typedef CIfInterceptTaskProxy super;
+
+    CRfpModEventRespTask ( const IConfigDb* pCfg )
+        : super( pCfg )
+    { SetClassId( clsid( CRfpModEventRespTask  ) ); }
+
+    virtual gint32 RunTask()
+    { return STATUS_PENDING; }
+
+    virtual gint32 OnTaskComplete( gint32 iRetVal );
 };
 
 class CRpcReqForwarderProxy :
@@ -676,13 +593,13 @@ class CRpcReqForwarderProxy :
     { return -ENOTSUP; }
 
     virtual gint32 ForwardRequest(
-        const std::string& strDestIp,   // [ in ]
+        IConfigDb* pReqCtx,
         DBusMessage* pReqMsg,           // [ in ]
         DMsgPtr& pRespMsg,              // [ out ]
         IEventSink* pCallback );
 
     virtual gint32 ForwardEvent(
-        const std::string& strSrcIp,
+        IConfigDb* pEvtCtx,
         DBusMessage* pEventMsg,
         IEventSink* pCallback );
 
@@ -731,13 +648,17 @@ class CRpcReqForwarderProxy :
 
     gint32 OnRmtSvrEvent(
         EnumEventId iEvent,
-        const std::string& strIpAddr,
+        IConfigDb* pEvtCtx,
         HANDLE hPort );
 
     protected:
 
+    gint32 OnModEvent(
+        EnumEventId iEvent,
+        const std::string& strModule );
+
     gint32 OnRmtSvrOffline(
-        const std::string& strIpAddr,
+        IConfigDb* pEvtCtx,
         HANDLE hPort );
 
     gint32 OnKeepAliveOrig(
@@ -835,10 +756,6 @@ class CRpcTcpBridge :
             pIrp, pReqCall, pCallback );
     }
 
-    gint32 SetupReqIrpOnProgress( IRP* pIrp,
-        IConfigDb* pReqCall,
-        IEventSink* pCallback );
-
     gint32 OpenStream_Server(
         IEventSink* pCallback,
         gint32 iPeerStm,
@@ -847,17 +764,6 @@ class CRpcTcpBridge :
     gint32 CloseStream_Server(
         IEventSink* pCallback,
         gint32 iStreamId );
-
-    gint32 CheckSendDataToRelay(
-        IConfigDb* pDataDesc );
-
-    // CRpcTcpBridge
-    gint32 SendFetch_Server(
-        IConfigDb* pDataDesc,           // [in, out]
-        gint32& fd,                     // [out]
-        guint32& dwOffset,              // [in,out]
-        guint32& dwSize,                // [in,out]
-        IEventSink* pCallback );
 
     protected:
     virtual gint32 SetupReqIrpFwrdEvt(
@@ -902,18 +808,14 @@ class CRpcTcpBridge :
         IMessageMatch* pMatch );
 
     virtual gint32 ForwardEvent(
-        const std::string& strSrcIp,
+        IConfigDb* pEvtCtx,
         DBusMessage* pEventMsg,
         IEventSink* pCallback );
 
-    virtual gint32 CheckReqToFwrd(
-        CRpcRouter* pRouter,
-        const std::string& strIpAddr,
+    virtual gint32 CheckReqToRelay(
+        IConfigDb* pReqCtx,
         DMsgPtr& pMsg,
         MatchPtr& pMatchHit );
-
-    virtual gint32 CheckSendDataToFwrd(
-        IConfigDb* pDataDesc );
 
     virtual gint32 InitUserFuncs();
 
@@ -945,35 +847,6 @@ class CRpcTcpBridge :
     virtual gint32 SetResponse(
         IEventSink* pTask,
         CfgPtr& pRespData );
-
-    // to send out a progress hint
-    gint32 OnProgressNotify(
-        guint32 dwProgress,
-        guint64 iTaskId );
-
-    // CRpcTcpBridge
-    virtual gint32 SendData_Server(
-        IConfigDb* pDataDesc,           // [in]
-        gint32 fd,                      // [in]
-        guint32 dwOffset,               // [in]
-        guint32 dwSize,                 // [in]
-        IEventSink* pCallback )
-    {
-        return SendFetch_Server( pDataDesc,
-            fd, dwOffset, dwSize, pCallback );
-    }
-
-    // CRpcTcpBridge
-    virtual gint32 FetchData_Server(
-        IConfigDb* pDataDesc,           // [in, out]
-        gint32& fd,                     // [out]
-        guint32& dwOffset,              // [in,out]
-        guint32& dwSize,                // [in,out]
-        IEventSink* pCallback )
-    {
-        return SendFetch_Server( pDataDesc,
-            fd, dwOffset, dwSize, pCallback );
-    }
 
     virtual gint32 OnPreStart(
         IEventSink* pCallback )
@@ -1026,6 +899,12 @@ class CRpcTcpBridge :
         return GetPortToSubmitShared(
             pCfg, pPort, bPdo );
     }
+
+    gint32 ForwardRequest(
+        IConfigDb* pReqCtx,
+        DBusMessage* pFwdrMsg,
+        DMsgPtr& pRespMsg,
+        IEventSink* pCallback );
 };
 
 class CRpcTcpBridgeProxy :
@@ -1111,13 +990,13 @@ class CRpcTcpBridgeProxy :
         IMessageMatch* pMatch );
 
     virtual gint32 ForwardRequest(
-        const std::string& strDestIp,   // [ in ]
+        IConfigDb* pReqCtx,
         DBusMessage* pReqMsg,           // [ in ]
         DMsgPtr& pRespMsg,              // [ out ]
         IEventSink* pCallback );
 
     virtual gint32 ForwardEvent(
-        const std::string& strSrcIp,
+        IConfigDb* pEvtCtx,
         DBusMessage* pEventMsg,
         IEventSink* pCallback );
 
@@ -1130,20 +1009,6 @@ class CRpcTcpBridgeProxy :
 
     virtual gint32 DoInvoke(
         DBusMessage* pEvtMsg,
-        IEventSink* pCallback );
-
-    virtual gint32 SendData_Proxy(
-        IConfigDb* pDataDesc,           // [in]
-        gint32 fd,                      // [in]
-        guint32 dwOffset,               // [in]
-        guint32 dwSize,                 // [in]
-        IEventSink* pCallback );
-
-    virtual gint32 FetchData_Proxy(
-        IConfigDb* pDataDesc,           // [in, out]
-        gint32& fd,                     // [out]
-        guint32& dwOffset,              // [out]
-        guint32& dwSize,                // [out]
         IEventSink* pCallback );
 
     // bridge and stream specific methods
@@ -1166,21 +1031,12 @@ class CRpcTcpBridgeProxy :
 
     virtual gint32 InitUserFuncs();
 
-    gint32 OnRmtModOffline( IEventSink* pCallback,
-        const std::string& strModName );
-
     gint32 OnInvalidStreamId(
         IEventSink* pCallback,
         gint32 iStreamId,
         gint32 iPeerStreamId,
         guint32 dwSeqNo,
         guint32 dwProtocol );
-
-    // to respond to a progress hint notification from
-    // server
-    gint32 OnProgressNotify(
-        guint32 dwProgress,
-        guint64 iTaskId );
 
     virtual gint32 OnPostStart(
         IEventSink* pContext );
@@ -1241,7 +1097,7 @@ class CRpcRouter :
 {
     // the key is the peer ip-addr and the value is the
     // pair of the tcp bridge and tcp bridge proxy
-    std::map< std::string, InterfPtr > m_mapIp2BdgeProxies;
+    std::map< guint32, InterfPtr > m_mapPid2BdgeProxies;
 
     // the key is the peer ip-addr plus peer port-number
     std::map< guint32, InterfPtr > m_mapPortId2Bdge;
@@ -1279,9 +1135,6 @@ class CRpcRouter :
     gint32 RebuildMatches();
 
     public:
-
-    typedef std::pair< std::multimap<MatchPtr, std::string>::iterator,
-        std::multimap<MatchPtr, std::string>::iterator> MIPAIR;
 
     typedef CAggInterfaceServer super;
 
@@ -1326,8 +1179,8 @@ class CRpcRouter :
     gint32 RemoveLocalMatch(
         IMessageMatch* pMatch );
 
-    gint32 RemoveLocalMatchByAddr(
-        const std::string& strIpAddr );
+    gint32 RemoveLocalMatchByPortId(
+        guint32 dwPortId );
 
     gint32 RemoveLocalMatchByUniqName(
         const std::string& strUniqName,
@@ -1350,7 +1203,15 @@ class CRpcRouter :
         InterfPtr& pIf );
 
     gint32 GetBridgeProxy(
-        const std::string& strIpAddr,
+        const std::string& strPath,
+        InterfPtr& pIf );
+
+    gint32 GetBridgeProxy(
+        const IConfigDb* pConnParams,
+        InterfPtr& pIf );
+
+    gint32 GetBridgeProxy(
+        guint32 dwPortId,
         InterfPtr& pIf );
 
     inline gint32 GetReqFwdr(
@@ -1383,28 +1244,37 @@ class CRpcRouter :
 
     // filter the request with the remote side
     // match table. The req cannot make to the
-    // destination if it failes the tests through
+    // destination if it failes the tests against
     // the match table
     gint32 CheckReqToRelay(
-        const std::string &strIpAddr,
+        IConfigDb* pReqCtx,
         DMsgPtr& pMsg,
         MatchPtr& pMatchHit );
 
     // filter the request with the local side
     // match table. The req cannot make to the
-    // destination if it failes the tests through
+    // destination if it failes the tests against
     // the match table
     gint32 CheckReqToFwrd(
-        const std::string &strIpAddr,
+        IConfigDb* pReqCtx,
         DMsgPtr& pMsg,
         MatchPtr& pMatch );
 
-    // filter the event with the local side
-    // match table. The req cannot make to the
-    // destination if it failes the tests through
+    // filter the event with the remote side
+    // match table. The event cannot make to the
+    // destination if it failes the tests against
     // the match table
     gint32 CheckEvtToFwrd(
-        const std::string& strIpAddr,
+        IConfigDb* pReqCtx,
+        DMsgPtr& pMsg,
+        std::set< guint32 >& setPortIds );
+
+    // filter the event with the local side
+    // match table. The event cannot make to the
+    // destination if it failes the tests against
+    // the match tables
+    gint32 CheckEvtToRelay(
+        IConfigDb* pEvtCtx,
         DMsgPtr& pMsg,
         std::vector< MatchPtr >& vecMatches );
 
@@ -1471,17 +1341,17 @@ class CRpcRouter :
 
     gint32 OnRmtSvrOnline(
         IEventSink* pCallback,
-        const std::string& strIpAddr,
+        IConfigDb* pEvtCtx,
         HANDLE hPort );
 
     gint32 OnRmtSvrOffline(
         IEventSink* pCallback,
-        const std::string& strIpAddr,
+        IConfigDb* pEvtCtx,
         HANDLE hPort );
 
     virtual gint32 OnRmtSvrEvent(
         EnumEventId iEvent,
-        const std::string& strIpAddr,
+        IConfigDb* pEvtCtx,
         HANDLE hPort );
 
     gint32 ForwardModOnOfflineEvent(
@@ -1602,13 +1472,8 @@ class CRpcRouter :
     virtual gint32 OnDBusEvent(
         EnumEventId iEvent )
     {
-        gint32 ret =
-            super::OnDBusEvent( iEvent );
-
-        if( ERROR( ret ) )
-            return ret;
-
-        return ForwardDBusEvent( iEvent );
+        // disconnection
+        return super::OnDBusEvent( iEvent );
     }
 
     // local match operation
@@ -1930,21 +1795,6 @@ class CReqFwdrForwardRequestTask :
     virtual gint32 OnTaskComplete( gint32 iRetVal );
 };
 
-class CReqFwdrSendDataTask :
-    public CReqFwdrForwardRequestTask
-{
-    public:
-    typedef CReqFwdrForwardRequestTask super;
-
-    CReqFwdrSendDataTask( const IConfigDb* pCfg )
-        : super( pCfg )
-    { SetClassId( clsid( CReqFwdrSendDataTask ) ); }
-
-    virtual gint32 RunTask();
-    virtual gint32 OnTaskComplete( gint32 iRetVal );
-    gint32 OnServiceComplete( gint32 iRetVal );
-};
-
 class CReqFwdrFetchDataTask :
     public CIfInterceptTask
 {
@@ -1976,224 +1826,6 @@ class CBdgeProxyReadWriteComplete:
     virtual gint32 OnIrpComplete( PIRP pIrp );
     virtual gint32 RunTask()
     { return STATUS_PENDING; }
-};
-
-
-// SEND_DATA tasks on the proxy side
-// the first task in SendData_Proxy's call
-class CBdgeProxyOpenStreamTask :
-    public CIfInterceptTask
-{
-    public:
-    typedef CIfInterceptTask super;
-    // parameters:
-    // propIfPtr
-    // propEventSink: the pointer to the CReqFwdrSendDataTask to intercept
-    // propIoMgr
-    // propReqPtr: contains the SendData_Proxy's input parameters
-    CBdgeProxyOpenStreamTask( const IConfigDb* pCfg )
-        : super( pCfg )
-    { SetClassId( clsid( CBdgeProxyOpenStreamTask ) ); }
-
-    virtual gint32 RunTask();
-    virtual gint32 OnTaskComplete( gint32 iRetVal );
-    gint32 EmitSendDataRequest( gint32 iStmId );
-};
-
-#define TMP_FILE_PREFIX "/tmp/SendData-"
-
-class CBdgeReadWriteStreamTask :
-    public CIfInterceptTask
-{
-
-    protected:
-    guint32 m_dwSize;
-    guint32 m_dwCurSize;
-    guint32 m_dwCurOffset;
-    guint32 m_dwOffset;
-    gint32  m_iFd;
-    gint32  m_iStmId;
-    CfgPtr  m_pDataDesc;
-    std::string  m_strFile;
-    bool    m_bTempFile;
-
-    public:
-    typedef CIfInterceptTask super;
-
-    CBdgeReadWriteStreamTask( const IConfigDb* pCfg )
-        :super( pCfg ),
-        m_dwSize( 0 ),
-        m_dwCurSize( 0 ),
-        m_dwCurOffset( 0 ),
-        m_dwOffset( 0 ),
-        m_iFd( -1 ),
-        m_iStmId( -1 ),
-        m_bTempFile( false )
-    {}
-
-    ~CBdgeReadWriteStreamTask()
-    {
-        if( m_iFd >= 0 )
-            close( m_iFd );
-
-        if( m_bTempFile )
-            unlink( m_strFile.c_str() );
-    }
-
-    gint32 ReadStream( bool bFinished );
-    gint32 WriteStream( bool bFinished );
-    gint32 OpenTempFile();
-};
-
-class CBdgeProxyStartSendTask :
-    public CBdgeReadWriteStreamTask 
-{
-    typedef enum{
-        statInit,
-        statSendReq,
-        statWaitNotify,
-        statWriteStream,
-        statReadStream,
-        statWaitResp,
-        statComplete,
-
-    } EnumTaskStat;
-
-    EnumTaskStat m_dwTaskState;
-
-    ObjPtr  m_pCallback;
-
-    inline EnumTaskStat GetState() const
-    { return m_dwTaskState; }
-
-    inline void SetState( EnumTaskStat iState )
-    { m_dwTaskState = iState; }
-
-    public:
-    typedef CBdgeReadWriteStreamTask super;
-    // parameters:
-    // propIfPtr
-    // propEventSink: the pointer to the CReqFwdrSendDataTask to intercept
-    // propIoMgr
-    // propReqPtr: contains the SendData_Proxy's input parameters
-    CBdgeProxyStartSendTask( const IConfigDb* pCfg )
-        : super( pCfg ),
-        m_dwTaskState( statInit )
-    {SetClassId( clsid( CBdgeProxyStartSendTask  ) ); }
-
-    virtual gint32 RunTask();
-    virtual gint32 OnTaskComplete( gint32 iRetVal );
-
-    gint32 CloseStream();
-
-    virtual gint32 OnNotify( LONGWORD dwEvent,
-        LONGWORD dwParam1,
-        LONGWORD dwParam2,
-        LONGWORD* pData );
-
-    // to handle the completion from the stream
-    // read
-    virtual gint32 OnIrpComplete( PIRP pIrp );
-    gint32 OnTaskCompleteWithError( gint32 iRetVal );
-};
-
-class CBdgeStartRecvDataTask :
-    public CBdgeReadWriteStreamTask 
-{
-    typedef enum{
-        statInit,
-        statReadStream,
-        statRelayReq,
-        statComplete,
-
-    } EnumTaskStat;
-
-    ObjPtr  m_pCallback;
-    guint64 m_qwTaskId;
-    guint32 m_dwProgress;
-    EnumTaskStat m_dwTaskState;
-
-    // parameters:
-    // propIfPtr
-    // propEventSink: the pointer to the CReqFwdrSendDataTask to intercept
-    // propIoMgr
-    // propReqPtr: contains the SendData_Server's input parameters
-    // propTaskId:
-    public:
-    typedef CBdgeReadWriteStreamTask super;
-    CBdgeStartRecvDataTask( const IConfigDb* pCfg )
-        : super( pCfg ),
-        m_qwTaskId( 0 ),
-        m_dwProgress( 0 ),
-        m_dwTaskState( statInit )
-    { SetClassId( clsid( CBdgeStartRecvDataTask ) ); }
-
-    ~CBdgeStartRecvDataTask()
-    {
-        if( m_iFd != -1 )
-        {
-            close( m_iFd );
-            m_iFd = -1;
-        }
-    }
-
-    virtual gint32 RunTask();
-    virtual gint32 OnTaskComplete( gint32 iRetVal );
-    gint32 OnTaskCompleteWithError( gint32 iRetVal );
-
-    virtual gint32 OnIrpComplete( PIRP pIrp );
-    gint32 RelaySendData();
-    gint32 SendProgressNotify();
-    inline EnumTaskStat GetState() const
-    { return m_dwTaskState; }
-
-    inline void SetState( EnumTaskStat iState )
-    { m_dwTaskState = iState; }
-};
-
-class CBdgeStartFetchDataTask :
-    public CBdgeReadWriteStreamTask  
-{
-    protected:
-
-    typedef enum{
-        statInit,
-        statRelayReq,
-        statWriteStream,
-        statComplete,
-
-    } EnumTaskStat;
-
-    ObjPtr  m_pCallback;
-    guint64 m_qwTaskId;
-    guint32 m_dwProgress;
-    EnumTaskStat m_dwTaskState;
-
-    public:
-
-    typedef CBdgeReadWriteStreamTask super;
-    // parameters:
-    // propIfPtr
-    // propEventSink: the pointer to the CReqFwdrSendDataTask to intercept
-    // propIoMgr
-    // propReqPtr: contains the SendData_Server's input parameters
-    CBdgeStartFetchDataTask( const IConfigDb* pCfg )
-        : super( pCfg )
-    { SetClassId( clsid( CBdgeStartFetchDataTask ) ); }
-
-    virtual gint32 RunTask();
-    virtual gint32 OnTaskComplete( gint32 iRetVal );
-    virtual gint32 OnIrpComplete( PIRP pIrp );
-    gint32 StartSendbackData();
-
-    gint32 SendProgressNotify();
-
-    inline EnumTaskStat GetState() const
-    { return m_dwTaskState; }
-
-    inline void SetState( EnumTaskStat iState )
-    { m_dwTaskState = iState; }
-    gint32 RelayFetchData();
 };
 
 DECLARE_AGGREGATED_SERVER(

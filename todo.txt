@@ -113,7 +113,7 @@ DONE    To make it configurable whether or not to open the listening socket
 DONE    To make the bridge to map to ipaddr + port number
 DONE    To add the CRpcTcpFido's driver
 
-TODO    To make the code 64-bit compatible.
+DONE    To make the code 64-bit compatible.
     
 TODO    To implement the web socket session manager interface with the following methods
             . Login, Logout, Ping, PingTimeout( proxy ), SessionTimeout( server )

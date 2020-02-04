@@ -225,12 +225,6 @@ class CIfParallelTask
     gint32 GetPropertyType(
         gint32 iProp, gint32& iType ) const;
 
-    virtual gint32 OnNotify( LONGWORD event,
-        LONGWORD dwParam1,
-        LONGWORD dwParam2,
-        LONGWORD* pData )
-    { return STATUS_PENDING; }
-
     virtual bool IsMultiThreadSafe()
     { return true; }
 
@@ -591,11 +585,6 @@ class CIfIoReqTask
 
     virtual gint32 OnKeepAlive(
         guint32 dwContext );
-
-    virtual gint32 OnNotify( LONGWORD event,
-        LONGWORD dwParam1,
-        LONGWORD dwParam2,
-        LONGWORD* pData );
 
     gint32 FilterMessageSend( 
         IConfigDb* pReqMsg );

@@ -882,9 +882,6 @@ CRpcStreamSock::CRpcStreamSock(
         CCfgOpener oCfg(
             ( IConfigDb* )m_pCfg );
 
-        ret = oCfg.CopyProp(
-            propIpAddr, pCfg );
-
         gint32 iFd = -1;
         ret = oCfg.GetIntProp(
             propFd, ( guint32& )iFd );
@@ -893,15 +890,6 @@ CRpcStreamSock::CRpcStreamSock(
         if( SUCCEEDED( ret ) )
         {
             m_iFd = iFd;
-            oCfg.CopyProp(
-                propSrcTcpPort, pCfg );
-            ret = oCfg.CopyProp(
-                propDestTcpPort, pCfg );
-        }
-        else
-        {
-            ret = oCfg.CopyProp(
-                propDestTcpPort, pCfg );
         }
 
         if( ERROR( ret ) )
@@ -919,8 +907,7 @@ CRpcStreamSock::CRpcStreamSock(
     }
 }
 
-gint32 CRpcStreamSock::ActiveConnect(
-    const string& strIpAddr )
+gint32 CRpcStreamSock::ActiveConnect()
 {
     gint32 ret = 0;
     addrinfo *res = nullptr;
@@ -929,12 +916,25 @@ gint32 CRpcStreamSock::ActiveConnect(
         CCfgOpener oCfg(
             ( IConfigDb* )m_pCfg );
 
+        IConfigDb* pConnParams = nullptr;
+        ret = oCfg.GetPointer(
+            propConnParams, pConnParams );
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpener oConnParams( pConnParams );
+        string strIpAddr;
+        ret = oConnParams.GetStrProp(
+            propDestIpAddr, strIpAddr );
+        if( ERROR( ret ) )
+            break;
+
         guint32 dwPortNum = 0;
-        ret = oCfg.GetIntProp(
+        ret = oConnParams.GetIntProp(
             propDestTcpPort, dwPortNum );
 
         if( ERROR( ret ) )
-            dwPortNum = RPC_SVR_PORTNUM;
+            break;
 
         /*  Connect to the remote host. */
         ret = GetAddrInfo( strIpAddr,
@@ -995,10 +995,17 @@ gint32 CRpcStreamSock::Connect()
         CCfgOpener oCfg(
             ( IConfigDb* )m_pCfg );
 
-        string strIpAddr;
-        ret = oCfg.GetStrProp(
-            propIpAddr, strIpAddr );
+        IConfigDb* pConnParams = nullptr;
+        ret = oCfg.GetPointer(
+            propConnParams, pConnParams );
+        if( ERROR( ret ) )
+            break;
 
+        string strIpAddr;
+
+        CCfgOpener oConnParams( pConnParams );
+        ret = oConnParams.GetStrProp(
+            propDestIpAddr, strIpAddr );
         if( ERROR( ret ) )
             break;
 
@@ -1030,7 +1037,7 @@ gint32 CRpcStreamSock::Connect()
             break;
 
         /*  Connect to the remote host. */
-        ret = ActiveConnect( strIpAddr );
+        ret = ActiveConnect();
 
     }while( 0 );
 
@@ -1081,6 +1088,69 @@ gint32 CRpcStreamSock::Start()
 
     return ret;
 }
+
+gint32 CRpcStreamSock::OnConnected()
+{
+    gint32 ret = 0;
+
+    do{
+        CCfgOpener oCfg(
+            ( IConfigDb* )m_pCfg );
+
+        IConfigDb* pConnParams = nullptr;
+        ret = oCfg.GetPointer(
+            propConnParams, pConnParams );
+        if( ERROR( ret ) )
+            break;
+
+        CConnParams oConnParams( pConnParams );
+        if( oConnParams.IsServer() )
+            break;
+
+        sockaddr_in6 oAddr;
+        socklen_t iSize = sizeof( oAddr );
+        ret = getsockname( m_iFd,
+            ( sockaddr* )&oAddr, &iSize );
+
+        if( ret == -1 )
+        {
+            ret = -errno;
+            break;
+        }
+
+        char szNode[ 32 ];
+        char szServ[ 8 ];
+
+        ret = getnameinfo( ( sockaddr* )&oAddr,
+            iSize, szNode, sizeof( szNode ),
+            szServ, sizeof( szServ ),
+            NI_NUMERICHOST | NI_NUMERICSERV );
+
+        if( ret != 0 )
+            break;
+            
+        string strSrcIp = szNode;
+        if( strSrcIp.empty() )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        guint32 dwSrcPortNum =
+            std::stoi( szServ );
+        
+        CCfgOpener oConnCfg( pConnParams );
+        oConnCfg.SetStrProp(
+            propSrcIpAddr, strSrcIp );
+
+        oConnCfg.SetIntProp(
+            propSrcTcpPort, dwSrcPortNum );
+
+    }while( 0 );
+
+    return ret;
+}
+
 /**
 * @name Start_bh
 * the bottom half of the Start process
@@ -1128,6 +1198,13 @@ gint32 CRpcStreamSock::Start_bh()
             break;
 
         ret = StartWatch( false );
+        if( ERROR( ret ) )
+            break;
+
+        ret = this->OnConnected();
+        if( ERROR( ret ) )
+            break;
+
         SetState( sockStarted );
         
     }while( 0 );
@@ -4294,20 +4371,26 @@ gint32 CRpcListeningSock::Connect()
         CCfgOpener oCfg(
             ( IConfigDb* )m_pCfg );
 
+        IConfigDb* pConnParams = nullptr;
+        ret = oCfg.GetPointer(
+            propConnParams, pConnParams );
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpener oConnParams( pConnParams );
         string strIpAddr;
-        ret = oCfg.GetStrProp(
-            propIpAddr, strIpAddr );
+        ret = oConnParams.GetStrProp(
+            propDestIpAddr, strIpAddr );
 
         if( ERROR( ret ) )
-            strIpAddr = "::";
+            break;
 
         guint32 dwPortNum = 0;
-
-        ret = oCfg.GetIntProp(
-            propSrcTcpPort, dwPortNum );
+        ret = oConnParams.GetIntProp(
+            propDestTcpPort, dwPortNum );
 
         if( ERROR( ret ) )
-            dwPortNum = RPC_SVR_PORTNUM;
+            break;
 
         ret = GetAddrInfo( strIpAddr,
             dwPortNum, res );
@@ -4411,7 +4494,8 @@ gint32 CRpcListeningSock::OnConnected()
         // let's schedule a task to start the port
         // building process
         m_pParentPort->OnEvent(
-            eventNewConn, newFd, 0, nullptr );
+            eventNewConn, newFd, 0,
+            ( LONGWORD* )this );
 
     }while( newFd != -1 );
 

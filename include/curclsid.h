@@ -31,9 +31,12 @@
 // propids, which serve as a start point for
 // future addition.
 //
-// rpc-frmwrk components
+// rpc-frmwrk components, last allocation was from
+// wsfido.h
 #define CLSIDS_ALLOCATED    ( clsid( ClassFactoryStart ) + 20 )
-#define PROPIDS_ALLOCATED   ( propReservedEnd + 100 )
+
+// last allocation was from wsfido.h
+#define PROPIDS_ALLOCATED   ( propReservedEnd + 106 )
 
 // iid allocated
 #define IID_ALLOCATED    ( clsid( ReservedIidStart ) + 210 )
