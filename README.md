@@ -32,6 +32,7 @@ This framework depends on the following packags:
 [`Fri 07 Feb 2020 07:31:31 PM Beijing`]  
 1. Merged the `multihop` branch to `master`.   
 2. Added the `WebSocket` support, though not working yet.   
+3. After the `WebSocket` is done, I will then choose one to implement between `multihop` and `connection recovery`.
 
 [`Sun 02 Feb 2020 08:30:52 PM Beijing`]   
 1. Created a new branch `multihop` for the newly added changes. It will take some time to get stable, and then I will merge back to the `master` branch.
