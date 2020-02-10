@@ -30,7 +30,7 @@ This framework depends on the following packags:
 
 ---
 [`Mon 10 Feb 2020 02:14:10 PM Beijing`]   
-1. `Websocket` support is comming. The new update delivers a working version of `Websocket` port. However, the websocket's transparent proxy traversal remains some more testing.   
+1. `Websocket` support is comming. The new update delivers a working version of `Websocket` port. However, the  `transparent proxy traversal` remains to test.   
 
 [`Fri 07 Feb 2020 07:31:31 PM Beijing`]  
 1. Merged the `multihop` branch to `master`.   
