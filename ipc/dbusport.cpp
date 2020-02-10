@@ -292,6 +292,7 @@ gint32 CDBusBusPort::BuildPdoPortName(
                     if( ERROR( ret ) )
                         break;
 
+                    CStdRMutex oPortLock( GetLock() );
                     CConnParamsProxy ocps( pConnParams );
 
                     ADDRID_MAP::const_iterator itr =
@@ -456,6 +457,7 @@ gint32 CDBusBusPort::CreateRpcProxyPdoShared(
             CConnParamsProxy ocp( pConnParams );
 
             // bind the ip addr and the port-id
+            CStdRMutex oPortLock( GetLock() );
             ADDRID_MAP::iterator
                 itr = m_mapAddrToId.find( ocp );
             if( itr != m_mapAddrToId.end() )
@@ -2309,6 +2311,7 @@ void CDBusBusPort::RemovePdoPort(
         guint32 iPortId )
 {
     PortPtr pPort;
+    CStdRMutex oPortLock( GetLock() );
     gint32 ret = GetPdoPort( iPortId, pPort );
     if( ERROR( ret ) )
         return;

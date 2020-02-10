@@ -1686,7 +1686,9 @@ gint32 CRpcOpenSSLFidoDrv::Probe(
         oNewCfg[ propPortClass ] =
             PORT_CLASS_OPENSSL_FIDO;
 
-        // destination ip addr
+        oNewCfg.SetIntProp(
+            propPortId, NewPortId() );
+
         oNewCfg.CopyProp(
             propConnParams, pLowerPort );
 

@@ -45,6 +45,8 @@ AC_CONFIG_FILES([Makefile
                  ipc/Makefile
                  rpc/Makefile
                  rpc/sslport/Makefile
+                 rpc/wsport/Makefile
+                 rpc/wsport/wsproto/Makefile
                  test/Makefile
                  test/Makefile.init.pub
                  test/actcancel/Makefile

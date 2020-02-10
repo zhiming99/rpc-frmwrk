@@ -1,0 +1,30 @@
+include ../../../Makefile.init.pub
+
+TARGET:=libwsock.a
+SOURCES:= base64.cpp sha1.cpp WebSocket.cpp
+
+OBJS:=$(SOURCES:%.cpp=$(OBJ_DIR)/%.o)
+
+all: ../$(OBJ_DIR)/$(TARGET)
+debug: ../$(OBJ_DIR)/$(TARGET)
+release: ../$(OBJ_DIR)/$(TARGET)
+
+../$(OBJ_DIR)/$(TARGET) : $(OBJS)
+	@if [ ! -d ../$(OBJ_DIR) ]; then mkdir -p ../$(OBJ_DIR);fi
+	$(AR) r ../$(OBJ_DIR)/$(TARGET) $(OBJS)
+
+-include $(OBJS:%.o=%.d)
+
+debug_clean: do_clean
+release_clean: do_clean
+
+clean:
+	make debug_clean
+	make release_clean
+
+do_clean:
+	-@rm $(OBJ_DIR)/*.d $(MUTE_CLEAN)
+	-@rm ../$(OBJ_DIR)/$(TARGET) $(MUTE_CLEAN)
+	-@rm $(OBJS) $(MUTE_CLEAN)
+
+.PHONY: sync clean do_clean

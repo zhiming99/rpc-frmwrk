@@ -14,6 +14,9 @@
             "ProxyPortClass": "DBusProxyPdo",
             "comment-1" : "IpAddress is the ip address of the server",
             "IpAddress" : "127.0.0.1",
+            "Compression" : "true",
+            "EnableSSL" : "false",
+            "EnableWS" : "true",
 
             "Interfaces" :
             [

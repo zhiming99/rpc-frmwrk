@@ -104,6 +104,7 @@ gint32 CRpcTcpBusPort::RemovePortAddr(
 void CRpcTcpBusPort::RemovePdoPort(
         guint32 iPortId )
 {
+    CStdRMutex oPortLock( GetLock() );
     super::RemovePdoPort( iPortId );
     RemovePortId( iPortId );
 }
@@ -169,6 +170,7 @@ gint32 CRpcTcpBusPort::BuildPdoPortName(
             if( ERROR( ret ) )
                 break;
 
+            CStdRMutex oPortLock( GetLock() );
             CConnParams ocps( pcp );
             PDOADDR oAddr( ocps );
             std::map< PDOADDR, guint32 >::iterator

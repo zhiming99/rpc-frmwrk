@@ -588,14 +588,12 @@ gint32 DecompressDataLZ4(
 
         pDecompressed->Resize( dwOrigSize );
 
-        pPayload->SetOffset( pPayload->offset() +
-            sizeof( guint32 ) );
+        pPayload->IncOffset( sizeof( guint32 ) );
 
         ret = pPayload->Decompress( ( guint8* )
             pDecompressed->ptr(), dwOrigSize );
 
-        pPayload->SetOffset( pPayload->offset() -
-            sizeof( guint32 ) );
+        pPayload->IncOffset( sizeof( guint32 ) );
 
     }while( 0 );
 

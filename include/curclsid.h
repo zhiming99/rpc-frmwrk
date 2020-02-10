@@ -36,7 +36,7 @@
 #define CLSIDS_ALLOCATED    ( clsid( ClassFactoryStart ) + 20 )
 
 // last allocation was from wsfido.h
-#define PROPIDS_ALLOCATED   ( propReservedEnd + 106 )
+#define PROPIDS_ALLOCATED   ( propReservedEnd + 110 )
 
 // iid allocated
 #define IID_ALLOCATED    ( clsid( ReservedIidStart ) + 210 )

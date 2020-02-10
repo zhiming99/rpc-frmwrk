@@ -1107,20 +1107,20 @@ class CRpcTcpBusPort :
     gint32 LoadPortOptions(
         IConfigDb* pCfg );
 
-    public:
-    typedef CGenericBusPort super;
-
     gint32 GetPdoAddr(
         guint32 dwPortId, PDOADDR& oAddr );
 
     gint32 GetPortId(
         PDOADDR& oAddr, guint32& dwPortId );
 
-    gint32 BindPortIdAndAddr(
-        guint32 dwPortId, PDOADDR oAddr );
-
     gint32 RemovePortId( guint32 dwPortId );
     gint32 RemovePortAddr( PDOADDR& oAddr );
+
+    public:
+    typedef CGenericBusPort super;
+
+    gint32 BindPortIdAndAddr(
+        guint32 dwPortId, PDOADDR oAddr );
 
     virtual void RemovePdoPort(
         guint32 iPortId );

@@ -45,6 +45,16 @@
             ]
         },
         {
+            "DriverName"    : "RpcWebSockFidoDrv",
+            "DriverType"    : "PortDriver",
+            "InternalClass" : "CRpcWebSockFidoDrv",
+            "Description"   : "This is a filter port driver, and the port it creats is the CRpcTcpFido",
+            "PortClasses"   :
+            [
+                "RpcWebSockFido"
+            ]
+        },
+        {
             "DriverName"    : "RpcNatProtoFdoDrv",
             "DriverType"    : "PortDriver",
             "InternalClass" : "CRpcNatProtoFdoDrv",
@@ -121,6 +131,12 @@
         },
         {
             "PortType"      : "Fido",
+            "PortClass"     : "RpcWebSockFido",
+            "InternalClass" : "CRpcWebSockFido",
+            "PortDriver"    : "RpcWebSockFidoDrv"
+        },
+        {
+            "PortType"      : "Fido",
             "PortClass"     : "RpcOpenSSLFido",
             "InternalClass" : "CRpcOpenSSLFido",
             "PortDriver"    : "RpcOpenSSLFidoDrv",
@@ -170,7 +186,7 @@
                     "comment"  : "inter-changable with 'TcpStreamPdo' when in a trusted and stable environment",
                     "PdoClass" : "TcpStreamPdo2",
                     "Compression" : "true",
-                    "EnableWS":  "false",
+                    "EnableWS":  "true",
                     "EnableSSL": "false"
                 },
                 {
@@ -180,7 +196,7 @@
                     "BindAddr" : "192.168.3.13",
                     "PdoClass" : "TcpStreamPdo2",
                     "Compression" : "true",
-                    "EnableWS":  "true",
+                    "EnableWS":  "false",
                     "EnableSSL": "true",
                     "ConnRecover" : "false"
                 }
@@ -367,7 +383,8 @@
             ],
             "ClassFactories" :
             [
-                "./libsslpt.so"
+                "./libsslpt.so",
+                "./libwspt.so"
             ]
         },
         {
@@ -437,7 +454,7 @@
         {
             "PortClass" : "TcpStreamPdo2",
             "comment" : "ProbeSequence specify the order of the drivers' Probe to call to build the port stack",
-            "ProbeSequence" : [ "RpcOpenSSLFidoDrv", "RpcNatProtoFdoDrv", "RpcTcpFidoDrv" ],
+            "ProbeSequence" : [ "RpcOpenSSLFidoDrv", "RpcWebSockFidoDrv", "RpcNatProtoFdoDrv", "RpcTcpFidoDrv" ],
             "Description" : "This match provides a binding between the pdo and the uppper fdo and fido",
             "comment-1" : "this is a new fork of the TcpStreamPdo, with better flexibility and extensibility"
         },
