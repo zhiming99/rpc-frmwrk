@@ -2721,8 +2721,7 @@ gint32 CIncomingPacket::FillPacket(
         if( dwToCopy > 0 )
         {
             memcpy( pDest, pBuf->ptr(), dwToCopy );
-            pBuf->SetOffset(
-                pBuf->offset() + dwToCopy );
+            pBuf->IncOffset( dwToCopy );
         }
 
         m_dwOffset += dwToCopy;

@@ -239,6 +239,9 @@ class CBuffer : public CObjBase
     inline guint32 offset() const
     { return m_dwOffset; }
 
+    inline gint32 IncOffset( guint32 dwOffset )
+    { return SetOffset( offset() + dwOffset ); }
+
     void SetExDataType( EnumTypeId dt );
     EnumTypeId GetExDataType() const;
 

@@ -60,10 +60,13 @@ class WebSocket
 	int makeHandshake( guint64 sec_key, const char* url, string& strRet );
 
 	int makeFrame(WebSocketFrameType frame_type, unsigned char* msg, int msg_len, BufPtr& dest_buf);
-	WebSocketFrameType getFrame(unsigned char* in_buffer, int in_length, BufPtr& dest_buf, int& frame_size );
+	WebSocketFrameType getFrame(BufPtr& src_buf, BufPtr& dest_buf );
 
-	string trim(string str);
-	vector<string> explode(string theString, string theDelimiter, bool theIncludeEmptyStrings = false );
+	void trim(string& str);
+	int explode(
+        const string& theString,
+        const string& theDelimiter,
+        vector< string >& vecStrings );
 };
 
 #endif	/* WEBSOCKET_H */

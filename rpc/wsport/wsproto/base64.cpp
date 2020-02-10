@@ -62,7 +62,7 @@ guint32 base64_dec_len( guint32 buf_len, const char* padding ) {
         if( padding[ 2 ] == '=' ) 
             ++padding_num;
     }
-    return ( ( buf_len << 2 ) * 3 - padding_num );
+    return ( ( buf_len >> 2 ) * 3 - padding_num );
 }
 
 gint32 base64_encode(unsigned char const* bytes_to_encode, unsigned int in_len, BufPtr& dest_buf ) {
@@ -123,7 +123,11 @@ std::string base64_encode(unsigned char const* bytes_to_encode, unsigned int in_
     if( ERROR( ret ) )
         return std::string( "" );
 
-    return std::string( dest_buf->ptr() );
+    BufPtr str_buf( true );
+    str_buf->Resize( dest_buf->size() + 1 );
+    memcpy( str_buf->ptr(), dest_buf->ptr(), dest_buf->size() );
+    str_buf->ptr()[ dest_buf->size() ] = 0;
+    return std::string( str_buf->ptr() );
 }
 
 gint32 base64_decode( const char* src_buf, unsigned int in_len, BufPtr& dest_buf ) {
@@ -131,7 +135,7 @@ gint32 base64_decode( const char* src_buf, unsigned int in_len, BufPtr& dest_buf
   if( src_buf == nullptr || in_len < 4 )
       return -EINVAL;
 
-  if( ( in_len & 0x3 ) != 0 )
+  if( in_len % 3 != 0 )
       return -EINVAL;
 
   int i = 0;
@@ -191,5 +195,9 @@ std::string base64_decode(std::string const& s)
     if( ERROR( ret ) )
         return std::string( "" );
 
-    return std::string( dest_buf->ptr() );
+    BufPtr str_buf( true );
+    str_buf->Resize( dest_buf->size() + 1 );
+    memcpy( str_buf->ptr(), dest_buf->ptr(), dest_buf->size() );
+    str_buf->ptr()[ dest_buf->size() ] = 0;
+    return std::string( str_buf->ptr() );
 }

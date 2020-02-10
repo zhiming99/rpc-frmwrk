@@ -21,7 +21,9 @@
 
 using namespace std;
 
-WebSocket::WebSocket() {
+WebSocket::WebSocket() :
+    protocol( "rpc-frmwrk" )
+{
 
 }
 
@@ -30,29 +32,31 @@ WebSocketFrameType WebSocket::parseHandshake(unsigned char* input_frame, int inp
 	// 1. copy char*/len into string
 	// 2. try to parse headers until \r\n occurs
 	string headers((char*)input_frame, input_len); 
-	int header_end = headers.find("\r\n\r\n");
+	size_t header_end = headers.find("\r\n\r\n");
 
-	if(( guint32 )header_end == string::npos) { // end-of-headers not found - do not parse
+	if(header_end == string::npos) { // end-of-headers not found - do not parse
 		return INCOMPLETE_FRAME;
 	}
 
     bool bValid = false;
 	headers.resize(header_end); // trim off any data we don't need after the headers
-	vector<string> headers_rows = explode(headers, string("\r\n"));
-	for(int i=0; i<(int)headers_rows.size(); i++) {
+	vector<string> headers_rows;
+    explode(headers, string("\r\n"), headers_rows );
+	for(size_t i=0; i<headers_rows.size(); i++) {
 		string& header = headers_rows[i];
 		if(header.find("GET") == 0) {
-			vector<string> get_tokens = explode(header, string(" "));
+			vector<string> get_tokens;
+            explode(header, string(" "), get_tokens);
 			if(get_tokens.size() >= 2) {
 				this->resource = get_tokens[1];
 			}
 		}
 		else {
-			int pos = header.find(":");
-			if(( guint32 )pos != string::npos) {
+			size_t pos = header.find(":");
+			if(pos != string::npos) {
 				string header_key(header, 0, pos);
 				string header_value(header, pos+1);
-				header_value = trim(header_value);
+				trim(header_value);
 				if(header_key == "Host") this->host = header_value;
 				else if(header_key == "Origin") this->origin = header_value, bValid = true;
 				else if(header_key == "Sec-WebSocket-Key") this->key = header_value, bValid = true;
@@ -68,7 +72,7 @@ WebSocketFrameType WebSocket::parseHandshake(unsigned char* input_frame, int inp
 	return OPENING_FRAME;
 }
 
-string WebSocket::trim(string str) 
+void WebSocket::trim(string& str) 
 {
 	//printf("TRIM\n");
 	const char* whitespace = " \t\r\n";
@@ -78,40 +82,47 @@ string WebSocket::trim(string str)
 		pos = str.find_first_not_of(whitespace);
 		if(pos != string::npos) str.erase(0, pos);
 	}
-	else {
-		return string();
-	}
-	return str;
+	return;
 }
 
-vector<string> WebSocket::explode(	
-	string  theString,
-    string  theDelimiter,
-    bool    theIncludeEmptyStrings)
+int WebSocket::explode(	
+	const string&  theString,
+    const string&  theDelimiter,
+    vector< string >& vecStrings )
 {
-	//printf("EXPLODE\n");
-	//UASSERT( theDelimiter.size(), >, 0 );
-	
-	vector<string> theStringVector;
-	int  start = 0, end = 0, length = 0;
+    //printf("EXPLODE\n");
+    //UASSERT( theDelimiter.size(), >, 0 );
 
-	while ( end != ( int )string::npos )
-	{
-		end = theString.find( theDelimiter, start );
+    if( theString.empty() || theDelimiter.empty() )
+        return -EINVAL;
 
-		// If at end, use length=maxLength.  Else use length=end-start.
-		length = (end == ( int )string::npos) ? ( int )string::npos : end - start;
+    size_t start = 0, end = 0, length = 0;
+    size_t str_size = theString.size();
+    do{
+        end = theString.find( theDelimiter, start );
+        if( end == string::npos )
+        {
+            length = str_size - start;
+        }
+        else
+        {
+            length = end - start;
+        }
 
-		if (theIncludeEmptyStrings
-			|| (   ( length > 0 ) /* At end, end == length == string::npos */
-            && ( start  < ( int )theString.size() ) ) )
-		theStringVector.push_back( theString.substr( start, length ) );
+        if( length > 0 )
+        {
+            vecStrings.push_back(
+                theString.substr( start, length ) );
+        }
 
-		// If at end, use start=maxSize.  Else use start=end+delimiter.
-		start = (   ( end > ( int )(string::npos - theDelimiter.size()) )
-              ?  ( int )string::npos  :  end + theDelimiter.size()     );
-	}
-	return theStringVector;
+        if( end == string::npos )
+            break;
+
+        start = end + theDelimiter.size();
+
+    }while( start < str_size );
+
+    return 0;
 }
 
 gint32 WebSocket::makeHandshake(
@@ -126,11 +137,13 @@ gint32 WebSocket::makeHandshake(
     if( key.empty() )
         return -EINVAL;
 
+    gint32 ret = 0;
+
     do{
         vector< string > vec_nodes;
         string strUrl = url;
 
-        gint32 ret = CRegistry::Namei(
+        ret = CRegistry::Namei(
             strUrl, vec_nodes );
 
         if( ERROR( ret ) )
@@ -145,11 +158,15 @@ gint32 WebSocket::makeHandshake(
         if( strcasecmp( "http:",
             vec_nodes[ 0 ].c_str() ) != 0 )
         {
-            ret = -EINVAL;
-            break;
+            if( strcasecmp( "https:",
+                vec_nodes[ 0 ].c_str() ) != 0 )
+            {
+                ret = -EINVAL;
+                break;
+            }
         }
 
-        string strDomain = "http://";
+        string strDomain = vec_nodes[ 0 ] + "//";
         strDomain += vec_nodes[ 1 ];
 
         string strPath = vec_nodes[ 2 ];
@@ -160,7 +177,7 @@ gint32 WebSocket::makeHandshake(
         strCliReq += "Upgrade: websocket\r\n";
         strCliReq += "Connection: Upgrade\r\n";
         strCliReq += "Sec-WebSocket-Key: " + key + "\r\n";
-        strCliReq += "Sec-WebSocket-Protocol: chat, superchat\r\n";
+        strCliReq += "Sec-WebSocket-Protocol: " + this->protocol + "\r\n";
         strCliReq += "Sec-WebSocket-Version: 13\r\n";
         // origin is not necessary yet
         strCliReq += "Origin: ";
@@ -169,7 +186,7 @@ gint32 WebSocket::makeHandshake(
 
     }while( 0 );
 
-    return 0;
+    return ret;
 }
 
 WebSocketFrameType WebSocket::checkHandshakeResp(unsigned char* input_frame, int input_len, int& header_size)
@@ -185,16 +202,17 @@ WebSocketFrameType WebSocket::checkHandshakeResp(unsigned char* input_frame, int
 	}
 
 	headers.resize(header_end); // trim off any data we don't need after the headers
-	vector<string> headers_rows = explode(headers, string("\r\n"));
+	vector<string> headers_rows;
+    explode(headers, string("\r\n"), headers_rows);
 	for(int i=0; i<( int )headers_rows.size(); i++) {
 		string& header = headers_rows[i];
         int pos = ( int )header.find(":");
         if(pos != ( int )string::npos) {
             string header_key(header, 0, pos);
-            if(header_key != "Sec-WebSocket-Key")
+            if(header_key != "Sec-WebSocket-Accept")
                 continue;
             string header_value(header, pos+1);
-            header_value = trim(header_value);
+            trim(header_value);
             string resp_key = header_value;
             string local_key = key + RFC6544_MAGIC_KEY;
 
@@ -293,7 +311,7 @@ int WebSocket::makeFrame(WebSocketFrameType frame_type, unsigned char* msg, int 
     else
         buffer_len = 1 + 1 + 8 + size;
 
-    int iOffset = dest_buf->size();
+    size_t iOffset = dest_buf->size();
     dest_buf->Resize( iOffset + buffer_len );
     if( dest_buf->size() < ( guint32 )iOffset + buffer_len )
         return -ENOMEM;
@@ -329,11 +347,15 @@ int WebSocket::makeFrame(WebSocketFrameType frame_type, unsigned char* msg, int 
 	return (size+pos);
 }
 
-WebSocketFrameType WebSocket::getFrame(unsigned char* in_buffer, int in_length,
-    BufPtr& dest_buf, int& frame_size )
+WebSocketFrameType WebSocket::getFrame(
+    BufPtr& src_buf, BufPtr& dest_buf )
 {
-    if( in_buffer == nullptr || dest_buf.IsEmpty() )
+    if( src_buf.IsEmpty() || dest_buf.IsEmpty() )
         return ERROR_FRAME;
+
+    size_t frame_size = 0;
+    guint8* in_buffer = ( guint8* )src_buf->ptr();
+    size_t in_length = src_buf->size();
 
     if(in_length < 3) return INCOMPLETE_FRAME;
 
@@ -343,8 +365,8 @@ WebSocketFrameType WebSocket::getFrame(unsigned char* in_buffer, int in_length,
 
 	// *** message decoding 
 
-	int payload_length = 0;
-	int pos = 2;
+	size_t payload_length = 0;
+	size_t pos = 2;
 	int length_field = in_buffer[1] & (~0x80);
 	unsigned int mask = 0;
 
@@ -387,25 +409,44 @@ WebSocketFrameType WebSocket::getFrame(unsigned char* in_buffer, int in_length,
 
 		// unmask data:
 		unsigned char* c = in_buffer+pos;
-		for(int i=0; i<payload_length; i++) {
+		for(size_t i=0; i<payload_length; i++) {
 			c[i] = c[i] ^ ((unsigned char*)(&mask))[i%4];
 		}
 	}
 	
 	if(payload_length > 1024 * 1024 ){
         return ERROR_FRAME;
-		//TODO: if output buffer is too small -- ERROR or resize(free and allocate bigger one) the buffer ?
 	}
-    dest_buf->Resize( payload_length );
-    char* out_buffer = dest_buf->ptr();
 
-    memcpy((void*)out_buffer, (void*)(in_buffer+pos), payload_length);
-	// out_buffer[payload_length] = 0;
-	// *out_length = payload_length+1;
-	
-	//printf("TEXT: %s\n", out_buffer);
+    gint32 ret = 0;
     frame_size = pos + payload_length;
+    if( in_length == frame_size &&
+        dest_buf->empty() )
+    {
+        // transfer the buffer from src_buf to
+        // dest_buf without copying
+        ret = src_buf->IncOffset( pos );
+        if( ERROR( ret ) )
+            return ERROR_FRAME;
 
+        dest_buf = src_buf;
+        src_buf.Clear();
+        // make sure src_buf is not empty
+        src_buf.NewObj();
+    }
+    else
+    {
+        ret = dest_buf->Append(
+            in_buffer + pos, payload_length );
+
+        if( ERROR( ret ) )
+            return ERROR_FRAME;
+
+        ret = src_buf->IncOffset( frame_size );
+        if( ERROR( ret ) )
+            return ERROR_FRAME;
+    }
+	
 	if(msg_opcode == 0x0) return (msg_fin)?TEXT_FRAME:INCOMPLETE_TEXT_FRAME; // continuation frame ?
 	if(msg_opcode == 0x1) return (msg_fin)?TEXT_FRAME:INCOMPLETE_TEXT_FRAME;
 	if(msg_opcode == 0x2) return (msg_fin)?BINARY_FRAME:INCOMPLETE_BINARY_FRAME;

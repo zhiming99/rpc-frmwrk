@@ -54,12 +54,7 @@ CRpcWebSockFido::CRpcWebSockFido(
     gint32 ret = 0;
     do{
         ret = m_pCurFrame.NewObj();
-
-        TaskletPtr pEmptyTask;
-        m_vecTasks.reserve( 3 );
-        m_vecTasks[ 0 ] = pEmptyTask;
-        m_vecTasks[ 1 ] = pEmptyTask;
-        m_vecTasks[ 2 ] = pEmptyTask;
+        m_vecTasks.resize( 3 );
 
     }while( 0 );
     if( ERROR( ret ) )
@@ -615,65 +610,71 @@ gint32 CRpcWebSockFido::CompleteListeningIrp(
         return ret;
     }
 
+    BufPtr pDecrypted( true );
     do{
-        BufPtr pDecrypted( true );
         BufPtr& pCurFrame = GetCurFrame();
-        int frame_size = 0;
+
         WebSocketFrameType ret1 =
             m_oWebSock.getFrame(
-                ( guint8* )pCurFrame->ptr(),
-                pCurFrame->size(),
-                pDecrypted,
-                frame_size );
+                pCurFrame, pDecrypted );
 
         if( ret1 == INCOMPLETE_TEXT_FRAME ||
             ret1 == INCOMPLETE_BINARY_FRAME ||
             ret1 == INCOMPLETE_FRAME )
         {
-            PortPtr pLowerPort = GetLowerPort();
-            pTopCtx->m_pRespData.Clear();
-            pTopCtx->SetStatus( STATUS_PENDING );
-
-            ret = pLowerPort->SubmitIrp( pIrp );
-            if( ret == STATUS_PENDING )
-                break;
-
-            if( ERROR( ret ) )
-                break;
-
-            pRespBuf = pTopCtx->m_pRespData;
-
-            STREAM_SOCK_EVENT* psse =
-            ( STREAM_SOCK_EVENT* )pRespBuf->ptr();
-
-            EnumStmSockEvt iEvent =
-                psse->m_iEvent;
-
-            if( iEvent == sseError )
+            if( pDecrypted.IsEmpty() ||
+                pDecrypted->empty() )
             {
-                pCtx->SetRespData( pRespBuf );
-                pCtx->SetStatus(
-                    pTopCtx->GetStatus() );
-                break;
-            }
-            else if( iEvent == sseRetWithFd )
-            {
-                ret = -ENOTSUP;
-                break;
+                PortPtr pLowerPort = GetLowerPort();
+                pTopCtx->m_pRespData.Clear();
+                pTopCtx->SetStatus( STATUS_PENDING );
+
+                ret = pLowerPort->SubmitIrp( pIrp );
+                if( ret == STATUS_PENDING )
+                    break;
+
+                if( ERROR( ret ) )
+                    break;
+
+                pRespBuf = pTopCtx->m_pRespData;
+                psse = ( STREAM_SOCK_EVENT* )
+                    pRespBuf->ptr();
+
+                EnumStmSockEvt iEvent =
+                    psse->m_iEvent;
+
+                if( iEvent == sseError )
+                {
+                    pCtx->SetRespData( pRespBuf );
+                    pCtx->SetStatus(
+                        pTopCtx->GetStatus() );
+                    break;
+                }
+                else if( iEvent == sseRetWithFd )
+                {
+                    ret = -ENOTSUP;
+                    break;
+                }
+
+                pBuf = psse->m_pInBuf;
+                psse->m_pInBuf.Clear();
+                if( pBuf.IsEmpty() || pBuf->empty() )
+                {
+                    ret = -EBADMSG;
+                    break;
+                }
+                ret = ReceiveData( pBuf );
+                if( ERROR( ret ) )
+                    break;
+
+                continue;
             }
 
-            pBuf = psse->m_pInBuf;
-            psse->m_pInBuf.Clear();
-            if( pBuf.IsEmpty() || pBuf->empty() )
-            {
-                ret = -EBADMSG;
-                break;
-            }
-            ret = ReceiveData( pBuf );
-            if( ERROR( ret ) )
-                break;
-
-            continue;
+            // there are frames received
+            psse->m_pInBuf = pDecrypted;
+            pCtx->SetRespData( pRespBuf );
+            ret = 0;
+            break;
         }
         else if( ret1 == TEXT_FRAME ||
             ret1 == BINARY_FRAME )
@@ -681,16 +682,15 @@ gint32 CRpcWebSockFido::CompleteListeningIrp(
             ret = 0;
             // the remaider if any, will be
             // returned on next read request
-            pCurFrame->SetOffset(
-                pCurFrame->offset() +
-                frame_size );
-
-            pCurFrame->Resize(
-                pCurFrame->size() );
-
-            psse->m_pInBuf = pDecrypted;
-            pCtx->SetRespData( pRespBuf );
-            break;
+            if( pCurFrame->empty() )
+            {
+                pCurFrame->Resize( 0 );
+                psse->m_pInBuf = pDecrypted;
+                pCtx->SetRespData( pRespBuf );
+                ret = 0;
+                break;
+            }
+            continue;
         }
         else if( ret1 == CLOSE_FRAME )
         {
@@ -731,17 +731,11 @@ gint32 CRpcWebSockFido::CompleteListeningIrp(
         else if( ret1 == PING_FRAME )
         {
             SchedulePongTask( pDecrypted );
-            pCurFrame->SetOffset(
-                pCurFrame->offset() +
-                frame_size );
             continue;
         }
         else if( ret1 == PONG_FRAME )
         {
             // ignore pong frames
-            pCurFrame->SetOffset(
-                pCurFrame->offset() +
-                frame_size );
             continue;
         }
 
@@ -1000,7 +994,9 @@ gint32 CRpcWebSockFido::AdvanceHandshakeServer(
             break;
 
         int header_size = 0;
-        if( !bHsReceived && pHandshake->empty() )
+        if( !bHsReceived &&
+            ( pHandshake.IsEmpty() ||
+            pHandshake->empty() ) )
         {
             BufPtr pBuf;
             ret = SendListenReq(
@@ -1064,8 +1060,12 @@ gint32 CRpcWebSockFido::AdvanceHandshakeServer(
                 ret = ERROR_FAIL;
                 break;
             }
+
             BufPtr pResp( true );
-            *pResp = strResp;
+            pResp->Resize( strResp.size() );
+
+            memcpy( pResp->ptr(),
+                strResp.c_str(), pResp->size() );
 
             ret = SendWriteReq(
                 pCallback, pResp );
@@ -1089,7 +1089,8 @@ gint32 CRpcWebSockFido::AdvanceHandshakeClient(
         int header_size = 0;
         BufPtr pBuf;
         BufPtr& pHandshake = GetCurFrame();
-        if( pHandshake.IsEmpty() )
+        if( pHandshake.IsEmpty() ||
+            pHandshake->empty() )
         {
             CCfgOpenerObj oTaskCfg( pCallback );
             bool bSent = false;
@@ -1118,7 +1119,10 @@ gint32 CRpcWebSockFido::AdvanceHandshakeClient(
                 if( ERROR( ret ) )
                     break;
 
-                *pBuf = strRet;
+                pBuf->Resize( strRet.size() );
+
+                memcpy( pBuf->ptr(),
+                    strRet.c_str(), pBuf->size() );
 
                 if( !pBuf->empty() )
                 {
@@ -1166,6 +1170,8 @@ gint32 CRpcWebSockFido::AdvanceHandshakeClient(
             }
             pHandshake->Resize(
                 pHandshake->size() );
+            // handshake is done
+            break;
         }
         else if( ret1 != INCOMPLETE_FRAME )
         {
@@ -1173,7 +1179,8 @@ gint32 CRpcWebSockFido::AdvanceHandshakeClient(
             break;
         }
 
-        // continue to receive
+        // continue to receive the remainder of
+        // the frame
         ret = SendListenReq( pCallback, pBuf );
         if( ERROR( ret ) )
             break;

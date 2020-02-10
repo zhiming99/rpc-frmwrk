@@ -96,9 +96,7 @@ class CWsPingPongTask :
     { SetClassId( clsid( CWsPingPongTask ) ); }
 
     gint32 OnIrpComplete( IRP* pIrp );
-    gint32 OnTaskComplete( gint32 iRet );
     gint32 RunTask();
-    gint32 OnCancel( guint32 dwContext );
 };
 
 class CWsCloseTask :
