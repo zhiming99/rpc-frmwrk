@@ -15,7 +15,7 @@ release: $(OUTPUT_DIR)/$(TARGET)
 
 $(OUTPUT_DIR)/$(TARGET) : $(OBJS) $(OBJ_DIR)/libwsock.a
 	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
-	$(CC) -o $(OUTPUT_DIR)/$(TARGET) $(LINKER_OPTION)  -lrpc $(OBJS) $(OBJ_DIR)/libwsock.a
+	$(CC) -o $(OUTPUT_DIR)/$(TARGET) $(LINKER_OPTION) -L$(OUTPUT_DIR) -lrpc $(OBJS) $(OBJ_DIR)/libwsock.a
 
 $(OBJ_DIR)/libwsock.a :
 	make -C ./wsproto 

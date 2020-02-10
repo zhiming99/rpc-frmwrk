@@ -10,9 +10,9 @@ SOURCES:= dbusprxy.cpp prxyfdo.cpp fdodrv.cpp \
 OBJS:=$(SOURCES:%.cpp=$(OBJ_DIR)/%.o)
 C_DEFINES += -D_USE_LIBEV=1
 
-all: SSLPort WSPort $(OUTPUT_DIR)/$(TARGET) 
-debug: SSLPort WSPort $(OUTPUT_DIR)/$(TARGET) 
-release: SSLPort WSPort $(OUTPUT_DIR)/$(TARGET) 
+all: $(OUTPUT_DIR)/$(TARGET) SSLPort WSPort
+debug: $(OUTPUT_DIR)/$(TARGET) SSLPort WSPort
+release: $(OUTPUT_DIR)/$(TARGET) SSLPort WSPort
 
 $(OUTPUT_DIR)/$(TARGET) : $(OBJS)
 	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
