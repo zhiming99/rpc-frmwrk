@@ -284,16 +284,16 @@ class CFlowControl
     guint64     m_qwAckTxBytes = 0;
     guint64     m_qwAckRxBytes = 0;
 
-    guint32     m_dwRxPkts = 0;
-    guint32     m_dwTxPkts = 0;
-    guint32     m_dwAckTxPkts = 0;
-    guint32     m_dwAckRxPkts = 0;
+    guint64     m_qwRxPkts = 0;
+    guint64     m_qwTxPkts = 0;
+    guint64     m_qwAckTxPkts = 0;
+    guint64     m_qwAckRxPkts = 0;
 
     gint8       m_byFlowCtrl = 0;
     bool        m_bMonitor = false;
 
     EnumFCState OnReportInternal(
-        guint64 qwAckTxBytes, guint32 dwAckTxPkts )
+        guint64 qwAckTxBytes, guint64 qwAckTxPkts )
     {
         EnumFCState ret = fcsKeep;
 
@@ -302,23 +302,23 @@ class CFlowControl
 
         CStdRMutex oLock( GetLock() );
         if( qwAckTxBytes <= m_qwAckTxBytes ||
-            dwAckTxPkts <= m_dwAckTxPkts )
+            qwAckTxPkts <= m_qwAckTxPkts )
             return ret;
 
         if( m_qwTxBytes - m_qwAckTxBytes >=
             STM_MAX_PENDING_WRITE ||
-            m_dwTxPkts - m_dwAckTxPkts >=
+            m_qwTxPkts - m_qwAckTxPkts >=
             STM_MAX_PACKATS_REPORT )
             bAboveLast = true;
 
         if( m_qwTxBytes - qwAckTxBytes >=
             STM_MAX_PENDING_WRITE ||
-            m_dwTxPkts - dwAckTxPkts >=
+            m_qwTxPkts - qwAckTxPkts >=
             STM_MAX_PACKATS_REPORT )
             bAbove = true;
 
         m_qwAckTxBytes = qwAckTxBytes;
-        m_dwAckTxPkts = dwAckTxPkts;
+        m_qwAckTxPkts = qwAckTxPkts;
 
         if( bAboveLast != bAbove )
             ret = DecFCCount();
@@ -348,18 +348,18 @@ class CFlowControl
             STM_MAX_PENDING_WRITE )
             bAboveLastBytes = true;
 
-        if( m_dwTxPkts - m_dwAckTxPkts >=
+        if( m_qwTxPkts - m_qwAckTxPkts >=
             STM_MAX_PACKATS_REPORT )
             bAboveLastPkts = true;
 
         m_qwTxBytes += pBuf->size();
-        m_dwTxPkts++;
+        m_qwTxPkts++;
 
         if( m_qwTxBytes - m_qwAckTxBytes >=
             STM_MAX_PENDING_WRITE )
             bAboveBytes = true;
 
-        if( m_dwTxPkts - m_dwAckTxPkts >=
+        if( m_qwTxPkts - m_qwAckTxPkts >=
             STM_MAX_PACKATS_REPORT )
             bAbovePkts = true;
 
@@ -390,18 +390,18 @@ class CFlowControl
             STM_MAX_PENDING_WRITE )
             bAboveLastBytes = true;
 
-        if( m_dwRxPkts - m_dwAckRxPkts >=
+        if( m_qwRxPkts - m_qwAckRxPkts >=
             STM_MAX_PACKATS_REPORT )
             bAboveLastPkts = true;
 
         m_qwRxBytes += pBuf->size();
-        m_dwRxPkts++;
+        m_qwRxPkts++;
 
         if( m_qwRxBytes - m_qwAckRxBytes >=
             STM_MAX_PENDING_WRITE  )
             bAboveBytes = true;
 
-        if( m_dwRxPkts - m_dwAckRxPkts >=
+        if( m_qwRxPkts - m_qwAckRxPkts >=
             STM_MAX_PACKATS_REPORT )
             bAbovePkts = true;
 
@@ -410,7 +410,7 @@ class CFlowControl
         {
             ret = fcsReport;
             m_qwAckRxBytes = m_qwRxBytes;
-            m_dwAckRxPkts = m_dwRxPkts;
+            m_qwAckRxPkts = m_qwRxPkts;
         }
 
         return ret;
@@ -441,20 +441,20 @@ class CFlowControl
         CCfgOpener oCfg(
             ( IConfigDb* )pReport );
 
-        guint32 dwAckTxPkts = 0;
+        guint64 qwAckTxPkts = 0;
         guint64 qwAckTxBytes = 0;
         gint32 ret = oCfg.GetQwordProp(
             propRxBytes, qwAckTxBytes );
         if( ERROR( ret ) )
             return fcsKeep;
 
-        ret = oCfg.GetIntProp(
-            propRxPkts, dwAckTxPkts );
+        ret = oCfg.GetQwordProp(
+            propRxPkts, qwAckTxPkts );
         if( ERROR( ret ) )
             return fcsKeep;
 
         return OnReportInternal(
-            qwAckTxBytes, dwAckTxPkts );
+            qwAckTxBytes, qwAckTxPkts );
     }
 
     void SetAsMonitor( bool bMonitor )
@@ -476,8 +476,8 @@ class CFlowControl
         oProgress.SetQwordProp(
             propRxBytes, m_qwRxBytes );
 
-        oProgress.SetIntProp(
-            propRxPkts, m_dwRxPkts );
+        oProgress.SetQwordProp(
+            propRxPkts, m_qwRxPkts );
 
         return oProgress.GetCfg();
     }

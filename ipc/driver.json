@@ -179,15 +179,29 @@
             "Parameters" :
             [
                 {
+                    "comment-1" : "remove it or change it according to your environment",
                     "AddrFormat" : "ipv4",
                     "Protocol" : "native",
+                    "comment-2" : "port 4132 will accept native non-websocket connection",
                     "PortNumber": "4132",
                     "BindAddr" : "127.0.0.1",
                     "comment"  : "inter-changable with 'TcpStreamPdo' when in a trusted and stable environment",
                     "PdoClass" : "TcpStreamPdo2",
                     "Compression" : "true",
-                    "EnableWS":  "true",
+                    "EnableWS":  "false",
                     "EnableSSL": "false"
+                },
+                {
+                    "AddrFormat" : "ipv4",
+                    "Protocol" : "native",
+                    "comment-2" : "port 4133 will accept websocket connection from httpd",
+                    "PortNumber": "4133",
+                    "BindAddr" : "127.0.0.1",
+                    "PdoClass" : "TcpStreamPdo2",
+                    "Compression" : "true",
+                    "EnableWS":  "true",
+                    "EnableSSL": "true",
+                    "ConnRecover" : "false"
                 },
                 {
                     "AddrFormat" : "ipv4",
@@ -196,7 +210,7 @@
                     "BindAddr" : "192.168.3.13",
                     "PdoClass" : "TcpStreamPdo2",
                     "Compression" : "true",
-                    "EnableWS":  "false",
+                    "EnableWS":  "true",
                     "EnableSSL": "true",
                     "ConnRecover" : "false"
                 }

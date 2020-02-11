@@ -48,6 +48,8 @@ enum EnumSrcState : guint8
     srcsDone,
 };
 
+extern void DumpTask( TaskletPtr& pTask );
+
 class IMainLoop: public IService
 {
 public:
@@ -292,6 +294,7 @@ class CMainIoLoopT : public T
             oLock.Unlock();
 
             ( *pTask )( eventZero );
+            DumpTask( pTask );
         }
         return G_SOURCE_REMOVE;
     }
