@@ -30,7 +30,7 @@ This framework depends on the following packags:
 
 ---
 [`Wed 12 Feb 2020 02:09:38 PM Beijing`]   
-1. The `WebSocket` support is completed. And the instructions about the usage is updated in the [`Readme.md`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/wsport/Readme.md)   
+1. The `WebSocket` support is completed. And the instructions about the usage is updated in the [`Readme.md`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/wsport/Readme.md).   
 2. Next task is `multihop` support, the very important feature!   
 
 [`Mon 10 Feb 2020 02:14:10 PM Beijing`]   
