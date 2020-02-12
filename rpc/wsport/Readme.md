@@ -4,7 +4,7 @@
   2. The max bytes per frame is 1MB, or 63KB per the streaming packet.
   3. Support to echo `PING_FRAME`, but will not actively pinging from the client.   
   4. Support to respond `CLOSE_FRAME`, but will not actively `CLOSE_FRAME` at present.   
-  5. The request/response header field `Sec-WebSocket-Protocol` are set to `chat` in the handshake so far, and ignored.
+  5. The `WebSocket handshake`'s request/response header field `Sec-WebSocket-Protocol` are both set to `chat` in the handshake so far, and ignored.
   6. The option `DestURL` in the XXXdesc.json along with options `EnableSSL`, `EnableWS`, etc, specifies the URI to request if exists. If `DestURL` is not specified, `"https://example.com/chat"` is used. And you can set up an Apache `virtualhost` following the settings below. Otherwise, please make the changes accordingly.
   6. Example of `Apache` configuration :
   ```
