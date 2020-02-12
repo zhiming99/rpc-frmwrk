@@ -41,6 +41,33 @@
 
 using namespace std;
 
+void DumpTask( TaskletPtr& pTask )
+{
+#ifdef DEBUG
+    gint32 iTaskRet = pTask->GetError();
+    if( ERROR( iTaskRet ) )
+    {
+        EnumClsid iClsid = pTask->GetClsid();
+        const char* pName =
+            CoGetClassName( iClsid );
+
+        string strTaskName;
+        if( pName == nullptr )
+        {
+            strTaskName =
+                std::to_string( iClsid );
+        }
+        else
+        {
+            strTaskName = pName;
+        }
+
+        DebugPrint( iTaskRet,
+            strTaskName + " failed" ); 
+    }
+#endif
+}
+
 // set the name of the current thread
 string GetThreadName()
 {
@@ -278,29 +305,7 @@ gint32 CTaskThread::ProcessTask(
 
     ( *pTask )( dwContext );
 
-#ifdef DEBUG
-    gint32 iTaskRet = pTask->GetError();
-    if( ERROR( iTaskRet ) )
-    {
-        EnumClsid iClsid = pTask->GetClsid();
-        const char* pName =
-            CoGetClassName( iClsid );
-
-        string strTaskName;
-        if( pName == nullptr )
-        {
-            strTaskName =
-                std::to_string( iClsid );
-        }
-        else
-        {
-            strTaskName = pName;
-        }
-
-        DebugPrint( iTaskRet,
-            strTaskName + " failed" ); 
-    }
-#endif
+    DumpTask( pTask );
 
     PopHead();
     // to exhaust the queue before

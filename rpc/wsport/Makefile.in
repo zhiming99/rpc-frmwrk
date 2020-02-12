@@ -13,11 +13,11 @@ all: $(OUTPUT_DIR)/$(TARGET)
 debug: $(OUTPUT_DIR)/$(TARGET)
 release: $(OUTPUT_DIR)/$(TARGET)
 
-$(OUTPUT_DIR)/$(TARGET) : $(OBJS) $(OBJ_DIR)/libwsock.a
+$(OUTPUT_DIR)/$(TARGET) : $(OBJS) WSProto
 	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
 	$(CC) -o $(OUTPUT_DIR)/$(TARGET) $(LINKER_OPTION) -L$(OUTPUT_DIR) -lrpc $(OBJS) $(OBJ_DIR)/libwsock.a
 
-$(OBJ_DIR)/libwsock.a :
+WSProto :
 	make -C ./wsproto 
 
 -include $(OBJS:%.o=%.d)

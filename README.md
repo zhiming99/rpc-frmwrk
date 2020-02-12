@@ -25,10 +25,13 @@ This framework depends on the following packags:
 10. `Peer online/offline awareness.`
 11. `Streaming support to provide double-direction stream transfer`
 12. `Secure Socket Layer (SSL) support`
-13. `Websocket/http2 support`(to come)
+13. `Websocket support`
 14. `Object access via Multi-hop routing` (to come)
 
 ---
+[`Mon 10 Feb 2020 02:14:10 PM Beijing`]   
+1. `Websocket` support is comming. The new update delivers a working version of `Websocket` port. However, the  `transparent proxy traversal` remains to test.   
+
 [`Fri 07 Feb 2020 07:31:31 PM Beijing`]  
 1. Merged the `multihop` branch to `master`.   
 2. Added the `WebSocket` support, though not working yet.   

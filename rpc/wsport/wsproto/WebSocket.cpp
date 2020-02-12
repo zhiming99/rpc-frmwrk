@@ -22,7 +22,7 @@
 using namespace std;
 
 WebSocket::WebSocket() :
-    protocol( "rpc-frmwrk" )
+    protocol( "chat" )
 {
 
 }
@@ -254,7 +254,7 @@ string WebSocket::answerHandshake()
 
 	string answer;
 	answer += "HTTP/1.1 101 Switching Protocols\r\n";
-	answer += "Upgrade: WebSocket\r\n";
+	answer += "Upgrade: websocket\r\n";
 	answer += "Connection: Upgrade\r\n";
 	if(this->key.length() > 0) {
 		string accept_key;
