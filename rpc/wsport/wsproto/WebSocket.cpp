@@ -169,7 +169,8 @@ gint32 WebSocket::makeHandshake(
         string strDomain = vec_nodes[ 0 ] + "//";
         strDomain += vec_nodes[ 1 ];
 
-        string strPath = vec_nodes[ 2 ];
+        string strPath = string( "/" );
+        strPath += vec_nodes[ 2 ];
 
         strCliReq = "GET ";
         strCliReq += strPath + " HTTP/1.1\r\n";
