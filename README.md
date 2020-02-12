@@ -29,6 +29,10 @@ This framework depends on the following packags:
 14. `Object access via Multi-hop routing` (to come)
 
 ---
+[`Wed 12 Feb 2020 02:09:38 PM Beijing`]   
+1. The `WebSocket` support is completed. And the instructions about the usage is updated in the [`Readme.md`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/wsport/Readme.md)   
+2. Next task is `multihop` support, the very important feature!   
+
 [`Mon 10 Feb 2020 02:14:10 PM Beijing`]   
 1. `Websocket` support is comming. The new update delivers a working version of `Websocket` port. However, the  `transparent proxy traversal` remains to test.   
 
