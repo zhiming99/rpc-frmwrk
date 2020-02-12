@@ -1,4 +1,4 @@
-### Technical Spec:   
+### Technical Information:   
 
   1. The data is transferred in binary format in a `BINARY_FRAME`.
   2. The max bytes per frame is 1MB.
