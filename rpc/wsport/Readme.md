@@ -6,6 +6,7 @@
   4. Support to respond `CLOSE_FRAME`, but will not actively `CLOSE_FRAME` at present.   
   5. The `WebSocket handshake`'s request/response header field `Sec-WebSocket-Protocol` are both set to `chat` in the handshake so far, and ignored. As following shows
   ```
+[Apache request]
 GET / HTTP/1.1
 Host: localhost:4133
 Sec-WebSocket-Key: BVk27NoJaxQ=
@@ -21,6 +22,7 @@ Connection: Upgrade
 
   ```
   ```
+[rpc-frmwrk response]  
 HTTP/1.1 101 Switching Protocols
 Upgrade: websocket
 Connection: Upgrade
