@@ -20,6 +20,14 @@ The `Server` and the `Proxy` has a one-to-many relationship, that is, the
 single `Server` instance can service mulitple `proxy` instances at the
 same time.
 
+
+### RPC, IPC and In-Process
+
+RPC-frmwrk supports `RPC` as remote process call, `IPC` as inter-process
+call, and `In-Process` as in-process call. That is, a `Server` can
+simutaneously be accessed by `Proxies` from internet, different processes,
+or different threads.
+
 ## Object and Interface
 
 
