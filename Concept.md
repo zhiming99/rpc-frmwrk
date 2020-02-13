@@ -2,11 +2,59 @@
 
 Remote Procedure Calls (RPCs) provide a useful abstraction for building
 distributed applications and services. The libraries in this repository
-provide a concrete implementation of an IPC/RPC combined communication 
+provide a concrete implementation of an `IPC/RPC` combined communication 
 framework. These libraries enable communication between clients and servers
-using c++ at present. And Python will be supported in the future.
+using c++ at present. And other language such as python will be supported
+in the future.
 
+
+## RPC Communication Participants and Roles
+
+
+The system uses the concept `Server` and `Proxy` to represent the
+communcation role of the RPC participants. `Proxy` sends out the request
+and `Server` accepts, processes and return responses to the `Proxy`. Also
+`Server` can broadcast events and `Proxy` can subscribe the events
+interested. Usually, the role of `Proxy` and `Server` are not exchangable.
+The `Server` and the `Proxy` has a one-to-many relationship, that is, the
+single `Server` instance can service mulitple `proxy` instances at the
+same time.
 
 ## Object and Interface
+
+
+The RPC-frmwrk utilizes the DBus for the IPC communication. It also uses
+the `DBusMessage` as one of the several message formats in the RPC
+communication. And Natually RPC-frmwrk inherits from DBUS, the concept of
+`Object` and `Interface` to identify the `IPC/RPC server`. If you are
+familiar with the Microsoft's `COM` technology, there should be no
+difficulty in understanding `Object`, `Interface` and the relations in
+between. Basically, you can view the `Object` as a host who provides the
+different services via different `interfaces`. And therefore, `Object`
+has a `one-to-many` mapping to the `interfaces` as `Server` and `Proxy`.
+The `Object Path` and `Interface Name` are two important info to address
+an `Object`. Though, RPC goes beyond. An `Object` may be addressed by
+`TCP connection`, `URL`, `RouterPath` combined with `Object Path` and
+`Interface Name`.
+
+## Synchronous vs. Asynchronous
+Synchronous RPC calls, that block until a response arrives from the server,
+are the closest approximation to the abstraction of a procedure call that RPC
+aspires to.
+
+On the other hand, networks are inherently asynchronous and in many scenarios,
+it is desirable to have the ability to start RPCs without blocking the current
+thread.
+
+The RPC-frmwrk user API comes in both synchronous and asynchronous flavors.
+
+
+## Streaming
+
+RPC-frmwrk supports streaming semantics, where the `Proxy` requests to setup
+a `stream channel` with `Server`. After the channel is established sucessfully,
+bi-directional bytes stream can start. The streaming channel has better
+flow-control and connection status awareness. The limit of a single stream
+channel instance is 2^64 bytes.
 
 
