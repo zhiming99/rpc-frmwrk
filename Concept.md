@@ -26,7 +26,9 @@ same time.
 RPC-frmwrk supports `RPC` as remote process call, `IPC` as inter-process
 call, and `In-Process` as in-process call. That is, a `Server` can
 simutaneously be accessed by `Proxies` from internet, different processes,
-or different threads.
+or different threads. A `Proxy` can switch to different target `Server` by
+modifying its configuration file, as `XXXdesc.json` from the sample codes
+under the `test` directory.
 
 ## Object and Interface
 
