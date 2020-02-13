@@ -30,6 +30,13 @@ or different threads. A `Proxy` can switch to different target `Server` by
 modifying its configuration file, as `XXXdesc.json` from the sample codes
 under the `test` directory.
 
+#### Security over Internet
+
+RPC-frmwrk can be configured to use WSS(Secure WebSocket) for the
+communication over internet. And it can also be configured to use SSL within
+the intranet. The pluggable authentation and access control will be
+supported in the future.
+
 ## Object and Interface
 
 
