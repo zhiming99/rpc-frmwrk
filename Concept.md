@@ -41,9 +41,9 @@ between. Basically, you can view the `Object` as a host who provides the
 different services via different `interfaces`. And therefore, `Object`
 has a `one-to-many` mapping to the `interfaces` as `Server` and `Proxy`.
 The `Object Path` and `Interface Name` are two important info to address
-an `Object`. Though, RPC goes beyond. An `Object` may be addressed by
-`TCP connection`, `URL`, `RouterPath` combined with `Object Path` and
-`Interface Name`.
+an `Object`. However, the RPC call goes beyond, when An `Object` can be
+addressed by `TCP connection`, `URL`, `RouterPath` combined with `Object
+Path` and `Interface Name`.
 
 ## Synchronous vs. Asynchronous
 Synchronous RPC calls, that block until a response arrives from the server,
