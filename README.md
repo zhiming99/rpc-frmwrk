@@ -29,6 +29,10 @@ This framework depends on the following packags:
 14. `Object access via Multi-hop routing` (to come)
 
 ---
+[`Sat 15 Feb 2020 12:02:14 AM Beijing`]   
+1. Fixed a bug in the streaming interface.
+2. Added [`Concept.md`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md) to introduce some technical information about rpc-frmwrk.
+
 [`Wed 12 Feb 2020 02:09:38 PM Beijing`]   
 1. The `WebSocket` support is completed. And the instructions about the usage is updated in the [`Readme.md`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/wsport/Readme.md).   
 2. Next task is `multihop` support, the very important feature!   
