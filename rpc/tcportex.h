@@ -264,7 +264,7 @@ class CRpcNativeProtoFdo: public CPort
     PacketPtr m_pPackReceiving;
 
     std::deque< Stm2Ptr >  m_cycQueSend;
-    gint32  m_iStmCounter;
+    std::atomic< gint32 >  m_iStmCounter;
     TaskletPtr m_pListeningTask;
 
 

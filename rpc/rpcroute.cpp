@@ -114,7 +114,6 @@ gint32 CRpcRouter::GetBridgeProxy(
 
             ret = ( ( CPort* )pPort )->
                 GetPdoPort( pPdo );
-
             if( ERROR( ret ) )
                 continue;
 
@@ -164,6 +163,9 @@ gint32 CRpcRouter::GetBridgeProxy(
             ret = 0;
             break;
         }
+
+        if( ERROR( ret ) )
+            ret = -ENOENT;
 
     }while( 0 );
 

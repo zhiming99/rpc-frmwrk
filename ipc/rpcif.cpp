@@ -4034,7 +4034,7 @@ gint32 CRpcServices::LoadObjDesc(
                     dwVal = std::strtol(
                         strVal.c_str(), nullptr, 10 );
                 }
-                if( dwVal > 1024 && dwVal < 0x10000 )
+                if( dwVal > 0 && dwVal < 0x10000 )
                 {
                     oCfg[ propDestTcpPort ] = dwVal;
                     dwPortNum = dwVal;
