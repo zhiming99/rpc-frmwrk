@@ -15,10 +15,10 @@ The system uses the concept `Server` and `Proxy` to represent the
 communcation role of the RPC participants. `Proxy` sends out the request
 and `Server` accepts, processes and return responses to the `Proxy`. Also
 `Server` can broadcast events and `Proxy` can subscribe the events
-interested. Usually, the role of `Proxy` and `Server` are not exchangable.
-The `Server` and the `Proxy` has a one-to-many relationship, that is, the
-single `Server` instance can service mulitple `proxy` instances at the
-same time.
+interested. Usually, the role of `Proxy` and `Server` are not
+interchangable. And the `Server` and the `Proxy` has a one-to-many
+relationship, that is, the single `Server` instance can service mulitple
+`proxy` instances at the same time.
 
 
 ### RPC, IPC and In-Process
@@ -42,29 +42,30 @@ supported in the future.
 
 The RPC-frmwrk utilizes the DBus for the IPC communication. It also uses
 the `DBusMessage` as one of the several message formats in the RPC
-communication. And Natually RPC-frmwrk inherits from DBUS, the concept of
-`Object` and `Interface` to identify the `IPC/RPC server`. If you are
-familiar with the Microsoft's `COM` technology, there should be no
-difficulty in understanding `Object`, `Interface` and the relations in
-between. Basically, you can view the `Object` as a host who provides the
-different services via different `interfaces`. And therefore, `Object`
-has a `one-to-many` mapping to the `interfaces` as `Server` and `Proxy`.
-The `Object Path` and `Interface Name` are two important info to address
-an `Object`. However, the RPC call goes beyond, when An `Object` can be
-addressed by `TCP connection`, `URL`, `RouterPath` combined with `Object
-Path` and `Interface Name`.
+communication. And thereby, RPC-frmwrk inherits from DBUS, the concept of
+`Object` and `Interface` to identify the `IPC/RPC server`.  You can refer
+to the [`DBus's
+documentation`](https://dbus.freedesktop.org/doc/dbus-specification.html#message-protocol-names-bus)
+for detailed explanation about the two.  and the relations in between.
+Basically, you can view the `Object` as a host who provides the different
+services via different `interfaces`. And therefore, `Object` has a
+`one-to-many` mapping to the `interfaces` similiar as that of `Server` and
+`Proxy`. And the `Object Path` and `Interface Name` are two important info
+to address an `Object` in the IPC communication.  However, the RPC call
+goes beyond, when An `Object` can be addressed by `TCP connection`, `URL`,
+`RouterPath` plus `Object Path` and `Interface Name`.
+
 
 ## Synchronous vs. Asynchronous
 Synchronous RPC calls, that block until a response arrives from the server,
-are the closest approximation to the abstraction of a procedure call that RPC
-aspires to.
+are the closest approximation to the abstraction of a procedure call that
+RPC aspires to.
 
-On the other hand, networks are inherently asynchronous and in many scenarios,
-it is desirable to have the ability to start RPCs without blocking the current
-thread.
+On the other hand, networks are inherently asynchronous and in many
+scenarios, it is desirable to have the ability to start RPCs without
+blocking the current thread.
 
 The RPC-frmwrk user API comes in both synchronous and asynchronous flavors.
-
 
 ## Streaming
 
