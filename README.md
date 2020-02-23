@@ -29,6 +29,9 @@ This framework depends on the following packags:
 14. `Object access via Multi-hop routing` (to come)
 
 ---
+[`Sun 23 Feb 2020 11:22:40 AM Beijing`]   
+ 1. Splitting the CRpcRouter class to four smaller classes to allow better management of shared resources.   
+
 [`Sat 15 Feb 2020 12:02:14 AM Beijing`]   
 1. Fixed a bug in the streaming interface.
 2. Added [`Concept.md`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md) as an introduction about the `rpc-frmwrk`.
