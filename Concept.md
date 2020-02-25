@@ -30,12 +30,12 @@ or different threads. A `Proxy` can switch to different target `Server` by
 modifying its configuration file, as `XXXdesc.json` from the sample codes
 under the `test` directory.
 
-#### Security over Internet
+#### Security over the Network
 
 RPC-frmwrk can be configured to use WSS(Secure WebSocket) for the
-communication over internet. And it can also be configured to use SSL within
-the intranet. The pluggable authentation and access control will be
-supported in the future.
+communication with the web server over the internet. And it can also be
+configured to use SSL within the intranet. The pluggable authentation and
+access control will be supported in the future.
 
 ## Object and Interface
 
@@ -75,5 +75,13 @@ a `stream channel` with `Server`. After the channel is established sucessfully,
 bi-directional bytes stream can start. The streaming channel has better
 flow-control and connection status awareness. The limit of a single stream
 channel instance is 2^64 bytes.
+
+## Development
+
+The RPC-frmwrk provides a set of API to facilitate the development. A typical
+RPC module contains a proxy and a server. The proxy side usually can be done
+with some system provided macros. And the developer can focus on the
+implementation of the features on the server side. The sample codes in the
+`tests` directory can be used as a start-point.
 
 
