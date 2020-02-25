@@ -39,7 +39,6 @@ access control will be supported in the future.
 
 ## Object and Interface
 
-
 The RPC-frmwrk utilizes the DBus for the IPC communication. It also uses
 the `DBusMessage` as one of the several message formats in the RPC
 communication. And thereby, RPC-frmwrk inherits from DBUS, the concept of
@@ -54,7 +53,6 @@ similiar as that of `Server` and `Proxy`. And the `Object Path` and
 communication.  However, the RPC call goes beyond, when An `Object` can be
 addressed by `TCP connection`, `URL`, `RouterPath` plus `Object Path` and
 `Interface Name`.
-
 
 
 ## Synchronous vs. Asynchronous
@@ -82,7 +80,7 @@ The RPC-frmwrk provides a set of API to facilitate the development. A typical
 RPC module contains a proxy and a server. The proxy side usually can be done
 with some system provided macros. And the developer can focus on the
 implementation of the features on the server side. The sample codes in the
-[`tests`](https://github.com/zhiming99/rpc-frmwrk/tree/master/test) directory
+[`test`](https://github.com/zhiming99/rpc-frmwrk/tree/master/test) directory
 can be used as a start-point.
 
 
