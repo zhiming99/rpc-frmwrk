@@ -82,6 +82,7 @@ The RPC-frmwrk provides a set of API to facilitate the development. A typical
 RPC module contains a proxy and a server. The proxy side usually can be done
 with some system provided macros. And the developer can focus on the
 implementation of the features on the server side. The sample codes in the
-`tests` directory can be used as a start-point.
+[`tests`](https://github.com/zhiming99/rpc-frmwrk/tree/master/test) directory
+can be used as a start-point.
 
 
