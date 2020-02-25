@@ -68,37 +68,42 @@ The RPC-frmwrk user API comes in both synchronous and asynchronous flavors.
 
 ## Stateful Connection
 
-Before the RPC calls can be delivered to the Server, the RPC-frmwrk will setup
-a connection between the proxy/server. The connection is dedicated to the 
-proxy/server pair. And only the requests can be accepted with the valid
+Before the RPC calls can be delivered to the Server, the RPC-frmwrk will
+setup a connection between the proxy/server. The connection is dedicated to
+the proxy/server pair. And only the requests can be accepted with the valid
 `Object Path`, `Interface name` plus the specific `TCP connection` and
 `RouterPath`. The connection also delivers the event from the server to all
-the subscriber proxies. Besides the RPC calls and events, the connection also
-carries the streaming messages between proxy/server in either direction.
+the subscriber proxies. Besides the RPC calls and events, the connection
+also carries the streaming messages between proxy/server in either
+direction.
+
 
 ### RPC calls and events
 
-An RPC call is a request from proxy to the server, and most likely a response
-will return with the desired result or error code if the request fails. 
+An RPC call is a request from proxy to the server, and most likely a
+response will return with the desired result or error code if the request
+fails.
 
 An RPC event is a message broadcasted by the server to all the interested
 proxies. It is a one-way message without response.
 
 ### Streaming
 
-RPC-frmwrk supports streaming semantics, where the `Proxy` requests to setup
-a `stream channel` with `Server` over the existing connection. After the
-channel is established sucessfully, bi-directional bytes stream can start.
-The streaming channel has better flow-control and connection status awareness.
-The limit of a single stream channel instance is 2^64 bytes.
+RPC-frmwrk supports streaming semantics, where the `Proxy` requests to
+setup a `stream channel` with the `Server` over the establised connection
+between the proxy and the server. After the channel is set up sucessfully,
+bi-directional byte stream can start. The streaming channel has better
+flow-control and connection status awareness. The limit of a single stream
+channel instance is 2^64 bytes.
 
 ## Development
 
-The RPC-frmwrk provides a set of API to facilitate the development. A typical
-distributed RPC application contains a proxy and a server. The proxy side
-usually can be done with some system provided macros. And the developers can
-focus on the implementation of the features on the server side. It is
-recommended to use he sample codes in the [`test`](https://github.com/zhiming99/rpc-frmwrk/tree/master/test)
+The RPC-frmwrk provides a set of API to facilitate the development. A
+typical distributed RPC application contains a proxy and a server. The
+proxy side usually can be done with some system provided macros. And the
+developers can focus on the implementation of the features on the server
+side. It is recommended to use he sample codes in the
+[`test`](https://github.com/zhiming99/rpc-frmwrk/tree/master/test)
 directory as a start-point of your RPC development.
 
 
