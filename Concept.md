@@ -66,14 +66,15 @@ blocking the current thread.
 
 The RPC-frmwrk user API comes in both synchronous and asynchronous flavors.
 
-## Stateful Connections
+## Stateful Connection
 
 Before the RPC calls can be delivered to the Server, the RPC-frmwrk will setup
 a connection between the proxy/server. The connection is dedicated to the 
 proxy/server pair. And only the requests can be accepted with the valid
 `Object Path`, `Interface name` plus the specific `TCP connection` and
-`RouterPath`. The connection will push the event from the server to all the
-subscriber proxies. 
+`RouterPath`. The connection also delivers the event from the server to all
+the subscriber proxies. Besides the RPC calls and events, the connection also
+carries the streaming messages between proxy/server in either direction.
 
 ### RPC calls and events
 
@@ -83,13 +84,13 @@ will return with the desired result or error code if the request fails.
 An RPC event is a message broadcasted by the server to all the interested
 proxies. It is a one-way message without response.
 
-## Streaming
+### Streaming
 
 RPC-frmwrk supports streaming semantics, where the `Proxy` requests to setup
-a `stream channel` with `Server`. After the channel is established sucessfully,
-bi-directional bytes stream can start. The streaming channel has better
-flow-control and connection status awareness. The limit of a single stream
-channel instance is 2^64 bytes.
+a `stream channel` with `Server` over the existing connection. After the
+channel is established sucessfully, bi-directional bytes stream can start.
+The streaming channel has better flow-control and connection status awareness.
+The limit of a single stream channel instance is 2^64 bytes.
 
 ## Development
 
