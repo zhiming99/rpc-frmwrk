@@ -66,6 +66,23 @@ blocking the current thread.
 
 The RPC-frmwrk user API comes in both synchronous and asynchronous flavors.
 
+## Stateful Connections
+
+Before the RPC calls can be delivered to the Server, the RPC-frmwrk will setup
+a connection between the proxy/server. The connection is dedicated to the 
+proxy/server pair. And only the requests can be accepted with the valid
+`Object Path`, `Interface name` plus the specific `TCP connection` and
+`RouterPath`. The connection will push the event from the server to all the
+subscriber proxies. 
+
+### RPC calls and events
+
+An RPC call is a request from proxy to the server, and most likely a response
+will return with the desired result or error code if the request fails. 
+
+An RPC event is a message broadcasted by the server to all the interested
+proxies. It is a one-way message without response.
+
 ## Streaming
 
 RPC-frmwrk supports streaming semantics, where the `Proxy` requests to setup
