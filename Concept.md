@@ -93,17 +93,17 @@ RPC-frmwrk supports streaming semantics, where the `Proxy` requests to
 setup a `stream channel` with the `Server` over the establised connection
 between the proxy and the server. After the channel is set up sucessfully,
 bi-directional byte stream can start. The streaming channel has better
-flow-control and connection status awareness. The limit of a single stream
-channel instance is 2^64 bytes.
+flow-control and connection status awareness. The upper limit of the
+capacity is 2^64 bytes per stream channel.
 
 ## Development
 
-The RPC-frmwrk provides a set of API to facilitate the development. A
-typical distributed RPC application contains a proxy and a server. The
-proxy side usually can be done with some system provided macros. And the
-developers can focus on the implementation of the features on the server
-side. It is recommended to use the sample codes in the
-[`test`](https://github.com/zhiming99/rpc-frmwrk/tree/master/test)
-directory as a start-point of your RPC development.
+The RPC-frmwrk provides a set of API to facilitate the development with
+the powerful support from `C++11`. A typical distributed RPC application
+makes up of a proxy and a server. The proxy can be developed with some
+system provided macros in most cases. And your efforts can focus on the
+implementation of the features the server delivers. It is recommended to
+refer to the sample codes in the [`test`](https://github.com/zhiming99/rpc-frmwrk/tree/master/test)
+directory as the start-point of your RPC development.
 
 
