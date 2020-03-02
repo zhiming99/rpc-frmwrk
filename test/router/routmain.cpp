@@ -39,9 +39,6 @@ CPPUNIT_TEST_SUITE_REGISTRATION( CIfRouterTest );
 
 // router role: 1. reqfwdr, 2. bridge, 3. both
 guint32 g_dwRole = 1;
-bool g_bCompress = false;
-bool g_bWebSocket = false;
-bool g_bSSL = false;
 
 void CIfRouterTest::setUp()
 {
@@ -52,7 +49,9 @@ void CIfRouterTest::setUp()
 
         CParamList oParams;
 
-        ret = oParams.Push( std::string( MODULE_NAME ) );
+        ret = oParams.Push(
+            std::string( MODULE_NAME ) );
+
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 
         ret = m_pMgr.NewObj(
@@ -72,24 +71,7 @@ void CIfRouterTest::setUp()
             pSvc->SetCmdLineOpt(
                 propRouterRole, g_dwRole );
 
-            if( g_bCompress )
-            {
-                pSvc->SetCmdLineOpt(
-                    propCompress, g_bCompress );
-            }
-
-            if( g_bSSL )
-            {
-                pSvc->SetCmdLineOpt(
-                    propEnableSSL, true );
-            }
-
-            if( g_bWebSocket )
-            {
-                pSvc->SetCmdLineOpt(
-                    propEnableWebSock, true );
-            }
-
+            pSvc->SetRouterName( MODULE_NAME );
             ret = pSvc->Start();
         }
         else
@@ -124,7 +106,6 @@ CfgPtr CIfRouterTest::InitRouterCfg(
 {
     CfgPtr ptrCfg;
     gint32 ret = 0;
-
     do{
         ret = CRpcServices::LoadObjDesc(
             ROUTER_OBJ_DESC,
@@ -137,7 +118,7 @@ CfgPtr CIfRouterTest::InitRouterCfg(
         CCfgOpener oCfg( ( IConfigDb* )ptrCfg );
         oCfg[ propIoMgr ] = m_pMgr;
         oCfg[ propIfStateClass ] =
-            clsid( CIfRouterState );
+            clsid( CIfRouterMgrState );
 
         oCfg[ propRouterRole ] = dwRole;
 
@@ -156,87 +137,36 @@ CfgPtr CIfRouterTest::InitRouterCfg(
 void CIfRouterTest::testSvrStartStop()
 {
     CPPUNIT_ASSERT( !m_pMgr.IsEmpty() );
+    CfgPtr pCfg = InitRouterCfg( g_dwRole );
 
-    CfgPtr pCfgFwdr;
-    CfgPtr pCfgBdge;
-
-    if( g_dwRole & 0x01 )
-        pCfgFwdr = InitRouterCfg( 0x01 );
-
-    if( g_dwRole & 0x02 )
-        pCfgBdge = InitRouterCfg( 0x02 );
-
-    InterfPtr pIfFwdr;
-    InterfPtr pIfBdge;
-
+    InterfPtr pIf;
     gint32 ret = 0;
     do{
-        if( !pCfgFwdr.IsEmpty() )
+        if( pCfg.IsEmpty() )
         {
-            ret =  pIfFwdr.NewObj(
-                clsid( CRpcRouterImpl ),
-                pCfgFwdr );
-
-            if( ERROR( ret ) )
-                break;
-                
-            CInterfaceServer* pSvrFwdr = pIfFwdr;
-            if( unlikely( pSvrFwdr == nullptr ) )
-            {
-                ret = -EFAULT;
-                break;
-            }
-            ret = pIfFwdr->Start();
-            if( ERROR( ret ) )
-                break;
+            ret = -EFAULT;
+            break;
         }
 
-        if( !pCfgBdge.IsEmpty() )
-        {
-            ret =  pIfBdge.NewObj(
-                clsid( CRpcRouterImpl ), pCfgBdge );
+        ret =  pIf.NewObj(
+            clsid( CRpcRouterManagerImpl ),
+            pCfg );
 
-            CInterfaceServer* pSvrBdge = pIfBdge;
-            if( unlikely( pSvrBdge == nullptr ) )
-            {
-                ret = -EFAULT;
-                break;
-            }
-            ret = pIfBdge->Start();
-            if( ERROR( ret ) )
-                break;
-        }
+        if( ERROR( ret ) )
+            break;
+            
+        ret = pIf->Start();
+        if( ERROR( ret ) )
+            break;
 
-
-        if( g_dwRole == 0x01 )
-        {
-            CInterfaceServer* pSvr = pIfFwdr;
-            while( pSvr->IsConnected() )
-                sleep( 1 );
-
-        }
-        else if( g_dwRole == 0x02 )
-        {
-            CInterfaceServer* pSvr = pIfBdge;
-            while( pSvr->IsConnected() )
-                sleep( 1 );
-        }
-        else
-        {
-            CInterfaceServer* pSvrFwdr = pIfFwdr;
-            CInterfaceServer* pSvrBdge = pIfBdge;
-            while( pSvrFwdr->IsConnected() &&
-                pSvrBdge->IsConnected() )
-                sleep( 1 );
-        }
+        CInterfaceServer* pSvr = pIf;
+        while( pSvr->IsConnected() )
+            sleep( 1 );
 
     }while( 0 );
 
-    if( !pIfFwdr.IsEmpty() )
-        ret = pIfFwdr->Stop();
-
-    if( !pIfBdge.IsEmpty() )
-        ret = pIfBdge->Stop();
+    if( !pIf.IsEmpty() )
+        ret = pIf->Stop();
 
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 
@@ -251,26 +181,10 @@ int main( int argc, char** argv )
 
     int opt = 0;
     int ret = 0;
-    while( ( opt = getopt( argc, argv, "wscr:" ) ) != -1 )
+    while( ( opt = getopt( argc, argv, "r:" ) ) != -1 )
     {
         switch (opt)
         {
-        case 'w':
-            {
-                g_bWebSocket = true;
-                break;
-            }
-        case 's':
-            {
-                g_bSSL = true;
-                break;
-            }
-        case 'c':
-            {
-                // compression required
-                g_bCompress = true;
-                break;
-            }
         case 'r':
             {
                 g_dwRole = ( guint32 )atoi( optarg );

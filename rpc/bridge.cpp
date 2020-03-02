@@ -676,39 +676,60 @@ gint32 CRpcTcpBridgeProxy::ForwardEvent(
     do{
         InterfPtr pIf;
         CRpcRouter* pRouter = GetParent();
-        pRouter->GetReqFwdr( pIf );
-        CRpcReqForwarder* pReqFwdr = pIf;
-        if( pReqFwdr == nullptr )
-        {
-            ret = -EFAULT;
-            break;
-        }
+        if( unlikely( pRouter == nullptr ) )
+            continue;
 
-        // TODO: need a taskgroup to glue the two
-        // tasks together.
         CCfgOpener oEvtCtx( pEvtCtx );
-        ret = oEvtCtx.CopyProp(
-            propConnHandle, propPortId, this );
+        if( pRouter->HasReqForwarder() )
+        {
+            // forward event to local proxies
+            CRpcRouterReqFwdr* pRtReqFwdr =
+                static_cast< CRpcRouterReqFwdr* >
+                    ( pRouter );
+
+            pRtReqFwdr->GetReqFwdr( pIf );
+            CRpcReqForwarder* pReqFwdr = pIf;
+            if( pReqFwdr == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+
+            ret = oEvtCtx.CopyProp(
+                propConnHandle, propPortId, this );
+            if( ERROR( ret ) )
+                break;
+
+            ret = pReqFwdr->ForwardEvent(
+                pEvtCtx, pEvtMsg, pCallback );
+
+            break;
+        }
+
+        if( !pRouter->HasBridge() )
+            break;
+
+        // dispatch the event to the remote
+        // listeners
+        TaskGrpPtr pTaskGrp;
+        CParamList oParams;
+        oParams[ propIfPtr ] = ObjPtr( this );
+        ret = pTaskGrp.NewObj();
         if( ERROR( ret ) )
             break;
 
-        ret = pReqFwdr->ForwardEvent(
-            pEvtCtx, pEvtMsg, pCallback );
-        if( ERROR( ret ) )
-        {
-            DebugPrint( ret,
-                "CRpcReqForwarder's "
-                "ForwardEvent failed" );
-        }
+        pTaskGrp->SetClientNotify( pCallback );
+        pTaskGrp->SetRelation( logicNONE );
+
+        CRpcRouterBridge* pRtBdge =
+            static_cast< CRpcRouterBridge* >
+                ( pRouter );
 
         std::string strPath;
         oEvtCtx.GetStrProp(
             propRouterPath, strPath );
 
-        // dispatch the event to the remote
-        // listeners
         CCfgOpener oEvtCtx2;
-
         oEvtCtx2.CopyProp(
             propConnHandle, propPortId, this );
 
@@ -717,10 +738,7 @@ gint32 CRpcTcpBridgeProxy::ForwardEvent(
         ret = oIfCfg.GetStrProp(
             propNodeName, strNodeName );
         if( ERROR( ret ) )
-        {
-            ret = 0;
             break;
-        }
 
         // prepend the node name to the router
         strPath = string( "/" ) +
@@ -731,18 +749,20 @@ gint32 CRpcTcpBridgeProxy::ForwardEvent(
 
         DMsgPtr fwdrMsg( pEvtMsg );
         std::set< guint32 > setPortIds;
-        ret = pRouter->CheckEvtToFwrd(
+        ret = pRtBdge->CheckEvtToFwrd(
             oEvtCtx2.GetCfg(), fwdrMsg,
             setPortIds );
 
         if( ERROR( ret ) )
             break;
 
+        bool bSingleBdge =
+            ( setPortIds.size() == 1 );
+
         for( auto elem : setPortIds )
         {
             InterfPtr pIf;
-            ret = pRouter->GetBridge(
-                elem, pIf );
+            ret = pRtBdge->GetBridge( elem, pIf );
             if( ERROR( ret ) )
                 continue;
 
@@ -750,10 +770,56 @@ gint32 CRpcTcpBridgeProxy::ForwardEvent(
             if( pBdge == nullptr )
                 continue;
 
-            pBdge->ForwardEvent(
-                oEvtCtx2.GetCfg(), 
-                pEvtMsg, pCallback );
+            if( bSingleBdge )
+            {
+                ret = pBdge->ForwardEvent(
+                    oEvtCtx2.GetCfg(), 
+                    pEvtMsg, pCallback );
+                break;
+            }
+
+            TaskletPtr pFwrdEvt;
+            ret = DEFER_IFCALLEX_NOSCHED(
+                pFwrdEvt, ObjPtr( pBdge ),
+                &CRpcTcpBridge::ForwardEvent,
+                pEvtCtx, pEvtMsg,
+                ( IEventSink* )0 );
+
+            if( SUCCEEDED( ret ) )
+            {
+                // replace the callback pointer
+                // with this defer task
+                CIfDeferCallTaskEx*
+                    pTask = pFwrdEvt;
+
+                BufPtr pBuf( true );
+                *pBuf = ObjPtr( pTask );
+
+                pTask->UpdateParamAt( 2, pBuf );
+                ret = pTaskGrp->AppendTask(
+                    pFwrdEvt );
+            }
+            else
+            {
+                DebugPrint( ret,
+                    "CRpcReqForwarder's "
+                    "ForwardEvent failed" );
+            }
         }
+
+        if( ERROR( ret ) )
+            break;
+
+        if( pTaskGrp->GetTaskCount() == 0 )
+            break;
+
+        TaskletPtr pTask = ObjPtr( pTaskGrp );
+        ret = DEFER_CALL( GetIoMgr(), this,
+            &CRpcServices::RunManagedTask,
+            pTask, false );
+
+        if( SUCCEEDED( ret ) )
+            ret = pTask->GetError();
 
     }while( 0 );
 
@@ -1571,8 +1637,10 @@ gint32 CRpcTcpBridge::ClearRemoteEvents(
         return ERROR_STATE;
 
     gint32 ret = 0;
-    CRpcRouter* pRouter = GetParent();
 
+    CRpcRouterBridge* pRouter =
+        static_cast< CRpcRouterBridge* >
+            ( GetParent() );
     do{
         std::vector< ObjPtr >& vecMatches =
             ( *pMatches )();
@@ -1708,12 +1776,14 @@ gint32 CRpcTcpBridge::EnableRemoteEventInternal(
         if( ERROR( ret ) )
             break;
 
-        bool bRelay = false;
+        CRpcRouterBridge* pRouter =
+            static_cast< CRpcRouterBridge* >
+                ( GetParent() );
+
         if( strPath > "/" )
         {
             InterfPtr pIf;
-            CRpcRouter* pRouter = GetParent();
-            ret = pRouter->GetBridgeProxy(
+            ret = pRouter->GetBridgeProxyByPath(
                 strPath, pIf );
             if( ERROR( ret ) )
             {
@@ -1728,29 +1798,19 @@ gint32 CRpcTcpBridge::EnableRemoteEventInternal(
             if( ERROR( ret ) )
                 break;
 
-            bRelay = true;
-        }
-        else if( strPath != "/" )
-        {
-            ret = -EINVAL;
+            // TODO: forward to the remote
+            // node
             break;
         }
 
         // trim the match properties to the
         // necessary ones
         MatchPtr pRtMatch;
-        CRpcRouter* pRouter = GetParent();
         ret = pRouter->GetMatchToAdd(
             pMatch, true, pRtMatch );
 
         if( ERROR( ret ) )
             break;
-
-        if( bRelay )
-        {
-            // TODO: implement it
-            break;
-        }
 
         if( bEnable )
         {
@@ -1759,7 +1819,6 @@ gint32 CRpcTcpBridge::EnableRemoteEventInternal(
         }
         else
         {
-
             ret = pRouter->RunDisableEventTask(
                 pCallback, pRtMatch );
         }
@@ -1862,7 +1921,10 @@ gint32 CRpcTcpBridge::CheckReqToRelay(
     DMsgPtr& pMsg,
     MatchPtr& pMatchHit )
 {
-    CRpcRouter* pRouter = GetParent();
+    CRpcRouterBridge* pRouter =
+        static_cast< CRpcRouterBridge* >
+            ( GetParent() );
+
     gint32 ret = pRouter->CheckReqToRelay(
         pReqCtx, pMsg, pMatchHit );
 
@@ -2122,6 +2184,113 @@ gint32 CRpcTcpBridge::OnKeepAliveRelay(
     return ret;
 }
 
+gint32 CBridgeForwardRequestTask::RunTask()
+{
+    gint32 ret = 0;
+
+    ObjPtr pObj;
+    CParamList oParams( GetConfig() );
+    DMsgPtr pRespMsg;
+
+    do{
+        CRpcServices* pIf;
+        ret = oParams.GetObjPtr( propIfPtr, pObj );
+        if( ERROR( ret ) )
+            break;
+
+        pIf = pObj;
+        if( pIf == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        CRpcRouterBridge* pRouter = nullptr;
+        ret = oParams.GetPointer(
+            propRouterPtr, pRouter );
+        if( ERROR( ret ) )
+            break;
+
+        IConfigDb* pReqCtx = nullptr;
+        ret = oParams.GetPointer( 0, pReqCtx );
+        if( ERROR( ret ) )
+            break;
+
+        DMsgPtr pMsg;
+        ret = oParams.GetMsgPtr( 1, pMsg );
+        if( ERROR( ret ) )
+            break;
+
+        if( pIf->GetClsid() !=
+            clsid( CRpcTcpBridgeImpl ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        CCfgOpener oReqCtx( pReqCtx );
+        std::string strRouterPath =
+            oReqCtx[ propRouterPath ];
+
+        if( strRouterPath != "/" )
+        {
+            //TODO: Implement it
+            ret = ERROR_NOT_IMPL;
+            break;
+        }
+
+        string strDest;
+        ret = oParams.GetStrProp(
+            2, strDest );
+
+        if( ERROR( ret ) )
+            break;
+
+        // we have reach the destination
+        InterfPtr proxyPtr;
+        ret = pRouter->GetReqFwdrProxy(
+            strDest, proxyPtr );
+
+        // port id for request canceling
+        oReqCtx.CopyProp( propConnHandle,
+            propPortId, pIf );
+
+        CRpcReqForwarderProxy* pProxy =
+            proxyPtr;
+
+        if( pProxy == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        ret = pProxy->ForwardRequest(
+            pReqCtx, pMsg, pRespMsg, this );
+
+    }while( 0 );
+
+    if( ret == STATUS_PENDING )
+        return ret;
+
+    if( Retriable( ret ) )
+        return STATUS_MORE_PROCESS_NEEDED;
+
+    oParams.GetObjPtr(
+        propRespPtr, pObj );
+
+    CParamList oRespCfg(
+        ( IConfigDb* )pObj );
+
+    oRespCfg.SetIntProp(
+        propReturnValue, ret );
+
+    if( !pRespMsg.IsEmpty() )
+        oRespCfg.Push( pRespMsg );
+
+    ret = OnTaskComplete( ret );
+
+    return ret;
+}
+
 gint32 CRpcTcpBridge::ForwardRequest(
     IConfigDb* pReqCtx,
     DBusMessage* pFwdrMsg,
@@ -2138,7 +2307,10 @@ gint32 CRpcTcpBridge::ForwardRequest(
 
     do{
         DMsgPtr fwdrMsg( pFwdrMsg );
-        CRpcRouter* pRouter = GetParent();
+
+        CRpcRouterBridge* pRouter =
+            static_cast< CRpcRouterBridge* >
+                ( GetParent() );
 
         CCfgOpener oReqCtx;
         oReqCtx.CopyProp(
@@ -2203,7 +2375,7 @@ gint32 CRpcTcpBridge::ForwardRequest(
         if( bRelay )
         {
             InterfPtr pIf;
-            ret = pRouter->GetBridgeProxy(
+            ret = pRouter->GetBridgeProxyByPath(
                 strRouterPath, pIf );
 
             if( ERROR( ret ) )
@@ -2219,7 +2391,7 @@ gint32 CRpcTcpBridge::ForwardRequest(
 
         TaskletPtr pTask;
         ret = pTask.NewObj(
-            clsid( CReqFwdrForwardRequestTask ),
+            clsid( CBridgeForwardRequestTask ),
             oParams.GetCfg() );
 
         if( ERROR( ret ) )
@@ -3519,3 +3691,4 @@ gint32 CRpcTcpBridgeShared::RegMatchCtrlStream(
 
     return ret;
 }
+

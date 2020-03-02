@@ -1,7 +1,7 @@
 /*
  * =====================================================================================
  *
- *       Filename:  sslfido.cpp
+ *       Filename:  wsfido.cpp
  *
  *    Description:  Implementation of WebSocket filter port and related classes 
  *
@@ -1533,6 +1533,8 @@ gint32 CWsHandshakeTask::OnIrpComplete(
             else if( psse->m_iEvent == sseError )
             {
                 ret = psse->m_iData;
+                if( ret == -ENOTCONN )
+                    ret = -ECONNRESET;
                 break;
             }
             else

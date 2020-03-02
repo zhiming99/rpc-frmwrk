@@ -335,12 +335,26 @@ BufPtr PackageTo( const T& i )
 }
 
 template<typename T,
+    typename T2 = typename std::enable_if<
+        !std::is_same<DBusMessage, T>::value, T >::type,
     typename T1 = typename std::enable_if<
         std::is_base_of<CObjBase, T>::value, T >::type >
 BufPtr PackageTo( T* pObj )
 {
     BufPtr pBuf( true );
     *pBuf = ObjPtr( pObj );
+    return pBuf;
+}
+
+template<typename T,
+    typename T2 = typename std::enable_if<
+        std::is_same<DBusMessage, T>::value, T >::type,
+    typename T1 = T2,
+    typename T3 = T2 >
+BufPtr PackageTo( T* pObj )
+{
+    BufPtr pBuf( true );
+    *pBuf = DMsgPtr( pObj );
     return pBuf;
 }
 

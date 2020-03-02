@@ -63,13 +63,14 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CRemoteProxyState );
     INIT_MAP_ENTRYCFG( CReqFwdrEnableRmtEventTask );
     INIT_MAP_ENTRYCFG( CReqFwdrForwardRequestTask );
+    INIT_MAP_ENTRYCFG( CBridgeForwardRequestTask );
     // INIT_MAP_ENTRYCFG( CReqFwdrSendDataTask );
     INIT_MAP_ENTRYCFG( CReqFwdrFetchDataTask );
     INIT_MAP_ENTRYCFG( CReqFwdrOpenRmtPortTask );
     INIT_MAP_ENTRYCFG( CReqFwdrCloseRmtPortTask );
     INIT_MAP_ENTRYCFG( CRouterEnableEventRelayTask );
     INIT_MAP_ENTRYCFG( CRouterLocalMatch );
-    INIT_MAP_ENTRYCFG( CRouterOpenRmtPortTask );
+    INIT_MAP_ENTRYCFG( CRouterOpenBdgePortTask );
     INIT_MAP_ENTRYCFG( CRouterRemoteMatch );
     INIT_MAP_ENTRYCFG( CRpcControlStream );
     INIT_MAP_ENTRYCFG( CRpcListeningSock );
@@ -96,7 +97,15 @@ static FactoryPtr InitClassFactory()
     // INIT_MAP_ENTRYCFG( CBdgeStartFetchDataTask );
     INIT_MAP_ENTRYCFG( CRpcSockWatchCallback );
     INIT_MAP_ENTRYCFG( CProxyFdoDriver );
-    INIT_MAP_ENTRYCFG( CRpcRouterImpl );
+    INIT_MAP_ENTRYCFG( CRpcRouterManagerImpl );
+    INIT_MAP_ENTRYCFG( CRpcRouterBridgeImpl );
+    INIT_MAP_ENTRYCFG( CRpcRouterReqFwdrImpl );
+    INIT_MAP_ENTRYCFG( CRouterOpenBdgePortTask );
+    // INIT_MAP_ENTRYCFG( CRouterStopBridgeProxyTask2 );
+    INIT_MAP_ENTRYCFG( CIfTcpBridgeState );
+    INIT_MAP_ENTRYCFG( CIfReqFwdrState );
+    INIT_MAP_ENTRYCFG( CIfReqFwdrPrxyState );
+
     INIT_MAP_ENTRYCFG( CRouterStartReqFwdrProxyTask );
     INIT_MAP_ENTRYCFG( CRouterStopBridgeProxyTask );
     INIT_MAP_ENTRYCFG( CRouterStopBridgeTask );
@@ -105,6 +114,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CRouterEventRelayRespTask );
     INIT_MAP_ENTRYCFG( CRpcTcpFidoDrv );
     INIT_MAP_ENTRYCFG( CIfRouterState );
+    INIT_MAP_ENTRYCFG( CIfRouterMgrState );
     INIT_MAP_ENTRYCFG( CTcpFidoListenTask );
     INIT_MAP_ENTRYCFG( CTcpBdgePrxyState );
     INIT_MAP_ENTRYCFG( CIfStartUxSockStmRelayTask );

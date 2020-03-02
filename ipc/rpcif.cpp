@@ -114,11 +114,6 @@ static CfgPtr InitIfProxyCfg(
         // address to match
         iStateClass = clsid( CRemoteProxyState );
     }
-    else if( strPortClass == PORT_CLASS_TCP_STREAM_PDO ||
-        strPortClass == PORT_CLASS_TCP_STREAM_PDO2 )
-    {
-        iStateClass = clsid( CTcpBdgePrxyState );
-    }
     else if( strPortClass == PORT_CLASS_UXSOCK_STM_PDO )
     {
         iStateClass = clsid( CUnixSockStmState );
@@ -3798,16 +3793,16 @@ gint32 CRpcServices::GetProxy(
  *  bServer: [ in ] a flag to indicate if the object is
  *  a a server object to create. 
  *
- *  pCfg: 
- *      [ in ] if propObjInstName is in the pCfg, it
- *      will be override the objectname from the desc
- *      file and used to build the propObjPath
+ *  properties in pCfg: 
+ *      [ in ] propObjInstName if exists, will
+ *      override the objectname from the desc file
+ *      and be used to build the propObjPath
  *
- *      [ in ] if propSvrInstName is in the pCfg, it
- *      will be override the server name from the desc
- *      file and used to build the propObjPath
+ *      [ in ] propSvrInstName if exists, will
+ *      override the server name from the desc
+ *      file and be used to build the propObjPath
  *
- *      [ out ] it will contain all the settings for
+ *      [ out ] contains all the settings for
  *      the object creation.
  * @} */
 

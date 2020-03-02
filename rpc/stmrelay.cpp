@@ -59,7 +59,10 @@ gint32 CStreamServerRelay::FetchData_Server(
         if( ERROR( ret ) )
             break;
 
-        CRpcRouter* pRouter = GetParent();
+        CRpcRouterBridge* pRouter =
+        static_cast< CRpcRouterBridge* >
+                ( GetParent() );
+
         if( unlikely( pRouter == nullptr ) )
         {
             ret = -EFAULT;

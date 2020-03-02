@@ -1908,6 +1908,8 @@ gint32 COpenSSLHandshakeTask::OnIrpComplete(
             else if( psse->m_iEvent == sseError )
             {
                 ret = psse->m_iData;
+                if( ret == -ENOTCONN )
+                    ret = -ECONNRESET;
                 break;
             }
             else

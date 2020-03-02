@@ -130,6 +130,7 @@
 #define CTRLCODE_RMTMOD_OFFLINE_PDO     0x1c
 #define CTRLCODE_GET_LOCAL_STMID        0x1e
 #define CTRLCODE_GET_RMT_STMID          0x1f
+#define CTRLCODE_RESET_CONNECTION       0x21           
 
 // ioctl code for CUnixSockStmPdo
 #define CTRLCODE_STREAM_CMD             0x20

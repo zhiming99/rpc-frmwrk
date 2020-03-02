@@ -361,7 +361,6 @@ class CIfServerState : public CInterfaceState
 
 class CTcpBdgePrxyState : public CLocalProxyState
 {
-
     public:
     typedef CLocalProxyState super;
     CTcpBdgePrxyState( const IConfigDb* pCfg )
@@ -379,6 +378,38 @@ class CTcpBdgePrxyState : public CLocalProxyState
     virtual gint32 OnPortEvent(
         EnumEventId iEvent,
         HANDLE hPort );
+
+    virtual gint32 SubscribeEvents();
+};
+
+class CIfTcpBridgeState : public CIfServerState
+{
+    public:
+    typedef CIfServerState super;
+    CIfTcpBridgeState( const IConfigDb* pCfg )
+        :super( pCfg )
+    { SetClassId( clsid( CIfTcpBridgeState ) ); }
+    virtual gint32 SubscribeEvents();
+};
+
+class CIfReqFwdrState : public CIfServerState
+{
+    public:
+    typedef CIfServerState super;
+    CIfReqFwdrState( const IConfigDb* pCfg )
+        :super( pCfg )
+    { SetClassId( clsid( CIfReqFwdrState ) ); }
+    virtual gint32 SubscribeEvents();
+};
+
+class CIfReqFwdrPrxyState : public CLocalProxyState
+{
+    public:
+    typedef CLocalProxyState super;
+    CIfReqFwdrPrxyState( const IConfigDb* pCfg )
+        :super( pCfg )
+    { SetClassId( clsid( CIfReqFwdrPrxyState ) ); }
+    virtual gint32 SubscribeEvents();
 };
 
 class CUnixSockStmState : public CLocalProxyState

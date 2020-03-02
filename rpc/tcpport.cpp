@@ -581,7 +581,16 @@ gint32 CRpcSocketBase::Stop()
 gint32 CRpcSocketBase::CloseSocket()
 {
     int ret = 0;
- 
+    ret = ResetSocket();
+    m_iFd = -1;
+
+    return ret;
+}
+
+gint32 CRpcSocketBase::ResetSocket()
+{
+    int ret = 0;
+
     do{
         if( m_iFd < 0 )
             ret = -ENOTSOCK;
@@ -604,8 +613,6 @@ gint32 CRpcSocketBase::CloseSocket()
         break;
 
     } while( 1 );
-
-    m_iFd = -1;
 
     return ret;
 }
@@ -2747,12 +2754,12 @@ gint32 CIncomingPacket::FillPacket(
             if( unlikely( dwBytes >
                 MAX_BYTES_PER_TRANSFER ) )
             {
-                ret = -EINVAL;
+                ret = -EPROTO;
                 break;
             }
             if( unlikely( dwBytes == 0 ) )
             {
-                ret = -EINVAL;
+                ret = -EPROTO;
                 break;
             }
 
@@ -3383,6 +3390,7 @@ gint32 CRpcControlStream::RecvPacket(
         if( ERROR( ret ) )
         {
             pBuf.Clear();
+            ret = -EPROTO;
             break;
         }
 
