@@ -29,6 +29,9 @@ This framework depends on the following packags:
 14. `Object access via Multi-hop routing` (to come)
 
 ---
+[`Mon 02 Mar 2020 05:36:15 PM Beijing`]
+ 1. Splitted the `CRpcRouter` to smaller classes.   
+ 
 [`Sun 23 Feb 2020 11:22:40 AM Beijing`]   
  1. Splitting the CRpcRouter class to four smaller classes to allow better management of shared resources.   
 
