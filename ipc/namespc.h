@@ -162,7 +162,7 @@ inline std::string DBUS_DESTINATION(
 
 #define OBJNAME_REQFWDR                 "RpcReqForwarderImpl"
 #define OBJNAME_TCP_BRIDGE              "RpcTcpBridgeImpl"
-#define OBJNAME_ROUTER                  "RpcRouterImpl"
+#define OBJNAME_ROUTER                  "RpcRouterManagerImpl"
 
 #define OBJNAME_IOMANAGER               "Obj_IoManager"
 #define OBJNAME_INVALID                 "Obj_Invalid"

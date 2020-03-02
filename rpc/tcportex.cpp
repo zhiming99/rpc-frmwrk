@@ -2460,6 +2460,7 @@ gint32 CRpcNativeProtoFdo::OnSubmitIrp(
                 case CTRLCODE_CLOSE_STREAM_LOCAL_PDO:
                 case CTRLCODE_GET_LOCAL_STMID:
                 case CTRLCODE_GET_RMT_STMID:
+                case CTRLCODE_RESET_CONNECTION:
                     {
                         ret = SubmitIoctlCmd( pIrp );
                         break;
@@ -2599,7 +2600,8 @@ bool CRpcNativeProtoFdo::IsImmediateReq(
             dwCtrlCode == CTRLCODE_GET_RMT_STMID || 
             dwCtrlCode == CTRLCODE_GET_LOCAL_STMID ||
             dwCtrlCode == CTRLCODE_REG_MATCH ||
-            dwCtrlCode == CTRLCODE_UNREG_MATCH )
+            dwCtrlCode == CTRLCODE_UNREG_MATCH ||
+            dwCtrlCode == CTRLCODE_RESET_CONNECTION )
             ret = true;
     }while( 0 );
 
@@ -2647,9 +2649,12 @@ gint32 CRpcNativeProtoFdo::HandleIoctlIrp(
         guint32 dwCtrlCode = pCtx->GetCtrlCode();
 
         CfgPtr pCfg;
-        ret = pCtx->GetReqAsCfg( pCfg );
-        if( ERROR( ret ) )
-            break;
+        if( dwCtrlCode != CTRLCODE_RESET_CONNECTION )
+        {
+            ret = pCtx->GetReqAsCfg( pCfg );
+            if( ERROR( ret ) )
+                break;
+        }
 
         CReqOpener oCfg(
             ( IConfigDb* )pCfg );
@@ -3020,6 +3025,21 @@ gint32 CRpcNativeProtoFdo::HandleIoctlIrp(
 
                 break;
             }
+        case CTRLCODE_RESET_CONNECTION:
+            {
+                IPort* pLowerPort =
+                    GetLowerPort();
+                if( pLowerPort == nullptr )
+                {
+                    ret = -EFAULT;
+                    break;
+                }
+                pIrp->AllocNextStack( pLowerPort,
+                    IOSTACK_ALLOC_COPY );
+                ret = pLowerPort->SubmitIrp( pIrp );
+                pIrp->PopCtxStack();
+                break;
+            }
         default:
             {
                 ret = -ENOTSUP;
@@ -3097,6 +3117,7 @@ gint32 CRpcNativeProtoFdo::CompleteIoctlIrp(
                     // fantastic, the response has
                     // arrived
                     ret = pCtx->GetStatus();
+                    iState = reqStatIn;
                 }
                 else
                 {
@@ -3135,7 +3156,8 @@ gint32 CRpcNativeProtoFdo::CompleteIoctlIrp(
                     // do nothing
                 }
             }
-            else if( iState == reqStatIn )
+
+            if( iState == reqStatIn )
             {
                 CTcpStreamPdo::SetIoctlReqState(
                     pIrp, reqStatDone );
@@ -3148,7 +3170,8 @@ gint32 CRpcNativeProtoFdo::CompleteIoctlIrp(
                     // about to complete
                     ret = CompleteOpenStmIrp( pIrp );
                 }
-                else
+                else if( dwCtrlCode ==
+                    CTRLCODE_CLOSE_STREAM_PDO )
                 {
                     ret = CompleteCloseStmIrp( pIrp );
                 }
@@ -3776,7 +3799,10 @@ gint32 CRpcNativeProtoFdo::OnReceive(
     }
 
     if( pBuf->size() > 0 )
-        return -EFAULT;
+    {
+        if( SUCCEEDED( ret ) )
+            return -EFAULT;
+    }
 
     // recover the original offset
     if( !pBuf.IsEmpty() )
@@ -4033,6 +4059,16 @@ gint32 CFdoListeningTask::OnTaskComplete(
     gint32 iRet )
 {
     gint32 ret = 0;
+
+    IConfigDb* pCfg = GetConfig();
+    CCfgOpener oCfg( pCfg );
+
+    CRpcNativeProtoFdo* pPort = nullptr;
+    ret = oCfg.GetPointer(
+        propPortPtr, pPort );
+    if( ERROR( ret ) )
+        return ret;
+
     if( ERROR( iRet ) )
     {
         if( iRet == ERROR_PORT_STOPPED )
@@ -4041,22 +4077,31 @@ gint32 CFdoListeningTask::OnTaskComplete(
         DebugPrint( iRet,
             "CFdoListeningTask encounters error..." );
 
-        return iRet;
+        if( iRet == -EPROTO )
+        {
+            // close the connection immediately
+            // and the next listening will receive
+            // the error code and fire the offline
+            // event
+            IrpPtr pIrp( true );
+            pIrp->AllocNextStack( pPort );
+            IrpCtxPtr& pCtx = pIrp->GetTopStack();
+            pCtx->SetMajorCmd( IRP_MJ_FUNC );
+            pCtx->SetMinorCmd( IRP_MN_IOCTL );
+            pCtx->SetCtrlCode(
+                CTRLCODE_RESET_CONNECTION );
+
+            CIoManager* pMgr = pPort->GetIoMgr();
+            pMgr->SubmitIrpInternal(
+                pPort, pIrp, false );
+        }
+        else
+        {
+            return iRet;
+        }
     }
 
-    IConfigDb* pCfg = GetConfig();
-    CCfgOpener oCfg( pCfg );
-
     do{
-
-        CRpcNativeProtoFdo* pPort = nullptr;
-
-        ret = oCfg.GetPointer(
-            propPortPtr, pPort );
-
-        if( ERROR( ret ) )
-            break;
-
         CParamList oParams;
         CIoManager* pMgr = pPort->GetIoMgr();
         oParams.SetPointer( propIoMgr, pMgr );

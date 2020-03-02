@@ -191,7 +191,7 @@ CfgPtr CIfSmokeTest::InitRouterCfg()
 
         oParams[ propIoMgr ] = m_pMgr;
         oParams[ propIfStateClass ] =
-            clsid( CIfRouterState );
+            clsid( CIfRouterMgrState );
 
 #ifdef CLIENT
         oParams[ propRouterRole ] = 1;
@@ -221,7 +221,7 @@ gint32 CIfSmokeTest::StartRouter( InterfPtr& pRt )
         {
             InterfPtr pIf;
             ret =  pIf.NewObj(
-                clsid( CRpcRouterImpl ),
+                clsid( CRpcRouterManagerImpl ),
                 pCfg );
 
             if( ERROR( ret ) )

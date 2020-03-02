@@ -129,10 +129,10 @@ struct CPacketHeader
 
         if( pHeader == nullptr
             || dwSize < sizeof( CPacketHeader ) )
-            return -EINVAL;
+            return -EPROTO;
 
         if( ntohl( pHeader->m_dwMagic ) != RPC_PACKET_MAGIC )
-            return -EINVAL;
+            return -EPROTO;
 
         m_dwMagic       = pHeader->m_dwMagic;
         m_dwSize        = pHeader->m_dwSize;
@@ -626,6 +626,8 @@ class CRpcSocketBase : public IService
 
     virtual gint32 OnReceive()
     { return -ENOTSUP; }
+
+    gint32 ResetSocket();
 
     // event dispatcher
     gint32 OnEvent(

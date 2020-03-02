@@ -10,7 +10,7 @@ This framework depends on the following packags:
 3. `lz4 (lz4-devel)`   
 4. `cppunit-1 (for the sample code, cppunit and cppunit-devel)`   
 5. `glib-2.0 (for compile only,glib2-devel)`   
-6. `openssl-1.1 for SSL transfer. ( openssl-devel, optional )`
+6. `openssl-1.1 for SSL communication. ( openssl-devel, optional )`
 
 #### Features:   
 1. `Support for multiple interfaces on a single object (COM alike).`   
@@ -20,7 +20,7 @@ This framework depends on the following packags:
 5. `Keep-alive for time-consuming request.`   
 6. `Pausable/Resumable interface.`
 7. `Support RPC from remote machine, local system, and in-process.` 
-8. `Transparent support for different kinds of remote communications.`
+8. `Transparent support for different types of remote communications.`
 9. `File/Big data transfer.`
 10. `Peer online/offline awareness.`
 11. `Streaming support to provide double-direction stream transfer`
@@ -29,6 +29,17 @@ This framework depends on the following packags:
 14. `Object access via Multi-hop routing` (to come)
 
 ---
+[`Sun 23 Feb 2020 11:22:40 AM Beijing`]   
+ 1. Splitting the CRpcRouter class to four smaller classes to allow better management of shared resources.   
+
+[`Sat 15 Feb 2020 12:02:14 AM Beijing`]   
+1. Fixed a bug in the streaming interface.
+2. Added [`Concept.md`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md) as an introduction about the `rpc-frmwrk`.
+
+[`Wed 12 Feb 2020 02:09:38 PM Beijing`]   
+1. The `WebSocket` support is completed. And the instructions about the usage is updated in the [`Readme.md`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/wsport/Readme.md).   
+2. Next task is `multihop` support, the very important feature!   
+
 [`Mon 10 Feb 2020 02:14:10 PM Beijing`]   
 1. `Websocket` support is comming. The new update delivers a working version of `Websocket` port. However, the  `transparent proxy traversal` remains to test.   
 

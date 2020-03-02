@@ -1687,6 +1687,7 @@ gint32 CTcpStreamPdo2::OnSubmitIrp(
                 {
                 case CTRLCODE_LISTENING:
                 case CTRLCODE_IS_CLIENT:
+                case CTRLCODE_RESET_CONNECTION:
                     {
                         ret = SubmitIoctlCmd( pIrp );
                         break;
@@ -1747,6 +1748,17 @@ gint32 CTcpStreamPdo2::SubmitIoctlCmd(
             {
                 ret = ERROR_FALSE;
             }
+            break;
+        }
+    case CTRLCODE_RESET_CONNECTION:
+        {
+            CRpcConnSock* pSock = m_pConnSock;
+            if( pSock == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            ret = pSock->ResetSocket();
             break;
         }
     default:

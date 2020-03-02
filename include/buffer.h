@@ -330,6 +330,8 @@ class CBuffer : public CObjBase
     }
 
     template<typename T, 
+        typename T1 = typename std::enable_if<
+            !std::is_same<DBusMessage, T>::value, T >::type,
         typename T3 = class std::enable_if<
             std::is_base_of<CObjBase, T>::value, T >::type >
     operator T*()
@@ -366,7 +368,15 @@ class CBuffer : public CObjBase
         return this;
     }
 
+    inline operator DBusMessage*() const
+    {
+        DMsgPtr& pmsg = *( DMsgPtr* )ptr();
+        return pmsg;
+    }
+
     template<typename T, 
+        typename T1 = typename std::enable_if<
+            !std::is_same<DBusMessage, T>::value, T >::type,
         typename T2 = typename std::enable_if<
             !std::is_base_of<CObjBase, T>::value, T >::type,
         typename T3 = typename std::decay< T2 >::type,

@@ -1189,3 +1189,27 @@ gint32 CTcpBdgePrxyState::OpenPort(
     return ret;
 }
 
+gint32 CTcpBdgePrxyState::SubscribeEvents()
+{ return 0; }
+
+gint32 CIfTcpBridgeState::SubscribeEvents()
+{ return 0; }
+
+gint32 CIfReqFwdrState::SubscribeEvents()
+{
+    vector< EnumPropId > vecEvtToSubscribe = {
+        propDBusModEvent,
+    };
+
+    return SubscribeEventsInternal(
+        vecEvtToSubscribe );
+}
+
+gint32 CIfReqFwdrPrxyState::SubscribeEvents()
+{
+    vector< EnumPropId > vecEvtToSubscribe = {
+        propDBusModEvent,
+    };
+    return SubscribeEventsInternal(
+        vecEvtToSubscribe );
+}

@@ -1548,6 +1548,7 @@ gint32 CTcpStreamPdo::CompleteIoctlIrp(
                     // fantastic, the response has
                     // arrived
                     ret = pCtx->GetStatus();
+                    iState = reqStatIn;
                 }
                 else
                 {
@@ -1586,7 +1587,8 @@ gint32 CTcpStreamPdo::CompleteIoctlIrp(
                     // do nothing
                 }
             }
-            else if( iState == reqStatIn )
+
+            if( iState == reqStatIn )
             {
                 SetIoctlReqState(
                     pIrp, reqStatDone );
@@ -1599,7 +1601,8 @@ gint32 CTcpStreamPdo::CompleteIoctlIrp(
                     // about to complete
                     ret = CompleteOpenStmIrp( pIrp );
                 }
-                else
+                else if( dwCtrlCode ==
+                    CTRLCODE_CLOSE_STREAM_PDO )
                 {
                     ret = CompleteCloseStmIrp( pIrp );
                 }
