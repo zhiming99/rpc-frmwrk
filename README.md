@@ -29,6 +29,9 @@ This framework depends on the following packags:
 14. `Object access via Multi-hop routing` (to come)
 
 ---
+[`Sat 14 Mar 2020 09:18:01 PM Beijing`]   
+ 1. Code complete the streaming support for multi-hop, about 70% done.    
+
 [`Mon 02 Mar 2020 05:36:15 PM Beijing`]
  1. Splitted the `CRpcRouter` to smaller classes.   
  
