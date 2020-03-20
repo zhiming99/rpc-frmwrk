@@ -109,13 +109,12 @@ CDBusProxyPdo::CDBusProxyPdo(
             oMyCfg.SetBoolProp( propSingleIrp, true );
         }
 
-        std::string strRouterPath =
-            oConnParams.GetRouterPath();
-        if( strRouterPath.empty() )
-        {
-            oConnParams.SetRouterPath(
-                std::string( "/" ) );
-        }
+        std::string strRouterPath;
+        ret = oMyCfg.GetStrProp(
+            propRouterPath, strRouterPath );
+
+        if( ERROR( ret ) )
+            break;
 
         oMyCfg.CopyProp(
             propSrcDBusName, m_pBusPort );
@@ -211,14 +210,11 @@ gint32 CDBusProxyPdo::CheckConnCmdResp(
         ret = oPortCfg.CopyProp(
             propConnParams, pResp );
 
-        CConnParamsProxy oConn =
-            GetConnParams( pResp );
-
         CCfgOpenerObj oMatchCfg(
             ( CObjBase* )m_pMatchFwder );
 
         oMatchCfg.CopyProp(
-            propRouterPath, oConn.GetCfg() );
+            propRouterPath, this );
 
         oMatchCfg.CopyProp(
             propConnHandle, this );
@@ -584,6 +580,11 @@ gint32 CDBusProxyPdo::HandleConnRequest(
         oMethodArgs.CopyProp(
             propSrcDBusName, this );
 
+        ret = oMethodArgs.CopyProp(
+            propRouterPath, this );
+        if( ERROR( ret ) )
+            break;
+
         if( bConnect )
         {
             ret = oMethodArgs.CopyProp(
@@ -759,8 +760,6 @@ gint32 CDBusProxyPdo::PackupReqMsg(
         CCfgOpenerObj oCfg( this );
 
         CCfgOpener oReqCtx;
-        CConnParamsProxy oConnParams =
-            GetConnParams( this );
 
         ret = oReqCtx.CopyProp(
             propConnHandle, this );
@@ -768,8 +767,7 @@ gint32 CDBusProxyPdo::PackupReqMsg(
             break;
 
         ret = oReqCtx.CopyProp(
-            propRouterPath,
-            oConnParams.GetCfg() );
+            propRouterPath, this );
 
         if( ERROR( ret ) )
             break;
@@ -1663,11 +1661,8 @@ gint32 CDBusProxyPdo::UnpackFwrdEventMsg(
         CCfgOpener oEvtCtx(
             ( IConfigDb* )pEvtCtx );
 
-        CConnParamsProxy oConn =
-            GetConnParams( this );
-
         gint32 ret1 = oEvtCtx.IsEqualProp(
-            propRouterPath, oConn.GetCfg() );
+            propRouterPath, this );
 
         ret = oEvtCtx.IsEqualProp(
             propConnHandle, this );
@@ -2009,12 +2004,9 @@ gint32 CDBusProxyPdo::HandleRmtRegMatch(
         CCfgOpenerObj oMatch(
             ( IMessageMatch* )pMatchToSend );
 
-        CConnParamsProxy oConn =
-            GetConnParams( this );
-
         // routing info
         ret = oMatch.CopyProp(
-            propRouterPath, oConn.GetCfg() );
+            propRouterPath, this );
 
         if( ERROR( ret ) )
             break;

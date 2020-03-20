@@ -20,7 +20,17 @@ AC_CHECK_LIB([dbus-1], [dbus_bus_get])
 AC_CHECK_LIB([jsoncpp], [_ZNK4Json5ValuecvbEv])
 
 # Checks for header files.
-AC_CHECK_HEADERS([arpa/inet.h fcntl.h netinet/in.h stdlib.h string.h sys/socket.h sys/time.h unistd.h])
+AC_CHECK_HEADERS([arpa/inet.h \
+                fcntl.h \
+                netinet/in.h \
+                stdlib.h \
+                string.h \
+                sys/socket.h \
+                sys/time.h \
+                unistd.h \
+                lz4.h \
+                openssl/ssl.h])
+
 AC_CHECK_HEADERS([dbus/dbus.h])
 AC_CHECK_HEADERS([glib.h])
 AC_CHECK_HEADERS([json/json.h])

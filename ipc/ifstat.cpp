@@ -983,7 +983,15 @@ gint32 CRemoteProxyState::SetupOpenPortParams(
         IConfigDb* pCfg )
 {
     CParamList oCfg( pCfg );
-    return oCfg.CopyProp( propConnParams, this );
+    oCfg.CopyProp( propConnParams, this );
+
+    gint32 ret = oCfg.CopyProp(
+        propRouterPath, this );
+
+    if( ERROR( ret ) )
+        oCfg.SetStrProp( propRouterPath, "/" );
+
+    return 0;
 }
 
 gint32 CRemoteProxyState::OnPortEvent(

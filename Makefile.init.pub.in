@@ -1,6 +1,6 @@
 #Set ARCH to `arm' for ARM target. This make file
 #assumes you are running on a raspberry pi desktop
-ARCH := 
+ARCH := x86
 
 #Set BUILD_64 to `0' for 32-bit target
 #Note it does not work for 64-bit arm yet, always
@@ -12,7 +12,11 @@ BASE:=$(abspath $(dir $(mkfile_path)) )
 
 #####
 ifeq ($(ARCH),arm)
+ifeq ($(BUILD_64),1)
+	ARCH_STR := aarch64-linux-gnueabihf
+else
 	ARCH_STR := arm-linux-gnueabihf
+endif
 	CROSS_COMPILE := $(ARCH_STR)-
 	CROSS:= $(CROSS_COMPILE)
 	ROOTFS := $(HOME)/mywork/raspberry/rootfs
@@ -34,12 +38,16 @@ DEBUG_FLAGS := -D_DEBUG=1 -DDEBUG -ggdb
 RELEASE_FLAGS := -D_DEBUG=0 -DRELEASE -O2 -ggdb
 
 ifeq ($(BUILD_64),1)
+ifeq ($(ARCH),x86)
 	WIDTH_FLAG := -m64
+endif
 	LIB_DIR := lib64
 	DBG_DIR := debug64
 	RLS_DIR := release64
 else ifeq ($(BUILD_64),0)
+ifeq ($(ARCH),x86)
 	WIDTH_FLAG := -m32
+endif
 	LIB_DIR := lib
 	DBG_DIR := debug
 	RLS_DIR := release

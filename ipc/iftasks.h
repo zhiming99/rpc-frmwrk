@@ -163,6 +163,24 @@ class CIfRetryTask
         return 0;
     }
 
+    inline gint32 GetClientNotify( EventPtr& pEvt ) const
+    {
+        CCfgOpener oParams(
+            ( const IConfigDb* )GetConfig() );
+        ObjPtr pVal;
+
+        // BUGBUG: no test of propNotifyClient
+        gint32 ret = oParams.GetObjPtr(
+            propEventSink, pVal );
+        if( ERROR( ret ) )
+            return ret;
+
+        pEvt = pVal;
+        if( pEvt.IsEmpty() )
+            return -ENOENT;
+        return 0;
+    }
+
     template< class ClassName >
     gint32 DelayRun(
         guint32 dwSecsDelay,
@@ -441,6 +459,9 @@ class CIfTaskGroup
     inline void GetRetVals(
         std::vector< gint32 >& vecRet ) const
     { vecRet = m_vecRetVals; }
+
+    gint32 GetHeadTask( TaskletPtr& pHead );
+    gint32 GetTailTask( TaskletPtr& pTail );
 };
 
 typedef CAutoPtr< Clsid_Invalid, CIfTaskGroup > TaskGrpPtr;
@@ -459,8 +480,6 @@ class CIfRootTaskGroup
     //  ( RunTask, OnCancel, OnChildComplete )
     // 
     virtual gint32 OnComplete( gint32 iRet );
-    gint32 GetHeadTask( TaskletPtr& pHead );
-    gint32 GetTailTask( TaskletPtr& pTail );
     virtual gint32 OnChildComplete(
         gint32 iRet, CTasklet* pChild );
 };
@@ -686,25 +705,8 @@ class CIfInterceptTask :
     {};
 
     // get the task to intercept
-    gint32 GetInterceptTask( EventPtr& ptr ) const
-    {
-        CCfgOpener oCfg(
-            ( const IConfigDb* )GetConfig() );
-
-        ObjPtr pObj;
-
-        gint32 ret = oCfg.GetObjPtr(
-            propEventSink, pObj );
-
-        if( ERROR( ret ) )
-            return ret;
-
-        ptr = pObj;
-        if( ptr.IsEmpty() )
-            return -EFAULT;
-
-        return 0;
-    }
+    inline gint32 GetInterceptTask( EventPtr& ptr ) const
+    { return GetClientNotify( ptr ); }
 
     gint32 GetCallerTask( TaskletPtr& pTask )
     {
@@ -789,7 +791,6 @@ class CIfInterceptTaskProxy :
     // set the task to intercept
     gint32 SetInterceptTask( IEventSink* pEvent )
     {
-        CCfgOpener oCfg( ( IConfigDb* )m_pCtx );
         if( pEvent != nullptr )
         {
             SetClientNotify( pEvent );

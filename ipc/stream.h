@@ -166,7 +166,7 @@ struct IStream
         HANDLE hChannel,
         IEventSink* pCallback = nullptr );
 
-    gint32 CreateUxStream(
+    virtual gint32 CreateUxStream(
         IConfigDb* pDataDesc,
         gint32 iFd,
         EnumClsid iClsid,

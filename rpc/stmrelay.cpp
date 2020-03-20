@@ -84,8 +84,9 @@ gint32 CStreamServerRelay::FetchData_Server(
 
         if( strPath != "/" )
         {
-            // TODO: implement it
-            ret = ERROR_NOT_IMPL;
+            // should go to the interface
+            // CStreamServerRelayMH
+            ret = -ENOTSUP;
             break;
         }
 
@@ -687,8 +688,23 @@ gint32 CIfStartUxSockStmRelayTask::OnTaskComplete(
         
         pParentIf = pIf;
         CRpcServices* pParent = pIf;
-        IStream* pStream = 
-            dynamic_cast< IStream* >( pParent );
+
+        IStream* pStream = nullptr;
+        if( pParent->IsServer() )
+        {
+            CStreamServerRelay* pIf =
+                ObjPtr( pParent );
+            pStream = static_cast< IStream* >
+                ( pIf );
+        }
+        else
+        {
+            CStreamProxyRelay* pIf =
+                ObjPtr( pParent );
+
+            pStream = static_cast< IStream* >
+                ( pIf );
+        }
 
         if( pStream == nullptr ||
             pParent == nullptr )
@@ -847,15 +863,9 @@ gint32 CIfUxListeningRelayTask::RunTask()
 {
     gint32 ret = 0;
     do{
-        CRpcServices* pIf = nullptr;
         CCfgOpener oCfg(
             ( IConfigDb* )GetConfig() );
 
-        ret = oCfg.GetPointer( propIfPtr, pIf );
-        if( ERROR( ret ) )
-            break;
-
-        ObjPtr pObj( pIf );
         CIfUxRelayTaskHelper oHelper( this );
         ret = oHelper.StartListening( this );
 
@@ -884,11 +894,6 @@ gint32 CIfUxListeningRelayTask::OnTaskComplete(
     do{
         IConfigDb* pCfg = GetConfig();
         CCfgOpener oCfg( pCfg );
-
-        ObjPtr pIf;
-        ret = oCfg.GetObjPtr( propIfPtr, pIf );
-        if( ERROR( ret ) )
-            break;
 
         IConfigDb* pResp = nullptr;
         ret = oCfg.GetPointer(
@@ -924,18 +929,11 @@ gint32 CIfUxListeningRelayTask::PostEvent(
         pBuf->empty() )
         return -EINVAL;
 
-    CRpcServices* pIf = nullptr;
     CCfgOpener oCfg(
         ( IConfigDb* )GetConfig() );
 
-    gint32 ret = oCfg.GetPointer(
-        propIfPtr, pIf );
-
-    if( ERROR( ret ) )
-        return ret;
-
+    gint32 ret = 0;
     CIfUxRelayTaskHelper oHelper( this );
-
     guint8 byToken = pBuf->ptr()[ 0 ];
     BufPtr pNewBuf;
     switch( byToken )
@@ -970,9 +968,7 @@ gint32 CIfUxListeningRelayTask::PostEvent(
             if( ERROR( ret ) )
                 break;
 
-            pNewBuf->Resize( sizeof( gint32 ) );
-            memcpy( pNewBuf->ptr(),
-                &iError, sizeof( iError ) );
+            *pNewBuf = ( guint32& )iError;
             break;
         }
     case tokClose:
@@ -1015,10 +1011,6 @@ gint32 CIfUxListeningRelayTask::OnIrpComplete(
     do{
         IConfigDb* pCfg = GetConfig();
         CCfgOpener oCfg( pCfg );
-        CRpcServices* pIf = nullptr;
-        ret = oCfg.GetPointer( propIfPtr, pIf );
-        if( ERROR( ret ) )
-            break;
 
         ret = pIrp->GetStatus();
         if( ERROR( ret ) )
@@ -1429,14 +1421,32 @@ gint32 CIfTcpStmTransTask::HandleIrpResp(
         return -EINVAL;
 
     ret = pIrp->GetStatus();
-    if( ERROR( ret ) )
-        return ret;
 
     if( !IsReading() )
         return ret;
 
-    IrpCtxPtr& pCtx = pIrp->GetTopStack();
-    BufPtr pPayload = pCtx->m_pRespData;
+    BufPtr pPayload( true );
+    if( ERROR( ret ) )
+    {
+        // return error to close the stream
+        if( ret == ERROR_PORT_STOPPED )
+        {
+            *pPayload = tokClose;
+        }
+        else
+        {
+            *pPayload = tokError;
+            gint32 iRet = htonl( ret );
+            memcpy( pPayload->ptr() + 1,
+                &iRet, sizeof( iRet ) );
+        }
+    }
+    else
+    {
+        IrpCtxPtr& pCtx = pIrp->GetTopStack();
+        pPayload = pCtx->m_pRespData;
+    }
+
     ret = PostEvent( pPayload );
 
     return ret;
@@ -1683,21 +1693,14 @@ gint32 CIfTcpStmTransTask::PostEvent(
         pBuf->empty() )
         return -EINVAL;
 
-    CRpcServices* pIf = nullptr;
     CCfgOpener oCfg(
         ( IConfigDb* )GetConfig() );
-
-    gint32 ret = oCfg.GetPointer(
-        propIfPtr, pIf );
-
-    if( ERROR( ret ) )
-        return ret;
 
     guint8 byToken = 0;
     BufPtr pNewBuf( true );
 
-    ret = RemoteToLocal( pBuf,
-        byToken, pNewBuf );
+    gint32 ret = RemoteToLocal(
+        pBuf, byToken, pNewBuf );
 
     if( ERROR( ret ) )
         return ret;
@@ -1775,7 +1778,28 @@ gint32 CIfTcpStmTransTask::Pause()
 
             // reset the task state
             SetTaskState( stateStarting );
+
             // don't cancel the irp
+            CCfgOpener oCfg(
+                ( IConfigDb* )GetConfig() );
+
+            IRP* pIrp = nullptr;
+            gint32 ret = oCfg.GetPointer(
+                propIrpPtr, pIrp );
+
+            if( ERROR( ret ) )
+                break;
+
+            CStdRMutex oIrpLock(
+                pIrp->GetLock() );
+
+            ret = pIrp->CanContinue(
+                IRP_STATE_READY );
+
+            if( SUCCEEDED( ret ) )
+                pIrp->RemoveCallback();
+
+            oCfg.RemoveProperty( propIrpPtr );
         }
 
     }while( 0 );

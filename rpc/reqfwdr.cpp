@@ -308,41 +308,102 @@ gint32 CReqFwdrOpenRmtPortTask::OnServiceComplete(
         return -EINVAL;
 
     gint32 ret = 0;
+    CRpcReqForwarder* pIf = nullptr;
+    CParamList oParams;
+    EventPtr pEvt;
+
     do{
-        EventPtr pEvt;
         ret = GetInterceptTask( pEvt );
         if( ERROR( ret ) )
             break;
+        SetInterceptTask( nullptr );
 
-        CRpcReqForwarder* pIf = nullptr;
         CCfgOpener oCfg(
             ( IConfigDb* )GetConfig() );
 
         ret = oCfg.GetPointer( propIfPtr, pIf );
-
         if( ERROR( ret ) )
             break;
 
-        CParamList oParams;
         oParams[ propReturnValue ] = iRetVal;
-        if( SUCCEEDED( iRetVal ) )
+
+        string strRouterPath;
+        ret = oCfg.GetStrProp(
+            propRouterPath, strRouterPath );
+
+        if( ERROR( ret ) )
         {
-            guint32 dwPortId = 0;
-            ret = oCfg.GetIntProp(
-                propPortId, dwPortId );
-            if( SUCCEEDED( ret ) )
-            {
-                oParams.SetIntProp(
-                    propConnHandle, dwPortId );
-                oParams.CopyProp(
-                    propConnParams, this );
-            }
+            if( SUCCEEDED( iRetVal ) )
+                oParams[ propReturnValue ] = ret;
+            break;
         }
 
-        ret = pIf->SetResponse( 
-            pEvt, oParams.GetCfg() );
+        if( ERROR( iRetVal ) )
+        {
+            ret = iRetVal;
+            oParams[ propReturnValue ] = ret;
+            break;
+        }
+
+        guint32 dwPortId = 0;
+        ret = oCfg.GetIntProp(
+            propPortId, dwPortId );
+
+        if( ERROR( ret ) )
+        {
+            oParams.SetIntProp(
+                propReturnValue,  ret );
+            break;
+        }
+
+        if( strRouterPath == "/" )
+        {
+            oParams.SetIntProp(
+                propConnHandle, dwPortId );
+
+            oParams.CopyProp(
+                propConnParams, this );
+
+            break;
+        }
+
+        // pass the output to the new task
+        CCfgOpener oReqCtx;
+        oReqCtx[ propConnHandle ] = dwPortId;
+        oReqCtx[ propRouterPath ] =
+            strRouterPath;
+        oReqCtx.CopyProp(
+            propConnParams, this );
+
+
+        // schedule a checkrouterpath task
+        TaskletPtr pChkRt;
+        ret = DEFER_HANDLER_NOSCHED(
+            pChkRt, ObjPtr( this ),
+            &CRpcReqForwarder::CheckRouterPath,
+            ( IEventSink* )pEvt,
+            oReqCtx.GetCfg() );
+
+        if( ERROR( ret ) )
+        {
+            oParams[ propReturnValue ] = ret;
+            break;
+        }
+
+        CIoManager* pMgr = pIf->GetIoMgr();
+        // a new task to release the seq task
+        // queue
+        TaskletPtr ptrTask( pChkRt );
+        ret = pMgr->RescheduleTask( ptrTask );
 
     }while( 0 );
+
+    if( ERROR( ret ) && pIf != nullptr )
+    {
+        pIf->SetResponse( 
+            pEvt, oParams.GetCfg() );
+
+    }
 
     return ret;
 }
@@ -426,10 +487,8 @@ gint32 CReqFwdrOpenRmtPortTask::RunTaskInternal(
             break;
 
         string strUniqName;
-
         ret = oCfg.GetStrProp(
             propSrcUniqName, strUniqName );
-
         if( ERROR( ret ) )
             break;
 
@@ -840,6 +899,12 @@ gint32 CRpcReqForwarder::OpenRemotePortInternal(
             break;
         }
 
+        string strRouterPath;
+        ret = oCfg.GetStrProp(
+            propRouterPath, strRouterPath );
+        if( ERROR( ret ) )
+            break;
+
         InterfPtr pIf;
 
         ret = GetParent()->GetBridgeProxy(
@@ -864,21 +929,47 @@ gint32 CRpcReqForwarder::OpenRemotePortInternal(
             oIfCfg.SetIntProp(
                 propPortId, dwPortId );
 
-            oResp[ propConnHandle ] = dwPortId;
-            oResp.CopyProp( propConnParams,
-                ( CObjBase* )pIf );
-
             ret = AddRefCount( dwPortId,
                 strSrcUniqName, strSender );
 
-            DebugPrint( ret,
-                "The bridge proxy already exists...,"\
-                "portid=%d, uniqName=%s, sender=%s",
-                dwPortId,
-                strSrcUniqName.c_str(),
-                strSender.c_str() );
+            if( strRouterPath == "/" )
+            {
+                oResp[ propConnHandle ] = dwPortId;
+                oResp.CopyProp( propConnParams,
+                    ( CObjBase* )pIf );
 
-            ret = 0;
+                DebugPrint( ret,
+                    "The bridge proxy already exists...,"\
+                    "portid=%d, uniqName=%s, sender=%s",
+                    dwPortId,
+                    strSrcUniqName.c_str(),
+                    strSender.c_str() );
+
+                ret = 0;
+                break;
+            }
+            // schedule a checkrouter path task
+            CCfgOpener oReqCtx;
+            oReqCtx[ propConnHandle ] = dwPortId;
+            oReqCtx.SetStrProp(
+                propRouterPath, strRouterPath );
+            oReqCtx.CopyProp( propConnParams,
+                ( CObjBase* )pIf );
+
+            // schedule a checkrouterpath task
+            TaskletPtr pChkRt;
+            ret = DEFER_HANDLER_NOSCHED(
+                pChkRt, ObjPtr( this ),
+                &CRpcReqForwarder::CheckRouterPath,
+                pCallback, oReqCtx.GetCfg() );
+            if( ERROR( ret ) )
+                break;
+
+            // a new task to release the seq task
+            // queue
+            CIoManager* pMgr = pSvc->GetIoMgr();
+            TaskletPtr ptrTask( pChkRt );
+            ret = pMgr->RescheduleTask( ptrTask );
         }
         else if( ret == -ENOENT )
         {
@@ -901,6 +992,9 @@ gint32 CRpcReqForwarder::OpenRemotePortInternal(
 
             oParams.SetStrProp(
                 propSrcUniqName, strSrcUniqName );
+
+            oParams.CopyProp(
+                propRouterPath, pCfg );
 
             TaskletPtr pTask;
 
@@ -2578,17 +2672,6 @@ gint32 CRpcReqForwarder::OnRmtSvrOffline(
         vector< string > vecUniqNames;
         std::string strPath;
         CCfgOpener oEvtCtx( pEvtCtx );
-        ret = oEvtCtx.GetStrProp(
-            propRouterPath, strPath );
-        if( ERROR( ret ) )
-            break;
-
-        if( strPath != "/" )
-        {
-            // TODO: Implement it
-            ret = ERROR_NOT_IMPL;
-            break;
-        }
 
         guint32 dwPortId;
         ret = oEvtCtx.GetIntProp(
@@ -2685,8 +2768,11 @@ gint32 CRpcReqForwarder::SendFetch_Server(
             break;
         }
 
-        string strMethod =
-            oDataDesc[ propMethodName ];
+        string strMethod;
+        ret = oDataDesc.GetStrProp(
+            propMethodName, strMethod ); 
+        if( ERROR( ret ) )
+            break;
 
         if( strMethod != SYS_METHOD_FETCHDATA )
         {
@@ -3372,6 +3458,11 @@ gint32 CRpcReqForwarderProxy::CustomizeRequest(
             oParams.CopyProp(
                 propDestDBusName, pDesc );
         }
+        else
+        {
+            ret = super::CustomizeRequest(
+                pReqCfg, pCallback );
+        }
 
     }while( 0 );
 
@@ -3885,6 +3976,23 @@ gint32 CReqFwdrFetchDataTask::RunTask()
         {
             ret = -EINVAL;
             break;
+        }
+
+        string strRouterPath;
+        ret = oTransCtx.GetStrProp(
+            propRouterPtr, strRouterPath );
+        if( ERROR( ret ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        if( strRouterPath != "/" )
+        {
+            // requesting the IStreamMH
+            // interface to handle this request
+            oDesc.SetIntProp( propIid,
+                iid( IStreamMH ) );
         }
 
         InterfPtr proxyPtr;

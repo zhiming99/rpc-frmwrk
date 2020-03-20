@@ -331,16 +331,17 @@ class CFlowControl
     inline stdrmutex& GetLock()
     { return m_oFCLock; }
 
-    EnumFCState IncTxBytes( const BufPtr& pBuf )
+    EnumFCState IncTxBytes( guint32 dwSize )
     {
         EnumFCState ret = fcsKeep;
+        if( dwSize == 0 ||
+            dwSize > MAX_BYTES_PER_TRANSFER )
+            return ret;
+
         bool bAboveLastBytes = false;
         bool bAboveLastPkts = false;
         bool bAboveBytes = false;
         bool bAbovePkts = false;
-
-        if( pBuf.IsEmpty() || pBuf->empty() )
-            return ret;
 
         CStdRMutex oLock( GetLock() );
 
@@ -352,7 +353,7 @@ class CFlowControl
             STM_MAX_PACKATS_REPORT )
             bAboveLastPkts = true;
 
-        m_qwTxBytes += pBuf->size();
+        m_qwTxBytes += dwSize;
         m_qwTxPkts++;
 
         if( m_qwTxBytes - m_qwAckTxBytes >=
@@ -372,17 +373,26 @@ class CFlowControl
         return ret;
     }
 
-    EnumFCState IncRxBytes( const BufPtr& pBuf )
+    EnumFCState IncTxBytes( const BufPtr& pBuf )
+    {
+        if( pBuf.IsEmpty() || pBuf->empty() )
+            return fcsKeep;
+
+        return IncTxBytes( pBuf->size() );
+    }
+
+
+    EnumFCState IncRxBytes( guint32 dwSize )
     {
         EnumFCState ret = fcsKeep;
+        if( dwSize == 0 ||
+            dwSize > MAX_BYTES_PER_TRANSFER )
+            return ret;
 
         bool bAboveLastBytes = false;
         bool bAboveLastPkts = false;
         bool bAboveBytes = false;
         bool bAbovePkts = false;
-
-        if( pBuf.IsEmpty() || pBuf->empty() )
-            return ret;
 
         CStdRMutex oLock( GetLock() );
 
@@ -394,7 +404,7 @@ class CFlowControl
             STM_MAX_PACKATS_REPORT )
             bAboveLastPkts = true;
 
-        m_qwRxBytes += pBuf->size();
+        m_qwRxBytes += dwSize;
         m_qwRxPkts++;
 
         if( m_qwRxBytes - m_qwAckRxBytes >=
@@ -414,6 +424,14 @@ class CFlowControl
         }
 
         return ret;
+    }
+
+    EnumFCState IncRxBytes( const BufPtr& pBuf )
+    {
+        if( pBuf.IsEmpty() || pBuf->empty() )
+            return fcsKeep;
+
+        return IncRxBytes( pBuf->size() );
     }
 
     EnumFCState IncFCCount()
@@ -519,9 +537,12 @@ class CUnixSockStream:
         gint32 ret = 0;
 
         do{
-            ret = oNewCfg.SetIntProp(
-                propIfStateClass, 
-                clsid( CUnixSockStmState ) ) ;
+            if( !oNewCfg.exist( propIfStateClass ) )
+            {
+                ret = oNewCfg.SetIntProp(
+                    propIfStateClass, 
+                    clsid( CUnixSockStmState ) ) ;
+            }
 
             guint32 dwFd;
             ret = oNewCfg.GetIntProp( propFd, dwFd );
@@ -552,8 +573,8 @@ class CUnixSockStream:
                 strVal = UXSOCK_OBJNAME_PROXY;
 
             // actually this object does not use 
-            // dbus's mechanism, so the names is
-            // not useful for this object.
+            // dbus's mechanism, so the names are 
+            // ignored for this object.
             std::string strSvrName =
                 pMgr->GetModName();
 
@@ -581,58 +602,62 @@ class CUnixSockStream:
                     propDestDBusName, strDest );
             }
 
-            if( true )
-            {
-                // build a match
-                MatchPtr pMatch;
-                pMatch.NewObj( clsid( CMessageMatch ) );
+            // build a match
+            MatchPtr pMatch;
+            pMatch.NewObj( clsid( CMessageMatch ) );
 
-                CCfgOpenerObj oMatch(
-                    ( CObjBase* )pMatch );
+            CCfgOpenerObj oMatch(
+                ( CObjBase* )pMatch );
 
-                oMatch.SetStrProp(
-                    propObjPath, strVal );
+            oMatch.SetStrProp(
+                propObjPath, strVal );
 
-                oMatch.SetIntProp( propMatchType,
-                    bServer ? matchServer : matchClient );
+            gint32 iType = matchClient;
+            if( bServer )
+                iType = matchServer;
 
-                std::string strIfName =
-                    UXSOCK_OBJNAME_SERVER;
+            oMatch.SetIntProp(
+                propMatchType, iType );
 
-                oMatch.SetStrProp( propIfName,
-                    DBUS_IF_NAME( strIfName ) );
+            std::string strIfName = DBUS_IF_NAME(
+                UXSOCK_OBJNAME_SERVER );
 
-                oMatch.SetBoolProp(
-                    propPausable, false );
+            oMatch.SetStrProp(
+                propIfName, strIfName );
 
-                ObjVecPtr pObjVec( true );
-                ( *pObjVec )().push_back( pMatch );
+            oMatch.SetBoolProp(
+                propPausable, false );
 
-                oNewCfg.SetObjPtr(
-                    propObjList, ObjPtr( pObjVec ) );
+            ObjVecPtr pObjVec( true );
+            ( *pObjVec )().push_back( pMatch );
 
-                // for the creation of CInterfaceState
-                oNewCfg.CopyProp( propIfName,
-                    ( CObjBase* )pMatch );
+            oNewCfg.SetObjPtr(
+                propObjList, ObjPtr( pObjVec ) );
 
-                oNewCfg.CopyProp( propMatchType,
-                    ( CObjBase* )pMatch );
-
-                oNewCfg.CopyProp( propObjPath,
-                    ( CObjBase* )pMatch );
-            }
-
+            // for the creation of CInterfaceState
+            oNewCfg[ propIfName ] = strIfName;
+            oNewCfg[ propMatchType ] = iType;
+            oNewCfg[ propObjPath ] = strVal;
 
             strVal = "UnixSockBusPort_0";
-            oNewCfg.SetStrProp(
-                propBusName, strVal );
+            if( !oNewCfg.exist( propBusName ) )
+            {
+                oNewCfg.SetStrProp(
+                    propBusName, strVal );
+            }
 
             strVal = "UnixSockStmPdo";
-            oNewCfg.SetStrProp(
-                propPortClass, strVal );
+            if( !oNewCfg.exist( propPortClass ) )
+            {
+                oNewCfg.SetStrProp(
+                    propPortClass, strVal );
+            }
 
-            oNewCfg.SetIntProp(
-                propPortId, dwFd );
+            if( !oNewCfg.exist( propPortId ) )
+            {
+                oNewCfg.SetIntProp(
+                    propPortId, dwFd );
+            }
 
         }while( 0 );
         
@@ -696,11 +721,14 @@ class CUnixSockStream:
         }
     }
 
-    inline IStream* GetParent()
+    virtual IStream* GetParent()
     {
         return dynamic_cast< IStream* >
             ( ( IGenericInterface* )m_pParent );
     }
+
+    inline void GetParent( InterfPtr& pIf ) const
+    { pIf = m_pParent; }
 
     virtual gint32 OnUxSockEvent(
         guint8 byToken,
@@ -1012,15 +1040,13 @@ class CUnixSockStream:
         if( !IsConnected() )
             return ERROR_STATE;
 
-        do{
-            ret = m_oFlowCtrl.DecFCCount();
-            if( ret == fcsKeep )
-                break;
-
+        ret = m_oFlowCtrl.DecFCCount();
+        if( ret == fcsLift )
+        {
             BufPtr pBuf( true );
-            SendUxStreamEvent( tokLift, pBuf );
-
-        }while( 0 );
+            SendUxStreamEvent(
+                tokLift, pBuf );
+        }
 
         return 0;
     }
@@ -1203,7 +1229,7 @@ class CUnixSockStream:
         return ret;
     }
 
-    gint32 StartListening(
+    virtual gint32 StartListening(
         IEventSink* pCallback )
     {
         gint32 ret = 0;
@@ -1573,9 +1599,11 @@ class CUnixSockStmProxy :
                 break;
 
             CParamList oParams;
-            oParams.CopyProp( propIfPtr, this );
-            oParams.CopyProp( propIoMgr, this );
-            oParams.CopyProp( propKeepAliveSec, this );
+            CIoManager* pMgr = GetIoMgr();
+            oParams.SetPointer( propIfPtr, this );
+            oParams.SetPointer( propIoMgr, pMgr );
+            oParams.CopyProp(
+                propKeepAliveSec, this );
 
             TaskletPtr pTask;
             gint32 ret = pTask.NewObj(

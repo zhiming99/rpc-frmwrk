@@ -133,6 +133,14 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CFdoListeningTask );
     INIT_MAP_ENTRYCFG( CStmSockConnectTask2 );
     INIT_MAP_ENTRYCFG( CRpcNatProtoFdoDrv );
+
+    INIT_MAP_ENTRYCFG( CStreamServerRelayMH );
+    INIT_MAP_ENTRYCFG( CRpcTcpBridgeProxyStream );
+    INIT_MAP_ENTRYCFG( CIfTcpStmTransTaskMH );
+    INIT_MAP_ENTRYCFG( CIfUxSockTransRelayTaskMH );
+    INIT_MAP_ENTRYCFG( CIfUxListeningRelayTaskMH );
+    INIT_MAP_ENTRYCFG( CIfStartUxSockStmRelayTaskMH );
+
     END_FACTORY_MAPS;
 };
 

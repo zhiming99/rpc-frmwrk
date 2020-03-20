@@ -642,7 +642,10 @@ gint32 CDBusLoopbackPdo::SetupDBusSetting(
         CDBusBusPort *pBusPort = static_cast
             < CDBusBusPort* >( m_pBusPort );
 
-        ret = pBusPort->IsDBusSvrOnline( strDest );
+        // ret = pBusPort->IsDBusSvrOnline( strDest );
+        ret = pBusPort->IsRegBusName( strDest );
+        if( ret == ERROR_FALSE )
+            ret = ENOTCONN;
         // NOTE: we don't have AddRules here, and all
         // the signals from this server will be looped
         // back

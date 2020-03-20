@@ -1202,6 +1202,9 @@ class CDBusBusPort : public CGenericBusPort
     gint32 IsDBusSvrOnline(
         const std::string& strDest );
 
+    gint32 IsRegBusName(
+        const std::string& strDest );
+
 	virtual gint32 PreStop( IRP* pIrp );
 };
 
