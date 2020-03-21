@@ -1878,14 +1878,7 @@ gint32 CIfTaskGroup::FindTaskByClsid(
     return 0;
 }
 
-gint32 CIfRootTaskGroup::OnComplete(
-    gint32 iRetVal )
-{
-    SetRunning( true );
-    return 0;
-}
-
-gint32 CIfRootTaskGroup::GetHeadTask(
+gint32 CIfTaskGroup::GetHeadTask(
     TaskletPtr& pHead )
 {
     CStdRTMutex oTaskLock( GetLock() );
@@ -1895,7 +1888,7 @@ gint32 CIfRootTaskGroup::GetHeadTask(
     return 0;
 }
 
-gint32 CIfRootTaskGroup::GetTailTask(
+gint32 CIfTaskGroup::GetTailTask(
     TaskletPtr& pTail )
 {
     CStdRTMutex oTaskLock( GetLock() );
@@ -1903,6 +1896,13 @@ gint32 CIfRootTaskGroup::GetTailTask(
         return -ENOENT;
 
     pTail = m_queTasks.back();
+    return 0;
+}
+
+gint32 CIfRootTaskGroup::OnComplete(
+    gint32 iRetVal )
+{
+    SetRunning( true );
     return 0;
 }
 

@@ -4060,7 +4060,7 @@ gint32 CRpcServices::LoadObjDesc(
                 oConnParams[ propEnableWebSock ] = false;
                 oConnParams[ propCompress ] = true;
                 oConnParams[ propConnRecover ] = false;
-                oConnParams[ propRouterPath ] = std::string( "/" );
+                oCfg[ propRouterPath ] = std::string( "/" );
 
                 if( dwPortNum == 0xFFFFFFFF )
                     dwPortNum = RPC_SVR_DEFAULT_PORTNUM;
@@ -4126,7 +4126,7 @@ gint32 CRpcServices::LoadObjDesc(
                     !bServer )
                 {
                     strVal = oObjElem[ JSON_ATTR_ROUTER_PATH  ].asString(); 
-                    oConnParams[ propRouterPath ] = strVal;
+                    oCfg[ propRouterPath ] = strVal;
                 }
 
                 oConnParams.CopyProp( propDestIpAddr, ( IConfigDb* )pCfg );
@@ -4134,6 +4134,8 @@ gint32 CRpcServices::LoadObjDesc(
 
                 oCfg[ propConnParams ] =
                     ObjPtr( oConnParams.GetCfg() );
+                oCfg.RemoveProperty( propDestIpAddr );
+                oCfg.RemoveProperty( propDestTcpPort );
             }
 
             if( oObjElem.isMember( JSON_ATTR_QUEUED_REQ ) &&

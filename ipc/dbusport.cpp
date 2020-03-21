@@ -2014,6 +2014,16 @@ gint32 CDBusBusPort::RemoveBusNameLpbk(
         strName, true );
 }
 
+gint32 CDBusBusPort::IsRegBusName(
+    const std::string& strName )
+{
+    CStdRMutex oPortLock( GetLock() );
+    CDBusLoopbackMatch* pMatch =
+        m_pMatchLpbkProxy;
+
+    return pMatch->IsRegBusName( strName );
+}
+
 gint32 CDBusBusPort::RegBusName(
     const std::string& strName,
     guint32 dwFlags )

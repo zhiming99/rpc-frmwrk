@@ -681,6 +681,36 @@ class CMessageMatch : public IMessageMatch
         return ret;
     }
 
+    gint32 RemoveProperty( gint32 iProp )
+    {
+        gint32 ret = 0;
+        switch( iProp )
+        {
+        case propObjPath:
+            {
+                m_strObjPath.clear();
+                break;
+            }
+        case propIfName:
+            {
+                m_strIfName.clear();
+                break;
+            }
+        case propMatchType:
+            {
+                SetType( matchInvalid );
+                break;
+            }
+        default:
+            {
+                ret = m_pCfg->
+                    RemoveProperty( iProp );
+                break;
+            }
+        }
+        return ret;
+    }
+
     const CMessageMatch& operator=(
         const CMessageMatch& rhs )
     {
@@ -1085,9 +1115,6 @@ class CDBusLoopbackMatch : public CMessageMatch
     gint32 FilterMsgP2S(
         DBusMessage* pDBusMsg, bool bIncoming ) const;
 
-    gint32 IsRegBusName(
-        const std::string& strBusName ) const;
-
     gint32 AddRemoveBusName(
         const std::string& strName, bool bRemove );
 
@@ -1106,6 +1133,10 @@ class CDBusLoopbackMatch : public CMessageMatch
 
     gint32 RemoveBusName(
         const std::string& strName );
+
+    gint32 IsRegBusName(
+        const std::string& strBusName ) const;
+
 };
 
 

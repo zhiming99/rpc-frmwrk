@@ -34,10 +34,6 @@ class CStreamRelayBase :
 {
     protected:
 
-    // the parent object, the CRpcTcpBridgeProxy or
-    // CRpcTcpBridge
-    InterfPtr m_pParent;
-
     // maps between the stream id and the stream handle
     std::map< HANDLE, gint32 > m_mapHandleToStmId;
     std::map< gint32, HANDLE > m_mapStmIdToHandle;
@@ -53,10 +49,6 @@ class CStreamRelayBase :
     CStreamRelayBase( const IConfigDb* pCfg )
         : super::_MyVirtBase( pCfg ), super( pCfg )
     {}
-
-    // stream over unix sock
-    guint32 GetPendingWrite(
-        HANDLE hWatch ) const;
 
     // data is ready for reading
     virtual gint32 OnStmRecv(
@@ -604,8 +596,10 @@ struct CUnixSockStmRelayBase :
         return 0;
     }
 
-    gint32 ForwardToRemoteUrgent(
-        guint8 byToken, BufPtr& pBuf )
+    gint32 ForwardToUrgent( SENDQUE* pQueue,
+        guint8 byToken,
+        BufPtr& pBuf,
+        TaskletPtr& pResumeTask )
     {
         gint32 ret = 0;
 
@@ -618,7 +612,6 @@ struct CUnixSockStmRelayBase :
                 break;
             }
 
-            SENDQUE* pQueue = &m_queToRemote;
             guint8 byHead = tokInvalid;
 
             if( !pQueue->empty() )
@@ -714,9 +707,11 @@ struct CUnixSockStmRelayBase :
                 break;
             }
 
+            // resume the writing task to send the
+            // flowctrl token.
             CIoManager* pMgr = this->GetIoMgr();
             ret = DEFER_CALL( pMgr,
-                ObjPtr( m_pWrTcpStmTask ),
+                ObjPtr( pResumeTask ),
                 &CIfUxTaskBase::Resume );
 
         }while( 0 );
@@ -724,14 +719,31 @@ struct CUnixSockStmRelayBase :
         return ret;
     }
 
-    gint32 ForwardToLocal(
+    gint32 ForwardToRemoteUrgent(
         guint8 byToken, BufPtr& pBuf )
+    {
+        return ForwardToUrgent( &m_queToRemote,
+            byToken, pBuf, m_pWrTcpStmTask );
+    }
+
+    gint32 ForwardToLocalUrgent(
+        gint8 byToken, BufPtr& pBuf )
+    {
+        return ForwardToUrgent( &m_queToLocal,
+            byToken, pBuf, m_pWritingTask );
+    }
+
+    gint32 ForwardToQueue(
+        guint8 byToken, BufPtr& pBuf,
+        SENDQUE& oQueue, SENDQUE& oQueUrgent,
+        TaskletPtr& pTaskResume,
+        TaskletPtr& pTaskUrgent )
     {
         gint32 ret = 0;
 
         do{
             CStdRMutex oIfLock( this->GetLock() );
-            SENDQUE* pQueue =  &m_queToLocal;
+            SENDQUE* pQueue =  &oQueue;
             bool bEmpty = pQueue->empty();
 
             pQueue->push_back(
@@ -749,7 +761,9 @@ struct CUnixSockStmRelayBase :
                 TaskletPtr pTask;
                 BufPtr pEmptyBuf( true );
 
-                ForwardToRemoteUrgent( tokFlowCtrl, pEmptyBuf );
+                ForwardToUrgent( &oQueUrgent,
+                    tokFlowCtrl, pEmptyBuf, pTaskUrgent );
+
                 ret = ERROR_QUEUE_FULL;
                 break;
             }
@@ -764,11 +778,12 @@ struct CUnixSockStmRelayBase :
                     pResumeTask,
                     ObjPtr( this ),
                     &CUnixSockStmRelayBase::PauseResumeTask,
-                    ( IEventSink* )m_pWritingTask, true );
+                    ( IEventSink* )pTaskResume, true );
 
                 if( ERROR( ret ) )
                     break;
 
+                oIfLock.Unlock();
                 // cannot run directly, could deadlock
                 TaskletPtr pDeferTask;
                 ret = DEFER_CALL_NOSCHED( pDeferTask,
@@ -787,7 +802,6 @@ struct CUnixSockStmRelayBase :
 
                 if( ERROR( ret ) )
                     ( *pResumeTask )( eventCancelTask );
-
             }
 
         }while( 0 );
@@ -795,22 +809,15 @@ struct CUnixSockStmRelayBase :
         return ret;
     }
 
-    gint32 ForwardToRemoteWrapper(
-        gint8 byToken, CBuffer* pBuf )
+    gint32 ForwardToLocal(
+        guint8 byToken, BufPtr& pBuf )
     {
-        if( pBuf != nullptr )
-        {
-            BufPtr ptrBuf( pBuf );
-            return ForwardToRemote(
-                byToken, ptrBuf );
-        }
-
-        BufPtr ptrBuf( true );
-        return ForwardToRemote(
-            byToken, ptrBuf );
+        return ForwardToQueue( byToken, pBuf,
+            m_queToLocal, m_queToRemote,
+            m_pWritingTask, m_pWrTcpStmTask );
     }
 
-    gint32 ForwardToRemote(
+    virtual gint32 ForwardToRemote(
         guint8 byToken, BufPtr& pBuf )
     {
         gint32 ret = 0;
@@ -825,8 +832,15 @@ struct CUnixSockStmRelayBase :
 
             if( pQueue->size() >= QueueLimit() )
             {
-                // return the error, but the request is
-                // queued still.
+                // return the error, but the
+                // request is queued still.
+                //
+                // unlike the remote end flow
+                // control, there is no
+                // ForwardToLocalUrgent since the
+                // PauseReading will stop pipe
+                // reading and thus the incoming
+                // message will stop.
                 ret = ERROR_QUEUE_FULL;
                 break;
             }
@@ -850,7 +864,7 @@ struct CUnixSockStmRelayBase :
         return ret;
     }
 
-    gint32 GetReqToRemote(
+    virtual gint32 GetReqToRemote(
         guint8& byToken, BufPtr& pBuf )
     {
         gint32 ret = 0;
@@ -902,7 +916,7 @@ struct CUnixSockStmRelayBase :
         return ret;
     }
 
-    gint32 PeekReqToLocal(
+    virtual gint32 PeekReqToLocal(
         guint8& byToken, BufPtr& pBuf )
     {
         gint32 ret = 0;
@@ -926,7 +940,7 @@ struct CUnixSockStmRelayBase :
         return ret;
     }
 
-    gint32 GetReqToLocal(
+    virtual gint32 GetReqToLocal(
         guint8& byToken, BufPtr& pBuf )
     {
         gint32 ret = 0;
@@ -1312,6 +1326,7 @@ struct CUnixSockStmRelayBase :
 
         return ret;
     }
+
 };
 
 class CUnixSockStmServerRelay :
@@ -1341,6 +1356,13 @@ class CUnixSockStmServerRelay :
         return SendBdgeStmEvent(
             bPing ? tokPing : tokPong,
             pBuf );
+    }
+
+    IStream* GetParent()
+    {
+        CStreamProxyRelay* pIf =
+            ObjPtr( m_pParent );
+        return ( IStream* )pIf;
     }
 };
 
@@ -1372,6 +1394,13 @@ class CUnixSockStmProxyRelay :
             bPing ? tokPing : tokPong,
             pBuf );
     }
+
+    IStream* GetParent()
+    {
+        CStreamServerRelay* pIf =
+            ObjPtr( m_pParent );
+        return ( IStream* )pIf;
+    }
 };
 
 struct CIfUxRelayTaskHelper
@@ -1380,7 +1409,7 @@ struct CIfUxRelayTaskHelper
     CIfUxRelayTaskHelper( IEventSink* pTask );
 
     gint32 SetTask( IEventSink* pTask );
-    gint32 GetBridgeIf( InterfPtr& pIf );
+    virtual gint32 GetBridgeIf( InterfPtr& pIf );
 
     // CUnixSockStmRelayBase methods
     gint32 ForwardToRemote(
@@ -1421,13 +1450,13 @@ struct CIfUxRelayTaskHelper
         IEventSink* pCallback );
 
     // CRpcTcpBridgeShared method
-    gint32 WriteTcpStream(
+    virtual gint32 WriteTcpStream(
         gint32 iStreamId,
         CBuffer* pSrcBuf,
         guint32 dwSizeToWrite,
         IEventSink* pCallback );
 
-    gint32 ReadTcpStream(
+    virtual gint32 ReadTcpStream(
         gint32 iStreamId,
         BufPtr& pSrcBuf,
         guint32 dwSizeToWrite,
@@ -1481,7 +1510,7 @@ class CIfUxListeningRelayTask :
 
     gint32 RunTask();
     gint32 OnIrpComplete( IRP* pIrp );
-    gint32 PostEvent( BufPtr& pBuf );
+    virtual gint32 PostEvent( BufPtr& pBuf );
     gint32 OnTaskComplete( gint32 iRet );
 
     gint32 Pause()

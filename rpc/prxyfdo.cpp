@@ -94,11 +94,8 @@ gint32 CDBusProxyFdo::BuildSendDataMsg(
         if( ERROR( ret ) )
             break;
 
-        CConnParamsProxy oConn =
-            GetConnParams( this );
-
         oTransCtx.CopyProp(
-            propRouterPath, oConn.GetCfg() );
+            propRouterPath, this );
 
         oDataDesc.SetPointer( propTransCtx,
             ( IConfigDb* )oTransCtx.GetCfg() );
@@ -996,6 +993,12 @@ gint32 CDBusProxyFdo::PostStart(
         if( ERROR( ret ) )
             break;
 
+        ret = oPortCfg.CopyProp(
+            propRouterPath, pPdoPort );
+
+        if( ERROR( ret ) )
+            break;
+
         if( true )
         {
             CCfgOpener matchCfg;
@@ -1174,9 +1177,6 @@ gint32 CProxyFdoRmtDBusOfflineTask::operator()(
         if( ERROR( ret ) )
             break;
 
-        CConnParamsProxy oConn =
-            GetConnParams( pPort );
-
         guint32 eventId = eventRmtDBusOffline;
         PortPtr pPdoPort;
         ret =pPort->GetPdoPort( pPdoPort );
@@ -1192,7 +1192,7 @@ gint32 CProxyFdoRmtDBusOfflineTask::operator()(
             break;
 
         ret = oTransCtx.CopyProp(
-            propRouterPath, oConn.GetCfg() );
+            propRouterPath, pPort );
         if( ERROR( ret ) )
             break;
 

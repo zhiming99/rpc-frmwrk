@@ -1438,9 +1438,41 @@ inline gint32 NewIfDeferredCall( EnumClsid iTaskClsid,
     NewIfDeferredCall( clsid( CIfDeferCallTask ), \
         __pTask, pObj, func , ##__VA_ARGS__ )
 
-#define DEFER_IFCALLEX_NOSCHED( __pTask, pObj, func, ... ) \
+// use this macro when the _pTask will be added
+// to a task group.
+#define DEFER_IFCALL_NOSCHED2( _pos, _pTask, pObj, func, ... ) \
+({ \
+    gint32 _ret = NewIfDeferredCall( clsid( CIfDeferCallTask ), \
+        _pTask, pObj, func , ##__VA_ARGS__ ); \
+    if( SUCCEEDED( _ret ) ) \
+    { \
+        CIfDeferCallTaskEx* pDefer = _pTask; \
+        BufPtr pBuf( true ); \
+        *pBuf = ObjPtr( pDefer ); \
+        pDefer->UpdateParamAt( _pos, pBuf );  \
+    } \
+    _ret; \
+})
+
+#define DEFER_IFCALLEX_NOSCHED( _pTask, pObj, func, ... ) \
     NewIfDeferredCall( clsid( CIfDeferCallTaskEx ), \
-        __pTask, pObj, func , ##__VA_ARGS__ )
+        _pTask, pObj, func , ##__VA_ARGS__ )
+
+// use this macro when the _pTask will be added
+// to a task group.
+#define DEFER_IFCALLEX_NOSCHED2( _pos, _pTask, pObj, func, ... ) \
+({ \
+    gint32 _ret = NewIfDeferredCall( clsid( CIfDeferCallTaskEx ), \
+        _pTask, pObj, func , ##__VA_ARGS__ ); \
+    if( SUCCEEDED( _ret ) ) \
+    { \
+        CIfDeferCallTaskEx* pDefer = _pTask; \
+        BufPtr pBuf( true ); \
+        *pBuf = ObjPtr( pDefer ); \
+        pDefer->UpdateParamAt( _pos, pBuf );  \
+    } \
+    _ret; \
+})
 
 class CIfDeferredHandler :
     public CIfInterceptTaskProxy
@@ -1474,6 +1506,7 @@ class CIfDeferredHandler :
 
 template < typename C, typename ... Types, typename ...Args>
 inline gint32 NewDeferredHandler(
+    gint32 iPos,
     TaskletPtr& pCallback,
     ObjPtr pIf, gint32(C::*f)(Types ...),
     IEventSink* pTaskToIntercept, Args&&... args )
@@ -1510,7 +1543,7 @@ inline gint32 NewDeferredHandler(
 
     // for the handler method, pass the pDeferTask
     // as the callback
-    ret = pDeferTask->UpdateParamAt( 0, pBuf );
+    ret = pDeferTask->UpdateParamAt( iPos, pBuf );
     if( ERROR( ret ) )
         return ret;
 
@@ -1520,7 +1553,10 @@ inline gint32 NewDeferredHandler(
 }
 
 #define DEFER_HANDLER_NOSCHED( __pTask, pObj, func, pCallback, ... ) \
-    NewDeferredHandler( __pTask, pObj, func , pCallback, ##__VA_ARGS__ )
+    NewDeferredHandler( 0, __pTask, pObj, func , pCallback, ##__VA_ARGS__ )
+
+#define DEFER_HANDLER_NOSCHED2( _pos, __pTask, pObj, func, pCallback, ... ) \
+    NewDeferredHandler( _pos, __pTask, pObj, func , pCallback, ##__VA_ARGS__ )
 
 class CIfResponseHandler :
     public CIfDeferredHandler
@@ -1577,6 +1613,12 @@ inline gint32 NewResponseHandler(
 
 #define NEW_PROXY_RESP_HANDLER( __pTask, pObj, func, pCallback, pContext ) \
     NewResponseHandler( __pTask, pObj, func , pCallback, pContext )
+
+#define NEW_PROXY_RESP_HANDLER2( __pTask, pObj, func, pCallback, pContext ) \
+( { ret = NewResponseHandler( __pTask, pObj, func , pCallback, pContext ); \
+    if( SUCCEEDED( ret ) ) \
+        ( *__pTask )( eventZero ); \
+    ret;} )
 
 // to insert the task pInterceptor to the head of
 // completion chain of the task pTarget 
@@ -1757,16 +1799,22 @@ inline gint32 NewDeferredCallOneshot(
     return 0;
 }
 
+#define NEW_COMPLETE_CALLBACK( _pTask, pEvent, _pObj, _func, ... ) \
+({ \
+    gint32 _ret = NewDeferredCallOneshot( \
+        pEvent, _pTask, _pObj, _func, ##__VA_ARGS__ ); \
+    if( !_pTask.IsEmpty() ) \
+        ( *_pTask )( eventZero ); \
+    _ret; \
+})
+
 // NOTE: it is required to provide at least one
 // argument in the variadic parameter pack
 #define INSTALL_COMPLETE_HANDLER( pEvent, pObj, func, ... ) \
-do{ \
+({ \
     TaskletPtr pTask; \
-    NewDeferredCallOneshot( \
-        pEvent, pTask, pObj, func VA_ARGS( __VA_ARGS__ ) ); \
-    if( !pTask.IsEmpty() ) \
-        ( *pTask )( eventZero ); \
-}while( 0 )
+    NEW_COMPLETE_CALLBACK( pTask, pEvent, pObj, func VA_ARGS(__VA_ARGS__) ); \
+})
 
 template< class T >
 class CAsyncCallbackBase :
@@ -2762,7 +2810,7 @@ struct CAggInterfaceServer :
     virtual const EnumClsid GetIid() const = 0;
     // for those interface who inherits other
     // interfaces
-    virtual bool SupportIid( EnumClsid )
+    virtual bool SupportIid( EnumClsid ) const
     { return false; }
 };
 
@@ -2922,7 +2970,7 @@ struct CAggInterfaceProxy :
         : CInterfaceProxy( pCfg )
     {}
     virtual const EnumClsid GetIid() const = 0;
-    virtual bool SupportIid( EnumClsid )
+    virtual bool SupportIid( EnumClsid ) const
     { return false; }
 };
 
