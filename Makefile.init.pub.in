@@ -8,6 +8,8 @@ endif
 #Set BUILD_64 to `0' for 32-bit target
 #Note it does not work for 64-bit arm yet, always
 #set to `0' for arm
+BUILD_64:= 0
+
 ifeq ($(ARCH),x86_64)
 BUILD_64 := 1
 ARCH := x86
