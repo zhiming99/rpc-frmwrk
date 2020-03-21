@@ -1,9 +1,5 @@
 include ./Makefile.init.pub
 
-ifeq ($(MODE),Release)
-	OUTPUT_DIR := ./release
-endif
-
 TARGETS := $(OUTPUT_DIR)/libcombase.so $(OUTPUT_DIR)/libipc.so $(OUTPUT_DIR)/librpc.so test
 
 all: $(TARGETS)

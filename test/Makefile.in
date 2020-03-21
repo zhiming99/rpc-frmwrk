@@ -1,4 +1,6 @@
-all:
+all: debug
+
+debug:
 	make -C helloworld
 	make -C iftest
 	make -C asynctst
@@ -73,4 +75,4 @@ debug_clean:
 	make -C router debug_clean
 	make -C btinrt debug_clean
 
-.PHONY: release clean
+.PHONY: release clean debug_clean debug

@@ -38,6 +38,8 @@ do_clean:
 	-@rm $(OBJ_DIR)/*.d $(MUTE_CLEAN)
 	-@rm $(OUTPUT_DIR)/$(TARGET) $(MUTE_CLEAN)
 	-@rm $(OBJS) $(MUTE_CLEAN)
+	make -C ./wsport $(MAKECMDGOALS)
+	make -C ./sslport $(MAKECMDGOALS)
 
 sync:
 	bash ./sync-up.sh
