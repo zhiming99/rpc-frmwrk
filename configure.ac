@@ -24,6 +24,8 @@ AC_CHECK_LIB([ipc], [DllLoadFactory])
 AC_CHECK_LIB([rpc], [DllLoadFactory])
 AC_CHECK_LIB([dbus-1], [dbus_bus_get])
 AC_CHECK_LIB([jsoncpp], [_ZNK4Json5ValuecvbEv])
+AC_CHECK_LIB([lz4], [LZ4_compress_default])
+AC_CHECK_LIB([ssl], [SSL_do_handshake])
 
 # Checks for header files.
 AC_CHECK_HEADERS([arpa/inet.h \
