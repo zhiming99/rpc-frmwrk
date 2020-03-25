@@ -51,6 +51,9 @@ AC_TYPE_OFF_T
 AC_TYPE_SIZE_T
 AC_TYPE_SSIZE_T
 
+#use --with-sysroot to set the cross-compile's rootfs
+AC_SUBST(with_sysroot)
+
 # Checks for library functions.
 AC_FUNC_ALLOCA
 AC_FUNC_LSTAT_FOLLOWS_SLASHED_SYMLINK
