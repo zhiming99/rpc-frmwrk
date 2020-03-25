@@ -80,6 +80,7 @@ C_INCLUDE := -I$(BASE)/include \
 	-I$(ROOTFS)/usr/include/dbus-1.0 \
 	-I$(USER_LIB_PREFIX)/dbus-1.0/include \
 	-I$(ROOTFS)/usr/include \
+	@INCLUDES@
 
 ifeq ($(ARCH),arm)
 	WIDTH_FLAG := -marm
