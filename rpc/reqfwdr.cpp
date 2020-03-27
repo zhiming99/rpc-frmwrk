@@ -3988,7 +3988,7 @@ gint32 CReqFwdrFetchDataTask::RunTask()
 
         string strRouterPath;
         ret = oTransCtx.GetStrProp(
-            propRouterPtr, strRouterPath );
+            propRouterPath, strRouterPath );
         if( ERROR( ret ) )
         {
             ret = -EINVAL;
