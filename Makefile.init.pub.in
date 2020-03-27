@@ -79,8 +79,7 @@ C_INCLUDE := -I$(BASE)/include \
 	-I$(USER_LIB_PREFIX)/glib-2.0/include \
 	-I$(ROOTFS)/usr/include/dbus-1.0 \
 	-I$(USER_LIB_PREFIX)/dbus-1.0/include \
-	-I$(ROOTFS)/usr/include \
-	@INCLUDES@
+	-I$(ROOTFS)/usr/include @INCLUDES@
 
 ifeq ($(ARCH),arm)
 	WIDTH_FLAG := -marm
@@ -95,6 +94,8 @@ OUTPUT_DIR := $(BASE)/$(DBG_DIR)
 OBJ_DIR := ./$(DBG_DIR)
 
 ifeq ($(MAKECMDGOALS),) 
+	C_FLAGS += $(DEBUG_FLAGS)
+else ifeq ($(MAKECMDGOALS),debug) 
 	C_FLAGS += $(DEBUG_FLAGS)
 else ifeq ($(MAKECMDGOALS),$(DBG_DIR)) 
 	C_FLAGS += $(DEBUG_FLAGS)
