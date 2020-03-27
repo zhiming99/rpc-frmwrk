@@ -51,7 +51,12 @@
 #define LONGWORD                guint32
 #endif
 
-// #define PAGE_SIZE               ( getpagesize() )
+#ifdef ARM
+#ifndef PAGE_SIZE
+#define PAGE_SIZE               ( getpagesize() )
+#endif
+#endif
+
 #define HANDLE                  uintptr_t
 #define PortToHandle( ptr )     reinterpret_cast<HANDLE>( ( IPort* )ptr )
 #define HandleToPort( handle )  reinterpret_cast< IPort* >( handle )

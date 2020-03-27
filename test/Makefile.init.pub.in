@@ -24,3 +24,12 @@ endif
 
 CPP_FLAGS += -D_USE_LIBEV=1
 LINKER_OPTION := -L$(OUTPUT_DIR) $(WIDTH_FLAG) -L$(USER_LIB_PREFIX) -L$(LIB_PREFIX) -lipc -lcombase -Wl,-rpath=$(USER_LIB_PREFIX) -Wl,-rpath=$(LIB_PREFIX) -ldbus-1 -lcppunit -ljsoncpp -lstdc++ -ldl -lpthread
+
+ifeq ($(ARCH),arm)
+atomic:=$(shell grep -l 'define HAVE_LIBATOMIC 1' $(BASE)/config.h)
+result:=$(patsubst %config.h,config.h,$(atomic))
+ifeq ($(result),config.h)
+LINKER_OPTION += -latomic
+endif
+endif
+

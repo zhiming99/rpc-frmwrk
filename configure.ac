@@ -24,6 +24,9 @@ AC_CHECK_LIB([ipc], [DllLoadFactory])
 AC_CHECK_LIB([rpc], [DllLoadFactory])
 AC_CHECK_LIB([dbus-1], [dbus_bus_get])
 AC_CHECK_LIB([jsoncpp], [_ZNK4Json5ValuecvbEv])
+AC_CHECK_LIB([lz4], [LZ4_compress_default])
+AC_CHECK_LIB([ssl], [SSL_do_handshake])
+AC_CHECK_LIB([atomic], [__atomic_fetch_add_8])
 
 # Checks for header files.
 AC_CHECK_HEADERS([arpa/inet.h \
@@ -48,6 +51,10 @@ AC_C_INLINE
 AC_TYPE_OFF_T
 AC_TYPE_SIZE_T
 AC_TYPE_SSIZE_T
+
+#use --with-sysroot to set the cross-compile's rootfs
+AC_SUBST(with_sysroot)
+AC_SUBST(INCLUDES)
 
 # Checks for library functions.
 AC_FUNC_ALLOCA

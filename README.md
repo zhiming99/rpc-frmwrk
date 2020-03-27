@@ -11,6 +11,7 @@ This framework depends on the following packags:
 4. `cppunit-1 (for the sample code, cppunit and cppunit-devel)`   
 5. `glib-2.0 (for compile only,glib2-devel)`   
 6. `openssl-1.1 for SSL communication. ( openssl-devel, optional )`
+7. c++11 is required, and you need make sure the GCC is 5.x or higher.
 
 #### Features:   
 1. `Support for multiple interfaces on a single object (COM alike).`   
@@ -29,8 +30,11 @@ This framework depends on the following packags:
 14. `Object access via Multi-hop routing` (to come)
 
 ---
+[`Sat 21 Mar 2020 01:47:35 PM Beijing`]   
+1. Updated some `autoconf` releated stuffs to make the cross-compile more efficient.
+
 [`Fri 20 Mar 2020 11:00:16 PM Beijing`]   
-1. Submitted a compilable version with multi-hop support. It will take a couple of weeks to get it work.   
+1. Submitted a compilable version with multi-hop support. It will take one or two weeks to get it work.   
 
 [`Sat 14 Mar 2020 09:18:01 PM Beijing`]   
 1. Code complete the streaming support for multi-hop, about 70% done.    

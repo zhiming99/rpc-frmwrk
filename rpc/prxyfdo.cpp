@@ -1077,7 +1077,7 @@ gint32 CDBusProxyFdo::PostStart(
                 GetConnParams( this );
 
             ret = matchRmtEvt.CopyProp(
-                propRouterPath, oConn.GetCfg() );
+                propRouterPath, this );
 
             if( ERROR( ret ) )
                 break;

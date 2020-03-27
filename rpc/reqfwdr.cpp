@@ -316,7 +316,6 @@ gint32 CReqFwdrOpenRmtPortTask::OnServiceComplete(
         ret = GetInterceptTask( pEvt );
         if( ERROR( ret ) )
             break;
-        SetInterceptTask( nullptr );
 
         CCfgOpener oCfg(
             ( IConfigDb* )GetConfig() );
@@ -364,6 +363,9 @@ gint32 CReqFwdrOpenRmtPortTask::OnServiceComplete(
             oParams.CopyProp(
                 propConnParams, this );
 
+            pIf->SetResponse( 
+                pEvt, oParams.GetCfg() );
+
             break;
         }
 
@@ -390,11 +392,17 @@ gint32 CReqFwdrOpenRmtPortTask::OnServiceComplete(
             break;
         }
 
+        SetInterceptTask( nullptr );
         CIoManager* pMgr = pIf->GetIoMgr();
         // a new task to release the seq task
         // queue
         TaskletPtr ptrTask( pChkRt );
         ret = pMgr->RescheduleTask( ptrTask );
+        if( ERROR( ret ) )
+        {
+            SetInterceptTask( pEvt );
+            ( *pChkRt )( eventCancelTask );
+        }
 
     }while( 0 );
 
