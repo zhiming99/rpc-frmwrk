@@ -94,8 +94,10 @@ gint32 CDBusProxyFdo::BuildSendDataMsg(
         if( ERROR( ret ) )
             break;
 
-        oTransCtx.CopyProp(
+        ret = oTransCtx.CopyProp(
             propRouterPath, this );
+        if( ERROR( ret ) )
+            break;
 
         oDataDesc.SetPointer( propTransCtx,
             ( IConfigDb* )oTransCtx.GetCfg() );
