@@ -65,10 +65,6 @@ void CIfRouterTest::setUp()
         if( pSvc != nullptr )
         {
             pSvc->SetCmdLineOpt(
-                propObjDescPath,
-                ROUTER_OBJ_DESC );
-
-            pSvc->SetCmdLineOpt(
                 propRouterRole, g_dwRole );
 
             pSvc->SetRouterName( MODULE_NAME );

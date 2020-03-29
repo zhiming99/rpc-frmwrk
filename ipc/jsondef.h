@@ -84,3 +84,6 @@
 #define JSON_ATTR_CONN_RECOVER  "ConnRecover"
 #define JSON_ATTR_DEST_URL      "DestURL"
 #define JSON_ATTR_ROUTER_PATH      "RouterPath"
+#define JSON_ATTR_NODES         "Nodes"
+#define JSON_ATTR_NODENAME         "NodeName"
+#define JSON_ATTR_ENABLED         "Enabled"

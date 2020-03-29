@@ -28,6 +28,7 @@
 #include "rpcroute.h"
 #include "dbusport.h"
 #include "connhelp.h"
+#include "jsondef.h"
 
 using namespace std;
 
@@ -493,6 +494,264 @@ gint32 CRpcRouterBridge::GetBridge(
     return ret;
 }
 
+gint32 CRpcRouterBridge::BuildNodeMap()
+{
+    gint32 ret = 0;
+    do{
+        std::string strObjName =
+            OBJNAME_ROUTER_BRIDGE;
+
+        std::string strObjDesc;
+        CCfgOpenerObj oRouterCfg( this );
+        ret = oRouterCfg.GetStrProp(
+            propObjDescPath, strObjDesc );
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpener oCfg;
+
+        // Load the object decription file in json
+        Json::Value valObjDesc;
+        ret = ReadJsonCfg(
+            strObjDesc, valObjDesc );
+        if( ERROR( ret ) )
+            break;
+
+        // get object array
+        Json::Value& oObjArray =
+            valObjDesc[ JSON_ATTR_OBJARR ];
+
+        if( oObjArray == Json::Value::null ||
+            !oObjArray.isArray() ||
+            oObjArray.empty() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+
+        string strVal;
+        guint32 i = 0;
+        for( ; i < oObjArray.size(); i++ )
+        {
+            if( oObjArray[ i ].empty() ||
+                !oObjArray[ i ].isObject() )
+                continue;
+
+            Json::Value& oObjElem = oObjArray[ i ];
+            if( !oObjElem.isMember( JSON_ATTR_OBJNAME ) )
+                continue;
+
+            // find the section with `ObjName' is
+            // strObjName
+            if( oObjElem[ JSON_ATTR_OBJNAME ].asString()
+                != strObjName )
+                continue;
+
+
+            // overwrite the global port class and port
+            // id if PROXY_PORTCLASS and PROXY_PORTID
+            // exist
+            CCfgOpener oConnParams;
+
+            Json::Value& oNodesArray =
+                oObjElem[ JSON_ATTR_NODES ];
+
+            if( oNodesArray == Json::Value::null ||
+                !oNodesArray.isArray() ||
+                oNodesArray.empty() )
+            {
+                ret = -ENOENT;
+                break;
+            }
+
+            // set the default parameters
+            for( guint32 i = 0; i < oNodesArray.size(); i++ )
+            {
+                Json::Value& oNodeElem = oNodesArray[ i ];
+
+                std::string strNode;
+                bool bEnabled = false;
+
+                if( oNodeElem.isMember( JSON_ATTR_ENABLED ) &&
+                    oNodeElem[ JSON_ATTR_ENABLED ].isString() )
+                {
+                    strVal =
+                       oNodeElem[ JSON_ATTR_ENABLED ].asString(); 
+                    if( strVal == "true" )
+                        bEnabled = true;
+                    else if( strVal != "false" )
+                    {
+                        ret = -EINVAL;
+                        break;
+                    }
+                }
+
+                if( !bEnabled )
+                    continue;
+
+                // mandatory attribute NodeName
+                if( oNodeElem.isMember( JSON_ATTR_NODENAME ) &&
+                    oNodeElem[ JSON_ATTR_NODENAME ].isString() )
+                {
+                    strNode =
+                       oNodeElem[ JSON_ATTR_NODENAME ].asString(); 
+                }
+                else
+                {
+                    ret = -EINVAL;
+                    break;
+                }
+
+                std::string strFormat = "ipv4";
+                oConnParams[ propAddrFormat ] = strFormat;
+                oConnParams[ propEnableSSL ] = false;
+                oConnParams[ propEnableWebSock ] = false;
+                oConnParams[ propCompress ] = true;
+                oConnParams[ propConnRecover ] = false;
+
+                if( oNodeElem.isMember( JSON_ATTR_ADDRFORMAT ) &&
+                    oNodeElem[ JSON_ATTR_ADDRFORMAT ].isString() )
+                {
+                    strFormat =
+                       oNodeElem[ JSON_ATTR_ADDRFORMAT ].asString(); 
+                    oConnParams[ propAddrFormat ] = strFormat;
+                }
+
+                // get ipaddr
+                if( oNodeElem.isMember( JSON_ATTR_IPADDR ) &&
+                    oNodeElem[ JSON_ATTR_IPADDR ].isString() )
+                {
+                    strVal = oNodeElem[ JSON_ATTR_IPADDR ].asString(); 
+                    string strNormVal;
+                    if( strFormat == "ipv4" )
+                        ret = NormalizeIpAddr(
+                            AF_INET, strVal, strNormVal );
+                    else
+                        ret = NormalizeIpAddr(
+                            AF_INET6, strVal, strNormVal );
+
+                    if( SUCCEEDED( ret ) )
+                    {
+                        oConnParams[ propDestIpAddr ] = strNormVal;
+                    }
+                    else
+                    {
+                        ret = -EINVAL;
+                        break;
+                    }
+                }
+
+                // tcp port number for router setting
+                guint32 dwPortNum = 0xFFFFFFFF;
+                if( oNodeElem.isMember( JSON_ATTR_TCPPORT ) &&
+                    oNodeElem[ JSON_ATTR_TCPPORT ].isString() )
+                {
+                    strVal = oNodeElem[ JSON_ATTR_TCPPORT ].asString(); 
+                    guint32 dwVal = 0;
+                    if( !strVal.empty() )
+                    {
+                        dwVal = std::strtol(
+                            strVal.c_str(), nullptr, 10 );
+                    }
+                    if( dwVal > 0 && dwVal < 0x10000 )
+                    {
+                        dwPortNum = dwVal;
+                    }
+                    else
+                    {
+                        ret = -EINVAL;
+                        break;
+                    }
+                }
+
+                if( dwPortNum == 0xFFFFFFFF )
+                    dwPortNum = RPC_SVR_DEFAULT_PORTNUM;
+
+                oConnParams[ propDestTcpPort ] = dwPortNum;
+
+                if( oNodeElem.isMember( JSON_ATTR_ENABLE_SSL ) &&
+                    oNodeElem[ JSON_ATTR_ENABLE_SSL ].isString() )
+                {
+                    strVal = oNodeElem[ JSON_ATTR_ENABLE_SSL  ].asString(); 
+                    if( strVal == "false" )
+                        oConnParams[ propEnableSSL ] = false;
+                    else if( strVal == "true" )
+                        oConnParams[ propEnableSSL ] = true;
+                }
+
+                if( oNodeElem.isMember( JSON_ATTR_ENABLE_WEBSOCKET ) &&
+                    oNodeElem[ JSON_ATTR_ENABLE_WEBSOCKET ].isString() )
+                {
+                    strVal = oNodeElem[ JSON_ATTR_ENABLE_WEBSOCKET  ].asString(); 
+                    if( strVal == "false" )
+                        oConnParams[ propEnableWebSock ] = false;
+                    else if( strVal == "true" )
+                        oConnParams[ propEnableWebSock ] = true;
+                }
+
+                if( oNodeElem.isMember( JSON_ATTR_ENABLE_COMPRESS ) &&
+                    oNodeElem[ JSON_ATTR_ENABLE_COMPRESS ].isString() )
+                {
+                    strVal = oNodeElem[ JSON_ATTR_ENABLE_COMPRESS  ].asString(); 
+                    if( strVal == "false" )
+                        oConnParams[ propCompress ] = false;
+                    else if( strVal == "true" )
+                        oConnParams[ propCompress ] = true;
+                }
+
+                if( oNodeElem.isMember( JSON_ATTR_CONN_RECOVER ) &&
+                    oNodeElem[ JSON_ATTR_CONN_RECOVER ].isString() )
+                {
+                    strVal = oNodeElem[ JSON_ATTR_CONN_RECOVER  ].asString(); 
+                    if( strVal == "false" )
+                        oConnParams[ propConnRecover ] = false;
+                    else if( strVal == "true" )
+                        oConnParams[ propConnRecover ] = true;
+                }
+
+                if( oNodeElem.isMember( JSON_ATTR_DEST_URL ) &&
+                    oNodeElem[ JSON_ATTR_DEST_URL ].isString() )
+                {
+                    strVal = oNodeElem[ JSON_ATTR_DEST_URL  ].asString(); 
+                    oConnParams[ propDestUrl ] = strVal;
+                }
+
+                ret = AddConnParamsByNodeName(
+                    strNode, oConnParams.GetCfg() );
+
+                if( ERROR( ret ) )
+                    break;
+
+            }
+
+            break;
+        }
+
+        if( ERROR( ret ) )
+            break;
+
+        if( i == oObjArray.size() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CRpcRouterBridge::OnPostStart(
+    IEventSink* pContext )
+{
+    gint32 ret = super::OnPostStart( pContext );
+
+    if( ERROR( ret ) )
+        return ret;
+
+    return BuildNodeMap();
+}
+
 gint32 CRpcRouterBridge::AddBridge( 
     IGenericInterface* pIf )
 {
@@ -890,10 +1149,11 @@ gint32 CRpcRouterBridge::BuildStartStopReqFwdrProxy(
             else
             {
                 std::string strObjDesc;
-                ret = GetIoMgr()->GetCmdLineOpt(
+                CCfgOpenerObj oRouterCfg( this );
+                ret = oRouterCfg.GetStrProp(
                     propObjDescPath, strObjDesc );
                 if( ERROR( ret ) )
-                    strObjDesc = ROUTER_OBJ_DESC;
+                    break;
 
                 string strRtName;
                 GetIoMgr()->GetRouterName( strRtName );
@@ -970,18 +1230,25 @@ gint32 CRouterOpenBdgePortTask::CreateInterface(
         if( ERROR( ret ) )
             break;
 
+        CRpcRouter* pRouter = nullptr;
+        ret = oCfg.GetPointer(
+            propRouterPtr, pRouter );
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpenerObj oRouterCfg( pRouter );
+
         bool bServer = true;
         oCfg.GetBoolProp( 0, bServer );
 
         std::string strObjDesc;
-        ret = pMgr->GetCmdLineOpt(
-            propObjDescPath, strObjDesc );
 
+        ret = oRouterCfg.GetStrProp(
+            propObjDescPath, strObjDesc );
         if( ERROR( ret ) )
-            strObjDesc = ROUTER_OBJ_DESC;
+            break;
 
         CParamList oParams;
-
         string strRtName;
 
         pMgr->GetRouterName( strRtName );
@@ -999,14 +1266,10 @@ gint32 CRouterOpenBdgePortTask::CreateInterface(
 
         oParams.CopyProp( propPortId, this );
 
-        ObjPtr pObj;
-        ret = oCfg.GetObjPtr( propRouterPtr, pObj );
-        if( ERROR( ret ) )
-            break;
+        oParams.SetPointer(
+            propRouterPtr, pRouter );
 
-        oParams.SetObjPtr( propRouterPtr, pObj );
         oParams.SetPointer( propIoMgr, pMgr );
-
         oParams.CopyProp( propConnParams, this );
         EnumClsid iClsid;
 
@@ -3126,10 +3389,11 @@ gint32 CRpcRouterReqFwdr::StartReqFwdr(
             clsid( CRpcReqForwarderImpl );
 
         std::string strObjDesc;
-        ret = GetIoMgr()->GetCmdLineOpt(
+        CCfgOpenerObj oRouterCfg( this );
+        ret = oRouterCfg.GetStrProp(
             propObjDescPath, strObjDesc );
         if( ERROR( ret ) )
-            strObjDesc = ROUTER_OBJ_DESC;
+            break;
 
         string strRtName;
         GetIoMgr()->GetRouterName( strRtName );
@@ -4197,7 +4461,8 @@ gint32 CRpcRouterManager::Start()
 
         std::string strObjDesc;
         CIoManager* pMgr = GetIoMgr();
-        ret = pMgr->GetCmdLineOpt(
+        CCfgOpenerObj oRouterCfg( this );
+        ret = oRouterCfg.GetStrProp(
             propObjDescPath, strObjDesc );
         if( ERROR( ret ) )
             break;
@@ -4211,7 +4476,7 @@ gint32 CRpcRouterManager::Start()
             CParamList oParams;
             ret = CRpcServices::LoadObjDesc(
                 strObjDesc,
-                "RpcRouterBridgeImpl",
+                OBJNAME_ROUTER_BRIDGE,
                 true, oParams.GetCfg() );
 
             if( ERROR( ret ) )
@@ -4243,7 +4508,7 @@ gint32 CRpcRouterManager::Start()
             CParamList oParams;
             ret = CRpcServices::LoadObjDesc(
                 strObjDesc,
-                "RpcRouterReqFwdrImpl",
+                OBJNAME_ROUTER_REQFWDR,
                 true, oParams.GetCfg() );
 
             if( ERROR( ret ) )
