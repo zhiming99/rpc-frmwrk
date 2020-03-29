@@ -1553,6 +1553,13 @@ do{ \
         break; \
 }while( 0 )
 
+/**
+* @name OnRmtModEvent: Works only if the interface
+* connecting to the remote server, otherwise this
+* event will be filtered out.
+* @{ */
+/**  @} */
+
 gint32 CRpcInterfaceBase::OnRmtModEvent(
     EnumEventId iEvent,
     const std::string& strModule,
@@ -1687,6 +1694,15 @@ do{ \
         break; \
     } \
 }while( 0 )
+
+/**
+* @name OnRmtSvrEvent: Works only if the interface
+* connects to a remote server. otherwise, it is
+* filtered out. However, it does not hold if you
+* override this method, such as those objects in
+* the router.
+* @{ */
+/**  @} */
 
 gint32 CRpcInterfaceBase::OnRmtSvrEvent(
     EnumEventId iEvent,
@@ -3855,7 +3871,10 @@ gint32 CRpcServices::LoadObjDesc(
             ret = -ENOENT;
             break;
         }
-        
+
+        oCfg.SetStrProp(
+            propObjDescPath, strFile );
+
         string strSvrName;
 
         ret = oCfg.GetStrProp(
@@ -4056,6 +4075,8 @@ gint32 CRpcServices::LoadObjDesc(
             // set the default parameters
             if( bProxyPdo )
             {
+                std::string strFormat = "ipv4";
+                oConnParams[ propAddrFormat ] = strFormat;
                 oConnParams[ propEnableSSL ] = false;
                 oConnParams[ propEnableWebSock ] = false;
                 oConnParams[ propCompress ] = true;
@@ -4078,6 +4099,16 @@ gint32 CRpcServices::LoadObjDesc(
                     {
                         oConnParams[ propEnableSSL ] = true;
                     }
+                }
+
+                if( oObjElem.isMember( JSON_ATTR_ADDRFORMAT ) &&
+                    oObjElem[ JSON_ATTR_ADDRFORMAT ].isString() &&
+                    !bServer )
+                {
+                    strFormat =
+                        oObjElem[ JSON_ATTR_ADDRFORMAT ].asString(); 
+                    oConnParams[ propAddrFormat ] =
+                        oObjElem[ JSON_ATTR_ADDRFORMAT ].asString(); 
                 }
 
                 if( oObjElem.isMember( JSON_ATTR_ENABLE_WEBSOCKET ) &&
@@ -4122,7 +4153,7 @@ gint32 CRpcServices::LoadObjDesc(
                 }
 
                 if( oObjElem.isMember( JSON_ATTR_ROUTER_PATH ) &&
-                    oObjElem[ JSON_ATTR_DEST_URL ].isString() &&
+                    oObjElem[ JSON_ATTR_ROUTER_PATH ].isString() &&
                     !bServer )
                 {
                     strVal = oObjElem[ JSON_ATTR_ROUTER_PATH  ].asString(); 

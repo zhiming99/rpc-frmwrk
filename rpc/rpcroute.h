@@ -1872,6 +1872,8 @@ class CRpcRouterBridge : public CRpcRouter
         IEventSink*  pIoReq,
         IConfigDb* pReqCtx );
 
+    gint32 BuildNodeMap();
+
     protected:
 
     std::map< std::string, guint32 > m_mapNode2Pid;
@@ -1895,6 +1897,9 @@ class CRpcRouterBridge : public CRpcRouter
         IEventSink* pCallback,
         IConfigDb* pEvtCtx,
         HANDLE hPort );
+
+    virtual gint32 OnPostStart(
+        IEventSink* pContext );
 
     private:
 
@@ -2011,6 +2016,40 @@ class CRpcRouterBridge : public CRpcRouter
             return ret;
 
         return GetReqFwdrProxy( strDest, pIf );
+    }
+
+    inline gint32 AddConnParamsByNodeName(
+        const std::string& strNode,
+        const CfgPtr& pConnParams )
+    {
+        if( strNode.empty() )
+            return -EINVAL;
+        
+        CStdRMutex oRouterLock( GetLock() );
+        std::map< std::string, CfgPtr >::const_iterator 
+            itr = m_mapNode2ConnParams.find(
+                strNode );
+        if( itr != m_mapNode2ConnParams.end() )
+            return -EEXIST;
+
+        m_mapNode2ConnParams[ strNode ] = pConnParams;
+        return 0;
+    }
+
+    inline gint32 RemoveConnParamsByNodeName(
+        const std::string& strNode )
+    {
+        if( strNode.empty() )
+            return -EINVAL;
+        
+        CStdRMutex oRouterLock( GetLock() );
+        size_t ret =
+            m_mapNode2ConnParams.erase( strNode );
+
+        if( ret == 0 )
+            ret = -ENOENT;
+
+        return 0;
     }
 
     inline gint32 GetConnParamsByNodeName(

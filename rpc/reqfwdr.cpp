@@ -231,6 +231,14 @@ gint32 CReqFwdrOpenRmtPortTask::CreateInterface(
         if( ERROR( ret ) )
             break;
 
+        CRpcInterfaceServer* pReqFwdr = nullptr;
+        ret = oCfg.GetPointer( propIfPtr, pReqFwdr );
+        if( pReqFwdr == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
         // ---interface related information---
         //
         // ----open port information----
@@ -250,14 +258,14 @@ gint32 CReqFwdrOpenRmtPortTask::CreateInterface(
         // propRouterPtr
 
         std::string strObjDesc;
-        ret = pMgr->GetCmdLineOpt(
+        CCfgOpenerObj oIfCfg( pReqFwdr );
+        ret = oIfCfg.GetStrProp(
             propObjDescPath, strObjDesc );
 
         if( ERROR( ret ) )
-            strObjDesc = ROUTER_OBJ_DESC;
+            break;
 
         CParamList oParams;
-
         string strRtName;
         pMgr->GetRouterName( strRtName );
         oParams.SetStrProp(
@@ -276,17 +284,9 @@ gint32 CReqFwdrOpenRmtPortTask::CreateInterface(
         oParams[ propIfStateClass ] =
             clsid( CTcpBdgePrxyState );
 
-        ObjPtr pObj;
-        ret = oCfg.GetObjPtr( propIfPtr, pObj );
-        CRpcInterfaceServer* pReqFwdr = pObj;
-        if( pReqFwdr == nullptr )
-        {
-            ret = -EFAULT;
-            break;
-        }
+        oParams.SetPointer( propRouterPtr,
+            pReqFwdr->GetParent() );
 
-        pObj = pReqFwdr->GetParent();
-        oParams.SetObjPtr( propRouterPtr, pObj );
         oParams.SetPointer( propIoMgr, pMgr );
         pIf.Clear();
 

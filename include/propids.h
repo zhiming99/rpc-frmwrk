@@ -214,6 +214,7 @@ enum EnumPropId : gint32
                         // the request, 0xfffffff stands for a CRpcReqForwarderProxy, and other values
                         // for a CRpcTcpBridgeProxy
     propNodeName,       // type: a string as the node name for a bridge proxy
+    propObjDescFile,    // type: a string as the file path for the object description file
     propReservedEnd = 0x10000000,
     propInvalid = -1, 
 };
