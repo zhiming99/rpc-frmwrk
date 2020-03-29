@@ -157,7 +157,7 @@
                     "Enabled" : "true",
                     "Protocol" : "native",
                     "AddrFormat" : "ipv4",
-                    "IpAddress" : "192.168.3.3",
+                    "IpAddress" : "192.168.3.2",
                     "PortNumber": "4132",
                     "Compression" : "true",
                     "EnableWS":  "false",
