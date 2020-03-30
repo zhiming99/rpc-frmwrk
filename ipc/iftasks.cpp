@@ -5383,12 +5383,14 @@ gint32 CIfResponseHandler::OnTaskComplete( gint32 iRet )
 {
     gint32 ret = 0;
     do{
-        // set the response data
+        // try best to make the response data
+        // available in parameter 1
         BufPtr pBuf( true );
         std::vector< LONGWORD > vecParams;
         ret = GetParamList( vecParams );
         if( SUCCEEDED( ret ) )
         {
+            // comes from a eventTaskComp
             if( vecParams.size() < 
                 GetArgCount( &IEventSink::OnEvent ) )
             {
@@ -5401,10 +5403,26 @@ gint32 CIfResponseHandler::OnTaskComplete( gint32 iRet )
                 *pBuf = ObjPtr( pIoReq );
             }
         }
+        else
+        {
+            // comes from a immediate return
+            CCfgOpener oCfg(
+                ( IConfigDb* )GetConfig() );
+            if( oCfg.exist( propRespPtr ) )
+            {
+                *pBuf = ObjPtr( this );
+                ret = 0;
+            }
+        }
+
         if( ERROR( ret ) )
         {
+            CParamList oResp;
+            oResp[ propReturnValue ] = iRet;
+
             CParamList oParams;
-            oParams[ propReturnValue ] = iRet;
+            oParams.SetPointer( propRespPtr,
+                ( CObjBase* )oResp.GetCfg() );
             TaskletPtr pTask;
             pTask.NewObj(
                 clsid( CIfDummyTask ),
@@ -5421,6 +5439,41 @@ gint32 CIfResponseHandler::OnTaskComplete( gint32 iRet )
     ret = ( *m_pDeferCall )( 0 );
     ClearClientNotify();
 
+    return ret;
+}
+
+gint32 CIfIoCallTask::RunTask()
+{
+    if( m_pMajorCall.IsEmpty() )
+        return super::RunTask();
+
+    gint32 ret = ( *m_pMajorCall )( eventZero );
+    if( ret == STATUS_PENDING )
+        return ret;
+
+    return OnTaskComplete( ret );
+}
+
+gint32 CIfIoCallTask::OnTaskComplete(
+    gint32 iRet )
+{
+    gint32 ret = super::OnTaskComplete( iRet );
+    // the deferred call cannot be called twice.
+    // this task should retire.
+    if( ret == STATUS_PENDING )
+        ret = 0;
+
+    m_pMajorCall.Clear();
+    m_pDeferCall.Clear();
+
+    return ret;
+}
+
+gint32 CIfIoCallTask::OnCancel(
+    guint32 dwContext )
+{
+    gint32 ret = super::OnCancel( dwContext );
+    m_pMajorCall.Clear();
     return ret;
 }
 
