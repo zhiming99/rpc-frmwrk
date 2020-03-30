@@ -150,44 +150,33 @@ gint32 CRpcTcpBridge::CheckRouterPathAgain(
 
             oReqCtx[ propRouterPath ] = strNext;
 
-            TaskletPtr pRespCb;
-            ret = NEW_PROXY_RESP_HANDLER2(
-                pRespCb, ObjPtr( this ),
-                &CRpcTcpBridge::OnCheckRouterPathComplete,
-                pCallback, oReqCtx.GetCfg() );
-
-            if( ERROR( ret ) )
-                break;
-
-            TaskletPtr pChkRt;
-            ret = DEFER_IFCALLEX_NOSCHED2(
-                1, pChkRt, ObjPtr( pProxy ),
+            TaskletPtr pMajorCall;
+            ret = DEFER_CALL_NOSCHED(
+                pMajorCall, ObjPtr( pProxy ),
                 &CRpcTcpBridgeProxy::CheckRouterPath,
-                oReqCtx.GetCfg(),
-                ( IEventSink* )nullptr );
-
+                pReqCtx, ( IEventSink* )nullptr );
             if( ERROR( ret ) )
-            {
-                ( *pRespCb )( eventCancelTask );
                 break;
-            }
 
-            ( ( CIfRetryTask* )pChkRt )->
-                SetClientNotify( pRespCb );
-                
-            
-            // schedule a new task to release the
-            // router's seq task queue 
-            ret = pMgr->RescheduleTask( pChkRt );
-            if( SUCCEEDED( ret ) )
-                ret = pChkRt->GetError();
+            TaskletPtr pIoCall;
+            ret = NEW_PROXY_IOTASK( 
+                1, pIoCall, pMajorCall, ObjPtr( this ),
+                &CRpcTcpBridge::OnCheckRouterPathComplete,
+                pCallback, pReqCtx );
+            if( ERROR( ret ) )
+                break;
 
+            // reschedule a task to let the seq
+            // queue move forward
+            ret = pMgr->RescheduleTask( pIoCall );
             if( ERROR( ret ) )
             {
-               ( *pChkRt )(eventCancelTask );
-               ( *pRespCb )(eventCancelTask );
+                (*pIoCall)( eventCancelTask );
             }
-
+            if( SUCCEEDED( ret ) )
+            {
+                ret = pIoCall->GetError();
+            }
         }
 
     }while( 0 );
@@ -196,8 +185,8 @@ gint32 CRpcTcpBridge::CheckRouterPathAgain(
     {
         CParamList oResp;
         oResp[ propReturnValue ] = ret;
-        OnServiceComplete(
-            oResp.GetCfg(), pCallback );
+        SetResponse(
+            pCallback, oResp.GetCfg() );
     }
 
     return ret;
@@ -267,9 +256,10 @@ gint32 CRpcTcpBridge::CheckRouterPath(
 
         if( SUCCEEDED( ret ) )
         {
-            // no need to check further, the
-            // presence of bridge proxy is OK to
-            // make rpc calls.
+            // no need to check further if strNext
+            // is the root dir, the presence of
+            // bridge proxy is enough to make
+            // further rpc calls.
             if( strNext == "/" )
                 break;
 
@@ -340,18 +330,22 @@ gint32 CRpcTcpBridge::CheckRouterPath(
             CIfInterceptTaskProxy*
                 pOpenPortTask = pTask;
 
+            pOpenPortTask->SetClientNotify(
+                pCallback );
+
+            // pChkRt will be inserted between
+            // pOpenPortTask and the pCallback
             TaskletPtr pChkRt;
-            ret = NEW_COMPLETE_CALLBACK(
-                pChkRt, nullptr, ObjPtr( this ),
+            ret = NEW_COMPLETE_CALLBACK( pChkRt,
+                pOpenPortTask, ObjPtr( this ),
                 &CRpcTcpBridge::CheckRouterPathAgain,
                 pCallback, oReqCtx.GetCfg() );
             if( ERROR( ret ) )
             {
-                ( *pOpenPortTask )( eventCancelTask );
+                ( *pOpenPortTask )(
+                    eventCancelTask );
                 break;
             }
-            pOpenPortTask->SetInterceptTask( 
-                ( IEventSink* ) pChkRt );
 
             ret = pRouter->AddSeqTask(
                 pTask, false );
@@ -359,6 +353,10 @@ gint32 CRpcTcpBridge::CheckRouterPath(
             {
                 ( *pOpenPortTask )( eventCancelTask );
                 ( *pChkRt )( eventCancelTask );
+            }
+            else if( SUCCEEDED( ret ) )
+            {
+                ret = pTask->GetError();
             }
         }
 
@@ -558,15 +556,8 @@ gint32 CRpcReqForwarder::CheckRouterPath(
         static_cast< CRpcRouterReqFwdr* >
             ( GetParent() );
 
-    CCfgOpener oReqCtx;
+    CCfgOpener oReqCtx( pReqCtx );
     do{
-        std::string strPath;
-
-        ret = oReqCtx.CopyProp(
-            propRouterPath, pReqCtx );
-        if( ERROR( ret ) )
-            break;
-
         guint32 dwPortId = 0;
         ret = oReqCtx.GetIntProp(
             propConnHandle, dwPortId );
@@ -601,13 +592,13 @@ gint32 CRpcReqForwarder::CheckRouterPath(
         ret = NEW_PROXY_RESP_HANDLER2(
             pRespCb, ObjPtr( this ),
             &CRpcReqForwarder::OnCheckRouterPathComplete,
-            pEvt, oReqCtx.GetCfg() );
+            pEvt, pReqCtx );
 
         if( ERROR( ret ) )
             break;
 
         ret = pProxy->CheckRouterPath(
-            oReqCtx.GetCfg(), pRespCb );
+            pReqCtx, pRespCb );
 
         if( ERROR( ret ) )
             ( *pRespCb )( eventCancelTask );
@@ -621,10 +612,15 @@ gint32 CRpcReqForwarder::CheckRouterPath(
     if( ret != STATUS_PENDING && !pEvt.IsEmpty() )
     {
         oReqCtx[ propReturnValue ] = ret;
+        if( ERROR( ret ) )
+        {
+            oReqCtx.RemoveProperty( propConnHandle );
+            oReqCtx.RemoveProperty( propRouterPath );
+        }
         SetResponse( pEvt, oReqCtx.GetCfg() );
     }
 
-    return 0;
+    return ret;
 }
 
 gint32 CRpcRouterBridge::BuildRmtSvrEventMH(

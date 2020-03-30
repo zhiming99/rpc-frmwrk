@@ -1575,8 +1575,29 @@ class CIfResponseHandler :
     gint32 OnCancel( guint32 dwContext );
 };
 
+class CIfIoCallTask :
+    public CIfResponseHandler
+{
+    TaskletPtr m_pMajorCall;
+
+    public:
+    typedef CIfResponseHandler super;
+    CIfIoCallTask( const IConfigDb* pCfg )
+        :super( pCfg )
+    { SetClassId( clsid( CIfIoCallTask ) );}
+
+    void SetMajorCall( TaskletPtr& pCall )
+    { m_pMajorCall = pCall; }
+
+    // just as a place holder
+    gint32 RunTask();
+    gint32 OnTaskComplete( gint32 iRet );
+    gint32 OnCancel( guint32 dwContext );
+};
+
 template< class C >
 inline gint32 NewResponseHandler(
+    EnumClsid iClsid,
     TaskletPtr& pRespHandler,
     ObjPtr pIf, gint32(C::* f)( IEventSink*, IEventSink*, IConfigDb* ),
     IEventSink* pCallback, IConfigDb* pContext )
@@ -1599,7 +1620,7 @@ inline gint32 NewResponseHandler(
     oParams[ propIfPtr ] = pIf;
 
     ret = pIfTask.NewObj( 
-        clsid( CIfResponseHandler ),
+        iClsid,
         oParams.GetCfg() );
     if( ERROR( ret ) )
         return ret;
@@ -1612,13 +1633,47 @@ inline gint32 NewResponseHandler(
 }
 
 #define NEW_PROXY_RESP_HANDLER( __pTask, pObj, func, pCallback, pContext ) \
-    NewResponseHandler( __pTask, pObj, func , pCallback, pContext )
+    NewResponseHandler( clsid( CIfResponseHandler ), __pTask, pObj, func , pCallback, pContext )
 
 #define NEW_PROXY_RESP_HANDLER2( __pTask, pObj, func, pCallback, pContext ) \
-( { ret = NewResponseHandler( __pTask, pObj, func , pCallback, pContext ); \
+( { ret = NewResponseHandler( clsid( CIfResponseHandler ), __pTask, pObj, func , pCallback, pContext ); \
     if( SUCCEEDED( ret ) ) \
         ( *__pTask )( eventZero ); \
     ret;} )
+/**
+* @name NEW_PROXY_IOTASK
+* @brief the macro to combine the async call and callback in the task __pTask.
+* @param _iPos the position of the callback parameter in the major call _pMajorCall
+* @param __pTask the pointer contains the task created for the io call and callback
+* @param _pMajorCall the pointer to the major call task, which should be created by DEFER_CALL_NOSCHED
+* @param _pObj the object whose _func will be called as the callback
+* @param _func the function pointer as the callback.
+* @param _pCallback the first parameter for the _func
+* @param _pContext the third parameter for the _func
+*
+* @note The macro restricts the response callback to have three parameters, a
+* pCallback, a pointer to the ioreq task, and a pointer to the context, and it
+* also needs the major call to be a simple DEFER_CALL_NOSCHED taskr; the _func
+* has the responsibility to pass on _pCallback if it returns pending or send
+* eventTaskComp to make the final completion, and __pTask's life cycle ends after
+* the _func gets called, whether _func return pending or not.
+* 
+* @{ */
+/**  @} */
+
+#define NEW_PROXY_IOTASK( _iPos, __pTask, _pMajorCall, _pObj, _func, _pCallback, _pContext ) \
+({ ret = NewResponseHandler( clsid( CIfIoCallTask ), __pTask, _pObj, _func , _pCallback, _pContext ); \
+    if( SUCCEEDED( ret ) ) {\
+        CIfIoCallTask* _pIoCall = __pTask;\
+        _pIoCall->SetMajorCall( _pMajorCall );\
+        CIfDeferCallTaskBase< CTasklet >* \
+            pDeferCall = pMajorCall; \
+        BufPtr pBuf( true );\
+        *pBuf = ObjPtr( _pIoCall );\
+        pDeferCall->UpdateParamAt( _iPos, pBuf );\
+    }\
+    ret;\
+})
 
 // to insert the task pInterceptor to the head of
 // completion chain of the task pTarget 
@@ -1763,7 +1818,12 @@ class CDeferredCallOneshot :
                 this->m_pObj, this->m_vecArgs );
 
             if( ret == STATUS_PENDING )
+            {
+                // the oneshot task has to retire
+                this->ClearClientNotify();
+                ret = 0;
                 break;
+            }
 
             if( pObjBase != nullptr )
                 CallOrigCallback( pObjBase, iRet );

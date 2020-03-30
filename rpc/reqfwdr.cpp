@@ -381,7 +381,7 @@ gint32 CReqFwdrOpenRmtPortTask::OnServiceComplete(
         // schedule a checkrouterpath task
         TaskletPtr pChkRt;
         ret = DEFER_HANDLER_NOSCHED(
-            pChkRt, ObjPtr( this ),
+            pChkRt, ObjPtr( pIf ),
             &CRpcReqForwarder::CheckRouterPath,
             ( IEventSink* )pEvt,
             oReqCtx.GetCfg() );
@@ -976,8 +976,9 @@ gint32 CRpcReqForwarder::OpenRemotePortInternal(
             // a new task to release the seq task
             // queue
             CIoManager* pMgr = pSvc->GetIoMgr();
-            TaskletPtr ptrTask( pChkRt );
-            ret = pMgr->RescheduleTask( ptrTask );
+            ret = pMgr->RescheduleTask( pChkRt );
+            if( SUCCEEDED( ret ) )
+                ret = pChkRt->GetError();
         }
         else if( ret == -ENOENT )
         {
