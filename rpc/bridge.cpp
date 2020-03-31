@@ -650,20 +650,14 @@ gint32 CRpcTcpBridgeProxy::FillRespData(
         }
     case CTRLCODE_SEND_REQ:
         {
-            // FIXME: ugly way to check if the resp is
-            // for ForwardRequest
-            TaskletPtr pTask = pIrp->m_pCallback;
-            CCfgOpenerObj oTaskCfg( ( CObjBase* )pTask );
-            CTasklet* pParentTask = nullptr;
-            ret = oTaskCfg.GetPointer(
-                propEventSink, pParentTask );
-            if( SUCCEEDED( ret ) )
+            BufPtr pBuf = pCtx->m_pReqData;
+            if( !pBuf.IsEmpty() &&
+                pBuf->GetExDataType() == typeDMsg )
             {
-                gint32 iClsid =
-                    pParentTask->GetClsid();
+                DMsgPtr& pMsg = *pBuf;
 
-                if( clsid( CReqFwdrForwardRequestTask )
-                    == iClsid )
+                if( pMsg.GetMember()
+                    == SYS_METHOD_FORWARDREQ )
                 {
                     ret = FillRespDataFwrdReq(
                         pIrp, pResp );
@@ -739,7 +733,9 @@ gint32 CRpcTcpBridgeProxy::ForwardEvent(
         TaskGrpPtr pTaskGrp;
         CParamList oParams;
         oParams[ propIfPtr ] = ObjPtr( this );
-        ret = pTaskGrp.NewObj();
+        ret = pTaskGrp.NewObj(
+            clsid( CIfTaskGroup ),
+            oParams.GetCfg() );
         if( ERROR( ret ) )
             break;
 
@@ -751,8 +747,17 @@ gint32 CRpcTcpBridgeProxy::ForwardEvent(
                 ( pRouter );
 
         std::string strPath;
-        oEvtCtx.GetStrProp(
+        ret = oEvtCtx.GetStrProp(
             propRouterPath, strPath );
+        if( ERROR( ret ) )
+            break;
+
+        if( strPath.empty() ||
+            strPath[ 0 ] != '/' )
+        {
+            ret = -ENOTDIR;
+            break;
+        }
 
         CCfgOpener oEvtCtx2;
         oEvtCtx2.CopyProp(
@@ -766,8 +771,15 @@ gint32 CRpcTcpBridgeProxy::ForwardEvent(
             break;
 
         // prepend the node name to the router
-        strPath = string( "/" ) +
-            strNodeName + strPath;
+        if( strPath != "/" )
+        {
+            strPath = string( "/" ) +
+                strNodeName + strPath;
+        }
+        else
+        {
+            strPath += strNodeName;
+        }
 
         oEvtCtx2.SetStrProp(
             propRouterPath, strPath );
@@ -2051,6 +2063,14 @@ gint32 CRpcTcpBridge::EnableRemoteEventInternal(
         }
 
     }while( 0 );
+
+    if( ret != STATUS_PENDING )
+    {
+        CCfgOpener oParams;
+        oParams[ propReturnValue ] = ret;
+        SetResponse( pCallback,
+            oParams.GetCfg() );
+    }
 
     return ret;
 }

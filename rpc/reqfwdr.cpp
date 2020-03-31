@@ -376,7 +376,19 @@ gint32 CReqFwdrOpenRmtPortTask::OnServiceComplete(
             strRouterPath;
         oReqCtx.CopyProp(
             propConnParams, this );
+        if( ERROR( ret ) )
+            break;
 
+        // for rollback 
+        ret = oReqCtx.CopyProp(
+            propSrcDBusName, this );
+        if( ERROR( ret ) )
+            break;
+
+        ret = oReqCtx.CopyProp(
+            propSrcUniqName, this );
+        if( ERROR( ret ) )
+            break;
 
         // schedule a checkrouterpath task
         TaskletPtr pChkRt;
@@ -963,6 +975,13 @@ gint32 CRpcReqForwarder::OpenRemotePortInternal(
                 propRouterPath, strRouterPath );
             oReqCtx.CopyProp( propConnParams,
                 ( CObjBase* )pIf );
+
+            // for rollback
+            oReqCtx.SetStrProp(
+                propSrcUniqName, strSrcUniqName );
+
+            oReqCtx.SetStrProp(
+                propSrcDBusName, strSender );
 
             // schedule a checkrouterpath task
             TaskletPtr pChkRt;

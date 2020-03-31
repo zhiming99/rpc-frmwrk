@@ -5400,7 +5400,24 @@ gint32 CIfResponseHandler::OnTaskComplete( gint32 iRet )
             {
                 CObjBase* pIoReq =
                     ( CObjBase* )vecParams[ 3 ];
-                *pBuf = ObjPtr( pIoReq );
+
+                if( pIoReq != nullptr )
+                {
+                    CCfgOpenerObj oReqCfg( pIoReq );
+                    IConfigDb* pResp = nullptr;
+
+                    ret = oReqCfg.GetPointer(
+                        propRespPtr, pResp );
+
+                    if( SUCCEEDED( ret ) )
+                        *pBuf = ObjPtr( pIoReq );
+                }
+                else
+                {
+                    // the caller does not
+                    // return response
+                    ret = -EFAULT;
+                }
             }
         }
         else
