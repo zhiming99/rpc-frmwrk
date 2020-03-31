@@ -31,7 +31,7 @@ This framework depends on the following packags:
 
 ---
 [`Tue 31 Mar 2020 10:11:09 PM Beijing`]   
-1. still debugging the multi-hop related stuffs. Request forwarding and event forwarding work now. Next job is to get streaming to work.   
+1. still debugging the multi-hop related stuffs. Request forwarding and event forwarding work now. Next task is to get streaming to work.   
 
 [`Sat 21 Mar 2020 01:47:35 PM Beijing`]   
 1. Updated some `autoconf` releated stuffs to make the cross-compile more efficient.
