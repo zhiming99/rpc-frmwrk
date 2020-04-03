@@ -425,3 +425,15 @@ class CUnixSockStmState : public CLocalProxyState
     gint32 SetupOpenPortParams(
         IConfigDb* pCfg );
 };
+
+class CDummyInterfaceState : public CLocalProxyState
+{
+    public:
+    typedef CLocalProxyState super;
+    CDummyInterfaceState( const IConfigDb* pCfg )
+        : super( pCfg )
+    { SetClassId( clsid( CDummyInterfaceState ) ); }
+    // subscribe a connection point event
+    virtual gint32 SubscribeEvents()
+    { return 0; }
+};

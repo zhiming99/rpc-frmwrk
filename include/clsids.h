@@ -266,6 +266,7 @@ typedef enum : guint32
     DECL_CLSID( CIfUxListeningRelayTaskMH ),
     DECL_CLSID( CIfStartUxSockStmRelayTaskMH ),
     DECL_CLSID( CIfIoCallTask ),
+    DECL_CLSID( CDummyInterfaceState ),
     DECL_CLSID( MaxClsid ),
     DECL_CLSID( ClassFactoryStart ) = 0x02000000,
     DECL_CLSID( ReservedClsidEnd ) = 0x0FFFFFFF,

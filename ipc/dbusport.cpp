@@ -328,7 +328,15 @@ gint32 CDBusBusPort::BuildPdoPortName(
                 }
                 else
                 {
-                    strPortName = strClass + string( "_0" ); 
+                    if( strClass == PORT_CLASS_LOCALDBUS_PDO )
+                        strPortName = strClass + string( "_0" ); 
+                    else
+                    {
+                        guint32 dwPortId = NewPdoId();
+                        oCfgOpener[ propPortId ] = dwPortId;
+                        strPortName = strClass + "_" +
+                            std::to_string( dwPortId );
+                    }
                 }
             }
             else
@@ -546,7 +554,7 @@ gint32 CDBusBusPort::CreateLoopbackPdo(
         {
             dwPortId = NewPdoId();
 
-            // must-have properties in creation
+            // mandatory property for creation
             oExtCfg[ propPortId ] = dwPortId;
             ret = 0;
         }

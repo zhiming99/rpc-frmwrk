@@ -362,6 +362,21 @@ gint32 CRpcRouter::OnPostStart(
             iid( IStream ), "s" );
     }
 
+    strIfName = CoGetIfNameFromIid(
+        iid( IStreamMH ), "p" );
+    if( strIfName.empty() )
+    {
+        CoAddIidName( "IStreamMH",
+            iid( IStreamMH ), "p" );
+    }
+
+    strIfName = CoGetIfNameFromIid(
+        iid( IStreamMH ), "s" );
+    if( strIfName.empty() )
+    {
+        CoAddIidName( "IStreamMH",
+            iid( IStreamMH ), "s" );
+    }
     return 0;
 }
 
@@ -866,7 +881,9 @@ gint32 CRpcRouterBridge::OnPreStopLongWait(
         TaskGrpPtr pTaskGrp;
         CParamList oParams;
         oParams[ propIfPtr ] = ObjPtr( this );
-        ret = pTaskGrp.NewObj();
+        ret = pTaskGrp.NewObj(
+            clsid( CIfTaskGroup ),
+            oParams.GetCfg() );
         if( ERROR( ret ) )
             break;
 
@@ -1258,13 +1275,14 @@ gint32 CRouterOpenBdgePortTask::CreateInterface(
         ret = CRpcServices::LoadObjDesc(
             strObjDesc,
             OBJNAME_TCP_BRIDGE,
-            true,
+            bServer ? true : false,
             oParams.GetCfg() );
 
         if( ERROR( ret ) )
             break;
 
-        oParams.CopyProp( propPortId, this );
+        if( bServer )
+            oParams.CopyProp( propPortId, this );
 
         oParams.SetPointer(
             propRouterPtr, pRouter );
@@ -1433,8 +1451,9 @@ gint32 CRouterOpenBdgePortTask::RunTaskInternal(
             }
             else
             {
-                if( SUCCEEDED( iRetVal ) ||
-                    iRetVal == 0x7fffffff )
+                ret = iRetVal;
+                while( SUCCEEDED( ret ) ||
+                    ret == 0x7fffffff )
                 {
                     ret = pRouter->
                         AddBridgeProxy( m_pProxy ); 
@@ -1475,8 +1494,11 @@ gint32 CRouterOpenBdgePortTask::RunTaskInternal(
 
                     pRouter->AddRefCount( strNode,
                         dwPortId, dwProxyId );
+
+                    break;
                 }
-                else
+
+                if( ERROR( ret ) )
                 {
                     CGenericInterface* pIf = m_pProxy;
                     if( unlikely( pIf == nullptr ) )
@@ -3203,7 +3225,7 @@ gint32 CRpcRouterBridge::GetBridgeProxyByPath(
     const std::string& strPath,
     InterfPtr& pIf )
 {
-    if( strPath.empty() || pIf.IsEmpty() )
+    if( strPath.empty() )
         return -EINVAL;
 
     gint32 ret = 0;
@@ -3345,7 +3367,9 @@ gint32 CRpcRouterReqFwdr::OnPreStopLongWait(
     CParamList oParams;
     oParams[ propIfPtr ] = ObjPtr( this );
     TaskGrpPtr pTaskGrp;
-    ret = pTaskGrp.NewObj();
+    ret = pTaskGrp.NewObj(
+        clsid( CIfTaskGroup ),
+        oParams.GetCfg() );
     if( ERROR( ret ) )
         return ret;
 
@@ -4553,7 +4577,9 @@ gint32 CRpcRouterManager::OnPreStop(
     do{
         CParamList oParams;
         oParams[ propIfPtr ] = ObjPtr( this );
-        ret = pTaskGrp.NewObj();
+        ret = pTaskGrp.NewObj(
+            clsid( CIfTaskGroup ),
+            oParams.GetCfg() );
         if( ERROR( ret ) )
             break;
 

@@ -321,6 +321,9 @@ class CRpcReqForwarder :
     // registered
     gint32 CheckMatch( IMessageMatch* pMatch );
 
+    gint32 SchedToStopBridgeProxy( 
+        IConfigDb* pReqCtx );
+
     virtual gint32 BuildBufForIrpFwrdEvt(
         BufPtr& pBuf,
         IConfigDb* pReqCall );
@@ -715,6 +718,10 @@ struct CRpcTcpBridgeShared
         MatchPtr& pMatch,
         bool bReg );
 
+    gint32 GetPeerStmId(
+        gint32 iStmId,
+        gint32& iPeerStmid );
+
     protected:
     CRpcServices* m_pParentIf;
 
@@ -745,6 +752,11 @@ class CRpcTcpBridge :
     public CRpcTcpBridgeShared
 {
     friend class CRpcTcpBridgeShared;
+
+    gint32 OnEnableRemoteEventCompleteMH(
+        IEventSink* pCallback,
+        IEventSink* pIoReq,
+        IConfigDb* pCtx );
 
     gint32 EnableRemoteEventInternal(
         IEventSink* pCallback,
@@ -802,7 +814,12 @@ class CRpcTcpBridge :
 
     gint32 CheckRouterPathAgain(
         IEventSink* pCallback,
+        IEventSink* pIoReq,
         IConfigDb* pReqCtx );
+
+    bool IsAccesable( IConfigDb* pReqCtx );
+    gint32 IsCyclicPath( IConfigDb* pReqCtx );
+    gint32 AddCheckStamp( IConfigDb* pReqCtx );
 
     public:
 
@@ -1782,9 +1799,6 @@ class CRegObjectBridge
         return 0;
     }
 
-    bool HasBridge() const
-    { return true; }
-
     guint32 GetPortId() const
     { return m_dwPortId; }
 
@@ -1956,6 +1970,9 @@ class CRpcRouterBridge : public CRpcRouter
 
     using IFMAP_CITR =
         std::map< std::string, InterfPtr >::const_iterator;
+
+    bool HasBridge() const
+    { return true; }
 
     inline gint32 GetReqFwdrProxy(
         const std::string& strDest,

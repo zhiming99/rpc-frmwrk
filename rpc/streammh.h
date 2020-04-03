@@ -31,6 +31,16 @@
 class CStreamServerRelayMH :
     public CStreamRelayBase< CStreamServer >
 {
+    gint32 OnClose2(
+        HANDLE hChannel,
+        gint32 iStmId,
+        IEventSink* pCallback );
+
+    gint32 OnCloseInternal(
+        HANDLE hChannel,
+        gint32 iStmId,
+        IEventSink* pCallback );
+
     public:
     typedef CStreamRelayBase< CStreamServer > super;
 
@@ -98,10 +108,15 @@ class CStreamServerRelayMH :
         return GetUxStream( itr->second, pIf );
     }
 
-    // the peer request to close
+    // the up-stream request to close or error
+    // occurs
     virtual gint32 OnClose( gint32 iStmId,
         IEventSink* pCallback = nullptr );
 
+    // the down-stream node request to close or
+    // error occues
+    virtual gint32 OnClose( HANDLE hChannel,
+        IEventSink* pCallback = nullptr );
 };
 
 /**
@@ -124,6 +139,7 @@ class CRpcTcpBridgeProxyStream :
     public:
     typedef CUnixSockStmProxyRelay super;
 
+    static CfgPtr InitCfg( const IConfigDb* pCfg );
     CRpcTcpBridgeProxyStream(
         const IConfigDb* pCfg );
 
@@ -197,6 +213,9 @@ class CRpcTcpBridgeProxyStream :
             ObjPtr( m_pParent );
         return ( IStream* )pIf;
     }
+
+    virtual gint32 OnPreStop(
+        IEventSink* pCallback );
 };
 
 struct CIfUxRelayTaskHelperMH : 

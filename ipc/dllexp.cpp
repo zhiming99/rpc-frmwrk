@@ -150,6 +150,8 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CIfDeferCallTaskEx );
     INIT_MAP_ENTRYCFG( CIfStmReadWriteTask );
     INIT_MAP_ENTRYCFG( CReadWriteWatchTask );
+    INIT_MAP_ENTRYCFG( CIfIoCallTask );
+    INIT_MAP_ENTRYCFG( CDummyInterfaceState );
 
 #ifdef _USE_LIBEV
     INIT_MAP_ENTRYCFG( CDBusLoopHooks );

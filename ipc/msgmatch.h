@@ -1279,24 +1279,9 @@ class CRouterRemoteMatch : public CMessageMatch
 
         CCfgOpenerObj oCfg( this );
 
-        ret = oCfg.IsEqualProp(
+        return oCfg.IsEqualProp(
             propRouterPath, pEvtCtx );
 
-        if( ERROR( ret ) )
-            return ret;
-
-        CCfgOpener oEvtCtx( pEvtCtx );
-
-        guint32 dwPortId = 0;
-        ret = oEvtCtx.GetIntProp(
-            propConnHandle, dwPortId );
-        if( ERROR( ret ) )
-            return ret;
-
-        ret = oCfg.IsEqual(
-            propPortId, dwPortId );
-
-        return ret;
     }
 
     virtual gint32 IsMyModule(

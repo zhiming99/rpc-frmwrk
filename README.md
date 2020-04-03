@@ -27,9 +27,12 @@ This framework depends on the following packags:
 11. `Streaming support to provide double-direction stream transfer`
 12. `Secure Socket Layer (SSL) support`
 13. `Websocket support`
-14. `Object access via Multi-hop routing` (to come)
+14. `Object access via Multi-hop routing` (coming)
 
 ---
+[`Tue 31 Mar 2020 10:11:09 PM Beijing`]   
+1. still debugging the multi-hop related stuffs. Request forwarding and event forwarding work now. Next task is to get streaming to work.   
+
 [`Sat 21 Mar 2020 01:47:35 PM Beijing`]   
 1. Updated some `autoconf` releated stuffs to make the cross-compile more efficient.
 
