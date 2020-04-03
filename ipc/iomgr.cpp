@@ -797,7 +797,7 @@ gint32 CIoManager::OpenPortByPath(
     ObjPtr objPtr;
     do{
         ret = this->GetObject( strPath, objPtr );
-        if( ret )
+        if( ERROR( ret ) )
             break;
 
         CObjBase* pObj = objPtr;

@@ -29,10 +29,10 @@
 #define METHOD_EchoUnknown      "EchoUnknown"
 #define METHOD_Ping             "Ping"
 
-#define MOD_SERVER_NAME "EchoServer"
+#define MOD_SERVER_NAME "HelloWorldServer"
 #define OBJNAME_ECHOSVR "CEchoServer"               
 
-#define MOD_CLIENT_NAME "EchoClient"
+#define MOD_CLIENT_NAME "HelloWorldClient"
 #define OBJNAME_ECHOCLIENT "CEchoClient"               
 
 enum EnumMyClsid

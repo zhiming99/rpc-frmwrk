@@ -2747,7 +2747,8 @@ gint32 CRpcInterfaceServer::ValidateRequest_SendData(
             break;
 
         if( iidClient != iid( IStream ) &&
-            iidClient != iid( CFileTransferServer ) )
+            iidClient != iid( CFileTransferServer ) &&
+            iidClient != iid( IStreamMH ) )
         {
             ret = -EBADMSG;
             break;
@@ -3999,3 +4000,47 @@ gint32 CRpcTcpBridgeShared::RegMatchCtrlStream(
     return ret;
 }
 
+gint32 CRpcTcpBridgeShared::GetPeerStmId(
+    gint32 iStmId,
+    gint32& iPeerStmid )
+{
+    gint32 ret = 0;
+    do{
+        IrpPtr pIrp( true );
+        ret = pIrp->AllocNextStack( nullptr );
+        if( ERROR( ret ) )
+            break;
+
+        IrpCtxPtr& pNewCtx = pIrp->GetTopStack();
+        pNewCtx->SetMajorCmd( IRP_MJ_FUNC );
+        pNewCtx->SetMinorCmd( IRP_MN_IOCTL );
+
+        pNewCtx->SetCtrlCode(
+            CTRLCODE_GET_RMT_STMID );
+
+        pNewCtx->SetIoDirection( IRP_DIR_INOUT );
+
+        CParamList oParams;
+        oParams.Push( iStmId );
+        BufPtr pBuf( true );
+        *pBuf = ObjPtr( oParams.GetCfg() );
+        pNewCtx->SetReqData( pBuf );
+
+        PortPtr pPort;
+        CIoManager* pMgr =
+            m_pParentIf->GetIoMgr();
+
+        HANDLE hPort =
+            m_pParentIf->GetPortHandle();
+
+        ret = pMgr->GetPortPtr( hPort, pPort );
+        if( ERROR( ret ) )
+            break;
+
+        ret = pMgr->SubmitIrp( hPort,
+            pIrp, false );
+
+    }while( 0 );
+
+    return ret;
+}

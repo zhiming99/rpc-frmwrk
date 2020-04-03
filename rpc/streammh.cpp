@@ -26,8 +26,31 @@
 #include "rpcroute.h"
 #include "streammh.h"
 
+CfgPtr CRpcTcpBridgeProxyStream::InitCfg(
+    const IConfigDb* pconstCfg )
+{
+    IConfigDb* pCfg =
+        const_cast< IConfigDb* >( pconstCfg );
+
+    ObjPtr pObj;
+    CCfgOpener oCfg( pCfg );
+    // propIfPtr has been used for other purpose in
+    // the base class, let's relocate the pointer
+    // at another place.
+    gint32 ret = oCfg.GetObjPtr(
+        propIfPtr, pObj );
+    if( ERROR( ret ) )
+        return CfgPtr( pCfg );
+
+    oCfg.RemoveProperty( propIfPtr );
+    oCfg.SetObjPtr(
+        propReservedEnd + 1, pObj );
+
+    return CfgPtr( pCfg );
+}
+
 CRpcTcpBridgeProxyStream::CRpcTcpBridgeProxyStream(
-    const IConfigDb* pCfg ) : super( pCfg )
+    const IConfigDb* pCfg ) : super( InitCfg( pCfg ) )
 {
     SetClassId( clsid(
         CRpcTcpBridgeProxyStream ) );
@@ -43,12 +66,12 @@ CRpcTcpBridgeProxyStream::CRpcTcpBridgeProxyStream(
 
         CRpcServices* pBridgeProxy = nullptr;
         ret = oCfg.GetPointer(
-            propIfPtr, pBridgeProxy );
+            propReservedEnd + 1, pBridgeProxy );
         if( ERROR( ret ) )
             break;
 
         m_pBridgeProxy = pBridgeProxy;
-        oCfg.RemoveProperty( propIfPtr );
+        oCfg.RemoveProperty( propReservedEnd + 1 );
         oCfg.RemoveProperty( propPeerStmId );
 
     }while( 0 );
@@ -199,6 +222,27 @@ gint32 CRpcTcpBridgeProxyStream::OnPostStart(
     }
 
     return ret;
+}
+
+gint32 CRpcTcpBridgeProxyStream::OnPreStop(
+    IEventSink* pCallback ) 
+{
+    do{
+        if( m_pBridgeProxy.IsEmpty() ||
+            m_iBdgePrxyStmId == 0 )
+            break;
+
+        CRpcTcpBridgeProxy* pProxy =
+            m_pBridgeProxy;
+        if( pProxy == nullptr )
+            break;
+
+        pProxy->CloseLocalStream(
+            nullptr, m_iBdgePrxyStmId );
+
+    }while( 0 );
+
+    return super::OnPreStop( pCallback );
 }
 
 gint32 CRpcTcpBridgeProxyStream::OnFlowControl()
@@ -608,6 +652,46 @@ gint32 CIfUxSockTransRelayTaskMH::RunTask()
                 break;
             }
 
+            if( pPayload.IsEmpty() )
+            {
+                pPayload.NewObj();
+                *pPayload = byToken;
+            }
+            else if( pPayload->empty() )
+            {
+                *pPayload = byToken;
+            }
+            else if( pPayload->offset() >=
+                UXPKT_HEADER_SIZE )
+            {
+                // recover the packet 
+                pPayload->SetOffset(
+                    pPayload->offset() -
+                    UXPKT_HEADER_SIZE );
+            }
+            else
+            {
+                BufPtr pNewBuf( true );
+                pNewBuf->Resize(
+                    UXPKT_HEADER_SIZE );
+
+                pNewBuf->ptr()[ 0 ] = byToken;
+
+                guint32 dwSize =
+                    htonl( pPayload->size() );
+
+                memcpy( pNewBuf->ptr() + 1,
+                    &dwSize,
+                    sizeof( dwSize ) );
+
+                ret = pNewBuf->Append(
+                    ( guint8* )pPayload->ptr(),
+                    pPayload->size() );
+
+                if( ERROR( ret ) )
+                    break;
+            }
+
             ret = oHelper.WriteTcpStream(
                 iStmId, pPayload,
                 pPayload->size(), this );
@@ -994,7 +1078,7 @@ gint32 CStreamServerRelayMH::OnOpenStreamComplete(
             break;
 
         guint32 dwPortId = 0;
-        std::string strPath = 0;
+        std::string strPath;
         oContext.GetIntProp( 1, dwPortId );
         oContext.GetStrProp( 2, strPath );
         oContext.Push( iStmId );
@@ -1185,6 +1269,7 @@ gint32 CStreamServerRelayMH::FetchData_Server(
         oContext.Push( ObjPtr( pDataDesc ) );
         oContext.Push( dwPortId );
         oContext.Push( strPath );
+        oContext[ propStreamId ] = fd;
 
         TaskletPtr pWrapper;
         ret = NEW_PROXY_RESP_HANDLER2(
@@ -1227,19 +1312,25 @@ gint32 CStreamServerRelayMH::CreateUxStream(
         oNewCfg.SetBoolProp(
             propIsServer, bServer );
 
+        // just to make the constructor happy.
+        oNewCfg.SetIntProp( propFd, iPrxyStmId );
+
         oNewCfg.SetPointer( propParentPtr,
             ( CObjBase* )GetInterface() ); 
 
         oNewCfg[ propIfStateClass ] = 
-            PORT_CLASS_LOOPBACK_PDO;
+            clsid( CDummyInterfaceState );
 
         std::string strBusName =
             std::string( PORT_CLASS_LOCALDBUS );
         strBusName += "_0";
 
         oNewCfg[ propBusName ] = strBusName;
+        oNewCfg[ propPortClass ] = 
+            PORT_CLASS_LOOPBACK_PDO;
 
-        // loopback port id 
+        // loopback port id, we will connect to
+        // the loopback port 
         oNewCfg[ propPortId ] = 1;
 
         ret = oNewCfg.CopyProp(
@@ -1314,10 +1405,10 @@ gint32 CStreamServerRelayMH::OnFetchDataComplete(
             break;
         }
 
-        ret = oResp.GetIntProp(
+        /*ret = oResp.GetIntProp(
             1, ( guint32& )iFd );
         if( ERROR( ret ) )
-            break;
+            break;*/
 
         CCfgOpener oContext( pContext );
         IConfigDb* pDataDesc = nullptr;
@@ -1326,13 +1417,18 @@ gint32 CStreamServerRelayMH::OnFetchDataComplete(
             break;
 
         ret = oContext.GetIntProp( 3,
-            ( guint32& )iStmId );
+            ( guint32& )iFd );
         if( ERROR( ret ) )
             break;
 
         guint32 dwPortId = 0;
         ret = oContext.GetIntProp( 1,
             dwPortId );
+        if( ERROR( ret ) )
+            break;
+
+        ret = oContext.GetIntProp(
+            propStreamId, ( guint32& )iStmId );
         if( ERROR( ret ) )
             break;
 
@@ -1377,8 +1473,10 @@ gint32 CStreamServerRelayMH::OnFetchDataComplete(
         CCfgOpenerObj oUxIf(
             ( CObjBase*) pUxIf );
 
-        oUxIf.SetIntProp( propStreamId,
-            ( guint32& )iStmId );
+        ret = oUxIf.SetIntProp(
+            propStreamId, iStmId );
+        if( ERROR( ret ) )
+            break;
 
         // to set CIfUxListeningRelayTask to
         // receive both incoming stream as well as
@@ -1439,62 +1537,138 @@ gint32 CStreamServerRelayMH::OnFetchDataComplete(
     return ret;
 }
 
-// tokClose is received or error in connection
-gint32 CStreamServerRelayMH::OnClose(
-    gint32 iStmId, IEventSink* pCallback )
+gint32 CStreamServerRelayMH::OnClose2(
+    HANDLE hChannel,
+    gint32 iStmId,
+    IEventSink* pCallback )
 {
     gint32 ret = 0;
-    if( iStmId < 0 )
-        return -EINVAL;
+    if( hChannel != INVALID_HANDLE )
+        ret = super::OnClose( hChannel, pCallback );
+    else if( iStmId != 0 )
+        ret = super::OnClose( iStmId, pCallback );
 
-    if( iStmId == TCP_CONN_DEFAULT_CMD ||
-        iStmId == TCP_CONN_DEFAULT_STM )
-        return -EINVAL;
+    return ret;
+}
+
+gint32 CStreamServerRelayMH::OnCloseInternal(
+    HANDLE hChannel,
+    gint32 iStmId,
+    IEventSink* pCallback )
+{
+    gint32 ret = 0;
+
+    TaskletPtr pSendClose;
+    TaskletPtr pClose2;
 
     do{
-        InterfPtr pIf;
-        ret = GetUxStream( iStmId, pIf );
-        if( ERROR( ret ) )
-            break;
+        gint32 iStreamId = 0;
+        ObjPtr pClass;
 
-        CRpcTcpBridgeProxyStream* pProxy = pIf;
-        gint32 iBdgePrxyId =
-            pProxy->GetStreamId( true );
+        if( hChannel != INVALID_HANDLE )
+        {
+            InterfPtr pIf;
+            ret = GetUxStream( hChannel, pIf );
+            if( ERROR( ret ) )
+                break;
+            CRpcTcpBridgeProxyStream*
+                pStm = pIf;
+            iStreamId =
+                pStm->GetStreamId( false );
+
+            pClass = this;
+        }
+        else
+        {
+            InterfPtr pIf;
+            ret = GetUxStream( iStmId, pIf );
+            if( ERROR( ret ) )
+                break;
+            CRpcTcpBridgeProxyStream*
+                pStm = pIf;
+            iStreamId =
+                pStm->GetStreamId( true );
+            pClass =
+                pStm->GetBridgeProxy();
+        }
 
         // write a close token to the bridge
         // proxy's peer directly and bypass the
         // m_pWritingTask
-        TaskletPtr pSendClose;
         BufPtr pBuf( true );
         *pBuf = ( guint8 )tokClose;
-        ret = DEFER_IFCALL_NOSCHED(
-            pSendClose, ObjPtr( this ),
+        ret = DEFER_IFCALL_NOSCHED2(
+            3, pSendClose, ObjPtr( pClass ),
             &CRpcTcpBridgeShared::WriteStream,
-            iBdgePrxyId, *pBuf, 1,
+            iStreamId, *pBuf, 1,
             ( IEventSink* )nullptr );
 
         if( ERROR( ret ) )
             break;
 
-        // Let the WriteStream to notify this task
-        // when completed
-        CIfDeferCallTask* pTemp = pSendClose;
-        BufPtr pwscb( true );
-        *pwscb = ObjPtr( pSendClose );
-        pTemp->UpdateParamAt( 3, pwscb );
+        // OnClose2 will close the iBdgeId
+        // immediately, so we need serialize it
+        // with the pSendClose task.
+        ret = DEFER_IFCALL_NOSCHED2(
+            1, pClose2, ObjPtr( this ),
+            &CStreamServerRelayMH::OnClose2,
+            hChannel, iStmId,
+            ( IEventSink* )nullptr );
 
-        // add the sequence queue to make sure the
-        // tokClose is sent before the hCannel is
-        // closed.
-        ret = this->AddSeqTask( pSendClose );
         if( ERROR( ret ) )
-            ( *pSendClose )( eventCancelTask );
+            break;
+        
+        TaskGrpPtr pTaskGrp;
+        CParamList oParams;
+        oParams[ propIfPtr ] = ObjPtr( this );
+        ret = pTaskGrp.NewObj(
+            clsid( CIfTaskGroup ),
+            oParams.GetCfg() );
+        if( ERROR( ret ) )
+            break;
 
-        ret = super::OnClose( iStmId, pCallback );
+        pTaskGrp->AppendTask( pSendClose );
+        pTaskGrp->AppendTask( pClose2 );
+
+        TaskletPtr pTask = pTaskGrp;
+        ret = GetIoMgr()->RescheduleTask( pTask );
 
     }while( 0 );
 
+    if( ERROR( ret ) )
+    {
+        if( !pSendClose.IsEmpty() )
+            ( *pSendClose )(eventCancelTask );
+
+        if( !pClose2.IsEmpty() )
+            ( *pClose2 )(eventCancelTask );
+    }
+
     return ret;
+}
+
+// tokClose is received or error in connection
+// from down-stream node
+gint32 CStreamServerRelayMH::OnClose(
+    HANDLE hChannel, IEventSink* pCallback )
+{
+    if( hChannel == INVALID_HANDLE ||
+        pCallback == nullptr )
+        return -EINVAL;
+
+    return OnCloseInternal(
+        hChannel, 0, pCallback );
+}
+// tokClose is received or error in connection
+// from up-stream node
+gint32 CStreamServerRelayMH::OnClose(
+    gint32 iStmId, IEventSink* pCallback )
+{
+    if( iStmId == 0 || pCallback == nullptr )
+        return -EINVAL;
+
+    return OnCloseInternal(
+        INVALID_HANDLE, iStmId, pCallback );
 }
 
 gint32 CIfStartUxSockStmRelayTaskMH::OnTaskComplete(
@@ -1590,11 +1764,18 @@ gint32 CIfStartUxSockStmRelayTaskMH::OnTaskComplete(
             hChannel );
 
         if( ERROR( ret ) )
+        {
+            ( *pConnTask )( eventCancelTask );
+            oResp.Clear();
             break;
+        }
 
         ret = pParent->RunManagedTask( pConnTask );
         if( ERROR( ret ) )
+        {
             ( *pConnTask )( eventCancelTask );
+            oResp.Clear();
+        }
 
         if( ret == STATUS_PENDING )
             ret = 0;
@@ -1622,10 +1803,15 @@ gint32 CIfStartUxSockStmRelayTaskMH::OnTaskComplete(
         break;
     }
 
-    if( ERROR( ret ) && SUCCEEDED( iRet ) )
+    if( ERROR( iRet ) )
+    {
+        oResp[ propReturnValue ] = iRet;
+        ret = iRet;
+    }
+    else if( ERROR( ret ) )
     {
         oResp[ propReturnValue ] = ret;
-        iRet = ret;
+        iRet = iRet;
     }
 
     EventPtr pEvt;

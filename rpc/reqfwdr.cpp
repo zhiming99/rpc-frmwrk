@@ -4092,33 +4092,21 @@ gint32 CReqFwdrFetchDataTask::OnServiceComplete(
 
     gint32 ret = 0;
     do{
-        ObjPtr pObj;
         CCfgOpener oCfg( ( IConfigDb* )GetConfig() );
-        ret = oCfg.GetObjPtr(
-            propEventSink, pObj );
+        IEventSink* pTask = nullptr;
+        ret = oCfg.GetPointer(
+            propEventSink, pTask );
 
         if( ERROR( ret ) )
             break;
 
-        IEventSink* pTask = pObj;
-        if( pTask == nullptr )
-        {
-            ret = -EFAULT;
-            break;
-        }
-        ret = oCfg.GetObjPtr( propIfPtr, pObj );
-
+        CInterfaceServer* pReqFwdr = nullptr;
+        ret = oCfg.GetPointer( propIfPtr, pReqFwdr );
         if( ERROR( ret ) )
             break;
 
-        CInterfaceServer* pReqFwdr = pObj;
-        if( pReqFwdr == nullptr )
-        {
-            ret = -EFAULT;
-            break;
-        }
-
-        ret = oCfg.GetObjPtr( propRespPtr, pObj );
+        IConfigDb* pResp = nullptr;
+        ret = oCfg.GetPointer( propRespPtr, pResp );
         if( ERROR( ret ) )
         {
             if( SUCCEEDED( iRetVal ) )
@@ -4134,8 +4122,22 @@ gint32 CReqFwdrFetchDataTask::OnServiceComplete(
         }
         else
         {
+            CCfgOpener oResp( pResp );
+            IConfigDb* pDesc = nullptr;
+            ret = oResp.GetPointer( 0, pDesc );
+            if( SUCCEEDED( ret ) )
+            {
+                CCfgOpener oDesc( pDesc );
+                // make sure the iid is istream
+                if( oDesc.IsEqual( propIid,
+                    iid( IStreamMH ) )  )
+                {
+                    oDesc[ propIid ] =
+                        iid( IStream );
+                }
+            }
             ret = pReqFwdr->OnServiceComplete( 
-                pObj, pTask );
+                pResp, pTask );
         }
 
         oCfg.RemoveProperty( propRespPtr );

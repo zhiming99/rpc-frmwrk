@@ -173,11 +173,26 @@ gint32 CRpcTcpBridge::CheckRouterPathAgain(
 
             oReqCtx[ propRouterPath ] = strNext;
 
+            CCfgOpener oReqCtx2;
+            oReqCtx2.SetStrProp(
+                propRouterPath, strNext );
+
+            oReqCtx2.CopyProp(
+                propObjList, pReqCtx );
+
+            ret = oReqCtx2.CopyProp(
+                propSid, pReqCtx );
+            if( ERROR( ret ) )
+                break;
+
+            AddCheckStamp( oReqCtx2.GetCfg() );
+
             TaskletPtr pMajorCall;
             ret = DEFER_CALL_NOSCHED(
                 pMajorCall, ObjPtr( pProxy ),
                 &CRpcTcpBridgeProxy::CheckRouterPath,
-                pReqCtx, ( IEventSink* )nullptr );
+                oReqCtx2.GetCfg(),
+                ( IEventSink* )nullptr );
             if( ERROR( ret ) )
                 break;
 
@@ -215,6 +230,73 @@ gint32 CRpcTcpBridge::CheckRouterPathAgain(
     return ret;
 }
 
+bool CRpcTcpBridge::IsAccesable(
+    IConfigDb* pReqCtx )
+{ return true; }
+
+gint32 CRpcTcpBridge::IsCyclicPath(
+    IConfigDb* pReqCtx )
+{
+    gint32 ret = 0;
+    if( pReqCtx == nullptr )
+        return false;
+
+    CCfgOpener oReqCtx( pReqCtx );
+    ObjPtr pObj;
+    ret = oReqCtx.GetObjPtr(
+        propObjList, pObj );
+    if( ERROR( ret ) )
+        return false;
+
+    LwVecPtr pBridgeIds = pObj;
+    if( pBridgeIds.IsEmpty() )
+        return false;
+
+    guint64 qwObjId = GetObjId();
+    for( auto elem : ( *pBridgeIds )() )
+    {
+        if( qwObjId == elem )
+            return true;
+    }
+    return false;
+}
+
+gint32 CRpcTcpBridge::AddCheckStamp(
+    IConfigDb* pReqCtx )
+{
+    gint32 ret = 0;
+    if( pReqCtx == nullptr )
+        return -EINVAL;
+
+    do{
+        ObjPtr pObj;
+        LwVecPtr pBridgeIds;
+
+        CCfgOpener oReqCtx( pReqCtx );
+        ret = oReqCtx.GetObjPtr(
+            propObjList, pObj );
+        if( ERROR( ret ) )
+        {
+            ret = pBridgeIds.NewObj();
+            if( ERROR( ret ) )
+                break;
+            pObj = pBridgeIds;
+            oReqCtx.SetObjPtr(
+                propObjList, pObj );
+        }
+        else
+        {
+            pBridgeIds = pObj;
+        }
+
+        ( *pBridgeIds )().push_back(
+            GetObjId() );
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CRpcTcpBridge::CheckRouterPath(
     IEventSink* pCallback,
     IConfigDb* pReqCtx )
@@ -232,21 +314,42 @@ gint32 CRpcTcpBridge::CheckRouterPath(
         static_cast< CRpcRouterBridge* >
             ( GetParent() );
     do{
+        if( IsCyclicPath( pReqCtx ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        if( !IsAccesable( pReqCtx ) )
+        {
+            ret = -EACCES;
+            break;
+        }
+
         CCfgOpener oReqCtx;
         std::string strPath;
         ret = oReqCtx.CopyProp(
             propRouterPath, pReqCtx );
-
         if( ERROR( ret ) )
             break;
+
+        oReqCtx.CopyProp(
+            propSid, pReqCtx );
+
+        oReqCtx.CopyProp(
+            propObjList, pReqCtx );
 
         oReqCtx.GetStrProp(
             propRouterPath, strPath );
 
-        // bound for this node
         if( strPath == "/" )
+        {
+            // we cannot be here.
+            ret = -EINVAL;
             break;
+        }
 
+        // move on to next node
         ret = oReqCtx.CopyProp(
             propConnHandle, propPortId, this );
         if( ERROR( ret ) )
@@ -281,8 +384,8 @@ gint32 CRpcTcpBridge::CheckRouterPath(
         {
             // no need to check further if strNext
             // is the root dir, the presence of
-            // bridge proxy is enough to make
-            // further rpc calls.
+            // bridge proxy is ok to make further
+            // rpc calls.
             if( strNext == "/" )
                 break;
 
@@ -301,6 +404,21 @@ gint32 CRpcTcpBridge::CheckRouterPath(
 
             oReqCtx[ propRouterPath ] = strNext;
 
+            // oReqCtx2 as the reqctx to next node
+            CCfgOpener oReqCtx2;
+            oReqCtx2[ propRouterPath ] = strNext;
+            oReqCtx2.CopyProp( propSid, pReqCtx );
+
+            LwVecPtr pvecLw;
+            ObjPtr pObj;
+            // for cyclic path avoidance
+            oReqCtx2.CopyProp(
+                propObjList, pReqCtx );
+            ret = AddCheckStamp(
+                oReqCtx2.GetCfg() );
+            if( ERROR( ret ) )
+                break;
+
             TaskletPtr pRespCb;
             ret = NEW_PROXY_RESP_HANDLER2(
                 pRespCb, ObjPtr( this ),
@@ -311,7 +429,7 @@ gint32 CRpcTcpBridge::CheckRouterPath(
                 break;
 
             ret = pProxy->CheckRouterPath(
-                oReqCtx.GetCfg(), pRespCb );
+                oReqCtx2.GetCfg(), pRespCb );
 
             if( ERROR( ret ) )
                 ( *pRespCb )( eventCancelTask );

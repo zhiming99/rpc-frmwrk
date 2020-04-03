@@ -447,6 +447,17 @@ class CStreamProxyRelay :
         guint32& dwSize,                // [in, out]
         IEventSink* pCallback );
 
+    bool SupportIid( EnumClsid iid ) const
+    {
+        // support IStreamMH to allow the call to
+        // FetchData_Proxy can come to this class.
+        // the call is made only by the
+        // CRpcReqForwarder
+        if( iid == iid( IStreamMH ) )
+            return true;
+        return false;
+    }
+
     public:
 
     typedef CStreamRelayBase< CStreamProxy > super;

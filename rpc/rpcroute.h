@@ -718,6 +718,10 @@ struct CRpcTcpBridgeShared
         MatchPtr& pMatch,
         bool bReg );
 
+    gint32 GetPeerStmId(
+        gint32 iStmId,
+        gint32& iPeerStmid );
+
     protected:
     CRpcServices* m_pParentIf;
 
@@ -812,6 +816,10 @@ class CRpcTcpBridge :
         IEventSink* pCallback,
         IEventSink* pIoReq,
         IConfigDb* pReqCtx );
+
+    bool IsAccesable( IConfigDb* pReqCtx );
+    gint32 IsCyclicPath( IConfigDb* pReqCtx );
+    gint32 AddCheckStamp( IConfigDb* pReqCtx );
 
     public:
 

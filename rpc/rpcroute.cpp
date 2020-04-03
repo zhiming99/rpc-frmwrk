@@ -362,6 +362,21 @@ gint32 CRpcRouter::OnPostStart(
             iid( IStream ), "s" );
     }
 
+    strIfName = CoGetIfNameFromIid(
+        iid( IStreamMH ), "p" );
+    if( strIfName.empty() )
+    {
+        CoAddIidName( "IStreamMH",
+            iid( IStreamMH ), "p" );
+    }
+
+    strIfName = CoGetIfNameFromIid(
+        iid( IStreamMH ), "s" );
+    if( strIfName.empty() )
+    {
+        CoAddIidName( "IStreamMH",
+            iid( IStreamMH ), "s" );
+    }
     return 0;
 }
 

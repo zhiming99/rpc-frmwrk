@@ -18,6 +18,7 @@
             "Compression" : "true",
             "EnableSSL" : "false",
             "EnableWS" : "false",
+            "RouterPath" : "/",
             "PauseOnStart" : "false",
             "Interfaces" :
             [
