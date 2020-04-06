@@ -2120,6 +2120,14 @@ class CRpcRouterBridge : public CRpcRouter
 
         return RemoveProxy( strDest, pIf );
     }
+
+    gint32 AddToNodePidMap(
+        const std::string& strNode,
+        guint32 dwPortId );
+
+    gint32 RemoveFromNodePidMap(
+        const std::string& strNode );
+
     gint32 BuildStartRecvTask(
         IMessageMatch* pMatch,
         TaskletPtr& pTask );

@@ -57,7 +57,42 @@ gint32 CRpcTcpBridge::OnCheckRouterPathComplete(
             break;
 
         if( ERROR( iRet ) )
+        {
             ret = iRet;
+            break;
+        }
+
+        CCfgOpenerObj oIfCfg( this );
+        guint32 dwPortId = 0;
+        ret = oIfCfg.GetIntProp(
+            propPortId, dwPortId );
+        if( ERROR( ret ) )
+            break;
+
+        std::string strPath, strNode;
+        CCfgOpener oReqCtx( pReqCtx );
+        ret = oReqCtx.GetStrProp(
+            propRouterPath, strPath );
+        if( ERROR( ret ) )
+            break;
+
+        CRpcRouterBridge* pRouter =
+        static_cast< CRpcRouterBridge* >
+            ( GetParent() );
+
+        ret = CRpcRouter::GetNodeName(
+            strPath, strNode );
+        if( ERROR( ret ) )
+            break;
+
+        guint32 dwProxyId;
+        ret = pRouter->GetProxyIdByNodeName(
+            strNode, dwProxyId );
+        if( ERROR( ret ) )
+            break;
+
+        ret = pRouter->AddRefCount(
+            strNode, dwPortId, dwProxyId );
 
     }while( 0 );
 
@@ -180,10 +215,7 @@ gint32 CRpcTcpBridge::CheckRouterPathAgain(
             oReqCtx2.CopyProp(
                 propObjList, pReqCtx );
 
-            ret = oReqCtx2.CopyProp(
-                propSid, pReqCtx );
-            if( ERROR( ret ) )
-                break;
+            oReqCtx2.CopyProp( propSid, pReqCtx );
 
             AddCheckStamp( oReqCtx2.GetCfg() );
 
@@ -872,6 +904,11 @@ gint32 CRpcRouterBridge::BuildRmtSvrEventMH(
         oParams.SetCallFlags( CF_ASYNC_CALL |
             DBUS_MESSAGE_TYPE_SIGNAL );
 
+        oParams.SetIntProp(
+            propTimeoutSec, 3 );
+
+        pEvtReq = oParams.GetCfg();
+
     }while( 0 );
 
     return ret;
@@ -1000,8 +1037,7 @@ gint32 CRpcRouterBridge::OnRmtSvrOfflineMH(
         CfgPtr pReqCall;
         ret = BuildRmtSvrEventMH(
             eventRmtSvrOffline,
-            oEvtCtx.GetCfg(),
-            pReqCall );
+            pEvtCtx, pReqCall );
 
         TaskGrpPtr pGrp;
         CParamList oParams;
@@ -1066,8 +1102,7 @@ gint32 CRpcRouterBridge::OnClearRemoteEventsComplete(
     // BUGBUG: simply set success and complete the
     // request, because at this moment, all the
     // tasks are gone.
-    CfgPtr pCfg( pReqCtx );
-    SetResponse( pCallback, pCfg );
+    OnServiceComplete( pReqCtx, pCallback );
     return 0;
 }
 /**

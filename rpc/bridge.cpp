@@ -80,7 +80,7 @@ gint32 CRpcTcpBridgeProxy::InitUserFuncs()
 
     ADD_EVENT_HANDLER(
         CRpcTcpBridgeProxy::OnRmtSvrEvent,
-        SYS_EVENT_RMTSVREVENT );
+        "RmtSvrEvent" );
 
     END_IFHANDLER_MAP;
 
@@ -1509,6 +1509,7 @@ gint32 CRpcTcpBridgeProxy::OnRmtSvrEvent(
                 break;
         }
 
+        pEvtCtx = oEvtCtx.GetCfg();
         HANDLE hPort = GetPortHandle();
         CIoManager* pMgr = GetIoMgr();
 
@@ -1821,8 +1822,7 @@ gint32 CRpcTcpBridge::OnClearRemoteEventsComplete(
     // BUGBUG: simply set success and complete the
     // request, because at this moment, all the
     // tasks are gone.
-    CfgPtr pCfg( pReqCtx );
-    SetResponse( pCallback, pCfg );
+    OnServiceComplete( pReqCtx, pCallback );
     return 0;
 }
 
@@ -2921,6 +2921,12 @@ gint32 CRpcInterfaceServer::DoInvoke(
                         ( IConfigDb* )oNewReq.GetCfg() );
 
                     break;
+                }
+                else if( ERROR( ret ) )
+                {
+                    if( ret == -ENOTSUP )
+                        ret = ERROR_FAIL;
+                    bResp = true; 
                 }
 
                 // whether successful or not, we

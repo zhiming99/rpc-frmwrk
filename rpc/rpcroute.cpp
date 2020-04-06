@@ -1492,8 +1492,8 @@ gint32 CRouterOpenBdgePortTask::RunTaskInternal(
                     if( ERROR( ret ) )
                         break;
 
-                    pRouter->AddRefCount( strNode,
-                        dwPortId, dwProxyId );
+                    pRouter->AddToNodePidMap(
+                        strNode, dwProxyId );
 
                     break;
                 }
@@ -2124,6 +2124,9 @@ gint32 CRouterStopBridgeProxyTask2::RunTask()
         pRouter->ClearRefCountByNodeName(
             strNode, setBridges );
 
+        pRouter->RemoveFromNodePidMap(
+            strNode  );
+
         InterfPtr pIf;
         for( auto elem : setBridges )
         {
@@ -2132,8 +2135,8 @@ gint32 CRouterStopBridgeProxyTask2::RunTask()
                 ( *setIfs )().insert( pIf );
         }
 
-        oCfg.SetObjPtr(
-            propObjList, ObjPtr( setIfs ) );
+        oCfg.SetObjPtr( propObjList,
+            ObjPtr( setIfs ) );
 
         pRouter->RemoveBridgeProxy( pProxy );
 
@@ -2322,6 +2325,8 @@ gint32 CRpcRouterBridge::OnRmtSvrOffline(
         }
 
         ret = ( *pTask )( eventZero );
+        if( ret == STATUS_PENDING )
+            ret = 0;
 
     }while( 0 );
 
@@ -3022,6 +3027,29 @@ gint32 CRpcRouterBridge::ForwardModOnOfflineEvent(
     return ret;
 }
 
+gint32 CRpcRouterBridge::AddToNodePidMap(
+    const std::string& strNode,
+    guint32 dwPortId )
+{
+    if( dwPortId == 0 || strNode.empty() )
+        return -EINVAL;
+
+    CStdRMutex oRouterLock( GetLock() );
+    m_mapNode2Pid[ strNode ] = dwPortId;
+    return 0;
+}
+
+gint32 CRpcRouterBridge::RemoveFromNodePidMap(
+    const std::string& strNode )
+{
+    if( strNode.empty() )
+        return -EINVAL;
+
+    CStdRMutex oRouterLock( GetLock() );
+    m_mapNode2Pid.erase( strNode );
+    return 0;
+}
+
 gint32 CRpcRouterBridge::AddRefCount(
     const std::string& strNode,
     guint32 dwPortId,
@@ -3051,7 +3079,6 @@ gint32 CRpcRouterBridge::AddRefCount(
         else
         {
             ret = m_mapRefCount[ oRegObj ] = 1;
-            m_mapNode2Pid[ strNode ] = dwProxyId;
         }
 
     }while( 0 );
@@ -3088,8 +3115,6 @@ gint32 CRpcRouterBridge::DecRefCount(
             }
         }
         ret = std::max( iRef, 0 );
-        if( ret == 0 )
-            m_mapNode2Pid.erase( strNode );
     }
     else
     {
@@ -3136,8 +3161,6 @@ gint32 CRpcRouterBridge::ClearRefCountByNodeName(
         }
         itr++;
     }
-    if( setPortIds.size() )
-        m_mapNode2Pid.erase( strNode );
 
     return setPortIds.size();
 }

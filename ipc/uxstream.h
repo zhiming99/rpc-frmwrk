@@ -308,13 +308,13 @@ class CFlowControl
         if( m_qwTxBytes - m_qwAckTxBytes >=
             STM_MAX_PENDING_WRITE ||
             m_qwTxPkts - m_qwAckTxPkts >=
-            STM_MAX_PACKATS_REPORT )
+            STM_MAX_PACKETS_REPORT )
             bAboveLast = true;
 
         if( m_qwTxBytes - qwAckTxBytes >=
             STM_MAX_PENDING_WRITE ||
             m_qwTxPkts - qwAckTxPkts >=
-            STM_MAX_PACKATS_REPORT )
+            STM_MAX_PACKETS_REPORT )
             bAbove = true;
 
         m_qwAckTxBytes = qwAckTxBytes;
@@ -350,7 +350,7 @@ class CFlowControl
             bAboveLastBytes = true;
 
         if( m_qwTxPkts - m_qwAckTxPkts >=
-            STM_MAX_PACKATS_REPORT )
+            STM_MAX_PACKETS_REPORT )
             bAboveLastPkts = true;
 
         m_qwTxBytes += dwSize;
@@ -361,7 +361,7 @@ class CFlowControl
             bAboveBytes = true;
 
         if( m_qwTxPkts - m_qwAckTxPkts >=
-            STM_MAX_PACKATS_REPORT )
+            STM_MAX_PACKETS_REPORT )
             bAbovePkts = true;
 
         // get the flow control to take effect
@@ -401,7 +401,7 @@ class CFlowControl
             bAboveLastBytes = true;
 
         if( m_qwRxPkts - m_qwAckRxPkts >=
-            STM_MAX_PACKATS_REPORT )
+            STM_MAX_PACKETS_REPORT )
             bAboveLastPkts = true;
 
         m_qwRxBytes += dwSize;
@@ -412,7 +412,7 @@ class CFlowControl
             bAboveBytes = true;
 
         if( m_qwRxPkts - m_qwAckRxPkts >=
-            STM_MAX_PACKATS_REPORT )
+            STM_MAX_PACKETS_REPORT )
             bAbovePkts = true;
 
         if( bAboveLastBytes != bAboveBytes ||
