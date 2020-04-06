@@ -521,7 +521,7 @@ struct CUnixSockStmRelayBase :
 
     bool  m_bTcpFlowCtrl = false;
     inline guint32 QueueLimit()
-    { return STM_MAX_PACKATS_REPORT + 4; }
+    { return STM_MAX_PACKETS_REPORT + 4; }
 
     gint32 SendBdgeStmEvent(
         guint8 byToken, BufPtr& pBuf )

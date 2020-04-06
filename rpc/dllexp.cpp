@@ -101,7 +101,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CRpcRouterBridgeImpl );
     INIT_MAP_ENTRYCFG( CRpcRouterReqFwdrImpl );
     INIT_MAP_ENTRYCFG( CRouterOpenBdgePortTask );
-    // INIT_MAP_ENTRYCFG( CRouterStopBridgeProxyTask2 );
+    INIT_MAP_ENTRYCFG( CRouterStopBridgeProxyTask2 );
     INIT_MAP_ENTRYCFG( CIfTcpBridgeState );
     INIT_MAP_ENTRYCFG( CIfReqFwdrState );
     INIT_MAP_ENTRYCFG( CIfReqFwdrPrxyState );

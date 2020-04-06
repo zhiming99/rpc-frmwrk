@@ -3515,6 +3515,10 @@ gint32 CRpcServices::SetupReqIrp( IRP* pIrp,
             pIrp->SetTimer(
                 dwTimeoutSec, GetIoMgr() );
         }
+        else
+        {
+            ret = 0;
+        }
 
     }while( 0 );
 

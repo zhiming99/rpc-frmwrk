@@ -1666,8 +1666,8 @@ inline gint32 NewResponseHandler(
     if( SUCCEEDED( ret ) ) {\
         CIfIoCallTask* _pIoCall = __pTask;\
         _pIoCall->SetMajorCall( _pMajorCall );\
-        CIfDeferCallTaskBase< CTasklet >* \
-            pDeferCall = pMajorCall; \
+        CDeferredCallBase< CTasklet >* \
+            pDeferCall = _pMajorCall; \
         BufPtr pBuf( true );\
         *pBuf = ObjPtr( _pIoCall );\
         pDeferCall->UpdateParamAt( _iPos, pBuf );\

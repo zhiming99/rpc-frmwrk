@@ -1568,7 +1568,8 @@ gint32 CStreamServerRelayMH::OnCloseInternal(
         if( hChannel != INVALID_HANDLE )
         {
             InterfPtr pIf;
-            ret = GetUxStream( hChannel, pIf );
+            ret = IStream::GetUxStream(
+                hChannel, pIf );
             if( ERROR( ret ) )
                 break;
             CRpcTcpBridgeProxyStream*
@@ -1610,7 +1611,7 @@ gint32 CStreamServerRelayMH::OnCloseInternal(
         // immediately, so we need serialize it
         // with the pSendClose task.
         ret = DEFER_IFCALL_NOSCHED2(
-            1, pClose2, ObjPtr( this ),
+            2, pClose2, ObjPtr( this ),
             &CStreamServerRelayMH::OnClose2,
             hChannel, iStmId,
             ( IEventSink* )nullptr );
@@ -1629,6 +1630,8 @@ gint32 CStreamServerRelayMH::OnCloseInternal(
 
         pTaskGrp->AppendTask( pSendClose );
         pTaskGrp->AppendTask( pClose2 );
+        if( pCallback != nullptr )
+            pTaskGrp->SetClientNotify( pCallback );
 
         TaskletPtr pTask = pTaskGrp;
         ret = GetIoMgr()->RescheduleTask( pTask );
@@ -1652,8 +1655,7 @@ gint32 CStreamServerRelayMH::OnCloseInternal(
 gint32 CStreamServerRelayMH::OnClose(
     HANDLE hChannel, IEventSink* pCallback )
 {
-    if( hChannel == INVALID_HANDLE ||
-        pCallback == nullptr )
+    if( hChannel == INVALID_HANDLE )
         return -EINVAL;
 
     return OnCloseInternal(
@@ -1664,7 +1666,7 @@ gint32 CStreamServerRelayMH::OnClose(
 gint32 CStreamServerRelayMH::OnClose(
     gint32 iStmId, IEventSink* pCallback )
 {
-    if( iStmId == 0 || pCallback == nullptr )
+    if( iStmId == 0 )
         return -EINVAL;
 
     return OnCloseInternal(

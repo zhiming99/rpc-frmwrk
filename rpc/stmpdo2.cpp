@@ -1137,10 +1137,8 @@ gint32 CBytesSender::OnSendReady(
         }
         CStdRMutex oPortLock( pPort->GetLock() );
         if( m_pIrp.IsEmpty() )
-        {
-            ret = ERROR_NOT_HANDLED;
-            break;
-        }
+            return ERROR_NOT_HANDLED;
+
         pIrp = m_pIrp;
         oPortLock.Unlock();
 
