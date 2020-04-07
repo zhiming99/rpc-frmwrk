@@ -1869,6 +1869,8 @@ gint32 CRpcTcpBridge::ClearRemoteEvents(
             CCfgOpenerObj oMatchCfg(
                 ( CObjBase* ) elem );
 
+            oMatchCfg.CopyProp( propPortId, this );
+
             ret = oMatchCfg.GetStrProp(
                 propRouterPath, strPath );
             if( ERROR( ret ) )
