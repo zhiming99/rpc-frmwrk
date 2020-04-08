@@ -30,6 +30,9 @@ This framework depends on the following packags:
 14. `Object access via Multi-hop routing` (coming)
 
 ---
+[`Tue 07 Apr 2020 11:15:32 AM Beijing`]   
+1. fixed some bugs in the multihop code. It should be more stable now. and more testing and tuning needed.
+
 [`Fri 03 Apr 2020 10:03:06 PM Beijing`]   
 1. Streaming for multihop almost works. the performance is not ideal yet. More testing and tuning needed.   
 

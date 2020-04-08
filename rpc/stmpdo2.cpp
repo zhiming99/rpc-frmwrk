@@ -1907,7 +1907,7 @@ gint32 CTcpStreamPdo2::SubmitWriteIrp(
         pIrp->GetStackSize() == 0 )
         return -EINVAL;
 
-    return StartSend( pIrp );
+    return StartSend2( pIrp );
 }
 
 gint32 CTcpStreamPdo2::StartSend(
@@ -1969,6 +1969,147 @@ gint32 CTcpStreamPdo2::StartSend(
         // the outgoing queue
         RemoveIrpFromMap( pIrpLocked );
     }
+
+    return ret;
+}
+
+gint32 CTcpStreamPdo2::StartSend2(
+    IRP* pIrpLocked  )
+{
+    if( pIrpLocked == nullptr ||
+        pIrpLocked->GetStackSize() == 0 )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        IrpCtxPtr& pCtx = pIrpLocked->GetCurCtx();
+        if( pCtx->GetMajorCmd() != IRP_MJ_FUNC &&
+            pCtx->GetMinorCmd() != IRP_MN_WRITE )
+            break;
+
+        CStdRMutex oPortLock( GetLock() );
+
+        m_queWriteIrps.push_back( pIrpLocked );
+
+        CRpcConnSock* pSock = m_pConnSock;
+        if( unlikely( pSock == nullptr ) )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        gint32 iFd = -1;
+        ret = pSock->GetSockFd( iFd );
+        if( ERROR( ret ) )
+            break;
+
+        if( !m_oSender.IsSendDone() ||
+            m_queWriteIrps.size() > 1 )
+        {
+            ret = STATUS_PENDING;
+            break;
+        }
+
+        // start sending immediately
+        m_oSender.SetIrpToSend(
+            m_queWriteIrps.front() );
+        m_queWriteIrps.pop_front();
+
+        oPortLock.Unlock();
+
+        ret = SendImmediate( iFd, pIrpLocked );
+        if( ret == ERROR_NOT_HANDLED ||
+            ret == -ENOENT )
+        {
+            // the irp is gone
+            ret = STATUS_PENDING;
+            break;
+        }
+        else if( ret == STATUS_PENDING )
+        {
+            pSock->StartWatch();
+            break;
+        }
+        else if( ERROR( ret ) )
+        {
+            break;
+        }
+
+        oPortLock.Lock();
+        IrpPtr pIrp;
+        if( !m_oSender.IsSendDone() )
+            break;
+        if( m_queWriteIrps.empty() )
+            break;
+
+        // schedule a task for the rest irps it
+        // could contends with other writing
+        // threads and the OnSendReady, but it can
+        // reduce the delay time
+        CIoManager* pMgr = GetIoMgr();
+        DEFER_CALL( pMgr, ObjPtr( this ),
+            &CTcpStreamPdo2::StartSend3 );
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+    {
+        // we need to remove the irp from
+        // the outgoing queue
+        RemoveIrpFromMap( pIrpLocked );
+    }
+
+    return ret;
+}
+
+gint32 CTcpStreamPdo2::StartSend3()
+{
+    gint32 ret = 0;
+    do{
+        CStdRMutex oPortLock( GetLock() );
+
+        CRpcConnSock* pSock = m_pConnSock;
+        if( unlikely( pSock == nullptr ) )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        gint32 iFd = -1;
+        ret = pSock->GetSockFd( iFd );
+        if( ERROR( ret ) )
+            break;
+
+        if( !m_oSender.IsSendDone() )
+            break;
+
+        if( m_queWriteIrps.empty() )
+            break;
+
+        IrpPtr pIrp = m_queWriteIrps.front();
+        // start sending immediately
+        m_oSender.SetIrpToSend( pIrp );
+        m_queWriteIrps.pop_front();
+
+        oPortLock.Unlock();
+
+        ret = SendImmediate( iFd, pIrp );
+        if( ret == ERROR_NOT_HANDLED ||
+            ret == -ENOENT )
+        {
+            break;
+        }
+        else if( ret == STATUS_PENDING )
+        {
+            pSock->StartWatch();
+            break;
+        }
+        else if( ERROR( ret ) )
+        {
+            break;
+        }
+
+    }while( 1 );
 
     return ret;
 }

@@ -206,7 +206,7 @@ gint32 CRpcTcpBridge::CheckRouterPathAgain(
                 break;
             }
 
-            oReqCtx[ propRouterPath ] = strNext;
+            oReqCtx[ propRouterPath ] = strPath;
 
             CCfgOpener oReqCtx2;
             oReqCtx2.SetStrProp(
@@ -434,7 +434,7 @@ gint32 CRpcTcpBridge::CheckRouterPath(
                 break;
             }
 
-            oReqCtx[ propRouterPath ] = strNext;
+            oReqCtx[ propRouterPath ] = strPath;
 
             // oReqCtx2 as the reqctx to next node
             CCfgOpener oReqCtx2;
@@ -1190,8 +1190,6 @@ gint32 CRpcRouterBridge::ClearRemoteEventsMH(
 
             CCfgOpenerObj oMatch(
                 ( CObjBase* )pObj );
-
-            oMatch.CopyProp( propPortId, this );
 
             ret = GetMatchToAdd(
                 pMatch, true, pRmtMatch );
