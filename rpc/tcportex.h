@@ -617,6 +617,8 @@ class CTcpStreamPdo2 : public CPort
     // gint32 CompleteFuncIrp( IRP* pIrp );
     gint32 CompleteIoctlIrp( IRP* pIrp );
     gint32 StartSend( IRP* pIrpLocked  );
+    gint32 StartSend2( IRP* pIrpLocked  );
+    gint32 StartSend3();
     gint32 CancelAllIrps( gint32 iErrno );
 
     SockPtr m_pConnSock;
