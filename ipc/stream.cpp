@@ -1237,10 +1237,9 @@ gint32 IStream::OnPreStopShared(
             break;
 
         TaskletPtr pTask = ObjPtr( pTaskGrp );
-        CIoManager* pMgr = pThis->GetIoMgr();
-        ret = pMgr->RescheduleTask( pTask );
+        ret = pThis->AddSeqTask( pTask );
         if( SUCCEEDED( ret ) )
-            ret = STATUS_PENDING;
+            ret = pTask->GetError();
 
     }while( 0 );
 

@@ -1115,41 +1115,24 @@ gint32 CRpcInterfaceBase::StopEx(
         }
         oIfLock.Unlock();
 
-        TaskletPtr pDummyTask;
-        ret = pDummyTask.NewObj(
-            clsid( CIfDummyTask ) );
-
-        if( ERROR( ret ) )
-            break;
-
         TaskletPtr pPreStop;
-        ret = DEFER_IFCALLEX_NOSCHED(
-            pPreStop, ObjPtr( this ),
+        ret = DEFER_IFCALLEX_NOSCHED2(
+            0, pPreStop, ObjPtr( this ),
             &CRpcInterfaceBase::OnPreStop,
-            pDummyTask );
+            ( IEventSink* )nullptr );
 
         if( ERROR( ret ) )
             break;
-
-        CIfDeferCallTaskEx* pPreStopEx = pPreStop;
-        BufPtr pCb( true );
-        *pCb = ObjPtr( pPreStopEx );
-        pPreStopEx->UpdateParamAt( 0, pCb );
 
         TaskletPtr pDoStop;
-        ret = DEFER_IFCALLEX_NOSCHED(
-            pDoStop, ObjPtr( this ),
+        ret = DEFER_IFCALLEX_NOSCHED2(
+            0, pDoStop, ObjPtr( this ),
             &CRpcInterfaceBase::DoStop,
-            pDummyTask );
+            ( IEventSink* )nullptr );
 
         if( ERROR( ret ) )
             break;
 
-        BufPtr pCb2( true );
-        CIfDeferCallTaskEx* pDoStopEx = pDoStop;
-        *pCb2 = ObjPtr( pDoStopEx );
-
-        pDoStopEx->UpdateParamAt( 0, pCb2 );
         CParamList oParams;
         ret = oParams.SetObjPtr(
             propIfPtr, ObjPtr( this ) );
