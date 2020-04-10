@@ -523,7 +523,7 @@ struct CUnixSockStmRelayBase :
     inline guint32 QueueLimit()
     { return STM_MAX_PACKETS_REPORT + 4; }
 
-    gint32 SendBdgeStmEvent(
+    virtual gint32 SendBdgeStmEvent(
         guint8 byToken, BufPtr& pBuf )
     {
         // forward to the parent IStream object

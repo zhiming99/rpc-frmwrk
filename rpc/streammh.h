@@ -38,7 +38,6 @@ class CStreamServerRelayMH :
 
     gint32 OnCloseInternal(
         HANDLE hChannel,
-        gint32 iStmId,
         IEventSink* pCallback );
 
     public:
@@ -216,6 +215,9 @@ class CRpcTcpBridgeProxyStream :
 
     virtual gint32 OnPreStop(
         IEventSink* pCallback );
+
+    virtual gint32 SendBdgeStmEvent(
+        guint8 byToken, BufPtr& pBuf );
 };
 
 struct CIfUxRelayTaskHelperMH : 

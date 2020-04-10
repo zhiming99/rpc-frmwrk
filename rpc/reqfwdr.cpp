@@ -1272,18 +1272,14 @@ gint32 CRpcReqForwarder::OnModOfflineInternal(
 
                 ObjPtr pEmptyCb;
                 TaskletPtr pDeferTask;
-                ret = DEFER_IFCALL_NOSCHED(
-                    pDeferTask, ObjPtr( pBdgePrxy ),
+                ret = DEFER_IFCALL_NOSCHED2(
+                    1, pDeferTask, ObjPtr( pBdgePrxy ),
                     &CRpcTcpBridgeProxy::ClearRemoteEvents,
                     pObj, pEmptyCb );
 
                 if( ERROR( ret ) )
                     break;
 
-                BufPtr pBuf( true );
-                *pBuf = ObjPtr( pDeferTask );
-                CIfDeferCallTask* pTask = pDeferTask;
-                pTask->UpdateParamAt( 1, pBuf );
                 pTaskGrp->AppendTask( pDeferTask );
             }
         }

@@ -4095,6 +4095,11 @@ gint32 CFdoListeningTask::OnTaskComplete(
             pMgr->SubmitIrpInternal(
                 pPort, pIrp, false );
         }
+        else if( ret == -EPIPE )
+        {
+            DebugPrint( iRet,
+                "CFdoListeningTask encounters strange error..." );
+        }
         else
         {
             return iRet;

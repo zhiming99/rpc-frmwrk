@@ -1015,7 +1015,7 @@ gint32 CRpcRouterBridge::OnRmtSvrOfflineMH(
         if( vecMatches.empty() )
             break;
 
-        // forward to the downstream subscribers
+        // forward to the upstream subscribers
         std::set< gint32 > setBridges;
         for( auto elem : vecMatches )
         {
