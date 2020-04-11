@@ -1462,3 +1462,59 @@ gint32 CRpcTcpBridge::EnableRemoteEventInternalMH(
 
     return ret;
 }
+
+gint32 CRpcTcpBridgeImpl::OnPreStop(
+    IEventSink* pCallback )
+{
+    gint32 ret = 0;
+    TaskletPtr plps, ppsmh;
+    do{
+        CParamList oParams;
+        oParams[ propIfPtr ] = ObjPtr( this );
+        TaskGrpPtr pTaskGrp;
+        ret = pTaskGrp.NewObj(
+            clsid( CIfTaskGroup ),
+            oParams.GetCfg() );
+        if( ERROR( ret ) )
+            return ret;
+
+        pTaskGrp->SetClientNotify( pCallback );
+        pTaskGrp->SetRelation( logicNONE );
+
+        ret = DEFER_IFCALLEX_NOSCHED2(
+            0, plps, ObjPtr( this ),
+            &CRpcTcpBridgeImpl::OnPreStopLocal,
+            ( IEventSink* )nullptr );
+
+        if( ERROR( ret ) )
+            break;
+
+        ret = DEFER_IFCALLEX_NOSCHED2(
+            0, plps, ObjPtr( this ),
+            &CRpcTcpBridgeImpl::OnPreStopMH,
+            ( IEventSink* )nullptr );
+        if( ERROR( ret ) )
+            break;
+
+        pTaskGrp->AppendTask( plps );
+        pTaskGrp->AppendTask( ppsmh );
+
+        TaskletPtr pTask = pTaskGrp;
+        CIoManager* pMgr = GetIoMgr();
+        ret = pMgr->RescheduleTask( pTask );
+        if( SUCCEEDED( ret ) )
+            ret = pTask->GetError();
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+    {
+        if( !plps.IsEmpty() )
+            ( *plps )( eventCancelTask );
+
+        if( !ppsmh.IsEmpty() )
+            ( *ppsmh )( eventCancelTask );
+    }
+
+    return ret;
+}

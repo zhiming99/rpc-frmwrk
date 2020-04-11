@@ -1563,7 +1563,7 @@ class CIfTcpStmTransTask :
     gint32 RunTask();
 
     gint32 HandleIrpResp( IRP* pIrp );
-    gint32 PostEvent( BufPtr& pBuf );
+    virtual gint32 PostEvent( BufPtr& pBuf );
 
     gint32 LocalToRemote( guint8 byToken,
         BufPtr& pLocal, BufPtr& pRemote );

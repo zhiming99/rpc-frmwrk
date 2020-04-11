@@ -2309,15 +2309,36 @@ DECLARE_AGGREGATED_PROXY(
 #include "streammh.h"
 
 DECLARE_AGGREGATED_SERVER(
-    CRpcTcpBridgeImpl,
+    CRpcTcpBridgeEx,
     CRpcTcpBridge,
+    CStatCountersServer,
     CStreamServerRelay,
-    CStreamServerRelayMH,
-    CStatCountersServer ); 
+    CStreamServerRelayMH
+    ); 
 
 DECLARE_AGGREGATED_PROXY(
     CRpcTcpBridgeProxyImpl,
-    CStreamProxyRelay,
     CRpcTcpBridgeProxy,
-    CStatCountersProxy );
+    CStatCountersProxy,
+    CStreamProxyRelay );
 
+class CRpcTcpBridgeImpl :
+    public CRpcTcpBridgeEx
+{
+    gint32 OnPreStopLocal( IEventSink* pCallback )
+    {
+        return this->CStreamServerRelay::OnPreStop(
+            pCallback );
+    }
+    gint32 OnPreStopMH( IEventSink* pCallback )
+    {
+        return this->CStreamServerRelayMH::OnPreStop(
+            pCallback );
+    }
+    public:
+    typedef CRpcTcpBridgeEx super;
+    CRpcTcpBridgeImpl( const IConfigDb* pCfg )
+        : virtbase( pCfg ), super( pCfg )
+    { SetClassId( clsid( CRpcTcpBridgeImpl ) ); }
+    gint32 OnPreStop( IEventSink* pCallback );
+};
