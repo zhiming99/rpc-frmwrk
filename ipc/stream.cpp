@@ -992,6 +992,12 @@ gint32 IStream::CloseChannel(
             break;
         }
 
+        EnumIfState iState = pIf->GetState();
+        if( iState == stateStopping ||
+            iState == stateStopped )
+        {
+            break;
+        }
         CParamList oParams;
         oParams.Push( ObjPtr( pIf ) );
         oParams[ propIfPtr ] = ObjPtr( pThisIf );
@@ -1233,6 +1239,15 @@ gint32 IStream::OnPreStopShared(
 
         for( auto elem : mapStreams )
         {
+            CRpcServices* pIf = elem.second;
+            EnumIfState iState = pIf->GetState();
+            if( iState == stateStopping ||
+                iState == stateStopped )
+            {
+                DebugPrint( 0, "the ux stream"
+                "is stopping already" );
+                continue;
+            }
             CParamList oParams;
             oParams.Push( ObjPtr( elem.second ) );
             oParams[ propIfPtr ] = ObjPtr( pThis );

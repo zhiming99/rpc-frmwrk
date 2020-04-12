@@ -1485,12 +1485,11 @@ gint32 CRpcTcpBridgeImpl::OnPreStop(
             0, plps, ObjPtr( this ),
             &CRpcTcpBridgeImpl::OnPreStopLocal,
             ( IEventSink* )nullptr );
-
         if( ERROR( ret ) )
             break;
 
         ret = DEFER_IFCALLEX_NOSCHED2(
-            0, plps, ObjPtr( this ),
+            0, ppsmh, ObjPtr( this ),
             &CRpcTcpBridgeImpl::OnPreStopMH,
             ( IEventSink* )nullptr );
         if( ERROR( ret ) )
