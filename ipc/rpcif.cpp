@@ -2517,7 +2517,6 @@ gint32 CRpcServices::OnPostStop(
     m_vecMatches.clear();
     m_mapFuncs.clear();
     m_mapProxyFuncs.clear();
-    m_pRootTaskGroup.Clear();
 
     m_pFtsMatch.Clear();
     m_pStmMatch.Clear();
@@ -2529,6 +2528,8 @@ gint32 CRpcServices::OnPostStop(
         oIfLock.Unlock();
         ( *pSeqTasks )( eventCancelTask );
     }
+    // should be the last to remove
+    m_pRootTaskGroup.Clear();
 
     return 0;
 }

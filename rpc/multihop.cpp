@@ -1485,7 +1485,6 @@ gint32 CRpcTcpBridgeImpl::OnPreStop(
             0, plps, ObjPtr( this ),
             &CRpcTcpBridgeImpl::OnPreStopLocal,
             ( IEventSink* )nullptr );
-
         if( ERROR( ret ) )
             break;
 

@@ -82,6 +82,12 @@ class CStreamRelayBase :
                 CloseTcpStream( iStmId, true );
                 ret = this->CloseChannel(
                     hChannel, pCallback );
+                // don't return pending since the
+                // caller is an IFCALL task. it
+                // could not be released
+                // immediately. 
+                if( ret == STATUS_PENDING )
+                    ret = 0;
             }
 
         }while( 0 );
@@ -120,6 +126,8 @@ class CStreamRelayBase :
                 CloseTcpStream( iStmId, false );
                 ret = this->CloseChannel(
                     hChannel, pCallback );
+                if( ret == STATUS_PENDING )
+                    ret = 0;
             }
 
         }while( 0 );
