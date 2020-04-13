@@ -566,8 +566,6 @@ gint32 CRpcRouterBridge::BuildNodeMap()
             // overwrite the global port class and port
             // id if PROXY_PORTCLASS and PROXY_PORTID
             // exist
-            CCfgOpener oConnParams;
-
             Json::Value& oNodesArray =
                 oObjElem[ JSON_ATTR_NODES ];
 
@@ -582,6 +580,8 @@ gint32 CRpcRouterBridge::BuildNodeMap()
             // set the default parameters
             for( guint32 i = 0; i < oNodesArray.size(); i++ )
             {
+                CCfgOpener oConnParams;
+
                 Json::Value& oNodeElem = oNodesArray[ i ];
 
                 std::string strNode;

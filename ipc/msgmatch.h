@@ -1267,21 +1267,52 @@ class CRouterRemoteMatch : public CMessageMatch
         return ret;
     }
 
-    gint32 IsMyEvtToForward(
-        IConfigDb* pEvtCtx,
+    gint32 IsMyModEvent(
         DBusMessage* pEvtMsg ) const
     {
-        gint32 ret =
-            super::IsMyMsgIncoming( pEvtMsg );
+        DMsgPtr pMsg( pEvtMsg );
+        if( pMsg.GetMember() !=
+            "NameOwnerChanged" )
+            return ERROR_FALSE;
+
+        std::string strModName;
+        gint32 ret = pMsg.GetStrArgAt(
+            0, strModName );
 
         if( ERROR( ret ) )
             return ret;
 
-        CCfgOpenerObj oCfg( this );
+        CCfgOpener oCfg(
+            ( IConfigDb* )GetCfg() );
 
-        return oCfg.IsEqualProp(
+        return oCfg.IsEqual(
+            propDestDBusName, strModName );
+    }
+
+    gint32 IsMyEvtToForward(
+        IConfigDb* pEvtCtx,
+        DBusMessage* pEvtMsg ) const
+    {
+        CCfgOpener oCfg(
+            ( IConfigDb* )GetCfg() );
+
+        gint32 ret = oCfg.IsEqualProp(
             propRouterPath, pEvtCtx );
 
+        if( ERROR( ret ) )
+            return ERROR_FALSE;
+        
+        ret = super::IsMyMsgIncoming( pEvtMsg );
+
+        if( ERROR( ret ) )
+        {
+            ret = IsMyModEvent( pEvtMsg );
+            if( ERROR( ret ) )
+                return ERROR_FALSE;
+
+        }
+
+        return ret;
     }
 
     virtual gint32 IsMyModule(
@@ -1466,12 +1497,6 @@ class CRouterLocalMatch : public CRouterRemoteMatch
         gint32 ret = 0;
 
         do{
-            ret = super::IsMyMsgIncoming(
-                pEvtMsg );
-
-            if( ERROR( ret ) )
-                break;
-
             CCfgOpenerObj oCfg( this );
 
             ret = oCfg.IsEqualProp(
@@ -1479,6 +1504,16 @@ class CRouterLocalMatch : public CRouterRemoteMatch
 
             if( ERROR( ret ) )
                 break;
+
+            ret = super::IsMyMsgIncoming(
+                pEvtMsg );
+
+            if( ERROR( ret ) )
+            {
+                if( !IsMyModEvent( pEvtMsg ) )
+                    break;
+                    
+            }
 
             CCfgOpener oEvtCtx( pEvtCtx );
 
