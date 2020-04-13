@@ -510,10 +510,6 @@ gint32 CPort::StartEx( IRP* pIrp )
 
     }while( 0 );
 
-    if( ERROR( ret ) )
-    {
-        OnPortStartFailed( pIrp, ret );
-    }
     return ret;
 }
 
@@ -1082,6 +1078,7 @@ gint32 CPort::SubmitStartIrp( IRP* pIrp )
         IrpCtxPtr& pIrpCtx = pIrp->GetCurCtx();
         pIrpCtx->SetStatus( ret );
         SetPortState( PORT_STATE_STOPPED );
+        OnPortStartFailed( pIrp, ret );
     }
 
     return ret;
@@ -1968,9 +1965,7 @@ gint32 CPort::CompleteStartIrp( IRP* pIrp )
 
     if( ERROR( ret ) )
     {
-        guint32 dwPortState =
-            GetPortState();
-
+        guint32 dwPortState = GetPortState();
         if( SetPortStateWake( dwPortState,
             PORT_STATE_STOPPED ) )
         {
@@ -1987,12 +1982,14 @@ gint32 CPort::CompleteStartIrp( IRP* pIrp )
         }
         else if( dwPortState == PORT_STATE_READY )
         {
-            // Don't know what happens. For a bus
-            // port, it may be the child port
-            // fails to start. Just return the
-            // error, let the pnpmgr to stop this
-            // port
+            // Possibly failed in OnPortReady().
+            // For a bus port, it may be the child
+            // port fails to start. Just return
+            // the error, let the pnpmgr to stop
+            // this port
         }
+
+        OnPortStartFailed( pIrp, ret );
     }
     return ret;
 }
