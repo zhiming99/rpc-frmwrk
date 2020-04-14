@@ -107,11 +107,15 @@ void CIfSmokeTest::testSvrStartStop()
     CEventServer* pSvr = pIf;
     CPPUNIT_ASSERT( pSvr != nullptr );
 
+    guint32 dwCounter = 0;
     while( pSvr->IsConnected() )
     {
-        ret = pSvr->OnHelloWorld( "Hello, World!" );
+        std::string strMsg = "Hello, World! (";
+        strMsg += std::to_string( dwCounter ) + ")";
+        ret = pSvr->OnHelloWorld( strMsg );
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
         sleep( 1 );
+        dwCounter++;
     }
 
     ret = pIf->Stop();
