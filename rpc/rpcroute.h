@@ -2205,6 +2205,11 @@ class CRpcRouterBridge : public CRpcRouter
         const std::string& strUniqName,
         std::set< guint32 >& setPortIds );
 
+    gint32 FindRefCount(
+        const std::string& strNode,
+        guint32 dwPortId,
+        guint32 dwProxyPortId = 0 );
+
     // get bridgeproxy's refcount by the bridge's
     // portid
     gint32 GetRefCountByPortId(

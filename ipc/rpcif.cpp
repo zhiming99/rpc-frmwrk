@@ -1524,14 +1524,8 @@ do{ \
         propConnHandle, _pEvtCtx ); \
     if( ERROR( ret ) ) \
         break; \
-    IConfigDb* pConnParams = nullptr; \
-    ret = oCfg.GetPointer( \
-        propConnParams, pConnParams ); \
-    if( ERROR( ret ) ) \
-        break; \
-    CCfgOpener oEvtCtx( _pEvtCtx ); \
-    ret = oEvtCtx.IsEqualProp( \
-        propRouterPath, pConnParams ); \
+    ret = oCfg.IsEqualProp( \
+        propRouterPath, _pEvtCtx ); \
     if( ERROR( ret ) ) \
         break; \
 }while( 0 )
@@ -1646,35 +1640,37 @@ do{ \
         propConnHandle, _pEvtCtx ); \
     if( ERROR( ret ) ) \
         break; \
-    IConfigDb* pConnParams = nullptr; \
-    ret = oCfg.GetPointer( \
-        propConnParams, pConnParams ); \
-    if( ERROR( ret ) ) \
-        break; \
     CCfgOpener oEvtCtx( _pEvtCtx ); \
     std::string strVal1, strVal2; \
     ret = oEvtCtx.GetStrProp( \
         propRouterPath, strVal1 ); \
     if( ERROR( ret ) ) \
         break; \
-    CConnParams oConn( pConnParams ); \
-    strVal2 = oConn.GetRouterPath(); \
+    ret = oCfg.GetStrProp( \
+        propRouterPath, strVal2 ); \
+    if( ERROR( ret ) )\
+        break; \
     if( strVal1 == strVal2 || \
         strVal1 == "/" ) \
     { \
         break; \
     } \
-    else if( strVal1 > strVal2 ) \
+    else if( strVal1.size() > strVal2.size() || \
+        strVal1 > strVal2 ) \
     { \
         ret = ERROR_FALSE; \
         break; \
     } \
-    else  \
+    else if( strVal2.substr( \
+        strVal1.size() ) != strVal1 ) \
     { \
-        guint32 ch = strVal2[ strVal1.size() ]; \
-        if( ch != '/' ) \
-            ret = ERROR_FALSE; \
+        ret = ERROR_FALSE; \
         break; \
+    } \
+    else if( strVal1.size() < strVal2.size() )\
+    { \
+        if( strVal1[ strVal2.size() ] != '/' ) \
+            return ERROR_FALSE; \
     } \
 }while( 0 )
 

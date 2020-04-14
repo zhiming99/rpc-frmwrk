@@ -2257,17 +2257,10 @@ gint32 CRpcRouterBridge::OnRmtSvrOffline(
 
         if( strPath != "/" )
         {
-            
-            TaskletPtr pDummyTask;
-            ret = pDummyTask.NewObj(
-                clsid( CIfDummyTask ) );
-            if( ERROR( ret ) )
-                break;
-
             // run the tasks outside the seq task
             // queue
             ret = OnRmtSvrOfflineMH(
-                pDummyTask, pEvtCtx, hPort );
+                pCallback, pEvtCtx, hPort );
             break;
         }
 
@@ -3048,6 +3041,37 @@ gint32 CRpcRouterBridge::RemoveFromNodePidMap(
     CStdRMutex oRouterLock( GetLock() );
     m_mapNode2Pid.erase( strNode );
     return 0;
+}
+
+gint32 CRpcRouterBridge::FindRefCount(
+    const std::string& strNode,
+    guint32 dwPortId,
+    guint32 dwProxyId )
+{
+    if( dwPortId == 0 || strNode.empty() )
+        return -EINVAL;
+       
+    gint32 ret = 0;
+    do{
+        CRegObjectBridge oRegObj(
+            strNode, dwPortId, dwProxyId );
+
+        CStdRMutex oRouterLock( GetLock() );
+        std::map< CRegObjectBridge, gint32 >::iterator
+            itr = m_mapRefCount.find( oRegObj );
+
+        if( itr != m_mapRefCount.end() )
+        {
+            break;
+        }
+        else
+        {
+            ret = -ENOENT;
+        }
+
+    }while( 0 );
+
+    return ret;
 }
 
 gint32 CRpcRouterBridge::AddRefCount(
