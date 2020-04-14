@@ -1367,8 +1367,7 @@ gint32 CProxyFdoModOnOfflineTask::operator()(
             GetConnParams( pPort );
 
         ret = oTransCtx.CopyProp(
-            propRouterPath,
-            ( IConfigDb* )oConn.GetCfg() );
+            propRouterPath, pPort );
 
         if( ERROR( ret ) )
             break;

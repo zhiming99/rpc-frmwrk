@@ -158,7 +158,6 @@ gint32 CRpcTcpBridge::CheckRouterPathAgain(
         oReqCtx.GetStrProp(
             propRouterPath, strPath );
 
-        InterfPtr pIf;
         std::string strNode;
         ret = pRouter->GetNodeName(
             strPath, strNode );
@@ -179,74 +178,87 @@ gint32 CRpcTcpBridge::CheckRouterPathAgain(
             break;
         }
 
-        guint32 dwPortId = 0;
+        guint32 dwProxyId = 0;
         ret = pRouter->GetProxyIdByNodeName(
-            strNode, dwPortId );
+            strNode, dwProxyId );
         if( ERROR( ret ) )
         {
             // open port failed
             ret = ERROR_FAIL;
             break;
         }
-        else
+        guint32 dwPortId = 0;
+        ret = oReqCtx.GetIntProp(
+            propConnHandle, dwPortId );
+        if( ERROR( ret ) )
+            break;
+
+        if( strNext == "/" )
         {
-            if( strNext == "/" )
-                break;
+            ret = pRouter->FindRefCount(
+                strNode, dwPortId );
 
-            InterfPtr pIf;    
-            ret = pRouter->GetBridgeProxy(
-                dwPortId, pIf );
-            if( ERROR( ret ) )
-                break;
-
-            CRpcTcpBridgeProxy* pProxy = pIf;
-            if( unlikely( pProxy == nullptr ) )
-            {
-                ret = -EFAULT;
-                break;
-            }
-
-            oReqCtx[ propRouterPath ] = strPath;
-
-            CCfgOpener oReqCtx2;
-            oReqCtx2.SetStrProp(
-                propRouterPath, strNext );
-
-            oReqCtx2.CopyProp(
-                propObjList, pReqCtx );
-
-            oReqCtx2.CopyProp( propSid, pReqCtx );
-
-            AddCheckStamp( oReqCtx2.GetCfg() );
-
-            TaskletPtr pMajorCall;
-            ret = DEFER_CALL_NOSCHED(
-                pMajorCall, ObjPtr( pProxy ),
-                &CRpcTcpBridgeProxy::CheckRouterPath,
-                oReqCtx2.GetCfg(),
-                ( IEventSink* )nullptr );
-            if( ERROR( ret ) )
-                break;
-
-            TaskletPtr pIoCall;
-            ret = NEW_PROXY_IOTASK( 
-                1, pIoCall, pMajorCall, ObjPtr( this ),
-                &CRpcTcpBridge::OnCheckRouterPathComplete,
-                pCallback, pReqCtx );
-            if( ERROR( ret ) )
-                break;
-
-            // reschedule a task to let the seq
-            // queue move forward
-            ret = pMgr->RescheduleTask( pIoCall );
-            if( ERROR( ret ) )
-            {
-                (*pIoCall)( eventCancelTask );
-            }
             if( SUCCEEDED( ret ) )
-            {
-                ret = pIoCall->GetError();
-            }
+                break;
+
+            pRouter->AddRefCount(
+                strNode, dwPortId, dwProxyId );
+            break;
+        }
+
+        InterfPtr pIf;    
+        ret = pRouter->GetBridgeProxy(
+            dwProxyId, pIf );
+        if( ERROR( ret ) )
+            break;
+
+        CRpcTcpBridgeProxy* pProxy = pIf;
+        if( unlikely( pProxy == nullptr ) )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        oReqCtx[ propRouterPath ] = strPath;
+
+        CCfgOpener oReqCtx2;
+        oReqCtx2.SetStrProp(
+            propRouterPath, strNext );
+
+        oReqCtx2.CopyProp(
+            propObjList, pReqCtx );
+
+        oReqCtx2.CopyProp( propSid, pReqCtx );
+
+        AddCheckStamp( oReqCtx2.GetCfg() );
+
+        TaskletPtr pMajorCall;
+        ret = DEFER_CALL_NOSCHED(
+            pMajorCall, ObjPtr( pProxy ),
+            &CRpcTcpBridgeProxy::CheckRouterPath,
+            oReqCtx2.GetCfg(),
+            ( IEventSink* )nullptr );
+        if( ERROR( ret ) )
+            break;
+
+        TaskletPtr pIoCall;
+        ret = NEW_PROXY_IOTASK( 
+            1, pIoCall, pMajorCall, ObjPtr( this ),
+            &CRpcTcpBridge::OnCheckRouterPathComplete,
+            pCallback, pReqCtx );
+        if( ERROR( ret ) )
+            break;
+
+        // reschedule a task to let the seq
+        // queue move forward
+        ret = pMgr->RescheduleTask( pIoCall );
+        if( ERROR( ret ) )
+        {
+            (*pIoCall)( eventCancelTask );
+        }
+        if( SUCCEEDED( ret ) )
+        {
+            ret = pIoCall->GetError();
         }
 
     }while( 0 );
@@ -387,6 +399,10 @@ gint32 CRpcTcpBridge::CheckRouterPath(
         if( ERROR( ret ) )
             break;
 
+        guint32 dwPortId = 0;
+        oReqCtx.GetIntProp(
+            propConnHandle, dwPortId );
+
         InterfPtr pIf;
         std::string strNode;
         ret = pRouter->GetNodeName(
@@ -408,9 +424,9 @@ gint32 CRpcTcpBridge::CheckRouterPath(
             break;
         }
 
-        guint32 dwPortId = 0;
+        guint32 dwProxyId = 0;
         ret = pRouter->GetProxyIdByNodeName(
-            strNode, dwPortId );
+            strNode, dwProxyId );
 
         if( SUCCEEDED( ret ) )
         {
@@ -419,11 +435,22 @@ gint32 CRpcTcpBridge::CheckRouterPath(
             // bridge proxy is ok to make further
             // rpc calls.
             if( strNext == "/" )
+            {
+                ret = pRouter->FindRefCount(
+                    strNode, dwPortId );
+
+                if( SUCCEEDED( ret ) )
+                    break;
+
+                pRouter->AddRefCount(
+                    strNode, dwPortId, dwProxyId );
+
                 break;
+            }
 
             InterfPtr pIf;    
             ret = pRouter->GetBridgeProxy(
-                dwPortId, pIf );
+                dwProxyId, pIf );
             if( ERROR( ret ) )
                 break;
 
