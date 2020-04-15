@@ -178,6 +178,12 @@ gint32 CRpcTcpBridge::CheckRouterPathAgain(
             break;
         }
 
+        guint32 dwPortId = 0;
+        ret = oReqCtx.GetIntProp(
+            propConnHandle, dwPortId );
+        if( ERROR( ret ) )
+            break;
+
         guint32 dwProxyId = 0;
         ret = pRouter->GetProxyIdByNodeName(
             strNode, dwProxyId );
@@ -187,11 +193,6 @@ gint32 CRpcTcpBridge::CheckRouterPathAgain(
             ret = ERROR_FAIL;
             break;
         }
-        guint32 dwPortId = 0;
-        ret = oReqCtx.GetIntProp(
-            propConnHandle, dwPortId );
-        if( ERROR( ret ) )
-            break;
 
         if( strNext == "/" )
         {
@@ -201,8 +202,13 @@ gint32 CRpcTcpBridge::CheckRouterPathAgain(
             if( SUCCEEDED( ret ) )
                 break;
 
-            pRouter->AddRefCount(
+            ret = pRouter->AddRefCount(
                 strNode, dwPortId, dwProxyId );
+
+            if( ERROR( ret ) )
+                break;
+
+            ret = 0;
             break;
         }
 
@@ -442,9 +448,13 @@ gint32 CRpcTcpBridge::CheckRouterPath(
                 if( SUCCEEDED( ret ) )
                     break;
 
-                pRouter->AddRefCount(
+                ret = pRouter->AddRefCount(
                     strNode, dwPortId, dwProxyId );
 
+                if( ERROR( ret ) )
+                    break;
+
+                ret = 0;
                 break;
             }
 

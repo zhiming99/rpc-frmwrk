@@ -47,6 +47,9 @@ CDBusProxyFdo::CDBusProxyFdo( const IConfigDb* pCfg )
     : super( pCfg )
 {
     SetClassId( clsid( CDBusProxyFdo ) );
+    CCfgOpener oCfg( ( IConfigDb* )m_pCfgDb );
+    if( !m_pCfgDb->exist( propSingleIrp ) )
+        oCfg.SetBoolProp( propSingleIrp, true );
 }
 
 gint32 CDBusProxyFdo::ClearDBusSetting(

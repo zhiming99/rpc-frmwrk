@@ -817,7 +817,7 @@ gint32 CIfStopUxSockStmTask::OnTaskComplete(
 
     do{
         LONGWORD qwStream = 0;
-        ret = oParams.GetQwordProp( 1, qwStream );
+        ret = oParams.Pop( qwStream );
         if( ERROR( ret ) )
             break;
 

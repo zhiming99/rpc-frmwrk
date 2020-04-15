@@ -1309,7 +1309,6 @@ class CRouterRemoteMatch : public CMessageMatch
             ret = IsMyModEvent( pEvtMsg );
             if( ERROR( ret ) )
                 return ERROR_FALSE;
-
         }
 
         return ret;
@@ -1510,9 +1509,9 @@ class CRouterLocalMatch : public CRouterRemoteMatch
 
             if( ERROR( ret ) )
             {
-                if( !IsMyModEvent( pEvtMsg ) )
+                ret = IsMyModEvent( pEvtMsg );
+                if( ERROR( ret ) )
                     break;
-                    
             }
 
             CCfgOpener oEvtCtx( pEvtCtx );
