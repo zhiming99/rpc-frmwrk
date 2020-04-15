@@ -119,7 +119,8 @@ gint32 CRpcBasePort::DispatchSignalMsg(
             continue;
         }
 
-        while( !oMe.m_queWaitingIrps.empty() )
+        while( oMe.m_queWaitingIrps.size() > 0 &&
+            oMe.m_quePendingMsgs.size() > 0 )
         {
             // first come, first service
             IrpPtr pIrp; 
@@ -151,7 +152,6 @@ gint32 CRpcBasePort::DispatchSignalMsg(
             }
 
             IrpCtxPtr& pCtx = pIrp->GetTopStack();
-
             if( pIrp->IoDirection() == IRP_DIR_IN
                 && pIrp->MinorCmd() == IRP_MN_IOCTL
                 && pIrp->MajorCmd() == IRP_MJ_FUNC )
@@ -162,20 +162,6 @@ gint32 CRpcBasePort::DispatchSignalMsg(
                 pCtx->SetRespData( bufPtr );
                 pCtx->SetStatus( 0 );
                 vecIrpsToComplete.push_back( pIrp );
-
-                // we complete one irp at a time
-                if( m_pCfgDb->exist( propSingleIrp ) )
-                {
-                    CCfgOpener oCfg( ( IConfigDb* )m_pCfgDb );
-                    bool bSingleIrp;
-
-                    ret1 = oCfg.GetBoolProp(
-                        propSingleIrp, bSingleIrp );
-
-                    if( SUCCEEDED( ret1 ) && bSingleIrp )
-                        break;
-                }
-
                 continue;
             }
 
@@ -876,7 +862,6 @@ gint32 CRpcBasePort::HandleListening( IRP* pIrp )
                 // queue the irp
                 oMe.m_queWaitingIrps.push_back(
                     IrpPtr( pIrp ) );
-
                 ret = STATUS_PENDING;
             }
         }
@@ -1675,6 +1660,7 @@ gint32 CRpcBasePortEx::DispatchReqMsg(
         m_mapReqTable.begin();
 
     IrpPtr pIrpToComplete;
+    vector< IrpPtr > vecIrpToComplete;
     vector< IrpPtr > vecIrpsError;
     bool bQueued = false;
 
@@ -1685,6 +1671,7 @@ gint32 CRpcBasePortEx::DispatchReqMsg(
         ret = itr->first->IsMyMsgIncoming( pMsg );
         if( SUCCEEDED( ret ) )
         {
+            bDone = true;
             do{
                 // test if the match is allowed to
                 // receive requests
@@ -1700,7 +1687,7 @@ gint32 CRpcBasePortEx::DispatchReqMsg(
 
                 if( dwQueSize == 0 )
                 {
-                    bDone = true;
+                    ret = ERROR_QUEUE_FULL;
                     break;
                 }
 
@@ -1714,8 +1701,7 @@ gint32 CRpcBasePortEx::DispatchReqMsg(
                     // waiting till the server is
                     // online
                     //
-                    bDone = true;
-                    ret = -ENOENT;
+                    ret = -ENOTCONN;
                     break;
                 }
 
@@ -1729,14 +1715,18 @@ gint32 CRpcBasePortEx::DispatchReqMsg(
                         ome.m_quePendingMsgs.pop_front();
                     }
                     bQueued = true;
-                    bDone = true;
+                    break;
                 }
-                else
+
+                ome.m_quePendingMsgs.push_back( pMsg );
+                while( ome.m_quePendingMsgs.size() > 0 &&
+                    ome.m_queWaitingIrps.size() > 0 ) 
                 {
-                    // first come, first service
+                    pMsg = ome.m_quePendingMsgs.front();
+                    ome.m_quePendingMsgs.pop_front();
+
                     IrpPtr pIrp =
                         ome.m_queWaitingIrps.front();
-
                     ome.m_queWaitingIrps.pop_front();
                     oPortLock.Unlock();
 
@@ -1744,13 +1734,9 @@ gint32 CRpcBasePortEx::DispatchReqMsg(
                     oPortLock.Lock();
                     ret = pIrp->CanContinue( IRP_STATE_READY );
                     if( ERROR( ret ) )
-                    {
-                        bDone = true;
-                        break;
-                    }
+                        continue;
 
                     IrpCtxPtr& pCtx = pIrp->GetCurCtx();
-
                     if( pIrp->IoDirection() == IRP_DIR_IN
                         && pIrp->MinorCmd() == IRP_MN_IOCTL
                         && pIrp->MajorCmd() == IRP_MJ_FUNC )
@@ -1760,9 +1746,7 @@ gint32 CRpcBasePortEx::DispatchReqMsg(
                         ret = 0;
                         pCtx->SetRespData( bufPtr );
                         pCtx->SetStatus( ret );
-                        pIrpToComplete = pIrp;
-                        bDone = true;
-                        break;
+                        vecIrpToComplete.push_back( pIrp );
                     }
                     else
                     {
@@ -1770,12 +1754,10 @@ gint32 CRpcBasePortEx::DispatchReqMsg(
                         //with this irp
                         pCtx->SetStatus( -EINVAL );
                         vecIrpsError.push_back( pIrp );
-                        continue;
                     }
                 }
-                break;
 
-            }while( 1 );
+            }while( 0 );
         }
 
         if( bDone )
@@ -1785,19 +1767,22 @@ gint32 CRpcBasePortEx::DispatchReqMsg(
     }
     oPortLock.Unlock();
 
-    if( !pIrpToComplete.IsEmpty() )
+    CIoManager* pMgr = GetIoMgr();
+    if( vecIrpToComplete.size() > 0 )
     {
-        ret = GetIoMgr()->CompleteIrp(
-            pIrpToComplete );
+        for( auto& elem : vecIrpToComplete )
+        {
+            ret = pMgr->CompleteIrp( elem );
+        }
     }
-    else if( !bQueued )
+    else if( !bQueued && SUCCEEDED( ret ) )
     {
         ret = -ENOENT;
     }
 
-    for( auto&& pIrpErr : vecIrpsError )
+    for( auto& pIrpErr : vecIrpsError )
     {
-        GetIoMgr()->CancelIrp(
+        pMgr->CancelIrp(
             pIrpErr, true, -EINVAL );
     }
 
