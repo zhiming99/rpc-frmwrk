@@ -201,6 +201,10 @@ class CRpcBasePort : public CPort
     gint32 BuildSendDataReq(
         IConfigDb* pParams, DMsgPtr& pMsg );
 
+    gint32 SchedCompleteIrps(
+        std::deque< IrpPtr >& queIrps,
+        std::deque< DMsgPtr>& queMsgs );
+
     public:
 
     typedef CPort super;

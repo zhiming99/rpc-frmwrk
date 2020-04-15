@@ -722,12 +722,12 @@ gint32 CCancelIrpsTask::operator()(
     guint32 dwContext ) 
 {
     gint32 ret = 0;
-    do{
-        CParamList oParams(
-            ( IConfigDb* )m_pCtx );
 
+    CParamList oParams(
+        ( IConfigDb* )m_pCtx );
+    do{
         ObjPtr pObj;
-        ret = oParams.Pop( pObj ); 
+        ret = oParams.GetObjPtr( 1, pObj ); 
         if( ERROR( ret ) )
             break;
 
@@ -739,11 +739,17 @@ gint32 CCancelIrpsTask::operator()(
         }
 
         gint32 iError = 0;
-        ret = oParams.Pop( iError );
+        ret = oParams.GetIntProp(
+            0, ( guint32& )iError );
         if( ERROR( ret ) )
         {
             iError = ERROR_CANCEL;
         }
+
+        bool bComplete = false;
+        ret = oParams.GetBoolProp( 2, bComplete );
+        if( ERROR( ret ) )
+            bComplete = false;
 
         CIoManager* pMgr = nullptr;
         ret = oParams.GetPointer(
@@ -757,11 +763,19 @@ gint32 CCancelIrpsTask::operator()(
         for( guint32 i = 0; i < dwSize; ++i ) 
         {
             pIrp = ( *pIrpVec )()[ i ];
-            if( pIrp == nullptr )
+            if( pIrp == nullptr ||
+                pIrp->GetStackSize() == 0 )
                 continue;
 
-            pMgr->CancelIrp(
-                pIrp, true, iError );
+            if( !bComplete )
+            {
+                pMgr->CancelIrp(
+                    pIrp, true, iError );
+            }
+            else
+            {
+                pMgr->CompleteIrp( pIrp );
+            }
         }
 
         ( *pIrpVec )().clear();
@@ -783,6 +797,8 @@ gint32 CCancelIrpsTask::operator()(
         pMgr->CompleteIrp( pMasterIrp );
 
     }while( 0 );
+
+    oParams.Clear();
 
     return SetError( ret );
 }

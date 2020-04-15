@@ -69,7 +69,7 @@ gint32 CRpcBasePort::DispatchSignalMsg(
         return -EINVAL;
 
     gint32 ret = -ENOENT;
-    DMsgPtr pMsg( pMessage );
+    DMsgPtr pMsg;
 
     CStdRMutex oPortLock( GetLock() );
     guint32 dwPortState = GetPortState();
@@ -89,6 +89,7 @@ gint32 CRpcBasePort::DispatchSignalMsg(
 
     while( itr != m_mapEvtTable.end() )
     {
+        pMsg = pMessage;
         gint32 ret1 =
             itr->first->IsMyMsgIncoming( pMsg );
 
@@ -104,10 +105,10 @@ gint32 CRpcBasePort::DispatchSignalMsg(
             ++itr;
             continue;
         }
+
+        oMe.m_quePendingMsgs.push_back( pMsg );
         if( oMe.m_queWaitingIrps.empty() )
         {
-            oMe.m_quePendingMsgs.push_back( pMsg );
-
             if( oMe.m_quePendingMsgs.size()
                 > MAX_PENDING_MSG )
             {
@@ -121,17 +122,26 @@ gint32 CRpcBasePort::DispatchSignalMsg(
         while( !oMe.m_queWaitingIrps.empty() )
         {
             // first come, first service
-            IrpPtr pIrp =
-                oMe.m_queWaitingIrps.front();
-
+            IrpPtr pIrp; 
+            pIrp = oMe.m_queWaitingIrps.front();
             oMe.m_queWaitingIrps.pop_front();
 
+            pMsg = oMe.m_quePendingMsgs.front();
+            oMe.m_quePendingMsgs.pop_front();
+
             oPortLock.Unlock();
+            // BUGBUG: the oMe could turn invalid
+            // at this point under extreme
+            // condition.
             CStdRMutex oIrpLock( pIrp->GetLock() );
             oPortLock.Lock();
             ret = pIrp->CanContinue( IRP_STATE_READY );
             if( ERROR( ret ) )
-                break;
+            {
+                // discard the irp and the
+                // messages
+                continue;
+            }
 
             if( pIrp->GetStackSize() == 0 )
             {
@@ -700,9 +710,79 @@ gint32 CRpcBasePort::HandleUnregMatch( IRP* pIrp )
     return ret;
 }
 
+gint32 CRpcBasePort::SchedCompleteIrps(
+    std::deque< IrpPtr >& queIrps,
+    std::deque< DMsgPtr>& queMsgs )
+{
+    gint32 ret = 0;
+    do{
+        IrpVecPtr pIrpVec( true );
+        while( queIrps.size() && queMsgs.size() )
+        {
+            IrpPtr& pIrp = queIrps.front();
+            queIrps.pop_front();
+
+            if( pIrp.IsEmpty() ||
+                pIrp->GetStackSize() == 0 )
+                continue;
+
+            CStdRMutex oIrpLock(
+                pIrp->GetLock() );
+
+            ret = pIrp->CanContinue(
+                IRP_STATE_READY );
+
+            if( ERROR( ret ) )
+                continue;
+
+            IrpCtxPtr& pCtx =
+                pIrp->GetTopStack();
+
+            BufPtr pBuf( true );
+            *pBuf = queMsgs.front();
+            queMsgs.pop_front();
+            pCtx->SetRespData( pBuf );
+            pCtx->SetStatus( 0 );
+
+            ( *pIrpVec )().push_back( pIrp );
+        }
+
+        if( ( *pIrpVec )().empty() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+
+        CParamList oParams;
+        ret = oParams.Push( STATUS_SUCCESS );
+        if( ERROR( ret ) )
+            break;
+
+        ObjPtr pObj;
+        pObj = pIrpVec;
+        ret = oParams.Push( pObj );
+        if( ERROR( ret ) )
+            break;
+
+        oParams.Push( ( bool )true );
+
+        oParams.SetPointer(
+            propIoMgr, GetIoMgr() );
+
+        ret = GetIoMgr()->ScheduleTask(
+            clsid( CCancelIrpsTask ),
+            oParams.GetCfg() );
+
+        if( ERROR( ret ) )
+            break;
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CRpcBasePort::HandleListening( IRP* pIrp )
 {
-
     if( pIrp == nullptr
         || pIrp->GetStackSize() == 0 )
         return -EINVAL;
@@ -747,7 +827,8 @@ gint32 CRpcBasePort::HandleListening( IRP* pIrp )
                 ret = -ENOTCONN;
                 break;
             }
-            if( oMe.m_quePendingMsgs.size() )
+            if( oMe.m_quePendingMsgs.size() &&
+                oMe.m_queWaitingIrps.empty() )
             {
                 BufPtr pBuf( true );
                 *pBuf = oMe.m_quePendingMsgs.front();
@@ -755,6 +836,30 @@ gint32 CRpcBasePort::HandleListening( IRP* pIrp )
 
                 oMe.m_quePendingMsgs.pop_front();
                 // immediate return
+            }
+            else if( oMe.m_quePendingMsgs.size() &&
+                !oMe.m_queWaitingIrps.empty() )
+            {
+                oMe.m_queWaitingIrps.push_back( pIrp );
+                std::deque< IrpPtr > queIrps;
+                std::deque< DMsgPtr > queMsgs;
+                while( oMe.m_queWaitingIrps.size() &&
+                    oMe.m_quePendingMsgs.size() )
+                {
+                    queIrps.push_back(
+                        oMe.m_queWaitingIrps.front() );
+                    queMsgs.push_back(
+                        oMe.m_quePendingMsgs.front() );
+                    oMe.m_queWaitingIrps.pop_front();
+                    oMe.m_quePendingMsgs.pop_front();
+                }
+                oPortLock.Unlock();
+                ret = SchedCompleteIrps(
+                    queIrps, queMsgs );
+                // BUGBUG:Discard all the remaining
+                // messages.
+                if( SUCCEEDED( ret ) )
+                    ret = STATUS_PENDING;
             }
             else
             {
