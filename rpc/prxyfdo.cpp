@@ -861,59 +861,63 @@ gint32 CProxyFdoListenTask::Process(
             break;
         }
 
-        IrpPtr pIrp( true );
-        pIrp->AllocNextStack( pPort );
+        do{
+            IrpPtr pIrp( true );
+            pIrp->AllocNextStack( pPort );
 
-        IrpCtxPtr pCtx = pIrp->GetTopStack();
+            IrpCtxPtr pCtx = pIrp->GetTopStack();
 
-        pCtx->SetMajorCmd( IRP_MJ_FUNC );
-        pCtx->SetMinorCmd( IRP_MN_IOCTL );
-        pCtx->SetCtrlCode( CTRLCODE_LISTENING_FDO );
-        pPort->AllocIrpCtxExt( pCtx );
+            pCtx->SetMajorCmd( IRP_MJ_FUNC );
+            pCtx->SetMinorCmd( IRP_MN_IOCTL );
+            pCtx->SetCtrlCode( CTRLCODE_LISTENING_FDO );
+            pPort->AllocIrpCtxExt( pCtx );
 
-        pCtx->SetIoDirection( IRP_DIR_IN ); 
-        pIrp->SetSyncCall( false );
+            pCtx->SetIoDirection( IRP_DIR_IN ); 
+            pIrp->SetSyncCall( false );
 
-        // NOTE: no timer here
-        //
-        // set a callback
-        pIrp->SetCallback( this, 0 );
-        oParams.SetPointer( propIrpPtr,
-            ( PIRP )pIrp );
+            // NOTE: no timer here
+            //
+            // set a callback
+            pIrp->SetCallback( this, 0 );
+            oParams.SetPointer( propIrpPtr,
+                ( PIRP )pIrp );
 
-        ret = pMgr->SubmitIrpInternal(
-            pPort, pIrp, false );
+            ret = pMgr->SubmitIrpInternal(
+                pPort, pIrp, false );
 
-        if( ret != STATUS_PENDING )
-            pIrp->RemoveCallback();
+            if( ret != STATUS_PENDING )
+                pIrp->RemoveCallback();
 
-        // continue to get next event message
-        if( SUCCEEDED( ret ) )
-        {
-            DMsgPtr pMsg = *pCtx->m_pRespData;
-            if( !pMsg.IsEmpty() )
+            // continue to get next event message
+            if( SUCCEEDED( ret ) )
             {
-                bool bEvent = false;
-                if( pMsg.GetType() ==
-                    DBUS_MESSAGE_TYPE_SIGNAL )
-                    bEvent = true;
-
-                ret = pPort->DispatchData(
-                    pCtx->m_pRespData );
-                if( ERROR( ret ) && !bEvent )
+                DMsgPtr pMsg = *pCtx->m_pRespData;
+                if( !pMsg.IsEmpty() )
                 {
-                    DebugPrint( ret,
-                        "Failed to Dispatch Incoming event" );
-                    ret = 0;
+                    bool bEvent = false;
+                    if( pMsg.GetType() ==
+                        DBUS_MESSAGE_TYPE_SIGNAL )
+                        bEvent = true;
+
+                    ret = pPort->DispatchData(
+                        pCtx->m_pRespData );
+                    if( ERROR( ret ) && !bEvent )
+                    {
+                        DebugPrint( ret,
+                            "Failed to Dispatch Incoming event" );
+                        ret = 0;
+                    }
                 }
+                else
+                {
+                    ret = -EBADMSG;
+                    break;
+                }
+                continue;
             }
-            else
-            {
-                ret = -EBADMSG;
-                break;
-            }
-            continue;
-        }
+            break;
+
+        }while( 1 );
 
         switch( ret )
         {

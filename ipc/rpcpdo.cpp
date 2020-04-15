@@ -788,6 +788,7 @@ gint32 CRpcBasePort::HandleListening( IRP* pIrp )
         return -EINVAL;
 
     gint32 ret = 0;
+    IrpPtr pIrpLocked( pIrp );
 
     do{
         IrpCtxPtr& pCtx = pIrp->GetCurCtx();
@@ -840,6 +841,7 @@ gint32 CRpcBasePort::HandleListening( IRP* pIrp )
             else if( oMe.m_quePendingMsgs.size() &&
                 !oMe.m_queWaitingIrps.empty() )
             {
+                bool bFound = false;
                 oMe.m_queWaitingIrps.push_back( pIrp );
                 std::deque< IrpPtr > queIrps;
                 std::deque< DMsgPtr > queMsgs;
@@ -852,6 +854,8 @@ gint32 CRpcBasePort::HandleListening( IRP* pIrp )
                         oMe.m_quePendingMsgs.front() );
                     oMe.m_queWaitingIrps.pop_front();
                     oMe.m_quePendingMsgs.pop_front();
+                    if( queIrps.front() == pIrpLocked )
+                        bFound = true;
                 }
                 oPortLock.Unlock();
                 ret = SchedCompleteIrps(
@@ -860,6 +864,12 @@ gint32 CRpcBasePort::HandleListening( IRP* pIrp )
                 // messages.
                 if( SUCCEEDED( ret ) )
                     ret = STATUS_PENDING;
+                else if( ERROR( ret ) && !bFound )
+                {
+                    // try best to keep in shape
+                    // on error
+                    ret = STATUS_PENDING;
+                }
             }
             else
             {
