@@ -2216,8 +2216,25 @@ gint32 CRouterStopBridgeProxyTask2::OnTaskComplete(
         for( auto elem : ( *setBridges )() )
         {
             CRpcTcpBridge* pBridge = elem;
+            if( !pBridge->IsConnected() )
+                continue;
             ret = pBridge->BroadcastEvent(
                 pReqCall, pDummyTask );
+
+            CStreamServerRelayMH* pStmSvr = elem;
+            if( pStmSvr == nullptr )
+                continue;
+
+            std::vector< HANDLE > vecHandles;
+            ret = pStmSvr->GetStreamsByBridgeProxy(
+                pProxy, vecHandles );
+            if( ERROR( ret ) )
+                continue;
+            if( vecHandles.empty() )
+                continue;
+
+            for( auto elem : vecHandles )
+                pStmSvr->OnClose( elem );
         }
 
     }while( 0 );

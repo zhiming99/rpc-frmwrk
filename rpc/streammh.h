@@ -40,6 +40,13 @@ class CStreamServerRelayMH :
         HANDLE hChannel,
         IEventSink* pCallback );
 
+    gint32 SendCloseToAll( IEventSink* pCallback );
+    gint32 ResumePreStop( IEventSink* pCallback )
+    {   return super::OnPreStop( pCallback ); }
+
+    protected:
+    gint32 OnPreStop( IEventSink* pCallback );
+
     public:
     typedef CStreamRelayBase< CStreamServer > super;
 
@@ -60,6 +67,10 @@ class CStreamServerRelayMH :
 
     const EnumClsid GetIid() const
     { return iid( IStreamMH ); }
+
+    gint32 GetStreamsByBridgeProxy(
+        CRpcServices* pProxy,
+        std::vector< HANDLE >& vecHandles );
 
     gint32 FetchData_Server(
         IConfigDb* pDataDesc,           // [in]

@@ -1695,7 +1695,184 @@ gint32 CStreamServerRelayMH::OnClose(
     return OnClose2(
         INVALID_HANDLE, iStmId, pCallback );
 }
+/**
+* @name SendCloseToAll
+* @brief Send token `tokClose' to all the
+* down-stream streams of this bridge object.
+* @{ */
+/**  @} */
 
+gint32 CStreamServerRelayMH::SendCloseToAll(
+    IEventSink* pCallback )
+{
+    if( pCallback == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        using STMID =
+            std::pair< gint32, InterfPtr >;
+        std::vector< STMID  > vecProxies;
+        CStdRMutex oIfLock( this->GetLock() );
+        for( auto elem : m_mapUxStreams )
+        {
+            CRpcTcpBridgeProxyStream* pStm =
+                elem.second;
+
+            InterfPtr pProxy =
+                pStm->GetBridgeProxy();
+
+            gint32 iStreamId = 
+                pStm->GetStreamId( true );
+
+            vecProxies.push_back(
+                STMID( iStreamId, pProxy ) );
+        }
+        oIfLock.Unlock();
+
+        if( vecProxies.empty() )
+            break;
+
+        CParamList oParams;
+        oParams[ propIfPtr ] = ObjPtr( this );
+        TaskGrpPtr pTaskGrp;
+        ret = pTaskGrp.NewObj(
+            clsid( CIfTaskGroup ),
+            oParams.GetCfg() );
+        if( ERROR( ret ) )
+            return ret;
+
+        pTaskGrp->SetClientNotify( pCallback );
+        pTaskGrp->SetRelation( logicNONE );
+        for( auto elem : vecProxies )
+        {
+            BufPtr pBuf( true );
+            CRpcTcpBridgeProxy* pProxy =
+                elem.second;
+
+            if( !pProxy->IsConnected() )
+                continue;
+
+            TaskletPtr pSendClose;
+            *pBuf = ( guint8 )tokClose;
+            ret = DEFER_IFCALL_NOSCHED2(
+                3, pSendClose, pProxy,
+                &CRpcTcpBridgeShared::WriteStream,
+                elem.first, *pBuf, 1,
+                ( IEventSink* )nullptr );
+
+            if( ERROR( ret ) )
+                continue;
+
+            pTaskGrp->AppendTask( pSendClose );
+        }
+
+        if( pTaskGrp->GetTaskCount() == 0 )
+        {
+            ret = 0;
+            break;
+        }
+        TaskletPtr pTask = pTaskGrp;
+        ret = GetIoMgr()->RescheduleTask( pTask );
+        if( SUCCEEDED( ret ) )
+            ret = STATUS_PENDING;
+
+        else if( ERROR( ret ) )
+            ( *pTask )( eventCancelTask );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CStreamServerRelayMH::OnPreStop(
+    IEventSink* pCallback ) 
+{
+    if( pCallback == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    TaskletPtr plps, ppsmh;
+    do{
+        CParamList oParams;
+        oParams[ propIfPtr ] = ObjPtr( this );
+        TaskGrpPtr pTaskGrp;
+        ret = pTaskGrp.NewObj(
+            clsid( CIfTaskGroup ),
+            oParams.GetCfg() );
+        if( ERROR( ret ) )
+            return ret;
+
+        pTaskGrp->SetClientNotify( pCallback );
+        pTaskGrp->SetRelation( logicNONE );
+
+        ret = DEFER_IFCALLEX_NOSCHED2(
+            0, plps, ObjPtr( this ),
+            &CStreamServerRelayMH::SendCloseToAll,
+            ( IEventSink* )nullptr );
+        if( ERROR( ret ) )
+            break;
+
+        ret = DEFER_IFCALLEX_NOSCHED2(
+            0, ppsmh, ObjPtr( this ),
+            &CStreamServerRelayMH::ResumePreStop,
+            ( IEventSink* )nullptr );
+        if( ERROR( ret ) )
+            break;
+
+        pTaskGrp->AppendTask( plps );
+        pTaskGrp->AppendTask( ppsmh );
+
+        TaskletPtr pTask = pTaskGrp;
+        CIoManager* pMgr = GetIoMgr();
+        ret = pMgr->RescheduleTask( pTask );
+        if( SUCCEEDED( ret ) )
+            ret = pTask->GetError();
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+    {
+        if( !plps.IsEmpty() )
+            ( *plps )( eventCancelTask );
+
+        if( !ppsmh.IsEmpty() )
+            ( *ppsmh )( eventCancelTask );
+    }
+
+    return ret;
+}
+
+gint32 CStreamServerRelayMH::GetStreamsByBridgeProxy(
+    CRpcServices* pProxy,
+    std::vector< HANDLE >& vecHandles )
+{
+    if( pProxy == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        CStdRMutex oIfLock( this->GetLock() );
+        for( auto elem : m_mapUxStreams )
+        {
+            CRpcTcpBridgeProxyStream*
+                pStm = elem.second;
+
+            InterfPtr pIf =
+                pStm->GetBridgeProxy();
+
+            if( pProxy == pIf )
+            {
+                vecHandles.push_back(
+                    ( HANDLE )pProxy );
+            }
+        }
+        oIfLock.Unlock();
+
+    }while( 0 );
+
+    return ret;
+}
 gint32 CIfStartUxSockStmRelayTaskMH::OnTaskComplete(
     gint32 iRet )
 {

@@ -1372,8 +1372,9 @@ gint32 CRpcTcpBridge::OnEnableRemoteEventCompleteMH(
         if( ERROR( ret ) )
             break;
 
-        if( ERROR( iRet ) )
-            ret = iRet;
+        // iRet may have other code than
+        // STATUS_SUCCESS
+        ret = iRet;
 
     }while( 0 );
 
