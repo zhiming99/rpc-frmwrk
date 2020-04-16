@@ -1662,15 +1662,15 @@ do{ \
         break; \
     } \
     else if( strVal2.substr( \
-        strVal1.size() ) != strVal1 ) \
+        0, strVal1.size() ) != strVal1 ) \
     { \
         ret = ERROR_FALSE; \
         break; \
     } \
     else if( strVal1.size() < strVal2.size() )\
     { \
-        if( strVal1[ strVal2.size() ] != '/' ) \
-            return ERROR_FALSE; \
+        if( strVal2[ strVal1.size() ] != '/' ) \
+            ret = ERROR_FALSE; \
     } \
 }while( 0 )
 
