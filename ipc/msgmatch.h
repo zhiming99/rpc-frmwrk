@@ -924,10 +924,13 @@ class CProxyMsgMatch : public CMessageMatch
                 strExpPath.substr( 0, dwLen );
 
             if( pMsg.GetMember() != 
-                "SYS_EVENT_RMTSVREVENT" )
+                SYS_EVENT_RMTSVREVENT )
                 return ret;
 
-            if( strVal == strEvtPath )
+            if( strVal != strEvtPath )
+                return ret;
+
+            if( strExpPath[ dwLen ] == '/' )
                 return STATUS_SUCCESS;
         }
         return ERROR_FALSE;
