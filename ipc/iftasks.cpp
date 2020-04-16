@@ -937,6 +937,8 @@ gint32 CIfEnableEventTask::OnIrpComplete(
         {
             ret = pIf->SetStateOnEvent(
                 eventModOffline );
+            if( SUCCEEDED( ret ) )
+                ret = ENOTCONN;
         }
         else if( Retriable( ret ) )
         {
@@ -1029,6 +1031,8 @@ gint32 CIfEnableEventTask::RunTask()
             // the communication channel is kept.
             ret = pIf->SetStateOnEvent(
                 eventModOffline );
+            if( SUCCEEDED( ret ) )
+                ret = ENOTCONN;
         }
 
     }while( 0 );

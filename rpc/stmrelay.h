@@ -1237,6 +1237,7 @@ struct CUnixSockStmRelayBase :
         gint32 ret = 0;
 
         do{
+            CIoManager* pMgr = this->GetIoMgr();
             ret = StartTicking( pContext );
             if( ERROR( ret ) )
                 break;
@@ -1244,8 +1245,7 @@ struct CUnixSockStmRelayBase :
             // start the data reading
             CParamList oParams;
             oParams.SetPointer( propIfPtr, this );
-            oParams.SetPointer(
-                propIoMgr, this->GetIoMgr() );
+            oParams.SetPointer( propIoMgr, pMgr );
 
             oParams.CopyProp( propTimeoutSec, this );
             oParams.CopyProp(
@@ -1259,8 +1259,8 @@ struct CUnixSockStmRelayBase :
             if( ERROR( ret ) )
                 break;
 
-            ret = this->GetIoMgr()->
-                RescheduleTask( this->m_pWritingTask );
+            ret = pMgr->RescheduleTask(
+                this->m_pWritingTask );
 
             if( ERROR( ret ) )
                 break;
@@ -1273,8 +1273,8 @@ struct CUnixSockStmRelayBase :
             if( ERROR( ret ) )
                 break;
 
-            ret = this->GetIoMgr()->
-                RescheduleTask( m_pWrTcpStmTask );
+            ret = pMgr->RescheduleTask(
+                m_pWrTcpStmTask );
 
             if( ERROR( ret ) )
                 break;
@@ -1287,8 +1287,8 @@ struct CUnixSockStmRelayBase :
             if( ERROR( ret ) )
                 break;
 
-            ret = this->GetIoMgr()->
-                RescheduleTask( m_pRdTcpStmTask );
+            ret = pMgr->RescheduleTask(
+                m_pRdTcpStmTask );
 
         }while( 0 );
 
