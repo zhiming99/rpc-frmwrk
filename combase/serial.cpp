@@ -455,3 +455,86 @@ gint32 CStlLongWordVector::Deserialize(
 
     return ret;
 }
+
+gint32 CStlQwordVector::Serialize(
+    CBuffer& oBuf ) const
+{
+    SERI_HEADER oHeader;
+
+    guint32 dwSize = 
+        sizeof( ElemType ) * m_vecElems.size();
+
+    oHeader.dwClsid = clsid( CStlQwordVector );
+    oHeader.dwSize = dwSize ;
+
+    oBuf.Resize(
+        sizeof( oHeader ) + dwSize );
+
+    oHeader.dwCount = m_vecElems.size();
+
+    oHeader.hton();
+    memcpy( oBuf.ptr(), &oHeader, sizeof( oHeader ) );
+
+    guint64 *pElem = ( guint64* )
+        ( oBuf.ptr() + sizeof( oHeader ) );
+
+    for( auto i : m_vecElems )
+    {
+        *pElem++ = htonll( i );
+    }
+
+    return 0;
+}
+
+gint32 CStlQwordVector::Deserialize(
+    const CBuffer& oBuf )
+{
+    const SERI_HEADER* pHeader =
+        ( SERI_HEADER* )oBuf.ptr();
+
+    if( pHeader == nullptr )
+        return -EINVAL;
+
+    SERI_HEADER oHeader( *pHeader );
+    oHeader.ntoh();
+
+    m_vecElems.clear();
+    gint32 ret = 0;
+
+    do{
+        if( oHeader.dwClsid != clsid( CStlQwordVector ) )
+        {
+            ret = -ENOTSUP;
+            break;
+        }
+
+        if( oHeader.bVersion != 1 )
+        {
+            ret = -ENOTSUP;
+        }
+
+        if( oHeader.dwSize > BUF_MAX_SIZE ) 
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        if( oHeader.dwSize / sizeof( ElemType ) !=
+            oHeader.dwCount )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        guint64* pElems =
+            ( guint64* )( pHeader + 1 );
+        for( guint32 i = 0; i < oHeader.dwCount; ++i )
+        {
+            m_vecElems.push_back(
+                ntohll( pElems[ i ] ) );
+        }
+
+    }while( 0 );
+
+    return ret;
+}

@@ -5893,11 +5893,14 @@ gint32 CInterfaceServer::DoInvoke(
             ret = 0;
             ObjPtr pObj;
 
-            bResp = false;
             ret = pMsg.GetObjArgAt( 0, pObj );
             if( ERROR( ret ) )
+            {
+                ret = -EBADMSG;
                 break;
+            }
 
+            bResp = false;
             IConfigDb* pCfg = pObj;
             if( pCfg == nullptr )
             {
