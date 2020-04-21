@@ -2218,7 +2218,7 @@ gint32 CRouterStopBridgeProxyTask2::OnTaskComplete(
             CRpcTcpBridge* pBridge = elem;
             if( !pBridge->IsConnected() )
                 continue;
-            ret = pBridge->BroadcastEvent(
+            pBridge->BroadcastEvent(
                 pReqCall, pDummyTask );
 
             CStreamServerRelayMH* pStmSvr = elem;

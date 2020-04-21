@@ -298,7 +298,7 @@ gint32 CRpcTcpBridge::IsCyclicPath(
     if( ERROR( ret ) )
         return false;
 
-    LwVecPtr pBridgeIds = pObj;
+    QwVecPtr pBridgeIds = pObj;
     if( pBridgeIds.IsEmpty() )
         return false;
 
@@ -320,7 +320,7 @@ gint32 CRpcTcpBridge::AddCheckStamp(
 
     do{
         ObjPtr pObj;
-        LwVecPtr pBridgeIds;
+        QwVecPtr pBridgeIds;
 
         CCfgOpener oReqCtx( pReqCtx );
         ret = oReqCtx.GetObjPtr(
@@ -478,7 +478,6 @@ gint32 CRpcTcpBridge::CheckRouterPath(
             oReqCtx2[ propRouterPath ] = strNext;
             oReqCtx2.CopyProp( propSid, pReqCtx );
 
-            LwVecPtr pvecLw;
             ObjPtr pObj;
             // for cyclic path avoidance
             oReqCtx2.CopyProp(

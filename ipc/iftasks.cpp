@@ -182,7 +182,7 @@ gint32 CIfStartRecvMsgTask::StartNewRecv(
         }
         // succeeded, issue the next recv req
 
-   }while( 1 );
+   }while( 0 );
 
    return ret;
 }

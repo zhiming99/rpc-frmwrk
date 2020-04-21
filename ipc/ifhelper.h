@@ -1202,6 +1202,9 @@ class CDeferredCallBase :
 
     virtual gint32 operator()( guint32 dwContext )
     {
+#ifdef DEBUG
+        this->SetError( -1 );
+#endif
         if( m_pObj.IsEmpty() )
             return this->SetError( -EINVAL );
 

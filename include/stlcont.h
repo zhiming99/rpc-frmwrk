@@ -184,6 +184,30 @@ class CStlIntVector : public CStlVector< guint32 >
 };
 
 typedef CAutoPtr< clsid( CStlIntVector ), CStlIntVector > IntVecPtr;
+class CStlQwordVector : public CStlVector< guint64 >
+{
+    public:
+
+    typedef CStlVector< guint64 > super;
+    CStlQwordVector() :super()
+    {
+        SetClassId( clsid( CStlQwordVector ) );
+    }
+
+    gint32 Serialize(
+        CBuffer& oBuf ) const;
+
+    gint32 Deserialize(
+        const CBuffer& obuf );
+};
+
+typedef CAutoPtr< clsid( CStlQwordVector ), CStlQwordVector > QwVecPtr;
+
+/** @name CStlLongWordVector, the class used to
+ * pass the pointers within the threads. The size
+ * of LONGWORD could change between different
+ * arch. So don't use it across the boxes.  @{ */
+/**  @} */
 
 class CStlLongWordVector : public CStlVector< LONGWORD >
 {
