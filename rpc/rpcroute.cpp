@@ -3537,6 +3537,22 @@ gint32 CRpcRouterReqFwdr::OnRmtSvrOffline(
         }
 
         CCfgOpener oEvtCtx( pEvtCtx );
+
+        std::string strPath;
+        ret = oEvtCtx.GetStrProp(
+            propRouterPath, strPath );
+        if( ERROR( ret ) )
+            break;
+
+        // not the immediate down-stream node
+        if( strPath != "/" )
+        {
+            ret = OnRmtSvrOfflineMH(
+                pCallback, pEvtCtx, hPort );
+            if( ret != STATUS_MORE_PROCESS_NEEDED )
+                break;
+        }
+
         guint32 dwPortId = 0;
         ret = oEvtCtx.GetIntProp(
             propConnHandle, dwPortId );
