@@ -1633,6 +1633,40 @@ gint32 CRpcInterfaceBase::OnDBusEvent(
     return ret;
 }
 
+gint32 IsMidwayPath(
+    const std::string& strTest,
+    const std::string& strDest )
+{
+    gint32 ret = STATUS_SUCCESS;
+    do{
+        if( strTest == strDest || strTest == "/" )
+            break;
+
+        if( strTest.size() > strDest.size() ||
+            strTest > strDest )
+        {
+            // NOTE: trailing '/', such as '/xxx/'
+            // is not allowed
+            ret = ERROR_FALSE;
+            break;
+        }
+        if( strDest.substr(
+            0, strTest.size() ) != strTest )
+        {
+            ret = ERROR_FALSE;
+            break;
+        }
+        if( strTest.size() < strDest.size() )
+        {
+            if( strDest[ strTest.size() ] != '/' )
+                ret = ERROR_FALSE;
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
 #define FILTER_RMT_EVT2( _pEvtCtx ) \
 do{ \
     CCfgOpenerObj oCfg( this ); \
@@ -1650,28 +1684,7 @@ do{ \
         propRouterPath, strVal2 ); \
     if( ERROR( ret ) )\
         break; \
-    if( strVal1 == strVal2 || \
-        strVal1 == "/" ) \
-    { \
-        break; \
-    } \
-    else if( strVal1.size() > strVal2.size() || \
-        strVal1 > strVal2 ) \
-    { \
-        ret = ERROR_FALSE; \
-        break; \
-    } \
-    else if( strVal2.substr( \
-        0, strVal1.size() ) != strVal1 ) \
-    { \
-        ret = ERROR_FALSE; \
-        break; \
-    } \
-    else if( strVal1.size() < strVal2.size() )\
-    { \
-        if( strVal2[ strVal1.size() ] != '/' ) \
-            ret = ERROR_FALSE; \
-    } \
+    ret = IsMidwayPath( strVal1, strVal2 ); \
 }while( 0 )
 
 /**
@@ -5864,7 +5877,7 @@ gint32 CInterfaceServer::DoInvoke(
     gint32 ret = 0;
 
     do{
-        bool bResp = true;
+        bool bResp = false;
         DMsgPtr pMsg( pReqMsg );
         CParamList oResp;
 
@@ -5900,7 +5913,6 @@ gint32 CInterfaceServer::DoInvoke(
                 break;
             }
 
-            bResp = false;
             IConfigDb* pCfg = pObj;
             if( pCfg == nullptr )
             {

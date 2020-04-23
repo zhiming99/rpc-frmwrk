@@ -1852,3 +1852,8 @@ gint32 CInterfaceProxy::FillArgs( CfgPtr& pResp,
 
     return ret;
 }
+
+gint32 IsMidwayPath(
+    const std::string& strTest,
+    const std::string& strDest );
+

@@ -1484,15 +1484,9 @@ gint32 CRpcTcpBridgeProxy::OnRmtSvrEvent(
     gint32 ret = 0;
     do{
         CCfgOpener oEvtCtx;
-        std::string strPath;
 
         ret = oEvtCtx.CopyProp(
             propRouterPath, pEvtCtx );
-
-        ret = oEvtCtx.GetStrProp(
-            propRouterPath, strPath );
-        if( ERROR( ret ) )
-            break;
 
         std::string strNode;
         ret = oEvtCtx.CopyProp(

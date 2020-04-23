@@ -2697,6 +2697,17 @@ gint32 CRpcReqForwarder::OnRmtSvrOffline(
         std::string strPath;
         CCfgOpener oEvtCtx( pEvtCtx );
 
+        ret = oEvtCtx.GetStrProp(
+            propRouterPath, strPath );
+        if( ERROR( ret ) )
+            break;
+
+        if( strPath != "/" )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
         guint32 dwPortId;
         ret = oEvtCtx.GetIntProp(
             propConnHandle, dwPortId );

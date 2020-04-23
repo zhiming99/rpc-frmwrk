@@ -1661,6 +1661,13 @@ class CRpcRouterReqFwdr : public CRpcRouter
         IConfigDb* pEvtCtx,
         HANDLE hPort );
 
+    gint32 OnRmtSvrOfflineMH(
+        IEventSink* pCallback,
+        IConfigDb* pEvtCtx,
+        HANDLE hPort );
+
+    bool IsProxyInUse( guint32 dwPortId );
+
     public:
     typedef CRpcRouter super;
     CRpcRouterReqFwdr( const IConfigDb* pCfg );
@@ -1723,6 +1730,11 @@ class CRpcRouterReqFwdr : public CRpcRouter
 
     gint32 RemoveLocalMatchByUniqName(
         const std::string& strUniqName,
+        std::vector< MatchPtr >& vecMatches );
+
+    gint32 RemoveLocalMatchByPath(
+        const std::string& strPath,
+        guint32 dwProxyPortId,
         std::vector< MatchPtr >& vecMatches );
 
     // local match operation

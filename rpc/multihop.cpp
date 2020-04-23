@@ -979,21 +979,13 @@ gint32 CRpcRouterBridge::RemoveRemoteMatchByPath(
                 continue;
             }
 
-            if( strPath.size() < strUpstm.size() )
+            ret = IsMidwayPath(
+                strUpstm, strPath );
+
+            if( SUCCEEDED( ret ) )
             {
-                ++itr;
-                continue;
-            }
-            if( strPath.substr( 0, strUpstm.size() )
-                != strUpstm )
-            {
-                ++itr;
-                continue;
-            }
-            if( strPath.size() == strUpstm.size() ||
-                strPath[ strUpstm.size() ] == '/' )
-            {
-                vecMatches.push_back( itr->first );
+                vecMatches.push_back(
+                    itr->first );
                 itr = plm->erase( itr );
             }
             else
@@ -1551,6 +1543,222 @@ gint32 CRpcTcpBridgeImpl::OnPreStop(
         if( !ppsmh.IsEmpty() )
             ( *ppsmh )( eventCancelTask );
     }
+
+    return ret;
+}
+
+gint32 CRpcRouterReqFwdr::RemoveLocalMatchByPath(
+    const std::string& strPath,
+    guint32 dwProxyPortId,
+    std::vector< MatchPtr >& vecMatches )
+{
+    gint32 ret = 0;
+    if( strPath.empty() || dwProxyPortId == 0 )
+        return -EINVAL;
+
+    do{
+        std::map< MatchPtr, gint32 >* plm =
+            &m_mapLocMatches;
+
+        CStdRMutex oRouterLock( GetLock() );
+        std::map< MatchPtr, gint32 >::iterator
+            itr = plm->begin();
+
+        while( itr != plm->end() )
+        {
+            CCfgOpenerObj oMatch(
+                ( CObjBase* )itr->first );
+
+            guint32 dwVal = 0;
+            ret = oMatch.GetIntProp(
+                propPrxyPortId, dwVal );
+            if( ERROR( ret ) )
+            {
+                ++itr;
+                continue;
+            }
+            if( dwVal != dwProxyPortId )
+            {
+                ++itr;
+                continue;
+            }
+            std::string strVal;
+            ret = oMatch.GetStrProp(
+                propRouterPath, strVal );
+
+            if( ERROR( ret ) )
+            {
+                ++itr;
+                continue;
+            }
+
+            ret = IsMidwayPath( strPath, strVal );
+            if( SUCCEEDED( ret ) )
+            {
+                vecMatches.push_back( itr->first );
+                itr = plm->erase( itr );
+            }
+            else
+            {
+                ++itr;
+            }
+        }
+
+    }while( 0 );
+
+    return vecMatches.size();
+}
+
+bool CRpcRouterReqFwdr::IsProxyInUse(
+    guint32 dwPortId )
+{
+    bool bFound = false;
+    do{
+        CStdRMutex oRouterLock( GetLock() );
+        for( auto elem : m_mapLocMatches )
+        {
+            CCfgOpenerObj oMatch(
+                ( CObjBase* )elem.first );
+
+            guint32 dwVal = 0;
+            gint32 ret = oMatch.GetIntProp(
+                propPrxyPortId, dwVal );
+            if( ERROR( ret ) )
+                continue;
+
+            if( dwPortId != dwVal )
+                continue;
+
+            bFound = true;
+            break;
+        }
+
+    }while( 0 );
+
+    return bFound;
+}
+/**
+* @name OnRmtSvrOfflineMH
+* @brief Pass on the eventRmtSvrOffline to the
+* local client if the router path is equal or
+* substring to the one in the match.
+* The method returns STATUS_MORE_PROCESS_NEEDED if
+* the related bridge proxy needs to be stopped due
+* to no usage at the moment. Otherwise, it will
+* sends out the eventRmtSvrOffline messages to the
+* affected local clients, without shutting down
+* the bridge proxy.
+* @{ */
+/**  @} */
+
+gint32 CRpcRouterReqFwdr::OnRmtSvrOfflineMH(
+    IEventSink* pCallback,
+    IConfigDb* pEvtCtx,
+    HANDLE hPort )
+{
+    gint32 ret = 0;
+    if( pEvtCtx == nullptr )
+        return -EINVAL;
+
+    do{
+        std::string strPath;
+        CCfgOpener oEvtCtx( pEvtCtx );
+
+        guint32 dwPortId = 0;
+        ret = oEvtCtx.GetIntProp(
+            propConnHandle, dwPortId );
+        if( ERROR( ret ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        ret = oEvtCtx.GetStrProp(
+            propRouterPath, strPath );
+        if( ERROR( ret ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        std::vector< MatchPtr > vecMatches;
+        ret = RemoveLocalMatchByPath(
+            strPath, dwPortId, vecMatches );
+
+        // no client referring this addr
+        if( ERROR( ret ) )
+            break;
+
+        if( ret == 0 )
+        {
+            ret = STATUS_SUCCESS;
+            break;
+        }
+
+        // test if the proxies are ok to stop
+        if( !IsProxyInUse( dwPortId ) )
+        {
+            ret = STATUS_MORE_PROCESS_NEEDED;
+            break;
+        }
+
+        // collect the local clients affected
+        std::set< std::string > setUniqNames;
+        for( auto& elem : vecMatches )
+        {
+            std::string strVal;
+            CCfgOpenerObj oMatch(
+                ( CObjBase* )elem );
+
+            ret = oMatch.GetStrProp(
+                propSrcUniqName, strVal );
+            if( ERROR( ret ) )
+                continue;
+
+            setUniqNames.insert( strVal );
+        }
+
+        TaskletPtr pDummyTask;
+        ret = pDummyTask.NewObj(
+            clsid( CIfDummyTask ) );
+
+        if( ERROR( ret ) )
+            break;
+
+        InterfPtr pIf;
+        GetReqFwdr( pIf );
+        CRpcReqForwarder* pReqFwdr = pIf;
+        if( pReqFwdr == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        // send out the eventRmtSvrOffline
+        for( auto& strDest : setUniqNames )
+        {
+            CReqBuilder oParams( this );
+            oParams.Push( pEvtCtx );
+            oParams.Push( false );
+
+            // correct the ifname 
+            oParams.SetIfName( DBUS_IF_NAME(
+                IFNAME_REQFORWARDER ) );
+
+            oParams.SetMethodName(
+                SYS_EVENT_RMTSVREVENT );
+
+            oParams.SetDestination( strDest );
+
+            oParams.SetCallFlags( 
+               DBUS_MESSAGE_TYPE_SIGNAL
+               | CF_ASYNC_CALL );
+
+            pReqFwdr->BroadcastEvent(
+                oParams.GetCfg(), pDummyTask );
+        }
+
+    }while( 0 );
 
     return ret;
 }
