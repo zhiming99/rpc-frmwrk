@@ -1103,6 +1103,7 @@ gint32 CRpcRouterBridge::OnRmtSvrOfflineMH(
 
         if( pGrp->GetTaskCount() > 0 )
         {
+            pGrp->MarkPending();
             TaskletPtr pGrpTask( pGrp );
             ret = DEFER_CALL( pMgr, this,
                 &CRpcServices::RunManagedTask,
@@ -1313,6 +1314,7 @@ gint32 CRpcRouterBridge::ClearRemoteEventsMH(
         if( pTaskGrp->GetTaskCount() == 0 )
             break;
 
+        pTaskGrp->MarkPending();
         TaskletPtr pTask = ObjPtr( pTaskGrp );
         ret = DEFER_CALL( GetIoMgr(), this,
             &CRpcServices::RunManagedTask,

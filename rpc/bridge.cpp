@@ -842,6 +842,7 @@ gint32 CRpcTcpBridgeProxy::ForwardEvent(
             break;
 
         TaskletPtr pTask = ObjPtr( pTaskGrp );
+        pTask->MarkPending();
         ret = DEFER_CALL( GetIoMgr(), this,
             &CRpcServices::RunManagedTask,
             pTask, false );
@@ -1945,6 +1946,7 @@ gint32 CRpcTcpBridge::ClearRemoteEvents(
         }
 
         TaskletPtr pParaTask( pParaGrp );
+        pParaGrp->MarkPending();
         ret = DEFER_CALL( GetIoMgr(), this,
             &CRpcServices::RunManagedTask,
             pParaTask, false );

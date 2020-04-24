@@ -2702,12 +2702,6 @@ gint32 CRpcReqForwarder::OnRmtSvrOffline(
         if( ERROR( ret ) )
             break;
 
-        if( strPath != "/" )
-        {
-            ret = -EINVAL;
-            break;
-        }
-
         guint32 dwPortId;
         ret = oEvtCtx.GetIntProp(
             propConnHandle, dwPortId );

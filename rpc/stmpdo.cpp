@@ -705,12 +705,12 @@ gint32 CRpcTcpBusDriver::GetTcpSettings(
                         ret = -ENOENT;
                         break;
                     }
-                    oElemCfg.SetIntProp( propDestTcpPort, dwPort );
+                    oElemCfg.SetIntProp( propSrcTcpPort, dwPort );
                 }
                 else
                 {
                     dwPort = RPC_SVR_DEFAULT_PORTNUM;
-                    oElemCfg.SetIntProp( propDestTcpPort, dwPort );
+                    oElemCfg.SetIntProp( propSrcTcpPort, dwPort );
                 }
 
                 // address to listen on
