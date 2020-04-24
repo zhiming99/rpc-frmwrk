@@ -1103,6 +1103,13 @@ gint32 CRpcRouterBridge::OnRmtSvrOfflineMH(
 
         if( pGrp->GetTaskCount() > 0 )
         {
+            // NOTE: it would be fatal if pending
+            // bit is not set for pGrp when the
+            // BroadcastEvent could complete
+            // immediately and pGrp would ignore
+            // the pCallback, and the Router
+            // bridge's seq task queue would be
+            // jammed for ever.
             pGrp->MarkPending();
             TaskletPtr pGrpTask( pGrp );
             ret = DEFER_CALL( pMgr, this,
@@ -1110,9 +1117,14 @@ gint32 CRpcRouterBridge::OnRmtSvrOfflineMH(
                 pGrpTask, false );
 
             if( ERROR( ret ) )
+            {
+                pGrp->MarkPending( false );
                 ( *pGrp )( eventCancelTask );
+            }
             else
+            {
                 ret = pGrp->GetError();
+            }
         }
 
     }while( 0 );
@@ -1321,9 +1333,14 @@ gint32 CRpcRouterBridge::ClearRemoteEventsMH(
             pTask, false );
 
         if( ERROR( ret ) )
+        {
+            pTaskGrp->MarkPending( false );
             ( *pTask )( eventCancelTask );
+        }
         else
+        {
             ret = pTask->GetError();
+        }
 
     }while( 0 );
 

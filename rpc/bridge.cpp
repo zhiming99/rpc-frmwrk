@@ -847,8 +847,15 @@ gint32 CRpcTcpBridgeProxy::ForwardEvent(
             &CRpcServices::RunManagedTask,
             pTask, false );
 
-        if( SUCCEEDED( ret ) )
+        if( ERROR( ret ) )
+        {
+            pTaskGrp->MarkPending( false );
+            ( *pTaskGrp )( eventCancelTask );
+        }
+        else if( SUCCEEDED( ret ) )
+        {
             ret = pTask->GetError();
+        }
 
     }while( 0 );
 
@@ -1951,8 +1958,16 @@ gint32 CRpcTcpBridge::ClearRemoteEvents(
             &CRpcServices::RunManagedTask,
             pParaTask, false );
 
-        if( SUCCEEDED( ret ) )
+
+        if( ERROR( ret ) )
+        {
+            pParaGrp->MarkPending( false );
+            ( *pParaGrp )( eventCancelTask );
+        }
+        else if( SUCCEEDED( ret ) )
+        {
             ret = pParaTask->GetError();
+        }
 
     }while( 0 );
 
