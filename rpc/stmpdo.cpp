@@ -729,7 +729,7 @@ gint32 CRpcTcpBusDriver::GetTcpSettings(
                             AF_INET6, strAddr, strNormVal );
                     }
 
-                    oElemCfg.SetStrProp( propDestIpAddr, strNormVal );
+                    oElemCfg.SetStrProp( propSrcIpAddr, strNormVal );
                 }
 
                 // address format, for detail, refer to propAddrFormat
