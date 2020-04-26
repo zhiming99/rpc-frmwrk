@@ -30,7 +30,7 @@ This framework depends on the following packags:
 14. `Object access via Multi-hop routing`
 
 #### Building `rpc-frmwrk`:   
-Please refer to this article [`how to build rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60) for details.
+Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60) for details.
 
 ---
 [`Sun 26 Apr 2020 06:19:24 PM Beijing`]   
