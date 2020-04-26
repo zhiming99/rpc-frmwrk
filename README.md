@@ -25,8 +25,8 @@ This framework depends on the following packags:
 9. `File/Big data transfer.`
 10. `Peer online/offline awareness.`
 11. `Streaming support to provide double-direction stream transfer`
-12. `Secure Socket Layer (SSL) support`
-13. `Websocket support`
+12. [`Secure Socket Layer (SSL) support`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/sslport/Readme.md)
+13. [`Websocket support`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/wsport/Readme.md)
 14. `Object access via Multi-hop routing`
 
 #### Building `rpc-frmwrk`:   
