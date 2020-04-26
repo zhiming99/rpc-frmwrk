@@ -32,7 +32,7 @@ This framework depends on the following packags:
 ---
 [`Sun 26 Apr 2020 06:19:24 PM Beijing`]   
 1. Added an article [`how to build rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60) to the wiki.
-2. The next to do could be either <span style="background-color:#00FF00">`Python support`</span> or <span style="background-color:#00FF00">`Authentication and access control`</span>. Not decided yet. 
+2. The next to do could be either `Python support` or `Authentication and access control`. Not decided yet. 
 
 [`Fri 24 Apr 2020 08:15:48 PM Beijing`]   
 1. Fixed some major bugs. There are still two or three known bugs, but multihop support is near complete.   
