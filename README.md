@@ -30,6 +30,9 @@ This framework depends on the following packags:
 14. `Object access via Multi-hop routing` (coming soon)
 
 ---
+[`Sun 26 Apr 2020 06:19:24 PM Beijing`]   
+1. Added an article [`how to build rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60) to the wiki.
+
 [`Fri 24 Apr 2020 08:15:48 PM Beijing`]   
 1. Fixed some major bugs. There are still two or three known bugs, but multihop support is near complete.   
 
