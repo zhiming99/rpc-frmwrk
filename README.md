@@ -27,7 +27,7 @@ This framework depends on the following packags:
 11. `Streaming support to provide double-direction stream transfer`
 12. `Secure Socket Layer (SSL) support`
 13. `Websocket support`
-14. `Object access via Multi-hop routing` (coming soon)
+14. `Object access via Multi-hop routing`
 
 ---
 [`Sun 26 Apr 2020 06:19:24 PM Beijing`]   
