@@ -34,7 +34,7 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 
 ---
 [`Tue 28 Apr 2020 02:12:02 PM Beijing`]   
-1. The next task is to implement `Authentication and access control` for rpc-frmwrk.
+1. The next task is to implement `Authentication and access control` for `rpc-frmwrk`.
 
 [`Sun 26 Apr 2020 06:19:24 PM Beijing`]   
 1. Multihop is almost completed, but testing will continue to cover more test cases.
