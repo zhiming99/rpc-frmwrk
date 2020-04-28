@@ -27,14 +27,14 @@ This framework depends on the following packags:
 11. `Streaming support to provide double-direction stream transfer`
 12. [`Secure Socket Layer (SSL) support`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/sslport/Readme.md)
 13. [`Websocket support`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/wsport/Readme.md)
-14. `Object access via Multi-hop routing`
+14. `Object access via Multihop routing`
 
 #### Building `rpc-frmwrk`:   
 Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60) for details.
 
 ---
 [`Sun 26 Apr 2020 06:19:24 PM Beijing`]   
-1. Multi-hop is almost completed, but testing will continue to cover more test cases.
+1. Multihop is almost completed, but testing will continue to cover more test cases.
 2. The next to do could be either `Python support` or `Authentication and access control`. Not decided yet. 
 
 [`Fri 24 Apr 2020 08:15:48 PM Beijing`]   
@@ -47,16 +47,16 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 1. Streaming for multihop almost works. the performance is not ideal yet. More testing and tuning needed.   
 
 [`Tue 31 Mar 2020 10:11:09 PM Beijing`]   
-1. still debugging the multi-hop related stuffs. Request forwarding and event forwarding work now. Next task is to get streaming to work.   
+1. still debugging the multihop related stuffs. Request forwarding and event forwarding work now. Next task is to get streaming to work.   
 
 [`Sat 21 Mar 2020 01:47:35 PM Beijing`]   
 1. Updated some `autoconf` releated stuffs to make the cross-compile more efficient.
 
 [`Fri 20 Mar 2020 11:00:16 PM Beijing`]   
-1. Submitted a compilable version with multi-hop support. It will take one or two weeks to get it work.   
+1. Submitted a compilable version with multihop support. It will take one or two weeks to get it work.   
 
 [`Sat 14 Mar 2020 09:18:01 PM Beijing`]   
-1. Code complete the streaming support for multi-hop, about 70% done.    
+1. Code complete the streaming support for multihop, about 70% done.    
 
 [`Mon 02 Mar 2020 05:36:15 PM Beijing`]
 1. Splitted the `CRpcRouter` to smaller classes.   
@@ -84,7 +84,7 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 1. Created a new branch `multihop` for the newly added changes. It will take some time to get stable, and then I will merge back to the `master` branch.
 
 [`Tue 21 Jan 2020 06:53:13 PM Beijing`]   
-1. The replacement of `ip address` with `connection handle` has turned out not a trivial change, and has escalated to a major change. I need to bring the pirority of `multi-hop routing` ahead of the `websocket` support for now. This is a major upgrade of the router module, which enables associations of two or more devices/controlers in a hierarchical tree, and enable the client to `RPC` to a number of remote servers via a `path` string.
+1. The replacement of `ip address` with `connection handle` has turned out not a trivial change, and has escalated to a major change. I need to bring the pirority of `multihop routing` ahead of the `websocket` support for now. This is a major upgrade of the router module, which enables associations of two or more devices/controlers in a hierarchical tree, and enable the client to `RPC` to a number of remote servers via a `path` string.
 
 [`Mon 06 Jan 2020 12:04:26 PM Beijing`]   
 1. I need to replace the `ip address` with a opaque `connection handle` for the upcoming support of websocket, since `ip address` is no longer the only address format to locate the server. It is the bottom half of an earlier change which replaced `ip address` with the `port id` on the `bridge` side. The `reqfwdr` and `dbusprxy` are the target modules for this time.   
@@ -135,7 +135,7 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 [`Sat 09 Nov 2019 10:09:12 AM Beijing`]   
 1. Refacting the tcpport. I did not realize that through the days, the tcpport has grown to a big module with about 10000 loc.
 2. Continue the design of the support for websock/http.
-3. Object addressing and multi-router hopping are also in the research.
+3. Object addressing and multiple hops between routers are also in the research.
 
 [`Sun 03 Nov 2019 02:05:39 PM Beijing`]   
 1. To add the support for websocket, SSL and other unknown protocols, I need to refact the current tcp port implementation, because the present design is too closely coupled without room for the new protocols. It is a bitter decision, but it should worth the effort. Sometime, you may need one step back for 2 steps forward. The good part is that the tcp port implementation is relatively isolated with little changes to other functions.
@@ -152,7 +152,7 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 1. IPv6 support is done.
 2. It turns out http support depends on the presence of some new features. It needs some time to have a full understanding of the task.
    * Object addressing mechanism
-   * multi-hop routing
+   * multihop routing
    * Session management and access control
    * Site registration and discovery.
 
