@@ -4,7 +4,7 @@
 This is an asynchronous and event-driven RPC framework for embeded system with small system footprint. It is targeting at the IOT platforms, high-throughput, and high availability over hybrid network. Welcome to join!  
 
 #### Concept
-[`Here`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md) are some concepts that help to understand this project.
+[`Here`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md) is an introduction about some concepts that help to understand this project.
 
 #### Dependency:  
 This framework depends on the following packags:  
