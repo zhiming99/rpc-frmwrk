@@ -25,7 +25,7 @@ This framework depends on the following packags:
 6. `Pausable/Resumable interface.`
 7. `Support RPC from remote machine, local system, and in-process.` 
 8. `Transparent support for different types of remote communications.`
-9. `File/Big data transfer.`
+9. `File/stream data transfer.`
 10. `Peer online/offline awareness.`
 11. `Streaming support to provide double-direction stream transfer`
 12. [`Secure Socket Layer (SSL) support`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/sslport/Readme.md)
