@@ -31,11 +31,15 @@ This framework depends on the following packags:
 12. [`Secure Socket Layer (SSL) support`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/sslport/Readme.md)
 13. [`Websocket support`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/wsport/Readme.md)
 14. [`Object access via Multihop routing`](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support)
+15. `Authentication and Access control` support. (To come)
 
 #### Building `rpc-frmwrk`:   
 Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60) for details.
 
 ---
+[`Mon 11 May 2020 09:23:20 PM Beijing`]   
+1. Trying to using `GSSAPI's Kerberos implementation` as the authentication mechanism. There is still some technical issues to investigate at this point.
+
 [`Tue 28 Apr 2020 02:12:02 PM Beijing`]   
 1. The next task is to implement `Authentication and access control` for `rpc-frmwrk`.
 
