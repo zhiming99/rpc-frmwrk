@@ -39,6 +39,7 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 ---
 [`Mon 11 May 2020 09:23:20 PM Beijing`]   
 1. Trying to use `GSSAPI's Kerberos implementation` as the authentication mechanism. There are still some technical issues to investigate at this point.
+2. It is not decided yet whether to use `File ACL` or `RBAC` as the `access control` model.
 
 [`Tue 28 Apr 2020 02:12:02 PM Beijing`]   
 1. The next task is to implement `Authentication and access control` for `rpc-frmwrk`.
