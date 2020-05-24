@@ -37,6 +37,9 @@ This framework depends on the following packags:
 Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60) for details.
 
 ---
+[`Sun 24 May 2020 04:49:09 PM Beijing`]   
+1. It turns out security stuffs never disappoint you by complexity. Still researching on the different authentication approaches. It would probably take another month to get it done.
+
 [`Wed 13 May 2020 05:23:01 PM Beijing`]   
 1. Preferable to `File ACL` as the `access control` model.
 2. `Kerberos` requires a lot of resources for deployment, and I will also try to add the `NTLM` as a low-cost alternative.
