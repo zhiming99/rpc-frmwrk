@@ -37,6 +37,9 @@ This framework depends on the following packags:
 Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60) for details.
 
 ---
+[`Fri 12 Jun 2020 04:58:06 PM Beijing`]   
+1. Designing is still in process. Details has made the progress slow.   
+
 [`Sun 24 May 2020 04:49:09 PM Beijing`]   
 1. It turns out security stuffs never disappoint you by complexity. Still researching on the different authentication approaches. It would probably take another month to get it done.
 
