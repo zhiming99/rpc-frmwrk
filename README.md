@@ -37,8 +37,11 @@ This framework depends on the following packags:
 Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60) for details.
 
 ---
+[`Sun 12 Jul 2020 11:23:27 AM Beijing`]   
+1. still battling with some technical difficulties. The "relative simple" design has turned not as simple as it looks. Anyway, authentication is coming...  
+
 [`Mon 22 Jun 2020 05:40:08 PM Beijing`]   
-1. Discarded the old authentication design, and chosed a relative simple design to start over now, `Kerberos` authentication.      
+1. Discarded the old authentication design, and chose a relative simple design to start over now, `Kerberos` authentication.      
 
 [`Fri 12 Jun 2020 04:58:06 PM Beijing`]   
 1. Designing is still in process. Details has made the progress slow.   
