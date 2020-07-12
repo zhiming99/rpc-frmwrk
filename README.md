@@ -38,7 +38,7 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 
 ---
 [`Sun 12 Jul 2020 11:23:27 AM Beijing`]   
-1. still battling with some technical difficulties. The "relative simple" design has turned not as simple as it looks. Anyway, authentication is coming...  
+1. still battling with some technical difficulties. The "relative simple" design has turned not as simple as it looks. Anyway, authentication support is coming...  
 
 [`Mon 22 Jun 2020 05:40:08 PM Beijing`]   
 1. Discarded the old authentication design, and chose a relative simple design to start over now, `Kerberos` authentication.      
