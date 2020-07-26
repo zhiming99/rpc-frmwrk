@@ -209,13 +209,13 @@
             "KeepAliveTimeoutSec" : "60",
             "QueuedRequests" : "false",
             "ProxyPortClass": "DBusLocalPdo",
-            "Interfaces" :
             "AuthInfo" :
             {
                 "AuthMech" : "krb5",
                 "ServiceName" : "rpcrouter/rasp1",
                 "Realm" : "rpcfrmwrk.org"
             },
+            "Interfaces" :
             [
                 {
                     "Comment-0" : "the following attributes are mandatory",
