@@ -4,7 +4,7 @@
 
 . OpenSSL requires to have the key file and certificate file ready before it can work.   
 
-. Here is a command line example. Note it assumes self-signed with no password protection.   
+. Here is a command line example. Note it generates a self-signed key with no password protection.   
 ```
 # command line
 openssl req -x509 -newkey rsa:4096 -nodes -keyout key.pem -out cert.pem -days 365
