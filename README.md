@@ -38,7 +38,8 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 
 ---
 [`Sun 26 Jul 2020 08:12:16 PM Beijing`]   
-1. submitted the Kerberos support. It is not debugged yet. So a lot of work to to yet :)
+1. submitted the Kerberos support. It is not debugged yet. So a lot of work to to yet :)   
+
 [`Sun 12 Jul 2020 11:23:27 AM Beijing`]   
 1. still battling with some technical difficulties. The "relative simple" design has turned not as simple as it looks. Anyway, authentication support is coming...  
 
