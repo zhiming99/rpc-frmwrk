@@ -827,6 +827,66 @@ gint32 CRpcWebSockFido::CompleteIoctlIrp(
     return ret;
 }
 
+gint32 CRpcWebSockFido::CompleteFuncIrp( IRP* pIrp )
+{
+    gint32 ret = 0;
+
+    do{
+        if( pIrp == nullptr 
+           || pIrp->GetStackSize() == 0 )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        if( pIrp->MajorCmd() != IRP_MJ_FUNC )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        
+        switch( pIrp->MinorCmd() )
+        {
+        case IRP_MN_IOCTL:
+            {
+                ret = CompleteIoctlIrp( pIrp );
+                break;
+            }
+        case IRP_MN_WRITE:
+            {
+                ret = CompleteWriteIrp( pIrp );
+                break;
+            }
+        default:
+            {
+                ret = -ENOTSUP;
+                break;
+            }
+        }
+
+    }while( 0 );
+
+    if( ret != STATUS_PENDING )
+    {
+        IrpCtxPtr& pCtx =
+            pIrp->GetCurCtx();
+
+        if( !pIrp->IsIrpHolder() )
+        {
+            IrpCtxPtr& pCtxLower = pIrp->GetTopStack();
+
+            ret = pCtxLower->GetStatus();
+            pCtx->SetStatus( ret );
+            pIrp->PopCtxStack();
+        }
+        else
+        {
+            ret = pCtx->GetStatus();
+        }
+    }
+    return ret;
+}
+
 gint32 CRpcWebSockFido::CompleteWriteIrp(
     IRP* pIrp )
 {

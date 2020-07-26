@@ -320,7 +320,10 @@ gint32 CIfStartRecvMsgTask::RunTask()
             propDummyMatch, bDummy );
 
         if( ERROR( ret ) )
+        {
             bDummy = false;
+            ret = 0;
+        }
 
         if( bDummy )
             break;
@@ -3849,7 +3852,7 @@ gint32 CIfInvokeMethodTask::FilterMessage(
         pIf = pObj;
 
         // filter the message
-        if( pIf->IsServer() )
+        if( pIf->IsConnected() )
         {
             IEventSink* pFilter = nullptr;
             std::vector< LONGWORD > vecParams;
@@ -4194,8 +4197,6 @@ gint32 CIfInvokeMethodTask::RunTask()
                 ret = ERROR_STATE;
                 break;
             }
-
-            std::string strMethod = pMsg.GetMember();
 
             // set the interface name in case the
             // method be called via the handler map
@@ -5707,4 +5708,97 @@ gint32 CIfCallbackInterceptor::OnComplete(
         ( *m_pCallAfter )( eventZero );
 
     return iRet;
+}
+
+gint32 CIfInterceptTaskProxy::EnableTimer(
+    guint32 dwTimeoutSec )
+{
+    gint32 ret = 0;
+    do{
+        CIoManager* pMgr = nullptr;
+        CCfgOpenerObj oTaskCfg( this );
+        if( dwTimeoutSec == 0 )
+        {
+            CRpcServices* pIf = nullptr;
+            ret = oTaskCfg.GetPointer(
+                propIfPtr, pIf );
+            if( ERROR( ret ) )
+                break;
+
+            CCfgOpenerObj oIfCfg( pIf );
+            ret = oIfCfg.GetIntProp(
+                propTimeoutSec, dwTimeoutSec );
+            if( ERROR( ret ) )
+                break;
+
+            pMgr = pIf->GetIoMgr();
+        }
+        else
+        {
+            ret = GET_IOMGR( oTaskCfg, pMgr );
+            if( ERROR( ret ) )
+                break;
+        }
+
+        CUtilities& oUtils = pMgr->GetUtils();
+        CTimerService& oTimerSvc =
+            oUtils.GetTimerSvc();
+
+        ret = oTimerSvc.AddTimer(
+            dwTimeoutSec, this, 
+            ( guint32 )eventTimeoutCancel );
+
+        if( ret > 0 )
+        {
+            m_iTimeoutId = ret;
+            ret = 0;
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CIfInterceptTaskProxy::DisableTimer()
+{
+    gint32 ret = 0;
+    do{
+        if( m_iTimeoutId == 0 )
+            break;
+
+        CCfgOpenerObj oTaskCfg( this );
+        CIoManager* pMgr = nullptr;
+        ret = GET_IOMGR( oTaskCfg, pMgr );
+        if( ERROR( ret ) )
+            break;
+
+        CUtilities& oUtils = pMgr->GetUtils();
+        CTimerService& oTimerSvc =
+            oUtils.GetTimerSvc();
+
+        oTimerSvc.RemoveTimer( m_iTimeoutId );
+        m_iTimeoutId = 0;
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CIfInterceptTaskProxy::OnCancel(
+    guint32 dwContext )
+{
+    if( dwContext == eventTimeoutCancel )
+    {
+        // we are in the the timeout context, the
+        // m_iTimoutId should be simply zeroed
+        m_iTimeoutId = 0;
+    }
+    return super::OnCancel( dwContext );
+}
+
+gint32 CIfInterceptTaskProxy::OnComplete(
+    gint32 iRetVal )
+{
+    DisableTimer();
+    return super::OnComplete( iRetVal );
 }

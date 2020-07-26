@@ -558,18 +558,29 @@ class CConnParams : public IConnParams
                 break;
             }
 
-            bVal1 = IsWebSocket();
-            if( bVal1 > 0 && !bServer )
+            if( IsWebSocket() && !bServer )
             {
-                // reverse proxy
                 std::string strUrl1, strUrl2;
                 strUrl1 = GetUrl();
                 strUrl2 = rhs.GetUrl();
-                if( strUrl1 < strUrl2 )
+                if( strUrl1.empty() &&
+                    strUrl2.empty() )
                 {
                     ret = true;
-                    break;
                 }
+                else if( strUrl1.empty() )
+                {
+                    ret = true;
+                }
+                else if( strUrl2.empty() )
+                {
+                    ret = false;
+                }
+                else if( strUrl1 < strUrl2 )
+                {
+                    ret = true;
+                }
+                break;
             }
 
             ret = false;
@@ -852,6 +863,26 @@ class CConnParams : public IConnParams
             ( IConfigDb* )m_pParams );
         lhs.SetStrProp(
             propDestUrl, strVal );
+    }
+
+    inline bool HasAuth() const
+    {
+        CCfgOpener lhs(
+            ( const IConfigDb* )m_pParams );
+
+        bool bAuth;
+        ObjPtr pObj;
+        gint32 ret = lhs.GetObjPtr(
+            propAuthInfo, pObj );
+        if( SUCCEEDED( ret ) )
+            return true;
+
+        ret = lhs.GetBoolProp(
+            propHasAuth, bAuth );
+        if( SUCCEEDED( ret ) )
+            return bAuth;
+
+        return false;
     }
 };
 

@@ -1536,7 +1536,142 @@ gint32 CPort::SubmitFuncIrp( IRP* pIrp )
 
     return ret;
 }
+/**
+* @name SubmitSetPropIrp
+* @brief to set a property on the specified port
+* object.
+*
+* @parameters the m_pReqData hold a pointer to a
+* IConfigDb object, which contains the following
+* parameters
+*   [ 0 ] : Pointer to the port whose property 
+*           will be set.
+*
+*   [ 1 ] : PropertyId, the property id 
+*
+*   [ 2 ] : a BufPtr containing the value of the
+*           property
+* @{ */
+/**  @} */
 
+gint32 CPort::SubmitSetPropIrp( IRP* pIrp )
+{
+    gint32 ret = 0;
+
+    if( pIrp == nullptr
+        || pIrp->GetStackSize() == 0 )
+        return -EINVAL;
+
+    IrpCtxPtr pCtx = pIrp->GetCurCtx();
+
+    do{
+        CStdRMutex oPortLock( GetLock() );
+        guint32 dwPortState = GetPortState();
+
+        if( dwPortState == PORT_STATE_REMOVED
+            || dwPortState == PORT_STATE_INVALID )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+
+        CfgPtr pParams;
+        ret = pCtx->GetReqAsCfg( pParams );
+        if( ERROR( ret ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        CParamList oParams( pParams );
+        ObjPtr pTarget;
+        ret = oParams.GetObjPtr( 0, pTarget );
+        if( ERROR( ret ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        if( pTarget->GetObjId() != GetObjId() )
+        {
+            IPort* pLowerPort = GetLowerPort();
+            if( pLowerPort == nullptr )
+            {
+                ret = -ENOENT;
+                break;
+            }
+            ret = pIrp->AllocNextStack(
+                pLowerPort, IOSTACK_ALLOC_COPY );
+
+            if( ERROR( ret ) )
+                break;
+
+            pLowerPort->AllocIrpCtxExt(
+                pIrp->GetTopStack() );
+
+            oPortLock.Unlock();
+
+            ret = pLowerPort->SubmitIrp( pIrp );
+
+            oPortLock.Lock();
+
+            dwPortState = GetPortState();
+            if( dwPortState == PORT_STATE_REMOVED
+                || dwPortState == PORT_STATE_INVALID )
+            {
+                ret = ERROR_STATE;
+                pIrp->PopCtxStack();
+                break;
+            }
+
+            pIrp->PopCtxStack();
+            break;
+        }
+
+        BufPtr pVal;
+        ret = oParams.GetProperty( 2, pVal );
+        if( ERROR( ret ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        guint32 dwPropId = 0;
+        ret = oParams.GetIntProp( 1, dwPropId );
+        if( ERROR( ret ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        ret = this->SetProperty(
+            dwPropId, *pVal );
+
+        break;
+
+    }while( 0 );
+
+    pCtx->SetStatus( ret );
+
+    return ret; 
+}
+
+/**
+* @name SubmitGetPropIrp
+* @brief to set a property on the specified port
+* object.
+*
+* @parameters the m_pReqData hold a pointer to a
+* IConfigDb object, which contains the following
+* parameters
+*   [ 0 ] : Pointer to the port whose property 
+*           will be set.
+*
+*   [ 1 ] : PropertyId, the property id 
+*
+* @return the m_pRespData contains the property
+* value with a CBuffer object.
+* @{ */
+/**  @} */
 gint32 CPort::SubmitGetPropIrp( IRP* pIrp )
 {
     gint32 ret = 0;
@@ -1558,14 +1693,21 @@ gint32 CPort::SubmitGetPropIrp( IRP* pIrp )
             break;
         }
 
-        guint32 dwMinorCmd = pIrp->MinorCmd();
-        IPort* pTarget = HandleToPort( dwMinorCmd );
-        if( pTarget == nullptr )
+        CfgPtr pParams;
+        ret = pCtx->GetReqAsCfg( pParams );
+        if( ERROR( ret ) )
         {
             ret = -EINVAL;
             break;
         }
-
+        CParamList oParams( pParams );
+        ObjPtr pTarget;
+        ret = oParams.GetObjPtr( 0, pTarget );
+        if( ERROR( ret ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
         if( pTarget->GetObjId() != GetObjId() )
         {
             IPort* pLowerPort = GetLowerPort();
@@ -1621,13 +1763,14 @@ gint32 CPort::SubmitGetPropIrp( IRP* pIrp )
             break;
         }
 
-        BufPtr& pReqData = pCtx->m_pReqData;
-        if( pReqData.IsEmpty() )
+        guint32 dwPropId = 0;
+        ret = oParams.GetIntProp( 1, dwPropId );
+        if( ERROR( ret ) )
         {
-            ret = -EINVAL;
+            pCtx->SetStatus( ret );
             break;
         }
-        guint32 dwPropId = ( guint32& )*pReqData;
+
         BufPtr pResp( true );
         ret = this->GetProperty( dwPropId, *pResp );
 
@@ -1636,7 +1779,6 @@ gint32 CPort::SubmitGetPropIrp( IRP* pIrp )
         {
             pCtx->SetRespData( pResp );
         }
-
         break;
 
     }while( 0 );
@@ -1797,6 +1939,11 @@ gint32 CPort::SubmitIrp( IRP* pIrp )
         case IRP_MJ_GETPROP:
             {
                 ret = SubmitGetPropIrp( pIrp );
+                break;
+            }
+        case IRP_MJ_SETPROP:
+            {
+                ret = SubmitSetPropIrp( pIrp );
                 break;
             }
         default:

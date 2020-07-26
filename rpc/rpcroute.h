@@ -30,6 +30,7 @@
 #include "tractgrp.h"
 
 #define ROUTER_OBJ_DESC             "./router.json"
+#define ROUTER_OBJ_DESC_AUTH        "./rtauth.json"
 
 struct IRpcReqProxyAsync
 {
@@ -423,7 +424,7 @@ class CRpcReqForwarder :
         const std::string& strSrcUniqName,
         const std::string& strSrcDBusName );
 
-    gint32 ClearRefCountByPortId(
+    virtual gint32 ClearRefCountByPortId(
         guint32 dwPortId,
         std::vector< std::string >& vecUniqNames );
 
@@ -678,6 +679,15 @@ class CRpcReqForwarderProxy :
 
 }; // CRpcReqForwarderProxy 
 
+#define GET_TARGET_PORT( pPort ) \
+do{ \
+        CCfgOpener oReq; \
+        bool _bPdo = false; \
+        oReq.SetBoolProp( propSubmitPdo, true ); \
+        ret = this->GetPortToSubmit( \
+            oReq.GetCfg(), pPort, _bPdo ); \
+}while( 0 ) 
+
 struct CRpcTcpBridgeShared
 {
     CRpcTcpBridgeShared( CRpcServices* pIf )
@@ -861,7 +871,7 @@ class CRpcTcpBridge :
         DBusMessage* pEventMsg,
         IEventSink* pCallback );
 
-    virtual gint32 CheckReqToRelay(
+    gint32 CheckReqToRelay(
         IConfigDb* pReqCtx,
         DMsgPtr& pMsg,
         MatchPtr& pMatchHit );
@@ -1213,6 +1223,9 @@ class CRpcRouter :
     virtual bool HasBridge() const
     { return false; }
 
+    virtual bool HasAuth() const
+    { return false; }
+
     gint32 AddRemoveMatch(
         IMessageMatch* pMatch, bool bAdd,
         std::map< MatchPtr, gint32 >* plm );
@@ -1281,6 +1294,10 @@ class CRpcRouter :
 
     gint32 GetPortId( HANDLE hPort,
         guint32 dwPortId ) const;
+
+    gint32 IsEqualConn(
+        const IConfigDb* pConn1,
+        const IConfigDb* pConn2 );
 };
 
 class CReqFwdrCloseRmtPortTask
@@ -1700,7 +1717,7 @@ class CRpcRouterReqFwdr : public CRpcRouter
         const std::string& strSrcUniqName,
         const std::string& strSrcDBusName );
 
-    gint32 DecRefCount(
+    virtual gint32 DecRefCount(
         guint32 dwPortId,
         const std::string& strSrcUniqName,
         const std::string& strSrcDBusName );
@@ -1750,7 +1767,7 @@ class CRpcRouterReqFwdr : public CRpcRouter
     // match table. The req cannot make to the
     // destination if it failes the tests against
     // the match table
-    gint32 CheckReqToFwrd(
+    virtual gint32 CheckReqToFwrd(
         IConfigDb* pReqCtx,
         DMsgPtr& pMsg,
         MatchPtr& pMatch );
@@ -1759,7 +1776,7 @@ class CRpcRouterReqFwdr : public CRpcRouter
     // match table. The event cannot make to the
     // destination if it failes the tests against
     // the match tables
-    gint32 CheckEvtToRelay(
+    virtual gint32 CheckEvtToRelay(
         IConfigDb* pEvtCtx,
         DMsgPtr& pMsg,
         std::vector< MatchPtr >& vecMatches );
@@ -2186,7 +2203,7 @@ class CRpcRouterBridge : public CRpcRouter
     // match table. The req cannot make to the
     // destination if it failes the tests against
     // the match table
-    gint32 CheckReqToRelay(
+    virtual gint32 CheckReqToRelay(
         IConfigDb* pReqCtx,
         DMsgPtr& pMsg,
         MatchPtr& pMatchHit );
@@ -2195,7 +2212,7 @@ class CRpcRouterBridge : public CRpcRouter
     // match table. The event cannot make to the
     // destination if it failes the tests against
     // the match table
-    gint32 CheckEvtToFwrd(
+    virtual gint32 CheckEvtToFwrd(
         IConfigDb* pReqCtx,
         DMsgPtr& pMsg,
         std::set< guint32 >& setPortIds );
@@ -2326,7 +2343,7 @@ DECLARE_AGGREGATED_PROXY(
 #include "streammh.h"
 
 DECLARE_AGGREGATED_SERVER(
-    CRpcTcpBridgeEx,
+    CRpcTcpBridgeImpl,
     CRpcTcpBridge,
     CStatCountersServer,
     CStreamServerRelay,
@@ -2339,23 +2356,40 @@ DECLARE_AGGREGATED_PROXY(
     CStatCountersProxy,
     CStreamProxyRelay );
 
-class CRpcTcpBridgeImpl :
-    public CRpcTcpBridgeEx
+#define AUTH_DEST( _pMgr ) \
+( { \
+    std::string strRtName; \
+    ( _pMgr )->GetRouterName( strRtName ); \
+    DBUS_DESTINATION2( strRtName, \
+        OBJNAME_ROUTER_BRIDGE_AUTH ); \
+} )
+
+class CIfDeferCallTaskEx2 :
+    public CIfDeferCallTaskBase< CIfRollbackableTask >
 {
-    gint32 OnPreStopLocal( IEventSink* pCallback )
-    {
-        return this->CStreamServerRelay::OnPreStop(
-            pCallback );
-    }
-    gint32 OnPreStopMH( IEventSink* pCallback )
-    {
-        return this->CStreamServerRelayMH::OnPreStop(
-            pCallback );
-    }
     public:
-    typedef CRpcTcpBridgeEx super;
-    CRpcTcpBridgeImpl( const IConfigDb* pCfg )
-        : virtbase( pCfg ), super( pCfg )
-    { SetClassId( clsid( CRpcTcpBridgeImpl ) ); }
-    gint32 OnPreStop( IEventSink* pCallback );
+    typedef CIfDeferCallTaskBase< CIfRollbackableTask > super;
+    CIfDeferCallTaskEx2 ( const IConfigDb* pCfg )
+        :super( pCfg )
+    { SetClassId( clsid( CIfDeferCallTaskEx2 ) );}
 };
+
+#define DEFER_IFCALLEX2_NOSCHED( _pTask, pObj, func, ... ) \
+    NewIfDeferredCall( clsid( CIfDeferCallTaskEx2 ), \
+        _pTask, pObj, func , ##__VA_ARGS__ )
+
+// use this macro when the _pTask will be added
+// to a task group.
+#define DEFER_IFCALLEX2_NOSCHED2( _pos, _pTask, pObj, func, ... ) \
+({ \
+    gint32 _ret = NewIfDeferredCall( clsid( CIfDeferCallTaskEx2 ), \
+        _pTask, pObj, func , ##__VA_ARGS__ ); \
+    if( SUCCEEDED( _ret ) ) \
+    { \
+        CIfDeferCallTaskEx* pDefer = _pTask; \
+        BufPtr pBuf( true ); \
+        *pBuf = ObjPtr( pDefer ); \
+        pDefer->UpdateParamAt( _pos, pBuf );  \
+    } \
+    _ret; \
+})

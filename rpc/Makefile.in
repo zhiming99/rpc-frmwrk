@@ -11,9 +11,9 @@ SOURCES:= dbusprxy.cpp prxyfdo.cpp fdodrv.cpp \
 OBJS:=$(SOURCES:%.cpp=$(OBJ_DIR)/%.o)
 C_DEFINES += -D_USE_LIBEV=1
 
-all: $(OUTPUT_DIR)/$(TARGET) SSLPort WSPort
-debug: $(OUTPUT_DIR)/$(TARGET) SSLPort WSPort
-release: $(OUTPUT_DIR)/$(TARGET) SSLPort WSPort
+all: $(OUTPUT_DIR)/$(TARGET) SSLPort WSPort Security
+debug: $(OUTPUT_DIR)/$(TARGET) SSLPort WSPort Security
+release: $(OUTPUT_DIR)/$(TARGET) SSLPort WSPort Security
 
 $(OUTPUT_DIR)/$(TARGET) : $(OBJS)
 	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
@@ -24,6 +24,9 @@ SSLPort:
 
 WSPort:
 	make -C ./wsport
+
+Security:
+	make -j -l 5 -C ./security
 
 -include $(OBJS:%.o=%.d)
 
@@ -40,6 +43,7 @@ do_clean:
 	-@rm $(OBJS) $(MUTE_CLEAN)
 	make -C ./wsport $(MAKECMDGOALS)
 	make -C ./sslport $(MAKECMDGOALS)
+	make -C ./security $(MAKECMDGOALS)
 
 sync:
 	bash ./sync-up.sh

@@ -156,6 +156,8 @@ inline std::string DBUS_DESTINATION(
 #define IFNAME_REQFORWARDER             "CRpcReqForwarder"
 #define IFNAME_TCP_BRIDGE               "CRpcTcpBridge"
 
+#define IFNAME_REQFORWARDERAUTH         "CRpcReqForwarderAuth"
+
 #define IFNAME_INVALID                  "If_Invalid" 
 // the obj name which will provide two interfaces
 // CRpcReqForwarder and CRpcReqForwarderProxy 
@@ -165,6 +167,12 @@ inline std::string DBUS_DESTINATION(
 #define OBJNAME_ROUTER                  "RpcRouterManagerImpl"
 #define OBJNAME_ROUTER_BRIDGE           "RpcRouterBridgeImpl"
 #define OBJNAME_ROUTER_REQFWDR          "RpcRouterReqFwdrImpl"
+
+#define OBJNAME_REQFWDR_AUTH            "RpcReqForwarderAuthImpl"
+#define OBJNAME_TCP_BRIDGE_AUTH         "RpcTcpBridgeAuthImpl"
+
+#define OBJNAME_ROUTER_BRIDGE_AUTH      "RpcRouterBridgeAuthImpl"
+#define OBJNAME_ROUTER_REQFWDR_AUTH     "RpcRouterReqFwdrAuthImpl"
 
 #define OBJNAME_IOMANAGER               "Obj_IoManager"
 #define OBJNAME_INVALID                 "Obj_Invalid"
@@ -220,6 +228,7 @@ inline std::string DBUS_DESTINATION2(
 #define SYS_METHOD_OPENRMTPORT          "RpcCall_OpenRemotePort"
 #define SYS_METHOD_CLOSERMTPORT         "RpcCall_CloseRemotePort"
 #define SYS_METHOD_ENABLERMTEVT         "RpcCall_EnableRemoteEvent"
+#define SYS_METHOD_LOCALLOGIN           "RpcCall_LocalLogin"
 #define SYS_METHOD_DISABLERMTEVT        "RpcCall_DisableRemoteEvent"
 #define SYS_METHOD_CLEARRMTEVTS         "RpcCall_ClearRemoteEvents"
 #define SYS_METHOD_CHECK_ROUTERPATH     "RpcCall_CheckRouterPath"

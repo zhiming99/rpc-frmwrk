@@ -8,19 +8,19 @@ debug:
 	@if [ ! -e $(OUTPUT_DIR)/librpc.so ]; then cd $(OUTPUT_DIR);ln -s ../../$(DBG_DIR)/librpc.so;cd -;fi
 	@if [ ! -e $(OUTPUT_DIR)/libsslpt.so ]; then cd $(OUTPUT_DIR);ln -s ../../$(DBG_DIR)/libsslpt.so;cd -;fi
 	@if [ ! -e $(OUTPUT_DIR)/libwspt.so ]; then cd $(OUTPUT_DIR);ln -s ../../$(DBG_DIR)/libwspt.so;cd -;fi
-	make -C helloworld
-	make -C iftest
-	make -C asynctst
-	make -C smoketest
-	make -C actcancel
-	make -C evtest
-	make -C inproc
-	make -C katest
-	make -C prtest
-	make -C sftest
-	make -C stmtest
-	make -C router
-	make -C btinrt
+	make -j -l 5 -C helloworld
+	make -j -l 5 -C iftest
+	make -j -l 5 -C asynctst
+	make -j -l 5 -C smoketest
+	make -j -l 5 -C actcancel
+	make -j -l 5 -C evtest
+	make -j -l 5 -C inproc
+	make -j -l 5 -C katest
+	make -j -l 5 -C prtest
+	make -j -l 5 -C sftest
+	make -j -l 5 -C stmtest
+	make -j -l 5 -C router
+	make -j -l 5 -C btinrt
 
 release:
 	@if [ ! -e $(OUTPUT_DIR)/libcombase.so ]; then cd $(OUTPUT_DIR);ln -s ../../$(RLS_DIR)/libcombase.so;cd -;fi
@@ -28,19 +28,19 @@ release:
 	@if [ ! -e $(OUTPUT_DIR)/librpc.so ]; then cd $(OUTPUT_DIR);ln -s ../../$(RLS_DIR)/librpc.so;cd -;fi
 	@if [ ! -e $(OUTPUT_DIR)/libsslpt.so ]; then cd $(OUTPUT_DIR);ln -s ../../$(RLS_DIR)/libsslpt.so;cd -;fi
 	@if [ ! -e $(OUTPUT_DIR)/libwspt.so ]; then cd $(OUTPUT_DIR);ln -s ../../$(RLS_DIR)/libwspt.so;cd -;fi
-	make -C helloworld release
-	make -C iftest release
-	make -C asynctst release
-	make -C smoketest release
-	make -C actcancel release
-	make -C evtest release
-	make -C inproc release
-	make -C katest release
-	make -C prtest release
-	make -C sftest release
-	make -C stmtest release
-	make -C router release
-	make -C btinrt release
+	make -j -l 5 -C helloworld release
+	make -j -l 5 -C iftest release
+	make -j -l 5 -C asynctst release
+	make -j -l 5 -C smoketest release
+	make -j -l 5 -C actcancel release
+	make -j -l 5 -C evtest release
+	make -j -l 5 -C inproc release
+	make -j -l 5 -C katest release
+	make -j -l 5 -C prtest release
+	make -j -l 5 -C sftest release
+	make -j -l 5 -C stmtest release
+	make -j -l 5 -C router release
+	make -j -l 5 -C btinrt release
 
 clean:
 	make -C helloworld clean

@@ -140,6 +140,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CIfUxSockTransRelayTaskMH );
     INIT_MAP_ENTRYCFG( CIfUxListeningRelayTaskMH );
     INIT_MAP_ENTRYCFG( CIfStartUxSockStmRelayTaskMH );
+    INIT_MAP_ENTRYCFG( CIfDeferCallTaskEx2 );
 
     END_FACTORY_MAPS;
 };

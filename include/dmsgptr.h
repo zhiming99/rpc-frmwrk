@@ -226,6 +226,44 @@ class CAutoPtr< Clsid_Invalid, DBusMessage > : public IAutoPtr
     gint32 Deserialize( CBuffer* pBuf );
     gint32 Clone( DBusMessage* pSrcMsg );
 
+    gint32 CopyHeader( DBusMessage* pMsg )
+    {
+        gint32 ret = 0;
+        do{
+            DMsgPtr pSrcMsg( pMsg );
+            gint32 iType =
+                dbus_message_get_type( pMsg );
+
+            ret = NewObj( ( EnumClsid ) iType );
+            if( ERROR( ret ) )
+                break;
+
+            SetSerial(
+                dbus_message_get_serial( pMsg ) );
+
+            SetDestination(
+                pSrcMsg.GetDestination() );
+
+            SetInterface(
+                pSrcMsg.GetInterface() );
+
+            SetPath( pSrcMsg.GetPath() );
+            SetMember( pSrcMsg.GetMember() );
+            SetSender( pSrcMsg.GetSender() );
+
+            if( iType ==
+                DBUS_MESSAGE_TYPE_METHOD_RETURN )
+            {
+                guint32 dwSerial =
+                    dbus_message_get_reply_serial( pMsg );
+                SetReplySerial( dwSerial );
+            }
+
+        }while( 0 );
+
+        return ret;
+    }
+
     std::string GetMember() const
     {
         if( IsEmpty() )

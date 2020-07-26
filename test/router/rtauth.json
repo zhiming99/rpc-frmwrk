@@ -4,6 +4,7 @@
     "Objects" :
     [
         {
+            "comment" : "For only CRpcReqForwarderProxyImpl",
             "ObjectName": "RpcReqForwarderImpl",
             "BusName" : "DBusBusPort_0",
             "PortClass": "DBusLocalPdo",
@@ -38,6 +39,39 @@
             ]
         },
         {
+            "ObjectName": "RpcReqForwarderAuthImpl",
+            "BusName" : "DBusBusPort_0",
+            "PortClass": "DBusLocalPdo",
+            "PortId" : "0",
+            "RequestTimeoutSec" : "120",
+            "KeepAliveTimeoutSec" : "60",
+            "QueuedRequests" : "false",
+            "ProxyPortClass": "DBusLocalPdo",
+            "comment-1" : "IpAddress is the ip address of the server for proxy",
+            "Note-1": "proxy's ip address can be overwritten at runtime, before it starts",
+            "Interfaces" :
+            [
+                {
+                    "Comment-0" : "the following attributes are mandatory",
+                    "InterfaceName" : "CRpcReqForwarderAuthImpl",
+                    "BindToClsid" : "true"
+                },
+                {
+                    "InterfaceName" : "IInterfaceServer"
+                },
+                {
+                    "InterfaceName" : "IUnknown"
+                },
+                {
+                    "InterfaceName" : "CRpcReqForwarder"
+                },
+                {
+                    "InterfaceName" : "CStatCountersServer"
+                }
+            ]
+        },
+        {
+            "comment" : "For creation of CRpcTcpBridgeProxyImpl only",
             "ObjectName": "RpcTcpBridgeImpl",
             "BusName" : "RpcTcpBusPort_0",
             "PortClass": "TcpStreamPdo2",
@@ -81,7 +115,58 @@
             ]
         },
         {
-            "ObjectName": "RpcRouterReqFwdrImpl",
+            "ObjectName": "RpcTcpBridgeAuthImpl",
+            "BusName" : "RpcTcpBusPort_0",
+            "PortClass": "TcpStreamPdo2",
+            "PortNumber" : "4132",
+            "RequestTimeoutSec" : "120",
+            "KeepAliveTimeoutSec" : "60",
+            "QueuedRequests" : "false",
+            "Note-1": " bridge's ip address is decided at runtime",
+            "ProxyPortClass": "TcpStreamPdo2",
+            "Interfaces" :
+            [
+                {
+                    "Comment-0" : "the following attributes are mandatory",
+                    "InterfaceName" : "CRpcTcpBridgeAuthImpl",
+                    "BindToClsid" : "true",
+                    "DummyInterface" : "true"
+                },
+                {
+                    "InterfaceName" : "IInterfaceServer",
+                    "Pausable"  : "false",
+                    "DummyInterface" : "true"
+                },
+                {
+                    "InterfaceName" : "IUnknown",
+                    "Pausable" : "false",
+                    "DummyInterface" : "true"
+                },
+                {
+                    "InterfaceName" : "IStream",
+                    "Pausable" : "false",
+                    "DummyInterface" : "true"
+
+                },
+                {
+                    "InterfaceName" : "IStreamMH",
+                    "Pausable" : "false",
+                    "DummyInterface" : "true"
+
+                },
+                {
+                    "InterfaceName" : "CRpcTcpBridge",
+                    "Pausable"  : "true"
+                },
+                {
+                    "InterfaceName" : "CStatCountersServer",
+                    "Pausable"  : "true",
+                    "DummyInterface" : "true"
+                }
+            ]
+        },
+        {
+            "ObjectName": "RpcRouterReqFwdrAuthImpl",
             "BusName" : "DBusBusPort_0",
             "PortClass": "DBusLocalPdo",
             "PortId" : "0",
@@ -93,7 +178,7 @@
             [
                 {
                     "Comment-0" : "the following attributes are mandatory",
-                    "InterfaceName" : "CRpcRouterReqFwdrImpl",
+                    "InterfaceName" : "CRpcRouterReqFwdrAuthImpl",
                     "BindToClsid" : "true"
                 },
                 {
@@ -105,7 +190,7 @@
                     "Pausable" : "false"
                 },
                 {
-                    "InterfaceName" : "CRpcRouterReqFwdr",
+                    "InterfaceName" : "CRpcRouterReqFwdrAuth",
                     "Pausable"  : "false"
                 },
                 {
@@ -115,7 +200,8 @@
             ]
         },
         {
-            "ObjectName": "RpcRouterBridgeImpl",
+            "comments" : "this is the section for router bridge with authentication",
+            "ObjectName": "RpcRouterBridgeAuthImpl",
             "BusName" : "DBusBusPort_0",
             "PortClass": "DBusLocalPdo",
             "PortId" : "0",
@@ -124,10 +210,16 @@
             "QueuedRequests" : "false",
             "ProxyPortClass": "DBusLocalPdo",
             "Interfaces" :
+            "AuthInfo" :
+            {
+                "AuthMech" : "krb5",
+                "ServiceName" : "rpcrouter/rasp1",
+                "Realm" : "rpcfrmwrk.org"
+            },
             [
                 {
                     "Comment-0" : "the following attributes are mandatory",
-                    "InterfaceName" : "CRpcRouterBridgeImpl",
+                    "InterfaceName" : "CRpcRouterBridgeAuthImpl",
                     "BindToClsid" : "true"
                 },
                 {
@@ -144,6 +236,11 @@
                 },
                 {
                     "InterfaceName" : "CStatCountersServer",
+                    "Pausable"  : "false"
+                },
+                {
+                    "comment" : "this is the destination interface for authentication",
+                    "InterfaceName" : "IAuthenticate",
                     "Pausable"  : "false"
                 }
             ],
@@ -200,5 +297,9 @@
                 }
             ]
         }
+    ],
+    "ClassFactories" :
+    [
+        "./libauth.so"
     ]
 }

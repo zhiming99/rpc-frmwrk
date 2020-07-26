@@ -4327,7 +4327,7 @@ CRpcListeningSock::CRpcListeningSock(
 
 gint32 CRpcSocketBase::GetAddrInfo(
     const std::string& strIpAddr,
-    guint32 dwPortNum, addrinfo*& res ) const
+    guint32 dwPortNum, addrinfo*& res )
 {
     gint32 ret = 0;
     do{

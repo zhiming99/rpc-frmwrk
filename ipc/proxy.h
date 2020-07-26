@@ -528,6 +528,9 @@ class CRpcInterfaceBase :
 
     virtual gint32 AddStartTasks(
         IEventSink* pTaskGrp ) = 0;
+
+    virtual gint32 AddStopTasks(
+        IEventSink* pTaskGrp ) = 0;
 };
 
 struct IRpcNonDBusIf
@@ -591,6 +594,9 @@ class CRpcServices :
 
 
     protected:
+
+    // message filters
+    std::deque< TaskletPtr > m_queFilters;
 
     std::map< gint32, PROXY_MAP > m_mapProxyFuncs;
     std::map< gint32, FUNC_MAP > m_mapFuncs;
@@ -866,20 +872,6 @@ class CRpcServices :
     virtual gint32 OnPostStart(
         IEventSink* pCallback );
 
-    virtual gint32 FilterMessage(
-        IEventSink* pTask,
-        DBusMessage* pMsg,
-        bool bIncoming,
-        IEventSink* pFilter = nullptr )
-    { return 0; }
-
-    virtual gint32 FilterMessage(
-        IEventSink* pTask,
-        IConfigDb* pMsg,
-        bool bIncoming,
-        IEventSink* pFilter = nullptr )
-    { return 0; }
-
     virtual gint32 CustomizeRequest(
         IConfigDb* pReqCfg,
         IEventSink* pCallback ) = 0;
@@ -892,15 +884,191 @@ class CRpcServices :
         IEventSink* pTaskGrp )
     { return 0; }
 
+    virtual gint32 AddStopTasks(
+        IEventSink* pTaskGrp )
+    { return 0; }
+
     // a helper for deferred task to run in the
     // interface's taskgroup
     gint32 RunManagedTask(
         IEventSink* pTask,
         const bool& bRoot = false );
 
+    gint32 AddSeqTaskInternal(
+        TaskGrpPtr& pTaskGrp,
+        TaskletPtr& pTask,
+        bool bLong );
+
     gint32 AddSeqTask(
         TaskletPtr& pTask,
         bool bLong = false );
+
+    gint32 RegisterFilter(
+        IEventSink* pFilterTask )
+    {
+        CStdRMutex oIfLock( GetLock() );
+
+        CTasklet* pTask = static_cast
+            < CTasklet* >( pFilterTask );
+
+        m_queFilters.push_back( TaskletPtr( pTask ) );
+        return 0;
+    }
+
+    gint32 UnregisterFilter(
+        IEventSink* pFilterTask )
+    {
+        gint32 ret = -ENOENT;
+        CStdRMutex oIfLock( GetLock() );
+
+        CTasklet* pTask = static_cast
+            < CTasklet* >( pFilterTask );
+
+        std::deque< TaskletPtr >::iterator itr =
+            m_queFilters.begin();
+
+        TaskletPtr ptrTask( pTask );
+        for( ; itr < m_queFilters.end(); ++itr )
+        {
+            if( *itr == ptrTask )
+            {
+                m_queFilters.erase( itr );
+                ret = 0;
+                break;
+            }
+        }
+        return ret;
+    }
+
+    gint32 GetFilters(
+        std::deque< TaskletPtr >& oFilters )
+    {
+        CStdRMutex oIfLock( GetLock() );
+        oFilters = m_queFilters;
+        return 0;
+    }
+
+    virtual gint32 FilterMessage(
+        IEventSink* pTask,
+        DBusMessage* pMsg,
+        bool bIncoming,
+        IEventSink* pFilter = nullptr )
+    {
+        return FilterMessageInternal( pTask,
+            pMsg, bIncoming, pFilter );
+    }
+
+    virtual gint32 FilterMessage(
+        IEventSink* pTask,
+        IConfigDb* pMsg,
+        bool bIncoming,
+        IEventSink* pFilter = nullptr )
+    {
+        return FilterMessageInternal( pTask,
+            pMsg, bIncoming, pFilter );
+    }
+
+    gint32 SetPortProp(
+        IPort* pPort,
+        guint32 dwPropId,
+        BufPtr& pVal );
+
+    gint32 GetPortProp(
+        IPort* pPort,
+        guint32 dwPropId,
+        BufPtr& pVal );
+
+    private:
+    template< class T >
+    gint32 FilterMessageInternal(
+        IEventSink* pTask,
+        T* pMsg,
+        bool bIncoming,
+        IEventSink* pFilter = nullptr )
+    {
+        gint32 ret = 0;
+
+        std::deque< TaskletPtr > oFilters;
+        GetFilters( oFilters );
+        std::deque< TaskletPtr >::iterator
+            itr = oFilters.begin();
+
+        if( pFilter != nullptr )
+        {
+            CTasklet* pFiltTask = ( CTasklet* )pFilter;
+            TaskletPtr pLastFilt( pFiltTask );
+            bool bFound = false;
+            for( ;itr!= oFilters.end(); ++itr )
+            {
+                if( *itr == pLastFilt )
+                {
+                    bFound = true;
+                    break;
+                }
+            }
+
+            // already the last one
+            if( !bFound )
+                return STATUS_SUCCESS;
+            // skip this one
+            ++itr;
+        }
+
+        for( ; itr != oFilters.end(); ++itr )
+        {
+            IMessageFilter* pFilter =
+                dynamic_cast< IMessageFilter* >(
+                    ( CTasklet* ) *itr );
+
+            if( pFilter == nullptr )
+                continue;
+
+            if( bIncoming )
+            {
+                ret = pFilter->FilterMsgIncoming(
+                    pTask, pMsg );
+            }
+            else
+            {
+                ret = pFilter->FilterMsgOutgoing(
+                    pTask, pMsg );
+            }
+
+            if( SUCCEEDED( ret ) )
+                continue;
+
+            if( ret == ERROR_PREMATURE )
+                break;
+
+            if( ERROR( ret ) )
+            {
+                EnumStrategy iStrategy;
+
+                ret = pFilter->GetFilterStrategy(
+                    pTask, pMsg, iStrategy );
+
+                // stop processing
+                if( ERROR( ret ) )
+                {
+                    ret = ERROR_PREMATURE;
+                    break;
+                }
+
+                if( iStrategy == stratStop )
+                {
+                    ret = ERROR_PREMATURE;
+                    break;
+                }
+                else
+                {
+                    ret = 0;
+                    continue;
+                }
+            }
+        }
+
+        return ret;
+    }
 };
 
 template< typename ...Args>
@@ -1185,7 +1353,6 @@ class CInterfaceServer :
 
     protected:
 
-    std::deque< TaskletPtr > m_queFilters;
     SvrConnPtr m_pConnMgr;
 
     virtual gint32 SendData_Server(
@@ -1433,162 +1600,6 @@ class CInterfaceServer :
     gint32 Resume_Server(
         IEventSink* pCallback );
 
-    gint32 RegisterFilter(
-        IEventSink* pFilterTask )
-    {
-        CStdRMutex oIfLock( GetLock() );
-
-        CTasklet* pTask = static_cast
-            < CTasklet* >( pFilterTask );
-
-        m_queFilters.push_back( TaskletPtr( pTask ) );
-        return 0;
-    }
-
-    gint32 UnregisterFilter(
-        IEventSink* pFilterTask )
-    {
-        gint32 ret = -ENOENT;
-        CStdRMutex oIfLock( GetLock() );
-
-        CTasklet* pTask = static_cast
-            < CTasklet* >( pFilterTask );
-
-        std::deque< TaskletPtr >::iterator itr =
-            m_queFilters.begin();
-
-        TaskletPtr ptrTask( pTask );
-        for( ; itr < m_queFilters.end(); ++itr )
-        {
-            if( *itr == ptrTask )
-            {
-                m_queFilters.erase( itr );
-                ret = 0;
-                break;
-            }
-        }
-        return ret;
-    }
-
-    gint32 GetFilters(
-        std::deque< TaskletPtr >& oFilters )
-    {
-        CStdRMutex oIfLock( GetLock() );
-        oFilters = m_queFilters;
-        return 0;
-    }
-
-    virtual gint32 FilterMessage(
-        IEventSink* pTask,
-        DBusMessage* pMsg,
-        bool bIncoming,
-        IEventSink* pFilter = nullptr )
-    {
-        return FilterMessageInternal( pTask,
-            pMsg, bIncoming, pFilter );
-    }
-
-    virtual gint32 FilterMessage(
-        IEventSink* pTask,
-        IConfigDb* pMsg,
-        bool bIncoming,
-        IEventSink* pFilter = nullptr )
-    {
-        return FilterMessageInternal( pTask,
-            pMsg, bIncoming, pFilter );
-    }
-
-    private:
-    template< class T >
-    gint32 FilterMessageInternal(
-        IEventSink* pTask,
-        T* pMsg,
-        bool bIncoming,
-        IEventSink* pFilter = nullptr )
-    {
-        gint32 ret = 0;
-
-        std::deque< TaskletPtr > oFilters;
-        GetFilters( oFilters );
-        std::deque< TaskletPtr >::iterator
-            itr = oFilters.begin();
-
-        if( pFilter != nullptr )
-        {
-            CTasklet* pFiltTask = ( CTasklet* )pFilter;
-            TaskletPtr pLastFilt( pFiltTask );
-            bool bFound = false;
-            for( ;itr!= oFilters.end(); ++itr )
-            {
-                if( *itr == pLastFilt )
-                {
-                    bFound = true;
-                    break;
-                }
-            }
-
-            // already the last one
-            if( !bFound )
-                return STATUS_SUCCESS;
-            // skip this one
-            ++itr;
-        }
-
-        for( ; itr != oFilters.end(); ++itr )
-        {
-            IMessageFilter* pFilter =
-                dynamic_cast< IMessageFilter* >(
-                    ( CTasklet* ) *itr );
-
-            if( pFilter == nullptr )
-                continue;
-
-            if( bIncoming )
-            {
-                ret = pFilter->FilterMsgIncoming(
-                    pTask, pMsg );
-            }
-            else
-            {
-                ret = pFilter->FilterMsgOutgoing(
-                    pTask, pMsg );
-            }
-
-            if( SUCCEEDED( ret ) )
-                continue;
-
-            if( ret == ERROR_PREMATURE )
-                break;
-
-            if( ERROR( ret ) )
-            {
-                EnumStrategy iStrategy;
-
-                ret = pFilter->GetFilterStrategy(
-                    pTask, pMsg, iStrategy );
-
-                // stop processing
-                if( ERROR( ret ) )
-                {
-                    ret = ERROR_PREMATURE;
-                    break;
-                }
-
-                if( iStrategy == stratStop )
-                {
-                    ret = ERROR_PREMATURE;
-                    break;
-                }
-                else
-                {
-                    ret = 0;
-                    continue;
-                }
-            }
-        }
-
-        return ret;
-    }
 };
 
 

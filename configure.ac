@@ -26,6 +26,8 @@ AC_CHECK_LIB([dbus-1], [dbus_bus_get])
 AC_CHECK_LIB([jsoncpp], [_ZNK4Json5ValuecvbEv])
 AC_CHECK_LIB([lz4], [LZ4_compress_default])
 AC_CHECK_LIB([ssl], [SSL_do_handshake])
+AC_CHECK_LIB([gssapi_krb5], [gss_wrap])
+AC_CHECK_LIB([krb5], [krb5_init_context])
 AC_CHECK_LIB([atomic], [__atomic_fetch_add_8])
 
 # Checks for header files.
@@ -71,6 +73,7 @@ AC_CONFIG_FILES([Makefile
                  rpc/sslport/Makefile
                  rpc/wsport/Makefile
                  rpc/wsport/wsproto/Makefile
+                 rpc/security/Makefile
                  test/Makefile
                  test/Makefile.init.pub
                  test/actcancel/Makefile

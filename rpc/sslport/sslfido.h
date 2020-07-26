@@ -139,6 +139,7 @@ class CRpcOpenSSLFido : public CPort
     gint32 SubmitWriteIrp( IRP* pIrp );
     gint32 SubmitIoctlCmd( IRP* pIrp );
 
+    gint32 CompleteFuncIrp( IRP* pIrp );
     gint32 CompleteWriteIrp( IRP* pIrp );
 
     gint32 CompleteIoctlIrp( IRP* pIrp );
@@ -201,6 +202,9 @@ class CRpcOpenSSLFido : public CPort
 
     inline bool IsClient() const
     { return m_bClient; }
+
+    gint32 CancelFuncIrp(
+        IRP* pIrp, bool bForce );
 
     gint32 DoHandshake( IEventSink* pCallback,
         BufPtr& pHandshake );

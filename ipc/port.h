@@ -301,6 +301,8 @@ class CPort : public IPort
         bool bImmediately = false );
 
 	gint32 SubmitGetPropIrp( IRP* pIrp );
+    gint32 SubmitSetPropIrp( IRP* pIrp );
+
     gint32 GetStopResumeTask(
         PIRP pIrp, TaskletPtr& pTask );
 

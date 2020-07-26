@@ -447,17 +447,18 @@ gint32 CRpcTcpBridgeProxy::ForwardRequest(
     do{
         CReqBuilder oBuilder( this );
         CCfgOpener oReqCtx;
-        std::string strPath;
         ret = oReqCtx.CopyProp(
             propRouterPath, pReqCtx );
         if( ERROR( ret ) )
             break;
 
-        oReqCtx.GetStrProp(
-            propRouterPath, strPath );
-
         bool bRelay = false;
-        if( strPath != "/" )
+
+        CRpcRouter* pRouter = GetParent();
+        if( unlikely( pRouter == nullptr ) )
+            continue;
+
+        if( pRouter->HasBridge() )
             bRelay = true;
 
         // just to conform to the rule
@@ -781,7 +782,11 @@ gint32 CRpcTcpBridgeProxy::ForwardEvent(
             strPath += strNodeName;
         }
 
+        // update the strPath
         oEvtCtx2.SetStrProp(
+            propRouterPath, strPath );
+
+        oEvtCtx.SetStrProp(
             propRouterPath, strPath );
 
         DMsgPtr fwdrMsg( pEvtMsg );
@@ -1331,15 +1336,6 @@ do{ \
             oReq.GetCfg(), pPort, _bPdo ); \
 }while( 0 ) 
 
-#define GET_TARGET_PORT( pPort ) \
-do{ \
-        CCfgOpener oReq; \
-        bool _bPdo = false; \
-        oReq.SetBoolProp( propSubmitPdo, true ); \
-        ret = this->GetPortToSubmit( \
-            oReq.GetCfg(), pPort, _bPdo ); \
-}while( 0 ) 
-
 gint32 CRpcTcpBridge::OnPostStart(
     IEventSink* pContext )
 {
@@ -1471,6 +1467,9 @@ gint32 CRpcTcpBridgeShared::OnPostStartShared(
 
         if( ERROR( ret ) )
             break;
+
+        if( ret == STATUS_PENDING )
+            ret = 0;
 
     }while( 0 );
 
@@ -1671,7 +1670,6 @@ CRpcTcpBridge::CRpcTcpBridge(
     : CAggInterfaceServer( pCfg ), super( pCfg ),
     CRpcTcpBridgeShared( this )
 {
-    // SetClassId( clsid( CRpcTcpBridge) );
     gint32 ret = 0;
 
     do{
@@ -2454,12 +2452,11 @@ gint32 CBridgeForwardRequestTask::RunTask()
     DMsgPtr pRespMsg;
 
     do{
-        CRpcServices* pIf;
-        ret = oParams.GetObjPtr( propIfPtr, pObj );
+        CRpcTcpBridge* pIf;
+        ret = oParams.GetPointer( propIfPtr, pIf );
         if( ERROR( ret ) )
             break;
 
-        pIf = pObj;
         if( pIf == nullptr )
         {
             ret = -EFAULT;
@@ -2482,15 +2479,7 @@ gint32 CBridgeForwardRequestTask::RunTask()
         if( ERROR( ret ) )
             break;
 
-        if( pIf->GetClsid() !=
-            clsid( CRpcTcpBridgeImpl ) )
-        {
-            ret = -EINVAL;
-            break;
-        }
-
         CCfgOpener oReqCtx( pReqCtx );
-
         std::string strRouterPath;
         ret = oReqCtx.GetStrProp(
             propRouterPath, strRouterPath );
@@ -2838,8 +2827,8 @@ gint32 CRpcInterfaceServer::DoInvoke(
                 if( ERROR( ret ) )
                     break;
 
-                bool bBridge = 
-                    GetClsid() == clsid( CRpcTcpBridgeImpl );
+                CRpcTcpBridge* pIf = ObjPtr( this );
+                bool bBridge = ( pIf == nullptr );
 
                 DMsgPtr pFwdrMsg;
                 ret = pFwdrMsg.Deserialize(

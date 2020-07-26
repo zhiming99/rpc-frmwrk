@@ -78,6 +78,53 @@ CRpcRouterManager* CRpcRouter::GetRouterMgr() const
         ( m_pParent );
 }
 
+gint32 CRpcRouter::IsEqualConn(
+    const IConfigDb* pConn1,
+    const IConfigDb* pConn2 )
+{
+    gint32 ret = 0;
+    if( pConn1 == nullptr || pConn2 == nullptr )
+        return -EINVAL;
+    do{
+        CCfgOpener oCfg( pConn1 );
+
+        ret = oCfg.IsEqualProp(
+            propDestIpAddr, pConn2 );
+        if( ERROR( ret ) )
+            break;
+
+        ret = oCfg.IsEqualProp(
+            propDestTcpPort, pConn2 );
+        if( ERROR( ret ) )
+            break;
+
+        ret = oCfg.IsEqualProp(
+            propEnableWebSock, pConn2 );
+        if( ERROR( ret ) )
+            break;
+            
+        ret = oCfg.IsEqualProp(
+            propEnableSSL, pConn2 );
+        if( ERROR( ret ) )
+            break;
+
+        ret = oCfg.IsEqualProp(
+            propConnRecover, pConn2 );
+        if( ERROR( ret ) )
+            break;
+
+        ret = oCfg.IsEqualProp(
+            propCompress, pConn2 );
+        if( ERROR( ret ) )
+            break;
+
+    }while( 0 );
+    if( ERROR( ret ) )
+        ret = ERROR_FALSE;
+
+    return ret;
+}
+
 gint32 CRpcRouter::GetBridgeProxy(
     const IConfigDb* pConnParams,
     InterfPtr& pIf )
@@ -119,41 +166,12 @@ gint32 CRpcRouter::GetBridgeProxy(
             if( ERROR( ret ) )
                 continue;
 
-            CfgPtr pPortConn = pcp;
-            CConnParams oPortConn( pPortConn );
+            ret = IsEqualConn(
+                pConnParams, pcp );
 
-            ret = oCfg.IsEqualProp(
-                propDestIpAddr, pcp );
-            if( ERROR( ret ) )
-                continue;
+            if( SUCCEEDED( ret ) )
+                pIf = elem.second;
 
-            ret = oCfg.IsEqualProp(
-                propDestTcpPort, pcp );
-            if( ERROR( ret ) )
-                continue;
-
-            ret = oCfg.IsEqualProp(
-                propEnableWebSock, pcp );
-            if( ERROR( ret ) )
-                continue;
-                
-            ret = oCfg.IsEqualProp(
-                propEnableSSL, pcp );
-            if( ERROR( ret ) )
-                continue;
-
-            ret = oCfg.IsEqualProp(
-                propConnRecover, pcp );
-            if( ERROR( ret ) )
-                continue;
-
-            ret = oCfg.IsEqualProp(
-                propCompress, pcp );
-            if( ERROR( ret ) )
-                continue;
-
-            pIf = elem.second;
-            ret = 0;
             break;
         }
 
@@ -849,7 +867,7 @@ do{ \
     TaskletPtr pDeferTask; \
     _ret = DEFER_IFCALL_NOSCHED2( \
         0, pDeferTask, ObjPtr( ( _pIf ) ), \
-        &CRpcServices::StopEx, \
+        &CRpcServices::Shutdown, \
         ( IEventSink* )0 ); \
     if( ERROR( _ret ) ) \
         break; \
@@ -1204,8 +1222,24 @@ gint32 CRpcRouterBridge::BuildStartStopReqFwdrProxy(
                 if( ERROR( ret ) )
                     break;
 
-                EnumClsid iClsid =
-                    clsid( CRpcReqForwarderProxyImpl );
+                EnumClsid iClsid = clsid(
+                    CRpcReqForwarderProxyImpl );
+
+                CIoManager* pMgr = GetIoMgr();
+                std::string strAuthDest =
+                    AUTH_DEST( pMgr );
+
+                if( oIfParams.IsEqual(
+                    propDestDBusName, strAuthDest ) )
+                {
+                    if( !HasAuth() )
+                    {
+                        ret = -EINVAL;
+                        break;
+                    }
+                    iClsid = clsid(
+                    CRpcReqForwarderProxyAuthImpl );
+                }
 
                 ret = pIf.NewObj( iClsid,
                     oIfParams.GetCfg() );
@@ -1268,35 +1302,67 @@ gint32 CRouterOpenBdgePortTask::CreateInterface(
         CParamList oParams;
         string strRtName;
 
+        oParams.CopyProp( propConnParams, this );
         pMgr->GetRouterName( strRtName );
         oParams.SetStrProp(
             propSvrInstName, strRtName );
 
+        IConfigDb* pConnParams = nullptr;
+        ret = oParams.GetPointer(
+            propConnParams, pConnParams );
+        if( ERROR( ret ) )
+            break;
+
+        CConnParams oConnParams( pConnParams );
+        bool bAuth = pRouter->HasAuth();
+        if( bAuth && !oConnParams.HasAuth() )
+        {
+            // forbid auth bridge router to have
+            // non-auth bridge.
+            ret = -EINVAL;
+            break;
+        }
+
+        std::string strObjName;
+        if( bAuth )
+            strObjName = OBJNAME_TCP_BRIDGE_AUTH;
+        else
+            strObjName = OBJNAME_TCP_BRIDGE;
+
         ret = CRpcServices::LoadObjDesc(
             strObjDesc,
-            OBJNAME_TCP_BRIDGE,
+            strObjName,
             bServer ? true : false,
             oParams.GetCfg() );
 
         if( ERROR( ret ) )
             break;
 
-        if( bServer )
-            oParams.CopyProp( propPortId, this );
-
         oParams.SetPointer(
             propRouterPtr, pRouter );
 
         oParams.SetPointer( propIoMgr, pMgr );
-        oParams.CopyProp( propConnParams, this );
-        EnumClsid iClsid;
+        EnumClsid iClsid = clsid( Invalid );
 
         if( bServer )
         {
+            oParams.CopyProp( propPortId, this );
             oParams.SetIntProp( propIfStateClass,
                 clsid( CIfTcpBridgeState ) );
             iClsid =
                 clsid( CRpcTcpBridgeImpl );
+
+            if( bAuth )
+            {
+                // copy the auth info from the
+                // router object
+                CCfgOpener oConn( pConnParams );
+                oConn.MoveProp( propAuthInfo,
+                ( IConfigDb* )oParams.GetCfg() );
+                iClsid = clsid(
+                    CRpcTcpBridgeAuthImpl );
+            }
+            ret = 0;
         }
         else
         {
@@ -3491,9 +3557,13 @@ gint32 CRpcRouterReqFwdr::StartReqFwdr(
         oParams.SetIntProp( propIfStateClass,
             clsid( CIfReqFwdrState ) );
 
+        string strObjName = OBJNAME_REQFWDR;
+        if( HasAuth() )
+            strObjName = OBJNAME_REQFWDR_AUTH;
+
         ret = CRpcServices::LoadObjDesc(
             strObjDesc,
-            OBJNAME_REQFWDR,
+            strObjName,
             true,
             oParams.GetCfg() );
 
@@ -4575,13 +4645,38 @@ gint32 CRpcRouterManager::Start()
         if( ERROR( ret ) )
             break;
 
+        bool bAuth = false;
+        ret = pMgr->GetCmdLineOpt(
+            propHasAuth, bAuth );
+        if( ERROR( ret ) )
+            ret = 0;
+
         if( m_dwRole & 0x02 )
         {
             CParamList oParams;
+            EnumClsid iClsid = clsid( Invalid );
+            std::string strObjName; 
+
+            if( bAuth )
+            {
+                iClsid = clsid(
+                    CRpcRouterBridgeAuthImpl );
+                strObjName =
+                   OBJNAME_ROUTER_BRIDGE_AUTH;
+            }
+            else
+            {
+                iClsid = clsid(
+                    CRpcRouterBridgeImpl );
+                strObjName =
+                    OBJNAME_ROUTER_BRIDGE;
+            }
+
             ret = CRpcServices::LoadObjDesc(
                 strObjDesc,
-                OBJNAME_ROUTER_BRIDGE,
-                true, oParams.GetCfg() );
+                strObjName,
+                true,
+                oParams.GetCfg() );
 
             if( ERROR( ret ) )
                 break;
@@ -4591,15 +4686,14 @@ gint32 CRpcRouterManager::Start()
 
             oParams[ propIfStateClass ] =
                 clsid( CIfRouterState );
-                
+
             ObjPtr pRtObj;
-            ret = pRtObj.NewObj( 
-                clsid( CRpcRouterBridgeImpl ),
+            ret = pRtObj.NewObj( iClsid,
                 oParams.GetCfg() );
             if( ERROR( ret ) )
                 break;
 
-            CRpcRouterBridgeImpl* prt = pRtObj;
+            CRpcRouterBridge* prt = pRtObj;
             ret = prt->Start();
             if( ERROR( ret ) )
                 break;
@@ -4610,10 +4704,30 @@ gint32 CRpcRouterManager::Start()
         if( m_dwRole & 0x01 )
         {
             CParamList oParams;
+            std::string strObjName; 
+
+            EnumClsid iClsid = clsid( Invalid );
+
+            if( bAuth )
+            {
+                strObjName =
+                    OBJNAME_ROUTER_REQFWDR_AUTH;
+                iClsid = clsid(
+                    CRpcRouterReqFwdrAuthImpl );
+            }
+            else
+            {
+                strObjName =
+                    OBJNAME_ROUTER_REQFWDR;
+                iClsid = clsid(
+                    CRpcRouterReqFwdrImpl );
+            }
+
             ret = CRpcServices::LoadObjDesc(
                 strObjDesc,
-                OBJNAME_ROUTER_REQFWDR,
-                true, oParams.GetCfg() );
+                strObjName,
+                true,
+                oParams.GetCfg() );
 
             if( ERROR( ret ) )
                 break;
@@ -4625,12 +4739,11 @@ gint32 CRpcRouterManager::Start()
                 clsid( CIfRouterState );
                 
             ret = m_pRouterReqFwdr.NewObj( 
-                clsid( CRpcRouterReqFwdrImpl ),
-                oParams.GetCfg() );
+                iClsid, oParams.GetCfg() );
             if( ERROR( ret ) )
                 break;
 
-            CRpcRouterReqFwdrImpl* prt =
+            CRpcRouterReqFwdr* prt =
                 m_pRouterReqFwdr;
 
             ret = prt->Start();
