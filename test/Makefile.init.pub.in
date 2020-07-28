@@ -29,7 +29,7 @@ ifeq ($(ARCH),arm)
 atomic:=$(shell grep -l 'define HAVE_LIBATOMIC 1' $(BASE)/config.h)
 result:=$(patsubst %config.h,config.h,$(atomic))
 ifeq ($(result),config.h)
-LINKER_OPTION += -latomic
+LINKER_OPTION += -latomic -lsystemd
 endif
 endif
 

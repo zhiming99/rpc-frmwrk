@@ -1050,6 +1050,66 @@ gint32 CRpcOpenSSLFido::CompleteIoctlIrp(
     return ret;
 }
 
+gint32 CRpcOpenSSLFido::CompleteFuncIrp( IRP* pIrp )
+{
+    gint32 ret = 0;
+
+    do{
+        if( pIrp == nullptr 
+           || pIrp->GetStackSize() == 0 )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        if( pIrp->MajorCmd() != IRP_MJ_FUNC )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        
+        switch( pIrp->MinorCmd() )
+        {
+        case IRP_MN_IOCTL:
+            {
+                ret = CompleteIoctlIrp( pIrp );
+                break;
+            }
+        case IRP_MN_WRITE:
+            {
+                ret = CompleteWriteIrp( pIrp );
+                break;
+            }
+        default:
+            {
+                ret = -ENOTSUP;
+                break;
+            }
+        }
+
+    }while( 0 );
+
+    if( ret != STATUS_PENDING )
+    {
+        IrpCtxPtr& pCtx =
+            pIrp->GetCurCtx();
+
+        if( !pIrp->IsIrpHolder() )
+        {
+            IrpCtxPtr& pCtxLower = pIrp->GetTopStack();
+
+            ret = pCtxLower->GetStatus();
+            pCtx->SetStatus( ret );
+            pIrp->PopCtxStack();
+        }
+        else
+        {
+            ret = pCtx->GetStatus();
+        }
+    }
+    return ret;
+}
+
 gint32 CRpcOpenSSLFido::CompleteWriteIrp(
     IRP* pIrp )
 {
@@ -1556,6 +1616,23 @@ gint32 CRpcOpenSSLFido::RemoveIrpFromMap(
     return 0;
 }
 
+gint32 CRpcOpenSSLFido::CancelFuncIrp(
+    IRP* pIrp, bool bForce )
+{
+    if( pIrp == nullptr ||
+        pIrp->GetStackSize() == 0 )
+        return -EINVAL;
+
+    do{
+        CStdRMutex oPortLock( GetLock() );
+        RemoveIrpFromMap( pIrp );
+
+    }while( 0 );
+
+    return super::CancelFuncIrp(
+        pIrp, bForce );
+}
+
 gint32 CRpcOpenSSLFido::AllocIrpCtxExt(
     IrpCtxPtr& pIrpCtx,
     void* pContext ) const
@@ -1628,10 +1705,6 @@ gint32 CRpcOpenSSLFidoDrv::Probe(
         if( ERROR( ret ) )
             break;
 
-        // BUGBUG: we should have a better way to
-        // determine if the underlying port is
-        // client or server before the port is
-        // started.
         CCfgOpenerObj oPdoPort(
             ( CObjBase* )pPdoPort );
 
@@ -1651,20 +1724,13 @@ gint32 CRpcOpenSSLFidoDrv::Probe(
             break;
         }
 
-        guint32 dwFd = 0;
-        ret = oPdoPort.GetIntProp(
-            propFd, dwFd );
-
-        if( SUCCEEDED( ret ) )
-            bServer = true;
-
+        bServer = oConn.IsServer();
         if( m_pSSLCtx == nullptr )
         {
             InitSSLContext( bServer );
         }
 
         std::string strPdoClass;
-
         CCfgOpenerObj oCfg( pLowerPort );
         ret = oCfg.GetStrProp(
             propPdoClass, strPdoClass );

@@ -38,7 +38,9 @@
 CPPUNIT_TEST_SUITE_REGISTRATION( CIfRouterTest );
 
 // router role: 1. reqfwdr, 2. bridge, 3. both
-guint32 g_dwRole = 1;
+static guint32 g_dwRole = 1;
+static bool g_bAuth = false;
+static std::string g_strService;
 
 void CIfRouterTest::setUp()
 {
@@ -67,6 +69,19 @@ void CIfRouterTest::setUp()
         {
             pSvc->SetCmdLineOpt(
                 propRouterRole, g_dwRole );
+
+            if( g_bAuth )
+            {
+                pSvc->SetCmdLineOpt(
+                    propHasAuth, g_bAuth );
+            }
+
+            if( g_strService.size() > 0 )
+            {
+                pSvc->SetCmdLineOpt(
+                    propServiceName,
+                    g_strService );
+            }
 
             pSvc->SetRouterName( MODULE_NAME );
             ret = pSvc->Start();
@@ -103,9 +118,15 @@ CfgPtr CIfRouterTest::InitRouterCfg(
 {
     CfgPtr ptrCfg;
     gint32 ret = 0;
+    std::string strDescPath;
+
     do{
+        strDescPath = ROUTER_OBJ_DESC;
+        if( g_bAuth )
+            strDescPath = ROUTER_OBJ_DESC_AUTH;
+
         ret = CRpcServices::LoadObjDesc(
-            ROUTER_OBJ_DESC,
+            strDescPath,
             OBJNAME_ROUTER,
             true, ptrCfg );
 
@@ -124,7 +145,9 @@ CfgPtr CIfRouterTest::InitRouterCfg(
     if( ERROR( ret ) )
     {
         std::string strMsg = DebugMsg(
-            ret, "Error loading file router.json" );
+            ret, "Error loading desc file %s",
+            strDescPath.c_str() );
+
         throw std::runtime_error( strMsg );
     }
 
@@ -178,7 +201,7 @@ int main( int argc, char** argv )
 
     int opt = 0;
     int ret = 0;
-    while( ( opt = getopt( argc, argv, "r:" ) ) != -1 )
+    while( ( opt = getopt( argc, argv, "r:as:" ) ) != -1 )
     {
         switch (opt)
         {
@@ -189,10 +212,32 @@ int main( int argc, char** argv )
                     ret = -EINVAL;
                 break;
             }
+        case 'a':
+            {
+                g_bAuth = true;
+                break;
+            }
+        case 's':
+            {
+                g_strService = optarg;
+                break;
+            }
         default: /*  '?' */
             ret = -EINVAL;
             break;
         }
+        if( !g_bAuth )
+        {
+            if( g_strService.size() > 0 )
+                ret = -EINVAL;
+        }
+        else
+        {
+            if( g_dwRole == 1 && 
+                g_strService.size() > 0 )
+                g_strService.clear();
+        }
+
         if( ERROR( ret ) )
             break;
     }
@@ -200,7 +245,9 @@ int main( int argc, char** argv )
     if( ERROR( ret ) )
     {
         fprintf( stderr,
-            "Usage: %s [-r <role number>]\n",
+            "Usage: %s [-r <role number, 1: reqfwrd, 2: bridge, 3: both>, mandatory ]\n"
+            "\t [-a to enable authentication ]\n"
+            "\t [-s < Service Name for authentication, valid for role 2 or 3, and ignored for role 1 >]\n",
             argv[ 0 ] );
         exit( -ret );
     }

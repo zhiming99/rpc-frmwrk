@@ -976,6 +976,13 @@ EnumTypeId CBuffer::GetExDataType() const
 }
 
 gint32 CBuffer::Append(
+    const char* pBlock, guint32 dwSize )
+{
+    const guint8* p = ( const guint8* )pBlock;
+    return Append( p, dwSize );
+}
+
+gint32 CBuffer::Append(
     const guint8* pBlock, guint32 dwSize )
 {
     if( GetDataType() != DataTypeMem )

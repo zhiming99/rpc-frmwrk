@@ -122,7 +122,7 @@ else ifeq ($(ARCH), arm)
 	C_FLAGS += -fPIC
 endif
 
-CPP_FLAGS := $(CPPFLAGS) -std=c++11 $(WIDTH_FLAG) -Wno-psabi
+CPP_FLAGS := $(CPPFLAGS) -std=c++11 $(WIDTH_FLAG) -Wno-psabi 
 LINKER_OPTION := -shared $(WIDTH_FLAG) -L$(USER_LIB_PREFIX) -L$(LIB_PREFIX) -Wl,-rpath=$(USER_LIB_PREFIX) -Wl,-rpath=$(LIB_PREFIX) -ldbus-1 -ljsoncpp -ldl -lstdc++ -lpthread
 
 ifeq ($(ARCH),arm)

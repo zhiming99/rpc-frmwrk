@@ -207,14 +207,28 @@ enum EnumPropId : gint32
     propTransCtx,       // type: a pointer to the configdb as are the context
                         // information for transferring requests or events,
                         // which could include propConnHandle, propRouterPath,
-                        // propSid. It is adhere with evey ForwardRequest/ForwardEvent/FetchData
-    propSid,            // type: a string as the session id
+
+    propObjDescFile,    // type: a string as the file path for the object description file
     propRouterPath,     // type: an string as the routing path to the destination server
     propPrxyPortId,     // type: a guint32 as the portid for a proxy to forward
                         // the request, 0xfffffff stands for a CRpcReqForwarderProxy, and other values
                         // for a CRpcTcpBridgeProxy
     propNodeName,       // type: a string as the node name for a bridge proxy
-    propObjDescFile,    // type: a string as the file path for the object description file
+
+    // security properties
+    propSecCtx,         // type: a pointer to a IConfigDb object holding security context
+    propSessHash,       // type: a byte array as the session hash
+    propSignature,      // type: a byte array as the message's signature/digest
+    propOpenPort,       // type: a bool to indiate the CDBusProxyPdo if a openport/locallogin is to send
+    propHasAuth,        // type: an bool flag to indicate authentication is enabled on the router
+    propAuthInfo,       // type: an objptr to a configdb containting authentication information
+    propAuthMech,       // type: a string as the authentication mechanism, it can be `krb5', `ntlmv2' or `password'
+    propTimestamp,      // type: a guint64 as a timestamp usec
+    propServiceName,    // type: a string as the service name
+    propRealm,          // type: a string as a kerberos realm
+    propNoEnc,          // type: a bool to tell encryption is not needed
+    propContinue,       // type: a bool to tell if the login process is still going on or not
+
     propReservedEnd = 0x10000000,
     propInvalid = -1, 
 };

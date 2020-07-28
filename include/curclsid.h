@@ -32,14 +32,14 @@
 // future addition.
 //
 // rpc-frmwrk components, last allocation was from
-// wsfido.h
-#define CLSIDS_ALLOCATED    ( clsid( ClassFactoryStart ) + 20 )
+// rpc/security/secclsid.h.
+#define CLSIDS_ALLOCATED    ( clsid( ClassFactoryStart ) + 40 )
 
 // last allocation was from wsfido.h
 #define PROPIDS_ALLOCATED   ( propReservedEnd + 110 )
 
-// iid allocated
-#define IID_ALLOCATED    ( clsid( ReservedIidStart ) + 210 )
+// iid allocated by rpc/security/secclsid
+#define IID_ALLOCATED    ( clsid( ReservedIidStart ) + 220 )
 
 // for non-rpc-frmwrk components, please refer to
 // test/helloworld/ifsvr.h as an example

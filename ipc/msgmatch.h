@@ -167,7 +167,6 @@ class CMessageMatch : public IMessageMatch
             if( ERROR( ret ) )
                 break;
 
-            // objpath is an optional property
             ret = a.GetStrProp(
                 propObjPath, m_strObjPath );
 

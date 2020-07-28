@@ -66,7 +66,19 @@ enum EnumSockState
 };
 
 #define RPC_PACKET_MAGIC    ( *( ( guint32* )"PHdr" ) )
-#define RPC_PACKET_FLG_COMPRESS       1
+#define RPC_PACKET_FLG_COMPRESS       0x01
+
+#define RPC_PACKET_FLG_SECMASK        0x06
+
+#define RPC_PACKET_FLG_CLEARTXT       0x00
+#define RPC_PACKET_FLG_SIGNED         0x02
+#define RPC_PACKET_FLG_ENCRYPTED      0x04
+
+#define ENC_TYPE( _flag ) \
+    ( ( _flag ) & RPC_PACKET_FLG_SECMASK )
+
+#define SET_ENC_TYPE( _flag, _type ) \
+    ( ( ( _flag ) & ~RPC_PACKET_FLG_SECMASK ) | ( _type ) )
 
 struct CPacketHeader
 {
@@ -563,10 +575,10 @@ class CRpcSocketBase : public IService
         return 0;
     }
 
-    gint32 GetAddrInfo(
+    static gint32 GetAddrInfo(
         const std::string& strIpAddr,
         guint32 dwPortNum,
-        addrinfo*& res ) const;
+        addrinfo*& res );
 
     gint32 GetAsyncErr() const;
     virtual gint32 SetProperty(

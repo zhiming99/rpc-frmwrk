@@ -760,6 +760,8 @@ class CIfInterceptTask :
 class CIfInterceptTaskProxy :
     public CIfInterceptTask
 {
+    gint32 m_iTimeoutId = 0;
+
     public:
     typedef CIfInterceptTask super;
 
@@ -788,6 +790,12 @@ class CIfInterceptTaskProxy :
         SetInterceptTask( pEvt );
     };
 
+    ~CIfInterceptTaskProxy()
+    { DisableTimer(); }
+
+    gint32 EnableTimer( guint32 dwTimeoutSec );
+    gint32 DisableTimer();
+
     // set the task to intercept
     gint32 SetInterceptTask( IEventSink* pEvent )
     {
@@ -802,6 +810,9 @@ class CIfInterceptTaskProxy :
 
         return 0;
     }
+
+    gint32 OnCancel( guint32 dwContext );
+    gint32 OnComplete( gint32 iRetVal );
 };
 
 class CIfFetchDataTask : public CIfRetryTask

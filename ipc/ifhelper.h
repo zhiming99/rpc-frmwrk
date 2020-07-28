@@ -1158,7 +1158,7 @@ do{\
 #define END_IFHANDLER_MAP END_HANDLER_MAP
 
 // A more high-level handler macro 
-#define ADD_SERVICE_HANDLER_EX( numArgs, f, fname ) \
+#define ADD_SERVICE_HANDLER_EX_BASE( numArgs, f, fname ) \
 do{ \
     if( _pCurMap_->size() > 0 && \
         _pCurMap_->find( fname ) != _pCurMap_->end() ) \
@@ -1179,7 +1179,13 @@ do{ \
 #define ADD_USER_SERVICE_HANDLER_EX( numArgs, f, fname ) \
 do{ \
     std::string strHandler = USER_METHOD( fname ); \
-    ADD_SERVICE_HANDLER_EX( numArgs, f, strHandler ); \
+    ADD_SERVICE_HANDLER_EX_BASE( numArgs, f, strHandler ); \
+}while( 0 )
+
+#define ADD_SERVICE_HANDLER_EX( numArgs, f, fname ) \
+do{ \
+    std::string strHandler = SYS_METHOD( fname ); \
+    ADD_SERVICE_HANDLER_EX_BASE( numArgs, f, strHandler ); \
 }while( 0 )
 
 template< class T >
@@ -2633,9 +2639,16 @@ gint32 CInterfaceProxy::ProxyCall(
 #define FORWARD_CALL( iNumInput, strMethod, ... ) \
     ProxyCall( _N( iNumInput ), strMethod, ##__VA_ARGS__ )
 
-#define FORWARD_IF_CALL( iid, iNumInput, strMethod, ... ) \
+#define FORWARD_SYSIF_CALL( _iid_, iNumInput, strMethod, ... ) \
 ({  CParamList oParams; \
-    oParams[ propIid ] = iid; \
+    oParams[ propIid ] = ( _iid_ ); \
+    oParams[ propSysMethod ] = true; \
+    InputCount< iNumInput > a( ( oParams.GetCfg() ) ); \
+    ProxyCall( &a, strMethod, ##__VA_ARGS__ );} )
+
+#define FORWARD_IF_CALL( _iid_, iNumInput, strMethod, ... ) \
+({  CParamList oParams; \
+    oParams[ propIid ] = ( _iid_ ); \
     oParams[ propSysMethod ] = false; \
     InputCount< iNumInput > a( ( oParams.GetCfg() ) ); \
     ProxyCall( &a, strMethod, ##__VA_ARGS__ );} )
@@ -2661,11 +2674,11 @@ struct has_##MethodName\
 
 
 #define VA_LIST(...) __VA_ARGS__
-// this macro serves to define a virtual method to all
-// this macro serves to define a virtual method to all
-// the overridden virtual methods from the interfaces
-// on this object which, in turn, overrides the base
-// class( CInterfaceServer or CInterfaceProxy ) if
+// this macro serves to define the master virtual
+// method to all the overridden virtual methods
+// from the interfaces on this object which, in
+// turn, overrides the base class(
+// CInterfaceServer or CInterfaceProxy ) if
 // defined.
 #define ITERATE_IF_VIRT_METHODS_IMPL( _MethodName, rettype, PARAMS, ARGS ) \
     private: \
@@ -2899,11 +2912,92 @@ gint32 GetIidOfType( std::vector< guint32 >& vecIids, Type* pType )
     return 0;
 }
 
+#include "frmwrk.h"
+// _pos is the position for the callback 'pCallback', which must be present in the
+// ARGS, otherwise the macro does not compile.
+#define ITERATE_IF_VIRT_METHODS_ASYNC_IMPL( _pos, _MethodName, rettype, PARAMS, ARGS ) \
+    private: \
+    DEFINE_HAS_METHOD( _MethodName, rettype, PARAMS ); \
+    gint32 AsyncInterf##_MethodName( NumberSequence<>  ) \
+    { return 0; } \
+    template < int N > \
+    gint32 AsyncInterf##_MethodName( \
+         std::vector< gint32 (*)( ThisType*, PARAMS )>& _vec, NumberSequence< N >, PARAMS ) \
+    { \
+        using IfClassName = typename std::tuple_element< N, std::tuple<Types...>>::type; \
+        if( has_##_MethodName< IfClassName >::value ) \
+            _vec.push_back( []( ThisType* p, PARAMS ){ return p->IfClassName::_MethodName( ARGS ); } ); \
+        return 0; \
+    } \
+    template < int N, int M, int...S > \
+    gint32 AsyncInterf##_MethodName( \
+        std::vector< gint32 (*)( ThisType*, PARAMS )>& _vec, NumberSequence< N, M, S... >, PARAMS ) \
+    { \
+        using IfClassName = typename std::tuple_element< N, std::tuple<Types...>>::type; \
+        if( has_##_MethodName< IfClassName >::value ) \
+        { \
+            _vec.push_back( []( ThisType* p, PARAMS ){ return p->IfClassName::_MethodName( ARGS ); } ); \
+            return 0; \
+        } \
+        return AsyncInterf##_MethodName( _vec, NumberSequence<M, S...>(), ARGS ); \
+    } \
+    rettype _MethodName##Hidden( \
+         LONGWORD ptr, PARAMS ){ \
+            gint32 (*p)( ThisType*, PARAMS ) = ( gint32 (*)(ThisType*, PARAMS ) )ptr;\
+            return p( this, ARGS );\
+        } \
+    public: \
+    virtual rettype _MethodName( PARAMS ) \
+    { \
+        /* main entrance of _MethodName */ \
+        std::vector< gint32 (*)( ThisType*, PARAMS )> _vec;\
+        TaskGrpPtr pTaskGrp;\
+        CParamList oParams;\
+        oParams[ propIfPtr ] = ObjPtr( this );\
+        gint32 ret = pTaskGrp.NewObj(\
+            clsid( CIfTaskGroup ),oParams.GetCfg() );\
+        _vec.push_back( []( ThisType* p, PARAMS ){ return p->virtbase::_MethodName( ARGS ); } ); \
+        if( ERROR( ret ) ) \
+            return ret; \
+        if( sizeof...( Types ) ) \
+        { \
+            using seq = typename GenSequence< sizeof...( Types ) >::type; \
+            AsyncInterf##_MethodName( _vec, seq(), ARGS ); \
+            if( _vec.empty() )\
+                return 0;\
+            for( auto& elem : _vec ) { \
+                TaskletPtr pTask;\
+                ret = DEFER_IFCALLEX_NOSCHED2( \
+                    _pos + 1, pTask, \
+                    ObjPtr( this ), \
+                    &ThisType::_MethodName##Hidden, \
+                    ( LONGWORD )elem, ARGS ); \
+                if( ERROR( ret ) ) break; \
+                pTaskGrp->AppendTask( pTask ); \
+            } \
+            if( ERROR( ret ) ) \
+            { \
+                ( *pTaskGrp )( eventCancelTask ); \
+                return ret; \
+            } \
+            CIoManager* pMgr = this->GetIoMgr(); \
+            CIfRetryTask* pTask = ObjPtr( pTaskGrp ); \
+            auto tup = std::make_tuple( ARGS ); \
+            pTask->SetClientNotify( std::get< _pos >( tup ) ); \
+            TaskletPtr pGrp = ObjPtr( pTask ); \
+            ret = pMgr->RescheduleTask( pGrp ); \
+            if( SUCCEEDED( ret ) ) \
+                ret = pGrp->GetError(); \
+        } \
+        return ret; \
+    }
+
 template< typename...Types >
 struct CAggregatedObject< CAggInterfaceServer, Types... >
     : Types...
 {
     using virtbase = CAggInterfaceServer;
+    using ThisType = CAggregatedObject< CAggInterfaceServer, Types... >;
 
     public:
     typedef virtbase super;
@@ -2917,7 +3011,7 @@ struct CAggregatedObject< CAggInterfaceServer, Types... >
     ITERATE_IF_VIRT_METHODS_IMPL( OnPreStart, gint32,
         VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
 
-    ITERATE_IF_VIRT_METHODS_IMPL( OnPostStart, gint32,
+    ITERATE_IF_VIRT_METHODS_ASYNC_IMPL( 0, OnPostStart, gint32,
         VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
 
     ITERATE_IF_VIRT_METHODS_IMPL( OnPostStop, gint32,
@@ -2926,7 +3020,10 @@ struct CAggregatedObject< CAggInterfaceServer, Types... >
     ITERATE_IF_VIRT_METHODS_IMPL( AddStartTasks, gint32,
         VA_LIST( IEventSink* pTaskGrp ), VA_LIST( pTaskGrp ) )
 
-    ITERATE_IF_VIRT_METHODS_IMPL( OnPreStop, gint32,
+    ITERATE_IF_VIRT_METHODS_IMPL( AddStopTasks, gint32,
+        VA_LIST( IEventSink* pTaskGrp ), VA_LIST( pTaskGrp ) )
+
+    ITERATE_IF_VIRT_METHODS_ASYNC_IMPL( 0, OnPreStop, gint32,
         VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
 
     const EnumClsid GetIid() const
@@ -3042,6 +3139,7 @@ struct CAggregatedObject< CAggInterfaceProxy, Types... >
     : Types...
 {
     using virtbase = CAggInterfaceProxy;
+    using ThisType = CAggregatedObject< CAggInterfaceProxy, Types... >;
     public:
     typedef virtbase super;
     CAggregatedObject( const IConfigDb* pCfg )
@@ -3054,7 +3152,7 @@ struct CAggregatedObject< CAggInterfaceProxy, Types... >
     ITERATE_IF_VIRT_METHODS_IMPL( OnPreStart, gint32,
         VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
 
-    ITERATE_IF_VIRT_METHODS_IMPL( OnPostStart, gint32,
+    ITERATE_IF_VIRT_METHODS_ASYNC_IMPL( 0, OnPostStart, gint32,
         VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
 
     ITERATE_IF_VIRT_METHODS_IMPL( OnPostStop, gint32,
@@ -3063,7 +3161,7 @@ struct CAggregatedObject< CAggInterfaceProxy, Types... >
     ITERATE_IF_VIRT_METHODS_IMPL( AddStartTasks, gint32,
         VA_LIST( IEventSink* pTaskGrp ), VA_LIST( pTaskGrp ) )
 
-    ITERATE_IF_VIRT_METHODS_IMPL( OnPreStop, gint32,
+    ITERATE_IF_VIRT_METHODS_ASYNC_IMPL( 0, OnPreStop, gint32,
         VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
 
     const EnumClsid GetIid() const

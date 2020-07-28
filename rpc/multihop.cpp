@@ -234,8 +234,6 @@ gint32 CRpcTcpBridge::CheckRouterPathAgain(
         oReqCtx2.CopyProp(
             propObjList, pReqCtx );
 
-        oReqCtx2.CopyProp( propSid, pReqCtx );
-
         AddCheckStamp( oReqCtx2.GetCfg() );
 
         TaskletPtr pMajorCall;
@@ -370,6 +368,8 @@ gint32 CRpcTcpBridge::CheckRouterPath(
             break;
         }
 
+        // check if this router is accessable for
+        // the session
         if( !IsAccesable( pReqCtx ) )
         {
             ret = -EACCES;
@@ -382,9 +382,6 @@ gint32 CRpcTcpBridge::CheckRouterPath(
             propRouterPath, pReqCtx );
         if( ERROR( ret ) )
             break;
-
-        oReqCtx.CopyProp(
-            propSid, pReqCtx );
 
         oReqCtx.CopyProp(
             propObjList, pReqCtx );
@@ -476,7 +473,6 @@ gint32 CRpcTcpBridge::CheckRouterPath(
             // oReqCtx2 as the reqctx to next node
             CCfgOpener oReqCtx2;
             oReqCtx2[ propRouterPath ] = strNext;
-            oReqCtx2.CopyProp( propSid, pReqCtx );
 
             ObjPtr pObj;
             // for cyclic path avoidance
@@ -1507,61 +1503,6 @@ gint32 CRpcTcpBridge::EnableRemoteEventInternalMH(
             ( *pTask )( eventCancelTask );
 
     }while( 0 );
-
-    return ret;
-}
-
-gint32 CRpcTcpBridgeImpl::OnPreStop(
-    IEventSink* pCallback )
-{
-    gint32 ret = 0;
-    TaskletPtr plps, ppsmh;
-    do{
-        CParamList oParams;
-        oParams[ propIfPtr ] = ObjPtr( this );
-        TaskGrpPtr pTaskGrp;
-        ret = pTaskGrp.NewObj(
-            clsid( CIfTaskGroup ),
-            oParams.GetCfg() );
-        if( ERROR( ret ) )
-            return ret;
-
-        pTaskGrp->SetClientNotify( pCallback );
-        pTaskGrp->SetRelation( logicNONE );
-
-        ret = DEFER_IFCALLEX_NOSCHED2(
-            0, plps, ObjPtr( this ),
-            &CRpcTcpBridgeImpl::OnPreStopLocal,
-            ( IEventSink* )nullptr );
-        if( ERROR( ret ) )
-            break;
-
-        ret = DEFER_IFCALLEX_NOSCHED2(
-            0, ppsmh, ObjPtr( this ),
-            &CRpcTcpBridgeImpl::OnPreStopMH,
-            ( IEventSink* )nullptr );
-        if( ERROR( ret ) )
-            break;
-
-        pTaskGrp->AppendTask( plps );
-        pTaskGrp->AppendTask( ppsmh );
-
-        TaskletPtr pTask = pTaskGrp;
-        CIoManager* pMgr = GetIoMgr();
-        ret = pMgr->RescheduleTask( pTask );
-        if( SUCCEEDED( ret ) )
-            ret = pTask->GetError();
-
-    }while( 0 );
-
-    if( ERROR( ret ) )
-    {
-        if( !plps.IsEmpty() )
-            ( *plps )( eventCancelTask );
-
-        if( !ppsmh.IsEmpty() )
-            ( *ppsmh )( eventCancelTask );
-    }
 
     return ret;
 }

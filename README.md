@@ -1,7 +1,10 @@
 # rpc-frmwrk
 
-这是一个嵌入式的RPC框架项目，关注于跨网络的互联互通。本项目欢迎有兴趣的人士加入!   
+这是一个嵌入式的RPC框架项目，关注于跨网络，跨协议，跨平台的互联互通。本项目欢迎有兴趣的人士加入!   
 This is an asynchronous and event-driven RPC framework for embeded system with small system footprint. It is targeting at the IOT platforms, high-throughput, and high availability over hybrid network. Welcome to join!  
+
+#### Concept
+[`Here`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md) is an introduction about some concepts that help to understand this project.
 
 #### Dependency:  
 This framework depends on the following packags:  
@@ -22,14 +25,51 @@ This framework depends on the following packags:
 6. `Pausable/Resumable interface.`
 7. `Support RPC from remote machine, local system, and in-process.` 
 8. `Transparent support for different types of remote communications.`
-9. `File/Big data transfer.`
+9. `File/stream data transfer.`
 10. `Peer online/offline awareness.`
 11. `Streaming support to provide double-direction stream transfer`
-12. `Secure Socket Layer (SSL) support`
-13. `Websocket support`
-14. `Object access via Multi-hop routing` (coming)
+12. [`Secure Socket Layer (SSL) support`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/sslport/Readme.md)
+13. [`Websocket support`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/wsport/Readme.md)
+14. [`Object access via Multihop routing`](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support)
+15. `Authentication and Access control` support. (To come)
+
+#### Building `rpc-frmwrk`:   
+Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60) for details.
 
 ---
+[`Sun 26 Jul 2020 08:12:16 PM Beijing`]   
+1. Submitted the Kerberos support to the main branch. It is not debugged yet. So it surely cannot work for now. And if you want to give a shot to the framework, please try version 0.3. :)   
+
+[`Sun 12 Jul 2020 11:23:27 AM Beijing`]   
+1. still battling with some technical difficulties. The "relative simple" design has turned not as simple as it looks. Anyway, authentication support is coming...  
+
+[`Mon 22 Jun 2020 05:40:08 PM Beijing`]   
+1. Discarded the old authentication design, and chose a relative simple design to start over now, `Kerberos` authentication.      
+
+[`Fri 12 Jun 2020 04:58:06 PM Beijing`]   
+1. Designing is still in process. Details has made the progress slow.   
+
+[`Sun 24 May 2020 04:49:09 PM Beijing`]   
+1. It turns out security stuffs never disappoint you by complexity. Still researching on the different authentication approaches. It would probably take another month to get it done.
+
+[`Wed 13 May 2020 05:23:01 PM Beijing`]   
+1. Preferable to `File ACL` as the `access control` model.
+2. `Kerberos` requires a lot of resources for deployment, and I will also try to add the `NTLM` as a low-cost alternative.
+
+[`Mon 11 May 2020 09:23:20 PM Beijing`]   
+1. Trying to use `GSSAPI's Kerberos implementation` as the authentication mechanism. There are still some technical issues to investigate at this point.
+2. It is not decided yet whether to use `File ACL` or `RBAC` as the `access control` model.
+
+[`Tue 28 Apr 2020 02:12:02 PM Beijing`]   
+1. The next task is to implement `Authentication and access control` for `rpc-frmwrk`.
+
+[`Sun 26 Apr 2020 06:19:24 PM Beijing`]   
+1. `Multihop` is almost completed, but testing will continue to cover more test cases.
+2. The next to do could be either `Python support` or `Authentication and access control`. Not decided yet. 
+
+[`Fri 24 Apr 2020 08:15:48 PM Beijing`]   
+1. Fixed some major bugs. There are still two or three known bugs, but multihop support is near complete.   
+
 [`Tue 07 Apr 2020 11:15:32 AM Beijing`]   
 1. fixed some bugs in the multihop code. It should be more stable now. and more testing and tuning needed.
 
@@ -37,16 +77,16 @@ This framework depends on the following packags:
 1. Streaming for multihop almost works. the performance is not ideal yet. More testing and tuning needed.   
 
 [`Tue 31 Mar 2020 10:11:09 PM Beijing`]   
-1. still debugging the multi-hop related stuffs. Request forwarding and event forwarding work now. Next task is to get streaming to work.   
+1. still debugging the multihop related stuffs. Request forwarding and event forwarding work now. Next task is to get streaming to work.   
 
 [`Sat 21 Mar 2020 01:47:35 PM Beijing`]   
 1. Updated some `autoconf` releated stuffs to make the cross-compile more efficient.
 
 [`Fri 20 Mar 2020 11:00:16 PM Beijing`]   
-1. Submitted a compilable version with multi-hop support. It will take one or two weeks to get it work.   
+1. Submitted a compilable version with multihop support. It will take one or two weeks to get it work.   
 
 [`Sat 14 Mar 2020 09:18:01 PM Beijing`]   
-1. Code complete the streaming support for multi-hop, about 70% done.    
+1. Code complete the streaming support for multihop, about 70% done.    
 
 [`Mon 02 Mar 2020 05:36:15 PM Beijing`]
 1. Splitted the `CRpcRouter` to smaller classes.   
@@ -74,7 +114,7 @@ This framework depends on the following packags:
 1. Created a new branch `multihop` for the newly added changes. It will take some time to get stable, and then I will merge back to the `master` branch.
 
 [`Tue 21 Jan 2020 06:53:13 PM Beijing`]   
-1. The replacement of `ip address` with `connection handle` has turned out not a trivial change, and has escalated to a major change. I need to bring the pirority of `multi-hop routing` ahead of the `websocket` support for now. This is a major upgrade of the router module, which enables associations of two or more devices/controlers in a hierarchical tree, and enable the client to `RPC` to a number of remote servers via a `path` string.
+1. The replacement of `ip address` with `connection handle` has turned out not a trivial change, and has escalated to a major change. I need to bring the pirority of `multihop routing` ahead of the `websocket` support for now. This is a major upgrade of the router module, which enables associations of two or more devices/controlers in a hierarchical tree, and enable the client to `RPC` to a number of remote servers via a `path` string.
 
 [`Mon 06 Jan 2020 12:04:26 PM Beijing`]   
 1. I need to replace the `ip address` with a opaque `connection handle` for the upcoming support of websocket, since `ip address` is no longer the only address format to locate the server. It is the bottom half of an earlier change which replaced `ip address` with the `port id` on the `bridge` side. The `reqfwdr` and `dbusprxy` are the target modules for this time.   
@@ -125,7 +165,7 @@ This framework depends on the following packags:
 [`Sat 09 Nov 2019 10:09:12 AM Beijing`]   
 1. Refacting the tcpport. I did not realize that through the days, the tcpport has grown to a big module with about 10000 loc.
 2. Continue the design of the support for websock/http.
-3. Object addressing and multi-router hopping are also in the research.
+3. Object addressing and multiple hops between routers are also in the research.
 
 [`Sun 03 Nov 2019 02:05:39 PM Beijing`]   
 1. To add the support for websocket, SSL and other unknown protocols, I need to refact the current tcp port implementation, because the present design is too closely coupled without room for the new protocols. It is a bitter decision, but it should worth the effort. Sometime, you may need one step back for 2 steps forward. The good part is that the tcp port implementation is relatively isolated with little changes to other functions.
@@ -142,7 +182,7 @@ This framework depends on the following packags:
 1. IPv6 support is done.
 2. It turns out http support depends on the presence of some new features. It needs some time to have a full understanding of the task.
    * Object addressing mechanism
-   * multi-hop routing
+   * multihop routing
    * Session management and access control
    * Site registration and discovery.
 

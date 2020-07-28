@@ -81,6 +81,7 @@
 // specific.
 // This must be a synchronous request
 #define IRP_MJ_GETPROP                  0x05
+#define IRP_MJ_SETPROP                  0x06
 
 #define IRP_MJ_INVALID                  0xFF
 

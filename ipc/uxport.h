@@ -211,6 +211,17 @@ class CIoWatchTask:
 
     CIoWatchTask( const IConfigDb* pCfg );
 
+    inline CIoManager* GetIoMgr() const
+    {
+        CCfgOpenerObj oCfg( this );
+        CIoManager* pMgr = nullptr;
+        gint32 ret = oCfg.GetPointer(
+            propIoMgr, pMgr );
+        if( ERROR( ret ) )
+            return nullptr;
+        return pMgr;
+    }
+
     static int GetFd( const IConfigDb* pCfg )
     {
         gint32 ret = 0;

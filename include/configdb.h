@@ -27,9 +27,15 @@
 #include "autoptr.h"
 #include "buffer.h"
 #include <stdexcept>
-#include <unordered_map>
+#include <map>
 
-#define hashmap unordered_map
+// NOTE:
+// changed back to std::map. Because usually the
+// map element is less than 20, it should be ok to
+// use std::map without performance loss. and
+// keeping the order is important for generating
+// the same hash across different platform.
+#define hashmap map
 
 class CIoManager;
 
@@ -548,7 +554,7 @@ class CCfgDbOpener
         return ret;
     }
 
-    gint32 IsEqualProp( gint32 iProp, CObjBase* pObj )
+    gint32 IsEqualProp( gint32 iProp, const CObjBase* pObj )
     {
         gint32 ret = 0;
 
@@ -1098,7 +1104,7 @@ class CCfgDbOpener< IConfigDb >
         return ret;
     }
 
-    gint32 IsEqualProp( gint32 iProp, CObjBase* pObj )
+    gint32 IsEqualProp( gint32 iProp, const CObjBase* pObj )
     {
         gint32 ret = 0;
 
@@ -1215,8 +1221,54 @@ class CCfgOpenerT : public CCfgDbOpener< T >
     }
 };
 
-typedef CCfgOpenerT< IConfigDb > CCfgOpener;
+typedef CCfgOpenerT< IConfigDb > CCfgOpenerBase;
 typedef CCfgOpenerT< CObjBase > CCfgOpenerObj;
+
+class CCfgOpener : public CCfgOpenerBase
+{
+    public:
+    typedef CCfgOpenerBase super;
+
+    CCfgOpener( IConfigDb* pCfg )
+        :CCfgOpenerBase( pCfg )
+    {}
+
+    CCfgOpener( const IConfigDb* pCfg )
+        :CCfgOpenerBase( pCfg )
+    {}
+
+    CCfgOpener() :
+        CCfgOpenerBase()
+    {}
+
+    CCfgOpener( CCfgOpener& rhs ):
+        CCfgOpenerBase(
+            ( IConfigDb* )rhs.m_pNewCfg )
+    { m_pNewCfg = rhs.m_pNewCfg; }
+
+    gint32 Serialize( CBuffer& oBuf ) const
+    {
+        if( m_pNewCfg.IsEmpty() )
+            return -EFAULT;
+        return m_pNewCfg->Serialize( oBuf );
+    }
+
+    gint32 Serialize( BufPtr& pBuf ) const
+    {
+        if( pBuf.IsEmpty() ||
+            m_pNewCfg.IsEmpty() )
+            return -EFAULT;
+        return m_pNewCfg->Serialize( *pBuf );
+    }
+
+    gint32 Deserialize( BufPtr& pBuf )
+    {
+        if( pBuf.IsEmpty() ||
+            m_pNewCfg.IsEmpty() )
+            return -EFAULT;
+        return m_pNewCfg->Deserialize( *pBuf );
+    }
+};
 
 class CParamList : public CCfgOpener
 {
@@ -1531,7 +1583,7 @@ gint32 CParamList::Push< const BufPtr& > ( const BufPtr& val  );
 class CConfigDb : public IConfigDb
 {
     protected:
-    std::unordered_map<gint32, BufPtr> m_mapProps;
+    std::hashmap<gint32, BufPtr> m_mapProps;
 
     public:
     typedef IConfigDb   super;

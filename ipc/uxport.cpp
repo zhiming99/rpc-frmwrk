@@ -1036,11 +1036,7 @@ gint32 CIoWatchTask::OnIoReady( guint32 revent )
 gint32 CIoWatchTask::ReleaseChannel()
 {
     do{
-        CPort* pPort = m_pPort;
-        if( pPort == nullptr )
-            break;
-
-        CIoManager* pMgr = pPort->GetIoMgr();
+        CIoManager* pMgr = GetIoMgr();
         CMainIoLoop* pLoop =
             pMgr->GetMainIoLoop();
 

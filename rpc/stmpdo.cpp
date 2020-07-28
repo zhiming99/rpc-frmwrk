@@ -243,7 +243,15 @@ gint32 CRpcTcpBusPort::CreatePdoPort(
         }
         else
         {
-            ret = -ENOTSUP;
+            EnumClsid iClsid = CoGetClassId(
+                strClass.c_str() );
+            if( iClsid == clsid( Invalid ) )
+            {
+                ret = -ENOTSUP;
+                break;
+            }
+            ret = CreateTcpStreamPdo(
+                pCfg, pNewPort, iClsid );
         }
 
     }while( 0 );
@@ -788,6 +796,15 @@ gint32 CRpcTcpBusDriver::GetTcpSettings(
                         oParams[ JSON_ATTR_CONN_RECOVER ].asString();
                     if( strVal == "true" )
                         oElemCfg.SetBoolProp( propConnRecover, true );
+                }
+
+                if( oParams.isMember( JSON_ATTR_HASAUTH ) &&
+                    oParams[ JSON_ATTR_HASAUTH ].isString() )
+                {
+                    string strVal =
+                        oParams[ JSON_ATTR_HASAUTH ].asString();
+                    if( strVal == "true" )
+                        oElemCfg.SetBoolProp( propHasAuth, true );
                 }
 
                 vecParams.push_back( ObjPtr( oElemCfg.GetCfg() ) );

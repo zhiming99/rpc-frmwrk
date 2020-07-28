@@ -36,6 +36,7 @@ class CDBusProxyPdo : public CRpcPdoPort
 
     protected:
     bool                m_bConnected;
+    bool                m_bAuth = false;
 
     // this match will work at two places
     //
@@ -132,6 +133,8 @@ class CDBusProxyPdo : public CRpcPdoPort
         CStdRMutex oPortLock( GetLock() );
         m_pConnTask.Clear();
     }
+
+    std::string GetReqFwdrName() const;
 };
 
 typedef CAutoPtr< clsid( CDBusProxyPdo ), CDBusProxyPdo > ProxyPdoPtr;

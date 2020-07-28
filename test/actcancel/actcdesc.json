@@ -17,7 +17,7 @@
             "Compression" : "true",
             "EnableSSL" : "false",
             "EnableWS" : "false",
-            "RouterPath" : "/",
+            "RouterPath" : "/rasp1",
             "Interfaces" :
             [
                 {

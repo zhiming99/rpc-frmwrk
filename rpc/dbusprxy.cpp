@@ -50,6 +50,21 @@ CConnParamsProxy GetConnParams(
     return CConnParamsProxy( pConnParams );
 }
 
+std::string CDBusProxyPdo::GetReqFwdrName() const
+{
+    std::string strVal;
+    if( m_bAuth )
+    {
+        strVal = OBJNAME_REQFWDR_AUTH;
+    }
+    else
+    {
+        strVal = OBJNAME_REQFWDR;
+    }
+
+    return strVal;
+}
+
 CDBusProxyPdo::CDBusProxyPdo(
     const IConfigDb* pCfg ) : super( pCfg ),
         m_atmInitDone( false )
@@ -96,6 +111,7 @@ CDBusProxyPdo::CDBusProxyPdo(
             break;
         }
 
+        m_bAuth = oConnParams.HasAuth();
         SetConnected( false );
 
         CCfgOpener oMyCfg( ( IConfigDb* )m_pCfgDb );
@@ -153,9 +169,7 @@ gint32 CDBusProxyPdo::CheckConnCmdResp(
     DMsgPtr pMsg( pMessage );
 
     do{
-
         string strMember = pMsg.GetMember();
-
         if( strMember.empty() )
         {
             ret = -EINVAL;
@@ -163,11 +177,16 @@ gint32 CDBusProxyPdo::CheckConnCmdResp(
         }
 
         if( strMember != SYS_METHOD_OPENRMTPORT && 
-            strMember != SYS_METHOD_CLOSERMTPORT )
+            strMember != SYS_METHOD_CLOSERMTPORT &&
+            strMember != SYS_METHOD_LOCALLOGIN )
         {
             ret = -EINVAL;
             break;
         }
+
+        bool bClose = false;
+        if( strMember == SYS_METHOD_CLOSERMTPORT )
+            bClose = true;
 
         ret = pMsg.GetIntArgAt( 0,
             ( guint32& )iMethodReturn );
@@ -176,6 +195,9 @@ gint32 CDBusProxyPdo::CheckConnCmdResp(
             break;
 
         if( ERROR( iMethodReturn ) )
+            break;
+
+        if( bClose )
             break;
 
         ObjPtr pObj;
@@ -210,6 +232,9 @@ gint32 CDBusProxyPdo::CheckConnCmdResp(
         ret = oPortCfg.CopyProp(
             propConnParams, pResp );
 
+        if( ERROR( ret ) )
+            break;
+
         CCfgOpenerObj oMatchCfg(
             ( CObjBase* )m_pMatchFwder );
 
@@ -222,8 +247,8 @@ gint32 CDBusProxyPdo::CheckConnCmdResp(
         // add the only match for this proxy pdo,
         // the listening IRP will be queued from
         // upper ProxyFdo port
-        ret = AddMatch(
-            m_mapEvtTable, m_pMatchFwder );
+        ret = AddMatch( m_mapEvtTable,
+            m_pMatchFwder );
 
         if( ERROR( ret ) )
             break;
@@ -602,13 +627,35 @@ gint32 CDBusProxyPdo::HandleConnRequest(
         oParams.Push(
             ObjPtr( oMethodArgs.GetCfg() ) );
 
+        string strIf = DBUS_IF_NAME(
+            IFNAME_REQFORWARDER );
+
         string strCmd;
 
         if( bConnect )
+        {
             strCmd = SYS_METHOD_OPENRMTPORT;
+        }
         else
             strCmd = SYS_METHOD_CLOSERMTPORT;
 
+        if( m_bAuth )
+        {
+            bool bOpenPort = false;
+            ret = oPortCfg.GetBoolProp(
+                propOpenPort, bOpenPort );
+            if( ERROR( ret ) || !bOpenPort )
+            {
+                strCmd = SYS_METHOD_LOCALLOGIN;
+                // the method is from an interface
+                // other than IFNAME_REQFORWARDER
+                strIf = DBUS_IF_NAME(
+                    IFNAME_REQFORWARDERAUTH );
+            }
+
+            ret = 0;
+        }
+        
         oParams.SetStrProp( propMethodName, strCmd );
 
         BufPtr pBuf( true );
@@ -624,9 +671,6 @@ gint32 CDBusProxyPdo::HandleConnRequest(
        if( ERROR( ret ) )
             break;
 
-        string strIf = DBUS_IF_NAME(
-            IFNAME_REQFORWARDER );
-
         ret = pMsg.SetInterface( strIf );
         if( ERROR( ret ) )
             break;
@@ -634,7 +678,7 @@ gint32 CDBusProxyPdo::HandleConnRequest(
         string strRtName;
         GetIoMgr()->GetRouterName( strRtName );
         string strDest = DBUS_DESTINATION2(
-                strRtName, OBJNAME_REQFWDR );
+                strRtName, GetReqFwdrName() );
 
         ret = pMsg.SetDestination( strDest );
 
@@ -651,7 +695,7 @@ gint32 CDBusProxyPdo::HandleConnRequest(
             break;
 
         string strObjPath = DBUS_OBJ_PATH(
-            strRtName, OBJNAME_REQFWDR );
+            strRtName, GetReqFwdrName() );
 
         ret = pMsg.SetPath( strObjPath );
 
@@ -706,7 +750,7 @@ gint32 CDBusProxyPdo::BuildMsgHeader(
         string strRtName;
         GetIoMgr()->GetRouterName( strRtName );
         string strDest = DBUS_DESTINATION2(
-            strRtName, OBJNAME_REQFWDR );
+            strRtName, GetReqFwdrName() );
 
         if( true )
         {
@@ -1447,7 +1491,7 @@ gint32 CDBusProxyPdo::PostStart( IRP* pIrp )
         GetIoMgr()->GetRouterName( strRtName );
 
         string strPath = DBUS_OBJ_PATH(
-            strRtName, OBJNAME_REQFWDR );
+            strRtName, GetReqFwdrName() );
 
         string strIfName =
             DBUS_IF_NAME( IFNAME_REQFORWARDER );
@@ -1456,7 +1500,7 @@ gint32 CDBusProxyPdo::PostStart( IRP* pIrp )
         // map must have propDestDBusName set to
         // handle the module online/offline
         string strDest = DBUS_DESTINATION2(
-                strRtName, OBJNAME_REQFWDR );
+                strRtName, GetReqFwdrName() );
 
         ret = matchCfg.SetStrProp(
             propDestDBusName, strDest );

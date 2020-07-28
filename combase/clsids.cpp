@@ -22,6 +22,7 @@
  * =====================================================================================
  */
 #include <map>
+#include <unordered_map>
 #include <vector>
 #include "defines.h"
 #include "buffer.h"
@@ -235,14 +236,15 @@ static gint32 CoInitClsidNames()
 // called
 gint32 CoInitialize( guint32 dwContext )
 {
-    if( g_pFactories.IsEmpty() )
-    {
-        g_pFactories = new CClassFactories(); 
-        if( g_pFactories.IsEmpty() )
-            return -EFAULT;
+    if( !g_pFactories.IsEmpty() )
+        return 0;
 
-        g_pFactories->DecRef();
-    }
+    g_pFactories = new CClassFactories(); 
+    if( g_pFactories.IsEmpty() )
+        return -EFAULT;
+
+    g_pFactories->DecRef();
+
     // load the class factory of combase ahead of 
     // any of the rest libraires
     FactoryPtr pBaseFactory = InitClassFactory();

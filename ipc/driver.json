@@ -75,6 +75,26 @@
             ]
         },
         {
+            "DriverName"    : "RpcSecFidoDrv",
+            "DriverType"    : "PortDriver",
+            "InternalClass" : "CRpcSecFidoDrv",
+            "Description"   : "This is a filter port driver, and the port it creats is the CRpcOpenSSLFido",
+            "PortClasses"   :
+            [
+                "RpcSecFido"
+            ]
+        },
+        {
+            "DriverName"    : "KdcRelayFdoDrv",
+            "DriverType"    : "PortDriver",
+            "InternalClass" : "CKdcRelayFdoDrv",
+            "Description"   : "This is a FDO port driver, and the port it creats is the CRpcNativeProtoFdo",
+            "PortClasses"   :
+            [
+                "KdcRelayFdo"
+            ]
+        },
+        {
             "DriverName"    : "UnixSockBusDriver",
             "DriverType"    : "BusDriver",
             "InternalClass" : "CUnixSockBusDriver",
@@ -148,10 +168,22 @@
             }
         },
         {
+            "PortType"      : "Fido",
+            "PortClass"     : "RpcSecFido",
+            "InternalClass" : "CRpcSecFido",
+            "PortDriver"    : "RpcSecFidoDrv"
+        },
+        {
             "PortType"      : "Fdo",
             "PortClass"     : "RpcNativeProtoFdo",
             "InternalClass" : "CRpcNativeProtoFdo",
             "PortDriver"    : "RpcNatProtoFdoDrv"
+        },
+        {
+            "PortType"      : "Fdo",
+            "PortClass"     : "KdcRelayFdo",
+            "InternalClass" : "CKdcRelayFdo",
+            "PortDriver"    : "KdcRelayPdoDrv"
         },
         {
             "PortType"      : "Pdo",
@@ -163,6 +195,12 @@
             "PortType"      : "Pdo",
             "PortClass"     : "TcpStreamPdo2",
             "InternalClass" : "CTcpStreamPdo2",
+            "BusPortClass"  : "RpcTcpBusPort"
+        },
+        {
+            "PortType"      : "Pdo",
+            "PortClass"     : "KdcRelayPdo",
+            "InternalClass" : "CKdcRelayPdo",
             "BusPortClass"  : "RpcTcpBusPort"
         },
         {
@@ -212,7 +250,9 @@
                     "Compression" : "true",
                     "EnableWS":  "false",
                     "EnableSSL": "false",
-                    "ConnRecover" : "false"
+                    "ConnRecover" : "false",
+                    "comments-3" : "this port has authentication enabled",
+                    "HasAuth"  : "true"
                 }
             ]
         },
@@ -468,9 +508,13 @@
         {
             "PortClass" : "TcpStreamPdo2",
             "comment" : "ProbeSequence specify the order of the drivers' Probe to call to build the port stack",
-            "ProbeSequence" : [ "RpcOpenSSLFidoDrv", "RpcWebSockFidoDrv", "RpcNatProtoFdoDrv", "RpcTcpFidoDrv" ],
+            "ProbeSequence" : [ "RpcOpenSSLFidoDrv", "RpcWebSockFidoDrv", "RpcSecFidoDrv", "RpcNatProtoFdoDrv", "RpcTcpFidoDrv" ],
             "Description" : "This match provides a binding between the pdo and the uppper fdo and fido",
             "comment-1" : "this is a new fork of the TcpStreamPdo, with better flexibility and extensibility"
+        },
+        {
+            "PortClass" : "KdcRelayPdo",
+            "ProbeSequence" : [ "KdcRelayFdoDrv" ]
         },
         {
             "PortClass" : "UnixSockStmPdo",
