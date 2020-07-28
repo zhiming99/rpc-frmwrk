@@ -20,13 +20,13 @@ $(OUTPUT_DIR)/$(TARGET) : $(OBJS)
 	$(CC) -o $(OUTPUT_DIR)/$(TARGET) $(LINKER_OPTION) $(OBJS)
 
 SSLPort:
-	make -C ./sslport
+	make -j 3 -l 5 -C ./sslport
 
 WSPort:
-	make -C ./wsport
+	make -j 3 -l 5 -C ./wsport
 
 Security:
-	make -j -l 5 -C ./security
+	make -j 3 -l 5 -C ./security
 
 -include $(OBJS:%.o=%.d)
 
