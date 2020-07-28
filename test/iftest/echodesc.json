@@ -19,6 +19,12 @@
             "EnableSSL" : "false",
             "EnableWS" : "false",
             "RouterPath" : "/rasp3",
+            "AuthInfo" :
+            {
+                "AuthMech" : "krb5",
+                "UserName" : "zhiming",
+                "Realm" : "rpcfrmwrk.org"
+            },
             "Interfaces" :
             [
                 {

@@ -45,8 +45,6 @@ class CKdcRelayProxy :
         super( pCfg )
     { SetClassId( clsid( CKdcRelayProxy ) ); }
 
-    ~CKdcRelayProxy();
-
     gint32 InitUserFuncs();
     gint32 SetupReqIrp( IRP* pIrp,
         IConfigDb* pReqCall,

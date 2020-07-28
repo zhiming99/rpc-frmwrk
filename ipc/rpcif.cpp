@@ -182,6 +182,8 @@ CInterfaceProxy::CInterfaceProxy(
         if( SUCCEEDED( ret ) )
             RemoveProperty( propDummyMatch );
 
+        ret = 0;
+
     }while( 0 );
 
     if( ERROR( ret ) )
@@ -5721,6 +5723,8 @@ CInterfaceServer::CInterfaceServer(
 
         if( SUCCEEDED( ret ) )
             RemoveProperty( propDummyMatch );
+
+        ret = 0;
 
     }while( 0 );
 

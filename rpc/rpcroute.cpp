@@ -532,7 +532,10 @@ gint32 CRpcRouterBridge::BuildNodeMap()
     gint32 ret = 0;
     do{
         std::string strObjName =
-            OBJNAME_ROUTER_BRIDGE;
+            OBJNAME_ROUTER_BRIDGE_AUTH;
+
+        if( !HasAuth() )
+            strObjName = OBJNAME_ROUTER_BRIDGE;
 
         std::string strObjDesc;
         CCfgOpenerObj oRouterCfg( this );
@@ -1229,8 +1232,9 @@ gint32 CRpcRouterBridge::BuildStartStopReqFwdrProxy(
                 std::string strAuthDest =
                     AUTH_DEST( pMgr );
 
-                if( oIfParams.IsEqual(
-                    propDestDBusName, strAuthDest ) )
+                ret = oIfParams.IsEqual(
+                    propDestDBusName, strAuthDest );
+                if( SUCCEEDED( ret ) )
                 {
                     if( !HasAuth() )
                     {

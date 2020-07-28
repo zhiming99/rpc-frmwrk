@@ -523,8 +523,6 @@ class CRpcReqForwarderAuth :
         IEventSink* pCallback,
         const IConfigDb* pcfg );
 
-    virtual gint32 RebuildMatches();
-
     virtual gint32 ClearRefCountByPortId(
         guint32 dwPortId,
         std::vector< std::string >& vecUniqNames );
@@ -568,18 +566,27 @@ struct CRpcRouterAuthShared
             oParams.SetStrProp(
                 propObjPath, strObjPath );
 
-            oParams.SetStrProp(
-                propDestDBusName, strDest );
-
             oParams.SetIntProp(
                 propMatchType, matchServer );
 
+            oParams.SetStrProp(
+                propRouterPath, "/" );
+
+            oParams.SetIntProp(
+                propPortId, 0xffffffff );
+
             ret = pMatch.NewObj(
-                clsid( CMessageMatch ),
+                clsid( CRouterRemoteMatch ),
                 oParams.GetCfg() );
 
             if( ERROR( ret ) )
                 break;
+
+            CCfgOpenerObj oMatch(
+                ( CObjBase* ) pMatch );
+
+            oMatch.SetStrProp(
+                propDestDBusName, strDest );
 
         }while( 0 );
 
@@ -649,7 +656,7 @@ class CRpcRouterReqFwdrAuth :
         return ret;
     }
 
-    virtual gint32 HasAuth()
+    virtual bool HasAuth() const
     { return true; }
 
 
@@ -698,7 +705,7 @@ class CRpcRouterBridgeAuth :
         return ret;
     }
 
-    virtual gint32 HasAuth()
+    virtual bool HasAuth() const
     { return true; }
 
     virtual gint32 OnPostStart(

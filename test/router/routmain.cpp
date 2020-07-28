@@ -118,10 +118,10 @@ CfgPtr CIfRouterTest::InitRouterCfg(
 {
     CfgPtr ptrCfg;
     gint32 ret = 0;
-    do{
-        std::string strDescPath =
-            ROUTER_OBJ_DESC;
+    std::string strDescPath;
 
+    do{
+        strDescPath = ROUTER_OBJ_DESC;
         if( g_bAuth )
             strDescPath = ROUTER_OBJ_DESC_AUTH;
 
@@ -145,7 +145,9 @@ CfgPtr CIfRouterTest::InitRouterCfg(
     if( ERROR( ret ) )
     {
         std::string strMsg = DebugMsg(
-            ret, "Error loading file router.json" );
+            ret, "Error loading desc file %s",
+            strDescPath.c_str() );
+
         throw std::runtime_error( strMsg );
     }
 

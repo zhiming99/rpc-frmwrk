@@ -178,7 +178,9 @@ class CInitHookMap
     gint32 CreateNewHook( ObjPtr& pHook );
 
     public:
-    CInitHookMap();
+    CInitHookMap()
+    {}
+
     ~CInitHookMap();
 
     stdrmutex& GetLock()
@@ -317,11 +319,9 @@ class CK5AuthProxy :
     virtual gint32 OnPreStart(
         IEventSink* pCallback );
 
-    virtual gint32 OnPostStart(
-        IEventSink* pCallback );
-
     virtual gint32 GetSess(
-        std::string& strSess ) const;
+        std::string& strSess ) const
+    { strSess = m_strSess; return 0; }
 
     virtual gint32 RebuildMatches();
 

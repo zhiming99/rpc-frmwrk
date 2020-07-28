@@ -2942,8 +2942,10 @@ gint32 GetIidOfType( std::vector< guint32 >& vecIids, Type* pType )
         return AsyncInterf##_MethodName( _vec, NumberSequence<M, S...>(), ARGS ); \
     } \
     rettype _MethodName##Hidden( \
-        gint32 (*p)( ThisType*, PARAMS ), PARAMS )\
-        { return p( this, ARGS );} \
+         LONGWORD ptr, PARAMS ){ \
+            gint32 (*p)( ThisType*, PARAMS ) = ( gint32 (*)(ThisType*, PARAMS ) )ptr;\
+            return p( this, ARGS );\
+        } \
     public: \
     virtual rettype _MethodName( PARAMS ) \
     { \
@@ -2969,7 +2971,7 @@ gint32 GetIidOfType( std::vector< guint32 >& vecIids, Type* pType )
                     _pos + 1, pTask, \
                     ObjPtr( this ), \
                     &ThisType::_MethodName##Hidden, \
-                    elem, ARGS ); \
+                    ( LONGWORD )elem, ARGS ); \
                 if( ERROR( ret ) ) break; \
                 pTaskGrp->AppendTask( pTask ); \
             } \

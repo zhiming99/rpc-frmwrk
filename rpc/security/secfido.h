@@ -68,7 +68,6 @@ class CRpcSecFido : public CPort
     typedef CPort super;
 
     CRpcSecFido( const IConfigDb* pCfg );
-    ~CRpcSecFido();
 
     gint32 CompleteFuncIrp( IRP* pIrp );
     gint32 OnSubmitIrp( IRP* pIrp );
