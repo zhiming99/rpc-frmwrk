@@ -3563,7 +3563,11 @@ gint32 CRpcRouterReqFwdr::StartReqFwdr(
 
         string strObjName = OBJNAME_REQFWDR;
         if( HasAuth() )
+        {
             strObjName = OBJNAME_REQFWDR_AUTH;
+            iClsid =
+                clsid( CRpcReqForwarderAuthImpl );
+        }
 
         ret = CRpcServices::LoadObjDesc(
             strObjDesc,

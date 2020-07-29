@@ -66,6 +66,9 @@
                     "InterfaceName" : "CRpcReqForwarder"
                 },
                 {
+                    "InterfaceName" : "CRpcReqForwarderAuth"
+                },
+                {
                     "InterfaceName" : "CStatCountersServer"
                 }
             ]
