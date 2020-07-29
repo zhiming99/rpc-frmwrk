@@ -41,7 +41,7 @@
             ]
         },
         {
-            "comment" : " "this is a proxy object to create within the krb5's plugin",
+            "comment" : "this is a proxy object to create within the krb5's plugin",
             "ObjectName": "KdcChannel",
             "BusName" : "DBusBusPort_0",
             "PortClass": "DBusLocalPdo",
