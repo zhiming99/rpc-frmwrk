@@ -1272,7 +1272,7 @@ gint32 CAuthentProxy::BuildLoginTask(
     do{
         std::string strMech = GET_MECH( pIf );
 
-        if( strMech != "krb5" ||
+        if( strMech != "krb5" &&
             strMech != "ntlm" )
         {
             ret = -ENOTSUP;
@@ -1399,6 +1399,12 @@ gint32 CAuthentProxy::StopSessImpl()
             break;
 
         CRpcServices* pSvc = pSessImpl;
+        ret = pSvc->TestSetState( cmdShutdown );
+        if( ERROR( ret ) )
+        {
+            ret = 0;
+            break;
+        }
         ret = DEFER_CALL( GetIoMgr(),
             ObjPtr( pSvc ),
             &CRpcServices::Shutdown,
@@ -1412,23 +1418,12 @@ gint32 CAuthentProxy::StopSessImpl()
 gint32 CAuthentProxy::OnPostStop(
     IEventSink* pCallback )
 {
+    // stop the auth proxy if it is still
+    // in connected state.
+    StopSessImpl();
+
     // remove the binding
-    do{
-        CRpcServices* pSvc = m_pSessImpl;
-        if( pSvc == nullptr )
-            break;
-
-        if( !super::IsConnected() )
-            break;
-
-        // stop the auth proxy if it is still
-        // in connected state.
-        StopSessImpl();
-
-    }while( 0 );
-
     m_pSessImpl.Clear();
-
     return 0;
 }
 
@@ -1817,6 +1812,45 @@ gint32 CRpcReqForwarderAuth::OnSessImplStarted(
             break;
         }
 
+        ObjPtr pAuthImpl;
+        ret = oReqCtx.GetObjPtr(
+            propIfPtr, pAuthImpl );
+        if( ERROR( ret ) )
+            break;
+
+        guint32 dwPortId = 0;
+        CCfgOpenerObj oIfCfg(
+            ( CObjBase* )pAuthImpl );
+
+        ret = oIfCfg.GetIntProp(
+            propConnHandle, dwPortId );
+        if( ERROR( ret ) )
+            break;
+
+        InterfPtr pbp;
+        CRpcRouter* pRouter = GetParent();
+        ret = pRouter->GetBridgeProxy(
+            dwPortId, pbp );
+        if( ERROR( ret ) )
+            break;
+
+        // bind the bridge proxy and the auth
+        // proxy
+        CAuthentProxy* pBdgePrxy = ObjPtr( pbp );
+        InterfPtr pTemp = pAuthImpl;
+        pBdgePrxy->SetSessImpl( pTemp );
+
+        IAuthenticateProxy* pAuth =
+            dynamic_cast < IAuthenticateProxy* >
+                ( ( CObjBase* )pAuthImpl );
+
+        if( unlikely( pAuth == nullptr ) )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        pAuth->SetParent( pBdgePrxy );
+
     }while( 0 );
 
     if( ERROR( ret ) )
@@ -1875,20 +1909,29 @@ gint32 CRpcReqForwarderAuth::OnSessImplLoginComplete(
         if( ERROR( ret ) )
             break;
 
+        IAuthenticateProxy* pAuth =
+            dynamic_cast < IAuthenticateProxy* >
+            ( pap );
+
+        if( unlikely( pAuth == nullptr ) )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        CRpcServices* pbp = pAuth->GetParent();
+        if( unlikely( pbp == nullptr ) )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
         // at this moment, the auth proxy should
         // have the correct connhandle in place.
         guint32 dwPortId = 0;
-        CCfgOpenerObj oIfCfg( pap );
-        ret = oIfCfg.GetIntProp(
+        CCfgOpenerObj oapCfg( pap );
+        ret = oapCfg.GetIntProp(
             propConnHandle, dwPortId );
-        if( ERROR( ret ) )
-            break;
-
-        InterfPtr pbp;
-        CRpcRouter* pRouter = GetParent();
-        ret = pRouter->GetBridgeProxy(
-            dwPortId, pbp );
-
         if( ERROR( ret ) )
             break;
 
@@ -1902,25 +1945,6 @@ gint32 CRpcReqForwarderAuth::OnSessImplLoginComplete(
         if( ERROR( ret ) )
             break;
 
-        // bind the bridge proxy and the auth
-        // proxy object
-        CRpcServices* psc = nullptr;
-        ret = oReqCtx.GetPointer(
-            propIfPtr, psc );
-        if( ERROR( ret ) )
-            break;
-
-        IAuthenticateProxy* pAuth =
-            dynamic_cast < IAuthenticateProxy* >
-            ( psc );
-
-        if( pAuth == nullptr )
-        {
-            ret = -EFAULT;
-            break;
-        }
-        CCfgOpenerObj oapCfg( psc );
-
         bool bNoEnc;
         ret = oapCfg.GetBoolProp(
             propNoEnc, bNoEnc );
@@ -1929,16 +1953,9 @@ gint32 CRpcReqForwarderAuth::OnSessImplLoginComplete(
 
         std::string strHash;
         pAuth->GetSess( strHash );
+
         CRpcTcpBridgeProxyAuth* pProxy =
             ObjPtr( pbp );
-
-        CAuthentProxy* pabp =
-            dynamic_cast< CAuthentProxy* >
-                ( pProxy );
-
-        InterfPtr pTemp = ObjPtr( psc );
-        pabp->SetSessImpl( pTemp );
-        pAuth->SetParent( pProxy );
 
         ret = pProxy->SetSessHash(
             strHash, bNoEnc );
@@ -2003,6 +2020,10 @@ gint32 CRpcReqForwarderAuth::OnSessImplLoginComplete(
 
         // a new task to release the seq task
         // queue
+        CAuthentProxy* pabp =
+            dynamic_cast< CAuthentProxy* >
+                ( pProxy );
+
         CIoManager* pMgr = pabp->GetIoMgr();
         ret = pMgr->RescheduleTask( pChkRt );
         if( SUCCEEDED( ret ) )
@@ -2191,7 +2212,7 @@ gint32 CRpcReqForwarderAuth::CreateBridgeProxyAuth(
         if( ERROR( ret ) )
             break;
 
-        CIfParallelTask* pTask = pApTask;
+        CIfRetryTask* pTask = pApTask;
         pTask->SetClientNotify( pSeqTask );
 
         CIoManager* pMgr = GetIoMgr();
@@ -2312,7 +2333,7 @@ gint32 CRpcRouterReqFwdrAuth::DecRefCount(
         RegObjPtr pReg;
         for( auto elem : m_mapRefCount )
         {
-            if( pReg->GetPortId() == dwPortId )
+            if( elem.first->GetPortId() == dwPortId )
             {
                 pReg = elem.first;
                 break;

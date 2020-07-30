@@ -58,14 +58,13 @@
         if( ERROR( ret ) ) \
             pAuth = nullptr;\
     }\
-    CCfgOpener oAuth( pAuth ); \
-    oAuth.GetCfg(); \
+    pAuth;\
 })
 
 #define GET_MECH( _pIf )\
 ({\
     CCfgOpener oAuth( \
-        ( IConfigDb* ) GET_AUTH( _pIf ) );\
+         GET_AUTH( _pIf ) );\
     std::string strMech;\
     oAuth.GetStrProp(\
         propAuthMech, strMech );\

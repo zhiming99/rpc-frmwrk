@@ -8,19 +8,19 @@ debug:
 	@if [ ! -e $(OUTPUT_DIR)/librpc.so ]; then cd $(OUTPUT_DIR);ln -s ../../$(DBG_DIR)/librpc.so;cd -;fi
 	@if [ ! -e $(OUTPUT_DIR)/libsslpt.so ]; then cd $(OUTPUT_DIR);ln -s ../../$(DBG_DIR)/libsslpt.so;cd -;fi
 	@if [ ! -e $(OUTPUT_DIR)/libwspt.so ]; then cd $(OUTPUT_DIR);ln -s ../../$(DBG_DIR)/libwspt.so;cd -;fi
-	make -j -l 5 -C helloworld
-	make -j -l 5 -C iftest
-	make -j -l 5 -C asynctst
-	make -j -l 5 -C smoketest
-	make -j -l 5 -C actcancel
-	make -j -l 5 -C evtest
-	make -j -l 5 -C inproc
-	make -j -l 5 -C katest
-	make -j -l 5 -C prtest
-	make -j -l 5 -C sftest
-	make -j -l 5 -C stmtest
-	make -j -l 5 -C router
-	make -j -l 5 -C btinrt
+	$(MAKE) -C helloworld
+	$(MAKE) -C iftest
+	$(MAKE) -C asynctst
+	$(MAKE) -C smoketest
+	$(MAKE) -C actcancel
+	$(MAKE) -C evtest
+	$(MAKE) -C inproc
+	$(MAKE) -C katest
+	$(MAKE) -C prtest
+	$(MAKE) -C sftest
+	$(MAKE) -C stmtest
+	$(MAKE) -C router
+	$(MAKE) -C btinrt
 
 release:
 	@if [ ! -e $(OUTPUT_DIR)/libcombase.so ]; then cd $(OUTPUT_DIR);ln -s ../../$(RLS_DIR)/libcombase.so;cd -;fi
@@ -28,63 +28,63 @@ release:
 	@if [ ! -e $(OUTPUT_DIR)/librpc.so ]; then cd $(OUTPUT_DIR);ln -s ../../$(RLS_DIR)/librpc.so;cd -;fi
 	@if [ ! -e $(OUTPUT_DIR)/libsslpt.so ]; then cd $(OUTPUT_DIR);ln -s ../../$(RLS_DIR)/libsslpt.so;cd -;fi
 	@if [ ! -e $(OUTPUT_DIR)/libwspt.so ]; then cd $(OUTPUT_DIR);ln -s ../../$(RLS_DIR)/libwspt.so;cd -;fi
-	make -j -l 5 -C helloworld release
-	make -j -l 5 -C iftest release
-	make -j -l 5 -C asynctst release
-	make -j -l 5 -C smoketest release
-	make -j -l 5 -C actcancel release
-	make -j -l 5 -C evtest release
-	make -j -l 5 -C inproc release
-	make -j -l 5 -C katest release
-	make -j -l 5 -C prtest release
-	make -j -l 5 -C sftest release
-	make -j -l 5 -C stmtest release
-	make -j -l 5 -C router release
-	make -j -l 5 -C btinrt release
+	$(MAKE) -C helloworld release
+	$(MAKE) -C iftest release
+	$(MAKE) -C asynctst release
+	$(MAKE) -C smoketest release
+	$(MAKE) -C actcancel release
+	$(MAKE) -C evtest release
+	$(MAKE) -C inproc release
+	$(MAKE) -C katest release
+	$(MAKE) -C prtest release
+	$(MAKE) -C sftest release
+	$(MAKE) -C stmtest release
+	$(MAKE) -C router release
+	$(MAKE) -C btinrt release
 
 clean:
-	make -C helloworld clean
-	make -C iftest clean
-	make -C asynctst clean
-	make -C smoketest clean
-	make -C actcancel clean
-	make -C evtest clean
-	make -C inproc clean
-	make -C katest clean
-	make -C prtest clean
-	make -C sftest clean
-	make -C stmtest clean
-	make -C router clean
-	make -C btinrt clean
+	$(MAKE) -C helloworld clean
+	$(MAKE) -C iftest clean
+	$(MAKE) -C asynctst clean
+	$(MAKE) -C smoketest clean
+	$(MAKE) -C actcancel clean
+	$(MAKE) -C evtest clean
+	$(MAKE) -C inproc clean
+	$(MAKE) -C katest clean
+	$(MAKE) -C prtest clean
+	$(MAKE) -C sftest clean
+	$(MAKE) -C stmtest clean
+	$(MAKE) -C router clean
+	$(MAKE) -C btinrt clean
 
 release_clean:
-	make -C helloworld release_clean
-	make -C iftest release_clean
-	make -C asynctst release_clean
-	make -C smoketest release_clean
-	make -C actcancel release_clean
-	make -C evtest release_clean
-	make -C inproc release_clean
-	make -C katest release_clean
-	make -C prtest release_clean
-	make -C sftest release_clean
-	make -C stmtest release_clean
-	make -C router release_clean
-	make -C btinrt release_clean
+	$(MAKE) -C helloworld release_clean
+	$(MAKE) -C iftest release_clean
+	$(MAKE) -C asynctst release_clean
+	$(MAKE) -C smoketest release_clean
+	$(MAKE) -C actcancel release_clean
+	$(MAKE) -C evtest release_clean
+	$(MAKE) -C inproc release_clean
+	$(MAKE) -C katest release_clean
+	$(MAKE) -C prtest release_clean
+	$(MAKE) -C sftest release_clean
+	$(MAKE) -C stmtest release_clean
+	$(MAKE) -C router release_clean
+	$(MAKE) -C btinrt release_clean
 
 debug_clean:
-	make -C helloworld debug_clean
-	make -C iftest debug_clean
-	make -C asynctst debug_clean
-	make -C smoketest debug_clean
-	make -C actcancel debug_clean
-	make -C evtest debug_clean
-	make -C inproc debug_clean
-	make -C katest debug_clean
-	make -C prtest debug_clean
-	make -C sftest debug_clean
-	make -C stmtest debug_clean
-	make -C router debug_clean
-	make -C btinrt debug_clean
+	$(MAKE) -C helloworld debug_clean
+	$(MAKE) -C iftest debug_clean
+	$(MAKE) -C asynctst debug_clean
+	$(MAKE) -C smoketest debug_clean
+	$(MAKE) -C actcancel debug_clean
+	$(MAKE) -C evtest debug_clean
+	$(MAKE) -C inproc debug_clean
+	$(MAKE) -C katest debug_clean
+	$(MAKE) -C prtest debug_clean
+	$(MAKE) -C sftest debug_clean
+	$(MAKE) -C stmtest debug_clean
+	$(MAKE) -C router debug_clean
+	$(MAKE) -C btinrt debug_clean
 
 .PHONY: release clean debug_clean debug

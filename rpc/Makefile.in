@@ -20,13 +20,13 @@ $(OUTPUT_DIR)/$(TARGET) : $(OBJS)
 	$(CC) -o $(OUTPUT_DIR)/$(TARGET) $(LINKER_OPTION) $(OBJS)
 
 SSLPort:
-	make -j 3 -l 5 -C ./sslport
+	$(MAKE) -C ./sslport
 
 WSPort:
-	make -j 3 -l 5 -C ./wsport
+	$(MAKE) -C ./wsport
 
 Security:
-	make -j 3 -l 5 -C ./security
+	$(MAKE) -C ./security
 
 -include $(OBJS:%.o=%.d)
 
@@ -34,16 +34,16 @@ debug_clean: do_clean
 release_clean: do_clean
 
 clean:
-	make debug_clean
-	make release_clean
+	$(MAKE) debug_clean
+	$(MAKE) release_clean
 
 do_clean:
 	-@rm $(OBJ_DIR)/*.d $(MUTE_CLEAN)
 	-@rm $(OUTPUT_DIR)/$(TARGET) $(MUTE_CLEAN)
 	-@rm $(OBJS) $(MUTE_CLEAN)
-	make -C ./wsport $(MAKECMDGOALS)
-	make -C ./sslport $(MAKECMDGOALS)
-	make -C ./security $(MAKECMDGOALS)
+	$(MAKE) -C ./wsport $(MAKECMDGOALS)
+	$(MAKE) -C ./sslport $(MAKECMDGOALS)
+	$(MAKE) -C ./security $(MAKECMDGOALS)
 
 sync:
 	bash ./sync-up.sh
