@@ -2417,7 +2417,7 @@ inline gint32 NewIfDeferredCall2( EnumClsid iTaskClsid,
         _pTask, pObj, func , ##__VA_ARGS__ ); \
     if( SUCCEEDED( _ret ) ) \
     { \
-        CIfDeferCallTaskEx* pDefer = _pTask; \
+        CIfDeferCallTaskEx2* pDefer = _pTask; \
         BufPtr pBuf( true ); \
         *pBuf = ObjPtr( pDefer ); \
         pDefer->UpdateParamAt( _pos, pBuf );  \
