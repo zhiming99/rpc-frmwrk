@@ -2144,8 +2144,19 @@ gint32 CRpcReqForwarder::BuildBufForIrpRmtSvrEvent(
         string strRtName;
         GetIoMgr()->GetRouterName( strRtName );
 
-        pOfflineMsg.SetPath( DBUS_OBJ_PATH(
-            strRtName, OBJNAME_REQFWDR ) );
+        CRpcRouter* pRouter = GetParent();
+        if( pRouter->HasAuth() )
+        {
+            pOfflineMsg.SetPath(
+                DBUS_OBJ_PATH( strRtName,
+                OBJNAME_REQFWDR_AUTH) );
+        }
+        else
+        {
+            pOfflineMsg.SetPath(
+                DBUS_OBJ_PATH( strRtName,
+                OBJNAME_REQFWDR ) );
+        }
 
         pOfflineMsg.SetMember(
             SYS_EVENT_RMTSVREVENT );
@@ -2407,9 +2418,19 @@ gint32 CRpcReqForwarder::ForwardEvent(
             string strRtName;
             GetIoMgr()->GetRouterName( strRtName );
 
-            oBuilder.SetObjPath(
-                DBUS_OBJ_PATH( strRtName,
-                OBJNAME_REQFWDR ) );
+            CRpcRouter* pRouter = GetParent();
+            if( pRouter->HasAuth() )
+            {
+                oBuilder.SetObjPath(
+                    DBUS_OBJ_PATH( strRtName,
+                    OBJNAME_REQFWDR_AUTH ) );
+            }
+            else
+            {
+                oBuilder.SetObjPath(
+                    DBUS_OBJ_PATH( strRtName,
+                    OBJNAME_REQFWDR) );
+            }
 
             CCfgOpenerObj oMatch(
                 ( CObjBase* )pObj );

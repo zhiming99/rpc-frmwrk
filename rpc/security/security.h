@@ -460,6 +460,7 @@ class CRpcReqForwarderAuth :
     public CRpcReqForwarder
 {
     TaskGrpPtr m_pLoginQue;
+    CfgPtr m_pLoginCtx;
 
     gint32 LocalLoginInternal(
         IEventSink* pCallback,
@@ -493,6 +494,23 @@ class CRpcReqForwarderAuth :
         if( iid == iid( CRpcReqForwarder ) )
             return true;
         return false;
+    }
+
+    gint32 GetStartCtx( IConfigDb*& pCtx ) const
+    {
+        if( m_pLoginCtx.IsEmpty() )
+            return -EFAULT;
+        pCtx = m_pLoginCtx;
+        return 0;
+    }
+
+    gint32 SetStartCtx( IConfigDb* pCtx )
+    {
+        if( pCtx == nullptr )
+            m_pLoginCtx.Clear();
+        else
+            m_pLoginCtx = pCtx;
+        return 0;
     }
 
     gint32 InitUserFuncs();
@@ -727,6 +745,9 @@ class CRpcTcpBridgeProxyAuth :
     gint32 SetSessHash(
         const std::string& strHash,
         bool bEncrypt );
+
+    virtual gint32 OnPostStart(
+        IEventSink* pCallback );
 
     gint32 OnPostStop(
         IEventSink* pCallback );
