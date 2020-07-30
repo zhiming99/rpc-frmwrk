@@ -34,7 +34,7 @@
 
 #define DESC_FILE               "./authprxy.json"
 #define PLUGIN_MODULE_NAME      "kdconn"
-#define OBJNAME_AUTHSVR         "AuthentServer"
+#define OBJNAME_AUTHSVR         "K5AuthServer"
 #define OBJNAME_KDCCHANNEL      "KdcChannel"
 #define USERNAME_NOLOGIN        "kdcclient"
 

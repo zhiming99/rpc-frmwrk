@@ -18,7 +18,7 @@ $(OUTPUT_DIR)/$(TARGET) : $(OBJS) WSProto
 	$(CC) -o $(OUTPUT_DIR)/$(TARGET) $(LINKER_OPTION) -L$(OUTPUT_DIR) -lrpc $(OBJS) $(OBJ_DIR)/libwsock.a
 
 WSProto :
-	make -C ./wsproto 
+	$(MAKE) -C ./wsproto 
 
 -include $(OBJS:%.o=%.d)
 

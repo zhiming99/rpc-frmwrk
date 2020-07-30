@@ -11,15 +11,15 @@ debug_clean: $(TARGETS)
 
 mygoal:=$(MAKECMDGOALS)
 $(OUTPUT_DIR)/libcombase.so :
-	-make -j 3 -l 5 -C ./combase $(mygoal)
+	-$(MAKE) -j 3 -l 5 -C ./combase $(mygoal)
 	
 $(OUTPUT_DIR)/libipc.so :
-	-make -j 3 -l 5 -C ./ipc $(mygoal)
+	-$(MAKE) -j 3 -l 5 -C ./ipc $(mygoal)
 
 $(OUTPUT_DIR)/librpc.so :
-	-make -j 3 -l 5 -C ./rpc $(mygoal)
+	-$(MAKE) -j 3 -l 5 -C ./rpc $(mygoal)
 
 test:
-	-make -j 3 -l 5 -C test $(mygoal)
+	-$(MAKE) -j 3 -l 5 -C test $(mygoal)
 
 .PHONY: $(TARGETS) test

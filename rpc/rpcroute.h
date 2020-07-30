@@ -2374,15 +2374,46 @@ class CIfDeferCallTaskEx2 :
     { SetClassId( clsid( CIfDeferCallTaskEx2 ) );}
 };
 
+template < typename C, typename ... Types, typename ...Args>
+inline gint32 NewIfDeferredCall2( EnumClsid iTaskClsid,
+    TaskletPtr& pCallback, ObjPtr pIf, gint32(C::*f)(Types ...),
+    Args&&... args )
+{
+    TaskletPtr pWrapper;
+    gint32 ret = NewDeferredCall( pWrapper, pIf, f, args... );
+    if( ERROR( ret ) )
+        return ret;
+
+    TaskletPtr pIfTask;
+    CParamList oParams;
+    oParams[ propIfPtr ] = pIf;
+    ret = pIfTask.NewObj(
+        iTaskClsid, oParams.GetCfg() );
+    if( ERROR( ret ) )
+        return ret;
+
+    if( iTaskClsid == clsid( CIfDeferCallTaskEx2 ) )
+    {
+        CIfDeferCallTask* pDeferTask = pIfTask;
+        pDeferTask->SetDeferCall( pWrapper );
+        pCallback = pDeferTask;
+    }
+    else
+    {
+        return -ENOTSUP;
+    }
+    return 0;
+}
+
 #define DEFER_IFCALLEX2_NOSCHED( _pTask, pObj, func, ... ) \
-    NewIfDeferredCall( clsid( CIfDeferCallTaskEx2 ), \
+    NewIfDeferredCall2( clsid( CIfDeferCallTaskEx2 ), \
         _pTask, pObj, func , ##__VA_ARGS__ )
 
 // use this macro when the _pTask will be added
 // to a task group.
 #define DEFER_IFCALLEX2_NOSCHED2( _pos, _pTask, pObj, func, ... ) \
 ({ \
-    gint32 _ret = NewIfDeferredCall( clsid( CIfDeferCallTaskEx2 ), \
+    gint32 _ret = NewIfDeferredCall2( clsid( CIfDeferCallTaskEx2 ), \
         _pTask, pObj, func , ##__VA_ARGS__ ); \
     if( SUCCEEDED( _ret ) ) \
     { \
