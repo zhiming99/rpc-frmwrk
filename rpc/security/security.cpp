@@ -1650,6 +1650,74 @@ gint32 CAuthentProxy::InitEnvRouter(
     return CK5AuthProxy::InitEnvRouter( pMgr );
 }
 
+gint32 CRpcTcpBridgeProxyAuth::OnPostStart(
+    IEventSink* pCallback )
+{
+    gint32 ret = 0;
+    do{
+        CRpcRouter* pRouter = GetParent();
+        CRpcRouterReqFwdrAuth* pRtAuth =
+            ObjPtr( pRouter );
+
+        if( unlikely( pRtAuth == nullptr ) )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        // bind the bridge proxy and the auth
+        // proxy
+        // this is the only valid place we can
+        // bind the two object, because the call
+        // is serialized by the seqtask, and if
+        // the bridge proxy goes offline
+        // immediately, it will not happen till
+        // this call ends.
+        InterfPtr pIf;
+        CRpcReqForwarderAuth* pReqFwdr = nullptr;
+        ret = pRtAuth->GetReqFwdr( pIf );
+        if( ERROR( ret ) )
+            break;
+
+        pReqFwdr = pIf;
+        if( unlikely( pReqFwdr == nullptr ) )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        IConfigDb* pReqCtx = nullptr;
+        ret = pReqFwdr->GetStartCtx( pReqCtx );
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpener oReqCtx( pReqCtx );
+        CRpcServices* pSvc = nullptr;        
+        ret = oReqCtx.GetPointer(
+            propIfPtr, pSvc );
+        if( ERROR( ret ) )
+            break;
+
+        InterfPtr pAuthObj = pSvc;
+        CAuthentProxy* pap = ObjPtr( this );
+        pap->SetSessImpl( pAuthObj );
+
+        IAuthenticateProxy* pAuth =
+        dynamic_cast < IAuthenticateProxy* >
+                ( pSvc );
+
+        if( unlikely( pAuth == nullptr ) )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        pAuth->SetParent( this );
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CRpcTcpBridgeProxyAuth::OnPostStop(
     IEventSink* pCallback )
 {
@@ -1790,6 +1858,7 @@ gint32 CRpcReqForwarderAuth::OnSessImplStarted(
     CCfgOpener oReqCtx( pReqCtx );
 
     do{
+        SetStartCtx( nullptr );
         CCfgOpenerObj oReq( pIoReq );
         IConfigDb* pResp = nullptr;
         ret = oReq.GetPointer(
@@ -1811,45 +1880,6 @@ gint32 CRpcReqForwarderAuth::OnSessImplStarted(
             ret = iRet;
             break;
         }
-
-        ObjPtr pAuthImpl;
-        ret = oReqCtx.GetObjPtr(
-            propIfPtr, pAuthImpl );
-        if( ERROR( ret ) )
-            break;
-
-        guint32 dwPortId = 0;
-        CCfgOpenerObj oIfCfg(
-            ( CObjBase* )pAuthImpl );
-
-        ret = oIfCfg.GetIntProp(
-            propConnHandle, dwPortId );
-        if( ERROR( ret ) )
-            break;
-
-        InterfPtr pbp;
-        CRpcRouter* pRouter = GetParent();
-        ret = pRouter->GetBridgeProxy(
-            dwPortId, pbp );
-        if( ERROR( ret ) )
-            break;
-
-        // bind the bridge proxy and the auth
-        // proxy
-        CAuthentProxy* pBdgePrxy = ObjPtr( pbp );
-        InterfPtr pTemp = pAuthImpl;
-        pBdgePrxy->SetSessImpl( pTemp );
-
-        IAuthenticateProxy* pAuth =
-            dynamic_cast < IAuthenticateProxy* >
-                ( ( CObjBase* )pAuthImpl );
-
-        if( unlikely( pAuth == nullptr ) )
-        {
-            ret = -EFAULT;
-            break;
-        }
-        pAuth->SetParent( pBdgePrxy );
 
     }while( 0 );
 
@@ -2176,6 +2206,7 @@ gint32 CRpcReqForwarderAuth::BuildStartAuthProxyTask(
         CIfTransactGroup* pTractGrp = pTaskGrp; 
         pTractGrp->AddRollback( pStopIf );
         pTask = ObjPtr( pTaskGrp );
+        SetStartCtx( pReqCtx );
 
     }while( 0 );
 

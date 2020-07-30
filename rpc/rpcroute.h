@@ -2394,7 +2394,7 @@ inline gint32 NewIfDeferredCall2( EnumClsid iTaskClsid,
 
     if( iTaskClsid == clsid( CIfDeferCallTaskEx2 ) )
     {
-        CIfDeferCallTask* pDeferTask = pIfTask;
+        CIfDeferCallTaskEx2* pDeferTask = pIfTask;
         pDeferTask->SetDeferCall( pWrapper );
         pCallback = pDeferTask;
     }

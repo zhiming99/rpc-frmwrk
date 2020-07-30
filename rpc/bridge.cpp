@@ -341,8 +341,13 @@ gint32 CRpcTcpBridgeProxy::BuildBufForIrpFwrdReq(
         string strIfName = DBUS_IF_NAME(
             IFNAME_TCP_BRIDGE );
 
+        string strObjName = OBJNAME_TCP_BRIDGE;
+        CRpcRouter* pRouter = GetParent();
+        if( pRouter->HasAuth() )
+            strObjName = OBJNAME_TCP_BRIDGE_AUTH;
+
         string strObjPath =DBUS_OBJ_PATH(
-            strRtName, OBJNAME_TCP_BRIDGE );
+            strRtName, strObjName );
 
         string strSender = DBUS_DESTINATION(
             GetIoMgr()->GetModName() );
@@ -360,8 +365,9 @@ gint32 CRpcTcpBridgeProxy::BuildBufForIrpFwrdReq(
             break;
 
         ret = pMsg.SetDestination( 
-            DBUS_DESTINATION2( strRtName,
-                OBJNAME_TCP_BRIDGE ) );
+            DBUS_DESTINATION2(
+                strRtName, strObjName ) );
+
         if( ERROR( ret ) )
             break;
 
@@ -2114,15 +2120,22 @@ gint32 CRpcTcpBridge::BuildBufForIrpFwrdEvt(
 
         ret = pMsg.SetSender(
             DBUS_DESTINATION( strRtName ) );
-
         if( ERROR( ret ) )
             break;
 
-        strVal = DBUS_OBJ_PATH(
-            strRtName, OBJNAME_TCP_BRIDGE );
+        CRpcRouter* pRouter = GetParent();
+        if( pRouter->HasAuth() )
+        {
+            strVal = DBUS_OBJ_PATH( strRtName,
+                OBJNAME_TCP_BRIDGE_AUTH );
+        }
+        else
+        {
+            strVal = DBUS_OBJ_PATH( strRtName,
+                OBJNAME_TCP_BRIDGE );
+        }
 
         ret = pMsg.SetPath( strVal );
-
         if( ERROR( ret ) )
             break;
 
