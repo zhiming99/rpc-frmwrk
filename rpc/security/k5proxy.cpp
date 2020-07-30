@@ -1510,11 +1510,16 @@ gint32 CK5AuthProxy::DoLogin(
             pDeferTask, true );
 
         if( ERROR( ret ) )
+        {
             ( *pDeferTask )( eventCancelTask );
+            break;
+        }
+
+        ret = pRetryTask->GetError();
 
     }while( 0 );
 
-    return 0;
+    return ret;
 }
 
 gint32 CK5AuthProxy::RebuildMatches()

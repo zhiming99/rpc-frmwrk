@@ -2197,7 +2197,7 @@ gint32 CRpcReqForwarderAuth::BuildStartAuthProxyTask(
         TaskletPtr pStopIf;
         ret = DEFER_IFCALLEX2_NOSCHED2(
             0, pStopIf, ObjPtr( pIf ),
-            &CRpcServices::StopEx,
+            &CRpcServices::Shutdown,
             nullptr );
 
         if( ERROR( ret ) )    
