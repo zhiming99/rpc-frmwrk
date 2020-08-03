@@ -282,3 +282,46 @@ void CClassFactories::EnumClassIds(
         ++itr;
     }
 }
+
+gint32 CClassFactories::IsDllLoaded(
+    const char* pszPath )
+{
+    if( pszPath == nullptr )
+        return -EINVAL;
+
+    bool bFound = false;
+    gint32 ret = 0;
+    CStdRMutex oLock( GetLock() );
+    MyType& vecFactories = ( *this) ();
+    MyItr itr = vecFactories.begin();
+
+    while( itr != vecFactories.end() )
+    {
+        if( itr->first != nullptr )
+        {
+            char szBuf[ 512 ];
+            ret = dlinfo( itr->first,
+                RTLD_DI_ORIGIN, szBuf );
+            if( ret == -1 )
+            {
+                ++itr;
+                continue;
+            }
+
+            szBuf[ sizeof( szBuf ) - 1 ] = 0;
+            ret = strncmp( szBuf,
+                pszPath, sizeof( szBuf ) );
+            if( ret == 0 )
+            {
+                bFound = true;
+                break;
+            }
+
+        }
+        ++itr;
+    }
+    if( bFound )
+        return STATUS_SUCCESS;
+
+    return ERROR_FALSE;
+}

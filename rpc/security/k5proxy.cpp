@@ -308,7 +308,7 @@ gint32 CInitHookMap::CreateNewHook(
 krb5_error_code CInitHookMap::PluginInit(
     krb5_context ctx, void** )
 {
-    CKrb5InitHook* pHook; 
+    CKrb5InitHook* pHook = nullptr;
     ObjPtr pObj;
     g_oHookMap.Start();
     gint32 ret = g_oHookMap.GetInitHook( pHook );
@@ -1131,12 +1131,6 @@ gint32 CK5AuthProxy::InitPluginHook()
 
     do{
         ObjPtr pHook;
-        if( !g_oHookMap.empty() )
-        {
-            pHook = g_oHookMap.GetFirst();
-            g_oHookMap.SetInitHook( pHook );
-            break;
-        }
         ret = pHook.NewObj(
             clsid( CKrb5InitHook ) );
         if( ERROR( ret ) )
@@ -1433,6 +1427,7 @@ gint32 CK5AuthProxy::StartLogin(
     IEventSink* pCallback )
 {
     gint32 ret = 0;
+    bool bHooked = false;
     do{
         std::string strMech = GET_MECH( this );
         if( strMech != "krb5" )
@@ -1445,6 +1440,7 @@ gint32 CK5AuthProxy::StartLogin(
         if( ERROR( ret ) )
             break;
 
+        bHooked = true;
         // user principal
         std::string strUserName;
         std::string strSvcName;
@@ -1474,6 +1470,9 @@ gint32 CK5AuthProxy::StartLogin(
         }
 
     }while( 0 );
+
+    if( bHooked )
+        g_oHookMap.RemoveHook();
 
     return ret;
 }
@@ -1510,11 +1509,16 @@ gint32 CK5AuthProxy::DoLogin(
             pDeferTask, true );
 
         if( ERROR( ret ) )
+        {
             ( *pDeferTask )( eventCancelTask );
+            break;
+        }
+
+        ret = pRetryTask->GetError();
 
     }while( 0 );
 
-    return 0;
+    return ret;
 }
 
 gint32 CK5AuthProxy::RebuildMatches()
