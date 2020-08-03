@@ -1094,14 +1094,19 @@ gint32 CRpcInterfaceBase::StopEx(
     do{
         CStdRMutex oIfLock( GetLock() );
         EnumIfState iState = GetState();
-        if( iState != stateStopping )
+        if( iState == stateStartFailed )
+        {
+            ret = SetStateOnEvent( cmdCleanup );
+            if( ERROR( ret ) )
+                break;
+        }
+        else if( iState != stateStopping )
         {
             ret = SetStateOnEvent( cmdShutdown );
             if( ERROR( ret ) )
                 break;
-
-            iState = GetState();
         }
+
         if( stateStopping != GetState() )
             return ERROR_STATE;
 
@@ -1387,8 +1392,13 @@ gint32 CRpcInterfaceBase::Pause(
 gint32 CRpcInterfaceBase::Shutdown(
     IEventSink* pCallback )
 {
-    gint32 ret =
-        SetStateOnEvent( cmdShutdown );
+    gint32 ret = 0;
+    EnumEventId iEvent = cmdShutdown;
+    EnumIfState iState = GetState();
+    if( iState == stateStartFailed )
+        iEvent = cmdCleanup;
+
+    ret = SetStateOnEvent( iEvent );
 
     if( ERROR( ret ) )
         return ret;
