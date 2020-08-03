@@ -130,6 +130,11 @@ gint32 CoLoadClassFactory( const char* pszPath  )
 
         ret = g_pFactories->AddFactory(
             pFactory, hDll );
+        if( ERROR( ret ) )
+            break;
+
+        g_pFactories->AddFactoryPath(
+            pszPath, hDll );
 
     }while( 0 );
 

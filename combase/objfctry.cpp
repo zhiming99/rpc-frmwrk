@@ -261,6 +261,7 @@ void CClassFactories::Clear()
         ++itr;
     }
     vecFactories.clear();
+    m_mapPathToHandle.clear();
 }
 
 void CClassFactories::EnumClassIds(
@@ -289,39 +290,43 @@ gint32 CClassFactories::IsDllLoaded(
     if( pszPath == nullptr )
         return -EINVAL;
 
-    bool bFound = false;
-    gint32 ret = 0;
     CStdRMutex oLock( GetLock() );
-    MyType& vecFactories = ( *this) ();
-    MyItr itr = vecFactories.begin();
+    if( m_mapPathToHandle.find( pszPath ) ==
+        m_mapPathToHandle.end() )
+        return ERROR_FALSE;
 
-    while( itr != vecFactories.end() )
+    return STATUS_SUCCESS;
+}
+
+gint32 CClassFactories::AddFactoryPath(
+    const char* pszPath, void* hDll )
+{
+    if( pszPath == nullptr )
+        return -EINVAL;
+
+    CStdRMutex oLock( GetLock() );
+    if( m_mapPathToHandle.find( pszPath ) !=
+        m_mapPathToHandle.end() )
+        return -EEXIST;
+
+    m_mapPathToHandle[ pszPath ] = hDll;
+    return STATUS_SUCCESS;
+}
+
+gint32 CClassFactories::RemoveFactoryPath(
+    void* hDll )
+{
+    CStdRMutex oLock( GetLock() );
+    std::map< std::string, void* >::iterator
+       itr = m_mapPathToHandle.begin(); 
+    while( itr != m_mapPathToHandle.end() )
     {
-        if( itr->first != nullptr )
+        if( itr->second == hDll )
         {
-            char szBuf[ 512 ];
-            ret = dlinfo( itr->first,
-                RTLD_DI_ORIGIN, szBuf );
-            if( ret == -1 )
-            {
-                ++itr;
-                continue;
-            }
-
-            szBuf[ sizeof( szBuf ) - 1 ] = 0;
-            ret = strncmp( szBuf,
-                pszPath, sizeof( szBuf ) );
-            if( ret == 0 )
-            {
-                bFound = true;
-                break;
-            }
-
+            m_mapPathToHandle.erase( itr );
+            return 0;
         }
-        ++itr;
     }
-    if( bFound )
-        return STATUS_SUCCESS;
 
-    return ERROR_FALSE;
+    return -ENOENT;
 }

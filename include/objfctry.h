@@ -188,6 +188,7 @@ struct CClassFactories: public CStlVector< ELEM_CLASSFACTORIES >
     public:
     typedef CStlVector< ELEM_CLASSFACTORIES > super;
 
+    std::map< std::string, void* > m_mapPathToHandle;
     CClassFactories();
     ~CClassFactories();
 
@@ -219,6 +220,12 @@ struct CClassFactories: public CStlVector< ELEM_CLASSFACTORIES >
     void Clear();
 
     gint32 IsDllLoaded( const char* pszPath );
+
+    gint32 AddFactoryPath(
+        const char* pszPath, void* hDll );
+
+    gint32 RemoveFactoryPath(
+        void* hDll );
 };
 
 typedef CAutoPtr< clsid( CClassFactories ), CClassFactories > FctryVecPtr;
