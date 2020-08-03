@@ -93,6 +93,10 @@ gint32 CoLoadClassFactory( const char* pszPath  )
     gint32 ret = 0;
 
     do{
+        ret = g_pFactories->IsDllLoaded( pszPath );
+        if( SUCCEEDED( ret ) )
+            break;
+
         hDll = dlopen( pszPath, RTLD_LAZY );
         if( hDll == nullptr )
         {

@@ -217,6 +217,8 @@ struct CClassFactories: public CStlVector< ELEM_CLASSFACTORIES >
         std::vector< EnumClsid >& vecClsIds );
 
     void Clear();
+
+    gint32 IsDllLoaded( const char* pszPath );
 };
 
 typedef CAutoPtr< clsid( CClassFactories ), CClassFactories > FctryVecPtr;
