@@ -769,11 +769,11 @@ gint32 CK5AuthProxy::InitUserFuncs()
 
     ADD_PROXY_METHOD_EX( 1,
         CK5AuthProxy::Login,
-        AUTH_METHOD_LOGIN );
+        SYS_METHOD( AUTH_METHOD_LOGIN ) );
 
     ADD_PROXY_METHOD_EX( 1,
         CK5AuthProxy::MechSpecReq,
-        AUTH_METHOD_MECHSPECREQ );
+        SYS_METHOD( AUTH_METHOD_MECHSPECREQ ) );
 
     END_IFPROXY_MAP;
     return 0;

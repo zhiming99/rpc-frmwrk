@@ -34,7 +34,7 @@ gint32 CKdcRelayProxy::InitUserFuncs()
 
     ADD_PROXY_METHOD_EX( 1,
         CKdcRelayProxy::MechSpecReq,
-        AUTH_METHOD_MECHSPECREQ );
+        SYS_METHOD( AUTH_METHOD_MECHSPECREQ ) );
 
     END_PROXY_MAP;
     return 0;

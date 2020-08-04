@@ -2458,11 +2458,11 @@ gint32 CAuthentServer::InitUserFuncs()
     
     ADD_SERVICE_HANDLER_EX( 1,
        CAuthentServer::Login,
-       AUTH_METHOD_LOGIN );
+       SYS_METHOD( AUTH_METHOD_LOGIN ) );
 
     ADD_SERVICE_HANDLER_EX( 1,
        CAuthentServer::MechSpecReq,
-       AUTH_METHOD_LOGIN );
+       SYS_METHOD( AUTH_METHOD_MECHSPECREQ ) );
 
     END_IFHANDLER_MAP;
     return 0;
