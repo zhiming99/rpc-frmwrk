@@ -1612,8 +1612,7 @@ inline gint32 NewResponseHandler(
     IEventSink* pCallback, IConfigDb* pContext )
 {
     TaskletPtr pWrapper;
-    if( pCallback == nullptr ||
-        pIf.IsEmpty() )
+    if( pIf.IsEmpty() )
         return -EINVAL;
 
     gint32 ret = NewDeferredCall(
