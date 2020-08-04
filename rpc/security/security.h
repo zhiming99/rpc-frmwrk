@@ -71,6 +71,51 @@
     strMech;\
 })
 
+template< int iNumInput, typename ClassName, typename ...Args>
+class CMethodProxyAsync;
+
+template< int iNumInput, typename ClassName, typename ...Args>
+struct CMethodProxyAsync< iNumInput, gint32 (ClassName::*)( IEventSink* pCallback, Args ...) >
+{
+    public:
+    typedef gint32 ( ClassName::* FuncType)( IEventSink* pCallback, Args... ) ;
+    CMethodProxyAsync( bool bNonDBus,
+        const std::string& strMethod, FuncType pFunc, ObjPtr& pProxy )
+    {
+        using InTypes = typename InputParamTypes< iNumInput, DecType( Args )... >::InputTypes;
+        using ProxyType = typename GetProxyType<InTypes>::type;
+        pProxy = new ProxyType( bNonDBus, strMethod );
+        pProxy->DecRef();
+    }
+};
+
+template < int iNumInput, typename C, typename ...Args>
+inline gint32 NewMethodProxyAsync(
+    ObjPtr& pProxy, bool bNonDBus,
+    const std::string& strMethod,
+    gint32(C::*f)(IEventSink* pCallback, Args ...),
+    InputCount< iNumInput >* b )
+{
+    CMethodProxyAsync< iNumInput, gint32 (C::*)( IEventSink* pCallback, Args...)> a( bNonDBus, strMethod, f, pProxy );  
+    if( pProxy.IsEmpty() )
+        return -ENOMEM;
+    return 0;
+}
+
+#define ADD_PROXY_METHOD_ASYNC( iNumInput, _f, MethodName ) \
+do{ \
+    std::string strName = MethodName; \
+    if( _pMapProxies_->size() > 0 && \
+        _pMapProxies_->find( strName ) != \
+            _pMapProxies_->end() ) \
+        break; \
+    ObjPtr pObj;\
+    InputCount< iNumInput > *p = nullptr; \
+    NewMethodProxyAsync( \
+          pObj, _bNonBus_, strName, &_f, p );\
+    ( *_pMapProxies_ )[ strName ] = pObj; \
+}while( 0 )
+
 struct IAuthenticate
 {
     virtual gint32 Login(

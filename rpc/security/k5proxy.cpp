@@ -767,11 +767,11 @@ gint32 CK5AuthProxy::InitUserFuncs()
 {
     BEGIN_IFPROXY_MAP( IAuthenticate, false );
 
-    ADD_PROXY_METHOD_EX( 1,
+    ADD_PROXY_METHOD_ASYNC( 1,
         CK5AuthProxy::Login,
         SYS_METHOD( AUTH_METHOD_LOGIN ) );
 
-    ADD_PROXY_METHOD_EX( 1,
+    ADD_PROXY_METHOD_ASYNC( 1,
         CK5AuthProxy::MechSpecReq,
         SYS_METHOD( AUTH_METHOD_MECHSPECREQ ) );
 
