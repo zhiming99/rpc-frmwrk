@@ -2091,6 +2091,7 @@ gint32 CReqFwdrForwardRequestTask::OnTaskComplete(
             {
                 DebugPrint( iRetVal,
                     "No response message" );
+                oResp[ propReturnValue ] = -EFAULT;
             }
             // the response will finally be sent
             // in this method
