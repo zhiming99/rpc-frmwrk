@@ -707,6 +707,15 @@ gint32 CRpcTcpBridgeAuth::ForwardRequest(
                 if( ERROR( ret ) )
                     break;
 
+                CCfgOpenerObj oResp(
+                    ( CObjBase*)pRespCb );
+
+                ret = oResp.CopyProp(
+                    propMsgPtr, pCallback );
+
+                if( ERROR( ret ) )
+                    break;
+
                 pCallback = pRespCb;
             }
             else

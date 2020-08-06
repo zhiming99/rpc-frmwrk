@@ -1983,8 +1983,8 @@ gint32 CReqFwdrForwardRequestTask::RunTask()
         if( ERROR( ret ) )
             break;
 
-        if( pIf->GetClsid() !=
-            clsid( CRpcReqForwarderImpl ) )
+        CRpcReqForwarder* pFwdr = ObjPtr( pIf );
+        if( pFwdr == nullptr ) 
         {
             ret = -EINVAL;
             break;

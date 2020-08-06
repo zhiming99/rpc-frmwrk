@@ -2841,7 +2841,7 @@ gint32 CRpcInterfaceServer::DoInvoke(
                     break;
 
                 CRpcTcpBridge* pIf = ObjPtr( this );
-                bool bBridge = ( pIf == nullptr );
+                bool bBridge = ( pIf != nullptr );
 
                 DMsgPtr pFwdrMsg;
                 ret = pFwdrMsg.Deserialize(

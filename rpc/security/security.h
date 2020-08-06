@@ -682,7 +682,7 @@ struct CRpcRouterAuthShared
             }
 
             ret = m_pAuthMatch->
-                IsMyMsgIncoming( pMsg );
+                IsMyMsgOutgoing( pMsg );
 
         }while( 0 );
 
