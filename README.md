@@ -37,6 +37,9 @@ This framework depends on the following packags:
 Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60) for details.
 
 ---
+[`Thu 06 Aug 2020 11:02:28 PM Beijing`]   
+1. still debugging the authentication module. some progress are made. many disturbing events happened in the last two weeks, such as 30-hour black-out, and new system update degraded the computer performance to 800MHz. Fortunately, everything return to normal. hopefully, next week the authentication support will be able to work.
+
 [`Sun 26 Jul 2020 08:12:16 PM Beijing`]   
 1. Submitted the Kerberos support to the main branch. It is not debugged yet. So it surely cannot work for now. And if you want to give a shot to the framework, please try version 0.3. :)   
 
