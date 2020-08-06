@@ -396,6 +396,8 @@ gint32 CRpcSecFido::SubmitWriteIrp(
 
         pTopCtx->SetReqData( pReqBuf );
         ret = pLowerPort->SubmitIrp( pIrp );
+        if( ret != STATUS_PENDING )
+            pIrp->PopCtxStack();
 
     }while( 0 );
 

@@ -5425,9 +5425,12 @@ gint32 CIfResponseHandler::OnTaskComplete( gint32 iRet )
                 }
             }
         }
-        else
+
+        if( ERROR( ret ) )
         {
-            // comes from a immediate return
+            // test whether response on this task
+            // from an immediate return or
+            // OnServiceComplete
             CCfgOpener oCfg(
                 ( IConfigDb* )GetConfig() );
             if( oCfg.exist( propRespPtr ) )
