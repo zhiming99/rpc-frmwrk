@@ -618,7 +618,7 @@ gint32 CK5AuthServer::OnPostStart(
         if( ERROR( ret ) )
             break;
 
-        gint32 ret = AcquireCred(
+        ret = AcquireCred(
             strSvcName,
             GSS_C_NT_HOSTBASED_SERVICE,
             &pCred );
@@ -838,7 +838,6 @@ gint32 CK5AuthServer::Krb5Login(
     gss_name_t      client;
     gss_OID         doid;
     OM_uint32       ret_flags, maj_stat, min_stat, acc_sec_min_stat;
-    gss_buffer_desc oid_name;
 
     gss_ctx_id_t context = GSS_C_NO_CONTEXT;
 
@@ -902,7 +901,6 @@ gint32 CK5AuthServer::Krb5Login(
         }
 
         m_mapSessions[ dwPortId ] = context;
-        gss_release_buffer(&min_stat, &oid_name);
         gss_release_name(&min_stat, &client);
 
         if( maj_stat == GSS_S_CONTINUE_NEEDED )
@@ -1004,7 +1002,7 @@ gint32 CK5AuthServer::Login(
         
         BufPtr pRespTok;
         std::string strSess;
-        if( !bKrbLogin )
+        if( bKrbLogin )
         {
             ret = Krb5Login( pCallback,
                 dwPortId, pToken, pRespTok ); 
@@ -1015,7 +1013,13 @@ gint32 CK5AuthServer::Login(
                 pCallback, dwPortId );
         }
 
-        CParamList oResp;
+        if( pResp.IsEmpty() )
+        {
+            ret = pResp.NewObj();
+            if( ERROR( ret ) )
+                break;
+        }
+        CParamList oResp( pResp );
         bool bContinue = false;
         if( ret == STATUS_MORE_PROCESS_NEEDED )
         {
@@ -1029,8 +1033,6 @@ gint32 CK5AuthServer::Login(
             !pRespTok.IsEmpty() &&
             !pRespTok->empty() )
             oResp.Push( pRespTok );
-
-        SetResponse( pCallback, oResp.GetCfg() );
 
     }while( 0 );
 

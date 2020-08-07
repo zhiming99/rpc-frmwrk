@@ -897,13 +897,18 @@ gint32 AcquireCred(
             }
         }
 
+        int cred_usage = GSS_C_INITIATE;
+        if( &oNameType ==
+            &GSS_C_NT_HOSTBASED_SERVICE )
+            cred_usage = GSS_C_ACCEPT;
+
         maj_stat = gss_acquire_cred(
             &min_stat, princ_name, 0,
-            desired_mechs, GSS_C_INITIATE,
+            desired_mechs, cred_usage,
             pServerCred, NULL, NULL );
         if( maj_stat != GSS_S_COMPLETE )
         {
-            ret = ERROR_FAIL;
+            ret = -EACCES;
             break;
         }
 
