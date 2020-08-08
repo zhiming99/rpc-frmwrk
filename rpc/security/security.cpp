@@ -562,7 +562,7 @@ gint32 CRpcTcpBridgeAuth::OnLoginComplete(
 
         gint32 iRet = 0;
         CCfgOpener oResp( pResp );
-        ret = oReq.GetIntProp(
+        ret = oResp.GetIntProp(
             propReturnValue, ( guint32& )iRet );
 
         if( ERROR( ret ) || ERROR( iRet ) )

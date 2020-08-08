@@ -1113,8 +1113,12 @@ gint32 CK5AuthProxy::Krb5Login(
                 gss_context, m_strSess );
         }
 
-        gss_release_buffer(
-            &min_stat, &send_tok );
+        if( send_tok.length > 0 &&
+            send_tok.value != nullptr )
+        {
+            gss_release_buffer(
+                &min_stat, &send_tok );
+        }
 
     }while( 0 );
 
@@ -1595,7 +1599,6 @@ gint32 CK5AuthProxy::DeleteSecCtx()
     if( pParent == nullptr )
         return -EFAULT;
 
-    CStdRMutex oIfLock( GetLock() );
     CCfgOpenerObj oIfCfg( pParent );
 
     std::string strHash;
@@ -1606,6 +1609,7 @@ gint32 CK5AuthProxy::DeleteSecCtx()
 
     oIfCfg.RemoveProperty( propSessHash );
 
+    CStdRMutex oGssLock( GetGssLock() );
     OM_uint32 minor, major;
     major = gss_delete_sec_context(
         &minor, &gss_ctx, GSS_C_NO_BUFFER );
