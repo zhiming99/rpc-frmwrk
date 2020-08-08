@@ -2634,6 +2634,17 @@ gint32 CRpcTcpBridge::ForwardRequest(
     DMsgPtr& pRespMsg,
     IEventSink* pCallback )
 {
+    return ForwardRequestInternal( pReqCtx,
+        pFwdrMsg, pRespMsg, pCallback, false );
+}
+
+gint32 CRpcTcpBridge::ForwardRequestInternal(
+    IConfigDb* pReqCtx,
+    DBusMessage* pFwdrMsg,
+    DMsgPtr& pRespMsg,
+    IEventSink* pCallback,
+    bool bSeqTask )
+{
     if( pFwdrMsg == nullptr ||
         pCallback == nullptr ||
         pReqCtx == nullptr )
@@ -2715,7 +2726,15 @@ gint32 CRpcTcpBridge::ForwardRequest(
         if( ERROR( ret ) )
             break;
 
-        ret = GetIoMgr()->RescheduleTask( pTask );
+        if( bSeqTask )
+        {
+            ret = pRouter->AddSeqTask( pTask );
+        }
+        else
+        {
+            ret = GetIoMgr()->RescheduleTask( pTask );
+        }
+
         if( ERROR( ret ) )
             break;
 

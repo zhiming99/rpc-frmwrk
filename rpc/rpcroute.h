@@ -831,6 +831,13 @@ class CRpcTcpBridge :
     gint32 IsCyclicPath( IConfigDb* pReqCtx );
     gint32 AddCheckStamp( IConfigDb* pReqCtx );
 
+    gint32 ForwardRequestInternal(
+        IConfigDb* pReqCtx,
+        DBusMessage* pFwdrMsg,
+        DMsgPtr& pRespMsg,
+        IEventSink* pCallback,
+        bool bSeqTask );
+
     public:
 
     virtual gint32 OnPostStart(
@@ -963,11 +970,12 @@ class CRpcTcpBridge :
             pCfg, pPort, bPdo );
     }
 
-    gint32 ForwardRequest(
+    virtual gint32 ForwardRequest(
         IConfigDb* pReqCtx,
         DBusMessage* pFwdrMsg,
         DMsgPtr& pRespMsg,
         IEventSink* pCallback );
+
 }; // CRpcTcpBridge
 
 class CRpcTcpBridgeProxy :

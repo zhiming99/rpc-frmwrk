@@ -236,14 +236,14 @@ gint32 CRpcTcpBridgeAuth::EnableInterfaces()
         CParamList oParams;            
         oParams[ propIfPtr ] = ObjPtr( this );
 
-        pTaskGrp->SetRelation( logicAND );
-
         ret = pTaskGrp.NewObj( 
             clsid( CIfTaskGroup ),
             oParams.GetCfg() );
 
         if( ERROR( ret ) )
             break;
+
+        pTaskGrp->SetRelation( logicAND );
 
         ObjVecPtr pObjVec;
         ret = pObjVec.NewObj(
@@ -538,27 +538,19 @@ gint32 CRpcTcpBridgeAuth::OnLoginComplete(
         return -EINVAL;
 
     gint32 ret = 0;
+    IConfigDb* pResp = nullptr;
     do{
+        if( !IsConnected() )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+
         CCfgOpenerObj oReq( pIoReq );
-        IConfigDb* pResp = nullptr;
         ret = oReq.GetPointer(
             propRespPtr, pResp );
-
         if( ERROR( ret ) )
             break;
-
-        // FIXME: we cannot 100% guarantee that
-        // the request is sent immediately. So if
-        // the request is pending on a port above
-        // the secfido, the request could be
-        // encrypted and the client will fill the
-        // login because of unable to decypt the
-        // response message. However, at this
-        // point, there is no more traffic at
-        // login stage, and most likely the login
-        // response can be sent without encrypted.
-        //
-        OnServiceComplete( pResp, pCallback );
 
         gint32 iRet = 0;
         CCfgOpener oResp( pResp );
@@ -576,7 +568,7 @@ gint32 CRpcTcpBridgeAuth::OnLoginComplete(
             break;
 
         ObjPtr pObj;
-        ret = pRespMsg.GetObjArgAt( 0, pObj );
+        ret = pRespMsg.GetObjArgAt( 1, pObj );
         if( ERROR( ret ) )
             break;
 
@@ -588,27 +580,42 @@ gint32 CRpcTcpBridgeAuth::OnLoginComplete(
         }
 
         CCfgOpener oLoginResp( pLoginResp );
+        IConfigDb* pLoginTok = nullptr;
+        ret = oLoginResp.GetPointer(
+            0, pLoginTok );
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpener oLoginTok( pLoginTok );
         bool bContinue = false;
-        ret = oLoginResp.GetBoolProp(
+        ret = oLoginTok.GetBoolProp(
             propContinue, bContinue );
         if( ERROR( ret ) )
             break;
 
+        if( true )
+        {
+            // We need to send out the response
+            // without encryption, and must be ahead
+            // of SetSessHash
+            //
+            // FIXME: we cannot 100% guarantee that
+            // the request is sent immediately. So if
+            // the request is pending on a port above
+            // the secfido, the request could be
+            // encrypted and the client will fill the
+            // login because of unable to decypt the
+            // response message. However, at this
+            // point, there is no more traffic at
+            // login stage, and most likely the login
+            // response can be sent without encrypted.
+            //
+            OnServiceComplete( pResp, pCallback );
+        }
+
         // the login is not complete yet.
         if( bContinue )
             break;
-
-        // login is done.
-        CRpcRouterBridgeAuthImpl* pRouter =
-            ObjPtr( GetParent() );
-
-        ObjPtr pAuthImpl;
-        ret = pRouter->GetAuthImpl( pAuthImpl );
-        if( ERROR( ret ) )
-        {
-            ret = 0;
-            break;
-        }
 
         CCfgOpenerObj oIfCfg( this );
         guint32 dwPortId = 0;
@@ -618,8 +625,7 @@ gint32 CRpcTcpBridgeAuth::OnLoginComplete(
             break;
 
         CAuthentServer* pAuth =
-        dynamic_cast< CAuthentServer* >
-            ( this );
+            ObjPtr( GetParent() );
 
         if( unlikely( pAuth == nullptr ) )
         {
@@ -668,8 +674,9 @@ gint32 CRpcTcpBridgeAuth::ForwardRequest(
         CCfgOpenerObj oIfCfg( this );
         DMsgPtr pMsg( pFwdrMsg );
         std::string strHash;
-
+        bool bSeqTask = false;
         bool bAuthed = false;
+
         ret = oIfCfg.GetStrProp(
             propSessHash, strHash );
 
@@ -716,6 +723,7 @@ gint32 CRpcTcpBridgeAuth::ForwardRequest(
                 if( ERROR( ret ) )
                     break;
 
+                bSeqTask = true;
                 pCallback = pRespCb;
             }
             else
@@ -737,9 +745,13 @@ gint32 CRpcTcpBridgeAuth::ForwardRequest(
                 }
             }
 
-            ret = super::ForwardRequest(
+            // NOTE: made the login task to be a
+            // seq task, to prevent
+            // eventRmtSvrOffline to execute
+            // within the same period.
+            ret = super::ForwardRequestInternal(
                 pReqCtx, pFwdrMsg,
-                pRespMsg, pCallback );
+                pRespMsg, pCallback, bSeqTask );
 
             if( ERROR( ret ) &&
                 !pRespCb.IsEmpty() )
