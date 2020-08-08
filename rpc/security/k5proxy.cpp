@@ -922,7 +922,7 @@ gint32 CK5AuthProxy::Krb5Login(
     const std::string& strUserName,
     const std::string& strSvcName )
 {
-    gss_buffer_desc send_tok, recv_tok;
+    gss_buffer_desc send_tok;
     gss_buffer_desc *in_token_ptr = nullptr;
     gss_buffer_desc in_token;
     gss_name_t target_name;
@@ -990,12 +990,6 @@ gint32 CK5AuthProxy::Krb5Login(
             {
                 ret = ERROR_FAIL;
                 break;
-            }
-
-            if( in_token_ptr != GSS_C_NO_BUFFER )
-            {
-                gss_release_buffer(
-                    &min_stat, &recv_tok );
             }
 
             if( maj_stat != GSS_S_COMPLETE &&
