@@ -17,7 +17,7 @@ release: $(OUTPUT_DIR)/$(TARGET)
 
 $(OUTPUT_DIR)/$(TARGET) : $(OBJS)
 	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
-	$(CC) -o $(OUTPUT_DIR)/$(TARGET) $(LINKER_OPTION) -L$(OUTPUT_DIR) -lrpc -lgssapi_krb5 -lkrb5 $(OBJS)
+	$(CC) -o $(OUTPUT_DIR)/$(TARGET) $(LINKER_OPTION) -L$(OUTPUT_DIR) -lrpc -lwspt -lgssapi_krb5 -lkrb5 $(OBJS)
 
 -include $(OBJS:%.o=%.d)
 

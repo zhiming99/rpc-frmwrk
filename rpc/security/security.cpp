@@ -2467,11 +2467,11 @@ gint32 CAuthentServer::InitUserFuncs()
     
     ADD_SERVICE_HANDLER_EX( 1,
        CAuthentServer::Login,
-       SYS_METHOD( AUTH_METHOD_LOGIN ) );
+       AUTH_METHOD_LOGIN );
 
     ADD_SERVICE_HANDLER_EX( 1,
        CAuthentServer::MechSpecReq,
-       SYS_METHOD( AUTH_METHOD_MECHSPECREQ ) );
+       AUTH_METHOD_MECHSPECREQ );
 
     END_IFHANDLER_MAP;
     return 0;
@@ -2769,7 +2769,7 @@ gint32 CAuthentServer::OnStartAuthImplComplete(
     }while( 0 );
 
     pCallback->OnEvent( eventTaskComp,
-        0, 0, ( LONGWORD* )this );
+        ret, 0, ( LONGWORD* )this );
 
     return ret;
 }

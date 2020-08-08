@@ -215,7 +215,7 @@
             "AuthInfo" :
             {
                 "AuthMech" : "krb5",
-                "ServiceName" : "rpcrouter/rasp1",
+                "ServiceName" : "rasp1@rpcfrmwrk.org",
                 "Realm" : "rpcfrmwrk.org"
             },
             "Interfaces" :

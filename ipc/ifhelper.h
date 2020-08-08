@@ -2934,10 +2934,7 @@ gint32 GetIidOfType( std::vector< guint32 >& vecIids, Type* pType )
     { \
         using IfClassName = typename std::tuple_element< N, std::tuple<Types...>>::type; \
         if( has_##_MethodName< IfClassName >::value ) \
-        { \
             _vec.push_back( []( ThisType* p, PARAMS ){ return p->IfClassName::_MethodName( ARGS ); } ); \
-            return 0; \
-        } \
         return AsyncInterf##_MethodName( _vec, NumberSequence<M, S...>(), ARGS ); \
     } \
     rettype _MethodName##Hidden( \

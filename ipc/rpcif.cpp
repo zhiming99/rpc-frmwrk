@@ -2387,50 +2387,10 @@ gint32 CRpcServices::RebuildMatches()
 gint32 CRpcServices::StartEx2(
     IEventSink* pCallback )
 {
-    gint32 ret = 0;
-
     if( pCallback == nullptr )
         return -EINVAL;
-        
-    do{
-        TaskletPtr pWrapper;
-        CParamList oParams;
-        oParams[ propIfPtr ] = ObjPtr( this );
-        oParams[ propEventSink ] = pCallback;
 
-        ret = pWrapper.NewObj(
-            clsid( CIfCallbackInterceptor ),
-            oParams.GetCfg() );
-
-        if( ERROR( ret ) )
-            break;
-
-        TaskletPtr pPostStart;
-        ret = DEFER_CALL_NOSCHED( pPostStart,
-            ObjPtr( this ),
-            &CRpcServices::OnPostStart,
-            pCallback );
-
-        if( ERROR( ret ) )
-            break;
-
-        CIfCallbackInterceptor* pcbi = pWrapper;
-        pcbi->InsertCall( pPostStart );
-        ( *pcbi )( 0 );
-
-        ret = super::StartEx( pWrapper );
-
-        if( ERROR( ret ) )
-            break;
-
-        if( ret == STATUS_PENDING )
-            break;
-
-        ret = OnPostStart( pCallback );
-
-    }while( 0 );
-
-    return ret;
+    return super::StartEx( pCallback );
 }
 
 gint32 CRpcServices::StartEx(
@@ -2472,6 +2432,15 @@ gint32 CRpcServices::StartEx(
         if( ERROR( ret ) )
             break;
 
+        TaskletPtr pPostStart;
+        ret = DEFER_IFCALLEX_NOSCHED2(
+            0, pPostStart, ObjPtr( this ),
+            &CRpcServices::OnPostStart,
+            nullptr );
+
+        if( ERROR( ret ) )
+            break;
+
         CParamList oParams;
         oParams.SetPointer( propIfPtr, this );
 
@@ -2494,6 +2463,7 @@ gint32 CRpcServices::StartEx(
         pGrp->SetRelation( logicAND );
         pGrp->AppendTask( pPreStart );
         pGrp->AppendTask( pStartEx2 );
+        pGrp->AppendTask( pPostStart );
         
         CIoManager* pMgr = GetIoMgr();
         ret = pMgr->RescheduleTask( pTaskGrp );
@@ -6468,17 +6438,28 @@ gint32 CInterfaceServer::SendResponse(
             BufPtr pBuf( true );
             ret = pRespData->Serialize( *pBuf );  
             if( ERROR( ret ) )
-                break;
-
-            const char* pData = pBuf->ptr();
-            if( !dbus_message_append_args( pRespMsg,
-                DBUS_TYPE_UINT32, &iRet,
-                DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
-                &pData, pBuf->size(),
-                DBUS_TYPE_INVALID ) )
             {
-                ret = -ENOMEM;
-                break;
+                ret = ERROR_FAIL;
+                if( !dbus_message_append_args( pRespMsg,
+                    DBUS_TYPE_UINT32, &ret,
+                    DBUS_TYPE_INVALID ) )
+                {
+                    ret = -ENOMEM;
+                    break;
+                }
+            }
+            else
+            {
+                const char* pData = pBuf->ptr();
+                if( !dbus_message_append_args( pRespMsg,
+                    DBUS_TYPE_UINT32, &iRet,
+                    DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
+                    &pData, pBuf->size(),
+                    DBUS_TYPE_INVALID ) )
+                {
+                    ret = -ENOMEM;
+                    break;
+                }
             }
         }
 

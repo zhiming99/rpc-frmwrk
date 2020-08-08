@@ -4639,8 +4639,6 @@ gint32 CRpcRouterManager::Start()
 {
     gint32 ret = 0;
     do{
-        gint32 ret = 0;
-
         std::string strObjDesc;
         CIoManager* pMgr = GetIoMgr();
         CCfgOpenerObj oRouterCfg( this );
