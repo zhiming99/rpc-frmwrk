@@ -14,7 +14,8 @@ This framework depends on the following packags:
 4. `cppunit-1 (for the sample code, cppunit and cppunit-devel)`   
 5. `glib-2.0 (for compile only,glib2-devel)`   
 6. `openssl-1.1 for SSL communication. ( openssl-devel, optional )`
-7. c++11 is required, and you need make sure the GCC is 5.x or higher.
+7. `Kerberos 5 for authentication and access control. ( krb5-server, krb5-workstation, krb5-libs, krb5-devel, optional )`
+8. c++11 is required, and you need make sure the GCC is 5.x or higher.
 
 #### Features:   
 1. `Support for multiple interfaces on a single object (COM alike).`   
