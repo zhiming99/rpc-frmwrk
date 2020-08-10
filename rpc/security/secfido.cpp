@@ -80,9 +80,9 @@ gint32 CRpcSecFido::IsClient() const
         return ret;
 
     if( bServer )
-        return 0;
+        return ERROR_FALSE;
 
-    return ERROR_FALSE;
+    return 0;
 }
 
 CRpcSecFido::CRpcSecFido(
@@ -283,8 +283,7 @@ gint32 CRpcSecFido::DoEncrypt(
                     break;
                 }
 
-                pOutBuf->Resize(
-                    sizeof( dwHdrSize ) );
+                pOutBuf->Resize( dwHdrSize );
 
                 ret = pAuth->WrapMessage(
                     pInBuf, pOutBuf );
@@ -568,6 +567,7 @@ gint32 CRpcSecFido::CompleteListeningIrp(
             m_pInBuf->size() - dwHdrSize )
         {
             pInBuf = m_pInBuf;
+            m_pInBuf.Clear();
         }
         else if( dwSize <
             m_pInBuf->size() - dwHdrSize )
@@ -588,9 +588,9 @@ gint32 CRpcSecFido::CompleteListeningIrp(
         }
         else
         {
-            // incoming data is not a complete
-            // packet, and re-submit the listening
-            // irp
+            // incoming data does not contain a
+            // complete packet, and re-submit the
+            // listening irp
             pTopCtx->m_pRespData.Clear();
             IPort* pPort = GetLowerPort();
             ret = pPort->SubmitIrp( pIrp );
@@ -622,7 +622,7 @@ gint32 CRpcSecFido::CompleteListeningIrp(
         if( ERROR( ret ) )
             break;
 
-        BufPtr pOutBuf;
+        BufPtr pOutBuf( true );
         ret = IsClient();
         if( SUCCEEDED( ret ) )
         {
@@ -692,6 +692,7 @@ gint32 CRpcSecFido::CompleteListeningIrp(
         psse->m_iEvent = sseError;
         psse->m_iData = ret;
         pCtx->m_pRespData = pRespBuf;
+        ret = 0;
     }
 
     pCtx->SetStatus( ret );

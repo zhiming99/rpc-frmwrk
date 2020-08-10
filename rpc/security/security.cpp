@@ -2079,7 +2079,7 @@ gint32 CRpcReqForwarderAuth::OnSessImplLoginComplete(
         ret = DEFER_HANDLER_NOSCHED(
             pChkRt, ObjPtr( this ),
             &CRpcReqForwarder::CheckRouterPath,
-            pInvTask, oReqCtx.GetCfg() );
+            pInvTask, pReqCtx );
         if( ERROR( ret ) )
             break;
 
