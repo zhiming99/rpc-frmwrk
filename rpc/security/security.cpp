@@ -1917,13 +1917,43 @@ gint32 CRpcReqForwarderAuth::OnSessImplStarted(
     return ret;
 }
 
-gint32 CRpcReqForwarderAuth::OnSessImplLoginComplete(
+gint32 CRpcReqForwarderAuth::OnSessImplLoginCompleteSafe(
     IEventSink* pInvTask,
-    IEventSink* pIoReq,
+    IEventSink* pCallback,
     IConfigDb* pReqCtx )
 {
     if( pInvTask == nullptr ||
-        pIoReq == nullptr ||
+        pCallback == nullptr ||
+        pReqCtx == nullptr )
+        return -EINVAL;
+
+    TaskletPtr pSeqTask;
+    gint32 ret = DEFER_IFCALL_NOSCHED(
+        pSeqTask, ObjPtr( this ),
+        &CRpcReqForwarderAuth::OnSessImplLoginComplete,
+        pInvTask, pReqCtx );
+    if( ERROR( ret ) )
+        return ret;
+
+    CIfRetryTask* pTask = pSeqTask;
+    pTask->SetClientNotify( pCallback );
+    CRpcRouter* pRouter = GetParent();
+
+    // by adding this task to the router's seq
+    // task, we want to prevent the potential
+    // contention with the eventRmtSvrOffline
+    ret = pRouter->AddSeqTask( pSeqTask );
+    if( SUCCEEDED( ret ) )
+        ret = pTask->GetError();
+
+    return ret;
+}
+    
+gint32 CRpcReqForwarderAuth::OnSessImplLoginComplete(
+    IEventSink* pInvTask,
+    IConfigDb* pReqCtx )
+{
+    if( pInvTask == nullptr ||
         pReqCtx == nullptr )
         return -EINVAL;
 
@@ -1932,28 +1962,6 @@ gint32 CRpcReqForwarderAuth::OnSessImplLoginComplete(
     CCfgOpener oReqCtx( pReqCtx );
 
     do{
-        CCfgOpenerObj oReq( pIoReq );
-        IConfigDb* pResp = nullptr;
-        ret = oReq.GetPointer(
-            propRespPtr, pResp );
-        if( ERROR( ret ) )
-            break;
-
-        CCfgOpener oResp( pResp );
-        gint32 iRet = 0;
-        ret = oResp.GetIntProp(
-            propReturnValue,
-            ( guint32& ) iRet );
-
-        if( ERROR( ret ) )
-            break;
-
-        if( ERROR( iRet ) )
-        {
-            ret = iRet;
-            break;
-        }
-
         CRpcServices* pap = nullptr;
         ret = oReqCtx.GetPointer(
             propIfPtr, pap );
@@ -1977,6 +1985,12 @@ gint32 CRpcReqForwarderAuth::OnSessImplLoginComplete(
             break;
         }
 
+        if( !pbp->IsConnected() )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+
         // at this moment, the auth proxy should
         // have the correct connhandle in place.
         guint32 dwPortId = 0;
@@ -1988,11 +2002,6 @@ gint32 CRpcReqForwarderAuth::OnSessImplLoginComplete(
 
         ret = oReqCtx.SetIntProp(
             propConnHandle, dwPortId );
-        if( ERROR( ret ) )
-            break;
-
-        ret = oReqCtx.CopyProp(
-            propSessHash, ( CObjBase* )pbp );
         if( ERROR( ret ) )
             break;
 
@@ -2010,6 +2019,11 @@ gint32 CRpcReqForwarderAuth::OnSessImplLoginComplete(
 
         ret = pProxy->SetSessHash(
             strHash, bNoEnc );
+        if( ERROR( ret ) )
+            break;
+
+        ret = oReqCtx.CopyProp(
+            propSessHash, ( CObjBase* )pbp );
         if( ERROR( ret ) )
             break;
 
@@ -2201,7 +2215,7 @@ gint32 CRpcReqForwarderAuth::BuildStartAuthProxyTask(
         // be completed here.
         ret = NEW_PROXY_RESP_HANDLER2(
             pRespCb1, ObjPtr( this ),
-            &CRpcReqForwarderAuth::OnSessImplLoginComplete,
+            &CRpcReqForwarderAuth::OnSessImplStarted,
             pInvTask, pReqCtx );
         if( ERROR( ret ) )
             break;
@@ -2214,6 +2228,16 @@ gint32 CRpcReqForwarderAuth::BuildStartAuthProxyTask(
             break;
 
         pTaskGrp->AppendTask( pLoginTask );
+
+        TaskletPtr pLoginComp;
+        ret = DEFER_IFCALLEX2_NOSCHED2(
+            1, pLoginComp, ObjPtr( this ),
+            &CRpcReqForwarderAuth::OnSessImplLoginCompleteSafe,
+            pInvTask, nullptr, pReqCtx );
+        if( ERROR( ret ) )
+            break;
+
+        pTaskGrp->AppendTask( pLoginComp );
 
         TaskletPtr pStopIf;
         ret = DEFER_IFCALLEX2_NOSCHED2(

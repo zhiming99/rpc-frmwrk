@@ -517,9 +517,13 @@ class CRpcReqForwarderAuth :
         IEventSink* pIoReq,
         IConfigDb* pReqCtx );
 
+    gint32 OnSessImplLoginCompleteSafe(
+        IEventSink* pInvTask,
+        IEventSink* pCallback,
+        IConfigDb* pReqCtx );
+
     gint32 OnSessImplLoginComplete(
         IEventSink* pInvTask,
-        IEventSink* pIoReq,
         IConfigDb* pReqCtx );
 
     public:
