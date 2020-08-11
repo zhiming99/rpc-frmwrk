@@ -1224,6 +1224,8 @@ gint32 CRpcReqForwarderAuth::LocalLoginInternal(
             // login seq task queue
             CIoManager* pMgr = pSvc->GetIoMgr();
             ret = pMgr->RescheduleTask( pChkRt );
+            if( SUCCEEDED( ret ) )
+                ret = STATUS_MORE_PROCESS_NEEDED;
         }
         else if( ret == -ENOENT )
         {
@@ -1237,6 +1239,12 @@ gint32 CRpcReqForwarderAuth::LocalLoginInternal(
         break;
 
     }while( 0 );
+
+    if( ret == STATUS_MORE_PROCESS_NEEDED )
+    {
+        // release the login queue only
+        return STATUS_SUCCESS;
+    }
 
     if( ret != STATUS_PENDING )
     {

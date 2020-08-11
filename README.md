@@ -15,7 +15,7 @@ This framework depends on the following packags:
 5. `glib-2.0 (for compile only,glib2-devel)`   
 6. `openssl-1.1 for SSL communication. ( openssl-devel, optional )`
 7. `Kerberos 5 for authentication and access control. ( krb5-server, krb5-workstation, krb5-libs, krb5-devel, optional )`
-8. c++11 is required, and you need make sure the GCC is 5.x or higher.
+8. c++11 is required, and make sure the GCC is 5.x or higher.
 
 #### Features:   
 1. `Support for multiple interfaces on a single object (COM alike).`   
@@ -32,7 +32,7 @@ This framework depends on the following packags:
 12. [`Secure Socket Layer (SSL) support`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/sslport/Readme.md)
 13. [`Websocket support`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/wsport/Readme.md)
 14. [`Object access via Multihop routing`](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support)
-15. `Authentication and Access control` support. (To come)
+15. `Authentication and Access control` support. (Coming...)
 
 #### Building `rpc-frmwrk`:   
 Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60) for details.

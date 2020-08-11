@@ -4412,6 +4412,11 @@ gint32 CRpcServices::LoadObjDesc(
                     oMatch.SetStrProp(
                         propDestDBusName, strRmtSvrName );
                 }
+                else
+                {
+                    oMatch.SetStrProp(
+                        propDestDBusName, strDest );
+                }
             }
 
             ( *pObjVec )().push_back( pMatch );
