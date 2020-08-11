@@ -39,7 +39,7 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 
 ---
 [`Tue 11 Aug 2020 10:02:46 PM Beijing`]  
-1. The test case `iftest` has passed. There should still be many bugs and more tests are on the way...   
+1. The test case `iftest` has passed. There should still be some bugs. Bug fixing and tests continues...   
 
 [`Thu 06 Aug 2020 11:02:28 PM Beijing`]   
 1. Still debugging the authentication module. And some progress are made. Many disturbing events happened in the last two weeks, such as 30-hour black-out, and buggy system update degraded the computer performance to 800MHz. Fortunately, everything returns to normal now. Hopefully, next week we will see the authentication support able to work.
