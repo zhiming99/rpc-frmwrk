@@ -1279,7 +1279,9 @@ gint32 CRouterOpenBdgePortTask::CreateInterface(
 {
     gint32 ret = 0;
     do{
-        CCfgOpener oCfg( ( IConfigDb* )GetConfig() );
+        CCfgOpener oCfg(
+            ( IConfigDb* )GetConfig() );
+
         CIoManager* pMgr = nullptr;
         ret = oCfg.GetPointer( propIoMgr, pMgr );
         if( ERROR( ret ) )
@@ -1317,14 +1319,18 @@ gint32 CRouterOpenBdgePortTask::CreateInterface(
         if( ERROR( ret ) )
             break;
 
-        CConnParams oConnParams( pConnParams );
-        bool bAuth = pRouter->HasAuth();
-        if( bAuth && !oConnParams.HasAuth() )
+        CConnParams oConn( pConnParams );
+        bool bAuth = false;
+        if( bServer )
         {
-            // forbid auth bridge router to have
-            // non-auth bridge.
-            ret = -EINVAL;
-            break;
+            bAuth = pRouter->HasAuth();
+            if( oConn.HasAuth() != bAuth )
+            {
+                // forbid auth bridge router to have
+                // non-auth bridge.
+                ret = -EINVAL;
+                break;
+            }
         }
 
         std::string strObjName;
