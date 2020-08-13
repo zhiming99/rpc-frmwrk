@@ -2514,18 +2514,23 @@ gint32 CRpcNativeProtoFdo::CompleteWriteIrp(
     if( !pIrp->IsIrpHolder() )
         pIrp->PopCtxStack();
 
-    if( SUCCEEDED( ret ) )
+    if( true )
     {
-        CStdRMutex oPortLock( GetLock() ); 
         Stm2Ptr pStm;
-        ret = GetStreamFromIrp( pIrp, pStm );
-        if( SUCCEEDED( ret ) )
+        CStdRMutex oPortLock( GetLock() ); 
+
+        gint32 iRet =
+            GetStreamFromIrp( pIrp, pStm );
+
+        if( SUCCEEDED( iRet ) )
             pStm->Refresh();
+
         SetSending( false );
         oPortLock.Unlock();
 
         StartSend( nullptr );
     }
+
     return ret;
 }
 

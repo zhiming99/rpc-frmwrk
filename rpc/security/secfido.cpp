@@ -778,8 +778,8 @@ gint32 CRpcSecFido::CompleteFuncIrp( IRP* pIrp )
     gint32 ret = 0;
 
     do{
-        if( pIrp == nullptr 
-           || pIrp->GetStackSize() == 0 )
+        if( pIrp == nullptr ||
+            pIrp->GetStackSize() == 0 )
         {
             ret = -EINVAL;
             break;
@@ -827,7 +827,7 @@ gint32 CRpcSecFido::CompleteFuncIrp( IRP* pIrp )
         }
         else
         {
-            ret = pCtx->GetStatus();
+            pCtx->SetStatus( ret );
         }
     }
     return ret;

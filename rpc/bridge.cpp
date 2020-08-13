@@ -343,7 +343,8 @@ gint32 CRpcTcpBridgeProxy::BuildBufForIrpFwrdReq(
 
         string strObjName = OBJNAME_TCP_BRIDGE;
         CRpcRouter* pRouter = GetParent();
-        if( pRouter->HasAuth() )
+        if( pRouter->HasAuth() &&
+            !pRouter->HasBridge() )
             strObjName = OBJNAME_TCP_BRIDGE_AUTH;
 
         string strObjPath =DBUS_OBJ_PATH(

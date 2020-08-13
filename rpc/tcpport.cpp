@@ -4387,14 +4387,14 @@ gint32 CRpcListeningSock::Connect()
         CCfgOpener oConnParams( pConnParams );
         string strIpAddr;
         ret = oConnParams.GetStrProp(
-            propSrcIpAddr, strIpAddr );
+            propDestIpAddr, strIpAddr );
 
         if( ERROR( ret ) )
             break;
 
         guint32 dwPortNum = 0;
         ret = oConnParams.GetIntProp(
-            propSrcTcpPort, dwPortNum );
+            propDestTcpPort, dwPortNum );
 
         if( ERROR( ret ) )
             break;

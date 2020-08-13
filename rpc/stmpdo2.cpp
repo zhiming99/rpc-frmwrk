@@ -1296,7 +1296,25 @@ gint32 CTcpStreamPdo2::SendImmediate(
     if( iFd < 0 || pIrp == nullptr )
         return -EINVAL;
 
-    return m_oSender.SendImmediate( iFd, pIrp );
+    gint32 ret = m_oSender.SendImmediate(
+        iFd, pIrp );
+
+    if( ERROR( ret ) && (
+        ret != -ENOENT &&
+        ret != ERROR_NOT_HANDLED ) )
+   { 
+        TaskletPtr pDisTask;
+        gint32 iRet = DEFER_CALL_NOSCHED(
+            pDisTask, ObjPtr( this ),
+            &CTcpStreamPdo2::OnDisconnected );
+        if( SUCCEEDED( iRet ) )
+        {
+            CIoManager* pMgr = GetIoMgr();
+            pMgr->RescheduleTask( pDisTask );
+        }
+   }
+
+   return ret;
 }
 
 gint32 CTcpStreamPdo2::OnSendReady(

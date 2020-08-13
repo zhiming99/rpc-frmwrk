@@ -7,14 +7,14 @@ This is an asynchronous and event-driven RPC framework for embeded system with s
 [`Here`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md) is an introduction about some concepts that help to understand this project.
 
 #### Dependency:  
-This framework depends on the following packags:  
+This framework depends on the following packags to build:  
 1. `dbus-1.0 (dbus-devel)`
 2. `libjson-cpp (jsoncpp-devel)` 
 3. `lz4 (lz4-devel)`   
 4. `cppunit-1 (for the sample code, cppunit and cppunit-devel)`   
 5. `glib-2.0 (for compile only,glib2-devel)`   
 6. `openssl-1.1 for SSL communication. ( openssl-devel, optional )`
-7. `Kerberos 5 for authentication and access control. ( krb5-server, krb5-workstation, krb5-libs, krb5-devel, optional )`
+7. `Kerberos 5 for authentication and access control. ( rpm: krb5-libs, krb5-devel, or deb: libkrb5-3, libkrb5-dev )`
 8. c++11 is required, and make sure the GCC is 5.x or higher.
 
 #### Features:   
@@ -32,12 +32,15 @@ This framework depends on the following packags:
 12. [`Secure Socket Layer (SSL) support`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/sslport/Readme.md)
 13. [`Websocket support`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/wsport/Readme.md)
 14. [`Object access via Multihop routing`](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support)
-15. `Authentication and Access control` support. (Coming...)
+15. `Authentication and Access control` support. ( Coming... )
 
 #### Building `rpc-frmwrk`:   
 Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60) for details.
 
 ---
+[`Tue 11 Aug 2020 10:02:46 PM Beijing`]  
+1. The test case `iftest` has passed. There should still be some bugs. Bug fixing and tests continues...   
+
 [`Thu 06 Aug 2020 11:02:28 PM Beijing`]   
 1. Still debugging the authentication module. And some progress are made. Many disturbing events happened in the last two weeks, such as 30-hour black-out, and buggy system update degraded the computer performance to 800MHz. Fortunately, everything returns to normal now. Hopefully, next week we will see the authentication support able to work.
 

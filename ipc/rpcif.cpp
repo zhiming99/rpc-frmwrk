@@ -2172,7 +2172,7 @@ gint32 CRpcInterfaceBase::AddAndRun(
         //     0       1       0       error
         //     0       1       1       run root
         //     1       0       0       run root
-        //     1       0       1       error
+        //     1       0       1       TBD
         //     1       1       0       error
         //     1       1       1       run direct
         if( !bImmediate || ( !bRunning && dwCount == 0 ) )
@@ -2250,6 +2250,30 @@ gint32 CRpcInterfaceBase::AddAndRun(
             // force to run the task on the current
             // thread
             ret = pParaGrp->RunTaskDirect( pIoTask );
+        }
+        else if( bImmediate && !bRunning && dwCount > 0 )
+        {
+            EnumTaskState iTaskState =
+                pParaGrp->GetTaskState();
+            if( iTaskState == stateStarting )
+            {
+                // the old pParaGrp is about to
+                // quit, the new pParaGrp is
+                // waiting.
+                pParaGrp->AppendTask( pIoTask );
+                pIoTask->MarkPending();
+                ret = STATUS_PENDING;
+                DebugPrint( GetTid(),
+                    "old paragrp is about to quit,"
+                    "dwCount=%d, bRunning=%d",
+                    dwCount, bRunning );
+            }
+            else
+            {
+                pParaLock->unlock();
+                oRootLock.Unlock();
+                ret = ERROR_STATE;
+            }
         }
         else
         {
