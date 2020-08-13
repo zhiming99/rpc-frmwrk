@@ -1701,6 +1701,11 @@ gint32 gen_sess_hash( BufPtr& pBuf,
         ( guint8* )pTemp->ptr(),
         pTemp->size(), strSess );
 
+    if( SUCCEEDED( ret ) )
+    {
+        DebugPrint( 0, "Sess hash is %s",
+            strSess.c_str() );
+    }
     return ret;
 }
 
@@ -1733,12 +1738,16 @@ gint32 AppendConnParams(
         guint32 dwSrcPort =
             oConn.GetSrcPortNum();
 
-        pBuf->Append( strDestIp.c_str(),
+        ret = pBuf->Append( strDestIp.c_str(),
             strDestIp.size() );
+        if( ERROR( ret ) )
+            break;
 
-        pBuf->Append(
+        ret = pBuf->Append(
             ( guint8* )&dwDestPort,
             sizeof( dwDestPort ) );
+        if( ERROR( ret ) )
+            break;
 
         ret = pBuf->Append( strSrcIp.c_str(),
             strSrcIp.size() );
@@ -1751,6 +1760,20 @@ gint32 AppendConnParams(
 
         if( ERROR( ret ) )
             break;
+
+        if( _DEBUG )
+        {
+            std::string strDump;
+            gint32 iRet = BytesToString(
+                ( guint8* )pBuf->ptr(),
+                pBuf->size(), strDump );
+
+            if( ERROR( iRet ) )
+                break;
+
+            DebugPrint( 0, "buf to hash: \n",
+               strDump.c_str() );
+        }
             
     }while( 0 );
         

@@ -713,12 +713,12 @@ gint32 CRpcTcpBusDriver::GetTcpSettings(
                         ret = -ENOENT;
                         break;
                     }
-                    oElemCfg.SetIntProp( propSrcTcpPort, dwPort );
+                    oElemCfg.SetIntProp( propDestTcpPort, dwPort );
                 }
                 else
                 {
                     dwPort = RPC_SVR_DEFAULT_PORTNUM;
-                    oElemCfg.SetIntProp( propSrcTcpPort, dwPort );
+                    oElemCfg.SetIntProp( propDestTcpPort, dwPort );
                 }
 
                 // address to listen on
@@ -737,7 +737,7 @@ gint32 CRpcTcpBusDriver::GetTcpSettings(
                             AF_INET6, strAddr, strNormVal );
                     }
 
-                    oElemCfg.SetStrProp( propSrcIpAddr, strNormVal );
+                    oElemCfg.SetStrProp( propDestIpAddr, strNormVal );
                 }
 
                 // address format, for detail, refer to propAddrFormat
