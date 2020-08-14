@@ -2233,7 +2233,7 @@ gint32 CRpcInterfaceBase::AddAndRun(
                 // appended on current thread are
                 // run and completed by other
                 // thread, though the tasks should
-                // run normally.
+                // succeed as normal.
                 ret = ( *pParaGrp )( eventZero );
                 if( ret == STATUS_PENDING )
                 {
@@ -2245,11 +2245,14 @@ gint32 CRpcInterfaceBase::AddAndRun(
         }
         else if( bImmediate && bRunning && dwCount > 0 )
         {
+            pParaGrp->AppendTask( pIoTask );
             pParaLock->unlock();
             oRootLock.Unlock();
-            // force to run the task on the current
-            // thread
-            ret = pParaGrp->RunTaskDirect( pIoTask );
+
+            // force the task to run immediately
+            ret = ( *pParaGrp )( eventZero );
+            if( ret == STATUS_PENDING )
+                pIoTask->MarkPending();
         }
         else if( bImmediate && !bRunning && dwCount > 0 )
         {
@@ -2262,6 +2265,7 @@ gint32 CRpcInterfaceBase::AddAndRun(
                 // waiting.
                 pParaGrp->AppendTask( pIoTask );
                 pIoTask->MarkPending();
+                pParaLock->unlock();
                 ret = STATUS_PENDING;
                 DebugPrint( GetTid(),
                     "old paragrp is about to quit,"
@@ -2271,14 +2275,16 @@ gint32 CRpcInterfaceBase::AddAndRun(
             else
             {
                 pParaLock->unlock();
-                oRootLock.Unlock();
                 ret = ERROR_STATE;
+                DebugPrint( GetTid(),
+                    "failed to run task immediately,"
+                    "dwCount=%d, bRunning=%d",
+                    dwCount, bRunning );
             }
         }
         else
-        {
+        {   // bImmediate && bRunning && dwCount == 0
             pParaLock->unlock();
-            oRootLock.Unlock();
             ret = ERROR_STATE;
         }
 

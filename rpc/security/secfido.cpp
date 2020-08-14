@@ -172,7 +172,7 @@ gint32 CRpcSecFido::EncEnabled()
 }
 
 gint32 CRpcSecFido::DoEncrypt(
-    PIRP pIrp, BufPtr& pOutBuf, bool bEncrypt)
+    PIRP pIrp, BufPtr& pOutBuf, bool bEncrypt )
 {
     if( pIrp == nullptr ||
         pIrp->GetStackSize() == 0 )
@@ -233,7 +233,11 @@ gint32 CRpcSecFido::DoEncrypt(
             ret = oParams.GetProperty(
                 i, pPayload );
             if( ERROR( ret ) )
-                break;
+                continue;
+
+            if( pPayload.IsEmpty() ||
+                pPayload->empty() )
+                continue;
 
             pInBuf->Append( pPayload->ptr(),
                 pPayload->size() );
@@ -245,7 +249,7 @@ gint32 CRpcSecFido::DoEncrypt(
             ret = -ERANGE;
             break;
         }
-        if( pInBuf->size() == dwHdrSize )
+        else if( pInBuf->size() <= dwHdrSize )
         {
             ret = -ENOMEM;
             break;
@@ -271,7 +275,7 @@ gint32 CRpcSecFido::DoEncrypt(
             if( SUCCEEDED( ret ) )
             {
                 pInBuf->SetOffset(
-                pInBuf->offset() + dwHdrSize );
+                    pInBuf->offset() + dwHdrSize );
 
                 IAuthenticateProxy* pAuth =
                 dynamic_cast< IAuthenticateProxy* >
@@ -414,10 +418,45 @@ gint32 CRpcSecFido::SubmitIoctlCmd(
         return -EINVAL;
 
     gint32 ret = 0;
+    STREAM_SOCK_EVENT sse;
+
+    IrpCtxPtr pCtx = pIrp->GetTopStack();
+
     switch( pIrp->CtrlCode() )
     {
     case CTRLCODE_LISTENING:
         {
+            BufPtr pInBuf;
+            bool bEncrypted = false;
+
+            ret = GetPktCached(
+                pInBuf, bEncrypted ); 
+
+            if( SUCCEEDED( ret ) )
+            {
+                BufPtr pOutBuf; 
+                ret = DecryptPkt( pInBuf,
+                    pOutBuf, bEncrypted );
+
+                if( ERROR( ret ) )
+                    break;
+
+                sse.m_iEvent = sseRetWithBuf;
+                sse.m_pInBuf = pOutBuf;
+                pInBuf->Resize( sizeof( sse ) );
+                memcpy( pInBuf->ptr(),
+                    &sse, sizeof( sse ) );
+                pCtx->SetRespData( pInBuf );
+                ret = 0;
+                break;
+            }
+
+            if( ERROR( ret ) )
+                break;
+
+            if( ret != EAGAIN )
+                break;
+
             PortPtr pLowerPort = GetLowerPort();
             ret = pIrp->AllocNextStack(
                 pLowerPort, IOSTACK_ALLOC_COPY );
@@ -484,6 +523,203 @@ gint32 CRpcSecFido::SubmitIoctlCmd(
         }
     }
 
+    if( ERROR( ret ) &&
+        pCtx->GetCtrlCode() ==
+        CTRLCODE_LISTENING )
+    {
+        sse.m_iEvent = sseError;
+        sse.m_iData = ret;
+        BufPtr pInBuf( true );
+        pInBuf->Resize( sizeof( sse ) );
+        memcpy( pInBuf->ptr(),
+            &sse, sizeof( sse ) );
+        pCtx->SetRespData( pInBuf );
+        ret = 0;
+    }
+
+    return ret;
+}
+
+gint32 CRpcSecFido::GetPktCached(
+    BufPtr& pRetBuf,
+    bool& bEncrypted )
+{
+    gint32 ret = 0;
+    BufPtr pInBuf;
+    do{
+        if( m_pInBuf.IsEmpty() ||
+            m_pInBuf->empty() )
+        {
+            ret = EAGAIN;
+            break;
+        }
+
+        char* pPayload = m_pInBuf->ptr();
+
+        const guint32& dwHdrSize =
+            sizeof( SEC_PACKET_HEADER );
+
+        if( m_pInBuf->size() < dwHdrSize )
+        {
+            ret = EAGAIN;
+            break;
+        }
+
+        guint32 dwMagic = ntohl(
+            ( ( guint32* )pPayload )[ 0 ] );
+
+        if( dwMagic == ENC_PACKET_MAGIC )
+            bEncrypted = true;
+        else if( dwMagic == CLEAR_PACKET_MAGIC )
+            bEncrypted = false;
+        else
+        {
+            ret = -EPROTO;
+            break;
+        }
+
+        guint32 dwSize = ntohl(
+            ( ( guint32* )pPayload )[ 1 ] );
+
+        guint32 dwPktSize = dwSize + dwHdrSize;
+
+        if( dwPktSize == m_pInBuf->size() )
+        {
+            pInBuf = m_pInBuf;
+            m_pInBuf.Clear();
+        }
+        else if( dwPktSize < m_pInBuf->size() )
+        {
+            ret = pInBuf.NewObj();
+            if( ERROR( ret ) )
+                break;
+
+            pInBuf->Append(
+                m_pInBuf->ptr() + dwPktSize, 
+                m_pInBuf->size() - dwPktSize );
+
+            m_pInBuf->Resize( dwPktSize );
+            std::swap( m_pInBuf, pInBuf );
+        }
+        else // dwPktSize > m_pInBuf->size()
+        {
+            ret = EAGAIN;
+            break;
+        }
+
+    }while( 0 );
+
+    if( SUCCEEDED( ret ) )
+        pRetBuf = pInBuf;
+
+    return ret;
+}
+
+gint32 CRpcSecFido::DecryptPkt(
+    BufPtr& pInBuf,
+    BufPtr& pOutBuf,
+    bool& bEncrypted )
+{
+    gint32 ret = 0;
+    const guint32& dwHdrSize =
+        sizeof( SEC_PACKET_HEADER );
+
+    if( pInBuf.IsEmpty() || pInBuf->empty() )
+        return -EINVAL;
+
+    if( pInBuf->size() < dwHdrSize )
+        return -EINVAL;
+
+    if( !bEncrypted )
+    {
+        pInBuf->SetOffset(
+            pInBuf->offset() + dwHdrSize );
+        pOutBuf = pInBuf;
+        return 0;
+    }
+
+    do{
+        ObjPtr pObj;
+        ret = GetSecCtx( pObj );
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpener oSecCtx(
+            ( IConfigDb* )pObj );
+
+        CObjBase* pAuthObj = nullptr;
+        ret = oSecCtx.GetPointer(
+            propObjPtr, pAuthObj );
+        if( ERROR( ret ) )
+            break;
+
+        pInBuf->SetOffset(
+            pInBuf->offset() + dwHdrSize );
+
+        if( pOutBuf.IsEmpty() ||
+            pOutBuf->empty() )
+        {
+            ret = pOutBuf.NewObj();
+            if( ERROR( ret ) )
+                break;
+        }
+        ret = IsClient();
+        if( SUCCEEDED( ret ) )
+        {
+            IAuthenticateProxy* pAuth =
+            dynamic_cast< IAuthenticateProxy* >
+                ( pAuthObj );
+
+            if( unlikely( pAuth == nullptr ) )
+            {
+                ret = -EFAULT;
+                break;
+            }
+
+            ret = pAuth->UnwrapMessage(
+                pInBuf, pOutBuf );
+
+            if( ERROR( ret ) )
+            {
+                ret = -EPROTO;
+                break;
+            }
+
+        }
+        else if( ret == ERROR_FALSE )
+        {
+            IAuthenticateServer* pAuth =
+            dynamic_cast< IAuthenticateServer* >
+                ( pAuthObj );
+
+            if( unlikely( pAuth == nullptr ) )
+            {
+                ret = -EFAULT;
+                break;
+            }
+
+            std::string strHash;
+            ret = oSecCtx.GetStrProp(
+                propSessHash, strHash );
+            if( ERROR( ret ) )
+                break;
+
+            ret = pAuth->UnwrapMessage(
+                strHash, pInBuf, pOutBuf );
+
+            if( ERROR( ret ) )
+            {
+                ret = -EPROTO;
+                break;
+            }
+        }
+        else
+        {
+            break;
+        }
+
+    }while( 0 );
+
     return ret;
 }
 
@@ -503,9 +739,6 @@ gint32 CRpcSecFido::CompleteListeningIrp(
         ( STREAM_SOCK_EVENT* )pRespBuf->ptr();
 
     do{
-        const guint32& dwHdrSize =
-            sizeof( SEC_PACKET_HEADER );
-
         BufPtr pSecPacket = psse->m_pInBuf;
         if( pSecPacket.IsEmpty() ||
             pSecPacket->empty() )
@@ -530,8 +763,14 @@ gint32 CRpcSecFido::CompleteListeningIrp(
                 break;
         }
 
-        char* pPayload = m_pInBuf->ptr();
-        if( m_pInBuf->size() < dwHdrSize )
+        bool bEncrypted = false;
+        BufPtr pInBuf;
+        ret = GetPktCached( pInBuf, bEncrypted );
+        if( ERROR( ret ) )
+        {
+            break;
+        }
+        else if( ret == EAGAIN )
         {
             // incoming data is not a complete
             // packet, and re-submit the listening
@@ -542,141 +781,18 @@ gint32 CRpcSecFido::CompleteListeningIrp(
             if( SUCCEEDED( ret ) )
                 continue;
 
-            break;
-
-        }
-        guint32 dwMagic = ntohl(
-            ( ( guint32* )pPayload )[ 0 ] );
-
-        bool bEncrypted;
-        if( dwMagic == ENC_PACKET_MAGIC )
-            bEncrypted = true;
-        else if( dwMagic == CLEAR_PACKET_MAGIC )
-            bEncrypted = false;
-        else
-        {
-            ret = -EPROTO;
-            break;
-        }
-
-        guint32 dwSize = ntohl(
-            ( ( guint32* )pPayload )[ 1 ] );
-
-        BufPtr pInBuf ;
-        if( dwSize ==
-            m_pInBuf->size() - dwHdrSize )
-        {
-            pInBuf = m_pInBuf;
-            m_pInBuf.Clear();
-        }
-        else if( dwSize <
-            m_pInBuf->size() - dwHdrSize )
-        {
-            ret = pInBuf.NewObj();
-            if( ERROR( ret ) )
+            if( ret == STATUS_PENDING )
                 break;
 
-            guint32 dwPktSize =
-                dwSize + dwHdrSize;
-
-            pInBuf->Append(
-                m_pInBuf->ptr() + dwPktSize, 
-                m_pInBuf->size() - dwPktSize );
-
-            m_pInBuf->Resize( dwPktSize );
-            std::swap( m_pInBuf, pInBuf );
-        }
-        else
-        {
-            // incoming data does not contain a
-            // complete packet, and re-submit the
-            // listening irp
-            pTopCtx->m_pRespData.Clear();
-            IPort* pPort = GetLowerPort();
-            ret = pPort->SubmitIrp( pIrp );
-            if( SUCCEEDED( ret ) )
-                continue;
-
             break;
         }
 
-        if( !bEncrypted )
-        {
-            pInBuf->SetOffset( dwHdrSize );
-            psse->m_pInBuf = pInBuf;
-            pCtx->SetRespData( pRespBuf );
-            break;
-        }
+        BufPtr pOutBuf;
+        ret = DecryptPkt( pInBuf,
+            pOutBuf, bEncrypted );
 
-        ObjPtr pObj;
-        ret = GetSecCtx( pObj );
         if( ERROR( ret ) )
             break;
-
-        CCfgOpener oSecCtx(
-            ( IConfigDb* )pObj );
-
-        CObjBase* pAuthObj = nullptr;
-        ret = oSecCtx.GetPointer(
-            propObjPtr, pAuthObj );
-        if( ERROR( ret ) )
-            break;
-
-        BufPtr pOutBuf( true );
-        ret = IsClient();
-        if( SUCCEEDED( ret ) )
-        {
-            pInBuf->SetOffset(
-                pInBuf->offset() + dwHdrSize );
-
-            IAuthenticateProxy* pAuth =
-            dynamic_cast< IAuthenticateProxy* >
-                ( pAuthObj );
-
-            if( unlikely( pAuth == nullptr ) )
-            {
-                ret = -EFAULT;
-                break;
-            }
-
-            ret = pAuth->UnwrapMessage(
-                pInBuf, pOutBuf );
-
-            if( ERROR( ret ) )
-                break;
-
-        }
-        else if( ret == ERROR_FALSE )
-        {
-            pInBuf->SetOffset(
-                pInBuf->offset() + dwHdrSize );
-
-            IAuthenticateServer* pAuth =
-            dynamic_cast< IAuthenticateServer* >
-                ( pAuthObj );
-
-            if( unlikely( pAuth == nullptr ) )
-            {
-                ret = -EFAULT;
-                break;
-            }
-
-            std::string strHash;
-            ret = oSecCtx.GetStrProp(
-                propSessHash, strHash );
-            if( ERROR( ret ) )
-                break;
-
-            ret = pAuth->UnwrapMessage(
-                strHash, pInBuf, pOutBuf );
-
-            if( ERROR( ret ) )
-                break;
-        }
-        else
-        {
-            break;
-        }
 
         psse->m_pInBuf = pOutBuf;
         pCtx->SetRespData( pRespBuf );

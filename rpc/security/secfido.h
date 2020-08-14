@@ -53,6 +53,11 @@ class CRpcSecFido : public CPort
 {
     BufPtr      m_pInBuf;
 
+    gint32 GetPktCached(
+        BufPtr& pRetBuf, bool& bEncrypted );
+    gint32 DecryptPkt( BufPtr& pInBuf,
+        BufPtr& pOutBuf, bool& bEncrypted );
+
     gint32 SubmitIoctlCmd( IRP* pIrp );
     gint32 CompleteWriteIrp( IRP* pIrp );
     gint32 CompleteIoctlIrp( IRP* pIrp );
