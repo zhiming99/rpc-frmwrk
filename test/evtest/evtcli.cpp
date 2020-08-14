@@ -55,12 +55,8 @@ gint32 CEventClient::OnHelloWorld(
 {
     gint32 ret = 0;
     static guint32 dwCount = 0;
-
-    do{
-        printf( "%d: Received Event: %s\n",
-            dwCount++, strText.c_str() );
-    }while( 0 );
-
+    printf( DebugMsg( 0, "%d: %s",
+        dwCount++, strText.c_str() ).c_str() );
     return ret;
 }
 
