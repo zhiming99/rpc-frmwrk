@@ -233,7 +233,7 @@ gint32 CRpcSecFido::DoEncrypt(
             ret = oParams.GetProperty(
                 i, pPayload );
             if( ERROR( ret ) )
-                continue;
+                break;
 
             if( pPayload.IsEmpty() ||
                 pPayload->empty() )
@@ -242,6 +242,9 @@ gint32 CRpcSecFido::DoEncrypt(
             pInBuf->Append( pPayload->ptr(),
                 pPayload->size() );
         }
+
+        if( ERROR( ret ) )
+            break;
 
         if( pInBuf->size() >
             MAX_BYTES_PER_TRANSFER )
@@ -443,10 +446,11 @@ gint32 CRpcSecFido::SubmitIoctlCmd(
 
                 sse.m_iEvent = sseRetWithBuf;
                 sse.m_pInBuf = pOutBuf;
-                pInBuf->Resize( sizeof( sse ) );
-                memcpy( pInBuf->ptr(),
-                    &sse, sizeof( sse ) );
-                pCtx->SetRespData( pInBuf );
+                BufPtr pEvtBuf( true );
+                pEvtBuf->Resize( sizeof( sse ) );
+                new ( pEvtBuf->ptr() )
+                    STREAM_SOCK_EVENT( sse );
+                pCtx->SetRespData( pEvtBuf );
                 ret = 0;
                 break;
             }
@@ -746,8 +750,7 @@ gint32 CRpcSecFido::CompleteListeningIrp(
             ret = -EBADMSG;
             break;
         }
-        // explicitly release the buffer in the
-        // STREAM_SOCK_EVENT
+
         psse->m_pInBuf.Clear();
         if( m_pInBuf.IsEmpty() ||
             m_pInBuf->empty() )

@@ -43,6 +43,16 @@ static std::atomic< int > s_atmSeqNo( GetRandom() );
 extern CConnParamsProxy GetConnParams(
     const CObjBase* pObj );
 
+#define REQFWDR_NAME \
+({ \
+    std::string strVal; \
+    if( m_bAuth ) \
+        strVal = OBJNAME_REQFWDR_AUTH; \
+    else \
+        strVal = OBJNAME_REQFWDR; \
+    strVal; \
+})
+
 CDBusProxyFdo::CDBusProxyFdo( const IConfigDb* pCfg )
     : super( pCfg )
 {
@@ -120,7 +130,7 @@ gint32 CDBusProxyFdo::BuildSendDataMsg(
         GetIoMgr()->GetRouterName( strRtName );
 
         string strPath = DBUS_OBJ_PATH(
-            strRtName, OBJNAME_REQFWDR );
+            strRtName, REQFWDR_NAME );
 
         pMsg.SetPath( strPath );
 
@@ -131,7 +141,7 @@ gint32 CDBusProxyFdo::BuildSendDataMsg(
 
         string strDest = DBUS_DESTINATION2(
                 strRtName,
-                OBJNAME_REQFWDR );
+                REQFWDR_NAME );
 
         pMsg.SetDestination( strDest );
 
@@ -1002,6 +1012,11 @@ gint32 CDBusProxyFdo::PostStart(
         if( ERROR( ret ) )
             break;
 
+        CConnParamsProxy oConn =
+            GetConnParams( this );
+
+        m_bAuth = oConn.HasAuth();
+
         ret = oPortCfg.CopyProp(
             propRouterPath, pPdoPort );
 
@@ -1046,7 +1061,7 @@ gint32 CDBusProxyFdo::PostStart(
             GetIoMgr()->GetRouterName( strRtName );
 
             string strPath = DBUS_OBJ_PATH(
-                strRtName, OBJNAME_REQFWDR );
+                strRtName, REQFWDR_NAME );
 
             string strIfName =
                 DBUS_IF_NAME( IFNAME_REQFORWARDER );
@@ -1081,9 +1096,6 @@ gint32 CDBusProxyFdo::PostStart(
 
             if( ERROR( ret ) )
                 break;
-
-            CConnParamsProxy oConn =
-                GetConnParams( this );
 
             ret = matchRmtEvt.CopyProp(
                 propRouterPath, this );

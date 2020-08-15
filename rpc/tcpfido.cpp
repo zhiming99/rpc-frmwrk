@@ -32,6 +32,19 @@
 
 using namespace std;
 
+#define BRIDGE_NAME \
+({ \
+    std::string strVal; \
+    if( m_bAuth ) \
+        strVal = OBJNAME_TCP_BRIDGE_AUTH; \
+    else \
+        strVal = OBJNAME_TCP_BRIDGE; \
+    strVal; \
+})
+
+extern CConnParamsProxy GetConnParams(
+    const CObjBase* pObj );
+
 std::atomic< guint32 > CRpcTcpFido::m_atmSeqNo(
     ( guint32 )GetRandom() );
 
@@ -1134,7 +1147,7 @@ gint32 CRpcTcpFido::BuildSendDataMsg(
         GetIoMgr()->GetRouterName( strRtName );
 
         string strDest = DBUS_DESTINATION2( 
-            strRtName, OBJNAME_TCP_BRIDGE );
+            strRtName, BRIDGE_NAME );
 
         pMsg.SetDestination( strDest );
         ret = oParams.SetIntProp(
@@ -1145,7 +1158,7 @@ gint32 CRpcTcpFido::BuildSendDataMsg(
             break;
 
         string strPath = DBUS_OBJ_PATH(
-            strRtName, OBJNAME_TCP_BRIDGE );
+            strRtName, BRIDGE_NAME );
 
         pMsg.SetPath( strPath );
         pMsg.SetInterface( strIfName );
@@ -1450,6 +1463,11 @@ gint32 CRpcTcpFido::OnPortReady(
 
         pCtx = pIrp->GetCurCtx();
         pCtx->SetStatus( ret );
+
+        CConnParamsProxy oConn =
+            GetConnParams( this );
+
+        m_bAuth = oConn.HasAuth();
 
     }while( 0 );
 
