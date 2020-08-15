@@ -166,6 +166,7 @@ class CDBusProxyFdo : public IRpcFdoPort
     TaskletPtr          m_pListenTask;
 
     bool                m_bConnected = false;
+    bool                m_bAuth = false;
 
     gint32 HandleListeningFdo( IRP* pIrp );
 

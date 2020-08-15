@@ -542,7 +542,7 @@ class CRpcReqForwarderAuth :
     {
         if( iid == iid( CRpcReqForwarder ) )
             return true;
-        return false;
+        return super::SupportIid( iid );
     }
 
     gint32 GetStartCtx( IConfigDb*& pCtx ) const

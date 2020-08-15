@@ -252,6 +252,7 @@ gint32 CRpcTcpBridgeAuth::EnableInterfaces()
         if( ERROR( ret ) )
             break;
 
+        oParams.Push( true );
         for( auto elem : vecMatches )
         {
             oParams[ propMatchPtr ] =
@@ -644,6 +645,17 @@ gint32 CRpcTcpBridgeAuth::OnLoginComplete(
             bNoEnc = true;
 
         ret = SetSessHash( strSess, bNoEnc );
+        if( ERROR( ret ) )
+            break;
+
+        TaskletPtr pDummy;
+        ret = pDummy.NewObj( 
+            clsid( CIfDummyTask ) );
+        if( ERROR( ret ) )
+            break;
+
+        // to open the default control stream
+        ret = super::OnPostStart( pDummy );
 
     }while( 0 );
 
@@ -1422,8 +1434,7 @@ gint32 CAuthentProxy::StopSessImpl()
 
         TaskletPtr pDummy;
         ret = pDummy.NewObj( 
-            clsid( CIfDummyTask ),
-            oParams.GetCfg() );
+            clsid( CIfDummyTask ) );
         if( ERROR( ret ) )
             break;
 
@@ -2088,6 +2099,17 @@ gint32 CRpcReqForwarderAuth::OnSessImplLoginComplete(
             pChkRt, ObjPtr( this ),
             &CRpcReqForwarder::CheckRouterPath,
             pInvTask, pReqCtx );
+        if( ERROR( ret ) )
+            break;
+
+        TaskletPtr pDummy;
+        ret = pDummy.NewObj( 
+            clsid( CIfDummyTask ) );
+        if( ERROR( ret ) )
+            break;
+
+        ret = pProxy->CRpcTcpBridgeProxy::
+            OnPostStart( pDummy );
         if( ERROR( ret ) )
             break;
 
