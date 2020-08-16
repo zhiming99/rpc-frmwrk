@@ -1089,7 +1089,13 @@ gint32 CDriverManager::BuildPortStack(
                 // not loaded yet
                 ret = LoadDriver( strDrvName );
                 if( ERROR( ret ) )
-                    break;
+                {
+                    DebugPrint( ret,
+                        "Driver %s is not found"
+                        ", and ignored...",
+                        strDrvName.c_str() );
+                    continue;
+                }
 
                 ret = FindDriver( strDrvName, pDrv );
                 if( ERROR( ret ) )
