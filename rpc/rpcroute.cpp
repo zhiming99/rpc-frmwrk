@@ -1323,14 +1323,8 @@ gint32 CRouterOpenBdgePortTask::CreateInterface(
         bool bAuth = false;
         if( bServer )
         {
-            bAuth = pRouter->HasAuth();
-            if( oConn.HasAuth() != bAuth )
-            {
-                // forbid auth bridge router to have
-                // non-auth bridge.
-                ret = -EINVAL;
-                break;
-            }
+            bAuth = ( pRouter->HasAuth() &&
+                oConn.HasAuth() );
         }
 
         std::string strObjName;
@@ -1604,7 +1598,19 @@ gint32 CRouterOpenBdgePortTask::RunTaskInternal(
             InterfPtr pBridgeIf;
             ret = CreateInterface( pBridgeIf );
             if( ERROR( ret ) )
+            {
+                if( !bServer )
+                    break;
+
+                HANDLE hPort = INVALID_HANDLE;
+                gint32 iRet = oCfg.GetIntPtr(
+                    1, ( guint32*& )hPort );
+                if( ERROR( iRet ) )
+                    break;
+
+                pMgr->ClosePort( hPort, nullptr );
                 break;
+            }
 
             if( bServer )
                 m_pServer = pBridgeIf;
@@ -1816,6 +1822,7 @@ gint32 CRpcRouterBridge::OnRmtSvrOnline(
 
             bool bServer = true;
             oParams.Push( bServer );
+            oParams.Push( hPort );
 
             TaskletPtr pTask;
             ret = pTask.NewObj(
@@ -2332,8 +2339,8 @@ gint32 CRpcRouterBridge::OnRmtSvrOffline(
 
     gint32 ret = 0;
     CIoManager* pMgr = GetIoMgr();
+    InterfPtr pIf;
     do{
-        InterfPtr pIf;
         if( !IsConnected() )
         {
             ret = ERROR_STATE;
@@ -3612,8 +3619,8 @@ gint32 CRpcRouterReqFwdr::OnRmtSvrOffline(
 
     gint32 ret = 0;
     CIoManager* pMgr = GetIoMgr();
+    InterfPtr pIf;
     do{
-        InterfPtr pIf;
         if( !IsConnected() )
         {
             ret = ERROR_STATE;
@@ -3678,7 +3685,7 @@ gint32 CRpcRouterReqFwdr::OnRmtSvrOffline(
     if( ERROR( ret ) )
     {
         // close the port if exists
-        pMgr->ClosePort( hPort, nullptr );
+        pMgr->ClosePort( hPort, pIf );
     }
 
     return ret;

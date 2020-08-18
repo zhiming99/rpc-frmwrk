@@ -4597,6 +4597,14 @@ gint32 CStmSockInvalStmNotifyTask::Process(
         if( ERROR( ret ) )
             break;
 
+        bool bAuth;
+        ret = oCfg.GetBoolProp( 0, bAuth );
+        if( ERROR( ret ) )
+        {
+            bAuth = false;
+            ret = 0;
+        }
+
         CReqBuilder oParams;
 
         oParams.SetIfName(
@@ -4605,8 +4613,18 @@ gint32 CStmSockInvalStmNotifyTask::Process(
         string strRtName;
         pMgr->GetRouterName( strRtName );
 
-        oParams.SetObjPath( DBUS_OBJ_PATH(
-            strRtName, OBJNAME_TCP_BRIDGE ) );
+        if( !bAuth )
+        {
+            oParams.SetObjPath(
+                DBUS_OBJ_PATH( strRtName,
+                OBJNAME_TCP_BRIDGE ) );
+        }
+        else
+        {
+            oParams.SetObjPath(
+                DBUS_OBJ_PATH( strRtName,
+                OBJNAME_TCP_BRIDGE_AUTH ) );
+        }
 
         oParams.SetSender(
             DBUS_DESTINATION( strRtName ) );

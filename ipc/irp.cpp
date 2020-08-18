@@ -448,6 +448,16 @@ void IoRequestPacket::SetNoComplete(
         m_dwFlags &= ~IRP_NO_COMPLETE;
 }
 
+void IoRequestPacket::SetCompleteInPlace(
+    bool bInPlace )
+{
+    if( bInPlace )
+        m_dwFlags |= IRP_COMP_INPLACE;
+    else
+        m_dwFlags &= ~IRP_COMP_INPLACE;
+
+}
+
 gint32 IoRequestPacket::WaitForComplete()
 {
     int ret = 0;

@@ -242,6 +242,7 @@ gint32 CRpcTcpFido::SubmitIoctlCmd(
             {
                 // the m_pReqData contains a
                 // pointer to DMsgPtr
+                pIrp->SetCompleteInPlace( true );
                 ret = HandleSendReq( pIrp );
                 break;
             }
@@ -498,9 +499,9 @@ gint32 CFidoRecvDataTask::Process(
         if( ERROR( ret ) )
             break;
 
-        BufVecPtr pBufVec;
-        pBufVec = pObj;
-        if( pBufVec.IsEmpty() )
+        BufVecPtr pVecBuf;
+        pVecBuf = pObj;
+        if( pVecBuf.IsEmpty() )
         {
             ret = -EFAULT;
             break;
@@ -519,7 +520,7 @@ gint32 CFidoRecvDataTask::Process(
             break;
         }
 
-        for( auto&& oElem : ( *pBufVec )() )
+        for( auto&& oElem : ( *pVecBuf )() )
             pPort->DispatchData( oElem );
 
     }while( 0 );
@@ -560,57 +561,47 @@ gint32 CRpcTcpFido::HandleListening(
             break;
         }
 
-        BufVecPtr pVecBuf( true );
+        ret = pIrp->AllocNextStack( pLowerPort );
+        if( ERROR( ret ) )
+            break;
 
-        do{
-            ret = pIrp->AllocNextStack( pLowerPort );
-            if( ERROR( ret ) )
-                break;
+        IrpCtxPtr pNewCtx = pIrp->GetTopStack();
 
-            IrpCtxPtr pNewCtx = pIrp->GetTopStack();
+        pNewCtx->SetMajorCmd( IRP_MJ_FUNC );
+        pNewCtx->SetMinorCmd( IRP_MN_READ );
+        pNewCtx->SetIoDirection( IRP_DIR_IN );
+        pLowerPort->AllocIrpCtxExt( pNewCtx );
 
-            pNewCtx->SetMajorCmd( IRP_MJ_FUNC );
-            pNewCtx->SetMinorCmd( IRP_MN_READ );
-            pNewCtx->SetIoDirection( IRP_DIR_IN );
-            pLowerPort->AllocIrpCtxExt( pNewCtx );
+        if( true )
+        {
+            // set the stream id to read from
+            gint32 iStmId = TCP_CONN_DEFAULT_STM;
+            GetBdgeIrpStmId( pIrp, iStmId );
+            CCfgOpener oReadReq;
+            oReadReq.SetIntProp(
+                propStreamId, iStmId );
 
-            if( true )
-            {
-                // set the stream id to read from
-                gint32 iStmId = TCP_CONN_DEFAULT_STM;
-                GetBdgeIrpStmId( pIrp, iStmId );
-                CCfgOpener oReadReq;
-                oReadReq.SetIntProp(
-                    propStreamId, iStmId );
+            BufPtr pBuf( true );
+            *pBuf = ObjPtr( oReadReq.GetCfg() );
 
-                BufPtr pBuf( true );
-                *pBuf = ObjPtr( oReadReq.GetCfg() );
+            pNewCtx->SetReqData( pBuf );
+        }
 
-                pNewCtx->SetReqData( pBuf );
-            }
+        ret = pLowerPort->SubmitIrp( pIrp );
+        if(  ret == STATUS_PENDING )
+            break;
 
-            ret = pLowerPort->SubmitIrp( pIrp );
-            if(  ret == STATUS_PENDING )
-                break;
+        if( ERROR( ret ) )
+        {
+            pCtx->SetStatus( ret );
+            break;
+        }
 
-            if( ERROR( ret ) )
-            {
-                pCtx->SetStatus( ret );
-                break;
-            }
+        pCtx->SetRespData(
+            pNewCtx->m_pRespData );
 
-            ( *pVecBuf )().push_back(
-                pNewCtx->m_pRespData );
-
-            pIrp->PopCtxStack();
-
-            // iterate till we exhaust all the
-            // cached messages
-
-        }while( 1 );
-
-        if( !( *pVecBuf )().empty() )
-            ScheduleRecvDataTask( pVecBuf );
+        pCtx->SetStatus( ret );
+        pIrp->PopCtxStack();
 
     }while( 0 );
 
@@ -624,8 +615,11 @@ gint32 CRpcTcpFido::ScheduleRecvDataTask(
         return 0;
 
     gint32 ret = 0;
-    if( !( *pVecBuf )().empty() )
-    {
+    if( ( *pVecBuf )().empty() )
+        return 0;
+
+    DebugPrint( 0, "Schedule dispatch" );
+    do{
         // schedule a task to dispatch the data
         CParamList oParams;
         ObjPtr pObj;
@@ -636,10 +630,17 @@ gint32 CRpcTcpFido::ScheduleRecvDataTask(
         oParams.SetObjPtr(
             propPortPtr, ObjPtr( this ) );
 
-        ret = GetIoMgr()->ScheduleTask(
+        TaskletPtr pTask;
+        ret = pTask.NewObj( 
             clsid( CFidoRecvDataTask ),
             oParams.GetCfg() );
-    }
+        if( ERROR( ret ) )
+            break;
+
+        ( *pTask )( eventZero );
+
+    }while( 0 );
+
     return ret;
 }
 
@@ -663,7 +664,6 @@ gint32 CRpcTcpFido::CompleteListening(
         // let's process the func irps
         IrpCtxPtr pCtx = pIrp->GetCurCtx();
         IrpCtxPtr pTopCtx = pIrp->GetTopStack();
-        BufVecPtr pVecBuf( true );
 
         ret = pTopCtx->GetStatus();
         if( ERROR( ret ) )
@@ -676,28 +676,13 @@ gint32 CRpcTcpFido::CompleteListening(
         }
         else
         {
-            BufPtr pRespData = pTopCtx->m_pRespData;
-            if( !pRespData.IsEmpty() )
-                ( *pVecBuf )().push_back( pRespData );
+            BufPtr pRespData =
+                pTopCtx->m_pRespData;
+
+            pCtx->SetRespData( pRespData );
+            pCtx->SetStatus( ret );
         }
-
         pIrp->PopCtxStack();
-
-        ret = ScheduleRecvDataTask( pVecBuf );
-        if( ERROR( ret ) )
-            break;
-
-        // we need to check if the port is in the
-        // proper state before re-submit the irp
-        guint32 dwOldState = PORT_STATE_INVALID;
-        ret = CanContinue( pIrp,
-            PORT_STATE_BUSY_SHARED, &dwOldState );
-
-        if( ERROR( ret ) )
-            return ret;
-
-        ret = HandleListening( pIrp );
-        PopState( dwOldState );
 
     }while( 0 );
 
@@ -1521,6 +1506,7 @@ gint32 CTcpFidoListenTask::Process(
         ( IConfigDb* )GetConfig() );
     gint32 ret = 0;
 
+    BufVecPtr pVecBuf( true );
     do{
         if( dwContext == eventIrpComp )
         {
@@ -1545,6 +1531,13 @@ gint32 CTcpFidoListenTask::Process(
             }
             if( ERROR( ret ) )
                 break;
+
+            IrpCtxPtr pCtx = pIrp->GetTopStack();
+            BufPtr pRespBuf = pCtx->m_pRespData;
+            ( *pVecBuf )().push_back( pRespBuf );
+
+            // continue to get next event message
+            dwContext = eventZero;
         }
 
         CIoManager* pMgr;
@@ -1583,6 +1576,7 @@ gint32 CTcpFidoListenTask::Process(
 
         pCtx->SetIoDirection( IRP_DIR_IN ); 
         pIrp->SetSyncCall( false );
+        pIrp->SetCompleteInPlace( true );
 
         // NOTE: no timer here
         //
@@ -1598,22 +1592,49 @@ gint32 CTcpFidoListenTask::Process(
 
         // continue to get next event message
         if( SUCCEEDED( ret ) )
+        {
+            BufPtr pRespBuf = pCtx->m_pRespData;
+            ( *pVecBuf )().push_back( pRespBuf );
             continue;
+        }
+
+        CRpcTcpFido* pFido = portPtr;
+        if( pFido == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
 
         switch( ret )
         {
-
         case STATUS_PENDING:
-            break;
+            {
+                if( ( *pVecBuf )().empty() )
+                    break;
+
+                pFido->ScheduleRecvDataTask(
+                    pVecBuf );
+
+                ( *pVecBuf )().clear();
+                break;
+            }
 
         case -ETIMEDOUT:
         case -ENOTCONN:
             {
                 DebugPrint( 0,
-                    "The server is not online?, retry scheduled..." );
+                    "The server is not online?,"
+                    " retry scheduled..." );
             }
         case -EAGAIN:
             {
+                if( ( *pVecBuf )().empty() )
+                    break;
+
+                pFido->ScheduleRecvDataTask(
+                    pVecBuf );
+
+                ( *pVecBuf )().clear();
                 ret = STATUS_MORE_PROCESS_NEEDED;
                 break;
             }

@@ -3759,6 +3759,21 @@ gint32 CRpcNativeProtoFdo::OnReceive(
                     if( ERROR( ret ) )
                         break;
 
+                    IConfigDb* pConn = nullptr;
+                    CCfgOpenerObj oPortCfg( this );
+                    ret = oPortCfg.GetPointer(
+                        propConnParams, pConn );
+                    if( SUCCEEDED( ret ) )
+                    {
+                        CCfgOpener oConn( pConn );
+                        IConfigDb* pAuth = nullptr;
+                        ret = oConn.GetPointer(
+                            propAuthInfo, pAuth );
+                        if( SUCCEEDED( ret ) )
+                            oParams.Push( true );
+                    }
+
+                    ret = 0;
                     GetIoMgr()->ScheduleTask(
                         clsid( CStmSockInvalStmNotifyTask ),
                         oParams.GetCfg() );
@@ -3989,6 +4004,7 @@ gint32 CFdoListeningTask::HandleIrpResp(
                         pPort->GetBottomPort();
                     FireRmtSvrEvent(
                         pdo, eventRmtSvrOffline );
+                    ret = ERROR_PORT_STOPPED;
                 }
                 break;
             }
@@ -4031,6 +4047,7 @@ gint32 CFdoListeningTask::RunTask()
         pCtx->SetMajorCmd( IRP_MJ_FUNC );
         pCtx->SetMinorCmd( IRP_MN_IOCTL );
         pCtx->SetCtrlCode( CTRLCODE_LISTENING );
+        pIrp->SetCompleteInPlace( true );
 
         CIoManager* pMgr = pPort->GetIoMgr();
         oCfg.SetPointer(

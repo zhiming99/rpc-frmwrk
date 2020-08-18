@@ -27,7 +27,7 @@
 #include "autoptr.h"
 #include "buffer.h"
 #include <stdexcept>
-#include <map>
+#include <unordered_map>
 
 // NOTE:
 // changed back to std::map. Because usually the
@@ -35,7 +35,7 @@
 // use std::map without performance loss. and
 // keeping the order is important for generating
 // the same hash across different platform.
-#define hashmap map
+#define hashmap unordered_map
 
 class CIoManager;
 

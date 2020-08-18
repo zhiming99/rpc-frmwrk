@@ -182,6 +182,7 @@
 // stack
 #define IRP_CALLBACK_ONLY               0x40
 #define IRP_SUBMITED                    0x80
+#define IRP_COMP_INPLACE                0x100
 
 // state flags of the irp
 #define IRP_STATE_READY                 0x01
@@ -461,6 +462,11 @@ struct IoRequestPacket : public IEventSink
 
     inline bool IsNoComplete() const
     { return ( ( m_dwFlags & IRP_NO_COMPLETE ) != 0 ); }
+
+    inline bool CompleteInPlace() const
+    { return ( ( m_dwFlags & IRP_COMP_INPLACE ) != 0 ); }
+
+    void SetCompleteInPlace( bool bInPlace );
 
     bool SetState( gint32 iCurState, gint32 iNewState );
 

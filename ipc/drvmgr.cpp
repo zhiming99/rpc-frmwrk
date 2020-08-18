@@ -1040,17 +1040,22 @@ gint32 CDriverManager::BuildPortStack(
             if( elem[ JSON_ATTR_PORTCLASS ].asString() != strPortClass )
                 continue;
 
+            std::string strVal;
             if( elem[ JSON_ATTR_FDODRIVER ] != Json::Value::null )
             {
-                vecDrivers.push_back( 
-                    elem[ JSON_ATTR_FDODRIVER ].asString() );
+                strVal = elem[ JSON_ATTR_FDODRIVER ].asString();
+                if( strVal.empty() )
+                    continue;
+                vecDrivers.push_back( strVal );
                 break;
             }
 
             if( elem[ JSON_ATTR_FIDODRIVER ] != Json::Value::null )
             {
-                vecDrivers.push_back( 
-                    elem[ JSON_ATTR_FIDODRIVER ].asString() );
+                strVal = elem[ JSON_ATTR_FIDODRIVER ].asString();
+                if( strVal.empty() )
+                    continue;
+                vecDrivers.push_back( strVal );
                 break;
             }
 

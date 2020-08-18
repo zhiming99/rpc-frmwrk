@@ -884,6 +884,7 @@ gint32 CProxyFdoListenTask::Process(
 
             pCtx->SetIoDirection( IRP_DIR_IN ); 
             pIrp->SetSyncCall( false );
+            pIrp->SetCompleteInPlace( true );
 
             // NOTE: no timer here
             //

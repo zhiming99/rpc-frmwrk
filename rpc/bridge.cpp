@@ -350,8 +350,8 @@ gint32 CRpcTcpBridgeProxy::BuildBufForIrpFwrdReq(
         string strObjPath =DBUS_OBJ_PATH(
             strRtName, strObjName );
 
-        string strSender = DBUS_DESTINATION(
-            GetIoMgr()->GetModName() );
+        string strSender =
+            DBUS_DESTINATION( strRtName );
 
         ret = pMsg.NewObj();
         if( ERROR( ret ) )
@@ -2733,7 +2733,8 @@ gint32 CRpcTcpBridge::ForwardRequestInternal(
         }
         else
         {
-            ret = GetIoMgr()->RescheduleTask( pTask );
+            // ret = GetIoMgr()->RescheduleTask( pTask );
+            ( *pTask )( eventZero );
         }
 
         if( ERROR( ret ) )
@@ -2842,6 +2843,7 @@ gint32 CRpcInterfaceServer::DoInvoke(
         do{
             if( strMethod == SYS_METHOD_FORWARDREQ )
             {
+                DebugPrint( 0, "invoke method" );
                 guint32 iArgCount = GetArgCount(
                     &IRpcReqProxyAsync::ForwardRequest );
 
