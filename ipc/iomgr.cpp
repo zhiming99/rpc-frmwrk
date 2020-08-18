@@ -236,51 +236,73 @@ gint32 CIoManager::PostCompleteIrp( IRP* pIrp, bool bCancel )
         // we don't know what could happen in user
         // callback, and let's schedule an
         // workitem to notify the caller
-        //
-        // check to see if we have dedicated irp
-        // completion thread
-        ThreadPtr thrdPtr;
-        IThread* pThrd = nullptr;
-        ret = pIrp->GetIrpThread( thrdPtr );
-
-        if( SUCCEEDED( ret ) )
-            pThrd = thrdPtr;
-
-        if( nullptr == pThrd )
+        if( unlikely( pIrp->CompleteInPlace() && 
+            !pIrp->m_pCallback.IsEmpty() ) )
         {
-            // in case some interface use workitem
-            // for irp completion
-            if( !pIrp->m_pCallback.IsEmpty() )
+            // complete the irp on the same thread
+            // CompleteIrp is called. a
+            // performance boost
+            ObjPtr irpPtr( pIrp );
+            CCfgOpener oCfg;
+            ret = oCfg.SetObjPtr( propIrpPtr, irpPtr );
+            if( SUCCEEDED( ret ) )
             {
-                ObjPtr irpPtr( pIrp );
-                CCfgOpener oCfg;
-                ret = oCfg.SetObjPtr( propIrpPtr, irpPtr );
+                TaskletPtr pTask;
+                ret = pTask.NewObj(
+                    clsid( CIoMgrIrpCompleteTask ),
+                    oCfg.GetCfg() );
                 if( SUCCEEDED( ret ) )
                 {
-                    ret = ScheduleTask(
-                        clsid( CIoMgrIrpCompleteTask ),
-                        oCfg.GetCfg() );
+                    ( *pTask )( eventZero );
                 }
             }
         }
         else
         {
-            // this is usually for irps from a
-            // server interface
-            if( pThrd && !pIrp->m_pCallback.IsEmpty() )
+            // check to see if we have dedicated irp
+            // completion thread
+            ThreadPtr thrdPtr;
+            IThread* pThrd = nullptr;
+            ret = pIrp->GetIrpThread( thrdPtr );
+
+            if( SUCCEEDED( ret ) )
+                pThrd = thrdPtr;
+
+            if( nullptr == pThrd )
             {
-                CIrpCompThread* pIrpThrd = thrdPtr;
-                if( pIrpThrd )
+                // in case some interface use workitem
+                // for irp completion
+                if( !pIrp->m_pCallback.IsEmpty() )
                 {
-                    pIrpThrd->AddIrp( pIrp );
+                    ObjPtr irpPtr( pIrp );
+                    CCfgOpener oCfg;
+                    ret = oCfg.SetObjPtr( propIrpPtr, irpPtr );
+                    if( SUCCEEDED( ret ) )
+                    {
+                        ret = ScheduleTask(
+                            clsid( CIoMgrIrpCompleteTask ),
+                            oCfg.GetCfg() );
+                    }
                 }
-                else
+            }
+            else
+            {
+                // this is usually for irps from a
+                // server interface
+                if( pThrd && !pIrp->m_pCallback.IsEmpty() )
                 {
-                    ret = -EFAULT;
+                    CIrpCompThread* pIrpThrd = thrdPtr;
+                    if( pIrpThrd )
+                    {
+                        pIrpThrd->AddIrp( pIrp );
+                    }
+                    else
+                    {
+                        ret = -EFAULT;
+                    }
                 }
             }
         }
-
     }
     else // ( !pIrp->IsSyncCall() && !pIrp->IsPending() )
     {
@@ -885,8 +907,7 @@ gint32 CIoManager::ClosePort(
     // otherwise unexpected things would happen
     gint32 ret = 0;
     do{
-        if( hPort == INVALID_HANDLE ||
-            pEvent == nullptr )
+        if( hPort == INVALID_HANDLE )
         {
             ret = -EINVAL;
             break;
@@ -900,7 +921,8 @@ gint32 CIoManager::ClosePort(
         CPort* pPort = static_cast< CPort* >(
             HandleToPort( hPort ) );
 
-        ret = RemoveFromHandleMap( pPort, pEvent );
+        if( pEvent != nullptr )
+            RemoveFromHandleMap( pPort, pEvent );
         ret = IsPortNoRef( pPort, bNoRef );
         if( ERROR( ret ) )
         {
@@ -935,6 +957,14 @@ gint32 CIoManager::ClosePort(
             }
             else
             {
+                TaskletPtr pDummy;
+                if( pCallback == nullptr )
+                {
+                    ret = pDummy.NewObj(
+                        clsid( CIfDummyTask ) );
+                    if( SUCCEEDED( ret ) )
+                        pCallback = pDummy;
+                }
                 ret = CloseChildPort( pBusPort,
                     pPort, pCallback );
             }

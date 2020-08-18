@@ -1063,6 +1063,17 @@ gint32 CRpcRouterBridge::OnRmtSvrOfflineMH(
             eventRmtSvrOffline,
             pEvtCtx, pReqCall );
 
+        CReqBuilder oAuthEvt;
+        ret = oAuthEvt.Append( pReqCall );
+        if( ERROR( ret ) )
+            break;
+
+        std::string strRtName;
+        pMgr->GetRouterName( strRtName );
+        oAuthEvt.SetObjPath(
+            DBUS_OBJ_PATH( strRtName,
+            OBJNAME_TCP_BRIDGE_AUTH ) );
+
         TaskGrpPtr pGrp;
         CParamList oParams;
         oParams[ propIfPtr ] = ObjPtr( this );
@@ -1083,13 +1094,20 @@ gint32 CRpcRouterBridge::OnRmtSvrOfflineMH(
             CRpcTcpBridge* pBridge = pIf;
             if( unlikely( pBridge == nullptr ) )
                 continue;
+            
+            bool bAuth = false;
+            if( pIf->GetClsid() ==
+                clsid( CRpcTcpBridgeAuthImpl ) )
+                bAuth = true;
+
+            CfgPtr pReq = bAuth ?
+                oAuthEvt.GetCfg() : pReqCall;
 
             TaskletPtr pTask;
             ret = DEFER_IFCALLEX_NOSCHED2(
                 1, pTask, ObjPtr( pBridge ),
                 &CRpcTcpBridge::BroadcastEvent,
-                pReqCall,
-                ( IEventSink* )nullptr );
+                pReq, ( IEventSink* )nullptr );
 
             if( ERROR( ret ) )
                 continue;

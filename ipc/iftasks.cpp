@@ -92,6 +92,7 @@ gint32 CIfStartRecvMsgTask::HandleIncomingMsg(
 
         TaskletPtr pTask;
 
+        DebugPrint( 0, "before invoke" );
         ret = pTask.NewObj(
             clsid( CIfInvokeMethodTask ),
             oParams.GetCfg() );
@@ -101,7 +102,7 @@ gint32 CIfStartRecvMsgTask::HandleIncomingMsg(
         // put the InvokeMethod in a managed
         // environment instead of letting it
         // running untracked
-        ret = pIf->AddAndRun( pTask );
+        ret = pIf->AddAndRun( pTask, true );
         if( ERROR( ret ) )
             break;
 

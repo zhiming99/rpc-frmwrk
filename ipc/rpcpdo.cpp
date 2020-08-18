@@ -2102,6 +2102,7 @@ gint32 CRpcPdoPort::HandleSendReq( IRP* pIrp )
             if( ERROR( ret ) )
                 break;
 
+            DebugPrint( 0, "Send Dbus Msg" );
             ret = SendDBusMsg( pMsg, &dwSerial );
         }
 

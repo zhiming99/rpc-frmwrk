@@ -775,6 +775,7 @@ gint32 CTcpStreamPdo2::OnReceive(
 
     gint32 ret = 0;
     bool bFirst = true;
+    DebugPrint( 0, "recv tcp msg" );
     do{
         STREAM_SOCK_EVENT sse;
         sse.m_iEvent = sseRetWithBuf;
@@ -1061,6 +1062,7 @@ gint32 CBytesSender::SendImmediate(
                 pBuf->size() - m_dwOffset,
                 dwMaxBytes );
 
+            DebugPrint( 0, "calling send" );
             ret = SendBytesNoSig( iFd,
                 pBuf->ptr() + m_dwOffset,
                 dwSize );

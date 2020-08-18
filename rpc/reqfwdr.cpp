@@ -734,10 +734,10 @@ gint32 CRpcReqForwarder::ForwardRequest(
         if( ERROR( ret ) )
             break;
 
-        // ( *pTask )( eventZero );
-        ret = GetIoMgr()->RescheduleTask( pTask );
-        if( ERROR( ret ) )
-            break;
+        ( *pTask )( eventZero );
+        // ret = GetIoMgr()->RescheduleTask( pTask );
+        // if( ERROR( ret ) )
+        //     break;
 
         ret = pTask->GetError();
         if( ret == STATUS_PENDING )
@@ -2041,6 +2041,7 @@ gint32 CReqFwdrForwardRequestTask::OnTaskComplete(
 {
     gint32 ret = 0;
 
+    DebugPrint( 0, "ForwardRequestTask complete" );
     do{
         ObjPtr pObj;
         CCfgOpener oCfg( ( IConfigDb* )*this );
@@ -2955,6 +2956,7 @@ gint32 CRpcReqForwarderProxy::SetupReqIrpFwrdReq(
 
     gint32 ret = 0;
 
+    DebugPrint( 0, "reqfwdr prxy fwrdreq" );
     do{
         CReqOpener oReq( pReqCall );
 
@@ -3199,6 +3201,7 @@ gint32 CRpcReqForwarderProxy::FillRespData(
                 if( clsid( CBridgeForwardRequestTask )
                     == iClsid )
                 {
+                    DebugPrint( 0, "BdgeFwrdReq FillRespData" );
                     DMsgPtr pMsg;
                     pMsg = ( DMsgPtr& )*pCtx->m_pRespData;
                     string strOrigSender;

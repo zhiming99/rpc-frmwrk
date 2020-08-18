@@ -1021,6 +1021,24 @@ gint32 CRpcSecFidoDrv::Probe(
             break;
         }
 
+        ret = GetIoMgr()->GetCmdLineOpt(
+            propHasAuth, bAuth );
+        if( ERROR( ret ) || !bAuth )
+        {
+            ret = 0;
+            // remove the authentication
+            // information if any. the two are for
+            // this port only
+            pConnParams->RemoveProperty(
+                propHasAuth );
+
+            pConnParams->RemoveProperty(
+                propAuthInfo );
+
+            pNewPort = pLowerPort;
+            break;
+        }
+
         std::string strPdoClass;
 
         CCfgOpenerObj oCfg( pLowerPort );
@@ -1048,7 +1066,8 @@ gint32 CRpcSecFidoDrv::Probe(
             propPortId, NewPortId() );
 
         oNewCfg.CopyProp(
-            propConnParams, pLowerPort );
+            propConnParams,
+            ( CObjBase* )pPdoPort );
 
         oNewCfg.SetPointer(
             propIoMgr, GetIoMgr() );
