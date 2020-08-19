@@ -2041,7 +2041,7 @@ gint32 CReqFwdrForwardRequestTask::OnTaskComplete(
 {
     gint32 ret = 0;
 
-    DebugPrint( 0, "ForwardRequestTask complete" );
+    // DebugPrint( 0, "probe: ForwardRequestTask complete" );
     do{
         ObjPtr pObj;
         CCfgOpener oCfg( ( IConfigDb* )*this );
@@ -2077,27 +2077,34 @@ gint32 CReqFwdrForwardRequestTask::OnTaskComplete(
                 break;
         }
 
+        EventPtr pEvent;
+        ret = GetInterceptTask( pEvent );
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpener oResp(
+            ( IConfigDb* )pObj );
+
+        oResp[ propReturnValue ] = iRetVal;
+        if( SUCCEEDED( iRetVal ) && !oResp.exist( 0 ) )
+        {
+            DebugPrint( iRetVal,
+                "No response message" );
+            oResp[ propReturnValue ] = -EFAULT;
+            ret = -EFAULT;
+        }
+
         if( IsPending() )
         {
-            EventPtr pEvent;
-            ret = GetInterceptTask( pEvent );
-            if( ERROR( ret ) )
-                break;
-
-            CCfgOpener oResp(
-                ( IConfigDb* )pObj );
-
-            oResp[ propReturnValue ] = iRetVal;
-            if( !oResp.exist( 0 ) )
-            {
-                DebugPrint( iRetVal,
-                    "No response message" );
-                oResp[ propReturnValue ] = -EFAULT;
-            }
             // the response will finally be sent
             // in this method
-            ret = pIfSvr->OnServiceComplete(
+            pIfSvr->OnServiceComplete(
                 pObj, pEvent ); 
+        }
+        else
+        {
+            pIfSvr->SetResponse(
+                pEvent, oResp.GetCfg() );
         }
 
     }while( 0 );
@@ -2109,7 +2116,7 @@ gint32 CReqFwdrForwardRequestTask::OnTaskComplete(
         oParams.ClearParams();
     }
 
-    return ret;
+    return iRetVal;
 }
 
 gint32 CRpcReqForwarder::BuildBufForIrpRmtSvrEvent(
@@ -2956,7 +2963,7 @@ gint32 CRpcReqForwarderProxy::SetupReqIrpFwrdReq(
 
     gint32 ret = 0;
 
-    DebugPrint( 0, "reqfwdr prxy fwrdreq" );
+    // DebugPrint( 0, "probe: reqfwdr prxy fwrdreq" );
     do{
         CReqOpener oReq( pReqCall );
 
@@ -3201,7 +3208,7 @@ gint32 CRpcReqForwarderProxy::FillRespData(
                 if( clsid( CBridgeForwardRequestTask )
                     == iClsid )
                 {
-                    DebugPrint( 0, "BdgeFwrdReq FillRespData" );
+                    // DebugPrint( 0, "probe: BdgeFwrdReq FillRespData" );
                     DMsgPtr pMsg;
                     pMsg = ( DMsgPtr& )*pCtx->m_pRespData;
                     string strOrigSender;

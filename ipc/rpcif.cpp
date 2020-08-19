@@ -6323,7 +6323,7 @@ gint32 CInterfaceServer::SendResponse(
         if( ERROR( ret ) )
             break;
 
-        DebugPrint( 0, "%s resp...", strMethod.c_str() );
+        //DebugPrint( 0, "%s resp...", strMethod.c_str() );
         CParamList oParams(
             ( IConfigDb* )pRespData );
 

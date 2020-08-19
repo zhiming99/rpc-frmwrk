@@ -1246,7 +1246,10 @@ gint32 CRpcBasePort::IsIfSvrOnline(
 
         while( itr != m_mapEvtTable.end() )
         {
-            if( itr->first->IsMyMsgOutgoing( pMsg ) )
+            ret = itr->first->
+                IsMyMsgOutgoing( pMsg );
+
+            if( SUCCEEDED( ret ) )
             {
                 if( itr->second.IsConnected() )
                     ret = 0;
@@ -2102,7 +2105,7 @@ gint32 CRpcPdoPort::HandleSendReq( IRP* pIrp )
             if( ERROR( ret ) )
                 break;
 
-            DebugPrint( 0, "Send Dbus Msg" );
+            // DebugPrint( 0, "probe: Send Dbus Msg" );
             ret = SendDBusMsg( pMsg, &dwSerial );
         }
 
