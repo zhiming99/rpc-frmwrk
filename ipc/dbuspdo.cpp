@@ -420,7 +420,7 @@ DBusHandlerResult CRpcBasePortEx::DispatchMsg(
     case DBUS_MESSAGE_TYPE_ERROR:
     default:
         {
-            DebugPrint( 0, "Recv dbus msg" );
+            // DebugPrint( 0, "probe: Recv dbus msg" );
             ret = super::DispatchMsg( iType, pMsg );
             break;
         }

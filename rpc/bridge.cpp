@@ -2843,7 +2843,7 @@ gint32 CRpcInterfaceServer::DoInvoke(
         do{
             if( strMethod == SYS_METHOD_FORWARDREQ )
             {
-                DebugPrint( 0, "invoke method" );
+                // DebugPrint( 0, "probe: invoke method" );
                 guint32 iArgCount = GetArgCount(
                     &IRpcReqProxyAsync::ForwardRequest );
 

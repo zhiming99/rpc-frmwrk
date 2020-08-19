@@ -92,7 +92,7 @@ gint32 CIfStartRecvMsgTask::HandleIncomingMsg(
 
         TaskletPtr pTask;
 
-        DebugPrint( 0, "before invoke" );
+        // DebugPrint( 0, "probe: before invoke" );
         ret = pTask.NewObj(
             clsid( CIfInvokeMethodTask ),
             oParams.GetCfg() );

@@ -242,7 +242,6 @@ gint32 CRpcTcpFido::SubmitIoctlCmd(
             {
                 // the m_pReqData contains a
                 // pointer to DMsgPtr
-                pIrp->SetCompleteInPlace( true );
                 ret = HandleSendReq( pIrp );
                 break;
             }
@@ -618,7 +617,7 @@ gint32 CRpcTcpFido::ScheduleRecvDataTask(
     if( ( *pVecBuf )().empty() )
         return 0;
 
-    DebugPrint( 0, "Schedule dispatch" );
+    // DebugPrint( 0, "probe: Schedule dispatch" );
     do{
         // schedule a task to dispatch the data
         CParamList oParams;
