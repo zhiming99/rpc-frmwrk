@@ -470,6 +470,10 @@ gint32 CK5AuthServer::StartKdcProxy(
     gint32 ret = 0;
     do{
         CParamList oParams;
+
+        oParams[ propIoMgr ] =
+            ObjPtr( GetIoMgr() );
+
         ret = CRpcServices::LoadObjDesc(
             KDCRELAY_DESC_FILE,
             "KdcRelayServer",
@@ -484,9 +488,6 @@ gint32 CK5AuthServer::StartKdcProxy(
 
         oParams[ propPortClass ] =
             PORT_CLASS_KDCRELAY_PDO;
-
-        oParams[ propIoMgr ] =
-            ObjPtr( GetIoMgr() );
 
         ret = m_pKdcProxy.NewObj(
             clsid( CKdcRelayProxy ),

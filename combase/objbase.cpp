@@ -104,6 +104,89 @@ gint64 GetRandom()
     return ( qwHighVal << 32 )  + dwLowVal;
 }
 
+#include <memory>
+#include <iostream>
+#include <array>
+
+gint32 GetCmdOutput( std::string& strResult,
+    const char* cmd )
+{
+    gint32 ret = 0;
+    do{
+        std::array<char, 128> buffer;
+        std::string result;
+        std::unique_ptr<FILE, decltype(&pclose)>
+            pipe(popen(cmd, "r"), pclose);
+
+        if (!pipe)
+        {
+            ret = -EBADF;
+            break;
+        }
+        while(fgets(buffer.data(),
+            buffer.size(),
+            pipe.get()) != nullptr)
+        {
+            strResult += buffer.data();
+        }
+
+        if( strResult.empty() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+
+        if( strResult[ 0 ] == '[' )
+        {
+            ret = -EBADF;
+            break;
+        }
+
+        if( strResult[ 0 ] == ' ' ||
+            strResult[ 0 ] == '\t' )
+        {
+            ret = -ENOTDIR;
+            break;
+        }
+
+        std::string::size_type iPos =
+            strResult.find_first_of( " \t\r\n" );
+
+        if( iPos == std::string::npos )
+            break;
+
+        strResult = strResult.substr( 0, iPos );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 GetLibPath( std::string& strResult,
+    const char* szLibName )
+{
+    char cmd[ 256 ];
+    if( szLibName == nullptr )
+        szLibName = "libcombase.so";
+
+    snprintf( cmd, sizeof( cmd ),
+        "dirname `cat /proc/%d/maps | grep '%s' |  awk '{print $6}' | uniq -d `",
+        getpid(), szLibName );
+
+    return GetCmdOutput( strResult, cmd );
+}
+
+gint32 GetModulePath( std::string& strResult )
+{
+    char cmd[ 256 ];
+
+    snprintf( cmd, sizeof( cmd ),
+        "dirname `cat /proc/%d/maps | head -n 1 |  awk '{print $6}' | uniq -d `",
+        getpid() );
+
+    return GetCmdOutput( strResult, cmd );
+}
+
 int Sem_Init( sem_t* psem, int pshared, unsigned int value )
 {
     if( psem == nullptr )

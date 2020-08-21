@@ -228,6 +228,7 @@ enum EnumPropId : gint32
     propRealm,          // type: a string as a kerberos realm
     propNoEnc,          // type: a bool to tell encryption is not needed
     propContinue,       // type: a bool to tell if the login process is still going on or not
+    propSearchPaths,    // type: an objptr to a set of paths where to find the libraries and config files
 
     propReservedEnd = 0x10000000,
     propInvalid = -1, 

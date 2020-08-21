@@ -1690,6 +1690,30 @@ CIoManager::CIoManager( const std::string& strModName ) :
             throw std::runtime_error(
                 "CRegistry failed to initialize" );
         }
+        m_pReg->MakeDir( "/cmdline" );
+
+        StrSetPtr psetPaths( true );
+        std::string strPath;
+        // get the libcombase.so's path
+        ret = GetLibPath( strPath );
+        if( SUCCEEDED( ret ) )
+            ( *psetPaths )().insert( strPath );
+
+        // get the executable's path
+        ret = GetModulePath( strPath ); 
+        if( SUCCEEDED( ret ) )
+            ( *psetPaths )().insert( strPath );
+
+        if( ( *psetPaths)().empty() )
+        {
+            throw std::runtime_error(
+                "Error get search paths for"
+                " config files" );
+        }
+
+        ObjPtr pObj = psetPaths;
+        this->SetCmdLineOpt(
+            propSearchPaths, pObj );
 
         ret = m_pUtils.NewObj(
             clsid( CUtilities ), pCfg );
@@ -1791,7 +1815,6 @@ CIoManager::CIoManager( const std::string& strModName ) :
                  std::thread::hardware_concurrency() );
         }
 
-        m_pReg->MakeDir( "/cmdline" );
         m_iHcTimer = 0;
 
     }while( 0 );
@@ -1902,6 +1925,138 @@ gint32 CIoManager::RemoveTask(
         return -EFAULT;
 
     return pTaskPool->RemoveTask( pTask );
+}
+
+gint32 CIoManager::TryLoadClassFactory(
+    const std::string& strPath )
+{
+    gint32 ret = 0;
+    do{
+        ret = access( strPath.c_str(), X_OK );
+        if( SUCCEEDED( ret ) )
+        {
+            ret = CoLoadClassFactory(
+                strPath.c_str() );
+            break;
+        }
+        if( strPath[ 0 ] == '/' )
+        {
+            ret = -ENOENT;
+            DebugPrint( ret,
+                "Failed to load class factory %s",
+                strPath.c_str() );
+            break;
+        }
+
+        // relative path
+        std::string strFile =
+            basename( strPath.c_str() );
+
+        ObjPtr pObj;
+        ret = this->GetCmdLineOpt(
+            propSearchPaths, pObj );
+        if( ERROR( ret ) )
+            break;
+
+        StrSetPtr psetPaths( pObj );
+        if( psetPaths.IsEmpty() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+
+        bool bLoaded = false;
+        for( auto& elem : ( *psetPaths )() )
+        {
+            std::string strFullPath =
+                elem + "/" + strFile;
+
+            ret = access(
+                strFullPath.c_str(), X_OK );
+
+            if( ret == -1 )
+            {
+                ret = -errno;
+                continue;
+            }
+
+            ret = CoLoadClassFactory(
+                strFullPath.c_str() );
+            if( ERROR( ret ) )
+                continue;
+
+            bLoaded = true;
+            break;
+        }
+
+        if( bLoaded )
+            ret = 0;
+        else
+        {
+            DebugPrint( ret,
+                "Failed to load class factory %s",
+                strPath.c_str() );
+            ret = -ENOENT;
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CIoManager::TryFindDescFile(
+    const std::string& strFile,
+    std::string& strPath )
+{
+    gint32 ret = 0;
+    do{
+
+        ObjPtr pObj;
+        ret = GetCmdLineOpt(
+            propSearchPaths, pObj );
+        if( ERROR( ret ) )
+            break;
+
+        StrSetPtr psetPaths( pObj );
+        if( psetPaths.IsEmpty() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+        bool bFound = false;
+        std::string strFullPath;
+        for( auto& elem : ( *psetPaths )() )
+        {
+            strFullPath = elem + "/" + strFile;
+
+            ret = access(
+                strFullPath.c_str(), R_OK );
+
+            if( ret == -1 )
+            {
+                ret = -errno;
+                continue;
+            }
+
+            bFound = true;
+            break;
+        }
+
+        if( bFound )
+        {
+            ret = 0;
+            break;
+        }
+
+        strFullPath = "/etc/rpcfrmwrk/";
+        strFullPath += strFile;
+        ret = access( strFullPath.c_str(), R_OK );
+        if( ret == -1 )
+            ret = -errno;
+
+    }while( 0 );
+
+    return ret;
 }
 
 gint32 CIoMgrStopTask::operator()(

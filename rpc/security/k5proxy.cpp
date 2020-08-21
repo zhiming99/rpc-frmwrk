@@ -82,12 +82,12 @@ gint32 CKrb5InitHook::StartProxy()
         InterfPtr pIf;
 
         CfgPtr pCfg = oCfg.GetCfg();
-        ret = CRpcServices::LoadObjDesc(
-            DESC_FILE, OBJNAME_KDCCHANNEL,
-            false, pCfg );
 
         // create the interface server
         oCfg.SetObjPtr( propIoMgr, m_pMgr );
+        ret = CRpcServices::LoadObjDesc(
+            DESC_FILE, OBJNAME_KDCCHANNEL,
+            false, pCfg );
 
         ret = pIf.NewObj(
             clsid( CKdcChannelProxy ),
@@ -261,6 +261,7 @@ gint32 CInitHookMap::CreateNewHook(
         InterfPtr pIf;
 
         CfgPtr pCfg = oCfg.GetCfg();
+        oCfg.SetObjPtr( propIoMgr, m_pMgr );
         ret = CRpcServices::LoadObjDesc(
             DESC_FILE,
             OBJNAME_KDCCHANNEL,

@@ -3850,6 +3850,14 @@ gint32 CRpcServices::LoadObjDesc(
     do{
         CCfgOpener oCfg( ( IConfigDb* )pCfg );
 
+        CIoManager* pMgr = nullptr;
+        ret = oCfg.GetPointer( propIoMgr, pMgr );
+        if( ERROR( ret ) )
+        {
+            pMgr = nullptr;
+            ret = 0;
+        }
+
         ret = oCfg.GetStrProp(
             propObjInstName, strInstName );
 
@@ -3866,7 +3874,30 @@ gint32 CRpcServices::LoadObjDesc(
         Json::Value valObjDesc;
         ret = ReadJsonCfg( strFile, valObjDesc );
         if( ERROR( ret ) )
-            break;
+        {
+            if( pMgr == nullptr ||
+                strFile[ 0 ] == '/' )
+            {
+                DebugPrint( ret, "Failed to open"
+                    "descprtion file %s",
+                    strFile.c_str() );
+                break;
+            }
+
+            std::string strPath;
+            ret = pMgr->TryFindDescFile(
+                strFile, strPath );
+            if( ERROR( ret ) )
+            {
+                DebugPrint( ret, "Failed to open"
+                    "descprtion file %s",
+                    strFile.c_str() );
+                break;
+            }
+
+            ret = ReadJsonCfg(
+                strPath, valObjDesc );
+        }
 
         // get ServerName
         Json::Value& oServerName =
@@ -4471,15 +4502,24 @@ gint32 CRpcServices::LoadObjDesc(
             oFactores.empty() )
             break;
 
-        string strLibPath;
+        string strPath;
         for( i = 0; i < oFactores.size(); i++ )
         {
             if( oFactores[ i ].empty() ||
                 !oFactores[ i ].isString() )
                 continue;
 
-            strLibPath = oFactores[ i ].asString();
-            CoLoadClassFactory( strLibPath.c_str() );
+            strPath = oFactores[ i ].asString();
+            if( pMgr == nullptr )
+            {
+                CoLoadClassFactory(
+                    strPath.c_str() );
+            }
+            else
+            {
+                pMgr->TryLoadClassFactory(
+                    strPath );
+            }
         }
 
     }while( 0 );

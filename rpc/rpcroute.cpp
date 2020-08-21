@@ -1143,8 +1143,8 @@ gint32 CRpcRouterBridge::BuildStartStopReqFwdrProxy(
 
     do{
         CParamList oIfParams;
-        oIfParams.SetPointer(
-            propIoMgr, GetIoMgr() );
+        CIoManager* pMgr = GetIoMgr();
+        oIfParams.SetPointer( propIoMgr, pMgr );
 
         CParamList oTaskCfg;
 
@@ -1194,12 +1194,15 @@ gint32 CRpcRouterBridge::BuildStartStopReqFwdrProxy(
                     break;
 
                 string strRtName;
-                GetIoMgr()->GetRouterName( strRtName );
+                pMgr->GetRouterName( strRtName );
                 oIfParams.SetStrProp(
                     propSvrInstName, strRtName );
 
                 oIfParams.SetIntProp( propIfStateClass,
                     clsid( CIfReqFwdrPrxyState ) );
+
+                oIfParams.SetPointer(
+                    propIoMgr, pMgr );
 
                 ret = CRpcServices::LoadObjDesc(
                     strObjDesc,
@@ -1333,6 +1336,8 @@ gint32 CRouterOpenBdgePortTask::CreateInterface(
         else
             strObjName = OBJNAME_TCP_BRIDGE;
 
+        oParams.SetPointer( propIoMgr, pMgr );
+
         ret = CRpcServices::LoadObjDesc(
             strObjDesc,
             strObjName,
@@ -1345,7 +1350,6 @@ gint32 CRouterOpenBdgePortTask::CreateInterface(
         oParams.SetPointer(
             propRouterPtr, pRouter );
 
-        oParams.SetPointer( propIoMgr, pMgr );
         EnumClsid iClsid = clsid( Invalid );
 
         if( bServer )
@@ -3582,6 +3586,9 @@ gint32 CRpcRouterReqFwdr::StartReqFwdr(
                 clsid( CRpcReqForwarderAuthImpl );
         }
 
+        oParams.SetPointer(
+            propIoMgr, GetIoMgr() );
+
         ret = CRpcServices::LoadObjDesc(
             strObjDesc,
             strObjName,
@@ -4691,6 +4698,8 @@ gint32 CRpcRouterManager::Start()
                     OBJNAME_ROUTER_BRIDGE;
             }
 
+            oParams.SetPointer( propIoMgr, pMgr );
+
             ret = CRpcServices::LoadObjDesc(
                 strObjDesc,
                 strObjName,
@@ -4699,9 +4708,6 @@ gint32 CRpcRouterManager::Start()
 
             if( ERROR( ret ) )
                 break;
-
-            oParams.SetPointer(
-                propIoMgr, pMgr );
 
             oParams[ propIfStateClass ] =
                 clsid( CIfRouterState );
@@ -4741,6 +4747,8 @@ gint32 CRpcRouterManager::Start()
                 iClsid = clsid(
                     CRpcRouterReqFwdrImpl );
             }
+
+            oParams.SetPointer( propIoMgr, pMgr );
 
             ret = CRpcServices::LoadObjDesc(
                 strObjDesc,

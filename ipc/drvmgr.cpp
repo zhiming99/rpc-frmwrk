@@ -275,6 +275,7 @@ gint32 CDriverManager::LoadClassFactories()
         Json::Value& oModuleArray =
             m_oConfig[ JSON_ATTR_MODULES ];
 
+        CIoManager* pMgr = GetIoMgr();
         if( oModuleArray == Json::Value::null )
         {
             ret = -ENOENT;
@@ -299,9 +300,10 @@ gint32 CDriverManager::LoadClassFactories()
                 oModDesc[ JSON_ATTR_MODNAME ];
 
             if( oModName.asString() ==
-                GetIoMgr()->GetModName() )
+                pMgr->GetModName() )
             {
-                oClsToLoad = oModDesc[ JSON_ATTR_CLSFACTORY ];
+                oClsToLoad =
+                    oModDesc[ JSON_ATTR_CLSFACTORY ];
                 break;
             }
         }
@@ -330,13 +332,15 @@ gint32 CDriverManager::LoadClassFactories()
                 !oClsToLoad[ i ].isString() )
                 continue;
 
-            ret = CoLoadClassFactory(
-                oClsToLoad[ i ].asString().c_str() );
+            std::string strPath = 
+                oClsToLoad[ i ].asString();
 
+            ret = pMgr->TryLoadClassFactory( strPath );
             if( ERROR( ret ) )
             {
-                // FIXME: bad thing happens, what to do
-                // simply fail?
+                DebugPrint( ret,
+                    "Failed to load class factory %s",
+                    strPath.c_str() );
                 break;
             }
         }

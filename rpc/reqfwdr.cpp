@@ -298,6 +298,8 @@ gint32 CReqFwdrOpenRmtPortTask::CreateInterface(
         oParams.SetStrProp(
             propSvrInstName, strRtName );
 
+        oParams.SetPointer( propIoMgr, pMgr );
+
         ret = CRpcServices::LoadObjDesc(
             strObjDesc,
             strObjName,
@@ -314,7 +316,6 @@ gint32 CReqFwdrOpenRmtPortTask::CreateInterface(
         oParams.SetPointer(
             propRouterPtr, pRouter );
 
-        oParams.SetPointer( propIoMgr, pMgr );
         pIf.Clear();
 
         ret = pIf.NewObj( iClsid,
