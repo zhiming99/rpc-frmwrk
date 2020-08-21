@@ -95,6 +95,11 @@
             "IpAddress" : "192.168.3.13",
             "RouterPath" : "/",
             "Interfaces" :
+            "AuthInfo" :
+            {   
+                 "Realm" : "rpcfrmwrk.org",
+                 "AuthMech" : "krb5"
+            },  
             [
                 {
                     "Comment-0" : "the following attributes are mandatory",
