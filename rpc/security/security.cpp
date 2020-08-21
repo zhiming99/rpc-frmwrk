@@ -1384,6 +1384,9 @@ gint32 CAuthentProxy::CreateSessImpl(
 
         CCfgOpener oCfg;
 
+        oCfg.SetPointer(
+            propIoMgr, pRouter->GetIoMgr() );
+
         ret = CRpcServices::LoadObjDesc(
             DESC_FILE, strObjName,
             false, oCfg.GetCfg() );
@@ -1399,8 +1402,6 @@ gint32 CAuthentProxy::CreateSessImpl(
         oCfg.SetPointer(
             propRouterPtr, pRouter );
 
-        oCfg.SetPointer(
-            propIoMgr, pRouter->GetIoMgr() );
 
         // use a special ifstate
         oCfg.SetIntProp( propIfStateClass,
@@ -2850,6 +2851,9 @@ gint32 CAuthentServer::StartAuthImpl(
     do{
         //FIXME: just mechanism is krb5 only
         CCfgOpener oCfg;
+        CIoManager* pMgr = GetIoMgr();
+        oCfg.SetPointer( propIoMgr, pMgr );
+
         ret = CRpcServices::LoadObjDesc(
             DESC_FILE, "K5AuthServer",
             true, oCfg.GetCfg() );
@@ -2861,9 +2865,6 @@ gint32 CAuthentServer::StartAuthImpl(
 
         oCfg.SetPointer(
             propRouterPtr, pRouter );
-
-        oCfg.SetPointer(
-            propIoMgr, pRouter->GetIoMgr() );
 
         ret = oCfg.CopyProp(
             propAuthInfo, this );
@@ -2904,7 +2905,35 @@ gint32 CAuthentServer::StartAuthImpl(
 gint32 CAuthentServer::OnPostStart(
     IEventSink* pCallback )
 {
-    return StartAuthImpl( pCallback );
+    gint32 ret = 0;
+    do{
+        // supercede the service name with the
+        // service name from the command line
+        IConfigDb* pAuth = nullptr;
+        CCfgOpenerObj oCfg( this );
+
+        ret = oCfg.GetPointer(
+            propAuthInfo, pAuth );
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpener oAuth( pAuth );
+        std::string strSvcName;
+        CIoManager* pMgr = GetIoMgr();
+
+        ret = pMgr->GetCmdLineOpt(
+            propServiceName, strSvcName );
+        if( SUCCEEDED( ret ) )
+        {
+            oAuth.SetStrProp(
+                propServiceName, strSvcName );
+        }
+
+        ret = StartAuthImpl( pCallback );
+
+    }while( 0 );
+
+    return ret;
 }
 
 gint32 CAuthentServer::OnPreStopComplete(

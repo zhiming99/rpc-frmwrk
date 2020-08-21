@@ -572,7 +572,7 @@ class CIoManager : public IService
             if( ERROR( ret ) )
                 break;
 
-            oVal = *pBuf;
+            oVal = ( T& )*pBuf;
         }while( 0 );
 
         return ret;
@@ -614,6 +614,13 @@ class CIoManager : public IService
         return SetCmdLineOpt(
             propRouterName, strRtName );
     }
+
+    gint32 TryLoadClassFactory(
+        const std::string& strFile );
+
+    gint32 TryFindDescFile(
+        const std::string& strFile,
+        std::string& strPath );
 };
 
 typedef CAutoPtr< Clsid_CIoManager, CIoManager > IoMgrPtr;
