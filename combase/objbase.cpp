@@ -181,7 +181,7 @@ gint32 GetModulePath( std::string& strResult )
     char cmd[ 256 ];
 
     snprintf( cmd, sizeof( cmd ),
-        "dirname `cat /proc/%d/maps | head -n 1 |  awk '{print $6}' | uniq -d `",
+        "dirname `cat /proc/%d/maps | head -n 1 |  awk '{print $6}'`",
         getpid() );
 
     return GetCmdOutput( strResult, cmd );

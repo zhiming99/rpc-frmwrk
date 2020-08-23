@@ -482,6 +482,13 @@
             "ClassFactories" :
             [
             ]
+        },
+        {
+            "ModName" : "KdcChannel",
+            "DriversToLoad" :
+            [
+                "DBusBusDriver"
+            ]
         }
     ],
 

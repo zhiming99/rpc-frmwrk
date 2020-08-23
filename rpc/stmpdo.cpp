@@ -139,8 +139,21 @@ gint32 CRpcTcpBusPort::BuildPdoPortName(
         if( strClass != PORT_CLASS_TCP_STREAM_PDO &&
             strClass != PORT_CLASS_TCP_STREAM_PDO2 )
         {
-            ret = -ENOTSUP;
-            break;
+            StrSetPtr psetClasses( true );
+            // search the config to see if we
+            // support it.
+            ret = EnumPdoClasses( psetClasses );
+            if( ERROR( ret ) )
+            {
+                ret = -ENOTSUP;
+                break;
+            }
+            if( ( *psetClasses )().find( strClass ) ==
+                ( *psetClasses )().end() )
+            {
+                ret = -ENOTSUP;
+                break;
+            }
         }
 
         guint32 dwPortId = ( guint32 )-1;
@@ -243,6 +256,9 @@ gint32 CRpcTcpBusPort::CreatePdoPort(
         }
         else
         {
+            strClass =
+                ExClassToInClass( strClass );
+
             EnumClsid iClsid = CoGetClassId(
                 strClass.c_str() );
             if( iClsid == clsid( Invalid ) )

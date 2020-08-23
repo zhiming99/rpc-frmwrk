@@ -677,6 +677,9 @@ class CGenericBusPort : public CPort
     gint32 AllocIrpCtxExt(
         IrpCtxPtr& pIrpCtx,
         void* pContext = nullptr ) const;
+
+    gint32 EnumPdoClasses(
+        StrSetPtr& pvecStrings ) const;
 };
 
 typedef CAutoPtr< Clsid_Invalid, CGenericBusPort > BusPortPtr;

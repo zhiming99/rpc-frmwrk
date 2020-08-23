@@ -3897,6 +3897,8 @@ gint32 CRpcServices::LoadObjDesc(
 
             ret = ReadJsonCfg(
                 strPath, valObjDesc );
+            if( ERROR( ret ) )
+                break;
         }
 
         // get ServerName

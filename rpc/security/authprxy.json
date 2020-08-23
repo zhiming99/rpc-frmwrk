@@ -59,8 +59,9 @@
             "AuthInfo" : 
             {
                 "AuthMech" : "krb5",
-                "ServiceName" : "rpcrouter/rasp1",
-                "UserName"  : "kdcclient"
+                "Realm" : "rpcfrmwrk.org",
+                "UserName"  : "kdcclient",
+                "ServiceName" : "rasp1/rpcfrmwrk.org"
             },
             "Interfaces" :
             [
@@ -94,11 +95,6 @@
             "ProxyPortClass": "DBusProxyPdo",
             "IpAddress" : "192.168.3.13",
             "RouterPath" : "/",
-            "AuthInfo" :
-            {   
-                 "Realm" : "rpcfrmwrk.org",
-                 "AuthMech" : "krb5"
-            },  
             "Interfaces" :
             [
                 {

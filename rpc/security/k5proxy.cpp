@@ -31,6 +31,46 @@
 
 #include <gssapi/gssapi_generic.h>
 #include <gssapi/gssapi_krb5.h> 
+#include <krb5/locate_plugin.h>
+
+// ---------------------------------
+// from krb5's "os-proto.h"
+typedef enum {
+    TCP_OR_UDP = 0,
+    TCP,
+    UDP,
+    HTTPS,
+} k5_transport;
+
+typedef enum {
+    UDP_FIRST = 0,
+    UDP_LAST,
+    NO_UDP,
+} k5_transport_strategy;
+
+/*  A single server hostname or address. */
+struct server_entry {
+    char *hostname;             /*  NULL -> use addrlen/addr instead */
+    int port;                   /*  Used only if hostname set */
+    k5_transport transport;     /*  May be 0 for UDP/TCP if hostname set */
+    char *uri_path;             /*  Used only if transport is HTTPS */
+    int family;                 /*  May be 0 (aka AF_UNSPEC) if hostname set */
+    int master;                 /*  True, false, or -1 for unknown. */
+    size_t addrlen;
+    struct sockaddr_storage addr;
+};
+
+/*  A list of server hostnames/addresses. */
+struct serverlist {
+    struct server_entry *servers;
+    size_t nservers;
+};
+
+struct module_callback_data {
+    int out_of_mem;
+    struct serverlist *list;
+};
+// -------------------------------------
 
 CKrb5InitHook::CKrb5InitHook(
     const IConfigDb* pCfg )
@@ -266,6 +306,8 @@ gint32 CInitHookMap::CreateNewHook(
             DESC_FILE,
             OBJNAME_KDCCHANNEL,
             false, pCfg );
+        if( ERROR( ret ) )
+            break;
 
         // create the interface server
         oCfg.SetObjPtr( propIoMgr, m_pMgr );
@@ -285,12 +327,17 @@ gint32 CInitHookMap::CreateNewHook(
 
         ret = pHook.NewObj(
             clsid( CKrb5InitHook ) );
+        if( ERROR( ret ) )
+        {
+            pIf->Stop();
+            break;
+        }
 
         CKrb5InitHook* pKrbHook = pHook;
         pKrbHook->SetIoMgr( m_pMgr );
         pKrbHook->m_bInRouter = m_bInRouter;
         pKrbHook->m_bInited = true;
-        pKrbHook->m_pProxy = pHook;
+        pKrbHook->m_pProxy = pIf;
 
         g_oHookMap.SetInitHook( pHook );
 
@@ -373,7 +420,8 @@ krb5_error_code CInitHookMap::Lookup(
 
     CRpcServices* p = pHook->GetProxy();
     do{
-        if( socktype != SOCK_STREAM )
+        if( socktype != SOCK_STREAM &&
+            socktype != SOCK_DGRAM )
             break;
         
         std::string strAuth;
@@ -387,11 +435,88 @@ krb5_error_code CInitHookMap::Lookup(
             break;
 
         if( strAuth == realm )
+        {
+            module_callback_data* pcb =
+                ( module_callback_data* )cbdata;
+
+            if( pcb == 0 )
+                break;
+
+            if( pcb->list == nullptr )
+                break;
+
+            if( pcb->list->nservers > 0 )
+                break;
+
+            pcb->list->servers =
+                ( server_entry* )calloc(
+                    1, sizeof( server_entry ) );
+
+            if( pcb->list->servers == nullptr )
+                break;
+
+            pcb->list->nservers = 1;
+            server_entry* pse = pcb->list->servers;
+            pse->transport = TCP_OR_UDP;
+
+            IConfigDb* pConnParams = nullptr;
+            CCfgOpenerObj oCfg( p );
+            ret = oCfg.GetPointer(
+                propConnParams, pConnParams );
+            if( ERROR( ret ) )
+                break;
+
+            CCfgOpener oConn( pConnParams );
+
+            bool bip6 = false;
+            std::string strFormat;
+            ret = oConn.GetStrProp(
+                propAddrFormat, strFormat );
+
+            if( SUCCEEDED( ret ) &&
+                strFormat == "ipv6"  )
+                bip6 = true;
+
+            pse->family = AF_INET;
+            if( bip6 )
+                pse->family = AF_INET6;
+
+            std::string strIpAddr;
+            ret = oConn.GetStrProp(
+                propDestIpAddr, strIpAddr );
+            if( ERROR( ret ) )
+                break;
+
+            guint32 dwPortNum = 0;
+            ret = oConn.GetIntProp(
+                propDestTcpPort, dwPortNum );
+            if( ERROR( ret ) )
+                break;
+            pse->master = -1;
+
+            addrinfo* pAddrInfo = nullptr;
+
+            ret = CRpcSocketBase::GetAddrInfo(
+                strIpAddr,
+                dwPortNum,
+                pAddrInfo );
+            if( ERROR( ret ) )
+                break;
+
+            pse->addrlen =
+                pAddrInfo->ai_addrlen;
+
+            memcpy( &pse->addr,
+                pAddrInfo->ai_addr,
+                pse->addrlen );
+
+            freeaddrinfo( pAddrInfo );
             iRet = 0;
+        }
 
     }while( 0 );
 
-    return ret;
+    return iRet;
 }
 
 // Make sure to run this blocking method on a
@@ -439,31 +564,36 @@ krb5_error_code CInitHookMap::Krb5SendHook(
             < CRpcServices* >( data );
 
 
-        CCfgOpener oAuth(
-            ( IConfigDb* )GET_AUTH( pProxy ) );
+        IConfigDb* pAuth =
+            GET_AUTH( pProxy );
 
         CCfgOpener oCfg;
-        ret = oCfg.CopyProp( propUserName,
-            ( IConfigDb* )oAuth.GetCfg() );
+        ret = oCfg.CopyProp(
+            propUserName, pAuth );
 
         if( ERROR( ret ) )
             break;
         
-        CKdcChannelProxy* pAuth = dynamic_cast
+        CKdcChannelProxy* pkc = dynamic_cast
             < CKdcChannelProxy* >( pProxy );
-        if( pAuth == nullptr )
+        if( pkc == nullptr )
         {
             ret = -EFAULT;
             break;
         }
 
         CParamList oParams;
+
+        oParams.SetStrProp(
+            propMethodName, SYS_METHOD(
+            AUTH_METHOD_MECHSPECREQ ) );
+
         oParams.Push( oCfg.GetCfg() );
         oParams.Push( pRealm );
         oParams.Push( pMsg );
 
         CCfgOpener oResp;
-        ret = pAuth->MechSpecReq( nullptr,
+        ret = pkc->MechSpecReq( nullptr,
             oParams.GetCfg(), oResp.GetCfg() );
 
         if( ERROR( ret ) )
@@ -1814,15 +1944,15 @@ gint32 CK5AuthProxy::GenSessHash(
 
 gint32 CKdcChannelProxy::InitUserFuncs()
 {
-    BEGIN_IFPROXY_MAP( IAuthenticate, true );
+    BEGIN_IFPROXY_MAP( IAuthenticate, false );
 
-    ADD_PROXY_METHOD_EX( 1,
+    ADD_PROXY_METHOD_ASYNC( 1,
         CKdcChannelProxy::Login,
-        AUTH_METHOD_LOGIN );
+        SYS_METHOD( AUTH_METHOD_LOGIN ) );
 
-    ADD_PROXY_METHOD_EX( 1,
+    ADD_PROXY_METHOD_ASYNC( 1,
         CKdcChannelProxy::MechSpecReq,
-        AUTH_METHOD_MECHSPECREQ );
+        SYS_METHOD( AUTH_METHOD_MECHSPECREQ ) );
 
     END_PROXY_MAP;
 

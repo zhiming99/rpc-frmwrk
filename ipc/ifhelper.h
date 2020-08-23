@@ -938,77 +938,88 @@ class CMethodServerEx< iNumInput, gint32 (ClassName::*)(IEventSink*, Args ...) >
 
         std::vector< BufPtr > vecDefOut;
 
-        // fill the output parameters with fake values
-        InitTupleDefault< OutTupType > a( vecDefOut );
-        vecResp.insert( vecResp.end(),
-            vecDefOut.begin(), vecDefOut.end() );
+        gint32 ret = 0;
 
-        // the parameters are ready for the call
-        std::tuple< DecType( Args )...> oTuple =
-            VecToTuple< DecType( Args )... >( vecResp );
+        try{
+            // fill the output parameters with fake values
+            InitTupleDefault< OutTupType > a( vecDefOut );
+            vecResp.insert( vecResp.end(),
+                vecDefOut.begin(), vecDefOut.end() );
 
-        gint32 ret = this->CallUserFunc( pClass, pCallback, oTuple,
-            typename GenSequence< sizeof...( Args ) >::type() );
+            // the parameters are ready for the call
+            std::tuple< DecType( Args )...> oTuple =
+                VecToTuple< DecType( Args )... >( vecResp );
 
-        if( ret == STATUS_PENDING )
-            return ret;
+            ret = this->CallUserFunc( pClass, pCallback, oTuple,
+                typename GenSequence< sizeof...( Args ) >::type() );
 
-        do{
-            CParamList oParams;
-            oParams[ propReturnValue ] = ret;
+            if( ret == STATUS_PENDING )
+                return ret;
 
-            // error, just return the error code
-            if( ERROR( ret ) )
-                break;
+            do{
+                CParamList oParams;
+                oParams[ propReturnValue ] = ret;
 
-            if( sizeof...( Args ) > iNumInput )
-            {
-                // fill the output values to the vector
-                vecResp.resize( sizeof...( Args ) - iNumInput );
-                TupleToVec2( oTuple, vecResp,
-                    typename GenSequence< sizeof...( Args ) >::type() );
+                // error, just return the error code
+                // the caller will setup the response
+                // package
+                if( ERROR( ret ) )
+                    break;
 
-                for( auto elem : vecResp )
-                    oParams.Push( elem );
-            }
-            else
-            {
-                // fine, no parameters for response
-            }
-            
-            CTasklet* pTask =
-                static_cast< CTasklet* >( pCallback );
+                if( sizeof...( Args ) > iNumInput )
+                {
+                    // fill the output values to the vector
+                    vecResp.resize( sizeof...( Args ) - iNumInput );
+                    TupleToVec2( oTuple, vecResp,
+                        typename GenSequence< sizeof...( Args ) >::type() );
 
-            // we are outside the task's context, let's
-            // complete it 
-            ObjPtr pObj;
-            CCfgOpenerObj oTaskCfg( pTask );
+                    for( auto elem : vecResp )
+                        oParams.Push( elem );
+                }
+                else
+                {
+                    // fine, no parameters for response
+                }
+                
+                CTasklet* pTask =
+                    static_cast< CTasklet* >( pCallback );
 
-            ret = oTaskCfg.GetObjPtr( propIfPtr, pObj );
-            if( ERROR( ret ) )
-                break;
+                // we are outside the task's context, let's
+                // complete it 
+                ObjPtr pObj;
+                CCfgOpenerObj oTaskCfg( pTask );
 
-            CRpcServices* pIf = pObj;
-            if( pIf == nullptr )
-            {
-                ret = -EFAULT;
-                break;
-            }
-            if( !pIf->IsServer() )
-                break;
+                ret = oTaskCfg.GetObjPtr( propIfPtr, pObj );
+                if( ERROR( ret ) )
+                    break;
 
-            CInterfaceServer* pSvr = pObj;
-            if( pTask->IsInProcess() )
-            {
-                pSvr->SetResponse(
-                    pCallback, oParams.GetCfg() );
-            }
-            else
-            {
-                pSvr->OnServiceComplete(
-                    oParams.GetCfg(), pCallback );
-            }
-        }while( 0 );
+                CRpcServices* pIf = pObj;
+                if( pIf == nullptr )
+                {
+                    ret = -EFAULT;
+                    break;
+                }
+                if( !pIf->IsServer() )
+                    break;
+
+                CInterfaceServer* pSvr = pObj;
+                if( pTask->IsInProcess() )
+                {
+                    pSvr->SetResponse(
+                        pCallback, oParams.GetCfg() );
+                }
+                else
+                {
+                    pSvr->OnServiceComplete(
+                        oParams.GetCfg(), pCallback );
+                }
+            }while( 0 );
+        }
+        catch( const std::invalid_argument& e )
+        {
+            ret = -EINVAL;
+        }
+
 
         return ret;
     }
@@ -2060,32 +2071,39 @@ class CAsyncCallback :
         if( vecParams.empty() )
             return -EINVAL;
 
-        if( vecParams.size() < sizeof...( Args ) )
-        {
-            guint32 iRet = *vecParams[ 0 ];
-            if( ERROR( iRet ) )
+        try{
+            if( vecParams.size() < sizeof...( Args ) )
             {
-                // error returned, let's make some fake
-                // values to get the callback be called
-                // with the error
-                std::vector< BufPtr > vecDefaults;
-
-                // at least there will be one argument
-                GetDefaults<Args...>( vecDefaults );
-
-                if( vecDefaults.size() <= vecParams.size() )
-                    return -ENOENT;
-
-                for( size_t i = vecParams.size(); i < vecDefaults.size(); ++i )
+                guint32 iRet = *vecParams[ 0 ];
+                if( ERROR( iRet ) )
                 {
-                    // replace with significant values
-                    vecParams.push_back( vecDefaults[ i ] );
+                    // error returned, let's make some fake
+                    // values to get the callback be called
+                    // with the error
+                    std::vector< BufPtr > vecDefaults;
+
+                    // at least there will be one argument
+                    GetDefaults<Args...>( vecDefaults );
+
+                    if( vecDefaults.size() <= vecParams.size() )
+                        return -ENOENT;
+
+                    for( size_t i = vecParams.size(); i < vecDefaults.size(); ++i )
+                    {
+                        // replace with significant values
+                        // when the call returns
+                        vecParams.push_back( vecDefaults[ i ] );
+                    }
+                }
+                else
+                {
+                    return -ENOENT;
                 }
             }
-            else
-            {
-                return -ENOENT;
-            }
+        }
+        catch( const std::invalid_argument& e )
+        {
+            return -EINVAL;
         }
 
         std::vector< BufPtr > vecResp;
