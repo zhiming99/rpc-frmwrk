@@ -20,6 +20,12 @@
             "EnableWS" : "false",
             "RouterPath" : "/",
             "PauseOnStart" : "false",
+            "AuthInfo" :
+            {
+                "AuthMech" : "krb5",
+                "UserName" : "zhiming",
+                "Realm" : "rpcfrmwrk.org"
+            },
             "Interfaces" :
             [
                 {

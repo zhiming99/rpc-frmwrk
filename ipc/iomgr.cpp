@@ -2044,6 +2044,7 @@ gint32 CIoManager::TryFindDescFile(
 
         if( bFound )
         {
+            strPath = strFullPath;
             ret = 0;
             break;
         }
@@ -2057,6 +2058,38 @@ gint32 CIoManager::TryFindDescFile(
     }while( 0 );
 
     return ret;
+}
+
+template<>
+gint32 CIoManager::GetCmdLineOpt(
+    EnumPropId iPropId, std::string& oVal )
+{
+    gint32 ret = 0;
+    do{
+        BufPtr pBuf( true );
+        CStdRMutex oRegLock( m_pReg->GetLock() );
+        ret = m_pReg->ChangeDir( "/cmdline" );
+        if( ERROR( ret ) )
+            break;
+
+        ret = m_pReg->GetProperty( iPropId, *pBuf );
+        if( ERROR( ret ) )
+            break;
+
+        oVal = *pBuf;
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CIoManager::GetRouterName(
+    std::string& strRtName )
+{
+    gint32 ret = GetCmdLineOpt(
+        propRouterName, strRtName );
+    if( ERROR( ret ) )
+         strRtName = MODNAME_RPCROUTER;
+    return 0;
 }
 
 gint32 CIoMgrStopTask::operator()(

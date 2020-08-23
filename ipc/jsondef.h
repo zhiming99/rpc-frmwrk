@@ -36,6 +36,8 @@
 #define JSON_ATTR_PORTDRV       "PortDriver"
 #define JSON_VAL_BUSDRV         "BusDriver"
 #define JSON_VAL_PORTDRV        "PortDriver"
+#define JSON_ATTR_BUSPORTCLASS  "BusPortClass"
+#define JSON_ATTR_PORTTYPE      "PortType"
 
 
 #define JSON_ATTR_DRIVERS       "Drivers"

@@ -32,7 +32,7 @@ gint32 CKdcRelayProxy::InitUserFuncs()
 {
     BEGIN_PROXY_MAP( true );
 
-    ADD_PROXY_METHOD_EX( 1,
+    ADD_PROXY_METHOD_ASYNC( 1,
         CKdcRelayProxy::MechSpecReq,
         SYS_METHOD( AUTH_METHOD_MECHSPECREQ ) );
 
@@ -254,8 +254,6 @@ gint32 CK5AuthServer::OnStartKdcProxyComplete(
             break;
         }
 
-        OnServiceComplete( pResp, pInvTask );
-
     }while( 0 );
 
     if( ERROR( ret ) )
@@ -280,84 +278,84 @@ gint32 CK5AuthServer::SendKdcRequest(
 
     gint32 ret = 0;
     do{
-        if( !m_pKdcProxy.IsEmpty() )
+        IConfigDb* pCtx;
+        CCfgOpener oReq( pReq );
+
+        ret = oReq.GetPointer( 0, pCtx );
+        if( ERROR( ret ) )
         {
-            IConfigDb* pCtx;
-            CCfgOpener oReq( pReq );
+            ret = -EINVAL;
+            break;
+        }
 
-            ret = oReq.GetPointer( 0, pCtx );
+        BufPtr pRealm;
+        ret = oReq.GetProperty( 1, pRealm );
+        if( ERROR( ret ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        BufPtr pToken;
+        ret = oReq.GetProperty( 2, pToken );
+        if( ERROR( ret ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        
+        BufPtr pRespBuf;
+        CKdcRelayProxy* pProxy =
+            m_pKdcProxy;
+        if( pProxy != nullptr &&
+            pProxy->IsConnected() )
+        {
+            ret = pProxy->MechSpecReq(
+                pInvTask, pToken,
+                pRespBuf );
+
             if( ERROR( ret ) )
-            {
-                ret = -EINVAL;
                 break;
-            }
 
-            BufPtr pRealm;
-            ret = oReq.GetProperty( 1, pRealm );
-            if( ERROR( ret ) )
-            {
-                ret = -EINVAL;
+            if( ret == STATUS_PENDING )
                 break;
-            }
 
-            BufPtr pToken;
-            ret = oReq.GetProperty( 2, pToken );
-            if( ERROR( ret ) )
+            CParamList oResp;
+            oResp[ propReturnValue ] = ret;
+            if( !pRespBuf.IsEmpty() && 
+                !pRespBuf->empty() )
             {
-                ret = -EINVAL;
-                break;
+                CParamList oArg0;
+                oArg0.Push( pRespBuf );
+                oResp.Push(
+                    oArg0.GetCfg() );
             }
-            
-            BufPtr pRespBuf;
-            CKdcRelayProxy* pProxy =
-                m_pKdcProxy;
-            if( pProxy != nullptr &&
-                pProxy->IsConnected() )
-            {
-                ret = pProxy->MechSpecReq(
-                    pInvTask, pToken,
-                    pRespBuf );
 
-                if( ERROR( ret ) )
-                    break;
+            OnServiceComplete(
+                oResp.GetCfg(), pInvTask );
 
-                if( ret == STATUS_PENDING )
-                    break;
-
-                CParamList oResp;
-                oResp[ propReturnValue ] = ret;
-                if( !pRespBuf.IsEmpty() && 
-                    !pRespBuf->empty() )
-                {
-                    CParamList oArg0;
-                    oArg0.Push( pRespBuf );
-                    oResp.Push(
-                        oArg0.GetCfg() );
-                }
-
-                OnServiceComplete(
-                    oResp.GetCfg(), pInvTask );
-
-                break;
-            }
-            else if( bFirst )
-            {
-                m_pKdcProxy.Clear();
-                // start the kdcrelay proxy and
-                // resend the request
-                ret = STATUS_MORE_PROCESS_NEEDED;
-            }
-            else
-            {
-                // don't know how to handle
-                ret = -EFAULT;
-            }
+            break;
+        }
+        else if( bFirst )
+        {
+            m_pKdcProxy.Clear();
+            // start the kdcrelay proxy and
+            // resend the request
+            ret = STATUS_MORE_PROCESS_NEEDED;
+        }
+        else
+        {
+            // don't know how to handle
+            ret = -EFAULT;
         }
 
     }while( 0 );
 
     if( ret == STATUS_MORE_PROCESS_NEEDED )
-        return ERROR_FALSE;
+    {
+        // move on to create the proxy
+        return -STATUS_MORE_PROCESS_NEEDED;
+    }
 
     if( ERROR( ret ) )
     {
@@ -452,6 +450,9 @@ gint32 CK5AuthServer::OnSendKdcRequestComplete(
 
     }while( 0 );
 
+    if( ret == -STATUS_MORE_PROCESS_NEEDED )
+        return ret;
+
     if( ERROR( ret ) )
     {
         oParams[ propReturnValue ] = ret;
@@ -522,7 +523,7 @@ gint32 CK5AuthServer::MechSpecReq(
             break;
 
         if( strMethod !=
-            USER_METHOD( __func__ ) )
+            SYS_METHOD( AUTH_METHOD_MECHSPECREQ ) )
         {
             ret = -ENOTSUP;
             break;
@@ -557,7 +558,7 @@ gint32 CK5AuthServer::MechSpecReq(
 
         TaskletPtr pSendTask2;
         ret = BuildSendReqTask(
-            pCallback, pReq, false, pSendTask );
+            pCallback, pReq, false, pSendTask2 );
         if( ERROR( ret ) )
             break;
 

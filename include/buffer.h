@@ -734,7 +734,7 @@ inline BufPtr GetDefault<ObjPtr>( ObjPtr* pT )
 {
     BufPtr pBuf( true );
     pBuf->Resize( sizeof( ObjPtr ) );
-    memset( pBuf->ptr(), 0, sizeof( DMsgPtr ) );
+    memset( pBuf->ptr(), 0, sizeof( ObjPtr ) );
     pBuf->SetDataType( DataTypeObjPtr );
     pBuf->SetExDataType( typeObj );
     return pBuf;
@@ -749,9 +749,15 @@ inline BufPtr GetDefault( T* pT )
 {
     BufPtr pBuf( true );
     pBuf->Resize( sizeof( ObjPtr ) );
-    memset( pBuf->ptr(), 0, sizeof( DMsgPtr ) );
+    memset( pBuf->ptr(), 0, sizeof( ObjPtr ) );
     pBuf->SetDataType( DataTypeObjPtr );
     pBuf->SetExDataType( typeObj );
     return pBuf;
+}
+
+template<>
+inline BufPtr GetDefault< IConfigDb* >( IConfigDb** pT )
+{
+    return GetDefault<ObjPtr>( ( ObjPtr* )nullptr );
 }
 

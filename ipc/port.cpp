@@ -31,6 +31,7 @@
 #include "frmwrk.h"
 #include "stlcont.h"
 #include "emaphelp.h"
+#include "jsondef.h"
 
 using namespace std;
 
@@ -3454,6 +3455,106 @@ gint32 CGenericBusPort::EnumPdoPorts(
         ++itr;
     }
     return 0;
+}
+
+gint32 CGenericBusPort::EnumPdoClasses(
+    StrSetPtr& psetStrings ) const
+{
+    gint32 ret = 0;
+    if( psetStrings.IsEmpty() )
+    {
+        ret = psetStrings.NewObj();
+        if( ERROR( ret ) )
+            return ret;
+    }
+    do{
+        std::string strBusClass;
+        CCfgOpenerObj oPortCfg( this );
+        ret = oPortCfg.GetStrProp(
+            propPortClass, strBusClass );
+        if( ERROR( ret ) )
+            break;
+
+        CIoManager* pMgr = GetIoMgr();
+        CDriverManager& oDrvMgr = pMgr->GetDrvMgr();
+        Json::Value& ojc = oDrvMgr.GetJsonCfg();
+        Json::Value& oPorts = ojc[ JSON_ATTR_PORTS ];
+
+        if( oPorts == Json::Value::null )
+        {
+            ret = -ENOENT;
+            break;
+        }
+
+        if( !oPorts.isArray() || oPorts.size() == 0 )
+        {
+            ret = -ENOENT;
+            break;
+        }
+
+        for( guint32 i = 0; i < oPorts.size(); i++ )
+        {
+            Json::Value& elem = oPorts[ i ];
+            if( elem == Json::Value::null )
+                continue;
+
+            if( !elem.isMember( JSON_ATTR_BUSPORTCLASS ) ||
+                !elem[ JSON_ATTR_BUSPORTCLASS ].isString() )
+                continue;
+
+            std::string strBusClass2 =
+                elem[ JSON_ATTR_BUSPORTCLASS ].asString();
+            if( strBusClass2.empty() )
+                continue;
+
+            if( strBusClass2 != strBusClass )
+                continue;
+
+            if( !elem.isMember( JSON_ATTR_PORTTYPE ) ||
+                !elem[ JSON_ATTR_PORTTYPE ].isString() )
+            {
+                ret = -EINVAL;
+                break;
+            }
+
+            std::string strPortType =
+                elem[ JSON_ATTR_PORTTYPE ].asString();
+
+            if( strPortType.empty() )
+            {
+                ret = -EINVAL;
+                break;
+            }
+            if( strPortType != "Pdo" )
+            {
+                ret = -EINVAL;
+                break;
+            }
+
+            if( !elem.isMember( JSON_ATTR_PORTCLASS ) ||
+                !elem[ JSON_ATTR_PORTCLASS ].isString() )
+            {
+                ret = -EINVAL;
+                break;
+            }
+
+            std::string strPortClass =
+                elem[ JSON_ATTR_PORTCLASS ].asString();
+            if( strPortClass.empty() )
+            {
+                ret = -EINVAL;
+                break;
+            }
+
+            ( *psetStrings )().insert( strPortClass );
+        }
+
+        if( ( *psetStrings )().empty() )
+            ret = -ENOENT;
+
+    }while( 0 );
+
+    return ret;
 }
 
 gint32 CGenericBusPort::PreStop( IRP* pIrp )

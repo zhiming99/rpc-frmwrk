@@ -116,40 +116,61 @@ CDriverManager::CDriverManager(
         return;
 
     SetClassId( clsid( CDriverManager ) );
-    BufPtr bufPtr( true );
+    gint32 ret = 0;
+    std::string strMsg;
+    do{
+        BufPtr bufPtr( true );
 
-    CCfgOpener a( pCfg );
-    // DrvMgr don't hold the reference of the io manager
-    // because it totally contained in the lifecycle of
-    // io manager
-    gint32 ret = a.GetPointer(
-        propIoMgr, m_pIoMgr );
+        CCfgOpener a( pCfg );
+        // DrvMgr don't hold the reference of the io manager
+        // because it totally contained in the lifecycle of
+        // io manager
+        gint32 ret = a.GetPointer(
+            propIoMgr, m_pIoMgr );
+
+        if( ERROR( ret ) )
+        {
+            strMsg = "cannot get IoMananger";
+            break;
+        }
+
+        // we also need the config file to find more
+        // information for driver loading
+        ret = a.GetStrProp( propConfigPath, m_strCfgPath );
+
+        if( ERROR( ret ) )
+        {
+            // we cannot live without the config file
+            strMsg = "Cannot get config path";
+            break;
+        }
+
+        ret = ReadConfig( m_oConfig );
+        if( ERROR( ret ) )
+        {
+            std::string strPath;
+            ret = m_pIoMgr->TryFindDescFile(
+                m_strCfgPath, strPath );
+            if( ERROR( ret ) )
+            {
+                strMsg = "error read config file";
+                break;
+            }
+            m_strCfgPath = strPath;
+            ret = ReadConfig( m_oConfig );
+            if( ERROR( ret ) )
+            {
+                strMsg = "error read config file 2";
+                break;
+            }
+        }
+    }while( 0 );
 
     if( ERROR( ret ) )
     {
         // we cannot live without io manager
-        throw std::invalid_argument(
-            "cannot get IoMananger" );
+        throw std::invalid_argument( strMsg );
     }
-
-    // we also need the config file to find more
-    // information for driver loading
-    ret = a.GetStrProp( propConfigPath, m_strCfgPath );
-
-    if( ERROR( ret ) )
-    {
-        // we cannot live without the config file
-        throw std::invalid_argument(
-            "Cannot get config path" );
-    }
-
-    ret = ReadConfig( m_oConfig );
-    if( ERROR( ret ) )
-    {
-        throw std::invalid_argument(
-            "error read config file" );
-    }
-
     // done
     return;
 }

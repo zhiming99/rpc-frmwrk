@@ -59,8 +59,9 @@
             "AuthInfo" : 
             {
                 "AuthMech" : "krb5",
-                "ServiceName" : "rpcrouter/rasp1",
-                "UserName"  : "kdcclient"
+                "Realm" : "rpcfrmwrk.org",
+                "UserName"  : "kdcclient",
+                "ServiceName" : "rasp1/rpcfrmwrk.org"
             },
             "Interfaces" :
             [
