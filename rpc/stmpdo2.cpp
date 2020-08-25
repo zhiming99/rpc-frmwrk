@@ -2062,7 +2062,6 @@ gint32 CTcpStreamPdo2::StartSend2(
         }
 
         oPortLock.Lock();
-        IrpPtr pIrp;
         if( !m_oSender.IsSendDone() )
             break;
         if( m_queWriteIrps.empty() )

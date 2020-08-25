@@ -1499,8 +1499,18 @@ void CPnpManager::HandleCPEvent(
             break;
         }
     case eventDBusOnline:
+        {
+            break;
+        }
     default:
-        break;
+        {
+
+            // dwParam1 is the ip addr, and the
+            // pData is the name of the interface
+            oConnPoint.BroadcastEvent(
+                propCustomEvent, iEvent, dwParam1, 0, pData );
+            break;
+        }
     }
 }
 
@@ -1595,6 +1605,9 @@ gint32 CPnpManager::Stop()
 
         ret = oReg.RemoveProperty(
             propAdminEvent );
+
+        ret = oReg.RemoveProperty(
+            propCustomEvent );
 
     }while( 0 );
 
@@ -1715,6 +1728,20 @@ gint32 CPnpManager::Start()
             break;
         
         vecEvents.push_back( propAdminEvent );
+
+        ret = pEvtMap.NewObj(
+            clsid( CStlEventMap ) );
+
+        if( ERROR( ret ) )
+            break;
+        
+        ret = oCfg.SetObjPtr(
+            propCustomEvent, pEvtMap );
+
+        if( ERROR( ret ) )
+            break;
+        
+        vecEvents.push_back( propCustomEvent );
 
     }while( 0 );
 

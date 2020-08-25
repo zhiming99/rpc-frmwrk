@@ -28,6 +28,10 @@
 #include "jsondef.h"
 #include "kdcfdo.h"
 #include <algorithm>
+#include "emaphelp.h"
+
+static gint32 FireConnErrEvent(
+    IPort* pPort, EnumEventId iEvent );
 
 gint32 CKdcRelayFdoDrv::Probe(
     IPort* pLowerPort,
@@ -170,7 +174,11 @@ gint32 CKdcRelayFdo::CompleteWriteIrp(
         IrpCtxPtr pTopCtx = pIrp->GetTopStack();
         ret = pTopCtx->GetStatus();
         if( ERROR( ret ) )
+        {
+            FireConnErrEvent(
+                this, eventConnErr );
             break;
+        }
 
         pIrp->PopCtxStack();
         PortPtr pLowerPort = GetLowerPort();
@@ -179,6 +187,7 @@ gint32 CKdcRelayFdo::CompleteWriteIrp(
             break;
 
         pTopCtx = pIrp->GetTopStack();
+        pTopCtx->SetMajorCmd( IRP_MJ_FUNC );
         pTopCtx->SetMinorCmd( IRP_MN_IOCTL );
         pTopCtx->SetCtrlCode(CTRLCODE_LISTENING );
 
@@ -427,9 +436,6 @@ gint32 CKdcRelayFdo::SubmitIoctlCmd(
             if( ret == STATUS_PENDING )
                 break;
 
-            if( ERROR( ret ) )
-                break;
-
             ret = CompleteWriteIrp( pIrp );
             break;
         }
@@ -558,6 +564,40 @@ gint32 CKdcRelayFdo::CompleteListeningIrp(
     return ret;
 }
 
+gint32 FireConnErrEvent(
+    IPort* pPort, EnumEventId iEvent )
+{
+    // this is an event detected by the
+    // socket
+    gint32 ret = 0;
+    do{
+        CCfgOpenerObj oCfg( pPort );
+        CPort* pcPort = static_cast
+            < CPort* >( pPort );
+
+        PortPtr pPdoPtr;
+        ret = pcPort->GetPdoPort( pPdoPtr );
+        if( ERROR( ret ) )
+            break;
+
+        CPort* pPdo = pPdoPtr;
+        HANDLE hPort = PortToHandle( pPdo );
+
+        // pass on this event to the pnp
+        // manager
+        CEventMapHelper< CPort >
+            oEvtHelper( pPdo );
+
+        oEvtHelper.BroadcastEvent(
+            eventConnPoint, iEvent,
+            ( LONGWORD )hPort, nullptr );
+
+        break;
+
+    }while( 0 );
+
+    return ret;
+}
 gint32 CKdcRelayFdo::CompleteIoctlIrp(
     IRP* pIrp )
 {
@@ -614,6 +654,11 @@ gint32 CKdcRelayFdo::CompleteIoctlIrp(
             {
                 ret = psse->m_iData;
                 pCtx->SetStatus( ret );
+                if( ret == -EAGAIN )
+                    break;
+
+                // FireConnErrEvent(
+                //     this, eventConnErr );
                 break;
             }
             else if( psse->m_iEvent ==
@@ -639,6 +684,9 @@ gint32 CKdcRelayFdo::CompleteIoctlIrp(
         pCtx->SetStatus( ret );
         HandleNextIrp( pIrp );
     }
+
+    if( ERROR( ret ) )
+        pIrp->PopCtxStack();
 
     return ret;
 }

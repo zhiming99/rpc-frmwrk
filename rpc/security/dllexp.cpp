@@ -56,6 +56,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CKdcRelayPdo );
     INIT_MAP_ENTRYCFG( CKrb5InitHook );
     INIT_MAP_ENTRYCFG( CRemoteProxyStateAuth );
+    INIT_MAP_ENTRYCFG( CKdcRelayProxyStat );
 
     END_FACTORY_MAPS;
 };

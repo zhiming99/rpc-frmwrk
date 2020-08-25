@@ -1503,7 +1503,7 @@ gint32 CAuthentProxy::Login(
 gint32 CAuthentProxy::MechSpecReq(
     IEventSink* pCallback,
     IConfigDb* pReq,
-    IConfigDb* pResp )
+    CfgPtr& pResp )
 {
     gint32 ret = 0;
     do{
@@ -2636,7 +2636,7 @@ gint32 CAuthentServer::GetSess(
 gint32 CAuthentServer::MechSpecReq(
     IEventSink* pCallback,
     IConfigDb* pInfo,/*[ in ]*/
-    IConfigDb* pResp )/*[ out ]*/
+    CfgPtr& pResp )/*[ out ]*/
 {
     gint32 ret = 0;
     do{

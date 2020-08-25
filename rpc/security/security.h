@@ -126,7 +126,7 @@ struct IAuthenticate
     virtual gint32 MechSpecReq(
         IEventSink* pCallback,
         IConfigDb* pReq,/*[ in ]*/
-        IConfigDb* pResp ) = 0;/*[ out ]*/
+        CfgPtr& pResp ) = 0;/*[ out ]*/
 };
 
 struct IAuthenticateProxy : public IAuthenticate
@@ -259,7 +259,7 @@ class CAuthentProxy :
     virtual gint32 MechSpecReq(
         IEventSink* pCallback,
         IConfigDb* pReq,/*[ in ]*/
-        IConfigDb* pResp );/*[ out ]*/
+        CfgPtr& pResp );/*[ out ]*/
 };
 
 struct IAuthenticateServer : public IAuthenticate
@@ -358,7 +358,7 @@ class CAuthentServer:
     virtual gint32 MechSpecReq(
         IEventSink* pCallback,
         IConfigDb* pReq,/*[ in ]*/
-        IConfigDb* pResp );/*[ out ]*/
+        CfgPtr& pResp );/*[ out ]*/
 
     virtual gint32 OnPostStart(
         IEventSink* pCallback );

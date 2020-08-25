@@ -114,7 +114,7 @@ enum EnumPropId : gint32
     propRetries,        // type: guint32 for times to retry
     propRetriesBackup,  // type: guint32 as backup of propRetries
     propTimerId,        // type: guint32 as a timer id
-    propParentPtr,      // type: ObjPtr to a generic obj pointer which contains the current object
+    propParentPtr,      // type: ObjPtr to a generic obj pointer which contains the parent object
     propSingleIrp,      // type: bool to tell CRpcPdoPort to complete a event irp in the match map
     propObjId,          // type: guint64 for a unique object id
     propClsid,          // type: guint32 for the class id
@@ -229,6 +229,8 @@ enum EnumPropId : gint32
     propNoEnc,          // type: a bool to tell encryption is not needed
     propContinue,       // type: a bool to tell if the login process is still going on or not
     propSearchPaths,    // type: an objptr to a set of paths where to find the libraries and config files
+
+    propCustomEvent,    // type: a connection point for port specific events
 
     propReservedEnd = 0x10000000,
     propInvalid = -1, 
