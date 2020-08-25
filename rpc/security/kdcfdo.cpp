@@ -690,3 +690,27 @@ gint32 CKdcRelayFdo::CompleteIoctlIrp(
 
     return ret;
 }
+
+gint32 CKdcRelayPdo::OnStmSockEvent(
+    STREAM_SOCK_EVENT& sse )
+{
+    gint32 ret = 0;
+    do{
+        CStdRMutex oPortLock( GetLock() );
+        if( m_queListeningIrps.empty() )
+        {
+            if( sse.m_iEvent == sseError )
+            {
+                FireConnErrEvent(
+                    this, eventConnErr );
+                break;
+            }
+        }
+
+        ret = super::OnStmSockEvent( sse );
+        break;
+
+    }while( 1 );
+
+    return ret;
+}
