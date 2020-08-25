@@ -126,7 +126,7 @@ class CKdcChannelProxy :
     gint32 MechSpecReq(
         IEventSink* pCallback,
         IConfigDb* pCtx,/*[ in ]  pCtx */
-        IConfigDb* pResp ); /* [ out ] pResp */
+        CfgPtr& pResp ); /* [ out ] pResp */
 
     gint32 Login(
         IEventSink* pCallback,
@@ -311,7 +311,7 @@ class CK5AuthProxy :
     gint32 MechSpecReq(
         IEventSink* pCallback,
         IConfigDb* pCtx,/*[ in ]  pCtx */
-        IConfigDb* pResp ); /* [ out ] pResp */
+        CfgPtr& pResp ); /* [ out ] pResp */
 
     virtual gint32 OnPostStop(
         IEventSink* pCallback );

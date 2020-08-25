@@ -28,6 +28,35 @@
 #include "k5server.h"
 #include "sha1.h"
 
+CKdcRelayProxy::CKdcRelayProxy(
+    const IConfigDb* pCfg ) :
+    super( pCfg )
+{
+    SetClassId( clsid( CKdcRelayProxy ) );
+    gint32 ret = 0;
+    do{
+        CCfgOpenerObj oCfg( this );
+        CRpcServices* pIf = nullptr;
+
+        ret = oCfg.GetPointer(
+            propParentPtr, pIf );
+        if( ERROR( ret ) )
+            break;
+
+        m_pParent = pIf;
+        oCfg.RemoveProperty(
+            propParentPtr );
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+    {
+        std::string strMsg = DebugMsg( ret,
+            "Error occurs in"
+            "CKdcRelayProxy's ctor" );
+        throw std::runtime_error( strMsg );
+    }
+}
 gint32 CKdcRelayProxy::InitUserFuncs()
 {
     BEGIN_PROXY_MAP( true );
@@ -37,6 +66,47 @@ gint32 CKdcRelayProxy::InitUserFuncs()
         SYS_METHOD( AUTH_METHOD_MECHSPECREQ ) );
 
     END_PROXY_MAP;
+    return 0;
+}
+
+gint32 CKdcRelayProxy::OnEvent(
+    EnumEventId iEvent,
+    LONGWORD dwParam1,
+    LONGWORD dwParam2,
+    LONGWORD* pData )
+{
+    gint32 ret = 0;
+    do{
+        if( iEvent != eventConnErr )
+        {
+            ret = super::OnEvent( iEvent,
+                dwParam1, dwParam2, pData );
+            break;
+        }
+
+        HANDLE hPort = ( HANDLE )dwParam1;
+        if( hPort != GetPortHandle() )
+            break;
+        TaskletPtr pStopTask;
+        ret = DEFER_IFCALLEX_NOSCHED2(
+            0, pStopTask, ObjPtr( this ),
+            &CRpcServices::Shutdown,
+            nullptr );
+        if( ERROR( ret ) )
+            break;
+
+        CRpcServices* pSvc = GetParent();
+        if( unlikely( pSvc == nullptr ) )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        pSvc->AddSeqTask( pStopTask );
+        break;
+
+    }while( 0 );
+
     return 0;
 }
 
@@ -128,7 +198,14 @@ gint32 CKdcRelayProxy::FillRespData(
             ret = -EBADMSG;
             break;
         }
-        oParams.Push( pBuf );
+        // because the CK5AuthServer's response is
+        // an IConfigDb*, we need to move the
+        // blob from kdc to an IConfigDb object,
+        // since nowhere else has chance to do it.
+        CParamList oRmtResp;
+        oRmtResp.Push( pBuf );
+        oParams.Push( ( CObjBase* )
+            oRmtResp.GetCfg() );
 
     }while( 0 );
 
@@ -267,12 +344,87 @@ gint32 CK5AuthServer::OnStartKdcProxyComplete(
     return ret;
 }
 
+gint32 CK5AuthServer::OnSendKdcRequestComplete(
+    IEventSink* pCallback, 
+    IEventSink* pIoReq,
+    IConfigDb* pReqCtx )
+{
+    if( pCallback == nullptr ||
+        pIoReq == nullptr ||
+        pReqCtx == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    CParamList oParams;
+    do{
+        CCfgOpenerObj oReq( pIoReq );
+        IConfigDb* pResp = nullptr;
+        ret = oReq.GetPointer(
+            propRespPtr, pResp );
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpener oResp( pResp );
+
+        gint32 iRet = 0;
+        ret = oResp.GetIntProp(
+            propReturnValue,
+            ( guint32& ) iRet );
+
+        if( ERROR( ret ) )
+            break;
+
+        if( ERROR( iRet ) )
+        {
+            DebugPrint( iRet,
+                "SendKdcRequest completed with"
+                " error" );
+            ret = iRet;
+            break;
+        }
+
+        OnServiceComplete(
+            pResp, pCallback );
+
+    }while( 0 );
+
+    if( ret == -STATUS_MORE_PROCESS_NEEDED )
+        return ret;
+
+    if( ERROR( ret ) )
+    {
+        oParams[ propReturnValue ] = ret;
+        OnServiceComplete(
+            oParams.GetCfg(), pCallback );
+
+        gint32 iRet = 0;
+        // stop the kdc proxy
+        TaskletPtr pStopTask;
+        iRet = DEFER_IFCALLEX_NOSCHED2( 0,
+            pStopTask, ObjPtr( m_pKdcProxy ),
+            &CRpcServices::Shutdown,
+            nullptr );
+        if( ERROR( iRet ) )
+        {
+            ( *pStopTask )( eventCancelTask );
+        }
+        else
+        {
+            iRet = this->AddSeqTask(
+                pStopTask );
+            if( ERROR( iRet ) )
+                ( *pStopTask )( eventCancelTask );
+        }
+    }
+    return ret;
+}
+
 gint32 CK5AuthServer::SendKdcRequest(
-    IEventSink* pInvTask,
+    IEventSink* pCallback,
     IConfigDb* pReq,
     bool bFirst ) /*[ in ]*/
 {
-    if( pInvTask == nullptr ||
+    if( pCallback == nullptr ||
         pReq == nullptr )
         return -EINVAL;
 
@@ -311,7 +463,7 @@ gint32 CK5AuthServer::SendKdcRequest(
             pProxy->IsConnected() )
         {
             ret = pProxy->MechSpecReq(
-                pInvTask, pToken,
+                pCallback, pToken,
                 pRespBuf );
 
             if( ERROR( ret ) )
@@ -331,8 +483,8 @@ gint32 CK5AuthServer::SendKdcRequest(
                     oArg0.GetCfg() );
             }
 
-            OnServiceComplete(
-                oResp.GetCfg(), pInvTask );
+            SetResponse(
+                pCallback, oResp.GetCfg() );
 
             break;
         }
@@ -361,13 +513,11 @@ gint32 CK5AuthServer::SendKdcRequest(
     {
         CParamList oResp;
         oResp[ propReturnValue ] = ret;
-        OnServiceComplete(
-            oResp.GetCfg(), pInvTask );
-        // don't move further
-        ret = 0;
+        SetResponse( pCallback,
+            oResp.GetCfg() );
     }
 
-    return 0;
+    return ret;
 }
 
 gint32 CK5AuthServer::BuildSendReqTask(
@@ -382,85 +532,32 @@ gint32 CK5AuthServer::BuildSendReqTask(
 
     gint32 ret = 0;
     do{
-        TaskletPtr pRespTask;
-        ret = NEW_PROXY_RESP_HANDLER2(
-            pRespTask, ObjPtr( this ),
+        TaskletPtr pSendTask;
+        ret = DEFER_CALL_NOSCHED(
+            pSendTask, ObjPtr( this ),
+            &CK5AuthServer::SendKdcRequest,
+            ( IEventSink* ) nullptr,
+            pReq, bFirst );
+
+        if( ERROR( ret ) )
+            break;
+
+        TaskletPtr pIoCall;
+        ret = NEW_PROXY_IOTASK(
+            0, pIoCall, pSendTask, ObjPtr( this ),
             &CK5AuthServer::OnSendKdcRequestComplete,
             pInvTask, pReq );
 
         if( ERROR( ret ) )
             break;
 
-        TaskletPtr pSendTask;
-        ret = DEFER_IFCALLEX_NOSCHED(
-            pSendTask, ObjPtr( this ),
-            &CK5AuthServer::SendKdcRequest,
-            pInvTask, pReq, bFirst );
-
-        if( ERROR( ret ) )
-            break;
+        pTask = pIoCall;
             
-        CIfRetryTask* pRetryTask = pSendTask;
-        pRetryTask->SetClientNotify( pRespTask );
-        pTask = pSendTask;
-
     }while( 0 );
 
     return ret;
 }
 
-gint32 CK5AuthServer::OnSendKdcRequestComplete(
-    IEventSink* pCallback, 
-    IEventSink* pIoReq,
-    IConfigDb* pReqCtx )
-{
-    if( pCallback == nullptr ||
-        pIoReq == nullptr ||
-        pReqCtx == nullptr )
-        return -EINVAL;
-
-    gint32 ret = 0;
-    CParamList oParams;
-    do{
-        CCfgOpenerObj oReq( pIoReq );
-        IConfigDb* pResp = nullptr;
-        ret = oReq.GetPointer(
-            propRespPtr, pResp );
-        if( ERROR( ret ) )
-            break;
-
-        CCfgOpener oResp( pResp );
-
-        gint32 iRet = 0;
-        ret = oResp.GetIntProp(
-            propReturnValue,
-            ( guint32& ) iRet );
-
-        if( ERROR( ret ) )
-            break;
-
-        if( ERROR( iRet ) )
-        {
-            ret = iRet;
-            break;
-        }
-
-        OnServiceComplete(
-            oResp.GetCfg(), pCallback );
-
-    }while( 0 );
-
-    if( ret == -STATUS_MORE_PROCESS_NEEDED )
-        return ret;
-
-    if( ERROR( ret ) )
-    {
-        oParams[ propReturnValue ] = ret;
-        OnServiceComplete(
-            oParams.GetCfg(), pCallback );
-    }
-    return 0;
-}
 
 gint32 CK5AuthServer::StartKdcProxy(
     IEventSink* pCallback )
@@ -484,8 +581,11 @@ gint32 CK5AuthServer::StartKdcProxy(
         if( ERROR( ret ) )
             break;
 
+        oParams[ propParentPtr ] =
+            ObjPtr( this );
+
         oParams[ propIfStateClass ] =
-            clsid( CTcpBdgePrxyState );
+            clsid( CKdcRelayProxyStat );
 
         oParams[ propPortClass ] =
             PORT_CLASS_KDCRELAY_PDO;
@@ -507,7 +607,7 @@ gint32 CK5AuthServer::StartKdcProxy(
 gint32 CK5AuthServer::MechSpecReq(
     IEventSink* pCallback,
     IConfigDb* pReq,/*[ in ]*/
-    IConfigDb* pResp )/*[ out ]*/
+    CfgPtr& pResp )/*[ out ]*/
 {
     if( pCallback == nullptr ||
         pReq == nullptr )

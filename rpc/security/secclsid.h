@@ -38,6 +38,7 @@ typedef enum
     DECL_CLSID( CKdcRelayPdo ),
     DECL_CLSID( CKrb5InitHook ),
     DECL_CLSID( CRemoteProxyStateAuth ),
+    DECL_CLSID( CKdcRelayProxyStat ),
 
     DECL_IID( CRpcReqForwarderAuth ) = clsid( ReservedIidStart ) + 210,
 

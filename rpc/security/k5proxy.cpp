@@ -928,7 +928,7 @@ gint32 CK5AuthProxy::Login(
 gint32 CK5AuthProxy::MechSpecReq(
     IEventSink* pCallback,
     IConfigDb* pInfo,/*[ in ]  pInfo */
-    IConfigDb* pResp ) /* [ out ] pResp */
+    CfgPtr& pResp ) /* [ out ] pResp */
 {
     if( pInfo == nullptr )
         return -EINVAL;
@@ -1962,7 +1962,7 @@ gint32 CKdcChannelProxy::InitUserFuncs()
 gint32 CKdcChannelProxy::MechSpecReq(
     IEventSink* pCallback,
     IConfigDb* pInfo,/*[ in ]  pInfo */
-    IConfigDb* pResp ) /* [ out ] pResp */
+    CfgPtr& pResp ) /* [ out ] pResp */
 {
     if( pInfo == nullptr )
         return -EINVAL;

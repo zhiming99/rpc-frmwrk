@@ -34,16 +34,37 @@
 
 #define KDCRELAY_DESC_FILE "./authprxy.json"
 
+class CKdcRelayProxyStat :
+    public CTcpBdgePrxyState
+{
+    public:
+    typedef CTcpBdgePrxyState super;
+    CKdcRelayProxyStat( const IConfigDb* pCfg )
+        : super( pCfg )
+    {
+        SetClassId( clsid( CKdcRelayProxyStat ) );
+    }
+    gint32 SubscribeEvents()
+    {
+        std::vector< EnumPropId >
+        vecEvtToSubscribe = { propCustomEvent };
+
+        return SubscribeEventsInternal(
+            vecEvtToSubscribe );
+    }
+};
+
 class CKdcRelayProxy : 
     public CInterfaceProxy
 {
-    public:
+    CRpcServices* m_pParent = nullptr;
 
+    public:
     typedef CInterfaceProxy super;
 
-    CKdcRelayProxy( const IConfigDb* pCfg ) :
-        super( pCfg )
-    { SetClassId( clsid( CKdcRelayProxy ) ); }
+    CKdcRelayProxy( const IConfigDb* pCfg );
+    inline CRpcServices* GetParent() const
+    { return m_pParent; }
 
     gint32 InitUserFuncs();
     gint32 SetupReqIrp( IRP* pIrp,
@@ -57,6 +78,12 @@ class CKdcRelayProxy :
         IEventSink* pCallback,
         BufPtr& pReq,
         BufPtr& pResp ); /* [ out ] pResp */
+
+    gint32 OnEvent(
+        EnumEventId iEvent,
+        LONGWORD dwParam1,
+        LONGWORD dwParam2,
+        LONGWORD* pData );
 };
 
 class CK5AuthServer :
@@ -118,7 +145,7 @@ class CK5AuthServer :
         IConfigDb* pReqCtx );
 
     gint32 SendKdcRequest(
-        IEventSink* pInvTask,
+        IEventSink* pCallback,
         IConfigDb* pReq,
         bool bFirst ); /*[ in ]*/
 
@@ -146,7 +173,7 @@ class CK5AuthServer :
     virtual gint32 MechSpecReq(
         IEventSink* pCallback,
         IConfigDb* pReq, /*[ in ]*/
-        IConfigDb* pResp ); /*[ out ]*/
+        CfgPtr& pResp ); /*[ out ]*/
 
     inline stdrmutex& GetGssLock()
     { return m_oAuthLock; }
