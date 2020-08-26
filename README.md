@@ -38,6 +38,9 @@ This framework depends on the following packags to build:
 Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60) for details.
 
 ---
+[`Tue 25 Aug 2020 08:19:12 PM Beijing`]   
+1. `kinit` now works with rpc-frmwrk through the rpc connection, that is, if the kerberos kdc is behind the firewall, and not open to the internet, the client still has a way to get authenticated.   
+
 [`Tue 11 Aug 2020 10:02:46 PM Beijing`]  
 1. The test case `iftest` has passed. There should still be some bugs. Bug fixing and tests continues...   
 
