@@ -2598,7 +2598,22 @@ struct Parameters< std::tuple< Types... >, std::tuple< Types2... > >
 
             // fill the output parameter
             gint32 iRet = 0;
-            ret = m_pIf->FillArgs( pResp, iRet, outArgs... );
+            try{
+                ret = m_pIf->FillArgs(
+                    pResp, iRet, outArgs... );
+            }
+            catch( const std::bad_alloc& e )
+            {
+                ret = -ENOMEM;
+            }
+            catch( const std::runtime_error& e )
+            {
+                ret = -EFAULT;
+            }
+            catch( const std::invalid_argument& e )
+            {
+                ret = -EINVAL;
+            }
 
             if( SUCCEEDED( ret ) )
                 ret = iRet;

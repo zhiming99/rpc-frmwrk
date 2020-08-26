@@ -577,14 +577,6 @@ krb5_error_code CInitHookMap::Krb5SendHook(
         if( ERROR( ret ) )
             break;
         
-        CKdcChannelProxy* pkc = dynamic_cast
-            < CKdcChannelProxy* >( pProxy );
-        if( pkc == nullptr )
-        {
-            ret = -EFAULT;
-            break;
-        }
-
         CParamList oParams;
 
         oParams.SetStrProp(
@@ -596,11 +588,41 @@ krb5_error_code CInitHookMap::Krb5SendHook(
         oParams.Push( pMsg );
 
         CfgPtr pResp;
-        ret = pkc->MechSpecReq( nullptr,
-            oParams.GetCfg(), pResp );
 
-        if( ERROR( ret ) )
-            break;
+        if( pProxy->GetClsid() ==
+            clsid( CKdcChannelProxy ) )
+        {
+            CKdcChannelProxy* pkc = dynamic_cast
+                < CKdcChannelProxy* >( pProxy );
+            if( pkc == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+
+            ret = pkc->MechSpecReq( nullptr,
+                oParams.GetCfg(), pResp );
+
+            if( ERROR( ret ) )
+                break;
+        }
+        else if( pProxy->GetClsid() ==
+            clsid( CAuthentProxyK5Impl ) )
+        {
+            CK5AuthProxy* pkc = dynamic_cast
+                < CK5AuthProxy* >( pProxy );
+            if( pkc == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+
+            ret = pkc->MechSpecReq( nullptr,
+                oParams.GetCfg(), pResp );
+
+            if( ERROR( ret ) )
+                break;
+        }
 
         BufPtr pToken;
         CCfgOpener oResp( ( IConfigDb* )pResp );
@@ -897,13 +919,11 @@ CK5AuthProxy::CK5AuthProxy(
 bool CK5AuthProxy::IsConnected(
     const char* szDestAddr )
 {
-    gint32 ret = super::IsConnected(
-        szDestAddr );
-    if( ERROR( ret ) )
+    if( !super::IsConnected( szDestAddr ) )
         return false;
 
     if( m_pParent.IsEmpty() )
-        return false;
+        return true;
 
     CRpcServices* pSvc = m_pParent;
     if( pSvc == nullptr )

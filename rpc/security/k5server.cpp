@@ -198,14 +198,7 @@ gint32 CKdcRelayProxy::FillRespData(
             ret = -EBADMSG;
             break;
         }
-        // because the CK5AuthServer's response is
-        // an IConfigDb*, we need to move the
-        // blob from kdc to an IConfigDb object,
-        // since nowhere else has chance to do it.
-        CParamList oRmtResp;
-        oRmtResp.Push( pBuf );
-        oParams.Push( ( CObjBase* )
-            oRmtResp.GetCfg() );
+        oParams.Push( pBuf );
 
     }while( 0 );
 
@@ -382,6 +375,18 @@ gint32 CK5AuthServer::OnSendKdcRequestComplete(
             ret = iRet;
             break;
         }
+
+        BufPtr pToken;
+        ret = oResp.GetProperty(
+            0, pToken );
+
+        if( ERROR( ret ) )
+            break;
+
+        CParamList oArg0;
+        oArg0.Push( pToken );
+        oResp.SetPointer( 0,
+            ( IConfigDb* )oArg0.GetCfg() );
 
         OnServiceComplete(
             pResp, pCallback );

@@ -730,6 +730,7 @@ class CRpcRouterReqFwdrAuth :
         const IConfigDb* pConn1,
         const IConfigDb* pConn2 );
 
+    using CRpcRouter::GetBridgeProxy;
     virtual gint32 GetBridgeProxy(
         const IConfigDb* pConnParams,
         InterfPtr& pIf );
@@ -738,8 +739,6 @@ class CRpcRouterReqFwdrAuth :
         guint32 dwPortId,
         const std::string& strSrcUniqName,
         const std::string& strSrcDBusName );
-
-    using CRpcRouter::GetBridgeProxy;
 };
 
 class CRpcRouterBridgeAuth :

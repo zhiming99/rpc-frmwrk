@@ -1252,7 +1252,7 @@ class CRpcRouter :
             pMatch, bRemote, pMatchRemove );
     }
 
-    gint32 GetBridgeProxy(
+    virtual gint32 GetBridgeProxy(
         const IConfigDb* pConnParams,
         InterfPtr& pIf );
 
@@ -1303,7 +1303,7 @@ class CRpcRouter :
     gint32 GetPortId( HANDLE hPort,
         guint32 dwPortId ) const;
 
-    gint32 IsEqualConn(
+    virtual gint32 IsEqualConn(
         const IConfigDb* pConn1,
         const IConfigDb* pConn2 );
 };

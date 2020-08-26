@@ -708,50 +708,50 @@ gint32 CRpcTcpBridgeAuth::ForwardRequest(
             std::string strMember =
                 SYS_METHOD( AUTH_METHOD_LOGIN );
 
+            std::string strReq = pMsg.GetMember();
+
             if( pMsg.GetMember() == strMember )
+            {
                 bLogin = true;
+            }
+            else if( strReq != SYS_METHOD(
+                AUTH_METHOD_MECHSPECREQ ) )
+            {
+                ret = -EACCES;
+                break;
+            }
 
             if( !bAuthed )
             {
-                if( !bLogin )
+                if( bLogin )
                 {
-                    ret = -EACCES;
-                    break;
+                    ret = NEW_PROXY_RESP_HANDLER2(
+                        pRespCb, ObjPtr( this ),
+                        &CRpcTcpBridgeAuth::OnLoginComplete,
+                        pCallback, pReqCtx );
+
+                    if( ERROR( ret ) )
+                        break;
+
+                    CCfgOpenerObj oResp(
+                        ( CObjBase*)pRespCb );
+
+                    ret = oResp.CopyProp(
+                        propMsgPtr, pCallback );
+
+                    if( ERROR( ret ) )
+                        break;
+
+                    bSeqTask = true;
+                    pCallback = pRespCb;
                 }
-                ret = NEW_PROXY_RESP_HANDLER2(
-                    pRespCb, ObjPtr( this ),
-                    &CRpcTcpBridgeAuth::OnLoginComplete,
-                    pCallback, pReqCtx );
-
-                if( ERROR( ret ) )
-                    break;
-
-                CCfgOpenerObj oResp(
-                    ( CObjBase*)pRespCb );
-
-                ret = oResp.CopyProp(
-                    propMsgPtr, pCallback );
-
-                if( ERROR( ret ) )
-                    break;
-
-                bSeqTask = true;
-                pCallback = pRespCb;
             }
             else
             {
                 if( bLogin )
                 {
-                    // duplicated login not
-                    // allowed
-                    ret = -EACCES;
-                    break;
-                }
-                std::string strMember =
-                    AUTH_METHOD_MECHSPECREQ;
-                if( pMsg.GetMember() !=
-                    SYS_METHOD( strMember ) )
-                {
+                    // already login, disconn to
+                    // login again
                     ret = -EACCES;
                     break;
                 }
@@ -2365,15 +2365,9 @@ gint32 CRpcRouterReqFwdrAuth::IsEqualConn(
         if( ERROR( ret ) )
             break;
 
-        if( !oAuth2.IsEqual(
-            propAuthMech, strMech ) )
-        {
-            ret = ERROR_FALSE;
-            break;
-        }
-
-        if( !oAuth1.IsEqualProp(
-            propUserName, pAuth2 ) )
+        ret = oAuth2.IsEqual(
+            propAuthMech, strMech );
+        if( ERROR( ret ) )
         {
             ret = ERROR_FALSE;
             break;
@@ -2381,13 +2375,23 @@ gint32 CRpcRouterReqFwdrAuth::IsEqualConn(
 
         if( strMech == "krb5" )
         {
-            if( !oAuth1.IsEqualProp(
-                propServiceName, pAuth2 ) )
-            {
-                ret = ERROR_FALSE;
+            ret = oAuth1.IsEqualProp(
+                propUserName, pAuth2 );
+            if( ERROR( ret ) )
                 break;
-            }
+
+            ret = oAuth1.IsEqualProp(
+                propServiceName, pAuth2 );
+            if( ERROR( ret ) )
+                break;
+
+            ret = oAuth1.IsEqualProp(
+                propRealm, pAuth2 );
+            if( ERROR( ret ) )
+                break;
         }
+
+        ret = 0;
 
     }while( 0 );
 
@@ -2414,7 +2418,7 @@ gint32 CRpcRouterReqFwdrAuth::GetBridgeProxy(
             break;
 
         ret = super::GetBridgeProxy(
-            propConnParams, pIf );
+            pConnParams, pIf );
 
     }while( 0 );
 
@@ -2474,7 +2478,7 @@ gint32 CRpcRouterReqFwdrAuth::DecRefCount(
         {
             // notify the authprxy to stop
             InterfPtr pIf;
-            ret = GetBridgeProxy( dwPortId, pIf );
+            ret = super::GetBridgeProxy( dwPortId, pIf );
             CAuthentProxy* pspp = pIf;
             oRouterLock.Unlock();
             pspp->StopSessImpl();
