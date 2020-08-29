@@ -1305,18 +1305,16 @@ gint32 CProxyPdoConnectTask::Process(
 
     ret = oParams.GetObjPtr( propIrpPtr, pObj );
     if( SUCCEEDED( ret ) )
-    {
         pMasterIrp = pObj;
-    }
 
+    bool bExpired = false;
     if( pMasterIrp != nullptr )
     {
         ret = ExtendIrpTimer( pMasterIrp );
-        if( ERROR( ret ) )
-        {
-            // cannot continue;
-            return SetError( ret );
-        }
+        // the master irp could canceled at this
+        // point, anyway, let's move on
+        if( ret == -EPERM )
+            bExpired = true;
     }
 
     do{
@@ -1371,6 +1369,10 @@ gint32 CProxyPdoConnectTask::Process(
 
             break;
         }
+        else if( dwContext == eventTimeout )
+        {
+            // do nothing
+        }
 
         ret = oParams.GetPointer(
             propPortPtr, pProxyPort );
@@ -1401,6 +1403,14 @@ gint32 CProxyPdoConnectTask::Process(
             break;
         }
 
+        if( bExpired )
+        {
+            ret = -ETIMEDOUT;
+            break;
+        }
+
+        DecRetries();
+
         IrpPtr pIrp( true );
         pIrp->AllocNextStack( nullptr );
         IrpCtxPtr& pIrpCtx = pIrp->GetTopStack(); 
@@ -1415,8 +1425,9 @@ gint32 CProxyPdoConnectTask::Process(
         pIrp->SetSyncCall( false );
 
         // set a timer
-        pIrp->SetTimer( PORT_START_TIMEOUT_SEC, pMgr );
-        pIrp->SetCallback( this, eventTimeout );
+        pIrp->SetTimer( PORT_START_TIMEOUT_SEC, 0 );
+        pIrp->SetCallback( this, eventZero );
+        pIrp->SetIrpThread( pMgr );
 
         // NOTE: we don't use association here because
         // it could cause to lock both the master irp

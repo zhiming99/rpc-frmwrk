@@ -791,27 +791,11 @@ gint32 CRpcInterfaceBase::StartRecvTasks(
         // while we may still in the starting or
         // stopped state
         CParamList oParams;
-
         ret = oParams.SetObjPtr(
             propIfPtr, ObjPtr( this ) );
 
         if( ERROR( ret  ) )
             break;
-
-        TaskGrpPtr pParaTaskGrp;
-        ret = GetParallelGrp( pParaTaskGrp );
-        if( ERROR( ret ) )
-        {
-            ret = pParaTaskGrp.NewObj(   
-                clsid( CIfParallelTaskGrp ),
-                oParams.GetCfg() );
-
-            if( ERROR( ret ) )
-                break;
-        }
-            
-        CIfParallelTaskGrp* pTaskGrp
-            = pParaTaskGrp;
 
         TaskletPtr pRecvMsgTask;
         for( auto pMatch : vecMatches )
@@ -826,29 +810,16 @@ gint32 CRpcInterfaceBase::StartRecvTasks(
             if( ERROR( ret ) )
                 break;
 
-            ret = pTaskGrp->AppendTask(
-                pRecvMsgTask );
-
+            ret = AddAndRun( pRecvMsgTask );
             if( ERROR( ret ) )
                 break;
+
+            if( ret == STATUS_PENDING )
+                ret = 0;
         }
 
         if( ERROR( ret ) )
             break;
-
-        TaskletPtr pTask = pParaTaskGrp;
-        ret = AppendAndRun( pTask );
-
-        if( ERROR( ret ) )
-            break;
-
-        // the ret does not necessarily indicate
-        // the return value of the receive task.
-        // we need to get the status code from the
-        // task.
-        ret = pParaTaskGrp->GetError();
-        if( ret == STATUS_PENDING )
-            ret = 0;
 
     }while( 0 );
 
@@ -2110,6 +2081,7 @@ gint32 CRpcInterfaceBase::AddAndRun(
 
         if( bTail )
         {
+            oRootLock.Unlock();
             pParaLock = &pParaGrp->GetLock();
             pParaLock->lock();
             EnumTaskState iTaskState =
@@ -2118,8 +2090,30 @@ gint32 CRpcInterfaceBase::AddAndRun(
                 ( iTaskState == stateStarted &&
                     !pParaGrp->IsRunning() ) )
             {
+                // the group has stopped
                 bTail = false;
                 pParaLock->unlock();
+                oRootLock.Lock();
+                // recheck if the taskgroup
+                // changed during the period the
+                // lock is released
+                dwCount =
+                    pRootTaskGroup->GetTaskCount();
+                TaskletPtr pTail1;
+                ret = pRootTaskGroup->
+                    GetTailTask( pTail1 );
+                if( SUCCEEDED( ret ) )
+                {
+                    if( pTail1 != pTail )
+                    {
+                        // something changed
+                        pParaGrp = pTail1;
+                        if( pParaGrp != nullptr )
+                            continue;
+                        // a non-paragrp added
+                        // fall through
+                    }
+                }
             }
         }
 
@@ -2131,7 +2125,6 @@ gint32 CRpcInterfaceBase::AddAndRun(
         else
         {
             // add a new parallel task group
-            CStdRMutex oIfLock( GetLock() );
             CCfgOpener oCfg;
 
             ret = oCfg.SetObjPtr(
@@ -2157,9 +2150,24 @@ gint32 CRpcInterfaceBase::AddAndRun(
             }
 
             pParaGrp = pParaTask;
+            oRootLock.Unlock();
+
             pParaLock= &pParaGrp->GetLock();
             pParaLock->lock();
+
+            EnumTaskState iTaskState =
+                pParaGrp->GetTaskState();
+
+            if( iTaskState == stateStopped ||
+                ( iTaskState == stateStarted &&
+                    !pParaGrp->IsRunning() ) )
+            {
+                pParaLock->unlock();
+                continue;
+            }
         }
+
+        // oRootLock.Lock();
 
         bool bRunning = pParaGrp->IsRunning();
 
@@ -2208,10 +2216,8 @@ gint32 CRpcInterfaceBase::AddAndRun(
                 // don't lock the io task, because it
                 // could cause deadlock
                 pIoTask->MarkPending();
-
                 pParaLock->unlock();
-                oRootLock.Unlock();
-                ret = STATUS_PENDING;
+                ret = 0;
 
                 DebugPrint( GetTid(),
                     "root task not run immediately, dwCount=%d, bRunning=%d",
@@ -2220,7 +2226,6 @@ gint32 CRpcInterfaceBase::AddAndRun(
             else
             {
                 pParaLock->unlock();
-                oRootLock.Unlock();
 
                 // NOTE: there could be deep nesting.
                 // Reschedule can fix, but performance
@@ -2234,25 +2239,28 @@ gint32 CRpcInterfaceBase::AddAndRun(
                 // run and completed by other
                 // thread, though the tasks should
                 // succeed as normal.
-                ret = ( *pParaGrp )( eventZero );
+                ( *pParaGrp )( eventZero );
+                ret = pIoTask->GetError();
                 if( ret == STATUS_PENDING )
                 {
                     // in case the io task is scheduled
                     // on the this thread.
                     pIoTask->MarkPending();
                 }
+                ret = 0;
             }
         }
         else if( bImmediate && bRunning && dwCount > 0 )
         {
             pParaGrp->AppendTask( pIoTask );
             pParaLock->unlock();
-            oRootLock.Unlock();
 
             // force the task to run immediately
-            ret = ( *pParaGrp )( eventZero );
+            ( *pParaGrp )( eventZero );
+            ret = pIoTask->GetError();
             if( ret == STATUS_PENDING )
                 pIoTask->MarkPending();
+            ret = 0;
         }
         else if( bImmediate && !bRunning && dwCount > 0 )
         {
@@ -2288,7 +2296,9 @@ gint32 CRpcInterfaceBase::AddAndRun(
             ret = ERROR_STATE;
         }
 
-    }while( 0 );
+        break;
+
+    }while( 1 );
 
     // don't rely on `ret' to determine the return
     // value from the task pIoTask, you need to

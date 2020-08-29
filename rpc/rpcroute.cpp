@@ -170,9 +170,10 @@ gint32 CRpcRouter::GetBridgeProxy(
                 pConnParams, pcp );
 
             if( SUCCEEDED( ret ) )
+            {
                 pIf = elem.second;
-
-            break;
+                break;
+            }
         }
 
         if( ERROR( ret ) )

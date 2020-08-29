@@ -289,6 +289,27 @@ gint32 CRpcTcpBridgeAuth::EnableInterfaces()
 
         TaskletPtr pTask = pTaskGrp;
         ret = AddAndRun( pTask );
+        if( SUCCEEDED( ret ) )
+        {
+            ret = pTask->GetError();
+            if( ERROR( ret ) ||
+                ret == STATUS_PENDING )
+                break;
+
+            CParamList oParms;
+            oParams[ propReturnValue ] = 0;
+
+            TaskletPtr pDummy;
+            pDummy.NewObj(
+                clsid( CIfDummyTask ) );
+            CCfgOpener oCfg( ( IConfigDb* )
+                pDummy->GetConfig() );
+            oCfg.SetPointer( propRespPtr,
+                ( IConfigDb* )oParams.GetCfg() );
+
+            ret = OnEnableComplete( nullptr,
+                pDummy, oReqCtx.GetCfg() );
+        }
 
     }while( 0 );
 
@@ -341,13 +362,16 @@ gint32 CRpcTcpBridgeAuth::SetSessHash(
             pAs = ObjPtr( pRouter );
 
             pAs->RemoveSession( strHash1 );
-            if( m_pLoginTimer.IsEmpty() )
+            if( !m_pLoginTimer.IsEmpty() )
             {
                 // at this point, the
                 // m_pLoginTimer is already
                 // canceled.
                 m_pLoginTimer.Clear();
             }
+            if( !m_pSessChecker.IsEmpty() )
+                ( *m_pSessChecker )( eventCancelTask );
+
             break;
         }
 
@@ -431,7 +455,29 @@ gint32 CRpcTcpBridgeAuth::SetSessHash(
 
         // start all the rest interfaces,
         // espacially the stream interfaces
+
         EnableInterfaces();
+
+        // set the session checker
+        ret = DEFER_IFCALLEX_NOSCHED(
+            m_pSessChecker, ObjPtr( this ),
+            &CRpcTcpBridgeAuth::CheckSessExpired,
+            strHash );
+
+        if( ERROR( ret ) )
+            break;
+
+        CIfRetryTask* pRetryTask = m_pSessChecker;
+        if( unlikely( pRetryTask == nullptr ) )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        CCfgOpenerObj oTaskCfg( pRetryTask );
+        oTaskCfg.SetIntProp( propRetries, 8640000 );
+        oTaskCfg.SetIntProp( propIntervalSec, 60 );
+        this->AddAndRun( m_pSessChecker );
 
     }while( 0 );
 
@@ -908,6 +954,36 @@ bool CRpcTcpBridgeAuth::IsKdcChannel()
         return false;
 
     return bNoEnc;
+}
+
+gint32 CRpcTcpBridgeAuth::CheckSessExpired(
+    const std::string& strSess )
+{
+    gint32 ret = 0;
+    do{
+        CAuthentServer* pAuth =
+            ObjPtr( GetParent() );
+
+        if( unlikely( pAuth == nullptr ) )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        ret = pAuth->IsSessExpired( strSess );
+        if( ret != ERROR_FALSE )
+        {
+            OnLoginFailed( nullptr );
+            ret = STATUS_SUCCESS;
+        }
+        else
+        {
+            ret = STATUS_MORE_PROCESS_NEEDED;
+        }
+
+    }while( 0 );
+
+    return ret;
 }
 
 gint32 CRpcReqForwarderProxyAuth::ForwardLogin(
@@ -1691,6 +1767,185 @@ gint32 CAuthentProxy::InitEnvRouter(
     return CK5AuthProxy::InitEnvRouter( pMgr );
 }
 
+gint32 CRpcTcpBridgeProxyAuth::OnEnableComplete(
+    IEventSink* pCallback,
+    IEventSink* pIoReq,
+    IConfigDb* pReqCtx )
+{
+    if( pIoReq == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        CCfgOpenerObj oReq( pIoReq );
+        IConfigDb* pResp = nullptr;
+        ret = oReq.GetPointer(
+            propRespPtr, pResp );
+
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpener oResp( pResp );
+        gint32 iRet = 0;
+        ret = oResp.GetIntProp(
+            propReturnValue,
+            ( guint32& ) iRet );
+
+        if( ERROR( ret ) )
+            break;
+
+        if( ERROR( iRet ) )
+        {
+            ret = iRet;
+            break;
+        }
+
+        CCfgOpener oReqCtx( pReqCtx );
+        CStlObjVector* pVec;
+        ret = oReqCtx.GetPointer( 0, pVec );
+        if( ERROR( ret ) )
+            break;
+
+        std::vector< MatchPtr > vecMatches;
+        for( auto elem : ( *pVec )() )
+        {
+            MatchPtr pMatch = elem;
+            vecMatches.push_back( pMatch );
+        }
+
+        ret = StartRecvTasks( vecMatches );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CRpcTcpBridgeProxyAuth::EnableInterfaces()
+{
+    gint32 ret = 0;
+    TaskGrpPtr pTaskGrp;
+    TaskletPtr pRespCb;
+    do{
+        if( IsKdcChannel() )
+        {
+            ret = 0;
+            break;
+        }
+        std::vector< MatchPtr > vecMatches;
+        for( auto& elem : m_vecMatches )
+        {
+            CCfgOpenerObj oMatch(
+                ( CObjBase* )elem );
+            std::string strIfName;
+            bool bDummy = true;
+            ret = oMatch.GetBoolProp(
+                propDummyMatch, bDummy );
+            if( ERROR( ret ) )
+                continue;
+
+            if( bDummy )
+            {
+                oMatch.RemoveProperty(
+                    propDummyMatch );
+                vecMatches.push_back( elem );
+            }
+        }
+
+        if( vecMatches.empty() )
+            break;
+
+        CParamList oParams;            
+        oParams[ propIfPtr ] = ObjPtr( this );
+
+        ret = pTaskGrp.NewObj( 
+            clsid( CIfTaskGroup ),
+            oParams.GetCfg() );
+
+        if( ERROR( ret ) )
+            break;
+
+        pTaskGrp->SetRelation( logicAND );
+
+        ObjVecPtr pObjVec;
+        ret = pObjVec.NewObj(
+            clsid( CStlObjVector ) );
+
+        if( ERROR( ret ) )
+            break;
+
+        oParams.Push( true );
+        for( auto elem : vecMatches )
+        {
+            oParams[ propMatchPtr ] =
+                ObjPtr( elem );
+
+            TaskletPtr pEnableEvtTask;
+            ret = pEnableEvtTask.NewObj(
+                clsid( CIfEnableEventTask ),
+                oParams.GetCfg() );
+
+            if( ERROR( ret ) )
+                break;
+
+            pTaskGrp->AppendTask(
+                pEnableEvtTask );
+
+            ( *pObjVec )().push_back(
+                ObjPtr( elem ) );
+        }
+
+        CParamList oReqCtx;
+        oReqCtx.Push( ObjPtr( pObjVec ) );
+        ret = NEW_PROXY_RESP_HANDLER2(
+            pRespCb, ObjPtr( this ),
+            &CRpcTcpBridgeProxyAuth::OnEnableComplete,
+            nullptr,
+            ( IConfigDb* )oReqCtx.GetCfg() );
+
+        if( ERROR( ret ) )
+            break;
+
+        pTaskGrp->SetClientNotify(
+            ( IEventSink* )pRespCb );
+
+        TaskletPtr pTask = pTaskGrp;
+        ret = AddAndRun( pTask );
+        if( SUCCEEDED( ret ) )
+        {
+            ret = pTask->GetError();
+            if( ERROR( ret ) ||
+                ret == STATUS_PENDING )
+                break;
+
+            CParamList oParms;
+            oParams[ propReturnValue ] = 0;
+
+            TaskletPtr pDummy;
+            pDummy.NewObj(
+                clsid( CIfDummyTask ) );
+            CCfgOpener oCfg( ( IConfigDb* )
+                pDummy->GetConfig() );
+            oCfg.SetPointer( propRespPtr,
+                ( IConfigDb* )oParams.GetCfg() );
+
+            ret = OnEnableComplete( nullptr,
+                pDummy, oReqCtx.GetCfg() );
+        }
+
+    }while( 0 );
+
+    if( !ERROR( ret ) )
+        return ret;
+
+    if( !pTaskGrp.IsEmpty() )
+        ( *pTaskGrp )( eventCancelTask );
+
+    if( pRespCb.IsEmpty() )
+        ( *pRespCb )( eventCancelTask );
+
+    return ret;
+};
+
 gint32 CRpcTcpBridgeProxyAuth::OnPostStart(
     IEventSink* pCallback )
 {
@@ -1868,6 +2123,9 @@ gint32 CRpcTcpBridgeProxyAuth::SetSessHash(
         *pBuf = ObjPtr( m_oSecCtx.GetCfg() );
         SetPortProp( pPort, propSecCtx, pBuf );
 
+        EnableInterfaces();
+
+
     }while( 0 );
 
     return ret;
@@ -2037,8 +2295,9 @@ gint32 CRpcReqForwarderAuth::OnSessImplLoginComplete(
         CRpcTcpBridgeProxyAuth* pProxy =
             ObjPtr( pbp );
 
-        ret = pProxy->SetSessHash(
-            strHash, bNoEnc );
+        ret = pProxy->
+            SetSessHash( strHash, bNoEnc );
+
         if( ERROR( ret ) )
             break;
 
@@ -3030,6 +3289,69 @@ gint32 CAuthentServer::RemoveSession(
     return pAuth->RemoveSession( strSess );
 }
 
+gint32 CAuthentServer::IsSessExpired(
+    const std::string& strSess )
+{
+    CRpcServices* pSvc = m_pAuthImpl;
+
+    IAuthenticateServer* pAuth =
+    dynamic_cast< IAuthenticateServer* >
+            ( pSvc );
+
+    if( pAuth == nullptr )
+        return -EFAULT;
+
+    return pAuth->IsSessExpired( strSess );
+}
+
+gint32 CRpcRouterBridgeAuth::OnStartRfpaComplete(
+    IEventSink* pCallback,
+    IEventSink* pIoReq,
+    IConfigDb* pReqCtx )
+{
+    if( pIoReq == nullptr ||
+        pReqCtx == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        CCfgOpenerObj oReq( pIoReq );
+        IConfigDb* pResp = nullptr;
+        ret = oReq.GetPointer(
+            propRespPtr, pResp );
+
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpener oResp( pResp );
+        gint32 iRet = 0;
+        ret = oResp.GetIntProp(
+            propReturnValue,
+            ( guint32& ) iRet );
+
+        if( ERROR( ret ) )
+            break;
+
+        TaskletPtr pStartRecv;
+        ret = pStartRecv.NewObj( 
+            clsid( CIfStartRecvMsgTask ),
+            pReqCtx );
+
+        if( ERROR( ret ) )
+            break;
+
+        ret = AddAndRun( pStartRecv );
+        if( ret == STATUS_PENDING )
+            ret = 0;
+
+    }while( 0 );
+
+    pCallback->OnEvent( eventTaskComp,
+        ret, 0, ( LONGWORD* )this );
+
+    return ret;
+}
+
 gint32 CRpcRouterBridgeAuth::OnPostStart(
     IEventSink* pCallback )
 {
@@ -3065,8 +3387,33 @@ gint32 CRpcRouterBridgeAuth::OnPostStart(
 
         pTransGrp->AppendTask( pStartTask );
 
+        TaskletPtr pEnableEvtTask;
+
+        oParams.Push( true );
+        oParams.SetPointer(
+            propMatchPtr, ( CObjBase* )pMatch );
+        
+        ret = pEnableEvtTask.NewObj(
+            clsid( CIfEnableEventTask ),
+            oParams.GetCfg() );
+
+        if( ERROR( ret ) )
+            break;
+
+        pTransGrp->AppendTask( pEnableEvtTask );
+
+        TaskletPtr pRespCb;
+        ret = NEW_PROXY_RESP_HANDLER2(
+            pRespCb, ObjPtr( this ),
+            &CRpcRouterBridgeAuth::OnStartRfpaComplete,
+            pCallback,
+            ( IConfigDb* )oParams.GetCfg() );
+
+        if( ERROR( ret ) )
+            break;
+
         CIfRetryTask* pGrp = pTransGrp;
-        pGrp->SetClientNotify( pCallback );
+        pGrp->SetClientNotify( pRespCb );
         TaskletPtr pTask( pGrp );
         ret = AddSeqTask( pTask );
         if( SUCCEEDED( ret ) )

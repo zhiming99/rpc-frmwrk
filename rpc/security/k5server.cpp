@@ -932,6 +932,41 @@ gint32 CK5AuthServer::RemoveSession(
     return RemoveSession( dwPortId );
 }
 
+gint32 CK5AuthServer::IsSessExpired(
+    const std::string& strSess )
+{
+    gint32 ret = 0;
+    do{
+        // the caller makes sure the gss lock is
+        // acquired.
+        gss_ctx_id_t context = GSS_C_NO_CONTEXT;
+        CStdRMutex oGssLock( GetGssLock() );
+        ret = GetGssCtx( strSess, context );
+        if( ERROR( ret ) )
+            break;
+
+        ret = ERROR_FALSE;
+        OM_uint32 maj_stat, min_stat, lifetime; 
+        maj_stat = gss_inquire_context(
+            &min_stat, context, nullptr, nullptr,
+            &lifetime, nullptr, nullptr,
+            nullptr, nullptr );
+        if( maj_stat == GSS_S_COMPLETE )
+        {
+            if( lifetime == 0 )
+                ret = STATUS_SUCCESS;
+        }
+        else
+        {
+            ret = ERROR_FAIL;
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+
 gint32 CK5AuthServer::Krb5Login(
     IEventSink* pCallback,
     guint32 dwPortId,
@@ -944,7 +979,7 @@ gint32 CK5AuthServer::Krb5Login(
     gss_buffer_desc send_tok, recv_tok;
     gss_name_t      client;
     gss_OID         doid;
-    OM_uint32       ret_flags, maj_stat, min_stat, acc_sec_min_stat;
+    OM_uint32       ret_flags, maj_stat, min_stat;
 
     gss_ctx_id_t context = GSS_C_NO_CONTEXT;
 
@@ -974,7 +1009,7 @@ gint32 CK5AuthServer::Krb5Login(
             context = m_mapSessions[ dwPortId ];
 
         maj_stat = gss_accept_sec_context(
-            &acc_sec_min_stat, &context,
+            &min_stat, &context,
             m_pSvcCred, in_tok_ptr,
             GSS_C_NO_CHANNEL_BINDINGS,
             &client, &doid, &send_tok,
