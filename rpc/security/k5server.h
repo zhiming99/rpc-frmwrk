@@ -129,6 +129,9 @@ class CK5AuthServer :
     gint32 RemoveSession(
         guint32 dwPortId );
 
+    gint32 IsSessExpired(
+        const std::string& strSess );
+
     gint32 Krb5Login(
         IEventSink* pCallback,
         guint32 dwPortId,

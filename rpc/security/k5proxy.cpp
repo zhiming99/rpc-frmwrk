@@ -556,13 +556,16 @@ krb5_error_code CInitHookMap::Krb5SendHook(
             break;
         }
 
-        pMsg->Resize( message->length  );
+        pMsg->Resize( sizeof( guint32 ) );
+        guint32 dwSize = ntohl( message->length );
         memcpy( pMsg->ptr(),
-            message->data, pMsg->size() );
+            &dwSize, sizeof( guint32 ) );
+       
+        ret = pMsg->Append(
+            message->data, message->length );
 
         CRpcServices* pProxy = reinterpret_cast
             < CRpcServices* >( data );
-
 
         IConfigDb* pAuth =
             GET_AUTH( pProxy );
@@ -574,14 +577,6 @@ krb5_error_code CInitHookMap::Krb5SendHook(
         if( ERROR( ret ) )
             break;
         
-        CKdcChannelProxy* pkc = dynamic_cast
-            < CKdcChannelProxy* >( pProxy );
-        if( pkc == nullptr )
-        {
-            ret = -EFAULT;
-            break;
-        }
-
         CParamList oParams;
 
         oParams.SetStrProp(
@@ -592,32 +587,74 @@ krb5_error_code CInitHookMap::Krb5SendHook(
         oParams.Push( pRealm );
         oParams.Push( pMsg );
 
-        CCfgOpener oResp;
-        ret = pkc->MechSpecReq( nullptr,
-            oParams.GetCfg(), oResp.GetCfg() );
+        CfgPtr pResp;
 
+        if( pProxy->GetClsid() ==
+            clsid( CKdcChannelProxy ) )
+        {
+            CKdcChannelProxy* pkc = dynamic_cast
+                < CKdcChannelProxy* >( pProxy );
+            if( pkc == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+
+            ret = pkc->MechSpecReq( nullptr,
+                oParams.GetCfg(), pResp );
+
+            if( ERROR( ret ) )
+                break;
+        }
+        else if( pProxy->GetClsid() ==
+            clsid( CAuthentProxyK5Impl ) )
+        {
+            CK5AuthProxy* pkc = dynamic_cast
+                < CK5AuthProxy* >( pProxy );
+            if( pkc == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+
+            ret = pkc->MechSpecReq( nullptr,
+                oParams.GetCfg(), pResp );
+
+            if( ERROR( ret ) )
+                break;
+        }
+
+        BufPtr pToken;
+        CCfgOpener oResp( ( IConfigDb* )pResp );
+        ret = oResp.GetProperty( 0, pToken );
         if( ERROR( ret ) )
             break;
 
-        BufPtr pResp;
-        ret = oResp.GetProperty( 0, pResp );
-        if( ERROR( ret ) )
-            break;
-
-        if( pResp->GetDataType() != DataTypeMem )
+        if( pToken->GetDataType() != DataTypeMem )
         {
             ret = -EINVAL;
             break;
         }
 
-        if( pResp->empty() )
+        if( pToken->empty() ||
+            pToken->size() < sizeof( guint32 ) )
         {
             ret = ERROR_FAIL;
             break;
         }
 
+        dwSize = htonl(
+            *( guint32* )pToken->ptr() );
+
+        if( dwSize != pToken->size() -
+            sizeof( guint32 ) )
+        {
+            ret = -EBADMSG;
+            break;
+        }
+
         *reply_out = ( krb5_data* )calloc( 1,
-            sizeof( krb5_data ) + pResp->size() );
+            sizeof( krb5_data ) );
 
         if( reply_out == nullptr )
         {
@@ -627,11 +664,14 @@ krb5_error_code CInitHookMap::Krb5SendHook(
 
         krb5_data* pdata = *reply_out;
         pdata->magic = KV5M_DATA;
-        pdata->length = pResp->size();
-        pdata->data = ( char* )&pdata[ 1 ];
+        pdata->length = pToken->size() -
+            sizeof( guint32 );
+
+        pdata->data = ( char* )malloc( pdata->length );
 
         memcpy( pdata->data,
-            pResp->ptr(), pResp->size() );
+            pToken->ptr() + sizeof( guint32 ),
+            pToken->size() );
 
     }while( 0 );
 
@@ -879,13 +919,11 @@ CK5AuthProxy::CK5AuthProxy(
 bool CK5AuthProxy::IsConnected(
     const char* szDestAddr )
 {
-    gint32 ret = super::IsConnected(
-        szDestAddr );
-    if( ERROR( ret ) )
+    if( !super::IsConnected( szDestAddr ) )
         return false;
 
     if( m_pParent.IsEmpty() )
-        return false;
+        return true;
 
     CRpcServices* pSvc = m_pParent;
     if( pSvc == nullptr )

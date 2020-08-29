@@ -304,6 +304,9 @@ struct IAuthenticateServer : public IAuthenticate
     virtual gint32 IsNoEnc(
         const std::string& strSess ) = 0;
 
+    virtual gint32 IsSessExpired(
+        const std::string& strSess ) = 0;
+
 };
 
 class CAuthentServer:
@@ -369,6 +372,9 @@ class CAuthentServer:
     gint32 RemoveSession(
         const std::string& strSess );
 
+    virtual gint32 IsSessExpired(
+        const std::string& strSess );
+
     virtual gint32 GetSess(
         guint32 dwPortId,
         std::string& strSess );
@@ -426,11 +432,45 @@ class CRpcReqForwarderProxyAuth :
         IEventSink* pCallback );
 };
 
+class CRpcTcpBridgeProxyAuth :
+    public CRpcTcpBridgeProxy
+{
+    CCfgOpener m_oSecCtx;
+
+    gint32 OnEnableComplete(
+        IEventSink* pCallback,
+        IEventSink* pIoReq,
+        IConfigDb* pReqCtx );
+
+    gint32 EnableInterfaces();
+
+    public:
+    typedef CRpcTcpBridgeProxy super;
+    CRpcTcpBridgeProxyAuth(
+        const IConfigDb* pCfg ) :
+        CAggInterfaceProxy( pCfg ),
+        super( pCfg )
+    {;}
+
+    gint32 SetSessHash(
+        const std::string& strHash,
+        bool bEncrypt );
+
+    virtual gint32 OnPostStart(
+        IEventSink* pCallback );
+
+    gint32 OnPostStop(
+        IEventSink* pCallback );
+
+    bool IsKdcChannel();
+};
+
 class CRpcTcpBridgeAuth :
     public CRpcTcpBridge
 {
     CCfgOpener m_oSecCtx;
     TaskletPtr m_pLoginTimer;
+    TaskletPtr m_pSessChecker;
 
     gint32 OnLoginFailed(
         IEventSink* pCallback );
@@ -499,6 +539,9 @@ class CRpcTcpBridgeAuth :
         IEventSink* pCallback );
 
     bool IsKdcChannel();
+
+    gint32 CheckSessExpired(
+        const std::string& strsess );
 };
 
 class CRpcReqForwarderAuth :
@@ -639,6 +682,9 @@ struct CRpcRouterAuthShared
                 propRouterPath, "/" );
 
             oParams.SetIntProp(
+                propIid, iid( IAuthenticate ) );
+
+            oParams.SetIntProp(
                 propPortId, 0xffffffff );
 
             ret = pMatch.NewObj(
@@ -730,6 +776,7 @@ class CRpcRouterReqFwdrAuth :
         const IConfigDb* pConn1,
         const IConfigDb* pConn2 );
 
+    using CRpcRouter::GetBridgeProxy;
     virtual gint32 GetBridgeProxy(
         const IConfigDb* pConnParams,
         InterfPtr& pIf );
@@ -738,8 +785,6 @@ class CRpcRouterReqFwdrAuth :
         guint32 dwPortId,
         const std::string& strSrcUniqName,
         const std::string& strSrcDBusName );
-
-    using CRpcRouter::GetBridgeProxy;
 };
 
 class CRpcRouterBridgeAuth :
@@ -776,32 +821,11 @@ class CRpcRouterBridgeAuth :
 
     virtual gint32 OnPostStart(
         IEventSink* pCallback );
-};
 
-class CRpcTcpBridgeProxyAuth :
-    public CRpcTcpBridgeProxy
-{
-    CCfgOpener m_oSecCtx;
-
-    public:
-    typedef CRpcTcpBridgeProxy super;
-    CRpcTcpBridgeProxyAuth(
-        const IConfigDb* pCfg ) :
-        CAggInterfaceProxy( pCfg ),
-        super( pCfg )
-    {;}
-
-    gint32 SetSessHash(
-        const std::string& strHash,
-        bool bEncrypt );
-
-    virtual gint32 OnPostStart(
-        IEventSink* pCallback );
-
-    gint32 OnPostStop(
-        IEventSink* pCallback );
-
-    bool IsKdcChannel();
+    gint32 OnStartRfpaComplete(
+        IEventSink* pCallback,
+        IEventSink* pIoReq,
+        IConfigDb* pReqCtx );
 };
 
 DECLARE_AGGREGATED_PROXY(

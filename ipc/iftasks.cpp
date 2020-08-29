@@ -1387,10 +1387,6 @@ gint32 CIfTaskGroup::RunTask()
         SetTaskState( stateStarted );
         SetRunning();
     }
-    else if( iState == stateStopped )
-    {
-        return ERROR_STATE;
-    }
     else if( !IsRunning() &&
         iState == stateStarted )
     {
@@ -1622,19 +1618,25 @@ gint32 CIfTaskGroup::Process(
 {
     gint32 ret = 0;
 
-    {
-        CStdRTMutex oTaskLock( GetLock() );
-        CCfgOpener oCfg( ( IConfigDb* )GetConfig() );
-        guint32 dwCtx = 0;
+    CStdRTMutex oTaskLock( GetLock() );
 
-        ret = oCfg.GetIntProp(
-            propContext, dwCtx );
+    if( GetTaskState() == stateStopped )
+        return ERROR_STATE;
 
-        // override the original dwContext if there is
-        // a propContext property in the config
-        if( SUCCEEDED( ret ) )
-            dwContext = dwCtx;
-    }
+    CCfgOpener oCfg(
+        ( IConfigDb* )GetConfig() );
+
+    guint32 dwCtx = 0;
+
+    ret = oCfg.GetIntProp(
+        propContext, dwCtx );
+
+    // override the original dwContext if there is
+    // a propContext property in the config
+    if( SUCCEEDED( ret ) )
+        dwContext = dwCtx;
+
+    oTaskLock.Unlock();
 
     ret = super::Process( dwContext );
 
@@ -1659,8 +1661,7 @@ gint32 CIfTaskGroup::WaitingToCancel(
             iRetry--;
         }
 
-        if( pTask->GetError() ==
-            STATUS_PENDING )
+        if( pTask->GetError() == STATUS_PENDING )
         {
             ( *pTask )( eventCancelTask );
         }
@@ -1677,9 +1678,6 @@ gint32 CIfTaskGroup::OnCancel(
         CStdRTMutex oTaskLock( GetLock() );
         CCfgOpener oCfg(
             ( IConfigDb* )GetConfig() );
-
-        if( GetTaskState() == stateStopped )
-            return ERROR_STATE;
 
         if( IsCanceling() )
         {
@@ -1707,10 +1705,12 @@ gint32 CIfTaskGroup::OnCancel(
         oCfg[ propNoResched ] = true;
 
         TaskletPtr pHead;
+        bool bPopd = false;
         if( m_queTasks.front()->IsInProcess() )
         {
             pHead = m_queTasks.front();
             PopTask();
+            bPopd = true;
         }
 
         do{
@@ -1732,7 +1732,10 @@ gint32 CIfTaskGroup::OnCancel(
 
         if( !pHead.IsEmpty() )
         {
-            m_queTasks.push_back( pHead );
+            if( bPopd &&
+                pHead->GetError() == STATUS_PENDING )
+                m_queTasks.push_back( pHead );
+
             oTaskLock.Unlock();
 
             WaitingToCancel( pHead );
@@ -1759,6 +1762,10 @@ gint32 CIfTaskGroup::OnCancel(
 
 gint32 CIfTaskGroup::OnComplete( gint32 iRet )
 {
+    CStdRTMutex oTaskLock( GetLock() );
+    if( GetTaskState() == stateStopped )
+        return ERROR_STATE;
+
     gint32 ret = super::OnComplete( iRet );
     SetTaskState( stateStopped );
     return ret;
@@ -1938,8 +1945,12 @@ gint32 CIfRootTaskGroup::OnChildComplete(
                 // an active canceling is going on from
                 // anther thread while an async task
                 // completion happens
-                ret = ERROR_STATE;
-                break;
+                // fall through, if we are here, the
+                // caller task will stop soon, the
+                // canceling task is still waiting.
+                // we need to get the task popped,
+                // otherwise, the task will be 
+                // called in a infinite loop 
             }
             else
             {
@@ -2351,12 +2362,6 @@ gint32 CIfParallelTaskGrp::RunTask()
         {
             SetTaskState( stateStarted );
             SetRunning();
-        }
-        else if( iState == stateStopped )
-        {
-            oCfg.RemoveProperty( propNoResched );
-            ret = ERROR_STATE;
-            break;
         }
         else if( !IsRunning() &&
             iState == stateStarted )

@@ -903,6 +903,121 @@ class CConnParamsProxy : public CConnParams
         super( rhs )
     {}
 
+    bool LessAuth( const CConnParamsProxy& rhs ) const
+    {
+        bool ret = 0;
+        do{
+            IConfigDb* pAuth1 = nullptr;
+            IConfigDb* pAuth2 = nullptr;
+
+            CCfgOpener oConn1( GetCfg() );
+            CCfgOpener oConn2( rhs.GetCfg() );
+
+            oConn1.GetPointer(
+                propAuthInfo, pAuth1 );
+
+            oConn2.GetPointer(
+                propAuthInfo, pAuth2 );
+
+            if( pAuth1 == pAuth2 )
+            {
+                ret = false;
+                break;
+            }
+
+            if( pAuth1 == nullptr &&
+                pAuth2 != nullptr )
+            {
+                ret = true;
+                break;
+            }
+
+            if( pAuth1 != nullptr &&
+                pAuth2 == nullptr )
+            {
+                ret = false;
+                break;
+            }
+
+            std::string strVal1, strVal2;
+
+            CCfgOpener oAuth1( pAuth1 );
+            CCfgOpener oAuth2( pAuth2 );
+
+            oAuth1.GetStrProp(
+                propAuthMech, strVal1 );
+
+            oAuth2.GetStrProp(
+                propAuthMech, strVal2 );
+
+            if( strVal1 < strVal2 )
+            {
+                ret = true;
+                break;
+            }
+
+            if( strVal1 > strVal2 )
+            {
+                ret = false;
+                break;
+            }
+
+            if( strVal1 == "krb5" )
+            {
+                oAuth1.GetStrProp(
+                    propUserName, strVal1 );
+
+                oAuth2.GetStrProp(
+                    propUserName, strVal2 );
+
+                if( strVal1 < strVal2 )
+                {
+                    ret = true;
+                    break;
+                }
+
+                if( strVal1 > strVal2 )
+                {
+                    ret = false;
+                    break;
+                }
+
+                oAuth1.GetStrProp(
+                    propRealm, strVal1 );
+
+                oAuth2.GetStrProp(
+                    propRealm, strVal2 );
+
+                std::transform( strVal1.begin(),
+                    strVal1.end(), strVal1.begin(),
+                    []( unsigned char c )
+                    { return std::tolower( c ); } );
+
+                std::transform( strVal2.begin(),
+                    strVal2.end(), strVal2.begin(),
+                    []( unsigned char c )
+                    { return std::tolower( c ); } );
+
+                if( strVal1 < strVal2 )
+                {
+                    ret = true;
+                    break;
+                }
+
+                if( strVal1 > strVal2 )
+                {
+                    ret = false;
+                    break;
+                }
+            }
+
+            ret = false;
+
+        }while( 0 );
+
+        return ret;   
+    }
+
     bool less(const CConnParamsProxy& rhs ) const
     {
         bool ret = false;
@@ -1004,7 +1119,23 @@ class CConnParamsProxy : public CConnParams
                     break;
                 }
             }
-            ret = false;
+
+            bool bAuth1 = HasAuth();
+            bool bAuth2 = rhs.HasAuth();
+            if( !bAuth1 && bAuth2 )
+            {
+                ret = true;
+                break;
+            }
+
+            if( ( bAuth1 && !bAuth2 ) ||
+                ( !bAuth1 && !bAuth2 ) )
+            {
+                ret = false;
+                break;
+            }
+
+            ret = LessAuth( rhs );
 
         }while( 0 );
 

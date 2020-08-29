@@ -38,6 +38,9 @@ class CKdcRelayPdo :
     {
         SetClassId( clsid( CKdcRelayPdo ) );
     }
+
+    gint32 OnStmSockEvent(
+        STREAM_SOCK_EVENT& sse );
 };
 
 class CKdcRelayFdoDrv : public CRpcTcpFidoDrv

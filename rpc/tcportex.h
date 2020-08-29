@@ -624,12 +624,14 @@ class CTcpStreamPdo2 : public CPort
     SockPtr m_pConnSock;
 
     std::deque< IrpPtr > m_queWriteIrps;
-    std::deque< IrpPtr >  m_queListeningIrps;
     std::deque< STREAM_SOCK_EVENT > m_queEvtToRecv;
 
     CBytesSender m_oSender;
 
     gint32 SendImmediate( gint32 iFd, PIRP pIrp );
+
+    protected:
+    std::deque< IrpPtr >  m_queListeningIrps;
 
     public:
 
@@ -683,7 +685,7 @@ class CTcpStreamPdo2 : public CPort
     gint32 OnReceive( gint32 iFd );
     gint32 OnSendReady( gint32 iFd );
 
-    gint32 OnStmSockEvent(
+    virtual gint32 OnStmSockEvent(
         STREAM_SOCK_EVENT& sse );
 
     gint32 OnDisconnected();

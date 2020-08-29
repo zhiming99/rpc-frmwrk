@@ -1285,7 +1285,7 @@ gint32 CRpcReqForwarder::OnModOfflineInternal(
                 if( ERROR( ret ) )
                     continue;
 
-                CRpcTcpBridgeProxyImpl* pBdgePrxy =
+                CRpcTcpBridgeProxy* pBdgePrxy =
                     pProxy;
 
                 if( pBdgePrxy == nullptr )
