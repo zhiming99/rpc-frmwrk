@@ -1,7 +1,7 @@
 # rpc-frmwrk
 
-这是一个嵌入式的RPC框架项目，关注于跨网络，跨协议，跨平台的互联互通。本项目欢迎有兴趣的人士加入!   
-This is an asynchronous and event-driven RPC framework for embeded system with small system footprint. It is targeting at the IOT platforms, high-throughput, and high availability over hybrid network. Welcome to join!  
+这是一个嵌入式的RPC实现关注于跨网络，跨协议，跨平台的互联互通。本项目欢迎有兴趣的人士加入!   
+This is an asynchronous and event-driven RPC implementation for embeded system with small system footprint. It is targeting at the IOT platforms, high-throughput, and high availability over hybrid network. Welcome to join!  
 
 #### Concept
 [`Here`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md) is an introduction about some concepts that help to understand this project.
