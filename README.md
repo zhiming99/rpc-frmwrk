@@ -1,6 +1,6 @@
 # rpc-frmwrk
 
-这是一个嵌入式的RPC实现关注于跨网络，跨协议，跨平台的互联互通。本项目欢迎有兴趣的人士加入!   
+这是一个嵌入式的RPC实现，关注于跨网络，跨协议，跨平台的互联互通。本项目欢迎有兴趣的人士加入!   
 This is an asynchronous and event-driven RPC implementation for embeded system with small system footprint. It is targeting at the IOT platforms, high-throughput, and high availability over hybrid network. Welcome to join!  
 
 #### Concept
