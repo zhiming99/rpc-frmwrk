@@ -32,12 +32,15 @@ This framework depends on the following packags to build:
 12. [`Secure Socket Layer (SSL) support`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/sslport/Readme.md)
 13. [`Websocket support`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/wsport/Readme.md)
 14. [`Object access via Multihop routing`](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support)
-15. `Authentication and Access control` support. ( Coming... )
+15. `Authentication with Kerberos 5`. ( In a few days... )
 
 #### Building `rpc-frmwrk`:   
 Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60) for details.
 
 ---
+[`Wed 02 Sep 2020 07:30:53 PM Beijing`]   
+1. fixed many bugs, and the test case `sftest` has passed. There are still some test cases to go. Kerberos support is almost ready.
+
 [`Tue 25 Aug 2020 08:19:12 PM Beijing`]   
 1. `kinit` now works with rpc-frmwrk through the rpc connection, that is, if the kerberos kdc is behind the firewall, and not open to the internet, the client still has a way to get authenticated.   
 
