@@ -181,7 +181,6 @@ gint32 CKrb5InitHook::StopProxy()
         // stop the server
         ret = pIf->Stop();
         m_pProxy.Clear();
-        m_pMgr.Clear();
 
     }while( 0 );
 

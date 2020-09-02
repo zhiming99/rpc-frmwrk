@@ -362,7 +362,7 @@ gint32 CMyFileProxy::OnCloseChannel_Loop(
             break;
         ret = pLoop->GetError();
         if( ret == STATUS_PENDING )
-            ret = 0;
+            pLoop->SetError( 0 );
 
     }while( 0 );
 
