@@ -30,6 +30,8 @@
 #include "security.h"
 #include "k5proxy.h"
 
+#define MAX_NUM_CHECK   8640000
+
 gint32 CRpcTcpBridgeAuth::OnLoginTimeout(
     IEventSink* pCallback,
     IEventSink* pIoReq,
@@ -457,6 +459,11 @@ gint32 CRpcTcpBridgeAuth::SetSessHash(
         // espacially the stream interfaces
 
         EnableInterfaces();
+        if( IsKdcChannel() )
+        {
+            ret = 0;
+            break;
+        }
 
         // set the session checker
         ret = DEFER_IFCALLEX_NOSCHED(
@@ -475,8 +482,13 @@ gint32 CRpcTcpBridgeAuth::SetSessHash(
         }
 
         CCfgOpenerObj oTaskCfg( pRetryTask );
-        oTaskCfg.SetIntProp( propRetries, 8640000 );
-        oTaskCfg.SetIntProp( propIntervalSec, 60 );
+
+        oTaskCfg.SetIntProp(
+            propRetries, MAX_NUM_CHECK );
+
+        oTaskCfg.SetIntProp(
+            propIntervalSec, 60 );
+
         this->AddAndRun( m_pSessChecker );
 
     }while( 0 );
@@ -568,8 +580,8 @@ gint32 CRpcTcpBridgeAuth::OnLoginFailed(
         IConfigDb* pReqCtx = oReqCtx.GetCfg();
         // stop the tcp port
         pRouter->OnEvent( eventRmtSvrOffline,
-            PortToHandle( pPdo ),
-            0, ( LONGWORD* )pReqCtx );
+            ( LONGWORD )pReqCtx, 0,
+            ( LONGWORD* )PortToHandle( pPdo ) );
 
     }while( 0 );
 
@@ -961,6 +973,21 @@ gint32 CRpcTcpBridgeAuth::CheckSessExpired(
 {
     gint32 ret = 0;
     do{
+        CCfgOpenerObj oCfg(
+            ( CObjBase* )m_pSessChecker );
+
+        guint32 dwRetries;
+        ret = oCfg.GetIntProp(
+            propRetries, dwRetries );
+        if( ERROR( ret ) )
+            break;
+
+        if( dwRetries == MAX_NUM_CHECK )
+        {
+            ret = STATUS_MORE_PROCESS_NEEDED;
+            break;
+        }
+
         CAuthentServer* pAuth =
             ObjPtr( GetParent() );
 
@@ -971,14 +998,19 @@ gint32 CRpcTcpBridgeAuth::CheckSessExpired(
         }
 
         ret = pAuth->IsSessExpired( strSess );
-        if( ret != ERROR_FALSE )
+        if( SUCCEEDED( ret ) || ret == ERROR_FAIL )
         {
             OnLoginFailed( nullptr );
-            ret = STATUS_SUCCESS;
+            ret = 0;
         }
-        else
+        else if( ret == ERROR_FALSE )
         {
             ret = STATUS_MORE_PROCESS_NEEDED;
+        }
+        else if( ret == -ENOENT )
+        {
+            // no such a session
+            break;
         }
 
     }while( 0 );

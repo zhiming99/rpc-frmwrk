@@ -1085,10 +1085,6 @@ gint32 CRouterStartReqFwdrProxyTask::RunTask()
         }
         else
         {
-            CRpcRouterBridge* pRouter =
-                static_cast< CRpcRouterBridge* >
-                    ( pIf->GetParent() );
-
             CStdRMutex oIfLock( pIf->GetLock() );
             CStdRMutex oRouterLock(
                 pRouter->GetLock() );

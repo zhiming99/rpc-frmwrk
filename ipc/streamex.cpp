@@ -1109,12 +1109,13 @@ gint32 CReadWriteWatchTask::operator()(
     guint32 dwContext )
 {
     gint32 ret = 0;
+    gint32 iRet = G_SOURCE_CONTINUE;
     do{
         std::vector< LONGWORD > vecParams;
         ret = GetParamList( vecParams );
         if( ERROR( ret ) )
         {
-            ret = G_SOURCE_REMOVE;
+            iRet = G_SOURCE_REMOVE;
             break;
         }
 
@@ -1129,7 +1130,7 @@ gint32 CReadWriteWatchTask::operator()(
 
         if( ERROR( ret ) )
         {
-            ret = G_SOURCE_REMOVE;
+            iRet = G_SOURCE_REMOVE;
             break;
         }
 
@@ -1140,11 +1141,11 @@ gint32 CReadWriteWatchTask::operator()(
             eventIoWatch, dwCond, 0, 0 );
 
         if( ERROR( ret ) )
-            ret = G_SOURCE_REMOVE;
+            iRet = G_SOURCE_REMOVE;
         else
-            ret = G_SOURCE_CONTINUE;
+            iRet = G_SOURCE_CONTINUE;
 
     }while( 0 );
 
-    return SetError( ret );
+    return SetError( iRet );
 }

@@ -523,6 +523,11 @@ class CMyFileServerBase :
                     ret = -errno;
                     break;
                 }
+                else if( iSize == 0 )
+                {
+                    ret = -ENODATA;
+                    break;
+                }
 
                 guint32 qwReqSize = ptctx->m_qwStart +
                     ptctx->m_dwReqSize;

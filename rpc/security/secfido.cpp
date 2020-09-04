@@ -237,7 +237,10 @@ gint32 CRpcSecFido::DoEncrypt(
 
             if( pPayload.IsEmpty() ||
                 pPayload->empty() )
-                continue;
+            {
+                ret = -EBADMSG;
+                break;
+            }
 
             pInBuf->Append( pPayload->ptr(),
                 pPayload->size() );
@@ -254,7 +257,7 @@ gint32 CRpcSecFido::DoEncrypt(
         }
         else if( pInBuf->size() <= dwHdrSize )
         {
-            ret = -ENOMEM;
+            ret = -ENODATA;
             break;
         }
 
@@ -634,6 +637,19 @@ gint32 CRpcSecFido::DecryptPkt(
     if( pInBuf->size() < dwHdrSize )
         return -EINVAL;
 
+#ifndef DEBUG
+    bool bEncExpected = true;
+    ret = EncEnabled();
+    if( ERROR( ret ) )
+        bEncExpected = false;
+
+    if( bEncExpected != bEncrypted )
+    {
+        ret = -EACCES;
+        break;
+    }
+#endif
+
     if( !bEncrypted )
     {
         pInBuf->SetOffset(
@@ -782,7 +798,13 @@ gint32 CRpcSecFido::CompleteListeningIrp(
             IPort* pPort = GetLowerPort();
             ret = pPort->SubmitIrp( pIrp );
             if( SUCCEEDED( ret ) )
+            {
+                pTopCtx = pIrp->GetTopStack();
+                pRespBuf = pTopCtx->m_pRespData;
+                psse = ( STREAM_SOCK_EVENT* )
+                    pRespBuf->ptr();
                 continue;
+            }
 
             if( ret == STATUS_PENDING )
                 break;
