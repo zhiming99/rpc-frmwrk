@@ -1,7 +1,7 @@
 # rpc-frmwrk
 
-这是一个嵌入式的RPC框架项目，关注于跨网络，跨协议，跨平台的互联互通。本项目欢迎有兴趣的人士加入!   
-This is an asynchronous and event-driven RPC framework for embeded system with small system footprint. It is targeting at the IOT platforms, high-throughput, and high availability over hybrid network. Welcome to join!  
+这是一个嵌入式的RPC实现，关注于跨网络，跨协议，跨平台的互联互通。本项目欢迎有兴趣的人士加入!   
+This is an asynchronous and event-driven RPC implementation for embeded system with small system footprint. It is targeting at the IOT platforms, high-throughput, and high availability over hybrid network. Welcome to join!  
 
 #### Concept
 [`Here`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md) is an introduction about some concepts that help to understand this project.
@@ -32,12 +32,15 @@ This framework depends on the following packags to build:
 12. [`Secure Socket Layer (SSL) support`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/sslport/Readme.md)
 13. [`Websocket support`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/wsport/Readme.md)
 14. [`Object access via Multihop routing`](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support)
-15. `Authentication and Access control` support. ( Coming... )
+15. `Authentication support with Kerberos 5`. ( In a few days... )
 
 #### Building `rpc-frmwrk`:   
 Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60) for details.
 
 ---
+[`Wed 02 Sep 2020 07:30:53 PM Beijing`]   
+1. fixed many bugs, and the test case `sftest` has passed. There are still some test cases to go. Kerberos support is almost ready.
+
 [`Tue 25 Aug 2020 08:19:12 PM Beijing`]   
 1. `kinit` now works with rpc-frmwrk through the rpc connection, that is, if the kerberos kdc is behind the firewall, and not open to the internet, the client still has a way to get authenticated.   
 
