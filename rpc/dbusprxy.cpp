@@ -38,6 +38,17 @@
 
 using namespace std;
 
+#define IS_AUTH_PROXY( _pPort ) \
+({ \
+    bool bOpenPort; \
+    CCfgOpenerObj _oPortCfg( _pPort ); \
+    gint32 iRet = _oPortCfg.GetBoolProp( \
+        propOpenPort, bOpenPort ); \
+    if( ERROR( iRet ) ) \
+        bOpenPort = false; \
+    m_bAuth && bOpenPort; \
+})
+
 CConnParamsProxy GetConnParams(
     const CObjBase* pObj )
 {
@@ -639,21 +650,13 @@ gint32 CDBusProxyPdo::HandleConnRequest(
         else
             strCmd = SYS_METHOD_CLOSERMTPORT;
 
-        if( m_bAuth )
+        if( !IS_AUTH_PROXY( this ) )
         {
-            bool bOpenPort = false;
-            ret = oPortCfg.GetBoolProp(
-                propOpenPort, bOpenPort );
-            if( ERROR( ret ) || !bOpenPort )
-            {
-                strCmd = SYS_METHOD_LOCALLOGIN;
-                // the method is from an interface
-                // other than IFNAME_REQFORWARDER
-                strIf = DBUS_IF_NAME(
-                    IFNAME_REQFORWARDERAUTH );
-            }
-
-            ret = 0;
+            strCmd = SYS_METHOD_LOCALLOGIN;
+            // the method is from an interface
+            // other than IFNAME_REQFORWARDER
+            strIf = DBUS_IF_NAME(
+                IFNAME_REQFORWARDERAUTH );
         }
         
         oParams.SetStrProp( propMethodName, strCmd );
@@ -1860,6 +1863,13 @@ gint32 CDBusProxyPdo::OnRmtSvrOnOffline(
             ret = CancelAllIrps( -ENOTCONN );
 
         EnumEventId eventId = eventRmtSvrOffline;
+        if( IS_AUTH_PROXY( this ) )
+        {
+            // if we are within the router, don't
+            // send out the eventRmtSvrOffline
+            // again.
+            eventId = eventConnErr;
+        }
 
         if( bOnline )
             eventId = eventRmtSvrOnline;

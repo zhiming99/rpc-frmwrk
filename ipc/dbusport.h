@@ -1102,6 +1102,17 @@ class CConnParamsProxy : public CConnParams
             }
 
             bVal1 = IsWebSocket();
+            bVal2 = rhs.IsWebSocket();
+            if( bVal1 < bVal2 )
+            {
+                ret = true;
+                break;
+            }
+            else if( bVal1 > bVal2 )
+            {
+                ret = false;
+                break;
+            }
             if( bVal1 > 0 )
             {
                 // reverse proxy
@@ -1113,11 +1124,24 @@ class CConnParamsProxy : public CConnParams
                     ret = true;
                     break;
                 }
-                if( strUrl2 < strUrl1)
+                if( strUrl2 < strUrl1 )
                 {
                     ret = false;
                     break;
                 }
+            }
+
+            bVal1 = IsSSL();
+            bVal2 = rhs.IsSSL();
+            if( bVal1 < bVal2 )
+            {
+                ret = true;
+                break;
+            }
+            else if( bVal1 > bVal2 )
+            {
+                ret = false;
+                break;
             }
 
             bool bAuth1 = HasAuth();
