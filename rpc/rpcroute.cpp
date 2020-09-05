@@ -113,11 +113,6 @@ gint32 CRpcRouter::IsEqualConn(
         if( ERROR( ret ) )
             break;
 
-        ret = oCfg.IsEqualProp(
-            propCompress, pConn2 );
-        if( ERROR( ret ) )
-            break;
-
     }while( 0 );
     if( ERROR( ret ) )
         ret = ERROR_FALSE;

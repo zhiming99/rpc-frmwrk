@@ -2531,6 +2531,8 @@ gint32 CRpcReqForwarderAuth::BuildStartAuthProxyTask(
         CIfRetryTask* pStart = pStartIfTask;
         pStart->SetClientNotify( pRespCb );
         pTaskGrp->AppendTask( pStartIfTask );
+        // force to call the callback all the time
+        pStart->MarkPending();
 
         // just to check if the token exchange is
         // done. if failed, the invoke task will
@@ -2550,6 +2552,8 @@ gint32 CRpcReqForwarderAuth::BuildStartAuthProxyTask(
             break;
 
         pTaskGrp->AppendTask( pLoginTask );
+        // force to call the callback all the time
+        pLoginTask->MarkPending();
 
         TaskletPtr pLoginComp;
         ret = DEFER_IFCALLEX2_NOSCHED2(

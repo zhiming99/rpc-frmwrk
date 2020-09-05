@@ -886,6 +886,43 @@ gint32 CK5AuthProxy::InitEnvRouter(
     return 0;
 }
 
+gint32 CK5AuthProxy::OnEvent(
+    EnumEventId iEvent,
+    LONGWORD dwParam1,
+    LONGWORD dwParam2,
+    LONGWORD* pData )
+{
+    gint32 ret = 0;
+    do{
+        if( iEvent != eventConnErr )
+        {
+            ret = super::OnEvent( iEvent,
+                dwParam1, dwParam2, pData );
+            break;
+        }
+
+        HANDLE hPort = ( HANDLE )pData;
+        if( hPort != GetPortHandle() )
+            break;
+
+        TaskletPtr pStopTask;
+        ret = DEFER_IFCALLEX_NOSCHED2(
+            0, pStopTask, ObjPtr( this ),
+            &CRpcServices::Shutdown,
+            nullptr );
+        if( ERROR( ret ) )
+            break;
+
+        GetIoMgr()->RescheduleTask(
+            pStopTask );
+
+        break;
+
+    }while( 0 );
+
+    return 0;
+}
+
 CK5AuthProxy::CK5AuthProxy(
     const IConfigDb* pCfg ) :
     super( pCfg )

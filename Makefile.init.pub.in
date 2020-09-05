@@ -71,21 +71,26 @@ endif
 	DBG_DIR := debug
 	RLS_DIR := release
 endif
+
+ifneq ($(SYSROOT),)
+PKGCONFIGPATH=$(shell find $(SYSROOT) -name pkgconfig | tr "\n" ":" )
+else
+PKGCONFIGPATH=$(shell find /usr/$(LIB_DIR) -name pkgconfig | tr "\n" ":")
+endif
+
 USER_LIB_PREFIX := $(ROOTFS)/usr/$(LIB_DIR)$(DIR_SUFFIX_ARCH)
 LIB_PREFIX := $(ROOTFS)/$(LIB_DIR)$(DIR_SUFFIX_ARCH)
 
+COMMON_INCLUDE:=$(shell PKG_CONFIG_PATH=$(PKGCONFIGPATH) pkg-config --define-variable=prefix=$(ROOTFS)/usr --cflags glib-2.0 dbus-1 jsoncpp openssl mit-krb5)
+
 C_INCLUDE := -I$(BASE)/include \
-	-I$(ROOTFS)/usr/include/glib-2.0 \
-	-I$(USER_LIB_PREFIX)/glib-2.0/include \
-	-I$(ROOTFS)/usr/include/dbus-1.0 \
-	-I$(USER_LIB_PREFIX)/dbus-1.0/include \
+	$(COMMON_INCLUDE) \
 	-I$(ROOTFS)/usr/include @INCLUDES@
 
 ifeq ($(ARCH),arm)
 	WIDTH_FLAG := -marm
-	C_INCLUDE += -I$(ROOTFS)/usr/include$(DIR_SUFFIX_ARCH) \
-		-I$(ROOTFS)/usr/include/jsoncpp/ \
-
+	SSLCONF:=$(dir $(shell dirname $$(find $(ROOTFS) -name opensslconf.h | head -n 1)))
+	C_INCLUDE += -I$(SSLCONF)
 	C_DEFINES += -DARM
 #-D_GLIBCXX_USE_CXX11_ABI=1
 endif
@@ -123,7 +128,9 @@ else ifeq ($(ARCH), arm)
 endif
 
 CPP_FLAGS := $(CPPFLAGS) -std=c++11 $(WIDTH_FLAG) -Wno-psabi 
-LINKER_OPTION := -shared $(WIDTH_FLAG) -L$(USER_LIB_PREFIX) -L$(LIB_PREFIX) -Wl,-rpath=$(USER_LIB_PREFIX) -Wl,-rpath=$(LIB_PREFIX) -ldbus-1 -ljsoncpp -ldl -lstdc++ -lpthread
+#LINKER_OPTION := -shared $(WIDTH_FLAG) -L$(USER_LIB_PREFIX) -L$(LIB_PREFIX) -Wl,-rpath=$(USER_LIB_PREFIX) -Wl,-rpath=$(LIB_PREFIX) -ldbus-1 -ljsoncpp -ldl -lstdc++ -lpthread
+COMMON_LINK=$(shell PKG_CONFIG_PATH=$(PKGCONFIGPATH) pkg-config --define-variable=prefix=$(ROOTFS)/usr --libs-only-L glib-2.0 dbus-1 jsoncpp openssl mit-krb5)
+LINKER_OPTION := -shared $(WIDTH_FLAG) $(COMMON_LINK) -ldl -lstdc++ -lpthread
 
 ifeq ($(ARCH),arm)
 LINKER_OPTION += --sysroot=$(ROOTFS)
