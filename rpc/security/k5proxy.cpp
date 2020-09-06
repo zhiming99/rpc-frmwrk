@@ -886,43 +886,6 @@ gint32 CK5AuthProxy::InitEnvRouter(
     return 0;
 }
 
-gint32 CK5AuthProxy::OnEvent(
-    EnumEventId iEvent,
-    LONGWORD dwParam1,
-    LONGWORD dwParam2,
-    LONGWORD* pData )
-{
-    gint32 ret = 0;
-    do{
-        if( iEvent != eventConnErr )
-        {
-            ret = super::OnEvent( iEvent,
-                dwParam1, dwParam2, pData );
-            break;
-        }
-
-        HANDLE hPort = ( HANDLE )pData;
-        if( hPort != GetPortHandle() )
-            break;
-
-        TaskletPtr pStopTask;
-        ret = DEFER_IFCALLEX_NOSCHED2(
-            0, pStopTask, ObjPtr( this ),
-            &CRpcServices::Shutdown,
-            nullptr );
-        if( ERROR( ret ) )
-            break;
-
-        GetIoMgr()->RescheduleTask(
-            pStopTask );
-
-        break;
-
-    }while( 0 );
-
-    return 0;
-}
-
 CK5AuthProxy::CK5AuthProxy(
     const IConfigDb* pCfg ) :
     super( pCfg )
@@ -1835,7 +1798,7 @@ gint32 gss_sess_hash_partial(
 
     OM_uint32       maj_stat, min_stat;
     gss_name_t      src_name, targ_name;
-    gss_buffer_desc sname, tname;
+    gss_buffer_desc sname = {0}, tname = {0};
     OM_uint32       lifetime;
     gss_OID         mechanism, name_type;   
     OM_uint32       context_flags;

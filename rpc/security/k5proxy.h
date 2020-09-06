@@ -170,9 +170,6 @@ class CRemoteProxyStateAuth :
     {
         std::vector< EnumPropId > vecEvtToSubscribe =
         {
-            propStartStopEvent,
-            propRmtSvrEvent,
-            propCustomEvent
         };
 
         return SubscribeEventsInternal(
@@ -358,13 +355,6 @@ class CK5AuthProxy :
         BufPtr& pInMic );/* [ in ] */
 
     gint32 InitPluginHook();
-    // methods to interface with the Krb plugins
-    // forward the request to the kdc
-    gint32 OnEvent(
-        EnumEventId iEvent,
-        LONGWORD dwParam1,
-        LONGWORD dwParam2,
-        LONGWORD* pData );
 };
 
 // auth/access control proxy implementation
