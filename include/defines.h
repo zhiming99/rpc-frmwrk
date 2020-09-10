@@ -111,6 +111,7 @@
 #define ERROR_USER_CANCEL       ( ( gint32 )0x8001000c )
 #define ERROR_PAUSED            ( ( gint32 )0x8001000d )
 #define ERROR_NOT_IMPL          ( ( gint32 )0x8001000e )
+#define ERROR_CANCEL_INSTEAD    ( ( gint32 )0x8001000f )
 
 // for flow control
 #define ERROR_QUEUE_FULL        ( ( gint32 )0x8001000e )
