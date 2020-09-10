@@ -21,18 +21,17 @@ This framework depends on the following packags to build:
 1. `Support for multiple interfaces on a single object (COM alike).`   
 2. `Support for synchronous/Asynchronous requests and handling.`   
 3. `Active canceling.`   
-4. `Server side event broadcasting.`   
+4. `Server-push events`   
 5. `Keep-alive for time-consuming request.`   
 6. `Pausable/Resumable interface.`
 7. `Support RPC from remote machine, local system, and in-process.` 
 8. `Transparent support for different types of remote communications.`
-9. `File/stream data transfer.`
-10. `Peer online/offline awareness.`
-11. `Streaming support to provide double-direction stream transfer`
-12. [`Secure Socket Layer (SSL) support`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/sslport/Readme.md)
-13. [`Websocket support`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/wsport/Readme.md)
-14. [`Object access via Multihop routing`](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support)
-15. `Authentication support with Kerberos 5`. ( In a few days... )
+9. `Peer online/offline awareness.`
+10. `Streaming support to provide double-direction stream transfer`
+11. [`Secure Socket Layer (SSL) support`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/sslport/Readme.md)
+12. [`Websocket support`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/wsport/Readme.md)
+13. [`Object access via Multihop routing`](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support)
+14. `Authentication support with Kerberos 5`. ( very soon... )
 
 #### Building `rpc-frmwrk`:   
 Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60) for details.
