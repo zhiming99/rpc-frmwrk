@@ -1,5 +1,5 @@
 ### Introduction to the rpc-frmwrk's Authentication support
-The authentication is the process to allow only valid person to access the rpc-frmwrk's service.
+The authentication process is the process to allow only valid users to access the rpc-frmwrk's service.
 Currently the rpc-frmwrk relies only on the `Kerberos 5` authentication framework. In the future, 
 we may add more authentication approaches besides the `Kerberos 5`.   
 
