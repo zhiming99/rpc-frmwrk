@@ -3009,14 +3009,12 @@ gint32 GetIidOfType( std::vector< guint32 >& vecIids, Type* pType )
                 ( *pTaskGrp )( eventCancelTask ); \
                 return ret; \
             } \
-            CIoManager* pMgr = this->GetIoMgr(); \
             CIfRetryTask* pTask = ObjPtr( pTaskGrp ); \
             auto tup = std::make_tuple( ARGS ); \
             pTask->SetClientNotify( std::get< _pos >( tup ) ); \
             TaskletPtr pGrp = ObjPtr( pTask ); \
-            ret = pMgr->RescheduleTask( pGrp ); \
-            if( SUCCEEDED( ret ) ) \
-                ret = pGrp->GetError(); \
+            ( *pTask )( eventZero ); \
+            ret = pTask->GetError(); \
         } \
         return ret; \
     }

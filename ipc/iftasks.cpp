@@ -1397,6 +1397,23 @@ gint32 CIfTaskGroup::RunTaskInternal(
             ret = STATUS_PENDING;
         }
 
+        if( ( m_queTasks.empty() ||
+            m_queTasks.front() != pTask ) &&
+            ret == STATUS_PENDING )
+        {
+            // the task has been removed from the
+            // queue. Recheck the task's error
+            // code, probably the return code
+            // changed before we have grabbed the
+            // lock
+            ret = pTask->GetError();
+            if( ret == STATUS_PENDING )
+            {
+                ret = ERROR_STATE;
+                m_vecRetVals.push_back( ret );
+            }
+        }
+
         if( ret == STATUS_PENDING )
             break;
 

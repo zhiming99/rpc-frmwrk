@@ -2539,10 +2539,6 @@ gint32 CRpcServices::OnPreStart(
 gint32 CRpcServices::OnPostStart(
     IEventSink* pCallback )
 {
-    if( GetClsid() == 2139 )
-    {
-        DebugPrint( 0, "CRpcReqForwarderProxy OnPostStart" );
-    }
     return 0;
 }
 
