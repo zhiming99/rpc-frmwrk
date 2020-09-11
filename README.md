@@ -38,7 +38,7 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 
 ---
 [`Fri 11 Sep 2020 08:25:18 PM Beijing`]   
-1. Encountered some concurrent bugs, and fixed some of them. There are still some bugs known to fix, which should be easier than the ones already fixed this week.   
+1. Encountered some concurrent bugs, and fixed some of them. There are still some bugs known to fix, which should be less difficult than the ones fixed this week.   
 
 [`Wed 02 Sep 2020 07:30:53 PM Beijing`]   
 1. fixed many bugs, and the test case `sftest` has passed. There are still some test cases to go. Kerberos support is almost ready.
