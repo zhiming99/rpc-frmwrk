@@ -13,3 +13,11 @@ beyond the list:
     services for the session.
  4. Credential management and key caches, including credential's lifecycle management,
     providing storage for keys and credentials.
+
+#### Setup Kerberos
+Please don't be scared, setup kerberos for authentication is not as difficult as you thought. And it can
+be deployed on a network as simple as with just two connected devices. Here are the steps to make Kerberos
+to work with `rpc-frmwrk` on such a simple network.
+  1. Setup a `kdc( Kerberos domain controller)`. You need to select one of your machines as the kdc server.
+  Depending on the linux distribution, the kerberos package name could be slightly different. On a Fedora
+  machine, for example, you can `dnf install krb5-server`, and dnf will install all the necessary packages.
