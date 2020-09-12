@@ -929,6 +929,9 @@ class CProxyMsgMatch : public CMessageMatch
             if( strVal != strEvtPath )
                 return ret;
 
+            if( strVal[ dwLen - 1 ] == '/' )
+                return STATUS_SUCCESS;
+
             if( strExpPath[ dwLen ] == '/' )
                 return STATUS_SUCCESS;
         }
