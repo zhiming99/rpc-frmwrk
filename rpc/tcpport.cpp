@@ -96,6 +96,7 @@ gint32 CRpcSocketBase::SetKeepAlive( bool bKeep )
 {
     gint32 ret = 0;
     gint32 val = bKeep;
+    gint32 interval = 120;
 
     do{
         if( m_iFd < 0 )
@@ -116,6 +117,51 @@ gint32 CRpcSocketBase::SetKeepAlive( bool bKeep )
             TCP_NODELAY, (void *)&val, sizeof(val) ) == -1 )
         {
             ret = -errno;
+            break;
+        }
+
+        if( setsockopt( m_iFd, SOL_SOCKET,
+            SO_KEEPALIVE, &val, sizeof(val) ) == -1)
+        {
+            ret = -errno; 
+            break;
+        }
+
+        if( !bKeep )
+            break;
+
+        // Send first probe after `interval'
+        // seconds.
+        val = interval;
+        if( setsockopt(m_iFd, IPPROTO_TCP,
+            TCP_KEEPIDLE, &val, sizeof(val) ) == -1 )
+        {
+            ret = -errno; 
+            break;
+        }
+
+        //  Send next probes after the specified
+        // interval. Note that we set the delay as
+        // interval / 3, as we send three probes
+        // before detecting an error (see the next
+        // setsockopt call).
+        val = interval / 3;
+        if( val == 0 ) val = 1;
+        if( setsockopt(m_iFd, IPPROTO_TCP,
+            TCP_KEEPINTVL, &val, sizeof(val) ) == -1 )
+        {
+            ret = -errno; 
+            break;
+        }
+
+        //  Consider the socket in error state
+        // after three we send three ACK probes
+        // without getting a reply.
+        val = 3;
+        if( setsockopt( m_iFd, IPPROTO_TCP,
+            TCP_KEEPCNT, &val, sizeof(val) ) == -1 )
+        {
+            ret = -errno; 
             break;
         }
 
@@ -1136,7 +1182,7 @@ gint32 CRpcStreamSock::Start_bh()
         }
 
         // tcp-level keep alive
-        ret = SetKeepAlive( false );
+        ret = SetKeepAlive( true );
         if( ERROR( ret ) )
             break;
 

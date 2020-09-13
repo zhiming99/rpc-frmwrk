@@ -2292,13 +2292,35 @@ gint32 CRouterStopBridgeProxyTask2::OnTaskComplete(
             oEvtCtx.GetCfg(),
             pReqCall );
 
+        CReqBuilder oAuthEvt;
+        ret = oAuthEvt.Append( pReqCall );
+        if( ERROR( ret ) )
+            break;
+
+        std::string strRtName;
+        CIoManager* pMgr = pRouter->GetIoMgr();
+        pMgr->GetRouterName( strRtName );
+        oAuthEvt.SetObjPath(
+            DBUS_OBJ_PATH( strRtName,
+            OBJNAME_TCP_BRIDGE_AUTH ) );
+
         for( auto elem : ( *setBridges )() )
         {
             CRpcTcpBridge* pBridge = elem;
             if( !pBridge->IsConnected() )
                 continue;
+
+            bool bAuth = false;
+            if( pBridge->GetClsid() ==
+                clsid( CRpcTcpBridgeAuthImpl ) )
+                bAuth = true;
+
+            IConfigDb* pReq = pReqCall; 
+            if( bAuth )
+                pReq = oAuthEvt.GetCfg();
+
             pBridge->BroadcastEvent(
-                pReqCall, pDummyTask );
+                pReq, pDummyTask );
 
             CStreamServerRelayMH* pStmSvr = elem;
             if( pStmSvr == nullptr )

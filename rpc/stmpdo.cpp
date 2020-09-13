@@ -707,6 +707,28 @@ gint32 CRpcTcpBusDriver::GetTcpSettings(
                 CCfgOpener oElemCfg;
                 Json::Value& oParams = arrParams[ j ];
 
+                bool bEnabled = true;
+                // protocol, refer to propProtocol for detail
+                if( oParams.isMember( JSON_ATTR_ENABLED ) &&
+                    oParams[ JSON_ATTR_ENABLED ].isString() )
+                {
+                    string strEnabled =
+                        oParams[ JSON_ATTR_ENABLED ].asString();
+                    if( strEnabled == "false" )
+                    {
+                        // disabled
+                        bEnabled = false;
+                    }
+                    else if( strEnabled != "true" )
+                    {
+                        // invalid value
+                        bEnabled = false;
+                    }
+                }
+
+                if( !bEnabled )
+                    continue;
+
                 // protocol, refer to propProtocol for detail
                 if( oParams.isMember( JSON_ATTR_PROTOCOL ) &&
                     oParams[ JSON_ATTR_PROTOCOL ].isString() )

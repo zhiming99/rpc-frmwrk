@@ -103,7 +103,7 @@ CRpcStream2::CRpcStream2(
         {
             ret = -EFAULT;
         }
-        m_pParent = pObj;
+        // m_pParent = pObj;
 
     }while( 0 );
 
@@ -3910,16 +3910,18 @@ gint32 CRpcNativeProtoFdo::CancelFuncIrp(
 
     }while( 0 );
 
-    if( true )
-    {
+    bool bSendDone = false;
+
+    do{
         IrpCtxPtr& pCtx = pIrp->GetCurCtx();
         pCtx->SetStatus( ERROR_CANCEL );
-        if( pIrp->MinorCmd() == IRP_MN_READ )
+        guint32 dwMinCmd = pIrp->MinorCmd();
+        if( dwMinCmd == IRP_MN_READ )
         {
             CfgPtr pCfg;
             ret = pCtx->GetReqAsCfg( pCfg );
             if( ERROR( ret ) )
-                return ret;
+                break;
 
             CCfgOpener oCfg(
                 ( IConfigDb* )pCfg );
@@ -3935,7 +3937,44 @@ gint32 CRpcNativeProtoFdo::CancelFuncIrp(
                 pIrp->RemoveCallback();
             }
         }
-        super::CancelFuncIrp( pIrp, bForce );
+        else if( dwMinCmd == IRP_MN_WRITE )
+        {
+            if( !pIrp->IsIrpHolder() )
+                bSendDone = true;
+        }
+        else if( dwMinCmd == IRP_MN_IOCTL )
+        {
+            if( pIrp->IsIrpHolder() )
+                break;
+
+            EnumIoctlStat iState = reqStatInvalid;
+
+            ret = CTcpStreamPdo::
+                GetIoctlReqState( pIrp, iState );
+
+            if( ERROR( ret ) )
+                break;
+
+            IrpCtxPtr pCtx = pIrp->GetCurCtx();
+
+            guint32 dwIoDir =
+                pCtx->GetIoDirection();
+
+            if( iState == reqStatOut &&
+                ( dwIoDir == IRP_DIR_INOUT ||
+                dwIoDir == IRP_DIR_OUT ) )
+                bSendDone = true;
+        }
+
+    }while( 0 );
+
+    ret = super::CancelFuncIrp( pIrp, bForce );
+    if( bSendDone )
+    {
+        CStdRMutex oPortLock( GetLock() ); 
+        SetSending( false );
+        oPortLock.Unlock();
+        StartSend( nullptr );
     }
 
     return ret;
