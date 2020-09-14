@@ -588,7 +588,9 @@ gint32 CRpcConnSock::OnEvent(
                 // OnDisconnected because the
                 // connection will down after that
                 // call
-                ret = m_pParentPort->OnDisconnected();
+                CTcpStreamPdo2* pPort =
+                    ObjPtr( m_pParentPort );
+                ret = pPort->OnDisconnected();
                 break;
             }
             else
