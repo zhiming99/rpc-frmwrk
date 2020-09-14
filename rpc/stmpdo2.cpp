@@ -556,6 +556,48 @@ gint32 CRpcConnSock::OnEvent(
     gint32 ret = 0;
     switch( iEvent )
     {
+    case eventTimeout:
+        {
+            CStdRMutex oSockLock( GetLock() );
+            EnumSockState iState = GetState();
+            if( iState == sockStopped )
+            {
+                ret = ERROR_STATE;
+                break;
+            }
+
+            if( dwParam1 == eventAgeSec )
+            {
+                m_dwAgeSec += SOCK_TIMER_SEC;
+                if( m_dwAgeSec < SOCK_LIFE_SEC )
+                {
+                    ret = StartTimer();
+                    if( ret > 0 )
+                    {
+                        m_iTimerId = ret;
+                        ret = STATUS_SUCCESS;
+                    }
+                    else
+                    {
+                        m_iTimerId = 0;
+                    }
+                }
+
+                oSockLock.Unlock();
+                // NOTE: we don't call
+                // OnDisconnected because the
+                // connection will down after that
+                // call
+                ret = m_pParentPort->OnDisconnected();
+                break;
+            }
+            else
+            {
+                ret = -ENOTSUP;
+            }
+
+            break;
+        }
     case eventCancelTask:
         {
             // cancel the start task

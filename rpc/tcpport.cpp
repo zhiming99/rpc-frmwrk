@@ -491,9 +491,10 @@ gint32 CRpcSocketBase::OnEvent(
                 }
 
                 ret = StartTimer();
-                if( SUCCEEDED( ret ) )
+                if( ret > 0 )
                 {
                     m_iTimerId = ret;
+                    ret = STATUS_SUCCESS;
                 }
                 else
                 {
