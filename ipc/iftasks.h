@@ -363,16 +363,19 @@ class CIfTaskGroup
     EnumLogicOp m_iTaskRel;
     EnumTaskState m_iTaskState = stateStarting;
 
+    bool m_bRunning = false;
+    bool m_bCanceling = false;
+    bool m_bNoSched = false;
+
     protected:
+
     void PopTask();
-
-    gint32 CancelRemainingTasks();
-
-    gint32 WaitingToCancel(
-        TaskletPtr& pTask );
 
     std::deque< TaskletPtr > m_queTasks;
     std::vector< gint32 > m_vecRetVals;
+
+    virtual gint32 RunTaskInternal(
+        guint32 dwContext );
 
     public:
     typedef CIfRetryTask super;
@@ -397,11 +400,22 @@ class CIfTaskGroup
         GetRetVals() const
     { return m_vecRetVals; }
 
-    bool IsRunning() const;
-    void SetRunning( bool bRun = true );
+    inline bool IsRunning() const
+    { return m_bRunning; }
 
-    bool IsCanceling() const;
+    inline void SetRunning( bool bRun = true )
+    { m_bRunning = bRun; }
+
+    inline bool IsCanceling() const
+    { return m_bCanceling; }
+
     void SetCanceling( bool bCancel );
+
+    inline bool IsNoSched() const
+    { return m_bNoSched; }
+
+    inline void SetNoSched( bool bNoSched = true )
+    { m_bNoSched = bNoSched; }
 
     inline EnumTaskState GetTaskState() const
     {
@@ -409,7 +423,8 @@ class CIfTaskGroup
         return m_iTaskState;
     }
 
-    inline void SetTaskState( EnumTaskState iState )
+    inline void SetTaskState(
+        EnumTaskState iState )
     {
         CStdRTMutex oTaskLock( GetLock() );
         m_iTaskState = iState;
@@ -522,11 +537,12 @@ class CIfParallelTaskGrp
         SetRelation( logicNONE );
     }
 
-    virtual gint32 RunTask();
+    virtual gint32 RunTaskInternal(
+        guint32 dwContext );
+
     virtual gint32 OnChildComplete(
         gint32 ret, CTasklet* pChild );
 
-    gint32 RunTaskDirect( TaskletPtr& pTask );
     gint32 AddAndRun( TaskletPtr& pTask );
     gint32 AppendTask( TaskletPtr& pTask );
 

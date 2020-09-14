@@ -650,7 +650,7 @@ gint32 CDBusProxyPdo::HandleConnRequest(
         else
             strCmd = SYS_METHOD_CLOSERMTPORT;
 
-        if( !IS_AUTH_PROXY( this ) )
+        if( m_bAuth && !IS_AUTH_PROXY( this ) )
         {
             strCmd = SYS_METHOD_LOCALLOGIN;
             // the method is from an interface
@@ -1868,7 +1868,7 @@ gint32 CDBusProxyPdo::OnRmtSvrOnOffline(
             // if we are within the router, don't
             // send out the eventRmtSvrOffline
             // again.
-            eventId = eventConnErr;
+            break;
         }
 
         if( bOnline )

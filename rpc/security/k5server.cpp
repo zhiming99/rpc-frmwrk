@@ -1025,7 +1025,7 @@ gint32 CK5AuthServer::Krb5Login(
                 gss_delete_sec_context( &min_stat,
                     &context, GSS_C_NO_BUFFER );
             }
-            ret = ERROR_FAIL;
+            ret = -EACCES;
             break;
         }
 
@@ -1156,11 +1156,8 @@ gint32 CK5AuthServer::Login(
         }
 
         if( pResp.IsEmpty() )
-        {
-            ret = pResp.NewObj();
-            if( ERROR( ret ) )
-                break;
-        }
+            pResp.NewObj();
+
         CParamList oResp( pResp );
         bool bContinue = false;
         if( ret == STATUS_MORE_PROCESS_NEEDED )

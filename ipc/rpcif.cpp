@@ -2092,8 +2092,8 @@ gint32 CRpcInterfaceBase::AddAndRun(
             {
                 // the group has stopped
                 bTail = false;
-                pParaLock->unlock();
                 oRootLock.Lock();
+                pParaLock->unlock();
                 // recheck if the taskgroup
                 // changed during the period the
                 // lock is released
@@ -2113,6 +2113,10 @@ gint32 CRpcInterfaceBase::AddAndRun(
                         // a non-paragrp added
                         // fall through
                     }
+                }
+                else
+                {
+                    ret = 0;
                 }
             }
         }
@@ -2534,7 +2538,9 @@ gint32 CRpcServices::OnPreStart(
 
 gint32 CRpcServices::OnPostStart(
     IEventSink* pCallback )
-{ return 0; }
+{
+    return 0;
+}
 
 gint32 CRpcServices::OnPostStop(
     IEventSink* pCallback )

@@ -103,7 +103,7 @@ CRpcStream2::CRpcStream2(
         {
             ret = -EFAULT;
         }
-        m_pParent = pObj;
+        // m_pParent = pObj;
 
     }while( 0 );
 
@@ -423,8 +423,8 @@ gint32 CRpcStream2::StartSendDeferred(
     PIRP pIrp )
 {
     gint32 ret = 0;
-    bool bPopState = false;
     guint32 dwOldState = 0;
+    bool bClearSending = true;
 
     do{
         if( pIrp == nullptr )
@@ -438,37 +438,36 @@ gint32 CRpcStream2::StartSendDeferred(
         if( ERROR( ret ) )
             break;
 
-        if( m_pParentPort == nullptr )
-        {
-            ret = -EFAULT;
-            break;
-        }
-
-        ret = m_pParentPort->CanContinue( pIrp,
-            PORT_STATE_BUSY_SHARED, &dwOldState );
-
-        if( ERROR( ret ) )
-            break;
-
-        bPopState = true;
-
         IPort* plowp =
             m_pParentPort->GetLowerPort();
 
+        // this is a call by SubmitFuncIrp, here
+        // we want to mimic the context as
+        // SubmitIrp does
+        ret = m_pParentPort->CanContinue(
+            pIrp, PORT_STATE_BUSY_SHARED,
+            &dwOldState );
+
+        if( ERROR( ret ) )
+            goto LBL_HANDLE_RET;
+
         ret = SetupIrpForLowerPort( plowp, pIrp );
         if( ERROR( ret ) )
-            break;
+            goto LBL_POPSTAT;
 
         // don't complete this irp from within the
         // submitIrp
         pIrp->SetNoComplete( true );
-
         ret = plowp->SubmitIrp( pIrp );
-
         pIrp->SetNoComplete( false );
 
+LBL_POPSTAT:
+        m_pParentPort->PopState( dwOldState );
+
+LBL_HANDLE_RET:
         if( ret == STATUS_PENDING )
         {
+            bClearSending = false;
             ret = 0;
             break;
         }
@@ -476,35 +475,31 @@ gint32 CRpcStream2::StartSendDeferred(
         if( SUCCEEDED( ret ) )
             Refresh();
 
-        if( !pIrp->IsIrpHolder() )
-        {
-            IrpCtxPtr& pTopCtx =
-                pIrp->GetTopStack();
+        IrpCtxPtr& pTopCtx =
+            pIrp->GetTopStack();
 
-            IrpCtxPtr& pCurCtx =
-                pIrp->GetCurCtx();
+        IrpCtxPtr& pCurCtx =
+            pIrp->GetCurCtx();
 
-            pCurCtx->SetStatus(
-                pTopCtx->GetStatus() );
+        pCurCtx->SetStatus(
+            pTopCtx->GetStatus() );
 
-            pIrp->PopCtxStack();
-        }
-
+        pIrp->PopCtxStack();
         oIrpLock.Unlock();
 
         m_pMgr->CompleteIrp( pIrp );
 
     }while( 0 );
 
-    if( ret != STATUS_PENDING )
-    {
-        CStdRMutex oPortLock(
-            m_pParentPort->GetLock() );
-        m_pParentPort->SetSending( false );
-    }
+    if( !bClearSending )
+        return ret;
 
-    if( bPopState )
-        m_pParentPort->PopState( dwOldState );
+    CStdRMutex oPortLock(
+        m_pParentPort->GetLock() );
+    m_pParentPort->SetSending( false );
+    oPortLock.Unlock();
+
+    m_pParentPort->StartSend( nullptr );
 
     return ret;
 }
@@ -771,28 +766,41 @@ gint32 CRpcStream2::StartSend(
         IPort* plowp =
             m_pParentPort->GetLowerPort();
 
-        if( plowp == nullptr )
-        {
-            pIrpToComp = pIrp;
-            ret = -EFAULT;
-            break;
-        }
-
-        m_pParentPort->SetSending( true );
-        if( pIrp == pIrpLocked )
+        if( likely( pIrp == pIrpLocked ) )
         {
             // build the irp here instead of
             // HandleWriteIrp to avoid timeout or
             // canceling with unwanted context stack
             ret = SetupIrpForLowerPort( plowp, pIrp );
-            if( SUCCEEDED( ret ) )
+            if( ERROR( ret ) )
             {
-                // irp is safe to access
-                // move on to submit the irp
-                ret = plowp->SubmitIrp( pIrp );
-                if( SUCCEEDED( ret ) )
-                    Refresh();
+                pIrpToComp = pIrp;
+                break;
             }
+
+            // irp is safe to access
+            // move on to submit the irp
+            ret = plowp->SubmitIrp( pIrp );
+            if( SUCCEEDED( ret ) )
+                Refresh();
+
+            if( ret == STATUS_PENDING )
+            {
+                pIrpToComp = pIrp;
+                break;
+            }
+
+            IrpCtxPtr& pTopCtx =
+                pIrp->GetTopStack();
+
+            IrpCtxPtr& pCurCtx =
+                pIrp->GetCurCtx();
+
+            pCurCtx->SetStatus(
+                pTopCtx->GetStatus() );
+
+            ret = pCurCtx->GetStatus();
+            pIrp->PopCtxStack();
         }
         else
         {
@@ -808,39 +816,32 @@ gint32 CRpcStream2::StartSend(
 
             if( SUCCEEDED( ret ) )
             {
-                ret = m_pMgr->RescheduleTask(
-                    pTask );
+                ret = m_pMgr->
+                    RescheduleTask( pTask );
+
                 if( SUCCEEDED( ret ) )
-                {
                     ret = STATUS_PENDING;
+            }
+            if( ERROR( ret ) )
+            {
+                //FIXME: delimma, Locking up irp
+                //to set the status, or break the
+                //locking rule?
+                if( pIrp->GetStackSize() > 0 )
+                {
+                    IrpCtxPtr pCtx =
+                        pIrp->GetTopStack();
+                    pCtx->SetStatus( ret );
+                    // it will be completed by the
+                    // caller
                 }
                 else
                 {
-                    IrpCtxPtr pTopCtx =
-                        pIrp->GetTopStack();
-                    pTopCtx->SetStatus( ret );
+                    // do nothing
                 }
-            }
-        }
-
-        if( ret != STATUS_PENDING )
-        {
-            // no pending write
-            m_pParentPort->SetSending( false );
-
-            if( !pIrp->IsIrpHolder() )
-            {
-                IrpCtxPtr& pTopCtx =
-                    pIrp->GetTopStack();
-
-                IrpCtxPtr& pCurCtx =
-                    pIrp->GetCurCtx();
-
-                pCurCtx->SetStatus(
-                    pTopCtx->GetStatus() );
-
-                ret = pCurCtx->GetStatus();
-                pIrp->PopCtxStack();
+                // don't move on to next irp
+                // it is the turn for other
+                // streams, now
             }
         }
 
@@ -2130,41 +2131,23 @@ gint32 CRpcNativeProtoFdo::RemoveStream(
         std::deque< Stm2Ptr >::iterator itr =
             m_cycQueSend.begin();
 
-        Stm2Ptr pCurStm;
-        if( IsSending() )
-            pCurStm = m_pCurStm;
-
         while( itr != m_cycQueSend.end() )
         {
-            if( !( *itr == pStm ) )
+            if( *itr != pStm )
             {
                 ++itr;
                 continue;
             }
 
-            itr = m_cycQueSend.erase( itr );
-
-            if( m_cycQueSend.empty() )
-                SetSending( false );
-
-            if( !IsSending() )
-                break;
-
-            if( pCurStm == pStm )
-            {
-                // assign -1 to restart the send
-                // on other streams.
-                SetSending( false );
-                break;
-            }
-
+            m_cycQueSend.erase( itr );
+            // NOTE: don't touch the sending bit
+            // if the removed stream is the
+            // current stream to send. The irp
+            // will finally clear the sending bit.
             break;
         }
 
     }while( 0 );
-
-    if( !IsSending() )
-        m_pCurStm.Clear();
 
     return ret;
 }
@@ -2180,18 +2163,19 @@ gint32 CRpcNativeProtoFdo::GetStreamToSend(
     while( !m_cycQueSend.empty() )  
     {
         pStm = m_cycQueSend.front();
-        if( pStm->GetQueSizeSend() > 0 )
+        if( pStm->GetQueSizeSend() == 0 )
         {
-            if( m_cycQueSend.size() > 1 )
-            {
-                // rotate
-                m_cycQueSend.pop_front();
-                m_cycQueSend.push_back( pStm );
-            }
-            m_pCurStm = pStm;
-            break;
+            m_cycQueSend.pop_front();
+            continue;
         }
-        m_cycQueSend.pop_front();
+        m_pCurStm = pStm;
+        if( m_cycQueSend.size() > 1 )
+        {
+            // rotate
+            m_cycQueSend.pop_front();
+            m_cycQueSend.push_back( pStm );
+        }
+        break;
     }
 
     if( m_cycQueSend.empty() )
@@ -2233,14 +2217,12 @@ gint32 CRpcNativeProtoFdo::StartSend(
 
     IrpCtxPtr pCtx;
     bool bHandled = false;
-    bool bControl = false;
+    guint32 dwIoDir = IRP_DIR_OUT;
 
     if( pIrpLocked != nullptr )
     {
         pCtx = pIrpLocked->GetCurCtx();
-        guint32 dwMinorCmd = pCtx->GetMinorCmd();
-        if( dwMinorCmd == IRP_MN_IOCTL )
-            bControl = true;
+        dwIoDir = pCtx->GetIoDirection();
     }
 
     // ALERT: complicated section ahead
@@ -2260,10 +2242,8 @@ gint32 CRpcNativeProtoFdo::StartSend(
         }
         else if( ret == -ENOENT )
         {
-            // this irp disappers in the thin air
-            // should be impossible. the irp is
-            // toxic, and don't touch it any more.
-            // DebugPrint( 0, "no stream to send" );
+            // there is no more irp to send in
+            // case the pIrpLocked is null
             ret = STATUS_PENDING;
             break;
         }
@@ -2278,20 +2258,25 @@ gint32 CRpcNativeProtoFdo::StartSend(
             break;
         }
 
+        SetSending( true );
         IrpPtr pIrp = pIrpLocked;
+
         // NOTE: pIrp is not necessarily the irp
-        // to send, just a hint for the stream as
-        // the irp is currently locked. The
-        // returned pIrp is the one currently
-        // being send out
+        // to send immediately, just a hint for
+        // the stream that the irp is currently
+        // locked. The returned pIrp is the one
+        // currently being send out
+
         ret = pStream->StartSend( pIrp );
         if( ret == STATUS_PENDING )
             break;
 
+        SetSending( false );
         if( pIrp.IsEmpty() )
         {
-            // find next stream to send
-            ret = 0;
+            // only when pIrpLocked is null.
+            // continue to find next stream to
+            // send
             continue;
         }
 
@@ -2302,12 +2287,11 @@ gint32 CRpcNativeProtoFdo::StartSend(
             bHandled = true;
         }
 
+        // if more than one irps in
+        // vecIrpComplete, the task scheduler
+        // could be failed to move on.
         CStlIrpVector2::ElemType e( ret, pIrp );
         vecIrpComplete.push_back( e );
-
-        // fatal error
-        if( ERROR( ret ) )
-            break;
 
     }while( 1 );
 
@@ -2315,22 +2299,28 @@ gint32 CRpcNativeProtoFdo::StartSend(
         if( vecIrpComplete.empty() )
             break;
 
-        bool bSync = ( pIrpLocked == nullptr );
-        if( !bHandled )
+        if( unlikely( !bHandled ) )
+        {
+            // the irp sent is not pIrpLocked or
+            // pIrpLocked is nullptr
+            goto LBL_SCHEDCOMP;
+        }
+        else if( unlikely( pIrpLocked !=
+            vecIrpComplete.front().second ) )
+        {
+            // when all the irp's ahead of the
+            // pIrpLocked failed to schedule
+            // StartSendDeferred.
+            goto LBL_SCHEDCOMP;
+        }
+        else if( unlikely(
+            vecIrpComplete.size() > 1 ) )
         {
             goto LBL_SCHEDCOMP;
         }
-        else if( pIrpLocked !=
-            vecIrpComplete.front().second )
+        else if( dwIoDir == IRP_DIR_OUT )
         {
-            goto LBL_SCHEDCOMP;
-        }
-        else if( vecIrpComplete.size() > 1 )
-        {
-            goto LBL_SCHEDCOMP;
-        }
-        else if( !bControl )
-        {
+            // write request is done
             ret = retLocked;
             break;
         }
@@ -2339,16 +2329,15 @@ gint32 CRpcNativeProtoFdo::StartSend(
             goto LBL_SCHEDCOMP;
         }
 
-        // bControl && ( pending or error )
+        // IRP_DIR_INOUT && ( pending or error )
         ret = retLocked;
         break;
 
 LBL_SCHEDCOMP:
         ret = ScheduleCompleteIrpTask(
-            GetIoMgr(), pIrpVec, bSync );
+            GetIoMgr(), pIrpVec, false );
         if( SUCCEEDED( ret ) )
             ret = STATUS_PENDING;
-
         break;
 
     }while( 0 );
@@ -2504,18 +2493,18 @@ gint32 CRpcNativeProtoFdo::CompleteWriteIrp(
     IRP* pIrp )
 {
     if( pIrp == nullptr ||
-        pIrp->GetStackSize() < 2 )
+        pIrp->GetStackSize() == 0 )
         return -EINVAL;
 
     IrpCtxPtr& pCtx = pIrp->GetTopStack();
     gint32 ret = pCtx->GetStatus();;
     IrpCtxPtr& pCurCtx = pIrp->GetCurCtx();
     pCurCtx->SetStatus( ret );
+
     if( !pIrp->IsIrpHolder() )
+    {
         pIrp->PopCtxStack();
 
-    if( true )
-    {
         Stm2Ptr pStm;
         CStdRMutex oPortLock( GetLock() ); 
 
@@ -2616,9 +2605,6 @@ bool CRpcNativeProtoFdo::IsImmediateReq(
 gint32 CRpcNativeProtoFdo::HandleIoctlIrp(
     IRP* pIrp )
 {
-    // NOTE: you should make sure the irp is
-    // locked from outside
-    //
     //
     // properties from irp's m_pReqData
     //
@@ -3073,6 +3059,13 @@ gint32 CRpcNativeProtoFdo::CompleteIoctlIrp(
 
     gint32 ret = 0;
 
+    EnumIoctlStat iState = reqStatInvalid;
+    ret = CTcpStreamPdo::GetIoctlReqState(
+        pIrp, iState );
+    if( ERROR( ret ) )
+        return ret;
+
+    bool bClearSending = false;
     IrpCtxPtr pCtx = pIrp->GetCurCtx();
     if( !pIrp->IsIrpHolder() )
     {
@@ -3080,14 +3073,10 @@ gint32 CRpcNativeProtoFdo::CompleteIoctlIrp(
         ret = pTopCtx->GetStatus();;
         pCtx->SetStatus( ret );
         pIrp->PopCtxStack();
+        bClearSending = true;
     }
 
-    EnumIoctlStat iState = reqStatInvalid;
-    ret = CTcpStreamPdo::GetIoctlReqState(
-        pIrp, iState );
-    if( ERROR( ret ) )
-        return ret;
-
+    bool bSendDone = false;
     guint32 dwCtrlCode = pIrp->CtrlCode();
     switch( dwCtrlCode )
     {
@@ -3103,6 +3092,11 @@ gint32 CRpcNativeProtoFdo::CompleteIoctlIrp(
             if( iState == reqStatOut &&
                 dwIoDir == IRP_DIR_INOUT )
             {
+                bSendDone = true;
+
+                if( ERROR( ret ) )
+                    break;
+
                 ret = CTcpStreamPdo::SetIoctlReqState(
                     pIrp, reqStatIn );
 
@@ -3123,17 +3117,24 @@ gint32 CRpcNativeProtoFdo::CompleteIoctlIrp(
                     // arrived
                     ret = pCtx->GetStatus();
                     iState = reqStatIn;
+                    // fall through
                 }
                 else
                 {
                     // we need to continue waiting for
                     // the response
                     ret = STATUS_PENDING;
+                    break;
                 }
             }
             else if( iState == reqStatOut &&
                 dwIoDir == IRP_DIR_OUT )
             {
+                bSendDone = true;
+
+                if( ERROR( ret ) )
+                    break;
+
                 // this should be a response
                 CTcpStreamPdo::SetIoctlReqState(
                     pIrp, reqStatDone );
@@ -3160,6 +3161,12 @@ gint32 CRpcNativeProtoFdo::CompleteIoctlIrp(
                     //
                     // do nothing
                 }
+                break;
+            }
+            else if( iState != reqStatIn )
+            {
+                ret = ERROR_STATE;
+                break;
             }
 
             if( iState == reqStatIn )
@@ -3192,10 +3199,11 @@ gint32 CRpcNativeProtoFdo::CompleteIoctlIrp(
     default:
         {
             ret = -ENOTSUP;
+            break;
         }
     }
 
-    if( iState == reqStatOut )
+    if( bSendDone && bClearSending )
     {
         CStdRMutex oPortLock( GetLock() );
         Stm2Ptr pStm;
@@ -3902,16 +3910,18 @@ gint32 CRpcNativeProtoFdo::CancelFuncIrp(
 
     }while( 0 );
 
-    if( true )
-    {
+    bool bSendDone = false;
+
+    do{
         IrpCtxPtr& pCtx = pIrp->GetCurCtx();
         pCtx->SetStatus( ERROR_CANCEL );
-        if( pIrp->MinorCmd() == IRP_MN_READ )
+        guint32 dwMinCmd = pIrp->MinorCmd();
+        if( dwMinCmd == IRP_MN_READ )
         {
             CfgPtr pCfg;
             ret = pCtx->GetReqAsCfg( pCfg );
             if( ERROR( ret ) )
-                return ret;
+                break;
 
             CCfgOpener oCfg(
                 ( IConfigDb* )pCfg );
@@ -3927,7 +3937,44 @@ gint32 CRpcNativeProtoFdo::CancelFuncIrp(
                 pIrp->RemoveCallback();
             }
         }
-        super::CancelFuncIrp( pIrp, bForce );
+        else if( dwMinCmd == IRP_MN_WRITE )
+        {
+            if( !pIrp->IsIrpHolder() )
+                bSendDone = true;
+        }
+        else if( dwMinCmd == IRP_MN_IOCTL )
+        {
+            if( pIrp->IsIrpHolder() )
+                break;
+
+            EnumIoctlStat iState = reqStatInvalid;
+
+            ret = CTcpStreamPdo::
+                GetIoctlReqState( pIrp, iState );
+
+            if( ERROR( ret ) )
+                break;
+
+            IrpCtxPtr pCtx = pIrp->GetCurCtx();
+
+            guint32 dwIoDir =
+                pCtx->GetIoDirection();
+
+            if( iState == reqStatOut &&
+                ( dwIoDir == IRP_DIR_INOUT ||
+                dwIoDir == IRP_DIR_OUT ) )
+                bSendDone = true;
+        }
+
+    }while( 0 );
+
+    ret = super::CancelFuncIrp( pIrp, bForce );
+    if( bSendDone )
+    {
+        CStdRMutex oPortLock( GetLock() ); 
+        SetSending( false );
+        oPortLock.Unlock();
+        StartSend( nullptr );
     }
 
     return ret;
