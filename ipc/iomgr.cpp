@@ -419,17 +419,12 @@ gint32 CIoManager::CompleteIrp( IRP* pIrpComp )
         pIrp->SetState(
             IRP_STATE_COMPLETING, IRP_STATE_COMPLETED );
 
+        a.Unlock();
         if( pIrp->GetMasterIrp() != nullptr )
         {
-            a.Unlock();
-
             this->CompleteAssocIrp( pIrp );
             // we don't care the return value from
             // CompleteAssocIrp
-
-            a.Lock();
-            // no one else should touch this irp
-            // because it is already marked as completed
         }
 
         ret = PostCompleteIrp( pIrp );
@@ -672,11 +667,10 @@ gint32 CIoManager::CancelIrp(
         pIrp->SetState(
             IRP_STATE_CANCELLING, IRP_STATE_CANCELLED );
 
+        a.Unlock();
         if( pIrp->GetMasterIrp() != nullptr )
         {
-            a.Unlock();
             ret = CancelAssocIrp( pIrp );
-            a.Lock();
         }
 
         ret = PostCompleteIrp( pIrp, true );

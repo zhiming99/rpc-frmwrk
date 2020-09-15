@@ -581,6 +581,7 @@ gint32 CRpcConnSock::OnEvent(
                     {
                         m_iTimerId = 0;
                     }
+                    break;
                 }
 
                 oSockLock.Unlock();
@@ -591,7 +592,6 @@ gint32 CRpcConnSock::OnEvent(
                 CTcpStreamPdo2* pPort =
                     ObjPtr( m_pParentPort );
                 ret = pPort->OnDisconnected();
-                break;
             }
             else
             {
