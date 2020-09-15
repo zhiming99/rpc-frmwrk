@@ -87,9 +87,12 @@ to work with `rpc-frmwrk` on such a simple network.
   can be generated from the server server, via `kadmin` and `ktadd` subcommand. When `ktadd` is asking service principal for the `key table`,
   in our case, `rasp1/rpcfrmwrk.org`. The The official document is at [here](https://web.mit.edu/kerberos/krb5-devel/doc/admin/install_appl_srv.html)
 
-4. Finally the options to enable `rpc-frmwrk` with authentication.
-  * In the [`driver.json`], the section for `RpcTcpBusPort`, you can find the configurations for each listening port. You can add 'HasAuth:"true"' to the listening port which will be authentication enabled.
-  * In the [`rtauth.json`], the section for `RpcRouterBridgeAuthImpl`, you can setup the authentication infomantion as the service server, it looks like,
+4. Setup the options to enable `rpc-frmwrk` with authentication.
+  * In the [`driver.json`](https://github.com/zhiming99/rpc-frmwrk/blob/master/ipc/driver.json), the section for `RpcTcpBusPort`,
+  you can find the configurations for each listening port. And add 'HasAuth:"true"' to the listening port which will enable
+  authentication.
+  * In the [`rtauth.json`](https://github.com/zhiming99/rpc-frmwrk/blob/master/test/router/rtauth.json), the section for
+  `RpcRouterBridgeAuthImpl`, you can setup the authentication infomantion as the service server. It looks like 
  ```
              "AuthInfo" :
             {
@@ -99,7 +102,8 @@ to work with `rpc-frmwrk` on such a simple network.
             }
  ```
 
-  * In the `helloworld` proxy's description file, hwdesc.json, add the following infomation,
+  * In the `helloworld's` description file, [`hwdesc.json`](https://github.com/zhiming99/rpc-frmwrk/blob/master/test/helloworld/hwdesc.json),
+  for example, add the following infomation,
   ```
             "AuthInfo" :
             {
@@ -109,3 +113,4 @@ to work with `rpc-frmwrk` on such a simple network.
                 "Realm" : "rpcfrmwrk.org"
             }
  ```
+5. Start the rpcrouter with `-a` option, which is the authentication flag.
