@@ -103,7 +103,7 @@ to work with `rpc-frmwrk` on such a simple network.
  ```
 
   * In the `helloworld's` description file, [`hwdesc.json`](https://github.com/zhiming99/rpc-frmwrk/blob/master/test/helloworld/hwdesc.json),
-  for example, add the following infomation,
+  for example, add the following lines,
   ```
             "AuthInfo" :
             {
