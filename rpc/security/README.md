@@ -75,8 +75,9 @@ to work with `rpc-frmwrk` on such a simple network.
       and help you configure the kerberos.
   * Put the same `krb5.conf` as the one on the `kdc server` to the directory `/etc`.
   * Type `kinit foo` to authenticate with the remote `kdc`. According to the `ticket_lifetime`, the ticket will expire in one day.
-  * In some environment when you cannot access `kdc` directly, rpc-frmwrk can provide a `kdc` channel for `kdc` access via the RPC
-  connection, thus you can use `kinit`, `kadmin` as usual. The approach is to symbolic link `libauth.so` under the directory, 
-  `/usr/lib64/krb5/plugins/libkrb5`, for example. the directory name could vary from different distributions or architectures.
+  * In some environment when you cannot access `kdc` directly, `rpc-frmwrk` can provide a `kdc` communication channel for `kdc` 
+  access via the RPC connection, thus you can use `kinit`, `kadmin` as usual. The approach is to symbolic link `libauth.so`
+  under the directory, `/usr/lib64/krb5/plugins/libkrb5`, for example. the directory name could vary from different distributions
+  or architectures.
   
 
