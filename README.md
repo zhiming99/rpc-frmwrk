@@ -38,7 +38,8 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 
 ---
 [`Tue 15 Sep 2020 11:37:29 AM Beijing`]   
-1. Fixed a bunch of bugs. Now the system works stable. Kerberos authentication support is ready! :) 
+1. Fixed a bunch of bugs. Now the system works stable. After almost 5 months, Kerberos authentication support is finally ready! :) 
+
 [`Fri 11 Sep 2020 08:25:18 PM Beijing`]   
 1. Encountered some concurrent bugs, and fixed some of them. There are still some bugs known to fix, which should be less difficult than the ones fixed this week.   
 
