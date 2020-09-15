@@ -89,8 +89,8 @@ to work with `rpc-frmwrk` on such a simple network.
 
 4. Setup the options to enable `rpc-frmwrk` with authentication.
   * In the [`driver.json`](https://github.com/zhiming99/rpc-frmwrk/blob/master/ipc/driver.json), the section for `RpcTcpBusPort`,
-  you can find the configurations for each listening port. And add 'HasAuth:"true"' to the listening port which will enable
-  authentication.
+  you can find the configurations for each listening port. And add `HasAuth:"true"` to the listening port which will enable
+  authentication on all the connections to that port.
   * In the [`rtauth.json`](https://github.com/zhiming99/rpc-frmwrk/blob/master/test/router/rtauth.json), the section for
   `RpcRouterBridgeAuthImpl`, you can setup the authentication infomantion as the service server. It looks like 
  ```
