@@ -31,12 +31,15 @@ This framework depends on the following packags to build:
 11. [`Secure Socket Layer (SSL) support`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/sslport/Readme.md)
 12. [`Websocket support`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/wsport/Readme.md)
 13. [`Object access via Multihop routing`](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support)
-14. `Authentication support with Kerberos 5`. ( very soon... )
+14. [`Authentication support with Kerberos 5`](https://github.com/zhiming99/rpc-frmwrk/tree/master/rpc/security)
 
 #### Building `rpc-frmwrk`:   
 Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60) for details.
 
 ---
+[`Tue 15 Sep 2020 11:37:29 AM Beijing`]   
+1. Fixed a bunch of bugs. Now the system works stable. After almost 5 months, Kerberos authentication support is finally ready! :) 
+
 [`Fri 11 Sep 2020 08:25:18 PM Beijing`]   
 1. Encountered some concurrent bugs, and fixed some of them. There are still some bugs known to fix, which should be less difficult than the ones fixed this week.   
 
