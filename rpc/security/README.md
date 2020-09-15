@@ -74,7 +74,8 @@ to work with `rpc-frmwrk` on such a simple network.
   * On a Raspberry Pi, you can `apt install krb5-user`, and apt will install all the necessary packages for you,
       and help you configure the kerberos.
   * Put the same `krb5.conf` as the one on the `kdc server` to the directory `/etc`.
-  * Type `kinit foo` to authenticate with the remote `kdc`. According to the `ticket_lifetime`, the ticket will expire in one day.
+  * Type `kinit foo` to authenticate with the remote `kdc`. According to the `ticket_lifetime` option above, the ticket will
+  last one day, and when it expires, the login session will ends.
   * In some environment when you cannot access `kdc` directly, `rpc-frmwrk` can provide a `kdc` communication channel for `kdc` 
   access via the RPC connection, thus you can use `kinit`, `kadmin` as usual. The approach is to symbolic link `libauth.so`
   under the directory, `/usr/lib64/krb5/plugins/libkrb5`, for example. the directory name could vary from different distributions
@@ -83,6 +84,28 @@ to work with `rpc-frmwrk` on such a simple network.
 3. Setup the service server, and in our case, the `rpc-frmwrk bridge` with authentication`
   * The installation is the same as we do on the client machines, that is, the first two steps.
   * Then, unlike the client machines, the service server needs a `key table` to authenticate to the `KDC`. The `key table`
-  can be generated from the server server, via `kadmin` and `ktadd` subcommand. The official document is at [here](https://web.mit.edu/kerberos/krb5-devel/doc/admin/install_appl_srv.html)
-  
+  can be generated from the server server, via `kadmin` and `ktadd` subcommand. When `ktadd` is asking service principal for the `key table`,
+  in our case, `rasp1/rpcfrmwrk.org`. The The official document is at [here](https://web.mit.edu/kerberos/krb5-devel/doc/admin/install_appl_srv.html)
 
+4. Finally the options to enable `rpc-frmwrk` with authentication.
+  * In the [`driver.json`], the section for `RpcTcpBusPort`, you can find the configurations for each listening port. You can add 'HasAuth:"true"' to the listening port which will be authentication enabled.
+  * In the [`rtauth.json`], the section for `RpcRouterBridgeAuthImpl`, you can setup the authentication infomantion as the service server, it looks like,
+ ```
+             "AuthInfo" :
+            {
+                "AuthMech" : "krb5",
+                "ServiceName" : "rasp1@rpcfrmwrk.org",
+                "Realm" : "rpcfrmwrk.org"
+            }
+ ```
+
+  * In the `helloworld` proxy's description file, hwdesc.json, add the following infomation,
+  ```
+            "AuthInfo" :
+            {
+                "AuthMech" : "krb5",
+                "UserName" : "foo@rpcfrmwrk.org",
+                "ServiceName" : "rasp1@rpcfrmwrk.org",
+                "Realm" : "rpcfrmwrk.org"
+            }
+ ```
