@@ -18,6 +18,12 @@ beyond the list:
 Please don't be scared, setup kerberos for authentication is not as difficult as you thought. And it can
 be deployed on a network as simple as with just two connected devices. Here are the steps to make Kerberos
 to work with `rpc-frmwrk` on such a simple network.
-  1. Setup a `kdc( Kerberos domain controller)`. You need to select one of your machines as the kdc server.
-  Depending on the linux distribution, the kerberos package name could be slightly different. On a Fedora
-  machine, for example, you can `dnf install krb5-server`, and dnf will install all the necessary packages.
+  1. Install a `kdc( Kerberos domain controller)`. You may want to select one of your machines as the kdc server.
+  Depending on the linux distribution, the kerberos package name could be slightly different.    
+     . On a Fedora machine, you can `dnf install krb5-server`, and dnf will install all the necessary packages for you. 
+     . On a Raspberry Pi, you can use `apt install krb5-kdc` and apt will install all the necessary packages for you.
+  2. Setup the client machines. Client machines are those devices via which the users can access the the RPC servers.
+     . On a Fedora machine, you can `dnf install krb5-workstation`, and dnf will install all the necessary packages for you.
+     . On a Raspberry Pi, you can `apt install krb5-user`, and apt will install all the necessary packages for you,
+     and help you configure the kerberos.
+ 
