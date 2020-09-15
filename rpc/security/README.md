@@ -1,7 +1,8 @@
 ### Introduction to the rpc-frmwrk's Authentication support
 The authentication process is the process to allow only valid users to access the rpc-frmwrk's service.
 Currently the rpc-frmwrk relies only on the `Kerberos 5` authentication framework. In the future, 
-we may add more authentication approaches besides the `Kerberos 5`.   
+we may add more authentication approaches besides the `Kerberos 5`. This document also tries to give some
+cookbook guide for users with no experience to `Kerberos` in advance.
 
 #### What does `Kerberos 5` do in rpc-frmwrk?
 The following are some services, `Kerberos` can provides, and of course, it can provide far more
@@ -22,9 +23,9 @@ to work with `rpc-frmwrk` on such a simple network.
   Depending on the linux distribution, the kerberos package name could be slightly different.
   * On a Fedora machine, you can `dnf install krb5-server`, and dnf will install all the necessary packages for you.
   * On a Raspberry Pi, you can use `apt install krb5-kdc` and apt will install all the necessary packages for you.
-  * After the successful installation, you need to made changes to the `/etc/krb5.conf` and add the user and service accounts.
-  and the following is a sample krb5 for reference. If your kdc does not have a dns entry, use the ip address as in the
-  `[realms]` section instead or add the domain name in `/etc/hosts`.
+  * After the successful installation, you need to made changes to the `/etc/krb5.conf` and add the user and service
+  accounts. And the following is a sample krb5 for reference. If your kdc does not have a dns entry, use the ip
+  address as in the`[realms]` section instead or add the domain name in `/etc/hosts`.
 ```
     [logging]
         default = FILE:/var/log/krb5libs.log
@@ -66,8 +67,16 @@ to work with `rpc-frmwrk` on such a simple network.
   * Start `krb5kdc`, the KDC server, and `kadmind` the adminstration deamon. And the kdc setup is done now. If you want advanced
   and exhaustive configuration options, please refer to the official document at [here](https://web.mit.edu/kerberos/krb5-devel/doc/admin/install_kdc.html#install-and-configure-the-master-kdc)
   
+  * You can use `kpasswd` to change each account's password.
+  
 2. Setup the client machines. Client machines are those devices via which the users can access the the RPC servers.
   * On a Fedora machine, you can `dnf install krb5-workstation`, and dnf will install all the necessary packages for you.
   * On a Raspberry Pi, you can `apt install krb5-user`, and apt will install all the necessary packages for you,
       and help you configure the kerberos.
+  * Put the same `krb5.conf` as the one on the `kdc server` to the directory `/etc`.
+  * Type `kinit foo` to authenticate with the remote `kdc`. According to the `ticket_lifetime`, the ticket will expire in one day.
+  * In some environment when you cannot access `kdc` directly, rpc-frmwrk can provide a `kdc` channel for `kdc` access via the RPC
+  connection, thus you can use `kinit`, `kadmin` as usual. The approach is to symbolic link `libauth.so` under the directory, 
+  `/usr/lib64/krb5/plugins/libkrb5`, for example. the directory name could vary from different distributions or architectures.
+  
 
