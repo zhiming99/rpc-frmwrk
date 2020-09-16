@@ -23,9 +23,12 @@ to work with `rpc-frmwrk` on such a simple network.
   Depending on the linux distribution, the kerberos package name could be slightly different.
   * On a Fedora machine, you can `dnf install krb5-server`, and dnf will install all the necessary packages for you.
   * On a Raspberry Pi, you can use `apt install krb5-kdc` and apt will install all the necessary packages for you.
-  * After the successful installation, you need to make some changes to the `/etc/krb5.conf` and add the user and
-  service accounts. And the following is a sample `krb5.conf` for reference. If your kdc does not have a DNS entry,
-  just the ip address as the kdc address in the section `[realms]` instead, or add the domain name to `/etc/hosts`.
+  * After the successful installation, you need first to select a good name for the default realm, in our case, 
+  `rpcfrmwrk.org`.
+  * And then make some changes to the `/etc/krb5.conf`. If your kdc does not have a public DNS entry, just put the ip
+  address as the kdc address in the section `[realms]`, or add the domain name to `/etc/hosts`.The following is a sample
+  `krb5.conf` for reference.  
+
 ```
     [logging]
         default = FILE:/var/log/krb5libs.log
