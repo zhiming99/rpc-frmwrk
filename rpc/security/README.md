@@ -19,7 +19,7 @@ beyond the list:
 Please don't be scared, setup kerberos for authentication is not as difficult as you thought. And it can
 be deployed on a network as simple as of only two connected devices. Here are the steps to make Kerberos
 to work with `rpc-frmwrk` on such a simple network.
-1. Setup `kdc( Kerberos domain controller)`. You may want to select one of your machines as the kdc server.
+##### 1. Setup `kdc( Kerberos domain controller)`. You may want to select one of your machines as the kdc server.
   Depending on the linux distribution, the kerberos package name could be slightly different.
   * On a Fedora machine, you can `dnf install krb5-server`, and dnf will install all the necessary packages for you.
   * On a Raspberry Pi, you can use `apt install krb5-kdc` and apt will install all the necessary packages for you.
@@ -72,7 +72,7 @@ to work with `rpc-frmwrk` on such a simple network.
   
   * BTW, You can use `kpasswd` to change each existing account's password.
   
-2. Setup the client machines. Client machines are those devices via which the users can access the the RPC services.
+##### 2. Setup the client machines. Client machines are those devices via which the users can access the the RPC services.
   * On a Fedora machine, you can `dnf install krb5-workstation`, and dnf will install all the necessary packages for you.
   * On a Raspberry Pi, you can `apt install krb5-user`, and apt will install all the necessary packages for you,
       and help you configure the kerberos.
@@ -85,13 +85,13 @@ to work with `rpc-frmwrk` on such a simple network.
   or architectures.
   * The official document is at [here](https://web.mit.edu/kerberos/krb5-devel/doc/admin/install_clients.html)
   
-3. Setup the service server, and in our case, the `rpc-frmwrk bridge` with authentication`
+##### 3. Setup the service server, and in our case, the `rpc-frmwrk bridge` with authentication`
   * The installation is the same as we do on the client machines, that is, the first two steps.
   * Then, unlike the client machines, the service server needs a `key table` to authenticate to the `KDC`. The `key table`
   can be generated from the server server, via `kadmin` and `ktadd` subcommand. When `ktadd` is asking service principal for the `key table`,
   in our case, `rasp1/rpcfrmwrk.org`. The The official document is at [here](https://web.mit.edu/kerberos/krb5-devel/doc/admin/install_appl_srv.html)
 
-4. Configure `rpc-frmwrk` with authentication.
+##### 4. Configure `rpc-frmwrk` with authentication.
   * In the [`driver.json`](https://github.com/zhiming99/rpc-frmwrk/blob/master/ipc/driver.json), the section for `RpcTcpBusPort`,
   you can find the configurations for each listening port. And add attribue `HasAuth:"true"` to the port, and all the incoming connections from
   that port will be authenticated first before normal `RPC` requests can be serviced.
@@ -120,7 +120,7 @@ to work with `rpc-frmwrk` on such a simple network.
  ```
 5. Start the rpcrouter with `-a` option, which is the authentication flag.
 
-#### More information
+##### 5. More information
 1. The session is encrypted all the way.
 2. The duration for authentication can last for about 2 minutes, if it cannot be finished during this period, the bridge side will reset the connection.
 3. If the ticket expires, the session will ends in 10 minutes.
