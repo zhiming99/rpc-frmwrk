@@ -79,7 +79,8 @@ to work with `rpc-frmwrk` on such a simple network.
   * In some environment when you cannot access `kdc` directly, `rpc-frmwrk` can provide a `kdc` communication channel for `kdc` 
   access via the RPC connection, thus you can use `kinit`, `kadmin` as usual. The approach is to symbolic link `libauth.so`
   under the directory, `/usr/lib64/krb5/plugins/libkrb5`, for example. the directory name could vary from different distributions
-  or architectures. The official document is at [here](https://web.mit.edu/kerberos/krb5-devel/doc/admin/install_clients.html)
+  or architectures.
+  * The official document is at [here](https://web.mit.edu/kerberos/krb5-devel/doc/admin/install_clients.html)
   
 3. Setup the service server, and in our case, the `rpc-frmwrk bridge` with authentication`
   * The installation is the same as we do on the client machines, that is, the first two steps.
@@ -89,10 +90,11 @@ to work with `rpc-frmwrk` on such a simple network.
 
 4. Configure `rpc-frmwrk` with authentication.
   * In the [`driver.json`](https://github.com/zhiming99/rpc-frmwrk/blob/master/ipc/driver.json), the section for `RpcTcpBusPort`,
-  you can find the configurations for each listening port. And add `HasAuth:"true"` to the listening port which will enable
-  authentication on all the connections to that port.
+  you can find the configurations for each listening port. And add attribue `HasAuth:"true"` to the port, and all the incoming connections from
+  that port will be authenticated first before normal `RPC` requests can be serviced.
+  
   * In the [`rtauth.json`](https://github.com/zhiming99/rpc-frmwrk/blob/master/test/router/rtauth.json), the section for
-  `RpcRouterBridgeAuthImpl`, you can setup the authentication infomantion as the service server. It looks like 
+  `RpcRouterBridgeAuthImpl`, you can add the authentication infomantion as the service server. It looks like 
  ```
              "AuthInfo" :
             {
@@ -114,3 +116,10 @@ to work with `rpc-frmwrk` on such a simple network.
             }
  ```
 5. Start the rpcrouter with `-a` option, which is the authentication flag.
+
+#### More information
+1. The session is encrypted all the way.
+2. The duration for authentication can last for about 2 minutes, if it cannot be finished during this period, the bridge side will reset the connection.
+3. If the ticket expires, the session will ends in 10 minutes.
+
+
