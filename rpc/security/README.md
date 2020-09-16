@@ -17,7 +17,7 @@ beyond the list:
 
 #### Setup Kerberos
 Please don't be scared, setup kerberos for authentication is not as difficult as you thought. And it can
-be deployed on a network as simple as with just two connected devices. Here are the steps to make Kerberos
+be deployed on a network as simple as of only two connected devices. Here are the steps to make Kerberos
 to work with `rpc-frmwrk` on such a simple network.
 1. Setup `kdc( Kerberos domain controller)`. You may want to select one of your machines as the kdc server.
   Depending on the linux distribution, the kerberos package name could be slightly different.
