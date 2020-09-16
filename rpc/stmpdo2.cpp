@@ -427,10 +427,10 @@ gint32 CRpcConnSock::DispatchSockEvent(
                 G_IO_HUP | G_IO_ERR | G_IO_NVAL ) )
             {
                 OnDisconnected();
+                ret = -ENOTCONN;
             }
             else if( dwCondition & G_IO_IN )
             {
-                m_dwAgeSec = 0;
                 ret = OnReceive();
                 if( ret == -ENOTCONN || 
                     ret == -EPIPE )
@@ -438,7 +438,6 @@ gint32 CRpcConnSock::DispatchSockEvent(
             }
             else if( dwCondition & G_IO_OUT )
             {
-                m_dwAgeSec = 0;
                 ret = OnSendReady();
                 if( ERROR( ret ) )
                     OnDisconnected();
@@ -446,6 +445,11 @@ gint32 CRpcConnSock::DispatchSockEvent(
             else
             {
                 ret = ERROR_STATE;
+            }
+
+            if( SUCCEEDED( ret ) )
+            {
+                m_dwAgeSec.store( 0 );
             }
             break;
         }
@@ -568,8 +572,10 @@ gint32 CRpcConnSock::OnEvent(
 
             if( dwParam1 == eventAgeSec )
             {
-                m_dwAgeSec += SOCK_TIMER_SEC;
-                if( m_dwAgeSec < SOCK_LIFE_SEC )
+                guint32 dwRet = m_dwAgeSec.
+                    fetch_add( SOCK_TIMER_SEC );
+                if( dwRet + SOCK_TIMER_SEC <
+                    SOCK_LIFE_SEC )
                 {
                     ret = StartTimer();
                     if( ret > 0 )
@@ -581,6 +587,7 @@ gint32 CRpcConnSock::OnEvent(
                     {
                         m_iTimerId = 0;
                     }
+                    break;
                 }
 
                 oSockLock.Unlock();
@@ -591,7 +598,6 @@ gint32 CRpcConnSock::OnEvent(
                 CTcpStreamPdo2* pPort =
                     ObjPtr( m_pParentPort );
                 ret = pPort->OnDisconnected();
-                break;
             }
             else
             {
@@ -1358,6 +1364,11 @@ gint32 CTcpStreamPdo2::SendImmediate(
             CIoManager* pMgr = GetIoMgr();
             pMgr->RescheduleTask( pDisTask );
         }
+   }
+   else if( SUCCEEDED( ret ) )
+   {
+        CRpcConnSock* pSock = m_pConnSock;
+        pSock->Refresh();
    }
 
    return ret;

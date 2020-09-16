@@ -483,6 +483,9 @@ class CRpcConnSock :
         LONGWORD dwParam1,
         LONGWORD dwParam2,
         LONGWORD* pData );
+
+    inline void Refresh()
+    { m_dwAgeSec = 0; }
 };
 
 #include "conntask.h"
