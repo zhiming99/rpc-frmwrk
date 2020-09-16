@@ -1,7 +1,7 @@
 ### Introduction to the rpc-frmwrk's Authentication support
 The authentication process is the process to allow only valid users to access the rpc-frmwrk's service.
 Currently the rpc-frmwrk relies only on the `Kerberos 5` authentication framework. In the future, 
-we may add more authentication approaches besides the `Kerberos 5`. This document also tries to give some
+we will add more authentication approaches besides the `Kerberos 5`. This document also tries to give some
 cookbook guide for users with no experience to `Kerberos` in advance.
 
 #### What does `Kerberos 5` do in rpc-frmwrk?
@@ -23,9 +23,9 @@ to work with `rpc-frmwrk` on such a simple network.
   Depending on the linux distribution, the kerberos package name could be slightly different.
   * On a Fedora machine, you can `dnf install krb5-server`, and dnf will install all the necessary packages for you.
   * On a Raspberry Pi, you can use `apt install krb5-kdc` and apt will install all the necessary packages for you.
-  * After the successful installation, you need to made changes to the `/etc/krb5.conf` and add the user and service
-  accounts. And the following is a sample krb5 for reference. If your kdc does not have a dns entry, use the ip
-  address as in the`[realms]` section instead or add the domain name in `/etc/hosts`.
+  * After the successful installation, you need to make some changes to the `/etc/krb5.conf` and add the user and
+  service accounts. And the following is a sample `krb5.conf` for reference. If your kdc does not have a DNS entry,
+  just the ip address as the kdc address in the section `[realms]` instead, or add the domain name to `/etc/hosts`.
 ```
     [logging]
         default = FILE:/var/log/krb5libs.log
@@ -62,14 +62,14 @@ to work with `rpc-frmwrk` on such a simple network.
  * Add the service principal to the kerberos's user database with the `kadmin.local` as well. The service principal, looks like
   `rasp1/rpcfrmwrk.org`. `rasp1` is the machine name, and `rpcfrmwrk.org` after the slash is instance name to tell the service is
   `rpc-frmwrk`. Note that, `Kerberos` uses the term `principal` to represent an entity that participate in the `Kerberos's`
-  authentication activity.
+  authentication process, and you can just assume it the same as a `name`.
   
-  * Start `krb5kdc`, the KDC server, and `kadmind` the adminstration deamon. And the kdc setup is done now. If you want advanced
-  and exhaustive configuration options, please refer to the official document at [here](https://web.mit.edu/kerberos/krb5-devel/doc/admin/install_kdc.html#install-and-configure-the-master-kdc)
+  * Start `krb5kdc`, the KDC server, and `kadmind` the admin deamon. And the kdc setup is done now. If you want advanced
+  and exhaustive configuration options, please refer to the official document [here](https://web.mit.edu/kerberos/krb5-devel/doc/admin/install_kdc.html#install-and-configure-the-master-kdc)
   
-  * You can use `kpasswd` to change each account's password.
+  * BTW, You can use `kpasswd` to change each existing account's password.
   
-2. Setup the client machines. Client machines are those devices via which the users can access the the RPC servers.
+2. Setup the client machines. Client machines are those devices via which the users can access the the RPC services.
   * On a Fedora machine, you can `dnf install krb5-workstation`, and dnf will install all the necessary packages for you.
   * On a Raspberry Pi, you can `apt install krb5-user`, and apt will install all the necessary packages for you,
       and help you configure the kerberos.
@@ -87,7 +87,7 @@ to work with `rpc-frmwrk` on such a simple network.
   can be generated from the server server, via `kadmin` and `ktadd` subcommand. When `ktadd` is asking service principal for the `key table`,
   in our case, `rasp1/rpcfrmwrk.org`. The The official document is at [here](https://web.mit.edu/kerberos/krb5-devel/doc/admin/install_appl_srv.html)
 
-4. Setup the options to enable `rpc-frmwrk` with authentication.
+4. Configure `rpc-frmwrk` with authentication.
   * In the [`driver.json`](https://github.com/zhiming99/rpc-frmwrk/blob/master/ipc/driver.json), the section for `RpcTcpBusPort`,
   you can find the configurations for each listening port. And add `HasAuth:"true"` to the listening port which will enable
   authentication on all the connections to that port.
