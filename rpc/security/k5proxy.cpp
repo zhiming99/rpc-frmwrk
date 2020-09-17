@@ -1156,14 +1156,14 @@ gint32 CK5AuthProxy::Krb5Login(
 
             if( gss_context == GSS_C_NO_CONTEXT )
             {
-                ret = ERROR_FAIL;
+                ret = -EACCES;
                 break;
             }
 
             if( maj_stat != GSS_S_COMPLETE &&
                 maj_stat != GSS_S_CONTINUE_NEEDED )
             {
-                ret = ERROR_FAIL;
+                ret = -EACCES;
                 break;
             }
 
@@ -1230,7 +1230,7 @@ gint32 CK5AuthProxy::Krb5Login(
                 {
                     // normal complete
                     if( ERROR( ret ) )
-                        ret = ERROR_FAIL;
+                        ret = -EACCES;
 
                     break;
                 }

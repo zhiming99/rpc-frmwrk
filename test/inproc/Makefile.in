@@ -10,9 +10,9 @@ OBJS_SVR:= inproctst.o
 SOURCES:= inprocsvr.cpp inprocli.cpp
 OBJS2:=$(SOURCES:%.cpp=$(OBJ_DIR)/%.o)
 
-all: $(TARGET)
-debug: $(TARGET)
-release: $(TARGET)
+all: $(TARGET) link_json
+debug: $(TARGET) link_json
+release: $(TARGET) link_json
 
 clean:
 	make debug_clean
@@ -27,6 +27,9 @@ do_clean:
 	-@rm $(OUTPUT_DIR)/$(CLASS_LIB) $(MUTE_CLEAN)
 	-@rm $(SOURCES:%.cpp=$(OBJ_DIR)/%.o) $(MUTE_CLEAN)
 	-@rm $(OBJ_DIR)/$(OBJS_SVR) $(MUTE_CLEAN)
+
+link_json:
+	@if [ ! -e $(OUTPUT_DIR)/inproc.json ]; then pushd $(OUTPUT_DIR);ln -s ../inproc/inproc.json;popd;fi
 
 -include $(OBJS2:%.o=%.d) $(OBJS_SVR:%.o=(OBJ_DIR)/%.d)
 

@@ -8,10 +8,10 @@ cookbook guide for users with no experience to `Kerberos` in advance.
 The following are some services, `Kerberos` can provides, and of course, it can provide far more
 beyond the list:
  1. user/service account management, adding/modify/delete the user or service account.
- 2. Grant tickets to the legistimate users, which could be used by the user to access all the
+ 2. Granting tickets to the legistimate users, which could be used by the user to access all the
     services, within a `realm( similiar to domain )` without repeatedly typing passwords.
- 3. Setup the secure sessions between the client and the services, and provide encryption/signature
-    services for the session.
+ 3. Setup the secure sessions between the client and the service servers, and provide
+    encryption/signature services for the communications of the session.
  4. Credential management and key caches, including credential's lifecycle management,
     providing storage for keys and credentials.
 
@@ -121,8 +121,9 @@ to work with `rpc-frmwrk` on such a simple network.
 5. Start the rpcrouter with `-a` option, which is the authentication flag.
 
 ##### 5. More information
-1. The session is encrypted all the way.
-2. The duration for authentication can last for about 2 minutes, if it cannot be finished during this period, the bridge side will reset the connection.
+1. The communication of an authenticated session is encrypted all the way.
+2. The duration for authenticating process can last for about 2 minutes, if the process cannot complete during this period, the bridge side will reset the connection.
 3. If the ticket expires, the session will ends in 10 minutes.
+4. Authorization and access control is not implementated yet.
 
 

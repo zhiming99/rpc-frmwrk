@@ -25,7 +25,7 @@ release: $(OUTPUT_DIR)/$(TARGET)
 
 $(OUTPUT_DIR)/$(TARGET) : $(OBJS)
 	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
-	$(CC) -o $(OUTPUT_DIR)/$(TARGET) $(LINKER_OPTION) $(OBJS)
+	$(CC) -o $(OUTPUT_DIR)/$(TARGET) -L$(OUTPUT_DIR) -lcombase -ljsoncpp -ldbus-1 $(LINKER_OPTION) $(OBJS)
 
 -include $(OBJS:%.o=%.d)
 
