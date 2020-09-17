@@ -12,9 +12,9 @@ OBJS_CLI:= actclitst.o
 SOURCES:= actcsvr.cpp actcli.cpp
 OBJS2:=$(SOURCES:%.cpp=$(OBJ_DIR)/%.o)
 
-all: $(TARGET)
-debug: $(TARGET)
-release: $(TARGET)
+all: $(TARGET) link_json
+debug: $(TARGET) link_json
+release: $(TARGET) link_json
 
 debug_clean: do_clean
 release_clean: do_clean
@@ -31,6 +31,9 @@ do_clean:
 	-@rm $(SOURCES:%.cpp=$(OBJ_DIR)/%.o) $(MUTE_CLEAN)
 	-@rm $(OBJ_DIR)/$(OBJS_SVR) $(MUTE_CLEAN)
 	-@rm $(OBJ_DIR)/$(OBJS_CLI) $(MUTE_CLEAN)
+
+link_json:
+	@if [ ! -e $(OUTPUT_DIR)/actcdesc.json ]; then pushd $(OUTPUT_DIR);ln -s ../actcancel/actcdesc.json;popd;fi
 
 -include $(OBJS2:%.o=%.d) $(OBJS_SVR:%.o=(OBJ_DIR)/%.d) $(OBJS_CLI:%.o=(OBJ_DIR)/%.d)
 

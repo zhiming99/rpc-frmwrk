@@ -8,12 +8,16 @@ ROUTER_OBJ:= routmain.o
 SOURCES:= routmain.cpp
 OBJS2:=$(SOURCES:%.cpp=$(OBJ_DIR)/%.o)
 
-all: $(TARGET)
-debug: $(TARGET)
-release: $(TARGET)
+all: $(TARGET) link_json
+debug: $(TARGET) link_json
+release: $(TARGET) link_json
 
 debug_clean: do_clean
 release_clean: do_clean
+
+link_json:
+	@if [ ! -e $(OUTPUT_DIR)/router.json ]; then cd $(OUTPUT_DIR);ln -s ../router/router.json;cd -;fi
+	@if [ ! -e $(OUTPUT_DIR)/rtauth.json ]; then cd $(OUTPUT_DIR);ln -s ../router/rtauth.json;cd -;fi
 
 clean:
 	make debug_clean

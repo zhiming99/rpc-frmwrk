@@ -8,6 +8,9 @@ debug:
 	@if [ ! -e $(OUTPUT_DIR)/librpc.so ]; then cd $(OUTPUT_DIR);ln -s ../../$(DBG_DIR)/librpc.so;cd -;fi
 	@if [ ! -e $(OUTPUT_DIR)/libsslpt.so ]; then cd $(OUTPUT_DIR);ln -s ../../$(DBG_DIR)/libsslpt.so;cd -;fi
 	@if [ ! -e $(OUTPUT_DIR)/libwspt.so ]; then cd $(OUTPUT_DIR);ln -s ../../$(DBG_DIR)/libwspt.so;cd -;fi
+	@if [ ! -e $(OUTPUT_DIR)/libauth.so ]; then cd $(OUTPUT_DIR);ln -s ../../$(DBG_DIR)/libauth.so;cd -;fi
+	@if [ ! -e $(OUTPUT_DIR)/driver.json ]; then cd $(OUTPUT_DIR);ln -s ../../ipc/driver.json;cd -;fi
+	@if [ ! -e $(OUTPUT_DIR)/authprxy.json ]; then cd $(OUTPUT_DIR);ln -s ../../rpc/security/authprxy.json;cd -;fi
 	$(MAKE) -C helloworld
 	$(MAKE) -C iftest
 	$(MAKE) -C asynctst
@@ -28,6 +31,9 @@ release:
 	@if [ ! -e $(OUTPUT_DIR)/librpc.so ]; then cd $(OUTPUT_DIR);ln -s ../../$(RLS_DIR)/librpc.so;cd -;fi
 	@if [ ! -e $(OUTPUT_DIR)/libsslpt.so ]; then cd $(OUTPUT_DIR);ln -s ../../$(RLS_DIR)/libsslpt.so;cd -;fi
 	@if [ ! -e $(OUTPUT_DIR)/libwspt.so ]; then cd $(OUTPUT_DIR);ln -s ../../$(RLS_DIR)/libwspt.so;cd -;fi
+	@if [ ! -e $(OUTPUT_DIR)/libauth.so ]; then cd $(OUTPUT_DIR);ln -s ../../$(RLS_DIR)/libauth.so;cd -;fi
+	@if [ ! -e $(OUTPUT_DIR)/driver.json ]; then cd $(OUTPUT_DIR);ln -s ../../ipc/driver.json;cd -;fi
+	@if [ ! -e $(OUTPUT_DIR)/authprxy.json ]; then cd $(OUTPUT_DIR);ln -s ../../rpc/security/authprxy.json;cd -;fi
 	$(MAKE) -C helloworld release
 	$(MAKE) -C iftest release
 	$(MAKE) -C asynctst release
