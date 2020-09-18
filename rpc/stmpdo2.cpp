@@ -34,6 +34,14 @@
 #include "ifhelper.h"
 #include "tcportex.h"
 
+inline gint32 SendBytesWithFlag( int iFd,
+    void* pBuf, guint32 dwSize,
+    int dwFlags = 0 )
+{
+    dwFlags |= MSG_NOSIGNAL;
+    return send( iFd, pBuf, dwSize, dwFlags );
+}
+
 CRpcConnSock::CRpcConnSock(
     const IConfigDb* pCfg )
     : super( pCfg )
@@ -1104,6 +1112,10 @@ gint32 CBytesSender::SendImmediate(
             break;
         }
 
+        guint32 dwSendFlag = 0;
+        if( m_iBufIdx < iCount - 1 )
+            dwSendFlag = MSG_MORE;
+
         do{
             guint32 dwMaxBytes =
                 MAX_BYTES_PER_TRANSFER;
@@ -1112,10 +1124,9 @@ gint32 CBytesSender::SendImmediate(
                 pBuf->size() - m_dwOffset,
                 dwMaxBytes );
 
-            // DebugPrint( 0, "probe: calling send" );
-            ret = SendBytesNoSig( iFd,
+            ret = SendBytesWithFlag( iFd,
                 pBuf->ptr() + m_dwOffset,
-                dwSize );
+                dwSize, dwSendFlag );
 
             if( ret == -1 && RETRIABLE( errno ) )
             {
@@ -1264,6 +1275,10 @@ gint32 CBytesSender::OnSendReady(
             break;
         }
 
+        guint32 dwSendFlag = 0;
+        if( m_iBufIdx < iCount - 1 )
+            dwSendFlag = MSG_MORE;
+
         do{
             guint32 dwMaxBytes =
                 MAX_BYTES_PER_TRANSFER;
@@ -1272,9 +1287,9 @@ gint32 CBytesSender::OnSendReady(
                 pBuf->size() - m_dwOffset,
                 dwMaxBytes );
 
-            ret = SendBytesNoSig( iFd,
+            ret = SendBytesWithFlag( iFd,
                 pBuf->ptr() + m_dwOffset,
-                dwSize );
+                dwSize, dwSendFlag );
 
             if( ret == -1 && RETRIABLE( errno ) )
             {

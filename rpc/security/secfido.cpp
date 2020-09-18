@@ -477,8 +477,8 @@ gint32 CRpcSecFido::SubmitWriteIrp(
         if( ERROR( ret ) )
             break;
 
-        BufPtr pReqBuf( true );
-        *pReqBuf = pOutBuf;
+        BufPtr pReqBuf;
+        pReqBuf = pOutBuf;
 
         PortPtr pLowerPort = GetLowerPort();
         ret = pIrp->AllocNextStack(
@@ -838,13 +838,13 @@ gint32 CRpcSecFido::DecryptPkt(
         if( !bSignMsg &&
             dwMagic == SIGNED_PACKET_MAGIC )
         {
-            ret = -EBADMSG;
+            ret = -EPROTO;
             break;
         }
         else if( bSignMsg &&
-            dwMagic != ENC_PACKET_MAGIC )
+            dwMagic == ENC_PACKET_MAGIC )
         {
-            ret = EBADMSG;
+            ret = -EPROTO;
             break;
         }
 

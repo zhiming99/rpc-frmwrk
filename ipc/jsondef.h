@@ -98,3 +98,4 @@
 #define JSON_ATTR_SVCNAME       "ServiceName"
 #define JSON_ATTR_REALM         "Realm"
 #define JSON_ATTR_USERNAME      "UserName"
+#define JSON_ATTR_SIGN_MSG      "SignMessage"

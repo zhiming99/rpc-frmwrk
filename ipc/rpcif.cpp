@@ -4161,6 +4161,17 @@ gint32 CRpcServices::LoadObjDesc(
                 }
 
                 strVal.clear();
+                if( oObjAuth.isMember( JSON_ATTR_SIGN_MSG ) &&
+                    oObjAuth[ JSON_ATTR_SIGN_MSG ].isString() )
+                {
+                    strVal = oObjAuth[ JSON_ATTR_SIGN_MSG ].asString();
+                    if( strVal.size() > 0 && strVal == "true" )
+                        oAuth.SetBoolProp( propSignMsg, true );
+                    else
+                        oAuth.SetBoolProp( propSignMsg, false );
+                }
+
+                strVal.clear();
                 if( oObjAuth.isMember( JSON_ATTR_USERNAME ) &&
                     oObjAuth[ JSON_ATTR_USERNAME ].isString() )
                 {
