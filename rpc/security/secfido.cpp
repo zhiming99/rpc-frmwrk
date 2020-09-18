@@ -171,6 +171,77 @@ gint32 CRpcSecFido::EncEnabled()
     return ret;
 }
 
+gint32 CRpcSecFido::BuildSingedMsg(
+    IAuthenticate* pAuthObj,
+    std::string& strHash,
+    BufPtr& pInBuf, BufPtr& pOutBuf )
+{
+    gint32 ret = 0;
+
+    if( pAuthObj == nullptr ||
+        pInBuf.IsEmpty() ||
+        pInBuf->empty() )
+        return -EINVAL;
+
+    do{
+        const guint32& dwHdrSize =
+            sizeof( SEC_PACKET_HEADER );
+
+        BufPtr pHeader( true );
+        pHeader->Resize( dwHdrSize + 2 );
+
+        if( strHash.empty() )
+        {
+            IAuthenticateProxy* pAuth =
+            static_cast< IAuthenticateProxy* >
+                    ( pAuthObj );
+            ret = pAuth->GetMicMsg(
+                pInBuf, pHeader );
+
+        }
+        else
+        {
+            IAuthenticateServer* pAuth =
+            static_cast< IAuthenticateServer* >
+                    ( pAuthObj );
+            ret = pAuth->GetMicMsg(
+                strHash, pInBuf, pHeader );
+        }
+
+        if( ERROR( ret ) )
+            break;
+
+
+        if( pHeader->size() > 65536 )
+        {
+            ret = -EOVERFLOW;
+            break;
+        }
+
+        guint16 wMicSize = pHeader->size()
+            - dwHdrSize - 2;
+
+        char* p = pHeader->ptr() + dwHdrSize;
+        *( ( guint16* )p ) = htons( wMicSize );
+
+        ( ( guint32* )pHeader->ptr() )[ 1 ] =
+            htonl( wMicSize + pInBuf->size() +
+            sizeof( guint16 ) );
+
+        ( ( guint32* )pHeader->ptr() )[ 0 ] =
+            htonl( SIGNED_PACKET_MAGIC );
+
+        CParamList oParams;
+        oParams.Push( pHeader );
+        oParams.Push( pInBuf );
+
+        *pOutBuf = ObjPtr( oParams.GetCfg() );
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CRpcSecFido::DoEncrypt(
     PIRP pIrp, BufPtr& pOutBuf, bool bEncrypt )
 {
@@ -262,6 +333,8 @@ gint32 CRpcSecFido::DoEncrypt(
         }
 
         ObjPtr pObj;
+        bool bSignMsg = false;
+
         if( bEncrypt )
         {
             ret = GetSecCtx( pObj );
@@ -277,7 +350,11 @@ gint32 CRpcSecFido::DoEncrypt(
             if( ERROR( ret ) )
                 break;
 
+            oSecCtx.GetBoolProp(
+                propSignMsg, bSignMsg );
+
             ret = IsClient();
+            std::string strHash;
             if( SUCCEEDED( ret ) )
             {
                 pInBuf->SetOffset(
@@ -293,13 +370,21 @@ gint32 CRpcSecFido::DoEncrypt(
                     break;
                 }
 
-                pOutBuf->Resize( dwHdrSize );
-
-                ret = pAuth->WrapMessage(
-                    pInBuf, pOutBuf );
-
-                if( ERROR( ret ) )
+                if( bSignMsg )
+                {
+                    ret = BuildSingedMsg( pAuth,
+                        strHash, pInBuf, pOutBuf );
                     break;
+                }
+                else
+                {
+                    pOutBuf->Resize( dwHdrSize );
+                    ret = pAuth->WrapMessage(
+                        pInBuf, pOutBuf );
+
+                    if( ERROR( ret ) )
+                        break;
+                }
             }
             else if( ret == ERROR_FALSE )
             {
@@ -316,18 +401,25 @@ gint32 CRpcSecFido::DoEncrypt(
                     break;
                 }
 
-                std::string strHash;
                 ret = oSecCtx.GetStrProp(
                     propSessHash, strHash );
                 if( ERROR( ret ) )
                     break;
 
-                pOutBuf->Resize( dwHdrSize );
-                ret = pAuth->WrapMessage(
-                    strHash, pInBuf, pOutBuf );
-
-                if( ERROR( ret ) )
+                if( bSignMsg )
+                {
+                    ret = BuildSingedMsg( pAuth,
+                        strHash, pInBuf, pOutBuf );
                     break;
+                }
+                else
+                {
+                    pOutBuf->Resize( dwHdrSize );
+                    ret = pAuth->WrapMessage(
+                        strHash, pInBuf, pOutBuf );
+                    if( ERROR( ret ) )
+                        break;
+                }
             }
             else
             {
@@ -385,10 +477,8 @@ gint32 CRpcSecFido::SubmitWriteIrp(
         if( ERROR( ret ) )
             break;
 
-        CParamList oParams;
-        oParams.Push( pOutBuf );
         BufPtr pReqBuf( true );
-        *pReqBuf = ObjPtr( oParams.GetCfg() );
+        *pReqBuf = pOutBuf;
 
         PortPtr pLowerPort = GetLowerPort();
         ret = pIrp->AllocNextStack(
@@ -575,7 +665,8 @@ gint32 CRpcSecFido::GetPktCached(
         guint32 dwMagic = ntohl(
             ( ( guint32* )pPayload )[ 0 ] );
 
-        if( dwMagic == ENC_PACKET_MAGIC )
+        if( dwMagic == ENC_PACKET_MAGIC ||
+            dwMagic == SIGNED_PACKET_MAGIC )
             bEncrypted = true;
         else if( dwMagic == CLEAR_PACKET_MAGIC )
             bEncrypted = false;
@@ -618,6 +709,67 @@ gint32 CRpcSecFido::GetPktCached(
 
     if( SUCCEEDED( ret ) )
         pRetBuf = pInBuf;
+
+    return ret;
+}
+
+gint32 CRpcSecFido::VerifySignedMsg(
+    IAuthenticate* pAuthObj,
+    std::string& strHash,
+    BufPtr& pInBuf,
+    BufPtr& pOutBuf )
+{
+    gint32 ret = 0;
+    if( pAuthObj == nullptr ||
+        pInBuf.IsEmpty() ||
+        pInBuf->empty() )
+        return -EINVAL;
+
+    do{
+        BufPtr pHeader( true );
+        char* p = pInBuf->ptr();
+
+        guint16 wMicSize =
+            ntohs( *( ( guint16* )p ) );
+
+        guint32 dwSize = pInBuf->size();
+
+        if( wMicSize >= dwSize )
+        {
+            ret = -EBADMSG;
+            break;
+        }
+
+        p += sizeof( guint16 );
+
+        pHeader->Append( p, wMicSize );
+        pInBuf->SetOffset( pInBuf->offset() + 
+            sizeof( guint16 ) + wMicSize );
+
+        if( strHash.empty() )
+        {
+            IAuthenticateProxy* pAuth =
+            static_cast< IAuthenticateProxy* >
+                    ( pAuthObj );
+            ret = pAuth->VerifyMicMsg(
+                pInBuf, pHeader );
+
+        }
+        else
+        {
+            IAuthenticateServer* pAuth =
+            static_cast< IAuthenticateServer* >
+                    ( pAuthObj );
+            ret = pAuth->VerifyMicMsg(
+                strHash, pInBuf, pHeader );
+        }
+
+        if( ERROR( ret ) )
+            break;
+
+        pOutBuf = pInBuf;
+
+    }while( 0 );
 
     return ret;
 }
@@ -673,6 +825,29 @@ gint32 CRpcSecFido::DecryptPkt(
         if( ERROR( ret ) )
             break;
 
+        bool bSignMsg = false;
+        oSecCtx.GetBoolProp(
+            propSignMsg, bSignMsg );
+
+        SEC_PACKET_HEADER* pHeader =
+            ( SEC_PACKET_HEADER* )pInBuf->ptr();
+
+        guint32 dwMagic =
+            ntohl( pHeader->m_dwMagic );
+
+        if( !bSignMsg &&
+            dwMagic == SIGNED_PACKET_MAGIC )
+        {
+            ret = -EBADMSG;
+            break;
+        }
+        else if( bSignMsg &&
+            dwMagic != ENC_PACKET_MAGIC )
+        {
+            ret = EBADMSG;
+            break;
+        }
+
         pInBuf->SetOffset(
             pInBuf->offset() + dwHdrSize );
 
@@ -683,6 +858,8 @@ gint32 CRpcSecFido::DecryptPkt(
             if( ERROR( ret ) )
                 break;
         }
+
+        std::string strHash;
         ret = IsClient();
         if( SUCCEEDED( ret ) )
         {
@@ -696,15 +873,22 @@ gint32 CRpcSecFido::DecryptPkt(
                 break;
             }
 
-            ret = pAuth->UnwrapMessage(
-                pInBuf, pOutBuf );
-
-            if( ERROR( ret ) )
+            if( bSignMsg )
             {
-                ret = -EPROTO;
-                break;
+                ret = VerifySignedMsg( pAuth,
+                    strHash, pInBuf, pOutBuf );
             }
+            else
+            {
+                ret = pAuth->UnwrapMessage(
+                    pInBuf, pOutBuf );
 
+                if( ERROR( ret ) )
+                {
+                    ret = -EPROTO;
+                    break;
+                }
+            }
         }
         else if( ret == ERROR_FALSE )
         {
@@ -718,19 +902,27 @@ gint32 CRpcSecFido::DecryptPkt(
                 break;
             }
 
-            std::string strHash;
             ret = oSecCtx.GetStrProp(
                 propSessHash, strHash );
+
             if( ERROR( ret ) )
                 break;
 
-            ret = pAuth->UnwrapMessage(
-                strHash, pInBuf, pOutBuf );
-
-            if( ERROR( ret ) )
+            if( bSignMsg )
             {
-                ret = -EPROTO;
-                break;
+                ret = VerifySignedMsg( pAuth,
+                    strHash, pInBuf, pOutBuf );
+            }
+            else
+            {
+                ret = pAuth->UnwrapMessage(
+                    strHash, pInBuf, pOutBuf );
+
+                if( ERROR( ret ) )
+                {
+                    ret = -EPROTO;
+                    break;
+                }
             }
         }
         else

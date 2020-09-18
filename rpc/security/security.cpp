@@ -395,6 +395,18 @@ gint32 CRpcTcpBridgeAuth::SetSessHash(
         {
             oCtx.SetObjPtr(
                 propObjPtr, pAuthImpl );
+
+            IConfigDb* pAuthInfo = nullptr;
+
+            CCfgOpenerObj oRtCfg( pRouter );
+            oRtCfg.GetPointer(
+                propAuthInfo, pAuthInfo );
+
+            if( ERROR( ret ) )
+                break;
+
+            oCtx.CopyProp(
+                propSignMsg, pAuthInfo );
         }
 
         oCtx.SetBoolProp( propNoEnc, bNoEnc );
@@ -2096,6 +2108,15 @@ gint32 CRpcTcpBridgeProxyAuth::SetSessHash(
         {
             oCtx.SetObjPtr(
                 propObjPtr, pSessImpl );
+
+            IConfigDb* pAuthInfo =
+                GET_AUTH( ( CObjBase* )pSessImpl );
+
+            if( ERROR( ret ) )
+                break;
+
+            oCtx.CopyProp(
+                propSignMsg, pAuthInfo );
         }
 
         oIfCfg.SetStrProp(
@@ -2684,6 +2705,21 @@ gint32 CRpcRouterReqFwdrAuth::IsEqualConn(
                 propRealm, pAuth2 );
             if( ERROR( ret ) )
                 break;
+                
+            bool bSignMsg1 = false;
+            bool bSignMsg2 = false;
+
+            oAuth1.GetBoolProp(
+                propSignMsg, bSignMsg1 );
+
+            oAuth2.GetBoolProp(
+                propSignMsg, bSignMsg2 );
+
+            if( bSignMsg1 != bSignMsg2 )
+            {
+                ret = ERROR_FALSE;
+                break;
+            }
         }
 
         ret = 0;

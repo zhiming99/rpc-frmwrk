@@ -1483,7 +1483,7 @@ gint32 verify_message(
             &qop_state );
 
         if( maj_stat != GSS_S_COMPLETE )
-            ret = ERROR_FAIL;
+            ret = -EBADMSG;
 
     }while( 0 );
 

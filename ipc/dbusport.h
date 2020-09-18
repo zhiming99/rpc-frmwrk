@@ -1009,6 +1009,21 @@ class CConnParamsProxy : public CConnParams
                     ret = false;
                     break;
                 }
+
+                bool bSignMsg1 = false;
+                bool bSignMsg2 = false;
+
+                oAuth1.GetBoolProp(
+                    propSignMsg, bSignMsg1 );
+                
+                oAuth2.GetBoolProp(
+                    propSignMsg, bSignMsg2 );
+
+                if( !bSignMsg1 && bSignMsg2 )
+                {
+                    ret = true;
+                    break;
+                }
             }
 
             ret = false;
