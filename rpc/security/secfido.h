@@ -49,6 +49,8 @@ struct SEC_PACKET_HEADER
     guint32 m_dwSize = 0;;
 };
 
+struct IAuthenticate;
+
 class CRpcSecFido : public CPort
 {
     BufPtr      m_pInBuf;
@@ -67,6 +69,18 @@ class CRpcSecFido : public CPort
         IRP* pIrp );
 
     gint32 EncEnabled();
+
+    gint32 VerifySignedMsg(
+        IAuthenticate* pAuthObj,
+        std::string& strHash,
+        BufPtr& pInBuf,
+        BufPtr& pOutBuf );
+
+    gint32 BuildSingedMsg(
+        IAuthenticate* pAuthObj,
+        std::string& strHash,
+        BufPtr& pInBuf,
+        BufPtr& pOutBuf );
 
     public:
 

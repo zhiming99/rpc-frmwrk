@@ -231,6 +231,7 @@ enum EnumPropId : gint32
     propSearchPaths,    // type: an objptr to a set of paths where to find the libraries and config files
 
     propCustomEvent,    // type: a connection point for port specific events
+    propSignMsg,        // type: a bool to indicate whether to sign the message or encrypt the message.
 
     propReservedEnd = 0x10000000,
     propInvalid = -1, 

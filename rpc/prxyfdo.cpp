@@ -863,10 +863,9 @@ gint32 CProxyFdoListenTask::Process(
                         true, -ECANCELED );
                 }
             }
-            oParams.RemoveProperty(
-                propPortPtr );
-            oParams.RemoveProperty(
-                propIoMgr );
+            oParams.RemoveProperty( propPortPtr );
+            oParams.RemoveProperty( propIoMgr );
+            super::OnCancel( dwContext );
             ret = -ECANCELED;
             break;
         }
