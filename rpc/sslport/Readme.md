@@ -10,4 +10,6 @@
 openssl req -x509 -newkey rsa:4096 -nodes -keyout key.pem -out cert.pem -days 365
 ```
 
-. The `sslfido` related settings are all added to the [driver.json](https://github.com/zhiming99/rpc-frmwrk/blob/master/ipc/driver.json). You can find the detail in this file.
+* The `sslfido` related settings are all added to the [driver.json](https://github.com/zhiming99/rpc-frmwrk/blob/master/ipc/driver.json). You can find the detail in this file.
+
+* To enable SSL, you need to add `EnableSSL:true` to the description files of the `driver.json` and the proxy's description. 
