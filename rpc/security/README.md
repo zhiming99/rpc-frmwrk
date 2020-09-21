@@ -126,8 +126,8 @@ to work with `rpc-frmwrk` on such a simple network.
                 ... ...
                 "SignMessage" : "true"
             }
-  ```  
-    * To enable SSL, please refer to this [`Read.md`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/sslport/Readme.md)
+  ```
+  * To enable SSL, please refer to this [`Read.md`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/sslport/Readme.md)
   
 5. Start the rpcrouter with `-a` option, which is the authentication flag.
 
