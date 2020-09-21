@@ -118,7 +118,16 @@ to work with `rpc-frmwrk` on such a simple network.
                 "Realm" : "rpcfrmwrk.org"
             }
   ```
-  * The messages of the authenticated session is usually encrypted over the network. And it can be signed instead, which can be preferable if you want to use SSL as the encryption method. You need to add `SignMessage:"true"` to both `rtauth.json` and `hwdesc.json` to get signing message enabled. To enable SSL, please refer to this [`Read.md`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/sslport/Readme.md)
+  * The messages of the authenticated session is usually encrypted over the network. And it can be signed instead, which can be preferable if you want to use SSL as the encryption method. You need to add `SignMessage:"true"` to both `rtauth.json` and `hwdesc.json` as mentioned above to enable this feature.
+  ```
+            "AuthInfo" :
+            {
+                "AuthMech" : "krb5",
+                ... ...
+                "SignMessage" : "true"
+            }
+  ```  
+    * To enable SSL, please refer to this [`Read.md`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/sslport/Readme.md)
   
 5. Start the rpcrouter with `-a` option, which is the authentication flag.
 
