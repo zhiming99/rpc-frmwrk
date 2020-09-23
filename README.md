@@ -38,7 +38,10 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 
 ---
 [`Wed 23 Sep 2020 12:24:43 PM Beijing`]   
-1. Next task would be adding support to Python. And I will fix a concurrent bug in the I/O manager before the task begins.
+1. TODO next
+    * Fix a concurrent bug in the IO manager
+    * Add the `make install` build command
+    * Add support to Python
 
 [`Tue 15 Sep 2020 11:37:29 AM Beijing`]   
 1. Fixed a bunch of bugs. Now the system works stable. After almost 5 months, Kerberos authentication support is finally ready! :) 
