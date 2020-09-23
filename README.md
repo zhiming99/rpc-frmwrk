@@ -40,7 +40,7 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 [`Wed 23 Sep 2020 12:24:43 PM Beijing`]   
 1. TODO next
     * Fix a concurrent bug in the IO manager
-    * Add the `make install` build command
+    * Add the build command `make install`
     * Add support to Python
 
 [`Tue 15 Sep 2020 11:37:29 AM Beijing`]   
