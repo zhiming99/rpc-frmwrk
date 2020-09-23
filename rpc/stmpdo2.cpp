@@ -2037,6 +2037,11 @@ gint32 CTcpStreamPdo2::StartSend(
                 // start sending immediately
                 gint32 iFd = -1;
                 ret = pSock->GetSockFd( iFd );
+                if( ERROR( ret ) )
+                {
+                    ret = ERROR_PORT_STOPPED;
+                    break;
+                }
                 m_oSender.SetIrpToSend(
                     m_queWriteIrps.front() );
                 m_queWriteIrps.pop_front();
@@ -2097,7 +2102,10 @@ gint32 CTcpStreamPdo2::StartSend2(
         gint32 iFd = -1;
         ret = pSock->GetSockFd( iFd );
         if( ERROR( ret ) )
+        {
+            ret = ERROR_PORT_STOPPED;
             break;
+        }
 
         if( !m_oSender.IsSendDone() ||
             m_queWriteIrps.size() > 1 )

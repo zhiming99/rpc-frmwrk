@@ -760,16 +760,21 @@ gint32 CRpcOpenSSLFido::CompleteListeningIrp(
     IRP* pIrp )
 {
     // listening request from the upper port
+    if( pIrp == nullptr ||
+        pIrp->GetStackSize() < 2 )
+        return -EINVAL;
+
+    if( pIrp->IsIrpHolder() )
+        return -EINVAL;
+
     gint32 ret = 0;
     IrpCtxPtr pCtx;
-    do{
-        pCtx = pIrp->GetCurCtx();
-        IrpCtxPtr pTopCtx = pIrp->GetTopStack();
-
-        BufPtr& pRespBuf = pTopCtx->m_pRespData;
-        STREAM_SOCK_EVENT* psse =
+    pCtx = pIrp->GetCurCtx();
+    IrpCtxPtr pTopCtx = pIrp->GetTopStack();
+    BufPtr& pRespBuf = pTopCtx->m_pRespData;
+    STREAM_SOCK_EVENT* psse =
         ( STREAM_SOCK_EVENT* )pRespBuf->ptr();
-
+    do{
         BufPtr pEncrypted = psse->m_pInBuf;
         if( pEncrypted.IsEmpty() ||
             pEncrypted->empty() )
@@ -846,27 +851,12 @@ gint32 CRpcOpenSSLFido::CompleteListeningIrp(
 
         }while( 1 );
 
-        if( ret == -ENOMEM )
-        {
-            pCtx->SetStatus( ret );
-            break;
-        }
-
+        gint32 iRet = ret;
         ret = GetSSLError( m_pSSL, iNumRead );
-        if( ret == -ENOTCONN )
+        if( ERROR( ret ) || ERROR( iRet ) )
         {
-            // peer initiated shutdown
-            psse->m_iEvent = sseError;
-            psse->m_iData = ret;
-            pCtx->SetRespData( pRespBuf );
-            pCtx->SetStatus( 0 );
-            ret = 0;
-            break;
-        }
-
-        if( ERROR( ret ) )
-        {
-            pCtx->SetStatus( ret );
+            if( SUCCEEDED( ret ) )
+                ret = iRet;
             break;
         }
 
@@ -974,8 +964,18 @@ gint32 CRpcOpenSSLFido::CompleteListeningIrp(
     if( ret == STATUS_PENDING )
         return ret;
 
-    if( !pIrp->IsIrpHolder() )
-        pIrp->PopCtxStack();
+    if( ERROR( ret ) )
+    {
+        psse->m_iEvent = sseError;
+        psse->m_iData = ret;
+        psse->m_pInBuf.Clear();
+        pCtx->SetRespData( pRespBuf );
+        ret = STATUS_SUCCESS;
+        DebugPrint( ret, "SSLFido, error detected "
+        "in CompleteListeningIrp" );
+    }
+    pCtx->SetStatus( 0 );
+    pIrp->PopCtxStack();
 
     return ret;
 }

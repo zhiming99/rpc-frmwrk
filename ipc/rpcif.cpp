@@ -4876,31 +4876,30 @@ gint32 CRpcServices::AddSeqTaskInternal(
     bool bNew = false;
     do{
         TaskGrpPtr ptrSeqTasks;
-        if( true )
+
+        CStdRMutex oIfLock( GetLock() );
+        if( pQueuedTasks.IsEmpty() )
         {
-            CStdRMutex oIfLock( GetLock() );
-            if( pQueuedTasks.IsEmpty() )
-            {
-                CParamList oParams;
-                oParams[ propIoMgr ] = 
-                    ObjPtr( GetIoMgr() );
+            CParamList oParams;
+            oParams[ propIoMgr ] = 
+                ObjPtr( GetIoMgr() );
 
-                ret = pQueuedTasks.NewObj(
-                    clsid( CIfTaskGroup ),
-                    oParams.GetCfg() );
+            ret = pQueuedTasks.NewObj(
+                clsid( CIfTaskGroup ),
+                oParams.GetCfg() );
 
-                if( ERROR( ret ) )
-                    break;
+            if( ERROR( ret ) )
+                break;
 
-                pQueuedTasks->SetRelation( logicNONE );
-                bNew = true;
-            }
-            ptrSeqTasks = pQueuedTasks;
+            pQueuedTasks->SetRelation( logicNONE );
+            bNew = true;
         }
+        ptrSeqTasks = pQueuedTasks;
+        oIfLock.Unlock();
 
         CIfRetryTask* pSeqTasks = ptrSeqTasks;
         CStdRTMutex oTaskLock( pSeqTasks->GetLock() );
-        CStdRMutex oIfLock( GetLock() );
+        oIfLock.Lock();
         if( pQueuedTasks.IsEmpty() )
             continue;
 

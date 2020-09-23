@@ -552,7 +552,12 @@ gint32 CRpcSecFido::SubmitIoctlCmd(
                 break;
 
             if( ret != EAGAIN )
+            {
+                DebugPrint( ret, "Received unexpected error "
+                    "in SubmitIoctlCmd" );
+                ret = -ret;
                 break;
+            }
 
             PortPtr pLowerPort = GetLowerPort();
             ret = pIrp->AllocNextStack(
@@ -942,6 +947,9 @@ gint32 CRpcSecFido::CompleteListeningIrp(
         pIrp->GetStackSize() == 0 )
         return -EINVAL;
 
+    if( pIrp->IsIrpHolder() )
+        return -EINVAL;
+
     // listening request from the upper port
     gint32 ret = 0;
     IrpCtxPtr pCtx = pIrp->GetCurCtx();
@@ -1024,14 +1032,15 @@ gint32 CRpcSecFido::CompleteListeningIrp(
     {
         psse->m_iEvent = sseError;
         psse->m_iData = ret;
+        psse->m_pInBuf.Clear();
         pCtx->m_pRespData = pRespBuf;
-        ret = 0;
+        ret = STATUS_SUCCESS;
+        DebugPrint( ret, "secfido, error detected "
+        "in CompleteListeningIrp" );
     }
 
     pCtx->SetStatus( ret );
-
-    if( !pIrp->IsIrpHolder() )
-        pIrp->PopCtxStack();
+    pIrp->PopCtxStack();
 
     return ret;
 }

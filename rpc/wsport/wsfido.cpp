@@ -723,9 +723,9 @@ gint32 CRpcWebSockFido::CompleteListeningIrp(
             }
 
             psse->m_iEvent = sseError;
-            psse->m_iData = ret = -ENOTCONN;
+            psse->m_iData = -ENOTCONN;
             pCtx->SetRespData( pRespBuf );
-            pCtx->SetStatus( ret );
+            pCtx->SetStatus( STATUS_SUCCESS );
             break;
         }
         else if( ret1 == PING_FRAME )
