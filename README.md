@@ -37,6 +37,12 @@ This framework depends on the following packags to build:
 Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60) for details.
 
 ---
+[`Wed 23 Sep 2020 12:24:43 PM Beijing`]   
+1. TODO next
+    * Fix a concurrent bug in the IO manager
+    * Add the build command `make install`
+    * Add support to Python
+
 [`Tue 15 Sep 2020 11:37:29 AM Beijing`]   
 1. Fixed a bunch of bugs. Now the system works stable. After almost 5 months, Kerberos authentication support is finally ready! :) 
 
