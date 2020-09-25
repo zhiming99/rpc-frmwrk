@@ -92,8 +92,17 @@ static CfgPtr InitIfProxyCfg(
     if( oOldCfg.exist( propIfStateClass ) )
         return CfgPtr( const_cast< IConfigDb* >( pCfg ) );
 
+    EnumClsid iStateClass =
+        clsid( CLocalProxyState );
+
     CCfgOpener oNewCfg;
     *oNewCfg.GetCfg() = *pCfg;
+    if( oNewCfg.exist( propNoPort ) )
+    {
+        oNewCfg.SetIntProp(
+            propIfStateClass, iStateClass );
+        return oNewCfg.GetCfg();
+    }
 
     string strPortClass;
     gint32 ret = oNewCfg.GetStrProp(
@@ -105,23 +114,21 @@ static CfgPtr InitIfProxyCfg(
             DebugMsg( -EINVAL, "Error occurs" ) );
     }
 
-    EnumClsid iStateClass =
-        clsid( CLocalProxyState );
-
-    if( strPortClass == PORT_CLASS_DBUS_PROXY_PDO )
+    if( strPortClass ==
+        PORT_CLASS_DBUS_PROXY_PDO )
     {
         // CRemoteProxyState will have an extra ip
         // address to match
         iStateClass = clsid( CRemoteProxyState );
     }
-    else if( strPortClass == PORT_CLASS_UXSOCK_STM_PDO )
+    else if( strPortClass ==
+        PORT_CLASS_UXSOCK_STM_PDO )
     {
         iStateClass = clsid( CUnixSockStmState );
     }
 
     oNewCfg.SetIntProp(
-        propIfStateClass,
-        iStateClass );
+        propIfStateClass, iStateClass );
 
     return oNewCfg.GetCfg();
 }
@@ -135,6 +142,9 @@ CInterfaceProxy::CInterfaceProxy(
     do{
         CCfgOpener oCfg( pCfg );
         string strPortClass;
+
+        if( oCfg.exist( propNoPort ) )
+            break;
 
         ret = oCfg.GetStrProp(
             propPortClass, strPortClass );
@@ -904,6 +914,15 @@ gint32 CRpcInterfaceBase::StartEx(
 
         if( ERROR( ret ) )
             break;
+
+        // non-IO interface
+        ret = oParams.CopyProp(propNoPort, this );
+        if( SUCCEEDED( ret ) )
+        {
+            ret = SetStateOnEvent(
+                eventPortStarted );
+            break;
+        }
 
         ret = pTaskGrp.NewObj(
             clsid( CIfTaskGroup ),

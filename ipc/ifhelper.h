@@ -3314,3 +3314,6 @@ class _ClassName : public virtual CAggInterfaceProxy{ \
 #define END_DECL_IF_PROXY_SYNC( _ClassName ) \
     END_DECL_PROXY_SYNC( _ClassName )
 
+BEGIN_DECL_PROXY_SYNC( CSimpleSyncIf, CInterfaceProxy )
+END_DECL_PROXY_SYNC( CSimpleSyncIf )
+

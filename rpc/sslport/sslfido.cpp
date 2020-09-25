@@ -524,16 +524,29 @@ gint32 CRpcOpenSSLFido::SubmitIoctlCmd(
             STREAM_SOCK_EVENT* psse =
             ( STREAM_SOCK_EVENT* )pRespBuf->ptr();
 
-            if( psse->m_iEvent == sseError )
+            if( unlikely(
+                psse->m_iEvent == sseError ) )
             {
                 pCtx->SetRespData( pRespBuf );
-                pCtx->SetStatus( ret );
+                pCtx->SetStatus( STATUS_SUCCESS );
             }
-            else if( psse->m_iEvent ==
-                sseRetWithFd )
+            else if( unlikely(
+                psse->m_iEvent == sseRetWithFd ) )
             {
-                ret = -ENOTSUP;
-                pCtx->SetStatus( ret );
+                psse->m_iEvent = sseError;
+                psse->m_iData = -ENOTSUP;
+                psse->m_iEvtSrc = GetClsid();
+                pCtx->SetRespData( pRespBuf );
+                pCtx->SetStatus( STATUS_SUCCESS );
+            }
+            else if( unlikely(
+                psse->m_iEvent == sseInvalid ) )
+            {
+                psse->m_iEvent = sseError;
+                psse->m_iData = -ENOTSUP;
+                psse->m_iEvtSrc = GetClsid();
+                pCtx->SetRespData( pRespBuf );
+                pCtx->SetStatus( STATUS_SUCCESS );
             }
             else
             {
@@ -771,7 +784,7 @@ gint32 CRpcOpenSSLFido::CompleteListeningIrp(
     IrpCtxPtr pCtx;
     pCtx = pIrp->GetCurCtx();
     IrpCtxPtr pTopCtx = pIrp->GetTopStack();
-    BufPtr& pRespBuf = pTopCtx->m_pRespData;
+    BufPtr pRespBuf = pTopCtx->m_pRespData;
     STREAM_SOCK_EVENT* psse =
         ( STREAM_SOCK_EVENT* )pRespBuf->ptr();
     do{
@@ -969,6 +982,7 @@ gint32 CRpcOpenSSLFido::CompleteListeningIrp(
         psse->m_iEvent = sseError;
         psse->m_iData = ret;
         psse->m_pInBuf.Clear();
+        psse->m_iEvtSrc = GetClsid();
         pCtx->SetRespData( pRespBuf );
         ret = STATUS_SUCCESS;
         DebugPrint( ret, "SSLFido, error detected "
@@ -1029,10 +1043,13 @@ gint32 CRpcOpenSSLFido::CompleteIoctlIrp(
                         pTopCtx->GetStatus() );
                     break;
                 }
-                else if( psse->m_iEvent == sseRetWithFd )
+                else if( psse->m_iEvent != sseRetWithBuf )
                 {
-                    ret = -ENOTSUP;
-                    pCtx->SetStatus( ret );
+                    psse->m_iEvent = sseError;
+                    psse->m_iData = -ENOTSUP;
+                    psse->m_iEvtSrc = GetClsid();
+                    pCtx->SetRespData( pBuf );
+                    pCtx->SetStatus( STATUS_SUCCESS );
                     break;
                 }
                 ret = CompleteListeningIrp( pIrp );

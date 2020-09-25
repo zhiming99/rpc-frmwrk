@@ -724,6 +724,7 @@ gint32 CRpcWebSockFido::CompleteListeningIrp(
 
             psse->m_iEvent = sseError;
             psse->m_iData = -ENOTCONN;
+            psse->m_iEvtSrc = GetClsid();
             pCtx->SetRespData( pRespBuf );
             pCtx->SetStatus( STATUS_SUCCESS );
             break;

@@ -360,6 +360,8 @@ class CIoManager : public IService
     gint32                      m_iMaxIrpThrd = 2;
     gint32                      m_iMaxTaskThrd = 2;
 
+    ObjPtr                      m_pSyncIf;
+
     protected:
 
     std::recursive_mutex& GetLock() const;
@@ -467,6 +469,8 @@ class CIoManager : public IService
     CThreadPool& GetTaskThreadPool() const;
     const std::string& GetModName() const;
     sem_t* GetSyncSem() const;
+
+    ObjPtr& GetSyncIf() const;
 
     guint32 GetNumCores() const
     { return m_dwNumCores; }
@@ -615,6 +619,12 @@ class CIoManager : public IService
     gint32 TryFindDescFile(
         const std::string& strFile,
         std::string& strPath );
+
+    gint32 AddAndRun(
+        TaskletPtr& pTask, bool bImmediate );
+
+    gint32 AppendAndRun(
+        TaskletPtr& pTask );
 };
 
 template<>

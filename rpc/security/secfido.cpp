@@ -636,6 +636,7 @@ gint32 CRpcSecFido::SubmitIoctlCmd(
         memcpy( pInBuf->ptr(),
             &sse, sizeof( sse ) );
         pCtx->SetRespData( pInBuf );
+        sse.m_iEvtSrc = GetClsid();
         ret = 0;
     }
 
@@ -1033,6 +1034,7 @@ gint32 CRpcSecFido::CompleteListeningIrp(
         psse->m_iEvent = sseError;
         psse->m_iData = ret;
         psse->m_pInBuf.Clear();
+        psse->m_iEvtSrc = GetClsid();
         pCtx->m_pRespData = pRespBuf;
         ret = STATUS_SUCCESS;
         DebugPrint( ret, "secfido, error detected "

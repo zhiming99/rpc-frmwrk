@@ -746,20 +746,3 @@ class CSyncCallback :
     { return -ENOTSUP; }
 };
 
-class CProxyPdoConnectTask
-    : public CThreadSafeTask
-{
-    public:
-    typedef CThreadSafeTask super;
-    CProxyPdoConnectTask( const IConfigDb* pCfg = nullptr )
-        : CThreadSafeTask( pCfg )
-    {
-        SetClassId( clsid( CProxyPdoConnectTask ) );
-    }
-    gint32 Process( guint32 dwContext );
-    gint32 ExtendIrpTimer( IRP* pIrp );
-    gint32 CompleteMasterIrp(
-        IRP* pIrp, gint32 ret2, bool bRetry );
-    gint32 CompleteReconnect( gint32 iRet );
-};
-
