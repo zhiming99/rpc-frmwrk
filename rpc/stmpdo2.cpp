@@ -1938,7 +1938,11 @@ gint32 CTcpStreamPdo2::SubmitListeningCmd(
         return ret;
 
     if( vecIrps.empty() )
+    {
+        ret = -ENOENT;
+        pCtx->SetStatus( ret );
         return ret;
+    }
 
     if( vecIrps.size() == 1 && bCompleted )
     {

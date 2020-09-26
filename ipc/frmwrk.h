@@ -336,8 +336,8 @@ class CIoManager : public IService
     // currently we allow only one instance of
     // CIoManager in a process. we use
     // `m_bInit' to control this.
-    static bool                 m_bInit;
-    static bool                 m_bStop;
+    bool                        m_bInit = false;
+    std::atomic< bool >         m_bStop = { false };
 
     CPortInterfaceMap           m_oPortIfMap;
 
@@ -355,7 +355,7 @@ class CIoManager : public IService
     // house clean timer
     gint32                      m_iHcTimer;
 
-    std::vector< ThreadPtr >      m_vecStandAloneThread;
+    std::vector< ThreadPtr >    m_vecStandAloneThread;
 
     gint32                      m_iMaxIrpThrd = 2;
     gint32                      m_iMaxTaskThrd = 2;

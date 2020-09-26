@@ -886,7 +886,12 @@ gint32 CRpcOpenSSLFido::CompleteListeningIrp(
                 IPort* pPort = GetLowerPort();
                 ret = pPort->SubmitIrp( pIrp );
                 if( SUCCEEDED( ret ) )
+                {
+                    pRespBuf = pTopCtx->m_pRespData;
+                    psse = ( STREAM_SOCK_EVENT* )
+                        pRespBuf->ptr();
                     continue;
+                }
 
                 // STATUS_PENDING goes here
             }

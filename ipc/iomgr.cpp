@@ -37,9 +37,6 @@
 #include "ifhelper.h"
 using namespace std;
 
-bool CIoManager::m_bInit( false );
-bool CIoManager::m_bStop( false );
-
 gint32 CIoManager::SubmitIrpInternal(
     IPort* pPort,
     IRP* pIrp1,

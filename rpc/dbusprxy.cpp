@@ -1278,7 +1278,6 @@ gint32 CProxyPdoConnectTask::Process(
     guint32 dwContext )
 {
     gint32 ret                  = 0;
-    gint32 iRetries             = 0;
     IRP* pMasterIrp             = nullptr;
     CIoManager* pMgr            = nullptr;
     CDBusProxyPdo* pProxyPort   = nullptr; 
