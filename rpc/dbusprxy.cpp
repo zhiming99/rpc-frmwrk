@@ -1112,7 +1112,7 @@ gint32 CProxyPdoConnectTask::CompleteReconnect(
 }
 
 gint32 CProxyPdoConnectTask::CompleteMasterIrp(
-    IRP* pMasterIrp, gint32 iRetConn, bool bRetry )
+    IRP* pMasterIrp, gint32 iRetConn )
 {
     gint32 ret                  = 0;
     CIoManager* pMgr            = nullptr;
@@ -1134,15 +1134,6 @@ gint32 CProxyPdoConnectTask::CompleteMasterIrp(
 
            ret = -EINVAL; 
            break;
-        }
-
-        if( iRetConn == -EAGAIN && bRetry )
-        {
-            // the connect request hits a temporary
-            // port state, and hinted to retry.
-            // Yes, we can retry, let's do it
-            ret = STATUS_MORE_PROCESS_NEEDED;
-            break;
         }
 
         ret = oParams.GetObjPtr( propPortPtr, pObj );
@@ -1287,7 +1278,6 @@ gint32 CProxyPdoConnectTask::Process(
     guint32 dwContext )
 {
     gint32 ret                  = 0;
-    gint32 iRetries             = 0;
     IRP* pMasterIrp             = nullptr;
     CIoManager* pMgr            = nullptr;
     CDBusProxyPdo* pProxyPort   = nullptr; 
@@ -1320,6 +1310,8 @@ gint32 CProxyPdoConnectTask::Process(
             bExpired = true;
     }
 
+    bool bRetry = CanRetry();
+
     do{
         if( dwContext == eventIrpComp )
         {
@@ -1343,11 +1335,12 @@ gint32 CProxyPdoConnectTask::Process(
                 ret == -ENOTCONN ||
                 ret == -ETIMEDOUT )
             {
-                if( CanRetry() )
+                if( bRetry )
                 {
                     DebugPrint( ret,
                         "Server is not up, retry in %d seconds",
                         PROXYPDO_CONN_INTERVAL );
+                    oParams.ClearParams();
                     ret = STATUS_MORE_PROCESS_NEEDED;
                 }
                 else
@@ -1366,6 +1359,16 @@ gint32 CProxyPdoConnectTask::Process(
             ret = oParams.GetPointer( 0, pIrp );
             if( ERROR( ret ) )
                 break;
+
+            CStdRMutex oIrpLock( pIrp->GetLock() );
+            ret = pIrp->CanContinue(
+                IRP_STATE_READY );
+            if( ERROR( ret ) )
+                break;
+
+            pIrp->RemoveCallback();
+            pIrp->RemoveTimer();
+            oIrpLock.Unlock();
 
             ret = pMgr->CancelIrp(
                 pIrp, true, -ECANCELED );
@@ -1393,14 +1396,7 @@ gint32 CProxyPdoConnectTask::Process(
             break;
         }
 
-        // port not connected
-        ret = oParams.GetIntProp(
-            propRetries, ( guint32& )iRetries );
-
-        if( ERROR( ret ) )
-            break;
-
-        if( iRetries <= 0 )
+        if( !bRetry )
         {
             ret = -ETIMEDOUT;
             break;
@@ -1467,25 +1463,24 @@ gint32 CProxyPdoConnectTask::Process(
 
     if( pMasterIrp != nullptr )
     {
-        ret = CompleteMasterIrp(
-            pMasterIrp, ret, iRetries > 0 );
+        CompleteMasterIrp( pMasterIrp, ret );
     }
     else
     {
-        ret = CompleteReconnect( ret );
+        CompleteReconnect( ret );
     }
 
-    ret = oParams.GetPointer(
+    gint32 iRet = oParams.GetPointer(
         propPortPtr, pProxyPort );
 
-    if( SUCCEEDED( ret ) )
+    if( SUCCEEDED( iRet ) )
     {
         pProxyPort->ClearConnTask();
     }
 
     RemoveProperty( propIrpPtr );
     RemoveProperty( propPortPtr );
-    RemoveProperty( 0 );
+    oParams.ClearParams();
 
     return SetError( ret );
 }
@@ -1593,8 +1588,15 @@ gint32 CDBusProxyPdo::OnPortReady( IRP* pIrp )
         CParamList oParams;
 
         // retry parameters
-        oParams.SetIntProp(
-            propRetries, PROXYPDO_CONN_RETRIES );
+        if( IS_AUTH_PROXY( this ) )
+        {
+            oParams.SetIntProp( propRetries, 0 );
+        }
+        else
+        {
+            oParams.SetIntProp( propRetries,
+                PROXYPDO_CONN_RETRIES );
+        }
 
         oParams.SetIntProp(
             propIntervalSec, PROXYPDO_CONN_INTERVAL );
@@ -1926,8 +1928,13 @@ gint32 CDBusProxyPdo::Reconnect()
         CParamList oParams;
         CIoManager* pMgr = GetIoMgr();
 
-        oParams[ propRetries ] =
-            PROXYPDO_CONN_RETRIES;
+        if( IS_AUTH_PROXY( this ) )
+            oParams[ propRetries ] = 0;
+        else
+        {
+            oParams[ propRetries ] =
+                PROXYPDO_CONN_RETRIES;
+        }
 
         oParams[ propIntervalSec ] =
             PROXYPDO_CONN_INTERVAL;

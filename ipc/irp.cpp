@@ -223,6 +223,10 @@ gint32 IRP_CONTEXT::GetReqAsCfg( CfgPtr& pCfg )
                 ret = -EFAULT;
         }
     }
+    catch( std::runtime_error & e )
+    {
+        ret = ERROR_FAIL;
+    }
     catch( std::invalid_argument& e )
     {
        ret = -EINVAL; 

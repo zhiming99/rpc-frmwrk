@@ -234,11 +234,13 @@ struct STREAM_SOCK_EVENT
     // m_pInBuf is a data block if m_iEvent is
     // sseRetWithBuf
     BufPtr          m_pInBuf;
+    EnumClsid       m_iEvtSrc;
 
     STREAM_SOCK_EVENT()
     {
         m_iEvent = sseInvalid;
         m_iData = 0;
+        m_iEvtSrc = clsid( Invalid );
     }
 
     STREAM_SOCK_EVENT(
@@ -247,6 +249,7 @@ struct STREAM_SOCK_EVENT
         m_iEvent = rhs.m_iEvent;
         m_iData = rhs.m_iData;
         m_pInBuf = rhs.m_pInBuf;
+        m_iEvtSrc = rhs.m_iEvtSrc;
     }
 };
 

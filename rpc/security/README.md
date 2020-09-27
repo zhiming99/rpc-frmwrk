@@ -117,13 +117,25 @@ to work with `rpc-frmwrk` on such a simple network.
                 "ServiceName" : "rasp1@rpcfrmwrk.org",
                 "Realm" : "rpcfrmwrk.org"
             }
- ```
+  ```
+  * The messages of the authenticated session is usually encrypted over the network. And it can be signed instead, which can be preferable if you want to use SSL as the encryption method. You need to add `SignMessage:"true"` to both `rtauth.json` and `hwdesc.json` as mentioned above to enable this feature.
+  ```
+            "AuthInfo" :
+            {
+                "AuthMech" : "krb5",
+                ... ...
+                "SignMessage" : "true"
+            }
+  ```
+  * To enable SSL, please refer to this [`Readme.md`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/sslport/Readme.md)
+  
 5. Start the rpcrouter with `-a` option, which is the authentication flag.
 
 ##### 5. More information
-1. The communication of an authenticated session is encrypted all the way.
+1. The communication of an authenticated session is encrypted or signed throughout the session's lifecycle.
 2. The duration for authenticating process can last for about 2 minutes, if the process cannot complete during this period, the bridge side will reset the connection.
-3. If the ticket expires, the session will ends in 10 minutes.
-4. Authorization and access control is not implementated yet.
+3. If the service ticket expires, the session will ends in 10 minutes.
+4. Train yourself to get used to `kinit` and `klist`, which can be used frequently as the login method. `kinit`, as mentioned above, is to use the password to get the `ticket granting ticket`, which will be used to acquire the other `sevice tickes` when the client is trying to access some service. And `klist` is to list the tickets for an account, and the tickets include both `ticket granting ticket` and `service tickets`. You can check the timestamp to know if the ticket is expired, and need to login again.
+
 
 

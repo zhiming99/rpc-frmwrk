@@ -34,6 +34,14 @@
 #include "ifhelper.h"
 #include "tcportex.h"
 
+inline gint32 SendBytesWithFlag( int iFd,
+    void* pBuf, guint32 dwSize,
+    int dwFlags = 0 )
+{
+    dwFlags |= MSG_NOSIGNAL;
+    return send( iFd, pBuf, dwSize, dwFlags );
+}
+
 CRpcConnSock::CRpcConnSock(
     const IConfigDb* pCfg )
     : super( pCfg )
@@ -499,6 +507,7 @@ gint32 CRpcConnSock::OnError(
             STREAM_SOCK_EVENT sse;
             sse.m_iEvent = sseError;
             sse.m_iData = iError;
+            sse.m_iEvtSrc = GetClsid();
             pPort->OnStmSockEvent( sse );
             ret = iError;
         }
@@ -763,6 +772,7 @@ gint32 CTcpStreamPdo2::OnDisconnected()
     STREAM_SOCK_EVENT sse;
     sse.m_iEvent = sseError;
     sse.m_iData = -ENOTCONN;
+    sse.m_iEvtSrc = GetClsid();
 
     return OnStmSockEvent( sse );
 }
@@ -828,7 +838,6 @@ gint32 CTcpStreamPdo2::OnReceive(
     // DebugPrint( 0, "probe: recv tcp msg" );
     do{
         STREAM_SOCK_EVENT sse;
-        sse.m_iEvent = sseRetWithBuf;
         guint32 dwBytes = 0;
         ret = ioctl( iFd, FIONREAD, &dwBytes );
         if( ret == -1 )
@@ -884,6 +893,8 @@ gint32 CTcpStreamPdo2::OnReceive(
         }
 
         sse.m_pInBuf = pInBuf;
+        sse.m_iEvent = sseRetWithBuf;
+        sse.m_iEvtSrc = GetClsid();
         
         CStdRMutex oPortLock( GetLock() );
         m_queEvtToRecv.push_back( sse );
@@ -1104,6 +1115,10 @@ gint32 CBytesSender::SendImmediate(
             break;
         }
 
+        guint32 dwSendFlag = 0;
+        if( m_iBufIdx < iCount - 1 )
+            dwSendFlag = MSG_MORE;
+
         do{
             guint32 dwMaxBytes =
                 MAX_BYTES_PER_TRANSFER;
@@ -1112,10 +1127,9 @@ gint32 CBytesSender::SendImmediate(
                 pBuf->size() - m_dwOffset,
                 dwMaxBytes );
 
-            // DebugPrint( 0, "probe: calling send" );
-            ret = SendBytesNoSig( iFd,
+            ret = SendBytesWithFlag( iFd,
                 pBuf->ptr() + m_dwOffset,
-                dwSize );
+                dwSize, dwSendFlag );
 
             if( ret == -1 && RETRIABLE( errno ) )
             {
@@ -1264,6 +1278,10 @@ gint32 CBytesSender::OnSendReady(
             break;
         }
 
+        guint32 dwSendFlag = 0;
+        if( m_iBufIdx < iCount - 1 )
+            dwSendFlag = MSG_MORE;
+
         do{
             guint32 dwMaxBytes =
                 MAX_BYTES_PER_TRANSFER;
@@ -1272,9 +1290,9 @@ gint32 CBytesSender::OnSendReady(
                 pBuf->size() - m_dwOffset,
                 dwMaxBytes );
 
-            ret = SendBytesNoSig( iFd,
+            ret = SendBytesWithFlag( iFd,
                 pBuf->ptr() + m_dwOffset,
-                dwSize );
+                dwSize, dwSendFlag );
 
             if( ret == -1 && RETRIABLE( errno ) )
             {
@@ -1873,9 +1891,6 @@ gint32 CTcpStreamPdo2::SubmitListeningCmd(
 
     do{
         CStdRMutex oPortLock( GetLock() );
-        if( pCtx->GetCtrlCode() !=
-            CTRLCODE_LISTENING )
-            break;
 
         m_queListeningIrps.push_back(
             pIrpLocked );
@@ -1894,7 +1909,8 @@ gint32 CTcpStreamPdo2::SubmitListeningCmd(
             BufPtr pBuf( true );
             pBuf->Resize( sizeof( sse ) );
 
-            void* ptr = pBuf->ptr();
+            STREAM_SOCK_EVENT* ptr =
+                ( STREAM_SOCK_EVENT* )pBuf->ptr();
             new ( ptr ) STREAM_SOCK_EVENT( sse );
 
             IrpPtr pIrp =
@@ -1907,6 +1923,11 @@ gint32 CTcpStreamPdo2::SubmitListeningCmd(
                 bCompleted = true;
 
             sse.m_pInBuf.Clear();
+            if( ptr->m_pInBuf.IsEmpty() )
+            {
+                DebugPrint( ret, "strange, the"
+                " inbuf is empty()" );
+            }
             m_queListeningIrps.pop_front();
             m_queEvtToRecv.pop_front();
         }
@@ -1917,7 +1938,11 @@ gint32 CTcpStreamPdo2::SubmitListeningCmd(
         return ret;
 
     if( vecIrps.empty() )
+    {
+        ret = -ENOENT;
+        pCtx->SetStatus( ret );
         return ret;
+    }
 
     if( vecIrps.size() == 1 && bCompleted )
     {
@@ -2022,6 +2047,11 @@ gint32 CTcpStreamPdo2::StartSend(
                 // start sending immediately
                 gint32 iFd = -1;
                 ret = pSock->GetSockFd( iFd );
+                if( ERROR( ret ) )
+                {
+                    ret = ERROR_PORT_STOPPED;
+                    break;
+                }
                 m_oSender.SetIrpToSend(
                     m_queWriteIrps.front() );
                 m_queWriteIrps.pop_front();
@@ -2082,7 +2112,10 @@ gint32 CTcpStreamPdo2::StartSend2(
         gint32 iFd = -1;
         ret = pSock->GetSockFd( iFd );
         if( ERROR( ret ) )
+        {
+            ret = ERROR_PORT_STOPPED;
             break;
+        }
 
         if( !m_oSender.IsSendDone() ||
             m_queWriteIrps.size() > 1 )

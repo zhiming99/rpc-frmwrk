@@ -477,8 +477,8 @@ gint32 CRpcSecFido::SubmitWriteIrp(
         if( ERROR( ret ) )
             break;
 
-        BufPtr pReqBuf( true );
-        *pReqBuf = pOutBuf;
+        BufPtr pReqBuf;
+        pReqBuf = pOutBuf;
 
         PortPtr pLowerPort = GetLowerPort();
         ret = pIrp->AllocNextStack(
@@ -552,7 +552,12 @@ gint32 CRpcSecFido::SubmitIoctlCmd(
                 break;
 
             if( ret != EAGAIN )
+            {
+                DebugPrint( ret, "Received unexpected error "
+                    "in SubmitIoctlCmd" );
+                ret = -ret;
                 break;
+            }
 
             PortPtr pLowerPort = GetLowerPort();
             ret = pIrp->AllocNextStack(
@@ -631,6 +636,7 @@ gint32 CRpcSecFido::SubmitIoctlCmd(
         memcpy( pInBuf->ptr(),
             &sse, sizeof( sse ) );
         pCtx->SetRespData( pInBuf );
+        sse.m_iEvtSrc = GetClsid();
         ret = 0;
     }
 
@@ -838,13 +844,13 @@ gint32 CRpcSecFido::DecryptPkt(
         if( !bSignMsg &&
             dwMagic == SIGNED_PACKET_MAGIC )
         {
-            ret = -EBADMSG;
+            ret = -EPROTO;
             break;
         }
         else if( bSignMsg &&
-            dwMagic != ENC_PACKET_MAGIC )
+            dwMagic == ENC_PACKET_MAGIC )
         {
-            ret = EBADMSG;
+            ret = -EPROTO;
             break;
         }
 
@@ -942,6 +948,9 @@ gint32 CRpcSecFido::CompleteListeningIrp(
         pIrp->GetStackSize() == 0 )
         return -EINVAL;
 
+    if( pIrp->IsIrpHolder() )
+        return -EINVAL;
+
     // listening request from the upper port
     gint32 ret = 0;
     IrpCtxPtr pCtx = pIrp->GetCurCtx();
@@ -1024,14 +1033,16 @@ gint32 CRpcSecFido::CompleteListeningIrp(
     {
         psse->m_iEvent = sseError;
         psse->m_iData = ret;
+        psse->m_pInBuf.Clear();
+        psse->m_iEvtSrc = GetClsid();
         pCtx->m_pRespData = pRespBuf;
-        ret = 0;
+        ret = STATUS_SUCCESS;
+        DebugPrint( ret, "secfido, error detected "
+        "in CompleteListeningIrp" );
     }
 
     pCtx->SetStatus( ret );
-
-    if( !pIrp->IsIrpHolder() )
-        pIrp->PopCtxStack();
+    pIrp->PopCtxStack();
 
     return ret;
 }

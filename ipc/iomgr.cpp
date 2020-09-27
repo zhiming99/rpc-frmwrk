@@ -37,9 +37,6 @@
 #include "ifhelper.h"
 using namespace std;
 
-bool CIoManager::m_bInit( false );
-bool CIoManager::m_bStop( false );
-
 gint32 CIoManager::SubmitIrpInternal(
     IPort* pPort,
     IRP* pIrp1,
@@ -717,6 +714,12 @@ CIoManager::GetTaskThreadPool() const
     return *m_pTaskThrdPool;
 }
 
+ObjPtr&
+CIoManager::GetSyncIf() const
+{
+    return const_cast< ObjPtr& >( m_pSyncIf );
+}
+
 // registry helpers
 gint32 CIoManager::RegisterObject(
     const std::string& strPath, const ObjPtr& pObj )
@@ -1220,6 +1223,23 @@ gint32 CIoManager::OnEvent( EnumEventId iEvent,
             {
             case eventStart:
                 {
+                    CParamList oParams;
+
+                    oParams.SetPointer(
+                        propIoMgr, this );
+
+                    oParams.SetBoolProp(
+                        propNoPort, true );
+
+                    ret = GetSyncIf().NewObj(
+                        clsid( CSimpleSyncIf ),
+                        oParams.GetCfg() );
+                    if( ERROR( ret ) )
+                        break;
+
+                    CRpcServices* pIf = GetSyncIf();
+                    pIf->Start();
+
                     // notified we can start.  the
                     // sem will be posted after
                     // the mainloop is started,
@@ -2086,6 +2106,26 @@ gint32 CIoManager::GetRouterName(
     return 0;
 }
 
+gint32 CIoManager::AddAndRun(
+    TaskletPtr& pTask, bool bImmediate )
+{
+    CRpcServices* pIf = GetSyncIf();
+    if( pIf == nullptr )
+        return -EFAULT;
+
+    return pIf->AddAndRun( pTask, bImmediate );
+}
+
+gint32 CIoManager::AppendAndRun(
+    TaskletPtr& pTask )
+{
+    CRpcServices* pIf = GetSyncIf();
+    if( pIf == nullptr )
+        return -EFAULT;
+
+    return pIf->AppendAndRun( pTask );
+}
+
 gint32 CIoMgrStopTask::operator()(
     guint32 dwContext )
 {
@@ -2102,6 +2142,12 @@ gint32 CIoMgrStopTask::operator()(
         // thread pool here
         ret = pMgr->GetDrvMgr().Stop();
         ret = pMgr->GetPnpMgr().Stop();
+        ObjPtr pObj = pMgr->GetSyncIf();
+        if( !pObj.IsEmpty() )
+        {
+            CRpcServices* pIf = pObj;
+            pIf->Stop();
+        }
         ret = pMgr->GetTaskThreadPool().Stop();
         ret = pMgr->GetIrpThreadPool().Stop();
         ret = pMgr->GetMainIoLoop()->Stop();

@@ -336,8 +336,8 @@ class CIoManager : public IService
     // currently we allow only one instance of
     // CIoManager in a process. we use
     // `m_bInit' to control this.
-    static bool                 m_bInit;
-    static bool                 m_bStop;
+    bool                        m_bInit = false;
+    std::atomic< bool >         m_bStop = { false };
 
     CPortInterfaceMap           m_oPortIfMap;
 
@@ -355,10 +355,12 @@ class CIoManager : public IService
     // house clean timer
     gint32                      m_iHcTimer;
 
-    std::vector< ThreadPtr >      m_vecStandAloneThread;
+    std::vector< ThreadPtr >    m_vecStandAloneThread;
 
     gint32                      m_iMaxIrpThrd = 2;
     gint32                      m_iMaxTaskThrd = 2;
+
+    ObjPtr                      m_pSyncIf;
 
     protected:
 
@@ -467,6 +469,8 @@ class CIoManager : public IService
     CThreadPool& GetTaskThreadPool() const;
     const std::string& GetModName() const;
     sem_t* GetSyncSem() const;
+
+    ObjPtr& GetSyncIf() const;
 
     guint32 GetNumCores() const
     { return m_dwNumCores; }
@@ -615,6 +619,12 @@ class CIoManager : public IService
     gint32 TryFindDescFile(
         const std::string& strFile,
         std::string& strPath );
+
+    gint32 AddAndRun(
+        TaskletPtr& pTask, bool bImmediate );
+
+    gint32 AppendAndRun(
+        TaskletPtr& pTask );
 };
 
 template<>
