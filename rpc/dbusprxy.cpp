@@ -1590,7 +1590,7 @@ gint32 CDBusProxyPdo::OnPortReady( IRP* pIrp )
         // retry parameters
         if( IS_AUTH_PROXY( this ) )
         {
-            oParams.SetIntProp( propRetries, 0 );
+            oParams.SetIntProp( propRetries, 2 );
         }
         else
         {
@@ -1929,7 +1929,7 @@ gint32 CDBusProxyPdo::Reconnect()
         CIoManager* pMgr = GetIoMgr();
 
         if( IS_AUTH_PROXY( this ) )
-            oParams[ propRetries ] = 0;
+            oParams[ propRetries ] = 2;
         else
         {
             oParams[ propRetries ] =

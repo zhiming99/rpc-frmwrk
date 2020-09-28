@@ -1663,7 +1663,6 @@ gint32 CIoManager::Stop()
     a.SetPointer( propIoMgr, this );
     if( true )
     {
-        CStdRMutex oMgrLock( GetLock() );
         if( m_bStop )
             return ERROR_STATE;
         m_bStop = true;

@@ -625,6 +625,9 @@ class CIoManager : public IService
 
     gint32 AppendAndRun(
         TaskletPtr& pTask );
+
+    inline bool IsStopping()
+    { return m_bStop; }
 };
 
 template<>

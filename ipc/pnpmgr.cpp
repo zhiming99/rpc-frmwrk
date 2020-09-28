@@ -282,22 +282,16 @@ gint32 CPnpManager::StartPortsInternal(
     IPort* pPort, IRP* pMastIrp )
 {
     gint32 ret = 0;
-
     IrpPtr pMasterIrp( pMastIrp );
-
-    do{
+    CIoManager* pMgr = GetIoMgr();
+    if( pMgr->IsStopping() )
+        ret = ERROR_STATE;
+    else do{
         if( pPort == nullptr )
         {
             ret = -EINVAL;
             break;
         }
-
-        // we cannot run on the main thread
-        /*if( GetIoMgr()->RunningOnMainThread() )
-        {
-            ret = ERROR_WRONG_THREAD;
-            break;
-        }*/
 
         IrpPtr pIrp( true );
         pIrp->AllocNextStack( nullptr );
@@ -310,7 +304,7 @@ gint32 CPnpManager::StartPortsInternal(
 
         // we can wait 2 minutes for
         // a start operation
-        pIrp->SetTimer( PORT_START_TIMEOUT_SEC, GetIoMgr() );
+        pIrp->SetTimer( PORT_START_TIMEOUT_SEC, pMgr );
 
 
         if( true  )
@@ -344,7 +338,7 @@ gint32 CPnpManager::StartPortsInternal(
                 if( ERROR( ret ) )
                     break;
 
-                ret = a.SetPointer( propIoMgr, GetIoMgr() );
+                ret = a.SetPointer( propIoMgr, pMgr );
 
                 if( ERROR( ret ) )
                     break;
@@ -394,7 +388,7 @@ gint32 CPnpManager::StartPortsInternal(
         // no check of the port existance, because
         // we are sure it exists
         if( SUCCEEDED( ret ) )
-            ret = GetIoMgr()->SubmitIrpInternal( pPort, pIrp );
+            ret = pMgr->SubmitIrpInternal( pPort, pIrp );
 
         if( ret == STATUS_PENDING )
             break;
@@ -407,7 +401,7 @@ gint32 CPnpManager::StartPortsInternal(
 
         if( !pMasterIrp.IsEmpty() )
         {
-            GetIoMgr()->CompleteAssocIrp( pIrp );
+            pMgr->CompleteAssocIrp( pIrp );
         }
 
         // add the event sink to the handle map and
@@ -426,7 +420,7 @@ gint32 CPnpManager::StartPortsInternal(
         guint32 dwState = pPort->GetPortState();
         if( dwState != PORT_STATE_REMOVED )
         {
-            GetIoMgr()->ClosePort(
+            pMgr->ClosePort(
                 PortToHandle( pPort ), nullptr );
         }
     }
