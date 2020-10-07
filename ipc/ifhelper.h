@@ -1593,6 +1593,7 @@ class CIfResponseHandler :
 
     gint32 OnTaskComplete( gint32 iRet );
     gint32 OnCancel( guint32 dwContext );
+    gint32 OnIrpComplete( PIRP pIrp );
 };
 
 class CIfIoCallTask :
@@ -1694,6 +1695,164 @@ inline gint32 NewResponseHandler(
     ret;\
 })
 
+template < typename T, typename C, typename ... Types, typename ...Args>
+inline gint32 NewObjDeferredCall( EnumClsid iTaskClsid,
+    TaskletPtr& pCallback, T* pIf, gint32(C::*f)(Types ...),
+    Args&&... args )
+{
+    TaskletPtr pWrapper;
+    gint32 ret = NewDeferredCall( pWrapper, pIf, f, args... );
+    if( ERROR( ret ) )
+        return ret;
+
+    if( pIf == nullptr )
+        return -EINVAL;
+
+    CParamList oParams;
+    oParams.SetPointer( propIoMgr, pIf->GetIoMgr() );
+
+    TaskletPtr pIfTask;
+    ret = pIfTask.NewObj( iTaskClsid, oParams.GetCfg() );
+    if( ERROR( ret ) )
+        return ret;
+
+    if( iTaskClsid == clsid( CIfDeferCallTask ) )
+    {
+        CIfDeferCallTask* pDeferTask = pIfTask;
+        pDeferTask->SetDeferCall( pWrapper );
+        pCallback = pDeferTask;
+    }
+    else if( iTaskClsid == clsid( CIfDeferCallTaskEx ) )
+    {
+        CIfDeferCallTaskEx* pDeferTask = pIfTask;
+        pDeferTask->SetDeferCall( pWrapper );
+        pCallback = pDeferTask;
+    }
+    else
+    {
+        return -ENOTSUP;
+    }
+    return 0;
+}
+
+#define DEFER_OBJCALL_NOSCHED( __pTask, pObj, func, ... ) \
+    NewObjDeferredCall( clsid( CIfDeferCallTask ), \
+        __pTask, pObj, func , ##__VA_ARGS__ )
+
+// use this macro when the _pTask will be added
+// to a task group.
+#define DEFER_OBJCALL_NOSCHED2( _pos, _pTask, pObj, func, ... ) \
+({ \
+    gint32 _ret = NewObjDeferredCall( clsid( CIfDeferCallTask ), \
+        _pTask, pObj, func , ##__VA_ARGS__ ); \
+    if( SUCCEEDED( _ret ) ) \
+    { \
+        CIfDeferCallTask* pDefer = _pTask; \
+        BufPtr pBuf( true ); \
+        *pBuf = ObjPtr( pDefer ); \
+        pDefer->UpdateParamAt( _pos, pBuf );  \
+    } \
+    _ret; \
+})
+
+#define DEFER_OBJCALLEX_NOSCHED( _pTask, pObj, func, ... ) \
+    NewObjDeferredCall( clsid( CIfDeferCallTaskEx ), \
+        _pTask, pObj, func , ##__VA_ARGS__ )
+
+// use this macro when the _pTask will be added
+// to a task group.
+#define DEFER_OBJCALLEX_NOSCHED2( _pos, _pTask, pObj, func, ... ) \
+({ \
+    gint32 _ret = NewObjDeferredCall( clsid( CIfDeferCallTaskEx ), \
+        _pTask, pObj, func , ##__VA_ARGS__ ); \
+    if( SUCCEEDED( _ret ) ) \
+    { \
+        CIfDeferCallTaskEx* pDefer = _pTask; \
+        BufPtr pBuf( true ); \
+        *pBuf = ObjPtr( pDefer ); \
+        pDefer->UpdateParamAt( _pos, pBuf );  \
+    } \
+    _ret; \
+})
+
+template< class T, class C >
+inline gint32 NewResponseHandler2(
+    EnumClsid iClsid,
+    TaskletPtr& pRespHandler,
+    T* pIf, gint32(C::* f)( IEventSink*, IEventSink*, IConfigDb* ),
+    IEventSink* pCallback, IConfigDb* pContext )
+{
+    TaskletPtr pWrapper;
+    if( pIf == nullptr )
+        return -EINVAL;
+
+    gint32 ret = NewDeferredCall(
+        pWrapper, pIf, f, pCallback,
+        ( IEventSink* )nullptr, pContext );
+
+    if( ERROR( ret ) )
+        return ret;
+
+    CParamList oParams;
+    oParams.SetPointer(
+        propIoMgr, pIf->GetIoMgr() );
+
+    TaskletPtr pIfTask;
+    ret = pIfTask.NewObj( 
+        iClsid, oParams.GetCfg() );
+
+    if( ERROR( ret ) )
+        return ret;
+
+    CIfResponseHandler* pNewTask = pIfTask;
+    pNewTask->SetDeferCall( pWrapper );
+    pRespHandler = pNewTask;
+
+    return 0;
+}
+
+#define NEW_OBJ_RESP_HANDLER( __pTask, pObj, func, pCallback, pContext ) \
+    NewResponseHandler2( clsid( CIfResponseHandler ), __pTask, pObj, func , pCallback, pContext )
+
+#define NEW_OBJ_RESP_HANDLER2( __pTask, pObj, func, pCallback, pContext ) \
+( { ret = NewResponseHandler2( clsid( CIfResponseHandler ), __pTask, pObj, func , pCallback, pContext ); \
+    if( SUCCEEDED( ret ) ) \
+        ( *__pTask )( eventZero ); \
+    ret;} )
+/**
+* @name NEW_PROXY_IOTASK
+* @brief the macro to combine the async call and callback in the task __pTask.
+* @param _iPos the position of the callback parameter in the major call _pMajorCall
+* @param __pTask the pointer contains the task created for the io call and callback
+* @param _pMajorCall the pointer to the major call task, which should be created by DEFER_CALL_NOSCHED
+* @param _pObj the object whose _func will be called as the callback
+* @param _func the function pointer as the callback.
+* @param _pCallback the first parameter for the _func
+* @param _pContext the third parameter for the _func
+*
+* @note The macro restricts the response callback to have three parameters, a
+* pCallback, a pointer to the ioreq task, and a pointer to the context, and it
+* also needs the major call to be a simple DEFER_CALL_NOSCHED taskr; the _func
+* has the responsibility to pass on _pCallback if it returns pending or send
+* eventTaskComp to make the final completion, and __pTask's life cycle ends after
+* the _func gets called, whether _func return pending or not.
+* 
+* @{ */
+/**  @} */
+
+#define NEW_OBJ_IOTASK( _iPos, __pTask, _pMajorCall, _pObj, _func, _pCallback, _pContext ) \
+({ ret = NewResponseHandler2( clsid( CIfIoCallTask ), __pTask, _pObj, _func , _pCallback, _pContext ); \
+    if( SUCCEEDED( ret ) ) {\
+        CIfIoCallTask* _pIoCall = __pTask;\
+        _pIoCall->SetMajorCall( _pMajorCall );\
+        CDeferredCallBase< CTasklet >* \
+            pDeferCall = _pMajorCall; \
+        BufPtr pBuf( true );\
+        *pBuf = ObjPtr( _pIoCall );\
+        pDeferCall->UpdateParamAt( _iPos, pBuf );\
+    }\
+    ret;\
+})
 // to insert the task pInterceptor to the head of
 // completion chain of the task pTarget 
 // please make sure both tasks inherit from the
@@ -3317,3 +3476,117 @@ class _ClassName : public virtual CAggInterfaceProxy{ \
 BEGIN_DECL_PROXY_SYNC( CSimpleSyncIf, CInterfaceProxy )
 END_DECL_PROXY_SYNC( CSimpleSyncIf )
 
+/**
+* @name AddSeqTaskTempl
+* @brief Add a task `pTask' to the taskgroup
+* `pQueuedTasks', and if the pQueuedTasks is empty
+* or completed, a new taskgroup instance will be
+* created, and scheduled to run.
+* @note Make sure the class T has both GetIoMgr and
+* GetLock methods implemented.
+*
+* @{ */
+/**  @} */
+
+template< class T >
+gint32 AddSeqTaskTempl( T* pObj,
+    TaskGrpPtr& pQueuedTasks,
+    TaskletPtr& pTask,
+    bool bLong )
+{
+    if( pTask.IsEmpty() || pObj == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    bool bNew = false;
+    do{
+        TaskGrpPtr ptrSeqTasks;
+        CIoManager* pMgr = pObj->GetIoMgr();
+
+        CStdRMutex oIfLock( pObj->GetLock() );
+        if( pQueuedTasks.IsEmpty() )
+        {
+            CParamList oParams;
+            oParams[ propIoMgr ] = ObjPtr( pMgr );
+
+            ret = pQueuedTasks.NewObj(
+                clsid( CIfTaskGroup ),
+                oParams.GetCfg() );
+
+            if( ERROR( ret ) )
+                break;
+
+            pQueuedTasks->SetRelation(logicNONE );
+            bNew = true;
+        }
+        ptrSeqTasks = pQueuedTasks;
+        oIfLock.Unlock();
+
+        CIfRetryTask* pSeqTasks = ptrSeqTasks;
+        CStdRTMutex oQueueLock(
+            pSeqTasks->GetLock() );
+
+        oIfLock.Lock();
+        if( pQueuedTasks.IsEmpty() )
+            continue;
+
+        if( !( pQueuedTasks == ptrSeqTasks ) )
+            continue;
+
+        ret = pQueuedTasks->AppendTask( pTask );
+        if( ERROR( ret ) && !bNew )
+        {
+            // the old seqTask is completed
+            pQueuedTasks.Clear();
+            continue;
+        }
+        else if( ERROR( ret ) && bNew )
+        {
+            // something bad happened
+            DebugPrint( ret,
+                "a fatal error happens "
+                "on sequential queue..." );
+            pQueuedTasks.Clear();
+            break;
+        }
+
+        pTask->MarkPending();
+        if( SUCCEEDED( ret ) && bNew )
+        {
+            // a new pQueuedTasks, add and run
+            oIfLock.Unlock();
+            oQueueLock.Unlock();
+
+            CRpcServices* pIf = ObjPtr( pObj );
+            if( unlikely( pIf == nullptr ) )
+            {
+                TaskletPtr pGrpTask( pSeqTasks );
+                ret = pMgr->RescheduleTask(
+                    pGrpTask, bLong );
+                break;
+            }
+            TaskletPtr pDeferTask;
+            ret = DEFER_CALL_NOSCHED(
+                pDeferTask, ObjPtr( pObj ),
+                &CRpcServices::RunManagedTask,
+                pQueuedTasks, false );
+
+            if( ERROR( ret ) )
+                break;
+
+            ret = pMgr->RescheduleTask(
+                pDeferTask, bLong );
+
+            break;
+        }
+        if( SUCCEEDED( ret ) && !bNew )
+        {
+            // pQueuedTasks is already running
+            // just waiting for the turn.
+        }
+        break;
+
+    }while( 1 );
+
+    return ret;
+}

@@ -344,33 +344,6 @@ class CPnpMgrDoStopNoMasterIrp
     gint32 operator()( guint32 dwContext );
 };
 
-class CPnpMgrStopPortStackTask
-    : public CTasklet
-{
-    public:
-    typedef CTasklet super;
-    CPnpMgrStopPortStackTask( const IConfigDb* pCfg = nullptr )
-        : CTasklet( pCfg )
-    {
-        SetClassId( clsid( CPnpMgrStopPortStackTask ) );
-    }
-
-    gint32 operator()( guint32 dwContext );
-};
-
-class CGenBusPortStopChildTask
-    : public CTaskletRetriable
-{
-    public:
-    typedef CTaskletRetriable super;
-    CGenBusPortStopChildTask( const IConfigDb* pCfg = nullptr )
-        : CTaskletRetriable( pCfg )
-    {
-        SetClassId( clsid( CGenBusPortStopChildTask ) );
-    }
-    gint32 Process( guint32 dwContext );
-};
-
 class CPortStartStopNotifTask
     : public CTasklet
 {
@@ -460,26 +433,6 @@ class CPnpMgrStartPortCompletionTask
         SetClassId( clsid( CPnpMgrStartPortCompletionTask ) );
     }
     gint32 operator()( guint32 dwContext );
-};
-
-class CPnpMgrStopPortAndDestroyTask
-    : public CTasklet
-{
-    public:
-    typedef CTasklet super;
-    CPnpMgrStopPortAndDestroyTask ( const IConfigDb* pCfg = nullptr )
-        : CTasklet( pCfg )
-    {
-        SetClassId( clsid( CPnpMgrStopPortAndDestroyTask ) );
-    }
-    gint32 operator()( guint32 dwContext );
-    gint32 OnIrpComplete( guint32 dwContext );
-    gint32 OnScheduledTask( guint32 dwContext );
-
-    gint32 OnEvent( EnumEventId iEvent,
-            LONGWORD dwParam1,
-            LONGWORD dwParam2,
-            LONGWORD* pData );
 };
 
 class CPortStateResumeSubmitTask

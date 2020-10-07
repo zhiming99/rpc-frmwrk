@@ -714,7 +714,7 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
 
             DEFER_CALL( pSvc->GetIoMgr(),
                 ObjPtr( pSvc ),
-                &CRpcInterfaceBase::StopEx,
+                &CRpcInterfaceBase::Shutdown,
                 ( IEventSink* )pDummyTask );
 
             break;
@@ -790,7 +790,7 @@ gint32 CIfStopUxSockStmTask::RunTask()
             break;
         }
 
-        ret = pSvc->StopEx( this );
+        ret = pSvc->Shutdown( this );
         if( ERROR( ret ) )
             break;
 
@@ -992,12 +992,6 @@ gint32 IStream::CloseChannel(
             break;
         }
 
-        EnumIfState iState = pIf->GetState();
-        if( iState == stateStopping ||
-            iState == stateStopped )
-        {
-            break;
-        }
         CParamList oParams;
         oParams.Push( ObjPtr( pIf ) );
         oParams[ propIfPtr ] = ObjPtr( pThisIf );
@@ -1239,15 +1233,6 @@ gint32 IStream::OnPreStopShared(
 
         for( auto elem : mapStreams )
         {
-            CRpcServices* pIf = elem.second;
-            EnumIfState iState = pIf->GetState();
-            if( iState == stateStopping ||
-                iState == stateStopped )
-            {
-                DebugPrint( 0, "the ux stream"
-                "is stopping already" );
-                continue;
-            }
             CParamList oParams;
             oParams.Push( ObjPtr( elem.second ) );
             oParams[ propIfPtr ] = ObjPtr( pThis );

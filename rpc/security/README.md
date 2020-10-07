@@ -118,7 +118,7 @@ to work with `rpc-frmwrk` on such a simple network.
                 "Realm" : "rpcfrmwrk.org"
             }
   ```
-  * The messages of the authenticated session is usually encrypted over the network. And it can be signed instead, which can be preferable if you want to use SSL as the encryption method. You need to add `SignMessage:"true"` to both `rtauth.json` and `hwdesc.json` as mentioned above to enable this feature.
+  * The messages of the authenticated session is usually encrypted over the network. And it can be signed instead, which can be preferable if you want to use SSL as the encryption method. You need to add `SignMessage:"true"` to both `rtauth.json` and `hwdesc.json` as mentioned above to enable this feature. According to my test, such a combination of kerberos signature plus SSL encryption delivers better performance than the encryption with `kerberos` only.
   ```
             "AuthInfo" :
             {
@@ -136,6 +136,7 @@ to work with `rpc-frmwrk` on such a simple network.
 2. The duration for authenticating process can last for about 2 minutes, if the process cannot complete during this period, the bridge side will reset the connection.
 3. If the service ticket expires, the session will ends in 10 minutes.
 4. Train yourself to get used to `kinit` and `klist`, which can be used frequently as the login method. `kinit`, as mentioned above, is to use the password to get the `ticket granting ticket`, which will be used to acquire the other `sevice tickes` when the client is trying to access some service. And `klist` is to list the tickets for an account, and the tickets include both `ticket granting ticket` and `service tickets`. You can check the timestamp to know if the ticket is expired, and need to login again.
+5. Make sure the firewall not block the `kerberos` ports, especially port 88 on your `kdc` machine, for the access from service servers.
 
 
 

@@ -41,7 +41,6 @@ extern gint32 ReadJsonCfg(
     const std::string& strFile,
     Json::Value& valConfig );
 
-
 class CDriverManager : public IService
 {
     protected:
@@ -245,7 +244,8 @@ class CPnpManager : public IService
      * you need to make sure the pPort is not in its starting
      * state, otherwise it could fail  @} */
     
-    gint32 DestroyPortStack( IPort* pPort );
+    gint32 DestroyPortStack( IPort* pPort,
+        IEventSink* pCallback = nullptr );
 
     void OnPortStarted( IPort* pTopPort );
     void OnPortStopped( IPort* pTopPort );
@@ -625,6 +625,9 @@ class CIoManager : public IService
 
     gint32 AppendAndRun(
         TaskletPtr& pTask );
+
+    inline bool IsStopping()
+    { return m_bStop; }
 };
 
 template<>

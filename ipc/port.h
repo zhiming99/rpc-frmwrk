@@ -609,6 +609,7 @@ class CGenericBusPort : public CPort
     // the reference here should be the last
     // before the pdo get removed
 	std::map<guint32, PortPtr> m_mapId2Pdo;
+    std::map< PortPtr, TaskletPtr > m_mapPort2TaskGrp;
 
     public:
 
@@ -632,6 +633,10 @@ class CGenericBusPort : public CPort
 
     virtual gint32 EnumPdoPorts(
             std::vector<PortPtr>& vecPorts );
+
+    virtual gint32 AddStartStopPortTask(
+            IPort* pPort,
+            TaskletPtr& pStopTask ) = 0;
 
     virtual gint32 BuildPdoPortName(
             IConfigDb* pCfg,

@@ -28,11 +28,11 @@
 #include <string>
 #include "defines.h"
 #include "registry.h"
-#include "port.h"
 #include "frmwrk.h"
 #include "tasklets.h"
 #include "jsondef.h"
 #include <algorithm>
+#include "portex.h"
 
 #include "ifhelper.h"
 using namespace std;
@@ -895,7 +895,7 @@ gint32 CIoManager::CloseChildPort(
 
 gint32 CIoManager::ClosePort(
     HANDLE hPort,
-    IEventSink* pEvent, // the registered interface
+    IEventSink* pIf, // the registered interface
     IEventSink* pCallback ) // the callback for complete stop
 {
     // Note: we need to make sure all the irps are
@@ -918,8 +918,8 @@ gint32 CIoManager::ClosePort(
         CPort* pPort = static_cast< CPort* >(
             HandleToPort( hPort ) );
 
-        if( pEvent != nullptr )
-            RemoveFromHandleMap( pPort, pEvent );
+        if( pIf != nullptr )
+            RemoveFromHandleMap( pPort, pIf );
         ret = IsPortNoRef( pPort, bNoRef );
         if( ERROR( ret ) )
         {
@@ -930,8 +930,17 @@ gint32 CIoManager::ClosePort(
         if( !bNoRef )
             break;
 
-        if( pPort->Unloadable() && !m_bStop )
+        if( pPort->Unloadable() && !IsStopping() )
         {
+            TaskletPtr pDummy;
+            if( pCallback == nullptr )
+            {
+                ret = pDummy.NewObj(
+                    clsid( CIfDummyTask ) );
+                if( SUCCEEDED( ret ) )
+                    pCallback = pDummy;
+            }
+
             IPort* pBusPort = nullptr;
 
             CCfgOpenerObj oPortCfg( pPort );
@@ -940,28 +949,23 @@ gint32 CIoManager::ClosePort(
 
             if( ERROR( ret ) )
             {
-                ret = DEFER_CALL( this,
-                    &GetPnpMgr(),
-                    &CPnpManager::DestroyPortStack,
-                    ( ( IPort* )pPort ) );
-                if( SUCCEEDED( ret ) )
+                ObjPtr pDriver;
+                ret = oPortCfg.GetObjPtr(
+                    propDrvPtr, pDriver );
+                if( ERROR( ret ) )
+                    break;
+
+                CGenBusDriverEx* pBusDrv = pDriver;
+                if( pBusDrv == nullptr )
                 {
-                    // the notification will be
-                    // via the OnPortEvent method
-                    // on the interface object
-                    ret = STATUS_PENDING;
+                    ret = -EFAULT;
+                    break;
                 }
+                ret = pBusDrv->DestroyPortSynced(
+                    pPort, pCallback );
             }
             else
             {
-                TaskletPtr pDummy;
-                if( pCallback == nullptr )
-                {
-                    ret = pDummy.NewObj(
-                        clsid( CIfDummyTask ) );
-                    if( SUCCEEDED( ret ) )
-                        pCallback = pDummy;
-                }
                 ret = CloseChildPort( pBusPort,
                     pPort, pCallback );
             }
@@ -1663,8 +1667,7 @@ gint32 CIoManager::Stop()
     a.SetPointer( propIoMgr, this );
     if( true )
     {
-        CStdRMutex oMgrLock( GetLock() );
-        if( m_bStop )
+        if( IsStopping() )
             return ERROR_STATE;
         m_bStop = true;
     }

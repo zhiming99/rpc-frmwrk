@@ -46,9 +46,6 @@
 #define SetDrvType( type_ ) \
     m_dwFlags = ( ( m_dwFlags & ~DRV_TYPE_MASK ) | ( ( type_ ) & DRV_TYPE_MASK ) )
 
-#define GetDrvType( type_ ) \
-    ( m_dwFlags & ~DRV_TYPE_MASK )
-
 class IPortDriver : public IService
 {
 	public:
@@ -75,6 +72,8 @@ class IPortDriver : public IService
 
     virtual gint32 EnumPorts(
             std::vector<PortPtr>& vecPorts ) const = 0;
+
+    virtual guint32 GetDrvType() const = 0;
 };
 
 typedef CAutoPtr< Clsid_Invalid, IPortDriver > PortDrvPtr;
@@ -122,9 +121,9 @@ class CPortDriver : public IPortDriver
     gint32 GetDrvName(
             std::string& strName ) const;
 
-    gint32 RemovePort( IPort* pPort );
+    virtual gint32 RemovePort( IPort* pPort );
 
-	gint32 AddPort( IPort* pNewPort );
+	virtual gint32 AddPort( IPort* pNewPort );
 
     inline CIoManager* GetIoMgr() const
     { return m_pIoMgr; }
@@ -132,6 +131,9 @@ class CPortDriver : public IPortDriver
     gint32 Start();
 
     gint32 Stop();
+
+    guint32 GetDrvType() const
+    { return ( m_dwFlags & ~DRV_TYPE_MASK ); }
 };
 
 class IBusDriver : public CPortDriver
@@ -142,6 +144,40 @@ class IBusDriver : public CPortDriver
     IBusDriver( const IConfigDb* pCfg = nullptr )
     : super( pCfg )
     { }
+};
+
+class CGenBusDriver : public IBusDriver
+{
+    protected:
+    std::atomic<guint32> m_atmBusId;
+    std::map< PortPtr, TaskletPtr > m_mapPort2TaskGrp;
+
+    public:
+    typedef IBusDriver super;
+    CGenBusDriver( const IConfigDb* pCfg );
+
+    // the Start() method will create the non-pnp bus
+    // ports from the configs
+    gint32 Start();
+
+    gint32 NewBusId()
+    { return m_atmBusId++; }
+
+    // create the fdo bus port, one instance
+    // for now
+    gint32 CreatePort(
+        PortPtr& pNewPort,
+        const IConfigDb* pConfig = NULL);
+
+    virtual gint32 RemovePort( IPort* pPort );
+	virtual gint32 AddPort( IPort* pNewPort );
+
+    // IEventSink method
+    gint32 OnEvent( EnumEventId iEvent,
+        LONGWORD dwParam1 = 0,
+        LONGWORD dwParam2 = 0,
+        LONGWORD* pData = NULL  )
+    { return 0;}
 };
 
 typedef CAutoPtr< Clsid_Invalid, IBusDriver > BusDrvPtr;

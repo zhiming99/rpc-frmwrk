@@ -153,7 +153,6 @@ CInterfaceState::CInterfaceState(
 
 CInterfaceState::~CInterfaceState()
 {
-    ClosePort();
 }
 
 gint32 CInterfaceState::SubscribeEventsInternal(
@@ -369,7 +368,6 @@ gint32 CInterfaceState::OnPortEvent(
                 case statePaused:
                 case stateStarting:
                     {
-                        ClosePort();
                         break;
                     }
                 case stateStopped:
@@ -453,7 +451,6 @@ gint32 CInterfaceState::OnDBusEvent(
                 {
                 case stateStopping:
                     {
-                        ClosePort();
                         break;
                     }
                 case stateStopped:
@@ -500,7 +497,6 @@ gint32 CInterfaceState::OnAdminEvent(
                 {
                 case stateStopping:
                     {
-                        ClosePort();
                         break;
                     }
                 default:
@@ -697,7 +693,7 @@ gint32 CInterfaceState::Start(
 
 gint32 CInterfaceState::Stop()
 {
-    return ClosePort();
+    return 0;
 }
 
 gint32 CInterfaceState::EnumProperties(

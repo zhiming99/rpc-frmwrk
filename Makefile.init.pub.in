@@ -42,6 +42,7 @@ endif
 	DIR_SUFFIX_ARCH := /$(ARCH_STR)
 endif
 
+SHELL := /bin/bash
 CC := $(CROSS_COMPILE)gcc
 CPP := $(CROSS_COMPILE)g++
 LD := $(CROSS_COMPILE)ld

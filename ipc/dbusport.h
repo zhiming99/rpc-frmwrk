@@ -28,6 +28,7 @@
 #include "port.h"
 #include "autoptr.h"
 #include "msgmatch.h"
+#include "portex.h"
 
 #define DBUS_HANDLER_RESULT_HALT    ( ( DBusHandlerResult )100 )
 
@@ -1203,7 +1204,7 @@ namespace std
     };
 }
 
-class CDBusBusPort : public CGenericBusPort
+class CDBusBusPort : public CGenericBusPortEx
 {
     // the pending calls waiting for dispatching
     // only calls to registered interface will
@@ -1296,7 +1297,7 @@ class CDBusBusPort : public CGenericBusPort
 
     public:
 
-    typedef CGenericBusPort super;
+    typedef CGenericBusPortEx super;
 
     CDBusBusPort(
         const IConfigDb* pConfig );
@@ -1431,42 +1432,10 @@ class CDBusConnFlushTask
 };
 
 
-class CGenBusDriver : public IBusDriver
+class CDBusBusDriver : public CGenBusDriverEx
 {
-    protected:
-    std::atomic<guint32> m_atmBusId;
-
     public:
-    typedef IBusDriver super;
-    CGenBusDriver( const IConfigDb* pCfg );
-
-    // the Start() method will create the non-pnp bus
-    // ports from the configs
-    gint32 Start();
-    gint32 Stop();
-
-    gint32 NewBusId()
-    { return m_atmBusId++; }
-
-    // create the fdo bus port, one instance
-    // for now
-    gint32 CreatePort(
-        PortPtr& pNewPort,
-        const IConfigDb* pConfig = NULL);
-
-    // IEventSink method
-    gint32 OnEvent( EnumEventId iEvent,
-        LONGWORD dwParam1 = 0,
-        LONGWORD dwParam2 = 0,
-        LONGWORD* pData = NULL  )
-    { return 0;}
-};
-
-class CDBusBusDriver : public CGenBusDriver
-{
-
-    public:
-    typedef CGenBusDriver super;
+    typedef CGenBusDriverEx super;
     CDBusBusDriver( const IConfigDb* pCfg );
 	gint32 Probe( IPort* pLowerPort,
         PortPtr& pNewPort,

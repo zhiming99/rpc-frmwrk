@@ -30,6 +30,8 @@
 #include <sys/socket.h>
 #include <netdb.h>
 
+#include "portex.h"
+
 #define RPC_MAX_BYTES_PACKET    ( 65536 - sizeof( CPacketHeader ) - 32 )
 
 #define TCP_CONN_DEFAULT_CMD    0
@@ -1102,7 +1104,7 @@ class CTcpStreamPdo : public CPort
 };
 
 class CRpcTcpBusPort :
-    public CGenericBusPort
+    public CGenericBusPortEx
 {
     SockPtr m_pListenSock;
     std::vector< SockPtr > m_vecListenSocks;
@@ -1132,7 +1134,7 @@ class CRpcTcpBusPort :
     gint32 RemovePortAddr( PDOADDR& oAddr );
 
     public:
-    typedef CGenericBusPort super;
+    typedef CGenericBusPortEx super;
 
     gint32 BindPortIdAndAddr(
         guint32 dwPortId, PDOADDR oAddr );
@@ -1173,10 +1175,10 @@ class CRpcTcpBusPort :
 
 };
 
-class CRpcTcpBusDriver : public CGenBusDriver
+class CRpcTcpBusDriver : public CGenBusDriverEx
 {
     public:
-    typedef CGenBusDriver super;
+    typedef CGenBusDriverEx super;
 
     CRpcTcpBusDriver(
         const IConfigDb* pCfg = nullptr );
