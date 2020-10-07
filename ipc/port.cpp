@@ -3255,7 +3255,7 @@ void CGenericBusPort::RemovePdoPort(
         == m_mapId2Pdo.end() )
         return;
 
-    PortPtr& pPort = m_mapId2Pdo[ iPortId ];
+    PortPtr pPort = m_mapId2Pdo[ iPortId ];
 
     CCfgOpenerObj a( ( IPort* )pPort );
 
