@@ -47,7 +47,6 @@ gint32 CPort::GetStopResumeTask(
 gint32 CGenBusDriverEx::Stop()
 {
     gint32 ret = 0;
-
     do
     {
         if( GetIoMgr() == nullptr )
@@ -65,13 +64,13 @@ gint32 CGenBusDriverEx::Stop()
         for( auto elem : vecPorts )
             DestroyPortSynced( elem, nullptr );
 
-        // stopping the child ports is done
-        // in CGenericBusPort
-
-        // let the base class to unreg the driver
-        ret = super::Stop();
+        // stopping the child ports is still going
+        // on in CGenericBusPort
+        if( vecPorts.empty() )
+            ret = super::Stop();
 
     }while( 0 );
+
     return ret;
 }
 
