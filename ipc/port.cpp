@@ -30,8 +30,10 @@
 #include "port.h"
 #include "frmwrk.h"
 #include "stlcont.h"
-#include "emaphelp.h"
+// #include "emaphelp.h"
 #include "jsondef.h"
+#include "ifhelper.h"
+#include "portex.h"
 
 using namespace std;
 
@@ -3241,6 +3243,9 @@ void CGenericBusPort::AddPdoPort(
         return;
 
     m_mapId2Pdo[ iPortId ] = portPtr;
+    
+    TaskletPtr pTask;
+    m_mapPort2TaskGrp[ portPtr ] = pTask;
 }
 
 void CGenericBusPort::RemovePdoPort(
@@ -3259,6 +3264,19 @@ void CGenericBusPort::RemovePdoPort(
         propPortState, PORT_STATE_REMOVED );
 
     m_mapId2Pdo.erase( iPortId );
+
+    TaskletPtr pTask; 
+    std::map< PortPtr, TaskletPtr >::iterator
+        itr = m_mapPort2TaskGrp.find( pPort );
+    if( itr == m_mapPort2TaskGrp.end() )
+        return;
+
+    pTask = itr->second;
+
+    if( !pTask.IsEmpty() )
+        ( *pTask )( eventCancelTask );
+
+    m_mapPort2TaskGrp.erase( itr );
 }
 
 gint32 CGenericBusPort::GetPdoPort(
@@ -3298,37 +3316,7 @@ bool CGenericBusPort::PortExist(
 gint32 CGenericBusPort::OnPortStackDestroy(
     IRP* pIrp )
 {
-    /*if( GetIoMgr()->RunningOnMainThread() )
-        return ERROR_WRONG_THREAD;
-        */
-
-    vector<PortPtr> vecChildPorts;
-    if( pIrp != nullptr )
-    {
-        CStdRMutex oPortLock( GetLock() );
-
-        PortPtr pPort;
-        map< guint32, PortPtr >::iterator itr
-            = m_mapId2Pdo.begin();
-
-        while( itr != m_mapId2Pdo.end() )
-        {
-            vecChildPorts.push_back( itr->second );
-            ++itr;
-        }
-    }
-    // we will destroy all the child port stack
-    // associated with this bus port
-    while( vecChildPorts.size() )
-    {
-        GetIoMgr()->GetPnpMgr().DestroyPortStack(
-            vecChildPorts.back() );
-
-        vecChildPorts.pop_back();
-    }
-
-    super::OnPortStackDestroy( pIrp );
-    return 0;
+    return super::OnPortStackDestroy( pIrp );
 }
 
 gint32 CPortAttachedNotifTask::operator()(
@@ -3576,10 +3564,6 @@ gint32 CGenericBusPort::PreStop( IRP* pIrp )
 
         if( pExt->m_dwExtState == 0 )
         {
-            // ret = StopChild( pIrp );
-            // if( ERROR( ret ) )
-            //     break;
-
             pExt->m_dwExtState = 1;
             if( ret == STATUS_PENDING )
             {
@@ -3605,24 +3589,6 @@ gint32 CGenericBusPort::PreStop( IRP* pIrp )
 
         if( pExt->m_dwExtState == 2 )
         {
-            // move forward the stop state machine
-            CIoManager* pMgr = GetIoMgr();
-            CPnpManager& oPnpMgr = pMgr->GetPnpMgr();
-            // destroy the child port stack
-            vector< PortPtr > vecChildPorts;
-
-            {
-                CStdRMutex oPortLock( GetLock() );
-                ret = GetChildPorts( vecChildPorts );
-            }
-
-            for( auto pChildPort : vecChildPorts )
-            {
-                // FIXME: what if the method return
-                // STATUS_PENDING?
-                oPnpMgr.DestroyPortStack( pChildPort );
-            }
-            
             SetPnpState( pIrp,
                 PNP_STATE_STOP_PRE );
             ret = 0;
@@ -3642,55 +3608,31 @@ gint32 CGenericBusPort::PreStop( IRP* pIrp )
     return ret;
 }
 
-gint32 CGenBusPortStopChildTask::Process(
-    guint32 dwContext )
+gint32 CGenBusPortStopChildTask::RunTask()
 {
     // this is a retriable task
     gint32 ret = 0;
-    bool bRetry = false;
-    bool bRevisit = false;
+    // bool bRetry = false;
+    // bool bRevisit = false;
     do{
         CIoManager* pMgr = nullptr;
-        CCfgOpener oCfg( (const IConfigDb* )m_pCtx );
+        CCfgOpener oCfg(
+            ( IConfigDb* )GetConfig() );
 
+        ret = oCfg.GetPointer( propIoMgr, pMgr );
+        if( ERROR( ret ) )
+            break;
+
+        CGenericBusPortEx* pBusPort = nullptr;
         ret = oCfg.GetPointer(
-            propIoMgr, pMgr );
-
+            propPortPtr, pBusPort );
         if( ERROR( ret ) )
             break;
 
         ObjPtr pObj;
-        IRP* pIrp;
-
-        ret =oCfg.GetObjPtr( propIrpPtr, pObj );
-        if( ERROR( ret ) )
-            pIrp = nullptr;
-        else
-            pIrp = pObj;
-
         ret = oCfg.GetObjPtr( propPortPtrs, pObj );
         if( ERROR( ret ) )
             break;
-
-        if( m_pCtx->exist( propParamList ) )
-        {
-            // we are called from within the
-            // timer service
-            bRetry = true;
-        }
-        m_pCtx->RemoveProperty( propParamList );
-
-        CStdRMutex oIrpLock( pIrp->GetLock() );
-        ret = pIrp->CanContinue( IRP_STATE_READY );
-        if( ERROR( ret ) )
-        {
-            // the irp is completed
-            break;
-        }
-        // a dumb irp to prevent the master irp
-        // from going away unexpectedly
-        pIrp->AddSlaveIrp( nullptr );
-        oIrpLock.Unlock();
 
         // we don't check the port state because we
         // are sure in the stopping port state, an
@@ -3701,77 +3643,83 @@ gint32 CGenBusPortStopChildTask::Process(
 
         vector< PortPtr > vecPortRevisit;
 
+        CParamList oParams;
+        oParams.SetPointer( propIoMgr, pMgr );
+        TaskGrpPtr pTaskGrp;
+        ret = pTaskGrp.NewObj( 
+            clsid( CIfParallelTaskGrp ),
+            oParams.GetCfg() );
+
         for( gint32 i = iPortCount - 1; i >= 0; --i )
         {
-            // iterate to stop all the child ports
-            PortPtr pChildPort = vecChildPorts.back();
-            pChildPort = pChildPort->GetTopmostPort();
-            CPnpManager& oPnpMgr = pMgr->GetPnpMgr();
+            TaskletPtr pStopTask;
+            ret = DEFER_OBJCALL_NOSCHED2(
+                1, pStopTask, pBusPort,
+                &CGenericBusPortEx::DestroyPortSynced,
+                vecChildPorts.back(), nullptr );
+            if( ERROR( ret ) )
+                continue;
 
-            if( !bRetry )
-            {
-                ret = oPnpMgr.StopPortStack(
-                        pChildPort, pIrp );
-            }
-            else
-            {
-                ret = oPnpMgr.StopPortStack(
-                        pChildPort, pIrp, false );
-            }
-
-            if( ret == -EAGAIN )
-            {
-                // NOTE: revisit is not an
-                // effective solution if the port
-                // has changed to non-ready state
-                vecPortRevisit.push_back( pChildPort );
-            }
+            pTaskGrp->AppendTask( pStopTask );
             vecChildPorts.pop_back();
         }
 
-        vecChildPorts = vecPortRevisit;
-        oIrpLock.Lock();
-        ret = pIrp->CanContinue( IRP_STATE_READY );
-        if( ERROR( ret ) )
+        if( pTaskGrp->GetTaskCount() > 0 )
         {
-            // the irp is invalid, no more revisit
-            bRevisit = false;
-            // the irp is completed or canceled
-            // during this period
-            break;
-        }
-
-        if( vecPortRevisit.size() )
-        {
-            // there are a few ports requiring revisit
-            // let's do it again
-            bRevisit = true;
-            pIrp->ResetTimer();
-            // reserve the slave count for revisit
-            // in the future
-            pIrp->SetMinSlaves( vecPortRevisit.size() );
-        }
-
-        pIrp->RemoveSlaveIrp( nullptr );
-
-        if( pIrp->GetSlaveCount() == 0 )
-        {
-            pIrp->GetTopStack()->SetStatus( 0 );
-            oIrpLock.Unlock();
-            pMgr->CompleteIrp( pIrp ); 
-        }
-        else
-        {
-            pIrp->ResetTimer();
-            // we will wait till all the associated
-            // irps completed and this master will
-            // be completed afterward
+            CIfRetryTask* pRetryTask = pTaskGrp;
+            pRetryTask->SetClientNotify( this );
+            TaskletPtr pTask( pRetryTask );
+            ret = pMgr->RescheduleTask( pTask );
+            if( ERROR( ret ) )
+            {
+                ( *pTask )( eventCancelTask );
+                break;
+            }
+            ret = pTask->GetError();
+            if( ret != STATUS_PENDING )
+                return ret;
         }
 
     }while( 0 );
 
-    if( bRevisit )
-        ret = STATUS_MORE_PROCESS_NEEDED;
+    if( ret != STATUS_PENDING )
+        OnTaskComplete( ret );
+
+    return ret;
+}
+
+gint32 CGenBusPortStopChildTask::OnTaskComplete(
+    gint32 iRet )
+{
+    gint32 ret = 0;
+    do{
+        CIoManager* pMgr = nullptr;
+        CCfgOpener oCfg(
+            ( IConfigDb* )GetConfig() );
+
+        ret = oCfg.GetPointer( propIoMgr, pMgr );
+        if( ERROR( ret ) )
+            break;
+
+        IRP* pIrp;
+
+        ret =oCfg.GetPointer( propIrpPtr, pIrp );
+        if( ERROR( ret ) )
+            break;
+
+        CStdRMutex oIrpLock( pIrp->GetLock() );
+        ret = pIrp->CanContinue(IRP_STATE_READY );
+        if( ERROR( ret ) )
+            break;
+
+        IrpCtxPtr pTopCtx = pIrp->GetTopStack();
+        pTopCtx->SetStatus( iRet );
+
+        oIrpLock.Unlock();
+
+        pMgr->CompleteIrp( pIrp ); 
+
+    }while( 0 );
 
     return ret;
 }
@@ -3808,27 +3756,18 @@ gint32 CGenericBusPort::StopChild( IRP* pIrp )
             ret = GetChildPorts( vecChildPorts );
         }
 
-        ret = oCfg.SetObjPtr( propIrpPtr,
-            ObjPtr( pIrp ) );
-        if( ERROR( ret ) )
+        if( vecChildPorts.empty() )
             break;
 
-        ret = oCfg.SetObjPtr( propPortPtrs,
-            ObjPtr( pPorts ) );
-        if( ERROR( ret ) )
-            break;
+        oCfg.SetPointer( propPortPtr, this );
+        oCfg.SetPointer( propIrpPtr, pIrp );
+        oCfg.SetObjPtr( propPortPtrs, pPorts );
 
-        ret = oCfg.SetIntProp(
-            propIntervalSec, BUSPORT_STOP_RETRY_SEC ); 
+        oCfg.SetIntProp( propIntervalSec,
+            BUSPORT_STOP_RETRY_SEC ); 
 
-        if( ERROR( ret ) )
-            break;
-
-        ret = oCfg.SetIntProp(
-            propRetries, BUSPORT_STOP_RETRY_TIMES ); 
-
-        if( ERROR( ret ) )
-            break;
+        oCfg.SetIntProp( propRetries,
+            BUSPORT_STOP_RETRY_TIMES ); 
 
         // we have to schedule a task to release
         // the current lock on the irp otherwise,
@@ -3850,6 +3789,7 @@ gint32 CGenericBusPort::StopChild( IRP* pIrp )
 
     return ret;
 }
+
 
 gint32 CGenericBusPort::AllocIrpCtxExt(
     IrpCtxPtr& pIrpCtx,
@@ -4062,10 +4002,7 @@ gint32 CGenericBusPort::OpenPdoPort(
                     // and waiting for the portStarted
                     // Event
                     ret = SchedulePortAttachNotifTask(
-                        pNewPort,
-                        eventPortAttached );
-
-                    oPortLock.Lock();
+                        pNewPort, eventPortAttached );
                 }
 
                 break;
@@ -4088,9 +4025,142 @@ gint32 CGenericBusPort::OpenPdoPort(
     return ret;
 }
 
+gint32 CBusPortStopSingleChildTask::OnIrpComplete(
+    PIRP pIrp )
+{
+    gint32 ret = 0;
+    CParamList oCfg(
+        ( IConfigDb* )GetConfig() );
+    do{
+        CIoManager* pMgr = nullptr;
+        ret = oCfg.GetPointer( propIoMgr, pMgr );
+        if( ERROR( ret ) )
+            break;
+
+        IPort* pPort = nullptr;
+        ret = oCfg.GetPointer( 0, pPort );
+        if( ERROR( ret ) )
+            break;
+
+        CPnpManager& oPnpMgr = pMgr->GetPnpMgr();
+        oPnpMgr.DestroyPortStack( pPort );
+
+        IEventSink* pCallback = nullptr;
+        ret = oCfg.GetPointer( 2, pCallback );
+        if( ERROR( ret ) )
+            break;
+
+        LONGWORD dwParam2 = 0;
+        ret = oCfg.GetIntPtr( 3,
+            ( guint32*& )dwParam2 );
+
+        if( ERROR( ret ) )
+            break;
+
+        LONGWORD dwParam1 =
+            ( LONGWORD )( ( IRP* )pIrp );
+
+        // run the original callback
+        pCallback->OnEvent( eventIrpComp,
+            dwParam1, dwParam2, nullptr );
+
+    }while( 0 );
+
+    oCfg.ClearParams();
+    return ret;
+}
+
+gint32 CBusPortStopSingleChildTask::RunTask()
+{
+    // this is a retriable task
+    gint32 ret = 0;
+    CParamList oCfg(
+        ( IConfigDb* )GetConfig() );
+
+    do{
+        CIoManager* pMgr = nullptr;
+
+        ret = oCfg.GetPointer(
+            propIoMgr, pMgr );
+
+        if( ERROR( ret ) )
+            break;
+
+        IPort* pPort = nullptr;
+        ret = oCfg.GetPointer( 0, pPort );
+        if( ERROR( ret ) )
+            break;
+
+        PIRP pIrp = nullptr; 
+        ret = oCfg.GetPointer( 1, pIrp );
+        if( ERROR( ret ) )
+            break;
+
+        CStdRMutex oIrpLock( pIrp->GetLock() );
+        ret = pIrp->CanContinue( IRP_STATE_READY );
+        if( ERROR( ret ) )
+            break;
+
+        EventPtr pIrpCb = pIrp->m_pCallback;
+        LONGWORD dwContext = pIrp->m_dwContext;
+
+        if( !pIrpCb.IsEmpty() )
+        {
+            oCfg.Push( ObjPtr( pIrpCb ) );
+            oCfg.Push( dwContext );
+        }
+
+        // intercept the callback
+        pIrp->SetCallback( this, 0 );
+
+        CPnpManager& oPnpMgr = pMgr->GetPnpMgr();
+        ret = oPnpMgr.StopPortStack(pPort, pIrp );
+
+        // to avoid other contender to complete or
+        // cancel the irp before we are done
+        oIrpLock.Unlock();
+
+        // the irp completion will be called
+        if( ret == STATUS_PENDING )
+            break;
+
+        if( ERROR( ret ) )
+        {
+            DebugPrint( ret,
+            "Failed to stop the port gracefully "
+            "proceed to complete the master irp "
+            "anyway" );
+        }
+        else
+        {
+            oPnpMgr.DestroyPortStack( pPort );
+        }
+
+        oIrpLock.Lock();
+
+        gint32 iRet =
+            pIrp->CanContinue( IRP_STATE_READY );
+
+        if( ERROR( iRet ) )
+            break;
+
+        // recover the original callback
+        pIrp->SetCallback( pIrpCb, dwContext );
+        IrpCtxPtr& pIrpCtx = pIrp->GetTopStack();
+
+        pIrpCtx->SetStatus( ret );
+        oIrpLock.Unlock();
+
+        pMgr->CompleteIrp( pIrp );
+        break;
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CGenericBusPort::ClosePdoPort(
-            PIRP pIrp,
-            IPort* pPort )
+    PIRP pIrp, IPort* pPort )
 {
     if( pPort == nullptr )
         return -EINVAL;
@@ -4169,9 +4239,9 @@ gint32 CGenericBusPort::ClosePdoPort(
         if( ERROR( ret ) )
             break;
 
-        ret = pMgr->RescheduleTask( pTask );
-        if( SUCCEEDED( ret ) )
-            ret = STATUS_PENDING;
+        ret = AddStartStopPortTask( pPort, pTask );
+        if( ERROR( ret ) )
+            ( *pTask )( eventCancelTask );
 
     }while( 0 );
 

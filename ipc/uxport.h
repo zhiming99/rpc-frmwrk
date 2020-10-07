@@ -28,6 +28,7 @@
 #include "mainloop.h"
 #include "dbusport.h"
 #include "frmwrk.h"
+#include "portex.h"
 
 #define STM_MAX_BYTES_PER_BUF ( 63 * 1024 )
 #define STM_MAX_PENDING_WRITE ( 1 * 1024 * 1024 )
@@ -428,14 +429,14 @@ class CUnixSockStmPdo : public CPort
 };
 
 class CUnixSockBusPort :
-    public CGenericBusPort
+    public CGenericBusPortEx
 {
     gint32 CreateUxStreamPdo(
         IConfigDb* pConfig,
         PortPtr& pNewPort );
 
     public:
-    typedef CGenericBusPort super;
+    typedef CGenericBusPortEx super;
     CUnixSockBusPort( const IConfigDb* pCfg ) :
         super( pCfg )
     { SetClassId( clsid( CUnixSockBusPort ) ); }
@@ -450,10 +451,10 @@ class CUnixSockBusPort :
 };
 
 class CUnixSockBusDriver :
-    public CGenBusDriver
+    public CGenBusDriverEx
 {
     public:
-    typedef CGenBusDriver super;
+    typedef CGenBusDriverEx super;
 
     CUnixSockBusDriver(
         const IConfigDb* pCfg = nullptr );

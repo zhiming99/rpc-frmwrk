@@ -32,7 +32,6 @@
 #include "registry.h"
 #include "tasklets.h"
 #include "ifstat.h"
-#include "proxy.h"
 
 #define GET_IOMGR( _oCfg, _pMgr ) \
 ({ \
@@ -887,14 +886,43 @@ class CBusPortStopSingleChildTask
     public:
     typedef CIfRetryTask super;
     CBusPortStopSingleChildTask( const IConfigDb* pCfg = nullptr )
-        : CIfRetryTask( pCfg )
+        : super( pCfg )
     {
         SetClassId( clsid( CBusPortStopSingleChildTask ) );
     }
     virtual gint32 RunTask();
     virtual gint32 OnIrpComplete( PIRP pIrp );
-    virtual gint32 OnComplete( gint32 iRetVal );
 };
+
+class CPnpMgrStopPortAndDestroyTask
+    : public CIfParallelTask
+{
+    public:
+    typedef CIfParallelTask super;
+    CPnpMgrStopPortAndDestroyTask ( const IConfigDb* pCfg = nullptr )
+        : super( pCfg )
+    {
+        SetClassId( clsid( CPnpMgrStopPortAndDestroyTask ) );
+    }
+    gint32 RunTask();
+    gint32 OnIrpComplete( PIRP pIrp );
+    gint32 OnScheduledTask( guint32 dwContext );
+};
+
+class CGenBusPortStopChildTask
+    : public CIfParallelTask
+{
+    public:
+    typedef CIfParallelTask super;
+    CGenBusPortStopChildTask( const IConfigDb* pCfg = nullptr )
+        : super( pCfg )
+    {
+        SetClassId( clsid( CGenBusPortStopChildTask ) );
+    }
+    gint32 RunTask();
+    gint32 OnTaskComplete( gint32 iRet );
+};
+
 
 class CIfCallbackInterceptor :
     public CIfInterceptTaskProxy

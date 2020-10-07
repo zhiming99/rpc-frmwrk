@@ -5100,11 +5100,16 @@ gint32 CIfDeferredHandler::OnTaskComplete( gint32 iRet )
             CCfgOpenerObj oTaskCfg( this );
             ret = oTaskCfg.GetPointer(
                 propIfPtr, pIf );
-            if( ERROR( ret ) )
-                break;
-
-            pIf->SetResponse( pEvtPtr,
-                oParams.GetCfg() );
+            if( SUCCEEDED( ret ) )
+            {
+                pIf->SetResponse( pEvtPtr,
+                    oParams.GetCfg() );
+            }
+            else
+            {
+                oTaskCfg.SetObjPtr( propRespPtr,
+                    ObjPtr( oParams.GetCfg() ) );
+            }
         }
         else
         {
@@ -5225,6 +5230,44 @@ gint32 CIfResponseHandler::OnTaskComplete( gint32 iRet )
     return ret;
 }
 
+gint32 CIfResponseHandler::OnIrpComplete(
+    PIRP pIrp ) 
+{
+    if( pIrp == nullptr ||
+        pIrp->GetStackSize() == 0 )
+        return -EINVAL;
+
+    gint32 ret = pIrp->GetStatus(); 
+
+    do{
+        CParamList oResp;
+        oResp[ propReturnValue ] = ret;
+        oResp[ propIrpPtr ] = ObjPtr( pIrp );
+
+        CParamList oParams;
+        oParams.SetPointer( propRespPtr,
+            ( CObjBase* )oResp.GetCfg() );
+
+        TaskletPtr pTask;
+        pTask.NewObj(
+            clsid( CIfDummyTask ),
+            oParams.GetCfg() );
+
+        BufPtr pBuf( true );
+        *pBuf = ObjPtr( pTask );
+        UpdateParamAt( 1, pBuf );
+
+    }while( 0 );
+
+    if( m_pDeferCall.IsEmpty() )
+        return 0;
+
+    ret = ( *m_pDeferCall )( 0 );
+    ClearClientNotify();
+
+    return ret;
+}
+
 gint32 CIfIoCallTask::RunTask()
 {
     if( m_pMajorCall.IsEmpty() )
@@ -5257,157 +5300,6 @@ gint32 CIfIoCallTask::OnCancel(
 {
     gint32 ret = super::OnCancel( dwContext );
     m_pMajorCall.Clear();
-    return ret;
-}
-
-gint32 CBusPortStopSingleChildTask::OnComplete(
-    gint32 iRetVal )
-{
-    gint32 ret = super::OnComplete( iRetVal );
-    return ret;
-}
-
-gint32 CBusPortStopSingleChildTask::OnIrpComplete(
-    PIRP pIrp )
-{
-    gint32 ret = 0;
-    CParamList oCfg(
-        ( IConfigDb* )GetConfig() );
-    do{
-        CIoManager* pMgr = nullptr;
-        ret = oCfg.GetPointer(
-            propIoMgr, pMgr );
-
-        if( ERROR( ret ) )
-            break;
-
-        IPort* pPort = nullptr;
-        ret = oCfg.GetPointer( 0, pPort );
-        if( ERROR( ret ) )
-            break;
-
-        CPnpManager& oPnpMgr = pMgr->GetPnpMgr();
-        ret = oPnpMgr.DestroyPortStack( pPort );
-        if( ret == STATUS_PENDING )
-        {
-            DebugPrint( ERROR_FAIL,
-            "Unable to stop the port gracefully "
-            "proceed to complete the master irp "
-            "anyway" );
-        }
-
-        IEventSink* pCallback = nullptr;
-        ret = oCfg.GetPointer( 2, pCallback );
-        if( ERROR( ret ) )
-            break;
-
-        LONGWORD dwParam2 = 0;
-
-#if ( BUILD_64 == 0 )
-        ret = oCfg.GetIntProp( 3, dwParam2 );
-#else
-        ret = oCfg.GetQwordProp( 3, dwParam2 );
-#endif
-
-        if( ERROR( ret ) )
-            break;
-
-        LONGWORD dwParam1 =
-            ( LONGWORD )( ( IRP* )pIrp );
-
-        // run the original callback
-        pCallback->OnEvent( eventIrpComp,
-            dwParam1, dwParam2, nullptr );
-
-    }while( 0 );
-
-    oCfg.ClearParams();
-    return ret;
-}
-
-gint32 CBusPortStopSingleChildTask::RunTask()
-{
-    // this is a retriable task
-    gint32 ret = 0;
-    CParamList oCfg(
-        ( IConfigDb* )GetConfig() );
-
-    do{
-        CIoManager* pMgr = nullptr;
-
-        ret = oCfg.GetPointer(
-            propIoMgr, pMgr );
-
-        if( ERROR( ret ) )
-            break;
-
-        IPort* pPort = nullptr;
-        ret = oCfg.GetPointer( 0, pPort );
-        if( ERROR( ret ) )
-            break;
-
-        PIRP pIrp = nullptr; 
-        ret = oCfg.GetPointer( 1, pIrp );
-        if( ERROR( ret ) )
-            break;
-
-        CStdRMutex oIrpLock( pIrp->GetLock() );
-        ret = pIrp->CanContinue( IRP_STATE_READY );
-        if( ERROR( ret ) )
-            break;
-
-        EventPtr pIrpCb = pIrp->m_pCallback;
-        LONGWORD dwContext = pIrp->m_dwContext;
-
-        oCfg.Push( ObjPtr( pIrpCb ) );
-        oCfg.Push( dwContext );
-
-        // intercept the callback
-        pIrp->SetCallback( this, 0 );
-
-        CPnpManager& oPnpMgr = pMgr->GetPnpMgr();
-        ret = oPnpMgr.StopPortStack(
-            pPort, pIrp );
-
-        // to avoid other contender to complete or
-        // cancel the irp before we are done
-        oIrpLock.Unlock();
-
-        // the irp completion will be called
-        if( SUCCEEDED( ret ) ||
-            ret == STATUS_PENDING )
-            break;
-
-        ret = oPnpMgr.DestroyPortStack( pPort );
-        if( ret == STATUS_PENDING )
-        {
-            DebugPrint( ret,
-            "Unable to stop the port gracefully "
-            "proceed to complete the master irp "
-            "anyway" );
-        }
-
-        oIrpLock.Lock();
-        ret = pIrp->CanContinue( IRP_STATE_READY );
-        if( ERROR( ret ) )
-        {
-            ret = 0;
-            break;
-        }
-
-        // recover the original callback
-        pIrp->SetCallback( pIrpCb, dwContext );
-        IrpCtxPtr& pIrpCtx =
-            pIrp->GetTopStack();
-
-        pIrpCtx->SetStatus( ret );
-        oIrpLock.Unlock();
-
-        pMgr->CompleteIrp( pIrp );
-        break;
-
-    }while( 0 );
-
     return ret;
 }
 

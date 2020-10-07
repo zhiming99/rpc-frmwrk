@@ -40,6 +40,7 @@
 #include "uxport.h"
 #include "uxstream.h"
 #include "streamex.h"
+#include "portex.h"
 
 #include <dlfcn.h>
 
@@ -108,7 +109,6 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CPnpMgrQueryStopCompletion );
     INIT_MAP_ENTRYCFG( CPnpMgrStartPortCompletionTask );
     INIT_MAP_ENTRYCFG( CPnpMgrStopPortAndDestroyTask );
-    INIT_MAP_ENTRYCFG( CPnpMgrStopPortStackTask );
     INIT_MAP_ENTRYCFG( CBusPortStopSingleChildTask );
     INIT_MAP_ENTRYCFG( CPortAttachedNotifTask );
     INIT_MAP_ENTRYCFG( CPortStartStopNotifTask );

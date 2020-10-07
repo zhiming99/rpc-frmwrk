@@ -27,6 +27,7 @@
 #include "frmwrk.h"
 #include "portdrv.h"
 #include "emaphelp.h"
+#include "iftasks.h"
 
 using namespace std;
 
@@ -241,5 +242,221 @@ gint32 CPortDriver::Stop()
 
     }while( 0 );
 
+    return ret;
+}
+
+CGenBusDriver::CGenBusDriver(
+    const IConfigDb* pCfg )
+    : super( pCfg )
+{
+
+    gint32 ret = 0;
+
+    do{
+        if( pCfg == nullptr )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        string strDrvName;
+
+        CCfgOpener a( pCfg ), b( ( IConfigDb* )m_pCfgDb );
+
+        ret = a.GetPointer( propIoMgr, m_pIoMgr );
+        if( ERROR( ret ) )
+            break;
+
+        // we don't have a standalone variable
+        // for the driver name, put it in the
+        // config db
+        ret = b.CopyProp( propDrvName, pCfg );
+
+        if( ERROR( ret ) )
+            break;
+
+        SetDrvType( DRV_TYPE_BUSDRV );
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+    {
+        string strMsg = DebugMsg( ret, 
+            "error happens in constructor" );
+
+        throw std::runtime_error( strMsg );
+    }
+}
+
+gint32 CGenBusDriver::Start()
+{
+    gint32 ret = 0;
+
+    do
+    {
+        ret = super::Start();
+
+        if( ERROR( ret ) )
+            break;
+
+        // create all the static ports
+        // specified in the config file, in our
+        // case, just one.
+        PortPtr pNewPort;
+
+        // this is the local dbus port
+        ret = Probe( nullptr, pNewPort, nullptr );
+        if( ERROR( ret ) )
+            break;
+
+        // send a message th pnp manager to
+        // start building the port stack
+        
+    }while( 0 );
+    return ret;
+}
+
+gint32 CGenBusDriver::CreatePort(
+    PortPtr& pNewPort,
+    const IConfigDb* pConfig )
+{
+
+    gint32 ret = 0;
+    CfgPtr pCfg( true );
+    do{
+        
+        if( pCfg.IsEmpty() )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        if( pConfig != nullptr )
+            *pCfg = *pConfig;
+
+        CCfgOpener a( ( IConfigDb* )pCfg );
+        ObjPtr objPtr( GetIoMgr() );
+
+        // a pointer to iomanager
+        ret = a.SetPointer( propIoMgr, GetIoMgr() );
+        if( ERROR( ret ) )
+            break;
+
+        // assign the port id
+        guint32 dwPortId = 0;
+        if( pCfg->exist( propPortId ) )
+        {
+            ret = a.GetIntProp(
+                propPortId, dwPortId );
+        }
+        else
+        {
+            dwPortId = NewPortId();
+            ret = a.SetIntProp(
+                propPortId, dwPortId );
+        }
+
+        if( ERROR( ret ) )
+            break;
+
+        string strClass;
+
+        ret = a.GetStrProp(
+            propPortClass, strClass );
+
+        if( ERROR( ret ) )
+            break;
+
+        // c++11 required to_string
+        string strPortName =
+            strClass
+            + string( "_" )
+            + std::to_string( dwPortId );
+
+        // the port name to pass
+        ret = a.SetStrProp(
+            propPortName, strPortName );
+
+        if( ERROR( ret ) )
+            break;
+
+        // the pointer to the driver
+        objPtr = this;
+        ret = a.SetObjPtr( propDrvPtr, objPtr );
+        if( ERROR( ret ) )
+            break;
+
+        guint32 dwClsid = 0;
+        ret = a.GetIntProp(
+            propClsid, dwClsid );
+
+        if( ERROR( ret ) )
+            break;
+
+        // create the bus port
+        PortPtr pBusFdo;
+        ret = pBusFdo.NewObj(
+            ( EnumClsid )dwClsid, pCfg );
+
+        if( ERROR( ret ) )
+            break;
+
+        ret = AddPort( pBusFdo );
+        if( ERROR( ret ) )
+            break;
+
+        pNewPort = pBusFdo;
+
+        // NOTE: the port `Start' will be called
+        // when the port stack is built
+
+        // we are done here
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CGenBusDriver::RemovePort(
+    IPort* pChildPort )
+{
+    if( pChildPort == nullptr )
+        return -EINVAL;
+
+    CStdRMutex oDrvLock( GetLock() );
+    gint32 ret = super::RemovePort( pChildPort );
+    if( ERROR( ret ) )
+        return ret;
+
+    TaskletPtr pTask;
+    PortPtr pPort( pChildPort );
+    std::map< PortPtr, TaskletPtr >::iterator
+        itr = m_mapPort2TaskGrp.find( pPort );
+    if( itr == m_mapPort2TaskGrp.end() )
+        return -ENOENT;
+
+    pTask = itr->second;
+
+    if( !pTask.IsEmpty() )
+        ( *pTask )( eventCancelTask );
+
+    m_mapPort2TaskGrp.erase( itr );
+
+    return ret;
+}
+
+gint32 CGenBusDriver::AddPort(
+    IPort* pNewPort )
+{
+    if( pNewPort == nullptr )
+        return -EINVAL;
+    CStdRMutex oDrvLock( GetLock() );
+    gint32 ret = super::AddPort( pNewPort );
+    if( ERROR( ret ) )
+        return ret;
+
+    TaskletPtr pTask;
+    PortPtr pPort( pNewPort );
+    m_mapPort2TaskGrp[ pPort ] = pTask;
     return ret;
 }

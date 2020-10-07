@@ -31,6 +31,7 @@
 #include "stlcont.h"
 #include "emaphelp.h"
 #include "ifhelper.h"
+#include "portex.h"
 
 gint32 CPort::GetStopResumeTask(
     PIRP pIrp, TaskletPtr& pTask )
@@ -42,3 +43,35 @@ gint32 CPort::GetStopResumeTask(
         pIrp );
     return ret;
 }
+
+gint32 CGenBusDriverEx::Stop()
+{
+    gint32 ret = 0;
+
+    do
+    {
+        if( GetIoMgr() == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        // Stop all the child ports
+        std::vector<PortPtr> vecPorts;
+        ret = EnumPorts( vecPorts );
+        if( ERROR( ret ) )
+            break;
+
+        for( auto elem : vecPorts )
+            DestroyPortSynced( elem, nullptr );
+
+        // stopping the child ports is done
+        // in CGenericBusPort
+
+        // let the base class to unreg the driver
+        ret = super::Stop();
+
+    }while( 0 );
+    return ret;
+}
+

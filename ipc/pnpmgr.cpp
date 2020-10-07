@@ -129,6 +129,13 @@ void CPnpManager::OnPortAttached(
 
     }while( 0 );
 
+    if( ret != STATUS_PENDING )
+    {
+        CCfgOpenerObj oPortCfg( pPort );
+        oPortCfg.SetIntProp(
+            propReturnValue, ret );
+    }
+
     return;
 }
 
@@ -832,32 +839,13 @@ gint32 CPnpMgrDoStopNoMasterIrp::operator()(
     return SetError( ret );
 }
 
-gint32 CPnpMgrStopPortAndDestroyTask::operator()(
-    guint32 dwContext )
+gint32 CPnpMgrStopPortAndDestroyTask::RunTask()
 {
-    gint32 ret = 0;
-
-    switch( ( EnumEventId )dwContext )
-    {
-    case eventOneShotTaskThrdCtx:
-    case eventTaskThrdCtx:
-        {
-            ret = OnScheduledTask( dwContext );
-            break;
-        }
-    case eventIrpComp:
-        {
-            ret = OnIrpComplete( dwContext );
-            break;
-        }
-    default:
-        break;
-    }
-    return ret;
+    return OnScheduledTask( eventZero );
 }
 
 gint32 CPnpMgrStopPortAndDestroyTask::OnIrpComplete(
-    guint32 dwContext )
+    PIRP pIrp )
 {
     gint32 ret = 0;
     
@@ -868,18 +856,10 @@ gint32 CPnpMgrStopPortAndDestroyTask::OnIrpComplete(
         if( ERROR( ret ) )
             break;
 
-        ObjPtr pObj;
-        ret = oParams.GetObjPtr(
-            propPortPtr, pObj );
+        CPort* pPort = nullptr;
+        ret = oParams.GetPointer( propPortPtr, pPort );
         if( ERROR( ret ) )
             break;
-
-        CPort* pPort = pObj;
-        if( pPort == nullptr )
-        {
-            ret = -EFAULT;
-            break;
-        }
 
         CPnpManager& oPnpMgr = pMgr->GetPnpMgr();
         oPnpMgr.DestroyPortStack( pPort );
@@ -973,6 +953,7 @@ gint32 CPnpMgrStopPortAndDestroyTask::OnScheduledTask(
 
         pMasterIrp->RemoveCallback();
         pMasterIrp->RemoveTimer();
+        pMasterIrp->SetStatus( ret );
 
         oIrpLock.Unlock();
 
@@ -985,20 +966,6 @@ gint32 CPnpMgrStopPortAndDestroyTask::OnScheduledTask(
     }while( 0 );
 
     return SetError( ret );
-}
-
-gint32 CPnpMgrStopPortAndDestroyTask::OnEvent(
-    EnumEventId iEvent,
-    LONGWORD dwParam1,
-    LONGWORD dwParam2,
-    LONGWORD* pData )
-{
-    // there is race condition between eventIrpComp
-    // from the normal irp completion and the timeout
-    // irp completion.
-    CReentrancyGuard oGuard( this );
-    return super::OnEvent( iEvent,
-        dwParam1, dwParam2, pData );
 }
 
 /**
@@ -1149,10 +1116,12 @@ void CPnpManager::OnPortStarted( IPort* pTopPort )
 }
 
 gint32 CPnpManager::DestroyPortStack(
-    IPort* pPortToDestroy )
+    IPort* pPortToDestroy,
+    IEventSink* pCallback )
 {
     gint32 ret = 0;
     do{
+        CIoManager* pMgr = GetIoMgr();
         if( pPortToDestroy == nullptr )
         {
             ret = -EINVAL;
@@ -1206,8 +1175,7 @@ gint32 CPnpManager::DestroyPortStack(
         ret = ERROR_STATE;
         if( pPort != pReadyPort )
         {
-            ret = GetIoMgr()->SubmitIrp(
-                hPort, pIrp, false );
+            ret = pMgr->SubmitIrp( hPort, pIrp, false );
         }
 
         if( ret == ERROR_STATE )
@@ -1238,7 +1206,7 @@ gint32 CPnpManager::DestroyPortStack(
                 // still in READY state, before
                 // destroying them
                 CCfgOpener oCfg;
-                ret = oCfg.SetPointer( propIoMgr, GetIoMgr() );
+                ret = oCfg.SetPointer( propIoMgr, pMgr );
 
                 ret = oCfg.SetObjPtr(
                     propPortPtr,
@@ -1249,10 +1217,21 @@ gint32 CPnpManager::DestroyPortStack(
                 // tasks due to the potential call
                 // of WaitForComplete from the
                 // StopPortStack
-                ret = GetIoMgr()->ScheduleTask(
+                TaskletPtr pStopTask;
+                ret = pStopTask.NewObj(
                     clsid( CPnpMgrStopPortAndDestroyTask ),
-                    oCfg.GetCfg(),
-                    false );
+                    oCfg.GetCfg() );
+
+                if( ERROR( ret ) )
+                    break;
+
+                if( pCallback != nullptr )
+                {
+                    CIfRetryTask* pTask = pStopTask;
+                    pTask->SetClientNotify( pCallback );
+                }
+
+                ret = pMgr->RescheduleTask( pStopTask );
 
                 if( SUCCEEDED( ret ) )
                     ret = STATUS_PENDING;
@@ -1346,52 +1325,6 @@ gint32 CPnpManager::DestroyPortStack(
 
     return ret;
 }
-
-gint32 CPnpMgrStopPortStackTask::operator()(
-    guint32 dwContext )
-{
-    gint32 ret = 0;
-    do{
-        guint32 iEventId = 0;
-        guint32 iEvent = 0;
-        guint32 dwParam1 = 0;
-        LONGWORD dwVal = 0;
-        guint32* pData = nullptr;
-        CIoManager* pMgr = nullptr;
-
-        CParamList oParams( GetConfig() );
-
-        // FIXME: the value is not right
-        oParams.Pop( dwVal );
-        pData = ( guint32* )dwVal;
-        oParams.Pop( dwParam1 );
-        oParams.Pop( iEvent );
-        oParams.Pop( iEventId );
-        ret = oParams.GetPointer( propIoMgr, pMgr );
-        if( ERROR( ret ) )
-            break;
-
-        CConnPointHelper oConnPoint( pMgr );
-        oConnPoint.BroadcastEvent( iEventId,
-            ( EnumEventId )iEvent,
-            dwParam1, 0, ( LONGWORD* )pData );
-
-        if( pData != nullptr )
-        {
-            IPort* pPort =
-                HandleToPort( dwVal );
-
-            CPnpManager& oPnpMgr =
-                pMgr->GetPnpMgr();
-
-            ret = oPnpMgr.DestroyPortStack(
-                pPort );
-        }
-
-    }while( 0 );
-
-    return SetError( ret );
-};
 
 void CPnpManager::HandleCPEvent(
     EnumEventId iEvent,

@@ -28,7 +28,7 @@
 #include <semaphore.h>
 #include "defines.h"
 #include "frmwrk.h"
-#include "emaphelp.h"
+// #include "emaphelp.h"
 #include "connhelp.h"
 #include "ifhelper.h"
 #include <sys/types.h>
@@ -4888,98 +4888,9 @@ gint32 CRpcServices::AddSeqTaskInternal(
     TaskletPtr& pTask,
     bool bLong )
 {
-    if( pTask.IsEmpty() )
-        return -EINVAL;
-
-    gint32 ret = 0;
-    bool bNew = false;
-    do{
-        TaskGrpPtr ptrSeqTasks;
-
-        CStdRMutex oIfLock( GetLock() );
-        if( pQueuedTasks.IsEmpty() )
-        {
-            CParamList oParams;
-            oParams[ propIoMgr ] = 
-                ObjPtr( GetIoMgr() );
-
-            ret = pQueuedTasks.NewObj(
-                clsid( CIfTaskGroup ),
-                oParams.GetCfg() );
-
-            if( ERROR( ret ) )
-                break;
-
-            pQueuedTasks->SetRelation( logicNONE );
-            bNew = true;
-        }
-        ptrSeqTasks = pQueuedTasks;
-        oIfLock.Unlock();
-
-        CIfRetryTask* pSeqTasks = ptrSeqTasks;
-        CStdRTMutex oTaskLock( pSeqTasks->GetLock() );
-        oIfLock.Lock();
-        if( pQueuedTasks.IsEmpty() )
-            continue;
-
-        if( !( pQueuedTasks == ptrSeqTasks ) )
-            continue;
-
-        ret = pQueuedTasks->AppendTask( pTask );
-        if( ERROR( ret ) && !bNew )
-        {
-            // the old seqTask is completed
-            pQueuedTasks.Clear();
-            continue;
-        }
-        else if( ERROR( ret ) && bNew )
-        {
-            // something bad happened
-            DebugPrint( ret, "a fatal error happens on sequential queue..." );
-            pQueuedTasks.Clear();
-            break;
-        }
-
-        pTask->MarkPending();
-        if( SUCCEEDED( ret ) && bNew )
-        {
-            // a new pQueuedTasks, add and run
-            oIfLock.Unlock();
-            oTaskLock.Unlock();
-
-            TaskletPtr pDeferTask;
-            ret = DEFER_CALL_NOSCHED( pDeferTask,
-                ObjPtr( this ),
-                &CRpcServices::RunManagedTask,
-                pQueuedTasks, false );
-
-            if( ERROR( ret ) )
-                break;
-
-            ret = GetIoMgr()->RescheduleTask(
-                pDeferTask, bLong );
-
-            break;
-        }
-        if( SUCCEEDED( ret ) && !bNew )
-        {
-            // pQueuedTasks is already running
-#ifdef DEBUG
-            /*
-            DebugPrint( ret, "a task is queued..." );
-            std::string strDump;
-            this->Dump( strDump );
-            DebugPrint( ret, "for class %s", strDump.c_str() );
-            */
-#endif
-        }
-        break;
-
-    }while( 1 );
-
-    return ret;
+    return AddSeqTaskTempl(
+        this, pQueuedTasks, pTask, bLong );
 }
-
 
 gint32 CRpcServices::AddSeqTask(
     TaskletPtr& pTask, bool bLong )
