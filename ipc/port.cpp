@@ -3265,17 +3265,13 @@ void CGenericBusPort::RemovePdoPort(
 
     m_mapId2Pdo.erase( iPortId );
 
-    TaskletPtr pTask; 
     std::map< PortPtr, TaskletPtr >::iterator
         itr = m_mapPort2TaskGrp.find( pPort );
     if( itr == m_mapPort2TaskGrp.end() )
         return;
 
-    pTask = itr->second;
-
-    if( !pTask.IsEmpty() )
-        ( *pTask )( eventCancelTask );
-
+    // NOTE: don't cancel the taskgroup, and let
+    // it complete
     m_mapPort2TaskGrp.erase( itr );
 }
 

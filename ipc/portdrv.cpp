@@ -428,18 +428,14 @@ gint32 CGenBusDriver::RemovePort(
     if( ERROR( ret ) )
         return ret;
 
-    TaskletPtr pTask;
     PortPtr pPort( pChildPort );
     std::map< PortPtr, TaskletPtr >::iterator
         itr = m_mapPort2TaskGrp.find( pPort );
     if( itr == m_mapPort2TaskGrp.end() )
         return -ENOENT;
 
-    pTask = itr->second;
-
-    if( !pTask.IsEmpty() )
-        ( *pTask )( eventCancelTask );
-
+    // NOTE: don't cancel the taskgroup, and let
+    // it complete
     m_mapPort2TaskGrp.erase( itr );
 
     return ret;
