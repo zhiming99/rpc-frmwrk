@@ -3256,13 +3256,6 @@ void CGenericBusPort::RemovePdoPort(
         return;
 
     PortPtr pPort = m_mapId2Pdo[ iPortId ];
-
-    CCfgOpenerObj a( ( IPort* )pPort );
-
-    // lable the port is removed
-    a.SetIntProp(
-        propPortState, PORT_STATE_REMOVED );
-
     m_mapId2Pdo.erase( iPortId );
 
     std::map< PortPtr, TaskletPtr >::iterator
