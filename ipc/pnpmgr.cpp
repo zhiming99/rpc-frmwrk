@@ -1270,14 +1270,19 @@ gint32 CPnpManager::DestroyPortStack(
                         break;
 
                     CGenericBusPort* pBus = pObj;
+                    if( pBus == nullptr )
+                    {
+                        ret = -EFAULT;
+                        break;
+                    }
 
                     guint32 dwPortId;
-
                     ret = oPortCfg.GetIntProp( propPortId, dwPortId );
                     if( ERROR( ret ) )
                         break;
 
                     pBus->RemovePdoPort( dwPortId );
+                    oPortCfg.RemoveProperty( propBusPortPtr );
                     break;
                 }
             case PORTFLG_TYPE_FDO:
@@ -1295,6 +1300,7 @@ gint32 CPnpManager::DestroyPortStack(
                     {
                         ret = pDrv->RemovePort( portPtr );
                     }
+                    oPortCfg.RemoveProperty( propDrvPtr );
                     break;
                 }
              case PORTFLG_TYPE_FIDO:
@@ -1312,6 +1318,7 @@ gint32 CPnpManager::DestroyPortStack(
                     {
                         ret = pDrv->RemovePort( portPtr );
                     }
+                    oPortCfg.RemoveProperty( propDrvPtr );
                     break;
                 }
             default:

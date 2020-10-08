@@ -121,10 +121,6 @@ gint32 CPortDriver::RemovePort( IPort* pPort )
     if( ERROR( ret ) )
         return ret;
 
-    // lable the port is removed
-    a.SetIntProp(
-        propPortState, PORT_STATE_REMOVED );
-
     m_mapIdToPort.erase( dwPortId );
     return ret;
 }
@@ -437,7 +433,6 @@ gint32 CGenBusDriver::RemovePort(
     // NOTE: don't cancel the taskgroup, and let
     // it complete
     m_mapPort2TaskGrp.erase( itr );
-
     return ret;
 }
 

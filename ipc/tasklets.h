@@ -492,9 +492,9 @@ class CProxyFdoListenTask
     : public CTaskletRetriable
 {
     public:
-    typedef CTasklet super;
+    typedef CTaskletRetriable super;
     CProxyFdoListenTask( const IConfigDb* pCfg = nullptr )
-        : CTaskletRetriable( pCfg )
+        : super( pCfg )
     {
         SetClassId( clsid( CProxyFdoListenTask ) );
     }
