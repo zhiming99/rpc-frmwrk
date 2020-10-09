@@ -1036,9 +1036,9 @@ gint32 CRpcSecFido::CompleteListeningIrp(
         psse->m_pInBuf.Clear();
         psse->m_iEvtSrc = GetClsid();
         pCtx->m_pRespData = pRespBuf;
-        ret = STATUS_SUCCESS;
         DebugPrint( ret, "secfido, error detected "
         "in CompleteListeningIrp" );
+        ret = STATUS_SUCCESS;
     }
 
     pCtx->SetStatus( ret );
