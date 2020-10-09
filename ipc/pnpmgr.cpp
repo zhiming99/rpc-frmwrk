@@ -852,17 +852,43 @@ gint32 CPnpMgrStopPortAndDestroyTask::OnIrpComplete(
     do{
         CIoManager* pMgr;
         CParamList oParams( GetConfig() );
-        ret = oParams.GetPointer( propIoMgr, pMgr );
+
+        ret = oParams.GetPointer(
+            propIoMgr, pMgr );
+
         if( ERROR( ret ) )
             break;
 
         CPort* pPort = nullptr;
-        ret = oParams.GetPointer( propPortPtr, pPort );
+        ret = oParams.GetPointer(
+            propPortPtr, pPort );
+
         if( ERROR( ret ) )
             break;
 
+        EventPtr pCallback;
         CPnpManager& oPnpMgr = pMgr->GetPnpMgr();
-        oPnpMgr.DestroyPortStack( pPort );
+
+        ret = GetClientNotify( pCallback );
+        if( SUCCEEDED( ret ) )
+        {
+            ret = oPnpMgr.DestroyPortStack(
+                pPort, pCallback );
+            if( ret == STATUS_PENDING )
+            {
+                // the callback is passed on
+                ClearClientNotify();
+
+                // and this task has retired
+                ret = 0;
+            }
+        }
+        else
+        {
+            ret = 0;
+            oPnpMgr.DestroyPortStack(
+                pPort, pCallback );
+        }
 
     }while( 0 );
 
