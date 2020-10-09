@@ -1939,6 +1939,7 @@ gint32 COpenSSLHandshakeTask::OnTaskComplete(
         oIrpLock.Unlock();
 
         pMgr->CompleteIrp( pMasterIrp );
+        DebugPrint( iRet, "SSL Handshake done" );
 
     }while( 0 );
 

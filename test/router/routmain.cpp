@@ -104,9 +104,10 @@ void CIfRouterTest::tearDown()
         ret = pSvc->Stop();
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 
+        m_pMgr.Clear();
+
         ret = CoUninitialize();
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
-        m_pMgr.Clear();
 
         CPPUNIT_ASSERT( CObjBase::GetActCount() == 0 );
 

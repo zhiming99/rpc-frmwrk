@@ -562,6 +562,8 @@ gint32 CRpcTcpBridgeAuth::OnLoginFailed(
     gint32 ret = 0;
     do{
 
+        DebugPrint( ret, "Login failed,"
+            " connection is reset" );
         CRpcRouter* pRouter = GetParent();
         if( !m_pLoginTimer.IsEmpty() )
             ( *m_pLoginTimer )( eventCancelTask );
