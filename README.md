@@ -37,6 +37,10 @@ This framework depends on the following packags to build:
 Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60) for details.
 
 ---
+[`Sat 10 Oct 2020 02:48:54 PM Beijing`]   
+1. Fixed the concurrent bug and some long-existing bugs. Now the `rpc-frmwrk` should work stably.
+2. As the next step, I will add the `make install` to the build system.
+
 [`Wed 23 Sep 2020 12:24:43 PM Beijing`]   
 1. TODO next
     * Fix a concurrent bug in the IO manager

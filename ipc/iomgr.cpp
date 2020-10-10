@@ -1413,15 +1413,13 @@ gint32 CIoManager::Start()
             break;
         }
 
+        DebugPrint( 0, "IoMgr is starting..." );
+
         m_bInit = true;
         m_bStop = false;
 
         GetTaskThreadPool().Start();
         GetIrpThreadPool().Start();
-
-        // the return value is the workitem id,
-        // and we don't want it here
-        ret = 0;
 
         // this task will be executed in the
         // mainloop
@@ -1671,6 +1669,8 @@ gint32 CIoManager::Stop()
             return ERROR_STATE;
         m_bStop = true;
     }
+
+    DebugPrint( 0, "IoMgr is stopping..." );
 
     if( m_iHcTimer != 0 )
     {
