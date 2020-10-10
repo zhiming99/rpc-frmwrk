@@ -1115,11 +1115,11 @@ gint32 CBytesSender::SendImmediate(
             break;
         }
 
-        guint32 dwSendFlag = 0;
-        if( m_iBufIdx < iCount - 1 )
-            dwSendFlag = MSG_MORE;
-
         do{
+            guint32 dwSendFlag = 0;
+            if( m_iBufIdx < iCount - 1 )
+                dwSendFlag = MSG_MORE;
+
             guint32 dwMaxBytes =
                 MAX_BYTES_PER_TRANSFER;
 
@@ -1278,11 +1278,11 @@ gint32 CBytesSender::OnSendReady(
             break;
         }
 
-        guint32 dwSendFlag = 0;
-        if( m_iBufIdx < iCount - 1 )
-            dwSendFlag = MSG_MORE;
-
         do{
+            guint32 dwSendFlag = 0;
+            if( m_iBufIdx < iCount - 1 )
+                dwSendFlag = MSG_MORE;
+
             guint32 dwMaxBytes =
                 MAX_BYTES_PER_TRANSFER;
 

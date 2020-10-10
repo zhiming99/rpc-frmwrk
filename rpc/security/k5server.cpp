@@ -812,6 +812,12 @@ gint32 CK5AuthServer::GenSessHash(
         if( ERROR( ret ) )
             break;
 
+        guint64 qwSalt = pIf->GetObjId();
+        qwSalt = htonll( qwSalt );
+
+        pBuf->Append( ( char* )&qwSalt,
+            sizeof( qwSalt ) );
+
         ret = gen_sess_hash( pBuf, strSess );
 
     }while( 0 );
@@ -1141,7 +1147,7 @@ gint32 CK5AuthServer::Login(
             propConnHandle, dwPortId );
         if( ERROR( ret ) )
             break;
-        
+
         BufPtr pRespTok;
         std::string strSess;
         if( bKrbLogin )
@@ -1168,10 +1174,28 @@ gint32 CK5AuthServer::Login(
         oResp[ propReturnValue ] = ret;
         oResp[ propContinue ] = bContinue;
 
-        if( SUCCEEDED( ret ) &&
-            !pRespTok.IsEmpty() &&
-            !pRespTok->empty() )
-            oResp.Push( pRespTok );
+        if( SUCCEEDED( ret ) )
+        {
+            if( !pRespTok.IsEmpty() &&
+                !pRespTok->empty() )
+                oResp.Push( pRespTok );
+
+            CRpcRouterBridge* pRouter =
+                static_cast< CRpcRouterBridge* >
+                    ( GetRouter() );
+            if( unlikely( pRouter == nullptr ) )
+            {
+                ret = -EFAULT;
+                break;
+            }
+
+            InterfPtr pIf;
+            ret = pRouter->GetBridge( dwPortId, pIf );
+            if( ERROR( ret ) )
+                break;
+            oResp.SetQwordProp(
+                propSalt, pIf->GetObjId() );
+        }
 
     }while( 0 );
 

@@ -1220,6 +1220,11 @@ gint32 CK5AuthProxy::Krb5Login(
                     continue;
                 }
 
+                ret = oResp.GetQwordProp(
+                    propSalt, m_qwSalt );
+                if( ERROR( ret ) )
+                    break;
+
                 // GSS_S_COMPLETE
                 break;
             }
@@ -1577,6 +1582,12 @@ gint32 CK5AuthProxy::NoTokenLogin()
         ret = Login( nullptr,
             oParams.GetCfg(), pResp );
 
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpener oResp( ( IConfigDb* )pResp );
+        ret = oResp.GetQwordProp(
+            propSalt, m_qwSalt );
         if( ERROR( ret ) )
             break;
 
@@ -1971,6 +1982,16 @@ gint32 CK5AuthProxy::GenSessHash(
         ret = AppendConnParams( pConn, pBuf );
         if( ERROR( ret ) )
             break;
+
+        if( m_qwSalt == 0 )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+
+        guint64 qwSalt = htonll( m_qwSalt );
+        pBuf->Append( ( char* )&qwSalt,
+            sizeof( qwSalt ) );
 
         ret = gen_sess_hash( pBuf, strSess );
 

@@ -266,6 +266,7 @@ class CK5AuthProxy :
     gss_ctx_id_t m_gssctx = GSS_C_NO_CONTEXT;
     CRpcRouter* m_pRouter = nullptr;
     stdrmutex m_oGssLock;
+    guint64 m_qwSalt = 0;
 
     gint32 StartLogin(
         IEventSink* pCallback );

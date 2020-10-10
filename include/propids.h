@@ -234,6 +234,7 @@ enum EnumPropId : gint32
     propSignMsg,        // type: a bool to indicate whether to sign the message or encrypt the message.
 
     propNoPort,         // type: a bool to indicate the interface object have the underlying port
+    propSalt,           // type: a guint64 as a salt for sess hash
 
     propReservedEnd = 0x10000000,
     propInvalid = -1, 
