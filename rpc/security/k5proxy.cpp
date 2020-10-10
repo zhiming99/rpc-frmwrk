@@ -1135,6 +1135,7 @@ gint32 CK5AuthProxy::Krb5Login(
         in_token_ptr = GSS_C_NO_BUFFER;
         gss_context = GSS_C_NO_CONTEXT;
         CfgPtr pResp;
+        guint64 qwSalt = 0;
 
         do{
             gss_OID mech_oid = gss_mech_krb5;
@@ -1198,6 +1199,13 @@ gint32 CK5AuthProxy::Krb5Login(
 
                 CCfgOpener oResp(
                     ( IConfigDb* )pResp );
+
+                ret = oResp.GetQwordProp(
+                    propSalt, qwSalt );
+
+                if( ERROR( ret ) )
+                    break;
+
                 if( maj_stat == GSS_S_CONTINUE_NEEDED )
                 {
                     BufPtr pToken;
@@ -1219,11 +1227,6 @@ gint32 CK5AuthProxy::Krb5Login(
 
                     continue;
                 }
-
-                ret = oResp.GetQwordProp(
-                    propSalt, m_qwSalt );
-                if( ERROR( ret ) )
-                    break;
 
                 // GSS_S_COMPLETE
                 break;
@@ -1260,6 +1263,15 @@ gint32 CK5AuthProxy::Krb5Login(
 
                     if( ERROR( ret ) )
                         break;
+
+                    CCfgOpener oResp(
+                        ( IConfigDb* )pResp );
+                    ret = oResp.GetQwordProp(
+                        propSalt, qwSalt );
+
+                    if( ERROR( ret ) )
+                        break;
+
                 }
                 else // GSS_S_CONTINUE_NEEDED
                 {
@@ -1275,6 +1287,7 @@ gint32 CK5AuthProxy::Krb5Login(
 
         if( SUCCEEDED( ret ) )
         {
+            m_qwSalt = qwSalt;
             m_gssctx = gss_context;
             ret = GenSessHash(
                 gss_context, m_strSess );
