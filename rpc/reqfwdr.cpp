@@ -1171,7 +1171,7 @@ gint32 CRpcReqForwarder::OnModEvent(
 
         BufPtr pBuf( true );
         *pBuf = ObjPtr( pDeferTask );
-        CIfDeferCallTask* pTask = pDeferTask;
+        CIfDeferCallTaskEx* pTask = pDeferTask;
         pTask->UpdateParamAt( 0, pBuf );
 
         // using the reqfwdr's sequential
