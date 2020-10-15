@@ -350,7 +350,7 @@ class CStreamRelayBase :
         do{
             IPort* pPort = nullptr;
             TaskletPtr pCloseStream;
-            ret = DEFER_IFCALL_NOSCHED(
+            ret = DEFER_IFCALLEX_NOSCHED(
                 pCloseStream, ObjPtr( this ),
                 &CRpcTcpBridgeShared::CloseLocalStream,
                 pPort, iStmId );
@@ -362,7 +362,7 @@ class CStreamRelayBase :
             TaskletPtr pSendClose;
             BufPtr pBuf( true );
             *pBuf = ( guint8 )tokClose;
-            ret = DEFER_IFCALL_NOSCHED(
+            ret = DEFER_IFCALLEX_NOSCHED(
                 pSendClose, ObjPtr( this ),
                 &CRpcTcpBridgeShared::WriteStream,
                 iStmId, *pBuf, 1, ( IEventSink* )nullptr );
@@ -372,7 +372,7 @@ class CStreamRelayBase :
 
             // Let the WriteStream to notify this task when
             // completed
-            CIfDeferCallTask* pTemp = pSendClose;
+            CIfDeferCallTaskEx* pTemp = pSendClose;
             BufPtr pwscb( true );
             *pwscb = ObjPtr( pSendClose );
             pTemp->UpdateParamAt( 3, pwscb );
@@ -793,7 +793,7 @@ struct CUnixSockStmRelayBase :
                 // use defer call to avoid lock nesting
                 // among the tasks
                 TaskletPtr pResumeTask;
-                ret = DEFER_IFCALL_NOSCHED(
+                ret = DEFER_IFCALLEX_NOSCHED(
                     pResumeTask,
                     ObjPtr( this ),
                     &CUnixSockStmRelayBase::PauseResumeTask,
@@ -1016,7 +1016,7 @@ struct CUnixSockStmRelayBase :
     {
         gint32 ret = 0;
         TaskletPtr pTask;
-        ret = DEFER_IFCALL_NOSCHED( pTask,
+        ret = DEFER_IFCALLEX_NOSCHED( pTask,
             ObjPtr( this ),
             &CUnixSockStmRelayBase::OnTcpStmEvent,
             byToken, ( CBuffer* )pBuf );

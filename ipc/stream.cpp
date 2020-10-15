@@ -741,7 +741,7 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
             oResp.Push( ( HANDLE )pSvc );
 
             TaskletPtr pConnTask;
-            ret = DEFER_IFCALL_NOSCHED(
+            ret = DEFER_IFCALLEX_NOSCHED(
                 pConnTask,
                 ObjPtr( pParent ),
                 &IStream::OnConnected,

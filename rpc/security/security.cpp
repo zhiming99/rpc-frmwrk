@@ -2261,7 +2261,7 @@ gint32 CRpcReqForwarderAuth::OnSessImplLoginCompleteSafe(
         return -EINVAL;
 
     TaskletPtr pSeqTask;
-    gint32 ret = DEFER_IFCALL_NOSCHED(
+    gint32 ret = DEFER_IFCALLEX_NOSCHED(
         pSeqTask, ObjPtr( this ),
         &CRpcReqForwarderAuth::OnSessImplLoginComplete,
         pInvTask, pReqCtx );

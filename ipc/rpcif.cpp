@@ -1325,24 +1325,16 @@ gint32 CRpcInterfaceBase::PauseResume(
         if( ERROR( ret ) )
             break;
 
-        ret = oParams.SetBoolProp(
-            propNotifyClient, true );
-
-        if( ERROR( ret ))
-            break;
-
-        ret = oParams.SetObjPtr(
-            propEventSink, ObjPtr( pCallback ) );
-
-        if( ERROR( ret ) )
-            break;
-        
         ret = pTask.NewObj(
             clsid( CIfPauseResumeTask ),
             oParams.GetCfg() );
 
         if( ERROR( ret ) )
             break;
+
+        CIfRetryTask* pRetryTask = pTask;
+        pRetryTask->SetClientNotify(
+            pCallback );
 
         // force to run on this thread
         ret = AddAndRun( pTask, true );
@@ -2686,21 +2678,6 @@ gint32 CRpcServices::RunIoTask(
         if( ERROR( ret ) )
             break;
 
-        ret = oParams.SetBoolProp(
-            propNotifyClient, true );
-
-        if( ERROR( ret ) )
-            break;
-
-        if( pCallback != nullptr )
-        {
-            ret = oParams.SetObjPtr(
-                propEventSink, pCallback );
-
-            if( ERROR( ret ) )
-                break;
-        }
-
         TaskletPtr pTask;   
         ret = pTask.NewObj(
             clsid( CIfIoReqTask ),
@@ -2715,6 +2692,9 @@ gint32 CRpcServices::RunIoTask(
             ret = -EFAULT;
             break;
         }
+
+        pIoTask->SetClientNotify(
+            pCallback );
 
         // set the req and the resp
         pIoTask->SetReqCall( pReqCall );

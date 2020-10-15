@@ -600,7 +600,7 @@ gint32 CMyFileProxy::UploadDownload(
         }
 
         TaskletPtr pTask;
-        ret = DEFER_IFCALL_NOSCHED(
+        ret = DEFER_IFCALLEX_NOSCHED(
             pTask, ObjPtr( this ),
             &CMyFileProxy::StartTransfer,
             ptctx );

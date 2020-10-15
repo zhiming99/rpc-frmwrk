@@ -586,9 +586,8 @@ gint32 CIfRetryTask::OnComplete(
 
     // clear all the objPtr we used
     RemoveProperty( propIfPtr );
-    RemoveProperty( propEventSink );
-    RemoveProperty( propNotifyClient );
     RemoveProperty( propIrpPtr );
+    ClearClientNotify();
 
     // NOTE: Moved setting task status to the
     // bottom due to a concurrent bug, when the
@@ -686,12 +685,14 @@ gint32 CIfRetryTask::Process( guint32 dwContext )
         case eventTimeoutCancel:
             {   
                 OnCancel( iEvent );
+                CancelTaskChain( dwContext );
                 ret = ERROR_TIMEOUT;
                 break;
             }
         case eventCancelTask:
             {
                 ret = OnCancel( iEvent );
+                CancelTaskChain( dwContext );
                 if( ret != STATUS_PENDING )
                     ret = ERROR_CANCEL;
                 break;
@@ -699,6 +700,7 @@ gint32 CIfRetryTask::Process( guint32 dwContext )
         case eventUserCancel:
             {
                 OnCancel( iEvent );
+                CancelTaskChain( dwContext );
                 ret = ERROR_USER_CANCEL;
                 break;
             }
@@ -873,6 +875,119 @@ gint32 CIfRetryTask::GetPropertyType(
     }
 
     return ret;
+}
+
+void CIfRetryTask::ClearClientNotify()
+{
+    CCfgOpener oParams(
+        ( IConfigDb* )GetConfig() );
+    oParams.RemoveProperty( propNotifyClient );
+    oParams.RemoveProperty( propEventSink );
+    ClearFwrdTask();
+}
+
+gint32 CIfRetryTask::SetClientNotify(
+    IEventSink* pCallback )
+{
+    if( pCallback == nullptr )
+        return -EINVAL;
+    ObjPtr pTask = pCallback;
+    CCfgOpener oParams(
+        ( IConfigDb* )GetConfig() );
+    oParams.SetBoolProp( propNotifyClient, true );
+    oParams.SetObjPtr( propEventSink, pTask );
+
+    CIfRetryTask* pRetryTask = pTask;
+    if( pRetryTask != nullptr )
+        pRetryTask->SetFwrdTask( this );
+
+    return 0;
+}
+
+gint32 CIfRetryTask::GetClientNotify(
+    EventPtr& pEvt ) const
+{
+    CCfgOpener oParams(
+        ( const IConfigDb* )GetConfig() );
+    ObjPtr pVal;
+
+    // BUGBUG: no test of propNotifyClient
+    gint32 ret = oParams.GetObjPtr(
+        propEventSink, pVal );
+    if( ERROR( ret ) )
+        return ret;
+
+    pEvt = pVal;
+    if( pEvt.IsEmpty() )
+        return -ENOENT;
+    return 0;
+}
+
+gint32 CIfRetryTask::SetFwrdTask(
+    IEventSink* pCallback )
+{
+    m_pFwdrTask = ObjPtr( pCallback );
+    return 0;
+}
+
+TaskletPtr CIfRetryTask::GetFwrdTask() const
+{
+    TaskletPtr pTask = m_pFwdrTask;
+    return pTask;
+}
+
+gint32 CIfRetryTask::ClearFwrdTask()
+{
+    m_pFwdrTask.Clear();
+    return 0;
+}
+
+TaskletPtr CIfRetryTask::GetEndFwrdTask()
+{
+    TaskletPtr pTask = GetFwrdTask();
+    if( pTask.IsEmpty() )
+        return pTask;
+
+    do{
+        CIfRetryTask* pRetry = pTask;
+        if( pRetry == nullptr )
+            break;
+
+        pTask = pRetry->GetFwrdTask();
+        if( pTask.IsEmpty() )
+        {
+            pTask = pRetry;
+            break;
+        }
+
+    }while( 1 );
+
+    return pTask;
+}
+
+gint32 CIfRetryTask::CancelTaskChain(
+    guint32 dwContext )
+{
+    TaskletPtr pTask = GetEndFwrdTask();
+    if( pTask.IsEmpty() )
+        return 0;
+
+    CCfgOpener oCfg(
+        ( IConfigDb* )GetConfig() );
+
+    CIoManager* pMgr = nullptr;
+    gint32 ret = GET_IOMGR( oCfg, pMgr );
+    if( ERROR( ret ) )
+        return 0;
+
+    DebugPrint( dwContext, "scheduled to "
+        "cancel task chain..." );
+
+    return DEFER_CALL(
+        pMgr, ObjPtr( pTask ),
+        &IEventSink::OnEvent,
+        ( EnumEventId )dwContext,
+        0, 0, nullptr );
 }
 
 CIfEnableEventTask::CIfEnableEventTask(

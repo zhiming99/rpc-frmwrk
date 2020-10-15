@@ -85,6 +85,13 @@ class CIfRetryTask
     protected:
     sem_t               m_semWait;
     TaskletPtr          m_pParentTask;
+    TaskletPtr          m_pFwdrTask;
+
+    gint32 SetFwrdTask( IEventSink* pCallback );
+    TaskletPtr GetFwrdTask() const;
+    gint32 ClearFwrdTask();
+    TaskletPtr GetEndFwrdTask();
+    gint32 CancelTaskChain( guint32 dwContest );
 
     public:
     typedef CThreadSafeTask super;
@@ -142,43 +149,9 @@ class CIfRetryTask
     gint32 GetPropertyType(
         gint32 iProp, gint32& iType ) const;
 
-    inline void ClearClientNotify()
-    {
-        CCfgOpener oParams(
-            ( IConfigDb* )GetConfig() );
-        oParams.RemoveProperty( propNotifyClient );
-        oParams.RemoveProperty( propEventSink );
-    }
-
-    inline gint32 SetClientNotify( IEventSink* pCallback )
-    {
-        if( pCallback == nullptr )
-            return -EINVAL;
-        CCfgOpener oParams(
-            ( IConfigDb* )GetConfig() );
-        oParams.SetBoolProp( propNotifyClient, true );
-        oParams.SetObjPtr(
-            propEventSink, ObjPtr( pCallback ) );
-        return 0;
-    }
-
-    inline gint32 GetClientNotify( EventPtr& pEvt ) const
-    {
-        CCfgOpener oParams(
-            ( const IConfigDb* )GetConfig() );
-        ObjPtr pVal;
-
-        // BUGBUG: no test of propNotifyClient
-        gint32 ret = oParams.GetObjPtr(
-            propEventSink, pVal );
-        if( ERROR( ret ) )
-            return ret;
-
-        pEvt = pVal;
-        if( pEvt.IsEmpty() )
-            return -ENOENT;
-        return 0;
-    }
+    void ClearClientNotify();
+    gint32 SetClientNotify( IEventSink* pCallback );
+    gint32 GetClientNotify( EventPtr& pEvt ) const;
 
     template< class ClassName >
     gint32 DelayRun(

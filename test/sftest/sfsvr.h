@@ -355,7 +355,7 @@ class CMyFileServerBase :
             if( ERROR( ret ) )
                 break;
 
-            ret = DEFER_IFCALL_NOSCHED(
+            ret = DEFER_IFCALLEX_NOSCHED(
                 pCloseTask, ObjPtr( this ),
                 &T::OnClose,
                 hChannel, ( IEventSink* )pDummy );
