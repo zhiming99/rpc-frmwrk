@@ -780,7 +780,7 @@ gint32 CIfStartUxSockStmRelayTask::OnTaskComplete(
 
         // set the response for OpenChannel
         TaskletPtr pConnTask;
-        ret = DEFER_IFCALL_NOSCHED( pConnTask,
+        ret = DEFER_IFCALLEX_NOSCHED( pConnTask,
             ObjPtr( pParent ),
             &IStream::OnConnected,
             hChannel );

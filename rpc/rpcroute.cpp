@@ -864,7 +864,7 @@ gint32 CRpcRouterBridge::RemoveBridge(
 #define ADD_STOPIF_TASK( _ret, _pTaskGrp, _pIf ) \
 do{ \
     TaskletPtr pDeferTask; \
-    _ret = DEFER_IFCALL_NOSCHED2( \
+    _ret = DEFER_IFCALLEX_NOSCHED2( \
         0, pDeferTask, ObjPtr( ( _pIf ) ), \
         &CRpcServices::Shutdown, \
         ( IEventSink* )0 ); \
@@ -1690,7 +1690,7 @@ gint32 CRpcRouterBridge::OnRmtSvrEvent(
             }
 
             ObjPtr pObj;
-            ret = DEFER_IFCALL_NOSCHED2(
+            ret = DEFER_IFCALLEX_NOSCHED2(
                 0, pDeferTask,
                 ObjPtr( this ),
                 &CRpcRouterBridge::OnRmtSvrOnline,
@@ -1708,7 +1708,7 @@ gint32 CRpcRouterBridge::OnRmtSvrEvent(
     case eventRmtSvrOffline:
         {
             ObjPtr pObj;
-            ret = DEFER_IFCALL_NOSCHED2(
+            ret = DEFER_IFCALLEX_NOSCHED2(
                 0, pDeferTask,
                 ObjPtr( this ),
                 &CRpcRouterBridge::OnRmtSvrOffline,
@@ -3489,7 +3489,7 @@ gint32 CRpcRouterReqFwdr::OnRmtSvrEvent(
         {
             ObjPtr pEmptyObj;
 
-            ret = DEFER_IFCALL_NOSCHED2(
+            ret = DEFER_IFCALLEX_NOSCHED2(
                 0, pDeferTask,
                 ObjPtr( this ),
                 &CRpcRouterReqFwdr::OnRmtSvrOffline,

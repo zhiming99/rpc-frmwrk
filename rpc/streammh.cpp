@@ -1653,7 +1653,7 @@ gint32 CStreamServerRelayMH::OnCloseInternal(
         // m_pWritingTask
         BufPtr pBuf( true );
         *pBuf = ( guint8 )tokClose;
-        ret = DEFER_IFCALL_NOSCHED2(
+        ret = DEFER_IFCALLEX_NOSCHED2(
             3, pSendClose, pClass,
             &CRpcTcpBridgeShared::WriteStream,
             iStreamId, *pBuf, 1,
@@ -1755,7 +1755,7 @@ gint32 CStreamServerRelayMH::SendCloseToAll(
 
             TaskletPtr pSendClose;
             *pBuf = ( guint8 )tokClose;
-            ret = DEFER_IFCALL_NOSCHED2(
+            ret = DEFER_IFCALLEX_NOSCHED2(
                 3, pSendClose, pProxy,
                 &CRpcTcpBridgeShared::WriteStream,
                 elem.first, *pBuf, 1,
@@ -1960,7 +1960,7 @@ gint32 CIfStartUxSockStmRelayTaskMH::OnTaskComplete(
 
         // set the response for OpenChannel
         TaskletPtr pConnTask;
-        ret = DEFER_IFCALL_NOSCHED( pConnTask,
+        ret = DEFER_IFCALLEX_NOSCHED( pConnTask,
             ObjPtr( pParent ),
             &IStream::OnConnected,
             hChannel );

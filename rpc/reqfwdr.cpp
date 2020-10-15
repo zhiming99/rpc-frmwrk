@@ -1161,7 +1161,7 @@ gint32 CRpcReqForwarder::OnModEvent(
 
         ObjPtr pObj;
         TaskletPtr pDeferTask;
-        ret = DEFER_IFCALL_NOSCHED(
+        ret = DEFER_IFCALLEX_NOSCHED(
             pDeferTask, ObjPtr( this ),
             &CRpcReqForwarder::OnModOfflineInternal,
             ( IEventSink* )pObj, iEvent, strModule );
@@ -1295,7 +1295,7 @@ gint32 CRpcReqForwarder::OnModOfflineInternal(
 
                 ObjPtr pEmptyCb;
                 TaskletPtr pDeferTask;
-                ret = DEFER_IFCALL_NOSCHED2(
+                ret = DEFER_IFCALLEX_NOSCHED2(
                     1, pDeferTask, ObjPtr( pBdgePrxy ),
                     &CRpcTcpBridgeProxy::ClearRemoteEvents,
                     pObj, pEmptyCb );

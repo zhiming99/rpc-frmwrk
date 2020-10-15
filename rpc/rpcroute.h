@@ -1593,10 +1593,10 @@ class CRouterEventRelayRespTask :
 };
 
 class CReqFwdrForwardRequestTask :
-    public CIfInterceptTask
+    public CIfInterceptTaskProxy
 {
     public:
-    typedef CIfInterceptTask super;
+    typedef CIfInterceptTaskProxy super;
 
     CReqFwdrForwardRequestTask( const IConfigDb* pCfg )
         : super( pCfg )
@@ -1623,10 +1623,10 @@ class CBridgeForwardRequestTask :
 };
 
 class CReqFwdrFetchDataTask :
-    public CIfInterceptTask
+    public CIfInterceptTaskProxy
 {
     public:
-    typedef CIfInterceptTask super;
+    typedef CIfInterceptTaskProxy super;
 
     CReqFwdrFetchDataTask( const IConfigDb* pCfg )
         : super( pCfg )

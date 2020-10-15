@@ -250,12 +250,6 @@ gint32 CRpcSecFido::DoEncrypt(
         return -EINVAL;
 
     gint32 ret = 0;
-    if( pOutBuf.IsEmpty() )
-    {
-        ret = pOutBuf.NewObj();
-        if( ERROR( ret ) )
-            return ret;
-    }
 
     IrpCtxPtr pCtx = pIrp->GetTopStack();
 
@@ -352,6 +346,13 @@ gint32 CRpcSecFido::DoEncrypt(
 
             oSecCtx.GetBoolProp(
                 propSignMsg, bSignMsg );
+
+            if( pOutBuf.IsEmpty() )
+            {
+                ret = pOutBuf.NewObj();
+                if( ERROR( ret ) )
+                    break;
+            }
 
             ret = IsClient();
             std::string strHash;

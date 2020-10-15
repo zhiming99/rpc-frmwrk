@@ -813,7 +813,7 @@ class CUnixSockStream:
             oParams.Push( ptrBuf );
 
             TaskletPtr pTask;
-            DEFER_IFCALL_NOSCHED( pTask,
+            DEFER_IFCALLEX_NOSCHED( pTask,
                 ObjPtr( m_pParent ),
                 &IStream::OnUxStmEvtWrapper,
                 hChannel,
@@ -835,7 +835,7 @@ class CUnixSockStream:
     {
         gint32 ret = 0;
         TaskletPtr pTask;
-        ret = DEFER_IFCALL_NOSCHED( pTask,
+        ret = DEFER_IFCALLEX_NOSCHED( pTask,
             ObjPtr( this ),
             &CUnixSockStream::OnUxSockEventWrapper,
             byToken, *pBuf );

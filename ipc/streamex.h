@@ -1046,7 +1046,7 @@ struct CStreamSyncBase :
      
             pTaskGrp->SetRelation( logicNONE );
             TaskletPtr pStartReader;
-            ret = DEFER_IFCALL_NOSCHED(
+            ret = DEFER_IFCALLEX_NOSCHED(
                 pStartReader,
                 ObjPtr( this ),
                 &CStreamSyncBase::RunManagedTaskWrapper,
@@ -1059,7 +1059,7 @@ struct CStreamSyncBase :
             pTaskGrp->AppendTask( pStartReader );
 
             TaskletPtr pStartWriter;
-            ret = DEFER_IFCALL_NOSCHED( 
+            ret = DEFER_IFCALLEX_NOSCHED( 
                 pStartWriter,
                 ObjPtr( this ),
                 &CStreamSyncBase::RunManagedTaskWrapper,
@@ -1082,7 +1082,7 @@ struct CStreamSyncBase :
                 memcpy( pBuf->ptr() + 1, &hChannel,
                     sizeof( hChannel ) );
 
-                ret = DEFER_IFCALL_NOSCHED(
+                ret = DEFER_IFCALLEX_NOSCHED(
                     pFirstEvent,
                     ObjPtr( this ),
                     &CStreamSyncBase::PostLoopEventWrapper,
@@ -1095,7 +1095,7 @@ struct CStreamSyncBase :
 
                 TaskletPtr pEnableRead;
                 bool bPause = false;
-                ret = DEFER_IFCALL_NOSCHED(
+                ret = DEFER_IFCALLEX_NOSCHED(
                     pEnableRead,
                     ObjPtr( this ),
                     &CStreamSyncBase::PauseReadNotify,
