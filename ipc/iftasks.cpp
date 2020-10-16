@@ -980,8 +980,12 @@ gint32 CIfRetryTask::CancelTaskChain(
     if( ERROR( ret ) )
         return 0;
 
+    EnumClsid iClsid = pTask->GetClsid();
+    const char* pszClass =
+        CoGetClassName( iClsid );
+
     DebugPrint( dwContext, "scheduled to "
-        "cancel task chain..." );
+        "cancel task %s...", pszClass );
 
     return DEFER_CALL(
         pMgr, ObjPtr( pTask ),
