@@ -335,23 +335,27 @@ gint32 CRpcTcpBridgeProxy::BuildBufForIrpFwrdReq(
         if( ERROR( ret ) )
             break;
 
+        CCfgOpenerObj oIfCfg( this );
+        string strDest;
+        ret = oIfCfg.GetStrProp(
+            propDestDBusName, strDest );
+        if( ERROR( ret ) )
+            break;
+
+        string strObjPath;
+        ret = oIfCfg.GetStrProp(
+            propObjPath, strObjPath );
+        if( ERROR( ret ) )
+            break;
+
         string strRtName;
         GetIoMgr()->GetRouterName( strRtName );
+        string strSender =
+            DBUS_DESTINATION( strRtName );
 
         string strIfName = DBUS_IF_NAME(
             IFNAME_TCP_BRIDGE );
 
-        string strObjName = OBJNAME_TCP_BRIDGE;
-        CRpcRouter* pRouter = GetParent();
-        if( pRouter->HasAuth() &&
-            !pRouter->HasBridge() )
-            strObjName = OBJNAME_TCP_BRIDGE_AUTH;
-
-        string strObjPath =DBUS_OBJ_PATH(
-            strRtName, strObjName );
-
-        string strSender =
-            DBUS_DESTINATION( strRtName );
 
         ret = pMsg.NewObj();
         if( ERROR( ret ) )
@@ -365,10 +369,7 @@ gint32 CRpcTcpBridgeProxy::BuildBufForIrpFwrdReq(
         if( ERROR( ret ) )
             break;
 
-        ret = pMsg.SetDestination( 
-            DBUS_DESTINATION2(
-                strRtName, strObjName ) );
-
+        ret = pMsg.SetDestination( strDest );
         if( ERROR( ret ) )
             break;
 
@@ -2115,26 +2116,21 @@ gint32 CRpcTcpBridge::BuildBufForIrpFwrdEvt(
         if( ERROR( ret ) )
             break;
 
+        CCfgOpenerObj oIfCfg( this );
         string strVal;
-        string strRtName;
-        GetIoMgr()->GetRouterName( strRtName );
-
-        ret = pMsg.SetSender(
-            DBUS_DESTINATION( strRtName ) );
+        ret = oIfCfg.GetStrProp(
+            propSrcDBusName, strVal );
         if( ERROR( ret ) )
             break;
 
-        CRpcRouter* pRouter = GetParent();
-        if( pRouter->HasAuth() )
-        {
-            strVal = DBUS_OBJ_PATH( strRtName,
-                OBJNAME_TCP_BRIDGE_AUTH );
-        }
-        else
-        {
-            strVal = DBUS_OBJ_PATH( strRtName,
-                OBJNAME_TCP_BRIDGE );
-        }
+        ret = pMsg.SetSender( strVal );
+        if( ERROR( ret ) )
+            break;
+
+        ret = oIfCfg.GetStrProp(
+            propObjPath, strVal );
+        if( ERROR( ret ) )
+            break;
 
         ret = pMsg.SetPath( strVal );
         if( ERROR( ret ) )

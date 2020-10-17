@@ -196,6 +196,15 @@ inline std::string DBUS_OBJ_PATH(
 {
     std::string strRet;
 
+    if( strModName.find_first_of( "./" ) !=
+        std::string::npos )
+        return std::string( "" );
+
+    if( strModName.find_first_of( "./" ) !=
+        std::string::npos )
+        return std::string( "" );
+
+
     if( strObjName.empty() )
         strObjName = DBUS_DEF_OBJ;
 
@@ -209,6 +218,14 @@ inline std::string DBUS_DESTINATION2(
     const std::string& strModName,
     const std::string& strObjName )
 {
+    if( strModName.find_first_of( "./" ) !=
+        std::string::npos )
+        return std::string( "" );
+
+    if( strModName.find_first_of( "./" ) !=
+        std::string::npos )
+        return std::string( "" );
+
     std::string strRet =
         DBUS_OBJ_PATH( strModName, strObjName );
 

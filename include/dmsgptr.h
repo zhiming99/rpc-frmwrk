@@ -338,6 +338,9 @@ class CAutoPtr< Clsid_Invalid, DBusMessage > : public IAutoPtr
         if( IsEmpty() )
             return -EFAULT; 
 
+        if( strPath.empty() )
+            return -EINVAL;
+
         if( !dbus_message_set_path(
             m_pObj, strPath.c_str() ) )
             return -ENOMEM;
@@ -391,6 +394,9 @@ class CAutoPtr< Clsid_Invalid, DBusMessage > : public IAutoPtr
     {
         if( IsEmpty() )
             return -EFAULT; 
+
+        if( strDestination.empty() )
+            return -EINVAL;
 
         if( !dbus_message_set_destination(
             m_pObj, strDestination.c_str() ) )
