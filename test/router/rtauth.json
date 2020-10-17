@@ -84,6 +84,7 @@
             "QueuedRequests" : "false",
             "Note-1": " bridge's ip address is decided at runtime",
             "ProxyPortClass": "TcpStreamPdo2",
+            "RemoteModName" : "rpcrouter",
             "Interfaces" :
             [
                 {
@@ -127,6 +128,7 @@
             "QueuedRequests" : "false",
             "Note-1": " bridge's ip address is decided at runtime",
             "ProxyPortClass": "TcpStreamPdo2",
+            "RemoteModName" : "rpcrouter",
             "Interfaces" :
             [
                 {

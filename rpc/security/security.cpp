@@ -2792,8 +2792,6 @@ gint32 CRpcRouterReqFwdrAuth::DecRefCount(
         std::string strName =
             pReg->GetUniqName();
 
-        oRouterLock.Unlock();
-
         PortPtr pPort = GetPort();
         CCfgOpenerObj oPortCfg(
             ( CObjBase* )pPort );
@@ -2812,6 +2810,9 @@ gint32 CRpcRouterReqFwdrAuth::DecRefCount(
             // notify the authprxy to stop
             InterfPtr pIf;
             ret = super::GetBridgeProxy( dwPortId, pIf );
+            if( ERROR( ret ) )
+                break;
+
             CAuthentProxy* pspp = pIf;
             oRouterLock.Unlock();
             pspp->StopSessImpl();

@@ -21,6 +21,8 @@
             "RouterPath" : "/",
             "note-1" : "the AuthInfo for this object is determined at runtime",
             "HasAuth"  : "true",
+            "RemoteModName" : "rpcrouter",
+            "RemoteObjName" : "RpcRouterBridgeAuthImpl",
             "Interfaces" :
             [
                 {
@@ -34,8 +36,6 @@
                     "InterfaceName" : "IAuthenticate",
                     "Pausable"  : "false",
                     "comments-1" : "the following two fields to compose a special destination for authentication server on the authenticate router bridge",
-                    "RemoteModName" : "rpcrouter",
-                    "RemoteObjName" : "RpcRouterBridgeAuthImpl",
                     "DummyInterface" : "true"
                 }
             ]
@@ -52,16 +52,19 @@
             "ProxyPortClass": "DBusProxyPdo",
             "comment-1" : "IpAddress is the ip address of the server",
             "IpAddress" : "192.168.3.13",
-            "Compression" : "false",
-            "EnableSSL" : "false",
+            "Compression" : "true",
+            "EnableSSL" : "true",
             "EnableWS" : "false",
             "RouterPath" : "/",
+            "RemoteModName" : "rpcrouter",
+            "RemoteObjName" : "RpcRouterBridgeAuthImpl",
             "AuthInfo" : 
             {
                 "AuthMech" : "krb5",
                 "Realm" : "rpcfrmwrk.org",
                 "UserName"  : "kdcclient",
-                "ServiceName" : "rasp1/rpcfrmwrk.org"
+                "ServiceName" : "rasp1/rpcfrmwrk.org",
+                "SignMessage" : "true"
             },
             "Interfaces" :
             [
@@ -76,8 +79,6 @@
                     "InterfaceName" : "IAuthenticate",
                     "Pausable"  : "false",
                     "comments-1" : "the following two fields to compose a special destination for authentication server on the authenticate router bridge",
-                    "RemoteModName" : "rpcrouter",
-                    "RemoteObjName" : "RpcRouterBridgeAuthImpl",
                     "DummyInterface" : "true"
                 }
             ]

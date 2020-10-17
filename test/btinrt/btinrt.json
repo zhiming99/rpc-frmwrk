@@ -14,7 +14,19 @@
             "ProxyPortClass": "DBusProxyPdoLpbk",
             "ProxyPortClass-1": "DBusLocalPdo",
             "comment-1" : "IpAddress is the ip address of the server",
-            "IpAddress" : "127.0.0.1",
+            "IpAddress" : "192.168.3.13",
+            "Compression" : "true",
+            "EnableSSL" : "true",
+            "EnableWS" : "false",
+            "RouterPath" : "/rasp3",
+            "AuthInfo" :
+            {
+                "AuthMech" : "krb5",
+                "UserName" : "zhiming@rpcfrmwrk.org",
+                "ServiceName" : "rasp1@rpcfrmwrk.org",
+                "Realm" : "rpcfrmwrk.org",
+                "SignMessage" : "true"
+            },
             "Interfaces" :
             [
                 {
@@ -29,42 +41,6 @@
             ]
         },
         {
-            "ObjectName": "RpcReqForwarderImpl",
-            "BusName" : "DBusBusPort_0",
-            "PortClass": "DBusLocalPdo",
-            "PortId" : "0",
-            "RequestTimeoutSec" : "120",
-            "KeepAliveTimeoutSec" : "60",
-            "QueuedRequests" : "false",
-            "ProxyPortClass": "DBusLoopbackPdo",
-            "comment-1" : "IpAddress is the ip address of the server for proxy",
-            "Note-1": "proxy's ip address can be overwritten at runtime, before it starts",
-            "Interfaces" :
-            [
-                {
-                    "Comment-0" : "the following attributes are mandatory",
-                    "InterfaceName" : "CRpcReqForwarderImpl",
-                    "BindToClsid" : "true"
-                },
-                {
-                    "InterfaceName" : "IInterfaceServer",
-                    "Pausable"  : "false"
-                },
-                {
-                    "InterfaceName" : "IUnknown",
-                    "Pausable" : "false"
-                },
-                {
-                    "InterfaceName" : "CRpcReqForwarder",
-                    "Pausable"  : "true"
-                },
-                {
-                    "InterfaceName" : "CStatCountersServer",
-                    "Pausable"  : "true"
-                }
-            ]
-        },
-        {
             "ObjectName": "RpcTcpBridgeImpl",
             "BusName" : "RpcTcpBusPort_0",
             "PortClass": "TcpStreamPdo",
@@ -74,6 +50,7 @@
             "QueuedRequests" : "false",
             "Note-1": " bridge's ip address is decided at runtime",
             "ProxyPortClass": "TcpStreamPdo",
+            "RemoteModName" : "rpcrouter",
             "Interfaces" :
             [
                 {
@@ -104,38 +81,54 @@
             ]
         },
         {
-            "ObjectName": "RpcRouterImpl",
-            "BusName" : "DBusBusPort_0",
-            "PortClass": "DBusLocalPdo",
-            "PortId" : "0",
+            "ObjectName": "RpcTcpBridgeAuthImpl",
+            "BusName" : "RpcTcpBusPort_0",
+            "PortClass": "TcpStreamPdo2",
+            "PortNumber" : "4132",
             "RequestTimeoutSec" : "120",
             "KeepAliveTimeoutSec" : "60",
             "QueuedRequests" : "false",
-            "ProxyPortClass": "DBusLocalPdo",
-            "Comment-0": "'Role' is a router-specific prop. 01: as a forwarder, 02: as a server, 03 or not exist: as both forwarder and server",
-            "Role" : "0x02",
+            "Note-1": " bridge's ip address is decided at runtime",
+            "ProxyPortClass": "TcpStreamPdo2",
+            "RemoteModName" : "rpcrouter",
             "Interfaces" :
             [
                 {
                     "Comment-0" : "the following attributes are mandatory",
-                    "InterfaceName" : "CRpcRouterImpl",
-                    "BindToClsid" : "true"
+                    "InterfaceName" : "CRpcTcpBridgeAuthImpl",
+                    "BindToClsid" : "true",
+                    "DummyInterface" : "true"
                 },
                 {
                     "InterfaceName" : "IInterfaceServer",
-                    "Pausable"  : "false"
+                    "Pausable"  : "false",
+                    "DummyInterface" : "true"
                 },
                 {
                     "InterfaceName" : "IUnknown",
-                    "Pausable" : "false"
+                    "Pausable" : "false",
+                    "DummyInterface" : "true"
                 },
                 {
-                    "InterfaceName" : "CRpcRouter",
-                    "Pausable"  : "false"
+                    "InterfaceName" : "IStream",
+                    "Pausable" : "false",
+                    "DummyInterface" : "true"
+
+                },
+                {
+                    "InterfaceName" : "IStreamMH",
+                    "Pausable" : "false",
+                    "DummyInterface" : "true"
+
+                },
+                {
+                    "InterfaceName" : "CRpcTcpBridge",
+                    "Pausable"  : "true"
                 },
                 {
                     "InterfaceName" : "CStatCountersServer",
-                    "Pausable"  : "false"
+                    "Pausable"  : "true",
+                    "DummyInterface" : "true"
                 }
             ]
         }
