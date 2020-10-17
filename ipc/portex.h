@@ -293,8 +293,31 @@ class CStartStopSafeBusPort :
             ret = AddStartStopPortTask(
                 pPort, pStopTask );
 
-            if( ERROR( ret ) )
-                ( *pStopTask )( eventCancelTask );
+            if( ERROR( ret ) && pCb != nullptr )
+            {
+                // NOTE: we don't know if the
+                // callback need to be completed
+                // at this point, so defer the
+                // eventCancelTask, otherwise, a
+                // deadlock could happen when the
+                // callback was reentered on the
+                // same thread.
+                ret = DEFER_CALL(
+                    pMgr, ObjPtr( pRetryTask ),
+                    &IEventSink::OnEvent,
+                    eventCancelTask, 0, 0,
+                    nullptr );
+
+                if( SUCCEEDED( ret ) )
+                    ret = STATUS_PENDING;
+                break;
+            }
+            else if( ERROR( ret ) )
+            {
+                pRetryTask->MarkPending( false );
+                ( *pRetryTask )( eventCancelTask );
+                break;
+            }
 
             if( ret == STATUS_PENDING &&
                 pCb == nullptr )
