@@ -606,7 +606,8 @@ gint32 CRpcConnSock::OnEvent(
                 // call
                 CTcpStreamPdo2* pPort =
                     ObjPtr( m_pParentPort );
-                ret = pPort->OnDisconnected();
+                if( pPort != nullptr )
+                    ret = pPort->OnDisconnected();
             }
             else
             {
@@ -710,7 +711,6 @@ gint32 CRpcConnSock::OnEvent(
 
 gint32 CRpcConnSock::OnDisconnected()
 {
-    Stop();
     gint32 ret = 0;
     do{
         CTcpStreamPdo2* pPort =
@@ -723,6 +723,16 @@ gint32 CRpcConnSock::OnDisconnected()
         }
 
         pPort->OnDisconnected();
+        // Sock's Stop must go after the reference
+        // of m_pParentPort, since there is a race
+        // condition between sock's Stop and the
+        // port's PreStop. if it runs ahead of
+        // pPort->OnDisconnected, the
+        // m_pParentPort could be released and
+        // become invalid, and the sock's later
+        // call of pPort->OnDisconnected will
+        // crash.
+        Stop();
 
     }while( 0 );
 
@@ -731,8 +741,11 @@ gint32 CRpcConnSock::OnDisconnected()
 
 gint32 CRpcConnSock::Stop()
 {
+    CStdRMutex oSockLock( GetLock() );
     gint32 ret = super::Stop();
     m_pStartTask.Clear();
+    m_pParentPort = nullptr;
+
     return ret;
 }
 
