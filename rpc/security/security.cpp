@@ -528,8 +528,7 @@ gint32 CRpcTcpBridgeAuth::IsAuthRequest(
             break;
         }
 
-        CIoManager* pMgr = GetIoMgr();
-        strVal = AUTH_DEST( pMgr );
+        strVal = AUTH_DEST( this );
         if( strVal != pMsg.GetDestination() )
         {
             ret = -EACCES;
@@ -1098,7 +1097,7 @@ gint32 CRpcReqForwarderProxyAuth::ForwardRequest(
         return -EINVAL;
 
     std::string strDest =
-        AUTH_DEST( GetIoMgr() );
+        AUTH_DEST( this );
 
     DMsgPtr pMsg( pMsgRaw );
     gint32 ret = 0;

@@ -2473,3 +2473,41 @@ gint32 CDBusProxyPdoLpbk::PackupReqMsg(
     return super::PackupReqMsg(
         pReqMsg, pOutMsg );
 }
+
+CDBusProxyPdoLpbk::CDBusProxyPdoLpbk(
+    const IConfigDb* pCfg ) :
+    super( pCfg )
+{
+    SetClassId( clsid( CDBusProxyPdoLpbk ) );
+    CCfgOpener oPortCfg( ( IConfigDb* )m_pCfgDb );
+    std::string strSender;
+    GetSender( strSender );
+    oPortCfg.SetStrProp(
+        propSrcUniqName, strSender );
+}
+
+gint32 CDBusProxyPdoLpbk::GetProperty(
+    gint32 iProp, CBuffer& oBuf ) const
+{
+    gint32 ret = 0;
+
+    CStdRMutex oPortLock( GetLock() );
+    switch( PropIdFromInt( iProp ) )
+    {
+    case propSrcUniqName:
+        {
+            std::string strSender;
+            ret = GetSender( strSender );
+            if( ERROR( ret ) )
+                break;
+            oBuf = strSender;
+            break;
+        }
+    default:
+        {
+            ret = super::GetProperty(
+                iProp, oBuf );
+        }
+    }
+    return ret;
+}

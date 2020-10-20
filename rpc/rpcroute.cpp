@@ -1185,10 +1185,10 @@ gint32 CRpcRouterBridge::BuildStartStopReqFwdrProxy(
                 if( ERROR( ret ) )
                     break;
 
-                string strRtName;
-                pMgr->GetRouterName( strRtName );
-                oIfParams.SetStrProp(
-                    propSvrInstName, strRtName );
+                ret = oIfParams.CopyProp(
+                    propSvrInstName, this );
+                if( ERROR( ret ) )
+                    break;
 
                 oIfParams.SetIntProp( propIfStateClass,
                     clsid( CIfReqFwdrPrxyState ) );
@@ -1223,9 +1223,8 @@ gint32 CRpcRouterBridge::BuildStartStopReqFwdrProxy(
                 EnumClsid iClsid = clsid(
                     CRpcReqForwarderProxyImpl );
 
-                CIoManager* pMgr = GetIoMgr();
                 std::string strAuthDest =
-                    AUTH_DEST( pMgr );
+                    AUTH_DEST( this );
 
                 ret = oIfParams.IsEqual(
                     propDestDBusName, strAuthDest );
@@ -1303,10 +1302,15 @@ gint32 CRouterOpenBdgePortTask::CreateInterface(
         CParamList oParams;
         string strRtName;
 
-        oParams.CopyProp( propConnParams, this );
-        pMgr->GetRouterName( strRtName );
-        oParams.SetStrProp(
-            propSvrInstName, strRtName );
+        ret = oParams.CopyProp(
+            propConnParams, this );
+        if( ERROR( ret ) )
+            break;
+
+        ret = oParams.CopyProp(
+            propSvrInstName, pRouter );
+        if( ERROR( ret ) )
+            break;
 
         IConfigDb* pConnParams = nullptr;
         ret = oParams.GetPointer(
@@ -2298,8 +2302,12 @@ gint32 CRouterStopBridgeProxyTask2::OnTaskComplete(
             break;
 
         std::string strRtName;
-        CIoManager* pMgr = pRouter->GetIoMgr();
-        pMgr->GetRouterName( strRtName );
+        CCfgOpenerObj oRtCfg( pRouter );
+        ret = oRtCfg.GetStrProp(
+            propSvrInstName, strRtName );
+        if( ERROR( ret ) )
+            break;
+
         oAuthEvt.SetObjPath(
             DBUS_OBJ_PATH( strRtName,
             OBJNAME_TCP_BRIDGE_AUTH ) );
@@ -3069,7 +3077,11 @@ gint32 CRpcRouterBridge::ForwardModOnOfflineEvent(
             break;
 
         string strRtName;
-        GetIoMgr()->GetRouterName( strRtName );
+        CCfgOpenerObj oRtCfg( this );
+        ret = oRtCfg.GetStrProp(
+            propSvrInstName, strRtName );
+        if( ERROR( ret ) )
+            break;
 
         ret = pMsg.SetSender(
             DBUS_DESTINATION( strRtName ) );
@@ -3584,10 +3596,10 @@ gint32 CRpcRouterReqFwdr::StartReqFwdr(
         if( ERROR( ret ) )
             break;
 
-        string strRtName;
-        GetIoMgr()->GetRouterName( strRtName );
-        oParams.SetStrProp(
-            propSvrInstName, strRtName );
+        ret = oParams.CopyProp(
+            propSvrInstName, this );
+        if( ERROR( ret ) )
+            break;
 
         oParams.SetIntProp( propIfStateClass,
             clsid( CIfReqFwdrState ) );
@@ -4691,9 +4703,11 @@ gint32 CRpcRouterManager::Start()
         if( ERROR( ret ) )
             ret = 0;
 
+        CParamList oParams;
+        oParams.CopyProp( propSvrInstName, this );
+
         if( m_dwRole & 0x02 )
         {
-            CParamList oParams;
             EnumClsid iClsid = clsid( Invalid );
             std::string strObjName; 
 
@@ -4742,7 +4756,6 @@ gint32 CRpcRouterManager::Start()
 
         if( m_dwRole & 0x01 )
         {
-            CParamList oParams;
             std::string strObjName; 
 
             EnumClsid iClsid = clsid( Invalid );

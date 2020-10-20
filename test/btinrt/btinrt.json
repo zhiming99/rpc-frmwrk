@@ -135,6 +135,9 @@
     ],
     "ClassFactories" :
     [
-        "./libbtinrt.so"
+        "./libbtinrt.so",
+        "./libauth.so",
+        "./libsslpt.so",
+        "./libwspt.so"
     ]
 }

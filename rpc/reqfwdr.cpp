@@ -293,13 +293,12 @@ gint32 CReqFwdrOpenRmtPortTask::CreateInterface(
                 CRpcTcpBridgeProxyAuthImpl );
         }
 
-        string strRtName;
-        pMgr->GetRouterName( strRtName );
-        oParams.SetStrProp(
-            propSvrInstName, strRtName );
+        ret = oParams.CopyProp(
+            propSvrInstName, pRouter );
+        if( ERROR( ret ) )
+            break;
 
         oParams.SetPointer( propIoMgr, pMgr );
-
         ret = CRpcServices::LoadObjDesc(
             strObjDesc,
             strObjName,
@@ -2152,7 +2151,11 @@ gint32 CRpcReqForwarder::BuildBufForIrpRmtSvrEvent(
             DBUS_IF_NAME( IFNAME_REQFORWARDER ) );
 
         string strRtName;
-        GetIoMgr()->GetRouterName( strRtName );
+        CCfgOpenerObj oIfCfg( this );
+        ret = oIfCfg.GetStrProp(
+            propSvrInstName, strRtName );
+        if( ERROR( ret ) )
+            break;
 
         CRpcRouter* pRouter = GetParent();
         if( pRouter->HasAuth() )
@@ -2400,6 +2403,14 @@ gint32 CRpcReqForwarder::ForwardEvent(
         if( ERROR( ret ) )
             break;
 
+        CCfgOpenerObj oRtCfg( pRouter );
+
+        string strRtName;
+        ret = oRtCfg.GetStrProp(
+            propSvrInstName, strRtName );
+        if( ERROR( ret ) )
+            break;
+
         for( auto&& pMatch : vecMatches )
         {
             // dispatch the event to all the
@@ -2425,10 +2436,6 @@ gint32 CRpcReqForwarder::ForwardEvent(
             oBuilder.SetIfName( DBUS_IF_NAME(
                 IFNAME_REQFORWARDER ) );
 
-            string strRtName;
-            GetIoMgr()->GetRouterName( strRtName );
-
-            CRpcRouter* pRouter = GetParent();
             if( pRouter->HasAuth() )
             {
                 oBuilder.SetObjPath(

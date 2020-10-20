@@ -117,7 +117,7 @@ void CIfRouterTest::tearDown()
 CfgPtr CIfRouterTest::InitRouterCfg(
     guint32 dwRole )
 {
-    CfgPtr ptrCfg;
+    CParamList oCfg;
     gint32 ret = 0;
     std::string strDescPath;
 
@@ -126,15 +126,14 @@ CfgPtr CIfRouterTest::InitRouterCfg(
         if( g_bAuth )
             strDescPath = ROUTER_OBJ_DESC_AUTH;
 
+        oCfg[ propSvrInstName ] = MODULE_NAME;
         ret = CRpcServices::LoadObjDesc(
-            strDescPath,
-            OBJNAME_ROUTER,
-            true, ptrCfg );
+            strDescPath, OBJNAME_ROUTER, true,
+            oCfg.GetCfg() );
 
         if( ERROR( ret ) )
             break;
 
-        CCfgOpener oCfg( ( IConfigDb* )ptrCfg );
         oCfg[ propIoMgr ] = m_pMgr;
         oCfg[ propIfStateClass ] =
             clsid( CIfRouterMgrState );
@@ -152,7 +151,7 @@ CfgPtr CIfRouterTest::InitRouterCfg(
         throw std::runtime_error( strMsg );
     }
 
-    return ptrCfg;
+    return oCfg.GetCfg();
 }
 
 void CIfRouterTest::testSvrStartStop()

@@ -64,6 +64,9 @@ void CIfSmokeTest::setUp()
 #ifdef CLIENT
         pSvc->SetCmdLineOpt(
             propRouterRole, 1 );
+
+        pSvc->SetCmdLineOpt(
+            propHasAuth, true );
 #endif
 #ifdef SERVER
         pSvc->SetCmdLineOpt(
@@ -182,7 +185,7 @@ CfgPtr CIfSmokeTest::InitRouterCfg()
             propSvrInstName, strRtName );
 
         ret = CRpcServices::LoadObjDesc(
-            "./btinrt.json",
+            "./rtauth.json",
             OBJNAME_ROUTER,
             true, oParams.GetCfg() );
 

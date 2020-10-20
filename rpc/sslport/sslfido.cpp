@@ -2264,6 +2264,7 @@ gint32 COpenSSLResumeWriteTask::RunTask()
             pIrp, pCfg, ( gint32& )dwIdx,
             dwTotal, dwOffset, true );
 
+        oIrpLock.Unlock();
         CIoManager* pMgr = pPort->GetIoMgr();
         if( ret != STATUS_PENDING )
             pMgr->CompleteIrp( pIrp );
