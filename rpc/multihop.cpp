@@ -910,10 +910,12 @@ gint32 CRpcRouterBridge::BuildRmtSvrEventMH(
         oParams.SetIfName(
             DBUS_IF_NAME( IFNAME_TCP_BRIDGE ) );
 
-        CIoManager* pMgr = GetIoMgr();
-
         std::string strRtName;
-        pMgr->GetRouterName( strRtName );
+        CCfgOpenerObj oRtCfg( this );
+        ret = oRtCfg.GetStrProp(
+            propSvrInstName, strRtName );
+        if( ERROR( ret ) )
+            break;
 
         oParams.SetObjPath( DBUS_OBJ_PATH(
             strRtName, OBJNAME_TCP_BRIDGE ) );
@@ -1069,7 +1071,12 @@ gint32 CRpcRouterBridge::OnRmtSvrOfflineMH(
             break;
 
         std::string strRtName;
-        pMgr->GetRouterName( strRtName );
+        CCfgOpenerObj oRtCfg( this );
+        ret = oRtCfg.GetStrProp(
+            propSvrInstName, strRtName );
+        if( ERROR( ret ) )
+            break;
+
         oAuthEvt.SetObjPath(
             DBUS_OBJ_PATH( strRtName,
             OBJNAME_TCP_BRIDGE_AUTH ) );

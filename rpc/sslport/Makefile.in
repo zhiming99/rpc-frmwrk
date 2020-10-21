@@ -15,7 +15,7 @@ release: $(OUTPUT_DIR)/$(TARGET)
 
 $(OUTPUT_DIR)/$(TARGET) : $(OBJS)
 	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
-	$(CC) -o $(OUTPUT_DIR)/$(TARGET) $(LINKER_OPTION) -lssl -lcrypto $(OBJS)
+	$(CC) -o $(OUTPUT_DIR)/$(TARGET) $(LINKER_OPTION) -L$(OUTPUT_DIR) -lssl -lcrypto -lrpc $(OBJS)
 
 -include $(OBJS:%.o=%.d)
 

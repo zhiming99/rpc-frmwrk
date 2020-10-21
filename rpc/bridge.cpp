@@ -349,7 +349,11 @@ gint32 CRpcTcpBridgeProxy::BuildBufForIrpFwrdReq(
             break;
 
         string strRtName;
-        GetIoMgr()->GetRouterName( strRtName );
+        ret = oIfCfg.GetStrProp(
+            propSvrInstName, strRtName );
+        if( ERROR( ret ) )
+            break;
+
         string strSender =
             DBUS_DESTINATION( strRtName );
 

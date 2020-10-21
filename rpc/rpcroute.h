@@ -2364,12 +2364,14 @@ DECLARE_AGGREGATED_PROXY(
     CStatCountersProxy,
     CStreamProxyRelay );
 
-#define AUTH_DEST( _pMgr ) \
+#define AUTH_DEST( _pObj ) \
 ( { \
     std::string strRtName; \
-    ( _pMgr )->GetRouterName( strRtName ); \
-    DBUS_DESTINATION2( strRtName, \
-        OBJNAME_ROUTER_BRIDGE_AUTH ); \
+    CCfgOpenerObj oCfg( _pObj ); \
+    gint32 ret = oCfg.GetStrProp( \
+        propSvrInstName, strRtName ); \
+    SUCCEEDED( ret ) ? DBUS_DESTINATION2( strRtName, \
+        OBJNAME_ROUTER_BRIDGE_AUTH ) : strRtName; \
 } )
 
 class CIfDeferCallTaskEx2 :

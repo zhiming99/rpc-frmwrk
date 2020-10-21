@@ -115,7 +115,9 @@ static CfgPtr InitIfProxyCfg(
     }
 
     if( strPortClass ==
-        PORT_CLASS_DBUS_PROXY_PDO )
+            PORT_CLASS_DBUS_PROXY_PDO ||
+        strPortClass ==
+            PORT_CLASS_DBUS_PROXY_PDO_LPBK )
     {
         // CRemoteProxyState will have an extra ip
         // address to match

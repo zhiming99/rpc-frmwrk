@@ -256,14 +256,16 @@ class CDBusProxyPdoLpbk : public CDBusProxyPdo
 {
     public:
     typedef CDBusProxyPdo super;
-    CDBusProxyPdoLpbk( const IConfigDb* pCfg ) :
-        super( pCfg )
-    { SetClassId( clsid( CDBusProxyPdoLpbk ) ); }
+    CDBusProxyPdoLpbk( const IConfigDb* pCfg );
 
     gint32 SendDBusMsg( DBusMessage* pMsg,
         guint32* pdwSerial );
 
     gint32 GetSender( std::string& strSender ) const;
+
     virtual gint32 PackupReqMsg(
         DMsgPtr& pReqMsg, DMsgPtr& pOutMsg ) const;
+
+    gint32 GetProperty(
+        gint32 iProp, CBuffer& oBuf ) const;
 };

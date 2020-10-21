@@ -32,6 +32,10 @@
 #include "secclsid.h"
 #include <krb5.h>
 #include <gssapi.h>
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+#include <string.h>
 
 #define AUTH_METHOD_LOGIN            "AuthReq_Login"
 #define AUTH_METHOD_MECHSPECREQ      "AuthReq_MechSpecReq"
@@ -655,11 +659,12 @@ struct CRpcRouterAuthShared
             std::string strIfName =
                 DBUS_IF_NAME( "IAuthenticate" );
 
-            CIoManager* pMgr =
-                m_pOwner->GetIoMgr();
-
             std::string strRouter;
-            pMgr->GetRouterName( strRouter );
+            CCfgOpenerObj oRtCfg( m_pOwner );            
+
+            ret = oRtCfg.GetStrProp(
+                propSvrInstName, strRouter );
+
             std::string strDest =
                 DBUS_DESTINATION2( strRouter,
                     OBJNAME_ROUTER_BRIDGE_AUTH  );
@@ -756,14 +761,113 @@ class CRpcRouterReqFwdrAuth :
         DMsgPtr& pMsg,
         MatchPtr& pMatchHit )
     {
-        gint32 ret = super::CheckReqToFwrd(
-            pTransCtx, pMsg, pMatchHit );
-        if( SUCCEEDED( ret ) )
-            return ret;
+        if( pTransCtx == nullptr )
+            return -EINVAL;
 
-        ret = IsAuthMsg( pTransCtx, pMsg );
-        if( SUCCEEDED( ret ) )
-            pMatchHit = m_pAuthMatch;
+        gint32 ret = 0;
+        do{
+            ret = super::CheckReqToFwrd(
+                pTransCtx, pMsg, pMatchHit );
+            if( SUCCEEDED( ret ) )
+                break;
+
+            std::string strVal;
+            CMessageMatch* pAuthMatch =
+                ( CMessageMatch* )m_pAuthMatch;
+            pAuthMatch->GetIfName( strVal );
+            if( pMsg.GetInterface() != strVal )
+            {
+                ret = ERROR_FALSE;
+                break;
+            }
+
+            CCfgOpener oTransCtx( pTransCtx );
+            std::string strPath;
+            ret = oTransCtx.GetStrProp(
+                propRouterPath, strPath );
+            if( ERROR( ret ) )
+                break;
+
+            if( strPath != "/" )
+            {
+                ret = ERROR_FALSE;
+                break;
+            }
+
+            guint32 dwPortId = 0;
+            ret = oTransCtx.GetIntProp(
+                propConnHandle, dwPortId );
+            if( ERROR( ret ) )
+                break;
+
+            InterfPtr pIf;
+            ret = GetBridgeProxy( dwPortId, pIf );
+            if( ERROR( ret ) )
+                break;
+
+            if( pMsg.GetType() !=
+                DBUS_MESSAGE_TYPE_METHOD_CALL )
+            {
+                ret = ERROR_FALSE;
+                break;
+            }
+
+            CCfgOpenerObj oIfCfg( ( CObjBase*) pIf );
+            ret = oIfCfg.GetStrProp(
+                propObjPath, strVal );
+            if( ERROR( ret ) )
+                break;
+
+            size_t pos = strVal.find_last_of( '/' );
+            if( pos == std::string::npos )
+            {
+                ret = ERROR_FALSE;
+                break;
+            }
+
+            std::string strDir =
+                strVal.substr( 0, pos + 1 );
+
+            strDir += OBJNAME_ROUTER_BRIDGE_AUTH;
+
+            if( strDir != pMsg.GetPath() )
+            {
+                ret = ERROR_FALSE;
+                break;
+            }
+
+            std::replace( strDir.begin(),
+                strDir.end(), '/', '.' );
+            strDir.erase( strDir.begin() );
+            if( strDir != pMsg.GetDestination() )
+            {
+                ret = ERROR_FALSE;
+                break;
+            }
+                    
+            ret = pMatchHit.NewObj(
+                clsid( CRouterRemoteMatch ) );
+            if( ERROR( ret ) )
+                break;
+
+            CRouterRemoteMatch* prrm = pMatchHit;
+            prrm->CopyMatch( m_pAuthMatch );
+
+            CCfgOpenerObj oMatch( prrm );
+
+            oMatch.SetStrProp(
+                propObjPath, pMsg.GetPath() );
+
+            oMatch.SetStrProp( propDestDBusName,
+                pMsg.GetDestination() );
+      
+            oMatch.SetIntProp(
+                propIid, iid( IAuthenticate ) );
+
+            oMatch.SetIntProp(
+                propPortId, 0xffffffff );
+
+        }while( 0 );
 
         return ret;
     }

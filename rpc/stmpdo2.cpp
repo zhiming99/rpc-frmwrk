@@ -829,6 +829,7 @@ gint32 CTcpStreamPdo2::OnStmSockEvent(
             pCtx->SetRespData( pRespBuf );
             pCtx->SetStatus( 0 );
 
+            oIrpLock.Unlock();
             GetIoMgr()->CompleteIrp( pIrp );
         }
 
@@ -955,6 +956,7 @@ gint32 CTcpStreamPdo2::OnReceive(
             pCtx->SetRespData( pRespBuf );
             pCtx->SetStatus( 0 );
 
+            oIrpLock.Unlock();
             GetIoMgr()->CompleteIrp( pIrp );
             continue;
         }
@@ -996,6 +998,7 @@ gint32 CBytesSender::SetSendDone(
 
     IrpCtxPtr& pCtx = pIrp->GetTopStack();
     pCtx->SetStatus( iRet );
+    oIrpLock.Unlock();
     CIoManager* pMgr = pPdo->GetIoMgr();
     pMgr->CompleteIrp( pIrp );
 
@@ -1032,6 +1035,7 @@ gint32 CBytesSender::CancelSend(
 
     IrpCtxPtr& pCtx = pIrp->GetTopStack();
     pCtx->SetStatus( ERROR_CANCEL );
+    oIrpLock.Unlock();
     pMgr->CompleteIrp( pIrp );
 
     return 0;
