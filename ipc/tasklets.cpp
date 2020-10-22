@@ -266,54 +266,32 @@ gint32 CTaskletRetriable::operator()(
     // dwContext = 0, the first run
     // dwContext = eventTimeout, this is a retry 
     gint32 ret = 0;
-    bool bExcept = false;
 
-    do{
-        try{
-            // no allow of reentrency from concurrent or
-            // cyclic calls
-            CReentrancyGuard oTaskEntered( this );
-            // test if we are from a retry
-            if( dwContext == eventTimeout )
+    CReentrancyGuard oTaskEntered( this );
+    // test if we are from a retry
+    if( dwContext == eventTimeout )
+    {
+        vector< LONGWORD > vecParams;
+        ret = GetParamList( vecParams );
+        if( SUCCEEDED( ret ) )
+        {
+            gint32 iEvent = vecParams[ 1 ];
+            if( iEvent == eventRetry )
             {
-                vector< LONGWORD > vecParams;
-                ret = GetParamList( vecParams );
-                if( SUCCEEDED( ret ) )
-                {
-                    gint32 iEvent = vecParams[ 1 ];
-                    if( iEvent == eventRetry )
-                    {
-                        // reset the timer id
-                        m_iTimerId = 0;
-                    }
-                }
-            }
-
-            ret = Process( dwContext );
-
-            if( ret == STATUS_MORE_PROCESS_NEEDED )
-            {
-                gint32 iRet = ScheduleRetry();
-                if( ERROR( iRet ) )
-                    ret = iRet;
+                // reset the timer id
+                m_iTimerId = 0;
             }
         }
-        catch( std::system_error& oErr )
-        {
-            ret = oErr.code().value();
-            bExcept = true;
-        }
+    }
 
-        if( bExcept )
-        {
-            // reschedule
-            sem_wait( &m_semReentSync );
-            bExcept = false;
-            continue;
-        }
-        break;
+    ret = Process( dwContext );
 
-    }while( 1 );
+    if( ret == STATUS_MORE_PROCESS_NEEDED )
+    {
+        gint32 iRet = ScheduleRetry();
+        if( ERROR( iRet ) )
+            ret = iRet;
+    }
 
     return ret;
 }
