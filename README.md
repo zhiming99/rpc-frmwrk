@@ -3,7 +3,7 @@
 这是一个嵌入式的RPC实现，关注于跨网络，跨协议，跨平台的互联互通。本项目欢迎有兴趣的人士加入!   
 This is an asynchronous and event-driven RPC implementation for embeded system with small system footprint. It is targeting at the IOT platforms, high-throughput, and high availability over hybrid network. Welcome to join!  
 
-#### Concept
+#### Concept:
 [`Here`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md) is an introduction about some concepts that help to understand this project.
 
 #### Dependency:  
@@ -36,7 +36,7 @@ This framework depends on the following packags to build:
 #### Building `rpc-frmwrk`:   
 Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60) for details.
 
-#### Todo
+#### Todo:
 1. Python support.
 2. Examples and Tutorials.
 3. HTTP2
