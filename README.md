@@ -36,7 +36,7 @@ This framework depends on the following packags to build:
 #### Building `rpc-frmwrk`:   
 Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60) for details.
 
-#### ToDo List
+#### TODO List
 1. Python support.
 2. Examples and Tutorials.
 3. HTTP2
