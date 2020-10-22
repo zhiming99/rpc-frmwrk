@@ -1,6 +1,6 @@
 Features of the RPC module:
 
-1. The RPC module enables the server to be accessed from the remote client via a TCP connection.
+1. The RPC module enables the server to expose its service objects to the remote clients via a TCP connection.
 2. The streaming, [`websocket`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/wsport/Readme.md), [`OpenSSL`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/sslport/Readme.md) and [authentication](https://github.com/zhiming99/rpc-frmwrk/tree/master/rpc/security/README.md) are also supported over this TCP connection.
 3. Besides, multiple RPC modules can coordinate to make objects from different machines available by the single connection, which is called the [`multihop`](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support).
 
