@@ -152,8 +152,7 @@ class CTasklet : public ICancellableTask
                 continue;
             }
             // already locked by someone
-            throw std::system_error(
-                -EDEADLK, std::system_category() );
+            Sem_Wait( &m_semReentSync );
         }
     }
 

@@ -55,8 +55,13 @@ gint32 CEventClient::OnHelloWorld(
 {
     gint32 ret = 0;
     static guint32 dwCount = 0;
-    printf( DebugMsg( 0, "%d: %s",
-        dwCount++, strText.c_str() ).c_str() );
+    std::string strOutput =
+        DebugMsg( 0, "%d: %s",
+        dwCount++,
+        strText.c_str() );
+
+    strOutput.push_back( '\n' );
+    printf( strOutput.c_str() );
     return ret;
 }
 
