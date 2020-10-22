@@ -41,7 +41,7 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 2. Examples and Tutorials.
 3. HTTP2
 4. OAuth2
-5. More languages support.
+5. Support for more languages
 
 ---
 [`Thu 22 Oct 2020 10:41:46 AM Beijing`]   
