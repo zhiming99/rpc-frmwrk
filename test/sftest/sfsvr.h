@@ -29,6 +29,7 @@
 #include <filetran.h>
 #include <counters.h>
 #include <streamex.h>
+#include <pwd.h>
 
 #define METHOD_Echo         "Echo"
 
@@ -434,7 +435,18 @@ class CMyFileServerBase :
 
             std::string strFile = SF_ROOT_DIR;
 
-            std::string strLogin = getlogin();
+            struct passwd* pwst =
+                getpwuid( getuid() );
+
+            if( pwst == nullptr )
+            {
+                ret = -errno;
+                if( ret == 0 )
+                    ret = -ENOENT;
+                break;
+            }
+
+            std::string strLogin = pwst->pw_name;
             strLogin += "/";
 
             strFile += strLogin +
