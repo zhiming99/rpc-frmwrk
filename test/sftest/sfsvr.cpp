@@ -282,7 +282,19 @@ gint32 CMyFileServer::GetFileInfo(
     CParamList oResp;
     do{
         std::string strPath = SF_ROOT_DIR;
-        std::string strLogin = getlogin();
+        struct passwd* pwst =
+            getpwuid( getuid() );
+
+        if( pwst == nullptr )
+        {
+            ret = -errno;
+            if( ret == 0 )
+                ret = -ENOENT;
+            break;
+        }
+
+        std::string strLogin = pwst->pw_name;
+
         strLogin += "/";
         strPath += strLogin + strFileName + "-1";
         ret = access( strPath.c_str(), 0 );
