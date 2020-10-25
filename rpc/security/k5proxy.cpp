@@ -1047,12 +1047,12 @@ gint32 AcquireCred(
         if( strName.size() > 0 )
         {
             BufPtr pNameBuf( true );
-            pNameBuf->Resize( strName.size() + 1 );
-            memcpy( pNameBuf->ptr(), strName.data(),
-                strName.size() + 1 );
+            pNameBuf->Resize( strName.size() );
+            memcpy( pNameBuf->ptr(), strName.c_str(),
+                strName.size() );
 
             name_buf.value = pNameBuf->ptr();
-            name_buf.length = strName.size() + 1;
+            name_buf.length = pNameBuf->size();
 
             maj_stat = gss_import_name(
                 &min_stat, &name_buf,
@@ -1113,13 +1113,14 @@ gint32 CK5AuthProxy::Krb5Login(
             ret = -EINVAL;
             break;
         }
+
         BufPtr pNameBuf( true );
-        pNameBuf->Resize( strSvcName.size() + 1 );
-        memcpy( pNameBuf->ptr(), strSvcName.data(),
-            strSvcName.size() + 1 );
+        pNameBuf->Resize( strSvcName.size() );
+        memcpy( pNameBuf->ptr(),
+            strSvcName.c_str(), strSvcName.size() );
 
         send_tok.value = pNameBuf->ptr();
-        send_tok.length = strSvcName.size() + 1;
+        send_tok.length = pNameBuf->size();
 
         maj_stat = gss_import_name( &min_stat,
             &send_tok,
