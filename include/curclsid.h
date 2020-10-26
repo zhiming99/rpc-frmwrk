@@ -31,6 +31,10 @@
 // propids, which serve as a start point for
 // future addition.
 //
+
+namespace rpcfrmwrk
+{
+
 // rpc-frmwrk components, last allocation was from
 // rpc/security/secclsid.h.
 #define CLSIDS_ALLOCATED    ( clsid( ClassFactoryStart ) + 40 )
@@ -44,3 +48,5 @@
 // for non-rpc-frmwrk components, please refer to
 // test/helloworld/ifsvr.h as an example
 #define USER_CLSIDS_ALLOCATED    ( clsid( UserClsidStart  ) + 1000 )
+
+}

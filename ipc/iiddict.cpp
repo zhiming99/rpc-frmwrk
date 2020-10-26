@@ -24,6 +24,9 @@
 #include "rpc.h"
 #include "iiddict.h"
 
+namespace rpcfrmwrk
+{
+
 guint64 CInterfIdDict::GetIid(
     const std::string& strIfName )
 {
@@ -63,3 +66,4 @@ gint32 CInterfIdDict::AddIid(
     return 0;
 }
 
+}

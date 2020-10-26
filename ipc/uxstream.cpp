@@ -23,6 +23,9 @@
  */
 #include "uxstream.h"
 
+namespace rpcfrmwrk
+{
+
 gint32 CIfUxPingTask::RunTask()
 {
     gint32 ret = 0;
@@ -657,4 +660,6 @@ gint32 CIfUxListeningTask::OnIrpComplete( IRP* pIrp )
     }while( 0 );
 
     return ret;
+}
+
 }

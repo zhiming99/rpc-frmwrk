@@ -44,6 +44,9 @@
 
 #include <dlfcn.h>
 
+namespace rpcfrmwrk
+{
+
 using namespace std;
 
 CInterfIdDict  g_oIidDict;
@@ -169,22 +172,6 @@ static FactoryPtr InitClassFactory()
     END_FACTORY_MAPS;
 };
 
-extern "C"
-gint32 DllLoadFactory( FactoryPtr& pFactory )
-{
-    pFactory = InitClassFactory();
-    if( pFactory.IsEmpty() )
-        return -EFAULT;
-
-    return 0;
-}
-
-extern "C"
-gint32 DllUnload()
-{
-    return 0;
-}
-
 std::string CoGetIfNameFromIid(
     EnumClsid Iid, 
     const std::string& strSuffix )
@@ -234,3 +221,23 @@ gint32 CoAddIidName(
     return g_oIidDict.AddIid(
         strNew, qwIid );
 }
+
+}
+
+using namespace rpcfrmwrk;
+extern "C"
+gint32 DllLoadFactory( FactoryPtr& pFactory )
+{
+    pFactory = InitClassFactory();
+    if( pFactory.IsEmpty() )
+        return -EFAULT;
+
+    return 0;
+}
+
+extern "C"
+gint32 DllUnload()
+{
+    return 0;
+}
+

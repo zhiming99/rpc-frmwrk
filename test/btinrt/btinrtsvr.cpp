@@ -20,8 +20,10 @@
 #include <iostream>
 #include <unistd.h>
 #include <cppunit/TestFixture.h>
-#include "btinrtsvr.h"
 #include "ifhelper.h"
+
+using namespace rpcfrmwrk;
+#include "btinrtsvr.h"
 
 using namespace std;
 

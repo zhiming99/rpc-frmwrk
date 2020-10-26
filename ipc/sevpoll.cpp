@@ -37,6 +37,9 @@
 #include "sevpoll.h"
 #include <fcntl.h>
 
+namespace rpcfrmwrk
+{
+
 CSimpleEvPoll::CSimpleEvPoll(
     const IConfigDb* pCfg ) :
     m_bStop( true ), m_iPiper( -1 ),
@@ -805,4 +808,5 @@ CIoManager* CSimpleEvPoll::GetIoMgr()
     return m_pLoop->GetIoMgr();
 }
 
+}
 #endif

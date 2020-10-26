@@ -33,6 +33,9 @@
 #include "tcpport.h"
 #include "frmwrk.h"
 
+namespace rpcfrmwrk
+{
+
 class CRpcNativeProtoFdo;
 
 class CRpcStream2 :
@@ -491,7 +494,12 @@ class CRpcConnSock :
     { m_dwAgeSec = 0; }
 };
 
+}
 #include "conntask.h"
+
+namespace rpcfrmwrk
+{
+
 class CStmSockConnectTask2 :
     public CStmSockConnectTaskBase< CRpcConnSock >
 {
@@ -699,3 +707,5 @@ class CTcpStreamPdo2 : public CPort
     void OnPortStartFailed(
         IRP* pIrp, gint32 ret );
 };
+
+}

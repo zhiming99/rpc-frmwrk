@@ -26,6 +26,9 @@
 #include "frmwrk.h"
 #include "portdrv.h"
 
+namespace rpcfrmwrk
+{
+
 #define PORT_MAX_GENERATIONS         4
 #define PORT_START_TIMEOUT_SEC       120
 
@@ -689,3 +692,4 @@ class CGenericBusPort : public CPort
 
 typedef CAutoPtr< Clsid_Invalid, CGenericBusPort > BusPortPtr;
 
+}

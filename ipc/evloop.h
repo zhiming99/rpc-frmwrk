@@ -35,6 +35,9 @@
 
 #ifdef _USE_LIBEV
 
+namespace rpcfrmwrk
+{
+
 class CIoManager;
 class CEvLoop;
 
@@ -93,7 +96,13 @@ class CDBusLoopHooks : public CObjBase
 
 typedef CAutoPtr< clsid( CDBusLoopHooks ), CDBusLoopHooks > DHookPtr;
 
+}
+
 #include "sevpoll.h"
+
+namespace rpcfrmwrk
+{
+
 class CEvLoop :
     public IMainLoop,
     public CSimpleEvPoll
@@ -498,4 +507,7 @@ class CEvLoopStopCb : public CTaskletSync
     gint32 operator()( guint32 dwContext );
 };
 
+}
+
 #endif
+

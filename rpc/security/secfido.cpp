@@ -31,6 +31,9 @@
 #include <algorithm>
 #include "security.h"
 
+namespace rpcfrmwrk
+{
+
 bool CRpcSecFido::HasSecCtx() const
 {
     CCfgOpenerObj oPortCfg( this );
@@ -1316,4 +1319,6 @@ gint32 CRpcSecFidoDrv::Probe(
     }while( 0 );
 
     return ret;
+}
+
 }

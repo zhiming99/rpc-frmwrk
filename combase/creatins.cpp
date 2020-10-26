@@ -26,6 +26,9 @@
 #include "stlcont.h"
 #include "objfctry.h"
 
+namespace rpcfrmwrk
+{
+
 FctryVecPtr g_pFactories;
 
 /**
@@ -77,3 +80,4 @@ gint32 CoCreateInstance(
     return ret;
 }
 
+}

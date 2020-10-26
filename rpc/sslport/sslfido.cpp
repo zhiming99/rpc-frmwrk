@@ -29,6 +29,9 @@
 #include "uxport.h"
 #include "jsondef.h"
 
+namespace rpcfrmwrk
+{
+
 #define PROP_TASK_QUEUED 10
 #define IsWantIo( n ) \
   ( n == SSL_ERROR_WANT_WRITE || \
@@ -2272,4 +2275,6 @@ gint32 COpenSSLResumeWriteTask::RunTask()
     }while( 0 );
 
     return ret;
+}
+
 }

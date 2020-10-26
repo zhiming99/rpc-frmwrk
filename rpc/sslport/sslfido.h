@@ -40,6 +40,9 @@
 #include <openssl/pem.h>
 #include <openssl/ssl.h>
 
+namespace rpcfrmwrk
+{
+
 #define PORT_CLASS_OPENSSL_FIDO "RpcOpenSSLFido"
 #define JSON_ATTR_CERTFILE      "CertFile"
 #define JSON_ATTR_KEYFILE       "KeyFile"
@@ -244,3 +247,4 @@ class CRpcOpenSSLFidoDrv : public CRpcTcpFidoDrv
     gint32 InitSSLContext( bool bServer );
 };
 
+}

@@ -26,6 +26,9 @@
 #include "frmwrk.h"
 #include "proxy.h"
 
+namespace rpcfrmwrk
+{
+
 using namespace std;
 
 CReqBuilder::CReqBuilder(
@@ -415,4 +418,6 @@ gint32 CReqOpener::GetTaskId(
 {
     return GetQwordProp(
         propTaskId, dwTaskId );
+}
+
 }

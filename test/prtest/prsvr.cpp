@@ -20,9 +20,11 @@
 #include <iostream>
 #include <unistd.h>
 #include <cppunit/TestFixture.h>
-#include "prsvr.h"
 #include "proxy.h"
 #include "frmwrk.h"
+
+using namespace rpcfrmwrk;
+#include "prsvr.h"
 
 using namespace std;
 

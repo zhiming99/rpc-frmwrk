@@ -29,6 +29,9 @@
 #include "defines.h"
 #include "port.h"
 
+namespace rpcfrmwrk
+{
+
 using namespace std;
 // refer to portstat.xlsx
 const gint8  CPortState::m_arrStatMap[ PORTSTAT_MAP_LEN ][ PORTSTAT_MAP_LEN ] =
@@ -971,4 +974,6 @@ gint32 CPortState::ScheduleResumeTask(
     }while( 0 );
 
     return ret;
+}
+
 }

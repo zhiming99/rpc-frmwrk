@@ -32,6 +32,9 @@
 #include "iftasks.h"
 #include "ifhelper.h"
 
+namespace rpcfrmwrk
+{
+
 template< class T >
 class CStartStopSafeBusPort :
     public T
@@ -355,3 +358,5 @@ class CGenBusDriverEx :
 
     gint32 Stop();
 };
+
+}

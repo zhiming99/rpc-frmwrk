@@ -36,6 +36,8 @@
 #include "portdrv.h"
 #include "mainloop.h"
 
+namespace rpcfrmwrk
+{
 
 extern gint32 ReadJsonCfg(
     const std::string& strFile,
@@ -636,3 +638,4 @@ gint32 CIoManager::GetCmdLineOpt< std::string >(
 
 typedef CAutoPtr< Clsid_CIoManager, CIoManager > IoMgrPtr;
 
+}

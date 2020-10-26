@@ -29,6 +29,10 @@
 #include "dbuserr.h"
 #include <unordered_map>
 
+
+namespace rpcfrmwrk
+{
+
 /**
 * @name ErrnoFromDbusErr 
 * @{ */
@@ -105,4 +109,6 @@ gint32 CDBusError::Errno() const
 CDBusError::operator DBusError*()
 {
     return &m_oError;
+}
+
 }

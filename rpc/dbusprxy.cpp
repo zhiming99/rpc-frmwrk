@@ -33,6 +33,9 @@
 #include "emaphelp.h"
 #include "ifhelper.h"
 
+namespace rpcfrmwrk
+{
+
 #define PROXYPDO_CONN_RETRIES       ( ( guint32 )12 )
 #define PROXYPDO_CONN_INTERVAL      ( ( guint32 )30 )
 
@@ -2510,4 +2513,6 @@ gint32 CDBusProxyPdoLpbk::GetProperty(
         }
     }
     return ret;
+}
+
 }

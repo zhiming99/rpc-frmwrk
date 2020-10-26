@@ -26,6 +26,9 @@
 #include "rpcroute.h"
 #include "streammh.h"
 
+namespace rpcfrmwrk
+{
+
 CfgPtr CRpcTcpBridgeProxyStream::InitCfg(
     const IConfigDb* pconstCfg )
 {
@@ -2031,4 +2034,6 @@ gint32 CIfStartUxSockStmRelayTaskMH::OnTaskComplete(
     ClearClientNotify();
 
     return iRet;
+}
+
 }

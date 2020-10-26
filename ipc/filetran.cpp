@@ -29,6 +29,9 @@
 #include "filetran.h"
 #include <algorithm>
 
+namespace rpcfrmwrk
+{
+
 gint32 CFileTransferProxy::InitUserFuncs()
 {
     // Note: no need to call super::InitUserFuncs for
@@ -791,4 +794,6 @@ gint32 CFileTransferServer::FetchData_Server(
         close( fdSrc );
 
     return ret;
+}
+
 }

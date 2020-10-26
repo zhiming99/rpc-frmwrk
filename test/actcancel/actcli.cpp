@@ -24,10 +24,9 @@
 #include <iostream>
 #include <unistd.h>
 #include <cppunit/TestFixture.h>
-#include "actcsvr.h"
 
 using namespace std;
-
+#include "actcsvr.h"
 
 CActcClient::CActcClient(
     const IConfigDb* pCfg )

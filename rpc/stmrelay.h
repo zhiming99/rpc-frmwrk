@@ -28,6 +28,9 @@
 #include "../ipc/stream.h"
 #include "tcpport.h"
 
+namespace rpcfrmwrk
+{
+
 template< class T >
 class CStreamRelayBase :
     public T
@@ -1582,3 +1585,5 @@ class CIfTcpStmTransTask :
     gint32 Pause();
     gint32 Resume();
 };
+
+}

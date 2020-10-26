@@ -28,6 +28,9 @@
 #include "configdb.h"
 #include "msgmatch.h"
 
+namespace rpcfrmwrk
+{
+
 #define CLEAR_SUBSCRIPTION_ON_ERROR() \
 do{ \
     if( ERROR( ret ) ) \
@@ -437,3 +440,5 @@ class CDummyInterfaceState : public CLocalProxyState
     virtual gint32 SubscribeEvents()
     { return 0; }
 };
+
+}

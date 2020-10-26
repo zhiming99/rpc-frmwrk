@@ -20,11 +20,12 @@
 #include <iostream>
 #include <unistd.h>
 #include <cppunit/TestFixture.h>
-#include "evtsvr.h"
 #include "ifhelper.h"
 
-using namespace std;
+using namespace rpcfrmwrk;
+#include "evtsvr.h"
 
+using namespace std;
 
 CEventServer::CEventServer( const IConfigDb* pCfg )
     : super( pCfg )

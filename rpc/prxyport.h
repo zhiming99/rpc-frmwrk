@@ -25,6 +25,9 @@
 #pragma once
 #include "dbusport.h"
 
+namespace rpcfrmwrk
+{
+
 class CDBusProxyPdo : public CRpcPdoPort
 {
     // this pdo will implement the ForwardRequest 
@@ -269,3 +272,5 @@ class CDBusProxyPdoLpbk : public CDBusProxyPdo
     gint32 GetProperty(
         gint32 iProp, CBuffer& oBuf ) const;
 };
+
+}

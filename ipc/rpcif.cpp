@@ -37,6 +37,9 @@
 #include "jsondef.h"
 #include "dbusport.h"
 
+namespace rpcfrmwrk
+{
+
 using namespace std;
 
 CGenericInterface::CGenericInterface(
@@ -7137,4 +7140,6 @@ gint32 CInterfaceServer::PauseResume_Server(
     }while( 0 );
 
     return ret;
+}
+
 }

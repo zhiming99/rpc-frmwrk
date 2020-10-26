@@ -30,6 +30,9 @@
 #include "jsondef.h"
 #include "tcportex.h"
 
+namespace rpcfrmwrk
+{
+
 CConnParams GetConnParams2(
     const CObjBase* pObj )
 {
@@ -1798,3 +1801,4 @@ gint32 CWsCloseTask::OnIrpComplete(
     return ret;
 }
 
+}

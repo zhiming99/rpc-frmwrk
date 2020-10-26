@@ -23,13 +23,14 @@
 #include <rpc.h>
 #include <proxy.h>
 
-#include "inproctst.h"
-#include "inprocsvr.h"
-
 #include <cppunit/extensions/TestFactoryRegistry.h>
 #include <cppunit/ui/text/TestRunner.h>
-
 #include <cppunit/extensions/HelperMacros.h>
+
+using namespace rpcfrmwrk;
+
+#include "inproctst.h"
+#include "inprocsvr.h"
 
 CPPUNIT_TEST_SUITE_REGISTRATION( CIfSmokeTest );
 

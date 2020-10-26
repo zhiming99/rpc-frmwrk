@@ -23,6 +23,10 @@
  */
 #pragma once
 #include <vector>
+
+namespace rpcfrmwrk
+{
+
 template< class SockClass >
 class CStmSockConnectTaskBase
     : public CTasklet
@@ -631,3 +635,4 @@ class CStmSockConnectTaskBase
 
 };
 
+}

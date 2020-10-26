@@ -35,6 +35,9 @@
 #include "tcportex.h"
 #include "emaphelp.h"
 
+namespace rpcfrmwrk
+{
+
 CRpcStream2::CRpcStream2(
     const IConfigDb* pCfg )
     : super(),
@@ -4303,3 +4306,4 @@ gint32 CRpcNatProtoFdoDrv::Probe(
     return ret;
 }
 
+}

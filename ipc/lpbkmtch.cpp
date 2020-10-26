@@ -29,6 +29,9 @@
 #include "port.h"
 #include "dbusport.h"
 
+namespace rpcfrmwrk
+{
+
 CDBusLoopbackMatch::CDBusLoopbackMatch(
     const IConfigDb* pCfg ) : super()
 {
@@ -350,4 +353,6 @@ gint32 CDBusLoopbackMatch::IsMyMsgOutgoing(
         ret = -ENOTSUP;
     }
     return ret;
+}
+
 }

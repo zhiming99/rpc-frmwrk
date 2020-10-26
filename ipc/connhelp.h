@@ -29,6 +29,9 @@
 #include "stlcont.h"
 #include "namespc.h"
 
+namespace rpcfrmwrk
+{
+
 class CConnPointHelper
 {
     CIoManager* m_pMgr;
@@ -169,3 +172,5 @@ class CConnPointHelper
         return 0;
     }
 };
+
+}

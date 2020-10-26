@@ -28,6 +28,9 @@
 #include "rpcroute.h"
 #include "stmrelay.h"
 
+namespace rpcfrmwrk
+{
+
 class CStreamServerRelayMH :
     public CStreamRelayBase< CStreamServer >
 {
@@ -309,3 +312,5 @@ class CIfStartUxSockStmRelayTaskMH :
     { SetClassId( clsid( CIfStartUxSockStmRelayTaskMH ) ); }
     gint32 OnTaskComplete( gint32 iRet );
 };
+
+}

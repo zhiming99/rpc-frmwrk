@@ -22,11 +22,12 @@
 #include <iostream>
 #include <unistd.h>
 #include <cppunit/TestFixture.h>
-#include "inprocsvr.h"
 #include "ifhelper.h"
 
-using namespace std;
+using namespace rpcfrmwrk;
+#include "inprocsvr.h"
 
+using namespace std;
 
 CInProcServer::CInProcServer( const IConfigDb* pCfg )
     : super( pCfg )

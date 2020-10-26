@@ -30,6 +30,8 @@
 #include "autoptr.h"
 #include "dbusport.h"
 
+namespace rpcfrmwrk
+{
 
 class CProxyFdoDriver : public CPortDriver
 {
@@ -57,3 +59,4 @@ class CProxyFdoDriver : public CPortDriver
     { return -ENOTSUP; }
 };
 
+}

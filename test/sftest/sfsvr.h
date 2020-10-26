@@ -741,7 +741,7 @@ class CMyFileServerBase :
 
 class CMyFileServer;
 template<>
-gint32 GetIidOfType< const CMyFileServer >(
+gint32 rpcfrmwrk::GetIidOfType< const CMyFileServer >(
     std::vector< guint32 >& vecIids, const CMyFileServer* pType );
 
 class CMyFileServer :
@@ -854,7 +854,7 @@ class CMyFileServer :
 
 class CMyFileProxy;
 template<>
-gint32 GetIidOfType< const CMyFileProxy >(
+gint32 rpcfrmwrk::GetIidOfType< const CMyFileProxy >(
     std::vector< guint32 >& vecIids, const CMyFileProxy* pType );
 
 class CMyFileProxy :

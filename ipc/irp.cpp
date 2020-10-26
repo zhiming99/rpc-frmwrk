@@ -29,6 +29,9 @@
 #include "port.h"
 #include "frmwrk.h"
 
+namespace rpcfrmwrk
+{
+
 using namespace std;
 
 IRP_CONTEXT::IRP_CONTEXT( IRP_CONTEXT* pRhs )
@@ -756,4 +759,6 @@ gint32 IoRequestPacket::GetIrpThread(
 void IoRequestPacket::ClearIrpThread()
 {
     m_IrpThrdPtr.Clear();
+}
+
 }

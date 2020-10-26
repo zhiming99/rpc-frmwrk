@@ -30,6 +30,9 @@
 #include "tcportex.h"
 #include "secclsid.h"
 
+namespace rpcfrmwrk
+{
+
 class CRpcSecFidoDrv : public CRpcTcpFidoDrv
 {
     public:
@@ -99,3 +102,5 @@ class CRpcSecFido : public CPort
     bool HasSecCtx() const;
     gint32 GetSecCtx( ObjPtr& pObj ) const;
 };
+
+}

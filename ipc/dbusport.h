@@ -30,6 +30,9 @@
 #include "msgmatch.h"
 #include "portex.h"
 
+namespace rpcfrmwrk
+{
+
 #define DBUS_HANDLER_RESULT_HALT    ( ( DBusHandlerResult )100 )
 
 gint32 NormalizeIpAddr(
@@ -1183,8 +1186,11 @@ class CConnParamsProxy : public CConnParams
     }
 };
 
+}
+
 namespace std
 {
+    using namespace rpcfrmwrk;
     template<>
     struct less<CConnParamsProxy>
     {
@@ -1203,6 +1209,9 @@ namespace std
         }
     };
 }
+
+namespace rpcfrmwrk
+{
 
 class CDBusBusPort : public CGenericBusPortEx
 {
@@ -1444,3 +1453,4 @@ class CDBusBusDriver : public CGenBusDriverEx
 
 typedef CAutoPtr< clsid( CDBusBusPort ), CDBusBusPort > DBPortPtr;
 
+}

@@ -37,6 +37,9 @@
 #include "tcportex.h"
 
 
+namespace rpcfrmwrk
+{
+
 using namespace std;
 
 // c++11 required
@@ -144,6 +147,10 @@ static FactoryPtr InitClassFactory()
 
     END_FACTORY_MAPS;
 };
+
+}
+
+using namespace rpcfrmwrk;
 
 extern "C"
 gint32 DllLoadFactory( FactoryPtr& pFactory )

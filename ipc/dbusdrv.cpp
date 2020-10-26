@@ -30,6 +30,9 @@
 #include "emaphelp.h"
 // #include "iftasks.h"
 
+namespace rpcfrmwrk
+{
+
 using namespace std;
 
 CDBusBusDriver::CDBusBusDriver(
@@ -109,3 +112,4 @@ gint32 CDBusBusDriver::Probe(
     return ret;
 }
 
+}

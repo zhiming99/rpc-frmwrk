@@ -23,6 +23,9 @@
 #include "uxstream.h"
 #include "streamex.h"
 
+namespace rpcfrmwrk
+{
+
 #define COMPLETE_SEND_IRP( _pIrp, _ret ) \
 do{ \
     gint32 _iRet = ( gint32 )( _ret ); \
@@ -1148,4 +1151,6 @@ gint32 CReadWriteWatchTask::operator()(
     }while( 0 );
 
     return SetError( iRet );
+}
+
 }

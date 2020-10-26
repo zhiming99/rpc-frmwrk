@@ -34,6 +34,8 @@
 #include "k5proxy.h"
 #include "kdcfdo.h"
 
+namespace rpcfrmwrk
+{
 // mandatory part, just copy/paste'd from clsids.cpp
 static FactoryPtr InitClassFactory()
 {
@@ -60,6 +62,10 @@ static FactoryPtr InitClassFactory()
 
     END_FACTORY_MAPS;
 };
+
+}
+
+using namespace rpcfrmwrk;
 
 // common method for a class factory library
 extern "C"

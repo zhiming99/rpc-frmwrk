@@ -24,13 +24,14 @@
 #include <rpc.h>
 #include <proxy.h>
 
+#include <cppunit/extensions/TestFactoryRegistry.h>
+#include <cppunit/ui/text/TestRunner.h>
+#include <cppunit/extensions/HelperMacros.h>
+
+using namespace rpcfrmwrk;
 #include "sftest.h"
 #include "sfsvr.h"
 
-#include <cppunit/extensions/TestFactoryRegistry.h>
-#include <cppunit/ui/text/TestRunner.h>
-
-#include <cppunit/extensions/HelperMacros.h>
 #define NSEC_PER_SEC 1000000000
 
 CPPUNIT_TEST_SUITE_REGISTRATION( CIfSmokeTest );

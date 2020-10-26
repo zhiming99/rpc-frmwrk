@@ -32,6 +32,9 @@
 #include "reqopen.h"
 #include <fcntl.h>
 
+namespace rpcfrmwrk
+{
+
 using namespace std;
 
 CRpcSocketBase::CRpcSocketBase(
@@ -4702,4 +4705,6 @@ gint32 CStmSockInvalStmNotifyTask::Process(
     }while( 0 );
 
     return ret;
+}
+
 }

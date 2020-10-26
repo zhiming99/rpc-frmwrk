@@ -35,6 +35,9 @@
 #include "ifhelper.h"
 #include "portex.h"
 
+namespace rpcfrmwrk
+{
+
 using namespace std;
 
 guint32 GetPnpState( IRP* pIrp );
@@ -4319,4 +4322,6 @@ gint32 CGenericBusPort::CompletePnpIrp(
     }while( 0 );
 
     return ret;
+}
+
 }

@@ -27,12 +27,15 @@
 #include "stlcont.h"
 #include <stdlib.h>
 
+namespace rpcfrmwrk
+{
+
 using namespace std;
 
 CTasklet::CTasklet( const IConfigDb* pCfg )
 {
     m_pCtx.NewObj( Clsid_CConfigDb, pCfg );
-    m_dwTid = ::GetTid();
+    m_dwTid = rpcfrmwrk::GetTid();
     m_iRet = 0;
     m_bPending = false;
     m_bInProcess = false;
@@ -573,3 +576,4 @@ gint32 CSyncCallback::WaitForComplete()
     return Sem_Wait( &m_semWait );
 }
 
+}

@@ -32,6 +32,9 @@
 #include "ifhelper.h"
 #include "connhelp.h"
 
+namespace rpcfrmwrk
+{
+
 using namespace std;
 
 CRpcTcpBridgeProxy::CRpcTcpBridgeProxy(
@@ -4086,4 +4089,6 @@ gint32 CRpcTcpBridgeShared::GetPeerStmId(
     }while( 0 );
 
     return ret;
+}
+
 }

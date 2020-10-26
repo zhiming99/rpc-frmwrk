@@ -72,6 +72,9 @@ struct module_callback_data {
 };
 // -------------------------------------
 
+namespace rpcfrmwrk
+{
+
 CKrb5InitHook::CKrb5InitHook(
     const IConfigDb* pCfg )
     : super()
@@ -1122,8 +1125,8 @@ gint32 CK5AuthProxy::Krb5Login(
         send_tok.value = pNameBuf->ptr();
         send_tok.length = pNameBuf->size();
 
-        maj_stat = gss_import_name( &min_stat,
-            &send_tok,
+        maj_stat = gss_import_name(
+            &min_stat, &send_tok,
             ( gss_OID )GSS_C_NT_HOSTBASED_SERVICE,
             &target_name );
 
@@ -2110,3 +2113,4 @@ gint32 CKdcChannelProxy::RebuildMatches()
     return 0;
 }
 
+}

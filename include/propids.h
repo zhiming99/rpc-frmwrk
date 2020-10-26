@@ -23,6 +23,10 @@
  */
 
 #pragma once
+#include <nsdef.h>
+
+namespace rpcfrmwrk
+{
 
 enum EnumPropId : gint32
 {
@@ -240,6 +244,7 @@ enum EnumPropId : gint32
     propInvalid = -1, 
 };
 
+}
 #define PropIdFromInt( intid ) ( static_cast< EnumPropId >( intid ) )
 #define PropId( propid ) ( static_cast< gint32 >( propid ) )
 

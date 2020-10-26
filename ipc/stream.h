@@ -31,6 +31,9 @@
 
 #include "uxport.h"
 
+namespace rpcfrmwrk
+{
+
 struct IStream
 {
     protected:
@@ -398,3 +401,5 @@ class CIfStopUxSockStmTask :
     gint32 RunTask();
     gint32 OnTaskComplete( gint32 iRet );
 };
+
+}

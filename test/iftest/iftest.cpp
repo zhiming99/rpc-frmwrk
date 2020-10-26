@@ -21,8 +21,10 @@
 #include <unistd.h>
 
 #include <rpc.h>
-#include <proxy.h>
 
+using namespace rpcfrmwrk;
+
+#include <proxy.h>
 #include "iftest.h"
 #include "ifsvr.h"
 

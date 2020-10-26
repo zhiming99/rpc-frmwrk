@@ -28,6 +28,9 @@
 #include "rpcroute.h"
 #include "dbusport.h"
 
+namespace rpcfrmwrk
+{
+
 using namespace std;
 
 // ---interface related information---
@@ -4208,4 +4211,6 @@ gint32 CReqFwdrFetchDataTask::OnServiceComplete(
     }while( 0 );
 
     return ret;
+}
+
 }

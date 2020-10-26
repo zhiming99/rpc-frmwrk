@@ -35,6 +35,8 @@
 #include "emaphelp.h"
 #include "ifhelper.h"
 
+namespace rpcfrmwrk
+{
 
 using namespace std;
 
@@ -2444,4 +2446,6 @@ gint32 CDBusConnFlushTask::Stop()
         m_hTimer = INVALID_HANDLE;
     }
     return 0;
+}
+
 }

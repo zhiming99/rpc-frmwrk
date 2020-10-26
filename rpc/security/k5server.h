@@ -34,6 +34,9 @@
 
 #define KDCRELAY_DESC_FILE "./authprxy.json"
 
+namespace rpcfrmwrk
+{
+
 class CKdcRelayProxyStat :
     public CTcpBdgePrxyState
 {
@@ -237,3 +240,4 @@ class CK5AuthServer :
         const std::string& strSess );
 };
 
+}

@@ -36,6 +36,9 @@
 #ifdef _USE_LIBEV
 #include "evloop.h"
 
+namespace rpcfrmwrk
+{
+
 CDBusLoopHookCb::CDBusLoopHookCb(
     const IConfigDb* pCfg )
     : super( pCfg ),
@@ -956,4 +959,5 @@ void CDBusLoopHooks::WakeupDispatch(
     return;
 }
 
+}
 #endif

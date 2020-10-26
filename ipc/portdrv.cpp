@@ -29,6 +29,9 @@
 #include "emaphelp.h"
 #include "iftasks.h"
 
+namespace rpcfrmwrk
+{
+
 using namespace std;
 
 // driver method
@@ -450,4 +453,6 @@ gint32 CGenBusDriver::AddPort(
     PortPtr pPort( pNewPort );
     m_mapPort2TaskGrp[ pPort ] = pTask;
     return ret;
+}
+
 }

@@ -29,6 +29,9 @@
 #include "ifhelper.h"
 #include "counters.h"
 
+namespace rpcfrmwrk
+{
+
 gint32 CStatCountersProxy::InitUserFuncs()
 {
     // don't call super::InitUserFuncs here
@@ -160,4 +163,6 @@ gint32 CStatCountersServer::GetCounter(
 
     // make a copy
     return oCfg.GetProperty( iPropId, *pBuf );
+}
+
 }

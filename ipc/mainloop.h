@@ -33,6 +33,9 @@
 #include "defines.h"
 #include "tasklets.h"
 
+namespace rpcfrmwrk
+{
+
 enum EnumSrcType : guint32
 {
     srcTimer,
@@ -304,7 +307,7 @@ class CMainIoLoopT : public T
 
         gint32 ret = 0;
         SetThreadName( m_strName );
-        SetTid( ::GetTid() );
+        SetTid( rpcfrmwrk::GetTid() );
         super::Start();
         SetTid( 0 );
         // Place OnPostLoop here, because the tid
@@ -343,11 +346,18 @@ class CMainIoLoopT : public T
     gint32 InstallTaskSource();
 };
 
+}
 #ifdef _USE_LIBEV
 #include "evloop.h"
+namespace rpcfrmwrk
+{
 typedef  CMainIoLoopT< CEvLoop > CMainIoLoop;
+}
 #else
 #include "gmloop.h"
+namespace rpcfrmwrk
+{
 typedef  CMainIoLoopT< CGMainLoop > CMainIoLoop;
+}
 #endif
 

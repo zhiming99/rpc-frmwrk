@@ -29,10 +29,14 @@
 #include <netinet/tcp.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <sys/ioctl.h>
 #include "reqopen.h"
 #include <fcntl.h>
 #include "ifhelper.h"
 #include "tcportex.h"
+
+namespace rpcfrmwrk
+{
 
 inline gint32 SendBytesWithFlag( int iFd,
     void* pBuf, guint32 dwSize,
@@ -840,7 +844,6 @@ gint32 CTcpStreamPdo2::OnStmSockEvent(
     return ret;
 }
 
-#include <sys/ioctl.h>
 gint32 CTcpStreamPdo2::OnReceive(
     gint32 iFd )
 {
@@ -2408,4 +2411,6 @@ void CTcpStreamPdo2::OnPortStartFailed(
 {
     m_oSender.Clear();
     return;
+}
+
 }

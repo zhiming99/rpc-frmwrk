@@ -28,6 +28,9 @@
 #include "port.h"
 #include "frmwrk.h"
 
+namespace rpcfrmwrk
+{
+
 using namespace std;
 
 CPortInterfaceMap::CPortInterfaceMap()
@@ -356,4 +359,6 @@ gint32 CPortInterfaceMap::GetPortPtr(
     }while( 0 );
 
     return ret;
+}
+
 }

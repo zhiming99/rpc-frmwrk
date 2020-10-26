@@ -32,6 +32,9 @@
 
 #include "portex.h"
 
+namespace rpcfrmwrk
+{
+
 #define RPC_MAX_BYTES_PACKET    ( 65536 - sizeof( CPacketHeader ) - 32 )
 
 #define TCP_CONN_DEFAULT_CMD    0
@@ -1214,7 +1217,12 @@ class CRpcTcpFidoDrv : public CPortDriver
     { return -ENOTSUP; }
 };
 
+}
 #include "conntask.h"
+
+namespace rpcfrmwrk
+{
+
 class CStmSockConnectTask :
     public CStmSockConnectTaskBase< CRpcStreamSock >
 {
@@ -1238,3 +1246,5 @@ gint32 GetPreStopStep(
 
 gint32 SetPreStopStep(
     PIRP pIrp, guint32 dwStepNo );
+
+}

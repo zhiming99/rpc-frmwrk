@@ -37,6 +37,9 @@
 #include "evloop.h"
 #include "ifhelper.h"
 
+namespace rpcfrmwrk
+{
+
 gint32 CEvLoop::SOURCE_HEADER::StartStop(
     bool bStart )
 {
@@ -963,4 +966,5 @@ CEvLoop::GetMap( EnumSrcType iType )
     return nullptr;
 }
 
+}
 #endif
