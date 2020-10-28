@@ -24,6 +24,9 @@
 #pragma once
 #include <unordered_map>
 
+namespace rpcfrmwrk
+{
+
 class CInterfIdDict
 {
     typedef std::unordered_map
@@ -50,4 +53,4 @@ class CInterfIdDict
         guint64 Iid );
 };
 
-
+}

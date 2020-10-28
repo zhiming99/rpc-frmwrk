@@ -26,6 +26,10 @@
 #include <dbus/dbus.h>
 #include "defines.h"
 
+
+namespace rpcfrmwrk
+{
+
 extern gint32 CoCreateInstance( EnumClsid clsid,
     CObjBase*& pObj, const IConfigDb* pCfg = nullptr ); 
 
@@ -438,11 +442,13 @@ typedef CAutoPtr< clsid( Invalid ), IEventSink >       EventPtr;
 typedef CAutoPtr< clsid( Invalid ), IThread >          ThreadPtr;
 typedef CAutoPtr< clsid( Invalid ), DBusMessage >      DMsgPtr;
 
+}
 
 #include "dmsgptr.h"
 
-namespace std {
-
+namespace std
+{
+    using namespace rpcfrmwrk;
     template<>
     struct less<ObjPtr>
     {
@@ -475,6 +481,8 @@ namespace std {
 
 };
 
+namespace rpcfrmwrk
+{
 // c++11 required
 template <typename R, typename C, typename ... Types>
 inline constexpr size_t GetArgCount( R(C::*f)(Types ...) )
@@ -485,3 +493,4 @@ inline constexpr size_t GetArgCount( R(C::*f)(Types ...) )
 extern gint32 DeserializeObj(
     const CBuffer& oBuf, ObjPtr& pObj );
 
+}

@@ -24,6 +24,10 @@
 #include <map>
 #include <unordered_map>
 #include <vector>
+#include <unistd.h>
+#include <dirent.h>
+#include <sys/stat.h>
+
 #include "defines.h"
 #include "buffer.h"
 #include "configdb.h"
@@ -33,6 +37,9 @@
 #include "objfctry.h"
 
 using namespace std;
+
+namespace rpcfrmwrk
+{
 
 extern FctryVecPtr g_pFactories;
 
@@ -161,10 +168,6 @@ gint32 CoAddClassFactory(
 * g_pFactories.
 * @{ */
 /**  @} */
-
-#include <unistd.h>
-#include <dirent.h>
-#include <sys/stat.h>
 
 gint32 CoLoadClassFactories( const char* dir )
 {
@@ -298,3 +301,4 @@ gint32 DllLoadFactory( FactoryPtr& pFactory )
     return 0;
 }
 
+}

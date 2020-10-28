@@ -25,13 +25,13 @@
 #include <rpc.h>
 #include <proxy.h>
 
-#include "stmtest.h"
-#include "stmsvr.h"
-
 #include <cppunit/extensions/TestFactoryRegistry.h>
 #include <cppunit/ui/text/TestRunner.h>
-
 #include <cppunit/extensions/HelperMacros.h>
+
+using namespace rpcfrmwrk;
+#include "stmtest.h"
+#include "stmsvr.h"
 
 #define NSEC_PER_SEC 1000000000
 

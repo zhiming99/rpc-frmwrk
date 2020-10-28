@@ -22,10 +22,11 @@
 #include <iostream>
 #include <unistd.h>
 #include <cppunit/TestFixture.h>
+
+using namespace rpcfrmwrk;
 #include "asyncsvr.h"
 
 using namespace std;
-
 
 CAsyncClient::CAsyncClient(
     const IConfigDb* pCfg )

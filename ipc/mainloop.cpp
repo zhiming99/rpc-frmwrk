@@ -32,6 +32,9 @@
 #include "frmwrk.h"
 #include "mainloop.h"
 
+namespace rpcfrmwrk
+{
+
 gint32 CSchedTaskCallback::operator()(
     guint32 dwContext )
 {
@@ -122,4 +125,6 @@ gint32 CMainIoLoop::InstallTaskSource()
     }while( 0 );
 
     return ret;
+}
+
 }

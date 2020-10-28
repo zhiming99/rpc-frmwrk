@@ -28,6 +28,9 @@
 #include "emaphelp.h"
 #include "uxport.h"
 
+namespace rpcfrmwrk
+{
+
 CRecvFilter::RecvState
 CRecvFilter::GetRecvState() const
 {
@@ -2333,4 +2336,6 @@ gint32 CUnixSockBusPort::CreateUxStreamPdo(
     }while( 0 );
 
     return ret;
+}
+
 }

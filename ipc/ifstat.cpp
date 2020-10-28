@@ -31,6 +31,9 @@
 #include "connhelp.h"
 #include "proxy.h"
 
+namespace rpcfrmwrk
+{
+
 using namespace std;
 
 #define STATEMAP_KEY std::pair< EnumIfState, EnumEventId >
@@ -1216,4 +1219,6 @@ gint32 CIfReqFwdrPrxyState::SubscribeEvents()
     };
     return SubscribeEventsInternal(
         vecEvtToSubscribe );
+}
+
 }

@@ -34,7 +34,15 @@
 #include <unordered_map>
 #include <byteswap.h>
 
+#include <memory>
+#include <iostream>
+#include <array>
+
+
 #define MAX_DUMP_SIZE 512
+
+namespace rpcfrmwrk
+{
 
 std::string DebugMsgInternal(
     gint32 ret, const std::string& strMsg,
@@ -103,10 +111,6 @@ gint64 GetRandom()
 
     return ( qwHighVal << 32 )  + dwLowVal;
 }
-
-#include <memory>
-#include <iostream>
-#include <array>
 
 gint32 GetCmdOutput( std::string& strResult,
     const char* cmd )
@@ -599,3 +603,5 @@ void CObjBase::Dump( std::string& strDump )
     strDump += std::to_string( m_qwObjId );
 }
 #endif
+
+}

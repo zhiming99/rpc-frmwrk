@@ -30,6 +30,9 @@
 #include "connhelp.h"
 #include "jsondef.h"
 
+namespace rpcfrmwrk
+{
+
 using namespace std;
 
 CRpcRouter::CRpcRouter(
@@ -4947,4 +4950,6 @@ gint32 CIfRouterMgrState::SubscribeEvents()
     };
     return SubscribeEventsInternal(
         vecEvtToSubscribe );
+}
+
 }

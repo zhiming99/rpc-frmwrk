@@ -8,14 +8,15 @@
 // woodhead99@gmail.com
 
 #include "rpc.h"
-#include "WebSocket.h"
-
-#include "base64.h"
-#include "sha1.h"
 
 #include <iostream>
 #include <string>
 #include <vector>
+
+using namespace rpcfrmwrk;
+#include "WebSocket.h"
+#include "base64.h"
+#include "sha1.h"
 
 #define RFC6544_MAGIC_KEY "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"; 
 

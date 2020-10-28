@@ -26,6 +26,9 @@
 
 #include "stream.h"
 
+namespace rpcfrmwrk
+{
+
 class CIfUxTaskBase :
     public CIfParallelTask
 {
@@ -1634,3 +1637,4 @@ class CUnixSockStmServer :
 
 };
 
+}

@@ -35,6 +35,8 @@
 #include "tcpport.h"
 #include "wsproto/WebSocket.h"
 
+namespace rpcfrmwrk
+{
 #define PORT_CLASS_WEBSOCK_FIDO "RpcWebSockFido"
 
 typedef enum 
@@ -223,3 +225,4 @@ class CRpcWebSockFidoDrv :
         const IConfigDb* pConfig = NULL );
 };
 
+}

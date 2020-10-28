@@ -26,6 +26,9 @@
 #pragma once
 #include "proxy.h"
 
+namespace rpcfrmwrk
+{
+
 // remove the reference or const modifiers from
 // the type list
 #define ValType( _T ) typename std::remove_cv< typename std::remove_pointer< typename std::decay< _T >::type >::type>::type
@@ -388,7 +391,12 @@ BufPtr PackageTo< ObjPtr >( const ObjPtr& pObj );
 template<>
 BufPtr PackageTo< CBuffer >( CBuffer* pObj );
 
+}
+
 #include <stdarg.h>
+
+namespace rpcfrmwrk
+{
 
 template< int N >
 struct _DummyClass_
@@ -1952,7 +1960,7 @@ class CDeferredCallOneshot :
 
     gint32 InterceptCallback( IEventSink* pCallback )
     {
-        return ::InterceptCallback( this, pCallback );
+        return rpcfrmwrk::InterceptCallback( this, pCallback );
     }
 
     public:
@@ -2336,7 +2344,8 @@ class CAsyncCallbackOneshot :
 
     gint32 InterceptCallback( IEventSink* pCallback )
     {
-        return ::InterceptCallback( this, pCallback );
+        return rpcfrmwrk::InterceptCallback(
+            this, pCallback );
     }
 
     public:
@@ -2581,7 +2590,7 @@ gint32 CInterfaceProxy::SyncCallEx(
         if( ERROR( ret ) )
         {
             DebugPrint( ret, "fatal error, about to quit, tid=%d\n",
-                ::GetTid() );
+                rpcfrmwrk::GetTid() );
             break;
         }
         pResp = pObj; 
@@ -3103,7 +3112,14 @@ gint32 GetIidOfType( std::vector< guint32 >& vecIids, Type* pType )
     return 0;
 }
 
+}
+
 #include "frmwrk.h"
+
+
+namespace rpcfrmwrk
+{
+
 // _pos is the position for the callback 'pCallback', which must be present in the
 // ARGS, otherwise the macro does not compile.
 #define ITERATE_IF_VIRT_METHODS_ASYNC_IMPL( _pos, _MethodName, rettype, PARAMS, ARGS ) \
@@ -3589,4 +3605,6 @@ gint32 AddSeqTaskTempl( T* pObj,
     }while( 1 );
 
     return ret;
+}
+
 }

@@ -30,6 +30,9 @@
 #include <algorithm>
 #include "emaphelp.h"
 
+namespace rpcfrmwrk
+{
+
 static gint32 FireConnErrEvent(
     IPort* pPort, EnumEventId iEvent );
 
@@ -713,4 +716,6 @@ gint32 CKdcRelayPdo::OnStmSockEvent(
     }while( 1 );
 
     return ret;
+}
+
 }

@@ -34,6 +34,9 @@
 #include "stlcont.h"
 #include "objfctry.h"
 
+namespace rpcfrmwrk
+{
+
 using namespace std;
 
 gint32 ReadJsonCfg(
@@ -1241,3 +1244,4 @@ gint32 CDriverManager::FindDriver(
     return ret;
 }
 
+}

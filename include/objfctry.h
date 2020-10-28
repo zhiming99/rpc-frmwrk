@@ -25,6 +25,9 @@
 #include "defines.h"
 #include "stlcont.h"
 
+namespace rpcfrmwrk
+{
+
 class CObjMakerBase
 {
     public:
@@ -239,3 +242,4 @@ extern gint32 CoAddClassFactory( const FactoryPtr& pFactory );
 extern gint32 CoInitialize( guint32 dwContext = 0 );
 extern gint32 CoUninitialize();
 
+}

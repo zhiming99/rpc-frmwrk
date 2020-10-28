@@ -23,6 +23,8 @@
 #include <rpc.h>
 #include <proxy.h>
 
+using namespace rpcfrmwrk;
+
 #include "iftest.h"
 #include "ifsvr.h"
 

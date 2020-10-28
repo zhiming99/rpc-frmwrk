@@ -22,6 +22,8 @@
 #include <iostream>
 #include <unistd.h>
 #include <cppunit/TestFixture.h>
+
+using namespace rpcfrmwrk;
 #include "btinrtsvr.h"
 
 using namespace std;

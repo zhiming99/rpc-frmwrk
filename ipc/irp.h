@@ -25,6 +25,9 @@
 #include "defines.h"
 #include "stlcont.h"
 
+namespace rpcfrmwrk
+{
+
 // the events, which will go to the IEventSink
 // the peer connection to a SS/E2 ready
 #define EVENT_CONN_READY        1
@@ -519,8 +522,11 @@ struct IoRequestPacket : public IEventSink
     guint32 IoDirection() const;
 };
 
+}
+
 namespace std
 {
+    using namespace rpcfrmwrk;
     template<>
     struct less<PortPtr>
     {
@@ -541,6 +547,9 @@ namespace std
             }
     };
 }
+
+namespace rpcfrmwrk
+{
 
 class CStlIrpVector : public CStlVector< IrpPtr >
 {
@@ -572,3 +581,4 @@ class CStlIrpVector2 : public CStlVector< std::pair< gint32, IrpPtr > >
 
 typedef CAutoPtr< clsid( CStlIrpVector2 ), CStlIrpVector2 > IrpVec2Ptr;
 
+}

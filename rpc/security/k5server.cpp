@@ -28,6 +28,9 @@
 #include "k5server.h"
 #include "sha1.h"
 
+namespace rpcfrmwrk
+{
+
 CKdcRelayProxy::CKdcRelayProxy(
     const IConfigDb* pCfg ) :
     super( pCfg )
@@ -1372,4 +1375,6 @@ gint32 IAuthenticateServer::VerifyMicMsg2s(
     }while( 0 );
 
     return ret;
+}
+
 }

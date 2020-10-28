@@ -31,6 +31,9 @@
 #include "buffer.h"
 #include "configdb.h"
 
+namespace rpcfrmwrk
+{
+
 gint32 CreateObjFast( EnumClsid iClsid,
     CObjBase*& pObj, const IConfigDb* pCfg ) 
 {
@@ -105,4 +108,6 @@ gint32 DeserializeObj( const CBuffer& oBuf, ObjPtr& pObj )
     }
 
     return ret;
+}
+
 }

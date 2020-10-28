@@ -24,6 +24,7 @@
 #pragma once
 
 #include <glib.h>
+#include <nsdef.h>
 
 #define DECL_CLSID( __classname__ ) \
     Clsid_ ## __classname__
@@ -37,6 +38,8 @@
 #define iid( interface_name ) \
     ( ( EnumClsid )DECL_IID( interface_name  ) )
 
+namespace rpcfrmwrk
+{
 /**
 * @name Class id declarations
 * @{ */
@@ -301,3 +304,4 @@ typedef enum : guint32
 
 }EnumClsid;
 
+}

@@ -37,6 +37,9 @@
 // the same hash across different platform.
 #define hashmap unordered_map
 
+namespace rpcfrmwrk
+{
+
 class CIoManager;
 
 class IConfigDb : public CObjBase
@@ -1669,3 +1672,5 @@ class CConfigDb : public IConfigDb
     virtual gint32 EnumProperties(
         std::vector< gint32 >& vecProps ) const; 
 };
+
+}

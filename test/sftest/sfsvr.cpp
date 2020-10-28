@@ -23,6 +23,8 @@
 #include <cppunit/TestFixture.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+
+using namespace rpcfrmwrk;
 #include "sfsvr.h"
 
 using namespace std;
@@ -323,7 +325,7 @@ gint32 CMyFileServer::GetFileInfo(
 }
 
 template<>
-gint32 GetIidOfType< const CMyFileServer >(
+gint32 rpcfrmwrk::GetIidOfType< const CMyFileServer >(
     std::vector< guint32 >& vecIids, const CMyFileServer* pType )
 {
     vecIids.push_back( pType->CMyFileServer::super::GetIid() );

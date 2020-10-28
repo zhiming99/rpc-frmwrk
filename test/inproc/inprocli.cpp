@@ -21,8 +21,10 @@
 #include <string>
 #include <unistd.h>
 #include <cppunit/TestFixture.h>
-#include "inprocsvr.h"
 #include "ifhelper.h"
+
+using namespace rpcfrmwrk;
+#include "inprocsvr.h"
 
 using namespace std;
 

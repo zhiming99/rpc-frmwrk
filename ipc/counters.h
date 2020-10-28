@@ -32,6 +32,9 @@
 #define METHOD_GetCounters "GetCounters"
 #define METHOD_GetCounter  "GetCounter"
 
+namespace rpcfrmwrk
+{
+
 // a read-only interface
 struct IStatCounters
 {
@@ -169,3 +172,5 @@ class CMessageCounterTask :
     virtual gint32 Process( guint32 dwContext )
     { return 0; }
 };
+
+}

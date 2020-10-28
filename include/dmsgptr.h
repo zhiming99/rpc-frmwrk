@@ -31,6 +31,9 @@
 #define DMSG_FIX_TYPE_SIZE  8
 #define DMSG_MAX_ARGS       16
 
+namespace rpcfrmwrk
+{
+
 typedef CAutoPtr< clsid( Invalid ), DBusMessage >  DMsgPtr;
 
 template<>
@@ -538,3 +541,4 @@ class CAutoPtr< Clsid_Invalid, DBusMessage > : public IAutoPtr
     GetTypeBytes( int typecode ) const;
 };
 
+}

@@ -29,6 +29,9 @@
 #include "stream.h"
 #include "uxstream.h"
 
+namespace rpcfrmwrk
+{
+
 bool IStream::CanSend( HANDLE hChannel )
 {
     InterfPtr pIf;
@@ -1266,4 +1269,6 @@ gint32 IStream::OnPreStopShared(
     }while( 0 );
 
     return ret;
+}
+
 }

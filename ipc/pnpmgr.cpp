@@ -32,6 +32,8 @@
 #include "connhelp.h"
 #include "ifhelper.h"
 
+namespace rpcfrmwrk
+{
 using namespace std;
 
 CPnpManager::CPnpManager( const IConfigDb* pCfg )
@@ -1716,4 +1718,6 @@ gint32 CPnpManager::Start()
     }
 
     return ret;
+}
+
 }

@@ -28,6 +28,9 @@
 #include "tcportex.h"
 #include "secclsid.h"
 
+namespace rpcfrmwrk
+{
+
 class CKdcRelayPdo :
     public CTcpStreamPdo2
 {
@@ -89,3 +92,5 @@ class CKdcRelayFdo : public CPort
 
     gint32 OnSubmitIrp( IRP* pIrp );
 };
+
+}

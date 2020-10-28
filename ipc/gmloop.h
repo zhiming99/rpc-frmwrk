@@ -34,6 +34,8 @@
 #include "mainloop.h"
 #include <glib.h>
 
+namespace rpcfrmwrk
+{
 
 class CIoManager;
 class CGMainLoop : public IMainLoop
@@ -247,4 +249,5 @@ class CGMainLoop : public IMainLoop
     gint32 Stop();
 };
 
+}
 #endif

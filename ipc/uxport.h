@@ -38,6 +38,9 @@
 #define UXPKT_HEADER_SIZE   ( sizeof( guint32 ) + sizeof( guint8 ) )
 #define UXBUF_OVERHEAD      8
 
+namespace rpcfrmwrk
+{
+
 enum EnumPktToken : guint8
 {
     tokInvalid = 255,
@@ -464,3 +467,4 @@ class CUnixSockBusDriver :
         const IConfigDb* pConfig = NULL );
 };
 
+}

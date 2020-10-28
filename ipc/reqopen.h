@@ -24,6 +24,8 @@
 #pragma once
 #include <configdb.h>
 
+namespace rpcfrmwrk
+{
 // CallFlags for SubmitIoRequest & InvokeMethod
 #define CF_MESSAGE_TYPE_MASK            0x07
 #define CF_ASYNC_CALL                   0x08 
@@ -87,3 +89,4 @@ class CReqBuilder : public CParamList
     gint32 SetTaskId( guint64 dwTaskid );
 };
 
+}

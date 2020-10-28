@@ -32,6 +32,9 @@
 #include "emaphelp.h"
 #include "reqopen.h"
 
+namespace rpcfrmwrk
+{
+
 using namespace std;
 
 CRpcBasePort::CRpcBasePort( const IConfigDb* pCfg )
@@ -2383,4 +2386,6 @@ gint32 CRpcPdoPort::HandleSetReqQueSize( IRP* pIrp )
     }while( 0 );
 
     return ret;
+}
+
 }

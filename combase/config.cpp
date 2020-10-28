@@ -25,10 +25,14 @@
 #include <string>
 #include <algorithm>
 #include <vector>
+#include <endian.h>
 
 #include "configdb.h"
 
 using namespace std;
+
+namespace rpcfrmwrk
+{
 
 CConfigDb::CConfigDb( const IConfigDb* pCfg )
 {
@@ -473,7 +477,6 @@ gint32 CConfigDb::EnumProperties(
 }
 
 
-#include <endian.h>
 guint64 htonll(guint64 iVal )
 {
     return htobe64( iVal );
@@ -545,4 +548,6 @@ gint32 CParamList::Push< const BufPtr& > ( const BufPtr& val  )
     }while( 0 );
 
     return ret;
+}
+
 }

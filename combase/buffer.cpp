@@ -27,6 +27,10 @@
 #include "defines.h"
 #include "autoptr.h"
 #include "buffer.h"
+#include <lz4.h>
+
+namespace rpcfrmwrk
+{
 
 // CBuffer implementation
 CBuffer::operator ObjPtr&() const
@@ -1000,7 +1004,6 @@ gint32 CBuffer::Append(
     return 0;
 }
 
-#include <lz4.h>
 gint32 CBuffer::Compress(
     guint8* pDest, guint32& dwSize ) const
 {
@@ -1040,4 +1043,6 @@ gint32 CBuffer::Decompress(
         return ERROR_FAIL;
 
     return 0;
+}
+
 }

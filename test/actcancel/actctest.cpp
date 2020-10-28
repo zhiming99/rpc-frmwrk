@@ -19,16 +19,18 @@
 #include <iostream>
 #include <unistd.h>
 
-#include <rpc.h>
-#include <proxy.h>
-
-#include "actctest.h"
-#include "actcsvr.h"
-
 #include <cppunit/extensions/TestFactoryRegistry.h>
 #include <cppunit/ui/text/TestRunner.h>
 
 #include <cppunit/extensions/HelperMacros.h>
+
+
+#include <rpc.h>
+#include <proxy.h>
+
+using namespace rpcfrmwrk;
+#include "actctest.h"
+#include "actcsvr.h"
 
 CPPUNIT_TEST_SUITE_REGISTRATION( CIfSmokeTest );
 

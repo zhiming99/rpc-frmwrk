@@ -31,6 +31,9 @@
 #include "emaphelp.h"
 #include "fdodrv.h"
 
+namespace rpcfrmwrk
+{
+
 using namespace std;
 
 CProxyFdoDriver::CProxyFdoDriver(
@@ -264,3 +267,4 @@ gint32 CProxyFdoDriver::Probe(
     return ret;
 }
 
+}

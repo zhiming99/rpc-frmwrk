@@ -27,6 +27,9 @@
 #include "registry.h"
 #include "stlcont.h"
 
+namespace rpcfrmwrk
+{
+
 template <typename T>
 class has_GetIoMgr
 {
@@ -199,3 +202,5 @@ class CEventMapHelper
         return 0;
     }
 };
+
+}

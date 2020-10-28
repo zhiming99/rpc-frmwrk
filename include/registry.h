@@ -28,6 +28,9 @@
 #include "autoptr.h"
 #include "configdb.h"
 
+namespace rpcfrmwrk
+{
+
 class CDirEntry : public CObjBase
 {
     friend class CRegistry;
@@ -114,3 +117,5 @@ class CRegistry : public CObjBase
 };
 
 typedef CAutoPtr< clsid( CRegistry ), CRegistry > RegPtr;
+
+}

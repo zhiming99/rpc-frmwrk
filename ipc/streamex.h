@@ -30,6 +30,9 @@
 #include <sys/eventfd.h>
 #include <fcntl.h>
 
+namespace rpcfrmwrk
+{
+
 #define CTRLCODE_READMSG    0x1000
 #define CTRLCODE_READBLK    0x1001
 
@@ -1459,3 +1462,5 @@ class CStreamServerSync :
        _MyVirtBase( pCfg ), super( pCfg )
     {;}
 };
+
+}

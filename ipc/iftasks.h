@@ -33,6 +33,9 @@
 #include "tasklets.h"
 #include "ifstat.h"
 
+namespace rpcfrmwrk
+{
+
 #define GET_IOMGR( _oCfg, _pMgr ) \
 ({ \
     gint32 ret_ = 0;\
@@ -924,3 +927,5 @@ class CIfCallbackInterceptor :
     gint32 OnTaskComplete( gint32 iRet );
     gint32 OnComplete( gint32 iRet );
 };
+
+}

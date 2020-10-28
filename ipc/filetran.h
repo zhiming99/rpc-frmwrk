@@ -29,6 +29,9 @@
 #include "ifhelper.h"
 #include <exception>
 
+namespace rpcfrmwrk
+{
+
 gint32 CopyFile( gint32 iFdDest,
     const std::string& strSrcFile );
 
@@ -160,3 +163,5 @@ class CFileTransferServer :
     virtual gint32 HandleIncomingData( gint32 fd );
 
 };
+
+}

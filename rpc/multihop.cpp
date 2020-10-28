@@ -29,6 +29,9 @@
 #include "dbusport.h"
 #include "connhelp.h"
 
+namespace rpcfrmwrk
+{
+
 gint32 CRpcTcpBridge::OnCheckRouterPathComplete(
     IEventSink* pCallback, 
     IEventSink* pIoReq,
@@ -1746,4 +1749,6 @@ gint32 CRpcRouterReqFwdr::OnRmtSvrOfflineMH(
     }while( 0 );
 
     return ret;
+}
+
 }

@@ -26,6 +26,9 @@
 
 #include "iftasks.h"
 
+namespace rpcfrmwrk
+{
+
 class CIfTransactGroup :
     public CIfTaskGroup
 {
@@ -144,3 +147,5 @@ class CIfTransactGroup :
         return iRet;
     }
 };
+
+}

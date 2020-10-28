@@ -43,6 +43,9 @@ using cchar = const char;
 
 #define MAX_ELEM_CONTAINER  10000
 
+namespace rpcfrmwrk
+{
+
 template< typename T >
 class CStlQueue : public CObjBase
 {
@@ -588,3 +591,5 @@ public:
 };
 
 typedef CAutoPtr< clsid( CStlStringSet ), CStlStringSet > StrSetPtr;
+
+}

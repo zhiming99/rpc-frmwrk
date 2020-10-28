@@ -32,6 +32,9 @@
 #define MAX_THREAD_LOAD     5
 #define MAX_THREADS         10
 
+namespace rpcfrmwrk
+{
+
 class CTaskThread : public IThread
 {
     protected:
@@ -485,3 +488,4 @@ class CUtilities : public IService
 
 typedef CAutoPtr< clsid( CUtilities ), CUtilities > UtilsPtr;
 
+}

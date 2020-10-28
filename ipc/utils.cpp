@@ -28,6 +28,9 @@
 #include "utils.h"
 #include <functional>
 
+namespace rpcfrmwrk
+{
+
 #define SecToMs( dwSec ) ( ( guint64 )( dwSec * 1000 ) )
 
 using namespace std;
@@ -652,3 +655,4 @@ gint32 CTimerService::Stop()
     return 0;
 }
 
+}

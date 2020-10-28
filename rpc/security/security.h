@@ -37,6 +37,9 @@
 #endif
 #include <string.h>
 
+namespace rpcfrmwrk
+{
+
 #define AUTH_METHOD_LOGIN            "AuthReq_Login"
 #define AUTH_METHOD_MECHSPECREQ      "AuthReq_MechSpecReq"
 #define SESS_METHOD_LOGOUT           "SessReq_Logout"
@@ -838,7 +841,10 @@ class CRpcRouterReqFwdrAuth :
 
             std::replace( strDir.begin(),
                 strDir.end(), '/', '.' );
-            strDir.erase( strDir.begin() );
+
+            if( strDir[ 0 ] == '.' )
+                strDir.erase( strDir.begin() );
+
             if( strDir != pMsg.GetDestination() )
             {
                 ret = ERROR_FALSE;
@@ -967,3 +973,5 @@ DECLARE_AGGREGATED_SERVER(
     CRpcRouterBridgeAuth,
     CAuthentServer,
     CStatCountersServer ); 
+
+}

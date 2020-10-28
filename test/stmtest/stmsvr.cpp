@@ -21,6 +21,8 @@
 #include <iostream>
 #include <unistd.h>
 #include <cppunit/TestFixture.h>
+
+using namespace rpcfrmwrk;
 #include "stmsvr.h"
 
 using namespace std;

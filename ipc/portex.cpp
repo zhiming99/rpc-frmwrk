@@ -33,6 +33,9 @@
 #include "ifhelper.h"
 #include "portex.h"
 
+namespace rpcfrmwrk
+{
+
 gint32 CPort::GetStopResumeTask(
     PIRP pIrp, TaskletPtr& pTask )
 {
@@ -74,3 +77,4 @@ gint32 CGenBusDriverEx::Stop()
     return ret;
 }
 
+}

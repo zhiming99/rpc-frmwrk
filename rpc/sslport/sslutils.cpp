@@ -27,6 +27,9 @@
 #include "dbusport.h"
 #include "sslfido.h"
 
+namespace rpcfrmwrk
+{
+
 gint32 GetSSLError( SSL* pssl, int n )
 {
     gint32 ret = 0;
@@ -207,4 +210,4 @@ gint32 CRpcOpenSSLFido::InitSSL()
     return ret;
 }
 
-
+}

@@ -30,6 +30,9 @@
 #include "reqopen.h"
 #include <byteswap.h>
 
+namespace rpcfrmwrk
+{
+
 using namespace std;
 
 #define BRIDGE_NAME \
@@ -1702,4 +1705,6 @@ gint32 CRpcTcpFido::OnRespMsgNoIrp(
     }while( 0 );
 
     return ret;
+}
+
 }

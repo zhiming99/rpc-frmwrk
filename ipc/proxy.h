@@ -34,6 +34,8 @@
 #include "ifstat.h"
 #include "reqopen.h"
 
+namespace rpcfrmwrk
+{
 #define ICT_MAX_IRPS 100
 #define ICT_MAX_IFS 10
 
@@ -396,8 +398,12 @@ class CRpcBaseOperations :
         PortPtr& pPort );
 };
 
+}
+
 #include "iftasks.h"
 
+namespace rpcfrmwrk
+{
 /**
 * @name CRpcInterfaceBase class will provide the
 * the interface state mangement and task
@@ -1868,3 +1874,4 @@ gint32 IsMidwayPath(
     const std::string& strTest,
     const std::string& strDest );
 
+}

@@ -22,8 +22,10 @@
 #include <iostream>
 #include <unistd.h>
 #include <cppunit/TestFixture.h>
-#include "ifsvr.h"
 #include "ifhelper.h"
+
+using namespace rpcfrmwrk;
+#include "ifsvr.h"
 
 using namespace std;
 

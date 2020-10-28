@@ -21,11 +21,11 @@
 #include <iostream>
 #include <unistd.h>
 #include <cppunit/TestFixture.h>
-#include "actcsvr.h"
 #include "ifhelper.h"
 #include "frmwrk.h"
 
 using namespace std;
+#include "actcsvr.h"
 
 CActcServer::CActcServer( const IConfigDb* pCfg )
     : super( pCfg )

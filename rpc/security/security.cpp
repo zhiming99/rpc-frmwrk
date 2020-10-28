@@ -30,6 +30,9 @@
 #include "security.h"
 #include "k5proxy.h"
 
+namespace rpcfrmwrk
+{
+
 #define MAX_NUM_CHECK   8640000
 
 gint32 CRpcTcpBridgeAuth::OnLoginTimeout(
@@ -3496,4 +3499,6 @@ gint32 CRpcRouterBridgeAuth::OnPostStart(
     }while( 0 );
 
     return ret;
+}
+
 }

@@ -35,6 +35,9 @@
 #ifndef _USE_LIBEV
 #include "gmloop.h"
 
+namespace rpcfrmwrk
+{
+
 using namespace std;
 
 CGMainLoop::TIMER_SOURCE::TIMER_SOURCE(
@@ -603,5 +606,7 @@ gint32 CGMainLoop::GetSource(
 
     pSrc = ( *pMap )[ hWatch ];
     return 0;
+}
+
 }
 #endif

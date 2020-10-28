@@ -25,6 +25,11 @@
 
 #pragma once
 #include <glib.h>
+#include "nsdef.h"
+
+namespace rpcfrmwrk
+{
+
 gint32 ErrnoFromDbusErr( const char *error );
 
 class CDBusError
@@ -41,3 +46,5 @@ class CDBusError
     gint32 Errno() const;
     operator DBusError*();
 };
+
+}

@@ -34,6 +34,8 @@
 
 #define MODULE_NAME MODNAME_RPCROUTER
 
+using namespace rpcfrmwrk;
+
 class CIfRouterTest :
     public CppUnit::TestFixture
 { 

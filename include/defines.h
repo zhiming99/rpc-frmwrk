@@ -198,6 +198,10 @@ do{\
 #define THREAD_WAKEUP_INTERVAL      10
 #define RPC_SVR_DEFAULT_PORTNUM         0x1024
 
+
+namespace rpcfrmwrk
+{
+
 extern std::string DebugMsgInternal(
     gint32 ret, const std::string& strMsg,
     const char* szFunc, gint32 iLineNum );
@@ -666,3 +670,4 @@ class  CStdRTMutex :
     CStdRTMutex( stdrtmutex& oMutex, guint32 dwTryTimeMs );
 };
 
+}

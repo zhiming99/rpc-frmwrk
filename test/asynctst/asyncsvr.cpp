@@ -20,9 +20,12 @@
 #include <iostream>
 #include <unistd.h>
 #include <cppunit/TestFixture.h>
-#include "asyncsvr.h"
+
 #include "proxy.h"
 #include "frmwrk.h"
+
+using namespace rpcfrmwrk;
+#include "asyncsvr.h"
 
 using namespace std;
 

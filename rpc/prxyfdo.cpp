@@ -32,6 +32,8 @@
 #include "emaphelp.h"
 #include "reqopen.h"
 
+namespace rpcfrmwrk
+{
 
 using namespace std;
 
@@ -1450,3 +1452,4 @@ gint32 CDBusProxyFdo::ScheduleModOnOfflineTask(
     return ret;
 }
 
+}

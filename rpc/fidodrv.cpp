@@ -33,6 +33,9 @@
 #include "dbusport.h"
 #include "tcpport.h"
 
+namespace rpcfrmwrk
+{
+
 using namespace std;
 
 CRpcTcpFidoDrv::CRpcTcpFidoDrv(
@@ -153,4 +156,6 @@ gint32 CRpcTcpFidoDrv::CreatePort(
     }while( 0 );
 
     return ret;
+}
+
 }

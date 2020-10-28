@@ -25,6 +25,9 @@
 #pragma once
 #include "clsids.h"
 
+namespace rpcfrmwrk
+{
+
 typedef enum 
 {
     DECL_CLSID( CKdcRelayFdo ) = clsid( ClassFactoryStart ) + 20 ,
@@ -52,3 +55,4 @@ typedef enum
 #define PORT_CLASS_KDCRELAY_PDO     "KdcRelayPdo"
 #define PORT_CLASS_KDCRELAY_FDO     "KdcRelayFdo"
 
+}

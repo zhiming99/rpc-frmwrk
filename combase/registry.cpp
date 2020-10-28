@@ -27,6 +27,9 @@
 
 using namespace std;
 
+namespace rpcfrmwrk
+{
+
 CDirEntry::CDirEntry()
 {
     m_pParent = NULL;
@@ -632,4 +635,6 @@ gint32 CRegistry::RemoveDir(
     }
 
     return ret;
+}
+
 }

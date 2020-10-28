@@ -30,6 +30,9 @@
 #include "configdb.h"
 #include "stlcont.h"
 
+namespace rpcfrmwrk
+{
+
 gint32 CStlIntVector::Serialize(
     CBuffer& oBuf ) const
 {
@@ -537,4 +540,6 @@ gint32 CStlQwordVector::Deserialize(
     }while( 0 );
 
     return ret;
+}
+
 }

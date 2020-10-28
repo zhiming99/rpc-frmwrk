@@ -38,6 +38,9 @@
 #define OBJNAME_KDCCHANNEL      "KdcChannel"
 #define USERNAME_NOLOGIN        "kdcclient"
 
+namespace rpcfrmwrk
+{
+
 gint32 gss_sess_hash_partial(
     gss_ctx_id_t gssctx, BufPtr& pBuf );
 
@@ -364,3 +367,4 @@ DECLARE_AGGREGATED_PROXY(
     CAuthentProxyK5Impl,
     CK5AuthProxy );
 
+}

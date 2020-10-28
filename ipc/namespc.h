@@ -3,7 +3,8 @@
  *
  *       Filename:  namespc.h
  *
- *    Description:  name spaces for interface, object, module and registries
+ *    Description:  name definitions for interface, object, module and
+ *                  registries
  *
  *        Version:  1.0
  *        Created:  11/20/2016 09:05:17 AM
@@ -27,6 +28,9 @@
 #include <dbus/dbus.h>
 #include <objfctry.h>
 
+
+namespace rpcfrmwrk
+{
 
 #define REG_DRV_ROOT                     "/drivers"
 #define REG_PRELOADABLE_ROOT             "/preloadable"
@@ -200,11 +204,6 @@ inline std::string DBUS_OBJ_PATH(
         std::string::npos )
         return std::string( "" );
 
-    if( strModName.find_first_of( "./" ) !=
-        std::string::npos )
-        return std::string( "" );
-
-
     if( strObjName.empty() )
         strObjName = DBUS_DEF_OBJ;
 
@@ -218,10 +217,6 @@ inline std::string DBUS_DESTINATION2(
     const std::string& strModName,
     const std::string& strObjName )
 {
-    if( strModName.find_first_of( "./" ) !=
-        std::string::npos )
-        return std::string( "" );
-
     if( strModName.find_first_of( "./" ) !=
         std::string::npos )
         return std::string( "" );
@@ -306,4 +301,6 @@ inline std::string SYS_METHOD(
     std::string strName = SYS_METHOD_PREFIX;
     strName += strMethod; 
     return strName;
+}
+
 }

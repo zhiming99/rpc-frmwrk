@@ -35,6 +35,9 @@
 #include "connhelp.h"
 #include "proxy.h"
 
+namespace rpcfrmwrk
+{
+
 CIfSvrConnMgr::CIfSvrConnMgr(
     const IConfigDb* pCfg )
 {
@@ -236,4 +239,6 @@ gint32 CIfSvrConnMgr::CanResponse(
     }while( 0 );
 
     return ret;
+}
+
 }

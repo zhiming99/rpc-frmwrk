@@ -31,6 +31,9 @@
 #include "dmsgptr.h"
 #include "ifhelper.h"
 
+namespace rpcfrmwrk
+{
+
 stdstr CastTo( BufPtr& pBuf )
 {
     std::string strVal( pBuf->ptr() );
@@ -116,3 +119,4 @@ void AssignVal( DMsgPtr& rVal, CBuffer& rBuf )
     rVal = ( DMsgPtr& )rBuf;
 }
 
+}

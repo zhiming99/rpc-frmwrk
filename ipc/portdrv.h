@@ -29,6 +29,9 @@
 #include "frmwrk.h"
 #include "port.h"
 
+namespace rpcfrmwrk
+{
+
 #define DRV_STATE_READY     0x01
 #define DRV_STATE_STOPPED   0x02
 #define DRV_STATE_MASK      0x03
@@ -182,3 +185,4 @@ class CGenBusDriver : public IBusDriver
 
 typedef CAutoPtr< Clsid_Invalid, IBusDriver > BusDrvPtr;
 
+}

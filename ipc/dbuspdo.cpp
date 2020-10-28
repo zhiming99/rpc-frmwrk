@@ -30,6 +30,8 @@
 #include "port.h"
 #include "dbusport.h"
 
+namespace rpcfrmwrk
+{
 
 using namespace std;
 
@@ -680,3 +682,4 @@ DBusHandlerResult CDBusLoopbackPdo::PreDispatchMsg(
     return ret;
 }
 
+}

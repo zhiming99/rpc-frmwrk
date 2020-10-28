@@ -31,6 +31,9 @@
 #include "configdb.h"
 #include "namespc.h"
 
+namespace rpcfrmwrk
+{
+
 typedef enum {
 
      matchServer,
@@ -75,8 +78,11 @@ class IMessageMatch : public CObjBase
 
 typedef CAutoPtr< Clsid_Invalid, IMessageMatch > MatchPtr;
 
+}
+
 namespace std
 {
+    using namespace rpcfrmwrk;
     template<>
     struct less<MatchPtr>
     {
@@ -95,6 +101,9 @@ namespace std
             }
     };
 }
+
+namespace rpcfrmwrk
+{
 
 class CMessageMatch : public IMessageMatch
 {
@@ -1567,3 +1576,5 @@ class CRouterLocalMatch : public CRouterRemoteMatch
         return ERROR_FALSE;
     }
 };
+
+}

@@ -36,6 +36,9 @@
 #include "jsondef.h"
 #include "ifhelper.h"
 
+namespace rpcfrmwrk
+{
+
 using namespace std;
 
 CRpcTcpBusPort::CRpcTcpBusPort(
@@ -2461,4 +2464,6 @@ gint32 CTcpStreamPdo::OnPortStackReady(
     pIrp->GetCurCtx()->SetStatus( ret );
 
     return ret;
+}
+
 }

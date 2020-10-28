@@ -34,6 +34,9 @@
 #include <poll.h>
 #include <deque>
 
+namespace rpcfrmwrk
+{
+
 enum EnumAsyncEvent : guint8
 {
     aevtInvalid,
@@ -168,4 +171,5 @@ class CSimpleEvPoll
     { return m_bStop; }
 };
 
+}
 #endif

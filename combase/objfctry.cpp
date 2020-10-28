@@ -28,6 +28,9 @@
 #include "stlcont.h"
 #include "objfctry.h"
 
+namespace rpcfrmwrk
+{
+
 typedef gint32 (*PUNLOADLIBRARY )();
 
 
@@ -329,4 +332,6 @@ gint32 CClassFactories::RemoveFactoryPath(
     }
 
     return -ENOENT;
+}
+
 }

@@ -15,11 +15,15 @@
  *
  * =====================================================================================
  */
-#include <rpc.h>
 #include <string>
 #include <iostream>
 #include <unistd.h>
 #include <cppunit/TestFixture.h>
+
+#include <rpc.h>
+
+using namespace rpcfrmwrk;
+
 #include "ifsvr.h"
 #include "ifhelper.h"
 

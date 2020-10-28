@@ -24,6 +24,9 @@
 #include "rpcroute.h"
 #include "stmrelay.h"
 
+namespace rpcfrmwrk
+{
+
 CRpcRouter* CStreamServerRelay::GetParent() const
 {
     CRpcInterfaceServer* pMainIf =
@@ -2301,4 +2304,6 @@ gint32 CIfUxRelayTaskHelper::PauseReading(
         ret = pUxStm->PauseReading( bPause );
     }
     return ret;
+}
+
 }

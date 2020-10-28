@@ -21,10 +21,10 @@
 #include <string>
 #include <unistd.h>
 #include <cppunit/TestFixture.h>
-#include "evtsvr.h"
 #include "ifhelper.h"
 
 using namespace std;
+#include "evtsvr.h"
 
 CEventClient::CEventClient(
     const IConfigDb* pCfg )

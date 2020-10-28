@@ -35,6 +35,10 @@
 #include "portex.h"
 
 #include "ifhelper.h"
+
+namespace rpcfrmwrk
+{
+
 using namespace std;
 
 gint32 CIoManager::SubmitIrpInternal(
@@ -2193,3 +2197,4 @@ gint32 CIoMgrPostStartTask::operator()(
     return SetError( ret );
 }
 
+}

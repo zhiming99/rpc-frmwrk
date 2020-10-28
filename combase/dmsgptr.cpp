@@ -31,6 +31,9 @@
 #include "buffer.h"
 #include "configdb.h"
 
+namespace rpcfrmwrk
+{
+
 gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
     ::GetArgs( std::vector< ARG_ENTRY >& vecArgs ) const
 {
@@ -701,4 +704,6 @@ std::string CAutoPtr< Clsid_Invalid, DBusMessage >::
         }
     }
     return strRet;
+}
+
 }

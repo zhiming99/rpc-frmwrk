@@ -32,8 +32,10 @@
 */
 
 #include "rpc.h"
-#include "base64.h"
 #include <iostream>
+
+using namespace rpcfrmwrk;
+#include "base64.h"
 
 static const std::string base64_chars = 
              "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
