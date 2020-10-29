@@ -263,8 +263,7 @@ int Sem_Post( sem_t* psem )
         ret = -errno;
         DebugPrint( ret, 
             "@Thread %d: Sem_Post failed with %s",
-            GetTid().c_str(),
-            strerror( -ret )
+            GetTid(), strerror( -ret )
             );
     }
 
