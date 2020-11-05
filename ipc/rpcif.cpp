@@ -5300,7 +5300,7 @@ gint32 CInterfaceProxy::SendProxyReq(
         oReq.SetMethodName( strMethod );
 
         for( auto& pBuf: vecParams )
-            oReq.Push( *pBuf );
+            oReq.Push( pBuf );
 
         guint32 dwFlags = CF_ASYNC_CALL |
             DBUS_MESSAGE_TYPE_METHOD_CALL |

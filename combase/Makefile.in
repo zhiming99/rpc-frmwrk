@@ -18,7 +18,7 @@ release: $(OUTPUT_DIR)/$(TARGET)
 
 $(OUTPUT_DIR)/$(TARGET) : $(OBJS)
 	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
-	$(CC) -o $(OUTPUT_DIR)/$(TARGET) $(LINKER_OPTION) -llz4 $(OBJS)
+	$(CC) -o $(OUTPUT_DIR)/$(TARGET) $(LINKER_OPTION) -ldbus-1 -llz4 $(OBJS)
 
 -include $(OBJS:%.o=%.d)
 

@@ -1182,7 +1182,7 @@ class CCfgOpenerT : public CCfgDbOpener< T >
 
     const CfgPtr& GetCfg() const
     {
-        return CfgPtr( m_pNewCfg );
+        return m_pNewCfg;
     }
 
     void Clear()
@@ -1354,6 +1354,16 @@ class CParamList : public CCfgOpener
         }
     }
 
+    CParamList( const CParamList& rhs )
+        : CParamList()
+    {
+        // copy constructor, added for sip
+        if( rhs.IsEmpty() )
+            return;
+        CfgPtr pCfg = rhs.GetCfg();                                     
+        Append( pCfg );
+    } 
+
     gint32 CopyParams(
         const IConfigDb* pCfg )
     {
@@ -1422,13 +1432,15 @@ class CParamList : public CCfgOpener
         return 0;
     }
 
-    inline gint32 GetSize( guint32 &dwSize )
+    inline gint32 GetSize(
+        guint32 &dwSize ) const
     {
         return GetIntProp(
             propParamCount, dwSize );
     }
 
-    gint32 GetType( gint32 iPos, gint32& iType )
+    gint32 GetType(
+        gint32 iPos, gint32& iType ) const
     {
         BufPtr pBuf( true );
         gint32 ret = GetCfg()->
@@ -1561,7 +1573,7 @@ class CParamList : public CCfgOpener
         return ret;
     }
 
-    bool IsEmpty()
+    bool IsEmpty() const
     {
         guint32 dwSize = 0;
         gint32 ret = GetSize( dwSize );

@@ -409,7 +409,7 @@ class CAutoPtr : public IAutoPtr
                 std::string strMsg =
                     DebugMsg( -EBADE, "bad cast happens" );
 
-                printf( strMsg.c_str() );
+                printf( "%s", strMsg.c_str() );
                 ret = -ENOTSUP;
             }
         }
