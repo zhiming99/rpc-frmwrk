@@ -166,7 +166,7 @@ gint32 GetCmdOutput( std::string& strResult,
     return ret;
 }
 
-gint32 GetLibPath( std::string& strResult,
+gint32 GetLibPathName( std::string& strResult,
     const char* szLibName )
 {
     char cmd[ 256 ];
@@ -174,10 +174,31 @@ gint32 GetLibPath( std::string& strResult,
         szLibName = "libcombase.so";
 
     snprintf( cmd, sizeof( cmd ),
-        "dirname `cat /proc/%d/maps | grep '%s' |  awk '{print $6}' | uniq -d `",
+        "cat /proc/%d/maps | grep '%s' |  awk '{print $6}' | uniq -d",
         getpid(), szLibName );
 
     return GetCmdOutput( strResult, cmd );
+}
+
+gint32 GetLibPath( std::string& strResult,
+    const char* szLibName )
+{
+    gint32 ret = 0;
+    do{
+        ret = GetLibPathName(
+            strResult, szLibName );
+
+        if( ERROR( ret ) )
+            break;
+
+        size_t pos = strResult.rfind( '/' );
+        if( pos == std::string::npos )
+            strResult.clear();
+        else
+            strResult.erase( pos );
+
+    }while( 0 );
+    return ret;
 }
 
 gint32 GetModulePath( std::string& strResult )

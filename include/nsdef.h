@@ -23,5 +23,5 @@
  */
 
 #pragma once
-#define rpcfrmwrk   zrpc
+#define rpcfrmwrk   cpp
 
