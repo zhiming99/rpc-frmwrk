@@ -44,6 +44,8 @@
 namespace rpcfrmwrk
 {
 
+EnumLogLvl g_dwLogLevel = logErr;
+
 std::string DebugMsgInternal(
     gint32 ret, const std::string& strMsg,
     const char* szFunc, gint32 iLineNum )

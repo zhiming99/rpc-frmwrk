@@ -2239,7 +2239,7 @@ gint32 CRpcInterfaceBase::AddAndRun(
                 pParaLock->unlock();
                 ret = 0;
 
-                DebugPrint( GetTid(),
+                DebugPrintEx( logInfo, GetTid(),
                     "root task not run immediately, dwCount=%d, bRunning=%d",
                     dwCount, bRunning );
             }

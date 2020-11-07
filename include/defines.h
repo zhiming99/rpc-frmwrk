@@ -184,6 +184,7 @@ do{\
 #define DebugPrint( ret, strFmt, ... ) \
 ({ printf( "%s\n", \
     DebugMsg( ret, strFmt, ##__VA_ARGS__ ).c_str() );} )
+
 #else
 
 #define DebugPrint( ret, strFmt, ... ) \
@@ -191,6 +192,11 @@ do{\
     DebugMsg( ret, strFmt, ##__VA_ARGS__ ).c_str() );} )
 
 #endif
+
+#define DebugPrintEx( _level, ret, strFmt, ... ) \
+({ if( ( _level ) <= g_dwLogLevel ) \
+    printf( "%s\n", \
+    DebugMsg( ret, strFmt, ##__VA_ARGS__ ).c_str() );} )
 
 #define MAX_PENDING_MSG             20
 
@@ -201,6 +207,20 @@ do{\
 
 namespace rpcfrmwrk
 {
+
+typedef enum : guint32 
+{
+    logEmerg = 0,
+    logAlert,
+    logCrit,
+    logErr,
+    logWarning,
+    logNotice, // = 5
+    logInfo,
+
+}EnumLogLvl;
+
+extern EnumLogLvl g_dwLogLevel;
 
 extern std::string DebugMsgInternal(
     gint32 ret, const std::string& strMsg,
