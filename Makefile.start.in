@@ -1,8 +1,8 @@
 include ./Makefile.init.pub
 
-TARGETS := $(OUTPUT_DIR)/libcombase.so $(OUTPUT_DIR)/libipc.so $(OUTPUT_DIR)/librpc.so test
+TARGETS := $(OUTPUT_DIR)/libcombase.so $(OUTPUT_DIR)/libipc.so $(OUTPUT_DIR)/librpc.so test Python
 
-all: $(TARGETS)
+all: $(TARGETS) 
 debug: $(TARGETS)
 release: $(TARGETS)
 clean: $(TARGETS)
@@ -22,4 +22,8 @@ $(OUTPUT_DIR)/librpc.so :
 test:
 	-$(MAKE) -C test $(mygoal)
 
-.PHONY: $(TARGETS) test
+Python:
+	-$(MAKE) -C python $(mygoal)
+
+
+.PHONY: $(TARGETS) test Python

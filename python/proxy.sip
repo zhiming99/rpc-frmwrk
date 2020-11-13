@@ -1,0 +1,865 @@
+%ModuleHeaderCode
+enum EnumMyClsid2
+{
+    DECL_CLSID( CPythonProxyImpl ) =
+        clsid( CStreamingClient ) + 1,
+};
+
+class CPythonProxyImpl : public CPythonProxy
+{
+    public:
+    typedef CPythonProxy super;
+    CPythonProxyImpl( const IConfigDb* pCfg ) 
+        : super::_MyVirtBase( pCfg ), super( pCfg )
+    { SetClassId( clsid( CPythonProxyImpl ) ); }
+
+    gint32 FillList( IConfigDb* pResp,
+        PyObject* listResp );
+
+    gint32 OnProxyCallResp(
+        IEventSink* pCallback, 
+        IEventSink* pIoReq,
+        IConfigDb* pReqCtx );
+
+    gint32 AsyncCallVector(
+        IEventSink* pTask,
+        CfgPtr& pOptions,
+        CfgPtr& pResp,
+        const std::string& strcMethod,
+        std::vector< BufPtr >& vecParams );
+
+    gint32 PyProxyCall(
+        PyObject* pCb,
+        const std::string& strIfName,
+        const std::string& strMethod,
+        PyObject* listArgs,
+        PyObject* listResp,
+        guint64& qwTaskCancel );
+
+    gint32 PyProxyCallSync(
+        const std::string& strIfName,
+        const std::string& strMethod,
+        PyObject* listArgs,
+        PyObject* listResp );
+
+    gint32 SetPyHost(
+        PyObject* pObj );
+
+    gint32 GetPyHost(
+        PyObject*& pObj );
+
+    gint32 RemovePyHost();
+
+    gint32 InvokeUserMethod(
+        IConfigDb* pParams,
+        IEventSink* pCallback );
+};
+%End
+
+%ModuleCode
+gint32 CPythonProxyImpl::FillList(
+    IConfigDb* pResp, PyObject* listResp )
+{
+    gint32 ret = 0;
+    do{
+        CParamList oResp( pResp );
+
+        guint32 dwSize = 0;
+        ret = oResp.GetSize( dwSize );
+        if( ERROR( ret ) )
+            break;
+
+        if( dwSize > 20 )
+        {
+            ret = -ERANGE;
+            break;
+        }
+
+        if( PyList_Size( listResp ) < 2 )
+        {
+            ret = -ERANGE;
+            break;
+        }
+
+        PyObject* listArgs = PyList_New( dwSize );
+        if( listArgs == nullptr )
+        {
+            ret = -ENOMEM;
+            break;
+        }
+
+        // note: the first parameter for the
+        // callback is the return code 
+        for( gint32 i = 0; i < ( gint32 )dwSize; ++i )
+        {
+            EnumTypeId iType = typeNone;
+            ret = oResp.GetType( i, ( gint32& )iType );
+            if( ERROR( ret ) )
+                break;
+
+            switch( iType )
+            {
+            case typeByte: 
+                {
+                    guint8 val = 0;
+                    ret = oResp.GetByteProp( i, val );
+                    if( ERROR( ret ) )
+                        break;
+                    PyObject* pObj = PyLong_FromLong( val );
+                    PyList_SET_ITEM( listArgs, i, pObj );
+                    break;
+                }
+            case typeUInt16:
+                {
+                    guint16 val = 0;
+                    ret = oResp.GetShortProp( i, val );
+                    if( ERROR( ret ) )
+                        break;
+                    PyObject* pObj = PyLong_FromLong( val );
+                    PyList_SET_ITEM( listArgs, i, pObj );
+                    break;
+                }
+            case typeUInt32:
+                {
+                    guint32 val = 0;
+                    ret = oResp.GetIntProp( i, val );
+                    if( ERROR( ret ) )
+                        break;
+                    PyObject* pObj = PyLong_FromLong( val );
+                    PyList_SET_ITEM( listArgs, i, pObj );
+                    break;
+                }
+            case typeUInt64:
+                {
+                    guint64 val = 0;
+                    ret = oResp.GetQwordProp( i, val );
+                    if( ERROR( ret ) )
+                        break;
+                    PyObject* pObj =
+                        PyLong_FromLongLong( val );
+                    PyList_SET_ITEM( listArgs, i, pObj );
+                    break;
+                }
+            case typeFloat:
+                {
+                    float val = 0;
+                    ret = oResp.GetFloatProp( i, val );
+                    if( ERROR( ret ) )
+                        break;
+                    PyObject* pObj =
+                        PyFloat_FromDouble( val );
+                    PyList_SET_ITEM( listArgs, i, pObj );
+                    break;
+                }
+            case typeDouble:
+                {
+                    double val = 0;
+                    ret = oResp.GetDoubleProp( i, val );
+                    if( ERROR( ret ) )
+                        break;
+                    PyObject* pObj =
+                        PyFloat_FromDouble( val );
+                    PyList_SET_ITEM( listArgs, i, pObj );
+                    break;
+                }
+            case typeString:
+                {
+                    std::string val;
+                    ret = oResp.GetStrProp( i, val );
+                    if( ERROR( ret ) )
+                        break;
+                    PyObject* pObj =
+                        PyUnicode_FromString( val.c_str() );
+                    PyList_SET_ITEM( listArgs, i, pObj );
+                    break;
+                }
+            case typeObj:
+                {
+                    ObjPtr* val = new ObjPtr();
+                    ret = oResp.GetObjPtr( i, *val );
+                    if( ERROR( ret ) )
+                        break;
+
+                    PyObject* pObj = sipConvertFromNewType(
+                        val,sipType_cpp_ObjPtr,SIP_NULLPTR);
+
+                    if( pObj == nullptr )
+                    {
+                        ret = -EFAULT;
+                        break;
+                    }
+                    PyList_SET_ITEM( listArgs, i, pObj );
+                    break;
+                }
+            case typeByteArr:
+                {
+                    BufPtr pBuf;
+                    ret = oResp.GetProperty( i, pBuf );
+                    if( ERROR( ret ) )
+                        break;
+                    if( pBuf.IsEmpty() || pBuf->empty() )
+                    {
+                        ret = -EINVAL;
+                        break;
+                    }
+                    PyObject* pView = PyMemoryView_FromMemory(
+                        pBuf->ptr(), pBuf->size(), PyBUF_READ );
+                    if( pView == nullptr )
+                    {
+                        ret = -EFAULT;
+                        break;
+                    }
+
+                    PyObject* pByteArr =
+                        PyByteArray_FromObject( pView );
+
+                    if( pByteArr == nullptr )
+                    {
+                        ret = -EFAULT;
+                        break;
+                    }
+                    PyList_SET_ITEM( listArgs, i, pByteArr );
+                    break;
+                }
+            case typeDMsg:
+                {
+                    ret = -ENOTSUP;
+                    break;
+                }
+            default:
+                {
+                    ret = -EINVAL;
+                    break;
+                }
+            }
+
+            if( ERROR( ret ) )
+                break;
+        }
+
+        PyList_SetItem( listResp, 1, listArgs );
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+    {
+        PyList_SetItem( listResp,
+            0, PyLong_FromLong( ret ) );
+    }
+
+    return ret;
+}
+
+gint32 CPythonProxyImpl::OnProxyCallResp(
+    IEventSink* pCallback, 
+    IEventSink* pIoReq,
+    IConfigDb* pReqCtx )
+{
+    gint32 ret = 0;
+    if( pIoReq == nullptr ||
+        pReqCtx == nullptr )
+        return -EINVAL;
+
+    PyObject* pPyCb = nullptr;
+    PyObject* pPyResp = nullptr;
+
+    do{
+        CCfgOpenerObj oCbCfg( pIoReq );
+        IConfigDb* pResp = nullptr;
+        ret = oCbCfg.GetPointer(
+            propRespPtr, pResp );
+        if( ERROR( ret ) )
+            break;
+
+        guint32* ptrVal = nullptr;
+        CCfgOpener oReqCtx( pReqCtx );
+        ret = oReqCtx.GetIntPtr( 0, ptrVal );
+        if( ERROR( ret ) )
+            break;
+        PyObject* pPyCb =
+            ( PyObject* )ptrVal;
+
+        ret = oReqCtx.GetIntPtr( 1, ptrVal );
+        if( ERROR( ret ) )
+            break;
+
+        PyObject* pPyResp =
+            ( PyObject* )ptrVal;  
+
+        guint32 iRet = 0;
+        CParamList oResp( pResp );
+        ret = oResp.GetIntProp(
+            propReturnValue, iRet );
+        if( ERROR( ret ) )
+            break;
+
+        if( ERROR( ( gint32 )iRet ) )
+        {
+            ret = iRet;
+        }
+        else
+        {
+            guint32 dwSize = 0;
+            ret = oResp.GetSize( dwSize );
+            if( SUCCEEDED( ret ) )
+            {
+                if( dwSize <
+                    PyList_Size( pPyResp ) )
+                    ret = -ERANGE;
+            }
+        }
+        if( ERROR( ret ) )
+        {
+            PyObject* pRet =
+                PyLong_FromLong( ret );
+            PyList_SET_ITEM( pPyResp, 0, pRet );
+        }
+        else
+        {
+            PyObject* pRet = PyLong_FromLong( 0 );
+            PyList_SET_ITEM( pPyResp, 0, pRet );
+            ret = FillList( pResp, pPyResp );
+        }
+        PyObject_Call( pPyCb, pPyResp, nullptr );
+
+    }while( 0 );
+
+    if( pPyCb != nullptr )
+        Py_DECREF( pPyCb );
+
+    if( pPyResp != nullptr )
+        Py_DECREF( pPyResp );
+
+    return 0;
+}
+
+gint32 CPythonProxyImpl::AsyncCallVector(
+    IEventSink* pTask,
+    CfgPtr& pOptions,
+    CfgPtr& pResp,
+    const std::string& strcMethod,
+    std::vector< BufPtr >& vecParams )
+{
+    gint32 ret = 0;
+
+    do{ 
+        if( pTask == nullptr )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        guint64 qwIoTaskId = 0; 
+        CCfgOpenerObj oCfg( pTask );
+        if( pResp.IsEmpty() )
+            pResp.NewObj();
+
+        oCfg.CopyProp( propIfName,
+            ( CObjBase* )pOptions );
+
+        std::string strMethod( strcMethod );
+        if( !pOptions.IsEmpty() )
+        {
+            bool bSysMethod = false;
+            CCfgOpener oOptions(
+                ( IConfigDb* )pOptions );
+
+            ret = oOptions.GetBoolProp(
+                propSysMethod, bSysMethod );
+
+            if( SUCCEEDED( ret ) && bSysMethod )
+                strMethod = SYS_METHOD( strMethod );
+            else
+                strMethod = USER_METHOD( strMethod );
+        }
+
+        ret = this->SendProxyReq( pTask, false,
+             strMethod, vecParams, qwIoTaskId ); 
+
+        if( ret == STATUS_PENDING ) 
+        {
+            // for canceling purpose
+            CParamList oResp( ( IConfigDb* )pResp );
+            oResp[ propTaskId ] = qwIoTaskId;
+            break;
+        }
+
+        if( ERROR( ret ) ) 
+            break; 
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CPythonProxyImpl::PyProxyCall(
+    PyObject* pCb,
+    const std::string& strIfName,
+    const std::string& strMethod,
+    PyObject* listArgs,
+    PyObject* listResp,
+    guint64& qwTaskCancel )
+{
+    gint32 ret = 0;
+    do{
+        bool bSync = false;
+        if( pCb == nullptr || pCb == Py_None )
+            bSync = true;
+        if( !bSync )
+        {
+            ret = PyCallable_Check( pCb );
+            if( ret == 0 )
+            {
+                ret = -EINVAL;
+                break;
+            }
+        }
+        std::vector< BufPtr > vecParams;
+        ret = List2Vector(listArgs, vecParams );
+        if( ERROR( ret ) )
+            break;
+
+        IEventSink* pRespCb = nullptr;
+        TaskletPtr pWrapperCb;
+        CParamList oReqCtx;
+        if( !bSync )
+        {
+            ret = NEW_PROXY_RESP_HANDLER2(
+                pWrapperCb, ObjPtr( this ),
+                &CPythonProxyImpl::OnProxyCallResp,
+                nullptr, oReqCtx.GetCfg() );
+
+            if( ERROR( ret ) )
+                break;
+
+            oReqCtx.Push( ( intptr_t ) pCb );
+            oReqCtx.Push( ( intptr_t ) listResp );
+            oReqCtx.Push( strMethod );
+            Py_INCREF( pCb );
+            Py_INCREF( listResp );
+        }
+        else
+        {
+            ret = pWrapperCb.NewObj(
+                clsid( CIoReqSyncCallback ) );
+            if( ERROR( ret ) )
+                break;
+        }
+        pRespCb = pWrapperCb;
+
+        CCfgOpener oOptions;
+        std::string strDBusIfName =
+            DBUS_IF_NAME( strIfName );
+        oOptions.SetStrProp(
+            propIfName, strDBusIfName );
+        oOptions.SetBoolProp(
+            propSysMethod, false );
+
+        CCfgOpener oResp;
+
+        PyThreadState *_save;
+        Py_UNBLOCK_THREADS;
+
+        ret = this->AsyncCallVector(
+            pRespCb, oOptions.GetCfg(),
+            oResp.GetCfg(), strMethod,
+            vecParams );
+
+        Py_BLOCK_THREADS;
+
+        if( ERROR( ret ) )
+            break;
+
+        if( ret == STATUS_PENDING && !bSync )
+        {
+            oResp.GetQwordProp(
+                propTaskId, qwTaskCancel );
+            break;
+        }
+        else if( ret == STATUS_PENDING )
+        {
+            cpp::CIoReqSyncCallback*
+                pSyncCb = pWrapperCb;
+            ret = pSyncCb->WaitForComplete();
+        }
+
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpenerObj oCbCfg( pRespCb );
+        IConfigDb* pRmtResp = nullptr;
+        ret = oCbCfg.GetPointer(
+            propRespPtr, pRmtResp );
+        if( ERROR( ret ) )
+            break;
+
+        guint32 iRet = 0;
+        CParamList oRmtResp( pRmtResp );
+
+        ret = oRmtResp.GetIntProp(
+            propReturnValue, iRet );
+
+        if( ERROR( ret ) )
+            break;
+
+        if( ERROR( ( gint32 )iRet ) )
+        {
+            ret = iRet;
+            break;
+        }
+
+        ret = FillList( pRmtResp, listResp );
+        if( ERROR( ret ) )
+            break;
+
+        qwTaskCancel = 0;
+        
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CPythonProxyImpl::PyProxyCallSync(
+    const std::string& strIfName,
+    const std::string& strMethod,
+    PyObject* listArgs,
+    PyObject* listResp )
+{
+    guint64 qwTaskCancel = 0;
+    return this->PyProxyCall( nullptr,
+        strIfName, strMethod, listArgs,
+        listResp, qwTaskCancel );
+}
+
+gint32 CPythonProxyImpl::SetPyHost(
+    PyObject* pObj )
+{
+    gint32 ret = 0;
+    Py_INCREF( pObj );
+    CCfgOpenerObj oCfg( this );
+    ret = oCfg.SetIntPtr( propPyObj,
+        ( guint32* )pObj );
+    if( ERROR( ret ) )
+        Py_DECREF( pObj );
+    return ret;
+}
+
+gint32 CPythonProxyImpl::GetPyHost(
+    PyObject*& pObj )
+{
+    gint32 ret = 0;
+    CCfgOpenerObj oCfg( this );
+    ret = oCfg.GetIntPtr( propPyObj,
+        ( guint32*& )pObj );
+    return ret;
+}
+
+gint32 CPythonProxyImpl::RemovePyHost()
+{
+    guint32* pObj = nullptr;
+    DebugPrint( 0, "RemovePyHost()..." );
+    CCfgOpenerObj oCfg( this );
+    gint32 ret = oCfg.GetIntPtr(
+        propPyObj, pObj );
+    if( ERROR( ret ) )
+        return ret;
+    oCfg.RemoveProperty( propPyObj );
+    PyObject* pPyObj = ( PyObject* )pObj;
+    if( pPyObj != nullptr )
+         Py_DECREF( pPyObj );
+    return ret;
+}
+
+gint32 CPythonProxyImpl::InvokeUserMethod(
+    IConfigDb* pParams,
+    IEventSink* pCallback )
+{
+    if( pParams == nullptr )
+        return -EINVAL;
+
+    CParamList oResp;
+    gint32 ret = 0;
+
+    PyThreadState *_save;
+    Py_BLOCK_THREADS;
+    do{
+        CReqOpener oReq( pParams );
+        std::string strMethod;
+        ret = oReq.GetMethodName( strMethod );
+        if( ERROR( ret ) )
+            break;
+
+        TaskletPtr pTask;
+
+        CCfgOpenerObj oCfg( pCallback );
+        std::string strIfName;
+
+        ret = oCfg.GetStrProp(
+            propIfName, strIfName );
+        if( ERROR( ret ) ) 
+            break;
+        
+        strIfName = IF_NAME_FROM_DBUS(
+            strIfName );
+
+        PyObject* pHost = nullptr;
+        ret = GetPyHost( pHost );
+        if( ERROR( ret ) )
+            break;
+
+        ObjPtr* pCb = new ObjPtr( pCallback );
+        ObjPtr* pArgs = new ObjPtr( pParams );
+
+        PyObject* pPyCb = sipConvertFromNewType(
+            pCb, sipType_cpp_ObjPtr, SIP_NULLPTR);
+        if( unlikely( pPyCb == nullptr ) )
+        {
+            ret = -ENOMEM;
+            break;
+        }
+
+        PyObject* pPyParams = sipConvertFromNewType(
+            pArgs, sipType_cpp_ObjPtr, SIP_NULLPTR);
+        if( unlikely( pPyParams == nullptr ) )
+        {
+            ret = -ENOMEM;
+            break;
+        }
+
+        PyObject* listResp = PyObject_CallMethod(
+            pHost, "InvokeMethod", 
+            "ssSS", strIfName.c_str(),
+            strMethod.c_str(), pPyCb, pPyParams );
+
+        if( unlikely( listResp == nullptr ) )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        if( PyList_Check( listResp ) == false ||
+            PyList_Size( listResp ) == 0 )
+        {
+            ret = ERROR_FAIL;
+            break;
+        }
+
+        PyObject* pyRet =
+            PyList_GetItem( listResp, 0 );
+        if( unlikely( pyRet == nullptr ) )
+        {
+            ret = ERROR_FAIL;
+            break;
+        }
+
+        ret = PyLong_AS_LONG( pyRet );
+        if( ret == STATUS_PENDING )
+            break;
+
+        if( ERROR( ret ) ) 
+            break;
+
+        PyObject* pyRespArgs =
+            PyList_GetItem( listResp, 1 );
+        if( pyRespArgs == nullptr )
+        {
+            // fine, no resp params
+            break;
+        }
+
+        if( PyList_Check( pyRespArgs ) == false ||
+            PyList_Size( pyRespArgs ) == 0 )
+            break;
+
+        std::vector< BufPtr > vecResp;
+        ret = List2Vector( pyRespArgs, vecResp );
+        if( ERROR( ret ) )
+            break;
+
+        if( vecResp.empty() )
+            break;
+
+        for( auto elem : vecResp )
+            oResp.Push( elem );
+
+    }while( 0 );
+
+    Py_UNBLOCK_THREADS
+
+    if( ret != STATUS_PENDING )
+    {
+        oResp[ propReturnValue ] = ret;
+        CCfgOpenerObj oCfg( pCallback );
+        oCfg.SetPointer( propRespPtr,
+            ( IConfigDb* )oResp.GetCfg() );
+    }
+
+    return ret;
+}
+
+static FactoryPtr InitClassFactory()
+{
+    BEGIN_FACTORY_MAPS;
+    INIT_MAP_ENTRYCFG( CPythonProxyImpl );
+    END_FACTORY_MAPS;
+};
+
+extern "C"
+gint32 DllLoadFactory( FactoryPtr& pFactory )
+{
+    pFactory = InitClassFactory();
+    if( pFactory.IsEmpty() )
+        return -EFAULT;
+
+    return 0;
+}
+
+gint32 LoadThisLib( ObjPtr& pIoMgr )
+{
+    gint32 ret = 0;
+    if( pIoMgr.IsEmpty() )
+        return -EINVAL;
+    do{
+        std::string strResult;
+        const char* szLib = "rpcfrmwrk.cpython";
+        ret = GetLibPathName( strResult, szLib );
+        if( ERROR( ret ) )
+            break;
+        CIoManager* pMgr = pIoMgr;
+        if( pMgr == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        ret = pMgr->TryLoadClassFactory(
+            strResult );
+
+    }while( 0 );
+    return ret;
+}
+%End
+
+enum EnumMyClsid
+{
+    Clsid_CStreamingServer,
+    Clsid_CStreamingClient,
+    Iid_CEchoServer
+};
+
+class CPythonProxy :
+    public cpp::CInterfaceProxy /Abstract/
+{
+    public:
+    %TypeHeaderCode
+    #include "stmsvr.h"
+    %End
+
+    gint32 PyProxyCall(
+        PyObject* pCb /In/,
+        const std::string& strIfName /In/,
+        const std::string& strMethod /In/,
+        PyObject* listArgs /In/,
+        PyObject* listResp,
+        guint64& qwTaskCancel /Out/ );
+
+    gint32 PyProxyCallSync(
+        const std::string& strIfName /In/,
+        const std::string& strMethod /In/,
+        PyObject* listArgs,
+        PyObject* listResp );
+    %MethodCode
+        guint64 qwTaskCancel = 0;
+        sipRes = sipCpp->PyProxyCall( Py_None,
+            *a0, *a1, a2, a3, qwTaskCancel );
+    %End
+
+    gint32 Start();
+    gint32 Stop();
+
+    gint32 SetPyHost( PyObject* pObj );
+    %MethodCode
+        CPythonProxyImpl* pImpl = static_cast
+            < CPythonProxyImpl* >( sipCpp );
+        if( pImpl == nullptr ) 
+            sipRes = -EFAULT;
+        else
+            sipRes = pImpl->SetPyHost( a0 );
+    %End
+
+    gint32 GetPyHost( PyObject* pObj );
+    %MethodCode
+        CPythonProxyImpl* pImpl = static_cast
+            < CPythonProxyImpl* >( sipCpp );
+        if( pImpl == nullptr ) 
+            sipRes = -EFAULT;
+        else
+            sipRes = pImpl->GetPyHost( a0 );
+    %End
+
+    gint32 RemovePyHost();
+    %MethodCode
+        CPythonProxyImpl* pImpl = static_cast
+            < CPythonProxyImpl* >( sipCpp );
+        if( pImpl == nullptr ) 
+            sipRes = -EFAULT;
+        else
+            sipRes = pImpl->RemovePyHost();
+    %End
+
+};
+
+cpp::ObjPtr CreateProxy(
+    cpp::ObjPtr& pMgr,
+    const std::string& strDesc,
+    const std::string& strObjName,
+    cpp::ObjPtr& pCfgObj );
+%MethodCode
+    gint32 ret = 0;
+    do{
+        cpp::CfgPtr pCfg = *a3;
+
+        if( pCfg.IsEmpty() )
+        {
+            CParamList oParams;
+            oParams.SetObjPtr(
+                propIoMgr, *a0 );
+            pCfg = oParams.GetCfg();
+        }
+        else
+        {
+            CParamList oParams( pCfg );
+            oParams.SetObjPtr(
+                propIoMgr, *a0 );
+        }
+
+        ret = CRpcServices::LoadObjDesc(
+            *a1, *a2, false, pCfg );
+        if( ERROR( ret ) )
+            break;
+
+        ObjPtr pIf;
+        ret = pIf.NewObj(
+            clsid( CPythonProxyImpl ),
+            pCfg );
+        if( ERROR( ret ) )
+            break;
+
+        sipRes = new cpp::ObjPtr(
+            nullptr, false );
+        *sipRes = pIf;
+
+    }while( 0 );
+%End
+
+gint32 LoadPyFactory( cpp::ObjPtr& pMgr );
+%MethodCode
+    sipRes = LoadThisLib( *a0 );
+%End
+
+CPythonProxy* CastToProxy(
+    cpp::ObjPtr& pObj );
+%MethodCode
+    CPythonProxy* pProxy = *a0;
+    sipRes = pProxy;
+%End
