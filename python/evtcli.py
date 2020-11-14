@@ -3,12 +3,20 @@ import time
 from proxy import PyRpcContext, PyRpcProxy
 
 class CEventClient:
+    """Mandatory class member to define the
+    interface name, which will be used to invoke
+    the event handler
+    """
+    ifName = "CEventServer"
     """
     this is a event handler, it print the event
     string from the remote server
     """
-    def OnHelloWorld( self, strSvrEvt ):
+    def OnHelloWorld( self, callback, strSvrEvt ):
         print( strSvrEvt )
+        # return a list, with the first element is
+        # the error number
+        return [ 0, ];
 
 #aggregrate the interface class and the PyProxy
 #class by CEchoProxy
@@ -32,7 +40,9 @@ def test_main() :
         with oProxy :
             while True :
                 state = oProxy.oInst.GetState();
-                if state == cpp.stateConnected or state == cpp.stateRecovery :
+                if ( state == cpp.stateConnected
+                    or state == cpp.stateRecovery
+                    ):
                     time.sleep( 1 )
                     continue
 

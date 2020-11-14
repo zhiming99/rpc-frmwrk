@@ -9,7 +9,6 @@
 #include <glib.h>
 #include <stdint.h>
 #include <errno.h>
-#include <Python.h>
 using namespace cpp;
 #define _USE_LIBEV
 #include "proxy.h"
@@ -588,15 +587,25 @@ namespace cpp
     cpp::IConfigDb* CastToCfg(
         cpp::ObjPtr* pObj );
     %MethodCode
-    cpp::IConfigDb* pCfg = *a0;
-    sipRes = pCfg;
+    if( a0 == nullptr )
+        sipRes = SIP_NULLPTR;
+    else
+    {
+        cpp::IConfigDb* pCfg = *a0;
+        sipRes = pCfg;
+    }
     %End
 
     cpp::IService* CastToSvc(
         cpp::ObjPtr* pObj );
     %MethodCode
-    cpp::IService* pSvc = *a0;
-    sipRes = pSvc;
+    if( a0 == nullptr )
+        sipRes = SIP_NULLPTR;
+    else
+    {
+        cpp::IService* pSvc = *a0;
+        sipRes = pSvc;
+    }
     %End
 
     cpp::BufPtr* CastToBuf(
@@ -604,11 +613,16 @@ namespace cpp
     %MethodCode
     cpp::BufPtr *pBuf = new cpp::BufPtr(
         nullptr, false );
-    *pBuf = *a0;
-    if( pBuf->IsEmpty() )
+    if( a0 == nullptr )
         sipRes = SIP_NULLPTR;
     else
-        sipRes = pBuf;
+    {
+        *pBuf = *a0;
+        if( pBuf->IsEmpty() )
+            sipRes = SIP_NULLPTR;
+        else
+            sipRes = pBuf;
+    }
     %End
 
     class CRpcServices : public cpp::IService /Abstract/

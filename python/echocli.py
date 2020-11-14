@@ -3,10 +3,10 @@ from proxy import PyRpcContext, PyRpcProxy
 
 #1. define the interface the CEchoServer provides
 class CEchoClient:
-    '''
-    For convienence, define a ifName for later
-    reference
-    '''
+    """Mandatory class member to define the
+    interface name, which will be used to invoke
+    the event handler if any
+    """
     ifName = "CEchoServer"
 
     '''all the methods have the similiar

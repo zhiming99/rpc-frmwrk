@@ -181,7 +181,7 @@ gint32 CPythonProxyImpl::FillList(
                         break;
 
                     PyObject* pObj = sipConvertFromNewType(
-                        val,sipType_cpp_ObjPtr,SIP_NULLPTR);
+                        val,sipType_cpp_ObjPtr, Py_None );
 
                     if( pObj == nullptr )
                     {
@@ -577,11 +577,13 @@ gint32 CPythonProxyImpl::InvokeUserMethod(
     if( pParams == nullptr )
         return -EINVAL;
 
+    PyGILState_STATE gstate;
+    gstate = PyGILState_Ensure();
+
     CParamList oResp;
     gint32 ret = 0;
+    PyObject* listResp = nullptr;
 
-    PyThreadState *_save;
-    Py_BLOCK_THREADS;
     do{
         CReqOpener oReq( pParams );
         std::string strMethod;
@@ -611,25 +613,24 @@ gint32 CPythonProxyImpl::InvokeUserMethod(
         ObjPtr* pArgs = new ObjPtr( pParams );
 
         PyObject* pPyCb = sipConvertFromNewType(
-            pCb, sipType_cpp_ObjPtr, SIP_NULLPTR);
+            pCb, sipType_cpp_ObjPtr, Py_None );
         if( unlikely( pPyCb == nullptr ) )
         {
             ret = -ENOMEM;
             break;
         }
-
         PyObject* pPyParams = sipConvertFromNewType(
-            pArgs, sipType_cpp_ObjPtr, SIP_NULLPTR);
-        if( unlikely( pPyParams == nullptr ) )
-        {
+            pArgs, sipType_cpp_ObjPtr, Py_None );
+        if( unlikely( pPyParams == nullptr ) ) 
+        {           
             ret = -ENOMEM;
             break;
-        }
+        }       
 
-        PyObject* listResp = PyObject_CallMethod(
+        listResp = PyObject_CallMethod(
             pHost, "InvokeMethod", 
-            "ssSS", strIfName.c_str(),
-            strMethod.c_str(), pPyCb, pPyParams );
+            "(SssS)", pPyCb, strIfName.c_str(),
+            strMethod.c_str(), pPyParams );
 
         if( unlikely( listResp == nullptr ) )
         {
@@ -683,8 +684,10 @@ gint32 CPythonProxyImpl::InvokeUserMethod(
             oResp.Push( elem );
 
     }while( 0 );
+    if( listResp != nullptr )
+        Py_DECREF( listResp );
 
-    Py_UNBLOCK_THREADS
+    PyGILState_Release(gstate);
 
     if( ret != STATUS_PENDING )
     {
@@ -787,14 +790,19 @@ class CPythonProxy :
             sipRes = pImpl->SetPyHost( a0 );
     %End
 
-    gint32 GetPyHost( PyObject* pObj );
+    PyObject* GetPyHost();
     %MethodCode
         CPythonProxyImpl* pImpl = static_cast
             < CPythonProxyImpl* >( sipCpp );
-        if( pImpl == nullptr ) 
-            sipRes = -EFAULT;
-        else
-            sipRes = pImpl->GetPyHost( a0 );
+        PyObject* pObj = nullptr;
+        sipRes = SIP_NULLPTR;
+        if( pImpl != nullptr ) 
+        {
+            gint32 ret = 
+                pImpl->GetPyHost( pObj );
+            if( SUCCEEDED( ret ) )
+                sipRes = pObj;
+        }
     %End
 
     gint32 RemovePyHost();

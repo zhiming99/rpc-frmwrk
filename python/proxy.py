@@ -2,6 +2,7 @@ from rpcfrmwrk import *
 
 import errno
 import inspect
+import types
 
 class PyRpcContext :
     def CreateIoMgr( self, strModName ) :
@@ -94,6 +95,9 @@ class PyRpcProxy :
         else :
             print( "Proxy started..." )
 
+        oCheck = self.oInst.GetPyHost()
+        print( oCheck, self )
+
     def Stop( self ) :
         self.oInst.RemovePyHost();
         self.oInst.Stop()
@@ -134,79 +138,79 @@ class PyRpcProxy :
 
         return resp;
 
-    def ArgObjToList( self, pObj, argList ) :
+    def ArgObjToList( self, pObj ) :
         pCfg = cpp.CastToCfg( pObj )
         if pCfg is None :
-            return -errno.EFAULT
+            return [ -errno.EFAULT, ]
         oParams = cpp.CParamList( pCfg )
         ret = oParams.GetSize()
         if ret[ 0 ] < 0 :
             resp[ 0 ] = ret[ 0 ];
         iSize = ret[ 1 ]
         if iSize <= 0 :
-            return -errno.EINVAL
+            return [ -errno.EINVAL, ]
         argList = []
         for i in range( iSize ) :
             ret = oParams.GetPropertyType( i )
             if ret[ 0 ] < 0 :
                 break;
             iType = ret[ 1 ];
-            if iType == cpp.typeInt32 :
+            if iType == cpp.typeUInt32 :
                 ret = oParams.GetIntProp( i )
                 if ret[ 0 ] < 0 :
                     break;
                 val = ret[ 1 ]
             elif iType == cpp.typeDouble :
-                ret = oParams.GetDoubleProp( i, val )
+                ret = oParams.GetDoubleProp( i )
                 if ret[ 0 ] < 0 :
                     break;
                 val = ret[ 1 ]
 
             elif iType == cpp.typeByte :
-                ret = oParams.GetByteProp( i, val )
+                ret = oParams.GetByteProp( i )
                 if ret[ 0 ] < 0 :
                     break;
                 val = ret[ 1 ]
 
             elif iType == cpp.typeUInt16 :
-                ret = oParams.GetShortProp( i, val )
+                ret = oParams.GetShortProp( i )
                 if ret[ 0 ] < 0 :
                     break;
                 val = ret[ 1 ]
 
             elif iType == cpp.typeUInt64 :
-                ret = oParams.GetQwordProp( i, val )
+                ret = oParams.GetQwordProp( i )
                 if ret[ 0 ] < 0 :
                     break;
                 val = ret[ 1 ]
 
             elif iType == cpp.typeFloat :
-                ret = oParams.GetFloatProp( i, val )
+                ret = oParams.GetFloatProp( i )
                 if ret[ 0 ] < 0 :
                     break;
                 val = ret[ 1 ]
 
             elif iType == cpp.typeString :
-                ret = oParams.GetStrProp( i, val )
+                ret = oParams.GetStrProp( i )
                 if ret[ 0 ] < 0 :
                     break;
                 val = ret[ 1 ]
 
             elif iType == cpp.typeObj :
-                ret = oParams.GetObjPtr( i, val )
+                ret = oParams.GetObjPtr( i )
                 if ret[ 0 ] < 0 :
                     break;
                 val = ret[ 1 ]
                 if val.IsEmpty() :
-                    ret = -errno.EFAULT
+                    ret = [ -errno.EFAULT, ]
                     break
             elif iType == cpp.typeByteArr :
-                ret = pCfg.GetProperty( i, val );
+                ret = pCfg.GetProperty( i );
                 if ret[ 0 ] < 0 :
                     break;
                 val = ret[ 1 ]
                 if val.IsEmpty() :
-                    ret = -errno.EFAULT
+                    ret = [ -errno.EFAULT, ]
                     break
                 pyBuf = bytearray( val.size() );
                 ret = val.CopyToPython( pyBuf );
@@ -216,45 +220,50 @@ class PyRpcProxy :
 
                 val = pyBuf;
 
-            argList.Add( val )
+            argList.append( val )
 
-        return ret[ 0 ]
+        if ret[ 0 ] < 0 :
+            return ret;
+
+        ret = [ 0, argList ]
+        return ret
 
     #for event handler 
-    def InvokeMethod( self, callback, ifName, methodName, cpparg ) :
+    def InvokeMethod(
+        self, callback, ifName, methodName, cppargs ) :
         resp = [ 0 ];
-        while true :
-            ret = ArgObjToList(
-                self, cppargs, argsList )
-            if ret < 0 :
-                break;
+        while True :
 
-            if ret < 0 :
+            ret = self.ArgObjToList( cppargs )
+            if ret[ 0 ] < 0 :
                 resp[ 0 ] = ret;
                 break;
 
-            bFound = False
-            for iftype in self.__bases__ :
-                if iftype.__name__ != ifName :
+            argList = ret[ 1 ]
+            found = False
+            for iftype in type(self).__bases__ :
+                if not hasattr( iftype, "ifName" ) :
                     continue;
-                bFound = True
+                if iftype.ifName != ifName :
+                    continue;
+                found = True
                 typeFound = iftype;
                 break;
                     
-            if not bFound :
+            if not found :
                 resp[ 0 ] = -errno.EINVAL;
                 break;
 
-            bFound = False
+            found = False
             oMembers = inspect.getmembers( typeFound,
                 predicate=inspect.isfunction);
             for oMethod in oMembers :
                 if oMethod[ 0 ] != methodName :
                     continue;
-                bFound = true;               
+                found = True;               
                 break;
 
-            if not bFound :
+            if not found :
                 resp[ 0 ] = -errno.EINVAL;
                 break;
 
@@ -263,9 +272,9 @@ class PyRpcProxy :
                 resp[ 0 ] = -error.EFAULT;
                 break;
 
-            resp = oMethod( self, callback, *argList )
+            resp = oMethod( callback, *argList )
 
-            break; #while true
+            break; #while True
 
         return resp
         
