@@ -38,15 +38,17 @@ def test_main() :
             return ret
 
         with oProxy :
-            while True :
-                state = oProxy.oInst.GetState();
-                if ( state == cpp.stateConnected
-                    or state == cpp.stateRecovery
-                    ):
-                    time.sleep( 1 )
-                    continue
 
-                break;
+            #wait if the server is not online
+            while ( cpp.stateRecovery ==
+                oProxy.oInst.GetState() ):
+                time.sleep( 1 )
+
+            #keep waiting for server event,
+            #till disconnection occurs
+            while ( cpp.stateConnected ==
+                oProxy.oInst.GetState() ):
+                time.sleep( 1 )
 
 ret = test_main()
 quit( ret )

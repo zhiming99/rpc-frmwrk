@@ -243,8 +243,10 @@ class PyRpcProxy :
             found = False
             for iftype in type(self).__bases__ :
                 if not hasattr( iftype, "ifName" ) :
+                    prevType = iftype
                     continue;
                 if iftype.ifName != ifName :
+                    prevType = iftype
                     continue;
                 found = True
                 typeFound = iftype;
@@ -254,12 +256,18 @@ class PyRpcProxy :
                 resp[ 0 ] = -errno.EINVAL;
                 break;
 
+            nameComps = methodName.split( '_' )
+            if nameComps[ 0 ] != "UserEvent" :
+                resp[ 0 ] = -errno.EINVAL;
+                break;
+
             found = False
             oMembers = inspect.getmembers( typeFound,
                 predicate=inspect.isfunction);
             for oMethod in oMembers :
-                if oMethod[ 0 ] != methodName :
+                if nameComps[ 1 ] != oMethod[ 0 ]: 
                     continue;
+                targetMethod = oMethod[ 1 ];
                 found = True;               
                 break;
 
@@ -267,12 +275,11 @@ class PyRpcProxy :
                 resp[ 0 ] = -errno.EINVAL;
                 break;
 
-            oMethod = getattr( self, methodName );
-            if oMethod is None :
+            if targetMethod is None :
                 resp[ 0 ] = -error.EFAULT;
                 break;
 
-            resp = oMethod( callback, *argList )
+            resp = targetMethod( self, callback, *argList )
 
             break; #while True
 

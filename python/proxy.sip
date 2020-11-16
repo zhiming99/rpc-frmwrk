@@ -181,7 +181,7 @@ gint32 CPythonProxyImpl::FillList(
                         break;
 
                     PyObject* pObj = sipConvertFromNewType(
-                        val,sipType_cpp_ObjPtr, Py_None );
+                        val,sipType_cpp_ObjPtr, SIP_NULLPTR );
 
                     if( pObj == nullptr )
                     {
@@ -260,6 +260,10 @@ gint32 CPythonProxyImpl::OnProxyCallResp(
         pReqCtx == nullptr )
         return -EINVAL;
 
+    
+    PyGILState_STATE gstate;
+    gstate = PyGILState_Ensure();
+
     PyObject* pPyCb = nullptr;
     PyObject* pPyResp = nullptr;
 
@@ -320,6 +324,7 @@ gint32 CPythonProxyImpl::OnProxyCallResp(
             PyList_SET_ITEM( pPyResp, 0, pRet );
             ret = FillList( pResp, pPyResp );
         }
+
         PyObject_Call( pPyCb, pPyResp, nullptr );
 
     }while( 0 );
@@ -329,6 +334,8 @@ gint32 CPythonProxyImpl::OnProxyCallResp(
 
     if( pPyResp != nullptr )
         Py_DECREF( pPyResp );
+
+    PyGILState_Release(gstate);
 
     return 0;
 }
@@ -584,6 +591,9 @@ gint32 CPythonProxyImpl::InvokeUserMethod(
     gint32 ret = 0;
     PyObject* listResp = nullptr;
 
+    PyObject* pPyCb = nullptr;
+    PyObject* pPyParams = nullptr;
+
     do{
         CReqOpener oReq( pParams );
         std::string strMethod;
@@ -612,15 +622,15 @@ gint32 CPythonProxyImpl::InvokeUserMethod(
         ObjPtr* pCb = new ObjPtr( pCallback );
         ObjPtr* pArgs = new ObjPtr( pParams );
 
-        PyObject* pPyCb = sipConvertFromNewType(
-            pCb, sipType_cpp_ObjPtr, Py_None );
+        pPyCb = sipConvertFromNewType(
+            pCb, sipType_cpp_ObjPtr, SIP_NULLPTR );
         if( unlikely( pPyCb == nullptr ) )
         {
             ret = -ENOMEM;
             break;
         }
-        PyObject* pPyParams = sipConvertFromNewType(
-            pArgs, sipType_cpp_ObjPtr, Py_None );
+        pPyParams = sipConvertFromNewType(
+            pArgs, sipType_cpp_ObjPtr, SIP_NULLPTR );
         if( unlikely( pPyParams == nullptr ) ) 
         {           
             ret = -ENOMEM;
@@ -628,9 +638,9 @@ gint32 CPythonProxyImpl::InvokeUserMethod(
         }       
 
         listResp = PyObject_CallMethod(
-            pHost, "InvokeMethod", 
-            "(SssS)", pPyCb, strIfName.c_str(),
-            strMethod.c_str(), pPyParams );
+             pHost, "InvokeMethod", 
+             "(OssO)", pPyCb, strIfName.c_str(),
+             strMethod.c_str(), pPyParams );
 
         if( unlikely( listResp == nullptr ) )
         {
@@ -655,7 +665,9 @@ gint32 CPythonProxyImpl::InvokeUserMethod(
 
         ret = PyLong_AS_LONG( pyRet );
         if( ret == STATUS_PENDING )
+        {
             break;
+        }
 
         if( ERROR( ret ) ) 
             break;
@@ -687,15 +699,17 @@ gint32 CPythonProxyImpl::InvokeUserMethod(
     if( listResp != nullptr )
         Py_DECREF( listResp );
 
-    PyGILState_Release(gstate);
-
     if( ret != STATUS_PENDING )
     {
         oResp[ propReturnValue ] = ret;
         CCfgOpenerObj oCfg( pCallback );
         oCfg.SetPointer( propRespPtr,
             ( IConfigDb* )oResp.GetCfg() );
+        Py_DECREF( pPyCb );
+        Py_DECREF( pPyParams );
     }
+
+    PyGILState_Release(gstate);
 
     return ret;
 }
