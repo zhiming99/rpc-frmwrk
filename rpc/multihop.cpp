@@ -1224,11 +1224,11 @@ gint32 CRpcRouterBridge::ClearRemoteEventsMH(
         if( ERROR( ret ) )
             break;
 
+        TaskletPtr pRespCb;
         if( !bForceClear )
         {
             CCfgOpener oReqCtx;
             oReqCtx[ propReturnValue ] = 0;
-            TaskletPtr pRespCb;
 
             ret = NEW_PROXY_RESP_HANDLER2(
                 pRespCb, ObjPtr( this ),
@@ -1348,7 +1348,11 @@ gint32 CRpcRouterBridge::ClearRemoteEventsMH(
 
         ret = 0;
         if( pTaskGrp->GetTaskCount() == 0 )
+        {
+            pTaskGrp->ClearClientNotify();
+            pRespCb.Clear();
             break;
+        }
 
         pTaskGrp->MarkPending();
         TaskletPtr pTask = ObjPtr( pTaskGrp );

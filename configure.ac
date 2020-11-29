@@ -74,6 +74,7 @@ AC_CONFIG_FILES([Makefile
                  rpc/wsport/Makefile
                  rpc/wsport/wsproto/Makefile
                  rpc/security/Makefile
+                 python/Makefile
                  test/Makefile
                  test/Makefile.init.pub
                  test/actcancel/Makefile

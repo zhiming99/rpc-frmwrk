@@ -33,12 +33,20 @@ namespace rpcfrmwrk
 // the type list
 #define ValType( _T ) typename std::remove_cv< typename std::remove_pointer< typename std::decay< _T >::type >::type>::type
 
+template< typename T >
+inline guint32 GetTypeSize( T* pT )
+{ return sizeof( T ); }
+
 // cast to stdstr temporary
 template< typename T,
     typename Allowed = typename std::enable_if<
         std::is_same< stdstr, T >::value, T >::type >
 T CastTo( BufPtr& pBuf )
 {
+    if( pBuf.IsEmpty() || pBuf->empty() ||
+        pBuf->GetExDataType() != typeString )
+        throw std::invalid_argument(
+            "error cast to string" );
     return stdstr( pBuf->ptr() );
 }
 
@@ -53,6 +61,15 @@ template< typename T,
         !std::is_same< const char*, DecType( T ) >::value, T >::type >
 T& CastTo( BufPtr& pBuf )
 {
+    if( pBuf.IsEmpty() || pBuf->empty() )
+        throw std::invalid_argument(
+            "error cast to prime types" );
+
+    guint32 dwSize = GetTypeSize( ( T* )0 );
+    if( dwSize > pBuf->size() )
+        throw std::invalid_argument(
+            "error cast to prime types" );
+
     return ( T& )*pBuf;
 }
 
@@ -65,6 +82,10 @@ template< typename T,
     typename T3=T >
 T& CastTo( BufPtr& pBuf )
 {
+    if( pBuf.IsEmpty() || pBuf->empty() ||
+        pBuf->GetExDataType() != typeObj )
+        throw std::invalid_argument(
+            "error cast to ObjPtr" );
     CObjBase* p = (ObjPtr&)*pBuf;
     T* pT = static_cast< T* >( p );
     return *pT;
@@ -83,6 +104,11 @@ template< typename T,
         >
 T& CastTo( BufPtr& pBuf )
 {
+    if( pBuf.IsEmpty() || pBuf->empty() ||
+        ( pBuf->GetExDataType() != typeObj &&
+        pBuf->GetExDataType() != typeDMsg ) )
+        throw std::invalid_argument(
+            "error cast to ObjPtr or DMsgPtr" );
     return ( T& )*pBuf;
 }
 
@@ -776,12 +802,20 @@ class CMethodServer :
         for( auto& elem : vecParams )
             vecResp.push_back( elem );
 
+        gint32 ret = 0;
 
-        // std::tuple<typename std::decay<Args>::type...> oTuple =
-        auto oTuple = VecToTuple< Args... >( vecResp );
+        try{
+            // std::tuple<typename std::decay<Args>::type...> oTuple =
+            auto oTuple = VecToTuple< Args... >( vecResp );
 
-        gint32 ret = CallUserFunc( pClass, pCallback, oTuple,
-            typename GenSequence< sizeof...( Args ) >::type() );
+            ret = CallUserFunc( pClass, pCallback, oTuple,
+                typename GenSequence< sizeof...( Args ) >::type() );
+
+        }
+        catch( const std::invalid_argument& e )
+        {
+            ret = -EINVAL;
+        }
 
         return ret;
     }
@@ -935,6 +969,9 @@ class CMethodServerEx< iNumInput, gint32 (ClassName::*)(IEventSink*, Args ...) >
         // vecParams contains only the input parameters.
         // Args contains both the input and output parameters
         if( vecParams.size() > sizeof...( Args ) )
+            return -EINVAL;
+
+        if( vecParams.size() != iNumInput )
             return -EINVAL;
 
         using OutTupType = typename OutputParamTypes<
@@ -2238,6 +2275,7 @@ class CAsyncCallback :
         if( vecParams.empty() )
             return -EINVAL;
 
+        gint32 ret = 0;
         try{
             if( vecParams.size() < sizeof...( Args ) )
             {
@@ -2267,22 +2305,23 @@ class CAsyncCallback :
                     return -ENOENT;
                 }
             }
+
+            std::vector< BufPtr > vecResp;
+
+            vecResp.insert( vecResp.begin(),
+                 vecParams.begin(), vecParams.end() );
+
+            std::tuple< DecType( Args )...>
+                oTupleStore(  VecToTuple< Args... >( vecResp ) );
+
+            ret = CallUserFunc( oTupleStore,
+                typename GenSequence< sizeof...( Args ) >::type() );
+
         }
         catch( const std::invalid_argument& e )
         {
             return -EINVAL;
         }
-
-        std::vector< BufPtr > vecResp;
-
-        vecResp.insert( vecResp.begin(),
-             vecParams.begin(), vecParams.end() );
-
-        std::tuple< DecType( Args )...>
-            oTupleStore(  VecToTuple< Args... >( vecResp ) );
-
-        gint32 ret = CallUserFunc( oTupleStore,
-            typename GenSequence< sizeof...( Args ) >::type() );
 
         return ret;
     }

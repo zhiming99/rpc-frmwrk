@@ -1,0 +1,15 @@
+# Specify sip v5 as the build system for the package.
+[build-system]
+requires = ["sip >=5, <6"]
+build-backend = "sipbuild.api"
+
+# Specify the PEP 566 metadata for the project.
+[tool.sip.metadata]
+name = "rpcfrmwrk"
+
+[tool.sip.bindings.rpcfrmwrk]
+headers = ["rpc.h"]
+include-dirs = ["../include","../ipc","/usr/include/dbus-1.0","/usr/lib64/dbus-1.0/include",
+"/usr/include/glib-2.0","/usr/lib64/glib-2.0/include","../test/stmtest" ]
+libraries = ["combase", "ipc", "stmsvr" ]
+library-dirs = ["../test/debug64"]

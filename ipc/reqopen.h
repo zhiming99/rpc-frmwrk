@@ -40,9 +40,6 @@ namespace rpcfrmwrk
 // instead a ConfigDb
 #define CF_NON_DBUS                     0x40
 
-#define MAX_BYTES_PER_TRANSFER ( 1024 * 1024 )
-#define MAX_BYTES_PER_FILE     ( 512 * 1024 * 1024 )
-
 class CReqOpener : public CParamList
 {
     gint32 GetCallOptions( CfgPtr& pCfg ) const;

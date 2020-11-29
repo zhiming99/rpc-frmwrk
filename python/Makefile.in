@@ -1,0 +1,15 @@
+all:
+	sudo sip-install --verbose --debug --tracing
+
+debug:
+
+build:
+	sip-build --verbose
+
+install:
+	sudo sip-install --verbose
+
+release:
+	sudo sip-install --verbose
+
+.PHONY: build debug release

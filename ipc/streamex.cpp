@@ -1153,4 +1153,101 @@ gint32 CReadWriteWatchTask::operator()(
     return SetError( iRet );
 }
 
+gint32 CStreamServerSync::OnConnected(
+    HANDLE hCfg )
+{
+    if( hCfg == INVALID_HANDLE )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        CStdRMutex oIfLock( this->GetLock() );
+        if( !this->IsConnected( nullptr ) )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+
+        IConfigDb* pResp = reinterpret_cast
+            < IConfigDb* >( hCfg );
+        if( pResp == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        CCfgOpener oResp( pResp );
+        HANDLE hChannel = ( HANDLE& )oResp[ 1 ];
+
+        InterfPtr pIf;
+        ret = GetUxStream( hChannel, pIf );
+        if( ERROR( ret ) )
+            break;
+
+        guint64 qwId = pIf->GetObjId();
+        guint64 qwHash = 0;
+        ret = GetObjIdHash( qwId, qwHash );
+        if( ERROR( ret ) )
+            break;
+
+        m_mapIdHashToHandle[ qwHash ] = hChannel;
+        oIfLock.Unlock();
+
+        ret = super::OnConnected( hCfg );
+        if( ERROR( ret ) )
+        {
+            oIfLock.Lock();
+            m_mapIdHashToHandle.erase( qwHash );
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CStreamServerSync::StopWorkers(
+    HANDLE hChannel )
+{
+    if( hChannel == INVALID_HANDLE )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        InterfPtr pIf;
+        ret = super::StopWorkers( hChannel );
+        CStdRMutex oIfLock( this->GetLock() );
+        gint32 r = GetUxStream( hChannel, pIf );
+        if( ERROR( r ) )
+            break;
+
+        guint64 qwId = pIf->GetObjId();
+        guint64 qwHash = 0;
+        ret = GetObjIdHash( qwId, qwHash );
+        if( ERROR( ret ) )
+            break;
+
+        m_mapIdHashToHandle.erase( qwHash );
+
+    }while( 0 );
+
+    return ret;
+}
+
+HANDLE CStreamServerSync::GetChanByIdHash(
+    guint64 qwIdHash ) const
+{
+    if( qwIdHash == 0 )
+        return INVALID_HANDLE;
+
+    CStdRMutex oIfLock( this->GetLock() );
+    std::map< guint64, HANDLE >::const_iterator
+        itr = m_mapIdHashToHandle.find( qwIdHash );
+    if( itr == m_mapIdHashToHandle.cend() )
+        return INVALID_HANDLE;
+
+    return itr->second;
+}
+
+
+
 }

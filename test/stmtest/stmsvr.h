@@ -77,14 +77,26 @@ class CEchoServer :
         std::string& strReply );
 };
 
+#ifndef Py_PYTHON_H
+struct PyObject;
+#endif    
+
 // Declare the interface class
-#include "ifhelper.h"
 BEGIN_DECL_IF_PROXY_SYNC( CEchoServer, CEchoClient )
 
     DECL_IF_PROXY_METHOD_SYNC( 1,
         CEchoServer, Echo,
         const std::string& /* strEmit */,
         std::string& /* strReply */ );
+
+    virtual gint32 PyProxyCall(
+        PyObject* pCb,
+        const std::string& strIfName,
+        const std::string& strMethod,
+        PyObject* tupleArgs,
+        PyObject* tupleResp,
+        guint64& qwTaskCancel )
+    { return -ENOTSUP; }
 
 END_DECL_IF_PROXY_SYNC( CEchoClient );
 
@@ -181,3 +193,6 @@ DECLARE_AGGREGATED_SERVER(
     CEchoServer,
     CMyStreamServer );
 
+#ifdef Py_PYTHON_H
+typedef CStreamingClient CPythonProxy;
+#endif

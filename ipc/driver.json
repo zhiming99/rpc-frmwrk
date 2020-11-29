@@ -249,7 +249,7 @@
                     "PdoClass" : "TcpStreamPdo2",
                     "Compression" : "true",
                     "EnableWS":  "false",
-                    "EnableSSL": "false",
+                    "EnableSSL": "true",
                     "ConnRecover" : "false",
                     "comments-3" : "this port has authentication enabled",
                     "HasAuth"  : "true"
@@ -489,7 +489,15 @@
             [
                 "DBusBusDriver"
             ]
-        }
+        },
+        {             
+            "ModName" : "PyRpcProxy",                                    
+            "DriversToLoad" :                                            
+            [                                                            
+                "DBusBusDriver"
+            ]                                                            
+        }     
+
     ],
 
     "Match" :

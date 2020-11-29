@@ -28,6 +28,7 @@
 #include "frmwrk.h"
 #include "stream.h"
 #include "uxstream.h"
+#include "sha1.h"
 
 namespace rpcfrmwrk
 {
@@ -446,6 +447,21 @@ gint32 CIfCreateUxSockStmTask::GetResponse()
             ( IConfigDb* )GetConfig() );
         oThisCfg[ propFd ] = dwVal;
 
+        IConfigDb* pDataDescSvr = nullptr;
+        ret = oResp.GetPointer( 0, pDataDescSvr );
+        if( ERROR( ret ) )
+            break;
+        
+        IConfigDb* pDataDesc = nullptr;
+        ret = oThisCfg.GetPointer( 0, pDataDesc );
+        if( ERROR( ret ) )
+            break;
+
+        // the peer stream object's id
+        CCfgOpener oDataDesc( pDataDesc );
+        ret = oDataDesc.CopyProp(
+            propPeerObjId, pDataDescSvr );
+
     }while( 0 );
 
     return ret;
@@ -531,7 +547,7 @@ gint32 CIfCreateUxSockStmTask::OnTaskComplete(
         if( ERROR( ret ) )
             break;
 
-        IConfigDb* pDataDesc;
+        IConfigDb* pDataDesc = nullptr;
         ret = oCfg.GetPointer( 0, pDataDesc );
         if( ERROR( ret ) )
             break;
@@ -555,11 +571,11 @@ gint32 CIfCreateUxSockStmTask::OnTaskComplete(
             if( ERROR( ret ) )
                 break;
 
-            // dataDesc for response
-            oStartParams.Push(
-                ObjPtr( pDataDesc ) );
-
         }
+
+        // dataDesc for response
+        oStartParams.Push(
+            ObjPtr( pDataDesc ) );
 
         CCfgOpenerObj oIfCfg(
             ( CObjBase* )pUxIf );
@@ -726,12 +742,23 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
         ret = 0;
         oResp[ propReturnValue ] = 0;
         guint32 dwFd = oParams[ propFd ];
+        ObjPtr& pObj = ( ObjPtr& )oParams[ 1 ];
 
         if( bServer )
         {
             // set the response for FETCH_DATA request
-            oResp.Push(
-                ( ObjPtr& )oParams[ 1 ] );
+            CCfgOpener oDataDesc(
+                ( IConfigDb* )pObj );
+
+            guint64 qwId = pIf->GetObjId();
+            guint64 qwHash = 0;
+            ret = GetObjIdHash( qwId, qwHash );
+            if( ERROR( ret ) )
+                break;
+
+            oDataDesc[ propPeerObjId ] = qwHash;
+
+            oResp.Push( pObj );
             oResp.Push( dwFd );
 
             oResp.Push( 0 );
@@ -740,15 +767,16 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
         else
         {
             // set the response for OpenChannel
-            oResp.Push( dwFd );
+            oResp.Push( pObj );
             oResp.Push( ( HANDLE )pSvc );
+            IConfigDb* pCfg = oResp.GetCfg();
 
             TaskletPtr pConnTask;
             ret = DEFER_IFCALLEX_NOSCHED(
                 pConnTask,
                 ObjPtr( pParent ),
                 &IStream::OnConnected,
-                ( HANDLE )pSvc ); 
+                ( HANDLE )pCfg ); 
 
             if( SUCCEEDED( ret ) )
                 ( *pConnTask )( eventZero );
@@ -1269,6 +1297,25 @@ gint32 IStream::OnPreStopShared(
     }while( 0 );
 
     return ret;
+}
+
+gint32 GetObjIdHash(
+    guint64 qwObjId, guint64& qwHash )
+{
+    SHA1 sha;
+    sha.Input( ( const char* )&qwObjId,
+        sizeof( qwObjId ) );
+
+    guint32 arrDwords[ 5 ];
+    if( !sha.Result( arrDwords ) )
+        return ERROR_FAIL;
+
+    guint32* ptr = ( guint32* )&qwHash;
+
+    ptr[ 0 ] = arrDwords[ 0 ];
+    ptr[ 1 ] = arrDwords[ 4 ];
+
+    return 0;
 }
 
 }

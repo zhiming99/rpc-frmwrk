@@ -40,10 +40,20 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 1. Python support
 2. Examples and Tutorials
 3. Access Control
-4. HTTP2 & OAuth2
-5. Support for more languages
+4. Support for more languages
 
 ---
+[`Fri Nov 27 2020 04:56:52 PM Beijing`]   
+1. I need to make the streaming interface less difficult to use before I can move on with Python support.
+
+[`Fri 27 Nov 2020 10:05:19 AM Beijing`]   
+1. Helped my father through a heart stent surgery during the last 10 days. Back to this project now!
+
+[`Sat 14 Nov 2020 01:49:44 PM Beijing`]   
+1. Added a preliminary version of python support, which can run the echo test so far. 
+2. The multithreading issue with Python makes some trouble in evtcli.py. So the event test cannot pass yet. 
+3. The python server is yet to develop, as well as streaming support. Anyway, it is a lot easier than the C/C++ version.
+
 [`Thu 22 Oct 2020 10:41:46 AM Beijing`]   
 1. Fixed some long standing bugs.
 2. Move on to add support for Python.

@@ -3827,9 +3827,6 @@ gint32 CRpcTcpBridgeShared::ReadWriteStream(
         oReq.SetIntProp(
             propStreamId, iStreamId );
 
-        // oReq.SetIntProp(
-        //     propByteCount, dwSize );
-
         if( bRead )
         {
             *pBuf = ObjPtr( 
@@ -3837,6 +3834,18 @@ gint32 CRpcTcpBridgeShared::ReadWriteStream(
         }
         else
         {
+            dwSize = std::min(
+                dwSize, pSrcBuf->size() );
+
+            if( dwSize > MAX_BYTES_PER_TRANSFER )
+            {
+                ret = -E2BIG;
+                break;
+            }
+
+            oReq.SetIntProp(
+                propByteCount, dwSize );
+
             oReq.Push( pSrcBuf );
             *pBuf = ObjPtr( 
                 ( IConfigDb* )oReq.GetCfg() );
