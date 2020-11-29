@@ -43,6 +43,9 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 4. Support for more languages
 
 ---
+[`Fri Nov 27 2020 04:56:52 PM Beijing`]   
+1. I need to make the streaming interface less difficult to use before I can move on with Python support.
+
 [`Fri 27 Nov 2020 10:05:19 AM Beijing`]   
 1. Helped my father through a heart stent surgery during the last 10 days. Back to this project now!
 
