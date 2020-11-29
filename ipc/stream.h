@@ -402,4 +402,7 @@ class CIfStopUxSockStmTask :
     gint32 OnTaskComplete( gint32 iRet );
 };
 
+extern gint32 GetObjIdHash(
+    guint64 qwObjId, guint64& qwHash );
+
 }

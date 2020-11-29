@@ -148,6 +148,7 @@ class CBuffer : public CObjBase
 	guint32 m_dwSize;
     guint32 m_dwType;
     guint32 m_dwOffset = 0;
+    guint32 m_dwTailOff = 0;
     char m_arrBuf[ 48 ] __attribute__( ( aligned ( 8 ) ) );
 
     protected:
@@ -216,7 +217,7 @@ class CBuffer : public CObjBase
         guint32 dwOffset = 0 )
     {
         m_pData = pData;
-        m_dwSize = dwSize;
+        m_dwTailOff = m_dwSize = dwSize;
         m_dwOffset = dwOffset;
     }
 
@@ -225,18 +226,59 @@ class CBuffer : public CObjBase
     guint32 type() const;
     void SetDataType( EnumDataType dt );
     EnumDataType GetDataType() const;
-	void Resize( guint32 dwSize );
+	gint32 Resize( guint32 dwSize );
+
+    inline guint32 GetActSize() const
+    { return m_dwSize; }
+
+    inline guint32 GetShadowSize() const
+    { return GetActSize() - GetTailOff(); }
+
+    inline guint32 GetTailOff() const
+    { return m_dwTailOff; }
 
     inline gint32 SetOffset( guint32 dwOffset )
     {
+        if( GetDataType() != DataTypeMem )
+            return ERROR_STATE;
+
         if( m_pData == nullptr )
             return ERROR_STATE;
 
-        if( dwOffset > m_dwSize )
+        if( dwOffset > GetTailOff() )
             return -EINVAL;
 
         m_dwOffset = dwOffset;
         return STATUS_SUCCESS;
+    }
+
+    inline void SetTailOff( guint32 dwSize )
+    {
+        if( GetDataType() != DataTypeMem )
+            return;
+
+        if( dwSize > GetActSize() )
+            dwSize = GetActSize();
+
+        if( dwSize < offset() )
+            dwSize = offset();
+
+        m_dwTailOff = dwSize;
+    }
+
+    inline void SetWinSize( guint32 dwSize )
+    {
+        SetTailOff( offset() + dwSize );
+    }
+
+    inline gint32 SlideWindow( guint32 dwNewSize )
+    {
+        if( GetDataType() != DataTypeMem )
+            return ERROR_STATE;
+
+        guint32 dwOldWin = size();
+        SetWinSize( dwOldWin + dwNewSize );
+        return IncOffset( dwOldWin );
     }
 
     inline guint32 offset() const

@@ -80,6 +80,7 @@ class CIfStmReadWriteTask :
 
     std::deque< IrpPtr > m_queRequests;
     std::deque< BufPtr > m_queBufRead;
+    std::map< IRP*, ObjPtr > m_mapIrp2Cb;
 
     BufPtr  m_pSendBuf;
     bool    m_bIn;
@@ -300,7 +301,7 @@ class CIfStmReadWriteTask :
     gint32 WriteBlock( BufPtr& pBuf,
         guint32 dwTimeoutSec )
     {
-        return WriteStreamInternal( true,
+        return WriteStreamInternal( false,
             pBuf, dwTimeoutSec );
     }
 
@@ -884,7 +885,7 @@ struct CStreamSyncBase :
         return ret;
     }
 
-    gint32 StopWorkers( HANDLE hChannel )
+    virtual gint32 StopWorkers( HANDLE hChannel )
     {
         if( hChannel == INVALID_HANDLE )
             return -EINVAL;
@@ -975,13 +976,14 @@ struct CStreamSyncBase :
             hChannel, pCallback );
     }
 
-    gint32 OnConnected( HANDLE hChannel )
+    gint32 OnConnected( HANDLE hCfg )
     {
         WORKER_ELEM oWorker;
         gint32 ret = 0;
         DebugPrint( 0, "OnConnected..." );
 
         TaskGrpPtr pTaskGrp;
+        HANDLE hChannel = INVALID_HANDLE;
         do{
             CStdRMutex oIfLock( this->GetLock() );
             if( !this->IsConnected( nullptr ) )
@@ -989,6 +991,17 @@ struct CStreamSyncBase :
                 ret = ERROR_STATE;
                 break;
             }
+
+            IConfigDb* pResp = reinterpret_cast
+                < IConfigDb* >( hCfg );
+            if( pResp == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+
+            CCfgOpener oResp( pResp );
+            hChannel = ( HANDLE& )oResp[ 1 ];
 
             typename WORKER_MAP::iterator itr = 
                 m_mapStmWorkers.find( hChannel );
@@ -1021,6 +1034,18 @@ struct CStreamSyncBase :
             ret = oWorker.pContext.NewObj();
             if( ERROR( ret ) )
                 break;
+
+            if( !this->IsServer() )
+            {
+                ObjPtr& pObj = oResp[ 0 ];
+                IConfigDb* pDataDesc = pObj;
+
+                CCfgOpener oCtx( ( IConfigDb* )
+                    oWorker.pContext );
+
+                oCtx.CopyProp(
+                    propPeerObjId, pDataDesc );
+            }
 
             // writer task
             oParams.SetBoolProp( 0, false );
@@ -1123,7 +1148,8 @@ struct CStreamSyncBase :
                 ( *pTaskGrp )( eventCancelTask );
 
             CStdRMutex oIfLock( this->GetLock() );
-            m_mapStmWorkers.erase( hChannel );
+            if( hChannel != INVALID_HANDLE )
+                m_mapStmWorkers.erase( hChannel );
             oIfLock.Unlock();
 
             if( !oWorker.pReader.IsEmpty() )
@@ -1417,6 +1443,7 @@ struct CStreamSyncBase :
 
         return 0;
     }
+
 };
 
 class CStreamProxySync :
@@ -1455,12 +1482,19 @@ class CStreamProxySync :
 class CStreamServerSync :
     public CStreamSyncBase< CStreamServer >
 {
-    public:
+    std::map< guint64, HANDLE > m_mapIdHashToHandle;
 
+    protected:
+    HANDLE GetChanByIdHash( guint64 ) const;
+
+    public:
     typedef CStreamSyncBase< CStreamServer > super;
     CStreamServerSync( const IConfigDb* pCfg ) :
        _MyVirtBase( pCfg ), super( pCfg )
     {;}
+
+    virtual gint32 OnConnected( HANDLE hCfg );
+    virtual gint32 StopWorkers( HANDLE hChannel );
 };
 
 }

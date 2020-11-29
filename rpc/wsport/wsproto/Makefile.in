@@ -1,7 +1,9 @@
 include ../../../Makefile.init.pub
 
 TARGET:=libwsock.a
-SOURCES:= base64.cpp sha1.cpp WebSocket.cpp
+SOURCES:= WebSocket.cpp
+
+C_INCLUDE += -I$(BASE)/ipc
 
 OBJS:=$(SOURCES:%.cpp=$(OBJ_DIR)/%.o)
 

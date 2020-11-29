@@ -1674,14 +1674,21 @@ gint32 CUnixSockStmPdo::SubmitWriteIrp(
         else
         {
             IrpCtxPtr& pCtx = pIrp->GetCurCtx();
-            if( pCtx->m_pReqData.IsEmpty() )
+            BufPtr& pBuf = pCtx->m_pReqData;
+            if( unlikely(
+                pBuf.IsEmpty() || pBuf->empty() ) )
             {
                 ret = -EINVAL;
                 break;
             }
-            ret = pTask->WriteStream(
-                pCtx->m_pReqData );
+            else if( unlikely( pBuf->size() >
+                MAX_BYTES_PER_TRANSFER ) )
+            {
+                ret = -E2BIG;
+                break;
+            }
 
+            ret = pTask->WriteStream( pBuf );
             if( ret == STATUS_PENDING )
             {
                 pTask->StartWatch();
@@ -2047,9 +2054,17 @@ gint32 CUnixSockStmPdo::OnSendReady()
                 IrpCtxPtr pCtx =
                     pIrpToWrite->GetTopStack();
 
-                if( pCtx->m_pReqData.IsEmpty() )
+                BufPtr& pBuf = pCtx->m_pReqData;
+                if( unlikely(
+                    pBuf.IsEmpty() || pBuf->empty() ) )
                 {
                     pCtx->SetStatus( -EINVAL );
+                }
+                else if( unlikely( pBuf->size() >
+                    MAX_BYTES_PER_TRANSFER ) )
+                {
+                    ret = -E2BIG;
+                    break;
                 }
                 else
                 {

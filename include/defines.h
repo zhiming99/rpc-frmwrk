@@ -204,6 +204,10 @@ do{\
 #define THREAD_WAKEUP_INTERVAL      10
 #define RPC_SVR_DEFAULT_PORTNUM         0x1024
 
+#define MAX_BYTES_PER_TRANSFER ( 1024 * 1024 )
+#define MAX_BYTES_PER_FILE     ( 512 * 1024 * 1024 )
+#define MAX_BYTES_PER_BUFFER   ( 16 * 1024 * 1024 )
+
 
 namespace rpcfrmwrk
 {

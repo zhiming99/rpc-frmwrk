@@ -253,7 +253,7 @@ CBuffer::CBuffer( guint32 dwSize )
     SetExDataType( typeNone );
 
     m_pData = nullptr;
-    m_dwSize = 0;
+    m_dwSize = m_dwTailOff = 0;
 
     if( dwSize > BUF_MAX_SIZE )
         return;
@@ -313,7 +313,7 @@ char* CBuffer::ptr() const
 
 guint32 CBuffer::size() const
 {
-    return m_dwSize - offset();
+    return GetTailOff() - offset();
 }
 
 guint32 CBuffer::type() const
@@ -323,6 +323,10 @@ guint32 CBuffer::type() const
 
 gint32 CBuffer::ResizeWithOffset( guint32 dwSize )
 {
+    if( dwSize == 0 ||
+        dwSize > MAX_BYTES_PER_BUFFER )
+        return -EINVAL;
+
     switch( GetDataType() )
     {
     case DataTypeMem:
@@ -338,109 +342,93 @@ gint32 CBuffer::ResizeWithOffset( guint32 dwSize )
     gint32 ret = 0;
     do{
         char* pBase = ptr() - offset();
-        guint32 dwActSize = size() + offset();
+        guint32 dwActSize = GetActSize();
 
         bool bArrBuf = false;
 
         if( pBase == m_arrBuf )
             bArrBuf = true;
 
-        if( dwSize == 0 )
-        {
-            if( pBase != nullptr && !bArrBuf )
-                free( pBase );
-
-            SetBuffer( nullptr, 0 );
-            break;
-        }
-
         if( dwSize == size() )
             break;
 
+        guint32 dwBytesCopy =
+            std::min( size(), dwSize );
+
+        bool bMove = ( dwBytesCopy > 0 && offset() > 0 );
+
         if( sizeof( m_arrBuf ) >= dwSize &&
-            sizeof( m_arrBuf ) >= size() )
+            sizeof( m_arrBuf ) >= dwActSize )
         {
-            if( size() > 0 )
-            {
-                memmove( m_arrBuf, ptr(),
-                    std::min( size(), dwSize ) );
-            }
-            SetBuffer( m_arrBuf, dwSize );
+            if( bMove > 0 )
+                memmove( m_arrBuf, ptr(), dwBytesCopy );
+
             if( !bArrBuf )
                 free( pBase );
+
+            SetBuffer( m_arrBuf, dwSize );
         }
         else if( dwSize > sizeof( m_arrBuf ) &&
-            sizeof( m_arrBuf ) >= size() )
+            sizeof( m_arrBuf ) >= dwActSize )
         {
             char* pData = nullptr;
-            if( bArrBuf )
+            if( unlikely( !bArrBuf ) )
             {
-                if( dwSize > 1024 )
-                    pData = ( char* )calloc( 1, dwSize );
-                else
-                    pData = ( char* )malloc( dwSize );
-                if( size() > 0 )
-                    memcpy( pData, ptr(), size() );
+                ret = ERROR_STATE;
+                break;
             }
-            else
-            {
-                if( dwSize <= dwActSize )
-                {
-                    pData = pBase;
-                    memmove( pData, ptr(), size() );
-                }
-                else
-                {
-                    pData = ( char* )realloc( pBase, dwSize );
-                    if( pData == nullptr )
-                        break;
 
-                    memmove( pData,
-                        pData + offset(), size() );
-                }
-                
-            }
+            if( dwSize > 1024 )
+                pData = ( char* )calloc( 1, dwSize );
+            else
+                pData = ( char* )malloc( dwSize );
 
             if( pData == nullptr )
             {
                 ret = -ENOMEM;
                 break;
             }
+
+            if( dwBytesCopy > 0 )
+                memcpy( pData, ptr(), dwBytesCopy );
+
             SetBuffer( pData, dwSize );
         }
-        else if( size() > sizeof( m_arrBuf ) &&
+        else if( dwActSize > sizeof( m_arrBuf ) &&
             sizeof( m_arrBuf ) >= dwSize )
         {
-            if( bArrBuf )
+            if( unlikely( bArrBuf ) )
             {
-                ret = -EFAULT;
+                ret = ERROR_STATE;
                 break;
             }
-            memcpy( m_arrBuf, ptr(), dwSize );
+
+            if( dwBytesCopy > 0 )
+                memcpy( m_arrBuf, ptr(), dwBytesCopy );
+
             free( pBase );
             SetBuffer( m_arrBuf, dwSize );
         }
-        else if( std::min( dwSize, size() ) > sizeof( m_arrBuf ) )
+        else if( dwBytesCopy > sizeof( m_arrBuf ) )
         {
-            if( bArrBuf )
+            if( unlikely( bArrBuf ) )
             {
-                ret = -EFAULT;
+                ret = ERROR_STATE;
                 break;
             }
-            char* pData = nullptr;
-            if( dwSize <= dwActSize )
+
+            if( bMove )
+                memmove( pBase, ptr(), dwBytesCopy );
+
+            char* pData = pBase;
+            if( dwSize > dwActSize )
             {
-                pData = pBase;
-                memmove( pData, ptr(),
-                    std::min( dwSize, size() ) );
-            }
-            else
-            {
-                memmove( pBase, ptr(), size() );
                 pData = ( char* )realloc( pBase, dwSize );
                 if( pData == nullptr )
+                {
+                    ret = -ENOMEM;
                     break;
-                
+                }
             }
             SetBuffer( pData, dwSize );
         }
@@ -452,8 +440,12 @@ gint32 CBuffer::ResizeWithOffset( guint32 dwSize )
     return ret;
 }
 
-void CBuffer::Resize( guint32 dwSize )
+gint32 CBuffer::Resize( guint32 dwSize )
 {
+    if( dwSize > MAX_BYTES_PER_BUFFER )
+        return -E2BIG;
+
+    gint32 ret = 0;
     switch( GetDataType() )
     {
     case DataTypeMsgPtr:
@@ -466,9 +458,7 @@ void CBuffer::Resize( guint32 dwSize )
             }
             SetDataType( DataTypeMem );
             SetExDataType( typeNone );
-            Resize( 0 );
-            if( dwSize > 0 )
-                Resize( dwSize );
+            ret = Resize( dwSize );
             break;
         }
     case DataTypeObjPtr:
@@ -481,25 +471,23 @@ void CBuffer::Resize( guint32 dwSize )
             }
             SetDataType( DataTypeMem );
             SetExDataType( typeNone );
-            Resize( 0 );
-            if( dwSize > 0 )
-                Resize( dwSize );
+            ret = Resize( dwSize );
             break;
         }
     case DataTypeMem:
         {
-            if( offset() > 0 )
-            {
-                ResizeWithOffset( dwSize );
-                break;
-            }
-
             if( dwSize == 0 )
             {
                 if( ptr() != nullptr && ptr() != m_arrBuf )
                     free( ptr() );
 
                 SetBuffer( nullptr, 0 );
+                break;
+            }
+
+            if( offset() > 0 || GetShadowSize() > 0  )
+            {
+                ret = ResizeWithOffset( dwSize );
                 break;
             }
 
@@ -521,7 +509,10 @@ void CBuffer::Resize( guint32 dwSize )
                     pData = ( char* )malloc( dwSize );
 
                 if( pData == nullptr )
+                {
+                    ret = -ENOMEM;
                     break;
+                }
 
                 if( size() > 0 )
                     memcpy( pData, m_arrBuf, size() );
@@ -545,19 +536,26 @@ void CBuffer::Resize( guint32 dwSize )
                 else
                 {
                     // keep the old pointer
+                    ret = -ENOMEM;
                     break;
                 }
             }
 
             SetExDataType( typeByteArr );
-
             break;
         }
     default:
         break;
     }
 
-    return;
+    if( ERROR( ret ) )
+    {
+        std::string strMsg = DebugMsg( ret,
+            "Resizing buffer failed" );
+        throw std::runtime_error( strMsg );
+    }
+
+    return ret;
 }
 
 gint32 CBuffer::Serialize( CBuffer& toBuf ) const
@@ -1044,5 +1042,6 @@ gint32 CBuffer::Decompress(
 
     return 0;
 }
+
 
 }

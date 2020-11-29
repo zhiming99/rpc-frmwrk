@@ -938,8 +938,23 @@ class CUnixSockStream:
                     HANDLE hChannel = ( HANDLE )
                         ( ( CObjBase* )this );
 
+                    CfgPtr pDataDesc;
                     IStream* pStream = GetParent();
-                    pStream->OnConnected( hChannel );
+                    ret = pStream->GetDataDesc(
+                        hChannel, pDataDesc );
+                    if( ERROR( ret ) )
+                    {
+                        BufPtr pNullTask;
+                        SendUxStreamEvent(
+                            tokClose, pNullTask );
+                        break;
+                    }
+                    CParamList oResp;
+                    oResp.Push( ObjPtr( pDataDesc ) );
+                    oResp.Push( hChannel );
+                    IConfigDb* pCfg = oResp.GetCfg();
+                    pStream->OnConnected(
+                        ( HANDLE )pCfg );
                     ret = 0;
                 }
             }

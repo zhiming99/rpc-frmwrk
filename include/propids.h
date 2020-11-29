@@ -242,6 +242,7 @@ enum EnumPropId : gint32
 
     propPyObj,          // type: a pointer to a PyObject which is an interface object
     propJavaObj,        // type: a pointer to a java object which is an interface object
+    propPeerObjId,      // type: gint64 for the uxstream object id from the peer
 
     propReservedEnd = 0x10000000,
     propInvalid = -1, 
