@@ -479,7 +479,7 @@ gint32 CBuffer::Resize( guint32 dwSize )
             if( dwSize == 0 )
             {
                 if( ptr() != nullptr && ptr() != m_arrBuf )
-                    free( ptr() );
+                    free( ptr() - offset() );
 
                 SetBuffer( nullptr, 0 );
                 break;
