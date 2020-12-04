@@ -40,9 +40,7 @@ gint32 CMyStreamProxy::OnRecvData_Loop(
             break;
         }
 
-        ret = ReadMsg(
-            hChannel, pBuf, -1 );
-
+        ret = ReadStreamNoWait( hChannel, pBuf );
         if( ret == -EAGAIN )
         {
             ret = 0;
@@ -87,7 +85,7 @@ gint32 CMyStreamProxy::SendMessage(
         if( ERROR( ret ) )
             break;
 
-        if( dwCount == 30000 )
+        if( dwCount == LOOP_COUNT )
         {
             StopLoop();
             break;
@@ -97,7 +95,7 @@ gint32 CMyStreamProxy::SendMessage(
             dwCount, "a message to server" );
 
         *pBuf = strMsg;
-        ret = WriteMsg( hChannel, pBuf, -1 );
+        ret = WriteStreamNoWait( hChannel, pBuf );
         if( ret == ERROR_QUEUE_FULL )
         {
             printf( "Queue full the message later...\n" );
@@ -186,7 +184,7 @@ gint32 CMyStreamProxy::OnWriteEnabled_Loop(
             // the first time, send greetings
             BufPtr pBuf( true );
             *pBuf = std::string( "Hello, Server" );
-            WriteMsg( hChannel, pBuf, -1 );
+            WriteStreamNoWait( hChannel, pBuf );
             DebugPrint( 0, "say hello to server" );
             oCfg.Push( ++dwCount );
             ret = 0;

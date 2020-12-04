@@ -127,8 +127,8 @@ gint32 CMyFileProxy::OnRecvData_Loop(
             break;
         }
         pBuf.Clear();
-        ret = this->ReadMsg(
-            hChannel, pBuf, -1 );
+        ret = this->ReadStreamNoWait(
+            hChannel, pBuf );
         if( ret == -EAGAIN )
         {
             ret = 0;
@@ -278,7 +278,7 @@ gint32 CMyFileProxy::OnSendDone_Loop(
  * to resend the blocked data buffer as held in
  * the transfer context.
  *
- * On successful return of ReadAndWrite or
+ * On successful return of ReadAndSend or
  * ResumeBlockedSend, the sending request should
  * still in the sending queue waiting for
  * transmission, or blocked by flowcontrol. In

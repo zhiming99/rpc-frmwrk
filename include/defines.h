@@ -208,6 +208,14 @@ do{\
 #define MAX_BYTES_PER_FILE     ( 512 * 1024 * 1024 )
 #define MAX_BYTES_PER_BUFFER   ( 16 * 1024 * 1024 )
 
+// streaming parameters
+// queue size for uxsock streams
+#define STM_MAX_QUEUE_SIZE      128
+
+// queue size for tcp streams
+#define STM_MAX_RECV_PACKETS    ( 2 * STM_MAX_QUEUE_SIZE + 16 )
+
+#define MAX_TIMEOUT_VALUE       ( 3600 * 24 * 30 )
 
 namespace rpcfrmwrk
 {

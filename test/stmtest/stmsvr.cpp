@@ -100,7 +100,7 @@ gint32 CMyStreamServer::OnWriteEnabled_Loop(
             // the first time, send greetings
             BufPtr pBuf( true );
             *pBuf = std::string( "Hello, Proxy" );
-            WriteMsg( hChannel, pBuf, -1 );
+            WriteStreamNoWait( hChannel, pBuf );
             oCfg.Push( dwCount );
             ret = 0;
             break;
@@ -115,12 +115,12 @@ gint32 CMyStreamServer::OnWriteEnabled_Loop(
         if( SUCCEEDED( ret ) && bResend )
         {
             // a message is blocked
-            std::string strMsg = DebugMsg( 0,
+            std::string strMsg = DebugMsg( 0, 
                 "this is the %d msg", dwCount );
 
             BufPtr pNewBuf( true );
             *pNewBuf = strMsg;
-            ret = WriteMsg( hChannel, pNewBuf, -1 );
+            ret = WriteStreamNoWait( hChannel, pNewBuf );
             if( ret == ERROR_QUEUE_FULL )
             {
                 ret = 0;
@@ -177,7 +177,7 @@ gint32 CMyStreamServer::OnRecvData_Loop(
             break;
         }
 
-        ret = ReadMsg( hChannel, pBuf, -1 );
+        ret = ReadStreamNoWait( hChannel, pBuf );
         if( ret == -EAGAIN )
         {
             ret = 0;
@@ -197,7 +197,7 @@ gint32 CMyStreamServer::OnRecvData_Loop(
         BufPtr pNewBuf( true );
         *pNewBuf = strMsg;
 
-        ret = WriteMsg( hChannel, pNewBuf, -1 );
+        ret = WriteStreamNoWait( hChannel, pNewBuf );
         if( ret == ERROR_QUEUE_FULL )
         {
             // set a flag to resend

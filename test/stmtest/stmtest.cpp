@@ -282,11 +282,12 @@ void CIfSmokeTest::testCliStartStop()
                 "a message to server" );
 
             *pBuf = strMsg;
-            ret = pCli->WriteMsg( hChannel, pBuf );
+            ret = pCli->WriteStream( hChannel, pBuf );
             if( ERROR( ret ) )
                 break;
 
-            ret = pCli->ReadMsg( hChannel, pBuf );
+            pBuf->Resize( 0 );
+            ret = pCli->ReadStream( hChannel, pBuf );
             if( ERROR( ret ) )
                 break;
 
