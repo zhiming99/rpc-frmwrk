@@ -43,6 +43,9 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 4. Support for more languages
 
 ---
+[`Fri Dec  4 2020 10:54:37 PM Beijing`]   
+1. Refacted the streaming interface, which should be easier to use than the previous one. There will be some tests to the new interface before the Python support can resume.
+
 [`Fri Nov 27 2020 04:56:52 PM Beijing`]   
 1. I need to make the streaming interface less difficult to use before I can move on with Python support.
 
