@@ -45,6 +45,7 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 ---
 [`Fri Dec  4 2020 10:54:37 PM Beijing`]   
 1. Refacted the streaming interface, which should be easier to use than the previous one. There will be some tests to the new interface before the Python support can resume.
+2. Suprisingly, the `sftest` turns to to be faster than old version with the new API. The reason is yet to check. Sweet.
 
 [`Fri Nov 27 2020 04:56:52 PM Beijing`]   
 1. I need to make the streaming interface less difficult to use before I can move on with Python support.
