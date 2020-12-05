@@ -1450,12 +1450,12 @@ gint32 CStreamServerRelayMH::OnFetchDataComplete(
         if( ERROR( ret ) )
             break;*/
 
-        CCfgOpener oContext( pContext );
         IConfigDb* pDataDesc = nullptr;
-        ret = oContext.GetPointer( 0, pDataDesc );
+        ret = oResp.GetPointer( 0, pDataDesc );
         if( ERROR( ret ) )
             break;
 
+        CCfgOpener oContext( pContext );
         ret = oContext.GetIntProp( 3,
             ( guint32& )iFd );
         if( ERROR( ret ) )
