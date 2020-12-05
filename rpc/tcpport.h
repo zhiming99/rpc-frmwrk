@@ -319,7 +319,6 @@ class CIncomingPacket:
 class CRpcSocketBase;
 class CRpcStreamSock;
 
-#define STM_MAX_RECV_PACKETS    100
 class CRpcStream :
     public CObjBase
 {

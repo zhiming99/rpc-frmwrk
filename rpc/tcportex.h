@@ -154,6 +154,10 @@ class CRpcStream2 :
             pIrp->GetStackSize() == 0 )
             return -EINVAL;
 
+        if( m_queWriteIrps.size() >
+            STM_MAX_RECV_PACKETS  )
+            return  ERROR_QUEUE_FULL;
+
         m_queWriteIrps.push_back( pIrp );
         return 0;
     }

@@ -118,7 +118,7 @@ gint32 CMyFileServer::OnRecvData_Loop(
             break;
 
         BufPtr pBuf;
-        ret = ReadMsg( hChannel, pBuf, -1 );
+        ret = ReadStreamNoWait( hChannel, pBuf );
         if( ret == -EAGAIN )
         {
             ret = 0;

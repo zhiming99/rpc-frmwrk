@@ -69,6 +69,8 @@ gint32 IStream::CreateUxStream(
 
     gint32 ret = 0;
     do{
+        CObjBase* pParent = GetInterface();
+
         CParamList oNewCfg;
 
         oNewCfg.SetBoolProp(
@@ -77,20 +79,47 @@ gint32 IStream::CreateUxStream(
         oNewCfg.SetIntProp(
             propFd, ( guint32& )iFd );
 
-        oNewCfg.SetPointer( propParentPtr,
-            ( CObjBase* )GetInterface() ); 
+        oNewCfg.SetPointer(
+            propParentPtr, pParent ); 
 
-        ret = oNewCfg.CopyProp(
-            propKeepAliveSec, pDataDesc );
-
+        guint32 dwTimeoutSec = 0;
+        CCfgOpener oDataDesc( pDataDesc );
+        ret = oDataDesc.GetIntProp(
+            propTimeoutSec, dwTimeoutSec );
         if( ERROR( ret ) )
             break;
 
-        oNewCfg.CopyProp(
-            propTimeoutSec, pDataDesc );
+        if( dwTimeoutSec > MAX_TIMEOUT_VALUE )
+        {
+            ret = oNewCfg.CopyProp(
+                propTimeoutSec, pParent );
+            if( ERROR( ret ) )
+                break;
+        }
+        else
+        {
+            oNewCfg.SetIntProp(
+                propTimeoutSec, dwTimeoutSec );
+        }
 
+        guint32 dwKeepAliveSec = 0;
+        ret = oDataDesc.GetIntProp(
+            propKeepAliveSec, dwKeepAliveSec );
         if( ERROR( ret ) )
             break;
+
+        if( dwKeepAliveSec > MAX_TIMEOUT_VALUE )
+        {
+            ret = oNewCfg.CopyProp(
+                propKeepAliveSec, pParent );
+            if( ERROR( ret ) )
+                break;
+        }
+        else
+        {
+            oNewCfg.SetIntProp(
+            propKeepAliveSec, dwKeepAliveSec );
+        }
 
         oNewCfg.Push( ObjPtr( pDataDesc ) );
 
@@ -934,7 +963,9 @@ gint32 CStreamProxy::OpenChannel(
 
 // call this helper to start a stream channel
 gint32 CStreamProxy::StartStream(
-    HANDLE& hChannel, IConfigDb* pDesc )
+    HANDLE& hChannel,
+    IConfigDb* pDesc,
+    IEventSink* pCb )
 {
     gint32 ret = 0;
     do{
@@ -947,13 +978,22 @@ gint32 CStreamProxy::StartStream(
         CParamList oParams( pDesc );
         oParams.SetPointer( propIoMgr, GetIoMgr() );
 
-        TaskletPtr pSyncTask;
-        ret = pSyncTask.NewObj(
-            clsid( CSyncCallback ),
-            oParams.GetCfg() );
+        bool bAsync = true;
+        TaskletPtr pCallback;
+        if( pCb == nullptr )
+        {
+            bAsync = false;
+            ret = pCallback.NewObj(
+                clsid( CSyncCallback ),
+                oParams.GetCfg() );
 
-        if( ERROR( ret ) )
-            break;
+            if( ERROR( ret ) )
+                break;
+        }
+        else
+        {
+            pCallback = ObjPtr( pCb );
+        }
 
         oParams.RemoveProperty( propIoMgr );
 
@@ -967,20 +1007,26 @@ gint32 CStreamProxy::StartStream(
 
 
         ret = OpenChannel( oParams.GetCfg(),
-            fd, hChannel, pSyncTask );
+            fd, hChannel, pCallback );
 
         if( ERROR( ret ) )
             break;
 
-        if( ret == STATUS_PENDING )
+        if( ret == STATUS_PENDING && bAsync )
         {
-            CSyncCallback* pscb = pSyncTask;
+            break;
+        }
+        else if( ret == STATUS_PENDING )
+        {
+            CSyncCallback* pscb = pCallback;
             pscb->WaitForComplete();
-            ret = pSyncTask->GetError();
+            ret = pscb->GetError();
+            if( ERROR( ret ) )
+                break;
         }
 
         CCfgOpenerObj oTaskCfg(
-            ( CObjBase* )pSyncTask );
+            ( CObjBase* )pCallback );
 
         IConfigDb* pCfg = nullptr;
         ret = oTaskCfg.GetPointer(

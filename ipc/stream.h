@@ -258,8 +258,10 @@ class CStreamProxy :
     gint32 CancelChannel( HANDLE hChannel );
 
     // call this helper to start a stream channel
-    gint32 StartStream( HANDLE& hChannel,
-        IConfigDb* pDesc = nullptr );
+    virtual gint32 StartStream(
+        HANDLE& hChannel,
+        IConfigDb* pDesc = nullptr,
+        IEventSink* pCallback = nullptr );
 
     gint32 OnUxStreamEvent(
         HANDLE hChannel,

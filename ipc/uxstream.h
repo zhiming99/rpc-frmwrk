@@ -953,8 +953,8 @@ class CUnixSockStream:
                     oResp.Push( ObjPtr( pDataDesc ) );
                     oResp.Push( hChannel );
                     IConfigDb* pCfg = oResp.GetCfg();
-                    pStream->OnConnected(
-                        ( HANDLE )pCfg );
+                    HANDLE hCfg = ( HANDLE )pCfg;
+                    pStream->OnConnected( hCfg );
                     ret = 0;
                 }
             }

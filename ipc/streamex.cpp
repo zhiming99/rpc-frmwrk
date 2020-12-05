@@ -26,6 +26,92 @@
 namespace rpcfrmwrk
 {
 
+#define HAS_CALLBACK( _pIrp, _pCallback, _pBuf, _iRet ) \
+({ \
+    bool _ret = false; \
+    do{ \
+        if( _pIrp.IsEmpty() ) break;\
+        BufPtr pExtBuf; \
+        IrpCtxPtr pCtx; \
+        if( _pIrp->GetStackSize() == 0 ) \
+            break; \
+        pCtx = _pIrp->GetTopStack(); \
+        pCtx->GetExtBuf( pExtBuf ); \
+        if( pExtBuf.IsEmpty() || \
+            pExtBuf->empty() ) \
+            break; \
+        IRPCTX_EXT* pCtxExt = \
+            ( IRPCTX_EXT* )pExtBuf->ptr(); \
+        if( pCtxExt->pCallback.IsEmpty() ) \
+            break; \
+        _ret = true; \
+        _pCallback = pCtxExt->pCallback; \
+        gint32 iRet =  pCtx->GetStatus(); \
+        if( ERROR( iRet ) ) \
+            break; \
+        guint32 dwDir = pCtx->GetIoDirection();\
+        if( dwDir == IRP_DIR_IN ) {\
+            _pBuf = pCtx->m_pRespData; \
+        } \
+        else {\
+            _pBuf = pCtx->m_pReqData; \
+        } \
+    }while( 0 ); \
+    _ret; \
+})
+
+#define INVOKE_CALLBACK( _pIrp_ ) \
+({bool bRet = false;\
+do{ \
+    ObjPtr pObj; \
+    BufPtr pBuf; \
+    gint32 iRet = 0; \
+    bool bHasCb = HAS_CALLBACK( \
+        _pIrp_, pObj, pBuf, iRet ); \
+    if( !bHasCb ) \
+        break; \
+    TaskletPtr pTask = pObj; \
+    if( pTask.IsEmpty() ) \
+        break; \
+    CParamList oResp; \
+    oResp[ propReturnValue ] = iRet; \
+    if( SUCCEEDED( ret ) ) \
+        oResp.Push( pBuf ); \
+    TaskletPtr pDummy; \
+    pDummy.NewObj( clsid( CIfDummyTask ), \
+        oResp.GetCfg() ); \
+    LONGWORD* pData = \
+        ( LONGWORD* )( ( CObjBase* )pDummy ); \
+    pTask->OnEvent( \
+        eventTaskComp, iRet, 0, pData ); \
+    bRet = true;\
+}while( 0 ); \
+bRet; \
+})
+
+#define CLEAR_CALLBACK( _pIrp ) \
+({ \
+    do{ \
+        if( _pIrp.IsEmpty() ) break;\
+        BufPtr pExtBuf; \
+        IrpCtxPtr pCtx; \
+        if( _pIrp->GetStackSize() == 0 ) \
+            break; \
+        pCtx = pIrp->GetTopStack(); \
+        pCtx->GetExtBuf( pExtBuf ); \
+        if( pExtBuf.IsEmpty() || \
+            pExtBuf->empty() ) \
+            break; \
+        IRPCTX_EXT* pCtxExt = \
+            ( IRPCTX_EXT* )pExtBuf->ptr(); \
+        if( pCtxExt->pCallback.IsEmpty() ) \
+            break; \
+        TaskletPtr pCallback = pCtxExt->pCallback;\
+        ( *pCallback )( eventCancelTask );\
+        pCtxExt->pCallback.Clear(); \
+    }while( 0 ); \
+})
+
 #define COMPLETE_SEND_IRP( _pIrp, _ret ) \
 do{ \
     gint32 _iRet = ( gint32 )( _ret ); \
@@ -35,9 +121,10 @@ do{ \
         _pIrp->RemoveTimer(); \
         _pIrp->RemoveCallback(); \
         _pIrp->SetStatus( ( _iRet ) ); \
-        Sem_Post( &_pIrp->m_semWait ); \
         _pIrp->SetState( IRP_STATE_READY, \
             IRP_STATE_COMPLETED ); \
+        if( INVOKE_CALLBACK( _pIrp ) ) break;\
+        Sem_Post( &_pIrp->m_semWait ); \
         bool bNoWait = \
             ( ( guint32 )-1 == _pIrp->m_dwTimeoutSec ); \
         if( IsLoopStarted() && bNoWait ) \
@@ -54,9 +141,10 @@ do{ \
         _pIrp->RemoveTimer(); \
         _pIrp->RemoveCallback(); \
         _pIrp->SetStatus( ( _iRet ) ); \
-        Sem_Post( &_pIrp->m_semWait ); \
         _pIrp->SetState( IRP_STATE_READY, \
             IRP_STATE_COMPLETED ); \
+        if( INVOKE_CALLBACK( _pIrp ) ) break;\
+        Sem_Post( &_pIrp->m_semWait ); \
     } \
 }while( 0 )
 
@@ -98,6 +186,7 @@ do{ \
         break; \
     } \
 }while( 0 )
+
 
 CIfStmReadWriteTask::CIfStmReadWriteTask(
     const IConfigDb* pCfg )
@@ -215,6 +304,7 @@ gint32 CIfStmReadWriteTask::OnWorkerIrpComplete(
         return -EINVAL;
 
     bool bFound = false;
+    bool bHead = false;
     std::deque< IrpPtr >::iterator
         itr = m_queRequests.begin();
 
@@ -222,8 +312,11 @@ gint32 CIfStmReadWriteTask::OnWorkerIrpComplete(
     {
         if( *itr == IrpPtr( pIrp ) )
         {
+            if( itr == m_queRequests.begin() )
+                bHead = true;
             itr = m_queRequests.erase( itr );
             bFound = true;
+            break;
         }
     }
 
@@ -233,6 +326,9 @@ gint32 CIfStmReadWriteTask::OnWorkerIrpComplete(
         pIrp->RemoveTimer();
         Sem_Post( &pIrp->m_semWait ); \
     }
+
+    if( !bHead )
+        return STATUS_PENDING;
 
     gint32 ret = ReRun();
     if( SUCCEEDED( ret ) )
@@ -392,13 +488,17 @@ gint32 CIfStmReadWriteTask::OnIrpComplete(
 }
 
 gint32 CIfStmReadWriteTask::ReadStreamInternal(
-    bool bMsg, BufPtr& pBuf,
-    guint32 dwTimeoutSec )
+    IEventSink* pCallback,
+    BufPtr& pBuf, bool bNoWait )
 {
     gint32 ret = 0;
     IrpPtr pIrp( true );
 
     do{
+
+        bool bMsg =
+        ( pBuf.IsEmpty() || pBuf->empty() );
+
         CStdRTMutex oTaskLock( GetLock() );
         EnumIfState dwState = GetTaskState();
         if( dwState == stateStopped )
@@ -413,7 +513,7 @@ gint32 CIfStmReadWriteTask::ReadStreamInternal(
             break;
         }
 
-        if( bMsg && dwTimeoutSec == ( guint32 )-1 )
+        if( bMsg && bNoWait )
         {
             if( !m_queBufRead.empty() &&
                 m_queRequests.empty() )
@@ -430,10 +530,11 @@ gint32 CIfStmReadWriteTask::ReadStreamInternal(
 
                 if( bFull && bFree )
                 {
-                    // wakeup to fill the m_queBufRead
-                    // queue
-                    POST_LOOP_EVENT( m_hChannel,
-                        stmevtLifted, ret );
+                    // wakeup to resume receiving mesages
+                    //
+                    //POST_LOOP_EVENT( m_hChannel,
+                    //    stmevtLifted, ret );
+                    //
                     Resume();
                 }
             }
@@ -447,11 +548,28 @@ gint32 CIfStmReadWriteTask::ReadStreamInternal(
             }
             return ret;
         }
+        else if( bNoWait )
+        {
+            ret = -EINVAL;
+            break;
+        }
 
         pIrp->AllocNextStack( nullptr );
         IrpCtxPtr& pIrpCtx = pIrp->GetTopStack(); 
 
-        // stop the child port
+        if( pCallback != nullptr )
+        {
+            IRPCTX_EXT oCtxExt;
+            oCtxExt.pCallback = ObjPtr( pCallback );
+
+            BufPtr pExtBuf( true );
+            pExtBuf->Resize( sizeof( IRPCTX_EXT ) );
+            new ( pExtBuf->ptr() )
+                IRPCTX_EXT( oCtxExt );
+
+            pIrpCtx->SetExtBuf( pExtBuf );
+        }
+
         pIrpCtx->SetMajorCmd( IRP_MJ_FUNC );
         pIrpCtx->SetMinorCmd( IRP_MN_IOCTL );
         pIrpCtx->SetIoDirection( IRP_DIR_IN );
@@ -478,6 +596,8 @@ gint32 CIfStmReadWriteTask::ReadStreamInternal(
         // send out notification on irp
         // completion.
         pIrp->MarkPending();
+
+        // this callback is for timer
         pIrp->SetCallback(
             this, ( intptr_t )this );
 
@@ -486,16 +606,20 @@ gint32 CIfStmReadWriteTask::ReadStreamInternal(
 
         CIoManager* pMgr = nullptr;
         ret = GET_IOMGR( oCfg, pMgr );
-        if( SUCCEEDED( ret ) && dwTimeoutSec != 0 )
-        {
-            pIrp->SetTimer(
-                dwTimeoutSec, pMgr );
-        }
+        if( ERROR( ret ) )
+            break;
+
+        guint32 dwTimeoutSec = 0;
+        ret = oCfg.GetIntProp(
+            propTimeoutSec, dwTimeoutSec );
+
+        if( ERROR( ret ) )
+            break;
+
+        pIrp->SetTimer( dwTimeoutSec, pMgr );
         
         BufPtr pTempBuf;
-        ret = CompleteReadIrp(
-            pIrp, pTempBuf );
-
+        ret = CompleteReadIrp( pIrp, pTempBuf );
         if( ret == STATUS_PENDING )
             break;
 
@@ -504,6 +628,10 @@ gint32 CIfStmReadWriteTask::ReadStreamInternal(
             pBuf = pTempBuf;
 
     }while( 0 );
+
+    if( ret == STATUS_PENDING &&
+        pCallback != nullptr )
+        return ret;
 
     if( ret == STATUS_PENDING )
     {
@@ -520,6 +648,8 @@ gint32 CIfStmReadWriteTask::ReadStreamInternal(
     {
        pIrp->RemoveTimer();
     }
+
+    CLEAR_CALLBACK( pIrp );
 
     return ret;
 }
@@ -569,9 +699,7 @@ gint32 CIfStmReadWriteTask::SetRdRespForIrp(
             memcpy( pDest->ptr(),
                 pBuf->ptr(), dwBytes );
 
-            pDest->SetOffset(
-                pDest->offset() + dwBytes );
-
+            pDest->IncOffset( dwBytes );
             if( pDest->size() > 0 )
             {
                 ret = STATUS_PENDING;
@@ -685,16 +813,18 @@ gint32 CIfStmReadWriteTask::CompleteReadIrp(
             // waiting in the queue
             if( bNewReq )
             {
+                m_queBufRead.pop_front();
+                if( !m_queBufRead.empty() )
+                    continue;
                 m_queRequests.push_back(
                     IrpPtr( pIrp ) );
             }
         }
         else if( ret == STATUS_MORE_PROCESS_NEEDED )
         {
-            // leave the pBuf where it is,
-            // that is, if the pbuf is in the
-            // queue, stay there. if not,
-            // still not
+            // leave the pBuf where it is, that
+            // is, if the pbuf is in the queue,
+            // stay there. if not, still not
             if( !bNewReq )
                 m_queRequests.pop_front(); 
 
@@ -710,7 +840,9 @@ gint32 CIfStmReadWriteTask::CompleteReadIrp(
             pIrpCtx->SetStatus( ret );
         }
 
-    }while( 0 );
+        break;
+
+    }while( 1 );
 
     return ret;
 }
@@ -840,25 +972,13 @@ gint32 CIfStmReadWriteTask::RunTask()
         }
         else
         {
-            BufPtr pTempBuf;
-            guint32 dwSize = pBuf->size();
-            if( dwSize > STM_MAX_BYTES_PER_BUF )
-            {
-                dwSize = STM_MAX_BYTES_PER_BUF;
-                ret = pTempBuf.NewObj();
-                if( ERROR( ret ) )
-                    break;
+            AdjustSizeToWrite( pIrp, pBuf );
+            BufPtr pExtBuf;
+            pIrpCtx->GetExtBuf( pExtBuf );
+            IRPCTX_EXT* pExt =
+                ( IRPCTX_EXT* )pExtBuf->ptr();
 
-                pTempBuf->Resize( dwSize );
-                memcpy( pTempBuf->ptr(),
-                    pBuf->ptr(), dwSize );
-
-            }
-            else
-            {
-                pTempBuf = pBuf;
-            }
-
+            BufPtr& pTempBuf = pBuf;
             pIrp->SetSubmited();
             ret = pStm->WriteStream(
                 m_hChannel, pTempBuf, this );
@@ -875,24 +995,40 @@ gint32 CIfStmReadWriteTask::RunTask()
             }
 
             if( ERROR( ret ) )
-                break;
+            {
+                pBuf->SetOffset( pExt->dwOffset );
+                pBuf->SetTailOff( pExt->dwTailOff );
+                m_queRequests.pop_front();
+                COMPLETE_IRP( pIrp, ret );
+                continue;
+            }
 
             bool bDone = false;
-            if( pTempBuf == pBuf ||
-                dwSize == pBuf->size() )
-                bDone = true;
+            if( pExt->dwTailOff ==
+                pBuf->GetTailOff() )
+                    bDone = true;
 
             if( bDone )
             {
+                pBuf->SetOffset( pExt->dwOffset );
+                pBuf->SetTailOff( pExt->dwTailOff );
                 m_queRequests.pop_front();
-                pBuf->SetOffset( 0 );
                 COMPLETE_IRP( pIrp, ret );
+                continue;
             }
             else
             {
                 pIrp->ClearSubmited();
-                pBuf->SetOffset(
-                    pBuf->offset() + dwSize );
+                ret = AdjustSizeToWrite(
+                    pIrp, pBuf, true );
+
+                if( SUCCEEDED( ret ) )
+                    continue;
+
+                pBuf->SetOffset( pExt->dwOffset );
+                pBuf->SetTailOff( pExt->dwTailOff );
+                m_queRequests.pop_front();
+                COMPLETE_IRP( pIrp, ret );
             }
         }
 
@@ -904,19 +1040,88 @@ gint32 CIfStmReadWriteTask::RunTask()
     return ret;
 }
 
-gint32 CIfStmReadWriteTask::WriteStreamInternal(
-    bool bMsg, BufPtr& pBuf,
-    guint32 dwTimeoutSec )
+gint32 CIfStmReadWriteTask::AdjustSizeToWrite(
+    IrpPtr& pIrp, BufPtr& pBuf, bool bSlide )
 {
     if( pBuf.IsEmpty() || pBuf->empty() )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        guint32 dwSize =
+            STM_MAX_BYTES_PER_BUF;
+
+        if( bSlide )
+        {
+            if( pBuf->GetShadowSize() == 0 )
+                ret = -ENODATA;
+            else
+            {
+                IrpCtxPtr& pCtx =
+                    pIrp->GetTopStack();
+                BufPtr pExt;
+                pCtx->GetExtBuf( pExt );
+                if( unlikely ( pExt.IsEmpty() ||
+                    pExt->empty() ) )
+                {
+                    ret = pBuf->
+                        SlideWindow( dwSize );
+                    break;
+                }
+
+                IRPCTX_EXT* pCtxExt =
+                    ( IRPCTX_EXT* )pExt->ptr();
+
+                guint32 dwOrigTail =
+                    pCtxExt->dwTailOff;
+
+                guint32 dwTailOff =
+                    pBuf->GetTailOff();
+
+                if( dwSize <=
+                    dwOrigTail - dwTailOff )
+                {
+                    pBuf->SlideWindow( dwSize );
+                }
+                else if( dwOrigTail > dwTailOff )
+                {
+                    dwSize = dwOrigTail - dwTailOff;
+                    pBuf->SlideWindow( dwSize );
+                }
+                else if( dwOrigTail == dwTailOff )
+                {
+                    ret = -ENODATA;
+                    break;
+                }
+                else if( dwOrigTail < dwTailOff )
+                {
+                    ret = -ERANGE;
+                    break;
+                }
+            }
+            break;
+        }
+
+        if( pBuf->size() > dwSize )
+            pBuf->SetWinSize( dwSize );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CIfStmReadWriteTask::WriteStreamInternal(
+    IEventSink* pCallback,
+    BufPtr& pBuf, bool bNoWait )
+{
+    if( pBuf.IsEmpty() || pBuf->empty() )
+        return -EINVAL;
+
+    if( bNoWait && pCallback != nullptr )
         return -EINVAL;
     
     gint32 ret = 0;
     IrpPtr pIrp( true );
-
-    bool bNoWait = false;
-    if( dwTimeoutSec == ( guint32 )-1 )
-        bNoWait = true;
 
     do{
         CStdRTMutex oTaskLock( GetLock() );
@@ -925,23 +1130,6 @@ gint32 CIfStmReadWriteTask::WriteStreamInternal(
         {
             ret = ERROR_STATE;
             break;
-        }
-
-        if( IsLoopStarted() )
-        {
-            // NOTE: check if a flow-control from
-            // the uxstream is going on. The
-            // transfer will get interrupted
-            // without this check, for the reason
-            // large amount of incoming data
-            // packets blocks the entrance for
-            // progress report packet.
-            if( !CanSend()  )
-            {
-                // uxstream's flow control
-                ret = ERROR_QUEUE_FULL;
-                break;
-            }
         }
 
         if( m_queRequests.size() >=
@@ -954,29 +1142,41 @@ gint32 CIfStmReadWriteTask::WriteStreamInternal(
         pIrp->AllocNextStack( nullptr );
         IrpCtxPtr& pIrpCtx = pIrp->GetTopStack(); 
 
-        // stop the child port
         pIrpCtx->SetMajorCmd( IRP_MJ_FUNC );
         pIrpCtx->SetMinorCmd( IRP_MN_IOCTL );
         pIrpCtx->SetIoDirection( IRP_DIR_OUT );
         pIrpCtx->m_pReqData = pBuf;
-        if( bMsg )
+
+        IRPCTX_EXT oCtxExt;
+        oCtxExt.dwOffset = pBuf->offset();
+        oCtxExt.dwTailOff = pBuf->GetTailOff();
+
+        if( pCallback != nullptr )
+            oCtxExt.pCallback = pCallback;
+
+        BufPtr pExtBuf( true );
+        pExtBuf->Resize( sizeof( IRPCTX_EXT ) );
+
+        new ( pExtBuf->ptr() )
+            IRPCTX_EXT( oCtxExt );
+
+        pIrpCtx->SetExtBuf( pExtBuf );
+
+        if( bNoWait && ( pBuf->size() >
+            STM_MAX_BYTES_PER_BUF ) )
         {
-            if( pBuf->size() >
-                STM_MAX_BYTES_PER_BUF )
-            {
-                ret = -EINVAL;
-                break;
-            }
+            ret = -EINVAL;
+            break;
+        }
+
+        if( bNoWait && ( pBuf->size() <= 
+            STM_MAX_BYTES_PER_BUF ) )
+        {
             pIrpCtx->SetCtrlCode(
                 CTRLCODE_WRITEMSG );
         }
         else
         {
-            if( pBuf.IsEmpty() || pBuf->empty() )
-            {
-                ret = -EINVAL;
-                break;
-            }
             pIrpCtx->SetCtrlCode(
                 CTRLCODE_WRITEBLK );
         }
@@ -986,21 +1186,20 @@ gint32 CIfStmReadWriteTask::WriteStreamInternal(
             ( IConfigDb* )GetConfig() );
 
         ret = GET_IOMGR( oCfg, pMgr );
-        if( SUCCEEDED( ret ) &&
-            dwTimeoutSec != 0 )
-        {
-            // for dwTimeoutSec == -1, the
-            // notification will be sent to the
-            // handler OnSendDone
-            if( dwTimeoutSec == ( guint32 )-1 )
-                pMgr = nullptr;
+        if( ERROR( ret ) )
+            break;
 
-            pIrp->SetTimer(
-                dwTimeoutSec, pMgr );
-        }
+        guint32 dwTimeoutSec = 0;
+        ret = oCfg.GetIntProp(
+            propTimeoutSec, dwTimeoutSec );
 
-        pIrp->SetTimer(
-            dwTimeoutSec, nullptr );
+        if( ERROR( ret ) )
+            break;
+
+        if( bNoWait )
+            pIrp->SetTimer( -1, nullptr );
+        else
+            pIrp->SetTimer( dwTimeoutSec, pMgr );
 
         // this irp is for callback only
         pIrp->SetCbOnly( true );
@@ -1026,11 +1225,19 @@ gint32 CIfStmReadWriteTask::WriteStreamInternal(
 
     }while( 0 );
 
-    if( ret == STATUS_PENDING && !bNoWait )
+    if( ret == STATUS_PENDING && bNoWait )
+        return ret;
+ 
+    if( ret == STATUS_PENDING &&
+        pCallback == nullptr )
     {
         pIrp->WaitForComplete();
         ret = pIrp->GetStatus();
     }
+    else if( ret == STATUS_PENDING )
+        return ret;
+
+    CLEAR_CALLBACK( pIrp );
 
     return ret;
 }
@@ -1072,13 +1279,11 @@ gint32 CIfStmReadWriteTask::OnStmRecv(
         IrpPtr pIrp;
         while( bContinue )
         {
-            ret = CompleteReadIrp(
-                pIrp, pBuf );
+            ret = CompleteReadIrp( pIrp, pBuf );
 
             // NOTE: this
             // STATUS_MORE_PROCESS_NEEDED cannot
-            // be returned as OnStmRecv's return
-            // value
+            // be as OnStmRecv's return value
             if( ret !=
                 STATUS_MORE_PROCESS_NEEDED )
                 bContinue = false;
@@ -1090,17 +1295,12 @@ gint32 CIfStmReadWriteTask::OnStmRecv(
             pIrp.Clear();
         }
 
-        if( ret != STATUS_PENDING )
+        // the buffer needs further
+        // processing
+        for( auto elem : vecIrps )
         {
-            // the buffer needs further
-            // processing
-            oTaskLock.Unlock();
-
-            for( auto elem : vecIrps )
-            {
-                gint32 iRet = elem->GetStatus();
-                COMPLETE_IRP( elem, iRet );
-            }
+            gint32 iRet = elem->GetStatus();
+            COMPLETE_IRP( elem, iRet );
         }
 
     }while( 0 );
@@ -1248,6 +1448,25 @@ HANDLE CStreamServerSync::GetChanByIdHash(
     return itr->second;
 }
 
+gint32 CStreamProxySync::StartStream(
+    HANDLE& hChannel,
+    IConfigDb* pDesc,
+    IEventSink* pCallback )
+{
+    gint32 ret = 0;
+    hChannel = INVALID_HANDLE;
+    do{
+        if( !IsConnected() )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+        ret = super::StartStream(
+            hChannel, pDesc, pCallback );
 
+    }while( 0 );
+
+    return ret;
+}
 
 }

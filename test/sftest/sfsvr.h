@@ -414,7 +414,8 @@ class CMyFileServerBase :
         if( pBuf->size() > STM_MAX_BYTES_PER_BUF )
             return -EINVAL;
 
-        return this->WriteMsg( hChannel, pBuf, -1 );
+        return this->
+            WriteStreamNoWait( hChannel, pBuf );
     }
 
     gint32 CheckAndOpenFile(

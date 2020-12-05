@@ -192,12 +192,12 @@ gint32 CStreamServerRelay::OnFetchDataComplete(
         if( ERROR( ret ) )
             break;
 
-        CCfgOpener oCtx( pContext );
         IConfigDb* pDataDesc = nullptr;
-        ret = oCtx.GetPointer( 1, pDataDesc );
+        ret = oResp.GetPointer( 0, pDataDesc );
         if( ERROR( ret ) )
             break;
 
+        CCfgOpener oCtx( pContext );
         ret = oCtx.GetIntProp( 0,
             ( guint32& )iStmId );
         if( ERROR( ret ) )
@@ -366,12 +366,8 @@ gint32 CStreamProxyRelay::OnFetchDataComplete(
         if( ERROR( ret ) )
             break;
 
-        CParamList oContext( pContext );
         IConfigDb* pDataDesc = nullptr;
-
-        ret = oContext.GetPointer(
-            0, pDataDesc );
-
+        ret = oResp.GetPointer( 0, pDataDesc );
         if( ERROR( ret ) )
             break;
 

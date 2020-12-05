@@ -34,7 +34,6 @@
 #define STM_MAX_PENDING_WRITE ( 1 * 1024 * 1024 )
 #define STM_MAX_PACKETS_REPORT 32
 
-#define STM_MAX_QUEUE_SIZE  128
 #define UXPKT_HEADER_SIZE   ( sizeof( guint32 ) + sizeof( guint8 ) )
 #define UXBUF_OVERHEAD      8
 
