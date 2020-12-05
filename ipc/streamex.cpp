@@ -180,7 +180,7 @@ do{ \
     if( ERROR( _ret ) ) \
         break; \
     GET_STMPTR( _pIf, _pStm ); \
-    if( pStm == nullptr ) \
+    if( _pStm == nullptr ) \
     { \
         _ret = -EFAULT; \
         break; \
@@ -259,8 +259,31 @@ gint32 CIfStmReadWriteTask::OnFCLifted()
         Resume();
 
     gint32 ret = 0;
-    POST_LOOP_EVENT( m_hChannel, 
-        stmevtLifted, ret );
+    if( IsLoopStarted() )
+    {
+        POST_LOOP_EVENT( m_hChannel, 
+            stmevtLifted, ret );
+    }
+    else
+    {
+        CRpcServices* pSvc = nullptr;
+        GET_STMPTR2( pSvc, ret );
+        if( ERROR( ret ) )
+            return ret;
+
+        if( pSvc->IsServer() )
+        {
+            CStreamServerSync* pIf =
+                ObjPtr( pSvc );
+            pIf->OnWriteResumed( m_hChannel );
+        }
+        else
+        {
+            CStreamProxySync* pIf =
+                ObjPtr( pSvc );
+            pIf->OnWriteResumed( m_hChannel );
+        }
+    }
     return 0;
 }
 
