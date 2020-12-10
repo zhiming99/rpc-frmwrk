@@ -39,8 +39,10 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 #### Todo:
 1. Python support
 2. Examples and Tutorials
-3. Access Control
-4. Support for more languages
+3. GUI for configuration and monitoring
+4. Node backup/Load banlance
+5. Java support
+6. Access Control
 
 ---
 [`Fri Dec  4 2020 10:54:37 PM Beijing`]   
