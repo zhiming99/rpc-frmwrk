@@ -883,9 +883,7 @@ class CUnixSockStream:
                 pProgress->Serialize( *pRptBuf );
 
                 TaskletPtr pDummy;
-                ret = pDummy.NewObj( clsid( CIfDummyTask ) );
-                if( ERROR( ret ) )
-                    break;
+                pDummy.NewObj( clsid( CIfDummyTask ) );
                 ret = SendProgress( pRptBuf, pDummy );
                 if( ret == STATUS_PENDING )
                     ret = 0;
@@ -1034,7 +1032,8 @@ class CUnixSockStream:
         return ret;
     }
 
-    // only happens on the writing
+    // only happens when the underlying ux port's
+    // output queue is full.
     virtual gint32 OnFlowControl()
     {
         gint32 ret =
@@ -1050,7 +1049,8 @@ class CUnixSockStream:
         return 0;
     }
 
-    // only happens on the writing
+    // only happens when the underlying ux port's
+    // output queue is full.
     virtual gint32 OnFCLifted()
     {
         gint32 ret = 0;

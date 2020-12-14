@@ -262,6 +262,8 @@ class CIfStmReadWriteTask :
     gint32 PostLoopEvent( BufPtr& pBuf );
     bool IsLoopStarted();
     bool CanSend();
+    gint32 ReschedRead();
+    gint32 PeekStream( BufPtr& pBuf );
 };
 
 
@@ -469,9 +471,9 @@ struct CStreamSyncBase :
     /**
      * Parameter(s):
      * hChannel: the handle to the stream channel.
-     * you can call ReadMsg/ReadBlock with this
-     * parameter to get the buffer containing the
-     * incoming message or data block.
+     * you can call ReadStream with this parameter
+     * to get the buffer containing the incoming
+     * message or data block.
      *
      * Return value:
      * 
@@ -824,9 +826,6 @@ struct CStreamSyncBase :
                 break;
 
             CIfStmReadWriteTask* pWriter = pTask;
-            CStdRTMutex oTaskLock(
-                pWriter->GetLock() );
-
             ret = pWriter->OnFCLifted();
             if( ERROR( ret ) )
                 break;
@@ -1209,261 +1208,6 @@ struct CStreamSyncBase :
         return ret;
     }
 
-    gint32 ReadWriteInternal(
-        HANDLE hChannel, BufPtr& pBuf,
-        IEventSink* pCallback,
-        bool bRead, bool bNoWait )
-    {
-        gint32 ret = 0;
-        do{
-            TaskletPtr pTask;
-
-            if( !this->IsConnected( nullptr ) )
-                return ERROR_STATE;
-
-            ret = GetWorker(
-                hChannel, bRead, pTask );
-            if( ERROR( ret ) )
-                return ret;
-
-
-            CIfStmReadWriteTask* pRwTask = pTask;
-            if( pRwTask == nullptr )
-            {
-                ret = -EFAULT;
-                break;
-            }
-            if( bRead && bNoWait )
-            {
-                ret = pRwTask->
-                    ReadStreamNoWait( pBuf );
-            }
-            else if( bRead && !bNoWait )
-            {
-                if( pCallback == nullptr )
-                    ret = pRwTask->ReadStream( pBuf );
-                else
-                    ret = pRwTask->ReadStreamAsync(
-                        pCallback, pBuf );
-            }
-            else if( !bRead && bNoWait )
-            {
-                ret = pRwTask->
-                    WriteStreamNoWait( pBuf );
-            }
-            else
-            {
-                if( pCallback == nullptr )
-                    ret = pRwTask->WriteStream( pBuf );
-                else
-                    ret = pRwTask->WriteStreamAsync(
-                        pCallback, pBuf );
-
-            }
-
-        }while( 0 );
-
-        return ret;
-    }
-
-    /**
-    * @name ReadMsg
-    * @{ Read a message from the stream. It is any
-    * thing the peer send via a WriteMsg/Write
-    * call. it will wait till the message arrives
-    * or error occurs on the underlying stream. It
-    * should be faster than ReadBlock, since there
-    * is zero copy along the path from the `read'
-    * call to the caller.
-    * */
-    /** 
-     * Parameter:
-     * pBuf: an empty buffer for receiving the
-     * incoming data.
-     *
-     * dwTimeoutSec: time to wait before return.
-     * if dwTimeoutSec == -1, ReadMsg will return
-     * immediately. If there are pending msgs in
-     * the receiving queue, the first msg will be
-     * returned via pBuf. And if there is no data
-     * pending, error code -EAGAIN is returned.
-     *
-     * return value:
-     * STATUS_SUCCESS: the pBuf contains the
-     * payload from the peer side
-     *
-     * @} */
-    gint32 ReadStream(
-        HANDLE hChannel, BufPtr& pBuf )
-    {
-        return ReadWriteInternal( hChannel,
-            pBuf, nullptr, true, false );
-    }
-
-    /**
-    * @name ReadBlock
-    * @{ Read a required size of data block from
-    * the stream. It is any thing the peer send
-    * via a WriteMsg/Write call. it will wait till
-    * the specified size of bytes arrives or error
-    * occurs on the underlying stream. 
-    * */
-    /** 
-     * Parameter:
-     * pBuf: a buffer for receiving the incoming
-     * data. The pBuf must not be empty. And the
-     * method will try to fill the buffer at the
-     * best effort. If the time is up before the
-     * requested amount of data can be received,
-     * the request will be canceled.
-     *
-     * dwTimeoutSec: time to wait before return.
-     * If there are pending data in the receiving
-     * queue, the first block will be returned via
-     * pBuf. And if there is no data pending,
-     * error code -EAGAIN is returned.
-     *
-     * return value:
-     * STATUS_SUCCESS: the pBuf contains the
-     * payload from the peer side
-     *
-     * @} */
-
-    gint32 ReadStreamNoWait(
-        HANDLE hChannel, BufPtr& pBuf )
-    {
-        return ReadWriteInternal( hChannel,
-            pBuf, nullptr, true, true );
-    }
-
-    gint32 ReadWriteAsync( HANDLE hChannel,
-        BufPtr& pBuf, LONGWORD& lwTid, bool bRead )
-    {
-        CParamList oReqCtx;
-        oReqCtx.Push( hChannel );
-        IConfigDb* pReqCtx = oReqCtx.GetCfg();
-
-        TaskletPtr pCallback;
-        gint32 ret = NEW_PROXY_RESP_HANDLER2(
-            pCallback, ObjPtr( this ),
-            &CStreamSyncBase::OnRWComplete,
-            nullptr, pReqCtx );
-
-        if( ERROR( ret ) )
-            return ret;
-
-        lwTid = pCallback->GetObjId();
-        oReqCtx.Push( lwTid );
-
-        // whether a read/write request
-        oReqCtx.Push( bRead );
-
-        return ReadWriteInternal( hChannel,
-            pBuf, pCallback, bRead, false );
-    }
-
-    gint32 ReadStreamAsync( HANDLE hChannel,
-        BufPtr& pBuf, LONGWORD& lwTid )
-    {
-        return ReadWriteAsync(
-            hChannel, pBuf, lwTid, true );
-    }
-
-    /**
-    * @name WriteStream
-    * @{ Write a message to the stream
-    * synchronously. It is any thing to peer end.
-    * It will wait till the message is out of the
-    * box or error occurs on the underlying
-    * stream. It should be fastest, since there is
-    * no copy work to the user specified places.
-    * If the flow-control happens, it will wait
-    * till flow-control is lifted and the the pBuf
-    * is sent successfully
-    * */
-    /** 
-     * Parameter:
-     * pBuf: a buffer for the outgoing data
-     *
-     * return vale:
-     * STATUS_SUCCESS: the content is sent
-     * successfully
-     *
-     * @} */
-    gint32 WriteStream(
-        HANDLE hChannel, BufPtr& pBuf )
-    {
-        return ReadWriteInternal( hChannel,
-            pBuf, nullptr, false, false );
-    }
-
-    /**
-    * @name WriteStreamNoWait
-    * @{ Write a block of data to the stream. It
-    * is any thing to peer end. It will return
-    * immediately without waiting till the message
-    * is sent. It will always return
-    * STATUS_PENDING. But you can still call this
-    * method  till ERROR_QUEUE_FULL is returned,
-    * which means the send queue is full. And you
-    * can resume write when OnWriteResumed event
-    * happens.
-    * */
-    /** 
-    * Parameter:
-    * pBuf: a buffer for the outgoing data. an
-    * empty buf will cause an error of -EINVAL.
-    * The buffer size can be up to the CBuffer's
-    * upper limit, MAX_BYTES_PER_BUFFER.
-    *
-    * return vale:
-    * STATUS_PENDING: the content is queued
-    * successfully
-    * ERROR_QUEUE_FULL: the buffer is not queued,
-    * and the send queue is full. 
-    *
-    * @} */
-    gint32 WriteStreamNoWait(
-        HANDLE hChannel, BufPtr& pBuf )
-    {
-        return ReadWriteInternal( hChannel,
-            pBuf, nullptr, false, true );
-    }
-
-    /**
-    * @name WriteStreamAsync
-    * @{ Write a block of data to the stream. It
-    * is any thing to peer end. It will return
-    * with STATUS_PENDING if the message is queued
-    * sucessfully. When the buffer is sent, the
-    * event OnWriteStreamComplete is called. It
-    * will report if the write succeeds or not.
-    * If the flowcontrol happens, ERROR_QUEUE_FULL
-    * will return and the request has to be resend
-    * after OnWriteResumed event happens
-    * */
-    /** 
-    * Parameter:
-    * pBuf: a buffer for the outgoing data. an
-    * empty buf will cause an error of -EINVAL.
-    * The buffer size can be up to the CBuffer's
-    * upper limit, MAX_BYTES_PER_BUFFER.
-    *
-    * return vale:
-    * STATUS_SUCCESS: the buffer is sent
-    * successfully, which is usually unlikely.
-    * STATUS_PENDING: the content is queued
-    * successfully
-    * ERROR_QUEUE_FULL: the buffer is not queued,
-    * and the send queue is full. 
-    *
-    * @} */
-    gint32 WriteStreamAsync( HANDLE hChannel,
-        BufPtr& pBuf, LONGWORD& lwTid )
-    {
-        return ReadWriteAsync(
-            hChannel, pBuf, lwTid, false );
-    }
 
     gint32 OnPreStop(
         IEventSink* pCallback )
@@ -1584,24 +1328,500 @@ struct CStreamSyncBase :
         return 0;
     }
 
+    protected:
+
+    gint32 ReadWriteInternal(
+        HANDLE hChannel, BufPtr& pBuf,
+        IEventSink* pCallback,
+        bool bRead, bool bNoWait )
+    {
+        gint32 ret = 0;
+        do{
+            TaskletPtr pTask;
+
+            if( !this->IsConnected( nullptr ) )
+                return ERROR_STATE;
+
+            ret = GetWorker(
+                hChannel, bRead, pTask );
+            if( ERROR( ret ) )
+                return ret;
+
+
+            CIfStmReadWriteTask* pRwTask = pTask;
+            if( pRwTask == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            if( bRead && bNoWait )
+            {
+                ret = pRwTask->
+                    ReadStreamNoWait( pBuf );
+            }
+            else if( bRead && !bNoWait )
+            {
+                if( pCallback == nullptr )
+                    ret = pRwTask->ReadStream( pBuf );
+                else
+                    ret = pRwTask->ReadStreamAsync(
+                        pCallback, pBuf );
+            }
+            else if( !bRead && bNoWait )
+            {
+                ret = pRwTask->
+                    WriteStreamNoWait( pBuf );
+            }
+            else
+            {
+                if( pCallback == nullptr )
+                    ret = pRwTask->WriteStream( pBuf );
+                else
+                    ret = pRwTask->WriteStreamAsync(
+                        pCallback, pBuf );
+
+            }
+
+        }while( 0 );
+
+        return ret;
+    }
+
+    public:
+    // ----methods as the streaming interface ----
+    /**
+    * @name ReadStream
+    * @{ Read a message from the stream. It is any
+    * thing the peer send via a WriteMsg/Write
+    * call. it will wait till the message arrives
+    * or error occurs on the underlying stream. It
+    * should be faster than ReadBlock, since there
+    * is zero copy along the path from the `read'
+    * call to the caller.
+    * */
+    /** 
+     * Parameter:
+     * pBuf: an empty buffer for receiving the
+     * incoming data.
+     *
+     * dwTimeoutSec: time to wait before return.
+     * if dwTimeoutSec == -1, ReadStream will return
+     * immediately. If there are pending msgs in
+     * the receiving queue, the first msg will be
+     * returned via pBuf. And if there is no data
+     * pending, error code -EAGAIN is returned.
+     *
+     * return value:
+     * STATUS_SUCCESS: the pBuf contains the
+     * payload from the peer side
+     *
+     * @} */
+    gint32 ReadStream(
+        HANDLE hChannel, BufPtr& pBuf )
+    {
+        return ReadWriteInternal( hChannel,
+            pBuf, nullptr, true, false );
+    }
+
+    /**
+    * @name ReadBlock
+    * @{ Read a required size of data block from
+    * the stream. It is any thing the peer send
+    * via a WriteMsg/Write call. it will wait till
+    * the specified size of bytes arrives or error
+    * occurs on the underlying stream. 
+    * */
+    /** 
+     * Parameter:
+     * hChannel: handle to the stream channel to
+     * read
+     *
+     * pBuf: a buffer for receiving the incoming
+     * data. The pBuf must not be empty. And the
+     * method will try to fill the buffer at the
+     * best effort. If the time is up before the
+     * requested amount of data can be received,
+     * the request will be canceled.
+     *
+     * return value:
+     * STATUS_SUCCESS: the pBuf contains the
+     * payload from the peer side
+     *
+     * @} */
+
+    gint32 ReadStreamNoWait(
+        HANDLE hChannel, BufPtr& pBuf )
+    {
+        return ReadWriteInternal( hChannel,
+            pBuf, nullptr, true, true );
+    }
+
+    gint32 ReadWriteAsync( HANDLE hChannel,
+        BufPtr& pBuf, IConfigDb* pCtx, bool bRead )
+    {
+        CCfgOpener oCtx;
+        if( pCtx == nullptr )
+            pCtx = oCtx.GetCfg();
+
+        CParamList oReqCtx;
+        oReqCtx.Push( hChannel );
+        IConfigDb* pReqCtx = oReqCtx.GetCfg();
+
+        TaskletPtr pCallback;
+        gint32 ret = NEW_PROXY_RESP_HANDLER2(
+            pCallback, ObjPtr( this ),
+            &CStreamSyncBase::OnRWComplete,
+            nullptr, pReqCtx );
+
+        if( ERROR( ret ) )
+            return ret;
+
+        oReqCtx.Push( ObjPtr( pCtx ) );
+
+        // whether a read/write request
+        oReqCtx.Push( bRead );
+
+        return ReadWriteInternal( hChannel,
+            pBuf, pCallback, bRead, false );
+    }
+
+    /**
+    * @name ReadStreamAsync
+    * @{ Read a block of data from the stream. It
+    * is any thing from peer end. It will return
+    * with STATUS_PENDING if there is no requested
+    * size of data ready for reading. When the
+    * request size of buffer is filled, the event
+    * OnReadStreamComplete will be called.  The
+    * callback will also  report error if the
+    * write failed not. 
+    * */
+    /** 
+     * Parameter:
+     *
+     * hChannel: handle to the stream channel to
+     * read
+     *
+     * pBuf: a buffer for receiving the incoming
+     * data. The pBuf must not be empty. And the
+     * method will try to fill the buffer at the
+     * best effort. If the time is up before the
+     * requested amount of data can be received,
+     * the request will be canceled.
+     *
+     * pCtx: context which will be passed to the
+     * callback method OnReadStreamComplete.
+     *
+     * return value:
+     * STATUS_SUCCESS: the pBuf contains the
+     * payload from the peer side
+     *
+     * @} */
+
+    gint32 ReadStreamAsync( HANDLE hChannel,
+        BufPtr& pBuf, IConfigDb* pCtx )
+    {
+        return ReadWriteAsync(
+            hChannel, pBuf, pCtx, true );
+    }
+
+    /**
+    * @name ReadStreamAsync
+    * @{ Read a block of data from the stream. It
+    * is any thing from peer end. It will return
+    * with STATUS_PENDING if there is no requested
+    * size of data ready for reading. When the
+    * request size of buffer is filled, the event
+    * OnReadStreamComplete will be called.  The
+    * callback will also  report error if the
+    * write failed not. 
+    * */
+    /** 
+     * Parameter:
+     *
+     * hChannel: handle to the stream channel to
+     * read
+     *
+     * pBuf: a buffer for receiving the incoming
+     * data. The pBuf must not be empty. And the
+     * method will try to fill the buffer at the
+     * best effort. If the time is up before the
+     * requested amount of data can be received,
+     * the request will be canceled.
+     *
+     * pCb: a pointer to the callback when the
+     * read request is done. The pCb must conform
+     * to the behavor as CIfResponseHandler does
+     * in OnTaskComplete.
+     *
+     *
+     * return value:
+     * STATUS_SUCCESS: the pBuf contains the
+     * payload from the peer side. It can be
+     * returned immediately or by
+     * OnReadStreamComplete.
+     *
+     * STATUS_PENDING: the request is accepted,
+     * but not complete yet. Wait till the
+     * callback is called.
+     *
+     * ETIMEDOUT : the read fails due to time's
+     * up.
+     *
+     * @} */
+
+    gint32 ReadStreamAsync( HANDLE hChannel,
+        BufPtr& pBuf, IEventSink* pCb )
+    {
+        if( pCb == nullptr )
+            return -EINVAL;
+
+        return ReadWriteInternal( hChannel,
+            pBuf, pCb, true, false );
+    }
+    /**
+    * @name WriteStream
+    * @{ Write a message to the stream
+    * synchronously. It can be any thing to peer
+    * end. The method will wait till the message
+    * is sent successfully or error occurs.
+    * */
+    /** 
+     * Parameter:
+     * hChannel: handle to the stream channel to
+     * write.
+     *
+     * pBuf: a buffer for the outgoing data. an
+     * empty buf will cause -EINVAL to return.
+     * The buffer size can be up to the CBuffer's
+     * upper limit, MAX_BYTES_PER_BUFFER.
+     *
+     * return vale:
+     *
+     * STATUS_SUCCESS: the content in the buffer
+     * is sent successfully.
+     *
+     * ERROR_QUEUE_FULL: the request is not
+     * accepted, due to the send queue full.
+     * Resend it later when OnWriteResumed occurs.
+     *
+     * ETIMEDOUT: the request fails to complete
+     * before time is up.
+     *
+     * @} */
+    gint32 WriteStream(
+        HANDLE hChannel, BufPtr& pBuf )
+    {
+        return ReadWriteInternal( hChannel,
+            pBuf, nullptr, false, false );
+    }
+
+    /**
+    * @name WriteStreamNoWait
+    * @{ Write a block of data to the stream. It
+    * can be any thing to peer end. And the method
+    * will return immediately without waiting till
+    * the message is sent. It will always return
+    * STATUS_PENDING. While you can still
+    * repeatedly call this method till
+    * ERROR_QUEUE_FULL is returned, which means
+    * the request is refused due to the send queue
+    * is full. And it also indicate to resend the
+    * request after the next OnWriteResumed event
+    * happens.
+    * */
+    /** 
+    * Parameter:
+     *
+     * hChannel: handle to the stream channel to
+     * write.
+     *
+     * pBuf: a buffer for the outgoing data. an
+     * empty buf will cause an error of -EINVAL.
+     * The buffer size can be up to the CBuffer's
+     * upper limit, MAX_BYTES_PER_BUFFER.
+     *
+     * return vale:
+     *
+     * STATUS_PENDING: the request is accepted,
+     * but not complete yet. Wait till the
+     * callback is called.
+     *
+     * ERROR_QUEUE_FULL: the request is not
+     * accepted, due to the send queue full.
+     * Resend it later when OnWriteResumed occurs.
+     *
+     * @} */
+    gint32 WriteStreamNoWait(
+        HANDLE hChannel, BufPtr& pBuf )
+    {
+        return ReadWriteInternal( hChannel,
+            pBuf, nullptr, false, true );
+    }
+
+    /**
+    * @name WriteStreamAsync
+    * @{ Write a block of data to the stream. It
+    * is any thing to peer end. It will return
+    * with STATUS_PENDING if the message is queued
+    * sucessfully. When the buffer is sent, the
+    * event OnWriteStreamComplete is called. It
+    * will report if the write succeeds or not.
+    * If the flowcontrol happens, ERROR_QUEUE_FULL
+    * will return and the request has to be resend
+    * after OnWriteResumed event happens
+    * */
+    /** 
+     * Parameter:
+     * hChannel: handle to the stream channel to
+     * write.
+     *
+     * pBuf: a buffer for the outgoing data. an
+     * empty buf will cause an error of -EINVAL.
+     * The buffer size can be up to the CBuffer's
+     * upper limit, MAX_BYTES_PER_BUFFER.
+     *
+     * pCtx: a pointer to user supplied context
+     * which will be passed to the callback method
+     * OnWriteStreamComplete.
+     *
+     * return vale:
+     *
+     * STATUS_SUCCESS: the content in the buffer
+     * is sent successfully.
+     *
+     * STATUS_PENDING: the request is accepted,
+     * but not complete yet. Wait till the
+     * callback is called.
+     *
+     * ERROR_QUEUE_FULL: the request is not
+     * accepted, due to the send queue full.
+     * Resend it later when OnWriteResumed occurs.
+     *
+     * ETIMEDOUT: the request fails to complete
+     * before time is up. This error should only
+     * be returned by the callback
+     * OnWriteStreamComplete, after this method
+     * returns STATUS_PENDING.
+     *
+     * @} */
+    gint32 WriteStreamAsync( HANDLE hChannel,
+        BufPtr& pBuf, IConfigDb* pCtx )
+    {
+        return ReadWriteAsync(
+            hChannel, pBuf, pCtx, false );
+    }
+
+    /**
+    * @name WriteStreamAsync ( version 2 )
+    * @{ Write a block of data to the stream. It
+    * is any thing to peer end. It will return
+    * with STATUS_PENDING if the message is queued
+    * sucessfully. Whether or not the buffer is
+    * sent, the callback pCb will be called later
+    * to notify the status of the request.
+    * */
+    /** 
+     * Parameter:
+     * hChannel: handle to the stream channel to
+     * write.
+     *
+     * pBuf: a buffer for the outgoing data. an
+     * empty buf will cause an error of -EINVAL.
+     * The buffer size can be up to the CBuffer's
+     * upper limit, MAX_BYTES_PER_BUFFER.
+     *
+     * pCb: a pointer to the callback when the
+     * write request is done. The pCb must conform
+     * to the same behavor as CIfResponseHandler
+     * does in OnTaskComplete.
+     *
+     * return vale:
+     *
+     * STATUS_SUCCESS: the content in the buffer
+     * is sent successfully.
+     *
+     * STATUS_PENDING: the request is accepted,
+     * but not complete yet. Wait till the
+     * callback is called.
+     *
+     * ERROR_QUEUE_FULL: the request is not
+     * accepted, due to the send queue full.
+     * Resend it later when OnWriteResumed occurs.
+     *
+     * ETIMEDOUT: the request fails to complete
+     * before time is up. This error should only
+     * be returned by the callback
+     * OnWriteStreamComplete, after this method
+     * returns STATUS_PENDING;
+     *
+     * @} */
+    gint32 WriteStreamAsync( HANDLE hChannel,
+        BufPtr& pBuf, IEventSink* pCb )
+    {
+        if( pCb == nullptr )
+            return -EINVAL;
+
+        return ReadWriteInternal( hChannel,
+            pBuf, pCb, false, false );
+    }
+    // event to notify the flow control is lifted,
+    // and write request is allowed.
     virtual gint32 OnWriteResumed(
         HANDLE hChannel )
     { return 0; }
 
+    // callback to notify the read request
+    // identified as lwTid is done with status
+    // code in iRet on channel hChannel.
     virtual gint32 OnReadStreamComplete(
         HANDLE hChannel,
         gint32 iRet,
         BufPtr& pBuf,
-        LONGWORD lwTid )
+        IConfigDb* pCtx )
     { return 0; }
 
+    // callback to notify the write request
+    // identified as lwTid is done with status
+    // code in iRet on channel hChannel.
     virtual gint32 OnWriteStreamComplete(
         HANDLE hChannel,
         gint32 iRet,
         BufPtr& pBuf,
-        LONGWORD dwTid ) 
+        IConfigDb* pCtx ) 
     { return 0; }
 
+    gint32 PeekStream(
+        HANDLE hChannel, BufPtr& pBuf )
+    {
+        gint32 ret = 0;
+        do{
+            TaskletPtr pTask;
+
+            if( !this->IsConnected( nullptr ) )
+                return ERROR_STATE;
+
+            ret = GetWorker(
+                hChannel, true, pTask );
+            if( ERROR( ret ) )
+                return ret;
+
+
+            CIfStmReadWriteTask* pRdTask = pTask;
+            if( pRdTask == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            ret = pRdTask->PeekStream( pBuf );
+
+        }while( 0 );
+
+        return ret;
+    }
+
+    // helper callback
+    protected:
     gint32 OnRWComplete(
         IEventSink* pCallback,
         IEventSink* pIoReq,
@@ -1640,14 +1860,15 @@ struct CStreamSyncBase :
             if( ERROR( ret ) )
                 break;
 
-            guint32* pTid = 0;
-            ret = oReqCtx.GetIntPtr(
-                1, pTid );
+            IConfigDb* pCtx = nullptr;
+            ret = oReqCtx.GetPointer(
+                1, pCtx );
 
             if( ERROR( ret ) )
                 break;
 
-            LONGWORD lwTid = ( LONGWORD )pTid;
+            if( pCtx->size() == 0 )
+                pCtx = nullptr;
 
             bool bRead = false;
             ret = oReqCtx.GetBoolProp(
@@ -1657,10 +1878,10 @@ struct CStreamSyncBase :
 
             if( bRead )
                 OnReadStreamComplete( hChannel,
-                    ( gint32& )iRet, pBuf, lwTid );
+                    ( gint32& )iRet, pBuf, pCtx );
             else
                 OnWriteStreamComplete( hChannel,
-                    ( gint32& )iRet, pBuf, lwTid );
+                    ( gint32& )iRet, pBuf, pCtx );
 
         }while( 0 );
 

@@ -287,8 +287,10 @@ IoRequestPacket::IoRequestPacket() :
 bool IoRequestPacket::SetState(
     gint32 iCurState, gint32 iNewState )
 {
-    // can only be called after a successful call of CanContinue
-    bool ret = m_atmState.compare_exchange_strong(
+    // can only be called after a successful call
+    // of CanContinue
+    bool ret =
+        m_atmState.compare_exchange_strong(
                 iCurState, iNewState );
     return ret;
 }

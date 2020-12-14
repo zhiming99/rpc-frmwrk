@@ -34,152 +34,6 @@ std::string convertPythonUnicodeObjectToStdString(PyObject *pyUnicodeObj)
 }
 
 using namespace cpp;
-gint32 List2Vector( PyObject *pList,
-    std::vector< BufPtr >& vecArgs )
-{
-    gint32 ret = 0;
-    if( pList == nullptr )
-        return -EFAULT;
-    do{
-        if( !PyList_Check( pList ) )
-        {
-            ret = -EINVAL;
-            break;
-        }
-        gint32 iSize = PyList_Size( pList );
-        if( iSize == 0 )
-            break;
-
-        for( int i = 0; i < iSize; ++i )
-        {
-            PyObject* pElem =
-                PyList_GetItem( pList, i );
-
-            if( PyLong_Check( pElem ) )
-            {
-                BufPtr pBuf( true );
-                *pBuf = ( guint32 )
-                    PyLong_AsLong( pElem );
-                vecArgs.push_back( pBuf );
-            }
-            else if( PyFloat_Check( pElem ) )
-            {
-                BufPtr pBuf( true );
-                *pBuf = PyFloat_AsDouble( pElem );
-                vecArgs.push_back( pBuf );
-            }
-            else if( PyBool_Check( pElem ) )
-            {
-                BufPtr pBuf( true );
-                bool bVal = true;
-                if( PyLong_AsLong( pElem ) == 0 )
-                    bVal = false;
-                *pBuf = bVal;
-                vecArgs.push_back( pBuf );
-            }
-            else if( PyUnicode_Check( pElem ) )
-            {
-                BufPtr pBuf( true );
-                std::string strVal =
-                convertPythonUnicodeObjectToStdString( pElem );
-                *pBuf = strVal;
-                vecArgs.push_back( pBuf );
-            }
-            else if( PyByteArray_Check( pElem ) ||
-                 PyBytes_CheckExact( pElem ) )
-            {
-                BufPtr pBuf( true );
-                Py_buffer *view = (Py_buffer *)
-                    malloc(sizeof(*view));
-                ret = PyObject_GetBuffer(
-                    pElem, view, PyBUF_READ );
-                if( ret < 0 )
-                {
-                    ret = -ENOMEM;
-                    break;
-                }
-                pBuf->Append( ( char* )view->buf,
-                    ( guint32 )view->len);
-                PyBuffer_Release( view );
-                vecArgs.push_back( pBuf );
-            }
-            else 
-            {
-                PyTypeObject* pExpType =
-                sipType_cpp_ObjPtr->td_py_type;
-
-                PyTypeObject* pActType =
-                    Py_TYPE( pElem );
-
-                if( pActType == pExpType )
-                {
-                    BufPtr pBuf( true );
-                    if(sipCanConvertToType( pElem,
-                        sipType_cpp_ObjPtr, 0 ))
-                    {
-                        gint32 iState = 0, iErr = 0;
-                        ObjPtr* pObj = ( ObjPtr* )
-                        sipConvertToType( pElem,
-                            sipType_cpp_ObjPtr,
-                            nullptr, 0, &iState,
-                            &iErr );
-                        if( iErr != 0 )
-                        {
-                            ret = ERROR_FAIL;
-                            break;
-                        }
-                        *pBuf = *pObj;
-                        vecArgs.push_back( pBuf );
-                    }
-                    else
-                    {
-                        // an empty argument
-                        vecArgs.push_back( pBuf );
-                    }
-                    continue;
-                }
-                pExpType =
-                sipType_cpp_BufPtr->td_py_type;
-                if( pActType ==  pExpType )
-                {
-                    BufPtr pBuf( true );
-                    if(sipCanConvertToType( pElem,
-                        sipType_cpp_BufPtr, 0 ))
-                    {
-                        gint32 iState = 0, iErr = 0;
-                        BufPtr* pObj = ( BufPtr* )
-                        sipConvertToType( pElem,
-                            sipType_cpp_BufPtr,
-                            nullptr, 0, &iState,
-                            &iErr );
-                        if( iErr != 0 )
-                        {
-                            ret = ERROR_FAIL;
-                            break;
-                        }
-                        pBuf = *pObj;
-                        vecArgs.push_back( pBuf );
-                    }
-                    else
-                    {
-                        // an empty argument
-                        vecArgs.push_back( pBuf );
-                    }
-
-                    continue;
-                }
-                ret = -ENOTSUP;
-                break;
-            }
-        }
-        
-    }while( 0 );
-
-    if( ERROR( ret ) )
-        vecArgs.clear();
-
-    return ret;
-}
 
 %End
 
@@ -191,6 +45,8 @@ typedef int gint32;
 typedef unsigned short guint16;
 typedef unsigned int guint32;
 typedef unsigned long long guint64;
+// just a hint, the ultimate definition comes from
+// 'defines.h'
 typedef guint64 LONGWORD;
 
 %MappedType std::string /TypeHint="str"/
@@ -340,6 +196,11 @@ namespace cpp
                 ( *sipCpp )->empty() );
         %End
 
+        EnumTypeId GetExDataType();
+        %MethodCode
+            sipRes = ( *sipCpp )->GetExDataType();
+        %End
+
         gint32 CopyToPython( PyObject* pPyObj );
         %MethodCode
             gint32 ret = 0;
@@ -391,7 +252,11 @@ namespace cpp
             EnumEventId iEvent,
             LONGWORD dwParam1, 
             LONGWORD dwParam2,
-            LONGWORD* pData );
+            LONGWORD* pData /In/ );
+        %MethodCode
+            sipRes = sipCpp->OnEvent(
+                a0, a1, a2, ( LONGWORD* )a3 );
+        %End
     };
 
     class IService : public cpp::IEventSink /Abstract/
@@ -408,7 +273,7 @@ namespace cpp
         gint32 SetProperty( gint32 iProp,
             const BufPtr& pBuf );
         gint32 GetProperty( gint32 iProp,
-            BufPtr& pBuf ) const;
+            BufPtr& pBuf /Out/ ) const;
     };
 
     class ObjPtr
@@ -513,6 +378,11 @@ namespace cpp
             CfgPtr pCfg = sipCpp->GetCfg();
             sipRes = pCfg->GetPropertyType(
                 a0, a1 );
+        %End
+
+        gint32 Push( PyObject* pObj /In/ );
+        %MethodCode
+            sipRes = sipCpp->Push( *a0 );
         %End
 
         gint32 PushObj( cpp::ObjPtr& val /In/ );

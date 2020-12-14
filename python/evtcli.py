@@ -10,7 +10,9 @@ class CEventClient:
     ifName = "CEventServer"
     """
     this is a event handler, it print the event
-    string from the remote server
+    string from the remote server. The first two
+    parameter must be self and callback, the rest
+    parameters depends what the server send.
     """
     def OnHelloWorld( self, callback, strSvrEvt ):
         print( strSvrEvt )
