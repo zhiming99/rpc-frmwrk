@@ -192,8 +192,6 @@ gint32 CMyStreamProxy::OnWriteEnabled_Loop(
         else if( ERROR( ret ) )
             break;
 
-        ret = SendMessage( hChannel );
-
     }while( 0 );
 
     if( ERROR( ret ) )

@@ -57,23 +57,80 @@ gint32 CEchoServer::Echo(
 gint32 CMyStreamServer::OnSendDone_Loop(
     HANDLE hChannel, gint32 iRet )
 {
+    BufPtr pBuf;
+    CfgPtr pCfg;
     gint32 ret = 0;
 
+    // get channel specific context
+    ret = GetContext( hChannel, pCfg );
+    if( ERROR( ret ) )
+        return ret;
+
+    CParamList oCfg( pCfg );
+    guint32 dwCount = oCfg[ 0 ];
+
     do{
-        // this handler will be the first one to
-        // call after the loop starts
-        //
-        // Enable incoming data notification via
-        // OnRecvData_Loop
-        PauseReadNotify( hChannel, false );
+        if( ERROR( iRet ) )
+        {
+            ret = iRet;
+            break;
+        }
+
+        ret = PeekStream( hChannel, pBuf );
+        if( ret == -EAGAIN )
+        {
+            PauseReadNotify( hChannel, false );
+            ret = 0;
+            break;
+        }
+        else if( ERROR( ret ) )
+        {
+            break;
+        }
+
+        std::string strMsg = DebugMsg( 0,
+            "this is the %d msg", dwCount + 1 );
+
+        BufPtr pNewBuf( true );
+        *pNewBuf = strMsg;
+
+        ret = WriteStreamNoWait(
+            hChannel, pNewBuf );
+
+        if( ret == STATUS_PENDING )
+        {
+            printf( "Proxy says(%d): %s\n",
+                dwCount++, ( char* )pBuf->ptr() );
+            // remove the buf from the pending
+            // queue.
+            ReadStreamNoWait( hChannel, pBuf );
+            ret = 0;
+            break;
+        }
+        else if( ret == ERROR_QUEUE_FULL )
+        {
+            // wait till another OnSendDone_Loop,
+            // when the writing queue has free
+            // slot
+            ret = 0;
+            break;
+        }
+
+        if( ERROR( ret ) )
+            break;
 
     }while( 0 );
 
-    // if( ERROR( ret ) )
-    //     StopLoop();
+    if( SUCCEEDED( ret ) )
+    {
+        oCfg[ 0 ] = dwCount;
+    }
+    else if( ERROR( ret ) )
+        StopLoop( ret );
 
-    return ret;
+    return 0;
 }
+
 
 // implementation of interface CMyStreamServer
 gint32 CMyStreamServer::OnWriteEnabled_Loop(
@@ -110,36 +167,10 @@ gint32 CMyStreamServer::OnWriteEnabled_Loop(
             break;
         }
 
-        bool bResend = false;
-        ret = oCfg.GetBoolProp( 1, bResend );
-        if( SUCCEEDED( ret ) && bResend )
-        {
-            // a message is blocked
-            std::string strMsg = DebugMsg( 0, 
-                "this is the %d msg", dwCount );
-
-            BufPtr pNewBuf( true );
-            *pNewBuf = strMsg;
-            ret = WriteStreamNoWait( hChannel, pNewBuf );
-            if( ret == ERROR_QUEUE_FULL )
-            {
-                ret = 0;
-            }
-            else if( ret == STATUS_PENDING )
-            {
-                // remove the resend flag
-                oCfg.RemoveProperty( 1 ); 
-            }
-            break;
-        }
-        // Enable incoming data notification via
-        // OnRecvData_Loop
-        PauseReadNotify( hChannel, false );
-
     }while( 0 );
 
-    // if( ERROR( ret ) )
-    //     StopLoop();
+    if( ERROR( ret ) )
+        StopLoop( ret );
 
     return ret;
 }
@@ -162,8 +193,7 @@ gint32 CMyStreamServer::OnRecvData_Loop(
         return 0;
 
     // get channel specific context
-    ret = GetContext(
-        hChannel, pCfg );
+    ret = GetContext( hChannel, pCfg );
     if( ERROR( ret ) )
         return ret;
 
@@ -177,7 +207,7 @@ gint32 CMyStreamServer::OnRecvData_Loop(
             break;
         }
 
-        ret = ReadStreamNoWait( hChannel, pBuf );
+        ret = PeekStream( hChannel, pBuf );
         if( ret == -EAGAIN )
         {
             ret = 0;
@@ -187,30 +217,32 @@ gint32 CMyStreamServer::OnRecvData_Loop(
         {
             break;
         }
-
-        printf( "Proxy says(%d): %s\n",
-            dwCount, ( char* )pBuf->ptr() );
+        PauseReadNotify( hChannel, true );
 
         std::string strMsg = DebugMsg( 0,
-            "this is the %d msg", ++dwCount );
+            "this is the %d msg", dwCount + 1 );
 
         BufPtr pNewBuf( true );
         *pNewBuf = strMsg;
 
-        ret = WriteStreamNoWait( hChannel, pNewBuf );
-        if( ret == ERROR_QUEUE_FULL )
+        ret = WriteStreamNoWait(
+            hChannel, pNewBuf );
+
+        if( ret == STATUS_PENDING )
         {
-            // set a flag to resend
-            oCfg.SetBoolProp( 1, true );
-            PauseReadNotify( hChannel, true );
+            printf( "Proxy says(%d): %s\n",
+                dwCount++, ( char* )pBuf->ptr() );
+            // remove the buf from the pending
+            // queue.
+            ReadStreamNoWait( hChannel, pBuf );
             ret = 0;
+            break;
         }
-        else if( ret == STATUS_PENDING )
+        else if( ret == ERROR_QUEUE_FULL )
         {
-            // Disable incoming data notification
-            // via OnRecvData_Loop till the flow
-            // control is lifted.
-            PauseReadNotify( hChannel, true );
+            // wait till another OnSendDone_Loop,
+            // when the writing queue has free
+            // slot
             ret = 0;
             break;
         }
@@ -218,12 +250,14 @@ gint32 CMyStreamServer::OnRecvData_Loop(
         if( ERROR( ret ) )
             break;
 
-    }while( 1 );
+    }while( 0 );
 
     if( SUCCEEDED( ret ) )
     {
         oCfg[ 0 ] = dwCount;
     }
+    else if( ERROR( ret ) )
+        StopLoop( ret );
 
     return 0;
 }

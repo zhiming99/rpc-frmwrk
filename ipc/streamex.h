@@ -262,6 +262,8 @@ class CIfStmReadWriteTask :
     gint32 PostLoopEvent( BufPtr& pBuf );
     bool IsLoopStarted();
     bool CanSend();
+    gint32 ReschedRead();
+    gint32 PeekStream( BufPtr& pBuf );
 };
 
 
@@ -824,9 +826,6 @@ struct CStreamSyncBase :
                 break;
 
             CIfStmReadWriteTask* pWriter = pTask;
-            CStdRTMutex oTaskLock(
-                pWriter->GetLock() );
-
             ret = pWriter->OnFCLifted();
             if( ERROR( ret ) )
                 break;
@@ -1791,6 +1790,35 @@ struct CStreamSyncBase :
         BufPtr& pBuf,
         IConfigDb* pCtx ) 
     { return 0; }
+
+    gint32 PeekStream(
+        HANDLE hChannel, BufPtr& pBuf )
+    {
+        gint32 ret = 0;
+        do{
+            TaskletPtr pTask;
+
+            if( !this->IsConnected( nullptr ) )
+                return ERROR_STATE;
+
+            ret = GetWorker(
+                hChannel, true, pTask );
+            if( ERROR( ret ) )
+                return ret;
+
+
+            CIfStmReadWriteTask* pRdTask = pTask;
+            if( pRdTask == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            ret = pRdTask->PeekStream( pBuf );
+
+        }while( 0 );
+
+        return ret;
+    }
 
     // helper callback
     protected:

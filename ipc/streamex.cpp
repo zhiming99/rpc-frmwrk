@@ -23,6 +23,8 @@
 #include "uxstream.h"
 #include "streamex.h"
 
+#define MAX_RW_PER_SCHED 2
+
 namespace rpcfrmwrk
 {
 
@@ -255,6 +257,8 @@ bool CIfStmReadWriteTask::CanSend()
 
 gint32 CIfStmReadWriteTask::OnFCLifted()
 {
+    CStdRTMutex oTaskLock( GetLock() );
+
     if( GetReqCount() > 0 )
         Resume();
 
@@ -271,17 +275,20 @@ gint32 CIfStmReadWriteTask::OnFCLifted()
         if( ERROR( ret ) )
             return ret;
 
+        HANDLE hChannel = m_hChannel;
+        oTaskLock.Unlock();
+
         if( pSvc->IsServer() )
         {
             CStreamServerSync* pIf =
                 ObjPtr( pSvc );
-            pIf->OnWriteResumed( m_hChannel );
+            pIf->OnWriteResumed( hChannel );
         }
         else
         {
             CStreamProxySync* pIf =
                 ObjPtr( pSvc );
-            pIf->OnWriteResumed( m_hChannel );
+            pIf->OnWriteResumed( hChannel );
         }
     }
     return 0;
@@ -506,6 +513,49 @@ gint32 CIfStmReadWriteTask::OnIrpComplete(
         ret = OnWorkerIrpComplete( pIrp );
     else
         ret = OnIoIrpComplete( pIrp );
+
+    return ret;
+}
+
+gint32 CIfStmReadWriteTask::PeekStream(
+    BufPtr& pBuf )
+{
+    gint32 ret = 0;
+
+    if( !IsReading() )
+        return -EINVAL;
+
+    do{
+        CStdRTMutex oTaskLock( GetLock() );
+        EnumIfState dwState = GetTaskState();
+        if( dwState == stateStopped )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+
+        if( m_bDiscard )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+
+        if( !m_queBufRead.empty() &&
+            m_queRequests.empty() )
+        {
+            pBuf = m_queBufRead.front();
+            ret = 0;
+        }
+        else if( m_queBufRead.empty() )
+        {
+            ret = -EAGAIN;
+        }
+        else
+        {
+            ret = ERROR_STATE;
+        }
+
+    }while( 0 );
 
     return ret;
 }
@@ -910,8 +960,10 @@ gint32 CIfStmReadWriteTask::RunTask()
         return STATUS_PENDING;
 
     gint32 ret = 0;
+    gint32 iNumSent = 0;
 
-    do{
+    while( iNumSent < MAX_RW_PER_SCHED )
+    {
         if( m_queRequests.empty() )
         {
             Pause();
@@ -936,29 +988,8 @@ gint32 CIfStmReadWriteTask::RunTask()
 
         IrpCtxPtr& pIrpCtx = pIrp->GetTopStack();
 
-        guint32 dwMajorCmd =
-            pIrpCtx->GetMajorCmd();
-
-        guint32 dwMinorCmd =
-            pIrpCtx->GetMinorCmd();
-
-        if( dwMajorCmd != IRP_MJ_FUNC ||
-            dwMinorCmd != IRP_MN_IOCTL )
-        {
-            m_queRequests.pop_front();
-            COMPLETE_IRP( pIrp, -EINVAL );
-            continue;
-        }
         guint32 dwCtrlCode =
             pIrpCtx->GetCtrlCode();
-
-        if( dwCtrlCode != CTRLCODE_WRITEBLK &&
-            dwCtrlCode != CTRLCODE_WRITEMSG )
-        {
-            m_queRequests.pop_front();
-            COMPLETE_IRP( pIrp, -EINVAL );
-            continue;
-        }
 
         BufPtr pBuf = pIrpCtx->m_pReqData;
 
@@ -991,6 +1022,7 @@ gint32 CIfStmReadWriteTask::RunTask()
 
             m_queRequests.pop_front();
             COMPLETE_IRP( pIrp, ret );
+            ++iNumSent;
             // move on to the next
         }
         else
@@ -1031,6 +1063,7 @@ gint32 CIfStmReadWriteTask::RunTask()
                 pBuf->GetTailOff() )
                     bDone = true;
 
+            ++iNumSent;
             if( bDone )
             {
                 pBuf->SetOffset( pExt->dwOffset );
@@ -1048,17 +1081,29 @@ gint32 CIfStmReadWriteTask::RunTask()
                 if( SUCCEEDED( ret ) )
                     continue;
 
+                if( ret == -ENODATA )
+                    ret = 0;
                 pBuf->SetOffset( pExt->dwOffset );
                 pBuf->SetTailOff( pExt->dwTailOff );
                 m_queRequests.pop_front();
                 COMPLETE_IRP( pIrp, ret );
             }
         }
-
-    }while( 1 );
+    };
 
     if( ERROR( ret ) )
         return ret;
+
+    if( iNumSent == MAX_RW_PER_SCHED &&
+        m_queRequests.size() > 0 )
+    {
+        // reschedule the task to reader or
+        // progress report to have chance to be
+        // handled
+        ret = ReRun();
+        if( SUCCEEDED( ret ) )
+            ret = STATUS_PENDING;
+    }
 
     return ret;
 }
@@ -1156,7 +1201,7 @@ gint32 CIfStmReadWriteTask::WriteStreamInternal(
         }
 
         if( m_queRequests.size() >=
-            SYNC_STM_MAX_PENDING_PKTS )
+            STM_MAX_PACKETS_REPORT )
         {
             ret = ERROR_QUEUE_FULL;
             break;
@@ -1261,6 +1306,59 @@ gint32 CIfStmReadWriteTask::WriteStreamInternal(
         return ret;
 
     CLEAR_CALLBACK( pIrp );
+
+    return ret;
+}
+
+gint32 CIfStmReadWriteTask::ReschedRead()
+{
+    if( !IsReading() )
+        return -EINVAL;
+
+    if( m_bDiscard )
+        return 0;
+
+    gint32 ret = 0;
+    do{
+        CStdRTMutex oTaskLock( GetLock() );
+        if( m_queRequests.empty() ||
+            m_queBufRead.empty() )
+            break;
+
+        BufPtr pBuf = m_queBufRead.front();
+        m_queBufRead.pop_front();
+        // assuming the incoming packet
+        // must not span across two irps
+        gint32 bContinue = true;
+        std::vector< IrpPtr > vecIrps;
+        IrpPtr pIrp;
+        while( bContinue )
+        {
+            ret = CompleteReadIrp( pIrp, pBuf );
+
+            // NOTE: this
+            // STATUS_MORE_PROCESS_NEEDED cannot
+            // be as OnStmRecv's return value
+            if( ret !=
+                STATUS_MORE_PROCESS_NEEDED )
+                bContinue = false;
+
+            if( ret == STATUS_PENDING )
+                break;
+
+            vecIrps.push_back( pIrp );
+            pIrp.Clear();
+        }
+
+        // the buffer needs further
+        // processing
+        for( auto elem : vecIrps )
+        {
+            gint32 iRet = elem->GetStatus();
+            COMPLETE_IRP( elem, iRet );
+        }
+
+    }while( 0 );
 
     return ret;
 }

@@ -16,6 +16,16 @@ class CPythonProxyImpl : public CPythonProxy
     gint32 FillList( IConfigDb* pResp,
         PyObject* listResp );
 
+    gint32 GetTypeId(
+        PyObject* pVar );
+
+    gint32 ConvertPyObjToBuf(
+        PyObject* pObject,
+        BufPtr& pBuf );
+
+    gint32 List2Vector( PyObject *pList,
+        std::vector< BufPtr >& vecArgs );
+
     gint32 OnProxyCallResp(
         IEventSink* pCallback, 
         IEventSink* pIoReq,
@@ -325,7 +335,14 @@ gint32 CPythonProxyImpl::OnProxyCallResp(
             ret = FillList( pResp, pPyResp );
         }
 
-        PyObject_Call( pPyCb, pPyResp, nullptr );
+        PyObject* pHost = nullptr;
+        ret = GetPyHost( pHost );
+        if( ERROR( ret ) )
+            break;
+
+        PyObject_CallMethod(
+             pHost, "HandleAsyncResp", 
+             "(OO)", pPyCb, pPyResp );
 
     }while( 0 );
 
@@ -395,6 +412,180 @@ gint32 CPythonProxyImpl::AsyncCallVector(
             break; 
 
     }while( 0 );
+
+    return ret;
+}
+
+gint32 CPythonProxyImpl::GetTypeId(
+    PyObject* pVar )
+{
+    EnumTypeId ret = typeNone;
+    gint32 iRet = 0;
+    do{
+        PyObject* pHost = nullptr;
+        iRet = GetPyHost( pHost );
+        if( ERROR( iRet ) )
+            break;
+
+        PyObject* pRet =
+        PyObject_CallMethod( pHost,
+            "GetObjType", "(O)", pVar );
+        if( pRet == nullptr )
+            break;
+
+        ret = ( EnumTypeId )
+            PyLong_AsLong( pRet );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CPythonProxyImpl::ConvertPyObjToBuf(
+    PyObject* pObject,
+    BufPtr& pBuf )
+{
+    if( pObject == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    if( pBuf.IsEmpty() )
+    {
+        ret = pBuf.NewObj();
+        if( ERROR( ret ) )
+            return ret;
+    }
+
+    EnumTypeId iType =
+        ( EnumTypeId )GetTypeId( pObject );
+
+    switch( iType )
+    {
+    case typeUInt32:
+        {
+            *pBuf = ( guint32 )
+                PyLong_AsLong( pObject );
+            break;
+        }
+    case typeUInt64:
+        {
+            *pBuf = ( guint64 )
+                PyLong_AsLong( pObject );
+            break;
+        }
+    case typeFloat:
+        {
+            *pBuf = ( float )
+                PyFloat_AsDouble( pObject );
+            break;
+        }
+    case typeDouble:
+        {
+            *pBuf =
+                PyFloat_AsDouble( pObject );
+            break;
+        }
+    case typeByte:
+        {
+            *pBuf = ( guint8 )
+                PyLong_AsLong( pObject );
+            break;
+        }
+    case typeUInt16:
+        {
+            *pBuf = ( guint16 )
+                PyLong_AsLong( pObject );
+            break;
+        }
+    case typeString:
+        {
+            std::string strVal =
+            convertPythonUnicodeObjectToStdString(
+            pObject );
+            *pBuf = strVal;
+            break;
+        }
+    case typeByteArr:
+        {
+            Py_buffer *view = (Py_buffer *)
+                malloc(sizeof(*view));
+            ret = PyObject_GetBuffer(
+                pObject, view, PyBUF_READ );
+            if( ret < 0 )
+            {
+                ret = -ENOMEM;
+                break;
+            }
+            pBuf->Append( ( char* )view->buf,
+                ( guint32 )view->len);
+            PyBuffer_Release( view );
+            break;
+        }
+    case typeObj:
+        {
+            if(sipCanConvertToType( pObject,
+                sipType_cpp_ObjPtr, 0 ))
+            {
+                gint32 iState = 0, iErr = 0;
+                ObjPtr* pObj = ( ObjPtr* )
+                sipConvertToType( pObject,
+                    sipType_cpp_ObjPtr,
+                    nullptr, 0, &iState,
+                    &iErr );
+                if( iErr != 0 )
+                {
+                    ret = ERROR_FAIL;
+                    break;
+                }
+                *pBuf = *pObj;
+            }
+            else
+            {
+                // an empty argument
+            }
+            break;
+        }
+    default:
+        ret = -ENOTSUP;
+        break;
+    }
+
+    return ret;
+}
+
+gint32 CPythonProxyImpl::List2Vector(
+    PyObject *pList,
+    std::vector< BufPtr >& vecArgs )
+{
+    gint32 ret = 0;
+    if( pList == nullptr )
+        return -EFAULT;
+    do{
+        if( !PyList_Check( pList ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        gint32 iSize = PyList_Size( pList );
+        if( iSize == 0 )
+            break;
+
+        for( int i = 0; i < iSize; ++i )
+        {
+            PyObject* pElem =
+                PyList_GetItem( pList, i );
+
+            BufPtr pBuf( true );
+            ret = ConvertPyObjToBuf( pElem, pBuf );
+            if( ERROR( ret ) )
+                break;
+            vecArgs.push_back( pBuf );
+        }
+        
+    }while( 0 );
+
+    if( ERROR( ret ) )
+        vecArgs.clear();
 
     return ret;
 }
