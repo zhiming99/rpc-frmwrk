@@ -174,8 +174,8 @@ do{ \
 
 #define GET_STMPTR2( _pStm, _ret ) \
 do{ \
-    CParamList _oParams( \
-        ( IConfigDb* )GetConfig() ); \
+    CCfgOpener _oParams( \
+        ( const IConfigDb* )GetConfig() ); \
     CRpcServices* _pIf; \
     _ret = _oParams.GetPointer( \
         propIfPtr, _pIf ); \
@@ -227,15 +227,8 @@ bool CIfStmReadWriteTask::CanSend()
     gint32 ret = 0;
     bool bRet = false;
     do{
-        IStream* pStm = nullptr;
-        GET_STMPTR2( pStm, ret );
-        if( ERROR( ret ) )
-            break;
-
         InterfPtr pUxIf;
-        ret = pStm->GetUxStream(
-            m_hChannel, pUxIf );
-
+        ret = GetUxStream( pUxIf );
         if( ERROR( ret ) )
             break;
 
@@ -299,15 +292,8 @@ gint32 CIfStmReadWriteTask::PauseReading(
 {
     gint32 ret = 0;
     do{
-        IStream* pStm = nullptr;
-        GET_STMPTR2( pStm, ret );
-        if( ERROR( ret ) )
-            break;
-
         InterfPtr pUxIf;
-        ret = pStm->GetUxStream(
-            m_hChannel, pUxIf );
-
+        ret = GetUxStream( pUxIf );
         if( ERROR( ret ) )
             break;
 
@@ -517,6 +503,25 @@ gint32 CIfStmReadWriteTask::OnIrpComplete(
     return ret;
 }
 
+gint32 CIfStmReadWriteTask::GetUxStream(
+    InterfPtr& pIf ) const
+{
+    gint32 ret = 0;
+    CStdRTMutex oTaskLock( GetLock() );
+    IStream* pStm = nullptr;
+    GET_STMPTR2( pStm, ret );
+    if( ERROR( ret ) )
+        return ret;
+
+    HANDLE hChannel = m_hChannel;
+    oTaskLock.Unlock();
+    ret = pStm->GetUxStream( hChannel, pIf );
+    if( ERROR( ret ) )
+        return ret;
+
+    return STATUS_SUCCESS;
+}
+
 gint32 CIfStmReadWriteTask::PeekStream(
     BufPtr& pBuf )
 {
@@ -525,16 +530,13 @@ gint32 CIfStmReadWriteTask::PeekStream(
     if( !IsReading() )
         return -EINVAL;
 
+    if( m_bDiscard )
+        return ERROR_STATE;
+
     do{
         CStdRTMutex oTaskLock( GetLock() );
         EnumIfState dwState = GetTaskState();
         if( dwState == stateStopped )
-        {
-            ret = ERROR_STATE;
-            break;
-        }
-
-        if( m_bDiscard )
         {
             ret = ERROR_STATE;
             break;
@@ -549,13 +551,24 @@ gint32 CIfStmReadWriteTask::PeekStream(
         else if( m_queBufRead.empty() )
         {
             ret = -EAGAIN;
+            break;
         }
         else
         {
             ret = ERROR_STATE;
+            break;
         }
 
-    }while( 0 );
+        bool bReport = IsReport( pBuf );
+        if( !bReport )
+            break;
+
+        m_queBufRead.pop_front();
+        oTaskLock.Unlock();
+
+        SendProgress( pBuf );
+
+    }while( 1 );
 
     return ret;
 }
@@ -568,7 +581,6 @@ gint32 CIfStmReadWriteTask::ReadStreamInternal(
     IrpPtr pIrp( true );
 
     do{
-
         bool bMsg =
         ( pBuf.IsEmpty() || pBuf->empty() );
 
@@ -584,6 +596,33 @@ gint32 CIfStmReadWriteTask::ReadStreamInternal(
         {
             ret = ERROR_STATE;
             break;
+        }
+
+        if( !m_queBufRead.empty() )
+        {
+            BufPtr pRptBuf = m_queBufRead.front();
+            if( IsReport( pRptBuf ) )
+            {
+                m_queBufRead.pop_front();
+                oTaskLock.Unlock();
+                SendProgress( pRptBuf );
+                continue;
+            }
+            else if( m_queBufRead.size() >= 2 )
+            {
+                // make sure the progress packet
+                // to be sent the same time the
+                // packet ahead of it is out of
+                // queue.
+                BufPtr pRptBuf = m_queBufRead[ 1 ];
+                if( IsReport( pRptBuf ) )
+                {
+                    m_queBufRead.erase(
+                        m_queBufRead.begin() + 1 );
+                    oTaskLock.Unlock();
+                    SendProgress( pRptBuf );
+                }
+            }
         }
 
         if( bMsg && bNoWait )
@@ -700,7 +739,9 @@ gint32 CIfStmReadWriteTask::ReadStreamInternal(
         if( SUCCEEDED( ret ) )
             pBuf = pTempBuf;
 
-    }while( 0 );
+        break;
+
+    }while( 1 );
 
     if( ret == STATUS_PENDING &&
         pCallback != nullptr )
@@ -1363,6 +1404,67 @@ gint32 CIfStmReadWriteTask::ReschedRead()
     return ret;
 }
 
+gint32 CIfStmReadWriteTask::SendProgress(
+    BufPtr& pBuf ) const
+{
+    if( !IsReading() )
+        return -ENOTSUP;
+
+    if( pBuf.IsEmpty() || pBuf->empty() )
+        return -EINVAL;
+
+    gint32 ret = 0;
+
+    do{
+        InterfPtr pIf;
+        ret = GetUxStream( pIf );
+        if( ERROR( ret ) )
+            break;
+
+        ObjPtr& pObj = *pBuf;
+        IConfigDb* pRpt = pObj;
+        if( pRpt == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        BufPtr pRptBuf( true );
+        ret = pRpt->Serialize( *pRptBuf );
+        if( ERROR( ret ) )
+            break;
+
+        TaskletPtr pCallback;
+        pCallback.NewObj(
+            clsid( CIfDummyTask ) );
+
+        if( pIf->IsServer() )
+        {
+            CUnixSockStmServer* pSvc = pIf;
+            if( pSvc == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            pSvc->SendProgress(
+                pRptBuf, pCallback );
+        }
+        else
+        {
+            CUnixSockStmProxy* pSvc = pIf;
+            if( pSvc == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            pSvc->SendProgress(
+                pRptBuf, pCallback );
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CIfStmReadWriteTask::OnStmRecv(
     BufPtr& pBuf )
 {
@@ -1372,12 +1474,25 @@ gint32 CIfStmReadWriteTask::OnStmRecv(
     if( !IsReading() )
         return -EINVAL;
 
-    if( m_bDiscard )
-        return 0;
-
     gint32 ret = 0;
     do{
+        bool bReport = IsReport( pBuf );
         CStdRTMutex oTaskLock( GetLock() );
+        if( bReport )
+        {
+            if( m_queBufRead.empty() || m_bDiscard )
+            {
+                oTaskLock.Unlock();
+                ret = SendProgress( pBuf );
+                break;
+            }
+            m_queBufRead.push_back( pBuf );
+            break;
+        }
+
+        if( m_bDiscard )
+            break;;
+
         if( m_queRequests.empty() )
         {
             m_queBufRead.push_back( pBuf );

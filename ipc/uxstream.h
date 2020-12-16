@@ -880,13 +880,9 @@ class CUnixSockStream:
                     m_oFlowCtrl.GetReport();
 
                 BufPtr pRptBuf( true );
-                pProgress->Serialize( *pRptBuf );
-
-                TaskletPtr pDummy;
-                pDummy.NewObj( clsid( CIfDummyTask ) );
-                ret = SendProgress( pRptBuf, pDummy );
-                if( ret == STATUS_PENDING )
-                    ret = 0;
+                *pRptBuf = ObjPtr( pProgress );
+                SendUxStreamEvent( tokData, pRptBuf );
+                ret = 0;
             }
             else
             {
@@ -1649,7 +1645,6 @@ class CUnixSockStmServer :
     CUnixSockStmServer( const IConfigDb* pCfg ) :
         super( pCfg )
     { SetClassId( clsid( CUnixSockStmServer ) ); }
-
 };
 
 }
