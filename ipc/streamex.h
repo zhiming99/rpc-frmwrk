@@ -264,6 +264,11 @@ class CIfStmReadWriteTask :
     bool CanSend();
     gint32 ReschedRead();
     gint32 PeekStream( BufPtr& pBuf );
+    inline bool IsReport( BufPtr& pBuf ) const
+    { return pBuf->GetExDataType() == typeObj; }
+    gint32 SendProgress( BufPtr& pBuf ) const;
+    gint32 GetUxStream( InterfPtr& pIf ) const;
+
 };
 
 
@@ -1182,6 +1187,9 @@ struct CStreamSyncBase :
         if( pReader == nullptr )
             return -EFAULT;
 
+        // NOTE: the pBuf could contain a progress
+        // report to send if the content is an
+        // objptr rather than a byte array
         bool bEmitEvt = false;
         ret = pReader->OnStmRecv( pBuf );
         if( ret == STATUS_MORE_PROCESS_NEEDED )
