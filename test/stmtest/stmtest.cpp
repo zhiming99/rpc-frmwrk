@@ -307,7 +307,8 @@ void CIfSmokeTest::testCliStartStop()
             nsec = ts2.tv_nsec - ts.tv_nsec;
         }
 
-        double dbTime2 = ( ( double )( ts2.tv_sec - ts.tv_sec - iCarry ) ) +
+        double dbTime2 = ( ( double )
+            ( ts2.tv_sec - ts.tv_sec - iCarry ) ) +
             ( nsec ) / NSEC_PER_SEC;
 
         // NOTE that the performance is MainLoop

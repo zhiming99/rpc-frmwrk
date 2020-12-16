@@ -23,8 +23,6 @@
 #include "uxstream.h"
 #include "streamex.h"
 
-#define MAX_RW_PER_SCHED 2
-
 namespace rpcfrmwrk
 {
 
@@ -1001,10 +999,8 @@ gint32 CIfStmReadWriteTask::RunTask()
         return STATUS_PENDING;
 
     gint32 ret = 0;
-    gint32 iNumSent = 0;
 
-    while( iNumSent < MAX_RW_PER_SCHED )
-    {
+    do{
         if( m_queRequests.empty() )
         {
             Pause();
@@ -1063,7 +1059,6 @@ gint32 CIfStmReadWriteTask::RunTask()
 
             m_queRequests.pop_front();
             COMPLETE_IRP( pIrp, ret );
-            ++iNumSent;
             // move on to the next
         }
         else
@@ -1104,7 +1099,6 @@ gint32 CIfStmReadWriteTask::RunTask()
                 pBuf->GetTailOff() )
                     bDone = true;
 
-            ++iNumSent;
             if( bDone )
             {
                 pBuf->SetOffset( pExt->dwOffset );
@@ -1130,13 +1124,13 @@ gint32 CIfStmReadWriteTask::RunTask()
                 COMPLETE_IRP( pIrp, ret );
             }
         }
-    };
+
+    }while( 1 );
 
     if( ERROR( ret ) )
         return ret;
 
-    if( iNumSent == MAX_RW_PER_SCHED &&
-        m_queRequests.size() > 0 )
+    if( m_queRequests.size() > 0 )
     {
         // reschedule the task to reader or
         // progress report to have chance to be
