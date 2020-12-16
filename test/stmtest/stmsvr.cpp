@@ -89,7 +89,8 @@ gint32 CMyStreamServer::OnSendDone_Loop(
         }
 
         std::string strMsg = DebugMsg( 0,
-            "this is the %d msg", dwCount + 1 );
+            "this is the %d msg of stream@0x%x",
+            dwCount + 1, hChannel  );
 
         BufPtr pNewBuf( true );
         *pNewBuf = strMsg;
@@ -126,7 +127,11 @@ gint32 CMyStreamServer::OnSendDone_Loop(
         oCfg[ 0 ] = dwCount;
     }
     else if( ERROR( ret ) )
-        StopLoop( ret );
+    {
+        DebugPrintEx( logNotice, ret,
+            "Error in OnSendDone_Loop"
+            " on stream 0x%x", hChannel );
+    }
 
     return 0;
 }
@@ -170,7 +175,11 @@ gint32 CMyStreamServer::OnWriteEnabled_Loop(
     }while( 0 );
 
     if( ERROR( ret ) )
-        StopLoop( ret );
+    {
+        DebugPrintEx( logNotice, ret,
+            "Error in OnWriteEnabled_Loop"
+            " on stream 0x%x", hChannel );
+    }
 
     return ret;
 }
@@ -220,7 +229,8 @@ gint32 CMyStreamServer::OnRecvData_Loop(
         PauseReadNotify( hChannel, true );
 
         std::string strMsg = DebugMsg( 0,
-            "this is the %d msg", dwCount + 1 );
+            "this is the %d msg of stream@0x%x",
+            dwCount + 1, hChannel  );
 
         BufPtr pNewBuf( true );
         *pNewBuf = strMsg;
@@ -257,7 +267,11 @@ gint32 CMyStreamServer::OnRecvData_Loop(
         oCfg[ 0 ] = dwCount;
     }
     else if( ERROR( ret ) )
-        StopLoop( ret );
+    {
+        DebugPrintEx( logNotice, ret,
+            "Error in OnRecvData_Loop"
+            " on stream 0x%x", hChannel );
+    }
 
     return 0;
 }
