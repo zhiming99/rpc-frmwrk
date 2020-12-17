@@ -452,31 +452,61 @@ gint32 CIfStmReadWriteTask::OnIoIrpComplete(
         IrpCtxPtr& pCurCtx =
             pCurIrp->GetTopStack();
 
-        BufPtr pReqBuf = pCurCtx->m_pReqData;
-        if( pReqBuf.IsEmpty() ||
-            pReqBuf->empty() )
+        BufPtr pBuf = pCurCtx->m_pReqData;
+        if( pBuf.IsEmpty() ||
+            pBuf->empty() )
         {
             ret = -EINVAL;
             break;
         }
 
-        if( pReqBuf->size() < dwSize )
+        if( pBuf->size() < dwSize )
         {
             ret = -ERANGE;
             break;
         }
 
-        pReqBuf->SetOffset(
-            pReqBuf->offset() + dwSize );
+        pBuf->SetOffset(
+            pBuf->offset() + dwSize );
 
-        if( pReqBuf->size() == 0 )
+        // recover the buffer
+        BufPtr pExtBuf;
+        pCurCtx->GetExtBuf( pExtBuf );
+        IRPCTX_EXT* pExt =
+            ( IRPCTX_EXT* )pExtBuf->ptr();
+
+        bool bDone = false;
+        if( pExt->dwTailOff ==
+            pBuf->GetTailOff() )
+                bDone = true;
+
+        gint32 iRet = 0;
+        if( bDone )
         {
-            // recover the buffer
-            pReqBuf->SetOffset( 0 );
+            pBuf->SetOffset( pExt->dwOffset );
+            pBuf->SetTailOff( pExt->dwTailOff );
             m_queRequests.pop_front();
-
-            gint32 iRet = pIrp->GetStatus();
+            iRet = pCurIrp->GetStatus();
             COMPLETE_IRP( pCurIrp, iRet );
+        }
+        else
+        {
+            pCurIrp->ClearSubmited();
+            iRet = AdjustSizeToWrite(
+                pCurIrp, pBuf, true );
+
+            if( ERROR( iRet ) )
+            {
+                if( iRet == -ENODATA )
+                {
+                    // the irp is done
+                    iRet = 0;
+                }
+                pBuf->SetOffset( pExt->dwOffset );
+                pBuf->SetTailOff( pExt->dwTailOff );
+                m_queRequests.pop_front();
+                COMPLETE_IRP( pCurIrp, iRet );
+            }
         }
 
         ret = ReRun();

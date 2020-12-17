@@ -89,8 +89,7 @@ gint32 CMyStreamServer::OnSendDone_Loop(
         }
 
         std::string strMsg = DebugMsg( 0,
-            "this is the %d msg of stream@0x%x",
-            dwCount + 1, hChannel  );
+            "this is the %d msg ", dwCount + 1 );
 
         BufPtr pNewBuf( true );
         *pNewBuf = strMsg;
@@ -100,8 +99,9 @@ gint32 CMyStreamServer::OnSendDone_Loop(
 
         if( ret == STATUS_PENDING )
         {
-            printf( "Proxy says(%d): %s\n",
-                dwCount++, ( char* )pBuf->ptr() );
+            printf( "Proxy @0x%x says(%d): %s\n",
+                ( guint32 )hChannel, dwCount++,
+                ( char* )pBuf->ptr() );
             // remove the buf from the pending
             // queue.
             ReadStreamNoWait( hChannel, pBuf );
@@ -229,8 +229,7 @@ gint32 CMyStreamServer::OnRecvData_Loop(
         PauseReadNotify( hChannel, true );
 
         std::string strMsg = DebugMsg( 0,
-            "this is the %d msg of stream@0x%x",
-            dwCount + 1, hChannel  );
+            "this is the %d msg ", dwCount + 1 );
 
         BufPtr pNewBuf( true );
         *pNewBuf = strMsg;
@@ -240,8 +239,9 @@ gint32 CMyStreamServer::OnRecvData_Loop(
 
         if( ret == STATUS_PENDING )
         {
-            printf( "Proxy says(%d): %s\n",
-                dwCount++, ( char* )pBuf->ptr() );
+            printf( "Proxy @0x%x says(%d): %s\n",
+                ( guint32 )hChannel, dwCount++,
+                ( char* )pBuf->ptr() );
             // remove the buf from the pending
             // queue.
             ReadStreamNoWait( hChannel, pBuf );
