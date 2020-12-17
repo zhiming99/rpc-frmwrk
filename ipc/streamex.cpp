@@ -1160,16 +1160,6 @@ gint32 CIfStmReadWriteTask::RunTask()
     if( ERROR( ret ) )
         return ret;
 
-    if( m_queRequests.size() > 0 )
-    {
-        // reschedule the task to reader or
-        // progress report to have chance to be
-        // handled
-        ret = ReRun();
-        if( SUCCEEDED( ret ) )
-            ret = STATUS_PENDING;
-    }
-
     return ret;
 }
 
