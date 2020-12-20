@@ -46,7 +46,7 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 
 ---
 [`Sun Dec 19 2020 12:06:37 AM Beijing`]   
-1. The latest changes in CUnixSockStream backed out `sending Progress` on tokPrgress receiving, and moved it to `CStreamSyncBase`'s CIfReadWriteStmTask, where the `sending progress` is sent when the pending message is finally out queue and consumed. This approach prevent the potential stall of stream due to receiving window congestion. 
+1. The latest changes in CUnixSockStream backed out `sending Progress` on `tokPrgress` receiving, and moved it to `CStreamSyncBase`'s `CIfReadWriteStmTask`, where the `tokProgress` is sent at the very moment the associated pending message is out queue and consumed. This approach prevent the potential stall of stream due to receiving window congestion. 
 
 [`Fri Dec  4 2020 10:54:37 PM Beijing`]   
 1. Refacted the streaming interface, and the new version should be less difficult to use than the old one. There will be some tests to the new interface before the Python support can resume.
