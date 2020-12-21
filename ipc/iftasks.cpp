@@ -4274,10 +4274,21 @@ gint32 CIfInvokeMethodTask::OnCancel(
         // NOTE: the error is not exactly the one
         // in the response. it is used internally.
         ret = ERROR_CANCEL;
+        CParamList oResp;
         if( dwContext == eventTimeoutCancel )
+        {
             ret = -ETIMEDOUT;
+            oResp[ propReturnValue ] = ret;
+            oCfg.SetPointer( propRespPtr,
+                ( IConfigDb* )oResp.GetCfg() );
+        }
         else if( dwContext == eventUserCancel )
+        {
             ret = ERROR_USER_CANCEL;
+            oResp[ propReturnValue ] = ret;
+            oCfg.SetPointer( propRespPtr,
+                ( IConfigDb* )oResp.GetCfg() );
+        }
 
         OnTaskComplete( ret );
 
