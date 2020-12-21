@@ -134,40 +134,45 @@ void CIfSmokeTest::testCliStartStop()
 
     CPPUNIT_ASSERT( !m_pMgr.IsEmpty() );
 
-    oCfg.SetObjPtr( propIoMgr, m_pMgr );
+    do{
+        oCfg.SetObjPtr( propIoMgr, m_pMgr );
 
-    ret = CRpcServices::LoadObjDesc(
-        OBJDESC_PATH,
-        OBJNAME_SERVER,
-        false, oCfg.GetCfg() );
-    
-    ret = pIf.NewObj(
-        clsid( CEventClient ),
-        oCfg.GetCfg() );
-    
-    CPPUNIT_ASSERT( SUCCEEDED( ret ) );
+        ret = CRpcServices::LoadObjDesc(
+            OBJDESC_PATH,
+            OBJNAME_SERVER,
+            false, oCfg.GetCfg() );
 
-    ret = pIf->Start();
-    // CPPUNIT_ASSERT( SUCCEEDED( ret ) );
-    
-    CEventClient* pCli = pIf;
-    if( pCli != nullptr )
+        if( ERROR( ret ) )
+            break;
+        
+        ret = pIf.NewObj(
+            clsid( CEventClient ),
+            oCfg.GetCfg() );
+        
+        if( ERROR( ret ) )
+            break;
+
+        ret = pIf->Start();
+        if( ERROR( ret ) )
+            break;
+        
+        CEventClient* pCli = pIf;
+        if( pCli != nullptr )
+        {
+            while( pCli->GetState() == stateRecovery )
+                sleep( 1 );
+
+            while( pCli->IsConnected() )
+                sleep( 1 );
+        }
+
+    }while( 0 );
+
+    if( !pIf.IsEmpty() )
     {
-        while( pCli->GetState() == stateRecovery )
-            sleep( 1 );
-
-        while( pCli->IsConnected() )
-            sleep( 1 );
+        pIf->Stop();
+        pIf.Clear();
     }
-    else
-    {
-        CPPUNIT_ASSERT( false );
-    }
-
-    ret = pIf->Stop();
-    // CPPUNIT_ASSERT( SUCCEEDED( ret ) );
-
-    pIf.Clear();
 }
 
 int main( int argc, char** argv )
