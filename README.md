@@ -45,8 +45,11 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 6. Access Control
 
 ---
+[`Sun Dec 19 2020 12:06:37 AM Beijing`]   
+1. The latest changes in CUnixSockStream backed out `sending Progress` when the remote peer has sent out enough messages to fill up the local receiving window. And instead, `sending tokProgress` is performed from `CStreamSyncBase`'s `CIfReadWriteStmTask`, at the very moment the associated pending message is out queue and consumed. This approach prevents the potential stall of stream due to receiving window congestion. 
+
 [`Fri Dec  4 2020 10:54:37 PM Beijing`]   
-1. Refacted the streaming interface, which should be easier to use than the previous one. There will be some tests to the new interface before the Python support can resume.
+1. Refacted the streaming interface, and the new version should be less difficult to use than the old one. There will be some tests to the new interface before the Python support can resume.
 2. Suprisingly, the `sftest` turns to to be faster than old version with the new streaming interface. The reason is yet to check. Sweet.
 
 [`Fri Nov 27 2020 04:56:52 PM Beijing`]   
