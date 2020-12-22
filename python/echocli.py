@@ -1,5 +1,6 @@
 from rpcfrmwrk import *
 from proxy import PyRpcContext, PyRpcProxy
+import numpy as np
 
 #1. define the interface the CEchoServer provides
 class CEchoClient:
@@ -25,11 +26,14 @@ class CEchoClient:
     #return sum of i1+i2
     def Echo2( self, i1, i2 ):
         return self.sendRequest(
-            self.ifName, "Echo2", i1, i2 )
+            self.ifName, "Echo2",
+            np.int32( i1 ),
+            np.float64( i2 ) )
 
     def EchoCfg( self, iCount, pObj ):
         return self.sendRequest(
-            self.ifName, "EchoCfg", iCount, pObj )
+            self.ifName, "EchoCfg",
+            np.int32( iCount ), pObj )
 
 #2. aggregrate the interface class and the PyRpcProxy
 # class by CEchoProxy to pickup the python-cpp
@@ -72,6 +76,7 @@ def HandleResp( resp, hint ) :
     return ret
 
 def test_main() : 
+    ret = 0
     oContext = PyRpcContext();
     with oContext :
         print( "start to work here..." )
@@ -84,7 +89,7 @@ def test_main() :
             return ret
 
         with oProxy :
-            for i in range( 100 ) :
+            for i in range( 10 ) :
                 #Echo a plain text
                 resp = oProxy.Echo( "Are you ok" );
                 ret = HandleResp( resp, "Echo" );
@@ -117,6 +122,7 @@ def test_main() :
                 ret = HandleResp( resp, "EchoCfg" );
                 if ret < 0 :
                     break;
+    return ret 
 
 ret = test_main()
 quit( ret )

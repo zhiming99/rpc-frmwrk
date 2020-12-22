@@ -254,8 +254,10 @@ namespace cpp
             LONGWORD dwParam2,
             LONGWORD* pData /In/ );
         %MethodCode
+            Py_BEGIN_ALLOW_THREADS;
             sipRes = sipCpp->OnEvent(
                 a0, a1, a2, ( LONGWORD* )a3 );
+            Py_END_ALLOW_THREADS;
         %End
     };
 
@@ -263,7 +265,17 @@ namespace cpp
     {
         public:
         gint32 Start();
+        %MethodCode
+            Py_BEGIN_ALLOW_THREADS;
+            sipRes = sipCpp->Start();
+            Py_END_ALLOW_THREADS;
+        %End
         gint32 Stop();
+        %MethodCode
+            Py_BEGIN_ALLOW_THREADS;
+            sipRes = sipCpp->Stop();
+            Py_END_ALLOW_THREADS;
+        %End
     };
 
     class IConfigDb : public cpp::CObjBase /Abstract/

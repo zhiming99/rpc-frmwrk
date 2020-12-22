@@ -1,17 +1,17 @@
-'''asynchronous version of echocli'''
+#asynchronous version of echocli
 
+from rpcfrmwrk import *
+from proxy import PyRpcContext, PyRpcProxy
 import numpy as np
 import threading as tr
-from rpcfrmwrk import *
-from proxy import pyrpccontext, pyrpcproxy
 
-#1. define the interface the cechoserver provides
-class cechoclient:
+#1. define the interface the CEchoServer provides
+class CEchoClient:
     """mandatory class member to define the
     interface name, which will be used to invoke
     the event handler if any
     """
-    ifname = "cechoserver"
+    ifName = "CEchoServer"
 
     '''all the proxy methods have the similiar
     implementation, pass the callback function,
@@ -37,14 +37,14 @@ class cechoclient:
     return value is ignored so far'''
     def EchoCb( self, iRet, textResp ) :
         if iRet < 0 :
-            print( "error occured in EchoAsyncCb", ret )
+            print( "error occured in EchoAsyncCb", iRet )
         else :
-            print( "Text Response is: ", testResp );
+            print( "Text Response is: ", textResp );
         self.sem.release()
 
     def EchoUnknowna( self, byteBuf ):
         tupRet = self.sendRequestAsync(
-            CEchoClient.EchoUnkAsyncCb,
+            CEchoClient.EchoUnknownCb,
             self.ifName, "EchoUnknown", byteBuf )
         ret = tupRet[ 0 ]
         if ret == 65537 :
@@ -58,8 +58,7 @@ class cechoclient:
         if iRet < 0 :
             print( "error occured in EchoUnknownCb", ret )
         else :
-            print( "Buf response is: " byteBuf );
-
+            print( "Buf response is: ", byteBuf )
         self.sem.release()
 
     #return sum of i1+i2
@@ -84,13 +83,13 @@ class cechoclient:
         if iRet < 0 :
             print( "error occured in Echo2Cb", ret )
         else :
-            print( "sum is: " i );
+            print( "sum is: ", i );
 
         self.sem.release()
 
     def EchoCfga( self, iCount, pObj ):
         tupRet = self.sendRequestAsync(
-            CEchoClient.EchoCfga,
+            CEchoClient.EchoCfgCb,
             self.ifName, "EchoCfg",
             np.int32( iCount ), pObj )
 
@@ -103,7 +102,7 @@ class cechoclient:
         return ret;
 
     #unpack the config object
-    def HandleResp( pObj ) :
+    def HandleResp( self, pObj ) :
         pCfg = cpp.CastToCfg( pObj )
         oResp = cpp.CParamList( pCfg )
         ret = oResp.GetSize()
@@ -111,8 +110,8 @@ class cechoclient:
             retText = oResp.GetStrProp( 0 )
             print( "response is \"",
                 retText[ 1 ], "\"" )
-        ret = ret[ 0 ]
-        return ret
+
+        return ret[ 0 ]
 
     '''EchoCfgCb will have two parameters to
     return as the response if the request
@@ -121,9 +120,9 @@ class cechoclient:
     carrying some properties.'''
     def EchoCfgCb( self, iRet, iCount, pCfg ) :
         if iRet < 0 :
-            print( "error occured in EchoCfgCb", ret )
+            print( "error occured in EchoCfgCb", iRet )
         else :
-            ret = HandleResp( pCfg );
+            ret = self.HandleResp( pCfg )
             if ret < 0 :
                 print( "error occured in EchoCfgCb 2", ret )
         self.sem.release()
@@ -134,9 +133,9 @@ class cechoclient:
 # interaction support
 
 class CEchoProxyAsync(CEchoClient, PyRpcProxy):
-    def __init__(self, pIoMgr, strDesc, strObjName) :
+    def __init__(self, pIoMgr, strCfgFile, strObjName) :
         super( CEchoClient, self ).__init__(
-            pIoMgr, strDesc, strObjName )
+            pIoMgr, strCfgFile, strObjName )
 
         '''a semaphore to synchronize between the
         main thread and the callback thread'''
@@ -168,18 +167,21 @@ def test_main() :
 
         ''' make the RPC calls
         '''
-        for i in range( 100 ) :
+        for i in range( 10 ) :
             #Echo a plain text
+            print( "Echo" )
             ret = oProxy.Echoa( "Are you ok" );
             if ret < 0 :
                 break;
 
             #Add to numbers and retun the sum
+            print( "Echo2" )
             ret = oProxy.Echo2a( 2, 3.0 );
             if ret < 0 :
                 break;
 
             #Echo whatever a block of binary data
+            print( "EchoUnknown" )
             f = open( "/usr/bin/sh", "rb" )
             f.seek(1024);
             o = f.read( 16 );
@@ -191,6 +193,7 @@ def test_main() :
 
             #Echo a serializable object held
             # by oParams
+            print( "EchoCfg" )
             oParams = cpp.CParamList();
             oParams.PushStr( "This is EchoCfg" );
             pObjSend = oParams.GetCfgAsObj();

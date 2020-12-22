@@ -1,5 +1,6 @@
 from rpcfrmwrk import *
 from inspect import signature
+import numpy as np
 
 import errno
 import inspect
@@ -9,25 +10,27 @@ import platform
 def GetObjType( var ) :
     if ( isinstance( var, np.int32 ) or
         isinstance( var, np.uint32 ) ) :
-        return cpp.typeUint32;
+        return cpp.typeUInt32;
     elif ( isinstance( var, np.int64 ) or
         isinstance( var, np.uint64 ) ) :
-        return cpp.typeUint64
+        return cpp.typeUInt64
     elif isinstance( var, np.float32 ) :
         return cpp.typeFloat
     elif isinstance( var, np.float64 ) :
         return cpp.typeDouble
     elif ( isinstance( var, np.int16 ) or
         isinstance( var, np.uint16 ) ) :
-        return cpp.typeUint16
+        return cpp.typeUInt16
     elif ( isinstance( var, np.int8 ) or
         isinstance( var, np.uint8 ) ) :
-        return cpp.typeUint8
+        return cpp.typeUInt8
     elif isinstance( var, str ) :
         return cpp.typeString
     elif isinstance( var, cpp.ObjPtr ) :
         return cpp.typeObj
     elif isinstance( var, bytearray ) :
+        return cpp.typeByteArr
+    elif isinstance( var, bytes ) :
         return cpp.typeByteArr
     elif isinstance( var, np.bool ) :
         return cpp.typeByte
@@ -36,18 +39,18 @@ def GetObjType( var ) :
     elif isinstance( var, int ) :
         arch = platform.architecture()[ 0 ];
         if arch == '32bit' :
-            return cpp.typeUint32
+            return cpp.typeUInt32
         elif arch == '64bit' :
-            return cpp.typeUint64
+            return cpp.typeUInt64
     elif isinstance( var, float ) :
         return cpp.typeDouble
     return cpp.typeNone;
 
 def GetTypeObj( typeid ) :
-    if typeid == cpp.typeUint32 :
+    if typeid == cpp.typeUInt32 :
         return np.uint32
 
-    elif typeid == cpp.typeUint64 :
+    elif typeid == cpp.typeUInt64 :
         return np.uint64
 
     elif typeid == cpp.typeFloat :
@@ -56,10 +59,10 @@ def GetTypeObj( typeid ) :
     elif typeid == cpp.typeDouble :
         return np.float64
 
-    elif typeid == cpp.typeUint16 :
+    elif typeid == cpp.typeUInt16 :
         return np.uint16
 
-    elif typeid ==  cpp.typeUint8 :
+    elif typeid ==  cpp.typeUInt8 :
         return np.uint8
 
     elif typeid == cpp.typeString :
@@ -105,7 +108,7 @@ class PyRpcContext :
         cpp.CoUninitialize();
 
     def DestroyRpcCtx( self ) :
-        print( "test.py: about to quit..." )
+        print( "proxy.py: about to quit..." )
         self.CleanUp();
 
     def __init__( self ) :
@@ -201,17 +204,12 @@ class PyRpcProxy :
 
         return resp;
 
-    def sendRequestAsync( *args ) :
-        strIfName = args[ 1 ]
-        strMethod = args[ 2 ]
-        self = args[ 0 ]
-        resp = [ 0, None ];
-
-        listArgs = list( args[3:] )
-        self.MakeCallAsync( strIfName, strMethod,
-            listArgs, resp )
-
-        return resp;
+    def sendRequestAsync( self, callback, strIfName, strMethod, *args ) :
+        resp = [ 0, None ]
+        listArgs = list( args )
+        tupRet = self.MakeCallAsync( callback,
+            strIfName, strMethod, listArgs, resp )
+        return tupRet
 
     def MakeCall( self, strIfName, strMethod, args, resp ) :
         ret = self.oInst.PyProxyCallSync(
@@ -221,30 +219,34 @@ class PyRpcProxy :
         return resp
 
     def HandleAsyncResp( self, callback, listResp ) :
+        listArgs = []
+        sig =signature( callback )
+        iArgNum = len( sig.parameters ) - 2
+        for i in range( iArgNum ):
+            listArgs.append( None );
+
         if listResp is None :
             print( "HandleAsyncResp: bad response" )
+            callback( self, -cpp.EBADMSG, *listArgs )
             return
 
-        iArgNum = signature( callback ) - 2
         if iArgNum < 0 :
             print( "HandleAsyncResp: bad callback")
+            callback( self, -cpp.EBADMSG, *listArgs )
             return
 
         ret = listResp[ 0 ];
-        if ret < 0 :
-            for i in range( iArgNum ):
-                listArgs.append( None );
-        else :
-            listArgs.extend( listResp[ 1 ] )
+        if ret == 0 :
+            listArgs = listResp[ 1 ]
         callback( self, ret, *listArgs )
-
+        return
 
     def MakeCallAsync( self, callback, strIfName, strMethod, args, resp ) :
         ret = self.oInst.PyProxyCall(
             callback, strIfName, strMethod, args, resp )
         return ret;
 
-    def GetObjType( self, pObj )
+    def GetObjType( self, pObj ) :
         return GetObjType( pObj )
 
     def ArgObjToList( self, pObj ) :

@@ -304,24 +304,11 @@ gint32 CPythonProxyImpl::OnProxyCallResp(
         CParamList oResp( pResp );
         ret = oResp.GetIntProp(
             propReturnValue, iRet );
-        if( ERROR( ret ) )
-            break;
 
-        if( ERROR( ( gint32 )iRet ) )
-        {
+        if( SUCCEEDED( ret ) &&
+            ERROR( ( gint32 )iRet ) )
             ret = iRet;
-        }
-        else
-        {
-            guint32 dwSize = 0;
-            ret = oResp.GetSize( dwSize );
-            if( SUCCEEDED( ret ) )
-            {
-                if( dwSize <
-                    PyList_Size( pPyResp ) )
-                    ret = -ERANGE;
-            }
-        }
+
         if( ERROR( ret ) )
         {
             PyObject* pRet =
@@ -974,16 +961,13 @@ class CPythonProxy :
     gint32 PyProxyCallSync(
         const std::string& strIfName /In/,
         const std::string& strMethod /In/,
-        PyObject* listArgs,
+        PyObject* listArgs /In/,
         PyObject* listResp );
     %MethodCode
         guint64 qwTaskCancel = 0;
         sipRes = sipCpp->PyProxyCall( Py_None,
             *a0, *a1, a2, a3, qwTaskCancel );
     %End
-
-    gint32 Start();
-    gint32 Stop();
 
     gint32 SetPyHost( PyObject* pObj );
     %MethodCode
