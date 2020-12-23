@@ -203,7 +203,12 @@ class PyRpcProxy :
 
         return resp;
 
-    def sendRequestAsync( self, callback, strIfName, strMethod, *args ) :
+    ''' sendRequestAsync returns a tuple with two
+    elements, 0 is the return code, and 1 is a
+    np.int64 as a taskid, which can be used to
+    cancel the request sent'''
+    def sendRequestAsync( self,
+        callback, strIfName, strMethod, *args ) :
         resp = [ 0, None ]
         listArgs = list( args )
         tupRet = self.MakeCallAsync( callback,
