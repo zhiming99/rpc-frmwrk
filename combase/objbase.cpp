@@ -189,6 +189,11 @@ gint32 GetEnvLibPath( std::set< std::string >& oSet )
     size_t pos = 0;
     std::string token;
     pos = s.find_first_of( delim );
+    if( pos == std::string::npos )
+    {
+        oSet.insert( s );
+        return STATUS_SUCCESS;
+    }
     while( pos != std::string::npos )
     {
         if( pos > 0 )
