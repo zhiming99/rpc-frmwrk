@@ -179,7 +179,6 @@ class PyRpcProxy :
             print( "Proxy started..." )
 
         oCheck = self.oInst.GetPyHost()
-        print( oCheck, self )
         return 0
 
     def Stop( self ) :
