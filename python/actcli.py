@@ -10,7 +10,18 @@ class CActcClient:
     """
     ifName = "CActcServer"
     """
-    this is the only method the server support
+    Method: LongWait
+
+    Description: this request is a long request,
+    it will be completed in 30 seconds. For some
+    reason we want to cancel it in 2 seconds after
+    the request is sent, we can call CancelRequest
+    to cancel this request.
+
+    Return value: the return value is a tuple with
+    two elememnts, 0 is the error code, and if it
+    is 65537, element 1 is the task id, which can
+    be passed to CancelRequest.
     """
     def LongWait( self, strText ) :
         tupRet = self.sendRequestAsync(
@@ -19,6 +30,18 @@ class CActcClient:
             strText )
         return tupRet
 
+    '''
+    Method: LongWaitCb
+
+    Description: the callback of `LongWait'
+    request. It will be called whether  the
+    request succeeds or not. If `iRet' is
+    STATUS_SUCCESS, the parameter `strReply'
+    contains the text string sent by LongWait
+    appended with a " 2" by the server.
+
+    Return Value: none
+    '''
     def LongWaitCb( self, iRet, strResp ) :
         if iRet < 0 :
             print( "LongWaitCb returns with error ", iRet )
