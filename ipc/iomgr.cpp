@@ -1721,7 +1721,7 @@ CIoManager::CIoManager( const std::string& strModName ) :
             ( *psetPaths )().insert( strPath );
 
         // get the executable's path
-        strPath.clear()
+        strPath.clear();
         ret = GetModulePath( strPath ); 
         if( SUCCEEDED( ret ) )
             ( *psetPaths )().insert( strPath );
