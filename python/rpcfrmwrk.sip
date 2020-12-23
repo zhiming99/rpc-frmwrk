@@ -526,6 +526,11 @@ namespace cpp
     {
         public:
         gint32 CancelRequest( guint64 qwTaskId );
+        %MethodCode
+            Py_BEGIN_ALLOW_THREADS;
+            sipRes = sipCpp->CancelRequest( a0 );
+            Py_END_ALLOW_THREADS;
+        %End
         EnumIfState GetState() const;
     };
 

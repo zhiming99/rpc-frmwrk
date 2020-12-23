@@ -121,8 +121,15 @@ gint32 GetCmdOutput( std::string& strResult,
     do{
         std::array<char, 128> buffer;
         std::string result;
-        std::unique_ptr<FILE, decltype(&pclose)>
-            pipe(popen(cmd, "r"), pclose);
+        FILE* fp = nullptr;
+        fp = popen( cmd, "r" );
+        if( fp == nullptr )
+        {
+            ret = -errno;
+            break;
+        }
+        std::unique_ptr< FILE, decltype(&pclose) >
+            pipe( fp, pclose );
 
         if (!pipe)
         {
@@ -168,6 +175,33 @@ gint32 GetCmdOutput( std::string& strResult,
     return ret;
 }
 
+gint32 GetEnvLibPath( std::set< std::string >& oSet )
+{
+    char* szEnv = secure_getenv(
+        "LD_LIBRARY_PATH" );
+
+    if( szEnv == nullptr )
+        return -ENOENT;
+    
+    std::string s = szEnv;
+    char delim = ':';
+
+    size_t pos = 0;
+    std::string token;
+    pos = s.find_first_of( delim );
+    while( pos != std::string::npos )
+    {
+        if( pos > 0 )
+        {
+            token = s.substr( 0, pos );
+            oSet.insert( token );
+        }
+        s.erase( 0, pos + 1 );
+        pos = s.find_first_of( delim );
+    }
+    return STATUS_SUCCESS;
+}
+
 gint32 GetLibPathName( std::string& strResult,
     const char* szLibName )
 {
@@ -176,8 +210,8 @@ gint32 GetLibPathName( std::string& strResult,
         szLibName = "libcombase.so";
 
     snprintf( cmd, sizeof( cmd ),
-        "cat /proc/%d/maps | grep '%s' |  awk '{print $6}' | uniq -d",
-        getpid(), szLibName );
+        "grep '%s' /proc/%d/maps |  awk '{print $6}' | uniq -d",
+        szLibName, getpid() );
 
     return GetCmdOutput( strResult, cmd );
 }
@@ -208,7 +242,7 @@ gint32 GetModulePath( std::string& strResult )
     char cmd[ 256 ];
 
     snprintf( cmd, sizeof( cmd ),
-        "dirname `cat /proc/%d/maps | head -n 1 |  awk '{print $6}'`",
+        "dirname `head -n 1 /proc/%d/maps |  awk '{print $6}'`",
         getpid() );
 
     return GetCmdOutput( strResult, cmd );

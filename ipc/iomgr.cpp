@@ -1721,6 +1721,7 @@ CIoManager::CIoManager( const std::string& strModName ) :
             ( *psetPaths )().insert( strPath );
 
         // get the executable's path
+        strPath.clear()
         ret = GetModulePath( strPath ); 
         if( SUCCEEDED( ret ) )
             ( *psetPaths )().insert( strPath );
@@ -1732,6 +1733,7 @@ CIoManager::CIoManager( const std::string& strModName ) :
                 " config files" );
         }
 
+        GetEnvLibPath( ( *psetPaths )() );
         ObjPtr pObj = psetPaths;
         this->SetCmdLineOpt(
             propSearchPaths, pObj );

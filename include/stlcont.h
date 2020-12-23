@@ -366,7 +366,12 @@ class CStlMap : public CObjBase
     {;}
 
     // a functor to return the container
-    std::map< Key_, Val_ >& operator()() const
+    const std::map< Key_, Val_ >& operator()() const
+    {
+        return ( std::map< Key_, Val_ >& )m_mapElems;
+    }
+
+    std::map< Key_, Val_ >& operator()()
     {
         return ( std::map< Key_, Val_ >& )m_mapElems;
     }
@@ -549,7 +554,10 @@ class CStlSet : public CObjBase
     { m_setElems.clear(); }
 
     // a functor to return the container
-    std::set< Val_ >& operator()() const
+    const std::set< Val_ >& operator()() const
+    { return ( std::set< Val_ >& )m_setElems; }
+
+    std::set< Val_ >& operator()()
     { return ( std::set< Val_ >& )m_setElems; }
 
     gint32 Serialize(
