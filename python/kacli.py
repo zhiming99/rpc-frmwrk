@@ -13,14 +13,15 @@ class CKeepAliveClient:
     """
     Method: LongWait
     Description:
-    this is a long request, and the client would
-    wait for about 5 minutes before the reply gets
-    back. Meanwhile, the server will send a
-    keep-alive event to notify the client the
-    request is still in process, upon getting the
-    event from server, the client will continue to
-    wait. Otherwise, the client will cancel the
-    request in 2 minutes.
+    This is a long request, and the client would
+    wait for about 300 seconds before the reply
+    can get back. Meanwhile, the server will send
+    a keep-alive event to notify the client the
+    request is still in process. And upon getting
+    the event from server, the client will
+    continue to wait. Otherwise, the client will
+    cancel the request in 120 seconds ( can be
+    configured in the `kadesc.json' ).
     """
     def LongWait( self, strText ) :
 
