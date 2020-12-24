@@ -1,9 +1,11 @@
 #asynchronous version of echocli
-
-from rpcfrmwrk import *
-from proxy import PyRpcContext, PyRpcProxy
+import sys
 import numpy as np
 import threading as tr
+from rpcfrmwrk import *
+
+sys.path.insert(0, '../')
+from proxy import PyRpcContext, PyRpcProxy
 
 #1. define the interface the CEchoServer provides
 class CEchoClient:

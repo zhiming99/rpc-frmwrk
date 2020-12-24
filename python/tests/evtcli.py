@@ -1,5 +1,8 @@
-from rpcfrmwrk import *
+import sys
 import time
+from rpcfrmwrk import *
+
+sys.path.insert(0, '../')
 from proxy import PyRpcContext, PyRpcProxy
 
 class CEventClient:

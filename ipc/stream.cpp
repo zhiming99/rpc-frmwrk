@@ -985,7 +985,7 @@ gint32 CStreamProxy::StartStream(
             bAsync = false;
             ret = pCallback.NewObj(
                 clsid( CSyncCallback ),
-                oParams.GetCfg() );
+                pDesc );
 
             if( ERROR( ret ) )
                 break;

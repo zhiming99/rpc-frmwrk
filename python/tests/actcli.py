@@ -1,7 +1,11 @@
-from rpcfrmwrk import *
+import sys
 import time
-from proxy import PyRpcContext, PyRpcProxy
 import numpy as np
+
+from rpcfrmwrk import *
+
+sys.path.insert(0, '../')
+from proxy import PyRpcContext, PyRpcProxy
 
 class CActcClient:
     """Mandatory class member to define the

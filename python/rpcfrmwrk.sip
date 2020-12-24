@@ -531,6 +531,21 @@ namespace cpp
             sipRes = sipCpp->CancelRequest( a0 );
             Py_END_ALLOW_THREADS;
         %End
+
+        gint32 Pause();
+        %MethodCode
+            Py_BEGIN_ALLOW_THREADS;
+            sipRes = sipCpp->Pause_Proxy();
+            Py_END_ALLOW_THREADS;
+        %End
+
+        gint32 Resume();
+        %MethodCode
+            Py_BEGIN_ALLOW_THREADS;
+            sipRes = sipCpp->Resume_Proxy();
+            Py_END_ALLOW_THREADS;
+        %End
+
         EnumIfState GetState() const;
     };
 
