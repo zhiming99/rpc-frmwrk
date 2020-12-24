@@ -3276,8 +3276,23 @@ gint32 CIfIoReqTask::OnCancel(
             break;
         }
 
-        ret = pIf->OnCancel(
+        pIf->OnCancel(
             ( IConfigDb* )pResp, this );
+
+        CCfgOpener oResp( ( IConfigDb* )pResp );
+        guint32 iRet = 0;
+        ret = oResp.GetIntProp(
+            propReturnValue, iRet );
+        if( ERROR( ret ) )
+        {
+            // set the return value for canceling
+            std::vector< LONGWORD > vecParams;
+            ret = GetParamList( vecParams );
+            if( SUCCEEDED( ret ) )
+                oResp[ propReturnValue ] =
+                    ( guint32 )vecParams[ 1 ];
+            ret = 0;
+        }
 
     }while( 0 );
 

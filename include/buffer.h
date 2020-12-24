@@ -91,8 +91,18 @@ inline gint32 GetTypeId( guint8* pT )
 { return typeByte; }
 
 template<>
+inline gint32 GetTypeId( gint8* pT )
+{ return typeByte; }
+
+
+template<>
 inline gint32 GetTypeId( guint16* pT )
 { return typeUInt16; }
+
+template<>
+inline gint32 GetTypeId( gint16* pT )
+{ return typeUInt16; }
+
 
 template<>
 inline gint32 GetTypeId( guint32* pT )
