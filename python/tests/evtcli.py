@@ -35,7 +35,7 @@ def test_main() :
     with oContext :
         print( "start to work here..." )
         oProxy = CEventProxy( oContext.pIoMgr,
-            "../test/debug64/evtdesc.json",
+            "../../test/debug64/evtdesc.json",
             "CEventServer" );
 
         ret = oProxy.GetError() 

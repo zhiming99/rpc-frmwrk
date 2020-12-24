@@ -84,7 +84,7 @@ def test_main() :
     with oContext :
         print( "start to work here..." )
         oProxy = CEchoProxy( oContext.pIoMgr,
-            "../test/debug64/echodesc.json",
+            "../../test/debug64/echodesc.json",
             "CEchoServer" );
 
         ret = oProxy.GetError() 
