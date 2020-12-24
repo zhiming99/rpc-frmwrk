@@ -2083,10 +2083,13 @@ gint32 CIfStopRecvMsgTask::RunTask()
 gint32 CIfPauseResumeTask::RunTask()
 {
     gint32 ret = 0;
+
+    ObjPtr pObj;
+    IEventSink* pCallback = nullptr;
+
     do{
         CParamList oParams(
             ( IConfigDb* )GetConfig() );
-        ObjPtr pObj;
         
         ret = oParams.GetObjPtr(
             propIfPtr, pObj );
@@ -2103,14 +2106,11 @@ gint32 CIfPauseResumeTask::RunTask()
             break;
         }
 
-        IEventSink* pCallback = nullptr;
-
         ret = oParams.GetObjPtr(
             propEventSink, pObj );
 
         if( SUCCEEDED( ret ) )
             pCallback = pObj;
-
 
         bool bResume = false;
 
@@ -2128,6 +2128,16 @@ gint32 CIfPauseResumeTask::RunTask()
         }
 
     }while( 0 );
+
+    if( ret != STATUS_PENDING &&
+        pCallback != nullptr )
+    {
+        CParamList oResp;
+        oResp[ propReturnValue ] = ret;
+        CCfgOpenerObj oCfg( pCallback );
+        oCfg.SetPointer( propRespPtr,
+            ( IConfigDb* )oResp.GetCfg() );
+    }
 
     return ret;
 }
