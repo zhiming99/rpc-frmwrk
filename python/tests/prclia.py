@@ -1,4 +1,5 @@
-#asynchronous version of echocli
+#asynchronous version proxy for CPauseResumeServer
+
 import sys
 import numpy as np
 import threading as tr
@@ -7,7 +8,7 @@ from rpcfrmwrk import *
 sys.path.insert(0, '../')
 from proxy import PyRpcContext, PyRpcProxy
 
-#1. define the interface the CEchoServer provides
+#1. define the interface 
 class CPauseResumeClient:
     """mandatory class member to define the
     interface name, which will be used to invoke
@@ -137,10 +138,11 @@ def test_main() :
         if ret < 0 :
             break;
 
-        print("Demonstrate what if the remote ",
-            "server is paused..." )
+        print("The server is paused by default."
+            "This example Demonstrates what to do",
+            "when server is paused..." )
 
-        print( "Echo" )
+        print( "Echo..." )
         strText = "Are you OK?"
         tupRet = oProxy.Echoa( strText )
         ret = tupRet[ 0 ]
@@ -170,14 +172,14 @@ def test_main() :
         if ret < 0 :
             break;
 
-        print( "Echo" )
+        print( "Echo... again" )
         tupRet = oProxy.Echoa( "Are you ok" )
         if tupRet[ 0 ] == 65537 :
             oProxy.sem.acquire()
         else :
             print( "unknown error" )
 
-        print( "EchoUnknown" )
+        print( "EchoUnknown..." )
         f = open( "/usr/bin/sh", "rb" )
         f.seek(1024);
         o = f.read( 16 );
@@ -185,7 +187,7 @@ def test_main() :
         f.close();
         oProxy.EchoUnknowna( o );
 
-        print( "EchoMany" )
+        print( "EchoMany..." )
         oProxy.EchoMany(
             1, 2, 3, 4, 5, strText )
 
