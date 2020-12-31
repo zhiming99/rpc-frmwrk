@@ -577,7 +577,7 @@ struct CStreamSyncBase :
     gint32 DispatchReadWriteEvent(
         guint32 dwParam1 )
     {
-        if( dwParam1 != POLL_IN )
+        if( dwParam1 != G_IO_IN )
             return ERROR_FAIL;
 
         if( m_iPiper < 0 )

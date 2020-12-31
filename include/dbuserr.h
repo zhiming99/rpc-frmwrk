@@ -24,7 +24,7 @@
  */
 
 #pragma once
-#include <glib.h>
+#include "clsids.h"
 #include "nsdef.h"
 
 namespace rpcfrmwrk

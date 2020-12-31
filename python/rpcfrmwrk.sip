@@ -6,7 +6,6 @@
 #include <string>
 #include "rpc.h"
 #include "defines.h"
-#include <glib.h>
 #include <stdint.h>
 #include <errno.h>
 using namespace cpp;

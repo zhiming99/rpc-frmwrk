@@ -13,12 +13,12 @@
             "QueuedRequests" : "false",
             "ProxyPortClass": "DBusProxyPdo",
             "comment-1" : "IpAddress is the ip address of the server",
-            "IpAddress" : "192.168.3.13",
+            "IpAddress" : "192.168.1.58",
             "Compression" : "true",
-            "EnableSSL" : "true",
+            "EnableSSL" : "false",
             "EnableWS" : "false",
-            "RouterPath" : "/rasp3",
-            "AuthInfo" :
+            "RouterPath" : "/",
+            "AuthInfo-1" :
             {
                 "AuthMech" : "krb5",
                 "UserName" : "zhiming@rpcfrmwrk.org",

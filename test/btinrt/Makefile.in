@@ -39,15 +39,15 @@ link_json:
 
 $(OUTPUT_DIR)/$(TARGET_SVR) : $(OUTPUT_DIR)/$(CLASS_LIB) $(OBJ_DIR)/$(OBJS_SVR)
 	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
-	$(CC) -o $@ $(LINKER_OPTION) -l$(CLASS_LINK) $(OBJ_DIR)/$(OBJS_SVR)
+	$(CC) -o $@ $(OBJ_DIR)/$(OBJS_SVR) -l$(CLASS_LINK) $(LINKER_OPTION)
 
 $(OUTPUT_DIR)/$(TARGET_CLI) : $(OUTPUT_DIR)/$(CLASS_LIB) $(OBJ_DIR)/$(OBJS_CLI)
 	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
-	$(CC) -o $@ $(LINKER_OPTION) -l$(CLASS_LINK) -ldbus-1 $(OBJ_DIR)/$(OBJS_CLI)
+	$(CC) -o $@ $(OBJ_DIR)/$(OBJS_CLI) -l$(CLASS_LINK) $(LINKER_OPTION)
 
 $(OUTPUT_DIR)/$(CLASS_LIB) : $(OBJS2)
 	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
-	$(CC) -o $@ $(LINKER_OPTION) -shared $(OBJS2)
+	$(CC) -o $@ $(OBJS2) -shared $(LINKER_OPTION)
 
 $(OBJ_DIR)/btinsvr.o : btinrtst.cpp
 	@echo Building file: $@

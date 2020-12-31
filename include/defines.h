@@ -36,6 +36,7 @@
 #include <syscall.h>
 #include <thread>
 #include <set>
+#include <string.h>
 
 #include "clsids.h"
 #include "propids.h"
@@ -218,8 +219,22 @@ do{\
 
 #define MAX_TIMEOUT_VALUE       ( 3600 * 24 * 30 )
 
+#define G_SOURCE_CONTINUE true
+#define G_SOURCE_REMOVE false
+
 namespace rpcfrmwrk
 {
+
+#include <poll.h>
+enum GIOCondition
+{
+	G_IO_IN = POLLIN,   // 1,
+	G_IO_PRI = POLLPRI, // 2,
+	G_IO_OUT = POLLOUT, // 4,
+	G_IO_ERR = POLLERR, // 8,
+	G_IO_HUP = POLLHUP, // 16,
+	G_IO_NVAL = POLLNVAL// 32
+};
 
 typedef enum : guint32 
 {

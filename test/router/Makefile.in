@@ -33,6 +33,6 @@ do_clean:
 
 $(OUTPUT_DIR)/$(TARGET_IMG) : $(OBJ_DIR)/$(ROUTER_OBJ)
 	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
-	$(CC) -o $@ $(LINKER_OPTION) -lrpc $(OBJ_DIR)/$(ROUTER_OBJ)
+	$(CC) -o $@ $(OBJ_DIR)/$(ROUTER_OBJ) $(LINKER_OPTION)
 
 .PHONY: sync TARGET clean_objs debug_clean release_clean do_clean
