@@ -1145,13 +1145,34 @@ gint32 CPythonProxyImpl::OnWriteStreamComplete(
         pPyCb = ( PyObject* )pVal;
 
         PyObject* pPyResp = PyList_New( 2 );
-        PyObject* pPyArgs = PyList_New( 0 );
+        PyObject* pPyArgs = nullptr; 
 
         PyObject* pRet = PyLong_FromLong( iRet );
         PyList_SET_ITEM( pPyResp, 0, pRet );
 
         if( SUCCEEDED( iRet ) )
-            PyList_SET_ITEM( pPyArgs, 0, pPyBuf );
+        {
+            pPyArgs = PyList_New( 2 );
+            PyObject* pyHandle = nullptr;
+            if( sizeof( HANDLE ) ==
+                sizeof( gint64 ) )
+            {
+                pyHandle =
+                    PyLong_FromLongLong( hChannel );
+            }
+            else
+            {
+                pyHandle =
+                    PyLong_FromLong( hChannel );
+            }
+
+            PyList_SET_ITEM( pPyArgs, 0, pyHandle );
+            PyList_SET_ITEM( pPyArgs, 1, pPyBuf );
+        }
+        else
+        {
+            pPyArgs = PyList_New( 0 );
+        }
 
         PyList_SET_ITEM( pPyResp, 1, pPyArgs );
 
@@ -1305,10 +1326,24 @@ class CPythonProxy :
         Py_END_ALLOW_THREADS;
     %End
 
+    gint32 CloseStream( HANDLE hChannel );
+    %MethodCode
+        Py_BEGIN_ALLOW_THREADS;
+        CPythonProxyImpl* pImpl = static_cast
+            < CPythonProxyImpl* >( sipCpp );
+        if( pImpl == nullptr ) 
+            sipRes = -EFAULT;
+        else
+        {
+            sipRes = pImpl->
+                CloseStream( a0 );
+        }
+        Py_END_ALLOW_THREADS;
+    %End
+
     gint32 WriteStream(
         HANDLE hChannel, PyObject* pPyBuf );
     %MethodCode
-    Py_BEGIN_ALLOW_THREADS;
     do{
         CPythonProxyImpl* pImpl = static_cast
             < CPythonProxyImpl* >( sipCpp );
@@ -1324,17 +1359,17 @@ class CPythonProxy :
             a1, pBuf );
         if( ERROR( sipRes ) )
             break;
-        sipRes = pImpl->
-            WriteStream( a0, pBuf );
+
+        Py_BEGIN_ALLOW_THREADS;
+        sipRes = pImpl->WriteStream( a0, pBuf );
+        Py_END_ALLOW_THREADS;
 
     }while( 0 );
-    Py_END_ALLOW_THREADS;
     %End
 
     PyObject* ReadStream( HANDLE hChannel );
     %MethodCode
     gint32 ret = 0;
-    Py_BEGIN_ALLOW_THREADS;
     do{
         CPythonProxyImpl* pImpl = static_cast
             < CPythonProxyImpl* >( sipCpp );
@@ -1346,7 +1381,9 @@ class CPythonProxy :
         }
 
         BufPtr* ppBuf = new BufPtr() ;
+        Py_BEGIN_ALLOW_THREADS;
         ret = pImpl->ReadStream( a0, *ppBuf );
+        Py_END_ALLOW_THREADS;
         if( ERROR( ret ) )
         {
             ret = -EFAULT;
@@ -1364,13 +1401,11 @@ class CPythonProxy :
         sipRes = sipBuildResult(
             0,"(i)",ret );
     }
-    Py_END_ALLOW_THREADS;
     %End
 
     gint32 ReadStreamAsync(
         HANDLE hChannel, PyObject* pCb );
     %MethodCode
-    Py_BEGIN_ALLOW_THREADS;
     do{
         sipRes = 0;
         CPythonProxyImpl* pImpl = static_cast
@@ -1395,14 +1430,14 @@ class CPythonProxy :
 
         BufPtr pBuf;
         IConfigDb* pCtx = oReqCtx.GetCfg();
+        Py_BEGIN_ALLOW_THREADS;
         sipRes = pImpl->ReadStreamAsync(
             a0, pBuf, pCtx );
-
+        Py_END_ALLOW_THREADS;
         break;
 
     }while( 0 );
 
-    Py_END_ALLOW_THREADS;
     %End
 
     gint32 WriteStreamAsync(
@@ -1410,7 +1445,6 @@ class CPythonProxy :
         PyObject* pPyBuf,
         PyObject* pCb );
     %MethodCode
-    Py_BEGIN_ALLOW_THREADS;
     do{
         sipRes = 0;
         CPythonProxyImpl* pImpl = static_cast
@@ -1442,14 +1476,13 @@ class CPythonProxy :
         Py_INCREF( a2 );
 
         IConfigDb* pCtx = oReqCtx.GetCfg();
+        Py_BEGIN_ALLOW_THREADS;
         sipRes = pImpl->WriteStreamAsync(
             a0, pBuf, pCtx );
-
+        Py_END_ALLOW_THREADS;
         break;
 
     }while( 0 );
-    Py_END_ALLOW_THREADS;
-
     %End
 };
 

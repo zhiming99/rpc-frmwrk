@@ -56,6 +56,28 @@ class CStreamingClient(CEchoClient, PyRpcProxy):
         '''a semaphore to synchronize between the
         main thread and the callback thread'''
         self.sem = tr.Semaphore( 0 )
+        self.iError = 0
+
+    def WriteStmCallback( self, iRet, hChannel, pBuf ) :
+        if iRet < 0 :
+            print( "Write failed with error", iRet )
+        else :
+            print( " server says(async): ", pBuf )
+        self.iError = iRet
+        self.sem.release()
+
+    '''a callback for async stream read
+    '''
+    def ReadStmCallback( self, iRet, hChannel, pBuf ) :
+        if iRet < 0 :
+            print( "Read failed with error", iRet )
+        else :
+            print( " server says(async): ", pBuf )
+        self.iError = iRet
+        self.sem.release()
+
+    def GetError( self ) :
+        return self.iError
 
 def test_main() : 
     while( True ) :
@@ -118,6 +140,25 @@ def test_main() :
             pBuf = tupRet[ 1 ]
             print( "Server says: ", pBuf )
 
+            b =  i + 0.1;
+            strMsg = strFmt.format( b ) 
+            ret = oProxy.WriteStreamAsync(
+                hChannel, strMsg,
+                CStreamingClient.WriteStmCallback )
+            if ret < 0 :
+                break
+            if ret == 65537 :
+                oProxy.sem.acquire()    
+
+            ret = oProxy.GetError()
+            if ret < 0 :
+                break
+
+            ret = oProxy.ReadStreamAsync( hChannel,
+                CStreamingClient.ReadStmCallback )
+            if ret < 0 :
+                break
+            
         break
 
     ''' Stop the guys'''

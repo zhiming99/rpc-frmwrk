@@ -280,8 +280,15 @@ class PyRpcProxy :
     def StartStream( self, pDesc ) :
         return self.oInst.StartStream( pDesc )
 
+    def CloseStream( self, hChannel ) :
+        return self.oInst.CloseStream( hChannel )
+
     def WriteStream( self, hChannel, pBuf ) :
         return self.oInst.WriteStream( hChannel, pBuf )
+
+    def WriteStreamAsync( self, hChannel, pBuf, callback ) :
+        return self.oInst.WriteStreamAsync(
+            hChannel, pBuf, callback )
 
     ''' return a bytes object read from the stream
     the bytes object must be consumed within
@@ -299,6 +306,9 @@ class PyRpcProxy :
             return ( -errno.EFAULT, )
         return ( 0, pBytes, pBuf )
 
+    def ReadStreamAsync( self, hChannel, callback ) :
+        return self.oInst.ReadStreamAsync(
+            hChannel, callback )
 
     def ArgObjToList( self, pObj ) :
         pCfg = cpp.CastToCfg( pObj )
