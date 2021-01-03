@@ -577,7 +577,7 @@ struct CStreamSyncBase :
     gint32 DispatchReadWriteEvent(
         guint32 dwParam1 )
     {
-        if( dwParam1 != POLL_IN )
+        if( dwParam1 != G_IO_IN )
             return ERROR_FAIL;
 
         if( m_iPiper < 0 )
@@ -1863,11 +1863,11 @@ struct CStreamSyncBase :
             
             CCfgOpener oReqCtx( pReqCtx );
             HANDLE hChannel = INVALID_HANDLE;
-            ret = oReqCtx.GetIntPtr(
-                0, ( guint32*& )hChannel );
+            guint32* pTemp = nullptr;
+            ret = oReqCtx.GetIntPtr( 0, pTemp );
             if( ERROR( ret ) )
                 break;
-
+            hChannel = ( HANDLE )pTemp;
             IConfigDb* pCtx = nullptr;
             ret = oReqCtx.GetPointer(
                 1, pCtx );

@@ -7,6 +7,27 @@ import inspect
 import types
 import platform
 
+def GetNpValue( typeid, val ) :
+    if typeid == cpp.typeUInt32 :
+        return np.uint32( val )
+
+    elif typeid == cpp.typeUInt64 :
+        return np.uint64( val )
+
+    elif typeid == cpp.typeFloat :
+        return np.float32( val )
+
+    elif typeid == cpp.typeDouble :
+        return np.float64( val )
+
+    elif typeid == cpp.typeUInt16 :
+        return np.uint16( val )
+
+    elif typeid ==  cpp.typeUInt8 :
+        return np.uint8( val )
+
+    return None
+
 def GetObjType( var ) :
     if ( isinstance( var, np.int32 ) or
         isinstance( var, np.uint32 ) ) :
@@ -252,6 +273,42 @@ class PyRpcProxy :
 
     def GetObjType( self, pObj ) :
         return GetObjType( pObj )
+
+    def GetNumpyValue( typeid, val ) :
+        return GetNpValue( typeid, val )
+
+    def StartStream( self, pDesc ) :
+        return self.oInst.StartStream( pDesc )
+
+    def CloseStream( self, hChannel ) :
+        return self.oInst.CloseStream( hChannel )
+
+    def WriteStream( self, hChannel, pBuf ) :
+        return self.oInst.WriteStream( hChannel, pBuf )
+
+    def WriteStreamAsync( self, hChannel, pBuf, callback ) :
+        return self.oInst.WriteStreamAsync(
+            hChannel, pBuf, callback )
+
+    ''' return a bytes object read from the stream
+    the bytes object must be consumed within
+    the lifecycle of pBuf '''
+    def ReadStream( self, hChannel ) :
+        tupRet = self.oInst.ReadStream( hChannel )
+        ret = tupRet[ 0 ]
+        if ret < 0 :
+            return tupRet;
+        #elem 1 is a BufPtr object on success
+        pBuf = tupRet[ 1 ]
+        #transfer the content to a bytes object
+        pBytes = pBuf.TransToBytes();
+        if pBytes == None :
+            return ( -errno.EFAULT, )
+        return ( 0, pBytes, pBuf )
+
+    def ReadStreamAsync( self, hChannel, callback ) :
+        return self.oInst.ReadStreamAsync(
+            hChannel, callback )
 
     def ArgObjToList( self, pObj ) :
         pCfg = cpp.CastToCfg( pObj )

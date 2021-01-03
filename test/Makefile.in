@@ -3,6 +3,7 @@ include Makefile.init.pub
 all: debug
 
 debug:
+	@if [ ! -e $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
 	@if [ ! -e $(OUTPUT_DIR)/libcombase.so ]; then cd $(OUTPUT_DIR);ln -s ../../$(DBG_DIR)/libcombase.so;cd -;fi
 	@if [ ! -e $(OUTPUT_DIR)/libipc.so ]; then cd $(OUTPUT_DIR);ln -s ../../$(DBG_DIR)/libipc.so;cd -;fi
 	@if [ ! -e $(OUTPUT_DIR)/librpc.so ]; then cd $(OUTPUT_DIR);ln -s ../../$(DBG_DIR)/librpc.so;cd -;fi
@@ -26,6 +27,7 @@ debug:
 	$(MAKE) -C btinrt
 
 release:
+	@if [ ! -e $(OUTPUT_DIR) ];then mkdir -p $(OUTPUT_DIR);fi
 	@if [ ! -e $(OUTPUT_DIR)/libcombase.so ]; then cd $(OUTPUT_DIR);ln -s ../../$(RLS_DIR)/libcombase.so;cd -;fi
 	@if [ ! -e $(OUTPUT_DIR)/libipc.so ]; then cd $(OUTPUT_DIR);ln -s ../../$(RLS_DIR)/libipc.so;cd -;fi
 	@if [ ! -e $(OUTPUT_DIR)/librpc.so ]; then cd $(OUTPUT_DIR);ln -s ../../$(RLS_DIR)/librpc.so;cd -;fi

@@ -12,10 +12,9 @@ This framework depends on the following packags to build:
 2. `libjson-cpp (jsoncpp-devel)` 
 3. `lz4 (lz4-devel)`   
 4. `cppunit-1 (for the sample code, cppunit and cppunit-devel)`   
-5. `glib-2.0 (for compile only,glib2-devel)`   
-6. `openssl-1.1 for SSL communication. ( openssl-devel, optional )`
-7. `Kerberos 5 for authentication and access control. ( rpm: krb5-libs, krb5-devel, or deb: libkrb5-3, libkrb5-dev )`
-8. `c++11` is required, and make sure the GCC is 5.x or higher.
+5. `openssl-1.1 for SSL communication. ( openssl-devel, optional )`
+6. `Kerberos 5 for authentication and access control. ( rpm: krb5-libs, krb5-devel, or deb: libkrb5-3, libkrb5-dev )`
+7. `c++11` is required, and make sure the GCC is 5.x or higher.
 
 #### Features:   
 1. `Support for multiple interfaces on a single object (COM alike).`   

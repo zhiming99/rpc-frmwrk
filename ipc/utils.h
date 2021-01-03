@@ -333,7 +333,7 @@ class CTimerService : public IService
         gint32 iTimerId,
         gint32 iOffset );
 
-	static gboolean TimerCallback(
+    static gboolean TimerCallback(
         gpointer dwParams );
 
     gint32 ProcessTimers();

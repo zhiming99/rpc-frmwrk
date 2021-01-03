@@ -13,10 +13,11 @@
             "QueuedRequests" : "false",
             "ProxyPortClass": "DBusProxyPdo",
             "comment-1" : "IpAddress is the ip address of the server",
-            "IpAddress" : "127.0.0.1",
+            "IpAddress" : "192.168.1.58",
             "Compression" : "true",
             "EnableSSL" : "false",
             "EnableWS" : "false",
+<<<<<<< HEAD
             "RouterPath" : "/rasp3",
             "AuthInfo-1" :
             {
@@ -26,6 +27,9 @@
                 "Realm" : "rpcfrmwrk.org",
                 "SignMessage" : "true"
             },
+=======
+            "RouterPath" : "/",
+>>>>>>> bafb8b1ce2d6a77f9051b2ec8226e4ad1cab7fb6
             "Interfaces" :
             [
                 {

@@ -9,7 +9,6 @@ SOURCES:= dbusprxy.cpp prxyfdo.cpp fdodrv.cpp \
 	multihop.cpp streammh.cpp
 
 OBJS:=$(SOURCES:%.cpp=$(OBJ_DIR)/%.o)
-C_DEFINES += -D_USE_LIBEV=1
 
 all: $(OUTPUT_DIR)/$(TARGET) SSLPort WSPort Security
 debug: $(OUTPUT_DIR)/$(TARGET) SSLPort WSPort Security
@@ -17,7 +16,7 @@ release: $(OUTPUT_DIR)/$(TARGET) SSLPort WSPort Security
 
 $(OUTPUT_DIR)/$(TARGET) : $(OBJS)
 	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
-	$(CC) -o $(OUTPUT_DIR)/$(TARGET) -L$(OUTPUT_DIR) -lcombase -lipc -ljsoncpp -ldbus-1 $(LINKER_OPTION) $(OBJS)
+	$(CC) -o $(OUTPUT_DIR)/$(TARGET) $(OBJS) -L$(OUTPUT_DIR) -lcombase -lipc -ljsoncpp -ldbus-1 -shared $(LINKER_OPTION)
 
 SSLPort:
 	$(MAKE) -C ./sslport

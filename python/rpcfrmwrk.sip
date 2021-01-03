@@ -6,7 +6,6 @@
 #include <string>
 #include "rpc.h"
 #include "defines.h"
-#include <glib.h>
 #include <stdint.h>
 #include <errno.h>
 using namespace cpp;
@@ -48,6 +47,7 @@ typedef unsigned long long guint64;
 // just a hint, the ultimate definition comes from
 // 'defines.h'
 typedef guint64 LONGWORD;
+typedef LONGWORD HANDLE;
 
 %MappedType std::string /TypeHint="str"/
 {
@@ -199,6 +199,17 @@ namespace cpp
         EnumTypeId GetExDataType();
         %MethodCode
             sipRes = ( *sipCpp )->GetExDataType();
+        %End
+
+        PyObject* TransToBytes();
+        %MethodCode
+            BufPtr& pBuf = *sipCpp;
+            PyObject* pView = PyMemoryView_FromMemory(
+                pBuf->ptr(), pBuf->size(), PyBUF_READ );
+            if( pView == nullptr )
+                sipRes = Py_None;
+            else
+                sipRes = PyBytes_FromObject( pView );
         %End
 
         gint32 CopyToPython( PyObject* pPyObj );

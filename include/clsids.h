@@ -23,7 +23,24 @@
  */
 #pragma once
 
-#include <glib.h>
+#include <stdint.h>
+
+typedef int8_t gint8;
+typedef uint8_t guint8;
+
+typedef int16_t gint16;
+typedef uint16_t guint16;
+
+typedef int32_t gint32;
+typedef uint32_t guint32;
+
+typedef int64_t gint64;
+typedef uint64_t guint64;
+
+typedef bool	gboolean;
+typedef void* 	gpointer;
+typedef guint32   GIOChannel;
+
 #include <nsdef.h>
 
 #define DECL_CLSID( __classname__ ) \

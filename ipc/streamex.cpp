@@ -78,18 +78,22 @@ do{ \
     if( SUCCEEDED( ret ) ) \
         oResp.Push( pBuf ); \
     TaskletPtr pDummy; \
-    pDummy.NewObj( clsid( CIfDummyTask ), \
-        oResp.GetCfg() ); \
+    pDummy.NewObj( clsid( CIfDummyTask ) ); \
+    CCfgOpener oCfg(\
+        ( IConfigDb* )pDummy->GetConfig() ); \
+    oCfg.SetPointer( propRespPtr, \
+        ( IConfigDb* )oResp.GetCfg() );\
     LONGWORD* pData = \
         ( LONGWORD* )( ( CObjBase* )pDummy ); \
     pTask->OnEvent( \
         eventTaskComp, iRet, 0, pData ); \
+    CLEAR_CALLBACK( _pIrp_, false );\
     bRet = true;\
 }while( 0 ); \
 bRet; \
 })
 
-#define CLEAR_CALLBACK( _pIrp ) \
+#define CLEAR_CALLBACK( _pIrp, _bCancel ) \
 ({ \
     do{ \
         if( _pIrp.IsEmpty() ) break;\
@@ -97,7 +101,7 @@ bRet; \
         IrpCtxPtr pCtx; \
         if( _pIrp->GetStackSize() == 0 ) \
             break; \
-        pCtx = pIrp->GetTopStack(); \
+        pCtx = _pIrp->GetTopStack(); \
         pCtx->GetExtBuf( pExtBuf ); \
         if( pExtBuf.IsEmpty() || \
             pExtBuf->empty() ) \
@@ -106,8 +110,10 @@ bRet; \
             ( IRPCTX_EXT* )pExtBuf->ptr(); \
         if( pCtxExt->pCallback.IsEmpty() ) \
             break; \
-        TaskletPtr pCallback = pCtxExt->pCallback;\
-        ( *pCallback )( eventCancelTask );\
+        if( _bCancel ) {\
+            TaskletPtr pCallback = pCtxExt->pCallback;\
+            ( *pCallback )( eventCancelTask );\
+        }\
         pCtxExt->pCallback.Clear(); \
     }while( 0 ); \
 })
@@ -791,7 +797,7 @@ gint32 CIfStmReadWriteTask::ReadStreamInternal(
        pIrp->RemoveTimer();
     }
 
-    CLEAR_CALLBACK( pIrp );
+    CLEAR_CALLBACK( pIrp, true );
 
     return ret;
 }
@@ -1360,7 +1366,7 @@ gint32 CIfStmReadWriteTask::WriteStreamInternal(
     else if( ret == STATUS_PENDING )
         return ret;
 
-    CLEAR_CALLBACK( pIrp );
+    CLEAR_CALLBACK( pIrp, true );
 
     return ret;
 }

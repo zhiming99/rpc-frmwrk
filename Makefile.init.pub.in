@@ -52,7 +52,7 @@ STRIP := $(CROSS_COMPILE)strip
 CUR_DIR := $(shell pwd)
 
 C_FLAGS := $(CFLAGS) -Wall -c -D_GNU_SOURCE -pthread
-#C_DEFINES :=
+C_DEFINES += -D_USE_LIBEV=1
 
 DEBUG_FLAGS := -D_DEBUG=1 -DDEBUG -ggdb
 RELEASE_FLAGS := -D_DEBUG=0 -DRELEASE -O2 -ggdb
@@ -82,7 +82,7 @@ endif
 USER_LIB_PREFIX := $(ROOTFS)/usr/$(LIB_DIR)$(DIR_SUFFIX_ARCH)
 LIB_PREFIX := $(ROOTFS)/$(LIB_DIR)$(DIR_SUFFIX_ARCH)
 
-COMMON_INCLUDE:=$(shell PKG_CONFIG_PATH=$(PKGCONFIGPATH) pkg-config --define-variable=prefix=$(ROOTFS)/usr --cflags glib-2.0 dbus-1 jsoncpp openssl mit-krb5)
+COMMON_INCLUDE:=$(shell PKG_CONFIG_PATH=$(PKGCONFIGPATH) pkg-config --define-variable=prefix=$(ROOTFS)/usr --cflags dbus-1 jsoncpp openssl mit-krb5)
 
 C_INCLUDE := -I$(BASE)/include \
 	$(COMMON_INCLUDE) \
@@ -130,8 +130,8 @@ endif
 
 CPP_FLAGS := $(CPPFLAGS) -std=c++11 $(WIDTH_FLAG) -Wno-psabi 
 #LINKER_OPTION := -shared $(WIDTH_FLAG) -L$(USER_LIB_PREFIX) -L$(LIB_PREFIX) -Wl,-rpath=$(USER_LIB_PREFIX) -Wl,-rpath=$(LIB_PREFIX) -ldbus-1 -ljsoncpp -ldl -lstdc++ -lpthread
-COMMON_LINK=$(shell PKG_CONFIG_PATH=$(PKGCONFIGPATH) pkg-config --define-variable=prefix=$(ROOTFS)/usr --libs-only-L glib-2.0 dbus-1 jsoncpp openssl mit-krb5)
-LINKER_OPTION := -shared $(WIDTH_FLAG) $(COMMON_LINK) -ldl -lstdc++ -lpthread
+COMMON_LINK=$(shell PKG_CONFIG_PATH=$(PKGCONFIGPATH) pkg-config --define-variable=prefix=$(ROOTFS)/usr --libs dbus-1 jsoncpp openssl mit-krb5 cppunit)
+LINKER_OPTION := $(WIDTH_FLAG) $(COMMON_LINK) -ldl -lstdc++ -lpthread
 
 ifeq ($(ARCH),arm)
 LINKER_OPTION += --sysroot=$(ROOTFS)

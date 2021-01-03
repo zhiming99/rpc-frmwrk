@@ -13,6 +13,15 @@ class CPythonProxyImpl : public CPythonProxy
         : super::_MyVirtBase( pCfg ), super( pCfg )
     { SetClassId( clsid( CPythonProxyImpl ) ); }
 
+    gint32 ConvertBufToPyObj(
+        BufPtr& pBuf,
+        PyObject*& pObject );
+
+    gint32 GetNumpyValue(
+        gint32 iType,
+        PyObject* pyInt,
+        PyObject*& val );
+
     gint32 FillList( IConfigDb* pResp,
         PyObject* listResp );
 
@@ -63,10 +72,144 @@ class CPythonProxyImpl : public CPythonProxy
     gint32 InvokeUserMethod(
         IConfigDb* pParams,
         IEventSink* pCallback );
+
+    gint32 OnReadStreamComplete(
+        HANDLE hChannel,
+        gint32 iRet,
+        BufPtr& pBuf,
+        IConfigDb* pCtx );
+
+    gint32 OnWriteStreamComplete(
+        HANDLE hChannel,
+        gint32 iRet,
+        BufPtr& pBuf,
+        IConfigDb* pCtx );
 };
 %End
 
 %ModuleCode
+
+gint32 CPythonProxyImpl::ConvertBufToPyObj(
+    BufPtr& pBuf, PyObject*& pObj )
+{
+    gint32 ret = 0;
+    if( pBuf.IsEmpty() || pBuf->empty() )
+    {
+        pObj = Py_None;
+        return ret;
+    }
+    do{
+        EnumTypeId iType = pBuf->GetExDataType();
+        if( iType == typeNone )
+        {
+            ret = -ENOTSUP;
+            break;
+        }
+
+        switch( iType )
+        {
+        case typeByte: 
+            {
+                guint8 val = *pBuf;
+                PyObject* pTemp =
+                    PyLong_FromLong( val );
+                ret = GetNumpyValue(
+                    iType, pTemp, pObj );
+                break;
+            }
+        case typeUInt16:
+            {
+                guint16 val = *pBuf;
+                PyObject* pTemp =
+                    PyLong_FromLong( val );
+                ret = GetNumpyValue(
+                    iType, pTemp, pObj );
+                break;
+            }
+        case typeUInt32:
+            {
+                guint32 val = *pBuf;
+                PyObject* pTemp =
+                    PyLong_FromLong( val );
+                ret = GetNumpyValue(
+                    iType, pTemp, pObj );
+                break;
+            }
+        case typeUInt64:
+            {
+                guint64 val = *pBuf;
+                PyObject* pTemp =
+                    PyLong_FromLongLong( val );
+                ret = GetNumpyValue(
+                    iType, pTemp, pObj );
+                break;
+            }
+        case typeFloat:
+            {
+                float val = *pBuf;
+                PyObject* pTemp =
+                    PyFloat_FromDouble( val );
+                ret = GetNumpyValue(
+                    iType, pTemp, pObj );
+                break;
+            }
+        case typeDouble:
+            {
+                double val = *pBuf;
+                PyObject* pTemp =
+                    PyFloat_FromDouble( val );
+                ret = GetNumpyValue(
+                    iType, pTemp, pObj );
+                break;
+            }
+        case typeString:
+            {
+                std::string val = *pBuf;
+                pObj =
+                    PyUnicode_FromString( val.c_str() );
+                break;
+            }
+        case typeObj:
+            {
+                ObjPtr* val = ( ObjPtr*)pBuf->ptr();
+                pObj = sipConvertFromNewType(
+                    val,sipType_cpp_ObjPtr, SIP_NULLPTR );
+                break;
+            }
+        case typeByteArr:
+            {
+                if( pBuf.IsEmpty() || pBuf->empty() )
+                {
+                    ret = -EINVAL;
+                    break;
+                }
+                PyObject* pView = PyMemoryView_FromMemory(
+                    pBuf->ptr(), pBuf->size(), PyBUF_READ );
+                if( pView == nullptr )
+                {
+                    ret = -EFAULT;
+                    break;
+                }
+
+                pObj = PyByteArray_FromObject( pView );
+                break;
+            }
+        case typeDMsg:
+            {
+                ret = -ENOTSUP;
+                break;
+            }
+        default:
+            {
+                ret = -EINVAL;
+                break;
+            }
+        }
+
+    }while( 0 );
+    return ret;
+}
+
 gint32 CPythonProxyImpl::FillList(
     IConfigDb* pResp, PyObject* listResp )
 {
@@ -98,12 +241,15 @@ gint32 CPythonProxyImpl::FillList(
             break;
         }
 
+        if( dwSize == 0 )
+            break;
+
         // note: the first parameter for the
         // callback is the return code 
         for( gint32 i = 0; i < ( gint32 )dwSize; ++i )
         {
-            EnumTypeId iType = typeNone;
-            ret = oResp.GetType( i, ( gint32& )iType );
+            gint32 iType = ( gint32 )typeNone;
+            ret = oResp.GetType( i, iType );
             if( ERROR( ret ) )
                 break;
 
@@ -116,7 +262,7 @@ gint32 CPythonProxyImpl::FillList(
                     if( ERROR( ret ) )
                         break;
                     PyObject* pObj = PyLong_FromLong( val );
-                    PyList_SET_ITEM( listArgs, i, pObj );
+                    PyList_SetItem( listArgs, i, pObj );
                     break;
                 }
             case typeUInt16:
@@ -126,7 +272,7 @@ gint32 CPythonProxyImpl::FillList(
                     if( ERROR( ret ) )
                         break;
                     PyObject* pObj = PyLong_FromLong( val );
-                    PyList_SET_ITEM( listArgs, i, pObj );
+                    PyList_SetItem( listArgs, i, pObj );
                     break;
                 }
             case typeUInt32:
@@ -136,7 +282,7 @@ gint32 CPythonProxyImpl::FillList(
                     if( ERROR( ret ) )
                         break;
                     PyObject* pObj = PyLong_FromLong( val );
-                    PyList_SET_ITEM( listArgs, i, pObj );
+                    PyList_SetItem( listArgs, i, pObj );
                     break;
                 }
             case typeUInt64:
@@ -147,7 +293,7 @@ gint32 CPythonProxyImpl::FillList(
                         break;
                     PyObject* pObj =
                         PyLong_FromLongLong( val );
-                    PyList_SET_ITEM( listArgs, i, pObj );
+                    PyList_SetItem( listArgs, i, pObj );
                     break;
                 }
             case typeFloat:
@@ -158,7 +304,7 @@ gint32 CPythonProxyImpl::FillList(
                         break;
                     PyObject* pObj =
                         PyFloat_FromDouble( val );
-                    PyList_SET_ITEM( listArgs, i, pObj );
+                    PyList_SetItem( listArgs, i, pObj );
                     break;
                 }
             case typeDouble:
@@ -169,7 +315,7 @@ gint32 CPythonProxyImpl::FillList(
                         break;
                     PyObject* pObj =
                         PyFloat_FromDouble( val );
-                    PyList_SET_ITEM( listArgs, i, pObj );
+                    PyList_SetItem( listArgs, i, pObj );
                     break;
                 }
             case typeString:
@@ -180,7 +326,7 @@ gint32 CPythonProxyImpl::FillList(
                         break;
                     PyObject* pObj =
                         PyUnicode_FromString( val.c_str() );
-                    PyList_SET_ITEM( listArgs, i, pObj );
+                    PyList_SetItem( listArgs, i, pObj );
                     break;
                 }
             case typeObj:
@@ -198,7 +344,7 @@ gint32 CPythonProxyImpl::FillList(
                         ret = -EFAULT;
                         break;
                     }
-                    PyList_SET_ITEM( listArgs, i, pObj );
+                    PyList_SetItem( listArgs, i, pObj );
                     break;
                 }
             case typeByteArr:
@@ -228,7 +374,7 @@ gint32 CPythonProxyImpl::FillList(
                         ret = -EFAULT;
                         break;
                     }
-                    PyList_SET_ITEM( listArgs, i, pByteArr );
+                    PyList_SetItem( listArgs, i, pByteArr );
                     break;
                 }
             case typeDMsg:
@@ -313,12 +459,12 @@ gint32 CPythonProxyImpl::OnProxyCallResp(
         {
             PyObject* pRet =
                 PyLong_FromLong( ret );
-            PyList_SET_ITEM( pPyResp, 0, pRet );
+            PyList_SetItem( pPyResp, 0, pRet );
         }
         else
         {
             PyObject* pRet = PyLong_FromLong( 0 );
-            PyList_SET_ITEM( pPyResp, 0, pRet );
+            PyList_SetItem( pPyResp, 0, pRet );
             ret = FillList( pResp, pPyResp );
         }
 
@@ -400,6 +546,27 @@ gint32 CPythonProxyImpl::AsyncCallVector(
 
     }while( 0 );
 
+    return ret;
+}
+
+gint32 CPythonProxyImpl::GetNumpyValue(
+    gint32 iType,
+    PyObject* pyInt,
+    PyObject*& pNpVal )
+{
+    gint32 ret = 0;
+    do{
+        PyObject* pHost = nullptr;
+        ret = GetPyHost( pHost );
+        if( ERROR( ret ) )
+            break;
+
+        pNpVal =
+        PyObject_CallMethod( pHost,
+            "GetNumpyValue", "(iO)",
+            iType, pyInt );
+
+    }while( 0 );
     return ret;
 }
 
@@ -892,6 +1059,145 @@ gint32 CPythonProxyImpl::InvokeUserMethod(
     return ret;
 }
 
+gint32 CPythonProxyImpl::OnReadStreamComplete(
+    HANDLE hChannel,
+    gint32 iRet,
+    BufPtr& pBuf,
+    IConfigDb* pCtx )
+{
+    if( pCtx == nullptr )
+        return -EINVAL;
+    CParamList oReqCtx( pCtx );
+    guint32* pCb = nullptr;
+    gint32 ret =
+        oReqCtx.GetIntPtr( 0, pCb );
+
+    if( ERROR( ret ) || pCb == nullptr )
+        return ret;
+
+    PyObject* pPyCb = nullptr;
+    PyGILState_STATE gstate;
+    gstate = PyGILState_Ensure();
+    do{
+        PyObject* pPyResp = PyList_New( 2 );
+
+        PyObject* pRet = PyLong_FromLong( iRet );
+        PyList_SetItem( pPyResp, 0, pRet );
+        PyObject* pArgs = PyList_New( 1 );
+        PyList_SetItem( pPyResp, 1, pArgs );
+
+        PyObject* pPyBuf = nullptr;
+        ret = ConvertBufToPyObj( pBuf, pPyBuf );
+        if( ERROR( ret ) )
+        {
+            pRet = PyLong_FromLong( ret );
+            PyList_SetItem( pPyResp, 0, pRet );
+        }
+        else
+        {
+            PyList_SetItem( pArgs, 0, pPyBuf );
+        }
+
+        pPyCb = ( PyObject* )pCb;
+
+        PyObject* pHost = nullptr;
+        ret = GetPyHost( pHost );
+        if( ERROR( ret ) )
+            break;
+
+        PyObject_CallMethod(
+             pHost, "HandleAsyncResp", 
+             "(OO)", pPyCb, pPyResp );
+
+    }while( 0 );
+
+    if( pPyCb != nullptr )
+        Py_DECREF( pPyCb );
+
+    PyGILState_Release( gstate );
+    return ret;
+}
+
+gint32 CPythonProxyImpl::OnWriteStreamComplete(
+    HANDLE hChannel,
+    gint32 iRet,
+    BufPtr& pBuf,
+    IConfigDb* pCtx )
+{
+    if( pCtx == nullptr )
+        return -EINVAL;
+    CParamList oReqCtx( pCtx );
+    PyObject* pPyBuf = nullptr; 
+    PyObject* pPyCb = nullptr;
+    gint32 ret = 0;
+    PyGILState_STATE gstate;
+    gstate = PyGILState_Ensure();
+    do{
+        guint32* pVal = nullptr;
+        ret = oReqCtx.GetIntPtr( 0, pVal );
+        if( ERROR( ret ) )
+            break;
+        pPyBuf = ( PyObject* )pVal;
+
+        ret = oReqCtx.GetIntPtr( 1, pVal );
+        if( ERROR( ret ) )
+            break;
+        pPyCb = ( PyObject* )pVal;
+
+        PyObject* pPyResp = PyList_New( 2 );
+        PyObject* pPyArgs = nullptr; 
+
+        PyObject* pRet = PyLong_FromLong( iRet );
+        PyList_SetItem( pPyResp, 0, pRet );
+
+        if( SUCCEEDED( iRet ) )
+        {
+            pPyArgs = PyList_New( 2 );
+            PyObject* pyHandle = nullptr;
+            if( sizeof( HANDLE ) ==
+                sizeof( gint64 ) )
+            {
+                pyHandle =
+                    PyLong_FromLongLong( hChannel );
+            }
+            else
+            {
+                pyHandle =
+                    PyLong_FromLong( hChannel );
+            }
+
+            PyList_SetItem( pPyArgs, 0, pyHandle );
+            PyList_SetItem( pPyArgs, 1, pPyBuf );
+            pPyBuf = nullptr;
+        }
+        else
+        {
+            pPyArgs = PyList_New( 0 );
+        }
+
+        PyList_SetItem( pPyResp, 1, pPyArgs );
+
+        PyObject* pHost = nullptr;
+        ret = GetPyHost( pHost );
+        if( ERROR( ret ) )
+            break;
+
+        PyObject_CallMethod(
+             pHost, "HandleAsyncResp", 
+             "(OO)", pPyCb, pPyResp );
+
+    }while( 0 );
+
+    if( pPyBuf != nullptr )
+        Py_DECREF( pPyBuf );
+
+    if( pPyCb != nullptr )
+        Py_DECREF( pPyCb );
+
+    PyGILState_Release( gstate );
+    return ret;
+}
+
 static FactoryPtr InitClassFactory()
 {
     BEGIN_FACTORY_MAPS;
@@ -1004,6 +1310,181 @@ class CPythonProxy :
             sipRes = pImpl->RemovePyHost();
     %End
 
+    gint32 StartStream( cpp::ObjPtr pObj,
+        HANDLE& hChannel /Out/ );
+    %MethodCode
+        Py_BEGIN_ALLOW_THREADS;
+        CPythonProxyImpl* pImpl = static_cast
+            < CPythonProxyImpl* >( sipCpp );
+        if( pImpl == nullptr ) 
+            sipRes = -EFAULT;
+        else
+        {
+            IConfigDb* pDesc = *a0;
+            sipRes = pImpl->
+                StartStream( a1, pDesc );
+        }
+        Py_END_ALLOW_THREADS;
+    %End
+
+    gint32 CloseStream( HANDLE hChannel );
+    %MethodCode
+        Py_BEGIN_ALLOW_THREADS;
+        CPythonProxyImpl* pImpl = static_cast
+            < CPythonProxyImpl* >( sipCpp );
+        if( pImpl == nullptr ) 
+            sipRes = -EFAULT;
+        else
+        {
+            sipRes = pImpl->
+                CloseStream( a0 );
+        }
+        Py_END_ALLOW_THREADS;
+    %End
+
+    gint32 WriteStream(
+        HANDLE hChannel, PyObject* pPyBuf );
+    %MethodCode
+    do{
+        CPythonProxyImpl* pImpl = static_cast
+            < CPythonProxyImpl* >( sipCpp );
+
+        if( pImpl == nullptr ) 
+        {
+            sipRes = -EFAULT;
+            break;
+        }
+
+        BufPtr pBuf( true );
+        sipRes = pImpl->ConvertPyObjToBuf(
+            a1, pBuf );
+        if( ERROR( sipRes ) )
+            break;
+
+        Py_BEGIN_ALLOW_THREADS;
+        sipRes = pImpl->WriteStream( a0, pBuf );
+        Py_END_ALLOW_THREADS;
+
+    }while( 0 );
+    %End
+
+    PyObject* ReadStream( HANDLE hChannel );
+    %MethodCode
+    gint32 ret = 0;
+    do{
+        CPythonProxyImpl* pImpl = static_cast
+            < CPythonProxyImpl* >( sipCpp );
+
+        if( pImpl == nullptr ) 
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        BufPtr* ppBuf = new BufPtr() ;
+        Py_BEGIN_ALLOW_THREADS;
+        ret = pImpl->ReadStream( a0, *ppBuf );
+        Py_END_ALLOW_THREADS;
+        if( ERROR( ret ) )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        sipRes = sipBuildResult(0,"(iN)",
+            ret,ppBuf,sipType_cpp_BufPtr,SIP_NULLPTR);
+
+        break;
+
+    }while( 0 );
+    if( ERROR( ret ) )
+    {
+        sipRes = sipBuildResult(
+            0,"(i)",ret );
+    }
+    %End
+
+    gint32 ReadStreamAsync(
+        HANDLE hChannel, PyObject* pCb );
+    %MethodCode
+    do{
+        sipRes = 0;
+        CPythonProxyImpl* pImpl = static_cast
+            < CPythonProxyImpl* >( sipCpp );
+
+        if( pImpl == nullptr || a1 == nullptr ) 
+        {
+            sipRes = -EFAULT;
+            break;
+        }
+
+        gint32 ret = PyCallable_Check( a1 );
+        if( ret == 0 )
+        {
+            sipRes = -EINVAL;
+            break;
+        }
+
+        CParamList oReqCtx;
+        oReqCtx.Push( ( intptr_t ) a1 );
+        Py_INCREF( a1 );
+
+        BufPtr pBuf;
+        IConfigDb* pCtx = oReqCtx.GetCfg();
+        Py_BEGIN_ALLOW_THREADS;
+        sipRes = pImpl->ReadStreamAsync(
+            a0, pBuf, pCtx );
+        Py_END_ALLOW_THREADS;
+        break;
+
+    }while( 0 );
+
+    %End
+
+    gint32 WriteStreamAsync(
+        HANDLE hChannel,
+        PyObject* pPyBuf,
+        PyObject* pCb );
+    %MethodCode
+    do{
+        sipRes = 0;
+        CPythonProxyImpl* pImpl = static_cast
+            < CPythonProxyImpl* >( sipCpp );
+
+        if( pImpl == nullptr ) 
+        {
+            sipRes = -EFAULT;
+            break;
+        }
+
+        BufPtr pBuf( true );
+        gint32 ret = PyCallable_Check( a2 );
+        if( ret == 0 )
+        {
+            sipRes = -EINVAL;
+            break;
+        }
+
+        sipRes = pImpl->ConvertPyObjToBuf(
+            a1, pBuf );
+        if( ERROR( sipRes ) )
+            break;
+
+        CParamList oReqCtx;
+        oReqCtx.Push( ( intptr_t ) a1 );
+        oReqCtx.Push( ( intptr_t ) a2 );
+        Py_INCREF( a1 );
+        Py_INCREF( a2 );
+
+        IConfigDb* pCtx = oReqCtx.GetCfg();
+        Py_BEGIN_ALLOW_THREADS;
+        sipRes = pImpl->WriteStreamAsync(
+            a0, pBuf, pCtx );
+        Py_END_ALLOW_THREADS;
+        break;
+
+    }while( 0 );
+    %End
 };
 
 cpp::ObjPtr CreateProxy(

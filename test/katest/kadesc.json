@@ -13,11 +13,19 @@
             "QueuedRequests" : "false",
             "ProxyPortClass": "DBusProxyPdo",
             "comment-1" : "IpAddress is the ip address of the server",
+<<<<<<< HEAD
             "IpAddress" : "127.0.0.1",
             "Compression" : "true",
             "EnableSSL" : "false",
             "EnableWS" : "false",
             "RouterPath" : "/rasp3",
+=======
+            "IpAddress" : "192.168.1.58",
+            "Compression" : "true",
+            "EnableSSL" : "false",
+            "EnableWS" : "false",
+            "RouterPath" : "/",
+>>>>>>> bafb8b1ce2d6a77f9051b2ec8226e4ad1cab7fb6
             "AuthInfo-1" :
             {
                 "AuthMech" : "krb5",
