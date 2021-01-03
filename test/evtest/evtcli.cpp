@@ -61,7 +61,7 @@ gint32 CEventClient::OnHelloWorld(
         strText.c_str() );
 
     strOutput.push_back( '\n' );
-    printf( strOutput.c_str() );
+    printf( "%s", strOutput.c_str() );
     return ret;
 }
 

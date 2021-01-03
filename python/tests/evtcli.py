@@ -1,5 +1,8 @@
-from rpcfrmwrk import *
+import sys
 import time
+from rpcfrmwrk import *
+
+sys.path.insert(0, '../')
 from proxy import PyRpcContext, PyRpcProxy
 
 class CEventClient:
@@ -32,7 +35,7 @@ def test_main() :
     with oContext :
         print( "start to work here..." )
         oProxy = CEventProxy( oContext.pIoMgr,
-            "../test/debug64/evtdesc.json",
+            "../../test/debug64/evtdesc.json",
             "CEventServer" );
 
         ret = oProxy.GetError() 

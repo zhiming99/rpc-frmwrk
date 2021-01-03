@@ -5565,8 +5565,26 @@ gint32 CInterfaceProxy::CancelRequest(
         ret = UserCancelRequest(
             qwThisTask, qwTaskId );
 
+        if( SUCCEEDED( ret ) )
+            break;
+
+        TaskGrpPtr pTaskGrp;
+        ret = GetParallelGrp( pTaskGrp );
         if( ERROR( ret ) )
             break;
+
+        TaskletPtr pTaskCancel;
+        ret = pTaskGrp->FindTask(
+            qwTaskId, pTaskCancel );
+
+        if( ERROR( ret ) )
+            break;
+
+        ret = DEFER_CALL(
+            GetIoMgr(), pTaskCancel,
+            &IEventSink::OnEvent,
+            eventUserCancel, ERROR_USER_CANCEL,
+            0, nullptr );
 
    }while( 0 ); 
 

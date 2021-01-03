@@ -354,10 +354,6 @@ namespace rpcfrmwrk
 typedef  CMainIoLoopT< CEvLoop > CMainIoLoop;
 }
 #else
-#include "gmloop.h"
-namespace rpcfrmwrk
-{
-typedef  CMainIoLoopT< CGMainLoop > CMainIoLoop;
-}
+#error _USE_LIBDEV is not defined
 #endif
 

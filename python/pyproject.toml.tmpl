@@ -9,7 +9,9 @@ name = "rpcfrmwrk"
 
 [tool.sip.bindings.rpcfrmwrk]
 headers = ["rpc.h"]
-include-dirs = ["../include","../ipc","/usr/include/dbus-1.0","/usr/lib64/dbus-1.0/include",
-"/usr/include/glib-2.0","/usr/lib64/glib-2.0/include","../test/stmtest" ]
+include-dirs = [ "../include","../ipc", "../test/stmtest"XXXXXXXX ]
 libraries = ["combase", "ipc", "stmsvr" ]
 library-dirs = ["../test/debug64"]
+debug = true
+tracing = true
+define-macros = ["DEBUG"]

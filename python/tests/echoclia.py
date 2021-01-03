@@ -1,9 +1,11 @@
 #asynchronous version of echocli
-
-from rpcfrmwrk import *
-from proxy import PyRpcContext, PyRpcProxy
+import sys
 import numpy as np
 import threading as tr
+from rpcfrmwrk import *
+
+sys.path.insert(0, '../')
+from proxy import PyRpcContext, PyRpcProxy
 
 #1. define the interface the CEchoServer provides
 class CEchoClient:
@@ -56,7 +58,7 @@ class CEchoClient:
     the request succeeds as iRet is 0'''
     def EchoUnknownCb( self, iRet, byteBuf ):
         if iRet < 0 :
-            print( "error occured in EchoUnknownCb", ret )
+            print( "error occured in EchoUnknownCb", iRet )
         else :
             print( "Buf response is: ", byteBuf )
         self.sem.release()
@@ -81,7 +83,7 @@ class CEchoClient:
     request succeeds'''
     def Echo2Cb( self, iRet, i ):
         if iRet < 0 :
-            print( "error occured in Echo2Cb", ret )
+            print( "error occured in Echo2Cb", iRet )
         else :
             print( "sum is: ", i );
 
@@ -154,7 +156,7 @@ def test_main() :
         it'''
         print( "start to work here..." )
         oProxy = CEchoProxyAsync( oContext.pIoMgr,
-            "../test/debug64/echodesc.json",
+            "../../test/debug64/echodesc.json",
             "CEchoServer" );
 
         ret = oProxy.GetError() 

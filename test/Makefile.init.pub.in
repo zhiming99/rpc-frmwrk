@@ -1,10 +1,6 @@
 mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
 include $(dir $(mkfile_path))/../Makefile.init.pub
 
-CUR_DIR := $(shell pwd)
-
-C_DEFINES :=
-
 C_INCLUDE += -I$(BASE)/ipc \
 	-I$(BASE)/rpc \
 
@@ -22,8 +18,7 @@ else ifeq ($(MAKECMDGOALS),release_clean)
 	RPCLIB_DIR := $(BASE)/$(RLS_DIR)
 endif
 
-CPP_FLAGS += -D_USE_LIBEV=1
-LINKER_OPTION := -L$(OUTPUT_DIR) $(WIDTH_FLAG) -L$(USER_LIB_PREFIX) -L$(LIB_PREFIX) -lipc -lcombase -Wl,-rpath=$(USER_LIB_PREFIX) -Wl,-rpath=$(LIB_PREFIX) -ldbus-1 -lcppunit -ljsoncpp -lstdc++ -ldl -lpthread
+LINKER_OPTION := -L$(OUTPUT_DIR) -lrpc -lipc -lcombase $(LINKER_OPTION)
 
 ifeq ($(ARCH),arm)
 atomic:=$(shell grep -l 'define HAVE_LIBATOMIC 1' $(BASE)/config.h)

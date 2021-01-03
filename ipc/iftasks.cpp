@@ -2083,10 +2083,13 @@ gint32 CIfStopRecvMsgTask::RunTask()
 gint32 CIfPauseResumeTask::RunTask()
 {
     gint32 ret = 0;
+
+    ObjPtr pObj;
+    IEventSink* pCallback = nullptr;
+
     do{
         CParamList oParams(
             ( IConfigDb* )GetConfig() );
-        ObjPtr pObj;
         
         ret = oParams.GetObjPtr(
             propIfPtr, pObj );
@@ -2103,14 +2106,11 @@ gint32 CIfPauseResumeTask::RunTask()
             break;
         }
 
-        IEventSink* pCallback = nullptr;
-
         ret = oParams.GetObjPtr(
             propEventSink, pObj );
 
         if( SUCCEEDED( ret ) )
             pCallback = pObj;
-
 
         bool bResume = false;
 
@@ -2128,6 +2128,16 @@ gint32 CIfPauseResumeTask::RunTask()
         }
 
     }while( 0 );
+
+    if( ret != STATUS_PENDING &&
+        pCallback != nullptr )
+    {
+        CParamList oResp;
+        oResp[ propReturnValue ] = ret;
+        CCfgOpenerObj oCfg( pCallback );
+        oCfg.SetPointer( propRespPtr,
+            ( IConfigDb* )oResp.GetCfg() );
+    }
 
     return ret;
 }
@@ -3266,8 +3276,23 @@ gint32 CIfIoReqTask::OnCancel(
             break;
         }
 
-        ret = pIf->OnCancel(
+        pIf->OnCancel(
             ( IConfigDb* )pResp, this );
+
+        CCfgOpener oResp( ( IConfigDb* )pResp );
+        guint32 iRet = 0;
+        ret = oResp.GetIntProp(
+            propReturnValue, iRet );
+        if( ERROR( ret ) )
+        {
+            // set the return value for canceling
+            std::vector< LONGWORD > vecParams;
+            ret = GetParamList( vecParams );
+            if( SUCCEEDED( ret ) )
+                oResp[ propReturnValue ] =
+                    ( guint32 )vecParams[ 1 ];
+            ret = 0;
+        }
 
     }while( 0 );
 
