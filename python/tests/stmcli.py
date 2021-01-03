@@ -62,7 +62,7 @@ class CStreamingClient(CEchoClient, PyRpcProxy):
         if iRet < 0 :
             print( "Write failed with error", iRet )
         else :
-            print( " server says(async): ", pBuf )
+            print( " server says( async ): ", pBuf )
         self.iError = iRet
         self.sem.release()
 
@@ -124,7 +124,7 @@ def test_main() :
         hChannel = tupRet[ 1 ]
         
         print( "start talking..." )
-        for i in range( 1000 ) :
+        for i in range( 10000 ) :
             strFmt = "a message to server {} " 
             strMsg = strFmt.format( i )
             ret = oProxy.WriteStream(
@@ -138,7 +138,7 @@ def test_main() :
                 break
 
             pBuf = tupRet[ 1 ]
-            print( "Server says: ", pBuf )
+            print( "Server says( sync ): ", pBuf )
 
             b =  i + 0.1;
             strMsg = strFmt.format( b ) 

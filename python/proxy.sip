@@ -262,7 +262,7 @@ gint32 CPythonProxyImpl::FillList(
                     if( ERROR( ret ) )
                         break;
                     PyObject* pObj = PyLong_FromLong( val );
-                    PyList_SET_ITEM( listArgs, i, pObj );
+                    PyList_SetItem( listArgs, i, pObj );
                     break;
                 }
             case typeUInt16:
@@ -272,7 +272,7 @@ gint32 CPythonProxyImpl::FillList(
                     if( ERROR( ret ) )
                         break;
                     PyObject* pObj = PyLong_FromLong( val );
-                    PyList_SET_ITEM( listArgs, i, pObj );
+                    PyList_SetItem( listArgs, i, pObj );
                     break;
                 }
             case typeUInt32:
@@ -282,7 +282,7 @@ gint32 CPythonProxyImpl::FillList(
                     if( ERROR( ret ) )
                         break;
                     PyObject* pObj = PyLong_FromLong( val );
-                    PyList_SET_ITEM( listArgs, i, pObj );
+                    PyList_SetItem( listArgs, i, pObj );
                     break;
                 }
             case typeUInt64:
@@ -293,7 +293,7 @@ gint32 CPythonProxyImpl::FillList(
                         break;
                     PyObject* pObj =
                         PyLong_FromLongLong( val );
-                    PyList_SET_ITEM( listArgs, i, pObj );
+                    PyList_SetItem( listArgs, i, pObj );
                     break;
                 }
             case typeFloat:
@@ -304,7 +304,7 @@ gint32 CPythonProxyImpl::FillList(
                         break;
                     PyObject* pObj =
                         PyFloat_FromDouble( val );
-                    PyList_SET_ITEM( listArgs, i, pObj );
+                    PyList_SetItem( listArgs, i, pObj );
                     break;
                 }
             case typeDouble:
@@ -315,7 +315,7 @@ gint32 CPythonProxyImpl::FillList(
                         break;
                     PyObject* pObj =
                         PyFloat_FromDouble( val );
-                    PyList_SET_ITEM( listArgs, i, pObj );
+                    PyList_SetItem( listArgs, i, pObj );
                     break;
                 }
             case typeString:
@@ -326,7 +326,7 @@ gint32 CPythonProxyImpl::FillList(
                         break;
                     PyObject* pObj =
                         PyUnicode_FromString( val.c_str() );
-                    PyList_SET_ITEM( listArgs, i, pObj );
+                    PyList_SetItem( listArgs, i, pObj );
                     break;
                 }
             case typeObj:
@@ -344,7 +344,7 @@ gint32 CPythonProxyImpl::FillList(
                         ret = -EFAULT;
                         break;
                     }
-                    PyList_SET_ITEM( listArgs, i, pObj );
+                    PyList_SetItem( listArgs, i, pObj );
                     break;
                 }
             case typeByteArr:
@@ -374,7 +374,7 @@ gint32 CPythonProxyImpl::FillList(
                         ret = -EFAULT;
                         break;
                     }
-                    PyList_SET_ITEM( listArgs, i, pByteArr );
+                    PyList_SetItem( listArgs, i, pByteArr );
                     break;
                 }
             case typeDMsg:
@@ -459,12 +459,12 @@ gint32 CPythonProxyImpl::OnProxyCallResp(
         {
             PyObject* pRet =
                 PyLong_FromLong( ret );
-            PyList_SET_ITEM( pPyResp, 0, pRet );
+            PyList_SetItem( pPyResp, 0, pRet );
         }
         else
         {
             PyObject* pRet = PyLong_FromLong( 0 );
-            PyList_SET_ITEM( pPyResp, 0, pRet );
+            PyList_SetItem( pPyResp, 0, pRet );
             ret = FillList( pResp, pPyResp );
         }
 
@@ -1082,20 +1082,20 @@ gint32 CPythonProxyImpl::OnReadStreamComplete(
         PyObject* pPyResp = PyList_New( 2 );
 
         PyObject* pRet = PyLong_FromLong( iRet );
-        PyList_SET_ITEM( pPyResp, 0, pRet );
+        PyList_SetItem( pPyResp, 0, pRet );
         PyObject* pArgs = PyList_New( 1 );
-        PyList_SET_ITEM( pPyResp, 1, pArgs );
+        PyList_SetItem( pPyResp, 1, pArgs );
 
         PyObject* pPyBuf = nullptr;
         ret = ConvertBufToPyObj( pBuf, pPyBuf );
         if( ERROR( ret ) )
         {
             pRet = PyLong_FromLong( ret );
-            PyList_SET_ITEM( pPyResp, 0, pRet );
+            PyList_SetItem( pPyResp, 0, pRet );
         }
         else
         {
-            PyList_SET_ITEM( pArgs, 0, pPyBuf );
+            PyList_SetItem( pArgs, 0, pPyBuf );
         }
 
         pPyCb = ( PyObject* )pCb;
@@ -1148,7 +1148,7 @@ gint32 CPythonProxyImpl::OnWriteStreamComplete(
         PyObject* pPyArgs = nullptr; 
 
         PyObject* pRet = PyLong_FromLong( iRet );
-        PyList_SET_ITEM( pPyResp, 0, pRet );
+        PyList_SetItem( pPyResp, 0, pRet );
 
         if( SUCCEEDED( iRet ) )
         {
@@ -1166,15 +1166,16 @@ gint32 CPythonProxyImpl::OnWriteStreamComplete(
                     PyLong_FromLong( hChannel );
             }
 
-            PyList_SET_ITEM( pPyArgs, 0, pyHandle );
-            PyList_SET_ITEM( pPyArgs, 1, pPyBuf );
+            PyList_SetItem( pPyArgs, 0, pyHandle );
+            PyList_SetItem( pPyArgs, 1, pPyBuf );
+            pPyBuf = nullptr;
         }
         else
         {
             pPyArgs = PyList_New( 0 );
         }
 
-        PyList_SET_ITEM( pPyResp, 1, pPyArgs );
+        PyList_SetItem( pPyResp, 1, pPyArgs );
 
         PyObject* pHost = nullptr;
         ret = GetPyHost( pHost );
