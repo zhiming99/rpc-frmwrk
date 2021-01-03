@@ -494,7 +494,8 @@
             "ModName" : "PyRpcProxy",                                    
             "DriversToLoad" :                                            
             [                                                            
-                "DBusBusDriver"
+                "DBusBusDriver",
+                "UnixSockBusDriver"
             ]                                                            
         }     
 
