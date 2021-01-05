@@ -2,13 +2,18 @@ include ../../Makefile.init.pub
 
 TARGET:=libauth.so
 SOURCES:= security.cpp dllexp.cpp kdcfdo.cpp secfido.cpp k5proxy.cpp k5server.cpp
+
+KRB5_INC:=$(shell PKG_CONFIG_PATH=$(PKGCONFIGPATH) pkg-config --define-variable=prefix=$(ROOTFS)/usr --cflags mit-krb5)
+
 C_INCLUDE:= \
 	-I$(BASE)/ipc \
 	-I$(BASE)/rpc \
-	$(C_INCLUDE)
+	$(C_INCLUDE) $(KRB5_INC)
 
 C_DEFINES += -D_USE_LIBEV=1
 OBJS:=$(SOURCES:%.cpp=$(OBJ_DIR)/%.o)
+
+KRB5_LINK:=$(shell PKG_CONFIG_PATH=$(PKGCONFIGPATH) pkg-config --define-variable=prefix=$(ROOTFS)/usr --libs mit-krb5)
 
 all: $(OUTPUT_DIR)/$(TARGET)
 debug: $(OUTPUT_DIR)/$(TARGET)
@@ -16,7 +21,7 @@ release: $(OUTPUT_DIR)/$(TARGET)
 
 $(OUTPUT_DIR)/$(TARGET) : $(OBJS)
 	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
-	$(CC) -o $(OUTPUT_DIR)/$(TARGET) $(OBJS) -shared -L$(OUTPUT_DIR) -lrpc -lipc -lcombase -lgssapi_krb5 $(LINKER_OPTION) 
+	$(CC) -o $(OUTPUT_DIR)/$(TARGET) $(OBJS) -shared -L$(OUTPUT_DIR) -lrpc -lipc -lcombase $(LINKER_OPTION) -lgssapi_krb5 $(KRB5_LINK)
 
 -include $(OBJS:%.o=%.d)
 

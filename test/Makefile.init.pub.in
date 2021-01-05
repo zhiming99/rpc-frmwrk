@@ -18,7 +18,7 @@ else ifeq ($(MAKECMDGOALS),release_clean)
 	RPCLIB_DIR := $(BASE)/$(RLS_DIR)
 endif
 
-LINKER_OPTION := -L$(OUTPUT_DIR) -lrpc -lipc -lcombase $(LINKER_OPTION)
+LINKER_OPTION := -L$(OUTPUT_DIR) -lrpc -lipc -lcombase $(WIDTH_FLAG) -L$(USER_LIB_PREFIX) -L$(LIB_PREFIX) -Wl,-rpath=$(USER_LIB_PREFIX) -Wl,-rpath=$(LIB_PREFIX) -ldbus-1 -lcppunit -ljsoncpp -lstdc++ -ldl -lpthread
 
 ifeq ($(ARCH),arm)
 atomic:=$(shell grep -l 'define HAVE_LIBATOMIC 1' $(BASE)/config.h)

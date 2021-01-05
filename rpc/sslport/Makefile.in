@@ -2,10 +2,13 @@ include ../../Makefile.init.pub
 
 TARGET:=libsslpt.so
 SOURCES:= sslfido.cpp dllexp.cpp sslutils.cpp
+
+SSL_INC:=$(shell PKG_CONFIG_PATH=$(PKGCONFIGPATH) pkg-config --define-variable=prefix=$(ROOTFS)/usr --cflags openssl)
+
 C_INCLUDE:= \
 	-I$(BASE)/ipc \
 	-I$(BASE)/rpc \
-	$(C_INCLUDE)
+	$(C_INCLUDE) $(SSL_INC)
 
 OBJS:=$(SOURCES:%.cpp=$(OBJ_DIR)/%.o)
 
@@ -13,9 +16,11 @@ all: $(OUTPUT_DIR)/$(TARGET)
 debug: $(OUTPUT_DIR)/$(TARGET)
 release: $(OUTPUT_DIR)/$(TARGET)
 
+SSL_LINK:=$(shell PKG_CONFIG_PATH=$(PKGCONFIGPATH) pkg-config --define-variable=prefix=$(ROOTFS)/usr --libs openssl)
+
 $(OUTPUT_DIR)/$(TARGET) : $(OBJS)
 	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
-	$(CC) -o $(OUTPUT_DIR)/$(TARGET) $(OBJS) -shared $(LINKER_OPTION) -L$(OUTPUT_DIR) -lssl -lcrypto -lrpc -lipc -lcombase
+	$(CC) -o $(OUTPUT_DIR)/$(TARGET) $(OBJS) -shared $(LINKER_OPTION) -L$(OUTPUT_DIR) -lrpc -lipc -lcombase $(SSL_LINK)
 
 -include $(OBJS:%.o=%.d)
 
