@@ -1,6 +1,7 @@
 #Set ARCH to `arm' for ARM target. This make file
 #assumes you are running on a raspberry pi desktop
-ARCH := @build_cpu@
+ARCH := @host_cpu@
+OS := @host_os@
 
 SYSROOT:= $(patsubst yes,,$(patsubst no,,@with_sysroot@))
 
@@ -10,6 +11,10 @@ ARCH:=arm
 endif
 
 ifeq ($(ARCH),)
+  ARCH:=x86
+else ifeq ($(ARCH),i386)
+  ARCH:=x86
+else ifeq ($(ARCH),i686)
   ARCH:=x86
 endif
 
@@ -24,22 +29,33 @@ ARCH := x86
 else ifeq ($(ARCH),arm64)
 BUILD_64 := 1
 ARCH := arm
+else ifeq ($(ARCH),aarch64)
+BUILD_64 := 1
+ARCH := arm
 endif
 
 mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
 BASE:=$(abspath $(dir $(mkfile_path)) )
 
+ARCH_STR:=$(ARCH)-$(OS)
+MULTIARCH:=1
+
+ARCH_STR:=$(ARCH)-$(OS)
+MULTIARCH:=1
+ifeq ("$(wildcard $(SYSROOT)/usr/lib/$(ARCH_STR)/libdbus-1*)","")
+        MULTIARCH:=0
+        ARCH_STR:=
+endif
+
 #####
 ifeq ($(ARCH),arm)
-ifeq ($(BUILD_64),0)
-	ARCH_STR := arm-linux-gnueabihf
-else
-	ARCH_STR := aarch64-linux-gnueabihf
+ifeq ($(BUILD_64),1)
+	ARCH_STR := aarch64-$(OS)
 endif
 	CROSS_COMPILE := $(ARCH_STR)-
 	CROSS:= $(CROSS_COMPILE)
 	ROOTFS := $(SYSROOT)
-	DIR_SUFFIX_ARCH := /$(ARCH_STR)
+	DIR_SUFFIX_ARCH := $(ARCH_STR)
 endif
 
 SHELL := /bin/bash
@@ -57,20 +73,24 @@ C_DEFINES += -D_USE_LIBEV=1
 DEBUG_FLAGS := -D_DEBUG=1 -DDEBUG -ggdb
 RELEASE_FLAGS := -D_DEBUG=0 -DRELEASE -O2 -ggdb
 
+LIB_DIR := lib
+DBG_DIR := debug
+RLS_DIR := release
+
 ifeq ($(BUILD_64),1)
 ifeq ($(ARCH),x86)
 	WIDTH_FLAG := -m64
 endif
+ifeq ($(MULTIARCH),0)
 	LIB_DIR := lib64
 	DBG_DIR := debug64
 	RLS_DIR := release64
+endif
+
 else ifeq ($(BUILD_64),0)
 ifeq ($(ARCH),x86)
 	WIDTH_FLAG := -m32
 endif
-	LIB_DIR := lib
-	DBG_DIR := debug
-	RLS_DIR := release
 endif
 
 ifneq ($(SYSROOT),)
@@ -79,10 +99,10 @@ else
 PKGCONFIGPATH=$(shell find /usr/$(LIB_DIR) -name pkgconfig | tr "\n" ":")
 endif
 
-USER_LIB_PREFIX := $(ROOTFS)/usr/$(LIB_DIR)$(DIR_SUFFIX_ARCH)
-LIB_PREFIX := $(ROOTFS)/$(LIB_DIR)$(DIR_SUFFIX_ARCH)
+USER_LIB_PREFIX := $(ROOTFS)/usr/$(LIB_DIR)/$(DIR_SUFFIX_ARCH)
+LIB_PREFIX := $(ROOTFS)/$(LIB_DIR)/$(DIR_SUFFIX_ARCH)
 
-COMMON_INCLUDE:=$(shell PKG_CONFIG_PATH=$(PKGCONFIGPATH) pkg-config --define-variable=prefix=$(ROOTFS)/usr --cflags dbus-1 jsoncpp openssl mit-krb5)
+COMMON_INCLUDE:=$(shell PKG_CONFIG_PATH=$(PKGCONFIGPATH) pkg-config --define-variable=prefix=$(ROOTFS)/usr --cflags dbus-1 jsoncpp)
 
 C_INCLUDE := -I$(BASE)/include \
 	$(COMMON_INCLUDE) \
@@ -130,8 +150,8 @@ endif
 
 CPP_FLAGS := $(CPPFLAGS) -std=c++11 $(WIDTH_FLAG) -Wno-psabi 
 #LINKER_OPTION := -shared $(WIDTH_FLAG) -L$(USER_LIB_PREFIX) -L$(LIB_PREFIX) -Wl,-rpath=$(USER_LIB_PREFIX) -Wl,-rpath=$(LIB_PREFIX) -ldbus-1 -ljsoncpp -ldl -lstdc++ -lpthread
-COMMON_LINK=$(shell PKG_CONFIG_PATH=$(PKGCONFIGPATH) pkg-config --define-variable=prefix=$(ROOTFS)/usr --libs dbus-1 jsoncpp openssl mit-krb5 cppunit)
-LINKER_OPTION := $(WIDTH_FLAG) $(COMMON_LINK) -ldl -lstdc++ -lpthread
+COMMON_LINK=$(shell PKG_CONFIG_PATH=$(PKGCONFIGPATH) pkg-config --define-variable=prefix=$(ROOTFS)/usr --libs dbus-1 jsoncpp cppunit)
+LINKER_OPTION := $(WIDTH_FLAG) $(COMMON_LINK) -Wl,-rpath=$(USER_LIB_PREFIX) -Wl,-rpath=$(LIB_PREFIX) -ldl -lstdc++ -lpthread
 
 ifeq ($(ARCH),arm)
 LINKER_OPTION += --sysroot=$(ROOTFS)
