@@ -4,6 +4,8 @@ ARCH := @host_cpu@
 OS := @host_os@
 
 SYSROOT:= $(patsubst yes,,$(patsubst no,,@with_sysroot@))
+ARCH_STR:=$(ARCH)-$(OS)
+MULTIARCH:=1
 
 CPUSTR := $(patsubst arm%,arm,$(ARCH))
 ifeq (arm,$(CPUSTR))
@@ -16,6 +18,7 @@ else ifeq ($(ARCH),i386)
   ARCH:=x86
 else ifeq ($(ARCH),i686)
   ARCH:=x86
+  ARCH_STR=i386-$(OS)
 endif
 
 #Set BUILD_64 to `0' for 32-bit target
@@ -24,140 +27,145 @@ endif
 BUILD_64:= 0
 
 ifeq ($(ARCH),x86_64)
-BUILD_64 := 1
-ARCH := x86
+BUILD_64:=1
+ARCH:=x86
 else ifeq ($(ARCH),arm64)
-BUILD_64 := 1
-ARCH := arm
+BUILD_64:=1
+ARCH:=arm
 else ifeq ($(ARCH),aarch64)
-BUILD_64 := 1
-ARCH := arm
+BUILD_64:=1
+ARCH:=arm
 endif
 
-mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
+mkfile_path:=$(abspath $(lastword $(MAKEFILE_LIST)))
 BASE:=$(abspath $(dir $(mkfile_path)) )
 
-ARCH_STR:=$(ARCH)-$(OS)
-MULTIARCH:=1
+DIR_SUFFIX_ARCH:=$(ARCH_STR)
 
-ARCH_STR:=$(ARCH)-$(OS)
-MULTIARCH:=1
 ifeq ("$(wildcard $(SYSROOT)/usr/lib/$(ARCH_STR)/libdbus-1*)","")
         MULTIARCH:=0
         ARCH_STR:=
+		DIR_SUFFIX_ARCH:=
 endif
 
 #####
 ifeq ($(ARCH),arm)
-ifeq ($(BUILD_64),1)
-	ARCH_STR := aarch64-$(OS)
-endif
-	CROSS_COMPILE := $(ARCH_STR)-
-	CROSS:= $(CROSS_COMPILE)
-	ROOTFS := $(SYSROOT)
-	DIR_SUFFIX_ARCH := $(ARCH_STR)
+
+	ifeq ($(BUILD_64),1)
+		ARCH_STR:=aarch64-$(OS)
+	endif
+
+	CROSS_COMPILE:=$(ARCH_STR)-
+	CROSS:=$(CROSS_COMPILE)
+	ROOTFS:= $(SYSROOT)
 endif
 
 SHELL := /bin/bash
-CC := $(CROSS_COMPILE)gcc
-CPP := $(CROSS_COMPILE)g++
-LD := $(CROSS_COMPILE)ld
-AR := $(CROSS_COMPILE)ar
-AS := $(CROSS_COMPILE)as
-STRIP := $(CROSS_COMPILE)strip
-CUR_DIR := $(shell pwd)
+CC:=$(CROSS_COMPILE)gcc
+CPP:=$(CROSS_COMPILE)g++
+LD:=$(CROSS_COMPILE)ld
+AR:=$(CROSS_COMPILE)ar
+AS:=$(CROSS_COMPILE)as
+STRIP:=$(CROSS_COMPILE)strip
+CUR_DIR:=$(shell pwd)
 
-C_FLAGS := $(CFLAGS) -Wall -c -D_GNU_SOURCE -pthread
-C_DEFINES += -D_USE_LIBEV=1
+C_FLAGS:=$(CFLAGS) -Wall -c -D_GNU_SOURCE -pthread
+C_DEFINES+=-D_USE_LIBEV=1
 
-DEBUG_FLAGS := -D_DEBUG=1 -DDEBUG -ggdb
-RELEASE_FLAGS := -D_DEBUG=0 -DRELEASE -O2 -ggdb
+DEBUG_FLAGS:=-D_DEBUG=1 -DDEBUG -ggdb
+RELEASE_FLAGS:= -D_DEBUG=0 -DRELEASE -O2 -ggdb
 
-LIB_DIR := lib
-DBG_DIR := debug
-RLS_DIR := release
+LIB_DIR:=lib
+DBG_DIR:=debug
+RLS_DIR:=release
 
 ifeq ($(BUILD_64),1)
-ifeq ($(ARCH),x86)
-	WIDTH_FLAG := -m64
-endif
-ifeq ($(MULTIARCH),0)
-	LIB_DIR := lib64
-	DBG_DIR := debug64
-	RLS_DIR := release64
-endif
+
+	ifeq ($(ARCH),x86)
+		WIDTH_FLAG:=-m64
+	endif
+
+	ifeq ($(MULTIARCH),0)
+		LIB_DIR:=lib64
+		DBG_DIR:=debug64
+		RLS_DIR:=release64
+	endif
 
 else ifeq ($(BUILD_64),0)
-ifeq ($(ARCH),x86)
-	WIDTH_FLAG := -m32
-endif
+
+	ifeq ($(ARCH),x86)
+		WIDTH_FLAG:=-m32
+	endif
+
 endif
 
-ifneq ($(SYSROOT),)
-PKGCONFIGPATH=$(shell find $(SYSROOT) -name pkgconfig | tr "\n" ":" )
+ifeq ($(MULTIARCH),0)
+	ifneq ($(SYSROOT),)
+	PKGCONFIGPATH=$(shell find $(SYSROOT) -name pkgconfig | tr "\n" ":" )
+	else
+	PKGCONFIGPATH=$(shell find /usr/$(LIB_DIR) -name pkgconfig | tr "\n" ":")
+	endif
 else
-PKGCONFIGPATH=$(shell find /usr/$(LIB_DIR) -name pkgconfig | tr "\n" ":")
+	PKGCONFIGPATH=$(shell find $(SYSROOT)/usr/$(LIB_DIR)/$(DIR_SUFFIX_ARCH) -name pkgconfig | tr "\n" ":" )
 endif
 
-USER_LIB_PREFIX := $(ROOTFS)/usr/$(LIB_DIR)/$(DIR_SUFFIX_ARCH)
-LIB_PREFIX := $(ROOTFS)/$(LIB_DIR)/$(DIR_SUFFIX_ARCH)
+USER_LIB_PREFIX:=$(ROOTFS)/usr/$(LIB_DIR)/$(DIR_SUFFIX_ARCH)
+LIB_PREFIX:=$(ROOTFS)/$(LIB_DIR)/$(DIR_SUFFIX_ARCH)
 
 COMMON_INCLUDE:=$(shell PKG_CONFIG_PATH=$(PKGCONFIGPATH) pkg-config --define-variable=prefix=$(ROOTFS)/usr --cflags dbus-1 jsoncpp)
 
-C_INCLUDE := -I$(BASE)/include \
+C_INCLUDE:=-I$(BASE)/include \
 	$(COMMON_INCLUDE) \
 	-I$(ROOTFS)/usr/include @INCLUDES@
 
 ifeq ($(ARCH),arm)
-	WIDTH_FLAG := -marm
-	SSLCONF:=$(dir $(shell dirname $$(find $(ROOTFS) -name opensslconf.h | head -n 1)))
-	C_INCLUDE += -I$(SSLCONF)
-	C_DEFINES += -DARM
+	WIDTH_FLAG:=-marm
+	C_DEFINES+=-DARM
 #-D_GLIBCXX_USE_CXX11_ABI=1
 endif
 
-OUTPUT_DIR := $(BASE)/$(DBG_DIR)
-OBJ_DIR := ./$(DBG_DIR)
+OUTPUT_DIR:=$(BASE)/$(DBG_DIR)
+OBJ_DIR:=./$(DBG_DIR)
 
 ifeq ($(MAKECMDGOALS),) 
-	C_FLAGS += $(DEBUG_FLAGS)
+	C_FLAGS+=$(DEBUG_FLAGS)
 else ifeq ($(MAKECMDGOALS),debug) 
-	C_FLAGS += $(DEBUG_FLAGS)
+	C_FLAGS+=$(DEBUG_FLAGS)
 else ifeq ($(MAKECMDGOALS),$(DBG_DIR)) 
-	C_FLAGS += $(DEBUG_FLAGS)
+	C_FLAGS+=$(DEBUG_FLAGS)
 else ifeq ($(MAKECMDGOALS),all) 
-	C_FLAGS += $(DEBUG_FLAGS)
+	C_FLAGS+=$(DEBUG_FLAGS)
 endif
 
 ifeq ($(MAKECMDGOALS),release)
-	C_FLAGS += $(RELEASE_FLAGS)
-	C_DEFINES += -DPRODUCTION 
-	OUTPUT_DIR := $(BASE)/$(RLS_DIR)
-	OBJ_DIR := ./$(RLS_DIR)
+	C_FLAGS+=$(RELEASE_FLAGS)
+	C_DEFINES+=-DPRODUCTION 
+	OUTPUT_DIR:=$(BASE)/$(RLS_DIR)
+	OBJ_DIR:=./$(RLS_DIR)
 else ifeq ($(MAKECMDGOALS),debug_clean)
-	OUTPUT_DIR := $(BASE)/$(DBG_DIR)
-	OBJ_DIR := ./$(DBG_DIR)
+	OUTPUT_DIR:=$(BASE)/$(DBG_DIR)
+	OBJ_DIR:=./$(DBG_DIR)
 else ifeq ($(MAKECMDGOALS),release_clean)
-	OUTPUT_DIR := $(BASE)/$(RLS_DIR)
-	OBJ_DIR := ./$(RLS_DIR)
+	OUTPUT_DIR:=$(BASE)/$(RLS_DIR)
+	OBJ_DIR:=./$(RLS_DIR)
 endif
 
 ifeq ($(BUILD_64),1)
-	C_FLAGS += -fPIC
+	C_FLAGS+=-fPIC
 else ifeq ($(ARCH), arm)
-	C_FLAGS += -fPIC
+	C_FLAGS+=-fPIC
 endif
 
-CPP_FLAGS := $(CPPFLAGS) -std=c++11 $(WIDTH_FLAG) -Wno-psabi 
+CPP_FLAGS:=$(CPPFLAGS) -std=c++11 $(WIDTH_FLAG) -Wno-psabi
 #LINKER_OPTION := -shared $(WIDTH_FLAG) -L$(USER_LIB_PREFIX) -L$(LIB_PREFIX) -Wl,-rpath=$(USER_LIB_PREFIX) -Wl,-rpath=$(LIB_PREFIX) -ldbus-1 -ljsoncpp -ldl -lstdc++ -lpthread
 COMMON_LINK=$(shell PKG_CONFIG_PATH=$(PKGCONFIGPATH) pkg-config --define-variable=prefix=$(ROOTFS)/usr --libs dbus-1 jsoncpp cppunit)
-LINKER_OPTION := $(WIDTH_FLAG) $(COMMON_LINK) -Wl,-rpath=$(USER_LIB_PREFIX) -Wl,-rpath=$(LIB_PREFIX) -ldl -lstdc++ -lpthread
+LINKER_OPTION:=$(WIDTH_FLAG) $(COMMON_LINK) -Wl,-rpath=$(USER_LIB_PREFIX) -Wl,-rpath=$(LIB_PREFIX) -ldl -lstdc++ -lpthread
 
 ifeq ($(ARCH),arm)
-LINKER_OPTION += --sysroot=$(ROOTFS)
+LINKER_OPTION +=--sysroot=$(ROOTFS)
 endif
 
-MUTE_CLEAN := 2>/dev/null || true
+MUTE_CLEAN:=2>/dev/null || true
 
 $(OBJ_DIR)/%.o : %.cpp
 	@echo Building file: $@
