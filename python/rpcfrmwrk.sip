@@ -379,6 +379,11 @@ namespace cpp
         gint32 SetQwordProp( gint32,
             guint64 dwVal );
 
+        gint32 GetDoubleProp( gint32,
+            double& fVal /Out/ );
+        gint32 SetDoubleProp( gint32,
+            double fVal );
+
         gint32 GetPointer( gint32,
             cpp::CObjBase*& pObj /Out/ );
         gint32 SetPointer( gint32,

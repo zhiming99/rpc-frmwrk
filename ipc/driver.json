@@ -490,15 +490,22 @@
                 "DBusBusDriver"
             ]
         },
-        {             
-            "ModName" : "PyRpcProxy",                                    
-            "DriversToLoad" :                                            
-            [                                                            
+        {
+            "ModName" : "PyRpcProxy",
+            "DriversToLoad" :
+            [
                 "DBusBusDriver",
                 "UnixSockBusDriver"
-            ]                                                            
+            ]
+        },
+        {
+            "ModName" : "PyRpcServer",
+            "DriversToLoad" :
+            [
+                "DBusBusDriver",
+                "UnixSockBusDriver"
+            ]
         }     
-
     ],
 
     "Match" :

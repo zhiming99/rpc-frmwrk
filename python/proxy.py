@@ -132,13 +132,13 @@ class PyRpcContext :
         print( "proxy.py: about to quit..." )
         self.CleanUp();
 
-    def __init__( self ) :
-        pass
+    def __init__( self, strModName= "PyRpcProxy" ) :
+        self.strModName = strModName
 
-    def Start( self ) :
+    def Start( self, strModName ) :
         ret = 0
         print( "entering..." );
-        self.pIoMgr = self.CreateIoMgr( "PyRpcProxy" );
+        self.pIoMgr = self.CreateIoMgr( strModName );
         if self.pIoMgr is not None :
             ret = self.StartIoMgr( self.pIoMgr );
             if ret > 0 :
@@ -154,7 +154,7 @@ class PyRpcContext :
         return self.DestroyRpcCtx();
 
     def __enter__( self ) :
-        self.Start()
+        self.Start( self.strModName )
 
     def __exit__( self, type, val, traceback ) :
         self.Stop();
@@ -267,53 +267,53 @@ class PyRpcServices :
         for i in range( iSize ) :
             ret = oParams.GetPropertyType( i )
             if ret[ 0 ] < 0 :
-                break;
+                break
             iType = ret[ 1 ];
             if iType == cpp.typeUInt32 :
                 ret = oParams.GetIntProp( i )
                 if ret[ 0 ] < 0 :
-                    break;
+                    break
                 val = ret[ 1 ]
             elif iType == cpp.typeDouble :
                 ret = oParams.GetDoubleProp( i )
                 if ret[ 0 ] < 0 :
-                    break;
+                    break
                 val = ret[ 1 ]
 
             elif iType == cpp.typeByte :
                 ret = oParams.GetByteProp( i )
                 if ret[ 0 ] < 0 :
-                    break;
+                    break
                 val = ret[ 1 ]
 
             elif iType == cpp.typeUInt16 :
                 ret = oParams.GetShortProp( i )
                 if ret[ 0 ] < 0 :
-                    break;
+                    break
                 val = ret[ 1 ]
 
             elif iType == cpp.typeUInt64 :
                 ret = oParams.GetQwordProp( i )
                 if ret[ 0 ] < 0 :
-                    break;
+                    break
                 val = ret[ 1 ]
 
             elif iType == cpp.typeFloat :
                 ret = oParams.GetFloatProp( i )
                 if ret[ 0 ] < 0 :
-                    break;
+                    break
                 val = ret[ 1 ]
 
             elif iType == cpp.typeString :
                 ret = oParams.GetStrProp( i )
                 if ret[ 0 ] < 0 :
-                    break;
+                    break
                 val = ret[ 1 ]
 
             elif iType == cpp.typeObj :
                 ret = oParams.GetObjPtr( i )
                 if ret[ 0 ] < 0 :
-                    break;
+                    break
                 val = ret[ 1 ]
                 if val.IsEmpty() :
                     ret = [ -errno.EFAULT, ]
@@ -321,26 +321,24 @@ class PyRpcServices :
             elif iType == cpp.typeByteArr :
                 ret = pCfg.GetProperty( i );
                 if ret[ 0 ] < 0 :
-                    break;
+                    break
                 val = ret[ 1 ]
                 if val.IsEmpty() :
                     ret = [ -errno.EFAULT, ]
                     break
                 pyBuf = bytearray( val.size() );
-                ret = val.CopyToPython( pyBuf );
-                if ret < 0 : 
-                    ret = ( ret, )
-                    break;
+                iRet = val.CopyToPython( pyBuf );
+                if iRet < 0 : 
+                    ret = [ iRet, ]
+                    break
 
                 val = pyBuf;
-
             argList.append( val )
 
         if ret[ 0 ] < 0 :
             return ret;
 
-        ret = [ 0, argList ]
-        return ret
+        return [ 0, argList ]
 
     #for event handler 
     def InvokeMethod(
@@ -351,7 +349,7 @@ class PyRpcServices :
             ret = self.ArgObjToList( cppargs )
             if ret[ 0 ] < 0 :
                 resp[ 0 ] = ret;
-                break;
+                break
 
             argList = ret[ 1 ]
             found = False
@@ -364,22 +362,21 @@ class PyRpcServices :
                     continue;
                 found = True
                 typeFound = iftype;
-                break;
-                    
+                break
             if not found :
                 resp[ 0 ] = -errno.EINVAL;
-                break;
+                break
 
             isServer = self.oInst.IsServer();
             nameComps = methodName.split( '_' )
             if not isServer :
                 if nameComps[ 0 ] != "UserEvent" :
                     resp[ 0 ] = -errno.EINVAL;
-                    break;
+                    break
             else :
                 if nameComps[ 0 ] != "UserMethod" :
                     resp[ 0 ] = -errno.EINVAL;
-                    break;
+                    break
 
             found = False
             oMembers = inspect.getmembers( typeFound,
@@ -389,19 +386,19 @@ class PyRpcServices :
                     continue;
                 targetMethod = oMethod[ 1 ];
                 found = True;               
-                break;
+                break
 
             if not found :
                 resp[ 0 ] = -errno.EINVAL;
-                break;
+                break
 
             if targetMethod is None :
                 resp[ 0 ] = -error.EFAULT;
-                break;
+                break
 
             resp = targetMethod( self, callback, *argList )
 
-            break; #while True
+            break #while True
 
         return resp
         
@@ -469,7 +466,7 @@ class PyRpcServer( PyRpcServices ) :
         self.pIoMgr = pIoMgr;
         self.iError = 0
         oParams = cpp.CParamList();
-        oObj = CreateServer( pIoMgr,
+        oObj = CreateRpcServer( pIoMgr,
             strDesc, strSvrObj,
             oParams.GetCfgAsObj() );
         if oObj is None or oObj.IsEmpty() :
@@ -483,3 +480,36 @@ class PyRpcServer( PyRpcServices ) :
         self.oInst = oInst;
         self.oObj = oObj;
         return
+
+    def OnStmReady( self, hChannel ) :
+        pass
+
+    def SetChanCtx( self, hChannel, oContext ) :
+        return self.oInst.SetChanCtx(
+            hChannel, oContext );
+
+    def GetChanCtx( self, hChannel ) :
+        return self.oInst.GetChanCtx( hChannel );
+
+    '''callback should be the one passed to the
+    InvokeMethod. This is for asynchronous invoke,
+    that is, the invoke method returns pending and
+    the task will complete later in the future
+    with a call to this method. the callback is
+    the glue between InvokeMethod and
+    OnServiceComplete.
+    '''
+    def OnServiceComplete(
+        self, callback, ret, *args ) :
+        listResp = list( args )
+        return self.oInst.OnServiceComplete(
+            callback, ret, listResp )
+
+    ''' callback can be none if it is not
+    necessary to get notified of the completion.
+    destName can be none if not needed.
+    '''
+    def SendEvent( self, callback,
+        ifName, evtName, destName, *args ) :
+        return self.oInst.SendEvent( callback,
+            ifName, evtName, destName, *args )

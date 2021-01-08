@@ -10,7 +10,7 @@ enum EnumMyClsid2
 typedef enum 
 {
     // a pointer to pyobject of the python context
-    propPyCtx = propReservedEnd + 110,
+    propChanCtx = propReservedEnd + 110,
 
 } EnumPyPropId;
 
@@ -934,7 +934,7 @@ class CPythonInterfBase : public T
         return 0;
     }
  
-    PyObject* GetPyCtx( HANDLE hChannel )
+    PyObject* GetChanCtx( HANDLE hChannel )
     {
         PyObject* sipRes = nullptr;
         do{
@@ -948,7 +948,7 @@ class CPythonInterfBase : public T
                 break;
             CCfgOpener oCfg( ( IConfigDb* )pCtx );
             guint32* ptr = nullptr;
-            ret = oCfg.GetIntPtr( propPyCtx, ptr );
+            ret = oCfg.GetIntPtr( propChanCtx, ptr );
             if( ERROR( ret ) )
                 break;
 
@@ -959,7 +959,7 @@ class CPythonInterfBase : public T
         return sipRes;
     }
 
-    gint32 SetPyCtx(
+    gint32 SetChanCtx(
         HANDLE hChannel, PyObject* pCtx )
     {
         gint32 ret = 0;
@@ -979,7 +979,7 @@ class CPythonInterfBase : public T
 
             guint32* ptr = nullptr;
             ret = oCfg.GetIntPtr(
-                propPyCtx, ptr );
+                propChanCtx, ptr );
 
             if( SUCCEEDED( ret ) )
             {
@@ -987,7 +987,7 @@ class CPythonInterfBase : public T
                 if( pOld != nullptr &&
                     pOld != Py_None )
                     Py_DECREF( pOld );
-                oCfg.RemoveProperty( propPyCtx );
+                oCfg.RemoveProperty( propChanCtx );
             }
 
             if( pCtx == nullptr ||
@@ -995,16 +995,16 @@ class CPythonInterfBase : public T
                 break;
 
             oCfg.SetIntPtr(
-                propPyCtx, ( guint32*)pCtx );
+                propChanCtx, ( guint32*)pCtx );
             Py_INCREF( pCtx );
 
         }while( 0 );
         return ret;
     }
 
-    gint32 RemovePyCtx( HANDLE hChannel )
+    gint32 RemoveChanCtx( HANDLE hChannel )
     {
-        return SetPyCtx( hChannel, nullptr);
+        return SetChanCtx( hChannel, nullptr);
     }
 };
 

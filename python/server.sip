@@ -10,14 +10,28 @@ class CPythonServerImpl :
     { SetClassId( clsid( CPythonServerImpl ) ); }
 
     gint32 OnStreamReady( HANDLE hChannel )
-    { return 0; }
+    {
+        gint32 ret = 0;
+        do{
+            Py_BEGIN_ALLOW_THREADS;
+            PyObject* pHost = nullptr;
+            ret = GetPyHost( pHost );
+            if( ERROR( ret ) )
+                break;
+            PyObject_CallMethod(
+             pHost, "OnStmReady", 
+             "(L)", hChannel );
+            Py_END_ALLOW_THREADS;
+        }while( 0 );
+        return ret;
+    }
 
     gint32 OnStmClosing( HANDLE hChannel )
     {
         if( hChannel == INVALID_HANDLE )
             return -EINVAL;
 
-        RemovePyCtx( hChannel );
+        RemoveChanCtx( hChannel );
         return super::OnStmClosing( hChannel );
     }
 
@@ -406,35 +420,37 @@ class CPythonServer :
         }while( 0 );
         if( SUCCEEDED( ret ) )
         {
+            Py_BEGIN_ALLOW_THREADS;
             sipCpp->OnServiceComplete(
                 oResp.GetCfg(), *a0 );
+            Py_END_ALLOW_THREADS;
         }
         sipRes = ret;
     %End
 
-    PyObject* GetPyCtx( HANDLE hChannel );
+    PyObject* GetChanCtx( HANDLE hChannel );
     %MethodCode
         CPythonServerImpl* pImpl =
         static_cast< CPythonServerImpl* >
             ( sipCpp );
-        sipRes = pImpl->GetPyCtx( a0 );
+        sipRes = pImpl->GetChanCtx( a0 );
     %End
 
-    gint32 SetPyCtx(
+    gint32 SetChanCtx(
         HANDLE hChannel, PyObject* pCtx );
     %MethodCode
         CPythonServerImpl* pImpl =
         static_cast< CPythonServerImpl* >
             ( sipCpp );
-        sipRes = pImpl->SetPyCtx( a0, a1 );
+        sipRes = pImpl->SetChanCtx( a0, a1 );
     %End
 
-    gint32 RemovePyCtx( HANDLE hChannel );
+    gint32 RemoveChanCtx( HANDLE hChannel );
     %MethodCode
         CPythonServerImpl* pImpl =
         static_cast< CPythonServerImpl* >
             ( sipCpp );
-        sipRes = pImpl->RemovePyCtx( a0 );
+        sipRes = pImpl->RemoveChanCtx( a0 );
     %End
 
     gint32 SendEvent( PyObject* pCallback,
@@ -443,11 +459,13 @@ class CPythonServer :
         const std::string& strDest,
         PyObject* pListArgs );
     %MethodCode
+        Py_BEGIN_ALLOW_THREADS;
         CPythonServerImpl* pImpl =
         static_cast< CPythonServerImpl* >
             ( sipCpp );
         sipRes = pImpl->SendEvent(
             a0, *a1, *a2, *a3, a4 );
+        Py_END_ALLOW_THREADS;
     %End
     bool IsServer();
     %MethodCode
@@ -455,7 +473,7 @@ class CPythonServer :
     %End
 };
 
-cpp::ObjPtr CreateServer(
+cpp::ObjPtr CreateRpcServer(
     cpp::ObjPtr& pMgr,
     const std::string& strDesc,
     const std::string& strObjName,
