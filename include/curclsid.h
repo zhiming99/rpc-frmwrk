@@ -39,8 +39,8 @@ namespace rpcfrmwrk
 // rpc/security/secclsid.h.
 #define CLSIDS_ALLOCATED    ( clsid( ClassFactoryStart ) + 40 )
 
-// last allocation was from wsfido.h
-#define PROPIDS_ALLOCATED   ( propReservedEnd + 110 )
+// last allocation was from server.sip
+#define PROPIDS_ALLOCATED   ( propReservedEnd + 120 )
 
 // iid allocated by rpc/security/secclsid
 #define IID_ALLOCATED    ( clsid( ReservedIidStart ) + 220 )

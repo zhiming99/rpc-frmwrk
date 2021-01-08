@@ -87,9 +87,9 @@ ifeq ($(BUILD_64),1)
 
 	ifeq ($(MULTIARCH),0)
 		LIB_DIR:=lib64
-		DBG_DIR:=debug64
-		RLS_DIR:=release64
 	endif
+    DBG_DIR:=debug64
+    RLS_DIR:=release64
 
 else ifeq ($(BUILD_64),0)
 

@@ -159,7 +159,7 @@ class PyRpcContext :
     def __exit__( self, type, val, traceback ) :
         self.Stop();
 
-class PyRpcProxy :
+class PyRpcServices :
     def GetError( self ) :
         if self.iError is None :
             return 0
@@ -167,28 +167,6 @@ class PyRpcProxy :
 
     def SetError( self, iErr ) :
         self.iError = iErr;
-
-    def Common_Proxy( self, ifName, methodName, argsList ) :
-        pass
-
-    def __init__( self, pIoMgr, strDesc, strSvrObj ) :
-        self.pIoMgr = pIoMgr;
-        self.iError = 0
-        oParams = cpp.CParamList();
-        oObj = CreateProxy( pIoMgr,
-            strDesc, strSvrObj,
-            oParams.GetCfgAsObj() );
-        if oObj is None or oObj.IsEmpty() :
-            print( "failed to create proxy..." )
-            self.SetError( -errno.EFAULT );
-            return
-
-        oInst = CastToProxy( oObj );
-        if oInst is None :
-            print( "failed to create proxy 2..." )
-        self.oInst = oInst;
-        self.oObj = oObj;
-        return
 
     def Start( self ) :
         self.oInst.SetPyHost( self );
@@ -212,37 +190,6 @@ class PyRpcProxy :
     def __exit__( self, type, val, traceback ) :
         self.Stop()
 
-    def sendRequest( *args ) :
-        strIfName = args[ 1 ]
-        strMethod = args[ 2 ]
-        self = args[ 0 ]
-        resp = [ 0, None ];
-
-        listArgs = list( args[3:] )
-        self.MakeCall( strIfName, strMethod,
-            listArgs, resp )
-
-        return resp;
-
-    ''' sendRequestAsync returns a tuple with two
-    elements, 0 is the return code, and 1 is a
-    np.int64 as a taskid, which can be used to
-    cancel the request sent'''
-    def sendRequestAsync( self,
-        callback, strIfName, strMethod, *args ) :
-        resp = [ 0, None ]
-        listArgs = list( args )
-        tupRet = self.MakeCallAsync( callback,
-            strIfName, strMethod, listArgs, resp )
-        return tupRet
-
-    def MakeCall( self, strIfName, strMethod, args, resp ) :
-        ret = self.oInst.PyProxyCallSync(
-            strIfName, strMethod, args, resp )
-        if ret < 0 :
-            resp[ 0 ] = ret
-        return resp
-
     def HandleAsyncResp( self, callback, listResp ) :
         listArgs = []
         sig =signature( callback )
@@ -265,11 +212,6 @@ class PyRpcProxy :
             listArgs = listResp[ 1 ]
         callback( self, ret, *listArgs )
         return
-
-    def MakeCallAsync( self, callback, strIfName, strMethod, args, resp ) :
-        ret = self.oInst.PyProxyCall(
-            callback, strIfName, strMethod, args, resp )
-        return ret;
 
     def GetObjType( self, pObj ) :
         return GetObjType( pObj )
@@ -428,10 +370,16 @@ class PyRpcProxy :
                 resp[ 0 ] = -errno.EINVAL;
                 break;
 
+            isServer = self.oInst.IsServer();
             nameComps = methodName.split( '_' )
-            if nameComps[ 0 ] != "UserEvent" :
-                resp[ 0 ] = -errno.EINVAL;
-                break;
+            if not isServer :
+                if nameComps[ 0 ] != "UserEvent" :
+                    resp[ 0 ] = -errno.EINVAL;
+                    break;
+            else :
+                if nameComps[ 0 ] != "UserMethod" :
+                    resp[ 0 ] = -errno.EINVAL;
+                    break;
 
             found = False
             oMembers = inspect.getmembers( typeFound,
@@ -457,3 +405,81 @@ class PyRpcProxy :
 
         return resp
         
+    
+class PyRpcProxy( PyRpcServices ) :
+
+    def __init__( self, pIoMgr, strDesc, strSvrObj ) :
+        self.pIoMgr = pIoMgr;
+        self.iError = 0
+        oParams = cpp.CParamList();
+        oObj = CreateProxy( pIoMgr,
+            strDesc, strSvrObj,
+            oParams.GetCfgAsObj() );
+        if oObj is None or oObj.IsEmpty() :
+            print( "failed to create proxy..." )
+            self.SetError( -errno.EFAULT );
+            return
+
+        oInst = CastToProxy( oObj );
+        if oInst is None :
+            print( "failed to create proxy 2..." )
+        self.oInst = oInst;
+        self.oObj = oObj;
+        return
+
+    def sendRequest( *args ) :
+        strIfName = args[ 1 ]
+        strMethod = args[ 2 ]
+        self = args[ 0 ]
+        resp = [ 0, None ];
+
+        listArgs = list( args[3:] )
+        self.MakeCall( strIfName, strMethod,
+            listArgs, resp )
+
+        return resp;
+
+    ''' sendRequestAsync returns a tuple with two
+    elements, 0 is the return code, and 1 is a
+    np.int64 as a taskid, which can be used to
+    cancel the request sent'''
+    def sendRequestAsync( self,
+        callback, strIfName, strMethod, *args ) :
+        resp = [ 0, None ]
+        listArgs = list( args )
+        tupRet = self.MakeCallAsync( callback,
+            strIfName, strMethod, listArgs, resp )
+        return tupRet
+
+    def MakeCall( self, strIfName, strMethod, args, resp ) :
+        ret = self.oInst.PyProxyCallSync(
+            strIfName, strMethod, args, resp )
+        if ret < 0 :
+            resp[ 0 ] = ret
+        return resp
+
+    def MakeCallAsync( self, callback, strIfName, strMethod, args, resp ) :
+        ret = self.oInst.PyProxyCall(
+            callback, strIfName, strMethod, args, resp )
+        return ret;
+
+class PyRpcServer( PyRpcServices ) :
+
+    def __init__( self, pIoMgr, strDesc, strSvrObj ) :
+        self.pIoMgr = pIoMgr;
+        self.iError = 0
+        oParams = cpp.CParamList();
+        oObj = CreateServer( pIoMgr,
+            strDesc, strSvrObj,
+            oParams.GetCfgAsObj() );
+        if oObj is None or oObj.IsEmpty() :
+            print( "failed to create server..." )
+            self.SetError( -errno.EFAULT );
+            return
+
+        oInst = CastToServer( oObj );
+        if oInst is None :
+            print( "failed to create server 2..." )
+        self.oInst = oInst;
+        self.oObj = oObj;
+        return

@@ -560,6 +560,12 @@ namespace cpp
         EnumIfState GetState() const;
     };
 
+    class CInterfaceServer : public cpp::CRpcServices /Abstract/
+    {
+        public:
+        EnumIfState GetState() const;
+    };
+
 };
 
 %Include proxy.sip
