@@ -471,6 +471,28 @@ class CPythonServer :
     %MethodCode
         sipRes = sipCpp->IsServer();
     %End
+
+    gint32 AddTimer(
+        guint32 dwTimeoutSec,
+        PyObject* pCb,
+        PyObject* pCtx,
+        cpp::ObjPtr& pTimer /Out/ );
+    %MethodCode
+        CPythonServerImpl* pImpl =
+        static_cast< CPythonServerImpl* >
+            ( sipCpp );
+        sipRes = pImpl->AddTimer(
+            a0, a1, a2, *a3 );
+    %End
+
+    gint32 DisableTimer(
+        cpp::ObjPtr& pTimer );
+    %MethodCode
+        CPythonServerImpl* pImpl =
+        static_cast< CPythonServerImpl* >
+            ( sipCpp );
+        sipRes = pImpl->DisableTimer( *a0 );
+    %End
 };
 
 cpp::ObjPtr CreateRpcServer(

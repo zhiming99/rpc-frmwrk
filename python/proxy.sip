@@ -14,6 +14,29 @@ typedef enum
 
 } EnumPyPropId;
 
+enum EnumRpcError
+{
+    PY_STATUS_SUCCESS = 0,
+    PY_STATUS_PENDING = 0x10001,
+    PY_STATUS_MORE_PROCESS_NEEDED,
+    PY_STATUS_CHECK_RESP,
+    PY_ERROR_ADDRESS = 0x80010002,
+    PY_ERROR_STATE = 0x80010003,
+    PY_ERROR_WRONG_THREAD = 0x80010004,
+    PY_ERROR_CANNOT_CANCEL = 0x80010005,
+    PY_ERROR_PORT_STOPPED = 0x80010006,
+    PY_ERROR_FALSE = 0x80010007,
+    PY_ERROR_REPEAT = 0x80010008,
+    PY_ERROR_PREMATURE = 0x80010009,
+    PY_ERROR_NOT_HANDLED = 0x8001000a,
+    PY_ERROR_CANNOT_COMP = 0x8001000b,
+    PY_ERROR_USER_CANCEL = 0x8001000c,
+    PY_ERROR_PAUSED = 0x8001000d,
+    PY_ERROR_NOT_IMPL = 0x8001000e,
+    PY_ERROR_CANCEL_INSTEAD = 0x8001000f,
+    PY_ERROR_QUEUE_FULL = 0x8001000e
+};
+
 template< class T >
 class CPythonInterfBase : public T
 {
@@ -142,6 +165,132 @@ class CPythonInterfBase : public T
             }
 
         }while( 0 );
+        return ret;
+    }
+
+    gint32 TimerCallback(
+        IEventSink* pCallback,
+        intptr_t pCb,
+        intptr_t pCtx )
+    {
+        if( pCb == 0 )
+            return -EINVAL;
+        PyGILState_STATE gstate;
+        gstate = PyGILState_Ensure();
+        gint32 ret = 0;
+        do{
+            PyObject* pHost = nullptr;
+            ret = GetPyHost( pHost );
+            if( ERROR( ret ) )
+                break;
+            PyObject* pPyCb = ( PyObject* )pCb;
+            PyObject* pPyCtx = ( PyObject* )pCtx;
+
+            PyObject_CallMethod( pHost,
+                "TimerCallback", "(OO)",
+                pPyCb, pPyCtx );
+
+            if( pPyCb != nullptr )
+                Py_DECREF( pPyCb );
+
+            if( pPyCtx != nullptr )
+                Py_DECREF( pPyCtx );
+
+        }while( 0 );
+
+        PyGILState_Release(gstate);
+        return ret;
+    }
+
+    gint32 DisableTimer( ObjPtr& pTimer )
+    {
+        CIfDeferCallTaskEx* pTaskEx = pTimer;
+        if( pTaskEx == nullptr )
+            return -EINVAL;
+        PyObject* pCb = nullptr;
+        PyObject* pCtx = nullptr;
+        gint32 ret = 0;
+
+        do{
+            ret = pTaskEx->DisableTimer();
+
+            CStdRTMutex oTaskLock(
+                pTaskEx->GetLock() );
+
+            BufPtr pBuf;
+            ret = pTaskEx->GetParamAt( 1, pBuf );
+            if( ERROR( ret ) )
+                break;
+
+            intptr_t ptrval = ( intptr_t& )*pBuf;
+            if( ptrval == 0 )
+                break;
+
+            pCb = ( PyObject* )ptrval;
+            ret = pTaskEx->GetParamAt( 2, pBuf );
+            if( ERROR( ret ) )
+                break;
+
+            ptrval = ( intptr_t& )*pBuf;
+            if( ptrval == 0 )
+                break;
+
+            pCtx = ( PyObject* ) ptrval ;
+
+        }while( 0 );
+
+        PyGILState_STATE gstate;
+        gstate = PyGILState_Ensure();
+
+        if( pCb != nullptr )
+            Py_DECREF( pCb );
+
+        if( pCtx != nullptr )
+            Py_DECREF( pCtx );
+
+        PyGILState_Release(gstate);
+        return ret;
+    }
+
+    gint32 AddTimer(
+        guint32 dwTimeoutSec,
+        PyObject* pCb,
+        PyObject* pCtx,
+        ObjPtr& pTimer )
+    {
+        if( pCb == nullptr )
+            return -EINVAL;
+
+        if( dwTimeoutSec > MAX_TIMEOUT_VALUE )
+            return -EINVAL;
+
+        gint32 ret = 0;
+        do{
+            TaskletPtr pTask;
+            ret = DEFER_IFCALLEX_NOSCHED2(
+                0, pTask, ObjPtr( this ),
+                &CPythonInterfBase::TimerCallback,
+                nullptr, ( intptr_t )pCb,
+                ( intptr_t )pCtx );
+
+            if( ERROR( ret ) )
+                break;
+
+            CIfDeferCallTaskEx* pTaskEx = pTask;
+            ret = pTaskEx->EnableTimer(
+                dwTimeoutSec, eventRetry );
+            if( ERROR( ret ) )
+                 break;
+
+            Py_INCREF( pCb );
+            if( pCtx != nullptr &&
+                pCtx != Py_None )
+                Py_INCREF( pCtx );
+
+            pTimer = pTask;
+
+        }while( 0 );
+
         return ret;
     }
 
@@ -702,12 +851,15 @@ class CPythonInterfBase : public T
             CCfgOpenerObj oCfg( pCallback );
             oCfg.SetPointer( propRespPtr,
                 ( IConfigDb* )oResp.GetCfg() );
-            Py_DECREF( pPyCb );
-            Py_DECREF( pPyParams );
         }
 
-        PyGILState_Release(gstate);
+        if( pPyCb != nullptr )
+            Py_DECREF( pPyCb );
 
+        if( pPyParams != nullptr )
+            Py_DECREF( pPyParams );
+
+        PyGILState_Release(gstate);
         return ret;
     }
 
@@ -1533,6 +1685,28 @@ class CPythonProxy :
     bool IsServer();
     %MethodCode
         sipRes = sipCpp->IsServer();
+    %End
+
+    gint32 AddTimer(
+        guint32 dwTimeoutSec,
+        PyObject* pCb,
+        PyObject* pCtx,
+        cpp::ObjPtr& pTimer /Out/ );
+    %MethodCode
+        CPythonProxyImpl* pImpl =
+        static_cast< CPythonProxyImpl* >
+            ( sipCpp );
+        sipRes = pImpl->AddTimer(
+            a0, a1, a2, *a3 );
+    %End
+
+    gint32 DisableTimer(
+        cpp::ObjPtr& pTimer );
+    %MethodCode
+        CPythonProxyImpl* pImpl =
+        static_cast< CPythonProxyImpl* >
+            ( sipCpp );
+        sipRes = pImpl->DisableTimer( *a0 );
     %End
 };
 

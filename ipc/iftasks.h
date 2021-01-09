@@ -784,7 +784,11 @@ class CIfInterceptTaskProxy :
     ~CIfInterceptTaskProxy()
     { DisableTimer(); }
 
-    gint32 EnableTimer( guint32 dwTimeoutSec );
+    gint32 EnableTimer(
+        guint32 dwTimeoutSec,
+        EnumEventId timerEvt =
+            eventTimeoutCancel );
+
     gint32 DisableTimer();
 
     // set the task to intercept

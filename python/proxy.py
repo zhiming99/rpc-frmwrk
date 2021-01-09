@@ -190,6 +190,16 @@ class PyRpcServices :
     def __exit__( self, type, val, traceback ) :
         self.Stop()
 
+    def TimerCallback( self, callback, context ) :
+        sig =signature( callback )
+        iCount = len( sig.parameters );
+        if iCount != 2 :
+            print( "TimerCallback: params number",
+                "does not match,", iCount )
+            return
+        ret = callback( self, context )
+        return
+
     def HandleAsyncResp( self, callback, listResp ) :
         listArgs = []
         sig =signature( callback )

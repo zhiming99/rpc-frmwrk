@@ -5522,7 +5522,8 @@ gint32 CIfCallbackInterceptor::OnComplete(
 }
 
 gint32 CIfInterceptTaskProxy::EnableTimer(
-    guint32 dwTimeoutSec )
+    guint32 dwTimeoutSec,
+    EnumEventId timerEvent  )
 {
     gint32 ret = 0;
     do{
@@ -5551,13 +5552,14 @@ gint32 CIfInterceptTaskProxy::EnableTimer(
                 break;
         }
 
+        CStdRTMutex oTaskLock( GetLock() );
         CUtilities& oUtils = pMgr->GetUtils();
         CTimerService& oTimerSvc =
             oUtils.GetTimerSvc();
 
         ret = oTimerSvc.AddTimer(
             dwTimeoutSec, this, 
-            ( guint32 )eventTimeoutCancel );
+            ( guint32 )timerEvent );
 
         if( ret > 0 )
         {
@@ -5574,6 +5576,7 @@ gint32 CIfInterceptTaskProxy::DisableTimer()
 {
     gint32 ret = 0;
     do{
+        CStdRTMutex oTaskLock( GetLock() );
         if( m_iTimeoutId == 0 )
             break;
 

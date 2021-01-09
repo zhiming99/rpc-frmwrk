@@ -1281,6 +1281,14 @@ class CDeferredCallBase :
         m_vecArgs[ i ] = pBuf;
         return 0;
     }
+
+    gint32 GetParamAt( guint32 i, BufPtr& pBuf ) const
+    {
+        if( i >= m_vecArgs.size() || i < 0 )
+            return -EINVAL;
+        pBuf = m_vecArgs[ i ];
+        return 0;
+    }
 };
 
 template<typename TaskType, typename ClassName, typename ...Args>
@@ -1431,6 +1439,17 @@ class CIfDeferCallTaskBase :
             return -EINVAL;
 
         return pTask->UpdateParamAt( i, pBuf );
+    }
+
+    gint32 GetParamAt(
+        guint32 i, BufPtr pBuf )
+    {
+        CDeferredCallBase< CTasklet >*
+            pTask = m_pDeferCall;
+        if( pTask == nullptr )
+            return -EINVAL;
+
+        return pTask->GetParamAt( i, pBuf );
     }
 
     gint32 OnComplete( gint32 iRetVal )

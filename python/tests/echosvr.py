@@ -40,10 +40,23 @@ class CEchoServer:
         listResp.append( listParams )
         return listResp
 
+    def EchoCfgCb( self, context ) :
+        self.OnServiceComplete( context[ 0 ],
+            0, *context[ 1: ] )
+
+    ''' this method demonstrates a request
+    completed asynchronously'''
     def EchoCfg( self, callback, iCount, pObj ):
-        listResp = [ 0 ]
-        listParams = [ iCount, pObj ]
-        listResp.append( listParams )
+        #schedule a timer to call EchoCfgCb in
+        #2 seconds
+        context = [ callback, iCount, pObj ]
+        ret = self.oInst.AddTimer(
+            np.int32( 2 ),
+            CEchoServer.EchoCfgCb,
+            context )
+        if ret[ 0 ] < 0 :
+            return [ ret[ 0 ],  ]
+        listResp = [ 65537, ]
         return listResp
 
 #2. aggregrate the interface class and the PyRpcProxy

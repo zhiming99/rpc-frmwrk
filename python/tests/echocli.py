@@ -1,4 +1,5 @@
 import sys
+import errno
 import numpy as np
 from rpcfrmwrk import *
 
@@ -59,9 +60,11 @@ def HandleResp( resp, hint ) :
         print( "error occured in ", hint, ret );
     elif resp[ 0 ] < 0:
         print( "error occured from peer", resp[ 0 ] )
-        ret = -errno.ENOENT;
+        ret = -errno.ENOENT
     else :
-        respArgs = resp[ 1 ];
+        respArgs = resp[ 1 ]
+        if respArgs is None :
+            return -errno.EFAULT
         if hint != "EchoCfg" :
             print( "response is \"",
                 respArgs[ 0 ],"\"" )
@@ -92,7 +95,7 @@ def test_main() :
             return ret
 
         with oProxy :
-            for i in range( 10 ) :
+            for i in range( 100 ) :
                 #Echo a plain text
                 resp = oProxy.Echo( "Are you ok" );
                 ret = HandleResp( resp, "Echo" );
