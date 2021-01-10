@@ -16,9 +16,24 @@ class CEchoServer:
 
     '''the server side implementation of the
     interface method share the same parameter
-    layout, a self object comes first, and then a
-    callback for async call, and then the
-    parameters from the proxy.
+    layout, the `self' object comes first, and
+    then a `callback' object for async call, and
+    then the parameters from the proxy. You can
+    ignore the `callback' if the request is
+    complete in the synchronous fashion.
+
+    the return value is a two-element list, the
+    first element is the error code, and the
+    second is the argument list if the error code
+    is STATUS_SUCCESS. If no argument to return,
+    the second element should be an empty list.
+
+    if the error code is STATUS_PENDING, which
+    means the request will be completed in the
+    future time. The parameter `callback' should
+    be kept and pass to OnServiceComplete when the
+    requests is truly completed, as shows by
+    method `EchoCfg'
     '''
     def Echo(self, callback, text ):
         listResp = [ 0 ]
