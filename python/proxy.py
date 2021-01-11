@@ -200,6 +200,41 @@ class PyRpcServices :
         ret = callback( self, context )
         return
 
+    ''' create a timer object, which is due in
+    timeoutSec seconds. And the `callback' will be
+    called with the parameter context.
+
+    it returns a two element list, the first
+    is the error code, and the second is a
+    timerObj if the error code is
+    STATUS_SUCCESS.
+    '''
+    def AddTimer( self,
+        timeoutSec, callback, context ) :
+        return self.oInst.AddTimer(
+            np.uint32( timeoutSec ),
+            callback, context )
+
+    '''Remove a previously scheduled timer.
+    '''
+    def DisableTimer( self, timerObj ) :
+        return self.oInst.DisableTimer(
+            timerObj );
+
+    '''attach a complete notification to the task
+    to complete. When the task is completed or
+    canceled, this notification will be triggered.
+    the notification has the following layout
+    callback( self, ret, *listArgs ), as is the
+    same as the response callback. The `ret' is
+    the error code of the task.
+    '''
+    def InstallCompNotify(
+        self, task, callback, *listArgs ):
+        listResp = [ 0, [ *listArgs ] ]
+        self.oInst.InstallCompNotify(
+            task, callback, listResp )
+
     def HandleAsyncResp( self, callback, listResp ) :
         listArgs = []
         sig =signature( callback )
@@ -218,9 +253,12 @@ class PyRpcServices :
             return
 
         ret = listResp[ 0 ];
-        if ret == 0 :
-            listArgs = listResp[ 1 ]
-        callback( self, ret, *listArgs )
+        if len( listResp ) <= 1 :
+            callback( self, ret, *listArgs )
+        elif isinstance( listResp[ 1 ], list ) :
+            callback( self, ret, *listResp[ 1 ] )
+        else :
+            callback( self, ret, *listArgs )
         return
 
     def GetObjType( self, pObj ) :
@@ -374,7 +412,7 @@ class PyRpcServices :
                 typeFound = iftype;
                 break
             if not found :
-                resp[ 0 ] = -errno.EINVAL;
+                resp[ 0 ] = -errno.ENOTSUP;
                 break
 
             isServer = self.oInst.IsServer();
@@ -513,6 +551,12 @@ class PyRpcServer( PyRpcServices ) :
         self, callback, ret, *args ) :
         listResp = list( args )
         return self.oInst.OnServiceComplete(
+            callback, ret, listResp )
+
+    def SetResponse(
+        self, callback, ret, *args ) :
+        listResp = list( args )
+        return self.oInst.SetResponse(
             callback, ret, listResp )
 
     ''' callback can be none if it is not

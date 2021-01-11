@@ -493,7 +493,38 @@ class CPythonServer :
             ( sipCpp );
         sipRes = pImpl->DisableTimer( *a0 );
     %End
+
+    gint32 InstallCompNotify(
+        cpp::ObjPtr& pCallback,
+        PyObject* pCb,
+        PyObject* pListResp );
+    %MethodCode
+        CPythonServerImpl* pImpl =
+        static_cast< CPythonServerImpl* >
+            ( sipCpp );
+        sipRes = pImpl->InstallCompNotify(
+            *a0, a1, a2 );
+    %End
 };
+
+gint32 ChainTasks(
+    cpp::ObjPtr& pObj1,
+    cpp::ObjPtr& pObj2 );
+%MethodCode
+    CIfRetryTask* pTask1 = *a0;
+    CIfRetryTask* pTask2 = *a1;
+    if( pTask1 == nullptr || pTask2 == nullptr )
+    {
+        sipRes = -EINVAL;
+    }
+    else
+    {
+        // Risk alert: potential race condition if
+        // one of the two tasks is already running
+        sipRes = pTask1->SetClientNotify(
+            pTask2 );
+    }
+%End
 
 cpp::ObjPtr CreateRpcServer(
     cpp::ObjPtr& pMgr,

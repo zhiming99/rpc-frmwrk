@@ -17,7 +17,14 @@ class CEchoClient:
     '''all the methods have the similiar
     #implementation, pass `self.sendRequest' with
     the interface name, method name and all the
-    input parameters '''
+    input parameters.
+
+    the response from the server is a two-element
+    list, the first is an error code, and the
+    second is a list of reponse parameters if the
+    error code is STATUS_SUCCESS. The content of
+    the list depends on the interface definition.
+    '''
 
     def Echo(self, text ):
         return self.sendRequest(

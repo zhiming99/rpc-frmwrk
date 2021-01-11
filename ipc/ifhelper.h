@@ -1442,7 +1442,7 @@ class CIfDeferCallTaskBase :
     }
 
     gint32 GetParamAt(
-        guint32 i, BufPtr pBuf )
+        guint32 i, BufPtr& pBuf ) const
     {
         CDeferredCallBase< CTasklet >*
             pTask = m_pDeferCall;
@@ -1920,7 +1920,7 @@ inline gint32 NewResponseHandler2(
 // to insert the task pInterceptor to the head of
 // completion chain of the task pTarget 
 // please make sure both tasks inherit from the
-// CIfParallelTask
+// CIfRetryTask
 inline gint32 InterceptCallback(
     IEventSink* pInterceptor, IEventSink* pTarget )
 {
@@ -1928,25 +1928,30 @@ inline gint32 InterceptCallback(
         pTarget == nullptr )
         return -EINVAL;
 
-    CCfgOpenerObj oTarget( pTarget );
-    TaskletPtr pInterceptTask;
-    pInterceptTask = ObjPtr( pInterceptor );
+    CIfRetryTask* pInterceptTask =
+        ObjPtr( pInterceptor );
 
-    if( pInterceptTask.IsEmpty() )
-        return -EFAULT;
+    if( pInterceptTask == nullptr )
+        return -EINVAL;
 
-    CCfgOpener oCfg( ( IConfigDb* )
-        pInterceptTask->GetConfig() );
+    CIfRetryTask* pTargetTask =
+        ObjPtr( pTarget );
 
-    oCfg.CopyProp( propNotifyClient, pTarget );
-    oCfg.CopyProp( propEventSink, pTarget );
+    if( pTargetTask == nullptr )
+        return -EINVAL;
 
-    oTarget.SetObjPtr(
-        propEventSink, ObjPtr( pInterceptor ) );
+    gint32 ret = 0;
+    EventPtr pParent;
+    ret = pTargetTask->GetClientNotify(
+        pParent );
+    if( SUCCEEDED( ret ) )
+    {
+        pInterceptTask->SetClientNotify(
+            pParent);
+    }
 
-    oTarget.SetBoolProp(
-        propNotifyClient, true );
-
+    pTargetTask->SetClientNotify(
+        pInterceptTask );
     return 0;
 }
 
@@ -1957,25 +1962,29 @@ inline gint32 RemoveInterceptCallback(
         pTarget == nullptr )
         return -EINVAL;
 
-    CCfgOpenerObj oTarget( pTarget );
-    TaskletPtr pIntceptTask;
-    pIntceptTask = ObjPtr( pIntceptTask );
+    CIfRetryTask* pInterceptTask =
+        ObjPtr( pInterceptor );
 
-    if( pIntceptTask.IsEmpty() )
-        return -EFAULT;
+    if( pInterceptTask == nullptr )
+        return -EINVAL;
 
-    CCfgOpener oCfg( ( IConfigDb* )
-        pIntceptTask->GetConfig() );
+    CIfRetryTask* pTargetTask =
+        ObjPtr( pTarget );
 
-    oTarget.CopyProp(
-        propNotifyClient, pInterceptor );
+    if( pTargetTask == nullptr )
+        return -EINVAL;
 
-    oTarget.CopyProp(
-        propEventSink, pInterceptor );
+    gint32 ret = 0;
+    EventPtr pParent;
+    ret = pInterceptTask->GetClientNotify(
+        pParent );
+    if( SUCCEEDED( ret ) )
+    {
+        pTargetTask->SetClientNotify(
+            pParent);
+    }
 
-    oCfg.RemoveProperty( propEventSink );
-    oCfg.RemoveProperty( propNotifyClient );
-
+    pInterceptTask->ClearClientNotify();
     return 0;
 }
 
@@ -1984,43 +1993,8 @@ class CDeferredCallOneshot :
     public CDeferredCall< CIfParallelTask, ClassName, Args... >
 {
     typedef gint32 ( ClassName::* FuncType)( Args... ) ;
-    TaskletPtr m_pTask;
-
-    gint32 CallOrigCallback(
-        CObjBase* pCallback, gint32 iRet )
-    {
-        if( pCallback == nullptr )
-            return -EINVAL;
-
-        CCfgOpener oCfg(
-            ( IConfigDb* ) this->GetConfig() );
-
-        ObjPtr pObj;
-        gint32 ret = oCfg.GetObjPtr(
-            propEventSink, pObj );
-
-        if( ERROR( ret ) )
-            return ret;
-
-        EventPtr pEvt( pObj );
-        if( pEvt.IsEmpty() )
-            return -EFAULT;
-
-        ret = pEvt->OnEvent( eventTaskComp,
-            iRet, 0, ( LONGWORD* )pCallback );
-
-        oCfg.RemoveProperty( propEventSink );
-
-        return ret;
-    }
-
-    gint32 InterceptCallback( IEventSink* pCallback )
-    {
-        return rpcfrmwrk::InterceptCallback( this, pCallback );
-    }
 
     public:
-
     typedef CDeferredCall< CIfParallelTask, ClassName, Args... > super;
 
     CDeferredCallOneshot( IEventSink* pCallback,
@@ -2029,8 +2003,7 @@ class CDeferredCallOneshot :
     {
         if( pCallback == nullptr )
             return;
-        InterceptCallback( pCallback );
-        m_pTask = ObjPtr( pCallback );
+        InterceptCallback( this, pCallback );
     }
 
     virtual gint32 operator()( guint32 dwContext = 0 )
@@ -2046,35 +2019,13 @@ class CDeferredCallOneshot :
 
     virtual gint32 OnTaskComplete( gint32 iRet ) 
     {
-        gint32 ret = 0;
-        CObjBase* pObjBase = m_pTask;
+        if( this->m_pObj.IsEmpty() )
+            return -EFAULT;
 
-        do{
-            if( this->m_pObj.IsEmpty() )
-            {
-                ret = -EINVAL;
-                break;
-            }
+        this->Delegate(
+            this->m_pObj, this->m_vecArgs );
 
-            ret = this->Delegate(
-                this->m_pObj, this->m_vecArgs );
-
-            if( ret == STATUS_PENDING )
-            {
-                // the oneshot task has to retire
-                this->ClearClientNotify();
-                ret = 0;
-                break;
-            }
-
-            if( pObjBase != nullptr )
-                CallOrigCallback( pObjBase, iRet );
-
-        }while( 0 );
-
-        m_pTask.Clear();
-
-        return ret;
+        return iRet;
     }
 };
 

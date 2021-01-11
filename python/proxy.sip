@@ -249,6 +249,7 @@ class CPythonInterfBase : public T
             Py_DECREF( pCtx );
 
         PyGILState_Release(gstate);
+        ( *pTaskEx )( eventCancelTask );
         return ret;
     }
 
@@ -763,7 +764,10 @@ class CPythonInterfBase : public T
             PyObject* pHost = nullptr;
             ret = GetPyHost( pHost );
             if( ERROR( ret ) )
+            {
+                ret = -ENOTSUP;
                 break;
+            }
 
             ObjPtr* pCb = new ObjPtr( pCallback );
             ObjPtr* pArgs = new ObjPtr( pParams );
@@ -811,9 +815,7 @@ class CPythonInterfBase : public T
 
             ret = PyLong_AS_LONG( pyRet );
             if( ret == STATUS_PENDING )
-            {
                 break;
-            }
 
             if( ERROR( ret ) ) 
                 break;
@@ -845,14 +847,6 @@ class CPythonInterfBase : public T
         if( listResp != nullptr )
             Py_DECREF( listResp );
 
-        if( ret != STATUS_PENDING )
-        {
-            oResp[ propReturnValue ] = ret;
-            CCfgOpenerObj oCfg( pCallback );
-            oCfg.SetPointer( propRespPtr,
-                ( IConfigDb* )oResp.GetCfg() );
-        }
-
         if( pPyCb != nullptr )
             Py_DECREF( pPyCb );
 
@@ -860,6 +854,21 @@ class CPythonInterfBase : public T
             Py_DECREF( pPyParams );
 
         PyGILState_Release(gstate);
+
+        if( ret != STATUS_PENDING &&
+            ret != -ENOTSUP)
+        {
+            oResp[ propReturnValue ] = ret;
+            CCfgOpenerObj oCfg( pCallback );
+            oCfg.SetPointer( propRespPtr,
+                ( IConfigDb* )oResp.GetCfg() );
+        }
+        else if( ret == -ENOTSUP )
+        {
+            return super::InvokeUserMethod(
+                pParams, pCallback );
+        }
+
         return ret;
     }
 
@@ -1157,6 +1166,84 @@ class CPythonInterfBase : public T
     gint32 RemoveChanCtx( HANDLE hChannel )
     {
         return SetChanCtx( hChannel, nullptr);
+    }
+
+    gint32 PyCompNotify(
+        IEventSink* pCallback,
+        intptr_t pCb,
+        intptr_t pResp )
+    {
+        CCfgOpenerObj oCfg( pCallback );
+        ObjPtr pObj;
+
+        if( pCb == 0 || pResp == 0 )
+            return -EINVAL;
+
+        PyGILState_STATE gstate;
+        gstate = PyGILState_Ensure();
+
+        gint32 ret = oCfg.GetObjPtr(
+            propRespPtr, pObj ); 
+
+        PyObject* pPyCb = ( PyObject*)pCb;
+        PyObject* pPyResp = ( PyObject*)pResp;
+
+        do{
+            PyObject* pHost = nullptr;
+            ret = GetPyHost( pHost );
+            if( ERROR( ret ) )
+                break;
+
+            if( SUCCEEDED( ret ) && !pObj.IsEmpty() )
+            {
+                CCfgOpener oResp(
+                    ( IConfigDb* )pObj );
+                ret = oResp[ propReturnValue ];
+            }
+
+            PyObject* pPyRet =
+                PyLong_FromLong( ret );
+            PyList_SetItem( pPyResp, 0, pPyRet );
+            // element 1 is not replaced with the
+            // the true response parameters.
+            PyObject_CallMethod(
+                 pHost, "HandleAsyncResp", 
+                 "(OO)", pPyCb, pPyResp );
+
+        }while( 0 );
+
+        if( pPyCb )
+            Py_DECREF( pPyCb );
+        if( pPyResp )
+            Py_DECREF( pPyResp );
+
+        PyGILState_Release(gstate);
+
+        return ret;
+    }
+
+    gint32 InstallCompNotify(
+        IEventSink* pCallback,
+        PyObject* pCb,
+        PyObject* pListResp )
+    {
+        if( pCb == nullptr ||
+            pListResp == nullptr )
+            return -EINVAL;
+
+        gint32 ret = INSTALL_COMPLETE_HANDLER(
+            pCallback, this,
+            &CPythonInterfBase::PyCompNotify,
+            pCallback,
+            ( intptr_t )pCb,
+            ( intptr_t)pListResp );    
+
+        if( SUCCEEDED( ret ) )
+        {
+            Py_INCREF( pCb );
+            Py_INCREF( pListResp );
+        }
+        return ret;
     }
 };
 

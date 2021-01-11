@@ -94,7 +94,9 @@ class CIfRetryTask
     TaskletPtr GetFwrdTask() const;
     gint32 ClearFwrdTask();
     TaskletPtr GetEndFwrdTask();
-    gint32 CancelTaskChain( guint32 dwContest );
+    gint32 CancelTaskChain(
+        guint32 dwContest,
+        gint32 iError = -ECANCELED );
 
     public:
     typedef CThreadSafeTask super;
