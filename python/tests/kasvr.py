@@ -7,32 +7,30 @@ from rpcfrmwrk import *
 sys.path.insert(0, '../')
 from proxy import PyRpcContext, PyRpcServer
 
-class CActcServer:
+class CKeepAliveServer:
     """Mandatory class member to define the
     interface name, which will be used to invoke
     the event handler
     """
-    ifName = "CActcServer"
+    ifName = "CKeepAliveServer"
     """
     Method: LongWait
-
     Description: this request is a long request,
     it will be completed in 30 seconds. For some
     reason we want to cancel it in 2 seconds after
     the request is sent, we can call CancelRequest
     to cancel this request.
 
-    Return value: the return value is a tuple with
-    two elememnts, 0 is the error code, and if it
-    is 65537, element 1 is the task id, which can
-    be passed to CancelRequest.
+    Return value: the return value is a list with
+    1 elememnt, elem 0 is the error code, and
+    if it is 0, 
     """
     def LongWait( self, callback, strText ) :
         #schedule a timer to call EchoCfgCb in
         #2 seconds
         context = [ callback, strText ]
-        ret = self.AddTimer( 30,
-            CActcServer.LongWaitCb,
+        ret = self.AddTimer( 300,
+            CKeepAliveServer.LongWaitCb,
             context )
         if ret[ 0 ] < 0 :
             return [ ret[ 0 ],  ]
@@ -42,7 +40,7 @@ class CActcServer:
         # Make sure the timerObj be freed if the
         # request is canceled
         self.InstallCompNotify( callback,
-            CActcServer.LongWaitCleanup,
+            CKeepAliveServer.LongWaitCleanup,
             timerObj )
         listResp = [ 65537, ]
         return listResp
@@ -65,25 +63,26 @@ class CActcServer:
     def LongWaitCb( self, context ) :
         callback = context[ 0 ]
         strText = context[ 1 ]
+        strText += " 2";
         self.OnServiceComplete(
             callback, 0, strText );
         return
 
 
 #aggregrate the interface class and the PyRpcServer
-class CActcSvrObj(CActcServer, PyRpcServer):
+class CKaSvrObj( CKeepAliveServer, PyRpcServer ):
     def __init__(self, pIoMgr, strDesc, strObjName) :
-        super(CActcServer, self).__init__(
+        super(CKeepAliveServer, self).__init__(
             pIoMgr, strDesc, strObjName )
 
 def test_main() : 
     ret = 0
-    oContext = PyRpcContext( "PyRpcServer" );
+    oContext = PyRpcContext();
     with oContext :
         print( "start to work here..." )
-        oServer = CActcSvrObj( oContext.pIoMgr,
-            "../../test/debug64/actcdesc.json",
-            "CActcServer" );
+        oServer = CKaSvrObj( oContext.pIoMgr,
+            "../../test/debug64/kadesc.json",
+            "CKeepAliveServer" );
 
         ret = oServer.GetError() 
         if ret < 0 :
@@ -110,3 +109,4 @@ def test_main() :
 
 ret = test_main()
 quit( ret )
+
