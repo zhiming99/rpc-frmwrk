@@ -150,6 +150,7 @@ class CPythonInterfBase : public T
                     }
 
                     pObj = PyByteArray_FromObject( pView );
+                    Py_DECREF( pView );
                     break;
                 }
             case typeDMsg:
@@ -474,7 +475,7 @@ class CPythonInterfBase : public T
 
                         PyObject* pByteArr =
                             PyByteArray_FromObject( pView );
-
+                        Py_DECREF( pView );
                         if( pByteArr == nullptr )
                         {
                             ret = -EFAULT;
@@ -896,7 +897,7 @@ class CPythonInterfBase : public T
 
             PyObject* pRet = PyLong_FromLong( iRet );
             PyList_SetItem( pPyResp, 0, pRet );
-            PyObject* pArgs = PyList_New( 1 );
+            PyObject* pArgs = PyList_New( 2 );
             PyList_SetItem( pPyResp, 1, pArgs );
 
             PyObject* pPyBuf = nullptr;
@@ -908,7 +909,21 @@ class CPythonInterfBase : public T
             }
             else
             {
-                PyList_SetItem( pArgs, 0, pPyBuf );
+                PyObject* pyHandle = nullptr;
+                if( sizeof( HANDLE ) ==
+                    sizeof( gint64 ) )
+                {
+                    pyHandle =
+                        PyLong_FromLongLong( hChannel );
+                }
+                else
+                {
+                    pyHandle =
+                        PyLong_FromLong( hChannel );
+                }
+
+                PyList_SetItem( pArgs, 0, pyHandle );
+                PyList_SetItem( pArgs, 1, pPyBuf );
             }
 
             pPyCb = ( PyObject* )pCb;
@@ -1687,24 +1702,27 @@ class CPythonProxy :
     }
     %End
 
-    gint32 ReadStreamAsync(
+    PyObject* ReadStreamAsync(
         HANDLE hChannel, PyObject* pCb );
     %MethodCode
     do{
-        sipRes = 0;
         CPythonProxyImpl* pImpl = static_cast
             < CPythonProxyImpl* >( sipCpp );
 
+        PyObject* pResp = PyList_New( 2 );
+        sipRes = pResp;
         if( pImpl == nullptr || a1 == nullptr ) 
         {
-            sipRes = -EFAULT;
+            PyList_SetItem( pResp, 0,
+                PyLong_FromLong( -EFAULT ) );
             break;
         }
 
         gint32 ret = PyCallable_Check( a1 );
         if( ret == 0 )
         {
-            sipRes = -EINVAL;
+            PyList_SetItem( pResp, 0,
+                PyLong_FromLong( -EINVAL ) );
             break;
         }
 
@@ -1715,13 +1733,49 @@ class CPythonProxy :
         BufPtr pBuf;
         IConfigDb* pCtx = oReqCtx.GetCfg();
         Py_BEGIN_ALLOW_THREADS;
-        sipRes = pImpl->ReadStreamAsync(
+        ret = pImpl->ReadStreamAsync(
             a0, pBuf, pCtx );
         Py_END_ALLOW_THREADS;
-        break;
+
+        if( ret == STATUS_PENDING ||
+            ERROR( ret ) )
+        {
+            PyList_SetItem( pResp, 0,
+                PyLong_FromLong( ret ) );
+            break;
+        }
+
+        PyObject* pView = PyMemoryView_FromMemory(
+            pBuf->ptr(), pBuf->size(), PyBUF_READ );
+        if( pView == nullptr )
+        {
+            PyList_SetItem( pResp, 0,
+                PyLong_FromLong( -EFAULT ) );
+            break;
+        }
+
+        PyObject* pPyBuf =
+            PyByteArray_FromObject( pView );
+        Py_DECREF( pView );
+
+        BufPtr* ppBuf = new BufPtr();
+        *ppBuf = pBuf;
+
+        PyObject* pPyBufBak = sipConvertFromNewType(
+            ppBuf, sipType_cpp_BufPtr, SIP_NULLPTR );
+        if( unlikely( pPyBufBak == nullptr ) )
+        {
+            PyList_SetItem( pResp, 0,
+                PyLong_FromLong( -ENOMEM ) );
+            break;
+        }
+        PyList_SetItem( pResp,
+            0, PyLong_FromLong( 0 ) );
+        PyList_SetItem( pResp, 1, pPyBuf );
+        PyList_Append( pResp, pPyBufBak );
+        Py_DECREF( pPyBufBak );
 
     }while( 0 );
-
     %End
 
     gint32 WriteStreamAsync(

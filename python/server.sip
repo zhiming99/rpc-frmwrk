@@ -263,24 +263,27 @@ class CPythonServer :
     }
     %End
 
-    gint32 ReadStreamAsync(
+    PyObject* ReadStreamAsync(
         HANDLE hChannel, PyObject* pCb );
     %MethodCode
     do{
-        sipRes = 0;
         CPythonServerImpl* pImpl = static_cast
             < CPythonServerImpl* >( sipCpp );
 
+        PyObject* pResp = PyList_New( 2 );
+        sipRes = pResp;
         if( pImpl == nullptr || a1 == nullptr ) 
         {
-            sipRes = -EFAULT;
+            PyList_SetItem( pResp, 0,
+                PyLong_FromLong( -EFAULT ) );
             break;
         }
 
         gint32 ret = PyCallable_Check( a1 );
         if( ret == 0 )
         {
-            sipRes = -EINVAL;
+            PyList_SetItem( pResp, 0,
+                PyLong_FromLong( -EINVAL ) );
             break;
         }
 
@@ -291,10 +294,47 @@ class CPythonServer :
         BufPtr pBuf;
         IConfigDb* pCtx = oReqCtx.GetCfg();
         Py_BEGIN_ALLOW_THREADS;
-        sipRes = pImpl->ReadStreamAsync(
+        ret = pImpl->ReadStreamAsync(
             a0, pBuf, pCtx );
         Py_END_ALLOW_THREADS;
-        break;
+
+        if( ret == STATUS_PENDING ||
+            ERROR( ret ) )
+        {
+            PyList_SetItem( pResp, 0,
+                PyLong_FromLong( ret ) );
+            break;
+        }
+
+        PyObject* pView = PyMemoryView_FromMemory(
+            pBuf->ptr(), pBuf->size(), PyBUF_READ );
+        if( pView == nullptr )
+        {
+            PyList_SetItem( pResp, 0,
+                PyLong_FromLong( -EFAULT ) );
+            break;
+        }
+
+        PyObject* pPyBuf =
+            PyByteArray_FromObject( pView );
+        Py_DECREF( pView );
+
+        BufPtr* ppBuf = new BufPtr();
+        *ppBuf = pBuf;
+
+        PyObject* pPyBufBak = sipConvertFromNewType(
+            ppBuf, sipType_cpp_BufPtr, SIP_NULLPTR );
+        if( unlikely( pPyBufBak == nullptr ) )
+        {
+            PyList_SetItem( pResp, 0,
+                PyLong_FromLong( -ENOMEM ) );
+            break;
+        }
+        PyList_SetItem( pResp,
+            0, PyLong_FromLong( 0 ) );
+        PyList_SetItem( pResp, 1, pPyBuf );
+        PyList_Append( pResp, pPyBufBak );
+        Py_DECREF( pPyBufBak );
 
     }while( 0 );
 

@@ -61,8 +61,9 @@ class CStreamingClient(CEchoClient, PyRpcProxy):
     def WriteStmCallback( self, iRet, hChannel, pBuf ) :
         if iRet < 0 :
             print( "Write failed with error", iRet )
-        else :
-            print( " server says( async ): ", pBuf )
+            self.iError = iRet
+            self.sem.release()
+            return
         self.iError = iRet
         self.sem.release()
 
@@ -71,10 +72,12 @@ class CStreamingClient(CEchoClient, PyRpcProxy):
     def ReadStmCallback( self, iRet, hChannel, pBuf ) :
         if iRet < 0 :
             print( "Read failed with error", iRet )
-        else :
-            print( " server says(async): ", pBuf )
+            self.iError = iRet
+            self.sem.release()
+            return
         self.iError = iRet
         self.sem.release()
+        print( "Server says( async ): ", pBuf )
 
     def GetError( self ) :
         return self.iError
@@ -154,16 +157,21 @@ def test_main() :
             if ret < 0 :
                 break
 
-            ret = oProxy.ReadStreamAsync( hChannel,
+            listResp = oProxy.ReadStreamAsync( hChannel,
                 CStreamingClient.ReadStmCallback )
+            ret = listResp[ 0 ]
             if ret < 0 :
                 break
+            elif ret == 65537 :
+                oProxy.sem.acquire()    
+            else :
+                print( "Server says( async ): ",
+                   listResp[ 1 ] )
             
         break
 
     ''' Stop the guys'''
-    if ( oProxy is not None and 
-        oProxy.GetError() == 0 ):
+    if oProxy is not None :
         oProxy.Stop();
 
     if oContext is not None:

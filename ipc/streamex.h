@@ -222,7 +222,7 @@ class CIfStmReadWriteTask :
     }
 
     gint32 ReadStreamAsync(
-        IEventSink* pCallback, BufPtr pBuf )
+        IEventSink* pCallback, BufPtr& pBuf )
     {
         return ReadStreamInternal(
             pCallback, pBuf, false );

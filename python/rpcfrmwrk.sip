@@ -209,7 +209,10 @@ namespace cpp
             if( pView == nullptr )
                 sipRes = Py_None;
             else
-                sipRes = PyBytes_FromObject( pView );
+            {
+                sipRes = PyByteArray_FromObject( pView );
+                Py_DECREF( pView );
+            }
         %End
 
         gint32 CopyToPython( PyObject* pPyObj );

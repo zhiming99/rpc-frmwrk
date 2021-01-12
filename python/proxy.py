@@ -135,10 +135,10 @@ class PyRpcContext :
     def __init__( self, strModName= "PyRpcProxy" ) :
         self.strModName = strModName
 
-    def Start( self, strModName ) :
+    def Start( self ) :
         ret = 0
         print( "entering..." );
-        self.pIoMgr = self.CreateIoMgr( strModName );
+        self.pIoMgr = self.CreateIoMgr( self.strModName );
         if self.pIoMgr is not None :
             ret = self.StartIoMgr( self.pIoMgr );
             if ret > 0 :
