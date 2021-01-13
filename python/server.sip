@@ -227,7 +227,7 @@ class CPythonServer :
     }while( 0 );
     %End
 
-    PyObject* ReadStream( HANDLE hChannel );
+    PyObject* ReadStream( HANDLE hChannel, guint32 dwSize );
     %MethodCode
     gint32 ret = 0;
     do{
@@ -240,7 +240,19 @@ class CPythonServer :
             break;
         }
 
+        if( a1 > MAX_BYTES_PER_FILE )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
         BufPtr* ppBuf = new BufPtr() ;
+        if( a1 > 0 )
+        {
+            ( *ppBuf ).NewObj();
+            ( *ppBuf )->Resize( a1 );
+        }
+
         Py_BEGIN_ALLOW_THREADS;
         ret = pImpl->ReadStream( a0, *ppBuf );
         Py_END_ALLOW_THREADS;
@@ -264,7 +276,7 @@ class CPythonServer :
     %End
 
     PyObject* ReadStreamAsync(
-        HANDLE hChannel, PyObject* pCb );
+        HANDLE hChannel, PyObject* pCb, guint32 dwSize );
     %MethodCode
     do{
         CPythonServerImpl* pImpl = static_cast
@@ -279,6 +291,12 @@ class CPythonServer :
             break;
         }
 
+        if( a2 > MAX_BYTES_PER_FILE )
+        {
+            PyList_SetItem( pResp, 0,
+                PyLong_FromLong( -EINVAL ) );
+            break;
+        }
         gint32 ret = PyCallable_Check( a1 );
         if( ret == 0 )
         {
@@ -291,7 +309,18 @@ class CPythonServer :
         oReqCtx.Push( ( intptr_t ) a1 );
         Py_INCREF( a1 );
 
-        BufPtr pBuf;
+        cpp::BufPtr pBuf;
+        if( a2 > 0 )
+        {
+            ret = pBuf.NewObj();
+            if( ERROR( ret ) )
+            {
+                PyList_SetItem( pResp, 0,
+                    PyLong_FromLong( ret ) );
+                break;
+            }
+            pBuf->Resize( a2 );
+        }
         IConfigDb* pCtx = oReqCtx.GetCfg();
         Py_BEGIN_ALLOW_THREADS;
         ret = pImpl->ReadStreamAsync(

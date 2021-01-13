@@ -149,7 +149,7 @@ def test_main() :
         if ret != 65537 :
             break;
 
-        taskId = tupRet[ 1 ]; 
+        taskId = tupRet[ 1 ] 
         '''wait for 3 seconds
         '''
         bCompleted = oProxy.sem.acquire( True, 3 );
@@ -170,7 +170,7 @@ def test_main() :
         print( "Resume the server..." )
         ret = oProxy.oInst.Resume()
         if ret < 0 :
-            break;
+            break
 
         print( "Echo... again" )
         tupRet = oProxy.Echoa( "Are you ok" )
@@ -181,10 +181,10 @@ def test_main() :
 
         print( "EchoUnknown..." )
         f = open( "/usr/bin/sh", "rb" )
-        f.seek(1024);
-        o = f.read( 16 );
-        print( o );
-        f.close();
+        f.seek(1024)
+        o = f.read( 16 )
+        print( o )
+        f.close()
         oProxy.EchoUnknowna( o );
 
         print( "EchoMany..." )
@@ -194,7 +194,7 @@ def test_main() :
         print( "Pause the server..." )
         oProxy.oInst.Pause()
 
-        break;
+        break
 
     ''' Stop the guys'''
     if ( oProxy is not None and 
@@ -204,7 +204,7 @@ def test_main() :
     if oContext is not None:
         oContext.Stop()
 
-    return ret;
+    return ret
 
 
 ret = test_main()

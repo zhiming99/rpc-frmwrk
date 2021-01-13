@@ -280,11 +280,23 @@ class PyRpcServices :
         return self.oInst.WriteStreamAsync(
             hChannel, pBuf, callback )
 
-    ''' return a bytes object read from the stream
-    the bytes object must be consumed within
-    the lifecycle of pBuf '''
-    def ReadStream( self, hChannel ) :
-        tupRet = self.oInst.ReadStream( hChannel )
+    '''ReadStream to read `size' bytes from the
+    stream `hChannel'.  If `size' is zero, the
+    number of bytes read depends on the first
+    message received. If you are not sure what
+    will come from the stream, you are recommended
+    to use zero size.
+
+    The return value is a list of 3 elements,
+    element 0 is the error code. If it is
+    negative, no data is returned. If it is
+    STATUS_SUCCESS, element 1 is a bytearray
+    object read from the stream. element 2 is a
+    hidden object to keep element 1 valid, just
+    leave it alone.
+    '''
+    def ReadStream( self, hChannel, size = 0 ) :
+        tupRet = self.oInst.ReadStream( hChannel, size )
         ret = tupRet[ 0 ]
         if ret < 0 :
             return tupRet;
@@ -293,12 +305,45 @@ class PyRpcServices :
         #transfer the content to a bytes object
         pBytes = pBuf.TransToBytes();
         if pBytes == None :
-            return ( -errno.EFAULT, )
+            return ( -errno.ENODATA, )
         return ( 0, pBytes, pBuf )
 
-    def ReadStreamAsync( self, hChannel, callback ) :
+    '''
+    ReadStreamAsync to read `size' bytes from the
+    stream `hChannel', and give control to
+    callback after the data is read from the
+    stream. If `size' is zero, the number of bytes
+    read depends on the first message in the
+    pending message queue. If you are not sure
+    what will come from the stream, you are
+    recommended to use zero size.
+
+    The return value is a list of 3 elements,
+    element 0 is the error code. If it is
+    STATUS_PENDING, there is no data in the
+    pending message queue, and wait till the
+    callback is called in the future time.
+
+    If the return value is STATUS_SUCCESS, element
+    1 holds a bytearray object of the bytes read
+    from the stream. And element 2 is a hidden
+    object, that you don't want to access.
+    Actually it controls the life time of element
+    1, so make sure not to access elemen 1 if
+    element2 is no longer valid.  '''
+
+    def ReadStreamAsync( self, hChannel, callback, size = 0 ) :
         return self.oInst.ReadStreamAsync(
-            hChannel, callback )
+            hChannel, callback, size )
+
+    '''Convert the arguments in the `pObj' c++
+    object to a list of python object.
+
+    The return value is a two element list. The
+    first element is the error code and the second
+    element is a list of python object. The second
+    element should be None if error occurs during
+    the conversion.  '''
 
     def ArgObjToList( self, pObj ) :
         pCfg = cpp.CastToCfg( pObj )
