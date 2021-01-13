@@ -387,6 +387,11 @@ namespace cpp
         gint32 SetDoubleProp( gint32,
             double fVal );
 
+        gint32 GetFloatProp( gint32,
+            float& fVal /Out/ );
+        gint32 SetFloatProp( gint32,
+            float fVal );
+
         gint32 GetPointer( gint32,
             cpp::CObjBase*& pObj /Out/ );
         gint32 SetPointer( gint32,

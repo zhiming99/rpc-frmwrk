@@ -135,7 +135,7 @@ class PyRpcContext :
     def __init__( self, strModName= "PyRpcProxy" ) :
         self.strModName = strModName
 
-    def Start( self, strModName ) :
+    def Start( self, strModName="PyRpcProxy" ) :
         ret = 0
         print( "entering..." );
         self.pIoMgr = self.CreateIoMgr( strModName );
@@ -309,7 +309,7 @@ class PyRpcServices :
         if ret[ 0 ] < 0 :
             resp[ 0 ] = ret[ 0 ];
         iSize = ret[ 1 ]
-        if iSize <= 0 :
+        if iSize < 0 :
             return [ -errno.EINVAL, ]
         argList = []
         for i in range( iSize ) :
