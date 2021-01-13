@@ -4,7 +4,7 @@ import numpy as np
 import threading as tr
 from rpcfrmwrk import *
 
-sys.path.insert(0, '../')
+sys.path.insert(0, '../../')
 from proxy import PyRpcContext, PyRpcProxy
 
 class CKeepAliveClient:

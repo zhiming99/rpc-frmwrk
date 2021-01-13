@@ -3,16 +3,16 @@ import time
 import numpy as np
 from rpcfrmwrk import *
 
-sys.path.insert(0, '../')
+sys.path.insert(0, '../../')
 from proxy import PyRpcContext, PyRpcServer
 
-#1. define the interface the CEchoServer provides
-class CEchoServer:
+#1. define the interface the CPauseResumeServer provides
+class CPauseResumeServer:
     """Mandatory class member to define the
     interface name, which will be used to invoke
     the event handler if any
     """
-    ifName = "CEchoServer"
+    ifName = "CPauseResumeServer"
 
     '''the server side implementation of the
     interface method share the same parameter
@@ -48,39 +48,68 @@ class CEchoServer:
         return listResp
 
     #return sum of i1+i2
-    def Echo2( self, callback, i1, i2 ):
+    def EchoMany( self,
+        callback, i1, i2, i3, i4, i5, strText ) :
         listResp = [ 0 ]
-        result = np.int32( i1 ) + np.float64( i2 )
-        listParams = [  result ]
+        listParams = [
+            np.int32( i1 + 1 ),
+            np.int16( i2 + 1 ),
+            np.int64( i3 + 1 ),
+            np.float32( i4 + 1 ),
+            np.float64( i5 + 1 ),
+            strText + " 2" ]
         listResp.append( listParams )
         return listResp
 
-    def EchoCfgCb( self, context ) :
-        self.OnServiceComplete( context[ 0 ],
-            0, *context[ 1: ] )
-
-    ''' this method demonstrates a request
-    completed asynchronously'''
-    def EchoCfg( self, callback, iCount, pObj ):
+    def LongWait( self, callback, strText ) :
         #schedule a timer to call EchoCfgCb in
         #2 seconds
-        context = [ callback, iCount, pObj ]
-        ret = self.oInst.AddTimer(
-            np.int32( 2 ),
-            CEchoServer.EchoCfgCb,
+        context = [ callback, strText ]
+        ret = self.AddTimer( 20,
+            CPauseResumeServer.LongWaitCb,
             context )
         if ret[ 0 ] < 0 :
             return [ ret[ 0 ],  ]
+
+        timerObj = ret[ 1 ]
+
+        # Make sure the timerObj be freed if the
+        # request is canceled or completed by
+        # other events
+        self.InstallCompNotify( callback,
+            CPauseResumeServer.LongWaitCleanup,
+            timerObj )
         listResp = [ 65537, ]
         return listResp
+
+    def LongWaitCleanup( self, ret, timerObj ) :
+        self.DisableTimer( timerObj )
+        print( "remove the timer",
+            "at user's request" );
+        return
+
+    '''
+    Method: LongWaitCb
+    Description: the callback of `LongWait'
+    request. It will be called only if the request
+    succeeds. In this test case, the request will
+    be canceled, so no chance to go to here.
+    Return Value: none
+    '''
+    def LongWaitCb( self, context ) :
+        callback = context[ 0 ]
+        strText = context[ 1 ] + " 2"
+        self.OnServiceComplete(
+            callback, 0, strText );
+        return
 
 #2. aggregrate the interface class and the PyRpcProxy
 # class by CEchoProxy to pickup the python-cpp
 # interaction support
 
-class CEchoSvrObj( CEchoServer, PyRpcServer ):
+class CPrSvrObj( CPauseResumeServer, PyRpcServer ):
     def __init__( self, pIoMgr, strDesc, strObjName ) :
-        super( CEchoServer, self ).__init__(
+        super( CPauseResumeServer, self ).__init__(
             pIoMgr, strDesc, strObjName )
 
 def test_main() : 
@@ -88,21 +117,29 @@ def test_main() :
     oContext = PyRpcContext( "PyRpcServer" );
     with oContext :
         print( "start to work here..." )
-        oServer = CEchoSvrObj( oContext.pIoMgr,
-            "../../test/debug64/echodesc.json",
-            "CEchoServer" );
+        oServer = CPrSvrObj( oContext.pIoMgr,
+            "../../test/debug64/prdesc.json",
+            "CPauseResumeServer" );
 
         ret = oServer.GetError() 
         if ret < 0 :
+            print( "error start server..." )
             return ret
 
         with oServer :
             #keep waiting for server event,
             #till disconnection occurs
-            while ( cpp.stateConnected ==
-                oServer.oInst.GetState() ):
-                time.sleep( 1 )
+            while True :
+                ret = oServer.oInst.GetState()
+                if ( ret == cpp.stateConnected or
+                    ret == cpp.statePaused or 
+                    ret == cpp.stateRecovery ) :
+                    time.sleep( 1 )
+                    continue
+                break
+
     return ret 
 
 ret = test_main()
 quit( ret )
+

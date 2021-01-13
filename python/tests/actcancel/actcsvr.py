@@ -4,7 +4,7 @@ import numpy as np
 
 from rpcfrmwrk import *
 
-sys.path.insert(0, '../')
+sys.path.insert(0, '../../')
 from proxy import PyRpcContext, PyRpcServer
 
 class CActcServer:
