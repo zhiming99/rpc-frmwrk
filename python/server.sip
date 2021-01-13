@@ -528,13 +528,11 @@ class CPythonServer :
         const std::string& strDest,
         PyObject* pListArgs );
     %MethodCode
-        Py_BEGIN_ALLOW_THREADS;
         CPythonServerImpl* pImpl =
         static_cast< CPythonServerImpl* >
             ( sipCpp );
         sipRes = pImpl->SendEvent(
             a0, *a1, *a2, *a3, a4 );
-        Py_END_ALLOW_THREADS;
     %End
     bool IsServer();
     %MethodCode

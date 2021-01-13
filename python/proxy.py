@@ -610,5 +610,6 @@ class PyRpcServer( PyRpcServices ) :
     '''
     def SendEvent( self, callback,
         ifName, evtName, destName, *args ) :
+        evtName = "UserEvent_" + evtName
         return self.oInst.SendEvent( callback,
-            ifName, evtName, destName, *args )
+            ifName, evtName, destName, [ *args ] )
