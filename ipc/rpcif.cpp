@@ -4522,9 +4522,47 @@ gint32 CRpcServices::LoadObjDesc(
             }
             else
             {
+                // allow each interface to have
+                // its own destination
+                std::string strRmtModName;
+                std::string strRmtObjName;
+                std::string strNewObjPath;
+                std::string strRmtSvrName;
+
+                if( oIfDesc.isMember( JSON_ATTR_RMTMODNAME ) &&
+                    oIfDesc[ JSON_ATTR_RMTMODNAME ].isString() )
+                {
+                    strRmtModName = 
+                        oIfDesc[ JSON_ATTR_RMTMODNAME ].asString();
+                }
+
+                if( oIfDesc.isMember( JSON_ATTR_RMTOBJNAME ) &&
+                    oIfDesc[ JSON_ATTR_RMTOBJNAME ].isString() )
+                {
+                    strRmtObjName =
+                        oIfDesc[ JSON_ATTR_RMTOBJNAME ].asString();
+                }
+
                 // this will be required by the 
                 // CRpcPdoPort::SetupDBusSetting
-                oMatch.CopyProp( propDestDBusName, pCfg );
+                if( strRmtObjName.empty() || strRmtModName.empty() )
+                {
+                    oMatch.CopyProp( propDestDBusName, pCfg );
+                }
+                else
+                {
+                    strNewObjPath = DBUS_OBJ_PATH(
+                        strRmtModName, strRmtObjName );
+
+                    strRmtSvrName = DBUS_DESTINATION2(
+                        strRmtModName, strRmtObjName );
+
+                    oMatch.SetStrProp(
+                        propDestDBusName, strRmtSvrName );
+
+                    oMatch.SetStrProp(
+                        propObjPath, strNewObjPath );
+                }
             }
 
             ( *pObjVec )().push_back( pMatch );
@@ -6822,6 +6860,7 @@ gint32 CInterfaceServer::UserCancelRequest(
 
         CfgPtr pResp;
         CIfInvokeMethodTask* pInvTask = pTask;
+        gint32 iRet = ERROR_USER_CANCEL;
 
         if( pInvTask == nullptr )
         {
@@ -6870,7 +6909,7 @@ gint32 CInterfaceServer::UserCancelRequest(
                     DBUS_MESSAGE_TYPE_METHOD_RETURN |
                     CF_NON_DBUS );
 
-                oResp.SetReturnValue( -ECANCELED );
+                oResp.SetReturnValue( iRet );
                 pResp = oResp.GetCfg();
             }
             else
@@ -6892,7 +6931,7 @@ gint32 CInterfaceServer::UserCancelRequest(
                 oResp.SetCallFlags( CF_ASYNC_CALL |
                     DBUS_MESSAGE_TYPE_METHOD_RETURN );
 
-                oResp.SetReturnValue( -ECANCELED );
+                oResp.SetReturnValue( iRet );
                 pResp = oResp.GetCfg();
             }
 
@@ -6913,8 +6952,8 @@ gint32 CInterfaceServer::UserCancelRequest(
                 ret = ERROR_FAIL;
                 break;
             }
-            pInvTask->OnEvent( eventUserCancel,
-                ERROR_USER_CANCEL, 0, 0 );
+            pInvTask->OnEvent(
+                eventUserCancel, iRet, 0, 0 );
 
             DebugPrint( 0,
                 "Inv Task Canceled, 0x%llx",

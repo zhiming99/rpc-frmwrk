@@ -4,7 +4,7 @@ import numpy as np
 import threading as tr
 from rpcfrmwrk import *
 
-sys.path.insert(0, '../')
+sys.path.insert(0, '../../')
 from proxy import PyRpcContext, PyRpcProxy
 
 class CKeepAliveClient:
@@ -79,7 +79,7 @@ def test_main() :
     with oContext :
         print( "start to work here..." )
         oProxy = CKeepAliveProxy( oContext.pIoMgr,
-            "../../test/debug64/kadesc.json",
+            "../../../test/debug64/kadesc.json",
             "CKeepAliveServer" );
 
         ret = oProxy.GetError() 

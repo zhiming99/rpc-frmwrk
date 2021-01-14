@@ -688,14 +688,15 @@ gint32 CIfRetryTask::Process( guint32 dwContext )
         case eventTimeoutCancel:
             {   
                 OnCancel( iEvent );
-                CancelTaskChain( dwContext );
                 ret = ERROR_TIMEOUT;
+                CancelTaskChain( dwContext, ret );
                 break;
             }
         case eventCancelTask:
             {
                 ret = OnCancel( iEvent );
-                CancelTaskChain( dwContext );
+                CancelTaskChain(
+                    dwContext, ERROR_CANCEL );
                 if( ret != STATUS_PENDING )
                     ret = ERROR_CANCEL;
                 break;
@@ -703,8 +704,8 @@ gint32 CIfRetryTask::Process( guint32 dwContext )
         case eventUserCancel:
             {
                 OnCancel( iEvent );
-                CancelTaskChain( dwContext );
                 ret = ERROR_USER_CANCEL;
+                CancelTaskChain( dwContext, ret );
                 break;
             }
         default:
@@ -895,8 +896,7 @@ gint32 CIfRetryTask::SetClientNotify(
     if( pCallback == nullptr )
         return -EINVAL;
     ObjPtr pTask = pCallback;
-    CCfgOpener oParams(
-        ( IConfigDb* )GetConfig() );
+    CCfgOpenerObj oParams( this );
     oParams.SetBoolProp( propNotifyClient, true );
     oParams.SetObjPtr( propEventSink, pTask );
 
@@ -969,11 +969,14 @@ TaskletPtr CIfRetryTask::GetEndFwrdTask()
 }
 
 gint32 CIfRetryTask::CancelTaskChain(
-    guint32 dwContext )
+    guint32 dwContext, gint32 iError )
 {
     TaskletPtr pTask = GetEndFwrdTask();
     if( pTask.IsEmpty() )
-        return 0;
+        return -EINVAL;
+
+    if( pTask->GetObjId() == GetObjId() )
+        return -EINVAL;
 
     CCfgOpener oCfg(
         ( IConfigDb* )GetConfig() );
@@ -981,7 +984,7 @@ gint32 CIfRetryTask::CancelTaskChain(
     CIoManager* pMgr = nullptr;
     gint32 ret = GET_IOMGR( oCfg, pMgr );
     if( ERROR( ret ) )
-        return 0;
+        return -EINVAL;
 
     EnumClsid iClsid = pTask->GetClsid();
     const char* pszClass =
@@ -990,11 +993,15 @@ gint32 CIfRetryTask::CancelTaskChain(
     DebugPrint( dwContext, "scheduled to "
         "cancel task %s...", pszClass );
 
+    if( dwContext == eventUserCancel ||
+        dwContext == eventTimeoutCancel )
+        dwContext = eventTaskComp;
+
     return DEFER_CALL(
         pMgr, ObjPtr( pTask ),
         &IEventSink::OnEvent,
         ( EnumEventId )dwContext,
-        0, 0, nullptr );
+        iError, 0, nullptr );
 }
 
 CIfEnableEventTask::CIfEnableEventTask(
@@ -4464,7 +4471,7 @@ gint32 CIfInvokeMethodTask::OnTaskComplete(
 
     }while( 0 );
 
-    return 0;
+    return iRetVal;
 }
 
 gint32 CIfInvokeMethodTask::OnComplete(
@@ -5522,7 +5529,8 @@ gint32 CIfCallbackInterceptor::OnComplete(
 }
 
 gint32 CIfInterceptTaskProxy::EnableTimer(
-    guint32 dwTimeoutSec )
+    guint32 dwTimeoutSec,
+    EnumEventId timerEvent  )
 {
     gint32 ret = 0;
     do{
@@ -5551,13 +5559,14 @@ gint32 CIfInterceptTaskProxy::EnableTimer(
                 break;
         }
 
+        CStdRTMutex oTaskLock( GetLock() );
         CUtilities& oUtils = pMgr->GetUtils();
         CTimerService& oTimerSvc =
             oUtils.GetTimerSvc();
 
         ret = oTimerSvc.AddTimer(
             dwTimeoutSec, this, 
-            ( guint32 )eventTimeoutCancel );
+            ( guint32 )timerEvent );
 
         if( ret > 0 )
         {
@@ -5574,6 +5583,7 @@ gint32 CIfInterceptTaskProxy::DisableTimer()
 {
     gint32 ret = 0;
     do{
+        CStdRTMutex oTaskLock( GetLock() );
         if( m_iTimeoutId == 0 )
             break;
 

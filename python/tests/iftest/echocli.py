@@ -1,8 +1,9 @@
 import sys
+import errno
 import numpy as np
 from rpcfrmwrk import *
 
-sys.path.insert(0, '../')
+sys.path.insert(0, '../../')
 from proxy import PyRpcContext, PyRpcProxy
 
 #1. define the interface the CEchoServer provides
@@ -16,7 +17,14 @@ class CEchoClient:
     '''all the methods have the similiar
     #implementation, pass `self.sendRequest' with
     the interface name, method name and all the
-    input parameters '''
+    input parameters.
+
+    the response from the server is a two-element
+    list, the first is an error code, and the
+    second is a list of reponse parameters if the
+    error code is STATUS_SUCCESS. The content of
+    the list depends on the interface definition.
+    '''
 
     def Echo(self, text ):
         return self.sendRequest(
@@ -59,9 +67,11 @@ def HandleResp( resp, hint ) :
         print( "error occured in ", hint, ret );
     elif resp[ 0 ] < 0:
         print( "error occured from peer", resp[ 0 ] )
-        ret = -errno.ENOENT;
+        ret = -errno.ENOENT
     else :
-        respArgs = resp[ 1 ];
+        respArgs = resp[ 1 ]
+        if respArgs is None :
+            return -errno.EFAULT
         if hint != "EchoCfg" :
             print( "response is \"",
                 respArgs[ 0 ],"\"" )
@@ -84,7 +94,7 @@ def test_main() :
     with oContext :
         print( "start to work here..." )
         oProxy = CEchoProxy( oContext.pIoMgr,
-            "../../test/debug64/echodesc.json",
+            "../../../test/debug64/echodesc.json",
             "CEchoServer" );
 
         ret = oProxy.GetError() 
@@ -92,7 +102,7 @@ def test_main() :
             return ret
 
         with oProxy :
-            for i in range( 10 ) :
+            for i in range( 100 ) :
                 #Echo a plain text
                 resp = oProxy.Echo( "Are you ok" );
                 ret = HandleResp( resp, "Echo" );

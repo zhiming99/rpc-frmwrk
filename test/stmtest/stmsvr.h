@@ -195,4 +195,5 @@ DECLARE_AGGREGATED_SERVER(
 
 #ifdef Py_PYTHON_H
 typedef CStreamingClient CPythonProxy;
+typedef CStreamingServer CPythonServer;
 #endif

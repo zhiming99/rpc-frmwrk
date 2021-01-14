@@ -4,7 +4,7 @@ import numpy as np
 import threading as tr
 from rpcfrmwrk import *
 
-sys.path.insert(0, '../')
+sys.path.insert(0, '../../')
 from proxy import PyRpcContext, PyRpcProxy
 
 #1. define the interface the CEchoServer provides
@@ -156,7 +156,7 @@ def test_main() :
         it'''
         print( "start to work here..." )
         oProxy = CEchoProxyAsync( oContext.pIoMgr,
-            "../../test/debug64/echodesc.json",
+            "../../../test/debug64/echodesc.json",
             "CEchoServer" );
 
         ret = oProxy.GetError() 

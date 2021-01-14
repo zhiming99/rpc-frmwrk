@@ -94,7 +94,9 @@ class CIfRetryTask
     TaskletPtr GetFwrdTask() const;
     gint32 ClearFwrdTask();
     TaskletPtr GetEndFwrdTask();
-    gint32 CancelTaskChain( guint32 dwContest );
+    gint32 CancelTaskChain(
+        guint32 dwContest,
+        gint32 iError = -ECANCELED );
 
     public:
     typedef CThreadSafeTask super;
@@ -784,7 +786,11 @@ class CIfInterceptTaskProxy :
     ~CIfInterceptTaskProxy()
     { DisableTimer(); }
 
-    gint32 EnableTimer( guint32 dwTimeoutSec );
+    gint32 EnableTimer(
+        guint32 dwTimeoutSec,
+        EnumEventId timerEvt =
+            eventTimeoutCancel );
+
     gint32 DisableTimer();
 
     // set the task to intercept

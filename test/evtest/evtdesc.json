@@ -26,7 +26,6 @@
                 "Realm" : "rpcfrmwrk.org",
                 "SignMessage" : "true"
             },
-            "RouterPath" : "/rasp3",
             "Interfaces" :
             [
                 {

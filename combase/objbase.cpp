@@ -430,7 +430,7 @@ struct cmp_obj
 };
 stdmutex g_oObjListLock;
 std::set< CObjBase*, cmp_obj > g_vecObjs;
-void DumpObjs()
+void DumpObjs( bool bAll = false)
 {
     for( auto pObj : g_vecObjs )
     {
@@ -439,7 +439,8 @@ void DumpObjs()
         {
             if( pObj->GetClsid() == clsid( CBuffer ) ||
                 pObj->GetClsid() == clsid( CConfigDb ) )
-                continue;
+                if( !bAll )
+                    continue;
             pObj->Dump( strObj );
             printf( "%s\n", strObj.c_str() );
         }

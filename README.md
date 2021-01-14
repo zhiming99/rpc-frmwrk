@@ -37,13 +37,18 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 
 #### Todo:
 1. Python support
-2. Examples and Tutorials
-3. GUI for configuration and monitoring
-4. Node backup/Load banlance
-5. Java support
-6. Access Control
+2. A proxy/server generator with IDL or google's proto file
+3. Examples and Tutorials
+4. GUI for configuration and monitoring
+5. Node backup/Load banlance
+6. Java support
+7. Access Control
 
 ---
+[`Fri Jan 08 2021 10:17:44 AM Beijing`]   
+1. Forked the `server.sip` and `PyRpcServer` from `proxy.sip` and `PyRpcProxy`. 
+2. Python version of test case `sftest` will be added after the python server support is complete.
+
 [`Sun Dec 19 2020 12:06:37 AM Beijing`]   
 1. The latest changes in CUnixSockStream backed out `sending Progress` when the remote peer has sent out enough messages to fill up the local receiving window. And instead, `sending tokProgress` is performed from `CStreamSyncBase`'s `CIfReadWriteStmTask`, at the very moment the associated pending message is out queue and consumed. This approach prevents the potential stall of stream due to receiving window congestion. 
 

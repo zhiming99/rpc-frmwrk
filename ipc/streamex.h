@@ -222,7 +222,7 @@ class CIfStmReadWriteTask :
     }
 
     gint32 ReadStreamAsync(
-        IEventSink* pCallback, BufPtr pBuf )
+        IEventSink* pCallback, BufPtr& pBuf )
     {
         return ReadStreamInternal(
             pCallback, pBuf, false );
@@ -757,7 +757,7 @@ struct CStreamSyncBase :
             RunManagedTask( pTask, bRoot );
         if( ret == STATUS_PENDING )
             ret = 0;
-        return 0;
+        return ret;
     }
 
     gint32 PostLoopEventWrapper( CBuffer* pBuf )
@@ -931,6 +931,29 @@ struct CStreamSyncBase :
             hChannel, pCallback );
     }
 
+    /**
+    * @name OnStreamReady
+    * event when the stream is fully initialized
+    * by the CStreamSyncBase, that is, the
+    * read/write tasks are running. if the loop is
+    * started, this event won't be sent, since the
+    * loop has its own start event
+    * @{ */
+    /**  @} */
+    
+    virtual gint32 OnStreamReady(
+        HANDLE hStream )
+    { return 0; }
+    /**
+    * @name OnConnected
+    * event when a new stream is setup between the
+    * proxy and the server. At this moment, both
+    * ends can send/receive. But for
+    * CStreamSyncBase, there remains some more
+    * initialization work to do.
+    * @{ */
+    /**  @} */
+
     gint32 OnConnected( HANDLE hCfg )
     {
         WORKER_ELEM oWorker;
@@ -1037,7 +1060,7 @@ struct CStreamSyncBase :
             if( ERROR( ret ) )
                 break;
      
-            pTaskGrp->SetRelation( logicNONE );
+            pTaskGrp->SetRelation( logicAND );
             TaskletPtr pStartReader;
             ret = DEFER_IFCALLEX_NOSCHED(
                 pStartReader,
@@ -1099,7 +1122,21 @@ struct CStreamSyncBase :
 
                 pTaskGrp->AppendTask( pEnableRead );
             }
+            else
+            {
 
+                TaskletPtr pReadyNotify;
+                ret = DEFER_IFCALLEX_NOSCHED( 
+                    pReadyNotify,
+                    ObjPtr( this ),
+                    &CStreamSyncBase::OnStreamReady,
+                    hChannel );
+                if( ERROR( ret ) )
+                    break;
+                pTaskGrp->AppendTask( pReadyNotify );
+            }
+
+            pTaskGrp->AppendTask( pStartWriter );
             // prevent the OnRecvData_Loop to be
             // the first event
             TaskletPtr pSeqTasks = pTaskGrp;
@@ -1253,6 +1290,29 @@ struct CStreamSyncBase :
 
         pCtx = itr->second.pContext;
         return 0;
+    }
+
+    gint32 GetPeerObjId( HANDLE hChannel,
+        guint64& qwPeerObjId )
+    {
+        // a place to store channel specific data.
+        if( hChannel == INVALID_HANDLE )
+            return -EINVAL;
+
+        if( this->IsServer() )
+            return -ENOTSUP;
+
+        CStdRMutex oIfLock( this->GetLock() );
+        typename WORKER_MAP::iterator itr = 
+            m_mapStmWorkers.find( hChannel );
+
+        if( itr == m_mapStmWorkers.end() )
+            return -ENOENT;
+
+        IConfigDb* pCtx = itr->second.pContext;
+        CCfgOpener oCtx( pCtx );
+        return oCtx.GetQwordProp(
+            propPeerObjId, qwPeerObjId );
     }
 
     gint32 IsReadNotifyPaused(

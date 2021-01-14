@@ -132,13 +132,13 @@ class PyRpcContext :
         print( "proxy.py: about to quit..." )
         self.CleanUp();
 
-    def __init__( self ) :
-        pass
+    def __init__( self, strModName= "PyRpcProxy" ) :
+        self.strModName = strModName
 
-    def Start( self ) :
+    def Start( self, strModName="PyRpcProxy" ) :
         ret = 0
         print( "entering..." );
-        self.pIoMgr = self.CreateIoMgr( "PyRpcProxy" );
+        self.pIoMgr = self.CreateIoMgr( strModName );
         if self.pIoMgr is not None :
             ret = self.StartIoMgr( self.pIoMgr );
             if ret > 0 :
@@ -154,12 +154,12 @@ class PyRpcContext :
         return self.DestroyRpcCtx();
 
     def __enter__( self ) :
-        self.Start()
+        self.Start( self.strModName )
 
     def __exit__( self, type, val, traceback ) :
         self.Stop();
 
-class PyRpcProxy :
+class PyRpcServices :
     def GetError( self ) :
         if self.iError is None :
             return 0
@@ -167,28 +167,6 @@ class PyRpcProxy :
 
     def SetError( self, iErr ) :
         self.iError = iErr;
-
-    def Common_Proxy( self, ifName, methodName, argsList ) :
-        pass
-
-    def __init__( self, pIoMgr, strDesc, strSvrObj ) :
-        self.pIoMgr = pIoMgr;
-        self.iError = 0
-        oParams = cpp.CParamList();
-        oObj = CreateProxy( pIoMgr,
-            strDesc, strSvrObj,
-            oParams.GetCfgAsObj() );
-        if oObj is None or oObj.IsEmpty() :
-            print( "failed to create proxy..." )
-            self.SetError( -errno.EFAULT );
-            return
-
-        oInst = CastToProxy( oObj );
-        if oInst is None :
-            print( "failed to create proxy 2..." )
-        self.oInst = oInst;
-        self.oObj = oObj;
-        return
 
     def Start( self ) :
         self.oInst.SetPyHost( self );
@@ -211,6 +189,333 @@ class PyRpcProxy :
 
     def __exit__( self, type, val, traceback ) :
         self.Stop()
+
+    def TimerCallback( self, callback, context ) :
+        sig =signature( callback )
+        iCount = len( sig.parameters );
+        if iCount != 2 :
+            print( "TimerCallback: params number",
+                "does not match,", iCount )
+            return
+        ret = callback( self, context )
+        return
+
+    ''' create a timer object, which is due in
+    timeoutSec seconds. And the `callback' will be
+    called with the parameter context.
+
+    it returns a two element list, the first
+    is the error code, and the second is a
+    timerObj if the error code is
+    STATUS_SUCCESS.
+    '''
+    def AddTimer( self,
+        timeoutSec, callback, context ) :
+        return self.oInst.AddTimer(
+            np.uint32( timeoutSec ),
+            callback, context )
+
+    '''Remove a previously scheduled timer.
+    '''
+    def DisableTimer( self, timerObj ) :
+        return self.oInst.DisableTimer(
+            timerObj );
+
+    '''attach a complete notification to the task
+    to complete. When the task is completed or
+    canceled, this notification will be triggered.
+    the notification has the following layout
+    callback( self, ret, *listArgs ), as is the
+    same as the response callback. The `ret' is
+    the error code of the task.
+    '''
+    def InstallCompNotify(
+        self, task, callback, *listArgs ):
+        listResp = [ 0, [ *listArgs ] ]
+        self.oInst.InstallCompNotify(
+            task, callback, listResp )
+
+    def HandleAsyncResp( self, callback, listResp ) :
+        listArgs = []
+        sig =signature( callback )
+        iArgNum = len( sig.parameters ) - 2
+        for i in range( iArgNum ):
+            listArgs.append( None );
+
+        if listResp is None :
+            print( "HandleAsyncResp: bad response" )
+            callback( self, -cpp.EBADMSG, *listArgs )
+            return
+
+        if iArgNum < 0 :
+            print( "HandleAsyncResp: bad callback")
+            callback( self, -cpp.EBADMSG, *listArgs )
+            return
+
+        ret = listResp[ 0 ];
+        if len( listResp ) <= 1 :
+            callback( self, ret, *listArgs )
+        elif isinstance( listResp[ 1 ], list ) :
+            callback( self, ret, *listResp[ 1 ] )
+        else :
+            callback( self, ret, *listArgs )
+        return
+
+    def GetObjType( self, pObj ) :
+        return GetObjType( pObj )
+
+    def GetNumpyValue( typeid, val ) :
+        return GetNpValue( typeid, val )
+
+    def StartStream( self, pDesc ) :
+        return self.oInst.StartStream( pDesc )
+
+    def CloseStream( self, hChannel ) :
+        return self.oInst.CloseStream( hChannel )
+
+    def WriteStream( self, hChannel, pBuf ) :
+        return self.oInst.WriteStream( hChannel, pBuf )
+
+    def WriteStreamAsync( self, hChannel, pBuf, callback ) :
+        return self.oInst.WriteStreamAsync(
+            hChannel, pBuf, callback )
+
+    '''ReadStream to read `size' bytes from the
+    stream `hChannel'.  If `size' is zero, the
+    number of bytes read depends on the first
+    message received. If you are not sure what
+    will come from the stream, you are recommended
+    to use zero size.
+
+    The return value is a list of 3 elements,
+    element 0 is the error code. If it is
+    negative, no data is returned. If it is
+    STATUS_SUCCESS, element 1 is a bytearray
+    object read from the stream. element 2 is a
+    hidden object to keep element 1 valid, just
+    leave it alone.
+    '''
+    def ReadStream( self, hChannel, size = 0 ) :
+        tupRet = self.oInst.ReadStream( hChannel, size )
+        ret = tupRet[ 0 ]
+        if ret < 0 :
+            return tupRet;
+        #elem 1 is a BufPtr object on success
+        pBuf = tupRet[ 1 ]
+        #transfer the content to a bytes object
+        pBytes = pBuf.TransToBytes();
+        if pBytes == None :
+            return ( -errno.ENODATA, )
+        return ( 0, pBytes, pBuf )
+
+    '''
+    ReadStreamAsync to read `size' bytes from the
+    stream `hChannel', and give control to
+    callback after the data is read from the
+    stream. If `size' is zero, the number of bytes
+    read depends on the first message in the
+    pending message queue. If you are not sure
+    what will come from the stream, you are
+    recommended to use zero size.
+
+    The return value is a list of 3 elements,
+    element 0 is the error code. If it is
+    STATUS_PENDING, there is no data in the
+    pending message queue, and wait till the
+    callback is called in the future time.
+
+    If the return value is STATUS_SUCCESS, element
+    1 holds a bytearray object of the bytes read
+    from the stream. And element 2 is a hidden
+    object, that you don't want to access.
+    Actually it controls the life time of element
+    1, so make sure not to access elemen 1 if
+    element2 is no longer valid.  '''
+
+    def ReadStreamAsync( self, hChannel, callback, size = 0 ) :
+        return self.oInst.ReadStreamAsync(
+            hChannel, callback, size )
+
+    '''Convert the arguments in the `pObj' c++
+    object to a list of python object.
+
+    The return value is a two element list. The
+    first element is the error code and the second
+    element is a list of python object. The second
+    element should be None if error occurs during
+    the conversion.  '''
+
+    def ArgObjToList( self, pObj ) :
+        pCfg = cpp.CastToCfg( pObj )
+        if pCfg is None :
+            return [ -errno.EFAULT, ]
+        oParams = cpp.CParamList( pCfg )
+        ret = oParams.GetSize()
+        if ret[ 0 ] < 0 :
+            resp[ 0 ] = ret[ 0 ];
+        iSize = ret[ 1 ]
+        if iSize < 0 :
+            return [ -errno.EINVAL, ]
+        argList = []
+        for i in range( iSize ) :
+            ret = oParams.GetPropertyType( i )
+            if ret[ 0 ] < 0 :
+                break
+            iType = ret[ 1 ];
+            if iType == cpp.typeUInt32 :
+                ret = oParams.GetIntProp( i )
+                if ret[ 0 ] < 0 :
+                    break
+                val = ret[ 1 ]
+            elif iType == cpp.typeDouble :
+                ret = oParams.GetDoubleProp( i )
+                if ret[ 0 ] < 0 :
+                    break
+                val = ret[ 1 ]
+
+            elif iType == cpp.typeByte :
+                ret = oParams.GetByteProp( i )
+                if ret[ 0 ] < 0 :
+                    break
+                val = ret[ 1 ]
+
+            elif iType == cpp.typeUInt16 :
+                ret = oParams.GetShortProp( i )
+                if ret[ 0 ] < 0 :
+                    break
+                val = ret[ 1 ]
+
+            elif iType == cpp.typeUInt64 :
+                ret = oParams.GetQwordProp( i )
+                if ret[ 0 ] < 0 :
+                    break
+                val = ret[ 1 ]
+
+            elif iType == cpp.typeFloat :
+                ret = oParams.GetFloatProp( i )
+                if ret[ 0 ] < 0 :
+                    break
+                val = ret[ 1 ]
+
+            elif iType == cpp.typeString :
+                ret = oParams.GetStrProp( i )
+                if ret[ 0 ] < 0 :
+                    break
+                val = ret[ 1 ]
+
+            elif iType == cpp.typeObj :
+                ret = oParams.GetObjPtr( i )
+                if ret[ 0 ] < 0 :
+                    break
+                val = ret[ 1 ]
+                if val.IsEmpty() :
+                    ret = [ -errno.EFAULT, ]
+                    break
+            elif iType == cpp.typeByteArr :
+                ret = pCfg.GetProperty( i );
+                if ret[ 0 ] < 0 :
+                    break
+                val = ret[ 1 ]
+                if val.IsEmpty() :
+                    ret = [ -errno.EFAULT, ]
+                    break
+                pyBuf = bytearray( val.size() );
+                iRet = val.CopyToPython( pyBuf );
+                if iRet < 0 : 
+                    ret = [ iRet, ]
+                    break
+
+                val = pyBuf;
+            argList.append( val )
+
+        if ret[ 0 ] < 0 :
+            return ret;
+
+        return [ 0, argList ]
+
+    #for event handler 
+    def InvokeMethod(
+        self, callback, ifName, methodName, cppargs ) :
+        resp = [ 0 ];
+        while True :
+
+            ret = self.ArgObjToList( cppargs )
+            if ret[ 0 ] < 0 :
+                resp[ 0 ] = ret;
+                break
+
+            argList = ret[ 1 ]
+            found = False
+            for iftype in type(self).__bases__ :
+                if not hasattr( iftype, "ifName" ) :
+                    prevType = iftype
+                    continue;
+                if iftype.ifName != ifName :
+                    prevType = iftype
+                    continue;
+                found = True
+                typeFound = iftype;
+                break
+            if not found :
+                resp[ 0 ] = -errno.ENOTSUP;
+                break
+
+            isServer = self.oInst.IsServer();
+            nameComps = methodName.split( '_' )
+            if not isServer :
+                if nameComps[ 0 ] != "UserEvent" :
+                    resp[ 0 ] = -errno.EINVAL;
+                    break
+            else :
+                if nameComps[ 0 ] != "UserMethod" :
+                    resp[ 0 ] = -errno.EINVAL;
+                    break
+
+            found = False
+            oMembers = inspect.getmembers( typeFound,
+                predicate=inspect.isfunction);
+            for oMethod in oMembers :
+                if nameComps[ 1 ] != oMethod[ 0 ]: 
+                    continue;
+                targetMethod = oMethod[ 1 ];
+                found = True;               
+                break
+
+            if not found :
+                resp[ 0 ] = -errno.EINVAL;
+                break
+
+            if targetMethod is None :
+                resp[ 0 ] = -error.EFAULT;
+                break
+
+            resp = targetMethod( self, callback, *argList )
+
+            break #while True
+
+        return resp
+        
+    
+class PyRpcProxy( PyRpcServices ) :
+
+    def __init__( self, pIoMgr, strDesc, strSvrObj ) :
+        self.pIoMgr = pIoMgr;
+        self.iError = 0
+        oParams = cpp.CParamList();
+        oObj = CreateProxy( pIoMgr,
+            strDesc, strSvrObj,
+            oParams.GetCfgAsObj() );
+        if oObj is None or oObj.IsEmpty() :
+            print( "failed to create proxy..." )
+            self.SetError( -errno.EFAULT );
+            return
+
+        oInst = CastToProxy( oObj );
+        if oInst is None :
+            print( "failed to create proxy 2..." )
+        self.oInst = oInst;
+        self.oObj = oObj;
+        return
 
     def sendRequest( *args ) :
         strIfName = args[ 1 ]
@@ -243,217 +548,65 @@ class PyRpcProxy :
             resp[ 0 ] = ret
         return resp
 
-    def HandleAsyncResp( self, callback, listResp ) :
-        listArgs = []
-        sig =signature( callback )
-        iArgNum = len( sig.parameters ) - 2
-        for i in range( iArgNum ):
-            listArgs.append( None );
-
-        if listResp is None :
-            print( "HandleAsyncResp: bad response" )
-            callback( self, -cpp.EBADMSG, *listArgs )
-            return
-
-        if iArgNum < 0 :
-            print( "HandleAsyncResp: bad callback")
-            callback( self, -cpp.EBADMSG, *listArgs )
-            return
-
-        ret = listResp[ 0 ];
-        if ret == 0 :
-            listArgs = listResp[ 1 ]
-        callback( self, ret, *listArgs )
-        return
-
     def MakeCallAsync( self, callback, strIfName, strMethod, args, resp ) :
         ret = self.oInst.PyProxyCall(
             callback, strIfName, strMethod, args, resp )
         return ret;
 
-    def GetObjType( self, pObj ) :
-        return GetObjType( pObj )
+class PyRpcServer( PyRpcServices ) :
 
-    def GetNumpyValue( typeid, val ) :
-        return GetNpValue( typeid, val )
+    def __init__( self, pIoMgr, strDesc, strSvrObj ) :
+        self.pIoMgr = pIoMgr;
+        self.iError = 0
+        oParams = cpp.CParamList();
+        oObj = CreateRpcServer( pIoMgr,
+            strDesc, strSvrObj,
+            oParams.GetCfgAsObj() );
+        if oObj is None or oObj.IsEmpty() :
+            print( "failed to create server..." )
+            self.SetError( -errno.EFAULT );
+            return
 
-    def StartStream( self, pDesc ) :
-        return self.oInst.StartStream( pDesc )
+        oInst = CastToServer( oObj );
+        if oInst is None :
+            print( "failed to create server 2..." )
+        self.oInst = oInst;
+        self.oObj = oObj;
+        return
 
-    def CloseStream( self, hChannel ) :
-        return self.oInst.CloseStream( hChannel )
+    def SetChanCtx( self, hChannel, oContext ) :
+        return self.oInst.SetChanCtx(
+            hChannel, oContext );
 
-    def WriteStream( self, hChannel, pBuf ) :
-        return self.oInst.WriteStream( hChannel, pBuf )
+    def GetChanCtx( self, hChannel ) :
+        return self.oInst.GetChanCtx( hChannel );
 
-    def WriteStreamAsync( self, hChannel, pBuf, callback ) :
-        return self.oInst.WriteStreamAsync(
-            hChannel, pBuf, callback )
+    '''callback should be the one passed to the
+    InvokeMethod. This is for asynchronous invoke,
+    that is, the invoke method returns pending and
+    the task will complete later in the future
+    with a call to this method. the callback is
+    the glue between InvokeMethod and
+    OnServiceComplete.
+    '''
+    def OnServiceComplete(
+        self, callback, ret, *args ) :
+        listResp = list( args )
+        return self.oInst.OnServiceComplete(
+            callback, ret, listResp )
 
-    ''' return a bytes object read from the stream
-    the bytes object must be consumed within
-    the lifecycle of pBuf '''
-    def ReadStream( self, hChannel ) :
-        tupRet = self.oInst.ReadStream( hChannel )
-        ret = tupRet[ 0 ]
-        if ret < 0 :
-            return tupRet;
-        #elem 1 is a BufPtr object on success
-        pBuf = tupRet[ 1 ]
-        #transfer the content to a bytes object
-        pBytes = pBuf.TransToBytes();
-        if pBytes == None :
-            return ( -errno.EFAULT, )
-        return ( 0, pBytes, pBuf )
+    def SetResponse(
+        self, callback, ret, *args ) :
+        listResp = list( args )
+        return self.oInst.SetResponse(
+            callback, ret, listResp )
 
-    def ReadStreamAsync( self, hChannel, callback ) :
-        return self.oInst.ReadStreamAsync(
-            hChannel, callback )
-
-    def ArgObjToList( self, pObj ) :
-        pCfg = cpp.CastToCfg( pObj )
-        if pCfg is None :
-            return [ -errno.EFAULT, ]
-        oParams = cpp.CParamList( pCfg )
-        ret = oParams.GetSize()
-        if ret[ 0 ] < 0 :
-            resp[ 0 ] = ret[ 0 ];
-        iSize = ret[ 1 ]
-        if iSize <= 0 :
-            return [ -errno.EINVAL, ]
-        argList = []
-        for i in range( iSize ) :
-            ret = oParams.GetPropertyType( i )
-            if ret[ 0 ] < 0 :
-                break;
-            iType = ret[ 1 ];
-            if iType == cpp.typeUInt32 :
-                ret = oParams.GetIntProp( i )
-                if ret[ 0 ] < 0 :
-                    break;
-                val = ret[ 1 ]
-            elif iType == cpp.typeDouble :
-                ret = oParams.GetDoubleProp( i )
-                if ret[ 0 ] < 0 :
-                    break;
-                val = ret[ 1 ]
-
-            elif iType == cpp.typeByte :
-                ret = oParams.GetByteProp( i )
-                if ret[ 0 ] < 0 :
-                    break;
-                val = ret[ 1 ]
-
-            elif iType == cpp.typeUInt16 :
-                ret = oParams.GetShortProp( i )
-                if ret[ 0 ] < 0 :
-                    break;
-                val = ret[ 1 ]
-
-            elif iType == cpp.typeUInt64 :
-                ret = oParams.GetQwordProp( i )
-                if ret[ 0 ] < 0 :
-                    break;
-                val = ret[ 1 ]
-
-            elif iType == cpp.typeFloat :
-                ret = oParams.GetFloatProp( i )
-                if ret[ 0 ] < 0 :
-                    break;
-                val = ret[ 1 ]
-
-            elif iType == cpp.typeString :
-                ret = oParams.GetStrProp( i )
-                if ret[ 0 ] < 0 :
-                    break;
-                val = ret[ 1 ]
-
-            elif iType == cpp.typeObj :
-                ret = oParams.GetObjPtr( i )
-                if ret[ 0 ] < 0 :
-                    break;
-                val = ret[ 1 ]
-                if val.IsEmpty() :
-                    ret = [ -errno.EFAULT, ]
-                    break
-            elif iType == cpp.typeByteArr :
-                ret = pCfg.GetProperty( i );
-                if ret[ 0 ] < 0 :
-                    break;
-                val = ret[ 1 ]
-                if val.IsEmpty() :
-                    ret = [ -errno.EFAULT, ]
-                    break
-                pyBuf = bytearray( val.size() );
-                ret = val.CopyToPython( pyBuf );
-                if ret < 0 : 
-                    ret = ( ret, )
-                    break;
-
-                val = pyBuf;
-
-            argList.append( val )
-
-        if ret[ 0 ] < 0 :
-            return ret;
-
-        ret = [ 0, argList ]
-        return ret
-
-    #for event handler 
-    def InvokeMethod(
-        self, callback, ifName, methodName, cppargs ) :
-        resp = [ 0 ];
-        while True :
-
-            ret = self.ArgObjToList( cppargs )
-            if ret[ 0 ] < 0 :
-                resp[ 0 ] = ret;
-                break;
-
-            argList = ret[ 1 ]
-            found = False
-            for iftype in type(self).__bases__ :
-                if not hasattr( iftype, "ifName" ) :
-                    prevType = iftype
-                    continue;
-                if iftype.ifName != ifName :
-                    prevType = iftype
-                    continue;
-                found = True
-                typeFound = iftype;
-                break;
-                    
-            if not found :
-                resp[ 0 ] = -errno.EINVAL;
-                break;
-
-            nameComps = methodName.split( '_' )
-            if nameComps[ 0 ] != "UserEvent" :
-                resp[ 0 ] = -errno.EINVAL;
-                break;
-
-            found = False
-            oMembers = inspect.getmembers( typeFound,
-                predicate=inspect.isfunction);
-            for oMethod in oMembers :
-                if nameComps[ 1 ] != oMethod[ 0 ]: 
-                    continue;
-                targetMethod = oMethod[ 1 ];
-                found = True;               
-                break;
-
-            if not found :
-                resp[ 0 ] = -errno.EINVAL;
-                break;
-
-            if targetMethod is None :
-                resp[ 0 ] = -error.EFAULT;
-                break;
-
-            resp = targetMethod( self, callback, *argList )
-
-            break; #while True
-
-        return resp
-        
+    ''' callback can be none if it is not
+    necessary to get notified of the completion.
+    destName can be none if not needed.
+    '''
+    def SendEvent( self, callback,
+        ifName, evtName, destName, *args ) :
+        evtName = "UserEvent_" + evtName
+        return self.oInst.SendEvent( callback,
+            ifName, evtName, destName, [ *args ] )

@@ -209,7 +209,10 @@ namespace cpp
             if( pView == nullptr )
                 sipRes = Py_None;
             else
-                sipRes = PyBytes_FromObject( pView );
+            {
+                sipRes = PyByteArray_FromObject( pView );
+                Py_DECREF( pView );
+            }
         %End
 
         gint32 CopyToPython( PyObject* pPyObj );
@@ -378,6 +381,16 @@ namespace cpp
             guint64& dwVal /Out/ );
         gint32 SetQwordProp( gint32,
             guint64 dwVal );
+
+        gint32 GetDoubleProp( gint32,
+            double& fVal /Out/ );
+        gint32 SetDoubleProp( gint32,
+            double fVal );
+
+        gint32 GetFloatProp( gint32,
+            float& fVal /Out/ );
+        gint32 SetFloatProp( gint32,
+            float fVal );
 
         gint32 GetPointer( gint32,
             cpp::CObjBase*& pObj /Out/ );
@@ -557,6 +570,12 @@ namespace cpp
             Py_END_ALLOW_THREADS;
         %End
 
+        EnumIfState GetState() const;
+    };
+
+    class CInterfaceServer : public cpp::CRpcServices /Abstract/
+    {
+        public:
         EnumIfState GetState() const;
     };
 
