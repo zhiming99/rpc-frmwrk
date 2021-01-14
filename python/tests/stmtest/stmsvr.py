@@ -55,6 +55,7 @@ class CStreamingServer(CEchoServer, PyRpcServer):
             ret = listResp[ 0 ]
             if ret < 0 :
                 print( "Error occurs", ret )
+                break
             elif ret == 65537 :
                 break
             print( "proxy says: ", listResp[ 1 ] )
@@ -79,11 +80,9 @@ class CStreamingServer(CEchoServer, PyRpcServer):
             i += 1
             self.SetCounter( hChannel, i )
             if ret < 0 :
-                print( "WriteAndReceive error...",
-                ret )
+                print( "WriteAndReceive error...", ret )
                 break
             if ret == 65537:
-                print( "WriteAndReceive pending..." )
                 break
             listResp = self.ReadStreamAsync(
                 hChannel,

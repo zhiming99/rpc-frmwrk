@@ -38,11 +38,18 @@ class CPythonServerImpl :
         if( hChannel == INVALID_HANDLE )
             return -EINVAL;
 
+        PyObject* pCtx = GetChanCtx( hChannel );
+        gint32 ret =
+            super::OnStmClosing( hChannel );
+
+        if( pCtx == nullptr )
+            return ret;
+
         PyGILState_STATE gstate;
         gstate = PyGILState_Ensure();
-        RemoveChanCtx( hChannel );
+        Py_DECREF( pCtx );
         PyGILState_Release( gstate );
-        return super::OnStmClosing( hChannel );
+        return ret;
     }
 
     gint32 SendEvent(
