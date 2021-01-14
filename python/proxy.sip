@@ -1112,11 +1112,10 @@ class CPythonInterfBase : public T
  
     PyObject* GetChanCtx( HANDLE hChannel )
     {
-        PyObject* sipRes = nullptr;
+        PyObject* sipRes = Py_None;
         do{
             if( hChannel == INVALID_HANDLE )
                 break;
-            sipRes = nullptr;
             CfgPtr pCtx;
             gint32 ret = this->GetContext(
                 hChannel, pCtx );
@@ -1127,8 +1126,8 @@ class CPythonInterfBase : public T
             ret = oCfg.GetIntPtr( propChanCtx, ptr );
             if( ERROR( ret ) )
                 break;
-
             sipRes = ( PyObject* )ptr;
+            Py_INCREF( sipRes );
 
         }while( 0 );
 
@@ -1142,8 +1141,8 @@ class CPythonInterfBase : public T
         do{
             if( hChannel == INVALID_HANDLE )
                 break;
-            CfgPtr pStmCtx;
 
+            CfgPtr pStmCtx;
             ret = this->GetContext(
                 hChannel, pStmCtx );
 
@@ -1160,11 +1159,14 @@ class CPythonInterfBase : public T
             if( SUCCEEDED( ret ) )
             {
                 PyObject* pOld = ( PyObject* )ptr;
+                if( pOld == pCtx )
+                    break;
                 if( pOld != nullptr &&
                     pOld != Py_None )
                     Py_DECREF( pOld );
                 oCfg.RemoveProperty( propChanCtx );
             }
+            ret = 0;
 
             if( pCtx == nullptr ||
                 pCtx == Py_None )
@@ -1431,6 +1433,12 @@ gint32 CPythonProxyImpl::PyProxyCall(
 
         Py_BLOCK_THREADS;
 
+        if( ret != STATUS_PENDING && !bSync )
+        {
+            Py_DECREF( pCb );
+            Py_DECREF( listResp );
+        }
+
         if( ERROR( ret ) )
             break;
 
@@ -1640,6 +1648,32 @@ class CPythonProxy :
         Py_END_ALLOW_THREADS;
     %End
 
+    gint32 WriteStreamNoWait(
+        HANDLE hChannel, PyObject* pPyBuf );
+    %MethodCode
+    do{
+        CPythonProxyImpl* pImpl = static_cast
+            < CPythonProxyImpl* >( sipCpp );
+
+        if( pImpl == nullptr ) 
+        {
+            sipRes = -EFAULT;
+            break;
+        }
+
+        BufPtr pBuf( true );
+        sipRes = pImpl->ConvertPyObjToBuf(
+            a1, pBuf );
+        if( ERROR( sipRes ) )
+            break;
+
+        Py_BEGIN_ALLOW_THREADS;
+        sipRes = pImpl->WriteStreamNoWait( a0, pBuf );
+        Py_END_ALLOW_THREADS;
+
+    }while( 0 );
+    %End
+
     gint32 WriteStream(
         HANDLE hChannel, PyObject* pPyBuf );
     %MethodCode
@@ -1765,6 +1799,9 @@ class CPythonProxy :
             a0, pBuf, pCtx );
         Py_END_ALLOW_THREADS;
 
+        if( ret != STATUS_PENDING )
+            Py_DECREF( a1 );
+
         if( ret == STATUS_PENDING ||
             ERROR( ret ) )
         {
@@ -1846,6 +1883,11 @@ class CPythonProxy :
         sipRes = pImpl->WriteStreamAsync(
             a0, pBuf, pCtx );
         Py_END_ALLOW_THREADS;
+        if( sipRes != STATUS_PENDING )
+        {
+            Py_DECREF( a1 );
+            Py_DECREF( a2 );
+        }
         break;
 
     }while( 0 );

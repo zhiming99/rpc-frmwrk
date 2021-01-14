@@ -118,7 +118,7 @@ def test_main() :
     with oContext :
         print( "start to work here..." )
         oServer = CPrSvrObj( oContext.pIoMgr,
-            "../../test/debug64/prdesc.json",
+            "../../../test/debug64/prdesc.json",
             "CPauseResumeServer" );
 
         ret = oServer.GetError() 

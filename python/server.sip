@@ -12,17 +12,24 @@ class CPythonServerImpl :
     gint32 OnStreamReady( HANDLE hChannel )
     {
         gint32 ret = 0;
+        PyGILState_STATE gstate;
+        gstate = PyGILState_Ensure();
         do{
-            Py_BEGIN_ALLOW_THREADS;
             PyObject* pHost = nullptr;
             ret = GetPyHost( pHost );
             if( ERROR( ret ) )
                 break;
+
+            std::string strFmt = "(L)";
+            if( sizeof( hChannel ) ==
+                sizeof( guint32 ) )
+                strFmt = "(i)";
+
             PyObject_CallMethod(
-             pHost, "OnStmReady", 
-             "(L)", hChannel );
-            Py_END_ALLOW_THREADS;
+                 pHost, "OnStmReady", 
+                 strFmt.c_str(), hChannel );
         }while( 0 );
+        PyGILState_Release( gstate );
         return ret;
     }
 
@@ -31,7 +38,10 @@ class CPythonServerImpl :
         if( hChannel == INVALID_HANDLE )
             return -EINVAL;
 
+        PyGILState_STATE gstate;
+        gstate = PyGILState_Ensure();
         RemoveChanCtx( hChannel );
+        PyGILState_Release( gstate );
         return super::OnStmClosing( hChannel );
     }
 
@@ -105,6 +115,7 @@ class CPythonServerImpl :
             for( auto elem : vecArgs )
                 oReq.Push<BufPtr&>( elem );
 
+            bool bDec = false;
             IEventSink* pCb = nullptr;
             TaskletPtr pTask;
             if( pCallback == nullptr ||
@@ -129,11 +140,14 @@ class CPythonServerImpl :
 
                 PyObject* listResp = PyList_New( 2 );
                 oReqCtx.Push( ( intptr_t )listResp );
+                bDec = true;
             }
             pCb = pTask;
             Py_BEGIN_ALLOW_THREADS;
-            BroadcastEvent( oReq.GetCfg(), pCb );
+            ret = BroadcastEvent( oReq.GetCfg(), pCb );
             Py_END_ALLOW_THREADS;
+            if( ret != STATUS_PENDING && bDec )
+                Py_DECREF( pCallback );
             
         }while( 0 );
 
@@ -199,6 +213,33 @@ class CPythonServer :
                 CloseStream( a0 );
         }
         Py_END_ALLOW_THREADS;
+    %End
+
+    gint32 WriteStreamNoWait(
+        HANDLE hChannel, PyObject* pPyBuf );
+    %MethodCode
+    do{
+        CPythonServerImpl* pImpl = static_cast
+            < CPythonServerImpl* >( sipCpp );
+
+        if( pImpl == nullptr ) 
+        {
+            sipRes = -EFAULT;
+            break;
+        }
+
+        BufPtr pBuf( true );
+        sipRes = pImpl->ConvertPyObjToBuf(
+            a1, pBuf );
+        if( ERROR( sipRes ) )
+            break;
+
+        Py_BEGIN_ALLOW_THREADS;
+        sipRes = pImpl->
+            WriteStreamNoWait( a0, pBuf );
+        Py_END_ALLOW_THREADS;
+
+    }while( 0 );
     %End
 
     gint32 WriteStream(
@@ -327,6 +368,9 @@ class CPythonServer :
             a0, pBuf, pCtx );
         Py_END_ALLOW_THREADS;
 
+        if( ret != STATUS_PENDING )
+            Py_DECREF( a1 );
+
         if( ret == STATUS_PENDING ||
             ERROR( ret ) )
         {
@@ -409,6 +453,11 @@ class CPythonServer :
         sipRes = pImpl->WriteStreamAsync(
             a0, pBuf, pCtx );
         Py_END_ALLOW_THREADS;
+        if( sipRes != STATUS_PENDING )
+        {
+            Py_DECREF( a1 );
+            Py_DECREF( a2 );
+        }
         break;
 
     }while( 0 );

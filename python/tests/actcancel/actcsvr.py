@@ -82,7 +82,7 @@ def test_main() :
     with oContext :
         print( "start to work here..." )
         oServer = CActcSvrObj( oContext.pIoMgr,
-            "../../test/debug64/actcdesc.json",
+            "../../../test/debug64/actcdesc.json",
             "CActcServer" );
 
         ret = oServer.GetError() 

@@ -89,7 +89,7 @@ def test_main() :
     with oContext :
         print( "start to work here..." )
         oServer = CEchoSvrObj( oContext.pIoMgr,
-            "../../test/debug64/echodesc.json",
+            "../../../test/debug64/echodesc.json",
             "CEchoServer" );
 
         ret = oServer.GetError() 

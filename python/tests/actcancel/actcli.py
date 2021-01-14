@@ -65,7 +65,7 @@ def test_main() :
     with oContext :
         print( "start to work here..." )
         oProxy = CActcProxy( oContext.pIoMgr,
-            "../../test/debug64/actcdesc.json",
+            "../../../test/debug64/actcdesc.json",
             "CActcServer" );
 
         ret = oProxy.GetError() 

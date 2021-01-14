@@ -1,4 +1,3 @@
-#asynchronous version of echocli
 import sys
 import numpy as np
 import threading as tr
@@ -95,7 +94,7 @@ def test_main() :
         it'''
         print( "start to work here..." )
         oProxy = CStreamingClient( oContext.pIoMgr,
-            "../../test/debug64/stmdesc.json",
+            "../../../test/debug64/stmdesc.json",
             "CStreamingServer" );
 
         ret = oProxy.GetError() 
@@ -127,7 +126,7 @@ def test_main() :
         hChannel = tupRet[ 1 ]
         
         print( "start talking..." )
-        for i in range( 10000 ) :
+        for i in range( 100 ) :
             strFmt = "a message to server {} " 
             strMsg = strFmt.format( i )
             ret = oProxy.WriteStream(

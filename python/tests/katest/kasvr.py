@@ -81,7 +81,7 @@ def test_main() :
     with oContext :
         print( "start to work here..." )
         oServer = CKaSvrObj( oContext.pIoMgr,
-            "../../test/debug64/kadesc.json",
+            "../../../test/debug64/kadesc.json",
             "CKeepAliveServer" );
 
         ret = oServer.GetError() 

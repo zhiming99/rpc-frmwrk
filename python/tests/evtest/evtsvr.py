@@ -34,7 +34,7 @@ def test_main() :
     with oContext :
         print( "start to work here..." )
         oServer = CEvtSvrObj( oContext.pIoMgr,
-            "../../test/debug64/evtdesc.json",
+            "../../../test/debug64/evtdesc.json",
             "CEventServer" );
 
         ret = oServer.GetError() 

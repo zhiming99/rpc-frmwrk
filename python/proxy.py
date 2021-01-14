@@ -574,9 +574,6 @@ class PyRpcServer( PyRpcServices ) :
         self.oObj = oObj;
         return
 
-    def OnStmReady( self, hChannel ) :
-        pass
-
     def SetChanCtx( self, hChannel, oContext ) :
         return self.oInst.SetChanCtx(
             hChannel, oContext );

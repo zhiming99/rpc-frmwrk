@@ -127,7 +127,7 @@ def test_main() :
         it'''
         print( "start to work here..." )
         oProxy = CPauseResumeProxy( oContext.pIoMgr,
-            "../../test/debug64/prdesc.json",
+            "../../../test/debug64/prdesc.json",
             "CPauseResumeServer" );
 
         ret = oProxy.GetError() 
