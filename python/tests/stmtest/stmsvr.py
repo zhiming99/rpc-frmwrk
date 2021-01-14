@@ -90,6 +90,7 @@ class CStreamingServer(CEchoServer, PyRpcServer):
             ret = listResp[ 0 ]
             if ret < 0 :
                 print( "Error occurs", ret )
+                break
             elif ret == 65537 :
                 break
             print( "proxy says: ", listResp[ 1 ] )
