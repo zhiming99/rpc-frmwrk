@@ -57,7 +57,8 @@ class CPythonServerImpl :
         const std::string& strCIfName,
         const std::string& strMethod,
         const std::string& strDest,
-        PyObject* pArgs )
+        PyObject* pArgs,
+        guint32 dwSeriProto )
     {
         guint32 ret = 0;
         do{
@@ -71,6 +72,10 @@ class CPythonServerImpl :
             CReqBuilder oReq( this );
             std::string strIfName =
                DBUS_IF_NAME( strCIfName );
+
+            oReq.SetIntProp(
+                propSeriProto, dwSeriProto );
+
             if( true )
             {
                 CStdRMutex oIfLock( GetLock() );
@@ -471,7 +476,9 @@ class CPythonServer :
     %End
 
     gint32 SetResponse(
-        cpp::ObjPtr& pCallback, gint32 iRet,
+        cpp::ObjPtr& pCallback,
+        gint32 iRet,
+        guint32 dwSeriProto,
         PyObject* pListResp );
     %MethodCode
         gint32 ret = 0;
@@ -492,7 +499,7 @@ class CPythonServer :
 
             std::vector< BufPtr > vecResp;
             ret = pImpl->List2Vector(
-                a2, vecResp);
+                a3, vecResp);
             if( ERROR( ret ) )
             {
                 oResp[ propReturnValue ] = ret;
@@ -501,6 +508,9 @@ class CPythonServer :
             }
             for( auto elem : vecResp )
                 oResp.Push( elem );
+
+            oResp[ propSeriProto ] = a2;
+
         }while( 0 );
         if( SUCCEEDED( ret ) )
         {
@@ -513,6 +523,7 @@ class CPythonServer :
     gint32 OnServiceComplete(
         cpp::ObjPtr& pCallback,
         gint32 iRet,
+        guint32 dwSeriProto,
         PyObject* pListResp );
     %MethodCode
         gint32 ret = 0;
@@ -533,7 +544,7 @@ class CPythonServer :
 
             std::vector< BufPtr > vecResp;
             ret = pImpl->List2Vector(
-                a2, vecResp );
+                a3, vecResp );
             if( ERROR( ret ) )
             {
                 oResp[ propReturnValue ] = ret;
@@ -542,6 +553,9 @@ class CPythonServer :
             }
             for( auto elem : vecResp )
                 oResp.Push( elem );
+
+            oResp[ propSeriProto ] = a2;
+
         }while( 0 );
         if( SUCCEEDED( ret ) )
         {
@@ -582,13 +596,14 @@ class CPythonServer :
         const std::string& strIfName,
         const std::string& strMethod,
         const std::string& strDest,
-        PyObject* pListArgs );
+        PyObject* pListArgs,
+        guint32 dwSeriProto );
     %MethodCode
         CPythonServerImpl* pImpl =
         static_cast< CPythonServerImpl* >
             ( sipCpp );
         sipRes = pImpl->SendEvent(
-            a0, *a1, *a2, *a3, a4 );
+            a0, *a1, *a2, *a3, a4, a5 );
     %End
     bool IsServer();
     %MethodCode

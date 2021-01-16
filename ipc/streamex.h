@@ -1292,29 +1292,6 @@ struct CStreamSyncBase :
         return 0;
     }
 
-    gint32 GetPeerObjId( HANDLE hChannel,
-        guint64& qwPeerObjId )
-    {
-        // a place to store channel specific data.
-        if( hChannel == INVALID_HANDLE )
-            return -EINVAL;
-
-        if( this->IsServer() )
-            return -ENOTSUP;
-
-        CStdRMutex oIfLock( this->GetLock() );
-        typename WORKER_MAP::iterator itr = 
-            m_mapStmWorkers.find( hChannel );
-
-        if( itr == m_mapStmWorkers.end() )
-            return -ENOENT;
-
-        IConfigDb* pCtx = itr->second.pContext;
-        CCfgOpener oCtx( pCtx );
-        return oCtx.GetQwordProp(
-            propPeerObjId, qwPeerObjId );
-    }
-
     gint32 IsReadNotifyPaused(
         HANDLE hChannel, bool& bPaused )
     {
@@ -1971,6 +1948,8 @@ class CStreamProxySync :
         IConfigDb* pDesc = nullptr,
         IEventSink* pCallback = nullptr );
 
+    gint32 GetPeerObjId( HANDLE hChannel,
+        guint64& qwPeerObjId );
 };
 
 class CStreamServerSync :
@@ -1989,7 +1968,6 @@ class CStreamServerSync :
 
     virtual gint32 OnConnected( HANDLE hCfg );
     virtual gint32 StopWorkers( HANDLE hChannel );
-
 };
 
 class CStreamProxyAsync :
@@ -2031,6 +2009,7 @@ class CStreamServerAsync :
     public CStreamServerSync
 {
 
+    public:
     typedef CStreamServerSync super;
     CStreamServerAsync( const IConfigDb* pCfg ) :
        _MyVirtBase( pCfg ), super( pCfg )

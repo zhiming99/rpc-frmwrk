@@ -356,6 +356,10 @@ class CBuffer : public CObjBase
             throw std::invalid_argument( strMsg );
         }
 
+        if( size() < sizeof( T2 ) )
+            throw std::invalid_argument(
+                "The type size does not match" );
+
         if( GetDataType() == DataTypeMem )
         {
             return *( reinterpret_cast< T* >( ptr() ) );

@@ -244,6 +244,8 @@ enum EnumPropId : gint32
     propJavaObj,        // type: a pointer to a java object which is an interface object
     propPeerObjId,      // type: gint64 for the uxstream object id from the peer
 
+    propSeriProto,     // type: a gint32 to indicate the serialize protocol of the current parament pack
+
     propReservedEnd = 0x10000000,
     propInvalid = -1, 
 };

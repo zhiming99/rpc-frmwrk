@@ -95,6 +95,7 @@ BEGIN_DECL_IF_PROXY_SYNC( CEchoServer, CEchoClient )
         const std::string& strMethod,
         PyObject* tupleArgs,
         PyObject* tupleResp,
+        guint32 dwSeriProto,
         guint64& qwTaskCancel )
     { return -ENOTSUP; }
 

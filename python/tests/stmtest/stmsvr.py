@@ -6,6 +6,7 @@ from rpcfrmwrk import *
 
 sys.path.insert(0, '../../')
 from proxy import PyRpcContext, PyRpcServer
+from proxy import ErrorCode as EC
 
 #1. define the interface the CEchoServer provides
 class CEchoServer:
@@ -56,7 +57,7 @@ class CStreamingServer(CEchoServer, PyRpcServer):
             if ret < 0 :
                 print( "Error occurs", ret )
                 break
-            elif ret == 65537 :
+            elif ret == EC.STATUS_PENDING :
                 break
             print( "proxy says: ", listResp[ 1 ] )
             i = self.GetCounter( hChannel )
@@ -66,7 +67,7 @@ class CStreamingServer(CEchoServer, PyRpcServer):
                 CStreamingServer.WriteStmCallback )
             i += 1
             self.SetCounter( hChannel, i )
-            if ret < 0 or ret == 65537 :
+            if ret < 0 or ret == EC.STATUS_PENDING:
                 break;
 
     def WriteAndReceive( self, hChannel ) :
@@ -82,7 +83,7 @@ class CStreamingServer(CEchoServer, PyRpcServer):
             if ret < 0 :
                 print( "WriteAndReceive error...", ret )
                 break
-            if ret == 65537:
+            if ret == EC.STATUS_PENDING:
                 break
             listResp = self.ReadStreamAsync(
                 hChannel,
@@ -91,13 +92,16 @@ class CStreamingServer(CEchoServer, PyRpcServer):
             if ret < 0 :
                 print( "Error occurs", ret )
                 break
-            elif ret == 65537 :
+            elif ret == EC.STATUS_PENDING :
                 break
             print( "proxy says: ", listResp[ 1 ] )
 
     '''OnStmReady is a system defined event
     handler, called when the stream channel is
-    ready to send/receive'''
+    ready to send/receive. There must be an
+    implementation of OnStmReady for the server to
+    support streaming related things.
+    '''
     def OnStmReady( self, hChannel ) :
         greeting = "Hello, Proxy"
         self.oInst.WriteStreamNoWait(
@@ -148,6 +152,9 @@ def test_main() :
 
         ret = oServer.Start()
         if ret < 0 :
+            break
+
+        if ret == EC.STATUS_PENDING :
             break
 
         #wait if the server is not online
