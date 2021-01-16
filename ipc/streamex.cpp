@@ -1725,4 +1725,24 @@ gint32 CStreamProxySync::StartStream(
     return ret;
 }
 
+gint32 CStreamProxySync::GetPeerObjId(
+    HANDLE hChannel, guint64& qwPeerObjId )
+{
+    // a place to store channel specific data.
+    if( hChannel == INVALID_HANDLE )
+        return -EINVAL;
+
+    CStdRMutex oIfLock( this->GetLock() );
+    typename WORKER_MAP::iterator itr = 
+        m_mapStmWorkers.find( hChannel );
+
+    if( itr == m_mapStmWorkers.end() )
+        return -ENOENT;
+
+    IConfigDb* pCtx = itr->second.pContext;
+    CCfgOpener oCtx( pCtx );
+    return oCtx.GetQwordProp(
+        propPeerObjId, qwPeerObjId );
+}
+
 }

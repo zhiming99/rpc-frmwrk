@@ -147,6 +147,15 @@ namespace cpp
         typeByteArr,
     };
 
+    enum EnumSeriProto
+    {
+        seriNone = 0,
+        seriCpp = 1,
+        seriPython = 2,
+        seriJava = 3,
+        seriInvalid = 4
+    };
+
     gint32 CoInitialize( guint32 );
     %MethodCode
         Py_Initialize();
@@ -364,36 +373,71 @@ namespace cpp
 
         gint32 GetByteProp( gint32,
             guint8& dwVal );
+        %MethodCode
+            a1 = 0;
+            sipRes = sipCpp->GetByteProp(
+                a0, a1 );
+        %End
         gint32 SetByteProp( gint32,
             guint8 dwVal );
 
         gint32 GetShortProp( gint32,
             guint16& dwVal /Out/ );
+        %MethodCode
+            a1 = 0;
+            sipRes = sipCpp->GetShortProp(
+                a0, a1 );
+        %End
         gint32 SetShortProp( gint32,
             guint16 dwVal );
 
         gint32 GetIntProp( gint32,
             guint32& dwVal /Out/ );
+        %MethodCode
+            a1 = 0;
+            sipRes = sipCpp->GetIntProp(
+                a0, a1 );
+        %End
         gint32 SetIntProp( gint32,
             guint32 dwVal );
 
         gint32 GetQwordProp( gint32,
             guint64& dwVal /Out/ );
+        %MethodCode
+            a1 = 0;
+            sipRes = sipCpp->GetQwordProp(
+                a0, a1 );
+        %End
         gint32 SetQwordProp( gint32,
             guint64 dwVal );
 
         gint32 GetDoubleProp( gint32,
             double& fVal /Out/ );
+        %MethodCode
+            a1 = .0;
+            sipRes = sipCpp->GetDoubleProp(
+                a0, a1 );
+        %End
         gint32 SetDoubleProp( gint32,
             double fVal );
 
         gint32 GetFloatProp( gint32,
             float& fVal /Out/ );
+        %MethodCode
+            a1 = .0;
+            sipRes = sipCpp->GetFloatProp(
+                a0, a1 );
+        %End
         gint32 SetFloatProp( gint32,
             float fVal );
 
         gint32 GetPointer( gint32,
             cpp::CObjBase*& pObj /Out/ );
+        %MethodCode
+            a1 = nullptr;
+            sipRes = sipCpp->GetPointer(
+                a0, a1 );
+        %End
         gint32 SetPointer( gint32,
             cpp::CObjBase* pObj );
 
@@ -404,6 +448,11 @@ namespace cpp
 
         gint32 GetBoolProp(
             gint32, bool& bVal /Out/ );
+        %MethodCode
+            a1 = false;
+            sipRes = sipCpp->GetBoolProp(
+                a0, a1 );
+        %End
         gint32 SetBoolProp(
             gint32, bool bVal );
 
@@ -474,6 +523,7 @@ namespace cpp
 
         gint32 GetSize( guint32& dwSize /Out/ );
         %MethodCode
+            a0 = 0;
             sipRes = sipCpp->GetSize( a0 );
         %End
     };

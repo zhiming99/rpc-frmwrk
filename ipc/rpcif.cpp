@@ -3554,6 +3554,15 @@ gint32 CRpcServices::InvokeUserMethod(
 
     gint32 ret = 0;
     do{
+        EnumSeriProto dwSeriProto = seriNone;
+        ret = GetSeriProto(
+            pParams, dwSeriProto );
+        if( dwSeriProto != seriNone )
+        {
+            ret = -EBADMSG;
+            break;
+        }
+        ret = 0;
         CReqOpener oReq( pParams );
         string strMethod;
         ret = oReq.GetMethodName( strMethod );
@@ -5335,6 +5344,7 @@ gint32 CInterfaceProxy::SendProxyReq(
         // overwrite the strIfName if exist in the
         // pCallback
         oReq.CopyProp( propIfName, pCallback );
+        oReq.CopyProp( propSeriProto, pCallback );
         oReq.SetMethodName( strMethod );
 
         for( auto& pBuf: vecParams )
@@ -6171,13 +6181,8 @@ gint32 CInterfaceServer::DoInvoke(
             ret = DoInvoke_SendData(
                 pReqMsg, pCallback, oResp );
         }
-        else
-        {
-            ret = -ENOTSUP;
-        }
+        else do{
 
-        while( ret == -ENOTSUP )
-        {
             ret = 0;
             ObjPtr pObj;
 
@@ -6254,8 +6259,8 @@ gint32 CInterfaceServer::DoInvoke(
                 oTaskCfg.SetObjPtr(
                     propReqPtr, ObjPtr( pCfg ) );
             }
-            break;
-        }
+
+        }while( 0 );
 
         if( ret == STATUS_PENDING )
             break;

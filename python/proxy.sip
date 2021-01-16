@@ -14,29 +14,6 @@ typedef enum
 
 } EnumPyPropId;
 
-enum EnumRpcError
-{
-    PY_STATUS_SUCCESS = 0,
-    PY_STATUS_PENDING = 0x10001,
-    PY_STATUS_MORE_PROCESS_NEEDED,
-    PY_STATUS_CHECK_RESP,
-    PY_ERROR_ADDRESS = 0x80010002,
-    PY_ERROR_STATE = 0x80010003,
-    PY_ERROR_WRONG_THREAD = 0x80010004,
-    PY_ERROR_CANNOT_CANCEL = 0x80010005,
-    PY_ERROR_PORT_STOPPED = 0x80010006,
-    PY_ERROR_FALSE = 0x80010007,
-    PY_ERROR_REPEAT = 0x80010008,
-    PY_ERROR_PREMATURE = 0x80010009,
-    PY_ERROR_NOT_HANDLED = 0x8001000a,
-    PY_ERROR_CANNOT_COMP = 0x8001000b,
-    PY_ERROR_USER_CANCEL = 0x8001000c,
-    PY_ERROR_PAUSED = 0x8001000d,
-    PY_ERROR_NOT_IMPL = 0x8001000e,
-    PY_ERROR_CANCEL_INSTEAD = 0x8001000f,
-    PY_ERROR_QUEUE_FULL = 0x8001000e
-};
-
 template< class T >
 class CPythonInterfBase : public T
 {
@@ -749,8 +726,11 @@ class CPythonInterfBase : public T
             if( ERROR( ret ) )
                 break;
 
-            TaskletPtr pTask;
+            guint32 dwSeriProto = seriNone;
+            oReq.GetIntProp(
+                propSeriProto, dwSeriProto );
 
+            TaskletPtr pTask;
             CCfgOpenerObj oCfg( pCallback );
             std::string strIfName;
 
@@ -790,8 +770,9 @@ class CPythonInterfBase : public T
 
             listResp = PyObject_CallMethod(
                  pHost, "InvokeMethod", 
-                 "(OssO)", pPyCb, strIfName.c_str(),
-                 strMethod.c_str(), pPyParams );
+                 "(OssiO)", pPyCb, strIfName.c_str(),
+                 strMethod.c_str(), dwSeriProto,
+                 pPyParams );
 
             if( unlikely( listResp == nullptr ) )
             {
@@ -935,7 +916,7 @@ class CPythonInterfBase : public T
 
             PyObject_CallMethod(
                  pHost, "HandleAsyncResp", 
-                 "(OO)", pPyCb, pPyResp );
+                 "(OiO)", pPyCb, seriNone, pPyResp );
 
         }while( 0 );
 
@@ -1012,7 +993,7 @@ class CPythonInterfBase : public T
 
             PyObject_CallMethod(
                  pHost, "HandleAsyncResp", 
-                 "(OO)", pPyCb, pPyResp );
+                 "(OiO)", pPyCb, seriNone, pPyResp );
 
         }while( 0 );
 
@@ -1075,6 +1056,7 @@ class CPythonInterfBase : public T
                 ERROR( ( gint32 )iRet ) )
                 ret = iRet;
 
+            guint32 dwSeriProto = seriNone;
             if( ERROR( ret ) )
             {
                 PyObject* pRet =
@@ -1083,6 +1065,8 @@ class CPythonInterfBase : public T
             }
             else
             {
+                oResp.GetIntProp(
+                    propSeriProto, dwSeriProto );
                 PyObject* pRet = PyLong_FromLong( 0 );
                 PyList_SetItem( pPyResp, 0, pRet );
                 ret = FillList( pResp, pPyResp );
@@ -1095,7 +1079,7 @@ class CPythonInterfBase : public T
 
             PyObject_CallMethod(
                  pHost, "HandleAsyncResp", 
-                 "(OO)", pPyCb, pPyResp );
+                 "(OiO)", pPyCb, dwSeriProto, pPyResp );
 
         }while( 0 );
 
@@ -1225,7 +1209,7 @@ class CPythonInterfBase : public T
             // the true response parameters.
             PyObject_CallMethod(
                  pHost, "HandleAsyncResp", 
-                 "(OO)", pPyCb, pPyResp );
+                 "(OiO)", pPyCb, seriNone, pPyResp );
 
         }while( 0 );
 
@@ -1286,13 +1270,15 @@ class CPythonProxyImpl :
         const std::string& strMethod,
         PyObject* listArgs,
         PyObject* listResp,
+        guint32 dwSeriProto,
         guint64& qwTaskCancel );
 
     gint32 PyProxyCallSync(
         const std::string& strIfName,
         const std::string& strMethod,
         PyObject* listArgs,
-        PyObject* listResp );
+        PyObject* listResp,
+        guint32 dwSeriProto );
 };
 
 %End
@@ -1321,6 +1307,9 @@ gint32 CPythonProxyImpl::AsyncCallVector(
             pResp.NewObj();
 
         oCfg.CopyProp( propIfName,
+            ( CObjBase* )pOptions );
+
+        oCfg.CopyProp( propSeriProto,
             ( CObjBase* )pOptions );
 
         std::string strMethod( strcMethod );
@@ -1364,6 +1353,7 @@ gint32 CPythonProxyImpl::PyProxyCall(
     const std::string& strMethod,
     PyObject* listArgs,
     PyObject* listResp,
+    guint32 dwSeriProto,
     guint64& qwTaskCancel )
 {
     gint32 ret = 0;
@@ -1420,7 +1410,8 @@ gint32 CPythonProxyImpl::PyProxyCall(
             propIfName, strDBusIfName );
         oOptions.SetBoolProp(
             propSysMethod, false );
-
+        oOptions.SetIntProp(
+            propSeriProto, dwSeriProto );
         CCfgOpener oResp;
 
         PyThreadState *_save;
@@ -1495,12 +1486,14 @@ gint32 CPythonProxyImpl::PyProxyCallSync(
     const std::string& strIfName,
     const std::string& strMethod,
     PyObject* listArgs,
-    PyObject* listResp )
+    PyObject* listResp,
+    guint32 dwSeriProto )
 {
     guint64 qwTaskCancel = 0;
     return this->PyProxyCall( nullptr,
         strIfName, strMethod, listArgs,
-        listResp, qwTaskCancel );
+        listResp, dwSeriProto,
+        qwTaskCancel );
 }
 
 static FactoryPtr InitClassFactory()
@@ -1568,17 +1561,20 @@ class CPythonProxy :
         const std::string& strMethod /In/,
         PyObject* listArgs /In/,
         PyObject* listResp,
+        guint32 dwSeriProto,
         guint64& qwTaskCancel /Out/ );
 
     gint32 PyProxyCallSync(
         const std::string& strIfName /In/,
         const std::string& strMethod /In/,
         PyObject* listArgs /In/,
-        PyObject* listResp );
+        PyObject* listResp,
+        guint32 dwSeriProto
+        );
     %MethodCode
         guint64 qwTaskCancel = 0;
         sipRes = sipCpp->PyProxyCall( Py_None,
-            *a0, *a1, a2, a3, qwTaskCancel );
+            *a0, *a1, a2, a3, a4,  qwTaskCancel );
     %End
 
     gint32 SetPyHost( PyObject* pObj );

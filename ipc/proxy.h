@@ -1822,6 +1822,17 @@ void AssignValues( TupleType& oTuple,
     AssignValues<N-1, TupleType, Second, Args...>( oTuple, queResp );
 }
 
+inline gint32 GetSeriProto(
+    IConfigDb* pCfg,
+    EnumSeriProto& dwSeriProto )
+{
+    if( pCfg == nullptr )
+        return -EINVAL;
+    CCfgOpener oCfg( pCfg );
+    return oCfg.GetIntProp( 
+        propSeriProto, ( guint32& )dwSeriProto );
+}
+
 template< typename ...Args >
 gint32 CInterfaceProxy::FillArgs( CfgPtr& pResp,
     gint32& iRet, Args&&... args )
@@ -1834,6 +1845,14 @@ gint32 CInterfaceProxy::FillArgs( CfgPtr& pResp,
     auto oTuple = std::tuple<Args...>(args...);
 
     do{
+        EnumSeriProto dwSeriProto = seriNone;
+        ret = GetSeriProto( pResp, dwSeriProto );
+        if( dwSeriProto != seriNone )
+        {
+            ret = -EBADMSG;
+            break;
+        }
+        ret = 0;
         CParamList oResp( ( IConfigDb* )pResp );
         if( !oResp.exist( propReturnValue ) )
         {

@@ -445,6 +445,16 @@ enum EnumEventId : guint32
 
 };
 
+// protocols to serialize/deserialze parameters
+enum EnumSeriProto : guint32
+{
+    seriNone = 0, // No serialization
+    seriCpp = 1, // C++ serialization( to come )
+    seriPython = 2, // Python's Pickle
+    seriJava = 3, // Java's Object Stream
+    seriInvalid = 4
+};
+
 struct SERI_HEADER_BASE
 {
     guint32 dwClsid;
