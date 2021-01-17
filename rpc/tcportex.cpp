@@ -2841,7 +2841,7 @@ gint32 CRpcNativeProtoFdo::HandleIoctlIrp(
 
                 guint32 dwProtoId = 0;
                 ret = oCfg.GetIntProp( 1,
-                    ( guint32& )dwProtoId );
+                    dwProtoId );
 
                 if( ERROR( ret ) )
                     break;

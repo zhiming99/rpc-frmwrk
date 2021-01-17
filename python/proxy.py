@@ -393,8 +393,10 @@ class PyRpcServices :
         if ret[ 0 ] < 0 :
             resp[ 0 ] = ret[ 0 ];
         iSize = ret[ 1 ]
+
         if iSize < 0 :
             return [ -errno.EINVAL, ]
+
         if seriProto == cpp.seriPython :
             ret = pCfg.GetProperty( 0 );
             if ret[ 0 ] < 0 :
@@ -417,7 +419,7 @@ class PyRpcServices :
                 return [ -errno.EBADMSG, ]
 
             return [ 0, argList ]
-        else :
+        elif seriProto != cpp.seriNone :
             return [ -errno.EBADMSG, ]
             
         argList = []
@@ -638,7 +640,8 @@ class PyRpcProxy( PyRpcServices ) :
         return resp
 
     def MakeCallAsync( self, callback,
-        strIfName, strMethod, args, resp ) :
+        strIfName, strMethod, args, resp,
+        seriProto ) :
         ret = self.oInst.PyProxyCall( callback,
             strIfName, strMethod, args, resp, seriProto )
         return ret;
