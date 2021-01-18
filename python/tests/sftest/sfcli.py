@@ -236,7 +236,7 @@ class PyFileTransProxy(
                 pBuf )
             if ret < 0 :
                 resp[ 0 ] = ret;
-            else
+            else :
                 '''transfer will start immediately
                 this request is successful
                 '''
@@ -257,33 +257,33 @@ def test_main() :
         '''create the server object, and start
         it'''
         print( "start to work here..." )
-        oServer = PyFileTransProxy( oContext.pIoMgr,
+        oProxy = PyFileTransProxy( oContext.pIoMgr,
             "./sfdesc.json",
             "PyFileTransSvr" );
 
-        ret = oServer.GetError() 
+        ret = oProxy.GetError() 
         if ret < 0 :
             break
 
-        ret = oServer.Start()
+        ret = oProxy.Start()
         if ret < 0 :
             break
 
         #wait if the server is not online
         while ( cpp.stateRecovery ==
-            oServer.oInst.GetState() ):
+            oProxy.oInst.GetState() ):
             time.sleep( 1 )
 
         #keep wait till offline
         while ( cpp.stateConnected ==
-            oServer.oInst.GetState() ):
+            oProxy.oInst.GetState() ):
             time.sleep( 1 )
             
         break
 
     ''' Stop the guys'''
-    if oServer is not None :
-        oServer.Stop();
+    if oProxy is not None :
+        oProxy.Stop();
 
     if oContext is not None:
         oContext.Stop()
