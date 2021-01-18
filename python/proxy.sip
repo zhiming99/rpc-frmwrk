@@ -727,9 +727,12 @@ class CPythonInterfBase : public T
                 break;
 
             guint32 dwSeriProto = seriNone;
-            oReq.GetIntProp(
+            ret = oReq.GetIntProp(
                 propSeriProto, dwSeriProto );
+            if( ERROR( ret ) )
+                dwSeriProto = seriNone;
 
+            ret = 0;
             TaskletPtr pTask;
             CCfgOpenerObj oCfg( pCallback );
             std::string strIfName;
@@ -1033,6 +1036,8 @@ class CPythonInterfBase : public T
                 break;
 
             guint32* ptrVal = nullptr;
+            guint32 dwReqProto = seriNone;
+
             CCfgOpener oReqCtx( pReqCtx );
             ret = oReqCtx.GetIntPtr( 0, ptrVal );
             if( ERROR( ret ) )
@@ -1043,6 +1048,8 @@ class CPythonInterfBase : public T
             ret = oReqCtx.GetIntPtr( 1, ptrVal );
             if( ERROR( ret ) )
                 break;
+
+            oReqCtx.GetIntProp( 3, dwReqProto );
 
             PyObject* pPyResp =
                 ( PyObject* )ptrVal;  
@@ -1065,11 +1072,19 @@ class CPythonInterfBase : public T
             }
             else
             {
-                oResp.GetIntProp(
+                ret = oResp.GetIntProp(
                     propSeriProto, dwSeriProto );
-                PyObject* pRet = PyLong_FromLong( 0 );
+                if( ERROR( ret ) )
+                    dwSeriProto = seriNone;
+
+                ret = 0;
+                if( dwSeriProto != dwReqProto )
+                    ret = -EBADMSG;
+
+                PyObject* pRet = PyLong_FromLong( ret );
                 PyList_SetItem( pPyResp, 0, pRet );
-                ret = FillList( pResp, pPyResp );
+                if( SUCCEEDED( ret ) )
+                    FillList( pResp, pPyResp );
             }
 
             PyObject* pHost = nullptr;
@@ -1077,9 +1092,9 @@ class CPythonInterfBase : public T
             if( ERROR( ret ) )
                 break;
 
-            PyObject_CallMethod(
-                 pHost, "HandleAsyncResp", 
-                 "(OiO)", pPyCb, dwSeriProto, pPyResp );
+            PyObject_CallMethod( pHost,
+                "HandleAsyncResp", "(OiO)",
+                pPyCb, dwSeriProto, pPyResp );
 
         }while( 0 );
 
@@ -1246,6 +1261,123 @@ class CPythonInterfBase : public T
         }
         return ret;
     }
+
+    gint32 OnStreamReady( HANDLE hChannel )
+    {
+        gint32 ret = 0;
+        PyGILState_STATE gstate;
+        gstate = PyGILState_Ensure();
+        do{
+            PyObject* pHost = nullptr;
+            ret = GetPyHost( pHost );
+            if( ERROR( ret ) )
+                break;
+
+            std::string strFmt = "(L)";
+            if( sizeof( hChannel ) ==
+                sizeof( guint32 ) )
+                strFmt = "(i)";
+
+            PyObject_CallMethod(
+                 pHost, "OnStmReady", 
+                 strFmt.c_str(), hChannel );
+        }while( 0 );
+        PyGILState_Release( gstate );
+        return ret;
+    }
+
+    gint32 OnStmClosing( HANDLE hChannel )
+    {
+        if( hChannel == INVALID_HANDLE )
+            return -EINVAL;
+
+        PyGILState_STATE gstate;
+        gstate = PyGILState_Ensure();
+        PyObject* pCtx = GetChanCtx( hChannel );
+
+        do{
+            if( pCtx == nullptr )
+                break;
+
+            PyObject* pHost = nullptr;
+            ret = GetPyHost( pHost );
+            if( ERROR( ret ) )
+                break;
+
+            std::string strFmt = "(L)";
+            if( sizeof( hChannel ) ==
+                sizeof( guint32 ) )
+                strFmt = "(i)";
+
+            PyObject_CallMethod(
+                 pHost, "OnStmClosing", 
+                 strFmt.c_str(), hChannel );
+
+        }while( 0 )
+
+        if( pCtx != nullptr &&
+            pCtx != Py_None )
+        {
+            Py_DECREF( pCtx );
+            RemoveChanCtx( hChannel )
+        }
+
+        PyGILState_Release( gstate );
+
+        return super::OnStmClosing( hChannel );
+    }
+
+    gint32 PyDeferCallback(
+        intptr_t pCb, intptr_t pArgs )
+    {
+        gint32 ret = 0;
+        PyGILState_STATE gstate;
+        gstate = PyGILState_Ensure();
+        PyObject* pPyCb = ( PyObject* )pCb;
+        PyObject* pPyArgs = ( PyObject* )pArgs;
+        do{
+            PyObject* pHost = nullptr;
+            ret = GetPyHost( pHost );
+            if( ERROR( ret ) )
+                break;
+
+            PyObject_CallMethod(
+                 pHost, "DeferCallback", 
+                 "OO", pPyCb, pPyArgs );
+
+        }while( 0 );
+        if( pPyCb != nullptr &&
+            pPyCb != Py_None )
+            Py_DECREF( pPyCb );
+
+        if( pPyArgs != nullptr &&
+            pPyArgs != Py_None )
+            Py_DECREF( pPyArgs );
+
+        PyGILState_Release( gstate );
+        return ret;
+    }
+
+    gint32 PyDeferCall(
+        PyObject* pPyCb, PyObject* pPyArgs )
+    {
+        TaskletPtr pTask;
+        ret = DEFER_IFCALLEX_NOSCHED(
+            m_pSessChecker, ObjPtr( this ),
+            &CPythonInterfBase::PyDeferCallback,
+            ( intptr_t )pPyCb,
+            ( intptr_t )pPyArgs );
+        if( ERROR( ret ) )
+            return ret;
+        ret = GetIoMgr->RescheduleTask( pTask );
+        if( ERROR( ret ) )
+            ( *pTask )( eventCancelTask )
+        // NOTE: if the task is canceled,
+        // the reference won't be released
+        Py_INCREF( pPyCb )
+        Py_INCREF( pPyArgs )
+        return ret;
+    }
 };
 
 class CPythonProxyImpl :
@@ -1391,6 +1523,7 @@ gint32 CPythonProxyImpl::PyProxyCall(
             oReqCtx.Push( ( intptr_t ) pCb );
             oReqCtx.Push( ( intptr_t ) listResp );
             oReqCtx.Push( strMethod );
+            oReqCtx.Push( dwSeriProto );
             Py_INCREF( pCb );
             Py_INCREF( listResp );
         }
@@ -1471,6 +1604,13 @@ gint32 CPythonProxyImpl::PyProxyCall(
             break;
         }
 
+        guint32 dwSpRet = seriNone;
+        GetSeriProto( pRmtResp, dwSpRet ) 
+        if( dwSpRet != dwSeriProto )
+        {
+            ret = -EBADMSG;
+            break;
+        }
         ret = FillList( pRmtResp, listResp );
         if( ERROR( ret ) )
             break;
@@ -1478,7 +1618,11 @@ gint32 CPythonProxyImpl::PyProxyCall(
         qwTaskCancel = 0;
         
     }while( 0 );
-
+    if( ERROR( ret ) )
+    {
+        PyList_SetItem( listResp, 0,
+            PyLong_FromLong( ret ) );
+    }
     return ret;
 }
 
@@ -1914,6 +2058,19 @@ class CPythonProxy :
         static_cast< CPythonProxyImpl* >
             ( sipCpp );
         sipRes = pImpl->DisableTimer( *a0 );
+    %End
+
+    gint32 GetPeerIdHash(
+        HANDLE hChannel,
+        guint64& qwPeerIdHash /Out/ );
+
+    gint32 PyDeferCall( PyObject* pPyCb,
+        PyObject* pPyArgs );
+    %MethodCode
+        CPythonProxyImpl* pImpl =
+        static_cast< CPythonProxyImpl* >
+            ( sipCpp );
+        sipRes = pImpl->PyDeferCall( a0, a1 );
     %End
 };
 

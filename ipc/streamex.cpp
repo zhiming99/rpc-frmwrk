@@ -1725,8 +1725,8 @@ gint32 CStreamProxySync::StartStream(
     return ret;
 }
 
-gint32 CStreamProxySync::GetPeerObjId(
-    HANDLE hChannel, guint64& qwPeerObjId )
+gint32 CStreamProxySync::GetPeerIdHash(
+    HANDLE hChannel, guint64& qwPeerIdHash )
 {
     // a place to store channel specific data.
     if( hChannel == INVALID_HANDLE )
@@ -1742,7 +1742,7 @@ gint32 CStreamProxySync::GetPeerObjId(
     IConfigDb* pCtx = itr->second.pContext;
     CCfgOpener oCtx( pCtx );
     return oCtx.GetQwordProp(
-        propPeerObjId, qwPeerObjId );
+        propPeerObjId, qwPeerIdHash );
 }
 
 }

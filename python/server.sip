@@ -9,49 +9,6 @@ class CPythonServerImpl :
         : super::_MyVirtBase( pCfg ), super( pCfg )
     { SetClassId( clsid( CPythonServerImpl ) ); }
 
-    gint32 OnStreamReady( HANDLE hChannel )
-    {
-        gint32 ret = 0;
-        PyGILState_STATE gstate;
-        gstate = PyGILState_Ensure();
-        do{
-            PyObject* pHost = nullptr;
-            ret = GetPyHost( pHost );
-            if( ERROR( ret ) )
-                break;
-
-            std::string strFmt = "(L)";
-            if( sizeof( hChannel ) ==
-                sizeof( guint32 ) )
-                strFmt = "(i)";
-
-            PyObject_CallMethod(
-                 pHost, "OnStmReady", 
-                 strFmt.c_str(), hChannel );
-        }while( 0 );
-        PyGILState_Release( gstate );
-        return ret;
-    }
-
-    gint32 OnStmClosing( HANDLE hChannel )
-    {
-        if( hChannel == INVALID_HANDLE )
-            return -EINVAL;
-
-        PyObject* pCtx = GetChanCtx( hChannel );
-        gint32 ret =
-            super::OnStmClosing( hChannel );
-
-        if( pCtx == nullptr )
-            return ret;
-
-        PyGILState_STATE gstate;
-        gstate = PyGILState_Ensure();
-        Py_DECREF( pCtx );
-        PyGILState_Release( gstate );
-        return ret;
-    }
-
     gint32 SendEvent(
         PyObject* pCallback,
         const std::string& strCIfName,
@@ -642,6 +599,23 @@ class CPythonServer :
             ( sipCpp );
         sipRes = pImpl->InstallCompNotify(
             *a0, a1, a2 );
+    %End
+
+    HANDLE GetChanByIdHash( guint64 );
+    %MethodCode
+        CPythonServerImpl* pImpl =
+        static_cast< CPythonServerImpl* >
+            ( sipCpp );
+        sipRes = pImpl->GetChanByIdHash( a0 );
+    %End
+
+    gint32 PyDeferCall( PyObject* pPyCb,
+        PyObject* pPyArgs );
+    %MethodCode
+        CPythonServerImpl* pImpl =
+        static_cast< CPythonServerImpl* >
+            ( sipCpp );
+        sipRes = pImpl->PyDeferCall( a0, a1 );
     %End
 };
 
