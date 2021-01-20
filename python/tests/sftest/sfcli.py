@@ -165,8 +165,7 @@ class PyFileTransProxy(
                 break;
 
             chanHash = ret[ 1 ]
-            ret = self.UploadFile(
-                PyFileTransfer.ifName,
+            ret = self.UploadFile( fileName,
                 chanHash, offset, size )
             if ret[ 0 ] < 0 :
                 resp[ 0 ] = ret[ 0 ]
@@ -231,12 +230,24 @@ class PyFileTransProxy(
                     fp.truncate( offset )
                     fp.seek( offset, os.SEEK_SET ) 
 
-            except OSError( eno, strerr ) : 
-                resp[ 0 ] = -eno
+            except OSError as err : 
+                resp[ 0 ] = -err.errno
                 break
 
             if resp[ 0 ] < 0 :
                 break
+
+            ret = self.oInst.GetPeerIdHash( hChannel )
+            if ret[ 0 ] < 0 :
+                resp[ 0 ] = ret[ 0 ]
+                break;
+
+            chanHash = ret[ 1 ]
+            ret = self.DownloadFile( fileName,
+                chanHash, offset, size )
+            if ret[ 0 ] < 0 :
+                resp[ 0 ] = ret[ 0 ]
+                break;
 
             oCtx.fp = fp
             oCtx.iOffset = offset

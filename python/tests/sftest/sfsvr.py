@@ -62,6 +62,7 @@ class PyFileTransSvr(
     ''' rpc method
     '''
     def UploadFile( self,
+        callback,
         fileName:   str,
         chanHash:   np.int64, 
         offset:     np.int64,
@@ -138,6 +139,7 @@ class PyFileTransSvr(
     ''' rpc method
     '''
     def GetFileInfo( self,
+        callback,
         fileName : str,
         bRead : bool ) -> [ int, list ] :
         resp = [ 0, list() ]
@@ -168,6 +170,7 @@ class PyFileTransSvr(
     ''' rpc method
     '''
     def DownloadFile( self,
+        callback,
         fileName:   str,
         chanHash:   np.int64,
         offset:     np.int64,

@@ -568,8 +568,9 @@ class PyRpcServices :
                     break
 
             found = False
-            oMembers = inspect.getmembers( typeFound,
-                predicate=inspect.isfunction);
+            oMembers = inspect.getmembers(
+                type( self ), inspect.isfunction)
+
             for oMethod in oMembers :
                 if nameComps[ 1 ] != oMethod[ 0 ]: 
                     continue;
