@@ -1300,7 +1300,7 @@ class CPythonInterfBase : public T
                 break;
 
             PyObject* pHost = nullptr;
-            ret = GetPyHost( pHost );
+            gint32 ret = GetPyHost( pHost );
             if( ERROR( ret ) )
                 break;
 
@@ -1313,13 +1313,13 @@ class CPythonInterfBase : public T
                  pHost, "OnStmClosing", 
                  strFmt.c_str(), hChannel );
 
-        }while( 0 )
+        }while( 0 );
 
         if( pCtx != nullptr &&
             pCtx != Py_None )
         {
             Py_DECREF( pCtx );
-            RemoveChanCtx( hChannel )
+            RemoveChanCtx( hChannel );
         }
 
         PyGILState_Release( gstate );
@@ -1362,20 +1362,20 @@ class CPythonInterfBase : public T
         PyObject* pPyCb, PyObject* pPyArgs )
     {
         TaskletPtr pTask;
-        ret = DEFER_IFCALLEX_NOSCHED(
-            m_pSessChecker, ObjPtr( this ),
+        gint32 ret = DEFER_IFCALLEX_NOSCHED(
+            pTask, ObjPtr( this ),
             &CPythonInterfBase::PyDeferCallback,
             ( intptr_t )pPyCb,
             ( intptr_t )pPyArgs );
         if( ERROR( ret ) )
             return ret;
-        ret = GetIoMgr->RescheduleTask( pTask );
+        ret = this->GetIoMgr()->RescheduleTask( pTask );
         if( ERROR( ret ) )
-            ( *pTask )( eventCancelTask )
+            ( *pTask )( eventCancelTask );
         // NOTE: if the task is canceled,
         // the reference won't be released
-        Py_INCREF( pPyCb )
-        Py_INCREF( pPyArgs )
+        Py_INCREF( pPyCb );
+        Py_INCREF( pPyArgs );
         return ret;
     }
 };
@@ -1604,8 +1604,8 @@ gint32 CPythonProxyImpl::PyProxyCall(
             break;
         }
 
-        guint32 dwSpRet = seriNone;
-        GetSeriProto( pRmtResp, dwSpRet ) 
+        EnumSeriProto dwSpRet = seriNone;
+        GetSeriProto( pRmtResp, dwSpRet );
         if( dwSpRet != dwSeriProto )
         {
             ret = -EBADMSG;

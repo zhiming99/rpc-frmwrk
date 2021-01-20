@@ -8,7 +8,7 @@ import types
 import platform
 import pickle
 from enum import IntEnum
-from typing import Union, Callable
+from typing import Union, Callable, Optional
 
 class ErrorCode( IntEnum ) :
     STATUS_SUCCESS = np.int32( 0 )
@@ -306,8 +306,19 @@ class PyRpcServices :
     def GetNumpyValue( typeid, val ) :
         return GetNpValue( typeid, val )
 
-    def StartStream( self, pDesc ) :
-        return self.oInst.StartStream( pDesc )
+    ''' establish a stream channel and
+    return a handle to the channel on success
+    '''
+    def StartStream( self ) -> int :
+        oDesc = cpp.CParamList()
+        tupRet = self.oInst.StartStream(
+            oDesc.GetCfgAsObj() )
+        ret = tupRet[ 0 ]
+        if ret < 0 :
+            print( "Error start stream", ret )
+            return 0
+        return tupRet[ 1 ]
+        
 
     def CloseStream( self, hChannel ) :
         return self.oInst.CloseStream( hChannel )
@@ -373,8 +384,8 @@ class PyRpcServices :
     element2 is no longer valid.  '''
 
     def ReadStreamAsync( self,
-        hChannel, callback, size = 0)
-        ->[int, optional[ bytearray ], optional[ cpp.ObjPtr] ]:
+        hChannel, callback, size = 0)->[
+            int, Optional[ bytearray ], Optional[ cpp.ObjPtr] ]:
 
         return self.oInst.ReadStreamAsync(
             hChannel, callback, size )
@@ -606,7 +617,7 @@ class PyRpcServices :
     def DeferCall( self, callback, *args ) :
         self.oInst.DeferCall( callback, *args )
 
-    def DeferCallback( self, callback, *args )
+    def DeferCallback( self, callback, *args ) :
         callback( self, *args )
     
 class PyRpcProxy( PyRpcServices ) :
@@ -671,7 +682,7 @@ class PyRpcProxy( PyRpcServices ) :
         if len( resp ) <= 1 :
             return resp
 
-        if pResp[ 0 ] == 0 :
+        if resp[ 0 ] == 0 :
             pPyBuf = resp[ 1 ][ 0 ]
             if not isinstance( pPyBuf, bytearray ) :
                 resp[ 0 ] = -errno.EBADMSG
@@ -687,7 +698,7 @@ class PyRpcProxy( PyRpcServices ) :
     def PySendRequestAsync(
         self, callback,
         strIfName, strMethod,
-        *args )->Union[[ int, int ],[int,list]]:
+        *args )->Union[ int, Optional[ int ], Optional[list]]:
 
         resp = [ 0, None ]
         listArgs = list( args )

@@ -26,6 +26,9 @@ from proxy import PyRpcContext, PyRpcServer
 from proxy import ErrorCode as EC
 from typing import Union
 
+from sfcommon import CTransContext, CFileInfo
+from sfcommon import PyFileTransfer, PyFileTransferBase
+
 #1. define the interfaces to support
 #CEchoServer interface
 class CEchoServer:
@@ -41,165 +44,20 @@ class CEchoServer:
         listResp.append( listParams )
         return listResp
 
-class CTransContext :
-    def __init__( self ) :
-        self.iError = 0
-        self.iBytesLeft = 0
-        self.iBytesSent = 0
-        self.fp = None 
-        self.byDir = 0
-        self.strPath = ""
-        self.iOffset = 0
-        self.iSize = 0
-
-# PyFileTransfer, another interface as a
-# python-specific interface
-class PyFileTransfer :
-
-    ifName = "PyFileTransfer"
-
-    def __init__( self ) :
-        pass
-
-    ''' rpc method
-    '''
-    def UploadFile( self,
-        fileName:   str,
-        chanHash:   np.int64, 
-        offset:     np.int64,
-        size:       np.int64 )->[ int, list ]:
-        pass
-
-    ''' rpc method
-    '''
-    def DownloadFile( self,
-        fileName:   str,
-        chanHash:   np.int64,
-        offset:     np.int64,
-        size:       np.int64 )->[ int, list ]:
-        pass
-
-    ''' rpc method
-    '''
-    def GetFileInfo( self,
-        fileName : str ) -> [ int, list ]
-        pass
-
 #2. aggregrate the interface class and the PyRpcServer
 # class by PyFileTransSvr to pickup the python-cpp
 # interaction support
 
-class CFileInfo :
-    def __init__(self ) :
-        self.fileName = ""
-        self.size = 0
-        self.bRead = True
-
-class PyFileTransferBase( PyFileTransfer ):
-
-    def __init__( self ):
-        self.mapChannels = dict()
-
-    def GetTransCtx( self, hChannel )->
-        Union[ CTransContext, None ] :
-        context = self.mapChannels[ hChannel ]
-        if context is None :
-            return None
-        return context
-
-    def SetTransCtx( self, hChannel, ctx )->None :
-        self.mapChannels[ hChannel ] = ctx
-
-    def ReadFileAndSend( self, hChannel ) :
-        ret = 0
-        sizeLimit = 2 * 1024 * 1204
-        while True :
-            ctx = self.GetTransCtx( hChannel )
-            iSize = ctx.iBytesLeft
-            if iSize > sizeLimit :
-                iSize = sizeLimit
-            elif iSize == 0 :
-                self.OnTransferDone( hChannel )
-                break
-
-            pBuf = ctx.fp.read( iSize )
-            ctx.iBytesLeft -= iSize
-
-            ret = self.WriteStreamAsync(
-                hChannel, pBuf,
-                self.WriteStmCallback )
-            if ret < 0 or ret == EC.STATUS_PENDING :
-                break;
-
-        return ret
-
-    def WriteFileAndRecv( self, hChannel, pBuf ) :
-        while True :
-            ret = 0
-
-            if len( pBuf ) > 0 :
-                ctx.fp.write( pBuf )
-                ctx.iBytesLeft -= len( pBuf )
-
-            sizeLimit = 2 * 1024 * 1204
-            ctx = self.GetTransCtx( hChannel )
-            iSize = ctx.iBytesLeft
-            if iSize > sizeLimit :
-                iSize = sizeLimit
-            elif iSize == 0 :
-                self.OnTransferDone( hChannel )
-                break
-
-            listResp = self.ReadStreamAsync(
-                hChannel, self.ReadStmCallback,
-                iSize )
-
-            ret = listResp[ 0 ]
-            if ret < 0 :
-                print( "Error occurs", ret )
-                break
-            elif ret == EC.STATUS_PENDING :
-                break
-            pBuf = listResp[ 1 ]
-
-        return ret
-
-    def OnTransferDone( self, hChannel )
-        oCtx = self.mapChannels[ hChannel ]
-        if oCtx is None :
-            return
-
-        if oCtx.fp is not None :
-            oCtx.fp.close()
-
-        self.mapChannels[ hChannel ] = CTransContext()
-
-    def WriteStmCallback( self, iRet, hChannel, pBuf ) :
-        if iRet < 0 :
-            print( "Download failed with error",
-                hChannel, iRet )
-            return
-        ret = self.ReadFileAndSend( hChannel )
-
-    '''a callback for async stream read
-    '''
-    def ReadStmCallback( self, iRet, hChannel, pBuf ) :
-        if iRet < 0 :
-            print( "Upload failed with error",
-                hChannel, iRet )
-            return
-        self.WriteFileAndRecv( hChannel, pBuf )
-    
 class PyFileTransSvr(
     CEchoServer, PyFileTransferBase, PyRpcServer):
 
-    strRootDir =
-        "/tmp/sfsvr-root/" + getpass.getuser()
+    strRootDir = "/tmp/sfsvr-root/" + getpass.getuser()
 
     def __init__(self, pIoMgr, strCfgFile, strObjName) :
-        super( PyFileTransferBase, self ).__init__(
-            pIoMgr, strCfgFile, strObjName )
-        super( CEchoServer, self ).__init__()
+        PyRpcServer.__init__(
+            self, pIoMgr, strCfgFile, strObjName )
+        PyFileTransferBase.__init__( self )
+        CEchoServer.__init__( self )
 
     ''' rpc method
     '''
@@ -210,14 +68,13 @@ class PyFileTransSvr(
         size:       np.int64 )->[ int, list ]:
         resp = [ 0, list() ]
         while True :
-            fileName =
-                self.strRootDir + "/" + fileName
+            fileName = self.strRootDir + "/" + fileName
             if not os.access( fileName, os.W_OK ) :
                 resp[ 0 ] = -errno.EACCES
                 break
 
-            hChannel = self.oInst.
-                GetChanByIdHash( np.int64( chanHash ) )
+            hChannel = self.oInst.GetChanByIdHash(
+                np.int64( chanHash ) )
             if hChannel == 0 :
                 resp[ 0 ] = -errno.EINVAL
                 break
@@ -240,15 +97,15 @@ class PyFileTransSvr(
 
             try:
                 fp = open( fileName, "wb+" )
-                iSize = fp.seek( 0, SEEK_END )
+                iSize = fp.seek( 0, os.SEEK_END )
                 if iSize < offset :
                     resp[ 0 ] = -errno.ERANGE
                     break
-                fp.seek( offset, SEEK_SET )
+                fp.seek( offset, os.SEEK_SET )
                 fp.truncate()
 
-            except OSError( eno, strerr ) : 
-                resp[ 0 ] = -eno
+            except OSError as err :
+                resp[ 0 ] = -err.errno
                 break
 
             if resp[ 0 ] < 0 :
@@ -269,7 +126,7 @@ class PyFileTransSvr(
                 hChannel, pBuf )
             if ret < 0 :
                 resp[ 0 ] = ret;
-            else
+            else :
                 '''transfer will start immediately
                 and complete this request with
                 success
@@ -282,10 +139,9 @@ class PyFileTransSvr(
     '''
     def GetFileInfo( self,
         fileName : str,
-        bRead : bool ) -> [ int, list ]
+        bRead : bool ) -> [ int, list ] :
         resp = [ 0, list() ]
-        strPath = self.strRootDir +
-            "/" + fileName
+        strPath = self.strRootDir + "/" + fileName
         if not os.path.isfile( strPath ) :
             print( "{} does not exist" )
             resp[ 0 ] = -errno.ENOENT
@@ -297,15 +153,15 @@ class PyFileTransSvr(
 
         if bRead :
             flag = "rb+"
-        else
+        else :
             flag = "wb+" 
         try:
             fp = open( strPath, flag )
-            fileInfo.size = fp.seek( 0, SEEK_END )
+            fileInfo.size = fp.seek( 0, os.SEEK_END )
             fp.close()
             resp.append( [ fileInfo, ] )
-        except OSError( eno, strError )
-            resp[ 0 ] = -eno
+        except OSError as err :
+            resp[ 0 ] = -err.errno
 
         return resp
 
@@ -318,14 +174,13 @@ class PyFileTransSvr(
         size:       np.int64 )->[ int, list ]:
         resp = [ 0, list() ]
         while True :
-            fileName =
-                self.strRootDir + "/" + fileName
+            fileName = self.strRootDir + "/" + fileName
             if not os.access( fileName, os.R_OK ) :
                 resp[ 0 ] = -errno.EACCES
                 break
 
-            hChannel = self.oInst.
-                GetChanByIdHash( np.int64( chanHash ) )
+            hChannel = self.oInst.GetChanByIdHash(
+                np.int64( chanHash ) )
             if hChannel == 0 :
                 resp[ 0 ] = -errno.EINVAL
                 break
@@ -349,16 +204,16 @@ class PyFileTransSvr(
             
             try:
                 fp = open( fileName, "rb" )
-                iSize = fp.seek( 0, SEEK_END )
+                iSize = fp.seek( 0, os.SEEK_END )
                 if iSize < offset + size :
                     resp[ 0 ] = -errno.ERANGE
                 else : 
-                    fp.seek( offset, SEEK_SET ) 
-            except OSError( eno, strerr ) : 
-                resp[ 0 ] = -eno
+                    fp.seek( offset, os.SEEK_SET ) 
+            except OSError as err :
+                resp[ 0 ] = -err.errno
                 break
 
-            if resp[ 0 ] < 0
+            if resp[ 0 ] < 0 :
                 break
 
             oCtx.fp = fp
@@ -374,7 +229,7 @@ class PyFileTransSvr(
                 self.ReadFileAndSend, hChannel )
             if ret < 0 :
                 resp[ 0 ] = ret;
-            else
+            else :
                 '''transfer will start immediately
                 this request is successful
                 '''
@@ -392,7 +247,7 @@ class PyFileTransSvr(
         self.SetTransCtx( hChannel,
             CTransContext() )
 
-    def OnStmClosing( self, hChannel )
+    def OnStmClosing( self, hChannel ) :
         self.OnTransferDone( hChannel )
         self.mapChannels.pop( hChannel )
 

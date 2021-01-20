@@ -22,11 +22,12 @@ from rpcfrmwrk import *
 
 import types
 sys.path.insert(0, '../../')
-from proxy import PyRpcContext, PyRpcServer
+from proxy import PyRpcContext, PyRpcProxy
 from proxy import ErrorCode as EC
 from typing import Union
-from sfsvr import CTransContext, CFileInfo,
-from sfsvr import PyFileTransfer, PyFileTransferBase
+
+from sfcommon import CTransContext, CFileInfo
+from sfcommon import PyFileTransfer, PyFileTransferBase
 
 #1. define the interfaces to support
 #CEchoServer interface
@@ -45,10 +46,23 @@ class PyFileTransProxy(
     CEchoClient, PyFileTransferBase, PyRpcProxy):
 
     def __init__(self, pIoMgr, strCfgFile, strObjName) :
-        super( PyFileTransferBase, self ).__init__(
-            pIoMgr, strCfgFile, strObjName )
-        super( CEchoClient, self ).__init__()
+        PyRpcProxy.__init__(
+            self, pIoMgr, strCfgFile, strObjName )
+        PyFileTransferBase.__init__( self )
+        CEchoClient.__init__( self )
+        self.sem = tr.Semaphore( 0 )
 
+    def OnTransferDone( self, hChannel ) :
+        PyFileTransferBase.OnTransferDone(
+            self, hChannel )
+        self.NotifyComplete()
+
+    def WaitForComplete( self ) :
+        self.sem.acquire()
+
+    def NotifyComplete( self ) :
+        self.sem.release()
+        
     ''' rpc method
     '''
     def UploadFile( self,
@@ -57,9 +71,9 @@ class PyFileTransProxy(
         offset:     np.int64,
         size:       np.int64 )->[ int, list ]:
 
-        resp = PySendRequest( self,
-            ifName, "UploadFile",
-            fileName, hChannel,
+        resp = self.PySendRequest(
+            PyFileTransfer.ifName, "UploadFile",
+            fileName, chanHash,
             offset, size )
 
         return resp
@@ -68,7 +82,7 @@ class PyFileTransProxy(
     '''
     def GetFileInfo( self,
         fileName : str,
-        bRead : bool ) -> [ int, list ]
+        bRead : bool ) -> [ int, list ] :
         return self.PySendRequest(
            PyFileTransfer.ifName, "GetFileInfo", 
             fileName, bRead )
@@ -97,29 +111,29 @@ class PyFileTransProxy(
         self.SetTransCtx( hChannel,
             CTransContext() )
 
-    def OnStmClosing( self, hChannel )
+    def OnStmClosing( self, hChannel ) :
         self.OnTransferDone( hChannel )
         self.mapChannels.pop( hChannel )
 
     def DoUploadFile( self,
         fileName:   str,
         hChannel:   np.int64, 
-        offset:     np.int64,
-        size:       np.int64 )->[ int, list ]:
+        offset: np.int64,
+        size :  np.int64 )->[ int, list ]:
         resp = [ EC.STATUS_SUCCESS, list() ]
         while True :
             if not os.access( fileName, os.W_OK ) :
                 resp[ 0 ] = -errno.EACCES
                 break
 
-            oCtx = self.mapChannels[ hChannel ]
-            if oCtx is None :
+            if hChannel not in self.mapChannels :
+                print( "hahaha",
+                    hChannel, self.mapChannels )
                 resp[ 0 ] = -errno.ENOENT
-                break;
+                break
 
-            if size == 0 :
-                resp[ 0 ] = -errno.EINVAL
-                break;
+            oCtx = self.mapChannels[ hChannel ]
+
             '''The channel can be full-duplex.
             But for simplicity, just one direction
             at one time
@@ -130,14 +144,16 @@ class PyFileTransProxy(
 
             try:
                 fp = open( fileName, "rb+" )
-                iSize = fp.seek( 0, SEEK_END )
-                if iSize < offset :
+                iSize = fp.seek( 0, os.SEEK_END )
+                if iSize < offset + size :
                     resp[ 0 ] = -errno.ERANGE
                     break
-                fp.seek( offset, SEEK_SET )
+                fp.seek( offset, os.SEEK_SET )
+                if size == 0 :
+                    size = iSize
 
-            except OSError( eno, strerr ) : 
-                resp[ 0 ] = -eno
+            except OSError as err : 
+                resp[ 0 ] = -err.errno
                 break
 
             if resp[ 0 ] < 0 :
@@ -149,7 +165,8 @@ class PyFileTransProxy(
                 break;
 
             chanHash = ret[ 1 ]
-            ret = self.UploadFile( ifName,
+            ret = self.UploadFile(
+                PyFileTransfer.ifName,
                 chanHash, offset, size )
             if ret[ 0 ] < 0 :
                 resp[ 0 ] = ret[ 0 ]
@@ -168,7 +185,7 @@ class PyFileTransProxy(
                 self.ReadFileAndSend, hChannel )
             if ret < 0 :
                 resp[ 0 ] = ret;
-            else
+            else :
                 '''transfer will start immediately
                 and complete this request with
                 success
@@ -207,18 +224,18 @@ class PyFileTransProxy(
             
             try:
                 fp = open( fileName, "wb+" )
-                iSize = fp.seek( 0, SEEK_END )
+                iSize = fp.seek( 0, os.SEEK_END )
                 if iSize < offset + size :
                     resp[ 0 ] = -errno.ERANGE
                 else : 
                     fp.truncate( offset )
-                    fp.seek( offset, SEEK_SET ) 
+                    fp.seek( offset, os.SEEK_SET ) 
 
             except OSError( eno, strerr ) : 
                 resp[ 0 ] = -eno
                 break
 
-            if resp[ 0 ] < 0
+            if resp[ 0 ] < 0 :
                 break
 
             oCtx.fp = fp
@@ -245,7 +262,7 @@ class PyFileTransProxy(
         return resp
 
 
-def test_main() : 
+def test_main_cli() : 
     while( True ) :
         '''create the transfer context, and start
         it'''
@@ -259,7 +276,7 @@ def test_main() :
         print( "start to work here..." )
         oProxy = PyFileTransProxy( oContext.pIoMgr,
             "./sfdesc.json",
-            "PyFileTransSvr" );
+            "PyFileTransSvr" )
 
         ret = oProxy.GetError() 
         if ret < 0 :
@@ -269,17 +286,25 @@ def test_main() :
         if ret < 0 :
             break
 
-        #wait if the server is not online
-        while ( cpp.stateRecovery ==
-            oProxy.oInst.GetState() ):
-            time.sleep( 1 )
+        '''to setup a stream channel between the
+        client and the server '''
+        hChannel = oProxy.StartStream() 
+        if hChannel == 0 :
+            ret = -EC.ERROR_FAIL
+            break;
 
-        #keep wait till offline
-        while ( cpp.stateConnected ==
-            oProxy.oInst.GetState() ):
-            time.sleep( 1 )
-            
-        break
+        ''' upload a file
+        '''
+        tupRet = oProxy.DoUploadFile(
+            "./f100M.dat", hChannel, 0, 0 )
+         
+        ret = tupRet[ 0 ]
+        if ret < 0 :
+            break
+
+        oProxy.WaitForComplete()
+
+        break #while True
 
     ''' Stop the guys'''
     if oProxy is not None :
@@ -291,6 +316,6 @@ def test_main() :
     return ret;
 
 
-ret = test_main()
+ret = test_main_cli()
 quit( ret )
 
