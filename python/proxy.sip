@@ -1369,9 +1369,13 @@ class CPythonInterfBase : public T
             ( intptr_t )pPyArgs );
         if( ERROR( ret ) )
             return ret;
-        ret = this->GetIoMgr()->RescheduleTask( pTask );
+        ret = this->GetIoMgr()->
+            RescheduleTask( pTask );
         if( ERROR( ret ) )
+        {
             ( *pTask )( eventCancelTask );
+            return ret;
+        }
         // NOTE: if the task is canceled,
         // the reference won't be released
         Py_INCREF( pPyCb );

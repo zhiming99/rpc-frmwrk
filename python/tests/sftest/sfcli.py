@@ -42,14 +42,10 @@ class CEchoClient:
         return self.sendRequest(
             CEchoClient.ifName, "Echo", text )
 
-class PyFileTransProxy(
-    CEchoClient, PyFileTransferBase, PyRpcProxy):
+class PyFileTransClient( PyFileTransferBase ):
 
-    def __init__(self, pIoMgr, strCfgFile, strObjName) :
-        PyRpcProxy.__init__(
-            self, pIoMgr, strCfgFile, strObjName )
+    def __init__(self ) :
         PyFileTransferBase.__init__( self )
-        CEchoClient.__init__( self )
         self.sem = tr.Semaphore( 0 )
 
     def OnTransferDone( self, hChannel ) :
@@ -67,12 +63,12 @@ class PyFileTransProxy(
     '''
     def UploadFile( self,
         fileName:   str,
-        chanHash:   np.int64, 
-        offset:     np.int64,
-        size:       np.int64 )->[ int, list ]:
+        chanHash:   np.uint64, 
+        offset:     np.uint64,
+        size:       np.uint64 )->[ int, list ]:
 
         resp = self.PySendRequest(
-            PyFileTransfer.ifName, "UploadFile",
+            PyFileTransClient.ifName, "UploadFile",
             fileName, chanHash,
             offset, size )
 
@@ -84,19 +80,19 @@ class PyFileTransProxy(
         fileName : str,
         bRead : bool ) -> [ int, list ] :
         return self.PySendRequest(
-           PyFileTransfer.ifName, "GetFileInfo", 
+           PyFileTransClient.ifName, "GetFileInfo", 
             fileName, bRead )
 
     ''' rpc method
     '''
     def DownloadFile( self,
         fileName:   str,
-        chanHash:   np.int64,
-        offset:     np.int64,
-        size:       np.int64 )->[ int, list ]:
+        chanHash:   np.uint64,
+        offset:     np.uint64,
+        size:       np.uint64 )->[ int, list ]:
 
         resp = self.PySendRequest(
-           PyFileTransfer.ifName, "DownloadFile", 
+           PyFileTransClient.ifName, "DownloadFile", 
            fileName, chanHash, offset, size )
 
         return resp
@@ -110,6 +106,7 @@ class PyFileTransProxy(
     def OnStmReady( self, hChannel ) :
         self.SetTransCtx( hChannel,
             CTransContext() )
+        self.NotifyComplete()
 
     def OnStmClosing( self, hChannel ) :
         self.OnTransferDone( hChannel )
@@ -117,18 +114,16 @@ class PyFileTransProxy(
 
     def DoUploadFile( self,
         fileName:   str,
-        hChannel:   np.int64, 
-        offset: np.int64,
-        size :  np.int64 )->[ int, list ]:
+        hChannel:   np.uint64, 
+        offset: np.uint64=0,
+        size :  np.uint64=0 )->[ int, list ]:
         resp = [ EC.STATUS_SUCCESS, list() ]
         while True :
-            if not os.access( fileName, os.W_OK ) :
+            if not os.access( fileName, os.R_OK ) :
                 resp[ 0 ] = -errno.EACCES
                 break
 
             if hChannel not in self.mapChannels :
-                print( "hahaha",
-                    hChannel, self.mapChannels )
                 resp[ 0 ] = -errno.ENOENT
                 break
 
@@ -153,6 +148,7 @@ class PyFileTransProxy(
                     size = iSize
 
             except OSError as err : 
+                print( "Error open file", err )
                 resp[ 0 ] = -err.errno
                 break
 
@@ -195,9 +191,9 @@ class PyFileTransProxy(
 
     def DoDownloadFile( self,
         fileName:   str,
-        hChannel:   np.int64,
-        offset:     np.int64,
-        size:       np.int64 )->[ int, list ]:
+        hChannel:   np.uint64,
+        offset:     np.uint64,
+        size:       np.uint64 )->[ int, list ]:
         resp = [ 0, list() ]
         while True :
             if not os.access( fileName, os.W_OK ) :
@@ -272,8 +268,17 @@ class PyFileTransProxy(
 
         return resp
 
+class PyFileTransProxy(
+    CEchoClient, PyFileTransClient, PyRpcProxy):
 
-def test_main_cli() : 
+    def __init__(self, pIoMgr, strCfgFile, strObjName) :
+        PyRpcProxy.__init__( self,
+            pIoMgr, strCfgFile, strObjName )
+        PyFileTransClient.__init__( self )
+        CEchoClient.__init__( self )
+
+
+def test_main() : 
     while( True ) :
         '''create the transfer context, and start
         it'''
@@ -304,10 +309,14 @@ def test_main_cli() :
             ret = -EC.ERROR_FAIL
             break;
 
+        '''Wait till OnStreamReady complete
+        '''
+        oProxy.WaitForComplete()
+
         ''' upload a file
         '''
         tupRet = oProxy.DoUploadFile(
-            "./f100M.dat", hChannel, 0, 0 )
+            "./f100M.dat", hChannel )
          
         ret = tupRet[ 0 ]
         if ret < 0 :
@@ -327,6 +336,6 @@ def test_main_cli() :
     return ret;
 
 
-ret = test_main_cli()
+ret = test_main()
 quit( ret )
 

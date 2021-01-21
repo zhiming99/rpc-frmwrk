@@ -48,34 +48,27 @@ class CEchoServer:
 # class by PyFileTransSvr to pickup the python-cpp
 # interaction support
 
-class PyFileTransSvr(
-    CEchoServer, PyFileTransferBase, PyRpcServer):
+class PyFileTransSvr( PyFileTransferBase ):
 
     strRootDir = "/tmp/sfsvr-root/" + getpass.getuser()
 
-    def __init__(self, pIoMgr, strCfgFile, strObjName) :
-        PyRpcServer.__init__(
-            self, pIoMgr, strCfgFile, strObjName )
+    def __init__(self ) :
         PyFileTransferBase.__init__( self )
-        CEchoServer.__init__( self )
 
     ''' rpc method
     '''
     def UploadFile( self,
         callback,
         fileName:   str,
-        chanHash:   np.int64, 
-        offset:     np.int64,
-        size:       np.int64 )->[ int, list ]:
+        chanHash:   np.uint64, 
+        offset:     np.uint64,
+        size:       np.uint64 )->[ int, list ]:
         resp = [ 0, list() ]
         while True :
-            fileName = self.strRootDir + "/" + fileName
-            if not os.access( fileName, os.W_OK ) :
-                resp[ 0 ] = -errno.EACCES
-                break
+            fileName = self.strRootDir + "/" + fileName + "-1"
 
             hChannel = self.oInst.GetChanByIdHash(
-                np.int64( chanHash ) )
+                np.uint64( chanHash ) )
             if hChannel == 0 :
                 resp[ 0 ] = -errno.EINVAL
                 break
@@ -134,6 +127,8 @@ class PyFileTransSvr(
                 '''
                 resp[ 0 ] = EC.STATUS_SUCCESS
 
+            break
+
         return resp
 
     ''' rpc method
@@ -172,9 +167,9 @@ class PyFileTransSvr(
     def DownloadFile( self,
         callback,
         fileName:   str,
-        chanHash:   np.int64,
-        offset:     np.int64,
-        size:       np.int64 )->[ int, list ]:
+        chanHash:   np.uint64,
+        offset:     np.uint64,
+        size:       np.uint64 )->[ int, list ]:
         resp = [ 0, list() ]
         while True :
             fileName = self.strRootDir + "/" + fileName
@@ -183,7 +178,7 @@ class PyFileTransSvr(
                 break
 
             hChannel = self.oInst.GetChanByIdHash(
-                np.int64( chanHash ) )
+                np.uint64( chanHash ) )
             if hChannel == 0 :
                 resp[ 0 ] = -errno.EINVAL
                 break
@@ -254,6 +249,14 @@ class PyFileTransSvr(
         self.OnTransferDone( hChannel )
         self.mapChannels.pop( hChannel )
 
+class PyFileTransSvrObj(
+    CEchoServer, PyFileTransSvr, PyRpcServer ) :
+    def __init__(self, pIoMgr, strCfgFile, strObjName) :
+        PyRpcServer.__init__(
+            self, pIoMgr, strCfgFile, strObjName )
+        PyFileTransSvr.__init__( self )
+        CEchoServer.__init__( self )
+
 def test_main() : 
     while( True ) :
         '''create the transfer context, and start
@@ -266,7 +269,7 @@ def test_main() :
         '''create the server object, and start
         it'''
         print( "start to work here..." )
-        oServer = PyFileTransSvr( oContext.pIoMgr,
+        oServer = PyFileTransSvrObj( oContext.pIoMgr,
             "./sfdesc.json",
             "PyFileTransSvr" );
 

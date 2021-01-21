@@ -269,34 +269,45 @@ class PyRpcServices :
 
         if listResp is None :
             print( "HandleAsyncResp: bad response" )
-            callback( self, -cpp.EBADMSG, *listArgs )
+            listArgs.insert( 0, -cpp.EBADMSG )
+            self.InvokeCallback( callback, listArgs )
             return
 
         if iArgNum < 0 :
             print( "HandleAsyncResp: bad callback")
-            callback( self, -cpp.EBADMSG, *listArgs )
+            listArgs.insert( 0, -cpp.EBADMSG )
+            self.InvokeCallback( callback, listArgs )
             return
 
         ret = listResp[ 0 ];
         if seriProto == cpp.seriNone :
             if len( listResp ) <= 1 :
-                callback( self, ret, *listArgs )
+                listArgs.insert( 0, ret )
+                self.InvokeCallback( callback, listArgs )
             elif isinstance( listResp[ 1 ], list ) :
-                callback( self, ret, *listResp[ 1 ] )
+                listArgs = listResp[ 1 ]
+                listArgs.insert( 0, ret )
+                self.InvokeCallback( callback, listArgs )
             else :
-                callback( self, ret, *listArgs )
+                listArgs.insert( 0, ret )
+                self.InvokeCallback( callback, listArgs )
+
         elif seriProto == cpp.seriPython :
             if len( listResp ) <= 1 :
-                callback( self, ret, *listArgs )
+                listArgs.insert( 0, ret )
+                self.InvokeCallback( callback, listArgs )
             elif isinstance( listResp[ 1 ], bytearray ) :
                 try:
                     trueResp = pickle.loads( listResp[ 1 ] )
                     if isinstance( trueResp, list ) :
-                        callback( self, ret, *trueResp )
+                        trueResp.insert( 0, ret )
+                        self.InvokeCallback( callback, trueResp )
                 except PickleError:
-                    callback( self, -errno.EBADMSG, *listArgs )
+                    listArgs.insert( 0, -cpp.EBADMSG )
+                    self.InvokeCallback( callback, listArgs )
             else :
-                callback( self, -errno.EBADMSG, *listArgs )
+                listArgs.insert( 0, -cpp.EBADMSG )
+                self.InvokeCallback( ret, listArgs )
 
         return
 
@@ -542,12 +553,12 @@ class PyRpcServices :
 
             argList = ret[ 1 ]
             found = False
-            for iftype in type(self).__bases__ :
+            typeFound = None
+            bases = type( self ).__bases__ 
+            for iftype in bases :
                 if not hasattr( iftype, "ifName" ) :
-                    prevType = iftype
                     continue;
                 if iftype.ifName != ifName :
-                    prevType = iftype
                     continue;
                 found = True
                 typeFound = iftype;
@@ -569,7 +580,7 @@ class PyRpcServices :
 
             found = False
             oMembers = inspect.getmembers(
-                type( self ), inspect.isfunction)
+                typeFound, inspect.isfunction)
 
             for oMethod in oMembers :
                 if nameComps[ 1 ] != oMethod[ 0 ]: 
@@ -587,6 +598,7 @@ class PyRpcServices :
                 break
 
             resp = targetMethod( self, callback, *argList )
+            print( "InvokeMethod", resp )
             if seriProto == cpp.seriNone :
                 break;
 
@@ -612,14 +624,23 @@ class PyRpcServices :
 
         return resp
 
+    def InvokeCallback( self, callback, listArgs):
+        ret = None
+        if inspect.isfunction( callback ) :
+            ret = callback( self, *listArgs )
+        elif inspect.ismethod( callback ) :
+            ret = callback( *listArgs )
+        return ret
+
     ''' run the callback on a new context instead
     of the current context
     '''
     def DeferCall( self, callback, *args ) :
-        self.oInst.DeferCall( callback, *args )
+        return self.oInst.PyDeferCall(
+            callback, [ *args ] )
 
-    def DeferCallback( self, callback, *args ) :
-        callback( self, *args )
+    def DeferCallback( self, callback, listArgs ) :
+        self.InvokeCallback( callback, listArgs )
     
 class PyRpcProxy( PyRpcServices ) :
 
