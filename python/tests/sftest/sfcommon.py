@@ -169,9 +169,6 @@ class PyFileTransferBase( PyFileTransfer ):
         print( f"Sent {ctx.iBytesSent},",
             f"To send {ctx.iBytesLeft} " )
 
-        if ctx.iBytesSent >= 9863168 :
-            return
-
         ret = self.ReadFileAndSend( hChannel )
 
     '''a callback for async stream read
