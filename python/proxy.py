@@ -31,6 +31,9 @@ class ErrorCode( IntEnum ) :
     ERROR_CANCEL_INSTEAD = np.int32( 0x8001000f )
     ERROR_QUEUE_FULL = np.int32( 0x8001000e )
 
+def DebugPrint( strMsg, logLevel = 3 ) :
+    PyDbgPrint( strMsg, logLevel )
+
 def GetNpValue( typeid, val ) :
     if typeid == cpp.typeUInt32 :
         return np.uint32( val )
@@ -598,7 +601,6 @@ class PyRpcServices :
                 break
 
             resp = targetMethod( self, callback, *argList )
-            print( "InvokeMethod", resp )
             if seriProto == cpp.seriNone :
                 break;
 
@@ -641,7 +643,7 @@ class PyRpcServices :
 
     def DeferCallback( self, callback, listArgs ) :
         self.InvokeCallback( callback, listArgs )
-    
+
 class PyRpcProxy( PyRpcServices ) :
 
     def __init__( self, pIoMgr, strDesc, strSvrObj ) :

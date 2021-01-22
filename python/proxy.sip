@@ -828,6 +828,8 @@ class CPythonInterfBase : public T
             for( auto elem : vecResp )
                 oResp.Push( elem );
 
+            oResp[ propSeriProto ] = dwSeriProto;
+
         }while( 0 );
         if( listResp != nullptr )
             Py_DECREF( listResp );
@@ -2131,6 +2133,11 @@ CPythonProxy* CastToProxy(
 %MethodCode
     CPythonProxy* pProxy = *a0;
     sipRes = pProxy;
+%End
+
+void PyDbgPrint( char* szMsg, int level = 3 );
+%MethodCode
+    DebugPrintEx( ( EnumLogLvl )a1, 0, "%s", a0 );
 %End
 
 %Include server.sip

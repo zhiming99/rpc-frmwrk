@@ -233,6 +233,8 @@ class PyFileTransSvr( PyFileTransferBase ):
                 '''
                 resp[ 0 ] = EC.STATUS_SUCCESS
 
+            break
+
         return resp
 
     '''OnStmReady is a system defined event

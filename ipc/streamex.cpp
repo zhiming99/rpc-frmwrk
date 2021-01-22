@@ -46,8 +46,8 @@ namespace rpcfrmwrk
             break; \
         _ret = true; \
         _pCallback = pCtxExt->pCallback; \
-        gint32 iRet =  pCtx->GetStatus(); \
-        if( ERROR( iRet ) ) \
+        _iRet =  pCtx->GetStatus(); \
+        if( ERROR( _iRet ) ) \
             break; \
         guint32 dwDir = pCtx->GetIoDirection();\
         if( dwDir == IRP_DIR_IN ) {\
@@ -75,7 +75,7 @@ do{ \
         break; \
     CParamList oResp; \
     oResp[ propReturnValue ] = iRet; \
-    if( SUCCEEDED( ret ) ) \
+    if( SUCCEEDED( iRet ) ) \
         oResp.Push( pBuf ); \
     TaskletPtr pDummy; \
     pDummy.NewObj( clsid( CIfDummyTask ) ); \

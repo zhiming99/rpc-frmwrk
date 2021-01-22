@@ -134,7 +134,7 @@ class PyFileTransClient( PyFileTransferBase ):
             at one time
             '''
             if oCtx.fp is not None:
-                resp[ 0 ] = -error.EBUSY
+                resp[ 0 ] = -errno.EBUSY
                 break
 
             try:
@@ -186,6 +186,8 @@ class PyFileTransClient( PyFileTransferBase ):
                 success
                 '''
                 resp[ 0 ] = EC.STATUS_SUCCESS
+
+            break
 
         return resp
 
@@ -265,6 +267,8 @@ class PyFileTransClient( PyFileTransferBase ):
                 this request is successful
                 '''
                 resp[ 0 ] = EC.STATUS_SUCCESS
+
+            break
 
         return resp
 
