@@ -9,5 +9,5 @@ The workflow is as follows,
   three Read( or Write ) approaches, as synchronous read/write, asynchronous read/write. And   
   `NoWait` read to peek the incoming queue, `NoWait` write to submit a write request, without   
   waiting for the result.
-* To close the stream channel, both proxy and server can launch a CloseStream request, or stop   
+  * To close the stream channel, both proxy and server can launch a CloseStream request, or stop   
 the proxy or server directly.
