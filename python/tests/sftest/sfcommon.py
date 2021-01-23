@@ -106,6 +106,10 @@ class PyFileTransferBase( PyFileTransfer ):
 
         return ret
 
+    def SendTokenDone( self, hChannel ) :
+        pBuf = "over"
+        self.WriteStream( hChannel, pBuf )
+
     def WriteFileAndRecv( self, hChannel, pBuf ) :
         ctx = self.GetTransCtx( hChannel )
         if ctx is None :
@@ -127,6 +131,8 @@ class PyFileTransferBase( PyFileTransfer ):
                 iSize = sizeLimit
             elif iSize == 0 :
                 self.OnTransferDone( hChannel )
+                self.DeferCall(
+                    self.SendTokenDone, hChannel )
                 break
 
             listResp = self.ReadStreamAsync(

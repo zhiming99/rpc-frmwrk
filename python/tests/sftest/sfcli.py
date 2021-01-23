@@ -78,7 +78,7 @@ class PyFileTransClient( PyFileTransferBase ):
     '''
     def GetFileInfo( self,
         fileName : str,
-        bRead : bool ) -> [ int, list ] :
+        bRead : bool = True ) -> [ int, list ] :
         return self.PySendRequest(
            PyFileTransClient.ifName, "GetFileInfo", 
             fileName, bRead )
@@ -129,10 +129,6 @@ class PyFileTransClient( PyFileTransferBase ):
 
             oCtx = self.mapChannels[ hChannel ]
 
-            '''The channel can be full-duplex.
-            But for simplicity, just one direction
-            at one time
-            '''
             if oCtx.fp is not None:
                 resp[ 0 ] = -errno.EBUSY
                 break
@@ -185,7 +181,7 @@ class PyFileTransClient( PyFileTransferBase ):
                 and complete this request with
                 success
                 '''
-                resp[ 0 ] = EC.STATUS_SUCCESS
+                resp[ 0 ] = EC.STATUS_PENDING
 
             break
 
@@ -210,10 +206,6 @@ class PyFileTransClient( PyFileTransferBase ):
             if size == 0 :
                 resp[ 0 ] = -errno.EINVAL
                 break;
-            '''The channel can be full-duplex.
-            But for simplicity, just one direction
-            at one time
-            '''
 
             if oCtx.fp is not None:
                 resp[ 0 ] = -error.EBUSY
@@ -221,12 +213,8 @@ class PyFileTransClient( PyFileTransferBase ):
             
             try:
                 fp = open( fileName, "wb+" )
-                iSize = fp.seek( 0, os.SEEK_END )
-                if iSize < offset + size :
-                    resp[ 0 ] = -errno.ERANGE
-                else : 
-                    fp.truncate( offset )
-                    fp.seek( offset, os.SEEK_SET ) 
+                fp.truncate( offset )
+                fp.seek( offset, os.SEEK_SET ) 
 
             except OSError as err : 
                 resp[ 0 ] = -err.errno
@@ -258,15 +246,16 @@ class PyFileTransClient( PyFileTransferBase ):
             '''
             pBuf = bytearray()
             ret = self.DeferCall(
-                self.WriteFileAndRecv, hChannel,
-                pBuf )
+                self.WriteFileAndRecv,
+                hChannel, pBuf )
             if ret < 0 :
                 resp[ 0 ] = ret;
             else :
                 '''transfer will start immediately
-                this request is successful
+                Notify the caller with an PENDING
+                status
                 '''
-                resp[ 0 ] = EC.STATUS_SUCCESS
+                resp[ 0 ] = EC.STATUS_PENDING
 
             break
 
@@ -310,7 +299,7 @@ def test_main() :
         client and the server '''
         hChannel = oProxy.StartStream() 
         if hChannel == 0 :
-            ret = -EC.ERROR_FAIL
+            ret = EC.ERROR_FAIL
             break;
 
         '''Wait till OnStreamReady complete
@@ -319,9 +308,47 @@ def test_main() :
 
         ''' upload a file
         '''
+        print( "Uploading file..." )
         tupRet = oProxy.DoUploadFile(
             "./f100M.dat", hChannel )
          
+        ret = tupRet[ 0 ]
+        if ret < 0 :
+            break
+
+        '''Wait till OnTransferDone notify
+        '''
+        oProxy.WaitForComplete()
+
+        '''confirm by check if server send an
+        "over" token
+        '''
+        tupRet = oProxy.ReadStream( hChannel )
+        ret = tupRet[ 0 ]
+        if ret < 0 :
+            break
+        
+        pBuf = tupRet[ 1 ].decode( sys.stdout.encoding )
+        if not ( pBuf[ 0 ] == 'o' and pBuf[ 1 ] == 'v' 
+            and pBuf[ 2 ] == 'e' and
+            pBuf[ 3 ] == 'r' ) :
+            ret = EC.ERROR_FAIL
+            break
+        
+        ''' Download a file
+        '''
+        print( "Downloading file..." )
+        tupRet = oProxy.GetFileInfo( "f100M.dat" )
+        ret = tupRet[ 0 ]
+        if ret < 0 :
+            break
+
+        fileInfo = tupRet[ 1 ][ 0 ] 
+        fileSize = fileInfo.size
+
+        tupRet = oProxy.DoDownloadFile(
+            "f100M.dat", hChannel, 0, fileSize )
+
         ret = tupRet[ 0 ]
         if ret < 0 :
             break

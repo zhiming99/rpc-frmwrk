@@ -15,6 +15,7 @@ class ErrorCode( IntEnum ) :
     STATUS_PENDING = np.int32( 0x10001 )
     STATUS_MORE_PROCESS_NEEDED = np.int32( 0x10002 )
     STATUS_CHECK_RESP = np.int32( 0x10003 )
+    ERROR_FAIL = np.int32( 0x80000001 )
     ERROR_ADDRESS = np.int32( 0x80010002 )
     ERROR_STATE = np.int32( 0x80010003 )
     ERROR_WRONG_THREAD = np.int32( 0x80010004 )

@@ -1,6 +1,6 @@
 '''This test case demonstrates 
     . Double-direction big data transfer via
-    streams
+    stream channel
 
     . How to enable python's built-in
     serialization
@@ -137,7 +137,7 @@ class PyFileTransSvr( PyFileTransferBase ):
         callback,
         fileName : str,
         bRead : bool ) -> [ int, list ] :
-        resp = [ 0, list() ]
+        resp = [ 0, None ]
         strPath = self.strRootDir + "/" + fileName
         if not os.path.isfile( strPath ) :
             print( "{} does not exist" )
@@ -156,7 +156,7 @@ class PyFileTransSvr( PyFileTransferBase ):
             fp = open( strPath, flag )
             fileInfo.size = fp.seek( 0, os.SEEK_END )
             fp.close()
-            resp.append( [ fileInfo, ] )
+            resp[ 1 ] = [ fileInfo, ]
         except OSError as err :
             resp[ 0 ] = -err.errno
 

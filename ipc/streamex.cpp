@@ -447,7 +447,6 @@ gint32 CIfStmReadWriteTask::OnIoIrpComplete(
             break;
         }
 
-        guint32 dwSize = pWritten->size();
         if( m_queRequests.empty() )
         {
             ret = ERROR_STATE;
@@ -459,21 +458,11 @@ gint32 CIfStmReadWriteTask::OnIoIrpComplete(
             pCurIrp->GetTopStack();
 
         BufPtr pBuf = pCurCtx->m_pReqData;
-        if( pBuf.IsEmpty() ||
-            pBuf->empty() )
+        if( pBuf != pWritten )
         {
             ret = -EINVAL;
             break;
         }
-
-        if( pBuf->size() < dwSize )
-        {
-            ret = -ERANGE;
-            break;
-        }
-
-        pBuf->SetOffset(
-            pBuf->offset() + dwSize );
 
         // recover the buffer
         BufPtr pExtBuf;
