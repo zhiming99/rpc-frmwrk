@@ -1,14 +1,16 @@
 '''This test case demonstrates 
     . Double-direction big data transfer via
-    streams
+    streaming API
 
-    . How to enable python's built-in
+    . send python's request with the built-in
     serialization
 
-    . Multiple interfaces support
+    . How the multiple rpc interfaces are
+    aggregrated
 
     . Note: this server is dedicated for python
-    client due to python specific serilization
+    client since we are using python specific
+    serilization
 '''
 import sys
 import time
@@ -160,11 +162,18 @@ class PyFileTransClient( PyFileTransferBase ):
             if resp[ 0 ] < 0 :
                 break
 
+            '''convert the handle to a idhash,
+            which the peer can use to find the
+            stream channel to transfer
+            '''
             ret = self.oInst.GetPeerIdHash( hChannel )
             if ret[ 0 ] < 0 :
                 resp[ 0 ] = ret[ 0 ]
                 break;
 
+            '''make an rpc call with the file
+            information for uploading
+            '''
             chanHash = ret[ 1 ]
             ret = self.UploadFile( fileName,
                 chanHash, offset, size )
@@ -179,7 +188,9 @@ class PyFileTransClient( PyFileTransferBase ):
             oCtx.byDir = 'u'
             oCtx.strPath = fileName
 
-            '''start the transfer a bit later
+            '''start sending file content via the
+            specified channel very soon, but not
+            immediately.
             '''
             ret = self.DeferCall(
                 self.ReadFileAndSend, hChannel )
@@ -188,8 +199,7 @@ class PyFileTransClient( PyFileTransferBase ):
             else :
                 '''transfer will start immediately
                 and complete this request with
-                success
-                '''
+                success '''
                 resp[ 0 ] = EC.STATUS_PENDING
 
             break
@@ -237,6 +247,9 @@ class PyFileTransClient( PyFileTransferBase ):
                 resp[ 0 ] = ret[ 0 ]
                 break;
 
+            '''Make an rpc call to inform the
+            download information.
+            '''
             chanHash = ret[ 1 ]
             ret = self.DownloadFile( fileName,
                 chanHash, offset, size )
@@ -251,7 +264,8 @@ class PyFileTransClient( PyFileTransferBase ):
             oCtx.byDir = 'd'
             oCtx.strPath = fileName
 
-            '''start the transfer a bit later
+            '''start receiving file content via
+            the specified channel hChannel.
             '''
             pBuf = bytearray()
             ret = self.DeferCall(
@@ -300,6 +314,8 @@ def test_main() :
         if ret < 0 :
             break
 
+        '''Start the proxy object
+        '''
         ret = oProxy.Start()
         if ret < 0 :
             break
@@ -315,7 +331,8 @@ def test_main() :
         '''
         oProxy.WaitForComplete()
 
-        '''Check if server is ready
+        '''confirm if server is ready by receiving
+        a token from server
         '''
         tupRet = oProxy.ReadStream( hChannel )
         ret = tupRet[ 0 ]
@@ -361,6 +378,11 @@ def test_main() :
         ''' Download a file
         '''
         print( "Downloading file..." )
+
+        '''Before downloading, fetch the
+        information of the file from the server,
+        via the rpc call `GetFileInfo'
+        '''
         tupRet = oProxy.GetFileInfo( "f100M.dat" )
         ret = tupRet[ 0 ]
         if ret < 0 :
@@ -369,6 +391,8 @@ def test_main() :
         fileInfo = tupRet[ 1 ][ 0 ] 
         fileSize = fileInfo.size
 
+        '''
+        '''
         tupRet = oProxy.DoDownloadFile(
             "f100M.dat", hChannel, 0, fileSize )
 
