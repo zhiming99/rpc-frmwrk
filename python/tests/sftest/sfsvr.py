@@ -246,7 +246,15 @@ class PyFileTransSvr( PyFileTransferBase ):
     def OnStmReady( self, hChannel ) :
         self.SetTransCtx( hChannel,
             CTransContext() )
+        self.DeferCall(
+            self.SendToken,
+            hChannel, "rdy" )
 
+    '''OnStmClosing is a system defined event
+    handler, called when the stream channel has
+    been closed by the peer, or this proxy/server
+    will shutdown, or actively calls `CloseStream'
+    '''
     def OnStmClosing( self, hChannel ) :
         self.OnTransferDone( hChannel )
         self.mapChannels.pop( hChannel )

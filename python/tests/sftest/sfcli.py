@@ -29,8 +29,7 @@ from typing import Union
 from sfcommon import CTransContext, CFileInfo
 from sfcommon import PyFileTransfer, PyFileTransferBase
 
-#1. define the interfaces to support
-#CEchoServer interface
+# define the RPC interface to support
 class CEchoClient:
     """mandatory class member to define the
     interface name, which will be used to invoke
@@ -42,6 +41,8 @@ class CEchoClient:
         return self.sendRequest(
             CEchoClient.ifName, "Echo", text )
 
+# or inherit an RPC interface, and implement the
+# RPC methods
 class PyFileTransClient( PyFileTransferBase ):
 
     def __init__(self ) :
@@ -59,7 +60,7 @@ class PyFileTransClient( PyFileTransferBase ):
     def NotifyComplete( self ) :
         self.sem.release()
         
-    ''' rpc method
+    ''' rpc method impl
     '''
     def UploadFile( self,
         fileName:   str,
@@ -74,7 +75,7 @@ class PyFileTransClient( PyFileTransferBase ):
 
         return resp
 
-    ''' rpc method
+    ''' rpc method impl
     '''
     def GetFileInfo( self,
         fileName : str,
@@ -83,7 +84,7 @@ class PyFileTransClient( PyFileTransferBase ):
            PyFileTransClient.ifName, "GetFileInfo", 
             fileName, bRead )
 
-    ''' rpc method
+    ''' rpc method impl
     '''
     def DownloadFile( self,
         fileName:   str,
@@ -108,6 +109,11 @@ class PyFileTransClient( PyFileTransferBase ):
             CTransContext() )
         self.NotifyComplete()
 
+    '''OnStmClosing is a system defined event
+    handler, called when the stream channel has
+    been closed by the peer, or this proxy/server
+    will shutdown, or actively calls `CloseStream'
+    '''
     def OnStmClosing( self, hChannel ) :
         self.OnTransferDone( hChannel )
         self.mapChannels.pop( hChannel )
@@ -136,6 +142,9 @@ class PyFileTransClient( PyFileTransferBase ):
             try:
                 fp = open( fileName, "rb+" )
                 iSize = fp.seek( 0, os.SEEK_END )
+                if iSize == 0 :
+                    resp[ 0 ] = -errno.ENODATA
+                    break
                 if iSize < offset + size :
                     resp[ 0 ] = -errno.ERANGE
                     break
@@ -302,9 +311,23 @@ def test_main() :
             ret = EC.ERROR_FAIL
             break;
 
-        '''Wait till OnStreamReady complete
+        '''Wait till OnStmReady notifies.
         '''
         oProxy.WaitForComplete()
+
+        '''Check if server is ready
+        '''
+        tupRet = oProxy.ReadStream( hChannel )
+        ret = tupRet[ 0 ]
+        if ret < 0 :
+            break
+        
+        pBuf = tupRet[ 1 ].decode(
+            sys.stdout.encoding )
+
+        if not pBuf[ :3 ] == "rdy" :
+            ret = EC.ERROR_FAIL
+            break
 
         ''' upload a file
         '''
@@ -328,10 +351,10 @@ def test_main() :
         if ret < 0 :
             break
         
-        pBuf = tupRet[ 1 ].decode( sys.stdout.encoding )
-        if not ( pBuf[ 0 ] == 'o' and pBuf[ 1 ] == 'v' 
-            and pBuf[ 2 ] == 'e' and
-            pBuf[ 3 ] == 'r' ) :
+        pBuf = tupRet[ 1 ].decode(
+            sys.stdout.encoding )
+
+        if not pBuf[ :4 ] == "over" :
             ret = EC.ERROR_FAIL
             break
         
