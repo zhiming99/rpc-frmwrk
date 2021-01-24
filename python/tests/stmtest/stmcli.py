@@ -115,15 +115,10 @@ def test_main() :
 
         '''to setup a stream channel between the
         client and the server '''
-        oDesc = cpp.CParamList()
-        tupRet = oProxy.StartStream(
-            oDesc.GetCfgAsObj() ) 
-
-        ret = tupRet[ 0 ]
-        if ret < 0 :
+        hChannel = oProxy.StartStream() 
+        if hChannel == 0 :
+            ret = -EC.ERROR_FAIL
             break;
-
-        hChannel = tupRet[ 1 ]
         
         print( "start talking..." )
         for i in range( 100 ) :

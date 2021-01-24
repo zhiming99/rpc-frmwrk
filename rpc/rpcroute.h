@@ -704,7 +704,7 @@ struct CRpcTcpBridgeShared
 
     gint32 OpenLocalStream( IPort* pPort,
         gint32 iStreamId,
-        guint16 wProtoId,
+        guint32 dwProtoId,
         gint32& iStmIdOpened );
 
     gint32 CloseLocalStream(

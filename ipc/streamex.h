@@ -1948,8 +1948,8 @@ class CStreamProxySync :
         IConfigDb* pDesc = nullptr,
         IEventSink* pCallback = nullptr );
 
-    gint32 GetPeerObjId( HANDLE hChannel,
-        guint64& qwPeerObjId );
+    gint32 GetPeerIdHash( HANDLE hChannel,
+        guint64& qwPeerIdHash );
 };
 
 class CStreamServerSync :

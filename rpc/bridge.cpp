@@ -3195,7 +3195,7 @@ gint32 CRpcTcpBridge::CloseStream_Server(
 gint32 CRpcTcpBridge::OpenStream_Server(
     IEventSink* pCallback,
     gint32 iPeerStm,
-    guint32 wProtocol )
+    guint32 dwProtocol )
 {
     gint32 ret = 0;
     gint32  iNewStm = 0;
@@ -3214,7 +3214,7 @@ gint32 CRpcTcpBridge::OpenStream_Server(
             break;
 
         gint32 iRet = OpenLocalStream( pPort,
-            iPeerStm, wProtocol, iNewStm );
+            iPeerStm, dwProtocol, iNewStm );
 
         if( pCallback != nullptr )
         {
@@ -3255,7 +3255,7 @@ gint32 CRpcTcpBridge::OpenStream_Server(
             if( SUCCEEDED( iRet ) )
             {
                 oResp.Push( iNewStm );
-                oResp.Push( ( guint32 )wProtocol );
+                oResp.Push( dwProtocol );
                 oResp.Push( iPeerStm );
             }
 
@@ -3523,7 +3523,7 @@ guint32 CRpcTcpBridgeShared::GetPortToSubmitShared(
 gint32 CRpcTcpBridgeShared::OpenLocalStream(
     IPort* pPort,
     gint32 iStreamId,
-    guint16 wProtoId,
+    guint32 dwProtoId,
     gint32& iStmIdOpened )
 {
     if( pPort == nullptr )
@@ -3552,7 +3552,7 @@ gint32 CRpcTcpBridgeShared::OpenLocalStream(
         CParamList oReq;
 
         oReq.Push( iStreamId ); // 0: peer stm id
-        oReq.Push( wProtoId );  // 1: protocol
+        oReq.Push( dwProtoId ); // 1: protocol
 
         *pBuf = ObjPtr( 
             ( IConfigDb* )oReq.GetCfg() );

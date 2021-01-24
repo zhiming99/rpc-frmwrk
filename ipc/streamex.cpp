@@ -46,8 +46,8 @@ namespace rpcfrmwrk
             break; \
         _ret = true; \
         _pCallback = pCtxExt->pCallback; \
-        gint32 iRet =  pCtx->GetStatus(); \
-        if( ERROR( iRet ) ) \
+        _iRet =  pCtx->GetStatus(); \
+        if( ERROR( _iRet ) ) \
             break; \
         guint32 dwDir = pCtx->GetIoDirection();\
         if( dwDir == IRP_DIR_IN ) {\
@@ -75,7 +75,7 @@ do{ \
         break; \
     CParamList oResp; \
     oResp[ propReturnValue ] = iRet; \
-    if( SUCCEEDED( ret ) ) \
+    if( SUCCEEDED( iRet ) ) \
         oResp.Push( pBuf ); \
     TaskletPtr pDummy; \
     pDummy.NewObj( clsid( CIfDummyTask ) ); \
@@ -447,7 +447,6 @@ gint32 CIfStmReadWriteTask::OnIoIrpComplete(
             break;
         }
 
-        guint32 dwSize = pWritten->size();
         if( m_queRequests.empty() )
         {
             ret = ERROR_STATE;
@@ -459,21 +458,11 @@ gint32 CIfStmReadWriteTask::OnIoIrpComplete(
             pCurIrp->GetTopStack();
 
         BufPtr pBuf = pCurCtx->m_pReqData;
-        if( pBuf.IsEmpty() ||
-            pBuf->empty() )
+        if( pBuf != pWritten )
         {
             ret = -EINVAL;
             break;
         }
-
-        if( pBuf->size() < dwSize )
-        {
-            ret = -ERANGE;
-            break;
-        }
-
-        pBuf->SetOffset(
-            pBuf->offset() + dwSize );
 
         // recover the buffer
         BufPtr pExtBuf;
@@ -1725,8 +1714,8 @@ gint32 CStreamProxySync::StartStream(
     return ret;
 }
 
-gint32 CStreamProxySync::GetPeerObjId(
-    HANDLE hChannel, guint64& qwPeerObjId )
+gint32 CStreamProxySync::GetPeerIdHash(
+    HANDLE hChannel, guint64& qwPeerIdHash )
 {
     // a place to store channel specific data.
     if( hChannel == INVALID_HANDLE )
@@ -1742,7 +1731,7 @@ gint32 CStreamProxySync::GetPeerObjId(
     IConfigDb* pCtx = itr->second.pContext;
     CCfgOpener oCtx( pCtx );
     return oCtx.GetQwordProp(
-        propPeerObjId, qwPeerObjId );
+        propPeerObjId, qwPeerIdHash );
 }
 
 }

@@ -45,6 +45,13 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 7. Access Control
 
 ---
+[`Sat Jan 23 2021 06:58:41 PM Beijing`]
+1. After having fixed some bugs in the streaming related code, test case `sftest` is almost done. I will add some document text and do some further test.
+2. After the `sftest` is done, the major development target of Python support has been achieved. As the `todo` list shows, I will do some investigation on the code generator and probably the next step is to add some support about protobuf, to enable multi-languate support, or JAVA support.
+
+[`Sun Jan 17 2021 12:41:10 PM Beijing`]   
+1. Completed most of the python support, and now we are fully prepared for writing python version of test case `sftest'.
+
 [`Fri Jan 08 2021 10:17:44 AM Beijing`]   
 1. Forked the `server.sip` and `PyRpcServer` from `proxy.sip` and `PyRpcProxy`. 
 2. Python version of test case `sftest` will be added after the python server support is completed.
