@@ -5,3 +5,5 @@ The Python support for RPC-Frmwrk is actually a wrapper over the C++ RPC-Frmwrk.
   * The `pyproject.toml.tmpl` and `gentoml.sh` can be seen as the `sip`'s makefile.
 
 The features the python wrapper can deliver are almost the same as C/C++ RPC-Frmwrk, except the two test cases `inproctst` and the `btinrtst`, which involves in-process IPC. You can refer to the tests directory to find more details about the supported features.
+
+So far the document is not complete, and if you want to start development quickly, please refer to the test cases in the `tests` directory.
