@@ -26,7 +26,7 @@ This framework depends on the following packags to build:
 7. `Support RPC from remote machine, local system, and in-process.` 
 8. `Transparent support for different types of remote communications.`
 9. `Peer online/offline awareness.`
-10. `Streaming support to provide double-direction stream transfer`
+10. [`Streaming support to provide double-direction stream transfer`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md#streaming)
 11. [`Secure Socket Layer (SSL) support`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/sslport/Readme.md)
 12. [`Websocket support`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/wsport/Readme.md)
 13. [`Object access via Multihop routing`](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support)
