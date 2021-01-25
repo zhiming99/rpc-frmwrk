@@ -99,8 +99,8 @@ Streaming transfer are for the scenarios where large data transfer is
 necessary. Normal RPC request/response has a upper limit of 1MB. When the
 request or the response exceeds the limit, You are recommend to use one
 or more stream channels to exchange data between proxy/server. The stream
-channels can last till the proxy close them. The upper limit of the
-capacity is 2^64 bytes per stream channel.
+channels can last till the proxy/server closes them. The upper limit of
+the capacity is 2^64 bytes per stream channel.
 
 ## Development
 
