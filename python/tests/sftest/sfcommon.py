@@ -31,8 +31,7 @@ class CFileInfo :
         self.size = 0
         self.bRead = True
 
-# PyFileTransfer, another interface as a
-# python-specific interface
+# PyFileTransfer, an RPC interface
 class PyFileTransfer :
 
     ifName = "PyFileTransfer"
@@ -106,9 +105,8 @@ class PyFileTransferBase( PyFileTransfer ):
 
         return ret
 
-    def SendTokenDone( self, hChannel ) :
-        pBuf = "over"
-        self.WriteStream( hChannel, pBuf )
+    def SendToken( self, hChannel, pBuf ) :
+        self.oInst.WriteStreamNoWait( hChannel, pBuf )
 
     def WriteFileAndRecv( self, hChannel, pBuf ) :
         ctx = self.GetTransCtx( hChannel )
@@ -131,8 +129,10 @@ class PyFileTransferBase( PyFileTransfer ):
                 iSize = sizeLimit
             elif iSize == 0 :
                 self.OnTransferDone( hChannel )
-                self.DeferCall(
-                    self.SendTokenDone, hChannel )
+                if self.oInst.IsServer() :
+                    self.DeferCall(
+                        self.SendToken, hChannel,
+                        "over" )
                 break
 
             listResp = self.ReadStreamAsync(

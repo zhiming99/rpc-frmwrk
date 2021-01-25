@@ -1,14 +1,16 @@
 '''This test case demonstrates 
     . Double-direction big data transfer via
-    streams
+    streaming API
 
-    . How to enable python's built-in
+    . send python's request with the built-in
     serialization
 
-    . Multiple interfaces support
+    . How the multiple rpc interfaces are
+    aggregrated
 
     . Note: this server is dedicated for python
-    client due to python specific serilization
+    client since we are using python specific
+    serilization
 '''
 import sys
 import time
@@ -29,8 +31,7 @@ from typing import Union
 from sfcommon import CTransContext, CFileInfo
 from sfcommon import PyFileTransfer, PyFileTransferBase
 
-#1. define the interfaces to support
-#CEchoServer interface
+# define the RPC interface to support
 class CEchoClient:
     """mandatory class member to define the
     interface name, which will be used to invoke
@@ -42,6 +43,8 @@ class CEchoClient:
         return self.sendRequest(
             CEchoClient.ifName, "Echo", text )
 
+# or inherit an RPC interface, and implement the
+# RPC methods
 class PyFileTransClient( PyFileTransferBase ):
 
     def __init__(self ) :
@@ -59,7 +62,7 @@ class PyFileTransClient( PyFileTransferBase ):
     def NotifyComplete( self ) :
         self.sem.release()
         
-    ''' rpc method
+    ''' rpc method impl
     '''
     def UploadFile( self,
         fileName:   str,
@@ -74,7 +77,7 @@ class PyFileTransClient( PyFileTransferBase ):
 
         return resp
 
-    ''' rpc method
+    ''' rpc method impl
     '''
     def GetFileInfo( self,
         fileName : str,
@@ -83,7 +86,7 @@ class PyFileTransClient( PyFileTransferBase ):
            PyFileTransClient.ifName, "GetFileInfo", 
             fileName, bRead )
 
-    ''' rpc method
+    ''' rpc method impl
     '''
     def DownloadFile( self,
         fileName:   str,
@@ -108,6 +111,11 @@ class PyFileTransClient( PyFileTransferBase ):
             CTransContext() )
         self.NotifyComplete()
 
+    '''OnStmClosing is a system defined event
+    handler, called when the stream channel has
+    been closed by the peer, or this proxy/server
+    will shutdown, or actively calls `CloseStream'
+    '''
     def OnStmClosing( self, hChannel ) :
         self.OnTransferDone( hChannel )
         self.mapChannels.pop( hChannel )
@@ -136,6 +144,9 @@ class PyFileTransClient( PyFileTransferBase ):
             try:
                 fp = open( fileName, "rb+" )
                 iSize = fp.seek( 0, os.SEEK_END )
+                if iSize == 0 :
+                    resp[ 0 ] = -errno.ENODATA
+                    break
                 if iSize < offset + size :
                     resp[ 0 ] = -errno.ERANGE
                     break
@@ -151,11 +162,18 @@ class PyFileTransClient( PyFileTransferBase ):
             if resp[ 0 ] < 0 :
                 break
 
+            '''convert the handle to a idhash,
+            which the peer can use to find the
+            stream channel to transfer
+            '''
             ret = self.oInst.GetPeerIdHash( hChannel )
             if ret[ 0 ] < 0 :
                 resp[ 0 ] = ret[ 0 ]
                 break;
 
+            '''make an rpc call with the file
+            information for uploading
+            '''
             chanHash = ret[ 1 ]
             ret = self.UploadFile( fileName,
                 chanHash, offset, size )
@@ -170,7 +188,9 @@ class PyFileTransClient( PyFileTransferBase ):
             oCtx.byDir = 'u'
             oCtx.strPath = fileName
 
-            '''start the transfer a bit later
+            '''start sending file content via the
+            specified channel very soon, but not
+            immediately.
             '''
             ret = self.DeferCall(
                 self.ReadFileAndSend, hChannel )
@@ -179,8 +199,7 @@ class PyFileTransClient( PyFileTransferBase ):
             else :
                 '''transfer will start immediately
                 and complete this request with
-                success
-                '''
+                success '''
                 resp[ 0 ] = EC.STATUS_PENDING
 
             break
@@ -228,6 +247,9 @@ class PyFileTransClient( PyFileTransferBase ):
                 resp[ 0 ] = ret[ 0 ]
                 break;
 
+            '''Make an rpc call to inform the
+            download information.
+            '''
             chanHash = ret[ 1 ]
             ret = self.DownloadFile( fileName,
                 chanHash, offset, size )
@@ -242,7 +264,8 @@ class PyFileTransClient( PyFileTransferBase ):
             oCtx.byDir = 'd'
             oCtx.strPath = fileName
 
-            '''start the transfer a bit later
+            '''start receiving file content via
+            the specified channel hChannel.
             '''
             pBuf = bytearray()
             ret = self.DeferCall(
@@ -291,6 +314,8 @@ def test_main() :
         if ret < 0 :
             break
 
+        '''Start the proxy object
+        '''
         ret = oProxy.Start()
         if ret < 0 :
             break
@@ -302,9 +327,24 @@ def test_main() :
             ret = EC.ERROR_FAIL
             break;
 
-        '''Wait till OnStreamReady complete
+        '''Wait till OnStmReady notifies.
         '''
         oProxy.WaitForComplete()
+
+        '''confirm if server is ready by receiving
+        a token from server
+        '''
+        tupRet = oProxy.ReadStream( hChannel )
+        ret = tupRet[ 0 ]
+        if ret < 0 :
+            break
+        
+        pBuf = tupRet[ 1 ].decode(
+            sys.stdout.encoding )
+
+        if not pBuf[ :3 ] == "rdy" :
+            ret = EC.ERROR_FAIL
+            break
 
         ''' upload a file
         '''
@@ -328,16 +368,21 @@ def test_main() :
         if ret < 0 :
             break
         
-        pBuf = tupRet[ 1 ].decode( sys.stdout.encoding )
-        if not ( pBuf[ 0 ] == 'o' and pBuf[ 1 ] == 'v' 
-            and pBuf[ 2 ] == 'e' and
-            pBuf[ 3 ] == 'r' ) :
+        pBuf = tupRet[ 1 ].decode(
+            sys.stdout.encoding )
+
+        if not pBuf[ :4 ] == "over" :
             ret = EC.ERROR_FAIL
             break
         
         ''' Download a file
         '''
         print( "Downloading file..." )
+
+        '''Before downloading, fetch the
+        information of the file from the server,
+        via the rpc call `GetFileInfo'
+        '''
         tupRet = oProxy.GetFileInfo( "f100M.dat" )
         ret = tupRet[ 0 ]
         if ret < 0 :
@@ -346,6 +391,8 @@ def test_main() :
         fileInfo = tupRet[ 1 ][ 0 ] 
         fileSize = fileInfo.size
 
+        '''
+        '''
         tupRet = oProxy.DoDownloadFile(
             "f100M.dat", hChannel, 0, fileSize )
 

@@ -67,6 +67,9 @@ class PyFileTransSvr( PyFileTransferBase ):
         while True :
             fileName = self.strRootDir + "/" + fileName + "-1"
 
+            '''Find the specified stream channel
+            by the idhash.
+            '''
             hChannel = self.oInst.GetChanByIdHash(
                 np.uint64( chanHash ) )
             if hChannel == 0 :
@@ -81,10 +84,7 @@ class PyFileTransSvr( PyFileTransferBase ):
             if size == 0 :
                 resp[ 0 ] = -errno.EINVAL
                 break;
-            '''The channel can be full-duplex.
-            But for simplicity, just one direction
-            at one time
-            '''
+
             if oCtx.fp is not None:
                 resp[ 0 ] = -error.EBUSY
                 break
@@ -112,7 +112,9 @@ class PyFileTransSvr( PyFileTransferBase ):
             oCtx.byDir = 'u'
             oCtx.strPath = fileName
 
-            '''start the transfer a bit later
+            '''start receiving the file content
+            via the stream channel hChannel very
+            soon.
             '''
             pBuf = bytearray()
             ret = self.DeferCall(
@@ -177,6 +179,9 @@ class PyFileTransSvr( PyFileTransferBase ):
                 resp[ 0 ] = -errno.EACCES
                 break
 
+            '''Find the specified stream channel
+            for file transfer by the idhash.
+            '''
             hChannel = self.oInst.GetChanByIdHash(
                 np.uint64( chanHash ) )
             if hChannel == 0 :
@@ -191,10 +196,6 @@ class PyFileTransSvr( PyFileTransferBase ):
             if size == 0 :
                 resp[ 0 ] = -errno.EINVAL
                 break;
-            '''The channel can be full-duplex.
-            But for simplicity, just one direction
-            at one time
-            '''
 
             if oCtx.fp is not None:
                 resp[ 0 ] = -error.EBUSY
@@ -221,7 +222,8 @@ class PyFileTransSvr( PyFileTransferBase ):
             oCtx.byDir = 'd'
             oCtx.strPath = fileName
 
-            '''start the transfer a bit later
+            '''start sending the file content very
+            soon. 
             '''
             ret = self.DeferCall(
                 self.ReadFileAndSend, hChannel )
@@ -246,7 +248,19 @@ class PyFileTransSvr( PyFileTransferBase ):
     def OnStmReady( self, hChannel ) :
         self.SetTransCtx( hChannel,
             CTransContext() )
+        '''send an 'rdy' token to the peer to
+        notify this stream channel is ready for
+        data transfer
+        '''
+        self.DeferCall(
+            self.SendToken,
+            hChannel, "rdy" )
 
+    '''OnStmClosing is a system defined event
+    handler, called when the stream channel has
+    been closed by the peer, or this proxy/server
+    will shutdown, or actively calls `CloseStream'
+    '''
     def OnStmClosing( self, hChannel ) :
         self.OnTransferDone( hChannel )
         self.mapChannels.pop( hChannel )
