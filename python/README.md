@@ -10,6 +10,6 @@ The features the python wrapper can deliver are almost the same as C/C++ RPC-Frm
 So far the document is not complete, and if you want to start development quickly, please refer to the test cases in the `tests` directory.
 
 ### Building the Python Support for RPC-Frmwrk
-So far, I have not integrated the sip building perfectly with other modules of RPC-Frmwrk. So you need to take extra steps to get the interface library installed.
- * Change to the `Python` directory and run `make install` to build and install to the Python's sytem directory `site-packages`. The installation is necessary, and the python script won't work without the installation.
+So far, I have not integrated the sip building process perfectly with that of other modules of RPC-Frmwrk. So you need to take extra steps to get the interface library installed.
+ * Change to the `Python` directory and run `make install` to compile and install to the Python's sytem directory `site-packages`. The installation is necessary, and the python script won't work without the installation.
  * Remove the `debug` and `tracing` flags from `pyproject.toml.tmpl` if you want a release version without debug symbol.
