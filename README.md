@@ -32,18 +32,19 @@ This framework depends on the following packags to build:
 13. [`Object access via Multihop routing`](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support)
 14. [`Authentication support with Kerberos 5`](https://github.com/zhiming99/rpc-frmwrk/tree/master/rpc/security/README.md)
 15. [`Python Support`](https://github.com/zhiming99/rpc-frmwrk/tree/master/python)
+16. A mulit-lang proxy/server generator with extended syntax of google's protobuf protocol (To come)
 
 #### Building `rpc-frmwrk`:   
 Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60) for details.
 
 #### Todo:
-
-1. A proxy/server generator with IDL or google's proto file
-2. Java support
-3. Examples and Tutorials
-4. GUI for configuration and monitoring
-5. Node backup/Load banlance
-6. Access Control
+1. Java support
+2. Examples and Tutorials
+3. GUI for configuration and monitoring
+4. Node backup/Load banlance
+5. Access Control
+6. A tree-like hierarchical persistant registry.
+7. Logging service
 
 ---
 [`Sat Jan 23 2021 06:58:41 PM Beijing`]
