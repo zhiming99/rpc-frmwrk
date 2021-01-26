@@ -137,6 +137,7 @@ to work with `rpc-frmwrk` on such a simple network.
 3. If the service ticket expires, the session will ends in 10 minutes.
 4. Train yourself to get used to `kinit` and `klist`, which can be used frequently as the login method. `kinit`, as mentioned above, is to use the password to get the `ticket granting ticket`, which will be used to acquire the other `sevice tickes` when the client is trying to access some service. And `klist` is to list the tickets for an account, and the tickets include both `ticket granting ticket` and `service tickets`. You can check the timestamp to know if the ticket is expired, and need to login again.
 5. Make sure the firewall not block the `kerberos` ports, especially port 88 on your `kdc` machine, for the access from service servers.
+6. `rpc-frmwrk` provids `kerberos` proxy support, in case clients unable to access the kerberos server, by linking `libauth.so` in `/usr/lib64/krb5/plugins/libkrb5/`(Fedora's directory, could vary on different distributions). The document is at [KDC location modules](https://web.mit.edu/kerberos/www/krb5-latest/doc/admin/host_config.html?highlight=plugin%20directory)
 
 
 
