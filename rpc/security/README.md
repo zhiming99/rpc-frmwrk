@@ -57,7 +57,7 @@ to work with `rpc-frmwrk` on such a simple network.
     .rpcfrmwrk.org = rpcfrmwrk.org
     rpcfrmwrk.org = rpcfrmwrk.org
 ```
-  * Add the user account with `kadmin.local` on your kdc machine. `kadmin.local` does not require password and
+  * Add the user account with [`kadmin.local`](https://web.mit.edu/kerberos/krb5-1.12/doc/admin/admin_commands/kadmin_local.html) on your kdc machine. `kadmin.local` does not require password and
   can only be used locally, while `kadmin` is a network version. Suppose you have a linux account name `foo`, and you can add a
   user account `foo` to the kerberos's user database. The fully qualified account name is `foo@rpcfrmwrk.org`, which must be put
   to the proxy's description file as the `user name` later, if authentication is enabled.
