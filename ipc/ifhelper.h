@@ -2557,6 +2557,8 @@ gint32 CInterfaceProxy::SyncCallEx(
 
         oParams.CopyProp( propIfName,
             ( CObjBase* )pOptions );
+        oParams.CopyProp( propSeriProto,
+            ( CObjBase* )pOptions );
 
         std::string strMethod( strcMethod );
         if( !pOptions.IsEmpty() )
@@ -2762,6 +2764,8 @@ struct Parameters< std::tuple< Types... >, std::tuple< Types2... > >
 
             if( !m_pCfg.IsEmpty() )
             {
+                oOptions.CopyProp( propSeriProto,
+                    ( IConfigDb* )m_pCfg );
                 oOptions.CopyProp( propSysMethod,
                     ( IConfigDb* )m_pCfg );
             }

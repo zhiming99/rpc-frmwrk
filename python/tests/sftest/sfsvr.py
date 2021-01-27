@@ -65,7 +65,7 @@ class PyFileTransSvr( PyFileTransferBase ):
         size:       np.uint64 )->[ int, list ]:
         resp = [ 0, list() ]
         while True :
-            fileName = self.strRootDir + "/" + fileName + "-1"
+            fileName = self.strRootDir + "/" + fileName
 
             '''Find the specified stream channel
             by the idhash.
@@ -99,6 +99,7 @@ class PyFileTransSvr( PyFileTransferBase ):
                 fp.truncate()
 
             except OSError as err :
+                print( err )
                 resp[ 0 ] = -err.errno
                 break
 
@@ -139,7 +140,7 @@ class PyFileTransSvr( PyFileTransferBase ):
         callback,
         fileName : str,
         bRead : bool ) -> [ int, list ] :
-        resp = [ 0, None ]
+        resp = [ 0, list() ]
         strPath = self.strRootDir + "/" + fileName
         if not os.path.isfile( strPath ) :
             print( "{} does not exist" )

@@ -627,6 +627,9 @@ class PyRpcServices :
 
         return resp
 
+    '''Invoke a callback function depending
+    whether it is bound function or not
+    '''
     def InvokeCallback( self, callback, listArgs):
         ret = None
         if inspect.isfunction( callback ) :
@@ -637,6 +640,13 @@ class PyRpcServices :
 
     ''' run the callback on a new context instead
     of the current context
+
+    DeferCall, like a functor object bind to the
+    callback function with the arguments. And it
+    can be scheduled run on a new stack context.
+    The purpose is to reduce the depth of the call
+    stack and provide a locking free or light
+    locking context as the current one cannot.
     '''
     def DeferCall( self, callback, *args ) :
         return self.oInst.PyDeferCall(
