@@ -1,6 +1,6 @@
-This is an advanced test case to demonstrate the streaming mechanism. It is different from the   
-CPP version of `sftest`, with less complexity of the file transfer than that of the CPP   
-`sftest`.   
+### This is an advanced test case to demonstrate the streaming mechanism.
+It is different from the C++ version of `sftest`, with less complexity of the file transfer than   
+that of the CPP [`sftest`](https://github.com/zhiming99/rpc-frmwrk/tree/master/test/sftest).   
 
 Unlike the normal RPC request, streaming mechanism requires a set of system defined API to work.   
 The workflow is as follows,   

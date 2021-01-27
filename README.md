@@ -26,23 +26,25 @@ This framework depends on the following packags to build:
 7. `Support RPC from remote machine, local system, and in-process.` 
 8. `Transparent support for different types of remote communications.`
 9. `Peer online/offline awareness.`
-10. `Streaming support to provide double-direction stream transfer`
+10. [`Streaming support to provide double-direction stream transfer`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md#streaming)
 11. [`Secure Socket Layer (SSL) support`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/sslport/Readme.md)
 12. [`Websocket support`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/wsport/Readme.md)
 13. [`Object access via Multihop routing`](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support)
 14. [`Authentication support with Kerberos 5`](https://github.com/zhiming99/rpc-frmwrk/tree/master/rpc/security/README.md)
+15. [`Python Support`](https://github.com/zhiming99/rpc-frmwrk/tree/master/python)
+16. A mulit-lang proxy/server generator(To come)
 
 #### Building `rpc-frmwrk`:   
 Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60) for details.
 
 #### Todo:
-1. Python support
-2. A proxy/server generator with IDL or google's proto file
-3. Examples and Tutorials
-4. GUI for configuration and monitoring
-5. Node backup/Load banlance
-6. Java support
-7. Access Control
+1. Java support
+2. Examples and Tutorials
+3. GUI for configuration and monitoring
+4. Node backup/Load banlance
+5. Access Control
+6. A tree-like hierarchical persistant registry.
+7. Logging service
 
 ---
 [`Sat Jan 23 2021 06:58:41 PM Beijing`]
