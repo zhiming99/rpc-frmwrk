@@ -847,6 +847,42 @@ class CRpcTcpBridge :
         IEventSink* pCallback,
         bool bSeqTask );
 
+    protected:
+    // for load balance
+    gint32 OnCheckRouterPathCompleteLB(
+        IEventSink* pCallback, 
+        IEventSink* pIoReq,
+        IConfigDb* pReqCtx );
+
+    gint32 OnCheckRouterPathCompleteLB2(
+        IEventSink* pCallback, 
+        IEventSink* pIoReq,
+        IConfigDb* pReqCtx );
+
+    gint32 CheckRouterPathAgainLB(
+        IEventSink* pCallback,
+        IEventSink* pInvTask,
+        IConfigDb* pReqCtx );
+
+    gint32 OnOpenPortCompleteLB(
+        IEventSink* pCallback,
+        IEventSink* pIoReq,
+        IConfigDb* pReqCtx );
+
+    gint32 OpenPortLB(
+        IEventSink* pCallback,
+        IEventSink* pInvTask,
+        IEventSink* pOpTask,
+        bool bLast );
+
+    gint32 CheckRouterPathLB(
+        IEventSink* pCallback,
+        IConfigDb* pReqCtx,
+        const std::string& strOldPath,
+        const std::string& strNext,
+        const std::string& strLBNode,
+        const std::vector< std::string >& vecNodes );
+
     public:
 
     virtual gint32 OnPostStart(
@@ -984,6 +1020,7 @@ class CRpcTcpBridge :
         DBusMessage* pFwdrMsg,
         DMsgPtr& pRespMsg,
         IEventSink* pCallback );
+
 
 }; // CRpcTcpBridge
 
@@ -1901,6 +1938,39 @@ class CRegObjectBridge
     }
 };
 
+struct ILoadBalancer : public IEventSink
+{
+    virtual gint32 GetNodesAvail(
+        const std::string& strGrpName,
+        std::vector< std::string >& vecNodes ) = 0;   
+
+    gint32 OnEvent(
+        EnumEventId iEvent,
+        LONGWORD    dwParam1 = 0,
+        LONGWORD    dwParam2 = 0,
+        LONGWORD*   pData = NULL  ) 
+    { return 0; }
+};
+
+class CRedudantNodes : public ILoadBalancer
+{
+
+    typedef std::map< std::string,
+        std::deque< std::string > > LBGRP_MAP;
+    typedef LBGRP_MAP::iterator ITER_LBGRPMAP;
+
+    LBGRP_MAP  m_mapLBGrp;
+    IEventSink* m_pParent;
+
+    public:
+    typedef ILoadBalancer super;
+    CRedudantNodes( const IConfigDb* pCfg );
+    gint32 GetNodesAvail(
+        const std::string& strGrpName,
+        std::vector< std::string >& vecNodes );
+    gint32 LoadLBInfo( Json::Value& oLBInfo );
+};
+
 class CRpcRouterBridge : public CRpcRouter
 {
     // the key is the peer ip-addr plus peer port-number
@@ -1916,6 +1986,8 @@ class CRpcRouterBridge : public CRpcRouter
     // server side to relay the request from
     // remote client to the remote server object
     std::map< std::string, InterfPtr > m_mapReqProxies;
+
+    ObjPtr m_pLBGrp;
 
     gint32 OnRmtSvrOnline(
         IEventSink* pCallback,

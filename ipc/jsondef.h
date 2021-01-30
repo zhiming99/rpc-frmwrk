@@ -99,3 +99,4 @@
 #define JSON_ATTR_REALM         "Realm"
 #define JSON_ATTR_USERNAME      "UserName"
 #define JSON_ATTR_SIGN_MSG      "SignMessage"
+#define JSON_ATTR_LBGROUP       "LBGroup"

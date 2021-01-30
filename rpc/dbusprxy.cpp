@@ -249,6 +249,13 @@ gint32 CDBusProxyPdo::CheckConnCmdResp(
         if( ERROR( ret ) )
             break;
 
+        // overwrite the local router path with
+        // the fresh router path
+        ret = oPortCfg.CopyProp(
+            propRouterPath, pResp );
+        if( ERROR( ret ) )
+            break;
+
         CCfgOpenerObj oMatchCfg(
             ( CObjBase* )m_pMatchFwder );
 

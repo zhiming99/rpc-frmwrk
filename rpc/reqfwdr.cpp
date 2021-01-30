@@ -1022,7 +1022,7 @@ gint32 CRpcReqForwarder::OpenRemotePortInternal(
             CIoManager* pMgr = GetIoMgr();
             ret = pMgr->RescheduleTask( pChkRt );
             if( SUCCEEDED( ret ) )
-                ret = pChkRt->GetError();
+                ret = STATUS_PENDING;
         }
         else if( ret == -ENOENT )
         {
@@ -2909,9 +2909,7 @@ gint32 CRpcReqForwarder::SendFetch_Server(
         if( ERROR( ret ) )
             break;
 
-        ret = pTask->GetError();
-        if( ret == STATUS_PENDING )
-            break;
+        ret = STATUS_PENDING;
 
     }while( 0 );
 

@@ -3667,9 +3667,7 @@ gint32 CGenBusPortStopChildTask::RunTask()
                 ( *pTask )( eventCancelTask );
                 break;
             }
-            ret = pTask->GetError();
-            if( ret != STATUS_PENDING )
-                return ret;
+            ret = STATUS_PENDING;
         }
 
     }while( 0 );

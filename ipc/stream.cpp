@@ -1089,7 +1089,7 @@ gint32 IStream::CloseChannel(
         ret = pThisIf->AddSeqTask( pStopTask );
 
         if( SUCCEEDED( ret ) )
-            ret = pStopTask->GetError();
+            ret = STATUS_PENDING;
 
     }while( 0 );
 
@@ -1338,7 +1338,7 @@ gint32 IStream::OnPreStopShared(
         TaskletPtr pTask = ObjPtr( pTaskGrp );
         ret = pThis->AddSeqTask( pTask );
         if( SUCCEEDED( ret ) )
-            ret = pTask->GetError();
+            ret = STATUS_PENDING;
 
     }while( 0 );
 

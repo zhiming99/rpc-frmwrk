@@ -89,7 +89,7 @@ class CStartStopSafeBusPort :
         ret = AddSeqTaskTempl( this,
             *ppTaskGrp, pStopTask, false );
         if( SUCCEEDED( ret ) )
-            ret = pStopTask->GetError();
+            ret = STATUS_PENDING;
 
         return ret;
     }

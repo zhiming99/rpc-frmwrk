@@ -1830,7 +1830,7 @@ gint32 CStreamServerRelayMH::OnPreStop(
         CIoManager* pMgr = GetIoMgr();
         ret = pMgr->RescheduleTask( pTask );
         if( SUCCEEDED( ret ) )
-            ret = pTask->GetError();
+            ret = STATUS_PENDING;
 
     }while( 0 );
 

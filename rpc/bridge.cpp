@@ -874,7 +874,7 @@ gint32 CRpcTcpBridgeProxy::ForwardEvent(
         }
         else if( SUCCEEDED( ret ) )
         {
-            ret = pTask->GetError();
+            ret = STATUS_PENDING;
         }
 
     }while( 0 );
@@ -1812,7 +1812,7 @@ gint32 CRpcTcpBridge::ClearRemoteEventsLocal(
             break;
         }
 
-        ret = pTaskGrp->GetError();
+        ret = STATUS_PENDING;
 
     }while( 0 );
 
@@ -1979,7 +1979,7 @@ gint32 CRpcTcpBridge::ClearRemoteEvents(
         }
         else if( SUCCEEDED( ret ) )
         {
-            ret = pParaTask->GetError();
+            ret = STATUS_PENDING;
         }
 
     }while( 0 );
@@ -2733,19 +2733,19 @@ gint32 CRpcTcpBridge::ForwardRequestInternal(
         if( bSeqTask )
         {
             ret = pRouter->AddSeqTask( pTask );
+            if( ERROR( ret ) )
+            {
+                ( *pTask )( eventCancelTask );
+                break;
+            }
+            ret = STATUS_PENDING;
         }
         else
         {
             // ret = GetIoMgr()->RescheduleTask( pTask );
             ( *pTask )( eventZero );
+            ret = pTask->GetError();
         }
-
-        if( ERROR( ret ) )
-            break;
-
-        ret = pTask->GetError();
-        if( ret == STATUS_PENDING )
-            break;
 
     }while( 0 );
 

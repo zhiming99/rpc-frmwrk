@@ -57,7 +57,7 @@ to work with `rpc-frmwrk` on such a simple network.
     .rpcfrmwrk.org = rpcfrmwrk.org
     rpcfrmwrk.org = rpcfrmwrk.org
 ```
-  * Add the user account with [`kadmin.local`](https://web.mit.edu/kerberos/krb5-1.12/doc/admin/admin_commands/kadmin_local.html) on your kdc machine. `kadmin.local` does not require password and
+  * Add the user account with `kadmin.local` on your kdc machine. `kadmin.local` does not require password and
   can only be used locally, while `kadmin` is a network version. Suppose you have a linux account name `foo`, and you can add a
   user account `foo` to the kerberos's user database. The fully qualified account name is `foo@rpcfrmwrk.org`, which must be put
   to the proxy's description file as the `user name` later, if authentication is enabled.
@@ -79,7 +79,11 @@ to work with `rpc-frmwrk` on such a simple network.
   * Put the same `krb5.conf` as the one on the `kdc server` to the directory `/etc`.
   * Type `kinit foo` to authenticate with the remote `kdc`. According to the `ticket_lifetime` option above, the ticket will
   last one day, and when it expires, the login session will ends.
-   * The official document is at [here](https://web.mit.edu/kerberos/krb5-devel/doc/admin/install_clients.html)
+  * In some environment when you cannot access `kdc` directly, `rpc-frmwrk` can provide a `kdc` communication channel for `kdc` 
+  access via the RPC connection, thus you can use `kinit`, `kadmin` as usual. The approach is to symbolic link `libauth.so`
+  under the directory, `/usr/lib64/krb5/plugins/libkrb5`, for example. the directory name could vary from different distributions
+  or architectures.
+  * The official document is at [here](https://web.mit.edu/kerberos/krb5-devel/doc/admin/install_clients.html)
   
 ##### 3. Setup the service server, and in our case, the `rpc-frmwrk bridge` with authentication`
   * The installation is the same as we do on the client machines, that is, the first two steps.
@@ -104,7 +108,7 @@ to work with `rpc-frmwrk` on such a simple network.
  ```
 
   * In the `helloworld's` description file, [`hwdesc.json`](https://github.com/zhiming99/rpc-frmwrk/blob/master/test/helloworld/hwdesc.json),
-  for example, add the following lines between the attributes `EnableWS` and `Interfaces`',
+  for example, add the following lines,
   ```
             "AuthInfo" :
             {
@@ -131,9 +135,8 @@ to work with `rpc-frmwrk` on such a simple network.
 1. The communication of an authenticated session is encrypted or signed throughout the session's lifecycle.
 2. The duration for authenticating process can last for about 2 minutes, if the process cannot complete during this period, the bridge side will reset the connection.
 3. If the service ticket expires, the session will ends in 10 minutes.
-4. Train yourself to get used to [`kinit`](https://web.mit.edu/kerberos/krb5-devel/doc/user/user_commands/kinit.html#kinit-1) and [`klist`](https://web.mit.edu/kerberos/krb5-devel/doc/user/user_commands/klist.html), which can be used frequently as the login method. `kinit`, as mentioned above, is to use the password to get the `ticket granting ticket`, which will be used to acquire the other `sevice tickes` when the client is trying to access some service. And `klist` is to list the tickets for an account, and the tickets include both `ticket granting ticket` and `service tickets`. You can check the timestamp to know if the ticket is expired, and need to login again.
+4. Train yourself to get used to `kinit` and `klist`, which can be used frequently as the login method. `kinit`, as mentioned above, is to use the password to get the `ticket granting ticket`, which will be used to acquire the other `sevice tickes` when the client is trying to access some service. And `klist` is to list the tickets for an account, and the tickets include both `ticket granting ticket` and `service tickets`. You can check the timestamp to know if the ticket is expired, and need to login again.
 5. Make sure the firewall not block the `kerberos` ports, especially port 88 on your `kdc` machine, for the access from service servers.
-6. `rpc-frmwrk` provids `kerberos` proxy support, in case clients unable to access the kerberos server, by linking `libauth.so` in `/usr/lib64/krb5/plugins/libkrb5/`(Fedora's directory, could vary on different distributions). The document is at [KDC location modules](https://web.mit.edu/kerberos/www/krb5-latest/doc/admin/host_config.html?highlight=plugin%20directory). And then tweak the connection options of `kdcChannel` in [`authprxy.json`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/security/authprxy.json) to match the bridge side connection configuration before you run `kinit` again.
 
 
 

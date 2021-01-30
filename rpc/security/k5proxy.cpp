@@ -1713,7 +1713,7 @@ gint32 CK5AuthProxy::DoLogin(
             break;
         }
 
-        ret = pRetryTask->GetError();
+        ret = STATUS_PENDING;
 
     }while( 0 );
 

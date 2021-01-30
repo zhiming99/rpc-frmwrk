@@ -2279,7 +2279,7 @@ gint32 CRpcReqForwarderAuth::OnSessImplLoginCompleteSafe(
     // contention with the eventRmtSvrOffline
     ret = pRouter->AddSeqTask( pSeqTask );
     if( SUCCEEDED( ret ) )
-        ret = pTask->GetError();
+        ret = STATUS_PENDING;
 
     return ret;
 }
@@ -3494,7 +3494,7 @@ gint32 CRpcRouterBridgeAuth::OnPostStart(
         TaskletPtr pTask( pGrp );
         ret = AddSeqTask( pTask );
         if( SUCCEEDED( ret ) )
-            ret = pTask->GetError();
+            ret = STATUS_PENDING;
         
     }while( 0 );
 
