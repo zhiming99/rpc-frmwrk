@@ -665,7 +665,6 @@ gint32 CRpcRouterBridge::BuildNodeMap()
                 != strObjName )
                 continue;
 
-
             // overwrite the global port class and port
             // id if PROXY_PORTCLASS and PROXY_PORTID
             // exist
@@ -675,10 +674,7 @@ gint32 CRpcRouterBridge::BuildNodeMap()
             if( oNodesArray == Json::Value::null ||
                 !oNodesArray.isArray() ||
                 oNodesArray.empty() )
-            {
-                ret = -ENOENT;
                 break;
-            }
 
             // set the default parameters
             for( guint32 i = 0; i < oNodesArray.size(); i++ )
@@ -845,6 +841,9 @@ gint32 CRpcRouterBridge::BuildNodeMap()
             break;
         }
 
+        if( ERROR( ret ) )
+            break;
+
         Json::Value& oLBInfo =
             valObjDesc[ JSON_ATTR_LBGROUP ];
 
@@ -870,13 +869,6 @@ gint32 CRpcRouterBridge::BuildNodeMap()
         ret = pLBGrp->LoadLBInfo( oLBInfo );
         if( ERROR( ret ) )
             break;
-
-        
-        if( i == oObjArray.size() )
-        {
-            ret = -ENOENT;
-            break;
-        }
 
     }while( 0 );
 
