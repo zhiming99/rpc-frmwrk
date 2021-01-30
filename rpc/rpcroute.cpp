@@ -526,6 +526,89 @@ gint32 CRpcRouterBridge::GetBridge(
     return ret;
 }
 
+CRedudantNodes::CRedudantNodes(
+    const IConfigDb* pCfg )
+{
+    SetClassId( clsid( CRedudantNodes ) );
+    gint32 ret = 0;
+    do{
+        if( pCfg == nullptr )
+            break;
+
+        CCfgOpener oCfg( pCfg );
+        ret = oCfg.GetPointer(
+            propParentPtr, m_pParent );
+        if( ERROR( ret ) )
+            break;
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+    {
+        throw std::invalid_argument(
+            "CRedudantNodes did not find parent"
+            "pointer, cannotproperly" );
+    }
+}
+
+gint32 CRedudantNodes::LoadLBInfo(
+    Json::Value& oLBInfo )
+{
+    for( guint32 i = 0 ; i < oLBInfo.size(); i++ )
+    {
+        Json::Value& oElem = oLBInfo[ i ];
+        if( oElem.empty() || !oElem.isObject() )
+            continue;
+
+        std::vector< std::string > vecGrpNames =
+            oElem.getMemberNames();
+        for( auto strName : vecGrpNames )
+        {
+            Json::Value& arrNodes = oElem[ strName ];
+            if( arrNodes == Json::Value::null ||
+                arrNodes.isArray() ||
+                arrNodes.empty() )
+                continue;
+            guint32 j = 0;
+            std::deque< std::string > listNodes;
+            for( ;j < arrNodes.size(); ++j )
+            {
+                listNodes.push_back(
+                    arrNodes[ j ].asString() );
+            }
+            m_mapLBGrp[ strName ] = listNodes;
+        }
+    }
+    return 0;
+}
+
+gint32 CRedudantNodes::GetNodesAvail(
+    const std::string& strGrpName,
+    std::vector< std::string >& vecNodes )
+{
+    ITER_LBGRPMAP itr =
+        m_mapLBGrp.find( strGrpName );
+    if(  itr == m_mapLBGrp.end() )
+        return -ENOENT;
+    std::deque< std::string >&
+        listNodes = itr->second;
+
+    if( listNodes.size() == 0 )
+        return -ENOENT;
+
+    for( auto elem : listNodes )
+        vecNodes.push_back( elem );
+
+    if( listNodes.size() > 1 ) 
+    {
+        // simple rotation
+        auto last = listNodes.back();
+        listNodes.pop_back();
+        listNodes.push_front( last );
+    }
+    return STATUS_SUCCESS;
+}
+
 gint32 CRpcRouterBridge::BuildNodeMap()
 {
     gint32 ret = 0;
@@ -762,9 +845,33 @@ gint32 CRpcRouterBridge::BuildNodeMap()
             break;
         }
 
+        Json::Value& oLBInfo =
+            valObjDesc[ JSON_ATTR_LBGROUP ];
+
+        if( oLBInfo == Json::Value::null ||
+            !oLBInfo.isArray() ||
+            oLBInfo.empty() )
+            break;
+
+        if( m_pLBGrp.IsEmpty() )
+        {
+            CParamList oParams;
+            oParams[ propParentPtr ] = ObjPtr( this );
+            ret = m_pLBGrp.NewObj(
+                clsid( CRedudantNodes ),
+                oParams.GetCfg() );
+            if( ERROR( ret ) )
+                break;
+        }
+
+        CRedudantNodes* pLBGrp =
+            ( CRedudantNodes* )m_pLBGrp;
+
+        ret = pLBGrp->LoadLBInfo( oLBInfo );
         if( ERROR( ret ) )
             break;
 
+        
         if( i == oObjArray.size() )
         {
             ret = -ENOENT;
@@ -937,7 +1044,7 @@ gint32 CRpcRouterBridge::OnPreStopLongWait(
             ret = GetIoMgr()->
                 RescheduleTask( pTask );
             if( SUCCEEDED( ret ) )
-                ret = pTask->GetError();
+                ret = STATUS_PENDING;
         }
 
     }while( 0 );
@@ -2872,7 +2979,7 @@ gint32 CRpcRouterBridge::RunEnableEventTask(
         TaskletPtr pGrpTask = pTransGrp;
         ret = AddSeqTask( pGrpTask, false );
         if( SUCCEEDED( ret ) )
-            ret = pTransGrp->GetError();
+            ret = STATUS_PENDING;
         
     }while( 0 );
 
@@ -2999,7 +3106,7 @@ gint32 CRpcRouterBridge::RunDisableEventTask(
 
         ret = AddSeqTask( pTask, false );
         if( SUCCEEDED( ret ) )
-            ret = pTask->GetError();
+            ret = STATUS_PENDING;
         
     }while( 0 );
 
@@ -3575,7 +3682,7 @@ gint32 CRpcRouterReqFwdr::OnPreStopLongWait(
         ret = GetIoMgr()->
             RescheduleTask( pTask );
         if( SUCCEEDED( ret ) )
-            ret = pTask->GetError();
+            ret = STATUS_PENDING;
     }
 
     return ret;
@@ -4871,7 +4978,7 @@ gint32 CRpcRouterManager::OnPreStop(
             ret = pMgr->RescheduleTask( pTask );
 
             if( SUCCEEDED( ret ) )
-                ret = pTaskGrp->GetError();
+                ret = STATUS_PENDING;
         }
 
     }while( 0 );

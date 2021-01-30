@@ -43,6 +43,7 @@ gint32 CRpcTcpBridge::OnCheckRouterPathComplete(
         return -EINVAL;
 
     gint32 ret = 0;
+    std::string strPath, strNode;
     do{
         CCfgOpenerObj oReq( pIoReq );
         IConfigDb* pResp = nullptr;
@@ -72,7 +73,6 @@ gint32 CRpcTcpBridge::OnCheckRouterPathComplete(
         if( ERROR( ret ) )
             break;
 
-        std::string strPath, strNode;
         CCfgOpener oReqCtx( pReqCtx );
         ret = oReqCtx.GetStrProp(
             propRouterPath, strPath );
@@ -101,6 +101,10 @@ gint32 CRpcTcpBridge::OnCheckRouterPathComplete(
 
     CParamList oResp;
     oResp[ propReturnValue ] = ret;
+
+    if( SUCCEEDED( ret ) )
+        oResp[ propRouterPath ] = strPath;
+
     OnServiceComplete(
         oResp.GetCfg(), pCallback );
 
@@ -133,6 +137,7 @@ gint32 CRpcTcpBridge::CheckRouterPathAgain(
         static_cast< CRpcRouterBridge* >
             ( GetParent() );
     CIoManager* pMgr = GetIoMgr();
+    std::string strPath;
 
     do{
         CCfgOpenerObj oIoReq( pIoReq );
@@ -157,7 +162,6 @@ gint32 CRpcTcpBridge::CheckRouterPathAgain(
         }
 
         CCfgOpener oReqCtx( pReqCtx );
-        std::string strPath;
         oReqCtx.GetStrProp(
             propRouterPath, strPath );
 
@@ -215,7 +219,7 @@ gint32 CRpcTcpBridge::CheckRouterPathAgain(
             break;
         }
 
-        InterfPtr pIf;    
+        InterfPtr pIf;
         ret = pRouter->GetBridgeProxy(
             dwProxyId, pIf );
         if( ERROR( ret ) )
@@ -264,9 +268,7 @@ gint32 CRpcTcpBridge::CheckRouterPathAgain(
             (*pIoCall)( eventCancelTask );
         }
         if( SUCCEEDED( ret ) )
-        {
-            ret = pIoCall->GetError();
-        }
+            ret = STATUS_PENDING;
 
     }while( 0 );
 
@@ -274,6 +276,8 @@ gint32 CRpcTcpBridge::CheckRouterPathAgain(
     {
         CParamList oResp;
         oResp[ propReturnValue ] = ret;
+        if( SUCCEEDED( ret ) )
+            oResp[ propRouterPath ] = strPath;
         OnServiceComplete(
             oResp.GetCfg(), pCallback );
     }
@@ -364,6 +368,8 @@ gint32 CRpcTcpBridge::CheckRouterPath(
     CRpcRouterBridge* pRouter =
         static_cast< CRpcRouterBridge* >
             ( GetParent() );
+
+    std::string strPath;
     do{
         if( IsCyclicPath( pReqCtx ) )
         {
@@ -380,7 +386,6 @@ gint32 CRpcTcpBridge::CheckRouterPath(
         }
 
         CCfgOpener oReqCtx;
-        std::string strPath;
         ret = oReqCtx.CopyProp(
             propRouterPath, pReqCtx );
         if( ERROR( ret ) )
@@ -414,7 +419,10 @@ gint32 CRpcTcpBridge::CheckRouterPath(
         ret = pRouter->GetNodeName(
             strPath, strNode );
         if( ERROR( ret ) )
+        {
+            ret = -ENOTDIR;
             break;
+        }
 
         std::string strNext =
             strPath.substr( 1 + strNode.size() );
@@ -426,7 +434,7 @@ gint32 CRpcTcpBridge::CheckRouterPath(
         else if( strNext[ 0 ] != '/' &&
             strNext.size() < 2 )
         {
-            ret = -EINVAL;
+            ret = -ENOTDIR;
             break;
         }
 
@@ -510,7 +518,10 @@ gint32 CRpcTcpBridge::CheckRouterPath(
             ret = pRouter->GetConnParamsByNodeName(
                 strNode, pConnParams );
             if( ERROR( ret ) )
+            {
+                ret = -ENOTDIR;
                 break;
+            }
 
             bool bServer = false;
             oParams.Push( bServer );
@@ -569,16 +580,18 @@ gint32 CRpcTcpBridge::CheckRouterPath(
             }
             else if( SUCCEEDED( ret ) )
             {
-                ret = pTask->GetError();
+                ret = STATUS_PENDING;
             }
         }
 
     }while( 0 );
 
-    if( SUCCEEDED( ret ) )
+    if( ret != STATUS_PENDING )
     {
         CParamList oResp;
         oResp[ propReturnValue ] = ret;
+        if( SUCCEEDED( ret ) )
+            oResp[ propRouterPath ] = strPath;
         SetResponse(
             pCallback, oResp.GetCfg() );
     }
@@ -762,9 +775,9 @@ gint32 CRpcReqForwarder::OnCheckRouterPathComplete(
 
     gint32 ret = 0;
     CParamList oParams;
+    IConfigDb* pResp = nullptr;
     do{
         CCfgOpenerObj oReq( pIoReq );
-        IConfigDb* pResp = nullptr;
         ret = oReq.GetPointer(
             propRespPtr, pResp );
         if( ERROR( ret ) )
@@ -794,6 +807,10 @@ gint32 CRpcReqForwarder::OnCheckRouterPathComplete(
 
         oParams.CopyProp(
             propConnParams, pReqCtx );
+
+        oParams.CopyProp(
+            propRouterPath, pResp );
+
     }
     else
     {
@@ -1147,7 +1164,7 @@ gint32 CRpcRouterBridge::OnRmtSvrOfflineMH(
             }
             else
             {
-                ret = pGrp->GetError();
+                ret = STATUS_PENDING;
             }
         }
 
@@ -1367,7 +1384,7 @@ gint32 CRpcRouterBridge::ClearRemoteEventsMH(
         }
         else
         {
-            ret = pTask->GetError();
+            ret = STATUS_PENDING;
         }
 
     }while( 0 );

@@ -698,7 +698,7 @@ gint32 CK5AuthServer::MechSpecReq(
         pSendTask = pSendGrp;
         ret = AddSeqTask( pSendTask );
         if( SUCCEEDED( ret ) )
-            ret = pSendTask->GetError();
+            ret = STATUS_PENDING;
 
     }while( 0 );
 

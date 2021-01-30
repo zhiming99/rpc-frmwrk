@@ -297,6 +297,7 @@ typedef enum : guint32
     DECL_CLSID( CRpcReqForwarderAuthImpl ),
     DECL_CLSID( CIfDeferCallTaskEx2 ),
     DECL_CLSID( CSimpleSyncIf ),
+    DECL_CLSID( CRedudantNodes ),
     DECL_CLSID( MaxClsid ),
     DECL_CLSID( ClassFactoryStart ) = 0x02000000,
     DECL_CLSID( ReservedClsidEnd ) = 0x0FFFFFFF,

@@ -1177,7 +1177,7 @@ gint32 CRpcInterfaceBase::StopEx(
         }
         else
         {
-            ret = pStopGrp->GetError();
+            ret = STATUS_PENDING;
         }
 
     }while( 0 );
@@ -2533,7 +2533,7 @@ gint32 CRpcServices::StartEx(
         }
         else 
         {
-            ret = pTaskGrp->GetError();
+            ret = STATUS_PENDING;
         }
 
     }while( 0 );

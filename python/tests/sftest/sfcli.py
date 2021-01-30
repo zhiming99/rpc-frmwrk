@@ -20,6 +20,7 @@ import getpass
 import errno
 import os
 import io
+import getopt
 from rpcfrmwrk import *
 
 import types
@@ -175,7 +176,10 @@ class PyFileTransClient( PyFileTransferBase ):
             information for uploading
             '''
             chanHash = ret[ 1 ]
-            ret = self.UploadFile( fileName,
+
+            rmtFileName = os.path.basename(
+                fileName )
+            ret = self.UploadFile( rmtFileName,
                 chanHash, offset, size )
             if ret[ 0 ] < 0 :
                 resp[ 0 ] = ret[ 0 ]
@@ -208,11 +212,22 @@ class PyFileTransClient( PyFileTransferBase ):
 
     def DoDownloadFile( self,
         fileName:   str,
-        hChannel:   np.uint64,
-        offset:     np.uint64,
-        size:       np.uint64 )->[ int, list ]:
-        resp = [ 0, list() ]
+        hChannel:   np.uint64 )->[ int, list ]:
+
         while True :
+            '''Before downloading, fetch the
+            information of the file from the server,
+            via the rpc call `GetFileInfo'
+            '''
+            resp = self.GetFileInfo( fileName )
+            ret = resp[ 0 ]
+            if ret < 0 :
+                break
+
+            fileInfo = resp[ 1 ][ 0 ] 
+            size = fileInfo.size
+            offset = 0
+
             if not os.access( fileName, os.W_OK ) :
                 resp[ 0 ] = -errno.EACCES
                 break
@@ -293,9 +308,35 @@ class PyFileTransProxy(
         PyFileTransClient.__init__( self )
         CEchoClient.__init__( self )
 
+def usage() :
+    print( "usage:" )
+    print( "python3 sfcli.py <filePath> :" )
+    print( "\tupload <filePath > to server, and download",
+        "it to current directory" )
+    print( "python3 sfcli.py -h: print this help")
+
 
 def test_main() : 
-    while( True ) :
+
+    try:
+        opts, args = getopt.getopt(
+            sys.argv[1:], "h", ["help"] )
+
+    except getopt.GetoptError as err:
+        print( err )
+        usage()
+        sys.exit(-1)
+
+    for o, a in opts :
+        if o in ( "-h", "--help" ) :
+            usage()
+            sys.exit( 0 )
+
+    if len( args ) == 0 :
+        usage()
+        sys.exit( -1 )
+
+    for fileName in args :
         '''create the transfer context, and start
         it'''
         oContext = PyRpcContext();
@@ -346,11 +387,9 @@ def test_main() :
             ret = EC.ERROR_FAIL
             break
 
-        ''' upload a file
-        '''
         print( "Uploading file..." )
         tupRet = oProxy.DoUploadFile(
-            "./f100M.dat", hChannel )
+            fileName, hChannel )
          
         ret = tupRet[ 0 ]
         if ret < 0 :
@@ -375,26 +414,22 @@ def test_main() :
             ret = EC.ERROR_FAIL
             break
         
-        ''' Download a file
-        '''
-        print( "Downloading file..." )
-
-        '''Before downloading, fetch the
-        information of the file from the server,
-        via the rpc call `GetFileInfo'
-        '''
-        tupRet = oProxy.GetFileInfo( "f100M.dat" )
-        ret = tupRet[ 0 ]
-        if ret < 0 :
+        fileName = os.path.basename( fileName )
+        if fileName == "" :
+            ret = -errno.EINVAL
             break
 
-        fileInfo = tupRet[ 1 ][ 0 ] 
-        fileSize = fileInfo.size
+        if not os.path.isfile( fileName ) :
+            try:
+                fp = open( fileName, "w" )
+                fp.close()
+            except OSError as err : 
+                resp[ 0 ] = -err.errno
+                break
 
-        '''
-        '''
+        print( "Downloading file..." )
         tupRet = oProxy.DoDownloadFile(
-            "f100M.dat", hChannel, 0, fileSize )
+            fileName, hChannel )
 
         ret = tupRet[ 0 ]
         if ret < 0 :
@@ -412,7 +447,6 @@ def test_main() :
         oContext.Stop()
 
     return ret;
-
 
 ret = test_main()
 quit( ret )

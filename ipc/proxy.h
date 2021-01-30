@@ -1683,6 +1683,8 @@ gint32 CInterfaceProxy::AsyncCall(
 
         oCfg.CopyProp( propIfName,
             ( CObjBase* )pOptions );
+        oCfg.CopyProp( propSeriProto,
+            ( CObjBase* )pOptions );
 
         std::string strMethod( strcMethod );
         if( !pOptions.IsEmpty() )

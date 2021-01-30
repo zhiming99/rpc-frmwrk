@@ -1037,6 +1037,13 @@ gint32 CRemoteProxyState::OnPortEvent(
 
                 ret = CopyProp( propConnParams,
                     ( CObjBase*)pPdo );
+                if( ERROR( ret ) )
+                    break;
+
+                ret = CopyProp( propRouterPath,
+                    ( CObjBase*)pPdo );
+                if( ERROR( ret ) )
+                    break;
 
                 break;
             }
