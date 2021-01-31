@@ -108,7 +108,7 @@ the round-robin load distribution among a list of available redudant nodes.
 You can view a `redudant node` as a device running RPC-frmwrk which provide 
 access to the same set of RPC services. The two connection requests to the
 same service from different clients will be effectively distributed to
-different node. 
+different node. And [here](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support#node-redundancyload-balance) is a technical introduction.
 
 ## Development
 
