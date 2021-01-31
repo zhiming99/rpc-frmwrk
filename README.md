@@ -32,6 +32,7 @@ This framework depends on the following packags to build:
 13. [`Object access via Multihop routing`](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support)
 14. [`Authentication support with Kerberos 5`](https://github.com/zhiming99/rpc-frmwrk/tree/master/rpc/security/README.md)
 15. [`Python Support`](https://github.com/zhiming99/rpc-frmwrk/tree/master/python)
+16. [`Node Redudancy/Load Balance`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md#load-balance--node-redudancy)
 16. A mulit-lang proxy/server generator(To come)
 
 #### Building `rpc-frmwrk`:   
