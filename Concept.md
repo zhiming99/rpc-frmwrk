@@ -102,6 +102,14 @@ or more stream channels to exchange data between proxy/server. The stream
 channels can last till the proxy/server closes them. The upper limit of
 the capacity is 2^64 bytes per stream channel.
 
+### Load Balance & Node Redudancy
+RPC-frmwrk currently support a simple load-balance/Node redundancy strategy,
+the round-robin load distribution among a list of available redudant nodes.
+You can view a `redudant node` as a device running RPC-frmwrk which provide 
+access to the same set of RPC services. The two connection requests to the
+same service from different clients will be effectively distributed to
+different node. We will add more load-balance strategies in the future.
+
 ## Development
 
 The RPC-frmwrk provides a set of API to facilitate the development with
