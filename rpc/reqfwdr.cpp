@@ -391,6 +391,9 @@ gint32 CReqFwdrOpenRmtPortTask::OnServiceComplete(
             oParams.CopyProp(
                 propConnParams, this );
 
+            oParams.SetStrProp(
+                propRouterPath, strRouterPath );
+
             pIf->SetResponse( 
                 pEvt, oParams.GetCfg() );
 

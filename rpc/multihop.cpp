@@ -97,6 +97,11 @@ gint32 CRpcTcpBridge::OnCheckRouterPathComplete(
         ret = pRouter->AddRefCount(
             strNode, dwPortId, dwProxyId );
 
+        if( ERROR( ret ) )
+            break;
+
+        ret = 0;
+
     }while( 0 );
 
     CParamList oResp;
@@ -436,6 +441,21 @@ gint32 CRpcTcpBridge::CheckRouterPath(
         {
             ret = -ENOTDIR;
             break;
+        }
+
+        std::vector< std::string > vecNodes;
+
+        ret = pRouter->GetLBNodes(
+            strNode, vecNodes );
+
+        if( SUCCEEDED( ret ) &&
+            !vecNodes.empty() )
+        {
+            return CheckRouterPathLB(
+                pCallback,
+                ( IConfigDb* )oReqCtx.GetCfg(),
+                strPath, strNext, strNode,
+                vecNodes );
         }
 
         guint32 dwProxyId = 0;

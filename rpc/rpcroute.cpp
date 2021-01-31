@@ -566,7 +566,7 @@ gint32 CRedudantNodes::LoadLBInfo(
         {
             Json::Value& arrNodes = oElem[ strName ];
             if( arrNodes == Json::Value::null ||
-                arrNodes.isArray() ||
+                !arrNodes.isArray() ||
                 arrNodes.empty() )
                 continue;
             guint32 j = 0;
@@ -838,41 +838,56 @@ gint32 CRpcRouterBridge::BuildNodeMap()
 
             }
 
-            break;
-        }
+            Json::Value& oLBInfo =
+                oObjElem[ JSON_ATTR_LBGROUP ];
 
-        if( ERROR( ret ) )
-            break;
-
-        Json::Value& oLBInfo =
-            valObjDesc[ JSON_ATTR_LBGROUP ];
-
-        if( oLBInfo == Json::Value::null ||
-            !oLBInfo.isArray() ||
-            oLBInfo.empty() )
-            break;
-
-        if( m_pLBGrp.IsEmpty() )
-        {
-            CParamList oParams;
-            oParams[ propParentPtr ] = ObjPtr( this );
-            ret = m_pLBGrp.NewObj(
-                clsid( CRedudantNodes ),
-                oParams.GetCfg() );
-            if( ERROR( ret ) )
+            if( oLBInfo == Json::Value::null ||
+                !oLBInfo.isArray() ||
+                oLBInfo.empty() )
                 break;
+
+            if( m_pLBGrp.IsEmpty() )
+            {
+                CParamList oParams;
+                oParams[ propParentPtr ] = ObjPtr( this );
+                ret = m_pLBGrp.NewObj(
+                    clsid( CRedudantNodes ),
+                    oParams.GetCfg() );
+                if( ERROR( ret ) )
+                    break;
+            }
+
+            CRedudantNodes* pLBGrp =
+                ( CRedudantNodes* )m_pLBGrp;
+
+            ret = pLBGrp->LoadLBInfo( oLBInfo );
+
+            break;
         }
 
-        CRedudantNodes* pLBGrp =
-            ( CRedudantNodes* )m_pLBGrp;
-
-        ret = pLBGrp->LoadLBInfo( oLBInfo );
         if( ERROR( ret ) )
             break;
 
     }while( 0 );
 
     return ret;
+}
+
+gint32 CRpcRouterBridge::GetLBNodes(
+    const std::string& strGrpName,
+    std::vector< std::string >& vecNodes )
+{
+    if( strGrpName.empty() )
+        return -EINVAL;
+
+    CStdRMutex oRouterLock( GetLock() );
+
+    CRedudantNodes* pLBGrp =
+        ( CRedudantNodes* )m_pLBGrp;
+
+    return pLBGrp->GetNodesAvail(
+        strGrpName, vecNodes );
+
 }
 
 gint32 CRpcRouterBridge::OnPostStart(
