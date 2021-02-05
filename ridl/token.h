@@ -2,8 +2,8 @@
 #include <map>
 enum EnumToken
 {
-    tokInvalid = 0,
-    tokStruct = 1,
+    tokInvalid = 1,
+    tokStruct,
     tokInterf,
     tokString,
     tokUint64,

@@ -6,19 +6,19 @@
 
 struct FILECTX
 {
-    int32_t     iNumCol = 0;
-    std::string m_strPath;
     FILE*       m_fp = nullptr;
+    BufPtr      m_pVal;
+    std::string m_strPath;
     std::string m_strLastVal;
-    BufPtr      m_curVal;
+
     FILECTX()
-    { m_curVal.NewObj(); }
+    { m_pVal.NewObj(); }
 
     ~FILECTX()
     {
         if( m_fp != nullptr )
             fclose( m_fp );
-        m_curVal.Clear()
+        m_pVal.Clear()
     }
 };
 
@@ -31,7 +31,7 @@ inline std::string& curpath()
 { return g_vecBufs.back().m_strPath; }
 
 inline BufPtr& curval()
-{ return g_vecBufs.back().m_curVal; }
+{ return g_vecBufs.back().m_pVal; }
 
 inline EnumToken IsKeyword( char* szKeyword )
 {
@@ -97,7 +97,7 @@ HexDig [0-9a-fA-F]
 %option   header-file="lexer.h"
 %option   stack
 
-%x incl readstr
+%x incl readstr c_comment
 %%
 
 \"  {
@@ -105,17 +105,17 @@ HexDig [0-9a-fA-F]
         yy_push_state( readstr );
     }
 
-;   return tokSColon;
-\[  return tokLbrack;
-\]  return tokRbrack;
-\{  return tokLbrace;
-\}  return tokRbrace;
-,   return tokComma;
-=   return tokEqual;
-\(   return tokLParen;
-\)   return tokRParen;
-\<   return tokLangle;
-\>   return tokRangle;
+";"     return tokSColon;
+"["     return tokLbrack;
+"]"     return tokRbrack;
+"{"     return tokLbrace;
+"}"     return tokRbrace;
+","     return tokComma;
+"="     return tokEqual;
+"("     return tokLParen;
+")"     return tokRParen;
+"<"     return tokLangle;
+">"     return tokRangle;
 
 [[:blank:]]* /*eat*/
 
@@ -220,14 +220,10 @@ HexDig [0-9a-fA-F]
 
 [[:alpha:]][[:alnum:]_]* {
         EnumToken iKey = IsKeyword( yytext );
-        if( iKey == tokInvalid )
-        {
-            std::string strMsg = "error unknown token '";
-            strMsg += yytext;
-            strMsg += "'";
-            PrintAndQuit( -EINVAL, strMsg.c_str() );
-        }
-        return iKey;
+        if( iKey != tokInvalid )
+            return iKey;
+        *curval() = yytext;
+        return tokIdent;
     }
 
 0(OctDig+) {
@@ -359,6 +355,12 @@ HexDig [0-9a-fA-F]
         return tokUint32;
     }
 
+"/*"         yy_push_state(c_comment);
+<c_comment>[^*\n]*        /* eat anything that's not a '*' */
+<c_comment>"*"+[^*/\n]* /* eat up '*'s not * followed by * '/'s */
+<c_comment>\n    
+<c_comment>"*"+"/" yy_pop_state();
+
 .*  {
 
         std::string strMsg = "error unknown token '";
@@ -367,3 +369,7 @@ HexDig [0-9a-fA-F]
         PrintAndQuit( -EINVAL,
             strMsg.c_str() );
     }
+
+%%
+
+
