@@ -1,0 +1,14 @@
+struct STMHANDLE
+{
+    uint64 handle;
+};
+
+struct OBJPTR
+{
+    ObjPtr pObj;
+};
+
+interface ITinyInterface
+{
+    [ async ] Ping() return ( int32_t iRet );
+};
