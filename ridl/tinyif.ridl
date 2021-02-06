@@ -5,10 +5,10 @@ struct STMHANDLE
 
 struct OBJPTR
 {
-    ObjPtr pObj;
+    bytearray pObj;
 };
 
 interface ITinyInterface
 {
-    [ async ] Ping() return ( int32_t iRet );
+    Ping() return ( int32_t iRet );
 };

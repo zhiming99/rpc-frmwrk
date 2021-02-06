@@ -90,20 +90,16 @@ inline gint32 IsAllZero( char* szText )
 OctDig [0-7] 
 HexDig [0-9a-fA-F]
 
-%option   8bit reentrant bison-bridge
-%option   warn nodefault
-%option   yylineno
-%option   outfile="lexer.cpp"
-%option   header-file="lexer.h"
-%option   stack
+%option     8bit reentrant bison-bridge
+%option     bison-locations
+%option     warn nodefault
+%option     yylineno
+%option     outfile="lexer.cpp"
+%option     header-file="lexer.h"
+%option     stack
 
 %x incl readstr c_comment
 %%
-
-\"  {
-        curstr().clear();
-        yy_push_state( readstr );
-    }
 
 ";"     return tokSColon;
 "["     return tokLbrack;
@@ -152,15 +148,10 @@ HexDig [0-9a-fA-F]
         yy_pop_state();
     }
 
-<<EOF>> {
-        g_vecBufs.pop_back();
-        yypop_buffer_state();
-        if ( !YY_CURRENT_BUFFER)
-        {
-            yyterminate();
-        }
+\"  {
+        curstr().clear();
+        yy_push_state( readstr );
     }
-
 
 <readstr>\"  { /* saw closing quote - all done */
         yy_pop_state();
@@ -171,6 +162,15 @@ HexDig [0-9a-fA-F]
         {
             *curval() = curstr();
             return tokStrVal;
+        }
+        else
+        {
+            if( curstr().empty() )
+            {
+                gint32 ret = -EINVAL;
+                PrintAndQuit( ret,
+                    "error empty file name" );
+            }
         }
      }
 
@@ -218,14 +218,6 @@ HexDig [0-9a-fA-F]
 
 \/\/.*\n        /* c++ comment line */
 
-[[:alpha:]][[:alnum:]_]* {
-        EnumToken iKey = IsKeyword( yytext );
-        if( iKey != tokInvalid )
-            return iKey;
-        *curval() = yytext;
-        return tokIdent;
-    }
-
 0(OctDig+) {
         guint32 iLen = strlen( yytext + 1 );
         if( iLen * 3 > 64 )
@@ -239,13 +231,13 @@ HexDig [0-9a-fA-F]
             guint64 iVal = strtoull(
                 yytext, nullptr, 8);
             *curval() = iVal;
-            return tokUint64;
+            return tokIntVal;
         }
 
         guint32 iVal = strtoul(
             yytext, nullptr, 8);
         *curval() = iVal;
-        return tokUint64;
+        return tokIntVal;
     }
 
 0(OctDig)+ {
@@ -267,7 +259,7 @@ HexDig [0-9a-fA-F]
         guint32 iVal = strtoul(
             yytext + 1, nullptr, 8);
         *curval() = iVal;
-        return tokUint32;
+        return tokIntVal;
     }
 
 0[xX](HexDig)+ {
@@ -289,7 +281,7 @@ HexDig [0-9a-fA-F]
         guint32 iVal = strtoul(
             yytext + 2, nullptr, 8);
         *curval() = iVal;
-        return tokUint32;
+        return tokIntVal;
     }
 
 [+-]?[1-9][[:digit:]]*.[[:digit:]]*[Ee][+-]?[1-9][[:digit:]]* {
@@ -301,7 +293,7 @@ HexDig [0-9a-fA-F]
                 "error float value overflow" );
         }
         *curval() = dblVal;
-        return tokDouble;
+        return tokDblVal;
     }
 [+-]?[0]?.[[:digit:]]*[Ee][+-]?[1-9][[:digit:]]* {
         gint32 ret = IsAllZero( yytext );
@@ -318,7 +310,7 @@ HexDig [0-9a-fA-F]
                 "error float value overflow" );
         }
         *curval() = dblVal;
-        return tokDouble;
+        return tokDblVal;
     }
 
 [+-]?[1-9][[:digit:]]* {
@@ -333,26 +325,71 @@ HexDig [0-9a-fA-F]
         if( iLen * 0.3010 > 64 )
         {
             PrintAndQuit( -ERANGE,
-                "error hex value out of range"
-                );
+                "error hex value out of range" );
         }
         if( iLen * 0.3010 > 32 )
         {
             guint64 iVal = strtoull(
                 yptr, nullptr, 8);
             *curval() = iVal;
-            return tokUint64;
+            return tokIntVal;
         }
 
         guint32 iVal = strtoul(
             yptr, nullptr, 8);
         *curval() = iVal;
-        return tokUint32;
+        return tokIntVal;
+    }
+
+[[:alpha:]][[:alnum:]_]* {
+        EnumToken iKey = IsKeyword( yytext );
+        if( iKey != tokInvalid )
+            return iKey;
+
+        if( strcmp( yytext, "true" ) == 0 )
+        {
+            *curval() = true;
+            return tokBoolVal;
+        }
+        else if( strcmp( yytext, "false" ) == 0 )
+        {
+            *curval() = false;
+            return tokBoolVal;
+        }
+
+        *curval() = yytext;
+        return tokIdent;
+    }
+
+"'.'" {
+        guint8 c = yytext[ 1 ];
+        *curval() = c;
+        return tokByVal;
+    }
+
+"'\\.'" {
+        guint8 c = yytext[ 2 ];
+        if( c == 'a' )
+            c = '\a';
+        else if( c == 'b' )
+            c = '\b';
+        else if( c == 't' )
+            c = '\t';
+        else if( c == 'n' )
+            c = '\n';
+        else if( c == 'v' )
+            c = '\v';
+        else if( c == 'f' )
+            c = '\f';
+        else if( c == 'r' )
+            c = '\r';
+        *curval() = c;
+        return tokByVal;
     }
 
 0   {
         *curval() = ( guint32 )0;
-        return tokUint32;
+        return tokIntVal;
     }
 
 "/*"         yy_push_state(c_comment);
@@ -368,6 +405,15 @@ HexDig [0-9a-fA-F]
         strMsg += "'";
         PrintAndQuit( -EINVAL,
             strMsg.c_str() );
+    }
+
+<<EOF>> {
+        g_vecBufs.pop_back();
+        yypop_buffer_state();
+        if ( !YY_CURRENT_BUFFER)
+        {
+            yyterminate();
+        }
     }
 
 %%
