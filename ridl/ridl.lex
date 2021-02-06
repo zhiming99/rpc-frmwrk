@@ -11,71 +11,16 @@ struct FILECTX
     std::string m_strPath;
     std::string m_strLastVal;
 
-    FILECTX()
-    { m_pVal.NewObj(); }
-
-    ~FILECTX()
-    {
-        if( m_fp != nullptr )
-            fclose( m_fp );
-        m_pVal.Clear()
-    }
+    FILECTX();
+    FILECTX( const std::string& strPath );
+    ~FILECTX();
 };
 
-std::vector< FILECTX > g_vecBufs;
-
-inline std::string& curstr()
-{ return g_vecBufs.back().m_strLastVal; }
-
-inline std::string& curpath()
-{ return g_vecBufs.back().m_strPath; }
-
-inline BufPtr& curval()
-{ return g_vecBufs.back().m_pVal; }
-
-inline EnumToken IsKeyword( char* szKeyword )
-{
-    std::string strKey = szKeyword;
-
-    std::map< std::string, EnumToken >::iterator
-        itr = g_mapTokens.find( strKey );
-    if( itr == g_mapTokens.end() )
-        return tokInvalid;
-    return itr->second;
-}
-
-inline gint32 IsAllZero( char* szText )
-{
-    std::string strFloat = szText;
-    size_t posPt =
-        strFloat.find_first_of( '.' );
-    if( posPt = std::string::npos )
-        return -ENOENT;
-
-    size_t posExp =
-        strFloat.find_first_of( "eE");
-    if( posExp = std::string::npos )
-        return -ENOENT;
-
-    if( posPt >= strFloat.size() ||
-        posExp >= strFloat.size() )
-        return -ENOENT;
-
-    if( posPt + 1 == posExp )
-        return -ENOENT;
-
-    if( posPt + 1 < posExp )
-    {
-        for( size_t i = posPt + 1;
-            i < posExp; ++i)
-        {
-            if( strFloat[ i ] != '0' )
-                return 0;
-        }
-        return ERROR_FALSE;
-    }
-    return -ENOENT;
-}
+std::string& curstr();
+std::string& curpath();
+BufPtr& curval();
+EnumToken IsKeyword( char* szKeyword );
+gint32 IsAllZero( char* szText );
 
 #define PrintAndQuit( ret, szMsg ) \
 { \
@@ -90,7 +35,7 @@ inline gint32 IsAllZero( char* szText )
 OctDig [0-7] 
 HexDig [0-9a-fA-F]
 
-%option     8bit reentrant bison-bridge
+%option     8bit bison-bridge
 %option     bison-locations
 %option     warn nodefault
 %option     yylineno
@@ -101,17 +46,19 @@ HexDig [0-9a-fA-F]
 %x incl readstr c_comment
 %%
 
-";"     return tokSColon;
-"["     return tokLbrack;
-"]"     return tokRbrack;
-"{"     return tokLbrace;
-"}"     return tokRbrace;
-","     return tokComma;
-"="     return tokEqual;
-"("     return tokLParen;
-")"     return tokRParen;
-"<"     return tokLangle;
-">"     return tokRangle;
+";"     |
+"["     |
+"]"     |
+"{"     |
+"}"     |
+","     |
+"="     |
+"("     |
+")"     |
+"<"     |
+">"    {
+        return yytext[ 0 ];
+    }
 
 [[:blank:]]* /*eat*/
 
@@ -161,7 +108,7 @@ HexDig [0-9a-fA-F]
         if( yy_top_state() != incl )
         {
             *curval() = curstr();
-            return tokStrVal;
+            return tok_strval;
         }
         else
         {
@@ -231,13 +178,13 @@ HexDig [0-9a-fA-F]
             guint64 iVal = strtoull(
                 yytext, nullptr, 8);
             *curval() = iVal;
-            return tokIntVal;
+            return tok_intval;
         }
 
         guint32 iVal = strtoul(
             yytext, nullptr, 8);
         *curval() = iVal;
-        return tokIntVal;
+        return tok_intval;
     }
 
 0(OctDig)+ {
@@ -253,13 +200,13 @@ HexDig [0-9a-fA-F]
             guint64 iVal = strtoull(
                 yytext + 1, nullptr, 8);
             *curval() = iVal;
-            return tokUint64;
+            return tok_uint64;
         }
 
         guint32 iVal = strtoul(
             yytext + 1, nullptr, 8);
         *curval() = iVal;
-        return tokIntVal;
+        return tok_intval;
     }
 
 0[xX](HexDig)+ {
@@ -275,13 +222,13 @@ HexDig [0-9a-fA-F]
             guint64 iVal = strtoull(
                 yytext + 2, nullptr, 8);
             *curval() = iVal;
-            return tokUint64;
+            return tok_uint64;
         }
 
         guint32 iVal = strtoul(
             yytext + 2, nullptr, 8);
         *curval() = iVal;
-        return tokIntVal;
+        return tok_intval;
     }
 
 [+-]?[1-9][[:digit:]]*.[[:digit:]]*[Ee][+-]?[1-9][[:digit:]]* {
@@ -293,7 +240,7 @@ HexDig [0-9a-fA-F]
                 "error float value overflow" );
         }
         *curval() = dblVal;
-        return tokDblVal;
+        return tok_dblval;
     }
 [+-]?[0]?.[[:digit:]]*[Ee][+-]?[1-9][[:digit:]]* {
         gint32 ret = IsAllZero( yytext );
@@ -310,7 +257,7 @@ HexDig [0-9a-fA-F]
                 "error float value overflow" );
         }
         *curval() = dblVal;
-        return tokDblVal;
+        return tok_dblval;
     }
 
 [+-]?[1-9][[:digit:]]* {
@@ -322,49 +269,50 @@ HexDig [0-9a-fA-F]
             bNegative = true;
 
         guint32 iLen = strlen( yptr );
-        if( iLen * 0.3010 > 64 )
+        double digits = 64 *.3010;
+        if( iLen > digits )
         {
             PrintAndQuit( -ERANGE,
                 "error hex value out of range" );
         }
-        if( iLen * 0.3010 > 32 )
+        else if( ( iLen << 1 ) > digits )
         {
             guint64 iVal = strtoull(
                 yptr, nullptr, 8);
             *curval() = iVal;
-            return tokIntVal;
+            return tok_intval;
         }
 
         guint32 iVal = strtoul(
             yptr, nullptr, 8);
         *curval() = iVal;
-        return tokIntVal;
+        return tok_intval;
     }
 
 [[:alpha:]][[:alnum:]_]* {
         EnumToken iKey = IsKeyword( yytext );
-        if( iKey != tokInvalid )
+        if( iKey != tok_invalid )
             return iKey;
 
         if( strcmp( yytext, "true" ) == 0 )
         {
             *curval() = true;
-            return tokBoolVal;
+            return tok_boolval;
         }
         else if( strcmp( yytext, "false" ) == 0 )
         {
             *curval() = false;
-            return tokBoolVal;
+            return tok_boolval;
         }
 
         *curval() = yytext;
-        return tokIdent;
+        return tok_ident;
     }
 
 "'.'" {
         guint8 c = yytext[ 1 ];
         *curval() = c;
-        return tokByVal;
+        return tok_byval;
     }
 
 "'\\.'" {
@@ -384,12 +332,12 @@ HexDig [0-9a-fA-F]
         else if( c == 'r' )
             c = '\r';
         *curval() = c;
-        return tokByVal;
+        return tok_byval;
     }
 
 0   {
         *curval() = ( guint32 )0;
-        return tokIntVal;
+        return tok_intval;
     }
 
 "/*"         yy_push_state(c_comment);
@@ -418,4 +366,76 @@ HexDig [0-9a-fA-F]
 
 %%
 
+std::vector< FILECTX > g_vecBufs;
+
+FILECTX::FILECTX()
+{ m_pVal.NewObj(); }
+
+FILECTX::FILECTX( const std::string& strPath )
+{
+    m_fp = fopen( strPath.c_str(), "r");
+    if( m_fp != nullptr )
+    {
+        m_strPath = strPath;
+    }
+}
+
+FILECTX::~FILECTX()
+{
+    if( m_fp != nullptr )
+        fclose( m_fp );
+    m_pVal.Clear()
+}
+std::string& curstr()
+{ return g_vecBufs.back().m_strLastVal; }
+
+std::string& curpath()
+{ return g_vecBufs.back().m_strPath; }
+
+BufPtr& curval()
+{ return g_vecBufs.back().m_pVal; }
+
+EnumToken IsKeyword( char* szKeyword )
+{
+    std::string strKey = szKeyword;
+
+    std::map< std::string, EnumToken >::iterator
+        itr = g_mapKeywords.find( strKey );
+    if( itr == g_mapKeywords.end() )
+        return tok_invalid;
+    return itr->second;
+}
+
+gint32 IsAllZero( char* szText )
+{
+    std::string strFloat = szText;
+    size_t posPt =
+        strFloat.find_first_of( '.' );
+    if( posPt = std::string::npos )
+        return -ENOENT;
+
+    size_t posExp =
+        strFloat.find_first_of( "eE");
+    if( posExp = std::string::npos )
+        return -ENOENT;
+
+    if( posPt >= strFloat.size() ||
+        posExp >= strFloat.size() )
+        return -ENOENT;
+
+    if( posPt + 1 == posExp )
+        return -ENOENT;
+
+    if( posPt + 1 < posExp )
+    {
+        for( size_t i = posPt + 1;
+            i < posExp; ++i)
+        {
+            if( strFloat[ i ] != '0' )
+                return 0;
+        }
+        return ERROR_FALSE;
+    }
+    return -ENOENT;
+}
 

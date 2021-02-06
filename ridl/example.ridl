@@ -46,6 +46,12 @@ interface IFileTransfer
         returns ( int32 iRet );
 };
 
+interface IChat
+{
+    SpecifyChannel( STMHANDLE hChannel )
+        returns( int32 iRet );
+}
+
 service SimpFileSvc [
     serial="protobuf",
     timeout=120, rtpath="/",
@@ -55,4 +61,5 @@ service SimpFileSvc [
     interface ITinyInterface [ async_p ];
     interface IEchoServer [ async ];
     interface IFileTransfer [ stream ];
+    interface IChat [ async, stream ];
 };
