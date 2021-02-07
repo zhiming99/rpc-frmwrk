@@ -2365,6 +2365,10 @@ class CRpcRouterBridge : public CRpcRouter
         EnumEventId iEvent,
         IConfigDb* pCtx,
         CfgPtr& pEvtReq );
+
+    gint32 GetLBNodes(
+        const std::string& strGrpName,
+        std::vector< std::string >& vecNodes );
 };
 
 class CIfRouterMgrState : public CIfServerState

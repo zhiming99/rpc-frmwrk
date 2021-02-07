@@ -1,0 +1,100 @@
+%{
+#include "rpc.h"
+#include "token.h"
+#include "lexer.h"
+%}
+
+%define api.value.type {BufPtr}
+%%
+
+%token  IDENT 
+%token  STRVAL
+%token  BOOLVAL
+%token  INTVAL
+%token  FLOATVAL
+%token  DBLVAL
+
+primetyp :
+      STRING
+    | UINT64
+    | INT64
+    | UINT32
+    | INT32
+    | UINT16
+    | INT16
+    | FLOAT
+    | DOUBLE
+    | BYTE
+    | BOOL
+    | BYTEARR
+    | OBJPTR
+    | HSTREAM
+    ;
+
+arrtype :
+    ARRAY '<' idltype '>'
+    ;
+
+maptype :
+    MAP '<' idltype, idltype '>'
+    ;
+
+structyp : STRUCT '{' fieldlist '}' ';'
+    ;
+
+fieldlist : idltype IDENT ';'
+    | idltype IDENT ';' fieldlist
+    ;
+
+idltype :
+      primetyp
+    | arrtyp
+    | maptyp
+    | structyp
+    ;
+
+value :
+      STRVAL
+    | BOOLVAL
+    | INTVAL
+    | FLOATVAL
+    | DBLVAL
+    | BOOLVAL
+    | BYVAL
+    ;
+
+attrname : 
+      TOK_ASYNC
+    | TOK_ASYNCP
+    | TOK_ASYNCS
+    | TOK_RETURN
+    | TOK_STREAM
+    | TOK_SERIAL
+    | TOK_TIMEOUT
+    | TOK_RTPATH
+    | TOK_SSL
+    | TOK_WEBSOCK
+    | TOK_COMPRES
+    | TOK_AUTH
+    ;
+
+attrexp :
+      attrname
+    | attrname '=' value
+    | attrname ',' attrexp
+    | attrname '=' value ',' attrexp
+    ;
+
+attrlist : '[' attrexp ']'
+    ;
+    
+
+%%
+%parse-param { char const *file_name };
+%initial-action
+{
+    @$.initialize( file_name );
+    FILECTX fc( file_name );
+    g_vecBufs.push_back( fc );
+};
+

@@ -103,6 +103,10 @@ gint32 CRpcTcpBridge::OnCheckRouterPathCompleteLB(
 
         ret = pRouter->AddRefCount(
             strNode, dwPortId, dwProxyId );
+        if( ERROR( ret ) )
+            break;
+
+        ret = 0;
 
     }while( 0 );
 
@@ -226,6 +230,8 @@ gint32 CRpcTcpBridge::CheckRouterPathAgainLB(
             if( ERROR( ret ) )
                 break;
 
+            ret = 0;
+
             break;
         }
 
@@ -249,17 +255,19 @@ gint32 CRpcTcpBridge::CheckRouterPathAgainLB(
             propRouterPath, strNext );
 
         QwVecPtr pvecIdsCpy;
-        CStlQwordVector* pvecIds; 
-        ret = oReqCtx.GetPointer(
-            propObjList, pvecIds );
-        if( ERROR( ret ) )
-            break;
-
         ret = pvecIdsCpy.NewObj();
         if( ERROR( ret ) )
             break;
 
-        ( *pvecIdsCpy )() = ( *pvecIds )();
+        CStlQwordVector* pvecIds; 
+        ret = oReqCtx.GetPointer(
+            propObjList, pvecIds );
+
+        if( SUCCEEDED( ret ) )
+            ( *pvecIdsCpy )() = ( *pvecIds )();
+        else
+            ret = 0;
+
         oReqCtx2.SetObjPtr( propObjList,
             ObjPtr( pvecIdsCpy ) );
 
@@ -493,6 +501,9 @@ gint32 CRpcTcpBridge::CheckRouterPathLB(
             oReqCtx.CopyProp(
                 propConnHandle, pReqCtx );
 
+            oReqCtx.CopyProp(
+                propObjList, pReqCtx );
+
             oReqCtx.Push( bLast );
             const std::string& strNode =
                 vecNodes[ i ];
@@ -645,24 +656,21 @@ gint32 CRpcTcpBridge::CheckRouterPathLB(
                 oReqCtx2[ propRouterPath ] = strNext;
 
                 QwVecPtr pvecIdsCpy;
-                CStlQwordVector* pvecIds; 
-
-                ret = oReqCtx2.CopyProp(
-                    propObjList, pReqCtx );
-                if( ERROR( ret ) )
-                    break;
-
-                ret = oReqCtx2.GetPointer(
-                    propObjList, pvecIds );
-                if( ERROR( ret ) )
-                    break;
-
-
                 ret = pvecIdsCpy.NewObj();
                 if( ERROR( ret ) )
                     break;
 
-                ( *pvecIdsCpy )() = ( *pvecIds )();
+                CStlQwordVector* pvecIds; 
+
+                oReqCtx2.CopyProp(
+                    propObjList, pReqCtx );
+
+                ret = oReqCtx2.GetPointer(
+                    propObjList, pvecIds );
+
+                if( SUCCEEDED( ret ) )
+                    ( *pvecIdsCpy )() = ( *pvecIds )();
+
                 oReqCtx2.SetObjPtr( propObjList,
                     ObjPtr( pvecIdsCpy ) );
 

@@ -1,0 +1,65 @@
+include "tinyif.ridl"
+
+struct FILE_INFO
+{
+    string szFileName;
+    uint64 fileSize;
+    bool bRead;
+    bytearray fileHeader;
+    array<string> vecLines;
+    map<int32, bytearray> vecBlocks;
+};
+
+interface IEchoServer
+{
+    Echo( string strText )
+        returns ( int32 iRet, string strResp ) ;
+
+    EchoUnknown( bytearray pBuf )
+        returns ( int32 iRet, bytearray pResp );
+
+    EchoCfg( OBJPTR pObj )
+        returns ( int32 iRet, OBJPTR pRespObj );
+
+    EchoMany ( int32 i1, int16 i2,
+        int64 i3, float i4, double i5, string szText )
+        returns ( int32 iRet,
+            int32 i1r, int16 i2r,
+            int64 i3r, float i4r,
+            double i5r, string szTextr );
+};
+
+interface IFileTransfer 
+{
+    UploadFile( string szFilePath,
+        STMHANDLE hChannel, uint64 offset,
+        uint64 size )
+        returns ( int32 iRet );
+
+    GetFileInfo(
+        string szFileName, bool bRead )
+        returns  ( int32 iRet, FILE_INFO fi );
+
+    DownloadFile( string szFileName,
+        STMHANDLE hChannel, uint64 offset,
+        uint64 size )
+        returns ( int32 iRet );
+};
+
+interface IChat
+{
+    SpecifyChannel( STMHANDLE hChannel )
+        returns( int32 iRet );
+}
+
+service SimpFileSvc [
+    serial="protobuf",
+    timeout=120, rtpath="/",
+    ssl, websock, compress,
+    auth ]
+{
+    interface ITinyInterface [ async_p ];
+    interface IEchoServer [ async ];
+    interface IFileTransfer [ stream ];
+    interface IChat [ async, stream ];
+};

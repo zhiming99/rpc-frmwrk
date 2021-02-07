@@ -32,6 +32,7 @@ This framework depends on the following packags to build:
 13. [`Object access via Multihop routing`](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support)
 14. [`Authentication support with Kerberos 5`](https://github.com/zhiming99/rpc-frmwrk/tree/master/rpc/security/README.md)
 15. [`Python Support`](https://github.com/zhiming99/rpc-frmwrk/tree/master/python)
+16. [`Node Redudancy/Load Balance`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md#load-balance--node-redudancy)
 16. A mulit-lang proxy/server generator(To come)
 
 #### Building `rpc-frmwrk`:   
@@ -47,6 +48,9 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 7. Logging service
 
 ---
+[`Sun Jan 31 2021 11:52:16 AM Beijing`]   
+1. During preparation for the proxy/server generator, I have added a small feature of `Node Redudancy/Load Balance`. It is a very simple implementation. Load distribution on more advanced strategy relies on more advanced data acquisiton technique, which needs some further development in the future.
+
 [`Sat Jan 23 2021 06:58:41 PM Beijing`]
 1. After having fixed some bugs in the streaming related code, test case `sftest` is almost done. I will add some document text and do some further test.
 2. After the `sftest` is done, the major development target of Python support has been achieved. As the `todo` list shows, I will do some investigation on the code generator and probably the next step is to add some support about protobuf, to enable multi-languate support, or JAVA support.
