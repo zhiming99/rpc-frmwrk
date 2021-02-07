@@ -2,33 +2,41 @@
 #include <string>
 #include <map>
 #include "rpc.h"
-#include "token.h"
+#include "yy.tab.h"
 
 struct FILECTX
 {
     FILE*       m_fp = nullptr;
-    BufPtr      m_pVal;
+    BufPtr*     m_pVal;
     std::string m_strPath;
     std::string m_strLastVal;
 
     FILECTX();
     FILECTX( const std::string& strPath );
+    FILECTX( const FILECTX& fc );
     ~FILECTX();
 };
 
+#define tok_invalid   1
+
 std::string& curstr();
 std::string& curpath();
-BufPtr& curval();
+CBuffer& newval();
 EnumToken IsKeyword( char* szKeyword );
 gint32 IsAllZero( char* szText );
 
-#define PrintAndQuit( ret, szMsg ) \
-{ \
+#define PrintMsg( ret, szMsg ) \
     DebugPrintEx( logErr, ret, \
         "%s(%d): %s", curpath().c_str(), \
-        yylineno, szMsg ); \
+        yylineno, szMsg );
+
+#define PrintAndQuit( ret, szMsg ) \
+{ \
+    PrintMsg( ret, szMsg )\
     yyterminate(); \
 }
+
+#define curval ( g_vecBufs.back().m_pVal )
 
 %}
 
@@ -107,7 +115,8 @@ HexDig [0-9a-fA-F]
          */
         if( yy_top_state() != incl )
         {
-            *curval() = curstr();
+            newval() = curstr();
+            yylval = curval;
             return tok_strval;
         }
         else
@@ -177,13 +186,15 @@ HexDig [0-9a-fA-F]
         {
             guint64 iVal = strtoull(
                 yytext, nullptr, 8);
-            *curval() = iVal;
+            newval() = iVal;
+            yylval = curval;
             return tok_intval;
         }
 
         guint32 iVal = strtoul(
             yytext, nullptr, 8);
-        *curval() = iVal;
+        newval() = iVal;
+        yylval = curval;
         return tok_intval;
     }
 
@@ -199,13 +210,15 @@ HexDig [0-9a-fA-F]
         {
             guint64 iVal = strtoull(
                 yytext + 1, nullptr, 8);
-            *curval() = iVal;
+            newval() = iVal;
+            yylval = curval;
             return tok_uint64;
         }
 
         guint32 iVal = strtoul(
             yytext + 1, nullptr, 8);
-        *curval() = iVal;
+        newval() = iVal;
+        yylval = curval;
         return tok_intval;
     }
 
@@ -221,13 +234,15 @@ HexDig [0-9a-fA-F]
         {
             guint64 iVal = strtoull(
                 yytext + 2, nullptr, 8);
-            *curval() = iVal;
+            newval() = iVal;
+            yylval = curval;
             return tok_uint64;
         }
 
         guint32 iVal = strtoul(
             yytext + 2, nullptr, 8);
-        *curval() = iVal;
+        newval() = iVal;
+        yylval = curval;
         return tok_intval;
     }
 
@@ -239,7 +254,8 @@ HexDig [0-9a-fA-F]
             PrintAndQuit( -ERANGE,
                 "error float value overflow" );
         }
-        *curval() = dblVal;
+        newval() = dblVal;
+        yylval = curval;
         return tok_dblval;
     }
 [+-]?[0]?.[[:digit:]]*[Ee][+-]?[1-9][[:digit:]]* {
@@ -256,7 +272,8 @@ HexDig [0-9a-fA-F]
             PrintAndQuit( -ERANGE,
                 "error float value overflow" );
         }
-        *curval() = dblVal;
+        newval() = dblVal;
+        yylval = curval;
         return tok_dblval;
     }
 
@@ -279,13 +296,15 @@ HexDig [0-9a-fA-F]
         {
             guint64 iVal = strtoull(
                 yptr, nullptr, 8);
-            *curval() = iVal;
+            newval() = iVal;
+            yylval = curval;
             return tok_intval;
         }
 
         guint32 iVal = strtoul(
             yptr, nullptr, 8);
-        *curval() = iVal;
+        newval() = iVal;
+        yylval = curval;
         return tok_intval;
     }
 
@@ -296,22 +315,26 @@ HexDig [0-9a-fA-F]
 
         if( strcmp( yytext, "true" ) == 0 )
         {
-            *curval() = true;
+            newval() = true;
+            yylval = curval;
             return tok_boolval;
         }
         else if( strcmp( yytext, "false" ) == 0 )
         {
-            *curval() = false;
+            newval() = false;
+            yylval = curval;
             return tok_boolval;
         }
 
-        *curval() = yytext;
+        newval() = yytext;
+        yylval = curval;
         return tok_ident;
     }
 
 "'.'" {
         guint8 c = yytext[ 1 ];
-        *curval() = c;
+        newval() = c;
+        yylval = curval;
         return tok_byval;
     }
 
@@ -331,12 +354,14 @@ HexDig [0-9a-fA-F]
             c = '\f';
         else if( c == 'r' )
             c = '\r';
-        *curval() = c;
+        newval() = c;
+        yylval = curval;
         return tok_byval;
     }
 
 0   {
-        *curval() = ( guint32 )0;
+        newval() = ( guint32 )0;
+        yylval = curval;
         return tok_intval;
     }
 
@@ -351,8 +376,8 @@ HexDig [0-9a-fA-F]
         std::string strMsg = "error unknown token '";
         strMsg += yytext;
         strMsg += "'";
-        PrintAndQuit( -EINVAL,
-            strMsg.c_str() );
+        PrintMsg( -EINVAL, strMsg.c_str() );
+        return YYerror;
     }
 
 <<EOF>> {
@@ -360,7 +385,7 @@ HexDig [0-9a-fA-F]
         yypop_buffer_state();
         if ( !YY_CURRENT_BUFFER)
         {
-            yyterminate();
+            return YYEOF;
         }
     }
 
@@ -369,9 +394,10 @@ HexDig [0-9a-fA-F]
 std::vector< FILECTX > g_vecBufs;
 
 FILECTX::FILECTX()
-{ m_pVal.NewObj(); }
+{ m_pVal = new BufPtr( true ); }
 
 FILECTX::FILECTX( const std::string& strPath )
+    : FILECTX()
 {
     m_fp = fopen( strPath.c_str(), "r");
     if( m_fp != nullptr )
@@ -384,16 +410,34 @@ FILECTX::~FILECTX()
 {
     if( m_fp != nullptr )
         fclose( m_fp );
-    m_pVal.Clear()
+    m_fp = nullptr;
+    if( m_pVal )
+        delete m_pVal;
+    m_pVal = nullptr;
 }
+
+FILECTX::FILECTX(
+    const FILECTX&& rhs )
+{
+    m_fp = rhs.m_fp;
+    m_pVal = rhs.m_pVal;
+    rhs.m_pVal = nullptr;
+    m_strPath = rhs.strPath;
+    m_strLastVal = rhs.m_strLastVal;
+}
+
 std::string& curstr()
 { return g_vecBufs.back().m_strLastVal; }
 
 std::string& curpath()
 { return g_vecBufs.back().m_strPath; }
 
-BufPtr& curval()
-{ return g_vecBufs.back().m_pVal; }
+CBuffer& newval()
+{ 
+    g_vecBufs.back().m_pVal =
+        new BufPtr( true );
+    return *( *g_vecBufs.back().m_pVal );
+}
 
 EnumToken IsKeyword( char* szKeyword )
 {
@@ -438,4 +482,3 @@ gint32 IsAllZero( char* szText )
     }
     return -ENOENT;
 }
-

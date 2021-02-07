@@ -2,7 +2,6 @@
 #include <map>
 enum EnumToken
 {
-    tok_invalid = 1,
     tok_struct=0x128,
     tok_interf,
     tok_service,
