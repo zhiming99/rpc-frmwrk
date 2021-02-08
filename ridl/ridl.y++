@@ -1,73 +1,136 @@
 %{
 #include "rpc.h"
-#include "token.h"
 #include "lexer.h"
 %}
 
 %define api.value.type {BufPtr}
+%define api.pure full
+
+// values
+%token TOK_IDENT 
+%token TOK_STRVAL
+%token TOK_BOOLVAL
+%token TOK_BYVAL
+%token TOK_INTVAL
+%token TOK_FLOATVAL
+%token TOK_DBLVAL
+
+// types
+%token TOK_STRING
+%token TOK_UINT64
+%token TOK_INT64
+%token TOK_UINT32
+%token TOK_INT32
+%token TOK_UINT16
+%token TOK_INT16
+%token TOK_FLOAT
+%token TOK_DOUBLE
+%token TOK_BYTE
+%token TOK_BOOL
+%token TOK_BYTEARR
+%token TOK_OBJPTR
+%token TOK_HSTREAM
+%token TOK_ARRAY
+%token TOK_MAP
+
+//
+%token TOK_INTERFACE
+%token TOK_STRUCT
+%token TOK_SERVICE
+
+// operators
+%token TOK_RETURNS
+
+%token TOK_ASYNC
+%token TOK_ASYNCP
+%token TOK_ASYNCS
+%token TOK_STREAM
+%token TOK_SERIAL
+%token TOK_TIMEOUT
+%token TOK_RTPATH
+%token TOK_SSL
+%token TOK_WEBSOCK
+%token TOK_COMPRES
+%token TOK_AUTH
+
+%parse-param { char const *file_name };
+%initial-action
+{
+    YYLTYPE2* pLtype = ( YYLTYPE2* )&@$;
+    pLtype->initialize( file_name );
+    FILECTX fc( file_name );
+    g_vecBufs.push_back( fc );
+};
+
 %%
 
-%token  IDENT 
-%token  STRVAL
-%token  BOOLVAL
-%token  INTVAL
-%token  FLOATVAL
-%token  DBLVAL
-
-primetyp :
-      STRING
-    | UINT64
-    | INT64
-    | UINT32
-    | INT32
-    | UINT16
-    | INT16
-    | FLOAT
-    | DOUBLE
-    | BYTE
-    | BOOL
-    | BYTEARR
-    | OBJPTR
-    | HSTREAM
+statements :
+    %empty
+    | statement
+    | statement ';' statements
     ;
 
-arrtype :
-    ARRAY '<' idltype '>'
+statement :
+    struct_decl
+    | interf_decl
+    | service_decl
     ;
 
-maptype :
-    MAP '<' idltype, idltype '>'
+prime_type :
+      TOK_STRING
+    | TOK_UINT64
+    | TOK_INT64
+    | TOK_UINT32
+    | TOK_INT32
+    | TOK_UINT16
+    | TOK_INT16
+    | TOK_FLOAT
+    | TOK_DOUBLE
+    | TOK_BYTE
+    | TOK_BOOL
+    | TOK_BYTEARR
+    | TOK_OBJPTR
+    | TOK_HSTREAM
     ;
 
-structyp : STRUCT '{' fieldlist '}' ';'
+arr_type :
+    TOK_ARRAY '<' idl_type '>'
     ;
 
-fieldlist : idltype IDENT ';'
-    | idltype IDENT ';' fieldlist
+map_type :
+    TOK_MAP '<' idl_type ',' idl_type '>'
     ;
 
-idltype :
-      primetyp
-    | arrtyp
-    | maptyp
-    | structyp
+struct_decl : TOK_STRUCT '{' field_list '}'
+    ;
+
+field_list : idl_type TOK_IDENT ';'
+    | idl_type TOK_IDENT ';' field_list
+    ;
+
+struct_ref : TOK_IDENT
+
+idl_type :
+      prime_type
+    | arr_type
+    | map_type
+    | struct_ref
     ;
 
 value :
-      STRVAL
-    | BOOLVAL
-    | INTVAL
-    | FLOATVAL
-    | DBLVAL
-    | BOOLVAL
-    | BYVAL
+      TOK_STRVAL
+    | TOK_INTVAL
+    | TOK_FLOATVAL
+    | TOK_DBLVAL
+    | TOK_BOOLVAL
+    | TOK_BYVAL
+    { $$=$1 };
     ;
 
-attrname : 
+attr_name : 
       TOK_ASYNC
     | TOK_ASYNCP
     | TOK_ASYNCS
-    | TOK_RETURN
     | TOK_STREAM
     | TOK_SERIAL
     | TOK_TIMEOUT
@@ -78,23 +141,41 @@ attrname :
     | TOK_AUTH
     ;
 
-attrexp :
-      attrname
-    | attrname '=' value
-    | attrname ',' attrexp
-    | attrname '=' value ',' attrexp
+attr_exp :
+      attr_name
+    | attr_name '=' value
+    | attr_name ',' attr_exp
+    | attr_name '=' value ',' attr_exp
     ;
 
-attrlist : '[' attrexp ']'
+attr_list : '[' attr_exp ']'
     ;
     
+formal_arg : idl_type TOK_IDENT
+    ;
 
+arg_list : formal_arg
+    | formal_arg ',' arg_list
+    ;
+
+method_decl : TOK_IDENT '(' arg_list ')' TOK_RETURNS '(' arg_list ')'
+    | TOK_IDENT '(' ')' TOK_RETURNS '(' arg_list ')'
+    ;
+
+method_decls : method_decl
+    | method_decl ';' method_decls
+    ;
+
+interf_decl : TOK_IDENT '{' method_decls '}'
+    ;
+
+interf_ref : TOK_INTERFACE TOK_IDENT attr_list
+
+interf_refs : interf_ref
+    | interf_ref ';' interf_refs
+    ;
+
+service_decl : TOK_SERVICE TOK_IDENT attr_list '{' interf_refs '}'
+    ;
 %%
-%parse-param { char const *file_name };
-%initial-action
-{
-    @$.initialize( file_name );
-    FILECTX fc( file_name );
-    g_vecBufs.push_back( fc );
-};
 

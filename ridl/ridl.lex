@@ -2,7 +2,21 @@
 #include <string>
 #include <map>
 #include "rpc.h"
-#include "yy.tab.h"
+#include "ridl.tab.h++"
+
+extern std::map< std::string, EnumToken > g_mapKeywords;
+
+struct YYLTYPE2 :
+    public YYLTYPE
+{
+    initialize( const char* szFileName ) 
+    {
+        first_line = 0;
+        first_column = 0;
+        last_line = 0;
+        last_column = 0;
+    }
+};
 
 struct FILECTX
 {
@@ -10,6 +24,7 @@ struct FILECTX
     BufPtr*     m_pVal;
     std::string m_strPath;
     std::string m_strLastVal;
+    YYLTYPE2    m_oLocation;
 
     FILECTX();
     FILECTX( const std::string& strPath );
@@ -17,7 +32,7 @@ struct FILECTX
     ~FILECTX();
 };
 
-#define tok_invalid   1
+#define TOK_INVALID  ( -100 )
 
 std::string& curstr();
 std::string& curpath();
@@ -117,7 +132,7 @@ HexDig [0-9a-fA-F]
         {
             newval() = curstr();
             yylval = curval;
-            return tok_strval;
+            return TOK_STRVAL;
         }
         else
         {
@@ -188,14 +203,14 @@ HexDig [0-9a-fA-F]
                 yytext, nullptr, 8);
             newval() = iVal;
             yylval = curval;
-            return tok_intval;
+            return TOK_INTVAL;
         }
 
         guint32 iVal = strtoul(
             yytext, nullptr, 8);
         newval() = iVal;
         yylval = curval;
-        return tok_intval;
+        return TOK_INTVAL;
     }
 
 0(OctDig)+ {
@@ -212,14 +227,14 @@ HexDig [0-9a-fA-F]
                 yytext + 1, nullptr, 8);
             newval() = iVal;
             yylval = curval;
-            return tok_uint64;
+            return TOK_UINT64;
         }
 
         guint32 iVal = strtoul(
             yytext + 1, nullptr, 8);
         newval() = iVal;
         yylval = curval;
-        return tok_intval;
+        return TOK_INTVAL;
     }
 
 0[xX](HexDig)+ {
@@ -236,14 +251,14 @@ HexDig [0-9a-fA-F]
                 yytext + 2, nullptr, 8);
             newval() = iVal;
             yylval = curval;
-            return tok_uint64;
+            return TOK_UINT64;
         }
 
         guint32 iVal = strtoul(
             yytext + 2, nullptr, 8);
         newval() = iVal;
         yylval = curval;
-        return tok_intval;
+        return TOK_INTVAL;
     }
 
 [+-]?[1-9][[:digit:]]*.[[:digit:]]*[Ee][+-]?[1-9][[:digit:]]* {
@@ -256,7 +271,7 @@ HexDig [0-9a-fA-F]
         }
         newval() = dblVal;
         yylval = curval;
-        return tok_dblval;
+        return TOK_DBLVAL;
     }
 [+-]?[0]?.[[:digit:]]*[Ee][+-]?[1-9][[:digit:]]* {
         gint32 ret = IsAllZero( yytext );
@@ -274,7 +289,7 @@ HexDig [0-9a-fA-F]
         }
         newval() = dblVal;
         yylval = curval;
-        return tok_dblval;
+        return TOK_DBLVAL;
     }
 
 [+-]?[1-9][[:digit:]]* {
@@ -298,44 +313,44 @@ HexDig [0-9a-fA-F]
                 yptr, nullptr, 8);
             newval() = iVal;
             yylval = curval;
-            return tok_intval;
+            return TOK_INTVAL;
         }
 
         guint32 iVal = strtoul(
             yptr, nullptr, 8);
         newval() = iVal;
         yylval = curval;
-        return tok_intval;
+        return TOK_INTVAL;
     }
 
 [[:alpha:]][[:alnum:]_]* {
         EnumToken iKey = IsKeyword( yytext );
-        if( iKey != tok_invalid )
+        if( iKey != TOK_INVALID )
             return iKey;
 
         if( strcmp( yytext, "true" ) == 0 )
         {
             newval() = true;
             yylval = curval;
-            return tok_boolval;
+            return TOK_BOOLVAL;
         }
         else if( strcmp( yytext, "false" ) == 0 )
         {
             newval() = false;
             yylval = curval;
-            return tok_boolval;
+            return TOK_BOOLVAL;
         }
 
         newval() = yytext;
         yylval = curval;
-        return tok_ident;
+        return TOK_IDENT;
     }
 
 "'.'" {
         guint8 c = yytext[ 1 ];
         newval() = c;
         yylval = curval;
-        return tok_byval;
+        return TOK_BYVAL;
     }
 
 "'\\.'" {
@@ -356,13 +371,13 @@ HexDig [0-9a-fA-F]
             c = '\r';
         newval() = c;
         yylval = curval;
-        return tok_byval;
+        return TOK_BYVAL;
     }
 
 0   {
         newval() = ( guint32 )0;
         yylval = curval;
-        return tok_intval;
+        return TOK_INTVAL;
     }
 
 "/*"         yy_push_state(c_comment);
@@ -392,6 +407,42 @@ HexDig [0-9a-fA-F]
 %%
 
 std::vector< FILECTX > g_vecBufs;
+
+std::map< std::string, EnumToken >
+    g_mapKeywords = {
+        { "string", TOK_STRING }, 
+        { "uint64", TOK_UINT64 }, 
+        { "int64", TOK_INT64 }, 
+        { "uint32", TOK_UINT32 }, 
+        { "int32", TOK_INT32 }, 
+        { "uint16", TOK_UINT16 }, 
+        { "int16", TOK_INT16 }, 
+        { "float", TOK_FLOAT }, 
+        { "double", TOK_DOUBLE }, 
+        { "byte", TOK_BYTE },
+        { "bool", TOK_BOOL },
+        { "bytearray", TOK_BYTEARR },
+        { "array", TOK_ARRAY },
+        { "map", TOK_MAP },
+        { "ObjPtr", TOK_OBJPTR },
+
+        { "async", TOK_ASYNC },
+        { "async_p", TOK_ASYNCP },
+        { "async_s", TOK_ASYNCS },
+        { "returns", TOK_RETURN },
+        { "stream", TOK_STREAM },
+        { "serial", TOK_SERIAL },
+        { "timeout", TOK_TIMEOUT },
+        { "rtpath", TOK_RTPATH },
+        { "ssl", TOK_SSL },
+        { "websock", TOK_WEBSOCK },
+        { "compression", TOK_COMPRES },
+        { "auth", TOK_AUTH },
+
+        { "struct", TOK_STRUCT }, 
+        { "interface", TOK_INTERF }, 
+        { "service", TOK_SERVICE },
+    };
 
 FILECTX::FILECTX()
 { m_pVal = new BufPtr( true ); }
@@ -446,7 +497,7 @@ EnumToken IsKeyword( char* szKeyword )
     std::map< std::string, EnumToken >::iterator
         itr = g_mapKeywords.find( strKey );
     if( itr == g_mapKeywords.end() )
-        return tok_invalid;
+        return TOK_INVALID;
     return itr->second;
 }
 
