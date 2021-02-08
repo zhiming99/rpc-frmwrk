@@ -139,16 +139,58 @@ attr_name :
     | TOK_WEBSOCK
     | TOK_COMPRES
     | TOK_AUTH
+    { $$=@1; }
     ;
 
-attr_exp :
-      attr_name
-    | attr_name '=' value
-    | attr_name ',' attr_exp
-    | attr_name '=' value ',' attr_exp
+attr_exp : attr_name
+    {
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CAttrExp ) );
+        CAttrExp* pae = pNode;
+        pae->SetName( $1 );
+    }
     ;
 
-attr_list : '[' attr_exp ']'
+attr_exp : attr_name '=' value
+    {
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CAttrExp ) );
+        CAttrExp* pae = pNode;
+        pae->SetName( $1 );
+        pae->SetValue( $3 );
+        $$.NewObj( true );
+        *$$ = pNode;
+    }
+    ;
+
+attr_exps :  attr_exp
+    {
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CAttrExps ) );
+        ObjPtr pExp = *$1;
+        CAttrExps* paes = pNode;
+        paes->AddChild( pExp );
+        $$.NewObj( true );
+        *$$ = pNode;
+    }
+    ;
+attr_exps :  attr_exp ',' attr_exps
+    {
+        ObjPtr pNode = *$3;
+        CAttrExps* paes = pNode;
+        ObjPtr pExp = *$1;
+        paes->InsertChild( pExp );
+        $$.NewObj( true );
+        *$$ = pNode;
+    }
+    ;
+
+attr_list : '[' attr_exps ']'
+    {
+        ObjPtr pNode = *$2;
+        $$.NewObj( true );
+        *$$ = pNode;
+    }
     ;
     
 formal_arg : idl_type TOK_IDENT

@@ -11,10 +11,10 @@ struct YYLTYPE2 :
 {
     initialize( const char* szFileName ) 
     {
-        first_line = 0;
-        first_column = 0;
-        last_line = 0;
-        last_column = 0;
+        first_line = 1;
+        first_column = 1;
+        last_line = 1;
+        last_column = 1;
     }
 };
 
