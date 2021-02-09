@@ -36,8 +36,8 @@ namespace rpcfrmwrk
 {
 
 // rpc-frmwrk components, last allocation was from
-// rpc/security/secclsid.h.
-#define CLSIDS_ALLOCATED    ( clsid( ClassFactoryStart ) + 40 )
+// ridl/astnode.h
+#define CLSIDS_ALLOCATED    ( clsid( ClassFactoryStart ) + 80 )
 
 // last allocation was from server.sip
 #define PROPIDS_ALLOCATED   ( propReservedEnd + 120 )
