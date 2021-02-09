@@ -1,6 +1,7 @@
 %{
 #include "rpc.h"
 #include "lexer.h"
+#include "astnode.h"
 
 CDeclMap g_oDeclMap;
 
@@ -67,16 +68,38 @@ CDeclMap g_oDeclMap;
 
 %%
 
-statements :
-    %empty
-    | statement
-    | statement ';' statements
+statements : %empty
+    ;
+
+statements : statement
+    {
+        ObjPtr pNode;
+        pNode.NewObj( clisd( CStatements ) );
+        CInterfRefs* pstmts = pNode;
+        ObjPtr& pstmt = *$1;
+        pstmts->AddChild( pstmt );
+        BufPtr pBuf( true );
+        pBuf = pNode;
+        $$ = pBuf;
+    }
+    ;
+statements : statement ';' statements
+    {
+        ObjPtr pNode = *$3;
+        CInterfRefs* pstmts = pNode;
+        ObjPtr& pstmt = *$1;
+        pstmts->InsertChild( pstmt );
+        BufPtr pBuf( true );
+        pBuf = pNode;
+        $$ = pBuf;
+    }
     ;
 
 statement :
     interf_decl
     | service_decl
     | struct_decl
+    { $$ = $1; }
     ;
 
 prime_type :
@@ -140,6 +163,7 @@ struct_ref : TOK_IDENT
         pObj.NewObj( clsid( CStructRef ) );
         CStructRef* psr = pObj;
         std::string strName = *$1;
+        psr->SetName( TOK_STRUCT );
 
         ObjPtr pTemp;
         gint32 ret = g_oDeclMap.GetDeclNode(
@@ -160,9 +184,9 @@ struct_ref : TOK_IDENT
 
 struct_decl : TOK_STRUCT TOK_IDENT '{' field_list '}'
     {
-        ObjPtr pObj;
-        pObj.NewObj( clsid( CStructDecl ) );
-        CStructDecl* psr = pObj;
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStructDecl ) );
+        CStructDecl* psr = pNode;
         std::string strName = *$2;
         ObjPtr pTemp;
         gint32 ret = g_oDeclMap.GetDeclNode(
@@ -175,11 +199,12 @@ struct_decl : TOK_STRUCT TOK_IDENT '{' field_list '}'
             PrintMsg( -EEXIST, strMsg.c_str() );
         }
         psr->SetName( strName );
-        ObjPtr pfl = *$3;
+        ObjPtr& pfl = *$3;
         psr->SetFieldList( pfl );
         BufPtr pBuf( true );
-        pBuf = pObj;
+        pBuf = pNode;
         $$ = pBuf;
+        g_oDeclMap.AddDeclNode( strName, pNode );
     }
     ;
 
@@ -187,7 +212,7 @@ field_list : field_decl
     {
         ObjPtr pNode;
         pNode.NewObj( clsid( CFieldList ) );
-        ObjPtr pfdd = *$1;
+        ObjPtr& pfdd = *$1;
         CFieldDecl* pfdl = pNode;
         pfdl->AddChild( pfdd );
         $$.NewObj( true );
@@ -197,8 +222,8 @@ field_list : field_decl
 
 field_list : field_decl ';' field_list
     {
-        ObjPtr pNode = *$3;
-        ObjPtr pfdd = *$1;
+        ObjPtr& pNode = *$3;
+        ObjPtr& pfdd = *$1;
         CFieldDecl* pfdl = pNode;
         pfdl->InsertChild( pfdd );
         $$.NewObj( true );
@@ -213,7 +238,7 @@ field_decl : idl_type TOK_IDENT ';'
         std::string strName = *$2;
         CFieldDecl* pfl = pNode;
         pfl->SetName( strName );
-        ObjPtr pType = *$1;
+        ObjPtr& pType = *$1;
         pfl->SetType( pType );
         BufPtr pBuf( true );
         pBuf = pNode;
@@ -259,7 +284,10 @@ attr_exp : attr_name
         ObjPtr pNode;
         pNode.NewObj( clsid( CAttrExp ) );
         CAttrExp* pae = pNode;
-        pae->SetName( $1 );
+        guint32& dwName = *$1;
+        pae->SetName( dwName );
+        $$.NewObj( true );
+        *$$ = pNode;
     }
     ;
 
@@ -268,8 +296,10 @@ attr_exp : attr_name '=' value
         ObjPtr pNode;
         pNode.NewObj( clsid( CAttrExp ) );
         CAttrExp* pae = pNode;
-        pae->SetName( $1 );
-        pae->SetValue( $3 );
+        guint32& dwName = *$1;
+        pae->SetName( dwName );
+        ObjPtr& pValue = *$3;
+        pae->SetValue( pValue );
         $$.NewObj( true );
         *$$ = pNode;
     }
@@ -279,7 +309,7 @@ attr_exps :  attr_exp
     {
         ObjPtr pNode;
         pNode.NewObj( clsid( CAttrExps ) );
-        ObjPtr pExp = *$1;
+        ObjPtr& pExp = *$1;
         CAttrExps* paes = pNode;
         paes->AddChild( pExp );
         $$.NewObj( true );
@@ -288,13 +318,16 @@ attr_exps :  attr_exp
     ;
 attr_exps :  attr_exp ',' attr_exps
     {
-        ObjPtr pNode = *$3;
+        ObjPtr& pNode = *$3;
         CAttrExps* paes = pNode;
-        ObjPtr pExp = *$1;
+        ObjPtr& pExp = *$1;
         paes->InsertChild( pExp );
         $$.NewObj( true );
         *$$ = pNode;
     }
+    ;
+
+attr_list : %empty
     ;
 
 attr_list : '[' attr_exps ']'
@@ -306,30 +339,239 @@ attr_list : '[' attr_exps ']'
     ;
     
 formal_arg : idl_type TOK_IDENT
+    {
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CFormalArg ) );
+        std::string strName = *$2;
+        CFormalArg* pfa = pNode;
+        pfa->SetName( strName );
+        ObjPtr& pType = *$1;
+        pfl->SetType( pType );
+        BufPtr pBuf( true );
+        pBuf = pNode;
+        $$ = pBuf;
+    }
     ;
 
 arg_list : formal_arg
-    | formal_arg ',' arg_list
+    {
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CArgList ) );
+        CArgList* pal = pNode;
+        ObjPtr& pArg = *$1;
+        pAl->AddChild( pArg );
+        BufPtr pBuf( true );
+        pBuf = pNode;
+        $$ = pBuf;
+    }
+arg_list : formal_arg ',' arg_list
+    {
+        ObjPtr& pNode = *$3;
+        ObjPtr& pArg = *$1;
+        CArgList* pal = pNode;
+        pal->InsertChild( pArg );
+        BufPtr pBuf( true );
+        pBuf = pNode;
+        $$ = pBuf;
+    }
     ;
 
 method_decl : TOK_IDENT '(' arg_list ')' TOK_RETURNS '(' arg_list ')'
-    | TOK_IDENT '(' ')' TOK_RETURNS '(' arg_list ')'
+    {
+        ObjPtr pNode;
+        pNode.NewObj( clisd( CMethodDecl ) );
+        CMethodDecl* pmd = pNode;
+        std::string strName = *$1;
+        pmd->SetName( strName );
+        ObjPtr& pInArgs = *$3;
+        pmd->SetInArgs( pInArgs );
+        ObjPtr& pOutArgs =  *$7;
+        pmd->SetOutArgs( pOutArgs );
+        BufPtr pBuf( true );
+        pBuf = pNode;
+        $$ = pBuf;
+        
+    }
+    ;
+method_decl : TOK_IDENT '(' ')' TOK_RETURNS '(' arg_list ')'
+    {
+        ObjPtr pNode;
+        pNode.NewObj( clisd( CMethodDecl ) );
+        CMethodDecl* pmd = pNode;
+        std::string strName = *$1;
+        pmd->SetName( strName );
+        ObjPtr& pOutArgs =  *$6;
+        pmd->SetOutArgs( pOutArgs );
+        BufPtr pBuf( true );
+        pBuf = pNode;
+        $$ = pBuf;
+    }
     ;
 
 method_decls : method_decl
-    | method_decl ';' method_decls
+    {
+        ObjPtr pNode;
+        pNode.NewObj( clisd( CMethodDecls ) );
+        CMethodDecls* pmds = pNode;
+        ObjPtr& pmd = *$1;
+        pmds->AddChild( pmd );
+        BufPtr pBuf( true );
+        pBuf = pNode;
+        $$ = pBuf;
+    }
+    ;
+method_decls : method_decl ';' method_decls
+    {
+        ObjPtr pNode = *$3;
+        CMethodDecls* pmds = pNode;
+        ObjPtr& pmd = *$1;
+        pmds->InsertChild( pmd );
+        BufPtr pBuf( true );
+        pBuf = pNode;
+        $$ = pBuf;
+    }
     ;
 
 interf_decl : TOK_IDENT '{' method_decls '}'
+    {
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CInterfaceDecl ) );
+        CInterfaceDecl* pifd = pNode;
+        std::string strName = *$1;
+        ObjPtr pTemp;
+        gint32 ret = g_oDeclMap.GetDeclNode(
+            strName, pTemp );
+        if( SUCCEEDED( ret ) )
+        {
+            std::string strMsg = "error interface '"; 
+            strMsg += strName + "'";
+            strMsg += " already declared yet";
+            PrintMsg( -EEXIST, strMsg.c_str() );
+        }
+        pifd->SetName( strName );
+        ObjPtr& pmdl = *$3;
+        pifd->SetMethodList( pmdl );
+        BufPtr pBuf( true );
+        pBuf = pNode;
+        $$ = pBuf;
+        g_oDeclMap.AddDeclNode( strName, pNode );
+    }
     ;
 
 interf_ref : TOK_INTERFACE TOK_IDENT attr_list
+    {
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CInterfRef ) );
+        CInterfaceDecl* pifr = pNode;
+        std::string strName = *$1;
+        ObjPtr pTemp;
+        gint32 ret = g_oDeclMap.GetDeclNode(
+            strName, pTemp );
+        if( ERROR( ret ) )
+        {
+            std::string strMsg = "error interface '"; 
+            strMsg += strName + "'";
+            strMsg += " not declared yet";
+            PrintMsg( -ENOENT, strMsg.c_str() );
+        }
+        pifr->SetName( strName );
+        BufPtr pAttrBuf = $3;
+        if( ! pAttrBuf.IsEmpty() &&
+            ! pAttrBuf->empty() )
+        {
+            ObjPtr& pal = *$3;
+            pifr->SetAttrList( pal );
+        }
+        BufPtr pBuf( true );
+        pBuf = pNode;
+        $$ = pBuf;
+    }
+    ;
 
 interf_refs : interf_ref
-    | interf_ref ';' interf_refs
+    {
+        ObjPtr pNode;
+        pNode.NewObj( clisd( CInterfRefs ) );
+        CInterfRefs* pifrs = pNode;
+        ObjPtr& pifr = *$1;
+        pifrs->AddChild( pifr );
+        BufPtr pBuf( true );
+        pBuf = pNode;
+        $$ = pBuf;
+    }
+    ;
+
+interf_refs : interf_ref ';' interf_refs
+    {
+        ObjPtr pNode = *$3;
+        CInterfRefs* pifrs = pNode;
+        ObjPtr& pifr = *$1;
+        pifrs->InsertChild( pifr );
+        BufPtr pBuf( true );
+        pBuf = pNode;
+        $$ = pBuf;
+    }
     ;
 
 service_decl : TOK_SERVICE TOK_IDENT attr_list '{' interf_refs '}'
+    {
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CServiceDecl ) );
+        CServiceDecl* psd = pNode;
+        std::string strName = *$2;
+        gint32 ret = g_oDeclMap.GetDeclNode(
+            strName, pTemp );
+        if( SUCCEEDED( ret ) )
+        {
+            std::string strMsg = "error service '"; 
+            strMsg += strName + "'";
+            strMsg += " already declared";
+            PrintMsg( -EEXIST, strMsg.c_str() );
+        }
+        psd->SetName( strName );
+        BufPtr pAttrBuf = $3;
+        if( ! pAttrBuf.IsEmpty() &&
+            ! pAttrBuf->empty() )
+        {
+            ObjPtr& pal = *$3;
+            pifr->SetAttrList( pal );
+        }
+        ObjPtr& pifrs = *$5;
+        psd->SetInterfList( pifrs );
+
+        BufPtr pBuf( true );
+        pBuf = pNode;
+        $$ = pBuf;
+        g_oDeclMap.AddDeclNode( strName, pNode );
+    }
     ;
 %%
+
+// mandatory part, just copy/paste'd from clsids.cpp
+static FactoryPtr InitClassFactory()
+{
+    BEGIN_FACTORY_MAPS;
+
+    INIT_MAP_ENTRY( CBuffer );
+    INIT_MAP_ENTRY( CAttrExp );
+    INIT_MAP_ENTRY( CAttrExps );
+    INIT_MAP_ENTRY( CPrimeType );
+    INIT_MAP_ENTRY( CArrayType );
+    INIT_MAP_ENTRY( CMapType );
+    INIT_MAP_ENTRY( CStructRef );
+    INIT_MAP_ENTRY( CFieldDecl );
+    INIT_MAP_ENTRY( CFieldList );
+    INIT_MAP_ENTRY( CStructDecl );
+    INIT_MAP_ENTRY( CFormalArg );
+    INIT_MAP_ENTRY( CArgList );
+    INIT_MAP_ENTRY( CMethodDecl );
+    INIT_MAP_ENTRY( CMethodDecls );
+    INIT_MAP_ENTRY( CInterfaceDecl );
+    INIT_MAP_ENTRY( CInterfRef );
+    INIT_MAP_ENTRY( CInterfRefs );
+    INIT_MAP_ENTRY( CServiceDecl );
+    INIT_MAP_ENTRY( CStatements );
+
+    END_FACTORY_MAPS;
+};
 
