@@ -1,6 +1,9 @@
 %{
 #include "rpc.h"
 #include "lexer.h"
+
+CDeclMap g_oDeclMap;
+
 %}
 
 %define api.value.type {BufPtr}
@@ -71,9 +74,9 @@ statements :
     ;
 
 statement :
-    struct_decl
-    | interf_decl
+    interf_decl
     | service_decl
+    | struct_decl
     ;
 
 prime_type :
@@ -91,30 +94,139 @@ prime_type :
     | TOK_BYTEARR
     | TOK_OBJPTR
     | TOK_HSTREAM
+    {
+        ObjPtr pObj;
+        pObj.NewObj( clsid( CPrimeType ) );
+        CPrimeType* ppt = pObj;
+        ppt->SetName( @1 );
+        BufPtr pBuf( true );
+        pBuf = pObj;
+        $$ = pBuf;
+    }
     ;
 
 arr_type :
     TOK_ARRAY '<' idl_type '>'
+    {
+        ObjPtr pObj;
+        pObj.NewObj( clsid( CArrayType ) );
+        CArrayType* pat = pObj;
+        pat->SetName( @1 );
+        pat->SetElemType( $3 );
+        BufPtr pBuf( true );
+        pBuf = pObj;
+        $$ = pBuf;
+    }
     ;
 
 map_type :
     TOK_MAP '<' idl_type ',' idl_type '>'
-    ;
-
-struct_decl : TOK_STRUCT '{' field_list '}'
-    ;
-
-field_list : idl_type TOK_IDENT ';'
-    | idl_type TOK_IDENT ';' field_list
+    {
+        ObjPtr pObj;
+        pObj.NewObj( clsid( CMapType ) );
+        CMapType* pmt = pObj;
+        pmt->SetName( @1 );
+        pmt->SetElemType( $5 );
+        pmt->SetKeyType( $3 );
+        BufPtr pBuf( true );
+        pBuf = pObj;
+        $$ = pBuf;
+    }
     ;
 
 struct_ref : TOK_IDENT
+    {
+        ObjPtr pObj;
+        pObj.NewObj( clsid( CStructRef ) );
+        CStructRef* psr = pObj;
+        std::string strName = *$1;
+
+        ObjPtr pTemp;
+        gint32 ret = g_oDeclMap.GetDeclNode(
+            strName, pTemp );
+        if( ERROR( ret ) )
+        {
+            std::string strMsg = "error '"; 
+            strMsg += strName + "'";
+            strMsg += " not declared yet";
+            PrintMsg( -ENOENT, strMsg.c_str() );
+        }
+        psr->SetName( strName );
+        BufPtr pBuf( true );
+        pBuf = pObj;
+        $$ = pBuf;
+    }
+    ;
+
+struct_decl : TOK_STRUCT TOK_IDENT '{' field_list '}'
+    {
+        ObjPtr pObj;
+        pObj.NewObj( clsid( CStructDecl ) );
+        CStructDecl* psr = pObj;
+        std::string strName = *$2;
+        ObjPtr pTemp;
+        gint32 ret = g_oDeclMap.GetDeclNode(
+            strName, pTemp );
+        if( SUCCEEDED( ret ) )
+        {
+            std::string strMsg = "error '"; 
+            strMsg += strName + "'";
+            strMsg += " already declared";
+            PrintMsg( -EEXIST, strMsg.c_str() );
+        }
+        psr->SetName( strName );
+        ObjPtr pfl = *$3;
+        psr->SetFieldList( pfl );
+        BufPtr pBuf( true );
+        pBuf = pObj;
+        $$ = pBuf;
+    }
+    ;
+
+field_list : field_decl
+    {
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CFieldList ) );
+        ObjPtr pfdd = *$1;
+        CFieldDecl* pfdl = pNode;
+        pfdl->AddChild( pfdd );
+        $$.NewObj( true );
+        *$$ = pNode;
+    }
+    ;
+
+field_list : field_decl ';' field_list
+    {
+        ObjPtr pNode = *$3;
+        ObjPtr pfdd = *$1;
+        CFieldDecl* pfdl = pNode;
+        pfdl->InsertChild( pfdd );
+        $$.NewObj( true );
+        *$$ = pNode;
+    }
+    ;
+
+field_decl : idl_type TOK_IDENT ';'
+    {
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CFieldDecl ) );
+        std::string strName = *$2;
+        CFieldDecl* pfl = pNode;
+        pfl->SetName( strName );
+        ObjPtr pType = *$1;
+        pfl->SetType( pType );
+        BufPtr pBuf( true );
+        pBuf = pNode;
+        $$ = pBuf;
+    }
+    ;
 
 idl_type :
       prime_type
     | arr_type
     | map_type
     | struct_ref
+    { $$ = $1; }
     ;
 
 value :
