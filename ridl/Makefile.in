@@ -1,0 +1,45 @@
+include ../Makefile.init.pub
+
+TARGET_IMG:=ridlc
+
+TARGET:=$(OUTPUT_DIR)/$(TARGET_IMG)
+RIDLC_OBJ:= ridlc.o
+
+BISON_SRC:= ridlc.cpp
+SOURCES:=$(BISON_SRC) lexer.cpp
+OBJS2:=$(SOURCES:%.cpp=$(OBJ_DIR)/%.o)
+
+all: $(TARGET)
+debug: $(TARGET)
+release: $(TARGET)
+
+debug_clean: do_clean
+release_clean: do_clean
+
+$(TARGET):$(OBJS2)
+
+$(OBJS2):$(SOURCES)
+
+ridlc.cpp: lexer.cpp ridl.y++
+	bison -d --output=ridlc.cpp ridl.y++
+
+lexer.cpp : ridl.lex
+	flex ridl.lex
+
+clean:
+	make debug_clean
+	make release_clean
+
+do_clean:
+	-@rm $(OBJ_DIR)/*.d $(MUTE_CLEAN)
+	-@rm $(OUTPUT_DIR)/$(TARGET_IMG) $(MUTE_CLEAN)
+	-@rm $(SOURCES:%.cpp=$(OBJ_DIR)/%.o) $(MUTE_CLEAN)
+	-@rm $(OBJ_DIR)/$(ROUTER_OBJ) $(MUTE_CLEAN)
+
+-include $(OBJS2:%.o=%.d) $(ROUTER_OBJ:%.o=(OBJ_DIR)/%.d)
+
+$(OUTPUT_DIR)/$(TARGET_IMG) : $(OBJ_DIR)/$(ROUTER_OBJ)
+	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
+	$(CC) -o $@ $(OBJ_DIR)/$(ROUTER_OBJ) $(LINKER_OPTION)
+
+.PHONY: sync TARGET clean_objs debug_clean release_clean do_clean

@@ -1,6 +1,6 @@
 #include <string>
 #include <map>
-#include "ridl.tab.h++"
+#include "ridlc.hpp"
 #include "rpc.h"
  
 #define SET_PARENT_OF( pObj ) \

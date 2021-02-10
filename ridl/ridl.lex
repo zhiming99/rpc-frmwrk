@@ -2,14 +2,15 @@
 #include <string>
 #include <map>
 #include "rpc.h"
-#include "ridl.tab.h++"
+#include "ridlc.hpp"
 
-extern std::map< std::string, EnumToken > g_mapKeywords;
+extern std::map< std::string, int > g_mapKeywords;
 
 struct YYLTYPE2 :
     public YYLTYPE
 {
-    initialize( const char* szFileName ) 
+    void initialize(
+        const char* szFileName ) 
     {
         first_line = 1;
         first_column = 1;

@@ -575,3 +575,68 @@ static FactoryPtr InitClassFactory()
     END_FACTORY_MAPS;
 };
 
+int Usage()
+{
+    printf( "Usage:" )
+    printf( "ridlc [options] <filePath> \n" )
+    printf( "\t compile the file",
+        "it to current directory" )
+    printf( "ridlc -h: print this help")
+}
+
+int main( int argc, void** argv )
+{
+    gint32 ret = 0;
+    bool bUninit = false;
+    do{
+        ret = CoInitialize( COINIT_NORPC );
+        if( ERROR( ret ) )
+            break;
+        bUninit = true;
+
+        FactoryPtr pFactory = InitClassFactory();
+        ret = CoAddClassFactory( pFactory );
+        if( ERROR( ret ) )
+            break;
+
+        int opt = 0;
+        int ret = 0;
+
+        while( ( opt =
+            getopt( argc, argv, "h" ) ) != -1 )
+        {
+            switch( opt )
+            {
+            case 'h' :
+                {
+                    Usage();
+                    break;
+                }
+            default:
+                break;
+            }
+        }
+
+        if( argv[ optind ] == nullptr )
+        {
+            printf( "Missing file to compile" );
+            Usage();
+            break;
+        }
+
+        std::string strFile = argv[ optind ];
+        ret = yyparse( strFile.c_str() );
+
+        if( argv[ optind + 1 ] != nullptr )
+        {
+            printf( "Too many arguments" );
+            Usage();
+            break;
+        }
+
+    }while( 0 );
+
+    CoUninitialize();
+
+    return ret;
+}

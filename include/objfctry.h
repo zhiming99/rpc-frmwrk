@@ -239,6 +239,7 @@ extern gint32 CoLoadClassFactory( const char* pszPath );
 extern gint32 CoLoadClassFactories( const char* dir );
 extern gint32 CoAddClassFactory( const FactoryPtr& pFactory );
 
+#define COINIT_NORPC  0x01
 extern gint32 CoInitialize( guint32 dwContext = 0 );
 extern gint32 CoUninitialize();
 

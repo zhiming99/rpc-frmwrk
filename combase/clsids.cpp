@@ -276,7 +276,10 @@ gint32 CoInitialize( guint32 dwContext )
     if( ERROR( ret ) )
         return ret;
 
-    ret = CoLoadClassFactories( strPath.c_str() );
+    if( ( dwContext && COINIT_NORPC ) == 0 )
+        ret = CoLoadClassFactories(
+            strPath.c_str() );
+
 #ifdef DEBUG
     if( SUCCEEDED( ret ) )
         CoInitClsidNames();        
