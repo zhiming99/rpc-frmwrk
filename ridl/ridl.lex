@@ -2,6 +2,9 @@
 #include <string>
 #include <map>
 #include "rpc.h"
+
+using namespace rpcfrmwrk;
+
 #include "ridlc.hpp"
 
 extern std::map< std::string, int > g_mapKeywords;
@@ -38,7 +41,7 @@ struct FILECTX
 std::string& curstr();
 std::string& curpath();
 CBuffer& newval();
-EnumToken IsKeyword( char* szKeyword );
+yytokentype IsKeyword( char* szKeyword );
 gint32 IsAllZero( char* szText );
 
 #define PrintMsg( ret, szMsg ) \
@@ -54,7 +57,7 @@ gint32 IsAllZero( char* szText );
 
 #define curval ( g_vecBufs.back().m_pVal )
 
-%}
+}
 
 OctDig [0-7] 
 HexDig [0-9a-fA-F]
@@ -325,7 +328,7 @@ HexDig [0-9a-fA-F]
     }
 
 [[:alpha:]][[:alnum:]_]* {
-        EnumToken iKey = IsKeyword( yytext );
+        yytokentype iKey = IsKeyword( yytext );
         if( iKey != TOK_INVALID )
             return iKey;
 
@@ -409,7 +412,7 @@ HexDig [0-9a-fA-F]
 
 std::vector< FILECTX > g_vecBufs;
 
-std::map< std::string, EnumToken >
+std::map< std::string, yytokentype >
     g_mapKeywords = {
         { "string", TOK_STRING }, 
         { "uint64", TOK_UINT64 }, 
@@ -491,11 +494,11 @@ CBuffer& newval()
     return *( *g_vecBufs.back().m_pVal );
 }
 
-EnumToken IsKeyword( char* szKeyword )
+yytokentype IsKeyword( char* szKeyword )
 {
     std::string strKey = szKeyword;
 
-    std::map< std::string, EnumToken >::iterator
+    std::map< std::string, yytokentype >::iterator
         itr = g_mapKeywords.find( strKey );
     if( itr == g_mapKeywords.end() )
         return TOK_INVALID;

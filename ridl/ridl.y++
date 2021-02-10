@@ -1,9 +1,13 @@
 %{
 #include "rpc.h"
+
+using namespace rpcfrmwrk;
+
 #include "lexer.h"
 #include "astnode.h"
 
 CDeclMap g_oDeclMap;
+extern std::vector< FILECTX > g_vecBufs;
 
 %}
 

@@ -13,23 +13,23 @@ if( !pObj.IsEmpty() ) \
 enum EnumMyClsid
 {
     DECL_CLSID( CAttrExp ) = clsid( ClassFactoryStart ) + 40,
-    DECEL_CLSID( CAttrExps ),
-    DECEL_CLSID( CPrimeType ),
-    DECEL_CLSID( CArrayType ),
-    DECEL_CLSID( CMapType ),
-    DECEL_CLSID( CStructRef ),
-    DECEL_CLSID( CFieldDecl ),
-    DECEL_CLSID( CFieldList ),
-    DECEL_CLSID( CStructDecl ),
-    DECEL_CLSID( CFormalArg ),
-    DECEL_CLSID( CArgList ),
-    DECEL_CLSID( CMethodDecl ),
-    DECEL_CLSID( CMethodDecls ),
-    DECEL_CLSID( CInterfaceDecl ),
-    DECEL_CLSID( CInterfRef ),
-    DECEL_CLSID( CInterfRefs ),
-    DECEL_CLSID( CServiceDecl ),
-    DECEL_CLSID( CStatements ),
+    DECL_CLSID( CAttrExps ),
+    DECL_CLSID( CPrimeType ),
+    DECL_CLSID( CArrayType ),
+    DECL_CLSID( CMapType ),
+    DECL_CLSID( CStructRef ),
+    DECL_CLSID( CFieldDecl ),
+    DECL_CLSID( CFieldList ),
+    DECL_CLSID( CStructDecl ),
+    DECL_CLSID( CFormalArg ),
+    DECL_CLSID( CArgList ),
+    DECL_CLSID( CMethodDecl ),
+    DECL_CLSID( CMethodDecls ),
+    DECL_CLSID( CInterfaceDecl ),
+    DECL_CLSID( CInterfRef ),
+    DECL_CLSID( CInterfRefs ),
+    DECL_CLSID( CServiceDecl ),
+    DECL_CLSID( CStatements ),
 };
 
 // declarations
@@ -90,14 +90,14 @@ struct CNamedNode :
 
     inline const std::string& GetName() const
     { return m_strName; }
-}
+};
 
 typedef CAutoPtr< clsid( Invalid ), CAstNodeBase > NodePtr;
 
 struct CAstListNode : CAstNodeBase
 {
     ObjPtr m_pSibling;
-    std::vector< ObjPtr > m_queChilds;
+    std::deque< ObjPtr > m_queChilds;
     typedef CAstNodeBase super;
     CAstListNode() : CAstNodeBase()
     {}
@@ -168,7 +168,7 @@ struct CPrimeType : public CAstNodeBase
 {
     guint32 m_dwAttrName;
     typedef CAstNodeBase super;
-    CPrimeType() : CAstNodeBase()
+    CPrimeType() : super()
     { SetClassId( clsid( CPrimeType ) ); }
 
     inline void SetName( guint32 dwAttrName )
@@ -183,7 +183,7 @@ struct CArrayType : public CPrimeType
     typedef CPrimeType super;
 
     CArrayType() : super()
-    { SetClassId( clsid( CArrayType ); }
+    { SetClassId( clsid( CArrayType ) ); }
 
     ObjPtr m_oElemType;
 
@@ -202,7 +202,7 @@ struct CMapType : public CArrayType
     ObjPtr m_pKeyType;
 
     CMapType() : super()
-    { SetClassId( clsid( CMapType ); }
+    { SetClassId( clsid( CMapType ) ); }
 
     void SetKeyType( ObjPtr& pKey )
     {
@@ -219,7 +219,7 @@ struct CStructRef : public CPrimeType
     typedef CPrimeType super;
 
     CStructRef() : super()
-    { SetClassId( clsid( CStructRef ); }
+    { SetClassId( clsid( CStructRef ) ); }
 
     std::string m_strName;
 
@@ -237,7 +237,7 @@ struct CFieldDecl : public CNamedNode
     ObjPtr m_pType;
 
     CFieldDecl() : super()
-    { SetClassId( clsid( CFieldDecl ); }
+    { SetClassId( clsid( CFieldDecl ) ); }
 
     void SetType( ObjPtr& pType )
     {
@@ -262,7 +262,7 @@ struct CStructDecl : public CNamedNode
     ObjPtr m_oFieldList;
 
     CStructDecl() : super()
-    { SetClassId( clsid( CStructDecl ); }
+    { SetClassId( clsid( CStructDecl ) ); }
 
     void SetFieldList( ObjPtr& oFields )
     {
@@ -328,7 +328,7 @@ struct CInterfaceDecl : public CNamedNode
     ObjPtr m_pMdl;
 
     CInterfaceDecl() : super()
-    { SetClassId( clsid( CInterfaceDecl ); }
+    { SetClassId( clsid( CInterfaceDecl ) ); }
 
     void SetMethodList( ObjPtr& pMethods )
     {
@@ -346,7 +346,7 @@ struct CInterfRef : public CNamedNode
     ObjPtr m_pAttrList;
 
     CInterfRef() : super()
-    { SetClassId( clsid( CInterfRef ); }
+    { SetClassId( clsid( CInterfRef ) ); }
 
     void SetAttrList( ObjPtr& pAttrList )
     {
@@ -361,14 +361,15 @@ struct CInterfRefs : public CAstListNode
 {
     typedef CAstListNode super;
     CInterfRefs() : super()
-    { SetClassId( clsid( CInterfRefs ); }
+    { SetClassId( clsid( CInterfRefs ) ); }
 };
 
 struct CServiceDecl : public CInterfRef
 {
     ObjPtr m_pInterfList;
-    CInterfRef() : super()
-    { SetClassId( clsid( CServiceDecl ); }
+    typedef CInterfRef super;
+    CServiceDecl() : super()
+    { SetClassId( clsid( CServiceDecl ) ); }
 
     void SetInterfList( ObjPtr& pInterfList )
     {
