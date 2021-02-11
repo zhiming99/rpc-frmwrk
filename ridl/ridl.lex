@@ -2,12 +2,13 @@
 #include <string>
 #include <map>
 #include "rpc.h"
+#include <math.h>
 
 using namespace rpcfrmwrk;
 
-#include "ridlc.hpp"
+#include "ridlc.h"
 
-extern std::map< std::string, int > g_mapKeywords;
+extern std::map< std::string, yytokentype > g_mapKeywords;
 
 struct YYLTYPE2 :
     public YYLTYPE
@@ -36,7 +37,7 @@ struct FILECTX
     ~FILECTX();
 };
 
-#define TOK_INVALID  ( -100 )
+extern std::vector< FILECTX > g_vecBufs;
 
 std::string& curstr();
 std::string& curpath();
@@ -69,6 +70,7 @@ HexDig [0-9a-fA-F]
 %option     outfile="lexer.cpp"
 %option     header-file="lexer.h"
 %option     stack
+%option     noyywrap
 
 %x incl readstr c_comment
 %%
@@ -108,10 +110,9 @@ HexDig [0-9a-fA-F]
         if ( !yyin )
         {
             PrintAndQuit(
-                -errno, strerror( ret ) );
+                -errno, strerror( -errno ) );
         }
 
-        FILECTX& curFc = g_vecBufs.back();
         FILECTX fc;
         fc.m_strPath = strFile;
         fc.m_fp = yyin;
@@ -173,7 +174,7 @@ HexDig [0-9a-fA-F]
      /* generate error - bad escape sequence; something
       * like '\48' or '\0777777'
       */
-        printAndQuit( -EINVAL,
+        PrintAndQuit( -EINVAL,
             "bad escape sequence" );
      }
 
@@ -305,6 +306,9 @@ HexDig [0-9a-fA-F]
             bNegative = true;
 
         guint32 iLen = strlen( yptr );
+        if( bNegative )
+            iLen -= 1;
+
         double digits = 64 *.3010;
         if( iLen > digits )
         {
@@ -313,16 +317,16 @@ HexDig [0-9a-fA-F]
         }
         else if( ( iLen << 1 ) > digits )
         {
-            guint64 iVal = strtoull(
+            gint64 iVal = strtoll(
                 yptr, nullptr, 8);
-            newval() = iVal;
+            newval() = ( guint64 )iVal;
             yylval = curval;
             return TOK_INTVAL;
         }
 
-        guint32 iVal = strtoul(
+        gint32 iVal = strtol(
             yptr, nullptr, 8);
-        newval() = iVal;
+        newval() = ( guint32 )iVal;
         yylval = curval;
         return TOK_INTVAL;
     }
@@ -330,7 +334,11 @@ HexDig [0-9a-fA-F]
 [[:alpha:]][[:alnum:]_]* {
         yytokentype iKey = IsKeyword( yytext );
         if( iKey != TOK_INVALID )
+        {
+            newval() = ( guint32 )iKey;
+            yylval = curval;
             return iKey;
+        }
 
         if( strcmp( yytext, "true" ) == 0 )
         {
@@ -433,7 +441,7 @@ std::map< std::string, yytokentype >
         { "async", TOK_ASYNC },
         { "async_p", TOK_ASYNCP },
         { "async_s", TOK_ASYNCS },
-        { "returns", TOK_RETURN },
+        { "returns", TOK_RETURNS },
         { "stream", TOK_STREAM },
         { "serial", TOK_SERIAL },
         { "timeout", TOK_TIMEOUT },
@@ -444,7 +452,7 @@ std::map< std::string, yytokentype >
         { "auth", TOK_AUTH },
 
         { "struct", TOK_STRUCT }, 
-        { "interface", TOK_INTERF }, 
+        { "interface", TOK_INTERFACE }, 
         { "service", TOK_SERVICE },
     };
 
@@ -471,13 +479,11 @@ FILECTX::~FILECTX()
     m_pVal = nullptr;
 }
 
-FILECTX::FILECTX(
-    const FILECTX&& rhs )
+FILECTX::FILECTX( const FILECTX& rhs )
 {
     m_fp = rhs.m_fp;
     m_pVal = rhs.m_pVal;
-    rhs.m_pVal = nullptr;
-    m_strPath = rhs.strPath;
+    m_strPath = rhs.m_strPath;
     m_strLastVal = rhs.m_strLastVal;
 }
 
@@ -510,12 +516,12 @@ gint32 IsAllZero( char* szText )
     std::string strFloat = szText;
     size_t posPt =
         strFloat.find_first_of( '.' );
-    if( posPt = std::string::npos )
+    if( posPt == std::string::npos )
         return -ENOENT;
 
     size_t posExp =
         strFloat.find_first_of( "eE");
-    if( posExp = std::string::npos )
+    if( posExp == std::string::npos )
         return -ENOENT;
 
     if( posPt >= strFloat.size() ||

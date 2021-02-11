@@ -1,6 +1,6 @@
 #include <string>
 #include <map>
-#include "ridlc.hpp"
+#include "ridlc.h"
 #include "rpc.h"
  
 #define SET_PARENT_OF( pObj ) \

@@ -13,6 +13,8 @@ all: $(TARGET)
 debug: $(TARGET)
 release: $(TARGET)
 
+clean: debug_clean release_clean
+
 debug_clean: do_clean
 release_clean: do_clean
 
@@ -21,25 +23,22 @@ $(TARGET):$(OBJS2)
 $(OBJS2):$(SOURCES)
 
 ridlc.cpp: lexer.cpp ridl.y++
-	bison -d --output=ridlc.cpp ridl.y++
+	bison --defines=ridlc.h --output=ridlc.cpp ridl.y++
 
-lexer.cpp : ridl.lex
+lexer.cpp: ridl.lex
 	flex ridl.lex
 
-clean:
-	make debug_clean
-	make release_clean
-
 do_clean:
+	-@rm ridlc.cpp ridlc.h lexer.cpp lexer.h
 	-@rm $(OBJ_DIR)/*.d $(MUTE_CLEAN)
 	-@rm $(OUTPUT_DIR)/$(TARGET_IMG) $(MUTE_CLEAN)
 	-@rm $(SOURCES:%.cpp=$(OBJ_DIR)/%.o) $(MUTE_CLEAN)
-	-@rm $(OBJ_DIR)/$(ROUTER_OBJ) $(MUTE_CLEAN)
+	-@rm $(OBJ_DIR)/$(RIDLC_OBJ) $(MUTE_CLEAN)
 
--include $(OBJS2:%.o=%.d) $(ROUTER_OBJ:%.o=(OBJ_DIR)/%.d)
+-include $(OBJS2:%.o=%.d)
 
-$(OUTPUT_DIR)/$(TARGET_IMG) : $(OBJ_DIR)/$(ROUTER_OBJ)
+$(OUTPUT_DIR)/$(TARGET_IMG) : $(OBJS2)
 	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
-	$(CC) -o $@ $(OBJ_DIR)/$(ROUTER_OBJ) $(LINKER_OPTION)
+	$(CC) -o $@ $(OBJS2) $(LINKER_OPTION) -L$(OUTPUT_DIR) -lcombase -ldbus-1 -ldl
 
-.PHONY: sync TARGET clean_objs debug_clean release_clean do_clean
+.PHONY: sync TARGET clean debug_clean release_clean do_clean

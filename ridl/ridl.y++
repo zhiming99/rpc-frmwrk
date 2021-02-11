@@ -8,6 +8,17 @@ using namespace rpcfrmwrk;
 
 CDeclMap g_oDeclMap;
 extern std::vector< FILECTX > g_vecBufs;
+void yyerror( YYLTYPE *locp,
+    char const* szFile, char const *msg );
+
+#define YYCOPY(Dst, Src, Count)              \
+do                                        \
+{                                       \
+  YYPTRDIFF_T yyi;                      \
+  for (yyi = 0; yyi < (Count); yyi++)   \
+    (Dst)[yyi] = (Src)[yyi];            \
+}                                       \
+while (0)
 
 %}
 
@@ -61,6 +72,8 @@ extern std::vector< FILECTX > g_vecBufs;
 %token TOK_COMPRES
 %token TOK_AUTH
 
+%token TOK_INVALID
+
 %parse-param { char const *file_name };
 %initial-action
 {
@@ -78,7 +91,7 @@ statements : %empty
 statements : statement
     {
         ObjPtr pNode;
-        pNode.NewObj( clisd( CStatements ) );
+        pNode.NewObj( clsid( CStatements ) );
         CInterfRefs* pstmts = pNode;
         ObjPtr& pstmt = *$1;
         pstmts->AddChild( pstmt );
@@ -125,7 +138,8 @@ prime_type :
         ObjPtr pObj;
         pObj.NewObj( clsid( CPrimeType ) );
         CPrimeType* ppt = pObj;
-        ppt->SetName( @1 );
+        guint32& dwName = *$1;
+        ppt->SetName( dwName );
         BufPtr pBuf( true );
         pBuf = pObj;
         $$ = pBuf;
@@ -138,8 +152,10 @@ arr_type :
         ObjPtr pObj;
         pObj.NewObj( clsid( CArrayType ) );
         CArrayType* pat = pObj;
-        pat->SetName( @1 );
-        pat->SetElemType( $3 );
+        guint32& dwName = *$1;
+        pat->SetName( dwName );
+        ObjPtr& pType = *$3;
+        pat->SetElemType( pType );
         BufPtr pBuf( true );
         pBuf = pObj;
         $$ = pBuf;
@@ -152,9 +168,12 @@ map_type :
         ObjPtr pObj;
         pObj.NewObj( clsid( CMapType ) );
         CMapType* pmt = pObj;
-        pmt->SetName( @1 );
-        pmt->SetElemType( $5 );
-        pmt->SetKeyType( $3 );
+        guint32& dwName = *$1;
+        pmt->SetName( dwName );
+        ObjPtr& pElem = *$5;
+        pmt->SetElemType( pElem );
+        ObjPtr& pKey = *$3;
+        pmt->SetKeyType( pKey );
         BufPtr pBuf( true );
         pBuf = pObj;
         $$ = pBuf;
@@ -167,7 +186,7 @@ struct_ref : TOK_IDENT
         pObj.NewObj( clsid( CStructRef ) );
         CStructRef* psr = pObj;
         std::string strName = *$1;
-        psr->SetName( TOK_STRUCT );
+        psr->SetName( strName );
 
         ObjPtr pTemp;
         gint32 ret = g_oDeclMap.GetDeclNode(
@@ -217,10 +236,11 @@ field_list : field_decl
         ObjPtr pNode;
         pNode.NewObj( clsid( CFieldList ) );
         ObjPtr& pfdd = *$1;
-        CFieldDecl* pfdl = pNode;
-        pfdl->AddChild( pfdd );
-        $$.NewObj( true );
-        *$$ = pNode;
+        CFieldList* pfl = pNode;
+        pfl->AddChild( pfdd );
+        BufPtr pBuf( true );
+        *pBuf = pNode;
+        $$ = pBuf;
     }
     ;
 
@@ -228,10 +248,11 @@ field_list : field_decl ';' field_list
     {
         ObjPtr& pNode = *$3;
         ObjPtr& pfdd = *$1;
-        CFieldDecl* pfdl = pNode;
-        pfdl->InsertChild( pfdd );
-        $$.NewObj( true );
-        *$$ = pNode;
+        CFieldList* pfl = pNode;
+        pfl->InsertChild( pfdd );
+        BufPtr pBuf( true );
+        *pBuf = pNode;
+        $$ = pBuf;
     }
     ;
 
@@ -240,10 +261,10 @@ field_decl : idl_type TOK_IDENT ';'
         ObjPtr pNode;
         pNode.NewObj( clsid( CFieldDecl ) );
         std::string strName = *$2;
-        CFieldDecl* pfl = pNode;
-        pfl->SetName( strName );
+        CFieldDecl* pfdl = pNode;
+        pfdl->SetName( strName );
         ObjPtr& pType = *$1;
-        pfl->SetType( pType );
+        pfdl->SetType( pType );
         BufPtr pBuf( true );
         pBuf = pNode;
         $$ = pBuf;
@@ -265,7 +286,7 @@ value :
     | TOK_DBLVAL
     | TOK_BOOLVAL
     | TOK_BYVAL
-    { $$=$1 };
+    { $$=$1; }
     ;
 
 attr_name : 
@@ -280,7 +301,7 @@ attr_name :
     | TOK_WEBSOCK
     | TOK_COMPRES
     | TOK_AUTH
-    { $$=@1; }
+    { $$=$1; }
     ;
 
 attr_exp : attr_name
@@ -290,8 +311,9 @@ attr_exp : attr_name
         CAttrExp* pae = pNode;
         guint32& dwName = *$1;
         pae->SetName( dwName );
-        $$.NewObj( true );
-        *$$ = pNode;
+        BufPtr pBuf( true );
+        *pBuf = pNode;
+        $$ = pBuf;
     }
     ;
 
@@ -302,10 +324,10 @@ attr_exp : attr_name '=' value
         CAttrExp* pae = pNode;
         guint32& dwName = *$1;
         pae->SetName( dwName );
-        ObjPtr& pValue = *$3;
-        pae->SetValue( pValue );
-        $$.NewObj( true );
-        *$$ = pNode;
+        pae->SetVal( $3 );
+        BufPtr pBuf( true );
+        *pBuf = pNode;
+        $$ = pBuf;
     }
     ;
 
@@ -316,8 +338,9 @@ attr_exps :  attr_exp
         ObjPtr& pExp = *$1;
         CAttrExps* paes = pNode;
         paes->AddChild( pExp );
-        $$.NewObj( true );
-        *$$ = pNode;
+        BufPtr pBuf( true );
+        *pBuf = pNode;
+        $$ = pBuf;
     }
     ;
 attr_exps :  attr_exp ',' attr_exps
@@ -326,8 +349,9 @@ attr_exps :  attr_exp ',' attr_exps
         CAttrExps* paes = pNode;
         ObjPtr& pExp = *$1;
         paes->InsertChild( pExp );
-        $$.NewObj( true );
-        *$$ = pNode;
+        BufPtr pBuf( true );
+        *pBuf = pNode;
+        $$ = pBuf;
     }
     ;
 
@@ -337,8 +361,9 @@ attr_list : %empty
 attr_list : '[' attr_exps ']'
     {
         ObjPtr pNode = *$2;
-        $$.NewObj( true );
-        *$$ = pNode;
+        BufPtr pBuf( true );
+        *pBuf = pNode;
+        $$ = pBuf;
     }
     ;
     
@@ -350,7 +375,7 @@ formal_arg : idl_type TOK_IDENT
         CFormalArg* pfa = pNode;
         pfa->SetName( strName );
         ObjPtr& pType = *$1;
-        pfl->SetType( pType );
+        pfa->SetType( pType );
         BufPtr pBuf( true );
         pBuf = pNode;
         $$ = pBuf;
@@ -363,7 +388,7 @@ arg_list : formal_arg
         pNode.NewObj( clsid( CArgList ) );
         CArgList* pal = pNode;
         ObjPtr& pArg = *$1;
-        pAl->AddChild( pArg );
+        pal->AddChild( pArg );
         BufPtr pBuf( true );
         pBuf = pNode;
         $$ = pBuf;
@@ -383,7 +408,7 @@ arg_list : formal_arg ',' arg_list
 method_decl : TOK_IDENT '(' arg_list ')' TOK_RETURNS '(' arg_list ')'
     {
         ObjPtr pNode;
-        pNode.NewObj( clisd( CMethodDecl ) );
+        pNode.NewObj( clsid( CMethodDecl ) );
         CMethodDecl* pmd = pNode;
         std::string strName = *$1;
         pmd->SetName( strName );
@@ -400,7 +425,7 @@ method_decl : TOK_IDENT '(' arg_list ')' TOK_RETURNS '(' arg_list ')'
 method_decl : TOK_IDENT '(' ')' TOK_RETURNS '(' arg_list ')'
     {
         ObjPtr pNode;
-        pNode.NewObj( clisd( CMethodDecl ) );
+        pNode.NewObj( clsid( CMethodDecl ) );
         CMethodDecl* pmd = pNode;
         std::string strName = *$1;
         pmd->SetName( strName );
@@ -415,7 +440,7 @@ method_decl : TOK_IDENT '(' ')' TOK_RETURNS '(' arg_list ')'
 method_decls : method_decl
     {
         ObjPtr pNode;
-        pNode.NewObj( clisd( CMethodDecls ) );
+        pNode.NewObj( clsid( CMethodDecls ) );
         CMethodDecls* pmds = pNode;
         ObjPtr& pmd = *$1;
         pmds->AddChild( pmd );
@@ -466,7 +491,7 @@ interf_ref : TOK_INTERFACE TOK_IDENT attr_list
     {
         ObjPtr pNode;
         pNode.NewObj( clsid( CInterfRef ) );
-        CInterfaceDecl* pifr = pNode;
+        CInterfRef* pifr = pNode;
         std::string strName = *$1;
         ObjPtr pTemp;
         gint32 ret = g_oDeclMap.GetDeclNode(
@@ -495,7 +520,7 @@ interf_ref : TOK_INTERFACE TOK_IDENT attr_list
 interf_refs : interf_ref
     {
         ObjPtr pNode;
-        pNode.NewObj( clisd( CInterfRefs ) );
+        pNode.NewObj( clsid( CInterfRefs ) );
         CInterfRefs* pifrs = pNode;
         ObjPtr& pifr = *$1;
         pifrs->AddChild( pifr );
@@ -523,6 +548,7 @@ service_decl : TOK_SERVICE TOK_IDENT attr_list '{' interf_refs '}'
         pNode.NewObj( clsid( CServiceDecl ) );
         CServiceDecl* psd = pNode;
         std::string strName = *$2;
+        ObjPtr pTemp;
         gint32 ret = g_oDeclMap.GetDeclNode(
             strName, pTemp );
         if( SUCCEEDED( ret ) )
@@ -538,7 +564,7 @@ service_decl : TOK_SERVICE TOK_IDENT attr_list '{' interf_refs '}'
             ! pAttrBuf->empty() )
         {
             ObjPtr& pal = *$3;
-            pifr->SetAttrList( pal );
+            psd->SetAttrList( pal );
         }
         ObjPtr& pifrs = *$5;
         psd->SetInterfList( pifrs );
@@ -579,16 +605,16 @@ static FactoryPtr InitClassFactory()
     END_FACTORY_MAPS;
 };
 
-int Usage()
+void Usage()
 {
-    printf( "Usage:" )
-    printf( "ridlc [options] <filePath> \n" )
-    printf( "\t compile the file",
-        "it to current directory" )
-    printf( "ridlc -h: print this help")
+    printf( "Usage:" );
+    printf( "ridlc [options] <filePath> \n" );
+    printf( "\t compile the file"
+        "it to current directory" );
+    printf( "ridlc -h: print this help");
 }
 
-int main( int argc, void** argv )
+int main( int argc, char** argv )
 {
     gint32 ret = 0;
     bool bUninit = false;
@@ -604,7 +630,6 @@ int main( int argc, void** argv )
             break;
 
         int opt = 0;
-        int ret = 0;
 
         while( ( opt =
             getopt( argc, argv, "h" ) ) != -1 )
@@ -640,7 +665,15 @@ int main( int argc, void** argv )
 
     }while( 0 );
 
-    CoUninitialize();
+    if( bUninit )
+        CoUninitialize();
 
     return ret;
 }
+
+void yyerror( YYLTYPE *locp, char const* szPath, char const *msg )
+{
+    printf( "%s(%d): %s",
+        szPath, locp->first_line, msg );
+}
+
