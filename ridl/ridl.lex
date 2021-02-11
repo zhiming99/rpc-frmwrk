@@ -13,6 +13,8 @@ extern std::map< std::string, yytokentype > g_mapKeywords;
 struct YYLTYPE2 :
     public YYLTYPE
 {
+    int prev_yylineno = 1;
+    int prev_yycolumn = 1;
     void initialize(
         const char* szFileName ) 
     {
@@ -23,10 +25,30 @@ struct YYLTYPE2 :
     }
 };
 
+/* This is executed before every action. */
+#define YY_USER_ACTION \
+do{\
+    YYLTYPE* ploc = curloc();\
+    ploc->first_line = \
+        ploc->last_line;\
+    ploc->first_column = \
+        ploc->last_column;\
+    if( yylineno == ploc->last_line ) \
+        ploc->last_column += yyleng;\
+    else{ \
+        for( ploc->last_column = 1;\
+            yytext[ yyleng - ploc->last_column ] != '\n';\
+            ++ploc->last_column ) {} \
+        ploc->last_line = yylineno; \
+    } \
+    memcpy( yylloc, ploc, sizeof( YYLTYPE ) );\
+}while( 0 );
+
+
 struct FILECTX
 {
     FILE*       m_fp = nullptr;
-    BufPtr*     m_pVal;
+    BufPtr      m_pVal;
     std::string m_strPath;
     std::string m_strLastVal;
     YYLTYPE2    m_oLocation;
@@ -35,12 +57,16 @@ struct FILECTX
     FILECTX( const std::string& strPath );
     FILECTX( const FILECTX& fc );
     ~FILECTX();
+    void ClearFp()
+    { m_fp = nullptr; }
 };
 
 extern std::vector< FILECTX > g_vecBufs;
+typedef BufPtr YYSTYPE;
 
 std::string& curstr();
 std::string& curpath();
+YYLTYPE* curloc();
 CBuffer& newval();
 yytokentype IsKeyword( char* szKeyword );
 gint32 IsAllZero( char* szText );
@@ -69,8 +95,8 @@ HexDig [0-9a-fA-F]
 %option     yylineno
 %option     outfile="lexer.cpp"
 %option     header-file="lexer.h"
-%option     stack
-%option     noyywrap
+%option     stack debug
+%option     noyywrap nounput 
 
 %x incl readstr c_comment
 %%
@@ -86,6 +112,9 @@ HexDig [0-9a-fA-F]
 ")"     |
 "<"     |
 ">"    {
+        
+        newval() = ( guint8 )yytext[ 0 ];
+        *yylval = curval;
         return yytext[ 0 ];
     }
 
@@ -118,6 +147,7 @@ HexDig [0-9a-fA-F]
         fc.m_fp = yyin;
 
         g_vecBufs.push_back( fc );
+        fc.ClearFp();
         yypush_buffer_state(
             yy_create_buffer( yyin, YY_BUF_SIZE ) );
         yy_pop_state();
@@ -136,7 +166,7 @@ HexDig [0-9a-fA-F]
         if( yy_top_state() != incl )
         {
             newval() = curstr();
-            yylval = curval;
+            *yylval = curval;
             return TOK_STRVAL;
         }
         else
@@ -207,14 +237,14 @@ HexDig [0-9a-fA-F]
             guint64 iVal = strtoull(
                 yytext, nullptr, 8);
             newval() = iVal;
-            yylval = curval;
+            *yylval = curval;
             return TOK_INTVAL;
         }
 
         guint32 iVal = strtoul(
             yytext, nullptr, 8);
         newval() = iVal;
-        yylval = curval;
+        *yylval = curval;
         return TOK_INTVAL;
     }
 
@@ -231,14 +261,14 @@ HexDig [0-9a-fA-F]
             guint64 iVal = strtoull(
                 yytext + 1, nullptr, 8);
             newval() = iVal;
-            yylval = curval;
-            return TOK_UINT64;
+            *yylval = curval;
+            return TOK_INTVAL;
         }
 
         guint32 iVal = strtoul(
             yytext + 1, nullptr, 8);
         newval() = iVal;
-        yylval = curval;
+        *yylval = curval;
         return TOK_INTVAL;
     }
 
@@ -255,14 +285,14 @@ HexDig [0-9a-fA-F]
             guint64 iVal = strtoull(
                 yytext + 2, nullptr, 8);
             newval() = iVal;
-            yylval = curval;
-            return TOK_UINT64;
+            *yylval = curval;
+            return TOK_INTVAL;
         }
 
         guint32 iVal = strtoul(
             yytext + 2, nullptr, 8);
         newval() = iVal;
-        yylval = curval;
+        *yylval = curval;
         return TOK_INTVAL;
     }
 
@@ -275,7 +305,7 @@ HexDig [0-9a-fA-F]
                 "error float value overflow" );
         }
         newval() = dblVal;
-        yylval = curval;
+        *yylval = curval;
         return TOK_DBLVAL;
     }
 [+-]?[0]?.[[:digit:]]*[Ee][+-]?[1-9][[:digit:]]* {
@@ -293,7 +323,7 @@ HexDig [0-9a-fA-F]
                 "error float value overflow" );
         }
         newval() = dblVal;
-        yylval = curval;
+        *yylval = curval;
         return TOK_DBLVAL;
     }
 
@@ -320,14 +350,14 @@ HexDig [0-9a-fA-F]
             gint64 iVal = strtoll(
                 yptr, nullptr, 8);
             newval() = ( guint64 )iVal;
-            yylval = curval;
+            *yylval = curval;
             return TOK_INTVAL;
         }
 
         gint32 iVal = strtol(
             yptr, nullptr, 8);
         newval() = ( guint32 )iVal;
-        yylval = curval;
+        *yylval = curval;
         return TOK_INTVAL;
     }
 
@@ -336,32 +366,33 @@ HexDig [0-9a-fA-F]
         if( iKey != TOK_INVALID )
         {
             newval() = ( guint32 )iKey;
-            yylval = curval;
+            *yylval = curval;
             return iKey;
         }
 
         if( strcmp( yytext, "true" ) == 0 )
         {
             newval() = true;
-            yylval = curval;
+            *yylval = curval;
             return TOK_BOOLVAL;
         }
         else if( strcmp( yytext, "false" ) == 0 )
         {
             newval() = false;
-            yylval = curval;
+            *yylval = curval;
             return TOK_BOOLVAL;
         }
 
-        newval() = yytext;
-        yylval = curval;
+        std::string strIdent = yytext;
+        newval() = strIdent;
+        *yylval = curval;
         return TOK_IDENT;
     }
 
 "'.'" {
         guint8 c = yytext[ 1 ];
         newval() = c;
-        yylval = curval;
+        *yylval = curval;
         return TOK_BYVAL;
     }
 
@@ -382,13 +413,13 @@ HexDig [0-9a-fA-F]
         else if( c == 'r' )
             c = '\r';
         newval() = c;
-        yylval = curval;
+        *yylval = curval;
         return TOK_BYVAL;
     }
 
 0   {
         newval() = ( guint32 )0;
-        yylval = curval;
+        *yylval = curval;
         return TOK_INTVAL;
     }
 
@@ -398,14 +429,7 @@ HexDig [0-9a-fA-F]
 <c_comment>\n    
 <c_comment>"*"+"/" yy_pop_state();
 
-.*  {
-
-        std::string strMsg = "error unknown token '";
-        strMsg += yytext;
-        strMsg += "'";
-        PrintMsg( -EINVAL, strMsg.c_str() );
-        return YYerror;
-    }
+[\n]      /**/
 
 <<EOF>> {
         g_vecBufs.pop_back();
@@ -416,7 +440,17 @@ HexDig [0-9a-fA-F]
         }
     }
 
+[.]+  {
+
+        std::string strMsg = "error unknown token '";
+        strMsg += yytext;
+        strMsg += "'";
+        PrintMsg( -EINVAL, strMsg.c_str() );
+        return YYerror;
+    }
 %%
+
+#include "ridlc.h"
 
 std::vector< FILECTX > g_vecBufs;
 
@@ -457,7 +491,13 @@ std::map< std::string, yytokentype >
     };
 
 FILECTX::FILECTX()
-{ m_pVal = new BufPtr( true ); }
+{
+    m_pVal.NewObj(); 
+    m_oLocation.first_line =
+    m_oLocation.first_column =  
+    m_oLocation.last_line =
+    m_oLocation.last_column = 1;
+}
 
 FILECTX::FILECTX( const std::string& strPath )
     : FILECTX()
@@ -472,11 +512,10 @@ FILECTX::FILECTX( const std::string& strPath )
 FILECTX::~FILECTX()
 {
     if( m_fp != nullptr )
+    {
         fclose( m_fp );
-    m_fp = nullptr;
-    if( m_pVal )
-        delete m_pVal;
-    m_pVal = nullptr;
+        m_fp = nullptr;
+    }
 }
 
 FILECTX::FILECTX( const FILECTX& rhs )
@@ -485,6 +524,9 @@ FILECTX::FILECTX( const FILECTX& rhs )
     m_pVal = rhs.m_pVal;
     m_strPath = rhs.m_strPath;
     m_strLastVal = rhs.m_strLastVal;
+    memcpy( &m_oLocation,
+        &rhs.m_oLocation,
+        sizeof( m_oLocation ) );
 }
 
 std::string& curstr()
@@ -493,11 +535,13 @@ std::string& curstr()
 std::string& curpath()
 { return g_vecBufs.back().m_strPath; }
 
+YYLTYPE* curloc()
+{ return &g_vecBufs.back().m_oLocation; }
+
 CBuffer& newval()
 { 
-    g_vecBufs.back().m_pVal =
-        new BufPtr( true );
-    return *( *g_vecBufs.back().m_pVal );
+    g_vecBufs.back().m_pVal.NewObj();
+    return *g_vecBufs.back().m_pVal;
 }
 
 yytokentype IsKeyword( char* szKeyword )

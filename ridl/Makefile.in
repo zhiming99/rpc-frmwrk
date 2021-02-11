@@ -22,11 +22,11 @@ $(TARGET):$(OBJS2)
 
 $(OBJS2):$(SOURCES)
 
-ridlc.cpp: lexer.cpp ridl.y++
-	bison --defines=ridlc.h --output=ridlc.cpp ridl.y++
-
-lexer.cpp: ridl.lex
+lexer.cpp: ridl.lex ridlc.h
 	flex ridl.lex
+
+ridlc.h: ridl.y++
+	bison --defines=ridlc.h --output=ridlc.cpp -r all ridl.y++
 
 do_clean:
 	-@rm ridlc.cpp ridlc.h lexer.cpp lexer.h
@@ -39,6 +39,6 @@ do_clean:
 
 $(OUTPUT_DIR)/$(TARGET_IMG) : $(OBJS2)
 	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
-	$(CC) -o $@ $(OBJS2) $(LINKER_OPTION) -L$(OUTPUT_DIR) -lcombase -ldbus-1 -ldl
+	$(CC) -o $@ $(OBJS2) -lcombase  $(LINKER_OPTION) -L$(OUTPUT_DIR) -ldl
 
 .PHONY: sync TARGET clean debug_clean release_clean do_clean

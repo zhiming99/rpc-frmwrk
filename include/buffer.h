@@ -76,9 +76,11 @@ template<>
 inline gint32 GetTypeId( EnumEventId* pT )
 { return typeUInt32; }
 
+template<>
 inline gint32 GetTypeId( EnumClsid* pT )
 { return typeUInt32; }
 
+template<>
 inline gint32 GetTypeId( EnumPropId* pT )
 { return typeUInt32; }
 

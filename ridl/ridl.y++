@@ -81,6 +81,13 @@ while (0)
     pLtype->initialize( file_name );
     FILECTX fc( file_name );
     g_vecBufs.push_back( fc );
+    yyin = fc.m_fp;
+    char szBuf[ 256 ];
+    gint32 ret = fread( szBuf, 1, 256, yyin );
+    if( ret == 0 )
+        ret = ferror( yyin );
+    rewind( yyin );
+    fc.ClearFp();
 };
 
 %%
@@ -96,7 +103,7 @@ statements : statement
         ObjPtr& pstmt = *$1;
         pstmts->AddChild( pstmt );
         BufPtr pBuf( true );
-        pBuf = pNode;
+        *pBuf = pNode;
         $$ = pBuf;
     }
     ;
@@ -107,7 +114,7 @@ statements : statement ';' statements
         ObjPtr& pstmt = *$1;
         pstmts->InsertChild( pstmt );
         BufPtr pBuf( true );
-        pBuf = pNode;
+        *pBuf = pNode;
         $$ = pBuf;
     }
     ;
@@ -116,34 +123,23 @@ statement :
     interf_decl
     | service_decl
     | struct_decl
-    { $$ = $1; }
     ;
 
 prime_type :
       TOK_STRING
-    | TOK_UINT64
-    | TOK_INT64
-    | TOK_UINT32
-    | TOK_INT32
-    | TOK_UINT16
-    | TOK_INT16
-    | TOK_FLOAT
-    | TOK_DOUBLE
-    | TOK_BYTE
-    | TOK_BOOL
-    | TOK_BYTEARR
-    | TOK_OBJPTR
-    | TOK_HSTREAM
-    {
-        ObjPtr pObj;
-        pObj.NewObj( clsid( CPrimeType ) );
-        CPrimeType* ppt = pObj;
-        guint32& dwName = *$1;
-        ppt->SetName( dwName );
-        BufPtr pBuf( true );
-        pBuf = pObj;
-        $$ = pBuf;
-    }
+      | TOK_UINT64
+      | TOK_INT64
+      | TOK_UINT32
+      | TOK_INT32
+      | TOK_UINT16
+      | TOK_INT16
+      | TOK_FLOAT
+      | TOK_DOUBLE
+      | TOK_BYTE
+      | TOK_BOOL
+      | TOK_BYTEARR
+      | TOK_OBJPTR
+      | TOK_HSTREAM
     ;
 
 arr_type :
@@ -157,7 +153,7 @@ arr_type :
         ObjPtr& pType = *$3;
         pat->SetElemType( pType );
         BufPtr pBuf( true );
-        pBuf = pObj;
+        *pBuf = pObj;
         $$ = pBuf;
     }
     ;
@@ -175,7 +171,7 @@ map_type :
         ObjPtr& pKey = *$3;
         pmt->SetKeyType( pKey );
         BufPtr pBuf( true );
-        pBuf = pObj;
+        *pBuf = pObj;
         $$ = pBuf;
     }
     ;
@@ -200,7 +196,7 @@ struct_ref : TOK_IDENT
         }
         psr->SetName( strName );
         BufPtr pBuf( true );
-        pBuf = pObj;
+        *pBuf = pObj;
         $$ = pBuf;
     }
     ;
@@ -222,10 +218,10 @@ struct_decl : TOK_STRUCT TOK_IDENT '{' field_list '}'
             PrintMsg( -EEXIST, strMsg.c_str() );
         }
         psr->SetName( strName );
-        ObjPtr& pfl = *$3;
+        ObjPtr& pfl = *$4;
         psr->SetFieldList( pfl );
         BufPtr pBuf( true );
-        pBuf = pNode;
+        *pBuf = pNode;
         $$ = pBuf;
         g_oDeclMap.AddDeclNode( strName, pNode );
     }
@@ -266,17 +262,25 @@ field_decl : idl_type TOK_IDENT ';'
         ObjPtr& pType = *$1;
         pfdl->SetType( pType );
         BufPtr pBuf( true );
-        pBuf = pNode;
+        *pBuf = pNode;
         $$ = pBuf;
     }
     ;
 
 idl_type :
-      prime_type
+      prime_type {
+        ObjPtr pObj;
+        pObj.NewObj( clsid( CPrimeType ) );
+        CPrimeType* ppt = pObj;
+        guint32& dwName = *$1;
+        ppt->SetName( dwName );
+        BufPtr pBuf( true );
+        *pBuf = pObj;
+        $$ = pBuf;
+    }
     | arr_type
     | map_type
     | struct_ref
-    { $$ = $1; }
     ;
 
 value :
@@ -286,7 +290,6 @@ value :
     | TOK_DBLVAL
     | TOK_BOOLVAL
     | TOK_BYVAL
-    { $$=$1; }
     ;
 
 attr_name : 
@@ -301,7 +304,6 @@ attr_name :
     | TOK_WEBSOCK
     | TOK_COMPRES
     | TOK_AUTH
-    { $$=$1; }
     ;
 
 attr_exp : attr_name
@@ -377,7 +379,7 @@ formal_arg : idl_type TOK_IDENT
         ObjPtr& pType = *$1;
         pfa->SetType( pType );
         BufPtr pBuf( true );
-        pBuf = pNode;
+        *pBuf = pNode;
         $$ = pBuf;
     }
     ;
@@ -390,7 +392,7 @@ arg_list : formal_arg
         ObjPtr& pArg = *$1;
         pal->AddChild( pArg );
         BufPtr pBuf( true );
-        pBuf = pNode;
+        *pBuf = pNode;
         $$ = pBuf;
     }
 arg_list : formal_arg ',' arg_list
@@ -400,7 +402,7 @@ arg_list : formal_arg ',' arg_list
         CArgList* pal = pNode;
         pal->InsertChild( pArg );
         BufPtr pBuf( true );
-        pBuf = pNode;
+        *pBuf = pNode;
         $$ = pBuf;
     }
     ;
@@ -417,7 +419,7 @@ method_decl : TOK_IDENT '(' arg_list ')' TOK_RETURNS '(' arg_list ')'
         ObjPtr& pOutArgs =  *$7;
         pmd->SetOutArgs( pOutArgs );
         BufPtr pBuf( true );
-        pBuf = pNode;
+        *pBuf = pNode;
         $$ = pBuf;
         
     }
@@ -432,7 +434,7 @@ method_decl : TOK_IDENT '(' ')' TOK_RETURNS '(' arg_list ')'
         ObjPtr& pOutArgs =  *$6;
         pmd->SetOutArgs( pOutArgs );
         BufPtr pBuf( true );
-        pBuf = pNode;
+        *pBuf = pNode;
         $$ = pBuf;
     }
     ;
@@ -445,7 +447,7 @@ method_decls : method_decl
         ObjPtr& pmd = *$1;
         pmds->AddChild( pmd );
         BufPtr pBuf( true );
-        pBuf = pNode;
+        *pBuf = pNode;
         $$ = pBuf;
     }
     ;
@@ -456,7 +458,7 @@ method_decls : method_decl ';' method_decls
         ObjPtr& pmd = *$1;
         pmds->InsertChild( pmd );
         BufPtr pBuf( true );
-        pBuf = pNode;
+        *pBuf = pNode;
         $$ = pBuf;
     }
     ;
@@ -481,7 +483,7 @@ interf_decl : TOK_IDENT '{' method_decls '}'
         ObjPtr& pmdl = *$3;
         pifd->SetMethodList( pmdl );
         BufPtr pBuf( true );
-        pBuf = pNode;
+        *pBuf = pNode;
         $$ = pBuf;
         g_oDeclMap.AddDeclNode( strName, pNode );
     }
@@ -512,7 +514,7 @@ interf_ref : TOK_INTERFACE TOK_IDENT attr_list
             pifr->SetAttrList( pal );
         }
         BufPtr pBuf( true );
-        pBuf = pNode;
+        *pBuf = pNode;
         $$ = pBuf;
     }
     ;
@@ -525,7 +527,7 @@ interf_refs : interf_ref
         ObjPtr& pifr = *$1;
         pifrs->AddChild( pifr );
         BufPtr pBuf( true );
-        pBuf = pNode;
+        *pBuf = pNode;
         $$ = pBuf;
     }
     ;
@@ -537,7 +539,7 @@ interf_refs : interf_ref ';' interf_refs
         ObjPtr& pifr = *$1;
         pifrs->InsertChild( pifr );
         BufPtr pBuf( true );
-        pBuf = pNode;
+        *pBuf = pNode;
         $$ = pBuf;
     }
     ;
@@ -570,7 +572,7 @@ service_decl : TOK_SERVICE TOK_IDENT attr_list '{' interf_refs '}'
         psd->SetInterfList( pifrs );
 
         BufPtr pBuf( true );
-        pBuf = pNode;
+        *pBuf = pNode;
         $$ = pBuf;
         g_oDeclMap.AddDeclNode( strName, pNode );
     }
