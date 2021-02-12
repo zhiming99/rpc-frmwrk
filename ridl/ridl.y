@@ -13,13 +13,13 @@ extern std::vector< std::unique_ptr< FILECTX > > g_vecBufs;
 void yyerror( YYLTYPE *locp,
     char const* szFile, char const *msg );
 
-#define YYCOPY(Dst, Src, Count)              \
-do                                        \
-{                                       \
-  YYPTRDIFF_T yyi;                      \
-  for (yyi = 0; yyi < (Count); yyi++)   \
-    (Dst)[yyi] = (Src)[yyi];            \
-}                                       \
+#define YYCOPY(Dst, Src, Count) \
+do\
+{\
+  YYPTRDIFF_T yyi;\
+  for (yyi = 0; yyi < (Count); yyi++) \
+    (Dst)[yyi] = (Src)[yyi];\
+}\
 while (0)
 
 %}
