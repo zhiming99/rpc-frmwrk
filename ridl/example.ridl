@@ -50,7 +50,7 @@ interface IChat
 {
     SpecifyChannel( STMHANDLE hChannel )
         returns( int32 iRet );
-}
+};
 
 service SimpFileSvc [
     serial="protobuf",

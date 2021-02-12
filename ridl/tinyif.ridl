@@ -10,5 +10,6 @@ struct OBJPTR
 
 interface ITinyInterface
 {
-    Ping() return ( int32_t iRet );
+    Ping() returns ( int32 iRet );
 };
+

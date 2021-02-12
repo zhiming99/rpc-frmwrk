@@ -3,6 +3,7 @@
 #include <map>
 #include "rpc.h"
 #include <math.h>
+#include <memory>
 
 using namespace rpcfrmwrk;
 
@@ -57,11 +58,9 @@ struct FILECTX
     FILECTX( const std::string& strPath );
     FILECTX( const FILECTX& fc );
     ~FILECTX();
-    void ClearFp()
-    { m_fp = nullptr; }
 };
 
-extern std::vector< FILECTX > g_vecBufs;
+extern std::vector< std::unique_ptr< FILECTX > > g_vecBufs;
 typedef BufPtr YYSTYPE;
 
 std::string& curstr();
@@ -71,10 +70,14 @@ CBuffer& newval();
 yytokentype IsKeyword( char* szKeyword );
 gint32 IsAllZero( char* szText );
 
-#define PrintMsg( ret, szMsg ) \
+#define DebugPrintMsg( ret, szMsg ) \
     DebugPrintEx( logErr, ret, \
         "%s(%d): %s", curpath().c_str(), \
         yylineno, szMsg );
+
+#define PrintMsg( ret, szMsg ) \
+    printf( "%s(%d): error %s(%d)\n", curpath().c_str(), \
+        yylineno, szMsg, ret );
 
 #define PrintAndQuit( ret, szMsg ) \
 { \
@@ -82,7 +85,8 @@ gint32 IsAllZero( char* szText );
     yyterminate(); \
 }
 
-#define curval ( g_vecBufs.back().m_pVal )
+#define curval ( g_vecBufs.back()->m_pVal )
+FILE* TryOpenFile( const std::string& strFile );
 
 }
 
@@ -135,19 +139,19 @@ HexDig [0-9a-fA-F]
             PrintAndQuit( ret, "Expect \"" );
         }
 
-        yyin = fopen( yytext, "r");
+        yyin = TryOpenFile( strFile.c_str() );
         if ( !yyin )
         {
             PrintAndQuit(
-                -errno, strerror( -errno ) );
+                -errno, strerror( errno ) );
         }
 
-        FILECTX fc;
-        fc.m_strPath = strFile;
-        fc.m_fp = yyin;
+        FILECTX* pfc = new FILECTX();
+        pfc->m_strPath = strFile;
+        pfc->m_fp = yyin;
 
-        g_vecBufs.push_back( fc );
-        fc.ClearFp();
+        g_vecBufs.push_back(
+            std::unique_ptr< FILECTX >( pfc ) );
         yypush_buffer_state(
             yy_create_buffer( yyin, YY_BUF_SIZE ) );
         yy_pop_state();
@@ -163,7 +167,7 @@ HexDig [0-9a-fA-F]
         /* return string constant token type and
          * value to parser
          */
-        if( yy_top_state() != incl )
+        if( YY_START != incl )
         {
             newval() = curstr();
             *yylval = curval;
@@ -452,7 +456,7 @@ HexDig [0-9a-fA-F]
 
 #include "ridlc.h"
 
-std::vector< FILECTX > g_vecBufs;
+std::vector< std::unique_ptr< FILECTX > > g_vecBufs;
 
 std::map< std::string, yytokentype >
     g_mapKeywords = {
@@ -482,7 +486,7 @@ std::map< std::string, yytokentype >
         { "rtpath", TOK_RTPATH },
         { "ssl", TOK_SSL },
         { "websock", TOK_WEBSOCK },
-        { "compression", TOK_COMPRES },
+        { "compress", TOK_COMPRES },
         { "auth", TOK_AUTH },
 
         { "struct", TOK_STRUCT }, 
@@ -507,6 +511,12 @@ FILECTX::FILECTX( const std::string& strPath )
     {
         m_strPath = strPath;
     }
+    else
+    {
+        std::string strMsg = "cannot open file '";
+        strMsg += strPath + "'";
+        throw std::invalid_argument( strMsg );
+    }
 }
 
 FILECTX::~FILECTX()
@@ -530,18 +540,18 @@ FILECTX::FILECTX( const FILECTX& rhs )
 }
 
 std::string& curstr()
-{ return g_vecBufs.back().m_strLastVal; }
+{ return g_vecBufs.back()->m_strLastVal; }
 
 std::string& curpath()
-{ return g_vecBufs.back().m_strPath; }
+{ return g_vecBufs.back()->m_strPath; }
 
 YYLTYPE* curloc()
-{ return &g_vecBufs.back().m_oLocation; }
+{ return &g_vecBufs.back()->m_oLocation; }
 
 CBuffer& newval()
 { 
-    g_vecBufs.back().m_pVal.NewObj();
-    return *g_vecBufs.back().m_pVal;
+    g_vecBufs.back()->m_pVal.NewObj();
+    return *g_vecBufs.back()->m_pVal;
 }
 
 yytokentype IsKeyword( char* szKeyword )

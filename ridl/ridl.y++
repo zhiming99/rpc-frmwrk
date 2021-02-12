@@ -5,9 +5,11 @@ using namespace rpcfrmwrk;
 
 #include "lexer.h"
 #include "astnode.h"
+#include <memory>
 
 CDeclMap g_oDeclMap;
-extern std::vector< FILECTX > g_vecBufs;
+extern std::vector< std::unique_ptr< FILECTX > > g_vecBufs;
+
 void yyerror( YYLTYPE *locp,
     char const* szFile, char const *msg );
 
@@ -79,27 +81,25 @@ while (0)
 {
     YYLTYPE2* pLtype = ( YYLTYPE2* )&@$;
     pLtype->initialize( file_name );
-    FILECTX fc( file_name );
-    g_vecBufs.push_back( fc );
-    yyin = fc.m_fp;
+    FILECTX* pfc = new FILECTX( file_name );
+    g_vecBufs.push_back(
+        std::unique_ptr< FILECTX >( pfc ) );
+    yyin = pfc->m_fp;
     char szBuf[ 256 ];
     gint32 ret = fread( szBuf, 1, 256, yyin );
     if( ret == 0 )
         ret = ferror( yyin );
     rewind( yyin );
-    fc.ClearFp();
 };
+
 
 %%
 
-statements : %empty
-    ;
-
-statements : statement
+statements : statement ';'
     {
         ObjPtr pNode;
         pNode.NewObj( clsid( CStatements ) );
-        CInterfRefs* pstmts = pNode;
+        CStatements* pstmts = pNode;
         ObjPtr& pstmt = *$1;
         pstmts->AddChild( pstmt );
         BufPtr pBuf( true );
@@ -110,7 +110,7 @@ statements : statement
 statements : statement ';' statements
     {
         ObjPtr pNode = *$3;
-        CInterfRefs* pstmts = pNode;
+        CStatements* pstmts = pNode;
         ObjPtr& pstmt = *$1;
         pstmts->InsertChild( pstmt );
         BufPtr pBuf( true );
@@ -240,9 +240,9 @@ field_list : field_decl
     }
     ;
 
-field_list : field_decl ';' field_list
+field_list : field_decl field_list
     {
-        ObjPtr& pNode = *$3;
+        ObjPtr& pNode = *$2;
         ObjPtr& pfdd = *$1;
         CFieldList* pfl = pNode;
         pfl->InsertChild( pfdd );
@@ -439,7 +439,7 @@ method_decl : TOK_IDENT '(' ')' TOK_RETURNS '(' arg_list ')'
     }
     ;
 
-method_decls : method_decl
+method_decls : method_decl ';'
     {
         ObjPtr pNode;
         pNode.NewObj( clsid( CMethodDecls ) );
@@ -453,7 +453,7 @@ method_decls : method_decl
     ;
 method_decls : method_decl ';' method_decls
     {
-        ObjPtr pNode = *$3;
+        ObjPtr& pNode = *$3;
         CMethodDecls* pmds = pNode;
         ObjPtr& pmd = *$1;
         pmds->InsertChild( pmd );
@@ -463,12 +463,12 @@ method_decls : method_decl ';' method_decls
     }
     ;
 
-interf_decl : TOK_IDENT '{' method_decls '}'
+interf_decl : TOK_INTERFACE TOK_IDENT '{' method_decls '}'
     {
         ObjPtr pNode;
         pNode.NewObj( clsid( CInterfaceDecl ) );
         CInterfaceDecl* pifd = pNode;
-        std::string strName = *$1;
+        std::string strName = *$2;
         ObjPtr pTemp;
         gint32 ret = g_oDeclMap.GetDeclNode(
             strName, pTemp );
@@ -476,11 +476,11 @@ interf_decl : TOK_IDENT '{' method_decls '}'
         {
             std::string strMsg = "error interface '"; 
             strMsg += strName + "'";
-            strMsg += " already declared yet";
+            strMsg += " already declared";
             PrintMsg( -EEXIST, strMsg.c_str() );
         }
         pifd->SetName( strName );
-        ObjPtr& pmdl = *$3;
+        ObjPtr& pmdl = *$4;
         pifd->SetMethodList( pmdl );
         BufPtr pBuf( true );
         *pBuf = pNode;
@@ -494,7 +494,7 @@ interf_ref : TOK_INTERFACE TOK_IDENT attr_list
         ObjPtr pNode;
         pNode.NewObj( clsid( CInterfRef ) );
         CInterfRef* pifr = pNode;
-        std::string strName = *$1;
+        std::string strName = *$2;
         ObjPtr pTemp;
         gint32 ret = g_oDeclMap.GetDeclNode(
             strName, pTemp );
@@ -510,7 +510,7 @@ interf_ref : TOK_INTERFACE TOK_IDENT attr_list
         if( ! pAttrBuf.IsEmpty() &&
             ! pAttrBuf->empty() )
         {
-            ObjPtr& pal = *$3;
+            ObjPtr& pal = *pAttrBuf;
             pifr->SetAttrList( pal );
         }
         BufPtr pBuf( true );
@@ -519,7 +519,7 @@ interf_ref : TOK_INTERFACE TOK_IDENT attr_list
     }
     ;
 
-interf_refs : interf_ref
+interf_refs : interf_ref ';'
     {
         ObjPtr pNode;
         pNode.NewObj( clsid( CInterfRefs ) );
@@ -579,6 +579,10 @@ service_decl : TOK_SERVICE TOK_IDENT attr_list '{' interf_refs '}'
     ;
 %%
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
 // mandatory part, just copy/paste'd from clsids.cpp
 static FactoryPtr InitClassFactory()
 {
@@ -616,6 +620,8 @@ void Usage()
     printf( "ridlc -h: print this help");
 }
 
+std::vector< std::string > g_vecPaths;
+
 int main( int argc, char** argv )
 {
     gint32 ret = 0;
@@ -632,20 +638,53 @@ int main( int argc, char** argv )
             break;
 
         int opt = 0;
+        bool bQuit = false;
 
         while( ( opt =
-            getopt( argc, argv, "h" ) ) != -1 )
+            getopt( argc, argv, "hI:" ) ) != -1 )
         {
             switch( opt )
             {
             case 'h' :
                 {
                     Usage();
+                    bQuit = true;
+                    break;
+                }
+            case 'I' :
+                {
+                    struct stat sb;
+                    if (lstat( optarg, &sb) == -1)
+                    {
+                        ret = -errno;
+                        perror( strerror( ret ) );
+                        bQuit = true;
+                        break;
+                    }
+                    mode_t iFlags =
+                        ( sb.st_mode & S_IFMT );
+                    if( iFlags != S_IFDIR )
+                    {
+                        std::string strMsg =
+                            "warning '";
+
+                        strMsg += optarg;
+                        strMsg +=
+                           "' is not a directory";
+                        printf( "%s",
+                            strMsg.c_str() );
+                        break;
+                    }
+                    g_vecPaths.push_back(
+                        std::string( optarg ) );
                     break;
                 }
             default:
                 break;
             }
+
+            if( bQuit )
+                break;
         }
 
         if( argv[ optind ] == nullptr )
@@ -671,6 +710,24 @@ int main( int argc, char** argv )
         CoUninitialize();
 
     return ret;
+}
+
+FILE* TryOpenFile( const std::string& strFile ) 
+{
+    FILE* fp = fopen( strFile.c_str(), "r");
+    if ( fp != nullptr )
+        return fp;
+
+    for( auto elem : g_vecPaths )
+    {
+        std::string strPath =
+            elem + "/" + strFile;
+        fp = fopen( strPath.c_str(), "r" );
+        if( fp != nullptr )
+            break;
+    }
+
+    return fp;
 }
 
 void yyerror( YYLTYPE *locp, char const* szPath, char const *msg )
