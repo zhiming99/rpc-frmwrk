@@ -14,8 +14,6 @@ extern std::map< std::string, yytokentype > g_mapKeywords;
 struct YYLTYPE2 :
     public YYLTYPE
 {
-    int prev_yylineno = 1;
-    int prev_yycolumn = 1;
     void initialize(
         const char* szFileName ) 
     {
@@ -99,8 +97,9 @@ HexDig [0-9a-fA-F]
 %option     yylineno
 %option     outfile="lexer.cpp"
 %option     header-file="lexer.h"
-%option     stack debug
+%option     stack 
 %option     noyywrap nounput 
+/* %option     debug */
 
 %x incl readstr c_comment
 %%
@@ -442,6 +441,11 @@ HexDig [0-9a-fA-F]
         {
             return YYEOF;
         }
+
+        YYLTYPE* ploc = curloc();
+        memcpy( yylloc,
+            ploc, sizeof( YYLTYPE ) );
+        yylineno = ploc->last_line;
     }
 
 [.]+  {

@@ -652,7 +652,7 @@ void Usage()
     printf( "Usage:" );
     printf( "ridlc [options] <filePath> \n" );
     printf( "\t compile the file"
-        "it to current directory" );
+        "it to current directory\n" );
     printf( "ridlc -h: print this help");
 }
 
@@ -707,7 +707,7 @@ int main( int argc, char** argv )
                         strMsg += optarg;
                         strMsg +=
                            "' is not a directory";
-                        printf( "%s",
+                        printf( "%s\n",
                             strMsg.c_str() );
                         break;
                     }
@@ -725,7 +725,7 @@ int main( int argc, char** argv )
 
         if( argv[ optind ] == nullptr )
         {
-            printf( "Missing file to compile" );
+            printf( "Missing file to compile\n" );
             Usage();
             break;
         }
@@ -734,7 +734,7 @@ int main( int argc, char** argv )
 
         if( argv[ optind + 1 ] != nullptr )
         {
-            printf( "error too many arguments" );
+            printf( "error too many arguments\n" );
             Usage();
             break;
         }
@@ -743,9 +743,11 @@ int main( int argc, char** argv )
         if( g_oRootNode.IsEmpty() )
         {
             ret = -EFAULT;
-            printf( "error too many arguments" );
             break;
         }
+
+        printf( "Successfully parsed %s\n",
+            strFile.c_str() );
 
         g_oDeclMap.Clear();
         g_oRootNode.Clear();
@@ -778,7 +780,7 @@ FILE* TryOpenFile( const std::string& strFile )
 
 void yyerror( YYLTYPE *locp, char const* szPath, char const *msg )
 {
-    printf( "%s(%d): %s",
+    printf( "%s(%d): %s\n",
         szPath, locp->first_line, msg );
 }
 

@@ -10,6 +10,7 @@ struct FILE_INFO
     map<int32, bytearray> vecBlocks;
 };
 
+// echo different type of information
 interface IEchoServer
 {
     Echo( string strText )
@@ -29,6 +30,9 @@ interface IEchoServer
             double i5r, string szTextr );
 };
 
+/*
+*interface for file transfer
+*/
 interface IFileTransfer 
 {
     UploadFile( string szFilePath,
