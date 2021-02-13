@@ -22,11 +22,11 @@ $(TARGET):$(OBJS2)
 
 $(OBJS2):$(SOURCES)
 
-lexer.cpp: ridl.lex ridlc.h
-	flex ridl.lex
+lexer.cpp: ridlc.lex ridlc.h
+	flex ridlc.lex
 
-ridlc.h: ridl.y
-	bison --defines=ridlc.h --output=ridlc.cpp -r all ridl.y
+ridlc.h: ridlc.y
+	bison --defines=ridlc.h --output=ridlc.cpp -r all ridlc.y
 
 do_clean:
 	-@rm ridlc.cpp ridlc.h lexer.cpp lexer.h

@@ -8,19 +8,27 @@ using namespace rpcfrmwrk;
 #include <memory>
 
 CDeclMap g_oDeclMap;
+ObjPtr g_oRootNode;
+
 extern std::vector< std::unique_ptr< FILECTX > > g_vecBufs;
+
 
 void yyerror( YYLTYPE *locp,
     char const* szFile, char const *msg );
 
 #define YYCOPY(Dst, Src, Count) \
-do\
-{\
+do{\
   YYPTRDIFF_T yyi;\
   for (yyi = 0; yyi < (Count); yyi++) \
     (Dst)[yyi] = (Src)[yyi];\
-}\
-while (0)
+}while (0)
+
+#define CLEAR_RSYMBS \
+for( int i = 0; i < ( yylen ); i++ ) \
+    { yyvsp[ -i ].Clear(); }
+
+#define DEFAULT_ACTION \
+    yyval = yyvsp[ 1 - yylen ]; CLEAR_RSYMBS;
 
 %}
 
@@ -105,6 +113,8 @@ statements : statement ';'
         BufPtr pBuf( true );
         *pBuf = pNode;
         $$ = pBuf;
+        CLEAR_RSYMBS;
+        g_oRootNode = pNode;
     }
     ;
 statements : statement ';' statements
@@ -116,13 +126,15 @@ statements : statement ';' statements
         BufPtr pBuf( true );
         *pBuf = pNode;
         $$ = pBuf;
+        CLEAR_RSYMBS;
+        g_oRootNode = pNode;
     }
     ;
 
 statement :
-    interf_decl
-    | service_decl
-    | struct_decl
+    interf_decl { DEFAULT_ACTION; }
+    | service_decl { DEFAULT_ACTION; }
+    | struct_decl { DEFAULT_ACTION; }
     ;
 
 prime_type :
@@ -155,6 +167,7 @@ arr_type :
         BufPtr pBuf( true );
         *pBuf = pObj;
         $$ = pBuf;
+        CLEAR_RSYMBS;
     }
     ;
 
@@ -173,6 +186,7 @@ map_type :
         BufPtr pBuf( true );
         *pBuf = pObj;
         $$ = pBuf;
+        CLEAR_RSYMBS;
     }
     ;
 
@@ -198,6 +212,7 @@ struct_ref : TOK_IDENT
         BufPtr pBuf( true );
         *pBuf = pObj;
         $$ = pBuf;
+        CLEAR_RSYMBS;
     }
     ;
 
@@ -224,6 +239,7 @@ struct_decl : TOK_STRUCT TOK_IDENT '{' field_list '}'
         *pBuf = pNode;
         $$ = pBuf;
         g_oDeclMap.AddDeclNode( strName, pNode );
+        CLEAR_RSYMBS;
     }
     ;
 
@@ -237,6 +253,7 @@ field_list : field_decl
         BufPtr pBuf( true );
         *pBuf = pNode;
         $$ = pBuf;
+        CLEAR_RSYMBS;
     }
     ;
 
@@ -264,6 +281,7 @@ field_decl : idl_type TOK_IDENT ';'
         BufPtr pBuf( true );
         *pBuf = pNode;
         $$ = pBuf;
+        CLEAR_RSYMBS;
     }
     ;
 
@@ -277,33 +295,34 @@ idl_type :
         BufPtr pBuf( true );
         *pBuf = pObj;
         $$ = pBuf;
+        CLEAR_RSYMBS;
     }
-    | arr_type
-    | map_type
-    | struct_ref
+    | arr_type { DEFAULT_ACTION; }
+    | map_type { DEFAULT_ACTION; }
+    | struct_ref { DEFAULT_ACTION; }
     ;
 
 value :
-      TOK_STRVAL
-    | TOK_INTVAL
-    | TOK_FLOATVAL
-    | TOK_DBLVAL
-    | TOK_BOOLVAL
-    | TOK_BYVAL
+      TOK_STRVAL { DEFAULT_ACTION; }
+    | TOK_INTVAL { DEFAULT_ACTION; }
+    | TOK_FLOATVAL { DEFAULT_ACTION; }
+    | TOK_DBLVAL { DEFAULT_ACTION; }
+    | TOK_BOOLVAL { DEFAULT_ACTION; }
+    | TOK_BYVAL { DEFAULT_ACTION; }
     ;
 
 attr_name : 
-      TOK_ASYNC
-    | TOK_ASYNCP
-    | TOK_ASYNCS
-    | TOK_STREAM
-    | TOK_SERIAL
-    | TOK_TIMEOUT
-    | TOK_RTPATH
-    | TOK_SSL
-    | TOK_WEBSOCK
-    | TOK_COMPRES
-    | TOK_AUTH
+      TOK_ASYNC { DEFAULT_ACTION; }
+    | TOK_ASYNCP { DEFAULT_ACTION; }
+    | TOK_ASYNCS { DEFAULT_ACTION; }
+    | TOK_STREAM { DEFAULT_ACTION; }
+    | TOK_SERIAL { DEFAULT_ACTION; }
+    | TOK_TIMEOUT { DEFAULT_ACTION; }
+    | TOK_RTPATH { DEFAULT_ACTION; }
+    | TOK_SSL { DEFAULT_ACTION; }
+    | TOK_WEBSOCK { DEFAULT_ACTION; }
+    | TOK_COMPRES { DEFAULT_ACTION; }
+    | TOK_AUTH { DEFAULT_ACTION; }
     ;
 
 attr_exp : attr_name
@@ -316,6 +335,7 @@ attr_exp : attr_name
         BufPtr pBuf( true );
         *pBuf = pNode;
         $$ = pBuf;
+        CLEAR_RSYMBS;
     }
     ;
 
@@ -330,6 +350,7 @@ attr_exp : attr_name '=' value
         BufPtr pBuf( true );
         *pBuf = pNode;
         $$ = pBuf;
+        CLEAR_RSYMBS;
     }
     ;
 
@@ -343,6 +364,7 @@ attr_exps :  attr_exp
         BufPtr pBuf( true );
         *pBuf = pNode;
         $$ = pBuf;
+        CLEAR_RSYMBS;
     }
     ;
 attr_exps :  attr_exp ',' attr_exps
@@ -354,6 +376,7 @@ attr_exps :  attr_exp ',' attr_exps
         BufPtr pBuf( true );
         *pBuf = pNode;
         $$ = pBuf;
+        CLEAR_RSYMBS;
     }
     ;
 
@@ -366,6 +389,7 @@ attr_list : '[' attr_exps ']'
         BufPtr pBuf( true );
         *pBuf = pNode;
         $$ = pBuf;
+        CLEAR_RSYMBS;
     }
     ;
     
@@ -381,6 +405,7 @@ formal_arg : idl_type TOK_IDENT
         BufPtr pBuf( true );
         *pBuf = pNode;
         $$ = pBuf;
+        CLEAR_RSYMBS;
     }
     ;
 
@@ -394,6 +419,7 @@ arg_list : formal_arg
         BufPtr pBuf( true );
         *pBuf = pNode;
         $$ = pBuf;
+        CLEAR_RSYMBS;
     }
 arg_list : formal_arg ',' arg_list
     {
@@ -404,6 +430,7 @@ arg_list : formal_arg ',' arg_list
         BufPtr pBuf( true );
         *pBuf = pNode;
         $$ = pBuf;
+        CLEAR_RSYMBS;
     }
     ;
 
@@ -421,6 +448,7 @@ method_decl : TOK_IDENT '(' arg_list ')' TOK_RETURNS '(' arg_list ')'
         BufPtr pBuf( true );
         *pBuf = pNode;
         $$ = pBuf;
+        CLEAR_RSYMBS;
         
     }
     ;
@@ -436,6 +464,7 @@ method_decl : TOK_IDENT '(' ')' TOK_RETURNS '(' arg_list ')'
         BufPtr pBuf( true );
         *pBuf = pNode;
         $$ = pBuf;
+        CLEAR_RSYMBS;
     }
     ;
 
@@ -449,6 +478,7 @@ method_decls : method_decl ';'
         BufPtr pBuf( true );
         *pBuf = pNode;
         $$ = pBuf;
+        CLEAR_RSYMBS;
     }
     ;
 method_decls : method_decl ';' method_decls
@@ -460,6 +490,7 @@ method_decls : method_decl ';' method_decls
         BufPtr pBuf( true );
         *pBuf = pNode;
         $$ = pBuf;
+        CLEAR_RSYMBS;
     }
     ;
 
@@ -486,6 +517,7 @@ interf_decl : TOK_INTERFACE TOK_IDENT '{' method_decls '}'
         *pBuf = pNode;
         $$ = pBuf;
         g_oDeclMap.AddDeclNode( strName, pNode );
+        CLEAR_RSYMBS;
     }
     ;
 
@@ -516,6 +548,7 @@ interf_ref : TOK_INTERFACE TOK_IDENT attr_list
         BufPtr pBuf( true );
         *pBuf = pNode;
         $$ = pBuf;
+        CLEAR_RSYMBS;
     }
     ;
 
@@ -529,6 +562,7 @@ interf_refs : interf_ref ';'
         BufPtr pBuf( true );
         *pBuf = pNode;
         $$ = pBuf;
+        CLEAR_RSYMBS;
     }
     ;
 
@@ -541,6 +575,7 @@ interf_refs : interf_ref ';' interf_refs
         BufPtr pBuf( true );
         *pBuf = pNode;
         $$ = pBuf;
+        CLEAR_RSYMBS;
     }
     ;
 
@@ -575,6 +610,7 @@ service_decl : TOK_SERVICE TOK_IDENT attr_list '{' interf_refs '}'
         *pBuf = pNode;
         $$ = pBuf;
         g_oDeclMap.AddDeclNode( strName, pNode );
+        CLEAR_RSYMBS;
     }
     ;
 %%
@@ -695,14 +731,24 @@ int main( int argc, char** argv )
         }
 
         std::string strFile = argv[ optind ];
-        ret = yyparse( strFile.c_str() );
 
         if( argv[ optind + 1 ] != nullptr )
         {
-            printf( "Too many arguments" );
+            printf( "error too many arguments" );
             Usage();
             break;
         }
+
+        ret = yyparse( strFile.c_str() );
+        if( g_oRootNode.IsEmpty() )
+        {
+            ret = -EFAULT;
+            printf( "error too many arguments" );
+            break;
+        }
+
+        g_oDeclMap.Clear();
+        g_oRootNode.Clear();
 
     }while( 0 );
 

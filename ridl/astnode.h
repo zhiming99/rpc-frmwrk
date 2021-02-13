@@ -58,6 +58,9 @@ struct CDeclMap
         m_mapDecls[ strName ] = pNode;
         return STATUS_SUCCESS;
     }
+
+    inline void Clear()
+    { m_mapDecls.clear(); }
 };
 
 extern CDeclMap g_oDeclMap;
@@ -68,7 +71,7 @@ struct CAstNodeBase :
     typedef CObjBase super;
     CAstNodeBase():super() {} 
     gint32 m_iType;
-    ObjPtr m_pParent;
+    CAstNodeBase* m_pParent;
 
     inline void SetParent(
         CAstNodeBase* pParent )
@@ -96,14 +99,10 @@ typedef CAutoPtr< clsid( Invalid ), CAstNodeBase > NodePtr;
 
 struct CAstListNode : CAstNodeBase
 {
-    ObjPtr m_pSibling;
     std::deque< ObjPtr > m_queChilds;
     typedef CAstNodeBase super;
     CAstListNode() : CAstNodeBase()
     {}
-
-    inline void SetSibling( ObjPtr& pSib )
-    { m_pSibling = pSib; }
 
     inline void AddChild( ObjPtr& pChild )
     {
