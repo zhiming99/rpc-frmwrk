@@ -10,8 +10,8 @@ using namespace rpcfrmwrk;
 CDeclMap g_oDeclMap;
 ObjPtr g_oRootNode;
 
-extern std::vector< std::unique_ptr< FILECTX > > g_vecBufs;
-
+extern std::vector<
+    std::unique_ptr< FILECTX > > g_vecBufs;
 
 void yyerror( YYLTYPE *locp,
     char const* szFile, char const *msg );
@@ -760,7 +760,7 @@ int main( int argc, char** argv )
     return ret;
 }
 
-FILE* TryOpenFile( const std::string& strFile ) 
+FILE* TryOpenFile( const std::string& strFile )
 {
     FILE* fp = fopen( strFile.c_str(), "r");
     if ( fp != nullptr )
@@ -778,9 +778,9 @@ FILE* TryOpenFile( const std::string& strFile )
     return fp;
 }
 
-void yyerror( YYLTYPE *locp, char const* szPath, char const *msg )
+void yyerror( YYLTYPE *locp,
+    char const* szPath, char const *msg )
 {
     printf( "%s(%d): %s\n",
         szPath, locp->first_line, msg );
 }
-
