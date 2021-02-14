@@ -13,7 +13,7 @@
 * [`evtest`](https://github.com/zhiming99/rpc-frmwrk/tree/master/test/evtest): 'event test', an example to demonstrate how to send a event/signal
     from server side and how to handle a signal or event from client side
 
-* [`actctest`](https://github.com/zhiming99/rpc-frmwrk/tree/master/test/actctest): 'actively cancel test', an example to demonstrate how to cancel an
+* [`actcancel`](https://github.com/zhiming99/rpc-frmwrk/tree/master/test/actcancel): 'actively canceling test', an example to demonstrate how to cancel an
     ongoing request from client side actively.
 
 * [`inproc`](https://github.com/zhiming99/rpc-frmwrk/tree/master/test/inproc): 'In-Process test', an example to demonstrate how the server and
