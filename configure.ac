@@ -16,12 +16,16 @@ AC_PROG_CXX
 AC_PROG_CC
 AC_PROG_CPP
 AC_PROG_MAKE_SET
+AC_PROG_LEX
+AC_PROG_YACC
+AC_PROG_SED
+AC_PROG_AWK
+AC_PROG_GREP
+AC_CHECK_PROG(ac_cv_prog_python3, python3, yes)
 LT_INIT
 
 # Checks for libraries.
 AC_CHECK_LIB([combase], [DllLoadFactory])
-AC_CHECK_LIB([ipc], [DllLoadFactory])
-AC_CHECK_LIB([rpc], [DllLoadFactory])
 AC_CHECK_LIB([dbus-1], [dbus_bus_get])
 AC_CHECK_LIB([jsoncpp], [_ZNK4Json5ValuecvbEv])
 AC_CHECK_LIB([lz4], [LZ4_compress_default])
@@ -74,6 +78,8 @@ AC_CONFIG_FILES([Makefile
                  rpc/wsport/Makefile
                  rpc/wsport/wsproto/Makefile
                  rpc/security/Makefile
+                 ridl/Makefile
+                 3rd_party/Makefile
                  python/Makefile
                  test/Makefile
                  test/Makefile.init.pub

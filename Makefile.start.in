@@ -1,6 +1,7 @@
 include ./Makefile.init.pub
 
-TARGETS := $(OUTPUT_DIR)/libcombase.so $(OUTPUT_DIR)/libipc.so $(OUTPUT_DIR)/librpc.so test Python
+TARGETS := 3rd_Party $(OUTPUT_DIR)/libcombase.so $(OUTPUT_DIR)/libipc.so \
+     $(OUTPUT_DIR)/librpc.so test Ridl Python 
 
 all: $(TARGETS) 
 debug: $(TARGETS)
@@ -25,5 +26,11 @@ test:
 Python:
 	-$(MAKE) -C python $(mygoal)
 
+Ridlc :
+	-$(MAKE) -C ridl $(mygoal)
 
-.PHONY: $(TARGETS) test Python
+3rd_Party:
+	-$(MAKE) -C 3rd_party $(mygoal)
+
+
+.PHONY: $(TARGETS) test Python Ridlc 3rd_Party

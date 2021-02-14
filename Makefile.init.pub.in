@@ -115,6 +115,7 @@ LIB_PREFIX:=$(ROOTFS)/$(LIB_DIR)/$(DIR_SUFFIX_ARCH)
 COMMON_INCLUDE:=$(shell PKG_CONFIG_PATH=$(PKGCONFIGPATH) pkg-config --define-variable=prefix=$(ROOTFS)/usr --cflags dbus-1 jsoncpp)
 
 C_INCLUDE:=-I$(BASE)/include \
+    -I$(BASE)/3rd_party \
 	$(COMMON_INCLUDE) \
 	-I$(ROOTFS)/usr/include @INCLUDES@
 

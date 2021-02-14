@@ -1,3 +1,26 @@
+/*
+ * =====================================================================================
+ *
+ *       Filename:  ridlc.y
+ *
+ *    Description:  The gramma parser for the RPC IDL
+ *
+ *        Version:  1.0
+ *        Created:  02/10/2021 05:01:32 PM
+ *       Revision:  none
+ *       Compiler:  gcc
+ *
+ *         Author:  Ming Zhi( woodhead99@gmail.com )
+ *   Organization:
+ *
+ *      Copyright:  2021 Ming Zhi( woodhead99@gmail.com )
+ *
+ *        License:  Licensed under GPL-3.0. You may not use this file except in
+ *                  compliance with the License. You may find a copy of the
+ *                  License at 'http://www.gnu.org/licenses/gpl-3.0.html'
+ *
+ * =====================================================================================
+ */
 %{
 #include "rpc.h"
 
@@ -653,7 +676,11 @@ void Usage()
     printf( "ridlc [options] <filePath> \n" );
     printf( "\t compile the file"
         "it to current directory\n" );
-    printf( "ridlc -h: print this help");
+    printf( "Options -h:\tprint this help\n");
+    printf( "\t-I:\tspecify the path to"
+        " search for the included files.\n"
+        "\t\tAnd this option can repeat many"
+        "times\n" );
 }
 
 std::vector< std::string > g_vecPaths;

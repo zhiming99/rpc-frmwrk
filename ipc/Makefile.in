@@ -10,8 +10,7 @@ port.cpp portstat.cpp drvmgr.cpp utils.cpp \
 iomgr.cpp ptifmap.cpp pnpmgr.cpp dbusdrv.cpp \
 dbusport.cpp portdrv.cpp rpcpdo.cpp dbuspdo.cpp \
 tasklets.cpp lpbkmtch.cpp ifhelper.cpp iiddict.cpp \
-reqopen.cpp uxport.cpp uxstream.cpp streamex.cpp \
-sha1.cpp base64.cpp
+reqopen.cpp uxport.cpp uxstream.cpp streamex.cpp
 
 OBJS := $(SOURCES:%.cpp=$(OBJ_DIR)/%.o)
 
@@ -21,7 +20,7 @@ release: $(OUTPUT_DIR)/$(TARGET)
 
 $(OUTPUT_DIR)/$(TARGET) : $(OBJS)
 	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
-	$(CC) -o $(OUTPUT_DIR)/$(TARGET) $(OBJS) -L$(OUTPUT_DIR) -lcombase -ljsoncpp -ldbus-1 -shared $(LINKER_OPTION) 
+	$(CC) -o $(OUTPUT_DIR)/$(TARGET) $(OBJS) -L$(OUTPUT_DIR) -lutils -lcombase -ljsoncpp -ldbus-1 -shared $(LINKER_OPTION) 
 
 -include $(OBJS:%.o=%.d)
 
