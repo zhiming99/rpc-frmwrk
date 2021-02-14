@@ -1,0 +1,30 @@
+include ../Makefile.init.pub
+
+TARGET:=libutils.a
+SOURCES:= sha1.cpp base64.cpp
+
+OBJS:=$(SOURCES:%.cpp=$(OBJ_DIR)/%.o)
+
+all: $(OUTPUT_DIR)/$(TARGET)
+debug: $(OUTPUT_DIR)/$(TARGET)
+release: $(OUTPUT_DIR)/$(TARGET)
+
+$(OUTPUT_DIR)/$(TARGET) : $(OBJS)
+	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
+	$(AR) r $(OUTPUT_DIR)/$(TARGET) $(OBJS)
+
+-include $(OBJS:%.o=%.d)
+
+debug_clean: do_clean
+release_clean: do_clean
+
+clean:
+	make debug_clean
+	make release_clean
+
+do_clean:
+	-@rm $(OBJ_DIR)/*.d $(MUTE_CLEAN)
+	-@rm $(OUTPUT_DIR)/$(TARGET) $(MUTE_CLEAN)
+	-@rm $(OBJS) $(MUTE_CLEAN)
+
+.PHONY: sync
