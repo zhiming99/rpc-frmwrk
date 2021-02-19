@@ -25,7 +25,8 @@
 #include <map>
 #include "ridlc.h"
 #include "rpc.h"
- 
+#include "idlclsid.h" 
+
 #define SET_PARENT_OF( pObj ) \
 if( !pObj.IsEmpty() ) \
 { \
@@ -33,27 +34,6 @@ if( !pObj.IsEmpty() ) \
     pnode->SetParent( this ); \
 }
 
-enum EnumMyClsid
-{
-    DECL_CLSID( CAttrExp ) = clsid( ClassFactoryStart ) + 40,
-    DECL_CLSID( CAttrExps ),
-    DECL_CLSID( CPrimeType ),
-    DECL_CLSID( CArrayType ),
-    DECL_CLSID( CMapType ),
-    DECL_CLSID( CStructRef ),
-    DECL_CLSID( CFieldDecl ),
-    DECL_CLSID( CFieldList ),
-    DECL_CLSID( CStructDecl ),
-    DECL_CLSID( CFormalArg ),
-    DECL_CLSID( CArgList ),
-    DECL_CLSID( CMethodDecl ),
-    DECL_CLSID( CMethodDecls ),
-    DECL_CLSID( CInterfaceDecl ),
-    DECL_CLSID( CInterfRef ),
-    DECL_CLSID( CInterfRefs ),
-    DECL_CLSID( CServiceDecl ),
-    DECL_CLSID( CStatements ),
-};
 
 // declarations
 struct CDeclMap
@@ -86,7 +66,37 @@ struct CDeclMap
     { m_mapDecls.clear(); }
 };
 
-extern CDeclMap g_oDeclMap;
+extern CDeclMap g_mapDecls;
+
+struct CAliasMap
+{
+    std::map< std::string, std::string > m_mapAlias;
+    inline gint32 GetAliasType(
+        const std::string& strName,
+        std::string& strType )
+    {
+        std::map< std::string, std::string >::iterator
+            itr = m_mapAlias.find( strName );
+        if( itr != m_mapAlias.end() )
+            return -ENOENT;
+        strType = itr->second;
+        return STATUS_SUCCESS;
+    }
+
+    inline gint32 AddAliasType(
+        const std::string& strName,
+        const std::string& strType )
+    {
+        std::map< std::string, std::string >::iterator
+            itr = m_mapAlias.find( strName );
+        if( itr != m_mapAlias.end() )
+            return -EEXIST;
+        m_mapAlias[ strName ] = strType;
+        return STATUS_SUCCESS;
+    }
+};
+
+extern CAliasMap g_mapAliases;
 
 struct CAstNodeBase :
     public CObjBase
@@ -102,6 +112,9 @@ struct CAstNodeBase :
         if( pParent != nullptr )
             m_pParent = pParent;
     }
+
+    virtual std::string ToString() const
+    { return std::string( "" ); }
 };
 
 struct CNamedNode :
@@ -198,6 +211,59 @@ struct CPrimeType : public CAstNodeBase
 
     inline guint32 GetName() const
     { return m_dwAttrName; }
+
+    std::string ToString() const
+    {
+        std::string strName;
+        switch( m_dwAttrName )
+        {
+        case TOK_STRING:
+            strName = "string";
+            break;
+        case TOK_UINT64:
+            strName = "guint64";
+            break;
+        case TOK_INT64:
+            strName = "gint64";
+            break;
+        case TOK_UINT32:
+            strName = "guint32";
+            break;
+        case TOK_INT32:
+            strName = "gint32";
+            break;
+        case TOK_UINT16:
+            strName = "guint16";
+            break;
+        case TOK_INT16:
+            strName = "gint16";
+            break;
+        case TOK_FLOAT:
+            strName = "float";
+            break;
+        case TOK_DOUBLE:
+            strName = "double";
+            break;
+        case TOK_BYTE:
+            strName = "guint8";
+            break;
+        case TOK_BOOL:
+            strName = "bool";
+            break;
+        case TOK_BYTEARR:
+            strName = "char*";
+            break;
+        case TOK_OBJPTR:
+            strName = "ObjPtr";
+            break;
+        case TOK_HSTREAM:
+            strName = "HSTREAM";
+            break;
+        default:
+            break;
+        }
+        return strName;
+    }
 };
 
 struct CArrayType : public CPrimeType
@@ -207,15 +273,27 @@ struct CArrayType : public CPrimeType
     CArrayType() : super()
     { SetClassId( clsid( CArrayType ) ); }
 
-    ObjPtr m_oElemType;
+    ObjPtr m_pElemType;
 
-    void SetElemType( ObjPtr& oElem )
+    void SetElemType( ObjPtr& pElem )
     {
-        m_oElemType = oElem;
+        m_pElemType = pElem;
     }
 
     ObjPtr& GetElemType()
-    { return m_oElemType; }
+    { return m_pElemType; }
+
+    std::string ToString() const
+    {
+        std::string strName;
+        strName = "std::vector<";
+
+        CAstNodeBase* pNode = m_pElemType;
+        std::string strElem = pNode->ToString();
+        strName += strElem;
+        strName += ">";
+        return strName;
+    }
 };
 
 struct CMapType : public CArrayType
@@ -234,6 +312,22 @@ struct CMapType : public CArrayType
 
     ObjPtr& GetKeyType()
     { return m_pKeyType; }
+
+    std::string ToString() const
+    {
+        std::string strName;
+        strName = "std::map<";
+
+        CAstNodeBase* pKey = m_pKeyType;
+        strName +=
+            pKey->ToString() + ",";
+
+        CAstNodeBase* pElem = m_pElemType;
+        strName +=
+            pElem->ToString();
+        strName += ">";
+        return strName;
+    }
 };
 
 struct CStructRef : public CPrimeType
@@ -251,6 +345,23 @@ struct CStructRef : public CPrimeType
 
     inline const std::string& GetName() const
     { return m_strName; }
+
+    std::string ToString() const
+    {
+        ObjPtr pTemp;
+        gint32 ret = g_mapDecls.GetDeclNode(
+            m_strName, pTemp );
+        if( SUCCEEDED( ret ) )
+            return m_strName;
+
+        std::string strType;
+        ret = g_mapAliases.GetAliasType(
+            m_strName, strType );
+        if( SUCCEEDED( ret ) )
+            return strType;
+
+        return std::string( "");
+    }
 };
 
 struct CFieldDecl : public CNamedNode
@@ -407,4 +518,59 @@ struct CStatements : public CAstListNode
     typedef CAstListNode super;
     CStatements() : CAstListNode()
     { SetClassId( clsid( CStatements ) ); }
+};
+
+struct CAliasList : public CAstNodeBase
+{
+    std::deque< std::string > m_queChilds;
+    typedef CAstNodeBase super;
+    CAliasList() : super()
+    { SetClassId( clsid( CAliasList ) ); }
+
+    inline void AddChild( const std::string& strAlias )
+    {
+        if( !strAlias.empty() )
+            m_queChilds.push_back( strAlias );
+    }
+
+    inline const std::string GetChild( guint32 i )
+    {
+        if( i >= m_queChilds.size() )
+            return "";
+        return m_queChilds[ i ];
+    }
+
+    gint32 GetCount()
+    { return m_queChilds.size(); }
+
+    void InsertChild( const std::string& strAlias )
+    {
+        if( !strAlias.empty() )
+            m_queChilds.push_front( strAlias );
+    }
+};
+
+struct CTypedefDecl : public CAstNodeBase
+{
+    typedef CAstNodeBase super;
+    ObjPtr m_pType;
+    ObjPtr m_pAliasList;
+    CTypedefDecl() : super()
+    { SetClassId( clsid( CTypedefDecl ) ); }
+
+    void SetType( ObjPtr& pType )
+    {
+        m_pType = pType;
+        SET_PARENT_OF( pType );
+    }
+    ObjPtr& GetType()
+    { return m_pType; }
+
+    void SetAliasList( ObjPtr& pAliasList )
+    {
+        m_pAliasList = pAliasList;
+        SET_PARENT_OF( pAliasList );
+    }
+    ObjPtr& GetAliasList()
+    { return m_pAliasList; }
 };

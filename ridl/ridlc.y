@@ -30,8 +30,9 @@ using namespace rpcfrmwrk;
 #include "astnode.h"
 #include <memory>
 
-CDeclMap g_oDeclMap;
+CDeclMap g_mapDecls;
 ObjPtr g_oRootNode;
+CAliasMap g_mapAliases;
 
 extern std::vector<
     std::unique_ptr< FILECTX > > g_vecBufs;
@@ -52,6 +53,34 @@ for( int i = 0; i < ( yylen ); i++ ) \
 
 #define DEFAULT_ACTION \
     yyval = yyvsp[ 1 - yylen ]; CLEAR_RSYMBS;
+
+#define ADDTO_ALIAS_MAP( pal, strType_ ) \
+do{ \
+    gint32 iCount = ( pal )->GetCount(); \
+    for( int i = 0; i < iCount; i++ ) \
+    { \
+        std::string strAlias = \
+            ( pal )->GetChild( i ); \
+        std::string strTemp; \
+        ret = g_mapAliases.GetAliasType( \
+            strAlias, strTemp ); \
+        if( SUCCEEDED( ret ) ) \
+        { \
+            std::string strMsg = \
+                "error typedef '";  \
+            strMsg += strAlias + "'"; \
+            strMsg += " already declared"; \
+            PrintMsg( -EEXIST, \
+                strMsg.c_str() ); \
+            ret = -EEXIST; \
+            break;\
+        } \
+        g_mapAliases.AddAliasType( \
+            strAlias, ( strType_ ) ); \
+    } \
+    if( ERROR( ret ) )\
+        YYABORT;\
+}while( 0 );
 
 %}
 
@@ -89,6 +118,7 @@ for( int i = 0; i < ( yylen ); i++ ) \
 %token TOK_INTERFACE
 %token TOK_STRUCT
 %token TOK_SERVICE
+%token TOK_TYPEDEF
 
 // operators
 %token TOK_RETURNS
@@ -158,6 +188,7 @@ statement :
     interf_decl { DEFAULT_ACTION; }
     | service_decl { DEFAULT_ACTION; }
     | struct_decl { DEFAULT_ACTION; }
+    | typedef_decl { CLEAR_RSYMBS; }
     ;
 
 prime_type :
@@ -205,6 +236,16 @@ map_type :
         ObjPtr& pElem = *$5;
         pmt->SetElemType( pElem );
         ObjPtr& pKey = *$3;
+        EnumClsid iClsid = pKey->GetClsid();
+        if( iClsid == clsid( CArrayType ) ||
+            iClsid == clsid( CMapType ) )
+        {
+            std::string strMsg =
+                "error map key cannot be array or map"; 
+            PrintMsg(
+                -ENOENT, strMsg.c_str() );
+            YYABORT;
+        }
         pmt->SetKeyType( pKey );
         BufPtr pBuf( true );
         *pBuf = pObj;
@@ -219,19 +260,29 @@ struct_ref : TOK_IDENT
         pObj.NewObj( clsid( CStructRef ) );
         CStructRef* psr = pObj;
         std::string strName = *$1;
-        psr->SetName( strName );
 
         ObjPtr pTemp;
-        gint32 ret = g_oDeclMap.GetDeclNode(
+        gint32 ret = g_mapDecls.GetDeclNode(
             strName, pTemp );
-        if( ERROR( ret ) )
+        if( SUCCEEDED( ret ) )
+            psr->SetName( strName );
+        else
         {
-            std::string strMsg = "error '"; 
-            strMsg += strName + "'";
-            strMsg += " not declared yet";
-            PrintMsg( -ENOENT, strMsg.c_str() );
+            std::string strType;
+            ret = g_mapAliases.GetAliasType(
+                strName, strType );
+            if( SUCCEEDED( ret ) )
+                psr->SetName( strName );
+            else
+            {
+                std::string strMsg = "error '"; 
+                strMsg += strName + "'";
+                strMsg += " not declared yet";
+                PrintMsg(
+                    -ENOENT, strMsg.c_str() );
+                YYABORT;
+            }
         }
-        psr->SetName( strName );
         BufPtr pBuf( true );
         *pBuf = pObj;
         $$ = pBuf;
@@ -246,7 +297,7 @@ struct_decl : TOK_STRUCT TOK_IDENT '{' field_list '}'
         CStructDecl* psr = pNode;
         std::string strName = *$2;
         ObjPtr pTemp;
-        gint32 ret = g_oDeclMap.GetDeclNode(
+        gint32 ret = g_mapDecls.GetDeclNode(
             strName, pTemp );
         if( SUCCEEDED( ret ) )
         {
@@ -254,6 +305,7 @@ struct_decl : TOK_STRUCT TOK_IDENT '{' field_list '}'
             strMsg += strName + "'";
             strMsg += " already declared";
             PrintMsg( -EEXIST, strMsg.c_str() );
+            YYABORT;
         }
         psr->SetName( strName );
         ObjPtr& pfl = *$4;
@@ -261,7 +313,7 @@ struct_decl : TOK_STRUCT TOK_IDENT '{' field_list '}'
         BufPtr pBuf( true );
         *pBuf = pNode;
         $$ = pBuf;
-        g_oDeclMap.AddDeclNode( strName, pNode );
+        g_mapDecls.AddDeclNode( strName, pNode );
         CLEAR_RSYMBS;
     }
     ;
@@ -524,7 +576,7 @@ interf_decl : TOK_INTERFACE TOK_IDENT '{' method_decls '}'
         CInterfaceDecl* pifd = pNode;
         std::string strName = *$2;
         ObjPtr pTemp;
-        gint32 ret = g_oDeclMap.GetDeclNode(
+        gint32 ret = g_mapDecls.GetDeclNode(
             strName, pTemp );
         if( SUCCEEDED( ret ) )
         {
@@ -532,6 +584,7 @@ interf_decl : TOK_INTERFACE TOK_IDENT '{' method_decls '}'
             strMsg += strName + "'";
             strMsg += " already declared";
             PrintMsg( -EEXIST, strMsg.c_str() );
+            YYABORT;
         }
         pifd->SetName( strName );
         ObjPtr& pmdl = *$4;
@@ -539,7 +592,7 @@ interf_decl : TOK_INTERFACE TOK_IDENT '{' method_decls '}'
         BufPtr pBuf( true );
         *pBuf = pNode;
         $$ = pBuf;
-        g_oDeclMap.AddDeclNode( strName, pNode );
+        g_mapDecls.AddDeclNode( strName, pNode );
         CLEAR_RSYMBS;
     }
     ;
@@ -551,7 +604,7 @@ interf_ref : TOK_INTERFACE TOK_IDENT attr_list
         CInterfRef* pifr = pNode;
         std::string strName = *$2;
         ObjPtr pTemp;
-        gint32 ret = g_oDeclMap.GetDeclNode(
+        gint32 ret = g_mapDecls.GetDeclNode(
             strName, pTemp );
         if( ERROR( ret ) )
         {
@@ -559,6 +612,7 @@ interf_ref : TOK_INTERFACE TOK_IDENT attr_list
             strMsg += strName + "'";
             strMsg += " not declared yet";
             PrintMsg( -ENOENT, strMsg.c_str() );
+            YYABORT;
         }
         pifr->SetName( strName );
         BufPtr pAttrBuf = $3;
@@ -609,7 +663,7 @@ service_decl : TOK_SERVICE TOK_IDENT attr_list '{' interf_refs '}'
         CServiceDecl* psd = pNode;
         std::string strName = *$2;
         ObjPtr pTemp;
-        gint32 ret = g_oDeclMap.GetDeclNode(
+        gint32 ret = g_mapDecls.GetDeclNode(
             strName, pTemp );
         if( SUCCEEDED( ret ) )
         {
@@ -617,6 +671,8 @@ service_decl : TOK_SERVICE TOK_IDENT attr_list '{' interf_refs '}'
             strMsg += strName + "'";
             strMsg += " already declared";
             PrintMsg( -EEXIST, strMsg.c_str() );
+            ret = -EEXIST;
+            YYABORT;
         }
         psd->SetName( strName );
         BufPtr pAttrBuf = $3;
@@ -632,10 +688,106 @@ service_decl : TOK_SERVICE TOK_IDENT attr_list '{' interf_refs '}'
         BufPtr pBuf( true );
         *pBuf = pNode;
         $$ = pBuf;
-        g_oDeclMap.AddDeclNode( strName, pNode );
+        g_mapDecls.AddDeclNode( strName, pNode );
         CLEAR_RSYMBS;
     }
     ;
+
+typedef_decl : TOK_TYPEDEF idl_type alias_list
+    {
+        gint32 ret = 0;
+        ObjPtr& pType = *$2;
+        CAstNodeBase* pAstNode = pType;
+
+        std::string strType =
+            pAstNode->ToString();
+        CAliasList* pAliases = *$3;
+        if( pType->GetClsid() !=
+            clsid( CStructRef ) )
+        {
+            ADDTO_ALIAS_MAP( pAliases, strType );
+        }
+        else do {
+            ObjPtr pTemp;
+            ret = g_mapDecls.GetDeclNode(
+                strType, pTemp );
+            if( SUCCEEDED( ret ) )
+            {
+                // alias a struct
+                ADDTO_ALIAS_MAP(
+                    pAliases, strType );
+            }
+            else
+            {
+                // alias an alias
+                std::string strTypeDecl = strType;
+                ret = g_mapAliases.GetAliasType(
+                    strTypeDecl, strType );
+                if( SUCCEEDED( ret ) )
+                {
+                    ADDTO_ALIAS_MAP(
+                        pAliases, strType );
+                }
+                else
+                {
+                    std::string strMsg =
+                        "error typedef '"; 
+                    strMsg += strType + "'";
+                    strMsg += " not declared yet";
+                    PrintMsg( -ENOENT,
+                        strMsg.c_str() );
+                    ret = -ENOENT;
+                    YYABORT;
+                }
+            }
+
+        }while( 0 );
+
+        if( ERROR( ret ) )
+        {
+            CLEAR_RSYMBS;
+            break;
+        }
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CTypedefDecl ) );
+        CTypedefDecl* ptd = pNode;
+        ptd->SetType( pType );
+        ObjPtr& pal = *$3;
+        ptd->SetAliasList( pal );
+
+        BufPtr pBuf( true );
+        *pBuf = pNode;
+        $$ = pBuf;
+        CLEAR_RSYMBS;
+    };
+
+alias_list : TOK_IDENT 
+    {
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CAliasList ) );
+        CAliasList* pal = pNode;
+        std::string strIdent = *$1;
+        pal->AddChild( strIdent );
+        BufPtr pBuf( true );
+        *pBuf = pNode;
+        $$ = pBuf;
+        CLEAR_RSYMBS;
+    }
+    ;
+
+alias_list : TOK_IDENT ',' alias_list
+    {
+        ObjPtr& pNode = *$3;
+        std::string strAlias = *$1;
+        CAliasList* pal = pNode;
+        pal->InsertChild( strAlias );
+        BufPtr pBuf( true );
+        *pBuf = pNode;
+        $$ = pBuf;
+        CLEAR_RSYMBS;
+    }
+    ;
+
 %%
 
 #include <sys/types.h>
@@ -776,7 +928,7 @@ int main( int argc, char** argv )
         printf( "Successfully parsed %s\n",
             strFile.c_str() );
 
-        g_oDeclMap.Clear();
+        g_mapDecls.Clear();
         g_oRootNode.Clear();
 
     }while( 0 );

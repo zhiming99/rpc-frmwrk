@@ -520,6 +520,7 @@ std::map< std::string, yytokentype >
         { "struct", TOK_STRUCT }, 
         { "interface", TOK_INTERFACE }, 
         { "service", TOK_SERVICE },
+        { "typedef", TOK_TYPEDEF },
     };
 
 FILECTX::FILECTX()

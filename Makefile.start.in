@@ -1,7 +1,7 @@
 include ./Makefile.init.pub
 
 TARGETS := 3rd_Party $(OUTPUT_DIR)/libcombase.so $(OUTPUT_DIR)/libipc.so \
-     $(OUTPUT_DIR)/librpc.so test Ridl Python 
+     $(OUTPUT_DIR)/librpc.so test Ridlc Python 
 
 all: $(TARGETS) 
 debug: $(TARGETS)
