@@ -54,16 +54,16 @@ for( int i = 0; i < ( yylen ); i++ ) \
 #define DEFAULT_ACTION \
     yyval = yyvsp[ 1 - yylen ]; CLEAR_RSYMBS;
 
-#define ADDTO_ALIAS_MAP( pal, strType_ ) \
+#define ADDTO_ALIAS_MAP( pal, pType_ ) \
 do{ \
     gint32 iCount = ( pal )->GetCount(); \
     for( int i = 0; i < iCount; i++ ) \
     { \
         std::string strAlias = \
             ( pal )->GetChild( i ); \
-        std::string strTemp; \
+        ObjPtr pTemp;\
         ret = g_mapAliases.GetAliasType( \
-            strAlias, strTemp ); \
+            strAlias, pTemp ); \
         if( SUCCEEDED( ret ) ) \
         { \
             std::string strMsg = \
@@ -75,11 +75,10 @@ do{ \
             ret = -EEXIST; \
             break;\
         } \
+        ret = 0;\
         g_mapAliases.AddAliasType( \
-            strAlias, ( strType_ ) ); \
+            strAlias, ( pType_ ) ); \
     } \
-    if( ERROR( ret ) )\
-        YYABORT;\
 }while( 0 );
 
 %}
@@ -268,9 +267,9 @@ struct_ref : TOK_IDENT
             psr->SetName( strName );
         else
         {
-            std::string strType;
+            ObjPtr pType;
             ret = g_mapAliases.GetAliasType(
-                strName, strType );
+                strName, pType );
             if( SUCCEEDED( ret ) )
                 psr->SetName( strName );
             else
@@ -280,6 +279,7 @@ struct_ref : TOK_IDENT
                 strMsg += " not declared yet";
                 PrintMsg(
                     -ENOENT, strMsg.c_str() );
+                CLEAR_RSYMBS;
                 YYABORT;
             }
         }
@@ -702,12 +702,15 @@ typedef_decl : TOK_TYPEDEF idl_type alias_list
         std::string strType =
             pAstNode->ToString();
         CAliasList* pAliases = *$3;
-        if( pType->GetClsid() !=
-            clsid( CStructRef ) )
-        {
-            ADDTO_ALIAS_MAP( pAliases, strType );
-        }
-        else do {
+        do{
+            if( pType->GetClsid() !=
+                clsid( CStructRef ) )
+            {
+                ADDTO_ALIAS_MAP(
+                    pAliases, pType );
+                break;
+            }
+
             ObjPtr pTemp;
             ret = g_mapDecls.GetDeclNode(
                 strType, pTemp );
@@ -715,30 +718,27 @@ typedef_decl : TOK_TYPEDEF idl_type alias_list
             {
                 // alias a struct
                 ADDTO_ALIAS_MAP(
-                    pAliases, strType );
+                    pAliases, pType );
+                break;
+            }
+
+            // alias an alias
+            ret = g_mapAliases.GetAliasType(
+                strType, pType );
+            if( SUCCEEDED( ret ) )
+            {
+                ADDTO_ALIAS_MAP(
+                    pAliases, pType );
             }
             else
             {
-                // alias an alias
-                std::string strTypeDecl = strType;
-                ret = g_mapAliases.GetAliasType(
-                    strTypeDecl, strType );
-                if( SUCCEEDED( ret ) )
-                {
-                    ADDTO_ALIAS_MAP(
-                        pAliases, strType );
-                }
-                else
-                {
-                    std::string strMsg =
-                        "error typedef '"; 
-                    strMsg += strType + "'";
-                    strMsg += " not declared yet";
-                    PrintMsg( -ENOENT,
-                        strMsg.c_str() );
-                    ret = -ENOENT;
-                    YYABORT;
-                }
+                std::string strMsg =
+                    "error typedef '"; 
+                strMsg += strType + "'";
+                strMsg += " not declared yet";
+                PrintMsg( -ENOENT,
+                    strMsg.c_str() );
+                ret = -ENOENT;
             }
 
         }while( 0 );
@@ -746,7 +746,7 @@ typedef_decl : TOK_TYPEDEF idl_type alias_list
         if( ERROR( ret ) )
         {
             CLEAR_RSYMBS;
-            break;
+            YYABORT;
         }
         ObjPtr pNode;
         pNode.NewObj( clsid( CTypedefDecl ) );

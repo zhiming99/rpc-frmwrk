@@ -62,6 +62,17 @@ struct CDeclMap
         return STATUS_SUCCESS;
     }
 
+    inline bool IsDeclared(
+        const std::string& strName )
+    {
+        ObjPtr pObj;
+        gint32 ret = GetDeclNode(
+            strName, pObj );
+        if( SUCCEEDED( ret ) )
+            return true;
+        return false;
+    }
+
     inline void Clear()
     { m_mapDecls.clear(); }
 };
@@ -70,28 +81,31 @@ extern CDeclMap g_mapDecls;
 
 struct CAliasMap
 {
-    std::map< std::string, std::string > m_mapAlias;
+    std::map< std::string, ObjPtr > m_mapAlias;
     inline gint32 GetAliasType(
         const std::string& strName,
-        std::string& strType )
+        ObjPtr& pType )
     {
-        std::map< std::string, std::string >::iterator
+        std::map< std::string, ObjPtr >::iterator
             itr = m_mapAlias.find( strName );
         if( itr != m_mapAlias.end() )
             return -ENOENT;
-        strType = itr->second;
+        pType = itr->second;
         return STATUS_SUCCESS;
     }
 
     inline gint32 AddAliasType(
         const std::string& strName,
-        const std::string& strType )
+        ObjPtr& pType )
     {
-        std::map< std::string, std::string >::iterator
+        if( pType.IsEmpty() )
+            return -EINVAL;
+
+        std::map< std::string, ObjPtr >::iterator
             itr = m_mapAlias.find( strName );
         if( itr != m_mapAlias.end() )
             return -EEXIST;
-        m_mapAlias[ strName ] = strType;
+        m_mapAlias[ strName ] = pType;
         return STATUS_SUCCESS;
     }
 };
@@ -349,17 +363,17 @@ struct CStructRef : public CPrimeType
     std::string ToString() const
     {
         ObjPtr pTemp;
-        gint32 ret = g_mapDecls.GetDeclNode(
-            m_strName, pTemp );
-        if( SUCCEEDED( ret ) )
+        if( g_mapDecls.IsDeclared( m_strName ) )
             return m_strName;
 
-        std::string strType;
-        ret = g_mapAliases.GetAliasType(
-            m_strName, strType );
+        ObjPtr pType;
+        gint32 ret = g_mapAliases.GetAliasType(
+            m_strName, pType );
         if( SUCCEEDED( ret ) )
-            return strType;
-
+        {
+            CAstNodeBase* pNode = pType;
+            return pNode->ToString();
+        }
         return std::string( "");
     }
 };
