@@ -8,13 +8,27 @@ typedef EnumContType
     typeMap = 0x200UL,
 };
 
-struct CSerialCtx
+struct CContCtx
 {
     EnumContType m_iContType = typeArray;
-    std::vector< guint32 > m_vecElemOff;
     EnumTypeId m_iType = typeNone;
-    guint32* m_pdwBytes;
-    guint32* m_pdwCount;
+    guint32* m_pdwBytes = nullptr;
+    guint32* m_pdwCount = nullptr;
+    guint32 m_dwCurCount = 0;
+    guint32 m_dwMaxSize = 0;
+
+    CContCtx()
+    {}
+
+    CContCtx( const CContCtx& rhs )
+    {
+        m_iContType = rhs.m_iContType;
+        m_iType = rhs.m_iType;
+        m_pdwBytes = rhs.m_pdwBytes;
+        m_pdwCount = rhs.m_pdwCount;
+        m_dwCurCount = rhs.m_dwCurCount;
+        m_dwMaxSize = rhs.m_dwMaxSize;
+    }
 };
 
 class CSerialBase : public CObjBase
@@ -23,6 +37,8 @@ class CSerialBase : public CObjBase
     typedef CObjBase super;
     CSerialBase() : super()
     {}
+
+    std::vector< CContCtx > m_vecContStack;
 
     template< typename T >
     gint32 Serialize( BufPtr& pBuf,
@@ -33,11 +49,11 @@ class CSerialBase : public CObjBase
         EnumTypeId iType, T& pResult );
 
     gint32 BeginSerialArray(
-        CSerialCtx& oCtx,
+        CContCtx& oCtx,
         BufPtr& pBuf );
 
     gint32 EndSerialArray(
-        CSerialCtx& oCtx );
+        CContCtx& oCtx );
 
     gint32 BeginDeseriArr( BufPtr& pBuf );
 
@@ -61,10 +77,9 @@ class CSerialBase : public CObjBase
 
     template< typename T >
     gint32 DeserialStruct(
-        BufPtr& pBuf, guint32 dwSize, T& val )
+        char* pBuf, guint32 dwSize, T& val )
     {
-        return val.Deserialize(
-            pBuf->ptr(), dwSize );
+        return val.Deserialize( pBuf, dwSize );
     }
 };
 
