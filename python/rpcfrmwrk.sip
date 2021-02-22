@@ -150,7 +150,7 @@ namespace cpp
     enum EnumSeriProto
     {
         seriNone = 0,
-        seriCpp = 1,
+        seriRidl = 1,
         seriPython = 2,
         seriJava = 3,
         seriInvalid = 4

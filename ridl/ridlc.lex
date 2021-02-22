@@ -147,11 +147,40 @@ HexDig [0-9a-fA-F]
 
 [[:blank:]]* /*eat*/
 
+"'\\.'" {
+        guint8 c = yytext[ 2 ];
+        if( c == 'a' )
+            c = '\a';
+        else if( c == 'b' )
+            c = '\b';
+        else if( c == 't' )
+            c = '\t';
+        else if( c == 'n' )
+            c = '\n';
+        else if( c == 'v' )
+            c = '\v';
+        else if( c == 'f' )
+            c = '\f';
+        else if( c == 'r' )
+            c = '\r';
+        newval() = c;
+        *yylval = curval;
+        return TOK_BYVAL;
+    }
+
+'([^'\\\n]|\\.)' {
+        guint8 c = yytext[ 1 ];
+        newval() = c;
+        *yylval = curval;
+        return TOK_BYVAL;
+    }
+
 ^include[[:blank:]]+\" {
         /*adapted from the info page*/
         yy_push_state(incl);
         yy_push_state( readstr );
         curstr().clear();
+        ( yy_top_state() );
     }
 
 <incl>[^"\n]*\n { /* got the include file name */
@@ -414,34 +443,6 @@ HexDig [0-9a-fA-F]
         newval() = strIdent;
         *yylval = curval;
         return TOK_IDENT;
-    }
-
-"'.'" {
-        guint8 c = yytext[ 1 ];
-        newval() = c;
-        *yylval = curval;
-        return TOK_BYVAL;
-    }
-
-"'\\.'" {
-        guint8 c = yytext[ 2 ];
-        if( c == 'a' )
-            c = '\a';
-        else if( c == 'b' )
-            c = '\b';
-        else if( c == 't' )
-            c = '\t';
-        else if( c == 'n' )
-            c = '\n';
-        else if( c == 'v' )
-            c = '\v';
-        else if( c == 'f' )
-            c = '\f';
-        else if( c == 'r' )
-            c = '\r';
-        newval() = c;
-        *yylval = curval;
-        return TOK_BYVAL;
     }
 
 0   {

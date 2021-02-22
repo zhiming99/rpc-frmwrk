@@ -34,6 +34,27 @@ CDeclMap g_mapDecls;
 ObjPtr g_oRootNode;
 CAliasMap g_mapAliases;
 
+bool g_bSemanErr = false;
+
+std::set< gint32 > int_set =
+    { typeUInt64, typeUInt32, typeUInt16, typeByte };
+
+std::map< gint32, std::set< gint32 > >
+    g_mapTypeVal = {
+        { TOK_STRING, { typeString } },
+        { TOK_UINT64, int_set },
+        { TOK_INT64, int_set },
+        { TOK_UINT32, int_set },
+        { TOK_INT32, int_set },
+        { TOK_UINT16, int_set },
+        { TOK_INT16, int_set },
+        { TOK_FLOAT, { typeFloat, typeDouble } },
+        { TOK_DOUBLE, { typeFloat, typeDouble } },
+        { TOK_BYTE, { typeByte } },
+        { TOK_BOOL, { typeByte } },
+        { TOK_HSTREAM, int_set }
+    };
+
 extern std::vector<
     std::unique_ptr< FILECTX > > g_vecBufs;
 
@@ -67,7 +88,7 @@ do{ \
         if( SUCCEEDED( ret ) ) \
         { \
             std::string strMsg = \
-                "error typedef '";  \
+                "typedef '";  \
             strMsg += strAlias + "'"; \
             strMsg += " already declared"; \
             PrintMsg( -EEXIST, \
@@ -240,10 +261,10 @@ map_type :
             iClsid == clsid( CMapType ) )
         {
             std::string strMsg =
-                "error map key cannot be array or map"; 
+                "map key cannot be array or map"; 
             PrintMsg(
                 -ENOENT, strMsg.c_str() );
-            YYABORT;
+            g_bSemanErr = true;
         }
         pmt->SetKeyType( pKey );
         BufPtr pBuf( true );
@@ -274,13 +295,13 @@ struct_ref : TOK_IDENT
                 psr->SetName( strName );
             else
             {
-                std::string strMsg = "error '"; 
+                std::string strMsg = "'"; 
                 strMsg += strName + "'";
                 strMsg += " not declared yet";
                 PrintMsg(
                     -ENOENT, strMsg.c_str() );
                 CLEAR_RSYMBS;
-                YYABORT;
+                g_bSemanErr = true;
             }
         }
         BufPtr pBuf( true );
@@ -301,11 +322,11 @@ struct_decl : TOK_STRUCT TOK_IDENT '{' field_list '}'
             strName, pTemp );
         if( SUCCEEDED( ret ) )
         {
-            std::string strMsg = "error '"; 
+            std::string strMsg = "'"; 
             strMsg += strName + "'";
             strMsg += " already declared";
             PrintMsg( -EEXIST, strMsg.c_str() );
-            YYABORT;
+            g_bSemanErr = true;
         }
         psr->SetName( strName );
         ObjPtr& pfl = *$4;
@@ -360,6 +381,56 @@ field_decl : idl_type TOK_IDENT ';'
     }
     ;
 
+field_decl : idl_type TOK_IDENT '=' const_val ';'
+    {
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CFieldDecl ) );
+        std::string strName = *$2;
+        CFieldDecl* pfdl = pNode;
+        pfdl->SetName( strName );
+        ObjPtr& pType = *$1;
+        pfdl->SetType( pType );
+        CPrimeType* pPtype = pType;
+        if( pPtype == nullptr )
+        {
+            std::string strMsg =
+                "value does not match the type";
+            PrintMsg(
+                -ENOTSUP, strMsg.c_str() );
+            g_bSemanErr = true;
+        }
+        gint32 iType = pPtype->GetName();
+        BufPtr pVal = $4;
+        gint32 iValType = ( gint32 )
+            pVal->GetExDataType();
+
+        if( g_mapTypeVal.find( iType ) ==
+            g_mapTypeVal.end() )
+        {
+            std::string strMsg =
+            "the type does not support initializer";
+            PrintMsg(
+                -ENOTSUP, strMsg.c_str() );
+            g_bSemanErr = true;
+        }
+        else if( g_mapTypeVal[ iType ].find( iValType )
+            == g_mapTypeVal[ iType ].end() )
+        {
+            std::string strMsg =
+                "the type and value mismatch";
+            PrintMsg(
+                -ENOTSUP, strMsg.c_str() );
+            g_bSemanErr = true;
+        }
+
+        pfdl->SetVal( $4 );
+        BufPtr pBuf( true );
+        *pBuf = pNode;
+        $$ = pBuf;
+        CLEAR_RSYMBS;
+    }
+    ;
+
 idl_type :
       prime_type {
         ObjPtr pObj;
@@ -377,7 +448,7 @@ idl_type :
     | struct_ref { DEFAULT_ACTION; }
     ;
 
-value :
+const_val :
       TOK_STRVAL { DEFAULT_ACTION; }
     | TOK_INTVAL { DEFAULT_ACTION; }
     | TOK_FLOATVAL { DEFAULT_ACTION; }
@@ -414,7 +485,7 @@ attr_exp : attr_name
     }
     ;
 
-attr_exp : attr_name '=' value
+attr_exp : attr_name '=' const_val
     {
         ObjPtr pNode;
         pNode.NewObj( clsid( CAttrExp ) );
@@ -580,11 +651,11 @@ interf_decl : TOK_INTERFACE TOK_IDENT '{' method_decls '}'
             strName, pTemp );
         if( SUCCEEDED( ret ) )
         {
-            std::string strMsg = "error interface '"; 
+            std::string strMsg = "interface '"; 
             strMsg += strName + "'";
             strMsg += " already declared";
             PrintMsg( -EEXIST, strMsg.c_str() );
-            YYABORT;
+            g_bSemanErr = true;
         }
         pifd->SetName( strName );
         ObjPtr& pmdl = *$4;
@@ -608,11 +679,11 @@ interf_ref : TOK_INTERFACE TOK_IDENT attr_list
             strName, pTemp );
         if( ERROR( ret ) )
         {
-            std::string strMsg = "error interface '"; 
+            std::string strMsg = "interface '"; 
             strMsg += strName + "'";
             strMsg += " not declared yet";
             PrintMsg( -ENOENT, strMsg.c_str() );
-            YYABORT;
+            g_bSemanErr = true;
         }
         pifr->SetName( strName );
         BufPtr pAttrBuf = $3;
@@ -667,12 +738,12 @@ service_decl : TOK_SERVICE TOK_IDENT attr_list '{' interf_refs '}'
             strName, pTemp );
         if( SUCCEEDED( ret ) )
         {
-            std::string strMsg = "error service '"; 
+            std::string strMsg = "service '"; 
             strMsg += strName + "'";
             strMsg += " already declared";
             PrintMsg( -EEXIST, strMsg.c_str() );
             ret = -EEXIST;
-            YYABORT;
+            g_bSemanErr = true;
         }
         psd->SetName( strName );
         BufPtr pAttrBuf = $3;
@@ -733,7 +804,7 @@ typedef_decl : TOK_TYPEDEF idl_type alias_list
             else
             {
                 std::string strMsg =
-                    "error typedef '"; 
+                    "typedef '"; 
                 strMsg += strType + "'";
                 strMsg += " not declared yet";
                 PrintMsg( -ENOENT,
@@ -746,7 +817,7 @@ typedef_decl : TOK_TYPEDEF idl_type alias_list
         if( ERROR( ret ) )
         {
             CLEAR_RSYMBS;
-            YYABORT;
+            g_bSemanErr = true;
         }
         ObjPtr pNode;
         pNode.NewObj( clsid( CTypedefDecl ) );
@@ -818,6 +889,8 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRY( CInterfRefs );
     INIT_MAP_ENTRY( CServiceDecl );
     INIT_MAP_ENTRY( CStatements );
+    INIT_MAP_ENTRY( CAliasList );
+    INIT_MAP_ENTRY( CTypedefDecl );
 
     END_FACTORY_MAPS;
 };
@@ -913,7 +986,7 @@ int main( int argc, char** argv )
 
         if( argv[ optind + 1 ] != nullptr )
         {
-            printf( "error too many arguments\n" );
+            printf( "too many arguments\n" );
             Usage();
             break;
         }
@@ -922,6 +995,12 @@ int main( int argc, char** argv )
         if( g_oRootNode.IsEmpty() )
         {
             ret = -EFAULT;
+            break;
+        }
+
+        if( g_bSemanErr )
+        {
+            ret = ERROR_FAIL;
             break;
         }
 
@@ -963,3 +1042,4 @@ void yyerror( YYLTYPE *locp,
     printf( "%s(%d): %s\n",
         szPath, locp->first_line, msg );
 }
+

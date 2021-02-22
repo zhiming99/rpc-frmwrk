@@ -449,7 +449,7 @@ enum EnumEventId : guint32
 enum EnumSeriProto : guint32
 {
     seriNone = 0, // No serialization
-    seriCpp = 1, // C++ serialization( to come )
+    seriRidl = 1, // ridl serialization( to come )
     seriPython = 2, // Python's Pickle
     seriJava = 3, // Java's Object Stream
     seriInvalid = 4

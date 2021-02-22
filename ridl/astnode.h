@@ -88,7 +88,7 @@ struct CAliasMap
     {
         std::map< std::string, ObjPtr >::iterator
             itr = m_mapAlias.find( strName );
-        if( itr != m_mapAlias.end() )
+        if( itr == m_mapAlias.end() )
             return -ENOENT;
         pType = itr->second;
         return STATUS_SUCCESS;
@@ -382,6 +382,7 @@ struct CFieldDecl : public CNamedNode
 {
     typedef CNamedNode super;
     ObjPtr m_pType;
+    BufPtr m_pVal;
 
     CFieldDecl() : super()
     { SetClassId( clsid( CFieldDecl ) ); }
@@ -394,6 +395,12 @@ struct CFieldDecl : public CNamedNode
 
     ObjPtr& GetType()
     { return m_pType; }
+
+    inline void SetVal( BufPtr& pVal )
+    { m_pVal = pVal; }
+
+    inline BufPtr& GetVal()
+    { return m_pVal; }
 };
 
 struct CFieldList : public CAstListNode

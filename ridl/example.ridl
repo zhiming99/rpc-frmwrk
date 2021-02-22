@@ -1,12 +1,16 @@
 include "tinyif.ridl"
 
+typedef array< string > STRARR;
+typedef array< STRARR > STRMATRIX;
+
 struct FILE_INFO
 {
-    string szFileName;
-    uint64 fileSize;
-    bool bRead;
+    /* define the fileds here, with default value optionally*/
+    string szFileName = "test.dat";
+    uint64 fileSize = 0;
+    bool bRead = true;
     bytearray fileHeader;
-    array<string> vecLines;
+    STRMATRIX vecLines;
     map<int32, bytearray> vecBlocks;
 };
 
