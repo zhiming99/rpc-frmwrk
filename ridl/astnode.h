@@ -21,6 +21,8 @@
  *
  * =====================================================================================
  */
+#pragma once
+
 #include <string>
 #include <map>
 #include "ridlc.h"
@@ -271,7 +273,7 @@ struct CPrimeType : public CAstNodeBase
             strName = "ObjPtr";
             break;
         case TOK_HSTREAM:
-            strName = "HSTREAM";
+            strName = "guint64";
             break;
         default:
             break;

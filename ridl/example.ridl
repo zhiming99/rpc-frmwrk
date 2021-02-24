@@ -2,6 +2,7 @@ include "tinyif.ridl"
 
 typedef array< string > STRARR;
 typedef array< STRARR > STRMATRIX;
+typedef array< array< string > > STRMATRIX2;
 
 struct FILE_INFO
 {
@@ -10,7 +11,7 @@ struct FILE_INFO
     uint64 fileSize = 0;
     bool bRead = true;
     bytearray fileHeader;
-    STRMATRIX vecLines;
+    STRMATRIX2 vecLines;
     map<int32, bytearray> vecBlocks;
 };
 

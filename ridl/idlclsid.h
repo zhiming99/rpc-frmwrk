@@ -21,6 +21,4 @@ enum EnumMyClsid
     DECL_CLSID( CAliasList ),
     DECL_CLSID( CTypedefDecl ),
 
-    DECL_CLSID( CArgsTuple ),
-    DECL_CLSID( CArgsMap ),
 };

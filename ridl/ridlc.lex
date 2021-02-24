@@ -117,7 +117,7 @@ HexDig [0-9a-fA-F]
 
 %option     8bit bison-bridge
 %option     bison-locations
-%option     warn nodefault
+%option     warn
 %option     yylineno
 %option     outfile="lexer.cpp"
 %option     header-file="lexer.h"
@@ -504,6 +504,7 @@ std::map< std::string, yytokentype >
         { "array", TOK_ARRAY },
         { "map", TOK_MAP },
         { "ObjPtr", TOK_OBJPTR },
+        { "HSTREAM", TOK_HSTREAM },
 
         { "async", TOK_ASYNC },
         { "async_p", TOK_ASYNCP },

@@ -1,6 +1,6 @@
 struct STMHANDLE
 {
-    uint64 handle;
+    HSTREAM handle;
 };
 
 struct OBJPTR

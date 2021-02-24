@@ -55,6 +55,24 @@ std::map< gint32, std::set< gint32 > >
         { TOK_HSTREAM, int_set }
     };
 
+std::map< gint32, char > g_mapTypeSig = {
+    { TOK_UINT64, 'Q' },
+    { TOK_INT64, 'q' },
+    { TOK_UINT32, 'D' },
+    { TOK_INT32, 'd' },
+    { TOK_UINT16, 'W' },
+    { TOK_INT16, 'w' },
+    { TOK_FLOAT, 'f' },
+    { TOK_DOUBLE, 'D' },
+    { TOK_BOOL, 'b' },
+    { TOK_BYTE, 'B' },
+    { TOK_HSTREAM, 'h' },
+    { TOK_STRING, 's' },
+    { TOK_BYTEARR, 'a' },
+    { TOK_OBJPTR, 'o' },
+    { TOK_STRUCT, 'O' }
+};
+
 extern std::vector<
     std::unique_ptr< FILECTX > > g_vecBufs;
 

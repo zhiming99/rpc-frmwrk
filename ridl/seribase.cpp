@@ -1,0 +1,257 @@
+/*
+ * =====================================================================================
+ *
+ *       Filename:  seribase.cpp
+ *
+ *    Description:  implementation of utilities for ridl serializations
+ *
+ *        Version:  1.0
+ *        Created:  02/23/2021 09:32:32 AM
+ *       Revision:  none
+ *       Compiler:  gcc
+ *
+ *         Author:  Ming Zhi( woodhead99@gmail.com )
+ *   Organization:
+ *
+ *      Copyright:  2021 Ming Zhi( woodhead99@gmail.com )
+ *
+ *        License:  Licensed under GPL-3.0. You may not use this file except in
+ *                  compliance with the License. You may find a copy of the
+ *                  License at 'http://www.gnu.org/licenses/gpl-3.0.html'
+ *
+ * =====================================================================================
+ */
+#include <rpc.h>
+
+using namespace rpcfrmwrk;
+#include "seribase.h"
+
+template<>
+gint32 CSerialBase::Deserialize< bool >(
+    BufPtr& pBuf, bool& val )
+{
+    if( pBuf.IsEmpty() || pBuf->empty() )
+        return -EINVAL;
+    if( pBuf->size() < sizeof( val ) )
+        return -ERANGE;
+    memcpy( &val, pBuf->ptr(), sizeof( val ) );
+    pBuf->IncOffset( sizeof( val ) );
+    return STATUS_SUCCESS;
+}
+
+template<>
+gint32 CSerialBase::Deserialize< char >(
+    BufPtr& pBuf, char& val )
+{
+    if( pBuf.IsEmpty() || pBuf->empty() )
+        return -EINVAL;
+    if( pBuf->size() < sizeof( val ) )
+        return -ERANGE;
+    memcpy( &val, pBuf->ptr(), sizeof( val ) );
+    pBuf->IncOffset( sizeof( val ) );
+    return STATUS_SUCCESS;
+}
+
+template<>
+gint32 CSerialBase::Deserialize< guint8 >(
+    BufPtr& pBuf, guint8& val )
+{
+    if( pBuf.IsEmpty() || pBuf->empty() )
+        return -EINVAL;
+    if( pBuf->size() < sizeof( val ) )
+        return -ERANGE;
+    memcpy( &val, pBuf->ptr(), sizeof( val ) );
+    pBuf->IncOffset( sizeof( val ) );
+    return STATUS_SUCCESS;
+}
+
+template<>
+gint32 CSerialBase::Deserialize< gint16 >(
+    BufPtr& pBuf, gint16& val )
+{
+    if( pBuf.IsEmpty() || pBuf->empty() )
+        return -EINVAL;
+    if( pBuf->size() < sizeof( val ) )
+        return -ERANGE;
+    memcpy( &val, pBuf->ptr(), sizeof( val ) );
+    val = ntohs( val );
+    pBuf->IncOffset( sizeof( val ) );
+    return STATUS_SUCCESS;
+}
+template<>
+gint32 CSerialBase::Deserialize< guint16 >(
+    BufPtr& pBuf, guint16& val )
+{
+    if( pBuf.IsEmpty() || pBuf->empty() )
+        return -EINVAL;
+    if( pBuf->size() < sizeof( val ) )
+        return -ERANGE;
+    memcpy( &val, pBuf->ptr(), sizeof( val ) );
+    val = ntohs( val );
+    pBuf->IncOffset( sizeof( val ) );
+    return STATUS_SUCCESS;
+}
+
+template<>
+gint32 CSerialBase::Deserialize< guint32 >(
+    BufPtr& pBuf, guint32& val )
+{
+    if( pBuf.IsEmpty() || pBuf->empty() )
+        return -EINVAL;
+    if( pBuf->size() < sizeof( val ) )
+        return -ERANGE;
+    memcpy( &val, pBuf->ptr(), sizeof( val ) );
+    val = ntohl( val );
+    pBuf->IncOffset( sizeof( val ) );
+    return STATUS_SUCCESS;
+}
+
+template<>
+gint32 CSerialBase::Deserialize< gint32 >(
+    BufPtr& pBuf, gint32& val )
+{
+    if( pBuf.IsEmpty() || pBuf->empty() )
+        return -EINVAL;
+    if( pBuf->size() < sizeof( val ) )
+        return -ERANGE;
+    memcpy( &val, pBuf->ptr(), sizeof( val ) );
+    val = ntohl( ( guint32 )val );
+    pBuf->IncOffset( sizeof( val ) );
+    return STATUS_SUCCESS;
+}
+
+template<>
+gint32 CSerialBase::Deserialize< guint64 >(
+    BufPtr& pBuf, guint64& val )
+{
+    if( pBuf.IsEmpty() || pBuf->empty() )
+        return -EINVAL;
+    if( pBuf->size() < sizeof( val ) )
+        return -ERANGE;
+    memcpy( &val, pBuf->ptr(), sizeof( val ) );
+    val = ntohll( val );
+    pBuf->IncOffset( sizeof( val ) );
+    return STATUS_SUCCESS;
+}
+
+template<>
+gint32 CSerialBase::Deserialize< gint64 >(
+    BufPtr& pBuf, gint64& val )
+{
+    if( pBuf.IsEmpty() || pBuf->empty() )
+        return -EINVAL;
+    if( pBuf->size() < sizeof( val ) )
+        return -ERANGE;
+    memcpy( &val, pBuf->ptr(), sizeof( val ) );
+    val = ntohll( ( guint64 )val );
+    pBuf->IncOffset( sizeof( val ) );
+    return STATUS_SUCCESS;
+}
+
+template<>
+gint32 CSerialBase::Deserialize< float >(
+    BufPtr& pBuf, float& val )
+{
+    if( pBuf.IsEmpty() || pBuf->empty() )
+        return -EINVAL;
+    if( pBuf->size() < sizeof( val ) )
+        return -ERANGE;
+    guint32 dwVal = 0;
+    memcpy( &dwVal, pBuf->ptr(), sizeof( val ) );
+    dwVal = ntohl( dwVal );
+    val = *( float* )&dwVal;
+    pBuf->IncOffset( sizeof( val ) );
+    return STATUS_SUCCESS;
+}
+
+template<>
+gint32 CSerialBase::Deserialize< double >(
+    BufPtr& pBuf, double& val )
+{
+    if( pBuf.IsEmpty() || pBuf->empty() )
+        return -EINVAL;
+    if( pBuf->size() < sizeof( val ) )
+        return -ERANGE;
+    guint64 qwVal = 0;
+    memcpy( &qwVal, pBuf->ptr(), sizeof( val ) );
+    qwVal = ntohll( qwVal );
+    val = *( double* )&qwVal;
+    pBuf->IncOffset( sizeof( val ) );
+    return STATUS_SUCCESS;
+}
+
+template<>
+gint32 CSerialBase::Deserialize< std::string >(
+    BufPtr& pBuf, std::string& val )
+{
+    if( pBuf.IsEmpty() || pBuf->empty() )
+        return -EINVAL;
+
+    gint32 ret = STATUS_SUCCESS;
+    guint32 dwCount = 0;
+    ret = this->Deserialize( pBuf, dwCount );
+    if( ERROR( ret ) )
+        return ret;
+    if( dwCount == 0 )
+    {
+        val = "";
+        return ret;
+    }
+    guint32 dwBytes = 
+        std::min( dwCount, pBuf->size() );
+    val.append( pBuf->ptr(), dwBytes );
+    pBuf->IncOffset( dwBytes );
+    return STATUS_SUCCESS;
+}
+
+template<>
+gint32 CSerialBase::Deserialize< ObjPtr >(
+    BufPtr& pBuf, ObjPtr& val )
+{
+    if( pBuf.IsEmpty() || val.IsEmpty() )
+        return -EINVAL;
+
+    guint8* pHead = ( guint8* )pBuf->ptr();
+    guint32 dwSize = 0;
+
+    guint32 dwHdrSize =
+        sizeof( dwSize ) * 2;
+
+    if( pBuf->size() < dwHdrSize )
+        return -ERANGE;
+
+    memcpy( &dwSize,
+        pHead + 4, sizeof( dwSize ) );
+    dwSize = ntohl( dwSize );
+    if( dwSize > pBuf->size() - dwHdrSize )
+        return -ERANGE;
+
+    gint32 ret = val->Deserialize(
+        pBuf->ptr() + dwHdrSize, dwSize );
+    if( ERROR( ret ) )
+        return ret;
+
+    pBuf->IncOffset( dwSize + dwHdrSize );
+    return STATUS_SUCCESS;
+}
+
+template<>
+gint32 CSerialBase::Deserialize< BufPtr >(
+    BufPtr& pBuf, BufPtr& val )
+{
+    if( pBuf.IsEmpty() || val.IsEmpty() )
+        return -EINVAL;
+
+    guint32 i = 0;
+    gint32 ret = Deserialize( pBuf, i );
+    if( ERROR( ret ) )
+        return ret;
+
+    ret = val->Append( pBuf->ptr(), i );
+    if( ERROR( ret ) )
+        return ret;
+
+    pBuf->IncOffset( i );
+    return STATUS_SUCCESS;
+}
+
