@@ -39,6 +39,6 @@ do_clean:
 
 $(OUTPUT_DIR)/$(TARGET_IMG) : $(OBJS2)
 	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
-	$(CC) -o $@ $(OBJS2) -lcombase  $(LINKER_OPTION) -L$(OUTPUT_DIR) -ldl
+	$(CC) -o $@ $(OBJS2) -lcombase -lutils $(LINKER_OPTION) -L$(OUTPUT_DIR) -ldl
 
 .PHONY: sync TARGET clean debug_clean release_clean do_clean

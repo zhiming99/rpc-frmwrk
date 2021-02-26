@@ -341,7 +341,7 @@ gint32 CConfigDb::Deserialize(
 
             BufPtr pValBuf( true );
 
-            ret = pValBuf->Deserialize( pLoc );
+            ret = pValBuf->Deserialize( pLoc, dwValSize );
             if( ERROR( ret ) )
                 break;
 

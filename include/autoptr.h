@@ -351,12 +351,15 @@ class CAutoPtr : public IAutoPtr
         return ( m_pObj == nullptr );
     }
 
+    inline void Detach()
+    { m_pObj = nullptr; }
+
     inline void Clear()
     {
         if( m_pObj != nullptr )
         {
             m_pObj->Release();
-            m_pObj = nullptr;
+            Detach();
         }
     }
 

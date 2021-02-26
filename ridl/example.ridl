@@ -1,3 +1,6 @@
+// must have statement
+appname "example";
+
 include "tinyif.ridl"
 
 typedef array< string > STRARR;
@@ -18,19 +21,23 @@ struct FILE_INFO
 // echo different type of information
 interface IEchoServer
 {
-    Echo( string strText )
-        returns ( int32 iRet, string strResp ) ;
+    // both proxy and server are asynchronous, that is return
+    // STATUS_PENDING if the request is not complete yet
+    [ async ]Echo( string strText )
+        returns ( string strResp ) ;
 
-    EchoUnknown( bytearray pBuf )
-        returns ( int32 iRet, bytearray pResp );
+    // proxy side is asynchronous, while server side is synchronous
+    [ async_p ]EchoUnknown( bytearray pBuf )
+        returns ( bytearray pResp );
 
-    EchoCfg( OBJPTR pObj )
-        returns ( int32 iRet, OBJPTR pRespObj );
+    // proxy side is synchronous, while server side is asynchronous
+    [ async_s ]EchoCfg( ObjPtr pObj )
+        returns ( ObjPtr pRespObj );
 
+    // both sides are synchronous
     EchoMany ( int32 i1, int16 i2,
         int64 i3, float i4, double i5, string szText )
-        returns ( int32 iRet,
-            int32 i1r, int16 i2r,
+        returns ( int32 i1r, int16 i2r,
             int64 i3r, float i4r,
             double i5r, string szTextr );
 };
@@ -40,35 +47,39 @@ interface IEchoServer
 */
 interface IFileTransfer 
 {
-    UploadFile( string szFilePath,
-        STMHANDLE hChannel, uint64 offset,
+    [ async ]UploadFile( string szFilePath,
+        HSTREAM hChannel, uint64 offset,
         uint64 size )
-        returns ( int32 iRet );
+        /*
+        * although nothing listed in the response
+        * list, an error code will always be
+        * returned.
+        */
+        returns ();
 
     GetFileInfo(
         string szFileName, bool bRead )
-        returns  ( int32 iRet, FILE_INFO fi );
+        returns  ( FILE_INFO fi );
 
-    DownloadFile( string szFileName,
-        STMHANDLE hChannel, uint64 offset,
+    [ async ]DownloadFile( string szFileName,
+        HSTREAM hChannel, uint64 offset,
         uint64 size )
-        returns ( int32 iRet );
+        returns ();
 };
 
 interface IChat
 {
-    SpecifyChannel( STMHANDLE hChannel )
-        returns( int32 iRet );
+    SpecifyChannel( HSTREAM hChannel )
+        returns();
 };
 
 service SimpFileSvc [
-    serial="protobuf",
     timeout=120, rtpath="/",
     ssl, websock, compress,
     auth ]
 {
-    interface ITinyInterface [ async_p ];
-    interface IEchoServer [ async ];
-    interface IFileTransfer [ stream ];
-    interface IChat [ async, stream ];
+    interface ITinyInterface;
+    interface IEchoServer;
+    interface IFileTransfer;
+    interface IChat;
 };

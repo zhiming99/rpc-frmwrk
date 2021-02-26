@@ -77,11 +77,10 @@ struct CContCtx
     }
 };
 
-class CSerialBase : public CObjBase
+class CSerialBase
 {
     public:
-    typedef CObjBase super;
-    CSerialBase() : super()
+    CSerialBase()
     {}
 
     template< typename T >
@@ -102,7 +101,6 @@ class CSerialBase : public CObjBase
             || std::is_same<T, gint16 >::value
             || std::is_same<T, guint64>::value
             || std::is_same<T, gint64>::value
-            || std::is_same<T, EnumEventId >::value
             || std::is_same<T, double >::value
             || std::is_same<T, float >::value
             || std::is_same<T, bool >::value
@@ -138,7 +136,7 @@ class CSerialBase : public CObjBase
 
     template< typename T,
         typename T2=typename std::enable_if<
-            std::is_base_of<CObjBase, T>::value, T >::type,
+            std::is_base_of<CSerialBase, T>::value, T >::type,
         typename T3 = T,
         typename T4 = T,
         typename T5 = T >
@@ -285,7 +283,6 @@ class CSerialBase : public CObjBase
             || std::is_same<T, gint16 >::value
             || std::is_same<T, guint64>::value
             || std::is_same<T, gint64>::value
-            || std::is_same<T, EnumEventId >::value
             || std::is_same<T, double >::value
             || std::is_same<T, float >::value
             || std::is_same<T, bool >::value
@@ -480,6 +477,14 @@ class CStructBase : public CSerialBase
     typedef CSerialBase super;
     CStructBase() : super()
     {}
+    
+    virtual gint32 Serialize(
+        CBuffer& oBuf ) const
+    { return -ENOTSUP; }
+
+    virtual gint32 Deserialize(
+        const char* pBuf, guint32 dwSize )
+    { return -ENOTSUP; }
 };
 
 #define APPEND( pBuf_, ptr_, size_ ) \
@@ -633,9 +638,14 @@ inline gint32 CSerialBase::Serialize< ObjPtr >(
 
     if( val.IsEmpty() )
     {
+        // protoSeriNone
+        // clsid
         Serialize( pBuf,
             ( guint32 )clsid( Invalid ) );
+        // size
         Serialize( pBuf, 0 );
+        // version
+        Serialize( pBuf, 1 );
         return STATUS_SUCCESS;
     }
 

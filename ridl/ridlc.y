@@ -33,6 +33,7 @@ using namespace rpcfrmwrk;
 CDeclMap g_mapDecls;
 ObjPtr g_oRootNode;
 CAliasMap g_mapAliases;
+std::string g_strAppName;
 
 bool g_bSemanErr = false;
 
@@ -157,6 +158,7 @@ do{ \
 %token TOK_STRUCT
 %token TOK_SERVICE
 %token TOK_TYPEDEF
+%token TOK_APPNAME
 
 // operators
 %token TOK_RETURNS
@@ -164,7 +166,7 @@ do{ \
 %token TOK_ASYNC
 %token TOK_ASYNCP
 %token TOK_ASYNCS
-%token TOK_STREAM
+// %token TOK_STREAM
 %token TOK_SERIAL
 %token TOK_TIMEOUT
 %token TOK_RTPATH
@@ -227,6 +229,31 @@ statement :
     | service_decl { DEFAULT_ACTION; }
     | struct_decl { DEFAULT_ACTION; }
     | typedef_decl { CLEAR_RSYMBS; }
+    | appname { DEFAULT_ACTION; }
+    ;
+
+appname : TOK_APPNAME TOK_STRVAL
+    {
+        std::string strName = *$2;
+        if( strName.empty() )
+        {
+            std::string strMsg =
+                "appname is empty";
+            PrintMsg(
+                -EINVAL, strMsg.c_str() );
+            g_bSemanErr = true;
+        }
+        g_strAppName = strName;
+
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CAppName ) );
+        CAppName* pan = pNode;
+        pan->SetName( strName );
+        BufPtr pBuf( true );
+        *pBuf = pNode;
+        $$ = pBuf;
+        CLEAR_RSYMBS;
+    }
     ;
 
 prime_type :
@@ -479,7 +506,7 @@ attr_name :
       TOK_ASYNC { DEFAULT_ACTION; }
     | TOK_ASYNCP { DEFAULT_ACTION; }
     | TOK_ASYNCS { DEFAULT_ACTION; }
-    | TOK_STREAM { DEFAULT_ACTION; }
+    // | TOK_STREAM { DEFAULT_ACTION; }
     | TOK_SERIAL { DEFAULT_ACTION; }
     | TOK_TIMEOUT { DEFAULT_ACTION; }
     | TOK_RTPATH { DEFAULT_ACTION; }
@@ -598,17 +625,24 @@ arg_list : formal_arg ',' arg_list
     }
     ;
 
-method_decl : TOK_IDENT '(' arg_list ')' TOK_RETURNS '(' arg_list ')'
+method_decl : attr_list TOK_IDENT '(' arg_list ')' TOK_RETURNS '(' arg_list ')'
     {
         ObjPtr pNode;
         pNode.NewObj( clsid( CMethodDecl ) );
         CMethodDecl* pmd = pNode;
-        std::string strName = *$1;
+        std::string strName = *$2;
         pmd->SetName( strName );
-        ObjPtr& pInArgs = *$3;
+        ObjPtr& pInArgs = *$4;
         pmd->SetInArgs( pInArgs );
-        ObjPtr& pOutArgs =  *$7;
+        ObjPtr& pOutArgs =  *$8;
         pmd->SetOutArgs( pOutArgs );
+        BufPtr pAttrBuf = $1;
+        if( ! pAttrBuf.IsEmpty() &&
+            ! pAttrBuf->empty() )
+        {
+            ObjPtr& pal = *pAttrBuf;
+            pmd->SetAttrList( pal );
+        }
         BufPtr pBuf( true );
         *pBuf = pNode;
         $$ = pBuf;
@@ -616,15 +650,67 @@ method_decl : TOK_IDENT '(' arg_list ')' TOK_RETURNS '(' arg_list ')'
         
     }
     ;
-method_decl : TOK_IDENT '(' ')' TOK_RETURNS '(' arg_list ')'
+
+method_decl : attr_list TOK_IDENT '(' ')' TOK_RETURNS '(' arg_list ')'
     {
         ObjPtr pNode;
         pNode.NewObj( clsid( CMethodDecl ) );
         CMethodDecl* pmd = pNode;
-        std::string strName = *$1;
+        std::string strName = *$2;
         pmd->SetName( strName );
-        ObjPtr& pOutArgs =  *$6;
+        ObjPtr& pOutArgs =  *$7;
         pmd->SetOutArgs( pOutArgs );
+        BufPtr pAttrBuf = $1;
+        if( ! pAttrBuf.IsEmpty() &&
+            ! pAttrBuf->empty() )
+        {
+            ObjPtr& pal = *pAttrBuf;
+            pmd->SetAttrList( pal );
+        }
+        BufPtr pBuf( true );
+        *pBuf = pNode;
+        $$ = pBuf;
+        CLEAR_RSYMBS;
+    }
+    ;
+
+method_decl : attr_list TOK_IDENT '(' ')' TOK_RETURNS '(' ')'
+    {
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CMethodDecl ) );
+        CMethodDecl* pmd = pNode;
+        std::string strName = *$2;
+        pmd->SetName( strName );
+        BufPtr pAttrBuf = $1;
+        if( ! pAttrBuf.IsEmpty() &&
+            ! pAttrBuf->empty() )
+        {
+            ObjPtr& pal = *pAttrBuf;
+            pmd->SetAttrList( pal );
+        }
+        BufPtr pBuf( true );
+        *pBuf = pNode;
+        $$ = pBuf;
+        CLEAR_RSYMBS;
+    }
+    ;
+
+method_decl : attr_list TOK_IDENT '(' arg_list ')' TOK_RETURNS '(' ')'
+    {
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CMethodDecl ) );
+        CMethodDecl* pmd = pNode;
+        std::string strName = *$2;
+        pmd->SetName( strName );
+        ObjPtr& pInArgs =  *$4;
+        pmd->SetInArgs( pInArgs );
+        BufPtr pAttrBuf = $1;
+        if( ! pAttrBuf.IsEmpty() &&
+            ! pAttrBuf->empty() )
+        {
+            ObjPtr& pal = *pAttrBuf;
+            pmd->SetAttrList( pal );
+        }
         BufPtr pBuf( true );
         *pBuf = pNode;
         $$ = pBuf;
@@ -686,7 +772,7 @@ interf_decl : TOK_INTERFACE TOK_IDENT '{' method_decls '}'
     }
     ;
 
-interf_ref : TOK_INTERFACE TOK_IDENT attr_list
+interf_ref : TOK_INTERFACE TOK_IDENT
     {
         ObjPtr pNode;
         pNode.NewObj( clsid( CInterfRef ) );
@@ -704,13 +790,6 @@ interf_ref : TOK_INTERFACE TOK_IDENT attr_list
             g_bSemanErr = true;
         }
         pifr->SetName( strName );
-        BufPtr pAttrBuf = $3;
-        if( ! pAttrBuf.IsEmpty() &&
-            ! pAttrBuf->empty() )
-        {
-            ObjPtr& pal = *pAttrBuf;
-            pifr->SetAttrList( pal );
-        }
         BufPtr pBuf( true );
         *pBuf = pNode;
         $$ = pBuf;
@@ -909,6 +988,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRY( CStatements );
     INIT_MAP_ENTRY( CAliasList );
     INIT_MAP_ENTRY( CTypedefDecl );
+    INIT_MAP_ENTRY( CAppName );
 
     END_FACTORY_MAPS;
 };
@@ -919,14 +999,17 @@ void Usage()
     printf( "ridlc [options] <filePath> \n" );
     printf( "\t compile the file"
         "it to current directory\n" );
-    printf( "Options -h:\tprint this help\n");
-    printf( "\t-I:\tspecify the path to"
+    printf( "Options -h:\tTo print this help\n");
+    printf( "\t-I:\tTo specify the path to"
         " search for the included files.\n"
         "\t\tAnd this option can repeat many"
         "times\n" );
+    printf( "\t-O:\tTo specify the path for"
+        " the output files.\n" );
 }
 
-std::vector< std::string > g_vecPaths;
+static std::string g_strOutPath = ".";
+static std::vector< std::string > g_vecPaths;
 
 int main( int argc, char** argv )
 {
@@ -947,7 +1030,7 @@ int main( int argc, char** argv )
         bool bQuit = false;
 
         while( ( opt =
-            getopt( argc, argv, "hI:" ) ) != -1 )
+            getopt( argc, argv, "hI:O:" ) ) != -1 )
         {
             switch( opt )
             {
@@ -957,6 +1040,7 @@ int main( int argc, char** argv )
                     bQuit = true;
                     break;
                 }
+            case 'O':
             case 'I' :
                 {
                     struct stat sb;
@@ -981,8 +1065,15 @@ int main( int argc, char** argv )
                             strMsg.c_str() );
                         break;
                     }
-                    g_vecPaths.push_back(
-                        std::string( optarg ) );
+                    if( opt == 'I' )
+                    {
+                        g_vecPaths.push_back(
+                            std::string( optarg ) );
+                    }
+                    else
+                    {
+                        g_strOutPath = optarg;
+                    }
                     break;
                 }
             default:

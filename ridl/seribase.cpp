@@ -208,26 +208,45 @@ template<>
 gint32 CSerialBase::Deserialize< ObjPtr >(
     BufPtr& pBuf, ObjPtr& val )
 {
-    if( pBuf.IsEmpty() || val.IsEmpty() )
+    if( pBuf.IsEmpty() )
         return -EINVAL;
 
     guint8* pHead = ( guint8* )pBuf->ptr();
+
     guint32 dwSize = 0;
+    guint32 dwClsid = 0;
 
     guint32 dwHdrSize =
-        sizeof( dwSize ) * 2;
+        sizeof( SERI_HEADER_BASE );
 
     if( pBuf->size() < dwHdrSize )
         return -ERANGE;
 
     memcpy( &dwSize,
-        pHead + 4, sizeof( dwSize ) );
+        pHead + sizeof( guint32 ),
+        sizeof( dwSize ) );
+
+    memcpy( &dwClsid,
+        pHead, sizeof( dwClsid ) );
+
+    dwClsid = ntohl( dwClsid );
     dwSize = ntohl( dwSize );
     if( dwSize > pBuf->size() - dwHdrSize )
         return -ERANGE;
 
-    gint32 ret = val->Deserialize(
-        pBuf->ptr() + dwHdrSize, dwSize );
+    if( dwSize == 0 )
+    {
+        // a null object
+        val.Clear();
+        return 0;
+    }
+
+    gint32 ret = val.NewObj(
+        ( EnumClsid )dwClsid );
+    if( ERROR( ret ) )
+        return ret;
+
+    ret = val->Deserialize( *pBuf );
     if( ERROR( ret ) )
         return ret;
 

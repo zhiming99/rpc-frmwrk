@@ -510,7 +510,7 @@ std::map< std::string, yytokentype >
         { "async_p", TOK_ASYNCP },
         { "async_s", TOK_ASYNCS },
         { "returns", TOK_RETURNS },
-        { "stream", TOK_STREAM },
+        //{ "stream", TOK_STREAM },
         { "serial", TOK_SERIAL },
         { "timeout", TOK_TIMEOUT },
         { "rtpath", TOK_RTPATH },
@@ -523,6 +523,7 @@ std::map< std::string, yytokentype >
         { "interface", TOK_INTERFACE }, 
         { "service", TOK_SERVICE },
         { "typedef", TOK_TYPEDEF },
+        { "appname", TOK_APPNAME },
     };
 
 FILECTX::FILECTX()

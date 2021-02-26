@@ -307,7 +307,7 @@ class CBuffer : public CObjBase
     gint32 SerializePrimeType( guint8* pDest ) const;
     gint32 Deserialize( const CBuffer& oBuf );
     gint32 DeserializePrimeType( guint8* pSrc );
-    gint32 Deserialize( const char* pBuf );
+    gint32 Deserialize( const char* pBuf, guint32 dwSize );
     gint32 Append( const guint8* pBlock, guint32 dwSize );
     gint32 Append( const char* pBlock, guint32 dwSize );
 

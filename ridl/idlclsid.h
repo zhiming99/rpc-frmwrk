@@ -20,5 +20,5 @@ enum EnumMyClsid
     DECL_CLSID( CStatements ),
     DECL_CLSID( CAliasList ),
     DECL_CLSID( CTypedefDecl ),
-
+    DECL_CLSID( CAppName ),
 };

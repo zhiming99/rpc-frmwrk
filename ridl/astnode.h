@@ -448,6 +448,7 @@ struct CMethodDecl : public CNamedNode
 {
     ObjPtr m_pInArgs;
     ObjPtr m_pOutArgs;
+    ObjPtr m_pAttrList;
 
     typedef CNamedNode super;
 
@@ -469,6 +470,14 @@ struct CMethodDecl : public CNamedNode
     }
     ObjPtr& GetOutArgs()
     { return m_pOutArgs; }
+
+    void SetAttrList( ObjPtr& pAttrList )
+    {
+        m_pAttrList = pAttrList;
+        SET_PARENT_OF( pAttrList );
+    }
+    ObjPtr& GetAttrList()
+    { return m_pAttrList; }
 };
 
 struct CMethodDecls : public CAstListNode
@@ -499,18 +508,9 @@ struct CInterfaceDecl : public CNamedNode
 struct CInterfRef : public CNamedNode
 {
     typedef CNamedNode super;
-    ObjPtr m_pAttrList;
 
     CInterfRef() : super()
     { SetClassId( clsid( CInterfRef ) ); }
-
-    void SetAttrList( ObjPtr& pAttrList )
-    {
-        m_pAttrList = pAttrList;
-        SET_PARENT_OF( pAttrList );
-    }
-    ObjPtr& GetAttrList()
-    { return m_pAttrList; }
 };
 
 struct CInterfRefs : public CAstListNode
@@ -523,6 +523,8 @@ struct CInterfRefs : public CAstListNode
 struct CServiceDecl : public CInterfRef
 {
     ObjPtr m_pInterfList;
+    ObjPtr m_pAttrList;
+
     typedef CInterfRef super;
     CServiceDecl() : super()
     { SetClassId( clsid( CServiceDecl ) ); }
@@ -534,6 +536,14 @@ struct CServiceDecl : public CInterfRef
     }
     ObjPtr& GetInterfList()
     { return m_pInterfList; }
+
+    void SetAttrList( ObjPtr& pAttrList )
+    {
+        m_pAttrList = pAttrList;
+        SET_PARENT_OF( pAttrList );
+    }
+    ObjPtr& GetAttrList()
+    { return m_pAttrList; }
 };
 
 struct CStatements : public CAstListNode
@@ -596,4 +606,11 @@ struct CTypedefDecl : public CAstNodeBase
     }
     ObjPtr& GetAliasList()
     { return m_pAliasList; }
+};
+
+struct CAppName : public CNamedNode
+{
+    typedef CNamedNode super;
+    CAppName() : super()
+    { SetClassId( clsid( CAppName ) ); }
 };

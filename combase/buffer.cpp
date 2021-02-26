@@ -790,10 +790,11 @@ gint32 CBuffer::Deserialize( const CBuffer& oBuf )
     // if( oBuf.GetDataType() != DataTypeMem )
     //     return -EINVAL;
 
-    return Deserialize( oBuf.ptr() );
+    return Deserialize( oBuf.ptr(), oBuf.size() );
 }
 
-gint32 CBuffer::Deserialize( const char* pBuf )
+gint32 CBuffer::Deserialize(
+    const char* pBuf, guint32 dwBufSize )
 {
     const SERI_HEADER* pheader =
         ( const SERI_HEADER* )pBuf;
