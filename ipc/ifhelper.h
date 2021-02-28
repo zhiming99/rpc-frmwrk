@@ -2550,15 +2550,8 @@ gint32 CInterfaceProxy::SyncCallEx(
         if( pResp.IsEmpty() )
             pResp.NewObj();
 
+        CopyUserOptions( pTask, pOptions );
         CParamList oResp( ( IConfigDb* )pResp );
-
-        CParamList oParams(
-            ( IConfigDb* )pTask->GetConfig() );
-
-        oParams.CopyProp( propIfName,
-            ( CObjBase* )pOptions );
-        oParams.CopyProp( propSeriProto,
-            ( CObjBase* )pOptions );
 
         std::string strMethod( strcMethod );
         if( !pOptions.IsEmpty() )
@@ -2619,8 +2612,9 @@ gint32 CInterfaceProxy::SyncCallEx(
 }
 
 template< typename ...Args >
-gint32 CInterfaceServer::SendEvent(
+gint32 CInterfaceServer::SendEventEx(
     IEventSink* pCallback, // optional
+    IConfigDb* pOptions,
     EnumClsid iid,
     const std::string& strMethod,
     const std::string& strDest, // optional
@@ -2638,6 +2632,11 @@ gint32 CInterfaceServer::SendEvent(
         CReqBuilder oReq( this );
         if( true )
         {
+            if( pOptions != nullptr )
+            {
+                oReq.CopyProp(
+                    propSeriProto, pOptions );
+            }
             CStdRMutex oIfLock( GetLock() );
             MatchPtr pIfMatch;
             for( auto pMatch : m_vecMatches )
@@ -2684,8 +2683,6 @@ gint32 CInterfaceServer::SendEvent(
            | CF_ASYNC_CALL );
 
         oReq.SetMethodName( strMethod );
-        CMethodProxy< DecType( Args )...>* pProxy =
-            new CMethodProxy< DecType( Args )... >( false, "test" );
 
         std::vector< BufPtr > vecArgs;
         PackParams( vecArgs, args... );
@@ -2699,12 +2696,22 @@ gint32 CInterfaceServer::SendEvent(
             pTask.NewObj( clsid( CIfDummyTask ) );
             BroadcastEvent( oReq.GetCfg(), pTask );
         }
-
-        pProxy->Release();
         
     }while( 0 );
 
     return ret;
+}
+
+template< typename ...Args >
+gint32 CInterfaceServer::SendEvent(
+    IEventSink* pCallback, // optional
+    EnumClsid iid,
+    const std::string& strMethod,
+    const std::string& strDest, // optional
+    Args&&... args )
+{
+    return SendEventEx( pCallback,
+        nullptr, iid, strMethod, strDest, args... );
 }
 
 #define BROADCAST_USER_EVENT( _iid_, ... ) \
@@ -2764,8 +2771,8 @@ struct Parameters< std::tuple< Types... >, std::tuple< Types2... > >
 
             if( !m_pCfg.IsEmpty() )
             {
-                oOptions.CopyProp( propSeriProto,
-                    ( IConfigDb* )m_pCfg );
+                m_pIf->CopyUserOptions(
+                    oOptions.GetCfg(), m_pCfg );
                 oOptions.CopyProp( propSysMethod,
                     ( IConfigDb* )m_pCfg );
             }

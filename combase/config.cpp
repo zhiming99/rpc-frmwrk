@@ -498,9 +498,8 @@ gint32 CParamList::Push< BufPtr& > ( BufPtr& val  )
             break;
         }
 
-        BufPtr pBuf = val;
+        BufPtr pBuf;
         try{
-
             pBuf = val;
             ret = GetCfg()->SetProperty(
                 iPos, pBuf );

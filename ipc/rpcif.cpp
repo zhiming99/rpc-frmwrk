@@ -5343,8 +5343,8 @@ gint32 CInterfaceProxy::SendProxyReq(
 
         // overwrite the strIfName if exist in the
         // pCallback
-        oReq.CopyProp( propIfName, pCallback );
-        oReq.CopyProp( propSeriProto, pCallback );
+        CopyUserOptions(
+            oReq.GetCfg(), pCallback );
         oReq.SetMethodName( strMethod );
 
         for( auto& pBuf: vecParams )
@@ -5637,6 +5637,21 @@ gint32 CInterfaceProxy::CancelRequest(
    }while( 0 ); 
 
    return ret;
+}
+
+gint32 CInterfaceProxy::CopyUserOptions(
+    CObjBase* pDest,
+    CObjBase* pSrc )
+{
+    if( pDest == nullptr || pSrc == nullptr )
+        return -EINVAL;
+    
+    CCfgOpenerObj oCfg( pDest );
+    oCfg.CopyProp( propIfName, pSrc );
+    oCfg.CopyProp( propSeriProto, pSrc );
+    oCfg.CopyProp( propKeepAliveSec, pSrc );
+    oCfg.CopyProp( propTimeoutSec, pSrc );
+    return 0;
 }
 
 static CfgPtr InitIfSvrCfg(

@@ -1313,6 +1313,10 @@ class CInterfaceProxy :
         InputCount< iNumInput >* p,
         const std::string& strMethod,
         Args&&... args );
+
+    gint32 CopyUserOptions(
+        CObjBase* pDest,
+        CObjBase* pSrc );
 };
 
 class CInterfaceServer;
@@ -1582,6 +1586,15 @@ class CInterfaceServer :
         const std::string& strDest, // optional
         Args&&... args );
 
+    template< typename ...Args >
+    gint32 SendEventEx(
+        IEventSink* pCallback,
+        IConfigDb* pOptions,
+        EnumClsid iid,
+        const std::string& strMethod,
+        const std::string& strDest, // optional
+        Args&&... args );
+
     virtual gint32 OnModEvent(
         EnumEventId iEvent,
         const std::string& strModule );
@@ -1678,13 +1691,11 @@ gint32 CInterfaceProxy::AsyncCall(
             pResp.NewObj();
 
         guint64 qwIoTaskId = 0; 
-        CCfgOpenerObj oCfg( pTask );
-        CParamList oResp( ( IConfigDb* )pResp );
 
-        oCfg.CopyProp( propIfName,
-            ( CObjBase* )pOptions );
-        oCfg.CopyProp( propSeriProto,
-            ( CObjBase* )pOptions );
+        CopyUserOptions(
+            pTask, ( CObjBase* )pOptions );
+
+        CParamList oResp( ( IConfigDb* )pResp );
 
         std::string strMethod( strcMethod );
         if( !pOptions.IsEmpty() )

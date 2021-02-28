@@ -53,7 +53,7 @@ std::map< gint32, std::set< gint32 > >
         { TOK_DOUBLE, { typeFloat, typeDouble } },
         { TOK_BYTE, { typeByte } },
         { TOK_BOOL, { typeByte } },
-        { TOK_HSTREAM, int_set }
+        { TOK_HSTREAM, { typeNone } }
     };
 
 std::map< gint32, char > g_mapTypeSig = {
@@ -167,6 +167,7 @@ do{ \
 %token TOK_ASYNCP
 %token TOK_ASYNCS
 // %token TOK_STREAM
+%token TOK_EVENT
 %token TOK_SERIAL
 %token TOK_TIMEOUT
 %token TOK_RTPATH
@@ -506,6 +507,7 @@ attr_name :
       TOK_ASYNC { DEFAULT_ACTION; }
     | TOK_ASYNCP { DEFAULT_ACTION; }
     | TOK_ASYNCS { DEFAULT_ACTION; }
+    | TOK_EVENT { DEFAULT_ACTION; }
     // | TOK_STREAM { DEFAULT_ACTION; }
     | TOK_SERIAL { DEFAULT_ACTION; }
     | TOK_TIMEOUT { DEFAULT_ACTION; }
@@ -1010,6 +1012,8 @@ void Usage()
 
 static std::string g_strOutPath = ".";
 static std::vector< std::string > g_vecPaths;
+
+#include "seribase.h"
 
 int main( int argc, char** argv )
 {

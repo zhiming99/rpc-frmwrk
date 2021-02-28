@@ -40,6 +40,12 @@ interface IEchoServer
         returns ( int32 i1r, int16 i2r,
             int64 i3r, float i4r,
             double i5r, string szTextr );
+
+    EchoStruct( FILE_INFO fi ) returns ( FILE_INFO fi );
+
+    // a event from server to the proxy, response list is alway empty and the
+    // server gets no feedback related to the proxy.
+    [ event ]OnHelloWorld( string strMsg ) returns ();
 };
 
 /*

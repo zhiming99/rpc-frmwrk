@@ -1950,6 +1950,8 @@ class CStreamProxySync :
 
     gint32 GetPeerIdHash( HANDLE hChannel,
         guint64& qwPeerIdHash );
+
+    HANDLE GetChanByIdHash( guint64 ) const;
 };
 
 class CStreamServerSync :
@@ -1957,8 +1959,6 @@ class CStreamServerSync :
 {
     std::map< guint64, HANDLE > m_mapIdHashToHandle;
 
-    protected:
-    HANDLE GetChanByIdHash( guint64 ) const;
 
     public:
     typedef CStreamSyncBase< CStreamServer > super;
@@ -1968,6 +1968,7 @@ class CStreamServerSync :
 
     virtual gint32 OnConnected( HANDLE hCfg );
     virtual gint32 StopWorkers( HANDLE hChannel );
+    HANDLE GetChanByIdHash( guint64 ) const;
 };
 
 class CStreamProxyAsync :

@@ -1734,4 +1734,28 @@ gint32 CStreamProxySync::GetPeerIdHash(
         propPeerObjId, qwPeerIdHash );
 }
 
+HANDLE CStreamProxySync::GetChanByIdHash(
+    guint64 qwPeerIdHash ) const
+{
+    // a place to store channel specific data.
+    if( qwPeerIdHash == 0 )
+        return INVALID_HANDLE;
+
+    CStdRMutex oIfLock( this->GetLock() );
+    for( auto elem : m_mapStmWorkers )
+    {
+        IConfigDb* pCtx = elem.second.pContext;
+        CCfgOpener oCtx( pCtx );
+        guint64 qwElemHash = 0;
+        gint32 ret = oCtx.GetQwordProp(
+            propPeerObjId, qwElemHash );
+        if( ERROR( ret ) )
+            continue;
+        if( qwPeerIdHash == qwElemHash )
+            return elem.first;
+    }
+
+    return INVALID_HANDLE;
+}
+
 }

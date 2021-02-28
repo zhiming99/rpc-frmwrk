@@ -509,6 +509,7 @@ std::map< std::string, yytokentype >
         { "async", TOK_ASYNC },
         { "async_p", TOK_ASYNCP },
         { "async_s", TOK_ASYNCS },
+        { "event", TOK_EVENT },
         { "returns", TOK_RETURNS },
         //{ "stream", TOK_STREAM },
         { "serial", TOK_SERIAL },

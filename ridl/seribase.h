@@ -23,6 +23,7 @@
  */
 #pragma once
 #include "rpc.h"
+#include "proxy.h"
 #include <vector>
 #include <map>
 
@@ -75,6 +76,15 @@ struct CContCtx
         m_pdwBytes = rhs.m_pdwBytes;
         m_pdwCount = rhs.m_pdwCount;
     }
+};
+
+struct HSTREAM
+{
+    HANDLE m_hStream = INVALID_HANDLE;
+    guint64 m_qwStmHash = 0;
+    CRpcServices* m_pIf = nullptr;
+    gint32 Serialize( BufPtr& pBuf ) const;
+    gint32 Deserialize( BufPtr& );
 };
 
 class CSerialBase
@@ -144,6 +154,18 @@ class CSerialBase
         BufPtr& pBuf, const T& val,
         const char* szSignature )
     { return SerialStruct( pBuf, val ); }
+
+    template< typename T,
+        typename T2=typename std::enable_if<
+            std::is_same<HSTREAM, T>::value, T >::type,
+        typename T3 = T,
+        typename T4 = T,
+        typename T5 = T,
+        typename T6 = T >
+    gint32 SerialElem(
+        BufPtr& pBuf, const T& val,
+        const char* szSignature )
+    { return val.Serialize( pBuf ); }
 
     template< typename T >
     gint32 SerializeArray(
@@ -323,9 +345,21 @@ class CSerialBase
         typename T4 = T,
         typename T5 = T >
     gint32 DeserialElem(
-        BufPtr& pBuf, const T& val,
+        BufPtr& pBuf, T& val,
         const char* szSignature )
     { return DeserialStruct( pBuf, val ); }
+
+    template< typename T,
+        typename T2=typename std::enable_if<
+            std::is_same<HSTREAM, T>::value, T >::type,
+        typename T3 = T,
+        typename T4 = T,
+        typename T5 = T,
+        typename T6 = T >
+    gint32 DeserialElem(
+        BufPtr& pBuf, T& val,
+        const char* szSignature )
+    { return val.Deserialize( pBuf ); }
 
     template< typename T >
     gint32 DeserialArray(
@@ -465,9 +499,9 @@ class CSerialBase
 
     template< typename T >
     gint32 DeserialStruct(
-        char* pBuf, guint32 dwSize, T& val )
+        BufPtr& pBuf, T& val )
     {
-        return val.Deserialize( pBuf, dwSize );
+        return val.Deserialize( pBuf );
     }
 };
 
@@ -483,9 +517,10 @@ class CStructBase : public CSerialBase
     { return -ENOTSUP; }
 
     virtual gint32 Deserialize(
-        const char* pBuf, guint32 dwSize )
+        BufPtr& pBuf, guint32 dwSize )
     { return -ENOTSUP; }
 };
+
 
 #define APPEND( pBuf_, ptr_, size_ ) \
 do{ \
