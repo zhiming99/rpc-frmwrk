@@ -1971,58 +1971,148 @@ class CStreamServerSync :
     HANDLE GetChanByIdHash( guint64 ) const;
 };
 
-class CStreamProxyAsync :
-    public CStreamProxySync
+class CStreamProxyWrapper :
+    public virtual CAggInterfaceProxy
 {
-    protected:
-    virtual gint32 OnStmClosing( HANDLE hChannel )
+    public:
+    typedef CAggInterfaceProxy super;
+    CStreamProxyWrapper( const IConfigDb* pCfg )
+        : super( pCfg )
+    {;}
+
+    inline gint32 ReadStream(
+        HANDLE hChannel, BufPtr& pBuf )
     {
-        OnCloseStream( hChannel );
-        return super::OnStmClosing( hChannel );
+        CStreamProxySync* pStm = ObjPtr( this );
+        if( pStm == nullptr )
+            return -EFAULT;
+        return pStm->ReadStream(
+            hChannel, pBuf );
     }
 
-    public:
-    typedef CStreamProxySync super;
-    CStreamProxyAsync( const IConfigDb* pCfg ) :
-       _MyVirtBase( pCfg ), super( pCfg )
-    {;}
+    inline gint32 ReadStreamNoWait(
+        HANDLE hChannel, BufPtr& pBuf )
+    {
+        CStreamProxySync* pStm = ObjPtr( this );
+        if( pStm == nullptr )
+            return -EFAULT;
+        return pStm->ReadStreamNoWait(
+            hChannel, pBuf );
+    }
 
-    // prepare for a big data transfer
-    gint32 StartStmTrans(
-        IConfigDb* pParams,     //[ in ]
-        HANDLE& hChannel,       //[ in, out ]
-        guint64& size,          //[ in, out ]
-        guint8  bDirection,     //[ in ]
-        CfgPtr& pResp,          //[ out ] 
-        bool bAsync );
+    inline gint32 ReadStreamAsync(
+        HANDLE hChannel, BufPtr& pBuf,
+        IEventSink* pCb )
+    {
+        CStreamProxySync* pStm = ObjPtr( this );
+        if( pStm == nullptr )
+            return -EFAULT;
+        return pStm->ReadStreamAsync(
+            hChannel, pBuf, pCb );
+    }
 
-    // completion routine for a 
-    virtual gint32 OnStartStmTransComplete(
-        IEventSink* pCallback, 
-        IEventSink* pIoReq,
-        IConfigDb* pReqCtx );
+    inline gint32 WriteStream(
+        HANDLE hChannel, BufPtr& pBuf )
+    {
+        CStreamProxySync* pStm = ObjPtr( this );
+        if( pStm == nullptr )
+            return -EFAULT;
+        return pStm->WriteStream(
+            hChannel, pBuf );
+    }
 
-    gint32 OnCloseStream(
-        HANDLE hChannel );
+    inline gint32 WriteStreamNoWait(
+        HANDLE hChannel, BufPtr& pBuf )
+    {
+        CStreamProxySync* pStm = ObjPtr( this );
+        if( pStm == nullptr )
+            return -EFAULT;
+        return pStm->WriteStreamNoWait(
+            hChannel, pBuf );
+    }
+
+    inline gint32 WriteStreamAsync(
+        HANDLE hChannel, BufPtr& pBuf,
+        IEventSink* pCb )
+    {
+        CStreamProxySync* pStm = ObjPtr( this );
+        if( pStm == nullptr )
+            return -EFAULT;
+        return pStm->WriteStreamAsync(
+            hChannel, pBuf, pCb );
+    }
 };
 
-class CStreamServerAsync :
-    public CStreamServerSync
+class CStreamServerWrapper :
+    public virtual CAggInterfaceServer
 {
-
     public:
-    typedef CStreamServerSync super;
-    CStreamServerAsync( const IConfigDb* pCfg ) :
-       _MyVirtBase( pCfg ), super( pCfg )
+    typedef CAggInterfaceServer super;
+    CStreamServerWrapper( const IConfigDb* pCfg )
+        : super( pCfg )
     {;}
 
-    // prepare for a big data transfer
-    gint32 StartTransfer(
-        IEventSink* pCallback,
-        IConfigDb*  pParams,        //[ in ]
-        guint64     qwStmHash,      //[ in ]
-        guint8      bDirection,     //[ in ]
-        guint64&    size );         //[ in, out ]
+    inline gint32 ReadStream(
+        HANDLE hChannel, BufPtr& pBuf )
+    {
+        CStreamServerSync* pStm = ObjPtr( this );
+        if( pStm == nullptr )
+            return -EFAULT;
+        return pStm->ReadStream(
+            hChannel, pBuf );
+    }
+
+    inline gint32 ReadStreamNoWait(
+        HANDLE hChannel, BufPtr& pBuf )
+    {
+        CStreamServerSync* pStm = ObjPtr( this );
+        if( pStm == nullptr )
+            return -EFAULT;
+        return pStm->ReadStreamNoWait(
+            hChannel, pBuf );
+    }
+
+    inline gint32 ReadStreamAsync(
+        HANDLE hChannel, BufPtr& pBuf,
+        IEventSink* pCb )
+    {
+        CStreamServerSync* pStm = ObjPtr( this );
+        if( pStm == nullptr )
+            return -EFAULT;
+        return pStm->ReadStreamAsync(
+            hChannel, pBuf, pCb );
+    }
+
+    inline gint32 WriteStream(
+        HANDLE hChannel, BufPtr& pBuf )
+    {
+        CStreamServerSync* pStm = ObjPtr( this );
+        if( pStm == nullptr )
+            return -EFAULT;
+        return pStm->WriteStream(
+            hChannel, pBuf );
+    }
+
+    inline gint32 WriteStreamNoWait(
+        HANDLE hChannel, BufPtr& pBuf )
+    {
+        CStreamServerSync* pStm = ObjPtr( this );
+        if( pStm == nullptr )
+            return -EFAULT;
+        return pStm->WriteStreamNoWait(
+            hChannel, pBuf );
+    }
+
+    inline gint32 WriteStreamAsync(
+        HANDLE hChannel, BufPtr& pBuf,
+        IEventSink* pCb )
+    {
+        CStreamServerSync* pStm = ObjPtr( this );
+        if( pStm == nullptr )
+            return -EFAULT;
+        return pStm->WriteStreamAsync(
+            hChannel, pBuf, pCb );
+    }
 };
 
 }

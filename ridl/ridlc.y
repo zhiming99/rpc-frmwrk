@@ -31,7 +31,7 @@ using namespace rpcfrmwrk;
 #include <memory>
 
 CDeclMap g_mapDecls;
-ObjPtr g_oRootNode;
+ObjPtr g_pRootNode;
 CAliasMap g_mapAliases;
 std::string g_strAppName;
 
@@ -121,6 +121,19 @@ do{ \
     } \
 }while( 0 );
 
+#define ENABLE_STREAM( pSrc_, pDest_ ) do{ \
+    CAstNodeBase* pNode = pSrc_; \
+    if( pNode != nullptr && \
+        pNode->IsStream() ) \
+        pDest_->EnableStream(); \
+}while( 0 )
+
+#define ENABLE_SERIAL( pSrc_, pDest_ ) do{ \
+    CAstNodeBase* pNode = pSrc_; \
+    if( pNode != nullptr && \
+        pNode->IsSerialize() ) \
+        pDest_->EnableSerialize(); \
+}while( 0 )
 %}
 
 %define api.value.type {BufPtr}
@@ -208,7 +221,7 @@ statements : statement ';'
         *pBuf = pNode;
         $$ = pBuf;
         CLEAR_RSYMBS;
-        g_oRootNode = pNode;
+        g_pRootNode = pNode;
     }
     ;
 statements : statement ';' statements
@@ -221,7 +234,7 @@ statements : statement ';' statements
         *pBuf = pNode;
         $$ = pBuf;
         CLEAR_RSYMBS;
-        g_oRootNode = pNode;
+        g_pRootNode = pNode;
     }
     ;
 
@@ -284,6 +297,10 @@ arr_type :
         pat->SetName( dwName );
         ObjPtr& pType = *$3;
         pat->SetElemType( pType );
+
+        ENABLE_STREAM( pType, pat );
+        pat->EnableSerialize();
+
         BufPtr pBuf( true );
         *pBuf = pObj;
         $$ = pBuf;
@@ -312,6 +329,10 @@ map_type :
                 -ENOENT, strMsg.c_str() );
             g_bSemanErr = true;
         }
+
+        ENABLE_STREAM( pKey, pmt );
+        pmt->EnableSerialize();
+
         pmt->SetKeyType( pKey );
         BufPtr pBuf( true );
         *pBuf = pObj;
@@ -331,14 +352,33 @@ struct_ref : TOK_IDENT
         gint32 ret = g_mapDecls.GetDeclNode(
             strName, pTemp );
         if( SUCCEEDED( ret ) )
+        {
             psr->SetName( strName );
+            ENABLE_STREAM( pTemp, psr );
+            psr->EnableSerialize();
+        }
         else
         {
             ObjPtr pType;
             ret = g_mapAliases.GetAliasType(
                 strName, pType );
             if( SUCCEEDED( ret ) )
+            {
                 psr->SetName( strName );
+                ENABLE_STREAM( pType, psr );
+                if( pType->GetClsid() !=
+                    clsid( CPrimeType ) )
+                {
+                    psr->EnableSerialize();
+                }
+                else
+                {
+                    CPrimeType* ppt = pType;
+                    guint32 dwName = ppt->GetName();
+                    if( dwName == TOK_HSTREAM )
+                        psr->EnableSerialize();
+                }
+            }
             else
             {
                 std::string strMsg = "'"; 
@@ -361,7 +401,7 @@ struct_decl : TOK_STRUCT TOK_IDENT '{' field_list '}'
     {
         ObjPtr pNode;
         pNode.NewObj( clsid( CStructDecl ) );
-        CStructDecl* psr = pNode;
+        CStructDecl* psd = pNode;
         std::string strName = *$2;
         ObjPtr pTemp;
         gint32 ret = g_mapDecls.GetDeclNode(
@@ -374,9 +414,12 @@ struct_decl : TOK_STRUCT TOK_IDENT '{' field_list '}'
             PrintMsg( -EEXIST, strMsg.c_str() );
             g_bSemanErr = true;
         }
-        psr->SetName( strName );
+        psd->SetName( strName );
         ObjPtr& pfl = *$4;
-        psr->SetFieldList( pfl );
+        psd->SetFieldList( pfl );
+
+        ENABLE_STREAM( pfl, psd );
+
         BufPtr pBuf( true );
         *pBuf = pNode;
         $$ = pBuf;
@@ -392,6 +435,9 @@ field_list : field_decl
         ObjPtr& pfdd = *$1;
         CFieldList* pfl = pNode;
         pfl->AddChild( pfdd );
+
+        ENABLE_STREAM( pfdd, pfl );
+
         BufPtr pBuf( true );
         *pBuf = pNode;
         $$ = pBuf;
@@ -405,6 +451,9 @@ field_list : field_decl field_list
         ObjPtr& pfdd = *$1;
         CFieldList* pfl = pNode;
         pfl->InsertChild( pfdd );
+
+        ENABLE_STREAM( pfdd, pfl );
+
         BufPtr pBuf( true );
         *pBuf = pNode;
         $$ = pBuf;
@@ -420,6 +469,9 @@ field_decl : idl_type TOK_IDENT ';'
         pfdl->SetName( strName );
         ObjPtr& pType = *$1;
         pfdl->SetType( pType );
+
+        ENABLE_STREAM( pType, pfdl );
+
         BufPtr pBuf( true );
         *pBuf = pNode;
         $$ = pBuf;
@@ -484,6 +536,8 @@ idl_type :
         CPrimeType* ppt = pObj;
         guint32& dwName = *$1;
         ppt->SetName( dwName );
+        if( dwName == TOK_HSTREAM )
+            ppt->EnableStream();
         BufPtr pBuf( true );
         *pBuf = pObj;
         $$ = pBuf;
@@ -595,6 +649,9 @@ formal_arg : idl_type TOK_IDENT
         pfa->SetName( strName );
         ObjPtr& pType = *$1;
         pfa->SetType( pType );
+
+        ENABLE_STREAM( pType, pfa );
+
         BufPtr pBuf( true );
         *pBuf = pNode;
         $$ = pBuf;
@@ -609,6 +666,10 @@ arg_list : formal_arg
         CArgList* pal = pNode;
         ObjPtr& pArg = *$1;
         pal->AddChild( pArg );
+
+        ENABLE_STREAM( pArg, pal );
+        ENABLE_SERIAL( pArg, pal );
+
         BufPtr pBuf( true );
         *pBuf = pNode;
         $$ = pBuf;
@@ -620,6 +681,10 @@ arg_list : formal_arg ',' arg_list
         ObjPtr& pArg = *$1;
         CArgList* pal = pNode;
         pal->InsertChild( pArg );
+
+        ENABLE_STREAM( pArg, pal );
+        ENABLE_SERIAL( pArg, pal );
+
         BufPtr pBuf( true );
         *pBuf = pNode;
         $$ = pBuf;
@@ -636,8 +701,16 @@ method_decl : attr_list TOK_IDENT '(' arg_list ')' TOK_RETURNS '(' arg_list ')'
         pmd->SetName( strName );
         ObjPtr& pInArgs = *$4;
         pmd->SetInArgs( pInArgs );
+
+        ENABLE_STREAM( pInArgs, pmd );
+        ENABLE_SERIAL( pInArgs, pmd );
+
         ObjPtr& pOutArgs =  *$8;
         pmd->SetOutArgs( pOutArgs );
+
+        ENABLE_STREAM( pOutArgs, pmd );
+        ENABLE_SERIAL( pOutArgs, pmd );
+
         BufPtr pAttrBuf = $1;
         if( ! pAttrBuf.IsEmpty() &&
             ! pAttrBuf->empty() )
@@ -662,6 +735,10 @@ method_decl : attr_list TOK_IDENT '(' ')' TOK_RETURNS '(' arg_list ')'
         pmd->SetName( strName );
         ObjPtr& pOutArgs =  *$7;
         pmd->SetOutArgs( pOutArgs );
+
+        ENABLE_STREAM( pOutArgs, pmd );
+        ENABLE_SERIAL( pOutArgs, pmd );
+
         BufPtr pAttrBuf = $1;
         if( ! pAttrBuf.IsEmpty() &&
             ! pAttrBuf->empty() )
@@ -706,6 +783,8 @@ method_decl : attr_list TOK_IDENT '(' arg_list ')' TOK_RETURNS '(' ')'
         pmd->SetName( strName );
         ObjPtr& pInArgs =  *$4;
         pmd->SetInArgs( pInArgs );
+        ENABLE_STREAM( pInArgs, pmd );
+        ENABLE_SERIAL( pInArgs, pmd );
         BufPtr pAttrBuf = $1;
         if( ! pAttrBuf.IsEmpty() &&
             ! pAttrBuf->empty() )
@@ -727,6 +806,7 @@ method_decls : method_decl ';'
         CMethodDecls* pmds = pNode;
         ObjPtr& pmd = *$1;
         pmds->AddChild( pmd );
+        ENABLE_STREAM( pmd, pmds );
         BufPtr pBuf( true );
         *pBuf = pNode;
         $$ = pBuf;
@@ -739,6 +819,7 @@ method_decls : method_decl ';' method_decls
         CMethodDecls* pmds = pNode;
         ObjPtr& pmd = *$1;
         pmds->InsertChild( pmd );
+        ENABLE_STREAM( pmd, pmds );
         BufPtr pBuf( true );
         *pBuf = pNode;
         $$ = pBuf;
@@ -766,6 +847,7 @@ interf_decl : TOK_INTERFACE TOK_IDENT '{' method_decls '}'
         pifd->SetName( strName );
         ObjPtr& pmdl = *$4;
         pifd->SetMethodList( pmdl );
+        ENABLE_STREAM( pmdl, pifd );
         BufPtr pBuf( true );
         *pBuf = pNode;
         $$ = pBuf;
@@ -791,6 +873,7 @@ interf_ref : TOK_INTERFACE TOK_IDENT
             PrintMsg( -ENOENT, strMsg.c_str() );
             g_bSemanErr = true;
         }
+        ENABLE_STREAM( pTemp, pifr );
         pifr->SetName( strName );
         BufPtr pBuf( true );
         *pBuf = pNode;
@@ -806,6 +889,7 @@ interf_refs : interf_ref ';'
         CInterfRefs* pifrs = pNode;
         ObjPtr& pifr = *$1;
         pifrs->AddChild( pifr );
+        ENABLE_STREAM( pifr, pifrs );
         BufPtr pBuf( true );
         *pBuf = pNode;
         $$ = pBuf;
@@ -817,8 +901,25 @@ interf_refs : interf_ref ';' interf_refs
     {
         ObjPtr pNode = *$3;
         CInterfRefs* pifrs = pNode;
-        ObjPtr& pifr = *$1;
-        pifrs->InsertChild( pifr );
+        ObjPtr& pObj = *$1;
+        CInterfRef* pifr = pObj;
+        if( pifr != nullptr )
+        {
+            std::string strName =
+                pifr->GetName();
+            if( pifrs->ExistIf(
+                pifr->GetName() ) )
+            {
+                std::string strMsg =
+                    "duplicated interface '"; 
+                strMsg += strName + "'";
+                PrintMsg(
+                    -EEXIST, strMsg.c_str() );
+                g_bSemanErr = true;
+            }
+        }
+        pifrs->InsertChild( pObj );
+        ENABLE_STREAM( pObj, pifrs );
         BufPtr pBuf( true );
         *pBuf = pNode;
         $$ = pBuf;
@@ -855,6 +956,8 @@ service_decl : TOK_SERVICE TOK_IDENT attr_list '{' interf_refs '}'
         ObjPtr& pifrs = *$5;
         psd->SetInterfList( pifrs );
 
+        ENABLE_STREAM( pifrs, psd );
+
         BufPtr pBuf( true );
         *pBuf = pNode;
         $$ = pBuf;
@@ -867,12 +970,27 @@ typedef_decl : TOK_TYPEDEF idl_type alias_list
     {
         gint32 ret = 0;
         ObjPtr& pType = *$2;
-        CAstNodeBase* pAstNode = pType;
 
-        std::string strType =
-            pAstNode->ToString();
+        std::string strType;
         CAliasList* pAliases = *$3;
         do{
+            CAstNodeBase* pTypeNode = pType;
+            if( pTypeNode->GetClsid() ==
+                clsid( CPrimeType ) )
+            {
+                CPrimeType* ppt = pType;
+                if( ppt->GetName() ==
+                    TOK_HSTREAM )
+                {
+                    std::string strMsg =
+                    "alias of 'HSTREAM' not"
+                    " allowed"; 
+                    PrintMsg(
+                        -EEXIST, strMsg.c_str() );
+                    g_bSemanErr = true;
+                    break;
+                }
+            }
             if( pType->GetClsid() !=
                 clsid( CStructRef ) )
             {
@@ -880,6 +998,9 @@ typedef_decl : TOK_TYPEDEF idl_type alias_list
                     pAliases, pType );
                 break;
             }
+
+            CStructRef* psr = pType;
+            strType = psr->GetName();
 
             ObjPtr pTemp;
             ret = g_mapDecls.GetDeclNode(
@@ -914,10 +1035,8 @@ typedef_decl : TOK_TYPEDEF idl_type alias_list
         }while( 0 );
 
         if( ERROR( ret ) )
-        {
-            CLEAR_RSYMBS;
             g_bSemanErr = true;
-        }
+
         ObjPtr pNode;
         pNode.NewObj( clsid( CTypedefDecl ) );
         CTypedefDecl* ptd = pNode;
@@ -1014,6 +1133,7 @@ static std::string g_strOutPath = ".";
 static std::vector< std::string > g_vecPaths;
 
 #include "seribase.h"
+#include "gencpp.h"
 
 int main( int argc, char** argv )
 {
@@ -1105,7 +1225,7 @@ int main( int argc, char** argv )
         }
 
         ret = yyparse( strFile.c_str() );
-        if( g_oRootNode.IsEmpty() )
+        if( g_pRootNode.IsEmpty() )
         {
             ret = -EFAULT;
             break;
@@ -1117,13 +1237,53 @@ int main( int argc, char** argv )
             break;
         }
 
+        std::string strAppName;
+        CStatements* pRoot = g_pRootNode;
+        if( pRoot != nullptr )
+        {
+            ret = pRoot->CheckAppName();
+            if( ERROR( ret ) )
+            {
+                printf( "error app name not"
+                     " declared \n" );
+                break;
+            }
+            else
+            {
+                strAppName = pRoot->GetName();
+                printf( "info using app name '"
+                     "%s' \n",
+                     strAppName.c_str() );
+            }
+            pRoot->SetInheritOrder();
+            std::vector< ObjPtr > vecSvcs;
+            ret = pRoot->GetSvcDecls( vecSvcs );
+            if( ERROR( ret ) )
+            {
+                printf( "error no service"
+                     " declared \n" );
+                break;
+            }
+            if( vecSvcs.size() > 20 )
+            {
+                printf( "error too many service"
+                     " declared \n" );
+                break;
+            }
+        }
+
         printf( "Successfully parsed %s\n",
             strFile.c_str() );
 
-        g_mapDecls.Clear();
-        g_oRootNode.Clear();
+        printf( "Generating files.. \n" );
+        ret = GenCppProj(
+            g_strOutPath, strAppName, pRoot );
+
 
     }while( 0 );
+
+    g_mapDecls.Clear();
+    g_pRootNode.Clear();
 
     if( bUninit )
         CoUninitialize();

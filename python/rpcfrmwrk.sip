@@ -11,7 +11,6 @@
 using namespace cpp;
 #define _USE_LIBEV
 #include "proxy.h"
-#include "stmsvr.h"
 
 extern std::string convertPythonUnicodeObjectToStdString(PyObject *pyUnicodeObj);
 %End

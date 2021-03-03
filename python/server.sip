@@ -130,9 +130,6 @@ class CPythonServer :
     public cpp::CInterfaceServer /Abstract/
 {
     public:
-    %TypeHeaderCode
-    #include "stmsvr.h"
-    %End
 
     gint32 SetPyHost( PyObject* pObj );
     %MethodCode

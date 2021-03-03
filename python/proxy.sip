@@ -1,11 +1,4 @@
 %ModuleHeaderCode
-enum EnumMyClsid2
-{
-    DECL_CLSID( CPythonProxyImpl ) =
-        clsid( CStreamingClient ) + 1,
-    DECL_CLSID( CPythonServerImpl ) =
-        clsid( CStreamingClient ) + 2,
-};
 
 typedef enum 
 {
@@ -13,6 +6,87 @@ typedef enum
     propChanCtx = propReservedEnd + 110,
 
 } EnumPyPropId;
+
+#include "streamex.h"
+#include "counters.h"
+
+class CPythonProxyBase :
+    public CStreamProxySync
+{
+    public:
+    typedef CStreamProxySync super;
+    CPythonProxyBase( const IConfigDb* pCfg ) :
+        super::_MyVirtBase( pCfg ), super( pCfg )
+    {}
+
+    virtual gint32 PyProxyCall(
+        PyObject* pCb,
+        const std::string& strIfName,
+        const std::string& strMethod,
+        PyObject* tupleArgs,
+        PyObject* tupleResp,
+        guint32 dwSeriProto,
+        guint64& qwTaskCancel ) 
+    { return -ENOTSUP; }
+
+    gint32 OnRecvData_Loop(
+        HANDLE hChannel, gint32 iRet )
+    { return -ENOTSUP; }
+
+    gint32 OnSendDone_Loop(
+        HANDLE hChannel, gint32 iRet )
+    { return -ENOTSUP; }
+
+    gint32 OnWriteEnabled_Loop(
+        HANDLE hChannel )
+    { return -ENOTSUP; }
+
+    gint32 OnCloseChannel_Loop(
+        HANDLE hChannel )
+    { return -ENOTSUP; }
+
+    gint32 OnStart_Loop()
+    { return -ENOTSUP; }
+};
+
+class CPythonServerBase :
+    public CStreamServerSync
+{
+    public:
+    typedef CStreamServerSync super;
+    CPythonServerBase( const IConfigDb* pCfg ) :
+        super::_MyVirtBase( pCfg ), super( pCfg )
+    {}
+
+    gint32 OnRecvData_Loop(
+        HANDLE hChannel, gint32 iRet )
+    { return -ENOTSUP; }
+
+    gint32 OnSendDone_Loop(
+        HANDLE hChannel, gint32 iRet )
+    { return -ENOTSUP; }
+
+    gint32 OnWriteEnabled_Loop(
+        HANDLE hChannel )
+    { return -ENOTSUP; }
+
+    gint32 OnCloseChannel_Loop(
+        HANDLE hChannel )
+    { return -ENOTSUP; }
+
+    gint32 OnStart_Loop()
+    { return -ENOTSUP; }
+};
+
+DECLARE_AGGREGATED_PROXY(
+    CPythonProxy,
+    CStatCountersProxy,
+    CPythonProxyBase );
+
+DECLARE_AGGREGATED_SERVER(
+    CPythonServer,
+    CStatCountersServer,
+    CPythonServerBase );
 
 template< class T >
 class CPythonInterfBase : public T
@@ -1649,6 +1723,8 @@ gint32 CPythonProxyImpl::PyProxyCallSync(
 static FactoryPtr InitClassFactory()
 {
     BEGIN_FACTORY_MAPS;
+    INIT_MAP_ENTRYCFG( CPythonProxy );
+    INIT_MAP_ENTRYCFG( CPythonServer );
     INIT_MAP_ENTRYCFG( CPythonProxyImpl );
     INIT_MAP_ENTRYCFG( CPythonServerImpl );
     END_FACTORY_MAPS;
@@ -1690,20 +1766,10 @@ gint32 LoadThisLib( ObjPtr& pIoMgr )
 }
 %End
 
-enum EnumMyClsid
-{
-    Clsid_CStreamingServer,
-    Clsid_CStreamingClient,
-    Iid_CEchoServer
-};
-
 class CPythonProxy :
     public cpp::CInterfaceProxy /Abstract/
 {
     public:
-    %TypeHeaderCode
-    #include "stmsvr.h"
-    %End
 
     gint32 PyProxyCall(
         PyObject* pCb /In/,

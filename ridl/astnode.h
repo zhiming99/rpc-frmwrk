@@ -114,12 +114,19 @@ struct CAliasMap
 
 extern CAliasMap g_mapAliases;
 
+#define NODE_FLAG_STREAM    1
+#define NODE_FLAG_SERIAL    2
+
+#define NODE_FLAG_ASYNCP    1
+#define NODE_FLAG_ASYNCS    2
+#define NODE_FLAG_ASYNC     3
+
 struct CAstNodeBase :
     public CObjBase
 {
     typedef CObjBase super;
     CAstNodeBase():super() {} 
-    gint32 m_iType;
+    guint32 m_dwFlags = 0;
     CAstNodeBase* m_pParent;
 
     inline void SetParent(
@@ -129,8 +136,44 @@ struct CAstNodeBase :
             m_pParent = pParent;
     }
 
-    virtual std::string ToString() const
+    virtual std::string ToStringCpp() const
     { return std::string( "" ); }
+
+    virtual std::string ToStringPy() const
+    { return std::string( "" ); }
+
+    virtual std::string ToStringJava() const
+    { return std::string( "" ); }
+
+    bool IsStream() const 
+    {
+        if( ( m_dwFlags & NODE_FLAG_STREAM ) > 0 )
+            return true;
+        return false;
+    }
+
+    void EnableStream( bool bEnable = true )
+    {
+        if( bEnable )
+            m_dwFlags |= NODE_FLAG_STREAM;
+        else
+            m_dwFlags &= ~NODE_FLAG_STREAM;
+    }
+
+    bool IsSerialize() const
+    {
+        if( ( m_dwFlags & NODE_FLAG_SERIAL ) > 0 )
+            return true;
+        return false;
+    }
+
+    void EnableSerialize( bool bEnable = true )
+    {
+        if( bEnable )
+            m_dwFlags |= NODE_FLAG_SERIAL;
+        else
+            m_dwFlags &= ~NODE_FLAG_SERIAL;
+    }
 };
 
 struct CNamedNode :
@@ -165,14 +208,14 @@ struct CAstListNode : CAstNodeBase
         }
     }
 
-    inline ObjPtr GetChild( guint32 i )
+    inline ObjPtr GetChild( guint32 i ) const
     {
         if( i >= m_queChilds.size() )
             return ObjPtr();
         return m_queChilds[ i ];
     }
 
-    gint32 GetCount()
+    guint32 GetCount() const
     { return m_queChilds.size(); }
 
     void InsertChild( ObjPtr& pChild )
@@ -213,6 +256,40 @@ struct CAttrExps : public CAstListNode
     CAttrExps() : CAstListNode()
     { SetClassId( clsid( CAttrExps ) ); }
 
+    guint32 GetAsyncFlags() const
+    {
+        guint32 dwFlags = 0;
+        for( auto elem : m_queChilds )
+        {
+            CAttrExp* pExp = elem;
+            if( pExp == nullptr )
+                continue;
+            guint32 dwToken = pExp->GetName();
+            if( dwToken == TOK_ASYNC )
+                dwFlags = NODE_FLAG_ASYNC;
+            else if( dwToken == TOK_ASYNCP )
+                dwFlags = NODE_FLAG_ASYNCP;
+            else if( dwToken == TOK_ASYNCS )
+                dwFlags = NODE_FLAG_ASYNCS;
+            if( dwFlags > 0 )
+                break;
+        }
+        return dwFlags;
+    }
+
+    bool IsEvent() const
+    {
+        for( auto elem : m_queChilds )
+        {
+            CAttrExp* pExp = elem;
+            if( pExp == nullptr )
+                continue;
+            guint32 dwToken = pExp->GetName();
+            if( dwToken == TOK_EVENT )
+                return true;
+        }
+        return false;
+    }
 };
 
 struct CPrimeType : public CAstNodeBase
@@ -228,13 +305,13 @@ struct CPrimeType : public CAstNodeBase
     inline guint32 GetName() const
     { return m_dwAttrName; }
 
-    std::string ToString() const
+    std::string ToStringCpp() const
     {
         std::string strName;
         switch( m_dwAttrName )
         {
         case TOK_STRING:
-            strName = "string";
+            strName = "std::string";
             break;
         case TOK_UINT64:
             strName = "guint64";
@@ -273,7 +350,7 @@ struct CPrimeType : public CAstNodeBase
             strName = "ObjPtr";
             break;
         case TOK_HSTREAM:
-            strName = "guint64";
+            strName = "HSTREAM";
             break;
         default:
             break;
@@ -299,13 +376,12 @@ struct CArrayType : public CPrimeType
     ObjPtr& GetElemType()
     { return m_pElemType; }
 
-    std::string ToString() const
+    std::string ToStringCpp() const
     {
         std::string strName;
         strName = "std::vector<";
-
         CAstNodeBase* pNode = m_pElemType;
-        std::string strElem = pNode->ToString();
+        std::string strElem = pNode->ToStringCpp();
         strName += strElem;
         strName += ">";
         return strName;
@@ -329,18 +405,15 @@ struct CMapType : public CArrayType
     ObjPtr& GetKeyType()
     { return m_pKeyType; }
 
-    std::string ToString() const
+    std::string ToStringCpp() const
     {
         std::string strName;
         strName = "std::map<";
 
         CAstNodeBase* pKey = m_pKeyType;
-        strName +=
-            pKey->ToString() + ",";
-
+        strName += pKey->ToStringCpp() + ",";
         CAstNodeBase* pElem = m_pElemType;
-        strName +=
-            pElem->ToString();
+        strName += pElem->ToStringCpp();
         strName += ">";
         return strName;
     }
@@ -362,7 +435,7 @@ struct CStructRef : public CPrimeType
     inline const std::string& GetName() const
     { return m_strName; }
 
-    std::string ToString() const
+    std::string ToStringCpp() const
     {
         ObjPtr pTemp;
         if( g_mapDecls.IsDeclared( m_strName ) )
@@ -372,10 +445,8 @@ struct CStructRef : public CPrimeType
         gint32 ret = g_mapAliases.GetAliasType(
             m_strName, pType );
         if( SUCCEEDED( ret ) )
-        {
-            CAstNodeBase* pNode = pType;
-            return pNode->ToString();
-        }
+            return m_strName;
+
         return std::string( "");
     }
 };
@@ -403,6 +474,89 @@ struct CFieldDecl : public CNamedNode
 
     inline BufPtr& GetVal()
     { return m_pVal; }
+
+    std::string ToStringCpp() const
+    {
+        std::string strRet;
+        do{
+            std::string strType;
+            std::string  strVal, strName;
+            CAstNodeBase* pType = m_pType;
+            strVal = pType->ToStringCpp();
+            strVal += " ";
+            strVal = GetName();
+            if( m_pVal.IsEmpty() ||
+                m_pVal->empty() )
+                break;
+            strVal += " = ";
+
+            if( pType->GetClsid() !=
+                clsid( CPrimeType ) )
+                break;
+
+            CPrimeType* ppt = m_pType;
+            switch( ppt->GetName() )
+            {
+            case TOK_STRING:
+                strVal +=
+                    ( const char*)m_pVal->ptr();
+                break;
+            case TOK_UINT64:
+                strVal += std::to_string(
+                    *( guint64* )m_pVal->ptr() );
+                break;
+            case TOK_INT64:
+                strVal += std::to_string(
+                    *( gint64* )m_pVal->ptr() );
+                break;
+            case TOK_UINT32:
+                strVal += std::to_string(
+                    *( guint32* )m_pVal->ptr() );
+                break;
+            case TOK_INT32:
+                strVal += std::to_string(
+                    *( gint32* )m_pVal->ptr() );
+                break;
+            case TOK_UINT16:
+                strVal += std::to_string(
+                    *( guint32* )m_pVal->ptr() );
+                break;
+            case TOK_INT16:
+                strVal += std::to_string(
+                    *( gint32* )m_pVal->ptr() );
+                break;
+            case TOK_FLOAT:
+                strVal += std::to_string(
+                    *( float* )m_pVal->ptr() );
+                break;
+            case TOK_DOUBLE:
+                strVal += std::to_string(
+                    *( double* )m_pVal->ptr() );
+                break;
+            case TOK_BYTE:
+                strVal += std::to_string(
+                    *m_pVal->ptr() );
+                break;
+            case TOK_BOOL:
+                {
+                    bool bVal =
+                        *( bool*)m_pVal->ptr();
+                    if( bVal )
+                        strVal += "true";
+                    else
+                        strVal += "false";
+                    break;
+                }
+            default:
+                break;
+            }
+
+            strVal += ";";
+
+        }while( 0 );
+
+        return strRet;
+    }
 };
 
 struct CFieldList : public CAstListNode
@@ -442,6 +596,23 @@ struct CArgList : public CAstListNode
     typedef CAstListNode super;
     CArgList() : super()
     { SetClassId( clsid( CArgList ) ); }
+    std::string ToStringCpp()
+    {
+        std::string strRet;
+        for( auto& elem : m_queChilds )
+        {
+            CFormalArg* pfa = elem;
+            if( pfa == nullptr )
+                continue;
+            strRet +=
+                pfa->ToStringCpp() + ", ";
+        }
+        if( strRet.empty() )
+            return strRet;
+
+        strRet.erase( strRet.size() - 2, 2 );
+        return strRet;
+    }
 };
 
 struct CMethodDecl : public CNamedNode
@@ -449,6 +620,13 @@ struct CMethodDecl : public CNamedNode
     ObjPtr m_pInArgs;
     ObjPtr m_pOutArgs;
     ObjPtr m_pAttrList;
+
+    bool m_bEvent = false;
+    bool m_bAsyncp = false;
+    bool m_bAsyncs = false;
+
+    guint32 m_dwTimeoutSec = 0;
+    guint32 m_dwKeepAliveSec = 0;
 
     typedef CNamedNode super;
 
@@ -478,6 +656,46 @@ struct CMethodDecl : public CNamedNode
     }
     ObjPtr& GetAttrList()
     { return m_pAttrList; }
+
+    guint32 GetAsyncFlags() const
+    {
+        if( m_pAttrList.IsEmpty() )
+            return 0;
+
+        CAttrExps* pList = m_pAttrList;
+        if( pList == nullptr )
+            return 0;
+
+        return pList->GetAsyncFlags();
+    }
+
+    bool IsAsyncp() const
+    {
+        guint32 dwFlags = GetAsyncFlags();
+        if( dwFlags & NODE_FLAG_ASYNCP )
+            return true;
+        return false;
+    }
+
+    bool IsAsyncs() const
+    {
+        guint32 dwFlags = GetAsyncFlags();
+        if( dwFlags & NODE_FLAG_ASYNCS )
+            return true;
+        return false;
+    }
+
+    gint32 IsEvent() const
+    {
+        if( m_pAttrList.IsEmpty() )
+            return 0;
+
+        CAttrExps* pList = m_pAttrList;
+        if( pList == nullptr )
+            return 0;
+
+        return pList->IsEvent();
+    }
 };
 
 struct CMethodDecls : public CAstListNode
@@ -491,6 +709,7 @@ struct CInterfaceDecl : public CNamedNode
 {
     typedef CNamedNode super;
     ObjPtr m_pMdl;
+    guint32 m_dwSeqNo = 0;
 
     CInterfaceDecl() : super()
     { SetClassId( clsid( CInterfaceDecl ) ); }
@@ -508,9 +727,17 @@ struct CInterfaceDecl : public CNamedNode
 struct CInterfRef : public CNamedNode
 {
     typedef CNamedNode super;
+    guint32 dwInheritNo = 0;
 
     CInterfRef() : super()
     { SetClassId( clsid( CInterfRef ) ); }
+
+    gint32 GetInterfDecl( ObjPtr& pIfDecl )
+    {
+        std::string strIfName = GetName();
+        return g_mapDecls.GetDeclNode(
+            strIfName, pIfDecl );
+    }
 };
 
 struct CInterfRefs : public CAstListNode
@@ -518,6 +745,57 @@ struct CInterfRefs : public CAstListNode
     typedef CAstListNode super;
     CInterfRefs() : super()
     { SetClassId( clsid( CInterfRefs ) ); }
+
+    guint32 GetStreamIfCount() const
+    {
+        if( IsStream() == false )
+            return 0;
+        guint32 dwCount = 0;
+        for( auto& elem : m_queChilds )
+        {
+            CAstNodeBase* pNode = elem;
+            if( pNode->IsStream() )
+                dwCount++;
+        }
+        return dwCount;
+    }
+
+    gint32 GetStreamIfs(
+        std::vector< ObjPtr >& vecIfs )
+    {
+        if( IsStream() == false )
+            return -ENOENT;
+        for( auto& elem : m_queChilds )
+        {
+            CAstNodeBase* pNode = elem;
+            if( pNode->IsStream() )
+                vecIfs.push_back( pNode );
+        }
+        return STATUS_SUCCESS;
+    }
+
+    gint32 GetIfDecls(
+        std::vector< ObjPtr >& vecIfs )
+    {
+        for( auto& elem : m_queChilds )
+            vecIfs.push_back( elem );
+
+        return STATUS_SUCCESS;
+    }
+
+    bool ExistIf(
+        const std::string& strName )
+    {
+        for( auto& elem : m_queChilds )
+        {
+            CInterfRef* pNode = elem;
+            if( pNode == nullptr )
+                continue;
+            if( pNode->GetName() == strName )
+                return true;
+        }
+        return false;
+    }
 };
 
 struct CServiceDecl : public CInterfRef
@@ -544,13 +822,34 @@ struct CServiceDecl : public CInterfRef
     }
     ObjPtr& GetAttrList()
     { return m_pAttrList; }
+
+    gint32 GetStreamIfs(
+        std::vector< ObjPtr >& vecIfs )
+    {
+        if( !IsStream() )
+            return -ENOENT;
+
+        CInterfRefs* pifrs = m_pInterfList;
+        if( pifrs == nullptr )
+            return -ENOENT;
+        return pifrs->GetStreamIfs( vecIfs );
+    }
+
+    gint32 GetIfDecls(
+        std::vector< ObjPtr >& vecIfs )
+    {
+        CInterfRefs* pifrs = m_pInterfList;
+        if( pifrs == nullptr )
+            return -ENOENT;
+        return pifrs->GetIfDecls( vecIfs );
+    }
 };
 
-struct CStatements : public CAstListNode
+struct CAppName : public CNamedNode
 {
-    typedef CAstListNode super;
-    CStatements() : CAstListNode()
-    { SetClassId( clsid( CStatements ) ); }
+    typedef CNamedNode super;
+    CAppName() : super()
+    { SetClassId( clsid( CAppName ) ); }
 };
 
 struct CAliasList : public CAstNodeBase
@@ -573,13 +872,24 @@ struct CAliasList : public CAstNodeBase
         return m_queChilds[ i ];
     }
 
-    gint32 GetCount()
+    guint32 GetCount() const
     { return m_queChilds.size(); }
 
     void InsertChild( const std::string& strAlias )
     {
         if( !strAlias.empty() )
             m_queChilds.push_front( strAlias );
+    }
+
+    std::string ToStringCpp() const
+    {
+        std::string strVal;
+        for( auto& elem : m_queChilds )
+            strVal += elem + ", ";
+        if( strVal.empty() ) 
+            return strVal;
+        strVal.erase( strVal.size() - 2, 2 );
+        return strVal;
     }
 };
 
@@ -606,11 +916,137 @@ struct CTypedefDecl : public CAstNodeBase
     }
     ObjPtr& GetAliasList()
     { return m_pAliasList; }
+
+    std::string ToStringCpp() const
+    {
+        CAstNodeBase* pType = m_pType;
+        std::string strType =
+            pType->ToStringCpp();
+
+        CAliasList* pAliases = m_pAliasList;
+        std::string strVal =
+            "typedef " + strType +
+            " " + pAliases->ToStringCpp() +
+            ";";
+        return strVal;
+    }
 };
 
-struct CAppName : public CNamedNode
+struct CStatements : public CAstListNode
 {
-    typedef CNamedNode super;
-    CAppName() : super()
-    { SetClassId( clsid( CAppName ) ); }
+    typedef CAstListNode super;
+    CStatements() : CAstListNode()
+    { SetClassId( clsid( CStatements ) ); }
+
+    std::string m_strName;    
+
+    inline void SetName(
+        const std::string& strName )
+    { m_strName = strName; }
+
+    inline const std::string& GetName() const
+    { return m_strName; }
+
+    gint32 CheckAppName()
+    {
+        for( auto elem : m_queChilds )
+        {
+            if( elem->GetClsid() !=
+                clsid( CAppName ) )
+                continue;
+            CAppName* pAppName = elem;
+            if( pAppName == nullptr )
+                continue;
+
+            SetName( pAppName->GetName() );
+            break;
+        }
+        if( GetName().empty() )
+            return -ENOENT;
+
+        return STATUS_SUCCESS;
+    }
+
+    gint32 GetStmtsByType( guint32 dwClsid,
+        std::vector< ObjPtr >& vecStmts )
+    {
+        for( auto elem : m_queChilds )
+        {
+            if( elem->GetClsid() != dwClsid )
+                continue;
+            vecStmts.push_back( elem );
+        }
+
+        if( vecStmts.empty() )
+            return -ENOENT;
+
+        return STATUS_SUCCESS;
+    }
+
+    gint32 GetSvcDecls(
+        std::vector< ObjPtr >& vecSvcs )
+    {
+        return GetStmtsByType(
+            clsid( CServiceDecl ),
+            vecSvcs );
+    }
+
+    gint32 GetIfDecls(
+        std::vector< ObjPtr >& vecIfs )
+    {
+        return GetStmtsByType(
+            clsid( CInterfaceDecl ),
+            vecIfs );
+    }
+
+    bool IsStreamNeeded()
+    {
+        std::vector< ObjPtr > vecIfs;
+        gint32 ret = GetIfDecls( vecIfs );
+        if( ERROR( ret ) )
+            return false;
+
+        for( auto& elem : vecIfs )
+        {
+            CInterfaceDecl* pIfDecl = elem;
+            if( pIfDecl == nullptr )
+                continue;
+            if( pIfDecl->IsStream() )
+                return true;
+        }
+        return false;
+    }
+
+    // set order of inheritance of the interface
+    // using streams
+    gint32 SetInheritOrder()
+    {
+        std::vector< ObjPtr > vecSvcs;
+        gint32 ret = GetSvcDecls( vecSvcs );
+        if( ERROR( ret ) )
+            return ret;
+
+        for( auto& pObj : vecSvcs )
+        {
+            gint32 ret = 0;
+            CServiceDecl* pSvc = pObj;
+            if( pSvc == nullptr )
+                continue;
+
+            std::vector< ObjPtr > vecIfs;
+            ret = pSvc->GetStreamIfs( vecIfs );
+            if( ERROR( ret ) )
+                continue;
+            for( auto elem : vecIfs )
+            {
+                CInterfRef* pRef = elem;
+                if( pRef == nullptr )
+                    continue;
+                DebugPrint( 0, "interface %s",
+                    pRef->GetName().c_str() );
+            }
+        }
+        return STATUS_SUCCESS;
+    }
 };
+

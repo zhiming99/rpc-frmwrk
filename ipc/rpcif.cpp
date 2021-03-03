@@ -3557,7 +3557,8 @@ gint32 CRpcServices::InvokeUserMethod(
         EnumSeriProto dwSeriProto = seriNone;
         ret = GetSeriProto(
             pParams, dwSeriProto );
-        if( dwSeriProto != seriNone )
+        if( dwSeriProto != seriNone &&
+            dwSeriProto != seriRidl )
         {
             ret = -EBADMSG;
             break;
