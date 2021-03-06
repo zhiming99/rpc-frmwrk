@@ -123,7 +123,7 @@ struct CWriterBase
     {
         IndentDown();
         NewLine();
-        AppendText( "};" );
+        AppendText( "}" );
     }
 
     guint32 SelectFile( guint32 idx )
@@ -183,6 +183,8 @@ class CCppWriter : public CWriterBase
 
 #define NEW_LINE m_pWriter->NewLine()
 
+#define NEW_LINES( i ) m_pWriter->NewLine( i )
+
 #define BLOCK_OPEN  m_pWriter->BlockOpen()
 #define BLOCK_CLOSE m_pWriter->BlockClose()
 
@@ -236,85 +238,7 @@ class CDeclareClassIds
             throw std::runtime_error( strMsg );
         }
     }
-
-    gint32 Output()
-    {
-        bool bFirst = true;
-        gint32 ret = STATUS_SUCCESS;
-        Wa( "enum EnumMyClsid" );
-        BLOCK_OPEN;
-        std::vector< ObjPtr > vecSvcs;
-        ret = m_pStmts->GetSvcDecls( vecSvcs );
-        if( ERROR( ret ) )
-        {
-            printf(
-            "error no service declared\n" );
-            return ret;
-        }
-        std::vector< std::string > vecNames;
-        for( auto& elem : vecSvcs )
-        {
-            CServiceDecl* pSvc = elem;
-            vecNames.push_back(
-                pSvc->GetName() );
-        }
-            
-        if( vecNames.size() > 1 )
-        {
-            std::sort( vecNames.begin(),
-                vecNames.end() );
-        }
-
-        std::string strAppName =
-            m_pStmts->GetName();
-
-        std::string strVal = strAppName;
-        for( auto& elem : vecNames )
-            strVal += elem;
-
-        guint32 dwClsid = GenClsid( strVal );
-        for( auto& elem : vecSvcs )
-        {
-            CServiceDecl* pSvc = elem;
-            if( pSvc == nullptr )
-                continue;
-
-            std::string strSvcName =
-                pSvc->GetName();
-            
-            if( bFirst )
-            {
-                CCOUT << "DECL_CLSID( "
-                    << strSvcName
-                    << " ) = "
-                    << dwClsid
-                    << ";";
-                bFirst = false;
-                continue;
-            }
-            CCOUT << "DECL_CLSID( "
-                << strSvcName
-                << " );";
-        }
-        std::vector< ObjPtr > vecIfs;
-        m_pStmts->GetIfDecls( vecIfs );
-        for( auto& elem : vecIfs )
-        {
-            CInterfaceDecl* pifd = elem;
-            if( pifd == nullptr )
-                continue;
-
-            std::string strIfName =
-                pifd->GetName();
-            
-            CCOUT << "DECL_IID( "
-                << strIfName
-                << " );";
-        }
-        BLOCK_CLOSE;
-
-        return ret;
-    }
+    gint32 Output();
 };
 
 class CDeclareTypedef
@@ -350,31 +274,56 @@ class CDeclInterfProxy
         ObjPtr& pNode );
 
     gint32 Output();
-    gint32 OutputEvent();
-    gint32 OutputSync();
-    gint32 OutputAsync();
+    gint32 OutputEvent( CMethodDecl* pmd );
+    gint32 OutputSync( CMethodDecl* pmd );
+    gint32 OutputAsync( CMethodDecl* pmd );
 };
 
 
 class CDeclInterfSvr
 {
-    /*
-    DeclInitUserFuncs
-        AddSyncImpHandler
-            AddSyncRidlHandler
-            AddSyncNoneHandler
-        AddAsyncImpHandler
-            AddAsyncRidlHandler
-            AddAsyncNoneHandler
-    */
+    CCppWriter* m_pWriter = nullptr;
+    CInterfaceDecl* m_pNode = nullptr;
+
+    public:
+    CDeclInterfSvr( CCppWriter* pWriter,
+        ObjPtr& pNode );
+
+    gint32 Output();
+    gint32 OutputEvent( CMethodDecl* pmd );
+    gint32 OutputSync( CMethodDecl* pmd );
+    gint32 OutputAsync( CMethodDecl* pmd );
+};
+
+class CDeclService
+{
+    CCppWriter* m_pWriter = nullptr;
+    CServiceDecl* m_pNode = nullptr;
+
+    public:
+    CDeclService( CCppWriter* pWriter,
+        ObjPtr& pNode );
+
+    gint32 Output();
+};
+
+class CDeclServiceImpl
+{
+    CCppWriter* m_pWriter = nullptr;
+    CServiceDecl* m_pNode = nullptr;
+
+    public:
+    CDeclServiceImpl( CCppWriter* pWriter,
+        ObjPtr& pNode );
+
+    gint32 FindAbstMethod(
+        std::vector< std::string >& vecMethods,
+        bool bProxy );
+
+    gint32 Output();
 };
 
 /*
-class CDeclareServices
-{
-    gint32 AggregateIfs;
-    ImplGetIidOfType;
-};
 class CImplSerialStruct
 {
 };

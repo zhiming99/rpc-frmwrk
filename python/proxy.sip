@@ -11,10 +11,10 @@ typedef enum
 #include "counters.h"
 
 class CPythonProxyBase :
-    public CStreamProxySync
+    public CStreamProxyAsync
 {
     public:
-    typedef CStreamProxySync super;
+    typedef CStreamProxyAsync super;
     CPythonProxyBase( const IConfigDb* pCfg ) :
         super::_MyVirtBase( pCfg ), super( pCfg )
     {}
@@ -28,54 +28,6 @@ class CPythonProxyBase :
         guint32 dwSeriProto,
         guint64& qwTaskCancel ) 
     { return -ENOTSUP; }
-
-    gint32 OnRecvData_Loop(
-        HANDLE hChannel, gint32 iRet )
-    { return -ENOTSUP; }
-
-    gint32 OnSendDone_Loop(
-        HANDLE hChannel, gint32 iRet )
-    { return -ENOTSUP; }
-
-    gint32 OnWriteEnabled_Loop(
-        HANDLE hChannel )
-    { return -ENOTSUP; }
-
-    gint32 OnCloseChannel_Loop(
-        HANDLE hChannel )
-    { return -ENOTSUP; }
-
-    gint32 OnStart_Loop()
-    { return -ENOTSUP; }
-};
-
-class CPythonServerBase :
-    public CStreamServerSync
-{
-    public:
-    typedef CStreamServerSync super;
-    CPythonServerBase( const IConfigDb* pCfg ) :
-        super::_MyVirtBase( pCfg ), super( pCfg )
-    {}
-
-    gint32 OnRecvData_Loop(
-        HANDLE hChannel, gint32 iRet )
-    { return -ENOTSUP; }
-
-    gint32 OnSendDone_Loop(
-        HANDLE hChannel, gint32 iRet )
-    { return -ENOTSUP; }
-
-    gint32 OnWriteEnabled_Loop(
-        HANDLE hChannel )
-    { return -ENOTSUP; }
-
-    gint32 OnCloseChannel_Loop(
-        HANDLE hChannel )
-    { return -ENOTSUP; }
-
-    gint32 OnStart_Loop()
-    { return -ENOTSUP; }
 };
 
 DECLARE_AGGREGATED_PROXY(
@@ -86,7 +38,7 @@ DECLARE_AGGREGATED_PROXY(
 DECLARE_AGGREGATED_SERVER(
     CPythonServer,
     CStatCountersServer,
-    CPythonServerBase );
+    CStreamServerAsync );
 
 template< class T >
 class CPythonInterfBase : public T

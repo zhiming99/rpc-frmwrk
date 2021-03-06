@@ -2115,4 +2115,62 @@ class CStreamServerWrapper :
     }
 };
 
+class CStreamProxyAsync :
+    public CStreamProxySync
+{
+    public:
+    typedef CStreamProxySync super;
+    CStreamProxyAsync( const IConfigDb* pCfg ) :
+        _MyVirtBase( pCfg ), super( pCfg )
+    {}
+
+    gint32 OnRecvData_Loop(
+        HANDLE hChannel, gint32 iRet )
+    { return -ENOTSUP; }
+
+    gint32 OnSendDone_Loop(
+        HANDLE hChannel, gint32 iRet )
+    { return -ENOTSUP; }
+
+    gint32 OnWriteEnabled_Loop(
+        HANDLE hChannel )
+    { return -ENOTSUP; }
+
+    gint32 OnCloseChannel_Loop(
+        HANDLE hChannel )
+    { return -ENOTSUP; }
+
+    gint32 OnStart_Loop()
+    { return -ENOTSUP; }
+};
+
+class CStreamServerAsync :
+    public CStreamServerSync
+{
+    public:
+    typedef CStreamServerSync super;
+    CStreamServerAsync( const IConfigDb* pCfg ) :
+        _MyVirtBase( pCfg ), super( pCfg )
+    {}
+
+    gint32 OnRecvData_Loop(
+        HANDLE hChannel, gint32 iRet )
+    { return -ENOTSUP; }
+
+    gint32 OnSendDone_Loop(
+        HANDLE hChannel, gint32 iRet )
+    { return -ENOTSUP; }
+
+    gint32 OnWriteEnabled_Loop(
+        HANDLE hChannel )
+    { return -ENOTSUP; }
+
+    gint32 OnCloseChannel_Loop(
+        HANDLE hChannel )
+    { return -ENOTSUP; }
+
+    gint32 OnStart_Loop()
+    { return -ENOTSUP; }
+};
+
 }

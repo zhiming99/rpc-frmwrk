@@ -267,6 +267,13 @@ gint32 CSerialBase::Deserialize< BufPtr >(
     if( ERROR( ret ) )
         return ret;
 
+    if( i == 0 )
+    {
+        // an empty buffer
+        val.Clear();
+        return STATUS_SUCCESS;
+    }
+
     ret = val->Append( pBuf->ptr(), i );
     if( ERROR( ret ) )
         return ret;

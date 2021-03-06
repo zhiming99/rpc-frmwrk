@@ -294,7 +294,7 @@ class CSerialBase
     gint32 SerialStruct(
         BufPtr& pBuf, const T& val )
     {
-        return val.Serialize( *pBuf );
+        return val.Serialize( pBuf );
     }
 
     template< typename T,
@@ -513,7 +513,7 @@ class CStructBase : public CSerialBase
     {}
     
     virtual gint32 Serialize(
-        CBuffer& oBuf ) const
+        BufPtr& pBuf ) const
     { return -ENOTSUP; }
 
     virtual gint32 Deserialize(
@@ -716,6 +716,7 @@ inline gint32 CSerialBase::Serialize< BufPtr >(
     if( i >= MAX_BYTES_PER_BUFFER )
         return -ERANGE;
 
+    // append the size
     this->Serialize( pBuf, i );
     if( i == 0 )
         return STATUS_SUCCESS;

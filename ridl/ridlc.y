@@ -134,6 +134,12 @@ do{ \
         pNode->IsSerialize() ) \
         pDest_->EnableSerialize(); \
 }while( 0 )
+
+gint32 CheckNameDup(
+    ObjPtr& pInArgs,
+    ObjPtr& pOutArgs,
+    std::string& strDupName );
+
 %}
 
 %define api.value.type {BufPtr}
@@ -680,7 +686,16 @@ arg_list : formal_arg ',' arg_list
         ObjPtr& pNode = *$3;
         ObjPtr& pArg = *$1;
         CArgList* pal = pNode;
-        pal->InsertChild( pArg );
+        gint32 ret = pal->InsertChild( pArg );
+        if( ret == -EEXIST )
+        {
+            CFormalArg* pfa = pArg;
+            std::string strName = pfa->GetName();
+            std::string strMsg = "duplicated arg name '"; 
+            strMsg += strName + "'";
+            PrintMsg( -EEXIST, strMsg.c_str() );
+            g_bSemanErr = true;
+        }
 
         ENABLE_STREAM( pArg, pal );
         ENABLE_SERIAL( pArg, pal );
@@ -700,13 +715,23 @@ method_decl : attr_list TOK_IDENT '(' arg_list ')' TOK_RETURNS '(' arg_list ')'
         std::string strName = *$2;
         pmd->SetName( strName );
         ObjPtr& pInArgs = *$4;
-        pmd->SetInArgs( pInArgs );
+        ObjPtr& pOutArgs =  *$8;
 
+        std::string strDupName;
+        gint32 ret = CheckNameDup(
+            pInArgs, pOutArgs, strDupName );        
+        if( SUCCEEDED( ret ) )
+        {
+            std::string strMsg = "duplicated arg  '"; 
+            strMsg += strDupName + "'";
+            PrintMsg( -EEXIST, strMsg.c_str() );
+            g_bSemanErr = true;
+        }
+
+        pmd->SetInArgs( pInArgs );
+        pmd->SetOutArgs( pOutArgs );
         ENABLE_STREAM( pInArgs, pmd );
         ENABLE_SERIAL( pInArgs, pmd );
-
-        ObjPtr& pOutArgs =  *$8;
-        pmd->SetOutArgs( pOutArgs );
 
         ENABLE_STREAM( pOutArgs, pmd );
         ENABLE_SERIAL( pOutArgs, pmd );
@@ -717,6 +742,15 @@ method_decl : attr_list TOK_IDENT '(' arg_list ')' TOK_RETURNS '(' arg_list ')'
         {
             ObjPtr& pal = *pAttrBuf;
             pmd->SetAttrList( pal );
+        }
+        // semantic checks
+        if( pmd->IsEvent() )
+        {
+            std::string strMsg = "event handler '"; 
+            strMsg += strName + "'";
+            strMsg += " does not have responses";
+            PrintMsg( -EEXIST, strMsg.c_str() );
+            g_bSemanErr = true;
         }
         BufPtr pBuf( true );
         *pBuf = pNode;
@@ -745,6 +779,16 @@ method_decl : attr_list TOK_IDENT '(' ')' TOK_RETURNS '(' arg_list ')'
         {
             ObjPtr& pal = *pAttrBuf;
             pmd->SetAttrList( pal );
+        }
+
+        // semantic checks
+        if( pmd->IsEvent() )
+        {
+            std::string strMsg = "event handler '"; 
+            strMsg += strName + "'";
+            strMsg += " does not have responses list";
+            PrintMsg( -EEXIST, strMsg.c_str() );
+            g_bSemanErr = true;
         }
         BufPtr pBuf( true );
         *pBuf = pNode;
@@ -1171,7 +1215,8 @@ int main( int argc, char** argv )
                     if (lstat( optarg, &sb) == -1)
                     {
                         ret = -errno;
-                        perror( strerror( ret ) );
+                        printf( "%s : %s\n", optarg,
+                            strerror( errno ) );
                         bQuit = true;
                         break;
                     }
@@ -1207,6 +1252,9 @@ int main( int argc, char** argv )
             if( bQuit )
                 break;
         }
+
+        if( bQuit )
+            break;
 
         if( argv[ optind ] == nullptr )
         {
@@ -1287,6 +1335,57 @@ int main( int argc, char** argv )
 
     if( bUninit )
         CoUninitialize();
+
+    return ret;
+}
+
+gint32 CheckNameDup(
+    ObjPtr& pInArgs,
+    ObjPtr& pOutArgs,
+    std::string& strDupName )
+{
+    CArgList* pIn = pInArgs;
+    CArgList* pOut = pOutArgs;
+    if( pIn == nullptr || pOut == nullptr )
+        return 0;
+
+    gint32 ret = ERROR_FALSE;
+    do{
+        guint32 dwSize = pIn->GetCount();
+        std::set< std::string > setNames;
+        for( guint32 i = 0; i < dwSize; i++ )
+        {
+            ObjPtr pObj = pIn->GetChild( i );
+            CFormalArg* pfa = pObj;
+            if( pfa == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            std::string strName = pfa->GetName();
+            setNames.insert( strName );
+        }
+        dwSize = pOut->GetCount();
+        for( guint32 i = 0; i < dwSize; i++ )
+        {
+            ObjPtr pObj = pOut->GetChild( i );
+            CFormalArg* pfa = pObj;
+            if( pfa == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            std::string strName = pfa->GetName();
+            if( setNames.find( strName ) !=
+                setNames.end() )
+            {
+                strDupName = strName;
+                ret = STATUS_SUCCESS;
+                break;
+            }
+        }
+
+    }while( 0 );
 
     return ret;
 }

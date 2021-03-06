@@ -21,19 +21,19 @@ struct FILE_INFO
 };
 
 // echo different type of information
-interface IEchoServer
+interface IEchoThings
 {
     // both proxy and server are asynchronous, that is return
     // STATUS_PENDING if the request is not complete yet
-    [ async ]Echo( string strText )
+    Echo( string strText )
         returns ( string strResp ) ;
 
     // proxy side is asynchronous, while server side is synchronous
-    [ async_p ]EchoUnknown( bytearray pBuf )
+    EchoUnknown( bytearray pBuf )
         returns ( bytearray pResp );
 
     // proxy side is synchronous, while server side is asynchronous
-    [ async_s ]EchoCfg( ObjPtr pObj )
+    EchoCfg( ObjPtr pObj )
         returns ( ObjPtr pRespObj );
 
     // both sides are synchronous
@@ -43,7 +43,7 @@ interface IEchoServer
             int64 i3r, float i4r,
             double i5r, string szTextr );
 
-    EchoStruct( FILE_INFO fi ) returns ( FILE_INFO fi );
+    EchoStruct( FILE_INFO fi ) returns ( FILE_INFO fir );
 
     // a event from server to the proxy, response list is alway empty and the
     // server gets no feedback related to the proxy.
@@ -55,7 +55,7 @@ interface IEchoServer
 */
 interface IFileTransfer 
 {
-    [ async ]UploadFile( string szFilePath,
+    UploadFile( string szFilePath,
         HSTREAM hChannel, uint64 offset,
         uint64 size )
         /*
@@ -69,7 +69,7 @@ interface IFileTransfer
         string szFileName, bool bRead )
         returns  ( FILE_INFO fi );
 
-    [ async ]DownloadFile( string szFileName,
+    DownloadFile( string szFileName,
         HSTREAM hChannel, uint64 offset,
         uint64 size )
         returns ();
@@ -87,7 +87,7 @@ service SimpFileSvc [
     auth ]
 {
     interface ITinyInterface;
-    interface IEchoServer;
+    interface IEchoThings;
     interface IFileTransfer;
     interface IChat;
 };

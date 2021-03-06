@@ -28,6 +28,7 @@
 #include "ridlc.h"
 #include "rpc.h"
 #include "idlclsid.h" 
+#include <regex>
 
 #define SET_PARENT_OF( pObj ) \
 if( !pObj.IsEmpty() ) \
@@ -218,13 +219,14 @@ struct CAstListNode : CAstNodeBase
     guint32 GetCount() const
     { return m_queChilds.size(); }
 
-    void InsertChild( ObjPtr& pChild )
+    virtual gint32 InsertChild( ObjPtr& pChild )
     {
         if( !pChild.IsEmpty() )
         {
             m_queChilds.push_front( pChild );
             SET_PARENT_OF( pChild );
         }
+        return 0;
     }
 };
 
@@ -344,7 +346,7 @@ struct CPrimeType : public CAstNodeBase
             strName = "bool";
             break;
         case TOK_BYTEARR:
-            strName = "char*";
+            strName = "BufPtr";
             break;
         case TOK_OBJPTR:
             strName = "ObjPtr";
@@ -475,16 +477,24 @@ struct CFieldDecl : public CNamedNode
     inline BufPtr& GetVal()
     { return m_pVal; }
 
-    std::string ToStringCpp() const
+    inline std::string ToStringCpp() const
+    { return ToStringCppRef( false ); }
+
+    std::string ToStringCppRef( bool bRef ) const
     {
         std::string strRet;
         do{
-            std::string strType;
-            std::string  strVal, strName;
+            std::string strType, strName;
+            std::string& strVal = strRet;
             CAstNodeBase* pType = m_pType;
             strVal = pType->ToStringCpp();
-            strVal += " ";
-            strVal = GetName();
+
+            if( bRef )
+                strVal += "& ";
+            else
+                strVal += " ";
+
+            strVal += GetName();
             if( m_pVal.IsEmpty() ||
                 m_pVal->empty() )
                 break;
@@ -551,8 +561,6 @@ struct CFieldDecl : public CNamedNode
                 break;
             }
 
-            strVal += ";";
-
         }while( 0 );
 
         return strRet;
@@ -596,7 +604,33 @@ struct CArgList : public CAstListNode
     typedef CAstListNode super;
     CArgList() : super()
     { SetClassId( clsid( CArgList ) ); }
+
+    virtual gint32 InsertChild( ObjPtr& pChild )
+    {
+        do{
+            CFormalArg* pnewfa = pChild;
+            std::string strName = pnewfa->GetName();
+            for( auto& elem : m_queChilds )
+            {
+                CFormalArg* pfa = elem;
+                if( pfa == nullptr )
+                    continue;
+                if( pfa->GetName() == strName )
+                    return -EEXIST;
+            }
+
+        }while( 0 );
+
+        return super::InsertChild( pChild );
+    }
+
     std::string ToStringCpp()
+    {
+        return ToStringCppRef( false );
+    }
+
+    // output args as lvalue references
+    std::string ToStringCppRef( bool bRef )
     {
         std::string strRet;
         for( auto& elem : m_queChilds )
@@ -604,13 +638,18 @@ struct CArgList : public CAstListNode
             CFormalArg* pfa = elem;
             if( pfa == nullptr )
                 continue;
-            strRet +=
-                pfa->ToStringCpp() + ", ";
+            strRet += pfa->
+                ToStringCppRef( bRef ) + ", ";
         }
         if( strRet.empty() )
             return strRet;
 
         strRet.erase( strRet.size() - 2, 2 );
+        std::regex e ("HSTREAM");
+
+        strRet = std::regex_replace(
+            strRet, e, "HANDLE" );
+
         return strRet;
     }
 };
@@ -627,6 +666,8 @@ struct CMethodDecl : public CNamedNode
 
     guint32 m_dwTimeoutSec = 0;
     guint32 m_dwKeepAliveSec = 0;
+
+    CCfgOpener m_oContext;
 
     typedef CNamedNode super;
 
@@ -696,6 +737,45 @@ struct CMethodDecl : public CNamedNode
 
         return pList->IsEvent();
     }
+
+    void SetAbstDecl(
+        std::string strDecl, bool bProxy = true )
+    {
+        if( bProxy )
+            m_oContext[ 0 ] = strDecl;
+        else
+            m_oContext[ 1 ] = strDecl;
+    }
+
+    std::string GetAbstDecl( bool bProxy = true )
+    {
+        std::string strDecl;
+        if( bProxy )
+        {
+            m_oContext.GetStrProp(
+                0, strDecl );
+        }
+        else
+        {
+            m_oContext.GetStrProp(
+                1, strDecl );
+        }
+        return strDecl;
+    }
+
+    gint32 SetProperty(
+        gint32 iProp, const BufPtr& val )
+    {
+        return m_oContext.SetProperty(
+            iProp, val );
+    }
+
+    gint32 GetProperty(
+        gint32 iProp, BufPtr& val ) const
+    {
+        return m_oContext.GetProperty(
+            iProp, val );
+    }
 };
 
 struct CMethodDecls : public CAstListNode
@@ -732,7 +812,7 @@ struct CInterfRef : public CNamedNode
     CInterfRef() : super()
     { SetClassId( clsid( CInterfRef ) ); }
 
-    gint32 GetInterfDecl( ObjPtr& pIfDecl )
+    gint32 GetIfDecl( ObjPtr& pIfDecl )
     {
         std::string strIfName = GetName();
         return g_mapDecls.GetDeclNode(
@@ -774,7 +854,7 @@ struct CInterfRefs : public CAstListNode
         return STATUS_SUCCESS;
     }
 
-    gint32 GetIfDecls(
+    gint32 GetIfRefs(
         std::vector< ObjPtr >& vecIfs )
     {
         for( auto& elem : m_queChilds )
@@ -835,13 +915,13 @@ struct CServiceDecl : public CInterfRef
         return pifrs->GetStreamIfs( vecIfs );
     }
 
-    gint32 GetIfDecls(
+    gint32 GetIfRefs(
         std::vector< ObjPtr >& vecIfs )
     {
         CInterfRefs* pifrs = m_pInterfList;
         if( pifrs == nullptr )
             return -ENOENT;
-        return pifrs->GetIfDecls( vecIfs );
+        return pifrs->GetIfRefs( vecIfs );
     }
 };
 
