@@ -37,6 +37,7 @@ if( !pObj.IsEmpty() ) \
     pnode->SetParent( this ); \
 }
 
+extern std::map< gint32, char > g_mapTypeSig;
 
 // declarations
 struct CDeclMap
@@ -137,6 +138,9 @@ struct CAstNodeBase :
             m_pParent = pParent;
     }
 
+    CAstNodeBase* GetParent() const
+    { return m_pParent; }
+
     virtual std::string ToStringCpp() const
     { return std::string( "" ); }
 
@@ -175,7 +179,48 @@ struct CAstNodeBase :
         else
             m_dwFlags &= ~NODE_FLAG_SERIAL;
     }
+
+    virtual std::string GetSignature() const
+    { return std::string( "" ); }
 };
+
+std::string GetTypeSig( ObjPtr& pObj )
+{
+    std::string strSig;
+    gint32 ret = 0;
+    if( pObj.IsEmpty() )
+        return strSig;
+    do{
+        CAstNodeBase* pType = pObj;
+        if( pType->GetClsid() != 
+            clsid( CStructRef ) )
+        {
+            strSig = pType->GetSignature();
+        }
+        else
+        {
+            ObjPtr pRefType;
+            CStructRef* pRef = pType;
+            std::string strName = pRef->GetName();
+            ret = g_mapDecls.GetDeclNode(
+                strName, pRefType );
+            if( SUCCEEDED( ret ) )
+            {
+                CAstNodeBase* pNode = pRefType;
+                strSig = "O";
+                break;
+            }
+            ret = g_mapAliases.GetAliasType(
+                strName, pRefType );
+            if( ERROR( ret ) )
+                break;
+            CAstNodeBase* pNode = pRefType;
+            strSig = pNode->GetSignature();
+        }
+    }while( 0 );
+
+    return strSig;
+}
 
 struct CNamedNode :
     public CAstNodeBase
@@ -307,6 +352,14 @@ struct CPrimeType : public CAstNodeBase
     inline guint32 GetName() const
     { return m_dwAttrName; }
 
+    std::string GetSignature() const
+    {
+        if( g_mapTypeSig.find( m_dwAttrName ) ==
+            g_mapTypeSig.end() )
+            return std::string( "" );
+        return g_mapTypeSig[ dwAttrName ];
+    }
+
     std::string ToStringCpp() const
     {
         std::string strName;
@@ -378,6 +431,14 @@ struct CArrayType : public CPrimeType
     ObjPtr& GetElemType()
     { return m_pElemType; }
 
+    std::string GetSignature() const
+    {
+        std::string strSig = "(";
+        strSig += GetTypeSig( m_pElemType );
+        strSig += ")";
+        return strSig;
+    }
+
     std::string ToStringCpp() const
     {
         std::string strName;
@@ -406,6 +467,15 @@ struct CMapType : public CArrayType
 
     ObjPtr& GetKeyType()
     { return m_pKeyType; }
+
+    std::string GetSignature() const
+    {
+        std::string strSig = "[";
+        strSig += GetTypeSig( m_pKeyType );
+        strSig += GetTypeSig( m_pElemType );
+        strSig += "]";
+        return strSig;
+    }
 
     std::string ToStringCpp() const
     {
@@ -437,6 +507,10 @@ struct CStructRef : public CPrimeType
     inline const std::string& GetName() const
     { return m_strName; }
 
+    std::string GetSignature() const
+    { 
+        return GetTypeSig( ObjPtr( this ) );
+    }
     std::string ToStringCpp() const
     {
         ObjPtr pTemp;
@@ -578,6 +652,7 @@ struct CStructDecl : public CNamedNode
 {
     typedef CNamedNode super;
     ObjPtr m_oFieldList;
+    CCfgOpener m_oContext;
 
     CStructDecl() : super()
     { SetClassId( clsid( CStructDecl ) ); }
@@ -590,6 +665,20 @@ struct CStructDecl : public CNamedNode
 
     ObjPtr& GetFieldList()
     { return m_oFieldList; }
+
+    gint32 SetProperty(
+        gint32 iProp, const BufPtr& val )
+    {
+        return m_oContext.SetProperty(
+            iProp, val );
+    }
+
+    gint32 GetProperty(
+        gint32 iProp, BufPtr& val ) const
+    {
+        return m_oContext.GetProperty(
+            iProp, val );
+    }
 };
 
 struct CFormalArg : public CFieldDecl

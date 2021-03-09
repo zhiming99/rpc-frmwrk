@@ -55,7 +55,7 @@ interface IEchoThings
 */
 interface IFileTransfer 
 {
-    UploadFile( string szFilePath,
+    [ async ]UploadFile( string szFilePath,
         HSTREAM hChannel, uint64 offset,
         uint64 size )
         /*
@@ -65,11 +65,11 @@ interface IFileTransfer
         */
         returns ();
 
-    GetFileInfo(
+    [ async_p ]GetFileInfo(
         string szFileName, bool bRead )
         returns  ( FILE_INFO fi );
 
-    DownloadFile( string szFileName,
+    [ async ]DownloadFile( string szFileName,
         HSTREAM hChannel, uint64 offset,
         uint64 size )
         returns ();

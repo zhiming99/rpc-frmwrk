@@ -45,13 +45,15 @@ struct CFileSet
     std::string  m_strObjDesc;
     std::string  m_strDriver;
     std::string  m_strMakefile;
-    std::vector< std::pair<
-        std::string, std::string > > m_vecIfImp;
+
+    std::map< std::string, gint32 > m_mapSvcImp;
+
     std::vector< STMPTR > m_vecFiles;
 
     CFileSet( const std::string& strOutPath,
         const std::string& strAppName );
     gint32 OpenFiles();
+    gint32 AddSvcImpl( const std::string& strSvcName );
     ~CFileSet();
 };
 
@@ -141,6 +143,12 @@ struct CWriterBase
     {
         m_dwIndent = 0;
     }
+
+    gint32 AddSvcImpl(
+        const std::string& strSvcName )
+    {
+        return m_pFiles->AddSvcImpl( strSvcName );
+    }
 };
 
 class CCppWriter : public CWriterBase
@@ -170,6 +178,16 @@ class CCppWriter : public CWriterBase
     inline gint32 SelectMakefile()
     { return SelectFile( 4 ); }
 
+    inline gint32 SelectImplFile(
+        const std::string& strFile )
+    {
+        decltype( m_pFiles->m_mapSvcImp )::iterator itr =
+        m_pFiles->m_mapSvcImp.find( strFile );
+        if( itr == m_pFiles->m_mapSvcImp.end() )
+            return -ENOENT;
+        gint32 idx = itr->second;
+        return SelectFile( idx );
+    }
 };
 
 #define INDENT_UP   m_pWriter->IndentUp()
@@ -323,67 +341,109 @@ class CDeclServiceImpl
     gint32 Output();
 };
 
-/*
 class CImplSerialStruct
 {
+    CCppWriter* m_pWriter = nullptr;
+    CStructDecl* m_pNode = nullptr;
+
+    public:
+    CImplSerialStruct( CCppWriter* pWriter,
+        ObjPtr& pNode );
+
+    gint32 OutputSerial();
+    gint32 OutputDeserial();
+    gint32 Output();
 };
 
-class CImplIfMethodPS
+class CImplIufProxy
 {
-    ConvertHandleToHash
-    ImplArgSerial
-    SendReq
-    ImplRespDeserial
-    ConvertHashToHandle
+    CCppWriter* m_pWriter = nullptr;
+    CInterfaceDecl* m_pNode = nullptr;
+
+    public:
+    CImplIufProxy( CCppWriter* pWriter,
+        ObjPtr& pNode );
+    gint32 Output();
 };
 
-class CImplIfMethodPA
+class CImplIufSvr
 {
-    ConvertHandleToHash
-    ImplArgSerial
-    SendReq
+    CCppWriter* m_pWriter = nullptr;
+    CInterfaceDecl* m_pNode = nullptr;
 
-    ImplCallback
-        ImplRespDeserial
-        ConvertHashToHandle
-        resp
+    public:
+    CImplIufSvr( CCppWriter* pWriter,
+        ObjPtr& pNode );
+    gint32 Output();
 };
 
-class CImplIfEventP
+class CEmitSerialCode
 {
-    ImplArgDeserial
-    ConvertHashToHandle
-    UserLogic
+    public:
+    CCppWriter* m_pWriter = nullptr;
+    CArgList* m_pArgs;
+
+    CEmitSerialCode( CCppWriter* pWriter,
+        ObjPtr& pNode );
+
+    gint32 OutputSerial(
+        const std::string& strObj,
+        const std::string strBuf = "pBuf" );
+
+    gint32 OutputDeserial(
+        const std::string& strObj,
+        const std::string strBuf = "pBuf" );
 };
 
-class CImplIfMethodSS
+class CImplIfMethodProxy
 {
-    ImplArgDeserial
-    ConvertHashToHandle
-    UserLogic
-    ConvertHandleToHash
-    ImplRespSerial
+    CCppWriter* m_pWriter = nullptr;
+    CMethodDecl* m_pNode = nullptr;
+    CInterfaceDecl* m_pIf = nullptr;
+
+    public:
+    CImplIfMethodProxy( CCppWriter* pWriter,
+        ObjPtr& pNode );
+
+    gint32 OutputAsyncCbWrapper();
+    gint32 OutputEvent();
+    gint32 OutputSync();
+    gint32 OutputAsync();
+    gint32 Output();
 };
 
-class CImplIfMethodSA
+class CImplIfMethodSvr
 {
-    ConvertHandleToHash
-    ImplArgDeserial
+    CCppWriter* m_pWriter = nullptr;
+    CMethodDecl* m_pNode = nullptr;
+    CInterfaceDecl* m_pIf = nullptr;
 
-    UserLogic
+    public:
+    CImplIfMethodSvr( CCppWriter* pWriter,
+        ObjPtr& pNode );
 
-    ImplCallback
-        ConvertHashToHandle
-        ImplRespSerial
+    gint32 OutputEvent();
+    gint32 OutputSync();
+    gint32 OutputAsyncCallback();
+    gint32 OutputAsync();
+    gint32 Output();
 };
 
-class CImplIfEventS
+class ImplDllLoadFactory
 {
-    ImplArgSerial
-    ConvertHandleToHash
-    BroadcastEvent
 };
-*/
+
+class CImplClassFactory
+{
+};
+
+class CImplMsgFactory
+{
+};
+
+class CImplMainFunc
+{
+};
 
 class CExportObjDesc
 {
