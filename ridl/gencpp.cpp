@@ -33,7 +33,21 @@ extern std::string g_strAppName;
 #define PROP_ABSTMETHOD_SERVER      1
 #define PROP_MESSAGE_ID             3
 
-std::string ToStringInArgs( ObjPtr& pArgs )
+gint32 CArgListUtils::GetArgCount(
+    ObjPtr& pArgs )
+{
+    if( pArgs.IsEmpty() )
+        return 0;
+
+    CArgList* pal = pArgs;
+    if( pal == nullptr )
+        return 0;
+
+    return pal->GetCount();
+}
+
+std::string CArgListUtils::ToStringInArgs(
+    ObjPtr& pArgs )
 {
     CArgList* pal = pArgs;
     std::string strVal;
@@ -51,7 +65,7 @@ std::string ToStringInArgs( ObjPtr& pArgs )
             pObj = pfa->GetType();
             guint32 dwClsid = pObj->GetClsid();
             std::string strType;
-            std::string strVarName = pfa->GetName;
+            std::string strVarName = pfa->GetName();
             if( dwClsid != clsid( CPrimeType ) )
             {
                 CAstNodeBase* pType = pObj;
@@ -96,7 +110,8 @@ std::string ToStringInArgs( ObjPtr& pArgs )
     return strVal;
 }
 
-std::string ToStringOutArgs( ObjPtr& pArgs )
+std::string CArgListUtils::ToStringOutArgs(
+    ObjPtr& pArgs )
 {
     CArgList* pal = pArgs;
     std::string strVal;
@@ -114,7 +129,7 @@ std::string ToStringOutArgs( ObjPtr& pArgs )
             pObj = pfa->GetType();
             guint32 dwClsid = pObj->GetClsid();
             std::string strType;
-            std::string strVarName = pfa->GetName;
+            std::string strVarName = pfa->GetName();
             if( dwClsid != clsid( CPrimeType ) )
             {
                 CAstNodeBase* pType = pObj;
@@ -145,6 +160,385 @@ std::string ToStringOutArgs( ObjPtr& pArgs )
     }while( 0 );
 
     return strVal;
+}
+
+gint32 CArgListUtils::GenLocals(
+    ObjPtr pArgList,
+    std::vector< std::string >& vecLocals )
+{
+    CArgList* pinal = pArgList;
+    if( pinal == nullptr )
+        return -EINVAL;
+   
+    gint32 ret = 0; 
+
+    do{
+        guint32 i = 0;
+        for( ; i < pinal->GetCount(); i++ )
+        {
+            ObjPtr pObj = pinal->GetChild( i );
+            CFormalArg* pfa = pObj;
+            if( pfa == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            pObj = pfa->GetType();
+            CAstNodeBase* pNode = pObj;
+            std::string strType =
+                pNode->ToStringCpp();
+
+            std::string strLocal =
+                pfa->GetName();
+
+            strType += " ";
+            vecLocals.push_back( strType );
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CArgListUtils::GetHstream(
+    ObjPtr& pArgList,
+    std::vector< ObjPtr >& vecHstms )
+{
+    CArgList* pinal = pArgList;
+    if( pinal == nullptr )
+        return -EINVAL;
+   
+    gint32 ret = 0; 
+
+    do{
+        guint32 i = 0;
+        for( ; i < pinal->GetCount(); i++ )
+        {
+            ObjPtr pObj = pinal->GetChild( i );
+            CFormalArg* pfa = pObj;
+            if( pfa == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            pObj = pfa->GetType();
+            CAstNodeBase* pNode = pObj;
+            std::string strSig =
+                pNode->GetSignature();
+
+            if( strSig[ 0 ] == 'h' )
+            {
+                vecHstms.push_back(
+                    ObjPtr( pfa ) );
+            }
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CArgListUtils::GetArgsForCall(
+    ObjPtr& pArgList,
+    std::vector< std::string >& vecArgs ) 
+{
+    CArgList* pinal = pArgList;
+    if( pinal == nullptr )
+        return -EINVAL;
+   
+    gint32 ret = 0; 
+
+    do{
+        guint32 i = 0;
+        for( ; i < pinal->GetCount(); i++ )
+        {
+            ObjPtr pObj = pinal->GetChild( i );
+            CFormalArg* pfa = pObj;
+            if( pfa == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            std::string strVarName =
+                pfa->GetName();
+
+            pObj = pfa->GetType();
+            CAstNodeBase* pNode = pObj;
+            std::string strSig =
+                pNode->GetSignature();
+
+            if( strSig[ 0 ] == 'h' )
+                strVarName += ".m_hStream";
+
+            vecArgs.push_back( strVarName );
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CArgListUtils::GetArgTypes(
+    ObjPtr pArgList,
+    std::vector< std::string >& vecTypes )
+{
+    CArgList* pinal = pArgList;
+    if( pinal == nullptr )
+        return -EINVAL;
+   
+    gint32 ret = 0; 
+
+    do{
+        guint32 i = 0;
+        for( ; i < pinal->GetCount(); i++ )
+        {
+            ObjPtr pObj = pinal->GetChild( i );
+            CFormalArg* pfa = pObj;
+            if( pfa == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            pObj = pfa->GetType();
+            CAstNodeBase* pNode = pObj;
+            std::string strType =
+                pNode->ToStringCpp();
+
+            vecTypes.push_back( strType );
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CMethodWriter::GenActParams(
+    ObjPtr& pArgList )
+{
+    if( GetArgCount( pArgList ) == 0 )
+        return STATUS_SUCCESS;
+
+    gint32 ret = 0;
+    do{
+        std::vector< std::string > vecArgs;
+        ret = GetArgsForCall(
+            pArgList, vecArgs );
+        if( ERROR( ret ) )
+            break;
+
+        guint32 i = 0;
+        for( ;i < vecArgs.size(); i++ )
+        {
+            CCOUT << vecArgs[ i ];
+            if( i + 1 < vecArgs.size() )
+            {
+                CCOUT << ",";
+                NEW_LINE;
+            }
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CMethodWriter::GenActParams(
+    ObjPtr& pArgList, ObjPtr& pArgList2 )
+{
+    guint32 dwCount =
+        GetArgCount( pArgList );
+
+    guint32 dwCount2 =
+        GetArgCount( pArgList2 );
+
+    if( dwCount == 0 && dwCount2 == 0 )
+        return STATUS_SUCCESS;
+
+    if( dwCount == 0 )
+        return GenActParams( pArgList2 );
+
+    if( dwCount2 == 0 )
+        return GenActParams( pArgList );
+
+    gint32 ret = 0;
+    do{
+        std::vector< std::string > vecArgs;
+        ret = GetArgsForCall(
+            pArgList, vecArgs );
+        if( ERROR( ret ) )
+            break;
+
+        ret = GetArgsForCall(
+            pArgList2, vecArgs );
+        if( ERROR( ret ) )
+            break;
+
+        guint32 i = 0;
+        for( ;i < vecArgs.size(); i++ )
+        {
+            CCOUT << vecArgs[ i ];
+            if( i + 1 < vecArgs.size() )
+            {
+                CCOUT << ",";
+                NEW_LINE;
+            }
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CMethodWriter::GenSerialArgs(
+    ObjPtr& pArgList,
+    const std::string& strBuf,
+    bool bDeclare, bool bAssign )
+{
+    gint32 ret = 0;
+    if( GetArgCount( pArgList ) == 0 )
+        return -ENOENT;
+
+    do{
+        NEW_LINE;
+        CCOUT << "BufPtr " << strBuf << "( true );";
+        Wa( "CSeriBase oSerial;" );
+        CEmitSerialCode oesc(
+            m_pWriter, pArgList );
+
+        std::vector< ObjPtr > vecHstms;
+        ret = GetHstream(
+            pArgList, vecHstms );
+        if( ERROR( ret ) )
+            break;
+
+        for( auto& elem : vecHstms )
+        {
+            CFormalArg* pfa = elem;
+            std::string strLocal =
+                pfa->GetName();
+
+            if( bDeclare )
+                CCOUT << "HSTREAM " << strLocal;
+
+            CCOUT << strLocal <<
+                ".m_pIf = this;";
+
+            if( bAssign )
+            {
+                CCOUT << strLocal
+                    << ".m_hStream = "
+                    << strLocal << "_h;";
+            }
+            NEW_LINE;
+        }
+
+        CCOUT << "do";
+        BLOCK_OPEN;
+        ret = oesc.OutputSerial(
+            "oSerial", strBuf );
+        if( ERROR( ret ) )
+            break;
+
+        BLOCK_CLOSE;
+        CCOUT << "while( 0 );";
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CMethodWriter::GenDeserialArgs(
+    ObjPtr& pArgList,
+    const std::string& strBuf,
+    bool bDeclare, bool bAssign )
+{
+    gint32 ret = 0;
+    if( GetArgCount( pArgList ) == 0 )
+        return -ENOENT;
+
+    do{
+        NEW_LINE;
+        Wa( "CSeriBase oDeserial;" );
+        CEmitSerialCode oedsc(
+            m_pWriter, pArgList );
+
+        std::vector< ObjPtr > vecHstms;
+        ret = GetHstream(
+            pArgList, vecHstms );
+        if( ERROR( ret ) )
+            break;
+
+        for( auto& elem : vecHstms )
+        {
+            CFormalArg* pfa = elem;
+            std::string strLocal =
+                pfa->GetName();
+
+            if( bDeclare )
+                CCOUT << "HSTREAM " << strLocal;
+            CCOUT << strLocal <<
+                ".m_pIf = this;";
+
+            NEW_LINE;
+        }
+
+        CCOUT << "do";
+        BLOCK_OPEN;
+        ret = oedsc.OutputDeserial(
+            "oDeserial", strBuf );
+        if( ERROR( ret ) )
+            break;
+
+        BLOCK_CLOSE;
+        CCOUT << "while( 0 );";
+
+        Wa( "if( ERROR( ret ) )" );
+        INDENT_UP;
+        NEW_LINE;
+        Wa( "return ret;" );
+        INDENT_DOWN;
+        NEW_LINE;
+
+        if( bAssign == false )
+            break;
+
+        if( vecHstms.size() )
+            break;
+
+        for( auto& elem : vecHstms )
+        {
+            CFormalArg* pfa = elem;
+            std::string strLocal =
+                pfa->GetName();
+
+            // assign the stream handle to
+            // the out parameter
+            CCOUT << strLocal << "_h = "
+                << strLocal << ".m_hStream;";
+
+            NEW_LINE;
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CMethodWriter::DeclLocals(
+    ObjPtr& pArgList )
+{
+    std::vector< std::string > vecLocals;
+    gint32 ret = GenLocals(
+        pArgList, vecLocals );
+    if( ERROR( ret ) )
+        return ret;
+
+    for( auto& elem : vecLocals )
+    {
+        CCOUT << elem << ";";
+        NEW_LINE;
+    }
+    return STATUS_SUCCESS;
 }
 
 guint32 GenClsid( const std::string& strName )
@@ -433,15 +827,15 @@ gint32 GenHeaderFile(
 }
 
 gint32 GenCppFile(
-    CCppWriter* pWriter, ObjPtr& pRoot )
+    CCppWriter* m_pWriter, ObjPtr& pRoot )
 {
-    if( pWriter == nullptr ||
+    if( m_pWriter == nullptr ||
         pRoot.IsEmpty() )
         return -EINVAL;
 
     gint32 ret = 0;
     do{
-        pWriter->SelectCppFile();
+        m_pWriter->SelectCppFile();
 
         CStatements* pStmts = pRoot;
         if( pStmts == nullptr )
@@ -455,7 +849,7 @@ gint32 GenCppFile(
         Wa( "//Generated by ridlc" );
         Wa( "//This file content could be cleared by ridlc" );
         Wa( "#include \"seribase.h\"" );
-        CCOUT << "#include \"" << strName << ".h\";
+        CCOUT << "#include \"" << strName << ".h\"";
         NEW_LINE;
         CCOUT << "using namespace rpcfrmwrk;";
         NEW_LINES( 2 );
@@ -471,7 +865,7 @@ gint32 GenCppFile(
             case clsid( CStructDecl ) :
                 {
                     CImplSerialStruct oiss(
-                        pWriter, pObj );
+                        m_pWriter, pObj );
                     ret = oiss.Output();
                     break;
                 }
@@ -485,7 +879,7 @@ gint32 GenCppFile(
                     }
 
                     CImplIufProxy oiufp(
-                        pWriter, pObj );
+                        m_pWriter, pObj );
                     oiufp.Output();
 
                     CInterfaceDecl* pifd = pObj;
@@ -503,21 +897,21 @@ gint32 GenCppFile(
                         i < pmdl->GetCount(); i++ )
                     {
                         ObjPtr pmd = pmdl->GetChild( i );
-                        CImplIfMethodProxy* oiimp(
-                            pWriter, pmd );
+                        CImplIfMethodProxy oiimp(
+                            m_pWriter, pmd );
                         oiimp.Output();
                     }
 
                     CImplIufSvr oiufs(
-                        pWriter, pObj );
+                        m_pWriter, pObj );
                     oiufs.Output();
 
                     for( guint32 i = 0;
                         i < pmdl->GetCount(); i++ )
                     {
                         ObjPtr pmd = pmdl->GetChild( i );
-                        CImplIfMethodSvr* oiims(
-                            pWriter, pmd );
+                        CImplIfMethodSvr oiims(
+                            m_pWriter, pmd );
                         oiims.Output();
                     }
 
@@ -950,8 +1344,7 @@ gint32 CDeclInterfProxy::OutputEvent(
         {
             strArgList = ToStringInArgs( pArgs );
             strDecl += strArgList;
-            CArgList* pinal = pArgs;
-            dwCount = pinal->GetCount();
+            dwCount = GetArgCount( pArgs );
         }
         strDecl += " )";
         CCOUT << strDecl <<" = 0;";
@@ -973,7 +1366,7 @@ gint32 CDeclInterfProxy::OutputEvent(
             // calling event handler.
             Wa( "//RPC event handler wrapper" );
             CCOUT << "gint32 " << strName
-                <<"Wrapper( IEventSink* pCallback );"
+                <<"Wrapper( IEventSink* pCallback );";
         }
         else if( !pmd->IsSerialize() )
         {
@@ -1004,16 +1397,7 @@ gint32 CDeclInterfProxy::OutputAsync(
         ObjPtr pInArgs = pmd->GetInArgs();
         ObjPtr pOutArgs = pmd->GetOutArgs();
         
-        CArgList* pinal = pInArgs;
-        CArgList* poutal = pOutArgs;
-        guint dwInCount = 0;
-        guint dwOutCount = 0;
-
-        if( pinal != nullptr )
-            dwInCount = pinal->GetCount();
-
-        if( poutal != nullptr )
-            dwOutCount = poutal->GetCount();
+        guint32 dwInCount = GetArgCount( pInArgs );
 
         Wa( "//RPC Aync Req Sender" );
         CCOUT << "gint32 " << strName << "( ";
@@ -1040,7 +1424,7 @@ gint32 CDeclInterfProxy::OutputAsync(
             Wa( "{ return STATUS_SUCCESS; }" );
         }
 
-        NEW_LINES;
+        NEW_LINE;
 
         Wa( "//Async callback wrapper" );
         CCOUT << "gint32 " << strName
@@ -1275,19 +1659,15 @@ gint32 CDeclInterfSvr::OutputSync(
     do{
         std::string strName, strArgs;
         strName = pmd->GetName();
+
         ObjPtr pInArgs = pmd->GetInArgs();
         ObjPtr pOutArgs = pmd->GetOutArgs();
 
-        CArgList* pinal = pInArgs;
-        CArgList* poutal = pOutArgs;
-        guint32 dwInCount = 0;
-        guint32 dwOutCount = 0;
+        guint32 dwInCount =
+            GetArgCount( pInArgs );
 
-        if( pinal != nullptr )
-            dwInCount += pinal->GetCount();
-
-        if( poutal != nullptr )
-            dwOutCount += poutal->GetCount();
+        guint32 dwOutCount =
+            GetArgCount( pInArgs );
 
         Wa( "//RPC Sync Request Handler Wrapper" );
         CCOUT << "gint32 " << strName
@@ -1345,17 +1725,7 @@ gint32 CDeclInterfSvr::OutputAsync(
         ObjPtr pInArgs = pmd->GetInArgs();
         ObjPtr pOutArgs = pmd->GetOutArgs();
 
-        CArgList* pinal = pInArgs;
-        CArgList* poutal = pOutArgs;
-        guint32 dwInCount = 0;
-        guint32 dwOutCount = 0;
-
-        if( pinal != nullptr )
-            dwInCount += pinal->GetCount();
-
-        if( poutal != nullptr )
-            dwOutCount += poutal->GetCount();
-
+        guint32 dwInCount = GetArgCount( pInArgs );
         if( pmd->IsSerialize() && dwInCount > 0 )
         {
             Wa( "//RPC Aync Req Handler wrapper" );
@@ -1791,7 +2161,7 @@ gint32 CImplSerialStruct::OutputSerial()
 
             CCOUT << "ret = Serialize( pBuf, m_dwMsgId );";
             NEW_LINE;
-            Wa( "if( ERROR( ret ) ) break;" )
+            Wa( "if( ERROR( ret ) ) break;" );
 
             switch( strSig[ 0 ] )
             {
@@ -1838,10 +2208,9 @@ gint32 CImplSerialStruct::OutputSerial()
             case 'W':
             case 'w':
             case 'f':
-            case 'D':
+            case 'F':
             case 'b':
             case 'B':
-            case 'h':
             case 's':
             case 'a':
             case 'o':
@@ -1982,10 +2351,9 @@ gint32 CImplSerialStruct::OutputDeserial()
             case 'W':
             case 'w':
             case 'f':
-            case 'D':
+            case 'F':
             case 'b':
             case 'B':
-            case 'h':
             case 's':
             case 'a':
             case 'o':
@@ -2051,8 +2419,8 @@ gint32 CImplIufProxy::Output()
     gint32 ret = 0;
     do{
         std::string strClass = "I";
-        strClass += pNode->GetName() + "_PImpl";
-        std::string strIfName = pNode->GetName();
+        strClass += m_pNode->GetName() + "_PImpl";
+        std::string strIfName = m_pNode->GetName();
         CCOUT << "gint32 " << strClass
             << "::" << "InitUserFuncs()";
         NEW_LINE;
@@ -2196,8 +2564,8 @@ gint32 CImplIufSvr::Output()
     gint32 ret = 0;
     do{
         std::string strClass = "I";
-        strClass += pNode->GetName() + "_SImpl";
-        std::string strIfName = pNode->GetName();
+        strClass += m_pNode->GetName() + "_SImpl";
+        std::string strIfName = m_pNode->GetName();
         CCOUT << "gint32 " << strClass
             << "::" << "InitUserFuncs()";
         NEW_LINE;
@@ -2229,26 +2597,18 @@ gint32 CImplIufSvr::Output()
                 CMethodDecl* pmd = elem;
                 std::string strMethod = pmd->GetName();
 
-                ObjPtr pObj == pmd->GetInArgs();
-                CArgList* pinal = pObj; 
-
-                pObj == pmd->GetOutArgs();
-                CArgList* poutal = pObj;
+                ObjPtr pInArgs = pmd->GetInArgs();
+                ObjPtr pOutArgs = pmd->GetOutArgs();
 
                 guint32 dwCount = 0;
                 if( !pmd->IsAsyncs() )
                 {
-                    if( pinal != nullptr )
-                        dwCount += pinal->GetCount();
-                    if( poutal != nullptr )
-                        dwCount += poutal->GetCount();
+                    dwCount = GetArgCount( pInArgs );
+                    dwCount += GetArgCount( pOutArgs );
                 }
                 else
                 {
-                    if( pinal == nullptr )
-                        dwCount = 0;
-                    else
-                        dwCount = pinal->GetCount();
+                    dwCount = GetArgCount( pInArgs );
                 }
                 
                 if( pmd->IsAsyncs() )
@@ -2271,9 +2631,8 @@ gint32 CImplIufSvr::Output()
                     }
                     else
                     {
-                        dwInCount = pinal->GetCount();
                         CCOUT << "ADD_USER_SERVICE_HANDLER_EX("
-                            << dwInCount << ",";
+                            << dwCount << ",";
                         INDENT_UP;
                         NEW_LINE;
                         CCOUT << strClass << "::"
@@ -2296,7 +2655,6 @@ gint32 CImplIufSvr::Output()
             Wa( "END_IFHANDLER_MAP;" );
         }
 
-
         Wa( "return STATUS_SUCCESS;" );
         BLOCK_CLOSE;
 
@@ -2309,8 +2667,8 @@ CEmitSerialCode::CEmitSerialCode(
     CCppWriter* pWriter, ObjPtr& pNode )
 {
     m_pWriter = pWriter;
-    m_pNode = pNode;
-    if( m_pNode == nullptr )
+    m_pArgs = pNode;
+    if( m_pArgs == nullptr )
     {
         std::string strMsg = DebugMsg(
             -EFAULT, "internal error empty "
@@ -2400,10 +2758,9 @@ gint32 CEmitSerialCode::OutputSerial(
             case 'W':
             case 'w':
             case 'f':
-            case 'D':
+            case 'F':
             case 'b':
             case 'B':
-            case 'h':
             case 's':
             case 'a':
             case 'o':
@@ -2425,6 +2782,8 @@ gint32 CEmitSerialCode::OutputSerial(
         }
 
     }while( 0 );
+
+    return ret;
 }
 
 gint32 CEmitSerialCode::OutputDeserial(
@@ -2503,10 +2862,9 @@ gint32 CEmitSerialCode::OutputDeserial(
             case 'W':
             case 'w':
             case 'f':
-            case 'D':
+            case 'F':
             case 'b':
             case 'B':
-            case 'h':
             case 's':
             case 'a':
             case 'o':
@@ -2527,9 +2885,11 @@ gint32 CEmitSerialCode::OutputDeserial(
             }
         }
     }while( 0 );
+
+    return ret;
 }
 
-CImplIfMethodProxy::CImplIfMethodProxy(
+CMethodWriter::CMethodWriter(
     CCppWriter* pWriter,
     ObjPtr& pNode )
 {
@@ -2543,7 +2903,7 @@ CImplIfMethodProxy::CImplIfMethodProxy(
         throw std::runtime_error( strMsg );
     }
 
-    CAstNodeBase* pParent = pNode->GetParent();
+    CAstNodeBase* pParent = m_pNode->GetParent();
     if( pParent == nullptr )
     {
         std::string strMsg = DebugMsg(
@@ -2603,165 +2963,17 @@ gint32 CImplIfMethodProxy::Output()
     return ret;
 }
 
-static gint32 GenLocals( ObjPtr pArgList,
-    std::vector< std::string >& vecLocals )
-{
-    CArgList* pinal = pInArgs;
-    if( pinal == nullptr )
-        return -EINVAL;
-   
-    gint32 ret = 0; 
-
-    do{
-        guint32 i = 0;
-        for( ; i < pinal->GetCount(); i++ )
-        {
-            ObjPtr pObj = pinal->GetChild();
-            CFormalArg* pfa = pObj;
-            if( pfa == nullptr )
-            {
-                ret = -EFAULT;
-                break;
-            }
-            pObj = pfa->GetType();
-            CAstNodeBase* pNode = pObj;
-            std::string strType =
-                pNode->ToStringCpp();
-
-            std::string strLocal =
-                pfa->GetName();
-
-            strType += " ";
-            vecLocals.push_back( strType );
-        }
-
-    }while( 0 )
-
-    return ret;
-}
-
-static gint32 GetHstream( ObjPtr& pArgList,
-    std::vector< ObjPtr >& vecHstms )
-{
-    CArgList* pinal = pInArgs;
-    if( pinal == nullptr )
-        return -EINVAL;
-   
-    gint32 ret = 0; 
-
-    do{
-        guint32 i = 0;
-        for( ; i < pinal->GetCount(); i++ )
-        {
-            ObjPtr pObj = pinal->GetChild();
-            CFormalArg* pfa = pObj;
-            if( pfa == nullptr )
-            {
-                ret = -EFAULT;
-                break;
-            }
-            pObj = pfa->GetType();
-            CAstNodeBase* pNode = pObj;
-            std::string strSig =
-                pNode->GetSignature();
-
-            if( strSig[ 0 ] == 'h' )
-            {
-                vecHstms.push_back(
-                    ObjPtr( pfa ) );
-            }
-        }
-
-    }while( 0 )
-
-    return ret;
-}
-
-static gint32 GetArgsForCall( ObjPtr& pArgList,
-    std::vector< std::string >& vecArgs ) 
-{
-    CArgList* pinal = pInArgs;
-    if( pinal == nullptr )
-        return -EINVAL;
-   
-    gint32 ret = 0; 
-
-    do{
-        guint32 i = 0;
-        for( ; i < pinal->GetCount(); i++ )
-        {
-            ObjPtr pObj = pinal->GetChild();
-            CFormalArg* pfa = pObj;
-            if( pfa == nullptr )
-            {
-                ret = -EFAULT;
-                break;
-            }
-            std::string strVarName =
-                pfa->GetName();
-
-            pObj = pfa->GetType();
-            CAstNodeBase* pNode = pObj;
-            std::string strSig =
-                pNode->GetSignature();
-
-            if( strSig[ 0 ] != 'h' )
-                strVarName += ".m_hStream";
-
-            vecArgs.push_back( strVarName );
-        }
-
-    }while( 0 )
-
-    return ret;
-}
-
-static gint32 GetArgTypes( ObjPtr pArgList,
-    std::vector< std::string >& vecTypes )
-{
-    CArgList* pinal = pInArgs;
-    if( pinal == nullptr )
-        return -EINVAL;
-   
-    gint32 ret = 0; 
-
-    do{
-        guint32 i = 0;
-        for( ; i < pinal->GetCount(); i++ )
-        {
-            ObjPtr pObj = pinal->GetChild();
-            CFormalArg* pfa = pObj;
-            if( pfa == nullptr )
-            {
-                ret = -EFAULT;
-                break;
-            }
-            pObj = pfa->GetType();
-            CAstNodeBase* pNode = pObj;
-            std::string strType =
-                pNode->ToStringCpp();
-
-            vecLocals.push_back( strType );
-        }
-
-    }while( 0 )
-
-    return ret;
-}
-
 gint32 CImplIfMethodProxy::OutputEvent()
 {
-    ObjPtr pInArgs = m_pNode->GetInArgs();
-    CArgList* pinal = pInArgs;
-    if( pinal == nullptr )
-        return 0;
-
     gint32 ret = 0;
     std::string strClass = "I";
     strClass += m_pIf->GetName() + "_PImpl";
-    strMethod = m_pNode->GetName();
+    std::string strMethod = m_pNode->GetName();
 
-    guint32 dwCount = pinal->GetCount();
+    ObjPtr pInArgs = m_pNode->GetInArgs();
+    guint32 dwInCount = GetArgCount( pInArgs );
+    guint32 dwCount = dwInCount;
+
     bool bSerial = m_pNode->IsSerialize();
 
     do{
@@ -2806,75 +3018,20 @@ gint32 CImplIfMethodProxy::OutputEvent()
         else
         {
             Wa( "gint32 ret = 0;" );
-            std::vector< string > vecLocals;
-            ret = GenLocals(
-                pInArgs, vecLocals );
-            if( ERROR( ret ) )
-                break;
+            DeclLocals( pInArgs );
 
-            for( auto& elem : vecLocals )
-            {
-                CCOUT << elem << ";";
-                NEW_LINE;
-            }
             NEW_LINE;
 
-            Wa( "CSeriBase oDeserial;" );
-            CEmitSerialCode odes(
-                m_pWriter, pInArgs );
-
-            std::vector< ObjPtr > vecHstms;
-            ret = GetHstream(
-                pInArgs, vecHstms );
-            if( ERROR( ret ) )
-                break;
-
-            for( auto& elem : vecHstms )
-            {
-                CFormalArg* pfa = elem;
-                std::string strLocal =
-                    pfa->GetName();
-
-                CCOUT << strLocal <<
-                    ".m_pIf = this;";
-                NEW_LINE;
-            }
-
-            CCOUT << "do";
-            BLOCK_OPEN;
-            ret = odes.OutputDeserial(
-                "oDeserial" );
-            if( ERROR( ret ) )
-                break;
-
-            BLOCK_CLOSE;
-            CCOUT << "while( 0 );";
-
-            Wa( "if( ERROR( ret ) )" );
-            INDENT_UP;
-            NEW_LINE;
-            Wa( "return ret;" );
-            INDENT_DOWN;
-            NEW_LINE;
-
-            std::vector< std::string > vecArgs;
-            ret = GetArgsForCall(
-                pInArgs, vecArgs );
+            ret = GenDeserialArgs(
+                pInArgs, "pBuf", false, false );
             if( ERROR( ret ) )
                 break;
 
             // call the user's handler
             CCOUT << strMethod << "(";
+            GenActParams( pInArgs );
 
-            guint32 i = 0;
-            for( ; i < vecArgs.size(); i++ )
-            {
-                CCOUT << " " << vecArgs[ i ];
-                if( i + 1 < vecArgs.size() )
-                    CCOUT << ", ";
-            }
-
-            if( vecArgs.empty() )
+            if( dwCount == 0 )
                 CCOUT << ");";
             else
                 CCOUT << " );";
@@ -2885,32 +3042,24 @@ gint32 CImplIfMethodProxy::OutputEvent()
         Wa( "return ret" );
         BLOCK_CLOSE;
 
-    }while( 0 )
+    }while( 0 );
     
     return ret;
 }
 
 gint32 CImplIfMethodProxy::OutputSync()
 {
+    gint32 ret = 0;
+    std::string strClass = "I";
+    std::string strIfName = m_pIf->GetName();
+    strClass += strIfName + "_PImpl";
+    std::string strMethod = m_pNode->GetName();
+
     ObjPtr pInArgs = m_pNode->GetInArgs();
     ObjPtr pOutArgs = m_pNode->GetOutArgs();
 
-    gint32 ret = 0;
-    std::string strClass = "I";
-    strIfName += m_pIf->GetName();
-    strClass += strIfName + "_PImpl";
-    strMethod = m_pNode->GetName();
-
-    CArgList* pinal = pInArgs;
-    CArgList* poutal = pOutArgs;
-    guint32 dwInCount = 0;
-    guint32 dwOutCount = 0;
-
-    if( pinal != nullptr )
-        dwInCount += pinal->GetCount();
-
-    if( poutal != nullptr )
-        dwOutCount += poutal->GetCount();
+    guint32 dwInCount = GetArgCount( pInArgs );
+    guint32 dwOutCount = GetArgCount( pOutArgs );
 
     bool bSerial = m_pNode->IsSerialize();
 
@@ -2922,8 +3071,7 @@ gint32 CImplIfMethodProxy::OutputSync()
         NEW_LINE;
 
         // gen the param list
-        if( dwInCount == 0 &&
-            dwOutCount == 0 )
+        if( dwInCount == 0 && dwOutCount == 0 )
         {
             CCOUT << " )";
         }
@@ -2946,23 +3094,28 @@ gint32 CImplIfMethodProxy::OutputSync()
                     ToStringOutArgs( pOutArgs );
             }
     
-            CCOUT << strArgList << " )
+            CCOUT << strArgList << " );";
         }
         INDENT_DOWN;
         NEW_LINE;
 
         BLOCK_OPEN;
 
-        if( 0 == dwInCount + dwOutCount )
-        {
-            Wa( "CParamList oOptions;" );
-            Wa( "CfgPtr pResp;" );
-            CCOUT << "oOptions[ propIfName ] = \""
-                << strIfName << "\";";
-            NEW_LINE;
+        Wa( "CParamList oOptions;" );
+        Wa( "CfgPtr pResp;" );
+        CCOUT << "oOptions[ propIfName ] = \""
+            << strIfName << "\";";
+        NEW_LINE;
+        if( !bSerial )
             CCOUT << "oOptions[ propSeriProto ] = "
                 << "( guint32 )seriNone;";
-            NEW_LINE;
+        else
+            CCOUT << "oOptions[ propSeriProto ] = "
+                << "( guint32 )seriRidl;";
+        NEW_LINE;
+
+        if( 0 == dwInCount + dwOutCount )
+        {
             CCOUT << " ret = this->SyncCallEx("
                 << "oOptions.GetCfg(), pResp, "
                 << "\"" << strMethod << "\" );";
@@ -2977,14 +3130,6 @@ gint32 CImplIfMethodProxy::OutputSync()
         }
         else if( !bSerial )
         {
-            Wa( "CParamList oOptions;" );
-            Wa( "CfgPtr pResp;" );
-            CCOUT << "oOptions[ propIfName ] = \""
-                << strIfName << "\";";
-            NEW_LINE;
-            CCOUT << "oOptions[ propSeriProto ] = "
-                << "( guint32 )seriNone;";
-            NEW_LINE;
             CCOUT << " ret = this->SyncCallEx("
                 << "oOptions.GetCfg(), pResp, "
                 << "\"" << strMethod << "\"";
@@ -2993,20 +3138,7 @@ gint32 CImplIfMethodProxy::OutputSync()
             {
                 CCOUT << ", ";
                 INDENT_UP;
-                std::vector< std::string > vecArgs;
-                ret = GetArgsForCall(
-                    pInArgs, vecArgs );
-                if( ERROR( ret ) )
-                    break;
-
-                guint32 i = 0;
-                for( ; i < vecArgs.size(); i++ )
-                {
-                    NEW_LINE;
-                    CCOUT << elem;
-                    if( i + 1 < vecArgs.size() )
-                        CCOUT << ", ";
-                }
+                GenActParams( pInArgs );
                 INDENT_DOWN;
             }
 
@@ -3030,66 +3162,16 @@ gint32 CImplIfMethodProxy::OutputSync()
 
                 CCOUT << ", ";
                 INDENT_UP;
-                std::vector< std::string > vecArgs;
-                ret = GetArgsForCall(
-                    pOutArgs, vecArgs );
-                if( ERROR( ret ) )
-                    break;
-
-                guint32 i = 0;
-                for( ; i < vecArgs.size(); i++ )
-                {
-                    NEW_LINE;
-                    CCOUT << elem;
-                    if( i + 1 < vecArgs.size() )
-                        CCOUT << ", ";
-                }
+                GenActParams( pOutArgs );
                 CCOUT << " );";
                 INDENT_DOWN;
             }
         }
         else /* need serialize */
         {
-            Wa( "CParamList oOptions;" );
-            Wa( "CfgPtr pResp;" );
-            CCOUT << "oOptions[ propIfName ] = \""
-                << strIfName << "\";";
-            NEW_LINE;
-            CCOUT << "oOptions[ propSeriProto ] = "
-                << "( guint32 )seriRidl;";
-            NEW_LINES( 2 );
-
             Wa( "//Serialize the input parameters" );
-            Wa( "BufPtr pBuf( true ); " );
-
-            Wa( "CSeriBase oSerial;" );
-            CEmitSerialCode oesc(
-                m_pWriter, pInArgs );
-
-            std::vector< ObjPtr > vecHstms;
-            ret = GetHstream(
-                pInArgs, vecHstms );
-            if( ERROR( ret ) )
-                break;
-
-            for( auto& elem : vecHstms )
-            {
-                CFormalArg* pfa = elem;
-                std::string strLocal =
-                    pfa->GetName();
-
-                // Init the hstream structure for
-                // serialization 
-                CCOUT << "HSTREAM " << strLocal;
-                CCOUT << strLocal <<
-                    ".m_pIf = this;";
-                CCOUT << strLocal << ".m_hStream = "
-                    << strLocal << "_h";
-                NEW_LINE;
-            }
-
-            NEW_LINE;
-            ret = oesc.OutputSerial( "oSerial" );
+            ret = GenSerialArgs(
+                pInArgs, "pBuf", true, true );
             if( ERROR( ret ) )
                 break;
 
@@ -3109,49 +3191,19 @@ gint32 CImplIfMethodProxy::OutputSync()
                 Wa( "return ret" );
             else
             {
-                Wa( "BufPtr pBuf2( true );" );
-                Wa( "ret = oResp.GetProperty( 0, pBuf );" );
+                Wa( "BufPtr pBuf2;" );
+                Wa( "ret = oResp.GetProperty( 0, pBuf2 );" );
                 Wa( "if( ERROR( ret ) ) return ret;" );
-                CCOUT << "do";
-                BLOCK_OPEN;
 
-                CEmitSerialCode oedsc(
-                    m_pWriter, pOutArgs );
-                ret = oedsc.OutputDeserial( "oSerial", "pBuf2" );
                 if( ERROR( ret ) )
                     break;
 
+                CCOUT << "do";
+                ret = GenDeserialArgs(
+                    pOutArgs, "pBuf2", true, true );
                 BLOCK_CLOSE;
                 Wa( "while( 0 );" );
 
-                Wa( "if( ERROR( ret ) )" );
-                INDENT_UP;
-                NEW_LINE;
-                Wa( "return ret;" );
-                INDENT_DOWN;
-                NEW_LINE;
-
-                // pass the stream handle to the
-                // output parameter
-                vecHstms.clear();
-                ret = GetHstream(
-                    pOutArgs, vecHstms );
-                if( ERROR( ret ) )
-                    break;
-
-                for( auto& elem : vecHstms )
-                {
-                    CFormalArg* pfa = elem;
-                    std::string strLocal =
-                        pfa->GetName();
-
-                    // assign the stream handle to
-                    // the out parameter
-                    CCOUT << strLocal << "_h = "
-                        strLocal << ".m_hStream;";
-
-                    NEW_LINE;
-                }
                 NEW_LINE;
                 Wa( "return ret" );
             }
@@ -3159,32 +3211,23 @@ gint32 CImplIfMethodProxy::OutputSync()
 
         BLOCK_CLOSE;
 
-    }while( 0 )
+    }while( 0 );
     
     return ret;
 }
 
 gint32 CImplIfMethodProxy::OutputAsync()
 {
-    ObjPtr pInArgs = m_pNode->GetInArgs();
-    ObjPtr pOutArgs = m_pNode->GetOutArgs();
-    CArgList* pinal = pInArgs;
-    CArgList* poutal = pOutArgs;
-
     gint32 ret = 0;
     std::string strClass = "I";
-    strIfName += m_pIf->GetName();
+    std::string strIfName = m_pIf->GetName();
     strClass += strIfName + "_PImpl";
-    strMethod = m_pNode->GetName();
+    std::string strMethod = m_pNode->GetName();
 
-    guint32 dwInCount = 0;
-    guint32 dwOutCount = 0;
+    ObjPtr pInArgs = m_pNode->GetInArgs();
+    ObjPtr pOutArgs = m_pNode->GetOutArgs();
 
-    if( pinal != nullptr )
-        dwInCount += pinal->GetCount();
-
-    if( poutal != nullptr )
-        dwOutCount += poutal->GetCount();
+    guint32 dwInCount = GetArgCount( pInArgs );
 
     bool bSerial = m_pNode->IsSerialize();
 
@@ -3205,7 +3248,7 @@ gint32 CImplIfMethodProxy::OutputAsync()
             strArgList =
                 ToStringInArgs( pInArgs );
 
-            CCOUT << strArgList << " )
+            CCOUT << strArgList << " )";
         }
         INDENT_DOWN;
         NEW_LINE;
@@ -3227,7 +3270,7 @@ gint32 CImplIfMethodProxy::OutputAsync()
         else
             CCOUT << "( guint32 )seriNone;";
 
-        NEW_LINE( 2 );
+        NEW_LINES( 2 );
         
         Wa( "CParamList oReqCtx;" );
         Wa( "ObjPtr pTemp( context );" );
@@ -3239,7 +3282,7 @@ gint32 CImplIfMethodProxy::OutputAsync()
         Wa(  "pRespCb, ObjPtr( this ), " );
         CCOUT << "&" << strClass << "::"
             << strMethod << "CbWrapper, "
-            << "nullptr, oReqCtx.GetCfg() );
+            << "nullptr, oReqCtx.GetCfg() );";
         INDENT_DOWN;
 
         Wa( "if( ERROR( ret ) ) return ret;" );
@@ -3270,20 +3313,7 @@ gint32 CImplIfMethodProxy::OutputAsync()
             {
                 CCOUT << ", ";
                 INDENT_UP;
-                std::vector< std::string > vecArgs;
-                ret = GetArgsForCall(
-                    pInArgs, vecArgs );
-                if( ERROR( ret ) )
-                    break;
-
-                guint32 i = 0;
-                for( ; i < vecArgs.size(); i++ )
-                {
-                    NEW_LINE;
-                    CCOUT << elem;
-                    if( i + 1 < vecArgs.size() )
-                        CCOUT << ", ";
-                }
+                GenActParams( pInArgs );
                 INDENT_DOWN;
             }
 
@@ -3297,41 +3327,13 @@ gint32 CImplIfMethodProxy::OutputAsync()
         else /* need serialize */
         {
             Wa( "//Serialize the input parameters" );
-            Wa( "BufPtr pBuf( true ); " );
+            ret = GenSerialArgs(
+                pInArgs, "pBuf", true, true );
 
-            Wa( "CSeriBase oSerial;" );
-            CEmitSerialCode oesc(
-                m_pWriter, pInArgs );
-
-            std::vector< ObjPtr > vecHstms;
-            ret = GetHstream(
-                pInArgs, vecHstms );
-            if( ERROR( ret ) )
-                break;
-
-            for( auto& elem : vecHstms )
-            {
-                CFormalArg* pfa = elem;
-                std::string strLocal =
-                    pfa->GetName();
-
-                // Init the hstream structure for
-                // serialization 
-                CCOUT << "HSTREAM " << strLocal;
-                CCOUT << strLocal <<
-                    ".m_pIf = this;";
-                CCOUT << strLocal << ".m_hStream = "
-                    << strLocal << "_h";
-                NEW_LINE;
-            }
-
-            NEW_LINE;
-            ret = oesc.OutputSerial( "oSerial" );
             if( ERROR( ret ) )
                 break;
 
             NEW_LINE;
-
             Wa( " ret = this->AsyncCall(" );
             INDENT_UP;
             Wa( "( IEventSink* )pRespCb, " );
@@ -3348,32 +3350,23 @@ gint32 CImplIfMethodProxy::OutputAsync()
 
         BLOCK_CLOSE;
 
-    }while( 0 )
+    }while( 0 );
     
     return ret;
 }
 
 gint32 CImplIfMethodProxy::OutputAsyncCbWrapper()
 {
-    ObjPtr pInArgs = m_pNode->GetInArgs();
-    ObjPtr pOutArgs = m_pNode->GetOutArgs();
-    CArgList* pinal = pInArgs;
-    CArgList* poutal = pOutArgs;
-
     gint32 ret = 0;
     std::string strClass = "I";
-    strIfName += m_pIf->GetName();
+    std::string strIfName = m_pIf->GetName();
     strClass += strIfName + "_PImpl";
-    strMethod = m_pNode->GetName();
+    std::string strMethod = m_pNode->GetName();
 
-    guint32 dwInCount = 0;
-    guint32 dwOutCount = 0;
+    ObjPtr pInArgs = m_pNode->GetInArgs();
+    ObjPtr pOutArgs = m_pNode->GetOutArgs();
 
-    if( pinal != nullptr )
-        dwInCount += pinal->GetCount();
-
-    if( poutal != nullptr )
-        dwOutCount += poutal->GetCount();
+    guint32 dwOutCount = GetArgCount( pOutArgs );
 
     bool bSerial = m_pNode->IsSerialize();
 
@@ -3388,13 +3381,14 @@ gint32 CImplIfMethodProxy::OutputAsyncCbWrapper()
         Wa( "IConfigDb* pReqCtx )" );
 
         INDENT_DOWN;
-        NEW_LINES( 2 );
+        NEW_LINE;
+        BLOCK_OPEN;
 
         Wa( "gint32 ret = 0;" );
-        CCOUT << "do{";
-        INDENT_UP;
+        CCOUT << "do";
+        BLOCK_OPEN;
         NEW_LINE; 
-        Wa( "CCfgOpenerObj oReq( pIoReq );" )
+        Wa( "CCfgOpenerObj oReq( pIoReq );" );
         Wa( "ret = oReq.GetPointer(" );
         Wa( "propRespPtr, pResp );" );
         Wa( "if( ERROR( ret ) )" );
@@ -3402,12 +3396,16 @@ gint32 CImplIfMethodProxy::OutputAsyncCbWrapper()
 
         Wa( "CCfgOpener oResp( pResp );" );
         Wa( "gint32 iRet = 0;" );
-        Wa( "ret = oResp.GetIntProp( propReturnValue," );
-        CCOUT << "( guint32& ) iRet );";
-        NEW_LINE;
+        Wa( "ret = oResp.GetIntProp( " );
+
+        INDENT_UPL;
+        CCOUT << "propReturnValue, ( guint32& ) iRet );";
+        INDENT_DOWNL;
 
         Wa( "if( ERROR( ret ) )" );
-        Wa( "    break;" );
+        INDENT_UP;
+        Wa( "break;" );
+        INDENT_DOWN;
 
         Wa( "IConfigDb* context = nullptr" );
         Wa( "CCfgOpener oReqCtx( pReqCtx );" );
@@ -3422,48 +3420,28 @@ gint32 CImplIfMethodProxy::OutputAsyncCbWrapper()
         }
         else if( !bSerial )
         {
-            std::vector< std::string > vecLocals;
-            ret = GenLocals( pOutArgs, vecLocals );
-            if( ERROR( ret ) )
-                break;
-
-            for( auto& elem : vecLocals )
-            {
-                CCOUT << vecLocals[ i ] << ";"
-                NEW_LINE;
-            }
+            DeclLocals( pOutArgs );
 
             Wa( "if( ERROR( iRet ) )" );
             BLOCK_OPEN;
 
-            CCOUT << strMethod << "Callback( context, iRet";
+            CCOUT << strMethod << "Callback( context, iRet,";
             NEW_LINE;
-            INDENT_UP
+            INDENT_UP;
 
-            std::vector< std::string > vecArgs;
-            ret = GetArgsForCall( pOutArgs, vecArgs );
-            if( ERROR( ret ) )
-                break;
-
-            // pass some random values
-            for( auto& elem : vecArgs )
-            {
-                CCOUT << ",";
-                NEW_LINE;
-                CCOUT << elem;
-            }
+            GenActParams( pOutArgs );
 
             CCOUT << " )";
             NEW_LINE;
             INDENT_DOWN;
 
             Wa( "return iRet;" );
-
             BLOCK_CLOSE;
 
             Wa( "guint32 i = 0;" );
             Wa( "std::vector< BufPtr > vecParms" );
-            Wa( "for( ; i <" << dwOutCount<< "; i++ )" );
+            CCOUT << "for( ; i <" << dwOutCount<< "; i++ )";
+            NEW_LINE;
             BLOCK_OPEN;
             Wa( "BufPtr pVal;" );
             Wa( "ret = oResp.GetProperty( i, pVal );" );
@@ -3491,6 +3469,7 @@ gint32 CImplIfMethodProxy::OutputAsyncCbWrapper()
                 CCOUT << "vecParams[" << i << "] )";
             }
 
+            CCOUT << " )";
             INDENT_DOWN;
             NEW_LINE;
 
@@ -3499,103 +3478,23 @@ gint32 CImplIfMethodProxy::OutputAsyncCbWrapper()
         }
         else /* need serialization */
         {
-            std::vector< std::string > vecLocals;
-            ret = GenLocals( pOutArgs, vecLocals );
+            Wa( "BufPtr pBuf;" );
+            Wa( "ret = oResp.GetProperty( 0, pBuf );" );
+            Wa( "if( ERROR( ret ) ) break;" );
+
+            DeclLocals( pOutArgs );
+            ret = GenDeserialArgs( pOutArgs,
+                "pBuf", false, false );
             if( ERROR( ret ) )
                 break;
 
-            // declare locals for output params
-            for( auto& elem : vecLocals )
-            {
-                CCOUT << vecLocals[ i ] << ";"
-                NEW_LINE;
-            }
-
-            Wa( "if( ERROR( iRet ) )" );
-            BLOCK_OPEN;
-
+            NEW_LINE;
             CCOUT << "this->" << strMethod
-                << "Callback( context, iRet";
+                <<"Callback( context, iRet,";
             NEW_LINE;
-            INDENT_UP
-
-            std::vector< std::string > vecArgs;
-            ret = GetArgsForCall( pOutArgs, vecArgs );
-            if( ERROR( ret ) )
-                break;
-
-            // pass some random values on error
-            for( auto& elem : vecArgs )
-            {
-                CCOUT << ",";
-                NEW_LINE;
-                CCOUT << elem;
-            }
-
-            CCOUT << " )";
-            NEW_LINE;
-            INDENT_DOWN;
-
-            Wa( "return iRet;" );
-            BLOCK_CLOSE;
-
-            std::vector< ObjPtr > vecHstms;
-            ret = GetHstream(
-                pInArgs, vecHstms );
-            if( ERROR( ret ) )
-                break;
-
-            for( auto& elem : vecHstms )
-            {
-                CFormalArg* pfa = elem;
-                std::string strLocal =
-                    pfa->GetName();
-
-                CCOUT << strLocal <<
-                    ".m_pIf = this;";
-                NEW_LINE;
-            }
-            NEW_LINE;
-
-            Wa( "CSeriBase oDeserial;" );
-            CEmitSerialCode odes(
-                m_pWriter, pOutArgs );
-
-            CCOUT << "do";
-            BLOCK_OPEN;
-            ret = odes.OutputDeserial(
-                "oDeserial" );
-            if( ERROR( ret ) )
-                break;
-
-            BLOCK_CLOSE;
-            CCOUT << "while( 0 );";
-
-            Wa( "if( ERROR( ret ) )" );
             INDENT_UP;
-            NEW_LINE;
-            Wa( "return ret;" );
-            INDENT_DOWN;
-            NEW_LINE;
 
-            NEW_LINE;
-            CCOUT << "this->" << strMethod
-                <<"Callback( context, iRet";
-            NEW_LINE;
-            INDENT_UP
-
-            std::vector< std::string > vecArgs;
-            ret = GetArgsForCall( pOutArgs, vecArgs );
-            if( ERROR( ret ) )
-                break;
-
-            // pass some random values
-            for( auto& elem : vecArgs )
-            {
-                CCOUT << ",";
-                NEW_LINE;
-                CCOUT << elem;
-            }
+            GenActParams( pOutArgs );
 
             CCOUT << " );";
             INDENT_DOWN;
@@ -3606,56 +3505,16 @@ gint32 CImplIfMethodProxy::OutputAsyncCbWrapper()
 
         INDENT_DOWN;
         NEW_LINE;
-        Wa( "}while( 0 );" );
+        BLOCK_CLOSE;
+        Wa( "while( 0 );" );
+        Wa( "return ret" );
 
         BLOCK_CLOSE;
 
-    }while( 0 )
+    }while( 0 );
     
     return ret;
 }
-
-CImplIfMethodSvr::CImplIfMethodSvr(
-    CCppWriter* pWriter,
-    ObjPtr& pNode )
-{
-    m_pWriter = pWriter;
-    m_pNode = pNode;
-    if( m_pNode == nullptr )
-    {
-        std::string strMsg = DebugMsg(
-            -EFAULT, "internal error empty "
-            "'interf_decl' node" );
-        throw std::runtime_error( strMsg );
-    }
-
-    CAstNodeBase* pParent = pNode->GetParent();
-    if( pParent == nullptr )
-    {
-        std::string strMsg = DebugMsg(
-            -EFAULT, "internal error empty "
-            "'method_decls' node" );
-        throw std::runtime_error( strMsg );
-    }
-    pParent = pParent->GetParent();
-    if( pParent == nullptr )
-    {
-        std::string strMsg = DebugMsg(
-            -EFAULT, "internal error empty "
-            "'interf_decl' node" );
-        throw std::runtime_error( strMsg );
-    }
-
-    m_pIf = ObjPtr( pParent );
-    if( m_pIf == nullptr )
-    {
-        std::string strMsg = DebugMsg(
-            -EFAULT, "internal error empty "
-            "'interf_decl' node" );
-        throw std::runtime_error( strMsg );
-    }
-};
-
 
 gint32 CImplIfMethodSvr::Output()
 {
@@ -3672,6 +3531,10 @@ gint32 CImplIfMethodSvr::Output()
         else if( m_pNode->IsAsyncp() )
         {
             ret = OutputAsync();
+            if( ERROR( ret ) )
+                break;
+
+            ret = OutputAsyncCallback();
         }
         else
         {
@@ -3687,20 +3550,14 @@ gint32 CImplIfMethodSvr::Output()
 
 gint32 CImplIfMethodSvr::OutputEvent()
 {
-    ObjPtr pInArgs = m_pNode->GetInArgs();
-
     gint32 ret = 0;
     std::string strClass = "I";
-    strIfName += m_pIf->GetName();
+    std::string strIfName = m_pIf->GetName();
     strClass += strIfName + "_SImpl";
-    strMethod = m_pNode->GetName();
+    std::string strMethod = m_pNode->GetName();
 
-    CArgList* pinal = pInArgs;
-    CArgList* poutal = pOutArgs;
-    guint32 dwInCount = 0;
-
-    if( pinal != nullptr )
-        dwInCount += pinal->GetCount();
+    ObjPtr pInArgs = m_pNode->GetInArgs();
+    guint32 dwInCount = GetArgCount( pInArgs );
 
     bool bSerial = m_pNode->IsSerialize();
 
@@ -3708,38 +3565,33 @@ gint32 CImplIfMethodSvr::OutputEvent()
         std::string strArgList;
         CCOUT << "gint32 " << strClass << "::"
             << strMethod << "( ";
-        INDENT_UP;
-        NEW_LINE;
+        INDENT_UPL;
 
         // gen the param list
-        if( dwInCount == 0 &&
-            dwOutCount == 0 )
+        if( dwInCount == 0 )
         {
             CCOUT << " )";
         }
         else
         {
-            bool bComma = false;
-            if( dwInCount > 0 )
-            {
-                bComma = true;
-                strArgList =
-                    ToStringInArgs( pInArgs );
-            }
-
-            CCOUT << strArgList << " )
+            strArgList =
+                ToStringInArgs( pInArgs );
+            CCOUT << strArgList << " )";
         }
-        INDENT_DOWN;
-        NEW_LINE;
 
+        INDENT_DOWNL;
         BLOCK_OPEN;
+
+        Wa( "CParamList oOptions;" );
+        CCOUT << "oOptions[ propSeriProto ] = ";
+        if( bSerial )
+            CCOUT << "( guint32 )seriRidl;";
+        else
+            CCOUT << "( guint32 )seriNone;";
+        NEW_LINE;
 
         if( 0 == dwInCount )
         {
-            Wa( "CParamList oOptions;" );
-            CCOUT << "oOptions[ propSeriProto ] = "
-                << "( guint32 )seriNone;";
-            NEW_LINE;
             CCOUT << " ret = this->SendEventEx("
                 << "nullptr, oOptions.GetCfg(), iid("
                 << strIfName << "), "
@@ -3750,79 +3602,24 @@ gint32 CImplIfMethodSvr::OutputEvent()
         }
         else if( !bSerial )
         {
-            Wa( "CParamList oOptions;" );
-            CCOUT << "oOptions[ propSeriProto ] = "
-                << "( guint32 )seriNone;";
-            NEW_LINE;
             CCOUT << " ret = this->SendEventEx("
                 << "nullptr, oOptions.GetCfg(), iid("
                 << strIfName << "), "
                 << "\"" << strMethod << "\", ";
 
-            if( dwInCount > 0 )
-            {
-                CCOUT << ", ";
-                INDENT_UP;
-                std::vector< std::string > vecArgs;
-                ret = GetArgsForCall(
-                    pInArgs, vecArgs );
-                if( ERROR( ret ) )
-                    break;
-
-                guint32 i = 0;
-                for( ; i < vecArgs.size(); i++ )
-                {
-                    NEW_LINE;
-                    CCOUT << elem;
-                    if( i + 1 < vecArgs.size() )
-                        CCOUT << ", ";
-                }
-            }
-
+            INDENT_UP;
+            ret = GenActParams( pInArgs );
+            if( ERROR( ret ) )
+                break;
             CCOUT << " );";
-            INDENT_DOWN;
-
-            NEW_LINE;
+            INDENT_DOWNL;
             Wa( "return ret;" );
         }
         else /* need serialize */
         {
-            Wa( "CParamList oOptions;" );
-            CCOUT << "oOptions[ propSeriProto ] = "
-                << "( guint32 )seriRidl;";
-            NEW_LINE;
-
             Wa( "//Serialize the input parameters" );
-            Wa( "BufPtr pBuf( true ); " );
-
-            Wa( "CSeriBase oSerial;" );
-            CEmitSerialCode oesc(
-                m_pWriter, pInArgs );
-
-            std::vector< ObjPtr > vecHstms;
-            ret = GetHstream(
-                pInArgs, vecHstms );
-            if( ERROR( ret ) )
-                break;
-
-            for( auto& elem : vecHstms )
-            {
-                CFormalArg* pfa = elem;
-                std::string strLocal =
-                    pfa->GetName();
-
-                // Init the hstream structure for
-                // serialization 
-                CCOUT << "HSTREAM " << strLocal;
-                CCOUT << strLocal <<
-                    ".m_pIf = this;";
-                CCOUT << strLocal << ".m_hStream = "
-                    << strLocal << "_h";
-                NEW_LINE;
-            }
-
-            NEW_LINE;
-            ret = oesc.OutputSerial( "oSerial" );
+            ret = GenSerialArgs(
+                pInArgs, "pBuf", true, true );
             if( ERROR( ret ) )
                 break;
 
@@ -3838,37 +3635,23 @@ gint32 CImplIfMethodSvr::OutputEvent()
 
         BLOCK_CLOSE;
 
-    }while( 0 )
+    }while( 0 );
     
     return ret;
 }
 
 gint32 CImplIfMethodSvr::OutputSync()
 {
-    ObjPtr pInArgs = m_pNode->GetInArgs();
-    CArgList* pinal = pInArgs;
-    if( pinal == nullptr )
-        return 0;
-
     gint32 ret = 0;
     std::string strClass = "I";
     strClass += m_pIf->GetName() + "_SImpl";
-    strMethod = m_pNode->GetName();
+    std::string strMethod = m_pNode->GetName();
 
-    ObjPtr pInArgs = pmd->GetInArgs();
-    ObjPtr pOutArgs = pmd->GetOutArgs();
+    ObjPtr pInArgs = m_pNode->GetInArgs();
+    ObjPtr pOutArgs = m_pNode->GetOutArgs();
 
-    CArgList* pinal = pInArgs;
-    CArgList* poutal = pOutArgs;
-    guint32 dwInCount = 0;
-    guint32 dwOutCount = 0;
-
-    if( pinal != nullptr )
-        dwInCount += pinal->GetCount();
-
-    if( poutal != nullptr )
-        dwOutCount += poutal->GetCount();
-
+    guint32 dwInCount = GetArgCount( pInArgs );
+    guint32 dwOutCount = GetArgCount( pOutArgs );
     guint32 dwCount = dwInCount + dwOutCount;
 
     bool bSerial = m_pNode->IsSerialize();
@@ -3877,29 +3660,26 @@ gint32 CImplIfMethodSvr::OutputSync()
         std::string strArgList;
         CCOUT << "gint32 " << strClass << "::"
             << strMethod << "Wrapper( ";
-        INDENT_UP;
-        NEW_LINE;
+        INDENT_UPL;
         CCOUT << "IEventSink* pCallback";
         if( dwCount == 0 )
         {
-            CCOUT << " )";
         }
         else if( bSerial )
         {
-            CCOUT << ", BufPtr& pBuf )";
+            CCOUT << ", BufPtr& pBuf";
         }
         else
         {
             strArgList =
                 ToStringInArgs( pInArgs );
-            if( !strArgList.empty() )
-                CCOUT << ", " << strArgList 
 
-            CCOUT << " )";
+            if( !strArgList.empty() )
+                CCOUT << ", " << strArgList;
         }
 
-        INDENT_DOWN;
-        NEW_LINE;
+        CCOUT << " )";
+        INDENT_DOWNL;
 
         BLOCK_OPEN;
 
@@ -3909,8 +3689,6 @@ gint32 CImplIfMethodSvr::OutputSync()
                 << strMethod << "();";
 
             Wa( "CParamList oResp;" );
-            INDENT_UP;
-            NEW_LINE;
             BLOCK_OPEN;
             Wa( "oResp[ propReturnValue ] = ret;" );
             Wa( "this->SetResponse( pCallback, oResp.GetCfg() )" );
@@ -3918,38 +3696,24 @@ gint32 CImplIfMethodSvr::OutputSync()
         }
         else if( !bSerial )
         {
-            CCOUT << "return this->"
+            CCOUT << "ret = this->"
                 << strMethod << "(";
-            INDENT_UP;
+            INDENT_UPL;
 
-            std::vector< std::string > vecArgs;
-            ret = GetArgsForCall(
-                pInArgs, vecArgs );
-            if( ERROR( ret ) )
-                break;
+            GenActParams( pInArgs, pOutArgs );
 
-            bool bFirst = true;
-            for( auto& elem : vecArgs )
-            {
-                if( !bFirst )
-                    CCOUT << ",";
-                NEW_LINE;
-                CCOUT << elem;
-            }
-
-            if( vecArgs.size() )
+            if( dwInCount > 0 )
                 CCOUT <<  " );";
             else
                 CCOUT << ");";
- 
+            INDENT_DOWNL;
+
             Wa( "CParamList oResp;" );
             Wa( "oResp[ propReturnValue ] = ret;" );
             Wa( "if( SUCCEEDED( ret ) )" );
-            INDENT_UP;
-            NEW_LINE;
             BLOCK_OPEN;
 
-            vecArgs.clear();
+            std::vector< std::string > vecArgs;
             ret = GetArgsForCall( pOutArgs, vecArgs );
             for( auto& elem : vecArgs )
             {
@@ -3958,118 +3722,30 @@ gint32 CImplIfMethodSvr::OutputSync()
             }
             Wa( "this->SetResponse( pCallback, oResp.GetCfg() )" );
             BLOCK_CLOSE;
-
         }
         else
         {
             Wa( "gint32 ret = 0;" );
 
-            std::vector< string > vecInLocals;
-            ret = GenLocals(
-                pInArgs, vecInLocals );
-            if( ERROR( ret ) )
-                break;
+            DeclLocals( pInArgs );
 
-            std::vector< string > vecOutLocals;
-            ret = GenLocals(
-                pOutArgs, vecOutLocals );
-            if( ERROR( ret ) )
-                break;
-
-            for( auto& elem : vecInLocals )
-            {
-                CCOUT << elem << ";";
-                NEW_LINE;
-            }
-
-            for( auto& elem : vecOutLocals )
-            {
-                CCOUT << elem << ";";
-                NEW_LINE;
-            }
+            NEW_LINE;
+            DeclLocals( pOutArgs );
 
             NEW_LINE;
 
-            Wa( "CSeriBase oDeserial;" );
-            CEmitSerialCode odes(
-                m_pWriter, pInArgs );
-
-            std::vector< ObjPtr > vecHstms;
-            ret = GetHstream(
-                pInArgs, vecHstms );
-            if( ERROR( ret ) )
-                break;
-
-            ret = GetHstream(
-                pOutArgs, vecHstms );
-
-            for( auto& elem : vecHstms )
+            if( dwInCount > 0 )
             {
-                CFormalArg* pfa = elem;
-                std::string strLocal =
-                    pfa->GetName();
-
-                CCOUT << strLocal <<
-                    ".m_pIf = this;";
-                NEW_LINE;
+                ret = GenDeserialArgs(
+                    pInArgs, "pBuf", false, false );
             }
-
-            CCOUT << "do";
-            BLOCK_OPEN;
-            ret = odes.OutputDeserial(
-                "oDeserial" );
-            if( ERROR( ret ) )
-                break;
-
-            BLOCK_CLOSE;
-            CCOUT << "while( 0 );";
-
-            Wa( "if( ERROR( ret ) )" );
-            INDENT_UP;
-            NEW_LINE;
-            Wa( "return ret;" );
-            INDENT_DOWN;
-            NEW_LINE;
-
-            std::vector< std::string > vecInArgs;
-            ret = GetArgsForCall(
-                pInArgs, vecArgs );
-            if( ERROR( ret ) )
-                break;
-
-            std::vector< std::string > vecOutArgs;
-            ret = GetArgsForCall(
-                pOutArgs, vecOutArgs );
-            if( ERROR( ret ) )
-                break;
 
             // call the user's handler
-            CCOUT << "ret ="
-                << strMethod << "(";
-
+            CCOUT << "ret =" << strMethod << "(";
             INDENT_UP;
-            guint32 i = 0;
-            bool bComma = false;
-            for( ; i < dwInCount; i++ )
-            {
-                bComma = true;
-                NEW_LINE;
-                CCOUT << " " << vecInArgs[ i ];
-                if( i + 1 < vecInArgs.size() )
-                    CCOUT << ", ";
-            }
+            NEW_LINE;
 
-            for( ; i < dwOutCount; i++ )
-            {
-                if( bComma )
-                {
-                    CCOUT << ", ";
-                    bComma = false;
-                }
-                CCOUT << " " << vecOutArgs[ i ];
-                if( i + 1 < vecOutArgs.size() )
-                    CCOUT << ", ";
-            }
+            GenActParams( pInArgs, pOutArgs );
 
             if( dwInCount + dwOutCount == 0 )
                 CCOUT << ");";
@@ -4087,18 +3763,11 @@ gint32 CImplIfMethodSvr::OutputSync()
             BLOCK_OPEN;
 
             Wa( "BufPtr pBuf2( true )" );
-            Wa( "CSeriBase oSerial;" );
-            CEmitSerialCode oesc(
-                m_pWriter, pInArgs );
-            Wa( "do" );
-            BLOCK_OPEN;
-            ret = oesc.OutputSerial( "oSerial", "pBuf2" );
+            ret = GenSerialArgs(
+                pOutArgs, "pBuf2", false, false );
             if( ERROR( ret ) )
                 break;
 
-            BLOCK_CLOSE;
-            Wa( "while( 0 );" );
-            Wa( "if( ERROR( ret ) ) return ret" );
             Wa( "oResp.push( pBuf );" );
             BLOCK_CLOSE;
         }
@@ -4106,38 +3775,23 @@ gint32 CImplIfMethodSvr::OutputSync()
         Wa( "return ret" );
         BLOCK_CLOSE;
 
-    }while( 0 )
+    }while( 0 );
     
     return ret;
 }
 
 gint32 CImplIfMethodSvr::OutputAsync()
 {
-    ObjPtr pInArgs = m_pNode->GetInArgs();
-    CArgList* pinal = pInArgs;
-    if( pinal == nullptr )
-        return 0;
-
     gint32 ret = 0;
     std::string strClass = "I";
     strClass += m_pIf->GetName() + "_SImpl";
-    strMethod = m_pNode->GetName();
+    std::string strMethod = m_pNode->GetName();
 
-    ObjPtr pInArgs = pmd->GetInArgs();
-    ObjPtr pOutArgs = pmd->GetOutArgs();
+    ObjPtr pInArgs = m_pNode->GetInArgs();
+    ObjPtr pOutArgs = m_pNode->GetOutArgs();
 
-    CArgList* pinal = pInArgs;
-    CArgList* poutal = pOutArgs;
-    guint32 dwInCount = 0;
-    guint32 dwOutCount = 0;
-
-    if( pinal != nullptr )
-        dwInCount += pinal->GetCount();
-
-    if( poutal != nullptr )
-        dwOutCount += poutal->GetCount();
-
-    guint32 dwCount = dwInCount + dwOutCount;
+    guint32 dwInCount = GetArgCount( pInArgs );
+    guint32 dwOutCount = GetArgCount( pOutArgs );
 
     bool bSerial = m_pNode->IsSerialize();
 
@@ -4160,112 +3814,25 @@ gint32 CImplIfMethodSvr::OutputAsync()
 
         Wa( "gint32 ret = 0;" );
 
-        std::vector< string > vecInLocals;
-        ret = GenLocals(
-            pInArgs, vecInLocals );
-        if( ERROR( ret ) )
-            break;
-
-        std::vector< string > vecOutLocals;
-        ret = GenLocals(
-            pOutArgs, vecOutLocals );
-        if( ERROR( ret ) )
-            break;
-
-        for( auto& elem : vecInLocals )
-        {
-            CCOUT << elem << ";";
-            NEW_LINE;
-        }
-
-        for( auto& elem : vecOutLocals )
-        {
-            CCOUT << elem << ";";
-            NEW_LINE;
-        }
-
+        DeclLocals( pInArgs );
         NEW_LINE;
 
-        Wa( "CSeriBase oDeserial;" );
-        CEmitSerialCode odes(
-            m_pWriter, pInArgs );
-
-        std::vector< ObjPtr > vecHstms;
-        ret = GetHstream(
-            pInArgs, vecHstms );
-        if( ERROR( ret ) )
-            break;
-
-        ret = GetHstream(
-            pOutArgs, vecHstms );
-
-        for( auto& elem : vecHstms )
-        {
-            CFormalArg* pfa = elem;
-            std::string strLocal =
-                pfa->GetName();
-
-            CCOUT << strLocal <<
-                ".m_pIf = this;";
-            NEW_LINE;
-        }
-
-        CCOUT << "do";
-        BLOCK_OPEN;
-        ret = odes.OutputDeserial(
-            "oDeserial" );
-        if( ERROR( ret ) )
-            break;
-
-        BLOCK_CLOSE;
-        CCOUT << "while( 0 );";
-
-        Wa( "if( ERROR( ret ) )" );
-        INDENT_UP;
-        NEW_LINE;
-        Wa( "return ret;" );
-        INDENT_DOWN;
+        DeclLocals( pOutArgs );
         NEW_LINE;
 
-        std::vector< std::string > vecInArgs;
-        ret = GetArgsForCall(
-            pInArgs, vecArgs );
-        if( ERROR( ret ) )
-            break;
-
-        std::vector< std::string > vecOutArgs;
-        ret = GetArgsForCall(
-            pOutArgs, vecOutArgs );
+        ret = GenDeserialArgs(
+            pInArgs, "pBuf", false, false );
         if( ERROR( ret ) )
             break;
 
         // call the user's handler
         CCOUT << "ret ="
-            << strMethod << "( pCallback";
+            << strMethod << "( pCallback,";
 
         INDENT_UP;
-        guint32 i = 0;
-        bool bComma = false;
-        for( ; i < dwInCount; i++ )
-        {
-            bComma = true;
-            NEW_LINE;
-            CCOUT << " " << vecInArgs[ i ];
-            if( i + 1 < vecInArgs.size() )
-                CCOUT << ", ";
-        }
+        NEW_LINE;
 
-        for( ; i < dwOutCount; i++ )
-        {
-            if( bComma )
-            {
-                CCOUT << ", ";
-                bComma = false;
-            }
-            CCOUT << " " << vecOutArgs[ i ];
-            if( i + 1 < vecOutArgs.size() )
-                CCOUT << ", ";
-        }
+        GenActParams( pInArgs, pOutArgs );
 
         if( dwInCount + dwOutCount == 0 )
             CCOUT << ");";
@@ -4284,61 +3851,36 @@ gint32 CImplIfMethodSvr::OutputAsync()
         BLOCK_OPEN;
 
         Wa( "BufPtr pBuf2( true )" );
-        Wa( "CSeriBase oSerial;" );
-        CEmitSerialCode oesc(
-            m_pWriter, pInArgs );
-        Wa( "do" );
-        BLOCK_OPEN;
-        ret = oesc.OutputSerial( "oSerial", "pBuf2" );
-        if( ERROR( ret ) )
-            break;
-
-        BLOCK_CLOSE;
-        Wa( "while( 0 );" );
-        Wa( "if( ERROR( ret ) ) return ret" );
+        ret = GenSerialArgs(
+            pOutArgs, "pBuf2", false, false );
         Wa( "oResp.push( pBuf );" );
         BLOCK_CLOSE;
 
         Wa( "return ret" );
         BLOCK_CLOSE;
 
-    }while( 0 )
+    }while( 0 );
     
     return ret;
 }
 
 gint32 CImplIfMethodSvr::OutputAsyncCallback()
 {
-    ObjPtr pInArgs = m_pNode->GetInArgs();
-    CArgList* pinal = pInArgs;
-    if( pinal == nullptr )
-        return 0;
-
     gint32 ret = 0;
     std::string strClass = "I";
     strClass += m_pIf->GetName() + "_SImpl";
-    strMethod = m_pNode->GetName();
+    std::string strMethod = m_pNode->GetName();
 
-    ObjPtr pInArgs = pmd->GetInArgs();
-    ObjPtr pOutArgs = pmd->GetOutArgs();
-
-    CArgList* pinal = pInArgs;
-    CArgList* poutal = pOutArgs;
-    guint32 dwInCount = 0;
-    guint32 dwOutCount = 0;
-
-    if( pinal != nullptr )
-        dwInCount += pinal->GetCount();
-
-    if( poutal != nullptr )
-        dwOutCount += poutal->GetCount();
-
-    guint32 dwCount = dwInCount + dwOutCount;
+    ObjPtr pInArgs = m_pNode->GetInArgs();
+    ObjPtr pOutArgs = m_pNode->GetOutArgs();
 
     bool bSerial = m_pNode->IsSerialize();
 
     do{
         std::string strArgList;
+        Wa( "// call me when you have completed" );
+        Wa( "// the asynchronous operation" );
+
         CCOUT << "gint32 " << strClass << "::"
             << strMethod << "Callback( ";
         INDENT_UP;
@@ -4360,89 +3902,33 @@ gint32 CImplIfMethodSvr::OutputAsyncCallback()
         BLOCK_OPEN;
         Wa( "gint32 ret = 0;" );
 
+        Wa( "if( ret == STATUS_PENDING )" );
+        INDENT_UP;
+        Wa( "ret = ERROR_STATE;" );
+        INDENT_DOWN;
+        Wa( "else" );
+        INDENT_UP;
+        Wa( "ret = iRet;" );
+        INDENT_DOWN;
+        Wa( "CParamList oResp;" );
+        Wa( "oResp[ propReturnValue ] = ret;" );
+
         if( bSerial )
         {
-            NEW_LINE;
-            Wa( "BufPtr pBuf( true );" );
-            Wa( "CSeriBase oSerial;" );
-            CEmitSerialCode oesc(
-                m_pWriter, pInArgs );
-
-            std::vector< ObjPtr > vecHstms;
-            ret = GetHstream(
-                pInArgs, vecHstms );
-            if( ERROR( ret ) )
-                break;
-
-            ret = GetHstream(
-                pOutArgs, vecHstms );
-
-            for( auto& elem : vecHstms )
-            {
-                CFormalArg* pfa = elem;
-                std::string strLocal =
-                    pfa->GetName();
-
-                CCOUT << "HSTREAM " << strLocal;
-                CCOUT << strLocal <<
-                    ".m_pIf = this;";
-
-                CCOUT << strLocal
-                    << ".m_hStream = "
-                    << strLocal << "_h;";
-
-                NEW_LINE;
-            }
-
-            CCOUT << "do";
-            BLOCK_OPEN;
-            ret = oesc.OutputSerial( "oSerial" );
-            if( ERROR( ret ) )
-                break;
-
-            BLOCK_CLOSE;
-            CCOUT << "while( 0 );";
-
-            Wa( "if( ERROR( ret ) )" );
-            INDENT_UP;
-            NEW_LINE;
-            Wa( "return ret;" );
-            INDENT_DOWN;
-            NEW_LINE;
-
-
-            Wa( "ret = iRet;" );
-            Wa( "if( ret == STATUS_PENDING ) ret = ERROR_STATE;" );
-            Wa( "CParamList oResp;" );
-            Wa( "oResp[ propReturnValue ] = ret;" );
             Wa( "if( SUCCEEDED( ret ) )" );
-            INDENT_UP;
-            NEW_LINE;
-                Wa( "oResp.Push( pBuf )" );
-            INDENT_DOWN;
-            NEW_LINE
-
-            Wa( "this->OnServiceComplete( "
-            INDENT_UP;
-            NEW_LINE;
-                CCOUT << "oResp.GetCfg(), pCallback )";
-            INDENT_DOWN;
-            NEW_LINE
-
-            Wa( "return ret;" );
-
-            break;
+            BLOCK_OPEN;
+            Wa( "BufPtr pBuf( true );" );
+            ret = GenSerialArgs(
+                pOutArgs, "pBuf", true, true );
+            if( ERROR( ret ) )
+                break;
+            Wa( "oResp.Push( pBuf )" );
+            BLOCK_CLOSE;
         }
         else
         {
-            Wa( "ret = iRet;" );
-            Wa( "if( ret == STATUS_PENDING ) ret = ERROR_STATE;" );
-            Wa( "CParamList oResp;" );
-            Wa( "oResp[ propReturnValue ] = ret;" );
             Wa( "if( SUCCEEDED( ret ) )" );
-            INDENT_UP;
-            NEW_LINE;
-
+            BLOCK_OPEN;
             std::vector< std::string > vecArgs;
             ret = GetArgsForCall( pOutArgs, vecArgs );
             if( ERROR( ret ) )
@@ -4451,24 +3937,20 @@ gint32 CImplIfMethodSvr::OutputAsyncCallback()
             for( auto& elem : vecArgs )
             {
                 CCOUT << "oResp.Push( "
-                    << vecArgs[ i ] << " );";
+                    << elem << " );";
             }
-
-            INDENT_DOWN;
-            NEW_LINE
-
-            Wa( "this->OnServiceComplete( " );
-            INDENT_UP;
-            NEW_LINE;
-                CCOUT << "( IConfigDb* )oResp.GetCfg(), pCallback )";
-            INDENT_DOWN;
-            NEW_LINE
-
-            Wa( "return ret;" );
+            BLOCK_CLOSE;
         }
+
+        Wa( "this->OnServiceComplete( " );
+        INDENT_UPL;
+        CCOUT << "( IConfigDb* )oResp.GetCfg(), pCallback )";
+        INDENT_DOWNL;
+        Wa( "return ret;" );
+
         BLOCK_CLOSE;
 
-    }while( 0 )
+    }while( 0 );
     
     return ret;
 }

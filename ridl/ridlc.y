@@ -56,8 +56,6 @@ std::map< gint32, std::set< gint32 > >
         { TOK_HSTREAM, { typeNone } }
     };
 
-};
-
 extern std::vector<
     std::unique_ptr< FILECTX > > g_vecBufs;
 

@@ -1,4 +1,5 @@
-enum EnumMyClsid
+#pragma once
+enum EnumRidlClsid
 {
     DECL_CLSID( CAttrExp ) = clsid( ClassFactoryStart ) + 40,
     DECL_CLSID( CAttrExps ),

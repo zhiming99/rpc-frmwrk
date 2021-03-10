@@ -24,6 +24,7 @@
 #include <rpc.h>
 
 using namespace rpcfrmwrk;
+#include "ridlc.h"
 #include "streamex.h"
 #include "seribase.h"
 
@@ -35,7 +36,7 @@ std::map< gint32, char > g_mapTypeSig = {
     { TOK_UINT16, 'W' },
     { TOK_INT16, 'w' },
     { TOK_FLOAT, 'f' },
-    { TOK_DOUBLE, 'D' },
+    { TOK_DOUBLE, 'F' },
     { TOK_BOOL, 'b' },
     { TOK_BYTE, 'B' },
     { TOK_HSTREAM, 'h' },
@@ -43,6 +44,7 @@ std::map< gint32, char > g_mapTypeSig = {
     { TOK_BYTEARR, 'a' },
     { TOK_OBJPTR, 'o' },
     { TOK_STRUCT, 'O' }
+};
 
 template<>
 gint32 CSerialBase::Deserialize< bool >(

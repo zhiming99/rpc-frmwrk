@@ -8,7 +8,7 @@ TARGET:=$(OUTPUT_DIR)/$(TARGET_IMG)
 RIDLC_OBJ:= ridlc.o
 
 BISON_SRC:= ridlc.cpp
-SOURCES:=$(BISON_SRC) lexer.cpp seribase.cpp gencpp.cpp
+SOURCES:=$(BISON_SRC) lexer.cpp seribase.cpp gencpp.cpp astnode.cpp
 OBJS2:=$(SOURCES:%.cpp=$(OBJ_DIR)/%.o)
 
 all: $(TARGET)
