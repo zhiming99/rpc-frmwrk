@@ -342,7 +342,6 @@ struct_ref : TOK_IDENT
         if( SUCCEEDED( ret ) )
         {
             psr->SetName( strName );
-            ENABLE_STREAM( pTemp, psr );
             psr->EnableSerialize();
         }
         else
@@ -405,8 +404,7 @@ struct_decl : TOK_STRUCT TOK_IDENT '{' field_list '}'
         psd->SetName( strName );
         ObjPtr& pfl = *$4;
         psd->SetFieldList( pfl );
-
-        ENABLE_STREAM( pfl, psd );
+        psd->EnableSerialize();
 
         BufPtr pBuf( true );
         *pBuf = pNode;
@@ -525,7 +523,10 @@ idl_type :
         guint32& dwName = *$1;
         ppt->SetName( dwName );
         if( dwName == TOK_HSTREAM )
+        {
             ppt->EnableStream();
+            ppt->EnableSerialize();
+        }
         BufPtr pBuf( true );
         *pBuf = pObj;
         $$ = pBuf;
@@ -639,6 +640,7 @@ formal_arg : idl_type TOK_IDENT
         pfa->SetType( pType );
 
         ENABLE_STREAM( pType, pfa );
+        ENABLE_SERIAL( pType, pfa );
 
         BufPtr pBuf( true );
         *pBuf = pNode;

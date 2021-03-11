@@ -322,8 +322,7 @@ struct CPrimeType : public CAstNodeBase
             g_mapTypeSig.end() )
             return std::string( "" );
         std::string strRet;
-        strRet.append(
-            1, g_mapTypeSig[ m_dwAttrName ] );
+        strRet += g_mapTypeSig[ m_dwAttrName ];
         return strRet;
     }
 
@@ -555,8 +554,10 @@ struct CFieldDecl : public CNamedNode
             switch( ppt->GetName() )
             {
             case TOK_STRING:
+                strVal += '"';
                 strVal +=
                     ( const char*)m_pVal->ptr();
+                strVal += '"';
                 break;
             case TOK_UINT64:
                 strVal += std::to_string(

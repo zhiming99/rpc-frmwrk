@@ -22,8 +22,6 @@ release_clean: do_clean
 
 $(TARGET):$(OBJS2)
 
-$(OBJS2):$(SOURCES)
-
 lexer.cpp: ridlc.lex ridlc.h
 	flex ridlc.lex
 
