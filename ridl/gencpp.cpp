@@ -34,7 +34,7 @@ extern std::string g_strAppName;
 #define PROP_MESSAGE_ID             3
 
 gint32 CArgListUtils::GetArgCount(
-    ObjPtr& pArgs )
+    ObjPtr& pArgs ) const
 {
     if( pArgs.IsEmpty() )
         return 0;
@@ -164,7 +164,7 @@ std::string CArgListUtils::ToStringOutArgs(
 
 gint32 CArgListUtils::GenLocals(
     ObjPtr pArgList,
-    std::vector< std::string >& vecLocals )
+    std::vector< std::string >& vecLocals ) const
 {
     CArgList* pinal = pArgList;
     if( pinal == nullptr )
@@ -203,7 +203,7 @@ gint32 CArgListUtils::GenLocals(
 
 gint32 CArgListUtils::GetHstream(
     ObjPtr& pArgList,
-    std::vector< ObjPtr >& vecHstms )
+    std::vector< ObjPtr >& vecHstms ) const
 {
     CArgList* pinal = pArgList;
     if( pinal == nullptr )
@@ -241,7 +241,7 @@ gint32 CArgListUtils::GetHstream(
 
 gint32 CArgListUtils::GetArgsForCall(
     ObjPtr& pArgList,
-    std::vector< std::string >& vecArgs ) 
+    std::vector< std::string >& vecArgs )  const
 {
     CArgList* pinal = pArgList;
     if( pinal == nullptr )
@@ -281,14 +281,42 @@ gint32 CArgListUtils::GetArgsForCall(
 
 gint32 CArgListUtils::GetArgTypes(
     ObjPtr pArgList,
-    std::vector< std::string >& vecTypes )
+    std::set< ObjPtr >& setTypes ) const
+{
+    CArgList* pinal = pArgList;
+
+    if( pinal == nullptr )
+        return -EINVAL;
+   
+    gint32 ret = 0; 
+    do{
+        guint32 i = 0;
+        for( ; i < pinal->GetCount(); i++ )
+        {
+            ObjPtr pObj = pinal->GetChild( i );
+            CFormalArg* pfa = pObj;
+            if( pfa == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            pObj = pfa->GetType();
+            setTypes.insert( pObj );
+        }
+
+    }while( 0 );
+    return ret;
+}
+
+gint32 CArgListUtils::GetArgTypes(
+    ObjPtr pArgList,
+    std::vector< std::string >& vecTypes ) const
 {
     CArgList* pinal = pArgList;
     if( pinal == nullptr )
         return -EINVAL;
    
     gint32 ret = 0; 
-
     do{
         guint32 i = 0;
         for( ; i < pinal->GetCount(); i++ )
@@ -309,7 +337,6 @@ gint32 CArgListUtils::GetArgTypes(
         }
 
     }while( 0 );
-
     return ret;
 }
 
@@ -699,6 +726,58 @@ CFileSet::~CFileSet()
     m_vecFiles.clear();
 }
 
+gint32 SetStructRefs( ObjPtr& pRoot )
+{
+    if( pRoot.IsEmpty() )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        CStatements* pStmts = pRoot;
+        if( pStmts == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        for( guint32 i = 0;
+            i < pStmts->GetCount(); i++ )
+        {
+            ObjPtr pObj = pStmts->GetChild( i );
+            guint32 dwClsid =
+                ( guint32 )pObj->GetClsid();
+            switch( dwClsid )
+            {
+            case clsid( CServiceDecl ):
+                {
+                    CSetStructRefs ossr( pObj );
+                    ret = ossr.SetStructRefs();
+                    if( ERROR( ret ) )
+                        break;
+                    break;
+                }
+            case clsid( CTypedefDecl ):
+            case clsid( CStructDecl ) :
+            case clsid( CInterfaceDecl ):
+            case clsid( CAppName ) :
+                {
+                    break;
+                }
+            default:
+                {
+                    ret = -ENOTSUP;
+                    break;
+                }
+            }
+            if( ERROR( ret ) )
+                break;
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 GenHeaderFile(
     CCppWriter* pWriter, ObjPtr& pRoot )
 {
@@ -748,6 +827,9 @@ gint32 GenHeaderFile(
                 }
             case clsid( CStructDecl ) :
                 {
+                    CStructDecl* psd = pObj;
+                    if( psd->RefCount() == 0 )
+                        break;
                     CDeclareStruct ods(
                         pWriter, pObj );
                     ret = ods.Output();
@@ -755,12 +837,15 @@ gint32 GenHeaderFile(
                 }
             case clsid( CInterfaceDecl ):
                 {
-                    CAstNodeBase* pNode = pObj;
+                    CInterfaceDecl* pNode = pObj;
                     if( pNode == nullptr )
                     {
                         ret = -EFAULT;
                         break;
                     }
+
+                    if( pNode->RefCount() == 0 )
+                        break;
 
                     CDeclInterfProxy odip(
                         pWriter, pObj );
@@ -871,6 +956,9 @@ gint32 GenCppFile(
             {
             case clsid( CStructDecl ) :
                 {
+                    CStructDecl* psd = pObj;
+                    if( psd->RefCount() == 0 )
+                        break;
                     CImplSerialStruct oiss(
                         m_pWriter, pObj );
                     ret = oiss.Output();
@@ -890,6 +978,10 @@ gint32 GenCppFile(
                     oiufp.Output();
 
                     CInterfaceDecl* pifd = pObj;
+
+                    if( pifd->RefCount() == 0 )
+                        break;
+
                     ObjPtr pmdlobj =
                         pifd->GetMethodList();
 
@@ -964,6 +1056,8 @@ gint32 GenCppProj(
     do{
         CCppWriter oWriter(
             strOutPath, strAppName, pRoot );
+
+        SetStructRefs( pRoot );
 
         ret = GenHeaderFile( &oWriter, pRoot );
         if( ERROR( ret ) )
@@ -1073,6 +1167,9 @@ gint32 CDeclareClassIds::Output()
         if( pifd == nullptr )
             continue;
 
+        if( pifd->RefCount() == 0 )
+            continue;
+
         std::string strIfName =
             pifd->GetName();
         
@@ -1104,6 +1201,71 @@ CDeclareTypedef::CDeclareTypedef(
 
 gint32 CDeclareTypedef::Output()
 {
+    ObjPtr pType = m_pNode->GetType();
+    std::string strSig = GetTypeSig( pType );
+    if( strSig.find( 'O' ) != std::string::npos )
+    {
+        gint32 ret = 0;
+        std::set< ObjPtr > setStructs;
+        if( strSig.size() == 1 &&
+            strSig[ 0 ] == 'O' )
+        {
+            CStructRef* pRef = pType;
+            if( pRef == nullptr )
+                return -EFAULT;
+
+            ret = pRef->GetStructType( pType );
+            if( ERROR( ret ) )
+                return ret;
+
+            CStructDecl* psd = pType;
+            if( psd == nullptr )
+                return ret;
+
+            if( psd->RefCount() == 0 )
+                return ret;
+        }
+        else if( strSig[ 0 ] == '(' )
+        {
+            CSetStructRefs ossr( pType );
+            ret = ossr.ExtractStructArr(
+                pType, setStructs );
+            if( ERROR( ret ) )
+                return ret;
+
+            guint32 dwRef = 0;
+            for( auto& elem : setStructs )
+            {
+                CStructDecl* psd = elem;
+                if( psd == nullptr )
+                    continue;
+                dwRef += psd->RefCount();
+            }
+            if( dwRef == 0 )
+                return 0;
+        }
+        else if( strSig[ 0 ] == '[' )
+        {
+            std::set< ObjPtr > setStructs;
+            CSetStructRefs ossr( pType );
+            ret = ossr.ExtractStructMap(
+                pType, setStructs );
+            if( ERROR( ret ) )
+                return ret;
+
+            guint32 dwRef = 0;
+            for( auto& elem : setStructs )
+            {
+                CStructDecl* psd = elem;
+                if( psd == nullptr )
+                    continue;
+                dwRef += psd->RefCount();
+            }
+            if( dwRef == 0 )
+                return 0;
+        }
+    }
+
     std::string strVal =
         m_pNode->ToStringCpp();
     if( strVal.empty() )
@@ -1136,8 +1298,10 @@ gint32 CDeclareStruct::Output()
             m_pNode->GetName();
 
         AP( "struct " ); 
-        Wa( strName );
-        Wa( ": public CStructBase" );
+        CCOUT << strName;
+        INDENT_UPL;
+        CCOUT <<  ": public CStructBase";
+        INDENT_DOWNL;
         BLOCK_OPEN;
     
         ObjPtr pFileds =
@@ -1507,17 +1671,16 @@ gint32 CDeclInterfProxy::OutputSync(
         }
 
         CCOUT << ");";
-
         NEW_LINE;
         if( pmd->IsSerialize() &&
             !pInArgs.IsEmpty() )
         {
+            NEW_LINE;
             CCOUT << "gint32 " << strName
                 << "Dummy( BufPtr& pBuf_ )";
             NEW_LINE;
             Wa( "{ return STATUS_SUCCESS; }" );
         }
-        NEW_LINES( 2 );
 
     }while( 0 );
 
@@ -1723,7 +1886,7 @@ gint32 CDeclInterfSvr::OutputSync(
         strDecl += ")";
         CCOUT << strDecl << " = 0;";
         pmd->SetAbstDecl( strDecl, false );
-        NEW_LINES( 2 );
+        NEW_LINE;
 
     }while( 0 );
 
@@ -1875,6 +2038,253 @@ gint32 CDeclService::Output()
         CCOUT << " );";
         INDENT_DOWN;
         NEW_LINES( 2 );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CSetStructRefs::ExtractStructArr(
+    ObjPtr& pArray,
+    std::set< ObjPtr >& setStructs )
+{
+    if( pArray.IsEmpty() )
+        return 0;
+
+    gint32 ret = 0;
+    do{
+        CStructRef* psr = pArray;
+        if( psr != nullptr )
+        {
+            // this is an alias
+            std::string strName = psr->GetName();
+            ret = g_mapAliases.GetAliasType(
+                strName, pArray );
+            if( ERROR( ret ) )
+                break;
+        }
+        CArrayType* pat = pArray;
+        if( pat == nullptr )
+            break;
+
+        ObjPtr pType = pat->GetElemType();
+        CArrayType* pet;
+        pet = pType;
+
+        if( pet != nullptr )
+        {
+            ret = ExtractStructArr(
+                pType, setStructs );
+            break;
+        }
+        CMapType* pmt = pType;
+        if( pmt != nullptr )
+        {
+            ret = ExtractStructMap(
+                pType, setStructs );
+            break;
+        }
+
+        CStructRef* pRef = pType;
+        if( pRef == nullptr )
+            break;
+
+        std::string strName = pRef->GetName();
+
+        ObjPtr pStruct;
+        ret = g_mapDecls.GetDeclNode(
+            strName, pStruct );
+        if( ERROR( ret ) )
+        {
+            DebugPrint( ret, "error, %s not defined\n",
+                strName.c_str() );
+            break;
+        }
+        setStructs.insert( pStruct );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CSetStructRefs::ExtractStructMap(
+    ObjPtr& pMap,
+    std::set< ObjPtr >& setStructs )
+{
+    if( pMap.IsEmpty() )
+        return 0;
+
+    gint32 ret = 0;
+    do{
+        CStructRef* psr = pMap;
+        if( psr != nullptr )
+        {
+            // this is an alias
+            std::string strName = psr->GetName();
+            ret = g_mapAliases.GetAliasType(
+                strName, pMap );
+            if( ERROR( ret ) )
+                break;
+        }
+        CMapType* pmt = pMap;
+        if( pmt == nullptr )
+            break;
+
+        ObjPtr pType = pmt->GetElemType();
+        guint32 iCount = 0;
+        do{
+            CMapType* pet = pType;
+            CArrayType* pat = pType;
+            if( pet != nullptr )
+            {
+                ret = ExtractStructMap(
+                    pType, setStructs );
+                if( ERROR( ret ) )
+                    break;
+            }
+            else if( pat != nullptr )
+            {
+                ret = ExtractStructArr(
+                    pType, setStructs );
+                if( ERROR( ret ) )
+                    break;
+            }
+            else
+            {
+                CStructRef* pRef = pType;
+                if( pRef != nullptr ){
+                std::string strName =
+                    pRef->GetName();
+
+                ObjPtr pStruct;
+                ret = g_mapDecls.GetDeclNode(
+                    strName, pStruct );
+                if( ERROR( ret ) )
+                {
+                    DebugPrint( ret, "error, %s not defined\n",
+                        strName.c_str() );
+                    break;
+                }
+                CStructDecl* psd = pStruct;
+                if( psd != nullptr )
+                    setStructs.insert( pStruct );
+                }
+            }
+
+            pType = pmt->GetKeyType();
+            ++iCount;
+
+        }while( iCount >= 2 );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CSetStructRefs::SetStructRefs()
+{
+    guint32 ret = STATUS_SUCCESS;
+    do{
+        std::vector< ObjPtr > vecIfs;
+        m_pNode->GetIfRefs( vecIfs );
+        if( vecIfs.empty() )
+            break;
+
+        
+        std::vector< ObjPtr > vecIfds;
+        for( auto& elem : vecIfs )
+        {
+            ObjPtr pObj;
+            CInterfRef* pifr = elem;
+            std::string strName = pifr->GetName();
+            ret = pifr->GetIfDecl( pObj );
+            if( ERROR( ret ) )
+            {
+                ret = 0;
+                continue;
+            }
+            vecIfds.push_back( pObj );
+        }
+
+        std::vector< ObjPtr > vecMethods;
+        for( auto& elem : vecIfds )
+        {
+            CInterfaceDecl* pifd = elem;
+            ObjPtr pObj = pifd->GetMethodList();
+            CMethodDecls* pmds = pObj;
+            guint32 i = 0;
+            for( ; i < pmds->GetCount(); i++ )
+            {
+                ObjPtr pObj = pmds->GetChild( i );
+                vecMethods.push_back( pObj );
+            }
+        }
+
+        std::set< ObjPtr > setTypes;
+        for( auto& elem : vecMethods )
+        {
+            CMethodDecl* pmd = elem;
+            ObjPtr pInArgs = pmd->GetInArgs();
+            ObjPtr pOutArgs = pmd->GetOutArgs();
+
+            GetArgTypes( pInArgs, setTypes );
+            GetArgTypes( pOutArgs, setTypes );
+        }
+
+        for( auto elem : setTypes )
+        {
+            std::string strSig =
+                GetTypeSig( elem );
+
+            if( strSig.find( 'O' ) ==
+                std::string::npos )
+                continue;
+
+            std::set< ObjPtr > setStructs;
+            if( strSig.size() == 1 )
+            {
+                CStructRef* pRef = elem;
+                if( pRef == nullptr )
+                    continue;
+
+                std::string strName =
+                    pRef->GetName();
+
+                ObjPtr pStruct;
+                ret = g_mapDecls.GetDeclNode(
+                    strName, pStruct );
+                if( ERROR( ret ) )
+                {
+                    DebugPrint( ret, "error, %s not defined\n",
+                        strName.c_str() );
+                    continue;
+                }
+                CStructDecl* psd = pStruct;
+                if( psd == nullptr )
+                    continue;
+
+                psd->AddRef();
+                continue;
+            }
+            else if( strSig[ 0 ] == '(' )
+            {
+                ret = ExtractStructArr(
+                    elem, setStructs );                
+            }
+            else if( strSig[ 0 ] == ']' )
+            {
+                ret = ExtractStructMap(
+                    elem, setStructs );                
+            }
+
+            for( auto& elem : setStructs )
+            {
+                CStructDecl* psd = elem;
+                if( psd == nullptr )
+                    continue;
+                psd->AddRef();
+            }
+        }
 
     }while( 0 );
 
@@ -2556,8 +2966,9 @@ gint32 CImplIufProxy::Output()
             NEW_LINE;
         }
 
-        Wa( "return STATUS_SUCCESS;" );
+        CCOUT << "return STATUS_SUCCESS;";
         BLOCK_CLOSE;
+        NEW_LINE;
 
     }while( 0 );
 
@@ -2675,8 +3086,9 @@ gint32 CImplIufSvr::Output()
             NEW_LINE;
         }
 
-        Wa( "return STATUS_SUCCESS;" );
+        CCOUT << "return STATUS_SUCCESS;";
         BLOCK_CLOSE;
+        NEW_LINE;
 
     }while( 0 );
 

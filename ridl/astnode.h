@@ -476,6 +476,29 @@ struct CStructRef : public CPrimeType
     inline const std::string& GetName() const
     { return m_strName; }
 
+    gint32 GetStructType( ObjPtr& pType ) const
+    {
+        // this method is to get the struct_decl
+        // if pType is already known to be a
+        // struct_decl
+        ObjPtr pTemp;
+        gint32 ret = g_mapDecls.GetDeclNode(
+            m_strName, pTemp );
+        if( SUCCEEDED( ret ) )
+        {
+            pType = pTemp;
+            return STATUS_SUCCESS;
+        }
+
+        ret = g_mapAliases.GetAliasType(
+            m_strName, pTemp );
+
+        if( SUCCEEDED( ret ) )
+            pType = pTemp;
+
+        return ret;
+    }
+
     std::string GetSignature() const
     {
         ObjPtr pObj;
@@ -627,6 +650,7 @@ struct CStructDecl : public CNamedNode
     typedef CNamedNode super;
     ObjPtr m_oFieldList;
     CCfgOpener m_oContext;
+    guint32 m_dwRefCount = 0;
 
     CStructDecl() : super()
     { SetClassId( clsid( CStructDecl ) ); }
@@ -653,6 +677,12 @@ struct CStructDecl : public CNamedNode
         return m_oContext.GetProperty(
             iProp, val );
     }
+
+    guint32 AddRef()
+    { return ++m_dwRefCount; }
+
+    guint32 RefCount() const
+    { return m_dwRefCount; }
 };
 
 struct CFormalArg : public CFieldDecl
@@ -852,7 +882,7 @@ struct CInterfaceDecl : public CNamedNode
 {
     typedef CNamedNode super;
     ObjPtr m_pMdl;
-    guint32 m_dwSeqNo = 0;
+    guint32 m_dwRefCount = 0;
 
     CInterfaceDecl() : super()
     { SetClassId( clsid( CInterfaceDecl ) ); }
@@ -865,6 +895,12 @@ struct CInterfaceDecl : public CNamedNode
 
     ObjPtr& GetMethodList()
     { return m_pMdl; }
+
+    guint32 AddRef()
+    { return ++m_dwRefCount; }
+
+    guint32 RefCount() const
+    { return m_dwRefCount; }
 };
 
 struct CInterfRef : public CNamedNode
@@ -1008,7 +1044,7 @@ struct CAliasList : public CAstNodeBase
             m_queChilds.push_back( strAlias );
     }
 
-    inline const std::string GetChild( guint32 i )
+    inline const std::string GetChild( guint32 i ) const
     {
         if( i >= m_queChilds.size() )
             return "";

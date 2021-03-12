@@ -901,11 +901,16 @@ interf_ref : TOK_INTERFACE TOK_IDENT
             PrintMsg( -ENOENT, strMsg.c_str() );
             g_bSemanErr = true;
         }
-        ENABLE_STREAM( pTemp, pifr );
-        pifr->SetName( strName );
-        BufPtr pBuf( true );
-        *pBuf = pNode;
-        $$ = pBuf;
+        if( !pTemp.IsEmpty() )
+        {
+            CInterfaceDecl* pifd = pTemp;
+            pifd->AddRef();
+            ENABLE_STREAM( pTemp, pifr );
+            pifr->SetName( strName );
+            BufPtr pBuf( true );
+            *pBuf = pNode;
+            $$ = pBuf;
+        }
         CLEAR_RSYMBS;
     }
     ;

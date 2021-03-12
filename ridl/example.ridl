@@ -4,7 +4,6 @@ appname "example";
 include "tinyif.ridl"
 
 typedef array< string > STRARR;
-typedef array< STRARR > STRMATRIX;
 typedef array< array< string > > STRMATRIX2;
 typedef int32 myint32;
 typedef myint32 myint32_t;
@@ -19,6 +18,9 @@ struct FILE_INFO
     STRMATRIX2 vecLines;
     map<int32, bytearray> vecBlocks;
 };
+
+typedef map< string, FILE_INFO > STRMATRIX;
+typedef array< OBJPTR > STRMATRIX1;
 
 // echo different type of information
 interface IEchoThings
@@ -78,7 +80,7 @@ interface IFileTransfer
 interface IChat
 {
     SpecifyChannel( HSTREAM hChannel )
-        returns();
+        returns( STRMATRIX fis );
 };
 
 service SimpFileSvc [

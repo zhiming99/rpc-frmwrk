@@ -287,7 +287,7 @@ class CDeclareStruct
 
 struct CArgListUtils
 {
-    gint32 GetArgCount( ObjPtr& pArgs );
+    gint32 GetArgCount( ObjPtr& pArgs ) const;
 
     std::string ToStringInArgs(
         ObjPtr& pArgs );
@@ -296,16 +296,19 @@ struct CArgListUtils
         ObjPtr& pArgs );
 
     gint32 GenLocals( ObjPtr pArgList,
-        std::vector< std::string >& vecLocals );
+        std::vector< std::string >& vecLocals ) const;
 
     gint32 GetHstream( ObjPtr& pArgList,
-        std::vector< ObjPtr >& vecHstms );
+        std::vector< ObjPtr >& vecHstms ) const;
 
     gint32 GetArgsForCall( ObjPtr& pArgList,
-        std::vector< std::string >& vecArgs );
+        std::vector< std::string >& vecArgs ) const;
 
     gint32 GetArgTypes( ObjPtr pArgList,
-        std::vector< std::string >& vecTypes );
+        std::vector< std::string >& vecTypes ) const;
+
+    gint32 GetArgTypes( ObjPtr pArgList,
+        std::set< ObjPtr >& vecTypes ) const;
 };
 
 class CDeclInterfProxy 
@@ -339,6 +342,24 @@ class CDeclInterfSvr
     gint32 OutputEvent( CMethodDecl* pmd );
     gint32 OutputSync( CMethodDecl* pmd );
     gint32 OutputAsync( CMethodDecl* pmd );
+};
+
+class CSetStructRefs :
+    public CArgListUtils
+{
+    CServiceDecl* m_pNode = nullptr;
+    public:
+
+    CSetStructRefs( ObjPtr& pNode )
+    { m_pNode = pNode; }
+
+    gint32 SetStructRefs();
+
+    gint32 ExtractStructArr( ObjPtr& pArray,
+        std::set< ObjPtr >& setStructs );
+
+    gint32 ExtractStructMap( ObjPtr& pMap,
+        std::set< ObjPtr >& setStructs );
 };
 
 class CDeclService
