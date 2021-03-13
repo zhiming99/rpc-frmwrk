@@ -29,7 +29,6 @@
 #include "rpc.h"
 #include "idlclsid.h" 
 #include <regex>
-#include "idlclsid.h" 
 
 #define SET_PARENT_OF( pObj ) \
 if( !pObj.IsEmpty() ) \
@@ -37,6 +36,23 @@ if( !pObj.IsEmpty() ) \
     CAstNodeBase* pnode = pObj; \
     pnode->SetParent( this ); \
 }
+
+#define PROP_ABSTMETHOD_PROXY       0
+#define PROP_ABSTMETHOD_SERVER      1
+
+#define PROP_MESSAGE_ID             3
+
+#define PROP_METHODFLAG_PROXY       4
+#define PROP_METHODFLAG_SERVER      5
+
+#define MF_IN_ARG         1
+#define MF_OUT_ARG        2
+
+#define MF_IN_AS_IN       4
+#define MF_OUT_AS_IN      8
+
+#define MF_OUT_AS_OUT     0
+#define MF_IN_AS_OUT      0
 
 extern std::map< gint32, char > g_mapTypeSig;
 std::string GetTypeSig( ObjPtr& pObj );
@@ -840,7 +856,7 @@ struct CMethodDecl : public CNamedNode
             m_oContext[ 1 ] = strDecl;
     }
 
-    std::string GetAbstDecl( bool bProxy = true )
+    std::string GetAbstDecl( bool bProxy = true ) const
     {
         std::string strDecl;
         if( bProxy )
@@ -854,6 +870,28 @@ struct CMethodDecl : public CNamedNode
                 1, strDecl );
         }
         return strDecl;
+    }
+
+    gint32 GetAbstFlag( guint32& dwFlags,
+        bool bProxy = true ) const
+    {
+        if( bProxy )
+            return m_oContext.GetIntProp(
+                PROP_METHODFLAG_PROXY, dwFlags );
+
+        return m_oContext.GetIntProp(
+            PROP_METHODFLAG_SERVER, dwFlags );
+    }
+
+    gint32 SetAbstFlag( guint32 dwFlags,
+        bool bProxy = true )
+    {
+        if( bProxy )
+            return m_oContext.SetIntProp(
+                PROP_METHODFLAG_PROXY, dwFlags );
+
+        return m_oContext.SetIntProp(
+            PROP_METHODFLAG_SERVER, dwFlags );
     }
 
     gint32 SetProperty(
@@ -1194,38 +1232,6 @@ struct CStatements : public CAstListNode
                 return true;
         }
         return false;
-    }
-
-    // set order of inheritance of the interface
-    // using streams
-    gint32 SetInheritOrder()
-    {
-        std::vector< ObjPtr > vecSvcs;
-        gint32 ret = GetSvcDecls( vecSvcs );
-        if( ERROR( ret ) )
-            return ret;
-
-        for( auto& pObj : vecSvcs )
-        {
-            gint32 ret = 0;
-            CServiceDecl* pSvc = pObj;
-            if( pSvc == nullptr )
-                continue;
-
-            std::vector< ObjPtr > vecIfs;
-            ret = pSvc->GetStreamIfs( vecIfs );
-            if( ERROR( ret ) )
-                continue;
-            for( auto elem : vecIfs )
-            {
-                CInterfRef* pRef = elem;
-                if( pRef == nullptr )
-                    continue;
-                DebugPrint( 0, "interface %s",
-                    pRef->GetName().c_str() );
-            }
-        }
-        return STATUS_SUCCESS;
     }
 };
 

@@ -1,0 +1,317 @@
+/*
+ * =====================================================================================
+ *
+ *       Filename:  main.cpp
+ *
+ *    Description:  main function for ridl compiler
+ *
+ *        Version:  1.0
+ *        Created:  03/12/2021 06:35:19 PM
+ *       Revision:  none
+ *       Compiler:  gcc
+ *
+ *         Author:  Ming Zhi( woodhead99@gmail.com )
+ *   Organization:
+ *
+ *      Copyright:  2021 Ming Zhi( woodhead99@gmail.com )
+ *
+ *        License:  Licensed under GPL-3.0. You may not use this file except in
+ *                  compliance with the License. You may find a copy of the
+ *                  License at 'http://www.gnu.org/licenses/gpl-3.0.html'
+ *
+ * =====================================================================================
+ */
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include "rpc.h"
+
+using namespace rpcfrmwrk;
+#include "astnode.h" 
+#include "ridlc.h"
+
+extern CDeclMap g_mapDecls;
+extern ObjPtr g_pRootNode;
+extern bool g_bSemanErr;
+
+// mandatory part, just copy/paste'd from clsids.cpp
+static FactoryPtr InitClassFactory()
+{
+    BEGIN_FACTORY_MAPS;
+
+    INIT_MAP_ENTRY( CBuffer );
+    INIT_MAP_ENTRY( CAttrExp );
+    INIT_MAP_ENTRY( CAttrExps );
+    INIT_MAP_ENTRY( CPrimeType );
+    INIT_MAP_ENTRY( CArrayType );
+    INIT_MAP_ENTRY( CMapType );
+    INIT_MAP_ENTRY( CStructRef );
+    INIT_MAP_ENTRY( CFieldDecl );
+    INIT_MAP_ENTRY( CFieldList );
+    INIT_MAP_ENTRY( CStructDecl );
+    INIT_MAP_ENTRY( CFormalArg );
+    INIT_MAP_ENTRY( CArgList );
+    INIT_MAP_ENTRY( CMethodDecl );
+    INIT_MAP_ENTRY( CMethodDecls );
+    INIT_MAP_ENTRY( CInterfaceDecl );
+    INIT_MAP_ENTRY( CInterfRef );
+    INIT_MAP_ENTRY( CInterfRefs );
+    INIT_MAP_ENTRY( CServiceDecl );
+    INIT_MAP_ENTRY( CStatements );
+    INIT_MAP_ENTRY( CAliasList );
+    INIT_MAP_ENTRY( CTypedefDecl );
+    INIT_MAP_ENTRY( CAppName );
+
+    END_FACTORY_MAPS;
+};
+
+void Usage()
+{
+    printf( "Usage:" );
+    printf( "ridlc [options] <filePath> \n" );
+    printf( "\t compile the file"
+        "it to current directory\n" );
+    printf( "Options -h:\tTo print this help\n");
+    printf( "\t-I:\tTo specify the path to"
+        " search for the included files.\n"
+        "\t\tAnd this option can repeat many"
+        "times\n" );
+    printf( "\t-O:\tTo specify the path for"
+        " the output files.\n" );
+}
+
+static std::string g_strOutPath = ".";
+static std::vector< std::string > g_vecPaths;
+
+#include "seribase.h"
+#include "gencpp.h"
+
+int main( int argc, char** argv )
+{
+    gint32 ret = 0;
+    bool bUninit = false;
+    do{
+        ret = CoInitialize( COINIT_NORPC );
+        if( ERROR( ret ) )
+            break;
+        bUninit = true;
+
+        FactoryPtr pFactory = InitClassFactory();
+        ret = CoAddClassFactory( pFactory );
+        if( ERROR( ret ) )
+            break;
+
+        int opt = 0;
+        bool bQuit = false;
+
+        while( ( opt =
+            getopt( argc, argv, "hI:O:" ) ) != -1 )
+        {
+            switch( opt )
+            {
+            case 'h' :
+                {
+                    Usage();
+                    bQuit = true;
+                    break;
+                }
+            case 'O':
+            case 'I' :
+                {
+                    struct stat sb;
+                    if (lstat( optarg, &sb) == -1)
+                    {
+                        ret = -errno;
+                        printf( "%s : %s\n", optarg,
+                            strerror( errno ) );
+                        bQuit = true;
+                        break;
+                    }
+                    mode_t iFlags =
+                        ( sb.st_mode & S_IFMT );
+                    if( iFlags != S_IFDIR )
+                    {
+                        std::string strMsg =
+                            "warning '";
+
+                        strMsg += optarg;
+                        strMsg +=
+                           "' is not a directory";
+                        printf( "%s\n",
+                            strMsg.c_str() );
+                        break;
+                    }
+                    if( opt == 'I' )
+                    {
+                        g_vecPaths.push_back(
+                            std::string( optarg ) );
+                    }
+                    else
+                    {
+                        g_strOutPath = optarg;
+                    }
+                    break;
+                }
+            default:
+                break;
+            }
+
+            if( bQuit )
+                break;
+        }
+
+        if( bQuit )
+            break;
+
+        if( argv[ optind ] == nullptr )
+        {
+            printf( "Missing file to compile\n" );
+            Usage();
+            break;
+        }
+
+        std::string strFile = argv[ optind ];
+
+        if( argv[ optind + 1 ] != nullptr )
+        {
+            printf( "too many arguments\n" );
+            Usage();
+            break;
+        }
+
+        ret = yyparse( strFile.c_str() );
+        if( g_pRootNode.IsEmpty() )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        if( g_bSemanErr )
+        {
+            ret = ERROR_FAIL;
+            break;
+        }
+
+        std::string strAppName;
+        CStatements* pRoot = g_pRootNode;
+        if( pRoot != nullptr )
+        {
+            ret = pRoot->CheckAppName();
+            if( ERROR( ret ) )
+            {
+                printf( "error app name not"
+                     " declared \n" );
+                break;
+            }
+            else
+            {
+                strAppName = pRoot->GetName();
+                printf( "info using app name '"
+                     "%s' \n",
+                     strAppName.c_str() );
+            }
+            std::vector< ObjPtr > vecSvcs;
+            ret = pRoot->GetSvcDecls( vecSvcs );
+            if( ERROR( ret ) )
+            {
+                printf( "error no service"
+                     " declared \n" );
+                break;
+            }
+            if( vecSvcs.size() > 1 )
+            {
+                printf(
+                "warning too many services declared, only\n"
+                "the first service will be used to generate\n"
+                "the project files\n" );
+                break;
+            }
+        }
+
+        printf( "Successfully parsed %s\n",
+            strFile.c_str() );
+
+        printf( "Generating files.. \n" );
+        ret = GenCppProj(
+            g_strOutPath, strAppName, pRoot );
+
+
+    }while( 0 );
+
+    g_mapDecls.Clear();
+    g_pRootNode.Clear();
+
+    if( bUninit )
+        CoUninitialize();
+
+    return ret;
+}
+
+gint32 CheckNameDup(
+    ObjPtr& pInArgs,
+    ObjPtr& pOutArgs,
+    std::string& strDupName )
+{
+    CArgList* pIn = pInArgs;
+    CArgList* pOut = pOutArgs;
+    if( pIn == nullptr || pOut == nullptr )
+        return 0;
+
+    gint32 ret = ERROR_FALSE;
+    do{
+        guint32 dwSize = pIn->GetCount();
+        std::set< std::string > setNames;
+        for( guint32 i = 0; i < dwSize; i++ )
+        {
+            ObjPtr pObj = pIn->GetChild( i );
+            CFormalArg* pfa = pObj;
+            if( pfa == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            std::string strName = pfa->GetName();
+            setNames.insert( strName );
+        }
+        dwSize = pOut->GetCount();
+        for( guint32 i = 0; i < dwSize; i++ )
+        {
+            ObjPtr pObj = pOut->GetChild( i );
+            CFormalArg* pfa = pObj;
+            if( pfa == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            std::string strName = pfa->GetName();
+            if( setNames.find( strName ) !=
+                setNames.end() )
+            {
+                strDupName = strName;
+                ret = STATUS_SUCCESS;
+                break;
+            }
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+FILE* TryOpenFile( const std::string& strFile )
+{
+    FILE* fp = fopen( strFile.c_str(), "r");
+    if ( fp != nullptr )
+        return fp;
+
+    for( auto elem : g_vecPaths )
+    {
+        std::string strPath =
+            elem + "/" + strFile;
+        fp = fopen( strPath.c_str(), "r" );
+        if( fp != nullptr )
+            break;
+    }
+
+    return fp;
+}

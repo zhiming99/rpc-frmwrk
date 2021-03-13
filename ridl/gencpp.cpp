@@ -29,10 +29,6 @@ using namespace rpcfrmwrk;
 
 extern std::string g_strAppName;
 
-#define PROP_ABSTMETHOD_PROXY       0
-#define PROP_ABSTMETHOD_SERVER      1
-#define PROP_MESSAGE_ID             3
-
 gint32 CArgListUtils::GetArgCount(
     ObjPtr& pArgs ) const
 {
@@ -46,13 +42,14 @@ gint32 CArgListUtils::GetArgCount(
     return pal->GetCount();
 }
 
-std::string CArgListUtils::ToStringInArgs(
-    ObjPtr& pArgs )
+gint32 CArgListUtils::ToStringInArgs(
+    ObjPtr& pArgs,
+    std::vector< std::string >& vecArgs ) const
 {
     CArgList* pal = pArgs;
     std::string strVal;
     if( pal == nullptr )
-        return strVal;
+        return STATUS_SUCCESS;
 
     do{
         guint32 dwCount = pal->GetCount();
@@ -98,25 +95,23 @@ std::string CArgListUtils::ToStringInArgs(
                 }
             }
 
-            strVal +=
-                strType + " " + strVarName;
-
-            if( i + 1 < dwCount )
-                strVal += ", ";
+            vecArgs.push_back(
+                strType + " " + strVarName );
         }
 
     }while( 0 );
 
-    return strVal;
+    return STATUS_SUCCESS;
 }
 
-std::string CArgListUtils::ToStringOutArgs(
-    ObjPtr& pArgs )
+gint32 CArgListUtils::ToStringOutArgs(
+    ObjPtr& pArgs,
+    std::vector< std::string >& vecArgs ) const
 {
     CArgList* pal = pArgs;
     std::string strVal;
     if( pal == nullptr )
-        return strVal;
+        return STATUS_SUCCESS;
 
     do{
         guint32 dwCount = pal->GetCount();
@@ -150,20 +145,17 @@ std::string CArgListUtils::ToStringOutArgs(
                 }
             }
 
-            strVal +=
-                strType + " " + strVarName;
-
-            if( i + 1 < dwCount )
-                strVal += ", ";
+            vecArgs.push_back(
+                strType + " " + strVarName );
         }
 
     }while( 0 );
 
-    return strVal;
+    return STATUS_SUCCESS;
 }
 
 gint32 CArgListUtils::GenLocals(
-    ObjPtr pArgList,
+    ObjPtr& pArgList,
     std::vector< std::string >& vecLocals ) const
 {
     CArgList* pinal = pArgList;
@@ -280,7 +272,7 @@ gint32 CArgListUtils::GetArgsForCall(
 }
 
 gint32 CArgListUtils::GetArgTypes(
-    ObjPtr pArgList,
+    ObjPtr& pArgList,
     std::set< ObjPtr >& setTypes ) const
 {
     CArgList* pinal = pArgList;
@@ -309,7 +301,7 @@ gint32 CArgListUtils::GetArgTypes(
 }
 
 gint32 CArgListUtils::GetArgTypes(
-    ObjPtr pArgList,
+    ObjPtr& pArgList,
     std::vector< std::string >& vecTypes ) const
 {
     CArgList* pinal = pArgList;
@@ -446,7 +438,8 @@ gint32 CMethodWriter::GenSerialArgs(
 
             if( bDeclare )
             {
-                CCOUT << "HSTREAM " << strLocal;
+                CCOUT << "HSTREAM "
+                    << strLocal << ";";
                 NEW_LINE;
             }
 
@@ -511,7 +504,10 @@ gint32 CMethodWriter::GenDeserialArgs(
                 pfa->GetName();
 
             if( bDeclare )
-                CCOUT << "HSTREAM " << strLocal;
+            {
+                CCOUT << "HSTREAM "
+                    << strLocal << ";";
+            }
             CCOUT << strLocal <<
                 ".m_pIf = this;";
 
@@ -572,6 +568,33 @@ gint32 CMethodWriter::DeclLocals(
         CCOUT << elem << ";";
         NEW_LINE;
     }
+    return STATUS_SUCCESS;
+}
+
+gint32 CMethodWriter::GenFormArgs(
+    ObjPtr& pArg, bool bIn )
+{
+    std::vector< std::string > vecArgs; 
+    if( bIn )
+        ToStringInArgs( pArg, vecArgs );
+    else
+        ToStringOutArgs( pArg, vecArgs );
+
+    std::string strVal;
+    if( vecArgs.empty() )
+        return STATUS_SUCCESS;
+
+    guint32 i = 0;
+    for( ; i < vecArgs.size(); i++ )
+    {
+        CCOUT << vecArgs[ i ]; 
+        if( i + 1 < vecArgs.size() )
+        {
+            CCOUT << ",";
+            NEW_LINE;
+        }
+    }
+
     return STATUS_SUCCESS;
 }
 
@@ -973,14 +996,14 @@ gint32 GenCppFile(
                         break;
                     }
 
-                    CImplIufProxy oiufp(
-                        m_pWriter, pObj );
-                    oiufp.Output();
-
                     CInterfaceDecl* pifd = pObj;
 
                     if( pifd->RefCount() == 0 )
                         break;
+
+                    CImplIufProxy oiufp(
+                        m_pWriter, pObj );
+                    oiufp.Output();
 
                     ObjPtr pmdlobj =
                         pifd->GetMethodList();
@@ -1035,6 +1058,12 @@ gint32 GenCppFile(
             if( ERROR( ret ) )
                 break;
         }
+
+        if( ERROR( ret ) )
+            break;
+
+        CImplClassFactory oicf( m_pWriter, pRoot );
+        ret = oicf.Output();
 
     }while( 0 );
 
@@ -1304,10 +1333,10 @@ gint32 CDeclareStruct::Output()
         INDENT_DOWNL;
         BLOCK_OPEN;
     
-        ObjPtr pFileds =
+        ObjPtr pFields =
             m_pNode->GetFieldList();
 
-        CFieldList* pfl = pFileds;
+        CFieldList* pfl = pFields;
         guint32 dwCount = pfl->GetCount();
         if( dwCount == 0 )
         {
@@ -1369,7 +1398,7 @@ gint32 CDeclareStruct::Output()
         CCOUT<< "gint32 Deserialize(";
         INDENT_UP;
         NEW_LINE;
-        CCOUT<<" BufPtr& pBuf_, guint32 dwSize ) override;"; 
+        CCOUT<<" BufPtr& pBuf_ ) override;"; 
         INDENT_DOWN;
         NEW_LINE;
 
@@ -1384,8 +1413,8 @@ gint32 CDeclareStruct::Output()
 
 CDeclInterfProxy::CDeclInterfProxy(
     CCppWriter* pWriter, ObjPtr& pNode )
+    : super( pWriter )
 {
-    m_pWriter = pWriter;
     m_pNode = pNode;
     if( m_pNode == nullptr )
     {
@@ -1516,18 +1545,25 @@ gint32 CDeclInterfProxy::OutputEvent(
         Wa( "//TODO: implement me" );
         std::string strDecl =
             std::string( "virtual gint32 " ) +
-            strName + "( ";
-        guint32 dwCount = 0;
-        std::string strArgList;
-        if( !pArgs.IsEmpty() )
+            strName + "(";
+        CCOUT << strDecl;
+        guint32 dwCount = GetArgCount( pArgs );
+
+        INDENT_UPL;
+        if( dwCount > 0 )
         {
-            strArgList = ToStringInArgs( pArgs );
-            strDecl += strArgList;
-            dwCount = GetArgCount( pArgs );
+            GenFormInArgs( pArgs );
+            CCOUT << " ) = 0;";
         }
-        strDecl += " )";
-        CCOUT << strDecl <<" = 0;";
+        else
+        {
+            CCOUT << ") = 0;";
+        }
+        INDENT_DOWNL;
+
         pmd->SetAbstDecl( strDecl );
+        pmd->SetAbstFlag( MF_IN_ARG | MF_IN_AS_IN );
+
         if( pmd->IsSerialize() && dwCount > 0 )
         { 
             NEW_LINE;
@@ -1554,8 +1590,13 @@ gint32 CDeclInterfProxy::OutputEvent(
             // calling event handler.
             Wa( "//RPC event handler wrapper" );
             CCOUT << "gint32 " << strName
-                <<"Wrapper( IEventSink* pCallback, "
-                << strArgList << " );";
+                <<"Wrapper(";
+            INDENT_UPL;
+            CCOUT << "IEventSink* pCallback, ";
+            NEW_LINE;
+            GenFormInArgs( pArgs );
+            CCOUT << " );";
+            INDENT_DOWNL;
         }
 
         NEW_LINE;
@@ -1577,8 +1618,9 @@ gint32 CDeclInterfProxy::OutputAsync(
         ObjPtr pOutArgs = pmd->GetOutArgs();
         
         guint32 dwInCount = GetArgCount( pInArgs );
+        guint32 dwOutCount = GetArgCount( pOutArgs );
 
-        Wa( "//RPC Aync Req Sender" );
+        Wa( "//RPC Async Req Sender" );
         CCOUT << "gint32 " << strName << "( ";
         INDENT_UP;
         NEW_LINE;
@@ -1586,17 +1628,18 @@ gint32 CDeclInterfProxy::OutputAsync(
         CCOUT << "IConfigDb* context";
         if( dwInCount > 0 )
         {
-            CCOUT << ", "
-                << ToStringInArgs( pInArgs );
+            CCOUT << ", ";
+            NEW_LINE;
+            GenFormInArgs( pInArgs );
+            CCOUT << " ";
         }
 
         CCOUT << ");";
         INDENT_DOWN;
 
-        if( pmd->IsSerialize() &&
-            !pInArgs.IsEmpty() )
+        if( pmd->IsSerialize() && dwInCount > 0 )
         {
-            NEW_LINE;
+            NEW_LINES( 2 );
             CCOUT << "gint32 " << strName
                 << "Dummy( BufPtr& pBuf_ )";
             NEW_LINE;
@@ -1616,7 +1659,7 @@ gint32 CDeclInterfProxy::OutputAsync(
         Wa( "IConfigDb* pReqCtx );" );
 
         INDENT_DOWN;
-        NEW_LINES( 2 );
+        NEW_LINE;
 
         Wa( "//RPC Async Req callback" );
         Wa( "//TODO: implement me by adding" );
@@ -1624,19 +1667,33 @@ gint32 CDeclInterfProxy::OutputAsync(
 
         std::string strDecl;
         strDecl += "virtual gint32 " + strName
-            + "Callback" + "( ";
-        strDecl += "IConfigDb* context, ";
-        strDecl += "gint32 iRet";
+            + "Callback" + "(";
+        CCOUT << strDecl;
+        strDecl += "IConfigDb* context, gint32 iRet";
 
-        if( !pOutArgs.IsEmpty() )
+        if( dwOutCount > 0 )
         {
-            strDecl += std::string( ", " ) +
-                ToStringInArgs( pOutArgs );
+            INDENT_UPL;
+            CCOUT << "IConfigDb* context, ";
+            NEW_LINE;
+            CCOUT << "gint32 iRet,";
+            strDecl += ",";
+            GenFormInArgs( pOutArgs );
+            CCOUT << " ) = 0;";
+            INDENT_DOWNL;
         }
-        strDecl += ")";
-        CCOUT << strDecl << " = 0;";
+        else
+        {
+            INDENT_UPL;
+            CCOUT << "IConfigDb* context, ";
+            NEW_LINE;
+            CCOUT << "gint32 iRet ) = 0;";
+            INDENT_DOWNL;
+        }
+
         pmd->SetAbstDecl( strDecl );
-        NEW_LINES( 2 );
+        pmd->SetAbstFlag(
+            MF_OUT_ARG | MF_OUT_AS_IN );
 
     }while( 0 );
 
@@ -1653,27 +1710,49 @@ gint32 CDeclInterfProxy::OutputSync(
         strName = pmd->GetName();
         ObjPtr pInArgs = pmd->GetInArgs();
         ObjPtr pOutArgs = pmd->GetOutArgs();
+        guint32 dwInCount =
+            GetArgCount( pInArgs );
 
-        Wa( "//RPC Sync Request Sender" );
-        CCOUT << "gint32 " << strName << "( ";
+        guint32 dwOutCount =
+            GetArgCount( pOutArgs );
+
+        guint32 dwCount =
+            dwInCount + dwOutCount;
+
+        Wa( "//RPC Sync Req Sender" );
+        CCOUT << "gint32 " << strName << "(";
 
         bool bComma = false;
-        if( !pInArgs.IsEmpty() )
+        if( dwCount == 0 )
         {
-            CCOUT << ToStringInArgs( pInArgs );
-            bComma = true;
+            CCOUT << ");";
+            NEW_LINE;
         }
-        if( !pOutArgs.IsEmpty() )
+        else
         {
-            if( bComma )
-                CCOUT << ", ";
-            CCOUT << ToStringOutArgs( pOutArgs );
+            INDENT_UPL;
+            if( dwInCount > 0 )
+            {
+                GenFormInArgs( pInArgs );
+                bComma = true;
+            }
+            if( dwOutCount > 0 )
+            {
+                if( bComma )
+                {
+                    CCOUT << ",";
+                    NEW_LINE;
+                }
+
+                GenFormOutArgs( pOutArgs );
+            }
+
+            CCOUT << " );";
+            INDENT_DOWNL;
         }
 
-        CCOUT << ");";
         NEW_LINE;
-        if( pmd->IsSerialize() &&
-            !pInArgs.IsEmpty() )
+        if( pmd->IsSerialize() && dwInCount > 0 )
         {
             NEW_LINE;
             CCOUT << "gint32 " << strName
@@ -1689,8 +1768,8 @@ gint32 CDeclInterfProxy::OutputSync(
 
 CDeclInterfSvr::CDeclInterfSvr(
     CCppWriter* pWriter, ObjPtr& pNode )
+    : super( pWriter )
 {
-    m_pWriter = pWriter;
     m_pNode = pNode;
     if( m_pNode == nullptr )
     {
@@ -1818,11 +1897,19 @@ gint32 CDeclInterfSvr::OutputEvent(
         ObjPtr pArgs = pmd->GetInArgs();
         Wa( "//RPC event sender" );
         CCOUT << "gint32 " << strName << "(";
-        if( !pArgs.IsEmpty() )
+        guint32 dwInCount = GetArgCount( pArgs );
+        if( dwInCount > 0 )
         {
-            CCOUT << ToStringInArgs( pArgs );
+            INDENT_UPL;
+            GenFormInArgs( pArgs );
+            CCOUT << " );";
+            INDENT_DOWNL;
         }
-        CCOUT << ");";
+        else
+        {
+            CCOUT << " );";
+        }
+
         NEW_LINE;
 
     }while( 0 );
@@ -1848,45 +1935,72 @@ gint32 CDeclInterfSvr::OutputSync(
         guint32 dwOutCount =
             GetArgCount( pInArgs );
 
-        Wa( "//RPC Sync Request Handler Wrapper" );
-        CCOUT << "gint32 " << strName
-             << "Wrapper( IEventSink* pCallback";
+        guint32 dwCount = dwInCount + dwOutCount;
+
+        Wa( "//RPC Sync Req Handler Wrapper" );
+        CCOUT << "gint32 " << strName << "Wrapper(;";
+        INDENT_UPL;
+        CCOUT << "IEventSink* pCallback";
 
         if( pmd->IsSerialize() &&
             dwInCount > 0 )
         {
-            CCOUT << ", BufPtr& pBuf_ ";
+            CCOUT << ", BufPtr& pBuf_ );";
         }
         else if( dwInCount > 0 )
         {
-            CCOUT << ", ";
-            CCOUT << ToStringInArgs( pInArgs );
+            CCOUT << ",";
+            NEW_LINE;
+            GenFormInArgs( pInArgs );
+            CCOUT << " );"; 
         }
+        else
+        {
+            CCOUT << " );"; 
+        }
+        INDENT_DOWNL;
+        NEW_LINES( 1 );
 
-        CCOUT << ");"; 
-        NEW_LINES( 2 );
-
-        Wa( "//RPC Sync Request Handler" );
+        Wa( "//RPC Sync Req Handler" );
         Wa( "//TODO: implement me" );
         std::string strDecl =
             std::string( "virtual gint32 " )
-            + strName + "( ";
-        bool bComma = false;
-        if( dwInCount > 0 )
+            + strName + "(";
+        CCOUT << strDecl;
+        if( dwCount == 0 )
         {
-            strDecl += ToStringInArgs( pInArgs );
-            bComma = true;
+            CCOUT << ") = 0;";
+            NEW_LINE;
         }
-        if( dwOutCount > 0 )
+        else
         {
-            if( bComma )
-                strDecl += ", ";
-            strDecl += ToStringOutArgs( pOutArgs );
+            INDENT_UPL;
+            bool bComma = false;
+            if( dwInCount > 0 )
+            {
+                bComma = true;
+                GenFormInArgs( pInArgs );
+            }
+            if( dwOutCount > 0 )
+            {
+                if( bComma )
+                {
+                    CCOUT << ",";
+                    NEW_LINE;
+                }
+                GenFormOutArgs( pOutArgs );
+            }
+            CCOUT << " ) = 0;";
+            INDENT_DOWNL;
         }
-        strDecl += ")";
-        CCOUT << strDecl << " = 0;";
+
         pmd->SetAbstDecl( strDecl, false );
-        NEW_LINE;
+        guint32 dwFlags = 0;
+        if( dwInCount > 0 )
+            dwFlags |= MF_IN_ARG | MF_IN_AS_IN;
+        if( dwOutCount > 0 )
+            dwFlags |= MF_OUT_ARG | MF_OUT_AS_OUT;
+        pmd->SetAbstFlag( dwFlags, false );
 
     }while( 0 );
 
@@ -1904,15 +2018,23 @@ gint32 CDeclInterfSvr::OutputAsync(
         ObjPtr pInArgs = pmd->GetInArgs();
         ObjPtr pOutArgs = pmd->GetOutArgs();
 
-        guint32 dwInCount = GetArgCount( pInArgs );
+        guint32 dwInCount =
+            GetArgCount( pInArgs );
+
+        guint32 dwOutCount =
+            GetArgCount( pOutArgs );
+
+        guint32 dwCount = dwInCount + dwOutCount;
         if( pmd->IsSerialize() && dwInCount > 0 )
         {
-            Wa( "//RPC Aync Req Handler wrapper" );
+            Wa( "//RPC Async Req Handler wrapper" );
             CCOUT << "gint32 "
-                << strName << "Wrapper( "
-                << "IEventSink* pCallback"
+                << strName << "Wrapper(";
+            INDENT_UPL;
+            CCOUT << "IEventSink* pCallback"
                 << ", BufPtr& pBuf_ );";
-            NEW_LINES( 2 );
+            INDENT_DOWNL;
+            NEW_LINES( 1 );
         }
 
         Wa( "//RPC Async Req callback" );
@@ -1922,41 +2044,62 @@ gint32 CDeclInterfSvr::OutputAsync(
         Wa( "//or an error code" );
 
         CCOUT << "virtual gint32 " << strName
-            << "Callback" << "( ";
+            << "Complete" << "( ";
 
+        INDENT_UPL;
         CCOUT << "IEventSink* pCallback, "
             << "gint32 iRet";
 
-        if( dwInCount > 0 )
+        if( dwOutCount > 0 )
         {
-            CCOUT << ", "
-                << ToStringInArgs( pOutArgs );
+            CCOUT << ",";
+            NEW_LINE;
+            GenFormInArgs( pOutArgs );
         }
         CCOUT << " );";
+        INDENT_DOWNL;
         NEW_LINES( 2 );
 
-        Wa( "//RPC Aync Req Handler" );
+        Wa( "//RPC Async Req Handler" );
         Wa( "//TODO: adding code to emit your async" );
         Wa( "//operation, keep a copy of pCallback and" );
         Wa( "//return STATUS_PENDING" );
         std::string strDecl =
             std::string( "virtual gint32 " ) +
-            strName + "( ";
+            strName + "(";
+
+        CCOUT << strDecl;
         strDecl += "IEventSink* pCallback";
-        if( !pInArgs.IsEmpty() )
+
+        INDENT_UPL;
+        CCOUT << "IEventSink* pCallback";
+        if( dwCount > 0 )
         {
-            strDecl += std::string( ", " ) +
-                ToStringInArgs( pInArgs );
+            strDecl += ",";
+            CCOUT << ",";
         }
-        if( !pOutArgs.IsEmpty() )
+
+        if( dwInCount > 0 )
         {
-            strDecl += std::string( ", " ) +
-                ToStringOutArgs( pOutArgs );
+            NEW_LINE;
+            GenFormInArgs( pInArgs );
         }
-        strDecl += ")";
-        CCOUT << strDecl << " = 0;";
+        if( dwOutCount > 0 )
+        {
+            NEW_LINE;
+            GenFormOutArgs( pOutArgs );
+        }
+        CCOUT << " ) = 0;";
+        INDENT_DOWNL;
+
         pmd->SetAbstDecl( strDecl, false );
-        NEW_LINES( 2 );
+
+        guint32 dwFlags = 0;
+        if( dwInCount > 0 )
+            dwFlags = MF_IN_AS_IN | MF_IN_ARG;
+        if( dwOutCount > 0 )
+            dwFlags |= MF_OUT_ARG | MF_OUT_AS_OUT;
+        pmd->SetAbstFlag( dwFlags, false );
 
     }while( 0 );
 
@@ -2174,7 +2317,7 @@ gint32 CSetStructRefs::ExtractStructMap(
             pType = pmt->GetKeyType();
             ++iCount;
 
-        }while( iCount >= 2 );
+        }while( iCount < 2 );
 
     }while( 0 );
 
@@ -2271,7 +2414,7 @@ gint32 CSetStructRefs::SetStructRefs()
                 ret = ExtractStructArr(
                     elem, setStructs );                
             }
-            else if( strSig[ 0 ] == ']' )
+            else if( strSig[ 0 ] == '[' )
             {
                 ret = ExtractStructMap(
                     elem, setStructs );                
@@ -2293,8 +2436,8 @@ gint32 CSetStructRefs::SetStructRefs()
 
 CDeclServiceImpl::CDeclServiceImpl(
     CCppWriter* pWriter, ObjPtr& pNode )
+    : super( pWriter )
 {
-    m_pWriter = pWriter;
     m_pNode = pNode;
     if( m_pNode == nullptr )
     {
@@ -2306,7 +2449,7 @@ CDeclServiceImpl::CDeclServiceImpl(
 }
 
 gint32 CDeclServiceImpl::FindAbstMethod(
-    std::vector< std::string >& vecMethods,
+    std::vector< ABSTE >& vecMethods,
     bool bProxy )
 {
     gint32 ret = 0;
@@ -2331,7 +2474,11 @@ gint32 CDeclServiceImpl::FindAbstMethod(
             ObjPtr pObj = pifd->GetMethodList();
             CMethodDecls* pmds = pObj;
             guint32 i = 0;
-            bool bFirst = true;
+
+            std::string strComment = "// ";
+            strComment += pifd->GetName();
+            vecMethods.push_back( {strComment, pObj } );
+
             for( ; i < pmds->GetCount(); i++ )
             {
                 ObjPtr p = pmds->GetChild( i );
@@ -2345,16 +2492,143 @@ gint32 CDeclServiceImpl::FindAbstMethod(
                     pmd->GetAbstDecl( bProxy );
                 if( strDecl.empty() )
                     continue;
-                if( bFirst )
-                {
-                    std::string strComment = "// ";
-                    strComment += pifd->GetName();
-                    vecMethods.push_back( strComment );
-                    bFirst = false;
-                }
-                vecMethods.push_back( strDecl );
+
+                vecMethods.push_back( { strDecl, p } );
             }
+            if( ERROR( ret ) )
+                break;
         }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CDeclServiceImpl::DeclAbstMethod(
+    ABSTE oMethod, bool bProxy )
+{
+    CMethodDecl* pmd = oMethod.second;    
+    if( pmd == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        ObjPtr pInArgs = pmd->GetInArgs();
+        ObjPtr pOutArgs = pmd->GetOutArgs();
+
+        guint32 dwInCount =
+            GetArgCount( pInArgs );
+
+        guint32 dwOutCount =
+            GetArgCount( pOutArgs );
+
+        guint32 dwCount = 0;
+
+        guint32 dwFlags = 0;
+        pmd->GetAbstFlag( dwFlags, bProxy );
+
+        bool bInArg = false, bOutArg = false;
+
+        if( dwFlags & MF_IN_ARG )
+            bInArg = true;
+
+        if( dwFlags & MF_OUT_ARG )
+            bOutArg = true;
+
+        bool bInAsIn = false, bOutAsIn = false;
+        if( dwFlags & MF_IN_AS_IN )
+            bInAsIn = true;
+
+        if( dwFlags & MF_OUT_AS_IN )
+            bOutAsIn = true;
+
+        if( bInArg )
+            dwCount = dwInCount;
+
+        if( bOutArg )
+            dwCount += dwOutCount;
+
+        if( dwCount == 0 )
+        {
+            if( oMethod.first.back() == '(' )
+            {
+                CCOUT << oMethod.first;
+                CCOUT << ");";
+                NEW_LINE;
+                break;
+            }
+            // there are some fixed arguments
+            // to indent
+        }
+
+        std::string strRet = oMethod.first;
+        size_t pos = strRet.find_first_of( '(' );
+        bool bAppend = false;
+        if( pos != std::string::npos )
+        {
+            pos += 1;
+            INDENT_UP;
+            std::string strNewLine =
+                m_pWriter->NewLineStr();
+            INDENT_DOWN;
+            if( pos >= strRet.size() )
+            {
+                strRet.append( strNewLine );
+                bAppend = true;
+            }
+            else
+                strRet.insert( pos, strNewLine );
+        }
+        else
+        {
+            printf( "error '%s' missing left paren\n",
+                oMethod.first.c_str() );
+            ret = -EINVAL;
+            break;
+        }
+
+        CCOUT << strRet;
+        if( dwCount == 0 )
+        {
+            CCOUT << " );";
+            NEW_LINE;
+            break;
+        }
+
+        if( !bAppend )
+        {
+            INDENT_UPL;
+        }
+        else
+        {
+            INDENT_UP;
+        }
+        if( bInArg && bInAsIn ) 
+        {
+            GenFormInArgs( pInArgs );
+        }
+        else if( bInArg )
+        {
+            GenFormOutArgs( pInArgs );
+        }
+
+        if( dwInCount > 0 && dwOutCount > 0 &&
+            bInArg && bOutArg )
+        {
+            CCOUT << ",";
+            NEW_LINE;
+        }
+
+        if( bOutArg && bOutAsIn )
+        {
+            GenFormInArgs( pOutArgs );
+        }
+        else if( bOutArg )
+        {
+            GenFormOutArgs( pOutArgs );
+        }
+        CCOUT << " );";
+        INDENT_DOWNL;
 
     }while( 0 );
 
@@ -2368,12 +2642,12 @@ gint32 CDeclServiceImpl::Output()
         std::string strSvcName =
             m_pNode->GetName();
 
-        std::vector< std::string > vecPMethods;
+        std::vector< ABSTE > vecPMethods;
         ret = FindAbstMethod( vecPMethods, true );
         if( ERROR( ret ) )
             break;
 
-        std::vector< std::string > vecSMethods;
+        std::vector< ABSTE > vecSMethods;
         ret = FindAbstMethod( vecSMethods, false );
         if( ERROR( ret ) )
             break;
@@ -2450,11 +2724,17 @@ gint32 CDeclServiceImpl::Output()
 
             for( auto& elem : vecPMethods )
             {
-                if( elem[ 0 ] == '/' && elem[ 1 ] == '/' )
+                if( elem.first[ 0 ] == '/' &&
+                    elem.first[ 1 ] == '/' )
+                {
                     NEW_LINE;
+                    CCOUT << elem.first;
+                    NEW_LINE;
+                    continue;
+                }
 
-                CCOUT << elem << ";";
                 NEW_LINE;
+                DeclAbstMethod( elem, true );
             }
 
             BLOCK_CLOSE;
@@ -2511,11 +2791,17 @@ gint32 CDeclServiceImpl::Output()
 
         for( auto& elem : vecSMethods )
         {
-            if( elem[ 0 ] == '/' && elem[ 1 ] == '/' )
+            if( elem.first[ 0 ] == '/' &&
+                elem.first[ 1 ] == '/' )
+            {
                 NEW_LINE;
+                CCOUT << elem.first;
+                NEW_LINE;
+                continue;
+            }
 
-            CCOUT << elem << ";";
             NEW_LINE;
+            DeclAbstMethod( elem, false );
         }
         BLOCK_CLOSE;
         CCOUT << ";";
@@ -2545,7 +2831,7 @@ gint32 CImplSerialStruct::OutputSerial()
     gint32 ret = 0;
     do{
         CCOUT << "gint32 " << m_pNode->GetName()
-            << "::" << "Serialize( BufPtr& pBuf_ )";
+            << "::" << "Serialize( BufPtr& pBuf_ ) const";
         NEW_LINE;
         BLOCK_OPEN;
         CCOUT << "if( pBuf_.IsEmpty() )";
@@ -2562,101 +2848,13 @@ gint32 CImplSerialStruct::OutputSerial()
         Wa( "if( ERROR( ret ) ) break;" );
         NEW_LINE;
 
-        ObjPtr pFileds =
+        ObjPtr pFields =
             m_pNode->GetFieldList();
 
-        CFieldList* pfl = pFileds;
-        guint32 i = 0;
-        guint32 dwCount = pfl->GetCount();
-        for( ; i < dwCount; i++ )
-        {
-            ObjPtr pObj = pfl->GetChild( i );
-            CFieldDecl* pfd = pObj;
-            if( pfd == nullptr )
-            {
-                ret = -EFAULT;
-                break;
-            }
+        CEmitSerialCode oesc(
+            m_pWriter, pFields );
 
-            pObj = pfd->GetType();
-            std::string strName = pfd->GetName();
-            CAstNodeBase* pTypeNode = pObj;
-
-            std::string strSig =
-                pTypeNode->GetSignature();
-
-            if( strSig.empty() )
-            {
-                ret = -EINVAL;
-                break;
-            }
-
-            switch( strSig[ 0 ] )
-            {
-            case '(' :
-                {
-                    CCOUT << "ret = SerializeArray( "
-                        << "pBuf_, " << strName << ", \""
-                        << strSig << "\" );";
-                    NEW_LINE;
-                    Wa( "if( ERROR( ret ) ) break;" );
-                    break;
-                }
-            case '[' :
-                {
-                    CCOUT << "ret = SerializeMap( "
-                        << "pBuf_, " << strName << ", \""
-                        << strSig << "\" );";
-                    NEW_LINE;
-                    Wa( "if( ERROR( ret ) ) break;" );
-                    break;
-                }
-
-            case 'O' :
-                {
-                    CCOUT << "ret = SerialStruct( "
-                        << "pBuf_, " << strName << " );";
-                    NEW_LINE;
-                    Wa( "if( ERROR( ret ) ) break;" );
-                    break;
-                }
-            case 'h':
-                {
-                    CCOUT << "ret = this->" << strName
-                        <<".Serialize( pBuf_ );";
-                    NEW_LINE;
-                    Wa( "if( ERROR( ret ) ) break;" );
-                    break;
-                }
-            case 'Q':
-            case 'q':
-            case 'D':
-            case 'd':
-            case 'W':
-            case 'w':
-            case 'f':
-            case 'F':
-            case 'b':
-            case 'B':
-            case 's':
-            case 'a':
-            case 'o':
-                {
-                    CCOUT << "ret = this->Serialize"
-                        << "( pBuf_, "
-                        << strName << " );";
-                    NEW_LINE;
-                    Wa( "if( ERROR( ret ) ) break;" );
-                    break;
-                }
-            default:
-                {
-                    ret = -EINVAL;
-                    break;
-                }
-            }
-            NEW_LINE;
-        }
+        oesc.OutputSerial( "", "pBuf_" );
 
         BLOCK_CLOSE;
         CCOUT << "while( 0 );";
@@ -2676,11 +2874,8 @@ gint32 CImplSerialStruct::OutputDeserial()
     gint32 ret = 0;
     do{
         CCOUT << "gint32 " << m_pNode->GetName()
-            << "::" << "Deserialize(";
-        INDENT_UP;
-        NEW_LINE;
-        CCOUT << "BufPtr& pBuf_, guint32 dwSize )";
-        INDENT_DOWN;
+            << "::" << "Deserialize( ";
+        CCOUT << "BufPtr& pBuf_ )";
         NEW_LINE;
         BLOCK_OPEN;
         CCOUT << "if( pBuf_.IsEmpty() )";
@@ -2692,11 +2887,10 @@ gint32 CImplSerialStruct::OutputDeserial()
         CCOUT << "do";
         BLOCK_OPEN;
 
-        ObjPtr pFileds =
+        ObjPtr pFields =
             m_pNode->GetFieldList();
 
-        CFieldList* pfl = pFileds;
-        guint32 i = 0;
+        CFieldList* pfl = pFields;
         guint32 dwCount = pfl->GetCount();
         if( dwCount == 0 )
         {
@@ -2706,101 +2900,13 @@ gint32 CImplSerialStruct::OutputDeserial()
 
         Wa( "guint32 dwMsgId = 0;" );
         CCOUT << "ret = Deserialize( pBuf_, dwMsgId );";
-        NEW_LINE;
+        NEW_LINES( 2 );
         Wa( "if( ERROR( ret ) ) return ret;" );
         Wa( "if( m_dwMsgId != dwMsgId ) return -EINVAL;" );
         NEW_LINE;
 
-        for( ; i < dwCount; i++ )
-        {
-            ObjPtr pObj = pfl->GetChild( i );
-            CFieldDecl* pfd = pObj;
-            if( pfd == nullptr )
-            {
-                ret = -EFAULT;
-                break;
-            }
-
-            pObj = pfd->GetType();
-            std::string strName = pfd->GetName();
-            CAstNodeBase* pTypeNode = pObj;
-
-            std::string strSig =
-                pTypeNode->GetSignature();
-
-            if( strSig.empty() )
-            {
-                ret = -EINVAL;
-                break;
-            }
-
-            switch( strSig[ 0 ] )
-            {
-            case '(' :
-                {
-                    CCOUT << "ret = DesrialArray( "
-                        << "pBuf_, " << strName << ", \""
-                        << strSig << "\" );";
-                    NEW_LINE;
-                    Wa( "if( ERROR( ret ) ) break;" );
-                    break;
-                }
-            case '[' :
-                {
-                    CCOUT << "ret = DeserialMap( "
-                        << "pBuf_, " << strName << ", \""
-                        << strSig << "\" );";
-                    NEW_LINE;
-                    Wa( "if( ERROR( ret ) ) break;" );
-                    break;
-                }
-
-            case 'O' :
-                {
-                    CCOUT << "ret = DeserialStruct( "
-                        << "pBuf_, " << strName << " );";
-                    NEW_LINE;
-                    Wa( "if( ERROR( ret ) ) break;" );
-                    break;
-                }
-            case 'h':
-                {
-                    CCOUT << "ret = this->"
-                        << strName
-                        <<".Deserialize( pBuf_ );";
-                    NEW_LINE;
-                    Wa( "if( ERROR( ret ) ) break;" );
-                    break;
-                }
-            case 'Q':
-            case 'q':
-            case 'D':
-            case 'd':
-            case 'W':
-            case 'w':
-            case 'f':
-            case 'F':
-            case 'b':
-            case 'B':
-            case 's':
-            case 'a':
-            case 'o':
-                {
-                    CCOUT << "ret = this->Deserialize"
-                        << "( pBuf_, "
-                        << strName << " );";
-                    NEW_LINE;
-                    Wa( "if( ERROR( ret ) ) break;" );
-                    break;
-                }
-            default:
-                {
-                    ret = -EINVAL;
-                    break;
-                }
-            }
-            NEW_LINE;
-        }
+        CEmitSerialCode odesc( m_pWriter, pFields );
+        odesc.OutputDeserial( "", "pBuf_" );
 
         BLOCK_CLOSE;
         CCOUT << "while( 0 );";
@@ -3110,7 +3216,7 @@ CEmitSerialCode::CEmitSerialCode(
 }
 
 gint32 CEmitSerialCode::OutputSerial(
-    const std::string& strObj,
+    const std::string& strObjc,
     const std::string strBuf )
 {
     gint32 ret = 0;
@@ -3121,7 +3227,7 @@ gint32 CEmitSerialCode::OutputSerial(
         for( ; i < dwCount; i++ )
         {
             ObjPtr pObj = m_pArgs->GetChild( i );
-            CFormalArg* pfa = pObj;
+            CFieldDecl* pfa = pObj;
             if( pfa == nullptr )
             {
                 ret = -EFAULT;
@@ -3141,12 +3247,16 @@ gint32 CEmitSerialCode::OutputSerial(
                 break;
             }
 
+            std::string strObj;
+            if( !strObjc.empty() )
+                strObj = strObjc + '.';
+
             switch( strSig[ 0 ] )
             {
             case '(' :
                 {
                     CCOUT << "ret = " << strObj
-                        << ".SerializeArray( "
+                        << "SerializeArray( "
                         << strBuf << ", " << strName << ", \""
                         << strSig << "\" );";
                     NEW_LINE;
@@ -3156,7 +3266,7 @@ gint32 CEmitSerialCode::OutputSerial(
             case '[' :
                 {
                     CCOUT << "ret = "<< strObj
-                        << ".SerializeMap( "
+                        << "SerializeMap( "
                         << strBuf << ", " << strName << ", \""
                         << strSig << "\" );";
                     NEW_LINE;
@@ -3167,7 +3277,7 @@ gint32 CEmitSerialCode::OutputSerial(
             case 'O' :
                 {
                     CCOUT << "ret = " << strObj
-                        << ".SerialStruct( "
+                        << "SerialStruct( "
                         << strBuf << ", " << strName << " );";
                     NEW_LINE;
                     Wa( "if( ERROR( ret ) ) break;" );
@@ -3197,11 +3307,10 @@ gint32 CEmitSerialCode::OutputSerial(
             case 'o':
                 {
                     CCOUT << "ret = " << strObj
-                        << ".Serialize( " << strBuf << ", "
+                        << "Serialize( " << strBuf << ", "
                         << strName << " );";
                     NEW_LINE;
                     Wa( "if( ERROR( ret ) ) break;" );
-                    NEW_LINE;
                     break;
                 }
             default:
@@ -3210,6 +3319,8 @@ gint32 CEmitSerialCode::OutputSerial(
                     break;
                 }
             }
+            if( i + 1 < dwCount )
+                NEW_LINE;
         }
 
     }while( 0 );
@@ -3218,7 +3329,7 @@ gint32 CEmitSerialCode::OutputSerial(
 }
 
 gint32 CEmitSerialCode::OutputDeserial(
-    const std::string& strObj,
+    const std::string& strObjc,
     const std::string strBuf )
 {
     gint32 ret = 0;
@@ -3228,7 +3339,7 @@ gint32 CEmitSerialCode::OutputDeserial(
         for( ; i < dwCount; i++ )
         {
             ObjPtr pObj = m_pArgs->GetChild( i );
-            CFormalArg* pfa = pObj;
+            CFieldDecl* pfa = pObj;
             if( pfa == nullptr )
             {
                 ret = -EFAULT;
@@ -3248,11 +3359,15 @@ gint32 CEmitSerialCode::OutputDeserial(
                 break;
             }
 
+            std::string strObj;
+            if( !strObjc.empty() )
+                strObj = strObjc + '.';
+
             switch( strSig[ 0 ] )
             {
             case '(' :
                 {
-                    CCOUT << "ret = " << strObj << ".DesrialArray( "
+                    CCOUT << "ret = " << strObj << "DesrialArray( "
                         << strBuf << ", " << strName << ", \""
                         << strSig << "\" );";
                     NEW_LINE;
@@ -3261,7 +3376,7 @@ gint32 CEmitSerialCode::OutputDeserial(
                 }
             case '[' :
                 {
-                    CCOUT << "ret = " << strObj << ".DeserialMap( "
+                    CCOUT << "ret = " << strObj << "DeserialMap( "
                         << strBuf << ", " << strName << ", \""
                         << strSig << "\" );";
                     NEW_LINE;
@@ -3271,7 +3386,7 @@ gint32 CEmitSerialCode::OutputDeserial(
 
             case 'O' :
                 {
-                    CCOUT << "ret = " << strObj << ".DeserialStruct( "
+                    CCOUT << "ret = " << strObj << "DeserialStruct( "
                         << strBuf << ", " << strName << " );";
                     NEW_LINE;
                     Wa( "if( ERROR( ret ) ) break;" );
@@ -3299,7 +3414,7 @@ gint32 CEmitSerialCode::OutputDeserial(
             case 'a':
             case 'o':
                 {
-                    CCOUT << "ret = " << strObj << ".Deserialize"
+                    CCOUT << "ret = " << strObj << "Deserialize"
                         << "( " << strBuf << ", "
                         << strName << " );";
                     NEW_LINE;
@@ -3312,6 +3427,8 @@ gint32 CEmitSerialCode::OutputDeserial(
                     break;
                 }
             }
+            if( i + 1 < dwCount )
+                NEW_LINE;
         }
     }while( 0 );
 
@@ -3319,10 +3436,13 @@ gint32 CEmitSerialCode::OutputDeserial(
 }
 
 CMethodWriter::CMethodWriter(
-    CCppWriter* pWriter,
-    ObjPtr& pNode )
+    CCppWriter* pWriter )
+{ m_pWriter = pWriter; }
+
+CImplIfMethodProxy::CImplIfMethodProxy(
+    CCppWriter* pWriter, ObjPtr& pNode )
+    : super( pWriter )
 {
-    m_pWriter = pWriter;
     m_pNode = pNode;
     if( m_pNode == nullptr )
     {
@@ -3357,8 +3477,7 @@ CMethodWriter::CMethodWriter(
             "'interf_decl' node" );
         throw std::runtime_error( strMsg );
     }
-};
-
+}
 
 gint32 CImplIfMethodProxy::Output()
 {
@@ -3406,7 +3525,6 @@ gint32 CImplIfMethodProxy::OutputEvent()
     bool bSerial = m_pNode->IsSerialize();
 
     do{
-        std::string strArgList;
         CCOUT << "gint32 " << strClass << "::"
             << strMethod << "Wrapper( ";
         INDENT_UP;
@@ -3422,9 +3540,9 @@ gint32 CImplIfMethodProxy::OutputEvent()
         }
         else
         {
-            strArgList =
-                ToStringInArgs( pInArgs );
-            CCOUT << ", " << strArgList;
+            CCOUT << ",";
+            NEW_LINE;
+            GenFormInArgs( pInArgs );
         }
         INDENT_DOWN;
         NEW_LINE;
@@ -3469,7 +3587,7 @@ gint32 CImplIfMethodProxy::OutputEvent()
         }
 
         BLOCK_CLOSE;
-        NEW_LINES( 2 );
+        NEW_LINES( 1 );
 
     }while( 0 );
     
@@ -3489,44 +3607,43 @@ gint32 CImplIfMethodProxy::OutputSync()
 
     guint32 dwInCount = GetArgCount( pInArgs );
     guint32 dwOutCount = GetArgCount( pOutArgs );
+    guint32 dwCount = dwInCount + dwOutCount;
+
 
     bool bSerial = m_pNode->IsSerialize();
 
     do{
-        std::string strArgList;
         CCOUT << "gint32 " << strClass << "::"
-            << strMethod << "( ";
-        INDENT_UP;
-        NEW_LINE;
+            << strMethod << "(";
 
         // gen the param list
-        if( dwInCount == 0 && dwOutCount == 0 )
+        if( dwCount == 0 )
         {
-            CCOUT << " )";
+            CCOUT << ")";
         }
         else
         {
+            INDENT_UPL;
             bool bComma = false;
             if( dwInCount > 0 )
             {
                 bComma = true;
-                strArgList =
-                    ToStringInArgs( pInArgs );
+                GenFormInArgs( pInArgs );
             }
 
             if( dwOutCount > 0 )
             {
                 if( bComma )
-                    strArgList += ", ";
-
-                strArgList +=
-                    ToStringOutArgs( pOutArgs );
+                {
+                    CCOUT << ",";
+                    NEW_LINE;
+                }
+                GenFormOutArgs( pOutArgs );
             }
     
-            CCOUT << strArgList << " );";
+            CCOUT << " );";
+            INDENT_DOWNL;
         }
-        INDENT_DOWN;
-        NEW_LINE;
 
         BLOCK_OPEN;
 
@@ -3643,6 +3760,7 @@ gint32 CImplIfMethodProxy::OutputSync()
             Wa( "return ret;" );
         }
         BLOCK_CLOSE;
+        NEW_LINES( 1 );
 
     }while( 0 );
     
@@ -3667,25 +3785,18 @@ gint32 CImplIfMethodProxy::OutputAsync()
     do{
         std::string strArgList;
         CCOUT << "gint32 " << strClass << "::"
-            << strMethod << "( IConfigDb* context";
+            << strMethod << "(IConfigDb* context";
         INDENT_UP;
 
         // gen the param list
-        if( dwInCount == 0 )
-        {
-            CCOUT << " )";
-        }
-        else
+        if( dwInCount > 0 )
         {
             CCOUT << ",";
             NEW_LINE;
-            strArgList =
-                ToStringInArgs( pInArgs );
-
-            CCOUT << strArgList << " )";
+            GenFormInArgs( pInArgs );
         }
-        INDENT_DOWN;
-        NEW_LINE;
+        CCOUT << " )";
+        INDENT_DOWNL;
 
         BLOCK_OPEN;
 
@@ -3779,10 +3890,10 @@ gint32 CImplIfMethodProxy::OutputAsync()
         Wa( "if( ret == STATUS_PENDING ) return ret;" );
         Wa( "( *pRespCb_ )( eventCancelTask )" );
         NEW_LINE;
-        Wa( "return ret" );
+        Wa( "return ret;" );
 
         BLOCK_CLOSE;
-        NEW_LINES( 2 );
+        NEW_LINES( 1 );
 
     }while( 0 );
     
@@ -3889,7 +4000,7 @@ gint32 CImplIfMethodProxy::OutputAsyncCbWrapper()
 
             CCOUT << strMethod << "Callback( ";
             INDENT_UPL;
-            CCOUT << "context, iRet,";
+            CCOUT << "context, iRet";
             NEW_LINE;
 
             std::vector< std::string > vecTypes;
@@ -3937,13 +4048,54 @@ gint32 CImplIfMethodProxy::OutputAsyncCbWrapper()
         BLOCK_CLOSE;
         Wa( "while( 0 );" );
         NEW_LINE;
-        Wa( "return 0" );
+        Wa( "return 0;" );
 
         BLOCK_CLOSE;
+        NEW_LINES( 1 );
 
     }while( 0 );
     
     return ret;
+}
+
+CImplIfMethodSvr::CImplIfMethodSvr(
+    CCppWriter* pWriter, ObjPtr& pNode )
+    : super( pWriter )
+{
+    m_pNode = pNode;
+    if( m_pNode == nullptr )
+    {
+        std::string strMsg = DebugMsg(
+            -EFAULT, "internal error empty "
+            "'interf_decl' node" );
+        throw std::runtime_error( strMsg );
+    }
+
+    CAstNodeBase* pParent = m_pNode->GetParent();
+    if( pParent == nullptr )
+    {
+        std::string strMsg = DebugMsg(
+            -EFAULT, "internal error empty "
+            "'method_decls' node" );
+        throw std::runtime_error( strMsg );
+    }
+    pParent = pParent->GetParent();
+    if( pParent == nullptr )
+    {
+        std::string strMsg = DebugMsg(
+            -EFAULT, "internal error empty "
+            "'interf_decl' node" );
+        throw std::runtime_error( strMsg );
+    }
+
+    m_pIf = ObjPtr( pParent );
+    if( m_pIf == nullptr )
+    {
+        std::string strMsg = DebugMsg(
+            -EFAULT, "internal error empty "
+            "'interf_decl' node" );
+        throw std::runtime_error( strMsg );
+    }
 }
 
 gint32 CImplIfMethodSvr::Output()
@@ -3994,19 +4146,18 @@ gint32 CImplIfMethodSvr::OutputEvent()
     do{
         std::string strArgList;
         CCOUT << "gint32 " << strClass << "::"
-            << strMethod << "( ";
+            << strMethod << "(";
         INDENT_UPL;
 
         // gen the param list
         if( dwInCount == 0 )
         {
-            CCOUT << " )";
+            CCOUT << ")";
         }
         else
         {
-            strArgList =
-                ToStringInArgs( pInArgs );
-            CCOUT << strArgList << " )";
+            GenFormInArgs( pInArgs );
+            CCOUT << " )";
         }
 
         INDENT_DOWNL;
@@ -4068,9 +4219,10 @@ gint32 CImplIfMethodSvr::OutputEvent()
             INDENT_DOWN;
         }
         NEW_LINE;
-        Wa( "return ret" );
+        CCOUT << "return ret;";
 
         BLOCK_CLOSE;
+        NEW_LINES( 1 );
 
     }while( 0 );
     
@@ -4094,7 +4246,6 @@ gint32 CImplIfMethodSvr::OutputSync()
     bool bSerial = m_pNode->IsSerialize();
 
     do{
-        std::string strArgList;
         CCOUT << "gint32 " << strClass << "::"
             << strMethod << "Wrapper( ";
         INDENT_UPL;
@@ -4108,11 +4259,9 @@ gint32 CImplIfMethodSvr::OutputSync()
         }
         else
         {
-            strArgList =
-                ToStringInArgs( pInArgs );
-
-            if( !strArgList.empty() )
-                CCOUT << ", " << strArgList;
+            CCOUT << ",";
+            NEW_LINE;
+            GenFormInArgs( pInArgs );
         }
 
         CCOUT << " )";
@@ -4130,6 +4279,8 @@ gint32 CImplIfMethodSvr::OutputSync()
         }
         else if( !bSerial )
         {
+            DeclLocals( pOutArgs );
+            NEW_LINE;
             CCOUT << "ret = this->"
                 << strMethod << "(";
             INDENT_UPL;
@@ -4141,6 +4292,7 @@ gint32 CImplIfMethodSvr::OutputSync()
             else
                 CCOUT << ");";
             INDENT_DOWNL;
+            NEW_LINE;
 
             Wa( "CParamList oResp_;" );
             Wa( "oResp_[ propReturnValue ] = ret;" );
@@ -4151,10 +4303,12 @@ gint32 CImplIfMethodSvr::OutputSync()
 
                 std::vector< std::string > vecArgs;
                 ret = GetArgsForCall( pOutArgs, vecArgs );
-                for( auto& elem : vecArgs )
+                for( guint32 i = 0; i < vecArgs.size(); i++ )
                 {
-                    CCOUT << "oParams.Push( " << elem << " );";
-                    NEW_LINE;
+                    CCOUT << "oParams.Push( "
+                        << vecArgs[ i ] << " );";
+                    if( i + 1 < vecArgs.size() )
+                        NEW_LINE;
                 }
                 BLOCK_CLOSE;
                 NEW_LINE;
@@ -4201,7 +4355,7 @@ gint32 CImplIfMethodSvr::OutputSync()
                 if( ERROR( ret ) )
                     break;
 
-                Wa( "oResp_.push( pBuf_ );" );
+                CCOUT << "oResp_.push( pBuf_ );";
                 BLOCK_CLOSE;
                 NEW_LINE;
             }
@@ -4216,6 +4370,7 @@ gint32 CImplIfMethodSvr::OutputSync()
         NEW_LINE;
         CCOUT << "return ret;";
         BLOCK_CLOSE;
+        NEW_LINES( 1 );
 
     }while( 0 );
     
@@ -4305,7 +4460,7 @@ gint32 CImplIfMethodSvr::OutputAsync()
         INDENT_DOWNL;
         CCOUT << "return ret;";
         BLOCK_CLOSE;
-        NEW_LINES( 2 );
+        NEW_LINES( 1 );
 
     }while( 0 );
     
@@ -4331,17 +4486,18 @@ gint32 CImplIfMethodSvr::OutputAsyncCallback()
         Wa( "// the asynchronous operation" );
 
         CCOUT << "gint32 " << strClass << "::"
-            << strMethod << "Callback( ";
+            << strMethod << "Complete( ";
         INDENT_UP;
         NEW_LINE;
         CCOUT << "IEventSink* pCallback"
             << ", gint32 iRet";
 
-        strArgList =
-            ToStringInArgs( pOutArgs );
-
-        if( !strArgList.empty() )
-            CCOUT << ", " << strArgList;
+        if( dwOutCount > 0 )
+        {
+            CCOUT << ",";
+            NEW_LINE;
+            GenFormInArgs( pOutArgs );
+        }
 
         CCOUT << " )";
 
@@ -4404,9 +4560,85 @@ gint32 CImplIfMethodSvr::OutputAsyncCallback()
         INDENT_DOWNL;
         CCOUT << "return ret;";
         BLOCK_CLOSE;
+        NEW_LINES( 1 );
 
     }while( 0 );
     
     return ret;
 }
 
+CImplClassFactory::CImplClassFactory(
+    CCppWriter* pWriter, ObjPtr& pNode )
+{
+    m_pWriter = pWriter;
+    m_pNode = pNode;
+    if( m_pNode == nullptr )
+    {
+        std::string strMsg = DebugMsg(
+            -EFAULT, "internal error empty "
+            "'statements' node" );
+        throw std::runtime_error( strMsg );
+    }
+}
+
+gint32 CImplClassFactory::Output()
+{
+    if( m_pNode == nullptr )
+        return -EFAULT;
+
+    gint32 ret = 0;
+    do{
+        CStatements* pStmts = m_pNode;
+        std::vector< ObjPtr > vecSvcs;
+        for( guint32 i = 0;
+            i < pStmts->GetCount(); i++ )
+        {
+            ObjPtr pObj = pStmts->GetChild( i );
+            guint32 dwClsid =
+                ( guint32 )pObj->GetClsid();
+            if( dwClsid !=
+                clsid( CServiceDecl ) )
+                continue;
+            vecSvcs.push_back( pObj );
+        }
+        if( vecSvcs.empty() )
+            break;
+        Wa( "static FactoryPtr InitClassFactory()" ); 
+        BLOCK_OPEN;
+        CCOUT << "BEGIN_FACTORY_MAPS;";
+        NEW_LINES( 2 );
+
+        for( auto& elem : vecSvcs )
+        {
+            CServiceDecl* pSvc = elem;
+            CCOUT << "INIT_MAP_ENTRYCFG( ";
+            CCOUT << "C" << pSvc->GetName()
+                << "_CliImpl );";
+            NEW_LINE;
+            CCOUT << "INIT_MAP_ENTRYCFG( ";
+            CCOUT << "C" << pSvc->GetName()
+                << "_SvrImpl );";
+            NEW_LINE;
+        }
+
+        NEW_LINE;
+        CCOUT << "END_FACTORY_MAPS;";
+        BLOCK_CLOSE;
+        NEW_LINES( 2 );
+
+        Wa( "extern \"C\"" );
+        Wa( "gint32 DllLoadFactory( FactoryPtr& pFactory )" );
+        BLOCK_OPEN;
+        Wa( "pFactory = InitClassFactory();" );
+        CCOUT << "if( pFactory.IsEmpty() )";
+        INDENT_UPL;
+        CCOUT << "return -EFAULT;";
+        INDENT_DOWNL;
+        CCOUT << "return STATUS_SUCCESS;";
+        BLOCK_CLOSE;
+        NEW_LINE;
+
+    }while( 0 );
+
+    return ret;
+}

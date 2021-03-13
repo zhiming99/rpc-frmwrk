@@ -67,6 +67,7 @@ struct CWriterBase
     std::unique_ptr< CFileSet > m_pFiles;
 
     std::ofstream* m_curFp = nullptr;
+    std::string m_strCurFile;
 
     CWriterBase(
         const std::string& strPath,
@@ -106,14 +107,16 @@ struct CWriterBase
         const std::string& strText )
     { COUT << strText; };
 
-    inline void NewLine( gint32 iCount = 1 )
-    {
+    inline std::string NewLineStr(
+        gint32 iCount = 1 ) const
+    { 
         std::string strChars( iCount, '\n' );
-        COUT << strChars;
-        strChars.clear();
         strChars.append( m_dwIndent, ' ' );
-        COUT << strChars;
+        return strChars;
     }
+
+    inline void NewLine( gint32 iCount = 1 )
+    { COUT << NewLineStr( iCount ); }
 
     inline void BlockOpen()
     {
@@ -289,13 +292,15 @@ struct CArgListUtils
 {
     gint32 GetArgCount( ObjPtr& pArgs ) const;
 
-    std::string ToStringInArgs(
-        ObjPtr& pArgs );
+    gint32 ToStringInArgs(
+        ObjPtr& pArgs,
+        std::vector< std::string >& vecArgs ) const;
 
-    std::string ToStringOutArgs(
-        ObjPtr& pArgs );
+    gint32 ToStringOutArgs(
+        ObjPtr& pArgs,
+        std::vector< std::string >& vecArgs ) const;
 
-    gint32 GenLocals( ObjPtr pArgList,
+    gint32 GenLocals( ObjPtr& pArgList,
         std::vector< std::string >& vecLocals ) const;
 
     gint32 GetHstream( ObjPtr& pArgList,
@@ -304,20 +309,58 @@ struct CArgListUtils
     gint32 GetArgsForCall( ObjPtr& pArgList,
         std::vector< std::string >& vecArgs ) const;
 
-    gint32 GetArgTypes( ObjPtr pArgList,
+    gint32 GetArgTypes( ObjPtr& pArgList,
         std::vector< std::string >& vecTypes ) const;
 
-    gint32 GetArgTypes( ObjPtr pArgList,
+    gint32 GetArgTypes( ObjPtr& pArgList,
         std::set< ObjPtr >& vecTypes ) const;
 };
 
-class CDeclInterfProxy 
+struct CMethodWriter 
     : public CArgListUtils
 {
     CCppWriter* m_pWriter = nullptr;
+
+    typedef CArgListUtils super;
+    CMethodWriter( CCppWriter* pWriter );
+
+    gint32 GenActParams(
+        ObjPtr& pArgList );
+
+    gint32 GenActParams(
+        ObjPtr& pArgList,
+        ObjPtr& pArgList2 );
+
+    gint32 GenSerialArgs(
+        ObjPtr& pArgList,
+        const std::string& strBuf,
+        bool bDeclare, bool bAssign );
+
+    gint32 GenDeserialArgs(
+        ObjPtr& pArgList,
+        const std::string& strBuf,
+        bool bDeclare, bool bAssign );
+
+    gint32 DeclLocals( ObjPtr& pArgList );
+
+    gint32 GenFormArgs(
+        ObjPtr& pArg, bool bIn );
+
+    gint32 GenFormInArgs( ObjPtr& pArg )
+    { return GenFormArgs( pArg, true ); }
+
+    gint32 GenFormOutArgs( ObjPtr& pArg )
+    { return GenFormArgs( pArg, false ); }
+};
+
+class CDeclInterfProxy 
+    : public CMethodWriter
+{
     CInterfaceDecl* m_pNode = nullptr;
 
     public:
+    typedef CMethodWriter super;
+
     CDeclInterfProxy( CCppWriter* pWriter,
         ObjPtr& pNode );
 
@@ -329,12 +372,13 @@ class CDeclInterfProxy
 
 
 class CDeclInterfSvr
-    : public CArgListUtils
+    : public CMethodWriter
 {
-    CCppWriter* m_pWriter = nullptr;
     CInterfaceDecl* m_pNode = nullptr;
 
     public:
+
+    typedef CMethodWriter super;
     CDeclInterfSvr( CCppWriter* pWriter,
         ObjPtr& pNode );
 
@@ -374,18 +418,24 @@ class CDeclService
     gint32 Output();
 };
 
-class CDeclServiceImpl
+class CDeclServiceImpl :
+    public CMethodWriter
 {
-    CCppWriter* m_pWriter = nullptr;
     CServiceDecl* m_pNode = nullptr;
 
     public:
+    typedef CMethodWriter super;
     CDeclServiceImpl( CCppWriter* pWriter,
         ObjPtr& pNode );
 
+    using ABSTE = std::pair< std::string, ObjPtr >;
+
     gint32 FindAbstMethod(
-        std::vector< std::string >& vecMethods,
+        std::vector< ABSTE >& vecMethods,
         bool bProxy );
+
+    gint32 DeclAbstMethod(
+        ABSTE oMethod, bool bProxy );
 
     gint32 Output();
 };
@@ -433,7 +483,7 @@ class CEmitSerialCode
 {
     public:
     CCppWriter* m_pWriter = nullptr;
-    CArgList* m_pArgs;
+    CAstListNode* m_pArgs;
 
     CEmitSerialCode( CCppWriter* pWriter,
         ObjPtr& pNode );
@@ -447,47 +497,17 @@ class CEmitSerialCode
         const std::string strBuf = "pBuf" );
 };
 
-struct CMethodWriter 
-    : public CArgListUtils
-{
-    CCppWriter* m_pWriter = nullptr;
-    CMethodDecl* m_pNode = nullptr;
-    CInterfaceDecl* m_pIf = nullptr;
-
-    typedef CArgListUtils super;
-    CMethodWriter( CCppWriter* pWriter,
-        ObjPtr& pNode );
-
-    gint32 GenActParams(
-        ObjPtr& pArgList );
-
-    gint32 GenActParams(
-        ObjPtr& pArgList,
-        ObjPtr& pArgList2 );
-
-    gint32 GenSerialArgs(
-        ObjPtr& pArgList,
-        const std::string& strBuf,
-        bool bDeclare, bool bAssign );
-
-    gint32 GenDeserialArgs(
-        ObjPtr& pArgList,
-        const std::string& strBuf,
-        bool bDeclare, bool bAssign );
-
-    gint32 DeclLocals( ObjPtr& pArgList );
-};
-
 class CImplIfMethodProxy
     : public CMethodWriter
 {
+    CMethodDecl* m_pNode = nullptr;
+    CInterfaceDecl* m_pIf = nullptr;
+
     public:
     typedef CMethodWriter super;
 
     CImplIfMethodProxy(
-        CCppWriter* pWriter, ObjPtr& pNode )
-        : super( pWriter, pNode )
-    {}
+        CCppWriter* pWriter, ObjPtr& pNode );
 
     gint32 OutputAsyncCbWrapper();
     gint32 OutputEvent();
@@ -499,12 +519,13 @@ class CImplIfMethodProxy
 class CImplIfMethodSvr
     : public CMethodWriter
 {
+    CMethodDecl* m_pNode = nullptr;
+    CInterfaceDecl* m_pIf = nullptr;
+
     public:
     typedef CMethodWriter super;
     CImplIfMethodSvr(
-        CCppWriter* pWriter, ObjPtr& pNode )
-        : super( pWriter, pNode )
-    {}
+        CCppWriter* pWriter, ObjPtr& pNode );
 
     gint32 OutputEvent();
     gint32 OutputSync();
@@ -519,6 +540,12 @@ class ImplDllLoadFactory
 
 class CImplClassFactory
 {
+    public:
+    CCppWriter* m_pWriter = nullptr;
+    CStatements* m_pNode = nullptr;
+    CImplClassFactory(
+        CCppWriter* pWriter, ObjPtr& pNode );
+    gint32 Output();
 };
 
 class CImplMsgFactory

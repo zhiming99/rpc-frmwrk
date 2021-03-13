@@ -517,7 +517,7 @@ class CStructBase : public CSerialBase
     { return -ENOTSUP; }
 
     virtual gint32 Deserialize(
-        BufPtr& pBuf, guint32 dwSize )
+        BufPtr& pBuf )
     { return -ENOTSUP; }
 };
 
