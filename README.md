@@ -48,6 +48,9 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 7. Logging service
 
 ---
+[`Sat Mar 13 2021 09:25:15 PM Beijing`]   
+1. Has finished 70% of the code generator for C++. It needs extensive test though.
+
 [`Sun Jan 31 2021 11:52:16 AM Beijing`]   
 1. During preparation for the proxy/server generator, I have added a small feature of `Node Redudancy/Load Balance`. It is a very simple implementation. Load distribution on more advanced strategy relies on more advanced data acquisiton technique, which needs some further development in the future.
 
