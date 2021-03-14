@@ -1661,7 +1661,7 @@ gint32 CDeclInterfProxy::OutputAsync(
         INDENT_DOWN;
         NEW_LINE;
 
-        Wa( "//RPC Async Req callback" );
+        Wa( "//RPC Async Req Callback" );
         Wa( "//TODO: implement me by adding" );
         Wa( "//response processing code" );
 
@@ -1694,6 +1694,8 @@ gint32 CDeclInterfProxy::OutputAsync(
         pmd->SetAbstDecl( strDecl );
         pmd->SetAbstFlag(
             MF_OUT_ARG | MF_OUT_AS_IN );
+
+        NEW_LINE;
 
     }while( 0 );
 
@@ -1754,7 +1756,6 @@ gint32 CDeclInterfProxy::OutputSync(
         NEW_LINE;
         if( pmd->IsSerialize() && dwInCount > 0 )
         {
-            NEW_LINE;
             CCOUT << "gint32 " << strName
                 << "Dummy( BufPtr& pBuf_ )";
             NEW_LINE;
@@ -1959,7 +1960,7 @@ gint32 CDeclInterfSvr::OutputSync(
             CCOUT << " );"; 
         }
         INDENT_DOWNL;
-        NEW_LINES( 1 );
+        NEW_LINE;
 
         Wa( "//RPC Sync Req Handler" );
         Wa( "//TODO: implement me" );
@@ -1993,6 +1994,7 @@ gint32 CDeclInterfSvr::OutputSync(
             CCOUT << " ) = 0;";
             INDENT_DOWNL;
         }
+        NEW_LINE;
 
         pmd->SetAbstDecl( strDecl, false );
         guint32 dwFlags = 0;
@@ -2037,7 +2039,7 @@ gint32 CDeclInterfSvr::OutputAsync(
             NEW_LINES( 1 );
         }
 
-        Wa( "//RPC Async Req callback" );
+        Wa( "//RPC Async Req Callback" );
         Wa( "//Call this method when you have" );
         Wa( "//finished the async operation" );
         Wa( "//with all the return value set" );
@@ -2058,7 +2060,7 @@ gint32 CDeclInterfSvr::OutputAsync(
         }
         CCOUT << " );";
         INDENT_DOWNL;
-        NEW_LINES( 2 );
+        NEW_LINE;
 
         Wa( "//RPC Async Req Handler" );
         Wa( "//TODO: adding code to emit your async" );
@@ -2091,6 +2093,7 @@ gint32 CDeclInterfSvr::OutputAsync(
         }
         CCOUT << " ) = 0;";
         INDENT_DOWNL;
+        NEW_LINE;
 
         pmd->SetAbstDecl( strDecl, false );
 
@@ -4110,7 +4113,7 @@ gint32 CImplIfMethodSvr::Output()
             ret = OutputEvent();
             break;
         }
-        else if( m_pNode->IsAsyncp() )
+        else if( m_pNode->IsAsyncs() )
         {
             ret = OutputAsync();
             if( ERROR( ret ) )
