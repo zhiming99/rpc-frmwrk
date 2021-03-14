@@ -1520,6 +1520,8 @@ gint32 CDeclInterfProxy::Output()
             {
                 ret = OutputAsync( pmd );
             }
+            if( i + 1 < dwCount )
+                NEW_LINE;
         }
         BLOCK_CLOSE;
         CCOUT << ";";
@@ -1596,9 +1598,8 @@ gint32 CDeclInterfProxy::OutputEvent(
             NEW_LINE;
             GenFormInArgs( pArgs );
             CCOUT << " );";
-            INDENT_DOWNL;
+            INDENT_DOWN;
         }
-
         NEW_LINE;
 
     }while( 0 );
@@ -1643,22 +1644,21 @@ gint32 CDeclInterfProxy::OutputAsync(
             CCOUT << "gint32 " << strName
                 << "Dummy( BufPtr& pBuf_ )";
             NEW_LINE;
-            Wa( "{ return STATUS_SUCCESS; }" );
+            CCOUT << "{ return STATUS_SUCCESS; }";
         }
 
-        NEW_LINE;
+        NEW_LINES( 2 );
 
         Wa( "//Async callback wrapper" );
         CCOUT << "gint32 " << strName
             << "CbWrapper" << "( ";
-        INDENT_UP;
+        INDENT_UPL;
 
-        NEW_LINE;
         Wa( "IEventSink* pCallback, " );
         Wa( "IEventSink* pIoReq," );
-        Wa( "IConfigDb* pReqCtx );" );
+        CCOUT <<  "IConfigDb* pReqCtx );";
 
-        INDENT_DOWN;
+        INDENT_DOWNL;
         NEW_LINE;
 
         Wa( "//RPC Async Req Callback" );
@@ -1680,7 +1680,7 @@ gint32 CDeclInterfProxy::OutputAsync(
             strDecl += ",";
             GenFormInArgs( pOutArgs );
             CCOUT << " ) = 0;";
-            INDENT_DOWNL;
+            INDENT_DOWN;
         }
         else
         {
@@ -1688,7 +1688,7 @@ gint32 CDeclInterfProxy::OutputAsync(
             CCOUT << "IConfigDb* context, ";
             NEW_LINE;
             CCOUT << "gint32 iRet ) = 0;";
-            INDENT_DOWNL;
+            INDENT_DOWN;
         }
 
         pmd->SetAbstDecl( strDecl );
@@ -1753,9 +1753,9 @@ gint32 CDeclInterfProxy::OutputSync(
             INDENT_DOWNL;
         }
 
-        NEW_LINE;
         if( pmd->IsSerialize() && dwInCount > 0 )
         {
+            NEW_LINE;
             CCOUT << "gint32 " << strName
                 << "Dummy( BufPtr& pBuf_ )";
             NEW_LINE;
@@ -1876,6 +1876,8 @@ gint32 CDeclInterfSvr::Output()
             {
                 ret = OutputAsync( pmd );
             }
+            if( i + 1 < dwCount )
+                NEW_LINE;
         }
         BLOCK_CLOSE;
         CCOUT << ";";
@@ -1904,7 +1906,7 @@ gint32 CDeclInterfSvr::OutputEvent(
             INDENT_UPL;
             GenFormInArgs( pArgs );
             CCOUT << " );";
-            INDENT_DOWNL;
+            INDENT_DOWN;
         }
         else
         {
@@ -1971,7 +1973,6 @@ gint32 CDeclInterfSvr::OutputSync(
         if( dwCount == 0 )
         {
             CCOUT << ") = 0;";
-            NEW_LINE;
         }
         else
         {
@@ -1992,7 +1993,7 @@ gint32 CDeclInterfSvr::OutputSync(
                 GenFormOutArgs( pOutArgs );
             }
             CCOUT << " ) = 0;";
-            INDENT_DOWNL;
+            INDENT_DOWN;
         }
         NEW_LINE;
 
@@ -2093,7 +2094,6 @@ gint32 CDeclInterfSvr::OutputAsync(
         }
         CCOUT << " ) = 0;";
         INDENT_DOWNL;
-        NEW_LINE;
 
         pmd->SetAbstDecl( strDecl, false );
 
@@ -2725,19 +2725,20 @@ gint32 CDeclServiceImpl::Output()
                 Wa( "{ return super::OnStmClosing( hChannel ); }" );
             }
 
-            for( auto& elem : vecPMethods )
+            for( guint32 i = 0;
+                i < vecPMethods.size(); i++ )
             {
+                ABSTE& elem = vecPMethods[ i ];
                 if( elem.first[ 0 ] == '/' &&
                     elem.first[ 1 ] == '/' )
                 {
-                    NEW_LINE;
                     CCOUT << elem.first;
                     NEW_LINE;
                     continue;
                 }
-
-                NEW_LINE;
                 DeclAbstMethod( elem, true );
+                if( i + 1 < vecPMethods.size() )
+                    NEW_LINE;
             }
 
             BLOCK_CLOSE;
@@ -2792,19 +2793,20 @@ gint32 CDeclServiceImpl::Output()
             NEW_LINE;
         }
 
-        for( auto& elem : vecSMethods )
+        for( guint32 i = 0;
+            i < vecSMethods.size(); i++ )
         {
+            ABSTE& elem = vecSMethods[ i ];
             if( elem.first[ 0 ] == '/' &&
                 elem.first[ 1 ] == '/' )
             {
-                NEW_LINE;
                 CCOUT << elem.first;
                 NEW_LINE;
                 continue;
             }
-
-            NEW_LINE;
             DeclAbstMethod( elem, false );
+            if( i + 1 < vecSMethods.size() )
+                NEW_LINE;
         }
         BLOCK_CLOSE;
         CCOUT << ";";
@@ -3171,7 +3173,7 @@ gint32 CImplIufSvr::Output()
                     }
                     else
                     {
-                        CCOUT << "ADD_USER_SERVICE_HANDLER_EX("
+                        CCOUT << "ADD_USER_SERVICE_HANDLER_EX( "
                             << dwCount << ",";
                         INDENT_UPL;
                         CCOUT << strClass << "::"
@@ -3506,8 +3508,6 @@ gint32 CImplIfMethodProxy::Output()
         {
             ret = OutputSync();
         }
-
-        NEW_LINE;
 
     }while( 0 );
 
@@ -4126,8 +4126,6 @@ gint32 CImplIfMethodSvr::Output()
             ret = OutputSync();
         }
 
-        NEW_LINE;
-
     }while( 0 );
 
     return ret;
@@ -4548,10 +4546,12 @@ gint32 CImplIfMethodSvr::OutputAsyncCallback()
             if( ERROR( ret ) )
                 break;
 
-            for( auto& elem : vecArgs )
+            for( guint32 i = 0; i < vecArgs.size(); i++ )
             {
                 CCOUT << "oResp_.Push( "
-                    << elem << " );";
+                    << vecArgs[ i ] << " );";
+                if( i + 1 < vecArgs.size() )
+                    NEW_LINE;
             }
             BLOCK_CLOSE;
             NEW_LINE;

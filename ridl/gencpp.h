@@ -111,7 +111,8 @@ struct CWriterBase
         gint32 iCount = 1 ) const
     { 
         std::string strChars( iCount, '\n' );
-        strChars.append( m_dwIndent, ' ' );
+        if( m_dwIndent > 0 )
+            strChars.append( m_dwIndent, ' ' );
         return strChars;
     }
 
