@@ -513,12 +513,16 @@ class CStructBase : public CSerialBase
     {}
     
     virtual gint32 Serialize(
-        BufPtr& pBuf ) const
-    { return -ENOTSUP; }
+        BufPtr& pBuf ) const = 0;
 
     virtual gint32 Deserialize(
-        BufPtr& pBuf )
-    { return -ENOTSUP; }
+        BufPtr& pBuf ) = 0;
+
+    virtual guint32
+        GetMsgId() const = 0;
+
+    virtual const std::string&
+        GetMsgName() const = 0;
 };
 
 

@@ -21,6 +21,7 @@
  *
  * =====================================================================================
  */
+#include <sys/stat.h>
 #include "rpc.h"
 using namespace rpcfrmwrk;
 #include "astnode.h"
@@ -572,7 +573,7 @@ gint32 CMethodWriter::DeclLocals(
 }
 
 gint32 CMethodWriter::GenFormArgs(
-    ObjPtr& pArg, bool bIn )
+    ObjPtr& pArg, bool bIn, bool bShowDir )
 {
     std::vector< std::string > vecArgs; 
     if( bIn )
@@ -588,6 +589,15 @@ gint32 CMethodWriter::GenFormArgs(
     for( ; i < vecArgs.size(); i++ )
     {
         CCOUT << vecArgs[ i ]; 
+
+        if( bShowDir )
+        {
+            if( bIn )
+                CCOUT << " /*[ In ]*/";
+            else
+                CCOUT << " /*[ Out ]*/";
+        }
+
         if( i + 1 < vecArgs.size() )
         {
             CCOUT << ",";
@@ -658,6 +668,12 @@ CFileSet::CFileSet(
     m_strMakefile =
         strOutPath + "/" + "Makefile" ;
 
+    m_strMainCli =
+        strOutPath + "/" + "maincli.cpp";
+
+    m_strMainSvr =
+        strOutPath + "/" + "mainsvr.cpp";
+
     m_strPath = strOutPath;
 
     gint32 ret = OpenFiles();
@@ -706,6 +722,20 @@ gint32 CFileSet::OpenFiles()
 
     m_vecFiles.push_back( std::move( pstm ) );
 
+    pstm = STMPTR( new std::ofstream(
+        m_strMainCli,
+        std::ofstream::out |
+        std::ofstream::trunc) );
+
+    m_vecFiles.push_back( std::move( pstm ) );
+
+    pstm = STMPTR( new std::ofstream(
+        m_strMainSvr,
+        std::ofstream::out |
+        std::ofstream::trunc) );
+
+    m_vecFiles.push_back( std::move( pstm ) );
+
     return STATUS_SUCCESS;
 }
 
@@ -735,6 +765,7 @@ gint32 CFileSet::AddSvcImpl(
         std::ofstream::out |
         std::ofstream::trunc) );
 
+    m_vecFiles.push_back( std::move( pstm ) );
     m_mapSvcImp[ strSvcName + ".cpp" ] = idx++;
     return 0;
 }
@@ -932,8 +963,32 @@ gint32 GenHeaderFile(
             if( ERROR( ret ) )
                 break;
 
-            CDeclServiceImpl osi( pWriter, elem.second );
+            CDeclServiceImpl osi(
+                pWriter, elem.second );
+
             ret = osi.Output();
+            if( ERROR( ret ) )
+                break;
+
+            ret = pWriter->SelectImplFile(
+                elem.first + ".cpp" ); 
+
+            if( ERROR( ret ) )
+                break;
+
+            CImplServiceImpl oisi(
+                pWriter, elem.second );
+
+            ret = oisi.Output();
+            if( ERROR( ret ) )
+                break;
+        }
+
+        if( !vecSvcNames.empty() )
+        {
+            CImplMainFunc omf( pWriter,
+                vecSvcNames[ 0 ].second );
+            ret = omf.Output();
         }
 
     }while( 0 );
@@ -1083,6 +1138,30 @@ gint32 GenCppProj(
     gint32 ret = 0;
 
     do{
+        struct stat sb;
+        if( lstat( strOutPath.c_str(), &sb ) == -1 )
+        {
+            std::string strCmd = "mkdir -p ";
+            strCmd += strOutPath;
+            system( strCmd.c_str() );
+        }
+        else
+        {
+            mode_t iFlags =
+                ( sb.st_mode & S_IFMT );
+            if( iFlags != S_IFDIR )
+            {
+                std::string strMsg =
+                    "error '";
+                strMsg += strOutPath;
+                strMsg +=
+                   "' is not a valid directory";
+                printf( "%s\n",
+                    strMsg.c_str() );
+                break;
+            }
+        }
+
         CCppWriter oWriter(
             strOutPath, strAppName, pRoot );
 
@@ -1390,17 +1469,23 @@ gint32 CDeclareStruct::Output()
         Wa( "// methods" );
         // declare two methods to implement
         CCOUT<< "gint32 Serialize(";
-        INDENT_UP;
+        INDENT_UPL;
+        CCOUT << " BufPtr& pBuf_ ) const override;";
+        INDENT_DOWNL;
         NEW_LINE;
-        CCOUT<< " BufPtr& pBuf_ ) const override;";
-        INDENT_DOWN;
+        CCOUT << "gint32 Deserialize(";
+        INDENT_UPL;
+        CCOUT <<" BufPtr& pBuf_ ) override;"; 
+        INDENT_DOWNL;
         NEW_LINE;
-        CCOUT<< "gint32 Deserialize(";
-        INDENT_UP;
+        Wa( "guint32 GetMsgId() const override" );
+        Wa( "{ return m_dwMsgId;" );
         NEW_LINE;
-        CCOUT<<" BufPtr& pBuf_ ) override;"; 
-        INDENT_DOWN;
-        NEW_LINE;
+        CCOUT << "const std::string&";
+        INDENT_UPL;
+        CCOUT << "GetMsgName() const override";
+        INDENT_DOWNL;
+        Wa( "{ return m_strMsgId; }" );
 
         BLOCK_CLOSE;
         CCOUT << ";";
@@ -2480,7 +2565,8 @@ gint32 CDeclServiceImpl::FindAbstMethod(
 
             std::string strComment = "// ";
             strComment += pifd->GetName();
-            vecMethods.push_back( {strComment, pObj } );
+            vecMethods.push_back(
+                {strComment, pifdo } );
 
             for( ; i < pmds->GetCount(); i++ )
             {
@@ -2496,7 +2582,8 @@ gint32 CDeclServiceImpl::FindAbstMethod(
                 if( strDecl.empty() )
                     continue;
 
-                vecMethods.push_back( { strDecl, p } );
+                vecMethods.push_back(
+                    { strDecl, p } );
             }
             if( ERROR( ret ) )
                 break;
@@ -2508,7 +2595,7 @@ gint32 CDeclServiceImpl::FindAbstMethod(
 }
 
 gint32 CDeclServiceImpl::DeclAbstMethod(
-    ABSTE oMethod, bool bProxy )
+    ABSTE oMethod, bool bProxy, bool bComma )
 {
     CMethodDecl* pmd = oMethod.second;    
     if( pmd == nullptr )
@@ -2565,6 +2652,13 @@ gint32 CDeclServiceImpl::DeclAbstMethod(
         }
 
         std::string strRet = oMethod.first;
+        if( !bComma )
+        {
+            char szHeader[] =
+                "virtual gint32 ";
+            strRet = strRet.substr(
+                sizeof( szHeader ) - 1 );
+        }
         size_t pos = strRet.find_first_of( '(' );
         bool bAppend = false;
         if( pos != std::string::npos )
@@ -2593,7 +2687,9 @@ gint32 CDeclServiceImpl::DeclAbstMethod(
         CCOUT << strRet;
         if( dwCount == 0 )
         {
-            CCOUT << " );";
+            CCOUT << " )";
+            if( bComma )
+                CCOUT << ";";
             NEW_LINE;
             break;
         }
@@ -2608,11 +2704,11 @@ gint32 CDeclServiceImpl::DeclAbstMethod(
         }
         if( bInArg && bInAsIn ) 
         {
-            GenFormInArgs( pInArgs );
+            GenFormInArgs( pInArgs, true );
         }
         else if( bInArg )
         {
-            GenFormOutArgs( pInArgs );
+            GenFormOutArgs( pInArgs, true );
         }
 
         if( dwInCount > 0 && dwOutCount > 0 &&
@@ -2624,13 +2720,15 @@ gint32 CDeclServiceImpl::DeclAbstMethod(
 
         if( bOutArg && bOutAsIn )
         {
-            GenFormInArgs( pOutArgs );
+            GenFormInArgs( pOutArgs, true );
         }
         else if( bOutArg )
         {
-            GenFormOutArgs( pOutArgs );
+            GenFormOutArgs( pOutArgs, true );
         }
-        CCOUT << " );";
+        CCOUT << " )";
+        if( bComma )
+            CCOUT << ";";
         INDENT_DOWNL;
 
     }while( 0 );
@@ -2811,6 +2909,153 @@ gint32 CDeclServiceImpl::Output()
         BLOCK_CLOSE;
         CCOUT << ";";
         NEW_LINES( 2 );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CImplServiceImpl::Output()
+{
+    guint32 ret = STATUS_SUCCESS;
+    do{
+        std::string strSvcName =
+            m_pNode->GetName();
+
+        std::vector< ABSTE > vecPMethods;
+        ret = FindAbstMethod( vecPMethods, true );
+        if( ERROR( ret ) )
+            break;
+
+        std::vector< ABSTE > vecSMethods;
+        ret = FindAbstMethod( vecSMethods, false );
+        if( ERROR( ret ) )
+            break;
+        
+        if( vecSMethods.empty() &&
+            vecPMethods.empty() )
+            break;
+
+        Wa( "/****BACKUP YOUR CODE BEFORE RUNNING RIDLC***/" );
+        Wa( "//Implement the following methods" );
+        Wa( "//to get the RPC proxy/server work" );
+        CAstNodeBase* pParent =
+            m_pNode->GetParent();
+        if( pParent == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        CStatements* pStmts = ObjPtr( pParent );
+        if( pStmts == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        std::string strAppName = pStmts->GetName();
+        Wa( "#include \"rpc.h\"" );
+        Wa( "using namespace rpcfrmwrk;" );
+        CCOUT << "#include \""
+            << strAppName << ".h\"" ;
+        NEW_LINE;
+        CCOUT << "#include \""
+            << strSvcName << ".h\"";
+
+        NEW_LINES( 2 );
+
+        std::string strClass, strBase;
+        if( !vecPMethods.empty() )
+        {
+            strClass = "C";
+            strClass += strSvcName + "_CliImpl";
+
+            for( guint32 i = 0;
+                i < vecPMethods.size(); i++ )
+            {
+                ABSTE& elem = vecPMethods[ i ];
+                if( elem.first[ 0 ] == '/' &&
+                    elem.first[ 1 ] == '/' )
+                {
+                    if( vecPMethods.size() == 1 )
+                        continue;
+                    CCOUT << elem.first
+                        << " Proxy";
+                    NEW_LINE;
+                    continue;
+                }
+                CCOUT << "gint32 " << strClass << "::";
+                DeclAbstMethod(
+                    elem, true, false );
+                BLOCK_OPEN;
+                CMethodDecl* pmd = elem.second;
+                if( pmd->IsEvent() )
+                {
+                    Wa( "// Processing the event here" );
+                    Wa( "// return code ignored");
+                    CCOUT << "return 0;";
+                }
+                else if( pmd->IsAsyncp() )
+                {
+                    Wa( "// Process the server response here" );
+                    Wa( "// return code ignored");
+                    CCOUT<< "return 0;";
+                }
+                BLOCK_CLOSE;
+                NEW_LINES( 2 );
+            }
+
+            NEW_LINE;
+        }
+
+        if( vecSMethods.empty() )
+            break;
+
+        strClass = "C";
+        strClass += strSvcName + "_SvrImpl";
+
+        for( guint32 i = 0;
+            i < vecSMethods.size(); i++ )
+        {
+            ABSTE& elem = vecSMethods[ i ];
+            if( elem.first[ 0 ] == '/' &&
+                elem.first[ 1 ] == '/' )
+            {
+                if( vecSMethods.size() == 1 )
+                    continue;
+                CCOUT << elem.first
+                    << " Server";
+                NEW_LINE;
+                continue;
+            }
+            CCOUT << "gint32 " << strClass << "::";
+            DeclAbstMethod( elem, false, false );
+            BLOCK_OPEN;
+            CMethodDecl* pmd = elem.second;
+            if( pmd->IsAsyncs() )
+            {
+                Wa( "// Emitting an async operation here " );
+                std::string strName =
+                    pmd->GetName();
+                CCOUT << "// Make sure to call "
+                    << strName << "Complete";
+                NEW_LINE;
+                CCOUT << "// when the service is done";
+                NEW_LINE;    
+                CCOUT << "return STATUS_PENDING;";
+            }
+            else if( !pmd->IsEvent() )
+            {
+                // sync method
+                Wa( "// Process the sync request here " );
+                Wa( "// return code can be an Error or" );
+                Wa( "// STATUS_SUCCESS" );
+                CCOUT << "return STATUS_SUCCESS;";
+            }
+            BLOCK_CLOSE;
+            NEW_LINES( 2 );
+        }
+
+        NEW_LINE;
 
     }while( 0 );
 
@@ -4640,6 +4885,259 @@ gint32 CImplClassFactory::Output()
         CCOUT << "return STATUS_SUCCESS;";
         BLOCK_CLOSE;
         NEW_LINE;
+
+    }while( 0 );
+
+    return ret;
+}
+
+extern std::string g_strTarget;
+
+CImplMainFunc::CImplMainFunc(
+    CCppWriter* pWriter,
+    ObjPtr& pNode )
+{
+    m_pWriter = pWriter;
+    m_pNode = pNode;
+}
+
+gint32 CImplMainFunc::Output()
+{
+    gint32 ret = 0;
+
+    do{
+        CServiceDecl* pSvc = m_pNode;
+        std::string strSvcName = pSvc->GetName();
+        std::string strModName = g_strTarget;
+        std::vector< std::string > vecSuffix =
+            { "cli", "svr" };
+        for( auto& elem : vecSuffix )
+        {
+            bool bProxy = ( elem == "cli" );
+            std::string strClass =
+                std::string( "C" ) + strSvcName;
+            if( bProxy )
+            {
+                strClass += "_CliImpl";
+                m_pWriter->SelectMainCli();
+            }
+            else
+            {
+                strClass += "_SvrImpl";
+                m_pWriter->SelectMainSvr();
+            }
+
+            Wa( "#include \"rpc.h\"" );
+            Wa( "#include \"proxy.h\"" );
+            Wa( "using namespace rpcfrmwrk;" );
+            CCOUT << "#include \""
+                << strSvcName << ".h\"";
+            NEW_LINES( 2 );
+            Wa( "ObjPtr g_pIoMgr;" );
+            NEW_LINE;
+
+            // InitContext
+            Wa( "gint32 InitContext()" );
+            BLOCK_OPEN;
+            Wa( "gint32 ret = CoInitialize( 0 );" );
+            CCOUT << "if( ERROR( ret ) )";
+            INDENT_UPL;
+            CCOUT << "return ret;";
+            INDENT_DOWNL;
+
+            CCOUT << "do";
+            BLOCK_OPEN;
+            CCOUT << "// load class factory for '"
+                << strModName << "'";
+            NEW_LINE;
+            CCOUT << "FactoryPtr p = "
+                << "InitClassFactory();";
+            NEW_LINE;
+            CCOUT << "ret = CoAddClassFactory( p );";
+            NEW_LINE;
+            CCOUT << "if( ERROR( ret ) )";
+            INDENT_UPL;
+            CCOUT << "break;";
+            INDENT_DOWNL;
+            NEW_LINE;
+            Wa( "CParamList oParams;" );
+            CCOUT << "oParams.Push( \""
+                << strModName + elem << "\" )";
+            NEW_LINES( 2 );
+
+            Wa( "// adjust the thread number if necessary" );
+            Wa( "oParams[ propMaxIrpThrd ] = 2;" );
+            Wa( "oParams[ propMaxTaskThrd ] = 2;" );
+            NEW_LINE;
+
+            CCOUT << "ret = g_pIoMgr.NewObj(";
+            INDENT_UPL;
+            CCOUT << "clsid( CIoManager ), ";
+            NEW_LINE;
+            CCOUT << "oParams.GetCfg() )";
+            INDENT_DOWNL;
+            CCOUT << "if( ERROR( ret ) )";
+            INDENT_UPL;
+            CCOUT << "break;";
+            INDENT_DOWNL;
+            NEW_LINE;
+            CCOUT << "IService* pSvc = g_pIoMgr;";
+            NEW_LINE;
+            CCOUT << "ret = pSvc->Start();";
+            NEW_LINE;
+            BLOCK_CLOSE;
+            CCOUT << "while( 0 );";
+            NEW_LINES( 2 );
+            Wa( "if( ERROR( ret ) )" );
+            BLOCK_OPEN;
+            CCOUT << "g_pIoMgr.Clear();";
+            NEW_LINE;
+            CCOUT << "CoUninitialize();";
+            BLOCK_CLOSE;
+            NEW_LINE;
+            CCOUT << "return ret;";
+            BLOCK_CLOSE;
+            NEW_LINES( 2 );
+
+            // DestroyContext
+            Wa( "gint32 DestroyContext()" );
+            BLOCK_OPEN;
+            Wa( "IService* pSvc = g_pIoMgr;" );
+            Wa( "if( pSvc != nullptr )" );
+            BLOCK_OPEN;
+            Wa( "pSvc->Stop();" );
+            CCOUT << "g_pIoMgr.Clear();";
+            BLOCK_CLOSE;
+            NEW_LINES( 2 );
+            Wa( "CoUninitialize();" );
+
+            CCOUT << "DebugPrint( 0, \""
+                << "#Leaked objects is %d\",";
+            INDENT_UPL;
+            CCOUT << "CObjBase::GetActCount() );";
+            INDENT_DOWNL;
+            CCOUT << "return ret;";
+            BLOCK_CLOSE;
+            NEW_LINES( 2 );
+            // proxy business logic
+            if( bProxy )
+            {
+            CCOUT << "gint32 DoWork( "
+                << strClass << "* pIf )";
+            NEW_LINE;
+            BLOCK_OPEN;
+            Wa( "// -----Your code begins here---" );
+            CCOUT << "return STATUS_SUCCESS;";
+            BLOCK_CLOSE;
+            NEW_LINES( 2 );
+            }
+
+            // main function
+            Wa( "int main( int argc, char** argv)" );
+            BLOCK_OPEN;
+            Wa( "gint32 ret = 0;" );
+            CCOUT << "do";
+            BLOCK_OPEN;
+            Wa( "ret = InitContext();" );
+            CCOUT << "if( ERROR( ret ) )";
+            INDENT_UPL;
+            CCOUT << "break;";
+            INDENT_DOWNL;
+            NEW_LINE;
+            Wa( "InterfPtr pIf;" );
+            Wa( "CParamList oParams;" );
+
+            CCOUT << "ret = CRpcServices::LoadObjDesc(";
+            INDENT_UPL;
+            CCOUT << "\"./"
+                << g_strAppName << "desc.json\",";
+            NEW_LINE;
+            CCOUT << "\"" << strSvcName << "\",";
+            NEW_LINE;
+            if( bProxy )
+                CCOUT << "false, oParams.GetCfg() );";
+            else
+                CCOUT << "true, oParams.GetCfg() );";
+
+            INDENT_DOWNL;
+
+            CCOUT << "if( ERROR( ret ) )";
+            INDENT_UPL;
+            CCOUT << "break;";
+            INDENT_DOWNL;
+            NEW_LINE;
+
+            Wa( "oParams[ propIoMgr ] = g_pIoMgr;" );
+            CCOUT << "ret = pIf.NewObj(";
+            INDENT_UPL;
+            CCOUT << "clsid( " << strClass << " ),";
+            NEW_LINE;
+            CCOUT << "oParams.GetCfg() );";
+            INDENT_DOWNL;
+
+            CCOUT << "if( ERROR( ret ) )";
+            INDENT_UPL;
+            CCOUT << "break;";
+            INDENT_DOWNL;
+            NEW_LINE;
+            CCOUT << strClass << "* pSvc = pIf;";
+            NEW_LINE;
+            CCOUT << "ret = pSvc->Start();";
+            NEW_LINE;
+
+            CCOUT << "if( ERROR( ret ) )";
+            INDENT_UPL;
+            CCOUT << "break;";
+            INDENT_DOWNL;
+
+            if( !bProxy )
+            {
+                NEW_LINE;
+                CCOUT << "// replace with your code for";
+                NEW_LINE;
+                CCOUT << "// advanced control";
+                NEW_LINE;
+                CCOUT << "while( pSvc->IsConnected() )";
+                INDENT_UPL;
+                CCOUT << "sleep( 1 );";
+                INDENT_DOWNL;
+            }
+            else
+            {
+                NEW_LINE;
+                CCOUT << "// replace with your code for";
+                NEW_LINE;
+                CCOUT << "// advanced control";
+                NEW_LINE;
+                CCOUT << "while( pSvc->GetState()"
+                    << "== stateRecovery )";
+                INDENT_UPL;
+                CCOUT << "sleep( 1 );";
+                INDENT_DOWNL;
+                NEW_LINE;
+                CCOUT << "if( pSvc->GetState() != "
+                    << "stateConnected )";
+                NEW_LINE;
+                BLOCK_OPEN;
+                CCOUT << "ret = ERROR_STATE;";
+                NEW_LINE;
+                CCOUT << "break;";
+                BLOCK_CLOSE;
+                NEW_LINE;
+                Wa( "ret = DoWork( pSvc );" );
+            }
+
+            NEW_LINE;
+            Wa( "// Stopping the object" );
+            CCOUT << "ret = pSvc->Stop();";
+            NEW_LINE;
+            BLOCK_CLOSE;
+            CCOUT<< "while( 0 );";
+            NEW_LINES( 2 );
+            Wa( "DestroyContext();" );
+            CCOUT << "return ret;";
+            BLOCK_CLOSE;
+        }
 
     }while( 0 );
 

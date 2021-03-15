@@ -5650,8 +5650,22 @@ gint32 CInterfaceProxy::CopyUserOptions(
     CCfgOpenerObj oCfg( pDest );
     oCfg.CopyProp( propIfName, pSrc );
     oCfg.CopyProp( propSeriProto, pSrc );
-    oCfg.CopyProp( propKeepAliveSec, pSrc );
-    oCfg.CopyProp( propTimeoutSec, pSrc );
+    if( oCfg.exist( propCallOptions ) )
+    {
+        IConfigDb* pCfg = nullptr;
+        oCfg.GetPointer(
+            propCallOptions, pCfg );
+        CCfgOpener oCallOpt( pCfg );
+        oCallOpt.CopyProp(
+            propKeepAliveSec, pSrc);
+        oCallOpt.CopyProp(
+            propTimeoutSec, pSrc);
+    }
+    else
+    {
+        oCfg.CopyProp( propKeepAliveSec, pSrc );
+        oCfg.CopyProp( propTimeoutSec, pSrc );
+    }
     return 0;
 }
 

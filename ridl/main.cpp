@@ -33,6 +33,7 @@ using namespace rpcfrmwrk;
 extern CDeclMap g_mapDecls;
 extern ObjPtr g_pRootNode;
 extern bool g_bSemanErr;
+extern std::string g_strAppName;
 
 // mandatory part, just copy/paste'd from clsids.cpp
 static FactoryPtr InitClassFactory()
@@ -69,19 +70,31 @@ void Usage()
 {
     printf( "Usage:" );
     printf( "ridlc [options] <filePath> \n" );
+
     printf( "\t compile the file"
         "it to current directory\n" );
+
     printf( "Options -h:\tTo print this help\n");
+
     printf( "\t-I:\tTo specify the path to"
         " search for the included files.\n"
         "\t\tAnd this option can repeat many"
         "times\n" );
-    printf( "\t-O:\tTo specify the path for"
-        " the output files.\n" );
+
+    printf( "\t-O:\tTo specify the path for\n"
+        "the output files. 'output' is the \n"
+        "default path if not specified\n" );
+
+    printf( "\t-o:\tTo specify the file name as\n"
+        " the base of the target image. That is,\n"
+        " the <name>cli for client and <name>svr\n"
+        " for server. If not specified, the\n"
+        " 'appname' from the ridl will be used\n" );
 }
 
-static std::string g_strOutPath = ".";
+static std::string g_strOutPath = "output";
 static std::vector< std::string > g_vecPaths;
+std::string g_strTarget;
 
 #include "seribase.h"
 #include "gencpp.h"
@@ -105,7 +118,7 @@ int main( int argc, char** argv )
         bool bQuit = false;
 
         while( ( opt =
-            getopt( argc, argv, "hI:O:" ) ) != -1 )
+            getopt( argc, argv, "hI:O:o:" ) ) != -1 )
         {
             switch( opt )
             {
@@ -150,6 +163,11 @@ int main( int argc, char** argv )
                     {
                         g_strOutPath = optarg;
                     }
+                    break;
+                }
+            case 'o':
+                {
+                    g_strTarget = optarg;
                     break;
                 }
             default:
@@ -230,6 +248,9 @@ int main( int argc, char** argv )
 
         printf( "Successfully parsed %s\n",
             strFile.c_str() );
+
+        if( g_strTarget.empty() )
+            g_strTarget = g_strAppName;
 
         printf( "Generating files.. \n" );
         ret = GenCppProj(

@@ -45,6 +45,8 @@ struct CFileSet
     std::string  m_strObjDesc;
     std::string  m_strDriver;
     std::string  m_strMakefile;
+    std::string  m_strMainCli;
+    std::string  m_strMainSvr;
 
     std::map< std::string, gint32 > m_mapSvcImp;
 
@@ -181,6 +183,12 @@ class CCppWriter : public CWriterBase
 
     inline gint32 SelectMakefile()
     { return SelectFile( 4 ); }
+
+    inline gint32 SelectMainCli()
+    { return SelectFile( 5 ); }
+
+    inline gint32 SelectMainSvr()
+    { return SelectFile( 6 ); }
 
     inline gint32 SelectImplFile(
         const std::string& strFile )
@@ -345,13 +353,15 @@ struct CMethodWriter
     gint32 DeclLocals( ObjPtr& pArgList );
 
     gint32 GenFormArgs(
-        ObjPtr& pArg, bool bIn );
+        ObjPtr& pArg, bool bIn, bool bShowDir );
 
-    gint32 GenFormInArgs( ObjPtr& pArg )
-    { return GenFormArgs( pArg, true ); }
+    gint32 GenFormInArgs(
+        ObjPtr& pArg, bool bShowDir = false )
+    { return GenFormArgs( pArg, true, bShowDir ); }
 
-    gint32 GenFormOutArgs( ObjPtr& pArg )
-    { return GenFormArgs( pArg, false ); }
+    gint32 GenFormOutArgs(
+        ObjPtr& pArg, bool bShowDir = false )
+    { return GenFormArgs( pArg, false, bShowDir ); }
 };
 
 class CDeclInterfProxy 
@@ -422,9 +432,8 @@ class CDeclService
 class CDeclServiceImpl :
     public CMethodWriter
 {
-    CServiceDecl* m_pNode = nullptr;
-
     public:
+    CServiceDecl* m_pNode = nullptr;
     typedef CMethodWriter super;
     CDeclServiceImpl( CCppWriter* pWriter,
         ObjPtr& pNode );
@@ -436,10 +445,26 @@ class CDeclServiceImpl :
         bool bProxy );
 
     gint32 DeclAbstMethod(
-        ABSTE oMethod, bool bProxy );
+        ABSTE oMethod,
+        bool bProxy,
+        bool bComma = true );
 
-    gint32 Output();
+    virtual gint32 Output();
 };
+
+class CImplServiceImpl :
+    public CDeclServiceImpl
+{
+    public:
+    typedef CDeclServiceImpl super;
+    CImplServiceImpl( CCppWriter* pWriter,
+        ObjPtr& pNode )
+        : super( pWriter, pNode )
+    {}
+
+    gint32 Output() override;
+};
+
 
 class CImplSerialStruct
 {
@@ -535,25 +560,30 @@ class CImplIfMethodSvr
     gint32 Output();
 };
 
-class ImplDllLoadFactory
-{
-};
-
 class CImplClassFactory
 {
-    public:
     CCppWriter* m_pWriter = nullptr;
     CStatements* m_pNode = nullptr;
+    public:
     CImplClassFactory(
         CCppWriter* pWriter, ObjPtr& pNode );
     gint32 Output();
 };
 
-class CImplMsgFactory
+class CImplMainFunc :
+    public CArgListUtils
 {
+    CCppWriter* m_pWriter = nullptr;
+    CServiceDecl* m_pNode = nullptr;
+    public:
+    typedef CMethodWriter super;
+
+    CImplMainFunc( CCppWriter* pWriter,
+        ObjPtr& pNode );
+    gint32 Output();
 };
 
-class CImplMainFunc
+class CImplMsgFactory
 {
 };
 
