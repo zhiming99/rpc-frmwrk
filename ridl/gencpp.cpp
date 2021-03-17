@@ -480,7 +480,7 @@ gint32 CMethodWriter::GenSerialArgs(
 gint32 CMethodWriter::GenDeserialArgs(
     ObjPtr& pArgList,
     const std::string& strBuf,
-    bool bDeclare, bool bAssign )
+    bool bDeclare, bool bAssign, bool bNoRet )
 {
     gint32 ret = 0;
     if( GetArgCount( pArgList ) == 0 )
@@ -527,7 +527,14 @@ gint32 CMethodWriter::GenDeserialArgs(
         NEW_LINES( 2 );
         CCOUT<< "if( ERROR( ret ) )";
         INDENT_UPL;
-        Wa( "return ret;" );
+        if( bNoRet )
+        {
+            Wa( "break;" );
+        }
+        else
+        {
+            Wa( "return ret;" );
+        }
         INDENT_DOWNL;
 
         if( bAssign == false )
@@ -2113,7 +2120,7 @@ gint32 CDeclInterfSvr::OutputAsync(
             GetArgCount( pOutArgs );
 
         guint32 dwCount = dwInCount + dwOutCount;
-        if( pmd->IsSerialize() && dwInCount > 0 )
+        if( pmd->IsSerialize() )
         {
             Wa( "//RPC Async Req Handler wrapper" );
             CCOUT << "gint32 "
@@ -2122,8 +2129,48 @@ gint32 CDeclInterfSvr::OutputAsync(
             CCOUT << "IEventSink* pCallback"
                 << ", BufPtr& pBuf_ );";
             INDENT_DOWNL;
-            NEW_LINES( 1 );
+            NEW_LINE;
+
+            CCOUT << "gint32 "
+                << strName << "CancelWrapper(";
+            INDENT_UPL;
+            CCOUT << "gint32 iRet"
+                << ", BufPtr& pBuf_ );";
+            INDENT_DOWNL;
+            NEW_LINE;
         }
+        else if( dwInCount == 0 )
+        {
+            Wa( "//RPC Async Req Handler wrapper" );
+            CCOUT << "gint32 "
+                << strName << "Wrapper(";
+            INDENT_UPL;
+            CCOUT << "IEventSink* pCallback );";
+            INDENT_DOWNL;
+            NEW_LINE;
+        }
+        else
+        {
+            Wa( "//RPC Async Req Handler wrapper" );
+            CCOUT << "gint32 "
+                << strName << "Wrapper(";
+            INDENT_UPL;
+            CCOUT << "IEventSink* pCallback,";
+            GenFormInArgs( pInArgs );
+            CCOUT << " );";
+            INDENT_DOWNL;
+            NEW_LINE;
+        }
+
+        Wa( "//RPC Async Req Cancel Handler" );
+        CCOUT << "gint32 "
+            << "On" << strName << "Canceled(";
+        INDENT_UPL;
+        CCOUT << "gint32 iRet,";
+        GenFormInArgs( pInArgs );
+        CCOUT << " ) = 0;";
+        INDENT_DOWNL;
+        NEW_LINE;
 
         Wa( "//RPC Async Req Callback" );
         Wa( "//Call this method when you have" );
@@ -2903,6 +2950,42 @@ gint32 CDeclServiceImpl::Output()
                 continue;
             }
             DeclAbstMethod( elem, false );
+
+            CMethodDecl* pmd = elem.second;
+            if( !pmd->IsAsyncs() )
+            {
+                if( i + 1 < vecSMethods.size() )
+                    NEW_LINE;
+                continue;
+            }
+            NEW_LINE;
+            std::string strName = pmd->GetName();
+            ObjPtr pInArgs = pmd->GetInArgs();
+            guint32 dwInCount =
+                GetArgCount( pInArgs );
+            Wa( "// RPC Async Req Cancel Handler" );
+            Wa( "// Rewrite this method for advanced controls" );
+            CCOUT << "gint32 "
+                << "On" << strName << "Canceled(";
+            INDENT_UPL;
+            CCOUT << "gint32 iRet";
+            if( dwInCount > 0 )
+            {
+                CCOUT << ",";
+                NEW_LINE;
+                GenFormInArgs( pInArgs );
+            }
+            CCOUT << " )";
+            INDENT_DOWNL;
+            BLOCK_OPEN;
+            CCOUT << "DebugPrintEx( logErr, iRet,";
+            INDENT_UPL;
+            CCOUT << "\"request '" << strName
+                << "'is canceled.\" );";
+            INDENT_DOWNL;
+            CCOUT << "return 0;";
+            BLOCK_CLOSE;
+
             if( i + 1 < vecSMethods.size() )
                 NEW_LINE;
         }
@@ -2937,8 +3020,8 @@ gint32 CImplServiceImpl::Output()
             break;
 
         Wa( "/****BACKUP YOUR CODE BEFORE RUNNING RIDLC***/" );
-        Wa( "//Implement the following methods" );
-        Wa( "//to get the RPC proxy/server work" );
+        Wa( "// Implement the following methods" );
+        Wa( "// to get the RPC proxy/server work" );
         CAstNodeBase* pParent =
             m_pNode->GetParent();
         if( pParent == nullptr )
@@ -2973,6 +3056,7 @@ gint32 CImplServiceImpl::Output()
                 i < vecPMethods.size(); i++ )
             {
                 ABSTE& elem = vecPMethods[ i ];
+
                 if( elem.first[ 0 ] == '/' &&
                     elem.first[ 1 ] == '/' )
                 {
@@ -2983,20 +3067,31 @@ gint32 CImplServiceImpl::Output()
                     NEW_LINE;
                     continue;
                 }
+
+                CMethodDecl* pmd = elem.second;
+                bool bAsync = pmd->IsAsyncp();
+                bool bEvent = pmd->IsEvent();
+
+                if( bAsync )
+                    Wa( "/* Async Req */" );
+                else if( bEvent )
+                    Wa( "/* Event */" );
+                else
+                    Wa( "/* Sync Req */" );
+
                 CCOUT << "gint32 " << strClass << "::";
                 DeclAbstMethod(
                     elem, true, false );
                 BLOCK_OPEN;
-                CMethodDecl* pmd = elem.second;
-                if( pmd->IsEvent() )
+                if( bEvent )
                 {
-                    Wa( "// Processing the event here" );
+                    Wa( "// TODO: Processing the event here" );
                     Wa( "// return code ignored");
                     CCOUT << "return 0;";
                 }
-                else if( pmd->IsAsyncp() )
+                else if( bAsync )
                 {
-                    Wa( "// Process the server response here" );
+                    Wa( "// TODO: Process the server response here" );
                     Wa( "// return code ignored");
                     CCOUT<< "return 0;";
                 }
@@ -3027,26 +3122,37 @@ gint32 CImplServiceImpl::Output()
                 NEW_LINE;
                 continue;
             }
+
+            CMethodDecl* pmd = elem.second;
+            bool bAsync = pmd->IsAsyncs();
+            bool bEvent = pmd->IsEvent();
+
+            if( bAsync )
+                Wa( "/* Async Req */" );
+            else if( bEvent )
+                Wa( "/* Event */" );
+            else
+                Wa( "/* Sync Req */" );
+
             CCOUT << "gint32 " << strClass << "::";
             DeclAbstMethod( elem, false, false );
             BLOCK_OPEN;
-            CMethodDecl* pmd = elem.second;
-            if( pmd->IsAsyncs() )
+            if( bAsync )
             {
-                Wa( "// Emitting an async operation here " );
+                Wa( "// TODO: Emitting an async operation here." );
                 std::string strName =
                     pmd->GetName();
-                CCOUT << "// Make sure to call "
+                CCOUT << "// And make sure to call "
                     << strName << "Complete";
                 NEW_LINE;
                 CCOUT << "// when the service is done";
                 NEW_LINE;    
                 CCOUT << "return STATUS_PENDING;";
             }
-            else if( !pmd->IsEvent() )
+            else if( !bEvent )
             {
                 // sync method
-                Wa( "// Process the sync request here " );
+                Wa( "// TODO: Process the sync request here " );
                 Wa( "// return code can be an Error or" );
                 Wa( "// STATUS_SUCCESS" );
                 CCOUT << "return STATUS_SUCCESS;";
@@ -3383,55 +3489,13 @@ gint32 CImplIufSvr::Output()
                 CMethodDecl* pmd = elem;
                 std::string strMethod = pmd->GetName();
 
-                ObjPtr pInArgs = pmd->GetInArgs();
-                ObjPtr pOutArgs = pmd->GetOutArgs();
-
-                guint32 dwCount = 0;
                 if( pmd->IsEvent() )
                     continue;
 
-                if( !pmd->IsAsyncs() )
-                {
-                    dwCount = GetArgCount( pInArgs );
-                    dwCount += GetArgCount( pOutArgs );
-                }
-                else
-                {
-                    dwCount = GetArgCount( pInArgs );
-                }
-                
-                if( pmd->IsAsyncs() )
-                {
-                    if( dwCount == 0 )
-                    {
-                        CCOUT << "ADD_USER_SERVICE_HANDLER(";
-                        INDENT_UPL;
-                        CCOUT << strClass << "::"
-                            << strMethod << ",";
-                    }
-                    else if( pmd->IsSerialize() )
-                    {
-                        CCOUT << "ADD_USER_SERVICE_HANDLER(";
-                        INDENT_UPL;
-                        CCOUT << strClass << "::"
-                            << strMethod << "Wrapper,";
-                    }
-                    else
-                    {
-                        CCOUT << "ADD_USER_SERVICE_HANDLER_EX( "
-                            << dwCount << ",";
-                        INDENT_UPL;
-                        CCOUT << strClass << "::"
-                            << strMethod << ",";
-                    }
-                }
-                else
-                {
-                    CCOUT << "ADD_USER_SERVICE_HANDLER(";
-                    INDENT_UPL;
-                    CCOUT << strClass << "::"
-                        << strMethod << "Wrapper,";
-                }
+                CCOUT << "ADD_USER_SERVICE_HANDLER(";
+                INDENT_UPL;
+                CCOUT << strClass << "::"
+                    << strMethod << "Wrapper,";
                 NEW_LINE;
                 CCOUT << "\"" << strMethod << "\" );";
                 INDENT_DOWNL;
@@ -3951,11 +4015,13 @@ gint32 CImplIfMethodProxy::OutputSync()
             CCOUT << "propReturnValue, dwRet_ );";
             INDENT_DOWNL;
             Wa( "if( ERROR( ret ) ) return ret;" );
+            NEW_LINE;
             Wa( "ret = ( gint32 )dwRet_;" );
 
             if( dwOutCount > 0 )
             {
                 Wa( "if( ERROR( ret ) ) return ret;" );
+                NEW_LINE;
                 CCOUT << "ret = this->FillArgs(";
                 INDENT_UPL;
                 CCOUT << "pResp_, ret,";
@@ -3969,6 +4035,7 @@ gint32 CImplIfMethodProxy::OutputSync()
         }
         else /* need serialize */
         {
+            NEW_LINE;
             Wa( "//Serialize the input parameters" );
             Wa( "BufPtr pBuf_( true );" );
             ret = GenSerialArgs(
@@ -4031,11 +4098,10 @@ gint32 CImplIfMethodProxy::OutputAsync()
     bool bSerial = m_pNode->IsSerialize();
 
     do{
-        std::string strArgList;
         CCOUT << "gint32 " << strClass << "::"
-            << strMethod << "(IConfigDb* context";
-        INDENT_UP;
-
+            << strMethod << "( ";
+        INDENT_UPL;
+        CCOUT << "IConfigDb* context";
         // gen the param list
         if( dwInCount > 0 )
         {
@@ -4390,7 +4456,6 @@ gint32 CImplIfMethodSvr::OutputEvent()
     bool bSerial = m_pNode->IsSerialize();
 
     do{
-        std::string strArgList;
         CCOUT << "gint32 " << strClass << "::"
             << strMethod << "(";
         INDENT_UPL;
@@ -4623,7 +4688,7 @@ gint32 CImplIfMethodSvr::OutputSync()
     return ret;
 }
 
-gint32 CImplIfMethodSvr::OutputAsync()
+gint32 CImplIfMethodSvr::OutputAsyncNonSerial()
 {
     gint32 ret = 0;
     std::string strClass = "I";
@@ -4637,12 +4702,136 @@ gint32 CImplIfMethodSvr::OutputAsync()
     guint32 dwOutCount = GetArgCount( pOutArgs );
 
     bool bSerial = m_pNode->IsSerialize();
+    if( bSerial )
+        return -EINVAL;
 
     do{
-        if( !bSerial )
-            break;
+        CCOUT << "gint32 " << strClass << "::"
+            << strMethod << "Wrapper( ";
+        INDENT_UPL;
+        if( dwInCount == 0 )
+        {
+            CCOUT << "IEventSink* pCallback )";
+        }
+        else
+        {
+            CCOUT << "IEventSink* pCallback,";
+            NEW_LINE;
+            GenFormInArgs( pInArgs );
+            CCOUT << " )";
+        }
 
-        std::string strArgList;
+        INDENT_DOWNL;
+        BLOCK_OPEN;
+
+        Wa( "gint32 ret = 0;" );
+        Wa( "TaskletPtr pNewCb;" );
+        CCOUT << "do";
+        BLOCK_OPEN;
+
+        if( dwOutCount > 0 )
+        {
+            DeclLocals( pOutArgs );
+            NEW_LINE;
+        }
+
+        CCOUT << "ret = DEFER_CANCEL_HANDLER2(";
+        INDENT_UPL;
+        CCOUT << "-1, pNewCb, this,";
+        NEW_LINE;
+        CCOUT << "&" << strClass << "::"
+            << strMethod << "CancelWrapper,";
+        NEW_LINE;
+        CCOUT << "pCallback, 0";
+        NEW_LINE;
+        ret = GenActParams( pInArgs );
+        if( ERROR( ret ) )
+            break;
+        INDENT_DOWNL;
+        NEW_LINE;
+        Wa( "if( ERROR( ret ) ) break;" );
+        NEW_LINE;
+
+        // call the user's handler
+        CCOUT << "ret = "
+            << strMethod << "( pNewCb,";
+
+        INDENT_UPL;
+
+        GenActParams( pInArgs, pOutArgs );
+
+        CCOUT << " );";
+        INDENT_DOWNL;
+        NEW_LINE;
+        Wa( "if( ret == STATUS_PENDING ) break;" );
+        NEW_LINE;
+        Wa( "CParamList oResp_;" );
+        Wa( "oResp_[ propReturnValue ] = ret;" );
+        if( dwOutCount > 0 )
+        {
+            Wa( "if( SUCCEEDED( ret ) )" );
+            BLOCK_OPEN;
+            std::vector< std::string > vecArgs;
+            ret = GetArgsForCall( pOutArgs, vecArgs );
+            if( ERROR( ret ) )
+                break;
+            for( guint32 i = 0; i < vecArgs.size(); i++ )
+            {
+                CCOUT << "oResp_.Push( "
+                    << vecArgs[ i ] << " );";
+                if( i + 1 < vecArgs.size() )
+                    NEW_LINE;
+            }
+            BLOCK_CLOSE;
+            NEW_LINE;
+        }
+        NEW_LINE;
+        CCOUT << "this->SetResponse( pCallback,";
+        INDENT_UPL;
+        CCOUT << "( IConfigDb* )oResp_.GetCfg() );";
+        INDENT_DOWNL;
+        BLOCK_CLOSE; // do
+        Wa( "while( 0 );" );
+        NEW_LINE;
+        CCOUT << "if( ret != STATUS_PENDING &&";
+        INDENT_UPL;
+        CCOUT << "!pNewCb.IsEmpty() )";
+        INDENT_DOWNL;
+        BLOCK_OPEN;
+        CCOUT << "CIfRetryTask* pTask = pNewCb;";
+        NEW_LINE;
+        CCOUT << "pTask->ClearClientNotify();";
+        NEW_LINE;
+        CCOUT << "( *pNewCb )( eventCancelTask );";
+        BLOCK_CLOSE;
+        NEW_LINE;
+        CCOUT << "return ret;";
+        BLOCK_CLOSE;
+        NEW_LINE;
+
+    }while( 0 );
+    
+    return ret;
+}
+
+gint32 CImplIfMethodSvr::OutputAsyncSerial()
+{
+    gint32 ret = 0;
+    std::string strClass = "I";
+    strClass += m_pIf->GetName() + "_SImpl";
+    std::string strMethod = m_pNode->GetName();
+
+    ObjPtr pInArgs = m_pNode->GetInArgs();
+    ObjPtr pOutArgs = m_pNode->GetOutArgs();
+
+    guint32 dwInCount = GetArgCount( pInArgs );
+    guint32 dwOutCount = GetArgCount( pOutArgs );
+
+    bool bSerial = m_pNode->IsSerialize();
+    if( !bSerial )
+        return -EINVAL;
+
+    do{
         CCOUT << "gint32 " << strClass << "::"
             << strMethod << "Wrapper( ";
         INDENT_UPL;
@@ -4656,12 +4845,27 @@ gint32 CImplIfMethodSvr::OutputAsync()
         BLOCK_OPEN;
 
         Wa( "gint32 ret = 0;" );
+        Wa( "TaskletPtr pNewCb;" );
+        CCOUT << "do";
+        BLOCK_OPEN;
+        CCOUT << "ret = DEFER_CANCEL_HANDLER2(";
+        INDENT_UPL;
+        CCOUT << "-1, pNewCb, this,";
+        NEW_LINE;
+        CCOUT << "&" << strClass << "::"
+            << strMethod << "CancelWrapper,";
+        NEW_LINE;
+        CCOUT << "pCallback, 0, pBuf_ );";
+        INDENT_DOWNL;
+        NEW_LINE;
+        Wa( "if( ERROR( ret ) ) break;" );
 
         if( dwInCount > 0 )
         {
             DeclLocals( pInArgs );
             ret = GenDeserialArgs(
-                pInArgs, "pBuf_", false, false );
+                pInArgs, "pBuf_",
+                false, false, true );
             if( ERROR( ret ) )
                 break;
         }
@@ -4673,17 +4877,18 @@ gint32 CImplIfMethodSvr::OutputAsync()
         }
 
         // call the user's handler
-        CCOUT << "ret ="
-            << strMethod << "( pCallback,";
+        CCOUT << "ret = "
+            << strMethod << "(";
 
         INDENT_UPL;
-
+        CCOUT << "pNewCb,";
+        NEW_LINE;
         GenActParams( pInArgs, pOutArgs );
 
         CCOUT << " );";
         INDENT_DOWNL;
-
-        Wa( "if( ret == STATUS_PENDING ) return ret;" );
+        NEW_LINE;
+        Wa( "if( ret == STATUS_PENDING ) break;" );
         NEW_LINE;
         Wa( "CParamList oResp_;" );
         Wa( "oResp_[ propReturnValue ] = ret;" );
@@ -4700,13 +4905,105 @@ gint32 CImplIfMethodSvr::OutputAsync()
             NEW_LINE;
         }
         NEW_LINE;
-        CCOUT << "this->SetResponse( ";
+        CCOUT << "this->SetResponse( pCallback,";
         INDENT_UPL;
-        CCOUT << "pCallback, ( IConfigDb* )oResp_.GetCfg() );";
+        CCOUT << "( IConfigDb* )oResp_.GetCfg() );";
         INDENT_DOWNL;
+        BLOCK_CLOSE; // do
+        Wa( "while( 0 );" );
+        NEW_LINE;
+        CCOUT << "if( ret != STATUS_PENDING &&";
+        INDENT_UPL;
+        CCOUT << "!pNewCb.IsEmpty() )";
+        INDENT_DOWNL;
+        BLOCK_OPEN;
+        CCOUT << "CIfRetryTask* pTask = pNewCb;";
+        NEW_LINE;
+        CCOUT << "pTask->ClearClientNotify();";
+        NEW_LINE;
+        CCOUT << "( *pNewCb )( eventCancelTask );";
+        BLOCK_CLOSE;
+        NEW_LINE;
         CCOUT << "return ret;";
         BLOCK_CLOSE;
-        NEW_LINES( 1 );
+        NEW_LINE;
+
+    }while( 0 );
+    
+    return ret;
+}
+
+gint32 CImplIfMethodSvr::OutputAsyncCancelWrapper()
+{
+    gint32 ret = 0;
+    std::string strClass = "I";
+    strClass += m_pIf->GetName() + "_SImpl";
+    std::string strMethod = m_pNode->GetName();
+
+    ObjPtr pInArgs = m_pNode->GetInArgs();
+    guint32 dwInCount = GetArgCount( pInArgs );
+
+    bool bSerial = m_pNode->IsSerialize();
+
+    do{
+        Wa( "// this method is called when" );
+        Wa( "// timeout happens or user cancels" );
+        Wa( "// this pending request" );
+
+        CCOUT << "gint32 " << strClass << "::"
+            << strMethod << "CancelWrapper(";
+        INDENT_UPL;
+        CCOUT << "gint32 iRet";
+        if( bSerial )
+        {
+            CCOUT << ", BufPtr& pBuf_";
+        }
+        else if( dwInCount > 0 )
+        {
+            CCOUT << ",";
+            NEW_LINE;
+            GenFormInArgs( pInArgs );
+        }
+        CCOUT << " )";
+        INDENT_DOWNL;
+
+        BLOCK_OPEN;
+        Wa( "gint32 ret = 0;" );
+
+        CCOUT << "do";
+        BLOCK_OPEN;
+        if( bSerial )
+        {
+            DeclLocals( pInArgs );
+            ret = GenDeserialArgs( pInArgs,
+                "pBuf_", false, false, true );
+            if( ERROR( ret ) )
+                break;
+        }
+
+        // call the user's handler
+        CCOUT << "On" << strMethod
+            << "Canceled(";
+
+        if( dwInCount == 0 )
+        {
+            CCOUT << " iRet );";
+        }
+        else
+        {
+            INDENT_UPL;
+            Wa( "iRet," );
+            GenActParams( pInArgs );
+            CCOUT << " );";
+            INDENT_DOWN;
+        }
+
+        BLOCK_CLOSE;
+        CCOUT << "while( 0 );";
+        NEW_LINES( 2 );
+        CCOUT << "return ret;";
+        BLOCK_CLOSE;
+        NEW_LINE;
 
     }while( 0 );
     
@@ -4727,7 +5024,6 @@ gint32 CImplIfMethodSvr::OutputAsyncCallback()
     bool bSerial = m_pNode->IsSerialize();
 
     do{
-        std::string strArgList;
         Wa( "// call me when you have completed" );
         Wa( "// the asynchronous operation" );
 
@@ -4813,6 +5109,22 @@ gint32 CImplIfMethodSvr::OutputAsyncCallback()
     }while( 0 );
     
     return ret;
+}
+
+gint32 CImplIfMethodSvr::OutputAsync()
+{
+    gint32 ret = 0;
+
+    bool bSerial = m_pNode->IsSerialize();
+    if( bSerial )
+        ret = OutputAsyncSerial();
+    else
+        ret = OutputAsyncNonSerial();
+
+    if( ERROR( ret ) )
+        return ret;
+
+    return OutputAsyncCancelWrapper();
 }
 
 CImplClassFactory::CImplClassFactory(
@@ -4966,8 +5278,16 @@ gint32 CImplMainFunc::Output()
             NEW_LINES( 2 );
 
             Wa( "// adjust the thread number if necessary" );
-            Wa( "oParams[ propMaxIrpThrd ] = 2;" );
-            Wa( "oParams[ propMaxTaskThrd ] = 2;" );
+            if( bProxy )
+            {
+                Wa( "oParams[ propMaxIrpThrd ] = 0;" );
+                Wa( "oParams[ propMaxTaskThrd ] = 1;" );
+            }
+            else
+            {
+                Wa( "oParams[ propMaxIrpThrd ] = 2;" );
+                Wa( "oParams[ propMaxTaskThrd ] = 2;" );
+            }
             NEW_LINE;
 
             CCOUT << "ret = g_pIoMgr.NewObj(";
@@ -5011,7 +5331,7 @@ gint32 CImplMainFunc::Output()
             NEW_LINES( 2 );
             Wa( "CoUninitialize();" );
 
-            CCOUT << "DebugPrint( 0, \""
+            CCOUT << "DebugPrintEx( logErr, 0, \""
                 << "#Leaked objects is %d\",";
             INDENT_UPL;
             CCOUT << "CObjBase::GetActCount() );";

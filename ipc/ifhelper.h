@@ -1590,6 +1590,7 @@ class CIfDeferredHandler :
 
 template < typename C, typename ... Types, typename ...Args>
 inline gint32 NewDeferredHandler(
+    EnumClsid iClsid,
     gint32 iPos,
     TaskletPtr& pCallback,
     ObjPtr pIf, gint32(C::*f)(Types ...),
@@ -1614,8 +1615,7 @@ inline gint32 NewDeferredHandler(
         ObjPtr( pTaskToIntercept );
 
     ret = pIfTask.NewObj( 
-        clsid( CIfDeferredHandler ),
-        oParams.GetCfg() );
+        iClsid, oParams.GetCfg() );
     if( ERROR( ret ) )
         return ret;
 
@@ -1625,22 +1625,46 @@ inline gint32 NewDeferredHandler(
     BufPtr pBuf( true );
     *pBuf = ObjPtr( pDeferTask );
 
+    pCallback = pDeferTask;
+    if( iPos < 0 )
+        return 0;
+
     // for the handler method, pass the pDeferTask
     // as the callback
     ret = pDeferTask->UpdateParamAt( iPos, pBuf );
     if( ERROR( ret ) )
         return ret;
 
-    pCallback = pDeferTask;
-
     return 0;
 }
 
 #define DEFER_HANDLER_NOSCHED( __pTask, pObj, func, pCallback, ... ) \
-    NewDeferredHandler( 0, __pTask, pObj, func , pCallback, ##__VA_ARGS__ )
+    NewDeferredHandler( clsid( CIfDeferredHandler ),\
+        0, __pTask, pObj, func , pCallback, ##__VA_ARGS__ )
 
 #define DEFER_HANDLER_NOSCHED2( _pos, __pTask, pObj, func, pCallback, ... ) \
-    NewDeferredHandler( _pos, __pTask, pObj, func , pCallback, ##__VA_ARGS__ )
+    NewDeferredHandler( clsid( CIfDeferredHandler ),\
+        _pos, __pTask, pObj, func , pCallback, ##__VA_ARGS__ )
+
+class CIfAsyncCancelHandler :
+    public CIfDeferredHandler
+{
+    public:
+    typedef CIfDeferredHandler super;
+    CIfAsyncCancelHandler( const IConfigDb* pCfg )
+        :super( pCfg )
+    { SetClassId( clsid( CIfAsyncCancelHandler ) );}
+
+    // just as a place holder
+    gint32 RunTask()
+    { return STATUS_PENDING; }
+
+    gint32 OnTaskComplete( gint32 iRet );
+};
+
+#define DEFER_CANCEL_HANDLER2( _pos, __pTask, pObj, func, pCallback, ... ) \
+    NewDeferredHandler( clsid( CIfAsyncCancelHandler ),\
+        _pos, __pTask, pObj, func , pCallback, ##__VA_ARGS__ )
 
 class CIfResponseHandler :
     public CIfDeferredHandler

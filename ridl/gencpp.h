@@ -348,7 +348,8 @@ struct CMethodWriter
     gint32 GenDeserialArgs(
         ObjPtr& pArgList,
         const std::string& strBuf,
-        bool bDeclare, bool bAssign );
+        bool bDeclare, bool bAssign,
+        bool bNoRet = false );
 
     gint32 DeclLocals( ObjPtr& pArgList );
 
@@ -556,6 +557,9 @@ class CImplIfMethodSvr
     gint32 OutputEvent();
     gint32 OutputSync();
     gint32 OutputAsyncCallback();
+    gint32 OutputAsyncCancelWrapper();
+    gint32 OutputAsyncSerial();
+    gint32 OutputAsyncNonSerial();
     gint32 OutputAsync();
     gint32 Output();
 };

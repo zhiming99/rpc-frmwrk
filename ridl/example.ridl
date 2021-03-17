@@ -39,13 +39,13 @@ interface IEchoThings
         returns ( ObjPtr pRespObj );
 
     // both sides are synchronous
-    EchoMany ( int32 i1, int16 i2,
+    [ async_s ]EchoMany ( int32 i1, int16 i2,
         int64 i3, float i4, double i5, string szText )
         returns ( int32 i1r, int16 i2r,
             int64 i3r, float i4r,
             double i5r, string szTextr );
 
-    EchoStruct( FILE_INFO fi ) returns ( FILE_INFO fir );
+    [ async ]EchoStruct( FILE_INFO fi ) returns ( FILE_INFO fir );
 
     // a event from server to the proxy, response list is alway empty and the
     // server gets no feedback related to the proxy.
@@ -67,7 +67,7 @@ interface IFileTransfer
         */
         returns ();
 
-    [ async_p ]GetFileInfo(
+    GetFileInfo(
         string szFileName, bool bRead )
         returns  ( FILE_INFO fi );
 
@@ -88,8 +88,8 @@ service SimpFileSvc [
     ssl, websock, compress,
     auth ]
 {
-    interface ITinyInterface;
-    interface IEchoThings;
+    // interface ITinyInterface;
+    // interface IEchoThings;
     interface IFileTransfer;
     interface IChat;
 };

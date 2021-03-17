@@ -5303,6 +5303,38 @@ gint32 CIfDeferredHandler::OnComplete( gint32 iRetVal )
     return ret;
 }
 
+gint32 CIfAsyncCancelHandler::OnTaskComplete(
+    gint32 iRet )
+{
+    gint32 ret = 0;
+
+    do{
+        if( iRet == ERROR_TIMEOUT ||
+            iRet == ERROR_USER_CANCEL )
+        {
+            // call the cancel handler
+            if( m_pDeferCall.IsEmpty() )
+                break;
+            BufPtr pBuf( true );
+            *pBuf = iRet;
+            UpdateParamAt( 0, iRet );
+            ( *m_pDeferCall )( 0 );
+
+            break;
+        }
+        else if( iRet == ERROR_CANCEL )
+        {
+            // we should not be here at all
+            break;
+        }
+
+        ret = super::OnTaskComplete( iRet );
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CIfResponseHandler::OnCancel(
     guint32 dwContext )
 {
