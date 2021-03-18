@@ -304,6 +304,51 @@ struct CAttrExps : public CAstListNode
         return dwFlags;
     }
 
+    gint32 CheckTimeoutSec() const
+    {
+        gint32 ret = 0;
+        for( auto elem : m_queChilds )
+        {
+            CAttrExp* pExp = elem;
+            if( pExp == nullptr )
+                continue;
+            guint32 dwToken = pExp->GetName();
+            if( dwToken != TOK_TIMEOUT )
+                continue;
+            BufPtr pBuf = pExp->GetVal();
+            if( pBuf.IsEmpty() || pBuf->empty() )
+            {
+                ret = -ENOENT;
+                break;
+            }
+            if( pBuf->GetExDataType() !=
+                typeUInt32 )
+            {
+                ret = -EINVAL;
+                break;
+            }
+        }
+        return ret;
+    }
+
+    guint32 GetTimeoutSec() const
+    {
+        guint32 dwTimeout = 0;
+        for( auto elem : m_queChilds )
+        {
+            CAttrExp* pExp = elem;
+            if( pExp == nullptr )
+                continue;
+            guint32 dwToken = pExp->GetName();
+            if( dwToken != TOK_TIMEOUT )
+                continue;
+            BufPtr pBuf = pExp->GetVal();
+            if( pBuf.IsEmpty() || pBuf->empty() )
+                break;
+            dwTimeout = *pBuf;
+        }
+        return dwTimeout;
+    }
     bool IsEvent() const
     {
         for( auto elem : m_queChilds )
@@ -807,6 +852,29 @@ struct CMethodDecl : public CNamedNode
     ObjPtr& GetAttrList()
     { return m_pAttrList; }
 
+    gint32 CheckTimeoutSec() const
+    {
+        if( m_pAttrList.IsEmpty() )
+            return 0;
+
+        CAttrExps* pList = m_pAttrList;
+        if( pList == nullptr )
+            return 0;
+
+        return pList->CheckTimeoutSec();
+    }
+    guint32 GetTimeoutSec() const
+    {
+        if( m_pAttrList.IsEmpty() )
+            return 0;
+
+        CAttrExps* pList = m_pAttrList;
+        if( pList == nullptr )
+            return 0;
+
+        return pList->GetTimeoutSec();
+    }
+
     guint32 GetAsyncFlags() const
     {
         if( m_pAttrList.IsEmpty() )
@@ -1214,6 +1282,14 @@ struct CStatements : public CAstListNode
         return GetStmtsByType(
             clsid( CInterfaceDecl ),
             vecIfs );
+    }
+
+    gint32 GetStructDecls(
+        std::vector< ObjPtr >& vecStructs )
+    {
+        return GetStmtsByType(
+            clsid( CStructDecl ),
+            vecStructs );
     }
 
     bool IsStreamNeeded()

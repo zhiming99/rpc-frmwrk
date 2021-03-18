@@ -67,11 +67,12 @@ interface IFileTransfer
         */
         returns ();
 
-    GetFileInfo(
+    [ async_s, timeout=70 ]GetFileInfo(
         string szFileName, bool bRead )
         returns  ( FILE_INFO fi );
 
-    [ async ]DownloadFile( string szFileName,
+    [ async, timeout=60 ]DownloadFile(\
+        string szFileName,
         HSTREAM hChannel, uint64 offset,
         uint64 size )
         returns ();
@@ -89,7 +90,7 @@ service SimpFileSvc [
     auth ]
 {
     // interface ITinyInterface;
-    // interface IEchoThings;
-    interface IFileTransfer;
+    interface IEchoThings;
+    // interface IFileTransfer;
     interface IChat;
 };

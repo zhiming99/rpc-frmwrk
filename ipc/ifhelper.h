@@ -1663,8 +1663,11 @@ class CIfAsyncCancelHandler :
 };
 
 #define DEFER_CANCEL_HANDLER2( _pos, __pTask, pObj, func, pCallback, ... ) \
-    NewDeferredHandler( clsid( CIfAsyncCancelHandler ),\
-        _pos, __pTask, pObj, func , pCallback, ##__VA_ARGS__ )
+    ( { gint32 ret_ = NewDeferredHandler( clsid( CIfAsyncCancelHandler ),\
+        _pos, __pTask, pObj, func , pCallback, ##__VA_ARGS__ ); \
+    if( SUCCEEDED( ret_ ) ) \
+        ( *__pTask )( eventZero ); \
+    ret_;} )
 
 class CIfResponseHandler :
     public CIfDeferredHandler
@@ -1744,10 +1747,10 @@ inline gint32 NewResponseHandler(
     NewResponseHandler( clsid( CIfResponseHandler ), __pTask, pObj, func , pCallback, pContext )
 
 #define NEW_PROXY_RESP_HANDLER2( __pTask, pObj, func, pCallback, pContext ) \
-( { ret = NewResponseHandler( clsid( CIfResponseHandler ), __pTask, pObj, func , pCallback, pContext ); \
-    if( SUCCEEDED( ret ) ) \
+( { gint32 ret_ = NewResponseHandler( clsid( CIfResponseHandler ), __pTask, pObj, func , pCallback, pContext ); \
+    if( SUCCEEDED( ret_ ) ) \
         ( *__pTask )( eventZero ); \
-    ret;} )
+    ret_;} )
 /**
 * @name NEW_PROXY_IOTASK
 * @brief the macro to combine the async call and callback in the task __pTask.

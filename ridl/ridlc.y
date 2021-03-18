@@ -716,6 +716,15 @@ method_decl : attr_list TOK_IDENT '(' arg_list ')' TOK_RETURNS '(' arg_list ')'
         {
             ObjPtr& pal = *pAttrBuf;
             pmd->SetAttrList( pal );
+            gint32 ret =
+                pmd->CheckTimeoutSec();
+            if( ERROR( ret )  )
+            {
+                std::string strMsg = "'timeout' "; 
+                strMsg += "does not have valid value";
+                PrintMsg( ret, strMsg.c_str() );
+                g_bSemanErr = true;
+            }
         }
         // semantic checks
         if( pmd->IsEvent() )
@@ -753,6 +762,15 @@ method_decl : attr_list TOK_IDENT '(' ')' TOK_RETURNS '(' arg_list ')'
         {
             ObjPtr& pal = *pAttrBuf;
             pmd->SetAttrList( pal );
+            gint32 ret =
+                pmd->CheckTimeoutSec();
+            if( ERROR( ret )  )
+            {
+                std::string strMsg = "'timeout' "; 
+                strMsg += "does not have valid value";
+                PrintMsg( ret, strMsg.c_str() );
+                g_bSemanErr = true;
+            }
         }
 
         // semantic checks
@@ -784,6 +802,15 @@ method_decl : attr_list TOK_IDENT '(' ')' TOK_RETURNS '(' ')'
         {
             ObjPtr& pal = *pAttrBuf;
             pmd->SetAttrList( pal );
+            gint32 ret =
+                pmd->CheckTimeoutSec();
+            if( ERROR( ret )  )
+            {
+                std::string strMsg = "'timeout' "; 
+                strMsg += "does not have valid value";
+                PrintMsg( ret, strMsg.c_str() );
+                g_bSemanErr = true;
+            }
         }
         BufPtr pBuf( true );
         *pBuf = pNode;
@@ -809,6 +836,15 @@ method_decl : attr_list TOK_IDENT '(' arg_list ')' TOK_RETURNS '(' ')'
         {
             ObjPtr& pal = *pAttrBuf;
             pmd->SetAttrList( pal );
+            gint32 ret =
+                pmd->CheckTimeoutSec();
+            if( ERROR( ret )  )
+            {
+                std::string strMsg = "'timeout' "; 
+                strMsg += "does not have valid value";
+                PrintMsg( ret, strMsg.c_str() );
+                g_bSemanErr = true;
+            }
         }
         BufPtr pBuf( true );
         *pBuf = pNode;

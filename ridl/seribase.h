@@ -505,11 +505,14 @@ class CSerialBase
     }
 };
 
-class CStructBase : public CSerialBase
+class CStructBase :
+    public CSerialBase,
+    public CObjBase
 {
     public:
     typedef CSerialBase super;
-    CStructBase() : super()
+    CStructBase() :
+        super(), CObjBase()
     {}
     
     virtual gint32 Serialize(

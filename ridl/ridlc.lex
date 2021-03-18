@@ -339,14 +339,14 @@ HexDig [0-9a-fA-F]
         if( iLen > 8 )
         {
             guint64 iVal = strtoull(
-                yytext + 2, nullptr, 8);
+                yytext + 2, nullptr, 16 );
             newval() = iVal;
             *yylval = curval;
             return TOK_INTVAL;
         }
 
         guint32 iVal = strtoul(
-            yytext + 2, nullptr, 8);
+            yytext + 2, nullptr, 16 );
         newval() = iVal;
         *yylval = curval;
         return TOK_INTVAL;
@@ -404,14 +404,14 @@ HexDig [0-9a-fA-F]
         else if( ( iLen << 1 ) > digits )
         {
             gint64 iVal = strtoll(
-                yptr, nullptr, 8);
+                yptr, nullptr, 10 );
             newval() = ( guint64 )iVal;
             *yylval = curval;
             return TOK_INTVAL;
         }
 
         gint32 iVal = strtol(
-            yptr, nullptr, 8);
+            yptr, nullptr, 10 );
         newval() = ( guint32 )iVal;
         *yylval = curval;
         return TOK_INTVAL;
