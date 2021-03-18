@@ -18,7 +18,7 @@ This framework depends on the following packags to build:
 
 #### Features:   
 1. `Support for multiple interfaces on a single object (COM alike).`   
-2. `Support for synchronous/Asynchronous requests and handling.`   
+2. `Support for synchronous/asynchronous requests handling from both sides.`   
 3. `Active canceling.`   
 4. `Server-push events`   
 5. `Keep-alive for time-consuming request.`   
