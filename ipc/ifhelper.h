@@ -53,6 +53,8 @@ T CastTo( BufPtr& pBuf )
 // cast to prime type reference except char* or const
 // char* or stdstr
 template< typename T,
+    typename T1= typename std::enable_if<
+        !std::is_same< DBusMessage*, T >::value, T>::type,
     typename Allowed = typename std::enable_if<
         !std::is_base_of< IAutoPtr, ValType( T ) >::value && 
         !std::is_base_of< CObjBase, ValType( T ) >::value && 
@@ -76,7 +78,7 @@ T& CastTo( BufPtr& pBuf )
 // cast to CObjBase reference
 template< typename T,
     typename T1= typename std::enable_if<
-        !std::is_same< DBusMessage, T >::value, T>::type,
+        !std::is_same< DBusMessage*, T >::value, T>::type,
     typename T2= typename std::enable_if<
         std::is_base_of< CObjBase, T >::value, T >::type,
     typename T3=T >
@@ -134,6 +136,9 @@ T CastTo( BufPtr& pBuf )
 #define ValTypeFirst ValType( First )
 
 template< typename First,
+    typename T2 = typename std::enable_if<
+        !std::is_same< DBusMessage*, First >::value,
+         First >::type,
     typename Allowed = typename std::enable_if<
         !std::is_base_of< CObjBase, ValTypeFirst >::value &&
         !std::is_same< BufPtr, ValTypeFirst >::value &&
@@ -146,7 +151,6 @@ ValTypeFirst* CastTo( const BufPtr& pCBuf )
     DFirst& val = *pBuf;
     return &val;
 }
-
 
 // cast to char* or const char*
 template< typename First,
@@ -161,13 +165,30 @@ DFirst CastTo( BufPtr& pCBuf )
     return val;
 }
 
+// cast to DBusMessage*
+template< typename First,
+    typename Allowed = typename std::enable_if<
+        std::is_same< DBusMessage*, First >::value,
+        First >::type,
+    typename T3=Allowed,
+    typename T4=Allowed >
+ValTypeFirst* CastTo( BufPtr& pCBuf )
+{
+    BufPtr& pBuf = const_cast<BufPtr&>( pCBuf );
+    DMsgPtr& pMsg = *pBuf;
+    return ( First )pMsg;
+}
+
 // cast to CObjBase*
 template< typename First,
+    typename T2 = typename std::enable_if<
+        !std::is_same< DBusMessage*, First >::value,
+         First >::type,
     typename Allowed = typename std::enable_if<
         std::is_base_of< CObjBase, ValTypeFirst >::value &&
         std::is_pointer< First >::value, First >::type,
-    typename T3=Allowed,
-    typename T4=Allowed >
+    typename T4=Allowed,
+    typename T5=Allowed >
 DFirst CastTo( BufPtr& pCBuf )
 {
     BufPtr& pBuf = const_cast<BufPtr&>( pCBuf );
@@ -1304,9 +1325,12 @@ class CDeferredCall :
         if( pObj == nullptr || m_pUserFunc == nullptr )
             return -EINVAL;
 
-        gint32 ret = ( pObj->*m_pUserFunc )( *vecParams[ S ]... );
+        std::tuple< DecType( Args )...> oTuple( 
+            VecToTuple< DecType( Args )... >(
+                vecParams ) );
 
-        return ret;
+        return ( pObj->*m_pUserFunc )(
+            std::get< S >( oTuple )... );
     }
 
     //---------

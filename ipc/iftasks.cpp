@@ -5317,7 +5317,7 @@ gint32 CIfAsyncCancelHandler::OnTaskComplete(
                 break;
             BufPtr pBuf( true );
             *pBuf = iRet;
-            UpdateParamAt( 0, iRet );
+            UpdateParamAt( 1, iRet );
             ( *m_pDeferCall )( 0 );
 
             break;

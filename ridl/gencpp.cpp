@@ -421,7 +421,7 @@ gint32 CMethodWriter::GenSerialArgs(
 
     do{
         NEW_LINE;
-        Wa( "CSeriBase oSerial_;" );
+        Wa( "CSerialBase oSerial_;" );
         CEmitSerialCode oesc(
             m_pWriter, pArgList );
 
@@ -488,7 +488,7 @@ gint32 CMethodWriter::GenDeserialArgs(
 
     do{
         NEW_LINE;
-        Wa( "CSeriBase oDeserial_;" );
+        Wa( "CSerialBase oDeserial_;" );
         CEmitSerialCode oedsc(
             m_pWriter, pArgList );
 
@@ -673,7 +673,7 @@ CFileSet::CFileSet(
         "drv.json";
 
     m_strMakefile =
-        strOutPath + "/" + "Makefile" ;
+        strOutPath + "/" + "Makefile.tst" ;
 
     m_strMainCli =
         strOutPath + "/" + "maincli.cpp";
@@ -1031,7 +1031,18 @@ gint32 GenCppFile(
         CCOUT << "#include \"seribase.h\"";
         NEW_LINE;
         CCOUT << "#include \"" << strName << ".h\"";
-        NEW_LINES( 2 );
+        NEW_LINE;
+        std::vector< ObjPtr > vecSvcs;
+        pStmts->GetSvcDecls( vecSvcs );
+        for( auto& elem : vecSvcs )
+        {
+            CServiceDecl* psvd = elem;
+            std::string strName = psvd->GetName();
+            CCOUT<< "#include \"" <<
+                strName << ".h\"";
+            NEW_LINE;
+        }
+        NEW_LINE;
 
         for( guint32 i = 0;
             i < pStmts->GetCount(); i++ )
@@ -1243,7 +1254,7 @@ gint32 CDeclareClassIds::Output()
                 << "_CliSkel"
                 << " ) = "
                 << dwClsid
-                << ";";
+                << ",";
 
             bFirst = false;
         }
@@ -1251,26 +1262,26 @@ gint32 CDeclareClassIds::Output()
         {
             CCOUT << "DECL_CLSID( "
                 << "C" << strSvcName
-                << "_CliSkel" << " );";
+                << "_CliSkel" << " ),";
         }
 
         NEW_LINE;
 
         CCOUT << "DECL_CLSID( "
             << "C" << strSvcName
-            << "_SvrSkel" << " );";
+            << "_SvrSkel" << " ),";
 
         NEW_LINE;
 
         CCOUT << "DECL_CLSID( "
             << "C" << strSvcName
-            << "_CliImpl" << " );";
+            << "_CliImpl" << " ),";
 
         NEW_LINE;
 
         CCOUT << "DECL_CLSID( "
             << "C" << strSvcName
-            << "_SvrImpl" << " );";
+            << "_SvrImpl" << " ),";
 
         NEW_LINE;
     }
@@ -1292,7 +1303,7 @@ gint32 CDeclareClassIds::Output()
         
         CCOUT << "DECL_IID( "
             << strIfName
-            << " );";
+            << " ),";
         NEW_LINE;
     }
 
@@ -1312,7 +1323,7 @@ gint32 CDeclareClassIds::Output()
         CCOUT << "DECL_CLSID( "
             << strName
             << " ) = "
-            << dwMsgId << ";";
+            << dwMsgId << ",";
     }
 
     BLOCK_CLOSE;
@@ -1574,9 +1585,9 @@ gint32 CDeclInterfProxy::Output()
         INDENT_UP;
         NEW_LINE;
         if( bStream )
-            CCOUT<< "public:" << strBase;
+            CCOUT<< ": public " << strBase;
         else
-            CCOUT<< "public: virtual " << strBase;
+            CCOUT<< ": public virtual " << strBase;
 
         INDENT_DOWN;
         NEW_LINE;
@@ -1594,7 +1605,7 @@ gint32 CDeclInterfProxy::Output()
         NEW_LINE;
         if( m_pNode->IsStream() )
         {
-            CCOUT << "virtbase( pCfg ), "
+            CCOUT << "super::super( pCfg ), "
                 << "super( pCfg )";
             NEW_LINE;
             CCOUT << "{}";
@@ -1609,6 +1620,10 @@ gint32 CDeclInterfProxy::Output()
         NEW_LINE;
         Wa( "gint32 InitUserFuncs();" );
         NEW_LINE;
+        Wa( "const EnumClsid GetIid() const override" );
+        CCOUT << "{ return iid( "
+            << strName << " ); }";
+        NEW_LINES( 2 );
 
         ObjPtr pMethods =
             m_pNode->GetMethodList();
@@ -1928,9 +1943,9 @@ gint32 CDeclInterfSvr::Output()
         INDENT_UP;
         NEW_LINE;
         if( bStream )
-            CCOUT<< "public:" << strBase;
+            CCOUT<< ": public " << strBase;
         else
-            CCOUT<< "public: virtual " << strBase;
+            CCOUT<< ": public virtual " << strBase;
 
         INDENT_DOWN;
         NEW_LINE;
@@ -1946,7 +1961,7 @@ gint32 CDeclInterfSvr::Output()
         NEW_LINE;
         if( m_pNode->IsStream() )
         {
-            CCOUT << "virtbase( pCfg ), "
+            CCOUT << "super::super( pCfg ), "
                 << "super( pCfg )";
             NEW_LINE;
             CCOUT << "{}";
@@ -1961,7 +1976,7 @@ gint32 CDeclInterfSvr::Output()
         NEW_LINE;
         Wa( "gint32 InitUserFuncs();" );
         NEW_LINE;
-        Wa( "const EnumClsid GetIid() const" );
+        Wa( "const EnumClsid GetIid() const override" );
         CCOUT<< "{ return iid( "
             << strName <<" ); }";
         NEW_LINES( 2 );
@@ -2063,7 +2078,7 @@ gint32 CDeclInterfSvr::OutputSync(
         guint32 dwCount = dwInCount + dwOutCount;
 
         Wa( "//RPC Sync Req Handler Wrapper" );
-        CCOUT << "gint32 " << strName << "Wrapper(;";
+        CCOUT << "gint32 " << strName << "Wrapper(";
         INDENT_UPL;
         CCOUT << "IEventSink* pCallback";
 
@@ -2164,8 +2179,10 @@ gint32 CDeclInterfSvr::OutputAsync(
             CCOUT << "gint32 "
                 << strName << "CancelWrapper(";
             INDENT_UPL;
-            CCOUT << "gint32 iRet"
-                << ", BufPtr& pBuf_ );";
+            CCOUT << "IEventSink* pCallback,";
+            NEW_LINE;
+            CCOUT << "gint32 iRet, "
+                << "BufPtr& pBuf_ );";
             INDENT_DOWNL;
             NEW_LINE;
         }
@@ -2178,6 +2195,15 @@ gint32 CDeclInterfSvr::OutputAsync(
             CCOUT << "IEventSink* pCallback );";
             INDENT_DOWNL;
             NEW_LINE;
+
+            CCOUT << "gint32 "
+                << strName << "CancelWrapper(";
+            INDENT_UPL;
+            CCOUT << "IEventSink* pCallback,";
+            NEW_LINE;
+            CCOUT << "gint32 iRet );";
+            INDENT_DOWNL;
+            NEW_LINE;
         }
         else
         {
@@ -2186,6 +2212,19 @@ gint32 CDeclInterfSvr::OutputAsync(
                 << strName << "Wrapper(";
             INDENT_UPL;
             CCOUT << "IEventSink* pCallback,";
+            NEW_LINE;
+            GenFormInArgs( pInArgs );
+            CCOUT << " );";
+            INDENT_DOWNL;
+            NEW_LINE;
+
+            CCOUT << "gint32 "
+                << strName << "CancelWrapper(";
+            INDENT_UPL;
+            CCOUT << "IEventSink* pCallback,";
+            NEW_LINE;
+            CCOUT << "gint32 iRet,";
+            NEW_LINE;
             GenFormInArgs( pInArgs );
             CCOUT << " );";
             INDENT_DOWNL;
@@ -2193,7 +2232,7 @@ gint32 CDeclInterfSvr::OutputAsync(
         }
 
         Wa( "//RPC Async Req Cancel Handler" );
-        CCOUT << "gint32 "
+        CCOUT << "virtual gint32 "
             << "On" << strName << "Canceled(";
         INDENT_UPL;
         CCOUT << "gint32 iRet,";
@@ -2251,6 +2290,7 @@ gint32 CDeclInterfSvr::OutputAsync(
         }
         if( dwOutCount > 0 )
         {
+            CCOUT << ",";
             NEW_LINE;
             GenFormOutArgs( pOutArgs );
         }
@@ -2324,7 +2364,7 @@ gint32 CDeclService::Output()
         INDENT_DOWN;
         NEW_LINES( 2 );
 
-        CCOUT << "DECLARE_AGGREGATED_PROXY(";
+        CCOUT << "DECLARE_AGGREGATED_SERVER(";
         INDENT_UP;
         NEW_LINE;
         CCOUT << "C" << strSvcName << "_SvrSkel,";
@@ -2867,7 +2907,7 @@ gint32 CDeclServiceImpl::Output()
             INDENT_UP;
             NEW_LINE;
 
-            CCOUT << "public " << strBase;
+            CCOUT << ": public " << strBase;
 
             INDENT_DOWN;
             NEW_LINE;
@@ -2882,7 +2922,7 @@ gint32 CDeclServiceImpl::Output()
                 << "( const IConfigDb* pCfg ) :";
             INDENT_UP;
             NEW_LINE;
-            CCOUT << "virtbase( pCfg ), "
+            CCOUT << "super::virtbase( pCfg ), "
                 << "super( pCfg )";
             INDENT_DOWN;
             NEW_LINE;
@@ -2894,7 +2934,7 @@ gint32 CDeclServiceImpl::Output()
                 Wa( "/* The following two methods are important for */" );
                 Wa( "/* streaming transfer. rewrite them if necessary */" );
                 Wa( "gint32 OnStreamReady( HANDLE hChannel ) override" );
-                Wa( "{ return super::OnStreamReady( hChannel ); " );
+                Wa( "{ return super::OnStreamReady( hChannel ); } " );
                 NEW_LINE;
                 Wa( "gint32 OnStmClosing( HANDLE hChannel ) override" );
                 Wa( "{ return super::OnStmClosing( hChannel ); }" );
@@ -2934,7 +2974,7 @@ gint32 CDeclServiceImpl::Output()
         INDENT_UP;
         NEW_LINE;
 
-        CCOUT << "public " << strBase;
+        CCOUT << ": public " << strBase;
 
         INDENT_DOWN;
         NEW_LINE;
@@ -2949,7 +2989,7 @@ gint32 CDeclServiceImpl::Output()
             << "( const IConfigDb* pCfg ) :";
         INDENT_UP;
         NEW_LINE;
-        CCOUT << "virtbase( pCfg ), "
+        CCOUT << "super::virtbase( pCfg ), "
             << "super( pCfg )";
         INDENT_DOWN;
         NEW_LINE;
@@ -2961,7 +3001,7 @@ gint32 CDeclServiceImpl::Output()
             Wa( "/* The following two methods are important for */" );
             Wa( "/* streaming transfer. rewrite them if necessary */" );
             Wa( "gint32 OnStreamReady( HANDLE hChannel ) override" );
-            Wa( "{ return super::OnStreamReady( hChannel ); " );
+            Wa( "{ return super::OnStreamReady( hChannel ); } " );
             NEW_LINE;
             Wa( "gint32 OnStmClosing( HANDLE hChannel ) override" );
             Wa( "{ return super::OnStmClosing( hChannel ); }" );
@@ -3229,7 +3269,7 @@ gint32 CImplSerialStruct::OutputSerial()
         CCOUT << "do";
         BLOCK_OPEN;
 
-        CCOUT << "ret = Serialize( pBuf_, m_dwMsgId );";
+        CCOUT << "ret = CSerialBase::Serialize( pBuf_, m_dwMsgId );";
         NEW_LINE;
         Wa( "if( ERROR( ret ) ) break;" );
         NEW_LINE;
@@ -3285,7 +3325,7 @@ gint32 CImplSerialStruct::OutputDeserial()
         }
 
         Wa( "guint32 dwMsgId = 0;" );
-        CCOUT << "ret = Deserialize( pBuf_, dwMsgId );";
+        CCOUT << "ret = CSerialBase::Deserialize( pBuf_, dwMsgId );";
         NEW_LINES( 2 );
         Wa( "if( ERROR( ret ) ) return ret;" );
         Wa( "if( m_dwMsgId != dwMsgId ) return -EINVAL;" );
@@ -3413,7 +3453,7 @@ gint32 CImplIufProxy::Output()
                 else
                 {
                     CCOUT << "ADD_USER_PROXY_METHOD_EX( "
-                        << dwCount;
+                        << dwCount << ",";
                     INDENT_UP;
                     NEW_LINE;
                     CCOUT << strClass << "::"
@@ -3651,7 +3691,8 @@ gint32 CEmitSerialCode::OutputSerial(
             case 'o':
                 {
                     CCOUT << "ret = " << strObj
-                        << "Serialize( " << strBuf << ", "
+                        << "CSerialBase::Serialize("
+                        << strBuf << ", "
                         << strName << " );";
                     NEW_LINE;
                     Wa( "if( ERROR( ret ) ) break;" );
@@ -3711,7 +3752,7 @@ gint32 CEmitSerialCode::OutputDeserial(
             {
             case '(' :
                 {
-                    CCOUT << "ret = " << strObj << "DesrialArray( "
+                    CCOUT << "ret = " << strObj << "DeserialArray( "
                         << strBuf << ", " << strName << ", \""
                         << strSig << "\" );";
                     NEW_LINE;
@@ -3758,7 +3799,8 @@ gint32 CEmitSerialCode::OutputDeserial(
             case 'a':
             case 'o':
                 {
-                    CCOUT << "ret = " << strObj << "Deserialize"
+                    CCOUT << "ret = " << strObj
+                        << "CSerialBase::Deserialize"
                         << "( " << strBuf << ", "
                         << strName << " );";
                     NEW_LINE;
@@ -3874,11 +3916,10 @@ gint32 CImplIfMethodProxy::OutputEvent()
         CCOUT << "IEventSink* pCallback";
         if( dwCount == 0 )
         {
-            CCOUT << " )";
         }
         else if( bSerial )
         {
-            CCOUT << ", BufPtr& pBuf_ )";
+            CCOUT << ", BufPtr& pBuf_";
         }
         else
         {
@@ -3886,6 +3927,7 @@ gint32 CImplIfMethodProxy::OutputEvent()
             NEW_LINE;
             GenFormInArgs( pInArgs );
         }
+        CCOUT << " )";
         INDENT_DOWN;
         NEW_LINE;
 
@@ -3983,12 +4025,12 @@ gint32 CImplIfMethodProxy::OutputSync()
                 GenFormOutArgs( pOutArgs );
             }
     
-            CCOUT << " );";
+            CCOUT << " )";
             INDENT_DOWNL;
         }
 
         BLOCK_OPEN;
-
+        Wa( "gint32 ret = 0;" );
         Wa( "CParamList oOptions_;" );
         Wa( "CfgPtr pResp_;" );
         CCOUT << "oOptions_[ propIfName ] = \""
@@ -4182,7 +4224,7 @@ gint32 CImplIfMethodProxy::OutputAsync()
         Wa( "oReqCtx_.Push( pTemp );" );
         Wa( "TaskletPtr pRespCb_;" );
         NEW_LINE;
-        CCOUT << "ret = NEW_PROXY_RESP_HANDLER2(";
+        CCOUT << "gint32 ret = NEW_PROXY_RESP_HANDLER2(";
         INDENT_UPL;
         CCOUT <<  "pRespCb_, ObjPtr( this ), ";
         NEW_LINE;
@@ -4240,7 +4282,7 @@ gint32 CImplIfMethodProxy::OutputAsync()
             INDENT_UPL;
             Wa( "( IEventSink* )pRespCb_, " );
             Wa( "oOptions_.GetCfg(), pResp_," );
-            CCOUT << "\"" << strMethod << "\"";
+            CCOUT << "\"" << strMethod << "\",";
             NEW_LINE;
             CCOUT << "pBuf_ );";
             INDENT_DOWNL;
@@ -4261,7 +4303,7 @@ gint32 CImplIfMethodProxy::OutputAsync()
         CCOUT << "return ret;";
         BLOCK_CLOSE;
         NEW_LINES( 2 );
-        Wa( "( *pRespCb_ )( eventCancelTask )" );
+        Wa( "( *pRespCb_ )( eventCancelTask );" );
         CCOUT << "return ret;";
         BLOCK_CLOSE;
         NEW_LINES( 1 );
@@ -4302,6 +4344,7 @@ gint32 CImplIfMethodProxy::OutputAsyncCbWrapper()
         CCOUT << "do";
         BLOCK_OPEN;
         NEW_LINE; 
+        Wa( "IConfigDb* pResp_ = nullptr;" );
         Wa( "CCfgOpenerObj oReq_( pIoReq );" );
         CCOUT << "ret = oReq_.GetPointer(";
         INDENT_UPL;
@@ -4326,7 +4369,7 @@ gint32 CImplIfMethodProxy::OutputAsyncCbWrapper()
 
         Wa( "IConfigDb* context = nullptr;" );
         Wa( "CCfgOpener oReqCtx_( pReqCtx );" );
-        Wa( "ret = oReqCtx_->GetPointer( 0, context );" );
+        Wa( "ret = oReqCtx_.GetPointer( 0, context );" );
         Wa( "if( ERROR( ret ) ) context = nullptr;" );
         NEW_LINE;
 
@@ -4530,7 +4573,7 @@ gint32 CImplIfMethodSvr::OutputEvent()
 
         INDENT_DOWNL;
         BLOCK_OPEN;
-
+        Wa( "gint32 ret = 0;" );
         Wa( "CParamList oOptions_;" );
         CCOUT << "oOptions_[ propSeriProto ] = ";
         if( bSerial )
@@ -4647,7 +4690,7 @@ gint32 CImplIfMethodSvr::OutputSync()
 
         if( dwCount == 0 )
         {
-            CCOUT << "ret = this->"
+            CCOUT << "gint32 ret = this->"
                 << strMethod << "();";
 
             Wa( "CParamList oResp_;" );
@@ -4657,7 +4700,7 @@ gint32 CImplIfMethodSvr::OutputSync()
         {
             DeclLocals( pOutArgs );
             NEW_LINE;
-            CCOUT << "ret = this->"
+            CCOUT << "gint32 ret = this->"
                 << strMethod << "(";
             INDENT_UPL;
 
@@ -4673,9 +4716,9 @@ gint32 CImplIfMethodSvr::OutputSync()
             Wa( "ret = ERROR_STATE;" );
             CCOUT << "DebugPrintEx( logErr, ret, ";
             INDENT_UPL;
-            CCOUT << "\"Cannot return pending with";
+            CCOUT << "\"Cannot return pending with\"";
             NEW_LINE;
-            CCOUT << "Sync Request Handler\" );";
+            CCOUT << "\"Sync Request Handler\" );";
             INDENT_DOWN;
             BLOCK_CLOSE;
             NEW_LINE;
@@ -4691,7 +4734,7 @@ gint32 CImplIfMethodSvr::OutputSync()
                 ret = GetArgsForCall( pOutArgs, vecArgs );
                 for( guint32 i = 0; i < vecArgs.size(); i++ )
                 {
-                    CCOUT << "oParams.Push( "
+                    CCOUT << "oResp_.Push( "
                         << vecArgs[ i ] << " );";
                     if( i + 1 < vecArgs.size() )
                         NEW_LINE;
@@ -4730,9 +4773,9 @@ gint32 CImplIfMethodSvr::OutputSync()
             Wa( "ret = ERROR_STATE;" );
             CCOUT << "DebugPrintEx( logErr, ret, ";
             INDENT_UPL;
-            CCOUT << "\"Cannot return pending with";
+            CCOUT << "\"Cannot return pending with\"";
             NEW_LINE;
-            CCOUT << "Sync Request Handler\" );";
+            CCOUT << "\"Sync Request Handler\" );";
             INDENT_DOWN;
             BLOCK_CLOSE;
             NEW_LINES( 2 );
@@ -4750,7 +4793,7 @@ gint32 CImplIfMethodSvr::OutputSync()
                 if( ERROR( ret ) )
                     break;
 
-                CCOUT << "oResp_.push( pBuf_ );";
+                CCOUT << "oResp_.Push( pBuf_ );";
                 BLOCK_CLOSE;
                 NEW_LINE;
             }
@@ -4835,9 +4878,9 @@ gint32 CImplIfMethodSvr::OutputAsyncNonSerial()
         NEW_LINE;
         CCOUT << "CIfInvokeMethodTask* pInv =";
         INDENT_UPL;
-        CCOUT << "ObjPtr( pCallback )";
+        CCOUT << "ObjPtr( pCallback );";
         INDENT_DOWNL;
-        CCOUT << "CfgPtr pCallOpt = nullptr;";
+        CCOUT << "CfgPtr pCallOpt;";
         NEW_LINE;
         CCOUT << "ret = pInv->GetCallOptions( pCallOpt );";
         NEW_LINE;
@@ -4870,11 +4913,12 @@ gint32 CImplIfMethodSvr::OutputAsyncNonSerial()
         CCOUT << "&" << strClass << "::"
             << strMethod << "CancelWrapper,";
         NEW_LINE;
-        CCOUT << "pCallback, 0";
+        CCOUT << "pCallback, 0,";
         NEW_LINE;
         ret = GenActParams( pInArgs );
         if( ERROR( ret ) )
             break;
+        CCOUT << " );";
         INDENT_DOWNL;
         NEW_LINE;
         Wa( "if( ERROR( ret ) ) break;" );
@@ -4916,7 +4960,7 @@ gint32 CImplIfMethodSvr::OutputAsyncNonSerial()
         NEW_LINE;
         CCOUT << "this->SetResponse( pCallback,";
         INDENT_UPL;
-        CCOUT << "( IConfigDb* )oResp_.GetCfg() );";
+        CCOUT << "oResp_.GetCfg() );";
         INDENT_DOWNL;
         BLOCK_CLOSE; // do
         Wa( "while( 0 );" );
@@ -4999,9 +5043,9 @@ gint32 CImplIfMethodSvr::OutputAsyncSerial()
         NEW_LINE;
         CCOUT << "CIfInvokeMethodTask* pInv =";
         INDENT_UPL;
-        CCOUT << "ObjPtr( pCallback )";
+        CCOUT << "ObjPtr( pCallback );";
         INDENT_DOWNL;
-        CCOUT << "CfgPtr pCallOpt = nullptr;";
+        CCOUT << "CfgPtr pCallOpt;";
         NEW_LINE;
         CCOUT << "ret = pInv->GetCallOptions( pCallOpt );";
         NEW_LINE;
@@ -5071,17 +5115,17 @@ gint32 CImplIfMethodSvr::OutputAsyncSerial()
             Wa( "if( SUCCEEDED( ret ) )" );
             BLOCK_OPEN;
 
-            Wa( "BufPtr pBuf2( true )" );
+            Wa( "BufPtr pBuf2( true );" );
             ret = GenSerialArgs(
                 pOutArgs, "pBuf2", false, false );
-            CCOUT << "oResp_.push( pBuf_ );";
+            CCOUT << "oResp_.Push( pBuf_ );";
             BLOCK_CLOSE;
             NEW_LINE;
         }
         NEW_LINE;
         CCOUT << "this->SetResponse( pCallback,";
         INDENT_UPL;
-        CCOUT << "( IConfigDb* )oResp_.GetCfg() );";
+        CCOUT << "oResp_.GetCfg() );";
         INDENT_DOWNL;
         BLOCK_CLOSE; // do
         Wa( "while( 0 );" );
@@ -5127,6 +5171,8 @@ gint32 CImplIfMethodSvr::OutputAsyncCancelWrapper()
         CCOUT << "gint32 " << strClass << "::"
             << strMethod << "CancelWrapper(";
         INDENT_UPL;
+        CCOUT << "IEventSink* pCallback,";
+        NEW_LINE;
         CCOUT << "gint32 iRet";
         if( bSerial )
         {
@@ -5248,7 +5294,7 @@ gint32 CImplIfMethodSvr::OutputAsyncCallback()
                 pOutArgs, "pBuf_", true, true );
             if( ERROR( ret ) )
                 break;
-            Wa( "oResp_.Push( pBuf_ )" );
+            Wa( "oResp_.Push( pBuf_ );" );
             BLOCK_CLOSE;
             NEW_LINE;
         }
@@ -5338,7 +5384,7 @@ gint32 CImplClassFactory::Output()
             vecActStructs.push_back( elem );
         }
 
-        Wa( "static FactoryPtr InitClassFactory()" ); 
+        Wa( "FactoryPtr InitClassFactory()" ); 
         BLOCK_OPEN;
         CCOUT << "BEGIN_FACTORY_MAPS;";
         NEW_LINES( 2 );
@@ -5360,7 +5406,7 @@ gint32 CImplClassFactory::Output()
         for( auto& elem : vecActStructs )
         {
             CStructDecl* psd = elem;
-            CCOUT << "INIT_MAP_ENTRYCFG( ";
+            CCOUT << "INIT_MAP_ENTRY( ";
             CCOUT << psd->GetName() << " );";
             NEW_LINE;
         }
@@ -5433,6 +5479,7 @@ gint32 CImplMainFunc::Output()
             NEW_LINE;
 
             // InitContext
+            Wa( "extern FactoryPtr InitClassFactory();" );
             Wa( "gint32 InitContext()" );
             BLOCK_OPEN;
             Wa( "gint32 ret = CoInitialize( 0 );" );
@@ -5458,7 +5505,7 @@ gint32 CImplMainFunc::Output()
             NEW_LINE;
             Wa( "CParamList oParams;" );
             CCOUT << "oParams.Push( \""
-                << strModName + elem << "\" )";
+                << strModName + elem << "\" );";
             NEW_LINES( 2 );
 
             Wa( "// adjust the thread number if necessary" );
@@ -5478,7 +5525,7 @@ gint32 CImplMainFunc::Output()
             INDENT_UPL;
             CCOUT << "clsid( CIoManager ), ";
             NEW_LINE;
-            CCOUT << "oParams.GetCfg() )";
+            CCOUT << "oParams.GetCfg() );";
             INDENT_DOWNL;
             CCOUT << "if( ERROR( ret ) )";
             INDENT_UPL;
@@ -5521,7 +5568,7 @@ gint32 CImplMainFunc::Output()
             NEW_LINE;
             CCOUT << "CObjBase::GetActCount() );";
             INDENT_DOWNL;
-            CCOUT << "return ret;";
+            CCOUT << "return STATUS_SUCCESS;";
             BLOCK_CLOSE;
             NEW_LINES( 2 );
 
@@ -5540,7 +5587,7 @@ gint32 CImplMainFunc::Output()
                 NEW_LINE;
                 CCOUT << "// advanced control";
                 NEW_LINE;
-                CCOUT << "while( pSvc->IsConnected() )";
+                CCOUT << "while( pIf->IsConnected() )";
                 INDENT_UPL;
                 CCOUT << "sleep( 1 );";
                 INDENT_DOWNL;

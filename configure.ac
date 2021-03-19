@@ -21,6 +21,11 @@ AC_PROG_YACC
 AC_PROG_SED
 AC_PROG_AWK
 AC_PROG_GREP
+AC_PROG_INSTALL
+
+AC_LANG([C++])
+#AX_CXX_COMPILE_STDCXX_11(noext, mandatory)
+
 AC_CHECK_PROG(ac_cv_prog_python3, python3, yes)
 LT_INIT
 
@@ -50,6 +55,8 @@ AC_CHECK_HEADERS([dbus/dbus.h])
 AC_CHECK_HEADERS([glib.h])
 AC_CHECK_HEADERS([json/json.h])
 AC_CHECK_HEADERS([cppunit/ui/text/TestRunner.h])
+AC_CHECK_HEADERS([libintl.h limits.h \
+netdb.h malloc.h stddef.h sys/ioctl.h  ])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_CHECK_HEADER_STDBOOL
@@ -58,6 +65,7 @@ AC_TYPE_OFF_T
 AC_TYPE_SIZE_T
 AC_TYPE_SSIZE_T
 
+AC_CHECK_TYPES([ptrdiff_t])
 #use --with-sysroot to set the cross-compile's rootfs
 AC_SUBST(with_sysroot)
 AC_SUBST(INCLUDES)
@@ -66,7 +74,25 @@ AC_SUBST(INCLUDES)
 AC_FUNC_ALLOCA
 AC_FUNC_LSTAT_FOLLOWS_SLASHED_SYMLINK
 AC_FUNC_REALLOC
-AC_CHECK_FUNCS([clock_gettime memmove ftruncate getcwd gettimeofday inet_ntoa memset realpath socket strerror strtol])
+AC_FUNC_ERROR_AT_LINE
+
+AC_FUNC_MALLOC
+AC_FUNC_STRTOD
+AC_PROG_RANLIB
+AC_CHECK_FUNCS([clock_gettime memmove ftruncate \
+getcwd gettimeofday inet_ntoa memset realpath \
+socket strerror strtol strcasecmp strchr strtoul \
+strtoull ])
+
+AC_TYPE_INT16_T 
+AC_TYPE_INT32_T 
+AC_TYPE_INT64_T 
+AC_TYPE_INT8_T
+AC_TYPE_MODE_T
+AC_TYPE_UINT16_T
+AC_TYPE_UINT32_T
+AC_TYPE_UINT64_T
+AC_TYPE_UINT8_T 
 
 AC_CONFIG_FILES([Makefile
                  Makefile.start

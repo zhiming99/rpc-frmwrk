@@ -122,7 +122,7 @@ class CSerialBase
              T >::type >
     gint32 SerialElem(
         BufPtr& pBuf, const T& val,
-        const char* szSignature )
+        const char* szSignature ) const
     { return Serialize( pBuf, val ); }
 
     template< typename T,
@@ -131,7 +131,7 @@ class CSerialBase
         typename T3 = T >
     gint32 SerialElem(
         BufPtr& pBuf, const T& val,
-        const char* szSignature )
+        const char* szSignature ) const
     { return SerializeArray( pBuf, val, szSignature ); }
 
     template< typename T,
@@ -141,7 +141,7 @@ class CSerialBase
         typename T4 = T >
     gint32 SerialElem(
         BufPtr& pBuf, const T& val,
-        const char* szSignature )
+        const char* szSignature ) const
     { return SerializeMap( pBuf, val, szSignature ); }
 
     template< typename T,
@@ -152,7 +152,7 @@ class CSerialBase
         typename T5 = T >
     gint32 SerialElem(
         BufPtr& pBuf, const T& val,
-        const char* szSignature )
+        const char* szSignature ) const
     { return SerialStruct( pBuf, val ); }
 
     template< typename T,
@@ -164,13 +164,13 @@ class CSerialBase
         typename T6 = T >
     gint32 SerialElem(
         BufPtr& pBuf, const T& val,
-        const char* szSignature )
+        const char* szSignature ) const
     { return val.Serialize( pBuf ); }
 
     template< typename T >
     gint32 SerializeArray(
         BufPtr& pBuf, T& val,
-        const char* szSignature )
+        const char* szSignature ) const
     {
         if( pBuf.IsEmpty() ||
             pBuf->empty() ||
@@ -229,7 +229,7 @@ class CSerialBase
     gint32 SerializeMap(
         BufPtr& pBuf,
         const std::map< key, val >& mapVals,
-        const char* szSignature )
+        const char* szSignature ) const
     {
         if( pBuf.IsEmpty() ||
             pBuf->empty() ||
@@ -292,7 +292,7 @@ class CSerialBase
 
     template< typename T >
     gint32 SerialStruct(
-        BufPtr& pBuf, const T& val )
+        BufPtr& pBuf, const T& val ) const
     {
         return val.Serialize( pBuf );
     }
