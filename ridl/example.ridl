@@ -89,8 +89,8 @@ service SimpFileSvc [
     ssl, websock, compress,
     auth ]
 {
-    // interface ITinyInterface;
+    interface ITinyInterface;
     interface IEchoThings;
-    // interface IFileTransfer;
+    interface IFileTransfer;
     interface IChat;
 };

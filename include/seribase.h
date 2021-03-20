@@ -23,12 +23,13 @@
  */
 #pragma once
 #include "rpc.h"
-#include "proxy.h"
 #include <vector>
 #include <map>
 
 #define DATATYPE_COMP_MASK 0x300UL
 #define MAX_ELEM_COUNT  1000000
+namespace rpcfrmwrk
+{
 
 enum EnumContType : guint32
 {
@@ -57,6 +58,10 @@ struct is_map< std::map< key, T, Compare, Alloc > >{
     static const bool value = true;
 };
 
+struct HSTREAM_BASE
+{
+};
+
 struct CContCtx
 {
     EnumContType m_iContType = typeArray;
@@ -78,15 +83,6 @@ struct CContCtx
     }
 };
 
-struct HSTREAM
-{
-    HANDLE m_hStream = INVALID_HANDLE;
-    guint64 m_qwStmHash = 0;
-    CRpcServices* m_pIf = nullptr;
-    gint32 Serialize( BufPtr& pBuf ) const;
-    gint32 Deserialize( BufPtr& );
-};
-
 class CSerialBase
 {
     public:
@@ -94,7 +90,7 @@ class CSerialBase
     {}
 
     template< typename T >
-    inline gint32 Serialize(
+    gint32 Serialize(
         BufPtr& pBuf, const T& val ) const
     { return -ENOTSUP; }
 
@@ -157,7 +153,7 @@ class CSerialBase
 
     template< typename T,
         typename T2=typename std::enable_if<
-            std::is_same<HSTREAM, T>::value, T >::type,
+            std::is_base_of<HSTREAM_BASE, T>::value, T >::type,
         typename T3 = T,
         typename T4 = T,
         typename T5 = T,
@@ -351,7 +347,7 @@ class CSerialBase
 
     template< typename T,
         typename T2=typename std::enable_if<
-            std::is_same<HSTREAM, T>::value, T >::type,
+            std::is_same<HSTREAM_BASE, T>::value, T >::type,
         typename T3 = T,
         typename T4 = T,
         typename T5 = T,
@@ -536,201 +532,6 @@ do{ \
     ( pBuf_ )->SetOffset( dwOffset + size_ ); \
 }while( 0 )
 
-template<>
-inline gint32 CSerialBase::Serialize< gint16 >(
-    BufPtr& pBuf, const gint16& val ) const
-{
-    if( pBuf.IsEmpty() )
-        return -EINVAL;
-    guint16 iVal = htons( ( guint16 )val );
-    APPEND( pBuf, &iVal, sizeof( val ) );
-    return STATUS_SUCCESS;
-}
-
-template<>
-inline gint32 CSerialBase::Serialize< guint16 >(
-    BufPtr& pBuf, const guint16& val ) const
-{
-    if( pBuf.IsEmpty() )
-        return -EINVAL;
-    guint16 iVal = htons( val );
-    APPEND( pBuf, &iVal, sizeof( val ) );
-    return STATUS_SUCCESS;
-}
-
-template<>
-inline gint32 CSerialBase::Serialize< gint32 >(
-    BufPtr& pBuf, const gint32& val ) const
-{
-    if( pBuf.IsEmpty() )
-        return -EINVAL;
-    guint32 iVal = htonl( ( guint32 )val );
-    APPEND( pBuf, &iVal, sizeof( val ) );
-    return STATUS_SUCCESS;
-}
-
-template<>
-inline gint32 CSerialBase::Serialize< guint32 >(
-    BufPtr& pBuf, const guint32& val ) const
-{
-    if( pBuf.IsEmpty() )
-        return -EINVAL;
-    guint32 iVal = htonl( val );
-    APPEND( pBuf, &iVal, sizeof( val ) );
-    return STATUS_SUCCESS;
-}
-
-template<>
-inline gint32 CSerialBase::Serialize< gint64 >(
-    BufPtr& pBuf, const gint64& val ) const
-{
-    if( pBuf.IsEmpty() )
-        return -EINVAL;
-    guint64 iVal = htonll( ( guint64& )val );
-    APPEND( pBuf, &iVal, sizeof( val ) );
-    return STATUS_SUCCESS;
-}
-
-template<>
-inline gint32 CSerialBase::Serialize< guint64 >(
-    BufPtr& pBuf, const guint64& val ) const
-{
-    if( pBuf.IsEmpty() )
-        return -EINVAL;
-    guint64 iVal = htonll( val );
-    APPEND( pBuf, &iVal, sizeof( val ) );
-    return STATUS_SUCCESS;
-}
-
-template<>
-inline gint32 CSerialBase::Serialize< float >(
-    BufPtr& pBuf, const float& val ) const
-{
-    if( pBuf.IsEmpty() )
-        return -EINVAL;
-    guint32* pval = ( guint32* )&val;
-    guint32 iVal = htonll( *pval );
-    APPEND( pBuf, &iVal, sizeof( val ) );
-    return STATUS_SUCCESS;
-}
-
-template<>
-inline gint32 CSerialBase::Serialize< double >(
-    BufPtr& pBuf, const double& val ) const
-{
-    if( pBuf.IsEmpty() )
-        return -EINVAL;
-    guint64* pval = ( guint64* )&val;
-    guint64 iVal = htonll( *pval );
-    APPEND( pBuf, &iVal, sizeof( val ) );
-    return STATUS_SUCCESS;
-}
-
-template<>
-inline gint32 CSerialBase::Serialize< bool >(
-    BufPtr& pBuf, const bool& val ) const
-{
-    if( pBuf.IsEmpty() )
-        return -EINVAL;
-    APPEND( pBuf, &val, sizeof( val ) );
-    return STATUS_SUCCESS;
-}
-
-template<>
-inline gint32 CSerialBase::Serialize< guint8 >(
-    BufPtr& pBuf, const guint8& val ) const
-{
-    if( pBuf.IsEmpty() )
-        return -EINVAL;
-    APPEND( pBuf, &val, sizeof( val ) );
-    return STATUS_SUCCESS;
-}
-
-template<>
-inline gint32 CSerialBase::Serialize< char >(
-    BufPtr& pBuf, const char& val ) const
-{
-    if( pBuf.IsEmpty() )
-        return -EINVAL;
-    APPEND( pBuf, &val, sizeof( val ) );
-    return STATUS_SUCCESS;
-}
-
-template<>
-inline gint32 CSerialBase::Serialize< std::string >(
-    BufPtr& pBuf, const std::string& val ) const
-{
-    if( pBuf.IsEmpty() )
-        return -EINVAL;
-    guint32 i = val.size();
-    if( i >= MAX_BYTES_PER_BUFFER )
-        return -ERANGE;
-    Serialize( pBuf, i );
-    if( i > 0 )
-        APPEND( pBuf, val.c_str(), i );
-    return STATUS_SUCCESS;
-}
-
-template<>
-inline gint32 CSerialBase::Serialize< ObjPtr >(
-    BufPtr& pBuf, const ObjPtr& val ) const
-{
-    if( pBuf.IsEmpty() )
-        return -EINVAL;
-
-    if( val.IsEmpty() )
-    {
-        // protoSeriNone
-        // clsid
-        Serialize( pBuf,
-            ( guint32 )clsid( Invalid ) );
-        // size
-        Serialize( pBuf, 0 );
-        // version
-        Serialize( pBuf, 1 );
-        return STATUS_SUCCESS;
-    }
-
-    BufPtr pNewBuf( true );
-    gint32 ret = val->Serialize( *pNewBuf );
-    if( ERROR( ret ) )
-        return ret;
-
-    guint32 i = pNewBuf->size();
-    if( i >= MAX_BYTES_PER_BUFFER )
-        return -ERANGE;
-
-    APPEND( pBuf, pNewBuf->ptr(),
-        pNewBuf->size() );
-
-    return STATUS_SUCCESS;
-}
-
-// bytearray
-template<>
-inline gint32 CSerialBase::Serialize< BufPtr >(
-    BufPtr& pBuf, const BufPtr& val ) const
-{
-    if( pBuf.IsEmpty() )
-        return -EINVAL;
-
-    guint32 i = 0;
-    if( val.IsEmpty() )
-        i = 0;
-    else
-        i = val->size();
-
-    if( i >= MAX_BYTES_PER_BUFFER )
-        return -ERANGE;
-
-    // append the size
-    this->Serialize( pBuf, i );
-    if( i == 0 )
-        return STATUS_SUCCESS;
-
-    APPEND( pBuf, val->ptr(), val->size() );
-    return STATUS_SUCCESS;
-}
 
 template<>
 gint32 CSerialBase::Deserialize< bool >(
@@ -791,3 +592,5 @@ gint32 CSerialBase::Deserialize< ObjPtr >(
 template<>
 gint32 CSerialBase::Deserialize< BufPtr >(
     BufPtr& pBuf, BufPtr& val );
+
+}

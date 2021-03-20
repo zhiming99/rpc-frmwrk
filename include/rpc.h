@@ -36,3 +36,4 @@
 #include "buffer.h"
 #include "configdb.h"
 #include "dmsgptr.h"
+#include "seribase.h"

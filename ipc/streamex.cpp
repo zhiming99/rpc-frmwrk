@@ -1758,4 +1758,94 @@ HANDLE CStreamProxySync::GetChanByIdHash(
     return INVALID_HANDLE;
 }
 
+gint32 HSTREAM::Serialize( BufPtr& pBuf ) const
+{
+    if( pBuf.IsEmpty() )
+        return -EINVAL;
+
+    if( m_pIf == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    guint64 qwHash = 0;
+
+    if( m_pIf->IsServer() )
+    {
+        IStream* pStm =
+            dynamic_cast< IStream* >( m_pIf );
+        if( pStm == nullptr )
+            return -EFAULT;
+
+        InterfPtr pIf;
+        ret = pStm->GetUxStream( m_hStream, pIf );
+        if( ERROR( ret ) )
+            return ret;
+
+        guint64 qwId = pIf->GetObjId();
+        guint64 qwHash = 0;
+        ret = GetObjIdHash( qwId, qwHash );
+        if( ERROR( ret ) )
+            return ret;
+    }
+    else
+    {
+        CStreamProxySync* pStm =
+            dynamic_cast< CStreamProxySync* >
+                ( m_pIf );
+        if( pStm == nullptr )
+            return -EFAULT;
+
+        ret = pStm->GetPeerIdHash(
+            m_hStream, qwHash );
+        if( ERROR( ret ) )
+            return ret;
+    }
+    CSerialBase oSerial;
+    return oSerial.Serialize( pBuf, qwHash );
+}
+
+gint32 HSTREAM::Deserialize( BufPtr& pBuf )
+{
+    if( pBuf.IsEmpty() ) 
+        return -EINVAL;
+
+    if( m_pIf == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    guint64 qwHash = 0;
+    CSerialBase oSerial;
+    ret = oSerial.Deserialize( pBuf, qwHash );
+    if( ERROR( ret ) )
+        return ret;
+
+    if( m_pIf->IsServer() )
+    {
+        CStreamServerSync* pStm =
+            dynamic_cast< CStreamServerSync* >
+                ( m_pIf );
+        if( pStm == nullptr )
+            return -EFAULT;
+
+        m_hStream = pStm->
+            GetChanByIdHash( qwHash );
+        if( m_hStream == INVALID_HANDLE )
+            return -ENOENT;
+    }
+    else
+    {
+        CStreamProxySync* pStm =
+            dynamic_cast< CStreamProxySync* >
+                ( m_pIf );
+        if( pStm == nullptr )
+            return -EFAULT;
+
+        m_hStream = pStm->
+            GetChanByIdHash( qwHash );
+        if( m_hStream == INVALID_HANDLE )
+            return -ENOENT;
+    }
+    return STATUS_SUCCESS;
+}
+
 }

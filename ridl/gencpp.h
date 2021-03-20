@@ -242,7 +242,6 @@ class CHeaderPrologue
         Wa( "#include <string>" );
         Wa( "#include \"rpc.h\"" );
         Wa( "#include \"ifhelper.h\"" );
-        Wa( "#include \"seribase.h\"" );
         if( m_pStmts->IsStreamNeeded() )
         {
             Wa( "#include \"streamex.h\"" );

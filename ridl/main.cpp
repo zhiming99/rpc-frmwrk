@@ -82,14 +82,14 @@ void Usage()
         "times\n" );
 
     printf( "\t-O:\tTo specify the path for\n"
-        "the output files. 'output' is the \n"
-        "default path if not specified\n" );
+        "\t\tthe output files. 'output' is the \n"
+        "\t\tdefault path if not specified\n" );
 
     printf( "\t-o:\tTo specify the file name as\n"
-        " the base of the target image. That is,\n"
-        " the <name>cli for client and <name>svr\n"
-        " for server. If not specified, the\n"
-        " 'appname' from the ridl will be used\n" );
+        "\t\tthe base of the target image. That is,\n"
+        "\t\tthe <name>cli for client and <name>svr\n"
+        "\t\tfor server. If not specified, the\n"
+        "\t\t'appname' from the ridl will be used\n" );
 }
 
 static std::string g_strOutPath = "output";

@@ -1294,17 +1294,17 @@ struct CStatements : public CAstListNode
 
     bool IsStreamNeeded()
     {
-        std::vector< ObjPtr > vecIfs;
-        gint32 ret = GetIfDecls( vecIfs );
+        std::vector< ObjPtr > vecSvcs;
+        gint32 ret = GetSvcDecls( vecSvcs );
         if( ERROR( ret ) )
             return false;
 
-        for( auto& elem : vecIfs )
+        for( auto& elem : vecSvcs )
         {
-            CInterfaceDecl* pIfDecl = elem;
-            if( pIfDecl == nullptr )
+            CServiceDecl* psd = elem;
+            if( psd == nullptr )
                 continue;
-            if( pIfDecl->IsStream() )
+            if( psd->IsStream() )
                 return true;
         }
         return false;

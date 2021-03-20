@@ -29,6 +29,7 @@
 #include <exception>
 #include <sys/eventfd.h>
 #include <fcntl.h>
+#include "seribase.h"
 
 namespace rpcfrmwrk
 {
@@ -2171,6 +2172,15 @@ class CStreamServerAsync :
 
     gint32 OnStart_Loop()
     { return -ENOTSUP; }
+};
+
+struct HSTREAM : public HSTREAM_BASE
+{
+    HANDLE m_hStream = INVALID_HANDLE;
+    guint64 m_qwStmHash = 0;
+    CRpcServices* m_pIf = nullptr;
+    gint32 Serialize( BufPtr& pBuf ) const;
+    gint32 Deserialize( BufPtr& );
 };
 
 }

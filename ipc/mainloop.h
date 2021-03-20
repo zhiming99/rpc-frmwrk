@@ -354,6 +354,6 @@ namespace rpcfrmwrk
 typedef  CMainIoLoopT< CEvLoop > CMainIoLoop;
 }
 #else
-#error _USE_LIBDEV is not defined
+#error _USE_LIBEV is not defined
 #endif
 

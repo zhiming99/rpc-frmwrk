@@ -2,15 +2,17 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.69])
-AC_INIT([rpc-frmwrk],[0.1],[woodhead99@gmail.com])
-AC_CONFIG_SRCDIR([ipc/rpcif.cpp])
-AC_CONFIG_HEADERS([config.h])
+AC_INIT([rpcfrmwrk],[0.1],[woodhead99@gmail.com])
+AC_CONFIG_SRCDIR([ipc/rpcif.cpp]) AC_CONFIG_HEADERS([config.h])
 AC_CANONICAL_TARGET
 
 AC_CONFIG_MACRO_DIRS([m4])
 AC_CONFIG_AUX_DIR([.])
 
 AM_INIT_AUTOMAKE([foreign])
+
+: ${CXXFLAGS=""}
+: ${CFLAGS=""}
 # Checks for programs.
 AC_PROG_CXX
 AC_PROG_CC
@@ -24,7 +26,7 @@ AC_PROG_GREP
 AC_PROG_INSTALL
 
 AC_LANG([C++])
-#AX_CXX_COMPILE_STDCXX_11(noext, mandatory)
+#AX_CXX_COMPILE_STDCXX(11,[noext], [mandatory])
 
 AC_CHECK_PROG(ac_cv_prog_python3, python3, yes)
 LT_INIT
@@ -93,6 +95,8 @@ AC_TYPE_UINT16_T
 AC_TYPE_UINT32_T
 AC_TYPE_UINT64_T
 AC_TYPE_UINT8_T 
+
+AC_DEFINE(_USE_LIBEV, 1, [using built-in event loop])
 
 AC_CONFIG_FILES([Makefile
                  Makefile.start

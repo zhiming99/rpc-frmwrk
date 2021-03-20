@@ -21,30 +21,205 @@
  *
  * =====================================================================================
  */
-#include <rpc.h>
+#include "rpc.h"
+namespace rpcfrmwrk
+{
 
-using namespace rpcfrmwrk;
-#include "ridlc.h"
-#include "streamex.h"
-#include "seribase.h"
+template<>
+gint32 CSerialBase::Serialize< gint16 >(
+    BufPtr& pBuf, const gint16& val ) const
+{
+    if( pBuf.IsEmpty() )
+        return -EINVAL;
+    guint16 iVal = htons( ( guint16 )val );
+    APPEND( pBuf, &iVal, sizeof( val ) );
+    return STATUS_SUCCESS;
+}
 
-std::map< gint32, char > g_mapTypeSig = {
-    { TOK_UINT64, 'Q' },
-    { TOK_INT64, 'q' },
-    { TOK_UINT32, 'D' },
-    { TOK_INT32, 'd' },
-    { TOK_UINT16, 'W' },
-    { TOK_INT16, 'w' },
-    { TOK_FLOAT, 'f' },
-    { TOK_DOUBLE, 'F' },
-    { TOK_BOOL, 'b' },
-    { TOK_BYTE, 'B' },
-    { TOK_HSTREAM, 'h' },
-    { TOK_STRING, 's' },
-    { TOK_BYTEARR, 'a' },
-    { TOK_OBJPTR, 'o' },
-    { TOK_STRUCT, 'O' }
-};
+template<>
+gint32 CSerialBase::Serialize< guint16 >(
+    BufPtr& pBuf, const guint16& val ) const
+{
+    if( pBuf.IsEmpty() )
+        return -EINVAL;
+    guint16 iVal = htons( val );
+    APPEND( pBuf, &iVal, sizeof( val ) );
+    return STATUS_SUCCESS;
+}
+
+template<>
+gint32 CSerialBase::Serialize< gint32 >(
+    BufPtr& pBuf, const gint32& val ) const
+{
+    if( pBuf.IsEmpty() )
+        return -EINVAL;
+    guint32 iVal = htonl( ( guint32 )val );
+    APPEND( pBuf, &iVal, sizeof( val ) );
+    return STATUS_SUCCESS;
+}
+
+template<>
+gint32 CSerialBase::Serialize< guint32 >(
+    BufPtr& pBuf, const guint32& val ) const
+{
+    if( pBuf.IsEmpty() )
+        return -EINVAL;
+    guint32 iVal = htonl( val );
+    APPEND( pBuf, &iVal, sizeof( val ) );
+    return STATUS_SUCCESS;
+}
+
+template<>
+gint32 CSerialBase::Serialize< gint64 >(
+    BufPtr& pBuf, const gint64& val ) const
+{
+    if( pBuf.IsEmpty() )
+        return -EINVAL;
+    guint64 iVal = htonll( ( guint64& )val );
+    APPEND( pBuf, &iVal, sizeof( val ) );
+    return STATUS_SUCCESS;
+}
+
+template<>
+gint32 CSerialBase::Serialize< guint64 >(
+    BufPtr& pBuf, const guint64& val ) const
+{
+    if( pBuf.IsEmpty() )
+        return -EINVAL;
+    guint64 iVal = htonll( val );
+    APPEND( pBuf, &iVal, sizeof( val ) );
+    return STATUS_SUCCESS;
+}
+
+template<>
+gint32 CSerialBase::Serialize< float >(
+    BufPtr& pBuf, const float& val ) const
+{
+    if( pBuf.IsEmpty() )
+        return -EINVAL;
+    guint32* pval = ( guint32* )&val;
+    guint32 iVal = htonll( *pval );
+    APPEND( pBuf, &iVal, sizeof( val ) );
+    return STATUS_SUCCESS;
+}
+
+template<>
+gint32 CSerialBase::Serialize< double >(
+    BufPtr& pBuf, const double& val ) const
+{
+    if( pBuf.IsEmpty() )
+        return -EINVAL;
+    guint64* pval = ( guint64* )&val;
+    guint64 iVal = htonll( *pval );
+    APPEND( pBuf, &iVal, sizeof( val ) );
+    return STATUS_SUCCESS;
+}
+
+template<>
+gint32 CSerialBase::Serialize< bool >(
+    BufPtr& pBuf, const bool& val ) const
+{
+    if( pBuf.IsEmpty() )
+        return -EINVAL;
+    APPEND( pBuf, &val, sizeof( val ) );
+    return STATUS_SUCCESS;
+}
+
+template<>
+gint32 CSerialBase::Serialize< guint8 >(
+    BufPtr& pBuf, const guint8& val ) const
+{
+    if( pBuf.IsEmpty() )
+        return -EINVAL;
+    APPEND( pBuf, &val, sizeof( val ) );
+    return STATUS_SUCCESS;
+}
+
+template<>
+gint32 CSerialBase::Serialize< char >(
+    BufPtr& pBuf, const char& val ) const
+{
+    if( pBuf.IsEmpty() )
+        return -EINVAL;
+    APPEND( pBuf, &val, sizeof( val ) );
+    return STATUS_SUCCESS;
+}
+
+template<>
+gint32 CSerialBase::Serialize< std::string >(
+    BufPtr& pBuf, const std::string& val ) const
+{
+    if( pBuf.IsEmpty() )
+        return -EINVAL;
+    guint32 i = val.size();
+    if( i >= MAX_BYTES_PER_BUFFER )
+        return -ERANGE;
+    Serialize( pBuf, i );
+    if( i > 0 )
+        APPEND( pBuf, val.c_str(), i );
+    return STATUS_SUCCESS;
+}
+
+template<>
+gint32 CSerialBase::Serialize< ObjPtr >(
+    BufPtr& pBuf, const ObjPtr& val ) const
+{
+    if( pBuf.IsEmpty() )
+        return -EINVAL;
+
+    if( val.IsEmpty() )
+    {
+        // protoSeriNone
+        // clsid
+        Serialize( pBuf,
+            ( guint32 )clsid( Invalid ) );
+        // size
+        Serialize( pBuf, 0 );
+        // version
+        Serialize( pBuf, 1 );
+        return STATUS_SUCCESS;
+    }
+
+    BufPtr pNewBuf( true );
+    gint32 ret = val->Serialize( *pNewBuf );
+    if( ERROR( ret ) )
+        return ret;
+
+    guint32 i = pNewBuf->size();
+    if( i >= MAX_BYTES_PER_BUFFER )
+        return -ERANGE;
+
+    APPEND( pBuf, pNewBuf->ptr(),
+        pNewBuf->size() );
+
+    return STATUS_SUCCESS;
+}
+
+// bytearray
+template<>
+gint32 CSerialBase::Serialize< BufPtr >(
+    BufPtr& pBuf, const BufPtr& val ) const
+{
+    if( pBuf.IsEmpty() )
+        return -EINVAL;
+
+    guint32 i = 0;
+    if( val.IsEmpty() )
+        i = 0;
+    else
+        i = val->size();
+
+    if( i >= MAX_BYTES_PER_BUFFER )
+        return -ERANGE;
+
+    // append the size
+    this->Serialize( pBuf, i );
+    if( i == 0 )
+        return STATUS_SUCCESS;
+
+    APPEND( pBuf, val->ptr(), val->size() );
+    return STATUS_SUCCESS;
+}
 
 template<>
 gint32 CSerialBase::Deserialize< bool >(
@@ -301,92 +476,4 @@ gint32 CSerialBase::Deserialize< BufPtr >(
     return STATUS_SUCCESS;
 }
 
-gint32 HSTREAM::Serialize( BufPtr& pBuf ) const
-{
-    if( pBuf.IsEmpty() )
-        return -EINVAL;
-
-    if( m_pIf == nullptr )
-        return -EINVAL;
-
-    gint32 ret = 0;
-    guint64 qwHash = 0;
-
-    if( m_pIf->IsServer() )
-    {
-        IStream* pStm =
-            dynamic_cast< IStream* >( m_pIf );
-        if( pStm == nullptr )
-            return -EFAULT;
-
-        InterfPtr pIf;
-        ret = pStm->GetUxStream( m_hStream, pIf );
-        if( ERROR( ret ) )
-            return ret;
-
-        guint64 qwId = pIf->GetObjId();
-        guint64 qwHash = 0;
-        ret = GetObjIdHash( qwId, qwHash );
-        if( ERROR( ret ) )
-            return ret;
-    }
-    else
-    {
-        CStreamProxySync* pStm =
-            dynamic_cast< CStreamProxySync* >
-                ( m_pIf );
-        if( pStm == nullptr )
-            return -EFAULT;
-
-        ret = pStm->GetPeerIdHash(
-            m_hStream, qwHash );
-        if( ERROR( ret ) )
-            return ret;
-    }
-    CSerialBase oSerial;
-    return oSerial.Serialize( pBuf, qwHash );
-}
-
-gint32 HSTREAM::Deserialize( BufPtr& pBuf )
-{
-    if( pBuf.IsEmpty() ) 
-        return -EINVAL;
-
-    if( m_pIf == nullptr )
-        return -EINVAL;
-
-    gint32 ret = 0;
-    guint64 qwHash = 0;
-    CSerialBase oSerial;
-    ret = oSerial.Deserialize( pBuf, qwHash );
-    if( ERROR( ret ) )
-        return ret;
-
-    if( m_pIf->IsServer() )
-    {
-        CStreamServerSync* pStm =
-            dynamic_cast< CStreamServerSync* >
-                ( m_pIf );
-        if( pStm == nullptr )
-            return -EFAULT;
-
-        m_hStream = pStm->
-            GetChanByIdHash( qwHash );
-        if( m_hStream == INVALID_HANDLE )
-            return -ENOENT;
-    }
-    else
-    {
-        CStreamProxySync* pStm =
-            dynamic_cast< CStreamProxySync* >
-                ( m_pIf );
-        if( pStm == nullptr )
-            return -EFAULT;
-
-        m_hStream = pStm->
-            GetChanByIdHash( qwHash );
-        if( m_hStream == INVALID_HANDLE )
-            return -ENOENT;
-    }
-    return STATUS_SUCCESS;
 }

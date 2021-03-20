@@ -30,6 +30,25 @@ using namespace rpcfrmwrk;
 
 extern std::string g_strAppName;
 
+std::map< gint32, char > g_mapTypeSig =
+{
+    { TOK_UINT64, 'Q' },
+    { TOK_INT64, 'q' },
+    { TOK_UINT32, 'D' },
+    { TOK_INT32, 'd' },
+    { TOK_UINT16, 'W' },
+    { TOK_INT16, 'w' },
+    { TOK_FLOAT, 'f' },
+    { TOK_DOUBLE, 'F' },
+    { TOK_BOOL, 'b' },
+    { TOK_BYTE, 'B' },
+    { TOK_HSTREAM, 'h' },
+    { TOK_STRING, 's' },
+    { TOK_BYTEARR, 'a' },
+    { TOK_OBJPTR, 'o' },
+    { TOK_STRUCT, 'O' }
+};
+
 gint32 CArgListUtils::GetArgCount(
     ObjPtr& pArgs ) const
 {
@@ -1027,9 +1046,11 @@ gint32 GenCppFile(
         Wa( "// This file content could be rewritten by ridlc" );
         Wa( "#include \"rpc.h\"" );
         Wa( "#include \"iftasks.h\"" );
+
+        if( pStmts->IsStreamNeeded() )
+            Wa( "#include \"streamex.h\"" );
+
         Wa( "using namespace rpcfrmwrk;" );
-        CCOUT << "#include \"seribase.h\"";
-        NEW_LINE;
         CCOUT << "#include \"" << strName << ".h\"";
         NEW_LINE;
         std::vector< ObjPtr > vecSvcs;
@@ -1163,7 +1184,8 @@ gint32 GenCppProj(
         {
             std::string strCmd = "mkdir -p ";
             strCmd += strOutPath;
-            system( strCmd.c_str() );
+            ret = system( strCmd.c_str() );
+            ret = 0;
         }
         else
         {
@@ -2235,8 +2257,13 @@ gint32 CDeclInterfSvr::OutputAsync(
         CCOUT << "virtual gint32 "
             << "On" << strName << "Canceled(";
         INDENT_UPL;
-        CCOUT << "gint32 iRet,";
-        GenFormInArgs( pInArgs );
+        CCOUT << "gint32 iRet";
+        if( dwInCount > 0 )
+        {
+            CCOUT << ",";
+            NEW_LINE;
+            GenFormInArgs( pInArgs );
+        }
         CCOUT << " ) = 0;";
         INDENT_DOWNL;
         NEW_LINE;
@@ -4913,11 +4940,15 @@ gint32 CImplIfMethodSvr::OutputAsyncNonSerial()
         CCOUT << "&" << strClass << "::"
             << strMethod << "CancelWrapper,";
         NEW_LINE;
-        CCOUT << "pCallback, 0,";
-        NEW_LINE;
-        ret = GenActParams( pInArgs );
-        if( ERROR( ret ) )
-            break;
+        CCOUT << "pCallback, 0";
+        if( dwInCount > 0 )
+        {
+            CCOUT << ",";
+            NEW_LINE;
+            ret = GenActParams( pInArgs );
+            if( ERROR( ret ) )
+                break;
+        }
         CCOUT << " );";
         INDENT_DOWNL;
         NEW_LINE;
@@ -4926,15 +4957,17 @@ gint32 CImplIfMethodSvr::OutputAsyncNonSerial()
 
         // call the user's handler
         CCOUT << "ret = "
-            << strMethod << "( pNewCb,";
+            << strMethod << "( pNewCb";
 
-        INDENT_UPL;
-
-        GenActParams( pInArgs, pOutArgs );
-
+        if( dwInCount + dwOutCount > 0 )
+        {
+            CCOUT << ",";
+            INDENT_UPL;
+            GenActParams( pInArgs, pOutArgs );
+            INDENT_DOWN;
+        }
         CCOUT << " );";
-        INDENT_DOWNL;
-        NEW_LINE;
+        NEW_LINES( 2 );
         Wa( "if( ret == STATUS_PENDING ) break;" );
         NEW_LINE;
         Wa( "CParamList oResp_;" );

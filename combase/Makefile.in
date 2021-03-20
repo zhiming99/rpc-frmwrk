@@ -9,6 +9,7 @@ SOURCES:= clsids.cpp autoptr.cpp buffer.cpp \
 	dbuserr.cpp \
 	objfctry.cpp \
 	dmsgptr.cpp \
+    seribase.cpp \
 
 OBJS:=$(SOURCES:%.cpp=$(OBJ_DIR)/%.o)
 
