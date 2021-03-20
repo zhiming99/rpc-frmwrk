@@ -1,26 +1,5 @@
-include ../Makefile.init.pub
-
-TARGET_IMG:=ridlc
-
-C_INCLUDE += -I$(BASE)/ipc
-
-TARGET:=$(OUTPUT_DIR)/$(TARGET_IMG)
-RIDLC_OBJ:= ridlc.o
-
-BISON_SRC:= ridlc.cpp
-SOURCES:=$(BISON_SRC) lexer.cpp seribase.cpp gencpp.cpp astnode.cpp main.cpp
-OBJS2:=$(SOURCES:%.cpp=$(OBJ_DIR)/%.o)
-
-all: $(TARGET)
-debug: $(TARGET)
-release: $(TARGET)
-
-clean: debug_clean release_clean
-
-debug_clean: do_clean
-release_clean: do_clean
-
-$(TARGET):$(OBJS2)
+ridlc_PROGRAMS=ridlc
+ridlc_SOURCES=ridlc.cpp lexer.cpp gencpp.cpp astnode.cpp main.cpp
 
 lexer.cpp: ridlc.lex ridlc.h
 	flex ridlc.lex
@@ -28,17 +7,18 @@ lexer.cpp: ridlc.lex ridlc.h
 ridlc.cpp: ridlc.y
 	bison --defines=ridlc.h --output=ridlc.cpp -r all ridlc.y
 
-do_clean:
-	-@rm ridlc.cpp ridlc.h lexer.cpp lexer.h
-	-@rm $(OBJ_DIR)/*.d $(MUTE_CLEAN)
-	-@rm $(OUTPUT_DIR)/$(TARGET_IMG) $(MUTE_CLEAN)
-	-@rm $(SOURCES:%.cpp=$(OBJ_DIR)/%.o) $(MUTE_CLEAN)
-	-@rm $(OBJ_DIR)/$(RIDLC_OBJ) $(MUTE_CLEAN)
+ridlc_LDADD=-lipc -lcombase -lutils -lstdc++ -L$(top_srcdir)/debug64
+ridlcdir=./
 
--include $(OBJS2:%.o=%.d)
+dbus_INCFLAGS=`pkg-config --cflags dbus-1 jsoncpp`
+ridlc_CXXFLAGS=$(dbus_INCFLAGS) -D_USE_LIBEV=1 -O0 -g -ggdb
+ridlc_HEADERS=gencpp.h astnode.h idlclsid.h
 
-$(OUTPUT_DIR)/$(TARGET_IMG) : $(OBJS2)
-	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
-	$(CC) -o $@ $(OBJS2) -lipc -lcombase -lutils $(LINKER_OPTION) -L$(OUTPUT_DIR) -ldl
+include_rpcdir=$(top_srcdir)/include
+include_comdir=$(top_srcdir)/combase
+include_ipcdir=$(top_srcdir)/ipc
+include_ridlcdir=$(top_srcdir)/ridlc
 
-.PHONY: sync TARGET clean debug_clean release_clean do_clean
+link_dir=-L$(top_srcdir)/debug64/
+ridlc_CPPFLAGS= -I$(include_rpcdir) -I$(include_ipcdir) -I$(top_srcdir)/3rd_party/
+
