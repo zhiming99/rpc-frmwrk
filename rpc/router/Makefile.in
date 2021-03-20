@@ -1,4 +1,4 @@
-include ../Makefile.init.pub
+include ../../Makefile.init.pub
 
 TARGET_IMG:=rpcrouter
 
@@ -15,9 +15,14 @@ release: $(TARGET) link_json
 debug_clean: do_clean
 release_clean: do_clean
 
+C_INCLUDE += -I$(BASE)/ipc \
+	-I$(BASE)/rpc \
+
+LINKER_OPTION := -L$(OUTPUT_DIR) -lrpc -lipc -lcombase $(WIDTH_FLAG) -L$(USER_LIB_PREFIX) -L$(LIB_PREFIX) -Wl,-rpath=$(USER_LIB_PREFIX) -Wl,-rpath=$(LIB_PREFIX) -ldbus-1 -lcppunit -ljsoncpp -lstdc++ -ldl -lpthread
+
 link_json:
-	@if [ ! -e $(OUTPUT_DIR)/router.json ]; then cd $(OUTPUT_DIR);ln -s ../router/router.json;cd -;fi
-	@if [ ! -e $(OUTPUT_DIR)/rtauth.json ]; then cd $(OUTPUT_DIR);ln -s ../router/rtauth.json;cd -;fi
+	@if [ ! -e $(OUTPUT_DIR)/router.json ]; then cd $(OUTPUT_DIR);ln -s ../rpc/router/router.json;cd -;fi
+	@if [ ! -e $(OUTPUT_DIR)/rtauth.json ]; then cd $(OUTPUT_DIR);ln -s ../rpc/router/rtauth.json;cd -;fi
 
 clean:
 	make debug_clean
@@ -34,8 +39,5 @@ do_clean:
 $(OUTPUT_DIR)/$(TARGET_IMG) : $(OBJ_DIR)/$(ROUTER_OBJ)
 	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
 	$(CC) -o $@ $(OBJ_DIR)/$(ROUTER_OBJ) $(LINKER_OPTION)
-	@mv $@ $(RPCLIB_DIR)
-	@ln -s $(RPCLIB_DIR)/$(TARGET_IMG) $(OUTPUT_DIR)/$(TARGET_IMG)
-    
 
 .PHONY: sync TARGET clean_objs debug_clean release_clean do_clean

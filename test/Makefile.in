@@ -23,7 +23,6 @@ debug:
 	$(MAKE) -C prtest
 	$(MAKE) -C sftest
 	$(MAKE) -C stmtest
-	$(MAKE) -C router
 	$(MAKE) -C btinrt
 
 release:
@@ -47,7 +46,6 @@ release:
 	$(MAKE) -C prtest release
 	$(MAKE) -C sftest release
 	$(MAKE) -C stmtest release
-	$(MAKE) -C router release
 	$(MAKE) -C btinrt release
 
 clean:
@@ -62,7 +60,6 @@ clean:
 	$(MAKE) -C prtest clean
 	$(MAKE) -C sftest clean
 	$(MAKE) -C stmtest clean
-	$(MAKE) -C router clean
 	$(MAKE) -C btinrt clean
 
 release_clean:
@@ -77,7 +74,6 @@ release_clean:
 	$(MAKE) -C prtest release_clean
 	$(MAKE) -C sftest release_clean
 	$(MAKE) -C stmtest release_clean
-	$(MAKE) -C router release_clean
 	$(MAKE) -C btinrt release_clean
 
 debug_clean:
@@ -92,7 +88,6 @@ debug_clean:
 	$(MAKE) -C prtest debug_clean
 	$(MAKE) -C sftest debug_clean
 	$(MAKE) -C stmtest debug_clean
-	$(MAKE) -C router debug_clean
 	$(MAKE) -C btinrt debug_clean
 
 .PHONY: release clean debug_clean debug

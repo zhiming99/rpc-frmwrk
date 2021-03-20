@@ -10,9 +10,9 @@ SOURCES:= ldbal.cpp dbusprxy.cpp prxyfdo.cpp fdodrv.cpp \
 
 OBJS:=$(SOURCES:%.cpp=$(OBJ_DIR)/%.o)
 
-all: $(OUTPUT_DIR)/$(TARGET) SSLPort WSPort Security
-debug: $(OUTPUT_DIR)/$(TARGET) SSLPort WSPort Security
-release: $(OUTPUT_DIR)/$(TARGET) SSLPort WSPort Security
+all: $(OUTPUT_DIR)/$(TARGET) SSLPort WSPort Security Router
+debug: $(OUTPUT_DIR)/$(TARGET) SSLPort WSPort Security Router
+release: $(OUTPUT_DIR)/$(TARGET) SSLPort WSPort Security Router
 
 $(OUTPUT_DIR)/$(TARGET) : $(OBJS)
 	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
@@ -26,6 +26,9 @@ WSPort:
 
 Security:
 	$(MAKE) -C ./security
+
+Router:
+	$(MAKE) -C ./router
 
 -include $(OBJS:%.o=%.d)
 
@@ -47,4 +50,4 @@ do_clean:
 sync:
 	bash ./sync-up.sh
 
-.PHONY: sync
+.PHONY: sync Security WSPort SSLPort

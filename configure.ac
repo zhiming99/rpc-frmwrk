@@ -108,6 +108,7 @@ AC_CONFIG_FILES([Makefile
                  rpc/wsport/Makefile
                  rpc/wsport/wsproto/Makefile
                  rpc/security/Makefile
+                 rpc/router/Makefile
                  ridl/Makefile
                  3rd_party/Makefile
                  python/Makefile
@@ -122,7 +123,6 @@ AC_CONFIG_FILES([Makefile
                  test/katest/Makefile
                  test/sftest/Makefile
                  test/stmtest/Makefile
-                 test/router/Makefile
                  test/iftest/Makefile
                  test/btinrt/Makefile
                  test/smoketest/Makefile])
