@@ -1,6 +1,4 @@
 all:
-
-debug:
 	@if [ ! -e pyproject.toml ]; then bash gentoml.sh;fi
 	sip-build --verbose
 
@@ -8,8 +6,4 @@ install:
 	@if [ ! -e pyproject.toml ]; then bash gentoml.sh;fi
 	sudo sip-install --verbose
 
-release:
-	@if [ ! -e pyproject.toml ]; then bash gentoml.sh;fi
-	sudo sip-install --verbose
-
-.PHONY: build debug release
+.PHONY: install

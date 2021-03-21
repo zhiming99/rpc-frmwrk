@@ -1,0 +1,30 @@
+lib_LTLIBRARIES=libipc.la
+
+libipc_la_SOURCES = \
+stream.cpp portex.cpp iftasks.cpp ifstat.cpp \
+rpcif.cpp sevpoll.cpp counters.cpp \
+connmgr.cpp filetran.cpp mainloop.cpp dllexp.cpp \
+evloop.cpp dbushook.cpp irp.cpp irpthread.cpp \
+port.cpp portstat.cpp drvmgr.cpp utils.cpp \
+iomgr.cpp ptifmap.cpp pnpmgr.cpp dbusdrv.cpp \
+dbusport.cpp portdrv.cpp rpcpdo.cpp dbuspdo.cpp \
+tasklets.cpp lpbkmtch.cpp ifhelper.cpp iiddict.cpp \
+reqopen.cpp uxport.cpp uxstream.cpp streamex.cpp
+
+include_dir=$(top_srcdir)/include
+
+libipc_la_HEADERS=  \
+connhelp.h counters.h dbusport.h emaphelp.h \
+evloop.h filetran.h frmwrk.h ifhelper.h \
+ifstat.h iftasks.h iiddict.h irp.h jsondef.h \
+mainloop.h msgmatch.h namespc.h port.h \
+portdrv.h portex.h reqopen.h sevpoll.h \
+stream.h streamex.h tasklets.h tractgrp.h \
+utils.h uxport.h uxstream.h
+
+libipc_la_DATA=driver.json
+
+libipc_ladir=./
+
+libipc_la_LDFLAGS=-version-info 0:0:0
+libipc_la_LIBADD= -L../combase -lcombase -lpthread -ldl -ljsoncpp

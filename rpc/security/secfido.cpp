@@ -808,7 +808,7 @@ gint32 CRpcSecFido::DecryptPkt(
     if( bEncExpected != bEncrypted )
     {
         ret = -EACCES;
-        break;
+        return ret;
     }
 #endif
 

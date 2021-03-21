@@ -1957,7 +1957,8 @@ gint32 AppendConnParams(
         if( ERROR( ret ) )
             break;
 
-        if( _DEBUG )
+#ifdef _DEBUG
+        if( true )
         {
             std::string strDump;
             gint32 iRet = BytesToString(
@@ -1970,6 +1971,7 @@ gint32 AppendConnParams(
             DebugPrint( 0, "buf to hash: \n",
                strDump.c_str() );
         }
+#endif
             
     }while( 0 );
         

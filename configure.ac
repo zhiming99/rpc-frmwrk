@@ -11,8 +11,8 @@ AC_CONFIG_AUX_DIR([.])
 
 AM_INIT_AUTOMAKE([foreign])
 
-: ${CXXFLAGS=""}
-: ${CFLAGS=""}
+#: ${CXXFLAGS=""}
+#: ${CFLAGS=""}
 # Checks for programs.
 AC_PROG_CXX
 AC_PROG_CC
@@ -70,7 +70,7 @@ AC_TYPE_SSIZE_T
 AC_CHECK_TYPES([ptrdiff_t])
 #use --with-sysroot to set the cross-compile's rootfs
 AC_SUBST(with_sysroot)
-AC_SUBST(INCLUDES)
+#AC_SUBST(INCLUDES)
 
 # Checks for library functions.
 AC_FUNC_ALLOCA
@@ -97,6 +97,10 @@ AC_TYPE_UINT64_T
 AC_TYPE_UINT8_T 
 
 AC_DEFINE(_USE_LIBEV, 1, [using built-in event loop])
+
+AC_SUBST( CXXFLAGS, '`pkg-config --cflags dbus-1 \
+jsoncpp cppunit` -D_USE_LIBEV=1 \
+-I$(top_srcdir)/include -I$(top_srcdir)/3rd_party' )
 
 AC_CONFIG_FILES([Makefile
                  Makefile.start
