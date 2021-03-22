@@ -1,0 +1,2 @@
+#!/bin/bash
+./configure "CPPFLAGS=-O0 -ggdb -D_USE_LIBEV -DDEBUG -D_DEBUG" --prefix=$(pwd)/../build
