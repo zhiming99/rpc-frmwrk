@@ -31,7 +31,7 @@ include_dir=$(top_srcdir)/include
 #    $(include_dir)/buffer.h \
 #    $(include_dir)/clsids.h
 
-rpcfcombasedir=$(includedir)/rpcf/include
+#rpcfcombasedir=$(includedir)/rpcf/include
 
 libcombase_ladir=$(libdir)
 

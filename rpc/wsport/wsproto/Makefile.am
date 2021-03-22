@@ -3,6 +3,7 @@ lib_LIBRARIES=libwsock.a
 libwsock_a_SOURCES = WebSocket.cpp
 libwsock_adir=./
 
+libwsock_a_CPPFLAGS  = -fPIC
 #libwsock_a_HEADERS= WebSocket.h
 #libwsock_a_DATA= README.md WSLic.txt
 
