@@ -8,9 +8,9 @@ ridlc.cpp: ridlc.y
 	bison --defines=ridlc.h --output=ridlc.cpp -r all ridlc.y
 
 ridlc_LDADD=-lipc -lcombase -lutils -lstdc++ -L../combase -L../ipc -L../3rd_party
-ridlcdir=./
+ridlcdir=$(bindir)
 
-ridlc_HEADERS=gencpp.h astnode.h idlclsid.h
+#ridlc_HEADERS=gencpp.h astnode.h idlclsid.h
 
 include_ipcdir=$(top_srcdir)/ipc
 include_ridlcdir=$(top_srcdir)/ridlc

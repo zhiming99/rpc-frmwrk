@@ -1,12 +1,14 @@
 rpcrouter_PROGRAMS=rpcrouter
 rpcrouter_SOURCES=routmain.cpp
-rpcrouter_DATA=Readme.txt router.json rtauth.json
 rpcrouter_LDADD=-lrpc -lipc -lcombase -lutils -lstdc++ -lcppunit \
 -L$(top_srcdir)/combase -L$(top_srcdir)/ipc -L$(top_srcdir)/rpc \
 -L$(top_srcdir)/3rd_party
 
-rpcrouter_HEADERS=routmain.h
-rpcrouterdir=./
+#rpcrouter_HEADERS=routmain.h
+
+rpcrouterconfdir= $(sysconfdir)/rpcf
+rpcrouterconf_DATA=router.json rtauth.json
+rpcrouterdir=$(bindir)
 
 link_dir=$(top_srcdir)/combase/
 
