@@ -1,7 +1,7 @@
 ridlc_PROGRAMS=ridlc
 ridlc_SOURCES=lexer.cpp ridlc.cpp gencpp.cpp astnode.cpp main.cpp
 
-lexer.cpp: ridlc.lex ridlc.h
+lexer.cpp: ridlc.lex ridlc.cpp
 	flex ridlc.lex
 
 ridlc.cpp: ridlc.y
