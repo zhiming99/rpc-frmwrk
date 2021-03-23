@@ -1,0 +1,25 @@
+include_ipcdir=$(top_srcdir)/ipc
+evtest_LDFLAGS=@TSTLDFLG@
+evtest_CPPFLAGS= -I$(include_ipcdir)
+
+lib_LTLIBRARIES=libevtst.la
+libevtst_la_SOURCES = evtsvr.cpp evtcli.cpp
+libevtst_la_LDFLAGS=-version-info 0:0:0
+libevtst_la_LIBADD= -lpthread -ldl
+libevtst_la_CPPFLAGS=$(evtest_CPPFLAGS)
+
+evtest_PROGRAMS=evtsvrtst evtclitst
+evtestdir=$(bindir)
+
+evtclitst_DATA=evtdesc.json
+evtclitstdir=$(sysconfdir)/rpcf
+
+evtclitst_SOURCES= evtest.cpp
+evtclitst_LDADD=$(evtest_LDFLAGS) libevtst.la
+evtclitst_CPPFLAGS=$(evtest_CPPFLAGS) -DCLIENT
+
+evtsvrtst_SOURCES=evtest.cpp
+evtsvrtst_LDADD=$(evtest_LDFLAGS) libevtst.la
+evtsvrtst_CPPFLAGS=$(evtest_CPPFLAGS) -DSERVER
+
+link_dir=./

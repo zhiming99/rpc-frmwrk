@@ -30,4 +30,4 @@ ipcconfdir=$(sysconfdir)/rpcf
 libipc_ladir=$(libdir)
 
 libipc_la_LDFLAGS=-version-info 0:0:0
-libipc_la_LIBADD= -L../combase -lcombase -lpthread -ldl -ljsoncpp
+libipc_la_LIBADD= -L../3rd_party -L../combase -lcombase -lutils -lpthread -ldl -ljsoncpp

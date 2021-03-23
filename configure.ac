@@ -97,14 +97,16 @@ AC_TYPE_UINT64_T
 AC_TYPE_UINT8_T 
 
 AC_DEFINE(_USE_LIBEV, 1, [using built-in event loop])
+AC_DEFINE(_GNU_SOURCE, 1,[compatible with old build])
 
 AC_SUBST( CXXFLAGS, '`pkg-config --cflags dbus-1 \
-jsoncpp cppunit` -D_USE_LIBEV=1 \
+jsoncpp cppunit` \
 -I$(top_srcdir)/include -I$(top_srcdir)/3rd_party' )
 
+AC_SUBST( TSTLDFLG, '-lipc -lcombase -lstdc++ -lcppunit \
+-L$(top_srcdir)/3rd_party -L$(top_srcdir)/combase -L$(top_srcdir)/ipc' )
+
 AC_CONFIG_FILES([Makefile
-                 Makefile.start
-                 Makefile.init.pub
                  combase/Makefile
                  ipc/Makefile
                  rpc/Makefile
@@ -117,7 +119,6 @@ AC_CONFIG_FILES([Makefile
                  3rd_party/Makefile
                  python/Makefile
                  test/Makefile
-                 test/Makefile.init.pub
                  test/actcancel/Makefile
                  test/asynctst/Makefile
                  test/evtest/Makefile

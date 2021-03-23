@@ -9,7 +9,6 @@
 #include <stdint.h>
 #include <errno.h>
 using namespace cpp;
-#define _USE_LIBEV
 #include "proxy.h"
 
 extern std::string convertPythonUnicodeObjectToStdString(PyObject *pyUnicodeObj);
