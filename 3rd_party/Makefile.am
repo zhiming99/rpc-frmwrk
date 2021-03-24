@@ -2,7 +2,7 @@ lib_LIBRARIES=libutils.a
 
 libutils_a_SOURCES = sha1.cpp base64.cpp
 
-libutils_a_CPPFLAGS= -fPIC
+libutils_a_CPPFLAGS= -fPIC -I$(top_srcdir)/include
 include_dir=./
 
 #libutils_a_HEADERS= sha1.h base64.h
