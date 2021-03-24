@@ -3902,24 +3902,24 @@ gint32 CRpcServices::LoadObjDesc(
 
         // Load the object decription file in json
         Json::Value valObjDesc;
+        std::string strPath = strFile;
         ret = ReadJsonCfg( strFile, valObjDesc );
         if( ERROR( ret ) )
         {
             if( pMgr == nullptr ||
                 strFile[ 0 ] == '/' )
             {
-                DebugPrint( ret, "Failed to open"
+                DebugPrint( ret, "Failed to open "
                     "descprtion file %s",
                     strFile.c_str() );
                 break;
             }
 
-            std::string strPath;
             ret = pMgr->TryFindDescFile(
                 strFile, strPath );
             if( ERROR( ret ) )
             {
-                DebugPrint( ret, "Failed to open"
+                DebugPrint( ret, "Failed to open "
                     "descprtion file %s",
                     strFile.c_str() );
                 break;
@@ -3942,7 +3942,7 @@ gint32 CRpcServices::LoadObjDesc(
         }
 
         oCfg.SetStrProp(
-            propObjDescPath, strFile );
+            propObjDescPath, strPath );
 
         string strSvrName;
         ret = oCfg.GetStrProp(
@@ -4597,7 +4597,6 @@ gint32 CRpcServices::LoadObjDesc(
             oFactores.empty() )
             break;
 
-        string strPath;
         for( i = 0; i < oFactores.size(); i++ )
         {
             if( oFactores[ i ].empty() ||

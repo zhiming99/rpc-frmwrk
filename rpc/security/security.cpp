@@ -1332,6 +1332,9 @@ gint32 CRpcReqForwarderAuth::LocalLoginInternal(
                 oResp.CopyProp( propConnParams,
                     ( CObjBase* )pIf );
 
+                oResp.SetStrProp(
+                    propRouterPath, "/" );
+
                 DebugPrint( ret,
                     "The bridge proxy already"
                     " exists..., portid=%d,"

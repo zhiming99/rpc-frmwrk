@@ -41,10 +41,11 @@ inline guint32 GetTypeSize( T* pT )
 template< typename T,
     typename Allowed = typename std::enable_if<
         std::is_same< stdstr, T >::value, T >::type >
-T CastTo( BufPtr& pBuf )
+stdstr CastTo( BufPtr& pBuf )
 {
-    if( pBuf.IsEmpty() || pBuf->empty() ||
-        pBuf->GetExDataType() != typeString )
+    if( pBuf.IsEmpty() || pBuf->empty() )
+        return stdstr("");
+    if( pBuf->GetExDataType() != typeString )
         throw std::invalid_argument(
             "error cast to string" );
     return stdstr( pBuf->ptr() );
@@ -97,10 +98,9 @@ T& CastTo( BufPtr& pBuf )
 template< typename T,
     typename Allowed= typename std::enable_if<
         std::is_same< DMsgPtr, T >::value ||
-        std::is_same< ObjPtr, T >::value ||
-        std::is_same< BufPtr, T >::value, T
-        >::type,
-        typename T2=Allowed,
+        std::is_same< ObjPtr, T >::value, T >::type,
+    typename T2 = typename std::enable_if<
+        !std::is_same< BufPtr, T >::value, T >::type,
         typename T3=T,
         typename T4=T
         >
@@ -124,6 +124,8 @@ template<typename T,
         !std::is_same< ObjPtr, T >::value, T >::type >
 T CastTo( BufPtr& pBuf )
 {
+    if( pBuf->empty() )
+    { T1 o; return o; }
     ObjPtr* ppObj = ( ObjPtr* )pBuf->ptr();
     T1 oT( *ppObj );
     return oT;
@@ -135,20 +137,26 @@ T CastTo( BufPtr& pBuf )
 
 #define ValTypeFirst ValType( First )
 
+// cast to plain object*
 template< typename First,
     typename T2 = typename std::enable_if<
         !std::is_same< DBusMessage*, First >::value,
          First >::type,
     typename Allowed = typename std::enable_if<
         !std::is_base_of< CObjBase, ValTypeFirst >::value &&
-        !std::is_same< BufPtr, ValTypeFirst >::value &&
+        !std::is_base_of< IAutoPtr, ValTypeFirst >::value &&
         !std::is_same< stdstr, ValTypeFirst >::value &&
         !std::is_same< char, ValTypeFirst >::value, First >
         ::type >
 ValTypeFirst* CastTo( const BufPtr& pCBuf )
 {
     BufPtr& pBuf = const_cast<BufPtr&>( pCBuf );
-    DFirst& val = *pBuf;
+    if( pBuf->empty() )
+    { return nullptr; }
+    if( pBuf->GetExDataType() == typeNone )
+        throw std::invalid_argument(
+            "error invalid type cast" );
+    ValTypeFirst& val = *pBuf;
     return &val;
 }
 
@@ -161,6 +169,8 @@ template< typename First,
 DFirst CastTo( BufPtr& pCBuf )
 {
     BufPtr& pBuf = const_cast<BufPtr&>( pCBuf );
+    if( pBuf->empty() )
+    { return nullptr; }
     DFirst val = pBuf->ptr();
     return val;
 }
@@ -169,12 +179,12 @@ DFirst CastTo( BufPtr& pCBuf )
 template< typename First,
     typename Allowed = typename std::enable_if<
         std::is_same< DBusMessage*, First >::value,
-        First >::type,
-    typename T3=Allowed,
-    typename T4=Allowed >
-ValTypeFirst* CastTo( BufPtr& pCBuf )
+        First >::type >
+DBusMessage* CastTo( BufPtr& pCBuf )
 {
     BufPtr& pBuf = const_cast<BufPtr&>( pCBuf );
+    if( pBuf->empty() )
+    { return nullptr; }
     DMsgPtr& pMsg = *pBuf;
     return ( First )pMsg;
 }
@@ -187,15 +197,40 @@ template< typename First,
     typename Allowed = typename std::enable_if<
         std::is_base_of< CObjBase, ValTypeFirst >::value &&
         std::is_pointer< First >::value, First >::type,
-    typename T4=Allowed,
+    typename T4 = typename std::enable_if<
+        !std::is_same< CBuffer*, First >::value,
+         First >::type,
     typename T5=Allowed >
 DFirst CastTo( BufPtr& pCBuf )
 {
     BufPtr& pBuf = const_cast<BufPtr&>( pCBuf );
+    if( pBuf->empty() )
+    { return nullptr; }
     ObjPtr& pObj = *pBuf;
     DFirst val = pObj;
     return val;
 }
+
+// cast to CBuffer*
+template< typename First,
+    typename Allowed = typename std::enable_if<
+        std::is_same< CBuffer, ValTypeFirst >::value &&
+        std::is_pointer< First >::value, First >::type  >
+CBuffer* CastTo( BufPtr& pCBuf )
+{
+    BufPtr& pBuf = const_cast<BufPtr&>( pCBuf );
+    if( pBuf.IsEmpty() || pBuf->empty() )
+        return nullptr;
+
+    return ( CBuffer* )pBuf;
+}
+
+// cast to BufPtr reference
+template< typename T,
+    typename Allowed= typename std::enable_if<
+        std::is_same< BufPtr, T >::value , T >::type  >
+BufPtr& CastTo( BufPtr& pBuf )
+{ return pBuf; }
 
 template< typename First >
 auto VecToTupleHelper( std::vector< BufPtr >& vec ) -> std::tuple<DFirst>

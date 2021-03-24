@@ -127,6 +127,7 @@ CfgPtr CIfRouterTest::InitRouterCfg(
             strDescPath = ROUTER_OBJ_DESC_AUTH;
 
         oCfg[ propSvrInstName ] = MODULE_NAME;
+        oCfg[ propIoMgr ] = m_pMgr;
         ret = CRpcServices::LoadObjDesc(
             strDescPath, OBJNAME_ROUTER, true,
             oCfg.GetCfg() );

@@ -986,6 +986,9 @@ gint32 CRpcReqForwarder::OpenRemotePortInternal(
                 oResp.CopyProp( propConnParams,
                     ( CObjBase* )pIf );
 
+                oResp.SetStrProp(
+                    propRouterPath, "/" );
+
                 DebugPrint( ret,
                     "The bridge proxy already exists...,"\
                     "portid=%d, uniqName=%s, sender=%s",

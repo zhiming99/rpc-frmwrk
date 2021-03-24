@@ -122,6 +122,7 @@ void CIfSmokeTest::testSvrStartStop()
 
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 
+    oCfg.SetObjPtr( propIoMgr, m_pMgr );
     CfgPtr pCfg = oCfg.GetCfg();
     ret = CRpcServices::LoadObjDesc(
         "./btinrt.json",
@@ -129,7 +130,6 @@ void CIfSmokeTest::testSvrStartStop()
         true, pCfg );
 
     // create the interface server
-    oCfg.SetObjPtr( propIoMgr, m_pMgr );
     ret = pIf.NewObj(
         clsid( CEchoServer ),
         oCfg.GetCfg() );
@@ -184,6 +184,7 @@ CfgPtr CIfSmokeTest::InitRouterCfg()
         oParams.SetStrProp(
             propSvrInstName, strRtName );
 
+        oParams[ propIoMgr ] = m_pMgr;
         ret = CRpcServices::LoadObjDesc(
             "./rtauth.json",
             OBJNAME_ROUTER,
@@ -192,7 +193,6 @@ CfgPtr CIfSmokeTest::InitRouterCfg()
         if( ERROR( ret ) )
             break;
 
-        oParams[ propIoMgr ] = m_pMgr;
         oParams[ propIfStateClass ] =
             clsid( CIfRouterMgrState );
 
@@ -261,6 +261,7 @@ void CIfSmokeTest::testCliStartStop()
     ret = StartRouter( pRouter );
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 
+    oCfg.SetObjPtr( propIoMgr, m_pMgr );
     CfgPtr pCfg = oCfg.GetCfg();
     ret = CRpcServices::LoadObjDesc(
         "./btinrt.json",
@@ -268,7 +269,6 @@ void CIfSmokeTest::testCliStartStop()
         false, pCfg );
 
     // create the proxy object
-    oCfg.SetObjPtr( propIoMgr, m_pMgr );
     ret = pIf.NewObj(
         clsid( CEchoClient ),
         oCfg.GetCfg() );

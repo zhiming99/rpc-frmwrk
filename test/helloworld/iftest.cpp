@@ -126,13 +126,13 @@ void CIfSmokeTest::testSvrStartStop()
     CPPUNIT_ASSERT( !m_pMgr.IsEmpty() );
 
     CfgPtr pCfg = oCfg.GetCfg();
+    oCfg.SetObjPtr( propIoMgr, m_pMgr );
     ret = CRpcServices::LoadObjDesc(
         "./hwdesc.json",
         OBJNAME_ECHOSVR,
         true, pCfg );
 
     // create the interface server
-    oCfg.SetObjPtr( propIoMgr, m_pMgr );
     ret = pIf.NewObj(
         clsid( CEchoServer ),
         oCfg.GetCfg() );
@@ -164,6 +164,7 @@ void CIfSmokeTest::testCliStartStop()
     // load the configuration
     CCfgOpener oCfg;
     CfgPtr pCfg = oCfg.GetCfg();
+    oCfg.SetObjPtr( propIoMgr, m_pMgr );
     ret = CRpcServices::LoadObjDesc(
         "./hwdesc.json",
         OBJNAME_ECHOSVR,
@@ -171,7 +172,6 @@ void CIfSmokeTest::testCliStartStop()
 
     // create the proxy object
     InterfPtr pIf;
-    oCfg.SetObjPtr( propIoMgr, m_pMgr );
     ret = pIf.NewObj(
         clsid( CEchoClient ),
         oCfg.GetCfg() );
