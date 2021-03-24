@@ -38,7 +38,6 @@
 #include <set>
 #include <string.h>
 
-#include "../config.h"
 #include "clsids.h"
 #include "propids.h"
 #include "sys/user.h"
