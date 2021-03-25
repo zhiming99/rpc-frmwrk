@@ -12,7 +12,7 @@ inproc_PROGRAMS=inproctst
 inprocdir=$(bindir)
 
 inproctst_SOURCES= inproctst.cpp
-inproctst_LDADD=$(inproc_LDFLAGS) libinproc.la
+inproctst_LDADD=$(inproc_LDFLAGS) libinproc.la -lpthread
 inproctst_CPPFLAGS=$(inproc_CPPFLAGS)
 
 link_dir=./

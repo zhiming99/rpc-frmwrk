@@ -96,7 +96,39 @@ AC_TYPE_UINT32_T
 AC_TYPE_UINT64_T
 AC_TYPE_UINT8_T 
 
-CXXFLAGS='`pkg-config --cflags dbus-1 jsoncpp cppunit` -D_USE_LIBEV -I$(top_srcdir)/include -I$(top_srcdir)/3rd_party'
+DEPLIBS='dbus-1 jsoncpp cppunit openssl mit-krb5'
+AC_SUBST(DEPLIBS)
+case ${with_sysroot} in
+    no)
+    CXXFLAGS='`pkg-config --cflags ${DEPLIBS}` -D_USE_LIBEV -I$(top_srcdir)/include -I$(top_srcdir)/3rd_party'
+    COMMON_LINK='`pkg-config --libs-only-L ${DEPLIBS}`'
+    SYSROOT=
+    ;;
+
+    *)
+    PKG_CONFIG_PATH=
+    PKG_CONFIG_LIBDIR=$(find ${with_sysroot} -type d -name pkgconfig | tr "\n" ":" )
+    PKG_CONFIG_SYSROOT_DIR=${with_sysroot}
+
+    SYSROOT=${with_sysroot}
+    CXXFLAGS='`PKG_CONFIG_SYSROOT_DIR=${PKG_CONFIG_SYSROOT_DIR} PKG_CONFIG_LIBDIR=${PKG_CONFIG_LIBDIR} \
+    pkg-config --cflags ${DEPLIBS}` -D_USE_LIBEV -I$(top_srcdir)/include -I$(top_srcdir)/3rd_party'
+
+    COMMON_LINK='`PKG_CONFIG_SYSROOT_DIR=${PKG_CONFIG_SYSROOT_DIR} PKG_CONFIG_LIBDIR=${PKG_CONFIG_LIBDIR} \
+    pkg-config --libs-only-L ${DEPLIBS}`'
+
+    AC_SUBST(PKG_CONFIG_PATH)
+    AC_SUBST(PKG_CONFIG_LIBDIR)
+    AC_SUBST(PKG_CONFIG_SYSROOT_DIR)
+
+    AC_SUBST(COMMON_LINK)
+
+    ;;
+esac
+
+AC_SUBST(SYSROOT)
+
+AC_MSG_NOTICE([the cxxflags string is ${CXXFLAGS}])
 
 case $host in
     arm*)
@@ -122,14 +154,12 @@ case $host in
     ;;
 esac
 
-AC_MSG_NOTICE([the host string is $host])
-
 AC_SUBST([CXXFLAGS])
 
 AC_DEFINE(_GNU_SOURCE, 1,[compatible with old build])
 
 AC_SUBST( TSTLDFLG, '-lipc -lcombase -lstdc++ -lcppunit \
--L$(top_srcdir)/3rd_party -L$(top_srcdir)/combase -L$(top_srcdir)/ipc' )
+-L$(top_srcdir)/3rd_party -L$(top_srcdir)/combase -L$(top_srcdir)/ipc ${COMMON_LINK}' )
 
 AC_CONFIG_FILES([Makefile
                  combase/Makefile

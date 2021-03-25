@@ -13,5 +13,5 @@ libauth_confdir=$(sysconfdir)/rpcf
 libauth_ladir=$(libdir)
 
 libauth_la_LDFLAGS = -version-info 0:0:0
-libauth_la_LIBADD = -L$(top_srcdir)/combase -L.. -L$(top_srcdir)/ipc -L$(top_srcdir)/3rd_party -lutils -lrpc -lipc -lcombase -lpthread -ldl
+libauth_la_LIBADD = $(COMMON_LINK) -L$(top_srcdir)/combase -L.. -L$(top_srcdir)/ipc -L$(top_srcdir)/3rd_party -lutils -lrpc -lipc -lcombase -lpthread -ldl
 
