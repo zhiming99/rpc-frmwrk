@@ -48,6 +48,10 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 7. Logging service
 
 ---
+[`Thu Mar 25 2021 11:26:39 PM Beijing`]   
+1. Suspended the ridlc development and turned to migrate the building system from the raw Makefiles to Autotools mechanism. And there should be still some bugs.  The new building system has the powerful support for installation and distribution, which the old building system cannot compete. And ridlc's output will depend on this building system as well.
+2. I can soon resume the ridlc's development.
+
 [`Sat Mar 13 2021 09:25:15 PM Beijing`]   
 1. Has finished 70% of the code generator for C++. It needs extensive test though.
 
