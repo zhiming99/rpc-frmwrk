@@ -96,11 +96,37 @@ AC_TYPE_UINT32_T
 AC_TYPE_UINT64_T
 AC_TYPE_UINT8_T 
 
-AC_DEFINE(_GNU_SOURCE, 1,[compatible with old build])
+CXXFLAGS='`pkg-config --cflags dbus-1 jsoncpp cppunit` -D_USE_LIBEV -I$(top_srcdir)/include -I$(top_srcdir)/3rd_party'
 
-AC_SUBST( CXXFLAGS, '`pkg-config --cflags dbus-1 \
-jsoncpp cppunit` \
--I$(top_srcdir)/include -I$(top_srcdir)/3rd_party -D_USE_LIBEV' )
+case $host in
+    arm*)
+        CXXFLAGS+=' -DARM'
+    ;;
+    aarch64)
+        CXXFLAGS+=' -DARM'
+    ;;
+esac
+
+case $host in
+    x86_64*)
+        CXXFLAGS+=' -DBUILD_64=1 -m64'
+    ;;
+    aarch64*)
+        CXXFLAGS+=' -DBUILD_64=1'
+    ;;
+    arm*)
+        CXXFLAGS+=' -DBUILD_64=0'
+    ;;
+    i?86*)
+        CXXFLAGS+=' -DBUILD_64=0 -m32'
+    ;;
+esac
+
+AC_MSG_NOTICE([the host string is $host])
+
+AC_SUBST([CXXFLAGS])
+
+AC_DEFINE(_GNU_SOURCE, 1,[compatible with old build])
 
 AC_SUBST( TSTLDFLG, '-lipc -lcombase -lstdc++ -lcppunit \
 -L$(top_srcdir)/3rd_party -L$(top_srcdir)/combase -L$(top_srcdir)/ipc' )
