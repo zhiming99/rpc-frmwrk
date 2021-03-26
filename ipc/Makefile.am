@@ -13,16 +13,16 @@ reqopen.cpp uxport.cpp uxstream.cpp streamex.cpp
 
 include_dir=$(top_srcdir)/include
 
-#rpcfipc_HEADERS=  \
-#connhelp.h counters.h dbusport.h emaphelp.h \
-#evloop.h filetran.h frmwrk.h ifhelper.h \
-#ifstat.h iftasks.h iiddict.h irp.h jsondef.h \
-#mainloop.h msgmatch.h namespc.h port.h \
-#portdrv.h portex.h reqopen.h sevpoll.h \
-#stream.h streamex.h tasklets.h tractgrp.h \
-#utils.h uxport.h uxstream.h
+rpcfipc_HEADERS=  \
+connhelp.h counters.h dbusport.h emaphelp.h \
+evloop.h filetran.h frmwrk.h ifhelper.h \
+ifstat.h iftasks.h iiddict.h irp.h jsondef.h \
+mainloop.h msgmatch.h namespc.h port.h \
+portdrv.h portex.h reqopen.h sevpoll.h \
+stream.h streamex.h tasklets.h tractgrp.h \
+utils.h uxport.h uxstream.h
 
-#rpcfipcdir=$(includedir)/rpcf/ipc
+rpcfipcdir=$(includedir)/rpcf/ipc
 
 ipcconf_DATA=driver.json
 ipcconfdir=$(sysconfdir)/rpcf

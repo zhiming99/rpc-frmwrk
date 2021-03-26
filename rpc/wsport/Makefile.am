@@ -1,11 +1,8 @@
 lib_LTLIBRARIES=libwspt.la
 
-libwspt_la_SOURCES = dllexp.cpp wsfido.cpp
+libwspt_la_SOURCES = dllexp.cpp wsfido.cpp wsfido.h Readme.md
 
 libwspt_la_CPPFLAGS  = -I$(top_srcdir)/ipc -I../ -I$(top_srcdir)/combase
-
-#libwspt_la_HEADERS = wsfido.h
-#dist_libwspt_la_DATA=Readme.md
 
 libwspt_ladir=$(libdir)
 

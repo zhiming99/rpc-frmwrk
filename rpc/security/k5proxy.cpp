@@ -1957,7 +1957,7 @@ gint32 AppendConnParams(
         if( ERROR( ret ) )
             break;
 
-#ifdef _DEBUG
+#ifdef DEBUG
         if( true )
         {
             std::string strDump;

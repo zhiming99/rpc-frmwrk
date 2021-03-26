@@ -1,0 +1,138 @@
+{
+    "Version" : "1.0",
+    "Drivers" : 
+    [
+
+        {
+            "DriverName"    : "DBusBusDriver",
+            "DriverType"    : "BusDriver",
+            "BusClass"      : "DBusBus",
+            "InternalClass" : "CDBusBusDriver",
+            "Description"   : "This is a bus driver, and the port it creats is the DBusBusPort",
+            "PortClasses"   :
+            [
+                "DBusBusPort"
+            ]
+        },
+        {
+            "DriverName"    : "ProxyFdoDriver",
+            "DriverType"    : "PortDriver",
+            "InternalClass" : "CProxyFdoDriver",
+            "Description"   : "This is a function port driver, and the port it creats is the DBusProxyFdo",
+            "PortClasses"   :
+            [
+                "DBusProxyFdo"
+            ]
+        },
+        {
+            "DriverName"    : "UnixSockBusDriver",
+            "DriverType"    : "BusDriver",
+            "InternalClass" : "CUnixSockBusDriver",
+            "BusClass"      : "UnixSockBus",
+            "Description"   : "This is a bus driver for unix stream sock, and the port it creats is the UnixSockBusPort",
+            "PortClasses"   :
+            [
+                "UnixSockBusPort"
+            ]
+        }
+    ],
+
+    "Ports" :
+    [
+        {
+            "PortType"      : "Pdo",
+            "PortClass"     : "DBusLocalPdo",
+            "InternalClass" : "CDBusLocalPdo",
+            "PortDriver"    : "",
+            "BusPortClass"  : "DBusBusPort"
+        },
+        {
+            "PortType"      : "Pdo",
+            "PortClass"     : "DBusLoopbackPdo",
+            "InternalClass" : "CDBusLoopbackPdo",
+            "PortDriver"    : "",
+            "BusPortClass"  : "DBusBusPort"
+        },
+        {
+            "PortType"      : "Pdo",
+            "PortClass"     : "DBusProxyPdo",
+            "InternalClass" : "CDBusProxyPdo",
+            "PortDriver"    : "",
+            "BusPortClass"  : "DBusBusPort"
+        },
+        {
+            "PortType"      : "Pdo",
+            "PortClass"     : "DBusProxyPdoLpbk",
+            "InternalClass" : "CDBusProxyPdoLpbk",
+            "PortDriver"    : "",
+            "BusPortClass"  : "DBusBusPort"
+        },
+        {
+            "PortType"      : "Fdo",
+            "PortClass"     : "DBusProxyFdo",
+            "InternalClass" : "CDBusProxyFdo",
+            "PortDriver"    : "ProxyFdoDriver"
+        },
+        {
+            "PortType"      : "Pdo",
+            "PortClass"     : "UnixSockStmPdo",
+            "InternalClass" : "CUnixSockStmPdo",
+            "PortDriver"    : "",
+            "BusPortClass"  : "UnixSockBusPort"
+        },
+        {
+            "PortType"      : "Fdo",
+            "PortClass"     : "UnixSockBusPort",
+            "PortDriver"    : "UnixSockBusDriver",
+            "InternalClass" : "CUnixSockBusPort"
+        }
+    ],
+
+    "Modules" :
+    [
+        {
+            "ModName" : "PyRpcProxy",
+            "DriversToLoad" :
+            [
+                "DBusBusDriver",
+                "UnixSockBusDriver"
+            ]
+        },
+        {
+            "ModName" : "PyRpcServer",
+            "DriversToLoad" :
+            [
+                "DBusBusDriver",
+                "UnixSockBusDriver"
+            ]
+        }     
+    ],
+
+    "Match" :
+    [
+        {
+            "PortClass" : "DBusLocalPdo",
+            "FdoDriver" : ""
+        },
+        {
+            "PortClass" : "DBusProxyPdoLpbk",
+            "FdoDriver" : "ProxyFdoDriver",
+            "Description" : "This match provides a binding between the pdo and fdo"
+        },
+        {
+            "PortClass" : "DBusProxyPdo",
+            "FdoDriver" : "ProxyFdoDriver",
+            "Description" : "This match provides a binding between the pdo and fdo"
+        },
+        {
+            "PortClass" : "UnixSockStmPdo",
+            "FdoDriver" : ""
+        }
+    ],
+
+    "Arch" :
+    {
+        "Processors" : "8"
+    }
+}
+

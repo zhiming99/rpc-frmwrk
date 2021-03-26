@@ -4939,7 +4939,7 @@ gint32 CIfInvokeMethodTask::SetAsyncCall(
             dwTimeoutSec, this,
             ( guint32 )eventKeepAlive );
 
-#ifdef __DEBUG
+#ifdef DEBUG
         DebugPrint( ret,
             "KeepAliveTimer started in %d seconds",
             dwTimeoutSec );

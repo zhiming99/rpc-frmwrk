@@ -1,0 +1,48 @@
+{
+    "Version" : "1.0",
+    "ServerName": "XXXX",
+    "Objects" :
+    [
+        {
+            "ObjectName": "XXXX",
+            "BusName" : "DBusBusPort_0",
+            "PortClass": "DBusLocalPdo",
+            "PortId" : "0",
+            "RequestTimeoutSec" : "120",
+            "KeepAliveTimeoutSec" : "60",
+            "QueuedRequests" : "false",
+            "ProxyPortClass": "DBusProxyPdo",
+            "ProxyPortClass-1": "DBusLocalPdo",
+            "comment-1" : "IpAddress is the ip address of the server",
+            "IpAddress" : "192.168.3.13",
+            "Compression" : "true",
+            "EnableSSL" : "true",
+            "EnableWS" : "false",
+            "RouterPath" : "/",
+            "AuthInfo-1" :
+            {
+                "comment" : "kerberos auth info, all the fields are required",
+                "AuthMech" : "krb5",
+                "UserName" : "zhiming@rpcfrmwrk.org",
+                "ServiceName" : "rasp1@rpcfrmwrk.org",
+                "Realm" : "rpcfrmwrk.org",
+                "SignMessage" : "true"
+            },
+            "Interfaces" :
+            [
+                {
+                    "Comment-0" : "the following attributes are mandatory",
+                    "InterfaceName" : "XXXX",
+                    "Comment-1" : "the following is a flag whether to use the object clsid for this interface, usually it indicates this is the major interface of this object, there must be one interface bind to clsid",
+                    "BindToClsid" : "true"
+                },
+                {
+                    "InterfaceName" : "IInterfaceServer"
+                }
+            ]
+        }
+    ],
+    "ClassFactories" :
+    [
+    ]
+}

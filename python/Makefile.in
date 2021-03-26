@@ -1,9 +1,9 @@
 all:
-	@if [ ! -e pyproject.toml ]; then bash gentoml.sh;fi
+	@bash gentoml.sh;
 	sip-build --verbose
 
 install:
-	@if [ ! -e pyproject.toml ]; then bash gentoml.sh;fi
+	@bash gentoml.sh;
 	sudo sip-install --verbose
 
 dist:

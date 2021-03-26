@@ -156,7 +156,7 @@ esac
 
 AC_SUBST([CXXFLAGS])
 
-AC_DEFINE(_GNU_SOURCE, 1,[compatible with old build])
+AC_DEFINE(_GNU_SOURCE, 1,[GNU non-portable features])
 
 AC_SUBST( TSTLDFLG, '-lipc -lcombase -lstdc++ -lcppunit \
 -L$(top_srcdir)/3rd_party -L$(top_srcdir)/combase -L$(top_srcdir)/ipc ${COMMON_LINK}' )
