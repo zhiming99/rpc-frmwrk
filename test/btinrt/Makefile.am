@@ -5,7 +5,7 @@ btinrt_CPPFLAGS= -I$(include_ipcdir)
 lib_LTLIBRARIES=libbtinrt.la
 libbtinrt_la_SOURCES = btinrtsvr.cpp btinrtcli.cpp btinrtsvr.h
 libbtinrt_la_LDFLAGS=-version-info 0:0:0
-libbtinrt_la_LIBADD= -lpthread -ldl
+libbtinrt_la_LIBADD= $(btinrt_LDFLAGS) -lpthread -ldl
 libbtinrt_la_CPPFLAGS=$(btinrt_CPPFLAGS)
 
 btinrt_PROGRAMS=btinrtcli btinrtsvr

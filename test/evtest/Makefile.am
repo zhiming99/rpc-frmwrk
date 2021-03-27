@@ -5,7 +5,7 @@ evtest_CPPFLAGS= -I$(include_ipcdir)
 lib_LTLIBRARIES=libevtst.la
 libevtst_la_SOURCES = evtsvr.cpp evtcli.cpp evtsvr.h
 libevtst_la_LDFLAGS=-version-info 0:0:0
-libevtst_la_LIBADD= -lpthread -ldl
+libevtst_la_LIBADD= $(evtest_LDFLAGS) -lpthread -ldl
 libevtst_la_CPPFLAGS=$(evtest_CPPFLAGS)
 
 evtest_PROGRAMS=evtsvrtst evtclitst

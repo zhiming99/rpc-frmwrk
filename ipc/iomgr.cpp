@@ -2028,13 +2028,18 @@ gint32 CIoManager::TryLoadClassFactory(
 }
 
 gint32 CIoManager::TryFindDescFile(
-    const std::string& strFile,
+    const std::string& strFileName,
     std::string& strPath )
 {
     gint32 ret = 0;
     do{
 
         ObjPtr pObj;
+
+        // relative path
+        std::string strFile =
+            basename( strFileName.c_str() );
+
         ret = GetCmdLineOpt(
             propSearchPaths, pObj );
         if( ERROR( ret ) )
