@@ -2455,6 +2455,9 @@ gint32 CRpcReqForwarderAuth::OnSessImplLoginComplete(
 
         oParams.CopyProp(
             propConnParams, pReqCtx );
+
+        oParams.CopyProp(
+            propRouterPath, pReqCtx );
     }
 
     if( ret != STATUS_PENDING )
