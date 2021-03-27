@@ -35,6 +35,11 @@ using namespace rpcfrmwrk;
 
 extern std::map< std::string, yytokentype > g_mapKeywords;
 
+// workaround for Bisons 3.3.2 or lower
+#define YY_EOF 0
+#define YY_ERROR ( TOK_START - ( yytokentype )2 )
+#define YY_INVALID ( TOK_START - ( yytokentype )1 )
+
 struct YYLTYPE2 :
     public YYLTYPE
 {
@@ -419,7 +424,7 @@ HexDig [0-9a-fA-F]
 
 [[:alpha:]][[:alnum:]_]* {
         yytokentype iKey = IsKeyword( yytext );
-        if( iKey != TOK_INVALID )
+        if( iKey != YY_INVALID )
         {
             newval() = ( guint32 )iKey;
             *yylval = curval;
@@ -464,7 +469,7 @@ HexDig [0-9a-fA-F]
         yypop_buffer_state();
         if ( !YY_CURRENT_BUFFER)
         {
-            return YYEOF;
+            return YY_EOF;
         }
 
         YYLTYPE* ploc = curloc();
@@ -479,7 +484,7 @@ HexDig [0-9a-fA-F]
         strMsg += yytext;
         strMsg += "'";
         PrintMsg( -EINVAL, strMsg.c_str() );
-        return YYerror;
+        return YY_ERROR;
     }
 %%
 
@@ -594,7 +599,7 @@ yytokentype IsKeyword( char* szKeyword )
     std::map< std::string, yytokentype >::iterator
         itr = g_mapKeywords.find( strKey );
     if( itr == g_mapKeywords.end() )
-        return TOK_INVALID;
+        return YY_INVALID;
     return itr->second;
 }
 

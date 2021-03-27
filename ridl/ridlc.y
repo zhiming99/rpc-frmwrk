@@ -128,6 +128,7 @@ gint32 CheckNameDup(
 %define api.pure full
 
 // values
+%token TOK_START
 %token TOK_IDENT 
 %token TOK_STRVAL
 %token TOK_BOOLVAL
@@ -176,8 +177,6 @@ gint32 CheckNameDup(
 %token TOK_WEBSOCK
 %token TOK_COMPRES
 %token TOK_AUTH
-
-%token TOK_INVALID
 
 %parse-param { char const *file_name };
 %initial-action
