@@ -37,8 +37,8 @@ extern std::map< std::string, yytokentype > g_mapKeywords;
 
 // workaround for Bisons 3.3.2 or lower
 #define YY_EOF 0
-#define YY_ERROR ( TOK_START - ( yytokentype )2 )
-#define YY_INVALID ( TOK_START - ( yytokentype )1 )
+#define YY_ERROR ( ( yytokentype )( TOK_START - 2 ) )
+#define YY_INVALID ( ( yytokentype )( TOK_START - 1 ) )
 
 struct YYLTYPE2 :
     public YYLTYPE
