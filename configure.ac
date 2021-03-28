@@ -186,4 +186,18 @@ AC_CONFIG_FILES([Makefile
                  test/iftest/Makefile
                  test/btinrt/Makefile
                  test/smoketest/Makefile])
+AC_ARG_ENABLE([testcases],
+    [AS_HELP_STRING([--disable-testcases], [no build and install of the testcases])],
+    [:],
+    [enable_testcases=yes])
+
+AM_CONDITIONAL([ENABLE_TESTCASES],[test "$enable_testcases" = "yes"])
+
+PYTHON_EXT=rpcfrmwrk`python << abc
+import importlib
+print(importlib.machinery.EXTENSION_SUFFIX[0])
+<<abc`
+
+AC_SUBST(PYTHON_EXT)
+
 AC_OUTPUT

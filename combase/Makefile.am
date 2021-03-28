@@ -31,7 +31,7 @@ rpcfcombase_HEADERS= $(include_dir)/autoptr.h \
     $(include_dir)/buffer.h \
     $(include_dir)/clsids.h
 
-rpcfcombasedir=$(includedir)
+rpcfcombasedir=$(includedir)/rpcf
 
 libcombase_ladir=$(libdir)
 

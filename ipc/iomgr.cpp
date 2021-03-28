@@ -2033,12 +2033,20 @@ gint32 CIoManager::TryFindDescFile(
 {
     gint32 ret = 0;
     do{
-
         ObjPtr pObj;
 
         // relative path
-        std::string strFile =
+        std::string strFile = "./";
+        strFile +=
             basename( strFileName.c_str() );
+
+        ret = access( strFile.c_str(), R_OK );
+        if( ret == 0 )
+        {
+            strPath = strFile;
+            ret = STATUS_SUCCESS;
+            break;
+        }
 
         ret = GetCmdLineOpt(
             propSearchPaths, pObj );
