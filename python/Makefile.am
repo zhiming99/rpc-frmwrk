@@ -4,8 +4,8 @@ EXTRA_DIST= $(pysources) tests/actcancel/*.py  tests/evtest/*.py tests/iftest/*.
 
 PYTHON_EXT=`python getname.py`
 
-build:
-	bash gentoml.sh pyprogect.toml.tmpl
+all:
+	bash gentoml.sh
 	sip-build --verbose
 
 inst:
