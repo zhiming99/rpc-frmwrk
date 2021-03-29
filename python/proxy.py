@@ -1,4 +1,4 @@
-from rpcfrmwrk import *
+from rpcf import *
 from inspect import signature
 import numpy as np
 

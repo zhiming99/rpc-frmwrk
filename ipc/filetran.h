@@ -29,7 +29,7 @@
 #include "ifhelper.h"
 #include <exception>
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 gint32 CopyFile( gint32 iFdDest,

@@ -29,7 +29,7 @@
 #include "ifhelper.h"
 #include "counters.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 gint32 CStatCountersProxy::InitUserFuncs()

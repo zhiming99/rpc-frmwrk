@@ -28,7 +28,7 @@
 #include "autoptr.h"
 #include "configdb.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 class CDirEntry : public CObjBase

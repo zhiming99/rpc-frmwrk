@@ -29,7 +29,7 @@
 #include "stlcont.h"
 #include "namespc.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 class CConnPointHelper

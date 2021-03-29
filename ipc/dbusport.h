@@ -30,7 +30,7 @@
 #include "msgmatch.h"
 #include "portex.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 #define DBUS_HANDLER_RESULT_HALT    ( ( DBusHandlerResult )100 )
@@ -1190,7 +1190,7 @@ class CConnParamsProxy : public CConnParams
 
 namespace std
 {
-    using namespace rpcfrmwrk;
+    using namespace rpcf;
     template<>
     struct less<CConnParamsProxy>
     {
@@ -1210,7 +1210,7 @@ namespace std
     };
 }
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 class CDBusBusPort : public CGenericBusPortEx

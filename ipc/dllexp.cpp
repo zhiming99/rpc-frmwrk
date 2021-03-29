@@ -44,7 +44,7 @@
 
 #include <dlfcn.h>
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 using namespace std;
@@ -224,7 +224,7 @@ gint32 CoAddIidName(
 
 }
 
-using namespace rpcfrmwrk;
+using namespace rpcf;
 extern "C"
 gint32 DllLoadFactory( FactoryPtr& pFactory )
 {

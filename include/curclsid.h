@@ -32,7 +32,7 @@
 // future addition.
 //
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 // rpc-frmwrk components, last allocation was from

@@ -37,7 +37,7 @@
 // the same hash across different platform.
 #define hashmap unordered_map
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 class CIoManager;

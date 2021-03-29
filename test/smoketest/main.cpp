@@ -22,7 +22,7 @@
 #include <cppunit/TestCase.h>
 
 using namespace std;
-using namespace rpcfrmwrk;
+using namespace rpcf;
 
 class CSmokeTest :
     public CppUnit::TestCase

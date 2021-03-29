@@ -37,7 +37,7 @@
 #include "sevpoll.h"
 #include <fcntl.h>
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 CSimpleEvPoll::CSimpleEvPoll(

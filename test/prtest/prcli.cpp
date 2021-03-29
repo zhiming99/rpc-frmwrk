@@ -23,7 +23,7 @@
 #include <unistd.h>
 #include <cppunit/TestFixture.h>
 
-using namespace rpcfrmwrk;
+using namespace rpcf;
 #include "prsvr.h"
 
 using namespace std;

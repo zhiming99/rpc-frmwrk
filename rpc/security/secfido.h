@@ -30,7 +30,7 @@
 #include "tcportex.h"
 #include "secclsid.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 class CRpcSecFidoDrv : public CRpcTcpFidoDrv

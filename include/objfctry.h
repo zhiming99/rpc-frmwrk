@@ -25,7 +25,7 @@
 #include "defines.h"
 #include "stlcont.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 class CObjMakerBase

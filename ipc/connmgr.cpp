@@ -35,7 +35,7 @@
 #include "connhelp.h"
 #include "proxy.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 CIfSvrConnMgr::CIfSvrConnMgr(

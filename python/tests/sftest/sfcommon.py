@@ -6,7 +6,7 @@ import getpass
 import errno
 import os
 import io
-from rpcfrmwrk import *
+from rpcf import *
 
 import types
 sys.path.insert(0, '../../')

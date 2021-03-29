@@ -41,7 +41,7 @@
 
 #define MAX_DUMP_SIZE 512
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 EnumLogLvl g_dwLogLevel = logErr;

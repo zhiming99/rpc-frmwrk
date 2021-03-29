@@ -29,7 +29,7 @@
 #include <objfctry.h>
 
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 #define REG_DRV_ROOT                     "/drivers"
@@ -86,7 +86,7 @@ inline std::string REG_IO_EVENTMAP_DIR(
     return strRet;
 }
 
-#define DBUS_NAME_PREFIX                "org.rpcfrmwrk."
+#define DBUS_NAME_PREFIX                "org.rpcf."
 #define DBUS_IF_NAME_FMT                DBUS_NAME_PREFIX"%s.%s"
 #define DBUS_DEST_PREFIX_FMT            DBUS_NAME_PREFIX"%s"
 
@@ -131,7 +131,7 @@ inline std::string DBUS_DESTINATION(
     return strRet;
 }
 
-#define LOOPBACK_DESTINATION   "org.rpcfrmwrk.loopback"
+#define LOOPBACK_DESTINATION   "org.rpcf.loopback"
 
 /**
 * @name Modue name module name is used to register
@@ -183,7 +183,7 @@ inline std::string DBUS_DESTINATION(
 
 #define DBUS_DEF_OBJ                    OBJNAME_IOMANAGER
 
-#define DBUS_DEFAULT_OBJ_PATH_FMT       "/org/rpcfrmwrk/%s/objs/%s"
+#define DBUS_DEFAULT_OBJ_PATH_FMT       "/org/rpcf/%s/objs/%s"
 
 #define DBUS_RESP_KEEP_ALIVE            "KeepAlive"
 

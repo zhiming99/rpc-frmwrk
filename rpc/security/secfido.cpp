@@ -31,7 +31,7 @@
 #include <algorithm>
 #include "security.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 bool CRpcSecFido::HasSecCtx() const

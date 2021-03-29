@@ -33,7 +33,7 @@
 #include "tcpport.h"
 #include "frmwrk.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 class CRpcNativeProtoFdo;
@@ -501,7 +501,7 @@ class CRpcConnSock :
 }
 #include "conntask.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 class CStmSockConnectTask2 :

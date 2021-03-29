@@ -34,7 +34,7 @@
 #include <poll.h>
 #include <deque>
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 enum EnumAsyncEvent : guint8

@@ -35,7 +35,7 @@
 #include "tcportex.h"
 #include "emaphelp.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 CRpcStream2::CRpcStream2(

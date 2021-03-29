@@ -32,7 +32,7 @@
 #include "frmwrk.h"
 #include "mainloop.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 gint32 CSchedTaskCallback::operator()(

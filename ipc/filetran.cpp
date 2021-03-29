@@ -29,7 +29,7 @@
 #include "filetran.h"
 #include <algorithm>
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 gint32 CFileTransferProxy::InitUserFuncs()

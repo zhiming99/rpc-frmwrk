@@ -28,7 +28,7 @@
 #include "port.h"
 #include "frmwrk.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 using namespace std;

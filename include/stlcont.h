@@ -43,7 +43,7 @@ using cchar = const char;
 
 #define MAX_ELEM_CONTAINER  10000
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 template< typename T >

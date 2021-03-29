@@ -26,7 +26,7 @@
 
 #include "iftasks.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 class CIfTransactGroup :

@@ -26,7 +26,7 @@
 #include <unistd.h>
 #include "rpc.h"
 
-using namespace rpcfrmwrk;
+using namespace rpcf;
 #include "astnode.h" 
 #include "ridlc.h"
 

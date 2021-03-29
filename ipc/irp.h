@@ -25,7 +25,7 @@
 #include "defines.h"
 #include "stlcont.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 // the events, which will go to the IEventSink
@@ -526,7 +526,7 @@ struct IoRequestPacket : public IEventSink
 
 namespace std
 {
-    using namespace rpcfrmwrk;
+    using namespace rpcf;
     template<>
     struct less<PortPtr>
     {
@@ -548,7 +548,7 @@ namespace std
     };
 }
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 class CStlIrpVector : public CStlVector< IrpPtr >

@@ -28,7 +28,7 @@
 
 #define DATATYPE_COMP_MASK 0x300UL
 #define MAX_ELEM_COUNT  1000000
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 enum EnumContType : guint32

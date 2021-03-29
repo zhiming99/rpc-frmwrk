@@ -40,7 +40,7 @@
 #include <openssl/pem.h>
 #include <openssl/ssl.h>
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 #define PORT_CLASS_OPENSSL_FIDO "RpcOpenSSLFido"

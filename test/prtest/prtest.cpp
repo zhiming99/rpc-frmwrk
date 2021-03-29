@@ -26,7 +26,7 @@
 #include <cppunit/ui/text/TestRunner.h>
 #include <cppunit/extensions/HelperMacros.h>
 
-using namespace rpcfrmwrk;
+using namespace rpcf;
 #include "prtest.h"
 #include "prsvr.h"
 

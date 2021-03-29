@@ -35,7 +35,7 @@
 
 #ifdef _USE_LIBEV
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 class CIoManager;
@@ -100,7 +100,7 @@ typedef CAutoPtr< clsid( CDBusLoopHooks ), CDBusLoopHooks > DHookPtr;
 
 #include "sevpoll.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 class CEvLoop :

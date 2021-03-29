@@ -23,7 +23,7 @@
  */
 #include <sys/stat.h>
 #include "rpc.h"
-using namespace rpcfrmwrk;
+using namespace rpcf;
 #include "astnode.h"
 #include "gencpp.h"
 #include "sha1.h"
@@ -1050,7 +1050,7 @@ gint32 GenCppFile(
         if( pStmts->IsStreamNeeded() )
             Wa( "#include \"streamex.h\"" );
 
-        Wa( "using namespace rpcfrmwrk;" );
+        Wa( "using namespace rpcf;" );
         CCOUT << "#include \"" << strName << ".h\"";
         NEW_LINE;
         std::vector< ObjPtr > vecSvcs;
@@ -3134,7 +3134,7 @@ gint32 CImplServiceImpl::Output()
         }
         std::string strAppName = pStmts->GetName();
         Wa( "#include \"rpc.h\"" );
-        Wa( "using namespace rpcfrmwrk;" );
+        Wa( "using namespace rpcf;" );
         CCOUT << "#include \""
             << strAppName << ".h\"" ;
         NEW_LINE;
@@ -5504,7 +5504,7 @@ gint32 CImplMainFunc::Output()
 
             Wa( "#include \"rpc.h\"" );
             Wa( "#include \"proxy.h\"" );
-            Wa( "using namespace rpcfrmwrk;" );
+            Wa( "using namespace rpcf;" );
             CCOUT << "#include \""
                 << strSvcName << ".h\"";
             NEW_LINES( 2 );

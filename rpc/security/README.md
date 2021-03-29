@@ -24,7 +24,7 @@ to work with `rpc-frmwrk` on such a simple network.
   * On a Fedora machine, you can `dnf install krb5-server`, and dnf will install all the necessary packages for you.
   * On a Raspberry Pi, you can use `apt install krb5-kdc` and apt will install all the necessary packages for you.
   * After the successful installation, you need first to select a good name for the default realm, in our case, 
-  `rpcfrmwrk.org`.
+  `rpcf.org`.
   * And then make some changes to the `/etc/krb5.conf`. If your kdc does not have a public DNS entry, just put the ip
   address as the kdc address in the section `[realms]`, or add the domain name to `/etc/hosts`.The following is a sample
   `krb5.conf` for reference.  
@@ -44,26 +44,26 @@ to work with `rpc-frmwrk` on such a simple network.
         pkinit_anchors = FILE:/etc/pki/tls/certs/ca-bundle.crt
         spake_preauth_groups = edwards25519
         dns_canonicalize_hostname = fallback
-        default_realm = rpcfrmwrk.org
+        default_realm = rpcf.org
         default_ccache_name = KEYRING:persistent:%{uid}
 
     [realms]
-    rpcfrmwrk.org = {
-        kdc = kdc.rpcfrmwrk.org
-        admin_server = kdc.rpcfrmwrk.org
+    rpcf.org = {
+        kdc = kdc.rpcf.org
+        admin_server = kdc.rpcf.org
     }
 
     [domain_realm]
-    .rpcfrmwrk.org = rpcfrmwrk.org
-    rpcfrmwrk.org = rpcfrmwrk.org
+    .rpcf.org = rpcf.org
+    rpcf.org = rpcf.org
 ```
   * Add the user account with `kadmin.local` on your kdc machine. `kadmin.local` does not require password and
   can only be used locally, while `kadmin` is a network version. Suppose you have a linux account name `foo`, and you can add a
-  user account `foo` to the kerberos's user database. The fully qualified account name is `foo@rpcfrmwrk.org`, which must be put
+  user account `foo` to the kerberos's user database. The fully qualified account name is `foo@rpcf.org`, which must be put
   to the proxy's description file as the `user name` later, if authentication is enabled.
   
  * Add the service principal to the kerberos's user database with the `kadmin.local` as well. The service principal, looks like
-  `rasp1/rpcfrmwrk.org`. `rasp1` is the machine name, and `rpcfrmwrk.org` after the slash is instance name to tell the service is
+  `rasp1/rpcf.org`. `rasp1` is the machine name, and `rpcf.org` after the slash is instance name to tell the service is
   `rpc-frmwrk`. Note that, `Kerberos` uses the term `principal` to represent an entity that participate in the `Kerberos's`
   authentication process, and you can just assume it the same as a `name`.
   
@@ -89,7 +89,7 @@ to work with `rpc-frmwrk` on such a simple network.
   * The installation is the same as we do on the client machines, that is, the first two steps.
   * Then, unlike the client machines, the service server needs a `key table` to authenticate to the `KDC`. The `key table`
   can be generated from the server server, via `kadmin` and `ktadd` subcommand. When `ktadd` is asking service principal for the `key table`,
-  in our case, `rasp1/rpcfrmwrk.org`. The The official document is at [here](https://web.mit.edu/kerberos/krb5-devel/doc/admin/install_appl_srv.html)
+  in our case, `rasp1/rpcf.org`. The The official document is at [here](https://web.mit.edu/kerberos/krb5-devel/doc/admin/install_appl_srv.html)
 
 ##### 4. Configure `rpc-frmwrk` with authentication.
   * In the [`driver.json`](https://github.com/zhiming99/rpc-frmwrk/blob/master/ipc/driver.json), the section for `RpcTcpBusPort`,
@@ -102,8 +102,8 @@ to work with `rpc-frmwrk` on such a simple network.
              "AuthInfo" :
             {
                 "AuthMech" : "krb5",
-                "ServiceName" : "rasp1@rpcfrmwrk.org",
-                "Realm" : "rpcfrmwrk.org"
+                "ServiceName" : "rasp1@rpcf.org",
+                "Realm" : "rpcf.org"
             }
  ```
 
@@ -113,9 +113,9 @@ to work with `rpc-frmwrk` on such a simple network.
             "AuthInfo" :
             {
                 "AuthMech" : "krb5",
-                "UserName" : "foo@rpcfrmwrk.org",
-                "ServiceName" : "rasp1@rpcfrmwrk.org",
-                "Realm" : "rpcfrmwrk.org"
+                "UserName" : "foo@rpcf.org",
+                "ServiceName" : "rasp1@rpcf.org",
+                "Realm" : "rpcf.org"
             }
   ```
   * The messages of the authenticated session is usually encrypted over the network. And it can be signed instead, which can be preferable if you want to use SSL as the encryption method. You need to add `SignMessage:"true"` to both `rtauth.json` and `hwdesc.json` as mentioned above to enable this feature. According to my test, such a combination of kerberos signature plus SSL encryption delivers better performance than the encryption with `kerberos` only.

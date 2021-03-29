@@ -22,7 +22,7 @@
 
 #include <rpc.h>
 
-using namespace rpcfrmwrk;
+using namespace rpcf;
 
 #include <proxy.h>
 #include "iftest.h"

@@ -30,7 +30,7 @@
 #include "configdb.h"
 #include "stlcont.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 gint32 CStlIntVector::Serialize(

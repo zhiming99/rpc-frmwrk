@@ -29,7 +29,7 @@
 #include "buffer.h"
 #include <lz4.h>
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 // CBuffer implementation

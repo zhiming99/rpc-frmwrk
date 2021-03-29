@@ -27,7 +27,7 @@
 #include "clsids.h"
 #include "nsdef.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 gint32 ErrnoFromDbusErr( const char *error );

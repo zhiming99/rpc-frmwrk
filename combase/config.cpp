@@ -31,7 +31,7 @@
 
 using namespace std;
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 CConfigDb::CConfigDb( const IConfigDb* pCfg )

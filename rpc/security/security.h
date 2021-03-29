@@ -37,7 +37,7 @@
 #endif
 #include <string.h>
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 #define AUTH_METHOD_LOGIN            "AuthReq_Login"

@@ -31,7 +31,7 @@
 #include "configdb.h"
 #include "namespc.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 typedef enum {
@@ -82,7 +82,7 @@ typedef CAutoPtr< Clsid_Invalid, IMessageMatch > MatchPtr;
 
 namespace std
 {
-    using namespace rpcfrmwrk;
+    using namespace rpcf;
     template<>
     struct less<MatchPtr>
     {
@@ -102,7 +102,7 @@ namespace std
     };
 }
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 class CMessageMatch : public IMessageMatch

@@ -28,7 +28,7 @@
 #include "../ipc/stream.h"
 #include "tcpport.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 template< class T >

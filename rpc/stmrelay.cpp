@@ -24,7 +24,7 @@
 #include "rpcroute.h"
 #include "stmrelay.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 CRpcRouter* CStreamServerRelay::GetParent() const

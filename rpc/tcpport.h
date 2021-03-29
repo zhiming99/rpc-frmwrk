@@ -32,7 +32,7 @@
 
 #include "portex.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 #define RPC_MAX_BYTES_PACKET    ( 65536 - sizeof( CPacketHeader ) - 32 )
@@ -1219,7 +1219,7 @@ class CRpcTcpFidoDrv : public CPortDriver
 }
 #include "conntask.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 class CStmSockConnectTask :

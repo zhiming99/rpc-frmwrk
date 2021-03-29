@@ -33,7 +33,7 @@
 #include "ifhelper.h"
 #include "portex.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 gint32 CPort::GetStopResumeTask(

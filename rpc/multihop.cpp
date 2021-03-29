@@ -29,7 +29,7 @@
 #include "dbusport.h"
 #include "connhelp.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 gint32 CRpcTcpBridge::OnCheckRouterPathComplete(

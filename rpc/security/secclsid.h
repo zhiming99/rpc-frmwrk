@@ -25,7 +25,7 @@
 #pragma once
 #include "clsids.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 typedef enum 

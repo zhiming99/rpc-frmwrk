@@ -34,7 +34,7 @@
 #include "stlcont.h"
 #include "objfctry.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 using namespace std;

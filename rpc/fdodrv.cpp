@@ -31,7 +31,7 @@
 #include "emaphelp.h"
 #include "fdodrv.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 using namespace std;

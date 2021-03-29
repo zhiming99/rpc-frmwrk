@@ -37,7 +37,7 @@
 #include "jsondef.h"
 #include "dbusport.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 using namespace std;

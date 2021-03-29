@@ -28,7 +28,7 @@
 #include "configdb.h"
 #include "msgmatch.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 #define CLEAR_SUBSCRIPTION_ON_ERROR() \

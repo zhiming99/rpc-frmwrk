@@ -31,7 +31,7 @@
 #define DMSG_FIX_TYPE_SIZE  8
 #define DMSG_MAX_ARGS       16
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 typedef CAutoPtr< clsid( Invalid ), DBusMessage >  DMsgPtr;

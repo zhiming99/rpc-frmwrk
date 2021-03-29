@@ -27,7 +27,7 @@
 #include "defines.h"
 
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 extern gint32 CoCreateInstance( EnumClsid clsid,
@@ -451,7 +451,7 @@ typedef CAutoPtr< clsid( Invalid ), DBusMessage >      DMsgPtr;
 
 namespace std
 {
-    using namespace rpcfrmwrk;
+    using namespace rpcf;
     template<>
     struct less<ObjPtr>
     {
@@ -484,7 +484,7 @@ namespace std
 
 };
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 // c++11 required
 template <typename R, typename C, typename ... Types>

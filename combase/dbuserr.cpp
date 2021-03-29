@@ -30,7 +30,7 @@
 #include <unordered_map>
 
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 /**

@@ -28,7 +28,7 @@
 #include "utils.h"
 #include <functional>
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 #define SecToMs( dwSec ) ( ( guint64 )( dwSec * 1000 ) )

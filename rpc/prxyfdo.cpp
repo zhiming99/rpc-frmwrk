@@ -32,7 +32,7 @@
 #include "emaphelp.h"
 #include "reqopen.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 using namespace std;

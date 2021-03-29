@@ -38,7 +38,7 @@
 #define OBJNAME_KDCCHANNEL      "KdcChannel"
 #define USERNAME_NOLOGIN        "kdcclient"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 gint32 gss_sess_hash_partial(

@@ -29,7 +29,7 @@
 #include "defines.h"
 #include "port.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 using namespace std;

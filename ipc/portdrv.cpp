@@ -29,7 +29,7 @@
 #include "emaphelp.h"
 #include "iftasks.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 using namespace std;

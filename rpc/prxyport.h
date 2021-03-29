@@ -25,7 +25,7 @@
 #pragma once
 #include "dbusport.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 class CDBusProxyPdo : public CRpcPdoPort

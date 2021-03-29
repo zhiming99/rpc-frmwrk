@@ -32,7 +32,7 @@
 #define METHOD_GetCounters "GetCounters"
 #define METHOD_GetCounter  "GetCounter"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 // a read-only interface

@@ -35,7 +35,7 @@
 #include "ifhelper.h"
 #include "tcportex.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 inline gint32 SendBytesWithFlag( int iFd,

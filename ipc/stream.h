@@ -31,7 +31,7 @@
 
 #include "uxport.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 struct IStream

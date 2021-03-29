@@ -33,7 +33,7 @@
 #include "dbusport.h"
 #include "tcpport.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 using namespace std;

@@ -28,7 +28,7 @@
 #include <rpc.h>
 #include <proxy.h>
 
-using namespace rpcfrmwrk;
+using namespace rpcf;
 #include "actctest.h"
 #include "actcsvr.h"
 

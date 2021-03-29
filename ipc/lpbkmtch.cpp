@@ -29,7 +29,7 @@
 #include "port.h"
 #include "dbusport.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 CDBusLoopbackMatch::CDBusLoopbackMatch(

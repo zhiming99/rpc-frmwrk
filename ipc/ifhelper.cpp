@@ -31,7 +31,7 @@
 #include "dmsgptr.h"
 #include "ifhelper.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 stdstr CastTo( BufPtr& pBuf )

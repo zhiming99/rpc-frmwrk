@@ -217,8 +217,8 @@
             "AuthInfo" :
             {
                 "AuthMech" : "krb5",
-                "ServiceName" : "rasp1@rpcfrmwrk.org",
-                "Realm" : "rpcfrmwrk.org",
+                "ServiceName" : "rasp1@rpcf.org",
+                "Realm" : "rpcf.org",
                 "SignMessage" : "true"
             },
             "Interfaces" :

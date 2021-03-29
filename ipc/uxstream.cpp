@@ -23,7 +23,7 @@
  */
 #include "uxstream.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 gint32 CIfUxPingTask::RunTask()

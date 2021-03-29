@@ -26,7 +26,7 @@
 #include "stlcont.h"
 #include "objfctry.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 FctryVecPtr g_pFactories;

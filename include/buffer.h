@@ -41,7 +41,7 @@ using cchar = const char;
 #define DATATYPE_MASK_EX    0xF0UL
 #define BUF_MAX_SIZE        ( 512 * 1024 * 1024 )
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 typedef enum {

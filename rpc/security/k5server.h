@@ -34,7 +34,7 @@
 
 #define KDCRELAY_DESC_FILE "./authprxy.json"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 class CKdcRelayProxyStat :

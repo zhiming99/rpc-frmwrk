@@ -26,7 +26,7 @@
 #pragma once
 #include "proxy.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 // remove the reference or const modifiers from
@@ -477,7 +477,7 @@ BufPtr PackageTo< CBuffer >( CBuffer* pObj );
 
 #include <stdarg.h>
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 template< int N >
@@ -2439,7 +2439,7 @@ class CAsyncCallbackOneshot :
 
     gint32 InterceptCallback( IEventSink* pCallback )
     {
-        return rpcfrmwrk::InterceptCallback(
+        return rpcf::InterceptCallback(
             this, pCallback );
     }
 
@@ -2680,7 +2680,7 @@ gint32 CInterfaceProxy::SyncCallEx(
         if( ERROR( ret ) )
         {
             DebugPrint( ret, "fatal error, about to quit, tid=%d\n",
-                rpcfrmwrk::GetTid() );
+                rpcf::GetTid() );
             break;
         }
         pResp = pObj; 
@@ -3223,7 +3223,7 @@ gint32 GetIidOfType( std::vector< guint32 >& vecIids, Type* pType )
 #include "frmwrk.h"
 
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 // _pos is the position for the callback 'pCallback', which must be present in the

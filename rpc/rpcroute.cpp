@@ -30,7 +30,7 @@
 #include "connhelp.h"
 #include "jsondef.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 using namespace std;

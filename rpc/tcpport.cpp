@@ -32,7 +32,7 @@
 #include "reqopen.h"
 #include <fcntl.h>
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 using namespace std;

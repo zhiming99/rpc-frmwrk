@@ -24,7 +24,7 @@
 #include <cppunit/TestFixture.h>
 #include "ifhelper.h"
 
-using namespace rpcfrmwrk;
+using namespace rpcf;
 #include "inprocsvr.h"
 
 using namespace std;

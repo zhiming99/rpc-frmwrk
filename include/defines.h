@@ -222,7 +222,7 @@ do{\
 #define G_SOURCE_CONTINUE true
 #define G_SOURCE_REMOVE false
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 #include <poll.h>

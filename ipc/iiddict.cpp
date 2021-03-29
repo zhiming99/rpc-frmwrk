@@ -24,7 +24,7 @@
 #include "rpc.h"
 #include "iiddict.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 guint64 CInterfIdDict::GetIid(

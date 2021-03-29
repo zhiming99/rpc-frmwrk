@@ -1,7 +1,7 @@
 import sys
 import numpy as np
 import threading as tr
-from rpcfrmwrk import *
+from rpcf import *
 
 sys.path.insert(0, '../../')
 from proxy import PyRpcContext, PyRpcProxy

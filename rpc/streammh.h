@@ -28,7 +28,7 @@
 #include "rpcroute.h"
 #include "stmrelay.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 class CStreamServerRelayMH :

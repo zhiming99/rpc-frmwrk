@@ -55,7 +55,7 @@ typedef guint32   GIOChannel;
 #define iid( interface_name ) \
     ( ( EnumClsid )DECL_IID( interface_name  ) )
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 /**
 * @name Class id declarations

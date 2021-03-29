@@ -27,7 +27,7 @@
 #include "dbusport.h"
 #include "sslfido.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 gint32 GetSSLError( SSL* pssl, int n )

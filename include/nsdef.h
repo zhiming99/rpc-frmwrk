@@ -23,5 +23,5 @@
  */
 
 #pragma once
-#define rpcfrmwrk   cpp
+#define rpcf   cpp
 

@@ -28,7 +28,7 @@
 #include "rpcroute.h"
 #include "dbusport.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 using namespace std;

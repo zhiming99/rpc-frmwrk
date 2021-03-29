@@ -23,9 +23,9 @@
             {
                 "comment" : "kerberos auth info, all the fields are required",
                 "AuthMech" : "krb5",
-                "UserName" : "zhiming@rpcfrmwrk.org",
-                "ServiceName" : "rasp1@rpcfrmwrk.org",
-                "Realm" : "rpcfrmwrk.org",
+                "UserName" : "zhiming@rpcf.org",
+                "ServiceName" : "rasp1@rpcf.org",
+                "Realm" : "rpcf.org",
                 "SignMessage" : "true"
             },
             "Interfaces" :

@@ -36,7 +36,7 @@
 #ifdef _USE_LIBEV
 #include "evloop.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 CDBusLoopHookCb::CDBusLoopHookCb(

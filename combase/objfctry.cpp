@@ -28,7 +28,7 @@
 #include "stlcont.h"
 #include "objfctry.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 typedef gint32 (*PUNLOADLIBRARY )();

@@ -30,7 +30,7 @@
 #include "uxstream.h"
 #include "sha1.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 bool IStream::CanSend( HANDLE hChannel )

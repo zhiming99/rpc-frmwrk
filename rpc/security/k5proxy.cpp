@@ -72,7 +72,7 @@ struct module_callback_data {
 };
 // -------------------------------------
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 CKrb5InitHook::CKrb5InitHook(

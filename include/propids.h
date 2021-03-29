@@ -25,7 +25,7 @@
 #pragma once
 #include <nsdef.h>
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 enum EnumPropId : gint32

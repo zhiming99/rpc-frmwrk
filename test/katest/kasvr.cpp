@@ -23,7 +23,7 @@
 #include "proxy.h"
 #include "frmwrk.h"
 
-using namespace rpcfrmwrk;
+using namespace rpcf;
 #include "kasvr.h"
 
 using namespace std;

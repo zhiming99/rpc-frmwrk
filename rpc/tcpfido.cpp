@@ -30,7 +30,7 @@
 #include "reqopen.h"
 #include <byteswap.h>
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 using namespace std;

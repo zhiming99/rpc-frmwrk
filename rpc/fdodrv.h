@@ -30,7 +30,7 @@
 #include "autoptr.h"
 #include "dbusport.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 class CProxyFdoDriver : public CPortDriver

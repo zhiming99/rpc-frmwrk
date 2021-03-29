@@ -37,7 +37,7 @@
 #define UXPKT_HEADER_SIZE   ( sizeof( guint32 ) + sizeof( guint8 ) )
 #define UXBUF_OVERHEAD      8
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 enum EnumPktToken : guint8

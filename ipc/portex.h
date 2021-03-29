@@ -32,7 +32,7 @@
 #include "iftasks.h"
 #include "ifhelper.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 template< class T >

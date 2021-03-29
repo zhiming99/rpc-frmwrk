@@ -23,7 +23,7 @@
 #include "uxstream.h"
 #include "streamex.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 #define HAS_CALLBACK( _pIrp, _pCallback, _pBuf, _iRet ) \

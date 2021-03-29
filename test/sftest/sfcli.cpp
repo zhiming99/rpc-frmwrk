@@ -25,7 +25,7 @@
 #include <sys/stat.h>
 #include <cppunit/TestFixture.h>
 
-using namespace rpcfrmwrk;
+using namespace rpcf;
 #include "sfsvr.h"
 
 using namespace std;
@@ -633,7 +633,7 @@ gint32 CMyFileProxy::DownloadFile(
 }
 
 template<>
-gint32 rpcfrmwrk::GetIidOfType< const CMyFileProxy >(
+gint32 rpcf::GetIidOfType< const CMyFileProxy >(
     std::vector< guint32 >& vecIids, const CMyFileProxy* pType )
 {
     vecIids.push_back( pType->CMyFileProxy::super::GetIid() );

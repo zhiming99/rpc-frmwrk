@@ -24,7 +24,7 @@
 %{
 #include "rpc.h"
 
-using namespace rpcfrmwrk;
+using namespace rpcf;
 
 #include "lexer.h"
 #include "astnode.h"

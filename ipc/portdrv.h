@@ -29,7 +29,7 @@
 #include "frmwrk.h"
 #include "port.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 #define DRV_STATE_READY     0x01

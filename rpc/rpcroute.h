@@ -32,7 +32,7 @@
 #define ROUTER_OBJ_DESC             "./router.json"
 #define ROUTER_OBJ_DESC_AUTH        "./rtauth.json"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 struct IRpcReqProxyAsync
@@ -210,7 +210,7 @@ typedef CAutoPtr< clsid( CRegisteredObject ), CRegisteredObject > RegObjPtr;
 
 namespace std
 {
-    using namespace rpcfrmwrk;
+    using namespace rpcf;
     template<>
     struct less<RegObjPtr>
     {
@@ -221,7 +221,7 @@ namespace std
     };
 }
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 class CRpcInterfaceProxy :
@@ -2437,7 +2437,7 @@ DECLARE_AGGREGATED_PROXY(
 #include "stmrelay.h"
 #include "streammh.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 DECLARE_AGGREGATED_SERVER(

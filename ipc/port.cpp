@@ -35,7 +35,7 @@
 #include "ifhelper.h"
 #include "portex.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 using namespace std;

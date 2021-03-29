@@ -22,7 +22,7 @@
 #include <cppunit/TestFixture.h>
 #include "ifhelper.h"
 
-using namespace rpcfrmwrk;
+using namespace rpcf;
 #include "ifsvr.h"
 
 using namespace std;

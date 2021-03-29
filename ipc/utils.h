@@ -32,7 +32,7 @@
 #define MAX_THREAD_LOAD     5
 #define MAX_THREADS         10
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 class CTaskThread : public IThread

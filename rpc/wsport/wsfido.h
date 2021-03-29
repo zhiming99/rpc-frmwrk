@@ -35,7 +35,7 @@
 #include "tcpport.h"
 #include "wsproto/WebSocket.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 #define PORT_CLASS_WEBSOCK_FIDO "RpcWebSockFido"
 

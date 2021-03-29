@@ -27,7 +27,7 @@
 #include "registry.h"
 #include "stlcont.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 template <typename T>

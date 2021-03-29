@@ -29,7 +29,7 @@
 #include "uxport.h"
 #include "jsondef.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 #define PROP_TASK_QUEUED 10

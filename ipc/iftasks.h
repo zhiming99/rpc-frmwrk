@@ -33,7 +33,7 @@
 #include "tasklets.h"
 #include "ifstat.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 #define GET_IOMGR( _oCfg, _pMgr ) \

@@ -33,7 +33,7 @@
 #include "defines.h"
 #include "tasklets.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 enum EnumSrcType : guint32
@@ -307,7 +307,7 @@ class CMainIoLoopT : public T
 
         gint32 ret = 0;
         SetThreadName( m_strName );
-        SetTid( rpcfrmwrk::GetTid() );
+        SetTid( rpcf::GetTid() );
         super::Start();
         SetTid( 0 );
         // Place OnPostLoop here, because the tid
@@ -349,7 +349,7 @@ class CMainIoLoopT : public T
 }
 #ifdef _USE_LIBEV
 #include "evloop.h"
-namespace rpcfrmwrk
+namespace rpcf
 {
 typedef  CMainIoLoopT< CEvLoop > CMainIoLoop;
 }

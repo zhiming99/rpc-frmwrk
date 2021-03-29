@@ -26,7 +26,7 @@
 #include "frmwrk.h"
 #include "portdrv.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 #define PORT_MAX_GENERATIONS         4

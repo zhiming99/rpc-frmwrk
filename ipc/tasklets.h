@@ -33,7 +33,7 @@
 #include "autoptr.h"
 #include "irp.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 class CTasklet : public ICancellableTask
@@ -61,7 +61,7 @@ class CTasklet : public ICancellableTask
     { return false; }
 
     void SetTid()
-    { m_dwTid = rpcfrmwrk::GetTid(); }
+    { m_dwTid = rpcf::GetTid(); }
 
     guint32 GetTid()
     { return m_dwTid; }
@@ -203,7 +203,7 @@ typedef CAutoPtr< Clsid_Invalid, CTasklet > TaskletPtr;
 
 namespace std
 {
-    using namespace rpcfrmwrk;
+    using namespace rpcf;
     template<>
     struct less<TaskletPtr>
     {
@@ -220,7 +220,7 @@ namespace std
     };
 }
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 class CTaskletSync : public CTasklet

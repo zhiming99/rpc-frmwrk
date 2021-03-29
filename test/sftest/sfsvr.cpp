@@ -24,7 +24,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-using namespace rpcfrmwrk;
+using namespace rpcf;
 #include "sfsvr.h"
 
 using namespace std;
@@ -325,7 +325,7 @@ gint32 CMyFileServer::GetFileInfo(
 }
 
 template<>
-gint32 rpcfrmwrk::GetIidOfType< const CMyFileServer >(
+gint32 rpcf::GetIidOfType< const CMyFileServer >(
     std::vector< guint32 >& vecIids, const CMyFileServer* pType )
 {
     vecIids.push_back( pType->CMyFileServer::super::GetIid() );

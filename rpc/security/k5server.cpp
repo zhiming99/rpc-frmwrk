@@ -28,7 +28,7 @@
 #include "k5server.h"
 #include "sha1.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 CKdcRelayProxy::CKdcRelayProxy(

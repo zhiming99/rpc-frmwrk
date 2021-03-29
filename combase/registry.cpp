@@ -27,7 +27,7 @@
 
 using namespace std;
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 CDirEntry::CDirEntry()

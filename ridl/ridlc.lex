@@ -29,7 +29,7 @@
 #include <math.h>
 #include <memory>
 
-using namespace rpcfrmwrk;
+using namespace rpcf;
 
 #include "ridlc.h"
 

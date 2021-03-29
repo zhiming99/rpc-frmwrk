@@ -26,7 +26,7 @@
 #include "frmwrk.h"
 #include "proxy.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 using namespace std;

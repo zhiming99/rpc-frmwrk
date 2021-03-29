@@ -38,7 +38,7 @@
 
 using namespace std;
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 extern FctryVecPtr g_pFactories;

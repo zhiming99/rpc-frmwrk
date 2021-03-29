@@ -30,7 +30,7 @@
 #include "jsondef.h"
 #include "tcportex.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 CConnParams GetConnParams2(

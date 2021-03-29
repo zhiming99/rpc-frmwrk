@@ -36,7 +36,7 @@
 #include "portdrv.h"
 #include "mainloop.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 extern gint32 ReadJsonCfg(

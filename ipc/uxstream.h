@@ -26,7 +26,7 @@
 
 #include "stream.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 class CIfUxTaskBase :

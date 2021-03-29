@@ -32,7 +32,7 @@
 #include "ifhelper.h"
 #include "connhelp.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 using namespace std;

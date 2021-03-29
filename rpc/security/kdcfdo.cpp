@@ -30,7 +30,7 @@
 #include <algorithm>
 #include "emaphelp.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 static gint32 FireConnErrEvent(

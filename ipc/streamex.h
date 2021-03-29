@@ -31,7 +31,7 @@
 #include <fcntl.h>
 #include "seribase.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 #define CTRLCODE_READMSG    0x1000

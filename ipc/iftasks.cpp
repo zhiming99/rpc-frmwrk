@@ -37,7 +37,7 @@
 #define IF_GENERIC_RETIRES         3
 #define IF_GENERIC_INTERVAL        60
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 using namespace std;
@@ -629,7 +629,7 @@ gint32 CIfRetryTask::Process( guint32 dwContext )
 {
     gint32 ret = 0;
     EnumEventId iEvent = ( EnumEventId )dwContext;
-    if( this->GetTid() != rpcfrmwrk::GetTid() )
+    if( this->GetTid() != rpcf::GetTid() )
         MarkPending();
 
     do{
@@ -2045,7 +2045,7 @@ gint32 CIfStopTask::RunTask()
 
         DebugPrint( dwServer,
             "About to close port, %d",
-            rpcfrmwrk::GetTid() );
+            rpcf::GetTid() );
 
 #endif
         ret = pIf->ClosePort( this );

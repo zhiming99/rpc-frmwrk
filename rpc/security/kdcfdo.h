@@ -28,7 +28,7 @@
 #include "tcportex.h"
 #include "secclsid.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 class CKdcRelayPdo :

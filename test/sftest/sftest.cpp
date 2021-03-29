@@ -28,7 +28,7 @@
 #include <cppunit/ui/text/TestRunner.h>
 #include <cppunit/extensions/HelperMacros.h>
 
-using namespace rpcfrmwrk;
+using namespace rpcf;
 #include "sftest.h"
 #include "sfsvr.h"
 

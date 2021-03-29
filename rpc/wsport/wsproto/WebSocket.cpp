@@ -13,7 +13,7 @@
 #include <string>
 #include <vector>
 
-using namespace rpcfrmwrk;
+using namespace rpcf;
 #include "WebSocket.h"
 #include "base64.h"
 #include "sha1.h"

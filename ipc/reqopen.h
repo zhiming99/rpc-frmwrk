@@ -24,7 +24,7 @@
 #pragma once
 #include <configdb.h>
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 // CallFlags for SubmitIoRequest & InvokeMethod
 #define CF_MESSAGE_TYPE_MASK            0x07

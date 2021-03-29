@@ -31,7 +31,7 @@
 #include "buffer.h"
 #include "configdb.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 gint32 CreateObjFast( EnumClsid iClsid,

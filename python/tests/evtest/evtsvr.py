@@ -1,6 +1,6 @@
 import sys
 import time
-from rpcfrmwrk import *
+from rpcf import *
 
 sys.path.insert(0, '../../')
 from proxy import PyRpcContext, PyRpcServer

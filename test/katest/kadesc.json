@@ -21,9 +21,9 @@
             "AuthInfo-1" :
             {
                 "AuthMech" : "krb5",
-                "UserName" : "zhiming@rpcfrmwrk.org",
-                "ServiceName" : "rasp1@rpcfrmwrk.org",
-                "Realm" : "rpcfrmwrk.org",
+                "UserName" : "zhiming@rpcf.org",
+                "ServiceName" : "rasp1@rpcf.org",
+                "Realm" : "rpcf.org",
                 "SignMessage" : "true"
             },
             "Interfaces" :

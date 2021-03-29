@@ -22,7 +22,7 @@
  * =====================================================================================
  */
 #include "rpc.h"
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 template<>

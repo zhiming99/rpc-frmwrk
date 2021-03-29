@@ -33,7 +33,7 @@
 #include "emaphelp.h"
 #include "ifhelper.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 #define PROXYPDO_CONN_RETRIES       ( ( guint32 )12 )

@@ -37,7 +37,7 @@
 #include "evloop.h"
 #include "ifhelper.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 gint32 CEvLoop::SOURCE_HEADER::StartStop(

@@ -34,7 +34,7 @@
 #include "ifstat.h"
 #include "reqopen.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 #define ICT_MAX_IRPS 100
 #define ICT_MAX_IFS 10
@@ -402,7 +402,7 @@ class CRpcBaseOperations :
 
 #include "iftasks.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 /**
 * @name CRpcInterfaceBase class will provide the

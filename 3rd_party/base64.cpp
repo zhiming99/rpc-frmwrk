@@ -34,7 +34,7 @@
 #include "rpc.h"
 #include <iostream>
 
-using namespace rpcfrmwrk;
+using namespace rpcf;
 #include "base64.h"
 
 static const std::string base64_chars = 

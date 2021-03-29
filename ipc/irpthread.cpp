@@ -39,7 +39,7 @@
 #include "objfctry.h"
 #include "frmwrk.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 using namespace std;
@@ -122,7 +122,7 @@ gint32 IThread::SetThreadName(
         strName += std::to_string( iTid );
     }
 
-    ret = rpcfrmwrk::SetThreadName( strName );
+    ret = rpcf::SetThreadName( strName );
 
     return ret;
 }
@@ -953,7 +953,7 @@ gint32 CTaskThreadPool::RemoveTask(
 
 namespace std
 {
-    using namespace rpcfrmwrk;
+    using namespace rpcf;
     template<>
     struct less<ThreadPtr>
     {

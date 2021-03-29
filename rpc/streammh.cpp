@@ -26,7 +26,7 @@
 #include "rpcroute.h"
 #include "streammh.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 CfgPtr CRpcTcpBridgeProxyStream::InitCfg(

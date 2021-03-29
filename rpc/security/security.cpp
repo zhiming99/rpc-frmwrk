@@ -30,7 +30,7 @@
 #include "security.h"
 #include "k5proxy.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 #define MAX_NUM_CHECK   8640000

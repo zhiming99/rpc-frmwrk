@@ -24,7 +24,7 @@
 #pragma once
 #include <vector>
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 template< class SockClass >

@@ -24,7 +24,7 @@
 #include "proxy.h"
 #include "frmwrk.h"
 
-using namespace rpcfrmwrk;
+using namespace rpcf;
 #include "asyncsvr.h"
 
 using namespace std;

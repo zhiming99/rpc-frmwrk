@@ -27,7 +27,7 @@
 #include "stlcont.h"
 #include <stdlib.h>
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 using namespace std;
@@ -35,7 +35,7 @@ using namespace std;
 CTasklet::CTasklet( const IConfigDb* pCfg )
 {
     m_pCtx.NewObj( Clsid_CConfigDb, pCfg );
-    m_dwTid = rpcfrmwrk::GetTid();
+    m_dwTid = rpcf::GetTid();
     m_iRet = 0;
     m_bPending = false;
     m_bInProcess = false;

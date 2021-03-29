@@ -28,7 +28,7 @@
 #include "emaphelp.h"
 #include "uxport.h"
 
-namespace rpcfrmwrk
+namespace rpcf
 {
 
 CRecvFilter::RecvState
