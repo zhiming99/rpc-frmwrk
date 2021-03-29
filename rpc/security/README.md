@@ -88,7 +88,7 @@ to work with `rpc-frmwrk` on such a simple network.
 ##### 3. Setup the service server, and in our case, the `rpc-frmwrk bridge` with authentication`
   * The installation is the same as we do on the client machines, that is, the first two steps.
   * Then, unlike the client machines, the service server needs a `key table` to authenticate to the `KDC`. The `key table`
-  can be generated from the server server, via `kadmin` and `ktadd` subcommand. When `ktadd` is asking service principal for the `key table`,
+  can be generated from the service server, with `kadmin` and `ktadd` subcommand. When `ktadd` is asking service principal for the `key table`,
   in our case, `rasp1/rpcf.org`. The The official document is at [here](https://web.mit.edu/kerberos/krb5-devel/doc/admin/install_appl_srv.html)
 
 ##### 4. Configure `rpc-frmwrk` with authentication.
