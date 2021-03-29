@@ -193,11 +193,5 @@ AC_ARG_ENABLE([testcases],
 
 AM_CONDITIONAL([ENABLE_TESTCASES],[test "$enable_testcases" = "yes"])
 
-PYTHON_EXT=rpcfrmwrk`python << abc
-import importlib
-print(importlib.machinery.EXTENSION_SUFFIX[0])
-<<abc`
-
-AC_SUBST(PYTHON_EXT)
 
 AC_OUTPUT
