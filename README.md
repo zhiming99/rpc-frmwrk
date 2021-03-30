@@ -48,6 +48,10 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 7. Logging service
 
 ---
+[`Tue Mar 30 2021 01:28:58 PM Beijing`]   
+1. The python's setup.py is still not ready, and so the installation of the whole project is still not perfect at this point. 
+2. Changed the project's code name to `rpcf` in source code, to end the naming related chaos. It is also a preparation for building the auto-generated project by ridlc.
+
 [`Thu Mar 25 2021 11:26:39 PM Beijing`]   
 1. Suspended the ridlc development and turned to migrate the building system from the raw Makefiles to Autotools mechanism. And there should be still some bugs.  The new building system has the powerful support for installation and distribution, which the old building system cannot compete. And ridlc's output will depend on this building system as well.
 2. I can soon resume the ridlc's development.
