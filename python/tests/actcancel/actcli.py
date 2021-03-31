@@ -2,10 +2,9 @@ import sys
 import time
 import numpy as np
 
-from rpcf import *
+from rpcf.rpcbase import *
 
-sys.path.insert(0, '../../')
-from proxy import PyRpcContext, PyRpcProxy
+from rpcf.proxy import PyRpcContext, PyRpcProxy
 
 class CActcClient:
     """Mandatory class member to define the

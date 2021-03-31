@@ -6,12 +6,11 @@ import getpass
 import errno
 import os
 import io
-from rpcf import *
+from rpcf.rpcbase import *
 
 import types
-sys.path.insert(0, '../../')
-from proxy import PyRpcContext, PyRpcProxy
-from proxy import ErrorCode as EC
+from rpcf.proxy import PyRpcContext, PyRpcProxy
+from rpcf.proxy import ErrorCode as EC
 from typing import Union
 
 class CTransContext :

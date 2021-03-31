@@ -1,4 +1,4 @@
-from rpcf import *
+from rpcf.rpcbase import *
 from inspect import signature
 import numpy as np
 

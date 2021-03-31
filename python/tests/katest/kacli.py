@@ -2,10 +2,9 @@ import sys
 import time
 import numpy as np
 import threading as tr
-from rpcf import *
+from rpcf.rpcbase import *
 
-sys.path.insert(0, '../../')
-from proxy import PyRpcContext, PyRpcProxy
+from rpcf.proxy import PyRpcContext, PyRpcProxy
 
 class CKeepAliveClient:
     """Mandatory class member to define the

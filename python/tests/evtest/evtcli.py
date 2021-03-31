@@ -1,9 +1,7 @@
 import sys
 import time
-from rpcf import *
-
-sys.path.insert(0, '../../')
-from proxy import PyRpcContext, PyRpcProxy
+from rpcf.rpcbase import *
+from rpcf.proxy import PyRpcContext, PyRpcProxy
 
 class CEventClient:
     """Mandatory class member to define the

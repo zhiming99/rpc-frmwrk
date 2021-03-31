@@ -3,10 +3,10 @@
 import sys
 import numpy as np
 import threading as tr
-from rpcf import *
+from rpcf.rpcbase import *
 
 sys.path.insert(0, '../../')
-from proxy import PyRpcContext, PyRpcProxy
+from rpcf.proxy import PyRpcContext, PyRpcProxy
 
 #1. define the interface 
 class CPauseResumeClient:

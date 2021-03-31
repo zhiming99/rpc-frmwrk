@@ -1,10 +1,9 @@
 import sys
 import errno
 import numpy as np
-from rpcf import *
+from rpcf.rpcbase import *
 
-sys.path.insert(0, '../../')
-from proxy import PyRpcContext, PyRpcProxy
+from rpcf.proxy import PyRpcContext, PyRpcProxy
 
 #1. define the interface the CEchoServer provides
 class CEchoClient:

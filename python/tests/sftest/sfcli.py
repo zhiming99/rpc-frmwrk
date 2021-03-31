@@ -21,12 +21,11 @@ import errno
 import os
 import io
 import getopt
-from rpcf import *
+from rpcf.rpcbase import *
 
 import types
-sys.path.insert(0, '../../')
-from proxy import PyRpcContext, PyRpcProxy
-from proxy import ErrorCode as EC
+from rpcf.proxy import PyRpcContext, PyRpcProxy
+from rpcf.proxy import ErrorCode as EC
 from typing import Union
 
 from sfcommon import CTransContext, CFileInfo

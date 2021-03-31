@@ -1,6 +1,6 @@
 // Define the SIP wrapper to the (theoretical) fib library.
 
-%Module(name=rpcf, language="C++")
+%Module(name=rpcbase, language="C++")
 
 %ModuleHeaderCode
 #include <string>

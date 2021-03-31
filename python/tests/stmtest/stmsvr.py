@@ -2,11 +2,10 @@ import sys
 import time
 import numpy as np
 import threading as tr
-from rpcf import *
+from rpcf.rpcbase import *
 
-sys.path.insert(0, '../../')
-from proxy import PyRpcContext, PyRpcServer
-from proxy import ErrorCode as EC
+from rpcf.proxy import PyRpcContext, PyRpcServer
+from rpcf.proxy import ErrorCode as EC
 
 #1. define the interface the CEchoServer provides
 class CEchoServer:

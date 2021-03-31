@@ -1699,7 +1699,7 @@ gint32 LoadThisLib( ObjPtr& pIoMgr )
         return -EINVAL;
     do{
         std::string strResult;
-        const char* szLib = "rpcf.cpython";
+        const char* szLib = "rpcbase.cpython";
         ret = GetLibPathName( strResult, szLib );
         if( ERROR( ret ) )
             break;

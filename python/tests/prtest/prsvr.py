@@ -1,10 +1,9 @@
 import sys
 import time
 import numpy as np
-from rpcf import *
+from rpcf.rpcbase import *
 
-sys.path.insert(0, '../../')
-from proxy import PyRpcContext, PyRpcServer
+from rpcf.proxy import PyRpcContext, PyRpcServer
 
 #1. define the interface the CPauseResumeServer provides
 class CPauseResumeServer:
