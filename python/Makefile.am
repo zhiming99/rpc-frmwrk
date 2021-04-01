@@ -4,13 +4,11 @@ EXTRA_DIST= $(pysources) tests/actcancel/*.py  tests/evtest/*.py tests/iftest/*.
 
 PYTHON_EXT=`python3 -c "import importlib.machinery;print('rpcbase',importlib.machinery.EXTENSION_SUFFIXES[0],sep='')"`
 
-#bash gentoml.sh
-#sip-build --verbose
-
 all:
 	bash gentoml.sh
-	sip-build --verbose
-	ln -s `pwd`/build/rpcbase/$(PYTHON_EXT) rpcf/
+	sip-build --verbose --build-dir ./sipbuild
+	if [ -f ./rpcf/$(PYTHON_EXT) ]; then rm ./rpcf/$(PYTHON_EXT); fi
+	ln -s `pwd`/sipbuild/rpcbase/$(PYTHON_EXT) rpcf/
 
 install:
 	python3 setup.py install
