@@ -1,0 +1,12 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@
+
+Name: rpcf
+Description: an RPC framework
+URL: https://github.com/zhiming99/rpc-frmwrk
+Version: @VERSION@
+Requires:
+Libs: -lcombase -lipc -L${libdir}
+Cflags: -I${includedir}/rpcf -I${includedir}/rpcf/ipc

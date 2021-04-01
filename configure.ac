@@ -161,6 +161,9 @@ AC_DEFINE(_GNU_SOURCE, 1,[GNU non-portable features])
 AC_SUBST( TSTLDFLG, '-lipc -lcombase -lstdc++ -lcppunit \
 -L$(top_srcdir)/3rd_party -L$(top_srcdir)/combase -L$(top_srcdir)/ipc ${COMMON_LINK}' )
 
+PKG_PROG_PKG_CONFIG
+PKG_INSTALLDIR
+
 AC_CONFIG_FILES([Makefile
                  combase/Makefile
                  ipc/Makefile
@@ -185,9 +188,11 @@ AC_CONFIG_FILES([Makefile
                  test/stmtest/Makefile
                  test/iftest/Makefile
                  test/btinrt/Makefile
-                 test/smoketest/Makefile])
+                 test/smoketest/Makefile
+                 rpcf.pc ])
+
 AC_ARG_ENABLE([testcases],
-    [AS_HELP_STRING([--disable-testcases], [no build and install of the testcases])],
+    [AS_HELP_STRING([--disable-testcases], [build and install without testcases])],
     [:],
     [enable_testcases=yes])
 

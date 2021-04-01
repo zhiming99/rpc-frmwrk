@@ -116,13 +116,11 @@
         },
         {
             "PortClass" : "DBusProxyPdoLpbk",
-            "FdoDriver" : "ProxyFdoDriver",
-            "Description" : "This match provides a binding between the pdo and fdo"
+            "FdoDriver" : "ProxyFdoDriver"
         },
         {
             "PortClass" : "DBusProxyPdo",
-            "FdoDriver" : "ProxyFdoDriver",
-            "Description" : "This match provides a binding between the pdo and fdo"
+            "FdoDriver" : "ProxyFdoDriver"
         },
         {
             "PortClass" : "UnixSockStmPdo",

@@ -37,6 +37,7 @@ gint32 GenCppProj(
     ObjPtr pRoot );
 
 typedef std::unique_ptr< std::ofstream > STMPTR;
+typedef std::unique_ptr< std::ifstream > STMIPTR;
 struct CFileSet
 {
     std::string  m_strPath;
@@ -586,8 +587,14 @@ class CImplMainFunc :
     gint32 Output();
 };
 
-class CImplMsgFactory
+class CExportMakefile
 {
+    CStatements* m_pNode = nullptr;
+    CCppWriter* m_pWriter = nullptr;
+    public:
+    CExportMakefile( CCppWriter* pWriter,
+        ObjPtr& pNode );
+    gint32 Output();
 };
 
 class CExportObjDesc
@@ -595,10 +602,6 @@ class CExportObjDesc
 };
 
 class CExportDrivers
-{
-};
-
-class CExportMakefile
 {
 };
 

@@ -1217,6 +1217,11 @@ gint32 GenCppProj(
         if( ERROR( ret ) )
             break;
 
+        oWriter.SelectMakefile();
+        CExportMakefile oemf( &oWriter, pRoot );
+        ret = oemf.Output();
+
+
     }while( 0 );
 
     return ret;
@@ -5726,6 +5731,94 @@ gint32 CImplMainFunc::Output()
         }
 
     }while( 0 );
+
+    return ret;
+}
+
+CExportMakefile::CExportMakefile(
+    CCppWriter* pWriter,
+    ObjPtr& pNode )
+{
+    m_pWriter = pWriter;
+    m_pNode = pNode;
+    if( m_pNode == nullptr )
+    {
+        std::string strMsg = DebugMsg(
+            -EFAULT, "internal error empty "
+            "'statements' node" );
+        throw std::runtime_error( strMsg );
+    }
+}
+
+gint32 CExportMakefile::Output()
+{
+    STMIPTR pstm( new std::ifstream(
+        "./mktpl",
+        std::ifstream::in ) );
+    gint32 ret = 0;
+    do{
+        BufPtr pBuf( true );
+        pBuf->Resize( PAGE_SIZE );
+        pstm->seekg( 0, pstm->end );
+        guint32 iLen = pstm->tellg();
+        pstm->seekg( 0, pstm->beg );
+        while( iLen > 0 )
+        {
+            guint32 dwCount =
+                std::min( iLen, pBuf->size() );
+            pstm->read( pBuf->ptr(), dwCount );
+            m_pWriter->m_curFp->write(
+                pBuf->ptr(), dwCount );
+            iLen -= dwCount;
+        }
+        m_pWriter->m_curFp->flush();
+        m_pWriter->m_curFp->close();
+
+        std::vector< ObjPtr > vecSvcs;
+        ret = m_pNode->GetSvcDecls( vecSvcs );
+        if( ERROR( ret ) )
+            break;
+
+        std::string strAppName =
+            m_pNode->GetName();
+
+        std::string strCpps =
+            strAppName + ".cpp ";
+
+        for( auto& elem : vecSvcs )
+        {
+            CServiceDecl* psd = elem;
+            if( psd == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            strCpps += psd->GetName() + ".cpp ";
+        }
+
+        std::string strClient =
+            strAppName + "Cli";
+
+        std::string strServer =
+            strAppName + "Svr";
+
+        std::string strCmdLine =
+            "sed -i 's/XXXSRCS/";
+
+        strCmdLine += strCpps + "/;" +
+            "s/XXXCLI/" + strClient + "/;" +
+            "s/XXXSVR/" + strServer + "/' " +
+            m_pWriter->m_pFiles->m_strMakefile;
+
+        printf( "%s\n", strCmdLine.c_str() );
+        system( strCmdLine.c_str() );
+
+    }while( 0 );
+
+    m_pWriter->m_curFp->open(
+        m_pWriter->m_pFiles->m_strMakefile,
+        std::ofstream::out |
+        std::ofstream::app);
 
     return ret;
 }

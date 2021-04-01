@@ -8,3 +8,5 @@ endif
 SUBDIRS += python
 
 EXTRA_DIST= README.md cfgdbg
+
+pkgconfig_DATA=rpcf.pc
