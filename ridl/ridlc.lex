@@ -517,7 +517,7 @@ std::map< std::string, yytokentype >
         { "event", TOK_EVENT },
         { "returns", TOK_RETURNS },
         //{ "stream", TOK_STREAM },
-        { "serial", TOK_SERIAL },
+        // { "serial", TOK_SERIAL },
         { "timeout", TOK_TIMEOUT },
         { "rtpath", TOK_RTPATH },
         { "ssl", TOK_SSL },

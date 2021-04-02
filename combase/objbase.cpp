@@ -253,6 +253,46 @@ gint32 GetModulePath( std::string& strResult )
     return GetCmdOutput( strResult, cmd );
 }
 
+gint32 FindInstCfg(
+    const std::string& strFileName,
+    std::string& strPath )
+{
+    ObjPtr pObj;
+    gint32 ret = 0;
+
+    if( strFileName.empty() )
+        return -EINVAL;
+
+    // relative path
+    std::string strFile = "./";
+    strFile +=
+        basename( strFileName.c_str() );
+
+    do{
+        std::string strFullPath = "/etc/rpcf/";
+        strFullPath += strFile;
+        ret = access( strFullPath.c_str(), R_OK );
+        if( ret == 0 )
+        {
+            strPath = strFullPath;
+            break;
+        }
+
+        strFullPath.clear();
+        ret = GetLibPath( strFullPath );
+        if( ERROR( ret ) )
+            break;
+
+        strFullPath += "/../etc/rpcf/" + strFile;
+        ret = access( strFullPath.c_str(), R_OK );
+        if( ret == 0 )
+            strPath = strFullPath;
+
+    }while( 0 );
+
+    return ret;
+}
+
 int Sem_Init( sem_t* psem, int pshared, unsigned int value )
 {
     if( psem == nullptr )

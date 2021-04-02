@@ -32,7 +32,7 @@ AC_CHECK_PROG(ac_cv_prog_python3, python3, yes)
 LT_INIT
 
 # Checks for libraries.
-AC_CHECK_LIB([combase], [DllLoadFactory])
+#AC_CHECK_LIB([combase], [DllLoadFactory])
 AC_CHECK_LIB([dbus-1], [dbus_bus_get])
 AC_CHECK_LIB([jsoncpp], [_ZNK4Json5ValuecvbEv])
 AC_CHECK_LIB([lz4], [LZ4_compress_default])
@@ -153,6 +153,8 @@ case $host in
         CXXFLAGS+=' -DBUILD_64=0 -m32'
     ;;
 esac
+
+CXXFLAGS+=' -std=c++11'
 
 AC_SUBST([CXXFLAGS])
 

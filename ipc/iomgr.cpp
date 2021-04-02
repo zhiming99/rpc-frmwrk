@@ -2085,24 +2085,8 @@ gint32 CIoManager::TryFindDescFile(
             break;
         }
 
-        strFullPath = "/etc/rpcf/";
-        strFullPath += strFile;
-        ret = access( strFullPath.c_str(), R_OK );
-        if( ret == 0 )
-        {
-            strPath = strFullPath;
-            break;
-        }
-
-        strFullPath.clear();
-        ret = GetLibPath( strFullPath );
-        if( ERROR( ret ) )
-            break;
-
-        strFullPath += "/../etc/rpcf/" + strFile;
-        ret = access( strFullPath.c_str(), R_OK );
-        if( ret == 0 )
-            strPath = strFullPath;
+        ret = FindInstCfg(
+            strFile, strFullPath );
 
     }while( 0 );
 

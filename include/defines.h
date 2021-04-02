@@ -294,6 +294,10 @@ gint32 GetLibPath( std::string& strResult,
 
 gint32 GetModulePath( std::string& strResult );
 
+gint32 FindInstCfg(
+    const std::string& strFileName,
+    std::string& strPath );
+
 using stdstr = std::string;
 
 // Event ids for the IEventSink

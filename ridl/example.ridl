@@ -91,6 +91,13 @@ service SimpFileSvc [
 {
     interface ITinyInterface;
     interface IEchoThings;
+};
+
+service StreamSvc [
+    timeout=120, rtpath="/",
+    ssl, websock, compress,
+    auth ]
+{
     interface IFileTransfer;
     interface IChat;
 };

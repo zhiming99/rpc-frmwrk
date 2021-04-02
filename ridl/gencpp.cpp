@@ -688,11 +688,10 @@ CFileSet::CFileSet(
         "desc.json";
 
     m_strDriver =
-        strOutPath + "/" + strAppName +
-        "drv.json";
+        strOutPath + "/" + "driver.json";
 
     m_strMakefile =
-        strOutPath + "/" + "Makefile.tst" ;
+        strOutPath + "/" + "Makefile" ;
 
     m_strMainCli =
         strOutPath + "/" + "maincli.cpp";
@@ -1220,7 +1219,12 @@ gint32 GenCppProj(
         oWriter.SelectMakefile();
         CExportMakefile oemf( &oWriter, pRoot );
         ret = oemf.Output();
+        if( ERROR( ret ) )
+            break;
 
+        oWriter.SelectDrvFile();
+        CExportDrivers oedrv( &oWriter, pRoot );
+        ret = oedrv.Output();
 
     }while( 0 );
 
@@ -2476,7 +2480,8 @@ gint32 CSetStructRefs::ExtractStructArr(
             strName, pStruct );
         if( ERROR( ret ) )
         {
-            DebugPrint( ret, "error, %s not defined\n",
+            DebugPrintEx( logErr, ret,
+                "error, %s not defined\n",
                 strName.c_str() );
             break;
         }
@@ -2541,7 +2546,8 @@ gint32 CSetStructRefs::ExtractStructMap(
                     strName, pStruct );
                 if( ERROR( ret ) )
                 {
-                    DebugPrint( ret, "error, %s not defined\n",
+                    DebugPrintEx( logErr, ret,
+                        "error, %s not defined\n",
                         strName.c_str() );
                     break;
                 }
@@ -2635,7 +2641,8 @@ gint32 CSetStructRefs::SetStructRefs()
                     strName, pStruct );
                 if( ERROR( ret ) )
                 {
-                    DebugPrint( ret, "error, %s not defined\n",
+                    DebugPrintEx( logErr, ret,
+                        "error, %s not defined\n",
                         strName.c_str() );
                     continue;
                 }
@@ -3257,7 +3264,7 @@ gint32 CImplServiceImpl::Output()
                 Wa( "// TODO: Process the sync request here " );
                 Wa( "// return code can be an Error or" );
                 Wa( "// STATUS_SUCCESS" );
-                CCOUT << "return STATUS_SUCCESS;";
+                CCOUT << "return ERROR_NOT_IMPL;";
             }
             BLOCK_CLOSE;
             NEW_LINES( 2 );
@@ -5735,7 +5742,7 @@ gint32 CImplMainFunc::Output()
     return ret;
 }
 
-CExportMakefile::CExportMakefile(
+CExportBase::CExportBase(
     CCppWriter* pWriter,
     ObjPtr& pNode )
 {
@@ -5750,13 +5757,32 @@ CExportMakefile::CExportMakefile(
     }
 }
 
-gint32 CExportMakefile::Output()
+gint32 CExportBase::Output()
 {
-    STMIPTR pstm( new std::ifstream(
-        "./mktpl",
-        std::ifstream::in ) );
     gint32 ret = 0;
     do{
+        STMIPTR pstm( new std::ifstream(
+            m_strFile, std::ifstream::in ) );
+
+        if( !pstm->good() )
+        {
+            std::string strPath;
+            ret = FindInstCfg(
+                m_strFile, strPath );
+
+            if( ERROR( ret ) )
+                break;
+
+            pstm->open(
+                strPath, std::ifstream::in );
+
+            if( !pstm->good() )
+            {
+                ret = -errno;
+                break;
+            }
+        }
+
         BufPtr pBuf( true );
         pBuf->Resize( PAGE_SIZE );
         pstm->seekg( 0, pstm->end );
@@ -5770,7 +5796,40 @@ gint32 CExportMakefile::Output()
             m_pWriter->m_curFp->write(
                 pBuf->ptr(), dwCount );
             iLen -= dwCount;
+            if( !m_pWriter->m_curFp->good() )
+            {
+                ret = -errno;
+                break;
+            }
         }
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+    {
+        std::string strMsg = strerror( -ret );
+        DebugPrintEx( logErr, ret,
+            "error open file `%s', %s\n", 
+            m_strFile, strMsg.c_str() );
+    }
+
+    return ret;
+}
+
+CExportMakefile::CExportMakefile(
+    CCppWriter* pWriter,
+    ObjPtr& pNode )
+    : super( pWriter, pNode )
+{ m_strFile = "./mktpl"; }
+
+gint32 CExportMakefile::Output()
+{
+    gint32 ret = 0;
+    do{
+        ret = super::Output();
+        if( ERROR( ret ) )
+            break;
+
         m_pWriter->m_curFp->flush();
         m_pWriter->m_curFp->close();
 
@@ -5797,10 +5856,10 @@ gint32 CExportMakefile::Output()
         }
 
         std::string strClient =
-            strAppName + "Cli";
+            strAppName + "cli";
 
         std::string strServer =
-            strAppName + "Svr";
+            strAppName + "svr";
 
         std::string strCmdLine =
             "sed -i 's/XXXSRCS/";
@@ -5815,10 +5874,116 @@ gint32 CExportMakefile::Output()
 
     }while( 0 );
 
-    m_pWriter->m_curFp->open(
-        m_pWriter->m_pFiles->m_strMakefile,
-        std::ofstream::out |
-        std::ofstream::app);
+    if( !m_pWriter->m_curFp->is_open() )
+    {
+        // keep current file open
+        m_pWriter->m_curFp->open(
+            m_pWriter->m_pFiles->m_strMakefile,
+            std::ofstream::out |
+            std::ofstream::app);
+    }
+
+    return ret;
+}
+
+CExportDrivers::CExportDrivers(
+    CCppWriter* pWriter,
+    ObjPtr& pNode )
+    : super( pWriter, pNode )
+{ m_strFile = "./drvtpl.json"; }
+
+#include <json/json.h>
+#include "jsondef.h"
+#include "frmwrk.h"
+
+gint32 CExportDrivers::Output()
+{
+    gint32 ret = 0;
+    do{
+        ret = super::Output();
+        if( ERROR( ret ) )
+            break;
+
+        m_pWriter->m_curFp->flush();
+        m_pWriter->m_curFp->close();
+
+        Json::Value oVal;
+        ret = ReadJsonCfg(
+            m_pWriter->m_strCurFile,
+            oVal );
+        if( ERROR( ret ) )
+            break;
+
+        m_pWriter->m_curFp->open(
+            m_pWriter->m_strCurFile,
+            std::ofstream::out |
+            std::ofstream::trunc);
+        if( !m_pWriter->m_curFp->good() )
+        {
+            ret = -errno;
+            break;
+        }
+
+        std::string strAppName =
+            m_pNode->GetName();
+
+        std::vector< ObjPtr > vecSvcs;
+        ret = m_pNode->GetSvcDecls( vecSvcs );
+        if( ERROR( ret ) )
+            break;
+
+        bool bStream = false;
+        for( auto& elem : vecSvcs )
+        {
+            CServiceDecl* psd = elem;
+            if( psd == nullptr )
+                continue;
+            if( psd->IsStream() )
+            {
+                bStream = true;
+                break;
+            }
+        }
+
+        
+        std::string strAppCli =
+            strAppName + "cli";
+
+        std::string strAppSvr =
+            strAppName + "svr";
+
+        Json::Value& oModuleArray =
+            oVal[ JSON_ATTR_MODULES ];
+
+        if( oModuleArray == Json::Value::null )
+        {
+            ret = -EINVAL;
+        }
+
+        if( !oModuleArray.isArray() )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        Json::Value oCli;
+        oCli[ JSON_ATTR_MODNAME ] = strAppCli;
+        Json::Value oDrvToLoad;
+        oDrvToLoad.append( "DBusBusDriver" );
+        if( bStream )
+            oDrvToLoad.append( "UnixSockBusDriver" );
+        oCli[ JSON_ATTR_DRVTOLOAD ] = oDrvToLoad;
+
+        Json::Value oSvr = oCli;
+        oSvr[ JSON_ATTR_MODNAME ] = strAppSvr;
+        oModuleArray.append( oSvr );
+        oModuleArray.append( oCli );
+
+        Json::StyledStreamWriter oJWriter;
+        oJWriter.write( *m_pWriter->m_curFp, oVal );
+        m_pWriter->m_curFp->flush();
+
+    }while( 0 );
 
     return ret;
 }

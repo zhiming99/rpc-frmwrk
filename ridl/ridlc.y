@@ -186,13 +186,15 @@ gint32 CheckNameDup(
 %token TOK_ASYNCS
 // %token TOK_STREAM
 %token TOK_EVENT
-%token TOK_SERIAL
+// %token TOK_SERIAL
 %token TOK_TIMEOUT
 %token TOK_RTPATH
 %token TOK_SSL
 %token TOK_WEBSOCK
 %token TOK_COMPRES
 %token TOK_AUTH
+%token TOK_IPADDR
+%token TOK_PORTNUM
 
 %parse-param { char const *file_name };
 %initial-action
@@ -557,7 +559,7 @@ attr_name :
     | TOK_ASYNCS { DEFAULT_ACTION; }
     | TOK_EVENT { DEFAULT_ACTION; }
     // | TOK_STREAM { DEFAULT_ACTION; }
-    | TOK_SERIAL { DEFAULT_ACTION; }
+    // | TOK_SERIAL { DEFAULT_ACTION; }
     | TOK_TIMEOUT { DEFAULT_ACTION; }
     | TOK_RTPATH { DEFAULT_ACTION; }
     | TOK_SSL { DEFAULT_ACTION; }

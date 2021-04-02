@@ -1,5 +1,13 @@
 #!/bin/make
 
+SHELL := /bin/bash
+CC:=$(CROSS_COMPILE)gcc
+CPP:=$(CROSS_COMPILE)g++
+LD:=$(CROSS_COMPILE)ld
+AR:=$(CROSS_COMPILE)ar
+AS:=$(CROSS_COMPILE)as
+STRIP:=$(CROSS_COMPILE)strip
+
 mkfile_path:=$(abspath $(lastword $(MAKEFILE_LIST)))
 BASE:=$(abspath $(dir $(mkfile_path)) )
 
@@ -49,8 +57,8 @@ TARGET_SVR:=XXXSVR
 TARGET_CLI:=XXXCLI
 
 TARGET:=$(OUTPUT_DIR)/$(TARGET_SVR) $(OUTPUT_DIR)/$(TARGET_CLI)
-OBJS_SVR:= maincli.o
-OBJS_CLI:= mainsvr.o
+OBJS_SVR:= mainsvr.o
+OBJS_CLI:= maincli.o
 
 SOURCES:=XXXSRCS
 OBJS2:=$(SOURCES:%.cpp=$(OBJ_DIR)/%.o)

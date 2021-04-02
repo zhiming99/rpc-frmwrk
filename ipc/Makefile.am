@@ -20,7 +20,7 @@ ifstat.h iftasks.h iiddict.h irp.h jsondef.h \
 mainloop.h msgmatch.h namespc.h port.h \
 portdrv.h portex.h reqopen.h sevpoll.h \
 stream.h streamex.h tasklets.h tractgrp.h \
-utils.h uxport.h uxstream.h
+utils.h uxport.h uxstream.h proxy.h
 
 rpcfipcdir=$(includedir)/rpcf/ipc
 

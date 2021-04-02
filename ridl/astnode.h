@@ -304,63 +304,82 @@ struct CAttrExps : public CAstListNode
         return dwFlags;
     }
 
-    gint32 CheckTimeoutSec() const
+    gint32 GetAttrByToken(
+        guint32 token, BufPtr& pVal ) const
     {
-        gint32 ret = 0;
+        gint32 ret = -ENOENT;
         for( auto elem : m_queChilds )
         {
             CAttrExp* pExp = elem;
             if( pExp == nullptr )
                 continue;
             guint32 dwToken = pExp->GetName();
-            if( dwToken != TOK_TIMEOUT )
-                continue;
-            BufPtr pBuf = pExp->GetVal();
-            if( pBuf.IsEmpty() || pBuf->empty() )
+            if( dwToken == token )
             {
-                ret = -ENOENT;
-                break;
-            }
-            if( pBuf->GetExDataType() !=
-                typeUInt32 )
-            {
-                ret = -EINVAL;
+                ret = 0;
+                BufPtr& pValue = pExp->GetVal();
+                if( pValue.IsEmpty() ||
+                    pValue->empty() )
+                    break;
+                pVal = pValue;
                 break;
             }
         }
         return ret;
     }
 
+    gint32 CheckTimeoutSec() const
+    {
+        BufPtr pBuf;
+        gint32 ret = GetAttrByToken(
+            TOK_TIMEOUT, pBuf );
+        if( ret == -ENOENT )
+            return STATUS_SUCCESS;
+
+        if( ERROR( ret ) )
+            return ret;
+
+        if( pBuf.IsEmpty() || pBuf->empty() )
+        {
+            return -ENOENT;
+        }
+        if( pBuf->GetExDataType() !=
+            typeUInt32 )
+        {
+            return  -EINVAL;
+        }
+        return ret;
+    }
+
     guint32 GetTimeoutSec() const
     {
+        BufPtr pBuf;
         guint32 dwTimeout = 0;
-        for( auto elem : m_queChilds )
-        {
-            CAttrExp* pExp = elem;
-            if( pExp == nullptr )
-                continue;
-            guint32 dwToken = pExp->GetName();
-            if( dwToken != TOK_TIMEOUT )
-                continue;
-            BufPtr pBuf = pExp->GetVal();
+        do{
+            gint32 ret = GetAttrByToken(
+                TOK_TIMEOUT, pBuf );
+
+            if( ERROR( ret ) )
+                break;
+
             if( pBuf.IsEmpty() || pBuf->empty() )
                 break;
+
             dwTimeout = *pBuf;
-        }
+
+        }while( 0 );
+
         return dwTimeout;
     }
+
     bool IsEvent() const
     {
-        for( auto elem : m_queChilds )
-        {
-            CAttrExp* pExp = elem;
-            if( pExp == nullptr )
-                continue;
-            guint32 dwToken = pExp->GetName();
-            if( dwToken == TOK_EVENT )
-                return true;
-        }
-        return false;
+        BufPtr pBuf;
+        gint32 ret = GetAttrByToken(
+            TOK_EVENT, pBuf );
+        if( ERROR( ret ) )
+            return false;
+        return true;
     }
 };
 
@@ -1127,6 +1146,183 @@ struct CServiceDecl : public CInterfRef
         if( pifrs == nullptr )
             return -ENOENT;
         return pifrs->GetIfRefs( vecIfs );
+    }
+
+    bool CheckBoolAttr( guint32 token )
+    {
+        bool bRet = false;
+        do{
+            CAttrExps* pal = m_pAttrList;
+            if( pal == nullptr )
+                break;
+
+            BufPtr pBuf;
+            gint32 ret = pal->
+                GetAttrByToken( TOK_SSL, pBuf );
+            if( ERROR( ret ) )
+                break;
+
+            bRet = true;
+
+        }while( 0 );
+
+        return bRet;
+    }
+
+    gint32 GetValueAttr(
+        guint32 token, BufPtr& pBuf )
+    {
+        gint32 ret = 0;
+        do{
+            CAttrExps* pal = m_pAttrList;
+            if( pal == nullptr )
+            {
+                ret = -ENOENT;
+                break;
+            }
+
+            BufPtr pBuf;
+            ret = pal->GetAttrByToken(
+                TOK_SSL, pBuf );
+
+            if( ERROR( ret ) )
+                break;
+
+        }while( 0 );
+
+        return ret;
+    }
+
+    bool IsSSL()
+    { return CheckBoolAttr( TOK_SSL ); }
+
+    bool IsWebSocket()
+    { return CheckBoolAttr( TOK_WEBSOCK ); }
+
+    bool IsAuth()
+    { return CheckBoolAttr( TOK_AUTH ); }
+
+    bool IsCompress()
+    { return CheckBoolAttr( TOK_COMPRES ); }
+
+    gint32 GetRouterPath( std::string& strRtPath )
+    {
+        BufPtr pBuf;
+        gint32 ret = 0;
+        do{
+            ret = GetValueAttr(
+                TOK_RTPATH, pBuf );
+            if( ERROR( ret ) )
+                break;
+
+            if( pBuf.IsEmpty() || pBuf->empty() )
+            {
+                ret = -ENOENT;
+                break;
+            }
+
+            if( pBuf->GetExDataType() !=
+                typeString )
+            {
+                ret = -EINVAL;
+                break;
+            }
+
+            strRtPath = *pBuf;
+
+        }while( 0 );
+
+        return ret;
+    }
+
+    gint32 GetIpAddr( std::string& strIpAddr )
+    {
+        BufPtr pBuf;
+        gint32 ret = 0;
+        do{
+            ret = GetValueAttr(
+                TOK_IPADDR, pBuf );
+            if( ERROR( ret ) )
+                break;
+
+            if( pBuf.IsEmpty() || pBuf->empty() )
+            {
+                ret = -ENOENT;
+                break;
+            }
+
+            if( pBuf->GetExDataType() !=
+                typeString )
+            {
+                ret = -EINVAL;
+                break;
+            }
+
+            strIpAddr = *pBuf;
+
+        }while( 0 );
+
+        return ret;
+    }
+
+    gint32 GetTimeoutSec( guint32 dwTimeout )
+    {
+        BufPtr pBuf;
+        gint32 ret = 0;
+        do{
+            ret = GetValueAttr(
+                TOK_TIMEOUT, pBuf );
+            if( ERROR( ret ) )
+                break;
+
+            if( pBuf.IsEmpty() || pBuf->empty() )
+            {
+                ret = -ENOENT;
+                break;
+            }
+
+            if( pBuf->GetExDataType() !=
+                typeUInt32 )
+            {
+                ret = -EINVAL;
+                break;
+            }
+
+            dwTimeout = *pBuf;
+
+        }while( 0 );
+
+        return ret;
+    }
+
+    gint32 GetPortNum( guint32 dwPort )
+    {
+        BufPtr pBuf;
+        gint32 ret = 0;
+        do{
+            ret = GetValueAttr(
+                TOK_PORTNUM, pBuf );
+            if( ERROR( ret ) )
+                break;
+
+            if( pBuf.IsEmpty() || pBuf->empty() )
+            {
+                ret = -ENOENT;
+                break;
+            }
+
+            if( pBuf->GetExDataType() !=
+                typeUInt32 )
+            {
+                ret = -EINVAL;
+                break;
+            }
+
+            dwPort = *pBuf;
+
+        }while( 0 );
+
+        return ret;
     }
 };
 

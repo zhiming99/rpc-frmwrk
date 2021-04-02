@@ -171,25 +171,46 @@ class CCppWriter : public CWriterBase
     { m_pNode = pStmts; }
 
     inline gint32 SelectHeaderFile()
-    { return SelectFile( 0 ); }
+    {
+        m_strCurFile = m_pFiles->m_strAppHeader;
+        return SelectFile( 0 );
+    }
 
     inline gint32 SelectCppFile()
-    { return SelectFile( 1 ); }
+    {
+        m_strCurFile = m_pFiles->m_strAppCpp;
+        return SelectFile( 1 );
+    }
 
     inline gint32 SelectDescFile()
-    { return SelectFile( 2 ); }
+    {
+        m_strCurFile = m_pFiles->m_strObjDesc;
+        return SelectFile( 2 );
+    }
 
     inline gint32 SelectDrvFile()
-    { return SelectFile( 3 ); }
+    {
+        m_strCurFile = m_pFiles->m_strDriver;
+        return SelectFile( 3 );
+    }
 
     inline gint32 SelectMakefile()
-    { return SelectFile( 4 ); }
+    {
+        m_strCurFile = m_pFiles->m_strMakefile;
+        return SelectFile( 4 );
+    }
 
     inline gint32 SelectMainCli()
-    { return SelectFile( 5 ); }
+    {
+        m_strCurFile = m_pFiles->m_strMainCli;
+        return SelectFile( 5 );
+    }
 
     inline gint32 SelectMainSvr()
-    { return SelectFile( 6 ); }
+    {
+        m_strCurFile = m_pFiles->m_strMainSvr;
+        return SelectFile( 6 );
+    }
 
     inline gint32 SelectImplFile(
         const std::string& strFile )
@@ -199,6 +220,7 @@ class CCppWriter : public CWriterBase
         if( itr == m_pFiles->m_mapSvcImp.end() )
             return -ENOENT;
         gint32 idx = itr->second;
+        m_strCurFile = strFile;
         return SelectFile( idx );
     }
 };
@@ -587,22 +609,42 @@ class CImplMainFunc :
     gint32 Output();
 };
 
-class CExportMakefile
+struct CExportBase
 {
     CStatements* m_pNode = nullptr;
     CCppWriter* m_pWriter = nullptr;
+    std::string m_strFile;
+
+    CExportBase( CCppWriter* pWriter,
+        ObjPtr& pNode );
+    gint32 Output();
+};
+
+class CExportMakefile :
+    public CExportBase
+{
     public:
+    typedef CExportBase super;
     CExportMakefile( CCppWriter* pWriter,
         ObjPtr& pNode );
     gint32 Output();
 };
 
-class CExportObjDesc
+class CExportObjDesc :
+    public CExportBase
 {
+    public:
+    typedef CExportBase super;
 };
 
-class CExportDrivers
+class CExportDrivers :
+    public CExportBase
 {
+    public:
+    typedef CExportBase super;
+    CExportDrivers( CCppWriter* pWriter,
+        ObjPtr& pNode );
+    gint32 Output();
 };
 
 

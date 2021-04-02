@@ -224,8 +224,8 @@ int main( int argc, char** argv )
             else
             {
                 strAppName = pRoot->GetName();
-                printf( "info using app name '"
-                     "%s' \n",
+                printf(
+                    "info using app name '%s' \n",
                      strAppName.c_str() );
             }
             std::vector< ObjPtr > vecSvcs;
@@ -239,10 +239,9 @@ int main( int argc, char** argv )
             if( vecSvcs.size() > 1 )
             {
                 printf(
-                "warning too many services declared, only\n"
+                "warning more than one services declared, only\n"
                 "the first service will be used to generate\n"
-                "the project files\n" );
-                break;
+                "the `main' function\n" );
             }
         }
 
