@@ -4,7 +4,7 @@ iftest_CPPFLAGS= -I$(include_ipcdir)
 
 lib_LTLIBRARIES=libhellowrd.la
 libhellowrd_la_SOURCES = ifsvr.cpp ifclient.cpp ifsvr.h
-libhellowrd_la_LDFLAGS=-version-info 0:0:0
+libhellowrd_la_LDFLAGS=-version-info @VERSION@
 libhellowrd_la_LIBADD= $(iftest_LDFLAGS) -lpthread -ldl
 libhellowrd_la_CPPFLAGS=$(iftest_CPPFLAGS)
 

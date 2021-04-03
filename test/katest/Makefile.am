@@ -4,7 +4,7 @@ katest_CPPFLAGS= -I$(include_ipcdir)
 
 lib_LTLIBRARIES=libkasvr.la
 libkasvr_la_SOURCES = kasvr.cpp kacli.cpp kasvr.h
-libkasvr_la_LDFLAGS=-version-info 0:0:0
+libkasvr_la_LDFLAGS=-version-info @VERSION@
 libkasvr_la_LIBADD= $(katest_LDFLAGS) -lpthread -ldl
 libkasvr_la_CPPFLAGS=$(katest_CPPFLAGS)
 

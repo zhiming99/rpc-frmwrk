@@ -26,6 +26,7 @@
 #include <memory>
 #include <iostream>
 #include <fstream>
+#include <json/json.h>
 #include "rpc.h"
 
 guint32 GenClsid(
@@ -266,9 +267,10 @@ class CHeaderPrologue
         Wa( "#include \"rpc.h\"" );
         Wa( "#include \"ifhelper.h\"" );
         if( m_pStmts->IsStreamNeeded() )
-        {
             Wa( "#include \"streamex.h\"" );
-        }
+        else
+            Wa( "#include \"seribase.h\"" );
+
         return STATUS_SUCCESS;
     }
 };
@@ -635,6 +637,14 @@ class CExportObjDesc :
 {
     public:
     typedef CExportBase super;
+    CExportObjDesc( CCppWriter* pWriter,
+        ObjPtr& pNode );
+
+    gint32 Output();
+
+    gint32 BuildObjDesc(
+        CServiceDecl* psd,
+        Json::Value& oElem );
 };
 
 class CExportDrivers :

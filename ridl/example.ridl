@@ -71,7 +71,7 @@ interface IFileTransfer
         string szFileName, bool bRead )
         returns  ( FILE_INFO fi );
 
-    [ async, timeout=60 ]DownloadFile(\
+    [ async, timeout=60 ]DownloadFile(
         string szFileName,
         HSTREAM hChannel, uint64 offset,
         uint64 size )
@@ -94,9 +94,8 @@ service SimpFileSvc [
 };
 
 service StreamSvc [
-    timeout=120, rtpath="/",
-    ssl, websock, compress,
-    auth ]
+    timeout=100, rtpath="/rasp2",
+     compress, auth ]
 {
     interface IFileTransfer;
     interface IChat;

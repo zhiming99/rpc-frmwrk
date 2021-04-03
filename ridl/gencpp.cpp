@@ -1046,9 +1046,6 @@ gint32 GenCppFile(
         Wa( "#include \"rpc.h\"" );
         Wa( "#include \"iftasks.h\"" );
 
-        if( pStmts->IsStreamNeeded() )
-            Wa( "#include \"streamex.h\"" );
-
         Wa( "using namespace rpcf;" );
         CCOUT << "#include \"" << strName << ".h\"";
         NEW_LINE;
@@ -1225,6 +1222,10 @@ gint32 GenCppProj(
         oWriter.SelectDrvFile();
         CExportDrivers oedrv( &oWriter, pRoot );
         ret = oedrv.Output();
+
+        oWriter.SelectDescFile();
+        CExportObjDesc oedesc( &oWriter, pRoot );
+        ret = oedesc.Output();
 
     }while( 0 );
 
@@ -3082,7 +3083,7 @@ gint32 CDeclServiceImpl::Output()
             {
                 CCOUT << ",";
                 NEW_LINE;
-                GenFormInArgs( pInArgs );
+                GenFormInArgs( pInArgs, true );
             }
             CCOUT << " )";
             INDENT_DOWNL;
@@ -5892,7 +5893,6 @@ CExportDrivers::CExportDrivers(
     : super( pWriter, pNode )
 { m_strFile = "./drvtpl.json"; }
 
-#include <json/json.h>
 #include "jsondef.h"
 #include "frmwrk.h"
 
@@ -5982,6 +5982,217 @@ gint32 CExportDrivers::Output()
         Json::StyledStreamWriter oJWriter;
         oJWriter.write( *m_pWriter->m_curFp, oVal );
         m_pWriter->m_curFp->flush();
+
+    }while( 0 );
+
+    return ret;
+}
+
+CExportObjDesc::CExportObjDesc(
+    CCppWriter* pWriter,
+    ObjPtr& pNode )
+    : super( pWriter, pNode )
+{ m_strFile = "./odesctpl.json"; }
+
+gint32 CExportObjDesc::Output()
+{
+    gint32 ret = 0;
+    do{
+        ret = super::Output();
+        if( ERROR( ret ) )
+            break;
+
+        m_pWriter->m_curFp->flush();
+        m_pWriter->m_curFp->close();
+
+        Json::Value oVal;
+        ret = ReadJsonCfg(
+            m_pWriter->m_strCurFile,
+            oVal );
+        if( ERROR( ret ) )
+            break;
+
+        m_pWriter->m_curFp->open(
+            m_pWriter->m_strCurFile,
+            std::ofstream::out |
+            std::ofstream::trunc);
+        if( !m_pWriter->m_curFp->good() )
+        {
+            ret = -errno;
+            break;
+        }
+
+        std::string strAppName =
+            m_pNode->GetName();
+
+        oVal[ JSON_ATTR_SVRNAME ] = strAppName;
+
+        Json::Value oElemTmpl;
+
+        // get object array
+        Json::Value& oObjArray =
+            oVal[ JSON_ATTR_OBJARR ];
+
+        if( oObjArray == Json::Value::null ||
+            !oObjArray.isArray() ||
+            oObjArray.empty() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+
+        oElemTmpl = oObjArray[ 0 ];
+        oObjArray.clear();
+
+        std::vector< ObjPtr > vecSvcs;
+        ret = m_pNode->GetSvcDecls( vecSvcs );
+        if( ERROR( ret ) )
+            break;
+
+        for( auto& elem : vecSvcs )
+        {
+            CServiceDecl* psd = elem;
+            if( psd == nullptr )
+                continue;
+
+            Json::Value oElem = oElemTmpl;
+            ret = BuildObjDesc( psd, oElem );
+            if( ERROR( ret ) )
+                break;
+            oObjArray.append( oElem );
+        }
+
+        if( ERROR( ret ) )
+            break;
+
+        Json::StyledStreamWriter oJWriter;
+        oJWriter.write( *m_pWriter->m_curFp, oVal );
+        m_pWriter->m_curFp->flush();
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CExportObjDesc::BuildObjDesc(
+    CServiceDecl* psd, Json::Value& oElem )
+{
+    if( psd == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        std::string strSvcName =
+            psd->GetName();
+
+        oElem[ JSON_ATTR_OBJNAME ] = strSvcName;
+
+        guint32 dwVal = 0;
+        ret = psd->GetTimeoutSec( dwVal );
+        if( SUCCEEDED( ret ) )
+        {
+            oElem[ JSON_ATTR_REQ_TIMEOUT ] =
+                std::to_string( dwVal );
+            oElem[ JSON_ATTR_KA_TIMEOUT ] =
+                std::to_string( dwVal / 2 );
+        }
+
+        std::string strVal;
+        ret = psd->GetIpAddr( strVal );
+        if( SUCCEEDED( ret ) )
+            oElem[ JSON_ATTR_IPADDR ] = strVal;
+
+        ret = psd->GetPortNum( dwVal );
+        if( SUCCEEDED( ret ) )
+            oElem[ JSON_ATTR_TCPPORT ] =
+                std::to_string( dwVal / 2 );
+
+        ret = psd->GetRouterPath( strVal );
+        if( SUCCEEDED( ret ) )
+            oElem[ JSON_ATTR_ROUTER_PATH ] =
+                strVal;
+
+        if( psd->IsWebSocket() )
+            oElem[ JSON_ATTR_ENABLE_WEBSOCKET ] =
+                "true";
+        else
+            oElem[ JSON_ATTR_ENABLE_WEBSOCKET ] =
+                "false";
+
+        if( psd->IsCompress() )
+            oElem[ JSON_ATTR_ENABLE_COMPRESS ] =
+                "true";
+        else
+            oElem[ JSON_ATTR_ENABLE_COMPRESS ] =
+                "false";
+
+        if( psd->IsSSL() )
+            oElem[ JSON_ATTR_ENABLE_SSL ] =
+                "true";
+        else
+            oElem[ JSON_ATTR_ENABLE_SSL ] =
+                "false";
+
+        ret = 0;
+
+        // get interface array
+        Json::Value& oIfArray =
+            oElem[ JSON_ATTR_IFARR ];
+
+        if( oIfArray == Json::Value::null ||
+            !oIfArray.isArray() ||
+            oIfArray.empty() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+
+        guint32 i;
+        for( i = 0; i < oIfArray.size(); i++ )
+        {
+            if( !oIfArray[ i ].isMember(
+                JSON_ATTR_IFNAME ) )
+                continue;
+            Json::Value& oIfElem = oIfArray[ i ];
+            if( oIfElem[ JSON_ATTR_IFNAME ]
+                == "XXXX" )
+            {
+                std::string strMainIf = "C";
+                strMainIf += strSvcName + "_SvrImpl";
+                oIfElem[ JSON_ATTR_IFNAME ] =
+                    strMainIf;
+                oIfElem[ JSON_ATTR_BIND_CLSID ] =
+                    "true";
+                oIfElem[ JSON_ATTR_DUMMYIF ] =
+                    "true";
+                break;
+            }
+        }
+
+        if( psd->IsStream() )
+        {
+            Json::Value oJif;
+            oJif[ JSON_ATTR_IFNAME ] =
+                "IStream";
+            oIfArray.append( oJif );
+        }
+
+        std::vector< ObjPtr > vecIfs;
+        ret = psd->GetIfRefs( vecIfs );
+        if( ERROR( ret ) )
+            break;
+
+        for( auto& pIf : vecIfs )
+        {
+            CInterfRef* pifr = pIf;
+            if( pifr == nullptr )
+                continue;
+
+            Json::Value oJif;
+            oJif[ JSON_ATTR_IFNAME ] =
+                pifr->GetName();
+            oIfArray.append( oJif );
+        }
 
     }while( 0 );
 

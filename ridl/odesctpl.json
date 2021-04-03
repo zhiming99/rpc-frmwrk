@@ -13,27 +13,15 @@
             "QueuedRequests" : "false",
             "ProxyPortClass": "DBusProxyPdo",
             "ProxyPortClass-1": "DBusLocalPdo",
-            "comment-1" : "IpAddress is the ip address of the server",
             "IpAddress" : "192.168.3.13",
             "Compression" : "true",
             "EnableSSL" : "true",
             "EnableWS" : "false",
             "RouterPath" : "/",
-            "AuthInfo-1" :
-            {
-                "comment" : "kerberos auth info, all the fields are required",
-                "AuthMech" : "krb5",
-                "UserName" : "zhiming@rpcf.org",
-                "ServiceName" : "rasp1@rpcf.org",
-                "Realm" : "rpcf.org",
-                "SignMessage" : "true"
-            },
             "Interfaces" :
             [
                 {
-                    "Comment-0" : "the following attributes are mandatory",
                     "InterfaceName" : "XXXX",
-                    "Comment-1" : "the following is a flag whether to use the object clsid for this interface, usually it indicates this is the major interface of this object, there must be one interface bind to clsid",
                     "BindToClsid" : "true"
                 },
                 {

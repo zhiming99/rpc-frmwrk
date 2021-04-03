@@ -532,6 +532,63 @@ do{ \
     ( pBuf_ )->SetOffset( dwOffset + size_ ); \
 }while( 0 )
 
+template<>
+gint32 CSerialBase::Serialize< gint16 >(
+    BufPtr& pBuf, const gint16& val ) const;
+
+template<>
+gint32 CSerialBase::Serialize< guint16 >(
+    BufPtr& pBuf, const guint16& val ) const;
+
+template<>
+gint32 CSerialBase::Serialize< gint32 >(
+    BufPtr& pBuf, const gint32& val ) const;
+
+template<>
+gint32 CSerialBase::Serialize< guint32 >(
+    BufPtr& pBuf, const guint32& val ) const;
+
+template<>
+gint32 CSerialBase::Serialize< gint64 >(
+    BufPtr& pBuf, const gint64& val ) const;
+
+template<>
+gint32 CSerialBase::Serialize< guint64 >(
+    BufPtr& pBuf, const guint64& val ) const;
+
+template<>
+gint32 CSerialBase::Serialize< float >(
+    BufPtr& pBuf, const float& val ) const;
+
+template<>
+gint32 CSerialBase::Serialize< double >(
+    BufPtr& pBuf, const double& val ) const;
+
+template<>
+gint32 CSerialBase::Serialize< bool >(
+    BufPtr& pBuf, const bool& val ) const;
+
+template<>
+gint32 CSerialBase::Serialize< guint8 >(
+    BufPtr& pBuf, const guint8& val ) const;
+
+template<>
+gint32 CSerialBase::Serialize< char >(
+    BufPtr& pBuf, const char& val ) const;
+
+template<>
+gint32 CSerialBase::Serialize< std::string >(
+    BufPtr& pBuf, const std::string& val ) const;
+
+template<>
+gint32 CSerialBase::Serialize< ObjPtr >(
+    BufPtr& pBuf, const ObjPtr& val ) const;
+
+// bytearray
+template<>
+gint32 CSerialBase::Serialize< BufPtr >(
+    BufPtr& pBuf, const BufPtr& val ) const;
+
 
 template<>
 gint32 CSerialBase::Deserialize< bool >(

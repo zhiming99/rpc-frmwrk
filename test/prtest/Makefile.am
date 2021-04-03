@@ -4,7 +4,7 @@ prtest_CPPFLAGS= -I$(include_ipcdir)
 
 lib_LTLIBRARIES= libprsvr.la
 libprsvr_la_SOURCES = prsvr.cpp prcli.cpp prsvr.h
-libprsvr_la_LDFLAGS=-version-info 0:0:0
+libprsvr_la_LDFLAGS=-version-info @VERSION@
 libprsvr_la_LIBADD= $(prtest_LDFLAGS) -lpthread -ldl
 libprsvr_la_CPPFLAGS=$(prtest_CPPFLAGS)
 

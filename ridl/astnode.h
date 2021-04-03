@@ -1181,9 +1181,8 @@ struct CServiceDecl : public CInterfRef
                 break;
             }
 
-            BufPtr pBuf;
             ret = pal->GetAttrByToken(
-                TOK_SSL, pBuf );
+                token, pBuf );
 
             if( ERROR( ret ) )
                 break;
@@ -1265,7 +1264,7 @@ struct CServiceDecl : public CInterfRef
         return ret;
     }
 
-    gint32 GetTimeoutSec( guint32 dwTimeout )
+    gint32 GetTimeoutSec( guint32& dwTimeout )
     {
         BufPtr pBuf;
         gint32 ret = 0;
@@ -1295,7 +1294,7 @@ struct CServiceDecl : public CInterfRef
         return ret;
     }
 
-    gint32 GetPortNum( guint32 dwPort )
+    gint32 GetPortNum( guint32& dwPort )
     {
         BufPtr pBuf;
         gint32 ret = 0;
