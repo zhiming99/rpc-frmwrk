@@ -4,7 +4,7 @@ actc_CPPFLAGS= -I$(include_ipcdir)
 
 lib_LTLIBRARIES=libactc.la
 libactc_la_SOURCES = actcsvr.cpp actcli.cpp actcsvr.h
-libactc_la_LDFLAGS=-version-info @VERSION@
+libactc_la_LDFLAGS=-version-info @VERSION2@
 libactc_la_LIBADD= $(actc_LDFLAGS) -lpthread -ldl
 libactc_la_CPPFLAGS=$(actc_CPPFLAGS)
 

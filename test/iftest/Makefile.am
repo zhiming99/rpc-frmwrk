@@ -4,7 +4,7 @@ iftest_CPPFLAGS= -I$(include_ipcdir)
 
 lib_LTLIBRARIES=libecho.la
 libecho_la_SOURCES = ifsvr.cpp ifclient.cpp ifsvr.h
-libecho_la_LDFLAGS=-version-info @VERSION@
+libecho_la_LDFLAGS=-version-info @VERSION2@
 libecho_la_LIBADD=$(iftest_LDFLAGS) -lpthread -ldl
 libecho_la_CPPFLAGS=$(iftest_CPPFLAGS)
 

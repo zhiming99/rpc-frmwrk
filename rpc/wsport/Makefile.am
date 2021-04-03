@@ -6,7 +6,7 @@ libwspt_la_CPPFLAGS  = -I$(top_srcdir)/ipc -I../ -I$(top_srcdir)/combase
 
 libwspt_ladir=$(libdir)
 
-libwspt_la_LDFLAGS = -version-info @VERSION@
+libwspt_la_LDFLAGS = -version-info @VERSION2@
 libwspt_la_LIBADD = -L../../combase -L.. -L../../ipc -L./wsproto \
 -L../../3rd_party -lutils -lrpc -lipc -lcombase -lwsock -lpthread -ldl
 

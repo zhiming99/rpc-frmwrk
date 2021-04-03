@@ -4,7 +4,7 @@ stmtest_CPPFLAGS= -I$(include_ipcdir)
 
 lib_LTLIBRARIES=libstmsvr.la
 libstmsvr_la_SOURCES = stmsvr.cpp stmcli.cpp stmsvr.h
-libstmsvr_la_LDFLAGS=-version-info @VERSION@
+libstmsvr_la_LDFLAGS=-version-info @VERSION2@
 libstmsvr_la_LIBADD= $(stmtest_LDFLAGS) -lpthread -ldl
 libstmsvr_la_CPPFLAGS=$(stmtest_CPPFLAGS)
 

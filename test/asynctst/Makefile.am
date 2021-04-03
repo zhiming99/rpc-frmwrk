@@ -4,7 +4,7 @@ async_CPPFLAGS= -I$(include_ipcdir)
 
 lib_LTLIBRARIES=libascsvr.la
 libascsvr_la_SOURCES = asyncsvr.cpp asyncli.cpp
-libascsvr_la_LDFLAGS=-version-info @VERSION@
+libascsvr_la_LDFLAGS=-version-info @VERSION2@
 libascsvr_la_LIBADD= $(async_LDFLAGS) -lpthread -ldl
 libascsvr_la_CPPFLAGS=$(async_CPPFLAGS)
 

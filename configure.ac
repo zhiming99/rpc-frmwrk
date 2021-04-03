@@ -200,5 +200,7 @@ AC_ARG_ENABLE([testcases],
 
 AM_CONDITIONAL([ENABLE_TESTCASES],[test "$enable_testcases" = "yes"])
 
+VERSION2='$(subst .,:,$(VERSION))'
+AC_SUBST(VERSION2)
 
 AC_OUTPUT

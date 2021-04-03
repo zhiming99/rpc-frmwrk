@@ -29,5 +29,5 @@ ipcconfdir=$(sysconfdir)/rpcf
 
 libipc_ladir=$(libdir)
 
-libipc_la_LDFLAGS=-version-info @VERSION@
+libipc_la_LDFLAGS=-version-info @VERSION2@
 libipc_la_LIBADD= $(COMMON_LINK) -L../3rd_party -L../combase -lcombase -lutils -lpthread -ldl -ljsoncpp

@@ -4,7 +4,7 @@ inproc_CPPFLAGS= -I$(include_ipcdir)
 
 lib_LTLIBRARIES=libinproc.la
 libinproc_la_SOURCES = inprocsvr.cpp inprocli.cpp inprocsvr.h
-libinproc_la_LDFLAGS=-version-info @VERSION@
+libinproc_la_LDFLAGS=-version-info @VERSION2@
 libinproc_la_LIBADD= $(inproc_LDFLAGS) -lpthread -ldl
 libinproc_la_CPPFLAGS=$(inproc_CPPFLAGS)
 
