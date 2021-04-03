@@ -2795,19 +2795,6 @@ gint32 CDeclServiceImpl::DeclAbstMethod(
         if( bOutArg )
             dwCount += dwOutCount;
 
-        if( dwCount == 0 )
-        {
-            if( oMethod.first.back() == '(' )
-            {
-                CCOUT << oMethod.first;
-                CCOUT << ");";
-                NEW_LINE;
-                break;
-            }
-            // there are some fixed arguments
-            // to indent
-        }
-
         std::string strRet = oMethod.first;
         if( !bComma )
         {
@@ -2816,6 +2803,22 @@ gint32 CDeclServiceImpl::DeclAbstMethod(
             strRet = strRet.substr(
                 sizeof( szHeader ) - 1 );
         }
+
+        if( dwCount == 0 )
+        {
+            if( strRet.back() == '(' )
+            {
+                CCOUT << strRet;
+                CCOUT << ")";
+                if( bComma )
+                    CCOUT << ";";
+                NEW_LINE;
+                break;
+            }
+            // there are some fixed arguments
+            // to indent
+        }
+
         size_t pos = strRet.find_first_of( '(' );
         bool bAppend = false;
         if( pos != std::string::npos )
