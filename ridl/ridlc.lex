@@ -524,6 +524,8 @@ std::map< std::string, yytokentype >
         { "websock", TOK_WEBSOCK },
         { "compress", TOK_COMPRES },
         { "auth", TOK_AUTH },
+        { "ipaddr", TOK_IPADDR },
+        { "portnum", TOK_PORTNUM },
 
         { "struct", TOK_STRUCT }, 
         { "interface", TOK_INTERFACE }, 

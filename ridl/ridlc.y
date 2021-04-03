@@ -566,6 +566,8 @@ attr_name :
     | TOK_WEBSOCK { DEFAULT_ACTION; }
     | TOK_COMPRES { DEFAULT_ACTION; }
     | TOK_AUTH { DEFAULT_ACTION; }
+    | TOK_IPADDR { DEFAULT_ACTION; }
+    | TOK_PORTNUM { DEFAULT_ACTION; }
     ;
 
 attr_exp : attr_name
