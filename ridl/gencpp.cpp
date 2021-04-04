@@ -4680,7 +4680,7 @@ gint32 CImplIfMethodSvr::OutputEvent()
             Wa( "nullptr, oOptions_.GetCfg()," );
             CCOUT << "iid( "<< strIfName << " ), ";
             NEW_LINE;
-            CCOUT << "\"" << strMethod << "\" ) ";
+            CCOUT << "\"" << strMethod << "\", \"\" ) ";
             INDENT_DOWN;
         }
         else if( !bSerial )
@@ -4690,10 +4690,8 @@ gint32 CImplIfMethodSvr::OutputEvent()
             Wa( "nullptr, oOptions_.GetCfg()," );
             CCOUT << "iid( "<< strIfName << " ), ";
             NEW_LINE;
-            CCOUT << "\"" << strMethod << "\", \"\"";
-            INDENT_DOWN;
-
-            INDENT_UP;
+            CCOUT << "\"" << strMethod << "\", \"\",";
+            NEW_LINE;
             ret = GenActParams( pInArgs );
             if( ERROR( ret ) )
                 break;
@@ -4715,12 +4713,12 @@ gint32 CImplIfMethodSvr::OutputEvent()
             Wa( "nullptr, oOptions_.GetCfg()," );
             CCOUT << "iid( "<< strIfName << " ), ";
             NEW_LINE;
-            CCOUT << "\"" << strMethod << "\", \"\"";
+            CCOUT << "\"" << strMethod << "\", \"\",";
             NEW_LINE;
             CCOUT << "pBuf_ );";
             INDENT_DOWN;
         }
-        NEW_LINE;
+        NEW_LINES( 2 );
         CCOUT << "return ret;";
 
         BLOCK_CLOSE;
