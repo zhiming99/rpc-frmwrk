@@ -500,6 +500,7 @@ class CImplSerialStruct
     CImplSerialStruct( CCppWriter* pWriter,
         ObjPtr& pNode );
 
+    gint32 OutputAssign();
     gint32 OutputSerial();
     gint32 OutputDeserial();
     gint32 Output();

@@ -1600,6 +1600,11 @@ gint32 CDeclareStruct::Output()
         INDENT_DOWNL;
         Wa( "{ return m_strMsgId; }" );
 
+        NEW_LINE;
+        CCOUT << strName << "& " << "operator=(";
+        INDENT_UPL;
+        CCOUT << "const " << strName << "& rhs );";
+        INDENT_DOWN;
         BLOCK_CLOSE;
         CCOUT << ";";
         NEW_LINES( 2 );
@@ -3365,6 +3370,7 @@ gint32 CImplSerialStruct::OutputSerial()
         Wa( "return ret;" );
 
         BLOCK_CLOSE;
+        NEW_LINE;
 
     }while( 0 );
 
@@ -3417,6 +3423,74 @@ gint32 CImplSerialStruct::OutputDeserial()
         Wa( "return ret;" );
 
         BLOCK_CLOSE;
+        NEW_LINE;
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CImplSerialStruct::OutputAssign()
+{
+    gint32 ret = 0;
+    do{
+        std::string strName = m_pNode->GetName();
+        CCOUT << strName << "& " << strName
+            << "::" << "operator=(";
+        INDENT_UPL;
+        CCOUT<< "const " << strName << "& rhs )";
+        INDENT_DOWNL;
+        BLOCK_OPEN;
+        CCOUT << "do";
+        BLOCK_OPEN;
+
+        ObjPtr pFields =
+            m_pNode->GetFieldList();
+        CFieldList* pfl = pFields;
+        if( pfl == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        guint32 dwCount = pfl->GetCount();
+        if( dwCount == 0 )
+        {
+            CCOUT << "break;";
+        }
+        else
+        {
+            Wa( "// data members" );
+            CCOUT << "if( GetObjId() == rhs.GetObjId() )";
+            INDENT_UPL;
+            CCOUT << "break;";
+            INDENT_DOWNL;
+            NEW_LINE;
+            guint32 i = 0;
+            for( ; i < dwCount; i++ )
+            {
+                ObjPtr pObj = pfl->GetChild( i );
+                CFieldDecl* pfd = pObj;
+                if( pfd == nullptr )
+                {
+                    ret = -EFAULT;
+                    break;
+                }
+                std::string strField =
+                    pfd->GetName();
+
+                CCOUT<< strField << " = rhs."
+                    << strField << ";"; 
+                if( i + 1 < dwCount )
+                    NEW_LINE;
+            }
+            NEW_LINE;
+        }
+        BLOCK_CLOSE;
+        CCOUT << "while( 0 );";
+        NEW_LINES( 2 );
+        CCOUT << "return *this;";
+        BLOCK_CLOSE;
+        NEW_LINE;
 
     }while( 0 );
 
@@ -3432,6 +3506,8 @@ gint32 CImplSerialStruct::Output()
     ret = OutputDeserial();
     if( ERROR( ret ) )
         return ret;
+    NEW_LINE;
+    ret = OutputAssign();
     NEW_LINE;
     return ret;
 }
@@ -4773,7 +4849,7 @@ gint32 CImplIfMethodSvr::OutputSync()
         {
             CCOUT << "gint32 ret = this->"
                 << strMethod << "();";
-
+            NEW_LINE;
             Wa( "CParamList oResp_;" );
             Wa( "oResp_[ propReturnValue ] = ret;" );
         }
