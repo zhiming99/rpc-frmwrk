@@ -4076,15 +4076,20 @@ gint32 CImplIfMethodProxy::OutputSync()
         Wa( "gint32 ret = 0;" );
         Wa( "CParamList oOptions_;" );
         Wa( "CfgPtr pResp_;" );
-        CCOUT << "oOptions_[ propIfName ] = \""
-            << strIfName << "\";";
+        CCOUT << "oOptions_[ propIfName ] =";
+        INDENT_UP;
         NEW_LINE;
-        if( !bSerial )
-            CCOUT << "oOptions_[ propSeriProto ] = "
-                << "( guint32 )seriNone;";
+        CCOUT << "DBUS_IF_NAME( \""
+            << strIfName << "\" );";
+        INDENT_DOWN;
+        NEW_LINE;
+        CCOUT << "oOptions_[ propSeriProto ] = ";
+        INDENT_UPL;
+        if( bSerial )
+            CCOUT << "( guint32 )seriRidl;";
         else
-            CCOUT << "oOptions_[ propSeriProto ] = "
-                << "( guint32 )seriRidl;";
+            CCOUT << "( guint32 )seriNone;";
+        INDENT_DOWNL;
         guint32 dwTimeoutSec =
             m_pNode->GetTimeoutSec();
         if( dwTimeoutSec > 0 )
@@ -4239,7 +4244,7 @@ gint32 CImplIfMethodProxy::OutputAsync()
 
         Wa( "CParamList oOptions_;" );
         Wa( "CfgPtr pResp_;" );
-        CCOUT << "oOptions_[ propIfName ] = ";
+        CCOUT << "oOptions_[ propIfName ] =";
         INDENT_UP;
         NEW_LINE;
         CCOUT << "DBUS_IF_NAME( \""
@@ -4619,10 +4624,12 @@ gint32 CImplIfMethodSvr::OutputEvent()
         Wa( "gint32 ret = 0;" );
         Wa( "CParamList oOptions_;" );
         CCOUT << "oOptions_[ propSeriProto ] = ";
+        INDENT_UPL;
         if( bSerial )
             CCOUT << "( guint32 )seriRidl;";
         else
             CCOUT << "( guint32 )seriNone;";
+        INDENT_DOWNL;
         guint32 dwTimeoutSec =
             m_pNode->GetTimeoutSec();
         if( dwTimeoutSec > 0 )
@@ -5659,7 +5666,7 @@ gint32 CImplMainFunc::Output()
             NEW_LINE;
             Wa( "InterfPtr pIf;" );
             Wa( "CParamList oParams;" );
-
+            Wa( "oParams[ propIoMgr ] = g_pIoMgr;" );
             CCOUT << "ret = CRpcServices::LoadObjDesc(";
             INDENT_UPL;
             CCOUT << "\"./"
@@ -5680,7 +5687,6 @@ gint32 CImplMainFunc::Output()
             INDENT_DOWNL;
             NEW_LINE;
 
-            Wa( "oParams[ propIoMgr ] = g_pIoMgr;" );
             CCOUT << "ret = pIf.NewObj(";
             INDENT_UPL;
             CCOUT << "clsid( " << strClass << " ),";
