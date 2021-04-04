@@ -2086,7 +2086,7 @@ gint32 CIoManager::TryFindDescFile(
         }
 
         ret = FindInstCfg(
-            strFile, strFullPath );
+            strFile, strPath );
 
     }while( 0 );
 
