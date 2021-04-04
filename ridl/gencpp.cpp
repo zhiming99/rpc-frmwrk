@@ -688,20 +688,33 @@ CFileSet::CFileSet(
         "desc.json";
 
     m_strDriver =
-        strOutPath + "/" + "driver.json";
+        strOutPath + "/driver.json";
 
     m_strMakefile =
-        strOutPath + "/" + "Makefile" ;
+        strOutPath + "/Makefile" ;
 
     m_strMainCli =
-        strOutPath + "/" + "maincli.cpp";
+        strOutPath + "/maincli.cpp";
+
+    gint32 ret = access(
+        m_strMainCli.c_str(), F_OK );
+
+    if( ret == 0 )
+        m_strMainCli =
+            strOutPath + "/maincli.cpp.new";
 
     m_strMainSvr =
-        strOutPath + "/" + "mainsvr.cpp";
+        strOutPath + "/mainsvr.cpp";
+    ret = access(
+        m_strMainSvr.c_str(), F_OK );
+
+    if( ret == 0 )
+        m_strMainSvr =
+            strOutPath + "/mainsvr.cpp.new";
 
     m_strPath = strOutPath;
 
-    gint32 ret = OpenFiles();
+    ret = OpenFiles();
     if( ERROR( ret ) )
     {
         std::string strMsg = DebugMsg( ret,
@@ -769,30 +782,44 @@ gint32 CFileSet::AddSvcImpl(
 {
     if( strSvcName.empty() )
         return -EINVAL;
+    gint32 ret = 0;
+    do{
+        gint32 idx = m_vecFiles.size();
+        std::string strExt = ".cpp";
+        std::string strCpp = m_strPath +
+            "/" + strSvcName + ".cpp";
 
-    gint32 idx = m_vecFiles.size();
-    std::string strCpp = m_strPath +
-        "/" + strSvcName + ".cpp";
+        ret = access( strCpp.c_str(), F_OK );
+        if( ret == 0 )
+        {
+            strExt = "cpp.new";
+            strCpp = m_strPath + "/" +
+                strSvcName + ".cpp.new";
+        }
 
-    std::string strHeader = m_strPath +
-        "/" + strSvcName + ".h";
+        std::string strHeader = m_strPath +
+            "/" + strSvcName + ".h";
 
-    STMPTR pstm( new std::ofstream(
-        strHeader,
-        std::ofstream::out |
-        std::ofstream::trunc ) );
+        STMPTR pstm( new std::ofstream(
+            strHeader,
+            std::ofstream::out |
+            std::ofstream::trunc ) );
 
-    m_vecFiles.push_back( std::move( pstm ) );
-    m_mapSvcImp[ strSvcName + ".h" ] = idx++;
+        m_vecFiles.push_back( std::move( pstm ) );
+        m_mapSvcImp[ strSvcName + ".h" ] = idx;
 
-    pstm = STMPTR( new std::ofstream(
-        strCpp,
-        std::ofstream::out |
-        std::ofstream::trunc) );
+        pstm = STMPTR( new std::ofstream(
+            strCpp,
+            std::ofstream::out |
+            std::ofstream::trunc) );
 
-    m_vecFiles.push_back( std::move( pstm ) );
-    m_mapSvcImp[ strSvcName + ".cpp" ] = idx++;
-    return 0;
+        idx += 1;
+        m_vecFiles.push_back( std::move( pstm ) );
+        m_mapSvcImp[ strSvcName + strExt ] = idx;
+
+    }while( 0 );
+
+    return ret;
 }
 
 CFileSet::~CFileSet()
