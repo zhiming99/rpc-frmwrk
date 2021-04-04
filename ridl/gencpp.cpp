@@ -4690,7 +4690,7 @@ gint32 CImplIfMethodSvr::OutputEvent()
             Wa( "nullptr, oOptions_.GetCfg()," );
             CCOUT << "iid( "<< strIfName << " ), ";
             NEW_LINE;
-            CCOUT << "\"" << strMethod << "\", ";
+            CCOUT << "\"" << strMethod << "\", \"\"";
             INDENT_DOWN;
 
             INDENT_UP;
@@ -4715,7 +4715,7 @@ gint32 CImplIfMethodSvr::OutputEvent()
             Wa( "nullptr, oOptions_.GetCfg()," );
             CCOUT << "iid( "<< strIfName << " ), ";
             NEW_LINE;
-            CCOUT << "\"" << strMethod << "\", ";
+            CCOUT << "\"" << strMethod << "\", \"\"";
             NEW_LINE;
             CCOUT << "pBuf_ );";
             INDENT_DOWN;
