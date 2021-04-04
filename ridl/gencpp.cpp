@@ -792,7 +792,7 @@ gint32 CFileSet::AddSvcImpl(
         ret = access( strCpp.c_str(), F_OK );
         if( ret == 0 )
         {
-            strExt = "cpp.new";
+            strExt = ".cpp.new";
             strCpp = m_strPath + "/" +
                 strSvcName + ".cpp.new";
         }
@@ -1024,6 +1024,12 @@ gint32 GenHeaderFile(
 
             ret = pWriter->SelectImplFile(
                 elem.first + ".cpp" ); 
+
+            if( ERROR( ret ) )
+            {
+                ret = pWriter->SelectImplFile(
+                    elem.first + ".cpp.new" );
+            }
 
             if( ERROR( ret ) )
                 break;
