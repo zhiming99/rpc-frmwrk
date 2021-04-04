@@ -156,6 +156,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CIfIoCallTask );
     INIT_MAP_ENTRYCFG( CDummyInterfaceState );
     INIT_MAP_ENTRYCFG( CSimpleSyncIf );
+    INIT_MAP_ENTRYCFG( CIfAsyncCancelHandler );
 
 #ifdef _USE_LIBEV
     INIT_MAP_ENTRYCFG( CDBusLoopHooks );

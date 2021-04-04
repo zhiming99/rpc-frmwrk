@@ -4680,7 +4680,7 @@ gint32 CImplIfMethodSvr::OutputEvent()
             Wa( "nullptr, oOptions_.GetCfg()," );
             CCOUT << "iid( "<< strIfName << " ), ";
             NEW_LINE;
-            CCOUT << "\"" << strMethod << "\", \"\" ) ";
+            CCOUT << "USER_EVENT( \"" << strMethod << "\" ), \"\" ) ";
             INDENT_DOWN;
         }
         else if( !bSerial )
@@ -4690,7 +4690,7 @@ gint32 CImplIfMethodSvr::OutputEvent()
             Wa( "nullptr, oOptions_.GetCfg()," );
             CCOUT << "iid( "<< strIfName << " ), ";
             NEW_LINE;
-            CCOUT << "\"" << strMethod << "\", \"\",";
+            CCOUT << "USER_EVENT( \"" << strMethod << "\" ), \"\",";
             NEW_LINE;
             ret = GenActParams( pInArgs );
             if( ERROR( ret ) )
@@ -4713,7 +4713,7 @@ gint32 CImplIfMethodSvr::OutputEvent()
             Wa( "nullptr, oOptions_.GetCfg()," );
             CCOUT << "iid( "<< strIfName << " ), ";
             NEW_LINE;
-            CCOUT << "\"" << strMethod << "\", \"\",";
+            CCOUT << "USER_EVENT( \"" << strMethod << "\" ), \"\",";
             NEW_LINE;
             CCOUT << "pBuf_ );";
             INDENT_DOWN;

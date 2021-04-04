@@ -6266,6 +6266,15 @@ gint32 CInterfaceServer::DoInvoke(
                         propDestDBusName, strVal );
             }while( 0 );
 
+            // for keep-alive purpose
+            CCfgOpenerObj oTaskCfg( pCallback );
+            SET_RMT_TASKID( pCfg, oTaskCfg );
+
+            // copy the request for reference
+            // later
+            oTaskCfg.SetObjPtr(
+                propReqPtr, ObjPtr( pCfg ) );
+
             ret = InvokeUserMethod(
                 pCfg, pCallback );
 
@@ -6277,16 +6286,12 @@ gint32 CInterfaceServer::DoInvoke(
                 ( dwFlags & CF_WITH_REPLY ) )
                 bResp = true;
 
-            if( ret == STATUS_PENDING )
+            if( ret != STATUS_PENDING )
             {
-                // for keep-alive purpose
-                CCfgOpenerObj oTaskCfg( pCallback );
-                SET_RMT_TASKID( pCfg, oTaskCfg );
-
-                // copy the request for reference
-                // later
-                oTaskCfg.SetObjPtr(
-                    propReqPtr, ObjPtr( pCfg ) );
+                oTaskCfg.RemoveProperty(
+                    propRmtTaskId );
+                oTaskCfg.RemoveProperty(
+                    propReqPtr );
             }
 
         }while( 0 );
