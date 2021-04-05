@@ -165,14 +165,17 @@ class CSerialBase
 
         strElemSig.erase( itr );
 
+        guint32 dwBytesOff = pBuf->offset();
         Serialize( pBuf, ( guint32 )0 );
 
         if( val.size() == 0 )
+        {
+            Serialize( pBuf, ( guint32 )0 );
             return STATUS_SUCCESS;
+        }
 
-        Serialize( pBuf, htonl( val.size() ) );
+        Serialize( pBuf, ( guint32 )val.size() );
         gint32 ret = 0;
-        guint32 dwBytesOff = pBuf->offset();
         for( auto& elem : val )
         {
             ret = SerialElem(
@@ -185,7 +188,7 @@ class CSerialBase
             return ret;
 
         guint32 dwBytes = pBuf->offset() -
-            dwBytesOff + sizeof( guint32 ) * 2;
+            dwBytesOff - 2 * sizeof( guint32 );
 
         guint32* pdwBytes = ( guint32* )(
             pBuf->ptr() - pBuf->offset() +
@@ -234,7 +237,7 @@ class CSerialBase
         }
 
         Serialize( pBuf,
-            htonl( mapVals.size() ) );
+            ( guint32 )mapVals.size() );
 
         gint32 ret = 0;
         for( auto& elem : mapVals )
@@ -256,7 +259,7 @@ class CSerialBase
             return ret;
 
         guint32 dwBytes = pBuf->offset() -
-            dwBytesOff + sizeof( guint32 ) * 2;
+            dwBytesOff - sizeof( guint32 ) * 2;
 
         guint32* pdwBytes = ( guint32* )(
             pBuf->ptr() - pBuf->offset() +
@@ -372,12 +375,16 @@ class CSerialBase
         memcpy( &dwBytes, pdwBytes,
             sizeof( guint32 ) );
         dwBytes = ntohl( dwBytes );
+        if( dwBytes > MAX_BYTES_PER_BUFFER )
+            return -ERANGE;
 
         guint32 dwCount = 0;
         memcpy( &dwCount,
             pdwBytes + sizeof( guint32 ),
             sizeof( guint32 ) );
         dwCount = ntohl( dwCount );
+        if( dwBytes == 0 || dwCount == 0 )
+            return 0;
 
         pBuf->IncOffset( dwHdrSize );
         if( dwCount == 0 )

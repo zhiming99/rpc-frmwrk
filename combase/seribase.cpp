@@ -388,13 +388,14 @@ gint32 CSerialBase::Deserialize< std::string >(
     ret = this->Deserialize( pBuf, dwCount );
     if( ERROR( ret ) )
         return ret;
+
+    val = "";
     if( dwCount == 0 )
-    {
-        val = "";
         return ret;
-    }
+
     guint32 dwBytes = 
         std::min( dwCount, pBuf->size() );
+
     val.append( pBuf->ptr(), dwBytes );
     pBuf->IncOffset( dwBytes );
     return STATUS_SUCCESS;
@@ -454,11 +455,18 @@ template<>
 gint32 CSerialBase::Deserialize< BufPtr >(
     BufPtr& pBuf, BufPtr& val )
 {
-    if( pBuf.IsEmpty() || val.IsEmpty() )
+    if( pBuf.IsEmpty() )
         return -EINVAL;
 
+    gint32 ret = 0;
+    if( val.IsEmpty() )
+        ret = val.NewObj();
+
+    if( ERROR( ret ) )
+        return ret;
+
     guint32 i = 0;
-    gint32 ret = Deserialize( pBuf, i );
+    ret = Deserialize( pBuf, i );
     if( ERROR( ret ) )
         return ret;
 
