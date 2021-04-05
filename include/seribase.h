@@ -62,27 +62,6 @@ struct HSTREAM_BASE
 {
 };
 
-struct CContCtx
-{
-    EnumContType m_iContType = typeArray;
-    EnumTypeId  m_iType = typeNone;
-    guint32*    m_pdwBytes = nullptr;
-    guint32*    m_pdwCount = nullptr;
-    guint32     m_dwCurSize = 0;
-    bool        m_bSerialize = true;
-
-    CContCtx()
-    {}
-
-    CContCtx( const CContCtx& rhs )
-    {
-        m_iContType = rhs.m_iContType;
-        m_iType = rhs.m_iType;
-        m_pdwBytes = rhs.m_pdwBytes;
-        m_pdwCount = rhs.m_pdwCount;
-    }
-};
-
 class CSerialBase
 {
     public:
@@ -168,17 +147,13 @@ class CSerialBase
         BufPtr& pBuf, T& val,
         const char* szSignature ) const
     {
+        // don't test pBuf->empty, since it is true
+        // all need to do is to append
         if( pBuf.IsEmpty() ||
-            pBuf->empty() ||
             szSignature == nullptr ||
             *szSignature != '(' )
             return -EINVAL;
 
-        guint32 dwHdrSize = sizeof( guint32 ) * 2;
-        if( pBuf->size() < dwHdrSize ) 
-            return -EINVAL;
-
-        CContCtx occ;
         std::string strElemSig = szSignature + 1;
         if( strElemSig.empty() ||
             strElemSig.back() != ')' )
@@ -189,20 +164,15 @@ class CSerialBase
             ( strElemSig.size() - 1 );
 
         strElemSig.erase( itr );
-        occ.m_pdwBytes = ( guint32* )pBuf->ptr();
-        occ.m_pdwCount = ( guint32* )
-            pBuf->ptr() + sizeof( guint32 );
 
-        pBuf->IncOffset( dwHdrSize );
+        Serialize( pBuf, ( guint32 )0 );
+
         if( val.size() == 0 )
-        {
-            *occ.m_pdwBytes = 0;
-            *occ.m_pdwCount = 0;
             return STATUS_SUCCESS;
-        }
 
+        Serialize( pBuf, htonl( val.size() ) );
         gint32 ret = 0;
-        *occ.m_pdwCount = htonl( val.size() );
+        guint32 dwBytesOff = pBuf->offset();
         for( auto& elem : val )
         {
             ret = SerialElem(
@@ -214,9 +184,16 @@ class CSerialBase
         if( ERROR( ret ) )
             return ret;
 
-        guint32 dwBytes =
-            pBuf->ptr() - ( char* )occ.m_pdwBytes;
-        *occ.m_pdwBytes = htonl( dwBytes );
+        guint32 dwBytes = pBuf->offset() -
+            dwBytesOff + sizeof( guint32 ) * 2;
+
+        guint32* pdwBytes = ( guint32* )(
+            pBuf->ptr() - pBuf->offset() +
+            dwBytesOff );
+
+        dwBytes = htonl( dwBytes );
+        memcpy( pdwBytes,
+            &dwBytes, sizeof( dwBytes ) );
 
         return STATUS_SUCCESS;
     }
@@ -228,16 +205,10 @@ class CSerialBase
         const char* szSignature ) const
     {
         if( pBuf.IsEmpty() ||
-            pBuf->empty() ||
             szSignature == nullptr ||
             *szSignature != '[' )
             return -EINVAL;
 
-        guint32 dwHdrSize = sizeof( guint32 ) * 2;
-        if( pBuf->size() < dwHdrSize ) 
-            return -EINVAL;
-
-        CContCtx occ;
         std::string strElemSig = szSignature + 1;
         if( strElemSig.empty() ||
             strElemSig.back() != ']' )
@@ -248,30 +219,35 @@ class CSerialBase
             ( strElemSig.size() - 1 );
 
         strElemSig.erase( itr );
-        occ.m_pdwBytes = ( guint32* )pBuf->ptr();
-        occ.m_pdwCount = ( guint32* )
-            pBuf->ptr() + sizeof( guint32 );
-
         std::string strKeySig =
             strElemSig.substr( 0, 1 );
         strElemSig.erase( strElemSig.begin() );
-        pBuf->IncOffset( dwHdrSize );
+
+        guint32 dwBytesOff = pBuf->offset();
+
+        Serialize( pBuf, ( guint32 )0 );
+
         if( mapVals.size() == 0 )
         {
-            *occ.m_pdwBytes = 0;
-            *occ.m_pdwCount = 0;
+            Serialize( pBuf, ( guint32 )0 );
             return STATUS_SUCCESS;
         }
+
+        Serialize( pBuf,
+            htonl( mapVals.size() ) );
+
         gint32 ret = 0;
-        *occ.m_pdwCount = htonl( mapVals.size() );
         for( auto& elem : mapVals )
         {
             ret = SerialElem(
-                pBuf, elem.first, strKeySig.c_str() );
+                pBuf, elem.first,
+                strKeySig.c_str() );
             if( ERROR( ret ) )
                 break;
+
             ret = SerialElem(
-                pBuf, elem.second, strElemSig.c_str() );
+                pBuf, elem.second,
+                strElemSig.c_str() );
             if( ERROR( ret ) )
                 break;
         }
@@ -279,9 +255,16 @@ class CSerialBase
         if( ERROR( ret ) )
             return ret;
 
-        guint32 dwBytes =
-            pBuf->ptr() - ( char* )occ.m_pdwBytes;
-        *occ.m_pdwBytes = htonl( dwBytes );
+        guint32 dwBytes = pBuf->offset() -
+            dwBytesOff + sizeof( guint32 ) * 2;
+
+        guint32* pdwBytes = ( guint32* )(
+            pBuf->ptr() - pBuf->offset() +
+            dwBytesOff );
+
+        dwBytes = htonl( dwBytes );
+        memcpy( pdwBytes,
+            &dwBytes, sizeof( dwBytes ) );
 
         return ret;
     }
@@ -372,7 +355,6 @@ class CSerialBase
         if( pBuf->size() < dwHdrSize ) 
             return -EINVAL;
 
-        CContCtx occ;
         std::string strElemSig = szSignature + 1;
         if( strElemSig.empty() ||
             strElemSig.back() != ')' )
@@ -383,16 +365,25 @@ class CSerialBase
             ( strElemSig.size() - 1 );
 
         strElemSig.erase( itr );
-        occ.m_pdwBytes = ( guint32* )pBuf->ptr();
-        occ.m_pdwCount = ( guint32* )
-            pBuf->ptr() + sizeof( guint32 );
+
+        guint32 dwBytes = 0;
+
+        char* pdwBytes = pBuf->ptr();
+        memcpy( &dwBytes, pdwBytes,
+            sizeof( guint32 ) );
+        dwBytes = ntohl( dwBytes );
+
+        guint32 dwCount = 0;
+        memcpy( &dwCount,
+            pdwBytes + sizeof( guint32 ),
+            sizeof( guint32 ) );
+        dwCount = ntohl( dwCount );
 
         pBuf->IncOffset( dwHdrSize );
-        if( *occ.m_pdwCount == 0 )
+        if( dwCount == 0 )
             return STATUS_SUCCESS;
 
         gint32 ret = 0;
-        guint32 dwCount = ntohl( *occ.m_pdwCount );
         if( dwCount > MAX_ELEM_COUNT )
             return -ERANGE;
 
@@ -408,10 +399,11 @@ class CSerialBase
         if( ERROR( ret ) )
             return ret;
 
-        guint32 dwBytes =
-            pBuf->ptr() - ( char* )occ.m_pdwBytes;
+        guint32 dwActBytes =
+            pBuf->ptr() - pdwBytes +
+            2 * sizeof( guint32 );
 
-        if( ntohl( *occ.m_pdwBytes ) != dwBytes )
+        if( dwActBytes != dwBytes )
             return -EBADMSG;
 
         return STATUS_SUCCESS;
@@ -432,7 +424,6 @@ class CSerialBase
         if( pBuf->size() < dwHdrSize ) 
             return -EINVAL;
 
-        CContCtx occ;
         std::string strElemSig = szSignature + 1;
         if( strElemSig.empty() ||
             strElemSig.back() != ']' )
@@ -443,24 +434,31 @@ class CSerialBase
             ( strElemSig.size() - 1 );
 
         strElemSig.erase( itr );
-        occ.m_pdwBytes = ( guint32* )pBuf->ptr();
-        occ.m_pdwCount = ( guint32* )
-            pBuf->ptr() + sizeof( guint32 );
-
         std::string strKeySig =
             strElemSig.substr( 0, 1 );
         strElemSig.erase( strElemSig.begin() );
-        pBuf->IncOffset( dwHdrSize );
-        guint32 dwCount = ntohl(
-            *occ.m_pdwCount );
 
+        guint32 dwBytes = 0;
+
+        char* pdwBytes = pBuf->ptr();
+        memcpy( &dwBytes, pdwBytes,
+            sizeof( guint32 ) );
+        dwBytes = ntohl( dwBytes );
+
+        guint32 dwCount = 0;
+        memcpy( &dwCount,
+            pdwBytes + sizeof( guint32 ),
+            sizeof( guint32 ) );
+        dwCount = ntohl( dwCount );
+
+        pBuf->IncOffset( dwHdrSize );
         if( dwCount == 0 )
             return STATUS_SUCCESS;
 
+        gint32 ret = 0;
         if( dwCount > MAX_ELEM_COUNT )
             return -ERANGE;
 
-        gint32 ret = 0;
         for( guint32 i = 0; i < dwCount; ++i )
         {
             std::pair< keytype, valtype > elem;
@@ -484,10 +482,11 @@ class CSerialBase
         if( ERROR( ret ) )
             return ret;
 
-        guint32 dwBytes =
-            pBuf->ptr() - ( char* )occ.m_pdwBytes;
+        guint32 dwActBytes =
+            pBuf->ptr() - pdwBytes +
+            2 * sizeof( guint32 );
 
-        if( ntohl( *occ.m_pdwBytes ) != dwBytes )
+        if( dwActBytes != dwBytes )
             return -EBADMSG;
 
         return ret;
@@ -528,6 +527,7 @@ class CStructBase :
 #define APPEND( pBuf_, ptr_, size_ ) \
 do{ \
     guint32 dwOffset = ( pBuf_ )->offset(); \
+    ( pBuf_ )->SetOffset( 0 );\
     ( pBuf_ )->Append( ( guint8* )( ptr_ ), size_ ); \
     ( pBuf_ )->SetOffset( dwOffset + size_ ); \
 }while( 0 )
@@ -610,8 +610,8 @@ gint32 CSerialBase::Deserialize< guint16 >(
     BufPtr& pBuf, guint16& val );
 
 template<>
-gint32 CSerialBase::Deserialize< gint16 >(
-    BufPtr& pBuf, gint16& val );
+gint32 CSerialBase::Deserialize< guint32 >(
+    BufPtr& pBuf, guint32& val );
 
 template<>
 gint32 CSerialBase::Deserialize< gint32 >(

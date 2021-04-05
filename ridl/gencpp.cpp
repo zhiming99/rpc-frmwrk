@@ -508,7 +508,8 @@ gint32 CMethodWriter::GenSerialArgs(
             "oSerial_", strBuf );
         if( ERROR( ret ) )
             break;
-
+        NEW_LINE;
+        CCOUT << strBuf << "->SetOffset( 0 );";
         BLOCK_CLOSE;
         CCOUT << "while( 0 );";
         NEW_LINES( 2 );
@@ -562,11 +563,16 @@ gint32 CMethodWriter::GenDeserialArgs(
 
         CCOUT << "do";
         BLOCK_OPEN;
+        CCOUT << "guint32 dwOrigOff = "
+            << strBuf << "->offset();";
+        NEW_LINE;
         ret = oedsc.OutputDeserial(
             "oDeserial_", strBuf );
         if( ERROR( ret ) )
             break;
-
+        NEW_LINE;
+        CCOUT << strBuf
+            << "->SetOffset( dwOrigOff );";
         BLOCK_CLOSE;
         CCOUT << "while( 0 );";
         NEW_LINES( 2 );
@@ -5012,7 +5018,7 @@ gint32 CImplIfMethodSvr::OutputSync()
                 if( ERROR( ret ) )
                     break;
 
-                CCOUT << "oResp_.Push( pBuf_ );";
+                CCOUT << "oResp_.Push( pBuf2 );";
                 BLOCK_CLOSE;
                 NEW_LINE;
             }
@@ -5343,7 +5349,7 @@ gint32 CImplIfMethodSvr::OutputAsyncSerial()
             Wa( "BufPtr pBuf2( true );" );
             ret = GenSerialArgs(
                 pOutArgs, "pBuf2", false, false );
-            CCOUT << "oResp_.Push( pBuf_ );";
+            CCOUT << "oResp_.Push( pBuf2 );";
             BLOCK_CLOSE;
             NEW_LINE;
         }

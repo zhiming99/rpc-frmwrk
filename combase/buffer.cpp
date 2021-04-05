@@ -573,7 +573,7 @@ gint32 CBuffer::Serialize( CBuffer& toBuf ) const
         // empty buffer
         pheader = reinterpret_cast< SERI_HEADER* >( toBuf.ptr() );
 
-        oHeader.dwClsid = htonl( clsid( CBuffer ) );
+        oHeader.dwClsid = clsid( CBuffer );
         oHeader.dwSize = 0;
         oHeader.dwType = DataTypeMem;
         oHeader.hton();
