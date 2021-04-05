@@ -260,19 +260,7 @@ class CHeaderPrologue
         m_pWriter = pWriter;
         m_pStmts = pNode;
     }
-    gint32 Output()
-    {
-        Wa( "#pragma once" );
-        Wa( "#include <string>" );
-        Wa( "#include \"rpc.h\"" );
-        Wa( "#include \"ifhelper.h\"" );
-        if( m_pStmts->IsStreamNeeded() )
-            Wa( "#include \"streamex.h\"" );
-        else
-            Wa( "#include \"seribase.h\"" );
-
-        return STATUS_SUCCESS;
-    }
+    gint32 Output();
 };
 
 class CDeclareClassIds
@@ -323,6 +311,10 @@ class CDeclareStruct
 
 struct CArgListUtils
 {
+    std::string DeclPtrLocal(
+        const std::string& strType,
+        const std::string strVar ) const;
+
     gint32 GetArgCount( ObjPtr& pArgs ) const;
 
     gint32 ToStringInArgs(
@@ -334,7 +326,8 @@ struct CArgListUtils
         std::vector< std::string >& vecArgs ) const;
 
     gint32 GenLocals( ObjPtr& pArgList,
-        std::vector< std::string >& vecLocals ) const;
+        std::vector< std::string >& vecLocals,
+        bool bObjPtr = false ) const;
 
     gint32 GetHstream( ObjPtr& pArgList,
         std::vector< ObjPtr >& vecHstms ) const;
@@ -375,7 +368,9 @@ struct CMethodWriter
         bool bDeclare, bool bAssign,
         bool bNoRet = false );
 
-    gint32 DeclLocals( ObjPtr& pArgList );
+    gint32 DeclLocals(
+        ObjPtr& pArgList,
+        bool bObjPtr = false );
 
     gint32 GenFormArgs(
         ObjPtr& pArg, bool bIn, bool bShowDir );

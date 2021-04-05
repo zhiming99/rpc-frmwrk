@@ -173,10 +173,20 @@ gint32 CArgListUtils::ToStringOutArgs(
 
     return STATUS_SUCCESS;
 }
+std::string CArgListUtils::DeclPtrLocal(
+    const std::string& strType,
+    const std::string strVar ) const
+{
+    std::string strRet = "DECLPTRO( ";
+    strRet += strType + ", " +
+        strVar + " )";
+    return strRet;
+}
 
 gint32 CArgListUtils::GenLocals(
     ObjPtr& pArgList,
-    std::vector< std::string >& vecLocals ) const
+    std::vector< std::string >& vecLocals,
+    bool bObjPtr ) const
 {
     CArgList* pinal = pArgList;
     if( pinal == nullptr )
@@ -203,9 +213,25 @@ gint32 CArgListUtils::GenLocals(
             std::string strLocal =
                 pfa->GetName();
 
-            strType += " ";
-            vecLocals.push_back(
-                strType + strLocal );
+            std::string strSig =
+                pNode->GetSignature();
+
+            bool bNonStruct =
+                !( ( strSig.size() == 1 ) &&
+                ( strSig[ 0 ] == 'O' ) );
+
+            if( bNonStruct || !bObjPtr )
+            {
+                strType += " ";
+                vecLocals.push_back(
+                    strType + strLocal );
+            }
+            else
+            {
+                vecLocals.push_back(
+                    DeclPtrLocal(
+                    strType, strLocal ) );
+            }
         }
 
     }while( 0 );
@@ -582,11 +608,12 @@ gint32 CMethodWriter::GenDeserialArgs(
 }
 
 gint32 CMethodWriter::DeclLocals(
-    ObjPtr& pArgList )
+    ObjPtr& pArgList,
+    bool bObjPtr )
 {
     std::vector< std::string > vecLocals;
     gint32 ret = GenLocals(
-        pArgList, vecLocals );
+        pArgList, vecLocals, bObjPtr );
     if( ERROR( ret ) )
         return ret;
 
@@ -786,6 +813,7 @@ gint32 CFileSet::AddSvcImpl(
     do{
         gint32 idx = m_vecFiles.size();
         std::string strExt = ".cpp";
+        std::string strExtHdr = ".h";
         std::string strCpp = m_strPath +
             "/" + strSvcName + ".cpp";
 
@@ -800,13 +828,21 @@ gint32 CFileSet::AddSvcImpl(
         std::string strHeader = m_strPath +
             "/" + strSvcName + ".h";
 
+        ret = access( strHeader.c_str(), F_OK );
+        if( ret == 0 )
+        {
+            strExtHdr = ".h.new";
+            strHeader = m_strPath + "/" +
+                strSvcName + ".h.new";
+        }
+
         STMPTR pstm( new std::ofstream(
             strHeader,
             std::ofstream::out |
             std::ofstream::trunc ) );
 
         m_vecFiles.push_back( std::move( pstm ) );
-        m_mapSvcImp[ strSvcName + ".h" ] = idx;
+        m_mapSvcImp[ strSvcName + strExtHdr ] = idx;
 
         pstm = STMPTR( new std::ofstream(
             strCpp,
@@ -882,6 +918,29 @@ gint32 SetStructRefs( ObjPtr& pRoot )
     }while( 0 );
 
     return ret;
+}
+
+gint32 CHeaderPrologue::Output()
+{
+    Wa( "#pragma once" );
+    Wa( "#include <string>" );
+    Wa( "#include \"rpc.h\"" );
+    Wa( "#include \"ifhelper.h\"" );
+    if( m_pStmts->IsStreamNeeded() )
+        Wa( "#include \"streamex.h\"" );
+    else
+        Wa( "#include \"seribase.h\"" );
+    NEW_LINE;
+    CCOUT << "#define DECLPTRO( _type, _name ) \\";
+    INDENT_UPL;
+    CCOUT << "ObjPtr p##_name;\\";
+    NEW_LINE;
+    CCOUT << "p##_name.NewObj( clsid( _type ) );\\";
+    NEW_LINE;
+    CCOUT << "_type& _name=*(_type*)p##_name;";
+    INDENT_DOWNL;
+
+    return STATUS_SUCCESS;
 }
 
 gint32 GenHeaderFile(
@@ -1013,7 +1072,10 @@ gint32 GenHeaderFile(
                 elem.first + ".h" ); 
 
             if( ERROR( ret ) )
-                break;
+            {
+                ret = pWriter->SelectImplFile(
+                    elem.first + ".h.new" );
+            }
 
             CDeclServiceImpl osi(
                 pWriter, elem.second );
@@ -1543,8 +1605,8 @@ gint32 CDeclareStruct::Output()
         guint32 dwMsgId = GenClsid( strMsgId );
 
         Wa( "//Message identity" );
-        CCOUT << "guint32 m_dwMsgId = "
-            << dwMsgId << ";";
+        CCOUT << "guint32 m_dwMsgId = clsid( "
+            << strName << " );";
         NEW_LINE;
 
         CCOUT << "std::string m_strMsgId = "
@@ -5243,7 +5305,7 @@ gint32 CImplIfMethodSvr::OutputAsyncSerial()
 
         if( dwInCount > 0 )
         {
-            DeclLocals( pInArgs );
+            DeclLocals( pInArgs, true );
             ret = GenDeserialArgs(
                 pInArgs, "pBuf_",
                 false, false, true );
