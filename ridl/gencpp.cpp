@@ -4367,6 +4367,7 @@ gint32 CImplIfMethodProxy::OutputSync()
             Wa( "ret = ( gint32 )dwRet_;" );
             if( dwOutCount > 0 )
             {
+                Wa( "if( ERROR( ret ) ) return ret;" );
                 Wa( "BufPtr pBuf2;" );
                 Wa( "ret = oResp_.GetProperty( 0, pBuf2 );" );
                 Wa( "if( ERROR( ret ) ) return ret;" );
@@ -5500,7 +5501,7 @@ gint32 CImplIfMethodSvr::OutputAsyncCallback()
         BLOCK_OPEN;
         Wa( "gint32 ret = 0;" );
 
-        CCOUT << "if( ret == STATUS_PENDING )";
+        CCOUT << "if( iRet == STATUS_PENDING )";
         INDENT_UPL;
         CCOUT << "ret = ERROR_STATE;";
         INDENT_DOWNL;
