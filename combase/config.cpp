@@ -300,7 +300,10 @@ gint32 CConfigDb::Serialize( CBuffer& oBuf ) const
         SERI_HEADER* pHeader =
             ( SERI_HEADER* )oBuf.ptr();
 
-        pHeader->dwSize = htonl( pLoc - oBuf.ptr() );
+        pHeader->dwSize = htonl(
+            pLoc - oBuf.ptr() -
+            sizeof( SERI_HEADER_BASE ) );
+
         RESIZE_BUF( pLoc - oBuf.ptr(), ret );
     }
 
@@ -324,7 +327,7 @@ gint32 CConfigDb::Deserialize(
     do{
         if( oHeader.dwClsid != clsid( CConfigDb ) ||
             oHeader.dwCount > CFGDB_MAX_ITEM ||
-            oHeader.dwSize > dwSize ||
+            oHeader.dwSize + sizeof( SERI_HEADER_BASE ) > dwSize ||
             oHeader.dwSize > CFGDB_MAX_SIZE )
         {
             ret = -EINVAL;

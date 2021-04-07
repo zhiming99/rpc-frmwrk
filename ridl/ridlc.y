@@ -728,6 +728,7 @@ method_decl : attr_list TOK_IDENT '(' arg_list ')' TOK_RETURNS '(' arg_list ')'
 
         ENABLE_STREAM( pOutArgs, pmd );
         ENABLE_SERIAL( pOutArgs, pmd );
+        pmd->EnableSerialize();
 
         BufPtr pAttrBuf = $1;
         if( ! pAttrBuf.IsEmpty() &&

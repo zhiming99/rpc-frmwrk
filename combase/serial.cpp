@@ -29,7 +29,7 @@
 #include "defines.h"
 #include "configdb.h"
 #include "stlcont.h"
-
+#define  HEADER_NBSIZE ( sizeof( SERI_HEADER ) - sizeof( SERI_HEADER_BASE ) )
 namespace rpcf
 {
 
@@ -42,7 +42,7 @@ gint32 CStlIntVector::Serialize(
         sizeof( ElemType ) * m_vecElems.size();
 
     oHeader.dwClsid = clsid( CStlIntVector );
-    oHeader.dwSize = dwSize ;
+    oHeader.dwSize = dwSize + HEADER_NBSIZE;
 
     oBuf.Resize(
         sizeof( oHeader ) + dwSize );
@@ -70,6 +70,9 @@ gint32 CStlIntVector::Deserialize(
     if( pHeader == nullptr )
         return -EINVAL;
 
+    if( oBuf.size() < sizeof( SERI_HEADER ) )
+        return -EINVAL;
+
     SERI_HEADER oHeader( *pHeader );
     // memcpy( &oHeader, pHeader, sizeof( oHeader ) );
     oHeader.ntoh();
@@ -95,6 +98,7 @@ gint32 CStlIntVector::Deserialize(
             break;
         }
 
+        oHeader.dwSize -= HEADER_NBSIZE;
         if( oHeader.dwSize / sizeof( ElemType ) !=
             oHeader.dwCount )
         {
@@ -123,7 +127,7 @@ gint32 CStlIntMap::Serialize(
         sizeof( guint32 ) * m_mapElems.size();
 
     oHeader.dwClsid = clsid( CStlIntMap );
-    oHeader.dwSize = dwSize;
+    oHeader.dwSize = dwSize + HEADER_NBSIZE;
 
     oBuf.Resize(
         sizeof( oHeader ) + dwSize );
@@ -154,6 +158,9 @@ gint32 CStlIntMap::Deserialize(
     if( pHeader == nullptr )
         return -EINVAL;
 
+    if( oBuf.size() < sizeof( SERI_HEADER ) )
+        return -EINVAL;
+
     SERI_HEADER oHeader( *pHeader );
     // memcpy( &oHeader, pHeader, sizeof( oHeader ) );
 
@@ -179,6 +186,7 @@ gint32 CStlIntMap::Deserialize(
             break;
         }
 
+        oHeader.dwSize -= HEADER_NBSIZE;
         if( oHeader.dwSize / sizeof( ElemType ) !=
             oHeader.dwCount )
         {
@@ -268,7 +276,8 @@ gint32 CStlObjVector::Serialize(
         // set the last offset to the payload size,
         // excluding the header section
         pHeader->arrOffsets[ dwOffsetCount - 1 ] = dwPos;
-        pHeader->dwSize = oBuf.size();
+        pHeader->dwSize = oBuf.size() -
+            sizeof( SERI_HEADER_BASE );
         pHeader->dwCount = dwOffsetCount;
         pHeader->hton();
 
@@ -304,6 +313,13 @@ gint32 CStlObjVector::Deserialize(
         if( pHeader->dwClsid != clsid( CStlObjVector ) )
         {
             ret = -EINVAL;
+            break;
+        }
+
+        if( dwBufSize <
+            pHeader->dwSize + HEADER_NBSIZE )
+        {
+            ret = -ERANGE;
             break;
         }
 
@@ -375,7 +391,7 @@ gint32 CStlLongWordVector::Serialize(
         sizeof( ElemType ) * m_vecElems.size();
 
     oHeader.dwClsid = clsid( CStlLongWordVector );
-    oHeader.dwSize = dwSize ;
+    oHeader.dwSize = dwSize + HEADER_NBSIZE ;
 
     oBuf.Resize(
         sizeof( oHeader ) + dwSize );
@@ -409,6 +425,9 @@ gint32 CStlLongWordVector::Deserialize(
     if( pHeader == nullptr )
         return -EINVAL;
 
+    if( oBuf.size() < sizeof( SERI_HEADER ) )
+        return -EINVAL;
+
     SERI_HEADER oHeader( *pHeader );
     // memcpy( &oHeader, pHeader, sizeof( oHeader ) );
     oHeader.ntoh();
@@ -434,6 +453,7 @@ gint32 CStlLongWordVector::Deserialize(
             break;
         }
 
+        oHeader.dwSize -= HEADER_NBSIZE;
         if( oHeader.dwSize / sizeof( ElemType ) !=
             oHeader.dwCount )
         {
@@ -468,7 +488,7 @@ gint32 CStlQwordVector::Serialize(
         sizeof( ElemType ) * m_vecElems.size();
 
     oHeader.dwClsid = clsid( CStlQwordVector );
-    oHeader.dwSize = dwSize ;
+    oHeader.dwSize = dwSize + HEADER_NBSIZE ;
 
     oBuf.Resize(
         sizeof( oHeader ) + dwSize );
@@ -498,6 +518,9 @@ gint32 CStlQwordVector::Deserialize(
     if( pHeader == nullptr )
         return -EINVAL;
 
+    if( oBuf.size() < sizeof( SERI_HEADER ) )
+        return -EINVAL;
+
     SERI_HEADER oHeader( *pHeader );
     oHeader.ntoh();
 
@@ -522,6 +545,7 @@ gint32 CStlQwordVector::Deserialize(
             break;
         }
 
+        oHeader.dwSize -= HEADER_NBSIZE;
         if( oHeader.dwSize / sizeof( ElemType ) !=
             oHeader.dwCount )
         {

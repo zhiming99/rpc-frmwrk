@@ -99,7 +99,7 @@ gint32 CSerialBase::Serialize< float >(
     if( pBuf.IsEmpty() )
         return -EINVAL;
     guint32* pval = ( guint32* )&val;
-    guint32 iVal = htonll( *pval );
+    guint32 iVal = htonl( *pval );
     APPEND( pBuf, &iVal, sizeof( val ) );
     return STATUS_SUCCESS;
 }
@@ -176,8 +176,12 @@ gint32 CSerialBase::Serialize< ObjPtr >(
             ( guint32 )clsid( Invalid ) );
         // size
         Serialize( pBuf, 0 );
+
         // version
-        Serialize( pBuf, 1 );
+        guint32 dwInfo = 0;
+        guint8* pInfo = ( guint8* )&dwInfo;
+        pInfo[ 0 ] = 1;
+        Serialize( pBuf, dwInfo );
         return STATUS_SUCCESS;
     }
 
