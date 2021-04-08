@@ -48,6 +48,10 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 7. Logging service
 
 ---
+[`Thu Apr 08 2021 08:37:46 PM Beijing`]   
+1. Debugging for cpp generator is still going on. And during debugging I found it is necessary to add a no-reply request to make `keep-alive` support perfect. it should be a quite easy task.
+2. So far the cpp generator has generated all the required files successfully. And only the stream support remains to debug.
+
 [`Tue Mar 30 2021 01:28:58 PM Beijing`]   
 1. The python's setup.py is still not ready, and so the installation of the whole project is still not perfect at this point. 
 2. Changed the project's code name to `rpcf` in source code, to end the naming related chaos. It is also a preparation for building the auto-generated project by ridlc.
