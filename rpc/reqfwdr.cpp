@@ -3006,7 +3006,7 @@ gint32 CRpcReqForwarderProxy::SetupReqIrpFwrdReq(
         bool bKeepAlive = false;
         ret = oReq.GetCallFlags( dwFlags );
         if( SUCCEEDED( ret ) && 
-            ( dwFlags & ~CF_KEEP_ALIVE ) )
+            ( dwFlags & CF_KEEP_ALIVE ) )
             bKeepAlive = true;
 
         if( bKeepAlive )
