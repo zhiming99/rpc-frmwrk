@@ -5341,10 +5341,6 @@ gint32 CInterfaceProxy::SendProxyReq(
     do{
         CReqBuilder oReq( this );
 
-        // overwrite the strIfName if exist in the
-        // pCallback
-        CopyUserOptions(
-            oReq.GetCfg(), pCallback );
         oReq.SetMethodName( strMethod );
 
         for( auto& pBuf: vecParams )
@@ -5366,6 +5362,11 @@ gint32 CInterfaceProxy::SendProxyReq(
         }
 
         oReq.SetCallFlags( dwFlags );
+
+        // overwrite the strIfName if exist in the
+        // pCallback
+        CopyUserOptions(
+            oReq.GetCfg(), pCallback );
 
         CfgPtr pResp( true );
         gint32 iRet = 0;
@@ -5395,6 +5396,11 @@ gint32 CInterfaceProxy::SendProxyReq(
         }
 
         if( ERROR( ret ) )
+            break;
+
+        CReqOpener oReq2( oReq.GetCfg() );
+        oReq2.GetCallFlags( dwFlags );
+        if( !( dwFlags & CF_WITH_REPLY ) )
             break;
 
         CReqOpener oResp( ( IConfigDb* )pResp );
@@ -5600,6 +5606,36 @@ gint32 CInterfaceProxy::PauseResume_Proxy(
     return ret;
 }
 
+// reset the timer on server side
+gint32 CInterfaceProxy::KeepAliveRequest(
+    guint64 qwTaskId )
+{
+	if( qwTaskId == 0 )
+		return -EINVAL;
+
+    const string& strIfName = CoGetIfNameFromIid(
+        iid( IInterfaceServer ), "p" );
+
+    if( strIfName.empty() )
+        return ERROR_FAIL;
+
+    CParamList oOptions;
+
+    oOptions[ propIfName ] =
+        DBUS_IF_NAME( strIfName );
+    oOptions[ propSysMethod ] = true;
+
+    // this is a one way request
+    oOptions[ propNoReply ] = true;
+
+    CfgPtr pResp;
+    // make the call
+    std::string strMethod( __func__ );
+
+    return SyncCallEx( oOptions.GetCfg(),
+        pResp, strMethod, qwTaskId );
+}
+
 gint32 CInterfaceProxy::CancelRequest(
     guint64 qwTaskId )
 {
@@ -5659,11 +5695,29 @@ gint32 CInterfaceProxy::CopyUserOptions(
             propKeepAliveSec, pSrc);
         oCallOpt.CopyProp(
             propTimeoutSec, pSrc);
+
+        CCfgOpenerObj oSrc( pSrc );
+        bool bNoReply = false;
+        gint32 ret = oSrc.GetBoolProp(
+            propNoReply, bNoReply );
+        if( SUCCEEDED( ret ) && bNoReply )
+        {
+            guint32 dwFlags;
+            ret = oCallOpt.GetIntProp(
+                propCallFlags, dwFlags );
+            if( SUCCEEDED( ret ) )
+            {
+                dwFlags &= ~CF_WITH_REPLY;
+                oCallOpt.SetIntProp(
+                    propCallFlags, dwFlags );
+            }
+        }
     }
     else
     {
         oCfg.CopyProp( propKeepAliveSec, pSrc );
         oCfg.CopyProp( propTimeoutSec, pSrc );
+        oCfg.CopyProp( propNoReply, pSrc );
     }
     return 0;
 }
@@ -6776,8 +6830,8 @@ gint32 CInterfaceServer::OnKeepAliveOrig(
         }
 
         // test if the interface is paused
-        string strIfname = pMsg.GetInterface();
-        if( IsPaused( strIfname ) )
+        string strIfName = pMsg.GetInterface();
+        if( IsPaused( strIfName ) )
         {
             ret = ERROR_PAUSED;
             break;
@@ -6806,6 +6860,7 @@ gint32 CInterfaceServer::OnKeepAliveOrig(
 
         CReqBuilder okaReq( this );
 
+        okaReq.SetIfName( strIfName );
         okaReq.SetMethodName(
             SYS_EVENT_KEEPALIVE );
 
@@ -6872,6 +6927,10 @@ gint32 CInterfaceServer::InitUserFuncs()
     ADD_SERVICE_HANDLER(
         CInterfaceServer::Resume_Server,
         SYS_METHOD_RESUME );
+
+    ADD_SERVICE_HANDLER(
+        CInterfaceServer::KeepAliveRequest,
+        SYS_METHOD_KEEPALIVEREQ );
 
     END_IFHANDLER_MAP;
 
@@ -7007,6 +7066,54 @@ gint32 CInterfaceServer::UserCancelRequest(
 
     SetResponse( pCallback,
         oMyResp.GetCfg() );
+
+    return ret;
+}
+
+gint32 CInterfaceServer::KeepAliveRequest(
+    IEventSink* pCallback,
+    guint64 qwTaskId )
+{
+    // let's search through the tasks to find the
+    // specified task to cancel
+    gint32 ret = 0;
+    do{
+        TaskGrpPtr pTaskGrp = GetTaskGroup();
+        if( pTaskGrp.IsEmpty() )
+            break;
+
+        TaskletPtr pTask;
+        ret = pTaskGrp->FindTaskByRmtId(
+            qwTaskId, pTask );
+        if( ERROR( ret ) )
+            break;
+
+        CfgPtr pResp;
+        CIfInvokeMethodTask* pInvTask = pTask;
+        gint32 iRet = ERROR_USER_CANCEL;
+
+        if( pInvTask == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        CStdRTMutex oTaskLock(
+            pInvTask->GetLock() );
+
+        if( pInvTask->GetTaskState() ==
+            stateStopped )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+       
+        pInvTask->ResetTimer();
+        DebugPrint( 0,
+            "timer is reset of Task %lld",
+            qwTaskId );
+
+    }while( 0 );
 
     return ret;
 }

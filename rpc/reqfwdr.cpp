@@ -2053,7 +2053,29 @@ gint32 CReqFwdrForwardRequestTask::OnTaskComplete(
     // DebugPrint( 0, "probe: ForwardRequestTask complete" );
     do{
         ObjPtr pObj;
-        CCfgOpener oCfg( ( IConfigDb* )*this );
+        CCfgOpener oCfg(
+            ( IConfigDb* )GetConfig() );
+
+        IConfigDb* pReqCtx = nullptr;
+        ret = oCfg.GetPointer( 0, pReqCtx );
+        if( ERROR( ret ) )
+            break;
+
+        // test if the request has reponse to send
+        CCfgOpener oReqCtx( pReqCtx );
+        IConfigDb* pOrigReq = nullptr;
+        ret = oReqCtx.GetPointer(
+            propReqPtr, pOrigReq );
+        if( SUCCEEDED( ret ) )
+        {
+            guint32 dwFlags = 0;
+            CReqOpener oOrigReq( pOrigReq );
+            ret = oOrigReq.GetCallFlags( dwFlags );
+            oReqCtx.RemoveProperty( propReqPtr );
+            if( SUCCEEDED( ret ) &&
+                !( dwFlags & CF_WITH_REPLY ) )
+                break;
+        }
 
         ret = oCfg.GetObjPtr( propIfPtr, pObj );
         if( ERROR( ret ) )
@@ -3287,7 +3309,10 @@ gint32 CRpcReqForwarderProxy::ForwardRequest(
         pReqMsg.SetSender( strSender );
 
         ObjPtr pObj;
-        ret = pReqMsg.GetObjArgAt( 0, pObj );
+        CCfgOpener oReqCtx( pReqCtx );
+        ret = oReqCtx.GetObjPtr(
+            propReqPtr, pObj );
+
         if( ERROR( ret ) )
             break;
 

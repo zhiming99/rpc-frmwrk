@@ -400,7 +400,7 @@ gint32 CDBusProxyFdo::HandleSendReq(
         pNextIrpCtx->SetMajorCmd( IRP_MJ_FUNC );
         pNextIrpCtx->SetMinorCmd( IRP_MN_IOCTL );
         pNextIrpCtx->SetCtrlCode( CTRLCODE_FORWARD_REQ );
-        pNextIrpCtx->SetIoDirection( IRP_DIR_INOUT );
+        pNextIrpCtx->SetIoDirection( dwIoDir );
         pPdoPort->AllocIrpCtxExt( pNextIrpCtx );
 
         pNextIrpCtx->SetReqData( pCtx->m_pReqData );
@@ -668,6 +668,10 @@ gint32 CDBusProxyFdo::CompleteIoctlIrp(
                 // need further actions
                 if( pTopCtx->GetCtrlCode() !=
                     CTRLCODE_FORWARD_REQ )
+                    break;
+
+                if( pTopCtx->GetIoDirection() !=
+                    IRP_DIR_INOUT )
                     break;
 
                 if( SUCCEEDED( ret ) )

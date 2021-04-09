@@ -6164,8 +6164,12 @@ gint32 CExportDrivers::Output()
         oModuleArray.append( oSvr );
         oModuleArray.append( oCli );
 
-        Json::StyledStreamWriter oJWriter;
-        oJWriter.write( *m_pWriter->m_curFp, oVal );
+        Json::StreamWriterBuilder oBuilder;
+        oBuilder["commentStyle"] = "None";
+        oBuilder["indentation"] = "    ";
+        std::unique_ptr<Json::StreamWriter> pWriter(
+            oBuilder.newStreamWriter() );
+        pWriter->write( oVal, m_pWriter->m_curFp );
         m_pWriter->m_curFp->flush();
 
     }while( 0 );
@@ -6250,8 +6254,12 @@ gint32 CExportObjDesc::Output()
         if( ERROR( ret ) )
             break;
 
-        Json::StyledStreamWriter oJWriter;
-        oJWriter.write( *m_pWriter->m_curFp, oVal );
+        Json::StreamWriterBuilder oBuilder;
+        oBuilder["commentStyle"] = "None";
+        oBuilder["indentation"] = "    ";
+        std::unique_ptr<Json::StreamWriter> pWriter(
+            oBuilder.newStreamWriter() );
+        pWriter->write( oVal, m_pWriter->m_curFp );
         m_pWriter->m_curFp->flush();
 
     }while( 0 );

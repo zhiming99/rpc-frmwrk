@@ -2670,6 +2670,17 @@ gint32 CInterfaceProxy::SyncCallEx(
         if( ERROR( ret ) ) 
             break; 
 
+        if( !pOptions.IsEmpty() )
+        {
+            CCfgOpener oOptions(
+                ( IConfigDb* )pOptions );
+            bool bNoReply = false;
+            gint32 iRet = oOptions.GetBoolProp(
+                propNoReply, bNoReply );
+            if( SUCCEEDED( iRet ) && bNoReply )
+                break;
+        }
+
         ObjPtr pObj; 
         CStdRTMutex oLock( pSyncCall->GetLock() );
         // CCfgOpener is faster than CCfgOpenerObj
@@ -2899,7 +2910,7 @@ struct Parameters< std::tuple< Types... >, std::tuple< Types2... > >
 };
 
 /**
-* @name ProxyCall: the main-entry for all the methods.
+* @name ProxyCall: the entry point as sync request senders.
 * @{ */
 /**
  * Template paramaters:

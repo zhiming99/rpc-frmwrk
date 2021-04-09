@@ -2605,6 +2605,9 @@ gint32 CIfParallelTaskGrp::FindTaskByRmtId(
 
     }while( i < 2 );
 
+    if( !bFound )
+        ret = -ENOENT;
+
     return ret;
 }
 
@@ -4615,7 +4618,7 @@ gint32 CIfInvokeMethodTask::OnKeepAliveOrig()
 
         if( m_iTimeoutId > 0 )
         {
-            oTimerSvc.ResetTimer( m_iTimeoutId );
+            // oTimerSvc.ResetTimer( m_iTimeoutId );
         }
         
     }while( 0 );

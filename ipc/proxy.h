@@ -1256,6 +1256,9 @@ class CInterfaceProxy :
 
     virtual gint32 InitUserFuncs();
 
+    gint32 KeepAliveRequest(
+        guint64 qwTaskToCancel );
+
     // a user-initialized cancel request
     gint32 UserCancelRequest(
         guint64& qwThisTaksId,
@@ -1522,6 +1525,11 @@ class CInterfaceServer :
         IEventSink* pInvokeTask,
         guint64 qwIoTaskId );
 
+    // a user-initialized keep-alive request
+    gint32 KeepAliveRequest(
+        IEventSink* pCallback,
+        guint64 qwIoTaskId );
+
     template< int N, typename ...Args >
     struct FillResp
     {
@@ -1725,6 +1733,17 @@ gint32 CInterfaceProxy::AsyncCall(
 
         if( ERROR( ret ) ) 
             break; 
+
+        if( !pOptions.IsEmpty() )
+        {
+            CCfgOpener oOptions(
+                ( IConfigDb* )pOptions );
+            bool bNoReply = false;
+            gint32 iRet = oOptions.GetBoolProp(
+                propNoReply, bNoReply );
+            if( SUCCEEDED( iRet ) && bNoReply )
+                break;
+        }
 
         ObjPtr pObj; 
         CCfgOpenerObj oTask( ( CObjBase* )pTask ); 

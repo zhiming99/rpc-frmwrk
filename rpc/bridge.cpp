@@ -485,10 +485,32 @@ gint32 CRpcTcpBridgeProxy::ForwardRequest(
         oBuilder.SetMethodName(
             SYS_METHOD_FORWARDREQ );
 
-        oBuilder.SetCallFlags( CF_WITH_REPLY
-           | DBUS_MESSAGE_TYPE_METHOD_CALL 
-           | CF_ASYNC_CALL );
+        guint32 dwFlags = 0;
+        bool bResp = true;
+        CCfgOpener oOrigCtx( pReqCtx );
+        IConfigDb* pReqPtr = nullptr;
+        ret = oOrigCtx.GetPointer(
+            propReqPtr, pReqPtr );
+        if( SUCCEEDED( ret ) )
+        {
+            CReqOpener oOrigReq( pReqPtr );
+            ret = oOrigReq.GetCallFlags(
+                dwFlags );
+            if( ERROR( ret ) )
+            {
+                dwFlags = CF_WITH_REPLY
+                   | DBUS_MESSAGE_TYPE_METHOD_CALL 
+                   | CF_ASYNC_CALL;
+                ret = 0;
+            }
+            else
+            {
+                if( !( dwFlags & CF_WITH_REPLY ) )
+                    bResp = false;
+            }
+        }
 
+        oBuilder.SetCallFlags( dwFlags );
         // a tcp default round trip time
         oBuilder.SetTimeoutSec(
             IFSTATE_DEFAULT_IOREQ_TIMEOUT ); 
@@ -523,7 +545,7 @@ gint32 CRpcTcpBridgeProxy::ForwardRequest(
         if( ret == STATUS_PENDING )
             break;
 
-        if( SUCCEEDED( ret ) )
+        if( SUCCEEDED( ret ) && bResp )
         {
             CCfgOpener oCfg(
                 ( IConfigDb* )pRespCfg );
@@ -2900,14 +2922,29 @@ gint32 CRpcInterfaceServer::DoInvoke(
                 if( ERROR( ret ) )
                     break;
 
+                bool bFlagValid = false;
+                guint32 dwCallFlags = 0;
+                CReqOpener oOrigReq( ( IConfigDb* )pObj );
+                ret = oOrigReq.GetCallFlags( dwCallFlags );
+                if( SUCCEEDED( ret ) )
+                {
+                    bFlagValid = true;
+                    if( dwCallFlags & CF_WITH_REPLY )
+                        bResp = true;
+                }
+
+                CCfgOpener oReqCtx(
+                    ( IConfigDb* )pReqCtx );
+
+                oReqCtx.SetObjPtr( propReqPtr, pObj );
+
+                ret = 0;
                 DMsgPtr pRespMsg;
                 ret = ForwardRequest( pReqCtx,
                     pFwdrMsg, pRespMsg, pCallback );
 
                 if( ret == STATUS_PENDING )
                 {
-                    CReqOpener oOrigReq(
-                        ( IConfigDb* )pObj );
 
                     CReqBuilder oNewReq( this );
                     oNewReq.SetMethodName( SYS_METHOD_FORWARDREQ );
@@ -2928,19 +2965,14 @@ gint32 CRpcInterfaceServer::DoInvoke(
                             oNewReq.SetKeepAliveSec( dwTimeout );
                     }
 
-                    guint32 dwCallFlags = 0;
-                    iRet = oOrigReq.GetCallFlags( dwCallFlags );
-                    if( SUCCEEDED( iRet ) )
+                    if( bFlagValid )
                     {
-                        oNewReq.SetCallFlags( dwCallFlags );
-                        // no keep alive. the
-                        // keep-alive should be
-                        // initiated from the server
-                        // side, but not from within
-                        // the router
+                        // don't start keep-alive.  the
+                        // keep-alive event should be initiated
+                        // from the server side, but not from
+                        // within the router
                         dwCallFlags &= ( ~CF_KEEP_ALIVE );
-                        if( dwCallFlags & CF_WITH_REPLY )
-                            bResp = true;
+                        oNewReq.SetCallFlags( dwCallFlags );
                     }
 
                     // keep-alive settings
@@ -2966,9 +2998,9 @@ gint32 CRpcInterfaceServer::DoInvoke(
                 {
                     if( ret == -ENOTSUP )
                         ret = ERROR_FAIL;
-                    bResp = true; 
                 }
 
+                oReqCtx.RemoveProperty( propReqPtr );
                 // whether successful or not, we
                 // put the result in the response
                 if( bResp )

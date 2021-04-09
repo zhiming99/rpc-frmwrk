@@ -248,6 +248,7 @@ inline std::string DBUS_DESTINATION2(
 #define SYS_METHOD_USERCANCELREQ        "RpcCall_UserCancelRequest"
 #define SYS_METHOD_PAUSE                "RpcCall_Pause"
 #define SYS_METHOD_RESUME               "RpcCall_Resume"
+#define SYS_METHOD_KEEPALIVEREQ         "RpcCall_KeepAliveRequest"
 
 #define SYS_EVENT_KEEPALIVE             "RpcEvt_KeepAlive"
 #define SYS_EVENT_FORWARDEVT            "RpcEvt_ForwardEvent"
