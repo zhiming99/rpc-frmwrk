@@ -195,6 +195,7 @@ gint32 CheckNameDup(
 %token TOK_AUTH
 %token TOK_IPADDR
 %token TOK_PORTNUM
+%token TOK_NOREPLY
 
 %parse-param { char const *file_name };
 %initial-action
@@ -568,6 +569,7 @@ attr_name :
     | TOK_AUTH { DEFAULT_ACTION; }
     | TOK_IPADDR { DEFAULT_ACTION; }
     | TOK_PORTNUM { DEFAULT_ACTION; }
+    | TOK_NOREPLY { DEFAULT_ACTION; }
     ;
 
 attr_exp : attr_name
@@ -751,10 +753,27 @@ method_decl : attr_list TOK_IDENT '(' arg_list ')' TOK_RETURNS '(' arg_list ')'
         {
             std::string strMsg = "event handler '"; 
             strMsg += strName + "'";
-            strMsg += " does not have responses";
+            strMsg += " should not have responses";
             PrintMsg( -EEXIST, strMsg.c_str() );
             g_bSemanErr = true;
         }
+        if( pmd->IsNoReply() )
+        {
+            std::string strMsg = "no-reply request '"; 
+            strMsg += strName + "'";
+            strMsg += " should not have responses";
+            PrintMsg( -EEXIST, strMsg.c_str() );
+            g_bSemanErr = true;
+        }
+        if( pmd->IsEvent() && pmd->IsNoReply() )
+        {
+            std::string strMsg = "event handler '"; 
+            strMsg += strName + "'";
+            strMsg += " should not have no-reply attribute";
+            PrintMsg( -EINVAL, strMsg.c_str() );
+            g_bSemanErr = true;
+        }
+
         BufPtr pBuf( true );
         *pBuf = pNode;
         $$ = pBuf;
@@ -775,6 +794,7 @@ method_decl : attr_list TOK_IDENT '(' ')' TOK_RETURNS '(' arg_list ')'
 
         ENABLE_STREAM( pOutArgs, pmd );
         ENABLE_SERIAL( pOutArgs, pmd );
+        pmd->EnableSerialize();
 
         BufPtr pAttrBuf = $1;
         if( ! pAttrBuf.IsEmpty() &&
@@ -798,10 +818,27 @@ method_decl : attr_list TOK_IDENT '(' ')' TOK_RETURNS '(' arg_list ')'
         {
             std::string strMsg = "event handler '"; 
             strMsg += strName + "'";
-            strMsg += " does not have responses list";
+            strMsg += " should not have responses";
             PrintMsg( -EEXIST, strMsg.c_str() );
             g_bSemanErr = true;
         }
+        if( pmd->IsNoReply() )
+        {
+            std::string strMsg = "no-reply request '"; 
+            strMsg += strName + "'";
+            strMsg += " should not have responses";
+            PrintMsg( -EEXIST, strMsg.c_str() );
+            g_bSemanErr = true;
+        }
+        if( pmd->IsEvent() && pmd->IsNoReply() )
+        {
+            std::string strMsg = "event handler '"; 
+            strMsg += strName + "'";
+            strMsg += " should not have no-reply attribute";
+            PrintMsg( -EINVAL, strMsg.c_str() );
+            g_bSemanErr = true;
+        }
+
         BufPtr pBuf( true );
         *pBuf = pNode;
         $$ = pBuf;
@@ -850,6 +887,7 @@ method_decl : attr_list TOK_IDENT '(' arg_list ')' TOK_RETURNS '(' ')'
         pmd->SetInArgs( pInArgs );
         ENABLE_STREAM( pInArgs, pmd );
         ENABLE_SERIAL( pInArgs, pmd );
+        pmd->EnableSerialize();
         BufPtr pAttrBuf = $1;
         if( ! pAttrBuf.IsEmpty() &&
             ! pAttrBuf->empty() )

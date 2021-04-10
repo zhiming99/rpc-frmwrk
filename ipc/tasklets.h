@@ -272,9 +272,6 @@ class CTaskletRetriable : public CTasklet
 
     gint32 m_iTimerId;
 
-    protected:
-
-    gint32 RemoveTimer( gint32 iTimerId );
 
     public:
 
@@ -289,8 +286,14 @@ class CTaskletRetriable : public CTasklet
     bool CanRetry() const;
     gint32 ScheduleRetry();
 
+    gint32 ResetTimer( gint32 iTimerId ) const;
     gint32 ResetTimer();
+    gint32 RemoveTimer( gint32 iTimerId ) const;
     gint32 RemoveTimer();
+
+    gint32 AddTimer(
+        guint32 dwIntervalSec,
+        guint32 dwParam );
 
     virtual gint32 SetProperty(
             gint32 iProp, const CBuffer& oBuf );

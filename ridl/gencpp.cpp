@@ -1892,7 +1892,7 @@ gint32 CDeclInterfProxy::OutputAsync(
         strName = pmd->GetName();
         ObjPtr pInArgs = pmd->GetInArgs();
         ObjPtr pOutArgs = pmd->GetOutArgs();
-        
+
         guint32 dwInCount = GetArgCount( pInArgs );
         guint32 dwOutCount = GetArgCount( pOutArgs );
 
@@ -1922,8 +1922,9 @@ gint32 CDeclInterfProxy::OutputAsync(
             CCOUT << "{ return STATUS_SUCCESS; }";
         }
 
-        NEW_LINES( 2 );
+        NEW_LINE;
 
+        NEW_LINE;
         Wa( "//Async callback wrapper" );
         CCOUT << "gint32 " << strName
             << "CbWrapper" << "( ";
@@ -2211,7 +2212,7 @@ gint32 CDeclInterfSvr::OutputSync(
             GetArgCount( pInArgs );
 
         guint32 dwOutCount =
-            GetArgCount( pInArgs );
+            GetArgCount( pOutArgs );
 
         guint32 dwCount = dwInCount + dwOutCount;
 
@@ -3310,8 +3311,16 @@ gint32 CImplServiceImpl::Output()
                 }
                 else if( bAsync )
                 {
-                    Wa( "// TODO: Process the server response here" );
-                    Wa( "// return code ignored");
+                    if( pmd->IsNoReply() )
+                    {
+                        Wa( "// TODO: the request is sent or failed" );
+                        Wa( "// return code ignored");
+                    }
+                    else
+                    {
+                        Wa( "// TODO: Process the server response here" );
+                        Wa( "// return code ignored");
+                    }
                     CCOUT<< "return 0;";
                 }
                 BLOCK_CLOSE;
@@ -4215,6 +4224,7 @@ gint32 CImplIfMethodProxy::OutputSync()
 
 
     bool bSerial = m_pNode->IsSerialize();
+    bool bNoReply = m_pNode->IsNoReply();
 
     do{
         CCOUT << "gint32 " << strClass << "::"
@@ -4259,6 +4269,11 @@ gint32 CImplIfMethodProxy::OutputSync()
         CCOUT << "DBUS_IF_NAME( \""
             << strIfName << "\" );";
         INDENT_DOWN;
+        if( bNoReply )
+        {
+            NEW_LINE;
+            CCOUT << "oOptions_[ propNoReply ] = true;";
+        }
         NEW_LINE;
         CCOUT << "oOptions_[ propSeriProto ] = ";
         INDENT_UPL;
@@ -4283,13 +4298,16 @@ gint32 CImplIfMethodProxy::OutputSync()
                 << "oOptions_.GetCfg(), pResp_, "
                 << "\"" << strMethod << "\" );";
             NEW_LINE;
-            Wa( "if( ERROR( ret ) ) return ret;" );
-            NEW_LINE;
-            Wa( "guint32 dwRet_ = 0;" );
-            Wa( "CCfgOpener oResp_( ( IConfigDb* )pResp_ );" );
-            Wa( "ret = oResp_.GetIntProp( propReturnValue, dwRet_ );" );
-            Wa( "if( ERROR( ret ) ) return ret;" );
-            Wa( "ret = ( gint32 )dwRet_;" );
+            if( !bNoReply )
+            {
+                Wa( "if( ERROR( ret ) ) return ret;" );
+                NEW_LINE;
+                Wa( "guint32 dwRet_ = 0;" );
+                Wa( "CCfgOpener oResp_( ( IConfigDb* )pResp_ );" );
+                Wa( "ret = oResp_.GetIntProp( propReturnValue, dwRet_ );" );
+                Wa( "if( ERROR( ret ) ) return ret;" );
+                Wa( "ret = ( gint32 )dwRet_;" );
+            }
             Wa( "return ret;" );
         }
         else if( !bSerial )
@@ -4310,32 +4328,33 @@ gint32 CImplIfMethodProxy::OutputSync()
 
             CCOUT << " );";
             NEW_LINE;
-
-            Wa( "if( ERROR( ret ) ) return ret;" );
-            NEW_LINE;
-            Wa( "guint32 dwRet_ = 0;" );
-            Wa( "CCfgOpener oResp_( ( IConfigDb* )pResp_ );" );
-            CCOUT << "ret = oResp_.GetIntProp(";
-            INDENT_UPL;
-            CCOUT << "propReturnValue, dwRet_ );";
-            INDENT_DOWNL;
-            Wa( "if( ERROR( ret ) ) return ret;" );
-            NEW_LINE;
-            Wa( "ret = ( gint32 )dwRet_;" );
-
-            if( dwOutCount > 0 )
+            if( !bNoReply )
             {
                 Wa( "if( ERROR( ret ) ) return ret;" );
                 NEW_LINE;
-                CCOUT << "ret = this->FillArgs(";
+                Wa( "guint32 dwRet_ = 0;" );
+                Wa( "CCfgOpener oResp_( ( IConfigDb* )pResp_ );" );
+                CCOUT << "ret = oResp_.GetIntProp(";
                 INDENT_UPL;
-                CCOUT << "pResp_, ret,";
-                NEW_LINE;
-                GenActParams( pOutArgs );
-                CCOUT << " );";
+                CCOUT << "propReturnValue, dwRet_ );";
                 INDENT_DOWNL;
-            }
+                Wa( "if( ERROR( ret ) ) return ret;" );
+                NEW_LINE;
+                Wa( "ret = ( gint32 )dwRet_;" );
 
+                if( dwOutCount > 0 )
+                {
+                    Wa( "if( ERROR( ret ) ) return ret;" );
+                    NEW_LINE;
+                    CCOUT << "ret = this->FillArgs(";
+                    INDENT_UPL;
+                    CCOUT << "pResp_, ret,";
+                    NEW_LINE;
+                    GenActParams( pOutArgs );
+                    CCOUT << " );";
+                    INDENT_DOWNL;
+                }
+            }
             Wa( "return ret;" );
         }
         else /* need serialize */
@@ -4358,25 +4377,28 @@ gint32 CImplIfMethodProxy::OutputSync()
                 << "pBuf_ );";
             INDENT_DOWNL;
             NEW_LINE;
-            Wa( "if( ERROR( ret ) ) return ret;" );
-            NEW_LINE;
-            Wa( "guint32 dwRet_ = 0;" );
-            Wa( "CCfgOpener oResp_( ( IConfigDb* )pResp_ );" );
-            Wa( "ret = oResp_.GetIntProp( propReturnValue, dwRet_ );" );
-            Wa( "if( ERROR( ret ) ) return ret;" );
-            Wa( "ret = ( gint32 )dwRet_;" );
-            if( dwOutCount > 0 )
+            if( !bNoReply )
             {
                 Wa( "if( ERROR( ret ) ) return ret;" );
-                Wa( "BufPtr pBuf2;" );
-                Wa( "ret = oResp_.GetProperty( 0, pBuf2 );" );
+                NEW_LINE;
+                Wa( "guint32 dwRet_ = 0;" );
+                Wa( "CCfgOpener oResp_( ( IConfigDb* )pResp_ );" );
+                Wa( "ret = oResp_.GetIntProp( propReturnValue, dwRet_ );" );
                 Wa( "if( ERROR( ret ) ) return ret;" );
+                Wa( "ret = ( gint32 )dwRet_;" );
+                if( dwOutCount > 0 )
+                {
+                    Wa( "if( ERROR( ret ) ) return ret;" );
+                    Wa( "BufPtr pBuf2;" );
+                    Wa( "ret = oResp_.GetProperty( 0, pBuf2 );" );
+                    Wa( "if( ERROR( ret ) ) return ret;" );
 
-                if( ERROR( ret ) )
-                    break;
+                    if( ERROR( ret ) )
+                        break;
 
-                ret = GenDeserialArgs(
-                    pOutArgs, "pBuf2", true, true );
+                    ret = GenDeserialArgs(
+                        pOutArgs, "pBuf2", true, true );
+                }
             }
             Wa( "return ret;" );
         }
@@ -4402,6 +4424,7 @@ gint32 CImplIfMethodProxy::OutputAsync()
     guint32 dwInCount = GetArgCount( pInArgs );
 
     bool bSerial = m_pNode->IsSerialize();
+    bool bNoReply = m_pNode->IsNoReply();
 
     do{
         CCOUT << "gint32 " << strClass << "::"
@@ -4428,6 +4451,11 @@ gint32 CImplIfMethodProxy::OutputAsync()
         CCOUT << "DBUS_IF_NAME( \""
             << strIfName << "\" );";
         INDENT_DOWN;
+        if( bNoReply )
+        {
+            NEW_LINE;
+            CCOUT << "oOptions_[ propNoReply ] = true;";
+        }
         NEW_LINE;
         CCOUT << "oOptions_[ propSeriProto ] = ";
         INDENT_UPL;
@@ -4445,6 +4473,7 @@ gint32 CImplIfMethodProxy::OutputAsync()
             NEW_LINE;
         }
         NEW_LINE;
+
         Wa( "CParamList oReqCtx_;" );
         Wa( "ObjPtr pTemp( context );" );
         Wa( "oReqCtx_.Push( pTemp );" );
@@ -4513,23 +4542,26 @@ gint32 CImplIfMethodProxy::OutputAsync()
             CCOUT << "pBuf_ );";
             INDENT_DOWNL;
         }
-        NEW_LINE;
-        Wa( "if( ret == STATUS_PENDING )" );
-        BLOCK_OPEN;
-        CCOUT << "if( context == nullptr )";
-        INDENT_UPL;
-        CCOUT <<"return ret;";
-        INDENT_DOWNL;
-        CCOUT << "CCfgOpener oContext( context );";
-        NEW_LINE;
-        CCOUT <<"oContext.CopyProp(";
-        INDENT_UPL;
-        CCOUT << "propTaskId, pResp_ );";
-        INDENT_DOWNL;
-        CCOUT << "return ret;";
-        BLOCK_CLOSE;
-        NEW_LINES( 2 );
-        Wa( "( *pRespCb_ )( eventCancelTask );" );
+        if( !bNoReply )
+        {
+            NEW_LINE;
+            Wa( "if( ret == STATUS_PENDING )" );
+            BLOCK_OPEN;
+            CCOUT << "if( context == nullptr )";
+            INDENT_UPL;
+            CCOUT <<"return ret;";
+            INDENT_DOWNL;
+            CCOUT << "CCfgOpener oContext( context );";
+            NEW_LINE;
+            CCOUT <<"oContext.CopyProp(";
+            INDENT_UPL;
+            CCOUT << "propTaskId, pResp_ );";
+            INDENT_DOWNL;
+            CCOUT << "return ret;";
+            BLOCK_CLOSE;
+            NEW_LINES( 2 );
+            Wa( "( *pRespCb_ )( eventCancelTask );" );
+        }
         CCOUT << "return ret;";
         BLOCK_CLOSE;
         NEW_LINES( 1 );
@@ -4553,6 +4585,7 @@ gint32 CImplIfMethodProxy::OutputAsyncCbWrapper()
     guint32 dwOutCount = GetArgCount( pOutArgs );
 
     bool bSerial = m_pNode->IsSerialize();
+    bool bNoReply = m_pNode->IsNoReply();
 
     do{
         Wa( "//Async callback wrapper" );
@@ -4600,7 +4633,7 @@ gint32 CImplIfMethodProxy::OutputAsyncCbWrapper()
         NEW_LINE;
 
         // gen the param list
-        if( dwOutCount == 0 )
+        if( dwOutCount == 0 || bNoReply )
         {
              CCOUT << strMethod
                  <<"Callback( context, iRet );";
@@ -4889,6 +4922,7 @@ gint32 CImplIfMethodSvr::OutputSync()
     guint32 dwCount = dwInCount + dwOutCount;
 
     bool bSerial = m_pNode->IsSerialize();
+    bool bNoReply = m_pNode->IsNoReply();
 
     do{
         CCOUT << "gint32 " << strClass << "::"
@@ -4919,8 +4953,11 @@ gint32 CImplIfMethodSvr::OutputSync()
             CCOUT << "gint32 ret = this->"
                 << strMethod << "();";
             NEW_LINE;
-            Wa( "CParamList oResp_;" );
-            Wa( "oResp_[ propReturnValue ] = ret;" );
+            if( !bNoReply )
+            {
+                Wa( "CParamList oResp_;" );
+                Wa( "oResp_[ propReturnValue ] = ret;" );
+            }
         }
         else if( !bSerial )
         {
@@ -4936,37 +4973,41 @@ gint32 CImplIfMethodSvr::OutputSync()
                 CCOUT <<  " );";
             else
                 CCOUT << ");";
+
             INDENT_DOWNL;
-            Wa( "if( ret == STATUS_PENDING )" );
-            BLOCK_OPEN;
-            Wa( "ret = ERROR_STATE;" );
-            CCOUT << "DebugPrintEx( logErr, ret, ";
-            INDENT_UPL;
-            CCOUT << "\"Cannot return pending with\"";
-            NEW_LINE;
-            CCOUT << "\"Sync Request Handler\" );";
-            INDENT_DOWN;
-            BLOCK_CLOSE;
-            NEW_LINE;
-
-            Wa( "CParamList oResp_;" );
-            Wa( "oResp_[ propReturnValue ] = ret;" );
-            if( dwOutCount > 0 )
+            if( !bNoReply )
             {
-                Wa( "if( SUCCEEDED( ret ) )" );
+                Wa( "if( ret == STATUS_PENDING )" );
                 BLOCK_OPEN;
-
-                std::vector< std::string > vecArgs;
-                ret = GetArgsForCall( pOutArgs, vecArgs );
-                for( guint32 i = 0; i < vecArgs.size(); i++ )
-                {
-                    CCOUT << "oResp_.Push( "
-                        << vecArgs[ i ] << " );";
-                    if( i + 1 < vecArgs.size() )
-                        NEW_LINE;
-                }
+                Wa( "ret = ERROR_STATE;" );
+                CCOUT << "DebugPrintEx( logErr, ret, ";
+                INDENT_UPL;
+                CCOUT << "\"Cannot return pending with\"";
+                NEW_LINE;
+                CCOUT << "\"Sync Request Handler\" );";
+                INDENT_DOWN;
                 BLOCK_CLOSE;
                 NEW_LINE;
+
+                Wa( "CParamList oResp_;" );
+                Wa( "oResp_[ propReturnValue ] = ret;" );
+                if( dwOutCount > 0 )
+                {
+                    Wa( "if( SUCCEEDED( ret ) )" );
+                    BLOCK_OPEN;
+
+                    std::vector< std::string > vecArgs;
+                    ret = GetArgsForCall( pOutArgs, vecArgs );
+                    for( guint32 i = 0; i < vecArgs.size(); i++ )
+                    {
+                        CCOUT << "oResp_.Push( "
+                            << vecArgs[ i ] << " );";
+                        if( i + 1 < vecArgs.size() )
+                            NEW_LINE;
+                    }
+                    BLOCK_CLOSE;
+                    NEW_LINE;
+                }
             }
         }
         else
@@ -5004,32 +5045,38 @@ gint32 CImplIfMethodSvr::OutputSync()
             CCOUT << "\"Sync Request Handler\" );";
             INDENT_DOWN;
             BLOCK_CLOSE;
-            NEW_LINES( 2 );
 
-            Wa( "CParamList oResp_;" );
-            Wa( "oResp_[ propReturnValue ] = ret;" );
-            if( dwOutCount > 0 )
+            if( !bNoReply )
             {
-                Wa( "if( SUCCEEDED( ret ) )" );
-                BLOCK_OPEN;
+                NEW_LINES( 2 );
+                Wa( "CParamList oResp_;" );
+                Wa( "oResp_[ propReturnValue ] = ret;" );
+                if( dwOutCount > 0 )
+                {
+                    Wa( "if( SUCCEEDED( ret ) )" );
+                    BLOCK_OPEN;
 
-                Wa( "BufPtr pBuf2( true );" );
-                ret = GenSerialArgs(
-                    pOutArgs, "pBuf2", false, false );
-                if( ERROR( ret ) )
-                    break;
+                    Wa( "BufPtr pBuf2( true );" );
+                    ret = GenSerialArgs(
+                        pOutArgs, "pBuf2", false, false );
+                    if( ERROR( ret ) )
+                        break;
 
-                CCOUT << "oResp_.Push( pBuf2 );";
-                BLOCK_CLOSE;
-                NEW_LINE;
+                    CCOUT << "oResp_.Push( pBuf2 );";
+                    BLOCK_CLOSE;
+                    NEW_LINE;
+                }
             }
         }
 
-        NEW_LINE;
-        CCOUT << "this->SetResponse( ";
-        INDENT_UPL;
-        CCOUT << "pCallback, oResp_.GetCfg() );";
-        INDENT_DOWNL;
+        if( !bNoReply )
+        {
+            NEW_LINE;
+            CCOUT << "this->SetResponse( ";
+            INDENT_UPL;
+            CCOUT << "pCallback, oResp_.GetCfg() );";
+            INDENT_DOWNL;
+        }
 
         NEW_LINE;
         CCOUT << "return ret;";
@@ -5057,7 +5104,7 @@ gint32 CImplIfMethodSvr::OutputAsyncNonSerial()
     bool bSerial = m_pNode->IsSerialize();
     if( bSerial )
         return -EINVAL;
-
+    bool bNoReply = m_pNode->IsNoReply();
     do{
         CCOUT << "gint32 " << strClass << "::"
             << strMethod << "Wrapper( ";
@@ -5167,33 +5214,36 @@ gint32 CImplIfMethodSvr::OutputAsyncNonSerial()
         }
         CCOUT << " );";
         NEW_LINES( 2 );
-        Wa( "if( ret == STATUS_PENDING ) break;" );
-        NEW_LINE;
-        Wa( "CParamList oResp_;" );
-        Wa( "oResp_[ propReturnValue ] = ret;" );
-        if( dwOutCount > 0 )
+        if( !bNoReply )
         {
-            Wa( "if( SUCCEEDED( ret ) )" );
-            BLOCK_OPEN;
-            std::vector< std::string > vecArgs;
-            ret = GetArgsForCall( pOutArgs, vecArgs );
-            if( ERROR( ret ) )
-                break;
-            for( guint32 i = 0; i < vecArgs.size(); i++ )
-            {
-                CCOUT << "oResp_.Push( "
-                    << vecArgs[ i ] << " );";
-                if( i + 1 < vecArgs.size() )
-                    NEW_LINE;
-            }
-            BLOCK_CLOSE;
+            Wa( "if( ret == STATUS_PENDING ) break;" );
             NEW_LINE;
+            Wa( "CParamList oResp_;" );
+            Wa( "oResp_[ propReturnValue ] = ret;" );
+            if( dwOutCount > 0 )
+            {
+                Wa( "if( SUCCEEDED( ret ) )" );
+                BLOCK_OPEN;
+                std::vector< std::string > vecArgs;
+                ret = GetArgsForCall( pOutArgs, vecArgs );
+                if( ERROR( ret ) )
+                    break;
+                for( guint32 i = 0; i < vecArgs.size(); i++ )
+                {
+                    CCOUT << "oResp_.Push( "
+                        << vecArgs[ i ] << " );";
+                    if( i + 1 < vecArgs.size() )
+                        NEW_LINE;
+                }
+                BLOCK_CLOSE;
+                NEW_LINE;
+            }
+            NEW_LINE;
+            CCOUT << "this->SetResponse( pCallback,";
+            INDENT_UPL;
+            CCOUT << "oResp_.GetCfg() );";
+            INDENT_DOWNL;
         }
-        NEW_LINE;
-        CCOUT << "this->SetResponse( pCallback,";
-        INDENT_UPL;
-        CCOUT << "oResp_.GetCfg() );";
-        INDENT_DOWNL;
         BLOCK_CLOSE; // do
         Wa( "while( 0 );" );
         NEW_LINE;
@@ -5234,7 +5284,7 @@ gint32 CImplIfMethodSvr::OutputAsyncSerial()
     bool bSerial = m_pNode->IsSerialize();
     if( !bSerial )
         return -EINVAL;
-
+    bool bNoReply = m_pNode->IsNoReply();
     do{
         CCOUT << "gint32 " << strClass << "::"
             << strMethod << "Wrapper( ";
@@ -5337,28 +5387,31 @@ gint32 CImplIfMethodSvr::OutputAsyncSerial()
 
         CCOUT << " );";
         INDENT_DOWNL;
-        NEW_LINE;
-        Wa( "if( ret == STATUS_PENDING ) break;" );
-        NEW_LINE;
-        Wa( "CParamList oResp_;" );
-        Wa( "oResp_[ propReturnValue ] = ret;" );
-        if( dwOutCount > 0 )
+        if( !bNoReply )
         {
-            Wa( "if( SUCCEEDED( ret ) )" );
-            BLOCK_OPEN;
-
-            Wa( "BufPtr pBuf2( true );" );
-            ret = GenSerialArgs(
-                pOutArgs, "pBuf2", false, false );
-            CCOUT << "oResp_.Push( pBuf2 );";
-            BLOCK_CLOSE;
             NEW_LINE;
+            Wa( "if( ret == STATUS_PENDING ) break;" );
+            NEW_LINE;
+            Wa( "CParamList oResp_;" );
+            Wa( "oResp_[ propReturnValue ] = ret;" );
+            if( dwOutCount > 0 )
+            {
+                Wa( "if( SUCCEEDED( ret ) )" );
+                BLOCK_OPEN;
+
+                Wa( "BufPtr pBuf2( true );" );
+                ret = GenSerialArgs(
+                    pOutArgs, "pBuf2", false, false );
+                CCOUT << "oResp_.Push( pBuf2 );";
+                BLOCK_CLOSE;
+                NEW_LINE;
+            }
+            NEW_LINE;
+            CCOUT << "this->SetResponse( pCallback,";
+            INDENT_UPL;
+            CCOUT << "oResp_.GetCfg() );";
+            INDENT_DOWNL;
         }
-        NEW_LINE;
-        CCOUT << "this->SetResponse( pCallback,";
-        INDENT_UPL;
-        CCOUT << "oResp_.GetCfg() );";
-        INDENT_DOWNL;
         BLOCK_CLOSE; // do
         Wa( "while( 0 );" );
         NEW_LINE;
@@ -5474,6 +5527,7 @@ gint32 CImplIfMethodSvr::OutputAsyncCallback()
     guint32 dwOutCount = GetArgCount( pOutArgs );
 
     bool bSerial = m_pNode->IsSerialize();
+    bool bNoReply = m_pNode->IsNoReply();
 
     do{
         Wa( "// call me when you have completed" );
@@ -5498,6 +5552,21 @@ gint32 CImplIfMethodSvr::OutputAsyncCallback()
         INDENT_DOWN;
         NEW_LINE;
 
+        if( bNoReply )
+        {
+            BLOCK_OPEN;
+            CCOUT << "if( SUCCEEDED( iRet ) ) return iRet;";
+            NEW_LINE;
+            CCOUT << "DebugPrint( iRet,";
+            INDENT_UPL;
+            CCOUT << "\"'"<< strMethod
+                << "' completed with error\" );";
+            INDENT_DOWNL;
+            CCOUT << "return iRet;";
+            BLOCK_CLOSE;
+            NEW_LINE;
+            break;
+        }
         BLOCK_OPEN;
         Wa( "gint32 ret = 0;" );
 
@@ -5556,7 +5625,7 @@ gint32 CImplIfMethodSvr::OutputAsyncCallback()
         INDENT_DOWNL;
         CCOUT << "return ret;";
         BLOCK_CLOSE;
-        NEW_LINES( 1 );
+        NEW_LINE;
 
     }while( 0 );
     

@@ -580,6 +580,7 @@ class CIfStartRecvMsgTask
 class CIfIoReqTask
     : public CIfParallelTask
 {
+    guint32 m_iKeepAlive = 0;
     public:
     typedef CIfParallelTask super;
     CIfIoReqTask( const IConfigDb* pCfg )
@@ -589,6 +590,12 @@ class CIfIoReqTask
     virtual gint32 OnIrpComplete( IRP* pIrp );
     virtual gint32 OnCancel( guint32 dwContext );
     virtual gint32 OnComplete( gint32 iRet );
+
+    gint32 RemoveKATimer();
+    gint32 AddKATimer(
+        guint32 dwTimeoutSec );
+
+    gint32 OnSendKANotify();
 
     gint32 SubmitIoRequest();
 

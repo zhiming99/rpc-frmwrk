@@ -526,6 +526,7 @@ std::map< std::string, yytokentype >
         { "auth", TOK_AUTH },
         { "ipaddr", TOK_IPADDR },
         { "portnum", TOK_PORTNUM },
+        { "noreply", TOK_NOREPLY },
 
         { "struct", TOK_STRUCT }, 
         { "interface", TOK_INTERFACE }, 

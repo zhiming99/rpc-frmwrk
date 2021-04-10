@@ -3621,6 +3621,11 @@ gint32 CIfIoReqTask::OnComplete(
 
     oParams.RemoveProperty( propRespPtr );
     oParams.RemoveProperty( propReqPtr );
+    if( m_iKeepAlive > 0 )
+    {
+        RemoveTimer( m_iKeepAlive );
+        m_iKeepAlive = 0;
+    }
 
     return iRet;
 }
@@ -3658,11 +3663,103 @@ gint32 CIfIoReqTask::ResetTimer()
     return ret;
 }
 
+gint32 CIfIoReqTask::AddKATimer(
+    guint32 dwTimeoutSec )
+{
+    if( dwTimeoutSec == 0 )
+        return -EINVAL;
+    gint32 ret = 0;
+    do{
+        CStdRTMutex oTaskLock( GetLock() );
+        CCfgOpener oCfg(
+            ( IConfigDb* )GetConfig() );
+
+        CRpcServices* pIf = nullptr;
+        ret = oCfg.GetPointer( propIfPtr, pIf );
+        if( ERROR( ret ) )
+            break;
+
+        if( pIf->IsServer() )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        CfgPtr pReq;
+        ret = GetReqCall( pReq );
+        if( ERROR( ret ) )
+            break;
+
+        guint32 dwFlags = 0;
+        CReqOpener oReq( pReq );
+        ret = oReq.GetCallFlags( dwFlags );
+        if( ERROR( ret ) )
+            break;
+
+        if( !( dwFlags & CF_WITH_REPLY ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        if( !( dwFlags & CF_KEEP_ALIVE ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        ret = AddTimer( dwTimeoutSec,
+            ( guint32 )eventKeepAlive );
+
+        if( unlikely( ret < 0 ) )
+            break;
+
+        m_iKeepAlive = ret;
+        ret = 0;
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CIfIoReqTask::RemoveKATimer()
+{
+    CStdRTMutex oTaskLock( GetLock() );
+    if( m_iKeepAlive > 0 )
+        return RemoveTimer( m_iKeepAlive );
+    return 0;
+}
+
+gint32 CIfIoReqTask::OnSendKANotify()
+{
+    gint32 ret = 0;
+    do{
+        CStdRTMutex oTaskLock( GetLock() );
+        CCfgOpener oCfg(
+            ( IConfigDb* )GetConfig() );
+
+        CRpcServices* pIf = nullptr;
+        ret = oCfg.GetPointer( propIfPtr, pIf );
+        if( ERROR( ret ) )
+            break;
+        CIoManager* pMgr = pIf->GetIoMgr();
+        ret = DEFER_CALL( pMgr, ObjPtr( pIf ),
+            &CInterfaceProxy::KeepAliveRequest,
+            this->GetObjId() );
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CIfIoReqTask::OnKeepAlive(
     guint32 dwContext )
 {
     gint32 ret = 0;
     do{
+        if( dwContext == eventTimeout )
+        {
+            ret = OnSendKANotify();
+            break;
+        }
         CCfgOpener oCfg(
             ( IConfigDb* )GetConfig() );
 
@@ -4603,24 +4700,18 @@ gint32 CIfInvokeMethodTask::OnKeepAliveOrig()
 
         DebugPrint( ret, "Schedule next keep-alive" );
         // schedule the next keep-alive event
-        CIoManager* pMgr = pIf->GetIoMgr();
-        CUtilities& oUtils = pMgr->GetUtils();
-
-        CTimerService& oTimerSvc =
-            oUtils.GetTimerSvc();
-
         if( dwTimeoutSec > 0 )
         {
-            m_iKeepAlive = oTimerSvc.AddTimer(
-                dwTimeoutSec, this,
+            ret = AddTimer( dwTimeoutSec,
                 ( guint32 )eventKeepAlive );
+
+            if( unlikely( ret < 0 ) )
+                break;
+
+            m_iKeepAlive = ret;
+            ret = 0;
         }
 
-        if( m_iTimeoutId > 0 )
-        {
-            // oTimerSvc.ResetTimer( m_iTimeoutId );
-        }
-        
     }while( 0 );
 
     // return status_pending to avoid the task
@@ -4635,41 +4726,16 @@ gint32 CIfInvokeMethodTask::ResetTimer()
 {
     gint32 ret = 0;
     CStdRTMutex oTaskLock( GetLock() );
-
     do{
-        ObjPtr pObj;
-        CCfgOpener oTaskCfg(
-            ( IConfigDb* )GetConfig() );
-
-        CInterfaceServer* pIf = nullptr;
-        ret = oTaskCfg.GetPointer(
-            propIfPtr, pIf );
-
+        ret = super::ResetTimer( m_iTimeoutId );
         if( ERROR( ret ) )
             break;
 
-        if( pIf == nullptr )
-        {
-            ret = -EFAULT;
-            break;
-        }
-
-        // schedule the next keep-alive event
-        CIoManager* pMgr = pIf->GetIoMgr();
-        CUtilities& oUtils = pMgr->GetUtils();
-
-        CTimerService& oTimerSvc =
-            oUtils.GetTimerSvc();
-
-        if( m_iTimeoutId > 0 )
-        {
-            oTimerSvc.ResetTimer( m_iTimeoutId );
+        m_iTimeoutId = 0;
 #ifdef DEBUG
-            DebugPrint( ret,
-                "Invoke Request timer is reset" );
+        DebugPrint( ret,
+            "Invoke Request timer is reset" );
 #endif
-        }
-
     }while( 0 );
 
     return ret;
@@ -4916,14 +4982,14 @@ gint32 CIfInvokeMethodTask::SetAsyncCall(
             break;
         }
 
-        CIoManager* pMgr = pIf->GetIoMgr();
-        CUtilities& oUtils = pMgr->GetUtils();
-        CTimerService& oTimerSvc =
-            oUtils.GetTimerSvc();
-
-        m_iTimeoutId = oTimerSvc.AddTimer(
-            dwTimeoutSec, this,
+        ret = AddTimer( dwTimeoutSec, 
             ( guint32 )eventTimeoutCancel );
+
+        if( unlikely( ret < 0 ) )
+            break;
+
+        m_iTimeoutId = ret;
+        ret = 0;
 
         if( !IsKeepAlive() )
             break;
@@ -4938,9 +5004,14 @@ gint32 CIfInvokeMethodTask::SetAsyncCall(
         if( dwTimeoutSec == 0 )
             break;
 
-        m_iKeepAlive = oTimerSvc.AddTimer(
-            dwTimeoutSec, this,
+        ret = AddTimer( dwTimeoutSec,
             ( guint32 )eventKeepAlive );
+
+        if( unlikely( ret < 0 ) )
+            break;
+
+        m_iKeepAlive = ret;
+        ret = 0;
 
         DebugPrintEx( logInfo, ret,
             "KeepAliveTimer started in %d seconds",
@@ -5567,7 +5638,6 @@ gint32 CIfInterceptTaskProxy::EnableTimer(
 {
     gint32 ret = 0;
     do{
-        CIoManager* pMgr = nullptr;
         CCfgOpenerObj oTaskCfg( this );
         if( dwTimeoutSec == 0 )
         {
@@ -5582,30 +5652,17 @@ gint32 CIfInterceptTaskProxy::EnableTimer(
                 propTimeoutSec, dwTimeoutSec );
             if( ERROR( ret ) )
                 break;
-
-            pMgr = pIf->GetIoMgr();
-        }
-        else
-        {
-            ret = GET_IOMGR( oTaskCfg, pMgr );
-            if( ERROR( ret ) )
-                break;
         }
 
         CStdRTMutex oTaskLock( GetLock() );
-        CUtilities& oUtils = pMgr->GetUtils();
-        CTimerService& oTimerSvc =
-            oUtils.GetTimerSvc();
-
-        ret = oTimerSvc.AddTimer(
-            dwTimeoutSec, this, 
+        ret = AddTimer( dwTimeoutSec, 
             ( guint32 )timerEvent );
 
-        if( ret > 0 )
-        {
-            m_iTimeoutId = ret;
-            ret = 0;
-        }
+        if( unlikely( ret < 0 ) )
+            break;
+
+        m_iTimeoutId = ret;
+        ret = 0;
 
     }while( 0 );
 
@@ -5617,20 +5674,11 @@ gint32 CIfInterceptTaskProxy::DisableTimer()
     gint32 ret = 0;
     do{
         CStdRTMutex oTaskLock( GetLock() );
+
         if( m_iTimeoutId == 0 )
             break;
 
-        CCfgOpenerObj oTaskCfg( this );
-        CIoManager* pMgr = nullptr;
-        ret = GET_IOMGR( oTaskCfg, pMgr );
-        if( ERROR( ret ) )
-            break;
-
-        CUtilities& oUtils = pMgr->GetUtils();
-        CTimerService& oTimerSvc =
-            oUtils.GetTimerSvc();
-
-        oTimerSvc.RemoveTimer( m_iTimeoutId );
+        RemoveTimer( m_iTimeoutId );
         m_iTimeoutId = 0;
 
     }while( 0 );

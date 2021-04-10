@@ -922,16 +922,33 @@ struct CMethodDecl : public CNamedNode
         return false;
     }
 
-    gint32 IsEvent() const
+    bool IsEvent() const
     {
         if( m_pAttrList.IsEmpty() )
-            return 0;
+            return false;
 
         CAttrExps* pList = m_pAttrList;
         if( pList == nullptr )
-            return 0;
+            return false;
 
         return pList->IsEvent();
+    }
+
+    bool IsNoReply() const
+    {
+        if( m_pAttrList.IsEmpty() )
+            return false;
+
+        CAttrExps* pList = m_pAttrList;
+        if( pList == nullptr )
+            return false;
+
+        BufPtr pBuf;
+        gint32 ret = pList->GetAttrByToken(
+            TOK_NOREPLY, pBuf );
+        if( ERROR( ret ) )
+            return false;
+        return true;
     }
 
     void SetAbstDecl(

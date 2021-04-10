@@ -201,6 +201,36 @@ gint32 CTasklet::GetIrpFromParams( IrpPtr& pIrp )
     return ret;
 }
 
+gint32 CTaskletRetriable::AddTimer(
+    guint32 dwIntervalSec,
+    guint32 dwParam )
+{
+    if( dwIntervalSec == 0 )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        CIoManager* pMgr = nullptr;
+        CCfgOpener oParams(
+            ( const IConfigDb* )GetConfig() );
+
+        ret = oParams.GetPointer(
+            propIoMgr, pMgr );
+
+        if( ERROR( ret ) )
+            break;
+
+        CTimerService& oTimerSvc =
+            pMgr->GetUtils().GetTimerSvc();
+
+        ret = oTimerSvc.AddTimer(
+            dwIntervalSec, this, dwParam );
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CTaskletRetriable::ScheduleRetry()
 {
     gint32 ret = 0;
@@ -208,15 +238,8 @@ gint32 CTaskletRetriable::ScheduleRetry()
     do{
         guint32 dwInterval = 0;
 
-        CIoManager* pMgr = nullptr;
         CCfgOpener oParams(
             ( IConfigDb* )GetConfig() );
-
-        ret = oParams.GetPointer(
-            propIoMgr, pMgr );
-
-        if( ERROR( ret ) )
-            break;
 
         ret = oParams.GetIntProp(
             propIntervalSec, dwInterval );
@@ -230,11 +253,9 @@ gint32 CTaskletRetriable::ScheduleRetry()
             ret = iRetries;
             break;
         }
-        CTimerService& oTimerSvc =
-            pMgr->GetUtils().GetTimerSvc();
 
-        m_iTimerId = oTimerSvc.AddTimer(
-            dwInterval, this, eventRetry );
+        m_iTimerId = AddTimer(
+            dwInterval, eventRetry );
 
         if( m_iTimerId < 0 )
         {
@@ -400,13 +421,15 @@ gint32 CTaskletRetriable::DecRetries()
     return ret;
 }
 
-gint32 CTaskletRetriable::ResetTimer()
+gint32 CTaskletRetriable::ResetTimer(
+    gint32 iTimerId ) const
 {
-    if( m_iTimerId <= 0 )
+    if( iTimerId <= 0 )
         return -EINVAL;
 
     CIoManager* pMgr = nullptr;
-    CCfgOpener oParams( ( IConfigDb* )m_pCtx );
+    CCfgOpener oParams(
+        ( const IConfigDb* )m_pCtx );
 
     gint32 ret = oParams.GetPointer(
         propIoMgr, pMgr );
@@ -417,18 +440,24 @@ gint32 CTaskletRetriable::ResetTimer()
     CTimerService& oTimerSvc =
         pMgr->GetUtils().GetTimerSvc();
 
-    ret = oTimerSvc.ResetTimer( m_iTimerId );
+    ret = oTimerSvc.ResetTimer( iTimerId );
     return ret;
 }
 
+gint32 CTaskletRetriable::ResetTimer()
+{
+    return ResetTimer( m_iTimerId );
+}
+
 gint32 CTaskletRetriable::RemoveTimer(
-    gint32 iTimerId )
+    gint32 iTimerId ) const
 {
     if( iTimerId <= 0 )
         return -EINVAL;
 
     CIoManager* pMgr = nullptr;
-    CCfgOpener oParams( ( IConfigDb* )m_pCtx );
+    CCfgOpener oParams(
+        ( const IConfigDb* )m_pCtx );
 
     gint32 ret = oParams.GetPointer(
         propIoMgr, pMgr );

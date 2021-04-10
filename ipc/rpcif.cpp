@@ -5632,7 +5632,11 @@ gint32 CInterfaceProxy::KeepAliveRequest(
     // make the call
     std::string strMethod( __func__ );
 
-    return SyncCallEx( oOptions.GetCfg(),
+    TaskletPtr pDummy;
+    pDummy.NewObj( clsid( CIfDummyTask ) );
+
+    return AsyncCall( pDummy,
+        oOptions.GetCfg(),
         pResp, strMethod, qwTaskId );
 }
 
