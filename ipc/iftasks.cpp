@@ -3621,11 +3621,6 @@ gint32 CIfIoReqTask::OnComplete(
 
     oParams.RemoveProperty( propRespPtr );
     oParams.RemoveProperty( propReqPtr );
-    if( m_iKeepAlive > 0 )
-    {
-        RemoveTimer( m_iKeepAlive );
-        m_iKeepAlive = 0;
-    }
 
     return iRet;
 }
@@ -3663,71 +3658,6 @@ gint32 CIfIoReqTask::ResetTimer()
     return ret;
 }
 
-gint32 CIfIoReqTask::AddKATimer(
-    guint32 dwTimeoutSec )
-{
-    if( dwTimeoutSec == 0 )
-        return -EINVAL;
-    gint32 ret = 0;
-    do{
-        CStdRTMutex oTaskLock( GetLock() );
-        CCfgOpener oCfg(
-            ( IConfigDb* )GetConfig() );
-
-        CRpcServices* pIf = nullptr;
-        ret = oCfg.GetPointer( propIfPtr, pIf );
-        if( ERROR( ret ) )
-            break;
-
-        if( pIf->IsServer() )
-        {
-            ret = -EINVAL;
-            break;
-        }
-
-        CfgPtr pReq;
-        ret = GetReqCall( pReq );
-        if( ERROR( ret ) )
-            break;
-
-        guint32 dwFlags = 0;
-        CReqOpener oReq( pReq );
-        ret = oReq.GetCallFlags( dwFlags );
-        if( ERROR( ret ) )
-            break;
-
-        if( !( dwFlags & CF_WITH_REPLY ) )
-        {
-            ret = -EINVAL;
-            break;
-        }
-        if( !( dwFlags & CF_KEEP_ALIVE ) )
-        {
-            ret = -EINVAL;
-            break;
-        }
-        ret = AddTimer( dwTimeoutSec,
-            ( guint32 )eventKeepAlive );
-
-        if( unlikely( ret < 0 ) )
-            break;
-
-        m_iKeepAlive = ret;
-        ret = 0;
-
-    }while( 0 );
-
-    return ret;
-}
-
-gint32 CIfIoReqTask::RemoveKATimer()
-{
-    CStdRTMutex oTaskLock( GetLock() );
-    if( m_iKeepAlive > 0 )
-        return RemoveTimer( m_iKeepAlive );
-    return 0;
-}
-
 gint32 CIfIoReqTask::OnSendKANotify()
 {
     gint32 ret = 0;
@@ -3755,11 +3685,6 @@ gint32 CIfIoReqTask::OnKeepAlive(
 {
     gint32 ret = 0;
     do{
-        if( dwContext == eventTimeout )
-        {
-            ret = OnSendKANotify();
-            break;
-        }
         CCfgOpener oCfg(
             ( IConfigDb* )GetConfig() );
 
@@ -3805,6 +3730,11 @@ gint32 CIfIoReqTask::OnKeepAlive(
                 CRpcServices::KARelay,
                 0, nullptr );
         }
+        else if( iKaFlag == CRpcServices::KATerm )
+        {
+            OnSendKANotify();
+        }
+
 
     }while( 0 );
 
@@ -4730,8 +4660,6 @@ gint32 CIfInvokeMethodTask::ResetTimer()
         ret = super::ResetTimer( m_iTimeoutId );
         if( ERROR( ret ) )
             break;
-
-        m_iTimeoutId = 0;
 #ifdef DEBUG
         DebugPrint( ret,
             "Invoke Request timer is reset" );

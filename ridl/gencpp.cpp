@@ -699,6 +699,15 @@ guint32 GenClsid( const std::string& strName )
     return iClsid;
 }
 
+#define GEN_FILEPATH( strRet, strPath, strName ) \
+do{ \
+    strRet = ( strPath ) + "/" + ( strName ); \
+    gint32 ret = access( \
+        strRet.c_str(), F_OK ); \
+    if( ret == 0 ) \
+        strRet += ".new"; \
+}while( 0 )
+
 CFileSet::CFileSet(
     const std::string& strOutPath,
     const std::string& strAppName )
@@ -716,38 +725,24 @@ CFileSet::CFileSet(
     m_strAppCpp =
         strOutPath + "/" + strAppName + ".cpp";
 
-    m_strObjDesc =
-        strOutPath + "/" + strAppName +
-        "desc.json";
+    GEN_FILEPATH( m_strObjDesc,
+        strOutPath, strAppName + "desc.json" );
 
-    m_strDriver =
-        strOutPath + "/driver.json";
+    GEN_FILEPATH( m_strDriver,
+        strOutPath, "driver.json" );
 
-    m_strMakefile =
-        strOutPath + "/Makefile" ;
+    GEN_FILEPATH( m_strMakefile,
+        strOutPath, "Makefile" );
 
-    m_strMainCli =
-        strOutPath + "/maincli.cpp";
+    GEN_FILEPATH( m_strMainCli,
+        strOutPath, "maincli.cpp" );
 
-    gint32 ret = access(
-        m_strMainCli.c_str(), F_OK );
-
-    if( ret == 0 )
-        m_strMainCli =
-            strOutPath + "/maincli.cpp.new";
-
-    m_strMainSvr =
-        strOutPath + "/mainsvr.cpp";
-    ret = access(
-        m_strMainSvr.c_str(), F_OK );
-
-    if( ret == 0 )
-        m_strMainSvr =
-            strOutPath + "/mainsvr.cpp.new";
+    GEN_FILEPATH( m_strMainSvr, 
+        strOutPath, "mainsvr.cpp" );
 
     m_strPath = strOutPath;
 
-    ret = OpenFiles();
+    gint32 ret = OpenFiles();
     if( ERROR( ret ) )
     {
         std::string strMsg = DebugMsg( ret,
@@ -4975,20 +4970,21 @@ gint32 CImplIfMethodSvr::OutputSync()
                 CCOUT << ");";
 
             INDENT_DOWNL;
+
+            Wa( "if( ret == STATUS_PENDING )" );
+            BLOCK_OPEN;
+            Wa( "ret = ERROR_STATE;" );
+            CCOUT << "DebugPrintEx( logErr, ret, ";
+            INDENT_UPL;
+            CCOUT << "\"Cannot return pending with\"";
+            NEW_LINE;
+            CCOUT << "\"Sync Request Handler\" );";
+            INDENT_DOWN;
+            BLOCK_CLOSE;
+            NEW_LINE;
+
             if( !bNoReply )
             {
-                Wa( "if( ret == STATUS_PENDING )" );
-                BLOCK_OPEN;
-                Wa( "ret = ERROR_STATE;" );
-                CCOUT << "DebugPrintEx( logErr, ret, ";
-                INDENT_UPL;
-                CCOUT << "\"Cannot return pending with\"";
-                NEW_LINE;
-                CCOUT << "\"Sync Request Handler\" );";
-                INDENT_DOWN;
-                BLOCK_CLOSE;
-                NEW_LINE;
-
                 Wa( "CParamList oResp_;" );
                 Wa( "oResp_[ propReturnValue ] = ret;" );
                 if( dwOutCount > 0 )
@@ -5555,6 +5551,8 @@ gint32 CImplIfMethodSvr::OutputAsyncCallback()
         if( bNoReply )
         {
             BLOCK_OPEN;
+            Wa( "if( pCallback == nullptr ) return -EINVAL;" );
+            Wa( "pCallback->OnEvent( eventTaskComp, iRet, 0, 0 );" );
             CCOUT << "if( SUCCEEDED( iRet ) ) return iRet;";
             NEW_LINE;
             CCOUT << "DebugPrint( iRet,";

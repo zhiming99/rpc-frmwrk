@@ -59,6 +59,8 @@ std::map< gint32, std::set< gint32 > >
 extern std::vector<
     std::unique_ptr< FILECTX > > g_vecBufs;
 
+extern bool g_bNewSerial;
+
 void yyerror( YYLTYPE *locp,
     char const* szFile, char const *msg );
 
@@ -730,7 +732,8 @@ method_decl : attr_list TOK_IDENT '(' arg_list ')' TOK_RETURNS '(' arg_list ')'
 
         ENABLE_STREAM( pOutArgs, pmd );
         ENABLE_SERIAL( pOutArgs, pmd );
-        pmd->EnableSerialize();
+        if( g_bNewSerial )
+            pmd->EnableSerialize();
 
         BufPtr pAttrBuf = $1;
         if( ! pAttrBuf.IsEmpty() &&
@@ -794,7 +797,8 @@ method_decl : attr_list TOK_IDENT '(' ')' TOK_RETURNS '(' arg_list ')'
 
         ENABLE_STREAM( pOutArgs, pmd );
         ENABLE_SERIAL( pOutArgs, pmd );
-        pmd->EnableSerialize();
+        if( g_bNewSerial )
+            pmd->EnableSerialize();
 
         BufPtr pAttrBuf = $1;
         if( ! pAttrBuf.IsEmpty() &&
@@ -887,7 +891,8 @@ method_decl : attr_list TOK_IDENT '(' arg_list ')' TOK_RETURNS '(' ')'
         pmd->SetInArgs( pInArgs );
         ENABLE_STREAM( pInArgs, pmd );
         ENABLE_SERIAL( pInArgs, pmd );
-        pmd->EnableSerialize();
+        if( g_bNewSerial )
+            pmd->EnableSerialize();
         BufPtr pAttrBuf = $1;
         if( ! pAttrBuf.IsEmpty() &&
             ! pAttrBuf->empty() )

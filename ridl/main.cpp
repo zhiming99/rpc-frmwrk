@@ -90,11 +90,17 @@ void Usage()
         "\t\tthe <name>cli for client and <name>svr\n"
         "\t\tfor server. If not specified, the\n"
         "\t\t'appname' from the ridl will be used\n" );
+
+    printf( "\t-s:\tTo apply new serilization\n"
+        "\t\tprotocol only when the old serilization\n"
+        "\t\tmethod cannot handle. Default is new\n"
+        "\t\tserialization protocol always\n" );
 }
 
 static std::string g_strOutPath = "output";
 static std::vector< std::string > g_vecPaths;
 std::string g_strTarget;
+bool g_bNewSerial = true;
 
 #include "seribase.h"
 #include "gencpp.h"
@@ -118,7 +124,7 @@ int main( int argc, char** argv )
         bool bQuit = false;
 
         while( ( opt =
-            getopt( argc, argv, "hI:O:o:" ) ) != -1 )
+            getopt( argc, argv, "ahI:O:o:" ) ) != -1 )
         {
             switch( opt )
             {
@@ -168,6 +174,11 @@ int main( int argc, char** argv )
             case 'o':
                 {
                     g_strTarget = optarg;
+                    break;
+                }
+            case 's':
+                {
+                    g_bNewSerial = false;
                     break;
                 }
             default:
