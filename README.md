@@ -49,8 +49,8 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 
 ---
 [`Mon Apr 12 2021 09:15:36 PM Beijing`]   
-1. `keep-alive` improvement and `no-reply` request are done.
-2. Found that three more files `router.json`, `rtauth.json`, and `authprxy.json` need to be customized for the generated project. And an `make install` target is needed to ease the deployment efforts or provide hints for deployment.
+1. `keep-alive` improvement and `no-reply` request are ready now.
+2. Found that three more files `router.json`, `rtauth.json`, and `authprxy.json` need to be customized for the generated project. And an `make install` target is needed to ease the deployment efforts or provide hints for deployment. It requires some new statements in the `ridl` gramma.
 
 [`Thu Apr 08 2021 08:37:46 PM Beijing`]   
 1. Debugging for cpp generator is still going on. And during debugging I found it is necessary to add a no-reply request to make `keep-alive` support perfect. it should be a quite easy task.
