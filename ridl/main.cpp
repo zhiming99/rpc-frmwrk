@@ -69,10 +69,10 @@ static FactoryPtr InitClassFactory()
 void Usage()
 {
     printf( "Usage:" );
-    printf( "ridlc [options] <filePath> \n" );
+    printf( "ridlc [options] <ridl file> \n" );
 
-    printf( "\t compile the file"
-        "it to current directory\n" );
+    printf( "\t compile the `ridl file'"
+        "and output the RPC skelton files<\n" );
 
     printf( "Options -h:\tTo print this help\n");
 
@@ -208,7 +208,14 @@ int main( int argc, char** argv )
             break;
         }
 
-        ret = yyparse( strFile.c_str() );
+        try {
+            ret = yyparse( strFile.c_str() );
+        }
+        catch (std::exception& e)
+        {
+            printf( "%s\n", e.what() );
+        }
+
         if( g_pRootNode.IsEmpty() )
         {
             ret = -EFAULT;

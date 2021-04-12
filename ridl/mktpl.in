@@ -14,7 +14,9 @@ BASE:=$(abspath $(dir $(mkfile_path)) )
 C_FLAGS:=$(CFLAGS) -Wall -c -D_GNU_SOURCE -pthread
 C_DEFINES+=-D_USE_LIBEV=1
 
-COMMON_INCLUDE:=$(shell pkg-config --cflags dbus-1 jsoncpp rpcf)
+PKG_CONFIG_PATH=@PKG_CONFIG_PATH@
+
+COMMON_INCLUDE:=$(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --cflags dbus-1 jsoncpp rpcf)
 
 C_INCLUDE:=-I./ $(COMMON_INCLUDE)
 
@@ -50,7 +52,7 @@ else ifeq ($(MAKECMDGOALS),release_clean)
 	OBJ_DIR:=./$(RLS_DIR)
 endif
 
-COMMON_LINK=$(shell pkg-config --libs dbus-1 jsoncpp rpcf)
+COMMON_LINK=$(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs dbus-1 jsoncpp rpcf)
 LINKER_OPTION:=$(COMMON_LINK) -ldl -lstdc++ -lpthread
 
 TARGET_SVR:=XXXSVR

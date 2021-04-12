@@ -1764,7 +1764,7 @@ gint32 HSTREAM::Serialize( BufPtr& pBuf ) const
         return -EINVAL;
 
     if( m_pIf == nullptr )
-        return -EINVAL;
+        return ERROR_STATE;
 
     gint32 ret = 0;
     guint64 qwHash = 0;
@@ -1810,7 +1810,7 @@ gint32 HSTREAM::Deserialize( BufPtr& pBuf )
         return -EINVAL;
 
     if( m_pIf == nullptr )
-        return -EINVAL;
+        return ERROR_STATE;
 
     gint32 ret = 0;
     guint64 qwHash = 0;

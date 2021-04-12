@@ -1688,8 +1688,8 @@ gint32 CRpcInterfaceProxy::OnKeepAliveOrig(
 
     }while( 0 );
 
-    // whether or not succeeded, we complete the invoke
-    // task.
+    // whether or not succeeded, we complete the
+    // invoke task.
     return 0;
 }
 
@@ -3461,10 +3461,6 @@ gint32 CRpcTcpBridge::SetupReqIrpFwrdEvt(
         // the io direction
         IrpCtxPtr& pIrpCtx = pIrp->GetTopStack(); 
         pIrpCtx->SetCtrlCode( CTRLCODE_SEND_EVENT );
-
-        // FIXME: we don't know if the request
-        // needs a reply, and the flag is set
-        // to CF_WITH_REPLY mandatorily
         pIrpCtx->SetIoDirection( IRP_DIR_OUT ); 
 
         CCfgOpener oReq( pReqCall );

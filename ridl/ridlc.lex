@@ -554,7 +554,7 @@ FILECTX::FILECTX( const std::string& strPath )
     }
     else
     {
-        std::string strMsg = "cannot open file '";
+        std::string strMsg = "error cannot open file '";
         strMsg += strPath + "'";
         throw std::invalid_argument( strMsg );
     }
