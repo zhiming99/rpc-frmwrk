@@ -554,6 +554,7 @@ gint32 CMethodWriter::GenDeserialArgs(
             {
                 CCOUT << "HSTREAM "
                     << strLocal << ";";
+                NEW_LINE;
             }
             CCOUT << strLocal <<
                 ".m_pIf = this;";
@@ -591,7 +592,7 @@ gint32 CMethodWriter::GenDeserialArgs(
         if( bAssign == false )
             break;
 
-        if( vecHstms.size() )
+        if( vecHstms.empty() )
             break;
 
         for( auto& elem : vecHstms )
@@ -4394,8 +4395,9 @@ gint32 CImplIfMethodProxy::OutputSync()
                     ret = GenDeserialArgs(
                         pOutArgs, "pBuf2", true, true );
                 }
+                NEW_LINE;
             }
-            Wa( "return ret;" );
+            CCOUT << "return ret;";
         }
         BLOCK_CLOSE;
         NEW_LINES( 1 );

@@ -1782,7 +1782,6 @@ gint32 HSTREAM::Serialize( BufPtr& pBuf ) const
             return ret;
 
         guint64 qwId = pIf->GetObjId();
-        guint64 qwHash = 0;
         ret = GetObjIdHash( qwId, qwHash );
         if( ERROR( ret ) )
             return ret;
