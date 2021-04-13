@@ -48,6 +48,9 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 7. Logging service
 
 ---
+[`Tue Apr 13 2021 05:29:19 PM Beijing`]   
+1. It seems not a good idea to put many irrelevant stuffs to ridl. Maybe a config dialog box is better.
+
 [`Mon Apr 12 2021 09:15:36 PM Beijing`]   
 1. `keep-alive` improvement and `no-reply` request are ready now.
 2. Found that three more files `router.json`, `rtauth.json`, and `authprxy.json` need to be customized for the generated project. And an `make install` target is needed to ease the deployment efforts or provide hints for deployment. It requires some new statements in the `ridl` gramma.
