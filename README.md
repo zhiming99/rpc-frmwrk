@@ -49,7 +49,7 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 
 ---
 [`Tue Apr 13 2021 05:29:19 PM Beijing`]   
-1. It seems not a good idea to put many irrelevant stuffs to ridl. Maybe a config dialog box is better.
+1. It seems not a good idea to put many irrelevant stuffs to ridl. Maybe a config dialog box is better. Let's keep ridl less complex.
 
 [`Mon Apr 12 2021 09:15:36 PM Beijing`]   
 1. `keep-alive` improvement and `no-reply` request are ready now.
