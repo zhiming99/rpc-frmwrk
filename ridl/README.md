@@ -59,7 +59,7 @@ The basic data types are:
 * `bool`
 * `string`
 * `bytearray`( binary blob )
-* `ObjPtr` : RPC-framework built-in serializable data type.
+* `ObjPtr` : `rpc-frmwrk` built-in serializable data type.
 * `HSTREAM` : a special data type as stream handle.
 
 The 3 composite types are
