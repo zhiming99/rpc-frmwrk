@@ -116,9 +116,9 @@ Currently ridlc can only output `c++` project. In the future, it will be able to
 On a successful compile of the above sample ridl file, ridlc will generate several files:
 * maincli.cpp, mainsvr.cpp: as the name indicate, the two files define main function of the proxy and server respectively.
 * example.cpp, example.h : the files are named with the name defined by `appname`. It contains all the skelton declarations, and implementations.
-* SimpFileSvc.cpp, SimpFileSvc.h: the files are named with the `service id` of the `service statement`. The cpp file contains all the methods that user must implement to get server/proxy to work. They are mainly the same-name methods on Server side as request handler, or method callback for asynchronous calls on proxy side. 
-* Makefile: make file to build the project. Note that, you must install the RPC-frmwrk first.
-* exampledesc.json, driver.json: the configuration files.
+* SimpFileSvc.cpp, SimpFileSvc.h: the files are named with the `service id` of the `service statement`. The cpp file contains all the methods that user must implement to get server/proxy to work. They are mainly the same-name methods on Server side as request handler. 
+* Makefile: The make file to build the project. Note that, you must install the RPC-frmwrk first.
+* exampledesc.json, driver.json: The configuration files.
 
  
  
