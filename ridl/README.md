@@ -6,6 +6,7 @@
 // must have statement
 appname "example";
 typedef array< array< string > > STRMATRIX2;
+const timeout_sec = 120;
 
 struct FILE_INFO
 {
@@ -39,7 +40,7 @@ interface IEchoThings
 };
 
 service SimpFileSvc [
-    timeout=120, rtpath="/",
+    timeout=timeout_sec, rtpath="/",
     ipaddr="192.168.3.13",
     compress, auth ]
 {
@@ -48,20 +49,29 @@ service SimpFileSvc [
 
 ```
 ### Supported Data Types
-ridl support 10 basic data types and 3 composite types, The basic data types are
-* byte
-* int16/uint16
-* int32/uint32
-* int64/uint64
-* float(32)/double(64)
-* bool
-* string
-* bytearray( binary blob )
-* ObjPtr : RPC-framework built-in serializable data type.
-* HSTREAM : a special data type as stream handle.
+ridl support 10 basic data types and 3 composite types.
+The basic data types are:
+* `byte`
+* `int16/uint16`
+* `int32/uint32`
+* `int64/uint64`
+* `float(32)/double(64)`
+* `bool`
+* `string`
+* `bytearray`( binary blob )
+* `ObjPtr` : RPC-framework built-in serializable data type.
+* `HSTREAM` : a special data type as stream handle.
+
 The 3 composite types are
-* array : an array of data of basic type or composite type except `HSTREAM`
-* map : a map consisting of key-value paires. `key` should be a comparable data type, and value could be any supported type except `HSTREAM`.
-* struct: as `FILE_INFO` shows in the above example.
+* `array` : an array of data of basic type or composite type except `HSTREAM`
+* `map` : a map consisting of key-value paires. `key` should be a comparable data type, and value could be any supported type except `HSTREAM`.
+* `struct`: as `FILE_INFO` shows in the above example, is a package of informations of different data types. 
+
+### Statements
+The above example shows most of the statements ridl supports. ridl now has 6 types of statements.
+* `appname` : specify the application name, it is a must have statement.
+* `typedef` : define an alias for a pre-defined data type, or alias.
+* `const declaration`: to assign a name to a constant value.
+* `struct declaration` : to define 
 
 
