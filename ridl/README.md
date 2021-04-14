@@ -91,7 +91,24 @@ The above example shows most of the statements ridl supports. ridl now has 6 typ
         * `websock` : the existance of this attribute instructs to connect to the remote router via `Websocket`
         * `SSL` : the existance of this attribute instructs to connect to the remote router via SSL connection.
         * `compress` : the existance of this attribute instruct to compress the message bound to the remote router.
-        * `auth` : a Json string, to specify the authentication information to access the remote router. If it does not exist, authentication will not happen. The above four attribute can combine randomly.
- 
+        * `auth` : a Json string, to specify the authentication information to access the remote router. If it does not exist, authentication will not happen. The above four attributes can combine freely.
 
+### Invoking ridlc
+ridlc command line looks like `ridlc [options] <ridl file>`, and there are the following major options:
+```
+        -I:     To specify the path to search for the included files.
+                And this option can repeat manytimes
+        -O:     To specify the path for
+                the output files. 'output' is the 
+                default path if not specified
+        -o:     To specify the file name as
+                the base of the target image. That is,
+                the <name>cli for client and <name>svr
+                for server. If not specified, the
+                'appname' from the ridl will be used
+        -s:     To apply new serilization
+                protocol only when the old serilization
+                method cannot handle. Default is new
+                serialization protocol always
+```
 
