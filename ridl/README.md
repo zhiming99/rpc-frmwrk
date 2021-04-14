@@ -65,13 +65,20 @@ The basic data types are:
 The 3 composite types are
 * `array` : an array of data of basic type or composite type except `HSTREAM`
 * `map` : a map consisting of key-value paires. `key` should be a comparable data type, and value could be any supported type except `HSTREAM`.
-* `struct`: as `FILE_INFO` shows in the above example, is a package of informations of different data types. 
+* `struct`: as `FILE_INFO` shows in the above example, is a package of informations of different data types. It is used as a build block for other data types or as the parameter to transfer between proxy and server.
 
 ### Statements
 The above example shows most of the statements ridl supports. ridl now has 6 types of statements.
 * `appname` : specify the application name, it is a must have statement.
 * `typedef` : define an alias for a pre-defined data type, or alias.
 * `const declaration`: to assign a name to a constant value.
-* `struct declaration` : to define 
+* `struct declaration` : to define a struct.
+* `interface declaration` : an interface is a set of methods logically bounded closely to deliver some kind of service to the client. It is made up of interface id and a set of methods, as similiar to a class in an OO language.
+    * `interface id`: a string to uniquely identify the interface, it is used by RPC-frmwrk to locate the serice.
+    * `method` : a method is the smallest unit of service an RPC server provides. The proxy send the request, and the server execute at the proxy's request and returns the response. As you can see, a `method` is made up of `method name`, `input parameter list`, `output parameter list`. Beside the three major parts a method must have, it can also carry some attributes, within the bracket as shown in the above example. the attributes include
+        * `async, async_s, async_p` : to instruct the ridl compiler to generate asynchronous or synchronous code for server or proxy.
+        * `timeout` : specify a method specific timeout value in second the proxy can wait before becoming impatient.
+        * `noreply` : specify a method not to wait for server response. The proxy side, the method will return as soon as the request is sent and on the server side, the request is handled without sending out the response.
+        * `event` : to specify a method as an event handler, as not applied to normal method, picks up a event broadcasted by the server and request the proxy to do somethings on the event.
 
 
