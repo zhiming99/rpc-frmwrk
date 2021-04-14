@@ -41,7 +41,7 @@ interface IEchoThings
 
 service SimpFileSvc [
     timeout=timeout_sec, rtpath="/",
-    ipaddr="192.168.3.13",
+    ipaddr="192.168.0.1",
     compress, auth ]
 {
     interface IEchoThings;
@@ -68,7 +68,7 @@ The 3 composite types are
 * `struct`: as `FILE_INFO` shows in the above example, is a package of informations of different data types. It is used as a build block for other data types or as the parameter to transfer between proxy and server.
 
 ### Statements
-The above example shows most of the statements ridl supports. ridl now has 6 types of statements.
+The above example shows most of the statements ridl supports. ridl now has 7 types of statements.
 * `appname` : specify the application name, it is a must have statement, if there are multiple `appname` statements, the last one will be the winner.
 * `include` : specify another ridl file, whose content are referred in this file. `include "abc.ridl";` for example.
 * `typedef` : define an alias for a pre-defined data type.
