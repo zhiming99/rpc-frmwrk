@@ -69,8 +69,9 @@ The 3 composite types are
 
 ### Statements
 The above example shows most of the statements ridl supports. ridl now has 6 types of statements.
-* `appname` : specify the application name, it is a must have statement.
-* `typedef` : define an alias for a pre-defined data type, or alias.
+* `appname` : specify the application name, it is a must have statement, if there are multiple `appname` statements, the last one will be the winner.
+* `include` : specify another ridl file, whose content are referred in this file. `include "abc.ridl";` for example.
+* `typedef` : define an alias for a pre-defined data type.
 * `const declaration`: to assign a name to a constant value.
 * `struct declaration` : to define a struct.
 * `interface declaration` : an interface is a set of methods logically bounded closely to deliver some kind of service to the client. It is made up of interface id and a set of methods, as similiar to a class in an OO language.
