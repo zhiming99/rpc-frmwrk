@@ -1,7 +1,7 @@
 ### Introduction   
 * The `ridl`, stands for `rpc idl`, as the RPC interface description language. And this project tries to deliver a rapid development tool for `rpc-frmwrk` by generating the set of skelton source files for proxy/server , as well as the configuration files, and Makefile with the input `ridl` files. It is expected be able to generate the skelton project for C++, Python and Java.   
 * This tool helps the developer to ease the learning curve and focus efforts on business implementations. And one can still refer to the `../test` directory to manually craft an `rpc-frmwrk` applications, with the maximum flexibility and performance advantage.
-* The following is a sample file. 
+* The following is a sample file `example.ridl`. 
 ```
 // must have statement
 appname "example";
@@ -111,4 +111,17 @@ ridlc command line looks like `ridlc [options] <ridl file>`, and there are the f
                 method cannot handle. Default is new
                 serialization protocol always
 ```
+Currently ridlc can only output `c++` project. In the future, it will be able to generate `python` files and `java` files.
+### Output
+On a successful compile of the above sample ridl file, ridlc will generate several files:
+* maincli.cpp, mainsvr.cpp: as the name indicate, the two files define main function of the proxy and server respectively.
+* example.cpp, example.h : the files are named with the name defined by `appname`. It contains all the skelton declarations, and implementations.
+* SimpFileSvc.cpp, SimpFileSvc.h: the files are named with the `service id` of the `service statement`. The cpp file contains all the methods that user must implement to get server/proxy to work. They are mainly the same-name methods on Server side as request handler, or method callback for asynchronous calls on proxy side. 
+* Makefile: make file to build the project. Note that, you must install the RPC-frmwrk first.
+* exampledesc.json, driver.json: the configuration files.
+
+ 
+ 
+    
+
 
