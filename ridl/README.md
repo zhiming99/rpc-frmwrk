@@ -91,7 +91,7 @@ The above example shows most of the statements ridl supports. ridl now has 7 typ
     * **timeout** : an integer to specify a method specific timeout value in second the proxy can wait before becoming impatient.
     * **noreply** : specify a method not to wait for server response. The proxy side, the method will return as soon as the request is sent and on the server side, the request is handled without sending out the response.
     * **event** : to specify a method as an event handler, as not applied to normal method, picks up a event broadcasted by the server and request the proxy to do somethings on the event.
-  * **the input parameters** or **output parameters** of a method can be empty, but the method still get an status code from the server to tell if the method is handled successfully or not, unless there is an `event` attribute.
+  * **the input parameters** or **output parameters** of a method can be empty, but the method still get an status code from the server to tell if the method is handled successfully or not, unless the method is labeled with the `event` attribute.
 * **service declaration** : to declare a `service` object. A `service` object contains a set of interfaces, to deliver a relatively independent feature or service. it contains a `service id` and a set of interfaces.
   * **service id**: will appear in the proxy request's `ObjPath` string, as part of an object address as to find the service.
   * Besides interfaces, the service can also be assigned some attributes will will go into the server/proxy configuration files.
