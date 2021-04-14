@@ -78,7 +78,7 @@ The above example shows most of the statements ridl supports. ridl now has 7 typ
 * `interface declaration` : an interface is a set of methods logically bounded closely to deliver some kind of service to the client. It is made up of interface id and a set of methods, as similiar to a class in an OO language.
     * `interface id`: a string to uniquely identify the interface, it is used by RPC-frmwrk to locate the serice.
     * `method` : a method is the smallest unit of service an RPC server provides. The proxy send the request, and the server execute at the proxy's request and returns the response. As you can see, a `method` is made up of `method name`, `input parameter list`, `output parameter list`. Beside the three major parts a method must have, it can also carry some attributes, within the bracket as shown in the above example. the attributes include
-        * `async, async_s, async_p` : to instruct the ridl compiler to generate asynchronous or synchronous code for server or proxy.
+        * `async, async_s, async_p` : to instruct the ridl compiler to generate asynchronous or synchronous code for server or proxy. Let me explain a bit more. `Asynchronous` means the method call can return immediately with the operation not completed. specifically in `rpc-frmwrk`, the method returns a status code STATUS_PENDING, to inform the caller the operation is still in-process. And synchronous is opposite, that when a method returns, it returns sucess, or an error code, and won't return STATUS_PENDING. And the caller is sure the operation is either done or ends up with error.
         * `timeout` : an integer to specify a method specific timeout value in second the proxy can wait before becoming impatient.
         * `noreply` : specify a method not to wait for server response. The proxy side, the method will return as soon as the request is sent and on the server side, the request is handled without sending out the response.
         * `event` : to specify a method as an event handler, as not applied to normal method, picks up a event broadcasted by the server and request the proxy to do somethings on the event.
@@ -95,8 +95,8 @@ The above example shows most of the statements ridl supports. ridl now has 7 typ
         * `compress` : the existance of this attribute instruct to compress the message bound to the remote router.
         * `auth` : a Json string, to specify the authentication information to access the remote router. If it does not exist, authentication will not happen. The above four attributes can combine freely.
 
-### Invoking ridlc
-ridlc command line looks like `ridlc [options] <ridl file>`, and there are the following major options:
+### Invoking `ridlc`
+`ridlc` stands for `ridl compiler`. Its command line looks like `ridlc [options] <ridl file>`, and there are the following major options:
 ```
         -I:     To specify the path to search for the included files.
                 And this option can repeat manytimes
