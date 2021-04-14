@@ -43,7 +43,7 @@ interface IEchoThings
 service SimpFileSvc [
     timeout=timeout_sec, rtpath="/",
     ipaddr="192.168.0.1",
-    compress, auth ]
+    compress ]
 {
     interface IEchoThings;
 };
@@ -93,7 +93,7 @@ The above example shows most of the statements ridl supports. ridl now has 7 typ
         * `websock` : the existance of this attribute instructs to connect to the remote router via `Websocket`
         * `SSL` : the existance of this attribute instructs to connect to the remote router via SSL connection.
         * `compress` : the existance of this attribute instruct to compress the message bound to the remote router.
-        * `auth` : a Json string, to specify the authentication information to access the remote router. If it does not exist, authentication will not happen. The above four attributes can combine freely.
+        * `auth` : a Json string, to specify the authentication information to access the remote router. If it does not exist, authentication will not happen. The above four attributes can combine freely. Currently `Kerberos`auth mechanism is supported, and therefore the json string should be the `Kerberos`'s authentication information.
 
 ### Invoking `ridlc`
 `ridlc` stands for `ridl compiler`. Its command line looks like `ridlc [options] <ridl file>`, and there are the following major options:
