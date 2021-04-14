@@ -22,6 +22,7 @@ struct FILE_INFO
 // echo different type of information
 interface IEchoThings
 {
+    // synchronous call on both server/proxy side by default.
     Echo( string strText )
         returns ( string strResp ) ;
 
