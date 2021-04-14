@@ -34,6 +34,7 @@ CDeclMap g_mapDecls;
 ObjPtr g_pRootNode;
 CAliasMap g_mapAliases;
 std::string g_strAppName;
+std::map< std::string, BufPtr > g_mapConsts;
 
 bool g_bSemanErr = false;
 
@@ -173,12 +174,13 @@ gint32 CheckNameDup(
 %token TOK_ARRAY
 %token TOK_MAP
 
-//
+// statements
 %token TOK_INTERFACE
 %token TOK_STRUCT
 %token TOK_SERVICE
 %token TOK_TYPEDEF
 %token TOK_APPNAME
+%token TOK_CONST
 
 // operators
 %token TOK_RETURNS
@@ -252,6 +254,7 @@ statement :
     | struct_decl { DEFAULT_ACTION; }
     | typedef_decl { CLEAR_RSYMBS; }
     | appname { DEFAULT_ACTION; }
+    | const_decl { DEFAULT_ACTION; }
     ;
 
 appname : TOK_APPNAME TOK_STRVAL
@@ -554,6 +557,23 @@ const_val :
     | TOK_DBLVAL { DEFAULT_ACTION; }
     | TOK_BOOLVAL { DEFAULT_ACTION; }
     | TOK_BYVAL { DEFAULT_ACTION; }
+    | TOK_IDENT
+    {
+        std::string strName = *$1;
+        if( g_mapConsts.find( strName ) ==
+            g_mapConsts.end() )
+        {
+            std::string strMsg = " Constant '"; 
+            strMsg += strName + "'";
+            PrintMsg( -EEXIST, strMsg.c_str() );
+            g_bSemanErr = true;
+        }
+        else
+        {
+            $$ = g_mapConsts[ strName ];
+        }
+        CLEAR_RSYMBS;
+    }
     ;
 
 attr_name : 
@@ -784,6 +804,20 @@ method_decl : attr_list TOK_IDENT '(' arg_list ')' TOK_RETURNS '(' arg_list ')'
         
     }
     ;
+
+const_decl : TOK_CONST TOK_IDENT '=' const_val
+    {
+        std::string strName = *$2;
+        g_mapConsts[ strName ] = $4;
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CConstDecl ) );
+        CConstDecl* pcstd = pNode;
+        pcstd->SetName( strName );
+        BufPtr pBuf( true );
+        *pBuf = pNode;
+        $$ = pBuf;
+        CLEAR_RSYMBS;
+    }
 
 method_decl : attr_list TOK_IDENT '(' ')' TOK_RETURNS '(' arg_list ')'
     {

@@ -130,7 +130,7 @@ HexDig [0-9a-fA-F]
 %option     noyywrap nounput 
 /* %option     debug */
 
-%x incl readstr c_comment
+%x incl readstr c_comment quote
 %%
 
 ";"     |
@@ -282,6 +282,22 @@ HexDig [0-9a-fA-F]
          while( *yptr )
              curstr().push_back( *yptr++ );
      }
+
+``` {
+        curstr().clear();
+        yy_push_state( quote );
+    }
+
+<quote>``` {
+        yy_pop_state();
+        newval() = curstr();
+        *yylval = curval;
+        return TOK_STRVAL;
+    }
+
+<quote>([^`]+|`[^`]+|``[^`]+) {
+        curstr() += yytext;
+    }
 
 \/\/.*\n        /* c++ comment line */
 
@@ -533,6 +549,7 @@ std::map< std::string, yytokentype >
         { "service", TOK_SERVICE },
         { "typedef", TOK_TYPEDEF },
         { "appname", TOK_APPNAME },
+        { "const", TOK_CONST },
     };
 
 FILECTX::FILECTX()

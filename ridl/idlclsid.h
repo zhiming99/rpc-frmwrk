@@ -22,4 +22,5 @@ enum EnumRidlClsid
     DECL_CLSID( CAliasList ),
     DECL_CLSID( CTypedefDecl ),
     DECL_CLSID( CAppName ),
+    DECL_CLSID( CConstDecl ),
 };

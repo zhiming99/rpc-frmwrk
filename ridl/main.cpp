@@ -62,6 +62,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRY( CAliasList );
     INIT_MAP_ENTRY( CTypedefDecl );
     INIT_MAP_ENTRY( CAppName );
+    INIT_MAP_ENTRY( CConstDecl );
 
     END_FACTORY_MAPS;
 };
@@ -72,7 +73,7 @@ void Usage()
     printf( "ridlc [options] <ridl file> \n" );
 
     printf( "\t compile the `ridl file'"
-        "and output the RPC skelton files<\n" );
+        "and output the RPC skelton files.\n" );
 
     printf( "Options -h:\tTo print this help\n");
 

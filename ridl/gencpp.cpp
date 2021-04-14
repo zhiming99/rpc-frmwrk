@@ -904,6 +904,7 @@ gint32 SetStructRefs( ObjPtr& pRoot )
             case clsid( CStructDecl ) :
             case clsid( CInterfaceDecl ):
             case clsid( CAppName ) :
+            case clsid( CConstDecl ) :
                 {
                     break;
                 }
@@ -1036,6 +1037,7 @@ gint32 GenHeaderFile(
                     break;
                 }
             case clsid( CAppName ) :
+            case clsid( CConstDecl ) :
                 {
                     break;
                 }
@@ -1235,6 +1237,7 @@ gint32 GenCppFile(
             case clsid( CServiceDecl ):
             case clsid( CTypedefDecl ):
             case clsid( CAppName ) :
+            case clsid( CConstDecl ) :
                 {
                     break;
                 }
@@ -6373,6 +6376,33 @@ gint32 CExportObjDesc::BuildObjDesc(
         if( SUCCEEDED( ret ) )
             oElem[ JSON_ATTR_ROUTER_PATH ] =
                 strVal;
+
+        BufPtr pAuth;
+        ret = psd->GetAuthVal( pAuth );
+        if( SUCCEEDED( ret ) )
+        {
+            Json::CharReaderBuilder oBuilder;
+            std::unique_ptr< Json::CharReader >
+                pReader( oBuilder.newCharReader() );
+
+            if( pReader == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            Json::Value oAuth;
+            std::string strMsg;
+            if( !pReader->parse( pAuth->ptr(),
+                pAuth->ptr() + pAuth->size(),
+                &oAuth, &strMsg ) )
+            {
+                DebugPrintEx( logErr, ret,
+                    "error, %s\n", strMsg.c_str() );
+                ret = -EBADMSG;
+                break;
+            }
+            oElem[ JSON_ATTR_AUTHINFO ] = oAuth;
+        }
 
         if( psd->IsWebSocket() )
             oElem[ JSON_ATTR_ENABLE_WEBSOCKET ] =

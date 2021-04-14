@@ -202,6 +202,8 @@ struct CAstNodeBase :
     { return std::string( "" ); }
 };
 
+typedef CAutoPtr< clsid( Invalid ), CAstNodeBase > NodePtr;
+
 struct CNamedNode :
     public CAstNodeBase
 {
@@ -216,7 +218,13 @@ struct CNamedNode :
     { return m_strName; }
 };
 
-typedef CAutoPtr< clsid( Invalid ), CAstNodeBase > NodePtr;
+struct CConstDecl:
+    public CNamedNode
+{
+    typedef CNamedNode super;
+    CConstDecl() : CNamedNode()
+    { SetClassId( clsid( CConstDecl ) ); }
+};
 
 struct CAstListNode : CAstNodeBase
 {
@@ -1215,8 +1223,32 @@ struct CServiceDecl : public CInterfRef
     bool IsWebSocket()
     { return CheckBoolAttr( TOK_WEBSOCK ); }
 
-    bool IsAuth()
-    { return CheckBoolAttr( TOK_AUTH ); }
+    gint32 GetAuthVal( BufPtr& pAuth )
+    {
+        gint32 ret = 0;
+        do{
+            ret = GetValueAttr(
+                TOK_AUTH, pAuth );
+            if( ERROR( ret ) )
+                break;
+
+            if( pAuth.IsEmpty() || pAuth->empty() )
+            {
+                ret = -ENOENT;
+                break;
+            }
+
+            if( pAuth->GetExDataType() !=
+                typeString )
+            {
+                ret = -EINVAL;
+                break;
+            }
+
+        }while( 0 );
+
+        return ret;
+    }
 
     bool IsCompress()
     { return CheckBoolAttr( TOK_COMPRES ); }
