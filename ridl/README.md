@@ -60,7 +60,7 @@ The basic data types are:
 * `string`
 * `bytearray`( binary blob )
 * `ObjPtr` : `rpc-frmwrk` built-in serializable data type.
-* `HSTREAM` : a special data type as stream handle.
+* `HSTREAM` : a special data type as a handle to a stream channel.
 
 The 3 composite types are
 * `array` : an array of data of basic type or composite type except `HSTREAM`
