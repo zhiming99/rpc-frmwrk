@@ -47,4 +47,21 @@ service SimpFileSvc [
 };
 
 ```
+### Supported Data Types
+ridl support 10 basic data types and 3 composite types, The basic data types are
+* byte
+* int16/uint16
+* int32/uint32
+* int64/uint64
+* float(32)/double(64)
+* bool
+* string
+* bytearray( binary blob )
+* ObjPtr : RPC-framework built-in serializable data type.
+* HSTREAM : a special data type as stream handle.
+The 3 composite types are
+* array : an array of data of basic type or composite type except `HSTREAM`
+* map : a map consisting of key-value paires. `key` should be a comparable data type, and value could be any supported type except `HSTREAM`.
+* struct: as `FILE_INFO` shows in the above example.
+
 
