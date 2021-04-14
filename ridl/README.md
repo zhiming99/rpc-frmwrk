@@ -80,5 +80,6 @@ The above example shows most of the statements ridl supports. ridl now has 6 typ
         * `timeout` : specify a method specific timeout value in second the proxy can wait before becoming impatient.
         * `noreply` : specify a method not to wait for server response. The proxy side, the method will return as soon as the request is sent and on the server side, the request is handled without sending out the response.
         * `event` : to specify a method as an event handler, as not applied to normal method, picks up a event broadcasted by the server and request the proxy to do somethings on the event.
+    * the `input parameter` or `output parameter` of a method can be empty, but the method still get an status code from the server to tell if the method is handled successfully or not, unless there is an `event` attribute.
 
 
