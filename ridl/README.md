@@ -94,7 +94,7 @@ The above example shows most of the statements ridl supports. ridl now has 7 typ
   * **the input parameters** or **output parameters** of a method can be empty, but the method still get an status code from the server to tell if the method is handled successfully or not, unless the method is labeled with the `event` attribute.
 * **service declaration** : to declare a `service` object. A `service` object contains a set of interfaces, to deliver a relatively independent feature or service. it contains a `service id` and a set of interfaces.
   * **service id**: will appear in the proxy request's `ObjPath` string, as part of an object address as to find the service.
-  * Besides interfaces, the service can also be assigned some attributes will will go into the server/proxy configuration files.
+  * Besides interfaces, the service can also be assigned some attributes, which will go into the server/proxy configuration files.
     * **timeout** : similiar to the one on a method, but it serves as the default timeout value for all the methods from all the interfaces.
     * **rtpath** : a path string to identify the target host behind a router of a cloud of hosts.
     * **ipaddr** : a string to specify the router ip address the proxy to connect to. It is not necessarily the address of the host of the target service.
