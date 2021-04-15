@@ -52,7 +52,7 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 1. The rpc-frmwrk's first code generator for C++ is ready now! Congratulations!
 
 [`Thu Apr 15 2021 12:56:10 PM Beijing`]   
-1. Before moving on to the python code generator, I need to add a flow-control mechanism to the request processing pipeline. The taget is to limit performance drop due to the surging incoming requests and let servers, routers, and proxies to coordinate to survive through the overwhelming request surge. 
+1. Before moving on to the python code generator, I need to add a flow-control mechanism to the request processing pipeline. The taget is to limit performance drop on arrival of huge amount of requests, and let servers, routers, and proxies to coordinate to survive through the overwhelming request surge. 
 
 [`Tue Apr 13 2021 05:29:19 PM Beijing`]   
 1. It seems not a good idea to put many irrelevant stuffs to ridl. Maybe a config dialog box is better. Let's keep ridl less complex.
