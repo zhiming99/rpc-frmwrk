@@ -50,7 +50,7 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 
 ---
 [`Thu Apr 15 2021 12:56:10 PM Beijing`]   
-1. Before moving on to the python code generator, I need to add a flow-control mechanism to the request processing pipeline. The taget is to limit performance drop due to the surging incoming requests and let sender and receiver to coordinate to survive through the overwhelming traffic.
+1. Before moving on to the python code generator, I need to add a flow-control mechanism to the request processing pipeline. The taget is to limit performance drop due to the surging incoming requests and let sender and receiver to coordinate to survive through the overwhelming traffic. Streaming part has flow-control at design time, so this change will not affect streaming related functions.
 
 [`Tue Apr 13 2021 05:29:19 PM Beijing`]   
 1. It seems not a good idea to put many irrelevant stuffs to ridl. Maybe a config dialog box is better. Let's keep ridl less complex.
