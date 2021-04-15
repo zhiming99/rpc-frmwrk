@@ -53,7 +53,7 @@ service SimpFileSvc [
 
 ### Supported Data Types
 
-`ridl` support 10 basic data types and 3 composite types.
+`ridl` support 10 basic types and 3 composite types.
 The basic data types are:
 
 * **byte**
