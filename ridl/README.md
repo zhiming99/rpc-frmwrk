@@ -57,11 +57,11 @@ service SimpFileSvc [
 The basic data types are:
 
 * **byte**
+* **bool**
 * **int16/uint16**
 * **int32/uint32**
 * **int64/uint64**
 * **float(32)/double(64)**
-* **bool**
 * **string**
 * **bytearray**( binary blob )
 * **ObjPtr** : `rpc-frmwrk` built-in serializable data type.
