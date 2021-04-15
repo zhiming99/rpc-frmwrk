@@ -43,10 +43,9 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 1. Java support
 2. Examples and Tutorials
 3. GUI for configuration and monitoring
-4. Node backup/Load banlance
-5. Access Control
-6. A tree-like hierarchical persistant registry.
-7. Logging service
+4. Access Control
+5. A tree-like hierarchical persistant registry.
+6. Logging service
 
 ---
 [`Thu Apr 15 2021 12:56:10 PM Beijing`]   
