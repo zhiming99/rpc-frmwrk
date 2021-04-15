@@ -458,7 +458,7 @@ gint32 CMethodWriter::GenActParams(
 gint32 CMethodWriter::GenSerialArgs(
     ObjPtr& pArgList,
     const std::string& strBuf,
-    bool bDeclare, bool bAssign )
+    bool bDeclare, bool bAssign, bool bNoRet )
 {
     gint32 ret = 0;
     if( GetArgCount( pArgList ) == 0 )
@@ -515,7 +515,10 @@ gint32 CMethodWriter::GenSerialArgs(
         NEW_LINES( 2 );
         CCOUT<< "if( ERROR( ret ) )";
         INDENT_UPL;
-        CCOUT << "return ret;";
+        if( bNoRet )
+            CCOUT << "break;";
+        else
+            CCOUT << "return ret;";
         INDENT_DOWNL;
 
     }while( 0 );
@@ -3183,7 +3186,7 @@ gint32 CDeclServiceImpl::Output()
             guint32 dwInCount =
                 GetArgCount( pInArgs );
             Wa( "// RPC Async Req Cancel Handler" );
-            Wa( "// Rewrite this method for advanced controls" );
+            Wa( "// Rewrite this method to release the resources" );
             CCOUT << "gint32 "
                 << "On" << strName << "Canceled(";
             INDENT_UPL;
@@ -3200,7 +3203,7 @@ gint32 CDeclServiceImpl::Output()
             CCOUT << "DebugPrintEx( logErr, iRet,";
             INDENT_UPL;
             CCOUT << "\"request '" << strName
-                << "'is canceled.\" );";
+                << "' is canceled.\" );";
             INDENT_DOWNL;
             CCOUT << "return 0;";
             BLOCK_CLOSE;
@@ -3426,8 +3429,10 @@ gint32 CImplSerialStruct::OutputSerial()
         CCOUT << "do";
         BLOCK_OPEN;
 
-        CCOUT << "ret = CSerialBase::Serialize( pBuf_, m_dwMsgId );";
-        NEW_LINE;
+        CCOUT << "ret = CSerialBase::Serialize(";
+        INDENT_UPL;
+        CCOUT << "pBuf_, m_dwMsgId );";
+        INDENT_DOWNL;
         Wa( "if( ERROR( ret ) ) break;" );
         NEW_LINE;
 
@@ -3483,8 +3488,11 @@ gint32 CImplSerialStruct::OutputDeserial()
         }
 
         Wa( "guint32 dwMsgId = 0;" );
-        CCOUT << "ret = CSerialBase::Deserialize( pBuf_, dwMsgId );";
-        NEW_LINES( 2 );
+        CCOUT << "ret = CSerialBase::Deserialize(";
+        INDENT_UPL;
+        CCOUT << "pBuf_, dwMsgId );";
+        INDENT_DOWNL;
+        NEW_LINE;
         Wa( "if( ERROR( ret ) ) return ret;" );
         Wa( "if( m_dwMsgId != dwMsgId ) return -EINVAL;" );
         NEW_LINE;
@@ -3868,20 +3876,22 @@ gint32 CEmitSerialCode::OutputSerial(
             case '(' :
                 {
                     CCOUT << "ret = " << strObj
-                        << "SerializeArray( "
-                        << strBuf << ", " << strName << ", \""
+                        << "SerializeArray(";
+                    INDENT_UPL;
+                    CCOUT << strBuf << ", " << strName << ", \""
                         << strSig << "\" );";
-                    NEW_LINE;
+                    INDENT_DOWNL;
                     Wa( "if( ERROR( ret ) ) break;" );
                     break;
                 }
             case '[' :
                 {
                     CCOUT << "ret = "<< strObj
-                        << "SerializeMap( "
-                        << strBuf << ", " << strName << ", \""
+                        << "SerializeMap(";
+                    INDENT_UPL;
+                    CCOUT << strBuf << ", " << strName << ", \""
                         << strSig << "\" );";
-                    NEW_LINE;
+                    INDENT_DOWNL;
                     Wa( "if( ERROR( ret ) ) break;" );
                     break;
                 }
@@ -3889,9 +3899,10 @@ gint32 CEmitSerialCode::OutputSerial(
             case 'O' :
                 {
                     CCOUT << "ret = " << strObj
-                        << "SerialStruct( "
-                        << strBuf << ", " << strName << " );";
-                    NEW_LINE;
+                        << "SerialStruct( ";
+                    INDENT_UPL;
+                    CCOUT << strBuf << ", " << strName << " );";
+                    INDENT_DOWNL;
                     Wa( "if( ERROR( ret ) ) break;" );
                     break;
                 }
@@ -3919,10 +3930,11 @@ gint32 CEmitSerialCode::OutputSerial(
             case 'o':
                 {
                     CCOUT << "ret = " << strObj
-                        << "CSerialBase::Serialize("
-                        << strBuf << ", "
+                        << "CSerialBase::Serialize(";
+                    INDENT_UPL;
+                    CCOUT << strBuf << ", "
                         << strName << " );";
-                    NEW_LINE;
+                    INDENT_DOWNL;
                     Wa( "if( ERROR( ret ) ) break;" );
                     break;
                 }
@@ -3980,18 +3992,22 @@ gint32 CEmitSerialCode::OutputDeserial(
             {
             case '(' :
                 {
-                    CCOUT << "ret = " << strObj << "DeserialArray( "
-                        << strBuf << ", " << strName << ", \""
+                    CCOUT << "ret = " << strObj << "DeserialArray(";
+                    INDENT_UPL;
+                    CCOUT << strBuf << ", " << strName << ", \""
                         << strSig << "\" );";
+                    INDENT_DOWNL;
                     NEW_LINE;
                     Wa( "if( ERROR( ret ) ) break;" );
                     break;
                 }
             case '[' :
                 {
-                    CCOUT << "ret = " << strObj << "DeserialMap( "
-                        << strBuf << ", " << strName << ", \""
+                    CCOUT << "ret = " << strObj << "DeserialMap(";
+                    INDENT_UPL;
+                    CCOUT << strBuf << ", " << strName << ", \""
                         << strSig << "\" );";
+                    INDENT_DOWNL;
                     NEW_LINE;
                     Wa( "if( ERROR( ret ) ) break;" );
                     break;
@@ -3999,9 +4015,10 @@ gint32 CEmitSerialCode::OutputDeserial(
 
             case 'O' :
                 {
-                    CCOUT << "ret = " << strObj << "DeserialStruct( "
-                        << strBuf << ", " << strName << " );";
-                    NEW_LINE;
+                    CCOUT << "ret = " << strObj << "DeserialStruct(";
+                    INDENT_UPL;
+                    CCOUT << strBuf << ", " << strName << " );";
+                    INDENT_DOWNL;
                     Wa( "if( ERROR( ret ) ) break;" );
                     break;
                 }
@@ -4028,9 +4045,10 @@ gint32 CEmitSerialCode::OutputDeserial(
             case 'o':
                 {
                     CCOUT << "ret = " << strObj
-                        << "CSerialBase::Deserialize"
-                        << "( " << strBuf << ", "
-                        << strName << " );";
+                        << "CSerialBase::Deserialize(";
+                    INDENT_UPL;
+                    CCOUT << strBuf << ", " << strName << " );";
+                    INDENT_DOWNL;
                     NEW_LINE;
                     Wa( "if( ERROR( ret ) ) break;" );
                     break;
@@ -5402,7 +5420,8 @@ gint32 CImplIfMethodSvr::OutputAsyncSerial()
 
                 Wa( "BufPtr pBuf2( true );" );
                 ret = GenSerialArgs(
-                    pOutArgs, "pBuf2", false, false );
+                    pOutArgs, "pBuf2", false,
+                    false, true );
                 CCOUT << "oResp_.Push( pBuf2 );";
                 BLOCK_CLOSE;
                 NEW_LINE;

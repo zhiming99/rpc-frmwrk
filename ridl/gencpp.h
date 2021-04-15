@@ -360,7 +360,8 @@ struct CMethodWriter
     gint32 GenSerialArgs(
         ObjPtr& pArgList,
         const std::string& strBuf,
-        bool bDeclare, bool bAssign );
+        bool bDeclare, bool bAssign,
+        bool bNoRet = false );
 
     gint32 GenDeserialArgs(
         ObjPtr& pArgList,

@@ -564,7 +564,7 @@ const_val :
             g_mapConsts.end() )
         {
             std::string strMsg = " Constant '"; 
-            strMsg += strName + "'";
+            strMsg += strName + "' is not declared";
             PrintMsg( -EEXIST, strMsg.c_str() );
             g_bSemanErr = true;
         }
