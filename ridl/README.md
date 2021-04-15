@@ -96,7 +96,7 @@ The above example shows most of the statements ridl supports. ridl now has 7 typ
   * **service id**: will appear in the proxy request's `ObjPath` string, as part of an object address as to find the service.
   * Besides interfaces, the service can also be assigned some attributes, which will go into the server/proxy configuration files.
     * **timeout** : similiar to the one on a method, but it serves as the default timeout value for all the methods from all the interfaces.
-    * **rtpath** : a path string to identify the target host behind a router to a cloud of hosts.
+    * **rtpath** : a path string to identify the target host behind a router to a cloud of hosts. [Here](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support#objetct-access-via-multihop-routing) is more information about `router path`.
     * **ipaddr** : a string to specify the router ip address the proxy to connect to. It is not necessarily the address of the host of the target service.
     * **portnum** : a integer to specify the router port number the proxy to connect to.
     * **websock** : the existance of this attribute instructs to connect to the remote router via [`Websocket`](https://github.com/zhiming99/rpc-frmwrk/tree/master/rpc/wsport#technical-information)
