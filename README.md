@@ -25,7 +25,7 @@ This framework depends on the following packags to build:
 5. `Keep-alive for time-consuming request.`   
 6. `Pausable/Resumable interface.`
 7. `Support RPC from remote machine, local system, and in-process.` 
-8. `Transparent support for different types of remote communications.`
+8. `Transparent support for different types of connections.`
 9. `Peer online/offline awareness.`
 10. [`Streaming support to provide double-direction stream transfer`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md#streaming)
 11. [`Secure Socket Layer (SSL) support`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/sslport/Readme.md)
@@ -48,6 +48,9 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 6. Logging service
 
 ---
+[`Thu Apr 15 2021 10:00:02 PM Beijing`]   
+1. The rpc-frmwrk's first code generator for C++ is ready now! Congratulations!
+
 [`Thu Apr 15 2021 12:56:10 PM Beijing`]   
 1. Before moving on to the python code generator, I need to add a flow-control mechanism to the request processing pipeline. The taget is to limit performance drop due to the surging incoming requests and let sender and receiver to coordinate to survive through the overwhelming traffic. Streaming part has flow-control at design time, so this change will not affect streaming related functions.
 
