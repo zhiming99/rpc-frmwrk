@@ -99,7 +99,7 @@ The above example shows most of the statements ridl supports. ridl now has 7 typ
     * **rtpath** : a path string to identify the target host behind a router to a cloud of hosts.
     * **ipaddr** : a string to specify the router ip address the proxy to connect to. It is not necessarily the address of the host of the target service.
     * **portnum** : a integer to specify the router port number the proxy to connect to.
-    * **websock** : the existance of this attribute instructs to connect to the remote router via `Websocket`
+    * **websock** : the existance of this attribute instructs to connect to the remote router via [`Websocket`](https://github.com/zhiming99/rpc-frmwrk/tree/master/rpc/wsport#technical-information)
     * **SSL** : the existance of this attribute instructs to connect to the remote router via [SSL](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/sslport/Readme.md) connection.
     * **compress** : the existance of this attribute instruct to compress the message bound to the remote router.
     * **auth** : a Json string, to specify the authentication information to access the remote router. If it does not exist, authentication will not happen. The above four attributes can combine freely. Currently `Kerberos`auth mechanism is supported, and therefore the json string should be the `Kerberos`'s authentication information. [Here](https://github.com/zhiming99/rpc-frmwrk/tree/master/rpc/security#4-configure-rpc-frmwrk-with-authentication) is more information about the auth string, 
