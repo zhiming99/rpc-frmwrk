@@ -49,7 +49,7 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 
 ---
 [`Thu Apr 15 2021 10:00:02 PM Beijing`]   
-1. The rpc-frmwrk's first code generator for C++ is ready now! Congratulations!
+1. The `rpc-frmwrk`'s first code generator for C++ is ready now! Congratulations!
 
 [`Thu Apr 15 2021 12:56:10 PM Beijing`]   
 1. Before moving on to the python code generator, I need to add a flow-control mechanism to the request processing pipeline. The taget is to limit performance drop on arrival of huge amount of requests, and let servers, routers, and proxies to coordinate to survive through the overwhelming request surge. 
