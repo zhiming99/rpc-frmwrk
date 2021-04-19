@@ -48,6 +48,9 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 6. Logging service
 
 ---
+[`Mon Apr 19 2021 02:14:36 PM Beijing`]   
+1. Win10 hosted `Ubuntu` is a nightmare, and the filesystem is so fragile to sustain a single unexpected shutdown or system crash. Switched to `Fedora-33` for luck.
+
 [`Thu Apr 15 2021 10:00:02 PM Beijing`]   
 1. The `rpc-frmwrk`'s first code generator for C++ is ready now! Congratulations!
 
