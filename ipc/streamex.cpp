@@ -1693,6 +1693,11 @@ HANDLE CStreamServerSync::GetChanByIdHash(
     return itr->second;
 }
 
+gint32 CStreamServerSync::AcceptNewStream(
+    IEventSink* pCallback,
+    IConfigDb* pDataDesc )
+{ return 0; }
+
 gint32 CStreamProxySync::StartStream(
     HANDLE& hChannel,
     IConfigDb* pDesc,

@@ -1970,6 +1970,10 @@ class CStreamServerSync :
     virtual gint32 OnConnected( HANDLE hCfg );
     virtual gint32 StopWorkers( HANDLE hChannel );
     HANDLE GetChanByIdHash( guint64 ) const;
+
+    virtual gint32 AcceptNewStream(
+        IEventSink* pCallback,
+        IConfigDb* pDataDesc ) override;
 };
 
 class CStreamProxyWrapper :
@@ -2174,7 +2178,7 @@ class CStreamServerAsync :
     { return -ENOTSUP; }
 };
 
-struct HSTREAM : public HSTREAM_BASE
+struct HSTREAM final : public HSTREAM_BASE
 {
     HANDLE m_hStream = INVALID_HANDLE;
     guint64 m_qwStmHash = 0;

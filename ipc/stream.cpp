@@ -1196,6 +1196,11 @@ gint32 CStreamServer::OpenChannel(
     int iRemote = -1, iLocal = -1;
 
     do{
+        ret = AcceptNewStream(
+            pCallback, pDataDesc );
+        if( ERROR( ret ) )
+            break;
+
         ret = CreateSocket( iLocal, iRemote );
         if( ERROR( ret ) )
             break;

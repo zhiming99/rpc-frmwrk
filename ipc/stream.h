@@ -322,6 +322,11 @@ class CStreamServer :
         return OnPreStopShared( pCallback );
     }
 
+    virtual gint32 AcceptNewStream(
+        IEventSink* pCallback,
+        IConfigDb* pDataDesc )
+    { return 0; }
+
     // called by FetchData_Server on new stream request
     // note the fd is from the FETCH_DATA request
     gint32 OpenChannel(
