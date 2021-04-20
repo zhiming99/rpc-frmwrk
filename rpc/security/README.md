@@ -57,6 +57,8 @@ to work with `rpc-frmwrk` on such a simple network.
     .rpcf.org = rpcf.org
     rpcf.org = rpcf.org
 ```
+  * Create the kdc database, on the kdc host, with command `sudo kdb5_util create -r rpcf.org -s`.
+  * 
   * Add the user account with `kadmin.local` on your kdc machine. `kadmin.local` does not require password and
   can only be used locally, while `kadmin` is a network version. Suppose you have a linux account name `foo`, and you can add a
   user account `foo` to the kerberos's user database. The fully qualified account name is `foo@rpcf.org`, which must be put
