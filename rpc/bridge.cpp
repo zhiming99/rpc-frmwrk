@@ -1900,7 +1900,6 @@ CRpcTcpBridge::CRpcTcpBridge(
             break;
         }
         RemoveProperty( propRouterPtr );
-        m_bHandshaked = false;
 
     }while( 0 );
 
@@ -3697,6 +3696,24 @@ gint32 CRpcTcpBridge::DoStartHandshake(
 {
     gint32 ret = 0;
     do{
+        CStdRMutex oIfLock( GetLock() );
+        if( m_bHandshaked )
+        {
+            TaskletPtr pTask = m_pHsTicker;
+            if( !m_pHsTicker.IsEmpty() )
+            {
+                m_pHsTicker.Clear();
+                oIfLock.Unlock();
+                DebugPrint( 0, "Deferred the handshake"
+                    " response till Start completes" );
+                pTask->OnEvent(
+                    eventTaskComp, 0, 0, nullptr );
+            }
+            break;
+        }
+
+        DebugPrint( 0, "start the handshake timer" );
+
         // set the session checker
         ret = DEFER_IFCALLEX_NOSCHED2(
             0, m_pHsTicker, ObjPtr( this ),
@@ -3721,7 +3738,12 @@ gint32 CRpcTcpBridge::DoStartHandshake(
         oTaskCfg.SetIntProp(
             propIntervalSec, 20 );
 
-        this->AddAndRun( m_pHsTicker );
+        oIfLock.Unlock();
+
+        ret = this->AddAndRun( m_pHsTicker );
+        if( ERROR( ret ) )
+            break;
+        ret = STATUS_PENDING;
 
     }while( 0 );
 
@@ -3738,6 +3760,16 @@ gint32 CRpcTcpBridge::Handshake(
 
     gint32 ret = 0;
     do{
+        CParamList oResp;
+        oResp[ propReturnValue ] = 0;
+        CStdRMutex oIfLock( GetLock() );
+        if( m_bHandshaked == true )
+        {
+            ret = ERROR_STATE;
+            oResp[ propReturnValue ] = ret;
+            break;
+        }
+
         timeval tv;
         ret = gettimeofday( &tv, nullptr );
         if( ret == -1 )
@@ -3750,8 +3782,6 @@ gint32 CRpcTcpBridge::Handshake(
         oParams.Push( "rpcf-bridge" );
         oParams[ propTimestamp ] = dwTimestamp;
 
-        CParamList oResp;
-        oResp[ propReturnValue ] = 0;
         oResp.Push( oParams.GetCfg() );
 
         SetResponse(
@@ -3759,7 +3789,15 @@ gint32 CRpcTcpBridge::Handshake(
 
         m_bHandshaked = true;
         if( !m_pHsTicker.IsEmpty() )
+        {
             ( *m_pHsTicker )( eventCancelTask );
+        }
+        else
+        {
+            // defer till the DoStartHandshake runs
+            ret = STATUS_PENDING;
+            m_pHsTicker = ObjPtr( pCallback );
+        }
 
     }while( 0 );
 

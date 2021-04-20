@@ -862,7 +862,7 @@ class CRpcTcpBridge :
 
     protected:
     TaskletPtr m_pHsTicker;
-    std::atomic< bool > m_bHandshaked;
+    bool m_bHandshaked = false;
 
     // for load balance
     gint32 OnCheckRouterPathCompleteLB(
