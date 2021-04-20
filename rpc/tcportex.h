@@ -708,6 +708,10 @@ class CTcpStreamPdo2 : public CPort
 
     gint32 OnDisconnected();
 
+    // methods from CObjBase
+    gint32 GetProperty( gint32 iProp,
+        CBuffer& oBuf ) const override;
+
     void OnPortStartFailed(
         IRP* pIrp, gint32 ret );
 };

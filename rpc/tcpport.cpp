@@ -406,18 +406,9 @@ gint32 CRpcSocketBase::UpdateRttTimeMs()
 gint32 CRpcSocketBase::GetRttTimeMs(
     guint32 dwMilSec)
 {
-    gint32 ret = 0;
-
-    if( m_dwRtt == 0 )
-    {
-        ret = UpdateRttTimeMs();
-        if( SUCCEEDED( ret ) )
-            dwMilSec = m_dwRtt;
-    }
-    else
-    {
+    gint32 ret = UpdateRttTimeMs();
+    if( SUCCEEDED( ret ) )
         dwMilSec = m_dwRtt;
-    }
 
     return ret;
 }

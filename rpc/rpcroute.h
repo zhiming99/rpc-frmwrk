@@ -32,6 +32,8 @@
 #define ROUTER_OBJ_DESC             "./router.json"
 #define ROUTER_OBJ_DESC_AUTH        "./rtauth.json"
 
+#define DEFAULT_WNDSIZE     20
+
 namespace rpcf
 {
 
@@ -741,8 +743,19 @@ struct CRpcTcpBridgeShared
         gint32 iStmId,
         gint32& iPeerStmid );
 
+    gint32 StartEx2(
+        IEventSink* pCallback );
+
+    gint32 StartExOrig(
+        IEventSink* pCallback );
+
+    gint32 StartHandshake(
+        IEventSink* pCallback );
+
     protected:
     CRpcServices* m_pParentIf;
+    guint32     m_dwWndSize = DEFAULT_WNDSIZE;
+    guint32     m_dwCurWndSize = DEFAULT_WNDSIZE;
 
     gint32 ReadWriteStream(
         gint32 iStreamId,
@@ -848,6 +861,9 @@ class CRpcTcpBridge :
         bool bSeqTask );
 
     protected:
+    TaskletPtr m_pHsTicker;
+    std::atomic< bool > m_bHandshaked;
+
     // for load balance
     gint32 OnCheckRouterPathCompleteLB(
         IEventSink* pCallback, 
@@ -949,6 +965,24 @@ class CRpcTcpBridge :
         return CloseStream_Server(
             pCallback, iStreamId );
     }
+
+    gint32 StartEx2(
+        IEventSink* pCallback ) override
+    {
+        return CRpcTcpBridgeShared::StartEx2(
+            pCallback );
+    }
+
+    gint32 CheckHsTimeout(
+        IEventSink* pTask,
+        IEventSink* pStartCb );
+
+    gint32 DoStartHandshake(
+        IEventSink* pCallback );
+
+    gint32 Handshake(
+        IEventSink* pCallback,
+        IConfigDb* pInfo );
 
     virtual gint32 SendResponse(
         IConfigDb* pReqMsg,
@@ -1158,6 +1192,25 @@ class CRpcTcpBridgeProxy :
         return CloseStream_Proxy( 
             iStreamId, pCallback );
     }
+
+    gint32 StartEx2(
+        IEventSink* pCallback ) override
+    {
+        return CRpcTcpBridgeShared::StartEx2(
+            pCallback );
+    }
+
+    gint32 OnHandshakeComplete(
+        IEventSink* pCallback,
+        IEventSink*  pIoReq,
+        IConfigDb* pReqCtx );
+
+    gint32 DoStartHandshake(
+        IEventSink* pCallback );
+
+    gint32 Handshake(
+        IConfigDb* pInfo,
+        IEventSink* pCallback );
 
     virtual gint32 InitUserFuncs();
 

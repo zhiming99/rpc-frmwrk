@@ -247,6 +247,8 @@ enum EnumPropId : gint32
     propSeriProto,      // type: a gint32 to indicate the serialize protocol of the current parament pack
     propNoReply,        // type: a bool value to indicate if the request has no reply.
 
+    propRttMs,          // type: a guint32 as the round trip time of a tcp connection in ms.
+
     propReservedEnd = 0x10000000,
     propInvalid = -1, 
 };

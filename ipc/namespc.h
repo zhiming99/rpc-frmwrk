@@ -244,6 +244,7 @@ inline std::string DBUS_DESTINATION2(
 #define SYS_METHOD_DISABLERMTEVT        "RpcCall_DisableRemoteEvent"
 #define SYS_METHOD_CLEARRMTEVTS         "RpcCall_ClearRemoteEvents"
 #define SYS_METHOD_CHECK_ROUTERPATH     "RpcCall_CheckRouterPath"
+#define SYS_METHOD_HANDSAKE             "RpcCall_Handshake"
 
 #define SYS_METHOD_USERCANCELREQ        "RpcCall_UserCancelRequest"
 #define SYS_METHOD_PAUSE                "RpcCall_Pause"

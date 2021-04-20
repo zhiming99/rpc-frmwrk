@@ -641,9 +641,10 @@ class CRpcServices :
 
     virtual gint32 RebuildMatches();
 
-    gint32 StartEx2( IEventSink* pCallback );
-
     public:
+
+    virtual gint32 StartEx2(
+        IEventSink* pCallback );
 
     PROXY_MAP* GetProxyMap(
         EnumClsid iIfId = clsid( Invalid ) );

@@ -2413,4 +2413,22 @@ void CTcpStreamPdo2::OnPortStartFailed(
     return;
 }
 
+// methods from CObjBase
+gint32 CTcpStreamPdo2::GetProperty(
+    gint32 iProp, CBuffer& oBuf ) const
+{
+    gint32 ret = 0;
+    if( iProp == propRttMs )
+    {
+        CRpcConnSock* pSock = m_pConnSock;
+        guint32 dwRtt;
+        ret = pSock->GetRttTimeMs( dwRtt );
+        if( ERROR( ret ) )
+            return ret;
+        oBuf = dwRtt;
+        return 0;
+    }
+    return super::GetProperty( iProp, oBuf );
+}
+
 }

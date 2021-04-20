@@ -97,9 +97,183 @@ gint32 CRpcTcpBridgeProxy::InitUserFuncs()
         CRpcTcpBridgeProxy::CheckRouterPath,
         SYS_METHOD_CHECK_ROUTERPATH );
 
+    ADD_PROXY_METHOD_EX( 1,
+        CRpcTcpBridgeProxy::Handshake,
+        SYS_METHOD_HANDSAKE );
+
     END_IFPROXY_MAP;
 
     return 0;
+}
+
+gint32 CRpcTcpBridgeProxy::OnHandshakeComplete(
+    IEventSink* pCallback,
+    IEventSink*  pIoReq,
+    IConfigDb* pReqCtx )
+{
+    gint32 ret = 0;
+    if( pCallback == nullptr ||
+        pIoReq == nullptr )
+        return -EINVAL;
+
+    do{
+        CCfgOpenerObj oReq( pIoReq );
+        IConfigDb* pResp = nullptr;
+        ret = oReq.GetPointer(
+            propRespPtr, pResp );
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpener oResp( pResp );
+        gint32 iRet = 0;
+        ret = oResp.GetIntProp( propReturnValue,
+            ( guint32& ) iRet );
+
+        if( ERROR( ret ) )
+            break;
+
+        if( ERROR( iRet ) )
+        {
+            ret = iRet;
+            break;
+        }
+
+        IConfigDb* pInfo = nullptr;
+        ret = oResp.GetPointer( 0, pInfo );
+        if( ERROR( ret ) )
+            break;
+
+        DebugPrint( ret,
+            "Handshake completed successfully" );
+
+        CCfgOpener oInfo( pInfo );
+        guint64 qwTimestamp = 0;
+        ret = oInfo.GetQwordProp(
+            propTimestamp, qwTimestamp );
+        if( ERROR( ret ) )
+            break;
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+        DebugPrintEx( logErr, ret,
+            "TcpBridgeProxy Handshake failed" );
+
+    pCallback->OnEvent(
+        eventTaskComp, ret, 0, nullptr );
+
+    return ret;
+}
+
+gint32 CRpcTcpBridgeProxy::Handshake(
+    IConfigDb* pInfo,
+    IEventSink* pCallback )
+{
+    if( pInfo == nullptr ||
+        pCallback == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        CParamList oOptions;
+        CParamList oResp;
+        EnumClsid iid = iid( CRpcTcpBridge );
+        const string& strIfName =
+            CoGetIfNameFromIid( iid, "p" );
+
+        if( strIfName.empty() )
+        {
+            ret = -ENOTSUP;
+            break;
+        }
+
+        oOptions[ propIfName ] = 
+            DBUS_IF_NAME( strIfName );
+
+        oOptions[ propSysMethod ] = ( bool )true;
+
+        ret = AsyncCall( pCallback,
+            oOptions.GetCfg(), oResp.GetCfg(),
+            __func__, pInfo );
+
+        if( ret == STATUS_PENDING )
+            break;
+        
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpenerObj oTask(
+            ( CObjBase* )pCallback ); 
+
+        ret = oTask.CopyProp(
+            propRespPtr, oResp.GetCfg() );
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+    {
+        DebugPrintEx( logErr, ret,
+            "TcpBridgeProxy Handshake failed" );
+    }
+    else if( SUCCEEDED( ret ) )
+    {
+        DebugPrint( ret,
+            "Handshake completed successfully" );
+    }
+    return ret;
+}
+
+gint32 CRpcTcpBridgeProxy::DoStartHandshake(
+    IEventSink* pCallback )
+{
+    CParamList oParams;
+    gint32 ret = 0;
+    do{
+        timeval tv;
+        ret = gettimeofday( &tv, nullptr );
+        if( ret == -1 )
+        {
+            ret = -errno;
+            break;
+        }
+        guint64 dwTimestamp = tv.tv_sec;
+        oParams[ propTimestamp ] = dwTimestamp;
+        oParams.Push( "rpcf-bridge-proxy" );
+
+        TaskletPtr pRespCb;
+        NEW_PROXY_RESP_HANDLER2(
+            pRespCb, ObjPtr( this ),
+            &CRpcTcpBridgeProxy::OnHandshakeComplete,
+            pCallback, oParams.GetCfg() );
+
+        ret = Handshake(
+            oParams.GetCfg(), pRespCb );
+        if( ERROR( ret ) )
+            break;
+
+        if( ret == STATUS_PENDING )
+            break;
+
+        CCfgOpenerObj oCfg( pCallback );
+        IConfigDb* pResp = nullptr;
+        ret = oCfg.GetPointer(
+            propRespPtr, pResp );
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpener oResp( pResp ); 
+        IConfigDb* pInfo = nullptr;
+        ret = oResp.GetPointer( 0, pInfo );
+        if( ERROR( ret ) )
+            break;
+        guint64 qwTimestamp = 0;
+        CCfgOpener oInfo( pInfo );
+        ret = oResp.GetQwordProp(
+            propTimestamp, qwTimestamp );
+
+    }while( 0 );
+
+    return ret;
 }
 
 gint32 CRpcTcpBridgeProxy::ClearRemoteEvents(
@@ -1726,6 +1900,7 @@ CRpcTcpBridge::CRpcTcpBridge(
             break;
         }
         RemoveProperty( propRouterPtr );
+        m_bHandshaked = false;
 
     }while( 0 );
 
@@ -3328,6 +3503,10 @@ gint32 CRpcTcpBridge::InitUserFuncs()
         CRpcTcpBridge::CheckRouterPath,
         SYS_METHOD_CHECK_ROUTERPATH );
 
+    ADD_SERVICE_HANDLER(
+        CRpcTcpBridge::Handshake,
+        SYS_METHOD_HANDSAKE );
+
     END_HANDLER_MAP;
 
     return 0;
@@ -3473,6 +3652,114 @@ gint32 CRpcTcpBridge::SetupReqIrpFwrdEvt(
             pIrp->SetCallback( pCallback, 0 );
             pIrp->SetIrpThread( GetIoMgr() );
         }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CRpcTcpBridge::CheckHsTimeout(
+    IEventSink* pTask,
+    IEventSink* pStartCb )
+{
+    gint32 ret = 0;
+    do{
+        CCfgOpenerObj oCfg(
+            ( CObjBase* )pTask );
+
+        if( m_bHandshaked )
+            break;
+
+        guint32 dwRetries;
+        ret = oCfg.GetIntProp(
+            propRetries, dwRetries );
+        if( ERROR( ret ) )
+            break;
+
+        if( dwRetries > 0 )
+        {
+            ret = STATUS_MORE_PROCESS_NEEDED;
+            break;
+        }
+
+        // disconnect
+        ret = -ETIMEDOUT;
+        pStartCb->OnEvent( eventTaskComp,
+            -ETIMEDOUT, 0, nullptr );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CRpcTcpBridge::DoStartHandshake(
+    IEventSink* pCallback )
+{
+    gint32 ret = 0;
+    do{
+        // set the session checker
+        ret = DEFER_IFCALLEX_NOSCHED2(
+            0, m_pHsTicker, ObjPtr( this ),
+            &CRpcTcpBridge::CheckHsTimeout,
+            nullptr, pCallback );
+
+        if( ERROR( ret ) )
+            break;
+
+        CIfRetryTask* pRetryTask = m_pHsTicker;
+        if( unlikely( pRetryTask == nullptr ) )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        CCfgOpenerObj oTaskCfg( pRetryTask );
+
+        oTaskCfg.SetIntProp(
+            propRetries, 3 );
+
+        oTaskCfg.SetIntProp(
+            propIntervalSec, 20 );
+
+        this->AddAndRun( m_pHsTicker );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CRpcTcpBridge::Handshake(
+    IEventSink* pCallback,
+    IConfigDb* pInfo )
+{
+    if( pCallback == nullptr ||
+        pInfo == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        timeval tv;
+        ret = gettimeofday( &tv, nullptr );
+        if( ret == -1 )
+        {
+            ret = -errno;
+            break;
+        }
+        guint64 dwTimestamp = tv.tv_sec;
+        CParamList oParams;
+        oParams.Push( "rpcf-bridge" );
+        oParams[ propTimestamp ] = dwTimestamp;
+
+        CParamList oResp;
+        oResp[ propReturnValue ] = 0;
+        oResp.Push( oParams.GetCfg() );
+
+        SetResponse(
+            pCallback, oResp.GetCfg() );
+
+        m_bHandshaked = true;
+        if( !m_pHsTicker.IsEmpty() )
+            ( *m_pHsTicker )( eventCancelTask );
 
     }while( 0 );
 
@@ -4124,6 +4411,101 @@ gint32 CRpcTcpBridgeShared::GetPeerStmId(
             pIrp, false );
 
     }while( 0 );
+
+    return ret;
+}
+
+gint32 CRpcTcpBridgeShared::StartExOrig(
+    IEventSink* pCallback )
+{
+    if( pCallback == nullptr )
+        return -EINVAL;
+    
+    return m_pParentIf->
+        CRpcServices::StartEx2( pCallback );
+}
+
+gint32 CRpcTcpBridgeShared::StartHandshake(
+    IEventSink* pCallback )
+{
+    gint32 ret = 0;
+    if( m_pParentIf->IsServer() )
+    {
+        CRpcTcpBridge* pIf =
+            ObjPtr( m_pParentIf );
+        if( pIf != nullptr )
+            ret = pIf->DoStartHandshake(
+                pCallback );
+    }
+    else
+    {
+        CRpcTcpBridgeProxy* pIf =
+            ObjPtr( m_pParentIf );
+        ret = pIf->DoStartHandshake(
+            pCallback );
+    }
+    return ret;
+}
+
+gint32 CRpcTcpBridgeShared::StartEx2(
+    IEventSink* pCallback )
+{
+    if( pCallback == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    TaskGrpPtr pTaskGrp;
+    do{
+        TaskletPtr pStart;
+        TaskletPtr pHandshake;
+
+        CParamList oParams;
+        oParams[ propIfPtr ] =
+            ObjPtr( m_pParentIf );
+
+        ret = pTaskGrp.NewObj(
+            clsid( CIfTaskGroup ),
+            oParams.GetCfg() );
+        if( ERROR( ret ) )
+            break;
+
+        pTaskGrp->SetRelation( logicAND );
+        pTaskGrp->SetClientNotify( pCallback );
+        ret = DEFER_IFCALLEX_NOSCHED2(
+            0, pStart , ObjPtr( m_pParentIf ),
+            &CRpcTcpBridgeShared::StartExOrig,
+            nullptr );
+        if( ERROR( ret ) )
+            break;
+        pTaskGrp->AppendTask( pStart );
+
+        ret = DEFER_IFCALLEX_NOSCHED2(
+            0, pHandshake, ObjPtr( m_pParentIf ),
+            &CRpcTcpBridgeShared::StartHandshake,
+            nullptr );
+        if( ERROR( ret ) )
+            break;
+
+        pTaskGrp->AppendTask( pHandshake );
+        TaskletPtr pGrp = ObjPtr( pTaskGrp );
+        CIoManager* pMgr = m_pParentIf->GetIoMgr();
+        ret = pMgr->RescheduleTask( pGrp );
+        if( ERROR( ret ) )
+        {
+            ( *pTaskGrp )( eventCancelTask );
+        }
+        else 
+        {
+            ret = STATUS_PENDING;
+        }
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+    {
+        if( !pTaskGrp.IsEmpty() )
+            ( *pTaskGrp )( eventCancelTask );
+    }
 
     return ret;
 }
