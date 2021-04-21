@@ -3683,10 +3683,14 @@ gint32 CRpcTcpBridge::CheckHsTimeout(
 
         // disconnect
         ret = -ETIMEDOUT;
-        pStartCb->OnEvent( eventTaskComp,
-            -ETIMEDOUT, 0, nullptr );
 
     }while( 0 );
+
+    if( ret != STATUS_MORE_PROCESS_NEEDED )
+    {
+        pStartCb->OnEvent( eventTaskComp,
+            ret, 0, nullptr );
+    }
 
     return ret;
 }
@@ -3790,7 +3794,7 @@ gint32 CRpcTcpBridge::Handshake(
         m_bHandshaked = true;
         if( !m_pHsTicker.IsEmpty() )
         {
-            ( *m_pHsTicker )( eventCancelTask );
+            ( *m_pHsTicker )( eventZero );
         }
         else
         {
