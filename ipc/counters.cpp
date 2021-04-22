@@ -112,12 +112,23 @@ gint32 CStatCountersServer::OnPostStop(
     return 0;
 }
 
-// business logics
 gint32 CStatCountersServer::IncMsgCount(
     EnumPropId iProp )
 {
+    return IncMsgCount( iProp, false );
+}
+
+gint32 CStatCountersServer::DecMsgCount(
+    EnumPropId iProp )
+{
+    return IncMsgCount( iProp, true );
+}
+// business logics
+gint32 CStatCountersServer::IncMsgCount(
+    EnumPropId iProp, bool bNegative )
+{
     gint32 ret = 0;
-    guint32 dwCount = 1;
+    guint32 dwCount = 0;
     CStdRMutex oIfLock( GetLock() );
     CCfgOpener oCounters(
         ( IConfigDb* ) m_pCfg );
@@ -133,8 +144,16 @@ gint32 CStatCountersServer::IncMsgCount(
         return ret;
     }
 
+    if( bNegative && dwCount == 0 )
+        return -ERANGE ;
+
+    if( bNegative )
+        dwCount -= 1;
+    else
+        dwCount += 1;
+
     return oCounters.SetIntProp(
-        iProp, dwCount + 1 );
+        iProp, dwCount );
 }
 
 // interface implementations

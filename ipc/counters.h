@@ -73,6 +73,9 @@ class CStatCountersServer:
     // message filter for message counter
     TaskletPtr m_pMsgFilter;
 
+    gint32 IncMsgCount(
+        EnumPropId iProp, bool bMinus );
+
     public:
     typedef CAggInterfaceServer super;
     CStatCountersServer( const IConfigDb* pCfg )
@@ -87,6 +90,7 @@ class CStatCountersServer:
     virtual gint32 OnPostStop( IEventSink* pCallback );
 
     gint32 IncMsgCount( EnumPropId iProp );
+    gint32 DecMsgCount( EnumPropId iProp );
 
     gint32 IncMsgOutCount();
 

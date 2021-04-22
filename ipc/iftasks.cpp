@@ -4240,9 +4240,11 @@ gint32 CIfInvokeMethodTask::RunTask()
         {
             ret = ERROR_FAIL;
             if( CanRetry() )
+            {
                 ret = STATUS_MORE_PROCESS_NEEDED;
-            // schedule a retry
-            break;
+                // schedule a retry
+                break;
+            }
         }
 
         OnTaskComplete( ret );
@@ -4372,23 +4374,22 @@ gint32 CIfInvokeMethodTask::OnTaskComplete(
         ret = oCfg.GetObjPtr(
             propRespPtr, pObj );
 
-        if( ERROR( ret ) )
-            break;
-
-        CfgPtr pResp;
-        pResp = pObj;
-        if( pResp.IsEmpty() )
+        if( ERROR( ret ) || pObj.IsEmpty() )
         {
             ret = 0;
             break;
         }
+
+        CfgPtr pResp;
+        pResp = pObj;
 
         CRpcServices* pIf = nullptr;
         ret = oCfg.GetPointer( propIfPtr, pIf );
         if( ERROR( ret ) )
             break;
 
-        bool bServer = pIf->IsServer();
+        if( !pIf->IsServer() )
+            break;
 
         gint32 iType = 0;
         ret = GetConfig()->GetPropertyType(
@@ -4407,19 +4408,8 @@ gint32 CIfInvokeMethodTask::OnTaskComplete(
             gint32 iType = pMsg.GetType();
             switch( iType )
             {
-            case DBUS_MESSAGE_TYPE_SIGNAL:
-                {
-                    bServer ? ret = -EINVAL : 0;
-                    break;
-                }
             case DBUS_MESSAGE_TYPE_METHOD_CALL:
                 {
-                    if( !bServer )
-                    {
-                        ret = -EINVAL;
-                        break;
-                    }
-
                     CInterfaceServer *pServer =
                         ObjPtr( pIf );
 
@@ -4434,17 +4424,9 @@ gint32 CIfInvokeMethodTask::OnTaskComplete(
 
                     if( ret != ERROR_FALSE )
                     {
-                        // so far we don't support
-                        // asynchronous filter on
-                        // response
-                        ret = pServer->FilterMessage(
-                            this, ( IConfigDb* )pResp, false );
-
                         if( ret != ERROR_PREMATURE )
-                        {
                             ret = pIf->SendResponse(
-                                pMsg, pResp );
-                        }
+                                this, pMsg, pResp );
                     }
 
                     // the connection record can be removed
@@ -4480,15 +4462,10 @@ gint32 CIfInvokeMethodTask::OnTaskComplete(
 
             switch( iType )
             {
-            case DBUS_MESSAGE_TYPE_SIGNAL:
-                {
-                    bServer ? ret = -EINVAL : 0;
-                    break;
-                }
             case DBUS_MESSAGE_TYPE_METHOD_CALL:
                 {
                     ret = pIf->SendResponse(
-                        pMsg, pResp );
+                        this, pMsg, pResp );
                     break;
                 }
             default:

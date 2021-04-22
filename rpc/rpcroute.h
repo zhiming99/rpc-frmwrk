@@ -985,6 +985,7 @@ class CRpcTcpBridge :
         IConfigDb* pInfo );
 
     virtual gint32 SendResponse(
+        IEventSink* pInvTask,
         IConfigDb* pReqMsg,
         CfgPtr& pRespData );
 

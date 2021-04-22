@@ -1581,6 +1581,9 @@ gint32 CRpcTcpBridge::OnPostStart(
         OnPostStartShared(
             pContext, pMatch );
 
+        this->m_pConnMgr.Clear();
+        
+
     }while( 0 );
 
     return ret;
@@ -3110,7 +3113,14 @@ gint32 CRpcInterfaceServer::DoInvoke(
                 CCfgOpener oReqCtx(
                     ( IConfigDb* )pReqCtx );
 
+                // for use by the reqfwdrproxy
+                // or tcpbridgeproxy 
                 oReqCtx.SetObjPtr( propReqPtr, pObj );
+
+                CCfgOpenerObj oTaskCfg( pCallback );
+                // make sure there is a propReqPtr
+                // for the message filter
+                oTaskCfg.SetObjPtr( propReqPtr, pObj );
 
                 ret = 0;
                 DMsgPtr pRespMsg;
@@ -3150,8 +3160,6 @@ gint32 CRpcInterfaceServer::DoInvoke(
                     }
 
                     // keep-alive settings
-                    CCfgOpenerObj oTaskCfg( pCallback );
-
                     if( bBridge )
                     {
                         oTaskCfg.SetQwordProp(
@@ -3512,7 +3520,9 @@ gint32 CRpcTcpBridge::InitUserFuncs()
 }
 
 gint32 CRpcTcpBridge::SendResponse(
-    IConfigDb* pReq, CfgPtr& pResp )
+    IEventSink* pInvTask,
+    IConfigDb* pReq,
+    CfgPtr& pResp )
 {
     if( pReq == nullptr || pResp.IsEmpty() )
         return -EINVAL;

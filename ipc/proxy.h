@@ -551,6 +551,7 @@ struct IRpcNonDBusIf
     { return -ENOTSUP; }
 
     virtual gint32 SendResponse(
+        IEventSink* pInvTask,
         IConfigDb* pReqMsg,
         CfgPtr& pRespData ) = 0;
 
@@ -837,6 +838,7 @@ class CRpcServices :
         IRP* pIrp, CfgPtr& pResp );
 
     virtual gint32 SendResponse(
+        IEventSink* pInvTask,
         DBusMessage* pReqMsg,
         CfgPtr& pRespData ) = 0;
 
@@ -1195,10 +1197,12 @@ class CInterfaceProxy :
         IEventSink* pCallback = nullptr );
 
     virtual gint32 SendResponse(
+        IEventSink* pInvTask,
         DBusMessage* pReqMsg,
         CfgPtr& pRespData );
 
     virtual gint32 SendResponse(
+        IEventSink* pInvTask,
         IConfigDb* pReqMsg,
         CfgPtr& pRespData );
 
@@ -1460,10 +1464,12 @@ class CInterfaceServer :
         CfgPtr& pRespData );
 
     virtual gint32 SendResponse(
+        IEventSink* pInvTask,
         DBusMessage* pReqMsg,
         CfgPtr& pRespData );
 
     virtual gint32 SendResponse(
+        IEventSink* pInvTask,
         IConfigDb* pReqMsg,
         CfgPtr& pRespData );
 

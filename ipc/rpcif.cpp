@@ -5300,6 +5300,7 @@ gint32 CInterfaceProxy::OnKeepAliveTerm(
 }
 
 gint32 CInterfaceProxy::SendResponse(
+    IEventSink* pInvTask,
     DBusMessage* pReqMsg,
     CfgPtr& pRespData )
 {
@@ -5308,6 +5309,7 @@ gint32 CInterfaceProxy::SendResponse(
 }
 
 gint32 CInterfaceProxy::SendResponse(
+    IEventSink* pInvTask,
     IConfigDb* pReqMsg,
     CfgPtr& pRespData )
 {
@@ -6349,8 +6351,6 @@ gint32 CInterfaceServer::DoInvoke(
             {
                 oTaskCfg.RemoveProperty(
                     propRmtTaskId );
-                oTaskCfg.RemoveProperty(
-                    propReqPtr );
             }
 
         }while( 0 );
@@ -6450,6 +6450,7 @@ gint32 CInterfaceServer::OnServiceComplete(
 }
 
 gint32 CInterfaceServer::SendResponse(
+    IEventSink* pInvTask,
     DBusMessage* pReqMsg,
     CfgPtr& pRespData )
 {
@@ -6650,6 +6651,14 @@ gint32 CInterfaceServer::SendResponse(
             }
         }
 
+        // so far we don't support asynchronous
+        // filter on response
+        ret = FilterMessage(
+            pInvTask, pRespMsg, false );
+
+        if( ret == ERROR_PREMATURE )
+            break;
+
         CIoManager* pMgr = GetIoMgr();
         IrpPtr pIrp;
 
@@ -6705,6 +6714,7 @@ gint32 CInterfaceServer::SendResponse(
 }
 
 gint32 CInterfaceServer::SendResponse(
+    IEventSink* pInvTask,
     IConfigDb* pReqMsg,
     CfgPtr& pRespData )
 {
