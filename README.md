@@ -41,7 +41,7 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 
 #### Todo:
 1. GUI config tools 
-2. Better flow control
+2. Request-based flow control
 3. Java support
 4. Examples and Tutorials
 5. Access Control
