@@ -68,7 +68,7 @@ gint32 CRpcTcpBridgeAuth::OnLoginTimeout(
             break;
         }
 
-        OnLoginFailed( pCallback );
+        OnLoginFailed( pCallback, -ETIMEDOUT );
 
     }while( 0 );
 
@@ -559,12 +559,12 @@ gint32 CRpcTcpBridgeAuth::IsAuthRequest(
 }
 
 gint32 CRpcTcpBridgeAuth::OnLoginFailed(
-    IEventSink* pCallback )
+    IEventSink* pCallback, gint32 iRet )
 {
     gint32 ret = 0;
     do{
 
-        DebugPrint( ret, "Login failed,"
+        DebugPrint( iRet, "Login failed,"
             " connection is reset" );
         CRpcRouter* pRouter = GetParent();
         if( !m_pLoginTimer.IsEmpty() )
@@ -632,8 +632,14 @@ gint32 CRpcTcpBridgeAuth::OnLoginComplete(
         ret = oResp.GetIntProp(
             propReturnValue, ( guint32& )iRet );
 
-        if( ERROR( ret ) || ERROR( iRet ) )
+        if( ERROR( ret ) )
             break;
+
+        if( ERROR( iRet ) )
+        {
+            ret = iRet;
+            break;
+        }
 
         // this is a forward-request, we need to
         // unwrap the response message first.
@@ -655,6 +661,17 @@ gint32 CRpcTcpBridgeAuth::OnLoginComplete(
         }
 
         CCfgOpener oLoginResp( pLoginResp );
+        ret = oLoginResp.GetIntProp(
+            propReturnValue, ( guint32& )iRet );
+        if( ERROR( ret ) )
+            break;
+
+        if( ERROR( iRet ) )
+        {
+            ret = iRet;
+            break;
+        }
+
         IConfigDb* pLoginTok = nullptr;
         ret = oLoginResp.GetPointer(
             0, pLoginTok );
@@ -738,7 +755,7 @@ gint32 CRpcTcpBridgeAuth::OnLoginComplete(
         DEFER_CALL_DELAY( GetIoMgr(), 1, 
             ObjPtr( this ),
             &CRpcTcpBridgeAuth::OnLoginFailed,
-            nullptr );
+            nullptr, ret );
     }
 
     return ret;
@@ -1016,7 +1033,9 @@ gint32 CRpcTcpBridgeAuth::CheckSessExpired(
         ret = pAuth->IsSessExpired( strSess );
         if( SUCCEEDED( ret ) || ret == ERROR_FAIL )
         {
-            OnLoginFailed( nullptr );
+            if( ret == STATUS_SUCCESS )
+                ret = -EKEYEXPIRED;
+            OnLoginFailed( nullptr, ret );
             ret = 0;
         }
         else if( ret == ERROR_FALSE )

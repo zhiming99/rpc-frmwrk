@@ -4370,78 +4370,79 @@ gint32 CIfInvokeMethodTask::OnTaskComplete(
         CCfgOpener oCfg(
             ( IConfigDb* )GetConfig() );
 
-        ObjPtr pObj;
-        ret = oCfg.GetObjPtr(
-            propRespPtr, pObj );
+        CRpcServices* pIf = nullptr;
+        oCfg.GetPointer( propIfPtr, pIf );
+        if( !pIf->IsServer() )
+            break;
 
+        bool bResp = true;
+        ObjPtr pObj;
+        ret = oCfg.GetObjPtr( propRespPtr, pObj );
         if( ERROR( ret ) || pObj.IsEmpty() )
         {
             ret = 0;
-            break;
+            bResp = false;
         }
-
         CfgPtr pResp;
-        pResp = pObj;
-
-        CRpcServices* pIf = nullptr;
-        ret = oCfg.GetPointer( propIfPtr, pIf );
-        if( ERROR( ret ) )
-            break;
-
-        if( !pIf->IsServer() )
-            break;
+        if( bResp )
+            pResp = pObj;
 
         gint32 iType = 0;
         ret = GetConfig()->GetPropertyType(
             propMsgPtr, iType );
-
         if( ERROR( ret ) )
             break;
 
         if( iType == typeDMsg )
         {
             DMsgPtr pMsg;
-            ret = oCfg.GetMsgPtr( propMsgPtr, pMsg );
-            if( ERROR( ret ) )
-                break;
+            oCfg.GetMsgPtr( propMsgPtr, pMsg );
 
             gint32 iType = pMsg.GetType();
-            switch( iType )
+            if( unlikely( iType !=
+                DBUS_MESSAGE_TYPE_METHOD_CALL ) )
             {
-            case DBUS_MESSAGE_TYPE_METHOD_CALL:
-                {
-                    CInterfaceServer *pServer =
-                        ObjPtr( pIf );
+                ret = -EINVAL;
+                break;
+            }
 
-                    SvrConnPtr pConnMgr =
-                        pServer->GetConnMgr();
+            // so far we don't support asynchronous
+            // filter on response
+            if( iRetVal != ERROR_QUEUE_FULL )
+            {
+                ret = pIf->FilterMessage(
+                    this, pMsg, false );
+            }
 
-                    if( !pConnMgr.IsEmpty() )
-                    {
-                        ret = pConnMgr->CanResponse(
-                            ( HANDLE )( ( CObjBase* )this ) );
-                    }
+            if( ret == ERROR_PREMATURE )
+                break;
 
-                    if( ret != ERROR_FALSE )
-                    {
-                        if( ret != ERROR_PREMATURE )
-                            ret = pIf->SendResponse(
-                                this, pMsg, pResp );
-                    }
+            if( !bResp )
+                break;
 
-                    // the connection record can be removed
-                    if( !pConnMgr.IsEmpty() )
-                    {
-                        pConnMgr->OnInvokeComplete(
-                            ( HANDLE )( ( CObjBase* )this ) );
-                    }
-                    break;
-                }
-            default:
-                {
-                    ret = -EINVAL;
-                    break;
-                }
+            CInterfaceServer *pServer =
+                ObjPtr( pIf );
+
+            SvrConnPtr pConnMgr =
+                pServer->GetConnMgr();
+
+            if( !pConnMgr.IsEmpty() )
+            {
+                ret = pConnMgr->CanResponse(
+                    ( HANDLE )( ( CObjBase* )this ) );
+            }
+
+            if( ret != ERROR_FALSE )
+            {
+                ret = pIf->SendResponse(
+                    this, pMsg, pResp );
+            }
+
+            // the connection record can be removed
+            if( !pConnMgr.IsEmpty() )
+            {
+                pConnMgr->OnInvokeComplete(
+                    ( HANDLE )( ( CObjBase* )this ) );
             }
         }
         else if( iType == typeObj )

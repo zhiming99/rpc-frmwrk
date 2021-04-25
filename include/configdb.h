@@ -528,7 +528,7 @@ class CCfgDbOpener
     }
 
     template< typename PrimType >
-    gint32 IsEqual( gint32 iProp, PrimType val )
+    gint32 IsEqual( gint32 iProp, const PrimType& val )
     {
         // c++11 required
         // static_assert( !std::is_base_of< CObjBase, PrimType >::value );
@@ -839,8 +839,8 @@ class CCfgDbOpener< IConfigDb >
             return -EFAULT;
 
         do{
-            const BufPtr bufPtr;
-            ret = m_pConstCfg->GetProperty( iProp, *bufPtr );
+            BufPtr bufPtr;
+            ret = m_pConstCfg->GetProperty( iProp, bufPtr );
             if( ERROR( ret ) )
                 break;
             pStr = bufPtr->ptr();
@@ -857,10 +857,10 @@ class CCfgDbOpener< IConfigDb >
             return -EFAULT;
 
         do{
-            BufPtr bufPtr( true ); 
+            BufPtr bufPtr; 
 
             ret = m_pConstCfg->GetProperty(
-                iProp, *bufPtr );
+                iProp, bufPtr );
 
             if( ERROR( ret ) )
                 break;
@@ -931,12 +931,12 @@ class CCfgDbOpener< IConfigDb >
 
     gint32 SwapProp( gint32 iProp1, gint32 iProp2 )
     {
-        BufPtr pBuf1( true );
+        BufPtr pBuf1;
         gint32 ret = GetProperty( iProp1, pBuf1 );
         if( ERROR( ret ) )
             return ret;
 
-        BufPtr pBuf2( true );
+        BufPtr pBuf2;
         ret = GetProperty( iProp2, pBuf2 );
         if( ERROR( ret ) )
             return ret;
@@ -946,7 +946,8 @@ class CCfgDbOpener< IConfigDb >
         return ret;
     }
 
-    template< typename PrimType >
+    template< typename PrimType, typename T2=
+        typename std::enable_if< !std::is_same< PrimType, stdstr >::value, PrimType >::type >
     gint32 GetPrimProp( gint32 iProp, PrimType& val ) const 
     {
         gint32 ret = 0;
@@ -955,13 +956,38 @@ class CCfgDbOpener< IConfigDb >
             return -EFAULT;
 
         do{
-            BufPtr bufPtr( true );
+            BufPtr bufPtr;
 
             ret = m_pConstCfg->GetProperty( iProp, bufPtr );
             if( ERROR( ret ) )
                 break;
 
             val = ( PrimType& )( *bufPtr );
+
+        }while( 0 );
+
+        return ret;
+    }
+
+    template< typename PrimType, typename T2=
+        typename std::enable_if< std::is_same< PrimType, stdstr >::value, PrimType >::type,
+        typename T3=T2 >
+    gint32 GetPrimProp(
+        gint32 iProp, PrimType& val ) const
+    {
+        gint32 ret = 0;
+
+        if( m_pConstCfg == nullptr )
+            return -EFAULT;
+
+        do{
+            BufPtr bufPtr;
+
+            ret = m_pConstCfg->GetProperty( iProp, bufPtr );
+            if( ERROR( ret ) )
+                break;
+
+            val = ( const char*  )( *bufPtr );
 
         }while( 0 );
 
@@ -994,8 +1020,8 @@ class CCfgDbOpener< IConfigDb >
     gint32 GetIntPtr( gint32 iProp, guint32*& val ) const
     {
         intptr_t val1;
-        BufPtr pBuf( true );
-        gint32 ret = GetProperty( iProp, *pBuf );
+        BufPtr pBuf;
+        gint32 ret = GetProperty( iProp, pBuf );
 
         if( ERROR( ret ) )
             return ret;
@@ -1009,7 +1035,7 @@ class CCfgDbOpener< IConfigDb >
     {
         BufPtr pBuf( true );
         *pBuf = ( intptr_t )val;
-        return SetProperty( iProp, *pBuf );
+        return SetProperty( iProp, pBuf );
     }
 
     gint32 GetShortProp( gint32 iProp, guint16& val ) const
@@ -1077,11 +1103,10 @@ class CCfgDbOpener< IConfigDb >
         return SetPrimProp( iProp, val );
     }
 
-    template< typename PrimType >
-    gint32 IsEqual( gint32 iProp, PrimType val )
+    template< typename PrimType, typename T2=
+        typename std::enable_if< ! std::is_same< PrimType, stdstr >::value, PrimType >::type >
+    gint32 IsEqual( gint32 iProp, const PrimType& val )
     {
-        // c++11 required
-        // static_assert( !std::is_base_of< CObjBase, PrimType >::value );
         gint32 ret = 0;
         do{
             if( m_pConstCfg == nullptr )
@@ -1090,15 +1115,40 @@ class CCfgDbOpener< IConfigDb >
                 break;
             }
 
-            BufPtr pBuf( true );
+            BufPtr pBuf;
             ret = m_pConstCfg->GetProperty( iProp, pBuf );
             if( ERROR( ret ) )
                 break;
 
-            BufPtr pBuf2( true );
-            *pBuf2 = val;
+            if( val == ( const PrimType& )*pBuf )
+                break;
 
-            if( *pBuf == *pBuf2 )
+            ret = ERROR_FALSE;
+        }while( 0 );
+
+        return ret;
+    }
+
+    template< typename PrimType, typename T2=
+        typename std::enable_if< std::is_same< PrimType, stdstr >::value, stdstr >::type,
+        typename T3=T2 >
+    gint32 IsEqual( gint32 iProp, const PrimType& val )
+    {
+        gint32 ret = 0;
+        do{
+            if( m_pConstCfg == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+
+            BufPtr pBuf;
+            ret = m_pConstCfg->GetProperty( iProp, pBuf );
+            if( ERROR( ret ) )
+                break;
+
+            std::string val2 = ( const char* )*pBuf;
+            if( val == val2 )
                 break;
 
             ret = ERROR_FALSE;
@@ -1128,7 +1178,7 @@ class CCfgDbOpener< IConfigDb >
             if( ERROR( ret ) )
                 break;
 
-            BufPtr pBuf2( true );
+            BufPtr pBuf2;
             ret = this->GetProperty( iProp, pBuf2 );
             if( ERROR( ret ) )
                 break;
@@ -1442,7 +1492,6 @@ class CParamList : public CCfgOpener
     gint32 GetType(
         gint32 iPos, gint32& iType ) const
     {
-        BufPtr pBuf( true );
         gint32 ret = GetCfg()->
             GetPropertyType( iPos, iType );
 
@@ -1502,7 +1551,7 @@ class CParamList : public CCfgOpener
                 *pBuf = val;
 
                 ret = GetCfg()->SetProperty(
-                    iPos, *pBuf );
+                    iPos, pBuf );
 
                 if( SUCCEEDED( ret ) )
                     SetCount( iPos + 1 );
@@ -1541,11 +1590,11 @@ class CParamList : public CCfgOpener
                 break;
             }
 
-            BufPtr pBuf( true );
+            BufPtr pBuf;
             try{
                 gint32 idx = iPos - 1;
                 ret = GetCfg()->GetProperty(
-                    idx, *pBuf );
+                    idx, pBuf );
 
                 if( ERROR( ret ) )
                     break;

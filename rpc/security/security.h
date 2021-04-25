@@ -480,7 +480,8 @@ class CRpcTcpBridgeAuth :
     TaskletPtr m_pSessChecker;
 
     gint32 OnLoginFailed(
-        IEventSink* pCallback );
+        IEventSink* pCallback,
+        gint32 iRet );
 
     gint32 OnLoginTimeout(
         IEventSink* pCallback,

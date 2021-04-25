@@ -86,10 +86,7 @@ gint32 CStatCountersServer::InitUserFuncs()
 gint32 CStatCountersServer::OnPreStart(
     IEventSink* pCallback )
 {
-    gint32 ret = m_pCfg.NewObj();
-    if( ERROR( ret ) )
-        return ret;
-
+    gint32 ret = 0;
     CParamList oParams;
     oParams[ propIfPtr ] = ObjPtr( this );
     ret = m_pMsgFilter.NewObj(
@@ -107,42 +104,41 @@ gint32 CStatCountersServer::OnPostStop(
     IEventSink* pCallback )
 {
     UnregisterFilter( m_pMsgFilter );
-    m_pCfg.Clear();
+    m_mapCounters.clear();
     m_pMsgFilter.Clear();
     return 0;
 }
 
-gint32 CStatCountersServer::IncMsgCount(
+gint32 CStatCountersServer::IncCounter(
     EnumPropId iProp )
 {
-    return IncMsgCount( iProp, false );
+    return IncCounter( iProp, false );
 }
 
-gint32 CStatCountersServer::DecMsgCount(
+gint32 CStatCountersServer::DecCounter(
     EnumPropId iProp )
 {
-    return IncMsgCount( iProp, true );
+    return IncCounter( iProp, true );
+}
+
+gint32 CStatCountersServer::SetCounter(
+    EnumPropId iProp, guint32 dwVal )
+{
+    CStdRMutex oIfLock( m_oStatLock );
+    m_mapCounters[ iProp ] = dwVal;
+    return 0;
 }
 // business logics
-gint32 CStatCountersServer::IncMsgCount(
+gint32 CStatCountersServer::IncCounter(
     EnumPropId iProp, bool bNegative )
 {
     gint32 ret = 0;
     guint32 dwCount = 0;
-    CStdRMutex oIfLock( GetLock() );
-    CCfgOpener oCounters(
-        ( IConfigDb* ) m_pCfg );
-    ret = oCounters.GetIntProp(
-        iProp, dwCount );
-    if( ret == -ENOENT )
-    {
-        oCounters.SetIntProp(
-            iProp, dwCount );
-    }
-    else if( ERROR( ret ) )
-    {
-        return ret;
-    }
+    CStdRMutex oIfLock( m_oStatLock );
+    std::hashmap< gint32, guint32 >::iterator
+        itr = m_mapCounters.find( iProp );
+    if( itr != m_mapCounters.end() )
+        dwCount = itr->second;
 
     if( bNegative && dwCount == 0 )
         return -ERANGE ;
@@ -152,8 +148,26 @@ gint32 CStatCountersServer::IncMsgCount(
     else
         dwCount += 1;
 
-    return oCounters.SetIntProp(
-        iProp, dwCount );
+    if( itr != m_mapCounters.end() )
+        itr->second = dwCount;
+    else
+        m_mapCounters[ iProp ] = dwCount;
+
+    return dwCount;
+}
+
+gint32 CStatCountersServer::GetCounter2( 
+    EnumPropId iProp, guint32& dwVal  )
+{
+    CStdRMutex oIfLock( m_oStatLock );
+    std::hashmap< gint32, guint32 >::iterator
+        itr = m_mapCounters.find( iProp );
+    if( itr == m_mapCounters.end() )
+        return -ENOENT;
+
+    dwVal = itr->second;
+    
+    return STATUS_SUCCESS;
 }
 
 // interface implementations
@@ -161,8 +175,15 @@ gint32 CStatCountersServer::GetCounters(
     IEventSink* pCallback,
     CfgPtr& pCfg )
 {
-    CStdRMutex oIfLock( GetLock() );
-    *pCfg = *m_pCfg;
+    if( pCfg.IsEmpty() )
+        pCfg.NewObj();
+
+    CStdRMutex oIfLock( m_oStatLock );
+    CCfgOpener oCfg( ( IConfigDb* )pCfg );
+
+    for( auto elem : m_mapCounters )
+        oCfg[ elem.first ] = elem.second;
+
     return 0;
 }
 
@@ -171,17 +192,65 @@ gint32 CStatCountersServer::GetCounter(
     guint32 iPropId,
     BufPtr& pBuf  )
 {
-    if( m_pCfg.IsEmpty() )
-        return -EFAULT;
-
     if( pBuf.IsEmpty() )
         pBuf.NewObj();
 
-    CCfgOpener oCfg( ( IConfigDb* )m_pCfg );
-    CStdRMutex oIfLock( GetLock() );
+    CStdRMutex oIfLock( m_oStatLock );
+    if( m_mapCounters.empty() )
+        return -EFAULT;
 
     // make a copy
-    return oCfg.GetProperty( iPropId, *pBuf );
+    std::hashmap< gint32, guint32 >::iterator
+        itr = m_mapCounters.find( iPropId );
+    if( itr == m_mapCounters.end() )
+        return -ENOENT;
+    *pBuf = itr->second;
+    return STATUS_SUCCESS;
+}
+
+gint32 CMessageCounterTask::FilterMsgOutgoing(
+    IEventSink* pReqTask, DBusMessage* pRawMsg )
+{
+    gint32 ret = 0;
+    if( pRawMsg == nullptr ||
+        pReqTask == nullptr )
+        return STATUS_SUCCESS;
+
+    do{
+        DMsgPtr pMsg( pRawMsg );
+        CStatCountersServer* pIf = nullptr;
+
+        CCfgOpener oTaskCfg(
+            ( IConfigDb* )GetConfig() );    
+
+        gint32 ret = oTaskCfg.GetPointer(
+            propIfPtr, pIf );
+
+        if( ERROR( ret ) )
+            break;
+
+        CIfIoReqTask* pReq = ObjPtr( pReqTask );
+        if( pReq != nullptr )
+        {
+            ret = pIf->IncCounter(
+                propMsgOutCount );
+            break;
+        }
+
+        CIfInvokeMethodTask* pInv =
+            ObjPtr( pReqTask );
+        if( pInv != nullptr )
+        {
+            stdstr strMethod = pMsg.GetMember();
+            if( strMethod !=
+                SYS_METHOD_FORWARDREQ )
+                break;
+            pIf->IncCounter( propWndSize );
+        }
+
+    }while( 0 );
+
+    return ret;
 }
 
 }

@@ -6651,14 +6651,6 @@ gint32 CInterfaceServer::SendResponse(
             }
         }
 
-        // so far we don't support asynchronous
-        // filter on response
-        ret = FilterMessage(
-            pInvTask, pRespMsg, false );
-
-        if( ret == ERROR_PREMATURE )
-            break;
-
         CIoManager* pMgr = GetIoMgr();
         IrpPtr pIrp;
 

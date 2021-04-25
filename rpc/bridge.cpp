@@ -151,7 +151,10 @@ gint32 CRpcTcpBridgeProxy::OnHandshakeComplete(
         ret = oInfo.GetQwordProp(
             propTimestamp, qwTimestamp );
         if( ERROR( ret ) )
+        {
+            ret = 0;
             break;
+        }
 
     }while( 0 );
 
@@ -3122,7 +3125,24 @@ gint32 CRpcInterfaceServer::DoInvoke(
                 // for the message filter
                 oTaskCfg.SetObjPtr( propReqPtr, pObj );
 
-                ret = 0;
+                CStatCountersServer* pStatSvr =
+                    ObjPtr( this );
+
+                ret = pStatSvr->DecCounter(
+                    propWndSize );
+
+                if( ERROR( ret ) && bResp )
+                {
+                    // window size is zero
+                    ret = ERROR_QUEUE_FULL;
+                    DebugPrint( ret,
+                        "Receiving window closed" );
+                    ret = 0;
+                    // oResp.SetIntProp(
+                    //     propReturnValue, ret );
+                    // break;
+                }
+
                 DMsgPtr pRespMsg;
                 ret = ForwardRequest( pReqCtx,
                     pFwdrMsg, pRespMsg, pCallback );
@@ -3223,6 +3243,19 @@ gint32 CRpcInterfaceServer::DoInvoke(
     }
 
     return ret;
+}
+
+gint32 CRpcInterfaceServer::OnPreStart(
+    IEventSink* pContext ) 
+{
+    CStatCountersServer* pStat = ObjPtr( this );
+    if( pStat == nullptr )
+        return 0;
+
+    pStat->SetCounter(
+        propWndSize, DEFAULT_WNDSIZE );
+
+    return 0;
 }
 
 gint32 CRpcTcpBridge::SetupReqIrp(

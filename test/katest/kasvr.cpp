@@ -37,6 +37,7 @@ CKeepAliveServer::CKeepAliveServer(
 
 gint32 CKeepAliveServer::InitUserFuncs()
 {
+    super::InitUserFuncs();
     BEGIN_HANDLER_MAP;
 
     ADD_USER_SERVICE_HANDLER(

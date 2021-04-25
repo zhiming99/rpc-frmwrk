@@ -248,6 +248,7 @@ enum EnumPropId : gint32
     propNoReply,        // type: a bool value to indicate if the request has no reply.
 
     propRttMs,          // type: a guint32 as the round trip time of a tcp connection in ms.
+    propWndSize,        // type: g guint32 as the receiving window size for all the pending requests
 
     propReservedEnd = 0x10000000,
     propInvalid = -1, 

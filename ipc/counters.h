@@ -41,8 +41,8 @@ struct IStatCounters
     virtual gint32 GetCounters(
         CfgPtr& pCfg ) = 0;
 
-    virtual gint32 GetCounter( guint32 iPropId,
-        BufPtr& pBuf ) = 0;
+    virtual gint32 GetCounter(
+        guint32 iPropId, BufPtr& pBuf ) = 0;
 };
 
 class CStatCountersProxy:
@@ -61,21 +61,23 @@ class CStatCountersProxy:
 
     virtual gint32 InitUserFuncs();
     gint32 GetCounters( CfgPtr& pCfg );
-    gint32 GetCounter( guint32 iPropId, BufPtr& pBuf );
+    gint32 GetCounter(
+        guint32 iPropId, BufPtr& pBuf );
 };
 
 class CStatCountersServer:
     public virtual CAggInterfaceServer
 {
     // storage for the counters
-    CfgPtr m_pCfg;
+    std::hashmap< gint32, guint32 > m_mapCounters;
 
     // message filter for message counter
     TaskletPtr m_pMsgFilter;
 
-    gint32 IncMsgCount(
+    gint32 IncCounter(
         EnumPropId iProp, bool bMinus );
 
+    CStdRMutex m_oStatLock;
     public:
     typedef CAggInterfaceServer super;
     CStatCountersServer( const IConfigDb* pCfg )
@@ -89,10 +91,14 @@ class CStatCountersServer:
     virtual gint32 OnPreStart( IEventSink* pCallback );
     virtual gint32 OnPostStop( IEventSink* pCallback );
 
-    gint32 IncMsgCount( EnumPropId iProp );
-    gint32 DecMsgCount( EnumPropId iProp );
+    gint32 IncCounter( EnumPropId iProp );
+    gint32 DecCounter( EnumPropId iProp );
 
-    gint32 IncMsgOutCount();
+    gint32 SetCounter(
+        EnumPropId iProp, guint32 dwVal );
+
+    gint32 GetCounter2( 
+        EnumPropId iPropId, guint32& dwVal  );
 
     gint32 GetCounters(
         IEventSink* pCallback,
@@ -126,7 +132,7 @@ class CMessageCounterTask :
         if( ERROR( ret ) )
             return 0;
 
-        return pIf->IncMsgCount( propMsgCount );
+        return pIf->IncCounter( propMsgCount );
     }
 
     virtual gint32 FilterMsgIncoming(
@@ -156,22 +162,11 @@ class CMessageCounterTask :
         if( ERROR( ret ) )
             return 0;
 
-        return pIf->IncMsgCount( propMsgRespCount );
+        return pIf->IncCounter( propMsgRespCount );
     }
 
     virtual gint32 FilterMsgOutgoing(
-        IEventSink* pReqTask, DBusMessage* pMsg )
-    {
-        CCfgOpenerObj oTaskCfg( this );    
-        CStatCountersServer* pIf = nullptr;
-
-        gint32 ret = oTaskCfg.GetPointer(
-            propIfPtr, pIf );
-        if( ERROR( ret ) )
-            return 0;
-
-        return pIf->IncMsgCount( propMsgOutCount );
-    }
+        IEventSink* pReqTask, DBusMessage* pMsg );
 
     virtual gint32 Process( guint32 dwContext )
     { return 0; }

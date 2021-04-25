@@ -316,6 +316,9 @@ class CRpcInterfaceServer :
     virtual gint32 OnKeepAlive(
         IEventSink* pInvokeTask,
         EnumKAPhase bOrigin );
+
+    virtual gint32 OnPreStart(
+        IEventSink* pContext ) override;
 };
 
 class CRpcReqForwarder :
@@ -754,8 +757,6 @@ struct CRpcTcpBridgeShared
 
     protected:
     CRpcServices* m_pParentIf;
-    guint32     m_dwWndSize = DEFAULT_WNDSIZE;
-    guint32     m_dwCurWndSize = DEFAULT_WNDSIZE;
 
     gint32 ReadWriteStream(
         gint32 iStreamId,
@@ -902,7 +903,7 @@ class CRpcTcpBridge :
     public:
 
     virtual gint32 OnPostStart(
-        IEventSink* pContext );
+        IEventSink* pContext ) override;
 
     typedef CRpcInterfaceServer super;
     CRpcTcpBridge( const IConfigDb* pCfg );

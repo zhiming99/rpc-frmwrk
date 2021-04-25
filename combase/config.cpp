@@ -501,11 +501,8 @@ gint32 CParamList::Push< BufPtr& > ( BufPtr& val  )
             break;
         }
 
-        BufPtr pBuf;
         try{
-            pBuf = val;
-            ret = GetCfg()->SetProperty(
-                iPos, pBuf );
+            ret = GetCfg()->SetProperty( iPos, val );
 
             if( SUCCEEDED( ret ) )
                 SetCount( iPos + 1 );
@@ -532,10 +529,9 @@ gint32 CParamList::Push< const BufPtr& > ( const BufPtr& val  )
             break;
         }
 
-        BufPtr pBuf = const_cast< BufPtr& >( val );
+        BufPtr pBuf;
         try{
-
-            pBuf = val;
+            pBuf = const_cast< BufPtr& >( val );
             ret = GetCfg()->SetProperty(
                 iPos, pBuf );
 
