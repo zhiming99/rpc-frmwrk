@@ -51,7 +51,7 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 ---
 [`Sun Apr 25 2021 03:07:27 PM Beijing`]
 1. The flow control turns out to be big and need some preparations before I can start. So I will first get the GUI config tool done, and at the same time, make some preparations for the flow control.
-2. With the aide from GUI config tool and ridl, you can easily deploy the `rpc-frmwrk` and start the development of your `hello, world` application in C++. That will be the next release of `rpc-frwmrk`.
+2. With the aide from GUI config tool and ridl, you can easily deploy the `rpc-frmwrk` and start the development of your `hello, world` application in C++. That will be the first official release of `rpc-frwmrk`.
 
 [`Mon Apr 19 2021 02:14:36 PM Beijing`]   
 1. Win10 hosted `Ubuntu` is a nightmare, and the filesystem is so fragile to sustain a single unexpected shutdown or system crash. Switched to `Fedora-33` for luck.
