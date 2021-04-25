@@ -40,12 +40,13 @@ This framework depends on the following packags to build:
 Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60) for details.
 
 #### Todo:
-1. Java support
-2. Examples and Tutorials
-3. GUI for configuration and monitoring
-4. Access Control
-5. A tree-like hierarchical persistant registry.
-6. Logging service
+1. GUI config tools 
+2. Better flow control
+3. Java support
+4. Examples and Tutorials
+5. Access Control
+6. A tree-like hierarchical persistant registry.
+7. Logging service
 
 ---
 [`Mon Apr 19 2021 02:14:36 PM Beijing`]   
