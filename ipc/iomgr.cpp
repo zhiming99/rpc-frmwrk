@@ -1718,13 +1718,21 @@ CIoManager::CIoManager( const std::string& strModName ) :
         // get the libcombase.so's path
         ret = GetLibPath( strPath );
         if( SUCCEEDED( ret ) )
+        {
             ( *psetPaths )().insert( strPath );
+            stdstr strTestLibs = strPath + "/rpcf";
+            ( *psetPaths )().insert( strTestLibs );
+        }
 
         // get the executable's path
         strPath.clear();
         ret = GetModulePath( strPath ); 
         if( SUCCEEDED( ret ) )
+        {
             ( *psetPaths )().insert( strPath );
+            stdstr strTestBins = strPath + "/rpcf";
+            ( *psetPaths )().insert( strTestBins );
+        }
 
         if( ( *psetPaths)().empty() )
         {

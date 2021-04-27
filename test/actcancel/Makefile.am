@@ -2,14 +2,15 @@ include_ipcdir=$(top_srcdir)/ipc
 actc_LDFLAGS=@TSTLDFLG@
 actc_CPPFLAGS= -I$(include_ipcdir)
 
-lib_LTLIBRARIES=libactc.la
+libactc_LTLIBRARIES=libactc.la
+libactcdir=$(libdir)/rpcf
 libactc_la_SOURCES = actcsvr.cpp actcli.cpp actcsvr.h
 libactc_la_LDFLAGS=-version-info @VERSION2@
 libactc_la_LIBADD= $(actc_LDFLAGS) -lpthread -ldl
 libactc_la_CPPFLAGS=$(actc_CPPFLAGS)
 
 actctst_PROGRAMS=actcsvrtst actclitst
-actctstdir=$(bindir)
+actctstdir=$(bindir)/rpcf
 
 actclitst_DATA= actcdesc.json
 actclitstdir=$(sysconfdir)/rpcf

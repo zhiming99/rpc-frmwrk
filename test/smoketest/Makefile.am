@@ -3,7 +3,7 @@ smktest_LDFLAGS=@TSTLDFLG@
 smktest_CPPFLAGS= -I$(include_ipcdir)
 
 smktest_PROGRAMS=smoketest
-smktestdir=$(bindir)
+smktestdir=$(bindir)/rpcf
 
 smoketest_SOURCES= main.cpp
 smoketest_LDADD=$(smktest_LDFLAGS)

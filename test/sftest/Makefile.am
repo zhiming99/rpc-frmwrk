@@ -2,14 +2,15 @@ include_ipcdir=$(top_srcdir)/ipc
 sftest_LDFLAGS=@TSTLDFLG@
 sftest_CPPFLAGS= -I$(include_ipcdir)
 
-lib_LTLIBRARIES= libsfsvr.la
+libsfsvr_LTLIBRARIES= libsfsvr.la
+libsfsvrdir=$(libdir)/rpcf
 libsfsvr_la_SOURCES = sfsvr.cpp sfcli.cpp sfsvr.h
 libsfsvr_la_LDFLAGS=-version-info @VERSION2@
 libsfsvr_la_LIBADD= $(sftest_LDFLAGS) -lpthread -ldl
 libsfsvr_la_CPPFLAGS=$(sftest_CPPFLAGS)
 
 sftest_PROGRAMS= sfsvrtst sfclitst
-sftestdir=$(bindir)
+sftestdir=$(bindir)/rpcf
 
 sfclitst_DATA= sfdesc.json
 sfclitstdir=$(sysconfdir)/rpcf

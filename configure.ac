@@ -160,8 +160,8 @@ AC_SUBST([CXXFLAGS])
 
 AC_DEFINE(_GNU_SOURCE, 1,[GNU non-portable features])
 
-AC_SUBST( TSTLDFLG, '-lipc -lcombase -lstdc++ -lcppunit \
--L$(top_srcdir)/3rd_party -L$(top_srcdir)/combase -L$(top_srcdir)/ipc ${COMMON_LINK}' )
+AC_SUBST( TSTLDFLG, '-lipc -lcombase -lstdc++ -lcppunit -L$(libdir) \
+-L$(libdir)/rpcf  ${COMMON_LINK}' )
 
 PKG_PROG_PKG_CONFIG
 PKG_INSTALLDIR
@@ -176,6 +176,7 @@ AC_CONFIG_FILES([Makefile
                  rpc/security/Makefile
                  rpc/router/Makefile
                  ridl/Makefile
+                 tools/Makefile
                  3rd_party/Makefile
                  python/Makefile
                  test/Makefile

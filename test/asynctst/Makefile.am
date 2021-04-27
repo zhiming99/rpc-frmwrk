@@ -2,14 +2,15 @@ include_ipcdir=$(top_srcdir)/ipc
 async_LDFLAGS=@TSTLDFLG@
 async_CPPFLAGS= -I$(include_ipcdir)
 
-lib_LTLIBRARIES=libascsvr.la
+libascsvr_LTLIBRARIES=libascsvr.la
+libascsvrdir=$(libdir)/rpcf
 libascsvr_la_SOURCES = asyncsvr.cpp asyncli.cpp
 libascsvr_la_LDFLAGS=-version-info @VERSION2@
 libascsvr_la_LIBADD= $(async_LDFLAGS) -lpthread -ldl
 libascsvr_la_CPPFLAGS=$(async_CPPFLAGS)
 
 asynctst_PROGRAMS=asyncsvrtst asynclitst
-asynctstdir=$(bindir)
+asynctstdir=$(bindir)/rpcf
 
 asynclitst_DATA= asyndesc.json
 asynclitstdir=$(sysconfdir)/rpcf

@@ -2,14 +2,15 @@ include_ipcdir=$(top_srcdir)/ipc
 iftest_LDFLAGS=@TSTLDFLG@
 iftest_CPPFLAGS= -I$(include_ipcdir)
 
-lib_LTLIBRARIES=libecho.la
+libecho_LTLIBRARIES=libecho.la
+libechodir=$(libdir)/rpcf
 libecho_la_SOURCES = ifsvr.cpp ifclient.cpp ifsvr.h
 libecho_la_LDFLAGS=-version-info @VERSION2@
 libecho_la_LIBADD=$(iftest_LDFLAGS) -lpthread -ldl
 libecho_la_CPPFLAGS=$(iftest_CPPFLAGS)
 
 iftest_PROGRAMS=ifsvrsmk ifclismk
-iftestdir=$(bindir)
+iftestdir=$(bindir)/rpcf
 
 ifclismk_DATA= echodesc.json
 ifclismkdir=$(sysconfdir)/rpcf
