@@ -7,6 +7,91 @@ from gi.repository import Gtk
 
 def LoadConfigFiles() :
     dir_path = os.path.dirname(os.path.realpath(__file__))
+    paths = list()
+    curDir = dir_path;
+    paths.append( curDir + "/../../etc/rpcf" )
+    paths.append( "/etc/rpcf")
+
+    paths.append( curDir + "/../ipc" )
+    paths.append( curDir + "/../rpc/router" )
+    paths.append( curDir + "/../rpc/security" )
+    
+    jsonvals = list()
+    for strPath in paths :
+        try:
+            drvfile = strPath + "/driver.json"
+            fp = open( drvfile, "r" )
+            jsonvals.append( [drvfile, json.load(fp) ] )
+            fp.close()
+        except OSError as err :
+            pass
+        try:
+            rtfile = strPath + "/router.json"
+            fp = open( rtfile, "r" )
+            jsonvals.append( [rtfile, json.load(fp)] )
+            fp.close()
+        except OSError as err :
+            pass
+
+        try:
+            rtaufile = strPath + "/rtauth.json"
+            fp = open( rtaufile, "r" )
+            jsonvals.append( [rtaufile, json.load(fp)])
+            fp.close()
+        except OSError as err :
+            pass
+        
+        try:
+            auprxyfile = strPath + "/authprxy.json"
+            fp = open( auprxyfile, "r" )
+            jsonvals.append( [auprxyfile, json.load(fp)] )
+            fp.close()
+        except OSError as err :
+            pass            
+
+
+    return jsonvals
+
+def RetrieveInfo() :
+    confVals = dict()
+    jsonFiles = LoadConfigFiles()
+    if len( jsonFiles ) == 0 :
+        return
+    drvVal = jsonFiles[ 0 ][1]
+    ports = drvVal['Ports']
+    for port in ports :
+        if port[ 'PortClass'] == 'RpcOpenSSLFido' :
+            sslFiles = port[ 'Parameters']
+            if sslFiles is None :
+                continue
+            confVals["keyFile"] = sslFiles[ "KeyFile"]
+            confVals["certFile"] = sslFiles[ "CertFile"]
+        
+        if port[ 'PortClass'] == 'RpcTcpBusPort' :
+            connParams = port[ 'Parameters']
+            if connParams is None :
+                continue
+            confVals[ "connParams"] = [ *connParams ]
+    rtauVal = jsonFiles[ 2 ][ 1 ]
+    svrObjs = rtauVal[ 'Objects']
+    if svrObjs is not None :
+        for svr in svrObjs :
+            if svr[ 'ObjectName' ] == 'RpcRouterBridgeAuthImpl' :
+                authInfo = svr[ 'AuthInfo']
+                if authInfo is not None :
+                    confVals[ 'authInfo'] = authInfo
+
+    apVal = jsonFiles[ 3 ][ 1 ]
+    proxies = apVal['Objects']
+    if proxies is None :
+        return confVals
+    for proxy in proxies :
+        if proxy[ 'ObjectName'] == 'KdcRelayServer' :
+            if proxy[ 'IpAddress'] is not None :
+                confVals[ 'kdcAddr'] = proxy[ 'IpAddress']
+    
+    return confVals
+    
 
 def GetGridRows(grid):
     rows = 0
@@ -30,6 +115,8 @@ class ConfigDlg(Gtk.Dialog):
         self.add_buttons(
             Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OK, Gtk.ResponseType.OK
         )
+
+        confVals = RetrieveInfo()
         self.set_default_size(500, 660)
         vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
 
@@ -44,7 +131,7 @@ class ConfigDlg(Gtk.Dialog):
         gridNet = Gtk.Grid();
         gridNet.set_row_homogeneous( True )
         gridNet.props.row_spacing = 6
-        self.InitNetworkPage( gridNet, 0, 0 )
+        self.InitNetworkPage( gridNet, 0, 0, confVals )
 
         stack.add_titled(gridNet, "GridConn", "Connection")
 
@@ -61,14 +148,19 @@ class ConfigDlg(Gtk.Dialog):
 
         self.show_all()
 
-    def InitNetworkPage( self, grid:Gtk.Grid, startCol, startRow ) :
+    def InitNetworkPage( self, grid:Gtk.Grid, startCol, startRow, confVals : dict ) :
         labelIp = Gtk.Label()
         labelIp.set_text("ip address: ")
         labelIp.set_xalign(1)
         grid.attach(labelIp, startCol, startRow, 1, 1 )
 
         ipEditBox = Gtk.Entry()
-        ipEditBox.set_text("192.168.0.1")
+        ipAddr = '192.168.0.1'
+        if confVals[ 'connParams'] is not None :
+            param0 = confVals[ 'connParams'][ 0 ]
+            if param0 is not None :
+                ipAddr = param0[ 'BindAddr']
+        ipEditBox.set_text(ipAddr)
         grid.attach(ipEditBox, startCol + 1, startRow + 0, 2, 1 )
 
         labelPort = Gtk.Label()
@@ -76,12 +168,17 @@ class ConfigDlg(Gtk.Dialog):
         labelPort.set_xalign(1)
         grid.attach(labelPort, startCol + 0, startRow + 1, 1, 1 )
 
+        portNum = 4312
+        if confVals[ 'connParams'] is not None :
+            param0 = confVals[ 'connParams'][ 0 ]
+            if param0 is not None :
+                portNum = param0[ 'PortNumber']
         portEditBox = Gtk.Entry()
-        portEditBox.set_text("4132")
+        portEditBox.set_text( portNum )
         grid.attach( portEditBox, startCol + 1, startRow + 1, 1, 1)
 
-        self.AddSSLOptions( grid, startCol + 0, startRow + 2 )
-        self.AddAuthOptions( grid, startCol + 0, startRow + 5 )
+        self.AddSSLOptions( grid, startCol + 0, startRow + 2, confVals )
+        self.AddAuthOptions( grid, startCol + 0, startRow + 5, confVals )
 
         rows = GetGridRows( grid )
         labelCompress = Gtk.Label()
@@ -104,13 +201,20 @@ class ConfigDlg(Gtk.Dialog):
             "toggled", self.on_button_toggled, "WebSock")
         grid.attach( webSockCheck, startCol + 1, rows + 1, 1, 1)
 
-    def AddSSLOptions( self, grid:Gtk.Grid, startCol, startRow ) :
+    def AddSSLOptions( self, grid:Gtk.Grid, startCol, startRow, confVals : dict ) :
         labelSSL = Gtk.Label()
         labelSSL.set_text("SSL: ")
         labelSSL.set_xalign(1)
         grid.attach(labelSSL, startCol, startRow, 1, 1 )
 
         bActive = False
+        if confVals[ 'connParams'] is not None :
+            param0 = confVals[ 'connParams'][ 0 ]
+            if param0 is not None :
+                strSSL = param0[ 'EnableSSL']
+                if strSSL == 'true' :
+                    bActive = True
+
         sslCheck = Gtk.CheckButton(label="")
         sslCheck.set_active( bActive )
         sslCheck.connect(
@@ -123,7 +227,10 @@ class ConfigDlg(Gtk.Dialog):
         grid.attach(labelKey, startCol + 1, startRow + 1, 1, 1 )
 
         keyEditBox = Gtk.Entry()
-        keyEditBox.set_text("./server.key")
+        strKey = ""
+        if confVals[ 'keyFile'] is not None :
+            strKey = confVals[ 'keyFile']
+        keyEditBox.set_text(strKey)
         grid.attach(keyEditBox, startCol + 2, startRow + 1, 1, 1 )
 
         keyBtn = Gtk.Button.new_with_label("...")
@@ -136,7 +243,10 @@ class ConfigDlg(Gtk.Dialog):
         grid.attach(labelCert, startCol + 1, startRow + 2, 1, 1 )
 
         certEditBox = Gtk.Entry()
-        certEditBox.set_text("./server.crt")
+        strCert = ""
+        if confVals[ 'certFile'] is not None :
+            strCert = confVals[ 'certFile']    
+        certEditBox.set_text(strCert)
         grid.attach(certEditBox, startCol + 2, startRow + 2, 1, 1 )
 
         certBtn = Gtk.Button.new_with_label("...")
@@ -209,13 +319,20 @@ class ConfigDlg(Gtk.Dialog):
         filter_any.add_pattern("*")
         dialog.add_filter(filter_any)
 
-    def AddAuthOptions( self, grid:Gtk.Grid, startCol, startRow ) :
+    def AddAuthOptions( self, grid:Gtk.Grid, startCol, startRow, confVals : dict ) :
         labelAuth = Gtk.Label()
         labelAuth.set_text("Auth: ")
         labelAuth.set_xalign(1)
         grid.attach(labelAuth, startCol, startRow, 1, 1 )
 
         bActive = False
+        if confVals[ 'connParams'] is not None :
+            param0 = confVals[ 'connParams'][ 0 ]
+            if param0 is not None :
+                strAuth = param0[ 'HasAuth']
+                if strAuth == 'true' :
+                    bActive = True
+
         authCheck = Gtk.CheckButton(label="")
         authCheck.set_active( bActive )
         authCheck.connect(
@@ -242,8 +359,13 @@ class ConfigDlg(Gtk.Dialog):
         labelSvc.set_xalign(.618)
         grid.attach(labelSvc, startCol + 1, startRow + 3, 1, 1 )
 
+        strSvc = ""
+        if confVals[ 'authInfo'] is not None :
+            authInfo = confVals[ 'authInfo']
+            if authInfo[ 'ServiceName'] is not None :
+                strSvc = authInfo[ 'ServiceName']
         svcEditBox = Gtk.Entry()
-        svcEditBox.set_text("")
+        svcEditBox.set_text(strSvc)
         grid.attach(svcEditBox, startCol + 2, startRow + 3, 2, 1 )
 
         labelRealm = Gtk.Label()
@@ -251,14 +373,27 @@ class ConfigDlg(Gtk.Dialog):
         labelRealm.set_xalign(.618)
         grid.attach(labelRealm, startCol + 1, startRow + 4, 1, 1 )
 
+        strRealm = ""
+        if confVals[ 'authInfo'] is not None :
+            authInfo = confVals[ 'authInfo']
+            if authInfo[ 'Realm'] is not None :
+                strRealm = authInfo[ 'Realm']
         realmEditBox = Gtk.Entry()
-        realmEditBox.set_text("")
+        realmEditBox.set_text(strRealm)
         grid.attach(realmEditBox, startCol + 2, startRow + 4, 2, 1 )
 
         labelSign = Gtk.Label()
         labelSign.set_text("Sign/Encrypt: ")
         labelSign.set_xalign(.618)
         grid.attach(labelSign, startCol + 1, startRow + 5, 1, 1 )
+
+        idx = 1
+        if confVals[ 'authInfo'] is not None :
+            authInfo = confVals[ 'authInfo']
+            if authInfo[ 'SignMessage'] is not None :
+                strSign = authInfo[ 'ServiceName']
+                if strSign == 'true' :
+                    idx = 0
 
         signMethod = Gtk.ListStore()
         signMethod = Gtk.ListStore(int, str)
@@ -268,7 +403,7 @@ class ConfigDlg(Gtk.Dialog):
         signCombo = Gtk.ComboBox.new_with_model_and_entry(signMethod)
         signCombo.connect("changed", self.on_sign_msg_changed)
         signCombo.set_entry_text_column(1)
-        signCombo.set_active(1)
+        signCombo.set_active(idx)
 
         grid.attach( signCombo, startCol + 2, startRow + 5, 1, 1 )
 
@@ -277,8 +412,12 @@ class ConfigDlg(Gtk.Dialog):
         labelKdc.set_xalign(.618)
         grid.attach(labelKdc, startCol + 1, startRow + 6, 1, 1 )
 
+        strKdcIp = ""
+        if confVals[ 'kdcAddr'] is not None :
+            strKdcIp = confVals[ 'kdcAddr']
+
         kdcEditBox = Gtk.Entry()
-        kdcEditBox.set_text("")
+        kdcEditBox.set_text(strKdcIp)
         grid.attach(kdcEditBox, startCol + 2, startRow + 6, 2, 1 )
 
         self.svcEdit = svcEditBox
