@@ -94,7 +94,7 @@ def RetrieveInfo() :
     
     return confVals    
 
-def GetGridRows(grid):
+def GetGridRows(grid: Gtk.Grid):
     rows = 0
     for child in grid.get_children():
         x = grid.child_get_property(child, 'top-attach')
@@ -102,7 +102,7 @@ def GetGridRows(grid):
         rows = max(rows, x+height)
     return rows
 
-def GetGridCols(grid):
+def GetGridCols(grid: Gtk.Grid):
     cols = 0
     for child in grid.get_children():
         x = grid.child_get_property(child, 'left-attach')
@@ -110,6 +110,32 @@ def GetGridCols(grid):
         cols = max(cols, x+width)
     return cols
 
+class InterfaceContext :
+    def __init__(self, ifNo ):
+        self.ifNo = ifNo
+        self.startRow = 0
+        self.rowCount = 0
+        self.Clear()
+
+    def Clear( self ) :
+        self.ipAddr = None
+        self.port = None
+        self.compress = None
+        self.webSock = None
+        self.urlEdit = None
+        self.certEdit = None
+        self.keyEdit = None
+        self.sslCheck = None
+        self.svcEdit = None
+        self.realmEdit = None
+        self.signCombo = None
+        self.kdcEdit = None
+        self.startRow = 0
+        self.rowCount = 0
+    
+    def IsEmpty( self ) :
+        return self.ipAddr is None
+        
 class ConfigDlg(Gtk.Dialog):
     def __init__(self, bServer):
         Gtk.Dialog.__init__(self, title="Config RPC Server Router", flags=0)
@@ -120,6 +146,14 @@ class ConfigDlg(Gtk.Dialog):
             self.get_header_bar().set_title( "Config RPC Proxy Router" )
 
         confVals = RetrieveInfo()
+        self.confVals = confVals
+        self.ifctx = []
+        try:
+            ifCount = len( confVals[ 'connParams'] )
+            for i in range( ifCount ) :
+                self.ifctx.append( InterfaceContext(i) )
+        except Exception as err :
+            pass
 
         vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
 
@@ -130,7 +164,14 @@ class ConfigDlg(Gtk.Dialog):
         gridNet = Gtk.Grid();
         gridNet.set_row_homogeneous( True )
         gridNet.props.row_spacing = 6
-        self.InitNetworkPage( gridNet, 0, 0, confVals )
+        i = 0
+        for interf in self.ifctx :
+            row = GetGridRows( gridNet )
+            interf.startRow = row
+            self.InitNetworkPage( gridNet, 0, row, confVals, i )
+            interf.rowCount = GetGridRows( gridNet ) - row
+            i += 1
+        self.gridNet = gridNet
 
         stack.add_titled(gridNet, "GridConn", "Connection")
 
@@ -156,9 +197,27 @@ class ConfigDlg(Gtk.Dialog):
         box = self.get_content_area()
         box.add(vbox)
         self.show_all()
-        self.confVals = confVals
+ 
 
     def InitNetworkPage( self, grid:Gtk.Grid, startCol, startRow, confVals : dict, ifNo = 0 ) :
+        row = GetGridRows( grid )
+        if self.bServer :
+            labelIfNo = Gtk.Label()
+            strIfNo = "Interface " + str( ifNo ) + " :"
+            labelIfNo.set_text( strIfNo )
+            grid.attach(labelIfNo, startCol, startRow, 1, 1 )
+            if ifNo > 0 :
+                removeBtn = Gtk.Button.new_with_label("Remove interface")
+                removeBtn.ifNo = ifNo
+                removeBtn.connect("clicked", self.on_remove_if_clicked)
+                grid.attach(removeBtn, startCol + 2, startRow, 1, 1 )
+            else :
+                addBtn = Gtk.Button.new_with_label("Add interface")
+                addBtn.connect("clicked", self.on_add_if_clicked)
+                grid.attach(addBtn, startCol + 2, startRow, 1, 1 )
+
+            startRow = GetGridRows( grid )
+        
         labelIp = Gtk.Label()
         if self.bServer :
             labelIp.set_text("Binding IP: ")
@@ -169,14 +228,17 @@ class ConfigDlg(Gtk.Dialog):
         grid.attach(labelIp, startCol, startRow, 1, 1 )
 
         ipEditBox = Gtk.Entry()
-        ipAddr = '192.168.0.1'
-        if confVals[ 'connParams'] is not None :
-            param0 = confVals[ 'connParams'][ ifNo ]
-            if param0 is not None :
-                ipAddr = param0[ 'BindAddr']
+        ipAddr = ''
+        try:
+            if confVals[ 'connParams'] is not None :
+                param0 = confVals[ 'connParams'][ ifNo ]
+                if param0 is not None :
+                    ipAddr = param0[ 'BindAddr']
+        except Exception as err :
+            pass
         ipEditBox.set_text(ipAddr)
         grid.attach(ipEditBox, startCol + 1, startRow + 0, 2, 1 )
-        self.ipAddr = ipEditBox
+        self.ifctx[ ifNo ].ipAddr = ipEditBox
 
         labelPort = Gtk.Label()
         if self.bServer :
@@ -188,14 +250,17 @@ class ConfigDlg(Gtk.Dialog):
         grid.attach(labelPort, startCol + 0, startRow + 1, 1, 1 )
 
         portNum = 4312
-        if confVals[ 'connParams'] is not None :
-            param0 = confVals[ 'connParams'][ ifNo ]
-            if param0 is not None :
-                portNum = param0[ 'PortNumber']
+        try:
+            if confVals[ 'connParams'] is not None :
+                param0 = confVals[ 'connParams'][ ifNo ]
+                if param0 is not None :
+                    portNum = param0[ 'PortNumber']
+        except Exception as err :
+            pass                
         portEditBox = Gtk.Entry()
-        portEditBox.set_text( portNum )
+        portEditBox.set_text( str( portNum ) )
         grid.attach( portEditBox, startCol + 1, startRow + 1, 1, 1)
-        self.port = portEditBox
+        self.ifctx[ ifNo ].port = portEditBox
 
         self.AddSSLOptions( grid, startCol + 0, startRow + 2, confVals, ifNo )
         self.AddAuthOptions( grid, startCol + 0, startRow + 5, confVals, ifNo )
@@ -212,8 +277,9 @@ class ConfigDlg(Gtk.Dialog):
         compressCheck = Gtk.CheckButton(label="")
         compressCheck.connect(
             "toggled", self.on_button_toggled, "Compress")
+        compressCheck.ifNo = ifNo
         grid.attach( compressCheck, startCol + 1, rows, 1, 1)
-        self.compress = compressCheck
+        self.ifctx[ ifNo ].compress = compressCheck
 
     def AddWebSockOptions( self, grid:Gtk.Grid, startCol, startRow, confVals : dict, ifNo = 0 ) :
         labelWebSock = Gtk.Label()
@@ -235,8 +301,9 @@ class ConfigDlg(Gtk.Dialog):
         webSockCheck = Gtk.CheckButton(label="")
         webSockCheck.connect(
             "toggled", self.on_button_toggled, "WebSock")
+        webSockCheck.ifNo = ifNo
         grid.attach( webSockCheck, startCol + 1, startRow + 0, 1, 1)
-        self.webSock = webSockCheck
+        self.ifctx[ ifNo ].webSock = webSockCheck
 
         labelUrl = Gtk.Label()
         labelUrl.set_text("WebSocket URL: ")
@@ -256,8 +323,7 @@ class ConfigDlg(Gtk.Dialog):
         urlEdit.set_sensitive( bActive )
         grid.attach(urlEdit, startCol + 2, startRow + 1, 1, 1 )
 
-        self.urlEdit = urlEdit
-        self.webSock = webSockCheck
+        self.ifctx[ ifNo ].urlEdit = urlEdit
 
     def AddSSLOptions( self, grid:Gtk.Grid, startCol, startRow, confVals : dict, ifNo = 0 ) :
         labelSSL = Gtk.Label()
@@ -266,17 +332,21 @@ class ConfigDlg(Gtk.Dialog):
         grid.attach(labelSSL, startCol, startRow, 1, 1 )
 
         bActive = False
-        if confVals[ 'connParams'] is not None :
-            param0 = confVals[ 'connParams'][ ifNo ]
-            if param0 is not None :
-                strSSL = param0[ 'EnableSSL']
-                if strSSL == 'true' :
-                    bActive = True
+        try:
+            if confVals[ 'connParams'] is not None :
+                param0 = confVals[ 'connParams'][ ifNo ]
+                if param0 is not None :
+                    strSSL = param0[ 'EnableSSL']
+                    if strSSL == 'true' :
+                        bActive = True
+        except Exception as err :
+            pass
 
         sslCheck = Gtk.CheckButton(label="")
         sslCheck.set_active( bActive )
         sslCheck.connect(
             "toggled", self.on_button_toggled, "SSL")
+        sslCheck.ifNo = ifNo
         grid.attach( sslCheck, startCol + 1, startRow, 1, 1 )
 
         labelKey = Gtk.Label()
@@ -286,13 +356,17 @@ class ConfigDlg(Gtk.Dialog):
 
         keyEditBox = Gtk.Entry()
         strKey = ""
-        if confVals[ 'keyFile'] is not None :
-            strKey = confVals[ 'keyFile']
+        try:
+            if confVals[ 'keyFile'] is not None :
+                strKey = confVals[ 'keyFile']
+        except Exception as err :
+            pass            
         keyEditBox.set_text(strKey)
         grid.attach(keyEditBox, startCol + 2, startRow + 1, 1, 1 )
 
         keyBtn = Gtk.Button.new_with_label("...")
         keyBtn.connect("clicked", self.on_choose_key_clicked)
+        keyBtn.ifNo = ifNo
         grid.attach(keyBtn, startCol + 3, startRow + 1, 1, 1 )
 
         labelCert = Gtk.Label()
@@ -302,13 +376,18 @@ class ConfigDlg(Gtk.Dialog):
 
         certEditBox = Gtk.Entry()
         strCert = ""
-        if confVals[ 'certFile'] is not None :
-            strCert = confVals[ 'certFile']    
+        
+        try:
+            if confVals[ 'certFile'] is not None :
+                strCert = confVals[ 'certFile']    
+        except Exception as err :
+            pass    
         certEditBox.set_text(strCert)
         grid.attach(certEditBox, startCol + 2, startRow + 2, 1, 1 )
 
         certBtn = Gtk.Button.new_with_label("...")
         certBtn.connect("clicked", self.on_choose_cert_clicked)
+        certBtn.ifNo = ifNo
         grid.attach(certBtn, startCol + 3, startRow + 2, 1, 1 )
 
         keyEditBox.set_sensitive( bActive )
@@ -316,9 +395,9 @@ class ConfigDlg(Gtk.Dialog):
         keyBtn.set_sensitive( bActive )
         certBtn.set_sensitive( bActive )
 
-        self.certEdit = certEditBox
-        self.keyEdit = keyEditBox
-        self.sslCheck = sslCheck
+        self.ifctx[ ifNo ].certEdit = certEditBox
+        self.ifctx[ ifNo ].keyEdit = keyEditBox
+        self.ifctx[ ifNo ].sslCheck = sslCheck
         sslCheck.keyBtn = keyBtn
         sslCheck.certBtn = certBtn
         keyBtn.editBox = keyEditBox
@@ -327,26 +406,27 @@ class ConfigDlg(Gtk.Dialog):
 
     def on_button_toggled( self, button, name ):
         print( name )
+        ifNo = button.ifNo
         if name == 'SSL' :
-            if self.webSock.props.active and not button.props.active :
+            if self.ifctx[ ifNo ].webSock.props.active and not button.props.active :
                 button.props.active = True
                 return
-            self.certEdit.set_sensitive( button.props.active )
-            self.keyEdit.set_sensitive( button.props.active )
+            self.ifctx[ ifNo ].certEdit.set_sensitive( button.props.active )
+            self.ifctx[ ifNo ].keyEdit.set_sensitive( button.props.active )
             button.certBtn.set_sensitive( button.props.active )
             button.keyBtn.set_sensitive( button.props.active )
         elif name == 'Auth' :
-            self.svcEdit.set_sensitive( button.props.active )
-            self.realmEdit.set_sensitive( button.props.active )
-            self.signCombo.set_sensitive( button.props.active )
-            self.kdcEdit.set_sensitive( button.props.active )
+            self.ifctx[ ifNo ].svcEdit.set_sensitive( button.props.active )
+            self.ifctx[ ifNo ].realmEdit.set_sensitive( button.props.active )
+            self.ifctx[ ifNo ].signCombo.set_sensitive( button.props.active )
+            self.ifctx[ ifNo ].kdcEdit.set_sensitive( button.props.active )
         elif name == 'WebSock' :
-            self.urlEdit.set_sensitive( button.props.active )
-            if not self.webSock.props.active :
+            self.ifctx[ ifNo ].urlEdit.set_sensitive( button.props.active )
+            if not self.ifctx[ ifNo ].webSock.props.active :
                 return
-            self.certEdit.set_sensitive( button.props.active )
-            self.keyEdit.set_sensitive( button.props.active )
-            self.sslCheck.set_active(button.props.active)
+            self.ifctx[ ifNo ].certEdit.set_sensitive( button.props.active )
+            self.ifctx[ ifNo ].keyEdit.set_sensitive( button.props.active )
+            self.ifctx[ ifNo ].sslCheck.set_active(button.props.active)
             button.certBtn.set_sensitive( button.props.active )
             button.keyBtn.set_sensitive( button.props.active )
 
@@ -355,6 +435,27 @@ class ConfigDlg(Gtk.Dialog):
 
     def on_choose_cert_clicked( self, button ) :
         self.on_choose_file_clicked( button, False )
+
+    def on_remove_if_clicked( self, button ) :
+        ifNo = button.ifNo
+        interf = self.ifctx[ ifNo ]
+        for i in range( interf.rowCount ) :
+            self.gridNet.remove_row( interf.startRow )
+        for elem in self.ifctx :
+            if elem.ifNo > ifNo and not elem.IsEmpty():
+                elem.startRow -= interf.rowCount
+        interf.Clear()
+
+    def on_add_if_clicked( self, button ) :
+        interf = InterfaceContext( len( self.ifctx) )
+        self.ifctx.append( interf )
+        startRow = GetGridRows( self.gridNet )
+        interf.startRow = startRow        
+        self.InitNetworkPage( self.gridNet,
+            0, startRow, self.confVals, interf.ifNo )
+        interf.rowCount = GetGridRows( self.gridNet ) - startRow
+        print( "%d, %d" % (interf.rowCount, interf.startRow) )
+        self.gridNet.show_all()
 
     def on_choose_file_clicked( self, button, bKey:bool ) :
         dialog = Gtk.FileChooserDialog(
@@ -397,17 +498,21 @@ class ConfigDlg(Gtk.Dialog):
         grid.attach(labelAuth, startCol, startRow, 1, 1 )
 
         bActive = False
-        if confVals[ 'connParams'] is not None :
-            param0 = confVals[ 'connParams'][ ifNo ]
-            if param0 is not None :
-                strAuth = param0[ 'HasAuth']
-                if strAuth == 'true' :
-                    bActive = True
+        try:
+            if confVals[ 'connParams'] is not None :
+                param0 = confVals[ 'connParams'][ ifNo ]
+                if param0 is not None :
+                    strAuth = param0[ 'HasAuth']
+                    if strAuth == 'true' :
+                        bActive = True
+        except Exception as err :
+            pass
 
         authCheck = Gtk.CheckButton(label="")
         authCheck.set_active( bActive )
         authCheck.connect(
             "toggled", self.on_button_toggled, "Auth")
+        authCheck.ifNo = ifNo
         grid.attach( authCheck, startCol + 1, startRow, 1, 1 )
 
         labelMech = Gtk.Label()
@@ -431,10 +536,14 @@ class ConfigDlg(Gtk.Dialog):
         grid.attach(labelSvc, startCol + 1, startRow + 3, 1, 1 )
 
         strSvc = ""
-        if confVals[ 'authInfo'] is not None :
-            authInfo = confVals[ 'authInfo']
-            if authInfo[ 'ServiceName'] is not None :
-                strSvc = authInfo[ 'ServiceName']
+        try:
+            if confVals[ 'authInfo'] is not None :
+                authInfo = confVals[ 'authInfo']
+                if authInfo[ 'ServiceName'] is not None :
+                    strSvc = authInfo[ 'ServiceName']
+        except Exception as err :
+            pass
+
         svcEditBox = Gtk.Entry()
         svcEditBox.set_text(strSvc)
         grid.attach(svcEditBox, startCol + 2, startRow + 3, 2, 1 )
@@ -445,10 +554,13 @@ class ConfigDlg(Gtk.Dialog):
         grid.attach(labelRealm, startCol + 1, startRow + 4, 1, 1 )
 
         strRealm = ""
-        if confVals[ 'authInfo'] is not None :
-            authInfo = confVals[ 'authInfo']
-            if authInfo[ 'Realm'] is not None :
-                strRealm = authInfo[ 'Realm']
+        try:
+            if confVals[ 'authInfo'] is not None :
+                authInfo = confVals[ 'authInfo']
+                if authInfo[ 'Realm'] is not None :
+                    strRealm = authInfo[ 'Realm']
+        except Exception as err :
+            pass
         realmEditBox = Gtk.Entry()
         realmEditBox.set_text(strRealm)
         grid.attach(realmEditBox, startCol + 2, startRow + 4, 2, 1 )
@@ -459,12 +571,15 @@ class ConfigDlg(Gtk.Dialog):
         grid.attach(labelSign, startCol + 1, startRow + 5, 1, 1 )
 
         idx = 1
-        if confVals[ 'authInfo'] is not None :
-            authInfo = confVals[ 'authInfo']
-            if authInfo[ 'SignMessage'] is not None :
-                strSign = authInfo[ 'ServiceName']
-                if strSign == 'true' :
-                    idx = 0
+        try:
+            if confVals[ 'authInfo'] is not None :
+                authInfo = confVals[ 'authInfo']
+                if authInfo[ 'SignMessage'] is not None :
+                    strSign = authInfo[ 'ServiceName']
+                    if strSign == 'true' :
+                        idx = 0
+        except Exception as err :
+            pass
 
         signMethod = Gtk.ListStore()
         signMethod = Gtk.ListStore(int, str)
@@ -473,6 +588,7 @@ class ConfigDlg(Gtk.Dialog):
 
         signCombo = Gtk.ComboBox.new_with_model_and_entry(signMethod)
         signCombo.connect("changed", self.on_sign_msg_changed)
+        signCombo.ifNo = ifNo
         signCombo.set_entry_text_column(1)
         signCombo.set_active(idx)
 
@@ -484,17 +600,20 @@ class ConfigDlg(Gtk.Dialog):
         grid.attach(labelKdc, startCol + 1, startRow + 6, 1, 1 )
 
         strKdcIp = ""
-        if confVals[ 'kdcAddr'] is not None :
-            strKdcIp = confVals[ 'kdcAddr']
+        try:
+            if confVals[ 'kdcAddr'] is not None :
+                strKdcIp = confVals[ 'kdcAddr']
+        except Exception as err :
+            pass
 
         kdcEditBox = Gtk.Entry()
         kdcEditBox.set_text(strKdcIp)
         grid.attach(kdcEditBox, startCol + 2, startRow + 6, 2, 1 )
 
-        self.svcEdit = svcEditBox
-        self.realmEdit = realmEditBox
-        self.signCombo = signCombo
-        self.kdcEdit = kdcEditBox
+        self.ifctx[ ifNo ].svcEdit = svcEditBox
+        self.ifctx[ ifNo ].realmEdit = realmEditBox
+        self.ifctx[ ifNo ].signCombo = signCombo
+        self.ifctx[ ifNo ].kdcEdit = kdcEditBox
 
         svcEditBox.set_sensitive( authCheck.props.active )
         realmEditBox.set_sensitive( authCheck.props.active )
