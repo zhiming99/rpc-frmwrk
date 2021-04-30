@@ -1,6 +1,7 @@
 import gi
 import json
-import os 
+import os
+import sys 
 
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk
@@ -52,47 +53,6 @@ def LoadConfigFiles() :
 
     return jsonvals
 
-def RetrieveInfo() :
-    confVals = dict()
-    jsonFiles = LoadConfigFiles()
-    if len( jsonFiles ) == 0 :
-        return
-    drvVal = jsonFiles[ 0 ][1]
-    ports = drvVal['Ports']
-    for port in ports :
-        if port[ 'PortClass'] == 'RpcOpenSSLFido' :
-            sslFiles = port[ 'Parameters']
-            if sslFiles is None :
-                continue
-            confVals["keyFile"] = sslFiles[ "KeyFile"]
-            confVals["certFile"] = sslFiles[ "CertFile"]
-        
-        if port[ 'PortClass'] == 'RpcTcpBusPort' :
-            connParams = port[ 'Parameters']
-            if connParams is None :
-                continue
-            confVals[ "connParams"] = [ *connParams ]
-
-    apVal = jsonFiles[ 3 ][ 1 ]
-    proxies = apVal['Objects']
-    if proxies is None :
-        return confVals
-
-    for proxy in proxies :
-        if proxy[ 'ObjectName'] == 'KdcRelayServer' :
-            try:
-                if proxy[ 'IpAddress'] is not None :
-                    confVals[ 'kdcAddr'] = proxy[ 'IpAddress']
-            except Exception as err :
-                pass
-        if proxy[ 'ObjectName'] == 'KdcChannel' :
-            try:
-                authInfo = proxy[ 'AuthInfo']
-                confVals[ 'authInfo'] = authInfo
-            except Exception as err :
-                pass
-    
-    return confVals    
 
 def GetGridRows(grid: Gtk.Grid):
     rows = 0
@@ -122,14 +82,9 @@ class InterfaceContext :
         self.port = None
         self.compress = None
         self.webSock = None
-        self.urlEdit = None
-        self.certEdit = None
-        self.keyEdit = None
         self.sslCheck = None
-        self.svcEdit = None
-        self.realmEdit = None
-        self.signCombo = None
-        self.kdcEdit = None
+        self.authCheck = None
+        self.urlEdit = None
         self.startRow = 0
         self.rowCount = 0
     
@@ -137,15 +92,69 @@ class InterfaceContext :
         return self.ipAddr is None
         
 class ConfigDlg(Gtk.Dialog):
+
+    def RetrieveInfo( self ) :
+        confVals = dict()
+        jsonFiles = LoadConfigFiles()
+        if len( jsonFiles ) == 0 :
+            return
+        drvVal = jsonFiles[ 0 ][1]
+        ports = drvVal['Ports']
+        for port in ports :
+            try:
+                if port[ 'PortClass'] == 'RpcOpenSSLFido' :
+                    sslFiles = port[ 'Parameters']
+                    if sslFiles is None :
+                        continue
+                    confVals["keyFile"] = sslFiles[ "KeyFile"]
+                    confVals["certFile"] = sslFiles[ "CertFile"]
+                
+                if port[ 'PortClass'] == 'RpcTcpBusPort' :
+                    connParams = port[ 'Parameters']
+                    if connParams is None :
+                        continue
+                    confVals[ "connParams"] = [ *connParams ]
+            except Exception as err :
+                pass
+
+        svrObjs = jsonFiles[ 2 ][ 1 ]
+        if svrObjs is None or len( svrObjs ) == 0 :
+            return confVals
+
+        for svrObj in svrObjs :
+            try:
+                if svrObj[ 'ObjectName'] == 'RpcRouterBridgeAuthImpl' :
+                    confVals[ 'authInfo'] = svrObj[ 'AuthInfo']
+                    break
+            except Exception as err :
+                pass
+        
+        apVal = jsonFiles[ 3 ][ 1 ]
+        proxies = apVal['Objects']
+        if proxies is None :
+            return confVals
+
+        for proxy in proxies :
+            try:
+                if proxy[ 'ObjectName'] == 'KdcRelayServer' :
+                    confVals[ 'kdcAddr'] = proxy[ 'IpAddress']
+                    break
+            except Exception as err :
+                pass
+        self.jsonFiles = jsonFiles
+        return confVals    
+
     def __init__(self, bServer):
         Gtk.Dialog.__init__(self, title="Config RPC Server Router", flags=0)
         self.add_buttons(
-            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OK, Gtk.ResponseType.OK )
+            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+            Gtk.STOCK_OK, Gtk.ResponseType.OK,
+            Gtk.STOCK_SAVE_AS, Gtk.ResponseType.YES )
         self.bServer = bServer
         if not bServer :
             self.get_header_bar().set_title( "Config RPC Proxy Router" )
 
-        confVals = RetrieveInfo()
+        confVals = self.RetrieveInfo()
         self.confVals = confVals
         self.ifctx = []
         try:
@@ -158,14 +167,17 @@ class ConfigDlg(Gtk.Dialog):
         vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
 
         stack = Gtk.Stack()
-        stack.set_transition_type(Gtk.StackTransitionType.SLIDE_LEFT_RIGHT)
+        stack.set_transition_type(Gtk.StackTransitionType.NONE)
         stack.set_transition_duration(1000)
 
         gridNet = Gtk.Grid();
-        gridNet.set_row_homogeneous( True )
+        #gridNet.set_row_homogeneous( True )
         gridNet.props.row_spacing = 6
         i = 0
-        for interf in self.ifctx :
+        #uncomment the following line for multi-if
+        #for interf in self.ifctx :
+        for i in range( 1 ) :
+            interf = self.ifctx[ i ]
             row = GetGridRows( gridNet )
             interf.startRow = row
             self.InitNetworkPage( gridNet, 0, row, confVals, i )
@@ -175,11 +187,12 @@ class ConfigDlg(Gtk.Dialog):
 
         stack.add_titled(gridNet, "GridConn", "Connection")
 
-        label = Gtk.Label()
-        label.set_text("Multihop Downstream Nodes")
-        gridMisc = Gtk.Grid();
-        gridMisc.add(label)
-        stack.add_titled(gridMisc, "GridMisc", "Misc")
+        gridCred = Gtk.Grid()
+        #gridCred.set_row_homogeneous( True )
+        gridCred.props.row_spacing = 6        
+        stack.add_titled(gridCred, "GridCred", "Security Info")
+        self.InitCredPage( gridCred, 0, 0, confVals )
+        self.gridCred = gridCred;
 
         stack_switcher = Gtk.StackSwitcher()
         stack_switcher.set_stack(stack)
@@ -188,16 +201,24 @@ class ConfigDlg(Gtk.Dialog):
         scrolledWin = Gtk.ScrolledWindow(hexpand=True, vexpand=True)
         scrolledWin.set_border_width(10)
         scrolledWin.set_policy(
-            Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.ALWAYS)
+            #uncomment the following line to show scrollbar
+            #Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.ALWAYS)
+            Gtk.PolicyType.NEVER, Gtk.PolicyType.NEVER)
         scrolledWin.add_with_viewport( stack )
         vbox.pack_start(scrolledWin, True, True, 0)
 
         self.set_border_width(10)
-        self.set_default_size(600, 740)
+        self.set_default_size(600, 440)
         box = self.get_content_area()
         box.add(vbox)
         self.show_all()
  
+    def InitCredPage( self, grid:Gtk.Grid, startCol, startRow, confVals : dict ) :
+        row = GetGridRows( grid )
+        self.AddSSLCred( grid, startCol, row, confVals )
+        row = GetGridRows( grid )
+        self.AddAuthCred( grid, startCol, row, confVals )
+        
 
     def InitNetworkPage( self, grid:Gtk.Grid, startCol, startRow, confVals : dict, ifNo = 0 ) :
         row = GetGridRows( grid )
@@ -214,7 +235,12 @@ class ConfigDlg(Gtk.Dialog):
             else :
                 addBtn = Gtk.Button.new_with_label("Add interface")
                 addBtn.connect("clicked", self.on_add_if_clicked)
-                grid.attach(addBtn, startCol + 2, startRow, 1, 1 )
+                #uncomment the following line to support more interfaces
+                #grid.attach(addBtn, startCol + 2, startRow, 1, 1 )
+
+                labelNote = Gtk.Label()
+                labelNote.set_markup('<i><small>edit "driver.json" to use "0.0.0.0"</small></i>')
+                grid.attach(labelNote, startCol + 1, startRow, 1, 1 )
 
             startRow = GetGridRows( grid )
         
@@ -322,14 +348,14 @@ class ConfigDlg(Gtk.Dialog):
         urlEdit.set_text( strUrl )
         urlEdit.set_sensitive( bActive )
         grid.attach(urlEdit, startCol + 2, startRow + 1, 1, 1 )
-
         self.ifctx[ ifNo ].urlEdit = urlEdit
+        urlEdit.ifNo = ifNo
 
     def AddSSLOptions( self, grid:Gtk.Grid, startCol, startRow, confVals : dict, ifNo = 0 ) :
         labelSSL = Gtk.Label()
         labelSSL.set_text("SSL: ")
         labelSSL.set_xalign(1)
-        grid.attach(labelSSL, startCol, startRow, 1, 1 )
+        grid.attach(labelSSL, startCol + 0, startRow, 1, 1 )
 
         bActive = False
         try:
@@ -348,11 +374,43 @@ class ConfigDlg(Gtk.Dialog):
             "toggled", self.on_button_toggled, "SSL")
         sslCheck.ifNo = ifNo
         grid.attach( sslCheck, startCol + 1, startRow, 1, 1 )
+        self.ifctx[ ifNo ].sslCheck = sslCheck
 
+        labelAuth = Gtk.Label()
+        labelAuth.set_text("Auth: ")
+        labelAuth.set_xalign(1)
+        grid.attach(labelAuth, startCol + 0, startRow + 1, 1, 1 )
+
+        bActive = False
+        try:
+            if confVals[ 'connParams'] is not None :
+                param0 = confVals[ 'connParams'][ ifNo ]
+                if param0 is not None :
+                    strAuth = param0[ 'HasAuth']
+                    if strAuth == 'true' :
+                        bActive = True
+        except Exception as err :
+            pass
+
+        authCheck = Gtk.CheckButton(label="")
+        authCheck.set_active( bActive )
+        authCheck.connect(
+            "toggled", self.on_button_toggled, "Auth")
+        authCheck.ifNo = ifNo
+        grid.attach( authCheck, startCol + 1, startRow + 1, 1, 1 )
+        self.ifctx[ ifNo ].authCheck = authCheck
+
+    def AddSSLCred( self, grid:Gtk.Grid, startCol, startRow, confVals : dict ) :
+        labelSSLfiles = Gtk.Label()
+        labelSSLfiles.set_text("SSL Files: ")
+        labelSSLfiles.set_xalign(1)
+        grid.attach(labelSSLfiles, startCol, startRow, 1, 1 )
+        
+        startRow+=1
         labelKey = Gtk.Label()
         labelKey.set_text("Key File: ")
-        labelKey.set_xalign(.618)
-        grid.attach(labelKey, startCol + 1, startRow + 1, 1, 1 )
+        labelKey.set_xalign(.5)
+        grid.attach(labelKey, startCol + 1, startRow, 1, 1 )
 
         keyEditBox = Gtk.Entry()
         strKey = ""
@@ -360,19 +418,20 @@ class ConfigDlg(Gtk.Dialog):
             if confVals[ 'keyFile'] is not None :
                 strKey = confVals[ 'keyFile']
         except Exception as err :
-            pass            
+            pass
+
         keyEditBox.set_text(strKey)
-        grid.attach(keyEditBox, startCol + 2, startRow + 1, 1, 1 )
+        grid.attach(keyEditBox, startCol + 2, startRow, 1, 1 )
 
         keyBtn = Gtk.Button.new_with_label("...")
         keyBtn.connect("clicked", self.on_choose_key_clicked)
-        keyBtn.ifNo = ifNo
-        grid.attach(keyBtn, startCol + 3, startRow + 1, 1, 1 )
+
+        grid.attach(keyBtn, startCol + 3, startRow, 1, 1 )
 
         labelCert = Gtk.Label()
         labelCert.set_text("Cert File: ")
-        labelCert.set_xalign(.618)
-        grid.attach(labelCert, startCol + 1, startRow + 2, 1, 1 )
+        labelCert.set_xalign(.5)
+        grid.attach(labelCert, startCol + 1, startRow + 1, 1, 1 )
 
         certEditBox = Gtk.Entry()
         strCert = ""
@@ -383,26 +442,17 @@ class ConfigDlg(Gtk.Dialog):
         except Exception as err :
             pass    
         certEditBox.set_text(strCert)
-        grid.attach(certEditBox, startCol + 2, startRow + 2, 1, 1 )
+        grid.attach(certEditBox, startCol + 2, startRow + 1, 1, 1 )
 
         certBtn = Gtk.Button.new_with_label("...")
         certBtn.connect("clicked", self.on_choose_cert_clicked)
-        certBtn.ifNo = ifNo
-        grid.attach(certBtn, startCol + 3, startRow + 2, 1, 1 )
+        grid.attach(certBtn, startCol + 3, startRow + 1, 1, 1 )
 
-        keyEditBox.set_sensitive( bActive )
-        certEditBox.set_sensitive( bActive )
-        keyBtn.set_sensitive( bActive )
-        certBtn.set_sensitive( bActive )
+        self.keyEdit = keyEditBox
+        self.certEdit = certEditBox
 
-        self.ifctx[ ifNo ].certEdit = certEditBox
-        self.ifctx[ ifNo ].keyEdit = keyEditBox
-        self.ifctx[ ifNo ].sslCheck = sslCheck
-        sslCheck.keyBtn = keyBtn
-        sslCheck.certBtn = certBtn
         keyBtn.editBox = keyEditBox
         certBtn.editBox = certEditBox
-
 
     def on_button_toggled( self, button, name ):
         print( name )
@@ -411,24 +461,13 @@ class ConfigDlg(Gtk.Dialog):
             if self.ifctx[ ifNo ].webSock.props.active and not button.props.active :
                 button.props.active = True
                 return
-            self.ifctx[ ifNo ].certEdit.set_sensitive( button.props.active )
-            self.ifctx[ ifNo ].keyEdit.set_sensitive( button.props.active )
-            button.certBtn.set_sensitive( button.props.active )
-            button.keyBtn.set_sensitive( button.props.active )
         elif name == 'Auth' :
-            self.ifctx[ ifNo ].svcEdit.set_sensitive( button.props.active )
-            self.ifctx[ ifNo ].realmEdit.set_sensitive( button.props.active )
-            self.ifctx[ ifNo ].signCombo.set_sensitive( button.props.active )
-            self.ifctx[ ifNo ].kdcEdit.set_sensitive( button.props.active )
+            pass
         elif name == 'WebSock' :
             self.ifctx[ ifNo ].urlEdit.set_sensitive( button.props.active )
             if not self.ifctx[ ifNo ].webSock.props.active :
                 return
-            self.ifctx[ ifNo ].certEdit.set_sensitive( button.props.active )
-            self.ifctx[ ifNo ].keyEdit.set_sensitive( button.props.active )
             self.ifctx[ ifNo ].sslCheck.set_active(button.props.active)
-            button.certBtn.set_sensitive( button.props.active )
-            button.keyBtn.set_sensitive( button.props.active )
 
     def on_choose_key_clicked( self, button ) :
         self.on_choose_file_clicked( button, True )
@@ -491,34 +530,16 @@ class ConfigDlg(Gtk.Dialog):
         filter_any.add_pattern("*")
         dialog.add_filter(filter_any)
 
-    def AddAuthOptions( self, grid:Gtk.Grid, startCol, startRow, confVals : dict, ifNo = 0 ) :
-        labelAuth = Gtk.Label()
-        labelAuth.set_text("Auth: ")
-        labelAuth.set_xalign(1)
-        grid.attach(labelAuth, startCol, startRow, 1, 1 )
-
-        bActive = False
-        try:
-            if confVals[ 'connParams'] is not None :
-                param0 = confVals[ 'connParams'][ ifNo ]
-                if param0 is not None :
-                    strAuth = param0[ 'HasAuth']
-                    if strAuth == 'true' :
-                        bActive = True
-        except Exception as err :
-            pass
-
-        authCheck = Gtk.CheckButton(label="")
-        authCheck.set_active( bActive )
-        authCheck.connect(
-            "toggled", self.on_button_toggled, "Auth")
-        authCheck.ifNo = ifNo
-        grid.attach( authCheck, startCol + 1, startRow, 1, 1 )
+    def AddAuthCred( self, grid:Gtk.Grid, startCol, startRow, confVals : dict ) :
+        labelAuthCred = Gtk.Label()
+        labelAuthCred.set_text("Auth Information")
+        labelAuthCred.set_xalign(1)
+        grid.attach(labelAuthCred, startCol + 0, startRow + 0, 1, 1 )
 
         labelMech = Gtk.Label()
         labelMech.set_text("Auth Mech: ")
-        labelMech.set_xalign(.618)
-        grid.attach(labelMech, startCol + 1, startRow + 2, 1, 1 )
+        labelMech.set_xalign(.5)
+        grid.attach(labelMech, startCol + 1, startRow + 1, 1, 1 )
 
         mechList = Gtk.ListStore()
         mechList = Gtk.ListStore(int, str)
@@ -528,12 +549,12 @@ class ConfigDlg(Gtk.Dialog):
         mechCombo.set_entry_text_column(1)
         mechCombo.set_active( 0 )
         mechCombo.set_sensitive( False )
-        grid.attach(mechCombo, startCol + 2, startRow + 2, 1, 1 )
+        grid.attach(mechCombo, startCol + 2, startRow + 1, 1, 1 )
 
         labelSvc = Gtk.Label()
         labelSvc.set_text("Service Name: ")
-        labelSvc.set_xalign(.618)
-        grid.attach(labelSvc, startCol + 1, startRow + 3, 1, 1 )
+        labelSvc.set_xalign(.5)
+        grid.attach(labelSvc, startCol + 1, startRow + 2, 1, 1 )
 
         strSvc = ""
         try:
@@ -546,12 +567,12 @@ class ConfigDlg(Gtk.Dialog):
 
         svcEditBox = Gtk.Entry()
         svcEditBox.set_text(strSvc)
-        grid.attach(svcEditBox, startCol + 2, startRow + 3, 2, 1 )
+        grid.attach(svcEditBox, startCol + 2, startRow + 2, 2, 1 )
 
         labelRealm = Gtk.Label()
         labelRealm.set_text("Realm: ")
-        labelRealm.set_xalign(.618)
-        grid.attach(labelRealm, startCol + 1, startRow + 4, 1, 1 )
+        labelRealm.set_xalign(.5)
+        grid.attach(labelRealm, startCol + 1, startRow + 3, 1, 1 )
 
         strRealm = ""
         try:
@@ -563,12 +584,12 @@ class ConfigDlg(Gtk.Dialog):
             pass
         realmEditBox = Gtk.Entry()
         realmEditBox.set_text(strRealm)
-        grid.attach(realmEditBox, startCol + 2, startRow + 4, 2, 1 )
+        grid.attach(realmEditBox, startCol + 2, startRow + 3, 2, 1 )
 
         labelSign = Gtk.Label()
         labelSign.set_text("Sign/Encrypt: ")
-        labelSign.set_xalign(.618)
-        grid.attach(labelSign, startCol + 1, startRow + 5, 1, 1 )
+        labelSign.set_xalign(.5)
+        grid.attach(labelSign, startCol + 1, startRow + 4, 1, 1 )
 
         idx = 1
         try:
@@ -588,16 +609,15 @@ class ConfigDlg(Gtk.Dialog):
 
         signCombo = Gtk.ComboBox.new_with_model_and_entry(signMethod)
         signCombo.connect("changed", self.on_sign_msg_changed)
-        signCombo.ifNo = ifNo
         signCombo.set_entry_text_column(1)
         signCombo.set_active(idx)
 
-        grid.attach( signCombo, startCol + 2, startRow + 5, 1, 1 )
+        grid.attach( signCombo, startCol + 2, startRow + 4, 1, 1 )
 
         labelKdc = Gtk.Label()
         labelKdc.set_text("KDC IP address: ")
-        labelKdc.set_xalign(.618)
-        grid.attach(labelKdc, startCol + 1, startRow + 6, 1, 1 )
+        labelKdc.set_xalign(.5)
+        grid.attach(labelKdc, startCol + 1, startRow + 5, 1, 1 )
 
         strKdcIp = ""
         try:
@@ -608,16 +628,15 @@ class ConfigDlg(Gtk.Dialog):
 
         kdcEditBox = Gtk.Entry()
         kdcEditBox.set_text(strKdcIp)
-        grid.attach(kdcEditBox, startCol + 2, startRow + 6, 2, 1 )
+        grid.attach(kdcEditBox, startCol + 2, startRow + 5, 2, 1 )
 
-        self.ifctx[ ifNo ].svcEdit = svcEditBox
-        self.ifctx[ ifNo ].realmEdit = realmEditBox
-        self.ifctx[ ifNo ].signCombo = signCombo
-        self.ifctx[ ifNo ].kdcEdit = kdcEditBox
+        self.svcEdit = svcEditBox
+        self.realmEdit = realmEditBox
+        self.signCombo = signCombo
+        self.kdcEdit = kdcEditBox
 
-        svcEditBox.set_sensitive( authCheck.props.active )
-        realmEditBox.set_sensitive( authCheck.props.active )
-        signCombo.set_sensitive( authCheck.props.active )
+    def AddAuthOptions( self, grid:Gtk.Grid, startCol, startRow, confVals : dict, ifNo = 0 ) :
+        pass
 
     def on_sign_msg_changed(self, combo) :
         tree_iter = combo.get_active_iter()
@@ -629,10 +648,240 @@ class ConfigDlg(Gtk.Dialog):
             entry = combo.get_child()
             print("Entered: %s" % entry.get_text())
 
+    def VerifyInput( self ) :
+        for interf in self.ifctx :
+            if interf.sslCheck is None :
+                break
+            if interf.sslCheck.props.active :
+                if len( self.keyEdit.get_text() ) == 0 :
+                    return "key file is empty"
+                if len( self.certEdit.get_text() ) == 0 :
+                    return "cert file is empty"
+            if interf.authCheck.props.active :
+                if len( self.realmEdit.get_text() ) == 0 :
+                    return "auth enabled, but realm is empty"
+                if len( self.svcEdit.get_text() ) == 0 :
+                    return "auth enabled, but service is empty"
+                if len( self.kdcEdit.get_text() ) == 0 :
+                    return "auth enabled, but kdc address is empty"
+            if len( interf.ipAddr.get_text() ) == 0 :
+                return "ip address is empty"
+            if interf.ipAddr.get_text() == '0.0.0.0' :
+                return "ip address is '0.0.0.0'";
+
+        return "success"
+
+    def ExportFiles( self, path : str) :
+        error = self.VerifyInput()
+        if error != 'success' :
+            text = "Error occurs : " + error
+            dialog = Gtk.MessageDialog(self,
+                     0,
+                     Gtk.MessageType.ERROR,
+                     Gtk.ButtonsType.OK,
+                     text );
+            dialog.run()
+            dialog.destroy()
+            return
+        try:
+            jsonFiles = self.jsonFiles;
+            drvVal = jsonFiles[ 0 ][ 1 ]
+            if len( self.keyEdit.get_text() ) > 0 :
+                ports = drvVal['Ports']
+
+            confVals = None
+            for port in ports :
+                if port[ 'PortClass'] == 'RpcOpenSSLFido' :
+                    sslFiles = port[ 'Parameters']
+                    if sslFiles is None :
+                        continue
+                    sslFiles[ "KeyFile"] = self.keyEdit.get_text()
+                    sslFiles[ "CertFile"] = self.certEdit.get_text()
+
+                if port[ 'PortClass'] == 'RpcTcpBusPort' :
+                    confVals = port[ 'Parameters']
+
+            ifs = []
+            for elem in self.ifctx :
+                if not elem.IsEmpty() :
+                    ifs.append( elem )
+
+            if ifs is None:
+                raise Exception("no valid configurations") 
+
+            diff = len( ifs ) - len( confVals )
+            if diff < 0 :
+                for i in range( -diff ):
+                    confVals.pop()
+            elif diff > 0 :
+                for i in range( diff ):
+                    confVals.append( confVals[ 0 ] )
+
+            for i in range( len( ifs ) ):  
+                curVals = ifs[ i ]
+                elem = confVals[ i ]
+                elem[ 'BindAddr' ] = curVals.ipAddr.get_text()
+                elem[ 'PortNumber' ] = curVals.port.get_text()
+                if curVals.compress.props.active :
+                    elem[ 'Compression' ] = 'true'
+                else:
+                    elem[ 'Compression' ] = 'false'
+
+                if curVals.sslCheck.props.active :
+                    elem[ 'EnableSSL' ] = 'true'
+                else:
+                    elem[ 'EnableSSL' ] = 'false'
+
+                if curVals.authCheck.props.active :
+                    elem[ 'HasAuth' ] = 'true'
+                else:
+                    elem[ 'HasAuth' ] = 'false'
+
+                if curVals.webSock.props.active :
+                    elem[ 'EnableWS' ] = 'true'
+                else:
+                    elem[ 'EnableWS' ] = 'false'
+
+            drvPath = path + "/driver.json"
+            fp = open(drvPath, "w")
+            json.dump( drvVal, fp, indent=4)
+            fp.close()
+
+            rtDesc = jsonFiles[ 2 ][ 1 ]
+            svrObjs = rtDesc[ 'Objects' ]
+            if svrObjs is not None and len( svrObjs ) > 0 :
+                for svrObj in svrObjs :
+                    if svrObj[ 'ObjectName'] == 'RpcRouterBridgeAuthImpl' :
+                        if len( self.realmEdit.get_text() ) == 0:
+                            break;
+                        authInfo = dict();
+                        authInfo[ 'Realm' ] = self.realmEdit.get_text()
+                        authInfo[ 'ServiceName' ] = self.svcEdit.get_text()
+                        authInfo[ 'AuthMech' ] = 'krb5'
+                        authInfo[ 'SignMessage' ] = 'True'
+                        tree_iter = self.signCombo.get_active_iter()
+                        if tree_iter is not None:
+                            model = self.signCombo.get_model()
+                            row_id, name = model[tree_iter][:2]
+                        if row_id == 1 :
+                            authInfo[ 'SignMessage' ] = 'false'
+                        else:
+                            authInfo[ 'SignMessage' ] = 'true'
+
+                        svrObj[ 'AuthInfo'] = authInfo;
+                        break
+
+            rtauPath = path + '/rtauth.json'
+            fp = open(rtauPath, "w")
+            json.dump( rtDesc, fp, indent = 4 )
+            fp.close()
+
+            apVal = jsonFiles[ 3 ][ 1 ]
+            proxies = apVal['Objects']
+            if proxies is None or len( proxies ) == 0:
+                raise Exception("bad content in authprxy.json") 
+
+            if0 = ifs[ 0]
+            for proxy in proxies :
+                objName = proxy[ 'ObjectName' ]
+                if objName == 'K5AuthServer' or objName == 'KdcChannel':
+                    elem = proxy
+                    elem[ 'IpAddress' ] = if0.ipAddr.get_text()
+                    elem[ 'PortNumber' ] = if0.port.get_text()
+                    if if0.compress.props.active :
+                        elem[ 'Compression' ] = 'true'
+                    else:
+                        elem[ 'Compression' ] = 'false'
+
+                    if if0.sslCheck.props.active :
+                        elem[ 'EnableSSL' ] = 'true'
+                    else:
+                        elem[ 'EnableSSL' ] = 'false'
+
+                    if objName == 'K5AuthServer' :
+                        if if0.authCheck.props.active :
+                            elem[ 'HasAuth' ] = 'true'
+                        else:
+                            elem[ 'HasAuth' ] = 'false'
+                    else :
+                        if 'AuthInfo' in elem :
+                            authInfo = elem[ 'AuthInfo' ]
+                        else:
+                            authInfo = dict()
+
+                        if len( self.realmEdit.get_text() ) != 0:
+                            authInfo[ 'Realm' ] = self.realmEdit.get_text()
+                            authInfo[ 'ServiceName' ] = self.svcEdit.get_text()
+                            authInfo[ 'AuthMech' ] = 'krb5'
+                            tree_iter = self.signCombo.get_active_iter()
+                            if tree_iter is not None:
+                                model = self.signCombo.get_model()
+                                row_id, name = model[tree_iter][:2]
+                            if row_id == 1 :
+                                authInfo[ 'SignMessage' ] = 'false'
+                            else :
+                                authInfo[ 'SignMessage' ] = 'true'
+
+                    if if0.webSock.props.active :
+                        elem[ 'EnableWS' ] = 'true'
+                        elem[ 'DestURL'] = if0.urlEdit.get_text()
+                    else:
+                        elem[ 'EnableWS' ] = 'false'
+
+                elif objName == 'KdcRelayServer' :
+                    if len( self.kdcEdit.get_text() ) != 0:
+                        proxy[ 'IpAddress' ] = self.kdcEdit.get_text()
+                    break
+
+            apPath = path + "/authprxy.json"
+            fp = open( apPath, "w" )
+            json.dump( apVal, fp, indent = 4  )
+            fp.close()
+
+            rtPath = path + "/router.json"
+            fp = open( rtPath, 'w')
+            json.dump( jsonFiles[1][1], fp, indent = 4  )
+            fp.close()
+
+        except Exception as err :
+            text = "Failed to export files:" + str( err )
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            second_text = "@" + fname + ":" + str(exc_tb.tb_lineno)
+            dialog = Gtk.MessageDialog(self,
+                     0,
+                     Gtk.MessageType.ERROR,
+                     Gtk.ButtonsType.OK,
+                     text )
+            dialog.format_secondary_text( second_text )                     
+            dialog.run()
+            dialog.destroy()
+        return
 
 win = ConfigDlg(True)
 win.connect("close", Gtk.main_quit)
-response = win.run()
-if response == Gtk.ResponseType.OK:
-    print("The OK button was clicked")
+while True :
+    response = win.run()
+    if response == Gtk.ResponseType.OK:
+        win.UpdateConfig()
+    elif response == Gtk.ResponseType.YES:
+        dialog = Gtk.FileChooserDialog(
+            title="Please choose a directory",
+            parent=win,
+            action=Gtk.FileChooserAction.SELECT_FOLDER)
+        dialog.add_buttons(
+            Gtk.STOCK_CANCEL,
+            Gtk.ResponseType.CANCEL,
+            Gtk.STOCK_OPEN,
+            Gtk.ResponseType.OK,
+        )
+        response = dialog.run()
+        path = '.'
+        if response == Gtk.ResponseType.OK:
+            path = dialog.get_filename()
+        dialog.destroy()
+        win.ExportFiles(path)
+        continue
+    break
+    
 win.destroy()
