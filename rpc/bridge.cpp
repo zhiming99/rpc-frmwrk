@@ -3787,12 +3787,23 @@ gint32 CRpcTcpBridge::DoStartHandshake(
 
         oIfLock.Unlock();
 
-        ret = this->AddAndRun( m_pHsTicker );
+        ret = GetIoMgr()->RescheduleTask(
+            m_pHsTicker );
+
         if( ERROR( ret ) )
             break;
         ret = STATUS_PENDING;
 
     }while( 0 );
+
+    if( ret != STATUS_PENDING )
+    {
+        if( !m_pHsTicker.IsEmpty() )
+            ( *m_pHsTicker )( eventCancelTask );
+
+        pCallback->OnEvent(
+            eventTaskComp, ret, 0, nullptr );
+    }
 
     return ret;
 }
