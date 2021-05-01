@@ -1,5 +1,5 @@
 ACLOCAL_AMFLAGS= -I m4
-SUBDIRS=3rd_party combase ipc rpc ridl
+SUBDIRS=3rd_party combase ipc rpc ridl tools
 
 if ENABLE_TESTCASES
 SUBDIRS += test

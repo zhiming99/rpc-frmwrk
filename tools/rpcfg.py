@@ -2,6 +2,7 @@ import gi
 import json
 import os
 import sys 
+from shutil import move
 
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk
@@ -17,39 +18,42 @@ def LoadConfigFiles() :
     paths.append( curDir + "/../rpc/router" )
     paths.append( curDir + "/../rpc/security" )
     
-    jsonvals = list()
+    jsonvals = [ None ] * 4
     for strPath in paths :
         try:
-            drvfile = strPath + "/driver.json"
-            fp = open( drvfile, "r" )
-            jsonvals.append( [drvfile, json.load(fp) ] )
-            fp.close()
+            if jsonvals[ 0 ] is None :
+                drvfile = strPath + "/driver.json"
+                fp = open( drvfile, "r" )
+                jsonvals[ 0 ] = [drvfile, json.load(fp) ]
+                fp.close()
         except OSError as err :
             pass
         try:
-            rtfile = strPath + "/router.json"
-            fp = open( rtfile, "r" )
-            jsonvals.append( [rtfile, json.load(fp)] )
-            fp.close()
+            if jsonvals[ 1 ] is None :
+                rtfile = strPath + "/router.json"
+                fp = open( rtfile, "r" )
+                jsonvals[ 1 ] = [rtfile, json.load(fp)]
+                fp.close()
         except OSError as err :
             pass
 
         try:
-            rtaufile = strPath + "/rtauth.json"
-            fp = open( rtaufile, "r" )
-            jsonvals.append( [rtaufile, json.load(fp)])
-            fp.close()
+            if jsonvals[ 2 ] is None :
+                rtaufile = strPath + "/rtauth.json"
+                fp = open( rtaufile, "r" )
+                jsonvals[ 2 ] = [rtaufile, json.load(fp)]
+                fp.close()
         except OSError as err :
             pass
         
         try:
-            auprxyfile = strPath + "/authprxy.json"
-            fp = open( auprxyfile, "r" )
-            jsonvals.append( [auprxyfile, json.load(fp)] )
-            fp.close()
+            if jsonvals[ 3 ] is None :
+                auprxyfile = strPath + "/authprxy.json"
+                fp = open( auprxyfile, "r" )
+                jsonvals[ 3 ] = [auprxyfile, json.load(fp)]
+                fp.close()
         except OSError as err :
             pass            
-
 
     return jsonvals
 
@@ -117,14 +121,15 @@ class ConfigDlg(Gtk.Dialog):
             except Exception as err :
                 pass
 
-        svrObjs = jsonFiles[ 2 ][ 1 ]
+        svrVals = jsonFiles[ 2 ][ 1 ]
+        svrObjs = svrVals[ 'Objects']
         if svrObjs is None or len( svrObjs ) == 0 :
             return confVals
 
         for svrObj in svrObjs :
             try:
                 if svrObj[ 'ObjectName'] == 'RpcRouterBridgeAuthImpl' :
-                    confVals[ 'authInfo'] = svrObj[ 'AuthInfo']
+                    confVals[ 'AuthInfo'] = svrObj[ 'AuthInfo']
                     break
             except Exception as err :
                 pass
@@ -145,7 +150,7 @@ class ConfigDlg(Gtk.Dialog):
         return confVals    
 
     def __init__(self, bServer):
-        Gtk.Dialog.__init__(self, title="Config RPC Server Router", flags=0)
+        Gtk.Dialog.__init__(self, title="Config the RPC Router", flags=0)
         self.add_buttons(
             Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
             Gtk.STOCK_OK, Gtk.ResponseType.OK,
@@ -208,7 +213,7 @@ class ConfigDlg(Gtk.Dialog):
         vbox.pack_start(scrolledWin, True, True, 0)
 
         self.set_border_width(10)
-        self.set_default_size(600, 440)
+        self.set_default_size(500, 460)
         box = self.get_content_area()
         box.add(vbox)
         self.show_all()
@@ -558,8 +563,8 @@ class ConfigDlg(Gtk.Dialog):
 
         strSvc = ""
         try:
-            if confVals[ 'authInfo'] is not None :
-                authInfo = confVals[ 'authInfo']
+            if confVals[ 'AuthInfo'] is not None :
+                authInfo = confVals[ 'AuthInfo']
                 if authInfo[ 'ServiceName'] is not None :
                     strSvc = authInfo[ 'ServiceName']
         except Exception as err :
@@ -576,8 +581,8 @@ class ConfigDlg(Gtk.Dialog):
 
         strRealm = ""
         try:
-            if confVals[ 'authInfo'] is not None :
-                authInfo = confVals[ 'authInfo']
+            if confVals[ 'AuthInfo'] is not None :
+                authInfo = confVals[ 'AuthInfo']
                 if authInfo[ 'Realm'] is not None :
                     strRealm = authInfo[ 'Realm']
         except Exception as err :
@@ -593,11 +598,11 @@ class ConfigDlg(Gtk.Dialog):
 
         idx = 1
         try:
-            if confVals[ 'authInfo'] is not None :
-                authInfo = confVals[ 'authInfo']
+            if confVals[ 'AuthInfo'] is not None :
+                authInfo = confVals[ 'AuthInfo']
                 if authInfo[ 'SignMessage'] is not None :
-                    strSign = authInfo[ 'ServiceName']
-                    if strSign == 'true' :
+                    strSign = authInfo[ 'SignMessage']
+                    if strSign == 'false' :
                         idx = 0
         except Exception as err :
             pass
@@ -682,7 +687,7 @@ class ConfigDlg(Gtk.Dialog):
                      text );
             dialog.run()
             dialog.destroy()
-            return
+            return -1
         try:
             jsonFiles = self.jsonFiles;
             drvVal = jsonFiles[ 0 ][ 1 ]
@@ -758,7 +763,6 @@ class ConfigDlg(Gtk.Dialog):
                         authInfo[ 'Realm' ] = self.realmEdit.get_text()
                         authInfo[ 'ServiceName' ] = self.svcEdit.get_text()
                         authInfo[ 'AuthMech' ] = 'krb5'
-                        authInfo[ 'SignMessage' ] = 'True'
                         tree_iter = self.signCombo.get_active_iter()
                         if tree_iter is not None:
                             model = self.signCombo.get_model()
@@ -856,7 +860,20 @@ class ConfigDlg(Gtk.Dialog):
             dialog.format_secondary_text( second_text )                     
             dialog.run()
             dialog.destroy()
-        return
+            return -1
+
+        return 0
+
+    def UpdateConfig( self ) :
+        path = '/tmp'
+        err = self.ExportFiles( path )
+        if err < 0 :
+            return err
+        move( path + '/driver.json', self.jsonFiles[ 0 ][ 0 ] )
+        move( path + '/router.json', self.jsonFiles[ 1 ][ 0 ] )
+        move( path + '/rtauth.json', self.jsonFiles[ 2 ][ 0 ] )
+        move( path + '/authprxy.json', self.jsonFiles[ 3 ][ 0 ] )
+        
 
 win = ConfigDlg(True)
 win.connect("close", Gtk.main_quit)
