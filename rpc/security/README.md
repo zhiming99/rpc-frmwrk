@@ -104,7 +104,8 @@ to work with `rpc-frmwrk` on such a simple network.
             {
                 "AuthMech" : "krb5",
                 "ServiceName" : "rasp1@rpcf.org",
-                "Realm" : "rpcf.org"
+                "Realm" : "rpcf.org",
+                "SignMessage" : "true"
             }
  ```
 
@@ -116,7 +117,8 @@ to work with `rpc-frmwrk` on such a simple network.
                 "AuthMech" : "krb5",
                 "UserName" : "foo@rpcf.org",
                 "ServiceName" : "rasp1@rpcf.org",
-                "Realm" : "rpcf.org"
+                "Realm" : "rpcf.org",
+                "SignMessage" : "true"
             }
   ```
   * The messages of the authenticated session is usually encrypted over the network. And it can be signed instead, which can be preferable if you want to use SSL as the encryption method. You need to add `SignMessage:"true"` to both `rtauth.json` and `hwdesc.json` as mentioned above to enable this feature. According to my test, such a combination of kerberos signature plus SSL encryption delivers better performance than the encryption with `kerberos` only.
