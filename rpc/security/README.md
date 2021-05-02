@@ -77,7 +77,7 @@ to work with `rpc-frmwrk` on such a simple network.
   * On a Fedora machine, you can `dnf install krb5-workstation`, and dnf will install all the necessary packages for you.
   * On a Raspberry Pi, you can `apt install krb5-user`, and apt will install all the necessary packages for you,
       and help you configure the kerberos.
-  * Put the same `krb5.conf` as the one on the `kdc server` to the directory `/etc`.
+  * Put the same `krb5.conf` as the one on the `kdc server` to the directory `/etc`. (Note: if the client is a different linux distribution, you may want to tweak the `krb5.conf`, as can be quite different from the one on the `kdc server`)
   * Type `kinit foo` to authenticate with the remote `kdc`. According to the `ticket_lifetime` option above, the ticket will
   last one day, and when it expires, the login session will ends.
   * In some environment when you cannot access `kdc` directly, `rpc-frmwrk` can provide a `kdc` communication channel for `kdc` 
