@@ -52,8 +52,10 @@ else ifeq ($(MAKECMDGOALS),release_clean)
 	OBJ_DIR:=./$(RLS_DIR)
 endif
 
+DIST_LIB_DIR = @DIST_LIB_DIR@
+
 COMMON_LINK=$(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs dbus-1 jsoncpp rpcf)
-LINKER_OPTION:=$(COMMON_LINK) -ldl -lstdc++ -lpthread
+LINKER_OPTION:=$(COMMON_LINK) -ldl -lstdc++ -lpthread -Wl,-rpath=$(DIST_LIB_DIR) -Wl,-rpath=$(DIST_LIB_DIR)/rpcf
 
 TARGET_SVR:=XXXSVR
 TARGET_CLI:=XXXCLI

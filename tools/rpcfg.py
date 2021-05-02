@@ -7,16 +7,19 @@ from shutil import move
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk
 
-def LoadConfigFiles() :
+def LoadConfigFiles( path : str) :
     dir_path = os.path.dirname(os.path.realpath(__file__))
-    paths = list()
-    curDir = dir_path;
-    paths.append( curDir + "/../../etc/rpcf" )
-    paths.append( "/etc/rpcf")
+    paths = []
+    if path is None:
+        curDir = dir_path;
+        paths.append( curDir + "/../../etc/rpcf" )
+        paths.append( "/etc/rpcf")
 
-    paths.append( curDir + "/../ipc" )
-    paths.append( curDir + "/../rpc/router" )
-    paths.append( curDir + "/../rpc/security" )
+        paths.append( curDir + "/../ipc" )
+        paths.append( curDir + "/../rpc/router" )
+        paths.append( curDir + "/../rpc/security" )
+    else:
+        paths.append( path )
     
     jsonvals = [ None ] * 4
     for strPath in paths :
@@ -77,8 +80,6 @@ def GetGridCols(grid: Gtk.Grid):
 class InterfaceContext :
     def __init__(self, ifNo ):
         self.ifNo = ifNo
-        self.startRow = 0
-        self.rowCount = 0
         self.Clear()
 
     def Clear( self ) :
@@ -89,19 +90,40 @@ class InterfaceContext :
         self.sslCheck = None
         self.authCheck = None
         self.urlEdit = None
+        self.enabled = None
         self.startRow = 0
         self.rowCount = 0
     
     def IsEmpty( self ) :
         return self.ipAddr is None
+
+class NodeContext :
+    def __init__(self, iNo):
+        self.iNo = iNo
+        self.Clear()
+        
+    def Clear( self ):
+        self.ipAddr = None
+        self.port = None
+        self.NodeName = None
+        self.enabled = None
+        self.compress = None
+        self.sslCheck = None
+        self.webSock = None
+        self.urlEdit = None
+        self.startRow = 0
+        self.rowCount = 0
+
+    def IsEmpty( self ) :
+        return self.ipAddr is None
         
 class ConfigDlg(Gtk.Dialog):
 
-    def RetrieveInfo( self ) :
+    def RetrieveInfo( self, path : str = None ) :
         confVals = dict()
-        jsonFiles = LoadConfigFiles()
+        jsonFiles = LoadConfigFiles( path )
         if len( jsonFiles ) == 0 :
-            return
+            return None
         drvVal = jsonFiles[ 0 ][1]
         ports = drvVal['Ports']
         for port in ports :
@@ -130,6 +152,7 @@ class ConfigDlg(Gtk.Dialog):
             try:
                 if svrObj[ 'ObjectName'] == 'RpcRouterBridgeAuthImpl' :
                     confVals[ 'AuthInfo'] = svrObj[ 'AuthInfo']
+                    confVals[ 'Nodes'] = svrObj[ 'Nodes']
                     break
             except Exception as err :
                 pass
@@ -149,12 +172,60 @@ class ConfigDlg(Gtk.Dialog):
         self.jsonFiles = jsonFiles
         return confVals    
 
+    def ReinitDialog( self, path : str ) :
+        confVals = self.RetrieveInfo( path )
+        self.confVals = confVals
+        self.ifctx = []
+
+        self.keyEdit = None
+        self.certEdit = None
+        self.svcEdit = None
+        self.realmEdit = None
+        self.signCombo = None
+        self.kdcEdit = None
+
+        try:
+            ifCount = len( confVals[ 'connParams'] )
+            for i in range( ifCount ) :
+                self.ifctx.append( InterfaceContext(i) )
+        except Exception as err :
+            pass
+
+        gridNet = self.gridNet
+        #uncomment the following line for multi-if
+        #for interf in self.ifctx :
+        rows = GetGridRows( gridNet )
+        for i in range( rows ) :
+            gridNet.remove_row( 0 )
+
+        for i in range( 1 ) :
+            interf = self.ifctx[ i ]
+            row = GetGridRows( gridNet )
+            interf.startRow = row
+            self.InitNetworkPage( gridNet, 0, row, confVals, i )
+            interf.rowCount = GetGridRows( gridNet ) - row
+            i += 1
+
+        gridCred = self.gridCred
+        rows = GetGridRows( gridCred )
+        for i in range( rows ) :
+            gridCred.remove_row( 0 )
+        self.InitCredPage( gridCred, 0, 0, confVals )
+
+        gridmh = self.gridmh
+        rows = GetGridRows( gridmh )
+        for i in range( rows ) :
+            gridmh.remove_row( 0 )
+        self.InitMultihopPage( gridmh, 0, 0, confVals )
+        self.show_all()
+
     def __init__(self, bServer):
         Gtk.Dialog.__init__(self, title="Config the RPC Router", flags=0)
         self.add_buttons(
             Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
             Gtk.STOCK_OK, Gtk.ResponseType.OK,
-            Gtk.STOCK_SAVE_AS, Gtk.ResponseType.YES )
+            Gtk.STOCK_SAVE_AS, Gtk.ResponseType.YES,
+            Gtk.STOCK_OPEN, Gtk.ResponseType.APPLY )
         self.bServer = bServer
         if not bServer :
             self.get_header_bar().set_title( "Config RPC Proxy Router" )
@@ -175,7 +246,7 @@ class ConfigDlg(Gtk.Dialog):
         stack.set_transition_type(Gtk.StackTransitionType.NONE)
         stack.set_transition_duration(1000)
 
-        gridNet = Gtk.Grid();
+        gridNet = Gtk.Grid()
         #gridNet.set_row_homogeneous( True )
         gridNet.props.row_spacing = 6
         i = 0
@@ -197,7 +268,13 @@ class ConfigDlg(Gtk.Dialog):
         gridCred.props.row_spacing = 6        
         stack.add_titled(gridCred, "GridCred", "Security Info")
         self.InitCredPage( gridCred, 0, 0, confVals )
-        self.gridCred = gridCred;
+        self.gridCred = gridCred
+
+        gridmh = Gtk.Grid()
+        gridmh.props.row_spacing = 6        
+        stack.add_titled(gridmh, "GridMh", "Multihop")
+        self.InitMultihopPage( gridmh, 0, 0, confVals )
+        self.gridmh = gridmh
 
         stack_switcher = Gtk.StackSwitcher()
         stack_switcher.set_stack(stack)
@@ -207,9 +284,9 @@ class ConfigDlg(Gtk.Dialog):
         scrolledWin.set_border_width(10)
         scrolledWin.set_policy(
             #uncomment the following line to show scrollbar
-            #Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.ALWAYS)
-            Gtk.PolicyType.NEVER, Gtk.PolicyType.NEVER)
-        scrolledWin.add_with_viewport( stack )
+            Gtk.PolicyType.NEVER, Gtk.PolicyType.ALWAYS)
+            #Gtk.PolicyType.NEVER, Gtk.PolicyType.NEVER)
+        scrolledWin.add( stack )
         vbox.pack_start(scrolledWin, True, True, 0)
 
         self.set_border_width(10)
@@ -223,14 +300,214 @@ class ConfigDlg(Gtk.Dialog):
         self.AddSSLCred( grid, startCol, row, confVals )
         row = GetGridRows( grid )
         self.AddAuthCred( grid, startCol, row, confVals )
-        
+
+    def AddNode( self, grid:Gtk.Grid, i ) :
+        try:
+            startCol = 0
+            startRow = GetGridRows( grid )
+
+            nodeCtx = NodeContext( i )
+            nodeCtx.startRow = startRow
+
+            labelNno = Gtk.Label()
+            strNno = "<b>Node " + str( i ) + "</b>"
+            labelNno.set_markup( strNno )
+            labelNno.set_xalign( 0.5 )
+            grid.attach(labelNno, startCol + 1, startRow + 0, 1, 1 )
+            nodeCfg = self.nodes[ i ]
+
+            labelName = Gtk.Label()
+            labelName.set_text( "Node Name: " )
+            labelName.set_xalign( 1 )
+            grid.attach(labelName, startCol, startRow + 1, 1, 1 )
+
+            nameEntry = Gtk.Entry()
+            nameEntry.set_text( nodeCfg[ 'NodeName' ] )
+            grid.attach(nameEntry, startCol + 1, startRow + 1, 1, 1 )
+            nameEntry.iNo = i
+            nodeCtx.nodeName = nameEntry;
+
+            labelIpAddr = Gtk.Label()
+            labelIpAddr.set_text( "Remote IP Address: " )
+            labelIpAddr.set_xalign( 1 )
+            grid.attach(labelIpAddr, startCol, startRow + 2, 1, 1 )
+
+            ipAddr = Gtk.Entry()
+            ipAddr.set_text( nodeCfg[ 'IpAddress' ] )
+            grid.attach(ipAddr, startCol + 1, startRow + 2, 1, 1 )
+            ipAddr.iNo = i
+            nodeCtx.ipAddr = ipAddr;
+
+            labelPort = Gtk.Label()
+            labelPort.set_text( "Port Number: " )
+            labelPort.set_xalign( 1 )
+            grid.attach(labelPort, startCol, startRow + 3, 1, 1 )
+
+            portNum = Gtk.Entry()
+            portNum.set_text( nodeCfg[ 'PortNumber' ] )
+            grid.attach(portNum, startCol + 1, startRow + 3, 1, 1 )
+            portNum.iNo = i
+            nodeCtx.portNum = portNum;
+
+            labelWebSock = Gtk.Label()
+            labelWebSock.set_text("WebSocket: ")
+            labelWebSock.set_xalign(1)
+            grid.attach(labelWebSock, startCol + 0, startRow + 4, 1, 1 )
+
+            webSockCheck = Gtk.CheckButton(label="")
+            webSockCheck.connect(
+                "toggled", self.on_button_toggled, "WebSock2")
+            webSockCheck.iNo = i
+            if nodeCfg[ 'EnableWS' ] == 'false' :
+                webSockCheck.props.active = False
+            else:
+                webSockCheck.props.active = True
+
+            grid.attach( webSockCheck, startCol + 1, startRow + 4, 1, 1)
+            nodeCtx.webSock = webSockCheck
+
+            labelUrl = Gtk.Label()
+            labelUrl.set_text("WebSocket URL: ")
+            labelUrl.set_xalign(1)
+            grid.attach(labelUrl, startCol + 0, startRow + 5, 1, 1 )
+
+            strUrl = ""
+            if 'DestURL' in nodeCfg:
+                strUrl = nodeCfg[ 'DestURL']
+            urlEdit = Gtk.Entry()
+            urlEdit.set_text( strUrl )
+            urlEdit.set_sensitive( webSockCheck.props.active )
+            grid.attach(urlEdit, startCol + 1, startRow + 5, 1, 1 )
+            nodeCtx.urlEdit = urlEdit
+            urlEdit.iNo = i
+
+            enabledCheck = Gtk.CheckButton( label = "Node Enabled" )
+            if nodeCfg[ 'Enabled' ] == 'false' :
+                enabledCheck.props.active = False
+            else :
+                enabledCheck.props.active = True
+            grid.attach( enabledCheck, startCol + 0, startRow + 6, 1, 1 )
+            nodeCtx.enabled = enabledCheck
+            enabledCheck.iNo = i
+
+            compress = Gtk.CheckButton( label = "Compression" )
+            if nodeCfg[ 'Compression' ] == 'false' :
+                compress.props.active = False
+            else :
+                compress.props.active = True
+            grid.attach( compress, startCol + 1, startRow + 6, 1, 1 )
+            compress.iNo = i
+            nodeCtx.compress = compress
+
+            sslCheck = Gtk.CheckButton( label = "SSL" )
+            if nodeCfg[ 'EnableSSL' ] == 'false' :
+                sslCheck.props.active = False
+            else :
+                sslCheck.props.active = True
+            sslCheck.connect(
+                "toggled", self.on_button_toggled, "SSL2")
+            grid.attach( sslCheck, startCol + 2, startRow + 6, 1, 1 )
+            sslCheck.iNo = i
+            nodeCtx.sslCheck = sslCheck
+
+            removeBtn = Gtk.Button.new_with_label("Remove Node " + str( i ))
+            removeBtn.connect("clicked", self.on_remove_node_clicked)
+            grid.attach(removeBtn, startCol + 1, startRow + 7, 1, 1 )
+            removeBtn.iNo = i
+
+            nodeCtx.rowCount = GetGridRows( self.gridNet ) - startRow
+            self.nodeCtxs.append( nodeCtx )
+
+        except Exception as err:
+            text = "Failed to add node:" + str( err )
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            second_text = "@" + fname + ":" + str(exc_tb.tb_lineno)
+            self.DisplayError( text, second_text )
+
+    def on_add_node_clicked( self, button ):
+        try:
+            iNo = len( self.nodeCtxs )
+            startRow = GetGridRows( self.gridmh )
+            startRow -= 1
+            self.gridmh.remove_row( startRow )
+
+            nodeCfg = dict()
+            nodeCfg[ "NodeName" ]= "foo" + str(iNo)
+            nodeCfg[ "Enabled" ]="true"
+            nodeCfg[ "Protocol" ]= "native"
+            nodeCfg[ "AddrFormat" ]= "ipv4"
+            nodeCfg[ "IpAddress"]= "192.168.0." + str( iNo % 256 )
+            nodeCfg[ "PortNumber" ]= "4132"
+            nodeCfg[ "Compression" ]= "true"
+            nodeCfg[ "EnableWS" ]= "false"
+            nodeCfg[ "EnableSSL" ]= "false"
+            nodeCfg[ "ConnRecover" ]= "false"
+
+            self.nodes.append( nodeCfg )
+            self.AddNode( self.gridmh, iNo )
+            rows = GetGridRows( self.gridmh )
+            addBtn = Gtk.Button.new_with_label("Add Node")
+            addBtn.connect("clicked", self.on_add_node_clicked)
+            self.gridmh.attach(addBtn, 1, rows, 1, 1 )
+
+            self.gridmh.show_all()
+        except Exception as err:
+            text = "Failed to add node:" + str( err )
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            second_text = "@" + fname + ":" + str(exc_tb.tb_lineno)
+            self.DisplayError( text, second_text )
+
+    def on_remove_node_clicked( self, button ):
+        try:
+            iNo = button.iNo
+            nodeCtx = self.nodeCtxs[ iNo ]
+            grid = self.gridmh
+            for i in range( nodeCtx.rowCount ) :
+                grid.remove_row( nodeCtx.startRow )
+            for elem in self.nodeCtxs :
+                if elem.iNo > iNo and not elem.IsEmpty():
+                    elem.startRow -= nodeCtx.rowCount
+            nodeCtx.Clear()
+
+        except Exception as err:
+            text = "Failed to remove node:" + str( err )
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            second_text = "@" + fname + ":" + str(exc_tb.tb_lineno)
+            self.DisplayError( text, second_text )
+
+    def InitMultihopPage( self, grid:Gtk.Grid, startCol, startRow, confVals : dict ) :
+        try:
+            nodes = confVals[ 'Nodes' ]
+            nodeCount = len( nodes )
+
+            self.nodeCtxs = []
+
+            if nodeCount == 0 :
+                return
+
+            self.nodes = nodes
+            for i in range( nodeCount ) :
+                self.AddNode( grid, i )
+
+            rows = GetGridRows( grid )
+            addBtn = Gtk.Button.new_with_label("Add Node")
+            addBtn.connect("clicked", self.on_add_node_clicked)
+            grid.attach(addBtn, startCol + 1, rows, 1, 1 )
+
+        except Exception as err :
+            pass
+
+        return
 
     def InitNetworkPage( self, grid:Gtk.Grid, startCol, startRow, confVals : dict, ifNo = 0 ) :
         row = GetGridRows( grid )
         if self.bServer :
             labelIfNo = Gtk.Label()
-            strIfNo = "Interface " + str( ifNo ) + " :"
-            labelIfNo.set_text( strIfNo )
+            strIfNo = "<b>Interface " + str( ifNo ) + " :</b>"
+            labelIfNo.set_markup( strIfNo )
             grid.attach(labelIfNo, startCol, startRow, 1, 1 )
             if ifNo > 0 :
                 removeBtn = Gtk.Button.new_with_label("Remove interface")
@@ -244,14 +521,16 @@ class ConfigDlg(Gtk.Dialog):
                 #grid.attach(addBtn, startCol + 2, startRow, 1, 1 )
 
                 labelNote = Gtk.Label()
-                labelNote.set_markup('<i><small>edit "driver.json" to use "0.0.0.0"</small></i>')
+                labelNote.set_markup('<i><small>Note: Red items are mandatory</small></i>')
                 grid.attach(labelNote, startCol + 1, startRow, 1, 1 )
 
             startRow = GetGridRows( grid )
         
         labelIp = Gtk.Label()
         if self.bServer :
-            labelIp.set_text("Binding IP: ")
+            strText = '<span foreground="red">Binding IP: </span>'
+            labelIp.set_markup(strText)
+            #labelIp.set_markup("<mark>Binding IP: </mark>")
         else :    
             labelIp.set_text("Server IP: ")
 
@@ -273,7 +552,8 @@ class ConfigDlg(Gtk.Dialog):
 
         labelPort = Gtk.Label()
         if self.bServer :
-            labelPort.set_text("Listening Port: ")
+            strText = '<span foreground="red">Listening Port: </span>'
+            labelPort.set_markup( strText )
         else:
             labelPort.set_text("Server Port: ")
 
@@ -293,11 +573,11 @@ class ConfigDlg(Gtk.Dialog):
         grid.attach( portEditBox, startCol + 1, startRow + 1, 1, 1)
         self.ifctx[ ifNo ].port = portEditBox
 
-        self.AddSSLOptions( grid, startCol + 0, startRow + 2, confVals, ifNo )
-        self.AddAuthOptions( grid, startCol + 0, startRow + 5, confVals, ifNo )
-
         rows = GetGridRows( grid )
         self.AddWebSockOptions( grid, startCol + 0, rows, confVals, ifNo)
+
+        rows = GetGridRows( grid )
+        self.AddSSLOptions( grid, startCol + 0, rows + 0, confVals, ifNo )
 
         rows = GetGridRows( grid )
         labelCompress = Gtk.Label()
@@ -305,9 +585,19 @@ class ConfigDlg(Gtk.Dialog):
         labelCompress.set_xalign(1)
         grid.attach(labelCompress, startCol + 0, rows, 1, 1 )
 
+        bActive = True
+        try:
+            if confVals[ 'connParams'] is not None :
+                param0 = confVals[ 'connParams'][ ifNo ]
+                if param0 is not None :
+                    if param0[ "Compression"] == 'false':
+                        bActive = False
+        except Exception as err :
+            pass                
         compressCheck = Gtk.CheckButton(label="")
         compressCheck.connect(
             "toggled", self.on_button_toggled, "Compress")
+        compressCheck.props.active = bActive
         compressCheck.ifNo = ifNo
         grid.attach( compressCheck, startCol + 1, rows, 1, 1)
         self.ifctx[ ifNo ].compress = compressCheck
@@ -333,13 +623,14 @@ class ConfigDlg(Gtk.Dialog):
         webSockCheck.connect(
             "toggled", self.on_button_toggled, "WebSock")
         webSockCheck.ifNo = ifNo
+        webSockCheck.props.active = bActive
         grid.attach( webSockCheck, startCol + 1, startRow + 0, 1, 1)
         self.ifctx[ ifNo ].webSock = webSockCheck
 
         labelUrl = Gtk.Label()
         labelUrl.set_text("WebSocket URL: ")
         labelUrl.set_xalign(1)
-        grid.attach(labelUrl, startCol + 1, startRow + 1, 1, 1 )
+        grid.attach(labelUrl, startCol + 0, startRow + 1, 1, 1 )
 
         strUrl = "https://example.com";
         try :
@@ -352,7 +643,7 @@ class ConfigDlg(Gtk.Dialog):
         urlEdit = Gtk.Entry()
         urlEdit.set_text( strUrl )
         urlEdit.set_sensitive( bActive )
-        grid.attach(urlEdit, startCol + 2, startRow + 1, 1, 1 )
+        grid.attach(urlEdit, startCol + 1, startRow + 1, 1, 1 )
         self.ifctx[ ifNo ].urlEdit = urlEdit
         urlEdit.ifNo = ifNo
 
@@ -407,15 +698,15 @@ class ConfigDlg(Gtk.Dialog):
 
     def AddSSLCred( self, grid:Gtk.Grid, startCol, startRow, confVals : dict ) :
         labelSSLfiles = Gtk.Label()
-        labelSSLfiles.set_text("SSL Files: ")
-        labelSSLfiles.set_xalign(1)
-        grid.attach(labelSSLfiles, startCol, startRow, 1, 1 )
+        labelSSLfiles.set_markup("<b>SSL Files</b> ")
+        labelSSLfiles.set_xalign(.5)
+        grid.attach(labelSSLfiles, startCol + 1, startRow, 1, 1 )
         
         startRow+=1
         labelKey = Gtk.Label()
         labelKey.set_text("Key File: ")
         labelKey.set_xalign(.5)
-        grid.attach(labelKey, startCol + 1, startRow, 1, 1 )
+        grid.attach(labelKey, startCol + 0, startRow, 1, 1 )
 
         keyEditBox = Gtk.Entry()
         strKey = ""
@@ -426,17 +717,17 @@ class ConfigDlg(Gtk.Dialog):
             pass
 
         keyEditBox.set_text(strKey)
-        grid.attach(keyEditBox, startCol + 2, startRow, 1, 1 )
+        grid.attach(keyEditBox, startCol + 1, startRow, 1, 1 )
 
         keyBtn = Gtk.Button.new_with_label("...")
         keyBtn.connect("clicked", self.on_choose_key_clicked)
 
-        grid.attach(keyBtn, startCol + 3, startRow, 1, 1 )
+        grid.attach(keyBtn, startCol + 2, startRow, 1, 1 )
 
         labelCert = Gtk.Label()
         labelCert.set_text("Cert File: ")
         labelCert.set_xalign(.5)
-        grid.attach(labelCert, startCol + 1, startRow + 1, 1, 1 )
+        grid.attach(labelCert, startCol + 0, startRow + 1, 1, 1 )
 
         certEditBox = Gtk.Entry()
         strCert = ""
@@ -447,11 +738,11 @@ class ConfigDlg(Gtk.Dialog):
         except Exception as err :
             pass    
         certEditBox.set_text(strCert)
-        grid.attach(certEditBox, startCol + 2, startRow + 1, 1, 1 )
+        grid.attach(certEditBox, startCol + 1, startRow + 1, 1, 1 )
 
         certBtn = Gtk.Button.new_with_label("...")
         certBtn.connect("clicked", self.on_choose_cert_clicked)
-        grid.attach(certBtn, startCol + 3, startRow + 1, 1, 1 )
+        grid.attach(certBtn, startCol + 2, startRow + 1, 1, 1 )
 
         self.keyEdit = keyEditBox
         self.certEdit = certEditBox
@@ -461,18 +752,30 @@ class ConfigDlg(Gtk.Dialog):
 
     def on_button_toggled( self, button, name ):
         print( name )
-        ifNo = button.ifNo
         if name == 'SSL' :
+            ifNo = button.ifNo
             if self.ifctx[ ifNo ].webSock.props.active and not button.props.active :
                 button.props.active = True
                 return
         elif name == 'Auth' :
             pass
         elif name == 'WebSock' :
+            ifNo = button.ifNo
             self.ifctx[ ifNo ].urlEdit.set_sensitive( button.props.active )
             if not self.ifctx[ ifNo ].webSock.props.active :
                 return
             self.ifctx[ ifNo ].sslCheck.set_active(button.props.active)
+        elif name == 'WebSock2' :
+            iNo = button.iNo
+            self.nodeCtxs[ iNo ].urlEdit.set_sensitive( button.props.active )
+            if not self.nodeCtxs[ iNo ].webSock.props.active :
+                return
+            self.nodeCtxs[ iNo ].sslCheck.set_active(button.props.active)
+        if name == 'SSL2' :
+            iNo = button.iNo
+            if self.nodeCtxs[ iNo ].webSock.props.active and not button.props.active :
+                button.props.active = True
+                return
 
     def on_choose_key_clicked( self, button ) :
         self.on_choose_file_clicked( button, True )
@@ -537,14 +840,14 @@ class ConfigDlg(Gtk.Dialog):
 
     def AddAuthCred( self, grid:Gtk.Grid, startCol, startRow, confVals : dict ) :
         labelAuthCred = Gtk.Label()
-        labelAuthCred.set_text("Auth Information")
-        labelAuthCred.set_xalign(1)
-        grid.attach(labelAuthCred, startCol + 0, startRow + 0, 1, 1 )
+        labelAuthCred.set_markup("<b>Auth Information</b>")
+        labelAuthCred.set_xalign(.5)
+        grid.attach(labelAuthCred, startCol + 1, startRow + 0, 1, 1 )
 
         labelMech = Gtk.Label()
         labelMech.set_text("Auth Mech: ")
         labelMech.set_xalign(.5)
-        grid.attach(labelMech, startCol + 1, startRow + 1, 1, 1 )
+        grid.attach(labelMech, startCol + 0, startRow + 1, 1, 1 )
 
         mechList = Gtk.ListStore()
         mechList = Gtk.ListStore(int, str)
@@ -554,12 +857,12 @@ class ConfigDlg(Gtk.Dialog):
         mechCombo.set_entry_text_column(1)
         mechCombo.set_active( 0 )
         mechCombo.set_sensitive( False )
-        grid.attach(mechCombo, startCol + 2, startRow + 1, 1, 1 )
+        grid.attach(mechCombo, startCol + 1, startRow + 1, 1, 1 )
 
         labelSvc = Gtk.Label()
         labelSvc.set_text("Service Name: ")
         labelSvc.set_xalign(.5)
-        grid.attach(labelSvc, startCol + 1, startRow + 2, 1, 1 )
+        grid.attach(labelSvc, startCol + 0, startRow + 2, 1, 1 )
 
         strSvc = ""
         try:
@@ -572,12 +875,12 @@ class ConfigDlg(Gtk.Dialog):
 
         svcEditBox = Gtk.Entry()
         svcEditBox.set_text(strSvc)
-        grid.attach(svcEditBox, startCol + 2, startRow + 2, 2, 1 )
+        grid.attach(svcEditBox, startCol + 1, startRow + 2, 2, 1 )
 
         labelRealm = Gtk.Label()
         labelRealm.set_text("Realm: ")
         labelRealm.set_xalign(.5)
-        grid.attach(labelRealm, startCol + 1, startRow + 3, 1, 1 )
+        grid.attach(labelRealm, startCol + 0, startRow + 3, 1, 1 )
 
         strRealm = ""
         try:
@@ -589,12 +892,12 @@ class ConfigDlg(Gtk.Dialog):
             pass
         realmEditBox = Gtk.Entry()
         realmEditBox.set_text(strRealm)
-        grid.attach(realmEditBox, startCol + 2, startRow + 3, 2, 1 )
+        grid.attach(realmEditBox, startCol + 1, startRow + 3, 2, 1 )
 
         labelSign = Gtk.Label()
         labelSign.set_text("Sign/Encrypt: ")
         labelSign.set_xalign(.5)
-        grid.attach(labelSign, startCol + 1, startRow + 4, 1, 1 )
+        grid.attach(labelSign, startCol + 0, startRow + 4, 1, 1 )
 
         idx = 1
         try:
@@ -617,12 +920,12 @@ class ConfigDlg(Gtk.Dialog):
         signCombo.set_entry_text_column(1)
         signCombo.set_active(idx)
 
-        grid.attach( signCombo, startCol + 2, startRow + 4, 1, 1 )
+        grid.attach( signCombo, startCol + 1, startRow + 4, 1, 1 )
 
         labelKdc = Gtk.Label()
         labelKdc.set_text("KDC IP address: ")
         labelKdc.set_xalign(.5)
-        grid.attach(labelKdc, startCol + 1, startRow + 5, 1, 1 )
+        grid.attach(labelKdc, startCol + 0, startRow + 5, 1, 1 )
 
         strKdcIp = ""
         try:
@@ -633,15 +936,12 @@ class ConfigDlg(Gtk.Dialog):
 
         kdcEditBox = Gtk.Entry()
         kdcEditBox.set_text(strKdcIp)
-        grid.attach(kdcEditBox, startCol + 2, startRow + 5, 2, 1 )
+        grid.attach(kdcEditBox, startCol + 1, startRow + 5, 2, 1 )
 
         self.svcEdit = svcEditBox
         self.realmEdit = realmEditBox
         self.signCombo = signCombo
         self.kdcEdit = kdcEditBox
-
-    def AddAuthOptions( self, grid:Gtk.Grid, startCol, startRow, confVals : dict, ifNo = 0 ) :
-        pass
 
     def on_sign_msg_changed(self, combo) :
         tree_iter = combo.get_active_iter()
@@ -654,39 +954,72 @@ class ConfigDlg(Gtk.Dialog):
             print("Entered: %s" % entry.get_text())
 
     def VerifyInput( self ) :
-        for interf in self.ifctx :
-            if interf.sslCheck is None :
-                break
-            if interf.sslCheck.props.active :
-                if len( self.keyEdit.get_text() ) == 0 :
-                    return "key file is empty"
-                if len( self.certEdit.get_text() ) == 0 :
-                    return "cert file is empty"
-            if interf.authCheck.props.active :
-                if len( self.realmEdit.get_text() ) == 0 :
-                    return "auth enabled, but realm is empty"
-                if len( self.svcEdit.get_text() ) == 0 :
-                    return "auth enabled, but service is empty"
-                if len( self.kdcEdit.get_text() ) == 0 :
-                    return "auth enabled, but kdc address is empty"
-            if len( interf.ipAddr.get_text() ) == 0 :
-                return "ip address is empty"
-            if interf.ipAddr.get_text() == '0.0.0.0' :
-                return "ip address is '0.0.0.0'";
+        try:
+            for interf in self.ifctx :
+                if interf.sslCheck.props.active :
+                    if len( self.keyEdit.get_text() ) == 0 :
+                        return "SSL enabled, key file is empty"
+                    if len( self.certEdit.get_text() ) == 0 :
+                        return "SSL enabled, cert file is empty"
+                if interf.authCheck.props.active :
+                    if len( self.realmEdit.get_text() ) == 0 :
+                        return "Auth enabled, but realm is empty"
+                    if len( self.svcEdit.get_text() ) == 0 :
+                        return "Auth enabled, but service is empty"
+                    if len( self.kdcEdit.get_text() ) == 0 :
+                        return "Auth enabled, but kdc address is empty"
+                if len( interf.ipAddr.get_text() ) == 0 :
+                    return "Ip address is empty"
+                if len( interf.port.get_text() ) == 0 :
+                    return "Port number is empty"
+                if interf.ipAddr.get_text() == '0.0.0.0' :
+                    return "Ip address is '0.0.0.0'";
+                if interf.webSock.props.active :
+                    if len( interf.urlEdit.get_text() ) == 0 :
+                        return "WebSocket enabled, but dest url is empty"
+
+            for nodeCtx in self.nodeCtxs :
+                if nodeCtx.sslCheck.props.active :
+                    if len( self.keyEdit.get_text() ) == 0 :
+                        return "SSL enabled, but key file is empty"
+                    if len( self.certEdit.get_text() ) == 0 :
+                        return "SSL enabled, but cert file is empty"
+                if len( nodeCtx.ipAddr.get_text() ) == 0 :
+                    return "Ip address is empty"
+                if len( nodeCtx.portNum.get_text() ) == 0 :
+                    return "Port number is empty"
+                if nodeCtx.ipAddr.get_text() == '0.0.0.0' :
+                    return "ip address is '0.0.0.0'"
+                if nodeCtx.webSock.props.active :
+                    if len( interf.urlEdit.get_text() ) == 0 :
+                        return "WebSocket enabled, but dest url is empty"
+
+        except Exception as err:
+            text = "Verify input failed:" + str( err )
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            second_text = "@" + fname + ":" + str(exc_tb.tb_lineno)
+            self.DisplayError( text, second_text )
+            return text
 
         return "success"
+
+    def DisplayError( self, text, second_text = None ):
+        dialog = Gtk.MessageDialog(
+            self, 0,
+            Gtk.MessageType.ERROR,
+            Gtk.ButtonsType.OK,
+            text )
+        if second_text is not None and len( second_text ) > 0 :
+            dialog.format_secondary_text( second_text )                     
+        dialog.run()
+        dialog.destroy()
 
     def ExportFiles( self, path : str) :
         error = self.VerifyInput()
         if error != 'success' :
             text = "Error occurs : " + error
-            dialog = Gtk.MessageDialog(self,
-                     0,
-                     Gtk.MessageType.ERROR,
-                     Gtk.ButtonsType.OK,
-                     text );
-            dialog.run()
-            dialog.destroy()
+            self.DisplayError( text )
             return -1
         try:
             jsonFiles = self.jsonFiles;
@@ -852,14 +1185,7 @@ class ConfigDlg(Gtk.Dialog):
             exc_type, exc_obj, exc_tb = sys.exc_info()
             fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
             second_text = "@" + fname + ":" + str(exc_tb.tb_lineno)
-            dialog = Gtk.MessageDialog(self,
-                     0,
-                     Gtk.MessageType.ERROR,
-                     Gtk.ButtonsType.OK,
-                     text )
-            dialog.format_secondary_text( second_text )                     
-            dialog.run()
-            dialog.destroy()
+            self.DisplayError( text, second_text )
             return -1
 
         return 0
@@ -869,10 +1195,19 @@ class ConfigDlg(Gtk.Dialog):
         err = self.ExportFiles( path )
         if err < 0 :
             return err
-        move( path + '/driver.json', self.jsonFiles[ 0 ][ 0 ] )
-        move( path + '/router.json', self.jsonFiles[ 1 ][ 0 ] )
-        move( path + '/rtauth.json', self.jsonFiles[ 2 ][ 0 ] )
-        move( path + '/authprxy.json', self.jsonFiles[ 3 ][ 0 ] )
+        try:
+            move( path + '/driver.json', self.jsonFiles[ 0 ][ 0 ] )
+            move( path + '/router.json', self.jsonFiles[ 1 ][ 0 ] )
+            move( path + '/rtauth.json', self.jsonFiles[ 2 ][ 0 ] )
+            move( path + '/authprxy.json', self.jsonFiles[ 3 ][ 0 ] )
+        except Exception as err :
+            text = "Failed to export files:" + str( err )
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            second_text = "@" + fname + ":" + str(exc_tb.tb_lineno)
+            self.DisplayError( text, second_text )
+            return -1
+        return 0
         
 
 win = ConfigDlg(True)
@@ -880,7 +1215,9 @@ win.connect("close", Gtk.main_quit)
 while True :
     response = win.run()
     if response == Gtk.ResponseType.OK:
-        win.UpdateConfig()
+        ret = win.UpdateConfig()
+        if ret < 0 :
+            continue
     elif response == Gtk.ResponseType.YES:
         dialog = Gtk.FileChooserDialog(
             title="Please choose a directory",
@@ -899,6 +1236,25 @@ while True :
         dialog.destroy()
         win.ExportFiles(path)
         continue
+    elif response == Gtk.ResponseType.APPLY:
+        dialog = Gtk.FileChooserDialog(
+            title="Please choose a directory",
+            parent=win,
+            action=Gtk.FileChooserAction.SELECT_FOLDER)
+        dialog.add_buttons(
+            Gtk.STOCK_CANCEL,
+            Gtk.ResponseType.CANCEL,
+            Gtk.STOCK_OPEN,
+            Gtk.ResponseType.OK,
+        )
+        response = dialog.run()
+        path = '.'
+        if response == Gtk.ResponseType.OK:
+            path = dialog.get_filename()
+        dialog.destroy()
+        win.ReinitDialog( path )
+        continue
+
     break
     
 win.destroy()

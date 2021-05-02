@@ -14,7 +14,7 @@ ridlc.cpp ridlc.h : ridlc.y
 	bison --defines=ridlc.h --output=ridlc.cpp -r all ridlc.y
 
 mktpl : mktpl.in
-	sed -e 's,[@]PKG_CONFIG_PATH[@],$(pkgconfigdir),g' mktpl.in > mktpl
+	sed -e 's,[@]PKG_CONFIG_PATH[@],$(pkgconfigdir),g;s,[@]DIST_LIB_DIR[@],$(libdir),g' mktpl.in > mktpl
 
 ridlc_LDADD=-lipc -lcombase -lutils -lstdc++ -ljsoncpp -L../combase -L../ipc -L../3rd_party
 ridlcdir=$(bindir)
