@@ -188,7 +188,7 @@ gint32 CheckNameDup(
 %token TOK_ASYNC
 %token TOK_ASYNCP
 %token TOK_ASYNCS
-// %token TOK_STREAM
+%token TOK_STREAM
 %token TOK_EVENT
 // %token TOK_SERIAL
 %token TOK_TIMEOUT
@@ -581,7 +581,7 @@ attr_name :
     | TOK_ASYNCP { DEFAULT_ACTION; }
     | TOK_ASYNCS { DEFAULT_ACTION; }
     | TOK_EVENT { DEFAULT_ACTION; }
-    // | TOK_STREAM { DEFAULT_ACTION; }
+    | TOK_STREAM { DEFAULT_ACTION; }
     // | TOK_SERIAL { DEFAULT_ACTION; }
     | TOK_TIMEOUT { DEFAULT_ACTION; }
     | TOK_RTPATH { DEFAULT_ACTION; }
@@ -1108,6 +1108,14 @@ service_decl : TOK_SERVICE TOK_IDENT attr_list '{' interf_refs '}'
         {
             ObjPtr& pal = *$3;
             psd->SetAttrList( pal );
+
+            BufPtr pBuf;
+            CAttrExps* paes = pal;
+            ret = paes->GetAttrByToken(
+                TOK_STREAM, pBuf );
+            if( SUCCEEDED( ret ) )
+                psd->EnableStream();
+            ret = 0;
         }
         ObjPtr& pifrs = *$5;
         psd->SetInterfList( pifrs );

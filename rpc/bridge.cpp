@@ -3158,14 +3158,18 @@ gint32 CRpcInterfaceServer::DoInvoke(
                         oOrigReq.GetTimeoutSec( dwTimeout );
                     if( SUCCEEDED( iRet ) )
                     {
-                        if( dwTimeout < 7200 )
+                        if( dwTimeout > ( MAX_TIMEOUT_VALUE / 30 ) )
+                            dwTimeout = ( MAX_TIMEOUT_VALUE / 30 );
+                        if( dwTimeout > 120 )
                             oNewReq.SetTimeoutSec( dwTimeout );
                     }
 
                     iRet = oOrigReq.GetKeepAliveSec( dwTimeout );
                     if( SUCCEEDED( iRet ) )
                     {
-                        if( dwTimeout < 7200 )
+                        if( dwTimeout > ( MAX_TIMEOUT_VALUE / 30 ) )
+                            dwTimeout = ( MAX_TIMEOUT_VALUE / 30 );
+                        if( dwTimeout > 120 )
                             oNewReq.SetKeepAliveSec( dwTimeout );
                     }
 
