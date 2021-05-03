@@ -105,7 +105,7 @@ class NodeContext :
     def Clear( self ):
         self.ipAddr = None
         self.port = None
-        self.NodeName = None
+        self.nodeName = None
         self.enabled = None
         self.compress = None
         self.sslCheck = None
@@ -347,7 +347,7 @@ class ConfigDlg(Gtk.Dialog):
             portNum.set_text( nodeCfg[ 'PortNumber' ] )
             grid.attach(portNum, startCol + 1, startRow + 3, 1, 1 )
             portNum.iNo = i
-            nodeCtx.portNum = portNum;
+            nodeCtx.port = portNum;
 
             labelWebSock = Gtk.Label()
             labelWebSock.set_text("WebSocket: ")
@@ -415,7 +415,7 @@ class ConfigDlg(Gtk.Dialog):
             grid.attach(removeBtn, startCol + 1, startRow + 7, 1, 1 )
             removeBtn.iNo = i
 
-            nodeCtx.rowCount = GetGridRows( self.gridNet ) - startRow
+            nodeCtx.rowCount = GetGridRows( grid ) - startRow
             self.nodeCtxs.append( nodeCtx )
 
         except Exception as err:
@@ -425,6 +425,20 @@ class ConfigDlg(Gtk.Dialog):
             second_text = "@" + fname + ":" + str(exc_tb.tb_lineno)
             self.DisplayError( text, second_text )
 
+    def InitNodeCfg( self, iNo ) :
+        nodeCfg = dict()
+        nodeCfg[ "NodeName" ]= "foo" + str(iNo)
+        nodeCfg[ "Enabled" ]="true"
+        nodeCfg[ "Protocol" ]= "native"
+        nodeCfg[ "AddrFormat" ]= "ipv4"
+        nodeCfg[ "IpAddress"]= "192.168.0." + str( iNo % 256 )
+        nodeCfg[ "PortNumber" ]= "4132"
+        nodeCfg[ "Compression" ]= "true"
+        nodeCfg[ "EnableWS" ]= "false"
+        nodeCfg[ "EnableSSL" ]= "false"
+        nodeCfg[ "ConnRecover" ]= "false"
+        return nodeCfg
+
     def on_add_node_clicked( self, button ):
         try:
             iNo = len( self.nodeCtxs )
@@ -432,17 +446,7 @@ class ConfigDlg(Gtk.Dialog):
             startRow -= 1
             self.gridmh.remove_row( startRow )
 
-            nodeCfg = dict()
-            nodeCfg[ "NodeName" ]= "foo" + str(iNo)
-            nodeCfg[ "Enabled" ]="true"
-            nodeCfg[ "Protocol" ]= "native"
-            nodeCfg[ "AddrFormat" ]= "ipv4"
-            nodeCfg[ "IpAddress"]= "192.168.0." + str( iNo % 256 )
-            nodeCfg[ "PortNumber" ]= "4132"
-            nodeCfg[ "Compression" ]= "true"
-            nodeCfg[ "EnableWS" ]= "false"
-            nodeCfg[ "EnableSSL" ]= "false"
-            nodeCfg[ "ConnRecover" ]= "false"
+            nodeCfg = self.InitNodeCfg( iNo )
 
             self.nodes.append( nodeCfg )
             self.AddNode( self.gridmh, iNo )
@@ -956,6 +960,8 @@ class ConfigDlg(Gtk.Dialog):
     def VerifyInput( self ) :
         try:
             for interf in self.ifctx :
+                if interf.IsEmpty() :
+                    continue
                 if interf.sslCheck.props.active :
                     if len( self.keyEdit.get_text() ) == 0 :
                         return "SSL enabled, key file is empty"
@@ -979,6 +985,8 @@ class ConfigDlg(Gtk.Dialog):
                         return "WebSocket enabled, but dest url is empty"
 
             for nodeCtx in self.nodeCtxs :
+                if nodeCtx.IsEmpty() :
+                    continue
                 if nodeCtx.sslCheck.props.active :
                     if len( self.keyEdit.get_text() ) == 0 :
                         return "SSL enabled, but key file is empty"
@@ -986,7 +994,7 @@ class ConfigDlg(Gtk.Dialog):
                         return "SSL enabled, but cert file is empty"
                 if len( nodeCtx.ipAddr.get_text() ) == 0 :
                     return "Ip address is empty"
-                if len( nodeCtx.portNum.get_text() ) == 0 :
+                if len( nodeCtx.port.get_text() ) == 0 :
                     return "Port number is empty"
                 if nodeCtx.ipAddr.get_text() == '0.0.0.0' :
                     return "ip address is '0.0.0.0'"
@@ -1014,6 +1022,101 @@ class ConfigDlg(Gtk.Dialog):
             dialog.format_secondary_text( second_text )                     
         dialog.run()
         dialog.destroy()
+
+    def ExportNodeCtx( self, nodeCtx, nodeCfg ):
+        try:
+            strVal = nodeCtx.ipAddr.get_text() 
+            if len( strVal ) == 0 :
+                raise Exception("'IP address' cannot be empty") 
+            nodeCfg[ 'IpAddress' ] = strVal
+
+            strVal = nodeCtx.port.get_text()
+            if len( strVal ) == 0 :
+                strVal = str( 4132 )
+            nodeCfg[ 'PortNumber' ] = strVal
+
+            strVal = nodeCtx.nodeName.get_text()
+            if len( strVal ) == 0 :
+                raise Exception("'Node Name' cannot be empty") 
+
+            if nodeCtx.enabled.props.active :
+                nodeCfg[ "Enabled" ] = "true"
+            else :
+                nodeCfg[ "Enabled" ] = "false"
+
+            if nodeCtx.compress.props.active:
+                nodeCfg[ "Compression" ] = "true"
+            else:
+                nodeCfg[ "Compression" ] = "false"
+
+            if nodeCtx.sslCheck.props.active:
+                nodeCfg[ "EnalbeSSL" ] = "true"
+            else:
+                nodeCfg[ "EnalbeSSL" ] = "false"
+
+            strVal = nodeCtx.urlEdit.get_text()
+            if nodeCtx.webSock.props.active :
+                if len( strVal ) == 0 :
+                    raise Exception("'WebSocket URL' cannot be empty") 
+                nodeCfg[ "EnableWS" ] = "true"
+                nodeCfg[ "DestURL" ] = strVal
+            else :
+                nodeCfg[ "EnableWS" ] = "false"
+                nodeCfg[ "DestURL" ] = strVal
+
+        except Exception as err :
+            text = "Failed to export node:" + str( err )
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            second_text = "@" + fname + ":" + str(exc_tb.tb_lineno)
+            self.DisplayError( text, second_text )
+            return -1
+
+        return 0
+
+    def ExportNodeCtxs( self ):
+        try:
+            nodeCtxs = self.nodeCtxs
+            nodeCtxsFin = []
+            if nodeCtxs is not None :
+                for nodeCtx in nodeCtxs :
+                    if nodeCtx.IsEmpty() :
+                        continue
+                    nodeCtxsFin.append( nodeCtx )
+
+            numCtx = len( nodeCtxsFin )
+            if numCtx == 0 :
+                self.nodes.clear()
+                return 0
+
+            if self.nodes is not None :
+                numCfg = len( self.nodes )
+            else :
+                numCfg = numCtx
+                self.nodes = [ InitNodeCfg( 0 ) ] * numCtx
+
+            diff = numCtx - numCfg
+            if diff < 0 :
+                for i in range( -diff ) :
+                    self.nodes.pop()
+            elif diff > 0 :
+                self.nodes += [ InitNodeCfg( 0 ) ] * diff
+
+            for i in range( numCtx ):
+                ret = self.ExportNodeCtx(
+                    nodeCtxsFin[ i ], self.nodes[ i ] )
+                if ret < 0 :
+                    return ret
+
+        except Exception as err :
+            text = "Failed to export node:" + str( err )
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            second_text = "@" + fname + ":" + str(exc_tb.tb_lineno)
+            self.DisplayError( text, second_text )
+            return -1
+
+        return 0
 
     def ExportFiles( self, path : str) :
         error = self.VerifyInput()
@@ -1106,10 +1209,23 @@ class ConfigDlg(Gtk.Dialog):
                             authInfo[ 'SignMessage' ] = 'true'
 
                         svrObj[ 'AuthInfo'] = authInfo;
+                        self.ExportNodeCtxs();
                         break
 
             rtauPath = path + '/rtauth.json'
             fp = open(rtauPath, "w")
+            json.dump( rtDesc, fp, indent = 4 )
+            fp.close()
+
+            rtDesc = jsonFiles[ 1 ][ 1 ]
+            svrObjs = rtDesc[ 'Objects' ]
+            if svrObjs is not None and len( svrObjs ) > 0 :
+                for svrObj in svrObjs :
+                    if svrObj[ 'ObjectName'] == 'RpcRouterBridgeImpl' :
+                        svrObj[ 'Nodes' ] = self.nodes;
+                        break
+            rtPath = path + '/router.json'
+            fp = open(rtPath, "w")
             json.dump( rtDesc, fp, indent = 4 )
             fp.close()
 
