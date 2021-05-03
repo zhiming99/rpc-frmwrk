@@ -1,0 +1,1 @@
+`rpcfg.py` is a GUI tool for rpcrouter configuration. It generate the configuration files including `driver.json, router.json, rtauth.json, and authprxy.json`. Both `bridge` and `reqfwdr` will use these four files to run. 
