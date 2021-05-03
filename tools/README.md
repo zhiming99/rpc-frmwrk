@@ -1,0 +1,1 @@
+`rpcfg.py` is a GUI tool for rpcrouter configuration. It generate the configuration files including `driver.json, router.json, rtauth.json, and authprxy.json`. Please refer to this [article](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/readme.md), for `rpcrouter`'s concept.
