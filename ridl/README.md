@@ -103,7 +103,7 @@ The above example shows most of the statements ridl supports. ridl now has 7 typ
     * **SSL** : the existance of this attribute instructs to connect to the remote router via [SSL](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/sslport/Readme.md) connection.
     * **compress** : the existance of this attribute instruct to compress the message bound to the remote router.
     * **auth** : the so-called `AuthInfo` string, to specify the authentication information to access the remote router. If this attribute does not exist, the authentication related traffic won't happen. The above four attributes can combine freely. Currently `Kerberos` is the only supported auth mechanism, and therefore the json string contain the `Kerberos`'s authentication information. Please follow [link](https://github.com/zhiming99/rpc-frmwrk/tree/master/rpc/security#4-configure-rpc-frmwrk-with-authentication) for more information about `AuthInfo`.
-    * **stream** : a flag to specify the `service` object with streaming support enabled.
+    * **stream** : a flag to enable streaming support on this `service` object.
 
 ### Invoking `ridlc`
 
