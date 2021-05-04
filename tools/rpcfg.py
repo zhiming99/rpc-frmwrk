@@ -3,6 +3,7 @@ import json
 import os
 import sys 
 from shutil import move
+from copy import deepcopy
 
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk
@@ -138,7 +139,18 @@ class ConfigDlg(Gtk.Dialog):
                 if port[ 'PortClass'] == 'RpcTcpBusPort' :
                     connParams = port[ 'Parameters']
                     if connParams is None :
-                        continue
+                        ifCfg = dict()
+                        ifCfg[ "AddrFormat" ]= "ipv4";
+                        ifCfg[ "Protocol" ]= "native";
+                        ifCfg[ "PortNumber" ]= "4132";
+                        ifCfg[ "BindAddr"] = "127.0.0.1" ;
+                        ifCfg[ "PdoClass"] = "TcpStreamPdo2",;
+                        ifCfg[ "Compression" ]= "true";
+                        ifCfg[ "EnableWS" ]= "false";
+                        ifCfg[ "EnableSSL" ]= "false";
+                        ifCfg[ "ConnRecover" ]= "false";
+                        ifCfg[ "HasAuth" ]= "false";
+                        connparams = [ ifCfg, ]
                     confVals[ "connParams"] = [ *connParams ]
             except Exception as err :
                 pass
@@ -192,14 +204,16 @@ class ConfigDlg(Gtk.Dialog):
             pass
 
         gridNet = self.gridNet
-        #uncomment the following line for multi-if
-        #for interf in self.ifctx :
         rows = GetGridRows( gridNet )
         for i in range( rows ) :
             gridNet.remove_row( 0 )
 
-        for i in range( 1 ) :
+        #uncomment the following line for multi-if
+        #for interf in self.ifctx :
+        for i in range( len( self.ifctx ) ) :
             interf = self.ifctx[ i ]
+            if interf.IsEmpty():
+                continue
             row = GetGridRows( gridNet )
             interf.startRow = row
             self.InitNetworkPage( gridNet, 0, row, confVals, i )
@@ -250,17 +264,17 @@ class ConfigDlg(Gtk.Dialog):
         #gridNet.set_row_homogeneous( True )
         gridNet.props.row_spacing = 6
         i = 0
+
         #uncomment the following line for multi-if
-        #for interf in self.ifctx :
-        for i in range( 1 ) :
+        for i in range( len( self.ifctx ) ) :
             interf = self.ifctx[ i ]
             row = GetGridRows( gridNet )
             interf.startRow = row
             self.InitNetworkPage( gridNet, 0, row, confVals, i )
             interf.rowCount = GetGridRows( gridNet ) - row
             i += 1
-        self.gridNet = gridNet
 
+        self.gridNet = gridNet
         stack.add_titled(gridNet, "GridConn", "Connection")
 
         gridCred = Gtk.Grid()
@@ -283,14 +297,12 @@ class ConfigDlg(Gtk.Dialog):
         scrolledWin = Gtk.ScrolledWindow(hexpand=True, vexpand=True)
         scrolledWin.set_border_width(10)
         scrolledWin.set_policy(
-            #uncomment the following line to show scrollbar
             Gtk.PolicyType.NEVER, Gtk.PolicyType.ALWAYS)
-            #Gtk.PolicyType.NEVER, Gtk.PolicyType.NEVER)
         scrolledWin.add( stack )
         vbox.pack_start(scrolledWin, True, True, 0)
 
         self.set_border_width(10)
-        self.set_default_size(500, 460)
+        self.set_default_size(400, 460)
         box = self.get_content_area()
         box.add(vbox)
         self.show_all()
@@ -512,21 +524,11 @@ class ConfigDlg(Gtk.Dialog):
             labelIfNo = Gtk.Label()
             strIfNo = "<b>Interface " + str( ifNo ) + " :</b>"
             labelIfNo.set_markup( strIfNo )
-            grid.attach(labelIfNo, startCol, startRow, 1, 1 )
-            if ifNo > 0 :
-                removeBtn = Gtk.Button.new_with_label("Remove interface")
-                removeBtn.ifNo = ifNo
-                removeBtn.connect("clicked", self.on_remove_if_clicked)
-                grid.attach(removeBtn, startCol + 2, startRow, 1, 1 )
-            else :
-                addBtn = Gtk.Button.new_with_label("Add interface")
-                addBtn.connect("clicked", self.on_add_if_clicked)
-                #uncomment the following line to support more interfaces
-                #grid.attach(addBtn, startCol + 2, startRow, 1, 1 )
+            grid.attach(labelIfNo, startCol + 1, startRow, 1, 1 )
 
-                labelNote = Gtk.Label()
-                labelNote.set_markup('<i><small>Note: Red items are mandatory</small></i>')
-                grid.attach(labelNote, startCol + 1, startRow, 1, 1 )
+                #labelNote = Gtk.Label()
+                #labelNote.set_markup('<i><small>red options are mandatory</small></i>')
+                #grid.attach(labelNote, startCol + 1, startRow, 1, 1 )
 
             startRow = GetGridRows( grid )
         
@@ -564,7 +566,7 @@ class ConfigDlg(Gtk.Dialog):
         labelPort.set_xalign(1)
         grid.attach(labelPort, startCol + 0, startRow + 1, 1, 1 )
 
-        portNum = 4312
+        portNum = 4132
         try:
             if confVals[ 'connParams'] is not None :
                 param0 = confVals[ 'connParams'][ ifNo ]
@@ -583,12 +585,6 @@ class ConfigDlg(Gtk.Dialog):
         rows = GetGridRows( grid )
         self.AddSSLOptions( grid, startCol + 0, rows + 0, confVals, ifNo )
 
-        rows = GetGridRows( grid )
-        labelCompress = Gtk.Label()
-        labelCompress.set_text("Compress: ")
-        labelCompress.set_xalign(1)
-        grid.attach(labelCompress, startCol + 0, rows, 1, 1 )
-
         bActive = True
         try:
             if confVals[ 'connParams'] is not None :
@@ -598,7 +594,8 @@ class ConfigDlg(Gtk.Dialog):
                         bActive = False
         except Exception as err :
             pass                
-        compressCheck = Gtk.CheckButton(label="")
+
+        compressCheck = Gtk.CheckButton(label="Compression")
         compressCheck.connect(
             "toggled", self.on_button_toggled, "Compress")
         compressCheck.props.active = bActive
@@ -606,20 +603,31 @@ class ConfigDlg(Gtk.Dialog):
         grid.attach( compressCheck, startCol + 1, rows, 1, 1)
         self.ifctx[ ifNo ].compress = compressCheck
 
+        if ifNo == 0 :
+            addBtn = Gtk.Button.new_with_label("Add interface")
+            addBtn.connect("clicked", self.on_add_if_clicked)
+            grid.attach(addBtn, startCol + 1, rows + 1, 1, 1 )
+        else :
+            removeBtn = Gtk.Button.new_with_label(
+                "Remove interface " + str(ifNo) )
+            removeBtn.ifNo = ifNo
+            removeBtn.connect("clicked", self.on_remove_if_clicked)
+            grid.attach(removeBtn, startCol + 1, rows + 1, 1, 1 )
+
     def AddWebSockOptions( self, grid:Gtk.Grid, startCol, startRow, confVals : dict, ifNo = 0 ) :
         labelWebSock = Gtk.Label()
         labelWebSock.set_text("WebSocket: ")
         labelWebSock.set_xalign(1)
         grid.attach(labelWebSock, startCol + 0, startRow + 0, 1, 1 )
 
-        bActive = True
+        bActive = False
         try :
             if confVals[ 'connParams'] is not None :
                 param0 = confVals[ 'connParams'][ ifNo ]
                 if param0[ 'EnableWS'] is not None :
-                    strUrl = param0[ 'EnableWS']
-                    if strUrl == 'false' :
-                        bActive = False
+                    strVal = param0[ 'EnableWS']
+                    if strVal == 'true' :
+                        bActive = True
         except Exception as err :
             pass
 
@@ -652,11 +660,6 @@ class ConfigDlg(Gtk.Dialog):
         urlEdit.ifNo = ifNo
 
     def AddSSLOptions( self, grid:Gtk.Grid, startCol, startRow, confVals : dict, ifNo = 0 ) :
-        labelSSL = Gtk.Label()
-        labelSSL.set_text("SSL: ")
-        labelSSL.set_xalign(1)
-        grid.attach(labelSSL, startCol + 0, startRow, 1, 1 )
-
         bActive = False
         try:
             if confVals[ 'connParams'] is not None :
@@ -668,18 +671,16 @@ class ConfigDlg(Gtk.Dialog):
         except Exception as err :
             pass
 
-        sslCheck = Gtk.CheckButton(label="")
+        if not bActive :
+            bActive = self.ifctx[ ifNo ].webSock.props.active
+
+        sslCheck = Gtk.CheckButton(label="SSL")
         sslCheck.set_active( bActive )
         sslCheck.connect(
             "toggled", self.on_button_toggled, "SSL")
         sslCheck.ifNo = ifNo
-        grid.attach( sslCheck, startCol + 1, startRow, 1, 1 )
+        grid.attach( sslCheck, startCol + 2, startRow, 1, 1 )
         self.ifctx[ ifNo ].sslCheck = sslCheck
-
-        labelAuth = Gtk.Label()
-        labelAuth.set_text("Auth: ")
-        labelAuth.set_xalign(1)
-        grid.attach(labelAuth, startCol + 0, startRow + 1, 1, 1 )
 
         bActive = False
         try:
@@ -692,12 +693,12 @@ class ConfigDlg(Gtk.Dialog):
         except Exception as err :
             pass
 
-        authCheck = Gtk.CheckButton(label="")
+        authCheck = Gtk.CheckButton(label="Auth")
         authCheck.set_active( bActive )
         authCheck.connect(
             "toggled", self.on_button_toggled, "Auth")
         authCheck.ifNo = ifNo
-        grid.attach( authCheck, startCol + 1, startRow + 1, 1, 1 )
+        grid.attach( authCheck, startCol + 0, startRow, 1, 1 )
         self.ifctx[ ifNo ].authCheck = authCheck
 
     def AddSSLCred( self, grid:Gtk.Grid, startCol, startRow, confVals : dict ) :
@@ -959,6 +960,7 @@ class ConfigDlg(Gtk.Dialog):
 
     def VerifyInput( self ) :
         try:
+            addrSet = set()
             for interf in self.ifctx :
                 if interf.IsEmpty() :
                     continue
@@ -976,14 +978,25 @@ class ConfigDlg(Gtk.Dialog):
                         return "Auth enabled, but kdc address is empty"
                 if len( interf.ipAddr.get_text() ) == 0 :
                     return "Ip address is empty"
+                else :
+                    strIp = interf.ipAddr.get_text()
+
                 if len( interf.port.get_text() ) == 0 :
                     return "Port number is empty"
+                else:
+                    strPort = interf.port.get_text()
+
+                if (strIp, strPort) not in addrSet :
+                    addrSet.add((strIp, strPort))
+                else :
+                    return "Identical IP and Port pair found between interfaces"
+
                 if interf.ipAddr.get_text() == '0.0.0.0' :
                     return "Ip address is '0.0.0.0'";
                 if interf.webSock.props.active :
                     if len( interf.urlEdit.get_text() ) == 0 :
                         return "WebSocket enabled, but dest url is empty"
-
+            addrSet.clear()
             for nodeCtx in self.nodeCtxs :
                 if nodeCtx.IsEmpty() :
                     continue
@@ -996,8 +1009,19 @@ class ConfigDlg(Gtk.Dialog):
                     return "Ip address is empty"
                 if len( nodeCtx.port.get_text() ) == 0 :
                     return "Port number is empty"
+                else :
+                    strPort = nodeCtx.port.get_text()
+
                 if nodeCtx.ipAddr.get_text() == '0.0.0.0' :
                     return "ip address is '0.0.0.0'"
+                else :
+                    strIp = nodeCtx.ipAddr.get_text()
+
+                if (strIp, strPort) not in addrSet :
+                    addrSet.add((strIp, strPort))
+                else :
+                    return "Identical IP and Port pair found between nodes"
+
                 if nodeCtx.webSock.props.active :
                     if len( interf.urlEdit.get_text() ) == 0 :
                         return "WebSocket enabled, but dest url is empty"
@@ -1156,7 +1180,7 @@ class ConfigDlg(Gtk.Dialog):
                     confVals.pop()
             elif diff > 0 :
                 for i in range( diff ):
-                    confVals.append( confVals[ 0 ] )
+                    confVals.append( deepcopy( confVals[ 0 ] ) )
 
             for i in range( len( ifs ) ):  
                 curVals = ifs[ i ]
