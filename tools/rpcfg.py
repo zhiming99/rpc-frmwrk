@@ -6,13 +6,35 @@ from shutil import move
 from copy import deepcopy
 
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk
+
+from gi.repository import Gtk, Pango
+
+def SetBtnMarkup( btn, text ):
+    elem = btn.get_child()
+    if type( elem ) is Gtk.Label :
+        elem.set_markup( text )
+
+def SetBtnText( btn, text ):
+    elem = btn.get_child()
+    if type( elem ) is Gtk.Label :
+        elem.set_text( text )
+
+def SetToString( oSet : set ) :
+    strText = ""
+    count = len( oSet )
+    i = 0
+    for x in oSet :
+        strText += "'" + x + "'"
+        if i + 1 < count :
+            strText += ', '
+            i += 1
+    return strText
 
 def LoadConfigFiles( path : str) :
     dir_path = os.path.dirname(os.path.realpath(__file__))
     paths = []
     if path is None:
-        curDir = dir_path;
+        curDir = dir_path
         paths.append( curDir + "/../../etc/rpcf" )
         paths.append( "/etc/rpcf")
 
@@ -61,6 +83,19 @@ def LoadConfigFiles( path : str) :
 
     return jsonvals
 
+def vc_changed(stack, gparamstring):
+    curTab = stack.get_visible_child_name()
+    wnd = stack.get_toplevel()
+    #scrolling back to top on switching
+    wnd.scrollWin.get_vadjustment().set_value( 0 )
+    if  wnd.curTab != "GridMh" :
+        wnd.curTab = curTab
+        return
+    wnd.curTab = curTab
+    ret = wnd.UpdateLBGrpPage()
+    if ret == -1 :
+        wnd.DisplayError( "node name is not valid" )
+        stack.set_visible_child( wnd.gridmh )
 
 def GetGridRows(grid: Gtk.Grid):
     rows = 0
@@ -118,6 +153,24 @@ class NodeContext :
     def IsEmpty( self ) :
         return self.ipAddr is None
         
+class LBGrpContext :
+    def __init__(self, iGrpNo ):
+        self.iGrpNo = iGrpNo
+        self.Clear()
+
+    def Clear( self ) :
+        self.grpName = None
+        self.textview = None
+        self.textbuffer  = None
+        self.removeBtn  = None
+        self.changeBtn  = None
+        self.labelName = None
+        self.startRow = 0
+        self.rowCount = 0
+    
+    def IsEmpty( self ) :
+        return self.labelName is None
+
 class ConfigDlg(Gtk.Dialog):
 
     def RetrieveInfo( self, path : str = None ) :
@@ -163,8 +216,18 @@ class ConfigDlg(Gtk.Dialog):
         for svrObj in svrObjs :
             try:
                 if svrObj[ 'ObjectName'] == 'RpcRouterBridgeAuthImpl' :
-                    confVals[ 'AuthInfo'] = svrObj[ 'AuthInfo']
-                    confVals[ 'Nodes'] = svrObj[ 'Nodes']
+                    if 'AuthInfo' in svrObj :
+                        confVals[ 'AuthInfo'] = svrObj[ 'AuthInfo']
+                    else :
+                        confVals[ 'AuthInfo' ] = []
+                    if 'Nodes' in svrObj :
+                        confVals[ 'Nodes'] = svrObj[ 'Nodes']
+                    else:
+                        confVals[ 'Nodes' ] = []
+                    if 'LBGroup' in svrObj : 
+                        confVals[ 'LBGroup' ] = svrObj[ 'LBGroup' ]
+                    else :
+                        confVals[ 'LBGroup' ] = []
                     break
             except Exception as err :
                 pass
@@ -231,6 +294,13 @@ class ConfigDlg(Gtk.Dialog):
         for i in range( rows ) :
             gridmh.remove_row( 0 )
         self.InitMultihopPage( gridmh, 0, 0, confVals )
+
+        gridlb = self.gridlb
+        rows = GetGridRows( gridlb )
+        for i in range( rows ) :
+            gridlb.remove_row( 0 )
+        self.InitLBGrpPage( gridlb, 0, 0, confVals )
+
         self.show_all()
 
     def __init__(self, bServer):
@@ -247,6 +317,7 @@ class ConfigDlg(Gtk.Dialog):
         confVals = self.RetrieveInfo()
         self.confVals = confVals
         self.ifctx = []
+        self.curTab = "GridConn"
         try:
             ifCount = len( confVals[ 'connParams'] )
             for i in range( ifCount ) :
@@ -280,7 +351,7 @@ class ConfigDlg(Gtk.Dialog):
         gridCred = Gtk.Grid()
         #gridCred.set_row_homogeneous( True )
         gridCred.props.row_spacing = 6        
-        stack.add_titled(gridCred, "GridCred", "Security Info")
+        stack.add_titled(gridCred, "GridCred", "Security")
         self.InitCredPage( gridCred, 0, 0, confVals )
         self.gridCred = gridCred
 
@@ -289,6 +360,14 @@ class ConfigDlg(Gtk.Dialog):
         stack.add_titled(gridmh, "GridMh", "Multihop")
         self.InitMultihopPage( gridmh, 0, 0, confVals )
         self.gridmh = gridmh
+        stack.connect("notify::visible-child", vc_changed)
+
+        gridlb = Gtk.Grid()
+        gridlb.set_column_homogeneous( True )
+        gridlb.props.row_spacing = 6        
+        stack.add_titled(gridlb, "GridLB", "Load Balance")
+        self.InitLBGrpPage( gridlb, 0, 0, confVals )
+        self.gridlb = gridlb
 
         stack_switcher = Gtk.StackSwitcher()
         stack_switcher.set_stack(stack)
@@ -300,6 +379,7 @@ class ConfigDlg(Gtk.Dialog):
             Gtk.PolicyType.NEVER, Gtk.PolicyType.ALWAYS)
         scrolledWin.add( stack )
         vbox.pack_start(scrolledWin, True, True, 0)
+        self.scrollWin = scrolledWin
 
         self.set_border_width(10)
         self.set_default_size(400, 460)
@@ -359,7 +439,7 @@ class ConfigDlg(Gtk.Dialog):
             portNum.set_text( nodeCfg[ 'PortNumber' ] )
             grid.attach(portNum, startCol + 1, startRow + 3, 1, 1 )
             portNum.iNo = i
-            nodeCtx.port = portNum;
+            nodeCtx.port = portNum
 
             labelWebSock = Gtk.Label()
             labelWebSock.set_text("WebSocket: ")
@@ -451,6 +531,11 @@ class ConfigDlg(Gtk.Dialog):
         nodeCfg[ "ConnRecover" ]= "false"
         return nodeCfg
 
+    def InitLBGrpCfg( self, iNo ) :
+        grpCfg = dict()
+        grpCfg[ "Group" + str(iNo) ] = []
+        return grpCfg
+
     def on_add_node_clicked( self, button ):
         try:
             iNo = len( self.nodeCtxs )
@@ -494,6 +579,237 @@ class ConfigDlg(Gtk.Dialog):
             second_text = "@" + fname + ":" + str(exc_tb.tb_lineno)
             self.DisplayError( text, second_text )
 
+    def CreateTextview(self, grid, startCol, startRow, text, iGrpNo):
+        scrolledwindow = Gtk.ScrolledWindow()
+        scrolledwindow.set_hexpand(True)
+        scrolledwindow.set_vexpand(False)
+        grid.attach(scrolledwindow, startCol + 0, startRow, 2, 2 )
+
+        grpCtx = self.grpCtxs[ iGrpNo ]
+        grpCtx.textview = Gtk.TextView()
+        grpCtx.textbuffer = grpCtx.textview.get_buffer()
+        grpCtx.textbuffer.set_text( text )
+        scrolledwindow.add(grpCtx.textview)
+        grpCtx.textview.set_sensitive( False )
+
+    def on_add_lbgrp_clicked( self, button ) :
+        try:
+            iNo = len( self.grpCtxs )
+            startRow = GetGridRows( self.gridlb )
+            startRow -= 1
+            self.gridlb.remove_row( startRow )
+
+            grpCtx = LBGrpContext( iNo )
+            self.grpCtxs.append( grpCtx )
+            grpCfg = self.InitLBGrpCfg( iNo )
+            grpCtx.startRow = startRow
+            self.AddLBGrp( self.gridlb, grpCfg, iNo )
+            rows = GetGridRows( self.gridlb )
+            grpCtx.rowCount = rows - startRow
+            addBtn = Gtk.Button.new_with_label("Add Group")
+            addBtn.connect("clicked", self.on_add_lbgrp_clicked)
+            self.gridlb.attach(addBtn, 1, rows, 1, 1 )
+
+            self.gridlb.show_all()
+        except Exception as err:
+            text = "Failed to add node:" + str( err )
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            second_text = "@" + fname + ":" + str(exc_tb.tb_lineno)
+            self.DisplayError( text, second_text )
+
+    def on_remove_lbgrp_clicked( self, button ) :
+        try:
+            iNo = button.iGrpNo
+            grpCtx = self.grpCtxs[ iNo ]
+            grid = self.gridlb
+            for i in range( grpCtx.rowCount ) :
+                grid.remove_row( grpCtx.startRow )
+            for elem in self.grpCtxs :
+                if elem.iGrpNo > iNo and not elem.IsEmpty():
+                    elem.startRow -= grpCtx.rowCount
+            self.nodeSet.update( grpCtx.grpSet )
+            grpCtx.Clear()
+
+        except Exception as err:
+            text = "Failed to remove node:" + str( err )
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            second_text = "@" + fname + ":" + str(exc_tb.tb_lineno)
+            self.DisplayError( text, second_text )
+
+
+    def on_change_lbgrp_clicked( self, button ) :
+        iNo = button.iGrpNo
+        dialog = LBGrpEditDlg( parent=self, iGrpNo = iNo )
+        response = dialog.run()
+        if response == Gtk.ResponseType.CANCEL:
+            dialog.destroy() 
+            return
+        grpCtx = self.grpCtxs[ iNo ]
+        strText = SetToString( grpCtx.grpSet )
+        grpCtx.textbuffer.set_text( strText )
+        grpCtx.grpName = dialog.nameEntry.get_text()
+        SetBtnText( grpCtx.removeBtn, "Remove '" + grpCtx.grpName + "'" )
+        SetBtnText( grpCtx.changeBtn, "Change '" + grpCtx.grpName + "'" )
+        grpCtx.labelName.set_markup( "<b>group '" + grpCtx.grpName + "'</b>" )
+
+        dialog.destroy()
+
+    def AddLBGrp( self, grid : Gtk.Grid, grp:dict, iGrpNo ) :
+        try:
+            startRow = GetGridRows( grid )
+            startCol = 0
+            nodeSet = self.nodeSet
+            for grpName in grp.keys() :
+                labelName = Gtk.Label()
+                labelName.set_markup("<b>group '" + grpName + "'</b> ")
+                labelName.set_xalign(1)
+                grid.attach(labelName, startCol + 1, startRow + 0, 1, 1 )
+
+                grpSet = set()
+                members = grp[ grpName ]
+                for nodeName in members :
+                    if nodeName not in nodeSet :
+                        continue
+                    grpSet.add( nodeName )
+                grpCtx = self.grpCtxs[ iGrpNo ]
+                grpCtx.grpSet = grpSet
+                grpCtx.labelName = labelName
+                grpCtx.grpName = grpName
+
+                strText = SetToString( grpSet )
+
+                self.CreateTextview( grid,
+                    startCol, startRow + 1, strText, iGrpNo )
+
+                rows = GetGridRows( grid )
+                strLabel = "Remove '" + grpName + "'"
+                removeBtn = Gtk.Button.new_with_label( strLabel )
+                #SetBtnMarkup( removeBtn, "<b>" + strLabel + "</b>" )
+                    
+                removeBtn.iGrpNo = iGrpNo
+                removeBtn.connect("clicked", self.on_remove_lbgrp_clicked)
+                grid.attach(removeBtn, startCol + 0, rows, 1, 1 )
+                grpCtx.removeBtn = removeBtn
+
+                strLabel = "Change '" + grpName + "'"
+                changeBtn = Gtk.Button.new_with_label(
+                    "Change '" + grpName + "'" )
+                changeBtn.iGrpNo = iGrpNo
+                changeBtn.connect("clicked", self.on_change_lbgrp_clicked)
+                grid.attach(changeBtn, startCol + 2, rows, 1, 1 )
+                grpCtx.changeBtn = changeBtn
+                #SetBtnMarkup( changeBtn, "<b>" + strLabel + "</b>" )
+
+
+        except Exception as err :
+            text = "Failed to remove node:" + str( err )
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            second_text = "@" + fname + ":" + str(exc_tb.tb_lineno)
+            self.DisplayError( text, second_text )
+
+    def BuildLBGrpCfg( self ):
+        try:
+            grpCfgs = []
+            for grpCtx in self.grpCtxs:
+                grpSet = grpCtx.grpSet
+                if len( grpSet ) == 0 :
+                    continue
+                members = [ *grpSet ]
+                cfg = dict()
+                cfg[ grpCtx.grpName ] = members
+                grpCfgs.append( cfg )
+
+            return grpCfgs
+            
+        except Exception as err :
+            text = "Failed to remove node:" + str( err )
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            second_text = "@" + fname + ":" + str(exc_tb.tb_lineno)
+            self.DisplayError( text, second_text )
+            return None
+
+    def UpdateLBGrpPage( self ) :
+        try:
+            ret = self.UpdateNodeNames()
+            if ret < 0 :
+                return ret
+            nodeSet = deepcopy( self.nodeSet )
+            for grpCtx in self.grpCtxs:
+                grpSet = grpCtx.grpSet
+                grpSet.intersection_update( nodeSet )
+                nodeSet.difference_update( grpSet )
+                strText = SetToString( grpSet )
+                grpCtx.textbuffer.set_text( strText )
+            return 0
+        except Exception as err :
+            return -2
+        
+    def InitLBGrpPage( self, grid:Gtk.Grid, startCol, startRow, confVals : dict ) :
+        try:
+            bNodes = False
+            grps = confVals[ 'LBGroup' ]
+            grpCount = len( grps )
+            for grp in grps :
+                for nameGrp in grp.keys() :
+                    if nameGrp in self.nodeSet :
+                        strMsg = "'" + nameGrp 
+                        strMsg += "' duplicated with a node member's name"
+                        raise Exception( strMsg ) 
+
+            if grpCount == 0 :
+                self.grpCtxs = None
+            else :
+                self.grpCtxs = []
+                for i in range( grpCount ) :
+                    self.grpCtxs.append( LBGrpContext( i ))
+
+            for i in range( grpCount ) :
+                grpCtx = self.grpCtxs[ i ]
+                startRow = GetGridRows( grid )
+                grpCtx.startRow = startRow
+                self.AddLBGrp( grid, grps[ i ], i )
+                grpCtx.rowCount = GetGridRows( grid ) - startRow
+
+        except Exception as err :
+            text = "Failed to remove node:" + str( err )
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            second_text = "@" + fname + ":" + str(exc_tb.tb_lineno)
+            self.DisplayError( text, second_text )
+
+        rows = GetGridRows( grid )
+        strLabel ="Add Group"
+        addBtn = Gtk.Button.new_with_label( strLabel )
+        addBtn.connect("clicked", self.on_add_lbgrp_clicked)
+        #SetBtnMarkup( addBtn, "<b>" + strLabel + "</b>" )
+        grid.attach(addBtn, startCol + 1, rows, 1, 1 )
+        return
+
+    def UpdateNodeNames( self ):
+        try:
+            self.nodeSet.clear()
+            for nodeCtx in self.nodeCtxs :
+                if nodeCtx.IsEmpty() :
+                    continue
+                strName = nodeCtx.nodeName.get_text()
+                if len( strName ) == 0 :
+                    continue
+                if not strName.isidentifier() :
+                    return -1
+                self.nodeSet.add( strName )
+            return 0
+        except Exception as err :
+            text = "Failed to remove node:" + str( err )
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            second_text = "@" + fname + ":" + str(exc_tb.tb_lineno)
+            self.DisplayError( text, second_text )
+            return -1
+
     def InitMultihopPage( self, grid:Gtk.Grid, startCol, startRow, confVals : dict ) :
         try:
             nodes = confVals[ 'Nodes' ]
@@ -501,10 +817,16 @@ class ConfigDlg(Gtk.Dialog):
 
             self.nodeCtxs = []
 
+            nodeSet = set()
+            self.nodeSet = nodeSet
+            self.nodes = nodes
+
             if nodeCount == 0 :
                 return
 
-            self.nodes = nodes
+            for nodeCfg in nodes :
+                nodeSet.add( nodeCfg[ 'NodeName' ] )
+            
             for i in range( nodeCount ) :
                 self.AddNode( grid, i )
 
@@ -1025,6 +1347,13 @@ class ConfigDlg(Gtk.Dialog):
                 if nodeCtx.webSock.props.active :
                     if len( interf.urlEdit.get_text() ) == 0 :
                         return "WebSocket enabled, but dest url is empty"
+                
+                strName = nodeCtx.nodeName.get_text()
+                if len( strName ) == 0:
+                    return "Multihop node name cannot be empty"
+
+                if not strName.isidentifier() :
+                    return "Multihop node name '%s' is not a valid identifier" % strName
 
         except Exception as err:
             text = "Verify input failed:" + str( err )
@@ -1212,14 +1541,18 @@ class ConfigDlg(Gtk.Dialog):
             json.dump( drvVal, fp, indent=4)
             fp.close()
 
+            lbCfgs = self.BuildLBGrpCfg()
+            if lbCfgs is None :
+                raise Exception("bad values in LB groups") 
+
             rtDesc = jsonFiles[ 2 ][ 1 ]
             svrObjs = rtDesc[ 'Objects' ]
             if svrObjs is not None and len( svrObjs ) > 0 :
                 for svrObj in svrObjs :
                     if svrObj[ 'ObjectName'] == 'RpcRouterBridgeAuthImpl' :
                         if len( self.realmEdit.get_text() ) == 0:
-                            break;
-                        authInfo = dict();
+                            break
+                        authInfo = dict()
                         authInfo[ 'Realm' ] = self.realmEdit.get_text()
                         authInfo[ 'ServiceName' ] = self.svcEdit.get_text()
                         authInfo[ 'AuthMech' ] = 'krb5'
@@ -1232,7 +1565,8 @@ class ConfigDlg(Gtk.Dialog):
                         else:
                             authInfo[ 'SignMessage' ] = 'true'
 
-                        svrObj[ 'AuthInfo'] = authInfo;
+                        svrObj[ 'AuthInfo'] = authInfo
+                        svrObj[ 'LBGroup' ] = lbCfgs
                         self.ExportNodeCtxs();
                         break
 
@@ -1247,6 +1581,7 @@ class ConfigDlg(Gtk.Dialog):
                 for svrObj in svrObjs :
                     if svrObj[ 'ObjectName'] == 'RpcRouterBridgeImpl' :
                         svrObj[ 'Nodes' ] = self.nodes;
+                        svrObj[ 'LBGroup' ] = lbCfgs
                         break
             rtPath = path + '/router.json'
             fp = open(rtPath, "w")
@@ -1315,11 +1650,6 @@ class ConfigDlg(Gtk.Dialog):
             json.dump( apVal, fp, indent = 4  )
             fp.close()
 
-            rtPath = path + "/router.json"
-            fp = open( rtPath, 'w')
-            json.dump( jsonFiles[1][1], fp, indent = 4  )
-            fp.close()
-
         except Exception as err :
             text = "Failed to export files:" + str( err )
             exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -1349,6 +1679,143 @@ class ConfigDlg(Gtk.Dialog):
             return -1
         return 0
         
+class LBGrpEditDlg(Gtk.Dialog):
+    def __init__(self, parent, iGrpNo):
+        Gtk.Dialog.__init__(self, flags=0,
+        transient_for = parent )
+        self.add_buttons(
+            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+            Gtk.STOCK_OK, Gtk.ResponseType.OK )
+
+        grid = Gtk.Grid()
+        grid.set_column_homogeneous( True )
+        grid.props.row_spacing = 6
+        grid.props.column_spacing = 6
+
+        self.iGrpNo = iGrpNo
+        self.grpCtxs = parent.grpCtxs
+        self.parent = parent
+
+        nodeSet = deepcopy( parent.nodeSet )
+        for grpCtx in parent.grpCtxs :
+            nodeSet.difference_update( grpCtx.grpSet )
+
+        grpCtx = parent.grpCtxs[ iGrpNo ]
+        grpSet = grpCtx.grpSet
+        self.grpSet = grpSet
+
+        self.nodeSet = nodeSet
+        self.listBoxes = []
+
+        labelName = Gtk.Label()
+        labelName.set_text( "Group Name: " )
+        labelName.set_xalign( 1 )
+        grid.attach(labelName, 0, 0, 1, 1 )
+
+        nameEntry = Gtk.Entry()
+        nameEntry.set_text( grpCtx.grpName  )
+        grid.attach(nameEntry, 1, 0, 1, 1 )
+        self.nameEntry = nameEntry
+
+        listAvail = self.BuildListBox( nodeSet, "Available Nodes" ) 
+        grid.attach( listAvail, 0, 1, 1, 8 )
+
+        listGrp = self.BuildListBox( grpSet, "Group Members" ) 
+        grid.attach( listGrp, 2, 1, 1, 8 )
+
+        rows = GetGridRows( grid )
+        if rows <= 3 :
+            rowAdd = 0
+            rowRm = 1
+        else :
+            btnSpc = rows / 3
+            rowAdd = btnSpc
+            rowRm = 2 * btnSpc
+
+        toMemberBtn = Gtk.Button.new_with_label(">>")
+        toMemberBtn .connect("clicked", self.on_alloc_lbgrp_clicked )
+        grid.attach(toMemberBtn, 1, rowAdd, 1, 1 )
+        if len( nodeSet ) == 0 :
+            toMemberBtn.set_sensitive( False )
+
+        rmMemberBtn = Gtk.Button.new_with_label("<<")
+        rmMemberBtn.connect("clicked", self.on_release_lbgrp_clicked )
+        grid.attach(rmMemberBtn, 1, rowRm, 1, 1 )
+        if len( grpSet ) == 0 :
+            rmMemberBtn.set_sensitive( False )
+
+        self.rmMemberBtn = rmMemberBtn
+        self.toMemberBtn = toMemberBtn
+
+        self.set_border_width(10)
+        #self.set_default_size(400, 460)
+        box = self.get_content_area()
+        box.add(grid)
+        self.show_all()
+
+    def BuildListBox( self, nodeSet, title ) :
+        member_store = Gtk.ListStore(str)
+        sortList = sorted( nodeSet )
+        for node in sortList :
+            member_store.append([node])
+
+        tree_members = Gtk.TreeView()
+        tree_members.set_model(member_store)
+
+        # The view can support a whole tree, but we want just a list.
+        renderer = Gtk.CellRendererText()
+        column = Gtk.TreeViewColumn(title, renderer, text=0)
+        tree_members.append_column(column)
+
+        # This is the part that enables multiple selection.
+        tree_members.get_selection().set_mode(Gtk.SelectionMode.MULTIPLE)
+
+        scrolled_tree = Gtk.ScrolledWindow(hexpand=True, vexpand=True)
+
+        scrolled_tree.set_policy(
+            Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.ALWAYS)
+
+        scrolled_tree.add_with_viewport(tree_members)
+        self.listBoxes.append( tree_members )
+
+        return scrolled_tree
+
+    def on_alloc_lbgrp_clicked( self, button ) :
+        listAvail = self.listBoxes[ 0 ]
+        listMember = self.listBoxes[ 1 ]
+        selection = listAvail.get_selection()
+        if selection.count_selected_rows() == 0 :
+            return
+        model, listPaths = selection.get_selected_rows()
+        for path in listPaths :
+            itr = model.get_iter( path )
+            nodeName = model.get_value( itr , 0)
+            listMember.get_model().append( [nodeName ] )
+            self.nodeSet.remove( nodeName )
+            self.grpSet.add( nodeName )
+            model.remove( itr )
+        if len( self.nodeSet ) == 0 :
+            self.toMemberBtn.set_sensitive( False )
+        self.rmMemberBtn.set_sensitive( True )
+
+
+    def on_release_lbgrp_clicked( self, button ) :
+        listAvail = self.listBoxes[ 0 ]
+        listMember = self.listBoxes[ 1 ]
+        selection = listMember.get_selection()
+        if selection.count_selected_rows() == 0 :
+            return
+        model, listPaths = selection.get_selected_rows()
+        for path in listPaths :
+            itr = model.get_iter( path )
+            nodeName = model.get_value( itr , 0)
+            listAvail.get_model().append( [nodeName ] )
+            self.grpSet.remove( nodeName )
+            self.nodeSet.add( nodeName )
+            model.remove( itr )
+        if len( self.grpSet ) == 0 :
+            self.rmMemberBtn.set_sensitive( False )
+        self.toMemberBtn.set_sensitive( True )
 
 win = ConfigDlg(True)
 win.connect("close", Gtk.main_quit)

@@ -5896,9 +5896,24 @@ gint32 CImplMainFunc::Output()
             NEW_LINES( 2 );
 
             //  business logic
-            CCOUT << "gint32 DoWork( "
-                << strClass << "* pIf )";
-            NEW_LINE;
+            if( bProxy )
+            {
+                CCOUT << "gint32 maincli(";
+                INDENT_UPL;
+                CCOUT << strClass << "* pIf,";
+                NEW_LINE;
+                CCOUT << "int argc, char** argv )";
+                INDENT_DOWNL;
+            }
+            else
+            {
+                CCOUT << "gint32 mainsvr( ";
+                INDENT_UPL;
+                CCOUT << strClass << "* pIf,";
+                NEW_LINE;
+                CCOUT << "int argc, char** argv )";
+                INDENT_DOWNL;
+            }
             BLOCK_OPEN;
             if( bProxy )
             {
@@ -5979,7 +5994,7 @@ gint32 CImplMainFunc::Output()
             if( !bProxy )
             {
                 NEW_LINE;
-                Wa( "DoWork( pSvc );" );
+                Wa( "mainsvr( pSvc, argc, argv );" );
             }
             else
             {
@@ -5999,7 +6014,7 @@ gint32 CImplMainFunc::Output()
                 CCOUT << "break;";
                 BLOCK_CLOSE;
                 NEW_LINES( 2 );
-                Wa( "DoWork( pSvc );" );
+                Wa( "maincli( pSvc, argc, argv );" );
             }
 
             NEW_LINE;
