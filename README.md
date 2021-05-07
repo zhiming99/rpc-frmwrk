@@ -51,6 +51,7 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 ---
 [`Fri May 07 2021 04:12:30 PM Beijing`]   
 1. The GUI config tool is almost done. There are still some testing to get it more stable.
+2. Now we can deploy `rpc-frmwrk` with ease!
 
 [`Sun Apr 25 2021 03:07:27 PM Beijing`]
 1. The flow control turns out to be big and need some preparations before I can start. So I will first get the GUI config tool done, and at the same time, make some preparations for the flow control.
