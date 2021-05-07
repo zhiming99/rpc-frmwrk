@@ -34,21 +34,24 @@ This framework depends on the following packags to build:
 14. [`Authentication support with Kerberos 5`](https://github.com/zhiming99/rpc-frmwrk/tree/master/rpc/security/README.md)
 15. [`Python Support`](https://github.com/zhiming99/rpc-frmwrk/tree/master/python)
 16. [`Node Redudancy/Load Balance`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md#load-balance--node-redudancy)
-16. [`A mulit-lang proxy/server code generator`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md)
+17. [`A mulit-lang proxy/server code generator`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md)
+18. [`A GUI config tool`](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools/README.md)
 
 #### Building `rpc-frmwrk`:   
 Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60) for details.
 
 #### Todo:
-1. GUI config tools 
-2. Request-based flow control
-3. Java support
-4. Examples and Tutorials
-5. Access Control
-6. A tree-like hierarchical persistant registry.
-7. Logging service
+1. Request-based flow control
+2. Java support
+3. Examples and Tutorials
+4. Access Control
+5. A tree-like hierarchical persistant registry.
+6. Logging service
 
 ---
+[`Fri May 07 2021 04:12:30 PM Beijing`]   
+1. The GUI config tool is almost done. There are still some testing to get it more stable.
+
 [`Sun Apr 25 2021 03:07:27 PM Beijing`]
 1. The flow control turns out to be big and need some preparations before I can start. So I will first get the GUI config tool done, and at the same time, make some preparations for the flow control.
 2. With the aide from GUI config tool and ridl, you can easily deploy the `rpc-frmwrk` and start the development of your `hello, world` application in C++. That will be the first official release of `rpc-frwmrk`.
