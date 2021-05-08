@@ -275,8 +275,6 @@ class ConfigDlg(Gtk.Dialog):
         #for interf in self.ifctx :
         for i in range( len( self.ifctx ) ) :
             interf = self.ifctx[ i ]
-            if interf.IsEmpty():
-                continue
             row = GetGridRows( gridNet )
             interf.startRow = row
             self.InitNetworkPage( gridNet, 0, row, confVals, i )
@@ -447,14 +445,13 @@ class ConfigDlg(Gtk.Dialog):
             grid.attach(labelWebSock, startCol + 0, startRow + 4, 1, 1 )
 
             webSockCheck = Gtk.CheckButton(label="")
-            webSockCheck.connect(
-                "toggled", self.on_button_toggled, "WebSock2")
             webSockCheck.iNo = i
             if nodeCfg[ 'EnableWS' ] == 'false' :
                 webSockCheck.props.active = False
             else:
                 webSockCheck.props.active = True
-
+            webSockCheck.connect(
+                "toggled", self.on_button_toggled, "WebSock2")
             grid.attach( webSockCheck, startCol + 1, startRow + 4, 1, 1)
             nodeCtx.webSock = webSockCheck
 
@@ -918,9 +915,9 @@ class ConfigDlg(Gtk.Dialog):
             pass                
 
         compressCheck = Gtk.CheckButton(label="Compression")
+        compressCheck.props.active = bActive
         compressCheck.connect(
             "toggled", self.on_button_toggled, "Compress")
-        compressCheck.props.active = bActive
         compressCheck.ifNo = ifNo
         grid.attach( compressCheck, startCol + 1, rows, 1, 1)
         self.ifctx[ ifNo ].compress = compressCheck
@@ -954,10 +951,10 @@ class ConfigDlg(Gtk.Dialog):
             pass
 
         webSockCheck = Gtk.CheckButton(label="")
-        webSockCheck.connect(
-            "toggled", self.on_button_toggled, "WebSock")
         webSockCheck.ifNo = ifNo
         webSockCheck.props.active = bActive
+        webSockCheck.connect(
+            "toggled", self.on_button_toggled, "WebSock")
         grid.attach( webSockCheck, startCol + 1, startRow + 0, 1, 1)
         self.ifctx[ ifNo ].webSock = webSockCheck
 
