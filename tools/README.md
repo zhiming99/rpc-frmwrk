@@ -7,6 +7,6 @@ The UI dialog consists of the following tab pages
   ![rpcfg tab2](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/rpcfg2.png)
 * Multihop Page. To add or remove the downstream nodes which also provide RPC services to the remote client. And [this link](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support) is an introduction to `multihop` technology. This is an optional configuration.   
   ![rpcfg tab3](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/rpcfg3.png)
-* Load Balance Page. Based on the `multihop` technology, `rpcrouter` can easily be configured to have the `load balance` support. However, currently the `load balance` support just one policy, the `round robin`. And you can refer to [this article](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support#node-redundancyload-balance) for more information.
-  ![rpcfg tab4)(https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/rpcfg4.png)
+* Load Balance Page. Based on the `multihop` technology, `rpcrouter` can easily be configured to have the `load balance` support. However, currently the `load balance` support just one policy, the `round robin`. And you can refer to [this article](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support#node-redundancyload-balance) for more information.   
+  ![rpcfg tab4](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/rpcfg4.png)
   
