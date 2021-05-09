@@ -12,7 +12,7 @@ libsfsvr_la_CPPFLAGS=$(sftest_CPPFLAGS)
 sftest_PROGRAMS= sfsvrtst sfclitst
 sftestdir=$(bindir)/rpcf
 
-sfclitst_DATA= sfdesc.json
+dist_sfclitst_DATA= sfdesc.json
 sfclitstdir=$(sysconfdir)/rpcf
 
 sfclitst_SOURCES= sftest.cpp sftest.h

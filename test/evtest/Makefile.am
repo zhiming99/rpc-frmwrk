@@ -12,7 +12,7 @@ libevtst_la_CPPFLAGS=$(evtest_CPPFLAGS)
 evtest_PROGRAMS=evtsvrtst evtclitst
 evtestdir=$(bindir)/rpcf
 
-evtclitst_DATA=evtdesc.json
+dist_evtclitst_DATA=evtdesc.json
 evtclitstdir=$(sysconfdir)/rpcf
 
 evtclitst_SOURCES= evtest.cpp evtest.h

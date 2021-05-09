@@ -12,7 +12,7 @@ libstmsvr_la_CPPFLAGS=$(stmtest_CPPFLAGS)
 stmtest_PROGRAMS=stmsvrtst stmclitst
 stmtestdir=$(bindir)/rpcf
 
-stmclitst_DATA=stmdesc.json
+dist_stmclitst_DATA=stmdesc.json
 stmclitstdir=$(sysconfdir)/rpcf
 ext_linkopt=-Wl,-rpath -Wl,$(libdir)/rpcf
 stmclitst_SOURCES= stmtest.cpp stmtest.h

@@ -12,7 +12,7 @@ libecho_la_CPPFLAGS=$(iftest_CPPFLAGS)
 iftest_PROGRAMS=ifsvrsmk ifclismk
 iftestdir=$(bindir)/rpcf
 
-ifclismk_DATA= echodesc.json
+dist_ifclismk_DATA= echodesc.json
 ifclismkdir=$(sysconfdir)/rpcf
 
 ifclismk_SOURCES= iftest.cpp iftest.h

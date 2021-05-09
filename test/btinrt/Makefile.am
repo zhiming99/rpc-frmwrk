@@ -12,7 +12,7 @@ libbtinrt_la_CPPFLAGS=$(btinrt_CPPFLAGS)
 btinrt_PROGRAMS=btinrtcli btinrtsvr
 btinrtdir=$(bindir)/rpcf
 
-btinrtcli_DATA= btinrt.json
+dist_btinrtcli_DATA= btinrt.json
 btinrtclidir=$(sysconfdir)/rpcf
 
 btinrtcli_SOURCES= btinrtst.cpp btinrtst.h

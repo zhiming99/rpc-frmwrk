@@ -6,7 +6,7 @@ rpcrouter_LDADD=$(COMMON_LINK) -lrpc -lipc -lcombase -lutils -lstdc++ -lcppunit 
 
 
 rpcrouterconfdir= $(sysconfdir)/rpcf
-rpcrouterconf_DATA=router.json rtauth.json
+dist_rpcrouterconf_DATA=router.json rtauth.json
 rpcrouterdir=$(bindir)
 
 link_dir=$(top_srcdir)/combase/

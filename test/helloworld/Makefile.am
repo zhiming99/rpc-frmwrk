@@ -12,7 +12,7 @@ libhellowrd_la_CPPFLAGS=$(iftest_CPPFLAGS)
 iftest_PROGRAMS=hwsvrsmk hwclismk
 iftestdir=$(bindir)/rpcf
 
-hwclismk_DATA= hwdesc.json
+dist_hwclismk_DATA= hwdesc.json
 hwclismkdir=$(sysconfdir)/rpcf
 
 hwclismk_SOURCES= iftest.cpp iftest.h

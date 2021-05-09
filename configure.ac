@@ -180,6 +180,7 @@ AC_CONFIG_FILES([Makefile
                  tools/Makefile
                  3rd_party/Makefile
                  python/Makefile
+                 pics/Makefile
                  test/Makefile
                  test/actcancel/Makefile
                  test/asynctst/Makefile

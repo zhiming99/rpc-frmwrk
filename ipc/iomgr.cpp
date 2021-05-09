@@ -1818,33 +1818,9 @@ CIoManager::CIoManager( const std::string& strModName ) :
             throw std::invalid_argument(
                 "No config" );
         }
-        Json::Value& oArch = oCfg[ JSON_ATTR_ARCH ];
-        if( oArch != Json::Value::null && 
-            oArch.isMember( JSON_ATTR_NUM_CORE ) &&
-            oArch[ JSON_ATTR_NUM_CORE ] != Json::Value::null )
-        {
-            Json::Value& oCores = oArch[ JSON_ATTR_NUM_CORE ];
-            string strVal = oCores.asString();
-            m_dwNumCores = std::strtol(
-                strVal.c_str(), nullptr, 10 );
-            if( m_dwNumCores != 0 )
-            {
-                // the #cores could be bigger than
-                // physical number
-                m_dwNumCores = std::min( m_dwNumCores,
-                     std::thread::hardware_concurrency() );
-            }
-            else
-            {
-                 m_dwNumCores = std::max( 1U,
-                     std::thread::hardware_concurrency() );
-            }
-        }
-        else
-        {
-             m_dwNumCores = std::max( 1U,
-                 std::thread::hardware_concurrency() );
-        }
+
+        m_dwNumCores = std::max( 1U,
+            std::thread::hardware_concurrency() );
 
         m_iHcTimer = 0;
 

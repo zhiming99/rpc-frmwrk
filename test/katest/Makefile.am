@@ -12,7 +12,7 @@ libkasvr_la_CPPFLAGS=$(katest_CPPFLAGS)
 katest_PROGRAMS=kasvrtst kaclitst
 katestdir=$(bindir)/rpcf
 
-kaclitst_DATA=kadesc.json
+dist_kaclitst_DATA=kadesc.json
 kaclitstdir=$(sysconfdir)/rpcf
 
 kaclitst_SOURCES= katest.cpp katest.h

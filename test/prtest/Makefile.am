@@ -12,7 +12,7 @@ libprsvr_la_CPPFLAGS=$(prtest_CPPFLAGS)
 prtest_PROGRAMS= prsvrtst prclitst
 prtestdir=$(bindir)/rpcf
 
-prclitst_DATA= prdesc.json
+dist_prclitst_DATA= prdesc.json
 prclitstdir=$(sysconfdir)/rpcf
 
 prclitst_SOURCES= prtest.cpp prtest.h

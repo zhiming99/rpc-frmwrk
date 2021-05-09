@@ -242,13 +242,17 @@ enum EnumPropId : gint32
 
     propPyObj,          // type: a pointer to a PyObject which is an interface object
     propJavaObj,        // type: a pointer to a java object which is an interface object
-    propPeerObjId,      // type: gint64 for the uxstream object id from the peer
+    propPeerObjId,      // type: a gint64 for the uxstream object id from the peer
 
     propSeriProto,      // type: a gint32 to indicate the serialize protocol of the current parament pack
     propNoReply,        // type: a bool value to indicate if the request has no reply.
 
     propRttMs,          // type: a guint32 as the round trip time of a tcp connection in ms.
-    propWndSize,        // type: g guint32 as the receiving window size for all the pending requests
+    propWndSize,        // type: a guint32 as the receiving window size for all the pending requests
+
+    propMaxConns,       // type: a guint32 to specify the max connections the router can accepts
+    propMaxReqs,        // type: a guint32 to specify the max requests in process concurrently this router allows
+    propMaxPending,     // type: a guint32 to specify the max requests queued or in process by this router
 
     propReservedEnd = 0x10000000,
     propInvalid = -1, 

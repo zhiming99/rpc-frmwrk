@@ -12,7 +12,7 @@ libactc_la_CPPFLAGS=$(actc_CPPFLAGS)
 actctst_PROGRAMS=actcsvrtst actclitst
 actctstdir=$(bindir)/rpcf
 
-actclitst_DATA= actcdesc.json
+dist_actclitst_DATA= actcdesc.json
 actclitstdir=$(sysconfdir)/rpcf
 
 actclitst_SOURCES= actctest.cpp actctest.h

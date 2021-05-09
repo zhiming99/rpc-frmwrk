@@ -24,7 +24,7 @@ utils.h uxport.h uxstream.h proxy.h
 
 rpcfipcdir=$(includedir)/rpcf/ipc
 
-ipcconf_DATA=driver.json
+dist_ipcconf_DATA=driver.json
 ipcconfdir=$(sysconfdir)/rpcf
 
 libipc_ladir=$(libdir)

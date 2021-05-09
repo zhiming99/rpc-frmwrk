@@ -19,7 +19,7 @@ mktpl : mktpl.in
 ridlc_LDADD=-lipc -lcombase -lutils -lstdc++ -ljsoncpp -L../combase -L../ipc -L../3rd_party
 ridlcdir=$(bindir)
 
-ridlc_conf_DATA=odesctpl.json drvtpl.json mktpl
+dist_ridlc_conf_DATA=odesctpl.json drvtpl.json mktpl
 ridlc_confdir=$(sysconfdir)/rpcf
 
 include_ipcdir=$(top_srcdir)/ipc
