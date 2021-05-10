@@ -132,7 +132,7 @@ Currently ridlc can only output `c++` project. In the future, it will be able to
 
 On a successful compile of the above sample ridl file, `ridlc` will generate several files:
 
-* **maincli.cpp, mainsvr.cpp**: as the name indicate, the two files define main function of the proxy and server respectively. Both files contains a `DoWork` function, which is an ideal place to add your business code if you are still new to `rpc-frmwrk`.
+* **maincli.cpp, mainsvr.cpp**: as the name indicate, the two files define main function of the proxy and server respectively. Each file contains a same-name function, that is `maincli` for maincli.cpp and `mainsvr` for mainsvr.cpp, which is the ideal place to add your business code if you are still new to `rpc-frmwrk`.
 * **example.cpp, example.h** : the files are named with the name defined by *appname*. It contains all the skelton method declarations, and implementations.
 * **SimpFileSvc.cpp, SimpFileSvc.h:** the files are named with the *service id* of the *service statement*. Each individual service declaration has a pair of `.cpp` and `.h` file. The cpp file contains all the methods that user should implement to get server/proxy to work. They are mainly the same-name methods on Server side as request handler. The amount of efforts are different depending on whether to use `sync` or `async` approach to implement the interfaces of the service. `sync` implementation is simple and time-saving at development time, `async` is relatively difficult to develop, but with better performance. And `rpc-frmwrk` provides rich utilities to help developing asynchronous implementation to minize the developing efforts.
 * **Makefile**: The make file to build the project. Note that, you must install the `rpc-frmwrk` first.
