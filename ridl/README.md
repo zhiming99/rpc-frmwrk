@@ -126,7 +126,7 @@ The above example shows most of the statements ridl supports. ridl now has 7 typ
                 serialization protocol always
 ```
 
-Currently ridlc can only output `c++` project. In the future, it will be able to generate `python` files and `java` files.
+Currently ridlc can only output `c++` project. In the future, it will be able to generate `python` project and `java` project as well.
 
 ### Output
 
