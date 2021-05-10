@@ -50,7 +50,7 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 
 ---
 [`Mon May 10 2021 09:24:59 PM Beijing`]   
-1. Let's move on to add request flow control support .
+1. Let's move on to add request-based flow control.
 
 [`Fri May 07 2021 04:12:30 PM Beijing`]   
 1. The GUI config tool is almost done. There are still some testing to get it more stable.
