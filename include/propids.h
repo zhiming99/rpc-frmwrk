@@ -253,6 +253,7 @@ enum EnumPropId : gint32
     propMaxConns,       // type: a guint32 to specify the max connections the router can accepts
     propMaxReqs,        // type: a guint32 to specify the max requests in process concurrently this router allows
     propMaxPending,     // type: a guint32 to specify the max requests queued or in process by this router
+    propEnableRfc,      // type: a bool to enable/disable request-based flow control
 
     propReservedEnd = 0x10000000,
     propInvalid = -1, 

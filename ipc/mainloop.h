@@ -207,16 +207,21 @@ class CMainIoLoopT : public T
     void SetTid( guint32 dwTid )
     { m_dwTid = dwTid; }
 
-    gint32 Stop()
+    gint32 WaitForQuit()
     {
-        super::Stop();
         if( m_pThread != nullptr )
         {
             m_pThread->join();
             delete m_pThread;
             m_pThread = nullptr;
         }
+        return 0;
+    }
 
+    gint32 Stop()
+    {
+        super::Stop();
+        WaitForQuit();
         return 0;
     }
 
@@ -347,6 +352,21 @@ class CMainIoLoopT : public T
 };
 
 }
+
+template<> struct std::less<rpcf::MloopPtr>
+{
+    bool operator()(const rpcf::MloopPtr& k1, const rpcf::MloopPtr& k2) const
+    {
+        if( k2.IsEmpty() )
+            return false;
+
+        if( k1.IsEmpty() )
+            return true;
+
+        return k1->GetObjId() < k2->GetObjId();
+    }
+};
+
 #ifdef _USE_LIBEV
 #include "evloop.h"
 namespace rpcf

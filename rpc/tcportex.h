@@ -475,6 +475,7 @@ class CRpcConnSock :
     virtual gint32 OnSendReady();
     virtual gint32 OnReceive();
     virtual gint32 OnConnected();
+    virtual CMainIoLoop* GetMainLoop() const override;
 
     gint32 OnDisconnected();
 
@@ -645,6 +646,7 @@ class CTcpStreamPdo2 : public CPort
     std::deque< STREAM_SOCK_EVENT > m_queEvtToRecv;
 
     CBytesSender m_oSender;
+    MloopPtr    m_pLoop;
 
     gint32 SendImmediate( gint32 iFd, PIRP pIrp );
 
@@ -714,6 +716,12 @@ class CTcpStreamPdo2 : public CPort
 
     void OnPortStartFailed(
         IRP* pIrp, gint32 ret );
+
+    CMainIoLoop* GetMainLoop() const
+    {
+        CMainIoLoop* pLoop = m_pLoop;
+        return pLoop;
+    }
 };
 
 }

@@ -753,6 +753,13 @@ gint32 CRpcConnSock::Stop()
     return ret;
 }
 
+CMainIoLoop* CRpcConnSock::GetMainLoop() const
+{
+    CTcpStreamPdo2* pPort =
+        ObjPtr( m_pParentPort );
+    return pPort->GetMainLoop();
+}
+
 CTcpStreamPdo2::CTcpStreamPdo2(
     const IConfigDb* pCfg ) :
     super( pCfg ),
@@ -1471,6 +1478,13 @@ gint32 CTcpStreamPdo2::PostStart(
     gint32 ret = 0;
 
     do{
+        CRpcTcpBusPort* pBus =
+            ObjPtr( m_pBusPort );
+
+        ret = pBus->AllocMainLoop( m_pLoop );
+        if( ERROR( ret ) )
+            break;
+
         CParamList oParams;
 
         // share the conn parameters with the sock
@@ -1702,10 +1716,9 @@ gint32 CTcpStreamPdo2::PreStop(
                 SetPreStopStep( pIrp, 1 );
                 break;
             }
-
-            if( pMgr->RunningOnMainThread() )
+            CMainIoLoop* pLoop = ObjPtr( m_pLoop );
+            if( pLoop->GetThreadId() == rpcf::GetTid() )
             {
-                // we need to run on the mainloop
                 m_pConnSock.Clear();
                 oSockLock.Unlock();
                 SetPreStopStep( pIrp, 1 );
@@ -1720,9 +1733,10 @@ gint32 CTcpStreamPdo2::PreStop(
                     &CIoManager::CompleteIrp,
                     pIrp );
 
-                ret = pMgr->RescheduleTaskMainLoop( pTask );
-                if( SUCCEEDED( ret ) )
-                    ret = STATUS_PENDING;
+                // we need to run on the mainloop
+                pTask->MarkPending();
+                pLoop->AddTask( pTask );
+                ret = STATUS_PENDING;
             }
             break;
         }
@@ -1757,6 +1771,7 @@ gint32 CTcpStreamPdo2::PreStop(
             DebugPrint( ret,
                 "CTcpStreamPdo2 PreStop, portid=%d",
                 dwPortId );
+        
             break;
         }
 
@@ -1769,8 +1784,15 @@ gint32 CTcpStreamPdo2::Stop(
 {
     CancelAllIrps( ERROR_PORT_STOPPED );
     m_oSender.Clear();
+
+    CRpcTcpBusPort* pBus =  
+        ObjPtr( m_pBusPort );
+    pBus->ReleaseMainLoop( m_pLoop );
+    m_pLoop.Clear();
+
     return super::Stop( pIrp );
 }
+
 gint32 CTcpStreamPdo2::OnSubmitIrp(
     IRP* pIrp )
 {

@@ -1822,6 +1822,24 @@ CIoManager::CIoManager( const std::string& strModName ) :
         m_dwNumCores = std::max( 1U,
             std::thread::hardware_concurrency() );
 
+        Json::Value& oArch = oCfg[ JSON_ATTR_ARCH ];
+        if( oArch != Json::Value::null && 
+            oArch.isMember( JSON_ATTR_NUM_CORE ) &&
+            oArch[ JSON_ATTR_NUM_CORE ] != Json::Value::null )
+        {
+            Json::Value& oCores = oArch[ JSON_ATTR_NUM_CORE ];
+            string strVal = oCores.asString();
+            guint32 dwNumCores = std::strtol(
+                strVal.c_str(), nullptr, 10 );
+            if( dwNumCores != 0 )
+            {
+                // the user wants to limit the 
+                // physical number
+                m_dwNumCores = std::min(
+                    m_dwNumCores, dwNumCores );
+            }
+        }
+
         m_iHcTimer = 0;
 
     }while( 0 );

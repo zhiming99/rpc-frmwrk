@@ -32,6 +32,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include <limits.h>
 #include "reqopen.h"
 #include "jsondef.h"
 #include "ifhelper.h"
@@ -46,6 +47,14 @@ CRpcTcpBusPort::CRpcTcpBusPort(
     : super( pCfg )
 {
     SetClassId( clsid( CRpcTcpBusPort ) );
+    CCfgOpener oCfg( pCfg );
+    gint32 ret = oCfg.GetIntProp(
+        propMaxConns, m_dwConns );
+    if( SUCCEEDED( ret ) )
+    {
+        CCfgOpenerObj oPortCfg( this );
+        oPortCfg.RemoveProperty( propMaxConns );
+    }
 }
 
 gint32 CRpcTcpBusPort::GetPdoAddr(
@@ -74,6 +83,7 @@ gint32 CRpcTcpBusPort::GetPortId(
 gint32 CRpcTcpBusPort::BindPortIdAndAddr(
     guint32 dwPortId, PDOADDR oAddr )
 {
+    CStdRMutex oPortLock( GetLock() );
     m_mapAddrToId[ oAddr ] = dwPortId;
     m_mapIdToAddr[ dwPortId ] = oAddr;
     return 0;
@@ -477,6 +487,25 @@ gint32 CRpcTcpBusPort::OnNewConnection(
 
     gint32 ret = 0;
     do{
+        if( true )
+        {
+            CStdRMutex oPortLock( GetLock() );
+            guint32 dwConns =
+                GetConnections() + 1;
+            if( dwConns > GetMaxConns() )
+            {
+                oPortLock.Unlock();
+                ret = shutdown( iSockFd, SHUT_RDWR );
+                if( ERROR( ret ) )
+                {
+                    DebugPrint( -errno,
+                        "Error shutdown socket[%d]",
+                        iSockFd );
+                }
+                ret = close( iSockFd );
+                break;
+            }
+        }
         // passive connection
         CCfgOpener oCfg;
         CCfgOpenerObj oPortCfg( this );
@@ -590,7 +619,7 @@ gint32 CRpcTcpBusPort::OnNewConnection(
         if( ret == -EAGAIN )        
         {
             // Performance Alert: running on the
-            // dispatching thread
+            // mainloop thread
             usleep( 1000 );
         }
         else
@@ -650,6 +679,175 @@ gint32 CRpcTcpBusPort::SetProperty(
     return ret;
 }
 
+gint32 CRpcTcpBusPort::CreateMLoopPool()
+{
+    gint32 ret = 0; 
+    do{
+        guint32 dwCount =
+            GetIoMgr()->GetNumCores();
+        for( int i = 0; i < dwCount; ++i )
+        {
+            CParamList oCfg;
+            oCfg.SetPointer( propIoMgr,
+                this->GetIoMgr() );
+            std::string strName( "SockLoop-" );
+            strName += std::to_string( i );
+
+            // thread name
+            oCfg.Push( strName );
+
+            // don't start new thread
+            oCfg.Push( true );
+
+            MloopPtr pLoop;
+            ret = pLoop.NewObj(
+                clsid( CMainIoLoop ),
+                oCfg.GetCfg() );
+
+            if( ERROR( ret ) )
+                break;
+
+            ret = pLoop->Start();
+            if( ERROR( ret ) )
+                break;
+
+            m_mapLoops[ pLoop ] = 0;
+        }
+            
+    }while( 0 );
+
+   return ret;
+}
+
+gint32 CRpcTcpBusPort::DestroyMLoopPool()
+{
+    gint32 ret = 0; 
+    do{
+        guint32 dwCount =
+            GetIoMgr()->GetNumCores();
+        for( auto elem : m_mapLoops )
+        {
+            CMainIoLoop* pLoop = elem.first;
+            gint32 iRet = pLoop->GetError();
+            if( iRet == STATUS_PENDING )
+                iRet = 0;
+            // don't call pLoop->Stop, which is
+            // dedicated to stop the mainloop
+            pLoop->WakeupLoop( aevtStop, iRet );
+            pLoop->WaitForQuit();
+        }
+        m_mapLoops.clear();
+
+    }while( 0 );
+    return ret;
+}
+
+gint32 CRpcTcpBusPort::AllocMainLoop(
+    MloopPtr& pLoop )
+{
+    if( !m_bRfc )
+    {
+        pLoop = GetIoMgr()->GetMainIoLoop();
+        return STATUS_SUCCESS;
+    }
+
+    gint32 ret = STATUS_SUCCESS;
+    do{
+        CStdRMutex oLock( GetLock() );
+        guint32 dwCount = 10000;
+        LOOPMAP_ITR itr = m_mapLoops.begin();
+        LOOPMAP_ITR itrRet = itr;
+        for( ; itr != m_mapLoops.end(); ++itr )
+        {
+            if( dwCount > itr->second )
+            {
+                itrRet = itr;
+                dwCount = itr->second;
+            }
+        }
+
+        ++itrRet->second;
+        pLoop = itrRet->first;
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CRpcTcpBusPort::ReleaseMainLoop(
+    MloopPtr& pLoop )
+{
+    if( !m_bRfc )
+        return STATUS_SUCCESS;
+
+    if( pLoop.IsEmpty() )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        CStdRMutex oLock( GetLock() );
+        LOOPMAP_ITR itr =
+            m_mapLoops.find( pLoop );
+        if( itr == m_mapLoops.end() )
+            break;
+        --itr->second;
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CRpcTcpBusPort::PreStart( IRP* pIrp )
+{
+    gint32 ret = 0;
+    do{
+        CIoManager* pMgr = GetIoMgr();
+        bool bRfc = false;
+        ret = pMgr->GetCmdLineOpt(
+            propEnableRfc, bRfc );
+        if( ERROR( ret ) )
+        {
+            m_bRfc = false;
+            ret = 0;
+            break;
+        }
+
+        m_bRfc = bRfc;
+        if( !m_bRfc )
+            break;
+
+        guint32 dwRole = 2;
+        ret = pMgr->GetCmdLineOpt(
+            propRouterRole, dwRole );
+
+        if( ERROR( ret ) )
+            ret = 0;
+
+        if( ( dwRole & 2 ) == 0 )
+        {
+            // not a bridge
+            m_bRfc = false;
+            break;
+        }
+
+        ret = CreateMLoopPool();
+        if( ERROR( ret ) )
+            return ret;
+
+    }while( 0 );
+
+    return super::PreStart( pIrp );
+}
+
+gint32 CRpcTcpBusPort::PostStop( IRP* pIrp )
+{
+    gint32 ret = 0;
+    if( m_bRfc )
+        ret = DestroyMLoopPool();
+    if( ERROR( ret ) )
+        return ret;
+    return super::PostStop( pIrp );
+}
 
 CRpcTcpBusDriver::CRpcTcpBusDriver(
     const IConfigDb* pCfg )
@@ -691,6 +889,22 @@ gint32 CRpcTcpBusDriver::GetTcpSettings(
             if( strPortClass != PORT_CLASS_RPC_TCPBUS )
                 continue;
 
+            guint32 dwConns = TCP_MAX_CONNS;
+            if( ( elem.isMember( JSON_ATTR_TCPCONN ) &&
+                elem[ JSON_ATTR_TCPCONN ].isString() ) )
+            {
+                std::string strConns =
+                    elem[ JSON_ATTR_TCPCONN ].asString();
+                char* pEnd = nullptr;
+                const char* pBegin = strConns.c_str();
+                dwConns = strtol( pBegin, &pEnd, 10 );
+                if( dwConns == 0 && pEnd == pBegin )
+                    dwConns = TCP_MAX_CONNS;
+                else if( dwConns == LONG_MIN ||
+                    dwConns == LONG_MAX )
+                    dwConns = TCP_MAX_CONNS;
+            }
+            oCfg.SetIntProp( propMaxConns, dwConns );        
 
             if( !( elem.isMember( JSON_ATTR_PARAMETERS ) &&
                 elem[ JSON_ATTR_PARAMETERS ].isArray() ) &&

@@ -257,6 +257,13 @@ gint32 CRpcSocketBase::StartWatch( bool bWrite )
     return ret;
 }
 
+CMainIoLoop*
+CRpcSocketBase::GetMainLoop() const
+{
+    CIoManager* pMgr = GetIoMgr();
+    return pMgr->GetMainIoLoop();
+}
+
 gint32 CRpcSocketBase::AttachMainloop()
 {
     if( m_iFd <= 0 )
@@ -268,9 +275,7 @@ gint32 CRpcSocketBase::AttachMainloop()
         // poll
         guint32 dwOpt = ( guint32 )G_IO_IN;
 
-        CIoManager* pMgr = GetIoMgr();
-        CMainIoLoop* pMainLoop =
-            pMgr->GetMainIoLoop();
+        CMainIoLoop* pMainLoop = GetMainLoop();
 
         CParamList oParams;
 
@@ -332,8 +337,7 @@ gint32 CRpcSocketBase::AttachMainloop()
 gint32 CRpcSocketBase::DetachMainloop()
 {
 
-    CIoManager* pMgr = GetIoMgr();
-    CMainIoLoop* pLoop = pMgr->GetMainIoLoop();
+    CMainIoLoop* pLoop = GetMainLoop();
 
     if( m_hIoRWatch != INVALID_HANDLE )
     {

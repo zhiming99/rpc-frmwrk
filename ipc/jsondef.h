@@ -100,3 +100,4 @@
 #define JSON_ATTR_USERNAME      "UserName"
 #define JSON_ATTR_SIGN_MSG      "SignMessage"
 #define JSON_ATTR_LBGROUP       "LBGroup"
+#define JSON_ATTR_TCPCONN       "MaxConnections"

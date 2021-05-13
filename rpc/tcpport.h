@@ -49,6 +49,8 @@ namespace rpcf
 #define RETRIABLE( iRet_ ) \
     ( iRet_ == EWOULDBLOCK || iRet_ == EAGAIN )
 
+#define TCP_MAX_CONNS           512
+
 enum EnumProtoId
 {
     protoDBusRelay,
@@ -537,6 +539,7 @@ class CRpcSocketBase : public IService
     HANDLE              m_hIoWWatch;
     HANDLE              m_hErrWatch;
 
+    virtual CMainIoLoop* GetMainLoop() const;
     gint32 AttachMainloop();
     gint32 DetachMainloop();
     gint32 UpdateRttTimeMs();
@@ -1026,6 +1029,7 @@ class CTcpStreamPdo : public CPort
         IRP* pIrp, gint32 ret );
 
     sem_t   m_semFireSync;
+    MloopPtr m_pLoop;
 
     public:
 
@@ -1103,6 +1107,11 @@ class CTcpStreamPdo : public CPort
 
     gint32 OnPortStackReady( IRP* pIrp );
 
+    CMainIoLoop* GetMainLoop() const
+    {
+        CMainIoLoop* pLoop = m_pLoop;
+        return pLoop;
+    }
 };
 
 class CRpcTcpBusPort :
@@ -1135,6 +1144,15 @@ class CRpcTcpBusPort :
     gint32 RemovePortId( guint32 dwPortId );
     gint32 RemovePortAddr( PDOADDR& oAddr );
 
+    bool m_bRfc = false;
+    guint32 m_dwConns = TCP_MAX_CONNS;
+
+    using LOOPMAP_ITR=
+        std::map< MloopPtr, gint32 >::iterator;
+    std::map< MloopPtr, gint32 > m_mapLoops;
+    gint32 CreateMLoopPool();
+    gint32 DestroyMLoopPool();
+
     public:
     typedef CGenericBusPortEx super;
 
@@ -1146,6 +1164,9 @@ class CRpcTcpBusPort :
 
     CRpcTcpBusPort(
         const IConfigDb* pCfg );
+
+    gint32 AllocMainLoop( MloopPtr& pLoop );
+    gint32 ReleaseMainLoop( MloopPtr& pLoop );
 
     virtual gint32 PostStart(
         IRP* pIrp );
@@ -1175,6 +1196,14 @@ class CRpcTcpBusPort :
             gint32 iProp,
             const CBuffer& oBuf );
 
+    virtual gint32 PreStart( IRP* pIrp ) override;
+    virtual gint32 PostStop( IRP* pIrp ) override;
+
+    guint32 GetMaxConns() const
+    { return m_dwConns; }
+
+    guint32 GetConnections() const
+    { return m_mapIdToAddr.size(); }
 };
 
 class CRpcTcpBusDriver : public CGenBusDriverEx
