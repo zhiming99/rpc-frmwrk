@@ -13,7 +13,7 @@ This framework depends on the following packags to build:
 3. `lz4 (lz4-devel)`   
 4. `cppunit-1 (for the test cases, cppunit and cppunit-devel)`   
 5. `openssl-1.1 for SSL communication. ( openssl-devel, optional )`
-6. `Kerberos 5 for authentication and access control. ( rpm: krb5-libs, krb5-devel, or deb: libkrb5-3, libkrb5-dev )`
+6. `MIT krb5 for authentication and access control. ( rpm: krb5-libs, krb5-devel, or deb: libkrb5-3, libkrb5-dev )`
 7. `c++11 is required, and make sure the GCC is 5.x or higher.`
 8. `python 3.5+ is required for python support.`
 
@@ -49,6 +49,9 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 6. Logging service
 
 ---
+[`Mon May 10 2021 09:24:59 PM Beijing`]   
+1. Let's move on to add request-based flow control.
+
 [`Fri May 07 2021 04:12:30 PM Beijing`]   
 1. The GUI config tool is almost done. There are still some testing to get it more stable.
 2. Now we can deploy `rpc-frmwrk` with ease!
