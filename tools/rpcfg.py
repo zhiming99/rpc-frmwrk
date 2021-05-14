@@ -1388,6 +1388,7 @@ class ConfigDlg(Gtk.Dialog):
             strVal = nodeCtx.nodeName.get_text()
             if len( strVal ) == 0 :
                 raise Exception("'Node Name' cannot be empty") 
+            nodeCfg[ 'NodeName' ] = strVal
 
             if nodeCtx.enabled.props.active :
                 nodeCfg[ "Enabled" ] = "true"
@@ -1443,14 +1444,14 @@ class ConfigDlg(Gtk.Dialog):
                 numCfg = len( self.nodes )
             else :
                 numCfg = numCtx
-                self.nodes = [ InitNodeCfg( 0 ) ] * numCtx
+                self.nodes = [ self.InitNodeCfg( 0 ) ] * numCtx
 
             diff = numCtx - numCfg
             if diff < 0 :
                 for i in range( -diff ) :
                     self.nodes.pop()
             elif diff > 0 :
-                self.nodes += [ InitNodeCfg( 0 ) ] * diff
+                self.nodes += [ self.InitNodeCfg( 0 ) ] * diff
 
             for i in range( numCtx ):
                 ret = self.ExportNodeCtx(
