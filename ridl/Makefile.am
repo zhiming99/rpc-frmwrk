@@ -16,7 +16,7 @@ ridlc.cpp ridlc.h : ridlc.y
 mktpl : mktpl.in
 	sed -e 's,[@]PKG_CONFIG_PATH[@],$(pkgconfigdir),g;s,[@]DIST_LIB_DIR[@],$(libdir),g' mktpl.in > mktpl
 
-ridlc_LDADD=-lipc -lcombase -lutils -lstdc++ -ljsoncpp -L../combase -L../ipc -L../3rd_party
+ridlc_LDADD=$(COMMON_LINK) -lipc -lcombase -lutils -lstdc++ -ljsoncpp -L../combase -L../ipc -L../3rd_party
 ridlcdir=$(bindir)
 
 dist_ridlc_conf_DATA=odesctpl.json drvtpl.json mktpl

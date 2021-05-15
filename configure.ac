@@ -28,7 +28,8 @@ AC_PROG_INSTALL
 AC_LANG([C++])
 #AX_CXX_COMPILE_STDCXX(11,[noext], [mandatory])
 
-AC_CHECK_PROG(ac_cv_prog_python3, python3, yes)
+AC_CHECK_PROG([python3], python3, yes)
+AC_CHECK_PROG([sipbuild], [sip-build], yes)
 LT_INIT
 
 # Checks for libraries.
@@ -202,6 +203,7 @@ AC_ARG_ENABLE([testcases],
     [enable_testcases=yes])
 
 AM_CONDITIONAL([ENABLE_TESTCASES],[test "$enable_testcases" = "yes"])
+AM_CONDITIONAL([SIPBUILD],[test x$ac_cv_prog_sipbuild = xyes])
 
 VERSION2='$(subst .,:,$(VERSION))'
 AC_SUBST(VERSION2)

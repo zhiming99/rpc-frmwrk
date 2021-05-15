@@ -499,7 +499,7 @@ class CIfParallelTaskGrp
     // a task group to synchronize the concurrent
     // tasks with the sequencial tasks
     std::set< TaskletPtr > m_setTasks;
-    std::set< TaskletPtr > m_setPendingTasks;
+    std::deque< TaskletPtr > m_quePendingTasks;
 
     public:
 
@@ -537,20 +537,20 @@ class CIfParallelTaskGrp
     {
         CStdRTMutex oLock( GetLock() );
         return m_setTasks.size() +
-            m_setPendingTasks.size();
+            m_quePendingTasks.size();
     }
 
     virtual guint32 Clear() 
     {
         CStdRTMutex oLock( GetLock() );
         m_setTasks.clear();
-        m_setPendingTasks.clear();
+        m_quePendingTasks.clear();
         return 0;
     }
 
     guint32 GetPendingCount()
     {
-        return m_setPendingTasks.size();
+        return m_quePendingTasks.size();
     }
 
     virtual gint32 RemoveTask( TaskletPtr& pTask );

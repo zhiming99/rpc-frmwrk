@@ -1811,7 +1811,11 @@ gint32 CIfTaskGroup::FindTaskByRmtId(
     gint32 ret = -ENOENT;
 
     CStdRTMutex oTaskLock( GetLock() );
-    for( auto&& pTask : m_queTasks )
+    std::deque< TaskletPtr >
+        queTasks( m_queTasks );
+    oTaskLock.Unlock();
+
+    for( auto&& pTask : queTasks )
     {
         CCfgOpenerObj oCfg( ( CObjBase* )pTask );
         if( pTask->GetClsid() ==
@@ -2252,10 +2256,19 @@ gint32 CIfParallelTaskGrp::RemoveTask(
 
     ret = m_setTasks.erase( pTask );
     if( ret == 0 )
-        ret = m_setPendingTasks.erase( pTask );
+    {
+        std::deque< TaskletPtr >::iterator
+            itr = m_quePendingTasks.begin();
 
-    if( ret == 0 )
-        return -ENOENT;
+        itr = std::find(
+            m_quePendingTasks.begin(),
+            m_quePendingTasks.end(), pTask );
+
+        if( itr != m_quePendingTasks.end() )
+            m_quePendingTasks.erase( itr );
+
+        ret = -ENOENT;
+    }
 
     return 0;
 }
@@ -2337,21 +2350,21 @@ gint32 CIfParallelTaskGrp::RunTaskInternal(
     }
 
     do{
-        std::set< TaskletPtr > setTasksToRun;
+        std::deque< TaskletPtr > queTasksToRun;
 
-        setTasksToRun.clear();
-        setTasksToRun = m_setPendingTasks;
+        queTasksToRun.clear();
+        queTasksToRun = m_quePendingTasks;
 
         m_setTasks.insert(
-            m_setPendingTasks.begin(),
-            m_setPendingTasks.end() );
+            m_quePendingTasks.begin(),
+            m_quePendingTasks.end() );
 
-        m_setPendingTasks.clear();
+        m_quePendingTasks.clear();
         SetNoSched( true );
 
         oTaskLock.Unlock();
 
-        for( auto pTask : setTasksToRun )
+        for( auto pTask : queTasksToRun )
         {
             if( !pTask.IsEmpty() )
                 ( *pTask )( eventZero );
@@ -2430,7 +2443,7 @@ gint32 CIfParallelTaskGrp::AddAndRun(
         oChildCfg.SetObjPtr(
             propParentTask, ObjPtr( this ) );
 
-        m_setPendingTasks.insert( pTask );
+        m_quePendingTasks.push_back( pTask );
         oTaskLock.Unlock();
 
         if( bRunning )
@@ -2491,7 +2504,7 @@ gint32 CIfParallelTaskGrp::AppendTask(
         oChildCfg.SetObjPtr(
             propParentTask, ObjPtr( this ) );
 
-        m_setPendingTasks.insert( pTask );
+        m_quePendingTasks.push_back( pTask );
 
     }while( 0 );
 
@@ -2523,7 +2536,7 @@ gint32 CIfParallelTaskGrp::FindTask(
         }
     }
 
-    for( auto&& pTask : m_setPendingTasks )
+    for( auto&& pTask : m_quePendingTasks )
     {
         if( pTask->GetObjId() == iTaskId )
         {
@@ -2551,23 +2564,28 @@ gint32 CIfParallelTaskGrp::FindTaskByRmtId(
     gint32 i = 0;
     bool bFound = false;
 
-    CStdRTMutex oTaskLock( GetLock() );
-    std::set< TaskletPtr >* psetTasks = &m_setTasks;
     do{
-        for( auto&& pTask : *psetTasks )
+        CStdRTMutex oTaskLock( GetLock() );
+        std::vector< TaskletPtr > vecTasks;
+        vecTasks.insert( vecTasks.end(),
+            m_setTasks.begin(),
+            m_setTasks.end() );
+
+        vecTasks.insert( vecTasks.end(),
+            m_quePendingTasks.begin(),
+            m_quePendingTasks.end() );
+
+        oTaskLock.Unlock();
+
+        for( auto&& pTask : vecTasks )
         {
-            const IConfigDb* pTaskCfg =
-                ( IConfigDb* )*pTask;
-
-            if( pTaskCfg == nullptr )
-                continue;
-
             if( pTask->GetClsid() ==
                 clsid( CIfInvokeMethodTask ) )
             {
-                CCfgOpener oCfg( pTaskCfg );
-                guint64 qwRmtId = 0;
+                CCfgOpenerObj oCfg(
+                    ( CObjBase* )pTask );
 
+                guint64 qwRmtId = 0;
                 ret = oCfg.GetQwordProp(
                     propRmtTaskId, qwRmtId );
 
@@ -2583,7 +2601,6 @@ gint32 CIfParallelTaskGrp::FindTaskByRmtId(
                 continue;
             }
             
-            CCfgOpener oCfg( pTaskCfg );
             CIfTaskGroup* pGrp = pTask;
             if( pGrp != nullptr )
             {
@@ -2598,12 +2615,7 @@ gint32 CIfParallelTaskGrp::FindTaskByRmtId(
             }
         }
 
-        if( bFound )
-            break;
-        ++i;
-        psetTasks = &m_setPendingTasks;
-
-    }while( i < 2 );
+    }while( 0 );
 
     if( !bFound )
         ret = -ENOENT;
@@ -2628,7 +2640,7 @@ gint32 CIfParallelTaskGrp::FindTaskByClsid(
             bFound = true;
         }
     }
-    for( auto elem : m_setPendingTasks )
+    for( auto elem : m_quePendingTasks )
     {
         if( iClsid == elem->GetClsid() )
         {
@@ -2670,14 +2682,14 @@ gint32 CIfParallelTaskGrp::OnCancel(
 
         // when canceling, no re-schedule of this
         // task on child task completion
-        if( m_setPendingTasks.size() > 0 )
+        if( m_quePendingTasks.size() > 0 )
         {
             vecTasks.insert(
                 vecTasks.end(),
-                m_setPendingTasks.begin(),
-                m_setPendingTasks.end() );
+                m_quePendingTasks.begin(),
+                m_quePendingTasks.end() );
 
-            m_setPendingTasks.clear();
+            m_quePendingTasks.clear();
         }
 
         if( m_setTasks.size() > 0 )

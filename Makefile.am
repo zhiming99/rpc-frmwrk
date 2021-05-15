@@ -5,7 +5,9 @@ if ENABLE_TESTCASES
 SUBDIRS += test
 endif
 
+if SIPBUILD
 SUBDIRS += python
+endif
 
 EXTRA_DIST= README.md cfgdbg
 
