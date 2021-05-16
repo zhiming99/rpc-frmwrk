@@ -30,6 +30,109 @@ def SetToString( oSet : set ) :
             i += 1
     return strText
 
+def GetTestPaths( path : str= None ) :
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    paths = []
+    if path is None:
+        curDir = dir_path
+        paths.append( curDir + "/../../etc/rpcf" )
+        paths.append( "/etc/rpcf")
+
+        curDir += "/../test/"
+        paths.append( curDir + "actcancel" )
+        paths.append( curDir + "asynctst" )
+        paths.append( curDir + "btinrt" )
+        paths.append( curDir + "evtest" )
+        paths.append( curDir + "helloworld" )
+        paths.append( curDir + "iftest" )
+        paths.append( curDir + "inproc" )
+        paths.append( curDir + "katest" )
+        paths.append( curDir + "prtest" )
+        paths.append( curDir + "sftest" )
+        paths.append( curDir + "stmtest" )
+    else:
+        paths.append( path )
+
+    return paths
+
+def GetPyTestPaths() :
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    paths = []
+    paths.append( dir_path +
+        "/../python/tests/sftest" )
+    return paths
+
+def ExportTestCfgs( cfgList:list ):
+    testDescs = [ "actcdesc.json",
+        "asyndesc.json",
+        "btinrt.json",
+        "evtdesc.json",
+        "hwdesc.json",
+        "echodesc.json",
+        "kadesc.json",
+        "prdesc.json",
+        "sfdesc.json",
+        "stmdesc.json" ]
+
+    paths = GetTestPaths()
+    for testDesc in testDescs :
+        pathVal = ReadTestCfg( paths, testDesc )
+        if pathVal is None :
+            continue
+        UpdateTestCfg( pathVal[ 1 ], cfgList )
+        WriteTestCfg( pathVal[ 0 ], pathVal[ 1 ] )
+
+    paths = GetPyTestPaths()
+    pathVal = ReadTestCfg( paths, 'sfdesc.json' )
+    if pathVal is not None :
+        UpdateTestCfg( pathVal[ 1 ], cfgList )
+        WriteTestCfg( pathVal[ 0 ], pathVal[ 1 ] )
+
+def ReadTestCfg( paths:list, name:str) :
+    jsonVal = None
+    for path in paths:
+        try:
+            cfgFile = path + "/" + name
+            fp = open( cfgFile, "r" )
+            jsonVal = [cfgFile, json.load(fp) ]
+            fp.close()
+        except OSError as err:
+            continue
+
+        return jsonVal
+    return None
+
+def UpdateTestCfg( jsonVal, cfgList:list ):
+    try:
+        ifCfg = cfgList[ 0 ]
+        authInfo = cfgList[ 1 ]
+        if not 'Objects' in jsonVal :
+            return
+
+        objs = jsonVal[ 'Objects' ]
+        for elem in objs :
+            elem[ 'IpAddress' ] = ifCfg[ 'BindAddr' ]
+            elem[ 'PortNumber' ] = ifCfg[ 'PortNumber' ]
+            elem[ 'Compression' ] = ifCfg[ 'Compression' ]
+            elem[ 'EnableSSL' ] = ifCfg[ 'EnableSSL' ]
+            elem[ 'EnableWS' ] = ifCfg[ 'EnableWS' ]
+            elem[ 'RouterPath' ] = '/'
+            if 'HasAuth' in ifCfg and ifCfg[ 'HasAuth' ] == 'true' :
+                elem[ 'AuthInfo' ] = authInfo
+            else :
+                elem.pop( 'AuthInfo' )
+
+    except Exception as err:
+        pass
+
+    return
+
+def WriteTestCfg( path, jsonVal ) :
+    fp = open(path, "w")
+    json.dump( jsonVal, fp, indent=4)
+    fp.close()
+    return
+
 def LoadConfigFiles( path : str) :
     dir_path = os.path.dirname(os.path.realpath(__file__))
     paths = []
@@ -245,6 +348,27 @@ class ConfigDlg(Gtk.Dialog):
             except Exception as err :
                 pass
         self.jsonFiles = jsonFiles
+
+        authUser = ""
+        paths = GetTestPaths()
+        pathVal = ReadTestCfg( paths, "echodesc.json" )
+        if pathVal is not None :
+            jsonVal = pathVal[ 1 ]
+            try:
+                svrObjs = jsonVal[ 'Objects' ]
+                if svrObjs is not None and len( svrObjs ) > 0 :
+                    for svrObj in svrObjs :
+                        if 'AuthInfo' in svrObj :
+                            authInfo = svrObj['AuthInfo']
+                            if 'UserName' in authInfo :
+                                authUser = authInfo[ 'UserName' ]
+            except Exception as err :
+                pass
+
+        if len( authUser ) > 0 and 'AuthInfo' in confVals :
+            authInfo = confVals[ 'AuthInfo' ]
+            authInfo[ 'UserName' ] = authUser
+
         return confVals    
 
     def ReinitDialog( self, path : str ) :
@@ -256,6 +380,7 @@ class ConfigDlg(Gtk.Dialog):
         self.certEdit = None
         self.svcEdit = None
         self.realmEdit = None
+        self.userEdit = None
         self.signCombo = None
         self.kdcEdit = None
 
@@ -281,11 +406,11 @@ class ConfigDlg(Gtk.Dialog):
             interf.rowCount = GetGridRows( gridNet ) - row
             i += 1
 
-        gridCred = self.gridCred
-        rows = GetGridRows( gridCred )
+        gridSec = self.gridSec
+        rows = GetGridRows( gridSec )
         for i in range( rows ) :
-            gridCred.remove_row( 0 )
-        self.InitCredPage( gridCred, 0, 0, confVals )
+            gridSec.remove_row( 0 )
+        self.InitSecurityPage( gridSec, 0, 0, confVals )
 
         gridmh = self.gridmh
         rows = GetGridRows( gridmh )
@@ -346,12 +471,12 @@ class ConfigDlg(Gtk.Dialog):
         self.gridNet = gridNet
         stack.add_titled(gridNet, "GridConn", "Connection")
 
-        gridCred = Gtk.Grid()
-        #gridCred.set_row_homogeneous( True )
-        gridCred.props.row_spacing = 6        
-        stack.add_titled(gridCred, "GridCred", "Security")
-        self.InitCredPage( gridCred, 0, 0, confVals )
-        self.gridCred = gridCred
+        gridSec = Gtk.Grid()
+        #gridSec.set_row_homogeneous( True )
+        gridSec.props.row_spacing = 6        
+        stack.add_titled(gridSec, "GridSec", "Security")
+        self.InitSecurityPage( gridSec, 0, 0, confVals )
+        self.gridSec = gridSec
 
         gridmh = Gtk.Grid()
         gridmh.props.row_spacing = 6        
@@ -385,7 +510,7 @@ class ConfigDlg(Gtk.Dialog):
         box.add(vbox)
         self.show_all()
  
-    def InitCredPage( self, grid:Gtk.Grid, startCol, startRow, confVals : dict ) :
+    def InitSecurityPage( self, grid:Gtk.Grid, startCol, startRow, confVals : dict ) :
         row = GetGridRows( grid )
         self.AddSSLCred( grid, startCol, row, confVals )
         row = GetGridRows( grid )
@@ -1190,9 +1315,9 @@ class ConfigDlg(Gtk.Dialog):
 
         strSvc = ""
         try:
-            if confVals[ 'AuthInfo'] is not None :
+            if 'AuthInfo' in confVals :
                 authInfo = confVals[ 'AuthInfo']
-                if authInfo[ 'ServiceName'] is not None :
+                if 'ServiceName' in authInfo :
                     strSvc = authInfo[ 'ServiceName']
         except Exception as err :
             pass
@@ -1208,9 +1333,9 @@ class ConfigDlg(Gtk.Dialog):
 
         strRealm = ""
         try:
-            if confVals[ 'AuthInfo'] is not None :
+            if 'AuthInfo' in confVals :
                 authInfo = confVals[ 'AuthInfo']
-                if authInfo[ 'Realm'] is not None :
+                if 'Realm' in authInfo :
                     strRealm = authInfo[ 'Realm']
         except Exception as err :
             pass
@@ -1225,9 +1350,9 @@ class ConfigDlg(Gtk.Dialog):
 
         idx = 1
         try:
-            if confVals[ 'AuthInfo'] is not None :
+            if 'AuthInfo' in confVals :
                 authInfo = confVals[ 'AuthInfo']
-                if authInfo[ 'SignMessage'] is not None :
+                if 'SignMessage' in authInfo :
                     strSign = authInfo[ 'SignMessage']
                     if strSign == 'false' :
                         idx = 0
@@ -1253,7 +1378,7 @@ class ConfigDlg(Gtk.Dialog):
 
         strKdcIp = ""
         try:
-            if confVals[ 'kdcAddr'] is not None :
+            if 'kdcAddr' in confVals :
                 strKdcIp = confVals[ 'kdcAddr']
         except Exception as err :
             pass
@@ -1262,10 +1387,29 @@ class ConfigDlg(Gtk.Dialog):
         kdcEditBox.set_text(strKdcIp)
         grid.attach(kdcEditBox, startCol + 1, startRow + 5, 2, 1 )
 
+        labelUser = Gtk.Label()
+        labelUser.set_text("User Name: ")
+        labelUser.set_xalign(.5)
+        grid.attach(labelUser, startCol + 0, startRow + 6, 1, 1 )
+
+        strUser = ""
+        try:
+            if confVals[ 'AuthInfo'] is not None :
+                authInfo = confVals[ 'AuthInfo']
+                if authInfo[ 'UserName'] is not None :
+                    strUser = authInfo[ 'UserName']
+        except Exception as err :
+            pass
+
+        userEditBox = Gtk.Entry()
+        userEditBox.set_text(strUser)
+        grid.attach(userEditBox, startCol + 1, startRow + 6, 2, 1 )
+
         self.svcEdit = svcEditBox
         self.realmEdit = realmEditBox
         self.signCombo = signCombo
         self.kdcEdit = kdcEditBox
+        self.userEdit = userEditBox
 
     def on_sign_msg_changed(self, combo) :
         tree_iter = combo.get_active_iter()
@@ -1545,12 +1689,13 @@ class ConfigDlg(Gtk.Dialog):
 
             rtDesc = jsonFiles[ 2 ][ 1 ]
             svrObjs = rtDesc[ 'Objects' ]
+
+            authInfo = dict()
             if svrObjs is not None and len( svrObjs ) > 0 :
                 for svrObj in svrObjs :
                     if svrObj[ 'ObjectName'] == 'RpcRouterBridgeAuthImpl' :
                         if len( self.realmEdit.get_text() ) == 0:
                             break
-                        authInfo = dict()
                         authInfo[ 'Realm' ] = self.realmEdit.get_text()
                         authInfo[ 'ServiceName' ] = self.svcEdit.get_text()
                         authInfo[ 'AuthMech' ] = 'krb5'
@@ -1572,6 +1717,11 @@ class ConfigDlg(Gtk.Dialog):
             fp = open(rtauPath, "w")
             json.dump( rtDesc, fp, indent = 4 )
             fp.close()
+
+            if len( confVals ) > 0 :
+                authInfo[ 'UserName' ] = self.userEdit.get_text()
+                cfgList = [ confVals[ 0 ], authInfo ]
+                ExportTestCfgs( cfgList ) 
 
             rtDesc = jsonFiles[ 1 ][ 1 ]
             svrObjs = rtDesc[ 'Objects' ]
@@ -1623,6 +1773,7 @@ class ConfigDlg(Gtk.Dialog):
                             authInfo[ 'Realm' ] = self.realmEdit.get_text()
                             authInfo[ 'ServiceName' ] = self.svcEdit.get_text()
                             authInfo[ 'AuthMech' ] = 'krb5'
+                            authInfo[ 'UserName' ] = 'kdcclient'
                             tree_iter = self.signCombo.get_active_iter()
                             if tree_iter is not None:
                                 model = self.signCombo.get_model()
