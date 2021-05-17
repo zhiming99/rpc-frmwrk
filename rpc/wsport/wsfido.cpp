@@ -616,10 +616,13 @@ gint32 CRpcWebSockFido::CompleteListeningIrp(
     BufPtr pDecrypted( true );
     do{
         BufPtr& pCurFrame = GetCurFrame();
+        WebSocketFrameType ret1;
 
-        WebSocketFrameType ret1 =
-            m_oWebSock.getFrame(
+        {
+            CStdRMutex oPortLock( GetLock() );
+            ret1 = m_oWebSock.getFrame(
                 pCurFrame, pDecrypted );
+        }
 
         if( ret1 == INCOMPLETE_TEXT_FRAME ||
             ret1 == INCOMPLETE_BINARY_FRAME ||
@@ -685,6 +688,7 @@ gint32 CRpcWebSockFido::CompleteListeningIrp(
             ret = 0;
             // the remaider if any, will be
             // returned on next read request
+            CStdRMutex oPortLock( GetLock() );
             if( pCurFrame->empty() )
             {
                 pCurFrame->Resize( 0 );

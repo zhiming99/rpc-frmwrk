@@ -2266,11 +2266,15 @@ gint32 CIfParallelTaskGrp::RemoveTask(
 
         if( itr != m_quePendingTasks.end() )
             m_quePendingTasks.erase( itr );
-
-        ret = -ENOENT;
+        else
+            ret = -ENOENT;
+    }
+    else
+    {
+        ret = 0;
     }
 
-    return 0;
+    return ret;
 }
 
 gint32 CIfParallelTaskGrp::OnChildComplete(

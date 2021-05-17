@@ -4,6 +4,7 @@ import os
 import sys 
 from shutil import move
 from copy import deepcopy
+from urllib.parse import urlparse
 
 gi.require_version("Gtk", "3.0")
 
@@ -121,6 +122,19 @@ def UpdateTestCfg( jsonVal, cfgList:list ):
                 elem[ 'AuthInfo' ] = authInfo
             else :
                 elem.pop( 'AuthInfo' )
+            if elem[ 'EnableWS' ] == 'true' :
+                elem[ 'DestURL' ] = ifCfg[ 'DestURL' ]
+                urlComp = urlparse( elem[ 'DestURL' ], scheme='https' )
+                if urlComp.port is None :
+                    elem[ 'PortNumber' ] = '443'
+                else :
+                    elem[ 'PortNumber' ] = urlComp.port
+                if urlComp.hostname is not None:
+                    elem[ 'IpAddress' ] = urlComp.hostname
+                else :
+                    raise Exception( 'web socket URL is not valid' ) 
+            else :
+                elem.pop( 'DestURL' )
 
     except Exception as err:
         pass
@@ -306,6 +320,7 @@ class ConfigDlg(Gtk.Dialog):
                         ifCfg[ "EnableSSL" ]= "false";
                         ifCfg[ "ConnRecover" ]= "false";
                         ifCfg[ "HasAuth" ]= "false";
+                        ifCfg[ "DestURL" ]= "https://www.example.com";
                         connparams = [ ifCfg, ]
                     confVals[ "connParams"] = [ *connParams ]
             except Exception as err :
@@ -1675,6 +1690,7 @@ class ConfigDlg(Gtk.Dialog):
 
                 if curVals.webSock.props.active :
                     elem[ 'EnableWS' ] = 'true'
+                    elem[ 'DestURL' ] = curVals.urlEdit.get_text();
                 else:
                     elem[ 'EnableWS' ] = 'false'
 
@@ -1720,7 +1736,11 @@ class ConfigDlg(Gtk.Dialog):
 
             if len( confVals ) > 0 :
                 authInfo[ 'UserName' ] = self.userEdit.get_text()
-                cfgList = [ confVals[ 0 ], authInfo ]
+                cfgIf0 = confVals[ 0 ]
+                if cfgIf0[ 'EnableWS' ] == 'true' :
+                    curVals = ifs[ 0 ]
+                    cfgIf0[ 'DestURL' ] = curVals.urlEdit.get_text()
+                cfgList = [ cfgIf0, authInfo ]
                 ExportTestCfgs( cfgList ) 
 
             rtDesc = jsonFiles[ 1 ][ 1 ]
@@ -1786,6 +1806,15 @@ class ConfigDlg(Gtk.Dialog):
                     if if0.webSock.props.active :
                         elem[ 'EnableWS' ] = 'true'
                         elem[ 'DestURL'] = if0.urlEdit.get_text()
+                        urlComp = urlparse( elem[ 'DestURL' ], scheme='https' )
+                        if urlComp.port is None :
+                            elem[ 'PortNumber' ] = '443'
+                        else :
+                            elem[ 'PortNumber' ] = urlComp.port
+                        if urlComp.hostname is not None:
+                            elem[ 'IpAddress' ] = urlComp.hostname
+                        else :
+                            raise Exception( 'web socket URL is not valid' ) 
                     else:
                         elem[ 'EnableWS' ] = 'false'
 

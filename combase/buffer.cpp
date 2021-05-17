@@ -409,7 +409,7 @@ gint32 CBuffer::ResizeWithOffset( guint32 dwSize )
             free( pBase );
             SetBuffer( m_arrBuf, dwSize );
         }
-        else if( dwBytesCopy > sizeof( m_arrBuf ) )
+        else
         {
             if( unlikely( bArrBuf ) )
             {
@@ -526,7 +526,7 @@ gint32 CBuffer::Resize( guint32 dwSize )
                 free( ptr() );
                 SetBuffer( m_arrBuf, dwSize );
             }
-            else if( std::min( dwSize, size() ) > sizeof( m_arrBuf ) )
+            else
             {
                 char* pNewBuf = ( char* )realloc( ptr(), dwSize );
                 if( pNewBuf != nullptr )
