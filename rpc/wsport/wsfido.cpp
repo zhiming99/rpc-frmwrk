@@ -1177,7 +1177,7 @@ gint32 CRpcWebSockFido::AdvanceHandshakeClient(
 
                 std::string strUrl = oConn.GetUrl();
                 if( strUrl.empty() )
-                    strUrl = "https://example.com/chat";
+                    strUrl = "https://www.example.com/chat";
 
                 std::string strRet;
 

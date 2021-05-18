@@ -97,7 +97,7 @@ def ReadTestCfg( paths:list, name:str) :
             fp = open( cfgFile, "r" )
             jsonVal = [cfgFile, json.load(fp) ]
             fp.close()
-        except OSError as err:
+        except Exception as err:
             continue
 
         return jsonVal
@@ -169,7 +169,7 @@ def LoadConfigFiles( path : str) :
                 fp = open( drvfile, "r" )
                 jsonvals[ 0 ] = [drvfile, json.load(fp) ]
                 fp.close()
-        except OSError as err :
+        except Exception as err :
             pass
         try:
             if jsonvals[ 1 ] is None :
@@ -177,7 +177,7 @@ def LoadConfigFiles( path : str) :
                 fp = open( rtfile, "r" )
                 jsonvals[ 1 ] = [rtfile, json.load(fp)]
                 fp.close()
-        except OSError as err :
+        except Exception as err :
             pass
 
         try:
@@ -186,7 +186,7 @@ def LoadConfigFiles( path : str) :
                 fp = open( rtaufile, "r" )
                 jsonvals[ 2 ] = [rtaufile, json.load(fp)]
                 fp.close()
-        except OSError as err :
+        except Exception as err :
             pass
         
         try:
@@ -195,7 +195,7 @@ def LoadConfigFiles( path : str) :
                 fp = open( auprxyfile, "r" )
                 jsonvals[ 3 ] = [auprxyfile, json.load(fp)]
                 fp.close()
-        except OSError as err :
+        except Exception as err :
             pass            
 
     return jsonvals
