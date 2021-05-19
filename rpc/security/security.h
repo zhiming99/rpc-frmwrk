@@ -437,6 +437,11 @@ class CRpcReqForwarderProxyAuth :
         DBusMessage* pMsgRaw,
         DMsgPtr& pRespMsg,
         IEventSink* pCallback );
+
+    virtual gint32 BuildNewMsgToFwrd(
+        IConfigDb* pReqCtx,
+        DMsgPtr& pFwrdMsg,
+        DMsgPtr& pNewMsg ) override;
 };
 
 class CRpcTcpBridgeProxyAuth :

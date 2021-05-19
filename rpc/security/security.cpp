@@ -570,34 +570,7 @@ gint32 CRpcTcpBridgeAuth::OnLoginFailed(
         if( !m_pLoginTimer.IsEmpty() )
             ( *m_pLoginTimer )( eventCancelTask );
 
-        CCfgOpener oReqCtx;
-        oReqCtx[ propRouterPath ] = "/";
-        oReqCtx.CopyProp( propConnHandle,
-            propPortId, this );
-
-        PortPtr pPort;
-        GET_TARGET_PORT( pPort ); 
-        if( ERROR( ret ) )
-            break;
-
-        BufPtr pBuf( true );
-        ret = GetPortProp( pPort,
-            propPdoPtr, pBuf );
-        if( ERROR( ret ) )
-            break;
-
-        IPort* pPdo = ( ObjPtr& )*pBuf;
-        if( unlikely( pPdo == nullptr ) )
-        {
-            ret = -EFAULT;
-            break;
-        }
-
-        IConfigDb* pReqCtx = oReqCtx.GetCfg();
-        // stop the tcp port
-        pRouter->OnEvent( eventRmtSvrOffline,
-            ( LONGWORD )pReqCtx, 0,
-            ( LONGWORD* )PortToHandle( pPdo ) );
+        PostDisconnEvent();
 
     }while( 0 );
 
@@ -870,41 +843,10 @@ gint32 CRpcTcpBridgeAuth::ForwardRequest(
             ret = -EACCES;
             break;
         }
-        // append a session hash for access
-        // control
-        CCfgOpener oReqCtx;
-        oReqCtx.SetStrProp(
-            propSessHash, strHash );
-
-        oReqCtx.CopyProp(
-            propRouterPath, pReqCtx );
-
-        DMsgPtr pNewMsg;
-        pNewMsg.CopyHeader( pFwdrMsg );
-        BufPtr pArg( true );
-        gint32 iType = 0;
-        ret = pMsg.GetArgAt( 0, pArg, iType );
-
-        BufPtr pCtxBuf( true );
-        ret = oReqCtx.Serialize( pCtxBuf );
-        if( ERROR( ret ) )
-            break;
-
-        const char* pData = pArg->ptr();
-        const char* pCtx = pCtxBuf->ptr();
-        if( !dbus_message_append_args(pNewMsg,
-            DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
-            &pData, pArg->size(),
-            DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
-            &pCtx, pCtxBuf->size(),
-            DBUS_TYPE_INVALID ) )
-        {
-            ret = -ENOMEM;
-            break;
-        }
-
+        CCfgOpener oReqCtx( pReqCtx );
+        oReqCtx[ propSessHash ] = strHash;
         ret = super::ForwardRequest(
-                pReqCtx, pNewMsg,
+                pReqCtx, pFwdrMsg,
                 pRespMsg, pCallback );
 
     }while( 0 );
@@ -1051,6 +993,22 @@ gint32 CRpcTcpBridgeAuth::CheckSessExpired(
     }while( 0 );
 
     return ret;
+}
+
+gint32 CRpcReqForwarderProxyAuth::BuildNewMsgToFwrd(
+    IConfigDb* pReqCtx,
+    DMsgPtr& pFwrdMsg,
+    DMsgPtr& pNewMsg ) 
+{
+
+    if( pFwrdMsg.GetMember() != SYS_METHOD(
+        AUTH_METHOD_LOGIN ) )
+    {
+        pNewMsg = pFwrdMsg;
+        return 0;
+    }
+    return super::BuildNewMsgToFwrd(
+        pReqCtx, pFwrdMsg, pNewMsg );
 }
 
 gint32 CRpcReqForwarderProxyAuth::ForwardLogin(

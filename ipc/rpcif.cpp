@@ -404,7 +404,7 @@ gint32 CRpcBaseOperations::DisableEvent(
         pMatch, false, pCompletion );
 }
 
-guint32 CRpcBaseOperations::GetPortToSubmit(
+gint32 CRpcBaseOperations::GetPortToSubmit(
     CObjBase* pCfg, PortPtr& pPort )
 {
     if( pCfg == nullptr )
@@ -413,7 +413,7 @@ guint32 CRpcBaseOperations::GetPortToSubmit(
     return GetPortToSubmit( pCfg, pPort, bPdo );
 }
 
-guint32 CRpcBaseOperations::GetPortToSubmit(
+gint32 CRpcBaseOperations::GetPortToSubmit(
     CObjBase* pCfg, PortPtr& pPort, bool& bPdo )
 {
     if( pCfg == nullptr )
@@ -6357,7 +6357,9 @@ gint32 CInterfaceServer::DoInvoke(
             }while( 0 );
 
             // for keep-alive purpose
-            CCfgOpenerObj oTaskCfg( pCallback );
+            TaskletPtr pCb = ObjPtr( pCallback );
+            CCfgOpener oTaskCfg(
+                ( IConfigDb* )pCb->GetConfig() );
             SET_RMT_TASKID( pCfg, oTaskCfg );
 
             // copy the request for reference

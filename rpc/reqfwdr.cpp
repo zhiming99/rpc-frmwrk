@@ -3048,13 +3048,18 @@ gint32 CRpcReqForwarderProxy::SetupReqIrpFwrdReq(
         pIrp->SetIrpThread( GetIoMgr() );
 
         guint32 dwTimeoutSec = 0;
-        ret = oReq.GetTimeoutSec( dwTimeoutSec );
-        if( ERROR( ret ) )
+        oReq.GetTimeoutSec( dwTimeoutSec );
+        guint64 qwTs = 0;
+        oReq.GetQwordProp( propTimestamp, qwTs );
+        guint64 qwAge =
+            CTimestampSvr::GetAgeSec( qwTs );
+        if( qwAge >= dwTimeoutSec )
         {
-            dwTimeoutSec =
-                IFSTATE_ENABLE_EVENT_TIMEOUT;
-            ret = 0;
+            ret = -ETIMEDOUT;
+            break;
         }
+        dwTimeoutSec -= qwAge;
+
         pIrp->SetTimer( dwTimeoutSec, GetIoMgr() );
 
     }while( 0 );
@@ -3270,6 +3275,49 @@ gint32 CRpcReqForwarderProxy::FillRespData(
     return ret;
 }
 
+gint32 CRpcReqForwarderProxy::BuildNewMsgToFwrd(
+    IConfigDb* pReqCtx,
+    DMsgPtr& pFwrdMsg,
+    DMsgPtr& pNewMsg )
+{
+    gint32 ret = 0;
+    do{
+        // append a session hash for access
+        // control
+        CCfgOpener oReqCtx;
+        oReqCtx.CopyProp( propRouterPath, pReqCtx );
+        oReqCtx.CopyProp( propSessHash, pReqCtx );
+        oReqCtx.CopyProp( propTimestamp, pReqCtx );
+
+        DMsgPtr pNewMsg;
+        pNewMsg.CopyHeader( pFwrdMsg );
+        BufPtr pArg( true );
+        gint32 iType = 0;
+        ret = pFwrdMsg.GetArgAt( 0, pArg, iType );
+
+        BufPtr pCtxBuf( true );
+        ret = oReqCtx.Serialize( pCtxBuf );
+        if( ERROR( ret ) )
+            break;
+
+        const char* pData = pArg->ptr();
+        const char* pCtx = pCtxBuf->ptr();
+        if( !dbus_message_append_args(pNewMsg,
+            DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
+            &pData, pArg->size(),
+            DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
+            &pCtx, pCtxBuf->size(),
+            DBUS_TYPE_INVALID ) )
+        {
+            ret = -ENOMEM;
+            break;
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CRpcReqForwarderProxy::ForwardRequest(
     IConfigDb* pReqCtx,
     DBusMessage* pMsg,
@@ -3322,16 +3370,30 @@ gint32 CRpcReqForwarderProxy::ForwardRequest(
             CF_ASYNC_CALL;
         oReq.GetCallFlags( dwFlags );
         oBuilder.SetCallFlags( dwFlags );
+        oBuilder.CopyProp(
+            propTimestamp, pReqCtx );
+
+        DMsgPtr pNewMsg;
+        ret = BuildNewMsgToFwrd( pReqCtx,
+            pReqMsg, pNewMsg );
+        if( ERROR( ret ) )
+            break;
 
         oBuilder.Push( pReqMsg );
         oBuilder.SetMethodName(
             SYS_METHOD_FORWARDREQ );
 
         // a tcp default round trip time
+        guint32 dwTimeoutSec = 0;
+        oReq.GetTimeoutSec( dwTimeoutSec );
         oBuilder.SetTimeoutSec(
+            dwTimeoutSec != 0 ? dwTimeoutSec :
             IFSTATE_DEFAULT_IOREQ_TIMEOUT ); 
 
+        dwTimeoutSec = 0;
+        oReq.GetKeepAliveSec( dwTimeoutSec );
         oBuilder.SetKeepAliveSec(
+            dwTimeoutSec != 0 ? dwTimeoutSec :
             IFSTATE_DEFAULT_IOREQ_TIMEOUT / 2 ); 
 
         // copy the port id from where this
@@ -3342,11 +3404,6 @@ gint32 CRpcReqForwarderProxy::ForwardRequest(
 
         CParamList oRespCfg;
         CfgPtr pRespCfg = oRespCfg.GetCfg();
-        if( pRespCfg.IsEmpty() )
-        {
-            ret = -EFAULT;
-            break;
-        }
 
         // keep a copy of the orignal sender
         oRespCfg.SetStrProp(

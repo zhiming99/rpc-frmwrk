@@ -388,12 +388,12 @@ class CRpcBaseOperations :
         return GetState() == stateConnected;
     }
 
-    virtual guint32 GetPortToSubmit(
+    virtual gint32 GetPortToSubmit(
         CObjBase* pCfg,
         PortPtr& pPort,
         bool& bPdo );
 
-    guint32 GetPortToSubmit(
+    gint32 GetPortToSubmit(
         CObjBase* pCfg,
         PortPtr& pPort );
 };
@@ -574,6 +574,63 @@ gint32 CoAddIidName(
     EnumClsid Iid,
     const std::string& strSuffix
     );
+
+// server side timestamp
+struct CTimestampSvr
+{
+    guint64 m_qwLocalBaseSec;
+
+    CTimestampSvr()
+    {}
+    CTimestampSvr( guint64 qwLocalTs )
+    { m_qwLocalBaseSec = qwLocalTs; }
+
+    void SetBase( guint64 qwTs )
+    { m_qwLocalBaseSec = qwTs; }
+
+    static guint64 GetAgeSec(
+        guint64 qwTimestampSec )
+    {
+        timespec tv;
+        clock_gettime( CLOCK_MONOTONIC, &tv );
+        return tv.tv_sec - qwTimestampSec;
+    }
+};
+
+// proxy side timestamp
+struct CTimestampProxy :
+    public CTimestampSvr
+{
+    guint64 m_qwPeerBaseSec;
+    CTimestampProxy() :
+        CTimestampSvr() 
+    {}
+
+    CTimestampProxy(
+        guint64 qwLocalTs, guint64 qwPeerTs ) :
+        CTimestampSvr( qwLocalTs ),
+        m_qwPeerBaseSec( qwPeerTs )
+    {}
+
+    void SetPeer( guint64 qwTs )
+    { m_qwPeerBaseSec = qwTs; }
+
+    // for relay
+    guint64 GetPeerTimestamp(
+        guint64 qwTimestampSec ) const
+    {
+        return m_qwPeerBaseSec +
+            ( qwTimestampSec - m_qwLocalBaseSec );
+    }
+
+    // for start point in reqfwdr
+    guint64 GetPeerTimestamp() const
+    {
+        timespec tv;
+        clock_gettime( CLOCK_MONOTONIC, &tv );
+        return GetPeerTimestamp( tv.tv_sec );
+    }
+};
 
 /**
 * @name CRpcServices as an interface to provide

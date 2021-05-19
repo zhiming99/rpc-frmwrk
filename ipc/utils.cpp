@@ -407,9 +407,11 @@ gint32 CTimerService::ResetTimer(
 
 gint32 CTimerService::AdjustTimer(
     gint32 iTimerId,
-    gint32 iOffset )
+    gint32 iNewInterval )
 {
     gint32 ret = -ENOENT;
+    if( iNewInterval <= 0 )
+        return -EINVAL;
 
     CStdMutex oMutex( m_oMapLock );
 
@@ -420,23 +422,10 @@ gint32 CTimerService::AdjustTimer(
     {
         TIMER_ENTRY& te = *itr;
 
-        guint32 dwOffset = abs( iOffset );
         if( te.m_iTimerId == iTimerId )
         {
-            if( iOffset > 0 )
-            {
-                te.m_qwIntervalMs += SecToMs( dwOffset );
-            }
-            else
-            {
-                te.m_qwTicks += SecToMs( dwOffset );
-            }
-
-            if( te.m_qwTicks > te.m_qwIntervalMs )
-            {
-                m_vecPendingTimeouts.push_back( te );        
-                m_vecTimers.erase( itr );
-            }
+            te.m_qwIntervalMs = SecToMs( iNewInterval );
+            te.m_qwTicks = 0;
             ret = 0;
             break;
         }

@@ -580,6 +580,11 @@ class CRpcReqForwarderProxy :
 
     virtual gint32 RebuildMatches();
 
+    virtual gint32 BuildNewMsgToFwrd(
+        IConfigDb* pReqCtx,
+        DMsgPtr& pFwrdMsg,
+        DMsgPtr& pNewMsg );
+
     using IFREF = std::pair< gint32, gint32 >;
     std::map< MatchPtr, std::pair< gint32, gint32 > > m_mapMatchRefs;
 
@@ -774,7 +779,7 @@ struct CRpcTcpBridgeShared
         IEventSink* pContext,
         MatchPtr& pMatch );
 
-    guint32 GetPortToSubmitShared(
+    gint32 GetPortToSubmitShared(
         CObjBase* pCfg,
         PortPtr& pPort,
         bool& bPdo );
@@ -864,6 +869,8 @@ class CRpcTcpBridge :
     protected:
     TaskletPtr m_pHsTicker;
     bool m_bHandshaked = false;
+    bool m_bHsFailed = false;
+    CTimestampSvr m_oTs;
 
     // for load balance
     gint32 OnCheckRouterPathCompleteLB(
@@ -1042,7 +1049,7 @@ class CRpcTcpBridge :
 
     using CRpcBaseOperations::GetPortToSubmit;
 
-    virtual guint32 GetPortToSubmit(
+    virtual gint32 GetPortToSubmit(
         CObjBase* pCfg,
         PortPtr& pPort,
         bool& bPdo )
@@ -1057,6 +1064,10 @@ class CRpcTcpBridge :
         DMsgPtr& pRespMsg,
         IEventSink* pCallback );
 
+    inline guint64 GetAgeSec( guint64 qwTs )
+    { return m_oTs.GetAgeSec( qwTs ); }
+
+    gint32 PostDisconnEvent();
 
 }; // CRpcTcpBridge
 
@@ -1110,6 +1121,8 @@ class CRpcTcpBridgeProxy :
         IEventSink* pCallback,
         IConfigDb* pEvtCtx,
         guint32 dwEventId );
+
+    CTimestampProxy m_oTs;
 
     public:
 
@@ -1227,7 +1240,7 @@ class CRpcTcpBridgeProxy :
         IEventSink* pContext );
 
     using CRpcBaseOperations::GetPortToSubmit;
-    virtual guint32 GetPortToSubmit(
+    virtual gint32 GetPortToSubmit(
         CObjBase* pCfg,
         PortPtr& pPort,
         bool& bPdo )
