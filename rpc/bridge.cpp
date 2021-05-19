@@ -787,14 +787,14 @@ gint32 CRpcTcpBridgeProxy::ForwardRequest(
                     break;
                 }
 
-                dwTos -= dwAge;
+                dwtos -= dwAge;
             }
         }
 
         oBuilder.SetCallFlags( dwFlags );
 
         // a tcp default round trip time
-        oBuilder.SetTimeoutSec( dwTos ); 
+        oBuilder.SetTimeoutSec( dwtos ); 
 
         oBuilder[ propStreamId ] =
             TCP_CONN_DEFAULT_STM;

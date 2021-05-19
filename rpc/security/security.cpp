@@ -1001,8 +1001,8 @@ gint32 CRpcReqForwarderProxyAuth::BuildNewMsgToFwrd(
     DMsgPtr& pNewMsg ) 
 {
 
-    if( pFwrdMsg.GetMember() != SYS_METHOD(
-        AUTH_METHOD_LOGIN ) )
+    if( pFwrdMsg.GetMember() ==
+        SYS_METHOD( AUTH_METHOD_LOGIN ) )
     {
         pNewMsg = pFwrdMsg;
         return 0;
@@ -1114,8 +1114,8 @@ gint32 CRpcReqForwarderProxyAuth::ForwardRequest(
             break;
         }
         
-        if( pMsg.GetMember() != SYS_METHOD(
-            AUTH_METHOD_LOGIN ) )
+        if( pMsg.GetMember() !=
+            SYS_METHOD( AUTH_METHOD_LOGIN ) )
             break;
 
         return ForwardLogin( pReqCtx,
