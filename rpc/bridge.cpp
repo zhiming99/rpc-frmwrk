@@ -769,18 +769,18 @@ gint32 CRpcTcpBridgeProxy::ForwardRequest(
                     bResp = false;
             }
 
+            gint32 iRet =
+                oOrigReq.GetTimeoutSec( dwtos );
+
+            if( ERROR( iRet ) )
+            {
+                CCfgOpenerObj oCfg( this );
+                oCfg.GetIntProp(
+                    propTimeoutSec, dwtos );
+            }
+
             if( bRelay )
             {
-                gint32 iRet = oOrigReq.
-                    GetTimeoutSec( dwtos );
-
-                if( ERROR( iRet ) )
-                {
-                    CCfgOpenerObj oCfg( this );
-                    oCfg.GetIntProp(
-                        propTimeoutSec, dwtos );
-                }
-
                 if( dwAge >= dwtos )
                 {
                     ret = -ETIMEDOUT;

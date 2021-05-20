@@ -4918,10 +4918,16 @@ gint32 CIfInvokeMethodTask::SetAsyncCall(
         ret = GetAgeSec( dwAge );
         if( SUCCEEDED( ret ) )
         {
-            if( dwAge >= dwTimeoutSec )
-                dwTimeoutSec = 1;
-            else
+            if( dwAge < dwTimeoutSec )
+            {
                 dwTimeoutSec -= dwAge;
+            }
+            else
+            {
+                // already timeout, give it 1s of
+                // breath
+                dwTimeoutSec = 1;
+            }
         }
 
         ret = AddTimer( dwTimeoutSec, 
