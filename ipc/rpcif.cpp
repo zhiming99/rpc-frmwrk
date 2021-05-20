@@ -6273,6 +6273,59 @@ gint32 CInterfaceServer::DoInvoke_SendData(
     return ret;
 }
 
+gint32 CInterfaceServer::CheckReqCtx(
+    IEventSink* pCallback,
+    DMsgPtr& pMsg )
+{
+    if( pCallback == nullptr || pMsg.IsEmpty() )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        ObjPtr pCtxObj;
+        IConfigDb* pReqCtx;
+        ret = pMsg.GetObjArgAt( 1, pCtxObj );
+        if( ERROR( ret ) )
+        {
+            ret = 0;
+            break;
+        }
+
+        pReqCtx = pCtxObj;
+        if( pReqCtx == nullptr )
+        {
+            // ipc clients
+            break;
+        }
+
+        TaskletPtr pCb = ObjPtr( pCallback );
+        CCfgOpener oTaskCfg(
+            ( IConfigDb* )pCb->GetConfig() );
+
+        oTaskCfg.CopyProp(
+            propRouterPath, pReqCtx );
+
+        oTaskCfg.CopyProp(
+            propSessHash, pReqCtx );
+
+        CCfgOpener oReqCtx( pReqCtx );
+        oTaskCfg.CopyProp(
+            propTimestamp, pReqCtx );
+
+        CIfInvokeMethodTask* pInv =
+            ObjPtr( pCallback );
+
+        if( likely( pInv != nullptr ) &&
+            pInv->GetTimeLeft() <= 0 )
+        {
+            ret = -ETIMEDOUT;
+            break;
+        }
+
+    }while( 0 );
+
+    return ret;
+}
 
 gint32 CInterfaceServer::DoInvoke(
     DBusMessage* pReqMsg,
@@ -6366,6 +6419,10 @@ gint32 CInterfaceServer::DoInvoke(
             // later
             oTaskCfg.SetObjPtr(
                 propReqPtr, ObjPtr( pCfg ) );
+
+            ret = CheckReqCtx( pCallback, pMsg );
+            if( ERROR( ret ) )
+                break;
 
             ret = InvokeUserMethod(
                 pCfg, pCallback );

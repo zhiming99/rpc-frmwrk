@@ -4651,9 +4651,32 @@ gint32 CIfInvokeMethodTask::ResetTimer()
     gint32 ret = 0;
     CStdRTMutex oTaskLock( GetLock() );
     do{
-        ret = super::ResetTimer( m_iTimeoutId );
+        // make sure propTimestamp exist first
+        CCfgOpener oCfg(
+            ( IConfigDb* )GetConfig() );
+
+        guint64 qwTs;
+        ret = oCfg.GetQwordProp(
+            propTimestamp, qwTs );
         if( ERROR( ret ) )
+        {
+            ret = super::ResetTimer( m_iTimeoutId );
             break;
+        }
+        guint32 dwTimeoutSec = 0;
+        GetTimeoutSec( dwTimeoutSec );
+        if( dwTimeoutSec == 0 )
+            break;
+
+        CIoManager* pMgr = nullptr;
+        GET_IOMGR( oCfg, pMgr );
+
+        CTimerService& oTimerSvc =
+            pMgr->GetUtils().GetTimerSvc();
+
+        oTimerSvc.AdjustTimer(
+            m_iTimeoutId, dwTimeoutSec );
+
 #ifdef DEBUG
         DebugPrint( ret,
             "Invoke Request timer is reset" );
@@ -4891,17 +4914,14 @@ gint32 CIfInvokeMethodTask::SetAsyncCall(
             dwTimeoutSec *= 2;
         }
 
-        ret = oTaskCfg.GetObjPtr(
-            propIfPtr, pObj );
-
-        if( ERROR( ret ) )
-            break;
-
-        CRpcServices* pIf = pObj;
-        if( pIf == nullptr )
+        guint32 dwAge = 0;
+        ret = GetAgeSec( dwAge );
+        if( SUCCEEDED( ret ) )
         {
-            ret = -EFAULT;
-            break;
+            if( dwAge >= dwTimeoutSec )
+                dwTimeoutSec = 1;
+            else
+                dwTimeoutSec -= dwAge;
         }
 
         ret = AddTimer( dwTimeoutSec, 
@@ -4943,6 +4963,39 @@ gint32 CIfInvokeMethodTask::SetAsyncCall(
     }
     
     return ret;
+}
+
+gint32 CIfInvokeMethodTask::GetAgeSec(
+    guint32& dwAge )
+{
+    gint32 ret = STATUS_SUCCESS;
+    do{
+        // make sure propTimestamp exist first
+        CCfgOpener oCfg(
+            ( IConfigDb* )GetConfig() );
+
+        guint64 qwTs;
+        ret = oCfg.GetQwordProp(
+            propTimestamp, qwTs );
+        if( ERROR( ret ) )
+            break;
+        
+        dwAge = CTimestampSvr::GetAgeSec( qwTs );
+
+    }while( 0 );
+    return ret;
+}
+
+gint32 CIfInvokeMethodTask::GetTimeLeft()
+{
+    // make sure propTimestamp exist first
+    guint32 dwTimeoutSec;
+    GetTimeoutSec( dwTimeoutSec );
+
+    guint32 dwAge = 0;
+    GetAgeSec( dwAge );
+
+    return ( gint32 )dwTimeoutSec - dwAge;
 }
 
 gint32 CopyFile( gint32 iFdSrc, gint32 iFdDest, ssize_t& iSize );

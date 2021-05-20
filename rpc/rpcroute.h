@@ -297,6 +297,11 @@ class CRpcInterfaceServer :
     virtual bool IsConnected(
         const char* szAddr = nullptr );
 
+    virtual gint32 CheckReqCtx(
+        IEventSink* pCallback,
+        DMsgPtr& pMsg ) override
+    { return STATUS_SUCCESS; }
+
     virtual gint32 DoInvoke(
         DBusMessage* pReqMsg,
         IEventSink* pCallback );

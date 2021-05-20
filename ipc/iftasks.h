@@ -669,6 +669,9 @@ class CIfInvokeMethodTask
 
     // reset the task expire timer
     gint32 ResetTimer();
+
+    gint32 GetTimeLeft();
+    gint32 GetAgeSec( guint32& dwAge );
 };
 
 class CIfInterceptTask :
