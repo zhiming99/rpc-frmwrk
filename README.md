@@ -56,7 +56,7 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 4. The `request based flow control` involves a `mainloop pool` to distribute the io loads, retiring long-wait requests, task scheduling restrictions in `CIfParallelTaskGrp`, and `concurrent request limit update` event.
 
 [`Mon May 10 2021 09:24:59 PM Beijing`]   
-1. Let's move on to add request-based flow control.
+1. Let's move on to add `request-based flow control`.
 
 [`Fri May 07 2021 04:12:30 PM Beijing`]   
 1. The GUI config tool is almost done. There are still some testing to get it more stable.
