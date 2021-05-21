@@ -42,11 +42,12 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 
 #### Todo:
 1. Request-based flow control
-2. Java support
-3. Examples and Tutorials
-4. Access Control
-5. A tree-like hierarchical persistant registry.
-6. Logging service
+2. Python code generator
+3. Java support
+4. Examples and Tutorials
+5. Access Control
+6. A tree-like hierarchical persistant registry.
+7. Logging service
 
 ---
 [`Fri May 21 2021 02:31:46 PM Beijing`]   
