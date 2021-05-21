@@ -50,7 +50,7 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 
 ---
 [`Fri May 21 2021 02:31:46 PM Beijing`]   
-1. Last week, fixed a fatal error when web socket was enabled, though it is an old bug, just exposed.
+1. Last week, fixed a memory corruption when web socket was enabled, though it is an old bug in `CBuffer`, just exposed.
 2. Also added `active disconnection` on server side if the handshake check fails.
 3. The tag 4 is the latest stable version before adding request-based flow control. 
 4. The `request based flow control` involves a `mainloop pool` to distribute the io loads, retiring long-wait requests, task scheduling restrictions in `CIfParallelTaskGrp`, and `concurrent request limit update` event.
