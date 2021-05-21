@@ -49,6 +49,11 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 6. Logging service
 
 ---
+[`Fri May 21 2021 02:31:46 PM Beijing`]   
+1. last week, fixed a fatal error when web socket was enabled, though it is an old bug, just exposed.
+2. The tag 4 is the latest stable version before adding request-based flow control. 
+3. The request based flow controls involves a mainloop pool to distribute the io loads, timeout long-wait requests, and task scheduling restrictions, and concurrent request limit update event from server to proxy.
+
 [`Mon May 10 2021 09:24:59 PM Beijing`]   
 1. Let's move on to add request-based flow control.
 
@@ -57,7 +62,7 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 2. Now we can deploy `rpc-frmwrk` with ease!
 
 [`Sun Apr 25 2021 03:07:27 PM Beijing`]
-1. The flow control turns out to be big and need some preparations before I can start. So I will first get the GUI config tool done, and at the same time, make some preparations for the flow control.
+1. The request flow control turns out to be big and need some preparations before I can start. So I will first get the GUI config tool done, and at the same time, make some preparations for the flow control.
 2. With the aide from GUI config tool and ridl, you can easily deploy the `rpc-frmwrk` and start the development of your `hello, world` application in C++. That will be the first official release of `rpc-frwmrk`.
 
 [`Mon Apr 19 2021 02:14:36 PM Beijing`]   
