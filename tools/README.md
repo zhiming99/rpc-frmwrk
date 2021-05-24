@@ -15,6 +15,6 @@ The UI dialog consists of the following tab pages
 ### Quick Start with Dockerfile
 If you are familiar with docker, and has no patient to setup the building environment,  you can use this tool to quickly setup the building environemt.
   * Open a terminal, and change to the directory `tools`.
-  * Type `docker build -t 'rpcf-buildenv'`.
+  * Type `docker build -t 'rpcf-buildenv' ./`.
   * Tweak the `Dockerfile` to customize the image you want to build.
   * This is a minimum environment without X, so the `rpcfg.py` cannot run in this container. You can either install X on the container or use `rpcfg.py` on your host to export a desired set of configuration, and upload them to the container.
