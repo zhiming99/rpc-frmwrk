@@ -63,6 +63,33 @@ def GetPyTestPaths() :
         "/../python/tests/sftest" )
     return paths
 
+def ExportTestCfgsTo( cfgList:list, destPath:str ):
+    testDescs = [ "actcdesc.json",
+        "asyndesc.json",
+        "btinrt.json",
+        "evtdesc.json",
+        "hwdesc.json",
+        "echodesc.json",
+        "kadesc.json",
+        "prdesc.json",
+        "sfdesc.json",
+        "stmdesc.json" ]
+
+    paths = GetTestPaths( destPath )
+    pathVal = ReadTestCfg( paths, testDescs[ 0 ] );
+    if pathVal is None :
+        paths = GetTestPaths()
+
+    for testDesc in testDescs :
+        pathVal = ReadTestCfg( paths, testDesc )
+        if pathVal is None :
+            continue
+        UpdateTestCfg( pathVal[ 1 ], cfgList )
+        strPath = destPath
+        WriteTestCfg(
+            destPath + "/" + testDesc,
+            pathVal[ 1 ] )
+
 def ExportTestCfgs( cfgList:list ):
     testDescs = [ "actcdesc.json",
         "asyndesc.json",
@@ -442,6 +469,7 @@ class ConfigDlg(Gtk.Dialog):
         self.show_all()
 
     def __init__(self, bServer):
+        self.strCfgPath = ""
         Gtk.Dialog.__init__(self, title="Config the RPC Router", flags=0)
         self.add_buttons(
             Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
@@ -1628,7 +1656,7 @@ class ConfigDlg(Gtk.Dialog):
 
         return 0
 
-    def ExportFiles( self, path : str) :
+    def ExportFiles( self, path : str, bSaveAs: bool = False ) :
         error = self.VerifyInput()
         if error != 'success' :
             text = "Error occurs : " + error
@@ -1741,7 +1769,14 @@ class ConfigDlg(Gtk.Dialog):
                     curVals = ifs[ 0 ]
                     cfgIf0[ 'DestURL' ] = curVals.urlEdit.get_text()
                 cfgList = [ cfgIf0, authInfo ]
-                ExportTestCfgs( cfgList ) 
+                if bSaveAs :
+                    ExportTestCfgsTo( cfgList, path ) 
+                else :
+                    if len( self.strCfgPath ) == 0 :
+                        ExportTestCfgs( cfgList ) 
+                    else :
+                        ExportTestCfgsTo(
+                            cfgList, self.strCfgPath ) 
 
             rtDesc = jsonFiles[ 1 ][ 1 ]
             svrObjs = rtDesc[ 'Objects' ]
@@ -2019,7 +2054,8 @@ while True :
         if response == Gtk.ResponseType.OK:
             path = dialog.get_filename()
         dialog.destroy()
-        win.ExportFiles(path)
+        win.strCfgPath = path
+        win.ExportFiles(path, True)
         continue
     elif response == Gtk.ResponseType.APPLY:
         dialog = Gtk.FileChooserDialog(
@@ -2036,7 +2072,21 @@ while True :
         path = '.'
         if response == Gtk.ResponseType.OK:
             path = dialog.get_filename()
+        drvCfgPath = path + "/" + "driver.json"
+        try:
+            fp = open( drvCfgPath, "r" )
+            fp.close()
+        except OSError as err:
+            text = "Failed to load config files:" + str( err )
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            second_text = "@" + fname + ":" + str(exc_tb.tb_lineno)
+            win.DisplayError( text, second_text )
+            dialog.destroy()
+            continue;
+
         dialog.destroy()
+        win.strCfgPath = path
         win.ReinitDialog( path )
         continue
 
