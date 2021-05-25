@@ -1,4 +1,4 @@
-- [RPC Router config Tool](#rpc-router-config-tool)
+- [RPC Router Config Tool](#rpc-router-config-tool)
 - [Quick Start with Dockerfile](#quick-start-with-dockerfile)
 
 ### RPC Router config Tool
