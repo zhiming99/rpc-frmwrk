@@ -1,3 +1,6 @@
+- [RPC Router Config Tool](#rpc-router-config-tool)
+- [Quick Start with Dockerfile](#quick-start-with-dockerfile)
+
 ### RPC Router config Tool
 `rpcfg.py` is a GUI tool for rpcrouter configuration. It generate the configuration files including `driver.json, router.json, rtauth.json, and authprxy.json`. Please refer to this [article](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/readme.md), for `rpcrouter`'s concept.
 The UI dialog consists of the following tab pages
@@ -17,4 +20,5 @@ If you are familiar with docker, and has no patient to setup the building enviro
   * Open a terminal, and change to the directory `tools`.
   * Type `docker build -t 'rpcf-buildenv' ./`.
   * Tweak the `Dockerfile` to customize the image you want to build.
-  * This is a minimum environment without X, so the `rpcfg.py` cannot run in this container. You can either install X on the container or use `rpcfg.py` on your host to export a desired set of configuration, and upload them to the container.
+  * This is a minimum environment without X, so the `rpcfg.py` cannot run in this container. You can either install X on the container or use `rpcfg.py` on your host to export a desired set of configuration, and upload them to the container's `/usr/local/etc/rpcf/`.
+
