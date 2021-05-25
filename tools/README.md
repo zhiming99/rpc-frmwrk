@@ -21,4 +21,4 @@ If you are familiar with docker, and has no patient to setup the building enviro
   * Type `docker build -t 'rpcf-buildenv' ./`.
   * Tweak the `Dockerfile` to customize the image you want to build.
   * This is a minimum environment without X, so the `rpcfg.py` cannot run in this container. You can either install X on the container or use `rpcfg.py` on your host to export a desired set of configuration, and upload them to the container's `/usr/local/etc/rpcf/`.
-  * P.S. the built binaries require the environment variable `export LD_LIBRARY_PATH=/usr/local/lib:/usr/local/lib/rpcf`.
+
