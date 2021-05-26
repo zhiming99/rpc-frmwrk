@@ -13,11 +13,13 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-    - name: configure
-      run: ./configure
+    - name: install tzdata
+      run: sudo DEBIAN_FRONTEND="noninteractive" apt-get -y install tzdata
+    - name: install tools
+      run: sudo apt-get install -y gcc g++ python3 python3-dev flex bison libtool shtool automake autoconf autotools-dev make dbus libdbus-1-3 libdbus-1-dev libjsoncpp1 libjsoncpp-dev libkrb5-3 libkrb5-dev liblz4-1 liblz4-dev lz4 openssl libssl1.1 libssl-dev libcppunit-1.15-0 libcppunit-dev
+    - name: install sip5
+      run: sudo apt-get -y install sip5-tools || true
+    - name: Extract dist
+      run: tar xvf tools/rpcf-0.1.0.tar.gz
     - name: make
-      run: make
-    - name: make check
-      run: make check
-    - name: make distcheck
-      run: make distcheck
+      run: cd rpcf-0.1.0;./configure;make;sudo make install;
