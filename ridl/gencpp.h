@@ -455,9 +455,10 @@ class CDeclServiceImpl :
 {
     public:
     CServiceDecl* m_pNode = nullptr;
+    bool m_bServer = true;
     typedef CMethodWriter super;
     CDeclServiceImpl( CCppWriter* pWriter,
-        ObjPtr& pNode );
+        ObjPtr& pNode, bool bServer );
 
     using ABSTE = std::pair< std::string, ObjPtr >;
 
@@ -471,6 +472,9 @@ class CDeclServiceImpl :
         bool bComma = true );
 
     virtual gint32 Output();
+
+    inline bool IsServer() const
+    { return m_bServer; }
 };
 
 class CImplServiceImpl :
@@ -479,8 +483,8 @@ class CImplServiceImpl :
     public:
     typedef CDeclServiceImpl super;
     CImplServiceImpl( CCppWriter* pWriter,
-        ObjPtr& pNode )
-        : super( pWriter, pNode )
+        ObjPtr& pNode, bool bServer )
+        : super( pWriter, pNode, bServer )
     {}
 
     gint32 Output() override;
@@ -587,19 +591,23 @@ class CImplIfMethodSvr
 
 class CImplClassFactory
 {
+    bool m_bServer = true;
     CCppWriter* m_pWriter = nullptr;
     CStatements* m_pNode = nullptr;
     public:
     CImplClassFactory(
-        CCppWriter* pWriter, ObjPtr& pNode );
+        CCppWriter* pWriter, ObjPtr& pNode, bool bServer );
     gint32 Output();
+
+    inline bool IsServer() const
+    { return m_bServer; }
 };
 
 class CImplMainFunc :
     public CArgListUtils
 {
     CCppWriter* m_pWriter = nullptr;
-    CServiceDecl* m_pNode = nullptr;
+    CStatements* m_pNode = nullptr;
     public:
     typedef CMethodWriter super;
 

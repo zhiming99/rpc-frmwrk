@@ -820,25 +820,46 @@ gint32 CFileSet::AddSvcImpl(
         std::string strExt = ".cpp";
         std::string strExtHdr = ".h";
         std::string strCpp = m_strPath +
-            "/" + strSvcName + ".cpp";
+            "/" + strSvcName + "svr.cpp";
+        std::string strCliCpp = m_strPath +
+            "/" + strSvcName + "cli.cpp";
 
         ret = access( strCpp.c_str(), F_OK );
         if( ret == 0 )
         {
-            strExt = ".cpp.new";
+            strExt = "cpp.new";
             strCpp = m_strPath + "/" +
-                strSvcName + ".cpp.new";
+                strSvcName + "svr.cpp.new";
+        }
+
+        ret = access( strCliCpp.c_str(), F_OK );
+        if( ret == 0 )
+        {
+            strExt = ".cpp.new";
+            strCliCpp = m_strPath + "/" +
+                strSvcName + "cli.cpp.new";
         }
 
         std::string strHeader = m_strPath +
-            "/" + strSvcName + ".h";
+            "/" + strSvcName + "svr.h";
 
         ret = access( strHeader.c_str(), F_OK );
         if( ret == 0 )
         {
             strExtHdr = ".h.new";
             strHeader = m_strPath + "/" +
-                strSvcName + ".h.new";
+                strSvcName + "svr.h.new";
+        }
+
+        std::string strCliHeader = m_strPath +
+            "/" + strSvcName + "cli.h";
+
+        ret = access( strCliHeader.c_str(), F_OK );
+        if( ret == 0 )
+        {
+            strExtHdr = ".h.new";
+            strCliHeader = m_strPath + "/" +
+                strSvcName + "cli.h.new";
         }
 
         STMPTR pstm( new std::ofstream(
@@ -847,7 +868,16 @@ gint32 CFileSet::AddSvcImpl(
             std::ofstream::trunc ) );
 
         m_vecFiles.push_back( std::move( pstm ) );
-        m_mapSvcImp[ strSvcName + strExtHdr ] = idx;
+        m_mapSvcImp[ strSvcName + "svr" + strExtHdr ] = idx;
+
+        pstm = STMPTR( new std::ofstream(
+            strCliHeader,
+            std::ofstream::out |
+            std::ofstream::trunc ) );
+
+        idx += 1;
+        m_vecFiles.push_back( std::move( pstm ) );
+        m_mapSvcImp[ strSvcName + "cli" + strExtHdr ] = idx;
 
         pstm = STMPTR( new std::ofstream(
             strCpp,
@@ -856,7 +886,16 @@ gint32 CFileSet::AddSvcImpl(
 
         idx += 1;
         m_vecFiles.push_back( std::move( pstm ) );
-        m_mapSvcImp[ strSvcName + strExt ] = idx;
+        m_mapSvcImp[ strSvcName + "svr" + strExt ] = idx;
+
+        pstm = STMPTR( new std::ofstream(
+            strCliCpp,
+            std::ofstream::out |
+            std::ofstream::trunc) );
+
+        idx += 1;
+        m_vecFiles.push_back( std::move( pstm ) );
+        m_mapSvcImp[ strSvcName + "cli" + strExt ] = idx;
 
     }while( 0 );
 
@@ -1075,47 +1114,101 @@ gint32 GenHeaderFile(
 
         for( auto& elem : vecSvcNames )
         {
+            // server declarations
             ret = pWriter->SelectImplFile(
-                elem.first + ".h" ); 
+                elem.first + "svr.h" ); 
 
             if( ERROR( ret ) )
             {
                 ret = pWriter->SelectImplFile(
-                    elem.first + ".h.new" );
+                    elem.first + "svr.h.new" );
             }
 
             CDeclServiceImpl osi(
-                pWriter, elem.second );
+                pWriter, elem.second, true );
 
             ret = osi.Output();
             if( ERROR( ret ) )
                 break;
 
+            // client declarations
             ret = pWriter->SelectImplFile(
-                elem.first + ".cpp" ); 
+                elem.first + "cli.h" ); 
 
             if( ERROR( ret ) )
             {
                 ret = pWriter->SelectImplFile(
-                    elem.first + ".cpp.new" );
+                    elem.first + "cli.h.new" );
+            }
+
+            CDeclServiceImpl osi2(
+                pWriter, elem.second, false );
+
+            ret = osi2.Output();
+            if( ERROR( ret ) )
+                break;
+
+            /* svr implementions*/
+            ret = pWriter->SelectImplFile(
+                elem.first + "svr.cpp" ); 
+
+            if( ERROR( ret ) )
+            {
+                ret = pWriter->SelectImplFile(
+                    elem.first + "svr.cpp.new" );
             }
 
             if( ERROR( ret ) )
                 break;
 
             CImplServiceImpl oisi(
-                pWriter, elem.second );
+                pWriter, elem.second, true );
 
             ret = oisi.Output();
+            if( ERROR( ret ) )
+                break;
+
+            /* client implementions*/
+            ret = pWriter->SelectImplFile(
+                elem.first + "cli.cpp" ); 
+
+            if( ERROR( ret ) )
+            {
+                ret = pWriter->SelectImplFile(
+                    elem.first + "cli.cpp.new" );
+            }
+
+            if( ERROR( ret ) )
+                break;
+
+            CImplServiceImpl oisi2(
+                pWriter, elem.second, false );
+
+            ret = oisi2.Output();
             if( ERROR( ret ) )
                 break;
         }
 
         if( !vecSvcNames.empty() )
         {
-            CImplMainFunc omf( pWriter,
-                vecSvcNames[ 0 ].second );
+            CImplMainFunc omf( pWriter, pRoot );
             ret = omf.Output();
+            if( ERROR( ret ) )
+                break;
+
+            pWriter->SelectMainSvr();
+            CImplClassFactory
+                oicf( pWriter, pRoot, true );
+            ret = oicf.Output();
+            if( ERROR( ret ) )
+                break;
+
+            pWriter->SelectMainCli();
+            CImplClassFactory
+                oicf2( pWriter, pRoot, false );
+            ret = oicf2.Output();
+            if( ERROR( ret ) )
+                break;
         }
 
     }while( 0 );
@@ -1153,14 +1246,14 @@ gint32 GenCppFile(
         NEW_LINE;
         std::vector< ObjPtr > vecSvcs;
         pStmts->GetSvcDecls( vecSvcs );
-        for( auto& elem : vecSvcs )
+        /*for( auto& elem : vecSvcs )
         {
             CServiceDecl* psvd = elem;
             std::string strName = psvd->GetName();
             CCOUT<< "#include \"" <<
                 strName << ".h\"";
             NEW_LINE;
-        }
+        }*/
         NEW_LINE;
 
         for( guint32 i = 0;
@@ -1256,9 +1349,6 @@ gint32 GenCppFile(
 
         if( ERROR( ret ) )
             break;
-
-        CImplClassFactory oicf( m_pWriter, pRoot );
-        ret = oicf.Output();
 
     }while( 0 );
 
@@ -2789,7 +2879,8 @@ gint32 CSetStructRefs::SetStructRefs()
 }
 
 CDeclServiceImpl::CDeclServiceImpl(
-    CCppWriter* pWriter, ObjPtr& pNode )
+    CCppWriter* pWriter,
+    ObjPtr& pNode, bool bServer )
     : super( pWriter )
 {
     m_pNode = pNode;
@@ -2800,6 +2891,7 @@ CDeclServiceImpl::CDeclServiceImpl(
             "'service' node" );
         throw std::runtime_error( strMsg );
     }
+    m_bServer = bServer;
 }
 
 gint32 CDeclServiceImpl::FindAbstMethod(
@@ -3048,7 +3140,7 @@ gint32 CDeclServiceImpl::Output()
         NEW_LINES( 2 );
 
         std::string strClass, strBase;
-        if( !vecPMethods.empty() )
+        if( !vecPMethods.empty() && !IsServer() )
         {
             strClass = "C";
             strClass += strSvcName + "_CliImpl";
@@ -3113,7 +3205,7 @@ gint32 CDeclServiceImpl::Output()
             NEW_LINES( 2 );
         }
 
-        if( vecSMethods.empty() )
+        if( vecSMethods.empty() || !IsServer() )
             break;
 
         strClass = "C";
@@ -3263,13 +3355,17 @@ gint32 CImplServiceImpl::Output()
         CCOUT << "#include \""
             << strAppName << ".h\"" ;
         NEW_LINE;
-        CCOUT << "#include \""
-            << strSvcName << ".h\"";
+        if( IsServer() )
+            CCOUT << "#include \""
+                << strSvcName << "svr.h\"";
+        else
+            CCOUT << "#include \""
+                << strSvcName << "cli.h\"";
 
         NEW_LINES( 2 );
 
         std::string strClass, strBase;
-        if( !vecPMethods.empty() )
+        if( !vecPMethods.empty() && !IsServer() )
         {
             strClass = "C";
             strClass += strSvcName + "_CliImpl";
@@ -3332,7 +3428,7 @@ gint32 CImplServiceImpl::Output()
             NEW_LINE;
         }
 
-        if( vecSMethods.empty() )
+        if( vecSMethods.empty() || !IsServer() )
             break;
 
         strClass = "C";
@@ -5671,7 +5767,9 @@ gint32 CImplIfMethodSvr::OutputAsync()
 }
 
 CImplClassFactory::CImplClassFactory(
-    CCppWriter* pWriter, ObjPtr& pNode )
+    CCppWriter* pWriter,
+    ObjPtr& pNode,
+    bool bServer )
 {
     m_pWriter = pWriter;
     m_pNode = pNode;
@@ -5682,6 +5780,7 @@ CImplClassFactory::CImplClassFactory(
             "'statements' node" );
         throw std::runtime_error( strMsg );
     }
+    m_bServer = bServer;
 }
 
 gint32 CImplClassFactory::Output()
@@ -5707,6 +5806,8 @@ gint32 CImplClassFactory::Output()
             vecActStructs.push_back( elem );
         }
 
+        NEW_LINE;
+
         Wa( "FactoryPtr InitClassFactory()" ); 
         BLOCK_OPEN;
         CCOUT << "BEGIN_FACTORY_MAPS;";
@@ -5715,14 +5816,20 @@ gint32 CImplClassFactory::Output()
         for( auto& elem : vecSvcs )
         {
             CServiceDecl* pSvc = elem;
-            CCOUT << "INIT_MAP_ENTRYCFG( ";
-            CCOUT << "C" << pSvc->GetName()
-                << "_CliImpl );";
-            NEW_LINE;
-            CCOUT << "INIT_MAP_ENTRYCFG( ";
-            CCOUT << "C" << pSvc->GetName()
-                << "_SvrImpl );";
-            NEW_LINE;
+            if( IsServer() )
+            {
+                CCOUT << "INIT_MAP_ENTRYCFG( ";
+                CCOUT << "C" << pSvc->GetName()
+                    << "_SvrImpl );";
+                NEW_LINE;
+            }
+            else
+            {
+                CCOUT << "INIT_MAP_ENTRYCFG( ";
+                CCOUT << "C" << pSvc->GetName()
+                    << "_CliImpl );";
+                NEW_LINE;
+            }
         }
 
         NEW_LINE;
@@ -5771,7 +5878,10 @@ gint32 CImplMainFunc::Output()
     gint32 ret = 0;
 
     do{
-        CServiceDecl* pSvc = m_pNode;
+        CStatements* pStmts = m_pNode;
+        std::vector< ObjPtr > vecSvcs;
+        pStmts->GetSvcDecls( vecSvcs );
+        CServiceDecl* pSvc = vecSvcs[ 0 ];
         std::string strSvcName = pSvc->GetName();
         std::string strModName = g_strTarget;
         std::vector< std::string > vecSuffix =
@@ -5795,9 +5905,22 @@ gint32 CImplMainFunc::Output()
             Wa( "#include \"rpc.h\"" );
             Wa( "#include \"proxy.h\"" );
             Wa( "using namespace rpcf;" );
-            CCOUT << "#include \""
-                << strSvcName << ".h\"";
-            NEW_LINES( 2 );
+            for( auto elem : vecSvcs )
+            {
+                CServiceDecl* pSvc = elem;
+                if( bProxy )
+                {
+                    CCOUT << "#include \""
+                        << pSvc->GetName() << "cli.h\"";
+                }
+                else
+                {
+                    CCOUT << "#include \""
+                        << pSvc->GetName() << "svr.h\"";
+                }
+                NEW_LINE;
+            }
+            NEW_LINES( 1 );
             Wa( "ObjPtr g_pIoMgr;" );
             NEW_LINE;
 
@@ -6027,6 +6150,7 @@ gint32 CImplMainFunc::Output()
             Wa( "DestroyContext();" );
             CCOUT << "return ret;";
             BLOCK_CLOSE;
+            NEW_LINE;
         }
 
     }while( 0 );
@@ -6136,6 +6260,10 @@ gint32 CExportMakefile::Output()
         std::string strCpps =
             strAppName + ".cpp ";
 
+        std::string strClient =
+            strAppName + "cli";
+
+        std::string strObjClient, strObjServer;
         for( auto& elem : vecSvcs )
         {
             CServiceDecl* psd = elem;
@@ -6144,21 +6272,26 @@ gint32 CExportMakefile::Output()
                 ret = -EFAULT;
                 break;
             }
-            strCpps += psd->GetName() + ".cpp ";
-        }
+            strObjClient +=
+                std::string( "$(OBJ_DIR)/" ) +
+                psd->GetName() + "cli.o ";
 
-        std::string strClient =
-            strAppName + "cli";
+            strObjServer +=
+                std::string( "$(OBJ_DIR)/" ) +
+                psd->GetName() + "svr.o ";
+        }
 
         std::string strServer =
             strAppName + "svr";
 
         std::string strCmdLine =
-            "sed -i 's/XXXSRCS/";
+            "sed -i 's:XXXSRCS:";
 
-        strCmdLine += strCpps + "/;" +
-            "s/XXXCLI/" + strClient + "/;" +
-            "s/XXXSVR/" + strServer + "/' " +
+        strCmdLine += strCpps + ":;" +
+            "s:XXXCLI:" + strClient + ":;" +
+            "s:XXXSVR:" + strServer + ":; " +
+            "s:XXXOBJSSVR:" + strObjServer + ":; " +
+            "s:XXXOBJSCLI:" + strObjClient + ":' " +
             m_pWriter->m_pFiles->m_strMakefile;
 
         printf( "%s\n", strCmdLine.c_str() );
