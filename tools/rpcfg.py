@@ -1755,7 +1755,10 @@ class ConfigDlg(Gtk.Dialog):
                         svrObj[ 'AuthInfo'] = authInfo
                         svrObj[ 'LBGroup' ] = lbCfgs
                         self.ExportNodeCtxs();
-                        break
+                    elif svrObj[ 'ObjectName'] == 'RpcRouterManagerImpl' :
+                        if not 'MaxRequests' in svrObj:
+                            svrObj[ 'MaxRequests' ] = str( 512 * 8 )
+                            svrObj[ 'MaxPendingRequests' ] = str( 512 * 16 )
 
             rtauPath = path + '/rtauth.json'
             fp = open(rtauPath, "w")
@@ -1785,7 +1788,12 @@ class ConfigDlg(Gtk.Dialog):
                     if svrObj[ 'ObjectName'] == 'RpcRouterBridgeImpl' :
                         svrObj[ 'Nodes' ] = self.nodes;
                         svrObj[ 'LBGroup' ] = lbCfgs
-                        break
+
+                    elif svrObj[ 'ObjectName'] == 'RpcRouterManagerImpl' :
+                        if not 'MaxRequests' in svrObj:
+                            svrObj[ 'MaxRequests' ] = str( 512 * 8 )
+                            svrObj[ 'MaxPendingRequests' ] = str( 512 * 16 )
+
             rtPath = path + '/router.json'
             fp = open(rtPath, "w")
             json.dump( rtDesc, fp, indent = 4 )
