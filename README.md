@@ -50,6 +50,9 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 7. Logging service
 
 ---
+[`Thu May 27 2021 05:42:27 PM Beijing`]   
+1. Completed just half of the `request based flow control`. The other half is the flow control logics in `request forwarder`.
+
 [`Fri May 21 2021 02:31:46 PM Beijing`]   
 1. Last week, fixed a memory corruption when web socket was enabled, though it is an old bug in `CBuffer`, just exposed.
 2. Also added the missing `active disconnection` on server side if the handshake check fails.
