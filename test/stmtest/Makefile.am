@@ -1,12 +1,12 @@
 include_ipcdir=$(top_srcdir)/ipc
-stmtest_LDFLAGS=@TSTLDFLG@ 
+stmtest_LDFLAGS=@TSTLDFLG@ -lpthread 
 stmtest_CPPFLAGS= -I$(include_ipcdir)
 
 libstmsvr_LTLIBRARIES=libstmsvr.la
 libstmsvrdir=$(libdir)/rpcf
 libstmsvr_la_SOURCES = stmsvr.cpp stmcli.cpp stmsvr.h
 libstmsvr_la_LDFLAGS=-version-info @VERSION2@
-libstmsvr_la_LIBADD= $(stmtest_LDFLAGS) -lpthread -ldl
+libstmsvr_la_LIBADD= $(stmtest_LDFLAGS) -ldl
 libstmsvr_la_CPPFLAGS=$(stmtest_CPPFLAGS)
 
 stmtest_PROGRAMS=stmsvrtst stmclitst
