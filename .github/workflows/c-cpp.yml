@@ -20,5 +20,5 @@ jobs:
     - name: install sip5
       run: sudo apt-get -y install sip5-tools || true
     - name: make
-      run: libtoolize;aclocal;automake --add-missing;autoreconf;autoconf;./configure;make;sudo make install
+      run: libtoolize;aclocal;autoreconf;automake --add-missing;autoconf;./configure;make;sudo make install
 
