@@ -254,6 +254,7 @@ inline std::string DBUS_DESTINATION2(
 #define SYS_EVENT_KEEPALIVE             "RpcEvt_KeepAlive"
 #define SYS_EVENT_FORWARDEVT            "RpcEvt_ForwardEvent"
 #define SYS_EVENT_RMTSVREVENT           "RpcEvt_RmtSvrEvent"
+#define SYS_EVENT_REFRESHREQLIMIT       "RpcEvt_RefreshReqLimit"
 
 #define IF_METHOD_ENABLEEVT             "IfReq_EnableEvt"
 #define IF_METHOD_DISABLEEVT            "IfReq_DisableEvt"

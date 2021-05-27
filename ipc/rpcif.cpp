@@ -4077,6 +4077,20 @@ gint32 CRpcServices::LoadObjDesc(
                     oCfg[ propPauseOnStart ] = false;
             }
 
+            if( oObjElem.isMember( JSON_ATTR_MAXREQS ) &&
+                oObjElem[ JSON_ATTR_MAXREQS ].isString() )
+            {
+                strVal = oObjElem[ JSON_ATTR_MAXREQS ].asString();
+                oCfg[ propMaxReqs ] = std::stoi( strVal );
+            }
+
+            if( oObjElem.isMember( JSON_ATTR_MAXPENDINGS ) &&
+                oObjElem[ JSON_ATTR_MAXPENDINGS ].isString() )
+            {
+                strVal = oObjElem[ JSON_ATTR_MAXPENDINGS ].asString();
+                oCfg[ propMaxPendings ] = std::stoi( strVal );
+            }
+
             // overwrite the global port class and port
             // id if PROXY_PORTCLASS and PROXY_PORTID
             // exist

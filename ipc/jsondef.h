@@ -101,3 +101,5 @@
 #define JSON_ATTR_SIGN_MSG      "SignMessage"
 #define JSON_ATTR_LBGROUP       "LBGroup"
 #define JSON_ATTR_TCPCONN       "MaxConnections"
+#define JSON_ATTR_MAXREQS       "MaxRequests"
+#define JSON_ATTR_MAXPENDINGS       "MaxPendingRequests"

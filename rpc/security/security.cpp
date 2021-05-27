@@ -33,8 +33,6 @@
 namespace rpcf
 {
 
-#define MAX_NUM_CHECK   8640000
-
 gint32 CRpcTcpBridgeAuth::OnLoginTimeout(
     IEventSink* pCallback,
     IEventSink* pIoReq,

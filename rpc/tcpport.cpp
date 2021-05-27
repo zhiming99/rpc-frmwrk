@@ -214,8 +214,7 @@ gint32 CRpcSockWatchCallback::operator()(
 gint32 CRpcSocketBase::StopWatch( bool bWrite )
 {
     gint32 ret = 0;
-    CMainIoLoop* pLoop =
-        GetIoMgr()->GetMainIoLoop();
+    CMainIoLoop* pLoop = GetMainLoop();
 
 #if _USE_LIBEV
     if( bWrite )
@@ -237,8 +236,7 @@ gint32 CRpcSocketBase::StopWatch( bool bWrite )
 gint32 CRpcSocketBase::StartWatch( bool bWrite )
 {
     gint32 ret = 0;
-    CMainIoLoop* pLoop =
-        GetIoMgr()->GetMainIoLoop();
+    CMainIoLoop* pLoop = GetMainLoop();
 
 #if _USE_LIBEV
     if( bWrite )

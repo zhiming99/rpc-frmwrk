@@ -1168,9 +1168,7 @@ class CRpcTcpBusPort :
     gint32 AllocMainLoop( MloopPtr& pLoop );
     gint32 ReleaseMainLoop( MloopPtr& pLoop );
 
-    virtual gint32 PostStart(
-        IRP* pIrp );
-
+    virtual gint32 PostStart( IRP* pIrp );
     virtual gint32 PreStop( IRP* pIrp );
 
     virtual gint32 BuildPdoPortName(

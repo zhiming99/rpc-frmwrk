@@ -33,6 +33,7 @@
 #define ROUTER_OBJ_DESC_AUTH        "./rtauth.json"
 
 #define DEFAULT_WNDSIZE     20
+#define MAX_NUM_CHECK   8640000
 
 namespace rpcf
 {
@@ -321,9 +322,6 @@ class CRpcInterfaceServer :
     virtual gint32 OnKeepAlive(
         IEventSink* pInvokeTask,
         EnumKAPhase bOrigin );
-
-    virtual gint32 OnPreStart(
-        IEventSink* pContext ) override;
 };
 
 class CRpcReqForwarder :
@@ -714,8 +712,7 @@ do{ \
 
 struct CRpcTcpBridgeShared
 {
-    CRpcTcpBridgeShared( CRpcServices* pIf )
-    { m_pParentIf = pIf; }
+    CRpcTcpBridgeShared( CRpcServices* pIf );
 
     gint32 OpenLocalStream( IPort* pPort,
         gint32 iStreamId,
@@ -765,8 +762,17 @@ struct CRpcTcpBridgeShared
     gint32 StartHandshake(
         IEventSink* pCallback );
 
+    inline bool IsRfcEnabled() const
+    { return m_bRfc; }
+
+    inline void SetRfcEnabled( bool bRfc )
+    { m_bRfc = bRfc; }
+
     protected:
     CRpcServices* m_pParentIf;
+    TaskGrpPtr    m_pGrpRfc;
+    TaskletPtr    m_pPHTask;
+    bool          m_bRfc = false;
 
     gint32 ReadWriteStream(
         gint32 iStreamId,
@@ -788,6 +794,8 @@ struct CRpcTcpBridgeShared
         CObjBase* pCfg,
         PortPtr& pPort,
         bool& bPdo );
+
+    gint32 InitRfc();
 };
 
 class CRpcTcpBridge :
@@ -1074,6 +1082,17 @@ class CRpcTcpBridge :
 
     gint32 PostDisconnEvent();
 
+    virtual gint32 AddAndRun(
+        TaskletPtr& pParallelTask,
+        bool bImmediate = false ) override;
+
+    virtual gint32 OnPreStop(
+        IEventSink* pCallback ) override;
+
+    gint32 RefreshReqLimit(
+        guint32 dwMaxReqs,
+        guint32 dwMaxPendigns );
+
 }; // CRpcTcpBridge
 
 class CRpcTcpBridgeProxy :
@@ -1195,6 +1214,10 @@ class CRpcTcpBridgeProxy :
         DBusMessage* pEvtMsg,
         IEventSink* pCallback );
 
+    virtual gint32 AddAndRun(
+        TaskletPtr& pParallelTask,
+        bool bImmediate = false ) override;
+
     // bridge and stream specific methods
     gint32 OpenStream(
         guint32 wProtocol,
@@ -1253,6 +1276,17 @@ class CRpcTcpBridgeProxy :
         return GetPortToSubmitShared(
             pCfg, pPort, bPdo );
     }
+
+    virtual gint32 OnPreStop(
+        IEventSink* pCallback ) override;
+
+    gint32 RefreshReqLimit(
+        IEventSink* pCallback,
+        guint32 dwMaxReqs,
+        guint32 dwMaxPendigns );
+
+    gint32 RequeueTask(
+        TaskletPtr& pFcTask );
 
 }; // CRpcTcpBridgeProxy
 
@@ -1714,6 +1748,7 @@ class CRouterEventRelayRespTask :
 class CReqFwdrForwardRequestTask :
     public CIfInterceptTaskProxy
 {
+    gint32 OnTaskCompleteRfc( gint32 iRetVal );
     public:
     typedef CIfInterceptTaskProxy super;
 
@@ -1734,6 +1769,7 @@ class CBridgeForwardRequestTask :
     CBridgeForwardRequestTask( const IConfigDb* pCfg )
         : super( pCfg )
     { SetClassId( clsid( CBridgeForwardRequestTask ) ); }
+
     gint32 RunTask();
     gint32 ForwardRequestMH(
         IConfigDb* pReqCtx,
@@ -2079,6 +2115,21 @@ class CRpcRouterBridge : public CRpcRouter
 
     gint32 BuildNodeMap();
 
+    #define RFC_HISTORY_LEN     1440
+    bool      m_bRfc = false;
+    struct REQ_LIMIT
+    {
+        guint32 dwMaxReqs;
+        guint32 dwMaxPendigns;
+        bool operator==( REQ_LIMIT& rhs )
+        {
+            return ( dwMaxReqs == rhs.dwMaxReqs &&
+                dwMaxPendigns == rhs.dwMaxPendigns );
+        }
+    };
+    using HISTORY_ELEM = std::pair< guint64, REQ_LIMIT >;
+    std::deque< HISTORY_ELEM > m_queHistory;
+
     protected:
 
     std::map< std::string, guint32 > m_mapNode2Pid;
@@ -2105,6 +2156,11 @@ class CRpcRouterBridge : public CRpcRouter
 
     virtual gint32 OnPostStart(
         IEventSink* pContext );
+
+    gint32 BuildRefreshReqLimit(
+        CfgPtr& pRequest,
+        guint32 dwMaxReqs,
+        guint32 dwMaxPendings );
 
     private:
 
@@ -2442,6 +2498,27 @@ class CRpcRouterBridge : public CRpcRouter
     gint32 GetLBNodes(
         const std::string& strGrpName,
         std::vector< std::string >& vecNodes );
+
+    inline gint32 GetBridgeCount() const
+    {
+        CStdRMutex oRouterLock( GetLock() );
+        return m_mapPortId2Bdge.size();
+    }
+
+    inline bool IsRfcEnabled() const
+    { return m_bRfc; }
+
+    gint32 GetCurConnLimit(
+        guint32& dwMaxReqs,
+        guint32& dwMaxPendings,
+        bool bNew = false ) const;
+
+    gint32 AddToHistory(
+        guint32 dwMaxReqs,
+        guint32 dwMaxPendings );
+
+    gint32 RefreshReqLimit();
+
 };
 
 class CIfRouterMgrState : public CIfServerState
@@ -2459,7 +2536,8 @@ class CRpcRouterManager : public CRpcRouter
     std::vector< InterfPtr > m_vecRoutersBdge;
     InterfPtr m_pRouterReqFwdr;
     guint32   m_dwRole = 1;
-
+    bool      m_bRfc = false;
+    TaskletPtr m_pRfcChecker;
 
     protected:
     gint32 RebuildMatches();
@@ -2479,6 +2557,11 @@ class CRpcRouterManager : public CRpcRouter
     gint32 Start();
     gint32 OnPreStop(
         IEventSink* pCallback ); 
+
+    inline bool IsRfcEnabled() const
+    { return m_bRfc; }
+
+    gint32 RefreshReqLimit();
 };
 
 DECLARE_AGGREGATED_SERVER(

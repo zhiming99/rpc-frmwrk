@@ -248,11 +248,10 @@ enum EnumPropId : gint32
     propNoReply,        // type: a bool value to indicate if the request has no reply.
 
     propRttMs,          // type: a guint32 as the round trip time of a tcp connection in ms.
-    propWndSize,        // type: a guint32 as the receiving window size for all the pending requests
 
     propMaxConns,       // type: a guint32 to specify the max connections the router can accepts
     propMaxReqs,        // type: a guint32 to specify the max requests in process concurrently this router allows
-    propMaxPending,     // type: a guint32 to specify the max requests queued or in process by this router
+    propMaxPendings,    // type: a guint32 to specify the max requests queued or in process by this router
     propEnableRfc,      // type: a bool to enable/disable request-based flow control
 
     propReservedEnd = 0x10000000,

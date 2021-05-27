@@ -524,7 +524,9 @@ class CRpcInterfaceBase :
     { return -ENOTSUP; }
 
     gint32 AppendAndRun( TaskletPtr& pTask );
-    gint32 AddAndRun( TaskletPtr& pParallelTask,
+
+    virtual gint32 AddAndRun(
+        TaskletPtr& pParallelTask,
         bool bImmediate = false );
 
     virtual gint32 OnEvent( EnumEventId iEvent,

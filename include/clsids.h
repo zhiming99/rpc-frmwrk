@@ -303,6 +303,7 @@ typedef enum : guint32
     DECL_CLSID( CPythonProxyImpl ),
     DECL_CLSID( CPythonServerImpl ),
     DECL_CLSID( CIfAsyncCancelHandler ),
+    DECL_CLSID( CIfParallelTaskGrpRfc ),
     DECL_CLSID( MaxClsid ),
     DECL_CLSID( ClassFactoryStart ) = 0x02000000,
     DECL_CLSID( ReservedClsidEnd ) = 0x0FFFFFFF,

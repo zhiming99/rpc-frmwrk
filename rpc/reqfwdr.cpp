@@ -2049,6 +2049,8 @@ gint32 CReqFwdrForwardRequestTask::OnTaskComplete(
     gint32 iRetVal )
 {
     gint32 ret = 0;
+    if( iRetVal == ERROR_QUEUE_FULL )
+        return OnTaskCompleteRfc( iRetVal );
 
     // DebugPrint( 0, "probe: ForwardRequestTask complete" );
     do{
@@ -2148,6 +2150,39 @@ gint32 CReqFwdrForwardRequestTask::OnTaskComplete(
     }
 
     return iRetVal;
+}
+
+gint32 CReqFwdrForwardRequestTask::OnTaskCompleteRfc(
+    gint32 iRetVal )
+{
+    gint32 ret = 0;
+    TaskletPtr pTask;
+
+    do{
+        CParamList oParams;
+        CRpcTcpBridgeProxy* pProxy = nullptr;
+        ret = oParams.GetPointer(
+            propIfPtr, pProxy );
+        if( ERROR( ret ) )
+            break;
+
+        if( !pProxy->IsRfcEnabled() )
+            break;
+
+        ret = pProxy->RequeueTask( pTask ); 
+        if( ERROR( ret ) )
+            break;
+
+        ret = STATUS_PENDING;
+
+    }while( 0 );
+
+    if( ERROR( ret ) && !pTask.IsEmpty() )
+    {
+        ret = iRetVal;
+    }
+
+    return ret;
 }
 
 gint32 CRpcReqForwarder::BuildBufForIrpRmtSvrEvent(
@@ -3289,7 +3324,6 @@ gint32 CRpcReqForwarderProxy::BuildNewMsgToFwrd(
         oReqCtx.CopyProp( propSessHash, pReqCtx );
         oReqCtx.CopyProp( propTimestamp, pReqCtx );
 
-        DMsgPtr pNewMsg;
         pNewMsg.CopyHeader( pFwrdMsg );
         BufPtr pArg( true );
         gint32 iType = 0;
@@ -3302,7 +3336,7 @@ gint32 CRpcReqForwarderProxy::BuildNewMsgToFwrd(
 
         const char* pData = pArg->ptr();
         const char* pCtx = pCtxBuf->ptr();
-        if( !dbus_message_append_args(pNewMsg,
+        if( !dbus_message_append_args( pNewMsg,
             DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
             &pData, pArg->size(),
             DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
@@ -3379,7 +3413,7 @@ gint32 CRpcReqForwarderProxy::ForwardRequest(
         if( ERROR( ret ) )
             break;
 
-        oBuilder.Push( pReqMsg );
+        oBuilder.Push( pNewMsg );
         oBuilder.SetMethodName(
             SYS_METHOD_FORWARDREQ );
 

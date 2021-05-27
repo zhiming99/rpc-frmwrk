@@ -40,6 +40,7 @@ CPPUNIT_TEST_SUITE_REGISTRATION( CIfRouterTest );
 // router role: 1. reqfwdr, 2. bridge, 3. both
 static guint32 g_dwRole = 1;
 static bool g_bAuth = false;
+static bool g_bRfc = false;
 static std::string g_strService;
 
 void CIfRouterTest::setUp()
@@ -75,6 +76,10 @@ void CIfRouterTest::setUp()
                 pSvc->SetCmdLineOpt(
                     propHasAuth, g_bAuth );
             }
+
+            if( ( g_dwRole & 0x2 ) && g_bRfc )
+                pSvc->SetCmdLineOpt(
+                    propEnableRfc, g_bRfc );
 
             if( g_strService.size() > 0 )
             {
@@ -202,7 +207,7 @@ int main( int argc, char** argv )
 
     int opt = 0;
     int ret = 0;
-    while( ( opt = getopt( argc, argv, "r:as:" ) ) != -1 )
+    while( ( opt = getopt( argc, argv, "r:afs:" ) ) != -1 )
     {
         switch (opt)
         {
@@ -221,6 +226,11 @@ int main( int argc, char** argv )
         case 's':
             {
                 g_strService = optarg;
+                break;
+            }
+        case 'f':
+            {
+                g_bRfc = true;
                 break;
             }
         default: /*  '?' */
@@ -248,6 +258,7 @@ int main( int argc, char** argv )
         fprintf( stderr,
             "Usage: %s [-r <role number, 1: reqfwrd, 2: bridge, 3: both>, mandatory ]\n"
             "\t [-a to enable authentication ]\n"
+            "\t [-f to enable request-based flow control on the gateway bridge, ignore it if no massive connections ]\n"
             "\t [-s < Service Name for authentication, valid for role 2 or 3, and ignored for role 1 >]\n",
             argv[ 0 ] );
         exit( -ret );

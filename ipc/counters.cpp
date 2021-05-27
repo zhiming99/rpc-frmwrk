@@ -237,17 +237,6 @@ gint32 CMessageCounterTask::FilterMsgOutgoing(
             break;
         }
 
-        CIfInvokeMethodTask* pInv =
-            ObjPtr( pReqTask );
-        if( pInv != nullptr )
-        {
-            stdstr strMethod = pMsg.GetMember();
-            if( strMethod !=
-                SYS_METHOD_FORWARDREQ )
-                break;
-            pIf->IncCounter( propWndSize );
-        }
-
     }while( 0 );
 
     return ret;

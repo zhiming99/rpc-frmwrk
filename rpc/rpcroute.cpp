@@ -498,6 +498,16 @@ CRpcRouterBridge::CRpcRouterBridge(
     const IConfigDb* pCfg ) :
     CAggInterfaceServer( pCfg ), super( pCfg )
 {
+    gint32 ret = 0;
+    do{
+        CIoManager* pMgr = GetIoMgr();
+        bool bRfc = false;
+        ret = pMgr->GetCmdLineOpt(
+            propEnableRfc, bRfc );
+        if( SUCCEEDED( ret ) )
+            m_bRfc = bRfc;
+
+    }while( 0 );
 }
 
 gint32 CRpcRouterBridge::GetBridge(
@@ -1384,6 +1394,205 @@ gint32 CRpcRouterBridge::BuildStartStopReqFwdrProxy(
     return ret;
 }
 
+gint32 CRpcRouterBridge::AddToHistory(
+    guint32 dwMaxReqs,
+    guint32 dwMaxPendings )
+{
+    timespec tv;
+    clock_gettime( CLOCK_MONOTONIC_COARSE, &tv );
+    CStdRMutex oRouterLock( GetLock() );
+    REQ_LIMIT rl ={ dwMaxReqs, dwMaxPendings };
+    HISTORY_ELEM he( tv.tv_sec, rl );
+    m_queHistory.push_back( he );
+    while( m_queHistory.size() > RFC_HISTORY_LEN )
+        m_queHistory.pop_front();
+
+    return 0;
+}
+
+gint32 CRpcRouterBridge::GetCurConnLimit(
+    guint32& dwMaxReqs,
+    guint32& dwMaxPendings,
+    bool bNew ) const
+{
+    gint32 ret = 0;
+    do{
+        CCfgOpenerObj oRouterCfg( this );
+
+        ret = oRouterCfg.GetIntProp(
+            propMaxReqs, dwMaxReqs );
+        if( ERROR( ret ) )
+            break;
+        
+        ret = oRouterCfg.GetIntProp(
+            propMaxPendings, dwMaxPendings );
+        if( ERROR( ret ) )
+            break;
+
+        guint32 dwCount = GetBridgeCount();
+
+        if( bNew )
+            dwCount += 1;
+
+        if( dwCount > 0 )
+        {
+            dwMaxReqs = std::max( 1U,
+                dwMaxReqs / dwCount );
+
+            dwMaxPendings = std::max( 1U,
+                dwMaxPendings / dwCount );
+
+            dwMaxReqs = std::min(
+                dwMaxReqs, RFC_MAX_REQS );
+
+            dwMaxPendings = std::min(
+                dwMaxPendings, RFC_MAX_PENDINGS );
+        }
+        else
+        {
+            dwMaxReqs = RFC_MAX_REQS;
+            dwMaxPendings = RFC_MAX_PENDINGS;
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CRpcRouterBridge::BuildRefreshReqLimit(
+    CfgPtr& pRequest,
+    guint32 dwMaxReqs,
+    guint32 dwMaxPendings )
+{
+    gint32 ret = 0;
+
+    do{
+        CReqBuilder oParams;
+
+        oParams.SetIfName(
+            DBUS_IF_NAME( IFNAME_TCP_BRIDGE ) );
+
+        std::string strRtName;
+        CCfgOpenerObj oRtCfg( this );
+
+        ret = oRtCfg.GetStrProp(
+            propSvrInstName, strRtName );
+        if( ERROR( ret ) )
+            break;
+
+        oParams.SetObjPath( DBUS_OBJ_PATH(
+            strRtName, OBJNAME_TCP_BRIDGE ) );
+
+        oParams.SetSender(
+            DBUS_DESTINATION( strRtName ) );
+
+        oParams.SetMethodName(
+            SYS_EVENT_REFRESHREQLIMIT );
+
+        oParams.SetIntProp( propStreamId,
+            TCP_CONN_DEFAULT_STM );
+
+        oParams.Push( dwMaxReqs );
+        oParams.Push( dwMaxPendings );
+
+        oParams.SetIntProp(
+            propCmdId, CTRLCODE_SEND_EVENT );
+
+        oParams.SetCallFlags( CF_ASYNC_CALL |
+            DBUS_MESSAGE_TYPE_SIGNAL );
+
+        oParams.SetIntProp(
+            propTimeoutSec, 3 );
+
+        pRequest = oParams.GetCfg();
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CRpcRouterBridge::RefreshReqLimit()
+{
+    guint32 ret = 0;
+    do{
+        guint32 dwMaxReqs = 0;
+        guint32 dwMaxPendings = 0;
+        CStdRMutex oRouterLock( GetLock() );
+
+        GetCurConnLimit(
+            dwMaxReqs, dwMaxPendings );
+
+        HISTORY_ELEM& hl = m_queHistory[ 0 ];
+
+        REQ_LIMIT& rl = hl.second;
+        REQ_LIMIT rlNow =
+            { dwMaxReqs, dwMaxPendings };
+
+        AddToHistory( dwMaxReqs, dwMaxPendings );
+        if( rl == rlNow )
+            break;
+
+        DebugPrint( 0, "RefreshReqLimit" );
+        std::vector< InterfPtr > vecBdges;
+        for( auto elem : m_mapPortId2Bdge )
+             vecBdges.push_back( elem.second );
+
+        oRouterLock.Unlock();
+
+        CReqBuilder oReq;
+        BuildRefreshReqLimit( oReq.GetCfg(),
+            dwMaxReqs, dwMaxPendings );
+
+        CReqBuilder oAuthEvt;
+        ret = oAuthEvt.Append( oReq.GetCfg() );
+        if( ERROR( ret ) )
+            break;
+
+        std::string strRtName;
+        CCfgOpenerObj oRtCfg( this );
+        ret = oRtCfg.GetStrProp(
+            propSvrInstName, strRtName );
+        if( ERROR( ret ) )
+            break;
+
+        oAuthEvt.SetObjPath(
+            DBUS_OBJ_PATH( strRtName,
+            OBJNAME_TCP_BRIDGE_AUTH ) );
+
+        TaskletPtr pDummyTask;
+        ret = pDummyTask.NewObj(
+            clsid( CIfDummyTask ) );
+        if( ERROR( ret ) )
+            break;
+
+        for( auto elem : vecBdges )
+        {
+            CRpcTcpBridge* pBridge = elem;
+            if( !pBridge->IsConnected() )
+                continue;
+
+            bool bAuth = false;
+            if( pBridge->GetClsid() ==
+                clsid( CRpcTcpBridgeAuthImpl ) )
+                bAuth = true;
+
+            IConfigDb* pReq;
+            if( bAuth )
+                pReq = oAuthEvt.GetCfg();
+            else
+                pReq = oReq.GetCfg(); 
+
+            pBridge->RefreshReqLimit(
+                dwMaxReqs, dwMaxPendings );
+
+            pBridge->BroadcastEvent(
+                pReq, pDummyTask );
+        }
+
+    }while( 0 );
+
+    return ret;
+}
 
 gint32 CRouterOpenBdgePortTask::CreateInterface(
     InterfPtr& pIf )
@@ -1398,7 +1607,7 @@ gint32 CRouterOpenBdgePortTask::CreateInterface(
         if( ERROR( ret ) )
             break;
 
-        CRpcRouter* pRouter = nullptr;
+        CRpcRouterBridge* pRouter = nullptr;
         ret = oCfg.GetPointer(
             propRouterPtr, pRouter );
         if( ERROR( ret ) )
@@ -1467,6 +1676,24 @@ gint32 CRouterOpenBdgePortTask::CreateInterface(
 
         if( bServer )
         {
+            if( pRouter->IsRfcEnabled() )
+            {
+                guint32 dwMaxReqs = 0;
+                guint32 dwMaxPendings = 0;
+
+                pRouter->GetCurConnLimit(
+                dwMaxReqs, dwMaxPendings, true );
+
+                pRouter->AddToHistory(
+                    dwMaxReqs, dwMaxPendings );
+
+                oParams.SetIntProp(
+                    propMaxReqs, dwMaxReqs );
+
+                oParams.SetIntProp(
+                    propMaxPendings, dwMaxPendings );
+            }
+
             oParams.CopyProp( propPortId, this );
             oParams.SetIntProp( propIfStateClass,
                 clsid( CIfTcpBridgeState ) );
@@ -4820,11 +5047,20 @@ gint32 CRpcRouterManager::Start()
         if( ERROR( ret ) )
             ret = 0;
 
+        ret = 0;
+
         CParamList oParams;
         oParams.CopyProp( propSvrInstName, this );
 
         if( m_dwRole & 0x02 )
         {
+            bool bRfc = false;
+            ret = pMgr->GetCmdLineOpt(
+                propEnableRfc, bRfc );
+            if( SUCCEEDED( ret ) )
+                m_bRfc = bRfc;
+
+            ret = 0;
             EnumClsid iClsid = clsid( Invalid );
             std::string strObjName; 
 
@@ -4856,6 +5092,45 @@ gint32 CRpcRouterManager::Start()
 
             oParams[ propIfStateClass ] =
                 clsid( CIfRouterState );
+
+            if( IsRfcEnabled() )
+            {
+                ret = oParams.CopyProp(
+                    propMaxReqs, this );
+                if( ERROR( ret ) )
+                    break;
+
+                ret = oParams.CopyProp(
+                    propMaxPendings, this );
+                if( ERROR( ret ) )
+                    break;
+
+                // set the session checker
+                ret = DEFER_IFCALLEX_NOSCHED(
+                    m_pRfcChecker, ObjPtr( this ),
+                    &CRpcRouterManager::RefreshReqLimit );
+
+                if( ERROR( ret ) )
+                    break;
+
+                CIfRetryTask* pRetryTask = m_pRfcChecker;
+                if( unlikely( pRetryTask == nullptr ) )
+                {
+                    ret = -EFAULT;
+                    break;
+                }
+
+                CCfgOpener oTaskCfg( ( IConfigDb* )
+                    pRetryTask->GetConfig() );
+
+                oTaskCfg.SetIntProp(
+                    propRetries, MAX_NUM_CHECK );
+
+                oTaskCfg.SetIntProp(
+                    propIntervalSec, 60 );
+
+                this->AddAndRun( m_pRfcChecker );
+            }
 
             ObjPtr pRtObj;
             ret = pRtObj.NewObj( iClsid,
@@ -4930,6 +5205,26 @@ gint32 CRpcRouterManager::Start()
     }while( 0 );
 
     return ret;
+}
+
+gint32 CRpcRouterManager::RefreshReqLimit()
+{
+    std::vector< InterfPtr > vecRoutersBdge;
+    do{
+        CStdRMutex oIfLock( GetLock() );
+        vecRoutersBdge = m_vecRoutersBdge;
+        oIfLock.Unlock();
+        for( auto elem : vecRoutersBdge )
+        {
+            CRpcRouterBridge* pRouter = elem;
+            if( pRouter == nullptr )
+                continue;
+            pRouter->RefreshReqLimit();
+        }
+
+    }while( 0 );
+
+    return STATUS_MORE_PROCESS_NEEDED;
 }
 
 gint32 CRpcRouterManager::OnPreStop(

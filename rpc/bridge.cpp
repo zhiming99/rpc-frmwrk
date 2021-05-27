@@ -88,6 +88,10 @@ gint32 CRpcTcpBridgeProxy::InitUserFuncs()
         CRpcTcpBridgeProxy::OnRmtSvrEvent,
         "RmtSvrEvent" );
 
+    ADD_EVENT_HANDLER(
+        CRpcTcpBridgeProxy::RefreshReqLimit,
+        "RefreshReqLimit" );
+
     END_IFHANDLER_MAP;
 
     BEGIN_IFPROXY_MAP( CRpcTcpBridge, false );
@@ -164,9 +168,29 @@ gint32 CRpcTcpBridgeProxy::OnHandshakeComplete(
         ret = oInfo.GetQwordProp(
             propTimestamp, qwTimestamp );
         if( ERROR( ret ) )
-        {
-            ret = 0;
             break;
+
+        CCfgOpenerObj oIfCfg( this );
+        guint32 dwmr = 0, dwmp = 0;
+        ret = oInfo.GetIntProp(
+            propMaxReqs, dwmr );
+        if( SUCCEEDED( ret ) )
+        {
+            ret = oInfo.GetIntProp(
+                propMaxPendings, dwmp );
+
+            if( ERROR( ret ) )
+                break;
+
+            guint32 dwMaxReqs = std::min(
+                RFC_MAX_REQS, dwmr + dwmp );
+
+            oIfCfg.SetIntProp(
+                propMaxReqs, dwMaxReqs );
+
+            CRpcRouter* pRouter = GetParent();
+            if( pRouter->HasReqForwarder() )
+                SetRfcEnabled( true );
         }
 
         CCfgOpener oReqCtx( pReqCtx );
@@ -174,10 +198,8 @@ gint32 CRpcTcpBridgeProxy::OnHandshakeComplete(
         ret = oReqCtx.GetQwordProp(
             propTimestamp, qwOriginTs );
         if( ERROR( ret ) )
-        {
-            ret = 0;
             break;
-        }
+
         timespec ts;
         clock_gettime( CLOCK_MONOTONIC, &ts );
         m_oTs.SetBase(
@@ -267,6 +289,9 @@ gint32 CRpcTcpBridgeProxy::DoStartHandshake(
             ret = -errno;
             break;
         }
+
+        oParams.SetQwordProp(
+            propTimestamp, tv.tv_sec );
         oParams.Push( "rpcf-bridge-proxy" );
 
         TaskletPtr pRespCb;
@@ -1732,6 +1757,59 @@ gint32 CRpcTcpBridgeProxy::OnPostStart(
     return ret;
 }
 
+gint32 CRpcTcpBridgeShared::InitRfc()
+{
+    gint32 ret = 0;
+    do{
+        if( !IsRfcEnabled() )
+            break;
+
+        CParamList oParams;
+        oParams[ propIfPtr ] =
+            ObjPtr( m_pParentIf );
+
+        ret = oParams.CopyProp(
+            propMaxReqs, m_pParentIf );
+        if( ERROR( ret ) )
+            break;
+
+        ret = oParams.CopyProp(
+            propMaxPendings, m_pParentIf ); 
+        if( ERROR( ret ) )
+            break;
+
+        ret = m_pGrpRfc.NewObj(
+            clsid( CIfParallelTaskGrpRfc ),
+            oParams.GetCfg() );
+        if( ERROR( ret ) )
+            break;
+
+        // a placeholder task to prevent
+        // m_pGrpRfc from completing itself
+        ret = m_pPHTask.NewObj(
+            clsid( CIfCallbackInterceptor ),
+            oParams.GetCfg() );
+        if( ERROR( ret ) )
+            break;
+
+        CIfParallelTaskGrpRfc* pGrp = m_pGrpRfc;
+        if( pGrp == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        pGrp->AppendTask( m_pPHTask );
+        TaskletPtr pTask = ObjPtr( pGrp );
+        ret = m_pParentIf->AddAndRun( pTask );
+        if( ret == STATUS_PENDING )
+            ret = 0;
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CRpcTcpBridgeShared::OnPostStartShared(
     IEventSink* pContext, MatchPtr& pMatch )
 {
@@ -1786,8 +1864,7 @@ gint32 CRpcTcpBridgeShared::OnPostStartShared(
         if( ERROR( ret ) )
             break;
 
-        if( ret == STATUS_PENDING )
-            ret = 0;
+        ret = InitRfc();
 
     }while( 0 );
 
@@ -1855,6 +1932,94 @@ gint32 CRpcTcpBridgeProxy::OnInvalidStreamId(
         return -EINVAL;
 
     return 0;
+}
+
+gint32 CRpcTcpBridgeProxy::OnPreStop(
+    IEventSink* pCallback )
+{
+    if( IsRfcEnabled() && !m_pPHTask.IsEmpty() )
+    {
+        m_pPHTask->OnEvent(
+            eventTaskComp, 0, 0, nullptr );
+        m_pPHTask.Clear();
+        m_pGrpRfc.Clear();
+    }
+    return super::OnPreStop( pCallback );
+}
+
+gint32 CRpcTcpBridgeProxy::AddAndRun(
+    TaskletPtr& pTask, bool bImmediate )
+{
+    do{
+        gint32 ret = 0;
+
+        if( !IsRfcEnabled() )
+            break;
+
+        CIfIoReqTask* pIoReq = pTask;
+        if( pIoReq == nullptr )
+            break;
+
+        CfgPtr pReq;
+        ret = pIoReq->GetReqCall( pReq );
+        if( ERROR( ret ) )
+            break;
+
+        std::string strMethod;
+        CReqOpener oReq( pReq );
+        ret = oReq.GetMethodName( strMethod );
+        if( ERROR( ret ) )
+            break;
+
+        if( strMethod != SYS_METHOD_FORWARDREQ )
+            break;
+
+        CIfParallelTaskGrpRfc* pGrpRfc =
+            m_pGrpRfc;
+
+        if( pGrpRfc != nullptr )
+            return pGrpRfc->AddAndRun( pTask );
+
+    }while( 0 );
+
+    return super::AddAndRun( pTask, bImmediate );
+}
+
+gint32 CRpcTcpBridgeProxy::RefreshReqLimit(
+    IEventSink* pCallback,
+    guint32 dwmr, guint32 dwmp )
+{
+    if( !IsRfcEnabled() )
+        return 0;
+
+    CIfParallelTaskGrpRfc* pGrpRfc =
+        m_pGrpRfc;
+
+    if( m_pGrpRfc.IsEmpty() )
+        return 0;
+
+    guint32 dwMaxReqs = std::min(
+        RFC_MAX_REQS, dwmr + dwmp );
+
+    pGrpRfc->SetLimit(
+        dwMaxReqs, RFC_MAX_PENDINGS );
+
+    return 0;
+}
+
+gint32 CRpcTcpBridgeProxy::RequeueTask(
+    TaskletPtr& pTask )
+{
+    if( !IsRfcEnabled() )
+        return ERROR_STATE;
+
+    CIfParallelTaskGrpRfc* pGrpRfc =
+        m_pGrpRfc;
+
+    if( pGrpRfc != nullptr )
+        return pGrpRfc->InsertTask( pTask );
+
+    return -EFAULT;
 }
 
 bool CRpcInterfaceProxy::IsConnected(
@@ -2600,7 +2765,8 @@ gint32 CRpcInterfaceServer::SetupReqIrp(
         {
             if( strMethod == SYS_EVENT_FORWARDEVT ||
                 strMethod == SYS_EVENT_KEEPALIVE ||
-                strMethod == SYS_EVENT_RMTSVREVENT )
+                strMethod == SYS_EVENT_RMTSVREVENT ||
+                strMethod == SYS_EVENT_REFRESHREQLIMIT )
             {
                 ret = SetupReqIrpFwrdEvt( pIrp,
                     pReqCall, pCallback );
@@ -3333,19 +3499,6 @@ gint32 CRpcInterfaceServer::DoInvoke(
     return ret;
 }
 
-gint32 CRpcInterfaceServer::OnPreStart(
-    IEventSink* pContext ) 
-{
-    CStatCountersServer* pStat = ObjPtr( this );
-    if( pStat == nullptr )
-        return 0;
-
-    pStat->SetCounter(
-        propWndSize, DEFAULT_WNDSIZE );
-
-    return 0;
-}
-
 gint32 CRpcTcpBridge::SetupReqIrp(
     IRP* pIrp,
     IConfigDb* pReqCall,
@@ -3934,14 +4087,25 @@ gint32 CRpcTcpBridge::Handshake(
         {
             timespec tv;
             clock_gettime( CLOCK_MONOTONIC, &tv );
-            guint64 qwTimestamp = tv.tv_sec;
+            guint64 qwTs = tv.tv_sec;
             CParamList oParams;
             oParams.Push( BRIDGE_GREETINGS );
-            oParams[ propTimestamp ] = qwTimestamp;
+            oParams[ propTimestamp ] = qwTs;
 
             oResp.Push( oParams.GetCfg() );
-            m_oTs.SetBase( qwTimestamp );
-            SetResponse( pCallback, oResp.GetCfg() );
+            m_oTs.SetBase( qwTs );
+
+            SetResponse(
+                pCallback, oResp.GetCfg() );
+
+            if( IsRfcEnabled() )
+            {
+                oParams.CopyProp( 
+                    propMaxReqs, this );
+
+                oParams.CopyProp( 
+                    propMaxPendings, this );
+            }
         }
 
         oResp[ propReturnValue ] = ret;
@@ -4002,6 +4166,105 @@ gint32 CRpcTcpBridge::PostDisconnEvent()
     }while( 0 );
 
     return ret;
+}
+
+gint32 CRpcTcpBridge::OnPreStop(
+    IEventSink* pCallback )
+{
+    if( IsRfcEnabled() && !m_pPHTask.IsEmpty() )
+    {
+        m_pPHTask->OnEvent(
+            eventTaskComp, 0, 0, nullptr );
+        m_pPHTask.Clear();
+        m_pGrpRfc.Clear();
+    }
+    return super::OnPreStop( pCallback );
+}
+
+gint32 CRpcTcpBridge::AddAndRun(
+    TaskletPtr& pTask, bool bImmediate )
+{
+    do{
+        gint32 ret = 0;
+        if( !IsRfcEnabled() )
+            break;
+
+        CIfInvokeMethodTask* pInv = pTask;
+        if( pInv == nullptr )
+            break;
+
+        CfgPtr pReq;
+        ret = pInv->GetReqCall( pReq );
+        if( ERROR( ret ) )
+            break;
+
+        std::string strMethod;
+        CReqOpener oReq( pReq );
+        ret = oReq.GetMethodName( strMethod );
+        if( ERROR( ret ) )
+            break;
+
+        if( strMethod != SYS_METHOD_FORWARDREQ )
+            break;
+
+        CIfParallelTaskGrpRfc* pGrpRfc =
+            m_pGrpRfc;
+
+        if( pGrpRfc != nullptr )
+            return pGrpRfc->AddAndRun( pTask );
+
+
+    }while( 0 );
+
+    return super::AddAndRun( pTask, bImmediate );
+}
+
+gint32 CRpcTcpBridge::RefreshReqLimit(
+    guint32 dwMaxReqs,
+    guint32 dwMaxPendigns )
+{
+    gint32 ret = 0;
+    do{
+        CIfParallelTaskGrpRfc* pGrpRfc =
+            m_pGrpRfc;
+
+        pGrpRfc->SetLimit(
+            dwMaxReqs, dwMaxPendigns );
+
+    }while( 0 );
+
+    return ret;
+}
+ 
+CRpcTcpBridgeShared::CRpcTcpBridgeShared(
+    CRpcServices* pIf )
+{
+    gint32 ret = 0;
+    do{
+        m_pParentIf = pIf;
+        if( !pIf->IsServer() )
+            break;
+
+        bool bRfc;
+        CIoManager* pMgr = pIf->GetIoMgr();
+
+        ret = pMgr->GetCmdLineOpt(
+            propEnableRfc, bRfc );
+
+        if( ERROR( ret ) )
+            bRfc = false;
+        
+        ret = 0;
+        SetRfcEnabled( bRfc );
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+    {
+        string strMsg = DebugMsg( ret,
+            "Error occurs in CRpcTcpBridgeShared ctor" );
+        throw runtime_error( strMsg );
+    }
 }
 
 gint32 CRpcTcpBridgeShared::GetPortToSubmitShared(
