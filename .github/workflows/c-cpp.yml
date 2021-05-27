@@ -22,7 +22,7 @@ jobs:
     - name: setup build env
       run: libtoolize;aclocal;autoreconf -vfi;automake --add-missing;autoconf;
     - name: configure
-      run: ./configure
+      run: ./configure "CPPFLAGS=-O2 -g -DRELEASE -D_DEBUG=0"
     - name: make
       run: make
     - name: install
