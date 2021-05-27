@@ -498,7 +498,7 @@ gint32 CopyFile( gint32 iFdSrc,
     gint32 ret = 0;
 
     gint32 iFdDest = open( strDestFile.c_str(),
-        O_CREAT | O_WRONLY );
+        O_CREAT | O_WRONLY, 0600 );
 
     if( iFdDest == -1 )
         return -errno;
