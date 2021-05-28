@@ -51,7 +51,7 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 
 ---
 [`Thu May 27 2021 05:42:27 PM Beijing`]   
-1. Completed just half of the `request based flow control`. The other half is the flow control logics in `request forwarder` and per-client connection.
+1. Completed just half of the `request based flow control`. The other half is the flow control logics in `request forwarder` and per-client connection besides the existing aggregrated connection.
 2. Added a workflow, so that we can verify every push now. 
 
 [`Fri May 21 2021 02:31:46 PM Beijing`]   
