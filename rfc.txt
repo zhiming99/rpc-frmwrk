@@ -1,0 +1,44 @@
+reqfwdr's modifications:
+
+. m_pGrpRfc creation:
+    . when reqfwdr's AddRefCount modification to create m_pGrpRfc if return value is 1
+    . reject and fail AddRefCount if bridge-proxy refcount > bridge-proxy maxpending
+    . and determine where to store the m_pGrpRfc in the reqfwdr
+    . recalcuate the maxreqs for all the m_pGrpRfc toward the bridge-proxy
+
+. m_pGrpRfc removal:
+    . OnRmtSvrOffline when the direction connection of the portid losts, ClearRefCountByPortId
+    . OnModOffline when the client quits, ClearRefCountByUniqName
+    . when DecRefCount from CloseRemotePort, clear m_pGrpRfc if the regobj's refcount is zero
+    
+. reqfwdr's AddAndRun
+    . dispatch the task to the correct m_pGrpRfc
+    . install completion task to inv-task for queue-full error from ForwardRequestTask.
+    . complete inv-task with error on m_pGrpRfc full
+
+. inv-task's ERROR_QUEUE_FULL handling: add a completion task to invoketask of fwrd-request
+
+. inv-task canceling:
+    . OnRmtSvrOffline when the node on the router path is down, ClearPendingsByRtPath
+    . NameOwnerChanged when the remote module is down, ClearPendingsByDestAddrSvr
+
+
+bridge's modification:
+
+    . Remove the time-based maxreq calculation, and Calculate new maxreqs by connection variation rate, and push
+    RefreshReqLimit
+
+    . AddAndRun: install a completion task to invoketask of fwrd-request for ERROR_QUEUE_FULL handling
+
+    . inv-task canceling:
+        . OnRmtSvrOffline( mh ), with ClearPendingsByRtPath
+        . OnModOffline, with ClearPendingsByDestAddrSvr
+        . ClearRemoteEvents with ClearPendingsBySrcDBusName
+        . ForwardEvent with NameOwnerChanged, ClearPendingsByDestAddrSvr
+
+bridge proxy's modification:
+
+    . inv-task canceling:
+        . OnRmtSvrOffline( multihop ) ClearPendingsByRtPathProxy
+        . ClearRemoteEvents, with ClearPendingsBySrcDBusName
+        . ForwardEvent of NameOwnerChanged, with ClearPendingsByDestAddrProxy  

@@ -38,6 +38,14 @@
 namespace rpcf
 {
 
+gint32 AppendConnParams(
+    IConfigDb* pConnParams,
+    BufPtr& pBuf );
+
+gint32 gen_sess_hash(
+    BufPtr& pBuf,
+    std::string& strSess );
+
 struct IRpcReqProxyAsync
 {
 
@@ -198,6 +206,14 @@ class CRegisteredObject
         std::string strName;
         CCfgOpener oCfg( this );
         strName = oCfg[ propSrcUniqName ];
+        return strName;
+    }
+
+    std::string GetSrcDBusName()
+    {
+        std::string strName;
+        CCfgOpener oCfg( this );
+        strName = oCfg[ propSrcDBusName ];
         return strName;
     }
 
@@ -449,11 +465,18 @@ class CRpcReqForwarder :
         const std::string& strUniqName,
         std::set< guint32 >& setPortIds );
 
+    gint32 ClearRefCountBySrcDBusName(
+        const std::string& strName,
+        std::set< guint32 >& setPortIds );
+
     gint32 GetRefCountByPortId(
         guint32 dwPortId );
 
     gint32 GetRefCountByUniqName(
         const std::string& strUniqName );
+
+    gint32 GetRefCountBySrcDBusName(
+        const std::string& strName );
 
     const EnumClsid GetIid() const
     { return iid( CRpcReqForwarder ); }
@@ -883,6 +906,8 @@ class CRpcTcpBridge :
     TaskletPtr m_pHsTicker;
     bool m_bHandshaked = false;
     bool m_bHsFailed = false;
+    stdstr m_strSess;
+
     CTimestampSvr m_oTs;
 
     // for load balance
@@ -919,6 +944,9 @@ class CRpcTcpBridge :
         const std::string& strNext,
         const std::string& strLBNode,
         const std::vector< std::string >& vecNodes );
+
+    gint32 GenSessHash(
+        std::string& strSess ) const;
 
     public:
 
@@ -1092,6 +1120,9 @@ class CRpcTcpBridge :
     gint32 RefreshReqLimit(
         guint32 dwMaxReqs,
         guint32 dwMaxPendigns );
+
+    const stdstr& GetSessHash() const
+    { return m_strSess; }
 
 }; // CRpcTcpBridge
 
@@ -1749,6 +1780,8 @@ class CReqFwdrForwardRequestTask :
     public CIfInterceptTaskProxy
 {
     gint32 OnTaskCompleteRfc( gint32 iRetVal );
+    gint32 CloneIoTask( TaskletPtr& pIoTask );
+
     public:
     typedef CIfInterceptTaskProxy super;
 
@@ -1893,11 +1926,18 @@ class CRpcRouterReqFwdr : public CRpcRouter
         const std::string& strUniqName,
         std::set< guint32 >& setPortIds );
 
+    gint32 ClearRefCountBySrcDBusName(
+        const std::string& strName,
+        std::set< guint32 >& setPortIds );
+
     gint32 GetRefCountByPortId(
         guint32 dwPortId );
 
     gint32 GetRefCountByUniqName(
         const std::string& strUniqName );
+
+    gint32 GetRefCountBySrcDBusName(
+        const std::string& strName );
 
     gint32 AddLocalMatch(
         IMessageMatch* pMatch );
@@ -2680,5 +2720,69 @@ inline gint32 NewIfDeferredCall2( EnumClsid iTaskClsid,
     } \
     _ret; \
 })
+
+class CIfParallelTaskGrpRfc :
+    public CIfParallelTaskGrp
+{
+    guint32 m_dwMaxRunning = RFC_MAX_REQS;
+    guint32 m_dwMaxPending = RFC_MAX_PENDINGS;
+
+    public:
+    typedef CIfParallelTaskGrp super;
+    CIfParallelTaskGrpRfc( const IConfigDb* pCfg );
+
+    gint32 SetLimit(
+        guint32 dwMaxRunning,
+        guint32 dwMaxPending );
+
+    inline guint32 GetMaxRunning() const
+    { return m_dwMaxRunning; }
+
+    inline guint32 GetMaxPending() const
+    { return m_dwMaxPending; }
+
+    inline guint32 GetRunningCount() const
+    { return m_setTasks.size(); }
+
+    virtual gint32 RunTaskInternal(
+        guint32 dwContext ) override;
+
+    virtual gint32 OnChildComplete(
+        gint32 ret, CTasklet* pChild ) override;
+
+    gint32 AddAndRun( TaskletPtr& pTask );
+
+    virtual gint32 AppendTask(
+        TaskletPtr& pTask ) override ;
+
+    virtual gint32 InsertTask(
+        TaskletPtr& pTask ) override ;
+
+    private:
+    bool CheckUniqName(
+        DMsgPtr& pMsg,
+        const stdstr& strVal,
+        const stdstr& strEmpty );
+
+    bool CheckRouterPath(
+        DMsgPtr& pMsg,
+        const stdstr& strVal,
+        const stdstr& strEmpty );
+
+    bool CheckDestAddr(
+        DMsgPtr& pMsg,
+        const stdstr& strRtPath,
+        const stdstr& strDestAddr );
+
+    bool CheckDestAddrProxy(
+        IConfigDb* pReqCall,
+        const stdstr& strRtPath,
+        const stdstr& strDest );
+
+    bool CheckRouterPathProxy(
+        IConfigDb* pReqCall,
+        const stdstr& strName,
+        const stdstr& strEmpty );
+};
 
 }

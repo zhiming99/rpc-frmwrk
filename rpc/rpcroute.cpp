@@ -2355,7 +2355,6 @@ gint32 CRouterStopBridgeTask::RunTask()
         // find all the proxies with matches
         // referring to this bridge
         std::set< string > setProxies;
-        std::set< guint32 > setTcpProxies;
         for( auto elem : vecMatches )
         {
             std::string strDest;
@@ -2374,15 +2373,6 @@ gint32 CRouterStopBridgeTask::RunTask()
                     elem, strDest );
                 if( SUCCEEDED( ret ) )
                     setProxies.insert( strDest );
-            }
-            else
-            {
-                guint32 dwPortId = 0;
-                ret = oMatch.GetIntProp(
-                    propPrxyPortId, dwPortId );
-                if( ERROR( ret ) )
-                    continue;
-                setTcpProxies.insert( dwPortId );
             }
         }
 
@@ -2459,15 +2449,8 @@ gint32 CRouterStopBridgeTask::RunTask()
 
         if( vecMatchesMH.size() )
         {
-            ObjVecPtr pvecMatches( true );
-            for( auto elem : vecMatchesMH )
-            {
-                ( *pvecMatches )().push_back(
-                    ObjPtr( elem ) );
-            }
-
-            // run this task freely, no need to
-            // add to the seqtask.
+            // run this task with no sync, no need
+            // to add to the seqtask.
             DisableRemoteEventsMH(
                 pDummy, vecMatchesMH );
         }
@@ -4457,8 +4440,8 @@ gint32 CRpcRouterReqFwdr::AddRefCount(
 }
 
 // NOTE: the return value on success is the
-// reference count to the ipAddress, but not the
-// reference count to the regobj.
+// reference count to the bridge proxy, but not
+// the reference count to the regobj.
 gint32 CRpcRouterReqFwdr::DecRefCount(
     guint32 dwPortId,
     const std::string& strSrcUniqName,
@@ -4508,6 +4491,52 @@ gint32 CRpcRouterReqFwdr::DecRefCount(
     }
 
     return ret;
+}
+
+// for local client offline
+gint32 CRpcRouterReqFwdr::GetRefCountBySrcDBusName(
+    const std::string& strName )
+{
+    gint32 iCount = 0;
+    CStdRMutex oRouterLock( GetLock() );
+    auto itr = m_mapRefCount.begin();
+    while( itr != m_mapRefCount.end() )
+    {
+        string strName2 =
+            itr->first->GetSrcDBusName();
+
+        if( strName2 == strName )
+            iCount++;
+
+        ++itr;
+    }
+    return iCount;
+}
+
+// for local client offline
+gint32 CRpcRouterReqFwdr::ClearRefCountBySrcDBusName(
+    const std::string& strName,
+    std::set< guint32 >& setPortIds )
+{
+    CStdRMutex oRouterLock( GetLock() );
+    auto itr = m_mapRefCount.begin();
+    while( itr != m_mapRefCount.end() )
+    {
+        string strName2 =
+            itr->first->GetSrcDBusName();
+
+        if( strName2 == strName )
+        {
+            setPortIds.insert(
+                itr->first->GetPortId() );
+            itr = m_mapRefCount.erase( itr );
+        }
+        else
+        {
+            ++itr;
+        }
+    }
+    return setPortIds.size();
 }
 
 // for local client offline
@@ -5359,6 +5388,775 @@ gint32 CIfRouterMgrState::SubscribeEvents()
     };
     return SubscribeEventsInternal(
         vecEvtToSubscribe );
+}
+
+CIfParallelTaskGrpRfc::CIfParallelTaskGrpRfc(
+    const IConfigDb* pCfg )
+    : super( pCfg )
+{
+    SetClassId( clsid( CIfParallelTaskGrpRfc ) );
+
+    CCfgOpener oCfg(
+        ( IConfigDb* )GetConfig() );
+    gint32 ret = 0;
+    do{
+        guint32 dwMaxRunning = 0;
+        guint32 dwMaxPending = 0;
+
+        ret = oCfg.GetIntProp(
+            propMaxReqs, dwMaxRunning );
+
+        if( SUCCEEDED( ret ) )
+        {
+            m_dwMaxRunning = dwMaxRunning;
+            oCfg.RemoveProperty( propMaxReqs );
+        }
+
+        ret = oCfg.GetIntProp(
+            propMaxPendings, dwMaxPending );
+
+        if( SUCCEEDED( ret ) )
+        {
+            m_dwMaxPending = dwMaxPending;
+            oCfg.RemoveProperty( propMaxPendings );
+        }
+
+    }while( 0 );
+
+    return;
+}
+
+gint32 CIfParallelTaskGrpRfc::OnChildComplete(
+    gint32 iRet, CTasklet* pChild )
+{
+
+    CStdRTMutex oTaskLock( GetLock() );
+    if( GetRunningCount() > GetMaxRunning() )
+    {
+        TaskletPtr taskPtr = pChild;
+        RemoveTask( taskPtr );
+        return 0;
+    }
+    return super::OnChildComplete( iRet, pChild );
+}
+
+gint32 CIfParallelTaskGrpRfc::RunTaskInternal(
+    guint32 dwContext )
+{
+    gint32 ret = 0;
+
+    CStdRTMutex oTaskLock( GetLock() );
+
+    EnumTaskState iState = GetTaskState();
+    if( iState == stateStopped )
+        return  STATUS_PENDING;
+
+    if( IsCanceling() )
+        return STATUS_PENDING;
+
+    if( !IsRunning() &&
+        iState == stateStarted )
+        return STATUS_PENDING;
+
+    CCfgOpener oCfg( ( IConfigDb* )GetConfig() );
+    if( IsNoSched() )
+        return STATUS_PENDING;
+
+    if( iState == stateStarting )
+    {
+        SetTaskState( stateStarted );
+        SetRunning( true );
+    }
+
+    do{
+        std::deque< TaskletPtr > queTasksToRun;
+
+        if( GetTaskCount() == 0 )
+            break;
+
+        gint32 iCount =
+            GetMaxRunning() - m_setTasks.size();
+
+        if( iCount <= 0 )
+        {
+            ret = STATUS_PENDING;
+            break;
+        }
+
+        if( m_quePendingTasks.empty() )
+        {
+            ret = STATUS_PENDING;
+            break;
+        }
+
+        iCount = std::min( ( size_t )iCount,
+            m_quePendingTasks.size() );
+
+        queTasksToRun.insert(
+            queTasksToRun.begin(),
+            m_quePendingTasks.begin(),
+            m_quePendingTasks.begin() + iCount );
+
+        m_quePendingTasks.erase(
+            m_quePendingTasks.begin(),
+            m_quePendingTasks.begin() + iCount );
+
+        m_setTasks.insert(
+            queTasksToRun.begin(),
+            queTasksToRun.end() );
+
+        SetNoSched( true );
+        oTaskLock.Unlock();
+
+        for( auto pTask : queTasksToRun )
+        {
+            if( !pTask.IsEmpty() )
+                ( *pTask )( eventZero );
+        }
+
+        oTaskLock.Lock();
+        SetNoSched( false );
+
+        if( GetPendingCount() > 0 &&
+            GetMaxRunning() > GetRunningCount() )
+        {
+            // there are free slot for more
+            // request
+            continue;
+        }
+
+        // pending means there are tasks running, does
+        // not indicate a specific task's return value
+        if( GetTaskCount() > 0 )
+            ret = STATUS_PENDING;
+
+        break;
+
+    }while( 1 );
+
+    if( ret != STATUS_PENDING )
+        SetRunning( false );
+
+    return ret;
+}
+
+#define CHECK_GRP_STATE \
+    CStdRTMutex oTaskLock( GetLock() ); \
+    EnumTaskState iState = GetTaskState(); \
+    if( iState == stateStopped ) \
+    { \
+        ret = ERROR_STATE; \
+        break; \
+    } \
+    if( IsCanceling() ) \
+    { \
+        ret = ERROR_STATE; \
+        break; \
+    } \
+    if( !IsRunning() && \
+        iState == stateStarted ) \
+    { \
+        ret = ERROR_STATE; \
+        break; \
+    }
+
+
+gint32 CIfParallelTaskGrpRfc::AddAndRun(
+    TaskletPtr& pTask )
+{
+    if( pTask.IsEmpty() )
+        return -EINVAL;
+
+    gint32 ret = 0;
+
+    do{
+        CHECK_GRP_STATE;
+
+        if( GetPendingCount() >= GetMaxPending() )
+        {
+            ret = ERROR_QUEUE_FULL;
+            DebugPrint( ret,
+                "RFC: queue is full,"
+                " AddAndRun failed" );
+            break;
+        }
+
+        CCfgOpener oChildCfg(
+            ( IConfigDb* )pTask->GetConfig() );
+
+        oChildCfg.SetPointer(
+            propParentTask, this );
+
+        m_quePendingTasks.push_back( pTask );
+
+        if( IsNoSched() )
+        {
+            pTask->MarkPending();
+            ret = STATUS_SUCCESS;
+            break;
+        }
+
+        if( !bRunning ||
+            GetRunningCount() >= GetMaxRunning() )
+        {
+            pTask->MarkPending();
+            break;
+        }
+
+        oTaskLock.Unlock();
+
+        // re-run this task group immediately
+        ret = ( *this )( eventZero );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CIfParallelTaskGrpRfc::AppendTask(
+    TaskletPtr& pTask )
+{
+    gint32 ret = 0;
+    do{
+        CStdRTMutex oTaskLock( GetLock() );
+        if( GetPendingCount() >= GetMaxPending() )
+        {
+            DebugPrint( ret,
+                "RFC: queue is full,"
+                " append task failed" );
+            ret = ERROR_QUEUE_FULL;
+            break;
+        }
+
+        ret = super::AppendTask( pTask );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CIfParallelTaskGrpRfc::InsertTask(
+    TaskletPtr& pTask )
+{
+    gint32 ret = 0;
+    do{
+        CStdRTMutex oTaskLock( GetLock() );
+        m_quePendingTasks.push_front( pTask );
+        if( GetRunningCount() >= GetMaxRunning() )
+            break;
+
+        CCfgOpener oCfg(
+            ( IConfigDb* )GetConfig() );
+
+        CIoManager* pMgr = nullptr;
+        ret = GET_IOMGR( oCfg, pMgr );
+        if( ERROR( ret ) )
+            break;
+
+        oTaskLock.Unlock();
+
+        TaskletPtr pThisTask( this );
+        ret = pMgr->RescheduleTask( pThisTask );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CIfParallelTaskGrpRfc::SetLimit(
+    guint32 dwMaxRunning, guint32 dwMaxPending )
+{
+    if( dwMaxPending == 0 || dwMaxRunning == 0 )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        CHECK_GRP_STATE;
+
+        m_dwMaxPending = std::min(
+            dwMaxPending, RFC_MAX_PENDINGS );
+
+        m_dwMaxRunning = std::min(
+            dwMaxRunning, RFC_MAX_REQS );
+
+        if( IsNoSched() )
+            break;
+
+        CCfgOpener oCfg( ( IConfigDb* )GetConfig() );
+
+        if( GetRunningCount() < m_dwMaxRunning &&
+            GetPendingCount() > 0 )
+        {
+            CCfgOpener oCfg(
+                ( IConfigDb* )GetConfig() );
+
+            CIoManager* pMgr = nullptr;
+            gint32 ret = GET_IOMGR( oCfg, pMgr );
+            if( ERROR( ret ) )
+                break;
+
+            TaskletPtr pThisTask( this );
+            ret = pMgr->RescheduleTask( pThisTask );
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+using TASK_ELEM = std::pair< TaskletPtr, DMsgPtr >
+
+using PCHECKMSG = bool(CIfParallelTaskGrpRfc::*f)(
+    DMsgPtr& pFwrdMsg,
+    const stdstr& strVal,
+    const stdstr& strVal2 );
+
+using PCHECKREQ = bool(CIfParallelTaskGrpRfc::*f)(
+    IConfigDb* pReqCall,
+    const stdstr& strVal,
+    const stdstr& strVal2 );
+
+bool CIfParallelTaskGrpRfc::CheckUniqName(
+    DMsgPtr& pMsg,
+    const stdstr& strVal,
+    const stdstr& strEmpty )
+{
+    // called by reqfwdr when a client is down
+    stdstr strSdr = pMsg.GetSender();
+    return strSdr == strVal;
+}
+
+bool CIfParallelTaskGrpRfc::CheckRouterPath(
+    DMsgPtr& pMsg,
+    const stdstr& strVal,
+    const stdstr& strEmpty )
+{
+    // called by bridge/reqfwdr when a node is down
+    ret = pMsg->GetObjArgAt( 0, pObj );
+    if( SUCCEEDED( ret ) )
+    {
+        stdstr strPath;
+        CCfgOpener oReqCtx(
+            ( IConfigDb* )pObj );
+        oReqCtx.GetStrProp(
+            propRouterPtr, strPath );
+
+        ret = IsMidwayPath(strName, strPath )
+        if( SUCCEEDED( ret ) )
+            return true;
+    }
+    return false;
+}
+
+bool CIfParallelTaskGrpRfc::CheckDestAddr(
+    DMsgPtr& pMsg,
+    const stdstr& strRtPath,
+    const stdstr& strDestAddr )
+{
+    // called by bridge/reqfwdr when a server is down
+    ret = pMsg->GetObjArgAt( 0, pObj );
+    if( SUCCEEDED( ret ) )
+    {
+        stdstr strPath;
+        CCfgOpener oReqCtx(
+            ( IConfigDb* )pObj );
+        oReqCtx.GetStrProp(
+            propRouterPtr, strPath );
+
+        if( strRtPath != strPath )
+            return false;
+
+        DMsgPtr pmr;
+        ret = pMsg->GetMsgArgAt( 1, pmr );
+        if( ERROR( ret ) )
+            return false;
+
+        if( pmr.GetDestination() != strDestAddr )
+            return false;
+
+        return true;
+    }
+    return false;
+}
+
+bool CIfParallelTaskGrpRfc::CheckRouterPathProxy(
+    IConfigDb* pReqCall,
+    const stdstr& strName,
+    const stdstr& strEmpty )
+{
+    // called by bdge-proxy when a node is down
+    CCfgOpener oReqCall( pReqCall );
+    IConfigDb* pReqCtx;
+    ret = oReqCall.GetPointer( 0, pReqCtx ); 
+    if( SUCCEEDED( ret ) )
+    {
+        stdstr strPath;
+        CCfgOpener oReqCtx( pReqCtx );
+        oReqCtx.GetStrProp(
+            propRouterPtr, strPath );
+
+        ret = IsMidwayPath(strName, strPath )
+        if( SUCCEEDED( ret ) )
+            return true;
+    }
+    return false;
+}
+
+bool CIfParallelTaskGrpRfc::CheckDestAddrProxy(
+    IConfigDb* pReqCall,
+    const stdstr& strRtPath,
+    const stdstr& strDest )
+{
+    // called by bridge proxy when server is down
+    CCfgOpener oReqCall( pReqCall );
+    IConfigDb* pReqCtx;
+    ret = oReqCall.GetPointer( 0, pReqCtx ); 
+    if( SUCCEEDED( ret ) )
+    {
+        stdstr strPath;
+        CCfgOpener oReqCtx( pReqCtx );
+        oReqCtx.GetStrProp(
+            propRouterPtr, strPath );
+        if( strRtPath != strPath )
+            return false;
+
+        DMsgPtr pMsg;
+        ret = oReqCall.GetMsgPtr( 1, pMsg );
+        if( ERROR( ret ) )
+            return false;
+
+        strDest2 = pMsg.GetDestination();
+        if( strDest2 != strDest )
+            return false;
+
+        return true;
+    }
+    return false;
+}
+
+gint32 CIfParallelTaskGrpRfc::ClearPendingsInternal(
+    const stdstr& strName, const stdstr& strVal2,
+    gint32 iRet, PCHECKMSG pCheck )
+{
+    gint32 ret = 0;
+    do{
+        CHECK_GRP_STATE;
+
+        CCfgOpener oCfg(
+            ( IConfigDb* )GetConfig() );
+
+        ObjPtr pObj;
+        ret = oCfg.GetObjPtr( propIfPtr, pObj );
+        if( ERROR( ret ) )
+            break;
+
+        CInterfaceServer* pSvr = pObj;
+
+        std::deque< TASK_ELEM > queToClear;
+        std::deque< TaskletPtr > queToKeep;
+
+        do{
+            SetNoSched( true );
+            std::deque< TaskletPtr >
+                quePendings = m_quePendingTasks;
+
+            m_quePendingTasks.clear();
+            oTaskLock.Unlock();
+
+            while( quePendings.size() > 0 )
+            {
+                TaskletPtr pTask =
+                    quePendings.front();
+
+                quePendings.pop_front();
+                CIfInvokeMethodTask* pInv = pTask;
+                if( pInv == nullptr )
+                {
+                    queToKeep.push_back( pTask );
+                    continue;
+                }
+
+                DMsgPtr pMsg;
+                CCfgOpenerObj oTaskCfg( pInv );
+                ret = oTaskCfg.GetMsgPtr(
+                    propMsgPtr, pMsg );
+                if( ERROR( ret ) )
+                {
+                    queToKeep.push_back( pTask );
+                    continue;
+                }
+                if( pCheck( pMsg, strName, strVal2 ) )
+                {
+                    queToClear.push_back(
+                        TASK_ELEM( pTask, pMsg ) );
+                }
+                else
+                {
+                    queToKeep.push_back( pTask );
+                }
+            }
+            oTaskLock.lock();
+            SetNoSched( false );
+         
+        }while( !m_quePendingTasks.empty() )
+
+        m_quePendingTasks = queToKeep;
+        oTaskLock.Unlock();
+
+        CParamList oResp;
+        oResp[ propReturnValue ] = ( guint32 )iRet;
+        for( auto elem : queToClear )
+        {
+            DMsgPtr& pMsg = elem.second;
+            TaskletPtr& pTask = elem.first;
+            ret = pMsg->GetObjArgAt( 0, pObj );
+            if( ERROR( ret ) )
+            {
+                ( *pTask )( eventTaskComp,
+                    iRet, 0, nullptr );
+                continue;
+            }
+            CCfgOpener oReqCtx(
+                ( IConfigDb* )pObj );
+
+            bool bNoReply;
+            ret = oReqCtx.GetIntProp(
+                propNoReply, bNoReply );
+            if( ERROR( ret ) )
+                bNoReply = false;
+
+            if( !bNoReply )
+            {
+                pSvr->OnServiceComplete(
+                    oResp.GetCfg(), pTask );
+            }
+            else
+            {
+                ( *pTask )( eventTaskComp,
+                    iRet, 0, nullptr );
+            }
+        }
+        break;
+
+    }while( 1 );
+
+    return ret;
+}
+
+gint32 CIfParallelTaskGrpRfc::ClearPendingsProxyInternal(
+    const stdstr& strRtPath,
+    const stdstr& strVal2,
+    gint32 iRet, PCHECKREQ pCheck )
+{
+    gint32 ret = 0;
+    do{
+        CHECK_GRP_STATE;
+
+        CCfgOpener oCfg(
+            ( IConfigDb* )GetConfig() );
+
+        ObjPtr pObj;
+        ret = oCfg.GetObjPtr( propIfPtr, pObj );
+        if( ERROR( ret ) )
+            break;
+
+        CRpcServices* pIf = pObj;
+
+        std::deque< TaskletPtr > queToClear;
+        std::deque< TaskletPtr > queToKeep;
+
+        do{
+            SetNoSched( true );
+            std::deque< TaskletPtr >
+                quePendings = m_quePendingTasks;
+
+            m_quePendingTasks.clear();
+            oTaskLock.Unlock();
+
+            while( quePendings.size() > 0 )
+            {
+                TaskletPtr pTask =
+                    quePendings.front();
+
+                quePendings.pop_front();
+                CIfIoReqTask* pIoReq = pTask;
+                if( pIoReq == nullptr )
+                {
+                    queToKeep.push_back( pTask );
+                    continue;
+                }
+
+                DMsgPtr pMsg;
+                CCfgOpenerObj oTaskCfg( pIoReq );
+                CfgPtr pReqCall = nullptr;
+                ret = pIoReq->GetReqCall( pReqCall );
+                if( ERROR( ret ) )
+                {
+                    queToKeep.push_back( pTask );
+                    continue;
+                }
+
+                if( pCheck( pReqCall, strRtPath, strVal2 ) )
+                    queToClear.push_back( pTask );
+                else
+                    queToKeep.push_back( pTask );
+            }
+
+            oTaskLock.lock();
+            SetNoSched( false );
+         
+        }while( !m_quePendingTasks.empty() )
+
+        m_quePendingTasks = queToKeep;
+        oTaskLock.Unlock();
+
+        for( auto elem : queToClear )
+        {
+            elem->OnEvent(
+                eventCancelTask, iRet, 0, 0 );
+        }
+
+        break;
+
+    }while( 1 );
+
+    return ret;
+}
+
+gint32 CIfParallelTaskGrpRfc::ClearPendingsByUniqName(
+    const stdstr& strUniqName, gint32 iRet )
+{
+    return ClearPendingsInternal(
+        strUniqName, "", iRet,
+        &CIfParallelTaskGrpRfc::CheckUniqName );
+}
+
+gint32 CIfParallelTaskGrpRfc::ClearPendingsByRtPath(
+    const stdstr& strRouterPath, gint32 iRet )
+{
+    return ClearPendingsInternal(
+        strRouterPath, "", iRet,
+        &CIfParallelTaskGrpRfc::CheckRouterPath );
+}
+
+gint32 CIfParallelTaskGrpRfc::ClearPendingsByDestAddrSvr(
+    const stdstr& strRouterPath,
+    const stdstr& strDest,
+    gint32 iRet )
+{
+
+    return ClearPendingsInternal(
+        strRouterPath, strDest, iRet,
+        &CIfParallelTaskGrpRfc::CheckDestAddr );
+}
+
+gint32 CIfParallelTaskGrpRfc::ClearPendingsByRtPathProxy(
+    const stdstr& strRouterPath, gint32 iRet )
+{
+    return ClearPendingsProxyInternal(
+        strRouterPath, "", iRet,
+        &CIfParallelTaskGrpRfc::CheckRouterPathProxy );
+}
+
+gint32 CIfParallelTaskGrpRfc::ClearPendingsByDestAddrProxy(
+    const stdstr& strRouterPath,
+    const stdstr& strDest,
+    gint32 iRet )
+{
+    return ClearPendingsProxyInternal(
+        strRouterPath, strDest, iRet,
+        &CIfParallelTaskGrpRfc::CheckDestAddrProxy );
+}
+
+gint32 gen_sess_hash(
+    BufPtr& pBuf,
+    std::string& strSess )
+{
+    BufPtr pTemp( true );
+    pTemp->Resize( 20 );
+    SHA1 sha;
+    sha.Input( pBuf->ptr(), pBuf->size());
+    if( !sha.Result( ( guint32* )pTemp->ptr() ) )
+        return ERROR_FAIL;
+
+    gint32 ret = BytesToString(
+        ( guint8* )pTemp->ptr(),
+        pTemp->size(), strSess );
+
+    return ret;
+}
+
+gint32 AppendConnParams(
+    IConfigDb* pConnParams,
+    BufPtr& pBuf )
+{
+    if( pConnParams == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    if( pBuf.IsEmpty() )
+    {
+        ret = pBuf.NewObj();
+        if( ERROR( ret ) )
+            return ret;
+    }
+
+    do{
+        CConnParams oConn( pConnParams );
+        std::string strDestIp =
+            oConn.GetDestIpAddr();
+
+        std::string strSrcIp =
+            oConn.GetSrcIpAddr();
+
+        guint32 dwDestPort =
+            oConn.GetDestPortNum();
+
+        guint32 dwSrcPort =
+            oConn.GetSrcPortNum();
+
+        ret = pBuf->Append( strDestIp.c_str(),
+            strDestIp.size() );
+        if( ERROR( ret ) )
+            break;
+
+        ret = pBuf->Append(
+            ( guint8* )&dwDestPort,
+            sizeof( dwDestPort ) );
+        if( ERROR( ret ) )
+            break;
+
+        ret = pBuf->Append( strSrcIp.c_str(),
+            strSrcIp.size() );
+        if( ERROR( ret ) )
+            break;
+
+        ret = pBuf->Append(
+            ( guint8* )&dwSrcPort,
+            sizeof( dwSrcPort ) );
+
+        if( ERROR( ret ) )
+            break;
+
+#ifdef DEBUG
+        if( true )
+        {
+            std::string strDump;
+            gint32 iRet = BytesToString(
+                ( guint8* )pBuf->ptr(),
+                pBuf->size(), strDump );
+
+            if( ERROR( iRet ) )
+                break;
+
+            DebugPrint( 0, "buf to hash: \n",
+               strDump.c_str() );
+        }
+#endif
+            
+    }while( 0 );
+        
+    return ret;
 }
 
 }
