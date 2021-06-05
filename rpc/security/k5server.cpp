@@ -821,7 +821,16 @@ gint32 CK5AuthServer::GenSessHash(
         pBuf->Append( ( char* )&qwSalt,
             sizeof( qwSalt ) );
 
-        ret = gen_sess_hash( pBuf, strSess );
+        stdstr strRet;
+        ret = gen_sess_hash( pBuf, strRet );
+        if( ERROR( ret ) )
+            break;
+
+        strSess = "AU";
+        strSess += strSess;
+
+        DebugPrint( 0, "Sess hash is %s",
+            strSess.c_str() );
 
     }while( 0 );
 

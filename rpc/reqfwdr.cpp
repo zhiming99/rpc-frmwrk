@@ -980,6 +980,9 @@ gint32 CRpcReqForwarder::OpenRemotePortInternal(
             ret = AddRefCount( dwPortId,
                 strSrcUniqName, strSender );
 
+            if( ERROR( ret ) )
+                break;
+
             if( strRouterPath == "/" )
             {
                 oResp[ propConnHandle ] = dwPortId;
@@ -1111,6 +1114,29 @@ gint32 CRpcReqForwarder::DecRefCount(
             ( GetParent() );
     return pRouter->DecRefCount( dwPortId,
         strSrcUniqName, strSrcDBusName );
+}
+
+// for local client offline
+gint32 CRpcReqForwarder::GetRefCountBySrcDBusName(
+    const std::string& strSrcName )
+{
+    CRpcRouterReqFwdr* pRouter =
+        static_cast< CRpcRouterReqFwdr* >
+            ( GetParent() );
+    return pRouter->GetRefCountBySrcDBusName(
+        strUniqName );
+}
+
+// for local client offline
+gint32 CRpcReqForwarder::ClearRefCountBySrcDBusName(
+    const std::string& strSrcName,
+    std::set< guint32 >& setPortIds )
+{
+    CRpcRouterReqFwdr* pRouter =
+        static_cast< CRpcRouterReqFwdr* >
+            ( GetParent() );
+    return pRouter->ClearRefCountBySrcDBusName(
+        strUniqName, setPortIds );
 }
 
 // for local client offline
@@ -1852,21 +1878,21 @@ gint32 CRegisteredObject::IsMyMatch(
     IMessageMatch* pMatch )
 {
     gint32 ret = 0;
+    if( pMatch == nullptr )
+        return -EINVAL;
+
     do{
         CCfgOpener oCfg( this );
+        const IConfigDb* pCfg =
+            pMatch->GetCfg();
 
         ret = oCfg.IsEqualProp(
-            propPrxyPortId, pMatch );
+            propPrxyPortId, pCfg );
         if( ERROR( ret ) )
             break;
 
         ret = oCfg.IsEqualProp(
-            propSrcUniqName, pMatch );
-        if( ERROR( ret ) )
-            break;
-
-        ret = oCfg.IsEqualProp(
-            propSrcDBusName, pMatch );
+            propSrcUniqName, pCfg );
         if( ERROR( ret ) )
             break;
 
@@ -1913,26 +1939,6 @@ bool CRegisteredObject::operator<(
 
         ret = oCfg2.GetStrProp(
             propSrcUniqName, strVal2 );
-        if( ERROR( ret ) )
-            break;
-
-        if( strVal < strVal2 )
-            break;
-
-        if( strVal2 < strVal )
-        {
-            ret = ERROR_FALSE;
-            break;
-        }
-
-        ret = oCfg.GetStrProp(
-            propSrcDBusName, strVal );
-        if( ERROR( ret ) )
-            break;
-
-        ret = oCfg2.GetStrProp(
-            propSrcDBusName, strVal2 );
-
         if( ERROR( ret ) )
             break;
 
@@ -2049,10 +2055,23 @@ gint32 CReqFwdrForwardRequestTask::OnTaskComplete(
     gint32 iRetVal )
 {
     gint32 ret = 0;
-    if( iRetVal == ERROR_QUEUE_FULL )
-        return OnTaskCompleteRfc( iRetVal );
 
-    // DebugPrint( 0, "probe: ForwardRequestTask complete" );
+    TaskletPtr pIoTask;
+    GetCallerTask( pIoTask );
+
+    if( IsPending() && iRetVal == ERROR_QUEUE_FULL )
+    {
+        if( !pIoTask.IsEmpty() )
+        {
+            ret = OnTaskCompleteRfc( iRetVal );
+            if( ret == STATUS_PENDING )
+                return ret;
+        }
+        // well, the bridge proxy's local queue is
+        // full, fall through to forward the error
+        // to reqfwdr
+    }
+
     do{
         ObjPtr pObj;
         CCfgOpener oCfg(
@@ -2064,20 +2083,12 @@ gint32 CReqFwdrForwardRequestTask::OnTaskComplete(
             break;
 
         // test if the request has reponse to send
+        bool bNoReply = false;
         CCfgOpener oReqCtx( pReqCtx );
-        IConfigDb* pOrigReq = nullptr;
         ret = oReqCtx.GetPointer(
-            propReqPtr, pOrigReq );
-        if( SUCCEEDED( ret ) )
-        {
-            guint32 dwFlags = 0;
-            CReqOpener oOrigReq( pOrigReq );
-            ret = oOrigReq.GetCallFlags( dwFlags );
-            oReqCtx.RemoveProperty( propReqPtr );
-            if( SUCCEEDED( ret ) &&
-                !( dwFlags & CF_WITH_REPLY ) )
-                break;
-        }
+            propNoReply, bNoReply )
+        if( SUCCEEDED( ret ) && bNoReply )
+            break;
 
         ret = oCfg.GetObjPtr( propIfPtr, pObj );
         if( ERROR( ret ) )
@@ -2090,12 +2101,10 @@ gint32 CReqFwdrForwardRequestTask::OnTaskComplete(
             break;
         }
 
-        TaskletPtr pCallerTask;
-        ret = GetCallerTask( pCallerTask );
-        if( SUCCEEDED( ret ) )
+        if( !pIoTask.IsEmpty() )
         {
-            CCfgOpenerObj oRespCfg(
-                ( CObjBase* )pCallerTask );
+            CCfgOpener oRespCfg( ( IConfigDb* )
+                pIoTask->GetConfig() );
 
             ret = oRespCfg.GetObjPtr(
                 propRespPtr, pObj );
@@ -2152,6 +2161,56 @@ gint32 CReqFwdrForwardRequestTask::OnTaskComplete(
     return iRetVal;
 }
 
+gint32 CReqFwdrForwardRequestTask::CloneIoTask(
+    TaskletPtr& pIoTask )
+{
+    gint32 ret = 0;
+    vector< LONGWORD > vecParams;
+    do{
+        ret = GetParamList( vecParams );
+        if( ERROR( ret ) )
+            break;
+
+        CObjBase* pObj = reinterpret_cast
+            < CObjBase* >( vecParams[ 3 ] );
+
+        if( unlikely( pObj == nullptr ) )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        CIfIoReqTask* pIoReq = ObjPtr( pObj );
+        if( unlikely( pIoReq == nullptr ) )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        // we are within this task's lock, free to
+        // use its member.
+        IConfigDb* pIoCfg = pIoReq->GetConfig();
+        CParamList oNewReq;
+        oNewReq.CopyProp( propIfPtr, pIoCfg );
+        oNewReq.CopyProp( propReqPtr, pIoCfg );
+        oNewReq.CopyProp( propRespPtr, pIoCfg );
+        oNewReq.CopyProp( propTaskId, pIoCfg );
+
+        ret = pIoTask.NewObj(
+            clsid( CIfIoReqTask ),
+            oNewReq.GetCfg() );
+
+        if( ERROR( ret ) )
+            break;
+
+        CIfIoReqTask* pTask = pIoTask;
+        pTask->SetClientNotify( this );
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CReqFwdrForwardRequestTask::OnTaskCompleteRfc(
     gint32 iRetVal )
 {
@@ -2169,18 +2228,22 @@ gint32 CReqFwdrForwardRequestTask::OnTaskCompleteRfc(
         if( !pProxy->IsRfcEnabled() )
             break;
 
-        ret = pProxy->RequeueTask( pTask ); 
+        ret = CloneIoTask( pTask );
         if( ERROR( ret ) )
             break;
+
+        // insert this task back to the pending
+        // queue
+        ret = pProxy->RequeueTask( pTask ); 
+        if( ERROR( ret ) )
+        {
+            ( *pTask )( eventCancelTask );
+            break;
+        }
 
         ret = STATUS_PENDING;
 
     }while( 0 );
-
-    if( ERROR( ret ) && !pTask.IsEmpty() )
-    {
-        ret = iRetVal;
-    }
 
     return ret;
 }
@@ -3320,7 +3383,10 @@ gint32 CRpcReqForwarderProxy::BuildNewMsgToFwrd(
         // append a session hash for access
         // control
         CCfgOpener oReqCtx;
-        oReqCtx.CopyProp( propRouterPath, pReqCtx );
+
+        oReqCtx.CopyProp(
+            propRouterPath, propPath2, pReqCtx );
+
         oReqCtx.CopyProp( propSessHash, pReqCtx );
         oReqCtx.CopyProp( propTimestamp, pReqCtx );
 

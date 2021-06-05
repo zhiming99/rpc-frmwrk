@@ -236,15 +236,28 @@ gint32 CRpcBaseOperations::AddPortProps()
         if( SUCCEEDED( ret ) )
         {
             CInterfaceState* pStat = m_pIfStat;
-            if( pStat->exist( propSrcDBusName ) )
-                return 0;
-            // Now the proxy will have a valid sender
-            // name. And on server side, the
-            // propSrcDBusName should be obtained from
-            // the server name and the object name
-            ret = this->SetProperty(
-                propSrcDBusName, *pBuf );
+            if( !pStat->exist( propSrcDBusName ) )
+            {
+                // Now the proxy will have a valid
+                // sender name. And on server
+                // side, the propSrcDBusName
+                // should be obtained from the
+                // server name and the object name
+                ret = this->SetProperty(
+                    propSrcDBusName, *pBuf );
+            }
         }
+        pBuf->Resize( 0 );
+        ret = GetIoMgr()->GetPortProp(
+            GetPortHandle(),
+            propSrcUniqName,
+            pBuf );
+        if( SUCCEEDED( ret ) )
+        {
+            ret = this->SetProperty(
+                propSrcUniqName, *pBuf );
+        }
+
     }
     return ret;
 }
