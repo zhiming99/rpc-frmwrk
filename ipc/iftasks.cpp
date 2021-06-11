@@ -939,7 +939,6 @@ TaskletPtr CIfRetryTask::GetFwrdTask() const
 {
     CStdRTMutex oTaskLock( GetLock() );
     TaskletPtr pTask = m_pFwdrTask;
-    ClearFwrdTask( pTask );
     return pTask;
 }
 

@@ -448,6 +448,22 @@ class CStlIntMap
 
 typedef CAutoPtr< clsid( CStlIntMap ), CStlIntMap > IntMapPtr;
 
+class CStlObjMap
+    : public CStlMap< ObjPtr, QwVecPtr > 
+{
+ 
+    public:
+    typedef CStlMap< guint32, guint32 > super;
+
+    CStlObjMap()
+        : CStlMap< guint32, guint32>()
+    {
+        SetClassId( clsid( CStlObjMap ) );
+    }
+};
+
+typedef CAutoPtr< clsid( CStlObjMap ), CStlObjMap > ObjMapPtr;
+
 class CStlEventMap:
     public CStlMap< EventPtr, gint32 > 
 {

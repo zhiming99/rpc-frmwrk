@@ -96,7 +96,7 @@ gint32 CRpcTcpBridgeProxy::InitUserFuncs()
 
     BEGIN_IFPROXY_MAP( CRpcTcpBridge, false );
 
-    ADD_PROXY_METHOD_EX( 1,
+    ADD_PROXY_METHOD_EX( 2,
         CRpcTcpBridgeProxy::ClearRemoteEvents,
         SYS_METHOD_CLEARRMTEVTS );
 
@@ -357,6 +357,7 @@ gint32 CRpcTcpBridgeProxy::DoStartHandshake(
 
 gint32 CRpcTcpBridgeProxy::ClearRemoteEvents(
     ObjPtr& pVecMatches,
+    ObjPtr& pVecTaskIds,
     IEventSink* pCallback )
 {
     // NOTE: pCallback is not an output parameter
@@ -399,7 +400,7 @@ gint32 CRpcTcpBridgeProxy::ClearRemoteEvents(
 
         ret = AsyncCall( pCallback,
             oOptions.GetCfg(), oResp.GetCfg(),
-            __func__, pVecMatches );
+            __func__, pVecMatches, pVecTaskIds );
 
         if( ret == STATUS_PENDING )
             break;
@@ -736,6 +737,9 @@ gint32 CRpcTcpBridgeProxy::ForwardRequest(
         if( pRouter->HasBridge() )
             bRelay = true;
 
+        oReqCtx.CopyProp(
+            propTaskId, pReqCtx );
+
         guint32 dwAge = 0;
         if( !bRelay )
         {
@@ -767,6 +771,7 @@ gint32 CRpcTcpBridgeProxy::ForwardRequest(
             oReqCtx.CopyProp(
                 propPath2, strPath );
         }
+
 
         // just to conform to the rule
         oBuilder.Push( ( IConfigDb* )
@@ -1994,8 +1999,10 @@ gint32 CRpcTcpBridgeProxy::AddAndRun(
         CIfParallelTaskGrpRfc* pGrpRfc =
             m_pGrpRfc;
 
-        if( pGrpRfc != nullptr )
-            return pGrpRfc->AddAndRun( pTask );
+        if( pGrpRfc == nullptr )
+            return -EFAULT;
+
+        return pGrpRfc->AddAndRun( pTask );
 
     }while( 0 );
 
@@ -2204,6 +2211,364 @@ CRpcTcpBridge::~CRpcTcpBridge()
 {
 }
 
+gint32 CRpcTcpBridge::FindFwrdReqsAll(
+    FWRDREQS& vecTasks, bool bTaskId )
+{
+    gint32 ret = 0;
+    do{
+        std::vector< TaskletPtr > vecInvTasks;
+        TaskletPtr pGrp;
+        if( IsRfcEnabled() )
+        {
+            pGrp = m_pGrpRfc;
+        }
+        else
+        {
+            ret = GetParallelGrp( pGrp );
+            if( ERROR( ret ) )
+                break;
+        }
+
+        ret = pGrp->FindTaskByClsid(
+            clsid( CIfInvokeMethodTask ),
+            vecInvTasks );
+
+        if( ERROR( ret ) || vecInvTasks.empty() )
+            break;
+        
+        for( auto elem : vecInvTasks )
+        {
+            CCfgOpenerObj oInv( pInv );
+            DMsgPtr pMsg;
+            ret = oInv.GetMsgPtr(
+                propMsgPtr, pMsg );
+            if( ERROR( ret ) )
+                continue;
+
+            if( pMsg.GetMember() != 
+                SYS_METHOD_FORWARDREQ )
+                continue;
+
+            guint64 qwTid = 0;
+            if( bTaskId )
+            {
+                ret = RetrieveTaskId( elem, qwTid );
+                if( ERROR( ret ) )
+                    continue;
+            }
+            vecTasks.push_back(
+                { elem , qwTid } );
+        }
+
+        ret = 0;
+        if( vecTasks.empty() )
+            ret = -ENOENT;
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CRpcTcpBridge::FindFwrdReqsByPrxyPortId(
+    guint32 dwPrxyPortId,
+    FWRDREQS& vecTasks )
+{
+    gint32 ret = 0;
+    do{
+        FWRDREQS vecTasksAll;
+        ret = FindFwrdReqsAll(
+            vecTasksAll, false );
+        if( ERROR( ret ) )
+            break;
+        
+        CRpcRouterBridge* pRouter =
+            static_cast< CRpcRouterBridge* >
+                ( GetParent() );
+
+        for( auto elem : vecTasksAll )
+        {
+            CCfgOpenerObj oInv(
+                ( CObjBase* )elem.first );
+
+            DMsgPtr pMsg;
+            ret = oInv.GetMsgPtr(
+                propMsgPtr, pMsg );
+            if( ERROR( ret ) )
+                continue;
+
+            ObjPtr pObj;
+            ret = pMsg.GetObjArgAt( 0, pObj );
+            if( ERROR( ret ) )
+                continue;
+
+            CCfgOpener oReqCtx(
+                ( IConfigDb* )pObj );
+
+            stdstr strPath, strNode;
+            ret = oReqCtx->GetStrProp(
+                propRouterPath, strPath );
+            if( ERROR( ret ) )
+                continue;
+
+            ret = pRouter->GetNodeName(
+                strPath, strNode );
+            if( ERROR( ret ) )
+                continue;
+
+            guint32 dwPortId = 0;
+            ret = pRouter->GetProxyIdByNodeName(
+                strNode, dwPortId );
+            if( ERROR( ret ) )
+                continue;
+
+            if( dwPortId != dwPrxyPortId )
+                continue;
+
+            vecTasks.push_back( elem );
+        }
+
+        ret = 0;
+        if( vecTasks.empty() )
+            ret = -ENOENT;
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+        vecTasks.clear();
+
+    return ret;
+}
+
+gint32 CRpcInterfaceServer::RetrieveTaskId(
+    IEventSink* pCallback,
+    guint64& qwTaskId ) const
+{
+    if( pCallback == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    CIfInvokeMethodTask* pInv =
+        static_cast< CIfInvokeMethodTask* >
+            ( pCallback );
+    do{
+        EnumTaskState iState =
+            pInv->GetTaskState();
+        if( iState == stateStarted )
+        {
+            IConfigDb* pReq = nullptr;
+            ret = oInv.GetPointer(
+                propReqPtr, pReq );
+            if( ERROR( ret ) )
+                break;
+
+            guint64 qwTaskId = 0;
+            CCfgOpener oReq( pReq );
+            ret = oReq.GetQwordProp(
+                propTaskId, qwTaskId );
+            break;
+        }
+
+        if( iState != stateStarting )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+        
+        DMsgPtr pMsg;
+        CCfgOpenerObj oInv( pInv );
+        ret = oInv.GetMsgPtr(
+            propMsgPtr, pMsg );
+        if( ERROR( ret ) )
+            break;
+
+        ObjPtr pObj;
+        CRpcRouter* pRouter = GetParent();
+        if( pRouter->HasBridge() )
+            ret = pMsg.GetObjArgAt( 0, pObj );
+        else
+            ret = pMsg.GetObjArgAt( 1, pObj );
+
+        if( ERROR( ret ) )
+            break;
+        
+        CCfgOpener oReqCtx( ( IConfigDb* )pObj );
+        ret = oReqCtx.GetQwordProp(
+            propTaskId, qwTaskId );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CRpcTcpBridge::FindFwrdReqsByTaskId(
+    std::vector< guint64 >& vecTaskIds,
+    FWRDREQS& vecTasks )
+{
+    gint32 ret = 0;
+    do{
+        FWRDREQS vecInvTasks;
+        ret = FindFwrdReqsAll( vecInvTasks );
+        if( ERROR( ret ) )
+            break;
+        
+        for( auto elem : vecInvTasks )
+        {
+            CCfgOpenerObj oInv(
+                ( CObjBase* )elem.first );
+
+            CIfInvokeMethodTask* pInv =
+                elem.first;
+
+            guin64 qwTid = elem.second;
+            std::vector< guint64 >::iterator 
+            itr = std::find( vecTaskIds.begin(),
+                vecTaskIds.end(), qwTid );
+
+            if( itr == vecTaskIds.end() )
+                continue;
+
+            vecTasks.push_back( elem );
+        }
+
+        ret = 0;
+        if( vecTasks.empty() )
+            ret = -ENOENT;
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+        vecTasks.clear();
+
+    return ret;
+}
+
+gint32 CRpcTcpBridge::FindFwrdReqsByPath(
+    const stdstr& strPath,
+    FWRDREQS& vecTasks )
+{
+    gint32 ret = 0;
+    do{
+        FWRDREQS vecTasksAll;
+        ret = FindFwrdReqsAll(
+            vecTasksAll, false );
+        if( ERROR( ret ) )
+            break;
+        
+        CRpcRouterBridge* pRouter =
+            static_cast< CRpcRouterBridge* >
+                ( GetParent() );
+
+        for( auto elem : vecTasksAll )
+        {
+            CCfgOpenerObj oInv(
+                ( CObjBase* )elem.first );
+
+            DMsgPtr pMsg;
+            ret = oInv.GetMsgPtr(
+                propMsgPtr, pMsg );
+            if( ERROR( ret ) )
+                continue;
+
+            ObjPtr pObj;
+            ret = pMsg.GetObjArgAt( 0, pObj );
+            if( ERROR( ret ) )
+                continue;
+
+            CCfgOpener oReqCtx(
+                ( IConfigDb* )pObj );
+
+            stdstr strFullPath;
+            ret = oReqCtx->GetStrProp(
+                propRouterPath, strFullPath );
+            if( ERROR( ret ) )
+                continue;
+
+            ret = IsMidwayPath(
+                strPath, strFullPath );
+            if( ERROR( ret ) )
+                continue;
+
+            vecTasks.push_back( elem );
+        }
+
+        ret = 0;
+        if( vecTasks.empty() )
+            ret = -ENOENT;
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+        vecTasks.clear();
+
+    return ret;
+}
+
+gint32 CRpcTcpBridge::FindFwrdReqsByDestAddr(
+    const stdstr& strPath,
+    const stdstr& strDest,
+    FWRDREQS& vecTasks )
+{
+    gint32 ret = 0;
+    do{
+        FWRDREQS vecTasksAll;
+        ret = FindFwrdReqsAll(
+            vecTasksAll, false );
+        if( ERROR( ret ) )
+            break;
+        
+        CRpcRouterBridge* pRouter =
+            static_cast< CRpcRouterBridge* >
+                ( GetParent() );
+
+        for( auto elem : vecTasksAll )
+        {
+            CCfgOpenerObj oInv(
+                ( CObjBase* )elem.first );
+
+            DMsgPtr pMsg;
+            ret = oInv.GetMsgPtr(
+                propMsgPtr, pMsg );
+            if( ERROR( ret ) )
+                continue;
+
+            ObjPtr pObj;
+            ret = pMsg.GetObjArgAt( 0, pObj );
+            if( ERROR( ret ) )
+                continue;
+
+            CCfgOpener oReqCtx(
+                ( IConfigDb* )pObj );
+
+            stdstr strFullPath;
+            ret = oReqCtx->GetStrProp(
+                propRouterPath, strFullPath );
+            if( ERROR( ret ) )
+                continue;
+
+            if( strPath != strFullPath );
+                continue;
+
+            stdstr strDestInv =
+                pMsg->GetDestination();
+
+            if( strDestInv != strDest )
+                continue;
+
+            vecTasks.push_back( elem );
+        }
+
+        ret = 0;
+        if( vecTasks.empty() )
+            ret = -ENOENT;
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+        vecTasks.clear();
+
+    return ret;
+}
+
 gint32 CRpcTcpBridge::ClearRemoteEventsLocal(
     IEventSink* pCallback,
     ObjPtr& pvecMatches )
@@ -2327,17 +2692,21 @@ gint32 CRpcTcpBridge::OnClearRemoteEventsComplete(
 }
 
 gint32 CRpcTcpBridge::ClearRemoteEvents(
-    IEventSink* pCallback, ObjPtr& pVecMatchesAll )
+    IEventSink* pCallback,
+    ObjPtr& pVecMatchesAll,
+    ObjPtr& pVecTaskIds )
 {
-    if( unlikely( pVecMatchesAll.IsEmpty() ||
-        pCallback == nullptr ) )
+    if( unlikely( pCallback == nullptr ) )
         return -EINVAL;
 
     ObjVecPtr pMatches( pVecMatchesAll );
-    if( unlikely( pMatches.IsEmpty() ) )
+    QwVecPtr pTaskIdsIn( pVecTaskIds );
+    if( unlikely( pMatches.IsEmpty() &&
+        pTaskIdsIn.IsEmpty() ) )
         return -EINVAL;
 
-    if( unlikely( ( *pMatches )().size() == 0 ) )
+    if( unlikely( ( *pMatches )().size() == 0 &&
+        ( *pTaskIdsIn )().size() == 0 ) )
         return -EINVAL;
 
     if( unlikely( !IsConnected() ) )
@@ -2355,11 +2724,11 @@ gint32 CRpcTcpBridge::ClearRemoteEvents(
         std::vector< ObjPtr >& vecMatchesAll =
             ( *pMatches )();
 
-        ObjVecPtr pvecMatches( true );
+        ObjVecPtr pvecMatchesLoc( true );
         ObjVecPtr pvecMatchesMH( true );
 
-        std::vector< ObjPtr >& vecMatches =
-            ( *pvecMatches )();
+        std::vector< ObjPtr >& vecMatchesLoc =
+            ( *pvecMatchesLoc )();
 
         std::vector< ObjPtr >& vecMatchesMH =
             ( *pvecMatchesMH )();
@@ -2378,24 +2747,9 @@ gint32 CRpcTcpBridge::ClearRemoteEvents(
                 continue;
 
             if( strPath == "/" )
-                vecMatches.push_back( elem );
+                vecMatchesLoc.push_back( elem );
             else
                 vecMatchesMH.push_back( elem );
-        }
-
-        if( vecMatchesMH.empty() )
-        {
-            ObjPtr pParam( pvecMatches );
-            ret = ClearRemoteEventsLocal(
-                pCallback, pParam );
-            break;
-        }
-        else if( vecMatches.empty() )
-        {
-            ObjPtr pParam( pvecMatchesMH );
-            ret = pRouter->ClearRemoteEventsMH(
-                pCallback, pParam, false );
-            break;
         }
 
         CParamList oParams;
@@ -2407,6 +2761,62 @@ gint32 CRpcTcpBridge::ClearRemoteEvents(
 
         if( ERROR( ret ) )
             break;
+
+        FWRDREQS vecTaskKill;
+        QwVecPtr pvecTaskIds = pTaskIdsIn;
+        FindFwrdReqsByTaskId(
+            ( *pvecTaskIds )(), vecTaskKill );
+
+        ObjMapPtr pmapTaskIdsMH( true );
+        ObjMapPtr pmapTaskIdsLoc( true );
+        std::map< InterfPtr, QwVecPtr >&
+            mapTasksLoc = ( *pmapTaskIdsLoc )();
+
+        GetFwrdReqs( vecTaskKill,
+            pmapTaskIdsLoc, pmapTaskIdsLoc );
+
+        ObjVecPtr pvecTasks( true );
+        FWRDREQS_ITER itr = vecTaskKill.begin();
+        while( itr != vecTaskKill.end() )
+        {
+            ( *pvecTasks )().push_back( elem.first );
+            ++itr;
+        }
+
+        // cancel all affected tasks locally
+        if( ( *pvecTasks )().size() > 0 )
+             CancelInvTasks( pvecTasks );
+
+        for( auto elem : mapTasksLoc )
+        {
+            TaskletPtr pTask;
+            guint64 qwTaskId = 0;
+            ret = DEFER_IFCALLEX_NOSCHED2(
+                2, pTask, ObjPtr( elem.first ),
+                CRpcReqForwarderProxy::ForceCancelRequests,
+                ObjPtr( elem.second ),
+                qwTaskId, nullptr );
+            if( ERROR( ret ) )
+                continue;
+            pParaGrp->AppendTask( pTask );
+        }
+
+        if( vecMatchesMH.size() > 0 ||
+            ( *pmapTaskIdsMH )().size() > 0 )
+        {
+            TaskletPtr pClearMH;
+            ret = DEFER_IFCALLEX_NOSCHED2( 
+                0, pClearMH, ObjPtr( pRouter ),
+                &CRpcRouterBridge::ClearRemoteEventsMH,
+                ( IEventSink* )nullptr,
+                ObjPtr( pvecMatchesMH ),
+                ObjPtr( pmapTaskIdsMH ),
+                false );
+
+            if( ERROR( ret ) )
+                break;
+            pParaGrp->AppendTask( pClearMH );
+        }
 
         CCfgOpener oReqCtx;
         oReqCtx[ propReturnValue ] = 0;
@@ -2421,43 +2831,26 @@ gint32 CRpcTcpBridge::ClearRemoteEvents(
 
         pParaGrp->SetClientNotify( pRespCb );
 
-        TaskletPtr pClearLocal, pClearMH;
-        ret = DEFER_IFCALLEX_NOSCHED2(
-            0, pClearLocal, ObjPtr( this ),
-            &CRpcTcpBridge::ClearRemoteEventsLocal,
-            ( IEventSink* )nullptr,
-            ObjPtr( pvecMatches ) );
+        if( vecMatchesLoc.size() > 0 )
+        {
+            TaskletPtr pClearLocal;
+            ret = DEFER_IFCALLEX_NOSCHED2(
+                0, pClearLocal, ObjPtr( this ),
+                &CRpcTcpBridge::ClearRemoteEventsLocal,
+                ( IEventSink* )nullptr,
+                ObjPtr( pvecMatchesLoc ) );
 
-        if( ERROR( ret ) )
-            break;
-
-        pParaGrp->AppendTask( pClearLocal );
-        ret = DEFER_IFCALLEX_NOSCHED2( 
-            0, pClearMH, ObjPtr( pRouter ),
-            &CRpcRouterBridge::ClearRemoteEventsMH,
-            ( IEventSink* )nullptr,
-            ObjPtr( pvecMatchesMH ),
-            false );
-
-        if( ERROR( ret ) )
-            break;
-        pParaGrp->AppendTask( pClearMH );
+            if( ERROR( ret ) )
+                break;
+            pParaGrp->AppendTask( pClearLocal );
+        }
 
         TaskletPtr pParaTask( pParaGrp );
-        pParaGrp->MarkPending();
-        ret = DEFER_CALL( GetIoMgr(), this,
-            &CRpcServices::RunManagedTask,
-            pParaTask, false );
+        CIoManager* pMgr = GetIoMgr();
+        ret = pMgr->RescheduleTask( pParaTask );
 
-        if( ERROR( ret ) )
-        {
-            pParaGrp->MarkPending( false );
-            break;
-        }
-        else if( SUCCEEDED( ret ) )
-        {
+        if( SUCCEEDED( ret ) )
             ret = STATUS_PENDING;
-        }
 
     }while( 0 );
 
@@ -2467,6 +2860,10 @@ gint32 CRpcTcpBridge::ClearRemoteEvents(
             ( *pParaGrp )( eventCancelTask );
         if( !pRespCb.IsEmpty() )
             ( *pRespCb )( eventCancelTask );
+
+        CCfgOpener oResp;
+        oResp[ propReturnValue ] = ret;
+        SetResponse( pCallback, oResp.GetCfg() );
     }
 
     return ret;
@@ -2688,6 +3085,45 @@ gint32 CRpcTcpBridge::CheckReqToRelay(
     return ret;
 }
 
+gint32 CRpcTcpBridge::ClearFwrdReqsByDestAddr(
+    const stdstr strPath, DMsgPtr& pMsg )
+{
+    stdstr strMember = pMsg.GetMember();
+    stdstr strIfName = pMsg.GetInterface();
+
+    if( strMember == "NameOwnerChanged" && 
+        strIfName == DBUS_SYS_INTERFACE )
+    {
+        stdstr strNewOwner;
+        ret = pMsg.GetStrArgAt( 2, strNewOwner );
+        if( ERROR( ret ) )
+            break;
+        if( strNewOwner.size() > 0 )
+        {
+            // an online message
+            ret = -EINVAL;
+            break;
+        }
+
+        stdstr strDest;
+        ret = pMsg.GetStrArgAt( 0, strDest );
+        if( SUCCEEDED( ret ) )
+        {
+            FWRDREQS vecReqs;
+            ret = FindFwrdReqsByDestAddr(
+                strPath, strDest, vecReqs );
+            ObjVecPtr pvecReqs( true );
+            for( auto elem : vecReqs )
+            {
+                ( *pvecReqs )().push_back(
+                    elem.first );
+            }
+            CancelInvTasks( pvecReqs );
+        }
+    }
+    return 0;
+}
+
 gint32 CRpcTcpBridge::ForwardEvent(
     IConfigDb* pEvtCtx,
     DBusMessage* pEvtMsg,
@@ -2713,10 +3149,15 @@ gint32 CRpcTcpBridge::ForwardEvent(
         if( ERROR( ret ) )
             break;
 
+        DMsgPtr pMsg( pEvtMsg );
+
+        ClearFwrdReqsByDestAddr(
+            strRouterPath, pMsg );
+
         oBuilder.Push( ( IConfigDb* )
             oEvtCtx.GetCfg() );
 
-        oBuilder.Push( DMsgPtr( pEvtMsg ) );
+        oBuilder.Push( pMsg );
 
         oBuilder.SetMethodName(
             SYS_EVENT_FORWARDEVT );
@@ -2858,6 +3299,113 @@ gint32 CRpcInterfaceServer::OnKeepAlive(
     return -EINVAL;
 }
 
+gint32 CRpcInterfaceServer::CloneInvTask(
+    IEventSink* pCallback,
+    TaskletPtr& pTask )
+{
+    if( pCallback == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        CParamList oParams;
+        oParams.CopyProp( propIfPtr, pCallback );
+        oParams.CopyProp( propMsgPtr, pCallback );
+        oParams.CopyProp( propMatchPtr, pCallback );
+
+        ret = pTask.NewObj(
+            clsid( CIfInvokeMethodTask ),
+            oParams.GetCfg() );
+        if( ERROR( ret ) )
+            break;
+
+        ret = InstallQFCallback( pTask );
+        if( ERROR( ret ) )
+            break;
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CRpcInterfaceServer::OnFwrdReqQueueFull(
+    IEventSink* pCallback,
+    IEventSink* pIoReq,
+    IConfigDb* pReqCtx )
+{
+    if( pCallback == nullptr ||
+        pIoReq == nullptr ||
+        pReqCtx == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        CCfgOpenerObj oReq( pIoReq );
+        IConfigDb* pResp = nullptr;
+        ret = oReq.GetPointer(
+            propRespPtr, pResp );
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpener oResp( pResp );
+        gint32 iRet = 0;
+        ret = oResp.GetIntProp( propReturnValue,
+            ( guint32& ) iRet );
+
+        if( ERROR( ret ) )
+            break;
+
+        // iRet may have other code than
+        // STATUS_SUCCESS
+        ret = iRet;
+        if( ret != ERROR_QUEUE_FULL )
+            break;
+
+        ret = RequeueInvTask( pCallback );
+        if( ERROR( ret ) )
+            break;
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CRpcInterfaceServer::InstallQFCallback(
+    TaskletPtr& pInvTask )
+{
+    TaskletPtr pTask;
+    ret = NEW_PROXY_RESP_HANDLER2( 
+        pTask, ObjPtr( this ),
+        &CRpcInterfaceServer::OnFwrdReqQueueFull,
+        pInvTask, nullptr );
+
+    return ret;
+}
+
+gint32 CRpcTcpBridge::RequeueInvTask(
+    IEventSink* pCallback )
+{
+    if( !IsRfcEnabled() )
+        return ERROR_STATE;
+
+    TaskletPtr pTask;
+    gint32 ret = CloneInvTask(
+        pCallback, pTask );
+    if( ERROR( ret ) )
+        return ret;
+
+    if( !IsConnected() )
+        return ERROR_STATE;
+
+    ret = m_pGrpRfc->InsertTask( pTask );
+    if( m_pGrpRfc->GetRunningCount() == 0 )
+    {
+        TaskletPtr pTask = ObjPtr( m_pGrpRfc );
+        GetIoMgr()->RescheduleTask( pTask );
+    }
+    return STATUS_SUCCESS;
+}
+
 gint32 CRpcTcpBridge::OnKeepAliveRelay(
     IEventSink* pTask )
 {
@@ -2950,6 +3498,7 @@ gint32 CBridgeForwardRequestTask::RunTask()
     ObjPtr pObj;
     CParamList oParams( GetConfig() );
     DMsgPtr pRespMsg;
+    CRpcRouterBridge* pRouter = nullptr;
 
     do{
         CRpcTcpBridge* pIf;
@@ -2963,7 +3512,6 @@ gint32 CBridgeForwardRequestTask::RunTask()
             break;
         }
 
-        CRpcRouterBridge* pRouter = nullptr;
         ret = oParams.GetPointer(
             propRouterPtr, pRouter );
         if( ERROR( ret ) )
@@ -3023,6 +3571,12 @@ gint32 CBridgeForwardRequestTask::RunTask()
     }while( 0 );
 
     if( ret == STATUS_PENDING )
+        return ret;
+
+    // let QueueFullCallback to handle this
+    // without sending the response
+    if( ret == ERROR_QUEUE_FULL &&
+        pRouter->IsRfcEnabled() )
         return ret;
 
     if( Retriable( ret ) )
@@ -3115,6 +3669,165 @@ gint32 CBridgeForwardRequestTask::ForwardRequestMH(
     return ret;
 }
 
+gint32 CRpcTcpBridge::IsMHTask(
+    TaskletPtr& pTask )
+{
+    gint32 ret = 0;
+    if( pTask.IsEmpty() )
+        return -EINVAL;
+
+    do{
+        CIfInvokeMethodTask* pInv = pTask;
+        if( unlikely( pInv == nullptr ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        CCfgOpenerObj oInvCfg( pInv );
+        DMsgPtr pMsg;
+        ret = oInvCfg.GetMsgPtr(
+            propMsgPtr, pMsg );
+        if( ERROR( ret ) )
+            break;
+
+        ObjPtr pObj;
+        ret = pMsg.GetObjArgAt( 0, pObj );
+        if( ERROR( ret ) )
+            break;
+
+        stdstr strPath;
+        CCfgOpener oReqCtx( ( IConfigDb* )pObj );
+        ret = oReqCtx.GetStrProp(
+            propRouterPath, strPath );
+
+        if( ERROR( ret ) )
+            break;
+
+        if( strPath != "/" )
+        {
+            ret = ERROR_FALSE;
+            break;
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CRpcTcpBridge::GetFwrdReqs(
+    FWRDREQS& vecReqs,
+    ObjMapPtr& pmapTaskIdsLoc,
+    ObjMapPtr& pmapTaskIdsMH )
+{
+    gint32 ret = 0;
+    do{
+        std::map< ObjPtr, QwVecPtr >&
+            mapTasksLoc = ( *pmapTaskIdsLoc )();
+
+        std::map< ObjPtr, QwVecPtr >&
+            mapTasksMH = ( *pmapTaskIdsMH )();
+
+        for( auto elem : vecReqs )
+        {
+            bool bQueued = false;
+            InterfPtr pProxy;
+            ret = GetInvTaskProxyMH(
+                elem.first, pProxy, bQueued );
+            if( ERROR( ret ) )
+            {
+                ret = 0;
+                continue;
+            }
+            if( bQueued )
+                continue;
+
+            ret = IsMHTask( elem.first );
+            if( SUCCEEDED( ret ) )
+            {
+                QwVecPtr& pTaskIds =
+                    mapTasksMH[ pProxy ];
+                if( pTaskIds.IsEmpty() )
+                    pTaskIds.NewObj();
+                ( *pTaskIds )().push_back(
+                    elem.second );
+            }
+            else if( ret == ERROR_FALSE )
+            {
+                QwVecPtr& pTaskIds =
+                    mapTasksLoc[ pProxy ];
+                if( pTaskIds.IsEmpty() )
+                    pTaskIds.NewObj();
+                ( *pTaskIds )().push_back(
+                    elem.second );
+            }
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CRpcTcpBridge::GetAllFwrdReqs(
+    FWRDREQS& vecReqs;
+    ObjMapPtr& pmapTaskIdsLoc,
+    ObjMapPtr& pmapTaskIdsMH )
+{
+    gint32 ret = FindFwrdReqsAll( vecReqs );
+    if( ERROR( ret ) )
+        return ret;
+    return GetFwrdReqs( vecReqs,
+        pmapTaskIdsLoc, pmapTaskIdsMH );
+}
+
+gint32 CRpcTcpBridge::GetInvTaskProxyMH(
+    TaskletPtr& pTask,
+    InterfPtr& pIf,
+    bool bQueued )
+{
+    gint32 ret = 0;
+    if( pTask.IsEmpty() )
+        return -EINVAL;
+    do{
+        CIfInvokeMethodTask* pInv = pTask;
+        if( unlikely( pInv == nullptr ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        TaskletPtr* pIoTask;
+        pInv->GetEndFwrdTask( pIoTask );
+        CIfParallelTask* pEndReq = pIoTask;
+
+        CCfgOpenerObj oIoCfg( pEndReq );
+        EnumTaskState iTaskState =
+            pEndReq->GetTaskState();
+        if( iTaskState == stateStarting )
+        {
+            bQueued = true;   
+            break;
+        }
+        else if( iTaskState == stateStarted )
+        {
+            bQueued = false;
+        }
+        else
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+
+        CRpcServices* pSvc = nullptr;
+        ret = oIoCfg.GetPointer( propIfPtr, pSvc );
+        if( ERROR( ret ) )
+            break;
+
+        pIf = pSvc;
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CRpcTcpBridge::ForwardRequest(
     IConfigDb* pReqCtx,
     DBusMessage* pFwdrMsg,
@@ -3125,6 +3838,19 @@ gint32 CRpcTcpBridge::ForwardRequest(
         pFwdrMsg, pRespMsg, pCallback, false );
 }
 
+/*
+ * pReqCtx contents across network:
+ * propRouterPath: the current router path
+ * propSessHash: the session id
+ * propTimestamp: the request's birth date
+ * propPath2: the client's router path
+ * propNoReply if no-reply is true
+ * propTaskId: the request's uniq-id
+ *
+ * copied after DoInvoke
+ * propReqPtr
+ *
+ */
 gint32 CRpcTcpBridge::ForwardRequestInternal(
     IConfigDb* pReqCtx,
     DBusMessage* pFwdrMsg,
@@ -3404,6 +4130,7 @@ gint32 CRpcInterfaceServer::DoInvoke(
                 CCfgOpener oReqCtx(
                     ( IConfigDb* )pReqCtx );
 
+                oReqCtx.CopyProp( propTaskId, pObj );
                 // for use by the reqfwdrproxy
                 // or tcpbridgeproxy 
                 oReqCtx.SetObjPtr( propReqPtr, pObj );
@@ -3412,7 +4139,6 @@ gint32 CRpcInterfaceServer::DoInvoke(
                 // make sure there is a propReqPtr
                 // for the message filter
                 oTaskCfg.SetObjPtr( propReqPtr, pObj );
-
 
                 DMsgPtr pRespMsg;
                 ret = ForwardRequest( pReqCtx,
@@ -3466,6 +4192,9 @@ gint32 CRpcInterfaceServer::DoInvoke(
                             ( IConfigDb* )pObj, oTaskCfg );
                     }
 
+                    oNewReq.CopyProp(
+                        propTaskId, ( IConfigDb* )pObj );
+
                     oTaskCfg.SetPointer( propReqPtr,
                         ( IConfigDb* )oNewReq.GetCfg() );
 
@@ -3516,6 +4245,31 @@ gint32 CRpcInterfaceServer::DoInvoke(
         ret = super::DoInvoke(
             pReqMsg, pCallback );
     }
+
+    return ret;
+}
+
+gint32 CRpcInterfaceServer::CancelInvTasks(
+    ObjVecPtr& pTasks )
+{
+    if( pTasks.IsEmpty() )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        std::vector< ObjPtr > vecTasks =
+            ( *pTasks )();
+
+        for( elem : vecTasks )
+        {
+            CIfInvokeMethodTask* pInv = elem;
+            // this will cancel the task chain
+            // till the CIfIoReqTask
+            if( pInv != nullptr )
+                ( *pInv )( eventCancelTask );
+        }
+
+    }while( 0 );
 
     return ret;
 }
@@ -4218,23 +4972,20 @@ gint32 CRpcTcpBridge::AddAndRun(
             ( IConfigDb* )pInv->GetConfig() );
 
         DMsgPtr pMsg;
-        ret = oCfg.GetMsgPtr( propMsgPtr, pMsg );
-        if( ERROR( ret ) )
-            break;
+        oCfg.GetMsgPtr( propMsgPtr, pMsg );
 
         stdstr strMethod = pMsg.GetMember();
         if( strMethod != SYS_METHOD_FORWARDREQ )
             break;
 
+        InstallQFCallback( pTask );
+
         CIfParallelTaskGrpRfc* pGrpRfc =
             m_pGrpRfc;
 
-        if( pGrpRfc == nullptr )
-            break;
-
-        ret = pGrpRfc->AddAndRun( pTask );
+        ret = pGrpRfc->AppendTask( pTask );
         if( ret != ERROR_QUEUE_FULL )
-            return ret;
+            return ( *pGrpRfc )( eventZero );
 
         bool bResp = true;
         ObjPtr pObj;

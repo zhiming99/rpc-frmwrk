@@ -504,26 +504,18 @@ class CMessageMatch : public IMessageMatch
         if( !strRule.empty() )
             strMatch = strRule;
 
-        CCfgOpenerObj oCfg( this );
-        if( oCfg.exist( propIfName ) )
+        GetIfName( strRule );
+        if( !strRule.empty() )
         {
-            ret = oCfg.GetStrProp( propIfName, strRule );
-            if( SUCCEEDED( ret ) && !strRule.empty() )
-            {
-                strMatch += std::string( ",interface='" )
-                    + strRule + std::string( "'" );
-            }
+            strMatch += std::string( ",interface='" )
+                + strRule + std::string( "'" );
         }
 
-        if( oCfg.exist( propObjPath ) )
+        GetObjPath( strRule );
+        if( !strRule.empty() )
         {
-            ret = oCfg.GetStrProp( propObjPath, strRule );
-
-            if( SUCCEEDED( ret ) && !strRule.empty() )
-            {
-                strMatch += std::string( ",path='" )
-                    + strRule + std::string( "'" );
-            }
+            strMatch += std::string( ",path='" )
+                + strRule + std::string( "'" );
         }
 
         if( oCfg.exist( propMethodName ) )

@@ -7054,6 +7054,10 @@ gint32 CInterfaceServer::InitUserFuncs()
         CInterfaceServer::KeepAliveRequest,
         SYS_METHOD_KEEPALIVEREQ );
 
+    ADD_SERVICE_HANDLER(
+        CInterfaceServer::ForceCancelRequests,
+        SYS_METHOD_FORCECANCELREQS );
+
     END_IFHANDLER_MAP;
 
     return ret;
@@ -7188,6 +7192,67 @@ gint32 CInterfaceServer::UserCancelRequest(
 
     SetResponse( pCallback,
         oMyResp.GetCfg() );
+
+    return ret;
+}
+
+gint32 CInterfaceServer::ForceCancelRequests(
+    IEventSink* pCallback,
+    ObjPtr& pTaskIds )
+{
+    // let's search through the tasks to find the
+    // specified task to cancel
+    gint32 ret = 0;
+    do{
+        if( pTaskIds.IsEmpty() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+
+        QwVecPtr pvecTasks = pTaskIds;
+        if( pvecTasks.IsEmpty() )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        std::vector< guint64 >& vecTaskIds =
+            ( *pvecTasks )();
+
+        TaskGrpPtr pTaskGrp = GetParallelGrp();
+        if( pTaskGrp.IsEmpty() )
+            break;
+
+        for( auto elem : vecTaskIds )
+        {
+            TaskletPtr pTask;
+
+            ret = pTaskGrp->FindTaskByRmtId(
+                elem, pTask );
+            if( ERROR( ret ) )
+            {
+                ret = 0;
+                continue;
+            }
+
+            CIfInvokeMethodTask* pInvTask = pTask;
+            gint32 iRet = ERROR_CANCEL;
+
+            pInvTask->OnEvent(
+                eventCancelTask, iRet, 0, 0 );
+
+            DebugPrint( 0,
+                "Inv Task Canceled silently, 0x%llx",
+                elem );
+        }
+
+    }while( 0 );
+
+    // set the response for this cancel request
+    CParamList oMyResp;
+    oMyResp[ propReturnValue ] = ret;
+    SetResponse( pCallback, oMyResp.GetCfg() );
 
     return ret;
 }
