@@ -7220,7 +7220,8 @@ gint32 CInterfaceServer::ForceCancelRequests(
         std::vector< guint64 >& vecTaskIds =
             ( *pvecTasks )();
 
-        TaskGrpPtr pTaskGrp = GetParallelGrp();
+        TaskGrpPtr pTaskGrp;
+        GetParallelGrp( pTaskGrp );
         if( pTaskGrp.IsEmpty() )
             break;
 

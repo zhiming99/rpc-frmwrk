@@ -2375,7 +2375,7 @@ gint32 CRpcReqForwarderAuth::OnSessImplLoginComplete(
             if( ret == 1 && IsRfcEnabled() )
             {
                 ret = CreateRfcGrp(
-                    strSrcUniqName, strSender );
+                    strUniqName, strSender );
                 if( ERROR( ret ) )
                     break;
             }

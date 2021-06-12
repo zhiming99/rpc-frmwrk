@@ -94,9 +94,7 @@ class CIfRetryTask
     TaskletPtr          m_pFwdrTask;
 
     gint32 SetFwrdTask( IEventSink* pCallback );
-    TaskletPtr GetFwrdTask() const;
-    gint32 ClearFwrdTask();
-    TaskletPtr GetEndFwrdTask();
+    TaskletPtr GetFwrdTask( bool bClear = false );
     gint32 CancelTaskChain(
         guint32 dwContest,
         gint32 iError = -ECANCELED );
@@ -163,6 +161,9 @@ class CIfRetryTask
     void ClearClientNotify();
     gint32 SetClientNotify( IEventSink* pCallback );
     gint32 GetClientNotify( EventPtr& pEvt ) const;
+
+    TaskletPtr GetEndFwrdTask( bool bClear = false );
+    gint32 ClearFwrdTask();
 
     template< class ClassName >
     gint32 DelayRun(

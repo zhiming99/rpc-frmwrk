@@ -897,8 +897,8 @@ gint32 CDBusProxyPdo::HandleFwrdReq( IRP* pIrp )
         }
 
         guint32 dwIoDir = pCtx->GetIoDirection();
-        ret = PackupReqMsg( pUsrReqMsg, pMsg
-            ( dwIoDir == IO_DIR_OUT ) );
+        ret = PackupReqMsg( pUsrReqMsg, pMsg,
+            ( dwIoDir == IRP_DIR_OUT ) );
 
         if( ERROR( ret ) )
             break;

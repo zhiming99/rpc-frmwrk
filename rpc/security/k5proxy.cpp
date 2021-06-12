@@ -24,7 +24,6 @@
  */
 
 #include "rpc.h"
-#include "sha1.h"
 #include "ifhelper.h"
 #include "security.h"
 #include "k5proxy.h"

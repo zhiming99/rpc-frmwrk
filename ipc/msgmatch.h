@@ -451,13 +451,15 @@ class CMessageMatch : public IMessageMatch
         m_iMatchType = iType;
     }
 
-    gint32 GetIfName( std::string& strIfName )
+    gint32 GetIfName(
+        std::string& strIfName ) const
     {
         strIfName = m_strIfName;
         return 0;
     }
 
-    gint32 GetObjPath( std::string& strObjPath )
+    gint32 GetObjPath(
+        std::string& strObjPath ) const
     {
         strObjPath = m_strObjPath;
         return 0;
@@ -518,9 +520,11 @@ class CMessageMatch : public IMessageMatch
                 + strRule + std::string( "'" );
         }
 
+        CCfgOpener oCfg( ( IConfigDb* )GetCfg() );
         if( oCfg.exist( propMethodName ) )
         {
-            ret = oCfg.GetStrProp( propMethodName, strRule );
+            ret = oCfg.GetStrProp(
+                propMethodName, strRule );
 
             if( SUCCEEDED( ret ) && !strRule.empty() )
             {
@@ -1173,7 +1177,7 @@ class CRouterRemoteMatch : public CMessageMatch
             if( ERROR( ret ) )
                 break;
 
-            CCfgOpener oCfg2( this->GetCfg() );
+            CCfgOpener oCfg2( ( IConfigDb* )GetCfg() );
             IConfigDb* prhs = pMatch->GetCfg();
 
             ret = oCfg2.CopyProp(
@@ -1405,7 +1409,7 @@ class CRouterLocalMatch : public CRouterRemoteMatch
             if( ERROR( ret ) )
                 break;
 
-            CCfgOpener oCfg2( this->GetCfg() );
+            CCfgOpener oCfg2( ( IConfigDb* )GetCfg() );
             IConfigDb* prhs = pMatch->GetCfg();
 
             ret = oCfg2.CopyProp(

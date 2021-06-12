@@ -630,6 +630,9 @@ class CIoManager : public IService
 
     inline bool IsStopping()
     { return m_bStop; }
+
+    inline CIoManager* GetIoMgr()
+    { return this; }
 };
 
 template<>

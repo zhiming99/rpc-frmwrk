@@ -188,9 +188,8 @@ gint32 CRpcTcpBridgeProxy::OnHandshakeComplete(
             oIfCfg.SetIntProp(
                 propMaxReqs, dwMaxReqs );
 
-            CRpcRouter* pRouter = GetParent();
-            if( pRouter->HasReqForwarder() )
-                SetRfcEnabled( true );
+            SetRfcEnabled( true );
+            InitRfc();
         }
 
         CCfgOpener oReqCtx( pReqCtx );
@@ -769,7 +768,7 @@ gint32 CRpcTcpBridgeProxy::ForwardRequest(
             dwAge = m_oTs.GetAgeSec( qwLocalTs );
 
             oReqCtx.CopyProp(
-                propPath2, strPath );
+                propPath2, pReqCtx );
         }
 
 
@@ -790,7 +789,6 @@ gint32 CRpcTcpBridgeProxy::ForwardRequest(
         guint32 dwtos =
             IFSTATE_DEFAULT_IOREQ_TIMEOUT;
 
-        CCfgOpener oOrigCtx( pReqCtx );
         IConfigDb* pReqPtr = nullptr;
         ret = oOrigCtx.GetPointer(
             propReqPtr, pReqPtr );
@@ -1783,9 +1781,6 @@ gint32 CRpcTcpBridgeShared::InitRfc()
 {
     gint32 ret = 0;
     do{
-        if( !IsRfcEnabled() )
-            break;
-
         CParamList oParams;
         oParams[ propIfPtr ] =
             ObjPtr( m_pParentIf );
@@ -1808,7 +1803,8 @@ gint32 CRpcTcpBridgeShared::InitRfc()
 
         // a placeholder task to prevent
         // m_pGrpRfc from completing itself
-        ret = m_pPHTask.NewObj(
+        TaskletPtr pPHTask;
+        ret = pPHTask.NewObj(
             clsid( CIfCallbackInterceptor ),
             oParams.GetCfg() );
         if( ERROR( ret ) )
@@ -1821,7 +1817,7 @@ gint32 CRpcTcpBridgeShared::InitRfc()
             break;
         }
 
-        pGrp->AppendTask( m_pPHTask );
+        pGrp->AppendTask( pPHTask );
         TaskletPtr pTask = ObjPtr( pGrp );
         ret = m_pParentIf->AddAndRun( pTask );
         if( ret == STATUS_PENDING )
@@ -1885,8 +1881,6 @@ gint32 CRpcTcpBridgeShared::OnPostStartShared(
 
         if( ERROR( ret ) )
             break;
-
-        ret = InitRfc();
 
     }while( 0 );
 
@@ -1959,13 +1953,9 @@ gint32 CRpcTcpBridgeProxy::OnInvalidStreamId(
 gint32 CRpcTcpBridgeProxy::OnPreStop(
     IEventSink* pCallback )
 {
-    if( IsRfcEnabled() && !m_pPHTask.IsEmpty() )
-    {
-        m_pPHTask->OnEvent(
-            eventTaskComp, 0, 0, nullptr );
-        m_pPHTask.Clear();
+    if( IsRfcEnabled() )
         m_pGrpRfc.Clear();
-    }
+
     return super::OnPreStop( pCallback );
 }
 
@@ -2217,7 +2207,7 @@ gint32 CRpcTcpBridge::FindFwrdReqsAll(
     gint32 ret = 0;
     do{
         std::vector< TaskletPtr > vecInvTasks;
-        TaskletPtr pGrp;
+        TaskGrpPtr pGrp;
         if( IsRfcEnabled() )
         {
             pGrp = m_pGrpRfc;
@@ -2238,7 +2228,9 @@ gint32 CRpcTcpBridge::FindFwrdReqsAll(
         
         for( auto elem : vecInvTasks )
         {
-            CCfgOpenerObj oInv( pInv );
+            CCfgOpenerObj oInv(
+                ( CObjBase* )elem );
+
             DMsgPtr pMsg;
             ret = oInv.GetMsgPtr(
                 propMsgPtr, pMsg );
@@ -2305,7 +2297,7 @@ gint32 CRpcTcpBridge::FindFwrdReqsByPrxyPortId(
                 ( IConfigDb* )pObj );
 
             stdstr strPath, strNode;
-            ret = oReqCtx->GetStrProp(
+            ret = oReqCtx.GetStrProp(
                 propRouterPath, strPath );
             if( ERROR( ret ) )
                 continue;
@@ -2355,6 +2347,7 @@ gint32 CRpcInterfaceServer::RetrieveTaskId(
             pInv->GetTaskState();
         if( iState == stateStarted )
         {
+            CCfgOpenerObj oInv( pInv );
             IConfigDb* pReq = nullptr;
             ret = oInv.GetPointer(
                 propReqPtr, pReq );
@@ -2419,7 +2412,7 @@ gint32 CRpcTcpBridge::FindFwrdReqsByTaskId(
             CIfInvokeMethodTask* pInv =
                 elem.first;
 
-            guin64 qwTid = elem.second;
+            guint64 qwTid = elem.second;
             std::vector< guint64 >::iterator 
             itr = std::find( vecTaskIds.begin(),
                 vecTaskIds.end(), qwTid );
@@ -2478,7 +2471,7 @@ gint32 CRpcTcpBridge::FindFwrdReqsByPath(
                 ( IConfigDb* )pObj );
 
             stdstr strFullPath;
-            ret = oReqCtx->GetStrProp(
+            ret = oReqCtx.GetStrProp(
                 propRouterPath, strFullPath );
             if( ERROR( ret ) )
                 continue;
@@ -2540,7 +2533,7 @@ gint32 CRpcTcpBridge::FindFwrdReqsByDestAddr(
                 ( IConfigDb* )pObj );
 
             stdstr strFullPath;
-            ret = oReqCtx->GetStrProp(
+            ret = oReqCtx.GetStrProp(
                 propRouterPath, strFullPath );
             if( ERROR( ret ) )
                 continue;
@@ -2549,7 +2542,7 @@ gint32 CRpcTcpBridge::FindFwrdReqsByDestAddr(
                 continue;
 
             stdstr strDestInv =
-                pMsg->GetDestination();
+                pMsg.GetDestination();
 
             if( strDestInv != strDest )
                 continue;
@@ -2769,7 +2762,7 @@ gint32 CRpcTcpBridge::ClearRemoteEvents(
 
         ObjMapPtr pmapTaskIdsMH( true );
         ObjMapPtr pmapTaskIdsLoc( true );
-        std::map< InterfPtr, QwVecPtr >&
+        std::map< ObjPtr, QwVecPtr >&
             mapTasksLoc = ( *pmapTaskIdsLoc )();
 
         GetFwrdReqs( vecTaskKill,
@@ -2779,7 +2772,8 @@ gint32 CRpcTcpBridge::ClearRemoteEvents(
         FWRDREQS_ITER itr = vecTaskKill.begin();
         while( itr != vecTaskKill.end() )
         {
-            ( *pvecTasks )().push_back( elem.first );
+            ( *pvecTasks )().push_back(
+                itr->first );
             ++itr;
         }
 
@@ -2793,7 +2787,7 @@ gint32 CRpcTcpBridge::ClearRemoteEvents(
             guint64 qwTaskId = 0;
             ret = DEFER_IFCALLEX_NOSCHED2(
                 2, pTask, ObjPtr( elem.first ),
-                CRpcReqForwarderProxy::ForceCancelRequests,
+                &CRpcReqForwarderProxy::ForceCancelRequests,
                 ObjPtr( elem.second ),
                 qwTaskId, nullptr );
             if( ERROR( ret ) )
@@ -3090,10 +3084,11 @@ gint32 CRpcTcpBridge::ClearFwrdReqsByDestAddr(
 {
     stdstr strMember = pMsg.GetMember();
     stdstr strIfName = pMsg.GetInterface();
+    gint32 ret = 0;
 
     if( strMember == "NameOwnerChanged" && 
         strIfName == DBUS_SYS_INTERFACE )
-    {
+    do{
         stdstr strNewOwner;
         ret = pMsg.GetStrArgAt( 2, strNewOwner );
         if( ERROR( ret ) )
@@ -3120,8 +3115,10 @@ gint32 CRpcTcpBridge::ClearFwrdReqsByDestAddr(
             }
             CancelInvTasks( pvecReqs );
         }
-    }
-    return 0;
+
+    }while( 0 );
+
+    return ret;
 }
 
 gint32 CRpcTcpBridge::ForwardEvent(
@@ -3301,7 +3298,7 @@ gint32 CRpcInterfaceServer::OnKeepAlive(
 
 gint32 CRpcInterfaceServer::CloneInvTask(
     IEventSink* pCallback,
-    TaskletPtr& pTask )
+    TaskletPtr& pTask ) const
 {
     if( pCallback == nullptr )
         return -EINVAL;
@@ -3371,15 +3368,19 @@ gint32 CRpcInterfaceServer::OnFwrdReqQueueFull(
 }
 
 gint32 CRpcInterfaceServer::InstallQFCallback(
-    TaskletPtr& pInvTask )
+    TaskletPtr& pInvTask ) const
 {
     TaskletPtr pTask;
-    ret = NEW_PROXY_RESP_HANDLER2( 
-        pTask, ObjPtr( this ),
+    ObjPtr pThis( ( CObjBase* )this );
+    gint32 ret = NEW_PROXY_RESP_HANDLER2( 
+        pTask, pThis,
         &CRpcInterfaceServer::OnFwrdReqQueueFull,
         pInvTask, nullptr );
+    if( ERROR( ret ) )
+        return ret;
 
-    return ret;
+    CIfRetryTask* pInv = pInvTask;
+    return InterceptCallback( pTask, pInv );
 }
 
 gint32 CRpcTcpBridge::RequeueInvTask(
@@ -3397,8 +3398,10 @@ gint32 CRpcTcpBridge::RequeueInvTask(
     if( !IsConnected() )
         return ERROR_STATE;
 
-    ret = m_pGrpRfc->InsertTask( pTask );
-    if( m_pGrpRfc->GetRunningCount() == 0 )
+    CIfParallelTaskGrpRfc* pGrpRfc = m_pGrpRfc;
+    CStdRTMutex oLock( pGrpRfc->GetLock() );
+    ret = pGrpRfc->InsertTask( pTask );
+    if( pGrpRfc->GetRunningCount() == 0 )
     {
         TaskletPtr pTask = ObjPtr( m_pGrpRfc );
         GetIoMgr()->RescheduleTask( pTask );
@@ -3768,7 +3771,7 @@ gint32 CRpcTcpBridge::GetFwrdReqs(
 }
 
 gint32 CRpcTcpBridge::GetAllFwrdReqs(
-    FWRDREQS& vecReqs;
+    FWRDREQS& vecReqs,
     ObjMapPtr& pmapTaskIdsLoc,
     ObjMapPtr& pmapTaskIdsMH )
 {
@@ -3794,8 +3797,10 @@ gint32 CRpcTcpBridge::GetInvTaskProxyMH(
             ret = -EINVAL;
             break;
         }
-        TaskletPtr* pIoTask;
-        pInv->GetEndFwrdTask( pIoTask );
+
+        TaskletPtr pIoTask =
+            pInv->GetEndFwrdTask();
+
         CIfParallelTask* pEndReq = pIoTask;
 
         CCfgOpenerObj oIoCfg( pEndReq );
@@ -4260,18 +4265,42 @@ gint32 CRpcInterfaceServer::CancelInvTasks(
         std::vector< ObjPtr > vecTasks =
             ( *pTasks )();
 
-        for( elem : vecTasks )
+        for( auto elem : vecTasks )
         {
-            CIfInvokeMethodTask* pInv = elem;
-            // this will cancel the task chain
-            // till the CIfIoReqTask
+            CIfRetryTask* pInv = elem;
             if( pInv != nullptr )
-                ( *pInv )( eventCancelTask );
+            {
+                CStdRTMutex oLock( pInv->GetLock() );
+                TaskletPtr pTask =
+                    pInv->GetEndFwrdTask();
+                if( pTask->GetObjId() !=
+                    elem->GetObjId() )
+                {
+                    // to avoid the DEFER_CALL.
+                    pInv->ClearFwrdTask();
+                    oLock.Unlock();
+                    ( *pInv )( eventCancelTask );
+                    ( *pTask )( eventCancelTask );
+                }
+                else
+                {
+                    oLock.Unlock();
+                    ( *pInv )( eventCancelTask );
+                }
+            }
         }
 
     }while( 0 );
 
     return ret;
+}
+
+bool CRpcInterfaceServer::IsRfcEnabled() const
+{
+    CRpcRouter* pRouter =
+        static_cast< CRpcRouter* >
+            ( GetParent() );
+    return pRouter->IsRfcEnabled();
 }
 
 gint32 CRpcTcpBridge::SetupReqIrp(
@@ -4946,13 +4975,9 @@ gint32 CRpcTcpBridge::PostDisconnEvent()
 gint32 CRpcTcpBridge::OnPreStop(
     IEventSink* pCallback )
 {
-    if( IsRfcEnabled() && !m_pPHTask.IsEmpty() )
-    {
-        m_pPHTask->OnEvent(
-            eventTaskComp, 0, 0, nullptr );
-        m_pPHTask.Clear();
+    if( IsRfcEnabled()  )
         m_pGrpRfc.Clear();
-    }
+
     return super::OnPreStop( pCallback );
 }
 
@@ -5076,21 +5101,12 @@ CRpcTcpBridgeShared::CRpcTcpBridgeShared(
 {
     gint32 ret = 0;
     do{
-        m_pParentIf = pIf;
-        if( !pIf->IsServer() )
+        if( pIf == nullptr )
+        {
+            ret = -EFAULT;
             break;
-
-        bool bRfc;
-        CIoManager* pMgr = pIf->GetIoMgr();
-
-        ret = pMgr->GetCmdLineOpt(
-            propEnableRfc, bRfc );
-
-        if( ERROR( ret ) )
-            bRfc = false;
-        
-        ret = 0;
-        SetRfcEnabled( bRfc );
+        }
+        m_pParentIf = pIf;
 
     }while( 0 );
 

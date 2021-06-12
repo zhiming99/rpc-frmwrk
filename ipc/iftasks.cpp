@@ -935,10 +935,13 @@ gint32 CIfRetryTask::SetFwrdTask(
     return 0;
 }
 
-TaskletPtr CIfRetryTask::GetFwrdTask() const
+TaskletPtr CIfRetryTask::GetFwrdTask(
+    bool bClear )
 {
     CStdRTMutex oTaskLock( GetLock() );
     TaskletPtr pTask = m_pFwdrTask;
+    if( bClear )
+        ClearFwrdTask();
     return pTask;
 }
 
@@ -948,9 +951,10 @@ gint32 CIfRetryTask::ClearFwrdTask()
     return 0;
 }
 
-TaskletPtr CIfRetryTask::GetEndFwrdTask()
+TaskletPtr CIfRetryTask::GetEndFwrdTask(
+    bool bClear )
 {
-    TaskletPtr pTask = GetFwrdTask();
+    TaskletPtr pTask = GetFwrdTask( bClear );
     if( pTask.IsEmpty() )
         return pTask;
 
@@ -994,7 +998,7 @@ gint32 CIfRetryTask::CancelTaskChain(
         pMgr, ObjPtr( pTask ),
         &CIfRetryTask::DoCancelTaskChain,
         ( EnumEventId )dwContext,
-        iError, 0, nullptr );
+        iError );
 }
 
 gint32 CIfRetryTask::DoCancelTaskChain(
@@ -1010,7 +1014,8 @@ gint32 CIfRetryTask::DoCancelTaskChain(
         "cancel task %s...", pszClass );
 
     return pTask->OnEvent(
-        dwContext, iError, 0, nullptr );
+        ( EnumEventId )dwContext,
+        iError, 0, nullptr );
 }
 
 CIfEnableEventTask::CIfEnableEventTask(

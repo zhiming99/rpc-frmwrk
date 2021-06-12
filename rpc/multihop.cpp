@@ -1294,7 +1294,7 @@ gint32 CRpcRouterBridge::ClearRemoteEventsMH(
             MatchPtr pRmtMatch;
 
             CCfgOpener oMatch(
-                ( IConfigDb* )pObj->GetCfg() );
+                ( IConfigDb* )pMatch->GetCfg() );
 
             ret = GetMatchToAdd(
                 pMatch, true, pRmtMatch );
@@ -1413,12 +1413,12 @@ gint32 CRpcRouterBridge::ClearRemoteEventsMH(
         if( pTaskGrp->GetTaskCount() == 0 )
         {
             pTaskGrp->ClearClientNotify();
-            pRespCb.Clear();
+            pTaskGrp.Clear();
             break;
         }
 
         TaskletPtr pTask = ObjPtr( pTaskGrp );
-        ret = GetIoMgr()->RescheduleTask( pTask ),
+        ret = GetIoMgr()->RescheduleTask( pTask );
 
         if( ERROR( ret ) )
         {
