@@ -1531,7 +1531,10 @@ gint32 CRpcRouterBridge::RefreshReqLimit()
         if( rl == rlNow )
             break;
 
-        DebugPrint( 0, "RefreshReqLimit" );
+        DebugPrint( 0, "RefreshReqLimit, "
+            "dwMaxReqs=%d, dwMaxPendings=%d",
+            dwMaxReqs, dwMaxPendings );
+
         std::vector< InterfPtr > vecBdges;
         for( auto elem : m_mapPortId2Bdge )
              vecBdges.push_back( elem.second );
@@ -2933,7 +2936,8 @@ gint32 CRpcRouterBridge::OnRmtSvrOffline(
 
     if( ERROR( ret ) )
     {
-        ( *pTaskGrp )( eventCancelTask );
+        if( !pTaskGrp.IsEmpty() )
+            ( *pTaskGrp )( eventCancelTask );
         // close the port if exists
         pMgr->ClosePort( hPort, nullptr );
     }
@@ -3123,8 +3127,9 @@ gint32 CRpcRouterBridge::FindRemoteMatchByPortId(
             itr = plm->begin();
         while( itr != plm->end() )
         {
-            CCfgOpenerObj oMatch(
-                ( CObjBase* )itr->first );
+            IMessageMatch* pMatch = itr->first;
+            CCfgOpener oMatch(
+                ( IConfigDb* )pMatch->GetCfg() );
 
             guint32 dwVal = 0;
             ret = oMatch.GetIntProp(
@@ -3137,15 +3142,16 @@ gint32 CRpcRouterBridge::FindRemoteMatchByPortId(
 
             if( dwPortId == dwVal )
             {
-                vecMatches.push_back(
-                    itr->first );
+                const MatchPtr& pMat = itr->first;
+                vecMatches.push_back( pMat );
                 if( bRemove )
+                {
                     itr = plm->erase( itr );
+                    continue;
+                }
             }
-            else
-            {
-                ++itr;
-            }
+
+            ++itr;
         }
 
     }while( 0 );
@@ -5265,15 +5271,16 @@ gint32 CRpcRouterManager::Start()
 
         CParamList oParams;
         oParams.CopyProp( propSvrInstName, this );
+        oParams.SetPointer( propRouterPtr, this );
+
+        bool bRfc = false;
+        ret = pMgr->GetCmdLineOpt(
+            propEnableRfc, bRfc );
+        if( SUCCEEDED( ret ) )
+            m_bRfc = bRfc;
 
         if( m_dwRole & 0x02 )
         {
-            bool bRfc = false;
-            ret = pMgr->GetCmdLineOpt(
-                propEnableRfc, bRfc );
-            if( SUCCEEDED( ret ) )
-                m_bRfc = bRfc;
-
             ret = 0;
             EnumClsid iClsid = clsid( Invalid );
             std::string strObjName; 
@@ -5293,7 +5300,8 @@ gint32 CRpcRouterManager::Start()
                     OBJNAME_ROUTER_BRIDGE;
             }
 
-            oParams.SetPointer( propIoMgr, pMgr );
+            oParams.SetPointer(
+                propIoMgr, pMgr );
 
             ret = CRpcServices::LoadObjDesc(
                 strObjDesc,
@@ -5766,12 +5774,11 @@ gint32 CIfParallelTaskGrpRfc::AddAndRun(
             break;
         }
 
-        CCfgOpener oChildCfg(
+        // CCfgOpenerObj oCfg( ( CObjBase* )pTask );
+        CCfgOpener oCfg(
             ( IConfigDb* )pTask->GetConfig() );
 
-        oChildCfg.SetPointer(
-            propParentTask, this );
-
+        oCfg.SetPointer( propParentTask, this );
         m_quePendingTasks.push_back( pTask );
 
         if( IsNoSched() )

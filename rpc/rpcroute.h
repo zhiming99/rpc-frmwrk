@@ -313,6 +313,14 @@ class CRpcInterfaceServer :
         IEventSink* pCallback,
         TaskletPtr& pTask ) const;
 
+    gint32 RetrieveTaskId(
+        IEventSink* pCallback,
+        guint64& qwTaskId ) const;
+
+    gint32 RetrieveDest(
+        IEventSink* pCallback,
+        stdstr& strDest ) const;
+
     public:
 
     typedef CAggInterfaceServer super;
@@ -349,10 +357,6 @@ class CRpcInterfaceServer :
         EnumKAPhase bOrigin );
 
     gint32 CancelInvTasks( ObjVecPtr& pTasks );
-
-    gint32 RetrieveTaskId(
-        IEventSink* pCallback,
-        guint64& qwTaskId ) const;
 
     virtual gint32 RequeueInvTask(
         IEventSink* pCallback ) = 0;
@@ -934,7 +938,7 @@ struct CRpcTcpBridgeShared
         PortPtr& pPort,
         bool& bPdo );
 
-    gint32 InitRfc();
+    gint32 InitRfc( CCfgOpener& oParams );
 };
 
 class CRpcTcpBridge :
@@ -1158,13 +1162,7 @@ class CRpcTcpBridge :
     }
 
     gint32 StartEx2(
-        IEventSink* pCallback ) override
-    {
-        if( IsRfcEnabled() )
-            InitRfc();
-        return CRpcTcpBridgeShared::StartEx2(
-            pCallback );
-    }
+        IEventSink* pCallback ) override;
 
     gint32 CheckHsTimeout(
         IEventSink* pTask,
@@ -2983,4 +2981,7 @@ class CIfParallelTaskGrpRfc :
         const stdstr& strEmpty );
 };
 
+#define IS_SVRMODOFFLINE_EVENT( __pEvtMsg ) \
+( __pEvtMsg.GetMember() == "NameOwnerChanged" && \
+    __pEvtMsg.GetInterface() == DBUS_SYS_INTERFACE )
 }

@@ -1403,15 +1403,8 @@ gint32 CRpcReqForwarder::ClearFwrdReqsByDestAddr(
     const stdstr& strPath,
     DMsgPtr& pMsg )
 {
-    stdstr strMember = pMsg.GetMember();
-    stdstr strIfName = pMsg.GetInterface();
-
     gint32 ret = 0;
     do{
-        if( strMember != "NameOwnerChanged" ||
-            strIfName != DBUS_SYS_INTERFACE )
-            break;
-
         stdstr strDest;
         ret = pMsg.GetStrArgAt( 0, strDest );
         if( ERROR( ret ) )
@@ -1455,8 +1448,12 @@ gint32 CRpcReqForwarder::ClearFwrdReqsByDestAddr(
                 if( ERROR( ret ) )
                     continue;
 
-                stdstr strVal =
-                    pMsg.GetDestination();
+                stdstr strVal;
+                ret = RetrieveDest(
+                    pInv, strVal );
+                if( ERROR( ret ) )
+                    continue;
+                    
                 if( strVal != strDest )
                     continue;
 
@@ -1665,7 +1662,11 @@ gint32 CRpcReqForwarder::OnModOfflineInternal(
             strUniqName, vecMatches );
 
         if( ret == 0 )
+        {
+            if( IsRfcEnabled() )
+                RemoveRfcGrp( strUniqName );
             break;
+        }
 
         TaskletPtr pDummyTask;
         ret = pDummyTask.NewObj(
@@ -3021,8 +3022,11 @@ gint32 CRpcReqForwarder::ForwardEvent(
         if( ERROR( ret ) )
             break;
 
-        ClearFwrdReqsByDestAddr(
-            dwPortId, strPath, pEvtMsg );
+        if( IS_SVRMODOFFLINE_EVENT( pEvtMsg ) )
+        {
+            ClearFwrdReqsByDestAddr(
+                dwPortId, strPath, pEvtMsg );
+        }
 
         BufPtr pBuf( true );
         ret = pEvtMsg.Serialize( *pBuf );

@@ -77,7 +77,7 @@ void CIfRouterTest::setUp()
                     propHasAuth, g_bAuth );
             }
 
-            if( ( g_dwRole & 0x2 ) && g_bRfc )
+            if( g_bRfc )
                 pSvc->SetCmdLineOpt(
                     propEnableRfc, g_bRfc );
 

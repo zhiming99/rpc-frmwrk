@@ -1886,7 +1886,7 @@ gint32 CK5AuthProxy::GenSessHash(
     gss_ctx_id_t gssctx,
     std::string& strSess )
 {
-    gint32          ret = 0;
+    gint32 ret = 0;
 
     do{
         BufPtr pBuf( true );
@@ -1922,7 +1922,7 @@ gint32 CK5AuthProxy::GenSessHash(
             break;
 
         strSess = "AU";
-        strSess += strSess;
+        strSess += strRet;
 
         DebugPrint( 0, "Sess hash is %s",
             strSess.c_str() );

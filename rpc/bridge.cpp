@@ -188,8 +188,20 @@ gint32 CRpcTcpBridgeProxy::OnHandshakeComplete(
             oIfCfg.SetIntProp(
                 propMaxReqs, dwMaxReqs );
 
+            oIfCfg.SetIntProp( propMaxPendings,
+                RFC_MAX_PENDINGS );
+
             SetRfcEnabled( true );
-            InitRfc();
+            CCfgOpener oCfg;
+            oCfg.SetIntProp(
+                propMaxReqs, dwMaxReqs );
+
+            oCfg.SetIntProp(
+                propMaxReqs, RFC_MAX_PENDINGS );
+
+            ret = InitRfc( oCfg );
+            if( ERROR( ret ) )
+                break;
         }
 
         CCfgOpener oReqCtx( pReqCtx );
@@ -1777,23 +1789,13 @@ gint32 CRpcTcpBridgeProxy::OnPostStart(
     return ret;
 }
 
-gint32 CRpcTcpBridgeShared::InitRfc()
+gint32 CRpcTcpBridgeShared::InitRfc(
+    CCfgOpener& oParams )
 {
     gint32 ret = 0;
     do{
-        CParamList oParams;
         oParams[ propIfPtr ] =
             ObjPtr( m_pParentIf );
-
-        ret = oParams.CopyProp(
-            propMaxReqs, m_pParentIf );
-        if( ERROR( ret ) )
-            break;
-
-        ret = oParams.CopyProp(
-            propMaxPendings, m_pParentIf ); 
-        if( ERROR( ret ) )
-            break;
 
         ret = m_pGrpRfc.NewObj(
             clsid( CIfParallelTaskGrpRfc ),
@@ -2379,7 +2381,15 @@ gint32 CRpcInterfaceServer::RetrieveTaskId(
         if( pRouter->HasBridge() )
             ret = pMsg.GetObjArgAt( 0, pObj );
         else
-            ret = pMsg.GetObjArgAt( 1, pObj );
+        {
+            DMsgPtr pCliMsg;
+            ret = pMsg.GetMsgArgAt( 1, pCliMsg );
+            if( SUCCEEDED( ret ) )
+            {
+                ret = pCliMsg.GetObjArgAt(
+                    0, pObj );
+            }
+        }
 
         if( ERROR( ret ) )
             break;
@@ -2387,6 +2397,61 @@ gint32 CRpcInterfaceServer::RetrieveTaskId(
         CCfgOpener oReqCtx( ( IConfigDb* )pObj );
         ret = oReqCtx.GetQwordProp(
             propTaskId, qwTaskId );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CRpcInterfaceServer::RetrieveDest(
+    IEventSink* pCallback,
+    stdstr& strDest ) const
+{
+    if( pCallback == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    CIfInvokeMethodTask* pInv =
+        static_cast< CIfInvokeMethodTask* >
+            ( pCallback );
+    do{
+        EnumTaskState iState =
+            pInv->GetTaskState();
+        if( iState == stateStarted )
+        {
+            CCfgOpenerObj oInv( pInv );
+            IConfigDb* pReq = nullptr;
+            ret = oInv.GetPointer(
+                propReqPtr, pReq );
+            if( ERROR( ret ) )
+                break;
+
+            guint64 qwTaskId = 0;
+            CReqOpener oReq( pReq );
+            oReq.GetDestination( strDest );
+            break;
+        }
+
+        if( iState != stateStarting )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+        
+        DMsgPtr pMsg;
+        CCfgOpenerObj oInv( pInv );
+        ret = oInv.GetMsgPtr(
+            propMsgPtr, pMsg );
+        if( ERROR( ret ) )
+            break;
+
+        DMsgPtr pCliMsg;
+        CRpcRouter* pRouter = GetParent();
+        ret = pMsg.GetMsgArgAt( 1, pCliMsg );
+        if( ERROR( ret ) )
+            break;
+        
+        strDest = pCliMsg.GetDestination();
 
     }while( 0 );
 
@@ -2541,8 +2606,11 @@ gint32 CRpcTcpBridge::FindFwrdReqsByDestAddr(
             if( strPath != strFullPath );
                 continue;
 
-            stdstr strDestInv =
-                pMsg.GetDestination();
+            stdstr strDestInv;
+            ret = RetrieveDest(
+                elem.first, strDestInv );
+            if( ERROR( ret ) )
+                continue;
 
             if( strDestInv != strDest )
                 continue;
@@ -3082,12 +3150,8 @@ gint32 CRpcTcpBridge::CheckReqToRelay(
 gint32 CRpcTcpBridge::ClearFwrdReqsByDestAddr(
     const stdstr strPath, DMsgPtr& pMsg )
 {
-    stdstr strMember = pMsg.GetMember();
-    stdstr strIfName = pMsg.GetInterface();
     gint32 ret = 0;
 
-    if( strMember == "NameOwnerChanged" && 
-        strIfName == DBUS_SYS_INTERFACE )
     do{
         stdstr strNewOwner;
         ret = pMsg.GetStrArgAt( 2, strNewOwner );
@@ -3148,8 +3212,11 @@ gint32 CRpcTcpBridge::ForwardEvent(
 
         DMsgPtr pMsg( pEvtMsg );
 
-        ClearFwrdReqsByDestAddr(
-            strRouterPath, pMsg );
+        if( IS_SVRMODOFFLINE_EVENT( pMsg ) )
+        {
+            ClearFwrdReqsByDestAddr(
+                strRouterPath, pMsg );
+        }
 
         oBuilder.Push( ( IConfigDb* )
             oEvtCtx.GetCfg() );
@@ -4200,6 +4267,9 @@ gint32 CRpcInterfaceServer::DoInvoke(
                     oNewReq.CopyProp(
                         propTaskId, ( IConfigDb* )pObj );
 
+                    oNewReq.SetDestination(
+                        pFwdrMsg.GetDestination() );
+
                     oTaskCfg.SetPointer( propReqPtr,
                         ( IConfigDb* )oNewReq.GetCfg() );
 
@@ -4240,6 +4310,9 @@ gint32 CRpcInterfaceServer::DoInvoke(
             // for not supported commands we will
             // try to handle them in the base
             // class
+            if( IsRfcEnabled() &&
+                ret == ERROR_QUEUE_FULL )
+                break;
             SetResponse( pCallback, oResp.GetCfg() );
         }
 
@@ -4745,6 +4818,13 @@ gint32 CRpcTcpBridge::SetupReqIrpFwrdEvt(
     return ret;
 }
 
+gint32 CRpcTcpBridge::StartEx2(
+    IEventSink* pCallback )
+{
+    return CRpcTcpBridgeShared::StartEx2(
+        pCallback );
+}
+
 gint32 CRpcTcpBridge::CheckHsTimeout(
     IEventSink* pTask,
     IEventSink* pStartCb )
@@ -4910,6 +4990,31 @@ gint32 CRpcTcpBridge::Handshake(
                 oParams.CopyProp( 
                     propMaxPendings, this );
             }
+        }
+
+        if( IsRfcEnabled() )
+        {
+            CCfgOpener oCfg;
+
+            ret = oCfg.CopyProp(
+                propMaxReqs, this );
+            if( ERROR( ret ) )
+            {
+                ret = oCfg.SetIntProp(
+                    propMaxReqs, RFC_MAX_REQS );
+            }
+            ret = oCfg.CopyProp(
+                propMaxPendings, this );
+            if( ERROR( ret ) )
+            {
+                ret = oCfg.SetIntProp(
+                    propMaxPendings,
+                    RFC_MAX_PENDINGS );
+            }
+
+            ret = InitRfc( oCfg );
+            if( ERROR( ret ) )
+                return ret;
         }
 
         oResp[ propReturnValue ] = ret;
@@ -5089,7 +5194,7 @@ gint32 CRpcTcpBridge::GenSessHash(
             break;
 
         strSess = "NA"; // non-auth session
-        strSess += strSess;
+        strSess += strRet;
 
     }while( 0 );
 

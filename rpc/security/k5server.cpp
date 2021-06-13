@@ -782,7 +782,7 @@ gint32 CK5AuthServer::GenSessHash(
     if( dwPortId == 0 )
         return -EINVAL;
 
-    gint32          ret = 0;
+    gint32 ret = 0;
     do{
         BufPtr pBuf( true );
         ret = gss_sess_hash_partial(
@@ -827,7 +827,7 @@ gint32 CK5AuthServer::GenSessHash(
             break;
 
         strSess = "AU";
-        strSess += strSess;
+        strSess += strRet;
 
         DebugPrint( 0, "Sess hash is %s",
             strSess.c_str() );
