@@ -50,6 +50,9 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 7. Logging service
 
 ---
+[`Sun Jun 13 2021 11:49:07 PM Beijing`]   
+1. Most of the `request flow control` code complete. Now entering debugging stage. It should be ready next week.
+
 [`Sat Jun 05 2021 03:40:07 PM Beijing`]   
 1. The scale and volume of the `request flow control` has expanded a lot, including some critical update in `multihop`. I have created another branch for the development.
 
