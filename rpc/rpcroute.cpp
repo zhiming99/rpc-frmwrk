@@ -5774,9 +5774,7 @@ gint32 CIfParallelTaskGrpRfc::AddAndRun(
             break;
         }
 
-        // CCfgOpenerObj oCfg( ( CObjBase* )pTask );
-        CCfgOpener oCfg(
-            ( IConfigDb* )pTask->GetConfig() );
+        CCfgOpenerObj oCfg( ( CObjBase* )pTask );
 
         oCfg.SetPointer( propParentTask, this );
         m_quePendingTasks.push_back( pTask );
