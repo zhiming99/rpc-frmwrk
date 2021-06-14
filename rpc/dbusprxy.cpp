@@ -806,7 +806,9 @@ gint32 CDBusProxyPdo::BuildMsgHeader(
 }
 
 gint32 CDBusProxyPdo::PackupReqMsg(
-    DMsgPtr& pReqMsg, DMsgPtr& pOutMsg ) const
+    DMsgPtr& pReqMsg,
+    DMsgPtr& pOutMsg,
+    bool bNoReply ) const
 {
     gint32 ret = 0;
     do{
@@ -828,6 +830,9 @@ gint32 CDBusProxyPdo::PackupReqMsg(
 
         if( ERROR( ret ) )
             break;
+
+        if( bNoReply )
+            oReqCtx[ propNoReply ] = true;
 
         ret = pOutMsg.SetMember(
             SYS_METHOD_FORWARDREQ );
@@ -891,7 +896,10 @@ gint32 CDBusProxyPdo::HandleFwrdReq( IRP* pIrp )
             break;
         }
 
-        ret = PackupReqMsg( pUsrReqMsg, pMsg );
+        guint32 dwIoDir = pCtx->GetIoDirection();
+        ret = PackupReqMsg( pUsrReqMsg, pMsg,
+            ( dwIoDir == IRP_DIR_OUT ) );
+
         if( ERROR( ret ) )
             break;
 
@@ -2470,7 +2478,8 @@ gint32 CDBusProxyPdoLpbk::SendDBusMsg(
 
 gint32 CDBusProxyPdoLpbk::PackupReqMsg(
     DMsgPtr& pReqMsg,
-    DMsgPtr& pOutMsg ) const
+    DMsgPtr& pOutMsg,
+    bool bNoReply ) const
 {
     // correct the sender of the inner
     std::string strSender;
@@ -2481,7 +2490,7 @@ gint32 CDBusProxyPdoLpbk::PackupReqMsg(
     pReqMsg.SetSender( strSender );
 
     return super::PackupReqMsg(
-        pReqMsg, pOutMsg );
+        pReqMsg, pOutMsg, bNoReply );
 }
 
 CDBusProxyPdoLpbk::CDBusProxyPdoLpbk(

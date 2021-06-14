@@ -1595,6 +1595,11 @@ class CInterfaceServer :
         IEventSink* pInvokeTask,
         guint64 qwIoTaskId );
 
+    // a user-initialized cancel request
+    gint32 ForceCancelRequests(
+        IEventSink* pInvokeTask,
+        ObjPtr& pvecTasks );
+
     // a user-initialized keep-alive request
     gint32 KeepAliveRequest(
         IEventSink* pCallback,

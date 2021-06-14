@@ -2371,6 +2371,14 @@ gint32 CRpcReqForwarderAuth::OnSessImplLoginComplete(
 
             if( ERROR( ret ) )
                 break;
+
+            if( ret == 1 && IsRfcEnabled() )
+            {
+                ret = CreateRfcGrp(
+                    strUniqName, strSender );
+                if( ERROR( ret ) )
+                    break;
+            }
         }
         // update the connparams with the newest
         // one from the bridge proxy.
@@ -2741,23 +2749,14 @@ gint32 CRpcRouterReqFwdrAuth::GetBridgeProxy(
     return ret;
 }
 
-gint32 CRpcRouterReqFwdrAuth::DecRefCount(
-        guint32 dwPortId,
-        const std::string& strSrcUniqName,
-        const std::string& strSrcDBusName )
+gint32 CRpcRouterReqFwdrAuth::StopProxyNoRef(
+    guint32 dwPortId )
 {
-    gint32 ret = super::DecRefCount( dwPortId,
-        strSrcUniqName, strSrcDBusName );
-
-    if( ERROR( ret ) )
-        return ret;
-
-    if( ret != 1 )
-        return ret;
+    gint32 ret = 0;
 
     do{
-        CStdRMutex oRouterLock( GetLock() );
         RegObjPtr pReg;
+        CStdRMutex oRouterLock( GetLock() );
         for( auto elem : m_mapRefCount )
         {
             if( elem.first->GetPortId() == dwPortId )
@@ -2800,6 +2799,31 @@ gint32 CRpcRouterReqFwdrAuth::DecRefCount(
             oRouterLock.Unlock();
             pspp->StopSessImpl();
         }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CRpcRouterReqFwdrAuth::DecRefCount(
+        guint32 dwPortId,
+        const std::string& strSrcUniqName,
+        const std::string& strSrcDBusName )
+{
+    gint32 ret = super::DecRefCount( dwPortId,
+        strSrcUniqName, strSrcDBusName );
+
+    if( ERROR( ret ) )
+        return ret;
+
+    if( ret != 1 )
+        return ret;
+
+    do{
+        ret = StopProxyNoRef( dwPortId );
+        if( ERROR( ret ) )
+            break;
+
         ret = 1;
 
     }while( 0 );
