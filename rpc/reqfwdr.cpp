@@ -661,7 +661,8 @@ gint32 CReqFwdrOpenRmtPortTask::RunTaskInternal(
                 oCfg.CopyProp( propConnParams,
                     ( CObjBase* )m_pProxy );
 
-                if( pReqFwdr->IsRfcEnabled() )
+                if( pReqFwdr->IsRfcEnabled() &&
+                    !pRouter->HasAuth() )
                 {
                     ret = pReqFwdr->CreateRfcGrp(
                         strUniqName, strSender );
