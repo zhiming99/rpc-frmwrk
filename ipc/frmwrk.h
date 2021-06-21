@@ -628,6 +628,10 @@ class CIoManager : public IService
     gint32 AppendAndRun(
         TaskletPtr& pTask );
 
+    gint32 AddSeqTask(
+        TaskletPtr& pTask,
+        bool bLong = false );
+
     inline bool IsStopping()
     { return m_bStop; }
 

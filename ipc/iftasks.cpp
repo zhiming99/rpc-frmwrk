@@ -956,7 +956,7 @@ TaskletPtr CIfRetryTask::GetEndFwrdTask(
 {
     TaskletPtr pTask = GetFwrdTask( bClear );
     if( pTask.IsEmpty() )
-        return pTask;
+        return TaskletPtr( this );
 
     do{
         CIfRetryTask* pRetry = pTask;

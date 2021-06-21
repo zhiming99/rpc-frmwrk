@@ -134,10 +134,7 @@ gint32 CRpcReqForwarder::CreateRfcGrp(
             itr = m_mapGrpRfcs.find(
                 strUniqName );
         if( itr != m_mapGrpRfcs.end() )
-        {
-            ret = -EEXIST;
             break;
-        }
 
         TaskGrpPtr pGrp;
         CParamList oParams;
@@ -661,6 +658,11 @@ gint32 CReqFwdrOpenRmtPortTask::RunTaskInternal(
                 oCfg.CopyProp( propConnParams,
                     ( CObjBase* )m_pProxy );
 
+                pReqFwdr->AddRefCount(
+                    dwPortId,
+                    strUniqName,
+                    strSender );
+
                 if( pReqFwdr->IsRfcEnabled() &&
                     !pRouter->HasAuth() )
                 {
@@ -669,10 +671,6 @@ gint32 CReqFwdrOpenRmtPortTask::RunTaskInternal(
                     if( ERROR( ret ) )
                         break;
                 }
-                pReqFwdr->AddRefCount(
-                    dwPortId,
-                    strUniqName,
-                    strSender );
             }
             else
             {
@@ -1042,8 +1040,8 @@ gint32 CRpcReqForwarder::OpenRemotePortInternal(
             break;
 
         InterfPtr pIf;
-
-        ret = GetParent()->GetBridgeProxy(
+        CRpcRouter* pRouter = GetParent();
+        ret = pRouter->GetBridgeProxy(
             pConnParams, pIf );
 
         if( SUCCEEDED( ret ) )
@@ -1062,6 +1060,15 @@ gint32 CRpcReqForwarder::OpenRemotePortInternal(
 
             if( ERROR( ret ) )
                 break;
+
+            if( ret == 1 && IsRfcEnabled() &&
+                !pRouter->HasAuth() )
+            {
+                ret = CreateRfcGrp(
+                    strSrcUniqName, strSender );
+                if( ERROR( ret ) )
+                    break;
+            }
 
             if( strRouterPath == "/" )
             {
@@ -2455,7 +2462,6 @@ gint32 CReqFwdrForwardRequestTask::RunTask()
             break;
         }
 
-        CRpcRouterReqFwdr* pRouter = nullptr;
         ret = oParams.GetPointer(
             propRouterPtr, pRouter );
         if( ERROR( ret ) )
@@ -3595,7 +3601,20 @@ gint32 CRpcReqForwarder::AddAndRun(
 
         ret = pGrpRfc->AppendTask( pTask );
         if( ret != ERROR_QUEUE_FULL )
-            return ( *pGrpRfc )( eventZero );
+        {
+            ( *pGrpRfc )( eventZero );
+            ret = pTask->GetError();
+            if( ret == ERROR_QUEUE_FULL )
+            {
+                ret = RequeueInvTask( pTask );
+                if( SUCCEEDED( ret ) )
+                    return ret;
+            }
+            else
+            {
+                return ret;
+            }
+        }
 
         bool bResp = true;
         ObjPtr pObj;
@@ -3618,7 +3637,7 @@ gint32 CRpcReqForwarder::AddAndRun(
             return ret;
 
         CCfgOpener oResp;
-        oResp[ propReturnValue ] = ret;
+        oResp[ propReturnValue ] = ERROR_QUEUE_FULL;
         OnServiceComplete( oResp.GetCfg(), pInv );
 
         return ret;
@@ -4396,7 +4415,7 @@ gint32 CRpcReqForwarderProxy::RebuildMatches()
     do{
         // add interface id to all the matches
         CCfgOpenerObj oIfCfg( this );
-        guint32 dwQueSize = MAX_PENDING_MSG;
+        guint32 dwQueSize = MAX_DBUS_REQS;
 
         // empty all the matches, the interfaces will
         // be added to the vector on the remote req.
@@ -4412,7 +4431,7 @@ gint32 CRpcReqForwarderProxy::RebuildMatches()
         oMatchCfg.SetIntProp(
             propIid, GetClsid() );
 
-        dwQueSize = MAX_PENDING_MSG;
+        dwQueSize = MAX_DBUS_REQS;
 
         oMatchCfg.SetIntProp(
             propQueSize, dwQueSize );

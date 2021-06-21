@@ -113,7 +113,7 @@ gint32 CRpcBasePort::DispatchSignalMsg(
         if( oMe.m_queWaitingIrps.empty() )
         {
             if( oMe.m_quePendingMsgs.size()
-                > MAX_PENDING_MSG )
+                > MAX_DBUS_REQS )
             {
                 // discard the oldest msg if too many
                 oMe.m_quePendingMsgs.pop_front();
@@ -1689,7 +1689,10 @@ gint32 CRpcBasePortEx::DispatchReqMsg(
                     propQueSize, dwQueSize );
 
                 if( ERROR( ret ) )
-                    dwQueSize = MAX_PENDING_MSG;
+                {
+                    dwQueSize = MAX_DBUS_REQS;
+                    ret = 0;
+                }
 
                 if( dwQueSize == 0 )
                 {
@@ -1715,7 +1718,7 @@ gint32 CRpcBasePortEx::DispatchReqMsg(
                 {
                     ome.m_quePendingMsgs.push_back( pMsg );
                     if( ome.m_quePendingMsgs.size()
-                        > MAX_PENDING_MSG )
+                        > dwQueSize )
                     {
                         // discard the oldest msg
                         ome.m_quePendingMsgs.pop_front();

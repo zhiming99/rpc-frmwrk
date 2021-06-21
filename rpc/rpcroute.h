@@ -2810,11 +2810,6 @@ DECLARE_AGGREGATED_SERVER(
      CRpcRouterBridge,
      CStatCountersServer ); 
 
-DECLARE_AGGREGATED_SERVER(
-    CRpcReqForwarderImpl,
-    CRpcReqForwarder,
-    CStatCountersServer ); 
-
 DECLARE_AGGREGATED_PROXY(
     CRpcReqForwarderProxyImpl,
     CRpcReqForwarderProxy,
@@ -2827,6 +2822,11 @@ DECLARE_AGGREGATED_PROXY(
 
 namespace rpcf
 {
+
+DECLARE_AGGREGATED_SERVER(
+    CRpcReqForwarderImpl,
+    CRpcReqForwarder,
+    CStatCountersServer ); 
 
 DECLARE_AGGREGATED_SERVER(
     CRpcTcpBridgeImpl,
@@ -2918,6 +2918,8 @@ class CIfParallelTaskGrpRfc :
 {
     guint32 m_dwMaxRunning = RFC_MAX_REQS;
     guint32 m_dwMaxPending = RFC_MAX_PENDINGS;
+    guint32 m_dwTaskAdded = 0;
+    guint32 m_dwTaskRejected = 0;
 
     public:
     typedef CIfParallelTaskGrp super;
@@ -2949,36 +2951,6 @@ class CIfParallelTaskGrpRfc :
 
     virtual gint32 InsertTask(
         TaskletPtr& pTask ) override ;
-
-    gint32 FindFwrdReqsByUniqName(
-        const stdstr strName,
-        FWRDREQS& vecTasks );
-
-    private:
-    bool CheckUniqName(
-        DMsgPtr& pMsg,
-        const stdstr& strVal,
-        const stdstr& strEmpty );
-
-    bool CheckRouterPath(
-        DMsgPtr& pMsg,
-        const stdstr& strVal,
-        const stdstr& strEmpty );
-
-    bool CheckDestAddr(
-        DMsgPtr& pMsg,
-        const stdstr& strRtPath,
-        const stdstr& strDestAddr );
-
-    bool CheckDestAddrProxy(
-        IConfigDb* pReqCall,
-        const stdstr& strRtPath,
-        const stdstr& strDest );
-
-    bool CheckRouterPathProxy(
-        IConfigDb* pReqCall,
-        const stdstr& strName,
-        const stdstr& strEmpty );
 };
 
 #define IS_SVRMODOFFLINE_EVENT( __pEvtMsg ) \

@@ -5767,6 +5767,7 @@ gint32 CIfParallelTaskGrpRfc::AddAndRun(
 
         if( GetPendingCount() >= GetMaxPending() )
         {
+            m_dwTaskRejected++;
             ret = ERROR_QUEUE_FULL;
             DebugPrint( ret,
                 "RFC: queue is full,"
@@ -5778,6 +5779,7 @@ gint32 CIfParallelTaskGrpRfc::AddAndRun(
 
         oCfg.SetPointer( propParentTask, this );
         m_quePendingTasks.push_back( pTask );
+        m_dwTaskAdded++;
 
         if( IsNoSched() )
         {
@@ -5815,10 +5817,12 @@ gint32 CIfParallelTaskGrpRfc::AppendTask(
                 "RFC: queue is full,"
                 " append task failed" );
             ret = ERROR_QUEUE_FULL;
+            m_dwTaskRejected++;
             break;
         }
 
         ret = super::AppendTask( pTask );
+        m_dwTaskAdded++;
 
     }while( 0 );
 
@@ -5835,6 +5839,7 @@ gint32 CIfParallelTaskGrpRfc::InsertTask(
         if( GetRunningCount() >= GetMaxRunning() )
             break;
 
+        m_dwTaskAdded++;
         CCfgOpener oCfg(
             ( IConfigDb* )GetConfig() );
 

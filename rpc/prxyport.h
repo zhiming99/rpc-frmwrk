@@ -57,6 +57,7 @@ class CDBusProxyPdo : public CRpcPdoPort
     bool                m_bStopReady = false;
     TaskletPtr          m_pConnTask;
     std::atomic< bool > m_atmInitDone;
+    std::atomic< guint32 > m_atmReqSent;
 
     gint32 CheckConnCmdResp(
         DBusMessage* pMsg, gint32& iMethodReturn );

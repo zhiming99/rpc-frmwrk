@@ -5138,7 +5138,7 @@ gint32 CRpcTcpBridge::AddAndRun(
             return ret;
 
         CCfgOpener oResp;
-        oResp[ propReturnValue ] = ret;
+        oResp[ propReturnValue ] = ERROR_QUEUE_FULL;
         OnServiceComplete( oResp.GetCfg(), pInv );
 
         return ret;

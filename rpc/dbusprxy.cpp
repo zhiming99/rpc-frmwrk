@@ -105,6 +105,7 @@ CDBusProxyPdo::CDBusProxyPdo(
         if( ERROR( ret ) )
             break;
 
+        m_atmReqSent = 0;
         m_pDBusConn = ( DBusConnection* )pdwValue;
         if( m_pDBusConn == nullptr )
         {
@@ -905,6 +906,8 @@ gint32 CDBusProxyPdo::HandleFwrdReq( IRP* pIrp )
 
         *pCtx->m_pReqData = pMsg;
         ret = HandleSendReq( pIrp );
+        if( ret >= 0 )
+            m_atmReqSent++;
 
     }while( 0 );
 

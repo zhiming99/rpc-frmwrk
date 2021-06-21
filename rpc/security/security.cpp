@@ -1280,6 +1280,13 @@ gint32 CRpcReqForwarderAuth::LocalLoginInternal(
             if( ERROR( ret ) )
                 break;
 
+            if( ret == 1 && IsRfcEnabled() )
+            {
+                ret = CreateRfcGrp(
+                    strSrcUniqName, strSender );
+                if( ERROR( ret ) )
+                    break;
+            }
             // schedule a checkrouter path task
             oReqCtx.SetIntProp(
                 propConnHandle, dwPortId );

@@ -1950,7 +1950,7 @@ gint32 CRpcInterfaceBase::SetReqQueSize(
     if( pMatch == nullptr )
         return -EINVAL;
 
-    if( dwSize > MAX_PENDING_MSG )
+    if( dwSize > MAX_DBUS_REQS )
         return -EINVAL;
 
     do{
@@ -2382,7 +2382,7 @@ gint32 CRpcServices::RebuildMatches()
         }
         
         bool bPausable = false;
-        guint32 dwQueSize = MAX_PENDING_MSG;
+        guint32 dwQueSize = MAX_DBUS_REQS;
 
         for( auto pMatch : m_vecMatches )
         {
@@ -2419,7 +2419,7 @@ gint32 CRpcServices::RebuildMatches()
             if( ERROR( ret ) )
                 bPausable = false;
 
-            dwQueSize = MAX_PENDING_MSG;
+            dwQueSize = MAX_DBUS_REQS;
 
             if( bPausable && bPauseOnStart )
                 dwQueSize = 0;
@@ -2435,7 +2435,7 @@ gint32 CRpcServices::RebuildMatches()
         oMatchCfg.SetIntProp( propIid,
             GetClsid() );
 
-        dwQueSize = MAX_PENDING_MSG;
+        dwQueSize = MAX_DBUS_REQS;
 
         // set the request que size for the
         // interface
@@ -5883,7 +5883,7 @@ gint32 CInterfaceServer::RestartListening(
                 // start all the interfaces
             }
         }
-        SetReqQueSize( pMsgMatch, MAX_PENDING_MSG );
+        SetReqQueSize( pMsgMatch, MAX_DBUS_REQS );
     }
 
     return ret;

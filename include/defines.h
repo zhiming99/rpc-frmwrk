@@ -202,6 +202,7 @@ do{\
     DebugMsg( ret, strFmt, ##__VA_ARGS__ ).c_str() );} )
 
 #define MAX_PENDING_MSG             20
+#define MAX_DBUS_REQS               ( MAX_PENDING_MSG * 1000 )
 
 // for Sem_Timedwait interval
 #define THREAD_WAKEUP_INTERVAL      10

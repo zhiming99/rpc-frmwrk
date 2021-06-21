@@ -627,6 +627,12 @@ gint32 CDBusBusPort::Start( IRP *pIrp )
             + string( "." )
             + strPortName;
 
+        if( !dbus_threads_init_default() )
+        {
+            ret = -ENOMEM;
+            break;
+        }
+
         m_pDBusConn = dbus_bus_get_private(
             DBUS_BUS_SESSION, error );
 
@@ -688,7 +694,7 @@ gint32 CDBusBusPort::Start( IRP *pIrp )
             ( guint32* )m_pDBusConn );
 
         // flush connection every 500ms
-        oParams.Push( 500 );
+        oParams.Push( 5000 );
 
         ret = m_pFlushTask.NewObj(
             clsid( CDBusConnFlushTask ),
@@ -1029,6 +1035,7 @@ void CDBusBusPort::ReleaseDBus()
 
         m_pDBusConn = nullptr;
         this->Release();
+        dbus_shutdown();
     }
 
     return;
