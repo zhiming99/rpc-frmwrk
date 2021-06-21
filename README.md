@@ -50,6 +50,9 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 7. Logging service
 
 ---
+[`Mon Jun 21 2021 03:14:14 PM Beijing`]   
+1. fixed a message leak bug when the system is under stress testing. 
+2. `RFC` is still under testing. Added a stress test to the `rfcdev` branch.
 [`Sun Jun 13 2021 11:49:07 PM Beijing`]   
 1. Most of the `request flow control` code complete. Now entering debugging stage. It should be ready next week.
 
