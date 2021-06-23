@@ -5784,7 +5784,6 @@ gint32 CIfParallelTaskGrpRfc::AddAndRun(
         if( IsNoSched() )
         {
             pTask->MarkPending();
-            ret = STATUS_SUCCESS;
             break;
         }
 
@@ -5799,6 +5798,8 @@ gint32 CIfParallelTaskGrpRfc::AddAndRun(
 
         // re-run this task group immediately
         ret = ( *this )( eventZero );
+        if( pTask->GetError() == STATUS_PENDING )
+            pTask->MarkPending();
 
     }while( 0 );
 
@@ -5834,7 +5835,7 @@ gint32 CIfParallelTaskGrpRfc::InsertTask(
 {
     gint32 ret = 0;
     do{
-        CStdRTMutex oTaskLock( GetLock() );
+        CHECK_GRP_STATE;
         m_quePendingTasks.push_front( pTask );
         if( GetRunningCount() >= GetMaxRunning() )
             break;

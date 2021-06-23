@@ -3589,9 +3589,9 @@ gint32 CRpcReqForwarder::AddAndRun(
         if( strMethod != SYS_METHOD_FORWARDREQ )
             break;
 
-        TaskGrpPtr pGrpRfc;
+        TaskGrpPtr pGrp;
         ret = GetGrpRfc(
-            pMsg.GetSender(), pGrpRfc );
+            pMsg.GetSender(), pGrp );
         if( ERROR( ret ) )
             break;
 
@@ -3599,14 +3599,28 @@ gint32 CRpcReqForwarder::AddAndRun(
         if( ERROR( ret ) )
             break;
 
-        ret = pGrpRfc->AppendTask( pTask );
+        ObjPtr pMatch;
+        oCfg.GetObjPtr( propMatchPtr, pMatch );
+
+        CIfParallelTaskGrpRfc* pGrpRfc = pGrp;
+        ret = pGrpRfc->AddAndRun( pTask );
         if( ret != ERROR_QUEUE_FULL )
         {
-            ( *pGrpRfc )( eventZero );
             ret = pTask->GetError();
             if( ret == ERROR_QUEUE_FULL )
             {
-                ret = RequeueInvTask( pTask );
+                // pTask context is gone
+                TaskletPtr pDummy;
+                pDummy.NewObj(
+                    clsid( CIfDummyTask ) );
+                CCfgOpener oCfg( ( IConfigDb* )
+                    pDummy->GetConfig() );
+
+                oCfg.SetPointer( propIfPtr, this );
+                oCfg.SetObjPtr( propMatchPtr, pMatch );
+                oCfg.SetMsgPtr( propMsgPtr, pMsg );
+
+                ret = RequeueInvTask( pDummy );
                 if( SUCCEEDED( ret ) )
                     return ret;
             }
@@ -3616,6 +3630,8 @@ gint32 CRpcReqForwarder::AddAndRun(
             }
         }
 
+        // notify the client we have reached the
+        // limit
         bool bResp = true;
         ObjPtr pObj;
         ret = pMsg.GetObjArgAt( 0, pObj );
@@ -3677,6 +3693,7 @@ gint32 CRpcReqForwarder::RequeueInvTask(
         if( ERROR( ret ) )
             break;
 
+        pTask->MarkPending();
         CIfParallelTaskGrpRfc* pGrpRfc = pGrp;
         CStdRTMutex oLock( pGrpRfc->GetLock() );
         pGrp->InsertTask( pTask );

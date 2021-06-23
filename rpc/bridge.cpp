@@ -3398,8 +3398,7 @@ gint32 CRpcInterfaceServer::OnFwrdReqQueueFull(
     IConfigDb* pReqCtx )
 {
     if( pCallback == nullptr ||
-        pIoReq == nullptr ||
-        pReqCtx == nullptr )
+        pIoReq == nullptr )
         return -EINVAL;
 
     gint32 ret = 0;
@@ -3465,6 +3464,7 @@ gint32 CRpcTcpBridge::RequeueInvTask(
     if( !IsConnected() )
         return ERROR_STATE;
 
+    pTask->MarkPending();
     CIfParallelTaskGrpRfc* pGrpRfc = m_pGrpRfc;
     CStdRTMutex oLock( pGrpRfc->GetLock() );
     ret = pGrpRfc->InsertTask( pTask );
@@ -4341,26 +4341,14 @@ gint32 CRpcInterfaceServer::CancelInvTasks(
         for( auto elem : vecTasks )
         {
             CIfRetryTask* pInv = elem;
-            if( pInv != nullptr )
-            {
-                CStdRTMutex oLock( pInv->GetLock() );
-                TaskletPtr pTask =
-                    pInv->GetEndFwrdTask();
-                if( pTask->GetObjId() !=
-                    elem->GetObjId() )
-                {
-                    // to avoid the DEFER_CALL.
-                    pInv->ClearFwrdTask();
-                    oLock.Unlock();
-                    ( *pInv )( eventCancelTask );
-                    ( *pTask )( eventCancelTask );
-                }
-                else
-                {
-                    oLock.Unlock();
-                    ( *pInv )( eventCancelTask );
-                }
-            }
+            if( pInv == nullptr )
+                continue;
+
+            TaskletPtr pTask =
+                pInv->GetEndFwrdTask();
+
+            pTask->OnEvent( eventCancelTask,
+                0, 0, nullptr );
         }
 
     }while( 0 );
@@ -5115,7 +5103,12 @@ gint32 CRpcTcpBridge::AddAndRun(
 
         ret = pGrpRfc->AppendTask( pTask );
         if( ret != ERROR_QUEUE_FULL )
-            return ( *pGrpRfc )( eventZero );
+        {
+            ret = ( *pGrpRfc )( eventZero );
+            if( pTask->GetError() == STATUS_PENDING )
+                pTask->MarkPending();
+            return ret;
+        }
 
         bool bResp = true;
         ObjPtr pObj;
