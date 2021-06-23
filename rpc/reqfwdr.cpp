@@ -1272,7 +1272,7 @@ gint32 CRpcReqForwarder::GetRefCountByPortId(
 }
 
 gint32 CRpcReqForwarder::FindFwrdReqsAllRfc(
-    stdstr strUniqName,
+    const stdstr& strUniqName,
     FWRDREQS& vecTasks,
     bool bTaskId )
 {
@@ -2724,6 +2724,7 @@ gint32 CReqFwdrForwardRequestTask::OnTaskCompleteRfc(
 
         // insert this task back to the pending
         // queue
+        pTask->MarkPending();
         ret = pProxy->RequeueTask( pTask ); 
         if( ERROR( ret ) )
         {
@@ -3566,101 +3567,6 @@ gint32 CRpcReqForwarder::SendFetch_Server(
     // the return value indicates if the response
     // message is generated or not.
     return ret;
-}
-
-gint32 CRpcReqForwarder::AddAndRun(
-    TaskletPtr& pTask, bool bImmediate )
-{
-    do{
-        gint32 ret = 0;
-        if( !IsRfcEnabled() )
-            break;
-
-        CIfInvokeMethodTask* pInv = pTask;
-        if( pInv == nullptr )
-            break;
-
-        CCfgOpener oCfg(
-            ( IConfigDb* )pInv->GetConfig() );
-
-        DMsgPtr pMsg;
-        oCfg.GetMsgPtr( propMsgPtr, pMsg );
-        stdstr strMethod = pMsg.GetMember();
-        if( strMethod != SYS_METHOD_FORWARDREQ )
-            break;
-
-        TaskGrpPtr pGrp;
-        ret = GetGrpRfc(
-            pMsg.GetSender(), pGrp );
-        if( ERROR( ret ) )
-            break;
-
-        ret = InstallQFCallback( pTask );
-        if( ERROR( ret ) )
-            break;
-
-        ObjPtr pMatch;
-        oCfg.GetObjPtr( propMatchPtr, pMatch );
-
-        CIfParallelTaskGrpRfc* pGrpRfc = pGrp;
-        ret = pGrpRfc->AddAndRun( pTask );
-        if( ret != ERROR_QUEUE_FULL )
-        {
-            ret = pTask->GetError();
-            if( ret == ERROR_QUEUE_FULL )
-            {
-                // pTask context is gone
-                TaskletPtr pDummy;
-                pDummy.NewObj(
-                    clsid( CIfDummyTask ) );
-                CCfgOpener oCfg( ( IConfigDb* )
-                    pDummy->GetConfig() );
-
-                oCfg.SetPointer( propIfPtr, this );
-                oCfg.SetObjPtr( propMatchPtr, pMatch );
-                oCfg.SetMsgPtr( propMsgPtr, pMsg );
-
-                ret = RequeueInvTask( pDummy );
-                if( SUCCEEDED( ret ) )
-                    return ret;
-            }
-            else
-            {
-                return ret;
-            }
-        }
-
-        // notify the client we have reached the
-        // limit
-        bool bResp = true;
-        ObjPtr pObj;
-        ret = pMsg.GetObjArgAt( 0, pObj );
-        if( SUCCEEDED( ret ) )
-        {
-            IConfigDb* pReqCtx = pObj;
-            if( pReqCtx != nullptr )
-            {
-                bool bNoReply;
-                CCfgOpener oReqCtx( pReqCtx );
-                ret = oReqCtx.GetBoolProp(
-                    propNoReply, bNoReply );
-                if( SUCCEEDED( ret ) )
-                    bResp = !bNoReply;
-            }
-
-        }
-        if( !bResp )
-            return ret;
-
-        CCfgOpener oResp;
-        oResp[ propReturnValue ] = ERROR_QUEUE_FULL;
-        OnServiceComplete( oResp.GetCfg(), pInv );
-
-        return ret;
-
-    }while( 0 );
-
-    return super::AddAndRun( pTask, bImmediate );
 }
 
 gint32 CRpcReqForwarder::RequeueInvTask(

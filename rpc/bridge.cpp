@@ -1988,13 +1988,15 @@ gint32 CRpcTcpBridgeProxy::AddAndRun(
         if( strMethod != SYS_METHOD_FORWARDREQ )
             break;
 
-        CIfParallelTaskGrpRfc* pGrpRfc =
-            m_pGrpRfc;
+        CIfParallelTaskGrpRfc* pGrp = m_pGrpRfc;
 
-        if( pGrpRfc == nullptr )
-            return -EFAULT;
-
-        return pGrpRfc->AddAndRun( pTask );
+        ret = pGrp->AddAndRun( pTask );
+        if( ret == ERROR_QUEUE_FULL )
+        {
+            pTask->OnEvent( eventTaskComp,
+                ret, 0, nullptr );
+        }
+        return ret;
 
     }while( 0 );
 
@@ -4364,6 +4366,110 @@ bool CRpcInterfaceServer::IsRfcEnabled() const
     return pRouter->IsRfcEnabled();
 }
 
+gint32 CRpcInterfaceServer::AddAndRun(
+    TaskletPtr& pTask, bool bImmediate )
+{
+    do{
+        gint32 ret = 0;
+        if( !IsRfcEnabled() )
+            break;
+
+        CIfInvokeMethodTask* pInv = pTask;
+        if( pInv == nullptr )
+            break;
+
+        CCfgOpener oCfg(
+            ( IConfigDb* )pInv->GetConfig() );
+
+        DMsgPtr pMsg;
+        oCfg.GetMsgPtr( propMsgPtr, pMsg );
+        stdstr strMethod = pMsg.GetMember();
+        if( strMethod != SYS_METHOD_FORWARDREQ )
+            break;
+
+        TaskGrpPtr pGrp;
+        ret = GetGrpRfc( pMsg, pGrp );
+        if( ERROR( ret ) )
+            break;
+
+        CIfParallelTaskGrpRfc* pGrpRfc = pGrp;
+        ret = InstallQFCallback( pTask );
+        if( ERROR( ret ) )
+            break;
+
+        ObjPtr pMatch;
+        oCfg.GetObjPtr( propMatchPtr, pMatch );
+
+        ret = pGrpRfc->AddAndRun( pTask );
+        if( ret != ERROR_QUEUE_FULL )
+        {
+            ret = pTask->GetError();
+            if( ret == ERROR_QUEUE_FULL )
+            {
+                // pTask context is gone
+                TaskletPtr pDummy;
+                pDummy.NewObj(
+                    clsid( CIfDummyTask ) );
+                CCfgOpener oCfg( ( IConfigDb* )
+                    pDummy->GetConfig() );
+
+                oCfg.SetPointer( propIfPtr, this );
+                oCfg.SetObjPtr( propMatchPtr, pMatch );
+                oCfg.SetMsgPtr( propMsgPtr, pMsg );
+
+                ret = RequeueInvTask( pDummy );
+                if( SUCCEEDED( ret ) )
+                    return ret;
+            }
+            else
+            {
+                return ret;
+            }
+        }
+
+        // notify the client we have reached the
+        // limit
+        bool bResp = true;
+        ObjPtr pObj;
+        ret = pMsg.GetObjArgAt( 0, pObj );
+        if( SUCCEEDED( ret ) )
+        {
+            IConfigDb* pReqCtx = pObj;
+            if( pReqCtx != nullptr )
+            {
+                bool bNoReply;
+                CCfgOpener oReqCtx( pReqCtx );
+                ret = oReqCtx.GetBoolProp(
+                    propNoReply, bNoReply );
+                if( SUCCEEDED( ret ) )
+                    bResp = !bNoReply;
+            }
+
+        }
+
+        EventPtr pEvt;
+        ret = pInv->GetClientNotify( pEvt );
+        if( SUCCEEDED( ret ) )
+        {
+            pInv->ClearClientNotify();
+            TaskletPtr pQFTask = pEvt;
+            ( *pQFTask )( eventCancelTask );
+        }
+
+        if( !bResp )
+            return ret;
+
+        CCfgOpener oResp;
+        oResp[ propReturnValue ] = ERROR_QUEUE_FULL;
+        OnServiceComplete( oResp.GetCfg(), pInv );
+
+        return ret;
+
+    }while( 0 );
+
+    return super::AddAndRun( pTask, bImmediate );
+}
+
 gint32 CRpcTcpBridge::SetupReqIrp(
     IRP* pIrp,
     IConfigDb* pReqCall,
@@ -5072,73 +5178,6 @@ gint32 CRpcTcpBridge::OnPreStop(
         m_pGrpRfc.Clear();
 
     return super::OnPreStop( pCallback );
-}
-
-gint32 CRpcTcpBridge::AddAndRun(
-    TaskletPtr& pTask, bool bImmediate )
-{
-    do{
-        gint32 ret = 0;
-        if( !IsRfcEnabled() )
-            break;
-
-        CIfInvokeMethodTask* pInv = pTask;
-        if( pInv == nullptr )
-            break;
-
-        CCfgOpener oCfg(
-            ( IConfigDb* )pInv->GetConfig() );
-
-        DMsgPtr pMsg;
-        oCfg.GetMsgPtr( propMsgPtr, pMsg );
-
-        stdstr strMethod = pMsg.GetMember();
-        if( strMethod != SYS_METHOD_FORWARDREQ )
-            break;
-
-        InstallQFCallback( pTask );
-
-        CIfParallelTaskGrpRfc* pGrpRfc =
-            m_pGrpRfc;
-
-        ret = pGrpRfc->AppendTask( pTask );
-        if( ret != ERROR_QUEUE_FULL )
-        {
-            ret = ( *pGrpRfc )( eventZero );
-            if( pTask->GetError() == STATUS_PENDING )
-                pTask->MarkPending();
-            return ret;
-        }
-
-        bool bResp = true;
-        ObjPtr pObj;
-        ret = pMsg.GetObjArgAt( 0, pObj );
-        if( SUCCEEDED( ret ) )
-        {
-            IConfigDb* pReqCtx = pObj;
-            if( pReqCtx != nullptr )
-            {
-                bool bNoReply;
-                CCfgOpener oReqCtx( pReqCtx );
-                ret = oReqCtx.GetBoolProp(
-                    propNoReply, bNoReply );
-                if( SUCCEEDED( ret ) )
-                    bResp = !bNoReply;
-            }
-
-        }
-        if( !bResp )
-            return ret;
-
-        CCfgOpener oResp;
-        oResp[ propReturnValue ] = ERROR_QUEUE_FULL;
-        OnServiceComplete( oResp.GetCfg(), pInv );
-
-        return ret;
-
-    }while( 0 );
-
-    return super::AddAndRun( pTask, bImmediate );
 }
 
 gint32 CRpcTcpBridge::RefreshReqLimit(

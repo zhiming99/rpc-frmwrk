@@ -958,15 +958,17 @@ TaskletPtr CIfRetryTask::GetEndFwrdTask(
     if( pTask.IsEmpty() )
         return TaskletPtr( this );
 
+    TaskletPtr pOldTask;
     do{
+        pOldTask = pTask;
         CIfRetryTask* pRetry = pTask;
         if( pRetry == nullptr )
             break;
 
-        pTask = pRetry->GetFwrdTask();
+        pTask = pRetry->GetFwrdTask( bClear );
         if( pTask.IsEmpty() )
         {
-            pTask = pRetry;
+            pTask = pOldTask;
             break;
         }
 
