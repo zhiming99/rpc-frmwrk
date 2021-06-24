@@ -138,19 +138,46 @@ int main( int argc, char** argv)
 extern std::atomic< guint32 > g_dwCounter;
 std::atomic< bool > g_bQueueFull( false );
 std::atomic< guint32 > g_dwReqs( 0 );
-gint32 maincli(
-    CStressSvc_CliImpl* pIf,
-    int argc, char** argv )
-{
-    TaskletPtr pTask;
-    gint32 ret = DEFER_CALL_NOSCHED(
-        pTask, ObjPtr( pIf ),
-        &CStressSvc_CliImpl::IncMloop );
-    if( ERROR( ret ) )
-        return ret;
 
-    CIoManager* pMgr = pIf->GetIoMgr();
-    pMgr->RescheduleTaskMainLoop( pTask );
+gint32 echocli(
+    CStressSvc_CliImpl* pIf )
+{
+    gint32 ret = 0;
+
+    for( int i = 0; i < 100; i++ )
+    {
+        CParamList oParams;
+        guint32 dwIdx = ++g_dwCounter;
+        oParams.Push( dwIdx );
+
+        stdstr strMsg = "Hello, Server ";
+        strMsg += std::to_string( dwIdx );
+
+        DebugPrint( 0, "req %d, pending %d, thread %d",
+             dwIdx, ( guint32 )g_dwReqs,
+             cpp::GetTid() );
+
+        ret = pIf->Echo(
+             oParams.GetCfg(), strMsg );
+        if( ERROR( ret ) )
+              break;
+
+        if( ret == STATUS_PENDING )
+            g_dwReqs++;
+    }
+    while( true )
+    {
+        DebugPrint( 0, "pending %d, thread %d",
+             ( guint32 )g_dwReqs, cpp::GetTid() );
+        sleep( 20 );
+    }
+    return STATUS_SUCCESS;
+}
+
+gint32 pingcli(
+    CStressSvc_CliImpl* pIf )
+{
+    gint32 ret = 0;
 
     for( int i = 0; i < 10000; i++ )
     {
@@ -161,13 +188,10 @@ gint32 maincli(
         stdstr strMsg = "Hello, Server ";
         strMsg += std::to_string( dwIdx );
 
-        // DebugPrint( 0, "req %d, pending %d, thread %d",
-        //     dwIdx, ( guint32 )g_dwReqs, cpp::GetTid() );
+        DebugPrint( 0, "req %d, pending %d, thread %d",
+             dwIdx, ( guint32 )g_dwReqs,
+             cpp::GetTid() );
 
-        // ret = pIf->Echo(
-        //     oParams.GetCfg(), strMsg );
-        // if( ERROR( ret ) )
-        //     break;
         ret = pIf->Ping( strMsg );
 
         if( ret == STATUS_PENDING )
@@ -176,8 +200,56 @@ gint32 maincli(
     while( true )
     {
         DebugPrint( 0, "pending %d, thread %d",
-            ( guint32 )g_dwReqs, cpp::GetTid() );
+             ( guint32 )g_dwReqs, cpp::GetTid() );
         sleep( 20 );
     }
     return STATUS_SUCCESS;
+}
+
+gint32 usage( const char* cmdline )
+{
+    fprintf( stderr,
+        "Usage: -[pe] %s \n" 
+        "\t -p no-reply call test, 10000 cases in parallel\n"
+        "\t -e continously echo test with 100 cases in parallel\n",
+        cmdline );
+    return 0;
+}
+
+gint32 maincli(
+    CStressSvc_CliImpl* pIf,
+    int argc, char** argv )
+{
+    int opt = 0;
+    int cmd = -1;
+    int ret = 0;
+    while( ( opt = getopt(
+            argc, argv, "pe" ) ) != -1 )
+    {
+        ret = 0;
+        switch (opt)
+        {
+        case 'p':
+            {
+                cmd = 0;
+                break;
+            }
+        case 'e':
+            {
+                cmd = 1;
+                break;
+            }
+        default: /*  '?' */
+            cmd = 3;
+            break;
+        }
+    }
+    if( cmd == 0 )
+        ret = pingcli( pIf );
+    else if( cmd == 1 )
+        ret = echocli( pIf );
+    else
+        ret = usage( argv[ 0 ] );
+
+    return ret;
 }

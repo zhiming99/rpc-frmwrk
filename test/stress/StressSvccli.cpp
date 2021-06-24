@@ -36,12 +36,16 @@ gint32 CStressSvc_CliImpl::EchoCallback(
         }
         else if( iRet == -ETIMEDOUT )
         {
-            DebugPrint( iRet, "req %d, completed, "
-                "resp is %s, pending %d", dwIdx,
-                strResp.c_str(),
+            DebugPrint( iRet, "req %d, timeout, "
+                "pending %d", dwIdx,
                 ( guint32 )g_dwReqs );
             return iRet;
         }
+
+        DebugPrint( iRet, "req %d, completed, "
+            "resp is %s, pending %d", dwIdx,
+            strResp.c_str(),
+            ( guint32 )g_dwReqs );
 
         g_bQueueFull = false;
         dwIdx = ++g_dwCounter;
@@ -51,18 +55,9 @@ gint32 CStressSvc_CliImpl::EchoCallback(
         g_dwReqs++;
 
         TaskletPtr pTask;
-        ret = DEFER_CALL_NOSCHED( pTask,
-            ObjPtr( this ),
-            &CStressSvc_CliImpl::Echo,
-            context, strMsg );
-        if( SUCCEEDED( ret ) )
-        {
-            CIoManager* pMgr = GetIoMgr();
-            pMgr->RescheduleTaskMainLoop( pTask );
-        }
-
-        // printf( "EchoCallback: pending reqs %d\n",
-        //     ( guint32 )g_dwReqs );
+        ret = this->Echo( context, strMsg );
+        if( ret == STATUS_PENDING )
+            ret = 0;
 
     }while( 0 );
 
@@ -78,10 +73,3 @@ gint32 CStressSvc_CliImpl::OnHelloWorld(
     return 0;
 }
 
-gint32 CStressSvc_CliImpl::IncMloop()
-{
-    gint32 ret = nice( -2 );
-    if( ret == -1 )
-        DebugPrint( -errno, "Nice() failed" );
-    return -errno;
-}
