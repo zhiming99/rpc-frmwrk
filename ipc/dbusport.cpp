@@ -231,13 +231,99 @@ gint32 IpAddrToByteStr(
     return ret;
 }
 
+gint32 AddrIdMap::Find(
+    CConnParamsProxy& ocp,
+    guint32& dwPortId )
+{
+    if( !m_bSepConns )
+    {
+        ADDRID_MAP::iterator itr =
+            m_pMap->find( ocp );
+        if( itr == m_pMap->end() )
+            return -ENOENT ;
+        dwPortId = itr->second;
+    }
+    else
+    {
+        CConnParamsProxySepConns
+            ocpsc( ocp.GetCfg() );
+        ADDRID_MAP2::iterator itr =
+            m_pMap2->find( ocpsc );
+        if( itr == m_pMap2->end() )
+            return -ENOENT;
+        dwPortId = itr->second;
+    }
+    return 0;
+}
+
+gint32 AddrIdMap::Add(
+    CConnParamsProxy& ocp,
+    guint32 dwPortId )
+{
+    if( !m_bSepConns )
+    {
+        ADDRID_MAP::iterator itr =
+            m_pMap->find( ocp );
+        if( itr != m_pMap->end() )
+        {
+            if( itr->second == dwPortId )
+                return -EEXIST;
+        }
+        ( *m_pMap )[ ocp ] = dwPortId;
+    }
+    else
+    {
+        CConnParamsProxySepConns
+            ocpsc( ocp.GetCfg() );
+        ADDRID_MAP2::iterator itr =
+            m_pMap2->find( ocpsc );
+        if( itr != m_pMap2->end() )
+        {
+            if( itr->second == dwPortId )
+                return -EEXIST;
+        }
+        ( *m_pMap2 )[ ocpsc ] = dwPortId;
+    }
+    return 0;
+}
+
+gint32 AddrIdMap::Erase(
+    CConnParamsProxy& ocp )
+{
+    if( !m_bSepConns )
+    {
+        m_pMap->erase( ocp );
+    }
+    else
+    {
+        CConnParamsProxySepConns
+            ocpsc( ocp.GetCfg() );
+        m_pMap2->erase( ocpsc );
+    }
+    return 0;
+}
+
 CDBusBusPort::CDBusBusPort( const IConfigDb* pConfig )
     : super( pConfig ),
     m_pDBusConn( nullptr ),
     m_iLocalPortId( -1 ),
     m_iLpbkPortId( -1 )
 {
+    gint32 ret = 0;
     SetClassId( clsid( CDBusBusPort ) );
+    CIoManager* pMgr = GetIoMgr();
+    bool bSepConns = false;
+    guint32 dwRole = 0;
+    ret = pMgr->GetCmdLineOpt(
+        propRouterRole, dwRole );
+    if( SUCCEEDED( ret ) && ( dwRole & 0x01 ) )
+    {
+        ret = pMgr->GetCmdLineOpt(
+            propSepConns, bSepConns );
+        if( ERROR( ret ) )
+            bSepConns = false;
+    }
+    m_mapAddrToId.Initialize( bSepConns );
 }
 
 CDBusBusPort::~CDBusBusPort()
@@ -297,15 +383,13 @@ gint32 CDBusBusPort::BuildPdoPortName(
                     CStdRMutex oPortLock( GetLock() );
                     CConnParamsProxy ocps( pConnParams );
 
-                    ADDRID_MAP::const_iterator itr =
-                        m_mapAddrToId.find( ocps );
-                    if( itr != m_mapAddrToId.end() )
-                    {
-                        dwPortId = itr->second;
-                    }
-                    else
+                    ret = m_mapAddrToId.Find(
+                        ocps, dwPortId );
+
+                    if( ERROR( ret ) )
                     {
                         dwPortId = NewPdoId();
+                        ret = 0;
                     }
                 }
                 oCfgOpener[ propPortId ] = dwPortId;
@@ -468,17 +552,8 @@ gint32 CDBusBusPort::CreateRpcProxyPdoShared(
 
             // bind the ip addr and the port-id
             CStdRMutex oPortLock( GetLock() );
-            ADDRID_MAP::iterator
-                itr = m_mapAddrToId.find( ocp );
-            if( itr != m_mapAddrToId.end() )
-            {
-                if( itr->second == dwPortId )
-                {
-                    ret = -EEXIST;
-                    break;
-                }
-            }
-            m_mapAddrToId[ ocp ] = dwPortId;
+            ret = m_mapAddrToId.Add(
+                ocp, dwPortId );
         }
         // the pdo port `Start()' will be deferred
         // till the complete port stack is built.
@@ -683,6 +758,12 @@ gint32 CDBusBusPort::Start( IRP *pIrp )
             break;
         }
         this->AddRef();
+
+        const char* szName =
+            dbus_bus_get_unique_name( m_pDBusConn );
+
+        DebugPrint( 0,
+            "dbus unique name: %s", szName );
 
         CParamList oParams;
 
@@ -1035,7 +1116,6 @@ void CDBusBusPort::ReleaseDBus()
 
         m_pDBusConn = nullptr;
         this->Release();
-        dbus_shutdown();
     }
 
     return;
@@ -2356,7 +2436,7 @@ void CDBusBusPort::RemovePdoPort(
         return;
 
     CConnParamsProxy ocps( pConnParams );
-    m_mapAddrToId.erase( ocps );
+    m_mapAddrToId.Erase( ocps );
 }
 
 CDBusConnFlushTask::CDBusConnFlushTask(

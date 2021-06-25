@@ -1244,6 +1244,12 @@ gint32 CRpcReqForwarderAuth::LocalLoginInternal(
         if( ERROR( ret ) )
             break;
 
+        if( IsSepConns() )
+        {
+            CCfgOpener oConnCfg( pConnParams );
+            oConnCfg[ propSrcUniqName ] =
+                strSrcUniqName;
+        }
         std::string strRouterPath;
         ret = oCfg.GetStrProp(
             propRouterPath, strRouterPath );
@@ -1353,7 +1359,6 @@ gint32 CRpcReqForwarderAuth::LocalLoginInternal(
             // create the authenticate proxy which
             // will finally create the bridge
             // proxy on success.
-            CParamList oParams;
             ret = CreateBridgeProxyAuth(
                 pCallback, pCfg, pInvTask );
         }

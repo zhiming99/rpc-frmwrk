@@ -2358,7 +2358,6 @@ gint32 CRpcInterfaceServer::RetrieveTaskId(
             if( ERROR( ret ) )
                 break;
 
-            guint64 qwTaskId = 0;
             CCfgOpener oReq( pReq );
             ret = oReq.GetQwordProp(
                 propTaskId, qwTaskId );
@@ -2836,7 +2835,7 @@ gint32 CRpcTcpBridge::ClearRemoteEvents(
             mapTasksLoc = ( *pmapTaskIdsLoc )();
 
         GetFwrdReqs( vecTaskKill,
-            pmapTaskIdsLoc, pmapTaskIdsLoc );
+            pmapTaskIdsLoc, pmapTaskIdsMH );
 
         ObjVecPtr pvecTasks( true );
         FWRDREQS_ITER itr = vecTaskKill.begin();
@@ -3470,7 +3469,9 @@ gint32 CRpcTcpBridge::RequeueInvTask(
     CIfParallelTaskGrpRfc* pGrpRfc = m_pGrpRfc;
     CStdRTMutex oLock( pGrpRfc->GetLock() );
     ret = pGrpRfc->InsertTask( pTask );
-    if( pGrpRfc->GetRunningCount() == 0 )
+    if( pGrpRfc->GetRunningCount() <
+        pGrpRfc->GetMaxRunning() &&
+        !pGrpRfc->IsNoSched() )
     {
         TaskletPtr pTask = ObjPtr( m_pGrpRfc );
         GetIoMgr()->RescheduleTask( pTask );
@@ -3775,7 +3776,7 @@ gint32 CRpcTcpBridge::IsMHTask(
         if( ERROR( ret ) )
             break;
 
-        if( strPath != "/" )
+        if( strPath == "/" )
         {
             ret = ERROR_FALSE;
             break;

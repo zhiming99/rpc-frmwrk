@@ -488,6 +488,7 @@ class CRpcReqForwarder :
     bool m_bRfc = false;
     std::hashmap< stdstr, TaskGrpPtr > m_mapGrpRfcs;
     std::hashmap< stdstr, stdstr > m_mapUq2SdName;
+    bool m_bSepConns = false;
 
     inline gint32 GetSrcDBusName(
         const stdstr& strUqName,
@@ -693,6 +694,8 @@ class CRpcReqForwarder :
         const stdstr& strUniqName,
         const stdstr& strSdName );
 
+    inline bool IsSepConns() const
+    { return m_bSepConns; }
 }; // CRpcReqForwarder
 
 class CRpcRfpForwardEventTask

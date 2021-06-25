@@ -72,6 +72,14 @@ CRpcReqForwarder::CRpcReqForwarder(
 
         RemoveProperty( propRouterPtr );
 
+        CIoManager* pMgr = GetIoMgr();
+        ret = pMgr->GetCmdLineOpt(
+            propSepConns, m_bSepConns );
+        if( ERROR( ret ) )
+            m_bSepConns = false;
+
+        ret = 0;
+
     }while( 0 );
 
     if( ERROR( ret ) )
@@ -1033,6 +1041,19 @@ gint32 CRpcReqForwarder::OpenRemotePortInternal(
             break;
         }
 
+        CRpcRouter* pRouter = GetParent();
+        CCfgOpener oConn( pConnParams );
+        if( !pRouter->HasAuth() &&
+            IsSepConns() )
+        {
+            oConn[ propSrcUniqName ] =
+                strSrcUniqName;
+        }
+        else
+        {
+            ret = 0;
+        }
+
         string strRouterPath;
         ret = oCfg.GetStrProp(
             propRouterPath, strRouterPath );
@@ -1040,7 +1061,6 @@ gint32 CRpcReqForwarder::OpenRemotePortInternal(
             break;
 
         InterfPtr pIf;
-        CRpcRouter* pRouter = GetParent();
         ret = pRouter->GetBridgeProxy(
             pConnParams, pIf );
 
@@ -1725,12 +1745,6 @@ gint32 CRpcReqForwarder::OnModOfflineInternal(
                 vecRmtTasks.push_back( elem );
         }
 
-        if( vecTasks.size() > 0 )
-            CancelInvTasks( pvecTasks );
-
-        if( IsRfcEnabled() )
-            RemoveRfcGrp( strUniqName );
-
         std::map< guint32, gint32 > oPortRefs;
         if( setPortIds.size() )
         {
@@ -1749,7 +1763,8 @@ gint32 CRpcReqForwarder::OnModOfflineInternal(
         {
             // if the port is about to close, no
             // need to send this commands
-            if( oPortRefs[ dwPortId ] == 0 )
+            if( oPortRefs[ dwPortId ] == 0 ||
+                IsSepConns() )
                 continue;
 
             ObjVecPtr pMatches( true );
@@ -1823,7 +1838,8 @@ gint32 CRpcReqForwarder::OnModOfflineInternal(
         // to close the bridge proxy with zero refcount
         for( auto& dwPortId : setPortIds )
         {
-            if( oPortRefs[ dwPortId ] > 0 )
+            if( oPortRefs[ dwPortId ] > 0 &&
+                !IsSepConns() )
                 continue;
 
             InterfPtr pProxy;
@@ -1854,6 +1870,12 @@ gint32 CRpcReqForwarder::OnModOfflineInternal(
 
             pTaskGrp->AppendTask( pTask );
         }
+
+        if( vecTasks.size() > 0 )
+            CancelInvTasks( pvecTasks );
+
+        if( IsRfcEnabled() )
+            RemoveRfcGrp( strUniqName );
 
         if( pTaskGrp->GetTaskCount() == 0 )
             break;
@@ -3603,7 +3625,9 @@ gint32 CRpcReqForwarder::RequeueInvTask(
         CIfParallelTaskGrpRfc* pGrpRfc = pGrp;
         CStdRTMutex oLock( pGrpRfc->GetLock() );
         pGrp->InsertTask( pTask );
-        if( pGrpRfc->GetRunningCount() == 0 )
+        if( pGrpRfc->GetRunningCount() <
+            pGrpRfc->GetMaxRunning() &&
+            !pGrpRfc->IsNoSched() )
         {
             TaskletPtr pTask = ObjPtr( pGrpRfc );
             GetIoMgr()->RescheduleTask( pTask );

@@ -117,6 +117,18 @@ gint32 CRpcRouter::IsEqualConn(
         if( ERROR( ret ) )
             break;
 
+        bool bSepConns = false;
+        CIoManager* pMgr = GetIoMgr();
+        gint32 iRet = pMgr->GetCmdLineOpt(
+            propSepConns, bSepConns );
+        if( SUCCEEDED( iRet ) &&
+            HasReqForwarder() &&
+            bSepConns )
+        {
+            ret = oCfg.IsEqualProp(
+                propSrcUniqName, pConn2 );
+        }
+
     }while( 0 );
     if( ERROR( ret ) )
         ret = ERROR_FALSE;
