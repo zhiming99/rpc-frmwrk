@@ -485,7 +485,7 @@ gint32 CReqFwdrOpenRmtPortTask::OnServiceComplete(
         oReqCtx[ propConnHandle ] = dwPortId;
         oReqCtx[ propRouterPath ] =
             strRouterPath;
-        oReqCtx.CopyProp(
+        ret = oReqCtx.CopyProp(
             propConnParams, this );
         if( ERROR( ret ) )
             break;
@@ -1458,7 +1458,7 @@ gint32 CRpcReqForwarder::ClearFwrdReqsByDestAddr(
             break;
         }
 
-        ObjVecPtr pvecTasks;
+        ObjVecPtr pvecTasks( true );
         for( auto elem : setNames )
         {
             FWRDREQS vecReqs;
@@ -1592,9 +1592,10 @@ gint32 CRpcReqForwarder::OnModEvent(
         if( strModule[ 0 ] != ':' )
             break;
 
-        ret = GetRefCountByUniqName( strModule );
-        if( ret <= 0 )
-            break;
+        //
+        // ret = GetRefCountByUniqName( strModule );
+        // if( ret <= 0 )
+        //     break;
 
         ObjPtr pObj;
         TaskletPtr pDeferTask;
@@ -1671,6 +1672,9 @@ gint32 CRpcReqForwarder::OnModOfflineInternal(
     gint32 ret = 0;
 
     do{
+        DebugPrint( 0, "%s is down",
+            strUniqName.c_str() );
+
         ret = ClearRefCountByUniqName(
             strUniqName, setPortIds );
         if( ret == 0 )
@@ -1689,7 +1693,9 @@ gint32 CRpcReqForwarder::OnModOfflineInternal(
         ret = pRouter->RemoveLocalMatchByUniqName(
             strUniqName, vecMatches );
 
-        if( ret == 0 )
+        if( vecReqs.empty() &&
+            vecMatches.empty() &&
+            setPortIds.empty() )
         {
             if( IsRfcEnabled() )
                 RemoveRfcGrp( strUniqName );
@@ -3743,7 +3749,7 @@ gint32 CRpcReqForwarderProxy::SetupReqIrpFwrdReq(
         oReq.GetTimeoutSec( dwTimeoutSec );
         guint64 qwTs = 0;
         oReq.GetQwordProp( propTimestamp, qwTs );
-        guint64 qwAge =
+        guint32 qwAge =
             CTimestampSvr::GetAgeSec( qwTs );
         if( qwAge >= dwTimeoutSec )
         {

@@ -5923,9 +5923,8 @@ gint32 CRpcTcpBridgeShared::StartHandshake(
     {
         CRpcTcpBridge* pIf =
             ObjPtr( m_pParentIf );
-        if( pIf != nullptr )
-            ret = pIf->DoStartHandshake(
-                pCallback );
+        ret = pIf->DoStartHandshake(
+            pCallback );
     }
     else
     {

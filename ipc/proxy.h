@@ -595,7 +595,8 @@ struct CTimestampSvr
     {
         timespec tv;
         clock_gettime( CLOCK_MONOTONIC, &tv );
-        return tv.tv_sec - qwTimestampSec;
+        return ( ( guint64 )tv.tv_sec -
+            qwTimestampSec );
     }
 };
 
