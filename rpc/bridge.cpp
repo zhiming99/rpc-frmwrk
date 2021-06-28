@@ -1988,13 +1988,15 @@ gint32 CRpcTcpBridgeProxy::AddAndRun(
         if( strMethod != SYS_METHOD_FORWARDREQ )
             break;
 
-        CIfParallelTaskGrpRfc* pGrpRfc =
-            m_pGrpRfc;
+        CIfParallelTaskGrpRfc* pGrp = m_pGrpRfc;
 
-        if( pGrpRfc == nullptr )
-            return -EFAULT;
-
-        return pGrpRfc->AddAndRun( pTask );
+        ret = pGrp->AddAndRun( pTask );
+        if( ret == ERROR_QUEUE_FULL )
+        {
+            pTask->OnEvent( eventTaskComp,
+                ret, 0, nullptr );
+        }
+        return ret;
 
     }while( 0 );
 
@@ -2356,7 +2358,6 @@ gint32 CRpcInterfaceServer::RetrieveTaskId(
             if( ERROR( ret ) )
                 break;
 
-            guint64 qwTaskId = 0;
             CCfgOpener oReq( pReq );
             ret = oReq.GetQwordProp(
                 propTaskId, qwTaskId );
@@ -2834,7 +2835,7 @@ gint32 CRpcTcpBridge::ClearRemoteEvents(
             mapTasksLoc = ( *pmapTaskIdsLoc )();
 
         GetFwrdReqs( vecTaskKill,
-            pmapTaskIdsLoc, pmapTaskIdsLoc );
+            pmapTaskIdsLoc, pmapTaskIdsMH );
 
         ObjVecPtr pvecTasks( true );
         FWRDREQS_ITER itr = vecTaskKill.begin();
@@ -3398,8 +3399,7 @@ gint32 CRpcInterfaceServer::OnFwrdReqQueueFull(
     IConfigDb* pReqCtx )
 {
     if( pCallback == nullptr ||
-        pIoReq == nullptr ||
-        pReqCtx == nullptr )
+        pIoReq == nullptr )
         return -EINVAL;
 
     gint32 ret = 0;
@@ -3465,10 +3465,13 @@ gint32 CRpcTcpBridge::RequeueInvTask(
     if( !IsConnected() )
         return ERROR_STATE;
 
+    pTask->MarkPending();
     CIfParallelTaskGrpRfc* pGrpRfc = m_pGrpRfc;
     CStdRTMutex oLock( pGrpRfc->GetLock() );
     ret = pGrpRfc->InsertTask( pTask );
-    if( pGrpRfc->GetRunningCount() == 0 )
+    if( pGrpRfc->GetRunningCount() <
+        pGrpRfc->GetMaxRunning() &&
+        !pGrpRfc->IsNoSched() )
     {
         TaskletPtr pTask = ObjPtr( m_pGrpRfc );
         GetIoMgr()->RescheduleTask( pTask );
@@ -3773,7 +3776,7 @@ gint32 CRpcTcpBridge::IsMHTask(
         if( ERROR( ret ) )
             break;
 
-        if( strPath != "/" )
+        if( strPath == "/" )
         {
             ret = ERROR_FALSE;
             break;
@@ -4341,26 +4344,14 @@ gint32 CRpcInterfaceServer::CancelInvTasks(
         for( auto elem : vecTasks )
         {
             CIfRetryTask* pInv = elem;
-            if( pInv != nullptr )
-            {
-                CStdRTMutex oLock( pInv->GetLock() );
-                TaskletPtr pTask =
-                    pInv->GetEndFwrdTask();
-                if( pTask->GetObjId() !=
-                    elem->GetObjId() )
-                {
-                    // to avoid the DEFER_CALL.
-                    pInv->ClearFwrdTask();
-                    oLock.Unlock();
-                    ( *pInv )( eventCancelTask );
-                    ( *pTask )( eventCancelTask );
-                }
-                else
-                {
-                    oLock.Unlock();
-                    ( *pInv )( eventCancelTask );
-                }
-            }
+            if( pInv == nullptr )
+                continue;
+
+            TaskletPtr pTask =
+                pInv->GetEndFwrdTask();
+
+            pTask->OnEvent( eventCancelTask,
+                0, 0, nullptr );
         }
 
     }while( 0 );
@@ -4374,6 +4365,110 @@ bool CRpcInterfaceServer::IsRfcEnabled() const
         static_cast< CRpcRouter* >
             ( GetParent() );
     return pRouter->IsRfcEnabled();
+}
+
+gint32 CRpcInterfaceServer::AddAndRun(
+    TaskletPtr& pTask, bool bImmediate )
+{
+    do{
+        gint32 ret = 0;
+        if( !IsRfcEnabled() )
+            break;
+
+        CIfInvokeMethodTask* pInv = pTask;
+        if( pInv == nullptr )
+            break;
+
+        CCfgOpener oCfg(
+            ( IConfigDb* )pInv->GetConfig() );
+
+        DMsgPtr pMsg;
+        oCfg.GetMsgPtr( propMsgPtr, pMsg );
+        stdstr strMethod = pMsg.GetMember();
+        if( strMethod != SYS_METHOD_FORWARDREQ )
+            break;
+
+        TaskGrpPtr pGrp;
+        ret = GetGrpRfc( pMsg, pGrp );
+        if( ERROR( ret ) )
+            break;
+
+        CIfParallelTaskGrpRfc* pGrpRfc = pGrp;
+        ret = InstallQFCallback( pTask );
+        if( ERROR( ret ) )
+            break;
+
+        ObjPtr pMatch;
+        oCfg.GetObjPtr( propMatchPtr, pMatch );
+
+        ret = pGrpRfc->AddAndRun( pTask );
+        if( ret != ERROR_QUEUE_FULL )
+        {
+            ret = pTask->GetError();
+            if( ret == ERROR_QUEUE_FULL )
+            {
+                // pTask context is gone
+                TaskletPtr pDummy;
+                pDummy.NewObj(
+                    clsid( CIfDummyTask ) );
+                CCfgOpener oCfg( ( IConfigDb* )
+                    pDummy->GetConfig() );
+
+                oCfg.SetPointer( propIfPtr, this );
+                oCfg.SetObjPtr( propMatchPtr, pMatch );
+                oCfg.SetMsgPtr( propMsgPtr, pMsg );
+
+                ret = RequeueInvTask( pDummy );
+                if( SUCCEEDED( ret ) )
+                    return ret;
+            }
+            else
+            {
+                return ret;
+            }
+        }
+
+        // notify the client we have reached the
+        // limit
+        bool bResp = true;
+        ObjPtr pObj;
+        ret = pMsg.GetObjArgAt( 0, pObj );
+        if( SUCCEEDED( ret ) )
+        {
+            IConfigDb* pReqCtx = pObj;
+            if( pReqCtx != nullptr )
+            {
+                bool bNoReply;
+                CCfgOpener oReqCtx( pReqCtx );
+                ret = oReqCtx.GetBoolProp(
+                    propNoReply, bNoReply );
+                if( SUCCEEDED( ret ) )
+                    bResp = !bNoReply;
+            }
+
+        }
+
+        EventPtr pEvt;
+        ret = pInv->GetClientNotify( pEvt );
+        if( SUCCEEDED( ret ) )
+        {
+            pInv->ClearClientNotify();
+            TaskletPtr pQFTask = pEvt;
+            ( *pQFTask )( eventCancelTask );
+        }
+
+        if( !bResp )
+            return ret;
+
+        CCfgOpener oResp;
+        oResp[ propReturnValue ] = ERROR_QUEUE_FULL;
+        OnServiceComplete( oResp.GetCfg(), pInv );
+
+        return ret;
+
+    }while( 0 );
+
+    return super::AddAndRun( pTask, bImmediate );
 }
 
 gint32 CRpcTcpBridge::SetupReqIrp(
@@ -5084,68 +5179,6 @@ gint32 CRpcTcpBridge::OnPreStop(
         m_pGrpRfc.Clear();
 
     return super::OnPreStop( pCallback );
-}
-
-gint32 CRpcTcpBridge::AddAndRun(
-    TaskletPtr& pTask, bool bImmediate )
-{
-    do{
-        gint32 ret = 0;
-        if( !IsRfcEnabled() )
-            break;
-
-        CIfInvokeMethodTask* pInv = pTask;
-        if( pInv == nullptr )
-            break;
-
-        CCfgOpener oCfg(
-            ( IConfigDb* )pInv->GetConfig() );
-
-        DMsgPtr pMsg;
-        oCfg.GetMsgPtr( propMsgPtr, pMsg );
-
-        stdstr strMethod = pMsg.GetMember();
-        if( strMethod != SYS_METHOD_FORWARDREQ )
-            break;
-
-        InstallQFCallback( pTask );
-
-        CIfParallelTaskGrpRfc* pGrpRfc =
-            m_pGrpRfc;
-
-        ret = pGrpRfc->AppendTask( pTask );
-        if( ret != ERROR_QUEUE_FULL )
-            return ( *pGrpRfc )( eventZero );
-
-        bool bResp = true;
-        ObjPtr pObj;
-        ret = pMsg.GetObjArgAt( 0, pObj );
-        if( SUCCEEDED( ret ) )
-        {
-            IConfigDb* pReqCtx = pObj;
-            if( pReqCtx != nullptr )
-            {
-                bool bNoReply;
-                CCfgOpener oReqCtx( pReqCtx );
-                ret = oReqCtx.GetBoolProp(
-                    propNoReply, bNoReply );
-                if( SUCCEEDED( ret ) )
-                    bResp = !bNoReply;
-            }
-
-        }
-        if( !bResp )
-            return ret;
-
-        CCfgOpener oResp;
-        oResp[ propReturnValue ] = ERROR_QUEUE_FULL;
-        OnServiceComplete( oResp.GetCfg(), pInv );
-
-        return ret;
-
-    }while( 0 );
-
-    return super::AddAndRun( pTask, bImmediate );
 }
 
 gint32 CRpcTcpBridge::RefreshReqLimit(
@@ -5890,9 +5923,8 @@ gint32 CRpcTcpBridgeShared::StartHandshake(
     {
         CRpcTcpBridge* pIf =
             ObjPtr( m_pParentIf );
-        if( pIf != nullptr )
-            ret = pIf->DoStartHandshake(
-                pCallback );
+        ret = pIf->DoStartHandshake(
+            pCallback );
     }
     else
     {

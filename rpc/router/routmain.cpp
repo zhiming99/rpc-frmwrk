@@ -41,6 +41,7 @@ CPPUNIT_TEST_SUITE_REGISTRATION( CIfRouterTest );
 static guint32 g_dwRole = 1;
 static bool g_bAuth = false;
 static bool g_bRfc = false;
+static bool g_bSepConn = false;
 static std::string g_strService;
 
 void CIfRouterTest::setUp()
@@ -86,6 +87,12 @@ void CIfRouterTest::setUp()
                 pSvc->SetCmdLineOpt(
                     propServiceName,
                     g_strService );
+            }
+
+            if( g_dwRole & 0x01 )
+            {
+                pSvc->SetCmdLineOpt(
+                    propSepConns, g_bSepConn );
             }
 
             pSvc->SetRouterName( MODULE_NAME );
@@ -207,7 +214,7 @@ int main( int argc, char** argv )
 
     int opt = 0;
     int ret = 0;
-    while( ( opt = getopt( argc, argv, "r:afs:" ) ) != -1 )
+    while( ( opt = getopt( argc, argv, "r:acfs:" ) ) != -1 )
     {
         switch (opt)
         {
@@ -221,6 +228,11 @@ int main( int argc, char** argv )
         case 'a':
             {
                 g_bAuth = true;
+                break;
+            }
+        case 'c':
+            {
+                g_bSepConn = true;
                 break;
             }
         case 's':
@@ -249,6 +261,9 @@ int main( int argc, char** argv )
                 g_strService.clear();
         }
 
+        if( ( g_dwRole & 1 ) == 0 )
+            g_bSepConn = false;
+
         if( ERROR( ret ) )
             break;
     }
@@ -258,6 +273,7 @@ int main( int argc, char** argv )
         fprintf( stderr,
             "Usage: %s [-r <role number, 1: reqfwrd, 2: bridge, 3: both>, mandatory ]\n"
             "\t [-a to enable authentication ]\n"
+            "\t [-c to establish a seperate connection to the same bridge per client, only for role 1]\n"
             "\t [-f to enable request-based flow control on the gateway bridge, ignore it if no massive connections ]\n"
             "\t [-s < Service Name for authentication, valid for role 2 or 3, and ignored for role 1 >]\n",
             argv[ 0 ] );

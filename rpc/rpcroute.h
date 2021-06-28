@@ -321,6 +321,10 @@ class CRpcInterfaceServer :
         IEventSink* pCallback,
         stdstr& strDest ) const;
 
+    virtual gint32 GetGrpRfc(
+        DMsgPtr& pMsg,
+        TaskGrpPtr& pGrp ) = 0;
+
     public:
 
     typedef CAggInterfaceServer super;
@@ -365,6 +369,10 @@ class CRpcInterfaceServer :
 
     gint32 InstallQFCallback(
         TaskletPtr& pInvTask ) const;
+
+    virtual gint32 AddAndRun(
+        TaskletPtr& pTask,
+        bool bImmediate = false ) override;
 };
 
 using FWRDREQ_ELEM = 
@@ -480,6 +488,7 @@ class CRpcReqForwarder :
     bool m_bRfc = false;
     std::hashmap< stdstr, TaskGrpPtr > m_mapGrpRfcs;
     std::hashmap< stdstr, stdstr > m_mapUq2SdName;
+    bool m_bSepConns = false;
 
     inline gint32 GetSrcDBusName(
         const stdstr& strUqName,
@@ -496,8 +505,8 @@ class CRpcReqForwarder :
         return 0;
     }
 
-    inline gint32 GetGrpRfc(
-        const stdstr strUniqName,
+    gint32 GetGrpRfc(
+        const stdstr& strUniqName,
         TaskGrpPtr& pGrp ) const
     {
         CStdRMutex oLock( GetLock() );
@@ -511,11 +520,19 @@ class CRpcReqForwarder :
         return 0;
     }
 
+    gint32 GetGrpRfc(
+        DMsgPtr& pMsg,        
+        TaskGrpPtr& pGrp ) override
+    {
+        stdstr strUniqName = pMsg.GetSender();
+        return GetGrpRfc( strUniqName, pGrp );
+    }
+
     gint32 RemoveRfcGrp(
         const stdstr& strUniqName );
 
     gint32 FindFwrdReqsAllRfc(
-        stdstr strUniqName,
+        const stdstr& strUniqName,
         FWRDREQS& vecTasks,
         bool bTaskId );
 
@@ -677,10 +694,8 @@ class CRpcReqForwarder :
         const stdstr& strUniqName,
         const stdstr& strSdName );
 
-    gint32 AddAndRun(
-        TaskletPtr& pTask,
-        bool bImmediate = false ) override;
-
+    inline bool IsSepConns() const
+    { return m_bSepConns; }
 }; // CRpcReqForwarder
 
 class CRpcRfpForwardEventTask
@@ -1048,6 +1063,14 @@ class CRpcTcpBridge :
         IEventSink* pCallback,
         bool bSeqTask );
 
+    virtual gint32 GetGrpRfc(
+        DMsgPtr& pMsg,
+        TaskGrpPtr& pGrp )
+    {
+        pGrp = m_pGrpRfc;
+        return 0;
+    }
+
     protected:
     TaskletPtr m_pHsTicker;
     bool m_bHandshaked = false;
@@ -1252,10 +1275,6 @@ class CRpcTcpBridge :
     { return m_oTs.GetAgeSec( qwTs ); }
 
     gint32 PostDisconnEvent();
-
-    virtual gint32 AddAndRun(
-        TaskletPtr& pParallelTask,
-        bool bImmediate = false ) override;
 
     virtual gint32 OnPreStop(
         IEventSink* pCallback ) override;

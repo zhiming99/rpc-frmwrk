@@ -28,6 +28,5 @@ class CStressSvc_CliImpl
     virtual gint32 OnHelloWorld(
         const std::string& strMsg /*[ In ]*/ );
     
-    gint32 IncMloop();
 };
 
