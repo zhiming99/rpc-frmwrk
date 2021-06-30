@@ -5993,7 +5993,7 @@ gint32 AppendConnParams(
             if( ERROR( iRet ) )
                 break;
 
-            DebugPrint( 0, "buf to hash: \n",
+            DebugPrint( 0, "buf to hash: %s \n",
                strDump.c_str() );
         }
 #endif

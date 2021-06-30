@@ -608,6 +608,7 @@ gint32 CRpcTcpBridgeAuth::OnLoginComplete(
 
         if( ERROR( iRet ) )
         {
+            OnServiceComplete( pResp, pCallback );
             ret = iRet;
             break;
         }

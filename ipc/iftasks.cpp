@@ -102,6 +102,12 @@ gint32 CIfStartRecvMsgTask::HandleIncomingMsg(
         if( ERROR( ret ) )
             break;
 
+        CIoManager* pMgr = pIf->GetIoMgr();
+        ret = DEFER_CALL( pMgr, ObjPtr( pIf ),
+            &CRpcServices::RunManagedTask,
+            pTask, false );
+
+        break;
         // put the InvokeMethod in a managed
         // environment instead of letting it
         // running untracked
@@ -241,28 +247,6 @@ gint32 CIfStartRecvMsgTask::OnIrpComplete(
             break;
         }
 
-        do{
-            // continue receiving the message
-            CParamList oParams;
-
-            // clone all the parameters in this
-            // task
-            oParams[ propIfPtr ] = pObj;
-            oParams.CopyProp( propMatchPtr, this );
-            oParams.CopyProp( propExtInfo, this );
-            ObjPtr pObj = oParams.GetCfg();
-
-            // offload the output tasks to the
-            // task threads
-            ret = DEFER_CALL( pMgr, ObjPtr( this ),
-                &CIfStartRecvMsgTask::StartNewRecv,
-                pObj );
-
-        }while( 0 );
-
-        if( ERROR( ret ) )
-            break;
-
         // whether error or not receiving, we
         // proceed to handle the incoming irp now
         ret = pIrp->GetStatus();
@@ -290,6 +274,30 @@ gint32 CIfStartRecvMsgTask::OnIrpComplete(
 
             HandleIncomingMsg( pObj, pCfg );
         }
+
+        do{
+            // continue receiving the message
+            CParamList oParams;
+
+            // clone all the parameters in this
+            // task
+            oParams[ propIfPtr ] = pObj;
+            oParams.CopyProp( propMatchPtr, this );
+            oParams.CopyProp( propExtInfo, this );
+            ObjPtr pObj = oParams.GetCfg();
+
+            // offload the output tasks to the
+            // task threads
+            ret = this->StartNewRecv( pObj );
+            //
+            // ret = DEFER_CALL( pMgr, ObjPtr( this ),
+            //     &CIfStartRecvMsgTask::StartNewRecv,
+            //     pObj );
+
+        }while( 0 );
+
+        if( ERROR( ret ) )
+            break;
 
     }while( 0 );
 
@@ -1731,18 +1739,9 @@ gint32 CIfTaskGroup::OnCancel(
             oTaskLock.Unlock();
 
             ( *pTask )( eventCancelTask );
-            ret = pTask->GetError();
 
             oTaskLock.Lock();
             SetNoSched( false );
-            // ridiculous, we support asynchronous
-            // cancel?
-            if( unlikely( ret ==
-                STATUS_MORE_PROCESS_NEEDED ) )
-                ret = STATUS_PENDING;
-
-            if( ret == STATUS_PENDING )
-                break;
 
             pPrevTask = pTask;
         }

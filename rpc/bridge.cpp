@@ -303,7 +303,7 @@ gint32 CRpcTcpBridgeProxy::DoStartHandshake(
 
         oParams.SetQwordProp(
             propTimestamp, tv.tv_sec );
-        oParams.Push( "rpcf-bridge-proxy" );
+        oParams.Push( BRIDGE_PROXY_GREETINGS );
 
         TaskletPtr pRespCb;
         NEW_PROXY_RESP_HANDLER2(
@@ -4972,6 +4972,10 @@ gint32 CRpcTcpBridge::DoStartHandshake(
         if( m_bHandshaked )
         {
             TaskletPtr pTask = m_pHsTicker;
+
+            if( m_bHsFailed )
+                ret = ERROR_FAIL;
+
             if( !m_pHsTicker.IsEmpty() )
             {
                 m_pHsTicker.Clear();
@@ -4979,8 +4983,6 @@ gint32 CRpcTcpBridge::DoStartHandshake(
                 DebugPrint( 0,
                     "Deferred the handshake "
                     "response till Start completes" );
-                if( m_bHsFailed )
-                    ret = ERROR_FAIL;
                 pTask->OnEvent(
                     eventTaskComp, ret, 0, nullptr );
             }
@@ -5009,13 +5011,12 @@ gint32 CRpcTcpBridge::DoStartHandshake(
         oTaskCfg.SetIntProp(
             propIntervalSec, 20 );
 
-        oIfLock.Unlock();
-
         CIoManager* pMgr = GetIoMgr();
         ret = pMgr->RescheduleTask( pHsTicker );
 
         if( ERROR( ret ) )
             break;
+
         ret = STATUS_PENDING;
 
     }while( 0 );
@@ -5090,26 +5091,30 @@ gint32 CRpcTcpBridge::Handshake(
         if( IsRfcEnabled() )
         {
             CCfgOpener oCfg;
-
-            ret = oCfg.CopyProp(
+            gint32 iRet = oCfg.CopyProp(
                 propMaxReqs, this );
-            if( ERROR( ret ) )
+            if( ERROR( iRet ) )
             {
-                ret = oCfg.SetIntProp(
+                oCfg.SetIntProp(
                     propMaxReqs, RFC_MAX_REQS );
             }
-            ret = oCfg.CopyProp(
+            iRet = oCfg.CopyProp(
                 propMaxPendings, this );
-            if( ERROR( ret ) )
+            if( ERROR( iRet ) )
             {
-                ret = oCfg.SetIntProp(
+                oCfg.SetIntProp(
                     propMaxPendings,
                     RFC_MAX_PENDINGS );
             }
 
-            ret = InitRfc( oCfg );
-            if( ERROR( ret ) )
-                return ret;
+            iRet = InitRfc( oCfg );
+            if( ERROR( iRet ) )
+            {
+                // fatal error
+                m_bHsFailed = true;
+                if( SUCCEEDED( ret ) )
+                    ret = iRet;
+            }
         }
 
         oResp[ propReturnValue ] = ret;
@@ -5117,9 +5122,26 @@ gint32 CRpcTcpBridge::Handshake(
 
         if( !m_pHsTicker.IsEmpty() )
         {
+            // the ticker can now be completed by
+            // revisiting CheckHsTimeout
             TaskletPtr pTask = m_pHsTicker;
+            CIfParallelTask* ppt = pTask;
+            m_pHsTicker.Clear();
             oIfLock.Unlock();
-            ( *pTask )( eventZero );
+            if( ppt->GetTaskState() == stateStopped )
+            {
+                // the handshake window has closed,
+                // though the bridge is not down
+                // yet
+                m_bHsFailed = true;
+                ret = -ETIMEDOUT;
+                oResp[ propReturnValue ] = -ETIMEDOUT;
+                oResp.RemoveProperty( 0 );
+            }
+            else
+            {
+                ( *pTask )( eventZero );
+            }
         }
         else
         {
@@ -5960,6 +5982,7 @@ gint32 CRpcTcpBridgeShared::StartEx2(
 
         pTaskGrp->SetRelation( logicAND );
         pTaskGrp->SetClientNotify( pCallback );
+
         ret = DEFER_IFCALLEX_NOSCHED2(
             0, pStart , ObjPtr( m_pParentIf ),
             &CRpcTcpBridgeShared::StartExOrig,

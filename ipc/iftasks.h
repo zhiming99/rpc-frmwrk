@@ -180,7 +180,7 @@ class CIfParallelTask
 {
 
     protected:
-    EnumTaskState m_iTaskState;
+    std::atomic< EnumTaskState > m_iTaskState;
 
     public:
     typedef CIfRetryTask super;
@@ -345,7 +345,8 @@ class CIfTaskGroup
     : public CIfRetryTask
 {
     EnumLogicOp m_iTaskRel;
-    EnumTaskState m_iTaskState = stateStarting;
+
+    std::atomic< EnumTaskState > m_iTaskState;
 
     bool m_bRunning = false;
     bool m_bCanceling = false;
@@ -369,6 +370,7 @@ class CIfTaskGroup
     {
         SetClassId( clsid( CIfTaskGroup ) );
         SetRelation( logicAND );
+        m_iTaskState = stateStarting;
     }
 
     virtual bool IsMultiThreadSafe()
@@ -403,14 +405,12 @@ class CIfTaskGroup
 
     inline EnumTaskState GetTaskState() const
     {
-        CStdRTMutex oTaskLock( GetLock() );
         return m_iTaskState;
     }
 
     inline void SetTaskState(
         EnumTaskState iState )
     {
-        CStdRTMutex oTaskLock( GetLock() );
         m_iTaskState = iState;
     }
 
