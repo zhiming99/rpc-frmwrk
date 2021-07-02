@@ -1952,13 +1952,13 @@ gint32 CRpcTcpBridgeProxy::OnInvalidStreamId(
     return 0;
 }
 
-gint32 CRpcTcpBridgeProxy::OnPreStop(
+gint32 CRpcTcpBridgeProxy::OnPostStop(
     IEventSink* pCallback )
 {
     if( IsRfcEnabled() )
         m_pGrpRfc.Clear();
 
-    return super::OnPreStop( pCallback );
+    return 0;
 }
 
 gint32 CRpcTcpBridgeProxy::AddAndRun(
@@ -3742,6 +3742,11 @@ gint32 CBridgeForwardRequestTask::ForwardRequestMH(
     return ret;
 }
 
+gint32 CBridgeForwardRequestTask::OnTaskCompleteRfc(
+    gint32 iRetVal,
+    TaskletPtr& pIoTask )
+{ return -ENOTSUP; }
+
 gint32 CRpcTcpBridge::IsMHTask(
     TaskletPtr& pTask )
 {
@@ -5194,13 +5199,13 @@ gint32 CRpcTcpBridge::PostDisconnEvent()
     return ret;
 }
 
-gint32 CRpcTcpBridge::OnPreStop(
+gint32 CRpcTcpBridge::OnPostStop(
     IEventSink* pCallback )
 {
-    if( IsRfcEnabled()  )
+    if( IsRfcEnabled() )
         m_pGrpRfc.Clear();
 
-    return super::OnPreStop( pCallback );
+    return 0;
 }
 
 gint32 CRpcTcpBridge::RefreshReqLimit(

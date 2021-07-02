@@ -573,7 +573,6 @@ gint32 CRpcBasePort::HandleRegMatch(
             break;
         }
 
-        CStdRMutex oPortLock( GetLock() );
 
         MatchPtr matchPtr( pMatch );
         ret = GetMatchMap( pIrp, pMap );
@@ -581,12 +580,32 @@ gint32 CRpcBasePort::HandleRegMatch(
         if( ERROR( ret ) )
             break;
 
+        bool bNew = false;
+        CStdRMutex oPortLock( GetLock() );
         MatchMap::iterator itr = 
             pMap->find( matchPtr );
+        MATCH_ENTRY* pme = nullptr;
         if( itr == pMap->end() )
         {
+            // new match rule
+            // let's register a match 
+            bNew = true;
+        }
+        else
+        {
+            itr->second.AddRef();
+            if( !itr->second.IsConnected() )
+                ret = -ENOTCONN;
+        }
+        oPortLock.Unlock();
+        if( bNew )
+        {
+            // add a dbus match rule, 
+            // Note: the operation contains dbus
+            // connection lock, and cannot put
+            // within the port lock, otherwise,
+            // deadlock can happen.
             MATCH_ENTRY oMe;
-            // add a dbus match rule
             ret = SetupDBusSetting( pMatch );
             if( ERROR( ret ) )
                 break;
@@ -602,18 +621,9 @@ gint32 CRpcBasePort::HandleRegMatch(
             {
                 oMe.SetConnected( true );
             }
-
             oMe.AddRef();
-            // new match rule
-            // let's register a match 
+            oPortLock.Lock();
             ( *pMap )[ matchPtr ] = oMe;
-
-        }
-        else
-        {
-            itr->second.AddRef();
-            if( !itr->second.IsConnected() )
-                ret = -ENOTCONN;
         }
 
     }while( 0 );
@@ -660,18 +670,18 @@ gint32 CRpcBasePort::HandleUnregMatch( IRP* pIrp )
             gint32 iRefCount = oEntry.Release();
             if( iRefCount == 0 )
             {
-                // nobody referencing this match rule
-                // remove it from the req/evt table
-                ret = ClearDBusSetting( pMatch );
-                if( ERROR( ret ) )
-                    break;
-
                 if( oEntry.m_quePendingMsgs.size() )
                     oEntry.m_quePendingMsgs.clear();
 
                 MATCH_ENTRY tempEnt = oEntry;
                 pMap->erase( matchPtr );
                 oPortLock.Unlock();
+
+                // nobody referencing this match rule
+                // remove it from the req/evt table
+                ret = ClearDBusSetting( pMatch );
+                if( ERROR( ret ) )
+                    break;
 
                 // completing the irps with error 
                 // and pending on the match
@@ -952,9 +962,9 @@ gint32 CRpcBasePort::SubmitIoctlCmd( IRP* pIrp )
 
 gint32 CRpcBasePort::ClearMatchMapInternal(
     MatchMap& oMap,
-    vector< IrpPtr >& vecPendingIrps )
+    vector< IrpPtr >& vecPendingIrps,
+    vector< MatchPtr >& vecMatches )
 {
-
     gint32 ret = 0;
     // note: this method must be called with
     // the port locked
@@ -985,7 +995,7 @@ gint32 CRpcBasePort::ClearMatchMapInternal(
         {
             oMe.m_quePendingMsgs.clear();
         }
-        ClearDBusSetting( itrMe->first );
+        vecMatches.push_back( itrMe->first );
         oMap.erase( itrMe );
         itrMe = oMap.begin();
     }
@@ -993,10 +1003,13 @@ gint32 CRpcBasePort::ClearMatchMapInternal(
 }
 
 gint32 CRpcBasePort::ClearMatchMap(
-    vector< IrpPtr >& vecPendingIrps )
+    vector< IrpPtr >& vecPendingIrps,
+    vector< MatchPtr >& vecMatches )
 {
     return ClearMatchMapInternal(
-        m_mapEvtTable, vecPendingIrps );
+        m_mapEvtTable,
+        vecPendingIrps,
+        vecMatches );
 }
 
 gint32 CRpcBasePort::RemoveIrpFromMapInternal(
@@ -1108,7 +1121,9 @@ gint32 CRpcBasePort::CancelAllIrps( gint32 iErrno )
 
         vector< IrpPtr > vecIrpRemaining;
 
-        ret = ClearMatchMap( vecIrpRemaining );
+        vector< MatchPtr > vecMatches;
+        ret = ClearMatchMap(
+            vecIrpRemaining, vecMatches );
         if( ERROR( ret ) )
             break;
 
@@ -1123,6 +1138,11 @@ gint32 CRpcBasePort::CancelAllIrps( gint32 iErrno )
 
         m_mapSerial2Resp.clear();
         oPortLock.Unlock();
+
+        for( auto elem : vecMatches )
+        {
+            ClearDBusSetting( elem );
+        }
 
         vector< IrpPtr >::iterator itrIrp =
             vecIrpRemaining.begin();
@@ -1625,18 +1645,21 @@ gint32 CRpcBasePortEx::RemoveIrpFromMap(
 }
 
 gint32 CRpcBasePortEx::ClearMatchMap(
-    vector< IrpPtr >& vecPendingIrps )
+    vector< IrpPtr >& vecPendingIrps,
+    vector< MatchPtr >& vecMatches )
 {
     gint32 ret = 0;
 
     ret = super::ClearMatchMap(
-        vecPendingIrps );
+        vecPendingIrps, vecMatches );
 
     if( ERROR( ret ) )
         return ret;
 
     ret = ClearMatchMapInternal(
-        m_mapReqTable, vecPendingIrps );
+        m_mapReqTable,
+        vecPendingIrps,
+        vecMatches );
 
     return ret;
 }

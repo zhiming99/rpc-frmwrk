@@ -1068,6 +1068,8 @@ class CRpcTcpBridge :
         TaskGrpPtr& pGrp )
     {
         pGrp = m_pGrpRfc;
+        if( pGrp.IsEmpty() )
+            return -EFAULT;
         return 0;
     }
 
@@ -1276,7 +1278,7 @@ class CRpcTcpBridge :
 
     gint32 PostDisconnEvent();
 
-    virtual gint32 OnPreStop(
+    virtual gint32 OnPostStop(
         IEventSink* pCallback ) override;
 
     gint32 RefreshReqLimit(
@@ -1500,7 +1502,7 @@ class CRpcTcpBridgeProxy :
             pCfg, pPort, bPdo );
     }
 
-    virtual gint32 OnPreStop(
+    virtual gint32 OnPostStop(
         IEventSink* pCallback ) override;
 
     gint32 RefreshReqLimit(
@@ -1981,7 +1983,7 @@ class CRouterEventRelayRespTask :
 class CReqFwdrForwardRequestTask :
     public CIfInterceptTaskProxy
 {
-    gint32 OnTaskCompleteRfc(
+    virtual gint32 OnTaskCompleteRfc(
         gint32 iRetVal, TaskletPtr& pTask );
 
     gint32 CloneIoTask( TaskletPtr& pIoTask );
@@ -2012,6 +2014,9 @@ class CBridgeForwardRequestTask :
         IConfigDb* pReqCtx,
         DBusMessage* pReqMsg,           // [ in ]
         DMsgPtr& pRespMsg );            // [ out ]
+
+    gint32 OnTaskCompleteRfc(
+        gint32 iRetVal, TaskletPtr& pTask ) override;
 };
 
 class CReqFwdrFetchDataTask :

@@ -138,6 +138,8 @@ CfgPtr CIfRouterTest::InitRouterCfg(
         if( g_bAuth )
             strDescPath = ROUTER_OBJ_DESC_AUTH;
 
+        if( g_dwRole & 0x2 )
+            oCfg[ propMaxTaskThrd ] = 4;
         oCfg[ propSvrInstName ] = MODULE_NAME;
         oCfg[ propIoMgr ] = m_pMgr;
         ret = CRpcServices::LoadObjDesc(

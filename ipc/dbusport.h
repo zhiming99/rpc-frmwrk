@@ -151,7 +151,8 @@ class CRpcBasePort : public CPort
 
     gint32 ClearMatchMapInternal(
         MatchMap& oMap,
-        std::vector< IrpPtr >& vecPendingIrps );
+        std::vector< IrpPtr >& vecPendingIrps,
+        std::vector< MatchPtr>& vecMatches );
 
     virtual gint32 ClearDBusSetting(
         IMessageMatch* pMatch ) = 0;
@@ -160,7 +161,8 @@ class CRpcBasePort : public CPort
         IMessageMatch* pMatch ) = 0;
 
     virtual gint32 ClearMatchMap(
-        std::vector< IrpPtr >& vecPendingIrps );
+        std::vector< IrpPtr >& vecPendingIrps,
+        std::vector< MatchPtr>& vecMatches );
 
     gint32 RemoveIrpFromMapInternal(
         IRP* pIrp, MatchMap& oMap );
@@ -260,7 +262,8 @@ class CRpcBasePortEx : public CRpcBasePort
     MatchMap    m_mapReqTable;
 
     virtual gint32 ClearMatchMap(
-        std::vector< IrpPtr >& vecPendingIrps );
+        std::vector< IrpPtr >& vecPendingIrps,
+        std::vector< MatchPtr>& vecMatches );
 
     virtual gint32 RemoveIrpFromMap( IRP* pIrp );
 

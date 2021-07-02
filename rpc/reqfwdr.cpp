@@ -2517,11 +2517,10 @@ gint32 CReqFwdrForwardRequestTask::RunTask()
         guint32 dwPortId = 0;
         ret = oReqCtx.GetIntProp(
             propConnHandle, dwPortId );
-
         if( ERROR( ret ) )
             break;
 
-        ret = pRouter->GetBridgeProxy(
+        pRouter->GetBridgeProxy(
             dwPortId, bridgePtr );
 
         CRpcTcpBridgeProxy* pProxy = bridgePtr;
@@ -2530,6 +2529,10 @@ gint32 CReqFwdrForwardRequestTask::RunTask()
             ret = -EFAULT;
             break;
         }
+
+        oParams.SetIntProp(
+            propPrxyPortId, dwPortId );
+
         ret = pProxy->ForwardRequest(
             pReqCtx, pMsg, pRespMsg, this );
 
@@ -2579,20 +2582,10 @@ gint32 CReqFwdrForwardRequestTask::OnTaskComplete(
         if( iRetVal == ERROR_QUEUE_FULL )
         {
             // error from remote server
-            CRpcTcpBridgeProxy* pProxy = nullptr;
-            ret = oCfg.GetPointer(
-                propIfPtr, pProxy );
-            if( ERROR( ret ) )
+            ret = OnTaskCompleteRfc(
+                iRetVal, pIoTask );
+            if( ret == STATUS_PENDING )
                 break;
-
-            if( pProxy->IsRfcEnabled() &&
-                !pIoTask.IsEmpty() )
-            {
-                ret = OnTaskCompleteRfc(
-                    iRetVal, pIoTask );
-                if( ret == STATUS_PENDING )
-                    break;
-            }
         }
 
         ObjPtr pObj;
@@ -2735,16 +2728,34 @@ gint32 CReqFwdrForwardRequestTask::OnTaskCompleteRfc(
     TaskletPtr& pTask )
 {
     gint32 ret = 0;
+    if( pTask.IsEmpty() )
+        return -EINVAL;
 
     do{
         CCfgOpener oParams(
             ( IConfigDb* )GetConfig() );
 
-        CRpcTcpBridgeProxy* pProxy = nullptr;
-        ret = oParams.GetPointer(
-            propIfPtr, pProxy );
+        CRpcRouter* pRouter = nullptr;
+        oParams.GetPointer(
+            propRouterPtr, pRouter );
+
+        IConfigDb* pReqCtx = nullptr;
+        guint32 dwPortId = 0;
+        oParams.GetIntProp(
+            propPrxyPortId, dwPortId );
+
+        InterfPtr pIf;
+        ret = pRouter->GetBridgeProxy(
+            dwPortId, pIf );
         if( ERROR( ret ) )
             break;
+
+        CRpcTcpBridgeProxy* pProxy = pIf;
+        if( !pProxy->IsRfcEnabled() )
+        {
+            ret = -ENOTSUP;
+            break;
+        }
 
         ret = CloneIoTask( pTask );
         if( ERROR( ret ) )

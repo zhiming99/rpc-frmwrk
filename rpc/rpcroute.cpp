@@ -2069,9 +2069,19 @@ gint32 CRpcRouterBridge::OnRmtSvrEvent(
         }
     case eventRmtSvrOffline:
         {
-            ObjPtr pObj;
-            ret = OnRmtSvrOffline(
+            ret = DEFER_IFCALLEX_NOSCHED2(
+                0, pDeferTask,
+                ObjPtr( this ),
+                &CRpcRouterBridge::OnRmtSvrOffline,
                 nullptr, pEvtCtx, hPort );
+
+            if( ERROR( ret ) )
+                break;
+
+            ret = AddSeqTask( pDeferTask, false );
+            if( ERROR( ret ) )
+                ( *pDeferTask )( eventCancelTask );
+
             break;
         }
     default:
@@ -2299,14 +2309,10 @@ gint32 CRouterStopBridgeTask::SyncedTasks(
         pRetry->SetClientNotify( pCallback );
 
         CCfgOpenerObj oCfg( this );
-        CRpcTcpBridge* pBridge = nullptr;
-        ret = oCfg.GetPointer( 0, pBridge );
+        CRpcRouterBridge* pRouter = nullptr;
+        ret = oCfg.GetPointer( propIfPtr, pRouter );
         if( ERROR( ret ) )
             break;
-
-        CRpcRouterBridge* pRouter =
-            static_cast< CRpcRouterBridge* >
-                ( pBridge->GetParent() );
 
         ret = pRouter->AddSeqTask( pTask );
         if( SUCCEEDED( ret ) )
@@ -2368,8 +2374,8 @@ gint32 CRouterStopBridgeTask::DoSyncedTask(
             pRouter->GetLock() );
 
         pRouter->RemoveBridge( pBridge );
-        pRouter->RemoveRemoteMatchByPortId(
-            dwPortId, vecMatches );
+        // pRouter->RemoveRemoteMatchByPortId(
+        //     dwPortId, vecMatches );
 
         pRouter->ClearRefCountByPortId(
             dwPortId, vecNodes );
@@ -2423,7 +2429,6 @@ gint32 CRouterStopBridgeTask::DoSyncedTask(
 gint32 CRouterStopBridgeTask::RunTask()
 {
     gint32 ret = 0;    
-    TaskGrpPtr pTaskGrp;
     do{
         CCfgOpener oCfg(
             ( IConfigDb* )GetConfig() );
@@ -2445,18 +2450,6 @@ gint32 CRouterStopBridgeTask::RunTask()
 
         // remove all the remote matches
         // registered via this bridge
-        vector< MatchPtr > vecMatches;
-        if( pRouter != nullptr )
-        {
-            pRouter->FindRemoteMatchByPortId(
-                dwPortId, vecMatches );
-        }
-        else
-        {
-            ret = -EFAULT;
-            break;
-        }
-
         FWRDREQS vecReqs;
         ObjMapPtr pmapTaskIdsMH( true );
         ObjMapPtr pmapTaskIdsLoc( true );
@@ -2470,22 +2463,13 @@ gint32 CRouterStopBridgeTask::RunTask()
 
         if( ( *pvecTasks )().size() > 0 )
         {
-            // cancel all the tasks originated
-            // from this bridge
+            // cancel all the tasks through this
+            // bridge
             pBridge->CancelInvTasks( pvecTasks );
         }
 
         CParamList oParams;
         oParams[ propIfPtr ] = ObjPtr( pRouter );
-
-        ret = pTaskGrp.NewObj(
-            clsid( CIfTaskGroup ),
-            oParams.GetCfg() );
-        if( ERROR( ret ) )
-            break;
-
-        pTaskGrp->SetRelation( logicNONE );
-        pTaskGrp->SetClientNotify( this );
 
         TaskGrpPtr pParaGrp;
         ret = pParaGrp.NewObj(
@@ -2494,9 +2478,6 @@ gint32 CRouterStopBridgeTask::RunTask()
         if( ERROR( ret ) )
             break;
 
-        TaskletPtr pGrpTask = pParaGrp;
-        pTaskGrp->AppendTask( pGrpTask );
-
         ObjVecPtr pvecMatches( true );
         std::vector< ObjPtr >& vecMatchesMH =
             ( *pvecMatches )();
@@ -2504,6 +2485,10 @@ gint32 CRouterStopBridgeTask::RunTask()
         ObjVecPtr pvecMatchesLoc( true );
         std::vector< ObjPtr >& vecMatchesLoc =
             ( *pvecMatchesLoc )();
+
+        vector< MatchPtr > vecMatches;
+        pRouter->RemoveRemoteMatchByPortId(
+            dwPortId, vecMatches );
 
         for( auto elem : vecMatches )
         {
@@ -2535,10 +2520,8 @@ gint32 CRouterStopBridgeTask::RunTask()
                 nullptr, ObjPtr( pvecMatches ),
                 ObjPtr( pmapTaskIdsMH ), true );
 
-            if( ERROR( ret ) )
-                continue;
-
-            pParaGrp->AppendTask( pTask );
+            if( SUCCEEDED( ret ) )
+                pParaGrp->AppendTask( pTask );
         }
 
         if( ( *pmapTaskIdsLoc )().size() > 0 )
@@ -2567,27 +2550,15 @@ gint32 CRouterStopBridgeTask::RunTask()
             }
         }
 
-        {
-            TaskletPtr pTask;
-            ret = DEFER_OBJCALLEX_NOSCHED2(
-                0, pTask, this,
-                &CRouterStopBridgeTask::SyncedTasks,
-                nullptr, pvecMatchesLoc );
-            if( ERROR( ret ) )
-                break;
-            pTaskGrp->AppendTask( pTask );
-        }
-
         CIoManager* pMgr = pRouter->GetIoMgr();
-        pGrpTask = pTaskGrp;
-        ret = pMgr->RescheduleTask( pGrpTask );
-        if( ret == 0 )
-            ret = STATUS_PENDING;
+        TaskletPtr pGrpTask = pParaGrp;
+        if( pParaGrp->GetTaskCount() > 0 )
+            pMgr->RescheduleTask( pGrpTask );
+
+        ret = DoSyncedTask(
+            this, pvecMatchesLoc );
 
     }while( 0 );
-
-    if( ERROR( ret ) )
-        ( *pTaskGrp )( eventCancelTask );
 
     if( ret != STATUS_PENDING )
         OnTaskComplete( ret );
@@ -2832,6 +2803,7 @@ gint32 CRpcRouterBridge::OnRmtSvrOffline(
     HANDLE hPort )
 {
     if( hPort == INVALID_HANDLE ||
+        pCallback == nullptr ||
         pEvtCtx == nullptr )
         return -EINVAL;
 
@@ -2896,40 +2868,27 @@ gint32 CRpcRouterBridge::OnRmtSvrOffline(
             clsid( CIfTaskGroup ),
             oParams.GetCfg() );
         
-        if( pCallback != nullptr )
-            pTaskGrp->SetClientNotify( pCallback );
-
+        pTaskGrp->SetClientNotify( pCallback );
         pTaskGrp->SetRelation( logicOR );
-        TaskletPtr pGrpTask = ObjPtr( pTaskGrp );
-
         pTaskGrp->AppendTask( pStopTask );
 
-        TaskletPtr pTask;
-
-        oParams[ propEventSink ] =
-            ObjPtr( pCallback );
-
         oParams.Push( pIf );
-        oParams[ propIfPtr ] =
-            ObjPtr( this );
+        oParams[ propIfPtr ] = ObjPtr( this );
 
         oParams.SetIntProp(
             propPortId, dwPortId );
 
         oParams.Push( pEvtCtx );
 
+        TaskletPtr pTask;
+
         if( bBridge )
         {
             // stop the bridge
-            ret = pTask.NewObj(
+            pTask.NewObj(
                 clsid( CRouterStopBridgeTask ),
                 oParams.GetCfg() );
-
-            if( ERROR( ret ) )
-                break;
-
             pTaskGrp->InsertTask( pTask );
-            ret = pMgr->RescheduleTask( pGrpTask );
         }
         else
         {
@@ -2939,10 +2898,10 @@ gint32 CRpcRouterBridge::OnRmtSvrOffline(
 
             if( ERROR( ret ) )
                 break;
-
-            ret = this->AddSeqTask( pTask );
+            pTaskGrp->InsertTask( pTask );
         }
 
+        ret = ( *pTaskGrp )( eventZero );
 
     }while( 0 );
 
@@ -4011,13 +3970,11 @@ gint32 CRpcRouterReqFwdr::OnRmtSvrEvent(
     {
     case eventRmtSvrOffline:
         {
-            ObjPtr pEmptyObj;
-
             ret = DEFER_IFCALLEX_NOSCHED2(
                 0, pDeferTask,
                 ObjPtr( this ),
                 &CRpcRouterReqFwdr::OnRmtSvrOffline,
-                pEmptyObj, pEvtCtx, hPort );
+                nullptr, pEvtCtx, hPort );
 
             if( ERROR( ret ) )
                 break;

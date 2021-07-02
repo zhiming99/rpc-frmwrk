@@ -331,7 +331,8 @@ gint32 CRpcTcpBridgeAuth::EnableInterfaces()
 gint32 CRpcTcpBridgeAuth::OnPostStop(
     IEventSink* pCallback )
 {
-    return SetSessHash( "", false );
+    SetSessHash( "", false );
+    return super::OnPostStop( pCallback );
 }
 
 gint32 CRpcTcpBridgeAuth::SetSessHash(
@@ -2057,7 +2058,7 @@ gint32 CRpcTcpBridgeProxyAuth::OnPostStop(
     IEventSink* pCallback )
 {
     SetSessHash( "", false );
-    return 0;
+    return super::OnPostStop( pCallback );
 }
 
 gint32 CRpcTcpBridgeProxyAuth::SetSessHash(
