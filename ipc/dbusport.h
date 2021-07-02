@@ -1519,6 +1519,7 @@ class CDBusBusPort : public CGenericBusPortEx
         const std::string& strDest );
 
 	virtual gint32 PreStop( IRP* pIrp );
+    static guint32 LabelMessage( DMsgPtr& pMsg );
 };
 
 class CDBusConnFlushTask 

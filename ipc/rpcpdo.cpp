@@ -2111,18 +2111,12 @@ gint32 CRpcPdoPort::HandleSendReq( IRP* pIrp )
 
         ret = -EINVAL;
 
-        // NOTE: there are slim chances, that the
-        // response message can arrive before the
-        // irp enters m_mapSerial2Resp
-        CStdRMutex oPortLock( GetLock() );
-
         if( dwIoDir == IRP_DIR_INOUT ||
             dwIoDir == IRP_DIR_OUT )
         {
             DMsgPtr pMsg = *pCtx->m_pReqData;
 
             ret = IsIfSvrOnline( pMsg );
-
             if( ret == ENOTCONN )
             {
                 // not connected yet, no need to
@@ -2134,19 +2128,38 @@ gint32 CRpcPdoPort::HandleSendReq( IRP* pIrp )
             if( ERROR( ret ) )
                 break;
 
-            // DebugPrint( 0, "probe: Send Dbus Msg" );
-            ret = SendDBusMsg( pMsg, &dwSerial );
+            CDBusBusPort *pBusPort = static_cast
+                < CDBusBusPort* >( m_pBusPort );
+
+            dwSerial =
+                pBusPort->LabelMessage( pMsg );
+
+            if( dwIoDir == IRP_DIR_INOUT )
+            {
+                // NOTE: there are slim chances,
+                // that the response message
+                // arrives before the irp enters
+                // m_mapSerial2Resp after sending,
+                // so we need to add the irp to
+                // the m_mapSerial2Resp ahead of
+                // sending the message.
+                CStdRMutex oPortLock( GetLock() );
+                m_mapSerial2Resp[ dwSerial ] =
+                    IrpPtr( pIrp );
+            }
+
+            ret = SendDBusMsg( pMsg, nullptr );
+            if( SUCCEEDED( ret ) &&
+                dwIoDir == IRP_DIR_INOUT )
+                ret = STATUS_PENDING;
         }
 
-        if( ERROR( ret ) )
-            break;
-
-        if( dwIoDir == IRP_DIR_INOUT && dwSerial != 0 )
+        if( ERROR( ret ) &&
+            dwIoDir == IRP_DIR_INOUT &&
+            dwSerial != 0 )
         {
-            // waiting for response
-            IrpPtr irpPtr( pIrp );
-            m_mapSerial2Resp[ dwSerial ] = irpPtr;
-            ret = STATUS_PENDING;
+            CStdRMutex oPortLock( GetLock() );
+            m_mapSerial2Resp.erase( dwSerial );
         }
 
     }while( 0 );
@@ -2192,7 +2205,13 @@ gint32 CRpcPdoPort::HandleSendEvent( IRP* pIrp )
             if( ERROR( ret ) )
                 break;
 
-            ret = SendDBusMsg( pMsg, &dwSerial );
+            CDBusBusPort *pBusPort = static_cast
+                < CDBusBusPort* >( m_pBusPort );
+
+            dwSerial =
+                pBusPort->LabelMessage( pMsg );
+
+            ret = SendDBusMsg( pMsg, nullptr );
         }
         else
         {

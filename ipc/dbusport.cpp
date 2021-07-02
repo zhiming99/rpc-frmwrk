@@ -1615,6 +1615,15 @@ gint32 CDBusTransLpbkMsgTask::operator()(
 
 extern gint64 GetRandom();
 static std::atomic< guint32 > dwDBusSerial( GetRandom() >> 32 );
+
+guint32 CDBusBusPort::LabelMessage(
+    DMsgPtr& pMsg )
+{
+    guint32 dwSerial = dwDBusSerial++;
+    pMsg.SetSerial( dwSerial );
+    return dwSerial;
+}
+
 gint32 CDBusBusPort::ScheduleLpbkTask(
     MatchPtr& pFilter,
     DBusMessage *pDBusMsg,
@@ -1652,20 +1661,20 @@ gint32 CDBusBusPort::ScheduleLpbkTask(
         oParams.Push( bReq );
         DMsgPtr pMsg( pDBusMsg );
 
-        guint32 dwSerial = dwDBusSerial++;
+        guint32 dwSerial; 
         if( DBUS_MESSAGE_TYPE_METHOD_CALL
             == pMsg.GetType()
             && iType == matchClient )
         {
             // sending request, a serial number is
             // needed
-            pMsg.SetSerial( dwSerial );
+            dwSerial = LabelMessage( pMsg );
             if( pdwSerial )
                 *pdwSerial = dwSerial;
         }
         else
         {
-            pMsg.SetSerial( dwSerial );
+            dwSerial = LabelMessage( pMsg );
         }
 
         CIoManager* pMgr = GetIoMgr();
