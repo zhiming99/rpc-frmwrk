@@ -2147,6 +2147,10 @@ gint32 CRpcPdoPort::HandleSendReq( IRP* pIrp )
                 m_mapSerial2Resp[ dwSerial ] =
                     IrpPtr( pIrp );
             }
+            else
+            {
+                pMsg.SetNoReply( true );
+            }
 
             ret = SendDBusMsg( pMsg, nullptr );
             if( SUCCEEDED( ret ) &&
@@ -2210,6 +2214,8 @@ gint32 CRpcPdoPort::HandleSendEvent( IRP* pIrp )
 
             dwSerial =
                 pBusPort->LabelMessage( pMsg );
+
+            pMsg.SetNoReply( true );
 
             ret = SendDBusMsg( pMsg, nullptr );
         }

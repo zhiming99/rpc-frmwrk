@@ -490,7 +490,8 @@ gint32 CIfRetryTask::DelayRun(
 
 gint32 CIfRetryTask::OnRetry()
 {
-    DebugPrint( 0, "Retrying task %s @0x%x",
+    DebugPrintEx( logInfo, 0,
+        "Retrying task %s @0x%x",
         CoGetClassName( GetClsid() ),
         ( intptr_t )this );
     return RunTask();
