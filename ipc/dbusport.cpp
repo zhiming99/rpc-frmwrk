@@ -1619,8 +1619,13 @@ static std::atomic< guint32 > dwDBusSerial( GetRandom() >> 32 );
 guint32 CDBusBusPort::LabelMessage(
     DMsgPtr& pMsg )
 {
-    guint32 dwSerial = dwDBusSerial++;
-    pMsg.SetSerial( dwSerial );
+    guint32 dwSerial = 0;
+    pMsg.GetSerial( dwSerial );
+    if( dwSerial == 0 )
+    {
+        dwSerial = dwDBusSerial++;
+        pMsg.SetSerial( dwSerial );
+    }
     return dwSerial;
 }
 

@@ -275,6 +275,7 @@ CK5AuthServer::CK5AuthServer(
 {
     gint32 ret = 0;
     do{
+        SetClassId( clsid( CK5AuthServer ) );
         CCfgOpenerObj oIfCfg( this );
         ret = oIfCfg.GetPointer(
             propRouterPtr, m_pRouter );
