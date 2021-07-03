@@ -2140,9 +2140,9 @@ gint32 CRpcPdoPort::HandleSendReq( IRP* pIrp )
                 // that the response message
                 // arrives before the irp enters
                 // m_mapSerial2Resp after sending,
-                // so we need to add the irp to
-                // the m_mapSerial2Resp ahead of
-                // sending the message.
+                // so better add the irp to
+                // m_mapSerial2Resp ahead of
+                // sending.
                 CStdRMutex oPortLock( GetLock() );
                 m_mapSerial2Resp[ dwSerial ] =
                     IrpPtr( pIrp );

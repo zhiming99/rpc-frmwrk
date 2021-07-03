@@ -4083,6 +4083,10 @@ gint32 CRpcReqForwarderProxy::ForwardRequest(
         oBuilder.CopyProp(
             propTimestamp, pReqCtx );
 
+        bool bResp = true;
+        if( !( dwFlags & CF_WITH_REPLY ) )
+            bResp = false;
+
         DMsgPtr pNewMsg;
         ret = BuildNewMsgToFwrd( pReqCtx,
             pReqMsg, pNewMsg );
@@ -4125,7 +4129,7 @@ gint32 CRpcReqForwarderProxy::ForwardRequest(
         if( ret == STATUS_PENDING )
             break;
 
-        if( SUCCEEDED( ret ) )
+        if( SUCCEEDED( ret ) && bResp )
         {
             CCfgOpener oCfg(
                 ( IConfigDb* )pRespCfg );
