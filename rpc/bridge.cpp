@@ -778,6 +778,7 @@ gint32 CRpcTcpBridgeProxy::ForwardRequest(
                 propTimestamp, qwPeerTs );
 
             dwAge = m_oTs.GetAgeSec( qwLocalTs );
+            dwAge = abs( ( gint32 )dwAge );
 
             oReqCtx.CopyProp(
                 propPath2, pReqCtx );

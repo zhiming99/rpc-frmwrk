@@ -5940,7 +5940,7 @@ gint32 AppendConnParams(
             break;
 
 #ifdef DEBUG
-        if( true )
+        if( false )
         {
             std::string strDump;
             gint32 iRet = BytesToString(
