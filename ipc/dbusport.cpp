@@ -1065,6 +1065,12 @@ DBusHandlerResult CDBusBusPort::OnMessageArrival(
             && ret == DBUS_HANDLER_RESULT_NOT_YET_HANDLED )
         {
             // reply with dbus error
+            DMsgPtr pDumpMsg( pMsg );
+            DebugPrint( GetPortState(),
+                "Error cannot find irp for response messages\n%s\n, port=%s, 0x%x",
+                pDumpMsg.DumpMsg().c_str(),
+                CoGetClassName( GetClsid() ), 
+                ( LONGWORD )this );
             ReplyWithError( pMessage );
             ret = DBUS_HANDLER_RESULT_HANDLED;
         }

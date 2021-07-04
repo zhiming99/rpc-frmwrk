@@ -292,12 +292,12 @@ gint32 CRpcBasePort::DispatchRespMsg(
         ret = FindIrpForResp( pMsg, pIrp );
         if( ret == -ENOENT )
         {
-            DMsgPtr pDumpMsg( pMsg );
+            /*DMsgPtr pDumpMsg( pMsg );
             DebugPrint( GetPortState(),
                 "Error cannot find irp for response messages\n%s\n, port=%s, 0x%x",
                 pDumpMsg.DumpMsg().c_str(),
                 CoGetClassName( GetClsid() ), 
-                ( LONGWORD )this );
+                ( LONGWORD )this );*/
         }
 
         if( ERROR( ret ) )
