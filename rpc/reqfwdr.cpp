@@ -3760,10 +3760,10 @@ gint32 CRpcReqForwarderProxy::SetupReqIrpFwrdReq(
         oReq.GetTimeoutSec( dwTimeoutSec );
         guint64 qwTs = 0;
         oReq.GetQwordProp( propTimestamp, qwTs );
-        guint32 qwAge =
+        guint64 qwAge =
             CTimestampSvr::GetAgeSec( qwTs );
-        qwAge = abs( ( gint32 )qwAge );
-        if( qwAge >= dwTimeoutSec )
+        qwAge = abs( ( gint64 )qwAge );
+        if( qwAge >= ( guint64 )dwTimeoutSec )
         {
             ret = -ETIMEDOUT;
             break;

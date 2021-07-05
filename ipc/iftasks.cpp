@@ -4914,7 +4914,9 @@ gint32 CIfInvokeMethodTask::GetAgeSec(
         if( ERROR( ret ) )
             break;
         
-        dwAge = CTimestampSvr::GetAgeSec( qwTs );
+        guint64 qwVal =
+            CTimestampSvr::GetAgeSec( qwTs );
+        dwAge = abs( ( gint64 )qwVal );
 
     }while( 0 );
     return ret;

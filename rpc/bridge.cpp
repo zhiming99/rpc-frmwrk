@@ -777,8 +777,10 @@ gint32 CRpcTcpBridgeProxy::ForwardRequest(
             oReqCtx.SetQwordProp(
                 propTimestamp, qwPeerTs );
 
-            dwAge = m_oTs.GetAgeSec( qwLocalTs );
-            dwAge = abs( ( gint32 )dwAge );
+            guint64 qwVal =
+                m_oTs.GetAgeSec( qwLocalTs );
+            qwVal = ( abs( ( gint64 )qwVal ) );
+            dwAge = qwVal; 
 
             oReqCtx.CopyProp(
                 propPath2, pReqCtx );
@@ -4935,18 +4937,19 @@ gint32 CRpcTcpBridge::CheckHsTimeout(
         CCfgOpenerObj oCfg(
             ( CObjBase* )pTask );
 
+        guint32 dwRetries;
+        ret = oCfg.GetIntProp(
+            propRetries, dwRetries );
+        if( ERROR( ret ) )
+            break;
+
+        CStdRMutex oIfLock( GetLock() );
         if( m_bHandshaked )
         {
             if( m_bHsFailed )
                 ret = ERROR_FAIL;
             break;
         }
-
-        guint32 dwRetries;
-        ret = oCfg.GetIntProp(
-            propRetries, dwRetries );
-        if( ERROR( ret ) )
-            break;
 
         if( dwRetries > 0 )
         {
@@ -5133,12 +5136,14 @@ gint32 CRpcTcpBridge::Handshake(
             TaskletPtr pTask = m_pHsTicker;
             CIfParallelTask* ppt = pTask;
             m_pHsTicker.Clear();
+            EnumTaskState iState =
+                ppt->GetTaskState();
             oIfLock.Unlock();
-            if( ppt->GetTaskState() == stateStopped )
+            CStdRTMutex oTaskLock( ppt->GetLock() );
+            if( iState == stateStopped )
             {
                 // the handshake window has closed,
-                // though the bridge is not down
-                // yet
+                // but the bridge is not down yet
                 m_bHsFailed = true;
                 ret = -ETIMEDOUT;
                 oResp[ propReturnValue ] = -ETIMEDOUT;
