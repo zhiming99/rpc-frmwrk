@@ -50,6 +50,10 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 7. Logging service
 
 ---
+[`Mon Jul 05 2021 04:42:26 PM Beijing`]   
+1. fixed some stability bugs on the `rfcdev` branch. Since `rfc` is a profound changes, it has exposed some old design issues, and stability issues. Although we have fixed some issues, it still need some more tests.
+2. the `rfc` feature has one last bit feature to make it complete, that is the algothrim to adaptively adjust the flow window with the feedback of current load and latency informantion.
+
 [`Mon Jun 21 2021 03:14:14 PM Beijing`]   
 1. fixed a message leak bug when the system is under stress testing. 
 2. `RFC` is still under testing. Added a stress test to the `rfcdev` branch.
