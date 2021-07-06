@@ -5637,7 +5637,7 @@ gint32 CIfParallelTaskGrpRfc::RunTaskInternal(
             break;
 
         gint32 iCount =
-            GetMaxRunning() - m_setTasks.size();
+            GetMaxRunning() - GetRunningCount();
 
         if( iCount <= 0 )
         {
@@ -5734,7 +5734,7 @@ gint32 CIfParallelTaskGrpRfc::AddAndRun(
     do{
         CHECK_GRP_STATE;
 
-        if( GetPendingCount() >= GetMaxPending() )
+        if( GetPendingCount() > GetMaxPending() )
         {
             m_dwTaskRejected++;
             ret = ERROR_QUEUE_FULL;
@@ -5757,7 +5757,7 @@ gint32 CIfParallelTaskGrpRfc::AddAndRun(
         }
 
         if( !IsRunning() ||
-            GetRunningCount() >= GetMaxRunning() )
+            GetRunningCount() > GetMaxRunning() )
         {
             pTask->MarkPending();
             break;
@@ -5805,11 +5805,11 @@ gint32 CIfParallelTaskGrpRfc::InsertTask(
     gint32 ret = 0;
     do{
         CHECK_GRP_STATE;
+        m_dwTaskAdded++;
         m_quePendingTasks.push_front( pTask );
-        if( GetRunningCount() >= GetMaxRunning() )
+        if( GetRunningCount() > GetMaxRunning() )
             break;
 
-        m_dwTaskAdded++;
         CCfgOpener oCfg(
             ( IConfigDb* )GetConfig() );
 
@@ -5849,7 +5849,7 @@ gint32 CIfParallelTaskGrpRfc::SetLimit(
 
         CCfgOpener oCfg( ( IConfigDb* )GetConfig() );
 
-        if( GetRunningCount() < m_dwMaxRunning &&
+        if( GetRunningCount() < GetMaxRunning() &&
             GetPendingCount() > 0 )
         {
             CCfgOpener oCfg(
