@@ -3428,9 +3428,16 @@ gint32 CRpcInterfaceServer::OnFwrdReqQueueFull(
         if( ret != ERROR_QUEUE_FULL )
             break;
 
-        ret = RequeueInvTask( pCallback );
+        TaskletPtr pTask;
+        ret = CloneInvTask( pCallback, pTask );
         if( ERROR( ret ) )
             break;
+
+        // requeuing the task directly could cause
+        // infinite loop
+        ret = DEFER_CALL( GetIoMgr(), this,
+            &CRpcInterfaceServer::RequeueInvTask,
+            pTask );
 
     }while( 0 );
 
@@ -3459,27 +3466,29 @@ gint32 CRpcTcpBridge::RequeueInvTask(
     if( !IsRfcEnabled() )
         return ERROR_STATE;
 
-    TaskletPtr pTask;
-    gint32 ret = CloneInvTask(
-        pCallback, pTask );
-    if( ERROR( ret ) )
-        return ret;
-
     if( !IsConnected() )
         return ERROR_STATE;
+
+    TaskletPtr pTask;
+    pTask = static_cast< CIfInvokeMethodTask* >
+        ( pCallback );
 
     pTask->MarkPending();
     CIfParallelTaskGrpRfc* pGrpRfc = m_pGrpRfc;
     CStdRTMutex oLock( pGrpRfc->GetLock() );
-    ret = pGrpRfc->InsertTask( pTask );
+    gint32 ret = pGrpRfc->InsertTask( pTask );
+    if( ERROR( ret ) )
+        return ret;
+
     if( pGrpRfc->GetRunningCount() <
         pGrpRfc->GetMaxRunning() &&
         !pGrpRfc->IsNoSched() )
     {
-        TaskletPtr pTask = ObjPtr( m_pGrpRfc );
-        GetIoMgr()->RescheduleTask( pTask );
+        pTask = ObjPtr( m_pGrpRfc );
+        oLock.Unlock();
+        ( *pTask )( eventZero );
     }
-    return STATUS_SUCCESS;
+    return 0;
 }
 
 gint32 CRpcTcpBridge::OnKeepAliveRelay(
@@ -4412,28 +4421,11 @@ gint32 CRpcInterfaceServer::AddAndRun(
         ret = pGrpRfc->AddAndRun( pTask );
         if( ret != ERROR_QUEUE_FULL )
         {
-            ret = pTask->GetError();
-            if( ret == ERROR_QUEUE_FULL )
-            {
-                // pTask context is gone
-                TaskletPtr pDummy;
-                pDummy.NewObj(
-                    clsid( CIfDummyTask ) );
-                CCfgOpener oCfg( ( IConfigDb* )
-                    pDummy->GetConfig() );
-
-                oCfg.SetPointer( propIfPtr, this );
-                oCfg.SetObjPtr( propMatchPtr, pMatch );
-                oCfg.SetMsgPtr( propMsgPtr, pMsg );
-
-                ret = RequeueInvTask( pDummy );
-                if( SUCCEEDED( ret ) )
-                    return ret;
-            }
-            else
-            {
-                return ret;
-            }
+            gint32 iRet = 0;
+            iRet = pTask->GetError();
+            if( SUCCEEDED( ret ) && ERROR( iRet ) )
+                ret = iRet;
+            return ret;
         }
 
         // notify the client we have reached the

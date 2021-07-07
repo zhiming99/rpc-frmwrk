@@ -3616,17 +3616,15 @@ gint32 CRpcReqForwarder::RequeueInvTask(
 
     gint32 ret = 0; 
     do{
-        TaskletPtr pTask;
-        ret = CloneInvTask( pCallback, pTask );
-        if( ERROR( ret ) )
-            break;
-
         if( !IsConnected() )
         {
             ret = ERROR_STATE;
             break;
         }
 
+        TaskletPtr pTask;
+        pTask = static_cast< CIfInvokeMethodTask* >
+            ( pCallback );
         CCfgOpener oTaskCfg(
             ( IConfigDb* )pTask->GetConfig() );
 

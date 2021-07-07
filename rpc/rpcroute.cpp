@@ -5636,8 +5636,8 @@ gint32 CIfParallelTaskGrpRfc::RunTaskInternal(
         if( GetTaskCount() == 0 )
             break;
 
-        gint32 iCount =
-            GetMaxRunning() - GetRunningCount();
+        gint32 iCount = ( gint32 )( GetMaxRunning() -
+            GetRunningCount() );
 
         if( iCount <= 0 )
         {
@@ -5645,14 +5645,14 @@ gint32 CIfParallelTaskGrpRfc::RunTaskInternal(
             break;
         }
 
-        if( m_quePendingTasks.empty() )
+        if( GetPendingCount() == 0 )
         {
             ret = STATUS_PENDING;
             break;
         }
 
         iCount = std::min( ( size_t )iCount,
-            m_quePendingTasks.size() );
+            ( size_t )GetPendingCount() );
 
         queTasksToRun.insert(
             queTasksToRun.begin(),
@@ -5757,7 +5757,7 @@ gint32 CIfParallelTaskGrpRfc::AddAndRun(
         }
 
         if( !IsRunning() ||
-            GetRunningCount() > GetMaxRunning() )
+            GetRunningCount() >= GetMaxRunning() )
         {
             pTask->MarkPending();
             break;
