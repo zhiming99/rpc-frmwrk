@@ -5805,7 +5805,15 @@ gint32 CIfParallelTaskGrpRfc::InsertTask(
     gint32 ret = 0;
     do{
         CHECK_GRP_STATE;
+
         m_dwTaskAdded++;
+
+        CCfgOpenerObj oTaskCfg(
+            ( CObjBase* )pTask );
+
+        oTaskCfg.SetObjPtr(
+            propParentTask, ObjPtr( this ) );
+
         m_quePendingTasks.push_front( pTask );
         if( GetRunningCount() > GetMaxRunning() )
             break;

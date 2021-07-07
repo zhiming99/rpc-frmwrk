@@ -197,7 +197,7 @@ gint32 CRpcTcpBridgeProxy::OnHandshakeComplete(
                 propMaxReqs, dwMaxReqs );
 
             oCfg.SetIntProp(
-                propMaxReqs, RFC_MAX_PENDINGS );
+                propMaxPendings, RFC_MAX_PENDINGS );
 
             ret = InitRfc( oCfg );
             if( ERROR( ret ) )
