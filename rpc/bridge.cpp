@@ -3464,31 +3464,48 @@ gint32 CRpcInterfaceServer::InstallQFCallback(
 gint32 CRpcTcpBridge::RequeueInvTask(
     IEventSink* pCallback )
 {
-    if( !IsRfcEnabled() )
-        return ERROR_STATE;
+    gint32 ret = 0;
+    do{
+        if( !IsRfcEnabled() )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
 
-    if( !IsConnected() )
-        return ERROR_STATE;
+        if( !IsConnected() )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
 
-    TaskletPtr pTask;
-    pTask = static_cast< CIfInvokeMethodTask* >
-        ( pCallback );
+        TaskletPtr pTask;
+        pTask = static_cast< CIfInvokeMethodTask* >
+            ( pCallback );
 
-    pTask->MarkPending();
-    CIfParallelTaskGrpRfc* pGrpRfc = m_pGrpRfc;
-    CStdRTMutex oLock( pGrpRfc->GetLock() );
-    gint32 ret = pGrpRfc->InsertTask( pTask );
+        pTask->MarkPending();
+        CIfParallelTaskGrpRfc* pGrpRfc = m_pGrpRfc;
+        CStdRTMutex oLock( pGrpRfc->GetLock() );
+        gint32 ret = pGrpRfc->InsertTask( pTask );
+        if( ERROR( ret ) )
+            return ret;
+
+        if( pGrpRfc->GetRunningCount() <
+            pGrpRfc->GetMaxRunning() &&
+            !pGrpRfc->IsNoSched() )
+        {
+            pTask = ObjPtr( m_pGrpRfc );
+            oLock.Unlock();
+            ( *pTask )( eventZero );
+        }
+    }while( 0 );
+    
     if( ERROR( ret ) )
-        return ret;
-
-    if( pGrpRfc->GetRunningCount() <
-        pGrpRfc->GetMaxRunning() &&
-        !pGrpRfc->IsNoSched() )
     {
-        pTask = ObjPtr( m_pGrpRfc );
-        oLock.Unlock();
-        ( *pTask )( eventZero );
+        TaskletPtr pTask = ObjPtr( pCallback );
+        if( !pTask.IsEmpty() )
+            ( *pTask )( eventCancelTask );
     }
+
     return 0;
 }
 
@@ -4459,7 +4476,10 @@ gint32 CRpcInterfaceServer::AddAndRun(
         }
 
         if( !bResp )
+        {
+            ( *pInv )( eventCancelTask );
             return ret;
+        }
 
         CCfgOpener oResp;
         oResp[ propReturnValue ] = ERROR_QUEUE_FULL;

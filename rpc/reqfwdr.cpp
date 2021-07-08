@@ -1368,10 +1368,7 @@ gint32 CRpcReqForwarder::GetGrpRfcs(
         while( itr != m_mapGrpRfcs.cend() )
         {
             if( itr->first.second == strUniqName )
-            {
                 vecGrps.push_back( itr->second );
-                continue;
-            }
             ++itr;
         }
         oLock.Unlock();
@@ -1394,10 +1391,7 @@ gint32 CRpcReqForwarder::GetGrpRfcs(
         while( itr != m_mapGrpRfcs.cend() )
         {
             if( itr->first.first == dwPortId )
-            {
                 vecGrps.push_back( itr->second );
-                continue;
-            }
             ++itr;
         }
         oLock.Unlock();
@@ -3848,11 +3842,13 @@ gint32 CRpcReqForwarder::SendFetch_Server(
 gint32 CRpcReqForwarder::RequeueInvTask(
     IEventSink* pCallback )
 {
-    if( !IsRfcEnabled() )
-        return ERROR_STATE;
-
     gint32 ret = 0; 
     do{
+        if( !IsRfcEnabled() )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
         if( !IsConnected() )
         {
             ret = ERROR_STATE;
@@ -3886,8 +3882,16 @@ gint32 CRpcReqForwarder::RequeueInvTask(
 
     }while( 0 );
 
+    if( ERROR( ret ) )
+    {
+        TaskletPtr pTask = ObjPtr( pCallback );
+        if( !pTask.IsEmpty() )
+            ( *pTask )( eventCancelTask );
+    }
+
     return ret;
 }
+
 CRpcReqForwarderProxy::CRpcReqForwarderProxy(
     const IConfigDb* pCfg )
     : CAggInterfaceProxy( pCfg ),
