@@ -486,8 +486,9 @@ class CRpcReqForwarder :
         IConfigDb* pReqCtx );
 
     bool m_bRfc = false;
-    std::hashmap< stdstr, TaskGrpPtr > m_mapGrpRfcs;
-    std::hashmap< stdstr, stdstr > m_mapUq2SdName;
+    using GRPRFC_KEY=std::pair< gint32, stdstr >;
+    std::map< GRPRFC_KEY, TaskGrpPtr > m_mapGrpRfcs;
+    std::map< stdstr, stdstr > m_mapUq2SdName;
     bool m_bSepConns = false;
 
     inline gint32 GetSrcDBusName(
@@ -495,7 +496,7 @@ class CRpcReqForwarder :
         stdstr& strName ) const
     {
         CStdRMutex oLock( GetLock() );
-        std::hashmap< stdstr, stdstr >::const_iterator
+        std::map< stdstr, stdstr >::const_iterator
             itr = m_mapUq2SdName.find( strUqName );
 
         if( itr == m_mapUq2SdName.cend() )
@@ -505,31 +506,42 @@ class CRpcReqForwarder :
         return 0;
     }
 
-    gint32 GetGrpRfc(
+    gint32 GetGrpRfcs(
+        guint32 dwPortId,
+        std::vector< TaskGrpPtr >& vecGrps ) const;
+
+    gint32 GetGrpRfcs(
         const stdstr& strUniqName,
-        TaskGrpPtr& pGrp ) const
-    {
-        CStdRMutex oLock( GetLock() );
-        std::hashmap< stdstr, TaskGrpPtr >::const_iterator
-        itr = m_mapGrpRfcs.find( strUniqName );
+        std::vector< TaskGrpPtr >& vecGrps ) const;
 
-        if( itr == m_mapGrpRfcs.cend() )
-            return -ENOENT;
-
-        pGrp = ObjPtr( itr->second );
-        return 0;
-    }
+    gint32 GetGrpRfc( GRPRFC_KEY& oKey,
+        TaskGrpPtr& pGrp ) const;
 
     gint32 GetGrpRfc(
         DMsgPtr& pMsg,        
-        TaskGrpPtr& pGrp ) override
-    {
-        stdstr strUniqName = pMsg.GetSender();
-        return GetGrpRfc( strUniqName, pGrp );
-    }
+        TaskGrpPtr& pGrp ) override;
 
-    gint32 RemoveRfcGrp(
+    gint32 RemoveGrpRfcs(
         const stdstr& strUniqName );
+
+    gint32 RemoveGrpRfcs(
+        guint32 dwPortId );
+
+    gint32 RemoveGrpRfc(
+        guint32 dwPortId,
+        const stdstr& strUniqName );
+
+    gint32 FindFwrdReqsAll(
+        guint32 dwPortId,
+        const stdstr& strUniqName,
+        FWRDREQS& vecTasks,
+        bool bTaskId );
+
+    gint32 FindFwrdReqsAllRfc(
+        guint32 dwPortId,
+        const stdstr& strUniqName,
+        FWRDREQS& vecTasks,
+        bool bTaskId );
 
     gint32 FindFwrdReqsAllRfc(
         const stdstr& strUniqName,
@@ -690,7 +702,8 @@ class CRpcReqForwarder :
     gint32 RequeueInvTask(
         IEventSink* pCallback ) override;
 
-    gint32 CreateRfcGrp(
+    gint32 CreateGrpRfc(
+        guint32 dwPortId,
         const stdstr& strUniqName,
         const stdstr& strSdName );
 

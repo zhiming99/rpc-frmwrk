@@ -3433,8 +3433,9 @@ gint32 CRpcInterfaceServer::OnFwrdReqQueueFull(
         if( ERROR( ret ) )
             break;
 
-        // requeuing the task directly could cause
-        // infinite loop
+        // calling RequeueInvTask directly could
+        // cause infinite loop, and we have to
+        // call it asynchronously.
         ret = DEFER_CALL( GetIoMgr(), this,
             &CRpcInterfaceServer::RequeueInvTask,
             pTask );

@@ -1290,7 +1290,7 @@ gint32 CRpcReqForwarderAuth::LocalLoginInternal(
 
             if( ret == 1 && IsRfcEnabled() )
             {
-                ret = CreateRfcGrp(
+                ret = CreateGrpRfc( dwPortId,
                     strSrcUniqName, strSender );
                 if( ERROR( ret ) )
                     break;
@@ -2388,7 +2388,7 @@ gint32 CRpcReqForwarderAuth::OnSessImplLoginComplete(
 
             if( ret == 1 && IsRfcEnabled() )
             {
-                ret = CreateRfcGrp(
+                ret = CreateGrpRfc( dwPortId,
                     strUniqName, strSender );
                 if( ERROR( ret ) )
                     break;
