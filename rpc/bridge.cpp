@@ -4437,13 +4437,30 @@ gint32 CRpcInterfaceServer::AddAndRun(
         oCfg.GetObjPtr( propMatchPtr, pMatch );
 
         ret = pGrpRfc->AddAndRun( pTask );
-        if( ret != ERROR_QUEUE_FULL )
+
+        gint32 iRet = 0;
+        if( SUCCEEDED( ret ) )
         {
-            gint32 iRet = 0;
             iRet = pTask->GetError();
-            if( SUCCEEDED( ret ) && ERROR( iRet ) )
-                ret = iRet;
+            if( iRet == STATUS_PENDING ||
+                SUCCEEDED( iRet ) )
+            {
+                return STATUS_SUCCESS;
+            }
+            if( iRet == ERROR_QUEUE_FULL )
+            {
+                CStdRTMutex oLock(
+                    pGrpRfc->GetLock() );
+                pGrpRfc->SetLimit(
+                    pGrpRfc->GetRunningCount();
+                    pGrpRfc->GetMaxPending() );
+            }
             return ret;
+        }
+        else if( ret != ERROR_QUEUE_FULL )
+        {
+            ( *pTask )( eventCancelTask );
+           return ret;
         }
 
         // notify the client we have reached the

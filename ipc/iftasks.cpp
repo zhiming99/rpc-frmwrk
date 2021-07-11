@@ -108,20 +108,6 @@ gint32 CIfStartRecvMsgTask::HandleIncomingMsg(
             pTask, false );
 
         break;
-        // put the InvokeMethod in a managed
-        // environment instead of letting it
-        // running untracked
-        ret = pIf->AddAndRun( pTask, true );
-        if( ERROR( ret ) )
-            break;
-
-        ret = pTask->GetError();
-        if( ret == STATUS_PENDING )
-        {
-            // CIfStartRecvMsgTask is done, the
-            // CIfInvokeMethodTask will take over
-            ret = 0;
-        }
 
     }while( 0 );
 

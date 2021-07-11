@@ -146,8 +146,11 @@ gint32 CRpcReqForwarder::CreateGrpRfc(
             break;
 
         TaskGrpPtr pGrp;
-        CParamList oParams;
+        CCfgOpener oParams;
         oParams.SetPointer( propIfPtr, this );
+        oParams[ propSrcUniqName ] = strUniqName;
+        oParams[ propPrxyPortId ] = dwPortId;
+
         ret = pGrp.NewObj(
             clsid( CIfParallelTaskGrpRfc ),
             oParams.GetCfg() );
@@ -155,7 +158,10 @@ gint32 CRpcReqForwarder::CreateGrpRfc(
             break;
 
         // a placeholder task to prevent
-        // m_pGrpRfc from completing itself
+        // m_pGrpRfc from quitting
+        oParams.RemoveProperty( propSrcUniqName );
+        oParams.RemoveProperty( propPrxyPortId );
+
         TaskletPtr pTask;
         ret = pTask.NewObj(
             clsid( CIfCallbackInterceptor ),
