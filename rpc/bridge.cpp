@@ -4452,7 +4452,7 @@ gint32 CRpcInterfaceServer::AddAndRun(
                 CStdRTMutex oLock(
                     pGrpRfc->GetLock() );
                 pGrpRfc->SetLimit(
-                    pGrpRfc->GetRunningCount();
+                    pGrpRfc->GetRunningCount(),
                     pGrpRfc->GetMaxPending() );
             }
             return ret;
