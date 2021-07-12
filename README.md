@@ -51,7 +51,7 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 
 ---
 [`Mon Jul 12 2021 01:54:27 PM Beijing`]   
-1. Over the way of tests, it has exposed a starving issue in the `reqfwdr` when a hundred requests arrive at the same time. However, the starving issue could also be an issue of the `bridge`. And I need to address it before the `rfc` can be released.
+1. Over the way of tests, it has exposed a starving issue in the `reqfwdr` when a hundred requests arrive at the same time. However, the starving issue could also be an issue of the `bridge`. And I need to address it ASAP before the `rfc` can be released.
 
 [`Mon Jul 05 2021 04:42:26 PM Beijing`]   
 1. fixed some stability bugs on the `rfcdev` branch. Since `rfc` is a profound changes, it has exposed some old design issues, and stability issues. Although we have fixed some issues, it still need some more tests.
