@@ -10,14 +10,15 @@
  *       Revision:  none
  *       Compiler:  gcc
  *
- *         Author:  Ming Zhi(woodhead99@gmail.com )
- *   Organization:
+ *         Author:  Ming Zhi( woodhead99@gmail.com )
+ *   Organization:  
  *
- *      Copyright:  2019 Ming Zhi( woodhead99@gmail.com )
+ *      Copyright:  2020 Ming Zhi( woodhead99@gmail.com )
  *
- *        License:  Licensed under GPL-3.0. You may not use this file except in
- *                  compliance with the License. You may find a copy of the
- *                  License at 'http://www.gnu.org/licenses/gpl-3.0.html'
+ *        License:  This program is free software; you can redistribute it
+ *                  and/or modify it under the terms of the GNU General Public
+ *                  License version 3.0 as published by the Free Software
+ *                  Foundation at 'http://www.gnu.org/licenses/gpl-3.0.html'
  *
  * =====================================================================================
  */
@@ -4439,14 +4440,10 @@ gint32 CRpcInterfaceServer::AddAndRun(
         ret = pGrpRfc->AddAndRun( pTask );
 
         gint32 iRet = 0;
-        if( SUCCEEDED( ret ) )
+        if( SUCCEEDED( ret ) ||
+            ret == STATUS_PENDING )
         {
             iRet = pTask->GetError();
-            if( iRet == STATUS_PENDING ||
-                SUCCEEDED( iRet ) )
-            {
-                return STATUS_SUCCESS;
-            }
             if( iRet == ERROR_QUEUE_FULL )
             {
                 CStdRTMutex oLock(
