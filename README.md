@@ -50,6 +50,9 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 7. Logging service
 
 ---
+[`Mon Jul 12 2021 01:54:27 PM Beijing`]   
+1. Over the tests of the days, it has exposed a starving issue in the `reqfwdr` when a hundred requests arrive at the same time. The starving issue could also be an issue of the `bridge`. And I need to address it before the `rfc` can be released.
+
 [`Mon Jul 05 2021 04:42:26 PM Beijing`]   
 1. fixed some stability bugs on the `rfcdev` branch. Since `rfc` is a profound changes, it has exposed some old design issues, and stability issues. Although we have fixed some issues, it still need some more tests.
 2. the feature `rfc` still remains one last bit to make it perfect, that is, the algothrim to adaptively and automaticaly adjust the sending window size with the feedback of current load and latency informantion.
