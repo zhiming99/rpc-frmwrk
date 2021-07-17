@@ -5816,21 +5816,6 @@ gint32 CIfParallelTaskGrpRfc::InsertTask(
             propParentTask, ObjPtr( this ) );
 
         m_quePendingTasks.push_front( pTask );
-        if( GetRunningCount() > GetMaxRunning() )
-            break;
-
-        CCfgOpener oCfg(
-            ( IConfigDb* )GetConfig() );
-
-        CIoManager* pMgr = nullptr;
-        ret = GET_IOMGR( oCfg, pMgr );
-        if( ERROR( ret ) )
-            break;
-
-        oTaskLock.Unlock();
-
-        TaskletPtr pThisTask( this );
-        ret = pMgr->RescheduleTask( pThisTask );
 
     }while( 0 );
 
@@ -5838,7 +5823,9 @@ gint32 CIfParallelTaskGrpRfc::InsertTask(
 }
 
 gint32 CIfParallelTaskGrpRfc::SetLimit(
-    guint32 dwMaxRunning, guint32 dwMaxPending )
+    guint32 dwMaxRunning,
+    guint32 dwMaxPending,
+    bool bNoResched )
 {
     if( dwMaxPending == 0 || dwMaxRunning == 0 )
         return -EINVAL;
@@ -5856,6 +5843,9 @@ gint32 CIfParallelTaskGrpRfc::SetLimit(
         if( IsNoSched() )
             break;
 
+        if( bNoResched )
+            break;
+
         CCfgOpener oCfg( ( IConfigDb* )GetConfig() );
 
         if( GetRunningCount() < GetMaxRunning() &&
@@ -5871,6 +5861,120 @@ gint32 CIfParallelTaskGrpRfc::SetLimit(
 
             TaskletPtr pThisTask( this );
             ret = pMgr->RescheduleTask( pThisTask );
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CIfParallelTaskGrpRfc2::SelTasksToKill(
+    std::vector< TaskletPtr >& vecTasks )
+{
+    gint32 ret = 0;
+    do{
+        CHECK_GRP_STATE;
+
+        guint32 dwCount = 0;
+        if( GetMaxRunning() >= GetRunningCount() )
+            break;
+
+        dwCount = GetRunningCount() -
+            GetMaxRunning();
+
+        for( auto elem : m_setTasks )
+        {
+            CIfInvokeMethodTask* pInv = elem;
+            if( pInv == nullptr )
+                continue;
+
+            vecTasks.push_back( elem );
+            dwCount--;
+            if( dwCount == 0 )
+                break;
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+guint32 CIfParallelTaskGrpRfc2::HasPendingTasks()
+{
+    CStdRTMutex oTaskLock( GetLock() );
+    return super::GetPendingCount();
+}
+
+bool CIfParallelTaskGrpRfc2::HasTaskToRun()
+{
+    gint32 ret = 0;
+    do{
+        CHECK_GRP_STATE;
+
+        if( GetRunningCount() >= GetMaxRunning() )
+        {
+            ret = ERROR_FALSE;
+            break;
+        }
+        if( GetPendingCount() == 0 )
+        {
+            ret = ERROR_FALSE;
+            break;
+        }
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+        return false;
+
+    return true;
+}
+
+gint32 CIfParallelTaskGrpRfc2::OnChildComplete(
+    gint32 ret, CTasklet* pChild )
+{
+    do{
+        CStdRTMutex oTaskLock( GetLock() );
+        if( GetRunningCount() > GetMaxRunning() )
+        {
+            TaskletPtr taskPtr = pChild;
+            RemoveTask( taskPtr );
+            return 0;
+        }
+        if( IsNoSched() )
+        {
+            ret = 0;
+            break;
+        }
+
+        if( GetPendingCount() == 0 &&
+            GetTaskCount() > 0 )
+        {
+            // NOTE: this check will effectively reduce
+            // the possibility RunTask to run on two
+            // thread at the same time, and lower the
+            // probability get blocked by reentrance lock
+            // no need to reschedule
+            ret = 0;
+            break;
+        }
+
+        if( ret == ERROR_KILLED_BYSCHED )
+            break;
+
+        CfgPtr pCfg = GetConfig();
+        CCfgOpener oCfg( ( IConfigDb* )pCfg );
+        ObjPtr pIfObj = nullptr;
+        ret = oCfg.GetObjPtr( propIfPtr, pIfObj );
+        if( ERROR( ret ) )
+            break;
+
+        CRpcReqForwarder* pReqFwdr = pIfObj;
+        if( pReqFwdr != nullptr )
+        {
+            TaskGrpPtr pGrp( this );
+            ret = pReqFwdr->SchedNextTaskGrp( pGrp );
+            break;
         }
 
     }while( 0 );

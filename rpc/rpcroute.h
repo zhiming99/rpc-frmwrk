@@ -313,10 +313,6 @@ class CRpcInterfaceServer :
         IEventSink* pCallback,
         TaskletPtr& pTask ) const;
 
-    gint32 RetrieveTaskId(
-        IEventSink* pCallback,
-        guint64& qwTaskId ) const;
-
     gint32 RetrieveDest(
         IEventSink* pCallback,
         stdstr& strDest ) const;
@@ -331,6 +327,10 @@ class CRpcInterfaceServer :
     CRpcInterfaceServer( const IConfigDb* pCfg ) :
         super( pCfg )
     {;}
+
+    gint32 RetrieveTaskId(
+        IEventSink* pCallback,
+        guint64& qwTaskId ) const;
 
     virtual bool IsConnected(
         const char* szAddr = nullptr );
@@ -490,6 +490,7 @@ class CRpcReqForwarder :
     std::map< GRPRFC_KEY, TaskGrpPtr > m_mapGrpRfcs;
     std::map< stdstr, stdstr > m_mapUq2SdName;
     bool m_bSepConns = false;
+    ObjPtr m_pScheduler;
 
     inline gint32 GetSrcDBusName(
         const stdstr& strUqName,
@@ -709,6 +710,16 @@ class CRpcReqForwarder :
 
     inline bool IsSepConns() const
     { return m_bSepConns; }
+
+    gint32 RunNextTaskGrp(
+        TaskGrpPtr& pCurGrp );
+
+    gint32 SchedNextTaskGrp(
+        TaskGrpPtr& pCurGrp );
+
+    gint32 AddAndRun(
+        TaskletPtr& pTask,
+        bool bImmediate = false ) override;
 }; // CRpcReqForwarder
 
 class CRpcRfpForwardEventTask
@@ -2964,7 +2975,8 @@ class CIfParallelTaskGrpRfc :
 
     gint32 SetLimit(
         guint32 dwMaxRunning,
-        guint32 dwMaxPending );
+        guint32 dwMaxPending,
+        bool bNoResched = false );
 
     inline guint32 GetMaxRunning() const
     { return m_dwMaxRunning; }
@@ -2988,6 +3000,30 @@ class CIfParallelTaskGrpRfc :
 
     virtual gint32 InsertTask(
         TaskletPtr& pTask ) override ;
+
+};
+
+class CIfParallelTaskGrpRfc2 :
+    public CIfParallelTaskGrpRfc
+{
+
+    public:
+    typedef CIfParallelTaskGrpRfc super;
+    CIfParallelTaskGrpRfc2( const IConfigDb* pCfg )
+        : super( pCfg )
+    {
+        SetClassId( clsid( CIfParallelTaskGrpRfc2 ) );
+    }
+
+    gint32 SelTasksToKill(
+        std::vector< TaskletPtr >& vecTasks );
+
+    bool HasTaskToRun();
+
+    guint32 HasPendingTasks();
+
+    gint32 OnChildComplete( gint32 ret,
+        CTasklet* pChild ) override;
 };
 
 #define IS_SVRMODOFFLINE_EVENT( __pEvtMsg ) \

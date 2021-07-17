@@ -71,12 +71,28 @@ CRpcReqForwarder::CRpcReqForwarder(
         }
 
         RemoveProperty( propRouterPtr );
+        if( !IsRfcEnabled() )
+            break;
 
         CIoManager* pMgr = GetIoMgr();
         ret = pMgr->GetCmdLineOpt(
             propSepConns, m_bSepConns );
         if( ERROR( ret ) )
             m_bSepConns = false;
+
+        std::string strType;
+        ret = oCfg.GetStrProp(
+            propTaskSched, strType );
+        if( SUCCEEDED( ret ) && strType == "RR" )
+        {
+            CCfgOpener oParams;
+            oParams[ propIfPtr ] = this;
+            // ret = m_pScheduler.NewObj(
+            //     clsid( CRRTaskScheduler ),
+            //     oParams.GetCfg() );
+            if( ERROR( ret ) )
+                break;
+        }
 
         ret = 0;
 
@@ -150,9 +166,11 @@ gint32 CRpcReqForwarder::CreateGrpRfc(
         oParams.SetPointer( propIfPtr, this );
         oParams[ propSrcUniqName ] = strUniqName;
         oParams[ propPrxyPortId ] = dwPortId;
+        oParams[ propMaxReqs ] = 0;
+        oParams[ propMaxPendings ] = RFC_MAX_PENDINGS;
 
         ret = pGrp.NewObj(
-            clsid( CIfParallelTaskGrpRfc ),
+            clsid( CIfParallelTaskGrpRfc2 ),
             oParams.GetCfg() );
         if( ERROR( ret ) )
             break;
@@ -176,6 +194,24 @@ gint32 CRpcReqForwarder::CreateGrpRfc(
         oLock.Unlock();
 
         ret = this->AddAndRun( pGrpTask );
+        if( ERROR( ret ) )
+            break;
+
+        if( !m_pScheduler.IsEmpty() )
+        {
+        /* 
+            InterfPtr pIf;
+            ITaskScheduler* pSched = m_pScheduler;
+            ret = GetParent()->GetBridgeProxy(
+                dwPortId, pIf );
+            if( ERROR( ret ) )
+                break;
+
+            ret = pSched->AddTaskGrp( pIf, pGrp );
+            if( ERROR( ret ) )
+                break;
+        */
+        }
 
     }while( 0 );
 
@@ -5317,6 +5353,122 @@ gint32 CReqFwdrFetchDataTask::OnServiceComplete(
     }while( 0 );
 
     return ret;
+}
+
+gint32 CRpcReqForwarder::RunNextTaskGrp(
+    TaskGrpPtr& pCurGrp )
+{
+    if( m_pScheduler.IsEmpty() )
+        return ( *pCurGrp )( eventZero );
+
+    // ITaskScheduler* pSched = m_pScheduler;
+    // return pSched->RunNextTaskGrp();
+    return -ENOTSUP;
+}
+
+gint32 CRpcReqForwarder::SchedNextTaskGrp(
+    TaskGrpPtr& pCurGrp )
+{
+    if( m_pScheduler.IsEmpty() )
+    {
+        CIoManager* pMgr = GetIoMgr();
+        TaskletPtr pTask = pCurGrp;
+        return pMgr->RescheduleTask( pTask );
+    }
+
+    // ITaskScheduler* pSched = m_pScheduler;
+    // return pSched->SchedNextTaskGrp();
+    return -ENOTSUP;
+}
+
+gint32 CRpcReqForwarder::AddAndRun(
+    TaskletPtr& pTask, bool bImmediate )
+{
+    do{
+        gint32 ret = 0;
+        if( !IsRfcEnabled() )
+            break;
+
+        CIfInvokeMethodTask* pInv = pTask;
+        if( pInv == nullptr )
+            break;
+
+        CCfgOpener oCfg(
+            ( IConfigDb* )pInv->GetConfig() );
+
+        DMsgPtr pMsg;
+        oCfg.GetMsgPtr( propMsgPtr, pMsg );
+        stdstr strMethod = pMsg.GetMember();
+        if( strMethod != SYS_METHOD_FORWARDREQ )
+            break;
+
+        TaskGrpPtr pGrp;
+        ret = GetGrpRfc( pMsg, pGrp );
+        if( ERROR( ret ) )
+            break;
+
+        CIfParallelTaskGrpRfc* pGrpRfc = pGrp;
+        ret = InstallQFCallback( pTask );
+        if( ERROR( ret ) )
+            break;
+
+        ret = pGrpRfc->AppendTask( pTask );
+        if( SUCCEEDED( ret ) )
+        {
+            // run the tasks
+            return RunNextTaskGrp( pGrp );
+        }
+        else if( ERROR( ret ) &&
+            ret != ERROR_QUEUE_FULL )
+        {
+            ( *pTask )( eventCancelTask );
+           return ret;
+        }
+
+        gint32 iRet = ret;
+        // notify the client we have reached the
+        // limit
+        bool bResp = true;
+        ObjPtr pObj;
+        ret = pMsg.GetObjArgAt( 0, pObj );
+        if( SUCCEEDED( ret ) )
+        {
+            IConfigDb* pReqCtx = pObj;
+            if( pReqCtx != nullptr )
+            {
+                bool bNoReply;
+                CCfgOpener oReqCtx( pReqCtx );
+                ret = oReqCtx.GetBoolProp(
+                    propNoReply, bNoReply );
+                if( SUCCEEDED( ret ) )
+                    bResp = !bNoReply;
+            }
+        }
+
+        EventPtr pEvt;
+        ret = pInv->GetClientNotify( pEvt );
+        if( SUCCEEDED( ret ) )
+        {
+            pInv->ClearClientNotify();
+            TaskletPtr pQFTask = pEvt;
+            ( *pQFTask )( eventCancelTask );
+        }
+
+        if( !bResp )
+        {
+            ( *pInv )( eventCancelTask );
+            return ret;
+        }
+
+        CCfgOpener oResp;
+        oResp[ propReturnValue ] = iRet;
+        OnServiceComplete( oResp.GetCfg(), pInv );
+
+        return ret;
+
+    }while( 0 );
+
+    return CRpcServices::AddAndRun( pTask, bImmediate );
 }
 
 }

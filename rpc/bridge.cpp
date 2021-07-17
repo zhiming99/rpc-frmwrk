@@ -378,15 +378,18 @@ gint32 CRpcTcpBridgeProxy::ClearRemoteEvents(
     // this is an async call
     gint32 ret = 0;
 
-    if( unlikely( pVecMatches.IsEmpty() ||
-        pCallback == nullptr ) )
+    if( unlikely( pCallback == nullptr ) )
         return -EINVAL;
 
     ObjVecPtr pMatches( pVecMatches );
-    if( unlikely( pMatches.IsEmpty() ) )
+    QwVecPtr pTaskIds( pVecTaskIds );
+
+    if( unlikely( pMatches.IsEmpty() &&
+        pTaskIds.IsEmpty() ) )
         return -EINVAL;
 
-    if( unlikely( ( *pMatches )().size() == 0 ) )
+    if( unlikely( ( *pMatches )().empty() &&
+        ( *pTaskIds )().empty() ) )
         return -EINVAL;
 
     if( unlikely( !IsConnected() ) )
@@ -2350,12 +2353,21 @@ gint32 CRpcInterfaceServer::RetrieveTaskId(
     CIfInvokeMethodTask* pInv =
         static_cast< CIfInvokeMethodTask* >
             ( pCallback );
+
+    if( pInv == nullptr )
+        return -EINVAL;
+
     do{
         EnumTaskState iState =
             pInv->GetTaskState();
         if( iState == stateStarted )
         {
             CCfgOpenerObj oInv( pInv );
+            ret = oInv.GetQwordProp(
+                propRmtTaskId, qwTaskId );
+            if( SUCCEEDED( ret ) )
+                break;
+
             IConfigDb* pReq = nullptr;
             ret = oInv.GetPointer(
                 propReqPtr, pReq );
@@ -2771,8 +2783,8 @@ gint32 CRpcTcpBridge::ClearRemoteEvents(
         pTaskIdsIn.IsEmpty() ) )
         return -EINVAL;
 
-    if( unlikely( ( *pMatches )().size() == 0 &&
-        ( *pTaskIdsIn )().size() == 0 ) )
+    if( unlikely( ( *pMatches )().empty() &&
+        ( *pTaskIdsIn )().empty() ) )
         return -EINVAL;
 
     if( unlikely( !IsConnected() ) )
@@ -4433,9 +4445,6 @@ gint32 CRpcInterfaceServer::AddAndRun(
         ret = InstallQFCallback( pTask );
         if( ERROR( ret ) )
             break;
-
-        ObjPtr pMatch;
-        oCfg.GetObjPtr( propMatchPtr, pMatch );
 
         ret = pGrpRfc->AddAndRun( pTask );
 
