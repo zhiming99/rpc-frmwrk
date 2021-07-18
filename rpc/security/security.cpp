@@ -2887,6 +2887,18 @@ gint32 CRpcReqForwarderAuth::ClearRefCountByPortId(
     return vecUniqNames.size();
 }
 
+gint32 CRpcReqForwarderAuth::OnPostStart(
+    IEventSink* pCallback )
+{
+    return super::OnPostStart( pCallback );
+}
+
+gint32 CRpcReqForwarderAuth::OnPreStop(
+    IEventSink* pCallback )
+{
+    return super::OnPreStop( pCallback );
+}
+
 gint32 CAuthentServer::InitUserFuncs()
 {
     BEGIN_IFHANDLER_MAP( IAuthenticate );
