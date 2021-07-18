@@ -576,6 +576,12 @@ class CRpcReqForwarder :
         std::vector< stdstr >& strNames,
         FWRDREQS& vecTasks );
 
+    gint32 OnPostStart(
+        IEventSink* pContext ) override;
+
+    gint32 OnPreStop(
+        IEventSink* pCallback ) override;
+
     public:
 
     typedef CRpcInterfaceServer super;
@@ -720,6 +726,12 @@ class CRpcReqForwarder :
     gint32 AddAndRun(
         TaskletPtr& pTask,
         bool bImmediate = false ) override;
+
+    gint32 RefreshReqLimit(
+        InterfPtr& pProxy,
+        guint32 dwMaxReqs,
+        guint32 dwMaxPendigns );
+
 }; // CRpcReqForwarder
 
 class CRpcRfpForwardEventTask
@@ -1539,6 +1551,19 @@ class CRpcTcpBridgeProxy :
 
     inline bool IsRfcEnabled() const
     { return m_bRfc; }
+
+    gint32 GetGrpRfc(
+        TaskGrpPtr& pGrp )
+    {
+        if( !IsRfcEnabled() )
+            return ERROR_STATE;
+
+        pGrp = m_pGrpRfc;
+        if( pGrp.IsEmpty() )
+            return -EFAULT;
+
+        return 0;
+    }
 
 }; // CRpcTcpBridgeProxy
 
@@ -2961,6 +2986,26 @@ inline gint32 NewIfDeferredCall2( EnumClsid iTaskClsid,
     _ret; \
 })
 
+#define CHECK_GRP_STATE \
+    CStdRTMutex oTaskLock( GetLock() ); \
+    EnumTaskState iState = GetTaskState(); \
+    if( iState == stateStopped ) \
+    { \
+        ret = ERROR_STATE; \
+        break; \
+    } \
+    if( IsCanceling() ) \
+    { \
+        ret = ERROR_STATE; \
+        break; \
+    } \
+    if( !IsRunning() && \
+        iState == stateStarted ) \
+    { \
+        ret = ERROR_STATE; \
+        break; \
+    }
+
 class CIfParallelTaskGrpRfc :
     public CIfParallelTaskGrp
 {
@@ -2977,6 +3022,10 @@ class CIfParallelTaskGrpRfc :
         guint32 dwMaxRunning,
         guint32 dwMaxPending,
         bool bNoResched = false );
+
+    gint32 GetLimit(
+        guint32& dwMaxRunning,
+        guint32& dwMaxPending ) const;
 
     inline guint32 GetMaxRunning() const
     { return m_dwMaxRunning; }

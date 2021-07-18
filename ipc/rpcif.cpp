@@ -4410,6 +4410,13 @@ gint32 CRpcServices::LoadObjDesc(
                 oCfg[ propRouterRole ] = 0x03;
             }
 
+            if( oObjElem.isMember( JSON_ATTR_TASKSCHED ) &&
+                oObjElem[ JSON_ATTR_TASKSCHED ].isString() )
+            {
+                strVal = oObjElem[ JSON_ATTR_TASKSCHED ].asString(); 
+                oCfg[ propTaskSched ] = strVal;
+            }
+
             // set the destination dbus name
             if( bServer )
             {

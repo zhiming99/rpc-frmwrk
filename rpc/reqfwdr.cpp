@@ -27,6 +27,7 @@
 #include "proxy.h"
 #include "rpcroute.h"
 #include "dbusport.h"
+#include "taskschd.h"
 
 namespace rpcf
 {
@@ -87,9 +88,9 @@ CRpcReqForwarder::CRpcReqForwarder(
         {
             CCfgOpener oParams;
             oParams[ propIfPtr ] = this;
-            // ret = m_pScheduler.NewObj(
-            //     clsid( CRRTaskScheduler ),
-            //     oParams.GetCfg() );
+            ret = m_pScheduler.NewObj(
+                clsid( CRRTaskScheduler ),
+                oParams.GetCfg() );
             if( ERROR( ret ) )
                 break;
         }
@@ -199,7 +200,6 @@ gint32 CRpcReqForwarder::CreateGrpRfc(
 
         if( !m_pScheduler.IsEmpty() )
         {
-        /* 
             InterfPtr pIf;
             ITaskScheduler* pSched = m_pScheduler;
             ret = GetParent()->GetBridgeProxy(
@@ -210,7 +210,6 @@ gint32 CRpcReqForwarder::CreateGrpRfc(
             ret = pSched->AddTaskGrp( pIf, pGrp );
             if( ERROR( ret ) )
                 break;
-        */
         }
 
     }while( 0 );
@@ -240,6 +239,12 @@ gint32 CRpcReqForwarder::RemoveGrpRfc(
         m_mapUq2SdName.erase( strUniqName );
         oLock.Unlock();
 
+        if( !m_pScheduler.IsEmpty() )
+        {
+            ITaskScheduler* pSched = m_pScheduler;
+            pSched->RemoveTaskGrp( pGrp );
+        }
+
         ( *pGrp )( eventCancelTask );
 
     }while( 0 );
@@ -267,6 +272,12 @@ gint32 CRpcReqForwarder::RemoveGrpRfcs(
             ++itr;
         }
         oLock.Unlock();
+
+        if( !m_pScheduler.IsEmpty() )
+        {
+            ITaskScheduler* pSched = m_pScheduler;
+            pSched->RemoveTaskGrps( dwPortId );
+        }
 
         for( auto elem : vecGrps )
             ( *elem )( eventCancelTask );
@@ -298,6 +309,12 @@ gint32 CRpcReqForwarder::RemoveGrpRfcs(
 
         m_mapUq2SdName.erase( strUniqName );
         oLock.Unlock();
+
+        if( !m_pScheduler.IsEmpty() )
+        {
+            ITaskScheduler* pSched = m_pScheduler;
+            pSched->RemoveTaskGrps( vecGrps );
+        }
 
         for( auto elem : vecGrps )
             ( *elem )( eventCancelTask );
@@ -5361,9 +5378,8 @@ gint32 CRpcReqForwarder::RunNextTaskGrp(
     if( m_pScheduler.IsEmpty() )
         return ( *pCurGrp )( eventZero );
 
-    // ITaskScheduler* pSched = m_pScheduler;
-    // return pSched->RunNextTaskGrp();
-    return -ENOTSUP;
+    ITaskScheduler* pSched = m_pScheduler;
+    return pSched->RunNextTaskGrp();
 }
 
 gint32 CRpcReqForwarder::SchedNextTaskGrp(
@@ -5376,9 +5392,8 @@ gint32 CRpcReqForwarder::SchedNextTaskGrp(
         return pMgr->RescheduleTask( pTask );
     }
 
-    // ITaskScheduler* pSched = m_pScheduler;
-    // return pSched->SchedNextTaskGrp();
-    return -ENOTSUP;
+    ITaskScheduler* pSched = m_pScheduler;
+    return pSched->SchedNextTaskGrp();
 }
 
 gint32 CRpcReqForwarder::AddAndRun(
@@ -5469,6 +5484,157 @@ gint32 CRpcReqForwarder::AddAndRun(
     }while( 0 );
 
     return CRpcServices::AddAndRun( pTask, bImmediate );
+}
+
+gint32 CRpcReqForwarder::RefreshReqLimit(
+    InterfPtr& pProxy,
+    guint32 dwMaxReqs,
+    guint32 dwMaxPendings )
+{
+    if( m_pScheduler.IsEmpty() )
+        return STATUS_SUCCESS;
+
+    gint32 ret = 0;
+    do{
+        ITaskScheduler* pSched = m_pScheduler;
+        ret = pSched->SetSlotCount( pProxy,
+            dwMaxReqs + dwMaxPendings );
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CRpcReqForwarder::OnPostStart(
+    IEventSink* pContext )
+{
+    if( m_pScheduler.IsEmpty() )
+        return 0;
+
+    ITaskScheduler* pSched = m_pScheduler;
+    return pSched->Start();
+}
+
+gint32 CRpcReqForwarder::OnPreStop(
+    IEventSink* pCallback )
+{
+    if( m_pScheduler.IsEmpty() )
+        return 0;
+    ITaskScheduler* pSched = m_pScheduler;
+    return pSched->Stop();
+}
+
+gint32 CIfParallelTaskGrpRfc2::SelTasksToKill(
+    std::vector< TaskletPtr >& vecTasks )
+{
+    gint32 ret = 0;
+    do{
+        CHECK_GRP_STATE;
+
+        guint32 dwCount = 0;
+        if( GetMaxRunning() >= GetRunningCount() )
+            break;
+
+        dwCount = GetRunningCount() -
+            GetMaxRunning();
+
+        for( auto elem : m_setTasks )
+        {
+            CIfInvokeMethodTask* pInv = elem;
+            if( pInv == nullptr )
+                continue;
+
+            vecTasks.push_back( elem );
+            dwCount--;
+            if( dwCount == 0 )
+                break;
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+guint32 CIfParallelTaskGrpRfc2::HasPendingTasks()
+{
+    CStdRTMutex oTaskLock( GetLock() );
+    return GetPendingCount();
+}
+
+bool CIfParallelTaskGrpRfc2::HasTaskToRun()
+{
+    gint32 ret = 0;
+    do{
+        CHECK_GRP_STATE;
+
+        if( GetRunningCount() >= GetMaxRunning() )
+        {
+            ret = ERROR_FALSE;
+            break;
+        }
+        if( GetPendingCount() == 0 )
+        {
+            ret = ERROR_FALSE;
+            break;
+        }
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+        return false;
+
+    return true;
+}
+
+gint32 CIfParallelTaskGrpRfc2::OnChildComplete(
+    gint32 ret, CTasklet* pChild )
+{
+    do{
+        CStdRTMutex oTaskLock( GetLock() );
+        if( GetRunningCount() > GetMaxRunning() )
+        {
+            TaskletPtr taskPtr = pChild;
+            RemoveTask( taskPtr );
+            return 0;
+        }
+        if( IsNoSched() )
+        {
+            ret = 0;
+            break;
+        }
+
+        if( GetPendingCount() == 0 &&
+            GetTaskCount() > 0 )
+        {
+            // NOTE: this check will effectively reduce
+            // the possibility RunTask to run on two
+            // thread at the same time, and lower the
+            // probability get blocked by reentrance lock
+            // no need to reschedule
+            ret = 0;
+            break;
+        }
+
+        if( ret == ERROR_KILLED_BYSCHED )
+            break;
+
+        CfgPtr pCfg = GetConfig();
+        CCfgOpener oCfg( ( IConfigDb* )pCfg );
+        ObjPtr pIfObj = nullptr;
+        ret = oCfg.GetObjPtr( propIfPtr, pIfObj );
+        if( ERROR( ret ) )
+            break;
+
+        CRpcReqForwarder* pReqFwdr = pIfObj;
+        if( pReqFwdr != nullptr )
+        {
+            TaskGrpPtr pGrp( this );
+            ret = pReqFwdr->SchedNextTaskGrp( pGrp );
+            break;
+        }
+
+    }while( 0 );
+
+    return ret;
 }
 
 }

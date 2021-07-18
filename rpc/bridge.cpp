@@ -2029,6 +2029,21 @@ gint32 CRpcTcpBridgeProxy::RefreshReqLimit(
     pGrpRfc->SetLimit(
         dwMaxReqs, RFC_MAX_PENDINGS );
 
+    CRpcRouter* pRouter = GetParent();
+    if( pRouter->HasReqForwarder() )
+    {
+        CRpcRouterReqFwdr* prt =
+            static_cast< CRpcRouterReqFwdr* >
+                ( pRouter );
+        InterfPtr pIf;
+        prt->GetReqFwdr( pIf );
+        CRpcReqForwarder* pReqFwdr = pIf;
+        InterfPtr pProxy = this;
+        pReqFwdr->RefreshReqLimit(
+            pProxy, dwMaxReqs,
+            pGrpRfc->GetMaxPending() );
+    }
+
     return 0;
 }
 
@@ -5252,7 +5267,7 @@ gint32 CRpcTcpBridge::OnPostStop(
 
 gint32 CRpcTcpBridge::RefreshReqLimit(
     guint32 dwMaxReqs,
-    guint32 dwMaxPendigns )
+    guint32 dwMaxPendings )
 {
     gint32 ret = 0;
     do{
@@ -5260,7 +5275,7 @@ gint32 CRpcTcpBridge::RefreshReqLimit(
             m_pGrpRfc;
 
         pGrpRfc->SetLimit(
-            dwMaxReqs, dwMaxPendigns );
+            dwMaxReqs, dwMaxPendings );
 
     }while( 0 );
 

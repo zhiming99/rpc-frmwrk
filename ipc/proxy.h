@@ -433,9 +433,6 @@ class CRpcInterfaceBase :
     gint32 SetReqQueSize(
         IMessageMatch* pMatch, guint32 dwSize );
 
-    gint32 GetParallelGrp(
-        TaskGrpPtr& pParaGrp );
-
     public:
 
     typedef CRpcBaseOperations super;
@@ -446,6 +443,8 @@ class CRpcInterfaceBase :
 
     gint32 ClearActiveTasks();
     gint32 ClearPausedTasks();
+    gint32 GetParallelGrp(
+        TaskGrpPtr& pParaGrp );
 
     TaskGrpPtr& GetTaskGroup()
     { return m_pRootTaskGroup; }
@@ -2001,4 +2000,23 @@ gint32 IsMidwayPath(
     const std::string& strTest,
     const std::string& strDest );
 
+}
+
+namespace std
+{
+    using namespace rpcf;
+    template<>
+    struct less<InterfPtr>
+    {
+        bool operator()(const InterfPtr& k1, const InterfPtr& k2) const
+        {
+            if( k2.IsEmpty() )
+                return false;
+
+            if( k1.IsEmpty() )
+                return true;
+
+            return k1->GetObjId() < k2->GetObjId();
+        }
+    };
 }

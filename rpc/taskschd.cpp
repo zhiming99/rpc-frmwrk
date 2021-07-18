@@ -22,23 +22,30 @@
  *
  * =====================================================================================
  */
+#include "configdb.h"
+#include "defines.h"
+#include "proxy.h"
+#include "rpcroute.h"
+#include "dbusport.h"
+#include "taskschd.h"
 
 namespace rpcf
 {
 
 void CRRTaskScheduler::SetLimitRunningGrps(
     CONNQUE_ELEM& ocq,
-    guint32& dwNewLimit )
+    guint32 dwNewLimit )
 {
-    std::list< InterfPtr >&
-        orq = ocq.m_plstReady;
+    std::list< TaskGrpPtr >&
+        orq = *ocq.m_plstReady;
     for( auto elem : orq )
     {
+        CIfParallelTaskGrpRfc2* pGrpRfc = elem;
+
         if( pGrpRfc->GetMaxRunning() ==
             dwNewLimit )
             continue;
 
-        CIfParallelTaskGrpRfc2* pGrpRfc = elem;
         pGrpRfc->SetLimit( dwNewLimit,
             pGrpRfc->GetMaxPending(),
             true );
@@ -49,12 +56,12 @@ void CRRTaskScheduler::SetLimitRunningGrps(
 
 void CRRTaskScheduler::SetLimitGrps(
     CONNQUE_ELEM& ocq,
-    guint32& dwNewLimit )
+    guint32 dwNewLimit )
 {
-    std::list< InterfPtr >& onq =
+    std::list< TaskGrpPtr >& onq =
         *ocq.m_plstReady;
 
-    std::list< InterfPtr >& owq =
+    std::list< TaskGrpPtr >& owq =
         ocq.m_lstWaitSlot;
 
     SetLimitRunningGrps( ocq, dwNewLimit );
@@ -75,13 +82,13 @@ void CRRTaskScheduler::SetLimitGrps(
 
 void CRRTaskScheduler::IncRunningGrps(
     CONNQUE_ELEM& ocq,
-    guint32& dwCount )
+    guint32 dwCount )
 {
     if( dwCount == 0 )
         return;
 
-    std::list< InterfPtr >&
-        orq = ocq.m_plstReady;
+    std::list< TaskGrpPtr >&
+        orq = *ocq.m_plstReady;
 
     for( auto elem : orq )
     {
@@ -104,8 +111,8 @@ void CRRTaskScheduler::SelTasksToKill(
     std::vector< TaskletPtr >& vecTasks,
     bool bWaitQue )
 {
-    std::list< InterfPtr >&
-        orq = ocq.m_plstReady;
+    std::list< TaskGrpPtr >&
+        orq = *ocq.m_plstReady;
     for( auto elem : orq )
     {
         CIfParallelTaskGrpRfc2* pGrpRfc = elem;
@@ -115,7 +122,7 @@ void CRRTaskScheduler::SelTasksToKill(
     if( !bWaitQue )
         return;
 
-    std::list< InterfPtr >& owq =
+    std::list< TaskGrpPtr >& owq =
         ocq.m_lstWaitSlot;
 
     for( auto elem : owq )
@@ -129,7 +136,7 @@ void CRRTaskScheduler::SelTasksToKill(
 
 void CRRTaskScheduler::IncWaitingGrp(
     CONNQUE_ELEM& ocq,
-    guint32& dwCount )
+    guint32 dwCount )
 {
     std::list< TaskGrpPtr >& owq =
         ocq.m_lstWaitSlot;
@@ -169,7 +176,7 @@ void CRRTaskScheduler::IncWaitingGrp(
     itr = owq.begin();
     while( itr != owq.end() )
     {
-        CIfParallelTaskGrpRfc2* pGrpRfc = elem;
+        CIfParallelTaskGrpRfc2* pGrpRfc = *itr;
         pGrpRfc->SetLimit( 1,
             pGrpRfc->GetMaxPending(),
             true );
@@ -188,7 +195,10 @@ gint32 CRRTaskScheduler::IncSlotCount(
         return STATUS_SUCCESS;
 
     guint32 dwOldCount = ocq.m_dwMaxSlots;
-    guint32 dwNumGrps = GetTaskGrpCount();
+    guint32 dwNumGrps = ocq.GetTaskGrpCount();
+    if( dwNumGrps == 0 )
+        return STATUS_SUCCESS;
+
     guint32 dwNewCount = dwOldCount + dwCount;
     guint32 dwAvg = dwNewCount / dwNumGrps;
     guint32 dwModulo =
@@ -220,7 +230,10 @@ gint32 CRRTaskScheduler::ResetSlotCount(
     std::vector< TaskletPtr >& vecTasks )
 {
     guint32 dwOldCount = ocq.m_dwMaxSlots;
-    guint32 dwNumGrps = GetTaskGrpCount();
+    guint32 dwNumGrps = ocq.GetTaskGrpCount();
+    if( dwNumGrps == 0 )
+        return STATUS_SUCCESS;
+
     guint32 dwNewCount = dwOldCount + dwDelta;
     guint32 dwAvg = dwNewCount / dwNumGrps;
     guint32 dwModulo =
@@ -259,7 +272,7 @@ CRRTaskScheduler::CRRTaskScheduler(
     gint32 ret = 0;
     do{
         CCfgOpener oCfg( pCfg );
-        ret = oCfg.GetPointer(
+        ret = oCfg.GetObjPtr(
             propIfPtr, m_pSchedMgr );
         if( ERROR( ret ) )
             break;
@@ -268,9 +281,9 @@ CRRTaskScheduler::CRRTaskScheduler(
 
     if( ERROR( ret ) )
     {
-        string strMsg = DebugMsg( ret,
+        stdstr strMsg = DebugMsg( ret,
             "Error occurs in CRRTaskScheduler ctor" );
-        throw runtime_error( strMsg );
+        throw std::runtime_error( strMsg );
     }
 }
 
@@ -280,7 +293,10 @@ CRRTaskScheduler::~CRRTaskScheduler()
 }
 
 CIoManager* CRRTaskScheduler::GetIoMgr()
-{ return m_pSchedMgr->GetIoMgr(); }
+{
+    CRpcServices* pSvc = m_pSchedMgr;
+    return pSvc->GetIoMgr();
+}
 
 stdrmutex& CRRTaskScheduler::GetLock()
 { return m_oSchedLock; }
@@ -315,7 +331,7 @@ gint32 CRRTaskScheduler::SetSlotCount(
                 ocq.m_dwMaxSlots - dwNumSlot;
             ret = IncSlotCount( ocq, dwDelta );
             if( SUCCEEDED( ret ) )
-                ocq.m_dwMaxSlots = dwNewCount;
+                ocq.m_dwMaxSlots = dwNumSlot;
         }
         else if( ocq.m_dwMaxSlots < dwNumSlot )
         {
@@ -324,7 +340,7 @@ gint32 CRRTaskScheduler::SetSlotCount(
             ret = DecSlotCount(
                 ocq, dwDelta, vecTasks );
             if( SUCCEEDED( ret ) )
-                ocq.m_dwMaxSlots = dwNewCount;
+                ocq.m_dwMaxSlots = dwNumSlot;
         }
         else
         {
@@ -370,7 +386,7 @@ gint32 CRRTaskScheduler::ReallocSlots(
             break;
 
         if( !vecTasks.empty() )
-            ret = KillTasks( pIf, vecTasks );
+            KillTasks( pIf, vecTasks );
 
     }while( 0 );
 
@@ -394,7 +410,7 @@ gint32 CRRTaskScheduler::SchedNextTaskGrp()
     if( ERROR( ret ) )
         return ret;
 
-    CIoManager* pMgr = m_pSchedMgr->GetIoMgr();
+    CIoManager* pMgr = GetIoMgr();
     TaskletPtr pTask = pGrp;
     return pMgr->RescheduleTask( pTask );
 }
@@ -411,8 +427,8 @@ gint32 CRRTaskScheduler::GetNextTaskGrp(
         InterfPtr pIf = m_lstConns.front();
         if( m_lstConns.size() > 1 )
         {
-            m_listConn.pop_front();
-            m_listconn.push_back( pIf );
+            m_lstConns.pop_front();
+            m_lstConns.push_back( pIf );
         }
 
         std::map< InterfPtr, CONNQUE_ELEM >::iterator
@@ -425,17 +441,32 @@ gint32 CRRTaskScheduler::GetNextTaskGrp(
         }
 
         CONNQUE_ELEM& ocq = itr->second;
-        std::list< InterfPtr >&
+        std::list< TaskGrpPtr >&
             orq = *ocq.m_plstReady;
 
-        std::list< InterfPtr >&
+        std::list< TaskGrpPtr >&
             owq = ocq.m_lstWaitSlot;
+
+        if( pIf->GetObjId() ==
+            m_pSchedMgr->GetObjId() )
+        {
+            TaskGrpPtr pHead = orq.front();     
+            CIfParallelTaskGrp* pPalGrp = pHead;
+            CStdRTMutex oTaskLock(
+                pPalGrp->GetLock() );
+            if( pPalGrp->GetPendingCount() )
+            {
+                pGrp = pPalGrp;
+                break;
+            }
+        }
 
         int j = 0;
         for( ; j < orq.size(); j++ )
         {
             TaskGrpPtr pHead = orq.front();
-            if( !pHead->HasTaskToRun() )
+            CIfParallelTaskGrpRfc2* pGrpRfc = pHead;
+            if( !pGrpRfc->HasTaskToRun() )
                 continue;
 
             orq.pop_front();
@@ -445,8 +476,6 @@ gint32 CRRTaskScheduler::GetNextTaskGrp(
             }
             else
             {
-                CIfParallelTaskGrpRfc2*
-                    pGrpRfc = pHead;
                 std::list< TaskGrpPtr >::iterator
                     itr = owq.begin();
 
@@ -456,7 +485,7 @@ gint32 CRRTaskScheduler::GetNextTaskGrp(
                 while( itr != owq.end() )
                 {
                     pGrpRfc2 = *itr;
-                    if( pGrpRfc2->HasTaskToRun() )
+                    if( pGrpRfc2->HasPendingTasks() )
                     {
                         pwh = *itr;
                         break;
@@ -491,42 +520,70 @@ gint32 CRRTaskScheduler::GetNextTaskGrp(
             break;
     }
 
-    if( i == m_listConn.size() )
+    if( i == m_lstConns.size() )
         ret = -ENOENT;
 
     return ret;
 }
 
 gint32 CRRTaskScheduler::RemoveTaskGrp(
-    InterfPtr pIf,
     TaskGrpPtr& pGrp )
 {
     gint32 ret = 0;
     do{
+        guint32 dwPortId = 0;
+
+        CCfgOpenerObj oGrpCfg(
+            ( CObjBase* )pGrp );
+
+        ret = oGrpCfg.GetIntProp(
+            propPrxyPortId, dwPortId );
+        if( ERROR( ret ) )
+            break;
+
         CStdRMutex oLock( GetLock() );
-        CONNQUE_ELEM& ocq = m_mapConnQues[ pIf ];
-        std::list< TaskGrpPtr >::iterator itr =
-            std::find( m_lstWaitSlot.begin(),
-                m_lstWaitSlot.end(), pGrp );
-        if( itr == m_lstWaitSlot.end() )
+
+        InterfPtr pIf;
+
+        std::hashmap< guint32, InterfPtr >::iterator
+            itr2 = m_mapId2If.find( dwPortId );
+
+        if( itr2 == m_mapId2If.end() )
         {
-            itr = std::find( m_plstReady->begin(),
-                m_plstReady.end(), pGrp );
-            if( itr == m_plstReady->end() )
+            ret = -ENOENT;
+            break;
+        }
+
+        pIf = itr2->second;
+        CONNQUE_ELEM& ocq = m_mapConnQues[ pIf ];
+        std::list< TaskGrpPtr >::iterator
+            itr = std::find(
+                ocq.m_lstWaitSlot.begin(),
+                ocq.m_lstWaitSlot.end(),
+                pGrp );
+
+        if( itr == ocq.m_lstWaitSlot.end() )
+        {
+            itr = std::find(
+                ocq.m_plstReady->begin(),
+                ocq.m_plstReady->end(),
+                pGrp );
+
+            if( itr == ocq.m_plstReady->end() )
             {
                 ret = -ENOENT;
                 break;
             }
-            m_plstReady->erase( itr );
+            ocq.m_plstReady->erase( itr );
         }
         else
         {
-            m_lstWaitSlot.erase( itr );
+            ocq.m_lstWaitSlot.erase( itr );
             break;
         }
 
         guint32 dwCount = ocq.m_dwMaxSlots;
-        guint32 dwNumGrps = GetTaskGrpCount();
+        guint32 dwNumGrps = ocq.GetTaskGrpCount();
         if( dwNumGrps == 0 )
         {
             ret = 0;
@@ -538,7 +595,7 @@ gint32 CRRTaskScheduler::RemoveTaskGrp(
 
         if( dwAvg == 0 )
         {
-            if( m_lstWaitSlot.empty() )
+            if( ocq.m_lstWaitSlot.empty() )
             {
                 ret = -EFAULT;
                 break;
@@ -563,14 +620,14 @@ gint32 CRRTaskScheduler::RemoveTaskGrps(
     do{
         CStdRMutex oLock( GetLock() );
         InterfPtr pIf;
-        std::map< guint32, InterfPtr >::itr2 =
-            m_mapId2If.find( dwPortId );
+        std::hashmap< guint32, InterfPtr >::iterator
+            itr2 = m_mapId2If.find( dwPortId );
         if( itr2 == m_mapId2If.end() )
         {
             ret = -ENOENT;
             break;
         }
-        pIf = *itr2;
+        pIf = itr2->second;
         RemoveConn( pIf );
 
     }while( 0 );
@@ -596,44 +653,46 @@ gint32 CRRTaskScheduler::RemoveTaskGrps(
                 continue;
 
             InterfPtr pIf;
-            std::map< guint32, InterfPtr >::itr2 =
-                m_mapId2If.find( dwPortId );
+            std::hashmap< guint32, InterfPtr >::iterator
+                itr2 = m_mapId2If.find( dwPortId );
             if( itr2 == m_mapId2If.end() )
             {
                 ret = -ENOENT;
                 break;
             }
 
-            pIf = *itr2;
+            pIf = itr2->second;
             CONNQUE_ELEM& ocq = m_mapConnQues[ pIf ];
-            std::list< TaskGrpPtr >::iterator itr =
-                std::find( m_lstWaitSlot.begin(),
-                    m_lstWaitSlot.end(), pGrp );
-            if( itr == m_lstWaitSlot.end() )
+            std::list< TaskGrpPtr >::iterator
+                itr = std::find(
+                    ocq.m_lstWaitSlot.begin(),
+                    ocq.m_lstWaitSlot.end(),
+                    pGrp );
+
+            if( itr == ocq.m_lstWaitSlot.end() )
             {
-                itr = std::find( m_plstReady->begin(),
-                    m_plstReady.end(), pGrp );
-                if( itr == m_plstReady->end() )
+                itr = std::find(
+                    ocq.m_plstReady->begin(),
+                    ocq.m_plstReady->end(),
+                    pGrp );
+
+                if( itr == ocq.m_plstReady->end() )
                 {
                     ret = -ENOENT;
                     break;
                 }
-                m_plstReady->erase( itr );
+                ocq.m_plstReady->erase( itr );
             }
             else
             {
-                m_lstWaitSlot.erase( itr );
-                break;
+                ocq.m_lstWaitSlot.erase( itr );
             }
             setIfs.insert( pIf );
         }
 
+        oLock.Unlock();
         for( auto elem : setIfs )
-        {
-            // there should be no task to kill, so
-            // no need to worry about locking.
-            ReallocSlots( elem );
-        }
+            ReallocSlots( elem, false );
 
     }while( 0 );
 
@@ -646,15 +705,33 @@ gint32 CRRTaskScheduler::AddTaskGrp(
 {
     gint32 ret = 0;
     do{
+        if( pIf->GetObjId() ==
+            m_pSchedMgr->GetObjId() )
+        {
+            CONNQUE_ELEM& ocq = m_mapConnQues[ pIf ];
+            ocq.m_dwMaxSlots = 1000;
+            ocq.m_plstReady->push_back( pGrp );
+            return 0;
+        }
+        std::vector< TaskletPtr > vecTasks;
         CStdRMutex oLock( GetLock() );
-        CONNQUE_ELEM& ocq = m_mapConnQues[ pIf ];
+        std::map< InterfPtr, CONNQUE_ELEM >::iterator
+            itr = m_mapConnQues.find( pIf );
+        if( itr == m_mapConnQues.end() )
+        {
+            oLock.Unlock();
+            AddConn( pIf );
+            continue;
+        }
+
+        CONNQUE_ELEM& ocq = itr->second;
         if( ocq.m_lstWaitSlot.size() > 0 )
         {
             ocq.m_lstWaitSlot.push_back( pGrp );
             break;
         }
         guint32 dwCount = ocq.m_dwMaxSlots;
-        guint32 dwNumGrps = GetTaskGrpCount() + 1;
+        guint32 dwNumGrps = ocq.GetTaskGrpCount() + 1;
         guint32 dwAvg = dwCount / dwNumGrps;
         guint32 dwModulo =
             dwCount - dwAvg * dwNumGrps;
@@ -676,7 +753,9 @@ gint32 CRRTaskScheduler::AddTaskGrp(
         if( !vecTasks.empty() )
             KillTasks(pIf, vecTasks );
 
-    }while( 0 );
+        break;
+
+    }while( 1 );
 
     return ret;
 }
@@ -691,11 +770,39 @@ gint32 CRRTaskScheduler::AddConn(
     if( ERROR( ret ) )
         return ret;
 
-    CStdRMutex oLock( GetLock() );
-    m_lstConns.push_back( pIf );
-    CONNQUE_ELEM& ocq = m_mapConnQues[ pIf ];
-    m_mapId2If[ dwPortId ] = ObjPtr( pIf );
-    return 0;
+    do{
+        TaskGrpPtr pGrp;
+        CRpcTcpBridgeProxy* pProxy = pIf;
+        ret = pProxy->GetGrpRfc( pGrp );
+        if( ERROR( ret ) )
+            break;
+
+        CIfParallelTaskGrpRfc2* pGrpRfc = pGrp;
+        guint32 dwMaxRunning = 0;
+        guint32 dwMaxPending = 0;
+        ret = pGrpRfc->GetLimit(
+            dwMaxRunning, dwMaxPending );
+        if( ERROR( ret ) )
+            break;
+
+        CStdRMutex oLock( GetLock() );
+        if( m_mapId2If.find( dwPortId ) !=
+            m_mapId2If.end() )
+        {
+            ret = -EEXIST;
+            break;
+        }
+
+        m_lstConns.push_back( pIf );
+        CONNQUE_ELEM& ocq = m_mapConnQues[ pIf ];
+        m_mapId2If[ dwPortId ] = ObjPtr( pIf );
+
+        ret = SetSlotCount( pIf,
+            dwMaxRunning + dwMaxPending );
+
+    }while( 0 );
+
+    return ret;
 }
 
 gint32 CRRTaskScheduler::RemoveConn(
@@ -706,12 +813,14 @@ gint32 CRRTaskScheduler::RemoveConn(
 
     gint32 ret = 0;
     do{
-        guint32 dwPortId = 0;
+        gint32 ret = 0;
+        guint32 dwPortId;
+
         CCfgOpenerObj oIfCfg( ( CObjBase* )pIf );
-        gint32 ret = oIfCfg.GetIntProp(
+        ret = oIfCfg.GetIntProp(
             propPortId, dwPortId );
         if( ERROR( ret ) )
-            return ret;
+            dwPortId = 0xffffffff;
 
         CStdRMutex oLock( GetLock() );
         std::list< InterfPtr >::iterator itr =
@@ -746,13 +855,14 @@ void CRRTaskScheduler::KillTasks(
     if( vecTasks.empty() )
         return;
 
-    ObjVecPtr pvecMatches( true );
+    gint32 ret = 0;
     QwVecPtr pvecTaskIds( true );
 
     std::vector< guint64 >&
         vecTaskIds = ( *pvecTaskIds )();
 
     CRpcReqForwarder* pReqFwdr = m_pSchedMgr;
+
     if( pReqFwdr != nullptr )
     {
         for( auto elem : vecTasks )
@@ -783,10 +893,12 @@ void CRRTaskScheduler::KillTasks(
     if( vecTaskIds.size() > 0 )
     {
         TaskletPtr pClear;
+        ObjPtr pEmptyObj;
+        ObjPtr pTaskIds = pvecTaskIds;
         ret = DEFER_IFCALLEX_NOSCHED2(
             2, pClear, pIf,
             &CRpcTcpBridgeProxy::ClearRemoteEvents,
-            pvecMatches, pvecTaskIds, nullptr );
+            pEmptyObj, pTaskIds, nullptr );
         if( SUCCEEDED( ret ) )
         {
             CIoManager* pMgr = pReqFwdr->GetIoMgr();
@@ -795,6 +907,26 @@ void CRRTaskScheduler::KillTasks(
     }
 
     return;
+}
+
+gint32 CRRTaskScheduler::Start()
+{
+    CRpcServices* pSvc = m_pSchedMgr;
+    if( pSvc == nullptr )
+        return -EFAULT;
+    TaskGrpPtr pGrp;
+    gint32 ret = pSvc->GetParallelGrp( pGrp );
+    if( ERROR( ret ) )
+        return ret;
+
+    InterfPtr pIf = m_pSchedMgr;
+    return AddTaskGrp( pIf, pGrp );
+}
+
+gint32 CRRTaskScheduler::Stop()
+{
+    InterfPtr pIf = m_pSchedMgr;
+    return RemoveConn( pIf );
 }
 
 }

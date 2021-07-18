@@ -305,6 +305,7 @@ typedef enum : guint32
     DECL_CLSID( CIfAsyncCancelHandler ),
     DECL_CLSID( CIfParallelTaskGrpRfc ),
     DECL_CLSID( CIfParallelTaskGrpRfc2 ),
+    DECL_CLSID( CRRTaskScheduler ),
     DECL_CLSID( CStlObjMap ),
     DECL_CLSID( MaxClsid ),
     DECL_CLSID( ClassFactoryStart ) = 0x02000000,

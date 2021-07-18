@@ -22,18 +22,16 @@
  *
  * =====================================================================================
  */
-
+#pragma once
+#include <list>
 namespace rpcf
 {
 
-struct ITaskScheduler : public CObjBase
+struct ITaskScheduler : public IService
 {
-    virtual gint32 SetSlotNumber(
-        InterfPtr& pIf, guint32 dwNumSlot ) = 0;
-
-    virtual gint32 ReallocSlots(
+    virtual gint32 SetSlotCount(
         InterfPtr& pIf,
-        bool bKill = true ) = 0;
+        guint32 dwNumSlot ) = 0;
 
     virtual gint32 RunNextTaskGrp() = 0;
     virtual gint32 SchedNextTaskGrp() = 0;
@@ -41,13 +39,13 @@ struct ITaskScheduler : public CObjBase
         TaskGrpPtr& pGrp ) = 0;
 
     virtual gint32 RemoveTaskGrp(
-        InterfPtr pIf, TaskGrpPtr& pGrp ) = 0;
+        TaskGrpPtr& pGrp ) = 0;
 
     virtual gint32 RemoveTaskGrps(
         guint32 dwPortId ) = 0;
 
     virtual gint32 RemoveTaskGrps(
-        const stdstr& strUniqName ) = 0;
+        std::vector< TaskGrpPtr >& vecGrps ) = 0;
 
     virtual gint32 AddTaskGrp(
         InterfPtr& pIf, TaskGrpPtr& pGrp ) = 0;
@@ -66,11 +64,6 @@ struct CONNQUE_ELEM
     std::list< TaskGrpPtr >* m_plstNextSched;
     std::list< TaskGrpPtr > m_lstRunningGrps[ 2 ];
 
-    TaskGrpPtr m_lstUrgent;
-
-    guint32 m_dwPendingReqs = 0;
-    guint32 m_dwFreeSlots = 0;
-
     guint32 m_dwMaxSlots =
         RFC_MAX_PENDINGS + RFC_MAX_REQS;
 
@@ -83,17 +76,14 @@ struct CONNQUE_ELEM
     {
         return m_lstWaitSlot.size() +
             m_lstRunningGrps[ 0 ].size() +
-            m_lstRunningGrps[ 1 ].size() +
+            m_lstRunningGrps[ 1 ].size();
     }
-
-    gint32 CanSend() const
-    { return m_dwMaxSlots > m_dwPendingReqs; }
 };
 
 class CRRTaskScheduler :
     public ITaskScheduler
 {
-    CRpcServices* m_pSchedMgr = nullptr;
+    ObjPtr m_pSchedMgr;
     std::map< InterfPtr, CONNQUE_ELEM > m_mapConnQues;
     std::list< InterfPtr > m_lstConns;
     std::hashmap< guint32, InterfPtr > m_mapId2If;
@@ -105,15 +95,15 @@ class CRRTaskScheduler :
 
     void SetLimitRunningGrps(
         CONNQUE_ELEM& ocq,
-        guint32& dwNewLimit );
+        guint32 dwNewLimit );
 
     void SetLimitGrps(
         CONNQUE_ELEM& ocq,
-        guint32& dwNewLimit );
+        guint32 dwNewLimit );
 
     void IncRunningGrps(
         CONNQUE_ELEM& ocq,
-        guint32& dwCount );
+        guint32 dwCount );
 
     void SelTasksToKill(
         CONNQUE_ELEM& ocq,
@@ -122,7 +112,7 @@ class CRRTaskScheduler :
 
     void IncWaitingGrp(
         CONNQUE_ELEM& ocq,
-        guint32& dwCount );
+        guint32 dwCount );
 
     gint32 IncSlotCount(
         CONNQUE_ELEM& ocq, guint32 dwCount );
@@ -134,6 +124,11 @@ class CRRTaskScheduler :
 
     void KillTasks(
         InterfPtr& pIf,
+        std::vector< TaskletPtr >& vecTasks );
+
+    gint32 ResetSlotCount(
+        CONNQUE_ELEM& ocq,
+        guint32 dwDelta,
         std::vector< TaskletPtr >& vecTasks );
 
     public:
@@ -150,7 +145,7 @@ class CRRTaskScheduler :
 
     gint32 ReallocSlots(
         InterfPtr& pIf,
-        bool bKill = true ) override;
+        bool bKill = true );
 
     gint32 RunNextTaskGrp() override;
 
@@ -160,7 +155,6 @@ class CRRTaskScheduler :
         TaskGrpPtr& pGrp ) override;
 
     gint32 RemoveTaskGrp(
-        InterfPtr pIf,
         TaskGrpPtr& pGrp ) override;
 
     gint32 AddTaskGrp(
@@ -177,8 +171,17 @@ class CRRTaskScheduler :
         guint32 dwPortId ) override;
 
     gint32 RemoveTaskGrps(
-        const stdstr& strUniqName ) override;
+        std::vector< TaskGrpPtr >& vecGrps ) override;
 
+    gint32 OnEvent(
+        EnumEventId iEvent,
+        LONGWORD dwParam1,
+        LONGWORD dwParam2,
+        LONGWORD* pData )
+    { return -ENOTSUP; }
+
+    gint32 Start() override;
+    gint32 Stop() override;
 };
 
 }

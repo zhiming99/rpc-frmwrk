@@ -35,7 +35,7 @@
 #include "fdodrv.h"
 #include "stmrelay.h"
 #include "tcportex.h"
-
+#include "taskschd.h"
 
 namespace rpcf
 {
@@ -148,6 +148,7 @@ static FactoryPtr InitClassFactory()
 
     INIT_MAP_ENTRYCFG( CIfParallelTaskGrpRfc );
     INIT_MAP_ENTRYCFG( CIfParallelTaskGrpRfc2 );
+    INIT_MAP_ENTRYCFG( CRRTaskScheduler );
 
     END_FACTORY_MAPS;
 };
