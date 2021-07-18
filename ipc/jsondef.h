@@ -103,3 +103,4 @@
 #define JSON_ATTR_TCPCONN       "MaxConnections"
 #define JSON_ATTR_MAXREQS       "MaxRequests"
 #define JSON_ATTR_MAXPENDINGS       "MaxPendingRequests"
+#define JSON_ATTR_TASKSCHED     "TaskScheduler"
