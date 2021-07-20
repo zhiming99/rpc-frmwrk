@@ -5091,6 +5091,7 @@ gint32 CIfDummyTask::OnEvent(
     return 0;
 }
 
+#include <signal.h>
 gint32 CIoReqSyncCallback::operator()(
     guint32 dwContext )
 {
@@ -5158,6 +5159,9 @@ gint32 CIoReqSyncCallback::operator()(
                 ret = 0;
 
             }while( 0 );
+
+            if( ret == -34 )
+                raise( SIGTRAP );
 
             SetError( ret );
             Sem_Post( &m_semWait );

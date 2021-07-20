@@ -1682,7 +1682,7 @@ gint32 CRpcBasePortEx::DispatchReqMsg(
     {
         // prevent messages piling in the match
         // entry
-        return ERROR_STATE;
+        return -ENOENT;
     }
 
     map< MatchPtr, MATCH_ENTRY >::iterator itr =
@@ -1691,16 +1691,14 @@ gint32 CRpcBasePortEx::DispatchReqMsg(
     IrpPtr pIrpToComplete;
     vector< IrpPtr > vecIrpToComplete;
     vector< IrpPtr > vecIrpsError;
-    bool bQueued = false;
+    bool bFound = false;
 
     while( itr != m_mapReqTable.end() )
     {
-        bool bDone = false;
-
         ret = itr->first->IsMyMsgIncoming( pMsg );
         if( SUCCEEDED( ret ) )
         {
-            bDone = true;
+            bFound = true;
             do{
                 // test if the match is allowed to
                 // receive requests
@@ -1746,7 +1744,6 @@ gint32 CRpcBasePortEx::DispatchReqMsg(
                         // discard the oldest msg
                         ome.m_quePendingMsgs.pop_front();
                     }
-                    bQueued = true;
                     break;
                 }
 
@@ -1792,7 +1789,7 @@ gint32 CRpcBasePortEx::DispatchReqMsg(
             }while( 0 );
         }
 
-        if( bDone )
+        if( bFound )
             break;
 
         ++itr;
@@ -1800,16 +1797,9 @@ gint32 CRpcBasePortEx::DispatchReqMsg(
     oPortLock.Unlock();
 
     CIoManager* pMgr = GetIoMgr();
-    if( vecIrpToComplete.size() > 0 )
+    for( auto& elem : vecIrpToComplete )
     {
-        for( auto& elem : vecIrpToComplete )
-        {
-            ret = pMgr->CompleteIrp( elem );
-        }
-    }
-    else if( !bQueued && SUCCEEDED( ret ) )
-    {
-        ret = -ENOENT;
+        pMgr->CompleteIrp( elem );
     }
 
     for( auto& pIrpErr : vecIrpsError )
@@ -1817,6 +1807,9 @@ gint32 CRpcBasePortEx::DispatchReqMsg(
         pMgr->CancelIrp(
             pIrpErr, true, -EINVAL );
     }
+
+    if( !bFound )
+        ret = -ENOENT;
 
     return ret;
 }

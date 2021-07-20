@@ -381,6 +381,8 @@ gint32 CReqFwdrCloseRmtPortTask::OnTaskComplete(
                     ( pIf->GetParent() );
             pRouter->RemoveLocalMatchByPortId(
                 dwPortId );
+
+            pIf->RemoveGrpRfcs( dwPortId );
         }
 
         EventPtr pEvt;
@@ -5590,19 +5592,18 @@ gint32 CIfParallelTaskGrpRfc2::OnChildComplete(
 {
     do{
         CStdRTMutex oTaskLock( GetLock() );
-        if( GetRunningCount() > GetMaxRunning() )
-        {
-            TaskletPtr taskPtr = pChild;
-            RemoveTask( taskPtr );
-            return 0;
-        }
+        TaskletPtr taskPtr = pChild;
+        RemoveTask( taskPtr );
+        // if( GetRunningCount() > GetMaxRunning() )
+        //     return 0;
+
         if( IsNoSched() )
         {
             ret = 0;
             break;
         }
 
-        if( GetPendingCount() == 0 &&
+        /*if( GetPendingCount() == 0 &&
             GetTaskCount() > 0 )
         {
             // NOTE: this check will effectively reduce
@@ -5612,7 +5613,7 @@ gint32 CIfParallelTaskGrpRfc2::OnChildComplete(
             // no need to reschedule
             ret = 0;
             break;
-        }
+        }*/
 
         if( ret == ERROR_KILLED_BYSCHED )
             break;
@@ -5627,6 +5628,7 @@ gint32 CIfParallelTaskGrpRfc2::OnChildComplete(
         CRpcReqForwarder* pReqFwdr = pIfObj;
         if( pReqFwdr != nullptr )
         {
+            oTaskLock.Unlock();
             TaskGrpPtr pGrp( this );
             ret = pReqFwdr->SchedNextTaskGrp( pGrp );
             break;

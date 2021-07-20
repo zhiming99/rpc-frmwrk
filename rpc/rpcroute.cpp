@@ -5811,10 +5811,10 @@ gint32 CIfParallelTaskGrpRfc::GetLimit(
         CHECK_GRP_STATE;
 
         dwMaxPending = std::min(
-            dwMaxPending, RFC_MAX_PENDINGS );
+            m_dwMaxPending, RFC_MAX_PENDINGS );
 
         dwMaxRunning = std::min(
-            dwMaxRunning, RFC_MAX_REQS );
+            m_dwMaxRunning, RFC_MAX_REQS );
 
    }while( 0 );
 

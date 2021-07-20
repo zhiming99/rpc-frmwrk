@@ -271,6 +271,7 @@ CRRTaskScheduler::CRRTaskScheduler(
 {
     gint32 ret = 0;
     do{
+        SetClassId( clsid( CRRTaskScheduler ) );
         CCfgOpener oCfg( pCfg );
         ret = oCfg.GetObjPtr(
             propIfPtr, m_pSchedMgr );
@@ -777,7 +778,7 @@ gint32 CRRTaskScheduler::AddConn(
         if( ERROR( ret ) )
             break;
 
-        CIfParallelTaskGrpRfc2* pGrpRfc = pGrp;
+        CIfParallelTaskGrpRfc* pGrpRfc = pGrp;
         guint32 dwMaxRunning = 0;
         guint32 dwMaxPending = 0;
         ret = pGrpRfc->GetLimit(

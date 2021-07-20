@@ -657,6 +657,15 @@ gint32 CDBusProxyPdo::HandleConnRequest(
         if( bConnect )
         {
             strCmd = SYS_METHOD_OPENRMTPORT;
+
+            timespec tv;
+            clock_gettime( CLOCK_MONOTONIC, &tv );
+
+            oMethodArgs.SetQwordProp(
+                propTimestamp, tv.tv_sec );
+
+            oMethodArgs.SetIntProp( propTimeoutSec,
+                PORT_START_TIMEOUT_SEC );
         }
         else
             strCmd = SYS_METHOD_CLOSERMTPORT;
@@ -834,6 +843,11 @@ gint32 CDBusProxyPdo::PackupReqMsg(
 
         if( bNoReply )
             oReqCtx[ propNoReply ] = true;
+
+        timespec tv;
+        clock_gettime( CLOCK_MONOTONIC, &tv );
+        oReqCtx.SetQwordProp(
+            propTimestamp, tv.tv_sec );
 
         ret = pOutMsg.SetMember(
             SYS_METHOD_FORWARDREQ );

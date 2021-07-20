@@ -2318,6 +2318,30 @@ gint32 CRpcReqForwarderAuth::OnSessImplLoginComplete(
             break;
         }
 
+        guint32 dwTimeoutSec = 0;
+        ret = oReqCtx.GetIntProp(
+            propTimeoutSec, dwTimeoutSec );
+        if( ERROR( ret ) )
+            break;
+
+        guint64 qwts = 0;
+        ret = oReqCtx.GetQwordProp(
+            propTimestamp, qwts );
+        if( ERROR( ret ) )
+            break;
+
+        timespec tv;
+        clock_gettime( CLOCK_MONOTONIC, &tv );
+        guint64 qwNow = tv.tv_sec;
+        guint32 dwDiff = abs( (
+            ( gint64 )qwNow - ( gint64 )qwts ) );
+
+        if( dwDiff > dwTimeoutSec )
+        {
+            ret = -ETIMEDOUT;
+            break;
+        }
+        
         // at this moment, the auth proxy should
         // have the correct connhandle in place.
         guint32 dwPortId = 0;
@@ -2535,6 +2559,16 @@ gint32 CRpcReqForwarderAuth::BuildStartAuthProxyTask(
 
         ret = oReqCtx.CopyProp(
             propSrcUniqName, pCfg );
+        if( ERROR( ret ) )
+            break;
+
+        ret = oReqCtx.CopyProp(
+            propTimestamp, pCfg );
+        if( ERROR( ret ) )
+            break;
+
+        ret = oReqCtx.CopyProp(
+            propTimeoutSec, pCfg );
         if( ERROR( ret ) )
             break;
 

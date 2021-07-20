@@ -973,19 +973,22 @@ DBusHandlerResult CDBusBusPort::OnMessageArrival(
                 break;
             }
 
-            for( auto elem : m_mapId2Pdo )
+            if( iType != DBUS_MESSAGE_TYPE_METHOD_CALL )
             {
-                guint32 dwPortId = elem.first;
-                if( dwPortId == ( guint32 )m_iLocalPortId ||
-                    dwPortId == ( guint32 )m_iLpbkPortId )
-                    continue;
+                for( auto elem : m_mapId2Pdo )
+                {
+                    guint32 dwPortId = elem.first;
+                    if( dwPortId == ( guint32 )m_iLocalPortId ||
+                        dwPortId == ( guint32 )m_iLpbkPortId )
+                        continue;
 
-                PortPtr& pPrxyPdo = elem.second;
-                if( pPrxyPdo->GetClsid() != 
-                    clsid( CDBusProxyPdo ) )
-                    continue;
+                    PortPtr& pPrxyPdo = elem.second;
+                    if( pPrxyPdo->GetClsid() != 
+                        clsid( CDBusProxyPdo ) )
+                        continue;
 
-                vecPorts.push_back( elem.second );
+                    vecPorts.push_back( elem.second );
+                }
             }
 
             // place the localdbus port at the
@@ -1043,11 +1046,11 @@ DBusHandlerResult CDBusBusPort::OnMessageArrival(
                     if( SUCCEEDED( ret1 ) || ret1 != -ENOENT)
                         ret = DBUS_HANDLER_RESULT_HANDLED;
 
-                    if( ERROR( ret1 ) )
+                    /*if( ERROR( ret1 ) )
                     {
                         DebugPrint( ret1,
                             "Error handling return values" );
-                    }
+                    }*/
                     break;
                 }
             default:
@@ -1061,17 +1064,26 @@ DBusHandlerResult CDBusBusPort::OnMessageArrival(
                 break;
         }
 
-        if( iType == DBUS_MESSAGE_TYPE_METHOD_CALL
-            && ret == DBUS_HANDLER_RESULT_NOT_YET_HANDLED )
+        if( iType == DBUS_MESSAGE_TYPE_METHOD_CALL &&
+            ret == DBUS_HANDLER_RESULT_NOT_YET_HANDLED )
         {
             // reply with dbus error
-            DMsgPtr pDumpMsg( pMsg );
             DebugPrint( GetPortState(),
-                "Error cannot find irp for response messages\n%s\n, port=%s, 0x%x",
-                pDumpMsg.DumpMsg().c_str(),
+                "Error cannot find irp for request message\n%s\n, port=%s, 0x%x",
+                pMsg.DumpMsg().c_str(),
                 CoGetClassName( GetClsid() ), 
                 ( LONGWORD )this );
             ReplyWithError( pMessage );
+            ret = DBUS_HANDLER_RESULT_HANDLED;
+        }
+        else if( iType == DBUS_MESSAGE_TYPE_METHOD_RETURN &&
+            ret == DBUS_HANDLER_RESULT_NOT_YET_HANDLED )
+        {
+            DebugPrint( GetPortState(),
+                "Error cannot find irp for response message\n%s\n, port=%s, 0x%x",
+                pMsg.DumpMsg().c_str(),
+                CoGetClassName( GetClsid() ), 
+                ( LONGWORD )this );
             ret = DBUS_HANDLER_RESULT_HANDLED;
         }
 
@@ -1730,8 +1742,8 @@ CDBusBusPort::OnLpbkMsgArrival(
 
     DMsgPtr ptrMsg( pMsg );
     bool bEvent = false;
-    if( ptrMsg.GetType() ==
-        DBUS_MESSAGE_TYPE_SIGNAL )
+    gint32 iType = ptrMsg.GetType();
+    if( iType == DBUS_MESSAGE_TYPE_SIGNAL )
         bEvent = true;
 
     PortPtr pPort;
@@ -1750,19 +1762,22 @@ CDBusBusPort::OnLpbkMsgArrival(
             break;
         }
 
-        for( auto elem : m_mapId2Pdo )
+        if( iType != DBUS_MESSAGE_TYPE_METHOD_CALL )
         {
-            guint32 dwPortId = elem.first;
-            if( dwPortId == ( guint32 )m_iLocalPortId ||
-                dwPortId == ( guint32 )m_iLpbkPortId )
-                continue;
+            for( auto elem : m_mapId2Pdo )
+            {
+                guint32 dwPortId = elem.first;
+                if( dwPortId == ( guint32 )m_iLocalPortId ||
+                    dwPortId == ( guint32 )m_iLpbkPortId )
+                    continue;
 
-            PortPtr& pPrxyPdo = elem.second;
-            if( pPrxyPdo->GetClsid() != 
-                clsid( CDBusProxyPdoLpbk ) )
-                continue;
+                PortPtr& pPrxyPdo = elem.second;
+                if( pPrxyPdo->GetClsid() != 
+                    clsid( CDBusProxyPdoLpbk ) )
+                    continue;
 
-            vecPorts.push_back( elem.second );
+                vecPorts.push_back( elem.second );
+            }
         }
 
         // place the loopback port at the

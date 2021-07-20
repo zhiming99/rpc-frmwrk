@@ -525,9 +525,6 @@ class CRpcReqForwarder :
     gint32 RemoveGrpRfcs(
         const stdstr& strUniqName );
 
-    gint32 RemoveGrpRfcs(
-        guint32 dwPortId );
-
     gint32 RemoveGrpRfc(
         guint32 dwPortId,
         const stdstr& strUniqName );
@@ -620,6 +617,9 @@ class CRpcReqForwarder :
 
     gint32 GetRefCountBySrcDBusName(
         const std::string& strName );
+
+    gint32 RemoveGrpRfcs(
+        guint32 dwPortId );
 
     const EnumClsid GetIid() const
     { return iid( CRpcReqForwarder ); }

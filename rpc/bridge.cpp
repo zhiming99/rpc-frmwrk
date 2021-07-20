@@ -756,19 +756,8 @@ gint32 CRpcTcpBridgeProxy::ForwardRequest(
             propTaskId, pReqCtx );
 
         guint32 dwAge = 0;
-        if( !bRelay )
+        if( true )
         {
-            oReqCtx.SetQwordProp(
-                propTimestamp,
-                m_oTs.GetPeerTimestamp() );
-            oReqCtx.SetStrProp(
-                propPath2, strPath );
-        }
-        else
-        {
-            oReqCtx.CopyProp(
-                propSessHash, pReqCtx );
-
             guint64 qwLocalTs = 0;
             ret = oOrigCtx.GetQwordProp(
                 propTimestamp, qwLocalTs );
@@ -785,6 +774,17 @@ gint32 CRpcTcpBridgeProxy::ForwardRequest(
                 m_oTs.GetAgeSec( qwLocalTs );
             qwVal = ( abs( ( gint64 )qwVal ) );
             dwAge = qwVal; 
+        }
+
+        if( !bRelay )
+        {
+            oReqCtx.SetStrProp(
+                propPath2, strPath );
+        }
+        else
+        {
+            oReqCtx.CopyProp(
+                propSessHash, pReqCtx );
 
             oReqCtx.CopyProp(
                 propPath2, pReqCtx );
@@ -842,16 +842,13 @@ gint32 CRpcTcpBridgeProxy::ForwardRequest(
                     propTimeoutSec, dwtos );
             }
 
-            if( bRelay )
+            if( dwAge >= dwtos )
             {
-                if( dwAge >= dwtos )
-                {
-                    ret = -ETIMEDOUT;
-                    break;
-                }
-
-                dwtos -= dwAge;
+                ret = -ETIMEDOUT;
+                break;
             }
+
+            dwtos -= dwAge;
         }
 
         oBuilder.SetCallFlags( dwFlags );

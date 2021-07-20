@@ -153,6 +153,8 @@ void CTaskQueue::AddTask( TaskletPtr& pTask )
             }
             ++itr;
         }
+        if( bAdd )
+            m_queTasks.push_back( pTask );
     }
     else
     {
