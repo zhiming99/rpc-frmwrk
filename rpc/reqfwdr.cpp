@@ -959,6 +959,20 @@ gint32 CRpcReqForwarder::ForwardRequest(
         if( ret == STATUS_PENDING )
             break;
 
+        if( SUCCEEDED( ret ) )
+        {
+            CCfgOpener oCfg(
+                ( IConfigDb* ) pTask->GetConfig() );
+
+            IConfigDb* pResp = nullptr;
+            ret = oCfg.GetPointer( propRespPtr, pResp );
+            if( ERROR( ret ) )
+                break;
+
+            CCfgOpener oResp( pResp );
+            ret = oResp.GetMsgPtr( 0, pRespMsg );
+        }
+
     }while( 0 );
 
     // the return value indicates if the response
@@ -2864,11 +2878,9 @@ gint32 CReqFwdrForwardRequestTask::OnTaskComplete(
 
     TaskletPtr pIoTask;
     GetCallerTask( pIoTask );
+    CParamList oCfg( GetConfig() );
 
     do{
-        CCfgOpener oCfg(
-            ( IConfigDb* )GetConfig() );
-
         if( iRetVal == ERROR_QUEUE_FULL )
         {
             // error from remote server
@@ -2948,8 +2960,7 @@ gint32 CReqFwdrForwardRequestTask::OnTaskComplete(
         }
         else
         {
-            pIfSvr->SetResponse(
-                pEvent, oResp.GetCfg() );
+            oCfg.SetObjPtr( propRespPtr, pObj );
         }
 
     }while( 0 );
@@ -2957,8 +2968,7 @@ gint32 CReqFwdrForwardRequestTask::OnTaskComplete(
     if( ret != STATUS_PENDING && !Retriable( ret ) )
     {
         // clear the objects
-        CParamList oParams( GetConfig() );
-        oParams.ClearParams();
+        oCfg.ClearParams();
     }
 
     return iRetVal;
@@ -5433,7 +5443,8 @@ gint32 CRpcReqForwarder::AddAndRun(
         if( SUCCEEDED( ret ) )
         {
             // run the tasks
-            return RunNextTaskGrp( pGrp );
+            RunNextTaskGrp( pGrp );
+            return STATUS_SUCCESS;
         }
         else if( ERROR( ret ) &&
             ret != ERROR_QUEUE_FULL )

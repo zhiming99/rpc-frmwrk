@@ -896,13 +896,15 @@ gint32 CRpcTcpBridgeProxy::ForwardRequest(
             if( ERROR( ret ) )
                 break;
 
+            ret = iRet;
+            if( ERROR( ret ) )
+                break;
+
             ret = oCfg.GetMsgPtr(
                 0, pRespMsg );
 
             if( ERROR( ret ) )
                 break;
-
-            ret = iRet;
         }
 
     }while( 0 );
@@ -4093,9 +4095,20 @@ gint32 CRpcTcpBridge::ForwardRequestInternal(
         }
         else
         {
-            // ret = GetIoMgr()->RescheduleTask( pTask );
             ( *pTask )( eventZero );
             ret = pTask->GetError();
+            if( SUCCEEDED( ret ) )
+            {
+                CCfgOpener oCfg(
+                    ( IConfigDb* ) pTask->GetConfig() );
+                IConfigDb* pResp = nullptr;
+                ret = oCfg.GetPointer( propRespPtr, pResp );
+                if( ERROR( ret ) )
+                    break;
+
+                CCfgOpener oResp( pResp );
+                ret = oResp.GetMsgPtr( 0, pRespMsg );
+            }
         }
 
     }while( 0 );
@@ -4370,9 +4383,6 @@ gint32 CRpcInterfaceServer::DoInvoke(
 
         if( ret != -ENOTSUP && bResp )
         {
-            // for not supported commands we will
-            // try to handle them in the base
-            // class
             if( IsRfcEnabled() &&
                 ret == ERROR_QUEUE_FULL )
                 break;
@@ -4383,6 +4393,8 @@ gint32 CRpcInterfaceServer::DoInvoke(
 
     if( ret == -ENOTSUP )
     {
+        // for not supported commands we will try
+        // to handle them in the base class
         ret = super::DoInvoke(
             pReqMsg, pCallback );
     }
