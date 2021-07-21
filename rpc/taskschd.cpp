@@ -463,14 +463,19 @@ gint32 CRRTaskScheduler::GetNextTaskGrp(
         }
 
         int j = 0;
-        for( ; j < orq.size(); j++ )
+        int iCount = orq.size();
+        for( ; j < iCount; j++ )
         {
             TaskGrpPtr pHead = orq.front();
+            orq.pop_front();
+
             CIfParallelTaskGrpRfc2* pGrpRfc = pHead;
             if( !pGrpRfc->HasTaskToRun() )
+            {
+                orq.push_back( pHead );
                 continue;
+            }
 
-            orq.pop_front();
             if( owq.empty() )
             {
                 orq.push_back( pHead );
@@ -505,8 +510,9 @@ gint32 CRRTaskScheduler::GetNextTaskGrp(
                         pGrpRfc2->GetMaxPending(),
                         true );
 
-                    orq.push_back( pwh );
+                    orq.push_front( pwh );
                     owq.push_back( pHead );
+                    pHead = pwh;
                 }
                 else
                 {

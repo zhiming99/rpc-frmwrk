@@ -3943,6 +3943,10 @@ gint32 CRpcReqForwarder::RequeueInvTask(
         CIfParallelTaskGrpRfc* pGrpRfc = pGrp;
         CStdRTMutex oLock( pGrpRfc->GetLock() );
         pGrp->InsertTask( pTask );
+
+        if( !m_pScheduler.IsEmpty() )
+            break;
+
         if( pGrpRfc->GetRunningCount() <
             pGrpRfc->GetMaxRunning() &&
             !pGrpRfc->IsNoSched() )
@@ -5608,13 +5612,13 @@ gint32 CIfParallelTaskGrpRfc2::OnChildComplete(
         // if( GetRunningCount() > GetMaxRunning() )
         //     return 0;
 
-        if( IsNoSched() )
+        /*if( IsNoSched() )
         {
             ret = 0;
             break;
         }
 
-        /*if( GetPendingCount() == 0 &&
+        if( GetPendingCount() == 0 &&
             GetTaskCount() > 0 )
         {
             // NOTE: this check will effectively reduce

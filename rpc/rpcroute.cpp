@@ -5692,6 +5692,8 @@ gint32 CIfParallelTaskGrpRfc::RunTaskInternal(
         // not indicate a specific task's return value
         if( GetTaskCount() > 0 )
             ret = STATUS_PENDING;
+        else
+            ret = 0;
 
         break;
 
@@ -5826,7 +5828,7 @@ gint32 CIfParallelTaskGrpRfc::SetLimit(
     guint32 dwMaxPending,
     bool bNoResched )
 {
-    if( dwMaxPending == 0 || dwMaxRunning == 0 )
+    if( dwMaxPending == 0 )
         return -EINVAL;
 
     gint32 ret = 0;
