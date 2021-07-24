@@ -33,10 +33,17 @@ struct ITaskScheduler : public IService
         InterfPtr& pIf,
         guint32 dwNumSlot ) = 0;
 
-    virtual gint32 RunNextTaskGrp() = 0;
-    virtual gint32 SchedNextTaskGrp() = 0;
+    virtual gint32 RunNextTaskGrp(
+        CTasklet* pCurGrp,
+        guint32 dwHint ) = 0;
+
+    virtual gint32 SchedNextTaskGrp(
+        CTasklet* pCurGrp,
+        guint32 dwHint ) = 0;
+
     virtual gint32 GetNextTaskGrp(
-        TaskGrpPtr& pGrp ) = 0;
+        TaskGrpPtr& pGrp,
+        guint32 dwHint  ) = 0;
 
     virtual gint32 RemoveTaskGrp(
         TaskGrpPtr& pGrp ) = 0;
@@ -55,6 +62,12 @@ struct ITaskScheduler : public IService
 
     virtual gint32 RemoveConn(
         InterfPtr& pIf ) = 0;
+
+    inline stdrmutex& GetLock()
+    { return m_oSchedLock; }
+
+    protected:
+    stdrmutex m_oSchedLock;
 };
 
 struct CONNQUE_ELEM
@@ -87,11 +100,6 @@ class CRRTaskScheduler :
     std::map< InterfPtr, CONNQUE_ELEM > m_mapConnQues;
     std::list< InterfPtr > m_lstConns;
     std::hashmap< guint32, InterfPtr > m_mapId2If;
-    stdrmutex m_oSchedLock;
-
-    gint32 GetNextTaskGrp(
-        InterfPtr& pIf,
-        TaskGrpPtr& pGrp );
 
     void SetLimitRunningGrps(
         CONNQUE_ELEM& ocq,
@@ -126,7 +134,11 @@ class CRRTaskScheduler :
         InterfPtr& pIf,
         std::vector< TaskletPtr >& vecTasks );
 
-    gint32 ResetSlotCount(
+    gint32 ResetSlotCountRelease(
+        CONNQUE_ELEM& ocq,
+        guint32 dwDelta );
+
+    gint32 ResetSlotCountAlloc(
         CONNQUE_ELEM& ocq,
         guint32 dwDelta,
         std::vector< TaskletPtr >& vecTasks );
@@ -137,22 +149,22 @@ class CRRTaskScheduler :
     CRRTaskScheduler( const IConfigDb* pCfg );
     ~CRRTaskScheduler();
     CIoManager* GetIoMgr();
-    stdrmutex& GetLock();
 
     gint32 SetSlotCount(
         InterfPtr& pIf,
         guint32 dwNumSlot ) override;
 
-    gint32 ReallocSlots(
-        InterfPtr& pIf,
-        bool bKill = true );
+    gint32 RunNextTaskGrp(
+        CTasklet* pCurGrp,
+        guint32 dwHint ) override;
 
-    gint32 RunNextTaskGrp() override;
-
-    gint32 SchedNextTaskGrp() override;
+    gint32 SchedNextTaskGrp(
+        CTasklet* pCurGrp,
+        guint32 dwHint ) override;
 
     gint32 GetNextTaskGrp(
-        TaskGrpPtr& pGrp ) override;
+        TaskGrpPtr& pGrp,
+        guint32 dwHint ) override;
 
     gint32 RemoveTaskGrp(
         TaskGrpPtr& pGrp ) override;

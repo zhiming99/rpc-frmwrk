@@ -384,12 +384,10 @@ gint32 CRpcTcpBridgeProxy::ClearRemoteEvents(
     ObjVecPtr pMatches( pVecMatches );
     QwVecPtr pTaskIds( pVecTaskIds );
 
-    if( unlikely( pMatches.IsEmpty() &&
-        pTaskIds.IsEmpty() ) )
-        return -EINVAL;
-
-    if( unlikely( ( *pMatches )().empty() &&
-        ( *pTaskIds )().empty() ) )
+    if( unlikely( ( pMatches.IsEmpty() ||\
+            ( *pMatches )().empty() ) &&
+        ( pTaskIds.IsEmpty() ||
+            ( *pTaskIds )().empty() ) ) )
         return -EINVAL;
 
     if( unlikely( !IsConnected() ) )

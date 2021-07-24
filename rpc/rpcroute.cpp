@@ -5637,8 +5637,8 @@ gint32 CIfParallelTaskGrpRfc::RunTaskInternal(
         if( GetTaskCount() == 0 )
             break;
 
-        gint32 iCount = ( gint32 )( GetMaxRunning() -
-            GetRunningCount() );
+        gint32 iCount =
+            GetMaxRunning() - GetRunningCount();
 
         if( iCount <= 0 )
         {
@@ -5717,7 +5717,8 @@ gint32 CIfParallelTaskGrpRfc::AddAndRun(
     do{
         CHECK_GRP_STATE;
 
-        if( GetPendingCount() > GetMaxPending() )
+        if( ( gint32 )GetPendingCount() + GetRunningCount() >=
+            ( gint32 )GetMaxPending() + GetMaxRunning() )
         {
             m_dwTaskRejected++;
             ret = ERROR_QUEUE_FULL;
@@ -5764,7 +5765,8 @@ gint32 CIfParallelTaskGrpRfc::AppendTask(
     gint32 ret = 0;
     do{
         CStdRTMutex oTaskLock( GetLock() );
-        if( GetPendingCount() >= GetMaxPending() )
+        if( ( gint32 )GetPendingCount() + GetRunningCount() >=
+            ( gint32 )GetMaxPending() + GetMaxRunning() )
         {
             DebugPrint( ret,
                 "RFC: queue is full,"

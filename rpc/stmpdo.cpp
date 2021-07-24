@@ -646,6 +646,16 @@ gint32 CRpcTcpBusPort::GetProperty(
             ret = -ENOENT;
             break;
         }
+    case propMaxConns:
+        {
+            oBuf = GetMaxConns();
+            break;
+        }
+    case propConnections:
+        {
+            oBuf = GetConnections();
+            break;
+        }
     default:
         {
             ret = super::GetProperty(
@@ -667,6 +677,22 @@ gint32 CRpcTcpBusPort::SetProperty(
     case propSrcUniqName:
         {
             ret = -ENOTSUP;
+            break;
+        }
+    case propMaxConns:
+        {
+            guint32& dwConn = oBuf;
+            if( dwConn == 0 || dwConn > 10000 )
+            {
+                ret = -EINVAL;
+                break;
+            }
+            SetMaxConns( dwConn );
+            break;
+        }
+    case propConnections:
+        {
+            ret = -EINVAL;
             break;
         }
     default:

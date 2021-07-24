@@ -718,10 +718,12 @@ class CRpcReqForwarder :
     { return m_bSepConns; }
 
     gint32 RunNextTaskGrp(
-        TaskGrpPtr& pCurGrp );
+        TaskGrpPtr& pCurGrp,
+        guint32 dwHint );
 
     gint32 SchedNextTaskGrp(
-        TaskGrpPtr& pCurGrp );
+        TaskGrpPtr& pCurGrp,
+        guint32 dwHint );
 
     gint32 AddAndRun(
         TaskletPtr& pTask,
@@ -732,6 +734,8 @@ class CRpcReqForwarder :
         guint32 dwMaxReqs,
         guint32 dwMaxPendigns );
 
+    inline bool HasScheduler() const
+    { return !m_pScheduler.IsEmpty(); }
 }; // CRpcReqForwarder
 
 class CRpcRfpForwardEventTask
@@ -3027,13 +3031,13 @@ class CIfParallelTaskGrpRfc :
         guint32& dwMaxRunning,
         guint32& dwMaxPending ) const;
 
-    inline guint32 GetMaxRunning() const
+    inline gint32 GetMaxRunning() const
     { return m_dwMaxRunning; }
 
     inline guint32 GetMaxPending() const
     { return m_dwMaxPending; }
 
-    inline guint32 GetRunningCount() const
+    inline gint32 GetRunningCount() const
     { return m_setTasks.size() - 1; }
 
     virtual gint32 RunTaskInternal(
@@ -3068,11 +3072,17 @@ class CIfParallelTaskGrpRfc2 :
         std::vector< TaskletPtr >& vecTasks );
 
     bool HasTaskToRun();
+    bool HasFreeSlot();
 
     guint32 HasPendingTasks();
 
     gint32 OnChildComplete( gint32 ret,
         CTasklet* pChild ) override;
+
+    gint32 DeferredRemove(
+        CTasklet* pChild,
+        CTasklet* pIoTask,
+        gint32 iRet );
 };
 
 #define IS_SVRMODOFFLINE_EVENT( __pEvtMsg ) \

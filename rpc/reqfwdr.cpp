@@ -1979,10 +1979,8 @@ gint32 CRpcReqForwarder::OnModOfflineInternal(
         DebugPrint( 0, "%s is down",
             strUniqName.c_str() );
 
-        ret = ClearRefCountByUniqName(
+        ClearRefCountByUniqName(
             strUniqName, setPortIds );
-        if( ret == 0 )
-            break;
 
         FWRDREQS vecReqs;
         FindFwrdReqsByUniqName(
@@ -5389,17 +5387,18 @@ gint32 CReqFwdrFetchDataTask::OnServiceComplete(
 }
 
 gint32 CRpcReqForwarder::RunNextTaskGrp(
-    TaskGrpPtr& pCurGrp )
+    TaskGrpPtr& pCurGrp, guint32 dwHint )
 {
     if( m_pScheduler.IsEmpty() )
         return ( *pCurGrp )( eventZero );
 
     ITaskScheduler* pSched = m_pScheduler;
-    return pSched->RunNextTaskGrp();
+    return pSched->RunNextTaskGrp(
+        pCurGrp, dwHint );
 }
 
 gint32 CRpcReqForwarder::SchedNextTaskGrp(
-    TaskGrpPtr& pCurGrp )
+    TaskGrpPtr& pCurGrp, guint32 dwHint )
 {
     if( m_pScheduler.IsEmpty() )
     {
@@ -5409,7 +5408,10 @@ gint32 CRpcReqForwarder::SchedNextTaskGrp(
     }
 
     ITaskScheduler* pSched = m_pScheduler;
-    return pSched->SchedNextTaskGrp();
+    CIoManager* pMgr = GetIoMgr();
+    return DEFER_CALL( pMgr, ObjPtr( pSched ),
+        &ITaskScheduler::RunNextTaskGrp,
+        ( CTasklet* )pCurGrp, dwHint );
 }
 
 gint32 CRpcReqForwarder::AddAndRun(
@@ -5447,7 +5449,7 @@ gint32 CRpcReqForwarder::AddAndRun(
         if( SUCCEEDED( ret ) )
         {
             // run the tasks
-            RunNextTaskGrp( pGrp );
+            RunNextTaskGrp( pGrp, 1 );
             return STATUS_SUCCESS;
         }
         else if( ERROR( ret ) &&
@@ -5547,11 +5549,11 @@ gint32 CIfParallelTaskGrpRfc2::SelTasksToKill(
     do{
         CHECK_GRP_STATE;
 
-        guint32 dwCount = 0;
+        gint32 iCount = 0;
         if( GetMaxRunning() >= GetRunningCount() )
             break;
 
-        dwCount = GetRunningCount() -
+        iCount = GetRunningCount() -
             GetMaxRunning();
 
         for( auto elem : m_setTasks )
@@ -5561,8 +5563,8 @@ gint32 CIfParallelTaskGrpRfc2::SelTasksToKill(
                 continue;
 
             vecTasks.push_back( elem );
-            dwCount--;
-            if( dwCount == 0 )
+            iCount--;
+            if( iCount == 0 )
                 break;
         }
 
@@ -5577,42 +5579,124 @@ guint32 CIfParallelTaskGrpRfc2::HasPendingTasks()
     return GetPendingCount();
 }
 
+bool CIfParallelTaskGrpRfc2::HasFreeSlot()
+{
+    CStdRTMutex oTaskLock( GetLock() );
+    if( IsNoSched() )
+        return false;
+    if( GetRunningCount() >= GetMaxRunning() )
+        return false;
+    return true;
+}
+
 bool CIfParallelTaskGrpRfc2::HasTaskToRun()
 {
+    CStdRTMutex oTaskLock( GetLock() );
+    if( IsNoSched() )
+        return false;
+    if( GetRunningCount() >= GetMaxRunning() )
+        return false;
+    if( GetPendingCount() == 0 )
+        return false;
+    return true;
+}
+
+gint32 CIfParallelTaskGrpRfc2::DeferredRemove(
+    CTasklet* pChild,
+    CTasklet* pIoTask,
+    gint32 iRet )
+{
     gint32 ret = 0;
+    CIfInvokeMethodTask* pInv = ObjPtr( pChild );
+    if( pInv == nullptr )
+    {
+        // the placeholder task quits
+        return ret;
+    }
     do{
-        CHECK_GRP_STATE;
+        CIfParallelTask* pIoReq =
+            static_cast< CIfParallelTask* >( pIoTask );
+        CStdRTMutex oReqLock( pIoReq->GetLock() );
+        // make sure the proxy has free slots
+        if( pIoReq->GetTaskState() != stateStopped )
+            continue;
+        oReqLock.Unlock();
+
+        CStdRTMutex oTaskLock( GetLock() );
+        TaskletPtr pChildTask( pChild );
+        RemoveTask( pChildTask );
 
         if( GetRunningCount() >= GetMaxRunning() )
-        {
-            ret = ERROR_FALSE;
             break;
-        }
-        if( GetPendingCount() == 0 )
-        {
-            ret = ERROR_FALSE;
+
+        if( IsNoSched() )
             break;
-        }
 
-    }while( 0 );
+        CfgPtr pCfg = GetConfig();
+        CCfgOpener oCfg( ( IConfigDb* )pCfg );
+        ObjPtr pIfObj = nullptr;
+        ret = oCfg.GetObjPtr( propIfPtr, pIfObj );
+        if( ERROR( ret ) )
+            break;
 
-    if( ERROR( ret ) )
-        return false;
+        oTaskLock.Unlock();
+        CRpcReqForwarder* pReqFwdr = pIfObj;
+        if( pReqFwdr == nullptr )
+            break;
 
-    return true;
+        TaskGrpPtr pGrp( this );
+        ret = pReqFwdr->RunNextTaskGrp( pGrp, 0 );
+        break;
+
+    }while( 1 );
+
+    return 0;
 }
 
 gint32 CIfParallelTaskGrpRfc2::OnChildComplete(
     gint32 ret, CTasklet* pChild )
 {
     do{
-        CStdRTMutex oTaskLock( GetLock() );
-        TaskletPtr taskPtr = pChild;
-        RemoveTask( taskPtr );
-        // if( GetRunningCount() > GetMaxRunning() )
-        //     return 0;
+        CIfRetryTask* pCaller =
+            static_cast< CIfRetryTask* >( pChild );
 
-        /*if( IsNoSched() )
+        TaskletPtr pEndTask =
+            pCaller->GetEndFwrdTask();
+
+        CStdRTMutex oTaskLock( GetLock() );
+
+        CCfgOpener oCfg(
+            ( IConfigDb* )GetConfig() );
+        CRpcReqForwarder* pReqFwdr = nullptr;
+        oCfg.GetPointer( propIfPtr, pReqFwdr );
+        CIoManager* pMgr = pReqFwdr->GetIoMgr();
+
+        bool bScheduler = pReqFwdr->HasScheduler();
+        TaskletPtr taskPtr = pChild;
+
+        if( bScheduler )
+        {
+            if( ret == ERROR_KILLED_BYSCHED )
+            {
+                RemoveTask( taskPtr );
+                break;
+            }
+
+            DEFER_CALL( pMgr, ObjPtr( this ),
+                &CIfParallelTaskGrpRfc2::DeferredRemove,
+                pChild, pEndTask, ret );
+
+            break;
+        }
+
+        RemoveTask( taskPtr );
+        if( GetRunningCount() >= GetMaxRunning() )
+        {
+            ret = 0;
+            break;
+        }
+
+        if( IsNoSched() )
         {
             ret = 0;
             break;
@@ -5628,26 +5712,10 @@ gint32 CIfParallelTaskGrpRfc2::OnChildComplete(
             // no need to reschedule
             ret = 0;
             break;
-        }*/
-
-        if( ret == ERROR_KILLED_BYSCHED )
-            break;
-
-        CfgPtr pCfg = GetConfig();
-        CCfgOpener oCfg( ( IConfigDb* )pCfg );
-        ObjPtr pIfObj = nullptr;
-        ret = oCfg.GetObjPtr( propIfPtr, pIfObj );
-        if( ERROR( ret ) )
-            break;
-
-        CRpcReqForwarder* pReqFwdr = pIfObj;
-        if( pReqFwdr != nullptr )
-        {
-            oTaskLock.Unlock();
-            TaskGrpPtr pGrp( this );
-            ret = pReqFwdr->SchedNextTaskGrp( pGrp );
-            break;
         }
+
+        TaskletPtr pThisTask( this );
+        pMgr->RescheduleTask( pThisTask );
 
     }while( 0 );
 
