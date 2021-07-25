@@ -529,18 +529,16 @@ gint32 CRRTaskScheduler::GetNextTaskGrp(
             }
             else
             {
-                if( dwHint == 1 && 
-                    !pGrpRfc->HasTaskToRun() )
+                bool bHasTask =
+                    pGrpRfc->HasTaskToRun();
+
+                if( dwHint == 1 && !bHasTask )
                 {
                     orq.push_back( pHead );
                     continue;
                 }
-                else if( dwHint == 1 &&
-                    pGrpRfc->HasTaskToRun() )
+                else if( dwHint == 1 && bHasTask )
                 {
-                    orq.push_back( pHead );
-                    pGrp = pHead;
-                    break;
                 }
                 else if( dwHint == 0 &&
                     !pGrpRfc->HasFreeSlot() )
@@ -554,17 +552,18 @@ gint32 CRRTaskScheduler::GetNextTaskGrp(
 
                 TaskGrpPtr pwh;
                 CIfParallelTaskGrpRfc2* pGrpRfc2 = nullptr;
-                while( itr != owq.end() )
+                gint32 iWaitCount = owq.size(), k = 0;
+                for( ; k < iWaitCount; k++ )
                 {
-                    pGrpRfc2 = *itr;
+                    pwh = owq.front();
+                    owq.pop_front();
+                    pGrpRfc2 = pwh;
                     if( pGrpRfc2->HasPendingTasks() )
-                    {
-                        pwh = *itr;
                         break;
-                    }
-                    itr++;
+                    owq.push_back( pwh );
                 }
-                if( itr != owq.end() )
+
+                if( k < iWaitCount )
                 {
                     pGrpRfc->SetLimit( 0,
                         pGrpRfc->GetMaxPending(),
@@ -574,7 +573,6 @@ gint32 CRRTaskScheduler::GetNextTaskGrp(
                         pGrpRfc2->GetMaxPending(),
                         true );
 
-                    owq.erase( itr );
                     orq.push_back( pwh );
                     owq.push_back( pHead );
                     pHead = pwh;

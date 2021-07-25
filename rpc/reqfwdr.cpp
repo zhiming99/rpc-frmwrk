@@ -4077,6 +4077,8 @@ gint32 CRpcReqForwarderProxy::SetupReqIrpFwrdReq(
         if( qwAge >= ( guint64 )dwTimeoutSec )
         {
             ret = -ETIMEDOUT;
+            DebugPrint( ret,
+                "The request is already timeout" );
             break;
         }
         dwTimeoutSec -= qwAge;

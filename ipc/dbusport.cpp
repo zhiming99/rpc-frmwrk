@@ -685,8 +685,8 @@ gint32 CDBusBusPort::Start( IRP *pIrp )
 
         // NOTE: at this point, the mainloop is
         // already started
-        string strInstNo = std::to_string(
-            pMloop->GetThreadId() );
+        string strInstNo =
+            std::to_string( getpid() );
 
         CCfgOpener oCfg( ( IConfigDb* )m_pCfgDb );
         ret = oCfg.GetStrProp(
