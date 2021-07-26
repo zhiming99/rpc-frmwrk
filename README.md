@@ -53,6 +53,7 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 [`Mon Jul 26 2021 08:20:46 PM Beijing`]   
 1. Added a round-robin task-scheduler to the `reqfwdr` as the solution of the starving issue. After having fixed some stable issues, and some old bugs, the starving issue is now eliminated from the `reqfwdr`.
 2. still, the connection-limiter on the bridge side is yet to add. Let me do some research to get it done.
+3. Did not expected `RFC` last so long.
 
 [`Mon Jul 12 2021 01:54:27 PM Beijing`]   
 1. Over the way of tests, it has exposed a starving issue in the `reqfwdr` when a hundred requests arrive at the same time. However, the starving issue could also be an issue of the `bridge`. And I need to address it ASAP before the `rfc` can be released.
