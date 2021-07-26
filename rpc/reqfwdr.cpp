@@ -5610,19 +5610,25 @@ gint32 CIfParallelTaskGrpRfc2::DeferredRemove(
 {
     gint32 ret = 0;
     CIfInvokeMethodTask* pInv = ObjPtr( pChild );
-    if( pInv == nullptr )
-    {
-        // the placeholder task quits
+    if( unlikely( pInv == nullptr ) )
         return ret;
-    }
+
     do{
-        CIfParallelTask* pIoReq =
-            static_cast< CIfParallelTask* >( pIoTask );
-        CStdRTMutex oReqLock( pIoReq->GetLock() );
-        // make sure the proxy has free slots
-        if( pIoReq->GetTaskState() != stateStopped )
-            continue;
-        oReqLock.Unlock();
+        if( pIoTask != nullptr )
+        {
+            CIfParallelTask* pIoReq = static_cast
+                < CIfParallelTask* >( pIoTask );
+            CStdRTMutex oReqLock( pIoReq->GetLock() );
+            // make sure the proxy has free slots
+            if( pIoReq->GetTaskState() != stateStopped )
+                continue;
+            oReqLock.Unlock();
+        }
+        else
+        {
+            // let loose ERROR_QUEUE_FULL if the
+            // pChild is canceled or timedout
+        }
 
         CStdRTMutex oTaskLock( GetLock() );
         TaskletPtr pChildTask( pChild );
@@ -5658,24 +5664,49 @@ gint32 CIfParallelTaskGrpRfc2::DeferredRemove(
 gint32 CIfParallelTaskGrpRfc2::OnChildComplete(
     gint32 ret, CTasklet* pChild )
 {
-    do{
-        CIfRetryTask* pCaller =
-            static_cast< CIfRetryTask* >( pChild );
+    if( pChild == nullptr )
+        return ret;
 
-        TaskletPtr pEndTask =
-            pCaller->GetEndFwrdTask();
+    do{
+        gint32 iRet = 0;
+        TaskletPtr pThisTask( this );
+        TaskletPtr taskPtr = pChild;
+
+        CIfInvokeMethodTask*
+            pCaller = ObjPtr( pChild );
+
+        if( pCaller == nullptr )
+        {
+            // the place holder is quitting
+            CStdRTMutex oTaskLock( GetLock() );
+            RemoveTask( taskPtr );
+            break;
+        }
+
+        TaskletPtr pIoTask;
+        std::vector< LONGWORD > vecParams;
+        iRet = pCaller->GetParamList( vecParams );
+        if( SUCCEEDED( iRet ) &&
+            vecParams[ 0 ] == eventTaskComp )
+        {
+            pIoTask =
+                pCaller->GetEndFwrdTask();
+        }
+        else
+        {
+            // if the invoke is canceled or timed
+            // out, calling GetEndFwrdTask is
+            // risky
+            pIoTask = pChild;
+        }
 
         CStdRTMutex oTaskLock( GetLock() );
-
         CCfgOpener oCfg(
             ( IConfigDb* )GetConfig() );
         CRpcReqForwarder* pReqFwdr = nullptr;
         oCfg.GetPointer( propIfPtr, pReqFwdr );
         CIoManager* pMgr = pReqFwdr->GetIoMgr();
-
         bool bScheduler = pReqFwdr->HasScheduler();
-        TaskletPtr taskPtr = pChild;
-
         if( bScheduler )
         {
             if( ret == ERROR_KILLED_BYSCHED )
@@ -5686,7 +5717,7 @@ gint32 CIfParallelTaskGrpRfc2::OnChildComplete(
 
             DEFER_CALL( pMgr, ObjPtr( this ),
                 &CIfParallelTaskGrpRfc2::DeferredRemove,
-                pChild, pEndTask, ret );
+                pChild, pIoTask, ret );
 
             break;
         }
@@ -5694,13 +5725,11 @@ gint32 CIfParallelTaskGrpRfc2::OnChildComplete(
         RemoveTask( taskPtr );
         if( GetRunningCount() >= GetMaxRunning() )
         {
-            ret = 0;
             break;
         }
 
         if( IsNoSched() )
         {
-            ret = 0;
             break;
         }
 
@@ -5712,11 +5741,9 @@ gint32 CIfParallelTaskGrpRfc2::OnChildComplete(
             // thread at the same time, and lower the
             // probability get blocked by reentrance lock
             // no need to reschedule
-            ret = 0;
             break;
         }
 
-        TaskletPtr pThisTask( this );
         pMgr->RescheduleTask( pThisTask );
 
     }while( 0 );
