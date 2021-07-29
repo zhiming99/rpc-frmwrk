@@ -2318,8 +2318,6 @@ gint32 CIfParallelTaskGrp::OnChildComplete(
 gint32 CIfParallelTaskGrp::RunTaskInternal(
     guint32 dwContext )
 {
-    gint32 ret = 0;
-
     CStdRTMutex oTaskLock( GetLock() );
 
     EnumTaskState iState = GetTaskState();
@@ -2343,10 +2341,20 @@ gint32 CIfParallelTaskGrp::RunTaskInternal(
         SetRunning( true );
     }
 
-    do{
-        std::deque< TaskletPtr > queTasksToRun;
+    if( GetTaskCount() == 0 )
+    {
+        SetRunning( false );
+        return STATUS_SUCCESS;
+    }
 
-        queTasksToRun.clear();
+    if( GetPendingCount() == 0 )
+        return STATUS_PENDING;
+
+    gint32 ret = 0;
+    std::deque< TaskletPtr > queTasksToRun;
+
+    do{
+
         queTasksToRun = m_quePendingTasks;
 
         m_setTasks.insert(
@@ -2363,6 +2371,8 @@ gint32 CIfParallelTaskGrp::RunTaskInternal(
             if( !pTask.IsEmpty() )
                 ( *pTask )( eventZero );
         }
+
+        queTasksToRun.clear();
 
         oTaskLock.Lock();
         SetNoSched( false );

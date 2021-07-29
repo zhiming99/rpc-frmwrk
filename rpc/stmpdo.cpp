@@ -719,8 +719,25 @@ gint32 CRpcTcpBusPort::CreateMLoopPool()
         if( ERROR( ret ) )
             ret = 0;
 
+        bool bMultiLoop = false;
         if( dwRole & 0x2 )
-            dwCount = pMgr->GetNumCores();
+            bMultiLoop = true;
+        else if( dwRole & 1 )
+        {
+            bool bSepConn = false;
+            ret = pMgr->GetCmdLineOpt(
+                propSepConns, bSepConn );
+            if( SUCCEEDED( ret ) )
+                bMultiLoop = bSepConn;
+            else
+                ret = 0;
+        }
+
+        if( bMultiLoop )
+        {
+            dwCount =
+                pMgr->GetNumCores() >> 1;
+        }
 
         for( int i = 0; i < dwCount; ++i )
         {

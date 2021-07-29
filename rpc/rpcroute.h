@@ -573,12 +573,6 @@ class CRpcReqForwarder :
         std::vector< stdstr >& strNames,
         FWRDREQS& vecTasks );
 
-    gint32 OnPostStart(
-        IEventSink* pContext ) override;
-
-    gint32 OnPreStop(
-        IEventSink* pCallback ) override;
-
     public:
 
     typedef CRpcInterfaceServer super;
@@ -736,6 +730,13 @@ class CRpcReqForwarder :
 
     inline bool HasScheduler() const
     { return !m_pScheduler.IsEmpty(); }
+
+    virtual gint32 OnPostStart(
+        IEventSink* pContext ) override;
+
+    virtual gint32 OnPreStop(
+        IEventSink* pCallback ) override;
+
 }; // CRpcReqForwarder
 
 class CRpcRfpForwardEventTask

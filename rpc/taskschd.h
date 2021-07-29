@@ -100,6 +100,9 @@ class CRRTaskScheduler :
     std::map< InterfPtr, CONNQUE_ELEM > m_mapConnQues;
     std::list< InterfPtr > m_lstConns;
     std::hashmap< guint32, InterfPtr > m_mapId2If;
+    CONNQUE_ELEM m_ocqSchdMgr;
+    guint32 m_dwNumSched = 0;
+    guint32 m_dwLastOp = 1;
 
     void SetLimitRunningGrps(
         CONNQUE_ELEM& ocq,
@@ -142,6 +145,12 @@ class CRRTaskScheduler :
         CONNQUE_ELEM& ocq,
         guint32 dwDelta,
         std::vector< TaskletPtr >& vecTasks );
+
+    gint32 GetConnCount()
+    {
+        CStdRMutex oLock( GetLock() );
+        return m_mapConnQues.size() - 1;
+    }
 
     public:
     typedef ITaskScheduler super;

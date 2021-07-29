@@ -57,6 +57,19 @@ void CIfRouterTest::setUp()
         ret = oParams.Push(
             std::string( MODULE_NAME ) );
 
+        guint32 dwNumThrds =
+            ( guint32 )std::max( 1U,
+            std::thread::hardware_concurrency() );
+
+        if( dwNumThrds > 1 )
+            dwNumThrds = ( dwNumThrds >> 1 );
+
+        oParams[ propMaxTaskThrd ] = dwNumThrds;
+
+        // weird, more threads will have worse
+        // performance of handshake
+        oParams[ propMaxIrpThrd ] = 2;
+
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 
         ret = m_pMgr.NewObj(
@@ -138,8 +151,6 @@ CfgPtr CIfRouterTest::InitRouterCfg(
         if( g_bAuth )
             strDescPath = ROUTER_OBJ_DESC_AUTH;
 
-        if( g_dwRole & 0x2 )
-            oCfg[ propMaxTaskThrd ] = 4;
         oCfg[ propSvrInstName ] = MODULE_NAME;
         oCfg[ propIoMgr ] = m_pMgr;
         ret = CRpcServices::LoadObjDesc(

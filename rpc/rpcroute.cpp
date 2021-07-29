@@ -5606,8 +5606,6 @@ gint32 CIfParallelTaskGrpRfc::OnChildComplete(
 gint32 CIfParallelTaskGrpRfc::RunTaskInternal(
     guint32 dwContext )
 {
-    gint32 ret = 0;
-
     CStdRTMutex oTaskLock( GetLock() );
 
     EnumTaskState iState = GetTaskState();
@@ -5631,26 +5629,26 @@ gint32 CIfParallelTaskGrpRfc::RunTaskInternal(
         SetRunning( true );
     }
 
+    if( GetTaskCount() == 0 )
+    {
+        SetRunning( true );
+        return STATUS_SUCCESS;
+    }
+
+    if( GetPendingCount() == 0 )
+        return STATUS_PENDING;
+
+    gint32 iCount =
+        GetMaxRunning() - GetRunningCount();
+
+    if( iCount <= 0 )
+        return STATUS_PENDING;
+
+    gint32 ret = 0;
+    std::deque< TaskletPtr > queTasksToRun;
+
     do{
-        std::deque< TaskletPtr > queTasksToRun;
 
-        if( GetTaskCount() == 0 )
-            break;
-
-        gint32 iCount =
-            GetMaxRunning() - GetRunningCount();
-
-        if( iCount <= 0 )
-        {
-            ret = STATUS_PENDING;
-            break;
-        }
-
-        if( GetPendingCount() == 0 )
-        {
-            ret = STATUS_PENDING;
-            break;
-        }
 
         iCount = std::min( ( size_t )iCount,
             ( size_t )GetPendingCount() );
@@ -5677,23 +5675,22 @@ gint32 CIfParallelTaskGrpRfc::RunTaskInternal(
                 ( *pTask )( eventZero );
         }
 
+        queTasksToRun.clear();
         oTaskLock.Lock();
         SetNoSched( false );
 
-        if( GetPendingCount() > 0 &&
-            GetMaxRunning() > GetRunningCount() )
+        iCount =
+            GetMaxRunning() - GetRunningCount();
+
+        if( GetPendingCount() > 0 && iCount > 0 )
         {
             // there are free slot for more
             // request
             continue;
         }
 
-        // pending means there are tasks running, does
-        // not indicate a specific task's return value
         if( GetTaskCount() > 0 )
             ret = STATUS_PENDING;
-        else
-            ret = 0;
 
         break;
 

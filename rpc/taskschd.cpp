@@ -436,13 +436,22 @@ gint32 CRRTaskScheduler::RunNextTaskGrp(
             ( pCurGrp );
         CStdRTMutex oLock( pGrpRfc->GetLock() );
         if( pGrpRfc->GetMaxRunning() == 0 )
+        {
+            oLock.Unlock();
+
+            CONNQUE_ELEM& ocq = m_ocqSchdMgr;
+            pGrp = ocq.m_plstReady->front();
+            if( pGrp.IsEmpty() )
+                return 0;
+            ( *pGrp )( eventZero );
             return 0;
+        }
     }
     gint32 ret = GetNextTaskGrp( pGrp, dwHint );
     if( ERROR( ret ) )
         return 0;
 
-    ret = ( *pGrp )( eventZero );
+    ( *pGrp )( eventZero );
     return ret;
 }
 
@@ -473,6 +482,28 @@ gint32 CRRTaskScheduler::GetNextTaskGrp(
     int i = 0;
 
     CStdRMutex oLock( GetLock() );
+    if( m_lstConns.size() >= 64 && dwHint == 1 )
+    {
+        if( m_dwLastOp == 1 &&
+            ( m_dwNumSched & 0x3f ) == 0 )
+        {
+            // let the schdmgr's taskgrp to run
+            CONNQUE_ELEM& ocq = m_ocqSchdMgr;
+            std::list< TaskGrpPtr >&
+                orq = *ocq.m_plstReady;
+            CIfParallelTaskGrp* pPalGrp = orq.front();
+            CStdRTMutex oTaskLock( pPalGrp->GetLock() );
+            if( pPalGrp->GetPendingCount() > 0 )
+            {
+                pGrp = orq.front();
+                m_dwLastOp = 0;
+                return ret;
+            }
+        }
+    }
+    m_dwLastOp = 1;
+    if( dwHint == 1 )
+        m_dwNumSched++;
     for( ; i < m_lstConns.size(); i++ )
     {
         InterfPtr pIf = m_lstConns.front();
@@ -480,6 +511,24 @@ gint32 CRRTaskScheduler::GetNextTaskGrp(
         {
             m_lstConns.pop_front();
             m_lstConns.push_back( pIf );
+        }
+
+        if( pIf->GetObjId() ==
+            m_pSchedMgr->GetObjId() )
+        {
+            CONNQUE_ELEM& ocq = m_ocqSchdMgr;
+            std::list< TaskGrpPtr >&
+                orq = *ocq.m_plstReady;
+            TaskGrpPtr pHead = orq.front();     
+            CIfParallelTaskGrp* pPalGrp = pHead;
+            CStdRTMutex oTaskLock(
+                pPalGrp->GetLock() );
+            if( pPalGrp->GetPendingCount() )
+            {
+                pGrp = pPalGrp;
+                break;
+            }
+            continue;
         }
 
         std::map< InterfPtr, CONNQUE_ELEM >::iterator
@@ -494,21 +543,6 @@ gint32 CRRTaskScheduler::GetNextTaskGrp(
 
         std::list< TaskGrpPtr >&
             owq = ocq.m_lstWaitSlot;
-
-        if( pIf->GetObjId() ==
-            m_pSchedMgr->GetObjId() )
-        {
-            TaskGrpPtr pHead = orq.front();     
-            CIfParallelTaskGrp* pPalGrp = pHead;
-            CStdRTMutex oTaskLock(
-                pPalGrp->GetLock() );
-            if( pPalGrp->GetPendingCount() )
-            {
-                pGrp = pPalGrp;
-                break;
-            }
-            continue;
-        }
 
         int j = 0;
         int iCount = orq.size();
@@ -789,9 +823,6 @@ gint32 CRRTaskScheduler::AddTaskGrp(
         if( pIf->GetObjId() ==
             m_pSchedMgr->GetObjId() )
         {
-            CONNQUE_ELEM& ocq = m_mapConnQues[ pIf ];
-            ocq.m_dwMaxSlots = 1000;
-            ocq.m_plstReady->push_back( pGrp );
             return 0;
         }
         std::vector< TaskletPtr > vecTasks;
@@ -1003,7 +1034,11 @@ gint32 CRRTaskScheduler::Start()
         return ret;
 
     InterfPtr pIf = m_pSchedMgr;
-    return AddTaskGrp( pIf, pGrp );
+    CONNQUE_ELEM& ocq = m_ocqSchdMgr;
+    ocq.m_dwMaxSlots = 1000;
+    ocq.m_plstReady->push_back( pGrp );
+    m_lstConns.push_back( pIf );
+    return 0;
 }
 
 gint32 CRRTaskScheduler::Stop()
