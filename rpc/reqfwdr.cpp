@@ -72,14 +72,15 @@ CRpcReqForwarder::CRpcReqForwarder(
         }
 
         RemoveProperty( propRouterPtr );
-        if( !IsRfcEnabled() )
-            break;
 
         CIoManager* pMgr = GetIoMgr();
         ret = pMgr->GetCmdLineOpt(
             propSepConns, m_bSepConns );
         if( ERROR( ret ) )
             m_bSepConns = false;
+
+        if( !IsRfcEnabled() )
+            break;
 
         std::string strType;
         ret = oCfg.GetStrProp(
@@ -5512,6 +5513,9 @@ gint32 CRpcReqForwarder::RefreshReqLimit(
     guint32 dwMaxReqs,
     guint32 dwMaxPendings )
 {
+    if( !IsRfcEnabled() )
+        return STATUS_SUCCESS;
+
     if( m_pScheduler.IsEmpty() )
         return STATUS_SUCCESS;
 

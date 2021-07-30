@@ -4090,13 +4090,6 @@ gint32 CRpcServices::LoadObjDesc(
                     oCfg[ propPauseOnStart ] = false;
             }
 
-            if( oObjElem.isMember( JSON_ATTR_MAXREQS ) &&
-                oObjElem[ JSON_ATTR_MAXREQS ].isString() )
-            {
-                strVal = oObjElem[ JSON_ATTR_MAXREQS ].asString();
-                oCfg[ propMaxReqs ] = std::stoi( strVal );
-            }
-
             if( oObjElem.isMember( JSON_ATTR_MAXPENDINGS ) &&
                 oObjElem[ JSON_ATTR_MAXPENDINGS ].isString() )
             {

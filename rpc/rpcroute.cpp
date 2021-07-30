@@ -1415,9 +1415,9 @@ gint32 CRpcRouterBridge::AddToHistory(
     CStdRMutex oRouterLock( GetLock() );
     REQ_LIMIT rl ={ dwMaxReqs, dwMaxPendings };
     HISTORY_ELEM he( tv.tv_sec, rl );
-    m_queHistory.push_back( he );
-    while( m_queHistory.size() > RFC_HISTORY_LEN )
-        m_queHistory.pop_front();
+    m_lstHistory.push_back( he );
+    while( m_lstHistory.size() > RFC_HISTORY_LEN )
+        m_lstHistory.pop_front();
 
     return 0;
 }
@@ -1427,48 +1427,12 @@ gint32 CRpcRouterBridge::GetCurConnLimit(
     guint32& dwMaxPendings,
     bool bNew ) const
 {
-    gint32 ret = 0;
-    do{
-        CCfgOpenerObj oRouterCfg( this );
-
-        ret = oRouterCfg.GetIntProp(
-            propMaxReqs, dwMaxReqs );
-        if( ERROR( ret ) )
-            break;
-        
-        ret = oRouterCfg.GetIntProp(
-            propMaxPendings, dwMaxPendings );
-        if( ERROR( ret ) )
-            break;
-
-        guint32 dwCount = GetBridgeCount();
-
-        if( bNew )
-            dwCount += 1;
-
-        if( dwCount > 0 )
-        {
-            dwMaxReqs = std::max( 1U,
-                dwMaxReqs / dwCount );
-
-            dwMaxPendings = std::max( 1U,
-                dwMaxPendings / dwCount );
-
-            dwMaxReqs = std::min(
-                dwMaxReqs, RFC_MAX_REQS );
-
-            dwMaxPendings = std::min(
-                dwMaxPendings, RFC_MAX_PENDINGS );
-        }
-        else
-        {
-            dwMaxReqs = RFC_MAX_REQS;
-            dwMaxPendings = RFC_MAX_PENDINGS;
-        }
-
-    }while( 0 );
-
-    return ret;
+    CRpcRouter* pParent = GetParent(); 
+    CRpcRouterManager* pMgr =
+        static_cast< CRpcRouterManager* >
+            ( pParent );
+    return pMgr->GetCurConnLimit(
+        dwMaxReqs, dwMaxPendings, bNew );
 }
 
 gint32 CRpcRouterBridge::BuildRefreshReqLimit(
@@ -1534,7 +1498,7 @@ gint32 CRpcRouterBridge::RefreshReqLimit()
         GetCurConnLimit(
             dwMaxReqs, dwMaxPendings );
 
-        HISTORY_ELEM& hl = m_queHistory[ 0 ];
+        HISTORY_ELEM& hl = m_lstHistory.back();
 
         REQ_LIMIT& rl = hl.second;
         REQ_LIMIT rlNow =
@@ -1553,6 +1517,8 @@ gint32 CRpcRouterBridge::RefreshReqLimit()
              vecBdges.push_back( elem.second );
 
         oRouterLock.Unlock();
+        if( vecBdges.empty() )
+            break;
 
         CReqBuilder oReq;
         BuildRefreshReqLimit( oReq.GetCfg(),
@@ -1697,10 +1663,8 @@ gint32 CRouterOpenBdgePortTask::CreateInterface(
                 guint32 dwMaxPendings = 0;
 
                 pRouter->GetCurConnLimit(
-                dwMaxReqs, dwMaxPendings, true );
-
-                pRouter->AddToHistory(
-                    dwMaxReqs, dwMaxPendings );
+                    dwMaxReqs, dwMaxPendings,
+                    true );
 
                 oParams.SetIntProp(
                     propMaxReqs, dwMaxReqs );
@@ -5227,6 +5191,10 @@ gint32 CRpcRouterManager::Start()
         if( ERROR( ret ) )
             break;
 
+        ret = GetMaxConns( m_dwMaxConns );
+        if( ERROR( ret ) )
+            break;
+
         ret = super::Start();
         if( ERROR( ret ) )
             break;
@@ -5319,7 +5287,7 @@ gint32 CRpcRouterManager::Start()
                     propRetries, MAX_NUM_CHECK );
 
                 oTaskCfg.SetIntProp(
-                    propIntervalSec, 60 );
+                    propIntervalSec, 30 );
 
                 this->AddAndRun( m_pRfcChecker );
             }
@@ -5536,6 +5504,235 @@ gint32 CRpcRouterManager::RebuildMatches()
                 ret = 0;
             }
         }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CRpcRouterManager::GetTcpBusPort(
+    PortPtr& pPort ) const
+{
+    gint32 ret = -ENOENT;
+
+    do{
+        EnumClsid iClsid =
+            clsid( CRpcTcpBusDriver );
+
+        stdstr strClass =
+            CoGetClassName( iClsid );
+
+        if( strClass.empty() )
+        {
+            ret = ERROR_FAIL;
+            break;
+        }
+
+        strClass = strClass.substr( 1 );
+        CIoManager* pMgr = GetIoMgr();
+        CDriverManager& odm = pMgr->GetDrvMgr();
+        IPortDriver* pDrv = nullptr;
+        ret = odm.FindDriver( strClass, pDrv );
+        if( ERROR( ret ) )
+            break;
+
+        std::vector<PortPtr> vecPorts;
+        ret = pDrv->EnumPorts( vecPorts );
+        if( ERROR( ret ) )
+            break;
+
+        for( auto elem : vecPorts )
+        {
+            // find the first one is ok
+            CRpcTcpBusPort* pBus = elem;
+            if( pBus != nullptr )
+            {
+                pPort = pBus;
+                ret = 0;
+                break;
+            }
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+// grabbed from stackoverflow
+static guint32 Pow2Roundup( guint32 x )
+{
+    if (x == 0)
+        return 0;
+    --x;
+    x |= x >> 1;
+    x |= x >> 2;
+    x |= x >> 4;
+    x |= x >> 8;
+    x |= x >> 16;
+
+    return x + 1;
+}
+
+static guint32 log2( guint32 pow2 )
+{
+    guint32 c = 0;
+    --pow2;
+    for( ; pow2; pow2 >>= 1 )
+        c++;
+    return c;
+}
+
+// methods from CObjBase
+gint32 CRpcRouterManager::GetProperty(
+        gint32 iProp,
+        CBuffer& oBuf ) const
+{
+    gint32 ret = 0;
+    switch( iProp )
+    {
+    case propMaxReqs:
+        {
+            oBuf = ( m_dwMaxConns << 1 );
+            break;
+        }
+    case propMaxPendings:
+        {
+            ret = super::GetProperty(
+                iProp, oBuf );
+            if( ERROR( ret ) )
+            {
+                oBuf = ( m_dwMaxConns << 2 );
+                break;
+            }
+            guint32& dwMaxConns = oBuf;
+            dwMaxConns = std::max(
+                ( m_dwMaxConns << 2 ),
+                dwMaxConns );
+            break;
+        }
+    default:
+        {
+            ret = super::GetProperty(
+                iProp, oBuf );
+            break;
+        }
+    }
+    return ret;
+}
+
+gint32 CRpcRouterManager::SetProperty(
+        gint32 iProp,
+        const CBuffer& oBuf )
+{
+    gint32 ret = 0;
+    switch( iProp )
+    {
+    case propMaxReqs:
+    case propMaxPendings:
+        {
+            ret = -EINVAL;
+            break;
+        }
+    default:
+        {
+            ret = super::SetProperty(
+                iProp, oBuf );
+            break;
+        }
+    }
+    return ret;
+}
+
+gint32 CRpcRouterManager::GetCurConnLimit(
+    guint32& dwMaxReqs,
+    guint32& dwMaxPendings,
+    bool bNew ) const
+{
+    gint32 ret = 0;
+    do{
+        CCfgOpenerObj oRouterCfg( this );
+
+        ret = oRouterCfg.GetIntProp(
+            propMaxReqs, dwMaxReqs );
+        if( ERROR( ret ) )
+            break;
+        
+        ret = oRouterCfg.GetIntProp(
+            propMaxPendings, dwMaxPendings );
+        if( ERROR( ret ) )
+            break;
+
+        std::vector< InterfPtr > vecRouters;
+        GetRouters( vecRouters );
+        if( vecRouters.empty() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+
+        guint32 dwCount = 0; 
+        for( auto elem : vecRouters )
+        {
+            CRpcRouterBridge* prtb = elem;
+            if( prtb == nullptr )
+                continue;
+            dwCount += prtb->GetBridgeCount();
+        }
+
+        if( bNew )
+            dwCount += 1;
+
+        if( dwCount == 0 )
+        {
+            dwMaxReqs = RFC_MAX_REQS;
+            dwMaxPendings = RFC_MAX_PENDINGS;
+            break;
+        }
+
+        dwCount = Pow2Roundup( dwCount );
+        guint32 dwShift = log2( dwCount );
+        dwMaxReqs = std::max( 1U,
+            dwMaxReqs >> dwShift );
+
+        dwMaxPendings = std::max( 1U,
+            dwMaxPendings >> dwShift );
+
+        dwMaxReqs = std::min(
+            dwMaxReqs, RFC_MAX_REQS );
+
+        dwMaxPendings = std::min(
+            dwMaxPendings, RFC_MAX_PENDINGS );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CRpcRouterManager::GetMaxConns(
+    guint32& dwMaxConns ) const
+{
+    gint32 ret = 0;
+    do{
+        if( m_dwMaxConns != 0 )
+        {
+            dwMaxConns = m_dwMaxConns;
+            break;
+        }
+        PortPtr pBus;
+        ret = GetTcpBusPort( pBus );
+        if( ERROR( ret ) )
+            break;
+
+        IPort* pPort = pBus;
+        HANDLE hPort = PortToHandle( pPort );
+        CIoManager* pMgr = GetIoMgr();
+        BufPtr pBuf( true );
+        ret = pMgr->GetPortProp(
+            hPort, propMaxConns, pBuf );
+        if( ERROR( ret ) )
+            break;
+
+        dwMaxConns = *pBuf;
 
     }while( 0 );
 

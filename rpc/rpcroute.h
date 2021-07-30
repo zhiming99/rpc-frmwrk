@@ -28,6 +28,7 @@
 #include "iftasks.h"
 #include "counters.h"
 #include "tractgrp.h"
+#include <list>
 
 #define ROUTER_OBJ_DESC             "./router.json"
 #define ROUTER_OBJ_DESC_AUTH        "./rtauth.json"
@@ -2423,7 +2424,7 @@ class CRpcRouterBridge : public CRpcRouter
 
     gint32 BuildNodeMap();
 
-    #define RFC_HISTORY_LEN     1440
+    #define RFC_HISTORY_LEN     120
     struct REQ_LIMIT
     {
         guint32 dwMaxReqs;
@@ -2435,7 +2436,7 @@ class CRpcRouterBridge : public CRpcRouter
         }
     };
     using HISTORY_ELEM = std::pair< guint64, REQ_LIMIT >;
-    std::deque< HISTORY_ELEM > m_queHistory;
+    std::list< HISTORY_ELEM > m_lstHistory;
 
     protected:
 
@@ -2848,9 +2849,16 @@ class CRpcRouterManager : public CRpcRouter
     guint32   m_dwRole = 1;
     bool      m_bRfc = false;
     TaskletPtr m_pRfcChecker;
+    guint32     m_dwMaxConns = 0;
 
     protected:
     gint32 RebuildMatches();
+
+    gint32 GetMaxConns(
+        guint32& dwMaxConns ) const;
+
+    gint32 GetTcpBusPort(
+        PortPtr& pPort ) const;
 
     public:
     typedef CRpcRouter super;
@@ -2872,6 +2880,17 @@ class CRpcRouterManager : public CRpcRouter
     { return m_bRfc; }
 
     gint32 RefreshReqLimit();
+
+    gint32 SetProperty(
+        gint32 iProp, const CBuffer& oBuf );
+
+    gint32 GetProperty(
+        gint32 iProp, CBuffer& oBuf ) const;
+
+    gint32 GetCurConnLimit(
+        guint32& dwMaxReqs,
+        guint32& dwMaxPendings,
+        bool bNew = false ) const;
 };
 
 DECLARE_AGGREGATED_SERVER(

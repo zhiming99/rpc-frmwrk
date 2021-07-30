@@ -138,13 +138,14 @@ int main( int argc, char** argv)
 extern std::atomic< guint32 > g_dwCounter;
 std::atomic< bool > g_bQueueFull( false );
 std::atomic< guint32 > g_dwReqs( 0 );
+gint32 g_iConcurrency = 0;
 
 gint32 echocli(
     CStressSvc_CliImpl* pIf )
 {
     gint32 ret = 0;
 
-    for( int i = 0; i < 100; i++ )
+    for( int i = 0; i < g_iConcurrency; i++ )
     {
         CParamList oParams;
         guint32 dwIdx = ++g_dwCounter;
@@ -211,7 +212,7 @@ gint32 usage( const char* cmdline )
     fprintf( stderr,
         "Usage: -[pe] %s \n" 
         "\t -p no-reply call test, 10000 cases in parallel\n"
-        "\t -e continously echo test with 100 cases in parallel\n",
+        "\t -e <count> continously echo test with count echos in parallel\n",
         cmdline );
     return 0;
 }
@@ -224,7 +225,7 @@ gint32 maincli(
     int cmd = -1;
     int ret = 0;
     while( ( opt = getopt(
-            argc, argv, "pe" ) ) != -1 )
+            argc, argv, "pe:" ) ) != -1 )
     {
         ret = 0;
         switch (opt)
@@ -236,6 +237,7 @@ gint32 maincli(
             }
         case 'e':
             {
+                g_iConcurrency = atoi( optarg );
                 cmd = 1;
                 break;
             }
