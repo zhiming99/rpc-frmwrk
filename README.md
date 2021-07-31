@@ -39,6 +39,9 @@ This framework depends on the following packags to build:
 
 #### Building `rpc-frmwrk`:   
 Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60) for details.
+#### Installing and Config `rpc-frmwrk`:
+1. Using the config tool to setup the parameters `rpc-frwmrk` requires. [Here](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools/README.md) is the illustration of the configuration tool.
+#### Developing Your Application:
 
 #### Todo:
 1. Request-based flow control
