@@ -40,8 +40,10 @@ This framework depends on the following packags to build:
 #### Building `rpc-frmwrk`:   
 Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60) for details.
 #### Installing and Config `rpc-frmwrk`:
-1. Using the config tool to setup the parameters `rpc-frwmrk` requires. [Here](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools/README.md) is the illustration of the configuration tool.
-#### Developing Your Application:
+1. After you have successfully build `rpc-frmwrk`, type `sudo make install` will install `rpc-frmwrk` to the system.
+2. Using the config tool to setup the parameters `rpc-frwmrk` requires. [Here](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools/README.md) is the illustration of the configuration tool.
+#### Developing applications with `rpc-frmwrk`:
+1. `rpc-frmwrk` has an `interface description languate`, as [`ridl`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md) to help you to generate the skelton code rapidly. Take some time to learn the simple language, and it can save you a lot of time.
 
 #### Todo:
 1. Request-based flow control
