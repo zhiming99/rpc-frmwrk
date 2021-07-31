@@ -36,11 +36,6 @@ namespace rpcf
 
 struct IStream
 {
-    protected:
-    gint32 OnUxStmEvtWrapper(
-        HANDLE hChannel,
-        IConfigDb* pCfg );
-
     public:
     typedef std::map< HANDLE, InterfPtr > UXSTREAM_MAP;
     UXSTREAM_MAP m_mapUxStreams;
@@ -184,6 +179,10 @@ struct IStream
         IEventSink* pCallback );
 
     bool CanSend( HANDLE hChannel );
+
+    gint32 OnUxStmEvtWrapper(
+        HANDLE hChannel,
+        IConfigDb* pCfg );
 };
 
 struct IStreamServer : public IStream

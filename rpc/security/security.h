@@ -648,6 +648,13 @@ class CRpcReqForwarderAuth :
     virtual gint32 ClearRefCountByPortId(
         guint32 dwPortId,
         std::vector< std::string >& vecUniqNames );
+
+    gint32 OnPostStart(
+        IEventSink* pCallback ) override;
+
+    gint32 OnPreStop(
+        IEventSink* pCallback ) override;
+
 };
 
 struct CRpcRouterAuthShared
@@ -901,6 +908,8 @@ class CRpcRouterReqFwdrAuth :
         guint32 dwPortId,
         const std::string& strSrcUniqName,
         const std::string& strSrcDBusName );
+
+    gint32 StopProxyNoRef( guint32 dwPortId );
 };
 
 class CRpcRouterBridgeAuth :

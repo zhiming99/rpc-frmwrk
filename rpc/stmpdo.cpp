@@ -646,6 +646,16 @@ gint32 CRpcTcpBusPort::GetProperty(
             ret = -ENOENT;
             break;
         }
+    case propMaxConns:
+        {
+            oBuf = GetMaxConns();
+            break;
+        }
+    case propConnections:
+        {
+            oBuf = GetConnections();
+            break;
+        }
     default:
         {
             ret = super::GetProperty(
@@ -669,6 +679,22 @@ gint32 CRpcTcpBusPort::SetProperty(
             ret = -ENOTSUP;
             break;
         }
+    case propMaxConns:
+        {
+            guint32& dwConn = oBuf;
+            if( dwConn == 0 || dwConn > 10000 )
+            {
+                ret = -EINVAL;
+                break;
+            }
+            SetMaxConns( dwConn );
+            break;
+        }
+    case propConnections:
+        {
+            ret = -EINVAL;
+            break;
+        }
     default:
         {
             ret = super::SetProperty(
@@ -683,8 +709,36 @@ gint32 CRpcTcpBusPort::CreateMLoopPool()
 {
     gint32 ret = 0; 
     do{
-        guint32 dwCount =
-            GetIoMgr()->GetNumCores();
+        CIoManager* pMgr = GetIoMgr();
+        guint32 dwCount = 1;
+
+        guint32 dwRole = 2;
+        ret = pMgr->GetCmdLineOpt(
+            propRouterRole, dwRole );
+
+        if( ERROR( ret ) )
+            ret = 0;
+
+        bool bMultiLoop = false;
+        if( dwRole & 0x2 )
+            bMultiLoop = true;
+        else if( dwRole & 1 )
+        {
+            bool bSepConn = false;
+            ret = pMgr->GetCmdLineOpt(
+                propSepConns, bSepConn );
+            if( SUCCEEDED( ret ) )
+                bMultiLoop = bSepConn;
+            else
+                ret = 0;
+        }
+
+        if( bMultiLoop )
+        {
+            dwCount =
+                pMgr->GetNumCores() >> 1;
+        }
+
         for( int i = 0; i < dwCount; ++i )
         {
             CParamList oCfg;
@@ -815,20 +869,6 @@ gint32 CRpcTcpBusPort::PreStart( IRP* pIrp )
         m_bRfc = bRfc;
         if( !m_bRfc )
             break;
-
-        guint32 dwRole = 2;
-        ret = pMgr->GetCmdLineOpt(
-            propRouterRole, dwRole );
-
-        if( ERROR( ret ) )
-            ret = 0;
-
-        if( ( dwRole & 2 ) == 0 )
-        {
-            // not a bridge
-            m_bRfc = false;
-            break;
-        }
 
         ret = CreateMLoopPool();
         if( ERROR( ret ) )

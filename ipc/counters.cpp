@@ -153,7 +153,7 @@ gint32 CStatCountersServer::IncCounter(
     else
         m_mapCounters[ iProp ] = dwCount;
 
-    return dwCount;
+    return STATUS_SUCCESS;
 }
 
 gint32 CStatCountersServer::GetCounter2( 

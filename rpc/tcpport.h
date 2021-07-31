@@ -1197,8 +1197,11 @@ class CRpcTcpBusPort :
     virtual gint32 PreStart( IRP* pIrp ) override;
     virtual gint32 PostStop( IRP* pIrp ) override;
 
-    guint32 GetMaxConns() const
+    inline guint32 GetMaxConns() const
     { return m_dwConns; }
+
+    inline void SetMaxConns( guint32 dwConns )
+    { m_dwConns = dwConns; }
 
     guint32 GetConnections() const
     { return m_mapIdToAddr.size(); }

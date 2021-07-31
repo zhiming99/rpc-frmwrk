@@ -253,6 +253,9 @@ enum EnumPropId : gint32
     propMaxReqs,        // type: a guint32 to specify the max requests in process concurrently this router allows
     propMaxPendings,    // type: a guint32 to specify the max requests queued or in process by this router
     propEnableRfc,      // type: a bool to enable/disable request-based flow control
+    propSepConns,       // type: a bool with `true' to have the reqfwdr to establish connections to the remote bridge.
+    propTaskSched,      // type: a string to indicate the type of task scheduler, currently only "RR" for round-robin.
+    propConnections,    // type: a guint32 to specify the connections the router has at the moment
 
     propReservedEnd = 0x10000000,
     propInvalid = -1, 
