@@ -350,6 +350,10 @@ class ConfigDlg(Gtk.Dialog):
                         ifCfg[ "DestURL" ]= "https://www.example.com";
                         connparams = [ ifCfg, ]
                     confVals[ "connParams"] = [ *connParams ]
+                    maxConns = port[ "MaxConnections" ]
+                    if maxConns is None :
+                        maxConns = "512"
+                    confVals[ "MaxConnections" ] = maxConns
             except Exception as err :
                 pass
 
@@ -360,7 +364,8 @@ class ConfigDlg(Gtk.Dialog):
 
         for svrObj in svrObjs :
             try:
-                if svrObj[ 'ObjectName'] == 'RpcRouterBridgeAuthImpl' :
+                objName = svrObj[ 'ObjectName' ]
+                if objName == 'RpcRouterBridgeAuthImpl' :
                     if 'AuthInfo' in svrObj :
                         confVals[ 'AuthInfo'] = svrObj[ 'AuthInfo']
                     else :
@@ -374,6 +379,11 @@ class ConfigDlg(Gtk.Dialog):
                     else :
                         confVals[ 'LBGroup' ] = []
                     break
+
+                elif objName == 'RpcReqForwarderAuthImpl' :
+                    if 'TaskScheduler' in svrObj :
+                        confVals[ 'TaskScheduler' ] = svrObj[ 'TaskScheduler' ]
+
             except Exception as err :
                 pass
         
@@ -558,6 +568,8 @@ class ConfigDlg(Gtk.Dialog):
         self.AddSSLCred( grid, startCol, row, confVals )
         row = GetGridRows( grid )
         self.AddAuthCred( grid, startCol, row, confVals )
+        row = GetGridRows( grid )
+        self.AddMiscOptions( grid, startCol, row, confVals )
 
     def AddNode( self, grid:Gtk.Grid, i ) :
         try:
@@ -1454,6 +1466,44 @@ class ConfigDlg(Gtk.Dialog):
         self.kdcEdit = kdcEditBox
         self.userEdit = userEditBox
 
+    def AddMiscOptions( self, grid:Gtk.Grid, startCol, startRow, confVals : dict ) :
+        labelMisc = Gtk.Label()
+        labelMisc.set_markup("<b>Misc Options</b>")
+        labelMisc.set_xalign(.5)
+        grid.attach(labelMisc, startCol + 1, startRow + 0, 1, 1 )
+
+        labelMaxConns = Gtk.Label()
+        labelMaxConns.set_text("Max Connections: ")
+        labelMaxConns.set_xalign(.5)
+        grid.attach( labelMaxConns, startCol + 0, startRow + 1, 1, 1 )
+
+        strMaxConns = ""
+        if 'MaxConnections' in confVals :
+            strMaxConns = confVals[ 'MaxConnections']
+        else :
+            strMaxConns = str( 512 )
+
+        maxconnEdit = Gtk.Entry()
+        maxconnEdit.set_text(strMaxConns)
+        grid.attach( maxconnEdit , startCol + 1, startRow + 1, 1, 1 )
+    
+        labelTs = Gtk.Label()
+        labelTs.set_text("Task Scheduler ")
+        labelTs.set_xalign(.5)
+        grid.attach( labelTs, startCol + 0, startRow + 2, 1, 1 )
+        self.maxconnEdit = maxconnEdit
+
+        tsCheck = Gtk.CheckButton(label="")
+        if 'TaskScheduler' in confVals :
+            tsCheck.props.active = True
+        else:
+            tsCheck.props.active = False
+
+        tsCheck.connect(
+            "toggled", self.on_button_toggled, "TaskSched")
+        grid.attach( tsCheck, startCol + 1, startRow + 2, 1, 1)
+        self.tsCheck = tsCheck
+ 
     def on_sign_msg_changed(self, combo) :
         tree_iter = combo.get_active_iter()
         if tree_iter is not None:
@@ -1679,6 +1729,11 @@ class ConfigDlg(Gtk.Dialog):
 
                 if port[ 'PortClass'] == 'RpcTcpBusPort' :
                     confVals = port[ 'Parameters']
+                    try:
+                        iVal = int( self.maxconnEdit.get_text() );
+                    except Exception as err :
+                        iVal = 512
+                    port[ 'MaxConnections' ] = str( iVal );
 
             ifs = []
             for elem in self.ifctx :
@@ -1737,7 +1792,8 @@ class ConfigDlg(Gtk.Dialog):
             authInfo = dict()
             if svrObjs is not None and len( svrObjs ) > 0 :
                 for svrObj in svrObjs :
-                    if svrObj[ 'ObjectName'] == 'RpcRouterBridgeAuthImpl' :
+                    objName = svrObj[ 'ObjectName']
+                    if objName == 'RpcRouterBridgeAuthImpl' :
                         if len( self.realmEdit.get_text() ) == 0:
                             break
                         authInfo[ 'Realm' ] = self.realmEdit.get_text()
@@ -1755,10 +1811,14 @@ class ConfigDlg(Gtk.Dialog):
                         svrObj[ 'AuthInfo'] = authInfo
                         svrObj[ 'LBGroup' ] = lbCfgs
                         self.ExportNodeCtxs();
-                    elif svrObj[ 'ObjectName'] == 'RpcRouterManagerImpl' :
-                        if not 'MaxRequests' in svrObj:
-                            svrObj[ 'MaxRequests' ] = str( 512 * 8 )
+                    elif objName == 'RpcRouterManagerImpl' :
+                        if not 'MaxPendingRequests' in svrObj:
                             svrObj[ 'MaxPendingRequests' ] = str( 512 * 16 )
+                    elif objName == 'RpcReqForwarderAuthImpl' :
+                        if self.tsCheck.props.active :
+                            svrObj[ 'TaskScheduler' ] = "RR"
+                        elif 'TaskScheduler' in svrObj:
+                            del svrObj[ 'TaskScheduler' ]
 
             rtauPath = path + '/rtauth.json'
             fp = open(rtauPath, "w")
@@ -1790,8 +1850,7 @@ class ConfigDlg(Gtk.Dialog):
                         svrObj[ 'LBGroup' ] = lbCfgs
 
                     elif svrObj[ 'ObjectName'] == 'RpcRouterManagerImpl' :
-                        if not 'MaxRequests' in svrObj:
-                            svrObj[ 'MaxRequests' ] = str( 512 * 8 )
+                        if not 'MaxPendingRequests' in svrObj:
                             svrObj[ 'MaxPendingRequests' ] = str( 512 * 16 )
 
             rtPath = path + '/router.json'

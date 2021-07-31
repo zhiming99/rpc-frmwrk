@@ -1,0 +1,53 @@
+{
+    "ClassFactories" : [],
+    "Objects" : 
+    [
+        {
+            "AuthInfo-1" : 
+            {
+                "AuthMech" : "krb5",
+                "Realm" : "rpcf.org",
+                "ServiceName" : "rasp1@rpcf.org",
+                "SignMessage" : "true",
+                "UserName" : "zhiming@rpcf.org"
+            },
+            "BusName" : "DBusBusPort_0",
+            "Compression" : "true",
+            "EnableSSL" : "false",
+            "EnableWS" : "false",
+            "Interfaces" : 
+            [
+                {
+                    "BindToClsid" : "true",
+                    "DummyInterface" : "true",
+                    "InterfaceName" : "CStressSvc_SvrImpl"
+                },
+                {
+                    "InterfaceName" : "IInterfaceServer"
+                },
+                {
+                    "InterfaceName" : "IUnknown"
+                },
+                {
+                    "InterfaceName" : "IStream"
+                },
+                {
+                    "InterfaceName" : "IEchoThings"
+                }
+            ],
+            "IpAddress" : "192.168.3.57",
+            "PortNumber" : "4132",
+            "KeepAliveTimeoutSec" : "60",
+            "ObjectName" : "StressSvc",
+            "PortClass" : "DBusLocalPdo",
+            "PortId" : "0",
+            "ProxyPortClass" : "DBusProxyPdo",
+            "ProxyPortClass-1" : "DBusLocalPdo",
+            "QueuedRequests" : "false",
+            "RequestTimeoutSec" : "120",
+            "RouterPath" : "/"
+        }
+    ],
+    "ServerName" : "StressTest",
+    "Version" : "1.0"
+}

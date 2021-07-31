@@ -1,0 +1,121 @@
+{
+    "Arch" : 
+    {
+        "Processors" : "8"
+    },
+    "Drivers" : 
+    [
+        {
+            "BusClass" : "DBusBus",
+            "Description" : "This is a bus driver, and the port it creats is the DBusBusPort",
+            "DriverName" : "DBusBusDriver",
+            "DriverType" : "BusDriver",
+            "InternalClass" : "CDBusBusDriver",
+            "PortClasses" : [ "DBusBusPort" ]
+        },
+        {
+            "Description" : "This is a function port driver, and the port it creats is the DBusProxyFdo",
+            "DriverName" : "ProxyFdoDriver",
+            "DriverType" : "PortDriver",
+            "InternalClass" : "CProxyFdoDriver",
+            "PortClasses" : [ "DBusProxyFdo" ]
+        },
+        {
+            "BusClass" : "UnixSockBus",
+            "Description" : "This is a bus driver for unix stream sock, and the port it creats is the UnixSockBusPort",
+            "DriverName" : "UnixSockBusDriver",
+            "DriverType" : "BusDriver",
+            "InternalClass" : "CUnixSockBusDriver",
+            "PortClasses" : [ "UnixSockBusPort" ]
+        }
+    ],
+    "Match" : 
+    [
+        {
+            "FdoDriver" : "",
+            "PortClass" : "DBusLocalPdo"
+        },
+        {
+            "FdoDriver" : "ProxyFdoDriver",
+            "PortClass" : "DBusProxyPdoLpbk"
+        },
+        {
+            "FdoDriver" : "ProxyFdoDriver",
+            "PortClass" : "DBusProxyPdo"
+        },
+        {
+            "FdoDriver" : "",
+            "PortClass" : "UnixSockStmPdo"
+        }
+    ],
+    "Modules" : 
+    [
+        {
+            "DriversToLoad" : [ "DBusBusDriver", "UnixSockBusDriver" ],
+            "ModName" : "PyRpcProxy"
+        },
+        {
+            "DriversToLoad" : [ "DBusBusDriver", "UnixSockBusDriver" ],
+            "ModName" : "PyRpcServer"
+        },
+        {
+            "DriversToLoad" : [ "DBusBusDriver", "UnixSockBusDriver" ],
+            "ModName" : "StressTestsvr"
+        },
+        {
+            "DriversToLoad" : [ "DBusBusDriver", "UnixSockBusDriver" ],
+            "ModName" : "StressTestcli"
+        }
+    ],
+    "Ports" : 
+    [
+        {
+            "BusPortClass" : "DBusBusPort",
+            "InternalClass" : "CDBusLocalPdo",
+            "PortClass" : "DBusLocalPdo",
+            "PortDriver" : "",
+            "PortType" : "Pdo"
+        },
+        {
+            "BusPortClass" : "DBusBusPort",
+            "InternalClass" : "CDBusLoopbackPdo",
+            "PortClass" : "DBusLoopbackPdo",
+            "PortDriver" : "",
+            "PortType" : "Pdo"
+        },
+        {
+            "BusPortClass" : "DBusBusPort",
+            "InternalClass" : "CDBusProxyPdo",
+            "PortClass" : "DBusProxyPdo",
+            "PortDriver" : "",
+            "PortType" : "Pdo"
+        },
+        {
+            "BusPortClass" : "DBusBusPort",
+            "InternalClass" : "CDBusProxyPdoLpbk",
+            "PortClass" : "DBusProxyPdoLpbk",
+            "PortDriver" : "",
+            "PortType" : "Pdo"
+        },
+        {
+            "InternalClass" : "CDBusProxyFdo",
+            "PortClass" : "DBusProxyFdo",
+            "PortDriver" : "ProxyFdoDriver",
+            "PortType" : "Fdo"
+        },
+        {
+            "BusPortClass" : "UnixSockBusPort",
+            "InternalClass" : "CUnixSockStmPdo",
+            "PortClass" : "UnixSockStmPdo",
+            "PortDriver" : "",
+            "PortType" : "Pdo"
+        },
+        {
+            "InternalClass" : "CUnixSockBusPort",
+            "PortClass" : "UnixSockBusPort",
+            "PortDriver" : "UnixSockBusDriver",
+            "PortType" : "Fdo"
+        }
+    ],
+    "Version" : "1.0"
+}
