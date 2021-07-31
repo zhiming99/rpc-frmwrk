@@ -168,8 +168,12 @@ gint32 CRpcReqForwarder::CreateGrpRfc(
         oParams.SetPointer( propIfPtr, this );
         oParams[ propSrcUniqName ] = strUniqName;
         oParams[ propPrxyPortId ] = dwPortId;
-        oParams[ propMaxReqs ] = 0;
         oParams[ propMaxPendings ] = RFC_MAX_PENDINGS;
+
+        if( !m_pScheduler.IsEmpty() )
+            oParams[ propMaxReqs ] = 0;
+        else
+            oParams[ propMaxReqs ] = RFC_MAX_REQS;
 
         ret = pGrp.NewObj(
             clsid( CIfParallelTaskGrpRfc2 ),
