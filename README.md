@@ -52,7 +52,7 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 ---
 [`Mon Jul 31 2021 10:23:00 AM Beijing`]   
 1. Made the connection limiter to work. Time to merge the `rfcdev` to the master branch.
-2. Will add some config options to the config dialog, to wrap up `rfcdev`.
+2. Will add some config options to the config dialog, to wrap up `rfcdev`. It is not perfect yet, since `rfc` is now just a concurrency limiter, to be a complete flow controller, we still need some work on traffics of each individual connection. But so far, let's leave this issue behind till it cannot be ignored.
 3. Next, we will move on to develop the python's generator.
 
 [`Mon Jul 26 2021 08:20:46 PM Beijing`]   
