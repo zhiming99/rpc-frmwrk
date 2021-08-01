@@ -1943,20 +1943,28 @@ class ConfigDlg(Gtk.Dialog):
     def UpdateConfig( self ) :
         path = '/tmp'
         err = self.ExportFiles( path )
+        path += '/'
+        files = [ 'driver.json', 'router.json', 'rtauth.json',
+            'authprxy.json' ]
         if err < 0 :
+            for i in files :
+                try:
+                    os.remove( path + i )
+                except Exception as oErr :
+                    pass
             return err
-        try:
-            move( path + '/driver.json', self.jsonFiles[ 0 ][ 0 ] )
-            move( path + '/router.json', self.jsonFiles[ 1 ][ 0 ] )
-            move( path + '/rtauth.json', self.jsonFiles[ 2 ][ 0 ] )
-            move( path + '/authprxy.json', self.jsonFiles[ 3 ][ 0 ] )
-        except Exception as err :
-            text = "Failed to export files:" + str( err )
-            exc_type, exc_obj, exc_tb = sys.exc_info()
-            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-            second_text = "@" + fname + ":" + str(exc_tb.tb_lineno)
-            self.DisplayError( text, second_text )
-            return -1
+
+        for i in files :
+            try:
+                move( path + i, self.jsonFiles[ 0 ][ 0 ] )
+            except Exception as oErr :
+                text = "Failed to export files:" + str( oErr )
+                exc_type, exc_obj, exc_tb = sys.exc_info()
+                fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+                second_text = "@" + fname + ":" + str(exc_tb.tb_lineno)
+                self.DisplayError( text, second_text )
+                return -1
+
         return 0
         
 class LBGrpEditDlg(Gtk.Dialog):

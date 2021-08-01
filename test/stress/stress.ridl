@@ -1,4 +1,4 @@
-// must have statement
+// a must-have statement
 appname "StressTest";
 
 const auth_json=```
@@ -14,20 +14,20 @@ const auth_json=```
 // echo different type of information
 interface IEchoThings
 {
-    // both proxy and server are asynchronous,
-    // that is return STATUS_PENDING if the
-    // request is not complete yet
+    // proxy side is asynchronous, while server
+    // side is synchronous
     [ async_p ]Echo( string strText )
         returns ( string strResp ) ;
 
-    // proxy side is asynchronous, while server
-    // side is synchronous
+    // synchronous method on both side
     EchoUnknown( bytearray pBuf )
         returns ( bytearray pResp );
 
+    // a noreply request from client to server
     [ noreply ]Ping( string strCount )
         returns ();
-    // a event from server to the proxy, response
+
+    // an event from server to the proxy, response
     // list is alway empty and the server gets no
     // feedback related to the proxy.
     [ event ]OnHelloWorld( string strMsg ) returns ();
