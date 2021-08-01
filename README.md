@@ -41,7 +41,7 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 2. [`Here`](https://github.com/zhiming99/rpc-frmwrk/tree/master/test/stress) is an example of `ridlc` generated project.
 
 #### Dependency:  
-This framework depends on the following packags to build:  
+This project depends on the following 3rd-party packags to build:  
 1. `dbus-1.0 (dbus-devel)`
 2. `libjson-cpp (jsoncpp-devel)` 
 3. `lz4 (lz4-devel)`   
