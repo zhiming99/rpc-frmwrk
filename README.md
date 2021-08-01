@@ -29,9 +29,13 @@ This is an asynchronous and event-driven RPC implementation for embeded system w
 
 #### Building `rpc-frmwrk`:   
 Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60) for details.
-#### Installation and Configuration:
-1. After you have successfully build `rpc-frmwrk`, typing `sudo make install` will install `rpc-frmwrk` to the system.
-2. Using the config tool to setup the parameters `rpc-frwmrk` requires. [Here](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools/README.md) is the illustration of the configuration tool.
+#### Deployment:
+1. Using the config tool to setup the parameters `rpc-frwmrk` requires. [Here](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools/README.md) is the illustration of the configuration tool.
+2. After you have successfully build `rpc-frmwrk`, typing `sudo make install` will install `rpc-frmwrk` to the system.
+4. On the server side, start the daemon `rpcrouter -r 2`, and on the client side, start daemon `rpcrouter -r 1` as the final setup step.
+5. Also on server side, start the `helloworld` server, and on the client side, start the `helloworld` client. 
+6. Please refer to this [article](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-get-Helloworld-run%3F) for more information.
+
 #### Development And Examples:
 1. `rpc-frmwrk` has an `interface description language`, as [`ridl`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md) to help you to generate the skelton code rapidly. It is recommended to take some time to learn this simple language, and it may save you a lot of time.
 2. [`Here`](https://github.com/zhiming99/rpc-frmwrk/tree/master/test/stress) is an example of `ridlc` generated project.
