@@ -6,17 +6,6 @@ This is an asynchronous and event-driven RPC implementation for embeded system w
 #### Concept:
 [`Here`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md) is an introduction about some concepts that help to understand this project.
 
-#### Dependency:  
-This framework depends on the following packags to build:  
-1. `dbus-1.0 (dbus-devel)`
-2. `libjson-cpp (jsoncpp-devel)` 
-3. `lz4 (lz4-devel)`   
-4. `cppunit-1 (for the test cases, cppunit and cppunit-devel)`   
-5. `openssl-1.1 for SSL communication. ( openssl-devel, optional )`
-6. `MIT krb5 for authentication and access control. ( rpm: krb5-libs, krb5-devel, or deb: libkrb5-3, libkrb5-dev )`
-7. `c++11 is required, and make sure the GCC is 5.x or higher.`
-8. `python 3.5+ is required for python support.`
-
 #### Features:   
 1. `Support for multiple interfaces on a single object (COM alike).`   
 2. `Support for synchronous/asynchronous requests handling from both sides.`   
@@ -36,6 +25,7 @@ This framework depends on the following packags to build:
 16. [`Node Redudancy/Load Balance`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md#load-balance--node-redudancy)
 17. [`A mulit-lang proxy/server code generator`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md)
 18. [`A GUI config tool for rpcrouter`](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools/README.md)
+19. `Request-based flow control`
 
 #### Building `rpc-frmwrk`:   
 Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60) for details.
@@ -46,14 +36,24 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 1. `rpc-frmwrk` has an `interface description languate`, as [`ridl`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md) to help you to generate the skelton code rapidly. Take some time to learn the simple language, and it can save you a lot of time.
 2. [`Here`](https://github.com/zhiming99/rpc-frmwrk/tree/master/test/stress) is an example of `ridlc` generated project.
 
+#### Dependency:  
+This framework depends on the following packags to build:  
+1. `dbus-1.0 (dbus-devel)`
+2. `libjson-cpp (jsoncpp-devel)` 
+3. `lz4 (lz4-devel)`   
+4. `cppunit-1 (for the test cases, cppunit and cppunit-devel)`   
+5. `openssl-1.1 for SSL communication. ( openssl-devel, optional )`
+6. `MIT krb5 for authentication and access control. ( rpm: krb5-libs, krb5-devel, or deb: libkrb5-3, libkrb5-dev )`
+7. `c++11 is required, and make sure the GCC is 5.x or higher.`
+8. `python 3.5+ is required for python support.`
+
 #### Todo:
-1. Request-based flow control
-2. Python code generator
-3. Java support
-4. Examples and Tutorials
-5. Access Control
-6. A tree-like hierarchical persistant registry.
-7. Logging service
+1. Python code generator
+2. Java support
+3. Examples and Tutorials
+4. Access Control
+5. A tree-like hierarchical persistant registry.
+6. Logging service
 
 ---
 [`Mon Jul 31 2021 10:23:00 AM Beijing`]   
