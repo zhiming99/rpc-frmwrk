@@ -33,7 +33,7 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 1. After you have successfully build `rpc-frmwrk`, typing `sudo make install` will install `rpc-frmwrk` to the system.
 2. Using the config tool to setup the parameters `rpc-frwmrk` requires. [Here](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools/README.md) is the illustration of the configuration tool.
 #### Development And Examples:
-1. `rpc-frmwrk` has an `interface description languate`, as [`ridl`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md) to help you to generate the skelton code rapidly. Take some time to learn the simple language, and it can save you a lot of time.
+1. `rpc-frmwrk` has an `interface description language`, as [`ridl`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md) to help you to generate the skelton code rapidly. It is recommended to take some time to learn this simple language, and it may save you a lot of time.
 2. [`Here`](https://github.com/zhiming99/rpc-frmwrk/tree/master/test/stress) is an example of `ridlc` generated project.
 
 #### Dependency:  
