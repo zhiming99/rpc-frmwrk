@@ -32,8 +32,8 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 #### Deployment:
 1. Using the config tool to setup the parameters `rpc-frwmrk` requires. [Here](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools/README.md) is the illustration of the configuration tool.
 2. After you have successfully build `rpc-frmwrk`, typing `sudo make install` will install `rpc-frmwrk` to the system.
-4. On the server side, start the daemon `rpcrouter -r 2`, and on the client side, start daemon `rpcrouter -r 1` as the final setup step.
-5. Also on server side, start the `helloworld` server, and on the client side, start the `helloworld` client. 
+4. On the server side, start the daemon process `rpcrouter -r 2`, and on the client side, start daemon process `rpcrouter -r 1` as the final setup step.
+5. And now on server side, start the `helloworld` server, and on the client side, start the `helloworld` client. 
 6. Please refer to this [article](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-get-Helloworld-run%3F) for more information.
 
 #### Development And Examples:
