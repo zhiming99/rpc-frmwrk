@@ -6532,6 +6532,9 @@ gint32 CExportObjDesc::Output()
         stdstr strDesc = m_pWriter->GetCurFile();
         stdstr strSrcPy;
 
+        strDesc = std::string( "./" ) +
+            basename( strDesc.c_str() );
+
         ret = FindInstCfg( "synccfg.py", strSrcPy );
         if( ERROR( ret ) )
         {
