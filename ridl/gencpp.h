@@ -59,6 +59,9 @@ struct CFileSet
     gint32 OpenFiles();
     gint32 AddSvcImpl( const std::string& strSvcName );
     ~CFileSet();
+
+    const stdstr& GetOutPath() const
+    { return m_strPath; }
 };
 
 
@@ -157,6 +160,12 @@ struct CWriterBase
     {
         return m_pFiles->AddSvcImpl( strSvcName );
     }
+
+    const stdstr& GetCurFile() const
+    { return m_strCurFile; }
+
+    const stdstr& GetOutPath() const
+    { return m_pFiles->GetOutPath(); }
 };
 
 class CCppWriter : public CWriterBase

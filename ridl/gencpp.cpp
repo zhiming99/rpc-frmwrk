@@ -6524,6 +6524,44 @@ gint32 CExportObjDesc::Output()
         pWriter->write( oVal, m_pWriter->m_curFp );
         m_pWriter->m_curFp->flush();
 
+        // output a python tool for syncing the
+        // config paramters with the system
+        // settings
+        stdstr strDstPy = m_pWriter->GetOutPath();
+        strDstPy += "/synccfg.py";
+        stdstr strDesc = m_pWriter->GetCurFile();
+        stdstr strSrcPy;
+
+        ret = FindInstCfg( "synccfg.py", strSrcPy );
+        if( ERROR( ret ) )
+        {
+            ret = 0;
+            break;
+        }
+
+        stdstr strObjList;
+        for( int i = 0; i < vecSvcs.size(); i++ )
+        {
+            auto elem = vecSvcs[ i ];
+            CServiceDecl* psd = elem;
+            if( psd == nullptr )
+                continue;
+
+            stdstr strObjName = psd->GetName();
+            strObjList += "'" + strObjName + "'";
+            if( i < vecSvcs.size() - 1 )
+                strObjList += ",";
+        }
+
+        stdstr strCmdLine = "sed \"s:XXXDESTDIR:";
+        strCmdLine += strDesc + ":;" +
+            "s:XXXOBJLIST:" + strObjList +
+            ":;\" " + strSrcPy + " > " +
+            strDstPy;
+
+        printf( "%s\n", strCmdLine.c_str() );
+        system( strCmdLine.c_str() );
+
     }while( 0 );
 
     return ret;
