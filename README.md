@@ -25,15 +25,14 @@ This is an asynchronous and event-driven RPC implementation for embeded system w
 16. [`Node Redudancy/Load Balance`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md#load-balance--node-redudancy)
 17. [`A mulit-lang proxy/server code generator`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md)
 18. [`A GUI config tool for rpcrouter`](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools/README.md)
-19. `Concurrency Limiter`
 
 #### Building `rpc-frmwrk`:   
 Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60) for details.
 #### Deployment:
 1. Using the config tool to setup the parameters `rpc-frwmrk` requires. [Here](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools/README.md) is the illustration of the configuration tool.
 2. After you have successfully build `rpc-frmwrk`, typing `sudo make install` will install `rpc-frmwrk` to the system.
-4. On the server side, start the daemon `rpcrouter -r 2`, and on the client side, start daemon `rpcrouter -r 1` as the final setup step.
-5. Also on server side, start the `helloworld` server, and on the client side, start the `helloworld` client. 
+4. On the server side, start the daemon process `rpcrouter -r 2`, and on the client side, start daemon process `rpcrouter -r 1` as the final setup step.
+5. And now on server side, start the `helloworld` server, and on the client side, start the `helloworld` client. About `rpcrouter`, please follow this [link](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/router/README.md).
 6. Please refer to this [article](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-get-Helloworld-run%3F) for more information.
 
 #### Development And Examples:
