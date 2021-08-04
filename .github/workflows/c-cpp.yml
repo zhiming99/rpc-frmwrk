@@ -27,4 +27,6 @@ jobs:
       run: make
     - name: install
       run: sudo make install
+    - name: testing
+      run: dbus-run-session sh tools/runtest
 
