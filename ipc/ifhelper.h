@@ -34,7 +34,7 @@ namespace rpcf
 #define ValType( _T ) typename std::remove_cv< typename std::remove_pointer< typename std::decay< _T >::type >::type>::type
 
 template< typename T >
-inline guint32 GetTypeSize( T* pT )
+inline guint32 GetTypeSize( T* )
 { return sizeof( T ); }
 
 // cast to stdstr temporary
@@ -545,7 +545,7 @@ class CMethodProxy :
     }
 };
 
-#define UNREFERENCED( a ) ( a )
+#define UNREFERENCED( a ) (void)( a )
 #define BEGIN_PROXY_MAP_COMMON( bNonDBus, _iIfId_, _pIf ) \
 do{ \
     CCfgOpenerObj oCfg( _pIf ); \
@@ -558,7 +558,7 @@ do{ \
     PROXY_MAP _oAnon_; \
     PROXY_MAP* _pMapProxies_ = &_oAnon_; \
     bool _bNonBus_ = bNonDBus; \
-    UNREFERENCED( _bNonBus_ = !!_bNonBus_ ); \
+    UNREFERENCED( _bNonBus_ ); \
     PROXY_MAP* _pMap_ = nullptr; \
     do{ \
         _pMap_ = _pIf->GetProxyMap( _iIfId_ ); \
@@ -624,7 +624,7 @@ do{ \
     PROXY_MAP _oAnon_; \
     PROXY_MAP* _pMapProxies_ = &_oAnon_; \
     bool _bNonBus_ = bNonDBus; \
-    UNREFERENCED( _bNonBus_ = !!_bNonBus_ ); \
+    UNREFERENCED( _bNonBus_ ); \
     PROXY_MAP* _pMap_ = nullptr; \
     do{ \
         _pMap_ = _pIf->GetProxyMap( _iIfId_ ); \

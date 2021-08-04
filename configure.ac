@@ -30,6 +30,7 @@ AC_LANG([C++])
 
 AC_CHECK_PROG([python3], python3, yes)
 AC_CHECK_PROG([sipbuild], [sip-build], yes)
+AC_CHECK_PROG([sip4], [sip], yes)
 LT_INIT
 
 # Checks for libraries.
@@ -204,6 +205,7 @@ AC_ARG_ENABLE([testcases],
 
 AM_CONDITIONAL([ENABLE_TESTCASES],[test "$enable_testcases" = "yes"])
 AM_CONDITIONAL([SIPBUILD],[test x$ac_cv_prog_sipbuild = xyes])
+AM_CONDITIONAL([SIP4],[test x$ac_cv_prog_sip4 = xyes])
 
 VERSION2='$(subst .,:,$(VERSION))'
 AC_SUBST(VERSION2)

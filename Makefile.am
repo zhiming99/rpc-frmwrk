@@ -9,6 +9,10 @@ if SIPBUILD
 SUBDIRS += python
 endif
 
+if SIP4                                                                 
+SUBDIRS += python                                                       
+endif                          
+
 EXTRA_DIST= README.md cfgdbg
 
 dist_pkgconfig_DATA=rpcf.pc

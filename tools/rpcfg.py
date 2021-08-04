@@ -323,7 +323,11 @@ class ConfigDlg(Gtk.Dialog):
         if len( jsonFiles ) == 0 :
             return None
         drvVal = jsonFiles[ 0 ][1]
-        ports = drvVal['Ports']
+        if 'Ports' in drvVal :
+            ports = drvVal['Ports']
+        else :
+            return None
+
         for port in ports :
             try:
                 if port[ 'PortClass'] == 'RpcOpenSSLFido' :
