@@ -6,7 +6,7 @@ config=sipconfig.Configuration()
 
 #os.system( "rm ./sip4build/*" )
 os.system( " ".join([config.sip_bin, "-c", "./sip4build", "-b", build_file, "rpcf.sip" ] ) )
-makefile = sipconfig.SIPModuleMakefile(config, build_file)
+makefile = sipconfig.SIPModuleMakefile(config, build_file, export_all=1)
 makefile.dir = "./sip4build"
 makefile.extra_libs = ["combase", "ipc" ]
 makefile.extra_defines = ["DEBUG","_USE_LIBEV" ]

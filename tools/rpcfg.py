@@ -1958,9 +1958,11 @@ class ConfigDlg(Gtk.Dialog):
                     pass
             return err
 
+        k = 0
         for i in files :
             try:
-                move( path + i, self.jsonFiles[ 0 ][ 0 ] )
+                move( path + i, self.jsonFiles[ k ][ 0 ] )
+                k += 1
             except Exception as oErr :
                 text = "Failed to export files:" + str( oErr )
                 exc_type, exc_obj, exc_tb = sys.exc_info()
