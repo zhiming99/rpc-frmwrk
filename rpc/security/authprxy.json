@@ -1,114 +1,110 @@
 {
-    "comments" : "this file for the proxy only. The server object is hosted in the CRpcRouterBridgeAuthImpl",
-    "Version" : "1.0",
+    "comments": "this file for the proxy only. The server object is hosted in the CRpcRouterBridgeAuthImpl",
+    "Version": "1.0",
     "ServerName": "K5AuthServer",
-    "Objects" :
-    [
+    "Objects": [
         {
             "ObjectName": "K5AuthServer",
-            "BusName" : "DBusBusPort_0",
+            "BusName": "DBusBusPort_0",
             "PortClass": "DBusLocalPdo",
-            "PortId" : "0",
-            "RequestTimeoutSec" : "120",
-            "KeepAliveTimeoutSec" : "60",
-            "QueuedRequests" : "false",
+            "PortId": "0",
+            "RequestTimeoutSec": "120",
+            "KeepAliveTimeoutSec": "60",
+            "QueuedRequests": "false",
             "ProxyPortClass": "DBusProxyPdo",
-            "comment-1" : "IpAddress is the ip address of the server",
-            "IpAddress" : "192.168.3.13",
-            "Compression" : "true",
-            "EnableSSL" : "true",
-            "EnableWS" : "false",
-            "RouterPath" : "/",
-            "note-1" : "the AuthInfo for this object is determined at runtime",
-            "HasAuth"  : "true",
-            "RemoteModName" : "rpcrouter",
-            "RemoteObjName" : "RpcRouterBridgeAuthImpl",
-            "Interfaces" :
-            [
+            "comment-1": "IpAddress is the ip address of the server",
+            "IpAddress": "127.0.0.1",
+            "Compression": "true",
+            "EnableSSL": "false",
+            "EnableWS": "false",
+            "RouterPath": "/",
+            "note-1": "the AuthInfo for this object is determined at runtime",
+            "HasAuth": "false",
+            "RemoteModName": "rpcrouter",
+            "RemoteObjName": "RpcRouterBridgeAuthImpl",
+            "Interfaces": [
                 {
-                    "Comment-0" : "the following attributes are mandatory",
-                    "InterfaceName" : "CK5AuthServer",
-                    "BindToClsid" : "true",
-                    "Comment-2" : "Don't register this match",
-                    "DummyInterface" : "true"
+                    "Comment-0": "the following attributes are mandatory",
+                    "InterfaceName": "CK5AuthServer",
+                    "BindToClsid": "true",
+                    "Comment-2": "Don't register this match",
+                    "DummyInterface": "true"
                 },
                 {
-                    "InterfaceName" : "IAuthenticate",
-                    "Pausable"  : "false",
-                    "comments-1" : "the following two fields to compose a special destination for authentication server on the authenticate router bridge",
-                    "DummyInterface" : "true"
+                    "InterfaceName": "IAuthenticate",
+                    "Pausable": "false",
+                    "comments-1": "the following two fields to compose a special destination for authentication server on the authenticate router bridge",
+                    "DummyInterface": "true"
                 }
-            ]
+            ],
+            "PortNumber": "4132"
         },
         {
-            "comment" : "this is a proxy object to create within the krb5's plugin",
+            "comment": "this is a proxy object to create within the krb5's plugin",
             "ObjectName": "KdcChannel",
-            "BusName" : "DBusBusPort_0",
+            "BusName": "DBusBusPort_0",
             "PortClass": "DBusLocalPdo",
-            "PortId" : "0",
-            "RequestTimeoutSec" : "120",
-            "KeepAliveTimeoutSec" : "60",
-            "QueuedRequests" : "false",
+            "PortId": "0",
+            "RequestTimeoutSec": "120",
+            "KeepAliveTimeoutSec": "60",
+            "QueuedRequests": "false",
             "ProxyPortClass": "DBusProxyPdo",
-            "comment-1" : "IpAddress is the ip address of the server",
-            "IpAddress" : "192.168.3.13",
-            "Compression" : "true",
-            "EnableSSL" : "true",
-            "EnableWS" : "false",
-            "RouterPath" : "/",
-            "RemoteModName" : "rpcrouter",
-            "RemoteObjName" : "RpcRouterBridgeAuthImpl",
-            "AuthInfo" : 
-            {
-                "AuthMech" : "krb5",
-                "Realm" : "rpcfrmwrk.org",
-                "UserName"  : "kdcclient",
-                "ServiceName" : "rasp1/rpcfrmwrk.org",
-                "SignMessage" : "true"
+            "comment-1": "IpAddress is the ip address of the server",
+            "IpAddress": "127.0.0.1",
+            "Compression": "true",
+            "EnableSSL": "false",
+            "EnableWS": "false",
+            "RouterPath": "/",
+            "RemoteModName": "rpcrouter",
+            "RemoteObjName": "RpcRouterBridgeAuthImpl",
+            "AuthInfo": {
+                "AuthMech": "krb5",
+                "Realm": "rpcf.org",
+                "UserName": "kdcclient",
+                "ServiceName": "rasp1@rpcf.org",
+                "SignMessage": "true"
             },
-            "Interfaces" :
-            [
+            "Interfaces": [
                 {
-                    "Comment-0" : "the following attributes are mandatory",
-                    "InterfaceName" : "CKdcChannel",
-                    "BindToClsid" : "true",
-                    "Comment-2" : "Don't register this match",
-                    "DummyInterface" : "true"
+                    "Comment-0": "the following attributes are mandatory",
+                    "InterfaceName": "CKdcChannel",
+                    "BindToClsid": "true",
+                    "Comment-2": "Don't register this match",
+                    "DummyInterface": "true"
                 },
                 {
-                    "InterfaceName" : "IAuthenticate",
-                    "Pausable"  : "false",
-                    "comments-1" : "the following two fields to compose a special destination for authentication server on the authenticate router bridge",
-                    "DummyInterface" : "true"
+                    "InterfaceName": "IAuthenticate",
+                    "Pausable": "false",
+                    "comments-1": "the following two fields to compose a special destination for authentication server on the authenticate router bridge",
+                    "DummyInterface": "true"
                 }
-            ]
+            ],
+            "PortNumber": "4132"
         },
         {
-            "comment" : "this is a proxy object to relay kdc token back/forth, and hosted by the K5AuthServer",
+            "comment": "this is a proxy object to relay kdc token back/forth, and hosted by the K5AuthServer",
             "ObjectName": "KdcRelayServer",
-            "BusName" : "RpcTcpBusPort_0",
+            "BusName": "RpcTcpBusPort_0",
             "PortClass": "KdcRelayPdo",
-            "PortNumber" : "88",
-            "RequestTimeoutSec" : "120",
-            "KeepAliveTimeoutSec" : "60",
-            "QueuedRequests" : "false",
+            "PortNumber": "88",
+            "RequestTimeoutSec": "120",
+            "KeepAliveTimeoutSec": "60",
+            "QueuedRequests": "false",
             "Note-1": "ProxyPortClass will be overwritten at runtime ",
             "ProxyPortClass": "DBusProxyPdo",
-            "IpAddress" : "192.168.3.13",
-            "RouterPath" : "/",
-            "Interfaces" :
-            [
+            "IpAddress": "192.168.3.57",
+            "RouterPath": "/",
+            "Interfaces": [
                 {
-                    "Comment-0" : "the following attributes are mandatory",
-                    "InterfaceName" : "KdcRelayServer",
-                    "BindToClsid" : "true",
-                    "DummyInterface" : "true"
+                    "Comment-0": "the following attributes are mandatory",
+                    "InterfaceName": "KdcRelayServer",
+                    "BindToClsid": "true",
+                    "DummyInterface": "true"
                 }
             ]
         }
     ],
-    "ClassFactories" :
-    [
+    "ClassFactories": [
         "./libauth.so"
     ]
 }

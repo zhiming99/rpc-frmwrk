@@ -1,554 +1,496 @@
 {
-    "Version" : "1.0",
-    "Drivers" : 
-    [
-
+    "Version": "1.0",
+    "Drivers": [
         {
-            "DriverName"    : "DBusBusDriver",
-            "DriverType"    : "BusDriver",
-            "BusClass"      : "DBusBus",
-            "InternalClass" : "CDBusBusDriver",
-            "Description"   : "This is a bus driver, and the port it creats is the DBusBusPort",
-            "PortClasses"   :
-            [
+            "DriverName": "DBusBusDriver",
+            "DriverType": "BusDriver",
+            "BusClass": "DBusBus",
+            "InternalClass": "CDBusBusDriver",
+            "Description": "This is a bus driver, and the port it creats is the DBusBusPort",
+            "PortClasses": [
                 "DBusBusPort"
             ]
         },
         {
-            "DriverName"    : "RpcTcpBusDriver",
-            "DriverType"    : "BusDriver",
-            "BusClass"      : "RpcTcpBus",
-            "InternalClass" : "CRpcTcpBusDriver",
-            "PortClasses"   :
-            [
+            "DriverName": "RpcTcpBusDriver",
+            "DriverType": "BusDriver",
+            "BusClass": "RpcTcpBus",
+            "InternalClass": "CRpcTcpBusDriver",
+            "PortClasses": [
                 "RpcTcpBusPort"
             ]
         },
         {
-            "DriverName"    : "ProxyFdoDriver",
-            "DriverType"    : "PortDriver",
-            "InternalClass" : "CProxyFdoDriver",
-            "Description"   : "This is a function port driver, and the port it creats is the DBusProxyFdo",
-            "PortClasses"   :
-            [
+            "DriverName": "ProxyFdoDriver",
+            "DriverType": "PortDriver",
+            "InternalClass": "CProxyFdoDriver",
+            "Description": "This is a function port driver, and the port it creats is the DBusProxyFdo",
+            "PortClasses": [
                 "DBusProxyFdo"
             ]
         },
         {
-            "DriverName"    : "RpcTcpFidoDrv",
-            "DriverType"    : "PortDriver",
-            "InternalClass" : "CRpcTcpFidoDrv",
-            "Description"   : "This is a filter port driver, and the port it creats is the CRpcTcpFido",
-            "PortClasses"   :
-            [
+            "DriverName": "RpcTcpFidoDrv",
+            "DriverType": "PortDriver",
+            "InternalClass": "CRpcTcpFidoDrv",
+            "Description": "This is a filter port driver, and the port it creats is the CRpcTcpFido",
+            "PortClasses": [
                 "RpcTcpFido"
             ]
         },
         {
-            "DriverName"    : "RpcWebSockFidoDrv",
-            "DriverType"    : "PortDriver",
-            "InternalClass" : "CRpcWebSockFidoDrv",
-            "Description"   : "This is a filter port driver, and the port it creats is the CRpcTcpFido",
-            "PortClasses"   :
-            [
+            "DriverName": "RpcWebSockFidoDrv",
+            "DriverType": "PortDriver",
+            "InternalClass": "CRpcWebSockFidoDrv",
+            "Description": "This is a filter port driver, and the port it creats is the CRpcTcpFido",
+            "PortClasses": [
                 "RpcWebSockFido"
             ]
         },
         {
-            "DriverName"    : "RpcNatProtoFdoDrv",
-            "DriverType"    : "PortDriver",
-            "InternalClass" : "CRpcNatProtoFdoDrv",
-            "Description"   : "This is a FDO port driver, and the port it creats is the CRpcNativeProtoFdo",
-            "PortClasses"   :
-            [
+            "DriverName": "RpcNatProtoFdoDrv",
+            "DriverType": "PortDriver",
+            "InternalClass": "CRpcNatProtoFdoDrv",
+            "Description": "This is a FDO port driver, and the port it creats is the CRpcNativeProtoFdo",
+            "PortClasses": [
                 "RpcNativeProtoFdo"
             ]
         },
         {
-            "DriverName"    : "RpcOpenSSLFidoDrv",
-            "DriverType"    : "PortDriver",
-            "InternalClass" : "CRpcOpenSSLFidoDrv",
-            "Description"   : "This is a filter port driver, and the port it creats is the CRpcOpenSSLFido",
-            "PortClasses"   :
-            [
+            "DriverName": "RpcOpenSSLFidoDrv",
+            "DriverType": "PortDriver",
+            "InternalClass": "CRpcOpenSSLFidoDrv",
+            "Description": "This is a filter port driver, and the port it creats is the CRpcOpenSSLFido",
+            "PortClasses": [
                 "RpcOpenSSLFido"
             ]
         },
         {
-            "DriverName"    : "RpcSecFidoDrv",
-            "DriverType"    : "PortDriver",
-            "InternalClass" : "CRpcSecFidoDrv",
-            "Description"   : "This is a filter port driver, and the port it creats is the CRpcOpenSSLFido",
-            "PortClasses"   :
-            [
+            "DriverName": "RpcSecFidoDrv",
+            "DriverType": "PortDriver",
+            "InternalClass": "CRpcSecFidoDrv",
+            "Description": "This is a filter port driver, and the port it creats is the CRpcOpenSSLFido",
+            "PortClasses": [
                 "RpcSecFido"
             ]
         },
         {
-            "DriverName"    : "KdcRelayFdoDrv",
-            "DriverType"    : "PortDriver",
-            "InternalClass" : "CKdcRelayFdoDrv",
-            "Description"   : "This is a FDO port driver, and the port it creats is the CRpcNativeProtoFdo",
-            "PortClasses"   :
-            [
+            "DriverName": "KdcRelayFdoDrv",
+            "DriverType": "PortDriver",
+            "InternalClass": "CKdcRelayFdoDrv",
+            "Description": "This is a FDO port driver, and the port it creats is the CRpcNativeProtoFdo",
+            "PortClasses": [
                 "KdcRelayFdo"
             ]
         },
         {
-            "DriverName"    : "UnixSockBusDriver",
-            "DriverType"    : "BusDriver",
-            "InternalClass" : "CUnixSockBusDriver",
-            "BusClass"      : "UnixSockBus",
-            "Description"   : "This is a bus driver for unix stream sock, and the port it creats is the UnixSockBusPort",
-            "PortClasses"   :
-            [
+            "DriverName": "UnixSockBusDriver",
+            "DriverType": "BusDriver",
+            "InternalClass": "CUnixSockBusDriver",
+            "BusClass": "UnixSockBus",
+            "Description": "This is a bus driver for unix stream sock, and the port it creats is the UnixSockBusPort",
+            "PortClasses": [
                 "UnixSockBusPort"
             ]
         }
     ],
-
-    "Ports" :
-    [
+    "Ports": [
         {
-            "PortType"      : "Pdo",
-            "PortClass"     : "DBusLocalPdo",
-            "InternalClass" : "CDBusLocalPdo",
-            "PortDriver"    : "",
-            "BusPortClass"  : "DBusBusPort"
+            "PortType": "Pdo",
+            "PortClass": "DBusLocalPdo",
+            "InternalClass": "CDBusLocalPdo",
+            "PortDriver": "",
+            "BusPortClass": "DBusBusPort"
         },
         {
-            "PortType"      : "Pdo",
-            "PortClass"     : "DBusLoopbackPdo",
-            "InternalClass" : "CDBusLoopbackPdo",
-            "PortDriver"    : "",
-            "BusPortClass"  : "DBusBusPort"
+            "PortType": "Pdo",
+            "PortClass": "DBusLoopbackPdo",
+            "InternalClass": "CDBusLoopbackPdo",
+            "PortDriver": "",
+            "BusPortClass": "DBusBusPort"
         },
         {
-            "PortType"      : "Pdo",
-            "PortClass"     : "DBusProxyPdo",
-            "InternalClass" : "CDBusProxyPdo",
-            "PortDriver"    : "",
-            "BusPortClass"  : "DBusBusPort"
+            "PortType": "Pdo",
+            "PortClass": "DBusProxyPdo",
+            "InternalClass": "CDBusProxyPdo",
+            "PortDriver": "",
+            "BusPortClass": "DBusBusPort"
         },
         {
-            "PortType"      : "Pdo",
-            "PortClass"     : "DBusProxyPdoLpbk",
-            "InternalClass" : "CDBusProxyPdoLpbk",
-            "PortDriver"    : "",
-            "BusPortClass"  : "DBusBusPort"
+            "PortType": "Pdo",
+            "PortClass": "DBusProxyPdoLpbk",
+            "InternalClass": "CDBusProxyPdoLpbk",
+            "PortDriver": "",
+            "BusPortClass": "DBusBusPort"
         },
         {
-            "PortType"      : "Fdo",
-            "PortClass"     : "DBusProxyFdo",
-            "InternalClass" : "CDBusProxyFdo",
-            "PortDriver"    : "ProxyFdoDriver"
+            "PortType": "Fdo",
+            "PortClass": "DBusProxyFdo",
+            "InternalClass": "CDBusProxyFdo",
+            "PortDriver": "ProxyFdoDriver"
         },
         {
-            "PortType"      : "Fido",
-            "PortClass"     : "RpcTcpFido",
-            "InternalClass" : "CRpcTcpFido",
-            "PortDriver"    : "RpcTcpFidoDrv"
+            "PortType": "Fido",
+            "PortClass": "RpcTcpFido",
+            "InternalClass": "CRpcTcpFido",
+            "PortDriver": "RpcTcpFidoDrv"
         },
         {
-            "PortType"      : "Fido",
-            "PortClass"     : "RpcWebSockFido",
-            "InternalClass" : "CRpcWebSockFido",
-            "PortDriver"    : "RpcWebSockFidoDrv"
+            "PortType": "Fido",
+            "PortClass": "RpcWebSockFido",
+            "InternalClass": "CRpcWebSockFido",
+            "PortDriver": "RpcWebSockFidoDrv"
         },
         {
-            "PortType"      : "Fido",
-            "PortClass"     : "RpcOpenSSLFido",
-            "InternalClass" : "CRpcOpenSSLFido",
-            "PortDriver"    : "RpcOpenSSLFidoDrv",
-            "Parameters":
-            {
-                "comments"  : "Certificate and private key file paths",
-                "CertFile"  : "./server.crt",
-                "KeyFile"   : "./server.key"
+            "PortType": "Fido",
+            "PortClass": "RpcOpenSSLFido",
+            "InternalClass": "CRpcOpenSSLFido",
+            "PortDriver": "RpcOpenSSLFidoDrv",
+            "Parameters": {
+                "comments": "Certificate and private key file paths",
+                "CertFile": "./server.crt",
+                "KeyFile": "./server.key"
             }
         },
         {
-            "PortType"      : "Fido",
-            "PortClass"     : "RpcSecFido",
-            "InternalClass" : "CRpcSecFido",
-            "PortDriver"    : "RpcSecFidoDrv"
+            "PortType": "Fido",
+            "PortClass": "RpcSecFido",
+            "InternalClass": "CRpcSecFido",
+            "PortDriver": "RpcSecFidoDrv"
         },
         {
-            "PortType"      : "Fdo",
-            "PortClass"     : "RpcNativeProtoFdo",
-            "InternalClass" : "CRpcNativeProtoFdo",
-            "PortDriver"    : "RpcNatProtoFdoDrv"
+            "PortType": "Fdo",
+            "PortClass": "RpcNativeProtoFdo",
+            "InternalClass": "CRpcNativeProtoFdo",
+            "PortDriver": "RpcNatProtoFdoDrv"
         },
         {
-            "PortType"      : "Fdo",
-            "PortClass"     : "KdcRelayFdo",
-            "InternalClass" : "CKdcRelayFdo",
-            "PortDriver"    : "KdcRelayPdoDrv"
+            "PortType": "Fdo",
+            "PortClass": "KdcRelayFdo",
+            "InternalClass": "CKdcRelayFdo",
+            "PortDriver": "KdcRelayPdoDrv"
         },
         {
-            "PortType"      : "Pdo",
-            "PortClass"     : "TcpStreamPdo",
-            "InternalClass" : "CTcpStreamPdo",
-            "BusPortClass"  : "RpcTcpBusPort"
+            "PortType": "Pdo",
+            "PortClass": "TcpStreamPdo",
+            "InternalClass": "CTcpStreamPdo",
+            "BusPortClass": "RpcTcpBusPort"
         },
         {
-            "PortType"      : "Pdo",
-            "PortClass"     : "TcpStreamPdo2",
-            "InternalClass" : "CTcpStreamPdo2",
-            "BusPortClass"  : "RpcTcpBusPort"
+            "PortType": "Pdo",
+            "PortClass": "TcpStreamPdo2",
+            "InternalClass": "CTcpStreamPdo2",
+            "BusPortClass": "RpcTcpBusPort"
         },
         {
-            "PortType"      : "Pdo",
-            "PortClass"     : "KdcRelayPdo",
-            "InternalClass" : "CKdcRelayPdo",
-            "BusPortClass"  : "RpcTcpBusPort"
+            "PortType": "Pdo",
+            "PortClass": "KdcRelayPdo",
+            "InternalClass": "CKdcRelayPdo",
+            "BusPortClass": "RpcTcpBusPort"
         },
         {
-            "PortType"      : "Fdo",
-            "PortClass"     : "DBusBusPort",
-            "PortDriver"    : "DBusBusDriver",
-            "InternalClass" : "CDBusBusPort"
+            "PortType": "Fdo",
+            "PortClass": "DBusBusPort",
+            "PortDriver": "DBusBusDriver",
+            "InternalClass": "CDBusBusPort"
         },
         {
-            "PortType"      : "Fdo",
-            "PortClass"     : "RpcTcpBusPort",
-            "PortDriver"    : "RpcTcpBusDriver",
-            "InternalClass" : "CTcpRpcBusPort",
-            "Parameters" :
-            [
+            "PortType": "Fdo",
+            "PortClass": "RpcTcpBusPort",
+            "PortDriver": "RpcTcpBusDriver",
+            "InternalClass": "CTcpRpcBusPort",
+            "Parameters": [
                 {
-                    "comment-1" : "remove it or change it according to your environment",
-                    "AddrFormat" : "ipv4",
-                    "Protocol" : "native",
-                    "comment-2" : "port 4132 will accept native non-websocket connection",
+                    "comment-1": "remove it or change it according to your environment",
+                    "AddrFormat": "ipv4",
+                    "Protocol": "native",
+                    "comment-2": "port 4132 will accept native non-websocket connection",
                     "PortNumber": "4132",
-                    "BindAddr" : "127.0.0.1",
-                    "comment"  : "inter-changable with 'TcpStreamPdo' when in a trusted and stable environment",
-                    "PdoClass" : "TcpStreamPdo2",
-                    "Compression" : "true",
-                    "EnableWS":  "false",
-                    "EnableSSL": "false"
+                    "BindAddr": "127.0.0.1",
+                    "comment": "inter-changable with 'TcpStreamPdo' when in a trusted and stable environment",
+                    "PdoClass": "TcpStreamPdo2",
+                    "Compression": "true",
+                    "EnableWS": "false",
+                    "EnableSSL": "false",
+                    "HasAuth": "false"
                 },
                 {
-                    "AddrFormat" : "ipv4",
-                    "Protocol" : "native",
-                    "comment-2" : "port 4133 will accept websocket connection from httpd",
+                    "AddrFormat": "ipv4",
+                    "Protocol": "native",
+                    "comment-2": "port 4133 will accept websocket connection from httpd",
                     "PortNumber": "4133",
-                    "BindAddr" : "127.0.0.1",
-                    "PdoClass" : "TcpStreamPdo2",
-                    "Compression" : "true",
-                    "EnableWS":  "true",
+                    "BindAddr": "127.0.0.1",
+                    "PdoClass": "TcpStreamPdo2",
+                    "Compression": "true",
+                    "EnableWS": "true",
                     "EnableSSL": "true",
-                    "ConnRecover" : "false"
-                },
-                {
-                    "AddrFormat" : "ipv4",
-                    "Protocol" : "native",
-                    "PortNumber": "4132",
-                    "BindAddr" : "192.168.3.13",
-                    "PdoClass" : "TcpStreamPdo2",
-                    "Compression" : "true",
-                    "EnableWS":  "false",
-                    "EnableSSL": "true",
-                    "ConnRecover" : "false",
-                    "comments-3" : "this port has authentication enabled",
-                    "HasAuth"  : "true"
+                    "ConnRecover": "false",
+                    "HasAuth": "true",
+                    "DestURL": "https://example.com"
                 }
-            ]
+            ],
+            "MaxConnections": "512"
         },
         {
-            "PortType"      : "Pdo",
-            "PortClass"     : "UnixSockStmPdo",
-            "InternalClass" : "CUnixSockStmPdo",
-            "PortDriver"    : "",
-            "BusPortClass"  : "UnixSockBusPort"
+            "PortType": "Pdo",
+            "PortClass": "UnixSockStmPdo",
+            "InternalClass": "CUnixSockStmPdo",
+            "PortDriver": "",
+            "BusPortClass": "UnixSockBusPort"
         },
         {
-            "PortType"      : "Fdo",
-            "PortClass"     : "UnixSockBusPort",
-            "PortDriver"    : "UnixSockBusDriver",
-            "InternalClass" : "CUnixSockBusPort"
+            "PortType": "Fdo",
+            "PortClass": "UnixSockBusPort",
+            "PortDriver": "UnixSockBusDriver",
+            "InternalClass": "CUnixSockBusPort"
         }
     ],
-
-    "Modules" :
-    [
+    "Modules": [
         {
-            "ModName" : "smoketest",
-            "DriversToLoad" :
-            [
+            "ModName": "smoketest",
+            "DriversToLoad": [
                 "DBusBusDriver"
             ]
         },
         {
-            "ModName" : "ifsvrsmk",
-            "DriversToLoad" :
-            [
+            "ModName": "ifsvrsmk",
+            "DriversToLoad": [
                 "DBusBusDriver"
             ]
         },
         {
-            "ModName" : "ifclismk",
-            "DriversToLoad" :
-            [
+            "ModName": "ifclismk",
+            "DriversToLoad": [
                 "DBusBusDriver",
                 "ProxyFdoDriver"
             ]
         },
         {
-            "ModName" : "hwsvrsmk",
-            "DriversToLoad" :
-            [
+            "ModName": "hwsvrsmk",
+            "DriversToLoad": [
                 "DBusBusDriver"
             ]
         },
         {
-            "ModName" : "hwclismk",
-            "DriversToLoad" :
-            [
+            "ModName": "hwclismk",
+            "DriversToLoad": [
                 "DBusBusDriver",
                 "ProxyFdoDriver"
             ]
         },
         {
-            "ModName" : "asyncsvrsmk",
-            "DriversToLoad" :
-            [
+            "ModName": "asyncsvrsmk",
+            "DriversToLoad": [
                 "DBusBusDriver"
             ]
         },
         {
-            "ModName" : "asynclismk",
-            "DriversToLoad" :
-            [
+            "ModName": "asynclismk",
+            "DriversToLoad": [
                 "DBusBusDriver"
             ]
         },
         {
-            "ModName" : "actcsvrtst",
-            "DriversToLoad" :
-            [
+            "ModName": "actcsvrtst",
+            "DriversToLoad": [
                 "DBusBusDriver"
             ]
         },
         {
-            "ModName" : "actclitst",
-            "DriversToLoad" :
-            [
+            "ModName": "actclitst",
+            "DriversToLoad": [
                 "DBusBusDriver"
             ]
         },
         {
-            "ModName" : "evtsvrtst",
-            "DriversToLoad" :
-            [
+            "ModName": "evtsvrtst",
+            "DriversToLoad": [
                 "DBusBusDriver"
             ]
         },
         {
-            "ModName" : "evtclitst",
-            "DriversToLoad" :
-            [
+            "ModName": "evtclitst",
+            "DriversToLoad": [
                 "DBusBusDriver"
             ]
         },
         {
-            "ModName" : "inproctst",
-            "DriversToLoad" :
-            [
+            "ModName": "inproctst",
+            "DriversToLoad": [
                 "DBusBusDriver"
             ]
         },
         {
-            "ModName" : "kasvrtst",
-            "DriversToLoad" :
-            [
+            "ModName": "kasvrtst",
+            "DriversToLoad": [
                 "DBusBusDriver"
             ]
         },
         {
-            "ModName" : "kaclitst",
-            "DriversToLoad" :
-            [
+            "ModName": "kaclitst",
+            "DriversToLoad": [
                 "DBusBusDriver"
             ]
         },
         {
-            "ModName" : "prclitst",
-            "DriversToLoad" :
-            [
+            "ModName": "prclitst",
+            "DriversToLoad": [
                 "DBusBusDriver"
             ]
         },
         {
-            "ModName" : "prsvrtst",
-            "DriversToLoad" :
-            [
+            "ModName": "prsvrtst",
+            "DriversToLoad": [
                 "DBusBusDriver"
             ]
         },
         {
-            "ModName" : "sfclitst",
-            "DriversToLoad" :
-            [
+            "ModName": "sfclitst",
+            "DriversToLoad": [
                 "DBusBusDriver",
                 "UnixSockBusDriver"
             ]
         },
         {
-            "ModName" : "sfsvrtst",
-            "DriversToLoad" :
-            [
+            "ModName": "sfsvrtst",
+            "DriversToLoad": [
                 "DBusBusDriver",
                 "UnixSockBusDriver"
             ]
         },
         {
-            "ModName" : "stmclitst",
-            "DriversToLoad" :
-            [
+            "ModName": "stmclitst",
+            "DriversToLoad": [
                 "DBusBusDriver",
                 "UnixSockBusDriver"
             ]
         },
         {
-            "ModName" : "stmsvrtst",
-            "DriversToLoad" :
-            [
+            "ModName": "stmsvrtst",
+            "DriversToLoad": [
                 "DBusBusDriver",
                 "UnixSockBusDriver"
             ]
         },
         {
-            "ModName" : "rpcrouter",
-            "DriversToLoad" :
-            [
+            "ModName": "rpcrouter",
+            "DriversToLoad": [
                 "DBusBusDriver",
                 "RpcTcpBusDriver",
                 "UnixSockBusDriver"
             ],
-            "PreloadableObjects" :
-            [
+            "PreloadableObjects": [
                 {
-                    "comment" : "remove the surfix '-1' of the field name to enable the object",
-                    "ObjectName-1" : "RpcRouter-0",
-                    "ObjectClass-1" : "RpcRouterImpl"
+                    "comment": "remove the surfix '-1' of the field name to enable the object",
+                    "ObjectName-1": "RpcRouter-0",
+                    "ObjectClass-1": "RpcRouterImpl"
                 }
             ],
-            "ClassFactories" :
-            [
+            "ClassFactories": [
                 "./libsslpt.so",
                 "./libwspt.so",
                 "./libauth.so"
             ]
         },
         {
-            "ModName" : "btinrtsvr",
-            "DriversToLoad" :
-            [
+            "ModName": "btinrtsvr",
+            "DriversToLoad": [
                 "DBusBusDriver",
                 "RpcTcpBusDriver",
                 "UnixSockBusDriver"
             ],
-            "PreloadableObjects" :
-            [
+            "PreloadableObjects": [
                 {
-                    "comment" : "remove the surfix '-1' of the field name to enable the object",
-                    "ObjectName-1" : "RpcRouter-0",
-                    "ObjectClass-1" : "RpcRouterImpl"
+                    "comment": "remove the surfix '-1' of the field name to enable the object",
+                    "ObjectName-1": "RpcRouter-0",
+                    "ObjectClass-1": "RpcRouterImpl"
                 }
             ],
-            "ClassFactories" :
-            [
-            ]
+            "ClassFactories": []
         },
         {
-            "ModName" : "btinrtcli",
-            "DriversToLoad" :
-            [
+            "ModName": "btinrtcli",
+            "DriversToLoad": [
                 "DBusBusDriver",
                 "RpcTcpBusDriver",
                 "UnixSockBusDriver",
                 "ProxyFdoDriver"
             ],
-            "PreloadableObjects" :
-            [
+            "PreloadableObjects": [
                 {
-                    "comment" : "remove the surfix '-1' of the field name to enable the object",
-                    "ObjectName-1" : "RpcRouter-0",
-                    "ObjectClass-1" : "RpcRouterImpl"
+                    "comment": "remove the surfix '-1' of the field name to enable the object",
+                    "ObjectName-1": "RpcRouter-0",
+                    "ObjectClass-1": "RpcRouterImpl"
                 }
             ],
-            "ClassFactories" :
-            [
-            ]
+            "ClassFactories": []
         },
         {
-            "ModName" : "KdcChannel",
-            "DriversToLoad" :
-            [
+            "ModName": "KdcChannel",
+            "DriversToLoad": [
                 "DBusBusDriver"
             ]
         },
         {
-            "ModName" : "PyRpcProxy",
-            "DriversToLoad" :
-            [
+            "ModName": "PyRpcProxy",
+            "DriversToLoad": [
                 "DBusBusDriver",
                 "UnixSockBusDriver"
             ]
         },
         {
-            "ModName" : "PyRpcServer",
-            "DriversToLoad" :
-            [
+            "ModName": "PyRpcServer",
+            "DriversToLoad": [
                 "DBusBusDriver",
                 "UnixSockBusDriver"
             ]
-        }     
-    ],
-
-    "Match" :
-    [
-        {
-            "PortClass" : "DBusLocalPdo",
-            "FdoDriver" : ""
-        },
-        {
-            "PortClass" : "DBusProxyPdoLpbk",
-            "FdoDriver" : "ProxyFdoDriver",
-            "Description" : "This match provides a binding between the pdo and fdo"
-        },
-        {
-            "PortClass" : "DBusProxyPdo",
-            "FdoDriver" : "ProxyFdoDriver",
-            "Description" : "This match provides a binding between the pdo and fdo"
-        },
-        {
-            "PortClass" : "TcpStreamPdo",
-            "FidoDriver" : "RpcTcpFidoDrv",
-            "Description" : "This match provides a binding between the pdo and the uppper fido"
-        },
-        {
-            "PortClass" : "TcpStreamPdo2",
-            "comment" : "ProbeSequence specify the order of the drivers' Probe to call to build the port stack",
-            "ProbeSequence" : [ "RpcOpenSSLFidoDrv", "RpcWebSockFidoDrv", "RpcSecFidoDrv", "RpcNatProtoFdoDrv", "RpcTcpFidoDrv" ],
-            "Description" : "This match provides a binding between the pdo and the uppper fdo and fido",
-            "comment-1" : "this is a new fork of the TcpStreamPdo, with better flexibility and extensibility"
-        },
-        {
-            "PortClass" : "KdcRelayPdo",
-            "ProbeSequence" : [ "KdcRelayFdoDrv" ]
-        },
-        {
-            "PortClass" : "UnixSockStmPdo",
-            "FdoDriver" : ""
         }
     ],
-
-    "Arch" :
-    {
-        "Processors" : "8"
+    "Match": [
+        {
+            "PortClass": "DBusLocalPdo",
+            "FdoDriver": ""
+        },
+        {
+            "PortClass": "DBusProxyPdoLpbk",
+            "FdoDriver": "ProxyFdoDriver",
+            "Description": "This match provides a binding between the pdo and fdo"
+        },
+        {
+            "PortClass": "DBusProxyPdo",
+            "FdoDriver": "ProxyFdoDriver",
+            "Description": "This match provides a binding between the pdo and fdo"
+        },
+        {
+            "PortClass": "TcpStreamPdo",
+            "FidoDriver": "RpcTcpFidoDrv",
+            "Description": "This match provides a binding between the pdo and the uppper fido"
+        },
+        {
+            "PortClass": "TcpStreamPdo2",
+            "comment": "ProbeSequence specify the order of the drivers' Probe to call to build the port stack",
+            "ProbeSequence": [
+                "RpcOpenSSLFidoDrv",
+                "RpcWebSockFidoDrv",
+                "RpcSecFidoDrv",
+                "RpcNatProtoFdoDrv",
+                "RpcTcpFidoDrv"
+            ],
+            "Description": "This match provides a binding between the pdo and the uppper fdo and fido",
+            "comment-1": "this is a new fork of the TcpStreamPdo, with better flexibility and extensibility"
+        },
+        {
+            "PortClass": "KdcRelayPdo",
+            "ProbeSequence": [
+                "KdcRelayFdoDrv"
+            ]
+        },
+        {
+            "PortClass": "UnixSockStmPdo",
+            "FdoDriver": ""
+        }
+    ],
+    "Arch": {
+        "Processors": "8"
     }
 }
-

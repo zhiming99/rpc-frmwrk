@@ -1,48 +1,37 @@
 {
-    "Version" : "1.0",
+    "Version": "1.0",
     "ServerName": "EventServer",
-    "Objects" :
-    [
+    "Objects": [
         {
             "ObjectName": "CEventServer",
-            "BusName" : "DBusBusPort_0",
+            "BusName": "DBusBusPort_0",
             "PortClass": "DBusLocalPdo",
-            "PortId" : "0",
-            "RequestTimeoutSec" : "200",
-            "KeepAliveTimeoutSec" : "60",
-            "QueuedRequests" : "false",
+            "PortId": "0",
+            "RequestTimeoutSec": "200",
+            "KeepAliveTimeoutSec": "60",
+            "QueuedRequests": "false",
             "ProxyPortClass": "DBusProxyPdo",
-            "comment-1" : "IpAddress is the ip address of the server",
-            "IpAddress" : "127.0.0.1",
-            "Compression" : "true",
-            "EnableSSL" : "false",
-            "EnableWS" : "false",
-            "RouterPath" : "/rasp3",
-            "AuthInfo-1" :
-            {
-                "AuthMech" : "krb5",
-                "UserName" : "zhiming@rpcfrmwrk.org",
-                "ServiceName" : "rasp1@rpcfrmwrk.org",
-                "Realm" : "rpcfrmwrk.org",
-                "SignMessage" : "true"
-            },
-            "Interfaces" :
-            [
+            "comment-1": "IpAddress is the ip address of the server",
+            "IpAddress": "127.0.0.1",
+            "Compression": "true",
+            "EnableSSL": "false",
+            "EnableWS": "false",
+            "RouterPath": "/",
+            "Interfaces": [
                 {
-                    "Comment-0" : "the following two are the mandatory attributes",
-                    "InterfaceName" : "CEventServer",
-
-                    "Comment-1" : "the following is a flag whether to use the object clsid for this interface, usually it indicates this is the major interface of this object, there must be one interface bind to clsid",
-                    "BindToClsid" : "true"
+                    "Comment-0": "the following two are the mandatory attributes",
+                    "InterfaceName": "CEventServer",
+                    "Comment-1": "the following is a flag whether to use the object clsid for this interface, usually it indicates this is the major interface of this object, there must be one interface bind to clsid",
+                    "BindToClsid": "true"
                 },
                 {
-                    "InterfaceName" : "IInterfaceServer"
+                    "InterfaceName": "IInterfaceServer"
                 }
-            ]
+            ],
+            "PortNumber": "4132"
         }
     ],
-    "ClassFactories" :
-    [
+    "ClassFactories": [
         "./libevtst.so"
     ]
 }

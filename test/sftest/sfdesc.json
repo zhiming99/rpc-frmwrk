@@ -1,63 +1,61 @@
 {
-    "Version" : "1.0",
+    "Version": "1.0",
     "ServerName": "SimpFileServer",
-    "Objects" :
-    [
+    "Objects": [
         {
             "ObjectName": "CSimpFileServer",
-            "BusName" : "DBusBusPort_0",
+            "BusName": "DBusBusPort_0",
             "PortClass": "DBusLocalPdo",
-            "PortId" : "0",
-            "RequestTimeoutSec" : "120",
-            "KeepAliveTimeoutSec" : "61",
-            "PauseOnStart" : "false",
-            "QueuedRequests" : "false",
+            "PortId": "0",
+            "RequestTimeoutSec": "120",
+            "KeepAliveTimeoutSec": "61",
+            "PauseOnStart": "false",
+            "QueuedRequests": "false",
             "ProxyPortClass": "DBusProxyPdo",
             "ProxyPortClass-1": "DBusLocalPdo",
-            "comment-1" : "IpAddress is the ip address of the server",
-            "IpAddress" : "127.0.0.1",
-            "Compression" : "true",
-            "EnableSSL" : "false",
-            "EnableWS" : "false",
-            "RouterPath" : "/rasp1",
-            "Interfaces" :
-            [
+            "comment-1": "IpAddress is the ip address of the server",
+            "IpAddress": "127.0.0.1",
+            "Compression": "true",
+            "EnableSSL": "false",
+            "EnableWS": "false",
+            "RouterPath": "/",
+            "Interfaces": [
                 {
-                    "Comment-0" : "the following attributes are mandatory",
-                    "InterfaceName" : "CSimpFileServer",
-                    "Comment-1" : "the following is a flag whether to use the object clsid for this interface, usually it indicates this is the major interface of this object, there must be one interface bind to clsid",
-                    "BindToClsid" : "true",
-                    "Pausable" : "true"
+                    "Comment-0": "the following attributes are mandatory",
+                    "InterfaceName": "CSimpFileServer",
+                    "Comment-1": "the following is a flag whether to use the object clsid for this interface, usually it indicates this is the major interface of this object, there must be one interface bind to clsid",
+                    "BindToClsid": "true",
+                    "Pausable": "true"
                 },
                 {
-                    "InterfaceName" : "IInterfaceServer",
-                    "Pausable" : "false"
+                    "InterfaceName": "IInterfaceServer",
+                    "Pausable": "false"
                 },
                 {
-                    "InterfaceName" : "IUnknown",
-                    "Pausable" : "false"
+                    "InterfaceName": "IUnknown",
+                    "Pausable": "false"
                 },
                 {
-                    "InterfaceName" : "CEchoServer",
-                    "Pausable" : "true"
+                    "InterfaceName": "CEchoServer",
+                    "Pausable": "true"
                 },
                 {
-                    "InterfaceName" : "CMyFileServer",
-                    "Pausable" : "true"
+                    "InterfaceName": "CMyFileServer",
+                    "Pausable": "true"
                 },
                 {
-                    "InterfaceName" : "IStream",
-                    "Pausable" : "false"
+                    "InterfaceName": "IStream",
+                    "Pausable": "false"
                 },
                 {
-                    "InterfaceName" : "CStatCounters",
-                    "Pausable" : "true"
+                    "InterfaceName": "CStatCounters",
+                    "Pausable": "true"
                 }
-            ]
+            ],
+            "PortNumber": "4132"
         }
     ],
-    "ClassFactories":
-    [
+    "ClassFactories": [
         "./libsfsvr.so"
     ]
 }

@@ -1,57 +1,55 @@
 {
-    "Version" : "1.0",
+    "Version": "1.0",
     "ServerName": "SimpFileServer",
-    "Objects" :
-    [
+    "Objects": [
         {
             "ObjectName": "PyFileTransSvr",
-            "BusName" : "DBusBusPort_0",
+            "BusName": "DBusBusPort_0",
             "PortClass": "DBusLocalPdo",
-            "PortId" : "0",
-            "RequestTimeoutSec" : "120",
-            "KeepAliveTimeoutSec" : "61",
-            "PauseOnStart" : "false",
-            "QueuedRequests" : "false",
+            "PortId": "0",
+            "RequestTimeoutSec": "120",
+            "KeepAliveTimeoutSec": "61",
+            "PauseOnStart": "false",
+            "QueuedRequests": "false",
             "ProxyPortClass": "DBusProxyPdo",
             "ProxyPortClass-1": "DBusLocalPdo",
-            "comment-1" : "IpAddress is the ip address of the server",
-            "IpAddress" : "192.168.3.13",
-            "Compression" : "false",
-            "EnableSSL" : "false",
-            "EnableWS" : "false",
-            "RouterPath" : "/",
-            "Interfaces" :
-            [
+            "comment-1": "IpAddress is the ip address of the server",
+            "IpAddress": "127.0.0.1",
+            "Compression": "true",
+            "EnableSSL": "false",
+            "EnableWS": "false",
+            "RouterPath": "/",
+            "Interfaces": [
                 {
-                    "Comment-0" : "the following attributes are mandatory",
-                    "InterfaceName" : "PyFileTransfer",
-                    "Comment-1" : "the following is a flag whether to use the object clsid for this interface, usually it indicates this is the major interface of this object, there must be one interface bind to clsid",
-                    "BindToClsid" : "true",
-                    "Pausable" : "true"
+                    "Comment-0": "the following attributes are mandatory",
+                    "InterfaceName": "PyFileTransfer",
+                    "Comment-1": "the following is a flag whether to use the object clsid for this interface, usually it indicates this is the major interface of this object, there must be one interface bind to clsid",
+                    "BindToClsid": "true",
+                    "Pausable": "true"
                 },
                 {
-                    "InterfaceName" : "IInterfaceServer"
+                    "InterfaceName": "IInterfaceServer"
                 },
                 {
-                    "InterfaceName" : "IUnknown"
+                    "InterfaceName": "IUnknown"
                 },
                 {
-                    "InterfaceName" : "CEchoServer"
+                    "InterfaceName": "CEchoServer"
                 },
                 {
-                    "InterfaceName" : "PyFileTransfer"
+                    "InterfaceName": "PyFileTransfer"
                 },
                 {
-                    "InterfaceName" : "IStream"
+                    "InterfaceName": "IStream"
                 },
                 {
-                    "InterfaceName" : "CStatCounters"
+                    "InterfaceName": "CStatCounters"
                 }
-            ]
+            ],
+            "PortNumber": "4132"
         }
     ],
-    "ClassFactories":
-    [
+    "ClassFactories": [
         "./libstmsvr.so"
     ]
 }

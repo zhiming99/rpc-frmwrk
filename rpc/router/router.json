@@ -1,204 +1,212 @@
 {
-    "Version" : "1.0",
+    "Version": "1.0",
     "ServerName": "rpcrouter",
-    "Objects" :
-    [
+    "Objects": [
         {
             "ObjectName": "RpcReqForwarderImpl",
-            "BusName" : "DBusBusPort_0",
+            "BusName": "DBusBusPort_0",
             "PortClass": "DBusLocalPdo",
-            "PortId" : "0",
-            "RequestTimeoutSec" : "120",
-            "KeepAliveTimeoutSec" : "60",
-            "QueuedRequests" : "false",
+            "PortId": "0",
+            "RequestTimeoutSec": "120",
+            "KeepAliveTimeoutSec": "60",
+            "QueuedRequests": "false",
+            "TaskScheduler": "RR",
             "ProxyPortClass": "DBusLocalPdo",
-            "Interfaces" :
-            [
+            "Interfaces": [
                 {
-                    "Comment-0" : "the following attributes are mandatory",
-                    "InterfaceName" : "CRpcReqForwarderImpl",
-                    "BindToClsid" : "true"
+                    "Comment-0": "the following attributes are mandatory",
+                    "InterfaceName": "CRpcReqForwarderImpl",
+                    "BindToClsid": "true"
                 },
                 {
-                    "InterfaceName" : "IInterfaceServer",
-                    "Pausable"  : "false"
+                    "InterfaceName": "IInterfaceServer",
+                    "Pausable": "false"
                 },
                 {
-                    "InterfaceName" : "IUnknown",
-                    "Pausable" : "false"
+                    "InterfaceName": "IUnknown",
+                    "Pausable": "false"
                 },
                 {
-                    "InterfaceName" : "CRpcReqForwarder",
-                    "Pausable"  : "true"
+                    "InterfaceName": "CRpcReqForwarder",
+                    "Pausable": "true"
                 },
                 {
-                    "InterfaceName" : "CStatCountersServer",
-                    "Pausable"  : "true"
+                    "InterfaceName": "CStatCountersServer",
+                    "Pausable": "true"
                 }
             ]
         },
         {
             "ObjectName": "RpcTcpBridgeImpl",
-            "BusName" : "RpcTcpBusPort_0",
+            "BusName": "RpcTcpBusPort_0",
             "PortClass": "TcpStreamPdo2",
-            "PortNumber" : "4132",
-            "RequestTimeoutSec" : "120",
-            "KeepAliveTimeoutSec" : "60",
-            "QueuedRequests" : "false",
+            "PortNumber": "4132",
+            "RequestTimeoutSec": "120",
+            "KeepAliveTimeoutSec": "60",
+            "QueuedRequests": "false",
             "Note-1": " bridge's ip address is decided at runtime",
             "ProxyPortClass": "TcpStreamPdo2",
-            "Interfaces" :
-            [
+            "Interfaces": [
                 {
-                    "Comment-0" : "the following attributes are mandatory",
-                    "InterfaceName" : "CRpcTcpBridgeImpl",
-                    "BindToClsid" : "true"
+                    "Comment-0": "the following attributes are mandatory",
+                    "InterfaceName": "CRpcTcpBridgeImpl",
+                    "BindToClsid": "true"
                 },
                 {
-                    "InterfaceName" : "IInterfaceServer",
-                    "Pausable"  : "false"
+                    "InterfaceName": "IInterfaceServer",
+                    "Pausable": "false"
                 },
                 {
-                    "InterfaceName" : "IUnknown",
-                    "Pausable" : "false"
+                    "InterfaceName": "IUnknown",
+                    "Pausable": "false"
                 },
                 {
-                    "InterfaceName" : "IStream",
-                    "Pausable" : "false"
+                    "InterfaceName": "IStream",
+                    "Pausable": "false"
                 },
                 {
-                    "InterfaceName" : "IStreamMH",
-                    "Pausable" : "false"
+                    "InterfaceName": "IStreamMH",
+                    "Pausable": "false"
                 },
                 {
-                    "InterfaceName" : "CRpcTcpBridge",
-                    "Pausable"  : "true"
+                    "InterfaceName": "CRpcTcpBridge",
+                    "Pausable": "true"
                 },
                 {
-                    "InterfaceName" : "CStatCountersServer",
-                    "Pausable"  : "true"
+                    "InterfaceName": "CStatCountersServer",
+                    "Pausable": "true"
                 }
             ]
         },
         {
             "ObjectName": "RpcRouterReqFwdrImpl",
-            "BusName" : "DBusBusPort_0",
+            "BusName": "DBusBusPort_0",
             "PortClass": "DBusLocalPdo",
-            "PortId" : "0",
-            "RequestTimeoutSec" : "120",
-            "KeepAliveTimeoutSec" : "60",
-            "QueuedRequests" : "false",
+            "PortId": "0",
+            "RequestTimeoutSec": "120",
+            "KeepAliveTimeoutSec": "60",
+            "QueuedRequests": "false",
             "ProxyPortClass": "DBusLocalPdo",
-            "Interfaces" :
-            [
+            "Interfaces": [
                 {
-                    "Comment-0" : "the following attributes are mandatory",
-                    "InterfaceName" : "CRpcRouterReqFwdrImpl",
-                    "BindToClsid" : "true"
+                    "Comment-0": "the following attributes are mandatory",
+                    "InterfaceName": "CRpcRouterReqFwdrImpl",
+                    "BindToClsid": "true"
                 },
                 {
-                    "InterfaceName" : "IInterfaceServer",
-                    "Pausable"  : "false"
+                    "InterfaceName": "IInterfaceServer",
+                    "Pausable": "false"
                 },
                 {
-                    "InterfaceName" : "IUnknown",
-                    "Pausable" : "false"
+                    "InterfaceName": "IUnknown",
+                    "Pausable": "false"
                 },
                 {
-                    "InterfaceName" : "CRpcRouterReqFwdr",
-                    "Pausable"  : "false"
+                    "InterfaceName": "CRpcRouterReqFwdr",
+                    "Pausable": "false"
                 },
                 {
-                    "InterfaceName" : "CStatCountersServer",
-                    "Pausable"  : "false"
+                    "InterfaceName": "CStatCountersServer",
+                    "Pausable": "false"
                 }
             ]
         },
         {
             "ObjectName": "RpcRouterBridgeImpl",
-            "BusName" : "DBusBusPort_0",
+            "BusName": "DBusBusPort_0",
             "PortClass": "DBusLocalPdo",
-            "PortId" : "0",
-            "RequestTimeoutSec" : "120",
-            "KeepAliveTimeoutSec" : "60",
-            "QueuedRequests" : "false",
+            "PortId": "0",
+            "RequestTimeoutSec": "120",
+            "KeepAliveTimeoutSec": "60",
+            "QueuedRequests": "false",
             "ProxyPortClass": "DBusLocalPdo",
-            "Interfaces" :
-            [
+            "Interfaces": [
                 {
-                    "Comment-0" : "the following attributes are mandatory",
-                    "InterfaceName" : "CRpcRouterBridgeImpl",
-                    "BindToClsid" : "true"
+                    "Comment-0": "the following attributes are mandatory",
+                    "InterfaceName": "CRpcRouterBridgeImpl",
+                    "BindToClsid": "true"
                 },
                 {
-                    "InterfaceName" : "IInterfaceServer",
-                    "Pausable"  : "false"
+                    "InterfaceName": "IInterfaceServer",
+                    "Pausable": "false"
                 },
                 {
-                    "InterfaceName" : "IUnknown",
-                    "Pausable" : "false"
+                    "InterfaceName": "IUnknown",
+                    "Pausable": "false"
                 },
                 {
-                    "InterfaceName" : "CRpcRouterBridge",
-                    "Pausable"  : "false"
+                    "InterfaceName": "CRpcRouterBridge",
+                    "Pausable": "false"
                 },
                 {
-                    "InterfaceName" : "CStatCountersServer",
-                    "Pausable"  : "false"
+                    "InterfaceName": "CStatCountersServer",
+                    "Pausable": "false"
                 }
             ],
-            "Nodes" :
-            [
+            "Nodes": [
                 {
                     "Comments-0": "here, we define the nodes this bridge allows to relay requests to",
-                    "NodeName" : "rasp2",
-                    "Enabled" : "true",
-                    "Protocol" : "native",
-                    "AddrFormat" : "ipv4",
-                    "IpAddress" : "192.168.3.8",
+                    "NodeName": "rasp2",
+                    "Enabled": "true",
+                    "Protocol": "native",
+                    "AddrFormat": "ipv4",
+                    "IpAddress": "192.168.3.8",
                     "PortNumber": "4132",
-                    "Compression" : "false",
-                    "EnableWS":  "false",
+                    "Compression": "false",
+                    "EnableWS": "false",
                     "EnableSSL": "false",
-                    "ConnRecover" : "false"
+                    "ConnRecover": "false",
+                    "EnalbeSSL": "false",
+                    "DestURL": ""
                 },
                 {
                     "Comments-0": "here, we define the nodes this bridge allows to relay requests to",
-                    "NodeName" : "rasp3",
-                    "Enabled" : "true",
-                    "Protocol" : "native",
-                    "AddrFormat" : "ipv4",
-                    "IpAddress" : "192.168.3.16",
+                    "NodeName": "vrasp",
+                    "Enabled": "true",
+                    "Protocol": "native",
+                    "AddrFormat": "ipv4",
+                    "IpAddress": "192.168.3.3",
                     "PortNumber": "4132",
-                    "Compression" : "false",
-                    "EnableWS":  "false",
+                    "Compression": "false",
+                    "EnableWS": "false",
                     "EnableSSL": "false",
-                    "ConnRecover" : "false"
+                    "ConnRecover": "false",
+                    "EnalbeSSL": "false",
+                    "DestURL": ""
+                }
+            ],
+            "LBGroup": [
+                {
+                    "rasps": [
+                        "rasp2",
+                        "vrasp"
+                    ]
                 }
             ]
         },
         {
             "ObjectName": "RpcRouterManagerImpl",
-            "BusName" : "DBusBusPort_0",
+            "BusName": "DBusBusPort_0",
             "PortClass": "DBusLocalPdo",
-            "PortId" : "0",
-            "RequestTimeoutSec" : "120",
-            "KeepAliveTimeoutSec" : "60",
-            "QueuedRequests" : "false",
+            "PortId": "0",
+            "RequestTimeoutSec": "120",
+            "KeepAliveTimeoutSec": "60",
+            "QueuedRequests": "false",
             "ProxyPortClass": "DBusLocalPdo",
             "Comment-0": "'Role' is a router-specific prop. 01: as a forwarder, 02: as a server, 03 or not exist: as both forwarder and server",
-            "Role" : "0x02",
-            "Interfaces" :
-            [
+            "Role": "0x02",
+            "Interfaces": [
                 {
-                    "InterfaceName" : "CRpcRouterManagerImpl",
-                    "BindToClsid" : "true"
+                    "InterfaceName": "CRpcRouterManagerImpl",
+                    "BindToClsid": "true"
                 },
                 {
-                    "InterfaceName" : "IInterfaceServer",
-                    "Pausable"  : "false"
+                    "InterfaceName": "IInterfaceServer",
+                    "Pausable": "false"
                 }
-            ]
+            ],
+            "MaxRequests": "4096",
+            "MaxPendingRequests": "8192"
         }
     ]
 }
