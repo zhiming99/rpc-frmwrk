@@ -2,11 +2,15 @@ lib_dir=@libdir@
 bin_dir=@bindir@
 export LD_LIBRARY_PATH=${lib_dir}:${lib_dir}/rpcf
 if [ "$1" == "2" ]; then
+    echo starting bridge...
+    ifconfig -a
     ${bin_dir}/rpcrouter -r 2 &
     ${bin_dir}/rpcf/ifsvrsmk &
     sleep 10
 elif [ "$1" == "1" ]; then
+    echo starting reqfwdr...
     ${bin_dir}/rpcrouter -r 1 &
     sleep 15
+    netstat -lnpt
     ${bin_dir}/rpcf/ifclismk
 fi
