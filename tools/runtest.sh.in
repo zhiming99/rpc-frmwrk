@@ -2,16 +2,14 @@ lib_dir=@libdir@
 bin_dir=@bindir@
 export LD_LIBRARY_PATH=${lib_dir}:${lib_dir}/rpcf
 if [ "$1" == "2" ]; then
-    echo starting bridge...
+    echo starting the bridge...
     ${bin_dir}/rpcrouter -r 2 &
-    ${bin_dir}/rpcf/ifsvrsmk &
-    sleep 10
+    echo starting the app server...
+    ${bin_dir}/rpcf/ifsvrsmk
 elif [ "$1" == "1" ]; then
-    echo starting reqfwdr...
+    echo starting the reqfwdr...
     ${bin_dir}/rpcrouter -r 1 &
     sleep 15
-    netstat -lnpt
-    cat ${bin_dir}/../etc/rpcf/echodesc.json
-    cat ${bin_dir}/../etc/rpcf/driver.json
+    echo starting echo test...
     ${bin_dir}/rpcf/ifclismk
 fi
