@@ -4,7 +4,9 @@ export LD_LIBRARY_PATH=${lib_dir}:${lib_dir}/rpcf
 if [ "$1" == "2" ]; then
     ${bin_dir}/rpcrouter -r 2 &
     ${bin_dir}/rpcf/ifsvrsmk &
+    sleep 10
 elif [ "$1" == "1" ]; then
     ${bin_dir}/rpcrouter -r 1 &
-    ${bin_dir}/rpcf/ifclismk &
+    sleep 15
+    ${bin_dir}/rpcf/ifclismk
 fi
