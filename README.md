@@ -59,6 +59,9 @@ This project depends on the following 3rd-party packags to build:
 6. Logging service
 
 ---
+[`Fri Aug 06 2021 10:05:20 AM Beijing`]   
+1. improved the workflow and docker build, and the test cases can now run automatically.
+
 [`Mon Jul 31 2021 10:23:00 AM Beijing`]   
 1. Made the connection limiter to work. Time to merge the `rfcdev` to the master branch.
 2. Will add some config options to the config dialog, to wrap up `rfcdev`. It is not perfect yet, since `rfc` is now just a concurrency limiter, to be a complete flow controller, we still need some work on traffics of each individual connection. But at this moment, let's leave this issue behind till it cannot be ignored.
