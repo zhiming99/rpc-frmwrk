@@ -6,4 +6,5 @@ RUN apt-get install -y gcc g++ python3 python3-dev flex bison libtool shtool aut
 RUN apt-get -y install sip5-tools || apt-get -y install sip-dev python3-sip python3-sip-dev || true
 ADD rpcf-0.1.0.tar.gz /root/
 RUN cd /root/rpcf-0.1.0;/bin/sh /root/rpcf-0.1.0/configure;make;make install;echo 'export LD_LIBRARY_PATH=/usr/local/lib:/usr/local/lib/rpcf'>>/root/.bashrc
-RUN dbus-run-session bash /root/rpcf-0.1.0/tools/runtest.sh 2; dbus-run-session /root/rpcf-0.1.0/tools/runtest.sh 1
+RUN dbus-run-session bash /root/rpcf-0.1.0/tools/runtest.sh 2 &
+RUN dbus-run-session bash /root/rpcf-0.1.0/tools/runtest.sh 1
