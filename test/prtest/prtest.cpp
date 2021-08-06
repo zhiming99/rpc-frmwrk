@@ -218,9 +218,10 @@ void CIfSmokeTest::testCliStartStop()
     }
 
     ret = pIf->Stop();
-    CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 
     pIf.Clear();
+
+    CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 }
 #endif
 

@@ -126,9 +126,9 @@ void CIfSmokeTest::testSvrStartStop()
 
     // stop the server
     ret = pIf->Stop();
-    CPPUNIT_ASSERT( SUCCEEDED( ret ) );
-
     pIf.Clear();
+
+    CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 }
 #endif
 
@@ -262,10 +262,10 @@ void CIfSmokeTest::testCliStartStop()
         ret = 0;
     }
 
-    CPPUNIT_ASSERT( SUCCEEDED( ret ) );
-
     // release all the resources of the proxy
     pIf.Clear();
+
+    CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 }
 
 void CIfSmokeTest::testDBusLeak()

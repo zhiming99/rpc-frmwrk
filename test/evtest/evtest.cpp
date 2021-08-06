@@ -120,9 +120,9 @@ void CIfSmokeTest::testSvrStartStop()
     }
 
     ret = pIf->Stop();
-    CPPUNIT_ASSERT( SUCCEEDED( ret ) );
-
     pIf.Clear();
+
+    CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 }
 
 void CIfSmokeTest::testCliStartStop()
@@ -173,6 +173,8 @@ void CIfSmokeTest::testCliStartStop()
         pIf->Stop();
         pIf.Clear();
     }
+
+    CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 }
 
 int main( int argc, char** argv )

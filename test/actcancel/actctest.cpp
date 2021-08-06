@@ -118,9 +118,10 @@ void CIfSmokeTest::testSvrStartStop()
         sleep( 1 );
 
     ret = pIf->Stop();
-    CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 
     pIf.Clear();
+
+    CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 }
 #endif
 
@@ -225,9 +226,9 @@ void CIfSmokeTest::testCliActCancel()
     }
 
     ret = pIf->Stop();
-    CPPUNIT_ASSERT( SUCCEEDED( ret ) );
-
     pIf.Clear();
+
+    CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 }
 #endif
 

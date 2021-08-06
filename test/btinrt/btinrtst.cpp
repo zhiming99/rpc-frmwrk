@@ -393,6 +393,8 @@ void CIfSmokeTest::testCliStartStop()
             sleep( 1 );
         ret = 0;
     }
+
+    CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 }
 
 void CIfSmokeTest::testDBusLeak()

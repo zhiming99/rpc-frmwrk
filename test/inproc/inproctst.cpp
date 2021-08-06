@@ -247,13 +247,14 @@ void CIfSmokeTest::testCliStartStop()
     }
 
     ret = pIf->Stop();
-    // CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 
     pIf.Clear();
 
     bExit = true;
     pSvrThrd->join();
     delete pSvrThrd;
+
+    CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 }
 
 int main( int argc, char** argv )

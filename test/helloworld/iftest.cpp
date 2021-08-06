@@ -288,6 +288,8 @@ void CIfSmokeTest::testCliStartStop()
 
     // release all the resources of the proxy
     pIf.Clear();
+
+    CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 }
 
 bool test()
