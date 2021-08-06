@@ -60,7 +60,7 @@ This project depends on the following 3rd-party packags to build:
 
 ---
 [`Fri Aug 06 2021 10:05:20 AM Beijing`]   
-1. improved the workflow and docker build, so that test cases can run after building.
+1. improved the workflow and docker build, and the test cases can now run automatically.
 
 [`Mon Jul 31 2021 10:23:00 AM Beijing`]   
 1. Made the connection limiter to work. Time to merge the `rfcdev` to the master branch.
