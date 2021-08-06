@@ -1,15 +1,22 @@
 lib_dir=@libdir@
 bin_dir=@bindir@
 export LD_LIBRARY_PATH=${lib_dir}:${lib_dir}/rpcf
+cat /proc/cpuinfo
 if [ "$1" == "2" ]; then
     echo starting the bridge...
     ${bin_dir}/rpcrouter -r 2 &
     echo starting the app server...
-    ${bin_dir}/rpcf/ifsvrsmk
+    ${bin_dir}/rpcf/ifsvrsmk&
+    ${bin_dir}/rpcf/kasvrtst&
+    ${bin_dir}/rpcf/actcsvrtst&
+    ${bin_dir}/rpcf/prsvrtst
 elif [ "$1" == "1" ]; then
     echo starting the reqfwdr...
     ${bin_dir}/rpcrouter -r 1 &
     sleep 15
     echo starting echo test...
     ${bin_dir}/rpcf/ifclismk
+    ${bin_dir}/rpcf/kaclitst
+    ${bin_dir}/rpcf/actclitst
+    ${bin_dir}/rpcf/prclitst
 fi
