@@ -4407,10 +4407,17 @@ gint32 CRpcReqForwarderProxy::ForwardRequest(
             bResp = false;
 
         DMsgPtr pNewMsg;
-        ret = BuildNewMsgToFwrd( pReqCtx,
-            pReqMsg, pNewMsg );
-        if( ERROR( ret ) )
-            break;
+        if( bResp )
+        {
+            pNewMsg = pReqMsg;
+        }
+        else
+        {
+            ret = BuildNewMsgToFwrd( pReqCtx,
+                pReqMsg, pNewMsg );
+            if( ERROR( ret ) )
+                break;
+        }
 
         oBuilder.Push( pNewMsg );
         oBuilder.SetMethodName(
