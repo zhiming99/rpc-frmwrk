@@ -55,7 +55,7 @@ This project depends on the following 3rd-party packags to build:
 1. Python code generator
 2. JavaScript support
 3. Examples and Tutorials
-4. Access Control
+4. Performance optimization
 5. A tree-like hierarchical persistant registry.
 6. Logging service
 
