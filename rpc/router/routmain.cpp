@@ -48,7 +48,7 @@ void CIfRouterTest::setUp()
 {
     gint32 ret = 0;
     do{
-        DebugPrint( 0, "Starting..." );
+        OutputMsg( 0, "Starting %s...", MODULE_NAME );
         ret = CoInitialize( 0 );
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 

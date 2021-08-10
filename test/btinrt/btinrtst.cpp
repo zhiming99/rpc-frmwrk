@@ -34,6 +34,10 @@ using namespace rpcf;
 
 CPPUNIT_TEST_SUITE_REGISTRATION( CIfSmokeTest );
 
+static bool g_bAuth = false;
+static bool g_bRfc = false;
+static bool g_bSepConn = false;
+
 void CIfSmokeTest::setUp()
 {
     gint32 ret = 0;
@@ -44,8 +48,22 @@ void CIfSmokeTest::setUp()
 
         CParamList oParams;
 
-        ret = oParams.Push( std::string( MODULE_NAME ) );
+        ret = oParams.Push(
+            std::string( MODULE_NAME ) );
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
+
+        guint32 dwNumThrds =
+            ( guint32 )std::max( 1U,
+            std::thread::hardware_concurrency() );
+
+        if( dwNumThrds > 1 )
+            dwNumThrds = ( dwNumThrds >> 1 );
+
+        oParams[ propMaxTaskThrd ] = dwNumThrds;
+
+        // weird, more threads will have worse
+        // performance of handshake
+        oParams[ propMaxIrpThrd ] = 2;
 
         // create the iomanager
         ret = m_pMgr.NewObj(
@@ -59,14 +77,26 @@ void CIfSmokeTest::setUp()
         pSvc->SetCmdLineOpt( propObjDescPath,
             "./btinrt.json" );
 
-        pSvc->SetRouterName( "btinrtsvr" );
+        pSvc->SetRouterName( ROUTER_NAME );
+
+        if( g_bAuth )
+        {
+            pSvc->SetCmdLineOpt(
+                propHasAuth, g_bAuth );
+        }
+
+        if( g_bRfc )
+        {
+            pSvc->SetCmdLineOpt(
+                propEnableRfc, g_bRfc );
+        }
 
 #ifdef CLIENT
         pSvc->SetCmdLineOpt(
-            propRouterRole, 1 );
+            propSepConns, g_bSepConn );
 
         pSvc->SetCmdLineOpt(
-            propHasAuth, true );
+            propRouterRole, 1 );
 #endif
 #ifdef SERVER
         pSvc->SetCmdLineOpt(
@@ -83,7 +113,6 @@ void CIfSmokeTest::setUp()
     }while( 0 );
 }
 
-extern void DumpObjs();
 void CIfSmokeTest::tearDown()
 {
     gint32 ret = 0;
@@ -177,6 +206,11 @@ CfgPtr CIfSmokeTest::InitRouterCfg()
 
     do{
 
+        stdstr strDescPath;
+        strDescPath = "./router.json";
+        if( g_bAuth )
+            strDescPath = "./rtauth.json";
+
         std::string strRtName;
         CIoManager* pMgr = m_pMgr;
         pMgr->GetRouterName( strRtName );
@@ -186,7 +220,7 @@ CfgPtr CIfSmokeTest::InitRouterCfg()
 
         oParams[ propIoMgr ] = m_pMgr;
         ret = CRpcServices::LoadObjDesc(
-            "./rtauth.json",
+            strDescPath,
             OBJNAME_ROUTER,
             true, oParams.GetCfg() );
 
@@ -284,6 +318,7 @@ void CIfSmokeTest::testCliStartStop()
 
     gint32 i = 0;
 
+    DebugPrint( 0, "Test start" );
     if( pCli != nullptr )
     do{
         // make sure the server is online
@@ -367,6 +402,11 @@ void CIfSmokeTest::testCliStartStop()
     if( ERROR( ret ) )
     {
         DebugPrint( ret, "Error, quit loop" );
+    }
+    else
+    {
+
+        OutputMsg( ret, "successfully completed" );
     }
     // stop the proxy
     ret = pIf->Stop();
@@ -466,5 +506,48 @@ bool test()
 
 int main( int argc, char** argv )
 {
+    int opt = 0;
+    int ret = 0;
+    while( ( opt = getopt( argc, argv, "acf" ) ) != -1 )
+    {
+        switch (opt)
+        {
+        case 'a':
+            {
+                g_bAuth = true;
+                break;
+            }
+        case 'c':
+            {
+#ifdef CLIENT
+                g_bSepConn = true;
+#endif
+                break;
+            }
+        case 'f':
+            {
+                g_bRfc = true;
+                break;
+            }
+        default: /*  '?' */
+            ret = -EINVAL;
+            break;
+        }
+
+        if( ERROR( ret ) )
+            break;
+    }
+
+    if( ERROR( ret ) )
+    {
+        fprintf( stderr,
+            "Usage: %s [Options]\n" 
+            "\t [-a to enable authentication ]\n"
+            "\t [-c to establish a seperate connection to the same bridge per client, only for role 1]\n"
+            "\t [-f to enable request-based flow control on the gateway bridge, ignore it if no massive connections ]\n",
+            argv[ 0 ] );
+
+        exit( -ret );
+    }
     return test();
 }

@@ -613,44 +613,36 @@ bool CIrpCompThread::IsRunning() const
 void CIrpCompThread::ThreadProc( void* context )
 {
     IrpPtr pIrp;
-    bool bEmpty = true;
     gint32 ret = 0;
 
     this->SetThreadName();
 
     while( !m_bExit )
     {
-        bEmpty = true;
-        ret = Sem_TimedwaitSec( &m_semIrps,
-            THREAD_WAKEUP_INTERVAL );
-
-        if( ret == -EAGAIN )
-            continue;
-
+        ret = Sem_Wait( &m_semIrps );
         if( ERROR( ret ) )
             break;
 
+        std::deque<IrpPtr> quePendingIrps;
         if( true )
         {
             CStdMutex a( m_oMutex );
-            if( m_quePendingIrps.size() )
-                pIrp = m_quePendingIrps.front();
+            guint32 dwCount = m_quePendingIrps.size();
+            if( dwCount > 0 )
+            {
+                quePendingIrps = m_quePendingIrps;
+                m_quePendingIrps.clear();
+                for( int i = 0; i < dwCount; ++i )
+                    Sem_Post( &m_semSlots );
+            }
         }
 
-        if( !pIrp.IsEmpty() )
+        for( auto elem : quePendingIrps )
         {
-            CompleteIrp( pIrp );
-
-            CStdMutex a( m_oMutex );
-            m_quePendingIrps.pop_front();
-            bEmpty = m_quePendingIrps.empty();
-            Sem_Post( &m_semSlots );
+            CompleteIrp( elem );
+            if( m_bExit )
+                break;
         }
-
-        pIrp.Clear();
-        // pIrp destroyed
-        if( !bEmpty )
-            continue;
     }
     
 }

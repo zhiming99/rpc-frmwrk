@@ -24,7 +24,7 @@ import getopt
 from rpcf.rpcbase import *
 
 import types
-from rpcf.proxy import PyRpcContext, PyRpcProxy
+from rpcf.proxy import *
 from rpcf.proxy import ErrorCode as EC
 from typing import Union
 
@@ -345,7 +345,7 @@ def test_main() :
 
         '''create the server object, and start
         it'''
-        print( "start to work here..." )
+        PyOutputMsg( "start to work here...".encode() )
         oProxy = PyFileTransProxy( oContext.pIoMgr,
             "./sfdesc.json",
             "PyFileTransSvr" )
@@ -386,7 +386,7 @@ def test_main() :
             ret = EC.ERROR_FAIL
             break
 
-        print( "Uploading file..." )
+        PyOutputMsg( "Uploading file...".encode() )
         tupRet = oProxy.DoUploadFile(
             fileName, hChannel )
          
@@ -413,6 +413,7 @@ def test_main() :
             ret = EC.ERROR_FAIL
             break
         
+        PyOutputMsg( "Uploading file done".encode() )
         fileName = os.path.basename( fileName )
         if fileName == "" :
             ret = -errno.EINVAL
@@ -426,7 +427,7 @@ def test_main() :
                 resp[ 0 ] = -err.errno
                 break
 
-        print( "Downloading file..." )
+        PyOutputMsg( "Downloading file...".encode() )
         tupRet = oProxy.DoDownloadFile(
             fileName, hChannel )
 
@@ -435,6 +436,7 @@ def test_main() :
             break
 
         oProxy.WaitForComplete()
+        PyOutputMsg( "Done".encode() )
 
         break #while True
 

@@ -3544,6 +3544,8 @@ gint32 CRpcServices::SetupReqIrp( IRP* pIrp,
         guint32 dwTimeoutSec = 0;
         ret = oReq.GetTimeoutSec( dwTimeoutSec );
 
+        pIrp->SetCompleteInPlace( true );
+
         if( SUCCEEDED( ret ) &&
             dwTimeoutSec != 0 )
         {

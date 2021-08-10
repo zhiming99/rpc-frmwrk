@@ -2158,4 +2158,9 @@ void PyDbgPrint( char* szMsg, int level = 3 );
     DebugPrintEx( ( EnumLogLvl )a1, 0, "%s", a0 );
 %End
 
+void PyOutputMsg( char* szMsg );
+%MethodCode
+    OutputMsg( 0, "%s", a0 );
+%End
+
 %Include server.sip

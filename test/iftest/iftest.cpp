@@ -181,7 +181,7 @@ void CIfSmokeTest::testCliStartStop()
         if( !pCli->IsConnected() )
             break;
 
-        DebugPrint( 0, "loop %d:", i );
+        OutputMsg( 0, "loop %d:", i );
 
         std::string strText( "Hello world!" );
         std::string strReply;
@@ -189,7 +189,7 @@ void CIfSmokeTest::testCliStartStop()
 
         // string echo
         const char*& pszReply = szReply ; 
-        DebugPrint( 0, "Start..." );
+        OutputMsg( 0, "Start..." );
         ret = pCli->Echo( strText, strReply );
         // CPPUNIT_ASSERT( SUCCEEDED( ret ) );
         if( ERROR( ret ) )
@@ -247,7 +247,7 @@ void CIfSmokeTest::testCliStartStop()
 
     if( ERROR( ret ) )
     {
-        DebugPrint( ret, "Error, quit loop" );
+        OutputMsg( ret, "Error, quit loop" );
     }
     // stop the proxy
     ret = pIf->Stop();

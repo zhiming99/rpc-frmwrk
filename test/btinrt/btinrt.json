@@ -9,7 +9,6 @@
             "PortId": "0",
             "RequestTimeoutSec": "120",
             "KeepAliveTimeoutSec": "60",
-            "QueuedRequests": "false",
             "ProxyPortClass": "DBusProxyPdoLpbk",
             "ProxyPortClass-1": "DBusLocalPdo",
             "comment-1": "IpAddress is the ip address of the server",
@@ -34,14 +33,13 @@
         {
             "ObjectName": "RpcTcpBridgeImpl",
             "BusName": "RpcTcpBusPort_0",
-            "PortClass": "TcpStreamPdo",
+            "PortClass": "TcpStreamPdo2",
             "PortNumber": "4132",
             "RequestTimeoutSec": "120",
             "KeepAliveTimeoutSec": "60",
-            "QueuedRequests": "false",
             "Note-1": " bridge's ip address is decided at runtime",
-            "ProxyPortClass": "TcpStreamPdo",
-            "RemoteModName": "rpcrouter",
+            "ProxyPortClass": "TcpStreamPdo2",
+            "RemoteModName": "btinrtsvr",
             "Interfaces": [
                 {
                     "Comment-0": "the following attributes are mandatory",
@@ -77,10 +75,9 @@
             "PortNumber": "4132",
             "RequestTimeoutSec": "120",
             "KeepAliveTimeoutSec": "60",
-            "QueuedRequests": "false",
             "Note-1": " bridge's ip address is decided at runtime",
             "ProxyPortClass": "TcpStreamPdo2",
-            "RemoteModName": "rpcrouter",
+            "RemoteModName": "btinrtsvr",
             "Interfaces": [
                 {
                     "Comment-0": "the following attributes are mandatory",

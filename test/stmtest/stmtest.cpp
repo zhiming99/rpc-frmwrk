@@ -228,7 +228,7 @@ void CIfSmokeTest::testCliStartStop()
         timespec ts = { 0 }, ts2={ 0 };
         clock_gettime( CLOCK_REALTIME, &ts );
 
-        DebugPrint( ret, "MainLoopStart..." );
+        OutputMsg( ret, "MainLoopStart..." );
 
         //
         // method 1: asynchronous way to
@@ -273,7 +273,7 @@ void CIfSmokeTest::testCliStartStop()
             break;
 
         BufPtr pBuf( true );
-        DebugPrint( ret, "SyncLoopStart..." );
+        OutputMsg( ret, "SyncLoopStart..." );
         clock_gettime( CLOCK_REALTIME, &ts );
         // sync call for LOOP_COUNT times
         for( int i = 0; i < LOOP_COUNT; i++ )
@@ -315,9 +315,9 @@ void CIfSmokeTest::testCliStartStop()
         // wins when the loop is over 10000, and
         // below 10000, the SyncLoop could be
         // better.
-        DebugPrint( ret, "MainLoop takes %g secs", dbTime1 );
-        DebugPrint( ret, "SyncLoop takes %g secs", dbTime2 );
-        DebugPrint( ret, " MainLoop is %g time faster than SyncLoop",
+        OutputMsg( ret, "MainLoop takes %g secs", dbTime1 );
+        OutputMsg( ret, "SyncLoop takes %g secs", dbTime2 );
+        OutputMsg( ret, " MainLoop is %g time faster than SyncLoop",
             dbTime2/dbTime1 );
 
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
@@ -326,7 +326,7 @@ void CIfSmokeTest::testCliStartStop()
         {
             ret = pCli->Pause_Proxy();
             CPPUNIT_ASSERT( SUCCEEDED( ret ) );
-            DebugPrint( 0, "Pause interface Completed" );
+            OutputMsg( 0, "Pause interface Completed" );
         }
 
     }while( 0 );

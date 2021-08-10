@@ -545,7 +545,6 @@ class CMethodProxy :
     }
 };
 
-#define UNREFERENCED( a ) (void)( a )
 #define BEGIN_PROXY_MAP_COMMON( bNonDBus, _iIfId_, _pIf ) \
 do{ \
     CCfgOpenerObj oCfg( _pIf ); \

@@ -1,4 +1,0 @@
-#!/bin/bash
-./configure "CPPFLAGS=-O0 -ggdb -DDEBUG -D_DEBUG=1"
-# release
-#./configure "CPPFLAGS=-O2 -g -DRELEASE -D_DEBUG=0"

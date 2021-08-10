@@ -719,24 +719,19 @@ gint32 CRpcTcpBusPort::CreateMLoopPool()
         if( ERROR( ret ) )
             ret = 0;
 
+        guint32 dwNumCores = pMgr->GetNumCores();
         bool bMultiLoop = false;
-        if( dwRole & 0x2 )
-            bMultiLoop = true;
+        if( ( dwRole & 0x2 ) && m_bRfc )
+        {
+            dwCount = dwNumCores >> 1;
+        }
         else if( dwRole & 1 )
         {
             bool bSepConn = false;
             ret = pMgr->GetCmdLineOpt(
                 propSepConns, bSepConn );
-            if( SUCCEEDED( ret ) )
-                bMultiLoop = bSepConn;
-            else
-                ret = 0;
-        }
-
-        if( bMultiLoop )
-        {
-            dwCount =
-                pMgr->GetNumCores() >> 1;
+            if( SUCCEEDED( ret ) && bSepConn )
+                dwCount = dwNumCores >> 1;
         }
 
         for( int i = 0; i < dwCount; ++i )
@@ -799,11 +794,11 @@ gint32 CRpcTcpBusPort::DestroyMLoopPool()
 gint32 CRpcTcpBusPort::AllocMainLoop(
     MloopPtr& pLoop )
 {
-    if( !m_bRfc )
+    /*if( !m_bRfc )
     {
         pLoop = GetIoMgr()->GetMainIoLoop();
         return STATUS_SUCCESS;
-    }
+    }*/
 
     gint32 ret = STATUS_SUCCESS;
     do{
@@ -831,8 +826,8 @@ gint32 CRpcTcpBusPort::AllocMainLoop(
 gint32 CRpcTcpBusPort::ReleaseMainLoop(
     MloopPtr& pLoop )
 {
-    if( !m_bRfc )
-        return STATUS_SUCCESS;
+    /*if( !m_bRfc )
+        return STATUS_SUCCESS;*/
 
     if( pLoop.IsEmpty() )
         return -EINVAL;
@@ -863,12 +858,12 @@ gint32 CRpcTcpBusPort::PreStart( IRP* pIrp )
         {
             m_bRfc = false;
             ret = 0;
-            break;
         }
+        else
+            m_bRfc = bRfc;
 
-        m_bRfc = bRfc;
-        if( !m_bRfc )
-            break;
+        /*if( !m_bRfc )
+            break;*/
 
         ret = CreateMLoopPool();
         if( ERROR( ret ) )
@@ -882,7 +877,7 @@ gint32 CRpcTcpBusPort::PreStart( IRP* pIrp )
 gint32 CRpcTcpBusPort::PostStop( IRP* pIrp )
 {
     gint32 ret = 0;
-    if( m_bRfc )
+    //if( m_bRfc )
         ret = DestroyMLoopPool();
     if( ERROR( ret ) )
         return ret;

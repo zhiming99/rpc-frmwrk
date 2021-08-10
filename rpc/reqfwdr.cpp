@@ -1981,7 +1981,7 @@ gint32 CRpcReqForwarder::OnModOfflineInternal(
     gint32 ret = 0;
 
     do{
-        DebugPrint( 0, "%s is down",
+        OutputMsg( 0, "%s is down",
             strUniqName.c_str() );
 
         ClearRefCountByUniqName(
@@ -4407,7 +4407,11 @@ gint32 CRpcReqForwarderProxy::ForwardRequest(
             bResp = false;
 
         DMsgPtr pNewMsg;
-        if( bResp )
+        CRpcRouterBridge* pRouter =
+            static_cast< CRpcRouterBridge* >
+                ( GetParent() );
+
+        if( !pRouter->HasAuth() )
         {
             pNewMsg = pReqMsg;
         }

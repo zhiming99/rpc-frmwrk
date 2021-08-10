@@ -25,7 +25,7 @@ gint32 CStressSvc_CliImpl::EchoCallback(
             break;
         }
         CCfgOpener oCfg( context );
-        guint32 dwIdx;
+        guint32 dwIdx = 0;
         oCfg.GetIntProp( 0, dwIdx );
         if( iRet == ERROR_QUEUE_FULL )
         {
@@ -36,13 +36,14 @@ gint32 CStressSvc_CliImpl::EchoCallback(
         }
         else if( iRet == -ETIMEDOUT )
         {
-            DebugPrint( iRet, "req %d, timeout, "
+            OutputMsg( iRet, "req %d, timeout, "
                 "pending %d", dwIdx,
                 ( guint32 )g_dwReqs );
             return iRet;
         }
 
-        DebugPrint( iRet, "req %d, completed, "
+        if( ( dwIdx % 100 ) == 0 )
+        OutputMsg( iRet, "req %d, completed, "
             "resp is %s, pending %d", dwIdx,
             strResp.c_str(),
             ( guint32 )g_dwReqs );

@@ -399,31 +399,10 @@ gint32 CDBusBusPort::BuildPdoPortName(
             else if( strClass == PORT_CLASS_LOCALDBUS_PDO
                 || strClass == PORT_CLASS_LOOPBACK_PDO )
             {
-                if( pCfg->exist( propPortId ) )
-                {
-                    guint32 dwPortId = 0;
-                    string strRet;
-                    ret = oCfgOpener.GetIntProp(
-                        propPortId, dwPortId );
-
-                    if( ERROR( ret ) )
-                        break;
-
-                    strPortName = strClass + string( "_" )
-                        + std::to_string( dwPortId );
-                }
+                if( strClass == PORT_CLASS_LOCALDBUS_PDO )
+                    strPortName = strClass + string( "_0" ); 
                 else
-                {
-                    if( strClass == PORT_CLASS_LOCALDBUS_PDO )
-                        strPortName = strClass + string( "_0" ); 
-                    else
-                    {
-                        guint32 dwPortId = NewPdoId();
-                        oCfgOpener[ propPortId ] = dwPortId;
-                        strPortName = strClass + "_" +
-                            std::to_string( dwPortId );
-                    }
-                }
+                    strPortName = strClass + string( "_1" ); 
             }
             else
             {
@@ -762,7 +741,7 @@ gint32 CDBusBusPort::Start( IRP *pIrp )
         const char* szName =
             dbus_bus_get_unique_name( m_pDBusConn );
 
-        DebugPrint( 0,
+        OutputMsg( 0,
             "dbus unique name: %s", szName );
 
         CParamList oParams;
@@ -775,7 +754,7 @@ gint32 CDBusBusPort::Start( IRP *pIrp )
             ( guint32* )m_pDBusConn );
 
         // flush connection every 500ms
-        oParams.Push( 5000 );
+        oParams.Push( 2000 );
 
         ret = m_pFlushTask.NewObj(
             clsid( CDBusConnFlushTask ),
@@ -2548,7 +2527,7 @@ gint32 CDBusConnFlushTask::operator()(
         return SetError( -EINVAL );
     dbus_connection_flush( m_pDBusConn );
 
-    return G_SOURCE_CONTINUE;
+    return SetError( G_SOURCE_CONTINUE );
 }
 
 CDBusConnFlushTask::~CDBusConnFlushTask()

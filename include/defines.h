@@ -79,6 +79,8 @@
 #define SUCCEEDED( ret_ )      likely( ( ret_ == 0 ) )
 #define FAILED( ret_ ) ERROR( ret_ )
 
+#define UNREFERENCED( a ) (void)( a )
+
 // the status codes
 // STATUS_PENDING, an irp is accepted and the
 // operation will happen sometime later
@@ -191,9 +193,7 @@ do{\
 
 #else
 
-#define DebugPrint( ret, strFmt, ... ) \
-({ printf( "%s\n", \
-    DebugMsg( ret, strFmt, ##__VA_ARGS__ ).c_str() );} )
+#define DebugPrint( ret, strFmt, ... ) UNREFERENCED( ret )
 
 #endif
 
@@ -201,6 +201,10 @@ do{\
 ({ if( ( _level ) <= g_dwLogLevel ) \
     printf( "%s\n", \
     DebugMsg( ret, strFmt, ##__VA_ARGS__ ).c_str() );} )
+
+#define OutputMsg( ret, strFmt, ... ) \
+    ({ printf( "%s\n", \
+        DebugMsg( ret, strFmt, ##__VA_ARGS__ ).c_str() );} )
 
 #define MAX_PENDING_MSG             20
 #define MAX_DBUS_REQS               ( MAX_PENDING_MSG * 1000 )

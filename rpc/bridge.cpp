@@ -162,7 +162,7 @@ gint32 CRpcTcpBridgeProxy::OnHandshakeComplete(
             break;
         }
 
-        DebugPrint( ret,
+        OutputMsg( ret,
             "Handshake completed successfully" );
 
         guint64 qwTimestamp = 0;
@@ -282,7 +282,7 @@ gint32 CRpcTcpBridgeProxy::Handshake(
     }
     else if( SUCCEEDED( ret ) )
     {
-        DebugPrint( ret,
+        OutputMsg( ret,
             "Handshake completed successfully" );
     }
     return ret;
@@ -1493,6 +1493,9 @@ gint32 CRpcTcpBridgeProxy::SetupReqIrp(
                 TCP_CONN_DEFAULT_STM );
         }
     }
+
+    if( SUCCEEDED( ret ) )
+        pIrp->SetCompleteInPlace( true );
 
     return ret;
 }
@@ -4579,6 +4582,9 @@ gint32 CRpcTcpBridge::SetupReqIrp(
             pReqCall, pCallback );
     }
 
+    if( SUCCEEDED( ret ) )
+        pIrp->SetCompleteInPlace( true );
+
     return ret;
 }
 
@@ -5047,7 +5053,7 @@ gint32 CRpcTcpBridge::DoStartHandshake(
             {
                 m_pHsTicker.Clear();
                 oIfLock.Unlock();
-                DebugPrint( 0,
+                OutputMsg( 0,
                     "Deferred the handshake "
                     "response till Start completes" );
                 pTask->OnEvent(
@@ -5056,7 +5062,7 @@ gint32 CRpcTcpBridge::DoStartHandshake(
             break;
         }
 
-        DebugPrint( 0, "start the handshake timer" );
+        OutputMsg( 0, "start the handshake timer" );
 
         // set the session checker
         ret = DEFER_IFCALLEX_NOSCHED2(

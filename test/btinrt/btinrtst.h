@@ -25,6 +25,8 @@
 #include <cppunit/TestFixture.h>
 #include <cppunit/extensions/HelperMacros.h>
 
+#define ROUTER_NAME "btinrouter"
+
 #ifdef SERVER
 #define MODULE_NAME "btinrtsvr"
 #endif

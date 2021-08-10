@@ -1417,7 +1417,7 @@ gint32 CIoManager::Start()
             break;
         }
 
-        DebugPrint( 0, "IoMgr is starting..." );
+        OutputMsg( 0, "IoMgr is starting..." );
 
         m_bInit = true;
         m_bStop = false;
