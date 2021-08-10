@@ -7,24 +7,25 @@ This is an asynchronous and event-driven RPC implementation for embeded system w
 [`Here`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md) is an introduction about some concepts that help to understand this project.
 
 #### Features:   
-1. `Support for multiple interfaces on a single object (COM alike).`   
+1. `Support for multiple interfaces on a single object.`   
 2. `Support for synchronous/asynchronous requests handling from both sides.`   
 3. `Active canceling.`   
 4. `Server-push events`   
 5. `Keep-alive for time-consuming request.`   
 6. `Pausable/Resumable interface.`
-7. `Support RPC from remote machine, local system, and in-process.` 
-8. `Transparent support for different types of connections.`
-9. `Peer online/offline awareness.`
-10. [`Streaming support to provide double-direction stream transfer`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md#streaming)
-11. [`Secure Socket Layer (SSL) support`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/sslport/Readme.md)
-12. [`Websocket support`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/wsport/Readme.md)
-13. [`Object access via Multihop routing`](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support)
-14. [`Authentication support with Kerberos 5`](https://github.com/zhiming99/rpc-frmwrk/tree/master/rpc/security/README.md)
-15. [`Python Support`](https://github.com/zhiming99/rpc-frmwrk/tree/master/python)
-16. [`Node Redudancy/Load Balance`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md#load-balance--node-redudancy)
-17. [`A mulit-lang proxy/server code generator`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md)
-18. [`A GUI config tool for rpcrouter`](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools/README.md)
+7. `Simultaneous object access via network, IPC, and in-process.` 
+8. `Peer online/offline awareness.`
+9. `Publishing all local/remote object servers via single network port.`
+10. `HTTP free, Webserver free.`
+11. [`Streaming support to provide double-direction stream transfer`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md#streaming)
+12. [`Secure Socket Layer (SSL) support`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/sslport/Readme.md)
+13. [`Websocket support`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/wsport/Readme.md)
+14. [`Object access via Multihop routing`](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support)
+15. [`Authentication support with Kerberos 5`](https://github.com/zhiming99/rpc-frmwrk/tree/master/rpc/security/README.md)
+16. [`Python Support`](https://github.com/zhiming99/rpc-frmwrk/tree/master/python)
+17. [`Node Redudancy/Load Balance`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md#load-balance--node-redudancy)
+18. [`A mulit-lang proxy/server code generator`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md)
+19. [`A GUI config tool for rpcrouter`](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools/README.md)
 
 #### Building `rpc-frmwrk`:   
 Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60) for details.
@@ -52,9 +53,9 @@ This project depends on the following 3rd-party packags to build:
 
 #### Todo:
 1. Python code generator
-2. Java support
+2. JavaScript support
 3. Examples and Tutorials
-4. Access Control
+4. Performance optimization
 5. A tree-like hierarchical persistant registry.
 6. Logging service
 
