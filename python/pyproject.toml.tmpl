@@ -12,6 +12,7 @@ headers = ["rpc.h"]
 include-dirs = [ "../include","../ipc", "../test/stmtest"XXXXXXXX ]
 libraries = ["combase", "ipc" ]
 library-dirs = ["../combase/.libs", "../ipc/.libs" ]
+extra-link-args=["XXXWLRPATH"]
 debug = true
 tracing = true
 define-macros = ["DEBUG","_USE_LIBEV" ]

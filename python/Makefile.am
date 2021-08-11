@@ -16,12 +16,12 @@ PYTHON_EXT=`python3 -c "import importlib.machinery;print('rpcbase',importlib.mac
 
 all:
 	@if [ "x$(SIPVER)" == "x5" ]; then \
-        bash gentoml.sh;\
+        bash gentoml.sh $(libdir);\
 		sip-build --verbose --build-dir ./sipbuild; \
         if [ -f ./rpcf/$(PYTHON_EXT) ]; then rm ./rpcf/$(PYTHON_EXT); fi;\
         ln -s `pwd`/sipbuild/rpcbase/$(PYTHON_EXT) rpcf/ ;\
     elif [ "x$(SIPVER)" == "x4" ]; then \
-        python3 build-4.9.py; \
+        python3 build-4.9.py $(libdir); \
         if [ -f ./rpcf/$(PYTHON_EXT) ]; then rm ./rpcf/$(PYTHON_EXT); fi;\
         ln -s `pwd`/sip4build/rpcbase.so rpcf/$(PYTHON_EXT); \
     fi
