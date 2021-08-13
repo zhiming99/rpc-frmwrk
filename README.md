@@ -15,7 +15,7 @@ This is an asynchronous and event-driven RPC implementation for embeded system w
 6. `Pausable/Resumable interface.`
 7. `Simultaneous object access via network, IPC, and in-process.` 
 8. `Peer online/offline awareness.`
-9. `Publishing all local/remote object servers via single network port.`
+9. `Publishing multiple local/remote objects via single network port.`
 10. `HTTP free, Webserver free.`
 11. [`Streaming support to provide double-direction stream transfer`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md#streaming)
 12. [`Secure Socket Layer (SSL) support`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/sslport/Readme.md)
