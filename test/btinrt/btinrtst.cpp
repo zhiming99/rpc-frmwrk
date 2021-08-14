@@ -343,7 +343,7 @@ void CIfSmokeTest::testCliStartStop()
 
         // string echo
         const char*& pszReply = szReply ; 
-        DebugPrint( 0, "Start..." );
+        OutputMsg( 0, "Start..." );
         ret = pCli->Echo( strText, strReply );
         // CPPUNIT_ASSERT( SUCCEEDED( ret ) );
         if( ERROR( ret ) )
@@ -396,6 +396,7 @@ void CIfSmokeTest::testCliStartStop()
         if( ERROR( ret ) )
             break;
         DebugPrint( 0, "Echo2 Completed, %g", fret );
+        OutputMsg( 0, "Loop done" );
 
     }while( ++i < 100 );
 
