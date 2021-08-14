@@ -16,7 +16,7 @@ jobs:
     - name: install tzdata
       run: sudo DEBIAN_FRONTEND="noninteractive" apt-get -y install tzdata
     - name: install tools
-      run: sudo apt-get install -y gcc g++ python3 python3-dev flex bison libtool shtool automake autoconf autotools-dev make dbus libdbus-1-3 libdbus-1-dev libjsoncpp1 libjsoncpp-dev libkrb5-3 libkrb5-dev liblz4-1 liblz4-dev lz4 openssl libssl1.1 libssl-dev libcppunit-1.15-0 libcppunit-dev bash net-tools
+      run: sudo apt-get install -y gcc g++ python3 python3-dev flex bison libtool shtool automake autoconf autotools-dev make dbus libdbus-1-3 libdbus-1-dev libjsoncpp1 libjsoncpp-dev libkrb5-3 libkrb5-dev liblz4-1 liblz4-dev lz4 openssl libssl1.1 libssl-dev libcppunit-1.15-0 libcppunit-dev bash net-tools procps
     - name: install sip
       run: sudo apt-get -y install sip5-tools || sudo apt-get -y install sip-dev python3-sip python3-sip-dev || true
     - name: setup build env
