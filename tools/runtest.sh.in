@@ -22,5 +22,5 @@ elif [ "$1" == "1" ]; then
     kill -9 `pidof rpcrouter`
     ${bin_dir}/rpcf/btinrtsvr &
     sleep 5
-    $(bin_dir)/rpcf/btinrtcli
+    ${bin_dir}/rpcf/btinrtcli
 fi
