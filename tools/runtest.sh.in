@@ -9,8 +9,7 @@ if [ "$1" == "2" ]; then
     ${bin_dir}/rpcf/ifsvrsmk&
     ${bin_dir}/rpcf/kasvrtst&
     ${bin_dir}/rpcf/actcsvrtst&
-    ${bin_dir}/rpcf/prsvrtst&
-    ${bin_dir}/rpcf/btinrtsvr
+    ${bin_dir}/rpcf/prsvrtst
 elif [ "$1" == "1" ]; then
     echo starting the reqfwdr...
     ${bin_dir}/rpcrouter -r 1 &
@@ -20,5 +19,8 @@ elif [ "$1" == "1" ]; then
     ${bin_dir}/rpcf/kaclitst
     ${bin_dir}/rpcf/actclitst
     ${bin_dir}/rpcf/prclitst
+    kill -9 `pidof rpcrouter`
+    ${bin_dir}/rpcf/btinrtsvr &
+    sleep 5
     ${bin_dir}/rpcf/btinrtcli
 fi
