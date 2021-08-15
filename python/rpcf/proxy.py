@@ -11,6 +11,7 @@ from enum import IntEnum
 from typing import Union, Callable, Optional
 
 class ErrorCode( IntEnum ) :
+    INVALID_HANDLE = np.int32( 0 )
     STATUS_SUCCESS = np.int32( 0 )
     STATUS_PENDING = np.int32( 0x10001 )
     STATUS_MORE_PROCESS_NEEDED = np.int32( 0x10002 )
@@ -86,14 +87,14 @@ def GetObjType( var ) :
     elif isinstance( var, cpp.BufPtr ) :
         return var.GetExDataType()
     elif isinstance( var, int ) :
-        arch = platform.architecture()[ 0 ];
+        arch = platform.architecture()[ 0 ]
         if arch == '32bit' :
             return cpp.typeUInt32
         elif arch == '64bit' :
             return cpp.typeUInt64
     elif isinstance( var, float ) :
         return cpp.typeDouble
-    return cpp.typeNone;
+    return cpp.typeNone
 
 def GetTypeObj( typeid ) :
     if typeid == cpp.typeUInt32 :
@@ -131,61 +132,61 @@ class PyRpcContext :
     def CreateIoMgr( self, strModName ) :
         cpp.CoInitialize(0)
         p1=cpp.CParamList()
-        ret = p1.SetStrProp( 0, strModName );
+        ret = p1.SetStrProp( 0, strModName )
         if ret < 0 :
             return None
-        p2 = cpp.CastToCfg( p1.GetCfgAsObj() );
+        p2 = cpp.CastToCfg( p1.GetCfgAsObj() )
         p3=cpp.CreateObject(
             cpp.Clsid_CIoManager, p2 )
         return p3
 
     def StartIoMgr( self, pIoMgr ) :
-        p = cpp.CastToSvc( pIoMgr );
+        p = cpp.CastToSvc( pIoMgr )
         if p is None :
             return -errno.EFAULT
-        ret = p.Start();
+        ret = p.Start()
         return ret
 
     def StopIoMgr( self, pIoMgr ) :
-        p = cpp.CastToSvc( pIoMgr );
+        p = cpp.CastToSvc( pIoMgr )
         if p is None :
             return -errno.EFAULT
-        ret = p.Stop();
+        ret = p.Stop()
         return ret
 
     def CleanUp( self ) :
-        cpp.CoUninitialize();
+        cpp.CoUninitialize()
 
     def DestroyRpcCtx( self ) :
         print( "proxy.py: about to quit..." )
-        self.CleanUp();
+        self.CleanUp()
 
     def __init__( self, strModName= "PyRpcProxy" ) :
         self.strModName = strModName
 
     def Start( self, strModName="PyRpcProxy" ) :
         ret = 0
-        print( "entering..." );
-        self.pIoMgr = self.CreateIoMgr( strModName );
+        print( "entering..." )
+        self.pIoMgr = self.CreateIoMgr( strModName )
         if self.pIoMgr is not None :
-            ret = self.StartIoMgr( self.pIoMgr );
+            ret = self.StartIoMgr( self.pIoMgr )
             if ret > 0 :
-                self.StopIoMgr( self.pIoMgr );
+                self.StopIoMgr( self.pIoMgr )
             else :
-                ret = LoadPyFactory( self.pIoMgr );
+                ret = LoadPyFactory( self.pIoMgr )
         return ret
 
     def Stop( self ) :
-        print( "exiting..." );
+        print( "exiting..." )
         if self.pIoMgr is not None :
-            self.StopIoMgr( self.pIoMgr );
-        return self.DestroyRpcCtx();
+            self.StopIoMgr( self.pIoMgr )
+        return self.DestroyRpcCtx()
 
     def __enter__( self ) :
         self.Start( self.strModName )
 
     def __exit__( self, type, val, traceback ) :
-        self.Stop();
+        self.Stop()
 
 class PyRpcServices :
     def GetError( self ) :
@@ -194,14 +195,14 @@ class PyRpcServices :
         return self.iError
 
     def SetError( self, iErr ) :
-        self.iError = iErr;
+        self.iError = iErr
 
     def Start( self ) :
-        self.oInst.SetPyHost( self );
+        self.oInst.SetPyHost( self )
         ret = self.oInst.Start()
         if ret < 0 :
             print( "Failed start proxy..." )
-            return ret;
+            return ret
         else :
             print( "Proxy started..." )
 
@@ -209,7 +210,7 @@ class PyRpcServices :
         return 0
 
     def Stop( self ) :
-        self.oInst.RemovePyHost();
+        self.oInst.RemovePyHost()
         return self.oInst.Stop()
 
     def __enter__( self ) :
@@ -220,7 +221,7 @@ class PyRpcServices :
 
     def TimerCallback( self, callback, context )->None :
         sig =signature( callback )
-        iCount = len( sig.parameters );
+        iCount = len( sig.parameters )
         if iCount != 2 :
             print( "TimerCallback: params number",
                 "does not match,", iCount )
@@ -238,7 +239,7 @@ class PyRpcServices :
     STATUS_SUCCESS.
     '''
     def AddTimer( self, timeoutSec,
-        callback, context )->[int,cpp.ObjPtr] :
+        callback, context )->list[int,cpp.ObjPtr] :
         return self.oInst.AddTimer(
             np.uint32( timeoutSec ),
             callback, context )
@@ -247,7 +248,7 @@ class PyRpcServices :
     '''
     def DisableTimer( self, timerObj ) :
         return self.oInst.DisableTimer(
-            timerObj );
+            timerObj )
 
     '''attach a complete notification to the task
     to complete. When the task is completed or
@@ -269,7 +270,7 @@ class PyRpcServices :
         sig =signature( callback )
         iArgNum = len( sig.parameters ) - 2
         for i in range( iArgNum ):
-            listArgs.append( None );
+            listArgs.append( None )
 
         if listResp is None :
             print( "HandleAsyncResp: bad response" )
@@ -283,7 +284,7 @@ class PyRpcServices :
             self.InvokeCallback( callback, listArgs )
             return
 
-        ret = listResp[ 0 ];
+        ret = listResp[ 0 ]
         if seriProto == cpp.seriNone :
             if len( listResp ) <= 1 :
                 listArgs.insert( 0, ret )
@@ -365,11 +366,11 @@ class PyRpcServices :
         tupRet = self.oInst.ReadStream( hChannel, size )
         ret = tupRet[ 0 ]
         if ret < 0 :
-            return tupRet;
+            return tupRet
         #elem 1 is a BufPtr object on success
         pBuf = tupRet[ 1 ]
         #transfer the content to a bytes object
-        pBytes = pBuf.TransToBytes();
+        pBytes = pBuf.TransToBytes()
         if pBytes == None :
             return ( -errno.ENODATA, )
         return ( 0, pBytes, pBuf )
@@ -399,7 +400,7 @@ class PyRpcServices :
     element2 is no longer valid.  '''
 
     def ReadStreamAsync( self,
-        hChannel, callback, size = 0)->[
+        hChannel, callback, size = 0)->list[
             int, Optional[ bytearray ], Optional[ cpp.ObjPtr] ]:
 
         return self.oInst.ReadStreamAsync(
@@ -426,7 +427,7 @@ class PyRpcServices :
 
     def ArgObjToList( self,
         seriProto:int,
-        pObj:cpp.ObjPtr )->[ int, list ] :
+        pObj:cpp.ObjPtr )->list[ int, list ] :
 
         pCfg = cpp.CastToCfg( pObj )
         if pCfg is None :
@@ -434,22 +435,22 @@ class PyRpcServices :
         oParams = cpp.CParamList( pCfg )
         ret = oParams.GetSize()
         if ret[ 0 ] < 0 :
-            resp[ 0 ] = ret[ 0 ];
+            resp[ 0 ] = ret[ 0 ]
         iSize = ret[ 1 ]
 
         if iSize < 0 :
             return [ -errno.EINVAL, ]
 
         if seriProto == cpp.seriPython :
-            ret = pCfg.GetProperty( 0 );
+            ret = pCfg.GetProperty( 0 )
             if ret[ 0 ] < 0 :
                 return [ ret[ 0 ], ]
             val = ret[ 1 ]
             if val.IsEmpty() :
                 return [ -errno.EFAULT, ]
 
-            pyBuf = bytearray( val.size() );
-            iRet = val.CopyToPython( pyBuf );
+            pyBuf = bytearray( val.size() )
+            iRet = val.CopyToPython( pyBuf )
             if iRet < 0 : 
                 return [ iRet, ]
 
@@ -470,7 +471,7 @@ class PyRpcServices :
             ret = oParams.GetPropertyType( i )
             if ret[ 0 ] < 0 :
                 break
-            iType = ret[ 1 ];
+            iType = ret[ 1 ]
             if iType == cpp.typeUInt32 :
                 ret = oParams.GetIntProp( i )
                 if ret[ 0 ] < 0 :
@@ -521,24 +522,24 @@ class PyRpcServices :
                     ret = [ -errno.EFAULT, ]
                     break
             elif iType == cpp.typeByteArr :
-                ret = pCfg.GetProperty( i );
+                ret = pCfg.GetProperty( i )
                 if ret[ 0 ] < 0 :
                     break
                 val = ret[ 1 ]
                 if val.IsEmpty() :
                     ret = [ -errno.EFAULT, ]
                     break
-                pyBuf = bytearray( val.size() );
-                iRet = val.CopyToPython( pyBuf );
+                pyBuf = bytearray( val.size() )
+                iRet = val.CopyToPython( pyBuf )
                 if iRet < 0 : 
                     ret = [ iRet, ]
                     break
 
-                val = pyBuf;
+                val = pyBuf
             argList.append( val )
 
         if ret[ 0 ] < 0 :
-            return ret;
+            return ret
 
         return [ 0, argList ]
 
@@ -546,13 +547,13 @@ class PyRpcServices :
     def InvokeMethod( self, callback,
         ifName, methodName,
         seriProto:int,
-        cppargs:cpp.ObjPtr ) ->[ int, list ]:
-        resp = [ 0 ];
+        cppargs:cpp.ObjPtr ) ->list[ int, list ]:
+        resp = [ 0 ]
         while True :
 
             ret = self.ArgObjToList( seriProto, cppargs )
             if ret[ 0 ] < 0 :
-                resp[ 0 ] = ret;
+                resp[ 0 ] = ret
                 break
 
             argList = ret[ 1 ]
@@ -561,25 +562,25 @@ class PyRpcServices :
             bases = type( self ).__bases__ 
             for iftype in bases :
                 if not hasattr( iftype, "ifName" ) :
-                    continue;
+                    continue
                 if iftype.ifName != ifName :
-                    continue;
+                    continue
                 found = True
-                typeFound = iftype;
+                typeFound = iftype
                 break
             if not found :
-                resp[ 0 ] = -errno.ENOTSUP;
+                resp[ 0 ] = -errno.ENOTSUP
                 break
 
-            isServer = self.oInst.IsServer();
+            isServer = self.oInst.IsServer()
             nameComps = methodName.split( '_' )
             if not isServer :
                 if nameComps[ 0 ] != "UserEvent" :
-                    resp[ 0 ] = -errno.EINVAL;
+                    resp[ 0 ] = -errno.EINVAL
                     break
             else :
                 if nameComps[ 0 ] != "UserMethod" :
-                    resp[ 0 ] = -errno.EINVAL;
+                    resp[ 0 ] = -errno.EINVAL
                     break
 
             found = False
@@ -588,37 +589,37 @@ class PyRpcServices :
 
             for oMethod in oMembers :
                 if nameComps[ 1 ] != oMethod[ 0 ]: 
-                    continue;
-                targetMethod = oMethod[ 1 ];
+                    continue
+                targetMethod = oMethod[ 1 ]
                 found = True;               
                 break
 
             if not found :
-                resp[ 0 ] = -errno.EINVAL;
+                resp[ 0 ] = -errno.EINVAL
                 break
 
             if targetMethod is None :
-                resp[ 0 ] = -error.EFAULT;
+                resp[ 0 ] = -error.EFAULT
                 break
 
             resp = targetMethod( self, callback, *argList )
             if seriProto == cpp.seriNone :
-                break;
+                break
 
             if seriProto != cpp.seriPython :
-                resp[ 0 ] = -errno.ENOTSUP;
-                break;
+                resp[ 0 ] = -errno.ENOTSUP
+                break
 
             ret = resp[ 0 ]
             if ret < 0 :
                 break
 
             if len( resp ) <= 1 : 
-                break;
+                break
 
             if not isinstance( resp[ 1 ], list ) :
-                resp[ 0 ] = -errno.EBADMSG;
-                break;
+                resp[ 0 ] = -errno.EBADMSG
+                break
 
             listResp = resp[ 1 ]
             pBuf = pickle.dumps( listResp )
@@ -658,33 +659,33 @@ class PyRpcServices :
 class PyRpcProxy( PyRpcServices ) :
 
     def __init__( self, pIoMgr, strDesc, strSvrObj ) :
-        self.pIoMgr = pIoMgr;
+        self.pIoMgr = pIoMgr
         self.iError = 0
-        oParams = cpp.CParamList();
+        oParams = cpp.CParamList()
         oObj = CreateProxy( pIoMgr,
             strDesc, strSvrObj,
-            oParams.GetCfgAsObj() );
+            oParams.GetCfgAsObj() )
         if oObj is None or oObj.IsEmpty() :
             print( "failed to create proxy..." )
-            self.SetError( -errno.EFAULT );
+            self.SetError( -errno.EFAULT )
             return
 
-        oInst = CastToProxy( oObj );
+        oInst = CastToProxy( oObj )
         if oInst is None :
             print( "failed to create proxy 2..." )
-        self.oInst = oInst;
-        self.oObj = oObj;
+        self.oInst = oInst
+        self.oObj = oObj
         return
 
     def sendRequest( self,
-        strIfName, strMethod, *args )->[int,list] :
-        resp = [ 0, None ];
+        strIfName, strMethod, *args )->list[int,list] :
+        resp = [ 0, None ]
 
         listArgs = list( args )
         self.MakeCall( strIfName, strMethod,
             listArgs, resp, cpp.seriNone )
 
-        return resp;
+        return resp
 
     ''' sendRequestAsync returns a tuple with two
     elements, 0 is the return code, and 1 is a
@@ -692,7 +693,7 @@ class PyRpcProxy( PyRpcServices ) :
     cancel the request sent'''
     def sendRequestAsync( self,
         callback, strIfName,
-        strMethod, *args )->[int, np.uint64]:
+        strMethod, *args )->list[int, np.uint64]:
 
         resp = [ 0, None ]
         listArgs = list( args )
@@ -707,9 +708,9 @@ class PyRpcProxy( PyRpcServices ) :
     '''
     def PySendRequest(
         self, strIfName,
-        strMethod, *args )->[ int, list] :
+        strMethod, *args )->list[ int, list] :
 
-        resp = [ 0, None ];
+        resp = [ 0, None ]
         listArgs = list( args )
         pBuf = pickle.dumps( listArgs )
         ret = self.MakeCall( strIfName, strMethod,
@@ -726,9 +727,9 @@ class PyRpcProxy( PyRpcServices ) :
             if not isinstance( listArgs, list ) :
                 resp[ 0 ] = -errno.EBADMSG
                 return resp
-            resp[ 1 ] = listArgs;
+            resp[ 1 ] = listArgs
 
-        return resp;
+        return resp
 
     def PySendRequestAsync(
         self, callback,
@@ -779,40 +780,40 @@ class PyRpcProxy( PyRpcServices ) :
     def MakeCallAsync(
         self, callback,
         strIfName, strMethod, args,
-        resp, seriProto )->[int,int]:
+        resp, seriProto )->list[int,int]:
 
         ret = self.oInst.PyProxyCall( callback,
             strIfName, strMethod, args, resp, seriProto )
 
-        return ret;
+        return ret
 
 class PyRpcServer( PyRpcServices ) :
 
     def __init__( self, pIoMgr, strDesc, strSvrObj ) :
-        self.pIoMgr = pIoMgr;
+        self.pIoMgr = pIoMgr
         self.iError = 0
-        oParams = cpp.CParamList();
+        oParams = cpp.CParamList()
         oObj = CreateRpcServer( pIoMgr,
             strDesc, strSvrObj,
-            oParams.GetCfgAsObj() );
+            oParams.GetCfgAsObj() )
         if oObj is None or oObj.IsEmpty() :
             print( "failed to create server..." )
-            self.SetError( -errno.EFAULT );
+            self.SetError( -errno.EFAULT )
             return
 
-        oInst = CastToServer( oObj );
+        oInst = CastToServer( oObj )
         if oInst is None :
             print( "failed to create server 2..." )
-        self.oInst = oInst;
-        self.oObj = oObj;
+        self.oInst = oInst
+        self.oObj = oObj
         return
 
     def SetChanCtx( self, hChannel, oContext ) :
         return self.oInst.SetChanCtx(
-            hChannel, oContext );
+            hChannel, oContext )
 
     def GetChanCtx( self, hChannel ) :
-        return self.oInst.GetChanCtx( hChannel );
+        return self.oInst.GetChanCtx( hChannel )
 
     '''callback should be the one passed to the
     InvokeMethod. This is for asynchronous invoke,

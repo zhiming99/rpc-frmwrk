@@ -2088,6 +2088,14 @@ class CPythonProxy :
         HANDLE hChannel,
         guint64& qwPeerIdHash /Out/ );
 
+    HANDLE GetChanByIdHash( guint64 );
+    %MethodCode
+        CPythonProxyImpl* pImpl =
+        static_cast< CPythonProxyImpl* >
+            ( sipCpp );
+        sipRes = pImpl->GetChanByIdHash( a0 );
+    %End
+
     gint32 PyDeferCall( PyObject* pPyCb,
         PyObject* pPyArgs );
     %MethodCode

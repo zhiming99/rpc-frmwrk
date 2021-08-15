@@ -10,6 +10,7 @@
 #include <errno.h>
 using namespace cpp;
 #include "proxy.h"
+#include "seribase.h"
 
 extern std::string convertPythonUnicodeObjectToStdString(PyObject *pyUnicodeObj);
 %End
@@ -172,6 +173,174 @@ namespace cpp
         gint32 GetClsid() const;
     };
 
+    class ObjPtr
+    {
+        public:
+
+        ObjPtr( cpp::CObjBase* pObj, bool bAddRef );
+        ~ObjPtr();
+        gint32 NewObj( EnumClsid iNewClsid,
+            cpp::IConfigDb* pCfg );
+        %MethodCode
+        sipRes = sipCpp->NewObj( a0, a1 );
+        %End
+
+        bool IsEmpty() const;
+
+        cpp::CObjBase* GetPointer();
+        %MethodCode
+        cpp::CObjBase* pObj =
+            (cpp::CObjBase*)*sipCpp;
+        if( pObj == SIP_NULLPTR )
+            return SIP_NULLPTR;
+        sipRes = pObj;
+        %End
+
+        PyObject* SerialToByteArray();
+        %MethodCode
+        do{
+            gint32 ret = 0;
+            ObjPtr& pObj = *sipCpp;
+            BufPtr pBuf( true );
+            if( pObj.IsEmpty() )
+            {
+                SERI_HEADER_BASE ohb;
+                ohb.dwClsid = clsid( Invalid );
+                ohb.dwSize = 0;
+                ohb.bVersion = 0;
+                ohb.hton();
+                pBuf->Resize(
+                    sizeof( SERI_HEADER_BASE ) );
+                memcpy( pBuf->ptr(), &ohb,
+                    pBuf->size() );
+            }
+            else
+            {
+                ret = pObj->Serialize( *pBuf );
+                if( ERROR( ret ) )
+                {
+                    sipRes = Py_None;
+                    break;
+                }
+            }
+            PyObject* pView =
+                PyMemoryView_FromMemory(
+                pBuf->ptr(), pBuf->size(),
+                PyBUF_READ );
+
+            if( pView == nullptr )
+                sipRes = Py_None;
+            else
+            {
+                sipRes =
+                PyByteArray_FromObject( pView );
+                Py_DECREF( pView );
+            }
+
+        }while( 0 );
+        %End
+
+        PyObject* DeserialObjPtr(
+            PyObject* pByteArray,
+            guint32 dwOffset );
+        %MethodCode
+        gint32 ret = 0;
+        PyObject* pPyResp = PyList_New( 3 );
+        sipRes = pPyResp;
+        Py_buffer *view =
+            (Py_buffer *)calloc(1,sizeof(*view));
+        do{
+            ret = PyObject_GetBuffer(
+                a0, view, PyBUF_READ);
+            if( ret < 0 )
+            {
+                break;
+            }
+            else
+            {
+                char* pBuf = ( char* )view->buf + a1;
+                guint32 dwClsid = 0;
+                memcpy( &dwClsid, pBuf, sizeof( dwClsid ) );
+                dwClsid = ntohl( dwClsid );
+
+                ObjPtr* ppObj =
+                    new cpp::ObjPtr( nullptr, false );
+
+                guint32 dwSize = 0;
+                memcpy( &dwSize, 
+                    pBuf + sizeof( guint32 ),
+                    sizeof( guint32 ) );
+
+                dwSize = ntohl( dwSize ) +
+                    sizeof( SERI_HEADER_BASE );
+
+                if( dwClsid != clsid( Invalid ) )
+                {
+                    ret = ppObj->NewObj(
+                        ( cpp::EnumClsid )dwClsid );
+                    if( ERROR( ret ) )
+                        break;
+
+                    if( ( guint32 )( view->len - a1 ) < dwSize )
+                    {
+                        ret = -ERANGE;
+                        break;
+                    }
+
+                    ret = ( *ppObj )->Deserialize(
+                        pBuf, dwSize );
+                    if( ERROR( ret ) )
+                        break;
+                }
+                PyObject* pRetObj = sipConvertFromNewType(
+                    ppObj, sipType_cpp_ObjPtr, SIP_NULLPTR );
+                if( pRetObj == nullptr )
+                {
+                    ret = -ENOMEM;
+                    break;
+                }
+
+                PyList_SetItem( pPyResp, 1, pRetObj );
+                PyObject* pRetOffset =
+                    PyLong_FromLong( dwSize + a1 );
+                PyList_SetItem( pPyResp, 2, pRetOffset );
+            }
+
+        }while( 0 );
+
+        PyObject* pPyRet = PyLong_FromLong( ret );
+        PyList_SetItem( pPyResp, 0, pPyRet );
+
+        if( view != nullptr )
+            PyBuffer_Release( view );
+        %End
+
+    };
+
+    class CfgPtr
+    {
+        public:
+
+        CfgPtr( cpp::IConfigDb* pCfg,
+            bool bAddRef );
+        ~CfgPtr();
+        gint32 NewObj();
+        %MethodCode
+        sipRes = sipCpp->NewObj(
+            cpp::Clsid_CConfigDb, nullptr );
+        %End
+
+        bool IsEmpty() const;
+        cpp::IConfigDb* GetPointer();
+        %MethodCode
+        cpp::IConfigDb* pObj =
+            (cpp::IConfigDb*)*sipCpp;
+        if( pObj == SIP_NULLPTR )
+            return SIP_NULLPTR;
+        sipRes = pObj;
+        %End
+    };
+
     class CBuffer : public cpp::CObjBase
     {
         public:
@@ -257,12 +426,55 @@ namespace cpp
             {
                 BufPtr& pBuf = *sipCpp;
                 pBuf->Resize( view->len );
-                pBuf->Append( ( char* )view->buf,
+                memcpy( pBuf->ptr(),
+                    ( char* )view->buf,
                     ( guint32 )view->len);
                 sipRes = 0;
                 PyBuffer_Release( view );
             }
         %End
+
+        gint32 AppendBytes( PyObject* pPyObj );
+        %MethodCode
+            gint32 ret = 0;
+            Py_buffer *view = (Py_buffer *)
+                malloc(sizeof(*view));
+            ret = PyObject_GetBuffer(
+                a0, view, PyBUF_READ);
+            if( ret < 0 )
+                sipRes = -ENOMEM;
+            else
+            {
+                BufPtr& pBuf = *sipCpp;
+                pBuf->Append(
+                    ( char* )view->buf,
+                    ( guint32 )view->len);
+                sipRes = 0;
+                PyBuffer_Release( view );
+            }
+        %End
+
+        gint32 AppendObjPtr( cpp::ObjPtr* );
+        %MethodCode
+            gint32 ret = 0;
+            CObjBase* pObj = *a0;
+            if( pObj == nullptr )
+                sipRes = -EFAULT;
+            else
+            {
+                BufPtr pObjBuf( true );
+                sipRes =
+                    pObj->Serialize( *pObjBuf );
+                if( SUCCEEDED( sipRes ) )
+                {
+                    BufPtr& pBuf = *sipCpp;
+                    APPEND( pBuf, pObjBuf->ptr(),
+                        pObjBuf->size() );
+                    sipRes = 0;
+                }
+            }
+        %End
+
     };
 
     class IEventSink : public cpp::CObjBase /Abstract/
@@ -307,54 +519,6 @@ namespace cpp
             const BufPtr& pBuf );
         gint32 GetProperty( gint32 iProp,
             BufPtr& pBuf /Out/ ) const;
-    };
-
-    class ObjPtr
-    {
-        public:
-
-        ObjPtr( cpp::CObjBase* pObj, bool bAddRef );
-        ~ObjPtr();
-        gint32 NewObj( EnumClsid iNewClsid,
-            cpp::IConfigDb* pCfg );
-        %MethodCode
-        sipRes = sipCpp->NewObj( a0, a1 );
-        %End
-
-        bool IsEmpty() const;
-
-        cpp::CObjBase* GetPointer();
-        %MethodCode
-        cpp::CObjBase* pObj =
-            (cpp::CObjBase*)*sipCpp;
-        if( pObj == SIP_NULLPTR )
-            return SIP_NULLPTR;
-        sipRes = pObj;
-        %End
-    };
-
-    class CfgPtr
-    {
-        public:
-
-        CfgPtr( cpp::IConfigDb* pCfg,
-            bool bAddRef );
-        ~CfgPtr();
-        gint32 NewObj();
-        %MethodCode
-        sipRes = sipCpp->NewObj(
-            cpp::Clsid_CConfigDb, nullptr );
-        %End
-
-        bool IsEmpty() const;
-        cpp::IConfigDb* GetPointer();
-        %MethodCode
-        cpp::IConfigDb* pObj =
-            (cpp::IConfigDb*)*sipCpp;
-        if( pObj == SIP_NULLPTR )
-            return SIP_NULLPTR;
-        sipRes = pObj;
-        %End
     };
 
     class CParamList

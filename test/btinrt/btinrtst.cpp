@@ -158,6 +158,9 @@ void CIfSmokeTest::testSvrStartStop()
         OBJNAME_ECHOSVR,
         true, pCfg );
 
+    oCfg[ propSvrInstName ] =
+        stdstr( "BtinrtSvr" );
+
     // create the interface server
     ret = pIf.NewObj(
         clsid( CEchoServer ),
@@ -301,6 +304,9 @@ void CIfSmokeTest::testCliStartStop()
         "./btinrt.json",
         OBJNAME_ECHOSVR,
         false, pCfg );
+
+    oCfg[ propSvrInstName ] =
+        stdstr( "BtinrtSvr" );
 
     // create the proxy object
     ret = pIf.NewObj(

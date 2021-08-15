@@ -703,15 +703,6 @@ guint32 GenClsid( const std::string& strName )
     return iClsid;
 }
 
-#define GEN_FILEPATH( strRet, strPath, strName ) \
-do{ \
-    strRet = ( strPath ) + "/" + ( strName ); \
-    gint32 ret = access( \
-        strRet.c_str(), F_OK ); \
-    if( ret == 0 ) \
-        strRet += ".new"; \
-}while( 0 )
-
 CFileSet::CFileSet(
     const std::string& strOutPath,
     const std::string& strAppName )

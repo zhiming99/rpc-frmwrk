@@ -96,15 +96,19 @@ void Usage()
         "\t\tprotocol only when the old serilization\n"
         "\t\tmethod cannot handle. Default is new\n"
         "\t\tserialization protocol always\n" );
+
+    printf( "\t-p:\tTo generate Python code\n" );
 }
 
 static std::string g_strOutPath = "output";
 static std::vector< std::string > g_vecPaths;
 std::string g_strTarget;
 bool g_bNewSerial = true;
+static stdstr g_strLang = "cpp";
 
 #include "seribase.h"
 #include "gencpp.h"
+#include "genpy.h"
 
 int main( int argc, char** argv )
 {
@@ -125,7 +129,7 @@ int main( int argc, char** argv )
         bool bQuit = false;
 
         while( ( opt =
-            getopt( argc, argv, "ahI:O:o:" ) ) != -1 )
+            getopt( argc, argv, "ahI:O:o:p" ) ) != -1 )
         {
             switch( opt )
             {
@@ -180,6 +184,11 @@ int main( int argc, char** argv )
             case 's':
                 {
                     g_bNewSerial = false;
+                    break;
+                }
+            case 'p':
+                {
+                    g_strLang = "py";
                     break;
                 }
             default:
@@ -271,8 +280,21 @@ int main( int argc, char** argv )
             g_strTarget = g_strAppName;
 
         printf( "Generating files.. \n" );
-        ret = GenCppProj(
-            g_strOutPath, strAppName, pRoot );
+        if( g_strLang == "cpp" )
+        {
+            ret = GenCppProj(
+                g_strOutPath, strAppName, pRoot );
+        }
+        else if( g_strLang == "py" )
+        {
+            ret = GenPyProj(
+                g_strOutPath, strAppName, pRoot );
+        }
+        else
+        {
+            Usage();
+            ret = -ENOTSUP;
+        }
 
 
     }while( 0 );

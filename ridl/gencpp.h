@@ -29,6 +29,15 @@
 #include <json/json.h>
 #include "rpc.h"
 
+#define GEN_FILEPATH( strRet, strPath, strName ) \
+do{ \
+    strRet = ( strPath ) + "/" + ( strName ); \
+    gint32 ret = access( \
+        strRet.c_str(), F_OK ); \
+    if( ret == 0 ) \
+        strRet += ".new"; \
+}while( 0 )
+
 guint32 GenClsid(
     const std::string& strName );
 
@@ -87,13 +96,13 @@ struct CWriterBase
         m_dwIndent = 0;
     }
 
-    void WriteLine1( std::string strText )
+    void WriteLine1( const std::string& strText )
     {
         NewLine();
         AppendText( strText );
     }
 
-    void WriteLine0( std::string strText )
+    void WriteLine0( const std::string& strText )
     {
         AppendText( strText );
         NewLine();

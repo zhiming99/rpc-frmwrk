@@ -598,6 +598,26 @@ class CPythonServer :
             *a0, a1, a2 );
     %End
 
+    guint64 GetIdHashByChan( HANDLE );
+    %MethodCode
+    do{
+        sipRes = 0;
+        CPythonServerImpl* pImpl =
+        static_cast< CPythonServerImpl* >
+            ( sipCpp );
+        
+        InterfPtr pIf;
+        gint32 ret = pImpl->GetUxStream( a0, pIf );
+        if( ERROR( ret ) )
+            break;
+        guint64 qwHash = 0;
+        guint64 qwId = pIf->GetObjId();
+        ret = GetObjIdHash( qwId, qwHash );
+        if( ERROR( ret ) )
+            break;
+        sipRes = qwHash;
+    }while( 0 );
+    %End
     HANDLE GetChanByIdHash( guint64 );
     %MethodCode
         CPythonServerImpl* pImpl =
