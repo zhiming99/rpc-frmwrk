@@ -112,6 +112,12 @@ namespace cpp
         propParamCount,
         propIoMgr,
         propPyObj,
+        propIfName,
+        propMethodName,
+        propSysMethod,
+        propNoReply,
+        propTimeoutSec,
+        propKeepAliveSec
     };
 
     enum EnumIfState

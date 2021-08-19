@@ -48,9 +48,27 @@ gint32 GenCppProj(
 
 typedef std::unique_ptr< std::ofstream > STMPTR;
 typedef std::unique_ptr< std::ifstream > STMIPTR;
-struct CFileSet
+
+struct IFileSet
 {
     std::string  m_strPath;
+    std::map< std::string, gint32 > m_mapSvcImp;
+    std::vector< STMPTR > m_vecFiles;
+
+    IFileSet( const stdstr& strOutPath )
+    { m_strPath = strOutPath; }
+
+    virtual gint32 OpenFiles() = 0;
+    virtual gint32 AddSvcImpl(
+        const std::string& strSvcName ) = 0;
+    ~IFileSet();
+
+    const stdstr& GetOutPath() const
+    { return m_strPath; }
+};
+
+struct CFileSet : public IFileSet
+{
     std::string  m_strAppHeader;
     std::string  m_strAppCpp;
     std::string  m_strObjDesc;
@@ -59,20 +77,17 @@ struct CFileSet
     std::string  m_strMainCli;
     std::string  m_strMainSvr;
 
-    std::map< std::string, gint32 > m_mapSvcImp;
-
-    std::vector< STMPTR > m_vecFiles;
+    typedef IFileSet super;
 
     CFileSet( const std::string& strOutPath,
         const std::string& strAppName );
-    gint32 OpenFiles();
-    gint32 AddSvcImpl( const std::string& strSvcName );
-    ~CFileSet();
 
-    const stdstr& GetOutPath() const
-    { return m_strPath; }
+    virtual gint32 OpenFiles();
+    virtual gint32 AddSvcImpl(
+        const std::string& strSvcName );
+    ~CFileSet()
+    {}
 };
-
 
 #define COUT ( *m_curFp )
 struct CWriterBase
@@ -80,7 +95,7 @@ struct CWriterBase
     guint32 m_dwIndWid = 4;
     guint32 m_dwIndent = 0;
 
-    std::unique_ptr< CFileSet > m_pFiles;
+    std::unique_ptr< IFileSet > m_pFiles;
 
     std::ofstream* m_curFp = nullptr;
     std::string m_strCurFile;
@@ -90,9 +105,6 @@ struct CWriterBase
         const std::string& strAppName,
         guint32 dwIndent = 0 )
     {
-        std::unique_ptr< CFileSet > ptr(
-            new CFileSet( strPath, strAppName ) );
-        m_pFiles = std::move( ptr );
         m_dwIndent = 0;
     }
 
@@ -187,47 +199,66 @@ class CCppWriter : public CWriterBase
         const std::string& strAppName,
         ObjPtr pStmts ) :
         super( strPath, strAppName )
-    { m_pNode = pStmts; }
+    {
+        std::unique_ptr< IFileSet > ptr(
+            new CFileSet( strPath, strAppName ) );
+        m_pFiles = std::move( ptr );
+        m_pNode = pStmts;
+    }
 
     inline gint32 SelectHeaderFile()
     {
-        m_strCurFile = m_pFiles->m_strAppHeader;
+        CFileSet* pFiles = static_cast< CFileSet* >
+            ( m_pFiles.get() );
+        m_strCurFile = pFiles->m_strAppHeader;
         return SelectFile( 0 );
     }
 
     inline gint32 SelectCppFile()
     {
-        m_strCurFile = m_pFiles->m_strAppCpp;
+        CFileSet* pFiles = static_cast< CFileSet* >
+            ( m_pFiles.get() );
+        m_strCurFile = pFiles->m_strAppCpp;
         return SelectFile( 1 );
     }
 
     inline gint32 SelectDescFile()
     {
-        m_strCurFile = m_pFiles->m_strObjDesc;
+        CFileSet* pFiles = static_cast< CFileSet* >
+            ( m_pFiles.get() );
+        m_strCurFile = pFiles->m_strObjDesc;
         return SelectFile( 2 );
     }
 
     inline gint32 SelectDrvFile()
     {
-        m_strCurFile = m_pFiles->m_strDriver;
+        CFileSet* pFiles = static_cast< CFileSet* >
+            ( m_pFiles.get() );
+        m_strCurFile = pFiles->m_strDriver;
         return SelectFile( 3 );
     }
 
     inline gint32 SelectMakefile()
     {
-        m_strCurFile = m_pFiles->m_strMakefile;
+        CFileSet* pFiles = static_cast< CFileSet* >
+            ( m_pFiles.get() );
+        m_strCurFile = pFiles->m_strMakefile;
         return SelectFile( 4 );
     }
 
     inline gint32 SelectMainCli()
     {
-        m_strCurFile = m_pFiles->m_strMainCli;
+        CFileSet* pFiles = static_cast< CFileSet* >
+            ( m_pFiles.get() );
+        m_strCurFile = pFiles->m_strMainCli;
         return SelectFile( 5 );
     }
 
     inline gint32 SelectMainSvr()
     {
-        m_strCurFile = m_pFiles->m_strMainSvr;
+        CFileSet* pFiles = static_cast< CFileSet* >
+            ( m_pFiles.get() );
+        m_strCurFile = pFiles->m_strMainSvr;
         return SelectFile( 6 );
     }
 
@@ -363,10 +394,10 @@ struct CArgListUtils
 struct CMethodWriter 
     : public CArgListUtils
 {
-    CCppWriter* m_pWriter = nullptr;
+    CWriterBase* m_pWriter = nullptr;
 
     typedef CArgListUtils super;
-    CMethodWriter( CCppWriter* pWriter );
+    CMethodWriter( CWriterBase* pWriter );
 
     gint32 GenActParams(
         ObjPtr& pArgList );
@@ -552,10 +583,10 @@ class CEmitSerialCode
     : public CArgListUtils
 {
     public:
-    CCppWriter* m_pWriter = nullptr;
+    CWriterBase* m_pWriter = nullptr;
     CAstListNode* m_pArgs;
 
-    CEmitSerialCode( CCppWriter* pWriter,
+    CEmitSerialCode( CWriterBase* pWriter,
         ObjPtr& pNode );
 
     gint32 OutputSerial(
@@ -637,10 +668,10 @@ class CImplMainFunc :
 struct CExportBase
 {
     CStatements* m_pNode = nullptr;
-    CCppWriter* m_pWriter = nullptr;
+    CWriterBase* m_pWriter = nullptr;
     std::string m_strFile;
 
-    CExportBase( CCppWriter* pWriter,
+    CExportBase( CWriterBase* pWriter,
         ObjPtr& pNode );
     gint32 Output();
 };
@@ -660,7 +691,7 @@ class CExportObjDesc :
 {
     public:
     typedef CExportBase super;
-    CExportObjDesc( CCppWriter* pWriter,
+    CExportObjDesc( CWriterBase* pWriter,
         ObjPtr& pNode );
 
     gint32 Output();
@@ -675,7 +706,7 @@ class CExportDrivers :
 {
     public:
     typedef CExportBase super;
-    CExportDrivers( CCppWriter* pWriter,
+    CExportDrivers( CWriterBase* pWriter,
         ObjPtr& pNode );
     gint32 Output();
 };

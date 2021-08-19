@@ -60,7 +60,7 @@ def GetNpValue( typeid, val ) :
 def GetObjType( var ) :
     if ( isinstance( var, np.int32 ) or
         isinstance( var, np.uint32 ) ) :
-        return cpp.typeUInt32;
+        return cpp.typeUInt32
     elif ( isinstance( var, np.int64 ) or
         isinstance( var, np.uint64 ) ) :
         return cpp.typeUInt64
@@ -265,7 +265,7 @@ class PyRpcServices :
             task, callback, listResp )
 
     def HandleAsyncResp( self,
-        callback, seriProto, listResp ) :
+        callback, seriProto, listResp, context ) :
         listArgs = []
         sig =signature( callback )
         iArgNum = len( sig.parameters ) - 2
@@ -314,6 +314,17 @@ class PyRpcServices :
                 listArgs.insert( 0, -cpp.EBADMSG )
                 self.InvokeCallback( ret, listArgs )
 
+        elif seriProto == cpp.seriRidl :
+            if len( listResp ) <= 1 :
+                self.InvokeCallback(
+                     callback, context, ret, listArgs )
+            elif isinstance( listResp[ 1 ], list ) :
+                listArgs = listResp[ 1 ]
+                self.InvokeCallback(
+                    callback, context, ret, listArgs )
+            else :
+                self.InvokeCallback(
+                    callback, context, ret, listArgs )
         return
 
     def GetObjType( self, pObj ) :
@@ -362,7 +373,8 @@ class PyRpcServices :
     hidden object to keep element 1 valid, just
     leave it alone.
     '''
-    def ReadStream( self, hChannel, size = 0 ) :
+    def ReadStream( self, hChannel, size = 0
+        )->( int, bytearray, cpp.BufPtr ) :
         tupRet = self.oInst.ReadStream( hChannel, size )
         ret = tupRet[ 0 ]
         if ret < 0 :
@@ -444,7 +456,7 @@ class PyRpcServices :
         if seriProto == cpp.seriPython :
             ret = pCfg.GetProperty( 0 )
             if ret[ 0 ] < 0 :
-                return [ ret[ 0 ], ]
+                return [ 0, argList ]
             val = ret[ 1 ]
             if val.IsEmpty() :
                 return [ -errno.EFAULT, ]
@@ -463,6 +475,24 @@ class PyRpcServices :
                 return [ -errno.EBADMSG, ]
 
             return [ 0, argList ]
+
+        elif seriProto == cpp.seriRidl :
+            ret = pCfg.GetProperty( 0 )
+            if ret[ 0 ] < 0 :
+                return [ 0, argList ]
+
+            val = ret[ 1 ]
+            if val.IsEmpty() :
+                return [ -errno.EFAULT, ]
+
+            pyBuf = bytearray( val.size() )
+            iRet = val.CopyToPython( pyBuf )
+            if iRet < 0 : 
+                return [ iRet, ]
+
+            argList.append( pyBuf )
+            return [ 0, argList ]
+
         elif seriProto != cpp.seriNone :
             return [ -errno.EBADMSG, ]
             
@@ -543,6 +573,38 @@ class PyRpcServices :
 
         return [ 0, argList ]
 
+    def GetMethod( self, strIfName : str, strMethod : str ) -> object :
+        while True :
+            found = False
+            typeFound = None
+            bases = type( self ).__bases__ 
+            for iftype in bases :
+                if not hasattr( iftype, "_ifName_" ) :
+                    continue
+                if iftype._ifName_ != strIfName :
+                    continue
+                found = True
+                typeFound = iftype
+                break
+            if not found :
+                break
+
+            found = False
+            oMembers = inspect.getmembers(
+                typeFound, inspect.isfunction)
+
+            for oMethod in oMembers :
+                if strMethod != oMethod[ 0 ]: 
+                    continue
+                targetMethod = oMethod[ 1 ]
+                found = True
+                break
+        if found :
+            return targetMethod
+
+        return None
+
+
     #for event handler 
     def InvokeMethod( self, callback,
         ifName, methodName,
@@ -561,9 +623,9 @@ class PyRpcServices :
             typeFound = None
             bases = type( self ).__bases__ 
             for iftype in bases :
-                if not hasattr( iftype, "ifName" ) :
+                if not hasattr( iftype, "_ifName_" ) :
                     continue
-                if iftype.ifName != ifName :
+                if iftype._ifName_ != ifName :
                     continue
                 found = True
                 typeFound = iftype
@@ -587,12 +649,21 @@ class PyRpcServices :
             oMembers = inspect.getmembers(
                 typeFound, inspect.isfunction)
 
-            for oMethod in oMembers :
-                if nameComps[ 1 ] != oMethod[ 0 ]: 
-                    continue
-                targetMethod = oMethod[ 1 ]
-                found = True;               
-                break
+            if( seriProto != cpp.seriRidl )
+                for oMethod in oMembers :
+                    if nameComps[ 1 ] != oMethod[ 0 ]: 
+                        continue
+                    targetMethod = oMethod[ 1 ]
+                    found = True
+                    break
+            else :
+                wrapMethod = nameComps[ 1 ] + "Wrapper"
+                for oMethod in oMembers :
+                    if wrapMethod != oMethod[ 0 ]: 
+                        continue
+                    targetMethod = oMethod[ 1 ]
+                    found = True
+                    break
 
             if not found :
                 resp[ 0 ] = -errno.EINVAL
@@ -604,6 +675,9 @@ class PyRpcServices :
 
             resp = targetMethod( self, callback, *argList )
             if seriProto == cpp.seriNone :
+                break
+
+            if seriProto == cpp.seriRidl :
                 break
 
             if seriProto != cpp.seriPython :
@@ -766,10 +840,8 @@ class PyRpcProxy( PyRpcServices ) :
 
         return tupRet
 
-    def MakeCall(
-        self, strIfName,
-        strMethod, args,
-        resp, seriProto )->int :
+    def MakeCall( self, strIfName,
+        strMethod, args, resp, seriProto )->int :
 
         self.oInst.PyProxyCallSync(
             strIfName, strMethod, args,
@@ -777,15 +849,53 @@ class PyRpcProxy( PyRpcServices ) :
 
         return resp
 
-    def MakeCallAsync(
-        self, callback,
-        strIfName, strMethod, args,
-        resp, seriProto )->list[int,int]:
+    def MakeCallAsync( self, callback,
+        strIfName, strMethod, args, resp, seriProto
+        )->list[int,int]:
 
         ret = self.oInst.PyProxyCall( callback,
             strIfName, strMethod, args, resp, seriProto )
 
         return ret
+
+    ''' MakeCallWithOpt: similiar to MakeCall, but with
+        more parameters in pCfg. It is a synchronous call.
+        the parameters in pCfg includes:
+        [ propIfName ]: string, interface name
+        [ propMethodName ]: string, method name
+        [ propSeriProto ]: guint32, serialization protocol
+        [ propNoReply ]: bool, one-way request (optional)
+        [ propTimeoutSec ]: guint32, timeout in second
+            specific to this request (optional)
+        [ propKeepAliveSec ]: guint32, timeout in second
+            for keep-alive heartbeat (optional)
+
+        the return value is a list includes:
+        [ 0 ] : error code
+        [ 1 ] : depending on the element[ 0 ]
+            if [ 0 ] is STATUS_PENDING
+                [ 1 ] is the taskid for canceling
+            if [ 0 ] is STATUS_SUCCESS and propNoReply is false,
+                [ 1 ] is a list with a bytearray as the
+                only element
+            if [ 0 ] is ERROR or propNoReply is true
+                [ 1 ] is None
+    '''
+    def MakeCallWithOpt( self,
+        pCfg : cpp.CfgPtr, args : list, resp : list
+        )->list[int,list]:
+
+        return self.oInst.PyProxyCall2(
+            None, None, pCfg, args, resp )
+
+    def MakeCallWithOptAsync( self, callback,
+        context: object
+        pCfg : cpp.CfgPtr,
+        args : list, resp : list
+        )->list[int,list]:
+
+        return self.oInst.PyProxyCall2(
+            callback, context, pCfg, args, resp )
 
 class PyRpcServer( PyRpcServices ) :
 
@@ -851,6 +961,24 @@ class PyRpcServer( PyRpcServices ) :
             callback, ret, cpp.seriPython,
             [ pBuf, ] )
 
+    def RidlOnServiceComplete(
+        self, callback, ret, pBuf : bytearray ) :
+        listResp = []
+        if ret == 0 :
+            listResp.append( pBuf )
+        return self.oInst.OnServiceComplete(
+            callback, ret, cpp.seriRidl,
+            pResp )
+
+    def RidlSetResponse(
+        self, callback, ret, pBuf : bytearray ) :
+        listResp = []
+        if ret == 0 :
+            listResp.append( pBuf )
+        return self.oInst.SetResponse(
+            callback, ret, cpp.seriRidl,
+            listResp )
+
     ''' callback can be none if it is not
     necessary to get notified of the completion.
     destName can be none if not needed.
@@ -873,3 +1001,17 @@ class PyRpcServer( PyRpcServices ) :
         return self.oInst.SendEvent( callback,
             ifName, evtName, destName, [ pBuf, ],
             cpp.seriPython )
+
+    ''' callback can be none if it is not
+    necessary to get notified of the completion.
+    destName can be none if not needed.
+    '''
+    def RidlSendEvent( self, callback,
+        ifName, evtName, destName, pBuf : bytearray ) :
+        evtName = "UserEvent_" + evtName
+        pListArgs = []
+        if pBuf is not None:
+            pListArgs.append( pBuf )
+        return self.oInst.SendEvent( callback,
+            ifName, evtName, destName, pListArgs,
+            cpp.seriRidl )

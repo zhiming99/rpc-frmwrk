@@ -442,6 +442,10 @@ gint32 CDBusProxyPdo::CompleteFwrdReq(
         if( ERROR( ret ) )
             break;
 
+        guint32 dwIoDir = pCtx->GetIoDirection();
+        if( dwIoDir == IRP_DIR_OUT )
+            break;
+
         DMsgPtr& pRespMsg =
             *pCtx->m_pRespData;
 

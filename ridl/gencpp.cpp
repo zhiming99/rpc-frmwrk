@@ -706,6 +706,7 @@ guint32 GenClsid( const std::string& strName )
 CFileSet::CFileSet(
     const std::string& strOutPath,
     const std::string& strAppName )
+    : super( strOutPath )
 {
     if( strAppName.empty() )
     {
@@ -734,8 +735,6 @@ CFileSet::CFileSet(
 
     GEN_FILEPATH( m_strMainSvr, 
         strOutPath, "mainsvr.cpp" );
-
-    m_strPath = strOutPath;
 
     gint32 ret = OpenFiles();
     if( ERROR( ret ) )
@@ -893,7 +892,7 @@ gint32 CFileSet::AddSvcImpl(
     return ret;
 }
 
-CFileSet::~CFileSet()
+IFileSet::~IFileSet()
 {
     for( auto& elem : m_vecFiles )
     {
@@ -3896,7 +3895,7 @@ gint32 CImplIufSvr::Output()
 }
 
 CEmitSerialCode::CEmitSerialCode(
-    CCppWriter* pWriter, ObjPtr& pNode )
+    CWriterBase* pWriter, ObjPtr& pNode )
 {
     m_pWriter = pWriter;
     m_pArgs = pNode;
@@ -4142,7 +4141,7 @@ gint32 CEmitSerialCode::OutputDeserial(
 }
 
 CMethodWriter::CMethodWriter(
-    CCppWriter* pWriter )
+    CWriterBase* pWriter )
 { m_pWriter = pWriter; }
 
 CImplIfMethodProxy::CImplIfMethodProxy(
@@ -6173,7 +6172,7 @@ gint32 CImplMainFunc::Output()
 }
 
 CExportBase::CExportBase(
-    CCppWriter* pWriter,
+    CWriterBase* pWriter,
     ObjPtr& pNode )
 {
     m_pWriter = pWriter;
@@ -6301,12 +6300,14 @@ gint32 CExportMakefile::Output()
         std::string strCmdLine =
             "sed -i 's:XXXSRCS:";
 
+        CFileSet* pFiles = static_cast< CFileSet* >
+            ( m_pWriter->m_pFiles.get() );
         strCmdLine += strCpps + ":;" +
             "s:XXXCLI:" + strClient + ":;" +
             "s:XXXSVR:" + strServer + ":; " +
             "s:XXXOBJSSVR:" + strObjServer + ":; " +
             "s:XXXOBJSCLI:" + strObjClient + ":' " +
-            m_pWriter->m_pFiles->m_strMakefile;
+            pFiles->m_strMakefile;
 
         printf( "%s\n", strCmdLine.c_str() );
         system( strCmdLine.c_str() );
@@ -6315,9 +6316,11 @@ gint32 CExportMakefile::Output()
 
     if( !m_pWriter->m_curFp->is_open() )
     {
+        CFileSet* pFiles = static_cast< CFileSet* >
+            ( m_pWriter->m_pFiles.get() );
         // keep current file open
         m_pWriter->m_curFp->open(
-            m_pWriter->m_pFiles->m_strMakefile,
+            pFiles->m_strMakefile,
             std::ofstream::out |
             std::ofstream::app);
     }
@@ -6326,7 +6329,7 @@ gint32 CExportMakefile::Output()
 }
 
 CExportDrivers::CExportDrivers(
-    CCppWriter* pWriter,
+    CWriterBase* pWriter,
     ObjPtr& pNode )
     : super( pWriter, pNode )
 { m_strFile = "./drvtpl.json"; }
@@ -6431,7 +6434,7 @@ gint32 CExportDrivers::Output()
 }
 
 CExportObjDesc::CExportObjDesc(
-    CCppWriter* pWriter,
+    CWriterBase* pWriter,
     ObjPtr& pNode )
     : super( pWriter, pNode )
 { m_strFile = "./odesctpl.json"; }

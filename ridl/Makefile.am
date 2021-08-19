@@ -1,5 +1,5 @@
 ridlc_PROGRAMS=ridlc
-ridlc_SOURCES= gencpp.cpp astnode.cpp main.cpp astnode.h gencpp.h idlclsid.h genpy.cpp genpy.h example.ridl tinyif.ridl README.md odesctpl.json drvtpl.json mktpl.in synccfg.py.in 
+ridlc_SOURCES= gencpp.cpp astnode.cpp main.cpp astnode.h gencpp.h idlclsid.h genpy.cpp genpy.h example.ridl tinyif.ridl README.md odesctpl.json drvtpl.json mktpl.in synccfg.py.in pymktpl
 
 EXTRA_DIST=ridlc.y ridlc.lex
 
@@ -22,7 +22,7 @@ synccfg.py : synccfg.py.in
 ridlc_LDADD=$(COMMON_LINK) -lipc -lcombase -lutils -lstdc++ -ljsoncpp -L../combase -L../ipc -L../3rd_party
 ridlcdir=$(bindir)
 
-dist_ridlc_conf_DATA=odesctpl.json drvtpl.json mktpl synccfg.py seribase.py
+dist_ridlc_conf_DATA=odesctpl.json drvtpl.json mktpl synccfg.py seribase.py pymktpl
 ridlc_confdir=$(sysconfdir)/rpcf
 
 include_ipcdir=$(top_srcdir)/ipc

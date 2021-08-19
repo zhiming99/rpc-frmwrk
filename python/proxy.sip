@@ -344,15 +344,22 @@ class CPythonInterfBase : public T
                 break;
             }
 
-            PyObject* listArgs = PyList_New( dwSize );
-            if( listArgs == nullptr )
+            PyObject* listArgs = nullptr;
+            if( dwSize != 0 )
             {
-                ret = -ENOMEM;
+                listArgs = PyList_New( dwSize );
+                if( listArgs == nullptr )
+                {
+                    ret = -ENOMEM;
+                    break;
+                }
+            }
+            else
+            {
+                // empty response
+                PyList_SetItem( listResp, 1, listArgs );
                 break;
             }
-
-            if( dwSize == 0 )
-                break;
 
             // note: the first parameter for the
             // callback is the return code 
@@ -744,6 +751,7 @@ class CPythonInterfBase : public T
 
         PyObject* pPyCb = nullptr;
         PyObject* pPyParams = nullptr;
+        bool bNoReply = false;
 
         do{
             CReqOpener oReq( pParams );
@@ -757,6 +765,14 @@ class CPythonInterfBase : public T
                 propSeriProto, dwSeriProto );
             if( ERROR( ret ) )
                 dwSeriProto = seriNone;
+
+            guint32 dwCallFlags = 0;
+            ret = oReq.GetCallFlags( dwCallFlags );
+            if( SUCCEEDED( ret ) )
+            {
+                if( !( dwCallFlags & CF_WITH_REPLY ) )
+                    bNoReply = true;
+            }
 
             ret = 0;
             TaskletPtr pTask;
@@ -828,7 +844,7 @@ class CPythonInterfBase : public T
             if( ret == STATUS_PENDING )
                 break;
 
-            if( ERROR( ret ) ) 
+            if( ERROR( ret ) || bNoReply ) 
                 break;
 
             PyObject* pyRespArgs =
@@ -857,6 +873,7 @@ class CPythonInterfBase : public T
             oResp[ propSeriProto ] = dwSeriProto;
 
         }while( 0 );
+
         if( listResp != nullptr )
             Py_DECREF( listResp );
 
@@ -867,6 +884,9 @@ class CPythonInterfBase : public T
             Py_DECREF( pPyParams );
 
         PyGILState_Release(gstate);
+
+        if( bNoReply )
+            return ret;
 
         if( ret != STATUS_PENDING &&
             ret != -ENOTSUP)
@@ -947,7 +967,8 @@ class CPythonInterfBase : public T
 
             PyObject_CallMethod(
                  pHost, "HandleAsyncResp", 
-                 "(OiO)", pPyCb, seriNone, pPyResp );
+                 "(OiO)", pPyCb, seriNone,
+                 pPyResp, Py_None );
 
         }while( 0 );
 
@@ -1024,7 +1045,8 @@ class CPythonInterfBase : public T
 
             PyObject_CallMethod(
                  pHost, "HandleAsyncResp", 
-                 "(OiO)", pPyCb, seriNone, pPyResp );
+                 "(OiO)", pPyCb, seriNone,
+                 pPyResp, Py_None );
 
         }while( 0 );
 
@@ -1054,6 +1076,7 @@ class CPythonInterfBase : public T
 
         PyObject* pPyCb = nullptr;
         PyObject* pPyResp = nullptr;
+        PyObject* pContext = nullptr;
 
         do{
             CCfgOpenerObj oCbCfg( pIoReq );
@@ -1077,10 +1100,16 @@ class CPythonInterfBase : public T
             if( ERROR( ret ) )
                 break;
 
-            oReqCtx.GetIntProp( 3, dwReqProto );
-
             PyObject* pPyResp =
                 ( PyObject* )ptrVal;  
+
+            oReqCtx.GetIntProp( 3, dwReqProto );
+
+            ret = oReqCtx.GetIntPtr( 4, ptrVal );
+            if( ERROR( ret ) )
+                pContext = Py_None;
+            else
+                pContext = ( PyObject* )ptrVal;
 
             guint32 iRet = 0;
             CParamList oResp( pResp );
@@ -1122,7 +1151,8 @@ class CPythonInterfBase : public T
 
             PyObject_CallMethod( pHost,
                 "HandleAsyncResp", "(OiO)",
-                pPyCb, dwSeriProto, pPyResp );
+                pPyCb, dwSeriProto,
+                pPyResp, pContext );
 
         }while( 0 );
 
@@ -1131,6 +1161,9 @@ class CPythonInterfBase : public T
 
         if( pPyResp != nullptr )
             Py_DECREF( pPyResp );
+
+        if( pContext != nullptr )
+            Py_DECREF( pContext );
 
         PyGILState_Release(gstate);
 
@@ -1214,6 +1247,7 @@ class CPythonInterfBase : public T
 
     gint32 PyCompNotify(
         IEventSink* pCallback,
+        gint32 iRet,
         intptr_t pCb,
         intptr_t pResp )
     {
@@ -1226,33 +1260,45 @@ class CPythonInterfBase : public T
         PyGILState_STATE gstate;
         gstate = PyGILState_Ensure();
 
-        gint32 ret = oCfg.GetObjPtr(
-            propRespPtr, pObj ); 
+        gint32 ret = 0;
+
+        if( SUCCEEDED( iRet ) )
+        {
+            ret = oCfg.GetObjPtr(
+                propRespPtr, pObj ); 
+        }
 
         PyObject* pPyCb = ( PyObject*)pCb;
         PyObject* pPyResp = ( PyObject*)pResp;
 
         do{
-            PyObject* pHost = nullptr;
-            ret = GetPyHost( pHost );
-            if( ERROR( ret ) )
-                break;
-
-            if( SUCCEEDED( ret ) && !pObj.IsEmpty() )
+            ret = iRet;
+            if( !pObj.IsEmpty() )
             {
                 CCfgOpener oResp(
                     ( IConfigDb* )pObj );
-                ret = oResp[ propReturnValue ];
+                guint32 dwRet = 0;
+                ret = oResp.GetIntProp(
+                    propReturnValue, dwRet );
+                if( SUCCEEDED( ret ) )
+                    ret = ( gint32 )dwRet;
+                else
+                    ret = iRet;
             }
+
+            PyObject* pHost = nullptr;
+            GetPyHost( pHost );
 
             PyObject* pPyRet =
                 PyLong_FromLong( ret );
+
             PyList_SetItem( pPyResp, 0, pPyRet );
             // element 1 is not replaced with the
             // the true response parameters.
             PyObject_CallMethod(
                  pHost, "HandleAsyncResp", 
-                 "(OiO)", pPyCb, seriNone, pPyResp );
+                 "(OiO)", pPyCb, seriNone,
+                 pPyResp, Py_None );
 
         }while( 0 );
 
@@ -1275,10 +1321,10 @@ class CPythonInterfBase : public T
             pListResp == nullptr )
             return -EINVAL;
 
-        gint32 ret = INSTALL_COMPLETE_HANDLER(
-            pCallback, this,
+        gint32 ret = DEFER_CANCEL_HANDLER2(
+            0, pCallback, this,
             &CPythonInterfBase::PyCompNotify,
-            pCallback,
+            pCallback, 0,
             ( intptr_t )pCb,
             ( intptr_t)pListResp );    
 
@@ -1443,6 +1489,13 @@ class CPythonProxyImpl :
         PyObject* listArgs,
         PyObject* listResp,
         guint32 dwSeriProto );
+
+    PyObject* PyProxyCall2(
+        PyObject* pCb,
+        PyObject* pContext,
+        CfgPtr& pOptions,
+        PyObject* listArgs,
+        PyObject* listResp );
 };
 
 %End
@@ -1658,6 +1711,184 @@ gint32 CPythonProxyImpl::PyProxyCall(
     return ret;
 }
 
+PyObject* CPythonProxyImpl::PyProxyCall2(
+    PyObject* pCb,
+    PyObject* pContext,
+    CfgPtr& pOptions,
+    PyObject* listArgs,
+    PyObject* listResp )
+{
+    gint32 ret = 0;
+    do{
+        bool bSync = false;
+        if( pCb == nullptr || pCb == Py_None )
+            bSync = true;
+        if( !bSync )
+        {
+            ret = PyCallable_Check( pCb );
+            if( ret == 0 )
+            {
+                ret = -EINVAL;
+                break;
+            }
+        }
+        std::vector< BufPtr > vecParams;
+        ret = List2Vector(listArgs, vecParams );
+        if( ERROR( ret ) )
+            break;
+
+        if( pOptions.IsEmpty() )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        CCfgOpener oOptions( ( IConfigDb* )pOptions );
+        stdstr strMethod, strIfName;
+        ret = oOptions.GetStrProp(
+            propMethodName, strMethod );
+        if( ERROR( ret ) )
+            break;
+
+        ret = oOptions.GetStrProp(
+            propIfName, strMethod );
+        if( ERROR( ret ) )
+            break;
+
+        bool bNoReply;
+        ret = oOptions.GetBoolProp(
+            propNoReply, bNoReply );
+        if( ERROR( ret ) )
+        {
+            bNoReply = false;
+            ret = 0;
+        }
+
+        guint32 dwSeriProto;
+        ret = oOptions.GetIntProp(
+            propSeriProto, dwSeriProto );
+        if( ERROR( ret ) )
+            break;
+
+        IEventSink* pRespCb = nullptr;
+        TaskletPtr pWrapperCb;
+        CParamList oReqCtx;
+        if( !bSync )
+        {
+            ret = NEW_PROXY_RESP_HANDLER2(
+                pWrapperCb, ObjPtr( this ),
+                &CPythonProxyImpl::OnAsyncCallResp,
+                nullptr, oReqCtx.GetCfg() );
+
+            if( ERROR( ret ) )
+                break;
+
+            oReqCtx.Push( ( intptr_t ) pCb );
+            oReqCtx.Push( ( intptr_t ) listResp );
+            oReqCtx.Push( strMethod );
+            oReqCtx.Push( dwSeriProto );
+            oReqCtx.Push( ( intptr_t )pContext );
+            Py_INCREF( pCb );
+            Py_INCREF( listResp );
+            Py_INCREF( pContext );
+        }
+        else
+        {
+            ret = pWrapperCb.NewObj(
+                clsid( CIoReqSyncCallback ) );
+            if( ERROR( ret ) )
+                break;
+        }
+        pRespCb = pWrapperCb;
+
+        std::string strDBusIfName =
+            DBUS_IF_NAME( strIfName );
+        oOptions.SetStrProp(
+            propIfName, strDBusIfName );
+
+        CCfgOpener oResp;
+        PyThreadState *_save;
+        Py_UNBLOCK_THREADS;
+
+        ret = this->AsyncCallVector(
+            pRespCb, oOptions.GetCfg(),
+            oResp.GetCfg(), strMethod,
+            vecParams );
+
+        Py_BLOCK_THREADS;
+
+        if( ret != STATUS_PENDING && !bSync )
+        {
+            Py_DECREF( pCb );
+            Py_DECREF( listResp );
+            Py_DECREF( pContext );
+        }
+
+        if( ERROR( ret ) )
+            break;
+
+        if( ret == STATUS_PENDING && !bSync )
+        {
+            guint64 qwTaskCancel = 0;
+            oResp.GetQwordProp(
+                propTaskId, qwTaskCancel );
+            PyList_SetItem( listResp, 1,
+                PyLong_FromLongLong( qwTaskCancel ) );
+            break;
+        }
+        else if( ret == STATUS_PENDING )
+        {
+            cpp::CIoReqSyncCallback*
+                pSyncCb = pWrapperCb;
+            ret = pSyncCb->WaitForComplete();
+        }
+
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpenerObj oCbCfg( pRespCb );
+        IConfigDb* pRmtResp = nullptr;
+        ret = oCbCfg.GetPointer(
+            propRespPtr, pRmtResp );
+        if( ERROR( ret ) )
+            break;
+
+        guint32 iRet = 0;
+        CParamList oRmtResp( pRmtResp );
+
+        ret = oRmtResp.GetIntProp(
+            propReturnValue, iRet );
+
+        if( ERROR( ret ) )
+            break;
+
+        if( ERROR( iRet ) )
+        {
+            ret = iRet;
+            break;
+        }
+
+        if( unlikely( bNoReply ) )
+            break;
+
+        EnumSeriProto dwSpRet = seriNone;
+        GetSeriProto( pRmtResp, dwSpRet );
+        if( dwSpRet != dwSeriProto )
+        {
+            ret = -EBADMSG;
+            break;
+        }
+        ret = FillList( pRmtResp, listResp );
+        if( ERROR( ret ) )
+            break;
+
+    }while( 0 );
+
+    PyList_SetItem( listResp, 0,
+        PyLong_FromLong( ret ) );
+
+    return listResp;
+}
+
 gint32 CPythonProxyImpl::PyProxyCallSync(
     const std::string& strIfName,
     const std::string& strMethod,
@@ -1731,6 +1962,18 @@ class CPythonProxy :
         PyObject* listResp,
         guint32 dwSeriProto,
         guint64& qwTaskCancel /Out/ );
+
+    PyObject* PyProxyCall2(
+        PyObject* pCb,
+        PyObject* pContext,
+        cpp::CfgPtr& pOptions,
+        PyObject* listArgs,
+        PyObject* listResp );
+    %MethodCode
+        guint64 qwTaskCancel = 0;
+        gint32 ret = sipCpp->PyProxyCall2(
+            *a0, *a1, a2, a3, a4 );
+    %End
 
     gint32 PyProxyCallSync(
         const std::string& strIfName /In/,
