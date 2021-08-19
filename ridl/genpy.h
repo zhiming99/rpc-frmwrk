@@ -330,3 +330,18 @@ class CImplPySvcProxy
     gint32 Output();
     gint32 OutputSvcProxyClass();
 };
+
+class CImplPyMainFunc :
+    public CArgListUtils
+{
+    CPyWriter* m_pWriter = nullptr;
+    CStatements* m_pNode = nullptr;
+    public:
+    typedef CMethodWriter super;
+
+    CImplPyMainFunc(
+        CPyWriter* pWriter, ObjPtr& pNode );
+    gint32 Output();
+    gint32 OutputCli( CServiceDecl* pSvc );
+    gint32 OutputSvr( CServiceDecl* pSvc );
+};

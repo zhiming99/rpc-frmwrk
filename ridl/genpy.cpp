@@ -1624,6 +1624,11 @@ gint32 GenPyProj(
             break;
 
         ret = GenSvcFiles( &oWriter, pRoot );
+        if( ERROR( ret ) )
+            break;
+
+        CImplPyMainFunc opmf( &oWriter, pRoot );
+        ret = opmf.Output();
 
     }while( 0 );
 
@@ -2745,6 +2750,226 @@ gint32 CImplPySvcProxy::Output()
             break;
 
         ret = OutputSvcProxyClass();
+
+    }while( 0 );
+
+    return ret;
+}
+
+CImplPyMainFunc::CImplPyMainFunc(
+    CPyWriter* pWriter,
+    ObjPtr& pNode )
+{
+    m_pWriter = pWriter;
+    m_pNode = pNode;
+    if( m_pNode == nullptr )
+    {
+        std::string strMsg = DebugMsg(
+            -EFAULT, "internal error empty "
+            "'statements' node" );
+        throw std::runtime_error( strMsg );
+    }
+}
+
+gint32 CImplPyMainFunc::OutputCli(
+    CServiceDecl* pSvc )
+{
+    gint32 ret = 0;
+    do{
+        OUTPUT_BANNER();
+        stdstr strName = pSvc->GetName();
+        CCOUT << "from " << strName << "cli"
+            << " import " << "C" << strName
+            << "Proxy";
+        NEW_LINES( 2 );
+        CCOUT << "def maincli() :";
+        INDENT_UPL;
+        Wa( "ret = 0" );
+        Wa( "oContext = PyRpcContext( PyRpcProxy )" );
+        CCOUT << "with oContext :";
+        INDENT_UPL;
+        Wa( "print( \"start to work here...\" )" );
+        CCOUT << "oProxy = C" << strName << "Proxy( oContext.pIoMgr,";
+        NEW_LINE;
+        CCOUT << "    './" << g_strAppName << "desc.json',";
+        NEW_LINE;
+        CCOUT << "    '" << strName << "' )" ;
+        NEW_LINE;
+        Wa( "ret = oProxy.GetError()" );
+        Wa( "if ret < 0 :" );
+        Wa( "    return ret" );
+        NEW_LINE;
+        CCOUT << "with oProxy :";
+        INDENT_UPL;
+        Wa( "'''" );
+        Wa( "adding your code here" );
+
+        std::vector< ObjPtr > vecIfs;
+        pSvc->GetIfRefs( vecIfs );
+        if( vecIfs.empty() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+
+        auto& elem = vecIfs.front();
+        do{
+            CInterfRef* pIfRef = elem;
+            ObjPtr pObj;
+            ret = pIfRef->GetIfDecl( pObj );
+            if( ERROR( ret ) )
+            {
+                ret = 0;
+                break;
+            }
+            CInterfaceDecl* pIf = pObj;
+            pObj = pIf->GetMethodList();
+            std::vector< ObjPtr > vecMethods;
+
+            CMethodDecls* pmds = pObj;
+            guint32 i = 0;
+            for( ; i < pmds->GetCount(); i++ )
+            {
+                ObjPtr pObj = pmds->GetChild( i );
+                vecMethods.push_back( pObj );
+            }
+            if( vecMethods.empty() )
+                break;
+
+            CMethodDecl* pmd = nullptr;
+            for( auto& elem : vecMethods )
+            {
+                pmd = vecMethods.front();
+                if( pmd->IsEvent() )
+                    continue;
+                break;
+            }
+            if( pmd == nullptr )
+                break;
+
+            stdstr strMName = pmd->GetName();
+            std::vector< std::pair< stdstr, stdstr >> vecArgs;
+            ObjPtr pInArgs = pmd->GetInArgs();
+            guint32 dwInCount = GetArgCount( pInArgs );
+            if( dwInCount == 0 )
+            {
+                Wa( "Calling a proxy method like" );
+                CCOUT << "oProxy." << strMName << "()";
+            }
+            else
+            {
+                ret = GetArgsAndSigs( pInArgs, vecArgs );
+                if( ERROR( ret ) )
+                    break;
+
+                Wa( "Calling a proxy method like" );
+                CCOUT << "'oProxy." << strMName << "(";
+                if( vecArgs.size() > 2 )
+                {
+                    NEW_LINE;
+                    CCOUT << "    ";
+                }
+                else
+                {
+                    CCOUT << " ";
+                }
+                for( int i = 0; i < vecArgs.size(); i++ )
+                {
+                    auto& elem = vecArgs[ i ];
+                    CCOUT << elem.first;
+                    if( i < vecArgs.size() - 1 )
+                        CCOUT << ", ";
+                    else
+                        CCOUT << " )'";
+                }
+            }
+            NEW_LINE;
+
+        }while( 0 );
+
+        Wa( "'''" );
+        INDENT_DOWN;
+        INDENT_DOWNL;
+        Wa( "return ret" );
+        INDENT_DOWNL;
+        Wa( "ret = maincli()" );
+        Wa( "quit( ret )" );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CImplPyMainFunc::OutputSvr(
+    CServiceDecl* pSvc )
+{
+    gint32 ret = 0;
+    do{
+        OUTPUT_BANNER();
+        stdstr strName = pSvc->GetName();
+        CCOUT << "from " << strName << "svr"
+            << " import " << "C" << strName
+            << "Server";
+        NEW_LINES( 2 );
+        CCOUT << "def mainsvr() :";
+        INDENT_UPL;
+        Wa( "ret = 0" );
+        Wa( "oContext = PyRpcContext( PyRpcServer )" );
+        CCOUT << "with oContext :";
+        INDENT_UPL;
+        Wa( "print( \"start to work here...\" )" );
+        CCOUT << "oServer = C" << strName << "Server( oContext.pIoMgr,";
+        NEW_LINE;
+        CCOUT << "    './" << g_strAppName << "desc.json',";
+        NEW_LINE;
+        CCOUT << "    '" << strName << "' )" ;
+        NEW_LINE;
+        Wa( "ret = oServer.GetError()" );
+        Wa( "if ret < 0 :" );
+        Wa( "    return ret" );
+        NEW_LINE;
+        CCOUT << "with oServer :";
+        INDENT_UPL;
+        Wa( "'''" );
+        Wa( "made change to the following code" );
+        Wa( "snippet for your own purpose" );
+        Wa( "'''" );
+
+        Wa( "while ( cpp.stateConnected ==" );
+        Wa( "    oServer.oInst.GetState() ):" );
+        Wa( "    time.sleep( 1 )" );
+        INDENT_DOWN;
+        INDENT_DOWNL;
+        Wa( "return ret" );
+        INDENT_DOWNL;
+
+        Wa( "ret = mainsvr()" );
+        Wa( "quit( ret )" );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CImplPyMainFunc::Output()
+{
+    gint32 ret = 0;
+    do{
+        std::vector< ObjPtr > vecSvcs;
+        ret = m_pNode->GetSvcDecls( vecSvcs );
+        if( ERROR( ret ) )
+            break;
+
+        CServiceDecl* pSvc = vecSvcs.front();
+        m_pWriter->SelectMainCli();
+        ret = OutputCli( pSvc );
+        if( ERROR( ret ) )
+            break;
+
+        m_pWriter->SelectMainSvr();
+        ret = OutputSvr( pSvc );
+        if( ERROR( ret ) )
+            break;
 
     }while( 0 );
 
