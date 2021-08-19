@@ -37,11 +37,11 @@ class CEchoClient:
     interface name, which will be used to invoke
     the event handler if any
     """
-    ifName = "CEchoServer"
+    _ifName_ = "CEchoServer"
 
     def Echo(self, text ):
         return self.sendRequest(
-            CEchoClient.ifName, "Echo", text )
+            CEchoClient._ifName_, "Echo", text )
 
 # or inherit an RPC interface, and implement the
 # RPC methods
@@ -71,7 +71,7 @@ class PyFileTransClient( PyFileTransferBase ):
         size:       np.uint64 )->[ int, list ]:
 
         resp = self.PySendRequest(
-            PyFileTransClient.ifName, "UploadFile",
+            PyFileTransClient._ifName_, "UploadFile",
             fileName, chanHash,
             offset, size )
 
@@ -83,7 +83,7 @@ class PyFileTransClient( PyFileTransferBase ):
         fileName : str,
         bRead : bool = True ) -> [ int, list ] :
         return self.PySendRequest(
-           PyFileTransClient.ifName, "GetFileInfo", 
+           PyFileTransClient._ifName_, "GetFileInfo", 
             fileName, bRead )
 
     ''' rpc method impl
@@ -95,7 +95,7 @@ class PyFileTransClient( PyFileTransferBase ):
         size:       np.uint64 )->[ int, list ]:
 
         resp = self.PySendRequest(
-           PyFileTransClient.ifName, "DownloadFile", 
+           PyFileTransClient._ifName_, "DownloadFile", 
            fileName, chanHash, offset, size )
 
         return resp

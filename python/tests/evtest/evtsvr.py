@@ -8,14 +8,14 @@ class CEventServer:
     interface name, which will be used to invoke
     the event handler
     """
-    ifName = "CEventServer"
+    _ifName_ = "CEventServer"
     """
     this is a event handler, it broadcast event
     message to the remote subscriber. 
     """
     def OnHelloWorld( self, strSvrEvt ):
         ret = self.SendEvent( None,
-            CEventServer.ifName,
+            CEventServer._ifName_,
             "OnHelloWorld",
             "", strSvrEvt )
 

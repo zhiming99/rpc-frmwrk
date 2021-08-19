@@ -11,7 +11,7 @@ class CEchoServer:
     interface name, which will be used to invoke
     the event handler if any
     """
-    ifName = "CEchoServer"
+    _ifName_ = "CEchoServer"
 
     '''the server side implementation of the
     interface method share the same parameter

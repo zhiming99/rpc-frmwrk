@@ -13,7 +13,7 @@ class CEchoServer:
     interface name, which will be used to invoke
     the event handler if any
     """
-    ifName = "CEchoServer"
+    _ifName_ = "CEchoServer"
 
     def Echo(self, callback, text ):
         listResp = [ 0 ]

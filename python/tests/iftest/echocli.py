@@ -11,7 +11,7 @@ class CEchoClient:
     interface name, which will be used to invoke
     the event handler if any
     """
-    ifName = "CEchoServer"
+    _ifName_ = "CEchoServer"
 
     '''all the methods have the similiar
     #implementation, pass `self.sendRequest' with
@@ -27,22 +27,22 @@ class CEchoClient:
 
     def Echo(self, text ):
         return self.sendRequest(
-            self.ifName, "Echo", text )
+            self._ifName_, "Echo", text )
  
     def EchoUnknown( self, byteBuf ):
         return self.sendRequest(
-            self.ifName, "EchoUnknown", byteBuf )
+            self._ifName_, "EchoUnknown", byteBuf )
 
     #return sum of i1+i2
     def Echo2( self, i1, i2 ):
         return self.sendRequest(
-            self.ifName, "Echo2",
+            self._ifName_, "Echo2",
             np.int32( i1 ),
             np.float64( i2 ) )
 
     def EchoCfg( self, iCount, pObj ):
         return self.sendRequest(
-            self.ifName, "EchoCfg",
+            self._ifName_, "EchoCfg",
             np.int32( iCount ), pObj )
 
 #2. aggregrate the interface class and the PyRpcProxy

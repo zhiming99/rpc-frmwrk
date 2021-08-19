@@ -4,7 +4,7 @@ import numpy as np
 
 from rpcf.rpcbase import *
 
-from rpcf.proxy import PyRpcContext, PyRpcServer
+from rpcf.proxy import PyRpcContext, PyRpcServer, ErrorCode
 
 class CKeepAliveServer:
     """Mandatory class member to define the
@@ -45,10 +45,10 @@ class CKeepAliveServer:
         return listResp
 
     def LongWaitCleanup( self, ret, timerObj ) :
-        if np.uint32( ret ) == 0x8001000c :
+        if np.uint32( ret ) == ErrorCode.ERROR_USER_CANCEL :
             self.DisableTimer( timerObj )
             print( "remove the timer",
-                "at user's request" );
+                "at user's request" )
         return
 
     '''
@@ -62,9 +62,9 @@ class CKeepAliveServer:
     def LongWaitCb( self, context ) :
         callback = context[ 0 ]
         strText = context[ 1 ]
-        strText += " 2";
+        strText += " 2"
         self.OnServiceComplete(
-            callback, 0, strText );
+            callback, 0, strText )
         return
 
 
@@ -76,12 +76,12 @@ class CKaSvrObj( CKeepAliveServer, PyRpcServer ):
 
 def test_main() : 
     ret = 0
-    oContext = PyRpcContext();
+    oContext = PyRpcContext()
     with oContext :
         print( "start to work here..." )
         oServer = CKaSvrObj( oContext.pIoMgr,
             "../../../test/debug64/kadesc.json",
-            "CKeepAliveServer" );
+            "CKeepAliveServer" )
 
         ret = oServer.GetError() 
         if ret < 0 :

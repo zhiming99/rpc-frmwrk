@@ -11,7 +11,7 @@ class CKeepAliveClient:
     interface name, which will be used to invoke
     the event handler
     """
-    ifName = "CKeepAliveServer"
+    _ifName_ = "CKeepAliveServer"
     """
     Method: LongWait
     Description:
@@ -29,7 +29,7 @@ class CKeepAliveClient:
 
         tupRet = self.sendRequestAsync(
             CKeepAliveClient.LongWaitCb,
-            self.ifName, "LongWait",
+            self._ifName_, "LongWait",
             strText )
 
         ret = tupRet[ 0 ]

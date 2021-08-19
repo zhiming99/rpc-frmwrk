@@ -11,7 +11,7 @@ class CPauseResumeServer:
     interface name, which will be used to invoke
     the event handler if any
     """
-    ifName = "CPauseResumeServer"
+    _ifName_ = "CPauseResumeServer"
 
     '''the server side implementation of the
     interface method share the same parameter

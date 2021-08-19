@@ -12,7 +12,7 @@ class CEchoClient:
     interface name, which will be used to invoke
     the event handler if any
     """
-    ifName = "CEchoServer"
+    _ifName_ = "CEchoServer"
 
     '''all the proxy methods have the similiar
     implementation, pass the callback function,
@@ -21,7 +21,7 @@ class CEchoClient:
     def Echoa(self, text ):
         tupRet = self.sendRequestAsync(
             CEchoClient.EchoCb,
-            self.ifName, "Echo", text )
+            self._ifName_, "Echo", text )
 
         ret = tupRet[ 0 ]
 
@@ -46,7 +46,7 @@ class CEchoClient:
     def EchoUnknowna( self, byteBuf ):
         tupRet = self.sendRequestAsync(
             CEchoClient.EchoUnknownCb,
-            self.ifName, "EchoUnknown", byteBuf )
+            self._ifName_, "EchoUnknown", byteBuf )
         ret = tupRet[ 0 ]
         if ret == 65537 :
             self.sem.acquire()
@@ -66,7 +66,7 @@ class CEchoClient:
     def Echo2a( self, i1, i2 ):
         tupRet = self.sendRequestAsync(
             CEchoClient.Echo2Cb,
-            self.ifName, "Echo2",
+            self._ifName_, "Echo2",
             np.int32( i1 ),
             np.float64( i2 ) )
 
@@ -91,7 +91,7 @@ class CEchoClient:
     def EchoCfga( self, iCount, pObj ):
         tupRet = self.sendRequestAsync(
             CEchoClient.EchoCfgCb,
-            self.ifName, "EchoCfg",
+            self._ifName_, "EchoCfg",
             np.int32( iCount ), pObj )
 
         ret = tupRet[ 0 ]

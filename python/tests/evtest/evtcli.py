@@ -8,7 +8,7 @@ class CEventClient:
     interface name, which will be used to invoke
     the event handler
     """
-    ifName = "CEventServer"
+    _ifName_ = "CEventServer"
     """
     this is a event handler, it print the event
     string from the remote server. The first two

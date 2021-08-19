@@ -11,7 +11,7 @@ class CEchoClient:
     interface name, which will be used to invoke
     the event handler if any
     """
-    ifName = "CEchoServer"
+    _ifName_ = "CEchoServer"
 
     '''all the proxy methods have the similiar
     implementation, pass the callback function,
@@ -20,7 +20,7 @@ class CEchoClient:
     def Echoa(self, text ):
         tupRet = self.sendRequestAsync(
             CEchoClient.EchoCb,
-            self.ifName, "Echo", text )
+            self._ifName_, "Echo", text )
 
         ret = tupRet[ 0 ]
 

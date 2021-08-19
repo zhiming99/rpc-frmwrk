@@ -11,7 +11,7 @@ class CActcClient:
     interface name, which will be used to invoke
     the event handler
     """
-    ifName = "CActcServer"
+    _ifName_ = "CActcServer"
     """
     Method: LongWait
 
@@ -29,7 +29,7 @@ class CActcClient:
     def LongWait( self, strText ) :
         tupRet = self.sendRequestAsync(
             CActcClient.LongWaitCb,
-            self.ifName, "LongWait",
+            self._ifName_, "LongWait",
             strText )
         return tupRet
 

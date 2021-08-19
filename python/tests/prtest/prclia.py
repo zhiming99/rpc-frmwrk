@@ -14,7 +14,7 @@ class CPauseResumeClient:
     interface name, which will be used to invoke
     the event handler if any
     """
-    ifName = "CPauseResumeServer"
+    _ifName_ = "CPauseResumeServer"
 
     '''all the proxy methods have the similiar
     implementation, pass the callback function,
@@ -23,7 +23,7 @@ class CPauseResumeClient:
     def Echoa(self, text ):
         tupRet = self.sendRequestAsync(
             CPauseResumeClient.EchoCb,
-            self.ifName, "Echo", text )
+            self._ifName_, "Echo", text )
 
         return tupRet;
 
@@ -44,7 +44,7 @@ class CPauseResumeClient:
     def EchoUnknowna( self, byteBuf ):
         tupRet = self.sendRequestAsync(
             CPauseResumeClient.EchoUnknownCb,
-            self.ifName, "EchoUnknown", byteBuf )
+            self._ifName_, "EchoUnknown", byteBuf )
         ret = tupRet[ 0 ]
         if ret == 65537 :
             self.sem.acquire()
@@ -65,7 +65,7 @@ class CPauseResumeClient:
     def EchoMany( self, i1, i2, i3, i4, i5, strText ):
         tupRet = self.sendRequestAsync(
             CPauseResumeClient.EchoManyCb,
-            self.ifName, "EchoMany",
+            self._ifName_, "EchoMany",
             np.int32( i1 ),
             np.int16( i2 ),
             np.int64( i3 ),

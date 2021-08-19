@@ -33,7 +33,7 @@ class CFileInfo :
 # PyFileTransfer, an RPC interface
 class PyFileTransfer :
 
-    ifName = "PyFileTransfer"
+    _ifName_ = "PyFileTransfer"
 
     def __init__( self ) :
         pass

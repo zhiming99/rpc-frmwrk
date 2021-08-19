@@ -4,14 +4,14 @@ import numpy as np
 
 from rpcf.rpcbase import *
 
-from rpcf.proxy import PyRpcContext, PyRpcServer
+from rpcf.proxy import PyRpcContext, PyRpcServer, ErrorCode
 
 class CActcServer:
     """Mandatory class member to define the
     interface name, which will be used to invoke
     the event handler
     """
-    ifName = "CActcServer"
+    _ifName_ = "CActcServer"
     """
     Method: LongWait
 
@@ -47,7 +47,7 @@ class CActcServer:
         return listResp
 
     def LongWaitCleanup( self, ret, timerObj ) :
-        if np.uint32( ret ) == 0x8001000c :
+        if np.uint32( ret ) == ErrorCode.ERROR_USER_CANCEL :
             self.DisableTimer( timerObj )
             print( "remove the timer",
                 "at user's request" );
