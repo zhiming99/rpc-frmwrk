@@ -1,3 +1,4 @@
+from typing import Tuple
 from rpcf.rpcbase import *
 import struct
 import errno
@@ -151,35 +152,35 @@ class CSerialBase :
         self.SerialElemOpt[ sig[ 0 ] ]( buf, val )
         return 0
 
-    def DeserialInt64( self, buf : bytearray, offset : int ) -> ( int, int ) :
+    def DeserialInt64( self, buf : bytearray, offset : int ) -> Tuple[ int, int ] :
         val = struct.unpack_from( "!Q", buf, offset )
         return ( val[ 0 ], offset + 8 )
 
-    def DeserialInt32( self, buf : bytearray, offset : int ) -> ( int, int ) :
+    def DeserialInt32( self, buf : bytearray, offset : int ) -> Tuple[ int, int ] :
         val = struct.unpack_from( "!I", buf, offset )
         return ( val[ 0 ], offset + 4 )
 
-    def DeserialInt16( self, buf : bytearray, offset : int ) -> ( int, int ) :
+    def DeserialInt16( self, buf : bytearray, offset : int ) -> Tuple[ int, int ] :
         val = struct.unpack_from( "!H", buf, offset )
         return ( val[ 0 ], offset + 2 )
 
-    def DeserialBool( self, buf : bytearray, offset : int ) -> ( bool, int ) :
+    def DeserialBool( self, buf : bytearray, offset : int ) -> Tuple[ bool, int ] :
         val = struct.unpack_from( "!B", buf, offset )
         return ( val[ 0 ], offset + 1 )
 
-    def DeserialInt8( self, buf : bytearray, offset : int ) -> ( int, int ) :
+    def DeserialInt8( self, buf : bytearray, offset : int ) -> Tuple[ int, int ] :
         val = struct.unpack_from( "!B", buf, offset )
         return ( val[ 0 ], offset + 1 )
 
-    def DeserialFloat( self, buf : bytearray, offset : int ) -> ( float, int ) :
+    def DeserialFloat( self, buf : bytearray, offset : int ) -> Tuple[ float, int ] :
         val = struct.unpack_from( "!f", buf, offset )
         return ( val[ 0 ], offset + 4 )
 
-    def DeserialDouble( self, buf : bytearray, offset : int ) -> ( float, int ) :
+    def DeserialDouble( self, buf : bytearray, offset : int ) -> Tuple[ float, int ] :
         val = struct.unpack_from( "!d", buf, offset )
         return ( val[ 0 ], offset + 8 )
 
-    def DeserialHStream( self, buf : bytearray, offset : int ) -> ( int, int ) :
+    def DeserialHStream( self, buf : bytearray, offset : int ) -> Tuple[ int, int ] :
         if self.pIf is None :
             return -errno.EFAULT
         val = self.DeserialInt64( self, buf, offset )
@@ -189,7 +190,7 @@ class CSerialBase :
             return -errno.EFAULT
         return ( ret, offset + 8 )
 
-    def DeserialString( self, buf : bytearray, offset : int ) -> ( str, int ) :
+    def DeserialString( self, buf : bytearray, offset : int ) -> Tuple[ str, int ] :
         ret = self.DeserialInt32( self, buf, offset )
         offset += 4
         iSize = ret[ 0 ]
@@ -199,7 +200,7 @@ class CSerialBase :
             return ( "", offset )
         return ( str( buf[ offset : offset + iSize ] ), offset + iSize )
 
-    def DeserialBuf( self, buf : bytearray, offset : int ) -> ( bytearray, int ) :
+    def DeserialBuf( self, buf : bytearray, offset : int ) -> Tuple[ bytearray, int ] :
         ret = self.DeserialInt32( self, buf, offset )
         offset += 4
         iSize = ret[ 0 ]
@@ -209,14 +210,14 @@ class CSerialBase :
             return ( bytearray(), offset )
         return ( buf[ offset : offset + iSize ], offset + iSize )
         
-    def DeserialObjPtr( self, buf : bytearray, offset : int ) -> ( cpp.ObjPtr, int ) :
+    def DeserialObjPtr( self, buf : bytearray, offset : int ) -> Tuple[ cpp.ObjPtr, int ] :
         pNewObj = cpp.ObjPtr()
         listRet = pNewObj.DeserialObjPtr( buf, offset )
         if listRet[ 0 ] < 0 :
             return ( None, 0 )
         return ( listRet[ 0 ], listRet[ 1 ] )
 
-    def DeserialStruct( self, buf : bytearray, offset : int ) -> ( object, int ) :
+    def DeserialStruct( self, buf : bytearray, offset : int ) -> Tuple[ object, int ] :
         ret = struct.unpack_from( "!I", buf, offset )
         structId = ret[ 0 ]
         structInst = CStructFactoryBase.Create( structId, self.pIf )
@@ -225,7 +226,7 @@ class CSerialBase :
             return ( None, 0 )
         return ( structInst, ret[ 1 ] )
 
-    def DeserialArray( self, buf : bytearray, offset : int, sig : str )->( list, int ):
+    def DeserialArray( self, buf : bytearray, offset : int, sig : str )-> Tuple[list, int ]:
         sigLen = len( sig )
         if sig[ 0 ] != '(' :
             return -errno.EINVAL
@@ -254,7 +255,7 @@ class CSerialBase :
 
         return ( arrRet, elemOff )
 
-    def DeserialMap( self, buf : bytearray, offset : int, sig : str ) -> ( dict, int ):
+    def DeserialMap( self, buf : bytearray, offset : int, sig : str ) -> Tuple[ dict, int ]:
         sigLen = len( sig )
         if sig[ 0 ] != '(' :
             return -errno.EINVAL
@@ -288,7 +289,7 @@ class CSerialBase :
             mapRet[ key ] = val
         return ( mapRet, elemOff )
 
-    def DeserialElem( self, buf : bytearray, offset : int, sig : str ) -> ( object, int ):
+    def DeserialElem( self, buf : bytearray, offset : int, sig : str ) -> Tuple[ object, int ]:
         if sig[ 0 ] == '(' :
             return self.DeserialArray( buf, offset, sig )
         if sig[ 0 ] == '[' :

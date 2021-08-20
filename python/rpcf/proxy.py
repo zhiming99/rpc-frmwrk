@@ -8,7 +8,7 @@ import types
 import platform
 import pickle
 from enum import IntEnum
-from typing import Union, Callable, Optional
+from typing import Union, Tuple, Optional
 
 class ErrorCode( IntEnum ) :
     INVALID_HANDLE = np.int32( 0 )
@@ -374,7 +374,7 @@ class PyRpcServices :
     leave it alone.
     '''
     def ReadStream( self, hChannel, size = 0
-        )->( int, bytearray, cpp.BufPtr ) :
+        )-> Tuple[ int, bytearray, cpp.BufPtr ] :
         tupRet = self.oInst.ReadStream( hChannel, size )
         ret = tupRet[ 0 ]
         if ret < 0 :
@@ -649,7 +649,7 @@ class PyRpcServices :
             oMembers = inspect.getmembers(
                 typeFound, inspect.isfunction)
 
-            if( seriProto != cpp.seriRidl )
+            if( seriProto != cpp.seriRidl ) :
                 for oMethod in oMembers :
                     if nameComps[ 1 ] != oMethod[ 0 ]: 
                         continue
@@ -670,7 +670,7 @@ class PyRpcServices :
                 break
 
             if targetMethod is None :
-                resp[ 0 ] = -error.EFAULT
+                resp[ 0 ] = -errno.EFAULT
                 break
 
             resp = targetMethod( self, callback, *argList )
@@ -889,7 +889,7 @@ class PyRpcProxy( PyRpcServices ) :
             None, None, pCfg, args, resp )
 
     def MakeCallWithOptAsync( self, callback,
-        context: object
+        context: object,
         pCfg : cpp.CfgPtr,
         args : list, resp : list
         )->list[int,list]:

@@ -2207,7 +2207,7 @@ gint32 CImplPyMthdSvr::Output()
 
         if( dwInCount > 0 )
         {
-            CCOUT << "def " << strName << "( self, callback : cpp.ObjPtr, "; 
+            CCOUT << "def " << strName << "( self, callback : cpp.ObjPtr,"; 
             INDENT_UPL;
 
             ret = EmitFormalArgList(
@@ -2218,7 +2218,7 @@ gint32 CImplPyMthdSvr::Output()
         }
         else
         {
-            CCOUT << "def " << strName << "( self, callback : cpp.ObjPtr ): "; 
+            CCOUT << "def " << strName << "( self, callback : cpp.ObjPtr"; 
             INDENT_UPL;
         }
 
@@ -2776,7 +2776,10 @@ gint32 CImplPyMainFunc::OutputCli(
 {
     gint32 ret = 0;
     do{
-        OUTPUT_BANNER();
+        Wa( "from rpcf.rpcbase import *" );
+        Wa( "from rpcf.proxy import PyRpcProxy, PyRpcContext, ErrorCode" );
+        Wa( "import errno" );
+
         stdstr strName = pSvc->GetName();
         CCOUT << "from " << strName << "cli"
             << " import " << "C" << strName
@@ -2785,7 +2788,7 @@ gint32 CImplPyMainFunc::OutputCli(
         CCOUT << "def maincli() :";
         INDENT_UPL;
         Wa( "ret = 0" );
-        Wa( "oContext = PyRpcContext( PyRpcProxy )" );
+        Wa( "oContext = PyRpcContext( 'PyRpcProxy' )" );
         CCOUT << "with oContext :";
         INDENT_UPL;
         Wa( "print( \"start to work here...\" )" );
@@ -2905,7 +2908,10 @@ gint32 CImplPyMainFunc::OutputSvr(
 {
     gint32 ret = 0;
     do{
-        OUTPUT_BANNER();
+        Wa( "from rpcf.rpcbase import *" );
+        Wa( "from rpcf.proxy import PyRpcServer, PyRpcContext, ErrorCode" );
+        Wa( "import errno" );
+
         stdstr strName = pSvc->GetName();
         CCOUT << "from " << strName << "svr"
             << " import " << "C" << strName
@@ -2914,7 +2920,7 @@ gint32 CImplPyMainFunc::OutputSvr(
         CCOUT << "def mainsvr() :";
         INDENT_UPL;
         Wa( "ret = 0" );
-        Wa( "oContext = PyRpcContext( PyRpcServer )" );
+        Wa( "oContext = PyRpcContext( 'PyRpcServer' )" );
         CCOUT << "with oContext :";
         INDENT_UPL;
         Wa( "print( \"start to work here...\" )" );

@@ -28,6 +28,14 @@ class CPythonProxyBase :
         guint32 dwSeriProto,
         guint64& qwTaskCancel ) 
     { return -ENOTSUP; }
+
+    PyObject* PyProxyCall2(
+        PyObject* pCb,
+        PyObject* pContext,
+        CfgPtr& pOptions,
+        PyObject* listArgs,
+        PyObject* listResp )
+    { return Py_None; }
 };
 
 DECLARE_AGGREGATED_PROXY(
@@ -1321,8 +1329,9 @@ class CPythonInterfBase : public T
             pListResp == nullptr )
             return -EINVAL;
 
+        TaskletPtr pTask;
         gint32 ret = DEFER_CANCEL_HANDLER2(
-            0, pCallback, this,
+            0, pTask, this,
             &CPythonInterfBase::PyCompNotify,
             pCallback, 0,
             ( intptr_t )pCb,
@@ -1970,9 +1979,8 @@ class CPythonProxy :
         PyObject* listArgs,
         PyObject* listResp );
     %MethodCode
-        guint64 qwTaskCancel = 0;
-        gint32 ret = sipCpp->PyProxyCall2(
-            *a0, *a1, a2, a3, a4 );
+        sipRes = sipCpp->PyProxyCall2(
+            a0, a1, *a2, a3, a4 );
     %End
 
     gint32 PyProxyCallSync(
