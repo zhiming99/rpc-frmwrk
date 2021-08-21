@@ -9,44 +9,33 @@ class CSerialBase :
         self.pIf = pIf
 
     def SerialBool( self, buf : bytearray, val : int ) :
-        offset = len( buf )
-        struct.pack_into( "!B", buf, offset, val )
+        buf.extend( struct.pack( "!B", val ) )
 
     def SerialInt8( self, buf : bytearray, val : int ) :
-        offset = len( buf )
-        struct.pack_into( "!B", buf, offset, val )
+        buf.extend( struct.pack( "!B", val ) )
 
     def SerialInt16( self, buf : bytearray, val : int ) :
-        offset = len( buf )
-        struct.pack_into( "!H", buf, offset, val )
+        buf.extend( struct.pack( "!H", val ) )
 
     def SerialInt32( self, buf : bytearray, val : int ) :
-        offset = len( buf )
-        struct.pack_into( "!I", buf, offset, val )
+        buf.extend( struct.pack( "!I", val ) )
 
     def SerialInt64( self, buf : bytearray, val : int ) :
-        offset = len( buf )
-        struct.pack_into( "!Q", buf, offset, val )
+        buf.extend( struct.pack( "!Q", val ) )
 
     def SerialFloat( self, buf : bytearray, val : float ) :
-        offset = len( buf )
-        struct.pack_into( "!f", buf, offset, val )
+        buf.extend( struct.pack( "!f", val ) )
 
     def SerialDouble( self, buf : bytearray, val : float ) :
-        offset = len( buf )
-        struct.pack_into( "!d", buf, offset, val )
+        buf.extend( struct.pack( "!d", val ) )
 
-    def SerialString( self, buf : bytearray, val : bytes ) :
-        offset = len( buf )
-        struct.pack_into( "!I", buf, offset, len( val ) )
-        offset = len( buf )
-        struct.pack_into( "!s", buf, offset, val )
+    def SerialString( self, buf : bytearray, val : str ) :
+        buf.extend( struct.pack(
+            "!I%ds" % len( val ), len( val ), val.encode() ) )
 
     def SerialBuf( self, buf : bytearray, val : bytearray ) :
-        offset = len( buf )
-        struct.pack_into( "!I", buf, offset, len( val ) )
-        offset = len( buf )
-        struct.pack_into( "!s", buf, offset, val )
+        buf.extend( struct.pack(
+            "!I%ds" % len( val ), len( val ), val ) )
 
     def SerialObjPtr( self, buf : bytearray, val : cpp.ObjPtr )-> int :
         objBuf = val.SerialToByteArray()
@@ -54,7 +43,7 @@ class CSerialBase :
             return -errno.EFAULT
         if type( objBuf ) is not bytearray :
             return -errno.EFAULT
-        buf.append( objBuf )
+        buf.extend( objBuf )
         return 0
 
     def SerialHStream( self, buf : bytearray, val : int ) -> int:
@@ -183,7 +172,7 @@ class CSerialBase :
     def DeserialHStream( self, buf : bytearray, offset : int ) -> Tuple[ int, int ] :
         if self.pIf is None :
             return -errno.EFAULT
-        val = self.DeserialInt64( self, buf, offset )
+        val = self.DeserialInt64( buf, offset )
         oInst = self.oInst
         ret = oInst.GetChanByIdHash( val[ 0 ] )
         if ret == ErrorCode.INVALID_HANDLE :
@@ -191,17 +180,17 @@ class CSerialBase :
         return ( ret, offset + 8 )
 
     def DeserialString( self, buf : bytearray, offset : int ) -> Tuple[ str, int ] :
-        ret = self.DeserialInt32( self, buf, offset )
+        ret = self.DeserialInt32( buf, offset )
         offset += 4
         iSize = ret[ 0 ]
         if iSize is None :
             return ( None, 0 )
         if  iSize == 0:
             return ( "", offset )
-        return ( str( buf[ offset : offset + iSize ] ), offset + iSize )
+        return ( buf[ offset : offset + iSize ].decode(), offset + iSize )
 
     def DeserialBuf( self, buf : bytearray, offset : int ) -> Tuple[ bytearray, int ] :
-        ret = self.DeserialInt32( self, buf, offset )
+        ret = self.DeserialInt32( buf, offset )
         offset += 4
         iSize = ret[ 0 ]
         if iSize is None :

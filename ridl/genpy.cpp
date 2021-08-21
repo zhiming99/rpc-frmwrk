@@ -997,13 +997,18 @@ gint32 CImplPyMthdProxyBase::OutputEvent()
 void CImplPyMthdProxyBase::EmitOptions()
 {
     stdstr strName = m_pNode->GetName();
+    stdstr strIfName = stdstr( "I" ) +
+        m_pIf->GetName() + "_CliImpl._ifName_";
     Wa( "#preparing the options" );
-    Wa( "oOptions = cpp.CParams()" );
-    Wa( "oOptions.SetStrProp( cpp.propIfName, self._ifName_ )" );
-    CCOUT << "oOptions.SetStrProp( cpp.propMethodName, \"" << strName << "\" )";
+    Wa( "oOptions = cpp.CParamList()" );
+    CCOUT << "oOptions.SetStrProp( cpp.propIfName, "
+        << strIfName << " )";
+    NEW_LINE;
+    CCOUT << "oOptions.SetStrProp( cpp.propMethodName, \""
+        << strName << "\" )";
     NEW_LINE;
     Wa( "oOptions.SetIntProp( cpp.propSeriProto, cpp.seriRidl )" );
-    Wa( "oOptions.SetBoolProp( cpp.propSysMethod, True )" );
+    Wa( "oOptions.SetBoolProp( cpp.propSysMethod, False )" );
     if( m_pNode->IsNoReply() )
         Wa( "oOptions.SetBoolProp( cpp.propNoReply, True )" );
 
@@ -1087,7 +1092,7 @@ gint32 CImplPyMthdProxyBase::OutputSync()
 
         EmitOptions();
 
-        Wa( "listResp = []" );
+        Wa( "listResp = [ None, None ]" );
         Wa( "ret = self.MakeCallWithOpt( " );
         Wa( "    oOptions.GetCfg(), listArgs, listResp )" );
         if( dwOutCount == 0 )
@@ -1109,6 +1114,7 @@ gint32 CImplPyMthdProxyBase::OutputSync()
         if( dwInCount == 0 )
             Wa( "osb = CSerialBase( self )" );
 
+        Wa( "listRet = []" );
         CArgList* pal = pOutArgs;
         for( guint32 i = 0; i < dwOutCount; i++ )
         {
@@ -1128,12 +1134,12 @@ gint32 CImplPyMthdProxyBase::OutputSync()
             if( ERROR( ret ) )
                 break;
 
-            Wa( "listResp.append( ret[ 0 ] )" );
+            Wa( "listRet.append( ret[ 0 ] )" );
             Wa( "offset = ret[ 1 ]" );
             NEW_LINE;
         }
 
-        Wa( "return [ 0, listResp ]" );
+        Wa( "return [ 0, listRet ]" );
         INDENT_DOWNL;
 
     }while( 0 );
@@ -1205,7 +1211,7 @@ gint32 CImplPyMthdProxyBase::OutputAsync()
 
         EmitOptions();
 
-        Wa( "listResp = []" );
+        Wa( "listResp = [ None, None ]" );
         Wa( "ret = self.MakeCallWithOptAsync( " );
         CCOUT << "    self." << strName << "CbWrapper, context,";
         NEW_LINE;
@@ -1231,6 +1237,7 @@ gint32 CImplPyMthdProxyBase::OutputAsync()
         if( dwInCount == 0 )
             Wa( "osb = CSerialBase( self )" );
 
+        Wa( "listRet = []" );
         CArgList* pal = pOutArgs;
         for( guint32 i = 0; i < dwOutCount; i++ )
         {
@@ -1250,12 +1257,12 @@ gint32 CImplPyMthdProxyBase::OutputAsync()
             if( ERROR( ret ) )
                 break;
 
-            Wa( "listResp.append( ret[ 0 ] )" );
+            Wa( "listRet.append( ret[ 0 ] )" );
             Wa( "offset = ret[ 1 ]" );
             NEW_LINE;
         }
 
-        Wa( "return [ 0, listResp ]" );
+        Wa( "return [ 0, listRet ]" );
         INDENT_DOWNL;
 
     }while( 0 );
@@ -1529,8 +1536,15 @@ gint32 GenSvcFiles(
                 break;
 
             // server imlementation
-            pWriter->SelectImplFile(
+            ret = pWriter->SelectImplFile(
                 strCommon + "svr.py" );
+            if( ERROR( ret ) )
+            {
+                ret = pWriter->SelectImplFile(
+                    strCommon + "svr.py.new" );
+                if( ERROR( ret ) )
+                    break;
+            }
 
             CImplPySvcSvr opss(
                 pWriter, elem.second );
@@ -1539,8 +1553,15 @@ gint32 GenSvcFiles(
                 break;
 
             // client imlementation
-            pWriter->SelectImplFile(
+            ret = pWriter->SelectImplFile(
                 strCommon + "cli.py" );
+            if( ERROR( ret ) )
+            {
+                ret = pWriter->SelectImplFile(
+                    strCommon + "cli.py.new" );
+                if( ERROR( ret ) )
+                    break;
+            }
 
             CImplPySvcProxy opsc(
                 pWriter, elem.second );
@@ -1671,20 +1692,23 @@ gint32 CImplPyMthdSvrBase::OutputSync( bool bSync )
     do{
         stdstr strName = m_pNode->GetName();
         stdstr strIfName = m_pIf->GetName();
-        CCOUT << "def " << strName << "Wrapper( self,";
-        NEW_LINE;
-        CCOUT << "    callback : cpp.ObjPtr, buf : bytearray";
-        NEW_LINE;
-        CCOUT << "    ) -> list[ int, list ] :";
-        INDENT_UPL;
-        NEW_LINE;
         ObjPtr pInArgs = m_pNode->GetInArgs();
         guint32 dwInCount =
             GetArgCount( pInArgs );
         ObjPtr pOutArgs = m_pNode->GetOutArgs();
-
         guint32 dwOutCount =
             GetArgCount( pOutArgs );
+
+        CCOUT << "def " << strName << "Wrapper( self,";
+        NEW_LINE;
+        if( dwInCount > 0 )
+            CCOUT << "    callback : cpp.ObjPtr, buf : bytearray";
+        else
+            CCOUT << "    callback : cpp.ObjPtr";
+        NEW_LINE;
+        CCOUT << "    ) -> list[ int, list ] :";
+        INDENT_UPL;
+        NEW_LINE;
 
         if( dwInCount == 0 )
         {
@@ -1909,7 +1933,6 @@ gint32 CImplPyMthdSvrBase::OutputAsyncCHWrapper()
         Wa( "cancelled due to timeout or user request" );
         Wa( "it gives a chance to do some cleanup work." );
         Wa( "'''" );
-        NEW_LINE;
         stdstr strName = m_pNode->GetName();
         ObjPtr pInArgs = m_pNode->GetInArgs();
         guint32 dwInCount =
@@ -1971,6 +1994,8 @@ gint32 CImplPyMthdSvrBase::OutputEvent()
         Wa( "'''" );
         NEW_LINE;
         stdstr strName = m_pNode->GetName();
+        stdstr strIfName = stdstr( "I" ) +
+            m_pIf->GetName() + "_SvrImpl._ifName_";
         ObjPtr pInArgs = m_pNode->GetInArgs();
         guint32 dwOutCount =
             GetArgCount( pInArgs );
@@ -1980,15 +2005,16 @@ gint32 CImplPyMthdSvrBase::OutputEvent()
             CCOUT << "def " << strName
                 << "( self, callback ): ";
             INDENT_UPL;
-            Wa( "self.RidlSendEvent( self._ifName_," );
-            CCOUT << "\"" << strName << "\", \"\", None )";
+            Wa( "self.RidlSendEvent( callback, " );
+            CCOUT << strIfName << ", \"" 
+                << strName << "\", \"\", None )";
             break;
         }
 
         CCOUT << "def "<< strName << "( self,";
         NEW_LINE;
         Wa( "    callback : cpp.ObjPtr, ret : int," );
-        INDENT_UPL;
+        INDENT_UP;
 
         ret = EmitFormalArgList( m_pWriter, pInArgs );
         if( ERROR( ret ) )
@@ -2025,7 +2051,9 @@ gint32 CImplPyMthdSvrBase::OutputEvent()
         INDENT_DOWNL;
         Wa( "if ret < 0 :" );
         Wa( "    return ret" );
-        Wa( "self.RidlSendEvent( self._ifName_," );
+        Wa( "self.RidlSendEvent( callback, " );
+        CCOUT << "    " << strIfName << ",";
+        NEW_LINE;
         CCOUT << "    \"" << strName << "\", \"\", buf )";
         NEW_LINE;
         Wa( "return 0" );
@@ -2083,6 +2111,7 @@ gint32 CImplPyIfSvrBase::Output()
         INDENT_UP;
         NEW_LINES( 2 );
         CCOUT << "_ifName_ = \"" <<  strIfName << "\"";
+        NEW_LINE;
         ObjPtr pObj = m_pNode->GetMethodList();
         std::vector< ObjPtr > vecMethods;
         CMethodDecls* pmds = pObj;
@@ -2245,7 +2274,7 @@ gint32 CImplPyMthdSvr::Output()
         else
             Wa( ") -> list[ int, None ] :" );
 
-        Wa( "return [ -errno.ENOTSUP, None ]" );
+        Wa( "return [ ErrorCode.ERROR_NOT_IMPL, None ]" );
         INDENT_DOWNL;
 
         if( m_pNode->IsAsyncs() )
@@ -2266,7 +2295,6 @@ gint32 CImplPyMthdSvr::OutputAsyncCancelHandler()
         Wa( "or user request. Add your own cleanup" );
         Wa( "code here" );
         Wa( "'''" );
-        NEW_LINE;
         stdstr strName = m_pNode->GetName();
         ObjPtr pInArgs = m_pNode->GetInArgs();
         guint32 dwInCount =
@@ -2778,6 +2806,7 @@ gint32 CImplPyMainFunc::OutputCli(
     do{
         Wa( "from rpcf.rpcbase import *" );
         Wa( "from rpcf.proxy import PyRpcProxy, PyRpcContext, ErrorCode" );
+        Wa( "from rpcf.proxy import OutputMsg" );
         Wa( "import errno" );
 
         stdstr strName = pSvc->GetName();
@@ -2893,7 +2922,7 @@ gint32 CImplPyMainFunc::OutputCli(
         Wa( "'''" );
         INDENT_DOWN;
         INDENT_DOWNL;
-        Wa( "return ret" );
+        Wa( "return ret[ 0 ]" );
         INDENT_DOWNL;
         Wa( "ret = maincli()" );
         Wa( "quit( ret )" );
@@ -2911,6 +2940,7 @@ gint32 CImplPyMainFunc::OutputSvr(
         Wa( "from rpcf.rpcbase import *" );
         Wa( "from rpcf.proxy import PyRpcServer, PyRpcContext, ErrorCode" );
         Wa( "import errno" );
+        Wa( "import time" );
 
         stdstr strName = pSvc->GetName();
         CCOUT << "from " << strName << "svr"

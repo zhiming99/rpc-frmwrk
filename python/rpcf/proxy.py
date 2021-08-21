@@ -33,8 +33,11 @@ class ErrorCode( IntEnum ) :
     ERROR_CANCEL_INSTEAD = np.int32( 0x8001000f )
     ERROR_QUEUE_FULL = np.int32( 0x8001000e )
 
-def DebugPrint( strMsg, logLevel = 3 ) :
-    PyDbgPrint( strMsg, logLevel )
+def DebugPrint( strMsg : str, logLevel = 3 ) :
+    PyDbgPrint( strMsg.encode(), logLevel )
+
+def OutputMsg( strMsg : str ) :
+    PyOutputMsg( strMsg.encode() )
 
 def GetNpValue( typeid, val ) :
     if typeid == cpp.typeUInt32 :
@@ -453,6 +456,7 @@ class PyRpcServices :
         if iSize < 0 :
             return [ -errno.EINVAL, ]
 
+        argList = []
         if seriProto == cpp.seriPython :
             ret = pCfg.GetProperty( 0 )
             if ret[ 0 ] < 0 :
@@ -483,7 +487,7 @@ class PyRpcServices :
 
             val = ret[ 1 ]
             if val.IsEmpty() :
-                return [ -errno.EFAULT, ]
+                return [ 0, argList ]
 
             pyBuf = bytearray( val.size() )
             iRet = val.CopyToPython( pyBuf )
@@ -496,7 +500,6 @@ class PyRpcServices :
         elif seriProto != cpp.seriNone :
             return [ -errno.EBADMSG, ]
             
-        argList = []
         for i in range( iSize ) :
             ret = oParams.GetPropertyType( i )
             if ret[ 0 ] < 0 :
@@ -599,6 +602,9 @@ class PyRpcServices :
                 targetMethod = oMethod[ 1 ]
                 found = True
                 break
+
+            break
+
         if found :
             return targetMethod
 
@@ -681,7 +687,7 @@ class PyRpcServices :
                 break
 
             if seriProto != cpp.seriPython :
-                resp[ 0 ] = -errno.ENOTSUP
+                resp[ 0 ] = -errno.EINVAL
                 break
 
             ret = resp[ 0 ]

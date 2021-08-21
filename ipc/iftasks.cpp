@@ -5111,6 +5111,12 @@ gint32 CIoReqSyncCallback::operator()(
     case eventTaskComp:
         {
             std::vector< LONGWORD > vecParams;
+            CParamList oResp;
+            bool bSet = false;
+            gint32 iRet = 0;
+            CCfgOpener oTaskCfg(
+                (IConfigDb*)GetConfig() );
+
             do{
                 ret = GetParamList(
                     vecParams, propParamList );
@@ -5119,9 +5125,7 @@ gint32 CIoReqSyncCallback::operator()(
                     break;
 
                 // the result of the io request
-                ret = vecParams[ 1 ];
-                if( ERROR( ret ) )
-                    break;
+                iRet = vecParams[ 1 ];
 
                 // the task could be the CIfIoReqTask
                 CObjBase* pTask =
@@ -5160,18 +5164,25 @@ gint32 CIoReqSyncCallback::operator()(
                     break;
                 }
 
-                CCfgOpener oTaskCfg(
-                    (IConfigDb*)GetConfig() );
-
                 oTaskCfg[ propRespPtr ] =
                     ObjPtr( pCfg );
 
+                bSet = true;
                 ret = 0;
 
             }while( 0 );
 
-            if( ret == -34 )
-                raise( SIGTRAP );
+            if( !bSet )
+            {
+                if( ERROR( ret ) )
+                    oResp[ propReturnValue ] = ret;
+                else if( ERROR( iRet ) )
+                    oResp[ propReturnValue ] = iRet;
+                else
+                    oResp[ propReturnValue ] = 0;
+
+                oTaskCfg[ propRespPtr ] = oResp.GetCfg();
+            }
 
             SetError( ret );
             Sem_Post( &m_semWait );

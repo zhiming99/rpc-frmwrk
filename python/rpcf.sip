@@ -115,6 +115,7 @@ namespace cpp
         propIfName,
         propMethodName,
         propSysMethod,
+        propSeriProto,
         propNoReply,
         propTimeoutSec,
         propKeepAliveSec

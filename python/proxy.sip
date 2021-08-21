@@ -29,7 +29,7 @@ class CPythonProxyBase :
         guint64& qwTaskCancel ) 
     { return -ENOTSUP; }
 
-    PyObject* PyProxyCall2(
+    virtual PyObject* PyProxyCall2(
         PyObject* pCb,
         PyObject* pContext,
         CfgPtr& pOptions,
@@ -760,6 +760,7 @@ class CPythonInterfBase : public T
         PyObject* pPyCb = nullptr;
         PyObject* pPyParams = nullptr;
         bool bNoReply = false;
+        guint32 dwSeriProto = seriNone;
 
         do{
             CReqOpener oReq( pParams );
@@ -768,7 +769,6 @@ class CPythonInterfBase : public T
             if( ERROR( ret ) )
                 break;
 
-            guint32 dwSeriProto = seriNone;
             ret = oReq.GetIntProp(
                 propSeriProto, dwSeriProto );
             if( ERROR( ret ) )
@@ -900,6 +900,7 @@ class CPythonInterfBase : public T
             ret != -ENOTSUP)
         {
             oResp[ propReturnValue ] = ret;
+            oResp[ propSeriProto ] = dwSeriProto;
             CCfgOpenerObj oCfg( pCallback );
             oCfg.SetPointer( propRespPtr,
                 ( IConfigDb* )oResp.GetCfg() );
@@ -1759,7 +1760,7 @@ PyObject* CPythonProxyImpl::PyProxyCall2(
             break;
 
         ret = oOptions.GetStrProp(
-            propIfName, strMethod );
+            propIfName, strIfName );
         if( ERROR( ret ) )
             break;
 
@@ -1819,7 +1820,7 @@ PyObject* CPythonProxyImpl::PyProxyCall2(
         Py_UNBLOCK_THREADS;
 
         ret = this->AsyncCallVector(
-            pRespCb, oOptions.GetCfg(),
+            pRespCb, pOptions,
             oResp.GetCfg(), strMethod,
             vecParams );
 
@@ -1894,6 +1895,8 @@ PyObject* CPythonProxyImpl::PyProxyCall2(
 
     PyList_SetItem( listResp, 0,
         PyLong_FromLong( ret ) );
+
+    Py_INCREF( listResp );
 
     return listResp;
 }
