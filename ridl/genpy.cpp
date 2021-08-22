@@ -30,7 +30,7 @@ extern std::string g_strAppName;
 extern gint32 SetStructRefs( ObjPtr& pRoot );
 extern guint32 GenClsid( const std::string& strName );
 
-std::map< char, stdstr > g_mapSig2Type =
+std::map< char, stdstr > g_mapSig2PyType =
 {
     { '(' , "list" },
     { '[' , "map" },
@@ -305,8 +305,8 @@ static gint32 EmitFormalArgList(
         {
             auto& elem = vecArgs[ i ];
             std::map< char, stdstr >::iterator itr =
-                g_mapSig2Type.find( elem.second[ 0 ] ); 
-            if( itr == g_mapSig2Type.end() )
+                g_mapSig2PyType.find( elem.second[ 0 ] ); 
+            if( itr == g_mapSig2PyType.end() )
             {
                 ret = -ENOENT;
                 break;
@@ -319,6 +319,106 @@ static gint32 EmitFormalArgList(
                 pWriter->NewLine();
             }
         }
+
+    }while( 0 );
+
+    return ret;
+}
+
+static stdstr GetTypeName( CAstNodeBase* pType )
+{
+    EnumClsid iClsid = pType->GetClsid();
+    if( iClsid == clsid( CStructDecl ) )
+    {
+        CStructDecl* pStruct =
+            static_cast< CStructDecl* >( pType );
+        return pStruct->GetName();
+    }
+    else if( iClsid == clsid( CStructRef ) )
+    {
+        CStructRef* pStruct = ObjPtr( pType );
+            static_cast< CStructRef* >( pType );
+        return pStruct->GetName();
+    }
+    else if( iClsid == clsid( CArrayType ) )
+    {
+        CArrayType* pArray =
+            static_cast< CArrayType* >( pType );
+
+        CAstNodeBase* pet = pArray->GetElemType();
+        stdstr strElem = GetTypeName( pet );
+        return stdstr( "(" ) + strElem + ")";
+    }
+    else if( iClsid == clsid( CMapType ) )
+    {
+        CMapType* pMap =
+            static_cast< CMapType* >( pType );
+        
+        CAstNodeBase* pkt = pMap->GetKeyType();
+        stdstr strKey = GetTypeName( pkt );
+
+        CAstNodeBase* pet = pMap->GetElemType();
+        stdstr strElem = GetTypeName( pet );
+        return stdstr( "[" ) + strKey +
+            "," + strElem + "]";
+    }
+
+    else if( iClsid != clsid( CMapType ) )
+        return "";
+
+    CPrimeType* pPrime =
+        static_cast< CPrimeType* >( pType );
+
+    return pPrime->ToStringPy();
+}
+
+static gint32 EmitRespList(
+    CWriterBase* pWriter, CArgList* pOutArgs )
+{
+    gint32 ret = 0;
+    std::ofstream& ofp = *pWriter->m_curFp;
+    do{
+        pWriter->WriteLine0( "'''" );
+        std::vector< std::pair< stdstr, stdstr > > vecArgs;
+        ret = GetArgsAndSigs( pOutArgs, vecArgs );
+        if( ERROR( ret ) )
+            break;
+
+        pWriter->WriteLine0(
+            "the response parameters includes" );
+
+        std::map< char, stdstr >::iterator itr;
+        stdstr strType;
+        for( int i = 0; i < vecArgs.size(); i++ )
+        {
+            auto& elem = vecArgs[ i ];
+            if( elem.second[ 0 ] != 'O' &&
+                elem.second[ 0 ] != '(' &&
+                elem.second[ 0 ] != '[' )
+            {
+                itr = g_mapSig2PyType.find(
+                    elem.second[ 0 ] );
+
+                if( itr != g_mapSig2PyType.end() )
+                    strType = itr->second;
+                else
+                    strType = "unknown";
+            }
+            else
+            {
+                CFormalArg* pfa =
+                    pOutArgs->GetChild( i );
+
+                CAstNodeBase* pType =
+                    pfa->GetType();
+
+                strType = GetTypeName( pType );
+            }
+            ofp << elem.first << " : " << strType;
+
+            pWriter->NewLine();
+        }
+        pWriter->WriteLine0( "'''" );
 
     }while( 0 );
 
@@ -679,6 +779,8 @@ gint32 CDeclarePyStruct::Output()
         NEW_LINE;
         Wa( "osb = CSerialBase( self.pIf )" );
         NEW_LINE;
+        CCOUT << "osb.SerialInt32( buf, " << strName << ".GetStructId() )";
+        NEW_LINE;
         for( i = 0; i < dwCount; i++ )
         {
             CFieldDecl* pfd = pfl->GetChild( i );
@@ -702,9 +804,6 @@ gint32 CDeclarePyStruct::Output()
                 m_pWriter, strField, strSig );
             if( ERROR( ret ) )
                 break;
-
-            if( i < dwCount - 1 )
-                NEW_LINES( 2 );
         }
         NEW_LINE;
         Wa( "return 0" );
@@ -715,6 +814,16 @@ gint32 CDeclarePyStruct::Output()
         INDENT_UPL;
         NEW_LINE;
         Wa( "osb = CSerialBase( self.pIf )" );
+        NEW_LINE;
+        CCOUT << "ret = osb.DeserialInt32( buf, offset )";
+        NEW_LINE;
+        Wa( "if ret[ 0 ] is None :" );
+        Wa( "    return ( -errno.ENOENT, 0 )" );
+        CCOUT << "if ret[ 0 ] != " << strName <<".GetStructId() :";
+        NEW_LINE;
+        CCOUT << "    return ( -errno.EBADMSG, 0 )";
+        NEW_LINE;
+        Wa( "offset = ret[ 1 ]" );
         NEW_LINE;
         for( i = 0; i < dwCount; i++ )
         {
@@ -737,7 +846,6 @@ gint32 CDeclarePyStruct::Output()
                 m_pWriter, strSig );
             if( ERROR( ret ) )
                 break;
-            NEW_LINE;
             Wa( "if ret[ 0 ] is None :" );
             Wa( "    return ( -errno.ENOENT, 0 )" );
             CCOUT << "self." << strName << " = ret[ 0 ]";
@@ -834,7 +942,7 @@ gint32 GenStructsFile(
                 g_strAppName + "::" + strName;
             guint32 dwMsgId = GenClsid( strMsgId );
             ofp << "g_mapStructs[ " << dwMsgId
-                << " ] = \"" << strName << "\"";
+                << " ] = " << strName;
             if( i < vecActStructs.size() - 1 )
                 pWriter->NewLine();
         }
@@ -975,7 +1083,6 @@ gint32 CImplPyMthdProxyBase::OutputEvent()
                 if( ERROR( ret ) )
                     break;
 
-                NEW_LINE;
                 Wa( "if ret[ 0 ] is None :" );
                 Wa( "    return" );
                 Wa( "listArgs.append( ret[ 0 ] )" );
@@ -1027,7 +1134,7 @@ void CImplPyMthdProxyBase::EmitOptions()
     Wa( "        dwTimeoutSec / 2 )" );
 }
 
-gint32 CImplPyMthdProxyBase::OutputSync()
+gint32 CImplPyMthdProxyBase::OutputSync( bool bSync )
 {
     gint32 ret = 0;
     do{
@@ -1043,7 +1150,10 @@ gint32 CImplPyMthdProxyBase::OutputSync()
 
         if( dwInCount > 0 )
         {
-            CCOUT << "def " << strName << "( self, "; 
+            if( bSync )
+                CCOUT << "def " << strName << "( self, "; 
+            else
+                CCOUT << "def " << strName << "( self, context, "; 
             INDENT_UPL;
 
             ret = EmitFormalArgList(
@@ -1053,130 +1163,17 @@ gint32 CImplPyMthdProxyBase::OutputSync()
 
             NEW_LINE;
             Wa( ") -> list[ int, list ] :" );
+
             NEW_LINE;
+            if( dwOutCount > 0 )
+                EmitRespList( m_pWriter, pOutArgs );
             Wa( "osb = CSerialBase( self )" );
             Wa( "buf = bytearray()" );
-            NEW_LINE;
-
-            CArgList* pinal = pInArgs;
-            for( guint32 i = 0; i < dwInCount; i++ )
-            {
-                CFormalArg* pfa = pinal->GetChild( i );
-                if( pfa == nullptr )
-                    continue;
-                CAstNodeBase* pType = pfa->GetType();
-                if( pType == nullptr )
-                {
-                    ret = -EFAULT;
-                    break;
-                }
-                stdstr strSig = pType->GetSignature();
-                stdstr strArg = pfa->GetName();
-                ret = EmitSerialBySig(
-                    m_pWriter, strArg, strSig );
-                if( ERROR( ret ) )
-                    break;
-            }
-            if( ERROR( ret ) )
-                break;
-
-            Wa( "listArgs = [ buf, ]" );
-        }
-        else
-        {
-            CCOUT << "def " << strName << "( self )->list[int,list] :";
+            Wa( "ret = 0" );
+            Wa( "while True:" );
             INDENT_UPL;
-            NEW_LINE;
-            Wa( "listArgs = []" );
-        }
 
-        EmitOptions();
-
-        Wa( "listResp = [ None, None ]" );
-        Wa( "ret = self.MakeCallWithOpt( " );
-        Wa( "    oOptions.GetCfg(), listArgs, listResp )" );
-        if( dwOutCount == 0 )
-        {
-            Wa( "return ret" );
-            INDENT_DOWNL;
-            break;
-        }
-        Wa( "if ret[ 0 ] < 0 :" );
-        Wa( "    return ret" );
-        Wa( "buf = ret[ 1 ][ 0 ]" );
-        Wa( "if buf is None or not isinstance( buf, bytearray ) : " );
-        Wa( "   ret[ 0 ] = -errno.EBADMSG " );
-        Wa( "   ret[ 1 ] = None" );
-        Wa( "   return ret " );
-        NEW_LINE;
-
-        Wa( "offset = 0" );
-        if( dwInCount == 0 )
-            Wa( "osb = CSerialBase( self )" );
-
-        Wa( "listRet = []" );
-        CArgList* pal = pOutArgs;
-        for( guint32 i = 0; i < dwOutCount; i++ )
-        {
-            ObjPtr pObj = pal->GetChild( i );
-            CFormalArg* pfa = pObj;
-            if( pfa == nullptr )
-                continue;
-            CAstNodeBase* pType = pfa->GetType();
-            if( pType == nullptr )
-            {
-                ret = -EFAULT;
-                break;
-            }
-            stdstr strSig = pType->GetSignature();
-            ret = EmitDeserialBySig(
-                m_pWriter, strSig );
-            if( ERROR( ret ) )
-                break;
-
-            Wa( "listRet.append( ret[ 0 ] )" );
-            Wa( "offset = ret[ 1 ]" );
-            NEW_LINE;
-        }
-
-        Wa( "return [ 0, listRet ]" );
-        INDENT_DOWNL;
-
-    }while( 0 );
-
-    return ret;
-}
-
-gint32 CImplPyMthdProxyBase::OutputAsync()
-{
-    gint32 ret = 0;
-    do{
-        CMethodDecl* pmd = m_pNode;
-        stdstr strName = pmd->GetName();
-        ObjPtr pInArgs = pmd->GetInArgs();
-        guint32 dwInCount =
-            GetArgCount( pInArgs );
-
-        ObjPtr pOutArgs = pmd->GetOutArgs();
-        guint32 dwOutCount =
-            GetArgCount( pOutArgs );
-
-        if( dwInCount > 0 )
-        {
-            CCOUT << "def " << strName << "( self, context, "; 
-            INDENT_UPL;
-            ret = EmitFormalArgList(
-                m_pWriter, pInArgs );
-            if( ERROR( ret ) )
-                break;
-
-            NEW_LINE;
-            Wa( ") -> list[ int, list ] :" );
-            NEW_LINE;
-            Wa( "osb = CSerialBase( self )" );
-            Wa( "buf = bytearray()" );
-            NEW_LINE;
-
+            bool bCheck = false;
             CArgList* pal = pInArgs;
             for( guint32 i = 0; i < dwInCount; i++ )
             {
@@ -1190,47 +1187,73 @@ gint32 CImplPyMthdProxyBase::OutputAsync()
                     break;
                 }
                 stdstr strSig = pType->GetSignature();
+                int ch = strSig[ 0 ];
+                if( ch == '(' ||
+                    ch == '[' || ch == 'O' )
+                    bCheck = true;
+
                 stdstr strArg = pfa->GetName();
                 ret = EmitSerialBySig(
-                    m_pWriter, strArg, strSig );
+                    m_pWriter, strArg, strSig, true );
                 if( ERROR( ret ) )
                     break;
             }
             if( ERROR( ret ) )
                 break;
 
+            Wa( "break" );
+            INDENT_DOWNL;
+            if( bCheck )
+            {
+                Wa( "if ret < 0 :" );
+                Wa( "    return [ ret, None ]" );
+            }
+
             Wa( "listArgs = [ buf, ]" );
         }
         else
         {
-            CCOUT << "def " << strName << "( self, context )->list[int,list] :";
+            if( bSync )
+                CCOUT << "def " << strName << "( self )->list[int,list] :";
+            else
+                CCOUT << "def " << strName << "( self, context )->list[int,list] :";
             INDENT_UPL;
             NEW_LINE;
+            if( dwOutCount > 0 )
+                EmitRespList( m_pWriter, pOutArgs );
             Wa( "listArgs = []" );
         }
 
         EmitOptions();
 
         Wa( "listResp = [ None, None ]" );
-        Wa( "ret = self.MakeCallWithOptAsync( " );
-        CCOUT << "    self." << strName << "CbWrapper, context,";
-        NEW_LINE;
+        if( bSync )
+        {
+            Wa( "ret = self.MakeCallWithOpt( " );
+        }
+        else
+        {
+            Wa( "ret = self.MakeCallWithOptAsync( " );
+            CCOUT << "    self." << strName << "CbWrapper, context,";
+            NEW_LINE;
+        }
         Wa( "    oOptions.GetCfg(), listArgs, listResp )" );
-        Wa( "if ret[ 0 ] == ErrorCode.STATUS_PENDING :" );
-        Wa( "    return ret" );
-        Wa( "if ret[ 0 ] < 0 :" );
-        Wa( "    return ret" );
+        if( !bSync )
+        {
+            Wa( "if ret[ 0 ] == ErrorCode.STATUS_PENDING :" );
+            Wa( "    return ret" );
+        }
         if( dwOutCount == 0 )
         {
             Wa( "return ret" );
             INDENT_DOWNL;
             break;
         }
+        Wa( "if ret[ 0 ] < 0 :" );
+        Wa( "    return ret" );
         Wa( "buf = ret[ 1 ][ 0 ]" );
         Wa( "if buf is None or not isinstance( buf, bytearray ) : " );
-        Wa( "   ret[ 0 ] = -errno.EBADMSG " );
-        Wa( "   ret[ 1 ] = None" );
-        Wa( "   return ret " );
+        Wa( "    return [ -errno.EBADMSG, None ] " );
         NEW_LINE;
 
         Wa( "offset = 0" );
@@ -1257,6 +1280,8 @@ gint32 CImplPyMthdProxyBase::OutputAsync()
             if( ERROR( ret ) )
                 break;
 
+            Wa( "if ret[ 0 ] is None :" );
+            Wa( "    return [ -errno.EBADMSG, None ]" );
             Wa( "listRet.append( ret[ 0 ] )" );
             Wa( "offset = ret[ 1 ]" );
             NEW_LINE;
@@ -1291,7 +1316,7 @@ gint32 CImplPyMthdProxyBase::OutputAsyncCbWrapper()
         Wa( "if targetMethod is None :" );
         Wa( "    return" );
 
-        Wa( "listResp = [context, ret]" );
+        Wa( "listResp = [ context, ret ]" );
         if( dwOutCount == 0 )
         {
             Wa( "self.InvokeCallback( targetMethod, listResp );" );
@@ -1301,7 +1326,7 @@ gint32 CImplPyMthdProxyBase::OutputAsyncCbWrapper()
         }
 
         NEW_LINE;
-        Wa( "if listArgs is None or len( listArgs ) < 1 :" );
+        Wa( "if listArgs is None or len( listArgs ) == 0 :" );
         Wa( "    return" );
         Wa( "buf = listArgs[ 0 ]" );
         Wa( "if buf is None or not isinstance( buf, bytearray ):" );
@@ -1330,6 +1355,8 @@ gint32 CImplPyMthdProxyBase::OutputAsyncCbWrapper()
             if( ERROR( ret ) )
                 break;
 
+            Wa( "if ret[ 0 ] is None :" );
+            Wa( "    return" );
             Wa( "listResp.append( ret[ 0 ] )" );
             Wa( "offset = ret[ 1 ]" );
             NEW_LINE;
@@ -1352,12 +1379,12 @@ gint32 CImplPyMthdProxyBase::Output()
     }
     else if( m_pNode->IsAsyncp() )
     {
-        gint32 ret = OutputAsync();
+        gint32 ret = OutputSync( false );
         if( ERROR( ret ) )
             return ret;
         return OutputAsyncCbWrapper();
     }
-    return OutputSync();
+    return OutputSync( true );
 }
 
 CImplPyIfProxyBase::CImplPyIfProxyBase(
@@ -1746,7 +1773,7 @@ gint32 CImplPyMthdSvrBase::OutputSync( bool bSync )
                     break;
 
                 Wa( "if ret[ 0 ] is None :" );
-                Wa( "    return [ -errno.EFAULT, None ]" );
+                Wa( "    return [ -errno.EBADMSG, None ]" );
                 Wa( "listArgs.append( ret[ 0 ] )" );
                 NEW_LINE;
                 if( i < dwInCount - 1 )
@@ -1797,6 +1824,7 @@ gint32 CImplPyMthdSvrBase::OutputSync( bool bSync )
         Wa( "while True:" );
         INDENT_UPL;
         CArgList* poutal = pOutArgs;
+        bool bCheck = false;
         for( guint32 i = 0; i < dwOutCount; i++ )
         {
             CFormalArg* pfa = poutal->GetChild( i );
@@ -1812,6 +1840,11 @@ gint32 CImplPyMthdSvrBase::OutputSync( bool bSync )
             std::string strSig =
                 pNode->GetSignature();
 
+            int ch = strSig[ 0 ];
+            if( ch == '(' ||
+                ch == '[' || ch == 'O' )
+                bCheck = true;
+
             ret = EmitSerialBySig(
                 m_pWriter, strVarName,
                 strSig, true );
@@ -1823,8 +1856,11 @@ gint32 CImplPyMthdSvrBase::OutputSync( bool bSync )
             break;
         Wa( "break" );
         INDENT_DOWNL;
-        Wa( "if ret < 0 :" );
-        Wa( "    return [ ret, None ]" );
+        if( bCheck )
+        {
+            Wa( "if ret < 0 :" );
+            Wa( "    return [ ret, None ]" );
+        }
         Wa( "return [ iRet, [ buf, ] ]" );
         INDENT_DOWNL;
         NEW_LINE;
@@ -1866,17 +1902,17 @@ gint32 CImplPyMthdSvrBase::OutputAsyncCompHandler()
         {
             CCOUT << "def On" << strName << "Complete( self,";
             NEW_LINE;
-            Wa( "    callback : cpp.ObjPtr, ret : int ): " );
+            Wa( "    callback : cpp.ObjPtr, iRet : int ): " );
             INDENT_UPL;
             Wa( "self.RidlOnServiceComplete(" );
-            Wa( "    callback, ret, bytearray() )" );
+            Wa( "    callback, iRet, None )" );
             Wa( "return" );
             INDENT_DOWNL;
             break;
         }
 
         CCOUT << "def On" << strName << "Complete"
-            << "( self, callback : cpp.ObjPtr, ret : int,";
+            << "( self, callback : cpp.ObjPtr, iRet : int,";
         INDENT_UPL;
 
         ret = EmitFormalArgList( m_pWriter, pOutArgs );
@@ -1885,11 +1921,17 @@ gint32 CImplPyMthdSvrBase::OutputAsyncCompHandler()
 
         CCOUT << "):";
         NEW_LINE;
+        Wa( "if iRet < 0:" );
+        Wa( "    self.RidlOnServiceComplete(" );
+        Wa( "    callback, iRet, None )" );
+        Wa( "    return" );
         Wa( "osb = CSerialBase( self )" );
         Wa( "buf = bytearray()" );
+        Wa( "ret = 0" );
         Wa( "while True:" );
         INDENT_UPL;
         guint32 i = 0;
+        bool bCheck = false;
         CArgList* pArgList = pOutArgs;
         for( ; i < dwOutCount; i++ )
         {
@@ -1903,19 +1945,25 @@ gint32 CImplPyMthdSvrBase::OutputAsyncCompHandler()
             stdstr strSig =
                 pType->GetSignature();
 
+            int ch = strSig[ 0 ];
+            if( ch == '(' ||
+                ch == '[' || ch == 'O' )
+                bCheck = true;
+
             ret = EmitSerialBySig(
                 m_pWriter, strArg, strSig, true );
             if( ERROR( ret ) )
                 break;
-            if( i < dwOutCount - 1 )
-                NEW_LINES( 2 );
         }
         Wa( "break" );
         INDENT_DOWNL;
-        Wa( "if ret < 0 :" );
-        Wa( "    buf = bytearray()" );
+        if( bCheck )
+        {
+            Wa( "if ret < 0 :" );
+            Wa( "    buf = None" );
+        }
         Wa( "self.RidlOnServiceComplete(" );
-        Wa( "    callback, ret, buf )" );
+        Wa( "    callback, iRet, buf )" );
         Wa( "return" );
         INDENT_DOWNL;
 
@@ -1992,20 +2040,19 @@ gint32 CImplPyMthdSvrBase::OutputEvent()
         Wa( "Call this method whenever the sever has the" );
         Wa( "event to broadcast" );
         Wa( "'''" );
-        NEW_LINE;
         stdstr strName = m_pNode->GetName();
         stdstr strIfName = stdstr( "I" ) +
             m_pIf->GetName() + "_SvrImpl._ifName_";
         ObjPtr pInArgs = m_pNode->GetInArgs();
-        guint32 dwOutCount =
+        guint32 dwInCount =
             GetArgCount( pInArgs );
 
-        if( dwOutCount == 0 )
+        if( dwInCount == 0 )
         {
             CCOUT << "def " << strName
                 << "( self, callback ): ";
             INDENT_UPL;
-            Wa( "self.RidlSendEvent( callback, " );
+            Wa( "ret = self.RidlSendEvent( callback : cpp.ObjPtr, " );
             CCOUT << strIfName << ", \"" 
                 << strName << "\", \"\", None )";
             break;
@@ -2013,8 +2060,8 @@ gint32 CImplPyMthdSvrBase::OutputEvent()
 
         CCOUT << "def "<< strName << "( self,";
         NEW_LINE;
-        Wa( "    callback : cpp.ObjPtr, ret : int," );
-        INDENT_UP;
+        CCOUT << "    callback : cpp.ObjPtr,";
+        INDENT_UPL;
 
         ret = EmitFormalArgList( m_pWriter, pInArgs );
         if( ERROR( ret ) )
@@ -2028,35 +2075,42 @@ gint32 CImplPyMthdSvrBase::OutputEvent()
         INDENT_UPL;
         guint32 i = 0;
         CArgList* pArgList = pInArgs;
-        for( ; i < dwOutCount; i++ )
+        bool bCheck = false;
+        for( ; i < dwInCount; i++ )
         {
             CFormalArg* pfa =
                 pArgList->GetChild( i );
 
             stdstr strArg = pfa->GetName();
-            CAstNodeBase* pType =
-                pfa->GetType();
+            CAstNodeBase* pType = pfa->GetType();
 
             stdstr strSig =
                 pType->GetSignature();
 
+            int ch = strSig[ 0 ];
+            if( ch == '(' ||
+                ch == '[' || ch == 'O' )
+                bCheck = true;
+
             ret = EmitSerialBySig(
                 m_pWriter, strArg, strSig, true );
+
             if( ERROR( ret ) )
                 break;
-            if( i < dwOutCount - 1 )
-                NEW_LINES( 2 );
         }
         Wa( "break" );
         INDENT_DOWNL;
-        Wa( "if ret < 0 :" );
-        Wa( "    return ret" );
-        Wa( "self.RidlSendEvent( callback, " );
+        if( bCheck )
+        {
+            Wa( "if ret < 0 :" );
+            Wa( "    return ret" );
+        }
+        Wa( "ret = self.RidlSendEvent( callback, " );
         CCOUT << "    " << strIfName << ",";
         NEW_LINE;
         CCOUT << "    \"" << strName << "\", \"\", buf )";
         NEW_LINE;
-        Wa( "return 0" );
+        Wa( "return ret" );
         INDENT_DOWNL;
 
     }while( 0 );
@@ -2254,22 +2308,8 @@ gint32 CImplPyMthdSvr::Output()
         if( dwOutCount > 0 )
         {
             Wa( ") -> list[ int, list ] :" );
-            Wa( "'''" );
-            std::vector< std::pair< stdstr, stdstr > > vecArgs;
-            ret = GetArgsAndSigs( pOutArgs, vecArgs );
-            if( ERROR( ret ) )
-                break;
-
-            Wa( "response parameters includes the following" );
-            for( auto& elem : vecArgs )
-            {
-                CCOUT << elem.first << " : "
-                    << g_mapSig2Type[ elem.second[ 0 ] ];
-                NEW_LINE;
-            }
-
-            Wa( "Implement this method here" );
-            Wa( "'''" );
+            EmitRespList( m_pWriter, pOutArgs );
+            Wa( "#Implement this method here" );
         }
         else
             Wa( ") -> list[ int, None ] :" );
@@ -2808,6 +2848,8 @@ gint32 CImplPyMainFunc::OutputCli(
         Wa( "from rpcf.proxy import PyRpcProxy, PyRpcContext, ErrorCode" );
         Wa( "from rpcf.proxy import OutputMsg" );
         Wa( "import errno" );
+        CCOUT << "from " << g_strAppName << "structs" << " import *";
+        NEW_LINE;
 
         stdstr strName = pSvc->GetName();
         CCOUT << "from " << strName << "cli"
@@ -2941,7 +2983,8 @@ gint32 CImplPyMainFunc::OutputSvr(
         Wa( "from rpcf.proxy import PyRpcServer, PyRpcContext, ErrorCode" );
         Wa( "import errno" );
         Wa( "import time" );
-
+        CCOUT << "from " << g_strAppName << "structs" << " import *";
+        NEW_LINE;
         stdstr strName = pSvc->GetName();
         CCOUT << "from " << strName << "svr"
             << " import " << "C" << strName

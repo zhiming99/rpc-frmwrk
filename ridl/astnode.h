@@ -466,6 +466,59 @@ struct CPrimeType : public CAstNodeBase
         }
         return strName;
     }
+
+    std::string ToStringPy() const
+    {
+        std::string strName;
+        switch( m_dwAttrName )
+        {
+        case TOK_STRING:
+            strName = "str";
+            break;
+        case TOK_UINT64:
+            strName = "int";
+            break;
+        case TOK_INT64:
+            strName = "int";
+            break;
+        case TOK_UINT32:
+            strName = "int";
+            break;
+        case TOK_INT32:
+            strName = "int";
+            break;
+        case TOK_UINT16:
+            strName = "int";
+            break;
+        case TOK_INT16:
+            strName = "nt";
+            break;
+        case TOK_FLOAT:
+            strName = "float";
+            break;
+        case TOK_DOUBLE:
+            strName = "float";
+            break;
+        case TOK_BYTE:
+            strName = "int";
+            break;
+        case TOK_BOOL:
+            strName = "bool";
+            break;
+        case TOK_BYTEARR:
+            strName = "cpp.BufPtr";
+            break;
+        case TOK_OBJPTR:
+            strName = "cpp.ObjPtr";
+            break;
+        case TOK_HSTREAM:
+            strName = "HSTREAM";
+            break;
+        default:
+            break;
+        }
+        return strName;
+    }
 };
 
 struct CArrayType : public CPrimeType

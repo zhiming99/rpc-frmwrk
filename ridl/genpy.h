@@ -181,8 +181,7 @@ class CImplPyMthdProxyBase :
     CImplPyMthdProxyBase(
         CPyWriter* pWriter, ObjPtr& pNode );
     gint32 Output();
-    gint32 OutputSync();
-    gint32 OutputAsync();
+    gint32 OutputSync( bool bSync = true );
     gint32 OutputAsyncCbWrapper();
     gint32 OutputEvent();
 

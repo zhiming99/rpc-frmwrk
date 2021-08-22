@@ -117,7 +117,7 @@ class CSerialBase :
         if type( val ) is not dict :
             return -errno.EINVAL
 
-        for ( key, value ) in val :
+        for ( key, value ) in val.items() :
             ret = self.SerialElem( buf, key, sigElem[ :1 ] )
             if ret < 0 :
                 return ret
@@ -138,7 +138,7 @@ class CSerialBase :
         if sig[ 0 ] == '[' :
             return self.SerialMap( buf, val, sig )
 
-        self.SerialElemOpt[ sig[ 0 ] ]( buf, val )
+        self.SerialElemOpt[ sig[ 0 ] ]( self, buf, val )
         return 0
 
     def DeserialInt64( self, buf : bytearray, offset : int ) -> Tuple[ int, int ] :
@@ -202,9 +202,9 @@ class CSerialBase :
     def DeserialObjPtr( self, buf : bytearray, offset : int ) -> Tuple[ cpp.ObjPtr, int ] :
         pNewObj = cpp.ObjPtr()
         listRet = pNewObj.DeserialObjPtr( buf, offset )
-        if listRet[ 0 ] < 0 :
-            return ( None, 0 )
-        return ( listRet[ 0 ], listRet[ 1 ] )
+        if listRet[ 0 ] < 0 : 
+            return ( None, 0 ) 
+        return ( listRet[ 1 ], listRet[ 2 ] ) 
 
     def DeserialStruct( self, buf : bytearray, offset : int ) -> Tuple[ object, int ] :
         ret = struct.unpack_from( "!I", buf, offset )

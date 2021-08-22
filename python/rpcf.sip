@@ -184,6 +184,7 @@ namespace cpp
     {
         public:
 
+        ObjPtr();
         ObjPtr( cpp::CObjBase* pObj, bool bAddRef );
         ~ObjPtr();
         gint32 NewObj( EnumClsid iNewClsid,
@@ -296,6 +297,12 @@ namespace cpp
 
                     ret = ( *ppObj )->Deserialize(
                         pBuf, dwSize );
+                    if( ret == -ENOTSUP )
+                    {
+                        ret = -EINVAL;
+                        break;
+                    }
+
                     if( ERROR( ret ) )
                         break;
                 }

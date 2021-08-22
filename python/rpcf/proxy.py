@@ -970,7 +970,7 @@ class PyRpcServer( PyRpcServices ) :
     def RidlOnServiceComplete(
         self, callback, ret, pBuf : bytearray ) :
         listResp = []
-        if ret == 0 :
+        if ret == 0 and pBuf is not None :
             listResp.append( pBuf )
         return self.oInst.OnServiceComplete(
             callback, ret, cpp.seriRidl,
@@ -979,7 +979,7 @@ class PyRpcServer( PyRpcServices ) :
     def RidlSetResponse(
         self, callback, ret, pBuf : bytearray ) :
         listResp = []
-        if ret == 0 :
+        if ret == 0 and pBuf is not None :
             listResp.append( pBuf )
         return self.oInst.SetResponse(
             callback, ret, cpp.seriRidl,
