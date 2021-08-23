@@ -8,7 +8,6 @@
 // must have statement
 appname "example";
 typedef array< array< string > > STRMATRIX2;
-const timeout_sec = 120;
 
 struct FILE_INFO
 {
