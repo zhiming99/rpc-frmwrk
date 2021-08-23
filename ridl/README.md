@@ -42,10 +42,7 @@ interface IEchoThings
     [ event ]OnHelloWorld( string strMsg ) returns ();
 };
 
-service SimpFileSvc [
-    timeout=timeout_sec, rtpath="/",
-    ipaddr="192.168.0.1",
-    compress ]
+service SimpFileSvc [ stream ]
 {
     interface IEchoThings;
 };
