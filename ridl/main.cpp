@@ -92,11 +92,6 @@ void Usage()
         "\t\tfor server. If not specified, the\n"
         "\t\t'appname' from the ridl will be used\n" );
 
-    printf( "\t-s:\tTo apply new serilization\n"
-        "\t\tprotocol only when the old serilization\n"
-        "\t\tmethod cannot handle. Default is new\n"
-        "\t\tserialization protocol always\n" );
-
     printf( "\t-p:\tTo generate Python code\n" );
 }
 
@@ -179,11 +174,6 @@ int main( int argc, char** argv )
             case 'o':
                 {
                     g_strTarget = optarg;
-                    break;
-                }
-            case 's':
-                {
-                    g_bNewSerial = false;
                     break;
                 }
             case 'p':

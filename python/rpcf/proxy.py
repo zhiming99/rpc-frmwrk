@@ -378,17 +378,7 @@ class PyRpcServices :
     '''
     def ReadStream( self, hChannel, size = 0
         )-> Tuple[ int, bytearray, cpp.BufPtr ] :
-        tupRet = self.oInst.ReadStream( hChannel, size )
-        ret = tupRet[ 0 ]
-        if ret < 0 :
-            return tupRet
-        #elem 1 is a BufPtr object on success
-        pBuf = tupRet[ 1 ]
-        #transfer the content to a bytes object
-        pBytes = pBuf.TransToBytes()
-        if pBytes == None :
-            return ( -errno.ENODATA, )
-        return ( 0, pBytes, pBuf )
+        return self.oInst.ReadStream( hChannel, size )
 
     '''
     ReadStreamAsync to read `size' bytes from the
@@ -420,6 +410,16 @@ class PyRpcServices :
 
         return self.oInst.ReadStreamAsync(
             hChannel, callback, size )
+
+    '''
+    ReadStreamNoWait to read the first block of
+    bufferrd data from the stream. If there are
+    not data bufferred, error -EAGIN will be
+    returned, and will not blocked to wait.
+    '''
+    def ReadStreamNoWait( self, hChannel
+        )-> Tuple[ int, bytearray, cpp.BufPtr ] :
+        return self.oInst.ReadStreamNoWait( hChannel )
 
     '''event called when the stream `hChannel' is
     ready '''
@@ -679,7 +679,11 @@ class PyRpcServices :
                 resp[ 0 ] = -errno.EFAULT
                 break
 
-            resp = targetMethod( self, callback, *argList )
+            try:
+                resp = targetMethod( self, callback, *argList )
+            except:
+                resp[ 0 ] = -errno.EFAULT
+                
             if seriProto == cpp.seriNone :
                 break
 
@@ -903,6 +907,9 @@ class PyRpcProxy( PyRpcServices ) :
         return self.oInst.PyProxyCall2(
             callback, context, pCfg, args, resp )
 
+    def IsServer( self ) :
+        return False
+
 class PyRpcServer( PyRpcServices ) :
 
     def __init__( self, pIoMgr, strDesc, strSvrObj ) :
@@ -1021,3 +1028,15 @@ class PyRpcServer( PyRpcServices ) :
         return self.oInst.SendEvent( callback,
             ifName, evtName, destName, pListArgs,
             cpp.seriRidl )
+
+    '''event called when the stream channel
+    described by pDataDesc is about to establish
+    If accepted, the OnStmReady will be called,
+    and the datadesc can be retrieved by the
+    stream handle.
+    '''
+    def AcceptNewStream( self, pDataDesc: cpp.ObjPtr ):
+        return 0
+
+    def IsServer( self ) :
+        return True

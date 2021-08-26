@@ -49,16 +49,17 @@ class CSerialBase :
     def SerialHStream( self, buf : bytearray, val : int ) -> int:
         if self.pIf is None :
             return -errno.EFAULT
-        oInst = self.oInst
-        isServer = self.oInst.IsServer()
+        pIf = self.pIf
+        isServer = pIf.IsServer()
         if isServer :
-            ret = oInst.GetIdHashByChan( val )
+            ret = pIf.oInst.GetIdHashByChan( val )
         else :
-            ret = oInst.GetPeerIdHash( val )
+            ret = pIf.oInst.GetPeerIdHash( val )
 
-        if ret == 0 :
-            return -errno.EFAULT
-        self.SerialInt64( buf, val )
+        if ret[ 0 ] <  0 :
+            return ret[ 0 ]
+
+        self.SerialInt64( buf, ret[ 1 ] )
         return 0 
 
     def SerialStruct( self, buf: bytearray, val : object ) -> int:
@@ -171,12 +172,12 @@ class CSerialBase :
 
     def DeserialHStream( self, buf : bytearray, offset : int ) -> Tuple[ int, int ] :
         if self.pIf is None :
-            return -errno.EFAULT
+            return ( 0, 0 )
+        pIf = self.pIf
         val = self.DeserialInt64( buf, offset )
-        oInst = self.oInst
-        ret = oInst.GetChanByIdHash( val[ 0 ] )
+        ret = pIf.oInst.GetChanByIdHash( val[ 0 ] )
         if ret == ErrorCode.INVALID_HANDLE :
-            return -errno.EFAULT
+            return ( ret, 0 )
         return ( ret, offset + 8 )
 
     def DeserialString( self, buf : bytearray, offset : int ) -> Tuple[ str, int ] :
@@ -218,11 +219,11 @@ class CSerialBase :
     def DeserialArray( self, buf : bytearray, offset : int, sig : str )-> Tuple[list, int ]:
         sigLen = len( sig )
         if sig[ 0 ] != '(' :
-            return -errno.EINVAL
+            return ( None, 0 )
         if sig[ sigLen -1 ] != ')':
-            return -errno.EINVAL
+            return ( None, 0 )
         if len( sig ) < 2 :
-            return -errno.EINVAL
+            return ( None, 0 )
         sigElem = sig[ 1 : sigLen - 1 ]
 
         sizeOff = len( buf )
@@ -246,12 +247,12 @@ class CSerialBase :
 
     def DeserialMap( self, buf : bytearray, offset : int, sig : str ) -> Tuple[ dict, int ]:
         sigLen = len( sig )
-        if sig[ 0 ] != '(' :
-            return -errno.EINVAL
-        if sig[ sigLen -1 ] != ')':
-            return -errno.EINVAL
+        if sig[ 0 ] != '[' :
+            return ( None, 0 )
+        if sig[ sigLen -1 ] != ']':
+            return ( None, 0 )
         if len( sig ) < 2 :
-            return -errno.EINVAL
+            return ( None, 0 )
         sigElem = sig[ 1 : sigLen - 1 ]
 
         sizeOff = len( buf )

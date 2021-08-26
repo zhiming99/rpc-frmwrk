@@ -470,7 +470,6 @@ namespace cpp
 
         gint32 AppendObjPtr( cpp::ObjPtr* );
         %MethodCode
-            gint32 ret = 0;
             CObjBase* pObj = *a0;
             if( pObj == nullptr )
                 sipRes = -EFAULT;

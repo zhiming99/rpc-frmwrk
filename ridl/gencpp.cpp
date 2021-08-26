@@ -4936,15 +4936,6 @@ gint32 CImplIfMethodSvr::OutputEvent()
         else
             CCOUT << "( guint32 )seriNone;";
         INDENT_DOWNL;
-        guint32 dwTimeoutSec =
-            m_pNode->GetTimeoutSec();
-        if( dwTimeoutSec > 0 )
-        {
-            NEW_LINE;
-            CCOUT << "oOptions_[ propTimeoutSec ] = "
-                << dwTimeoutSec << ";"; 
-        }
-        NEW_LINE;
 
         if( 0 == dwInCount )
         {

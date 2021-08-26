@@ -6379,6 +6379,7 @@ gint32 CInterfaceServer::DoInvoke(
         if( strMethod == SYS_METHOD_SENDDATA ||
             strMethod == SYS_METHOD_FETCHDATA )
         {
+            bResp = true;
             ret = DoInvoke_SendData(
                 pReqMsg, pCallback, oResp );
         }

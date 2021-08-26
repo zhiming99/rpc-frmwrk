@@ -18,6 +18,8 @@ class CPythonServerImpl :
         guint32 dwSeriProto )
     {
         guint32 ret = 0;
+        bool bDec = false;
+        TaskletPtr pTask;
         do{
             if( strMethod.empty() ||
                 strCIfName.empty() )
@@ -25,6 +27,40 @@ class CPythonServerImpl :
                 ret = -EINVAL;
                 break;
             }
+
+            std::vector< BufPtr > vecArgs;
+            ret = List2Vector( pArgs, vecArgs );
+            if( ERROR( ret ) )
+                break;
+
+            IEventSink* pCb = nullptr;
+            if( pCallback == nullptr ||
+                pCallback == Py_None )
+            {
+                pTask.NewObj( clsid( CIfDummyTask ) );
+            }
+            else
+            {
+                CParamList oReqCtx;
+                ret = NEW_PROXY_RESP_HANDLER2(
+                    pTask, ObjPtr( this ),
+                    &CPythonServerImpl::OnAsyncCallResp,
+                    nullptr, oReqCtx.GetCfg() );
+
+                if( ERROR( ret ) )
+                    break;
+
+                oReqCtx.Push(
+                    ( intptr_t ) pCallback );
+                Py_INCREF( pCallback );
+
+                PyObject* listResp = PyList_New( 2 );
+                oReqCtx.Push( ( intptr_t )listResp );
+                bDec = true;
+            }
+            pCb = pTask;
+
+            Py_BEGIN_ALLOW_THREADS;
 
             CReqBuilder oReq( this );
             std::string strIfName =
@@ -76,52 +112,61 @@ class CPythonServerImpl :
 
             oReq.SetMethodName( strMethod );
 
-            std::vector< BufPtr > vecArgs;
-            ret = List2Vector( pArgs, vecArgs );
-            if( ERROR( ret ) )
-                break;
-
             for( auto elem : vecArgs )
                 oReq.Push<BufPtr&>( elem );
 
-            bool bDec = false;
-            IEventSink* pCb = nullptr;
-            TaskletPtr pTask;
-            if( pCallback == nullptr ||
-                pCallback == Py_None )
-            {
-                pTask.NewObj( clsid( CIfDummyTask ) );
-            }
-            else
-            {
-                CParamList oReqCtx;
-                ret = NEW_PROXY_RESP_HANDLER2(
-                    pTask, ObjPtr( this ),
-                    &CPythonServerImpl::OnAsyncCallResp,
-                    nullptr, oReqCtx.GetCfg() );
-
-                if( ERROR( ret ) )
-                    break;
-
-                oReqCtx.Push(
-                    ( intptr_t ) pCallback );
-                Py_INCREF( pCallback );
-
-                PyObject* listResp = PyList_New( 2 );
-                oReqCtx.Push( ( intptr_t )listResp );
-                bDec = true;
-            }
-            pCb = pTask;
-            Py_BEGIN_ALLOW_THREADS;
             ret = BroadcastEvent( oReq.GetCfg(), pCb );
             Py_END_ALLOW_THREADS;
-            if( ret != STATUS_PENDING && bDec )
-                Py_DECREF( pCallback );
             
         }while( 0 );
 
+        if( ret != STATUS_PENDING && bDec )
+        {
+            Py_DECREF( pCallback );
+            if( !pTask.IsEmpty() )
+                ( *pTask )( eventCancelTask );
+        }
+
         return ret;
     }
+
+    gint32 AcceptNewStream(
+        IEventSink* pCallback,
+        IConfigDb* pCfg ) override
+    {
+        if( !this->IsServer() )
+            return -EINVAL;
+
+        gint32 ret = 0;
+        PyGILState_STATE gstate;
+        gstate = PyGILState_Ensure();
+        do{
+            PyObject* pHost = nullptr;
+            ret = GetPyHost( pHost );
+            if( ERROR( ret ) )
+                break;
+
+            ObjPtr* ppObj = new ObjPtr();
+            *ppObj = pCfg;
+            PyObject* pPyObj = sipConvertFromNewType(
+                ppObj, sipType_cpp_ObjPtr, SIP_NULLPTR );
+            if( unlikely( pPyObj == nullptr ) )
+            {
+                ret = -EFAULT;
+                break;
+            }
+
+            PyObject* pPyRet = nullptr;
+            pPyRet = PyObject_CallMethod(
+                 pHost, "AcceptNewStream", 
+                 "(O)", pPyObj );
+            ret = PyLong_AsLong( pPyRet );
+
+        }while( 0 );
+        PyGILState_Release( gstate );
+        return ret;
+    }
+
 };
 
 %End
@@ -234,6 +279,59 @@ class CPythonServer :
     }while( 0 );
     %End
 
+    PyObject* ReadStreamNoWait( HANDLE hChannel );
+    %MethodCode
+    gint32 ret = 0;
+
+    PyObject* pResp = PyList_New( 2 );
+    sipRes = pResp;
+
+    do{
+
+        CPythonServerImpl* pImpl = static_cast
+            < CPythonServerImpl* >( sipCpp );
+
+        if( pImpl == nullptr ) 
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        BufPtr pBuf;
+
+        Py_BEGIN_ALLOW_THREADS;
+        ret = pImpl->ReadStreamNoWait( a0, pBuf );
+        Py_END_ALLOW_THREADS;
+
+        if( ERROR( ret ) )
+            break;
+
+        PyObject* pPyBuf = nullptr;
+        ret = pImpl->ConvertBufToPyObj( pBuf, pPyBuf );
+        if( ERROR( ret ) )
+            break;
+
+        BufPtr* ppBuf = new BufPtr( pBuf );
+        PyObject* pPyBufBak = sipConvertFromNewType(
+            ppBuf, sipType_cpp_BufPtr, SIP_NULLPTR );
+
+        if( pPyBufBak == nullptr )
+        {
+            delete ppBuf;
+            ret = -ENOMEM;
+            break;
+        }
+
+        PyList_SetItem( pResp, 1, pPyBuf );
+        PyList_Append( pResp, pPyBufBak );
+
+    }while( 0 );
+
+    PyList_SetItem( pResp, 0,
+        PyLong_FromLong( ret ) );
+
+    %End
+
     PyObject* ReadStream( HANDLE hChannel, guint32 dwSize );
     %MethodCode
     gint32 ret = 0;
@@ -253,15 +351,15 @@ class CPythonServer :
             break;
         }
 
-        BufPtr* ppBuf = new BufPtr() ;
+        BufPtr pBuf;
         if( a1 > 0 )
         {
-            ( *ppBuf ).NewObj();
-            ( *ppBuf )->Resize( a1 );
+            pBuf.NewObj();
+            pBuf->Resize( a1 );
         }
 
         Py_BEGIN_ALLOW_THREADS;
-        ret = pImpl->ReadStream( a0, *ppBuf );
+        ret = pImpl->ReadStream( a0, pBuf );
         Py_END_ALLOW_THREADS;
         if( ERROR( ret ) )
         {
@@ -269,8 +367,14 @@ class CPythonServer :
             break;
         }
 
-        sipRes = sipBuildResult(0,"(iN)",
-            ret,ppBuf,sipType_cpp_BufPtr,SIP_NULLPTR);
+        PyObject* pPyBuf = nullptr;
+        ret = pImpl->ConvertBufToPyObj( pBuf, pPyBuf );
+        if( ERROR( ret ) )
+            break;
+
+        BufPtr* ppBuf = new BufPtr( pBuf );
+        return sipBuildResult(0,"(iRN)",
+            0, pPyBuf, ppBuf,sipType_cpp_BufPtr,SIP_NULLPTR);
 
         break;
 
@@ -345,18 +449,10 @@ class CPythonServer :
             break;
         }
 
-        PyObject* pView = PyMemoryView_FromMemory(
-            pBuf->ptr(), pBuf->size(), PyBUF_READ );
-        if( pView == nullptr )
-        {
-            PyList_SetItem( pResp, 0,
-                PyLong_FromLong( -EFAULT ) );
+        PyObject* pPyBuf = nullptr;
+        ret = pImpl->ConvertBufToPyObj( pBuf, pPyBuf );
+        if( ERROR( ret ) )
             break;
-        }
-
-        PyObject* pPyBuf =
-            PyByteArray_FromObject( pView );
-        Py_DECREF( pView );
 
         BufPtr* ppBuf = new BufPtr();
         *ppBuf = pBuf;
@@ -367,8 +463,10 @@ class CPythonServer :
         {
             PyList_SetItem( pResp, 0,
                 PyLong_FromLong( -ENOMEM ) );
+            delete ppBuf;
             break;
         }
+
         PyList_SetItem( pResp,
             0, PyLong_FromLong( 0 ) );
         PyList_SetItem( pResp, 1, pPyBuf );
