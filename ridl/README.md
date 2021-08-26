@@ -8,7 +8,6 @@
 // must have statement
 appname "example";
 typedef array< array< string > > STRMATRIX2;
-const timeout_sec = 120;
 
 struct FILE_INFO
 {
@@ -42,10 +41,7 @@ interface IEchoThings
     [ event ]OnHelloWorld( string strMsg ) returns ();
 };
 
-service SimpFileSvc [
-    timeout=timeout_sec, rtpath="/",
-    ipaddr="192.168.0.1",
-    compress ]
+service SimpFileSvc [ stream ]
 {
     interface IEchoThings;
 };
@@ -94,15 +90,7 @@ The above example shows most of the statements ridl supports. ridl now has 7 typ
   * **the input parameters** or **output parameters** of a method can be empty, but the method still get an status code from the server to tell if the method is handled successfully or not, unless the method is labeled with the `event` attribute.
 * **service declaration** : to declare a `service` object. A `service` object contains a set of interfaces, to deliver a relatively independent feature or service. it contains a `service id` and a set of interfaces.
   * **service id**: will appear in the proxy request's `ObjPath` string, as part of an object address as to find the service.
-  * Besides interfaces, the service can also be assigned some attributes, which will go into the server/proxy configuration files.
-    * **timeout** : similiar to the one on a method, but it serves as the default timeout value for all the methods from all the interfaces.
-    * **rtpath** : a path string to identify the target host behind a router to a cloud of hosts. You can find more information [Here](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support#objetct-access-via-multihop-routing) about `router path`.
-    * **ipaddr** : a string to specify the router ip address the proxy to connect to. It is not necessarily the address of the host of the target service.
-    * **portnum** : a integer to specify the router port number the proxy to connect to.
-    * **websock** : the existance of this attribute instructs to connect to the remote router via [`Websocket`](https://github.com/zhiming99/rpc-frmwrk/tree/master/rpc/wsport#technical-information)
-    * **SSL** : the existance of this attribute instructs to connect to the remote router via [SSL](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/sslport/Readme.md) connection.
-    * **compress** : the existance of this attribute instruct to compress the message bound to the remote router.
-    * **auth** : the so-called `AuthInfo` string, to specify the authentication information to access the remote router. If this attribute does not exist, the authentication related traffic won't happen. The above four attributes can combine freely. Currently `Kerberos` is the only supported auth mechanism, and therefore the json string contain the `Kerberos`'s authentication information. Please follow [link](https://github.com/zhiming99/rpc-frmwrk/tree/master/rpc/security#4-configure-rpc-frmwrk-with-authentication) for more information about `AuthInfo`.
+  * Besides interfaces, the service can also be assigned some more attributes.
     * **stream** : a flag to enable streaming support on this `service` object.
 
 ### Invoking `ridlc`
@@ -124,6 +112,7 @@ The above example shows most of the statements ridl supports. ridl now has 7 typ
                 protocol only when the old serilization
                 method cannot handle. Default is new
                 serialization protocol always
+        -p:     To generate Python code
 ```
 
 Currently ridlc can only output `c++` project. In the future, it will be able to generate `python` project and `java` project as well.
