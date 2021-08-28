@@ -722,19 +722,24 @@ CFileSet::CFileSet(
         strOutPath + "/" + strAppName + ".cpp";
 
     GEN_FILEPATH( m_strObjDesc,
-        strOutPath, strAppName + "desc.json" );
+        strOutPath, strAppName + "desc.json",
+        true );
 
     GEN_FILEPATH( m_strDriver,
-        strOutPath, "driver.json" );
+        strOutPath, "driver.json",
+        true );
 
     GEN_FILEPATH( m_strMakefile,
-        strOutPath, "Makefile" );
+        strOutPath, "Makefile",
+        true );
 
     GEN_FILEPATH( m_strMainCli,
-        strOutPath, "maincli.cpp" );
+        strOutPath, "maincli.cpp",
+        true );
 
     GEN_FILEPATH( m_strMainSvr, 
-        strOutPath, "mainsvr.cpp" );
+        strOutPath, "mainsvr.cpp",
+        true );
 
     gint32 ret = OpenFiles();
     if( ERROR( ret ) )

@@ -352,20 +352,10 @@ class CPythonInterfBase : public T
                 break;
             }
 
-            PyObject* listArgs = nullptr;
-            if( dwSize != 0 )
+            PyObject* listArgs = PyList_New( dwSize );
+            if( listArgs == nullptr )
             {
-                listArgs = PyList_New( dwSize );
-                if( listArgs == nullptr )
-                {
-                    ret = -ENOMEM;
-                    break;
-                }
-            }
-            else
-            {
-                // empty response
-                PyList_SetItem( listResp, 1, listArgs );
+                ret = -ENOMEM;
                 break;
             }
 
@@ -630,7 +620,7 @@ class CPythonInterfBase : public T
                     ret = -ENOMEM;
                     break;
                 }
-                pBuf->Append( ( char* )view->buf,
+                ret = pBuf->Append( ( char* )view->buf,
                     ( guint32 )view->len);
                 PyBuffer_Release( view );
                 break;
@@ -893,12 +883,12 @@ class CPythonInterfBase : public T
 
         PyGILState_Release(gstate);
 
-        if( bNoReply )
-            return ret;
-
         if( ret != STATUS_PENDING &&
             ret != -ENOTSUP)
         {
+            if( bNoReply )
+                return ret;
+
             oResp[ propReturnValue ] = ret;
             oResp[ propSeriProto ] = dwSeriProto;
             CCfgOpenerObj oCfg( pCallback );
@@ -939,16 +929,10 @@ class CPythonInterfBase : public T
             PyObject* pRet = PyLong_FromLong( iRet );
             PyList_SetItem( pPyResp, 0, pRet );
             PyObject* pArgs = PyList_New( 2 );
-            PyList_SetItem( pPyResp, 1, pArgs );
 
             PyObject* pPyBuf = nullptr;
             ret = ConvertBufToPyObj( pBuf, pPyBuf );
-            if( ERROR( ret ) )
-            {
-                pRet = PyLong_FromLong( ret );
-                PyList_SetItem( pPyResp, 0, pRet );
-            }
-            else
+            if( SUCCEEDED( ret ) )
             {
                 PyObject* pyHandle = nullptr;
                 if( sizeof( HANDLE ) ==
@@ -963,14 +947,22 @@ class CPythonInterfBase : public T
                         PyLong_FromLong( hChannel );
                 }
 
-                BufPtr *ppBuf = new BufPtr( pBuf );
-
-                PyObject* pPyBufBak = sipConvertFromNewType(
-                    ppBuf, sipType_cpp_BufPtr, SIP_NULLPTR );
-
+                // Note: callback dose not to worry 
+                // the pPyBuf become invalid if pBuf is released.
+                // so we don't put pBuf to the list here.
+                // but do pay attention to consume the pPyBuf
+                // with the call. It would become invalid when
+                // the callback returns
                 PyList_SetItem( pArgs, 0, pyHandle );
                 PyList_SetItem( pArgs, 1, pPyBuf );
-                PyList_SetItem( pArgs, 2, pPyBufBak );
+                PyList_SetItem( pPyResp, 1, pArgs );
+            }
+            else
+            {
+                if( SUCCEEDED( iRet ) )
+                    PyList_SetItem( pPyResp,
+                        0, PyLong_FromLong( ret ) );
+                PyList_SetItem( pPyResp, 1, Py_None );
             }
 
             pPyCb = ( PyObject* )pCb;
@@ -982,7 +974,7 @@ class CPythonInterfBase : public T
 
             PyObject_CallMethod(
                  pHost, "HandleAsyncResp", 
-                 "(OiO)", pPyCb, seriNone,
+                 "(OiOO)", pPyCb, seriNone,
                  pPyResp, Py_None );
 
         }while( 0 );
@@ -1060,7 +1052,7 @@ class CPythonInterfBase : public T
 
             PyObject_CallMethod(
                  pHost, "HandleAsyncResp", 
-                 "(OiO)", pPyCb, seriNone,
+                 "(OiOO)", pPyCb, seriNone,
                  pPyResp, Py_None );
 
         }while( 0 );
@@ -1165,7 +1157,7 @@ class CPythonInterfBase : public T
                 break;
 
             PyObject_CallMethod( pHost,
-                "HandleAsyncResp", "(OiO)",
+                "HandleAsyncResp", "(OiOO)",
                 pPyCb, dwSeriProto,
                 pPyResp, pContext );
 
@@ -1312,7 +1304,7 @@ class CPythonInterfBase : public T
             // the true response parameters.
             PyObject_CallMethod(
                  pHost, "HandleAsyncResp", 
-                 "(OiO)", pPyCb, seriNone,
+                 "(OiOO)", pPyCb, seriNone,
                  pPyResp, Py_None );
 
         }while( 0 );
@@ -2120,7 +2112,7 @@ class CPythonProxy :
     %MethodCode
     gint32 ret = 0;
 
-    PyObject* pResp = PyList_New( 3 );
+    PyObject* pResp = PyList_New( 2 );
     sipRes = pResp;
 
     do{
@@ -2226,30 +2218,29 @@ class CPythonProxy :
     PyObject* ReadStreamAsync(
         HANDLE hChannel, PyObject* pCb, guint32 dwSize );
     %MethodCode
+    PyObject* pResp = PyList_New( 2 );
+    sipRes = pResp;
+    gint32 ret = 0;
     do{
         CPythonProxyImpl* pImpl = static_cast
             < CPythonProxyImpl* >( sipCpp );
 
-        PyObject* pResp = PyList_New( 2 );
-        sipRes = pResp;
         if( pImpl == nullptr || a1 == nullptr ) 
         {
-            PyList_SetItem( pResp, 0,
-                PyLong_FromLong( -EFAULT ) );
+            ret = -EFAULT;
             break;
         }
 
         if( a2 > MAX_BYTES_PER_FILE )
         {
-            PyList_SetItem( pResp, 0,
-                PyLong_FromLong( -EINVAL ) );
+            ret = -EINVAL;
             break;
         }
-        gint32 ret = PyCallable_Check( a1 );
+
+        ret = PyCallable_Check( a1 );
         if( ret == 0 )
         {
-            PyList_SetItem( pResp, 0,
-                PyLong_FromLong( -EINVAL ) );
+            ret = -EINVAL;
             break;
         }
 
@@ -2262,11 +2253,8 @@ class CPythonProxy :
         {
             ret = pBuf.NewObj();
             if( ERROR( ret ) )
-            {
-                PyList_SetItem( pResp, 0,
-                    PyLong_FromLong( ret ) );
                 break;
-            }
+
             pBuf->Resize( a2 );
         }
         IConfigDb* pCtx = oReqCtx.GetCfg();
@@ -2278,39 +2266,32 @@ class CPythonProxy :
         if( ret != STATUS_PENDING )
             Py_DECREF( a1 );
 
-        if( ret == STATUS_PENDING ||
-            ERROR( ret ) )
-        {
-            PyList_SetItem( pResp, 0,
-                PyLong_FromLong( ret ) );
+        if( ret == STATUS_PENDING || ERROR( ret ) )
             break;
-        }
 
         PyObject* pPyBuf = nullptr;
         ret = pImpl->ConvertBufToPyObj( pBuf, pPyBuf );
         if( ERROR( ret ) )
             break;
 
-        BufPtr* ppBuf = new BufPtr();
-        *ppBuf = pBuf;
-
+        BufPtr* ppBuf = new BufPtr( pBuf );
         PyObject* pPyBufBak = sipConvertFromNewType(
             ppBuf, sipType_cpp_BufPtr, SIP_NULLPTR );
         if( unlikely( pPyBufBak == nullptr ) )
         {
-            PyList_SetItem( pResp, 0,
-                PyLong_FromLong( -ENOMEM ) );
+            ret = -ENOMEM;
             delete ppBuf;
             break;
         }
 
-        PyList_SetItem( pResp,
-            0, PyLong_FromLong( 0 ) );
         PyList_SetItem( pResp, 1, pPyBuf );
         PyList_Append( pResp, pPyBufBak );
-        Py_DECREF( pPyBufBak );
 
     }while( 0 );
+
+    PyList_SetItem( pResp, 0,
+        PyLong_FromLong( ret ) );
+
     %End
 
     gint32 WriteStreamAsync(

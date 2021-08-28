@@ -75,7 +75,7 @@ class CStreamingClient(CEchoClient, PyRpcProxy):
             return
         self.iError = iRet
         self.sem.release()
-        print( "Server says( async ): ", pBuf )
+        print( "Server says( async ): ", pBuf.decode() )
 
     def GetError( self ) :
         return self.iError
@@ -134,7 +134,7 @@ def test_main() :
                 break
 
             pBuf = tupRet[ 1 ]
-            print( "Server says( sync ): ", pBuf )
+            print( "Server says( sync ): ", pBuf.decode() )
 
             b =  i + 0.1;
             strMsg = strFmt.format( b ) 
@@ -159,7 +159,7 @@ def test_main() :
                 oProxy.sem.acquire()    
             else :
                 print( "Server says( async ): ",
-                   listResp[ 1 ] )
+                   listResp[ 1 ].decode() )
             
         break
 

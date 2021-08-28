@@ -2869,7 +2869,8 @@ gint32 CIfParallelTask::CancelIrp()
             if( ERROR( ret ) )
                 break;
 
-            ret = pMgr->CancelIrp( pIrp );
+            ret = pMgr->CancelIrp(
+                pIrp, true, -ECANCELED );
         }
 
     }while( 0 );

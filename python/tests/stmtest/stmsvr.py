@@ -58,7 +58,7 @@ class CStreamingServer(CEchoServer, PyRpcServer):
                 break
             elif ret == EC.STATUS_PENDING :
                 break
-            print( "proxy says: ", listResp[ 1 ] )
+            print( "proxy says: ", listResp[ 1 ].decode() )
             i = self.GetCounter( hChannel )
             strMsg = "This is message {}"
             ret = self.WriteStreamAsync(
@@ -93,7 +93,7 @@ class CStreamingServer(CEchoServer, PyRpcServer):
                 break
             elif ret == EC.STATUS_PENDING :
                 break
-            print( "proxy says: ", listResp[ 1 ] )
+            print( "proxy says: ", listResp[ 1 ].decode() )
 
     '''OnStmReady is a system defined event
     handler, called when the stream channel is
@@ -123,7 +123,7 @@ class CStreamingServer(CEchoServer, PyRpcServer):
             print( "Read failed with error",
                 hChannel, iRet )
             return
-        print( "proxy says: ", pBuf )
+        print( "proxy says: ", pBuf.decode() )
         self.WriteAndReceive( hChannel )
 
     def GetError( self ) :

@@ -29,12 +29,12 @@
 #include <json/json.h>
 #include "rpc.h"
 
-#define GEN_FILEPATH( strRet, strPath, strName ) \
+#define GEN_FILEPATH( strRet, strPath, strName, bNew ) \
 do{ \
     strRet = ( strPath ) + "/" + ( strName ); \
     gint32 ret = access( \
         strRet.c_str(), F_OK ); \
-    if( ret == 0 ) \
+    if( ret == 0 && bNew ) \
         strRet += ".new"; \
 }while( 0 )
 

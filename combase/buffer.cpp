@@ -1005,7 +1005,10 @@ gint32 CBuffer::Append(
         return -EINVAL;
 
     guint32 dwOldSize = size();
-    Resize( size() + dwSize );
+    gint32 ret = Resize( size() + dwSize );
+    if( ERROR( ret ) )
+        return ret;
+
     memcpy( ptr() + dwOldSize, pBlock, dwSize );
     SetExDataType( typeByteArr );
     return 0;

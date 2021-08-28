@@ -203,11 +203,19 @@ class PyRpcServices :
     def Start( self ) :
         self.oInst.SetPyHost( self )
         ret = self.oInst.Start()
+        isServer = self.IsServer()
+
         if ret < 0 :
-            print( "Failed start proxy..." )
+            if isServer :
+                print( "Failed start server..." )
+            else :
+                print( "Failed start proxy..." )
             return ret
         else :
-            print( "Proxy started..." )
+            if isServer :
+                print( "Server started..." )
+            else :
+                print( "Proxy started..." )
 
         oCheck = self.oInst.GetPyHost()
         return 0
@@ -318,16 +326,16 @@ class PyRpcServices :
                 self.InvokeCallback( ret, listArgs )
 
         elif seriProto == cpp.seriRidl :
+            listArgs.insert( 0, context )
+            listArgs.insert( 1, ret )
             if len( listResp ) <= 1 :
-                self.InvokeCallback(
-                     callback, context, ret, listArgs )
+                self.InvokeCallback( callback, listArgs )
             elif isinstance( listResp[ 1 ], list ) :
-                listArgs = listResp[ 1 ]
-                self.InvokeCallback(
-                    callback, context, ret, listArgs )
+                if len( listResp[ 1 ] ) > 0 :
+                    listArgs[2:] = listResp[ 1 ]
+                self.InvokeCallback( callback, listArgs )
             else :
-                self.InvokeCallback(
-                    callback, context, ret, listArgs )
+                self.InvokeCallback( callback, listArgs )
         return
 
     def GetObjType( self, pObj ) :

@@ -11,7 +11,7 @@ class CKeepAliveServer:
     interface name, which will be used to invoke
     the event handler
     """
-    ifName = "CKeepAliveServer"
+    _ifName_ = "CKeepAliveServer"
     """
     Method: LongWait
     Description: this request is a long request,
