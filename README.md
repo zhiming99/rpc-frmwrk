@@ -24,7 +24,7 @@ This is an asynchronous and event-driven RPC implementation for embeded system w
 15. [`Authentication support with Kerberos 5`](https://github.com/zhiming99/rpc-frmwrk/tree/master/rpc/security/README.md)
 16. [`Python Support`](https://github.com/zhiming99/rpc-frmwrk/tree/master/python)
 17. [`Node Redudancy/Load Balance`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md#load-balance--node-redudancy)
-18. [`A mulit-lang proxy/server code generator`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md)
+18. [`A CPP and Python code generator`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md)
 19. [`A GUI config tool for rpcrouter`](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools/README.md)
 
 #### Building `rpc-frmwrk`:   
@@ -60,6 +60,9 @@ This project depends on the following 3rd-party packags to build:
 6. Logging service
 
 ---
+[`Sat Aug 28 2021 10:44:47 AM Beijing`]   
+1. Python code generator is coming. It should be almost complete. I will add the documentation in the next few days.
+
 [`Fri Aug 06 2021 10:05:20 AM Beijing`]   
 1. improved the workflow and docker build, and the test cases can now run automatically.
 
