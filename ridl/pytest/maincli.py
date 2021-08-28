@@ -208,15 +208,15 @@ def maincli() :
                 OutputMsg( "error creating CStreamSvcProxy %d" % ret  )
                 return ret
 
-            with oProxy2 :
+            with oProxy, oProxy2 :
                 '''
                 adding your code here
                 Calling a proxy method like
                 '''
-                #oProxy.Ping()
-                #SyncTests( oProxy )
-                #time.sleep( 1 )
-                #AsyncTests( oProxy )
+                oProxy.Ping()
+                SyncTests( oProxy )
+                time.sleep( 1 )
+                AsyncTests( oProxy )
                 StreamTests( oProxy2 )
     except:
         return -errno.EFAULT
