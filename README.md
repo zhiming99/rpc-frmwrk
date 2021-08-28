@@ -52,12 +52,11 @@ This project depends on the following 3rd-party packags to build:
 8. `python 3.5+ is required for python support.`
 
 #### Todo:
-1. Python code generator(coming soon)
-2. JavaScript support
-3. Examples and Tutorials
-4. Performance optimization
-5. A tree-like hierarchical persistant registry.
-6. Logging service
+1. JavaScript support
+2. Examples and Tutorials
+3. Performance optimization
+4. A tree-like hierarchical persistant registry.
+5. Logging service
 
 ---
 [`Sat Aug 28 2021 10:44:47 AM Beijing`]   
