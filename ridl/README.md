@@ -119,7 +119,7 @@ Currently ridlc can output `c++` and `python` project. In the future, it will be
 
 ### Output for C++ project
 
-On a successful compile of the above sample ridl file, `ridlc` will generate several files:
+On a successful compile of the above sample ridl file, `ridlc` will generate the following files:
 
 * **maincli.cpp, mainsvr.cpp**: as the name indicate, the two files define main function of the proxy and server respectively. Each file contains a same-name function, that is a `maincli` function in maincli.cpp and `mainsvr` in mainsvr.cpp, which is the ideal place to add your custom code.
 
@@ -131,7 +131,7 @@ On a successful compile of the above sample ridl file, `ridlc` will generate sev
 
 ### Output for Python project
 
-On a successful compile of the above sample ridl file, `ridlc` will generate several files.
+On a successful compile of the above sample ridl file, `ridlc` will generate the following files.
 
 * **maincli.py, mainsvr.py**: as the name indicate, the two files define main function of the proxy and server respectively. Each file contains a same-name function, that is a `maincli` function in maincli.py and `mainsvr` in mainsvr.py, which is the ideal place to add your custom code.
 
