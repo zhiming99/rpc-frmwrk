@@ -61,7 +61,7 @@ The basic data types are:
 * **string**
 * **bytearray**( binary blob )
 * **ObjPtr** : `rpc-frmwrk` built-in serializable data type.
-* **HANDLE** : a handle representing an existing stream channel, which can be transferred between the proxy/server.
+* **HSTREAM** : a handle representing an existing stream channel, which can be transferred between the proxy/server.
 
 The 3 composite types are
 
