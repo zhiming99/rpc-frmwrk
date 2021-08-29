@@ -127,6 +127,7 @@ On a successful compile of the above sample ridl file, `ridlc` will generate sev
 * **SimpFileSvc.cpp, SimpFileSvc.h:** the files are named with the *service id* of the *service statement*. Each individual service declaration has a pair of `.cpp` and `.h` file. The cpp file contains all the methods that user should implement to get server/proxy to work. They are mainly the same-name methods on Server side as request handler. The amount of efforts are different depending on whether to use `sync` or `async` approach to implement the interfaces of the service. `sync` implementation is simple and time-saving at development time, `async` is relatively difficult to develop, but with better performance. And `rpc-frmwrk` provides rich utilities to help developing asynchronous implementation to minize the developing efforts.
 * **Makefile**: The make file to build the project. Note that, you must install the `rpc-frmwrk` first.
 * **exampledesc.json, driver.json:** The configuration files.
+* **run:** After the successful make, there will be two executables, `examplecli` and `examplesvr`. Run the server on the `bridge` side and the client on the `reqfwdr` side.
 
 ### Output for Python project
 
@@ -142,3 +143,4 @@ On a successful compile of the above sample ridl file, `ridlc` will generate sev
 
 * **Makefile**: The make file to build the project. Note that, it just synchronizes the configuration with the system settings.
 * **exampledesc.json, driver.json:** The configuration files.
+* **run:** you can run `mainsvr.py` and `maincli.py` directly, there is no need to make or build.
