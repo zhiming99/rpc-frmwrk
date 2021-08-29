@@ -115,7 +115,7 @@ The above example shows most of the statements ridl supports. ridl now has 7 typ
         -p:     To generate Python code
 ```
 
-Currently ridlc can only output `c++` project. In the future, it will be able to generate `python` project and `java` project as well.
+Currently ridlc can output `c++` and `python` project. In the future, it will be able to generate `java` project as well.
 
 ### Output
 
