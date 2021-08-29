@@ -64,7 +64,10 @@ class CIFileTransfersvr( IIFileTransfer_SvrImpl ):
         hChannel : int,
         offset : int,
         size : int ):
+
         self.curTest = 0
+        self.curSize = 0
+        self.totalSize = 0
         
     '''
     Asynchronous request handler
@@ -100,7 +103,12 @@ class CIFileTransfersvr( IIFileTransfer_SvrImpl ):
         offset : int,
         size : int
         ) -> list[ int, None ] :
+
         self.curTest = 2
+        self.curSize = size
+        self.numTest += 1
+        self.totalSize = size
+
         return [ 0, None ]
         
     '''
@@ -117,6 +125,8 @@ class CIFileTransfersvr( IIFileTransfer_SvrImpl ):
         size : int ):
 
         self.curTest = 0
+        self.curSize = 0
+        self.totalSize = 0
         
     
 class CIChatsvr( IIChat_SvrImpl ):
@@ -132,6 +142,7 @@ class CIChatsvr( IIChat_SvrImpl ):
         fis : STRMATRIX
         '''
         if hChannel == 0 :
+            print( "hChannel is zero" )
             return [ -errno.EINVAL, None ]
 
         self.hChannel = hChannel
@@ -167,6 +178,8 @@ class CStreamSvcServer(
     def OnStmReady( self, hChannel ) :
         print( "OnStmReady ",
             hChannel, self.hChannel )
+        #notify client we are ready
+        self.WriteStream( hChannel, "RDY" )
 
     def OnStmClosing( self, hChannel ) :
         if self.hChannel == hChannel :

@@ -162,6 +162,7 @@ class CPythonServerImpl :
                  pHost, "AcceptNewStream", 
                  "(O)", pPyObj );
             ret = PyLong_AsLong( pPyRet );
+            Py_DECREF( pPyObj );
 
         }while( 0 );
         PyGILState_Release( gstate );
@@ -325,6 +326,7 @@ class CPythonServer :
 
         PyList_SetItem( pResp, 1, pPyBuf );
         PyList_Append( pResp, pPyBufBak );
+        Py_DECREF( pPyBufBak );
 
     }while( 0 );
 
@@ -458,6 +460,7 @@ class CPythonServer :
 
         PyList_SetItem( pResp, 1, pPyBuf );
         PyList_Append( pResp, pPyBufBak );
+        Py_DECREF( pPyBufBak );
 
     }while( 0 );
 

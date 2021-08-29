@@ -1112,11 +1112,11 @@ void CImplPyMthdProxyBase::EmitOptions()
     CCOUT << "dwTimeoutSec = " << dwTimeoutSec;
     NEW_LINE;
     Wa( "oOptions.SetIntProp(" );
-    Wa( "    propTimeoutSec, dwTimeoutSec )" ); 
-    Wa( "oOptions.RemoveProperty( propKeepAliveSec )" );
+    Wa( "    cpp.propTimeoutSec, dwTimeoutSec )" ); 
     Wa( "if dwTimeoutSec > 2 :" );
-    Wa( "    oOptions.SetIntProp( propKeepAliveSec," );
-    Wa( "        dwTimeoutSec / 2 )" );
+    Wa( "    dwTimeoutSec /= 2" );
+    Wa( "oOptions.SetIntProp( cpp.propKeepAliveSec," );
+    Wa( "    dwTimeoutSec )" );
 }
 
 gint32 CImplPyMthdProxyBase::OutputSync( bool bSync )
@@ -1603,6 +1603,17 @@ gint32 GenSvcFiles(
     return ret;
 }
 
+gint32 SyncCfg( const stdstr& strPath )
+{
+    sync();
+    stdstr strCmd = "make -C ";
+    strCmd += strPath;
+    gint32 ret = system( strCmd.c_str() );
+    if( ret < 0 )
+        ret = -errno;
+    return ret;
+}
+
 gint32 GenPyProj(
     const std::string& strOutPath,
     const std::string& strAppName,
@@ -1680,6 +1691,9 @@ gint32 GenPyProj(
         ret = opmf.Output();
 
     }while( 0 );
+
+    if( SUCCEEDED( ret ) )
+        SyncCfg( strOutPath );
 
     return ret;
 }
@@ -2136,9 +2150,7 @@ gint32 CImplPyMthdSvrBase::Output()
         if( ERROR( ret ) )
             return ret;
 
-        ret = OutputAsyncCHWrapper();
-        if( ERROR( ret ) )
-            return ret;
+        return  OutputAsyncCHWrapper();
     }
     return OutputSync();
 }

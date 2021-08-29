@@ -66,12 +66,11 @@ def mainsvr() :
                         continue
 
                     size = len( ret[ 1 ] )
-                    OutputMsg( "received msg size %d" % size )
 
                     oStmSvr.curSize -= size
                     if oStmSvr.curSize == 0:
                         OutputMsg( "test %d complete" % oStmSvr.numTest )
-                        OutputMsg( "%d bytes transfered" % oStmSvr.totalSize )
+                        OutputMsg( "%d bytes uploaded" % oStmSvr.totalSize )
                         oStmSvr.curTest = 0
                         buf = "ROK"
                         oStmSvr.WriteStream(
@@ -83,6 +82,47 @@ def mainsvr() :
                         break
 
                     continue
+
+                if oStmSvr.curTest == 2 :
+
+                    #upload test
+                    ret = 0
+                    while oStmSvr.curSize > 0 :
+                        size = oStmSvr.curSize
+                        if size > 4 * 1024 * 1024 :
+                            size = 4 * 1024 * 1024
+
+                        buf = bytearray( size )
+                        ret = oStmSvr.WriteStream(
+                            oStmSvr.hChannel, buf )
+
+                        if ret < 0:
+                            break
+
+                        oStmSvr.curSize -= size
+                        #OutputMsg( "send bytes %d" % size )
+
+                    if ret < 0 :
+                        print( "error send bytes", ret )
+                        time.sleep( 1 )
+                        oFileSvr.OnHelloWorld( None, "hello, world" )
+                        oStmSvr.curTest = 0
+                        continue
+
+                    if oStmSvr.curSize == 0:
+                        OutputMsg( "test %d complete" % oStmSvr.numTest )
+                        OutputMsg( "%d bytes downloaded" % oStmSvr.totalSize )
+                        oStmSvr.curTest = 0
+                        ret = oStmSvr.ReadStream( oStmSvr.hChannel )
+                        if  ret[ 0 ] < 0 :
+                            OutputMsg( "receiving ACK failed" )
+                        else :
+                            OutputMsg( ret[ 1 ].decode() )
+
+                    elif oStmSvr.curSize < 0 :
+                        print( "error size is %d" % oStmSvr.size )
+                        ret = -errno.ERANGE
+                        break
                     
 
     return ret

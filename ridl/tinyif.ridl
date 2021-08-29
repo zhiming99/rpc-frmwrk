@@ -11,5 +11,7 @@ struct OBJPTR
 interface ITinyInterface
 {
     Ping() returns ();
+    [ noreply ]KAReq( int64 qwTaskId ) returns ();
+    [ noreply, async ]KAReq2( int64 qwTaskId ) returns ();
 };
 

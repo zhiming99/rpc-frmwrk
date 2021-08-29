@@ -331,8 +331,8 @@ class PyRpcServices :
             if len( listResp ) <= 1 :
                 self.InvokeCallback( callback, listArgs )
             elif isinstance( listResp[ 1 ], list ) :
-                if len( listResp[ 1 ] ) > 0 :
-                    listArgs[2:] = listResp[ 1 ]
+                if len( listResp[ 1 ] ) > 0 and iArgNum == 1 :
+                    listArgs[ 2 ] = listResp[ 1 ][ 0 ]
                 self.InvokeCallback( callback, listArgs )
             else :
                 self.InvokeCallback( callback, listArgs )

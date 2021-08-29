@@ -2153,6 +2153,7 @@ class CPythonProxy :
 
         PyList_SetItem( pResp, 1, pPyBuf );
         PyList_Append( pResp, pPyBufBak );
+        Py_DECREF( pPyBufBak );
 
     }while( 0 );
 
@@ -2286,6 +2287,7 @@ class CPythonProxy :
 
         PyList_SetItem( pResp, 1, pPyBuf );
         PyList_Append( pResp, pPyBufBak );
+        Py_DECREF( pPyBufBak );
 
     }while( 0 );
 

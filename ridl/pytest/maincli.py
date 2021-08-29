@@ -119,7 +119,7 @@ def AsyncTests( oProxy ) :
 
 def UploadTest( oProxy, hStream : int ) :
 
-    for i in range( 16 ) :
+    for i in range( 15 ) :
         blockSize = ( 1<<i ) * 1024
         ret = oProxy.UploadFile( i,
             "block", hStream, 0, blockSize )
@@ -134,11 +134,11 @@ def UploadTest( oProxy, hStream : int ) :
         ret = oProxy.WriteStream( hStream, buf )
         if ret < 0 :
             oProxy.status = ret
-            strMsg = "Write %dKB bytes failed(%d)" % ( blockSize, ret )
+            strMsg = "upload %dKB bytes failed(%d)" % ( blockSize, ret )
             OutputMsg( strMsg )
             break
 
-        OutputMsg( "Write %d Bytes" % blockSize );
+        OutputMsg( "uploaded %d Bytes" % blockSize );
         ret = oProxy.ReadStream( hStream )
         if ret[ 0 ] < 0 :
             oProxy.status = ret
@@ -148,16 +148,60 @@ def UploadTest( oProxy, hStream : int ) :
 
     return oProxy.status
 
+def DownloadTest( oProxy, hStream : int ) :
+
+    for i in range( 15 ) :
+        blockSize = ( 1<< i ) * 1024
+        ret = oProxy.DownloadFile( i,
+            "block", hStream, 0, blockSize )
+
+        if ret[ 0 ] < 0 :
+            oProxy.status = ret[ 0 ]
+            break
+        if ret[ 0 ] == EC.STATUS_PENDING :
+            oProxy.sem.acquire()
+    
+        OutputMsg( "downloading %d Bytes" % blockSize );
+        while blockSize > 0 :
+            ret = oProxy.ReadStream( hStream )
+            if ret[ 0 ] < 0 :
+                oProxy.status = ret
+                break
+
+            count = len( ret[ 1 ] )
+            blockSize -= count
+
+
+        buf = "ROK".encode()
+        ret = oProxy.WriteStream( hStream, buf )
+        if ret < 0 :
+            oProxy.status = ret
+            strMsg = "send ACK failed"
+            OutputMsg( strMsg )
+            break
+
+        OutputMsg( "download complete"  )
+
+    return oProxy.status
+
 def StreamTests( oProxy )  :
 
     ret = oProxy.StartStream()
     if ret == 0 :
         OutputMsg( "StartStream failed" )
-        return
+        return oProxy.GetError()
 
     hStream = ret;
     while True:
         OutputMsg( "Start stream test..." )
+        listRet = oProxy.ReadStream( hStream )
+        if listRet[ 0 ] < 0 :
+            OutputMsg(
+                "Channel READY ACK failed %d" % listRet[ 0 ] )
+        else :
+            OutputMsg(
+                "peer Channel %s" % listRet[ 1 ].decode() )
+
         ret = oProxy.SpecifyChannel( hStream )
         if ret[ 0 ] < 0 :
             OutputMsg(
@@ -182,9 +226,15 @@ def StreamTests( oProxy )  :
         OutputMsg( content.decode() )
 
         ret = UploadTest( oProxy, hStream )
+        if ret < 0 :
+            break
+
+        ret = DownloadTest( oProxy, hStream )
         break
 
     oProxy.CloseStream( hStream )
+    oProxy.status = ret
+    return ret
 
 
 def maincli() :
