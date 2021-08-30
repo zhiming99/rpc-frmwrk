@@ -132,7 +132,7 @@ class CIEchoThingssvr( IIEchoThings_SvrImpl ):
     '''
     def EchoStruct( self, callback : cpp.ObjPtr,
         fi : object
-        ) -> list[ int, list ] :
+        ) -> Tuple[ int, list ] :
         '''
         parameters in the response includes
         fir : FILE_INFO
