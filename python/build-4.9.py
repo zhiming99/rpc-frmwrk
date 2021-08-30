@@ -17,7 +17,7 @@ makefile = sipconfig.SIPModuleMakefile(config, build_file, export_all=1)
 makefile.dir = "./sip4build"
 makefile.extra_libs = ["combase", "ipc" ]
 makefile.extra_defines = ["DEBUG","_USE_LIBEV" ]
-makefile.extra_library_dirs = ["../../combase/.libs", "../../ipc/.libs" ]
+makefile.extra_lib_dirs = ["../../combase/.libs", "../../ipc/.libs" ]
 makefile.extra_include_dirs = [ "../../include","../../ipc", "../../test/stmtest", "/usr/include/dbus-1.0", "/usr/lib/x86_64-linux-gnu/dbus-1.0/include", "/usr/include/jsoncpp" ]
 
 if libdir is not None :
