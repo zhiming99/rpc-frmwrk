@@ -1,16 +1,6 @@
 // a must-have statement
 appname "StressTest";
 
-const auth_json=```
-{
-    "AuthMech" : "krb5",
-    "UserName" : "zhiming@rpcf.org",
-    "ServiceName" : "rasp1@rpcf.org",
-    "Realm" : "rpcf.org",
-    "SignMessage" : "true"
-}
-```;
-
 // echo different type of information
 interface IEchoThings
 {
@@ -33,11 +23,7 @@ interface IEchoThings
     [ event ]OnHelloWorld( string strMsg ) returns ();
 };
 
-service StressSvc [
-    timeout=120, rtpath="/",
-    ipaddr="192.168.3.13",
-    compress, auth=auth_json,
-    stream ]
+service StressSvc [ timeout=120, stream ]
 {
     interface IEchoThings;
 };
