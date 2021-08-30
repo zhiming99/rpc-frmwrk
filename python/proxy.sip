@@ -733,6 +733,45 @@ class CPythonInterfBase : public T
         return ret;
     }
 
+    gint32 SetTimeoutSec(
+        IEventSink* pCallback, 
+        guint32 dwTimeoutSec )
+    {
+        gint32 ret = 0;
+        do{
+            if( dwTimeoutSec <= 1 )
+            {
+                CCfgOpenerObj oCfg( this);
+                ret = oCfg.GetIntProp(
+                    propTimeoutSec, dwTimeoutSec );
+                if( ERROR( ret ) )
+                    break;
+                if( dwTimeoutSec <= 1 )
+                {
+                    ret = -EINVAL;
+                    break;
+                }
+            }
+
+            CIfInvokeMethodTask* pInv =
+                ObjPtr( pCallback );
+            CfgPtr pCallOpt;
+            ret = pInv->GetCallOptions( pCallOpt );
+            if( ERROR( ret ) )
+                break;
+            
+            CCfgOpener oOptions(
+                ( IConfigDb* )pCallOpt );
+            oOptions[ propTimeoutSec ] = dwTimeoutSec;
+            if( dwTimeoutSec > 2 )
+                dwTimeoutSec >>= 1;
+            oOptions[ propKeepAliveSec ] = dwTimeoutSec;
+
+        }while( 0 );
+
+        return ret;
+    }
+
     gint32 InvokeUserMethod(
         IConfigDb* pParams,
         IEventSink* pCallback )

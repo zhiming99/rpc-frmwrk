@@ -1814,6 +1814,10 @@ gint32 CImplPyMthdSvrBase::OutputSync( bool bSync )
         else
         {
             Wa( "if bPending:" );
+            guint32 dwTimeoutSec = m_pNode->GetTimeoutSec();
+            Wa( "    self.oInst.SetTimeoutSec(" );
+            CCOUT << "        callback, " << dwTimeoutSec << " )";
+            NEW_LINE;
             Wa( "    self.InstallCompNotify( callback," );
             CCOUT << "        self.On" << strName << "CanceledWrapper,";
             NEW_LINE;

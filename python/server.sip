@@ -519,6 +519,24 @@ class CPythonServer :
     }while( 0 );
     %End
 
+    gint32 SetTimeoutSec(
+        cpp::ObjPtr& pCallback,
+        guint32 dwTimeoutSec );
+    %MethodCode
+        do{
+            CPythonServerImpl* pImpl =
+            static_cast< CPythonServerImpl* >
+                ( sipCpp );
+            if( a0->IsEmpty() )
+            {
+                sipRes = -EINVAL;
+                break;
+            }
+            sipRes = pImpl->SetTimeoutSec( *a0, a1 );
+
+        }while( 0 );
+    %End
+
     gint32 SetResponse(
         cpp::ObjPtr& pCallback,
         gint32 iRet,

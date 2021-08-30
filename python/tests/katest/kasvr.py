@@ -45,7 +45,7 @@ class CKeepAliveServer:
         return listResp
 
     def LongWaitCleanup( self, ret, timerObj ) :
-        if np.uint32( ret ) == ErrorCode.ERROR_USER_CANCEL :
+        if ret == ErrorCode.ERROR_USER_CANCEL :
             self.DisableTimer( timerObj )
             print( "remove the timer",
                 "at user's request" )
