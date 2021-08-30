@@ -23,4 +23,21 @@ elif [ "$1" == "1" ]; then
     ${bin_dir}/rpcf/btinrtsvr &
     sleep 5
     ${bin_dir}/rpcf/btinrtcli
+    kill -9 `pidof btinrtsvr`
+    kill -9 `pidof ifsvrsmk`
+    kill -9 `pidof kasvrtst`
+    kill -9 `pidof actcsvrtst`
+    kill -9 `pidof prsvrtst`
+    echo restart rpcrouters...
+    ${bin_dir}/rpcrouter -r 2&
+    ${bin_dir}/rpcrouter -r 1&
+    pwd
+    pushd ./ridl
+    ${bin_dir}/ridlc -I ./ -pO ./pytest example.ridl
+    cd ./pytest
+    python mainsvr.py &
+    sleep 5
+    echo start the Python testcase
+    python maincli.py
+    popd
 fi
