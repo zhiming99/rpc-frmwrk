@@ -1,7 +1,10 @@
 import os
-import sipconfig
 import sys
 
+from pathlib import Path
+Path("./sip4build").mkdir(parents=True, exist_ok=True)
+
+import sipconfig
 build_file = "rpcf.sbf"
 config=sipconfig.Configuration()
 
