@@ -250,7 +250,7 @@ class PyRpcServices :
     STATUS_SUCCESS.
     '''
     def AddTimer( self, timeoutSec,
-        callback, context )->list[int,cpp.ObjPtr] :
+        callback, context )->Tuple[int,cpp.ObjPtr] :
         return self.oInst.AddTimer(
             np.uint32( timeoutSec ),
             callback, context )
@@ -413,7 +413,7 @@ class PyRpcServices :
     element2 is no longer valid.  '''
 
     def ReadStreamAsync( self,
-        hChannel, callback, size = 0)->list[
+        hChannel, callback, size = 0)->Tuple[
             int, Optional[ bytearray ], Optional[ cpp.ObjPtr] ]:
 
         return self.oInst.ReadStreamAsync(
@@ -450,7 +450,7 @@ class PyRpcServices :
 
     def ArgObjToList( self,
         seriProto:int,
-        pObj:cpp.ObjPtr )->list[ int, list ] :
+        pObj:cpp.ObjPtr )->Tuple[ int, list ] :
 
         pCfg = cpp.CastToCfg( pObj )
         if pCfg is None :
@@ -623,7 +623,7 @@ class PyRpcServices :
     def InvokeMethod( self, callback,
         ifName, methodName,
         seriProto:int,
-        cppargs:cpp.ObjPtr ) ->list[ int, list ]:
+        cppargs:cpp.ObjPtr ) ->Tuple[ int, list ]:
         resp = [ 0 ]
         while True :
 
@@ -770,7 +770,7 @@ class PyRpcProxy( PyRpcServices ) :
         return
 
     def sendRequest( self,
-        strIfName, strMethod, *args )->list[int,list] :
+        strIfName, strMethod, *args )->Tuple[int,list] :
         resp = [ 0, None ]
 
         listArgs = list( args )
@@ -785,7 +785,7 @@ class PyRpcProxy( PyRpcServices ) :
     cancel the request sent'''
     def sendRequestAsync( self,
         callback, strIfName,
-        strMethod, *args )->list[int, np.uint64]:
+        strMethod, *args )->Tuple[int, np.uint64]:
 
         resp = [ 0, None ]
         listArgs = list( args )
@@ -800,7 +800,7 @@ class PyRpcProxy( PyRpcServices ) :
     '''
     def PySendRequest(
         self, strIfName,
-        strMethod, *args )->list[ int, list] :
+        strMethod, *args )->Tuple[ int, list] :
 
         resp = [ 0, None ]
         listArgs = list( args )
@@ -869,7 +869,7 @@ class PyRpcProxy( PyRpcServices ) :
 
     def MakeCallAsync( self, callback,
         strIfName, strMethod, args, resp, seriProto
-        )->list[int,int]:
+        )->Tuple[int,int]:
 
         ret = self.oInst.PyProxyCall( callback,
             strIfName, strMethod, args, resp, seriProto )
@@ -901,7 +901,7 @@ class PyRpcProxy( PyRpcServices ) :
     '''
     def MakeCallWithOpt( self,
         pCfg : cpp.CfgPtr, args : list, resp : list
-        )->list[int,list]:
+        )->Tuple[int,list]:
 
         return self.oInst.PyProxyCall2(
             None, None, pCfg, args, resp )
@@ -910,7 +910,7 @@ class PyRpcProxy( PyRpcServices ) :
         context: object,
         pCfg : cpp.CfgPtr,
         args : list, resp : list
-        )->list[int,list]:
+        )->Tuple[int,list]:
 
         return self.oInst.PyProxyCall2(
             callback, context, pCfg, args, resp )
