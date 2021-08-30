@@ -98,33 +98,26 @@ The above example shows most of the statements ridl supports. ridl now has 7 typ
 `ridlc` stands for `ridl compiler`. Its command line looks like `ridlc [options] <ridl file>`, and there are the following major options:
 
 ```
-        -I:     To specify the path to search for the included files.
-                And this option can repeat manytimes
+        -I:     To specify the path to search for the included files. And this option can repeat
+                manytimes
                 
-        -O:     To specify the path for
-                the output files. 'output' is the 
-                default path if not specified
+        -O:     To specify the path for the output files. 'output' is the default path if not
+                specified
                 
-        -o:     To specify the file name as
-                the base of the target image. That is,
-                the <name>cli for client and <name>svr
-                for server. If not specified, the
-                'appname' from the ridl will be used
+        -o:     To specify the file name as the base of the target image. That is, the <name>cli for
+                client and <name>svr for server. If not specified, the 'appname' from the ridl will
+                be used
                 
-        -s:     To apply new serilization
-                protocol only when the old serilization
-                method cannot handle. Default is new
-                serialization protocol always
+        -s:     To apply new serilization protocol only when the old serilization method cannot handle.
+                Default is new serialization protocol always
                 
         -p:     To generate Python skelton files
         
-        -l:	    To output a shared library
-                instead of executables. This
-                option is for CPP project only
+        -l:     To output a shared library instead of executables. This option is for CPP project only
 
 ```
 
-Currently ridlc can output `c++` and `python` project. In the future, it will be able to generate `Java` project as well.
+Currently `ridlc` can output `c++` and `python` project. In the future, it will be able to generate `Java` project as well.
 
 ### Output for C++ project
 
@@ -136,7 +129,7 @@ On a successful compile of the above sample ridl file, `ridlc` will generate the
 * **SimpFileSvc.cpp, SimpFileSvc.h:** the files are named with the *service id* of the *service statement*. Each individual service declaration has a pair of `.cpp` and `.h` file. The cpp file contains all the methods that user should implement to get server/proxy to work. They are mainly the same-name methods on Server side as request handler. The amount of efforts are different depending on whether to use `sync` or `async` approach to implement the interfaces of the service. `sync` implementation is simple and time-saving at development time, `async` is relatively difficult to develop, but with better performance. And `rpc-frmwrk` provides rich utilities to help developing asynchronous implementation to minize the developing efforts.
 * **Makefile**: The make file to build the project. Note that, you must install the `rpc-frmwrk` first.
 * **exampledesc.json, driver.json:** The configuration files.
-* **run:** After the successful make, there will be two executables, `examplecli` and `examplesvr`. Run the server on the `bridge` side and the client on the `reqfwdr` side.
+* **run:** After the successful make, there will be two executables, `examplecli` and `examplesvr`. Run the server on the `bridge` side and the client on the `reqfwdr` side. If you have specified `-l` option when generating the code, the `make` command will produce a shared library named `examplelib.so`.
 
 ### Output for Python project
 
