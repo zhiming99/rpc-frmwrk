@@ -45,7 +45,11 @@ interface IEchoThings
             int64 i3r, float i4r,
             double i5r, string szTextr );
 
-    [ async ]EchoStruct( FILE_INFO fi ) returns ( FILE_INFO fir );
+    [ async_s ]EchoStruct( FILE_INFO fi ) returns ( FILE_INFO fir );
+
+    [ async ]EchoTypedef( STRMATRIX1 stm ) returns ( STRMATRIX1 stmr );
+
+    [ async ]EchoHandle( STMHANDLE stm ) returns ( STMHANDLE stmr );
 
     // a event from server to the proxy, response list is alway empty and the
     // server gets no feedback related to the proxy.
@@ -84,18 +88,13 @@ interface IChat
         returns( STRMATRIX fis );
 };
 
-service SimpFileSvc [
-    timeout=120, rtpath="/",
-    ssl, websock, compress,
-    auth ]
+service SimpFileSvc [ timeout=120 ]
 {
     interface ITinyInterface;
     interface IEchoThings;
 };
 
-service StreamSvc [
-    timeout=100, rtpath="/rasp2",
-     compress, auth ]
+service StreamSvc [ timeout=100 ]
 {
     interface IFileTransfer;
     interface IChat;
