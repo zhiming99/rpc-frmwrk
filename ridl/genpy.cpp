@@ -2979,7 +2979,7 @@ gint32 CImplPyMainFunc::OutputCli(
         Wa( "'''" );
         INDENT_DOWN;
         INDENT_DOWNL;
-        Wa( "return ret[ 0 ]" );
+        Wa( "return ret" );
         INDENT_DOWNL;
         Wa( "ret = maincli()" );
         Wa( "quit( ret )" );

@@ -92,7 +92,11 @@ void Usage()
         "\t\tfor server. If not specified, the\n"
         "\t\t'appname' from the ridl will be used\n" );
 
-    printf( "\t-p:\tTo generate Python code\n" );
+    printf( "\t-p:\tTo generate the Python skelton files\n" );
+
+    printf( "\t-l:\tTo output a shared library\n" );
+    printf( "\t\tinstead of executables. This\n" );
+    printf( "\t\toption is for CPP project only\n" );
 }
 
 static std::string g_strOutPath = "output";
@@ -100,6 +104,7 @@ static std::vector< std::string > g_vecPaths;
 std::string g_strTarget;
 bool g_bNewSerial = true;
 static stdstr g_strLang = "cpp";
+bool g_bMklib = false;
 
 #include "seribase.h"
 #include "gencpp.h"
@@ -124,7 +129,7 @@ int main( int argc, char** argv )
         bool bQuit = false;
 
         while( ( opt =
-            getopt( argc, argv, "ahI:O:o:p" ) ) != -1 )
+            getopt( argc, argv, "ahlI:O:o:p" ) ) != -1 )
         {
             switch( opt )
             {
@@ -179,6 +184,11 @@ int main( int argc, char** argv )
             case 'p':
                 {
                     g_strLang = "py";
+                    break;
+                }
+            case 'l':
+                {
+                    g_bMklib = true;
                     break;
                 }
             default:

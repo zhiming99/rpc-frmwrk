@@ -29,6 +29,7 @@ using namespace rpcf;
 #include "sha1.h"
 
 extern std::string g_strAppName;
+extern bool g_bMklib;
 
 std::map< gint32, char > g_mapTypeSig =
 {
@@ -6027,7 +6028,21 @@ gint32 CImplMainFunc::Output()
             NEW_LINES( 1 );
 
             // main function
-            Wa( "int main( int argc, char** argv)" );
+            if( g_bMklib )
+            {
+                stdstr strSuffix;
+                if( bProxy )
+                    strSuffix = "cli";
+                else
+                    strSuffix = "svr";
+                CCOUT << "int Start" << strSuffix
+                    << "( int argc, char** argv)";
+                NEW_LINE;
+            }
+            else
+            {
+                Wa( "int main( int argc, char** argv)" );
+            }
             BLOCK_OPEN;
             Wa( "gint32 ret = 0;" );
             CCOUT << "do";
@@ -6269,9 +6284,6 @@ gint32 CExportMakefile::Output()
         std::string strCpps =
             strAppName + ".cpp ";
 
-        std::string strClient =
-            strAppName + "cli";
-
         std::string strObjClient, strObjServer;
         for( auto& elem : vecSvcs )
         {
@@ -6290,8 +6302,14 @@ gint32 CExportMakefile::Output()
                 psd->GetName() + "svr.o ";
         }
 
+        std::string strClient =
+            strAppName + "cli";
+
         std::string strServer =
             strAppName + "svr";
+
+        std::string strLib =
+            strAppName + "lib.so";
 
         std::string strCmdLine =
             "sed -i 's:XXXSRCS:";
@@ -6301,10 +6319,16 @@ gint32 CExportMakefile::Output()
         strCmdLine += strCpps + ":;" +
             "s:XXXCLI:" + strClient + ":;" +
             "s:XXXSVR:" + strServer + ":; " +
+            "s:XXXLIB:" + strLib + ":; " +
             "s:XXXOBJSSVR:" + strObjServer + ":; " +
-            "s:XXXOBJSCLI:" + strObjClient + ":' " +
-            pFiles->m_strMakefile;
+            "s:XXXOBJSCLI:" + strObjClient + ":; ";
 
+        if( g_bMklib )
+            strCmdLine += "s:XXXMKLIB:1:' ";
+        else
+            strCmdLine += "s:XXXMKLIB::' ";
+
+        strCmdLine += pFiles->m_strMakefile;
         printf( "%s\n", strCmdLine.c_str() );
         system( strCmdLine.c_str() );
 
