@@ -81,13 +81,13 @@ The above example shows most of the statements ridl supports. ridl now has 7 typ
 * **interface** : an interface is a set of methods logically bounded closely to deliver some kind of service to the client. It is made up of interface id and a set of methods, as similiar to a class in an OO language.
   * **interface id**: a string to uniquely identify the interface, it is used by `rpc-frmwrk` to locate the service.
   * **method** : a method is the smallest unit of interaction between server and proxy. The proxy send the request, and the server executes at the proxy's request and returns the response. As you can see, an `ridl method` is made up of `method name`, `input parameter list`, `output parameter list`. Beside the three major components a method must have, it can have some attributes, too, within the bracket ahead of the `method name` as shown in the above example. The attributes supported by a `method` include
-    * **async, async_s, async_p** : to instruct the ridl compiler to generate asynchronous or synchronous code for server or proxy. Let me explain a bit more. 
+    * **async, async_s, async_p** : to instruct the ridl compiler to generate asynchronous or synchronous code for server or proxy. `async_s` indicates server side will handle the request asynchronously, while `async_p` indicates proxy side to send request asynchronously. Let me explain a bit more. 
       * *Asynchronous* means the method call can return immediately with the operation not completed. specifically in the context of `rpc-frmwrk`, the method may return a status code STATUS_PENDING, to inform the caller the operation is still in-process, besides success or error.
       *  *Synchronous* is in the opposite, that when a method returns, it returns sucess, or an error code, and never returns STATUS_PENDING. And the caller is sure the operation either is done or ends up with error.
     * **timeout** : an integer to specify a method specific timeout value in second the proxy can wait before becoming impatient.
-    * **noreply** : specify a method not to wait for server response. The proxy side, the method will return as soon as the request is sent and on the server side, the request is handled without sending out the response.
-    * **event** : to specify a method as an event handler, as not applied to normal method, picks up a event broadcasted by the server and request the proxy to do somethings on the event.
-  * **the input parameters** or **output parameters** of a method can be empty, but the method still get an status code from the server to tell if the method is handled successfully or not, unless the method is labeled with the `event` attribute.
+    * **noreply** : specify a method does not require a response from server. The proxy side, the method will return as soon as the request is sent and on the server side, the request is handled without sending out the response.
+    * **event** : to specify a method as an event handler, as not applied to normal method. The event flag means the proxy side has an event handler to pick up the event broadcasted by the server and do some processing. The event delivery is a reverse process compared to a normal rpc request, as initiated by server side and ends up at the proxy side. 
+  * **the input parameter list** or **output parameter list** of a method can be empty, but normally the method will get a status code from the server to tell if the request succeeds or not, unless the method has attributes such as the `event` or `noreply`.
 * **service declaration** : to declare a `service` object. A `service` object contains a set of interfaces, to deliver a relatively independent feature or service. it contains a `service id` and a set of interfaces.
   * **service id**: will appear in the proxy request's `ObjPath` string, as part of an object address as to find the service.
   * Besides interfaces, the service can also be assigned some more attributes.
@@ -115,7 +115,7 @@ The above example shows most of the statements ridl supports. ridl now has 7 typ
         -p:     To generate Python code
 ```
 
-Currently ridlc can output `c++` and `python` project. In the future, it will be able to generate `java` project as well.
+Currently ridlc can output `c++` and `python` project. In the future, it will be able to generate `Java` project as well.
 
 ### Output for C++ project
 
@@ -143,4 +143,4 @@ On a successful compile of the above sample ridl file, `ridlc` will generate the
 
 * **Makefile**: The make file to build the project. Note that, it just synchronizes the configuration with the system settings.
 * **exampledesc.json, driver.json:** The configuration files.
-* **run:** you can run `mainsvr.py` and `maincli.py` directly, there is no need to make or build.
+* **run:** you can run `mainsvr.py` and `maincli.py` directly, and there is no need to make or build.
