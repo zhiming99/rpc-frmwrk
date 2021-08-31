@@ -1702,6 +1702,11 @@ class CInterfaceServer :
     gint32 Resume_Server(
         IEventSink* pCallback );
 
+    // override the invoketask's timeout value in
+    // second
+    gint32 SetInvTimeout(
+        IEventSink* pCallback,
+        guint32 dwTimeoutSec );
 };
 
 

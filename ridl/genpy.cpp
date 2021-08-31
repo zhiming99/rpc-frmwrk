@@ -1816,7 +1816,7 @@ gint32 CImplPyMthdSvrBase::OutputSync( bool bSync )
         {
             Wa( "if bPending:" );
             guint32 dwTimeoutSec = m_pNode->GetTimeoutSec();
-            Wa( "    self.oInst.SetTimeoutSec(" );
+            Wa( "    self.oInst.SetInvTimeout(" );
             CCOUT << "        callback, " << dwTimeoutSec << " )";
             NEW_LINE;
             Wa( "    self.InstallCompNotify( callback," );

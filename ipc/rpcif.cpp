@@ -7536,4 +7536,52 @@ gint32 CInterfaceServer::PauseResume_Server(
     return ret;
 }
 
+gint32 CInterfaceServer::SetInvTimeout(
+    IEventSink* pCallback,
+    guint32 dwTimeoutSec )
+{
+    gint32 ret = 0;
+    do{
+        CIfInvokeMethodTask* pInv =
+            ObjPtr( pCallback );
+        if( pInv == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        if( dwTimeoutSec <= 1 )
+        {
+            CCfgOpenerObj oCfg( this);
+            ret = oCfg.GetIntProp(
+                propTimeoutSec, dwTimeoutSec );
+            if( ERROR( ret ) )
+                break;
+            if( dwTimeoutSec <= 1 )
+            {
+                ret = -EINVAL;
+                break;
+            }
+        }
+
+        CfgPtr pCallOpt;
+        ret = pInv->GetCallOptions( pCallOpt );
+        if( ERROR( ret ) )
+            break;
+        
+        CCfgOpener oOptions(
+            ( IConfigDb* )pCallOpt );
+
+        oOptions[ propTimeoutSec ] =
+            dwTimeoutSec;
+
+        oOptions[ propKeepAliveSec ] =
+            ( dwTimeoutSec << 1 );
+
+    }while( 0 );
+
+    return ret;
+}
+
+
 }

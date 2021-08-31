@@ -3456,7 +3456,7 @@ gint32 CImplServiceImpl::Output()
                 NEW_LINE;
                 CCOUT << "// when the service is done";
                 NEW_LINE;    
-                CCOUT << "return STATUS_PENDING;";
+                CCOUT << "return ERROR_NOT_IMPL;";
             }
             else if( !bEvent )
             {
@@ -5224,47 +5224,11 @@ gint32 CImplIfMethodSvr::OutputAsyncNonSerial()
 
         guint32 dwTimeoutSec =
             m_pNode->GetTimeoutSec();
-        if( dwTimeoutSec == 0 )
-        {
-            Wa( "guint32 dwTimeoutSec = 0;" );
-            Wa( "CCfgOpenerObj oCfg( this);" );
-            CCOUT << "ret = oCfg.GetIntProp(";
-            INDENT_UPL;
-            CCOUT << "propTimeoutSec, dwTimeoutSec );";
-            INDENT_DOWNL;
-            Wa( "if( ERROR( ret ) ) break;" );
-        }
-        else
-        {
-            CCOUT << "guint32 dwTimeoutSec = "
-                << dwTimeoutSec << ";";
-            NEW_LINE;
-        }
 
-        NEW_LINE;
-        CCOUT << "CIfInvokeMethodTask* pInv =";
-        INDENT_UPL;
-        CCOUT << "ObjPtr( pCallback );";
-        INDENT_DOWNL;
-        CCOUT << "CfgPtr pCallOpt;";
-        NEW_LINE;
-        CCOUT << "ret = pInv->GetCallOptions( pCallOpt );";
+        CCOUT << "ret = SetInvTimeout( pCallback, "
+            << dwTimeoutSec << " );";
         NEW_LINE;
         Wa( "if( ERROR( ret ) ) break;" );
-        NEW_LINE;
-        CCOUT << "CCfgOpener oOptions(";
-        INDENT_UPL;
-        CCOUT << "( IConfigDb* )pCallOpt );";
-        INDENT_DOWNL;
-        Wa( "oOptions[ propTimeoutSec ] = dwTimeoutSec;" );
-        Wa( "oOptions.RemoveProperty( propKeepAliveSec );" );
-        CCOUT << "if( dwTimeoutSec > 2 )";
-        INDENT_UPL; 
-        CCOUT << "oOptions[ propKeepAliveSec ] =";
-        INDENT_UPL; 
-        CCOUT << "dwTimeoutSec / 2;";
-        INDENT_DOWNL;
-        INDENT_DOWNL;
 
         if( dwOutCount > 0 )
         {
@@ -5398,47 +5362,10 @@ gint32 CImplIfMethodSvr::OutputAsyncSerial()
 
         guint32 dwTimeoutSec =
             m_pNode->GetTimeoutSec();
-        if( dwTimeoutSec == 0 )
-        {
-            Wa( "guint32 dwTimeoutSec = 0;" );
-            Wa( "CCfgOpenerObj oCfg( this);" );
-            CCOUT << "ret = oCfg.GetIntProp(";
-            INDENT_UPL;
-            CCOUT << "propTimeoutSec, dwTimeoutSec );";
-            INDENT_DOWNL;
-            Wa( "if( ERROR( ret ) ) break;" );
-        }
-        else
-        {
-            CCOUT << "guint32 dwTimeoutSec = "
-                << dwTimeoutSec << ";";
-            NEW_LINE;
-        }
-
-        NEW_LINE;
-        CCOUT << "CIfInvokeMethodTask* pInv =";
-        INDENT_UPL;
-        CCOUT << "ObjPtr( pCallback );";
-        INDENT_DOWNL;
-        CCOUT << "CfgPtr pCallOpt;";
-        NEW_LINE;
-        CCOUT << "ret = pInv->GetCallOptions( pCallOpt );";
+        CCOUT << "ret = SetInvTimeout( pCallback, "
+            << dwTimeoutSec << " );";
         NEW_LINE;
         Wa( "if( ERROR( ret ) ) break;" );
-        NEW_LINE;
-        CCOUT << "CCfgOpener oOptions(";
-        INDENT_UPL;
-        CCOUT << "( IConfigDb* )pCallOpt );";
-        INDENT_DOWNL;
-        Wa( "oOptions[ propTimeoutSec ] = dwTimeoutSec;" );
-        Wa( "oOptions.RemoveProperty( propKeepAliveSec );" );
-        CCOUT << "if( dwTimeoutSec > 2 )";
-        INDENT_UPL; 
-        CCOUT << "oOptions[ propKeepAliveSec ] =";
-        INDENT_UPL; 
-        CCOUT << "dwTimeoutSec / 2;";
-        INDENT_DOWNL;
-        INDENT_DOWNL;
 
         CCOUT << "ret = DEFER_CANCEL_HANDLER2(";
         INDENT_UPL;

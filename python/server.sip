@@ -519,7 +519,7 @@ class CPythonServer :
     }while( 0 );
     %End
 
-    gint32 SetTimeoutSec(
+    gint32 SetInvTimeout(
         cpp::ObjPtr& pCallback,
         guint32 dwTimeoutSec );
     %MethodCode
@@ -532,7 +532,7 @@ class CPythonServer :
                 sipRes = -EINVAL;
                 break;
             }
-            sipRes = pImpl->SetTimeoutSec( *a0, a1 );
+            sipRes = pImpl->SetInvTimeout( *a0, a1 );
 
         }while( 0 );
     %End
