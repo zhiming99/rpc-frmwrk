@@ -15,14 +15,14 @@ elif [ "$1" == "1" ]; then
     ${bin_dir}/rpcrouter -r 1 &
     sleep 15
     echo starting echo test...
-    ${bin_dir}/rpcf/ifclismk
-    ${bin_dir}/rpcf/kaclitst
-    ${bin_dir}/rpcf/actclitst
-    ${bin_dir}/rpcf/prclitst
+    ${bin_dir}/rpcf/ifclismk || exit 1
+    ${bin_dir}/rpcf/kaclitst || exit 2
+    ${bin_dir}/rpcf/actclitst || exit 3
+    ${bin_dir}/rpcf/prclitst || exit 4
     kill -9 `pidof rpcrouter`
     ${bin_dir}/rpcf/btinrtsvr &
     sleep 5
-    ${bin_dir}/rpcf/btinrtcli
+    ${bin_dir}/rpcf/btinrtcli || exit 5
     kill -9 `pidof btinrtsvr`
     kill -9 `pidof ifsvrsmk`
     kill -9 `pidof kasvrtst`
@@ -33,11 +33,11 @@ elif [ "$1" == "1" ]; then
     ${bin_dir}/rpcrouter -r 1&
     pwd
     pushd ./ridl
-    ${bin_dir}/ridlc -I ./ -pO ./pytest example.ridl
+    ${bin_dir}/ridlc -I ./ -pO ./pytest example.ridl || exit 6
     cd ./pytest
     python mainsvr.py &
     sleep 5
-    echo start the Python testcase
-    python maincli.py
+    echo start the Python testcases
+    python maincli.py || exit 7
     popd
 fi
