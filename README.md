@@ -61,7 +61,9 @@ This project depends on the following 3rd-party packags to build:
 ---
 [`Tue Aug 31 2021 13:32:00 AM Beijing`]   
 1. Python support is now officially released. **Congratulations!**
-2. Before starting the JavaScript support, I will do some optimization work to improve the performance at least 20%.
+2. Before starting the JavaScript support, I will do some optimization work to improve the performance at least 20%, which includes at least,
+   * New serialization implementation of CConfigDb
+   * Replace the CBuffer with a lean structure VARIANT as the CConfigDb's property storage.
 
 [`Sat Aug 28 2021 10:44:47 AM Beijing`]   
 1. Python code generator is coming. It should be almost complete. I will add the documentation in the next few days.
