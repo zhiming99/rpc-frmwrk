@@ -146,3 +146,6 @@ On a successful compile of the above sample ridl file, `ridlc` will generate the
 * **Makefile**: The make file to build the project. Note that, it just synchronizes the configuration with the system settings.
 * **exampledesc.json, driver.json:** The configuration files.
 * **run:** you can run `mainsvr.py` and `maincli.py` directly, and there is no need to make or build.
+
+### Interchangable client and server between C++ and Python
+You can connect the C++ server with a python client or a Python server with a C++ client as long as both are generated with the same ridl file.
