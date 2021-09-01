@@ -24,7 +24,7 @@ This is an asynchronous and event-driven RPC implementation for embeded system w
 15. [`Authentication support with Kerberos 5`](https://github.com/zhiming99/rpc-frmwrk/tree/master/rpc/security/README.md)
 16. [`Python Support`](https://github.com/zhiming99/rpc-frmwrk/tree/master/python)
 17. [`Node Redudancy/Load Balance`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md#load-balance--node-redudancy)
-18. [`A CPP and Python code generator`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md)
+18. [`A CPP and Python skelton code generator`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md)
 19. [`A GUI config tool for rpcrouter`](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools/README.md)
 
 #### Building `rpc-frmwrk`:   
