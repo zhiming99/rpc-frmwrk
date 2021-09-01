@@ -534,28 +534,36 @@ gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
 {
     gint32 ret = 0;
 
-    if( pBuf == nullptr
-        || pBuf->size() == 0 )
+    if( pBuf == nullptr || pBuf->size() == 0 )
+        return -EINVAL;
+
+    return Deserialize(
+        pBuf->ptr(), pBuf->size() );
+}
+
+gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
+    ::Deserialize( const char* pBuf, guint32 dwSizeMax )
+{
+    gint32 ret = 0;
+    if( pBuf == nullptr )
         return -EINVAL;
 
     do{
         Clear();
 
-        guint32 dwSize =
-            *( guint32* )pBuf->ptr();
-
+        guint32 dwSize;
+        memcpy( &dwSize, pBuf, sizeof( dwSize ) );
         dwSize = ntohl( dwSize );
-        if( dwSize > 1024 * 1024 )
+        if( dwSize > dwSizeMax )
         {
             ret = -EINVAL;
             break;
         }
 
         guint8* pMsg =
-            ( guint8* )pBuf->ptr() + sizeof( guint32 );
+            ( guint8* )pBuf + sizeof( guint32 );
 
         CDBusError dbusError;
-
         m_pObj = dbus_message_demarshal(
             ( char* )pMsg, dwSize, dbusError );
 

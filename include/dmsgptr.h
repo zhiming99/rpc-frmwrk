@@ -227,6 +227,9 @@ class CAutoPtr< Clsid_Invalid, DBusMessage > : public IAutoPtr
 
     gint32 Serialize( CBuffer* pBuf );
     gint32 Deserialize( CBuffer* pBuf );
+    gint32 Deserialize(
+        const char* pBuf, guint32 dwSize );
+
     gint32 Clone( DBusMessage* pSrcMsg );
 
     gint32 CopyHeader( DBusMessage* pMsg )

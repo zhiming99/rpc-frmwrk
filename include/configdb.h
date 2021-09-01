@@ -1752,9 +1752,16 @@ class CConfigDb : public IConfigDb
     const CBuffer& operator[]( gint32 iProp ) const;
     CBuffer& operator[]( gint32 iProp );
 
-    virtual gint32 Serialize( CBuffer& oBuf ) const;
+    gint32 SerializeOld( CBuffer& oBuf ) const;
+    gint32 DeserializeOld( const char* oBuf, guint32 dwSize );
+
     virtual gint32 Deserialize( const CBuffer& oBuf );
+
+    virtual gint32 Serialize( CBuffer& oBuf ) const;
     virtual gint32 Deserialize( const char* oBuf, guint32 dwSize );
+
+    gint32 SerializeNew( CBuffer& oBuf ) const;
+    gint32 DeserializeNew( const char* oBuf, guint32 dwSize );
 
     gint32 size() const
     { return m_mapProps.size(); }

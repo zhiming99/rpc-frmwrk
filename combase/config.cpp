@@ -204,7 +204,7 @@ do{ \
  \
 }while( 0 ) 
 
-gint32 CConfigDb::Serialize( CBuffer& oBuf ) const
+gint32 CConfigDb::SerializeOld( CBuffer& oBuf ) const
 {
     struct SERI_HEADER oHeader;
     gint32 ret = 0;
@@ -310,7 +310,7 @@ gint32 CConfigDb::Serialize( CBuffer& oBuf ) const
     return ret;
 }
 
-gint32 CConfigDb::Deserialize(
+gint32 CConfigDb::DeserializeOld(
     const char* pBuf, guint32 dwSize )
 {
     if( pBuf == nullptr || dwSize == 0 )
@@ -329,6 +329,11 @@ gint32 CConfigDb::Deserialize(
             oHeader.dwCount > CFGDB_MAX_ITEM ||
             oHeader.dwSize + sizeof( SERI_HEADER_BASE ) > dwSize ||
             oHeader.dwSize > CFGDB_MAX_SIZE )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        if( oHeader.bVersion != 1 )
         {
             ret = -EINVAL;
             break;
@@ -364,6 +369,449 @@ gint32 CConfigDb::Deserialize(
 
     return ret;
 }
+
+gint32 CConfigDb::Serialize(
+    CBuffer& oBuf ) const
+{
+    return SerializeNew( oBuf );
+}
+gint32 CConfigDb::Deserialize(
+    const char* oBuf, guint32 dwSize )
+{
+    return DeserializeNew( oBuf, dwSize );
+}
+
+#define QPAGE ( PAGE_SIZE / 2 )
+gint32 CConfigDb::SerializeNew(
+    CBuffer& oBuf ) const
+{
+    struct SERI_HEADER oHeader;
+    gint32 ret = 0;
+
+    hashmap<gint32, BufPtr>::const_iterator itr
+        = m_mapProps.cbegin();
+
+    oHeader.dwClsid = clsid( CConfigDb );
+    oHeader.dwCount = m_mapProps.size();
+    oHeader.bVersion = 2;
+
+    // NOTE: oHeader.dwSize at this point is an
+    // estimated size at this moment
+
+    oBuf.Resize( sizeof( SERI_HEADER ) + QPAGE );
+
+    char* pLoc = oBuf.ptr();
+
+    oHeader.hton();
+    memcpy( pLoc, &oHeader, sizeof( oHeader ) );
+    pLoc += sizeof( oHeader );
+    oHeader.ntoh();
+
+    itr = m_mapProps.begin();
+
+    char* pEnd = oBuf.ptr() + oBuf.size();
+
+    while( itr != m_mapProps.cend() )
+    {
+        guint32 dwKey = htonl( itr->first );
+        if( pEnd - pLoc < ( gint32 )( sizeof( guint32 ) ) )
+        {
+            RESIZE_BUF( oBuf.size() + QPAGE, ret );
+            if( ERROR( ret ) )
+                break;
+        }
+        memcpy( pLoc, &dwKey, sizeof( guint32 ) );
+        pLoc += sizeof( guint32 );
+
+        const BufPtr& pValBuf = itr->second;
+        guint8 byType = pValBuf->GetExDataType();
+        if( byType == typeNone )
+        {
+            guint32 dwType = pValBuf->GetDataType();
+            if( dwType == DataTypeObjPtr )
+                byType = typeObj;
+            else if( dwType == DataTypeMsgPtr )
+                byType = typeDMsg;
+            else
+                byType = typeByteArr;
+        }
+
+        if( pEnd - pLoc < sizeof( byType ) )
+        {
+            RESIZE_BUF( oBuf.size() + QPAGE, ret );
+            if( ERROR( ret ) )
+                break;
+        }
+        *pLoc++ = byType;
+
+        switch( ( EnumTypeId )byType )
+        {
+        case typeByte: 
+            {
+                if( pEnd - pLoc < sizeof( guint8 ) )
+                {
+                    RESIZE_BUF( oBuf.size() + QPAGE, ret );
+                    if( ERROR( ret ) )
+                        break;
+                }
+                *pLoc++ = pValBuf->ptr()[ 0 ];
+                break;
+            }
+        case typeUInt16:
+            {
+                guint16 val =
+                    htons( ( guint16& )*pValBuf );
+                if( pEnd - pLoc < sizeof( guint16 ) )
+                {
+                    RESIZE_BUF( oBuf.size() + QPAGE, ret );
+                    if( ERROR( ret ) )
+                        break;
+                }
+                memcpy( pLoc, &val, sizeof( guint16 ) );
+                pLoc += sizeof( guint16 );
+                break;
+            }
+        case typeUInt32:
+        case typeFloat:
+            {
+                guint32 val =
+                    htonl( ( guint32& )*pValBuf );
+                if( pEnd - pLoc < sizeof( guint32 ) )
+                {
+                    RESIZE_BUF( oBuf.size() + QPAGE, ret );
+                    if( ERROR( ret ) )
+                        break;
+                }
+                memcpy( pLoc, &val, sizeof( guint32 ) );
+                pLoc += sizeof( guint32 );
+                break;
+            }
+        case typeUInt64:
+        case typeDouble:
+            {
+                guint64 val =
+                    htonll( ( guint64& )*pValBuf );
+
+                if( pEnd - pLoc < sizeof( guint64 ) )
+                {
+                    RESIZE_BUF( oBuf.size() + QPAGE, ret );
+                    if( ERROR( ret ) )
+                        break;
+                }
+                memcpy( pLoc, &val, sizeof( guint64 ) );
+                pLoc += sizeof( guint64 );
+                break;
+            }
+        case typeString:
+            {
+                guint32 len = 1 + strnlen(
+                    ( char* )pValBuf->ptr(), pValBuf->size() );
+                if( pEnd - pLoc < sizeof( guint32 ) + len )
+                {
+                    guint32 dwIncSize = std::max(
+                        QPAGE, len + QPAGE );
+
+                    RESIZE_BUF( oBuf.size() + dwIncSize, ret );
+                    if( ERROR( ret ) )
+                        break;
+                }
+
+                len = htonl( len );
+                memcpy( pLoc, &len, sizeof( guint32 ) );
+                len = ntohl( len );
+
+                if( len == 0 )
+                    break;
+
+                pLoc += sizeof( guint32 );
+                memcpy( pLoc, pValBuf->ptr(), len - 1 );
+                pLoc += len;
+                pLoc[ -1 ] = 0;
+                break;
+            }
+        case typeDMsg:
+            {
+                BufPtr pBuf( true );
+                DMsgPtr& pMsg = ( DMsgPtr& )*pValBuf->ptr();
+                ret = pMsg.Serialize( *pBuf );
+                if( ERROR( ret ) )
+                    break;
+                guint32 len = pBuf->size();
+                if( pEnd - pLoc < len )
+                {
+                    guint32 dwIncSize = std::max(
+                        QPAGE, len + QPAGE );
+
+                    RESIZE_BUF( oBuf.size() + dwIncSize, ret );
+                    if( ERROR( ret ) )
+                        break;
+                }
+                memcpy( pLoc, pBuf->ptr(), len );
+                pLoc += len;
+                break;
+            }
+        case typeObj:
+            {
+                BufPtr pBuf( true );
+                ObjPtr& pObj = ( ObjPtr& )*pValBuf->ptr();
+                ret = pObj->Serialize( *pBuf );
+                if( ERROR( ret ) )
+                    break;
+                guint32 len = pBuf->size();
+                if( pEnd - pLoc < len )
+                {
+                    guint32 dwIncSize = std::max(
+                        QPAGE, len + QPAGE );
+
+                    RESIZE_BUF( oBuf.size() + dwIncSize, ret );
+                    if( ERROR( ret ) )
+                        break;
+                }
+                memcpy( pLoc, pBuf->ptr(), len );
+                pLoc += len;
+                break;
+            }
+        case typeByteArr:
+            {
+                guint32 len = pValBuf->size() + sizeof( guint32 );
+                if( pEnd - pLoc < len )
+                {
+                    guint32 dwIncSize = std::max(
+                        QPAGE, len + QPAGE );
+
+                    RESIZE_BUF( oBuf.size() + dwIncSize, ret );
+                    if( ERROR( ret ) )
+                        break;
+                }
+                len = htonl( len );
+                memcpy( pLoc, &len, sizeof( guint32 ) );
+                len = ntohl( len );
+
+                if( len == 0 )
+                    break;
+
+                pLoc += sizeof( guint32 );
+                memcpy( pLoc, pValBuf->ptr(), len );
+                pLoc += len;
+                break;
+            }
+        default:
+            {
+                ret = -EINVAL;
+                break;
+            }
+        }
+
+        ++itr;
+    }
+
+    if( SUCCEEDED( ret ) )
+    {
+        SERI_HEADER* pHeader =
+            ( SERI_HEADER* )oBuf.ptr();
+
+        pHeader->dwSize = htonl(
+            pLoc - oBuf.ptr() -
+            sizeof( SERI_HEADER_BASE ) );
+
+        RESIZE_BUF( pLoc - oBuf.ptr(), ret );
+    }
+
+    return ret;
+}
+
+gint32 CConfigDb::DeserializeNew(
+    const char* pBuf, guint32 dwSize )
+{
+    if( pBuf == nullptr || dwSize == 0 )
+        return -EINVAL;
+
+    const SERI_HEADER* pHeader =
+        reinterpret_cast< const SERI_HEADER* >( pBuf );
+
+    SERI_HEADER oHeader;
+    memcpy( &oHeader, pHeader, sizeof( oHeader ) );
+    oHeader.ntoh();
+
+    gint32 ret = 0;
+
+    do{
+        if( oHeader.dwClsid != clsid( CConfigDb ) ||
+            oHeader.dwCount > CFGDB_MAX_ITEM ||
+            oHeader.dwSize + sizeof( SERI_HEADER_BASE ) > dwSize ||
+            oHeader.dwSize > CFGDB_MAX_SIZE )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        if( oHeader.bVersion != 2 )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+
+        const char* pLoc = pBuf + sizeof( SERI_HEADER );
+        const char* pEnd = pBuf + dwSize;
+
+        for( guint32 i = 0; i < oHeader.dwCount; i++ )
+        {
+            gint32 iKey = ntohl( *( guint32* )pLoc );
+            guint32 dwValSize = ntohl( ( ( guint32* )pLoc )[ 1 ] );
+            pLoc += sizeof( guint32 );
+            guint8 byType = pLoc[ 0 ];
+            pLoc += 1;
+
+            BufPtr pValBuf( true );
+            switch( ( EnumTypeId )byType )
+            {
+            case typeByte: 
+                {
+                    guint8 val = pLoc[ 0 ];
+                    *pValBuf = val;
+                    pLoc++;
+                    break;
+                }
+            case typeUInt16:
+                {
+                    guint16 val = 0;
+                    memcpy( &val, pLoc, sizeof( guint16 ) );
+                    *pValBuf = ntohs( val );
+                    pLoc += sizeof( guint16 );
+                    break;
+                }
+            case typeUInt32:
+            case typeFloat:
+                {
+                    guint32 val = 0;
+                    memcpy( &val, pLoc, sizeof( guint32 ) );
+                    *pValBuf = ntohl( val );
+                    pLoc += sizeof( guint32 );
+                    break;
+                }
+            case typeUInt64:
+            case typeDouble:
+                {
+                    guint64 val = 0;
+                    memcpy( &val, pLoc, sizeof( guint64 ) );
+                    *pValBuf = ntohll( val );
+                    pLoc += sizeof( guint64 );
+                    break;
+                }
+            case typeString:
+                {
+                    guint32 len = 0;
+                    memcpy( &len, pLoc, sizeof( guint32 ) );
+                    len = ntohl( len );
+                    pLoc += sizeof( guint32 );
+                    if( pLoc + len > pEnd )
+                    {
+                        ret = -E2BIG;
+                        break;
+                    }
+                    ret = pValBuf->Resize( len );
+                    if( ERROR( ret ) )
+                        break;
+                    strncpy( pValBuf->ptr(), pLoc, len );
+                    pValBuf->ptr()[ len - 1 ] = 0;
+                    pValBuf->SetDataType( DataTypeMem );
+                    pValBuf->SetExDataType( typeString );
+                    pLoc += len;
+                    break;
+                }
+            case typeDMsg:
+                {
+                    guint32 len = 0;
+                    memcpy( &len, pLoc, sizeof( guint32 ) );
+                    len = ntohl( len );
+                    if( pLoc + len > pEnd )
+                    {
+                        ret = -E2BIG;
+                        break;
+                    }
+                    DMsgPtr pMsg;
+                    ret = pMsg.Deserialize( pLoc, len );
+                    if( ERROR( ret ) )
+                        break;
+
+                    *pValBuf = pMsg;
+                    pLoc += len + sizeof( guint32 );
+                    break;
+                }
+            case typeObj:
+                {
+                    SERI_HEADER_BASE* pHdr =
+                        ( SERI_HEADER_BASE* )pLoc;
+                    SERI_HEADER_BASE oHdr;
+                    memcpy( &oHdr, pHdr, sizeof( oHdr ) );
+                    oHdr.ntoh();
+                    guint32 len = oHdr.dwSize +
+                        sizeof( SERI_HEADER_BASE );
+                    
+                    if( pLoc + len > pEnd )
+                    {
+                        ret = -E2BIG;
+                        break;
+                    }
+
+                    ObjPtr pObj;
+                    ret = pObj.NewObj(
+                        ( EnumClsid )oHdr.dwClsid );
+                    if( ret )
+                        break;
+
+                    ret = pObj->Deserialize( pLoc, len );
+                    if( ERROR( ret ) )
+                        break;
+
+                    *pValBuf = pObj;
+                    pLoc += len;
+                    break;
+                }
+            case typeByteArr:
+                {
+                    guint32 len = 0;
+                    memcpy( &len, pLoc, sizeof( guint32 ) );
+                    len = ntohl( len );
+                    pLoc += sizeof( guint32 );
+                    if( pLoc + len > pEnd )
+                    {
+                        ret = -E2BIG;
+                        break;
+                    }
+                    ret = pValBuf->Resize( len );
+                    if( ERROR( ret ) )
+                        break;
+
+                    memcpy( pValBuf->ptr(), pLoc, len );
+                    pValBuf->SetDataType( DataTypeMem );
+                    pValBuf->SetExDataType( typeByteArr );
+                    pLoc += len;
+                    break;
+                }
+            default:
+                ret = -EINVAL;
+                break;
+            }
+
+            if( ERROR( ret ) )
+                break;
+
+            SetProperty( iKey, pValBuf );
+
+            if( pLoc > pEnd )
+            {
+                // don't know how to handle
+                ret = -E2BIG;
+                break;
+            }
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
 
 gint32 CConfigDb::Deserialize(
     const CBuffer& oBuf )

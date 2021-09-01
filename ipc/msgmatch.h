@@ -758,8 +758,9 @@ class CMessageMatch : public IMessageMatch
         // clsid( CMessageMatch )
         oHeader.dwClsid = GetClsid();
 
-        oHeader.dwSize =
-            pCfgBuf->size();
+        oHeader.dwSize = pCfgBuf->size() +
+            sizeof( SERI_HEADER ) -
+            sizeof( SERI_HEADER_BASE );
 
         oHeader.hton();
         ret = oBuf.Append(
