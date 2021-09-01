@@ -1531,6 +1531,7 @@ gint32 CDeclareClassIds::Output()
             << strName
             << " ) = "
             << dwMsgId << ",";
+        NEW_LINE;
     }
 
     BLOCK_CLOSE;
