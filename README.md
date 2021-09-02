@@ -59,6 +59,10 @@ This project depends on the following 3rd-party packags to build:
 5. Logging service
 
 ---
+[`Thu Sep 02 2021 02:54:14 PM Beiging`]   
+1. Canceled the CBuffer-to-VARIANT change, to keep code clean.
+2. Start the JavaScript support right away.
+
 [`Tue Aug 31 2021 13:32:00 AM Beijing`]   
 1. Python support is now officially released. **Congratulations!**
 2. Before starting the JavaScript support, I will do some optimization work to improve the performance at least 20%, which includes at least,
