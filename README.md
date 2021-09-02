@@ -61,7 +61,7 @@ This project depends on the following 3rd-party packags to build:
 ---
 [`Thu Sep 02 2021 02:54:14 PM Beiging`]   
 1. Canceled the CBuffer-to-VARIANT change, to keep code clean.
-2. Start Json support right away. Json support is to use the text in Json format as the input/output parameters. 
+2. Start Json support right away. Json support is to pass the text in Json format as the input/output parameters to the `rpc-frmwrk`. 
 
 [`Tue Aug 31 2021 13:32:00 AM Beijing`]   
 1. Python support is now officially released. **Congratulations!**
