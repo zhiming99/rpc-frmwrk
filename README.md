@@ -52,7 +52,7 @@ This project depends on the following 3rd-party packags to build:
 8. `python 3.5+ is required for python support.`
 
 #### Todo:
-1. JavaScript support
+1. Json support and FUSE support
 2. Examples and Tutorials
 3. Performance optimization
 4. A tree-like hierarchical persistant registry.
@@ -61,7 +61,7 @@ This project depends on the following 3rd-party packags to build:
 ---
 [`Thu Sep 02 2021 02:54:14 PM Beiging`]   
 1. Canceled the CBuffer-to-VARIANT change, to keep code clean.
-2. Start the JavaScript support right away.
+2. Start Json support right away. Json support is to use the text in Json format as the input/output parameters. 
 
 [`Tue Aug 31 2021 13:32:00 AM Beijing`]   
 1. Python support is now officially released. **Congratulations!**
