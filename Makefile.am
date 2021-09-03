@@ -13,6 +13,6 @@ if SIP4
 SUBDIRS += python                                                       
 endif                          
 
-EXTRA_DIST= README.md cfgdbg
+EXTRA_DIST= README.md cfgsel
 
 dist_pkgconfig_DATA=rpcf.pc

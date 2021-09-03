@@ -1,5 +1,5 @@
 pysources = rpcfg.py
-EXTRA_DIST= $(pysources) README.md Dockerfile
+EXTRA_DIST= $(pysources) README.md Dockerfile runtest.sh.in
 install-exec-local:
 	-if [ ! -e $(bindir)/rpcf ]; then mkdir -p $(bindir)/rpcf;fi
 	-cp rpcfg.py $(bindir)/rpcf

@@ -449,7 +449,6 @@ gint32 IIEchoThings_SImpl::OnHelloWorld(
     CParamList oOptions_;
     oOptions_[ propSeriProto ] = 
         ( guint32 )seriRidl;
-    
     //Serialize the input parameters
     BufPtr pBuf_( true );
     

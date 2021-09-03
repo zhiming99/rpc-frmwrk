@@ -59,8 +59,17 @@ LINKER_OPTION:=$(COMMON_LINK) -ldl -lstdc++ -lpthread -Wl,-rpath=$(DIST_LIB_DIR)
 
 TARGET_SVR:=StressTestsvr
 TARGET_CLI:=StressTestcli
+TARGET_SO:=StressTestlib.so
 
+MKLIB:=
+
+ifeq ($(MKLIB),)
 TARGET:=$(OUTPUT_DIR)/$(TARGET_SVR) $(OUTPUT_DIR)/$(TARGET_CLI)
+else ifeq ($(MKLIB),1)
+TARGET:=$(OUTPUT_DIR)/$(TARGET_SO)
+CPP_FLAGS+=-fPIC
+endif
+
 OBJS_SVR:= mainsvr.o $(OBJ_DIR)/StressSvcsvr.o 
 OBJS_CLI:= maincli.o $(OBJ_DIR)/StressSvccli.o 
 
@@ -99,6 +108,16 @@ $(OUTPUT_DIR)/$(TARGET_CLI) : $(OBJ_DIR)/$(OBJS_CLI) $(OBJS2)
 	$(CC) -o $@ $(OBJ_DIR)/$(OBJS_CLI) $(OBJS2) $(LINKER_OPTION)
 	@python3 ./synccfg.py
 	@cp *.json $(OUTPUT_DIR)
+
+$(OUTPUT_DIR)/$(TARGET_SO) : $(OBJ_DIR)/$(OBJS_CLI) $(OBJ_DIR)/$(OBJS_SVR) $(OBJS2)
+	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
+	$(CC) -o $@ $(OBJ_DIR)/$(OBJS_CLI) $(OBJS2) $(LINKER_OPTION) -shared
+	@python3 ./synccfg.py
+	@cp *.json $(OUTPUT_DIR)
+
+$(OUTPUT_DIR)/$(TARGET_LIB) : $(OBJ_DIR)/$(OBJS_SVR) $(OBJS2)
+	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
+	$(CC) -o $@ $(OBJ_DIR)/$(OBJS_SVR) $(OBJS2) $(LINKER_OPTION)
 
 $(OBJ_DIR)/%.o : %.cpp
 	@echo Building file: $@
