@@ -37,7 +37,7 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 6. Please refer to this [article](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-get-Helloworld-run%3F) for more information.
 
 #### Development And Examples:
-1. `rpc-frmwrk` has an `interface description language`, as [`ridl`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md) to help you to generate the skelton code rapidly. It is recommended to take some time to learn this simple language, and it may save you a lot of time.
+1. `rpc-frmwrk` has an `interface description language`, [`ridl`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md) to help you to generate the skelton code rapidly. It is recommended to take some time to learn this simple language, and it may save you a lot of time.
 2. [`Here`](https://github.com/zhiming99/rpc-frmwrk/tree/master/test/stress) is an example of `ridlc` generated project.
 
 #### Dependency:  
