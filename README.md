@@ -37,7 +37,7 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 6. Please refer to this [article](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-get-Helloworld-run%3F) for more information.
 
 #### Development And Examples:
-1. `rpc-frmwrk` has an `interface description language`, as [`ridl`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md) to help you to generate the skelton code rapidly. It is recommended to take some time to learn this simple language, and it may save you a lot of time.
+1. `rpc-frmwrk` has an `interface description language`, [`ridl`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md) to help you to generate the skelton code rapidly. It is recommended to take some time to learn this simple language, and it may save you a lot of time.
 2. [`Here`](https://github.com/zhiming99/rpc-frmwrk/tree/master/test/stress) is an example of `ridlc` generated project.
 
 #### Dependency:  
@@ -52,13 +52,17 @@ This project depends on the following 3rd-party packags to build:
 8. `python 3.5+ is required for python support.`
 
 #### Todo:
-1. JavaScript support
+1. Json support and FUSE support
 2. Examples and Tutorials
 3. Performance optimization
 4. A tree-like hierarchical persistant registry.
 5. Logging service
 
 ---
+[`Thu Sep 02 2021 02:54:14 PM Beiging`]   
+1. Canceled the CBuffer-to-VARIANT change, to keep code clean.
+2. Start Json support right away. Json support is to pass the text in Json format as the input/output parameters to the `rpc-frmwrk`. 
+
 [`Tue Aug 31 2021 13:32:00 AM Beijing`]   
 1. Python support is now officially released. **Congratulations!**
 2. Before starting the JavaScript support, I will do some optimization work to improve the performance at least 20%, which includes at least,
