@@ -381,7 +381,7 @@ gint32 CConfigDb::Deserialize(
     return DeserializeNew( oBuf, dwSize );
 }
 
-#define QPAGE ( PAGE_SIZE / 2 )
+#define QPAGE ( ( guint32 )( PAGE_SIZE >> 1 ) )
 gint32 CConfigDb::SerializeNew(
     CBuffer& oBuf ) const
 {

@@ -18,7 +18,10 @@ makefile.dir = "./sip4build"
 makefile.extra_libs = ["combase", "ipc" ]
 makefile.extra_defines = ["DEBUG","_USE_LIBEV" ]
 makefile.extra_lib_dirs = ["../../combase/.libs", "../../ipc/.libs" ]
-makefile.extra_include_dirs = [ "../../include","../../ipc", "../../test/stmtest", "/usr/include/dbus-1.0", "/usr/lib/x86_64-linux-gnu/dbus-1.0/include", "/usr/include/jsoncpp" ]
+
+dbus_path = os.popen('pkg-config --cflags dbus-1 | sed "s/-I//g"').read().split()
+jsoncpp_path = os.popen('pkg-config --cflags jsoncpp | sed "s/-I//g"').read().split()
+makefile.extra_include_dirs = [ "../../include","../../ipc", "../../test/stmtest" ] + dbus_path + jsoncpp_path
 
 if libdir is not None :
     rpaths = "-Wl,-rpath=" + libdir + ",-rpath=" + libdir + "/rpcf"

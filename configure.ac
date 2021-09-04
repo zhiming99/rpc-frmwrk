@@ -135,9 +135,11 @@ AC_MSG_NOTICE([the cxxflags string is ${CXXFLAGS}])
 case $host in
     arm*)
         CXXFLAGS+=' -DARM'
+        COMMON_LINK+=' -latomic'
     ;;
     aarch64)
         CXXFLAGS+=' -DARM'
+        COMMON_LINK+=' -latomic'
     ;;
 esac
 
