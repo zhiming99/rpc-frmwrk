@@ -13,15 +13,28 @@ if len( sys.argv ) > 1 :
 
 #os.system( "rm ./sip4build/*" )
 os.system( " ".join([config.sip_bin, "-c", "./sip4build", "-b", build_file, "rpcf.sip" ] ) )
+
+macros = config.build_macros()
+macros[ 'CC' ] = os.environ['CC']
+macros[ 'CXX' ] = os.environ['CXX']                              
+macros[ 'LINK' ] = os.environ['CXX']                             
+macros[ 'LINK_SHLIB' ] = macros[ 'LINK' ]                        
+sysroot = os.environ['SYSROOT']                                  
+
 makefile = sipconfig.SIPModuleMakefile(config, build_file, export_all=1)
 makefile.dir = "./sip4build"
 makefile.extra_libs = ["combase", "ipc" ]
 makefile.extra_defines = ["DEBUG","_USE_LIBEV" ]
 makefile.extra_lib_dirs = ["../../combase/.libs", "../../ipc/.libs" ]
 
+python_inc = 'pkg-config --cflags '
+python_inc += os.popen('pkg-config --list-all | grep "python-3" | sort -r').read().split()[ 0 ]
+python_inc += '| sed \'s;-I;;g\''
+python3_path = os.popen( python_inc ).read().split()
+
 dbus_path = os.popen('pkg-config --cflags dbus-1 | sed "s/-I//g"').read().split()
 jsoncpp_path = os.popen('pkg-config --cflags jsoncpp | sed "s/-I//g"').read().split()
-makefile.extra_include_dirs = [ "../../include","../../ipc", "../../test/stmtest" ] + dbus_path + jsoncpp_path
+makefile.extra_include_dirs = [ "../../include","../../ipc", "../../test/stmtest", sysroot + '/usr/include' ] + dbus_path + jsoncpp_path + python3_path
 
 if libdir is not None :
     rpaths = "-Wl,-rpath=" + libdir + ",-rpath=" + libdir + "/rpcf"
