@@ -27,13 +27,20 @@ makefile.extra_libs = ["combase", "ipc" ]
 makefile.extra_defines = ["DEBUG","_USE_LIBEV" ]
 makefile.extra_lib_dirs = ["../../combase/.libs", "../../ipc/.libs" ]
 
-python_inc = 'pkg-config --cflags '
-python_inc += os.popen('pkg-config --list-all | grep "python-3" | sort -r').read().split()[ 0 ]
+try:
+    pkgconfig=os.environ[ 'PKG_CONFIG' ]
+    if pkgconfig is None or len( pkgconfig ) == 0:
+        pkgconfig = 'pkg-config'
+except:
+    pkgconfig = 'pkg-confg'
+
+python_inc = pkgconfig + ' --cflags '
+python_inc += os.popen( pkgconfig + ' --list-all | grep "python-3" | sort -r').read().split()[ 0 ] 
 python_inc += '| sed \'s;-I;;g\''
 python3_path = os.popen( python_inc ).read().split()
 
-dbus_path = os.popen('pkg-config --cflags dbus-1 | sed "s/-I//g"').read().split()
-jsoncpp_path = os.popen('pkg-config --cflags jsoncpp | sed "s/-I//g"').read().split()
+dbus_path = os.popen( pkgconfig + ' --cflags dbus-1 | sed "s/-I//g"').read().split()
+jsoncpp_path = os.popen( pkgconfig + ' --cflags jsoncpp | sed "s/-I//g"').read().split()
 makefile.extra_include_dirs = [ "../../include","../../ipc", "../../test/stmtest", sysroot + '/usr/include' ] + dbus_path + jsoncpp_path + python3_path
 
 if libdir is not None :

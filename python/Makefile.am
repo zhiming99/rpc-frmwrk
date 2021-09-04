@@ -22,9 +22,9 @@ all:
         export CC=${CC}; \
 		export CXX=${CXX}; \
 		export PKG_CONFIG=${PKG_CONFIG};\
-		export PKG_CONFIG_LIBDIR=${PKG_CONFIG_LIBDIR};\
-		export PKG_CONFIG_PATH=${PKG_CONFIG_PATH};\
-		export PKG_CONFIG_SYSROOT_DIR=${PKG_CONFIG_SYSROOT_DIR};\
+		if [ "x${PKG_CONFIG_LIBDIR}" != "x" ];then export PKG_CONFIG_LIBDIR=${PKG_CONFIG_LIBDIR};fi;\
+		if [ "x${PKG_CONFIG_PATH}" != "x" ]; then export PKG_CONFIG_PATH=${PKG_CONFIG_PATH};fi;\
+		if [ "x${PKG_CONFIG_SYSROOT_DIR}" != "x" ];then export PKG_CONFIG_SYSROOT_DIR=${PKG_CONFIG_SYSROOT_DIR};fi;\
 		export SYSROOT=${with_sysroot};\
         python3 build-4.9.py $(libdir); \
         if [ -f ./rpcf/$(PYTHON_EXT) ]; then rm ./rpcf/$(PYTHON_EXT); fi;\
