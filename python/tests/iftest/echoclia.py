@@ -183,7 +183,13 @@ def test_main() :
 
             #Echo whatever a block of binary data
             print( "EchoUnknown" )
-            f = open( "/usr/bin/sh", "rb" )
+
+            try:
+                f = open( "/bin/sh", "rb" )
+            except:
+                ret = -errno.ENOENT
+                break
+
             f.seek(1024);
             o = f.read( 16 );
             print( o );

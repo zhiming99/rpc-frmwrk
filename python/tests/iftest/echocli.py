@@ -115,8 +115,13 @@ def test_main() :
                     break;
 
                 #Echo whatever a block of binary data
-                f = open( "/usr/bin/sh", "rb" )
-                f.seek(1024);
+                try:
+                    f = open( "/bin/sh", "rb" )
+                except:
+                    ret = -errno.ENOENT
+                    break
+
+                f.seek(128);
                 o = f.read( 16 );
                 print( o );
                 f.close();

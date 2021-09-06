@@ -219,7 +219,9 @@ def StreamTests( oProxy )  :
 
         ret = oProxy.ReadStream( hStream )
         if ret[ 0 ] < 0 :
-            OutputMsg( "WriteStream failed" )
+            ret = ret[ 0 ]
+            OutputMsg(
+                "ReadStream failed %d" % ret )
             break
 
         content = ret[ 1 ]
