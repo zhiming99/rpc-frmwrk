@@ -31,6 +31,9 @@ try:
     pkgconfig=os.environ[ 'PKG_CONFIG' ]
     if pkgconfig is None or len( pkgconfig ) == 0:
         pkgconfig = 'pkg-config'
+    armbuild = os.environ[ 'ARMBUILD' ]
+    if armbuild == "1" :
+        makefile.extra_libs.append( "atomic" )
 except:
     pkgconfig = 'pkg-confg'
 

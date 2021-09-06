@@ -13,7 +13,8 @@ endif
 PYTHON_EXT=`python3 -c "import importlib.machinery;print('rpcbase',importlib.machinery.EXTENSION_SUFFIXES[0],sep='')"`
 
 all:
-	@if [ "x$(SIPVER)" == "x5" ]; then \
+	@if echo "${COMMON_LINK}" | grep "latomic"; then export ARMBUILD="1"; else export ARMBUILD="0";fi;\
+	if [ "x$(SIPVER)" == "x5" ]; then \
         bash gentoml.sh $(libdir);\
 		sip-build --verbose --build-dir ./sipbuild; \
         if [ -f ./rpcf/$(PYTHON_EXT) ]; then rm ./rpcf/$(PYTHON_EXT); fi;\

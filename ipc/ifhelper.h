@@ -219,7 +219,7 @@ template< typename First,
 CBuffer* CastTo( BufPtr& pCBuf )
 {
     BufPtr& pBuf = const_cast<BufPtr&>( pCBuf );
-    if( pBuf.IsEmpty() || pBuf->empty() )
+    if( pBuf.IsEmpty() )
         return nullptr;
 
     return ( CBuffer* )pBuf;
