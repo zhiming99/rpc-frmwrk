@@ -15,9 +15,10 @@
  *
  *      Copyright:  2021 Ming Zhi( woodhead99@gmail.com )
  *
- *        License:  Licensed under GPL-3.0. You may not use this file except in
- *                  compliance with the License. You may find a copy of the
- *                  License at 'http://www.gnu.org/licenses/gpl-3.0.html'
+ *        License:  This program is free software; you can redistribute it
+ *                  and/or modify it under the terms of the GNU General Public
+ *                  License version 3.0 as published by the Free Software
+ *                  Foundation at 'http://www.gnu.org/licenses/gpl-3.0.html'
  *
  * =====================================================================================
  */
@@ -2860,17 +2861,7 @@ gint32 CImplPyMainFunc::OutputCli(
 {
     gint32 ret = 0;
     do{
-        Wa( "from rpcf.rpcbase import *" );
-        Wa( "from rpcf.proxy import *" );
-        Wa( "from rpcf.proxy import OutputMsg" );
-        CCOUT << "from " << g_strAppName << "structs" << " import *";
-        NEW_LINE;
-        Wa( "import errno" );
-
         stdstr strName = pSvc->GetName();
-        CCOUT << "from " << strName << "cli"
-            << " import " << "C" << strName
-            << "Proxy";
         NEW_LINES( 2 );
         CCOUT << "def maincli() :";
         INDENT_UPL;
@@ -2995,16 +2986,8 @@ gint32 CImplPyMainFunc::OutputSvr(
 {
     gint32 ret = 0;
     do{
-        Wa( "from rpcf.rpcbase import *" );
-        Wa( "from rpcf.proxy import *" );
-        Wa( "import errno" );
-        Wa( "import time" );
-        CCOUT << "from " << g_strAppName << "structs" << " import *";
-        NEW_LINE;
         stdstr strName = pSvc->GetName();
-        CCOUT << "from " << strName << "svr"
-            << " import " << "C" << strName
-            << "Server";
+        CCOUT << "import time";
         NEW_LINES( 2 );
         CCOUT << "def mainsvr() :";
         INDENT_UPL;
@@ -3057,11 +3040,31 @@ gint32 CImplPyMainFunc::Output()
 
         CServiceDecl* pSvc = vecSvcs.front();
         m_pWriter->SelectMainCli();
+        OUTPUT_BANNER();
+        for( auto& elem : vecSvcs )
+        {
+            CServiceDecl* pNode = elem;
+            stdstr strName = pNode->GetName();
+            CCOUT << "from " << strName << "cli"
+                << " import " << "C" << strName
+                << "Proxy";
+            NEW_LINE;
+        }
         ret = OutputCli( pSvc );
         if( ERROR( ret ) )
             break;
 
         m_pWriter->SelectMainSvr();
+        OUTPUT_BANNER();
+        for( auto& elem : vecSvcs )
+        {
+            CServiceDecl* pNode = elem;
+            stdstr strName = pNode->GetName();
+            CCOUT << "from " << strName << "svr"
+                << " import " << "C" << strName
+                << "Server";
+            NEW_LINE;
+        }
         ret = OutputSvr( pSvc );
         if( ERROR( ret ) )
             break;

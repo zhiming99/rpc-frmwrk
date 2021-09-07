@@ -4,7 +4,7 @@ extlib ='rpcbase' + importlib.machinery.EXTENSION_SUFFIXES[0]
 print( extlib )
 kwargs = {
       'name':'rpcf',
-      'version':'0.1.0',
+      'version':'@VERSION@',
       'packages': find_packages(),
 
        #ensure so-files are copied to the installation:

@@ -1,4 +1,28 @@
-// Define the SIP wrapper to the (theoretical) fib library.
+/*
+ * =====================================================================================
+ *
+ *       Filename:  rpcf.sip
+ *
+ *    Description:  a sip file as the wrapper of important C++ helper classes
+ *                  for Python
+ *
+ *        Version:  1.0
+ *        Created:  11/04/2020 01:10:51 AM
+ *       Revision:  none
+ *       Compiler:  gcc
+ *
+ *         Author:  Ming Zhi( woodhead99@gmail.com )
+ *   Organization:
+ *
+ *      Copyright:  2021 Ming Zhi( woodhead99@gmail.com )
+ *
+ *        License:  This program is free software; you can redistribute it
+ *                  and/or modify it under the terms of the GNU General Public
+ *                  License version 3.0 as published by the Free Software
+ *                  Foundation at 'http://www.gnu.org/licenses/gpl-3.0.html'
+ *
+ * =====================================================================================
+ */ 
 
 %Module(name=rpcbase, language="C++")
 
