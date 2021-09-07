@@ -36,9 +36,9 @@ all:
     fi
 
 install:
-	@export pkg="dist/`ls -1t dist | head -n 1`";\
+	@python3 setup.py bdist_wheel;\
+	export pkg="dist/`ls -1t dist | head -n 1`";\
 	if [ "x${DESTDIR}" == "x" ]; then \
-		python3 setup.py bdist_wheel;\
 		pip install ${pkg};\
 	else\
 		cp ${pkg} ${DESTDIR}; \
