@@ -1,10 +1,11 @@
 from setuptools import setup, find_packages
 import importlib.machinery
-extlib ='rpcbase' + importlib.machinery.EXTENSION_SUFFIXES[0]
+version='@VERSION@'
+extlib ='rpcbase' + importlib.machinery.EXTENSION_SUFFIXES[0] + "." + version
 print( extlib )
 kwargs = {
       'name':'rpcf',
-      'version':'@VERSION@',
+      'version':version,
       'packages': find_packages(),
 
        #ensure so-files are copied to the installation:

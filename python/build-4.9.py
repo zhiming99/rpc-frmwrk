@@ -3,6 +3,7 @@ import sys
 
 from pathlib import Path
 Path("./sip4build").mkdir(parents=True, exist_ok=True)
+curPath=pathlib.Path(__file__).parent.resolve()
 
 import sipconfig
 build_file = "rpcf.sbf"
@@ -25,7 +26,9 @@ makefile = sipconfig.SIPModuleMakefile(config, build_file, export_all=1)
 makefile.dir = "./sip4build"
 makefile.extra_libs = ["combase", "ipc" ]
 makefile.extra_defines = ["DEBUG","_USE_LIBEV" ]
-makefile.extra_lib_dirs = ["../../combase/.libs", "../../ipc/.libs" ]
+makefile.extra_lib_dirs = [ \
+    curPath + "../../combase/.libs", \
+    curPath + "../../ipc/.libs" ]
 
 try:
     pkgconfig=os.environ[ 'PKG_CONFIG' ]
@@ -44,7 +47,12 @@ python3_path = os.popen( python_inc ).read().split()
 
 dbus_path = os.popen( pkgconfig + ' --cflags dbus-1 | sed "s/-I//g"').read().split()
 jsoncpp_path = os.popen( pkgconfig + ' --cflags jsoncpp | sed "s/-I//g"').read().split()
-makefile.extra_include_dirs = [ "../../include","../../ipc", "../../test/stmtest", sysroot + '/usr/include' ] + dbus_path + jsoncpp_path + python3_path
+makefile.extra_include_dirs = [ \
+    curPath + "../../include", \
+    curPath + "../../ipc", \
+    curPath + "../../test/stmtest", \
+    sysroot + '/usr/include' ] + \
+    dbus_path + jsoncpp_path + python3_path
 
 if libdir is not None :
     rpaths = "-Wl,-rpath=" + libdir + ",-rpath=" + libdir + "/rpcf"

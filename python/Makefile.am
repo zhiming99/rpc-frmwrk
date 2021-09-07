@@ -10,15 +10,17 @@ if SIPBUILD
 SIPVER=5
 endif
 
-PYTHON_EXT=`python3 -c "import importlib.machinery;print('rpcbase',importlib.machinery.EXTENSION_SUFFIXES[0],sep='')"`
+PYTHON_EXT1=`python3 -c "import importlib.machinery;print('rpcbase',importlib.machinery.EXTENSION_SUFFIXES[0],sep='')"`
+PYTHON_EXT=$(PYTHON_EXT1).$(VERSION)
 
 all:
 	@if echo "${COMMON_LINK}" | grep "latomic"; then export ARMBUILD="1"; else export ARMBUILD="0";fi;\
 	if [ "x$(SIPVER)" == "x5" ]; then \
         bash gentoml.sh $(libdir);\
 		sip-build --verbose --build-dir ./sipbuild; \
-        if [ -f ./rpcf/$(PYTHON_EXT) ]; then rm ./rpcf/$(PYTHON_EXT); fi;\
-        ln -s `pwd`/sipbuild/rpcbase/$(PYTHON_EXT) rpcf/ ;\
+        rm rpcf/$(PYTHON_EXT1)*;\
+        cp `pwd`/sipbuild/rpcbase/$(PYTHON_EXT1) rpcf/$(PYTHON_EXT) ;\
+		cd rpcf; ln -s $(PYTHON_EXT) $(PYTHON_EXT1);\
     elif [ "x$(SIPVER)" == "x4" ]; then \
         export CC=${CC}; \
 		export CXX=${CXX}; \
@@ -28,9 +30,18 @@ all:
 		if [ "x${PKG_CONFIG_SYSROOT_DIR}" != "x" ];then export PKG_CONFIG_SYSROOT_DIR=${PKG_CONFIG_SYSROOT_DIR};fi;\
 		export SYSROOT=${with_sysroot};\
         python3 build-4.9.py $(libdir); \
-        if [ -f ./rpcf/$(PYTHON_EXT) ]; then rm ./rpcf/$(PYTHON_EXT); fi;\
-        ln -s `pwd`/sip4build/rpcbase.so rpcf/$(PYTHON_EXT); \
+        rm rpcf/$(PYTHON_EXT1)*;\
+        cp `pwd`/sip4build/rpcbase.so rpcf/$(PYTHON_EXT); \
+		cd rpcf; ln -s $(PYTHON_EXT) $(PYTHON_EXT1);\
     fi
 
 install:
-	python3 setup.py install
+	@export pkg="dist/`ls -1t dist | head -n 1`";\
+	if [ "x${DESTDIR}" == "x" ]; then \
+		python3 setup.py bdist_wheel;\
+		pip install ${pkg};\
+	else\
+		cp ${pkg} ${DESTDIR}; \
+	fi
+
+
