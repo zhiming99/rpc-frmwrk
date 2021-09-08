@@ -27,8 +27,8 @@ makefile.dir = "./sip4build"
 makefile.extra_libs = ["combase", "ipc" ]
 makefile.extra_defines = ["DEBUG","_USE_LIBEV" ]
 makefile.extra_lib_dirs = [ \
-    curPath + "../../combase/.libs", \
-    curPath + "../../ipc/.libs" ]
+    curPath + "../combase/.libs", \
+    curPath + "../ipc/.libs" ]
 
 try:
     pkgconfig=os.environ[ 'PKG_CONFIG' ]
@@ -48,10 +48,10 @@ python3_path = os.popen( python_inc ).read().split()
 dbus_path = os.popen( pkgconfig + ' --cflags dbus-1 | sed "s/-I//g"').read().split()
 jsoncpp_path = os.popen( pkgconfig + ' --cflags jsoncpp | sed "s/-I//g"').read().split()
 makefile.extra_include_dirs = [ \
-    curPath + "../../include", \
-    curPath + "../../ipc", \
-    curPath + "../../test/stmtest", \
-    sysroot + '/usr/include' ] + \
+    curPath + "../include", \
+    curPath + "../ipc", \
+    curPath + "../test/stmtest", \
+    sysroot + "/usr/include" ] + \
     dbus_path + jsoncpp_path + python3_path
 
 if libdir is not None :
