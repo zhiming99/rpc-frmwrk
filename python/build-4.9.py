@@ -3,7 +3,7 @@ import sys
 
 from pathlib import Path
 Path("./sip4build").mkdir(parents=True, exist_ok=True)
-curPath=pathlib.Path(__file__).parent.resolve()
+curPath=Path(__file__).parent.resolve()
 
 import sipconfig
 build_file = "rpcf.sbf"
