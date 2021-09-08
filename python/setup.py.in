@@ -1,7 +1,8 @@
 from setuptools import setup, find_packages
 import importlib.machinery
 version='@VERSION@'
-extlib ='rpcbase' + importlib.machinery.EXTENSION_SUFFIXES[0] + "." + version
+extlib_nover ='rpcbase' + importlib.machinery.EXTENSION_SUFFIXES[0]
+extlib = extlib_nover + "." + version
 print( extlib )
 kwargs = {
       'name':'rpcf',
@@ -9,7 +10,7 @@ kwargs = {
       'packages': find_packages(),
 
        #ensure so-files are copied to the installation:
-      'package_data' : { 'rpcf': ['proxy',extlib]},
+      'package_data' : { 'rpcf': ['proxy', extlib_nover]},
       'include_package_data' : True,
       'zip_safe' : False  
 }
