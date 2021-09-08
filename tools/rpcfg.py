@@ -5,6 +5,8 @@ import sys
 from shutil import move
 from copy import deepcopy
 from urllib.parse import urlparse
+from typing import Dict
+import errno
 
 gi.require_version("Gtk", "3.0")
 
@@ -1710,6 +1712,151 @@ class ConfigDlg(Gtk.Dialog):
 
         return 0
 
+    def Export_Conns( self, jsonVal ) -> int :
+        ret = 0
+        try:
+            elemList = []
+            json[ 'Connections' ] = elemList
+            for i in range( len( self.ifctx ) ) :
+                curVals = self.ifctx[ i ]
+                if curVals.IsEmpty() :
+                    continue
+                elem = dict()
+                strIp = curVals.ipAddr.get_text()
+                elem[ 'IpAddress' ] = strIp
+                strPort = curVals.port.get_text()
+                elem[ 'PortNumber' ] = curVals.port.get_text()
+                if curVals.compress.props.active :
+                    elem[ 'Compression' ] = 'true'
+                else:
+                    elem[ 'Compression' ] = 'false'
+
+                if curVals.sslCheck.props.active :
+                    elem[ 'EnableSSL' ] = 'true'
+                else:
+                    elem[ 'EnableSSL' ] = 'false'
+
+                if curVals.authCheck.props.active :
+                    elem[ 'HasAuth' ] = 'true'
+                else:
+                    elem[ 'HasAuth' ] = 'false'
+
+                if curVals.webSock.props.active :
+                    elem[ 'EnableWS' ] = 'true'
+                    elem[ 'DestURL' ] = curVals.urlEdit.get_text();
+                else:
+                    elem[ 'EnableWS' ] = 'false'
+
+                elemList.append( elem )
+                
+        except Exception as err :
+            text = "Failed to export node:" + str( err )
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            second_text = "@" + fname + ":" + str(exc_tb.tb_lineno)
+            self.DisplayError( text, second_text )
+            return -errno.EFAULT
+
+        return ret
+        
+    def Export_Security( self, jsonVal ) -> int :
+        ret = 0
+        try:
+            elemSecs = dict()
+            jsonVal[ 'Security' ] = elemSecs
+            sslFiles = dict()
+            elemSecs[ 'SSLCred' ] = sslFiles
+            sslFiles[ "KeyFile"] = self.keyEdit.get_text()
+            sslFiles[ "CertFile"] = self.certEdit.get_text()
+
+            authInfo = dict()
+            elemSecs[ 'AuthInfo' ] = authInfo
+
+            authInfo[ 'Realm' ] = self.realmEdit.get_text()
+            authInfo[ 'ServiceName' ] = self.svcEdit.get_text()
+            authInfo[ 'AuthMech' ] = 'krb5'
+            authInfo[ 'UserName' ] = self.userEdit.get_text()
+
+            tree_iter = self.signCombo.get_active_iter()
+            if tree_iter is not None:
+                model = self.signCombo.get_model()
+                row_id, name = model[tree_iter][:2]
+            if row_id == 1 :
+                authInfo[ 'SignMessage' ] = 'false'
+            else:
+                authInfo[ 'SignMessage' ] = 'true'
+
+            miscOpts = dict()
+            elemSecs[ 'misc' ] = miscOpts
+            try:
+                iVal = int( self.maxconnEdit.get_text() );
+                if iVal > 60000 :
+                    iVal = 60000
+            except Exception as err :
+                iVal = 512
+            miscOpts[ 'MaxConnections' ] = str( iVal );
+
+            if self.tsCheck.props.active :
+                miscOpts[ 'TaskScheduler' ] = "RR"
+
+        except Exception as err :
+            text = "Failed to export node:" + str( err )
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            second_text = "@" + fname + ":" + str(exc_tb.tb_lineno)
+            self.DisplayError( text, second_text )
+            return -errno.EFAULT
+
+    def Export_Multihop( self, jsonVal ) -> int :
+        ret = 0
+        try:
+            nodes = list()
+            jsonVal[ 'Multihop' ] = nodes
+
+            nodeCtxs = self.nodeCtxs
+            nodeCtxsFin = []
+            if nodeCtxs is not None :
+                for nodeCtx in nodeCtxs :
+                    if nodeCtx.IsEmpty() :
+                        continue
+                    nodeCtxsFin.append( nodeCtx )
+
+            numCtx = len( nodeCtxsFin )
+            if numCtx == 0 :
+                return 0
+
+            for i in range( numCtx ):
+                node = dict()
+                ret = self.ExportNodeCtx(
+                    nodeCtxsFin[ i ], node )
+                if ret < 0 :
+                    break
+                nodes.append( node )
+
+        except Exception as err :
+            text = "Failed to export node:" + str( err )
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            second_text = "@" + fname + ":" + str(exc_tb.tb_lineno)
+            self.DisplayError( text, second_text )
+            return -errno.EFAULT
+
+    def Export_InitCfg( self, path ) -> int :
+        jsonVal = dict()
+        ret = self.Export_Conns( jsonVal )
+        if ret < 0 :
+            return ret
+
+        ret = self.Export_Security( jsonVal )
+        if ret < 0 :
+            return ret
+
+        ret = self.Export_Multihop( jsonVal )
+        if ret < 0 :
+            return ret
+
+        return ret
+        
     def ExportFiles( self, path : str, bSaveAs: bool = False ) :
         error = self.VerifyInput()
         if error != 'success' :
