@@ -1,4 +1,3 @@
-import gi
 import json
 import os
 import sys 
@@ -7,227 +6,7 @@ from copy import deepcopy
 from urllib.parse import urlparse
 from typing import Dict
 import errno
-
-gi.require_version("Gtk", "3.0")
-
-from gi.repository import Gtk, Pango
-
-def SetBtnMarkup( btn, text ):
-    elem = btn.get_child()
-    if type( elem ) is Gtk.Label :
-        elem.set_markup( text )
-
-def SetBtnText( btn, text ):
-    elem = btn.get_child()
-    if type( elem ) is Gtk.Label :
-        elem.set_text( text )
-
-def SetToString( oSet : set ) :
-    strText = ""
-    count = len( oSet )
-    i = 0
-    for x in oSet :
-        strText += "'" + x + "'"
-        if i + 1 < count :
-            strText += ', '
-            i += 1
-    return strText
-
-def GetTestPaths( path : str= None ) :
-    dir_path = os.path.dirname(os.path.realpath(__file__))
-    paths = []
-    if path is None:
-        curDir = dir_path
-        paths.append( curDir + "/../../etc/rpcf" )
-        paths.append( "/etc/rpcf")
-
-        curDir += "/../test/"
-        paths.append( curDir + "actcancel" )
-        paths.append( curDir + "asynctst" )
-        paths.append( curDir + "btinrt" )
-        paths.append( curDir + "evtest" )
-        paths.append( curDir + "helloworld" )
-        paths.append( curDir + "iftest" )
-        paths.append( curDir + "inproc" )
-        paths.append( curDir + "katest" )
-        paths.append( curDir + "prtest" )
-        paths.append( curDir + "sftest" )
-        paths.append( curDir + "stmtest" )
-    else:
-        paths.append( path )
-
-    return paths
-
-def GetPyTestPaths() :
-    dir_path = os.path.dirname(os.path.realpath(__file__))
-    paths = []
-    paths.append( dir_path +
-        "/../python/tests/sftest" )
-    return paths
-
-def ExportTestCfgsTo( cfgList:list, destPath:str ):
-    testDescs = [ "actcdesc.json",
-        "asyndesc.json",
-        "btinrt.json",
-        "evtdesc.json",
-        "hwdesc.json",
-        "echodesc.json",
-        "kadesc.json",
-        "prdesc.json",
-        "sfdesc.json",
-        "stmdesc.json" ]
-
-    paths = GetTestPaths( destPath )
-    pathVal = ReadTestCfg( paths, testDescs[ 0 ] );
-    if pathVal is None :
-        paths = GetTestPaths()
-
-    for testDesc in testDescs :
-        pathVal = ReadTestCfg( paths, testDesc )
-        if pathVal is None :
-            continue
-        UpdateTestCfg( pathVal[ 1 ], cfgList )
-        strPath = destPath
-        WriteTestCfg(
-            destPath + "/" + testDesc,
-            pathVal[ 1 ] )
-
-def ExportTestCfgs( cfgList:list ):
-    testDescs = [ "actcdesc.json",
-        "asyndesc.json",
-        "btinrt.json",
-        "evtdesc.json",
-        "hwdesc.json",
-        "echodesc.json",
-        "kadesc.json",
-        "prdesc.json",
-        "sfdesc.json",
-        "stmdesc.json" ]
-
-    paths = GetTestPaths()
-    for testDesc in testDescs :
-        pathVal = ReadTestCfg( paths, testDesc )
-        if pathVal is None :
-            continue
-        UpdateTestCfg( pathVal[ 1 ], cfgList )
-        WriteTestCfg( pathVal[ 0 ], pathVal[ 1 ] )
-
-    paths = GetPyTestPaths()
-    pathVal = ReadTestCfg( paths, 'sfdesc.json' )
-    if pathVal is not None :
-        UpdateTestCfg( pathVal[ 1 ], cfgList )
-        WriteTestCfg( pathVal[ 0 ], pathVal[ 1 ] )
-
-def ReadTestCfg( paths:list, name:str) :
-    jsonVal = None
-    for path in paths:
-        try:
-            cfgFile = path + "/" + name
-            fp = open( cfgFile, "r" )
-            jsonVal = [cfgFile, json.load(fp) ]
-            fp.close()
-        except Exception as err:
-            continue
-
-        return jsonVal
-    return None
-
-def UpdateTestCfg( jsonVal, cfgList:list ):
-    try:
-        ifCfg = cfgList[ 0 ]
-        authInfo = cfgList[ 1 ]
-        if not 'Objects' in jsonVal :
-            return
-
-        objs = jsonVal[ 'Objects' ]
-        for elem in objs :
-            elem[ 'IpAddress' ] = ifCfg[ 'BindAddr' ]
-            elem[ 'PortNumber' ] = ifCfg[ 'PortNumber' ]
-            elem[ 'Compression' ] = ifCfg[ 'Compression' ]
-            elem[ 'EnableSSL' ] = ifCfg[ 'EnableSSL' ]
-            elem[ 'EnableWS' ] = ifCfg[ 'EnableWS' ]
-            elem[ 'RouterPath' ] = '/'
-            if 'HasAuth' in ifCfg and ifCfg[ 'HasAuth' ] == 'true' :
-                elem[ 'AuthInfo' ] = authInfo
-            else :
-                elem.pop( 'AuthInfo' )
-            if elem[ 'EnableWS' ] == 'true' :
-                elem[ 'DestURL' ] = ifCfg[ 'DestURL' ]
-                urlComp = urlparse( elem[ 'DestURL' ], scheme='https' )
-                if urlComp.port is None :
-                    elem[ 'PortNumber' ] = '443'
-                else :
-                    elem[ 'PortNumber' ] = urlComp.port
-                if urlComp.hostname is not None:
-                    elem[ 'IpAddress' ] = urlComp.hostname
-                else :
-                    raise Exception( 'web socket URL is not valid' ) 
-            else :
-                elem.pop( 'DestURL' )
-
-    except Exception as err:
-        pass
-
-    return
-
-def WriteTestCfg( path, jsonVal ) :
-    fp = open(path, "w")
-    json.dump( jsonVal, fp, indent=4)
-    fp.close()
-    return
-
-def LoadConfigFiles( path : str) :
-    dir_path = os.path.dirname(os.path.realpath(__file__))
-    paths = []
-    if path is None:
-        curDir = dir_path
-        paths.append( curDir + "/../../etc/rpcf" )
-        paths.append( "/etc/rpcf")
-
-        paths.append( curDir + "/../ipc" )
-        paths.append( curDir + "/../rpc/router" )
-        paths.append( curDir + "/../rpc/security" )
-    else:
-        paths.append( path )
-    
-    jsonvals = [ None ] * 4
-    for strPath in paths :
-        try:
-            if jsonvals[ 0 ] is None :
-                drvfile = strPath + "/driver.json"
-                fp = open( drvfile, "r" )
-                jsonvals[ 0 ] = [drvfile, json.load(fp) ]
-                fp.close()
-        except Exception as err :
-            pass
-        try:
-            if jsonvals[ 1 ] is None :
-                rtfile = strPath + "/router.json"
-                fp = open( rtfile, "r" )
-                jsonvals[ 1 ] = [rtfile, json.load(fp)]
-                fp.close()
-        except Exception as err :
-            pass
-
-        try:
-            if jsonvals[ 2 ] is None :
-                rtaufile = strPath + "/rtauth.json"
-                fp = open( rtaufile, "r" )
-                jsonvals[ 2 ] = [rtaufile, json.load(fp)]
-                fp.close()
-        except Exception as err :
-            pass
-        
-        try:
-            if jsonvals[ 3 ] is None :
-                auprxyfile = strPath + "/authprxy.json"
-                fp = open( auprxyfile, "r" )
-                jsonvals[ 3 ] = [auprxyfile, json.load(fp)]
-                fp.close()
-        except Exception as err :
-            pass            
-
-    return jsonvals
+from updcfg import *
 
 def vc_changed(stack, gparamstring):
     curTab = stack.get_visible_child_name()
@@ -243,22 +22,6 @@ def vc_changed(stack, gparamstring):
         wnd.DisplayError( "node name is not valid" )
         stack.set_visible_child( wnd.gridmh )
 
-def GetGridRows(grid: Gtk.Grid):
-    rows = 0
-    for child in grid.get_children():
-        x = grid.child_get_property(child, 'top-attach')
-        height = grid.child_get_property(child, 'height')
-        rows = max(rows, x+height)
-    return rows
-
-def GetGridCols(grid: Gtk.Grid):
-    cols = 0
-    for child in grid.get_children():
-        x = grid.child_get_property(child, 'left-attach')
-        width = grid.child_get_property(child, 'width')
-        cols = max(cols, x+width)
-    return cols
-
 class InterfaceContext :
     def __init__(self, ifNo ):
         self.ifNo = ifNo
@@ -272,6 +35,7 @@ class InterfaceContext :
         self.sslCheck = None
         self.authCheck = None
         self.urlEdit = None
+        self.rtpathEdit = None
         self.enabled = None
         self.startRow = 0
         self.rowCount = 0
@@ -311,11 +75,82 @@ class LBGrpContext :
         self.removeBtn  = None
         self.changeBtn  = None
         self.labelName = None
+        self.grpSet = None
         self.startRow = 0
         self.rowCount = 0
     
     def IsEmpty( self ) :
         return self.labelName is None
+
+import gi
+gi.require_version("Gtk", "3.0")
+
+from gi.repository import Gtk, Pango
+
+def GetRouterPath( descFile : str ) :
+    strPath = '/'
+    while True :
+        paths = GetTestPaths()
+        pathVal = ReadTestCfg( paths, descFile )
+        if pathVal is None :
+            ret = -errno.ENOENT
+            break
+
+        jsonVal = pathVal[ 1 ]
+        try:
+            svrObjs = jsonVal[ 'Objects' ]
+            if svrObjs is None or len( svrObjs ) == 0 :
+                ret = -errno.ENOENT
+                break
+            for svrObj in svrObjs :
+                if 'RouterPath' not in svrObj :
+                    continue
+                strPath = svrObj['RouterPath']
+                break
+
+        except :
+            ret = -errno.EFAULT
+
+        break
+
+    return strPath
+
+def SetToString( oSet : set ) :
+    strText = ""
+    count = len( oSet )
+    i = 0
+    for x in oSet :
+        strText += "'" + x + "'"
+        if i + 1 < count :
+            strText += ', '
+            i += 1
+    return strText
+
+def SetBtnMarkup( btn, text ):
+    elem = btn.get_child()
+    if type( elem ) is Gtk.Label :
+        elem.set_markup( text )
+
+def SetBtnText( btn, text ):
+    elem = btn.get_child()
+    if type( elem ) is Gtk.Label :
+        elem.set_text( text )
+
+def GetGridRows(grid: Gtk.Grid):
+    rows = 0
+    for child in grid.get_children():
+        x = grid.child_get_property(child, 'top-attach')
+        height = grid.child_get_property(child, 'height')
+        rows = max(rows, x+height)
+    return rows
+
+def GetGridCols(grid: Gtk.Grid):
+    cols = 0
+    for child in grid.get_children():
+        x = grid.child_get_property(child, 'left-attach')
+        width = grid.child_get_property(child, 'width')
+        cols = max(cols, x+width)
+    return cols
 
 class ConfigDlg(Gtk.Dialog):
 
@@ -343,17 +178,17 @@ class ConfigDlg(Gtk.Dialog):
                     connParams = port[ 'Parameters']
                     if connParams is None :
                         ifCfg = dict()
-                        ifCfg[ "AddrFormat" ]= "ipv4";
-                        ifCfg[ "Protocol" ]= "native";
-                        ifCfg[ "PortNumber" ]= "4132";
-                        ifCfg[ "BindAddr"] = "127.0.0.1" ;
-                        ifCfg[ "PdoClass"] = "TcpStreamPdo2",;
-                        ifCfg[ "Compression" ]= "true";
-                        ifCfg[ "EnableWS" ]= "false";
-                        ifCfg[ "EnableSSL" ]= "false";
-                        ifCfg[ "ConnRecover" ]= "false";
-                        ifCfg[ "HasAuth" ]= "false";
-                        ifCfg[ "DestURL" ]= "https://www.example.com";
+                        ifCfg[ "AddrFormat" ]= "ipv4"
+                        ifCfg[ "Protocol" ]= "native"
+                        ifCfg[ "PortNumber" ]= "4132"
+                        ifCfg[ "BindAddr"] = "127.0.0.1"
+                        ifCfg[ "PdoClass"] = "TcpStreamPdo2"
+                        ifCfg[ "Compression" ]= "true"
+                        ifCfg[ "EnableWS" ]= "false"
+                        ifCfg[ "EnableSSL" ]= "false"
+                        ifCfg[ "ConnRecover" ]= "false"
+                        ifCfg[ "HasAuth" ]= "false"
+                        ifCfg[ "DestURL" ]= "https://www.example.com"
                         connparams = [ ifCfg, ]
                     confVals[ "connParams"] = [ *connParams ]
                     maxConns = port[ "MaxConnections" ]
@@ -601,7 +436,7 @@ class ConfigDlg(Gtk.Dialog):
             nameEntry.set_text( nodeCfg[ 'NodeName' ] )
             grid.attach(nameEntry, startCol + 1, startRow + 1, 1, 1 )
             nameEntry.iNo = i
-            nodeCtx.nodeName = nameEntry;
+            nodeCtx.nodeName = nameEntry
 
             labelIpAddr = Gtk.Label()
             labelIpAddr.set_text( "Remote IP Address: " )
@@ -612,7 +447,7 @@ class ConfigDlg(Gtk.Dialog):
             ipAddr.set_text( nodeCfg[ 'IpAddress' ] )
             grid.attach(ipAddr, startCol + 1, startRow + 2, 1, 1 )
             ipAddr.iNo = i
-            nodeCtx.ipAddr = ipAddr;
+            nodeCtx.ipAddr = ipAddr
 
             labelPort = Gtk.Label()
             labelPort.set_text( "Port Number: " )
@@ -777,7 +612,11 @@ class ConfigDlg(Gtk.Dialog):
 
     def on_add_lbgrp_clicked( self, button ) :
         try:
-            iNo = len( self.grpCtxs )
+            if self.grpCtxs is None :
+                iNo = 0
+                self.grpCtxs = []
+            else :
+                iNo = len( self.grpCtxs )
             startRow = GetGridRows( self.gridlb )
             startRow -= 1
             self.gridlb.remove_row( startRow )
@@ -813,6 +652,7 @@ class ConfigDlg(Gtk.Dialog):
                     elem.startRow -= grpCtx.rowCount
             self.nodeSet.update( grpCtx.grpSet )
             grpCtx.Clear()
+            return
 
         except Exception as err:
             text = "Failed to remove node:" + str( err )
@@ -1005,6 +845,10 @@ class ConfigDlg(Gtk.Dialog):
             self.nodes = nodes
 
             if nodeCount == 0 :
+                rows = GetGridRows( grid )
+                addBtn = Gtk.Button.new_with_label("Add Node")
+                addBtn.connect("clicked", self.on_add_node_clicked)
+                grid.attach(addBtn, startCol + 1, rows, 1, 1 )
                 return
 
             for nodeCfg in nodes :
@@ -1109,9 +953,25 @@ class ConfigDlg(Gtk.Dialog):
         self.ifctx[ ifNo ].compress = compressCheck
 
         if ifNo == 0 :
+            rows = GetGridRows( grid )
+            labelPath = Gtk.Label()
+            strText = 'RouterPath: '
+            labelPath.set_text( strText )
+
+            labelPath.set_xalign(1)
+            grid.attach(labelPath, startCol + 0, rows + 0, 1, 1 )
+
+            strPath = GetRouterPath( "echodesc.json" )
+            pathEditBox = Gtk.Entry()
+            pathEditBox.set_text( str( strPath ) )
+            grid.attach( pathEditBox, startCol + 1, rows + 0, 1, 1)
+            self.ifctx[ 0 ].rtpathEdit = pathEditBox
+
+            rows = GetGridRows( grid )
             addBtn = Gtk.Button.new_with_label("Add interface")
             addBtn.connect("clicked", self.on_add_if_clicked)
             grid.attach(addBtn, startCol + 1, rows + 1, 1, 1 )
+
         else :
             removeBtn = Gtk.Button.new_with_label(
                 "Remove interface " + str(ifNo) )
@@ -1149,7 +1009,7 @@ class ConfigDlg(Gtk.Dialog):
         labelUrl.set_xalign(1)
         grid.attach(labelUrl, startCol + 0, startRow + 1, 1, 1 )
 
-        strUrl = "https://example.com";
+        strUrl = "https://example.com"
         try :
             if confVals[ 'connParams'] is not None :
                 param0 = confVals[ 'connParams'][ ifNo ]
@@ -1523,6 +1383,7 @@ class ConfigDlg(Gtk.Dialog):
     def VerifyInput( self ) :
         try:
             addrSet = set()
+            strNode = ""
             for interf in self.ifctx :
                 if interf.IsEmpty() :
                     continue
@@ -1538,6 +1399,8 @@ class ConfigDlg(Gtk.Dialog):
                         return "Auth enabled, but service is empty"
                     if len( self.kdcEdit.get_text() ) == 0 :
                         return "Auth enabled, but kdc address is empty"
+                    if len( self.userEdit.get_text() ) == 0 :
+                        return "Auth enabled, but user name is empty"
                 if len( interf.ipAddr.get_text() ) == 0 :
                     return "Ip address is empty"
                 else :
@@ -1554,11 +1417,26 @@ class ConfigDlg(Gtk.Dialog):
                     return "Identical IP and Port pair found between interfaces"
 
                 if interf.ipAddr.get_text() == '0.0.0.0' :
-                    return "Ip address is '0.0.0.0'";
+                    return "Ip address is '0.0.0.0'"
+
+                if interf.rtpathEdit is not None :
+                    strPath = interf.rtpathEdit.get_text()
+                    if strPath[ 0 ] != '/' :
+                        return "RouterPath is not a valid path"
+                    try:
+                        strNode = strPath[1:].split('/')[ 0 ]
+                    except:
+                        return "RouterPath is not a valid path"
+
                 if interf.webSock.props.active :
                     if len( interf.urlEdit.get_text() ) == 0 :
                         return "WebSocket enabled, but dest url is empty"
+
             addrSet.clear()
+            bValidPath = False
+            if strNode == "" :
+                bValidPath = True
+
             for nodeCtx in self.nodeCtxs :
                 if nodeCtx.IsEmpty() :
                     continue
@@ -1592,8 +1470,14 @@ class ConfigDlg(Gtk.Dialog):
                 if len( strName ) == 0:
                     return "Multihop node name cannot be empty"
 
+                if strNode == strName:
+                    bValidPath = True
+
                 if not strName.isidentifier() :
                     return "Multihop node name '%s' is not a valid identifier" % strName
+
+            if not bValidPath :
+                return "RouterPath is not valid because the node to forward is not in the multihop node list"
 
         except Exception as err:
             text = "Verify input failed:" + str( err )
@@ -1644,9 +1528,9 @@ class ConfigDlg(Gtk.Dialog):
                 nodeCfg[ "Compression" ] = "false"
 
             if nodeCtx.sslCheck.props.active:
-                nodeCfg[ "EnalbeSSL" ] = "true"
+                nodeCfg[ "EnableSSL" ] = "true"
             else:
-                nodeCfg[ "EnalbeSSL" ] = "false"
+                nodeCfg[ "EnableSSL" ] = "false"
 
             strVal = nodeCtx.urlEdit.get_text()
             if nodeCtx.webSock.props.active :
@@ -1656,51 +1540,6 @@ class ConfigDlg(Gtk.Dialog):
                 nodeCfg[ "DestURL" ] = strVal
             else :
                 nodeCfg[ "EnableWS" ] = "false"
-                nodeCfg[ "DestURL" ] = strVal
-
-        except Exception as err :
-            text = "Failed to export node:" + str( err )
-            exc_type, exc_obj, exc_tb = sys.exc_info()
-            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-            second_text = "@" + fname + ":" + str(exc_tb.tb_lineno)
-            self.DisplayError( text, second_text )
-            return -1
-
-        return 0
-
-    def ExportNodeCtxs( self ):
-        try:
-            nodeCtxs = self.nodeCtxs
-            nodeCtxsFin = []
-            if nodeCtxs is not None :
-                for nodeCtx in nodeCtxs :
-                    if nodeCtx.IsEmpty() :
-                        continue
-                    nodeCtxsFin.append( nodeCtx )
-
-            numCtx = len( nodeCtxsFin )
-            if numCtx == 0 :
-                self.nodes.clear()
-                return 0
-
-            if self.nodes is not None :
-                numCfg = len( self.nodes )
-            else :
-                numCfg = numCtx
-                self.nodes = [ self.InitNodeCfg( 0 ) ] * numCtx
-
-            diff = numCtx - numCfg
-            if diff < 0 :
-                for i in range( -diff ) :
-                    self.nodes.pop()
-            elif diff > 0 :
-                self.nodes += [ self.InitNodeCfg( 0 ) ] * diff
-
-            for i in range( numCtx ):
-                ret = self.ExportNodeCtx(
-                    nodeCtxsFin[ i ], self.nodes[ i ] )
-                if ret < 0 :
-                    return ret
 
         except Exception as err :
             text = "Failed to export node:" + str( err )
@@ -1716,7 +1555,7 @@ class ConfigDlg(Gtk.Dialog):
         ret = 0
         try:
             elemList = []
-            json[ 'Connections' ] = elemList
+            jsonVal[ 'Connections' ] = elemList
             for i in range( len( self.ifctx ) ) :
                 curVals = self.ifctx[ i ]
                 if curVals.IsEmpty() :
@@ -1743,9 +1582,15 @@ class ConfigDlg(Gtk.Dialog):
 
                 if curVals.webSock.props.active :
                     elem[ 'EnableWS' ] = 'true'
-                    elem[ 'DestURL' ] = curVals.urlEdit.get_text();
+                    elem[ 'DestURL' ] = curVals.urlEdit.get_text()
                 else:
                     elem[ 'EnableWS' ] = 'false'
+
+                if i == 0 :
+                    strPath = curVals.rtpathEdit.get_text()
+                    if len( strPath ) == 0 :
+                        strPath = '/'
+                    elem[ 'RouterPath' ] = strPath
 
                 elemList.append( elem )
                 
@@ -1776,6 +1621,7 @@ class ConfigDlg(Gtk.Dialog):
             authInfo[ 'ServiceName' ] = self.svcEdit.get_text()
             authInfo[ 'AuthMech' ] = 'krb5'
             authInfo[ 'UserName' ] = self.userEdit.get_text()
+            authInfo[ 'KdcIp' ] = self.kdcEdit.get_text()
 
             tree_iter = self.signCombo.get_active_iter()
             if tree_iter is not None:
@@ -1789,12 +1635,12 @@ class ConfigDlg(Gtk.Dialog):
             miscOpts = dict()
             elemSecs[ 'misc' ] = miscOpts
             try:
-                iVal = int( self.maxconnEdit.get_text() );
+                iVal = int( self.maxconnEdit.get_text() )
                 if iVal > 60000 :
                     iVal = 60000
             except Exception as err :
                 iVal = 512
-            miscOpts[ 'MaxConnections' ] = str( iVal );
+            miscOpts[ 'MaxConnections' ] = str( iVal )
 
             if self.tsCheck.props.active :
                 miscOpts[ 'TaskScheduler' ] = "RR"
@@ -1806,6 +1652,7 @@ class ConfigDlg(Gtk.Dialog):
             second_text = "@" + fname + ":" + str(exc_tb.tb_lineno)
             self.DisplayError( text, second_text )
             return -errno.EFAULT
+        return ret
 
     def Export_Multihop( self, jsonVal ) -> int :
         ret = 0
@@ -1826,7 +1673,7 @@ class ConfigDlg(Gtk.Dialog):
                 return 0
 
             for i in range( numCtx ):
-                node = dict()
+                node = self.InitNodeCfg( 0 )
                 ret = self.ExportNodeCtx(
                     nodeCtxsFin[ i ], node )
                 if ret < 0 :
@@ -1840,6 +1687,37 @@ class ConfigDlg(Gtk.Dialog):
             second_text = "@" + fname + ":" + str(exc_tb.tb_lineno)
             self.DisplayError( text, second_text )
             return -errno.EFAULT
+        return ret
+
+    def Export_LBGrp( self, jsonVal ) -> int :
+        ret = 0
+        try:
+            groups = list()
+            jsonVal[ 'LBGroup' ] = groups
+
+            if self.grpCtxs is None:
+                return ret
+
+            for grpCtx in self.grpCtxs:
+                if grpCtx.IsEmpty():
+                    continue
+                grpSet = grpCtx.grpSet
+                if len( grpSet ) == 0 :
+                    continue
+                members = [ *grpSet ]
+                cfg = dict()
+                cfg[ grpCtx.grpName ] = members
+                groups.append( cfg )
+
+        except Exception as err :
+            text = "Failed to export node:" + str( err )
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            second_text = "@" + fname + ":" + str(exc_tb.tb_lineno)
+            self.DisplayError( text, second_text )
+            return -errno.EFAULT
+
+        return ret
 
     def Export_InitCfg( self, path ) -> int :
         jsonVal = dict()
@@ -1855,271 +1733,46 @@ class ConfigDlg(Gtk.Dialog):
         if ret < 0 :
             return ret
 
+        ret = self.Export_LBGrp( jsonVal )
+        if ret < 0 :
+            return ret
+
+        try:
+            fp = open(path, "w")
+            json.dump( jsonVal, fp, indent=4)
+            fp.close()
+        except Exception as err:
+            text = "Failed to export node:" + str( err )
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            second_text = "@" + fname + ":" + str(exc_tb.tb_lineno)
+            self.DisplayError( text, second_text )
+            ret = -errno.EFAULT
+
         return ret
-        
-    def ExportFiles( self, path : str, bSaveAs: bool = False ) :
+
+    def Export_Files( self, destPath : str, bServer: bool ) -> int :
         error = self.VerifyInput()
         if error != 'success' :
             text = "Error occurs : " + error
             self.DisplayError( text )
             return -1
-        try:
-            jsonFiles = self.jsonFiles;
-            drvVal = jsonFiles[ 0 ][ 1 ]
-            if len( self.keyEdit.get_text() ) > 0 :
-                ports = drvVal['Ports']
+                
+        initFile = '/tmp/initcfg.json'
+        if destPath is not None :
+            initFile = destPath + '/initcfg.json'
+            return self.Export_InitCfg( initFile )
 
-            confVals = None
-            for port in ports :
-                if port[ 'PortClass'] == 'RpcOpenSSLFido' :
-                    sslFiles = port[ 'Parameters']
-                    if sslFiles is None :
-                        continue
-                    sslFiles[ "KeyFile"] = self.keyEdit.get_text()
-                    sslFiles[ "CertFile"] = self.certEdit.get_text()
+        ret = self.Export_InitCfg( initFile )
+        if ret < 0 :
+            return ret
 
-                if port[ 'PortClass'] == 'RpcTcpBusPort' :
-                    confVals = port[ 'Parameters']
-                    try:
-                        iVal = int( self.maxconnEdit.get_text() );
-                    except Exception as err :
-                        iVal = 512
-                    port[ 'MaxConnections' ] = str( iVal );
-
-            ifs = []
-            for elem in self.ifctx :
-                if not elem.IsEmpty() :
-                    ifs.append( elem )
-
-            if ifs is None:
-                raise Exception("no valid configurations") 
-
-            diff = len( ifs ) - len( confVals )
-            if diff < 0 :
-                for i in range( -diff ):
-                    confVals.pop()
-            elif diff > 0 :
-                for i in range( diff ):
-                    confVals.append( deepcopy( confVals[ 0 ] ) )
-
-            for i in range( len( ifs ) ):  
-                curVals = ifs[ i ]
-                elem = confVals[ i ]
-                elem[ 'BindAddr' ] = curVals.ipAddr.get_text()
-                elem[ 'PortNumber' ] = curVals.port.get_text()
-                if curVals.compress.props.active :
-                    elem[ 'Compression' ] = 'true'
-                else:
-                    elem[ 'Compression' ] = 'false'
-
-                if curVals.sslCheck.props.active :
-                    elem[ 'EnableSSL' ] = 'true'
-                else:
-                    elem[ 'EnableSSL' ] = 'false'
-
-                if curVals.authCheck.props.active :
-                    elem[ 'HasAuth' ] = 'true'
-                else:
-                    elem[ 'HasAuth' ] = 'false'
-
-                if curVals.webSock.props.active :
-                    elem[ 'EnableWS' ] = 'true'
-                    elem[ 'DestURL' ] = curVals.urlEdit.get_text();
-                else:
-                    elem[ 'EnableWS' ] = 'false'
-
-            drvPath = path + "/driver.json"
-            fp = open(drvPath, "w")
-            json.dump( drvVal, fp, indent=4)
-            fp.close()
-
-            lbCfgs = self.BuildLBGrpCfg()
-            if lbCfgs is None :
-                raise Exception("bad values in LB groups") 
-
-            rtDesc = jsonFiles[ 2 ][ 1 ]
-            svrObjs = rtDesc[ 'Objects' ]
-
-            authInfo = dict()
-            if svrObjs is not None and len( svrObjs ) > 0 :
-                for svrObj in svrObjs :
-                    objName = svrObj[ 'ObjectName']
-                    if objName == 'RpcRouterBridgeAuthImpl' :
-                        if len( self.realmEdit.get_text() ) == 0:
-                            break
-                        authInfo[ 'Realm' ] = self.realmEdit.get_text()
-                        authInfo[ 'ServiceName' ] = self.svcEdit.get_text()
-                        authInfo[ 'AuthMech' ] = 'krb5'
-                        tree_iter = self.signCombo.get_active_iter()
-                        if tree_iter is not None:
-                            model = self.signCombo.get_model()
-                            row_id, name = model[tree_iter][:2]
-                        if row_id == 1 :
-                            authInfo[ 'SignMessage' ] = 'false'
-                        else:
-                            authInfo[ 'SignMessage' ] = 'true'
-
-                        svrObj[ 'AuthInfo'] = authInfo
-                        svrObj[ 'LBGroup' ] = lbCfgs
-                        self.ExportNodeCtxs();
-                    elif objName == 'RpcRouterManagerImpl' :
-                        if not 'MaxPendingRequests' in svrObj:
-                            svrObj[ 'MaxPendingRequests' ] = str( 512 * 16 )
-                    elif objName == 'RpcReqForwarderAuthImpl' :
-                        if self.tsCheck.props.active :
-                            svrObj[ 'TaskScheduler' ] = "RR"
-                        elif 'TaskScheduler' in svrObj:
-                            del svrObj[ 'TaskScheduler' ]
-
-            rtauPath = path + '/rtauth.json'
-            fp = open(rtauPath, "w")
-            json.dump( rtDesc, fp, indent = 4 )
-            fp.close()
-
-            if len( confVals ) > 0 :
-                authInfo[ 'UserName' ] = self.userEdit.get_text()
-                cfgIf0 = confVals[ 0 ]
-                if cfgIf0[ 'EnableWS' ] == 'true' :
-                    curVals = ifs[ 0 ]
-                    cfgIf0[ 'DestURL' ] = curVals.urlEdit.get_text()
-                cfgList = [ cfgIf0, authInfo ]
-                if bSaveAs :
-                    ExportTestCfgsTo( cfgList, path ) 
-                else :
-                    if len( self.strCfgPath ) == 0 :
-                        ExportTestCfgs( cfgList ) 
-                    else :
-                        ExportTestCfgsTo(
-                            cfgList, self.strCfgPath ) 
-
-            rtDesc = jsonFiles[ 1 ][ 1 ]
-            svrObjs = rtDesc[ 'Objects' ]
-            if svrObjs is not None and len( svrObjs ) > 0 :
-                for svrObj in svrObjs :
-                    if svrObj[ 'ObjectName'] == 'RpcRouterBridgeImpl' :
-                        svrObj[ 'Nodes' ] = self.nodes;
-                        svrObj[ 'LBGroup' ] = lbCfgs
-
-                    elif svrObj[ 'ObjectName'] == 'RpcRouterManagerImpl' :
-                        if not 'MaxPendingRequests' in svrObj:
-                            svrObj[ 'MaxPendingRequests' ] = str( 512 * 16 )
-
-            rtPath = path + '/router.json'
-            fp = open(rtPath, "w")
-            json.dump( rtDesc, fp, indent = 4 )
-            fp.close()
-
-            apVal = jsonFiles[ 3 ][ 1 ]
-            proxies = apVal['Objects']
-            if proxies is None or len( proxies ) == 0:
-                raise Exception("bad content in authprxy.json") 
-
-            if0 = ifs[ 0]
-            for proxy in proxies :
-                objName = proxy[ 'ObjectName' ]
-                if objName == 'K5AuthServer' or objName == 'KdcChannel':
-                    elem = proxy
-                    elem[ 'IpAddress' ] = if0.ipAddr.get_text()
-                    elem[ 'PortNumber' ] = if0.port.get_text()
-                    if if0.compress.props.active :
-                        elem[ 'Compression' ] = 'true'
-                    else:
-                        elem[ 'Compression' ] = 'false'
-
-                    if if0.sslCheck.props.active :
-                        elem[ 'EnableSSL' ] = 'true'
-                    else:
-                        elem[ 'EnableSSL' ] = 'false'
-
-                    if objName == 'K5AuthServer' :
-                        if if0.authCheck.props.active :
-                            elem[ 'HasAuth' ] = 'true'
-                        else:
-                            elem[ 'HasAuth' ] = 'false'
-                    else :
-                        if 'AuthInfo' in elem :
-                            authInfo = elem[ 'AuthInfo' ]
-                        else:
-                            authInfo = dict()
-
-                        if len( self.realmEdit.get_text() ) != 0:
-                            authInfo[ 'Realm' ] = self.realmEdit.get_text()
-                            authInfo[ 'ServiceName' ] = self.svcEdit.get_text()
-                            authInfo[ 'AuthMech' ] = 'krb5'
-                            authInfo[ 'UserName' ] = 'kdcclient'
-                            tree_iter = self.signCombo.get_active_iter()
-                            if tree_iter is not None:
-                                model = self.signCombo.get_model()
-                                row_id, name = model[tree_iter][:2]
-                            if row_id == 1 :
-                                authInfo[ 'SignMessage' ] = 'false'
-                            else :
-                                authInfo[ 'SignMessage' ] = 'true'
-
-                    if if0.webSock.props.active :
-                        elem[ 'EnableWS' ] = 'true'
-                        elem[ 'DestURL'] = if0.urlEdit.get_text()
-                        urlComp = urlparse( elem[ 'DestURL' ], scheme='https' )
-                        if urlComp.port is None :
-                            elem[ 'PortNumber' ] = '443'
-                        else :
-                            elem[ 'PortNumber' ] = urlComp.port
-                        if urlComp.hostname is not None:
-                            elem[ 'IpAddress' ] = urlComp.hostname
-                        else :
-                            raise Exception( 'web socket URL is not valid' ) 
-                    else:
-                        elem[ 'EnableWS' ] = 'false'
-
-                elif objName == 'KdcRelayServer' :
-                    if len( self.kdcEdit.get_text() ) != 0:
-                        proxy[ 'IpAddress' ] = self.kdcEdit.get_text()
-                    break
-
-            apPath = path + "/authprxy.json"
-            fp = open( apPath, "w" )
-            json.dump( apVal, fp, indent = 4  )
-            fp.close()
-
-        except Exception as err :
-            text = "Failed to export files:" + str( err )
-            exc_type, exc_obj, exc_tb = sys.exc_info()
-            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-            second_text = "@" + fname + ":" + str(exc_tb.tb_lineno)
-            self.DisplayError( text, second_text )
-            return -1
-
-        return 0
+        return Update_InitCfg(
+            initFile, bServer, destPath )
 
     def UpdateConfig( self ) :
-        path = '/tmp'
-        err = self.ExportFiles( path )
-        path += '/'
-        files = [ 'driver.json', 'router.json', 'rtauth.json',
-            'authprxy.json' ]
-        if err < 0 :
-            for i in files :
-                try:
-                    os.remove( path + i )
-                except Exception as oErr :
-                    pass
-            return err
+        return self.Export_Files( None, True )
 
-        k = 0
-        for i in files :
-            try:
-                move( path + i, self.jsonFiles[ k ][ 0 ] )
-                k += 1
-            except Exception as oErr :
-                text = "Failed to export files:" + str( oErr )
-                exc_type, exc_obj, exc_tb = sys.exc_info()
-                fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-                second_text = "@" + fname + ":" + str(exc_tb.tb_lineno)
-                self.DisplayError( text, second_text )
-                return -1
-
-        return 0
-        
 class LBGrpEditDlg(Gtk.Dialog):
     def __init__(self, parent, iGrpNo):
         Gtk.Dialog.__init__(self, flags=0,
@@ -2283,7 +1936,7 @@ while True :
             path = dialog.get_filename()
         dialog.destroy()
         win.strCfgPath = path
-        win.ExportFiles(path, True)
+        win.Export_Files(path, True)
         continue
     elif response == Gtk.ResponseType.APPLY:
         dialog = Gtk.FileChooserDialog(
@@ -2311,7 +1964,7 @@ while True :
             second_text = "@" + fname + ":" + str(exc_tb.tb_lineno)
             win.DisplayError( text, second_text )
             dialog.destroy()
-            continue;
+            continue
 
         dialog.destroy()
         win.strCfgPath = path
