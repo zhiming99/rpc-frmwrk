@@ -40,15 +40,14 @@ AC_CHECK_LIB([dbus-1], [dbus_bus_get],
 AC_DEFINE([HAVE_LIBdbus_1], [1], [Define to 1 if you have dbus-1.]) ],
 [AC_MSG_ERROR([dbus-1 was not found])] )
 
-AC_CHECK_LIB([jsoncpp], [_ZNK4Json5ValuecvbEv],
-[LIBS="${LIBS}"
-AC_DEFINE([HAVE_LIBjsoncpp], [1], [Define to 1 if you have jsoncpp.]) ],
-[AC_MSG_ERROR([jsoncpp was not found])] )
-
 AC_CHECK_LIB([lz4], [LZ4_compress_default],
 [LIBS="${LIBS}"
 AC_DEFINE([HAVE_LIBlz4], [1], [Define to 1 if you have lz4.])],
 [AC_MSG_ERROR([lz4 was not found])] )
+
+AC_CHECK_LIB([jsoncpp], [_ZNK4Json5ValuecvbEv],
+[LIBS="${LIBS}"
+AC_DEFINE([HAVE_LIBjsoncpp], [1], [Define to 1 if you have jsoncpp.])])
 
 AC_CHECK_LIB([ssl], [SSL_do_handshake],
 [LIBS="${LIBS}"
