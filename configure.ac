@@ -35,13 +35,36 @@ LT_INIT
 
 # Checks for libraries.
 #AC_CHECK_LIB([combase], [DllLoadFactory])
-AC_CHECK_LIB([dbus-1], [dbus_bus_get])
-AC_CHECK_LIB([jsoncpp], [_ZNK4Json5ValuecvbEv])
-AC_CHECK_LIB([lz4], [LZ4_compress_default])
-AC_CHECK_LIB([ssl], [SSL_do_handshake])
-AC_CHECK_LIB([gssapi_krb5], [gss_wrap])
-AC_CHECK_LIB([krb5], [krb5_init_context])
-AC_CHECK_LIB([atomic], [__atomic_fetch_add_8])
+AC_CHECK_LIB([dbus-1], [dbus_bus_get],
+[LIBS="${LIBS}"
+AC_DEFINE([HAVE_LIBdbus_1], [1], [Define to 1 if you have dbus-1.]) ],
+[AC_MSG_ERROR([dbus-1 was not found])] )
+
+AC_CHECK_LIB([jsoncpp], [_ZNK4Json5ValuecvbEv],
+[LIBS="${LIBS}"
+AC_DEFINE([HAVE_LIBjsoncpp], [1], [Define to 1 if you have jsoncpp.]) ],
+[AC_MSG_ERROR([jsoncpp was not found])] )
+
+AC_CHECK_LIB([lz4], [LZ4_compress_default],
+[LIBS="${LIBS}"
+AC_DEFINE([HAVE_LIBlz4], [1], [Define to 1 if you have lz4.])],
+[AC_MSG_ERROR([lz4 was not found])] )
+
+AC_CHECK_LIB([ssl], [SSL_do_handshake],
+[LIBS="${LIBS}"
+AC_DEFINE([HAVE_LIBssl], [1], [Define to 1 if you have ssl.])])
+
+AC_CHECK_LIB([gssapi_krb5], [gss_wrap],
+[LIBS="${LIBS}"
+AC_DEFINE([HAVE_LIBgssapi], [1], [Define to 1 if you have krb5-gssapi.])])
+
+AC_CHECK_LIB([krb5], [krb5_init_context],
+[LIBS="${LIBS}"
+AC_DEFINE([HAVE_LIBkrb5], [1], [Define to 1 if you have krb5.])])
+
+AC_CHECK_LIB([atomic], [__atomic_fetch_add_8],
+[LIBS="${LIBS}"
+AC_DEFINE([HAVE_LIBatomic], [1], [Define to 1 if you have atomic.])])
 
 # Checks for header files.
 AC_CHECK_HEADERS([arpa/inet.h \
@@ -98,12 +121,25 @@ AC_TYPE_UINT32_T
 AC_TYPE_UINT64_T
 AC_TYPE_UINT8_T 
 
-DEPLIBS='dbus-1 jsoncpp cppunit openssl mit-krb5'
+DEPLIBS_ALL='dbus-1 jsoncpp cppunit openssl mit-krb5'
+DEPLIBS='dbus-1 jsoncpp'
+DEPLIBS_CPPUNIT='dbus-1 jsoncpp cppunit'
+DEPLIBS_SSL='dbus-1 jsoncpp openssl'
+DEPLIBS_KRB5='dbus-1 jsoncpp mit-krb5 mit-krb5-gssapi'
+
 AC_SUBST(DEPLIBS)
+AC_SUBST(DEPLIBS_ALL)
+AC_SUBST(DEPLIBS_CPPUNIT)
+AC_SUBST(DEPLIBS_SSL)
+AC_SUBST(DEPLIBS_KRB5)
+
 case ${with_sysroot} in
     no)
-    CXXFLAGS='`pkg-config --cflags ${DEPLIBS}` -D_USE_LIBEV -I$(top_srcdir)/include -I$(top_srcdir)/3rd_party'
-    COMMON_LINK='`pkg-config --libs-only-L ${DEPLIBS}`'
+    CXXFLAGS='`pkg-config --cflags ${DEPLIBS_ALL}` -D_USE_LIBEV -I$(top_srcdir)/include -I$(top_srcdir)/3rd_party'
+    COMMON_LINK='`pkg-config --libs ${DEPLIBS}`'
+    COMMON_LINK_CPPUNIT='`pkg-config --libs ${DEPLIBS_CPPUNIT}`'
+    COMMON_LINK_SSL='`pkg-config --libs ${DEPLIBS_SSL}`'
+    COMMON_LINK_KRB5='`pkg-config --libs ${DEPLIBS_KRB5}`'
     SYSROOT=
     ;;
 
@@ -114,19 +150,32 @@ case ${with_sysroot} in
 
     SYSROOT=${with_sysroot}
     CXXFLAGS='`PKG_CONFIG_SYSROOT_DIR=${PKG_CONFIG_SYSROOT_DIR} PKG_CONFIG_LIBDIR=${PKG_CONFIG_LIBDIR} \
-    pkg-config --cflags ${DEPLIBS}` -D_USE_LIBEV -I$(top_srcdir)/include -I$(top_srcdir)/3rd_party'
+    pkg-config --cflags ${DEPLIBS_ALL}` -D_USE_LIBEV -I$(top_srcdir)/include -I$(top_srcdir)/3rd_party'
 
     COMMON_LINK='`PKG_CONFIG_SYSROOT_DIR=${PKG_CONFIG_SYSROOT_DIR} PKG_CONFIG_LIBDIR=${PKG_CONFIG_LIBDIR} \
-    pkg-config --libs-only-L ${DEPLIBS}`'
+    pkg-config --libs ${DEPLIBS}`'
+
+    COMMON_LINK_CPPUNIT='`PKG_CONFIG_SYSROOT_DIR=${PKG_CONFIG_SYSROOT_DIR} \
+    PKG_CONFIG_LIBDIR=${PKG_CONFIG_LIBDIR} pkg-config --libs \
+    ${DEPLIBS_CPPUNIT}`'
+    COMMON_LINK_SSL='`PKG_CONFIG_SYSROOT_DIR=${PKG_CONFIG_SYSROOT_DIR} \
+    PKG_CONFIG_LIBDIR=${PKG_CONFIG_LIBDIR} pkg-config --libs \
+    ${DEPLIBS_SSL}`'
+    COMMON_LINK_KRB5='`PKG_CONFIG_SYSROOT_DIR=${PKG_CONFIG_SYSROOT_DIR} \
+    PKG_CONFIG_LIBDIR=${PKG_CONFIG_LIBDIR} pkg-config --libs \
+    ${DEPLIBS_KRB5}`'
 
     AC_SUBST(PKG_CONFIG_PATH)
     AC_SUBST(PKG_CONFIG_LIBDIR)
     AC_SUBST(PKG_CONFIG_SYSROOT_DIR)
 
-    AC_SUBST(COMMON_LINK)
-
     ;;
 esac
+
+AC_SUBST(COMMON_LINK)
+AC_SUBST(COMMON_LINK_CPPUNIT)
+AC_SUBST(COMMON_LINK_SSL)
+AC_SUBST(COMMON_LINK_KRB5)
 
 AC_SUBST(SYSROOT)
 
@@ -136,10 +185,16 @@ case $host in
     arm*)
         CXXFLAGS+=' -DARM'
         COMMON_LINK+=' -latomic'
+        COMMON_LINK_CPPUNIT+=' -latomic'
+        COMMON_LINK_SSL+=' -latomic'
+        COMMON_LINK_KRB5+=' -latomic'
     ;;
     aarch64)
         CXXFLAGS+=' -DARM'
         COMMON_LINK+=' -latomic'
+        COMMON_LINK_CPPUNIT+=' -latomic'
+        COMMON_LINK_SSL+=' -latomic'
+        COMMON_LINK_KRB5+=' -latomic'
     ;;
 esac
 
@@ -166,7 +221,7 @@ AC_DEFINE(_GNU_SOURCE, 1,[GNU non-portable features])
 
 AC_SUBST( TSTLDFLG, '-lipc -lcombase -lstdc++ -lcppunit \
 -L$(top_srcdir)/3rd_party -L$(top_srcdir)/combase -L$(top_srcdir)/ipc \
-${COMMON_LINK}' )
+${COMMON_LINK_CPPUNIT}' )
 
 PKG_PROG_PKG_CONFIG
 PKG_INSTALLDIR

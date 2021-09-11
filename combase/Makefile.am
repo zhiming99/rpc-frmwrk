@@ -36,4 +36,4 @@ rpcfcombasedir=$(includedir)/rpcf
 libcombase_ladir=$(libdir)
 
 libcombase_la_LDFLAGS=-version-info @VERSION2@
-libcombase_la_LIBADD= -lpthread -ldl
+libcombase_la_LIBADD= -lpthread -ldl -llz4 $(COMMON_LINK)
