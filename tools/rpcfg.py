@@ -176,25 +176,16 @@ class ConfigDlg(Gtk.Dialog):
                 
                 if port[ 'PortClass'] == 'RpcTcpBusPort' :
                     connParams = port[ 'Parameters']
-                    if connParams is None :
-                        ifCfg = dict()
-                        ifCfg[ "AddrFormat" ]= "ipv4"
-                        ifCfg[ "Protocol" ]= "native"
-                        ifCfg[ "PortNumber" ]= "4132"
-                        ifCfg[ "BindAddr"] = "127.0.0.1"
-                        ifCfg[ "PdoClass"] = "TcpStreamPdo2"
-                        ifCfg[ "Compression" ]= "true"
-                        ifCfg[ "EnableWS" ]= "false"
-                        ifCfg[ "EnableSSL" ]= "false"
-                        ifCfg[ "ConnRecover" ]= "false"
-                        ifCfg[ "HasAuth" ]= "false"
-                        ifCfg[ "DestURL" ]= "https://www.example.com"
-                        connparams = [ ifCfg, ]
-                    confVals[ "connParams"] = [ *connParams ]
-                    maxConns = port[ "MaxConnections" ]
-                    if maxConns is None :
-                        maxConns = "512"
-                    confVals[ "MaxConnections" ] = maxConns
+                    if self.bServer :
+                        if connParams is None :
+                            ifCfg = DefaultIfCfg()
+                            confVals[ "connParams"] = [ ifCfg, ]
+                        else :
+                            confVals[ "connParams"] = [ *connParams ]
+                        maxConns = port[ "MaxConnections" ]
+                        if maxConns is None :
+                            maxConns = "512"
+                        confVals[ "MaxConnections" ] = maxConns
             except Exception as err :
                 pass
 
@@ -207,10 +198,10 @@ class ConfigDlg(Gtk.Dialog):
             try:
                 objName = svrObj[ 'ObjectName' ]
                 if objName == 'RpcRouterBridgeAuthImpl' :
-                    if 'AuthInfo' in svrObj :
+                    if 'AuthInfo' in svrObj and self.bServer:
                         confVals[ 'AuthInfo'] = svrObj[ 'AuthInfo']
                     else :
-                        confVals[ 'AuthInfo' ] = []
+                        confVals[ 'AuthInfo' ] = None
                     if 'Nodes' in svrObj :
                         confVals[ 'Nodes'] = svrObj[ 'Nodes']
                     else:
@@ -249,12 +240,40 @@ class ConfigDlg(Gtk.Dialog):
             jsonVal = pathVal[ 1 ]
             try:
                 svrObjs = jsonVal[ 'Objects' ]
-                if svrObjs is not None and len( svrObjs ) > 0 :
-                    for svrObj in svrObjs :
+                authInfo = None
+                for svrObj in svrObjs :
+                    if self.bServer:
+                        authInfo = svrObj['AuthInfo']
+                        authUser = authInfo[ 'UserName' ]
+                        break
+
+                    if not self.bServer :
+                        if svrObj[ "ProxyPortClass"] != "DBusProxyPdo" :
+                            continue
+
                         if 'AuthInfo' in svrObj :
                             authInfo = svrObj['AuthInfo']
-                            if 'UserName' in authInfo :
-                                authUser = authInfo[ 'UserName' ]
+                            authUser = authInfo[ 'UserName' ]
+                            confVals[ 'AuthInfo' ] = authInfo
+
+                        ifCfg0 = DefaultIfCfg()
+                        ifCfg0[ 'BindAddr' ] = svrObj[ 'IpAddress' ]
+                        ifCfg0[ 'PortNumber' ] = svrObj[ 'PortNumber' ]
+                        ifCfg0[ 'Compression' ] = svrObj[ 'Compression' ]
+                        ifCfg0[ 'EnableWS' ] = svrObj[ 'EnableWS' ]
+                        ifCfg0[ 'EnableSSL' ] = svrObj[ 'EnableSSL' ]
+
+                        if ifCfg0[ 'EnableWS' ] == 'true':
+                            ifCfg0[ 'DestURL' ] = svrObj[ 'DestURL' ]
+
+                        if authInfo is not None:
+                            ifCfg0[ 'HasAuth' ] = 'true'
+                        else:
+                            ifCfg0[ 'HasAuth' ] = 'false'
+                        ifCfg0[ 'RouterPath' ] = svrObj[ 'RouterPath' ]
+                        confVals[ 'connParams' ] = [ ifCfg0, ]
+                        break
+
             except Exception as err :
                 pass
 
@@ -305,31 +324,36 @@ class ConfigDlg(Gtk.Dialog):
             gridSec.remove_row( 0 )
         self.InitSecurityPage( gridSec, 0, 0, confVals )
 
-        gridmh = self.gridmh
-        rows = GetGridRows( gridmh )
-        for i in range( rows ) :
-            gridmh.remove_row( 0 )
-        self.InitMultihopPage( gridmh, 0, 0, confVals )
+        if self.bServer :
+            gridmh = self.gridmh
+            rows = GetGridRows( gridmh )
+            for i in range( rows ) :
+                gridmh.remove_row( 0 )
+            self.InitMultihopPage( gridmh, 0, 0, confVals )
 
-        gridlb = self.gridlb
-        rows = GetGridRows( gridlb )
-        for i in range( rows ) :
-            gridlb.remove_row( 0 )
-        self.InitLBGrpPage( gridlb, 0, 0, confVals )
+            gridlb = self.gridlb
+            rows = GetGridRows( gridlb )
+            for i in range( rows ) :
+                gridlb.remove_row( 0 )
+            self.InitLBGrpPage( gridlb, 0, 0, confVals )
 
         self.show_all()
 
     def __init__(self, bServer):
         self.strCfgPath = ""
-        Gtk.Dialog.__init__(self, title="Config the RPC Router", flags=0)
+        if bServer :
+            title = "Config the RPC Router"
+        else:
+            title = "Config the RPC Proxy Router"
+
+        Gtk.Dialog.__init__(self, title, flags=0)
         self.add_buttons(
             Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
             Gtk.STOCK_OK, Gtk.ResponseType.OK,
             Gtk.STOCK_SAVE_AS, Gtk.ResponseType.YES,
             Gtk.STOCK_OPEN, Gtk.ResponseType.APPLY )
+
         self.bServer = bServer
-        if not bServer :
-            self.get_header_bar().set_title( "Config RPC Proxy Router" )
 
         confVals = self.RetrieveInfo()
         self.confVals = confVals
@@ -372,19 +396,20 @@ class ConfigDlg(Gtk.Dialog):
         self.InitSecurityPage( gridSec, 0, 0, confVals )
         self.gridSec = gridSec
 
-        gridmh = Gtk.Grid()
-        gridmh.props.row_spacing = 6        
-        stack.add_titled(gridmh, "GridMh", "Multihop")
-        self.InitMultihopPage( gridmh, 0, 0, confVals )
-        self.gridmh = gridmh
-        stack.connect("notify::visible-child", vc_changed)
+        if self.bServer :
+            gridmh = Gtk.Grid()
+            gridmh.props.row_spacing = 6        
+            stack.add_titled(gridmh, "GridMh", "Multihop")
+            self.InitMultihopPage( gridmh, 0, 0, confVals )
+            self.gridmh = gridmh
+            stack.connect("notify::visible-child", vc_changed)
 
-        gridlb = Gtk.Grid()
-        gridlb.set_column_homogeneous( True )
-        gridlb.props.row_spacing = 6        
-        stack.add_titled(gridlb, "GridLB", "Load Balance")
-        self.InitLBGrpPage( gridlb, 0, 0, confVals )
-        self.gridlb = gridlb
+            gridlb = Gtk.Grid()
+            gridlb.set_column_homogeneous( True )
+            gridlb.props.row_spacing = 6        
+            stack.add_titled(gridlb, "GridLB", "Load Balance")
+            self.InitLBGrpPage( gridlb, 0, 0, confVals )
+            self.gridlb = gridlb
 
         stack_switcher = Gtk.StackSwitcher()
         stack_switcher.set_stack(stack)
@@ -1049,12 +1074,15 @@ class ConfigDlg(Gtk.Dialog):
 
         bActive = False
         try:
-            if confVals[ 'connParams'] is not None :
+            if not self.bServer: 
+                authInfo = confVals[ 'AuthInfo' ]
+                if 'UserName' in authInfo :
+                    bActive = True
+            else:
                 param0 = confVals[ 'connParams'][ ifNo ]
-                if param0 is not None :
-                    strAuth = param0[ 'HasAuth']
-                    if strAuth == 'true' :
-                        bActive = True
+                strAuth = param0[ 'HasAuth']
+                if strAuth == 'true' :
+                    bActive = True
         except Exception as err :
             pass
 
@@ -1315,10 +1343,8 @@ class ConfigDlg(Gtk.Dialog):
 
         strUser = ""
         try:
-            if confVals[ 'AuthInfo'] is not None :
-                authInfo = confVals[ 'AuthInfo']
-                if authInfo[ 'UserName'] is not None :
-                    strUser = authInfo[ 'UserName']
+            authInfo = confVals[ 'AuthInfo']
+            strUser = authInfo[ 'UserName']
         except Exception as err :
             pass
 
@@ -1395,11 +1421,11 @@ class ConfigDlg(Gtk.Dialog):
                 if interf.authCheck.props.active :
                     if len( self.realmEdit.get_text() ) == 0 :
                         return "Auth enabled, but realm is empty"
-                    if len( self.svcEdit.get_text() ) == 0 :
+                    if len( self.svcEdit.get_text() ) == 0 and self.bServer :
                         return "Auth enabled, but service is empty"
-                    if len( self.kdcEdit.get_text() ) == 0 :
+                    if len( self.kdcEdit.get_text() ) == 0 and self.bServer :
                         return "Auth enabled, but kdc address is empty"
-                    if len( self.userEdit.get_text() ) == 0 :
+                    if len( self.userEdit.get_text() ) == 0 and not self.bServer:
                         return "Auth enabled, but user name is empty"
                 if len( interf.ipAddr.get_text() ) == 0 :
                     return "Ip address is empty"
@@ -1431,6 +1457,9 @@ class ConfigDlg(Gtk.Dialog):
                 if interf.webSock.props.active :
                     if len( interf.urlEdit.get_text() ) == 0 :
                         return "WebSocket enabled, but dest url is empty"
+
+            if not self.bServer :
+                return 'success'
 
             addrSet.clear()
             bValidPath = False
@@ -1476,7 +1505,7 @@ class ConfigDlg(Gtk.Dialog):
                 if not strName.isidentifier() :
                     return "Multihop node name '%s' is not a valid identifier" % strName
 
-            if not bValidPath :
+            if not bValidPath and self.bServer:
                 return "RouterPath is not valid because the node to forward is not in the multihop node list"
 
         except Exception as err:
@@ -1621,7 +1650,8 @@ class ConfigDlg(Gtk.Dialog):
             authInfo[ 'ServiceName' ] = self.svcEdit.get_text()
             authInfo[ 'AuthMech' ] = 'krb5'
             authInfo[ 'UserName' ] = self.userEdit.get_text()
-            authInfo[ 'KdcIp' ] = self.kdcEdit.get_text()
+            if self.bServer :
+                authInfo[ 'KdcIp' ] = self.kdcEdit.get_text()
 
             tree_iter = self.signCombo.get_active_iter()
             if tree_iter is not None:
@@ -1656,6 +1686,8 @@ class ConfigDlg(Gtk.Dialog):
 
     def Export_Multihop( self, jsonVal ) -> int :
         ret = 0
+        if not self.bServer :
+            return 0
         try:
             nodes = list()
             jsonVal[ 'Multihop' ] = nodes
@@ -1691,6 +1723,8 @@ class ConfigDlg(Gtk.Dialog):
 
     def Export_LBGrp( self, jsonVal ) -> int :
         ret = 0
+        if not self.bServer :
+            return 0
         try:
             groups = list()
             jsonVal[ 'LBGroup' ] = groups
@@ -1737,6 +1771,11 @@ class ConfigDlg(Gtk.Dialog):
         if ret < 0 :
             return ret
 
+        if self.bServer :
+            jsonVal[ 'IsServer' ] = "true"
+        else:
+            jsonVal[ 'IsServer' ] = "false"
+
         try:
             fp = open(path, "w")
             json.dump( jsonVal, fp, indent=4)
@@ -1768,10 +1807,10 @@ class ConfigDlg(Gtk.Dialog):
             return ret
 
         return Update_InitCfg(
-            initFile, bServer, destPath )
+            initFile, destPath )
 
     def UpdateConfig( self ) :
-        return self.Export_Files( None, True )
+        return self.Export_Files( None, self.bServer )
 
 class LBGrpEditDlg(Gtk.Dialog):
     def __init__(self, parent, iGrpNo):
@@ -1910,67 +1949,97 @@ class LBGrpEditDlg(Gtk.Dialog):
         if len( self.grpSet ) == 0 :
             self.rmMemberBtn.set_sensitive( False )
         self.toMemberBtn.set_sensitive( True )
+        
+import getopt
+def usage():
+    print( "Usage: python3 rpcfg.py [-hc]" )
+    print( "\t-c: to config a client host." )
+    print( "\t\tOtherwise it is for a server host" )
 
-win = ConfigDlg(True)
-win.connect("close", Gtk.main_quit)
-while True :
-    response = win.run()
-    if response == Gtk.ResponseType.OK:
-        ret = win.UpdateConfig()
-        if ret < 0 :
-            continue
-    elif response == Gtk.ResponseType.YES:
-        dialog = Gtk.FileChooserDialog(
-            title="Please choose a directory",
-            parent=win,
-            action=Gtk.FileChooserAction.SELECT_FOLDER)
-        dialog.add_buttons(
-            Gtk.STOCK_CANCEL,
-            Gtk.ResponseType.CANCEL,
-            Gtk.STOCK_OPEN,
-            Gtk.ResponseType.OK,
-        )
-        response = dialog.run()
-        path = '.'
+def main() :
+    bServer = True
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], "hc" )
+    except getopt.GetoptError as err:
+        # print help information and exit:
+        print(err)  # will print something like "option -a not recognized"
+        usage()
+        sys.exit(-errno.EINVAL)
+
+    output = None
+    verbose = False
+    for o, a in opts:
+        if o == "-h" :
+            usage()
+            sys.exit( 0 )
+        elif o == "-c":
+            bServer = False
+        else:
+            assert False, "unhandled option"
+ 
+    win = ConfigDlg(bServer)
+    win.connect("close", Gtk.main_quit)
+    while True :
+        response = win.run()
         if response == Gtk.ResponseType.OK:
-            path = dialog.get_filename()
-        dialog.destroy()
-        win.strCfgPath = path
-        win.Export_Files(path, True)
-        continue
-    elif response == Gtk.ResponseType.APPLY:
-        dialog = Gtk.FileChooserDialog(
-            title="Please choose a directory",
-            parent=win,
-            action=Gtk.FileChooserAction.SELECT_FOLDER)
-        dialog.add_buttons(
-            Gtk.STOCK_CANCEL,
-            Gtk.ResponseType.CANCEL,
-            Gtk.STOCK_OPEN,
-            Gtk.ResponseType.OK,
-        )
-        response = dialog.run()
-        path = '.'
-        if response == Gtk.ResponseType.OK:
-            path = dialog.get_filename()
-        drvCfgPath = path + "/" + "driver.json"
-        try:
-            fp = open( drvCfgPath, "r" )
-            fp.close()
-        except OSError as err:
-            text = "Failed to load config files:" + str( err )
-            exc_type, exc_obj, exc_tb = sys.exc_info()
-            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-            second_text = "@" + fname + ":" + str(exc_tb.tb_lineno)
-            win.DisplayError( text, second_text )
+            ret = win.UpdateConfig()
+            if ret < 0 :
+                continue
+        elif response == Gtk.ResponseType.YES:
+            dialog = Gtk.FileChooserDialog(
+                title="Please choose a directory",
+                parent=win,
+                action=Gtk.FileChooserAction.SELECT_FOLDER)
+            dialog.add_buttons(
+                Gtk.STOCK_CANCEL,
+                Gtk.ResponseType.CANCEL,
+                Gtk.STOCK_OPEN,
+                Gtk.ResponseType.OK,
+            )
+            response = dialog.run()
+            path = '.'
+            if response == Gtk.ResponseType.OK:
+                path = dialog.get_filename()
             dialog.destroy()
+            win.strCfgPath = path
+            win.Export_Files(path, win.bServer)
+            continue
+        elif response == Gtk.ResponseType.APPLY:
+            dialog = Gtk.FileChooserDialog(
+                title="Please choose a directory",
+                parent=win,
+                action=Gtk.FileChooserAction.SELECT_FOLDER)
+            dialog.add_buttons(
+                Gtk.STOCK_CANCEL,
+                Gtk.ResponseType.CANCEL,
+                Gtk.STOCK_OPEN,
+                Gtk.ResponseType.OK,
+            )
+            response = dialog.run()
+            path = '.'
+            if response == Gtk.ResponseType.OK:
+                path = dialog.get_filename()
+            drvCfgPath = path + "/" + "driver.json"
+            try:
+                fp = open( drvCfgPath, "r" )
+                fp.close()
+            except OSError as err:
+                text = "Failed to load config files:" + str( err )
+                exc_type, exc_obj, exc_tb = sys.exc_info()
+                fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+                second_text = "@" + fname + ":" + str(exc_tb.tb_lineno)
+                win.DisplayError( text, second_text )
+                dialog.destroy()
+                continue
+
+            dialog.destroy()
+            win.strCfgPath = path
+            win.ReinitDialog( path )
             continue
 
-        dialog.destroy()
-        win.strCfgPath = path
-        win.ReinitDialog( path )
-        continue
+        break
+        
+    win.destroy()
 
-    break
-    
-win.destroy()
+if __name__ == "__main__":
+    main()

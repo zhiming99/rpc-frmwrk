@@ -260,7 +260,19 @@ AC_ARG_ENABLE([testcases],
     [:],
     [enable_testcases=yes])
 
+AC_ARG_ENABLE([openssl],
+    [AS_HELP_STRING([--disable-openssl], [build and install without openssl])],
+    [:],
+    [enable_openssl=yes])
+
+AC_ARG_ENABLE([kerberos],
+    [AS_HELP_STRING([--disable-kerberos], [build and install without kerberos])],
+    [:],
+    [enable_kerberos=yes])
+
 AM_CONDITIONAL([ENABLE_TESTCASES],[test "$enable_testcases" = "yes"])
+AM_CONDITIONAL([ENABLE_OPENSSL],[test "$enable_openssl" = "yes"])
+AM_CONDITIONAL([ENABLE_KERBEROS],[test "$enable_kerberos" = "yes"])
 AM_CONDITIONAL([SIPBUILD],[test x$ac_cv_prog_sipbuild = xyes])
 AM_CONDITIONAL([SIP4],[test x$ac_cv_prog_sip4 = xyes])
 

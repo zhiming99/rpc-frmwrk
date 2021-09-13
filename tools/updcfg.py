@@ -71,7 +71,7 @@ def UpdateTestCfg( jsonVal, cfgList:list ):
             if 'HasAuth' in ifCfg and ifCfg[ 'HasAuth' ] == 'true' :
                 elem[ 'AuthInfo' ] = authInfo
             else :
-                elem.pop( 'AuthInfo' )
+                elem.pop( 'AuthInfo', None )
             if elem[ 'EnableWS' ] == 'true' :
                 elem[ 'DestURL' ] = ifCfg[ 'DestURL' ]
                 urlComp = urlparse( elem[ 'DestURL' ], scheme='https' )
@@ -233,7 +233,8 @@ def Update_AuthPrxy( initCfg: dict, drvFile : list,
         'AuthInfo' in initCfg[ 'Security' ] ):
         authInfo = deepcopy(
             initCfg[ 'Security' ][ 'AuthInfo' ] )
-        kdcIp = authInfo[ 'KdcIp' ]
+        if bServer :
+            kdcIp = authInfo[ 'KdcIp' ]
         authInfo.pop( 'KdcIp', None )
         if 'UserName' in authInfo :
             userName = authInfo[ 'UserName' ]
@@ -270,7 +271,7 @@ def Update_AuthPrxy( initCfg: dict, drvFile : list,
                     raise Exception( 'web socket URL is not valid' ) 
 
         elif objName == 'KdcRelayServer' :
-            if kdcIp is not None :
+            if kdcIp is not None and bServer :
                 proxy[ 'IpAddress' ] = kdcIp
             break
 
@@ -391,6 +392,21 @@ def Update_Rtauth( initCfg: dict, drvFile: list,
     fp.close()
     return ret
 
+def DefaultIfCfg() -> dict :
+    defCfg = dict()
+    defCfg[ "AddrFormat" ]= "ipv4"
+    defCfg[ "Protocol" ]= "native"
+    defCfg[ "PortNumber" ]= "4132"
+    defCfg[ "BindAddr"] = "127.0.0.1"
+    defCfg[ "PdoClass"] = "TcpStreamPdo2"
+    defCfg[ "Compression" ]= "true"
+    defCfg[ "EnableWS" ]= "false"
+    defCfg[ "EnableSSL" ]= "false"
+    defCfg[ "ConnRecover" ]= "false"
+    defCfg[ "HasAuth" ]= "false"
+    defCfg[ "DestURL" ]= "https://www.example.com"
+    return defCfg
+
 def Update_Drv( initCfg: dict, drvFile : list,
     bServer : bool, destDir : str ) -> int :
 
@@ -434,17 +450,8 @@ def Update_Drv( initCfg: dict, drvFile : list,
                 break
         break
 
-    defCfg = dict()
-    defCfg[ "AddrFormat" ]= "ipv4"
-    defCfg[ "Protocol" ]= "native"
-    defCfg[ "PortNumber" ]= "4132"
-    defCfg[ "BindAddr"] = "127.0.0.1"
-    defCfg[ "PdoClass"] = "TcpStreamPdo2"
-    defCfg[ "Compression" ]= "true"
-    defCfg[ "EnableWS" ]= "false"
-    defCfg[ "EnableSSL" ]= "false"
-    defCfg[ "ConnRecover" ]= "false"
-    defCfg[ "HasAuth" ]= "false"
+
+    defCfg = DefaultIfCfg()
 
     defConn = dict()
     defConn[ "PortNumber" ]= "4132"
@@ -454,8 +461,9 @@ def Update_Drv( initCfg: dict, drvFile : list,
     defConn[ "EnableSSL" ]= "false"
     defConn[ "HasAuth" ]= "false"
 
+    oConns = None
     if bServer and 'Connections' not in initCfg:
-        oConns = [ defConn ]
+        oConns = [ defConn, ]
 
     while bServer and 'Connections' in initCfg:
         oConns = initCfg[ 'Connections' ]
@@ -486,6 +494,52 @@ def Update_Drv( initCfg: dict, drvFile : list,
             break
         break
 
+    if not bServer and 'Connections' in initCfg:
+        oConns = initCfg[ 'Connections' ]
+
+    bAuth = False
+    bSSL = False
+    if oConns is not None:
+        for oConn in oConns:
+            if 'HasAuth' in oConn :
+                if oConn[ 'HasAuth' ] == 'true' :
+                    bAuth = True
+            if 'EnableSSL' in oConn:
+                if oConn[ 'EnableSSL' ] == 'true' :
+                    bSSL = True
+
+    try:
+        if 'Match' in drvVal :
+            oMatches = drvVal[ 'Match' ]
+            for oMatch in oMatches:
+                if oMatch[ 'PortClass' ] != "TcpStreamPdo2":
+                    continue
+                oSeq = [ "RpcNatProtoFdoDrv", "RpcTcpFidoDrv" ]
+                if bAuth :
+                    oSeq.insert( 0, "RpcSecFidoDrv" )
+                if bSSL :
+                    oSeq.insert( 0, "RpcWebSockFidoDrv" )
+                    oSeq.insert( 0, "RpcOpenSSLFidoDrv" )
+                oMatch[ 'ProbeSequence' ] = oSeq
+                break
+
+        if 'Modules' in drvVal :
+            oModules = drvVal[ 'Modules' ]
+            for oModule in oModules :
+                if oModule[ 'ModName' ] != 'rpcrouter':
+                    continue
+                oFactories = []
+                if bAuth :
+                    oFactories.append ( './libauth.so' )
+                if bSSL:
+                    oFactories.append( './libsslpt.so' )
+                    oFactories.append( './libwspt.so' )
+                oModule[ "ClassFactories" ] = oFactories
+                break
+
+    except Exception as err:
+        pass
+
     if destDir is None:
         drvPath = drvFile[ 0 ]
     else:
@@ -496,13 +550,21 @@ def Update_Drv( initCfg: dict, drvFile : list,
 
     return ret
 
-def Update_InitCfg( cfgPath : str,
-    bServer : bool, destDir : str ) -> int :
+def Update_InitCfg(
+    cfgPath : str, destDir : str ) -> int :
     ret = 0
     try:
         fp = open( cfgPath, "r" )
         initCfg = json.load( fp )
         fp.close()
+
+        strVal = initCfg[ 'IsServer' ]
+        if strVal == 'true' :
+            bServer = True
+        elif strVal == 'false' :
+            bServer = False
+        else:
+            return -errno.EINVAL
 
         jsonFiles = LoadConfigFiles( None )
         if jsonFiles is None :

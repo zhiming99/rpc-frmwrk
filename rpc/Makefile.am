@@ -20,5 +20,12 @@ rpcfrpcdir=$(top_srcdir)/rpc
 librpc_la_LDFLAGS=-version-info @VERSION2@
 librpc_la_LIBADD= -L../combase -L../ipc -lcombase -lipc -lpthread -ldl
 
-SUBDIRS= . router security sslport wsport
+SUBDIRS= . router
 
+if ENABLE_OPENSSL
+SUBDIRS += sslport wsport
+endif
+
+if ENABLE_KERBEROS
+SUBDIRS += security
+endif
