@@ -14,6 +14,12 @@ The UI dialog consists of the following tab pages
 * Load Balance Page. Based on the `multihop` technology, `rpcrouter` can easily be configured to have the `load balance` support. However, currently the `load balance` support just one policy, the `round robin`. And you can refer to [this article](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support#node-redundancyload-balance) for more information.   
   ![rpcfg tab4](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/rpcfg4.png)
   
+**Depending** on the location of rpcfg.py, the set of config files updated will be different. If rpcfg.py is under the installation directory, it will update all the config files installed. If rpcfg.py is under the source tree, it will update all the config files under the source tree, which can finaly go to the installation directory by `make install`
+
+**`rpcfgnui.py`** is a command line config tool in case the target host is not running X. There are two steps to get the settings update.
+  * Setting up the parameters with rpcfg.py on your development host, and uses the `SaveAs`button to generate the config file, `initcfg.json`.
+  * copy the `initcfg.json` to the target host, and type `python3 rpcfgnui.py initcfg.json`. You may want to use `sudo` when you are updating the config files in the priviledged directory.
+  * `rpcfgnui.py` have the same behavor as `rpcfg.py` in updating the different set of config files according to its location.
 
 ### Quick Start with Dockerfile
 If you are familiar with docker, and has no patient to setup the building environment,  you can use this tool to quickly setup the building environemt.
