@@ -506,10 +506,11 @@ gint32 CConfigDb::SerializeNew(
             {
                 guint32 len = 1 + strnlen(
                     ( char* )pValBuf->ptr(), pValBuf->size() );
-                if( pEnd - pLoc < sizeof( guint32 ) + len )
+                guint32 dwFree = pEnd - pLoc;
+                if( dwFree < sizeof( guint32 ) + len )
                 {
-                    guint32 dwIncSize = std::max(
-                        QPAGE, len + QPAGE );
+                    guint32 dwIncSize = 
+                        len + sizeof( guint32 ) - dwFree + QPAGE;
 
                     RESIZE_BUF( oBuf.size() + dwIncSize, ret );
                     if( ERROR( ret ) )
@@ -536,16 +537,24 @@ gint32 CConfigDb::SerializeNew(
                 ret = pMsg.Serialize( *pBuf );
                 if( ERROR( ret ) )
                     break;
+
+                guint32 dwFree = pEnd - pLoc;
                 guint32 len = pBuf->size();
-                if( pEnd - pLoc < len )
+                if( dwFree < len + sizeof( guint32 ) )
                 {
-                    guint32 dwIncSize = std::max(
-                        QPAGE, len + QPAGE );
+                    guint32 dwIncSize = 
+                        len + sizeof( guint32 ) - dwFree + QPAGE;
 
                     RESIZE_BUF( oBuf.size() + dwIncSize, ret );
                     if( ERROR( ret ) )
                         break;
                 }
+
+                len = htonl( len );
+                memcpy( pLoc, &len, sizeof( guint32 ) );
+                len = ntohl( len );
+
+                pLoc += sizeof( guint32 );
                 memcpy( pLoc, pBuf->ptr(), len );
                 pLoc += len;
                 break;
@@ -573,11 +582,12 @@ gint32 CConfigDb::SerializeNew(
             }
         case typeByteArr:
             {
-                guint32 len = pValBuf->size() + sizeof( guint32 );
-                if( pEnd - pLoc < len )
+                guint32 len = pValBuf->size();
+                guint32 dwFree = pEnd - pLoc;
+                if( dwFree < len + sizeof( guint32 ) )
                 {
-                    guint32 dwIncSize = std::max(
-                        QPAGE, len + QPAGE );
+                    guint32 dwIncSize =
+                        len + sizeof( guint32 ) - dwFree + QPAGE;
 
                     RESIZE_BUF( oBuf.size() + dwIncSize, ret );
                     if( ERROR( ret ) )
@@ -701,6 +711,11 @@ gint32 CConfigDb::DeserializeNew(
             case typeString:
                 {
                     guint32 len = 0;
+                    if( pLoc + sizeof( guint32 ) > pEnd )
+                    {
+                        ret = -E2BIG;
+                        break;
+                    }
                     memcpy( &len, pLoc, sizeof( guint32 ) );
                     len = ntohl( len );
                     pLoc += sizeof( guint32 );
@@ -722,6 +737,11 @@ gint32 CConfigDb::DeserializeNew(
             case typeDMsg:
                 {
                     guint32 len = 0;
+                    if( pLoc + sizeof( guint32 ) > pEnd )
+                    {
+                        ret = -E2BIG;
+                        break;
+                    }
                     memcpy( &len, pLoc, sizeof( guint32 ) );
                     len = ntohl( len );
                     if( pLoc + len > pEnd )
@@ -771,6 +791,11 @@ gint32 CConfigDb::DeserializeNew(
             case typeByteArr:
                 {
                     guint32 len = 0;
+                    if( pLoc + sizeof( guint32 ) > pEnd )
+                    {
+                        ret = -E2BIG;
+                        break;
+                    }
                     memcpy( &len, pLoc, sizeof( guint32 ) );
                     len = ntohl( len );
                     pLoc += sizeof( guint32 );
