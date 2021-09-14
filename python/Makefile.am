@@ -36,14 +36,30 @@ all:
     fi
 
 install:
-	@python3 setup.py bdist_wheel
+	if [ "x$${SUDO_USER}" == "x" ];then \
+		python3 setup.py bdist_wheel; \
+	else \
+		su -c "python3 setup.py bdist_wheel" $${SUDO_USER} ;\
+	fi;
 	@export pkg=./dist/`ls -1t dist | head -n 1`; \
 	echo installing $${pkg} ....;\
 	if [ "x$(DESTDIR)" == "x" ]; then \
-		pip install $${pkg};\
+		echo destdir is $(DESTDIR);\
+		if [ "x$${SUDO_USER}" == "x" ];then \
+			pip install --user $${pkg};\
+		else \
+			su -c "pip install --user $${pkg}" $${SUDO_USER};\
+		fi; \
 	else\
-		cp $${pkg} $(DESTDIR); \
+		cp $${pkg} $(DESTDIR)/usr/local/lib/rpcf/; \
 	fi
 
 uninstall:
-	@pip3 uninstall rpcf
+	@if [ "x$(DESTDIR)" == "x" ]; then \
+		if [ "x$${SUDO_USER}" == "x" ];then \
+			pip uninstall rpcf;\
+		else \
+			su -c "pip uninstall $${pkg}" $${SUDO_USER};\
+		fi; \
+	fi
+
