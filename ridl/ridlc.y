@@ -57,6 +57,19 @@ std::map< gint32, std::set< gint32 > >
         { TOK_HSTREAM, { typeNone } }
     };
 
+std::map< gint32, EnumTypeId >
+    g_mapTok2Type = {
+        { TOK_UINT64, typeUInt64 },
+        { TOK_INT64, typeUInt64 },
+        { TOK_UINT32, typeUInt32 },
+        { TOK_INT32, typeUInt32 },
+        { TOK_UINT16, typeUInt16 },
+        { TOK_INT16, typeUInt16 },
+        { TOK_FLOAT, typeFloat },
+        { TOK_DOUBLE, typeDouble },
+        { TOK_BYTE, typeByte }
+};
+
 extern std::vector<
     std::unique_ptr< FILECTX > > g_vecBufs;
 
@@ -64,6 +77,60 @@ extern bool g_bNewSerial;
 
 void yyerror( YYLTYPE *locp,
     char const* szFile, char const *msg );
+
+template< class RetType >
+RetType CastPrimeVal( BufPtr& pBuf )
+{
+    EnumTypeId  iType = pBuf->GetExDataType();
+    switch( iType )
+    {
+    case typeByte:
+            return ( RetType )( guint8& )*pBuf;
+    case typeUInt16:
+            return ( RetType )( guint16&)*pBuf;
+    case typeUInt32:
+            return ( RetType )( guint32&)*pBuf;
+    case typeUInt64:
+            return ( RetType )( guint64&)*pBuf;
+    case typeFloat:
+            return ( RetType )( float&)*pBuf;
+    case typeDouble:
+            return ( RetType )( double&)*pBuf;
+    default:
+        break;
+    }
+    return 0;
+}
+
+BufPtr CastPrimeValBuf(
+    EnumTypeId iRetType, BufPtr& pBuf )
+{
+    BufPtr pRetBuf( true );
+    switch( iRetType )
+    {
+    case typeByte:
+        *pRetBuf = CastPrimeVal< guint8 >( pBuf );
+        break;
+    case typeUInt16:
+        *pRetBuf = CastPrimeVal< guint16 >( pBuf );
+        break;
+    case typeUInt32:
+        *pRetBuf = CastPrimeVal< guint32 >( pBuf );
+        break;
+    case typeUInt64:
+        *pRetBuf = CastPrimeVal< guint64 >( pBuf );
+        break;
+    case typeFloat:
+        *pRetBuf = CastPrimeVal< float >( pBuf );
+        break;
+    case typeDouble:
+        *pRetBuf = CastPrimeVal< double >( pBuf );
+        break;
+    default:
+        break;
+    }
+    return pRetBuf;
+}
 
 #ifndef YYPTRDIFF_T
 # if defined __PTRDIFF_TYPE__ && defined __PTRDIFF_MAX__
@@ -520,7 +587,33 @@ field_decl : idl_type TOK_IDENT '=' const_val ';'
             g_bSemanErr = true;
         }
 
-        pfdl->SetVal( $4 );
+        if( iType == TOK_STRING ||
+            iType == TOK_BOOL ||
+            iType == TOK_HSTREAM )
+        {
+            pfdl->SetVal( pVal );
+        }
+        else
+        {
+            std::map< gint32, EnumTypeId>::iterator
+                itr = g_mapTok2Type.find( iType );
+            if( itr != g_mapTok2Type.end() )
+            {
+                EnumTypeId iExType = itr->second;
+                BufPtr pActVal =
+                    CastPrimeValBuf( iExType, pVal );
+                pfdl->SetVal( pActVal );
+            }
+            else
+            {
+                std::string strMsg =
+                    "internal error happens";
+                PrintMsg(
+                    -EFAULT, strMsg.c_str() );
+                g_bSemanErr = true;
+            }
+        }
+
         BufPtr pBuf( true );
         *pBuf = pNode;
         $$ = pBuf;

@@ -719,6 +719,8 @@ gint32 CDeclarePyStruct::Output()
                 break;
             }
             stdstr strSig = pType->GetSignature();
+            BufPtr& pVal = pfd->GetVal();
+
             switch( strSig[ 0 ] )
             {
             case '(' :
@@ -738,27 +740,132 @@ gint32 CDeclarePyStruct::Output()
                     break;
                 }
             case 'h':
-            case 'Q':
-            case 'q':
-            case 'D':
-            case 'd':
-            case 'W':
-            case 'w':
-            case 'b':
-            case 'B':
                 {
                     CCOUT << "self." << strName << " = 0";
                     break;
                 }
+            case 'Q':
+                {
+                    if( pVal.IsEmpty() )
+                        CCOUT << "self." << strName << " = 0";
+                    else
+                    {
+                        guint64 qwVal = *pVal;
+                        CCOUT << "self." << strName << " = " << qwVal;
+                    }
+                    break;
+                }
+            case 'q':
+                {
+                    if( pVal.IsEmpty() )
+                        CCOUT << "self." << strName << " = 0";
+                    else
+                    {
+                        gint64 qwVal = *pVal;
+                        CCOUT << "self." << strName << " = " << qwVal;
+                    }
+                    break;
+                }
+            case 'D':
+                {
+                    if( pVal.IsEmpty() )
+                        CCOUT << "self." << strName << " = 0";
+                    else
+                    {
+                        guint32 dwVal = *pVal;
+                        CCOUT << "self." << strName << " = " << dwVal;
+                    }
+                    break;
+                }
+            case 'd':
+                {
+                    if( pVal.IsEmpty() )
+                        CCOUT << "self." << strName << " = 0";
+                    else
+                    {
+                        gint32 iVal = *pVal;
+                        CCOUT << "self." << strName << " = " << iVal;
+                    }
+                    break;
+                }
+            case 'W':
+                {
+                    if( pVal.IsEmpty() )
+                        CCOUT << "self." << strName << " = 0";
+                    else
+                    {
+                        guint16 wVal = *pVal;
+                        CCOUT << "self." << strName << " = " << wVal;
+                    }
+                    break;
+                }
+            case 'w':
+                {
+                    if( pVal.IsEmpty() )
+                        CCOUT << "self." << strName << " = 0";
+                    else
+                    {
+                        gint16 sVal = *pVal;
+                        CCOUT << "self." << strName << " = " << sVal;
+                    }
+                    break;
+                }
+            case 'b':
+                {
+                    if( pVal.IsEmpty() )
+                        CCOUT << "self." << strName << " = True";
+                    else
+                    {
+                        bool bVal = *pVal;
+                        if( bVal )
+                            CCOUT << "self." << strName << " = " << "True";
+                        else
+                            CCOUT << "self." << strName << " = " << "False";
+                    }
+                    break;
+                }
+            case 'B':
+                {
+                    if( pVal.IsEmpty() )
+                        CCOUT << "self." << strName << " = 0";
+                    else
+                    {
+                        guint8 byVal = *pVal;
+                        CCOUT << "self." << strName << " = " << byVal;
+                    }
+                    break;
+                }
             case 'f':
+                {
+                    if( pVal.IsEmpty() )
+                        CCOUT << "self." << strName << " = .0";
+                    else
+                    {
+                        float fVal = *pVal;
+                        CCOUT << "self." << strName << " = " << fVal;
+                    }
+                    break;
+                }
             case 'F':
                 {
-                    CCOUT << "self." << strName << " = .0";
+                    if( pVal.IsEmpty() )
+                        CCOUT << "self." << strName << " = .0";
+                    else
+                    {
+                        double dblVal = *pVal;
+                        CCOUT << "self." << strName << " = " << dblVal;
+                    }
                     break;
                 }
             case 's':
                 {
-                    CCOUT << "self." << strName << " = \"\"";
+                    if( pVal.IsEmpty() )
+                        CCOUT << "self." << strName << " = ''";
+                    else
+                    {
+                        const char* szVal = pVal->ptr();
+                        CCOUT << "self." << strName << " = \"" << szVal << "\"";
+                    }
                     break;
                 }
             case 'a':
