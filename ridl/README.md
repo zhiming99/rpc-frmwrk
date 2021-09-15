@@ -126,10 +126,11 @@ On a successful compile of the above sample ridl file, `ridlc` will generate the
 * **maincli.cpp, mainsvr.cpp**: as the name indicate, the two files define main function of the proxy and server respectively. Each file contains a same-name function, that is a `maincli` function in maincli.cpp and `mainsvr` in mainsvr.cpp, which is the ideal place to add your custom code.
 
 * **example.cpp, example.h** : the files are named with the name defined by *appname*. It contains all the skelton method declarations, and implementations.
-* **SimpFileSvc.cpp, SimpFileSvc.h:** the files are named with the *service id* of the *service statement*. Each individual service declaration has a pair of `.cpp` and `.h` file. The cpp file contains all the methods that user should implement to get server/proxy to work. They are mainly the same-name methods on Server side as request handler. The amount of efforts are different depending on whether to use `sync` or `async` approach to implement the interfaces of the service. `sync` implementation is simple and time-saving at development time, `async` is relatively difficult to develop, but with better performance. And `rpc-frmwrk` provides rich utilities to help developing asynchronous implementation to minize the developing efforts.
-* **Makefile**: The make file to build the project. Note that, you must install the `rpc-frmwrk` first.
-* **exampledesc.json, driver.json:** The configuration files.
-* **run:** After the successful make, there will be two executables, `examplecli` and `examplesvr`. Run the server on the `bridge` side and the client on the `reqfwdr` side. If you have specified `-l` option when generating the code, the `make` command will produce a shared library named `examplelib.so`.
+* **SimpFileSvccli.cpp, SimpFileSvccli.h, SimpFileSvcsvr.cpp, SimpFileSvcsvr.h:** the files are named with the *service id* of the *service statement* appending a `svr` or `cli`. Each individual service declaration has two pairs of `.cpp` and `.h` file, for both server/client side. The cpp file contains all the methods that user should implement to get server/proxy to work. They are mainly the same-name methods as defined in ridl file on Server side as the request handlers. 
+The amount of efforts to take are different depending on whether or not the meethod is labeled `async`. Without `async` tag, the implementation is a synchronous version and time-saving at development time. And the implementation with `async` tag takes more efforts, but has better performance. The implementation consists of two parts, one is the skelton code to serialize/deserialize parameters, schedule callbacks, setup timers, and the rest are business logics for the user, including handling response, errors, timeout, canceling current request or starting new request. And `rpc-frmwrk` provides rich utilities to help developing asynchronous implementation to reduce the developing efforts.
+* **Makefile**: The make file to build the project. It has two build targets, `debug` and `release`. the debug version of image will go to the `debug` directory, and the release version of image will go to the `release` directory. During making, the communication settings are synchronized with current system settings, and usually you don't need to manually config it.
+* **exampledesc.json, driver.json:** The configuration files. `driver.json` is for `I/O manager` and `port objsects`, which is relative stable, and `exampledesc.json` contains all the things needed for the services defined in the ridl file. Everytime you have used rpcfg.py to update the settings of `rpc-frmwrk`, you need to run `make` to update the two files as well.
+* **run:** After a successful make, there will be two executables, `examplecli` and `examplesvr`. Run the server on the `bridge` side and the client on the `reqfwdr` side. If you have specified `-l` option when generating the code, the `make` command will produce a shared library named `examplelib.so`.
 
 ### Output for Python project
 
@@ -137,15 +138,15 @@ On a successful compile of the above sample ridl file, `ridlc` will generate the
 
 * **maincli.py, mainsvr.py**: as the name indicate, the two files define main function of the proxy and server respectively. Each file contains a same-name function, that is a `maincli` function in maincli.py and `mainsvr` in mainsvr.py, which is the ideal place to add your custom code.
 
-* **examplestructs.py, seribase.py** : the struct file is named with the name defined by *appname*. It contains all the struct declaration, and serialization methods, while seribase.py contains the serialization utilities.
+* **examplestructs.py, seribase.py** : the struct file is named with the name defined by *appname*. It contains all the struct declarations, with serialization implementations respectively, and `seribase.py` contains the serialization support utilities.
 
-* **SimpFileSvcclibase.py, SimpFileSvcsvrbase.py:** the files are named with the *service id* of the *service statement* plus `clibase` or `svrbase`. as their name shows, they contain the the server or client side classes which serve as the base class of the client/server. These files should not be touched by the users.
+* **SimpFileSvcclibase.py, SimpFileSvcsvrbase.py:** the files are named with the *service id* of the *service statement* plus `clibase` or `svrbase`. as their name show, they contain the the server or client side classes which serve as the base class of the client/server. These files should not be touched by the users, and they will be overwritten after running `ridlc` again.
 
-* **SimpFileSvccli.py, SimpFileSvcsvr.py:**: the files are named with the *service id* of the *service statement* plus `cli` or `svr`. These two files lists all the methods that require the user the implement. The synchronous method call has the least set of methods to implement, while the asynchronous method call has relatively complicated set of methods to implement.
+* **SimpFileSvccli.py, SimpFileSvcsvr.py:**: the files are named with the *service id* of the *service statement* plus `cli` or `svr`. These two files lists all the methods that require the user the implement. The synchronous method call has the least set of methods to implement, while the asynchronous method call has 1 or 2 more methods for each requests to implement.
 
 * **Makefile**: The make file to build the project. Note that, it just synchronizes the configuration with the system settings.
 * **exampledesc.json, driver.json:** The configuration files.
-* **run:** you can run `mainsvr.py` and `maincli.py` directly, and there is no need to make or build.
+* **run:** you can run `python3 mainsvr.py` and `python3 maincli.py` to start the server and client. Before the first run after `ridlc`, make sure to run `make` to update the configuration file, that is, the `exampledesc.json` file in this context.
 
 ### Interchangable client and server between C++ and Python
 You can connect the C++ server with a python client or a Python server with a C++ client as long as both are generated with the same ridl file.
