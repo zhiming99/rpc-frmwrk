@@ -46,9 +46,9 @@ install:
 	if [ "x$(DESTDIR)" == "x" ]; then \
 		echo destdir is $(DESTDIR);\
 		if [ "x$${SUDO_USER}" == "x" ];then \
-			pip install --user $${pkg};\
+			pip3 install --user $${pkg};\
 		else \
-			su -c "pip install --user $${pkg}" $${SUDO_USER};\
+			su -c "pip3 install --user $${pkg}" $${SUDO_USER};\
 		fi; \
 	else\
 		cp $${pkg} $(DESTDIR)/usr/local/lib/rpcf/; \
@@ -57,9 +57,9 @@ install:
 uninstall:
 	@if [ "x$(DESTDIR)" == "x" ]; then \
 		if [ "x$${SUDO_USER}" == "x" ];then \
-			pip uninstall rpcf;\
+			pip3 uninstall rpcf;\
 		else \
-			su -c "pip uninstall $${pkg}" $${SUDO_USER};\
+			su -c "pip3 uninstall $${pkg}" $${SUDO_USER};\
 		fi; \
 	fi
 

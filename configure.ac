@@ -204,6 +204,9 @@ case $host in
     aarch64*)
         CXXFLAGS+=' -DBUILD_64=1'
     ;;
+    arm64*)
+        CXXFLAGS+=' -DBUILD_64=1'
+    ;;
     arm*)
         CXXFLAGS+=' -DBUILD_64=0'
     ;;
@@ -236,6 +239,8 @@ AC_CONFIG_FILES([Makefile
                  rpc/router/Makefile
                  ridl/Makefile
                  tools/Makefile
+                 tools/Dockerfile
+                 tools/runtest.sh
                  3rd_party/Makefile
                  python/Makefile
                  python/setup.py
