@@ -23,8 +23,9 @@ The UI dialog consists of the following tab pages
   * `rpcfgnui.py` have the same behavor as `rpcfg.py` in updating the different set of config files according to its location.
 
 ### Quick Start with Dockerfile
-If you are familiar with docker, and has no patient to setup the building environment,  you can use this tool to quickly setup the building environemt.
+If you are familiar with docker, you can use this tool to quickly setup the building/running environemt.
   * Open a terminal, and change to the directory `tools` where a `Dockerfile` can be found.
   * Type `docker build -t 'rpcf-buildenv' ./`
   * You can tweak the `Dockerfile` to customize the image you want to build. Ubuntu Focal is a tested platform, .
-  * This is a minimum environment without X, you can use use `rpcfgnui.py` to update the container's settings as described in the above section.
+  * This is a minimum environment without X, and for test purpose the server is set to listening to 127.0.0.1.
+  * You can use use `rpcfgnui.py` to update the container's settings as described in the above section.
