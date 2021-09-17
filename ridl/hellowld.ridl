@@ -1,0 +1,18 @@
+// for Python code, 'ridlc -pO ./outputdir hellowld.ridl'
+// for C++ code, 'ridlc -O ./outputdir hellowld.ridl'
+
+// declare the name of the application
+appname "HelloWorld";
+
+// declare interface
+interface IHelloWorld
+{
+    Echo( string strText )
+        returns ( string strResp ) ;
+};
+
+// declare the service
+service HelloWorldSvc
+{
+    interface IHelloWorld;
+};
