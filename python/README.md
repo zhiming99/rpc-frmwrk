@@ -8,11 +8,11 @@ The Python support for RPC-Frmwrk is actually a wrapper over the C++ RPC-Frmwrk.
 The features the python wrapper can deliver are almost the same as C/C++ RPC-Frmwrk, except the two test cases `inproctst` and the `btinrtst`, which involves in-process IPC. You can refer to the tests directory to find more details about the supported features.
 
 ### Building your Python RPC applications
-It is strongly recommend to use the `ridlc` to generate the Python skelton code, which can be the start point of your Python RPC application. The information about `ridlc` can be found [here](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl#introduction).
+I strongly recommend you to use the `ridlc` to generate the Python skelton code, which can be the start point of your Python RPC application. The information about `ridlc` can be found [here](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl#introduction).
 
 ### Technical Information
 At present, Python wrapper suport 3 types of serializations for data communication.
-* The first is the ridl serialization, the recommended serialization delivered by ridlc generated python skelton. It can communicate with the peer written in different languages. And it is transparent to the application developer.
+* The first is the ridl serialization, the recommended serialization delivered by ridlc generated Python skelton code. It can communicate with the peer written in different languages. And it is transparent to the application developer.
 * The second is the native serialization from the C++ RPC-Frwmrk, which support the primary data types, bytes, bytearray plus the serializable `ObjPtr`. It can talk with both C++ server or the Python server. But the disadvantage it that you may need to explicitly serialized complex data structure to bytearray in your business code.
 * the last serialization approach supported is the Python's `pickle`, which transparently seralize all the parameters passed down to the RPC-Frmwrk, and deserialized by the peer before passing to the user defined interface. The disadvantage is that, it limit both proxy and server to be written in Python. The lang-neutural serialization approach is still in the making. 
 
