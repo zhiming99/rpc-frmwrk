@@ -18,14 +18,13 @@ The UI dialog consists of the following tab pages
 `rpcfg.py` accepts a command line option `-c`, to config the local host to be a client only. The UI has just `connection` and `security` tabs.
 
 **`rpcfgnui.py`** is a command line config tool in case the target host is not running X. There are two steps to get the settings update.
-  * Setting up the parameters with rpcfg.py on your development host, and uses the `SaveAs`button to generate the config file, `initcfg.json`.
+  * Setting up the parameters with rpcfg.py on your desktop host, and uses the `SaveAs`button to generate the config file, `initcfg.json`.
   * copy the `initcfg.json` to the target host, and type `python3 rpcfgnui.py initcfg.json`. You may want to use `sudo` when you are updating the config files in the priviledged directory.
   * `rpcfgnui.py` have the same behavor as `rpcfg.py` in updating the different set of config files according to its location.
 
 ### Quick Start with Dockerfile
 If you are familiar with docker, and has no patient to setup the building environment,  you can use this tool to quickly setup the building environemt.
-  * Open a terminal, and change to the directory `tools`.
-  * Type `docker build -t 'rpcf-buildenv' ./`.
-  * You can tweak the `Dockerfile` to customize the image you want to build. Ubuntu groovy+ or Fedora 33+ are preferred because they ships with `sip5-tools`, which builds the `python` directory, more complete than Ubuntu 20.04.
-  * This is a minimum environment without X, so the `rpcfg.py` cannot run in this container. You can either install X on the container or use `rpcfg.py` on your host to export a desired set of configuration, and upload them to the container's `/usr/local/etc/rpcf/`.
-
+  * Open a terminal, and change to the directory `tools` where a `Dockerfile` can be found.
+  * Type `docker build -t 'rpcf-buildenv' ./`
+  * You can tweak the `Dockerfile` to customize the image you want to build. Ubuntu Focal is a tested platform, .
+  * This is a minimum environment without X, you can use use `rpcfgnui.py` to update the container's settings as described in the above section.
