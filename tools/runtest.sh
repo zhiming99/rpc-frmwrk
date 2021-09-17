@@ -33,7 +33,7 @@ elif [ "$1" == "1" ]; then
     ${bin_dir}/rpcrouter -r 1&
     pwd
     pushd ./ridl
-    ${bin_dir}/ridlc -I ./ -pO ./pytest example.ridl || exit 6
+    ${bin_dir}/ridlc -I ./ -pO ./pytest comptest.ridl || exit 6
     cd ./pytest
     make
     python3 mainsvr.py &
