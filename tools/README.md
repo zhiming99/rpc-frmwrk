@@ -24,8 +24,8 @@ The UI dialog consists of the following tab pages
 
 ### Quick Start with Dockerfile
 If you are familiar with docker, you can use this tool to quickly setup the building/running environemt.
-  * Open a terminal, and change to the directory `tools` where a `Dockerfile` can be found.
-  * Type `docker build -t 'rpcf-buildenv' ./`
-  * You can tweak the `Dockerfile` to customize the image you want to build. Ubuntu Focal is a tested platform, .
+  * Open a terminal, and download the `Dockerfile` as shown above.
+  * Type `docker build -t 'rpcf-buildenv' .` in the same directory the `Dockerfile` is downloaded.
+  * You can tweak `Dockerfile` to customize the image you want to build. Ubuntu Focal (20.04LTS) is a tested platform, higher version of Ubuntu would be more preferable. 
   * This is a minimum environment without X, and for test purpose the server is set to listening to 127.0.0.1.
   * You can use use `rpcfgnui.py` to update the container's settings as described in the above section.
