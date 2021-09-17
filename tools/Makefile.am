@@ -1,5 +1,5 @@
 pysources = rpcfg.py updcfg.py rpcfgnui.py
-EXTRA_DIST= $(pysources) README.md runtest.sh.in Dockerfile
+EXTRA_DIST= $(pysources) README.md runtest.sh Dockerfile
 
 docker:
 	docker build -t rpcf .

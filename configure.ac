@@ -239,7 +239,6 @@ AC_CONFIG_FILES([Makefile
                  rpc/router/Makefile
                  ridl/Makefile
                  tools/Makefile
-                 tools/runtest.sh
                  3rd_party/Makefile
                  python/Makefile
                  python/setup.py
