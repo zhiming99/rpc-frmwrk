@@ -375,8 +375,8 @@ def Update_Rtauth( initCfg: dict, drvFile: list,
                     svrObj[ 'Nodes'] = mhNodes
 
             elif objName == 'RpcRouterManagerImpl' :
-                if not 'MaxPendingRequests' in svrObj:
-                    svrObj[ 'MaxPendingRequests' ] = str( maxConns * 16  )
+                svrObj[ 'MaxRequests' ] = str( maxConns * 8  )
+                svrObj[ 'MaxPendingRequests' ] = str( maxConns * 16  )
             elif ( objName == 'RpcReqForwarderAuthImpl' or
                 objName == 'RpcReqForwarderImpl' ):
                 svrObj[ 'TaskScheduler' ] = taskSched

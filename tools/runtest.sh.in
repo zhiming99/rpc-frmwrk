@@ -3,13 +3,13 @@ bin_dir=@bindir@
 export LD_LIBRARY_PATH=${lib_dir}:${lib_dir}/rpcf
 cat /proc/cpuinfo
 if [ "$1" == "2" ]; then
-    echo starting the bridge...
-    ${bin_dir}/rpcrouter -r 2 &
     echo starting the app server...
-    ${bin_dir}/rpcf/ifsvrsmk&
-    ${bin_dir}/rpcf/kasvrtst&
-    ${bin_dir}/rpcf/actcsvrtst&
-    ${bin_dir}/rpcf/prsvrtst
+    ${bin_dir}/rpcf/ifsvrsmk &
+    ${bin_dir}/rpcf/kasvrtst &
+    ${bin_dir}/rpcf/actcsvrtst &
+    ${bin_dir}/rpcf/prsvrtst &
+    echo starting the bridge...
+    ${bin_dir}/rpcrouter -r 2 
 elif [ "$1" == "1" ]; then
     echo starting the reqfwdr...
     ${bin_dir}/rpcrouter -r 1 &
@@ -35,9 +35,10 @@ elif [ "$1" == "1" ]; then
     pushd ./ridl
     ${bin_dir}/ridlc -I ./ -pO ./pytest example.ridl || exit 6
     cd ./pytest
-    python mainsvr.py &
+    make
+    python3 mainsvr.py &
     sleep 5
     echo start the Python testcases
-    python maincli.py || exit 7
+    python3 maincli.py || exit 7
     popd
 fi
