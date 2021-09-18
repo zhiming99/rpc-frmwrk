@@ -6721,7 +6721,7 @@ gint32 CExportReadme::Output()
         }
 
         Wa( "### Introduction to the files:" );
-        CCOUT<< "* **" << g_strAppName << ".cpp**, **" << g_strAppName <<".h**: "
+        CCOUT<< "* *" << g_strAppName << ".cpp*, *" << g_strAppName <<".h*: "
             << "Containing all the implementations of the helpers "
             << "and utilities for each declared interfaces, for "
             << "both client and server.";
@@ -6730,7 +6730,7 @@ gint32 CExportReadme::Output()
             << "overwritten by ridlc without auto-backup.";
         NEW_LINES( 2 );
 
-        CCOUT<< "* **" << g_strAppName << "desc.json**: "
+        CCOUT<< "* *" << g_strAppName << "desc.json*: "
             << "Containing the configuration parameters for all "
             << "the services declared in the ridl file";
         NEW_LINE;
@@ -6738,7 +6738,7 @@ gint32 CExportReadme::Output()
             << "overwritten by ridlc and synccfg.py without backup.";
         NEW_LINES( 2 );
 
-        CCOUT << "* **driver.json**: "
+        CCOUT << "* *driver.json*: "
             << "Containing the configuration parameters for all "
             << "the ports and drivers";
         NEW_LINE;
@@ -6759,7 +6759,7 @@ gint32 CExportReadme::Output()
             << "generated code to `maincli.cpp.new` and `mainsvr.cpp.new`.";
         NEW_LINES( 2 );
 
-        CCOUT << "* **Makefile**: "
+        CCOUT << "* *Makefile*: "
             << "The Makefile will build both the server/client side program "
             << "or shared library. Besides, it will also synchronize the configurations "
             << "with the local system settings.";
@@ -6793,9 +6793,15 @@ gint32 CExportReadme::Output()
             NEW_LINES( 2 );
         }
 
-        CCOUT << "* **synccfg.py**: "
+        CCOUT << "* *synccfg.py*: "
             << "a small python script to synchronous settings "
             << "with the system settings, just ignore it.";
+        NEW_LINES(2);
+
+        CCOUT << "**Note**: the files in bold text need your further implementation. "
+            << "And files in italic text do not. And of course, "
+            << "you can still customized the italic files by backing up them "
+            << "and overwriting the auto-generated version.";
         NEW_LINE;
 
    }while( 0 );
