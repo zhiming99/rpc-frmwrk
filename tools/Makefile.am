@@ -1,5 +1,5 @@
 pysources = rpcfg.py updcfg.py rpcfgnui.py
-EXTRA_DIST= $(pysources) README.md runtest.sh Dockerfile
+EXTRA_DIST= $(pysources) README.md runtest.sh Dockerfile testcfgs/mincfg.json
 
 docker:
 	docker build -t rpcf .

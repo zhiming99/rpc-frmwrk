@@ -3250,7 +3250,7 @@ gint32 CExportPyReadme::Output()
             << "and definition of `mainsvr()` function server program respectively. ";
         NEW_LINE;
         CCOUT << "And you can make changes to the files to customize the program. "
-            << "The `ridlc` will not touch them if they exists in the target directory, "
+            << "The `ridlc` will not touch them if they exist in the project directory, "
             << "when it runs again, and put the newly "
             << "generated code to `maincli.py.new` and `mainsvr.py.new`.";
         NEW_LINES( 2 );
@@ -3275,12 +3275,12 @@ gint32 CExportPyReadme::Output()
 
             CCOUT << "* **" << elem << "svr.py**, **" << elem << "cli.py**: "
                 << "Containing the declarations and definitions of all the server/client side "
-                << "methods that need to be implemented by you, mainly the request handlers, "
+                << "methods that need to be implemented by you, mainly the request/event handlers, "
                 << "for service `" << elem << "`.";
             NEW_LINE;
             CCOUT << "And you need to make changes to the files to implement the "
                 << "functionality for server/client. "
-                << "The `ridlc` will not touch them if they exists in the target directory, "
+                << "The `ridlc` will not touch them if they exist in the project directory, "
                 << "when it runs again, and put the newly "
                 << "generated code to `"<<elem  <<".py.new`.";
             NEW_LINES( 2 );

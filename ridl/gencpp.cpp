@@ -6727,7 +6727,7 @@ gint32 CExportReadme::Output()
             << "both client and server.";
         NEW_LINE;
         CCOUT << "And please don't edit them, since they will be "
-            << "overwritten by ridlc without auto-backup.";
+            << "overwritten by `ridlc` without auto-backup.";
         NEW_LINES( 2 );
 
         CCOUT<< "* *" << g_strAppName << "desc.json*: "
@@ -6735,7 +6735,7 @@ gint32 CExportReadme::Output()
             << "the services declared in the ridl file";
         NEW_LINE;
         CCOUT << "And please don't edit it, since they will be "
-            << "overwritten by ridlc and synccfg.py without backup.";
+            << "overwritten by `ridlc` and synccfg.py without backup.";
         NEW_LINES( 2 );
 
         CCOUT << "* *driver.json*: "
@@ -6743,7 +6743,7 @@ gint32 CExportReadme::Output()
             << "the ports and drivers";
         NEW_LINE;
         CCOUT << "And please don't edit it, since they will be "
-            << "overwritten by ridlc and synccfg.py without backup.";
+            << "overwritten by `ridlc` and synccfg.py without backup.";
         NEW_LINES( 2 );
 
         CCOUT << "* **maincli.cpp**, **mainsvr.cpp**: "
@@ -6754,7 +6754,7 @@ gint32 CExportReadme::Output()
             << "if `-l` option is not specified.";
         NEW_LINE;
         CCOUT << "And you can make changes to the files to customize the program. "
-            << "The ridlc will not touch them if they exists in the target directory, "
+            << "The `ridlc` will not touch them if they exist in the project directory, "
             << "when it runs again, and put the newly "
             << "generated code to `maincli.cpp.new` and `mainsvr.cpp.new`.";
         NEW_LINES( 2 );
@@ -6765,7 +6765,7 @@ gint32 CExportReadme::Output()
             << "with the local system settings.";
         NEW_LINE;
         CCOUT << "And please don't edit it, since it will be "
-            << "overwritten by ridlc and synccfg.py without backup.";
+            << "overwritten by `ridlc` and synccfg.py without backup.";
         NEW_LINES( 2 );
 
         for( auto& elem : vecSvcNames )
@@ -6776,7 +6776,7 @@ gint32 CExportReadme::Output()
                 << "for service `" << elem << "`.";
             NEW_LINE;
             CCOUT << "And you need to make changes to the files to implement the server logics. "
-                << "The ridlc will not touch them if they exists in the target directory, "
+                << "The `ridlc` will not touch them if they exist in the project directory, "
                 << "when it runs again, and put the newly "
                 << "generated code to `"<<elem  <<".h.new` and `"<<elem <<".cpp.new`.";
             NEW_LINES( 2 );
@@ -6787,7 +6787,7 @@ gint32 CExportReadme::Output()
                 << "or asynchronous callbacks, for service `" << elem << "`.";
             NEW_LINE;
             CCOUT << "And you need to make changes to the files to implement the client logics. "
-                << "The ridlc will not touch them if they exists in the target directory, "
+                << "The `ridlc` will not touch them if they exist in the project directory, "
                 << "when it runs again, and put the newly "
                 << "generated code to `"<<elem  <<".h.new` and `"<<elem <<".cpp.new`.";
             NEW_LINES( 2 );
