@@ -465,6 +465,9 @@ CPyFileSet::CPyFileSet(
         strOutPath, "mainsvr.py",
         true );
 
+    GEN_FILEPATH( m_strReadme, 
+        strOutPath, "README.md",
+        false );
     m_strPath = strOutPath;
 
     gint32 ret = OpenFiles();
@@ -522,6 +525,13 @@ gint32 CPyFileSet::OpenFiles()
 
     pstm = STMPTR( new std::ofstream(
         m_strMainSvr,
+        std::ofstream::out |
+        std::ofstream::trunc) );
+
+    m_vecFiles.push_back( std::move( pstm ) );
+
+    pstm = STMPTR( new std::ofstream(
+        m_strReadme,
         std::ofstream::out |
         std::ofstream::trunc) );
 
@@ -1798,6 +1808,12 @@ gint32 GenPyProj(
 
         CImplPyMainFunc opmf( &oWriter, pRoot );
         ret = opmf.Output();
+        if( ERROR( ret ) )
+            break;
+
+        oWriter.SelectReadme();
+        CExportPyReadme ordme( &oWriter, pRoot );
+        ret = ordme.Output();
 
     }while( 0 );
 
@@ -3179,4 +3195,128 @@ gint32 CImplPyMainFunc::Output()
     }while( 0 );
 
     return ret;
+}
+
+gint32 CExportPyReadme::Output()
+{
+   gint32 ret = 0; 
+   do{
+        std::vector< ObjPtr > vecSvcs;
+        ret = m_pNode->GetSvcDecls( vecSvcs );
+        if( ERROR( ret ) )
+            break;
+
+        std::vector< stdstr > vecSvcNames;
+        for( auto& elem : vecSvcs )
+        {
+            CServiceDecl* psd = elem;
+            if( psd == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            vecSvcNames.push_back(
+                psd->GetName() );
+        }
+
+        Wa( "### Introduction to the files:" );
+        CCOUT<< "* **" << g_strAppName << "structs.py**: "
+            << "Containing all the declarations of the struct classes "
+            << "declared in the ridl, with serialization methods implemented.";
+        NEW_LINE;
+        CCOUT << "And please don't edit it, since they will be "
+            << "overwritten by ridlc without auto-backup.";
+        NEW_LINES( 2 );
+
+        CCOUT<< "* **" << g_strAppName << "desc.json**: "
+            << "Containing the configuration parameters for all "
+            << "the services declared in the ridl file";
+        NEW_LINE;
+        CCOUT << "And please don't edit it, since they will be "
+            << "overwritten by ridlc and synccfg.py without backup.";
+        NEW_LINES( 2 );
+
+        CCOUT << "* **driver.json**: "
+            << "Containing the configuration parameters for all "
+            << "the ports and drivers";
+        NEW_LINE;
+        CCOUT << "And please don't edit it, since they will be "
+            << "overwritten by ridlc and synccfg.py without backup.";
+        NEW_LINES( 2 );
+
+        CCOUT << "* **maincli.py**, **mainsvr.py**: "
+            << "Containing defintion of `maincli()` function for client, as the main "
+            << "entry for client program "
+            << "and definition of `mainsvr()` function server program respectively. ";
+        NEW_LINE;
+        CCOUT << "And you can make changes to the files to customize the program. "
+            << "The ridlc will not touch them if they exists in the target directory, "
+            << "when it runs again, and put the newly "
+            << "generated code to `maincli.py.new` and `mainsvr.py.new`.";
+        NEW_LINES( 2 );
+
+        CCOUT << "* **Makefile**: "
+            << "The Makefile will just synchronize the configurations "
+            << "with the local system settings. And it does nothing else.";
+        NEW_LINE;
+        CCOUT << "And please don't edit it, since it will be "
+            << "overwritten by ridlc and synccfg.py without backup.";
+        NEW_LINES( 2 );
+
+        for( auto& elem : vecSvcNames )
+        {
+            CCOUT << "* **" << elem << "svrbase.py**: "
+                << "Containing the declarations and definitions of all the server side "
+                << "utilities and helpers for the interfaces of service `" << elem << "`.";
+            NEW_LINE;
+            CCOUT << "And please don't edit it, since it will be "
+                << "overwritten by ridlc without backup.";
+            NEW_LINES( 2 );
+
+            CCOUT << "* **" << elem << "clibase.py**: "
+                << "Containing the declarations and definitions of all the client side "
+                << "utilities and helpers for the interfaces of service `" << elem << "`.";
+            NEW_LINE;
+            CCOUT << "And please don't edit it, since it will be "
+                << "overwritten by ridlc without backup.";
+            NEW_LINES( 2 );
+
+            CCOUT << "* **" << elem << "svr.py**: "
+                << "Containing the declarations and definitions of all the server side "
+                << "methods that need to be implemented by you, mainly the request handlers, "
+                << "for service `" << elem << "`.";
+            NEW_LINE;
+            CCOUT << "And you need to make changes to the files to implement the server logics. "
+                << "The ridlc will not touch them if they exists in the target directory, "
+                << "when it runs again, and put the newly "
+                << "generated code to `"<<elem  <<".py.new`.";
+            NEW_LINES( 2 );
+
+            CCOUT << "* **" << elem << "cli.py**: "
+                << "Containing the declarations and definitions of all the client side "
+                << "methods that need to be implemented by you, mainly the event handlers "
+                << "or asynchronous callbacks, for service `" << elem << "`.";
+            NEW_LINE;
+            CCOUT << "And you need to make changes to the files to implement the client logics. "
+                << "The ridlc will not touch them if they exists in the target directory, "
+                << "when it runs again, and put the newly "
+                << "generated code to `"<<elem  <<".py.new`.";
+            NEW_LINES( 2 );
+        }
+
+        CCOUT << "* **seribase.py**: "
+            << "Containing the utility classes for serializations.";
+        NEW_LINE;
+        CCOUT << "And please don't edit it, since they will be "
+            << "overwritten by ridlc.";
+        NEW_LINES( 2 );
+
+        CCOUT << "* **synccfg.py**: "
+            << "a small python script to synchronous settings "
+            << "with the system settings, just ignore it.";
+        NEW_LINE;
+
+   }while( 0 );
+
+   return ret;
 }

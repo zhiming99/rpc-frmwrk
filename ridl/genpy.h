@@ -42,6 +42,7 @@ struct CPyFileSet : public IFileSet
     std::string  m_strMakefile;
     std::string  m_strMainCli;
     std::string  m_strMainSvr;
+    std::string  m_strReadme;
 
     typedef IFileSet super;
     CPyFileSet( const std::string& strOutPath,
@@ -124,6 +125,15 @@ class CPyWriter : public CWriterBase
         m_strCurFile = pFiles->m_strMainSvr;
         return SelectFile( 6 );
     }
+
+    inline gint32 SelectReadme()
+    {
+        CPyFileSet* pFiles = static_cast< CPyFileSet* >
+            ( m_pFiles.get() );
+        m_strCurFile = pFiles->m_strReadme;
+        return SelectFile( 7 );
+    }
+
 
     inline gint32 SelectImplFile(
         const std::string& strFile )
@@ -343,4 +353,16 @@ class CImplPyMainFunc :
     gint32 Output();
     gint32 OutputCli( CServiceDecl* pSvc );
     gint32 OutputSvr( CServiceDecl* pSvc );
+};
+
+class CExportPyReadme :
+    public CExportReadme
+{
+    public:
+    typedef CExportReadme super;
+    CExportPyReadme( CWriterBase* pWriter,
+        ObjPtr& pNode )
+        : super( pWriter, pNode )
+    {}
+    gint32 Output();
 };

@@ -725,15 +725,15 @@ CFileSet::CFileSet(
 
     GEN_FILEPATH( m_strObjDesc,
         strOutPath, strAppName + "desc.json",
-        true );
+        false );
 
     GEN_FILEPATH( m_strDriver,
         strOutPath, "driver.json",
-        true );
+        false );
 
     GEN_FILEPATH( m_strMakefile,
         strOutPath, "Makefile",
-        true );
+        false );
 
     GEN_FILEPATH( m_strMainCli,
         strOutPath, "maincli.cpp",
@@ -742,6 +742,10 @@ CFileSet::CFileSet(
     GEN_FILEPATH( m_strMainSvr, 
         strOutPath, "mainsvr.cpp",
         true );
+
+    GEN_FILEPATH( m_strReadme,
+        strOutPath, "README.md",
+        false );
 
     gint32 ret = OpenFiles();
     if( ERROR( ret ) )
@@ -798,6 +802,13 @@ gint32 CFileSet::OpenFiles()
 
     pstm = STMPTR( new std::ofstream(
         m_strMainSvr,
+        std::ofstream::out |
+        std::ofstream::trunc) );
+
+    m_vecFiles.push_back( std::move( pstm ) );
+
+    pstm = STMPTR( new std::ofstream(
+        m_strReadme,
         std::ofstream::out |
         std::ofstream::trunc) );
 
@@ -1402,6 +1413,12 @@ gint32 GenCppProj(
         oWriter.SelectDescFile();
         CExportObjDesc oedesc( &oWriter, pRoot );
         ret = oedesc.Output();
+        if( ERROR( ret ) )
+            break;
+        
+        oWriter.SelectReadme();
+        CExportReadme ordme( &oWriter, pRoot );
+        ret = ordme.Output();
 
     }while( 0 );
 
@@ -6663,4 +6680,125 @@ gint32 CExportObjDesc::BuildObjDesc(
     }while( 0 );
 
     return ret;
+}
+
+CExportReadme::CExportReadme(
+    CWriterBase* pWriter,
+    ObjPtr& pNode )
+{
+    m_pWriter = pWriter;
+    m_pNode = pNode;
+    if( m_pNode == nullptr )
+    {
+        std::string strMsg = DebugMsg(
+            -EFAULT, "CExportReadme ctor "
+            "internal error empty "
+            "'statement' node " );
+        throw std::runtime_error( strMsg );
+    }
+}
+
+gint32 CExportReadme::Output()
+{
+   gint32 ret = 0; 
+   do{
+        std::vector< ObjPtr > vecSvcs;
+        ret = m_pNode->GetSvcDecls( vecSvcs );
+        if( ERROR( ret ) )
+            break;
+
+        std::vector< stdstr > vecSvcNames;
+        for( auto& elem : vecSvcs )
+        {
+            CServiceDecl* psd = elem;
+            if( psd == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            vecSvcNames.push_back(
+                psd->GetName() );
+        }
+
+        Wa( "### Introduction to the files:" );
+        CCOUT<< "* **" << g_strAppName << ".cpp**, **" << g_strAppName <<".h**: "
+            << "Containing all the implementations of the helpers "
+            << "and utilities for each declared interfaces, for "
+            << "both client and server.";
+        NEW_LINE;
+        CCOUT << "And please don't edit them, since they will be "
+            << "overwritten by ridlc without auto-backup.";
+        NEW_LINES( 2 );
+
+        CCOUT<< "* **" << g_strAppName << "desc.json**: "
+            << "Containing the configuration parameters for all "
+            << "the services declared in the ridl file";
+        NEW_LINE;
+        CCOUT << "And please don't edit it, since they will be "
+            << "overwritten by ridlc and synccfg.py without backup.";
+        NEW_LINES( 2 );
+
+        CCOUT << "* **driver.json**: "
+            << "Containing the configuration parameters for all "
+            << "the ports and drivers";
+        NEW_LINE;
+        CCOUT << "And please don't edit it, since they will be "
+            << "overwritten by ridlc and synccfg.py without backup.";
+        NEW_LINES( 2 );
+
+        CCOUT << "* **maincli.cpp**, **mainsvr.cpp**: "
+            << "Containing defintion of `maincli()` function for client, as the main "
+            << "entry for client program "
+            << "and definition of `mainsvr()` function server program respectively. "
+            << "There is also an implementation of the `main` function in both files, "
+            << "if `-l` option is not specified.";
+        NEW_LINE;
+        CCOUT << "And you can make changes to the files to customize the program. "
+            << "The ridlc will not touch them if they exists in the target directory, "
+            << "when it runs again, and put the newly "
+            << "generated code to `maincli.cpp.new` and `mainsvr.cpp.new`.";
+        NEW_LINES( 2 );
+
+        CCOUT << "* **Makefile**: "
+            << "The Makefile will build both the server/client side program "
+            << "or shared library. Besides, it will also synchronize the configurations "
+            << "with the local system settings.";
+        NEW_LINE;
+        CCOUT << "And please don't edit it, since it will be "
+            << "overwritten by ridlc and synccfg.py without backup.";
+        NEW_LINES( 2 );
+
+        for( auto& elem : vecSvcNames )
+        {
+            CCOUT << "* **" << elem << "svr.h**, **" << elem << "svr.cpp**: "
+                << "Containing the declarations and definitions of all the server side "
+                << "methods that need to be implemented by you, mainly the request handlers, "
+                << "for service `" << elem << "`.";
+            NEW_LINE;
+            CCOUT << "And you need to make changes to the files to implement the server logics. "
+                << "The ridlc will not touch them if they exists in the target directory, "
+                << "when it runs again, and put the newly "
+                << "generated code to `"<<elem  <<".h.new` and `"<<elem <<".cpp.new`.";
+            NEW_LINES( 2 );
+
+            CCOUT << "* **" << elem << "cli.h**, **" << elem << "cli.cpp**: "
+                << "Containing the declarations and definitions of all the client side "
+                << "methods that need to be implemented by you, mainly the event handlers "
+                << "or asynchronous callbacks, for service `" << elem << "`.";
+            NEW_LINE;
+            CCOUT << "And you need to make changes to the files to implement the client logics. "
+                << "The ridlc will not touch them if they exists in the target directory, "
+                << "when it runs again, and put the newly "
+                << "generated code to `"<<elem  <<".h.new` and `"<<elem <<".cpp.new`.";
+            NEW_LINES( 2 );
+        }
+
+        CCOUT << "* **synccfg.py**: "
+            << "a small python script to synchronous settings "
+            << "with the system settings, just ignore it.";
+        NEW_LINE;
+
+   }while( 0 );
+
+   return ret;
 }

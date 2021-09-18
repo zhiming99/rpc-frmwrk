@@ -76,6 +76,7 @@ struct CFileSet : public IFileSet
     std::string  m_strMakefile;
     std::string  m_strMainCli;
     std::string  m_strMainSvr;
+    std::string  m_strReadme;
 
     typedef IFileSet super;
 
@@ -262,6 +263,14 @@ class CCppWriter : public CWriterBase
         return SelectFile( 6 );
     }
 
+    inline gint32 SelectReadme()
+    {
+        CFileSet* pFiles = static_cast< CFileSet* >
+            ( m_pFiles.get() );
+        m_strCurFile = pFiles->m_strReadme;
+        return SelectFile( 7 );
+    }
+
     inline gint32 SelectImplFile(
         const std::string& strFile )
     {
@@ -441,7 +450,6 @@ class CDeclInterfProxy
 
     public:
     typedef CMethodWriter super;
-
     CDeclInterfProxy( CCppWriter* pWriter,
         ObjPtr& pNode );
 
@@ -473,8 +481,9 @@ class CSetStructRefs :
     public CArgListUtils
 {
     CServiceDecl* m_pNode = nullptr;
-    public:
 
+    public:
+    typedef CArgListUtils super;
     CSetStructRefs( ObjPtr& pNode )
     { m_pNode = pNode; }
 
@@ -562,6 +571,7 @@ class CImplIufProxy
     CInterfaceDecl* m_pNode = nullptr;
 
     public:
+    typedef CArgListUtils super;
     CImplIufProxy( CCppWriter* pWriter,
         ObjPtr& pNode );
     gint32 Output();
@@ -574,6 +584,7 @@ class CImplIufSvr :
     CInterfaceDecl* m_pNode = nullptr;
 
     public:
+    typedef CArgListUtils super;
     CImplIufSvr( CCppWriter* pWriter,
         ObjPtr& pNode );
     gint32 Output();
@@ -583,6 +594,7 @@ class CEmitSerialCode
     : public CArgListUtils
 {
     public:
+    typedef CArgListUtils super;
     CWriterBase* m_pWriter = nullptr;
     CAstListNode* m_pArgs;
 
@@ -658,7 +670,7 @@ class CImplMainFunc :
     CCppWriter* m_pWriter = nullptr;
     CStatements* m_pNode = nullptr;
     public:
-    typedef CMethodWriter super;
+    typedef CArgListUtils super;
 
     CImplMainFunc( CCppWriter* pWriter,
         ObjPtr& pNode );
@@ -673,7 +685,7 @@ struct CExportBase
 
     CExportBase( CWriterBase* pWriter,
         ObjPtr& pNode );
-    gint32 Output();
+    virtual gint32 Output();
 };
 
 class CExportMakefile :
@@ -711,4 +723,14 @@ class CExportDrivers :
     gint32 Output();
 };
 
+class CExportReadme
+{
+    protected:
+    CWriterBase* m_pWriter = nullptr;
+    CStatements* m_pNode = nullptr;
 
+    public:
+    CExportReadme( CWriterBase* pWriter,
+        ObjPtr& pNode );
+    gint32 Output();
+};
