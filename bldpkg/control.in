@@ -1,0 +1,6 @@
+Package: @PACKAGE_NAME@
+Version: @VERSION@
+Maintainer: zhiming <@PACKAGE_BUGREPORT@>
+Architecture: @host_cpu@
+Description: RPC-frmwrk is a small event-driven, asynchronous RPC framework with high performance and high flexibility.
+Depends: libdbus-1, liblz4-1, libjsoncpp1, libkrb5-3, lz4, openssl, libssl1.1, libcppunit-1.15-0, python3-pip

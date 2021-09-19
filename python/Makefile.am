@@ -35,7 +35,7 @@ all:
 		cd rpcf; ln -s $(PYTHON_EXT) $(PYTHON_EXT1);\
     fi
 
-install:
+install: build_dpkg
 	if [ "x$${SUDO_USER}" == "x" ];then \
 		python3 setup.py bdist_wheel; \
 	else \
@@ -51,7 +51,7 @@ install:
 			su -c "pip3 install --user $${pkg}" $${SUDO_USER};\
 		fi; \
 	else\
-		cp $${pkg} $(DESTDIR)/usr/local/lib/rpcf/; \
+		cp $${pkg} $(DESTDIR)/$(libdir)/rpcf/; \
 	fi
 
 uninstall:
@@ -63,3 +63,8 @@ uninstall:
 		fi; \
 	fi
 
+build_dpkg:
+	@export pkg=./dist/`ls -1t dist | head -n 1`;\
+	if [ ! "x$(DESTDIR)" == "x" ]; then \
+		bash blddpkg.sh $(DESTDIR) $(prefix) $${pkg}; \
+	fi

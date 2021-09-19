@@ -243,6 +243,8 @@ AC_CONFIG_FILES([Makefile
                  python/Makefile
                  python/setup.py
                  pics/Makefile
+                 bldpkg/Makefile
+                 bldpkg/control
                  test/Makefile
                  test/actcancel/Makefile
                  test/asynctst/Makefile
