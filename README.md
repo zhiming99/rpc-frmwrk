@@ -59,6 +59,12 @@ This project depends on the following 3rd-party packags to build:
 5. Logging service
 
 ---
+[`Mon Sep 20 2021 11:34:52 PM Beijing`]   
+1. Fixed the cumulated bugs in Dockerfile, and made it work independently from any building output.
+2. Added scripts to build debian package, and almost done.
+3. The first official release 0.4.0 is coming.
+4. Json support will start after 0.4.0 is released.
+
 [`Thu Sep 02 2021 02:54:14 PM Beiging`]   
 1. Canceled the CBuffer-to-VARIANT change, to keep code clean.
 2. Start Json support right away. Json support is to pass the text in Json format as the input/output parameters to the `rpc-frmwrk`. 
