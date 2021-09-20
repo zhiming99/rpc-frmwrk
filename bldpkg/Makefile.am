@@ -3,8 +3,7 @@ EXTRA_DIST=control.in
 dpkg:
 	if [ ! -e $(DESTDIR)/DEBIAN ]; then \
 		mkdir -p $(DESTDIR)/DEBIAN;fi;\
-	cp ./control $(DESTDIR)/DEBIAN/;\
-	dpkg-deb $(DESTDIR) .
+	bash blddpkg.sh $(DESTDIR)
 
 install:
 	if [ ! "x$(DESTDIR)" == "x" ]; then \

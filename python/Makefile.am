@@ -57,9 +57,9 @@ install: build_dpkg
 uninstall:
 	@if [ "x$(DESTDIR)" == "x" ]; then \
 		if [ "x$${SUDO_USER}" == "x" ];then \
-			pip3 uninstall rpcf;\
+			pip3 uninstall -y @PACKAGE_NAME@;\
 		else \
-			su -c "pip3 uninstall $${pkg}" $${SUDO_USER};\
+			su -c "pip3 uninstall -y @PACKAGE_NAME@" $${SUDO_USER};\
 		fi; \
 	fi
 
