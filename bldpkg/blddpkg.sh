@@ -29,7 +29,10 @@ else
     ubuntu_ver="u20"
 fi
 
-
+inst_size=`du -sk ${DESTDIR} | awk '{print $1}'`
+if grep 'XXXSize' ./control > /dev/null; then
+    sed -i "s/XXXSize/${inst_size}/" ./control
+fi
 cp ./control ${DESTDIR}/DEBIAN/;
 dpkg-deb --build ${DESTDIR} .
 mv ${pkgname}.deb ${pkgname}_${ubuntu_ver}.deb
