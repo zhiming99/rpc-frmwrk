@@ -21,7 +21,7 @@ if [ "${os_name}" != "ubuntu" ]; then
     exit 0
 fi
 
-ubuntu_ver=`cat /etc/os-release | grep VERSION_ID | awk -F '=' '{print $2}'`
+ubuntu_ver=`cat /etc/os-release | grep VERSION_ID | awk -F '"' '{print $2}'`
 if [[ "$ubuntu_ver" > "21.00" ]]; then
     sed -i 's/libjsoncpp1/libjsoncpp24/' ./control
     ubuntu_ver="u21"
