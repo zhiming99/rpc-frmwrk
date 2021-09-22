@@ -1,5 +1,5 @@
 ridlc_PROGRAMS=ridlc
-ridlc_SOURCES= gencpp.cpp astnode.cpp main.cpp astnode.h gencpp.h idlclsid.h genpy.cpp genpy.h example.ridl tinyif.ridl README.md odesctpl.json drvtpl.json mktpl.in synccfg.py.in pymktpl
+ridlc_SOURCES= gencpp.cpp astnode.cpp main.cpp astnode.h gencpp.h idlclsid.h genpy.cpp genpy.h fulltest.ridl tinyif.ridl README.md odesctpl.json drvtpl.json mktpl.in synccfg.py.in pymktpl
 
 EXTRA_DIST=ridlc.y ridlc.lex pytest/SimpFileSvcsvr.py pytest/SimpFileSvccli.py pytest/StreamSvcsvr.py pytest/StreamSvccli.py pytest/maincli.py pytest/mainsvr.py
 

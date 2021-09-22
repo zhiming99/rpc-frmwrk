@@ -11,6 +11,7 @@ else
     mkdir -p ./stripped/lib/;
 fi
 rm ${pkgname}*.deb
+rm ${pkgname}*.tar.bz2
 find ${DESTDIR} -name '*.a' -exec mv '{}' ./stripped/lib/ ';' 
 stripList=`find ${DESTDIR} -perm 0755 | xargs file | grep ELF | awk -F ':' '{print $1}'`
 for i in $stripList; do bash ./stripsym.sh $i ${curdir}/stripped/dbgsyms;done
