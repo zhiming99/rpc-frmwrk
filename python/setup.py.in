@@ -5,12 +5,12 @@ extlib_nover ='rpcbase' + importlib.machinery.EXTENSION_SUFFIXES[0]
 extlib = extlib_nover + "." + version
 print( extlib )
 kwargs = {
-      'name':'rpcf',
+      'name':'@PACKAGE_NAME@',
       'version':version,
       'packages': find_packages(),
 
        #ensure so-files are copied to the installation:
-      'package_data' : { 'rpcf': ['proxy', extlib_nover]},
+      'package_data' : { '@PACKAGE_NAME@': ['proxy', extlib_nover]},
       'include_package_data' : True,
       'zip_safe' : False  
 }

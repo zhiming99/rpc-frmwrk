@@ -18,3 +18,8 @@ SUBDIRS += bldpkg
 EXTRA_DIST= README.md cfgsel
 
 dist_pkgconfig_DATA=rpcf.pc
+
+dpkg:
+	if [ -d ./dpkg_dir ]; then rm -rf ./dpkg_dir/*;fi;
+	make install DESTDIR=`pwd`/dpkg_dir
+	@rm -rf ./dpkg_dir

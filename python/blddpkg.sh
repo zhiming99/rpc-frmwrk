@@ -16,7 +16,7 @@ pip3 install ${prefix}/lib/${pkgname}/${pkgfile};
 EOF
 
 cat << EOF >> ${DESTDIR}/DEBIAN/postrm
-pip3 uninstall ${pkgname}
+pip3 uninstall -y ${pkgname}
 EOF
 
 chmod 0755 ${DESTDIR}/DEBIAN/postinst

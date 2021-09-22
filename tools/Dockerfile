@@ -8,6 +8,7 @@ libdbus-1-dev libjsoncpp1 libjsoncpp-dev libkrb5-3 libkrb5-dev liblz4-1 \
 liblz4-dev lz4 openssl libssl1.1 libssl-dev libcppunit-1.15-0 libcppunit-dev \
 bash net-tools procps;pip3 install numpy wheel
 RUN apt-get -y install sip5-tools || apt-get -y install sip-dev python3-sip python3-sip-dev || true
+RUN apt-get -y install libjsoncpp1 || apt-get -y install libjsoncpp24
 RUN apt-get -y install git;cd ${HOME} && git clone 'https://github.com/zhiming99/rpc-frmwrk.git'
 RUN cd ${HOME}/rpc-frmwrk && libtoolize && aclocal && autoreconf -vfi && \
 automake --add-missing && autoconf; echo `pwd`;ls -l `pwd`

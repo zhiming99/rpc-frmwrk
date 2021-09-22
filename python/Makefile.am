@@ -36,6 +36,12 @@ all:
     fi
 
 install: build_dpkg
+	if [ "x$(DESTDIR)" != "x" ];then \
+        cp rpcf/$(PYTHON_EXT) ./$(PYTHON_EXT).bak; \
+        symdir=`pwd`/../bldpkg/stripped/dbgsyms;\
+        if [ ! -d $${symdir} ];then mkdir -p $${symdir};fi;\
+        bash ../bldpkg/stripsym.sh rpcf/$(PYTHON_EXT) $${symdir};\
+    fi;
 	if [ "x$${SUDO_USER}" == "x" ];then \
 		python3 setup.py bdist_wheel; \
 	else \
@@ -51,7 +57,8 @@ install: build_dpkg
 			su -c "pip3 install --user $${pkg}" $${SUDO_USER};\
 		fi; \
 	else\
-		cp $${pkg} $(DESTDIR)/$(libdir)/rpcf/; \
+        mv ./$(PYTHON_EXT).bak rpcf/$(PYTHON_EXT); \
+		cp $${pkg} $(DESTDIR)/$(libdir)/rpcf/;\
 	fi
 
 uninstall:
