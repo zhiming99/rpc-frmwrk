@@ -1957,7 +1957,7 @@ gint32 CIoManager::TryLoadClassFactory(
 {
     gint32 ret = 0;
     do{
-        ret = access( strPath.c_str(), X_OK );
+        ret = access( strPath.c_str(), R_OK );
         if( SUCCEEDED( ret ) )
         {
             ret = CoLoadClassFactory(
@@ -1997,7 +1997,7 @@ gint32 CIoManager::TryLoadClassFactory(
                 elem + "/" + strFile;
 
             ret = access(
-                strFullPath.c_str(), X_OK );
+                strFullPath.c_str(), R_OK );
 
             if( ret == -1 )
             {
