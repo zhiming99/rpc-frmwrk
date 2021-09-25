@@ -1,4 +1,4 @@
-EXTRA_DIST=control.in blddpkg.sh stripsym.sh
+EXTRA_DIST=control.in blddpkg.sh stripsym.sh rules
 DISTDIR=$$(pwd)/$(PACKAGE_NAME)-$(VERSION)
 
 debdir:
