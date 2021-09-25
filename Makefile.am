@@ -15,11 +15,14 @@ endif
 
 SUBDIRS += bldpkg
 
-EXTRA_DIST= README.md cfgsel
+EXTRA_DIST= README.md cfgsel Concept.md LICENSE
 
 dist_pkgconfig_DATA=rpcf.pc
 
-dpkg:
-	if [ -d ./dpkg_dir ]; then rm -rf ./dpkg_dir/*;fi;
-	make install DESTDIR=`pwd`/dpkg_dir
-	@rm -rf ./dpkg_dir
+DISTDIR=$(PACKAGE_NAME)-$(VERSION)
+pkgname=$(DISTDIR).tar.gz
+debtar=$(subst -,_,$(DISTDIR)).orig.tar.gz
+deb:
+	make dist;echo dist done ; mv $(pkgname) ./bldpkg/${debtar};cd bldpkg;tar zxf $(debtar)
+	make -C ./bldpkg deb DESTDIR=`pwd`/bldpkg/$(DISTDIR)/debian/$(PACKAGE_NAME)
+	@rm -rf ./bldpkg/$(DISTDIR)

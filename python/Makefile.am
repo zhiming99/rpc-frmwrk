@@ -1,4 +1,4 @@
-pysources = README.md gentoml.sh rpcf/proxy.py proxy.sip pyproject.toml pyproject.toml.tmpl rpcf.sip server.sip setup.py
+pysources = README.md gentoml.sh rpcf/proxy.py proxy.sip pyproject.toml pyproject.toml.tmpl rpcf.sip server.sip setup.py build-4.9.py blddpkg.sh
 
 EXTRA_DIST= $(pysources) tests/actcancel/*.py  tests/evtest/*.py tests/iftest/*.py  tests/katest/*.py  tests/prtest/*.py  tests/sftest/*.py  tests/sftest/README.md tests/sftest/sfdesc.json tests/stmtest/*.py tests/stmtest/README.md
 
@@ -35,10 +35,10 @@ all:
 		cd rpcf; ln -s $(PYTHON_EXT) $(PYTHON_EXT1);\
     fi
 
-install: build_dpkg
+install:
 	if [ "x$(DESTDIR)" != "x" ];then \
         cp rpcf/$(PYTHON_EXT) ./$(PYTHON_EXT).bak; \
-        symdir=`pwd`/../bldpkg/stripped/dbgsyms;\
+        symdir=`pwd`/../bldpkg/symlibs/dbgsyms;\
         if [ ! -d $${symdir} ];then mkdir -p $${symdir};fi;\
         bash ../bldpkg/stripsym.sh rpcf/$(PYTHON_EXT) $${symdir};\
     fi;
@@ -59,6 +59,7 @@ install: build_dpkg
 	else\
         mv ./$(PYTHON_EXT).bak rpcf/$(PYTHON_EXT); \
 		cp $${pkg} $(DESTDIR)/$(libdir)/rpcf/;\
+		bash blddpkg.sh `pwd`/../ $(libdir) $${pkg}; \
 	fi
 
 uninstall:
@@ -70,8 +71,3 @@ uninstall:
 		fi; \
 	fi
 
-build_dpkg:
-	@export pkg=./dist/`ls -1t dist | head -n 1`;\
-	if [ ! "x$(DESTDIR)" == "x" ]; then \
-		bash blddpkg.sh $(DESTDIR) $(prefix) $${pkg}; \
-	fi

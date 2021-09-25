@@ -1,23 +1,18 @@
 #!/bin/bash
-DESTDIR=$1
-prefix=$2
+DISTDIR=$1
+DEBDIR=$1/debian
+libdir=$2
 pkg=$3
 
 pkgfile=$(basename $pkg)
 pkgname=${pkgfile%%-*}
 
-if ! which dpkg-deb; then
+if ! which debuild; then
     exit 0
 fi
 
-if [ ! -e ${DESTDIR}/DEBIAN ]; then mkdir ${DESTDIR}/DEBIAN; fi
-cat << EOF >> ${DESTDIR}/DEBIAN/postinst
-pip3 install ${prefix}/lib/${pkgname}/${pkgfile};
-EOF
+if [ ! -e ${DEBDIR} ]; then exit 2; fi
 
-cat << EOF >> ${DESTDIR}/DEBIAN/postrm
-pip3 uninstall -y ${pkgname}
-EOF
-
-chmod 0755 ${DESTDIR}/DEBIAN/postinst
-chmod 0755 ${DESTDIR}/DEBIAN/postrm
+echo sed -i "s:XXXX:${libdir}:" ${DEBDIR}/postinst
+sed -i "s:XXXX:${libdir}:" ${DEBDIR}/postinst
+cat ${DEBDIR}/postinst

@@ -1,14 +1,39 @@
 EXTRA_DIST=control.in blddpkg.sh stripsym.sh
+DISTDIR=$$(pwd)/$(PACKAGE_NAME)-$(VERSION)
 
-dpkg:
-	if [ ! -e $(DESTDIR)/DEBIAN ]; then \
-		mkdir -p $(DESTDIR)/DEBIAN;fi;\
+debdir:
+	if [ ! -d $(DISTDIR)/debian/$(PACKAGE_NAME) ]; then \
+		mkdir -p $(DISTDIR)/debian/$(PACKAGE_NAME);\
+    fi;
 	arch=$(host_cpu);\
 	if [ "x$${arch}" == "xx86_64" ]; then arch="amd64";fi;\
-	bash blddpkg.sh $(DESTDIR) $(PACKAGE_NAME)_$(VERSION)_$${arch}
+	if ! bash blddpkg.sh $(DISTDIR) $(DESTDIR) $(PACKAGE_NAME)_$(VERSION)_$${arch} $(prefix); then \
+        echo error occurs && false; \
+    else \
+        cd $(DISTDIR);\
+        dch --create -v $(VERSION) --package $(PACKAGE_NAME);\
+    fi
 
-install:
-	if [ "x$(DESTDIR)" != "x" ]; then \
-		if which dpkg-deb; then make dpkg; fi; \
-	fi
+deb:
+	if [ "x$(DESTDIR)" == "x" ]; \
+        then echo done && false; \
+	else \
+        if which debuild; then \
+            make debdir DESTDIR=$(DESTDIR);\
+        fi;\
+    fi
+	cd $(DISTDIR);debuild -us -uc
+	ubuntu_ver=$$(cat /etc/os-release | grep VERSION_ID | awk -F '"' '{print $$2}');\
+    echo ubuntu version is $${ubuntu_ver}; \
+    if [[ "$${ubuntu_ver}" > "21.00" ]]; then \
+        ubuntu_ver="u"$${ubuntu_ver%%.*}; \
+    else \
+        ubuntu_ver="u20";\
+    fi;\
+    for i in *.deb; do \
+        mv $$i $${i%%.deb}.$${ubuntu_ver}.deb; \
+    done;\
+    for i in *.ddeb; do \
+        mv $$i $${i%%.ddeb}.$${ubuntu_ver}.ddeb; \
+    done
 
