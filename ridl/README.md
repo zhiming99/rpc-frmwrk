@@ -104,13 +104,6 @@ The above example shows most of the statements ridl supports. ridl now has 7 typ
         -O:     To specify the path for the output files. 'output' is the default path if not
                 specified
                 
-        -o:     To specify the file name as the base of the target image. That is, the <name>cli for
-                client and <name>svr for server. If not specified, the 'appname' from the ridl will
-                be used
-                
-        -s:     To apply new serilization protocol only when the old serilization method cannot handle.
-                Default is new serialization protocol always
-                
         -p:     To generate Python skelton files
         
         -l:     To output a shared library instead of executables. This option is for CPP project only
