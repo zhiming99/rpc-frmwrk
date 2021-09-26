@@ -45,7 +45,7 @@ License: GPL-3+
  along with this program. If not, see <http://www.gnu.org/licenses/>
  .
  On Debian systems, the complete text of the GNU General
- Public License version 2 can be found in "/usr/share/common-licenses/GPL-3".
+ Public License version 3 can be found in "/usr/share/common-licenses/GPL-3".
 
 EOF
 

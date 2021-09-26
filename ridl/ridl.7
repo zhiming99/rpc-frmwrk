@@ -1,0 +1,215 @@
+.\" Manpage for ridl.
+.\" Contact woodhead99@gmail.com to correct errors or typos.
+
+.TH man 7 "26 Sep. 2021" "1.0" "rpc-frmwrk user manuals"
+.SH NAME
+ridl \- the RPC interface description language
+.SH DESCRIPTION
+.BR ridl
+is a simple language to define the data structures and interfaces to
+communication between the RPC client and RPC server. It has simple syntax and
+intuitive statements, quick to learn for the developers. And with the ridl
+compiler, we can quickly generate a robust RPC framework and focus the the
+development efforts on the business logics.
+.SH Supported Data Types
+.BR ridl
+support 10 basic types and 3 composite types. The basic data types are:
+.RS
+.IP \fBbool\fP
+\- 1-byte boolean value.
+.IP \fBbyte\fP
+\- 1-byte unsigned integer.
+.IP \fBint16/uint16\fP
+\- 2-byte signed integer or unsigned integer.
+.IP \fBint32/uint32\fP
+\- 4-byte signed integer or unsigned integer.
+.IP \fBint64/uint64\fP
+\- 8-byte signed integer or unsigned integer.
+.IP \fBfloat(32)/double(64)\fP
+\- float point number.
+.IP \fBstring\fP
+\- null terminated string.
+.IP \fBHSTREAM\fP
+\- handle representing an active stream channel.
+.IP \fBbytearray\fP 
+\- binary blob.
+.IP \fBObjPtr\fP
+\- \fIrpc-frmwrk\fR's built-in serializable data type.
+.RE
+
+And 3 composite types:
+.RS
+.IP \fBstruct\fP
+\- a bundle of values of different data types. It is usually used as a building
+block for other data types or as the parameter to transfer between client and
+server.
+.IP \fBarray\fP
+\- an array of elements of the same type, either basic type or composite type,
+except \fIHSTREAM\fR. For example, \fIarray<int32>\fR, or \fIarray<string>\fR
+.IP \fBmap\fP
+\- a map consists of key-value paires. The key should be a comparable data type,
+and value could be any supported type except \fIHSTREAM\fR. For example,
+\fImap<string, int32>\fR, or \fImap<int64, array<int>>\fR
+.RE
+
+See also the EXAMPLE section.
+
+.SH Supported Statements
+.BR ridl
+support 7 types of statements:
+.TP
+\fBappname\fP \fIstrname\fR
+sets the \fi the \fIstrname\fR as application name, it is a mandatory statement.
+If there are multiple \fBappname\fP statements, the last one will be the winner.
+The application name will be extensively used as a component of the name of the
+classes and the generated files. For example, \fIappname "helloworld";\fR
+
+.TP
+\fBinclude\fP \fIfilename\fR
+specify another ridl file, whose content will be referred in this file. for
+example, \fIinclude "abc.ridl";\fR
+
+.TP
+\fBtypedef\fP \fIdefined-type alias\fR
+define an alias for a pre-defined data type.
+For example, \fItypedef myint int32;\fR
+
+.TP
+\fBconst\fP \fIidentifier=constant\fR
+assigns a name to a constant value. For example, \fIconst i = 2;\fR
+
+.TP
+\fBstruct\fP \fIstruct-id {field-list};\fR
+declare a struct. For concrete struct declaration,
+refer to the EXAMPEL section.
+
+.TP
+\fBinterface\fP \fIif-id {method-list};\fR
+declare an interface with a set of methods. It is a mandatory statement and
+there must be at least one interface declaration in the ridl file or the
+included ridl file.
+The methods of the interface are seperated by ';'.
+
+A method is the smallest communication unit between server and proxy. The proxy
+send the request, and the server processes the proxy's request and returns the
+response. The proxy's request sender and the server's request handler are two
+different methods with the same method name. Both share the same method
+declaration in the method list.
+
+A method declaration is made up of method name, input parameter list, and output
+parameter list. Beside the three major components a method must have, it can
+optionally have some attribute tags, within a pair of brackets ahead of the
+method name as shown in the code snippet in the EXAMPLE section. The attributes
+supported are, 
+
+.RS
+.IP \fBevent\fP
+\- the method is an event handler on the proxy side, and the method on the
+server side broadcasts event. 
+.IP \fBnoreply\fP
+\- the method will send the request and returns immediately without waiting for
+the response from the server.
+.IP \fBtimeout=intValSec\fP
+\- the proxy will wait the response from the server for 'intvalSec' seconds,
+until when, it will cancel the request and report error to the caller.
+.IP \fBasync,async_s,async_p\fP
+\- async indicates the methods would behave asynchronously, both server side and
+proxy side, async_s indicates the server side asynchronously, and proxy side
+synchronously, and async_p indicates the server side synchronously, and proxy
+side asynchronously. If a method on proxy side is asynchronous, it will have a
+callback to handle the response. And if a method on server side is asynchronous,
+the user code is required to send a complete notification when it has handled
+the request.
+.RE
+
+The input parameter list and output parameter list follow the similiar format to
+a C++ or Java parameter list declaration. Either list can be empty. Even the
+output response list is empty, a 32-bit error code will be returned by the
+server unless the 'noreply' attribute is specified in the method declaration.
+
+Refer to the EXAMPLE section for concrete method declaration, and interface
+declaration.
+
+.TP
+\fBservice\fP \fIservice-id {interface-list};\fR
+declare a service with a set of interfaces. It is a mandatory statement and
+there must be at least one service declaration in the ridl file or the
+included ridl file.
+The service declaration can optionally have some attribute tags, within a pair
+of brackets between the \fIservice-id\fR and the opening brace. The attributes
+include,
+.RS
+.IP \fBstream\fP
+\- The service object will have streaming support. Actually if a method has one
+of its parameter, either input or output, will implicitly enable the streaming
+support for the service object. If there is not such a hint, you need to
+explicitly set the \fIstream\fR flag.
+.RE
+
+
+.SH EXAMPLE
+.de SAMPLE
+.br
+.nr saveIN \\n(.i   \" double the backslash when defining a macro
+.RS
+.nf
+.nh
+..
+.de ESAMPLE
+.hy
+.fi
+.RE
+.in \\n[saveIN]u    \" 'u' means 'units': do not scale this number
+..
+.SAMPLE
+// example.ridl
+// must have statement
+appname "example";
+typedef array< array< string > > STRMATRIX2;
+
+struct FILE_INFO
+{
+    /* define the fileds here, with default value optionally*/
+    string szFileName = "test.dat";
+    uint64 fileSize = 0;
+    bool bRead = true;
+    bytearray fileHeader;
+    STRMATRIX2 vecLines;
+    map<int32, bytearray> vecBlocks;
+};
+
+// echo different type of information
+interface IEchoThings
+{
+    // synchronous call on both server/proxy side by default.
+    Echo( string strText )
+        returns ( string strResp ) ;
+
+    // server/proxy both sides asynchronous
+    [ async ]EchoMany ( int32 i1, int16 i2,
+        int64 i3, float i4, double i5, string szText )
+        returns ( int32 i1r, int16 i2r,
+            int64 i3r, float i4r,
+            double i5r, string szTextr );
+
+    // server side asynchronous, and proxy side synchronous
+    [ async_s ]EchoStruct( FILE_INFO fi ) returns ( FILE_INFO fir );
+
+    // An event Handler
+    [ event ]OnHelloWorld( string strMsg ) returns ();
+};
+
+service SimpFileSvc [ stream ]
+{
+    interface IEchoThings;
+};
+.ESAMPLE
+
+.SH SEE ALSO
+ridlc(1), rpcrouter(1)
+.SH REFERENCES
+https://github.com/zhiming99/rpc-frmwrk/blob/master/ridl/README.md
+.SH BUGS
+No known bugs.
+.SH AUTHOR
+zhiming <woodhead99@gmail.com>

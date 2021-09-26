@@ -1,11 +1,13 @@
 ridlc_PROGRAMS=ridlc
 ridlc_SOURCES= gencpp.cpp astnode.cpp main.cpp astnode.h gencpp.h idlclsid.h genpy.cpp genpy.h fulltest.ridl tinyif.ridl README.md odesctpl.json drvtpl.json mktpl.in synccfg.py.in pymktpl
 
-EXTRA_DIST=ridlc.y ridlc.lex pytest/SimpFileSvcsvr.py pytest/SimpFileSvccli.py pytest/StreamSvcsvr.py pytest/StreamSvccli.py pytest/maincli.py pytest/mainsvr.py
+EXTRA_DIST=ridlc.y ridlc.lex pytest/SimpFileSvcsvr.py pytest/SimpFileSvccli.py pytest/StreamSvcsvr.py pytest/StreamSvccli.py pytest/maincli.py pytest/mainsvr.py ridlc.1 ridl.7
 
 nodist_ridlc_SOURCES = ridlc.cpp lexer.cpp ridlc.h lexer.h mktpl synccfg.py
 
 BUILT_SOURCES=ridlc.cpp lexer.cpp mktpl synccfg.py 
+
+man_MANS=ridlc.1 ridl.7
 
 CLEANFILES = ridlc.cpp lexer.cpp ridlc.h lexer.h mktpl
 

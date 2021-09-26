@@ -1,0 +1,58 @@
+.\" Manpage for rpcrouter.
+.\" Contact woodhead99@gmail.com to correct errors or typos.
+.TH man 1 "26 Sep. 2021" "1.0" "rpc-frmwrk user manuals"
+.SH NAME
+rpcrouter \- the RPC traffic router program for \fIrpc-frmwrk\fR
+.SH SYNOPSIS
+rpcrouter [options]
+.SH DESCRIPTION
+rpcrouter runs on both side of the client and server hosts to relay the
+request/response, broadcast events, set up the communication channels and
+perform the security, authentication, or load-balance tasks.
+On the server side, it should be invoked with the option \fI-r2\fR,
+and on the client host, it should be invoked with option \fI-r1\fR.
+If both client/server are on the same host, both will be invoked on the same host, too.
+Of course, the client/server can be configured to communicate without rpcrouter,
+if both are on the same host.
+.SH OPTIONS
+.TP
+.BR \-r " "\fInum\fR
+Specify the role the rpcrouter plays.
+1 to run as a \fIreqfwdr\fR on the client side.
+2 to run as a \fIbridge\fR on the server side.
+It is a mandatory option, and must be present to invoke the rpcrouter.
+
+.TP
+.BR \-a
+Enable the authentication between \fIreqfwdr\fR and \fIbridge\fR.
+And Kerberos is only supported authentication mechanism so far.
+Make sure both sides have this option, otherwise the connection request will be
+rejected.
+
+.TP
+.BR \-c
+To establish a seperate connection to the remote \fIbridge\fR for each proxy.  It is an option for \fIreqfwdr\fR only. The seperate connections has both advantages and disadvantages. The pros is that each connection has its own quota of concurrency, without sharing with other proxy instances. the disadvangage is that it requires a full connection setup, which has the probability to timeout if the number connection requests are high.
+
+.TP
+.BR \-f
+Enable the request-based flow control. The \fIbridge\fR with this option,
+will limit the outstanding requests to 2 * connections,
+and buffered requests to 4 * connections.
+And requests beyond this limit will be rejected with error ERROR_QUEUE_FULL.
+The \fIreqfwdr\fR with this option will queue the rejected requests from the
+\fIbridge\fR and retry them later, or pass on ERROR_QUEUE_FULL to the proxy
+if the client has overdone it without stopping.
+So it is for situation when there are large number of connections, not necessary
+for light weight traffic.
+
+.SH RELATED FILES
+router.json, rtauth.json, authprxy.json
+.SH SEE ALSO
+ridlc(1), ridl(7)
+.SH REFERENCE
+https://github.com/zhiming99/rpc-frmwrk/tree/master/rpc/router
+.SH BUGS
+No known bugs.
+.SH AUTHOR
+zhiming <woodhead99@gmail.com>
+

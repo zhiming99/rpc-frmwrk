@@ -1,0 +1,33 @@
+.\" Manpage for ridlc.
+.\" Contact woodhead99@gmail.com to correct errors or typos.
+.TH man 1 "26 Sep. 2021" "1.0" "rpc-frmwrk user manuals"
+.SH NAME
+ridlc \- ridl compiler to generate skelton code for rpc-frmwrk.
+.SH SYNOPSIS
+ridlc [options] <ridl file>
+.SH DESCRIPTION
+.BR ridlc
+parses the given ridl file and generate a set of skelton code in the
+specified language, Python or C++ at present.
+.SH OPTIONS
+.TP
+.BR \-I " "\fIpath\fR
+Specify the path to search for the included files. This option can repeat many times.
+.TP
+.BR \-O " "\fIpath\fR
+Specify the path to store the generated files.
+.TP
+.BR \-p " "
+Instruct the ridlc to generate the Python skelton files.
+.TP
+.BR \-l " "
+Instruct the ridlc to generate Makefile to output a shared library instead of a
+program. This options works only for C++.
+
+.SH SEE ALSO
+ridl(7), rpcrouter(1)
+.SH BUGS
+No known bugs.
+.SH AUTHOR
+zhiming <woodhead99@gmail.com>
+

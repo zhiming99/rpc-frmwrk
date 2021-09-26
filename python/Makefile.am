@@ -1,4 +1,4 @@
-pysources = README.md gentoml.sh rpcf/proxy.py proxy.sip pyproject.toml pyproject.toml.tmpl rpcf.sip server.sip setup.py build-4.9.py blddpkg.sh
+pysources = README.md gentoml.sh rpcf/proxy.py proxy.sip pyproject.toml pyproject.toml.tmpl rpcf.sip server.sip setup.py build-4.9.py blddpkg.sh stripsym.sh
 
 EXTRA_DIST= $(pysources) tests/actcancel/*.py  tests/evtest/*.py tests/iftest/*.py  tests/katest/*.py  tests/prtest/*.py  tests/sftest/*.py  tests/sftest/README.md tests/sftest/sfdesc.json tests/stmtest/*.py tests/stmtest/README.md
 
@@ -40,7 +40,7 @@ install:
         cp rpcf/$(PYTHON_EXT) ./$(PYTHON_EXT).bak; \
         symdir=`pwd`/../bldpkg/symlibs/dbgsyms;\
         if [ ! -d $${symdir} ];then mkdir -p $${symdir};fi;\
-        bash ../bldpkg/stripsym.sh rpcf/$(PYTHON_EXT) $${symdir};\
+        bash ./stripsym.sh rpcf/$(PYTHON_EXT) $${symdir};\
     fi;
 	if [ "x$${SUDO_USER}" == "x" ];then \
 		python3 setup.py bdist_wheel; \
