@@ -22,7 +22,7 @@ deb:
             make debdir DESTDIR=$(DESTDIR);\
         fi;\
     fi
-	for i in *.deb *.ddeb; do rm $$i; done
+	for i in *.deb *.ddeb; do rm $$i; done || true
 	cd $(DISTDIR);debuild -us -uc
 	ubuntu_ver=$$(cat /etc/os-release | grep VERSION_ID | awk -F '"' '{print $$2}');\
     echo ubuntu version is $${ubuntu_ver}; \
