@@ -19,10 +19,12 @@ EXTRA_DIST= README.md cfgsel Concept.md LICENSE
 
 dist_pkgconfig_DATA=rpcf.pc
 
+rev=0
 DISTDIR=$(PACKAGE_NAME)-$(VERSION)
 pkgname=$(DISTDIR).tar.gz
 debtar=$(subst -,_,$(DISTDIR)).orig.tar.gz
 deb:
-	make dist;echo dist done ; mv $(pkgname) ./bldpkg/${debtar};cd bldpkg;tar zxf $(debtar)
-	make -C ./bldpkg deb DESTDIR=`pwd`/bldpkg/$(DISTDIR)/debian/$(PACKAGE_NAME)
-	@rm -rf ./bldpkg/$(DISTDIR)
+	make dist;echo dist done ; mv $(pkgname) ./bldpkg/${debtar};cd bldpkg;tar zxf $(debtar);\
+	if [ -d $(DISTDIR)-$(rev) ]; then rm -rf $(DISTDIR)-$(rev); fi;mv $(DISTDIR) $(DISTDIR)-$(rev)
+	make -C ./bldpkg deb DESTDIR=`pwd`/bldpkg/$(DISTDIR)-$(rev)/debian/$(PACKAGE_NAME)
+	@rm -rf ./bldpkg/$(DISTDIR)-$(rev)

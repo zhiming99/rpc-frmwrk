@@ -1,5 +1,6 @@
 EXTRA_DIST=control.in blddpkg.sh rules
-DISTDIR=$$(pwd)/$(PACKAGE_NAME)-$(VERSION)
+rev=0
+DISTDIR=$$(pwd)/$(PACKAGE_NAME)-$(VERSION)-$(rev)
 
 debdir:
 	if [ ! -d $(DISTDIR)/debian/$(PACKAGE_NAME) ]; then \
@@ -7,11 +8,11 @@ debdir:
     fi;
 	arch=$(host_cpu);\
 	if [ "x$${arch}" == "xx86_64" ]; then arch="amd64";fi;\
-	if ! bash blddpkg.sh $(DISTDIR) $(DESTDIR) $(PACKAGE_NAME)_$(VERSION)_$${arch} $(prefix); then \
+	if ! bash blddpkg.sh $(DISTDIR) $(DESTDIR) $(PACKAGE_NAME)_$(VERSION)-$(rev)_$${arch} $(prefix); then \
         echo error occurs && false; \
     else \
         cd $(DISTDIR);\
-        dch --create -v $(VERSION) --package $(PACKAGE_NAME);\
+        dch --create -v $(VERSION)-$(rev) --package $(PACKAGE_NAME);\
     fi
 
 deb:
