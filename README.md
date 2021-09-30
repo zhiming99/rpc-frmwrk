@@ -59,6 +59,9 @@ This project depends on the following 3rd-party packags to build:
 5. Logging service
 
 ---
+[`Thu Sep 30 2021 11:26:55 PM Beijing`]    
+1. Added scripts to build `deb` and `rpm` package, but still need some tests.
+
 [`Mon Sep 20 2021 11:34:52 PM Beijing`]   
 1. Fixed the cumulated bugs in Dockerfile, and made it work independently from any building output.
 2. Added scripts to build debian package, and almost done.
