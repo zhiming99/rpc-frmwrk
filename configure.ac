@@ -245,6 +245,7 @@ AC_CONFIG_FILES([Makefile
                  pics/Makefile
                  bldpkg/Makefile
                  bldpkg/control
+                 bldpkg/rpcf.spec
                  test/Makefile
                  test/actcancel/Makefile
                  test/asynctst/Makefile

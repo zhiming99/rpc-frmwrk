@@ -28,3 +28,6 @@ deb:
 	if [ -d $(DISTDIR)-$(rev) ]; then rm -rf $(DISTDIR)-$(rev); fi;mv $(DISTDIR) $(DISTDIR)-$(rev)
 	make -C ./bldpkg deb DESTDIR=`pwd`/bldpkg/$(DISTDIR)-$(rev)/debian/$(PACKAGE_NAME)
 	@rm -rf ./bldpkg/$(DISTDIR)-$(rev)
+
+rpm:
+	make -C ./bldpkg rpm

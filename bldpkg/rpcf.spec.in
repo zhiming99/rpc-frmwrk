@@ -1,0 +1,184 @@
+Name:           @PACKAGE_NAME@
+Version:        @VERSION@
+Release:        0%{?dist}
+Summary:        RPC-frmwrk is a small event-driven, asynchronous RPC framework with high performance and high flexibility.
+
+License:        GPLv3
+URL:            https://github.com/zhiming99/rpc-frmwrk 
+
+Source0:        SSSSS/@PACKAGE_NAME@-@VERSION@.tar.gz
+
+BuildRequires:  gcc, g++, python3, python3-devel, python3-pip, flex, bison, libtool, shtool, automake, autoconf, make, sip5, dbus-devel, jsoncpp-devel, krb5-devel, lz4-devel, openssl-devel, cppunit-devel
+Requires:       dbus dbus-libs jsoncpp krb5-libs lz4-libs openssl openssl-libs cppunit
+
+%description
+
+
+%prep
+%autosetup
+
+
+%build
+
+./configure --prefix=/usr --includedir=%{_includedir} --mandir=%{_mandir} \
+--infodir=%{_infodir} --sysconfdir=%{_sysconfdir} --localstatedir=%{_localstatedir} \
+--disable-silent-rules --libdir=%{_libdir} \
+--disable-maintainer-mode --disable-dependency-tracking CPPFLAGS="-O2 -g3 -DRELEASE -D_DEBUG=0"
+
+%make_build
+
+
+%install
+rm -rf $RPM_BUILD_ROOT
+make install DESTDIR=$RPM_BUILD_ROOT
+find $RPM_BUILD_ROOT -name '*.a' -exec rm '{}' ';'
+
+
+%files
+%license %{buildroot}/LICENSE
+#%doc 
+%{_bindir}/ridlc
+%{_bindir}/rpcf/actclitst
+%{_bindir}/rpcf/actcsvrtst
+%{_bindir}/rpcf/asynclitst
+%{_bindir}/rpcf/asyncsvrtst
+%{_bindir}/rpcf/btinrtcli
+%{_bindir}/rpcf/btinrtsvr
+%{_bindir}/rpcf/evtclitst
+%{_bindir}/rpcf/evtsvrtst
+%{_bindir}/rpcf/hwclismk
+%{_bindir}/rpcf/hwsvrsmk
+%{_bindir}/rpcf/ifclismk
+%{_bindir}/rpcf/ifsvrsmk
+%{_bindir}/rpcf/inproctst
+%{_bindir}/rpcf/kaclitst
+%{_bindir}/rpcf/kasvrtst
+%{_bindir}/rpcf/prclitst
+%{_bindir}/rpcf/prsvrtst
+%{_bindir}/rpcf/rpcfg.py
+%{_bindir}/rpcf/rpcfgnui.py
+%{_bindir}/rpcf/sfclitst
+%{_bindir}/rpcf/sfsvrtst
+%{_bindir}/rpcf/smoketest
+%{_bindir}/rpcf/stmclitst
+%{_bindir}/rpcf/stmsvrtst
+%{_bindir}/rpcf/updcfg.py
+%{_bindir}/rpcrouter
+%{_sysconfdir}/rpcf/actcdesc.json
+%{_sysconfdir}/rpcf/asyndesc.json
+%{_sysconfdir}/rpcf/authprxy.json
+%{_sysconfdir}/rpcf/btinrt.json
+%{_sysconfdir}/rpcf/driver.json
+%{_sysconfdir}/rpcf/drvtpl.json
+%{_sysconfdir}/rpcf/echodesc.json
+%{_sysconfdir}/rpcf/evtdesc.json
+%{_sysconfdir}/rpcf/hwdesc.json
+%{_sysconfdir}/rpcf/inproc.json
+%{_sysconfdir}/rpcf/kadesc.json
+%{_sysconfdir}/rpcf/mktpl
+%{_sysconfdir}/rpcf/odesctpl.json
+%{_sysconfdir}/rpcf/prdesc.json
+%{_sysconfdir}/rpcf/pymktpl
+%{_sysconfdir}/rpcf/router.json
+%{_sysconfdir}/rpcf/rtauth.json
+%{_sysconfdir}/rpcf/seribase.py
+%{_sysconfdir}/rpcf/sfdesc.json
+%{_sysconfdir}/rpcf/stmdesc.json
+%{_sysconfdir}/rpcf/synccfg.py
+%{_includedir}/rpcf/autoptr.h
+%{_includedir}/rpcf/buffer.h
+%{_includedir}/rpcf/clsids.h
+%{_includedir}/rpcf/configdb.h
+%{_includedir}/rpcf/curclsid.h
+%{_includedir}/rpcf/dbuserr.h
+%{_includedir}/rpcf/defines.h
+%{_includedir}/rpcf/dmsgptr.h
+%{_includedir}/rpcf/ipc/connhelp.h
+%{_includedir}/rpcf/ipc/counters.h
+%{_includedir}/rpcf/ipc/dbusport.h
+%{_includedir}/rpcf/ipc/emaphelp.h
+%{_includedir}/rpcf/ipc/evloop.h
+%{_includedir}/rpcf/ipc/filetran.h
+%{_includedir}/rpcf/ipc/frmwrk.h
+%{_includedir}/rpcf/ipc/ifhelper.h
+%{_includedir}/rpcf/ipc/ifstat.h
+%{_includedir}/rpcf/ipc/iftasks.h
+%{_includedir}/rpcf/ipc/iiddict.h
+%{_includedir}/rpcf/ipc/irp.h
+%{_includedir}/rpcf/ipc/jsondef.h
+%{_includedir}/rpcf/ipc/mainloop.h
+%{_includedir}/rpcf/ipc/msgmatch.h
+%{_includedir}/rpcf/ipc/namespc.h
+%{_includedir}/rpcf/ipc/port.h
+%{_includedir}/rpcf/ipc/portdrv.h
+%{_includedir}/rpcf/ipc/portex.h
+%{_includedir}/rpcf/ipc/proxy.h
+%{_includedir}/rpcf/ipc/reqopen.h
+%{_includedir}/rpcf/ipc/sevpoll.h
+%{_includedir}/rpcf/ipc/stream.h
+%{_includedir}/rpcf/ipc/streamex.h
+%{_includedir}/rpcf/ipc/tasklets.h
+%{_includedir}/rpcf/ipc/tractgrp.*h
+%{_includedir}/rpcf/ipc/utils.h
+%{_includedir}/rpcf/ipc/uxport.h
+%{_includedir}/rpcf/ipc/uxstream.h
+%{_includedir}/rpcf/nsdef.h
+%{_includedir}/rpcf/objfctry.h
+%{_includedir}/rpcf/propids.h
+%{_includedir}/rpcf/registry.h
+%{_includedir}/rpcf/rpc.h
+%{_includedir}/rpcf/seribase.h
+%{_includedir}/rpcf/stlcont.h
+%{_libdir}/libauth.la
+%{_libdir}/libauth.so*
+%{_libdir}/libcombase.la
+%{_libdir}/libcombase.so*
+%{_libdir}/libipc.la
+%{_libdir}/libipc.so*
+%{_libdir}/librpc.la
+%{_libdir}/librpc.so*
+%{_libdir}/libsslpt.la
+%{_libdir}/libsslpt.so*
+%{_libdir}/libwspt.la
+%{_libdir}/libwspt.so*
+%{_libdir}/pkgconfig/rpcf.pc
+%{_libdir}/rpcf/libactc.la
+%{_libdir}/rpcf/libactc.so*
+%{_libdir}/rpcf/libascsvr.la
+%{_libdir}/rpcf/libascsvr.so*
+%{_libdir}/rpcf/libbtinrt.la
+%{_libdir}/rpcf/libbtinrt.so*
+%{_libdir}/rpcf/libecho.la
+%{_libdir}/rpcf/libecho.so*
+%{_libdir}/rpcf/libevtst.la
+%{_libdir}/rpcf/libevtst.so*
+%{_libdir}/rpcf/libhellowrd.la
+%{_libdir}/rpcf/libhellowrd.so*
+%{_libdir}/rpcf/libinproc.la
+%{_libdir}/rpcf/libinproc.so*
+%{_libdir}/rpcf/libkasvr.la
+%{_libdir}/rpcf/libkasvr.so*
+%{_libdir}/rpcf/libprsvr.la
+%{_libdir}/rpcf/libprsvr.so*
+%{_libdir}/rpcf/libsfsvr.la
+%{_libdir}/rpcf/libsfsvr.so*
+%{_libdir}/rpcf/libstmsvr.la
+%{_libdir}/rpcf/libstmsvr.so*
+%{_libdir}/rpcf/@PACKAGE_NAME@-@VERSION@-*.whl
+
+%{_mandir}/man1/ridlc.1.gz
+%{_mandir}/man1/rpcrouter.1.gz
+%{_mandir}/man7/ridl.7.gz
+
+%post
+for i in %{_libdir}/rpcf/*.whl; do
+    pip3 install $i;
+done
+
+%postun
+pip3 uninstall -y ${PACKAGE_NAME}
+
+
+%changelog
+* XXXXX zhiming <@PACKAGE_BUGREPORT@>
+- 

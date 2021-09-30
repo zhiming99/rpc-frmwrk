@@ -1,4 +1,4 @@
-EXTRA_DIST=control.in blddpkg.sh rules
+EXTRA_DIST=control.in blddpkg.sh rules bldrpm.sh rpcf.spec.in
 rev=0
 DISTDIR=$$(pwd)/$(PACKAGE_NAME)-$(VERSION)-$(rev)
 
@@ -39,3 +39,8 @@ deb:
         mv $$i $${i%%.ddeb}.$${ubuntu_ver}.ddeb; \
     done
 
+rpm:
+	rm -rf $${HOME}/rpmbuild && rpmdev-setuptree
+	make -C .. dist
+	cp ../$(PACKAGE_NAME)-$(VERSION).tar.gz $${HOME}/rpmbuild/SOURCES
+	bash ./bldrpm.sh $$(pwd)/../ $(PACKAGE_NAME) && exit 0
