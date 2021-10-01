@@ -59,6 +59,8 @@ This project depends on the following 3rd-party packags to build:
 5. Logging service
 
 ---
+[`Fri Oct 01 2021 04:29:54 PM Beijing`]    
+1. **0.4.0 is released!**
 [`Thu Sep 30 2021 11:26:55 PM Beijing`]    
 1. Added scripts to build `deb` and `rpm` package, but still need some tests.
 
