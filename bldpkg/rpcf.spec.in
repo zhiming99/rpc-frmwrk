@@ -35,7 +35,7 @@ find $RPM_BUILD_ROOT -name '*.a' -exec rm '{}' ';'
 
 
 %files
-%license %{buildroot}/LICENSE
+%license ./LICENSE
 #%doc 
 %{_bindir}/ridlc
 %{_bindir}/rpcf/actclitst

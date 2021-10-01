@@ -43,4 +43,4 @@ rpm:
 	rm -rf $${HOME}/rpmbuild && rpmdev-setuptree
 	make -C .. dist
 	cp ../$(PACKAGE_NAME)-$(VERSION).tar.gz $${HOME}/rpmbuild/SOURCES
-	bash ./bldrpm.sh $$(pwd)/../ $(PACKAGE_NAME) && exit 0
+	bash ./bldrpm.sh $$(pwd)/../ $(PACKAGE_NAME) $(host_cpu)
