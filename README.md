@@ -52,13 +52,17 @@ This project depends on the following 3rd-party packags to build:
 8. `python 3.5+ is required for python support.`
 
 #### Todo:
-1. Json support and FUSE support
-2. Examples and Tutorials
-3. Performance optimization
-4. A tree-like hierarchical persistant registry.
-5. Logging service
+1. Java support
+2. Json support
+3. Examples and Tutorials
+4. Performance optimization
+5. A tree-like hierarchical persistant registry.
+6. Logging service
 
 ---
+[`Sat Oct 02 2021 08:07:17 PM Beijing`]    
+1. Decided, I will first implement Java support, and start right away.
+
 [`Fri Oct 01 2021 04:29:54 PM Beijing`]    
 1. **0.4.0 is released!**
 
