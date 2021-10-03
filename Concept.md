@@ -34,8 +34,10 @@ under the `test` directory.
 
 RPC-frmwrk can be configured to use WSS(Secure WebSocket) for the
 communication with the web server over the internet. And it can also be
-configured to use SSL within the intranet. The pluggable authentation and
-access control will be supported in the future.
+configured to use SSL within the intranet. And Kerberos authentication
+can be enabled over SSL. The auth module adds more to security by signing
+all the outbound messages. When authentication is enabled, the
+server side can obtain the session information of each requests. 
 
 ## Object and Interface
 
