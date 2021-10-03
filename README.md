@@ -60,6 +60,9 @@ This project depends on the following 3rd-party packags to build:
 6. Logging service
 
 ---
+[`Sun Oct 03 2021 05:21:45 PM Beijing`]    
+1. Planning to use SWIG to wrap the classes, because SIP cannot generate JAVA. It seems technically preferable to choosing SWIG at the beginning of Python support, without introducing extra load of learning and development efforts.
+
 [`Sat Oct 02 2021 08:07:17 PM Beijing`]    
 1. Decided, I will first implement Java support, and start right away.
 
