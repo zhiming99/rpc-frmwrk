@@ -3,10 +3,10 @@
 这是一个嵌入式的RPC实现，关注于跨网络，跨协议，跨平台的互联互通。本项目欢迎有兴趣的人士加入!   
 This is an asynchronous and event-driven RPC implementation for embeded system with small system footprint. It is targeting at the IOT platforms, high-throughput, and high availability over hybrid network. Welcome to join!  
 
-#### Concept:
+#### Concept
 [`Here`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md) is an introduction about some concepts that help to understand this project.
 
-#### Features:   
+#### Features   
 1. `Support for multiple interfaces on a single object.`   
 2. `Support for synchronous/asynchronous requests handling from both sides.`   
 3. `Active canceling.`   
@@ -15,7 +15,7 @@ This is an asynchronous and event-driven RPC implementation for embeded system w
 6. `Pausable/Resumable interface.`
 7. `Simultaneous object access via network, IPC, and in-process.` 
 8. `Peer online/offline awareness.`
-9. `Publishing multiple local/remote objects via single network port.`
+9. `Publishing multiple local/remote object services via single network port.`
 10. `HTTP free, Webserver free.`
 11. [`Streaming support to provide double-direction stream transfer`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md#streaming)
 12. [`Secure Socket Layer (SSL) support`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/sslport/Readme.md)
@@ -27,20 +27,20 @@ This is an asynchronous and event-driven RPC implementation for embeded system w
 18. [`A CPP and Python skelton code generator`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md)
 19. [`A GUI config tool for rpcrouter`](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools/README.md)
 
-#### Building `rpc-frmwrk`:   
+#### Building `rpc-frmwrk`   
 Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60) for details.
-#### Install & Run:
+#### Install & Run
 1. Using the config tool to setup the parameters `rpc-frwmrk` requires. [Here](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools/README.md) is the illustration of the configuration tool.
 2. After you have successfully build `rpc-frmwrk`, typing `sudo make install` will install `rpc-frmwrk` to the system.
 4. On the server side, start the daemon process `rpcrouter -r 2`, and on the client side, start daemon process `rpcrouter -r 1` as the final setup step.
 5. And now on server side, start the `helloworld` server, and on the client side, start the `helloworld` client. About `rpcrouter`, please follow this [link](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/router/README.md).
 6. Please refer to this [article](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-get-Helloworld-run%3F) for more information.
 
-#### Development And Examples:
+#### Development And Examples
 1. `rpc-frmwrk` has an `interface description language`, [`ridl`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md) to help you to generate the skelton code rapidly. It is recommended to take some time to learn this simple language, and it may save you a lot of time.
 2. [`Here`](https://github.com/zhiming99/rpc-frmwrk/tree/master/test/stress) is an example of `ridlc` generated project.
 
-#### Dependency:  
+#### Dependency  
 This project depends on the following 3rd-party packags to build:  
 1. `dbus-1.0 (dbus-devel)`
 2. `libjson-cpp (jsoncpp-devel)` 
@@ -51,7 +51,7 @@ This project depends on the following 3rd-party packags to build:
 7. `c++11 is required, and make sure the GCC is 5.x or higher.`
 8. `python 3.5+ is required for python support.`
 
-#### Todo:
+#### Todo
 1. Java support
 2. Json support
 3. Examples and Tutorials
