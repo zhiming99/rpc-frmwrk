@@ -1441,6 +1441,10 @@ class CParamList : public CCfgOpener
         }
     }
 
+    CParamList( CfgPtr& pCfg )
+        : CParamList( ( IConfigDb* )pCfg )
+    {}
+
     CParamList( const CParamList& rhs )
         : CParamList()
     {

@@ -62,7 +62,7 @@ using namespace cpp;
 typedef char gint8;
 typedef unsigned char guint8;
 
-typedef short gint64;
+typedef short gint16;
 typedef int gint32;
 typedef unsigned short guint16;
 typedef unsigned int guint32;
