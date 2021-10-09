@@ -15,8 +15,9 @@ using namespace rpcf;
 
 typedef int32_t gint32;
 typedef uint32_t guint32;
+typedef int64_t  gint64;
 typedef uint64_t guint64;
-typedef guint64 LONGWORD;
+typedef gint64  LONGWORD;
 typedef LONGWORD HANDLE;
 
 %javaconst(1);
@@ -123,11 +124,10 @@ enum // EnumSeriProto
     seriInvalid = 4
 };
 
-gint32 CoInitialize( guint32 );
+gint32 CoInitialize( gint32 iCtx );
 gint32 CoUninitialize();
 
 %nodefaultctor;
-%nodefaultdtor;
 
 %typemap(javadestruct, methodname="delete", methodmodifiers="public synchronized") CObjBase {
     if (swigCPtr != 0) {
@@ -166,6 +166,15 @@ class CObjBase
 %feature("ref")   CObjBase "$this->AddRef();"
 %feature("unref") CObjBase "$this->Release();"
 
+%typemap(javadestruct_derived, methodname="delete", methodmodifiers="public synchronized") IConfigDb {
+    if (swigCPtr != 0) {
+      if (swigCMemOwn) {
+        swigCMemOwn = false;
+      }
+      swigCPtr = 0;
+    }
+    super.delete();
+  }
 class IConfigDb : public CObjBase
 {
     public:
@@ -175,8 +184,45 @@ class IConfigDb : public CObjBase
         BufPtr& pBuf ) const;
 };
 
+%typemap(javadestruct_derived, methodname="delete", methodmodifiers="public synchronized") IEventSink {
+    if (swigCPtr != 0) {
+      if (swigCMemOwn) {
+        swigCMemOwn = false;
+      }
+      swigCPtr = 0;
+    }
+    super.delete();
+  }
+
+%typemap(javadestruct_derived, methodname="delete", methodmodifiers="public synchronized") IService {
+    if (swigCPtr != 0) {
+      if (swigCMemOwn) {
+        swigCMemOwn = false;
+      }
+      swigCPtr = 0;
+    }
+    super.delete();
+  }
+
+class IEventSink : public CObjBase
+{
+    public:
+
+    gint32 OnEvent(
+        EnumEventId iEvent,
+        LONGWORD dwParam1, 
+        LONGWORD dwParam2,
+        LONGWORD* pData );
+};
+
+class IService : public IEventSink
+{
+    public:
+    gint32 Start();
+    gint32 Stop();
+};
+
 %clearnodefaultctor;
-%clearnodefaultdtor;
 
 class ObjPtr
 {
@@ -249,7 +295,7 @@ EnumTypeId GetTypeId(
         jenv, cls, "getTypeId",
         "(Ljava/lang/Object;)I");
 
-    jint iType = (*jenv)->CallVoidMethod(
+    jint iType = (*jenv)->CallIntMethod(
         jenv, jRet, gtid_method, pObj );
 
     return (EnumTypeId)iType;
@@ -464,6 +510,42 @@ EnumTypeId GetObjType( JNIEnv* jenv, jobject pObj )
     }
 }
 
+IService* CastToSvc(
+    JNIEnv* jenv, ObjPtr* pObj )
+{
+    if( pObj == nullptr ||
+        ( *pObj ).IsEmpty() )
+        return nullptr;
+
+    IService* pSvc = *pObj;
+    return pSvc;
+}
+
+ObjPtr* CreateObject(
+    EnumClsid iClsid, CfgPtr& pCfg )
+{
+
+    ObjPtr* pObj =
+        new ObjPtr( nullptr, false );
+    gint32 ret = pObj->NewObj(
+        iClsid, ( IConfigDb* )pCfg ); 
+    if( ret < 0 )
+        return nullptr;
+
+    return pObj;
+}
+
+CfgPtr* CastToCfg( ObjPtr* pObj )
+{
+    if( pObj == nullptr )
+        return nullptr;
+
+    CfgPtr* pCfg = new CfgPtr(
+        ( IConfigDb* )pObj, true );
+    return pCfg;
+}
+
+
 %}
 
 %typemap(in,numinputs=0) JNIEnv *jenv "$1 = jenv;"
@@ -677,24 +759,6 @@ class BufPtr
     }
 }
 
-class IEventSink : public CObjBase
-{
-    public:
-
-    gint32 OnEvent(
-        EnumEventId iEvent,
-        LONGWORD dwParam1, 
-        LONGWORD dwParam2,
-        LONGWORD* pData );
-};
-
-class IService : public IEventSink
-{
-    public:
-    gint32 Start();
-    gint32 Stop();
-};
-
 class CParamList
 {
     public:
@@ -755,8 +819,12 @@ class CParamList
         return jRet;
     }
 
-    gint32 SetByteProp( gint32,
-        guint8 dwVal );
+    gint32 SetByteProp(
+        gint32 iProp, gint8 byVal )
+    {
+        return $self->SetIntProp(
+            iProp, ( guint8 )byVal ); 
+    }
 
     jobject GetShortProp(
         JNIEnv* jenv, gint32 iProp )
@@ -782,8 +850,12 @@ class CParamList
         return jRet;
     }
 
-    gint32 SetShortProp( gint32,
-        guint16 dwVal );
+    gint32 SetShortProp(
+        gint32 iProp, gint16 wVal )
+    {
+        return $self->SetShortProp(
+            iProp, ( guint16 )wVal ); 
+    }
 
     jobject GetIntProp(
         JNIEnv* jenv, gint32 iProp )
@@ -809,8 +881,12 @@ class CParamList
         return jRet;
     }
 
-    gint32 SetIntProp( gint32,
-        guint32 dwVal );
+    gint32 SetIntProp(
+        gint32 iProp, gint32 dwVal )
+    {
+        return $self->SetIntProp(
+            iProp, ( guint32 )dwVal ); 
+    }
 
     gint32 GetQwordProp(
         JNIEnv* jenv, gint32 iProp )
@@ -835,8 +911,12 @@ class CParamList
         SetErrorJRet( jenv, jRet, ret );
         return jRet;
     }
-    gint32 SetQwordProp( gint32,
-        guint64 dwVal );
+    gint32 SetQwordProp(
+        gint32 iProp, gint64 qwVal )
+    {
+        return $self->SetQwordProp(
+            iProp, ( guint64 )qwVal ); 
+    }
 
     jobject GetDoubleProp(
         JNIEnv* jenv, gint32 iProp )
@@ -917,8 +997,8 @@ class CParamList
         return jRet;
     }
 
-    gint32 SetObjPtr( gint32,
-        ObjPtr& pObj );
+    gint32 SetObjPtr(
+        gint32 iProp, ObjPtr& pObj );
 
     jobject GetBoolProp(
         JNIEnv* jenv, gint32 iProp )
@@ -1000,7 +1080,7 @@ class CParamList
         return $self->Push( val );
     }
 
-    gint32 PushQword( guint64& val )
+    gint32 PushQword( gint64& val )
     {
         return $self->Push( val );
     }
@@ -1095,42 +1175,26 @@ class CParamList
 
 %newobject CreateObject;
 ObjPtr* CreateObject(
-    EnumClsid iClsid, CfgPtr& pCfg )
-{
-
-    ObjPtr* pObj =
-        new ObjPtr( nullptr, false );
-    gint32 ret = pObj->NewObj(
-        iClsid, ( IConfigDb* )pCfg ); 
-    if( ret < 0 )
-        return nullptr;
-
-    return pObj;
-}
+    EnumClsid iClsid, CfgPtr& pCfg );
 
 %newobject CastToCfg;
-CfgPtr* CastToCfg( ObjPtr* pObj )
-{
-    if( pObj == nullptr )
-        return nullptr;
-
-    CfgPtr* pCfg = new CfgPtr(
-        ( IConfigDb* )pObj, true );
-    return pCfg;
-}
+CfgPtr* CastToCfg( ObjPtr* pObj );
 
 
-jobject CastToSvc(
-    JNIEnv* jenv, ObjPtr* pObj )
-{
-    if( pObj == nullptr ||
-        ( *pObj ).IsEmpty() )
-        return nullptr;
+%newobject CastToSvc;
+IService* CastToSvc(
+    JNIEnv* jenv, ObjPtr* pObj );
 
-    IService* pSvc = *pObj;
-    return NewIService( jenv, pSvc, true );
-}
-
+%nodefaultctor;
+%typemap(javadestruct_derived, methodname="delete", methodmodifiers="public synchronized") CRpcServices {
+    if (swigCPtr != 0) {
+      if (swigCMemOwn) {
+        swigCMemOwn = false;
+      }
+      swigCPtr = 0;
+    }
+    super.delete();
+  }
 class CRpcServices : public IService
 {
     public:
@@ -1139,19 +1203,39 @@ class CRpcServices : public IService
         const std::string& strObjName,
         bool bServer,
         CfgPtr& pCfg );
+    EnumIfState GetState() const;
 };
 
+%typemap(javadestruct_derived, methodname="delete", methodmodifiers="public synchronized") CInterfaceProxy {
+    if (swigCPtr != 0) {
+      if (swigCMemOwn) {
+        swigCMemOwn = false;
+      }
+      swigCPtr = 0;
+    }
+    super.delete();
+  }
 class CInterfaceProxy : public CRpcServices
 {
     public:
-    gint32 CancelRequest( guint64 qwTaskId );
+    gint32 CancelRequest( gint64 qwTaskId );
     gint32 Pause();
     gint32 Resume();
-    EnumIfState GetState() const;
 };
 
+%typemap(javadestruct_derived, methodname="delete", methodmodifiers="public synchronized") CInterfaceServer {
+    if (swigCPtr != 0) {
+      if (swigCMemOwn) {
+        swigCMemOwn = false;
+      }
+      swigCPtr = 0;
+    }
+    super.delete();
+  }
 class CInterfaceServer : public CRpcServices
 {
-    public:
-    EnumIfState GetState() const;
 };
+
+%clearnodefaultctor;
+
+

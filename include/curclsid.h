@@ -39,8 +39,8 @@ namespace rpcf
 // ridl/astnode.h
 #define CLSIDS_ALLOCATED    ( clsid( ClassFactoryStart ) + 80 )
 
-// last allocation was from server.sip
-#define PROPIDS_ALLOCATED   ( propReservedEnd + 120 )
+// last allocation was from proxy.i
+#define PROPIDS_ALLOCATED   ( propReservedEnd + 130 )
 
 // iid allocated by rpc/security/secclsid
 #define IID_ALLOCATED    ( clsid( ReservedIidStart ) + 220 )

@@ -20,7 +20,6 @@ public class Helpers
         oMap.put( "long", rpcbaseConstants.typeUInt64 ); 
         oMap.put( "float", rpcbaseConstants.typeFloat ); 
         oMap.put( "double", rpcbaseConstants.typeDouble ); 
-        oMap.put( "String", rpcbaseConstants.typeString ); 
         oMap.put( "org.rpcf.rpcbase.ObjPtr", rpcbaseConstants.typeObj );
         oMap.put( "java.lang.Integer", rpcbaseConstants.typeUInt32Obj );
         oMap.put( "java.lang.Long", rpcbaseConstants.typeUInt64Obj );
@@ -29,6 +28,7 @@ public class Helpers
         oMap.put( "java.lang.Float", rpcbaseConstants.typeFloatObj );
         oMap.put( "java.lang.Double", rpcbaseConstants.typeDoubleObj );
         oMap.put( "java.lang.Boolean", rpcbaseConstants.typeByteObj );
+        oMap.put( "java.lang.String", rpcbaseConstants.typeString ); 
         return oMap;
     }
 
