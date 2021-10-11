@@ -7,10 +7,12 @@
 #include <stdint.h>
 #include <errno.h>
 #include <vector>
+#include <algorithm>
 using namespace rpcf;
 %}
 
 %include "std_string.i"
+%include "std_vector.i"
 %include "stdint.i"
 
 typedef int32_t gint32;
@@ -106,7 +108,7 @@ enum // EnumTypeId
     typeDMsg,
     typeObj,
     typeByteArr,
-    typeByteObj,
+    typeByteObj = 100,
     typeUInt16Obj,
     typeUInt32Obj,
     typeUInt64Obj,
@@ -123,6 +125,8 @@ enum // EnumSeriProto
     seriJava = 3,
     seriInvalid = 4
 };
+
+%template(vectorBufPtr) std::vector<BufPtr>;
 
 gint32 CoInitialize( gint32 iCtx );
 gint32 CoUninitialize();
@@ -243,29 +247,30 @@ class ObjPtr
 }
 %header %{
 
+typedef std::vector<BufPtr> vectorBufPtr;
 jobject NewJRet( JNIEnv* jenv )
 {
-    jclass cls = (*jenv)->FindClass(
-        jenv, "org/rpcf/rpcbase/JRetVal");
+    jclass cls = jenv->FindClass(
+        "org/rpcf/rpcbase/JRetVal");
 
-    jmethodID ctor  = (*jenv)->GetMethodID(
-        jenv, cls, "<init>", "()V");
+    jmethodID ctor  = jenv->GetMethodID(
+        cls, "<init>", "()V");
 
-    return ( *jenv )->NewObject( cls, ctor);
+    return jenv->NewObject( cls, ctor);
 }
 
 void AddElemToJRet( JNIEnv* jenv,
     jobject jRet, jobject pObj )
 {
-    jclass cls = (*jenv)->FindClass(
-        jenv, "org/rpcf/rpcbase/JRetVal");
+    jclass cls = jenv->FindClass(
+        "org/rpcf/rpcbase/JRetVal");
 
-    jmethodId addElem = (*jenv)->GetMethodID(
-        jenv, cls, "addElemToJRet",
+    jmethodId addElem = jenv->GetMethodID(
+        cls, "addElemToJRet",
         "(Ljava/lang/Object;)V");
 
-    (*jenv)->CallVoidMethod(
-        jenv, jRet, addElem, pObj );
+    jenv->CallVoidMethod(
+        jRet, addElem, pObj );
 
     return;
 }
@@ -273,148 +278,275 @@ void AddElemToJRet( JNIEnv* jenv,
 void SetErrorJRet( JNIEnv* jenv,
     jobject jRet, gint32 iRet )
 {
-    jclass cls = (*jenv)->FindClass(
-        jenv, "org/rpcf/rpcbase/JRetVal");
+    jclass cls = jenv->FindClass(
+        "org/rpcf/rpcbase/JRetVal");
 
-    jmethodId setError = (*jenv)->GetMethodID(
-        jenv, cls, "setError", "(I)V");
+    jmethodId setError = jenv->GetMethodID(
+        cls, "setError", "(I)V");
 
-    (*jenv)->CallVoidMethod(
-        jenv, jRet, setError, iRet );
+    jenv->CallVoidMethod(
+        jRet, setError, iRet );
 
     return;
+}
+
+gint32 GetErrorJRet( JNIEnv* jenv, jobject jRet )
+{
+    jclass cls = jenv->FindClass(
+        "org/rpcf/rpcbase/JRetVal");
+
+    jmethodId getError = jenv->GetMethodID(
+        cls, "getError", "()I");
+
+    return jenv->CallIntMethod(
+        jRet, getError );
+}
+
+// returns an array of BufPtr
+int GetParamsJRet(
+    JNIEnv* jenv, vectorBufPtr& vecParams )
+{
+    jclass cls = jenv->FindClass(
+        "org/rpcf/rpcbase/JRetVal");
+
+    jmethodId getParams = jenv->GetMethodID(
+        cls, "getParams",
+        "()Lorg/rpcf/rpcbase/vectorBufPtr;");
+
+    jobject jvecParams = jenv->CallIntMethod(
+        jRet, getParams );
+
+    if( jvecParams == nullptr )
+        return -EFAULT;
+
+    intptr_t lPtr = GetWrappedPtr(
+        jenv, jvecParams );
+
+    if( lPtr == 0 )
+        return -EFAULT;
+
+    vectorBufPtr* pvecBufs =
+        ( vectorBufPtr* )lPtr;
+
+    vecParams = *pvecBufs;
+    return STATUS_SUCCESS;
+}
+
+// returns an array of BufPtr
+int GetParamCountJRet(
+    JNIEnv* jenv, jobject jret )
+{
+    jclass cls = jenv->FindClass(
+        "org/rpcf/rpcbase/JRetVal");
+
+    jmethodId getParams = jenv->GetMethodID(
+        cls, "getParamCount", "()i");
+
+    return jenv->CallIntMethod( jRet, getParams );
 }
 
 EnumTypeId GetTypeId(
     JNIEnv* jenv, jobject pObj )
 {
-    jclass cls = (*jenv)->FindClass(
-        jenv, "org/rpcf/rpcbase/Helpers");
+    jclass cls = jenv->FindClass(
+        "org/rpcf/rpcbase/Helpers");
 
-    jmethodId gtid_method = (*jenv)->GetMethodID(
-        jenv, cls, "getTypeId",
+    jmethodId gtid_method = jenv->GetMethodID(
+        cls, "getTypeId",
         "(Ljava/lang/Object;)I");
 
-    jint iType = (*jenv)->CallIntMethod(
-        jenv, jRet, gtid_method, pObj );
+    jint iType = jenv->CallIntMethod(
+        jRet, gtid_method, pObj );
 
     return (EnumTypeId)iType;
 }
 
+jobject NewWrapperObj( JNIEnv* jenv,
+    const stdstr& strClass,
+    long lPtr, bool bOwner = true )
+{
+    jclass cls = jenv->FindClass(
+        strClass.c_str() );
+
+    jmethodID ctor  = jenv->GetMethodID(
+        cls, "<init>", "(JZ)V");
+
+    return jenv->NewObject(
+        cls, ctor, lPtr, bOwner );
+
+}
 jobject NewIService( JNIEnv* jenv,
     long lPtr, bool bOwner )
 {
-    jclass cls = (*jenv)->FindClass(
-        jenv, "org/rpcf/rpcbase/IService");
-
-    jmethodID ctor  = (*jenv)->GetMethodID(
-        jenv, cls, "<init>", "(JZ)V");
-
-    return ( *jenv )->NewObject(
-        cls, ctor, lPtr, bOwner );
+    stdstr strClass =
+        "org/rpcf/rpcbase/IService";
+    return NewWrapperObj(
+        jenv, strClass, lPtr, bOwner );
 }
 
 jobject NewObjPtr( JNIEnv* jenv,
-    long lPtr, bool bOwner )
+    long lPtr, bool bOwner = true )
 {
-    jclass cls = (*jenv)->FindClass(
-        jenv, "org/rpcf/rpcbase/ObjPtr");
+    stdstr strClass =
+        "org/rpcf/rpcbase/ObjPtr";
 
-    jmethodID ctor  = (*jenv)->GetMethodID(
-        jenv, cls, "<init>", "(JZ)V");
+    return NewWrapperObj(
+        jenv, strClass, lPtr, bOwner );
+}
 
-    return ( *jenv )->NewObject(
-        cls, ctor, lPtr, bOwner );
+jobject NewBufPtr( JNIEnv* jenv,
+    long lPtr, bool bOwner = true )
+{
+    stdstr strClass =
+        "org/rpcf/rpcbase/BufPtr";
+
+    return NewWrapperObj(
+        jenv, strClass, lPtr, bOwner );
+}
+
+jobject NewCfgPtr( JNIEnv* jenv,
+    long lPtr, bool bOwner = true )
+{
+    stdstr strClass =
+        "org/rpcf/rpcbase/CfgPtr";
+
+    return NewWrapperObj(
+        jenv, strClass, lPtr, bOwner );
+}
+
+LONGWORD GetWrappedPtr(
+    JNIEnv *jenv, jobject jObj )
+{
+    jclass objClass =
+        jenv->GetObjectClass( jObj );
+
+    jmethodID getName = jenv->GetMethodId(
+        objClass, "getCanonicName",
+        ()"Ljava/lang/String;" );
+
+    jobject jName = jenv->CallObjectMethod(
+        jenv, objClass, getName );
+
+    const char* szName =
+        jenv->GetStringUTFChars( jstr, 0 );
+
+    stdstr strSig;
+    strSig = strSig + "(L" + szName + ";)J"
+    jenv->ReleaseStringUTFChars( jstr, szName );
+
+    jmethodID getCPtr =
+        jenv->GetStaticMethodID(
+            cls, "getCPtr",
+            strSig.c_str() );
+
+    return jenv->CallStaticLongMethod(
+            objClass, getCPtr, jObj );
+}
+
+LONGWORD GetWrappedBufPtr(
+    JNIEnv *jenv, jobject jObj )
+{
+    jclass objClass =
+        jenv->GetObjectClass( jObj );
+
+    stdstr strSig =
+        "(Lorg/rpcf/rpcbase/BufPtr;)";
+
+    jmethodID getCPtr = jenv->GetStaticMethodID(
+        cls, "getCPtr", strSig.c_str() );
+
+    return jenv->CallStaticLongMethod(
+            objClass, getCPtr, jObj );
 }
 
 jobject NewBoolean( JNIEnv* jenv, bool val )
 {
-    jclass cls = (*jenv)->FindClass(
-        jenv, "java/lang/Boolean");
-    jmethodID midInit = (*jenv)->GetMethodID(
-        jenv, cls, "<init>", "(Z)V");
+    jclass cls = jenv->FindClass(
+        "java/lang/Boolean");
+    jmethodID midInit = jenv->GetMethodID(
+        cls, "<init>", "(Z)V");
     if( nullptr == midInit )
         return nullptr;
-    jobject newObj = (*jenv)->NewObject(
-        jenv, cls, midInit, (jboolean)val);
+    jobject newObj = jenv->NewObject(
+        cls, midInit, (jboolean)val);
     return newObj;
 }
 
 jobject NewByte( JNIEnv* jenv, guint8 val )
 {
-    jclass cls = (*jenv)->FindClass(
-        jenv, "java/lang/Byte");
-    jmethodID midInit = (*jenv)->GetMethodID(
-        jenv, cls, "<init>", "(B)V");
+    jclass cls = jenv->FindClass(
+        "java/lang/Byte");
+    jmethodID midInit = jenv->GetMethodID(
+        cls, "<init>", "(B)V");
     if( nullptr == midInit )
         return nullptr;
-    jobject newObj = (*jenv)->NewObject(
-        jenv, cls, midInit, (jbyte)val);
+    jobject newObj = jenv->NewObject(
+        cls, midInit, (jbyte)val);
     return newObj;
 }
 
 jobject NewShort( JNIEnv* jenv, guint16 val )
 {
-    jclass cls = (*jenv)->FindClass(
-        jenv, "java/lang/Short");
-    jmethodID midInit = (*jenv)->GetMethodID(
-        jenv, cls, "<init>", "(S)V");
+    jclass cls = jenv->FindClass(
+        "java/lang/Short");
+    jmethodID midInit = jenv->GetMethodID(
+        cls, "<init>", "(S)V");
     if( nullptr == midInit )
         return nullptr;
-    jobject newObj = (*jenv)->NewObject(
-        jenv, cls, midInit, val);
+    jobject newObj = jenv->NewObject(
+        cls, midInit, val);
     return newObj;
 }
 
-jobject NewInt( JNIEnv* jenv, int val )
+jobject NewInt( JNIEnv* jenv, guint32 val )
 {
-    jclass cls = (*jenv)->FindClass(
-        jenv, "java/lang/Integer");
-    jmethodID midInit = (*jenv)->GetMethodID(
+    jclass cls = jenv->FindClass(
+        "java/lang/Integer");
+    jmethodID midInit = jenv->GetMethodID(
         jenv, cls, "<init>", "(I)V");
     if( nullptr == midInit )
         return nullptr;
-    jobject newObj = (*jenv)->NewObject(
-        jenv, cls, midInit, val);
+    jobject newObj = jenv->NewObject(
+        cls, midInit, val);
     return newObj;
 }
 
 jobject NewLong( JNIEnv* jenv, gint64 val )
 {
-    jclass cls = (*jenv)->FindClass(
-        jenv, "java/lang/Long");
-    jmethodID midInit = (*jenv)->GetMethodID(
-        jenv, cls, "<init>", "(J)V");
+    jclass cls = jenv->FindClass(
+        "java/lang/Long");
+    jmethodID midInit = jenv->GetMethodID(
+        cls, "<init>", "(J)V");
     if( nullptr == midInit )
         return nullptr;
-    jobject newObj = (*jenv)->NewObject(
-        jenv, cls, midInit, val);
+    jobject newObj = jenv->NewObject(
+        cls, midInit, val);
     return newObj;
 }
 
 jobject NewFloat( JNIEnv* jenv, float val )
 {
-    jclass cls = (*jenv)->FindClass(
-        jenv, "java/lang/Float");
-    jmethodID midInit = (*jenv)->GetMethodID(
-        jenv, cls, "<init>", "(F)V");
+    jclass cls = jenv->FindClass(
+        "java/lang/Float");
+    jmethodID midInit = jenv->GetMethodID(
+        cls, "<init>", "(F)V");
     if( nullptr == midInit )
         return nullptr;
-    jobject newObj = (*jenv)->NewObject(
-        jenv, cls, midInit, val);
+    jobject newObj = jenv->NewObject(
+        cls, midInit, val);
     return newObj;
 }
 
 jobject NewDouble( JNIEnv* jenv, double val )
 {
-    jclass cls = (*jenv)->FindClass(
-        jenv, "java/lang/Double");
-    jmethodID midInit = (*jenv)->GetMethodID(
+    jclass cls = jenv->FindClass(
+        "java/lang/Double");
+    jmethodID midInit = jenv->GetMethodID(
         jenv, cls, "<init>", "(D)V");
     if( nullptr == midInit )
         return nullptr;
-    jobject newObj = (*jenv)->NewObject(
-        jenv, cls, midInit, val);
+    jobject newObj = jenv->NewObject(
+        cls, midInit, val);
     return newObj;
 }
 
@@ -426,9 +558,9 @@ jobject GetJniString(JNIEnv *jenv, const stdstr& message )
             ( message.c_str() );
 
     jbyteArray bytes =
-        (*jenv)->NewByteArray(byteCount);
+        jenv->NewByteArray( byteCount);
 
-    (*jenv)->SetByteArrayRegion(
+    jenv->SetByteArrayRegion(
         bytes, 0, byteCount, pNativeMessage);
 
     /*
@@ -436,73 +568,73 @@ jobject GetJniString(JNIEnv *jenv, const stdstr& message )
      *  javap -s java.nio.charset.Charset | egrep -A2 "forName"
     */
     jclass charsetClass =
-        (*jenv)->FindClass("java/nio/charset/Charset");
+        jenv->FindClass("java/nio/charset/Charset");
 
-    jmethodID forName = (*jenv)->GetStaticMethodID(
+    jmethodID forName = jenv->GetStaticMethodID(
       charsetClass, "forName",
       "(Ljava/lang/String;)"
       "Ljava/nio/charset/Charset;");
 
-    jstring utf8 = (*jenv)->NewStringUTF("UTF-8");
-    jobject charset = (*jenv)->CallStaticObjectMethod(
+    jstring utf8 = jenv->NewStringUTF("UTF-8");
+    jobject charset = jenv->CallStaticObjectMethod(
         charsetClass, forName, utf8);
 
     // find a String constructor that takes a Charset:
     //   javap -s java.lang.String | egrep -A2 "String\(.*charset"
     jclass stringClass =
-        (*jenv)->FindClass("java/lang/String");
+        jenv->FindClass("java/lang/String");
 
-    jmethodID ctor = (*jenv)->GetMethodID(
+    jmethodID ctor = jenv->GetMethodID(
        stringClass, "<init>",
        "([BLjava/nio/charset/Charset;)V");
 
-    return (*jenv)->NewObject(
+    return jenv->NewObject(
         stringClass, ctor, bytes, charset);
 }
 
 bool IsArray( JNIEnv* jenv, jojbect pObj )
 {
     jclass Class_class = 
-        (*jenv)->FindClass("java/lang/Class");
+        jenv->FindClass("java/lang/Class");
     jmethodID Class_isArray_m =
-        (*jenv)->GetMethodID(
-            jenv, Class_class, "isArray", "()Z");
+        jenv->GetMethodID(
+            Class_class, "isArray", "()Z");
     jclass obj_class =
-        (*jenv)->GetObjectClass(pObj);
-    return (*jenv)->CallBooleanMethod(
+        jenv->GetObjectClass(pObj);
+    return jenv->CallBooleanMethod(
             obj_class, Class_isArray_mid);
 }
 
 EnumTypeId GetObjType( JNIEnv* jenv, jobject pObj )
 {
     jclass iClass =
-        (*jenv)->FindClass("java/lang/String");
-    if( ( *jenv )->IsInstanceOf( pObj, iClass ) )
+        jenv->FindClass("java/lang/String");
+    if( jenv->IsInstanceOf( pObj, iClass ) )
         return typeString;
 
     iClass =
-        (*jenv)->FindClass("java/lang/Integer");
-    if( ( *jenv )->IsInstanceOf( pObj, iClass ) )
+        jenv->FindClass("java/lang/Integer");
+    if( jenv->IsInstanceOf( pObj, iClass ) )
         return typeUInt32;
 
     iClass =
-        (*jenv)->FindClass("org/rpcf/rpcbase/ObjPtr");
-    if( ( *jenv )->IsInstanceOf( pObj, iClass ) )
+        jenv->FindClass("org/rpcf/rpcbase/ObjPtr");
+    if( jenv->IsInstanceOf( pObj, iClass ) )
         return typeObj;
 
     iClass =
-        (*jenv)->FindClass("org/rpcf/rpcbase/CfgPtr");
-    if( ( *jenv )->IsInstanceOf( pObj, iClass ) )
+        jenv->FindClass("org/rpcf/rpcbase/CfgPtr");
+    if( jenv->IsInstanceOf( pObj, iClass ) )
         return typeObj;
 
     iClass =
-        (*jenv)->FindClass("java/lang/Boolean");
-    if( ( *jenv )->IsInstanceOf( pObj, iClass ) )
+        jenv->FindClass("java/lang/Boolean");
+    if( jenv->IsInstanceOf( pObj, iClass ) )
         return typeByte;
 
     iClass =
-        (*jenv)->FindClass("java/lang/Byte");
-    if( ( *jenv )->IsInstanceOf( pObj, iClass ) )
+        jenv->FindClass("java/lang/Byte");
+    if( jenv->IsInstanceOf( pObj, iClass ) )
     {
         if( IsArray( jenv, pObj ) )
             return typeByteArr;
@@ -574,11 +706,11 @@ CfgPtr* CastToCfg( ObjPtr* pObj )
         }
 
         jbyteArray retBuf =
-            ( *jenv )->NewByteArray(
-                jenv, pBuf->size() );
+            jenv->NewByteArray(
+                pBuf->size() );
 
-        (*jenv)->SetByteArrayRegion(
-            jenv, retBuf, 0, size, pBuf->ptr() );
+        jenv->SetByteArrayRegion(
+            retBuf, 0, size, pBuf->ptr() );
 
         jobject jRet = NewJRet( jenv );
         AddElemToJRet( jenv, jRet, retBuf );
@@ -595,11 +727,11 @@ CfgPtr* CastToCfg( ObjPtr* pObj )
         bool bRelease = false;
         jbyte* buf = nullptr;
         do{
-            jsize len = ( *jenv )->GetArrayLength(
-                jenv, pByteArray);
+            jsize len = jenv->GetArrayLength(
+                pByteArray);
 
-            buf=(*jenv)->GetPrimitiveArrayCritical(
-                jenv, pByteArray, 0 );
+            buf=jenv->GetPrimitiveArrayCritical(
+                pByteArray, 0 );
             bRelease = true;
 
             char* pBuf = ( char* )buf + dwOffset;
@@ -670,8 +802,8 @@ CfgPtr* CastToCfg( ObjPtr* pObj )
         }while( 0 );
         if( bRelease )
         {
-            (*jenv)->ReleasePrimitiveArrayCritical(
-                jenv, pByteArray, buf, 0 );
+            jenv->ReleasePrimitiveArrayCritical(
+                pByteArray, buf, 0 );
         }
 
         SetErrorJRet( jenv, jRet, ret );
@@ -683,8 +815,7 @@ class CfgPtr
 {
     public:
 
-    CfgPtr( IConfigDb* pCfg,
-        bool bAddRef );
+    CfgPtr( IConfigDb* pCfg, bool bAddRef );
     ~CfgPtr();
     bool IsEmpty() const;
 };
@@ -693,6 +824,8 @@ class CfgPtr
 %newobject NewObj;
     gint32 NewObj()
     {
+        if( $self == nullptr )
+            return -EFAULT;
         return $self->NewObj(
             Clsid_CConfigDb, nullptr );
     }
@@ -720,7 +853,7 @@ class BufPtr
     public:
     void Clear();
 
-    BufPtr( CBuffer* pObj, bool );
+    BufPtr( bool );
     ~BufPtr();
     char* ptr();
     guint32 size() const;
@@ -731,33 +864,360 @@ class BufPtr
 
 %extend BufPtr {
 
-    void CopyToJava(
-        JNIEnv *jenv, jbyteArray pArr )
+    gint32 NewObj()
     {
-        BufPtr& pBuf = *$self;
-        jsize len = ( *jenv )->GetArrayLength(
-            jenv, pArr );
-        jsize iSize = std::min(
-            ( jsize )pBuf->size(), len );
-        ( *jenv )->SetByteArrayRegion( jenv, pArr,
-            iSize, 0, pBuf->ptr() );
+        if( $self == nullptr )
+            return -EFAULT;
+        return $self->NewObj(
+            Clsid_CBuffer, nullptr );
+    }
+    jobject GetByteArray( JNIEnv *jenv )
+    {
+        if( $self == nullptr )
+            return nullptr;
+        gint32 ret = 0;
+        jobject jRet = NewJRet( jenv );
+        do{
+            BufPtr& pBuf = *$self;
+            if( pBuf.IsEmpty() || pBuf->empty() )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            jsize len = ( jsize )pBuf->size();
+            jbyteArray bytes =
+                jenv->NewByteArray( len );
+            jenv->SetByteArrayRegion( pArr,
+                len, 0, pBuf->ptr() );
+            AddElemToJRet( jenv, jRet, bytes );
+
+        }while( 0 );
+
+        SetErrorJRet( jenv, jRet, ret );
+        return jRet;
     }
 
-    gint32 CopyFromJava(
+    jobject GetByte()
+    {
+        if( $self == nullptr )
+            return -EINVAL;
+        gint32 ret = 0;
+        jobject jRet = NewJRet( jenv );
+        do{
+            BufPtr& pBuf = *$self;
+            if( pBuf.IsEmpty() || pBuf->empty() )
+            {
+                ret = -EINVAL;
+                break;
+            }
+            guint8 val = ( guint8& )*pBuf;
+            jobject jval = NewByte( jenv, val );
+            if( jval == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            AddElemToJRet( jenv, jRet, val );
+            
+        }while( 0 );
+        SetErrorJRet( jenv, jRet, ret );
+        return jRet;
+    }
+    jshort GetShort()
+    {
+        if( $self == nullptr )
+            return -EINVAL;
+        gint32 ret = 0;
+        jobject jRet = NewJRet( jenv );
+        do{
+            BufPtr& pBuf = *$self;
+            if( pBuf.IsEmpty() || pBuf->empty() )
+            {
+                ret = -EINVAL;
+                break;
+            }
+            guint16 val = ( guint16& )*pBuf;
+            jobject jval = NewShort( jenv, val );
+            if( jval == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            AddElemToJRet( jenv, jRet, val );
+            
+        }while( 0 );
+        SetErrorJRet( jenv, jRet, ret );
+        return jRet;
+    }
+    jobject GetInt( JNIEnv* jenv )
+    {
+        if( $self == nullptr )
+            return -EINVAL;
+        gint32 ret = 0;
+        jobject jRet = NewJRet( jenv );
+        do{
+            BufPtr& pBuf = *$self;
+            if( pBuf.IsEmpty() || pBuf->empty() )
+            {
+                ret = -EINVAL;
+                break;
+            }
+            guint32 val = ( guint32& )*pBuf;
+            jobject jval = NewInt( jenv, val );
+            if( jval == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            AddElemToJRet( jenv, jRet, val );
+            
+        }while( 0 );
+        SetErrorJRet( jenv, jRet, ret );
+        return jRet;
+    }
+    jobject GetLong( JNIEnv* jenv )
+    {
+        if( $self == nullptr )
+            return -EINVAL;
+        gint32 ret = 0;
+        jobject jRet = NewJRet( jenv );
+        do{
+            BufPtr& pBuf = *$self;
+            if( pBuf.IsEmpty() || pBuf->empty() )
+            {
+                ret = -EINVAL;
+                break;
+            }
+            guint64 val = ( guint64& )*pBuf;
+            jobject jval = NewLong( jenv, val );
+            if( jval == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            AddElemToJRet( jenv, jRet, val );
+            
+        }while( 0 );
+        SetErrorJRet( jenv, jRet, ret );
+        return jRet;
+    }
+    jobject GetFloat( JNIEnv* jenv )
+    {
+        if( $self == nullptr )
+            return -EINVAL;
+        gint32 ret = 0;
+        jobject jRet = NewJRet( jenv );
+        do{
+            BufPtr& pBuf = *$self;
+            if( pBuf.IsEmpty() || pBuf->empty() )
+            {
+                ret = -EINVAL;
+                break;
+            }
+            float val = ( float& )*pBuf;
+            jobject jval = NewFloat( jenv, val );
+            if( jval == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            AddElemToJRet( jenv, jRet, val );
+            
+        }while( 0 );
+        SetErrorJRet( jenv, jRet, ret );
+        return jRet;
+    }
+    jobject GetDouble( JNIEnv* jenv )
+    {
+        if( $self == nullptr )
+            return -EINVAL;
+        gint32 ret = 0;
+        jobject jRet = NewJRet( jenv );
+        do{
+            BufPtr& pBuf = *$self;
+            if( pBuf.IsEmpty() || pBuf->empty() )
+            {
+                ret = -EINVAL;
+                break;
+            }
+            double val = ( double& )*pBuf;
+            jobject jval = NewDouble( jenv, val );
+            if( jval == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            AddElemToJRet( jenv, jRet, val );
+            
+        }while( 0 );
+        SetErrorJRet( jenv, jRet, ret );
+        return jRet;
+    }
+
+    jobject GetObjPtr( JNIEnv* jenv )
+    {
+        if( $self == nullptr )
+            return -EINVAL;
+        gint32 ret = 0;
+        jobject jRet = NewJRet( jenv );
+        do{
+            BufPtr& pBuf = *$self;
+            if( pBuf.IsEmpty() || pBuf->empty() )
+            {
+                ret = -EINVAL;
+                break;
+            }
+            ObjPtr& val = ( ObjPtr& )*pBuf;
+            jobject jval = NewObjPtr( jenv, val );
+            if( jval == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            AddElemToJRet( jenv, jRet, val );
+            
+        }while( 0 );
+        SetErrorJRet( jenv, jRet, ret );
+        return jRet;
+    }
+
+    jobject GetString( JNIEnv* jenv )
+    {
+        if( $self == nullptr )
+            return -EINVAL;
+        gint32 ret = 0;
+        jobject jRet = NewJRet( jenv );
+        do{
+            BufPtr& pBuf = *$self;
+            if( pBuf.IsEmpty() || pBuf->empty() )
+            {
+                ret = -EINVAL;
+                break;
+            }
+            stdstr strVal = ( char* )*pBuf;
+            jobject jval =
+                GetJniString( jenv, strVal );
+
+            if( jval == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            AddElemToJRet( jenv, jRet, val );
+            
+        }while( 0 );
+        SetErrorJRet( jenv, jRet, ret );
+        return jRet;
+    }
+
+    gint32 SetByteArray(
         JNIEnv *jenv, jbyteArray pArr )
     {
         gint32 ret = 0;
-        jsize len = ( *jenv )->GetArrayLength(
-            jenv, pArr );
+        jsize len =
+            jenv->GetArrayLength( pArr );
+
         BufPtr& pBuf = *$self;
         ret = pBuf->Resize( len );
         if( ERROR( ret ) )
             return ret;
-        ( *jenv )->GetByteArrayRegion( jenv, pArr,
+        jenv->GetByteArrayRegion( pArr,
             len, 0, pBuf->ptr() );
         return ret;
     }
-}
+
+    gint32 SetString(
+        JNIEnv *jenv, jstring jstr )
+    {
+        if( $self == nullptr )
+            return -EINVAL;
+
+        if( jstr == nullptr )
+            return -EFAULT;
+
+        BufPtr& pBuf = *$self;
+        if( pBuf.IsEmpty() )
+            pBuf.NewObj();
+
+        const char* val = 
+            jenv->GetStringUTFChars( jstr, 0 );
+
+        *this = ( const stdstr& )val;
+        jenv->ReleaseStringUTFChars( jstr, val); 
+        return STATUS_SUCCESS;
+    }
+
+    gint32 SetByte( jbyte val )
+    {
+        if( $self == nullptr )
+            return -EINVAL;
+        BufPtr& pBuf = *$self;
+        if( pBuf.IsEmpty() )
+            pBuf.NewObj();
+        *this = ( guint8 )val;
+        return STATUS_SUCCESS;
+    }
+    gint32 SetShort( jshort val )
+    { 
+        if( $self == nullptr )
+            return -EINVAL;
+        BufPtr& pBuf = *$self;
+        if( pBuf.IsEmpty() )
+            pBuf.NewObj();
+        *this = ( guint8 )val;
+        return STATUS_SUCCESS;
+    }
+    gint32 SetInt( jint val )
+    { 
+        if( $self == nullptr )
+            return -EINVAL;
+        BufPtr& pBuf = *$self;
+        if( pBuf.IsEmpty() )
+            pBuf.NewObj();
+        *this = ( guint32 )val;
+        return STATUS_SUCCESS;
+    }
+    gint32 SetLong( jlong val )
+    { 
+        if( $self == nullptr )
+            return -EINVAL;
+        BufPtr& pBuf = *$self;
+        if( pBuf.IsEmpty() )
+            pBuf.NewObj();
+        *this = ( guint64 )val;
+        return STATUS_SUCCESS;
+    }
+    gint32 SetFloat( jfloat val )
+    { 
+        if( $self == nullptr )
+            return -EINVAL;
+        BufPtr& pBuf = *$self;
+        if( pBuf.IsEmpty() )
+            pBuf.NewObj();
+        *this = ( float )val;
+        return STATUS_SUCCESS;
+    }
+    gint32 SetDouble( jdouble val )
+    { 
+        if( $self == nullptr )
+            return -EINVAL;
+        BufPtr& pBuf = *$self;
+        if( pBuf.IsEmpty() )
+            pBuf.NewObj();
+        *this = ( double )val;
+        return STATUS_SUCCESS;
+    }
+    gint32 SetObjPtr( ObjPtr* ppObj )
+    { 
+        if( $self == nullptr )
+            return -EINVAL;
+        BufPtr& pBuf = *$self;
+        if( pBuf.IsEmpty() )
+            pBuf.NewObj();
+        *this = *pObj;
+        return STATUS_SUCCESS;
+    }
+};
 
 class CParamList
 {
@@ -1040,8 +1500,7 @@ class CParamList
                 iProp, iType );
             if( ERROR( ret ) )
                 break;
-            jobject jval =
-                NewInt( jenv, iType );
+            jobject jval = NewInt( jenv, iType );
             if( jval == nullptr )
             {
                 ret = -ENOMEM;
@@ -1093,16 +1552,17 @@ class CParamList
             return -EINVAL;
         do{
             BufPtr pBuf( true );
-            jsize len = ( *jenv )->GetArrayLength(
-                jenv, pba );
+            jsize len =
+                jenv->GetArrayLength( pba );
+
             if( len > 0 )
             {
                 ret = pBuf->Resize();
                 if( ERROR( ret ) )
                     break;
                 
-                ( *jenv )->GetByteArrayRegion(
-                    jenv, pba, len, 0,
+                jenv->GetByteArrayRegion(
+                    pba, len, 0,
                     pBuf->ptr() );
             }
 
@@ -1158,8 +1618,7 @@ class CParamList
                 ret = -ERANGE;
                 break;
             }
-            iSize = ( int32_t )dwSize;
-            jobject jInt = NewInt( jenv, iSize );
+            jobject jInt = NewInt( jenv, dwSize );
             if( jInt == nullptr )
             {
                 ret = -EFAULT;
@@ -1204,6 +1663,7 @@ class CRpcServices : public IService
         bool bServer,
         CfgPtr& pCfg );
     EnumIfState GetState() const;
+    bool IsServer();
 };
 
 %typemap(javadestruct_derived, methodname="delete", methodmodifiers="public synchronized") CInterfaceProxy {
