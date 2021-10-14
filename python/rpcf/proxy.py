@@ -293,10 +293,10 @@ class PyRpcServices :
     same as the response callback. The `ret' is
     the error code of the task.
     '''
-    def InstallCompNotify(
+    def InstallCancelNotify(
         self, task, callback, *listArgs ):
         listResp = [ 0, [ *listArgs ] ]
-        self.oInst.InstallCompNotify(
+        self.oInst.InstallCancelNotify(
             task, callback, listResp )
 
     def HandleAsyncResp( self,
@@ -482,7 +482,7 @@ class PyRpcServices :
         oParams = cpp.CParamList( pCfg )
         ret = oParams.GetSize()
         if ret[ 0 ] < 0 :
-            resp[ 0 ] = ret[ 0 ]
+            return ret
         iSize = ret[ 1 ]
 
         if iSize < 0 :
@@ -755,8 +755,8 @@ class PyRpcServices :
             ret = callback( *listArgs )
         return ret
 
-    ''' run the callback on a new context instead
-    of the current context
+    ''' run the callback on a new stack context
+    instead of the current one
 
     DeferCall, like a functor object bind to the
     callback function with the arguments. And it

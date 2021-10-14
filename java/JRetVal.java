@@ -1,9 +1,13 @@
 package org.rpcf.rpcbase;
 import java.util.ArrayList;
+import java.util.List;
 
 public class JRetVal {
+
     protected  int m_iRetVal = 0;
-    protected ArrayList< Object > m_listResp;
+
+    protected List<Object> m_listResp =
+        new ArrayList< Object >();
 
     boolean ERROR( )
     { return m_iRetVal < 0; }
@@ -14,12 +18,23 @@ public class JRetVal {
     boolean isPending()
     { return m_iRetVal == 65537; }
 
-    void setErrorJRet( int iRet )
+    void setError( int iRet )
     { m_iRetVal = iRet; }
 
-    void addElemToJRet( Object pObj )
+    void addElem( Object pObj )
     { m_listResp.add( pObj ); }
 
+    void clear()
+    {
+        m_listResp.clear();
+        m_iRetVal = 0;
+    }
+    Object[] getParamArray()
+    {
+        if( m_listResp.size() == 0 )
+            return new Object[ 0 ];
+        return m_listResp.toArray();
+    }
     vectorBufPtr getParams()
     {
         int ret = 0;
@@ -87,7 +102,7 @@ public class JRetVal {
             case rpcbaseConstants.typeDMsg:
             default:
                 {
-                    ret = -1;
+                    ret = -rpcbaseConstants.ENOTSUP;
                     break;
                 }
             }
@@ -107,4 +122,11 @@ public class JRetVal {
 
     int getError()
     { return m_iRetVal; }
+
+    Object getAt( int idx )
+    {
+        if( getParamCount() <= idx )
+            return null;
+        return m_listResp.get( idx );
+    }
 }

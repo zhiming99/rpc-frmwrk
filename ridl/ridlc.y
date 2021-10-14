@@ -1062,6 +1062,17 @@ method_decls : method_decl ';' method_decls
         ObjPtr& pNode = *$3;
         CMethodDecls* pmds = pNode;
         ObjPtr& pmd = *$1;
+        CMethodDecl* pMethod = pmd;
+        stdstr strName = pMethod->GetName();
+        if( pmds->ExistMethod( strName ) )
+        {
+            std::string strMsg =
+                "found duplicated method name '"; 
+            strMsg += strName + "', not supported";
+            PrintMsg(
+                -EEXIST, strMsg.c_str() );
+            g_bSemanErr = true;
+        }
         pmds->InsertChild( pmd );
         ENABLE_STREAM( pmd, pmds );
         BufPtr pBuf( true );

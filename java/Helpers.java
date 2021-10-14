@@ -10,6 +10,12 @@ public class Helpers
             null && obj.getClass().isArray();
     }
 
+    public static boolean isInterface( Object obj ) 
+    {
+        return obj !=
+            null && obj.getClass().isInterface();
+    }
+
     private static HashMap< String, Integer >
         InitMap( HashMap< String, Integer > oMap )
     {

@@ -1079,6 +1079,20 @@ struct CMethodDecls : public CAstListNode
     typedef CAstListNode super;
     CMethodDecls() : super()
     { SetClassId( clsid( CMethodDecls ) ); }
+
+    bool ExistMethod(
+        const std::string& strName )
+    {
+        for( auto& elem : m_queChilds )
+        {
+            CMethodDecl* pNode = elem;
+            if( pNode == nullptr )
+                continue;
+            if( pNode->GetName() == strName )
+                return true;
+        }
+        return false;
+    }
 };
 
 struct CInterfaceDecl : public CNamedNode

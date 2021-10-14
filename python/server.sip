@@ -719,7 +719,7 @@ class CPythonServer :
         sipRes = pImpl->DisableTimer( *a0 );
     %End
 
-    gint32 InstallCompNotify(
+    gint32 InstallCancelNotify(
         cpp::ObjPtr& pCallback,
         PyObject* pCb,
         PyObject* pListResp );
@@ -727,7 +727,7 @@ class CPythonServer :
         CPythonServerImpl* pImpl =
         static_cast< CPythonServerImpl* >
             ( sipCpp );
-        sipRes = pImpl->InstallCompNotify(
+        sipRes = pImpl->InstallCancelNotify(
             *a0, a1, a2 );
     %End
 

@@ -4347,6 +4347,23 @@ gint32 CRpcReqForwarderProxy::BuildNewMsgToFwrd(
     return ret;
 }
 
+bool IsAuthSession( IConfigDb* pReqCtx )
+{
+    CCfgOpener oCfg( pReqCtx );
+    stdstr strHash;
+    gint32 ret = oCfg.GetStrProp(
+        propSessHash, strHash );
+    if( ERROR( ret ) )
+        return false;
+
+    const char* szHash = strHash.c_str();
+    if( szHash[ 0 ] == 'A' &&
+        szHash[ 1 ]  == 'U' )
+        return true;
+
+    return false;
+}
+
 gint32 CRpcReqForwarderProxy::ForwardRequest(
     IConfigDb* pReqCtx,
     DBusMessage* pMsg,
@@ -4411,7 +4428,7 @@ gint32 CRpcReqForwarderProxy::ForwardRequest(
             static_cast< CRpcRouterBridge* >
                 ( GetParent() );
 
-        if( !pRouter->HasAuth() )
+        if( !IsAuthSession( pReqCtx ) )
         {
             pNewMsg = pReqMsg;
         }

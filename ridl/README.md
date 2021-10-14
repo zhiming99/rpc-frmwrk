@@ -88,6 +88,9 @@ The above example shows most of the statements ridl supports. ridl now has 7 typ
     * **noreply** : specify a method not require a response from server. On thhe proxy side, the method will return as soon as the request is sent and on the server side, the request is handled without sending out the response.
     * **event** : to specify a method as an event handler, as not applied to normal method. The event flag means the proxy side has an event handler to pick up the event broadcasted by the server and do some processing. The event delivery is a reverse process compared to a normal rpc request, as initiated by server side and ends up at the proxy side. 
   * **the input parameter list** or **output parameter list** of a method can be empty, but normally the method will get a status code from the server to tell if the request succeeds or not, unless the method has attributes such as the `event` or `noreply`.
+
+  * **duplicated method names** : Note that the duplicated method names could have different problems between different language implementations. So the ridlc will generate error if it finds duplicate method names within an interface declaration. It is recommended to avoid duplicate method names within one service declaration.
+
 * **service declaration** : to declare a `service` object. A `service` object contains a set of interfaces, to deliver a relatively independent feature or service. it contains a `service id` and a set of interfaces.
   * **service id**: will appear in the proxy request's `ObjPath` string, as part of an object address as to find the service.
   * Besides interfaces, the service can also be assigned some more attributes.

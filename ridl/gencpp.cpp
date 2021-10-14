@@ -5279,7 +5279,7 @@ gint32 CImplIfMethodSvr::OutputAsyncNonSerial()
 
         // call the user's handler
         CCOUT << "ret = "
-            << strMethod << "( pNewCb";
+            << strMethod << "( pCallback";
 
         if( dwInCount + dwOutCount > 0 )
         {
@@ -5331,6 +5331,12 @@ gint32 CImplIfMethodSvr::OutputAsyncNonSerial()
         CCOUT << "CIfRetryTask* pTask = pNewCb;";
         NEW_LINE;
         CCOUT << "pTask->ClearClientNotify();";
+        NEW_LINE;
+        CCOUT << "if( pCallback != nullptr )";
+        NEW_LINE;
+        CCOUT << "    rpcf::RemoveInterceptCallback(";
+        NEW_LINE;
+        CCOUT << "        pTask, pCallback );";
         NEW_LINE;
         CCOUT << "( *pNewCb )( eventCancelTask );";
         BLOCK_CLOSE;
@@ -5420,7 +5426,7 @@ gint32 CImplIfMethodSvr::OutputAsyncSerial()
             << strMethod << "(";
 
         INDENT_UPL;
-        CCOUT << "pNewCb,";
+        CCOUT << "pCallback,";
         NEW_LINE;
         GenActParams( pInArgs, pOutArgs );
 
@@ -5463,6 +5469,12 @@ gint32 CImplIfMethodSvr::OutputAsyncSerial()
         CCOUT << "CIfRetryTask* pTask = pNewCb;";
         NEW_LINE;
         CCOUT << "pTask->ClearClientNotify();";
+        NEW_LINE;
+        CCOUT << "if( pCallback != nullptr )";
+        NEW_LINE;
+        CCOUT << "    rpcf::RemoveInterceptCallback(";
+        NEW_LINE;
+        CCOUT << "        pTask, pCallback );";
         NEW_LINE;
         CCOUT << "( *pNewCb )( eventCancelTask );";
         BLOCK_CLOSE;

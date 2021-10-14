@@ -1943,7 +1943,7 @@ gint32 CImplPyMthdSvrBase::OutputSync( bool bSync )
             Wa( "    self.oInst.SetInvTimeout(" );
             CCOUT << "        callback, " << dwTimeoutSec << " )";
             NEW_LINE;
-            Wa( "    self.InstallCompNotify( callback," );
+            Wa( "    self.InstallCancelNotify( callback," );
             CCOUT << "        self.On" << strName << "CanceledWrapper,";
             NEW_LINE;
             Wa( "        *listArgs )" );
@@ -2154,7 +2154,7 @@ gint32 CImplPyMthdSvrBase::OutputAsyncCHWrapper()
 
         CCOUT << "):";
         NEW_LINE;
-        CCOUT << "self.On" << strName << "Canceled( self, ";
+        CCOUT << "self.On" << strName << "Canceled(";
         INDENT_UPL;
         CCOUT << "callback, iRet,";
         NEW_LINE; 

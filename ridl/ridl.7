@@ -11,7 +11,7 @@ communication between the RPC client and RPC server. It has simple syntax and
 intuitive statements, quick to learn for the developers. And with the ridl
 compiler, we can quickly generate a robust RPC framework and focus the the
 development efforts on the business logics.
-.SH SUPPORTED DATA TYPES
+.SH DATA TYPES
 .BR ridl
 support 10 basic types and 3 composite types. The basic data types are:
 .RS
@@ -54,7 +54,7 @@ and value could be any supported type except \fIHSTREAM\fR. For example,
 
 See also the EXAMPLE section.
 
-.SH SUPPORTED STATEMENTS
+.SH STATEMENTS
 .BR ridl
 support 7 types of statements:
 .TP
@@ -99,7 +99,7 @@ declaration in the method list.
 A method declaration is made up of method name, input parameter list, and output
 parameter list. Beside the three major components a method must have, it can
 optionally have some attribute tags, within a pair of brackets ahead of the
-method name as shown in the code snippet in the EXAMPLE section. The attributes
+method name as shown in the code snippet in the EXAMPLES section. The attributes
 supported are, 
 
 .RS
@@ -111,7 +111,8 @@ server side broadcasts event.
 the response from the server.
 .IP \fBtimeout=intValSec\fP
 \- the proxy will wait the response from the server for 'intvalSec' seconds,
-until when, it will cancel the request and report error to the caller.
+until when, it will cancel the request and report error to the caller. This
+value supercedes the timeout value defined in the config files.
 .IP \fBasync,async_s,async_p\fP
 \- async indicates the methods would behave asynchronously, both server side and
 proxy side, async_s indicates the server side asynchronously, and proxy side
@@ -123,12 +124,17 @@ the request.
 .RE
 
 The input parameter list and output parameter list follow the similiar format to
-a C++ or Java parameter list declaration. Either list can be empty. Even the
-output response list is empty, a 32-bit error code will be returned by the
+a C++ or Java argument list declaration. Either list can be empty. If the output
+response list is empty, a 32-bit error code will still be delivered from the
 server unless the 'noreply' attribute is specified in the method declaration.
 
-Refer to the EXAMPLE section for concrete method declaration, and interface
+Refer to the EXAMPLES section for concrete method declaration, and interface
 declaration.
+
+Finally, note that the duplicated method names could have different problems
+between different language implementations. So the ridlc will generate error if
+it finds duplicate method names within an interface declaration. It is
+recommended to avoid duplicate method names within one service declaration.
 
 .TP
 \fBservice\fP \fIservice-id {interface-list};\fR
@@ -147,7 +153,7 @@ explicitly set the \fIstream\fR flag.
 .RE
 
 
-.SH EXAMPLE
+.SH EXAMPLES
 .de SAMPLE
 .br
 .nr saveIN \\n(.i   \" double the backslash when defining a macro

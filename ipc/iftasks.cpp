@@ -5305,7 +5305,8 @@ gint32 CIfAsyncCancelHandler::OnTaskComplete(
 
     do{
         if( iRet == ERROR_TIMEOUT ||
-            iRet == ERROR_USER_CANCEL )
+            iRet == ERROR_USER_CANCEL ||
+            iRet == ERROR_CANCEL )
         {
             // call the cancel handler
             if( m_pDeferCall.IsEmpty() )
@@ -5314,16 +5315,7 @@ gint32 CIfAsyncCancelHandler::OnTaskComplete(
             *pBuf = iRet;
             UpdateParamAt( 1, pBuf );
             ( *m_pDeferCall )( 0 );
-
-            break;
         }
-        else if( iRet == ERROR_CANCEL )
-        {
-            // we should not be here at all
-            break;
-        }
-
-        ret = super::OnTaskComplete( iRet );
 
     }while( 0 );
 

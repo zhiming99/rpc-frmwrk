@@ -1616,6 +1616,77 @@ inline gint32 NewIfDeferredCall( EnumClsid iTaskClsid,
     _ret; \
 })
 
+// to insert the task pInterceptor to the head of
+// completion chain of the task pTarget 
+// please make sure both tasks inherit from the
+// CIfRetryTask
+inline gint32 InterceptCallback(
+    IEventSink* pInterceptor, IEventSink* pTarget )
+{
+    if( pInterceptor == nullptr ||
+        pTarget == nullptr )
+        return -EINVAL;
+
+    CIfRetryTask* pInterceptTask =
+        ObjPtr( pInterceptor );
+
+    if( pInterceptTask == nullptr )
+        return -EINVAL;
+
+    CIfRetryTask* pTargetTask =
+        ObjPtr( pTarget );
+
+    if( pTargetTask == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    EventPtr pParent;
+    ret = pTargetTask->GetClientNotify(
+        pParent );
+    if( SUCCEEDED( ret ) )
+    {
+        pInterceptTask->SetClientNotify(
+            pParent);
+    }
+
+    pTargetTask->SetClientNotify(
+        pInterceptTask );
+    return 0;
+}
+
+inline gint32 RemoveInterceptCallback(
+    IEventSink* pInterceptor, IEventSink* pTarget )
+{
+    if( pInterceptor == nullptr ||
+        pTarget == nullptr )
+        return -EINVAL;
+
+    CIfRetryTask* pInterceptTask =
+        ObjPtr( pInterceptor );
+
+    if( pInterceptTask == nullptr )
+        return -EINVAL;
+
+    CIfRetryTask* pTargetTask =
+        ObjPtr( pTarget );
+
+    if( pTargetTask == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    EventPtr pParent;
+    ret = pInterceptTask->GetClientNotify(
+        pParent );
+    if( SUCCEEDED( ret ) )
+    {
+        pTargetTask->SetClientNotify(
+            pParent);
+    }
+
+    pInterceptTask->ClearClientNotify();
+    return 0;
+}
+
 class CIfDeferredHandler :
     public CIfInterceptTaskProxy
 {
@@ -1648,6 +1719,7 @@ class CIfDeferredHandler :
 
 template < typename C, typename ... Types, typename ...Args>
 inline gint32 NewDeferredHandler(
+    bool bInsertBefore, // put the new task to complete before/after pTaskToIntercept
     EnumClsid iClsid,
     gint32 iPos,
     TaskletPtr& pCallback,
@@ -1669,14 +1741,24 @@ inline gint32 NewDeferredHandler(
     CParamList oParams;
     oParams[ propIfPtr ] = pIf;
 
-    oParams[ propEventSink ] =
-        ObjPtr( pTaskToIntercept );
+    if( bInsertBefore )
+    {
+        oParams[ propEventSink ] =
+            ObjPtr( pTaskToIntercept );
+    }
 
     ret = pIfTask.NewObj( 
         iClsid, oParams.GetCfg() );
     if( ERROR( ret ) )
         return ret;
 
+    if( !bInsertBefore )
+    {
+        ret = rpcf::InterceptCallback(
+            pIfTask, pTaskToIntercept );
+        if( ERROR( ret ) )
+            return ret;
+    }
     CIfDeferredHandler* pDeferTask = pIfTask;
     pDeferTask->SetDeferCall( pWrapper );
 
@@ -1697,11 +1779,11 @@ inline gint32 NewDeferredHandler(
 }
 
 #define DEFER_HANDLER_NOSCHED( __pTask, pObj, func, pCallback, ... ) \
-    NewDeferredHandler( clsid( CIfDeferredHandler ),\
+    NewDeferredHandler( true, clsid( CIfDeferredHandler ),\
         0, __pTask, pObj, func , pCallback, ##__VA_ARGS__ )
 
 #define DEFER_HANDLER_NOSCHED2( _pos, __pTask, pObj, func, pCallback, ... ) \
-    NewDeferredHandler( clsid( CIfDeferredHandler ),\
+    NewDeferredHandler( true, clsid( CIfDeferredHandler ),\
         _pos, __pTask, pObj, func , pCallback, ##__VA_ARGS__ )
 
 class CIfAsyncCancelHandler :
@@ -1721,7 +1803,7 @@ class CIfAsyncCancelHandler :
 };
 
 #define DEFER_CANCEL_HANDLER2( _pos, __pTask, pObj, func, pCallback, ... ) \
-    ( { gint32 ret_ = NewDeferredHandler( clsid( CIfAsyncCancelHandler ),\
+    ( { gint32 ret_ = NewDeferredHandler( false, clsid( CIfAsyncCancelHandler ),\
         _pos, __pTask, pObj, func , pCallback, ##__VA_ARGS__ ); \
     if( SUCCEEDED( ret_ ) ) \
         ( *__pTask )( eventZero ); \
@@ -2002,77 +2084,6 @@ inline gint32 NewResponseHandler2(
     }\
     ret;\
 })
-// to insert the task pInterceptor to the head of
-// completion chain of the task pTarget 
-// please make sure both tasks inherit from the
-// CIfRetryTask
-inline gint32 InterceptCallback(
-    IEventSink* pInterceptor, IEventSink* pTarget )
-{
-    if( pInterceptor == nullptr ||
-        pTarget == nullptr )
-        return -EINVAL;
-
-    CIfRetryTask* pInterceptTask =
-        ObjPtr( pInterceptor );
-
-    if( pInterceptTask == nullptr )
-        return -EINVAL;
-
-    CIfRetryTask* pTargetTask =
-        ObjPtr( pTarget );
-
-    if( pTargetTask == nullptr )
-        return -EINVAL;
-
-    gint32 ret = 0;
-    EventPtr pParent;
-    ret = pTargetTask->GetClientNotify(
-        pParent );
-    if( SUCCEEDED( ret ) )
-    {
-        pInterceptTask->SetClientNotify(
-            pParent);
-    }
-
-    pTargetTask->SetClientNotify(
-        pInterceptTask );
-    return 0;
-}
-
-inline gint32 RemoveInterceptCallback(
-    IEventSink* pInterceptor, IEventSink* pTarget )
-{
-    if( pInterceptor == nullptr ||
-        pTarget == nullptr )
-        return -EINVAL;
-
-    CIfRetryTask* pInterceptTask =
-        ObjPtr( pInterceptor );
-
-    if( pInterceptTask == nullptr )
-        return -EINVAL;
-
-    CIfRetryTask* pTargetTask =
-        ObjPtr( pTarget );
-
-    if( pTargetTask == nullptr )
-        return -EINVAL;
-
-    gint32 ret = 0;
-    EventPtr pParent;
-    ret = pInterceptTask->GetClientNotify(
-        pParent );
-    if( SUCCEEDED( ret ) )
-    {
-        pTargetTask->SetClientNotify(
-            pParent);
-    }
-
-    pInterceptTask->ClearClientNotify();
-    return 0;
-}
-
 template<typename ClassName, typename ...Args>
 class CDeferredCallOneshot :
     public CDeferredCall< CIfParallelTask, ClassName, Args... >

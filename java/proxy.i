@@ -19,11 +19,11 @@ class CJavaProxyBase :
     {}
 
     virtual jobject JavaProxyCall2(
+        JNIEnv* jenv,
         jobject pCb,
         jobject pContext,
         CfgPtr& pOptions,
-        jobject listArgs,
-        jobject listResp )
+        jobject listArgs )
     { return nullptr; }
 };
 
@@ -59,30 +59,38 @@ class CJavaInterfBase : public T
         do{
             EnumTypeId iType =
                 pBuf->GetExDataType();
-            if( iType != typeByteArr )
+            switch( iType )
+            {
+            case typeByteArr:
+                {
+                    jbyteArray bytes =
+                        jenv->NewByteArray(
+                            pBuf->size() );
+
+                    jenv->SetByteArrayRegion(
+                        bytes, 0, pBuf->size(),
+                        pBuf->ptr() );
+
+                    pObj = bytes;
+                    break;
+                }
+            }
+            default:
             {
                 ret = -EINVAL;
                 break;
             }
 
-            jbyteArray bytes = (*jenv)->
-                NewByteArray( pBuf->size() );
-
-            ( *jenv )->SetByteArrayRegion(
-                jenv, bytes, 0, pBuf->size(),
-                pBuf->ptr() );
-
-            pObj = bytes;
-
         }while( 0 );
 
         return ret;
-    }
+    };
 
     gint32 TimerCallback(
         IEventSink* pCallback,
         intptr_t pCb,
-        intptr_t pCtx )
+        intptr_t pCtx,
+        int iRet )
     {
         if( pCb == 0 )
             return -EINVAL;
@@ -95,23 +103,26 @@ class CJavaInterfBase : public T
             return ret;
         do{
             jobject pHost = nullptr;
-            ret = GetJavaHost( jenv, pHost );
+            ret = GetJavaHost( pHost );
             if( ERROR( ret ) )
                 break;
 
-            jobject* pgcb = ( jobject )pCb;
-            jobject* pgctx = ( jobject )pCtx;
+            jobject pgcb = ( jobject )pCb;
+            jobject pgctx = ( jobject )pCtx;
 
-            ( *jenv )->CallVoidMethod( pHost,
-                "TimerCallback",
-                "(Ljava/lang/Object;Ljava/lang/Object;)V",
-                pgcb, pgtx );
+            jmethodId timercb = jenv->GetMethodID(
+                cls, "timeCallback",
+                "(Ljava/lang/Object;"
+                "Ljava/lang/Object;I)V" );
+
+            jenv->CallVoidMethod( pHost,
+                timercb, pgcb, pgtx, iRet );
 
             if( pgcb != nullptr )
-                ( *jenv )->DeleteGlobalRef( pgcb );
+                jenv->DeleteGlobalRef( pgcb );
 
             if( pgctx != nullptr )
-                ( *jenv )->DeleteGlobalRef( pgctx );
+                jenv->DeleteGlobalRef( pgctx );
 
         }while( 0 );
 
@@ -160,47 +171,53 @@ class CJavaInterfBase : public T
         }while( 0 );
 
         if( pCb != nullptr && jenv != nullptr )
-            ( *jenv )->DeleteGlobalRef( pCb );
+            jenv->DeleteGlobalRef( pCb );
 
         if( pCtx != nullptr && jenv != nullptr )
-            ( *jenv )->DeleteGlobalRef( pCtx );
+            jenv->DeleteGlobalRef( pCtx );
 
         ( *pTaskEx )( eventCancelTask );
         return ret;
     }
 
-    gint32 AddTimer(
+    jobject AddTimer(
         JNIEnv* jenv,
         guint32 dwTimeoutSec,
         jobject pCb,
-        jobject pCtx,
-        ObjPtr& pTimer )
+        jobject pCtx )
     {
         if( pCb == nullptr || jenv == nullptr )
-            return -EINVAL;
+            return nullptr;
 
-        if( dwTimeoutSec > MAX_TIMEOUT_VALUE )
-            return -EINVAL;
+        jobject jret = NewJRet( jenv );
+        if( jret == nullptr )
+            return -EFAULT;
 
         gint32 ret = 0;
         jobject pgcb = nullptr;
         jobject pgctx = nullptr;
         do{
+            if( dwTimeoutSec > MAX_TIMEOUT_VALUE )
+            {
+                ret = -EINVAL;
+                break;
+            }
+
             TaskletPtr pTask;
             pgcb =
-                ( *jenv )->NewGlobalRef( pCb );
+                jenv->NewGlobalRef( pCb );
 
             if( pCtx != nullptr )
             {
-                pgctx = ( *jenv )->
-                    NewGlobalRef( pCtx );
+                pgctx =
+                    jenv->NewGlobalRef( pCtx );
             }
 
             ret = DEFER_IFCALLEX_NOSCHED2(
                 0, pTask, ObjPtr( this ),
                 &CJavaInterfBase::TimerCallback,
                 nullptr, ( intptr_t )pgcb,
-                ( intptr_t )pgctx );
+                ( intptr_t )pgctx, 0 );
 
             if( ERROR( ret ) )
                 break;
@@ -211,25 +228,33 @@ class CJavaInterfBase : public T
             if( ERROR( ret ) )
                  break;
 
-            pTimer = pTask;
+            ObjPtr pTimer( pTask );
+            jobject jtimer =
+                NewObjPtr( jenv, pTimer );
+            AddElemToJRet( jenv, jret, jtimer );
 
         }while( 0 );
 
         if( ERROR( ret ) )
         {
             if( pgcb )
-                ( *jenv )->DeleteGlobalRef( pgcb );
+                jenv->DeleteGlobalRef( pgcb );
             if( pgctx )
-                ( *jenv )->DeleteGlobalRef( pgctx );
+                jenv->DeleteGlobalRef( pgctx );
         }
 
-        return ret;
+        SetErrorJRet( jenv, jret, ret );
+        return jret;
     }
 
-    gint32 FillList( IConfigDb* pResp,
-        PyObject* listResp )
+    gint32 FillList( JNIEnv* jenv,
+        IConfigDb* pResp,
+        jobject listResp )
     {
         gint32 ret = 0;
+        if( jenv == nullptr || pResp == nullptr )
+            return -EINVAL;
+
         do{
             CParamList oResp( pResp );
 
@@ -244,16 +269,12 @@ class CJavaInterfBase : public T
                 break;
             }
 
-            if( PyList_Size( listResp ) < 2 )
-            {
-                ret = -ERANGE;
-                break;
-            }
+            jclass jcls = jenv->FindClass(
+                "org/rpcf/rpcbase/JRetVal" );
 
-            PyObject* listArgs = PyList_New( dwSize );
-            if( listArgs == nullptr )
+            if( !jenv->IsInstanceOf( listResp, jcls ) )
             {
-                ret = -ENOMEM;
+                ret = -EINVAL;
                 break;
             }
 
@@ -274,8 +295,13 @@ class CJavaInterfBase : public T
                         ret = oResp.GetByteProp( i, val );
                         if( ERROR( ret ) )
                             break;
-                        PyObject* pObj = PyLong_FromLong( val );
-                        PyList_SetItem( listArgs, i, pObj );
+                        jobject jval = NewByte( jenv, val );
+                        if( jval == nullptr )
+                        {
+                            ret = -EFAULT;
+                            break;
+                        }
+                        AddElemToJRet( jenv, listResp, jval );
                         break;
                     }
                 case typeUInt16:
@@ -284,8 +310,13 @@ class CJavaInterfBase : public T
                         ret = oResp.GetShortProp( i, val );
                         if( ERROR( ret ) )
                             break;
-                        PyObject* pObj = PyLong_FromLong( val );
-                        PyList_SetItem( listArgs, i, pObj );
+                        jobject jval = NewShort( jenv, val );
+                        if( jval == nullptr )
+                        {
+                            ret = -EFAULT;
+                            break;
+                        }
+                        AddElemToJRet( jenv, listResp, jval );
                         break;
                     }
                 case typeUInt32:
@@ -294,8 +325,13 @@ class CJavaInterfBase : public T
                         ret = oResp.GetIntProp( i, val );
                         if( ERROR( ret ) )
                             break;
-                        PyObject* pObj = PyLong_FromLong( val );
-                        PyList_SetItem( listArgs, i, pObj );
+                        jobject jval = NewInt( jenv, val );
+                        if( jval == nullptr )
+                        {
+                            ret = -EFAULT;
+                            break;
+                        }
+                        AddElemToJRet( jenv, listResp, jval );
                         break;
                     }
                 case typeUInt64:
@@ -304,9 +340,13 @@ class CJavaInterfBase : public T
                         ret = oResp.GetQwordProp( i, val );
                         if( ERROR( ret ) )
                             break;
-                        PyObject* pObj =
-                            PyLong_FromLongLong( val );
-                        PyList_SetItem( listArgs, i, pObj );
+                        jobject jval = NewLong( jenv, val );
+                        if( jval == nullptr )
+                        {
+                            ret = -EFAULT;
+                            break;
+                        }
+                        AddElemToJRet( jenv, listResp, jval );
                         break;
                     }
                 case typeFloat:
@@ -315,9 +355,13 @@ class CJavaInterfBase : public T
                         ret = oResp.GetFloatProp( i, val );
                         if( ERROR( ret ) )
                             break;
-                        PyObject* pObj =
-                            PyFloat_FromDouble( val );
-                        PyList_SetItem( listArgs, i, pObj );
+                        jobject jval = NewFloat( jenv, val );
+                        if( jval == nullptr )
+                        {
+                            ret = -EFAULT;
+                            break;
+                        }
+                        AddElemToJRet( jenv, listResp, jval );
                         break;
                     }
                 case typeDouble:
@@ -326,9 +370,13 @@ class CJavaInterfBase : public T
                         ret = oResp.GetDoubleProp( i, val );
                         if( ERROR( ret ) )
                             break;
-                        PyObject* pObj =
-                            PyFloat_FromDouble( val );
-                        PyList_SetItem( listArgs, i, pObj );
+                        jobject jval = NewDouble( jenv, val );
+                        if( jval == nullptr )
+                        {
+                            ret = -EFAULT;
+                            break;
+                        }
+                        AddElemToJRet( jenv, listResp, jval );
                         break;
                     }
                 case typeString:
@@ -337,9 +385,13 @@ class CJavaInterfBase : public T
                         ret = oResp.GetStrProp( i, val );
                         if( ERROR( ret ) )
                             break;
-                        PyObject* pObj =
-                            PyUnicode_FromString( val.c_str() );
-                        PyList_SetItem( listArgs, i, pObj );
+                        jobject jval = GetJniString( jenv, val );
+                        if( jval == nullptr )
+                        {
+                            ret = -EFAULT;
+                            break;
+                        }
+                        AddElemToJRet( jenv, listResp, jval );
                         break;
                     }
                 case typeObj:
@@ -349,15 +401,13 @@ class CJavaInterfBase : public T
                         if( ERROR( ret ) )
                             break;
 
-                        PyObject* pObj = sipConvertFromNewType(
-                            val,sipType_cpp_ObjPtr, SIP_NULLPTR );
-
-                        if( pObj == nullptr )
+                        jobject jval = NewObjPtr( jenv, val );
+                        if( jval == nullptr )
                         {
                             ret = -EFAULT;
                             break;
                         }
-                        PyList_SetItem( listArgs, i, pObj );
+                        AddElemToJRet( jenv, listResp, jval );
                         break;
                     }
                 case typeByteArr:
@@ -366,28 +416,28 @@ class CJavaInterfBase : public T
                         ret = oResp.GetProperty( i, pBuf );
                         if( ERROR( ret ) )
                             break;
+
                         if( pBuf.IsEmpty() || pBuf->empty() )
                         {
                             ret = -EINVAL;
                             break;
                         }
-                        PyObject* pView = PyMemoryView_FromMemory(
-                            pBuf->ptr(), pBuf->size(), PyBUF_READ );
-                        if( pView == nullptr )
+
+                        jbyteArray jval  =
+                            jenv->NewByteArray( pBuf->size() );
+
+                        if( jval == nullptr )
                         {
                             ret = -EFAULT;
                             break;
                         }
 
-                        PyObject* pByteArr =
-                            PyByteArray_FromObject( pView );
-                        Py_DECREF( pView );
-                        if( pByteArr == nullptr )
-                        {
-                            ret = -EFAULT;
-                            break;
-                        }
-                        PyList_SetItem( listArgs, i, pByteArr );
+                        jenv->SetByteArrayRegion( jval,
+                            0, pBuf->size(), pBuf->ptr() );
+
+                        AddElemToJRet(
+                            jenv, listResp, ( jobject )jval );
+
                         break;
                     }
                 case typeDMsg:
@@ -406,45 +456,16 @@ class CJavaInterfBase : public T
                     break;
             }
 
-            PyList_SetItem( listResp, 1, listArgs );
-
         }while( 0 );
 
-        if( ERROR( ret ) )
-        {
-            PyList_SetItem( listResp,
-                0, PyLong_FromLong( ret ) );
-        }
+        SetErrorJRet( jenv, listResp, ret );
 
         return ret;
     }
 
-    gint32 GetTypeId( PyObject* pVar )
-    {
-        EnumTypeId ret = typeNone;
-        gint32 iRet = 0;
-        do{
-            PyObject* pHost = nullptr;
-            iRet = GetPyHost( pHost );
-            if( ERROR( iRet ) )
-                break;
-
-            PyObject* pRet =
-            PyObject_CallMethod( pHost,
-                "GetObjType", "(O)", pVar );
-            if( pRet == nullptr )
-                break;
-
-            ret = ( EnumTypeId )
-                PyLong_AsLong( pRet );
-
-        }while( 0 );
-
-        return ret;
-    }
-
-    gint32 ConvertPyObjToBuf(
-        PyObject* pObject,
+    gint32 ConvertByteArrayToBuf(
+        JNIEnv* jenv,
+        jobject* pObject,
         BufPtr& pBuf )
     {
         if( pObject == nullptr )
@@ -463,91 +484,28 @@ class CJavaInterfBase : public T
 
         switch( iType )
         {
-        case typeUInt32:
-            {
-                *pBuf = ( guint32 )
-                    PyLong_AsLong( pObject );
-                break;
-            }
-        case typeUInt64:
-            {
-                *pBuf = ( guint64 )
-                    PyLong_AsLong( pObject );
-                break;
-            }
-        case typeFloat:
-            {
-                *pBuf = ( float )
-                    PyFloat_AsDouble( pObject );
-                break;
-            }
-        case typeDouble:
-            {
-                *pBuf =
-                    PyFloat_AsDouble( pObject );
-                break;
-            }
-        case typeByte:
-            {
-                *pBuf = ( guint8 )
-                    PyLong_AsLong( pObject );
-                break;
-            }
-        case typeUInt16:
-            {
-                *pBuf = ( guint16 )
-                    PyLong_AsLong( pObject );
-                break;
-            }
-        case typeString:
-            {
-                std::string strVal =
-                convertJavaUnicodeObjectToStdString(
-                pObject );
-                *pBuf = strVal;
-                break;
-            }
         case typeByteArr:
             {
-                Py_buffer *view = (Py_buffer *)
-                    malloc(sizeof(*view));
-                ret = PyObject_GetBuffer(
-                    pObject, view, PyBUF_READ );
-                if( ret < 0 )
-                {
-                    ret = -ENOMEM;
+                jbyteArray pba = reinterpret_cast
+                    < jbyteArray >( pObject );
+
+                jsize len =
+                    jenv->GetArrayLength( pba )
+
+                if( len == 0 )
                     break;
-                }
-                ret = pBuf->Append( ( char* )view->buf,
-                    ( guint32 )view->len);
-                PyBuffer_Release( view );
-                break;
-            }
-        case typeObj:
-            {
-                if(sipCanConvertToType( pObject,
-                    sipType_cpp_ObjPtr, 0 ))
-                {
-                    gint32 iState = 0, iErr = 0;
-                    ObjPtr* pObj = ( ObjPtr* )
-                    sipConvertToType( pObject,
-                        sipType_cpp_ObjPtr,
-                        nullptr, 0, &iState,
-                        &iErr );
-                    if( iErr != 0 )
-                    {
-                        ret = ERROR_FAIL;
-                        break;
-                    }
-                    *pBuf = *pObj;
-                }
-                else
-                {
-                    // an empty argument
-                }
+
+                ret = pBuf->Resize( len );
+                if( ERROR( ret ) )
+                    break;
+
+                jenv->GetByteArrayRegion(
+                    pba, 0, len, pBuf->ptr() );
+
                 break;
             }
         default:
+
             ret = -ENOTSUP;
             break;
         }
@@ -556,36 +514,14 @@ class CJavaInterfBase : public T
     }
 
     gint32 List2Vector(
-        PyObject *pList,
+        JNIEnv* jenv, jobject jRet,
         std::vector< BufPtr >& vecArgs )
     {
         gint32 ret = 0;
-        if( pList == nullptr )
-            return -EFAULT;
-        do{
-            if( !PyList_Check( pList ) )
-            {
-                ret = -EINVAL;
-                break;
-            }
-            gint32 iSize = PyList_Size( pList );
-            if( iSize == 0 )
-                break;
+        if( pList == nullptr || jenv == nullptr )
+            return -EINVAL;
 
-            for( int i = 0; i < iSize; ++i )
-            {
-                PyObject* pElem =
-                    PyList_GetItem( pList, i );
-
-                BufPtr pBuf( true );
-                ret = ConvertPyObjToBuf( pElem, pBuf );
-                if( ERROR( ret ) )
-                    break;
-                vecArgs.push_back( pBuf );
-            }
-            
-        }while( 0 );
-
+        ret = GetParamsJRet( jenv, vecArgs );
         if( ERROR( ret ) )
             vecArgs.clear();
 
@@ -600,9 +536,9 @@ class CJavaInterfBase : public T
             return -EINVAL;
         do{
             Java_VM* pvm;
-            ( *jenv )->GetJavaVM( &pvm );
+            jenv->GetJavaVM( &pvm );
             jobject pgobj =
-                ( *jenv )->NewGlobalRef( pObj );
+                jenv->NewGlobalRef( pObj );
 
             CCfgOpenerObj oCfg( this );
             oCfg.SetIntPtr(
@@ -615,8 +551,7 @@ class CJavaInterfBase : public T
         return ret;
     }
 
-    gint32 GetJavaHost(
-        JNIEnv* jenv, jobject& pObj )
+    gint32 GetJavaHost( jobject& pObj )
     {
         gint32 ret = 0;
         CCfgOpenerObj oCfg( this );
@@ -697,8 +632,8 @@ class CJavaInterfBase : public T
         bool bAttach = false;
         CCfgOpenerObj oCfg( this );
         do{
-            JNIEnv* e = nullptr;
-            ret = GetJavaEnv( e, bAttach );
+            JNIEnv* jenv = nullptr;
+            ret = GetJavaEnv( jenv, bAttach );
             if( ERROR( ret ) )
                 break;
             guint32* pObj = nullptr;
@@ -710,7 +645,7 @@ class CJavaInterfBase : public T
             oCfg.RemoveProperty( propJavaObj );
             jobject pjObj = ( jobject )pObj;
             if( pjObj != nullptr )
-                 ( *e )->DeleteGlobalRef( pjObj );
+                 jenv->DeleteGlobalRef( pjObj );
 
         }while( 0 );
 
@@ -729,15 +664,17 @@ class CJavaInterfBase : public T
         if( pParams == nullptr )
             return -EINVAL;
 
-        PyGILState_STATE gstate;
-        gstate = PyGILState_Ensure();
+        JNIEnv* jenv = nullptr;
+        bool bAttach = false;
+        ret = GetJavaEnv( jenv, bAttach );
+        if( ERROR( ret ) )
+            return ret;
 
         CParamList oResp;
         gint32 ret = 0;
-        PyObject* listResp = nullptr;
 
-        PyObject* pPyCb = nullptr;
-        PyObject* pPyParams = nullptr;
+        jobject pjCb = nullptr;
+        jobject pjParams = nullptr;
         bool bNoReply = false;
         guint32 dwSeriProto = seriNone;
 
@@ -774,37 +711,42 @@ class CJavaInterfBase : public T
             strIfName = IF_NAME_FROM_DBUS(
                 strIfName );
 
-            PyObject* pHost = nullptr;
-            ret = GetPyHost( pHost );
+            jobject pHost = nullptr;
+            ret = GetJavaHost( pHost );
             if( ERROR( ret ) )
             {
                 ret = -ENOTSUP;
                 break;
             }
 
-            ObjPtr* pCb = new ObjPtr( pCallback );
-            ObjPtr* pArgs = new ObjPtr( pParams );
+            ObjPtr pCb( pCallback );
+            ObjPtr pArgs( pParams );
 
-            pPyCb = sipConvertFromNewType(
-                pCb, sipType_cpp_ObjPtr, SIP_NULLPTR );
-            if( unlikely( pPyCb == nullptr ) )
+            pjCb = NewObjPtr( jenv, pCb );
+            if( unlikely( pjCb == nullptr ) )
             {
                 ret = -ENOMEM;
                 break;
             }
-            pPyParams = sipConvertFromNewType(
-                pArgs, sipType_cpp_ObjPtr, SIP_NULLPTR );
+            pjParams = NewObjPtr( jenv, pArgs );
             if( unlikely( pPyParams == nullptr ) ) 
             {           
                 ret = -ENOMEM;
                 break;
             }       
 
-            listResp = PyObject_CallMethod(
-                 pHost, "InvokeMethod", 
-                 "(OssiO)", pPyCb, strIfName.c_str(),
+            jmethodId invoke = jenv->GetMethodID(
+                cls, "invokeMethod",
+                 "(Ljava/lang/Object;"
+                 "Ljava/lang/String;"
+                 "Ljava/lang/String;"
+                 "IL/java/lang/Object;)" );
+
+            listResp = jenv->CallObjectMethod(
+                 pHost, invoke
+                 pjCb, strIfName.c_str(),
                  strMethod.c_str(), dwSeriProto,
-                 pPyParams );
+                 pjParams );
 
             if( unlikely( listResp == nullptr ) )
             {
@@ -812,42 +754,26 @@ class CJavaInterfBase : public T
                 break;
             }
 
-            if( PyList_Check( listResp ) == false ||
-                PyList_Size( listResp ) == 0 )
-            {
-                ret = ERROR_FAIL;
+            ret = GetErrorJRet( jenv, listResp );
+            if( ERROR( ret ) )
                 break;
-            }
 
-            PyObject* pyRet =
-                PyList_GetItem( listResp, 0 );
-            if( unlikely( pyRet == nullptr ) )
-            {
-                ret = ERROR_FAIL;
-                break;
-            }
-
-            ret = PyLong_AS_LONG( pyRet );
             if( ret == STATUS_PENDING )
                 break;
+
+            gint32 iCount = GetParamCountJRet(
+                jenv, listResp );
 
             if( ERROR( ret ) || bNoReply ) 
                 break;
 
-            PyObject* pyRespArgs =
-                PyList_GetItem( listResp, 1 );
-            if( pyRespArgs == nullptr )
-            {
-                // fine, no resp params
-                break;
-            }
-
-            if( PyList_Check( pyRespArgs ) == false ||
-                PyList_Size( pyRespArgs ) == 0 )
+            // fine, no resp params
+            if( iCount == 0 )
                 break;
 
             std::vector< BufPtr > vecResp;
-            ret = List2Vector( pyRespArgs, vecResp );
+            ret = List2Vector(
+                jenv, listResp, vecResp );
             if( ERROR( ret ) )
                 break;
 
@@ -861,16 +787,10 @@ class CJavaInterfBase : public T
 
         }while( 0 );
 
-        if( listResp != nullptr )
-            Py_DECREF( listResp );
-
-        if( pPyCb != nullptr )
-            Py_DECREF( pPyCb );
-
-        if( pPyParams != nullptr )
-            Py_DECREF( pPyParams );
-
-        PyGILState_Release(gstate);
+        // freeing pjCb pjParams and listResp
+        // is left to JVM
+        if( bAttach )
+            PutJavaEnv();
 
         if( ret != STATUS_PENDING &&
             ret != -ENOTSUP)
@@ -893,6 +813,36 @@ class CJavaInterfBase : public T
         return ret;
     }
 
+    gint32 JavaHandleAsyncResp(
+        JNIEnv* jenv, jobject pjCb,
+        guint32 dwSeriProto, jobject pjResp,
+        jobject pContext )
+    {
+        gint32 ret = 0;
+        do{
+            jobject pHost = nullptr;
+            ret = GetJavaHost( pHost );
+            if( ERROR( ret ) )
+                break;
+
+            jclass cls =
+                jenv->GetObjectClass( pHost );
+
+            jmethodId harsp = jenv->GetMethodID(
+                cls, "handleAsyncResp",
+                "(Ljava/lang/Object;I"
+                "(Ljava/lang/Object;"
+                "(Ljava/lang/Object;)V" );
+
+            jenv->CallVoidMethod( pHost,
+                harsp, pjCb, dwSeriProto,
+                pjResp, pContext );
+
+        }while( 0 );
+
+        return ret;
+    }
+
     gint32 OnReadStreamComplete(
         HANDLE hChannel,
         gint32 iRet,
@@ -901,77 +851,65 @@ class CJavaInterfBase : public T
     {
         if( pCtx == nullptr )
             return -EINVAL;
+
+        gint32 ret = 0;
+        JNIEnv* jenv = nullptr;
+        bool bAttach = false;
+
+        ret = GetJavaEnv( jenv, bAttach );
+        if( ERROR( ret ) )
+            return ret;
+
         CParamList oReqCtx( pCtx );
         guint32* pCb = nullptr;
-        gint32 ret =
-            oReqCtx.GetIntPtr( 0, pCb );
 
+        ret = oReqCtx.GetIntPtr( 0, pCb );
         if( ERROR( ret ) || pCb == nullptr )
             return ret;
 
-        PyObject* pPyCb = nullptr;
-        PyGILState_STATE gstate;
-        gstate = PyGILState_Ensure();
+        jobject pjCb = nullptr;
         do{
-            PyObject* pPyResp = PyList_New( 2 );
+            jobject pjResp = NewJRet( jenv );
+            SetErrorJRet( jenv, pjResp, iRet );
+            jobject pjBuf = nullptr;
 
-            PyObject* pRet = PyLong_FromLong( iRet );
-            PyList_SetItem( pPyResp, 0, pRet );
-            PyObject* pArgs = PyList_New( 2 );
+            if( SUCCEEDED( iRet ) )
+            {
+                ret = ConvertBufToByteArray(
+                    jenv, pBuf, pjBuf );
+            }
+            else
+            {
+                ret = iRet;
+            }
 
-            PyObject* pPyBuf = nullptr;
-            ret = ConvertBufToPyObj( pBuf, pPyBuf );
+            jobject pjHandle = nullptr;
+            pjHandle = NewLong(
+                jenv, ( jlong )hChannel );
+
             if( SUCCEEDED( ret ) )
             {
-                PyObject* pyHandle = nullptr;
-                if( sizeof( HANDLE ) ==
-                    sizeof( gint64 ) )
-                {
-                    pyHandle =
-                        PyLong_FromLongLong( hChannel );
-                }
-                else
-                {
-                    pyHandle =
-                        PyLong_FromLong( hChannel );
-                }
-
                 // Note: callback dose not to worry 
                 // the pPyBuf become invalid if pBuf is released.
                 // so we don't put pBuf to the list here.
                 // but do pay attention to consume the pPyBuf
                 // with the call. It would become invalid when
                 // the callback returns
-                PyList_SetItem( pArgs, 0, pyHandle );
-                PyList_SetItem( pArgs, 1, pPyBuf );
-                PyList_SetItem( pPyResp, 1, pArgs );
-            }
-            else
-            {
-                if( SUCCEEDED( iRet ) )
-                    PyList_SetItem( pPyResp,
-                        0, PyLong_FromLong( ret ) );
-                PyList_SetItem( pPyResp, 1, Py_None );
+                AddElemToJRet( jenv, pjResp, pjBuf );
             }
 
-            pPyCb = ( PyObject* )pCb;
-
-            PyObject* pHost = nullptr;
-            ret = GetPyHost( pHost );
-            if( ERROR( ret ) )
-                break;
-
-            PyObject_CallMethod(
-                 pHost, "HandleAsyncResp", 
-                 "(OiOO)", pPyCb, seriNone,
-                 pPyResp, Py_None );
+            pjCb = ( jobject )pCb;
+            ret = JavaHandleAsyncResp( jenv,
+                pjCb, seriNone, pjResp, pjHandle );
 
         }while( 0 );
 
-        if( pPyCb != nullptr )
-            Py_DECREF( pPyCb );
+        if( pjCb != nullptr )
+            jenv->DeleteGlobalRef( pjCb );
 
-        PyGILState_Release( gstate );
+        if( bAttach )
+            PutJavaEnv();
+
         return ret;
     }
 
@@ -983,76 +921,53 @@ class CJavaInterfBase : public T
     {
         if( pCtx == nullptr )
             return -EINVAL;
+
+        JNIEnv* jenv = nullptr;
+        bool bAttach = false;
+
+        ret = GetJavaEnv( jenv, bAttach );
+        if( ERROR( ret ) )
+            return ret;
+
         CParamList oReqCtx( pCtx );
-        PyObject* pPyBuf = nullptr; 
-        PyObject* pPyCb = nullptr;
+        jobject pjBuf = nullptr; 
+        jobject pjCb = nullptr;
         gint32 ret = 0;
-        PyGILState_STATE gstate;
-        gstate = PyGILState_Ensure();
         do{
             guint32* pVal = nullptr;
             ret = oReqCtx.GetIntPtr( 0, pVal );
             if( ERROR( ret ) )
                 break;
-            pPyBuf = ( PyObject* )pVal;
+
+            jobject pjBuf = ( jobject )pVal;
 
             ret = oReqCtx.GetIntPtr( 1, pVal );
             if( ERROR( ret ) )
                 break;
-            pPyCb = ( PyObject* )pVal;
+            pjCb = ( jobject )pVal;
 
-            PyObject* pPyResp = PyList_New( 2 );
-            PyObject* pPyArgs = nullptr; 
-
-            PyObject* pRet = PyLong_FromLong( iRet );
-            PyList_SetItem( pPyResp, 0, pRet );
-
+            JRetVal pjResp = NewJRet( jenv );
+            SetErrorJRet( jenv, pjResp, iRet );
+            jobject pjHandle = NewLong(
+                jenv, ( jlong )hChannel );    
+                        
             if( SUCCEEDED( iRet ) )
-            {
-                pPyArgs = PyList_New( 2 );
-                PyObject* pyHandle = nullptr;
-                if( sizeof( HANDLE ) ==
-                    sizeof( gint64 ) )
-                {
-                    pyHandle =
-                        PyLong_FromLongLong( hChannel );
-                }
-                else
-                {
-                    pyHandle =
-                        PyLong_FromLong( hChannel );
-                }
+                AddElemToJRet( jenv, pjResp, pjBuf );
 
-                PyList_SetItem( pPyArgs, 0, pyHandle );
-                PyList_SetItem( pPyArgs, 1, pPyBuf );
-                pPyBuf = nullptr;
-            }
-            else
-            {
-                pPyArgs = PyList_New( 0 );
-            }
-
-            PyList_SetItem( pPyResp, 1, pPyArgs );
-
-            PyObject* pHost = nullptr;
-            ret = GetPyHost( pHost );
-            if( ERROR( ret ) )
-                break;
-
-            PyObject_CallMethod(
-                 pHost, "HandleAsyncResp", 
-                 "(OiOO)", pPyCb, seriNone,
-                 pPyResp, Py_None );
+            ret = JavaHandleAsyncResp( jenv,
+                pjCb, seriNone, pjResp, pjHandle );
 
         }while( 0 );
 
-        if( pPyBuf != nullptr )
-            Py_DECREF( pPyBuf );
+        if( pjBuf != nullptr )
+            jenv->DeleteGlobalRef( pjBuf );
 
-        if( pPyCb != nullptr )
-            Py_DECREF( pPyCb );
+        if( pjCb != nullptr )
+            jenv->DeleteGlobalRef( pjCb );
 
-        PyGILState_Release( gstate );
+        if( bAttach )
+            PutJavaEnv();
+
         return ret;
     }
 
@@ -1066,13 +981,16 @@ class CJavaInterfBase : public T
             pReqCtx == nullptr )
             return -EINVAL;
 
-        
-        PyGILState_STATE gstate;
-        gstate = PyGILState_Ensure();
+ 
+        bool bAttach = false;
+        JNIEnv* jenv = nullptr;
+        ret = GetJavaEnv( jenv, bAttach );
+        if( ERROR( ret ) )
+            return ret;
 
-        PyObject* pPyCb = nullptr;
-        PyObject* pPyResp = nullptr;
-        PyObject* pContext = nullptr;
+        jobject pjCb = nullptr;
+        jobject pjResp = nullptr;
+        jobject pContext = nullptr;
 
         do{
             CCfgOpenerObj oCbCfg( pIoReq );
@@ -1089,23 +1007,23 @@ class CJavaInterfBase : public T
             ret = oReqCtx.GetIntPtr( 0, ptrVal );
             if( ERROR( ret ) )
                 break;
-            PyObject* pPyCb =
-                ( PyObject* )ptrVal;
+            jobject pjCb =
+                ( jobject )ptrVal;
 
             ret = oReqCtx.GetIntPtr( 1, ptrVal );
             if( ERROR( ret ) )
                 break;
 
-            PyObject* pPyResp =
-                ( PyObject* )ptrVal;  
+            jobject pjResp =
+                ( jobject )ptrVal;  
 
             oReqCtx.GetIntProp( 3, dwReqProto );
 
             ret = oReqCtx.GetIntPtr( 4, ptrVal );
             if( ERROR( ret ) )
-                pContext = Py_None;
+                pContext = nullptr;
             else
-                pContext = ( PyObject* )ptrVal;
+                pContext = ( jobject )ptrVal;
 
             guint32 iRet = 0;
             CParamList oResp( pResp );
@@ -1119,9 +1037,7 @@ class CJavaInterfBase : public T
             guint32 dwSeriProto = seriNone;
             if( ERROR( ret ) )
             {
-                PyObject* pRet =
-                    PyLong_FromLong( ret );
-                PyList_SetItem( pPyResp, 0, pRet );
+                SetErrorJRet( jenv, pjResp, ret );
             }
             else
             {
@@ -1134,66 +1050,74 @@ class CJavaInterfBase : public T
                 if( dwSeriProto != dwReqProto )
                     ret = -EBADMSG;
 
-                PyObject* pRet = PyLong_FromLong( ret );
-                PyList_SetItem( pPyResp, 0, pRet );
+                SetErrorJRet( jenv, pjResp, ret );
                 if( SUCCEEDED( ret ) )
-                    FillList( pResp, pPyResp );
+                    FillList( jenv, pResp, pjResp );
             }
 
-            PyObject* pHost = nullptr;
-            ret = GetPyHost( pHost );
-            if( ERROR( ret ) )
-                break;
-
-            PyObject_CallMethod( pHost,
-                "HandleAsyncResp", "(OiOO)",
-                pPyCb, dwSeriProto,
-                pPyResp, pContext );
+            ret = JavaHandleAsyncResp( jenv,
+                pjCb, dwSeriProto,
+                pjResp, pContext );
 
         }while( 0 );
 
-        if( pPyCb != nullptr )
-            Py_DECREF( pPyCb );
+        if( pjCb != nullptr )
+            jenv->DeleteGlobalRef( pjCb );
 
-        if( pPyResp != nullptr )
-            Py_DECREF( pPyResp );
+        if( pjResp != nullptr )
+            jenv->DeleteGlobalRef( pjResp );
 
         if( pContext != nullptr )
-            Py_DECREF( pContext );
+            jenv->DeleteGlobalRef( pContext );
 
-        PyGILState_Release(gstate);
+        if( bAttach )
+            PutJavaEnv();
 
         return 0;
     }
  
-    PyObject* GetChanCtx( HANDLE hChannel )
+    jobject GetChanCtx(
+        JNIEnv* jenv, HANDLE hChannel )
     {
-        PyObject* sipRes = Py_None;
+        if( jenv == nullptr )
+            return nullptr;
+
+        jobject jret = NewJRet( jenv );
         do{
             if( hChannel == INVALID_HANDLE )
                 break;
+
             CfgPtr pCtx;
             gint32 ret = this->GetContext(
                 hChannel, pCtx );
+
             if( ERROR( ret ) )
                 break;
+
             CCfgOpener oCfg( ( IConfigDb* )pCtx );
+
             guint32* ptr = nullptr;
-            ret = oCfg.GetIntPtr( propChanCtx, ptr );
+            ret = oCfg.GetIntPtr(
+                propChanCtx, ptr );
+
             if( ERROR( ret ) )
                 break;
-            sipRes = ( PyObject* )ptr;
-            Py_INCREF( sipRes );
+
+            AddElemToJRet(
+                jenv, jret, ( jobject )ptr );
 
         }while( 0 );
+        SetErrorJRet( jenv, jret, ret );
 
-        return sipRes;
+        return jret;
     }
 
-    gint32 SetChanCtx(
-        HANDLE hChannel, PyObject* pCtx )
+    gint32 SetChanCtx( JNIEnv* jenv,
+        HANDLE hChannel, jobject pCtx )
     {
         gint32 ret = 0;
+        jobject pgctx = nullptr;
+
         do{
             if( hChannel == INVALID_HANDLE )
                 break;
@@ -1207,38 +1131,42 @@ class CJavaInterfBase : public T
 
             CCfgOpener oCfg(
                ( IConfigDb* )pStmCtx );
-
             guint32* ptr = nullptr;
             ret = oCfg.GetIntPtr(
                 propChanCtx, ptr );
 
             if( SUCCEEDED( ret ) )
             {
-                PyObject* pOld = ( PyObject* )ptr;
+                jobject pOld = ( jobject )ptr;
                 if( pOld == pCtx )
                     break;
-                if( pOld != nullptr &&
-                    pOld != Py_None )
-                    Py_DECREF( pOld );
+                if( pOld != nullptr && 
+                    jenv != nullptr )
+                   jenv->DeleteGlobalRef( pOld ); 
                 oCfg.RemoveProperty( propChanCtx );
             }
+
             ret = 0;
 
             if( pCtx == nullptr ||
-                pCtx == Py_None )
+                jenv == nullptr )
                 break;
 
-            oCfg.SetIntPtr(
-                propChanCtx, ( guint32*)pCtx );
-            Py_INCREF( pCtx );
+            pgctx = jenv->NewGlobalRef(pCtx);
+
+            oCfg.SetIntPtr( propChanCtx,
+                ( guint32*)pjctx );
 
         }while( 0 );
+
         return ret;
     }
 
-    gint32 RemoveChanCtx( HANDLE hChannel )
+    gint32 RemoveChanCtx(
+        JNIEnv* jenv, HANDLE hChannel )
     {
-        return SetChanCtx( hChannel, nullptr);
+        return SetChanCtx(
+            jenv, hChannel, nullptr );
     }
 
     gint32 PyCompNotify(
@@ -1253,10 +1181,12 @@ class CJavaInterfBase : public T
         if( pCb == 0 || pResp == 0 )
             return -EINVAL;
 
-        PyGILState_STATE gstate;
-        gstate = PyGILState_Ensure();
-
         gint32 ret = 0;
+        bool bAttach = false;
+        JNIEnv* jenv = nullptr;
+        ret = GetJavaEnv( jenv, bAttach );
+        if( ERROR( ret ) )
+            return ret;
 
         if( SUCCEEDED( iRet ) )
         {
@@ -1264,8 +1194,8 @@ class CJavaInterfBase : public T
                 propRespPtr, pObj ); 
         }
 
-        PyObject* pPyCb = ( PyObject*)pCb;
-        PyObject* pPyResp = ( PyObject*)pResp;
+        jobject pjCb = ( jobject)pCb;
+        jobject pjResp = ( jobject)pResp;
 
         do{
             ret = iRet;
@@ -1282,36 +1212,28 @@ class CJavaInterfBase : public T
                     ret = iRet;
             }
 
-            PyObject* pHost = nullptr;
-            GetPyHost( pHost );
-
-            PyObject* pPyRet =
-                PyLong_FromLong( ret );
-
-            PyList_SetItem( pPyResp, 0, pPyRet );
-            // element 1 is not replaced with the
-            // the true response parameters.
-            PyObject_CallMethod(
-                 pHost, "HandleAsyncResp", 
-                 "(OiOO)", pPyCb, seriNone,
-                 pPyResp, Py_None );
+            SetErrorJRet( jenv, pjResp, ret );
+            ret = JavaHandleAsyncResp( jenv,
+                pjCb, seriNone, pjResp, nullptr );
 
         }while( 0 );
 
-        if( pPyCb )
-            Py_DECREF( pPyCb );
-        if( pPyResp )
-            Py_DECREF( pPyResp );
+        if( pjCb )
+            jenv->DeleteGlobalRef( pjCb );
+        if( pjResp )
+            jenv->DeleteGlobalRef( pjResp );
 
-        PyGILState_Release(gstate);
+        if( bAttach )
+            PutJavaEnv();
 
         return ret;
     }
 
-    gint32 InstallCompNotify(
+    gint32 InstallCancelNotify(
+        JNIEnv* jenv,
         IEventSink* pCallback,
-        PyObject* pCb,
-        PyObject* pListResp )
+        jobject pCb,
+        jobject pListResp )
     {
         if( pCb == nullptr ||
             pListResp == nullptr )
@@ -1319,7 +1241,7 @@ class CJavaInterfBase : public T
 
         TaskletPtr pTask;
         gint32 ret = DEFER_CANCEL_HANDLER2(
-            0, pTask, this,
+            -1, pTask, this,
             &CJavaInterfBase::PyCompNotify,
             pCallback, 0,
             ( intptr_t )pCb,
@@ -1333,27 +1255,69 @@ class CJavaInterfBase : public T
         return ret;
     }
 
-    gint32 OnStreamReady( HANDLE hChannel )
+    gint32 JavaOnStmReady(
+        JNIEnv* jenv, HANDLE hChannel )
     {
         gint32 ret = 0;
-        PyGILState_STATE gstate;
-        gstate = PyGILState_Ensure();
         do{
-            PyObject* pHost = nullptr;
-            ret = GetPyHost( pHost );
+            jobject pHost = nullptr;
+            ret = GetJavaHost( pHost );
             if( ERROR( ret ) )
                 break;
 
-            std::string strFmt = "(L)";
-            if( sizeof( hChannel ) ==
-                sizeof( guint32 ) )
-                strFmt = "(i)";
+            jclass cls =
+                jenv->GetObjectClass( pHost );
 
-            PyObject_CallMethod(
-                 pHost, "OnStmReady", 
-                 strFmt.c_str(), hChannel );
+            jmethodId stmReady = jenv->GetMethodID(
+                cls, "onStmReady", "(J)V" );
+
+            ret = jenv->CallVoidMethod( pHost,
+                stmReady, ( jlong )hChannel );
+
         }while( 0 );
-        PyGILState_Release( gstate );
+
+        return ret;
+    }
+
+    gint32 OnStreamReady( HANDLE hChannel )
+    {
+        gint32 ret = 0;
+
+        bool bAttach = false;
+        JNIEnv* jenv = nullptr;
+        ret = GetJavaEnv( jenv, bAttach );
+        if( ERROR( ret ) )
+            return ret;
+
+        JavaOnStmReady( jenv, hChannel );
+
+        if( bAttach )
+            PutJavaEnv();
+
+        return ret;
+    }
+
+    gint32 JavaOnStmClosing(
+        JNIEnv* jenv, HANDLE hChannel )
+    {
+        gint32 ret = 0;
+        do{
+            jobject pHost = nullptr;
+            ret = GetJavaHost( pHost );
+            if( ERROR( ret ) )
+                break;
+
+            jclass cls =
+                jenv->GetObjectClass( pHost );
+
+            jmethodId stmClosing = jenv->GetMethodID(
+                cls, "onStmClosing", "(J)V" );
+
+            ret = jenv->CallVoidMethod( pHost,
+                stmClosing, ( jlong )hChannel );
+
+        }while( 0 );
+
         return ret;
     }
 
@@ -1362,95 +1326,121 @@ class CJavaInterfBase : public T
         if( hChannel == INVALID_HANDLE )
             return -EINVAL;
 
-        PyGILState_STATE gstate;
-        gstate = PyGILState_Ensure();
-        PyObject* pCtx = GetChanCtx( hChannel );
+        bool bAttach = false;
+        JNIEnv* jenv = nullptr;
+        ret = GetJavaEnv( jenv, bAttach );
+        if( ERROR( ret ) )
+            return ret;
 
-        do{
-            if( pCtx == nullptr )
-                break;
+        JavaOnStmClosing( jenv, hChannel );
 
-            PyObject* pHost = nullptr;
-            gint32 ret = GetPyHost( pHost );
-            if( ERROR( ret ) )
-                break;
+        jobject pCtx = GetChanCtx( hChannel );
+        if( pCtx != nullptr )
+            RemoveChanCtx( jenv, hChannel );
 
-            std::string strFmt = "(L)";
-            if( sizeof( hChannel ) ==
-                sizeof( guint32 ) )
-                strFmt = "(i)";
+        ret = super::OnStmClosing( hChannel );
+        if( bAttach )
+            PutJavaEnv();
 
-            PyObject_CallMethod(
-                 pHost, "OnStmClosing", 
-                 strFmt.c_str(), hChannel );
-
-        }while( 0 );
-
-        if( pCtx != nullptr &&
-            pCtx != Py_None )
-        {
-            Py_DECREF( pCtx );
-            RemoveChanCtx( hChannel );
-        }
-
-        PyGILState_Release( gstate );
-
-        return super::OnStmClosing( hChannel );
-    }
-
-    gint32 PyDeferCallback(
-        intptr_t pCb, intptr_t pArgs )
-    {
-        gint32 ret = 0;
-        PyGILState_STATE gstate;
-        gstate = PyGILState_Ensure();
-        PyObject* pPyCb = ( PyObject* )pCb;
-        PyObject* pPyArgs = ( PyObject* )pArgs;
-        do{
-            PyObject* pHost = nullptr;
-            ret = GetPyHost( pHost );
-            if( ERROR( ret ) )
-                break;
-
-            PyObject_CallMethod(
-                 pHost, "DeferCallback", 
-                 "OO", pPyCb, pPyArgs );
-
-        }while( 0 );
-        if( pPyCb != nullptr &&
-            pPyCb != Py_None )
-            Py_DECREF( pPyCb );
-
-        if( pPyArgs != nullptr &&
-            pPyArgs != Py_None )
-            Py_DECREF( pPyArgs );
-
-        PyGILState_Release( gstate );
         return ret;
     }
 
-    gint32 PyDeferCall(
-        PyObject* pPyCb, PyObject* pPyArgs )
+    void JavaDeferCallback(
+        JNIEnv* jenv, jobject pjCb,
+        jobject pjArgs )
+    {
+        do{
+            jobject pHost = nullptr;
+            ret = GetJavaHost( pHost );
+            if( ERROR( ret ) )
+                break;
+
+            jclass cls =
+                jenv->GetObjectClass( pHost );
+
+            jmethodId deferCall = jenv->GetMethodID(
+                cls, "DeferCallback",
+                "(Ljava/lang/Object;Ljava/lang/Object;)V" );
+
+            jenv->CallVoidMethod( pHost,
+                deferCall, pjCb, pjArgs );
+
+        }while( 0 );
+
+        return;
+    }
+
+    gint32 DeferCallback(
+        intptr_t pCb, intptr_t pArgs )
+    {
+        gint32 ret = 0;
+        jobject pjCb = ( jobject )pCb;
+        jobject pjArgs = ( jobject )pArgs;
+
+        bool bAttach = false;
+        JNIEnv* jenv = nullptr;
+        ret = GetJavaEnv( jenv, bAttach );
+        if( ERROR( ret ) )
+            return ret;
+
+        JavaDeferCallback( jenv, pjCb, pjArgs );
+
+        if( pjCb != nullptr )
+            jenv->DeleteGlobalRef( pjCb );
+
+        if( pjArgs != nullptr )
+            jenv->DeleteGlobalRef( pjArgs );
+
+        if( bAttach )
+            PutJavaEnv();
+
+        return ret;
+    }
+
+    gint32 DeferCall(
+        JNIEnv* jenv, jobject pjCb,
+        jobject pjArgs )
     {
         TaskletPtr pTask;
-        gint32 ret = DEFER_IFCALLEX_NOSCHED(
-            pTask, ObjPtr( this ),
-            &CJavaInterfBase::PyDeferCallback,
-            ( intptr_t )pPyCb,
-            ( intptr_t )pPyArgs );
-        if( ERROR( ret ) )
-            return ret;
-        ret = this->GetIoMgr()->
-            RescheduleTask( pTask );
+
+        jobject pgcb =
+            jenv->NewGlobalRef( pjCb );
+
+        jobject pjargs =
+            jenv->NewGlobalRef( pjArgs );
+
+        gint32 ret = 0;
+
+        do{
+            ret = DEFER_IFCALLEX_NOSCHED(
+                pTask, ObjPtr( this ),
+                &CJavaInterfBase::DeferCallback,
+                ( intptr_t )pgcb,
+                ( intptr_t )pgargs );
+
+            if( ERROR( ret ) )
+                break;
+
+            ret = this->GetIoMgr()->
+                RescheduleTask( pTask );
+
+            if( ERROR( ret ) )
+            {
+                ( *pTask )( eventCancelTask );
+                break;
+            }
+
+        }while( 0 );
+
         if( ERROR( ret ) )
         {
-            ( *pTask )( eventCancelTask );
-            return ret;
+            if( pgcb != nullptr )
+                jenv->DeleteGlobalRef( pgcb );
+
+            if( pgargs != nullptr )
+                jenv->DeleteGlobalRef( pgargs );
         }
-        // NOTE: if the task is canceled,
-        // the reference won't be released
-        Py_INCREF( pPyCb );
-        Py_INCREF( pPyArgs );
+
         return ret;
     }
 };
@@ -1472,11 +1462,11 @@ class CJavaProxyImpl :
         std::vector< BufPtr >& vecParams );
 
     jobject JavaProxyCall2(
+        JNIEnv* jenv,
         jobject pCb,
         jobject pContext,
         CfgPtr& pOptions,
-        jobject listArgs,
-        jobject listResp );
+        jobject listArgs );
 };
 
 gint32 CJavaProxyImpl::AsyncCallVector(
@@ -1538,16 +1528,20 @@ gint32 CJavaProxyImpl::AsyncCallVector(
 }
 
 jobject CJavaProxyImpl::JavaProxyCall2(
+    JNIEnv* jenv,
     jobject pCb,
     jobject pContext,
     CfgPtr& pOptions,
-    jobject listArgs,
-    jobject listResp )
+    jobject listArgs )
 {
     gint32 ret = 0;
+    if( jenv == nullptr )
+        return -EINVAL;
     do{
         bool bSync = false;
-        if( pCb == nullptr || pCb == Py_None )
+        jobject listResp = NewJRet( jenv );
+
+        if( pCb == nullptr )
             bSync = true;
         if( !bSync )
         {
@@ -1559,7 +1553,8 @@ jobject CJavaProxyImpl::JavaProxyCall2(
             }
         }
         std::vector< BufPtr > vecParams;
-        ret = List2Vector(listArgs, vecParams );
+        ret = List2Vector(
+           jenv, listArgs, vecParams );
         if( ERROR( ret ) )
             break;
 
@@ -1701,7 +1696,8 @@ jobject CJavaProxyImpl::JavaProxyCall2(
             ret = -EBADMSG;
             break;
         }
-        ret = FillList( pRmtResp, listResp );
+        ret = FillList(
+            jenv, pRmtResp, listResp );
         if( ERROR( ret ) )
             break;
 
@@ -1761,3 +1757,474 @@ gint32 LoadThisLib( ObjPtr& pIoMgr )
 }
 
 %}
+
+class CJavaRpcServices :
+    public CRpcServices
+{
+};
+
+%extend CJavaRpcServices
+{
+    public:
+    gint32 SetJavaHost(
+        JNIEnv *jenv, jobject pObj )
+    {
+        gint32 ret = 0;
+        CJavaProxyImpl* pImpl = static_cast
+            < CJavaProxyImpl* >( $self );
+        if( pImpl == nullptr ) 
+            ret = -EFAULT;
+        else
+        {
+            ret = pImpl->SetJavaHost(
+                jenv, pObj );
+        }
+
+        return ret;
+    }
+
+    jobject GetJavaHost()
+    {
+        CJavaProxyImpl* pImpl = static_cast
+            < CJavaProxyImpl* >( $self );
+        jobject pObj = nullptr;
+        if( pImpl != nullptr ) 
+        {
+            gint32 ret = 
+                pImpl->GetJavaHost( pObj );
+            if( ERROR( ret ) )
+                pObj = nullptr;
+        }
+        return pObj;
+    }
+
+    gint32 RemoveJavaHost()
+    {
+        gint32 ret = 0;
+        CJavaProxyImpl* pImpl = static_cast
+            < CJavaProxyImpl* >( $self );
+        if( pImpl == nullptr ) 
+            ret = -EFAULT;
+        else
+            ret = pImpl->RemoveJavaHost();
+
+        return ret;
+    }
+
+    gint32 StartStream( JNIEnv *jenv, ObjPtr* ppObj )
+    {
+        jobject jret = NewJRet();
+        gint32 ret = 0;
+        do{
+            CJavaProxyImpl* pImpl = static_cast
+                < CJavaProxyImpl* >( $self );
+            if( pImpl == nullptr ) 
+            {
+                ret = -EFAULT;
+                break;
+            }
+
+            IConfigDb* pDesc = *ppObj;
+            if( pDesc == nullptr )
+            {
+                ret = -EINVAL;
+                break;
+            }
+            HANDLE hChannel = nullptr;
+            ret = pImpl->StartStream(
+                ( HANDLE )hChannel, pDesc );
+            if( ERROR( ret ) )
+                break;
+
+            jobject pChan = NewLong( jenv,
+                ( jlong )hChannel );
+
+            AddElemToJRet( jenv, jret, pChan );
+
+        }while( 0 );
+        SetErrorJRet( jenv, jret, ret );
+        return ret;
+    }
+
+    gint32 CloseStream( jlong hChannel );
+    {
+        gint32 ret = 0;
+        CJavaProxyImpl* pImpl = static_cast
+            < CPJavaProxyImpl* >( $self );
+        if( pImpl == nullptr ) 
+            ret = -EFAULT;
+        else
+        {
+            ret = pImpl->CloseStream(
+                ( HANDLE )hChannel );
+        }
+        return ret;
+    }
+
+    gint32 WriteStreamNoWait( JNIEnv *jenv,
+        jlong hChannel, jobject pjBuf );
+    {
+        gint32 ret = 0;
+        do{
+            CJavaProxyImpl* pImpl = static_cast
+                < CJavaProxyImpl* >( $self );
+
+            if( pImpl == nullptr ) 
+            {
+                ret = -EFAULT;
+                break;
+            }
+
+            BufPtr pBuf( true );
+            ret = pImpl->ConvertByteArrayToBuf(
+                jenv, pjBuf, pBuf );
+            if( ERROR( ret ) )
+                break;
+
+            ret = pImpl->WriteStreamNoWait(
+                ( HANDLE )hChannel, pBuf );
+
+        }while( 0 );
+        return ret;
+    }
+
+    gint32 WriteStream( JNIEnv *jenv,
+        jlong hChannel, jobject pjBuf );
+    {
+        gint32 ret = 0;
+        do{
+            CJavaProxyImpl* pImpl = static_cast
+                < CJavaProxyImpl* >( $self );
+
+            if( pImpl == nullptr ) 
+            {
+                ret = -EFAULT;
+                break;
+            }
+
+            BufPtr pBuf( true );
+            ret = pImpl->ConvertByteArrayToBuf(
+                pjBuf, pBuf );
+            if( ERROR( ret ) )
+                break;
+
+            ret = pImpl->WriteStream(
+                ( HANDLE )hChannel, pBuf );
+
+        }while( 0 );
+
+        return ret;
+    }
+
+    JRetVal ReadStreamNoWait( 
+        JNIEnv *jenv, jlong hChannel )
+    {
+        gint32 ret = 0;
+
+        jobject pResp = NewJRet( jenv );
+
+        do{
+
+            CJavaProxyImpl* pImpl = static_cast
+                < CJavaProxyImpl* >( $self );
+
+            if( pImpl == nullptr ) 
+            {
+                ret = -EFAULT;
+                break;
+            }
+
+            BufPtr pBuf;
+            ret = pImpl->ReadStreamNoWait(
+                ( HANDLE )hChannel, pBuf );
+
+            if( ERROR( ret ) )
+                break;
+
+            jobject pjBuf = nullptr;
+            ret = pImpl->ConvertBufToByteArray( 
+                jenv, pBuf, pjBuf );
+            if( ERROR( ret ) )
+                break;
+
+            AddElemToJRet( jenv, pResp, pjBuf );
+
+        }while( 0 );
+        SetErrorJRet( jenv, pResp, ret );
+        return pResp;
+    }
+
+    jobject ReadStream( JNIEnv *jenv,
+        jlong hChannel, gint32 dwSize )
+    {
+        jobject jRet = NewJRet( jenv );
+        gint32 ret = 0;
+        do{
+            CJavaProxyImpl* pImpl = static_cast
+                < CJavaProxyImpl* >( $self );
+
+            if( pImpl == nullptr ) 
+            {
+                ret = -EFAULT;
+                break;
+            }
+
+            BufPtr pBuf;
+            if( dwSize > 0 )
+            {
+                ret = pBuf.NewObj();
+                if( ERROR( ret ) )
+                    break;
+                ret = pBuf->Resize( dwSize );
+                if( ERROR( ret ) )
+                    break;
+            }
+
+            ret = pImpl->ReadStream(
+                ( HANDLE )hChannel, pBuf );
+            if( ERROR( ret ) )
+            {
+                ret = -EFAULT;
+                break;
+            }
+
+            jobject pjBuf = nullptr;
+            ret = pImpl->ConvertBufToByteArray(
+                jenv, pBuf, pjBuf );
+            if( ERROR( ret ) )
+                break;
+
+            AddElemToJRet( jenv, jRet, pjBuf );
+            break;
+
+        }while( 0 );
+
+        SetErrorJRet( jenv, jRet, ret );
+        return jRet;
+    }
+
+    jobject ReadStreamAsync( JNIEnv *jenv,
+        jlong hChannel,
+        jobject pCb,
+        guint32 dwSize );
+    {
+        jobject pResp = NewJRet( jenv );
+        gint32 ret = 0;
+        do{
+            CJavaProxyImpl* pImpl = static_cast
+                < CJavaProxyImpl* >( $self );
+
+            if( pImpl == nullptr ||
+                pCb == nullptr ||
+                jenv == nullptr ) 
+            {
+                ret = -EFAULT;
+                break;
+            }
+
+            jobject pjCb =
+                jenv->NewGlobalRef( pCb );
+
+            CParamList oReqCtx;
+            oReqCtx.Push( ( intptr_t ) pjCb );
+
+            cpp::BufPtr pBuf;
+
+            if( dwSize > 0 )
+            {
+                ret = pBuf.NewObj();
+                if( ERROR( ret ) )
+                    break;
+
+                ret = pBuf->Resize( dwSize );
+                if( ERROR( ret ) )
+                    break;
+            }
+
+            IConfigDb* pCtx = oReqCtx.GetCfg();
+            ret = pImpl->ReadStreamAsync(
+                ( HANDLE )hChannel, pBuf, pCtx );
+
+            if( ret != STATUS_PENDING )
+                jenv->DeleteGlobalRef( pjCb );
+
+            if( ret == STATUS_PENDING || ERROR( ret ) )
+                break;
+
+            jobject pjBuf = nullptr;
+            ret = pImpl->ConvertBufToByteArray(
+                jenv, pBuf, pjBuf );
+            if( ERROR( ret ) )
+                break;
+
+            AddElemToJRet( jenv, jRet, pjBuf );
+
+        }while( 0 );
+
+        SetErrorJRet( jenv, jRet, ret );
+        return jRet;
+    }
+
+    gint32 WriteStreamAsync(
+        JNIEnv* jenv,
+        HANDLE hChannel,
+        jobject* pPyBuf,
+        jobject* pCb );
+    %MethodCode
+    do{
+        sipRes = 0;
+        CJavaProxyImpl* pImpl = static_cast
+            < CJavaProxyImpl* >( $self );
+
+        if( pImpl == nullptr ) 
+        {
+            sipRes = -EFAULT;
+            break;
+        }
+
+        BufPtr pBuf( true );
+        gint32 ret = PyCallable_Check( a2 );
+        if( ret == 0 )
+        {
+            sipRes = -EINVAL;
+            break;
+        }
+
+        sipRes = pImpl->ConvertByteArrayToBuf(
+            a1, pBuf );
+        if( ERROR( sipRes ) )
+            break;
+
+        CParamList oReqCtx;
+        oReqCtx.Push( ( intptr_t ) a1 );
+        oReqCtx.Push( ( intptr_t ) a2 );
+        Py_INCREF( a1 );
+        Py_INCREF( a2 );
+
+        IConfigDb* pCtx = oReqCtx.GetCfg();
+        Py_BEGIN_ALLOW_THREADS;
+        sipRes = pImpl->WriteStreamAsync(
+            a0, pBuf, pCtx );
+        Py_END_ALLOW_THREADS;
+        if( sipRes != STATUS_PENDING )
+        {
+            Py_DECREF( a1 );
+            Py_DECREF( a2 );
+        }
+        break;
+
+    }while( 0 );
+    %End
+
+    jobject AddTimer(
+        JNIEnv* jenv;
+        guint32 dwTimeoutSec,
+        PyObject* pCb,
+        PyObject* pCtx )
+    {
+        CJavaProxyImpl* pImpl =
+        static_cast< CJavaProxyImpl* >( $self );
+        return pImpl->AddTimer( jenv,
+            dwTimeoutSec, pCb, pCtx );
+    }
+
+    gint32 DisableTimer(
+        cpp::ObjPtr& pTimer );
+    %MethodCode
+        CJavaProxyImpl* pImpl =
+        static_cast< CJavaProxyImpl* >
+            ( $self );
+        sipRes = pImpl->DisableTimer( *a0 );
+    %End
+
+    gint32 JavaDeferCall( JNIEnv* jenv,
+        jobject pjCb,
+        jobject pjArgs );
+    {
+        CJavaProxyImpl* pImpl =
+            static_cast< CJavaProxyImpl* >( $self  );
+        return pImpl->JavaDeferCall( jenv, a0, a1 );
+    }
+};
+
+class CJavaInterfProxy :
+    public CJavaRpcServices
+{
+    jobject JavaProxyCall2(
+        JNIEnv* jenv,
+        jobject pCb,
+        jobject pContext,
+        cpp::CfgPtr& pOptions,
+        jobject listArgs );
+
+    gint32 GetPeerIdHash(
+        HANDLE hChannel,
+        guint64& qwPeerIdHash );
+
+    HANDLE GetChanByIdHash( guint64 );
+};
+
+cpp::ObjPtr CreateProxy(
+    cpp::ObjPtr& pMgr,
+    const std::string& strDesc,
+    const std::string& strObjName,
+    cpp::ObjPtr& pCfgObj );
+%MethodCode
+    gint32 ret = 0;
+    do{
+        cpp::CfgPtr pCfg = *a3;
+
+        if( pCfg.IsEmpty() )
+        {
+            CParamList oParams;
+            oParams.SetObjPtr(
+                propIoMgr, *a0 );
+            pCfg = oParams.GetCfg();
+        }
+        else
+        {
+            CParamList oParams( pCfg );
+            oParams.SetObjPtr(
+                propIoMgr, *a0 );
+        }
+
+        ret = CRpcServices::LoadObjDesc(
+            *a1, *a2, false, pCfg );
+        if( ERROR( ret ) )
+            break;
+
+        ObjPtr pIf;
+        ret = pIf.NewObj(
+            clsid( CJavaProxyImpl ),
+            pCfg );
+        if( ERROR( ret ) )
+            break;
+
+        sipRes = new cpp::ObjPtr(
+            nullptr, false );
+        *sipRes = pIf;
+
+    }while( 0 );
+%End
+
+gint32 LoadPyFactory( cpp::ObjPtr& pMgr );
+%MethodCode
+    sipRes = LoadThisLib( *a0 );
+%End
+
+CJavaProxy* CastToProxy(
+    cpp::ObjPtr& pObj );
+%MethodCode
+    CJavaProxy* pProxy = *a0;
+    sipRes = pProxy;
+%End
+
+void PyDbgPrint( char* szMsg, int level = 3 );
+%MethodCode
+    DebugPrintEx( ( EnumLogLvl )a1, 0, "%s", a0 );
+%End
+
+void PyOutputMsg( char* szMsg );
+%MethodCode
+    OutputMsg( 0, "%s", a0 );
+%End

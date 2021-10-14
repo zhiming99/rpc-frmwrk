@@ -1344,7 +1344,7 @@ class CPythonInterfBase : public T
         return ret;
     }
 
-    gint32 InstallCompNotify(
+    gint32 InstallCancelNotify(
         IEventSink* pCallback,
         PyObject* pCb,
         PyObject* pListResp )
@@ -1355,7 +1355,7 @@ class CPythonInterfBase : public T
 
         TaskletPtr pTask;
         gint32 ret = DEFER_CANCEL_HANDLER2(
-            0, pTask, this,
+            -1, pTask, this,
             &CPythonInterfBase::PyCompNotify,
             pCallback, 0,
             ( intptr_t )pCb,
@@ -1400,12 +1400,8 @@ class CPythonInterfBase : public T
 
         PyGILState_STATE gstate;
         gstate = PyGILState_Ensure();
-        PyObject* pCtx = GetChanCtx( hChannel );
 
         do{
-            if( pCtx == nullptr )
-                break;
-
             PyObject* pHost = nullptr;
             gint32 ret = GetPyHost( pHost );
             if( ERROR( ret ) )
@@ -1422,13 +1418,7 @@ class CPythonInterfBase : public T
 
         }while( 0 );
 
-        if( pCtx != nullptr &&
-            pCtx != Py_None )
-        {
-            Py_DECREF( pCtx );
-            RemoveChanCtx( hChannel );
-        }
-
+        RemoveChanCtx( hChannel );
         PyGILState_Release( gstate );
 
         return super::OnStmClosing( hChannel );
