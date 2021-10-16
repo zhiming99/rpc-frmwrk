@@ -1,26 +1,39 @@
 package org.rpcf.rpcbase;
 import java.lang.String;
 import java.util.HashMap;
+import java.util.Map;
+import java.util.List;
+import java.util.ArrayList;
 
-public class JavaRpcService
+/*
+ * Hilarious, I need c preprocessor to spawn the java
+ * classes and cannot find native way to do it yet.
+ * I just want to keep one version of code to maintain.
+ */
+
+abstract public class JavaRpcService
 {
     protected int m_iError = 0;
-    protected  CRpcServices m_oInst = null;
+    protected ObjPtr m_pIoMgr = null;
+    protected InstType m_oInst = null;
+
+    public abstract boolean isServer();
+    public abstract gint32 initMaps();
+
     int GetError()
     { return m_iError; }
 
-    int SetError( iErr ) :
+    void SetError( int iErr )
     { m_iError = iErr; }
 
     int start()
     {
         m_oInst.SetJavaHost( this );
         int ret = m_oInst.Start();
-        boolean isServer = m_oInst.IsServer();
 
         if( ret < 0 )
         {
-            if( isServer )
+            if( isServer() )
                 System.out.println(
                     "Failed start server..." );
             else
@@ -29,7 +42,7 @@ public class JavaRpcService
         }
         else
         {
-            if( isServer )
+            if( isServer() )
                 System.out.println(
                     "Server started..." );
             else
@@ -39,25 +52,25 @@ public class JavaRpcService
         return ret;
     }
 
-    int stop( self )
+    int stop()
     {
-        m_oInst.RemoveJavaHost()
-        return m_oInst.Stop()
+        m_oInst.RemoveJavaHost();
+        return m_oInst.Stop();
     }
 
     // types of callback
     //
     interface IAsyncRespCb {
-        static int getArgCount();
-        static Class<?>[] getArgTypes();
-        void onAsyncResp( Object oContext,
+        public abstract int getArgCount();
+        public abstract Class<?>[] getArgTypes();
+        public abstract void onAsyncResp( Object oContext,
             int iRet, Object[] oParams ); 
     }
 
     interface IReqHandler {
-        static int getArgCount();
-        static Class<?> getArgTypes();
-        JRetVal invoke(
+        public abstract int getArgCount();
+        public abstract Class<?> getArgTypes();
+        public abstract JRetVal invoke(
             Object callback, Object[] oParams ); 
     }
 
@@ -65,16 +78,16 @@ public class JavaRpcService
     }
 
     interface IDeferredCall {
-        static int getArgCount();
-        static Class<?>[] getArgTypes();
-        void call( Object[] oParams );
+        public abstract int getArgCount();
+        public abstract Class<?>[] getArgTypes();
+        public abstract void call( Object[] oParams );
     }
 
     interface ICancelNotify extends IAsyncRespCb{
     }
 
     public interface IUserTimerCb {
-        void onTimer( Object octx, int iRet );
+        public abstract void onTimer( Object octx, int iRet );
     }
 
     public void TimerCallback(
@@ -88,20 +101,21 @@ public class JavaRpcService
      * seconds. And the `callback' will be called with
      * the parameter context.
 
-     * AddTimer returns JRetVal object, includes the
+     * addTimer returns JRetVal object, includes the
      * error code, and a timerObj if the error code is
      * STATUS_SUCCESS.
      */
     JRetVal addTimer( int timeoutSec,
         Object callback,  Object context )
     {
-        return m_oInst.AddTimer(
+        Object jret = m_oInst.AddTimer(
             timeoutSec, callback, context );
+        return ( JRetVal )jret;
     }
 
     /*Remove a previously scheduled timer.
     */
-    int disableTimer( self, timerObj )
+    int disableTimer( ObjPtr timerObj )
     {
         return m_oInst.DisableTimer( timerObj );
     }
@@ -110,28 +124,28 @@ public class JavaRpcService
      * to complete. When the task is completed or
      * canceled, this notification will be triggered.
      * the notification has the following layout
-     * callback( self, ret, *listArgs ), as is the
+     * callback( ret, *listArgs ), as is the
      * same as the response callback. The `ret' is
      * the error code of the task.
      */
     int installCancelNotify( ObjPtr task,
-        Object callback, Object[] listArgs ):
+        Object callback, Object[] listArgs )
     {
-        JRetVal jRet = new JRetVal();
+        JRetVal jret = new JRetVal();
         for( Object i : listArgs )
-            jRet.addElem( i );
+            jret.addElem( i );
         return m_oInst.InstallCancelNotify(
-            task, callback, listArgs )
+            task, callback, listArgs );
     }
 
     void handleAsyncResp( Object callback,
         int seriProto, Object listResp,
         Object context )
     {
-        if( !Helper.isInterface( callback ) )
+        if( !Helpers.isInterface( callback ) )
             return;
 
-        JRetVal jRet = ( JRetVal )listResp;
+        JRetVal jret = ( JRetVal )listResp;
         do{
             IAsyncRespCb asyncb =
                 ( IAsyncRespCb )callback;
@@ -139,24 +153,24 @@ public class JavaRpcService
             List<Object> listArgs =
                 new ArrayList< Object >();
 
-            iArgNum = asyncb.getArgCount();
+            int iArgNum = asyncb.getArgCount();
             for( int i = 0; i < iArgNum + 2; i++ ) 
-                listArgs.add( null )
+                listArgs.add( null );
 
             if( listResp == null )
             {
                 listArgs.set(
-                    1, -rpcbaseConstants.EBADMSG )
-                invokeCallback( callback, listArgs )
+                    1, -rpcbaseConstants.EBADMSG );
+                invokeCallback( callback, listArgs );
                 break;
             }
 
-            int ret = jRet.getError();
+            int ret = jret.getError();
 
-            listArgs.set( 0, context )
-            listArgs.insert( 1, ret )
-            int iSize = jRet.getParamCount();
-            if( jRet.ERROR() || iSize == 0 )
+            listArgs.set( 0, context );
+            listArgs.set( 1, ret );
+            int iSize = jret.getParamCount();
+            if( jret.ERROR() || iSize == 0 )
             {
                 invokeCallback( callback, listArgs );
                 break;
@@ -166,70 +180,78 @@ public class JavaRpcService
                 if( iArgNum != iSize )
                 {
                     ret = -rpcbaseConstants.EINVAL;
-                    listArgs.set( 1, ret )
+                    listArgs.set( 1, ret );
                 }
                 if( ret == rpcbaseConstants.STATUS_SUCCESS )
                     for( int i = 0; i < iArgNum; i++ )
-                        listArgs.set( i + 2, jRet.getAt( i );
+                        listArgs.set( i + 2, jret.getAt( i ) );
 
-                invokeCallback( callback, listArgs )
+                invokeCallback( callback, listArgs );
             }
-            else if( seriProto == cpp.seriRidl )
+            else if( seriProto == rpcbaseConstants.seriRidl )
             {
                 if( iArgNum == 1 && iArgNum == iSize ) 
-                    listArgs.set( 2, listResp.getAt( 0 ) );
+                    listArgs.set( 2, jret.getAt( 0 ) );
                 else
                 {
                     ret = -rpcbaseConstants.EINVAL;
-                    listArgs.set( 1, ret )
+                    listArgs.set( 1, ret );
                 }
-                invokeCallback( callback, listArgs )
+                invokeCallback( callback, listArgs );
             }
             else
             {
                 break;
             }
-        }while( 0 );
+        }while( false );
 
-        return
+        return;
     }
 
     /* establish a stream channel and
      * return a handle to the channel on success
      */
-    JRetVal StartStream()
+    JRetVal startStream( CParamList oDesc )
     {
-        CParamList oDesc = new CParamList()
-        return m_oInst.StartStream(
-            oDesc.GetCfgAsObj() )
+        if( oDesc == null )
+            oDesc = new CParamList();
+        JRetVal jret = ( JRetVal )
+            m_oInst.StartStream(
+                ( ObjPtr )oDesc.GetCfg() );
+        if( jret == null )
+        {
+            jret = new JRetVal();
+            jret.setError( -rpcbaseConstants.EFAULT );
+        }
+        return jret;
     }
         
 
-    int CloseStream( long hChannel )
+    int closeStream( long hChannel )
     {
         return m_oInst.CloseStream( hChannel );
     }
 
-    int WriteStream( long hChannel, byte[] pBuf )
+    int writeStream( long hChannel, byte[] pBuf )
     {
-        return m_oInst.WriteStream( hChannel, pBuf )
+        return m_oInst.WriteStream( hChannel, pBuf );
     }
 
     void writeStreamComplete( int iRet,
         long hChannel, byte[] buf )
     { return; }
 
-    IAsyncRespCb m_oWriteStmCallback = new IAsyncRespCb {
-        static int getArgCount()
+    IAsyncRespCb m_oWriteStmCallback = new IAsyncRespCb() {
+        public int getArgCount()
         { return 1; }
-        static Class<?>[] getArgTypes()
-        { return new Class<?>[]{ byte[].class } }
+        public Class<?>[] getArgTypes()
+        { return new Class<?>[]{ byte[].class }; }
 
-        void onAsyncResp( Object oContext,
+        public void onAsyncResp( Object oContext,
             int iRet, Object[] oParams ) 
         {
             long hChannel;
-            if( ! oContext instanceof Long )
+            if( !( oContext instanceof Long ) )
                 return;
             hChannel = ( ( Long )oContext ).longValue();
             byte[] buf = null;
@@ -237,13 +259,13 @@ public class JavaRpcService
                 buf = ( byte[] )oParams[ 0 ];
             writeStreamComplete( iRet, hChannel, buf );
         }
-    }
+    };
 
-    int WriteStreamAsync( 
+    int writeStreamAsync( 
         long hChannel, byte[] pBuf, Object callback )
     {
         return m_oInst.WriteStreamAsync(
-            hChannel, pBuf, callback )
+            hChannel, pBuf, callback );
     }
 
     /* ReadStream to read `size' bytes from the
@@ -261,9 +283,16 @@ public class JavaRpcService
      * hidden object to keep element 1 valid, just
      * leave it alone.
     */
-    JRetVal ReadStream( long hChannel, int size = 0)
+    JRetVal readStream( long hChannel )
     {
-        return m_oInst.ReadStream( hChannel, size );
+        return ( JRetVal )
+            m_oInst.ReadStream( hChannel, 0 );
+    }
+
+    JRetVal readStream( long hChannel, int size )
+    {
+        return ( JRetVal )
+            m_oInst.ReadStream( hChannel, size );
     }
 
     /*
@@ -295,17 +324,16 @@ public class JavaRpcService
         long hChannel, byte[] buf )
     { return; }
 
-    IAsyncRespCb m_oReadStmCallback = new IAsyncRespCb {
-        static int getArgCount()
+    IAsyncRespCb m_oReadStmCallback = new IAsyncRespCb() {
+        public int getArgCount()
         { return 1; }
-        static Class<?>[] getArgTypes()
-        { return new Class<?>[]{ byte[].class } }
-
-        void onAsyncResp( Object oContext,
+        public Class<?>[] getArgTypes()
+        { return new Class<?>[]{ byte[].class }; }
+        public void onAsyncResp( Object oContext,
             int iRet, Object[] oParams ) 
         {
             long hChannel;
-            if( ! oContext instanceof Long )
+            if( ! ( oContext instanceof Long ) )
                 return;
             hChannel = ( ( Long )oContext ).longValue();
             byte[] buf = null;
@@ -313,12 +341,12 @@ public class JavaRpcService
                 buf = ( byte[] )oParams[ 0 ];
             readStreamComplete( iRet, hChannel, buf );
         }
-    }
+    };
 
     JRetVal readStreamAsync( long hChannel, int size )
     {
-        return m_oInst.ReadStreamAsync(
-            hChannel, m_oReadStmCallback, size )
+        return ( JRetVal )m_oInst.ReadStreamAsync(
+            hChannel, m_oReadStmCallback, size );
     }
 
     /*
@@ -327,9 +355,10 @@ public class JavaRpcService
      * not data bufferred, error -EAGIN will be
      * returned, and will not blocked to wait.
      */
-    JRetVal ReadStreamNoWait( long hChannel)
+    JRetVal readStreamNoWait( long hChannel)
     {
-        return m_oInst.ReadStreamNoWait( hChannel );
+        return ( JRetVal )
+            m_oInst.ReadStreamNoWait( hChannel );
     }
 
     /* event called when the stream `hChannel' is
@@ -358,15 +387,15 @@ public class JavaRpcService
     {
         JRetVal jret = new JRetVal();
         do{
-            pCfg = rpcbase.CastToCfg( pObj );
+            CfgPtr pCfg = rpcbase.CastToCfg( pObj );
             if( pCfg == null )
             {
-                jret.SetError( -rpcbaseConstants.EFAULT );
+                jret.setError( -rpcbaseConstants.EFAULT );
                 break;
             }
-            oParams = new CParamList( pCfg )
-            jret = ( JRetVal )oParams.GetSize()
-            if( jret.Error() ||
+            CParamList oParams = new CParamList( pCfg );
+            jret = ( JRetVal )oParams.GetSize();
+            if( jret.ERROR() ||
                 jret.getParamCount() == 0 )
                 break;
 
@@ -377,7 +406,7 @@ public class JavaRpcService
             Object val;
             if( seriProto == rpcbaseConstants.seriRidl )
             {
-                jret = oParams.GetProperty( 0 );
+                jret = ( JRetVal )oParams.GetProperty( 0 );
                 if( jret.ERROR() )
                     break;
 
@@ -392,8 +421,11 @@ public class JavaRpcService
 
                 BufPtr pcBuf = ( BufPtr )val;
                 jret.clear();
-                jret = pcBuf.GetByteArray()
-                if( jret.Error() ) 
+
+                jret = ( JRetVal )
+                    pcBuf.GetByteArray();
+
+                if( jret.ERROR() ) 
                     break;
 
                 val = jret.getAt( 0 );
@@ -405,10 +437,10 @@ public class JavaRpcService
                     break;
                 }
                 byte[] bytearr = ( byte[] )val;
-                jret.addElem( bytearr )
+                jret.addElem( bytearr );
                 break;
             }
-            else if( seriProto != cpp.seriNone )
+            else if( seriProto != rpcbaseConstants.seriNone )
             {
                 jret.setError( 
                     -rpcbaseConstants.EBADMSG );
@@ -417,10 +449,10 @@ public class JavaRpcService
                 
             for( int i = 0; i < iSize; i++ )
             {
-                jret =
+                jret = ( JRetVal )
                     oParams.GetPropertyType( i );
 
-                if( jret.Error() )
+                if( jret.ERROR() )
                     break;
 
                 val = jret.getAt( 0 );
@@ -438,34 +470,43 @@ public class JavaRpcService
                 switch( iType )
                 {
                 case rpcbaseConstants.typeUInt32 :
-                    jret2 = oParams.GetIntProp( i );
+                    jret2 = ( JRetVal )
+                        oParams.GetIntProp( i );
                     break;
                 case rpcbaseConstants.typeDouble :
-                    jret2  = oParams.GetDoubleProp( i );
+                    jret2  = ( JRetVal )
+                        oParams.GetDoubleProp( i );
                     break;
                 case rpcbaseConstants.typeByte :
-                    jret2 = oParams.GetByteProp( i );
+                    jret2 = ( JRetVal )
+                        oParams.GetByteProp( i );
                     break;
                 case rpcbaseConstants.typeUInt16 :
-                    jret2 = oParams.GetShortProp( i );
+                    jret2 = ( JRetVal )
+                        oParams.GetShortProp( i );
                     break;
                 case rpcbaseConstants.typeUInt64 :
-                    jret2 = oParams.GetQwordProp( i );
+                    jret2 = ( JRetVal )
+                        oParams.GetQwordProp( i );
                     break;
                 case rpcbaseConstants.typeFloat :
-                    jret2 = oParams.GetFloatProp( i );
+                    jret2 = ( JRetVal )
+                        oParams.GetFloatProp( i );
                     break;
                 case rpcbaseConstants.typeString :
-                    jret2 = oParams.GetStrProp( i );
+                    jret2 = ( JRetVal )
+                        oParams.GetStrProp( i );
                     break;
                 case rpcbaseConstants.typeObj :
-                    jret2 = oParams.GetObjPtr( i );
+                    jret2 = ( JRetVal )
+                        oParams.GetObjPtr( i );
                     break;
                 case rpcbaseConstants.typeByteArr :
-                    jret2 = pCfg.GetProperty( i );
+                    jret2 = ( JRetVal )
+                        oParams.GetProperty( i );
                     break;
                 }
-                if( jret2.Error() )
+                if( jret2.ERROR() )
                 {
                     jret.clear();
                     jret.setError( jret2.getError() );
@@ -481,16 +522,16 @@ public class JavaRpcService
                     break;
                 }
                 jret2.clear();
-                jret.addElem( val )
+                jret.addElem( val );
             }
 
-        }while( 0 );
+        }while( false );
 
         return jret;
     }
 
     // must be overridden by the subclass
-    int InitUserFuncs()
+    int initUserFuncs()
     { return rpcbaseConstants.ERROR_NOT_IMPL; }
 
     // map for request handlers
@@ -510,101 +551,62 @@ public class JavaRpcService
         JRetVal oResp = new JRetVal();
         do{
             JRetVal jret = new JRetVal();
-            jret = ArgObjToList( seriProto, cppargs )
-            if( jret.Error() )
+            jret = ArgObjToList(
+                seriProto, cppargs );
+            if( jret.ERROR() )
             {
                 oResp = jret;
-                break
+                break;
             }
 
             Object[] argList = jret.getParamArray();
             boolean found = false;
-            Object typeFound = null;
-            bases = type( self ).__bases__ 
-            for iftype in bases :
-                if not hasattr( iftype, "_ifName_" ) :
-                    continue
-                if iftype._ifName_ != ifName :
-                    continue
-                found = True
-                typeFound = iftype
-                break
-            if not found :
-                resp[ 0 ] = -errno.ENOTSUP
-                break
+            boolean isServer = m_oInst.IsServer();
+            String[] nameComps = methodName.split( "_" );
+            if( isServer )
+            {
+                if( nameComps[ 0 ] != "UserMethod" )
+                {
+                    oResp.setError(
+                        -rpcbaseConstants.EINVAL );
+                    break;
+                }
+            }
+            else 
+            {
+                if( nameComps[ 0 ] != "UserEvent" )
+                {
+                    oResp.setError(
+                        -rpcbaseConstants.EINVAL );
+                    break;
+                }
+            }
 
-            isServer = m_oInst.IsServer()
-            nameComps = methodName.split( '_' )
-            if not isServer :
-                if nameComps[ 0 ] != "UserEvent" :
-                    resp[ 0 ] = -errno.EINVAL
-                    break
-            else :
-                if nameComps[ 0 ] != "UserMethod" :
-                    resp[ 0 ] = -errno.EINVAL
-                    break
-
-            found = False
-            oMembers = inspect.getmembers(
-                typeFound, inspect.isfunction)
-
-            if( seriProto != cpp.seriRidl ) :
-                for oMethod in oMembers :
-                    if nameComps[ 1 ] != oMethod[ 0 ]: 
-                        continue
-                    targetMethod = oMethod[ 1 ]
-                    found = True
-                    break
-            else :
-                wrapMethod = nameComps[ 1 ] + "Wrapper"
-                for oMethod in oMembers :
-                    if wrapMethod != oMethod[ 0 ]: 
-                        continue
-                    targetMethod = oMethod[ 1 ]
-                    found = True
-                    break
-
-            if not found :
-                resp[ 0 ] = -errno.EINVAL
-                break
-
-            if targetMethod is None :
-                resp[ 0 ] = -errno.EFAULT
-                break
-
-            try:
-                resp = targetMethod( self, callback, *argList )
-            except:
-                resp[ 0 ] = -errno.EFAULT
+            String strKey =
+                ifName + "::" + nameComps[ 1 ]; 
+            IReqHandler oMethod =
+                m_mapReqHandlers.get( strKey );
+            if( oMethod == null )
+            {
+                oResp.setError(
+                    -rpcbaseConstants.EFAULT );
+                break;
+            }
                 
-            if seriProto == cpp.seriNone :
-                break
+            try
+            {
+                oResp = oMethod.invoke(
+                    callback, argList );
+            }
+            catch( Exception e )
+            {
+                oResp.setError(
+                    -rpcbaseConstants.EFAULT );
+            }
+                
+        }while( false );
 
-            if seriProto == cpp.seriRidl :
-                break
-
-            if seriProto != cpp.seriPython :
-                resp[ 0 ] = -errno.EINVAL
-                break
-
-            ret = resp[ 0 ]
-            if ret < 0 :
-                break
-
-            if len( resp ) <= 1 : 
-                break
-
-            if not isinstance( resp[ 1 ], list ) :
-                resp[ 0 ] = -errno.EBADMSG
-                break
-
-            listResp = resp[ 1 ]
-            pBuf = pickle.dumps( listResp )
-            resp[ 1 ] = [ pBuf, ]
-
-        }while( 0 );
-
-        return resp
+        return oResp;
     }
 
     /* Invoke a callback function depending
@@ -613,6 +615,7 @@ public class JavaRpcService
     int invokeCallback( Object callback,
         List< Object > listArgs )
     {
+        int ret = 0;
         try{
             IAsyncRespCb asyncb =
                 ( IAsyncRespCb )callback;
@@ -630,11 +633,11 @@ public class JavaRpcService
         {
             ret = -rpcbaseConstants.EFAULT;
         }
-        catch( CallCastException e )
+        catch( ClassCastException e )
         {
             ret = -rpcbaseConstants.EINVAL;
         }
-        return ret
+        return ret;
     }
 
     /* run the callback on a new context instead
@@ -647,13 +650,13 @@ public class JavaRpcService
      * stack and provide a locking free or light
      * locking context as the current one cannot.
      */
-    int DeferCall(
+    int deferCall(
         IDeferredCall callback, Object[] args )
     {
         return m_oInst.DeferCall( callback, args );
     }
 
-    void DeferCallback(
+    void deferCallback(
         Object callback, Object listArgs )
     {
         IDeferredCall dc = ( IDeferredCall )callback;

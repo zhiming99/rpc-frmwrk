@@ -1,3 +1,28 @@
+/*
+ * =====================================================================================
+ *
+ *       Filename:  rpcbase.i
+ *
+ *    Description:  a swig file as the wrapper of CInterfaceProxy class and
+ *                  helper classes for Java.
+ *
+ *        Version:  1.0
+ *        Created:  10/16/2021 02:43:51 PM
+ *       Revision:  none
+ *       Compiler:  gcc
+ *
+ *         Author:  Ming Zhi( woodhead99@gmail.com )
+ *   Organization:
+ *
+ *      Copyright:  2021 Ming Zhi( woodhead99@gmail.com )
+ *
+ *        License:  This program is free software; you can redistribute it
+ *                  and/or modify it under the terms of the GNU General Public
+ *                  License version 3.0 as published by the Free Software
+ *                  Foundation at 'http://www.gnu.org/licenses/gpl-3.0.html'
+ *
+ * =====================================================================================
+ */ 
 %module rpcbase
 
 %{
@@ -289,7 +314,7 @@ enum // rpcf specific errors
     // no incoming notification
     ERROR_TIMEOUT          = ( -ETIMEDOUT ),
 
-    // STATUS_CANCEL, the irp is cancelled at the caller's
+    // STATUS_CANCEL, the irp is cancelled at the caller
     // request
     ERROR_CANCEL           = ( -ECANCELED ),
 
@@ -438,7 +463,7 @@ class ObjPtr
 %header %{
 
 typedef std::vector<BufPtr> vectorBufPtr;
-jobject NewJRet( JNIEnv* jenv )
+jobject NewJRet( JNIEnv *jenv )
 {
     jclass cls = jenv->FindClass(
         "org/rpcf/rpcbase/JRetVal");
@@ -449,7 +474,7 @@ jobject NewJRet( JNIEnv* jenv )
     return jenv->NewObject( cls, ctor);
 }
 
-void AddElemToJRet( JNIEnv* jenv,
+void AddElemToJRet( JNIEnv *jenv,
     jobject jRet, jobject pObj )
 {
     jclass cls = jenv->FindClass(
@@ -465,7 +490,7 @@ void AddElemToJRet( JNIEnv* jenv,
     return;
 }
 
-void SetErrorJRet( JNIEnv* jenv,
+void SetErrorJRet( JNIEnv *jenv,
     jobject jRet, gint32 iRet )
 {
     jclass cls = jenv->FindClass(
@@ -480,7 +505,7 @@ void SetErrorJRet( JNIEnv* jenv,
     return;
 }
 
-gint32 GetErrorJRet( JNIEnv* jenv, jobject jRet )
+gint32 GetErrorJRet( JNIEnv *jenv, jobject jRet )
 {
     jclass cls = jenv->FindClass(
         "org/rpcf/rpcbase/JRetVal");
@@ -494,7 +519,7 @@ gint32 GetErrorJRet( JNIEnv* jenv, jobject jRet )
 
 // returns an array of BufPtr
 int GetParamsJRet(
-    JNIEnv* jenv, vectorBufPtr& vecParams )
+    JNIEnv *jenv, vectorBufPtr& vecParams )
 {
     jclass cls = jenv->FindClass(
         "org/rpcf/rpcbase/JRetVal");
@@ -524,7 +549,7 @@ int GetParamsJRet(
 
 // returns an array of BufPtr
 int GetParamCountJRet(
-    JNIEnv* jenv, jobject jret )
+    JNIEnv *jenv, jobject jret )
 {
     jclass cls = jenv->FindClass(
         "org/rpcf/rpcbase/JRetVal");
@@ -536,7 +561,7 @@ int GetParamCountJRet(
 }
 
 EnumTypeId GetTypeId(
-    JNIEnv* jenv, jobject pObj )
+    JNIEnv *jenv, jobject pObj )
 {
     jclass cls = jenv->FindClass(
         "org/rpcf/rpcbase/Helpers");
@@ -551,7 +576,7 @@ EnumTypeId GetTypeId(
     return (EnumTypeId)iType;
 }
 
-jobject NewWrapperObj( JNIEnv* jenv,
+jobject NewWrapperObj( JNIEnv *jenv,
     const stdstr& strClass,
     long lPtr, bool bOwner = true )
 {
@@ -565,7 +590,7 @@ jobject NewWrapperObj( JNIEnv* jenv,
         cls, ctor, lPtr, bOwner );
 
 }
-jobject NewIService( JNIEnv* jenv,
+jobject NewIService( JNIEnv *jenv,
     long lPtr, bool bOwner )
 {
     stdstr strClass =
@@ -574,7 +599,7 @@ jobject NewIService( JNIEnv* jenv,
         jenv, strClass, lPtr, bOwner );
 }
 
-jobject NewObjPtr( JNIEnv* jenv,
+jobject NewObjPtr( JNIEnv *jenv,
     long lPtr, bool bOwner = true )
 {
     stdstr strClass =
@@ -584,7 +609,7 @@ jobject NewObjPtr( JNIEnv* jenv,
         jenv, strClass, lPtr, bOwner );
 }
 
-jobject NewBufPtr( JNIEnv* jenv,
+jobject NewBufPtr( JNIEnv *jenv,
     long lPtr, bool bOwner = true )
 {
     stdstr strClass =
@@ -594,11 +619,31 @@ jobject NewBufPtr( JNIEnv* jenv,
         jenv, strClass, lPtr, bOwner );
 }
 
-jobject NewCfgPtr( JNIEnv* jenv,
+jobject NewCfgPtr( JNIEnv *jenv,
     long lPtr, bool bOwner = true )
 {
     stdstr strClass =
         "org/rpcf/rpcbase/CfgPtr";
+
+    return NewWrapperObj(
+        jenv, strClass, lPtr, bOwner );
+}
+
+jobject NewJavaProxy( JNIEnv *jenv,
+    long lPtr, bool bOwner = true )
+{
+    stdstr strClass =
+        "org/rpcf/rpcbase/CJavaProxyImpl";
+
+    return NewWrapperObj(
+        jenv, strClass, lPtr, bOwner );
+}
+
+jobject NewJavaServer( JNIEnv *jenv,
+    long lPtr, bool bOwner = true )
+{
+    stdstr strClass =
+        "org/rpcf/rpcbase/CJavaServerImpl";
 
     return NewWrapperObj(
         jenv, strClass, lPtr, bOwner );
@@ -649,7 +694,7 @@ LONGWORD GetWrappedBufPtr(
             objClass, getCPtr, jObj );
 }
 
-jobject NewBoolean( JNIEnv* jenv, bool val )
+jobject NewBoolean( JNIEnv *jenv, bool val )
 {
     jclass cls = jenv->FindClass(
         "java/lang/Boolean");
@@ -662,7 +707,7 @@ jobject NewBoolean( JNIEnv* jenv, bool val )
     return newObj;
 }
 
-jobject NewByte( JNIEnv* jenv, guint8 val )
+jobject NewByte( JNIEnv *jenv, guint8 val )
 {
     jclass cls = jenv->FindClass(
         "java/lang/Byte");
@@ -675,7 +720,7 @@ jobject NewByte( JNIEnv* jenv, guint8 val )
     return newObj;
 }
 
-jobject NewShort( JNIEnv* jenv, guint16 val )
+jobject NewShort( JNIEnv *jenv, guint16 val )
 {
     jclass cls = jenv->FindClass(
         "java/lang/Short");
@@ -688,7 +733,7 @@ jobject NewShort( JNIEnv* jenv, guint16 val )
     return newObj;
 }
 
-jobject NewInt( JNIEnv* jenv, guint32 val )
+jobject NewInt( JNIEnv *jenv, guint32 val )
 {
     jclass cls = jenv->FindClass(
         "java/lang/Integer");
@@ -701,7 +746,7 @@ jobject NewInt( JNIEnv* jenv, guint32 val )
     return newObj;
 }
 
-jobject NewLong( JNIEnv* jenv, gint64 val )
+jobject NewLong( JNIEnv *jenv, gint64 val )
 {
     jclass cls = jenv->FindClass(
         "java/lang/Long");
@@ -714,7 +759,7 @@ jobject NewLong( JNIEnv* jenv, gint64 val )
     return newObj;
 }
 
-jobject NewFloat( JNIEnv* jenv, float val )
+jobject NewFloat( JNIEnv *jenv, float val )
 {
     jclass cls = jenv->FindClass(
         "java/lang/Float");
@@ -727,7 +772,7 @@ jobject NewFloat( JNIEnv* jenv, float val )
     return newObj;
 }
 
-jobject NewDouble( JNIEnv* jenv, double val )
+jobject NewDouble( JNIEnv *jenv, double val )
 {
     jclass cls = jenv->FindClass(
         "java/lang/Double");
@@ -782,7 +827,7 @@ jobject GetJniString(JNIEnv *jenv, const stdstr& message )
         stringClass, ctor, bytes, charset);
 }
 
-bool IsArray( JNIEnv* jenv, jojbect pObj )
+bool IsArray( JNIEnv *jenv, jojbect pObj )
 {
     jclass Class_class = 
         jenv->FindClass("java/lang/Class");
@@ -795,7 +840,7 @@ bool IsArray( JNIEnv* jenv, jojbect pObj )
             obj_class, Class_isArray_mid);
 }
 
-EnumTypeId GetObjType( JNIEnv* jenv, jobject pObj )
+EnumTypeId GetObjType( JNIEnv *jenv, jobject pObj )
 {
     jclass iClass =
         jenv->FindClass("java/lang/String");
@@ -833,7 +878,7 @@ EnumTypeId GetObjType( JNIEnv* jenv, jobject pObj )
 }
 
 IService* CastToSvc(
-    JNIEnv* jenv, ObjPtr* pObj )
+    JNIEnv *jenv, ObjPtr* pObj )
 {
     if( pObj == nullptr ||
         ( *pObj ).IsEmpty() )
@@ -1144,7 +1189,7 @@ class BufPtr
         SetErrorJRet( jenv, jRet, ret );
         return jRet;
     }
-    jobject GetInt( JNIEnv* jenv )
+    jobject GetInt( JNIEnv *jenv )
     {
         if( $self == nullptr )
             return -EINVAL;
@@ -1170,7 +1215,7 @@ class BufPtr
         SetErrorJRet( jenv, jRet, ret );
         return jRet;
     }
-    jobject GetLong( JNIEnv* jenv )
+    jobject GetLong( JNIEnv *jenv )
     {
         if( $self == nullptr )
             return -EINVAL;
@@ -1196,7 +1241,7 @@ class BufPtr
         SetErrorJRet( jenv, jRet, ret );
         return jRet;
     }
-    jobject GetFloat( JNIEnv* jenv )
+    jobject GetFloat( JNIEnv *jenv )
     {
         if( $self == nullptr )
             return -EINVAL;
@@ -1222,7 +1267,7 @@ class BufPtr
         SetErrorJRet( jenv, jRet, ret );
         return jRet;
     }
-    jobject GetDouble( JNIEnv* jenv )
+    jobject GetDouble( JNIEnv *jenv )
     {
         if( $self == nullptr )
             return -EINVAL;
@@ -1249,7 +1294,7 @@ class BufPtr
         return jRet;
     }
 
-    jobject GetObjPtr( JNIEnv* jenv )
+    jobject GetObjPtr( JNIEnv *jenv )
     {
         if( $self == nullptr )
             return -EINVAL;
@@ -1276,7 +1321,7 @@ class BufPtr
         return jRet;
     }
 
-    jobject GetString( JNIEnv* jenv )
+    jobject GetString( JNIEnv *jenv )
     {
         if( $self == nullptr )
             return -EINVAL;
@@ -1424,7 +1469,7 @@ class CParamList
 
 %extend CParamList {
     jobject GetStrProp( 
-        JNIEnv* jenv, gint32 iProp )
+        JNIEnv *jenv, gint32 iProp )
     {
         
         gint32 ret = 0;
@@ -1451,7 +1496,7 @@ class CParamList
         const std::string& strVal );
 
     jobject GetByteProp(
-        JNIEnv* jenv, gint32 iProp )
+        JNIEnv *jenv, gint32 iProp )
     {
         gint32 ret = 0;
         jobject jRet = NewJRet( jenv );
@@ -1482,7 +1527,7 @@ class CParamList
     }
 
     jobject GetShortProp(
-        JNIEnv* jenv, gint32 iProp )
+        JNIEnv *jenv, gint32 iProp )
     {
         gint32 ret = 0;
         jobject jRet = NewJRet( jenv );
@@ -1513,7 +1558,7 @@ class CParamList
     }
 
     jobject GetIntProp(
-        JNIEnv* jenv, gint32 iProp )
+        JNIEnv *jenv, gint32 iProp )
     {
         gint32 ret = 0;
         jobject jRet = NewJRet( jenv );
@@ -1543,8 +1588,8 @@ class CParamList
             iProp, ( guint32 )dwVal ); 
     }
 
-    gint32 GetQwordProp(
-        JNIEnv* jenv, gint32 iProp )
+    jobject GetQwordProp(
+        JNIEnv *jenv, gint32 iProp )
     {
         gint32 ret = 0;
         jobject jRet = NewJRet( jenv );
@@ -1574,7 +1619,7 @@ class CParamList
     }
 
     jobject GetDoubleProp(
-        JNIEnv* jenv, gint32 iProp )
+        JNIEnv *jenv, gint32 iProp )
     {
         gint32 ret = 0;
         jobject jRet = NewJRet( jenv );
@@ -1600,7 +1645,7 @@ class CParamList
     gint32 SetDoubleProp( gint32, double fVal );
 
     jobject GetFloatProp(
-        JNIEnv* jenv, gint32 iProp )
+        JNIEnv *jenv, gint32 iProp )
     {
         gint32 ret = 0;
         jobject jRet = NewJRet( jenv );
@@ -1625,8 +1670,8 @@ class CParamList
 
     gint32 SetFloatProp( gint32, float fVal );
 
-    jobject GetObjPtr( gint32,
-        JNIEnv* jenv, gint32 iProp )
+    jobject GetObjPtr(
+        JNIEnv *jenv, gint32 iProp )
     {
         gint32 ret = 0;
         jobject jRet = NewJRet( jenv );
@@ -1656,7 +1701,7 @@ class CParamList
         gint32 iProp, ObjPtr& pObj );
 
     jobject GetBoolProp(
-        JNIEnv* jenv, gint32 iProp )
+        JNIEnv *jenv, gint32 iProp )
     {
         gint32 ret = 0;
         jobject jRet = NewJRet( jenv );
@@ -1683,7 +1728,7 @@ class CParamList
         gint32, bool bVal );
 
     jobject GetPropertyType(
-        JNIEnv* jenv, gint32 iProp )
+        JNIEnv *jenv, gint32 iProp )
     {
         gint32 ret = 0;
         jobject jRet = NewJRet( jenv );
@@ -1708,8 +1753,8 @@ class CParamList
         return jRet;
     }
 
-    jobject GetProperty( gint32,
-        JNIEnv* jenv, gint32 iProp )
+    jobject GetProperty(
+        JNIEnv *jenv, gint32 iProp )
     {
         gint32 ret = 0;
         jobject jRet = NewJRet( jenv );
@@ -1799,7 +1844,7 @@ class CParamList
         return ret;
     }
 
-    jobject GetCfg( JNIEnv* jenv )
+    jobject GetCfg( JNIEnv *jenv )
     {
         gint32 ret = 0;
         jobject jRet = NewJRet( jenv );
@@ -1829,7 +1874,7 @@ class CParamList
         return jRet;
     }
 
-    jobject GetSize( JNIEnv* jenv )
+    jobject GetSize( JNIEnv *jenv )
     {
         gint32 ret = 0;
         jobject jRet = NewJRet( jenv );
@@ -1868,7 +1913,7 @@ CfgPtr* CastToCfg( ObjPtr* pObj );
 
 %newobject CastToSvc;
 IService* CastToSvc(
-    JNIEnv* jenv, ObjPtr* pObj );
+    JNIEnv *jenv, ObjPtr* pObj );
 
 %nodefaultctor;
 %typemap(javadestruct_derived, methodname="delete", methodmodifiers="public synchronized") CRpcServices {
@@ -1924,4 +1969,4 @@ class CInterfaceServer : public CRpcServices
 
 %clearnodefaultctor;
 
-
+%include "proxy.i"
