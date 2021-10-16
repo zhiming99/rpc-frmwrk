@@ -1,3 +1,28 @@
+/*
+ * =====================================================================================
+ *
+ *       Filename:  proxy.i
+ *
+ *    Description:  a swig file as the wrapper of CJavaProxyImpl class and
+ *                  helper classes for Java
+ *
+ *        Version:  1.0
+ *        Created:  10/16/2021 02:45:30 PM
+ *       Revision:  none
+ *       Compiler:  gcc
+ *
+ *         Author:  Ming Zhi( woodhead99@gmail.com )
+ *   Organization:
+ *
+ *      Copyright:  2021 Ming Zhi( woodhead99@gmail.com )
+ *
+ *        License:  This program is free software; you can redistribute it
+ *                  and/or modify it under the terms of the GNU General Public
+ *                  License version 3.0 as published by the Free Software
+ *                  Foundation at 'http://www.gnu.org/licenses/gpl-3.0.html'
+ *
+ * =====================================================================================
+ */ 
 %header {
 typedef enum 
 {
@@ -19,7 +44,7 @@ class CJavaProxyBase :
     {}
 
     virtual jobject JavaProxyCall2(
-        JNIEnv* jenv,
+        JNIEnv *jenv,
         jobject pCb,
         jobject pContext,
         CfgPtr& pOptions,
@@ -46,7 +71,7 @@ class CJavaInterfBase : public T
         : super::_MyVirtBase( pCfg ), super( pCfg )
     {}
 
-    gint32 ConvertBufToByteArray( JNIEnv* jenv,
+    gint32 ConvertBufToByteArray( JNIEnv *jenv,
         BufPtr& pBuf, jobject& pObj )
     {
         gint32 ret = 0;
@@ -97,7 +122,7 @@ class CJavaInterfBase : public T
 
         gint32 ret = 0;
         bool bAttach = false;
-        JNIEnv* jenv = nullptr;
+        JNIEnv *jenv = nullptr;
         ret = GetJavaEnv( jenv, bAttach );
         if( ERROR( ret ) )
             return ret;
@@ -133,7 +158,7 @@ class CJavaInterfBase : public T
     }
 
     gint32 DisableTimer(
-        JNIEnv* jenv, ObjPtr& pTimer )
+        JNIEnv *jenv, ObjPtr& pTimer )
     {
         CIfDeferCallTaskEx* pTaskEx = pTimer;
         if( pTaskEx == nullptr )
@@ -181,7 +206,7 @@ class CJavaInterfBase : public T
     }
 
     jobject AddTimer(
-        JNIEnv* jenv,
+        JNIEnv *jenv,
         guint32 dwTimeoutSec,
         jobject pCb,
         jobject pCtx )
@@ -247,7 +272,7 @@ class CJavaInterfBase : public T
         return jret;
     }
 
-    gint32 FillList( JNIEnv* jenv,
+    gint32 FillList( JNIEnv *jenv,
         IConfigDb* pResp,
         jobject listResp )
     {
@@ -464,7 +489,7 @@ class CJavaInterfBase : public T
     }
 
     gint32 ConvertByteArrayToBuf(
-        JNIEnv* jenv,
+        JNIEnv *jenv,
         jobject* pObject,
         BufPtr& pBuf )
     {
@@ -514,7 +539,7 @@ class CJavaInterfBase : public T
     }
 
     gint32 List2Vector(
-        JNIEnv* jenv, jobject jRet,
+        JNIEnv *jenv, jobject jRet,
         std::vector< BufPtr >& vecArgs )
     {
         gint32 ret = 0;
@@ -529,7 +554,7 @@ class CJavaInterfBase : public T
     }
 
     gint32 SetJavaHost(
-        JNIEnv* jenv, jobject pObj )
+        JNIEnv *jenv, jobject pObj )
     {
         gint32 ret = 0;
         if( jenv == nullptr || pObj == nullptr )
@@ -729,7 +754,7 @@ class CJavaInterfBase : public T
                 break;
             }
             pjParams = NewObjPtr( jenv, pArgs );
-            if( unlikely( pPyParams == nullptr ) ) 
+            if( unlikely( pjParams == nullptr ) ) 
             {           
                 ret = -ENOMEM;
                 break;
@@ -814,7 +839,7 @@ class CJavaInterfBase : public T
     }
 
     gint32 JavaHandleAsyncResp(
-        JNIEnv* jenv, jobject pjCb,
+        JNIEnv *jenv, jobject pjCb,
         guint32 dwSeriProto, jobject pjResp,
         jobject pContext )
     {
@@ -891,7 +916,7 @@ class CJavaInterfBase : public T
             {
                 // Note: callback dose not to worry 
                 // the pPyBuf become invalid if pBuf is released.
-                // so we don't put pBuf to the list here.
+                // so we do not put pBuf to the list here.
                 // but do pay attention to consume the pPyBuf
                 // with the call. It would become invalid when
                 // the callback returns
@@ -946,7 +971,7 @@ class CJavaInterfBase : public T
                 break;
             pjCb = ( jobject )pVal;
 
-            JRetVal pjResp = NewJRet( jenv );
+            jobject pjResp = NewJRet( jenv );
             SetErrorJRet( jenv, pjResp, iRet );
             jobject pjHandle = NewLong(
                 jenv, ( jlong )hChannel );    
@@ -1077,7 +1102,7 @@ class CJavaInterfBase : public T
     }
  
     jobject GetChanCtx(
-        JNIEnv* jenv, HANDLE hChannel )
+        JNIEnv *jenv, HANDLE hChannel )
     {
         if( jenv == nullptr )
             return nullptr;
@@ -1112,7 +1137,7 @@ class CJavaInterfBase : public T
         return jret;
     }
 
-    gint32 SetChanCtx( JNIEnv* jenv,
+    gint32 SetChanCtx( JNIEnv *jenv,
         HANDLE hChannel, jobject pCtx )
     {
         gint32 ret = 0;
@@ -1163,13 +1188,13 @@ class CJavaInterfBase : public T
     }
 
     gint32 RemoveChanCtx(
-        JNIEnv* jenv, HANDLE hChannel )
+        JNIEnv *jenv, HANDLE hChannel )
     {
         return SetChanCtx(
             jenv, hChannel, nullptr );
     }
 
-    gint32 PyCompNotify(
+    gint32 JavaCancelNotify(
         IEventSink* pCallback,
         gint32 iRet,
         intptr_t pCb,
@@ -1183,7 +1208,7 @@ class CJavaInterfBase : public T
 
         gint32 ret = 0;
         bool bAttach = false;
-        JNIEnv* jenv = nullptr;
+        JNIEnv *jenv = nullptr;
         ret = GetJavaEnv( jenv, bAttach );
         if( ERROR( ret ) )
             return ret;
@@ -1230,7 +1255,7 @@ class CJavaInterfBase : public T
     }
 
     gint32 InstallCancelNotify(
-        JNIEnv* jenv,
+        JNIEnv *jenv,
         IEventSink* pCallback,
         jobject pCb,
         jobject pListResp )
@@ -1239,24 +1264,30 @@ class CJavaInterfBase : public T
             pListResp == nullptr )
             return -EINVAL;
 
+        jobject pjCb =
+            jenv->NewGlobalRef( pCb );
+
+        jobject pjResp =
+            jenv->NewGlobalRef( pListResp );
+
         TaskletPtr pTask;
         gint32 ret = DEFER_CANCEL_HANDLER2(
             -1, pTask, this,
-            &CJavaInterfBase::PyCompNotify,
+            &CJavaInterfBase::JavaCancelNotify,
             pCallback, 0,
             ( intptr_t )pCb,
-            ( intptr_t)pListResp );    
+            ( intptr_t)pjResp );    
 
-        if( SUCCEEDED( ret ) )
+        if( ERROR( ret ) )
         {
-            Py_INCREF( pCb );
-            Py_INCREF( pListResp );
+            jenv->DeleteGlobalRef( pjCb );
+            jenv->DeleteGlobalRef( pjResp );
         }
         return ret;
     }
 
     gint32 JavaOnStmReady(
-        JNIEnv* jenv, HANDLE hChannel )
+        JNIEnv *jenv, HANDLE hChannel )
     {
         gint32 ret = 0;
         do{
@@ -1284,7 +1315,7 @@ class CJavaInterfBase : public T
         gint32 ret = 0;
 
         bool bAttach = false;
-        JNIEnv* jenv = nullptr;
+        JNIEnv *jenv = nullptr;
         ret = GetJavaEnv( jenv, bAttach );
         if( ERROR( ret ) )
             return ret;
@@ -1298,7 +1329,7 @@ class CJavaInterfBase : public T
     }
 
     gint32 JavaOnStmClosing(
-        JNIEnv* jenv, HANDLE hChannel )
+        JNIEnv *jenv, HANDLE hChannel )
     {
         gint32 ret = 0;
         do{
@@ -1327,7 +1358,7 @@ class CJavaInterfBase : public T
             return -EINVAL;
 
         bool bAttach = false;
-        JNIEnv* jenv = nullptr;
+        JNIEnv *jenv = nullptr;
         ret = GetJavaEnv( jenv, bAttach );
         if( ERROR( ret ) )
             return ret;
@@ -1346,7 +1377,7 @@ class CJavaInterfBase : public T
     }
 
     void JavaDeferCallback(
-        JNIEnv* jenv, jobject pjCb,
+        JNIEnv *jenv, jobject pjCb,
         jobject pjArgs )
     {
         do{
@@ -1398,7 +1429,7 @@ class CJavaInterfBase : public T
     }
 
     gint32 DeferCall(
-        JNIEnv* jenv, jobject pjCb,
+        JNIEnv *jenv, jobject pjCb,
         jobject pjArgs )
     {
         TaskletPtr pTask;
@@ -1462,7 +1493,7 @@ class CJavaProxyImpl :
         std::vector< BufPtr >& vecParams );
 
     jobject JavaProxyCall2(
-        JNIEnv* jenv,
+        JNIEnv *jenv,
         jobject pCb,
         jobject pContext,
         CfgPtr& pOptions,
@@ -1528,7 +1559,7 @@ gint32 CJavaProxyImpl::AsyncCallVector(
 }
 
 jobject CJavaProxyImpl::JavaProxyCall2(
-    JNIEnv* jenv,
+    JNIEnv *jenv,
     jobject pCb,
     jobject pContext,
     CfgPtr& pOptions,
@@ -1537,21 +1568,16 @@ jobject CJavaProxyImpl::JavaProxyCall2(
     gint32 ret = 0;
     if( jenv == nullptr )
         return -EINVAL;
+    jobject pjCb = nullptr;
+    jobject jgret = nullptr;
+    jobject pjContext = nullptr;
+    jobject jret = NewJRet( jenv );
     do{
         bool bSync = false;
-        jobject listResp = NewJRet( jenv );
 
         if( pCb == nullptr )
             bSync = true;
-        if( !bSync )
-        {
-            ret = PyCallable_Check( pCb );
-            if( ret == 0 )
-            {
-                ret = -EINVAL;
-                break;
-            }
-        }
+
         std::vector< BufPtr > vecParams;
         ret = List2Vector(
            jenv, listArgs, vecParams );
@@ -1603,14 +1629,14 @@ jobject CJavaProxyImpl::JavaProxyCall2(
             if( ERROR( ret ) )
                 break;
 
-            oReqCtx.Push( ( intptr_t ) pCb );
-            oReqCtx.Push( ( intptr_t ) listResp );
+            pjCb = jenv->NewGlobalRef( pCb );
+            jgret = jenv->NewGlobalRef( jret );
+            pjContext = jenv->NewGlobalRef( pContext );
+            oReqCtx.Push( ( intptr_t ) pjCb );
+            oReqCtx.Push( ( intptr_t ) jgret );
             oReqCtx.Push( strMethod );
             oReqCtx.Push( dwSeriProto );
-            oReqCtx.Push( ( intptr_t )pContext );
-            Py_INCREF( pCb );
-            Py_INCREF( listResp );
-            Py_INCREF( pContext );
+            oReqCtx.Push( ( intptr_t )pjContext );
         }
         else
         {
@@ -1627,8 +1653,6 @@ jobject CJavaProxyImpl::JavaProxyCall2(
             propIfName, strDBusIfName );
 
         CCfgOpener oResp;
-        PyThreadState *_save;
-        Py_UNBLOCK_THREADS;
 
         ret = this->AsyncCallVector(
             pRespCb, pOptions,
@@ -1637,18 +1661,19 @@ jobject CJavaProxyImpl::JavaProxyCall2(
 
         if( ret == STATUS_PENDING && bSync )
         {
-            cpp::CIoReqSyncCallback*
+            CIoReqSyncCallback*
                 pSyncCb = pWrapperCb;
             ret = pSyncCb->WaitForComplete();
         }
 
-        Py_BLOCK_THREADS;
-
         if( ret != STATUS_PENDING && !bSync )
         {
-            Py_DECREF( pCb );
-            Py_DECREF( listResp );
-            Py_DECREF( pContext );
+            jenv->DeleteGlobalRef( pjCb );
+            jenv->DeleteGlobalRef( jgret );
+            jenv->DeleteGlobalRef( pjContext );
+            pjCb = nullptr;
+            jgret = nullptr;
+            pjContext = nullptr;
         }
 
         if( ERROR( ret ) )
@@ -1656,11 +1681,15 @@ jobject CJavaProxyImpl::JavaProxyCall2(
 
         else if( ret == STATUS_PENDING )
         {
+            // the original jret is passed to the task.
+            jret = NewJRet( jenv );
             guint64 qwTaskCancel = 0;
             oResp.GetQwordProp(
                 propTaskId, qwTaskCancel );
-            PyList_SetItem( listResp, 1,
-                PyLong_FromLongLong( qwTaskCancel ) );
+
+            jobject jtaskId =
+                NewLong( jenv, qwTaskCancel );
+            AddElemToJRet( jenv, jret, jtaskId );
             break;
         }
 
@@ -1697,18 +1726,21 @@ jobject CJavaProxyImpl::JavaProxyCall2(
             break;
         }
         ret = FillList(
-            jenv, pRmtResp, listResp );
+            jenv, pRmtResp, jret );
         if( ERROR( ret ) )
             break;
 
     }while( 0 );
 
-    PyList_SetItem( listResp, 0,
-        PyLong_FromLong( ret ) );
+    SetErrorJRet( jenv, jret, ret );
+    if( ret != STATUS_PENDING )
+    {
+        pjCb && jenv->DeleteGlobalRef( pjCb );
+        pjContext && jenv->DeleteGlobalRef( pjContext );
+        jgret && jenv->DeleteGlobalRef( jgret );
+    }
 
-    Py_INCREF( listResp );
-
-    return listResp;
+    return jret;
 }
 
 static FactoryPtr InitClassFactory()
@@ -1756,22 +1788,133 @@ gint32 LoadThisLib( ObjPtr& pIoMgr )
     return ret;
 }
 
+jobject CreateProxy(
+    JNIEnv *jenv,
+    ObjPtr& pMgr,
+    const std::string& strDesc,
+    const std::string& strObjName,
+    ObjPtr& pCfgObj )
+{
+    gint32 ret = 0;
+    jobject jRet = NewJRet( jenv );
+    do{
+        CfgPtr pCfg = pCfgObj;
+        if( pCfg.IsEmpty() )
+        {
+            CParamList oParams;
+            oParams.SetObjPtr(
+                propIoMgr, pMgr );
+            pCfg = oParams.GetCfg();
+        }
+        else
+        {
+            CParamList oParams( pCfg );
+            oParams.SetObjPtr(
+                propIoMgr, pMgr );
+        }
+
+        ret = CRpcServices::LoadObjDesc(
+            strDesc, strObjName,
+            false, pCfg );
+
+        if( ERROR( ret ) )
+            break;
+
+        ObjPtr pIf;
+        ret = pIf.NewObj(
+            clsid( CJavaProxyImpl ),
+            pCfg );
+        if( ERROR( ret ) )
+            break;
+
+        jobject pjIf = NewObjPtr( jenv, pIf );
+        AddElemToJRet( jenv, jRet, jtimer );
+
+    }while( 0 );
+
+    SetErrorJRet( jenv, jRet, ret );
+    return ret;
+}
+
+gint32 LoadJavaFactory( ObjPtr& pMgr )
+{ return LoadThisLib( pMgr ); }
+
+jobject CastToProxy(
+    JNIEnv *jenv,
+    ObjPtr& pObj )
+{
+    gint32 ret = 0;
+    jobject jRet = NewJRet( jenv );
+    CJavaProxyImpl* pProxy = pObj;
+    if( pProxy == nullptr )
+    {
+        SetErrorJRet( jenv, jRet, -EFAULT );
+        return jRet;
+    }
+    jobject jproxy = NewJavaProxy(
+        jenv, ( intptr_t )pProxy );
+    if( jproxy == nullptr )
+    {
+        SetErrorJRet( jenv, jRet, -EFAULT );
+        return jRet;
+    }
+    AddElemToJRet( jenv, jRet, jproxy );
+    return jRet;
+}
+
+void JavaDbgPrint(
+    const std::string strMsg, int level = 3 )
+{
+    DebugPrintEx(
+        ( EnumLogLvl )level, 0,
+        "%s", strMsg.c_str() );
+}
+
+void JavaOutputMsg(
+    const std::string strMsg )
+{
+    OutputMsg( 0, "%s", strMsg.c_str() );
+}
 %}
 
-class CJavaRpcServices :
-    public CRpcServices
-{
-};
+jobject CreateProxy(
+    JNIEnv *jenv,
+    ObjPtr& pMgr,
+    const std::string& strDesc,
+    const std::string& strObjName,
+    ObjPtr& pCfgObj );
 
-%extend CJavaRpcServices
+gint32 LoadJavaFactory( ObjPtr& pMgr );
+
+jobject CastToProxy(
+    JNIEnv *jenv,
+    ObjPtr& pObj );
+
+void JavaDbgPrint(
+    const std::string strMsg, int level = 3 );
+
+void JavaOutputMsg( const std::string strMsg );
+%nodefaultctor;
+%typemap(javadestruct_derived, methodname="delete", methodmodifiers="public synchronized") CJavaInterfBase {
+    if (swigCPtr != 0) {
+      if (swigCMemOwn) {
+        swigCMemOwn = false;
+      }
+      swigCPtr = 0;
+    }
+    super.delete();
+  }
+template< typename T >
+class CJavaInterfBase
+    : public CRpcServices 
 {
     public:
     gint32 SetJavaHost(
         JNIEnv *jenv, jobject pObj )
     {
         gint32 ret = 0;
-        CJavaProxyImpl* pImpl = static_cast
-            < CJavaProxyImpl* >( $self );
+        T* pImpl = static_cast
+            < T* >( $self );
         if( pImpl == nullptr ) 
             ret = -EFAULT;
         else
@@ -1785,8 +1928,8 @@ class CJavaRpcServices :
 
     jobject GetJavaHost()
     {
-        CJavaProxyImpl* pImpl = static_cast
-            < CJavaProxyImpl* >( $self );
+        T* pImpl = static_cast
+            < T* >( $self );
         jobject pObj = nullptr;
         if( pImpl != nullptr ) 
         {
@@ -1801,8 +1944,8 @@ class CJavaRpcServices :
     gint32 RemoveJavaHost()
     {
         gint32 ret = 0;
-        CJavaProxyImpl* pImpl = static_cast
-            < CJavaProxyImpl* >( $self );
+        T* pImpl = static_cast
+            < T* >( $self );
         if( pImpl == nullptr ) 
             ret = -EFAULT;
         else
@@ -1811,13 +1954,13 @@ class CJavaRpcServices :
         return ret;
     }
 
-    gint32 StartStream( JNIEnv *jenv, ObjPtr* ppObj )
+    jobject StartStream( JNIEnv *jenv, ObjPtr* ppObj )
     {
         jobject jret = NewJRet();
         gint32 ret = 0;
         do{
-            CJavaProxyImpl* pImpl = static_cast
-                < CJavaProxyImpl* >( $self );
+            T* pImpl = static_cast
+                < T* >( $self );
             if( pImpl == nullptr ) 
             {
                 ret = -EFAULT;
@@ -1846,10 +1989,10 @@ class CJavaRpcServices :
         return ret;
     }
 
-    gint32 CloseStream( jlong hChannel );
+    gint32 CloseStream( jlong hChannel )
     {
         gint32 ret = 0;
-        CJavaProxyImpl* pImpl = static_cast
+        T* pImpl = static_cast
             < CPJavaProxyImpl* >( $self );
         if( pImpl == nullptr ) 
             ret = -EFAULT;
@@ -1862,12 +2005,12 @@ class CJavaRpcServices :
     }
 
     gint32 WriteStreamNoWait( JNIEnv *jenv,
-        jlong hChannel, jobject pjBuf );
+        jlong hChannel, jobject pjBuf )
     {
         gint32 ret = 0;
         do{
-            CJavaProxyImpl* pImpl = static_cast
-                < CJavaProxyImpl* >( $self );
+            T* pImpl = static_cast
+                < T* >( $self );
 
             if( pImpl == nullptr ) 
             {
@@ -1889,12 +2032,12 @@ class CJavaRpcServices :
     }
 
     gint32 WriteStream( JNIEnv *jenv,
-        jlong hChannel, jobject pjBuf );
+        jlong hChannel, jobject pjBuf )
     {
         gint32 ret = 0;
         do{
-            CJavaProxyImpl* pImpl = static_cast
-                < CJavaProxyImpl* >( $self );
+            T* pImpl = static_cast
+                < T* >( $self );
 
             if( pImpl == nullptr ) 
             {
@@ -1916,7 +2059,7 @@ class CJavaRpcServices :
         return ret;
     }
 
-    JRetVal ReadStreamNoWait( 
+    jobject ReadStreamNoWait( 
         JNIEnv *jenv, jlong hChannel )
     {
         gint32 ret = 0;
@@ -1925,8 +2068,8 @@ class CJavaRpcServices :
 
         do{
 
-            CJavaProxyImpl* pImpl = static_cast
-                < CJavaProxyImpl* >( $self );
+            T* pImpl = static_cast
+                < T* >( $self );
 
             if( pImpl == nullptr ) 
             {
@@ -1960,8 +2103,8 @@ class CJavaRpcServices :
         jobject jRet = NewJRet( jenv );
         gint32 ret = 0;
         do{
-            CJavaProxyImpl* pImpl = static_cast
-                < CJavaProxyImpl* >( $self );
+            T* pImpl = static_cast
+                < T* >( $self );
 
             if( pImpl == nullptr ) 
             {
@@ -2006,13 +2149,13 @@ class CJavaRpcServices :
     jobject ReadStreamAsync( JNIEnv *jenv,
         jlong hChannel,
         jobject pCb,
-        guint32 dwSize );
+        guint32 dwSize )
     {
         jobject pResp = NewJRet( jenv );
         gint32 ret = 0;
         do{
-            CJavaProxyImpl* pImpl = static_cast
-                < CJavaProxyImpl* >( $self );
+            T* pImpl = static_cast
+                < T* >( $self );
 
             if( pImpl == nullptr ||
                 pCb == nullptr ||
@@ -2028,7 +2171,7 @@ class CJavaRpcServices :
             CParamList oReqCtx;
             oReqCtx.Push( ( intptr_t ) pjCb );
 
-            cpp::BufPtr pBuf;
+            BufPtr pBuf;
 
             if( dwSize > 0 )
             {
@@ -2066,165 +2209,190 @@ class CJavaRpcServices :
     }
 
     gint32 WriteStreamAsync(
-        JNIEnv* jenv,
-        HANDLE hChannel,
-        jobject* pPyBuf,
-        jobject* pCb );
-    %MethodCode
-    do{
-        sipRes = 0;
-        CJavaProxyImpl* pImpl = static_cast
-            < CJavaProxyImpl* >( $self );
+        JNIEnv *jenv,
+        jlong hChannel,
+        jobject pjBuf,
+        jobject pjCb )
+    {
+        if( jenv == nullptr ||
+            ( HANDLE )hChannel == INVALID_HANDLE ||
+            pjBuf == nullptr ||
+            pjCb == nullptr )
+            return -EINVAL;
 
-        if( pImpl == nullptr ) 
+        gint32 ret = 0;
+        jobject pgbuf = nullptr;
+        jobject pgcb = nullptr;
+        do{
+            T* pImpl = static_cast
+                < T* >( $self );
+
+            if( pImpl == nullptr ) 
+            {
+                ret = -EFAULT;
+                break;
+            }
+
+            BufPtr pBuf( true );
+            ret = pImpl->ConvertByteArrayToBuf(
+                jenv, pjBuf, pBuf );
+            if( ERROR( ret ) )
+                break;
+
+            pgbuf = jenv->NewGlobalRef( pjBuf );
+            pgcb = jenv->NewGlobalRef( pjCb );
+
+            CParamList oReqCtx;
+            oReqCtx.Push( ( intptr_t ) pgbuf );
+            oReqCtx.Push( ( intptr_t ) pgcb );
+
+            IConfigDb* pCtx = oReqCtx.GetCfg();
+            ret = pImpl->WriteStreamAsync(
+                ( HANDLE )hChannel, pBuf, pCtx );
+
+        }while( 0 );
+
+        if( ret != STATUS_PENDING )
         {
-            sipRes = -EFAULT;
-            break;
+            if( pgbuf != nullptr )
+                jenv->DeleteGlobalRef( pgbuf );
+            if( pgcb != nullptr )
+                jenv->DeleteGlobalRef( pgcb );
         }
-
-        BufPtr pBuf( true );
-        gint32 ret = PyCallable_Check( a2 );
-        if( ret == 0 )
-        {
-            sipRes = -EINVAL;
-            break;
-        }
-
-        sipRes = pImpl->ConvertByteArrayToBuf(
-            a1, pBuf );
-        if( ERROR( sipRes ) )
-            break;
-
-        CParamList oReqCtx;
-        oReqCtx.Push( ( intptr_t ) a1 );
-        oReqCtx.Push( ( intptr_t ) a2 );
-        Py_INCREF( a1 );
-        Py_INCREF( a2 );
-
-        IConfigDb* pCtx = oReqCtx.GetCfg();
-        Py_BEGIN_ALLOW_THREADS;
-        sipRes = pImpl->WriteStreamAsync(
-            a0, pBuf, pCtx );
-        Py_END_ALLOW_THREADS;
-        if( sipRes != STATUS_PENDING )
-        {
-            Py_DECREF( a1 );
-            Py_DECREF( a2 );
-        }
-        break;
-
-    }while( 0 );
-    %End
+        return ret;
+    }
 
     jobject AddTimer(
-        JNIEnv* jenv;
+        JNIEnv *jenv,
         guint32 dwTimeoutSec,
-        PyObject* pCb,
-        PyObject* pCtx )
+        jobject pCb,
+        jobject pCtx )
     {
-        CJavaProxyImpl* pImpl =
-        static_cast< CJavaProxyImpl* >( $self );
+        T* pImpl =
+        static_cast< T* >( $self );
         return pImpl->AddTimer( jenv,
             dwTimeoutSec, pCb, pCtx );
     }
 
     gint32 DisableTimer(
-        cpp::ObjPtr& pTimer );
-    %MethodCode
-        CJavaProxyImpl* pImpl =
-        static_cast< CJavaProxyImpl* >
-            ( $self );
-        sipRes = pImpl->DisableTimer( *a0 );
-    %End
-
-    gint32 JavaDeferCall( JNIEnv* jenv,
-        jobject pjCb,
-        jobject pjArgs );
+        ObjPtr& pTimer )
     {
-        CJavaProxyImpl* pImpl =
-            static_cast< CJavaProxyImpl* >( $self  );
-        return pImpl->JavaDeferCall( jenv, a0, a1 );
+        T* pImpl =
+        static_cast< T* >
+            ( $self );
+        sipRes = pImpl->DisableTimer( pTimer );
+    }
+
+    gint32 JavaDeferCall(
+        JNIEnv *jenv,
+        jobject pjCb,
+        jobject pjArgs )
+    {
+        T* pImpl =
+            static_cast< T* >( $self  );
+        return pImpl->JavaDeferCall( jenv, pjCb, pjArgs );
+    }
+
+    gint32 InstallCancelNotify(
+        JNIEnv *jenv,
+        ObjPtr& pCallback,
+        jobject pCb,
+        jobject pListResp )
+    {
+        T* pImpl =
+            static_cast< T* >( $self  );
+        return pImpl->JavaDeferCall( jenv, pjCb, pjArgs );
+    }
+
+    gint32 DeferCall(
+        JNIEnv *jenv, jobject pjCb,
+        jobject pjArgs )
+    {
+        T* pImpl =
+            static_cast< T* >( $self  );
+        return pImpl->DeferCall( jenv, pjCb, pjArgs );
+    }
+
+    gint32 SetChanCtx( JNIEnv *jenv,
+        jlong hChannel, jobject pCtx )
+    {
+        T* pImpl =
+            static_cast< T* >( $self  );
+        return pImpl->SetChanCtx( jenv,
+            ( HANDLE )hChannel, pCtx );
+    }
+
+    gint32 RemoveChanCtx(
+        JNIEnv *jenv, jlong hChannel )
+    {
+        T* pImpl =
+            static_cast< T* >( $self  );
+        return pImpl->SetChanCtx( jenv,
+            ( HANDLE )hChannel, nullptr );
+    }
+
+    jobject GetChanCtx(
+        JNIEnv *jenv, jlong hChannel )
+    {
+        T* pImpl =
+            static_cast< T* >( $self  );
+        return pImpl->GetChanCtx( jenv,
+            ( HANDLE )hChannel );
     }
 };
 
-class CJavaInterfProxy :
-    public CJavaRpcServices
+%template(CJavaInterfBaseP) CJavaInterfBase<CJavaProxy>;
+
+%typemap(javadestruct_derived, methodname="delete", methodmodifiers="public synchronized") CJavaProxyImpl {
+    if (swigCPtr != 0) {
+      if (swigCMemOwn) {
+        swigCMemOwn = false;
+      }
+      swigCPtr = 0;
+    }
+    super.delete();
+  }
+class CJavaProxyImpl :
+    public CJavaInterfBase<CJavaProxy>
 {
+};
+
+%extend CJavaProxyImpl{
+
     jobject JavaProxyCall2(
-        JNIEnv* jenv,
+        JNIEnv *jenv,
         jobject pCb,
         jobject pContext,
-        cpp::CfgPtr& pOptions,
+        CfgPtr& pOptions,
         jobject listArgs );
 
     gint32 GetPeerIdHash(
-        HANDLE hChannel,
+        jlong hChannel,
         guint64& qwPeerIdHash );
 
-    HANDLE GetChanByIdHash( guint64 );
+    jlong GetChanByIdHash( guint64 qwHash )
+    {
+        CJavaProxyImpl* pImpl =
+            static_cast< CJavaProxyImpl* >( $self  );
+        HANDLE hChannel =
+            pImpl->GetChanByIdHash( qwHash );
+        return ( jlong )hChannel;
+    }
+}
+
+%template(CJavaInterfBaseS) CJavaInterfBase<CJavaServer>;
+%typemap(javadestruct_derived, methodname="delete", methodmodifiers="public synchronized") CJavaServerImpl {
+    if (swigCPtr != 0) {
+      if (swigCMemOwn) {
+        swigCMemOwn = false;
+      }
+      swigCPtr = 0;
+    }
+    super.delete();
+  }
+class CJavaServerImpl :
+    public CJavaInterfBase<CJavaServer>
+{
 };
 
-cpp::ObjPtr CreateProxy(
-    cpp::ObjPtr& pMgr,
-    const std::string& strDesc,
-    const std::string& strObjName,
-    cpp::ObjPtr& pCfgObj );
-%MethodCode
-    gint32 ret = 0;
-    do{
-        cpp::CfgPtr pCfg = *a3;
-
-        if( pCfg.IsEmpty() )
-        {
-            CParamList oParams;
-            oParams.SetObjPtr(
-                propIoMgr, *a0 );
-            pCfg = oParams.GetCfg();
-        }
-        else
-        {
-            CParamList oParams( pCfg );
-            oParams.SetObjPtr(
-                propIoMgr, *a0 );
-        }
-
-        ret = CRpcServices::LoadObjDesc(
-            *a1, *a2, false, pCfg );
-        if( ERROR( ret ) )
-            break;
-
-        ObjPtr pIf;
-        ret = pIf.NewObj(
-            clsid( CJavaProxyImpl ),
-            pCfg );
-        if( ERROR( ret ) )
-            break;
-
-        sipRes = new cpp::ObjPtr(
-            nullptr, false );
-        *sipRes = pIf;
-
-    }while( 0 );
-%End
-
-gint32 LoadPyFactory( cpp::ObjPtr& pMgr );
-%MethodCode
-    sipRes = LoadThisLib( *a0 );
-%End
-
-CJavaProxy* CastToProxy(
-    cpp::ObjPtr& pObj );
-%MethodCode
-    CJavaProxy* pProxy = *a0;
-    sipRes = pProxy;
-%End
-
-void PyDbgPrint( char* szMsg, int level = 3 );
-%MethodCode
-    DebugPrintEx( ( EnumLogLvl )a1, 0, "%s", a0 );
-%End
-
-void PyOutputMsg( char* szMsg );
-%MethodCode
-    OutputMsg( 0, "%s", a0 );
-%End
+%clearnodefaultctor;
