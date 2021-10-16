@@ -8,7 +8,7 @@ This is an asynchronous and event-driven RPC implementation for embeded system w
 
 #### Features   
 1. `Support for multiple interfaces on a single object.`   
-2. `Support for synchronous/asynchronous requests handling from both sides.`   
+2. `Decent and robust asynchronous support for both client/server programming`   
 3. `Active canceling.`   
 4. `Server-push events`   
 5. `Keep-alive for time-consuming request.`   
