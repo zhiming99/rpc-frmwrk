@@ -68,6 +68,11 @@ blocking the current thread.
 
 The RPC-frmwrk user API comes in both synchronous and asynchronous flavors.
 
+Unlike gRPC or Thrift requiring the developer to have better understanding
+of the system internal process, RPC-frmwrk's ridlc can generate a
+quite intuitive skelton with little internal knowlege of RPC-frmwrk to kick off
+the distributed development.
+
 ## Stateful Connection
 
 Before the RPC calls can be delivered to the Server, the RPC-frmwrk will
