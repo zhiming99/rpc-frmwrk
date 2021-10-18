@@ -1255,12 +1255,12 @@ gint32 CStreamServer::FetchData_Server(
 {
     HANDLE hChannel = 0;
 
-    ret = AcceptNewStream(
+    gint32 ret = AcceptNewStream(
         pCallback, pDataDesc );
     if( ERROR( ret ) )
         return ret;
 
-    gint32 ret = OpenChannel( pDataDesc,
+    ret = OpenChannel( pDataDesc,
         fd, hChannel, pCallback );
 
     if( ret == STATUS_PENDING )
