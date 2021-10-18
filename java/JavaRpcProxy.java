@@ -5,14 +5,14 @@ import java.util.Map;
 import java.util.List;
 
 
-class JavaRpcProxy extends JavaRpcServiceP
+abstract public class JavaRpcProxy extends JavaRpcServiceP
 {
     public JavaRpcProxy(
         ObjPtr pIoMgr,
         String strDesc,
         String strSvrObj )
     {
-        JRetVal jret = new JRetVal();
+        JRetVal jret = null;
         do{
             m_pIoMgr = pIoMgr;
             m_iError = 0;
@@ -180,6 +180,4 @@ class JavaRpcProxy extends JavaRpcServiceP
     public boolean isServer()
     { return false; }
 
-    public gint32 initMaps()
-    { return rpcbaseConstants.ERROR_NOT_IMPL; }
 }

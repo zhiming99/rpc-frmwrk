@@ -18,7 +18,7 @@ abstract public class JavaRpcService
     protected InstType m_oInst = null;
 
     public abstract boolean isServer();
-    public abstract gint32 initMaps();
+    public abstract int initMaps();
 
     int GetError()
     { return m_iError; }
@@ -665,6 +665,26 @@ abstract public class JavaRpcService
         Object[] arrArgs = ( Object[] )listArgs;
         dc.call( arrArgs );
         return;
+    }
+
+    public int setChanCtx(
+        long hChannel, Object pCtx)
+    {
+        return m_oInst.SetChanCtx(
+            hChannel, pCtx );
+    }
+
+    public int removeChanCtx(
+        long hChannel )
+    {
+        return m_oInst.RemoveChanCtx(
+            hChannel );
+    }
+
+    public JRetVal getChanCtx( long hChannel )
+    {
+        return ( JRetVal )m_oInst.GetChanCtx(
+            hChannel );
     }
 }
 

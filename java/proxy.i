@@ -34,6 +34,9 @@ typedef enum
 #include "streamex.h"
 #include "counters.h"
 
+#define typeJRet 200
+#define typeObjArr 201
+
 class CJavaProxyBase :
     public CStreamProxyAsync
 {
@@ -538,15 +541,25 @@ class CJavaInterfBase : public T
         return ret;
     }
 
-    gint32 List2Vector(
-        JNIEnv *jenv, jobject jRet,
+    gint32 List2Vector( JNIEnv *jenv,
+        jobject jObj,
         std::vector< BufPtr >& vecArgs )
     {
         gint32 ret = 0;
         if( pList == nullptr || jenv == nullptr )
             return -EINVAL;
 
-        ret = GetParamsJRet( jenv, vecArgs );
+        int typeId = GetObjType( jenv, jObj );
+        if( typeId == typeJRet )
+        {
+            ret = GetParamsJRet(
+                jenv, jObj, vecArgs );
+        }
+        else if( typeId == typeObjArr )
+        {
+            ret = GetParamsObjArr(
+                jenv, jObj, vecArgs );
+        }
         if( ERROR( ret ) )
             vecArgs.clear();
 
@@ -760,15 +773,16 @@ class CJavaInterfBase : public T
                 break;
             }       
 
-            jmethodId invoke = jenv->GetMethodID(
+            jmethodId invokeMethod = jenv->GetMethodID(
                 cls, "invokeMethod",
                  "(Ljava/lang/Object;"
                  "Ljava/lang/String;"
                  "Ljava/lang/String;"
-                 "IL/java/lang/Object;)" );
+                 "IL/java/lang/Object;)"
+                 "L/java/lang/Object" );
 
             listResp = jenv->CallObjectMethod(
-                 pHost, invoke
+                 pHost, invokeMethod,
                  pjCb, strIfName.c_str(),
                  strMethod.c_str(), dwSeriProto,
                  pjParams );
@@ -2380,19 +2394,6 @@ class CJavaProxyImpl :
     }
 }
 
-%template(CJavaInterfBaseS) CJavaInterfBase<CJavaServer>;
-%typemap(javadestruct_derived, methodname="delete", methodmodifiers="public synchronized") CJavaServerImpl {
-    if (swigCPtr != 0) {
-      if (swigCMemOwn) {
-        swigCMemOwn = false;
-      }
-      swigCPtr = 0;
-    }
-    super.delete();
-  }
-class CJavaServerImpl :
-    public CJavaInterfBase<CJavaServer>
-{
-};
-
 %clearnodefaultctor;
+
+%include "server.i"

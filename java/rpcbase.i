@@ -139,6 +139,8 @@ enum // EnumTypeId
     typeUInt64Obj,
     typeFloatObj,
     typeDoubleObj,
+    typeJRet = 200,
+    typeObjArr = 201
 };
 
 typedef int32_t EnumSeriProto;
@@ -519,7 +521,7 @@ gint32 GetErrorJRet( JNIEnv *jenv, jobject jRet )
 
 // returns an array of BufPtr
 int GetParamsJRet(
-    JNIEnv *jenv, vectorBufPtr& vecParams )
+    JNIEnv *jenv, jobject jret, vectorBufPtr& vecParams )
 {
     jclass cls = jenv->FindClass(
         "org/rpcf/rpcbase/JRetVal");
@@ -529,7 +531,7 @@ int GetParamsJRet(
         "()Lorg/rpcf/rpcbase/vectorBufPtr;");
 
     jobject jvecParams = jenv->CallIntMethod(
-        jRet, getParams );
+        jret, getParams );
 
     if( jvecParams == nullptr )
         return -EFAULT;
@@ -546,6 +548,37 @@ int GetParamsJRet(
     vecParams = *pvecBufs;
     return STATUS_SUCCESS;
 }
+
+int GetParamsObjArr(
+    JNIEnv *jenv, jobject arrObj, vectorBufPtr& vecParams )
+{
+    jclass cls = jenv->FindClass(
+        "org/rpcf/rpcbase/Helpers");
+
+    jmethodId cotb = jenv->GetMethodID(
+        cls, "convertObjectToBuf",
+        "()Lorg/rpcf/rpcbase/vectorBufPtr;");
+
+    jobject jvecParams =
+        jenv->CallStaticIntMethod(
+        jret, cotb, arrObj );
+
+    if( jvecParams == nullptr )
+        return -EFAULT;
+
+    intptr_t lPtr = GetWrappedPtr(
+        jenv, jvecParams );
+
+    if( lPtr == 0 )
+        return -EFAULT;
+
+    vectorBufPtr* pvecBufs =
+        ( vectorBufPtr* )lPtr;
+
+    vecParams = *pvecBufs;
+    return STATUS_SUCCESS;
+}
+    
 
 // returns an array of BufPtr
 int GetParamCountJRet(
@@ -843,38 +876,18 @@ bool IsArray( JNIEnv *jenv, jojbect pObj )
 EnumTypeId GetObjType( JNIEnv *jenv, jobject pObj )
 {
     jclass iClass =
-        jenv->FindClass("java/lang/String");
+        jenv->FindClass("org/rpcf/rpcbase/JRetVal");
     if( jenv->IsInstanceOf( pObj, iClass ) )
-        return typeString;
+        return typeJRet;
 
     iClass =
-        jenv->FindClass("java/lang/Integer");
-    if( jenv->IsInstanceOf( pObj, iClass ) )
-        return typeUInt32;
-
-    iClass =
-        jenv->FindClass("org/rpcf/rpcbase/ObjPtr");
-    if( jenv->IsInstanceOf( pObj, iClass ) )
-        return typeObj;
-
-    iClass =
-        jenv->FindClass("org/rpcf/rpcbase/CfgPtr");
-    if( jenv->IsInstanceOf( pObj, iClass ) )
-        return typeObj;
-
-    iClass =
-        jenv->FindClass("java/lang/Boolean");
-    if( jenv->IsInstanceOf( pObj, iClass ) )
-        return typeByte;
-
-    iClass =
-        jenv->FindClass("java/lang/Byte");
+        jenv->FindClass("java/lang/Object");
     if( jenv->IsInstanceOf( pObj, iClass ) )
     {
         if( IsArray( jenv, pObj ) )
-            return typeByteArr;
-        return typeByte;
+            return typeObjArr;
     }
+    return typeNone;
 }
 
 IService* CastToSvc(
