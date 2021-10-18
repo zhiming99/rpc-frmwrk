@@ -167,7 +167,9 @@ class CStreamSvcServer(
             self.numTest = 0
             self.totalSize = 0
 
-    def AcceptNewStream( self, pDataDesc: cpp.ObjPtr ):
+    def AcceptNewStream( self,
+        pCtx: cpp.ObjPtr,
+        pDataDesc: cpp.ObjPtr ):
         try:
             print( "AccpetNewstream ", pDataDesc )
         except:

@@ -158,7 +158,7 @@ class CPythonServerImpl :
 
     gint32 AcceptNewStream(
         IEventSink* pCallback,
-        IConfigDb* pCfg ) override
+        IConfigDb* pDesc ) override
     {
         if( !this->IsServer() )
             return -EINVAL;
@@ -172,8 +172,18 @@ class CPythonServerImpl :
             if( ERROR( ret ) )
                 break;
 
+            ObjPtr* ppCtx = new ObjPtr();
+            *ppCtx = pCallback;
+            PyObject* pPyCtx = sipConvertFromNewType(
+                ppCtx, sipType_cpp_ObjPtr, SIP_NULLPTR );
+            if( unlikely( pPyCtx == nullptr ) )
+            {
+                ret = -EFAULT;
+                break;
+            }
+
             ObjPtr* ppObj = new ObjPtr();
-            *ppObj = pCfg;
+            *ppObj = pDesc;
             PyObject* pPyObj = sipConvertFromNewType(
                 ppObj, sipType_cpp_ObjPtr, SIP_NULLPTR );
             if( unlikely( pPyObj == nullptr ) )
@@ -185,9 +195,11 @@ class CPythonServerImpl :
             PyObject* pPyRet = nullptr;
             pPyRet = PyObject_CallMethod(
                  pHost, "AcceptNewStream", 
-                 "(O)", pPyObj );
+                 "(OO)", pPyCtx, pPyObj );
             ret = PyLong_AsLong( pPyRet );
+
             Py_DECREF( pPyObj );
+            Py_DECREF( pPyCtx );
 
         }while( 0 );
         PyGILState_Release( gstate );

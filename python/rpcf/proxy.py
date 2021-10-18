@@ -1067,7 +1067,8 @@ class PyRpcServer( PyRpcServices ) :
     and the datadesc can be retrieved by the
     stream handle.
     '''
-    def AcceptNewStream( self, pDataDesc: cpp.ObjPtr ):
+    def AcceptNewStream( self,
+        pCtx: cpp.ObjPtr, pDataDesc: cpp.ObjPtr ):
         return 0
 
     def IsServer( self ) :

@@ -1196,11 +1196,6 @@ gint32 CStreamServer::OpenChannel(
     int iRemote = -1, iLocal = -1;
 
     do{
-        ret = AcceptNewStream(
-            pCallback, pDataDesc );
-        if( ERROR( ret ) )
-            break;
-
         ret = CreateSocket( iLocal, iRemote );
         if( ERROR( ret ) )
             break;
@@ -1259,18 +1254,19 @@ gint32 CStreamServer::FetchData_Server(
     IEventSink* pCallback )
 {
     HANDLE hChannel = 0;
+
+    ret = AcceptNewStream(
+        pCallback, pDataDesc );
+    if( ERROR( ret ) )
+        return ret;
+
     gint32 ret = OpenChannel( pDataDesc,
         fd, hChannel, pCallback );
 
     if( ret == STATUS_PENDING )
         return ret;
 
-    if( ERROR( ret ) )
-        return ret;
-
-    // notify subclass the connection is setup
-    // OnConnected( hChannel );
-    return 0;
+    return ret;
 }
 
 gint32 IStream::OnClose(
