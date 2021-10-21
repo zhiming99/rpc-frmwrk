@@ -5,12 +5,11 @@ import java.util.Map;
 import java.util.List;
 import java.util.ArrayList;
 import java.nio.ByteBuffer;
-import static java.util.Map.entry;
 
 public class JavaSerialImpl extends JavaSerialBase
 {
     protected InstType m_oInst = null;
-    public JavaSerialBase( Object pIf )
+    public JavaSerialImpl( Object pIf )
     { m_oInst = ( InstType )pIf; }
 
     ObjPtr getInst()
@@ -24,23 +23,33 @@ public class JavaSerialImpl extends JavaSerialBase
 
         JRetVal jret =
             ( JRetVal )m_oInst.GetIdHash( val );
-        if( jret.Error() ) 
+        if( jret.ERROR() ) 
             return jret.getError();
 
-        serialInt64( buf, ( Long )jret.getAt( 0 ) )
-        return 0 
+        serialInt64(
+            buf, ( Long )jret.getAt( 0 ) );
+
+        return 0;
     }
 
-    Object[] deserialHStream( ByteBuffer buf, int offset )
+    Long deserialHStream( ByteBuffer buf )
     {
         if( m_oInst == null )
-        {
-            return new Object[0];
-        }
-        val = deserialInt64( buf, offset )
-        ret = m_oInst.GetChanByIdHash( val[ 0 ] )
-        if ret == ErrorCode.INVALID_HANDLE :
-            return new Object[ 2 ]{ 0, 0};
-        return new Object[ 2 ]{ret, offset + 8 };
+            throw new NullPointerException(
+                "c++ object is empty");
+
+        Long qwHash = deserialInt64( buf );
+        if( qwHash == rpcbaseConstants.INVALID_HANDLE )
+            throw new NullPointerException(
+                "channel hash is empty");
+
+        long ret = m_oInst.GetChanByIdHash(
+            qwHash.longValue() );
+
+        if( ret == rpcbaseConstants.INVALID_HANDLE )
+            throw new NullPointerException(
+                "channel handle is invalid");
+
+        return new Long( ret );
     }
 }

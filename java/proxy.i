@@ -1488,6 +1488,12 @@ class CJavaInterfBase : public T
 
         return ret;
     }
+
+    ObjPtr* CastToObjPtr()
+    {
+        ObjPtr* ppObj = new ObjPtr( this );
+        return ppObj;
+    }
 };
 
 class CJavaProxyImpl :
@@ -1546,12 +1552,6 @@ class CJavaProxyImpl :
         return jret;
     }
 
-    ObjPtr* CastToObjPtr(
-        JNIEnv *jenv )
-    {
-        ObjPtr* ppObj = new ObjPtr( this );
-        return ppObj;
-    }
 };
 
 gint32 CJavaProxyImpl::AsyncCallVector(
@@ -2438,10 +2438,7 @@ class CJavaProxyImpl :
         JNIEnv *jenv,
         jlong hChannel );
 
-    %extend{
-    ObjPtr* CastToObjPtr(
-        JNIEnv *jenv );
-    }
+    ObjPtr* CastToObjPtr();
 };
 
 %clearnodefaultctor;

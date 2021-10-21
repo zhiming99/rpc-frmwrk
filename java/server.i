@@ -340,7 +340,7 @@ class CJavaServerImpl :
 %extend{ 
     gint32 SetInvTimeout(
         ObjPtr& pCallback,
-        guint32 dwTimeoutSec )
+        gint32 dwTimeoutSec )
     {
         gint32 ret = 0;
         do{
@@ -351,8 +351,8 @@ class CJavaServerImpl :
                 ret = -EINVAL;
                 break;
             }
-            ret = pImpl->SetInvTimeout(
-                pCallback, dwTimeoutSec );
+            ret = pImpl->SetInvTimeout(pCallback,
+                ( guint32 )dwTimeoutSec );
 
         }while( 0 );
         return ret;
@@ -459,18 +459,20 @@ class CJavaServerImpl :
         const std::string& strMethod,
         const std::string& strDest,
         jobject pListArgs,
-        guint32 dwSeriProto )
+        gint32 dwSeriProto )
     {
         CJavaServerImpl* pImpl = static_cast
             < CJavaServerImpl* >( $self );
         return pImpl->SendEvent( jenv,
             pCallback, strIfName,
             strMethod, strDest,
-            pListArgs, dwSeriProto );
+            pListArgs,
+            ( guint32 )dwSeriProto );
     }
 
     }
 
+    ObjPtr* CastToObjPtr();
     jlong GetIdHashByChan( jlong hChannel );
     jobject GetPeerIdHash(
         JNIEnv *jenv,
