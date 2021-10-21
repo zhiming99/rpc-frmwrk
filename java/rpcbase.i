@@ -445,23 +445,6 @@ class IService : public IEventSink
 
 %clearnodefaultctor;
 
-class ObjPtr
-{
-    public:
-
-    ObjPtr();
-    ~ObjPtr();
-    bool IsEmpty() const;
-};
-
-%extend ObjPtr {
-    gint32 NewObj(
-        EnumClsid iNewClsid, CfgPtr& pCfg )
-    {
-        return $self->NewObj( iNewClsid,
-            ( IConfigDb* )pCfg );
-    }
-}
 %header %{
 
 typedef std::vector<BufPtr> vectorBufPtr;
@@ -935,8 +918,23 @@ CfgPtr* CastToCfg( ObjPtr* pObj )
 
 %typemap(in,numinputs=0) JNIEnv *jenv "$1 = jenv;"
 
-%extend ObjPtr
+class ObjPtr
 {
+    public:
+
+    ObjPtr();
+    ~ObjPtr();
+    bool IsEmpty() const;
+};
+
+%extend ObjPtr {
+    gint32 NewObj(
+        EnumClsid iNewClsid, CfgPtr& pCfg )
+    {
+        return $self->NewObj( iNewClsid,
+            ( IConfigDb* )pCfg );
+    }
+
     jobject SerialToByteArray( JNIEnv *jenv )
     {
         BufPtr pBuf( true );

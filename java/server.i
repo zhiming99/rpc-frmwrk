@@ -213,6 +213,30 @@ class CJavaServerImpl :
 
         return ret;
     }
+
+    jobject GetPeerIdHash(
+        JNIEnv *jenv,
+        jlong hChannel )
+    { return nullptr; }
+
+    jlong GetIdHashByChan( jlong hChannel )
+    {
+        CJavaServerImpl* pImpl = static_cast
+            < CJavaServerImpl* >( $self );
+        InterfPtr pIf;
+        gint32 ret = pImpl->GetUxStream(
+            ( HANDLE )hChannel, pIf );
+        if( ERROR( ret ) )
+            return 0;
+
+        guint64 qwHash = 0;
+        guint64 qwId = pIf->GetObjId();
+        ret = GetObjIdHash( qwId, qwHash );
+        if( ERROR( ret ) )
+            return 0;
+         return qwHash;
+    } 
+
 };
 
 gint32 ChainTasks(
@@ -313,7 +337,7 @@ class CJavaServerImpl :
     public CJavaInterfBase<CJavaServer>
 {
     public:
- 
+%extend{ 
     gint32 SetInvTimeout(
         ObjPtr& pCallback,
         guint32 dwTimeoutSec )
@@ -393,7 +417,7 @@ class CJavaServerImpl :
         CParamList oResp;
         do{
             CJavaServerImpl* pImpl = static_cast
-                < CJavaServerImpl* >( sipCpp );
+                < CJavaServerImpl* >( $self );
 
             if( pCallback.IsEmpty() )
             {
@@ -445,38 +469,12 @@ class CJavaServerImpl :
             pListArgs, dwSeriProto );
     }
 
-    bool IsServer()
-    { return $self->IsServer(); }
-
-    jlong GetIdHashByChan( gint64 hChannel )
-    {
-        CJavaServerImpl* pImpl = static_cast
-            < CJavaServerImpl* >( $self );
-        InterfPtr pIf;
-        gint32 ret = pImpl->GetUxStream(
-            ( HANDLE )hChannel, pIf );
-        if( ERROR( ret ) )
-            return 0;
-
-        guint64 qwHash = 0;
-        guint64 qwId = pIf->GetObjId();
-        ret = GetObjIdHash( qwId, qwHash );
-        if( ERROR( ret ) )
-            return 0;
-         return qwHash;
-    } 
-
-    jlong GetChanByIdHash( gint64 qwHash )
-    {
-        CPythonServerImpl* pImpl =
-        static_cast< CPythonServerImpl* >
-            ( sipCpp );
-        HANDLE hChannel =
-            pImpl->GetChanByIdHash( qwHash );
-        if( hChannel == INVALID_HANDLE )
-            return 0;
-        return ( jlong )hChannel;
     }
+
+    jlong GetIdHashByChan( jlong hChannel );
+    jobject GetPeerIdHash(
+        JNIEnv *jenv,
+        jlong hChannel );
 };
 %clearnodefaultctor;
 

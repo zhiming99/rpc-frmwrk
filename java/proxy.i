@@ -606,7 +606,7 @@ class CJavaInterfBase : public T
             propJavaVM, pVal );
         if( ERROR( ret ) )
             return ret;
-        pvm = ( Java_VM* )pVal );
+        pvm = ( Java_VM* )pVal;
         return STATUS_SUCCESS;
     }
 
@@ -1512,6 +1512,46 @@ class CJavaProxyImpl :
         jobject pContext,
         CfgPtr& pOptions,
         jobject listArgs );
+
+    jlong GetIdHashByChan(
+        jlong hChannel )
+    { reutrn 0; }
+
+    jobject GetPeerIdHash(
+        JNIEnv *jenv,
+        jlong hChannel )
+    {
+        if( jenv == nullptr )
+            return nullptr;
+        jobject jret = NewJRet( jenv );
+        if( jret == nullptr )
+            return nullptr;
+        do{
+            gint32 ret = this->GetPeerIdHash(
+                ( HANDLE )hChannel, qwHash );
+            if( ERROR( ret ) )
+                break;
+
+            jobject jhash = NewLong( jenv, qwHash );
+            if( jhash == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            AddElemToJRet( jenv, jret, jhash );
+
+        }while( 0 );
+
+        SetErrorJRet( jenv, jret, ret );
+        return jret;
+    }
+
+    ObjPtr* CastToObjPtr(
+        JNIEnv *jenv )
+    {
+        ObjPtr* ppObj = new ObjPtr( this );
+        return ppObj;
+    }
 };
 
 gint32 CJavaProxyImpl::AsyncCallVector(
@@ -1923,6 +1963,7 @@ class CJavaInterfBase
     : public CRpcServices 
 {
     public:
+    %extend{
     gint32 SetJavaHost(
         JNIEnv *jenv, jobject pObj )
     {
@@ -2353,6 +2394,19 @@ class CJavaInterfBase
         return pImpl->GetChanCtx( jenv,
             ( HANDLE )hChannel );
     }
+
+    jlong GetChanByIdHash( gint64 qwHash )
+    {
+        T* pImpl =
+        static_cast< CJavaServerImpl* >
+            ( $self );
+        HANDLE hChannel =
+            pImpl->GetChanByIdHash( qwHash );
+        if( hChannel == INVALID_HANDLE )
+            return 0;
+        return ( jlong )hChannel;
+    }
+    }
 };
 
 %template(CJavaInterfBaseP) CJavaInterfBase<CJavaProxy>;
@@ -2369,9 +2423,9 @@ class CJavaInterfBase
 class CJavaProxyImpl :
     public CJavaInterfBase<CJavaProxy>
 {
-};
-
-%extend CJavaProxyImpl{
+    public:
+    jlong GetIdHashByChan(
+        jlong hChannel );
 
     jobject JavaProxyCall2(
         JNIEnv *jenv,
@@ -2380,19 +2434,15 @@ class CJavaProxyImpl :
         CfgPtr& pOptions,
         jobject listArgs );
 
-    gint32 GetPeerIdHash(
-        jlong hChannel,
-        guint64& qwPeerIdHash );
+    jobject GetPeerIdHash(
+        JNIEnv *jenv,
+        jlong hChannel );
 
-    jlong GetChanByIdHash( guint64 qwHash )
-    {
-        CJavaProxyImpl* pImpl =
-            static_cast< CJavaProxyImpl* >( $self  );
-        HANDLE hChannel =
-            pImpl->GetChanByIdHash( qwHash );
-        return ( jlong )hChannel;
+    %extend{
+    ObjPtr* CastToObjPtr(
+        JNIEnv *jenv );
     }
-}
+};
 
 %clearnodefaultctor;
 

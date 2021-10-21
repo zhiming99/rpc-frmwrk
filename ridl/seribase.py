@@ -76,7 +76,7 @@ class CSerialBase :
             return -errno.EINVAL
         if sig[ sigLen -1 ] != ')':
             return -errno.EINVAL
-        if len( sig ) < 2 :
+        if sigLen <= 2 :
             return -errno.EINVAL
         sigElem = sig[ 1 : sigLen - 1 ]
 
@@ -104,7 +104,7 @@ class CSerialBase :
             return -errno.EINVAL
         if sig[ sigLen -1 ] != ']':
             return -errno.EINVAL
-        if len( sig ) < 2 :
+        if sigLen <= 2 :
             return -errno.EINVAL
         sigElem = sig[ 1 : sigLen - 1 ]
 
@@ -222,7 +222,7 @@ class CSerialBase :
             return ( None, 0 )
         if sig[ sigLen -1 ] != ')':
             return ( None, 0 )
-        if len( sig ) < 2 :
+        if sigLen <= 2 :
             return ( None, 0 )
         sigElem = sig[ 1 : sigLen - 1 ]
 
@@ -251,7 +251,7 @@ class CSerialBase :
             return ( None, 0 )
         if sig[ sigLen -1 ] != ']':
             return ( None, 0 )
-        if len( sig ) < 2 :
+        if sigLen <= 2 :
             return ( None, 0 )
         sigElem = sig[ 1 : sigLen - 1 ]
 
