@@ -59,6 +59,9 @@ This project depends on the following 3rd-party packags to build:
 6. Logging service
 
 ---
+[`Fri Oct 22 2021 06:18:56 PM Beijing`]   
+1. The progress of Java support is faster than python, because I have followed Python module's architecture. I will work out the Java generator before starting to debug.
+
 [`Sun Oct 03 2021 05:21:45 PM Beijing`]    
 1. Planning to use SWIG to wrap the classes, because SIP cannot generate JAVA. It seems technically preferable to choosing SWIG at the beginning of Python support, without introducing extra load of learning and development efforts.
 
