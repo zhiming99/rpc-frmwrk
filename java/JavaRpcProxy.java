@@ -55,8 +55,8 @@ abstract public class JavaRpcProxy extends JavaRpcServiceP
         String strMethod,
         Object[] args )
     {
-        return makeCall( strIfName, strMethod, args,
-            rpcbaseConstants.seriNone );
+        return makeCall( strIfName, strMethod,
+            args, rpcbaseConstants.seriNone );
     }
     /* sendRequestAsync returns a tuple with two
      * elements, 0 is the return code, and 1 is a
@@ -124,8 +124,7 @@ abstract public class JavaRpcProxy extends JavaRpcServiceP
                 rpcbase.CastToCfg( pParams );
 
             jret = makeCallWithOptAsync(
-                callback, null,
-                pCfg, args );
+                callback, null, pCfg, args );
 
         }while( false );
 

@@ -53,7 +53,7 @@ abstract public class JavaRpcServer extends JavaRpcServiceS
      * the glue between InvokeMethod and
      * OnServiceComplete.
      */
-    int OnServiceComplete(
+    int onServiceComplete(
         ObjPtr callback, int ret, Object[] args )
     {
         return m_oInst.OnServiceComplete(
@@ -62,7 +62,7 @@ abstract public class JavaRpcServer extends JavaRpcServiceS
             args );
     }
 
-    int SetResponse(
+    int setResponse(
         ObjPtr callback, int ret, Object[] args )
     {
         return m_oInst.SetResponse(
@@ -71,7 +71,7 @@ abstract public class JavaRpcServer extends JavaRpcServiceS
             args );
     }
 
-    int RidlOnServiceComplete(
+    int ridlOnServiceComplete(
         ObjPtr callback, int ret, byte[] pBuf )
     {
         List<Object> lstObj =
@@ -83,7 +83,7 @@ abstract public class JavaRpcServer extends JavaRpcServiceS
             lstObj.toArray() );
     }
 
-    int RidlSetResponse(
+    int ridlSetResponse(
         ObjPtr callback, int ret, byte[] pBuf )
     {
         List<Object> lstObj =
@@ -99,7 +99,7 @@ abstract public class JavaRpcServer extends JavaRpcServiceS
      * necessary to get notified of the completion.
      * destName can be none if not needed.
      */
-    int SendEvent( Object callback,
+    int sendEvent( Object callback,
         String ifName, String evtName,
         String destName, Object[] arrArgs )
     {
@@ -113,7 +113,7 @@ abstract public class JavaRpcServer extends JavaRpcServiceS
      * necessary to get notified of the completion.
      * destName can be none if not needed.
      */
-    int RidlSendEvent( Object callback,
+    int ridlSendEvent( Object callback,
         String ifName, String evtName,
         String destName, byte[] pBuf )
     {

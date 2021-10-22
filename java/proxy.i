@@ -23,19 +23,24 @@
  *
  * =====================================================================================
  */ 
+%{
+#include "rpc.h"
+#include "defines.h"
+#include "streamex.h"
+#include "counters.h"
+%}
+
 %header {
+
+gint32 LoadJavaFactory( ObjPtr& pMgr );
+
 typedef enum 
 {
     // a pointer to pyobject of the python context
     propJavaVM = propReservedEnd + 120,
+    propChanCtx
 
 } EnumJavaPropId;
-
-#include "streamex.h"
-#include "counters.h"
-
-#define typeJRet 200
-#define typeObjArr 201
 
 class CJavaProxyBase :
     public CStreamProxyAsync
@@ -97,16 +102,16 @@ class CJavaInterfBase : public T
 
                     jenv->SetByteArrayRegion(
                         bytes, 0, pBuf->size(),
-                        pBuf->ptr() );
+                        ( jbyte* )pBuf->ptr() );
 
                     pObj = bytes;
                     break;
                 }
-            }
             default:
-            {
-                ret = -EINVAL;
-                break;
+                {
+                    ret = -EINVAL;
+                    break;
+                }
             }
 
         }while( 0 );
@@ -135,16 +140,19 @@ class CJavaInterfBase : public T
             if( ERROR( ret ) )
                 break;
 
+            jclass cls =
+                jenv->GetObjectClass( pHost );
+
             jobject pgcb = ( jobject )pCb;
             jobject pgctx = ( jobject )pCtx;
 
-            jmethodId timercb = jenv->GetMethodID(
+            jmethodID timercb = jenv->GetMethodID(
                 cls, "timeCallback",
                 "(Ljava/lang/Object;"
                 "Ljava/lang/Object;I)V" );
 
             jenv->CallVoidMethod( pHost,
-                timercb, pgcb, pgtx, iRet );
+                timercb, pgcb, pgctx, iRet );
 
             if( pgcb != nullptr )
                 jenv->DeleteGlobalRef( pgcb );
@@ -166,8 +174,8 @@ class CJavaInterfBase : public T
         CIfDeferCallTaskEx* pTaskEx = pTimer;
         if( pTaskEx == nullptr )
             return -EINVAL;
-        jobject* pCb = nullptr;
-        jobject* pCtx = nullptr;
+        jobject pCb = nullptr;
+        jobject pCtx = nullptr;
         gint32 ret = 0;
 
         do{
@@ -219,7 +227,7 @@ class CJavaInterfBase : public T
 
         jobject jret = NewJRet( jenv );
         if( jret == nullptr )
-            return -EFAULT;
+            return nullptr;
 
         gint32 ret = 0;
         jobject pgcb = nullptr;
@@ -256,9 +264,9 @@ class CJavaInterfBase : public T
             if( ERROR( ret ) )
                  break;
 
-            ObjPtr pTimer( pTask );
+            ObjPtr* pTimer = new ObjPtr( pTask );
             jobject jtimer =
-                NewObjPtr( jenv, pTimer );
+                NewObjPtr( jenv, ( jlong )pTimer );
             AddElemToJRet( jenv, jret, jtimer );
 
         }while( 0 );
@@ -427,11 +435,16 @@ class CJavaInterfBase : public T
                         ObjPtr* val = new ObjPtr();
                         ret = oResp.GetObjPtr( i, *val );
                         if( ERROR( ret ) )
+                        {
+                            delete val;
                             break;
+                        }
 
-                        jobject jval = NewObjPtr( jenv, val );
+                        jobject jval =
+                            NewObjPtr( jenv,( jlong ) val );
                         if( jval == nullptr )
                         {
+                            delete val;
                             ret = -EFAULT;
                             break;
                         }
@@ -461,7 +474,8 @@ class CJavaInterfBase : public T
                         }
 
                         jenv->SetByteArrayRegion( jval,
-                            0, pBuf->size(), pBuf->ptr() );
+                            0, pBuf->size(),
+                            ( jbyte* )pBuf->ptr() );
 
                         AddElemToJRet(
                             jenv, listResp, ( jobject )jval );
@@ -493,7 +507,7 @@ class CJavaInterfBase : public T
 
     gint32 ConvertByteArrayToBuf(
         JNIEnv *jenv,
-        jobject* pObject,
+        jobject pObject,
         BufPtr& pBuf )
     {
         if( pObject == nullptr )
@@ -518,7 +532,7 @@ class CJavaInterfBase : public T
                     < jbyteArray >( pObject );
 
                 jsize len =
-                    jenv->GetArrayLength( pba )
+                    jenv->GetArrayLength( pba );
 
                 if( len == 0 )
                     break;
@@ -527,8 +541,8 @@ class CJavaInterfBase : public T
                 if( ERROR( ret ) )
                     break;
 
-                jenv->GetByteArrayRegion(
-                    pba, 0, len, pBuf->ptr() );
+                jenv->GetByteArrayRegion( pba,
+                    0, len, ( jbyte* )pBuf->ptr() );
 
                 break;
             }
@@ -546,17 +560,19 @@ class CJavaInterfBase : public T
         std::vector< BufPtr >& vecArgs )
     {
         gint32 ret = 0;
-        if( pList == nullptr || jenv == nullptr )
+        if( jObj == nullptr || jenv == nullptr )
             return -EINVAL;
 
         int typeId = GetObjType( jenv, jObj );
-        if( typeId == typeJRet )
+        if( typeId == 200 )
         {
+            // jObj is a JRetVal
             ret = GetParamsJRet(
                 jenv, jObj, vecArgs );
         }
-        else if( typeId == typeObjArr )
+        else if( typeId == 201 )
         {
+            // jObj is a byte array
             ret = GetParamsObjArr(
                 jenv, jObj, vecArgs );
         }
@@ -573,7 +589,7 @@ class CJavaInterfBase : public T
         if( jenv == nullptr || pObj == nullptr )
             return -EINVAL;
         do{
-            Java_VM* pvm;
+            JavaVM* pvm = nullptr;
             jenv->GetJavaVM( &pvm );
             jobject pgobj =
                 jenv->NewGlobalRef( pObj );
@@ -598,7 +614,7 @@ class CJavaInterfBase : public T
         return ret;
     }
 
-    gint32 GetVmPtr( Java_VM* pvm )
+    gint32 GetVmPtr( JavaVM* pvm )
     {
         guint32* pVal = nullptr;
         CCfgOpenerObj oCfg( this );
@@ -606,14 +622,14 @@ class CJavaInterfBase : public T
             propJavaVM, pVal );
         if( ERROR( ret ) )
             return ret;
-        pvm = ( Java_VM* )pVal;
+        pvm = ( JavaVM* )pVal;
         return STATUS_SUCCESS;
     }
 
     gint32 GetJavaEnv(
         JNIEnv*& jenv, bool& bAttach )
     {
-        Java_VM pvm = nullptr;
+        JavaVM* pvm = nullptr;
         gint32 ret = 0;
         bAttach = false;
         do{
@@ -627,7 +643,7 @@ class CJavaInterfBase : public T
             if (ret == JNI_EDETACHED)
             {
                 if( pvm->AttachCurrentThread(
-                    &jenv, NULL )!= 0 )
+                    ( void** )&jenv, NULL )!= 0 )
                 {
                     ret = ERROR_FAIL;
                     break;
@@ -652,7 +668,7 @@ class CJavaInterfBase : public T
 
     gint32 PutJavaEnv()
     {
-        Java_VM pvm = nullptr;
+        JavaVM* pvm = nullptr;
         gint32 ret = STATUS_SUCCESS;
         do{
             ret = GetVmPtr( pvm );
@@ -704,12 +720,12 @@ class CJavaInterfBase : public T
 
         JNIEnv* jenv = nullptr;
         bool bAttach = false;
-        ret = GetJavaEnv( jenv, bAttach );
+        gint32 ret = GetJavaEnv( jenv, bAttach );
         if( ERROR( ret ) )
             return ret;
 
         CParamList oResp;
-        gint32 ret = 0;
+        ret = 0;
 
         jobject pjCb = nullptr;
         jobject pjParams = nullptr;
@@ -757,23 +773,32 @@ class CJavaInterfBase : public T
                 break;
             }
 
-            ObjPtr pCb( pCallback );
-            ObjPtr pArgs( pParams );
+            jclass cls =
+                jenv->GetObjectClass( pHost );
 
-            pjCb = NewObjPtr( jenv, pCb );
+            ObjPtr* pCb = new ObjPtr( pCallback );
+            ObjPtr* pArgs = new ObjPtr( pParams );
+
+            pjCb =
+                NewObjPtr( jenv, ( jlong )pCb );
+
             if( unlikely( pjCb == nullptr ) )
             {
+                delete pCb;
                 ret = -ENOMEM;
                 break;
             }
-            pjParams = NewObjPtr( jenv, pArgs );
+            pjParams =
+                NewObjPtr( jenv, ( jlong )pArgs );
+
             if( unlikely( pjParams == nullptr ) ) 
             {           
+                delete pArgs;
                 ret = -ENOMEM;
                 break;
             }       
 
-            jmethodId invokeMethod = jenv->GetMethodID(
+            jmethodID invokeMethod = jenv->GetMethodID(
                 cls, "invokeMethod",
                  "(Ljava/lang/Object;"
                  "Ljava/lang/String;"
@@ -781,7 +806,8 @@ class CJavaInterfBase : public T
                  "IL/java/lang/Object;)"
                  "L/java/lang/Object" );
 
-            listResp = jenv->CallObjectMethod(
+            jobject listResp =
+                jenv->CallObjectMethod(
                  pHost, invokeMethod,
                  pjCb, strIfName.c_str(),
                  strMethod.c_str(), dwSeriProto,
@@ -867,7 +893,7 @@ class CJavaInterfBase : public T
             jclass cls =
                 jenv->GetObjectClass( pHost );
 
-            jmethodId harsp = jenv->GetMethodID(
+            jmethodID harsp = jenv->GetMethodID(
                 cls, "handleAsyncResp",
                 "(Ljava/lang/Object;I"
                 "(Ljava/lang/Object;"
@@ -964,14 +990,13 @@ class CJavaInterfBase : public T
         JNIEnv* jenv = nullptr;
         bool bAttach = false;
 
-        ret = GetJavaEnv( jenv, bAttach );
+        gint32 ret = GetJavaEnv( jenv, bAttach );
         if( ERROR( ret ) )
             return ret;
 
         CParamList oReqCtx( pCtx );
         jobject pjBuf = nullptr; 
         jobject pjCb = nullptr;
-        gint32 ret = 0;
         do{
             guint32* pVal = nullptr;
             ret = oReqCtx.GetIntPtr( 0, pVal );
@@ -1122,12 +1147,13 @@ class CJavaInterfBase : public T
             return nullptr;
 
         jobject jret = NewJRet( jenv );
+        gint32 ret = 0;
         do{
             if( hChannel == INVALID_HANDLE )
                 break;
 
             CfgPtr pCtx;
-            gint32 ret = this->GetContext(
+            ret = this->GetContext(
                 hChannel, pCtx );
 
             if( ERROR( ret ) )
@@ -1194,7 +1220,7 @@ class CJavaInterfBase : public T
             pgctx = jenv->NewGlobalRef(pCtx);
 
             oCfg.SetIntPtr( propChanCtx,
-                ( guint32*)pjctx );
+                ( guint32*)pgctx );
 
         }while( 0 );
 
@@ -1313,10 +1339,10 @@ class CJavaInterfBase : public T
             jclass cls =
                 jenv->GetObjectClass( pHost );
 
-            jmethodId stmReady = jenv->GetMethodID(
+            jmethodID stmReady = jenv->GetMethodID(
                 cls, "onStmReady", "(J)V" );
 
-            ret = jenv->CallVoidMethod( pHost,
+            jenv->CallVoidMethod( pHost,
                 stmReady, ( jlong )hChannel );
 
         }while( 0 );
@@ -1355,10 +1381,10 @@ class CJavaInterfBase : public T
             jclass cls =
                 jenv->GetObjectClass( pHost );
 
-            jmethodId stmClosing = jenv->GetMethodID(
+            jmethodID stmClosing = jenv->GetMethodID(
                 cls, "onStmClosing", "(J)V" );
 
-            ret = jenv->CallVoidMethod( pHost,
+            jenv->CallVoidMethod( pHost,
                 stmClosing, ( jlong )hChannel );
 
         }while( 0 );
@@ -1373,13 +1399,15 @@ class CJavaInterfBase : public T
 
         bool bAttach = false;
         JNIEnv *jenv = nullptr;
-        ret = GetJavaEnv( jenv, bAttach );
+        gint32 ret = GetJavaEnv( jenv, bAttach );
         if( ERROR( ret ) )
             return ret;
 
         JavaOnStmClosing( jenv, hChannel );
 
-        jobject pCtx = GetChanCtx( hChannel );
+        jobject pCtx =
+            GetChanCtx( jenv, hChannel );
+
         if( pCtx != nullptr )
             RemoveChanCtx( jenv, hChannel );
 
@@ -1396,14 +1424,14 @@ class CJavaInterfBase : public T
     {
         do{
             jobject pHost = nullptr;
-            ret = GetJavaHost( pHost );
+            gint32 ret = GetJavaHost( pHost );
             if( ERROR( ret ) )
                 break;
 
             jclass cls =
                 jenv->GetObjectClass( pHost );
 
-            jmethodId deferCall = jenv->GetMethodID(
+            jmethodID deferCall = jenv->GetMethodID(
                 cls, "DeferCallback",
                 "(Ljava/lang/Object;Ljava/lang/Object;)V" );
 
@@ -1461,7 +1489,7 @@ class CJavaInterfBase : public T
                 pTask, ObjPtr( this ),
                 &CJavaInterfBase::DeferCallback,
                 ( intptr_t )pgcb,
-                ( intptr_t )pgargs );
+                ( intptr_t )pjargs );
 
             if( ERROR( ret ) )
                 break;
@@ -1482,17 +1510,19 @@ class CJavaInterfBase : public T
             if( pgcb != nullptr )
                 jenv->DeleteGlobalRef( pgcb );
 
-            if( pgargs != nullptr )
-                jenv->DeleteGlobalRef( pgargs );
+            if( pjargs != nullptr )
+                jenv->DeleteGlobalRef( pjargs );
         }
 
         return ret;
     }
 
-    ObjPtr* CastToObjPtr()
+    jobject CastToObjPtr( JNIEnv *jenv )
     {
         ObjPtr* ppObj = new ObjPtr( this );
-        return ppObj;
+        jobject pNewObj =
+            NewObjPtr( jenv, ( jlong )ppObj );
+        return pNewObj;
     }
 };
 
@@ -1521,7 +1551,7 @@ class CJavaProxyImpl :
 
     jlong GetIdHashByChan(
         jlong hChannel )
-    { reutrn 0; }
+    { return 0; }
 
     jobject GetPeerIdHash(
         JNIEnv *jenv,
@@ -1532,13 +1562,17 @@ class CJavaProxyImpl :
         jobject jret = NewJRet( jenv );
         if( jret == nullptr )
             return nullptr;
+        gint32 ret = 0;
         do{
-            gint32 ret = this->GetPeerIdHash(
+            guint64 qwHash = 0;
+            ret = super::GetPeerIdHash(
                 ( HANDLE )hChannel, qwHash );
             if( ERROR( ret ) )
                 break;
 
-            jobject jhash = NewLong( jenv, qwHash );
+            jobject jhash = NewLong(
+                jenv, ( gint64 )qwHash );
+
             if( jhash == nullptr )
             {
                 ret = -EFAULT;
@@ -1551,7 +1585,6 @@ class CJavaProxyImpl :
         SetErrorJRet( jenv, jret, ret );
         return jret;
     }
-
 };
 
 gint32 CJavaProxyImpl::AsyncCallVector(
@@ -1621,7 +1654,7 @@ jobject CJavaProxyImpl::JavaProxyCall2(
 {
     gint32 ret = 0;
     if( jenv == nullptr )
-        return -EINVAL;
+        return nullptr; 
     jobject pjCb = nullptr;
     jobject jgret = nullptr;
     jobject pjContext = nullptr;
@@ -1789,14 +1822,108 @@ jobject CJavaProxyImpl::JavaProxyCall2(
     SetErrorJRet( jenv, jret, ret );
     if( ret != STATUS_PENDING )
     {
-        pjCb && jenv->DeleteGlobalRef( pjCb );
-        pjContext && jenv->DeleteGlobalRef( pjContext );
-        jgret && jenv->DeleteGlobalRef( jgret );
+        if( pjCb != nullptr )
+            jenv->DeleteGlobalRef( pjCb );
+        if( pjContext != nullptr )
+            jenv->DeleteGlobalRef( pjContext );
+        if( jgret != nullptr )
+            jenv->DeleteGlobalRef( jgret );
     }
 
     return jret;
 }
 
+jobject CreateProxy(
+    JNIEnv *jenv,
+    ObjPtr& pMgr,
+    const std::string& strDesc,
+    const std::string& strObjName,
+    ObjPtr& pCfgObj )
+{
+    gint32 ret = 0;
+    jobject jret = NewJRet( jenv );
+    do{
+        CfgPtr pCfg = pCfgObj;
+        if( pCfg.IsEmpty() )
+        {
+            CParamList oParams;
+            oParams.SetObjPtr(
+                propIoMgr, pMgr );
+            pCfg = oParams.GetCfg();
+        }
+        else
+        {
+            CParamList oParams( pCfg );
+            oParams.SetObjPtr(
+                propIoMgr, pMgr );
+        }
+
+        ret = CRpcServices::LoadObjDesc(
+            strDesc, strObjName,
+            false, pCfg );
+
+        if( ERROR( ret ) )
+            break;
+
+        ObjPtr* pIf = new ObjPtr();
+        ret = pIf->NewObj(
+            clsid( CJavaProxyImpl ),
+            pCfg );
+        if( ERROR( ret ) )
+        {
+            delete pIf;
+            break;
+        }
+
+        jobject pjIf =
+            NewObjPtr( jenv, ( jlong )pIf );
+
+        AddElemToJRet( jenv, jret, pjIf );
+
+    }while( 0 );
+
+    SetErrorJRet( jenv, jret, ret );
+    return jret;
+}
+
+jobject CastToProxy(
+    JNIEnv *jenv,
+    ObjPtr& pObj )
+{
+    gint32 ret = 0;
+    jobject jret = NewJRet( jenv );
+    CJavaProxyImpl* pProxy = pObj;
+    if( pProxy == nullptr )
+    {
+        SetErrorJRet( jenv, jret, -EFAULT );
+        return jret;
+    }
+    jobject jproxy = NewJavaProxy(
+        jenv, ( intptr_t )pProxy );
+    if( jproxy == nullptr )
+    {
+        SetErrorJRet( jenv, jret, -EFAULT );
+        return jret;
+    }
+    AddElemToJRet( jenv, jret, jproxy );
+    return jret;
+}
+
+void JavaDbgPrint(
+    const std::string strMsg, int level = 3 )
+{
+    DebugPrintEx(
+        ( EnumLogLvl )level, 0,
+        "%s", strMsg.c_str() );
+}
+
+void JavaOutputMsg(
+    const std::string strMsg )
+{
+    OutputMsg( 0, "%s", strMsg.c_str() );
+}
+
+class CJavaServerImpl;
 static FactoryPtr InitClassFactory()
 {
     BEGIN_FACTORY_MAPS;
@@ -1842,94 +1969,10 @@ gint32 LoadThisLib( ObjPtr& pIoMgr )
     return ret;
 }
 
-jobject CreateProxy(
-    JNIEnv *jenv,
-    ObjPtr& pMgr,
-    const std::string& strDesc,
-    const std::string& strObjName,
-    ObjPtr& pCfgObj )
-{
-    gint32 ret = 0;
-    jobject jRet = NewJRet( jenv );
-    do{
-        CfgPtr pCfg = pCfgObj;
-        if( pCfg.IsEmpty() )
-        {
-            CParamList oParams;
-            oParams.SetObjPtr(
-                propIoMgr, pMgr );
-            pCfg = oParams.GetCfg();
-        }
-        else
-        {
-            CParamList oParams( pCfg );
-            oParams.SetObjPtr(
-                propIoMgr, pMgr );
-        }
-
-        ret = CRpcServices::LoadObjDesc(
-            strDesc, strObjName,
-            false, pCfg );
-
-        if( ERROR( ret ) )
-            break;
-
-        ObjPtr pIf;
-        ret = pIf.NewObj(
-            clsid( CJavaProxyImpl ),
-            pCfg );
-        if( ERROR( ret ) )
-            break;
-
-        jobject pjIf = NewObjPtr( jenv, pIf );
-        AddElemToJRet( jenv, jRet, jtimer );
-
-    }while( 0 );
-
-    SetErrorJRet( jenv, jRet, ret );
-    return ret;
-}
-
 gint32 LoadJavaFactory( ObjPtr& pMgr )
 { return LoadThisLib( pMgr ); }
 
-jobject CastToProxy(
-    JNIEnv *jenv,
-    ObjPtr& pObj )
-{
-    gint32 ret = 0;
-    jobject jRet = NewJRet( jenv );
-    CJavaProxyImpl* pProxy = pObj;
-    if( pProxy == nullptr )
-    {
-        SetErrorJRet( jenv, jRet, -EFAULT );
-        return jRet;
-    }
-    jobject jproxy = NewJavaProxy(
-        jenv, ( intptr_t )pProxy );
-    if( jproxy == nullptr )
-    {
-        SetErrorJRet( jenv, jRet, -EFAULT );
-        return jRet;
-    }
-    AddElemToJRet( jenv, jRet, jproxy );
-    return jRet;
 }
-
-void JavaDbgPrint(
-    const std::string strMsg, int level = 3 )
-{
-    DebugPrintEx(
-        ( EnumLogLvl )level, 0,
-        "%s", strMsg.c_str() );
-}
-
-void JavaOutputMsg(
-    const std::string strMsg )
-{
-    OutputMsg( 0, "%s", strMsg.c_str() );
-}
-%}
 
 jobject CreateProxy(
     JNIEnv *jenv,
@@ -1937,8 +1980,6 @@ jobject CreateProxy(
     const std::string& strDesc,
     const std::string& strObjName,
     ObjPtr& pCfgObj );
-
-gint32 LoadJavaFactory( ObjPtr& pMgr );
 
 jobject CastToProxy(
     JNIEnv *jenv,
@@ -1963,92 +2004,32 @@ class CJavaInterfBase
     : public CRpcServices 
 {
     public:
-    %extend{
-    gint32 SetJavaHost(
-        JNIEnv *jenv, jobject pObj )
-    {
-        gint32 ret = 0;
-        T* pImpl = static_cast
-            < T* >( $self );
-        if( pImpl == nullptr ) 
-            ret = -EFAULT;
-        else
-        {
-            ret = pImpl->SetJavaHost(
-                jenv, pObj );
-        }
 
-        return ret;
-    }
+    gint32 SetJavaHost(
+        JNIEnv *jenv, jobject pObj );
+
+    gint32 GetJavaHost( jobject& pObj );
+    %extend{
 
     jobject GetJavaHost()
     {
-        T* pImpl = static_cast
-            < T* >( $self );
         jobject pObj = nullptr;
-        if( pImpl != nullptr ) 
-        {
-            gint32 ret = 
-                pImpl->GetJavaHost( pObj );
-            if( ERROR( ret ) )
-                pObj = nullptr;
-        }
+        gint32 ret = $self->GetJavaHost( pObj );
+        if( ERROR( ret ) )
+            return nullptr;
         return pObj;
     }
 
     gint32 RemoveJavaHost()
     {
         gint32 ret = 0;
-        T* pImpl = static_cast
-            < T* >( $self );
-        if( pImpl == nullptr ) 
-            ret = -EFAULT;
-        else
-            ret = pImpl->RemoveJavaHost();
-
-        return ret;
-    }
-
-    jobject StartStream( JNIEnv *jenv, ObjPtr* ppObj )
-    {
-        jobject jret = NewJRet();
-        gint32 ret = 0;
-        do{
-            T* pImpl = static_cast
-                < T* >( $self );
-            if( pImpl == nullptr ) 
-            {
-                ret = -EFAULT;
-                break;
-            }
-
-            IConfigDb* pDesc = *ppObj;
-            if( pDesc == nullptr )
-            {
-                ret = -EINVAL;
-                break;
-            }
-            HANDLE hChannel = nullptr;
-            ret = pImpl->StartStream(
-                ( HANDLE )hChannel, pDesc );
-            if( ERROR( ret ) )
-                break;
-
-            jobject pChan = NewLong( jenv,
-                ( jlong )hChannel );
-
-            AddElemToJRet( jenv, jret, pChan );
-
-        }while( 0 );
-        SetErrorJRet( jenv, jret, ret );
-        return ret;
+        return $self->RemoveJavaHost();
     }
 
     gint32 CloseStream( jlong hChannel )
     {
         gint32 ret = 0;
-        T* pImpl = static_cast
-            < CPJavaProxyImpl* >( $self );
+        T* pImpl = static_cast< T* >( $self );
         if( pImpl == nullptr ) 
             ret = -EFAULT;
         else
@@ -2064,8 +2045,7 @@ class CJavaInterfBase
     {
         gint32 ret = 0;
         do{
-            T* pImpl = static_cast
-                < T* >( $self );
+            T* pImpl = static_cast< T* >( $self );
 
             if( pImpl == nullptr ) 
             {
@@ -2074,7 +2054,7 @@ class CJavaInterfBase
             }
 
             BufPtr pBuf( true );
-            ret = pImpl->ConvertByteArrayToBuf(
+            ret = $self->ConvertByteArrayToBuf(
                 jenv, pjBuf, pBuf );
             if( ERROR( ret ) )
                 break;
@@ -2091,8 +2071,7 @@ class CJavaInterfBase
     {
         gint32 ret = 0;
         do{
-            T* pImpl = static_cast
-                < T* >( $self );
+            T* pImpl = static_cast< T* >( $self );
 
             if( pImpl == nullptr ) 
             {
@@ -2101,8 +2080,8 @@ class CJavaInterfBase
             }
 
             BufPtr pBuf( true );
-            ret = pImpl->ConvertByteArrayToBuf(
-                pjBuf, pBuf );
+            ret = $self->ConvertByteArrayToBuf(
+                jenv, pjBuf, pBuf );
             if( ERROR( ret ) )
                 break;
 
@@ -2123,8 +2102,7 @@ class CJavaInterfBase
 
         do{
 
-            T* pImpl = static_cast
-                < T* >( $self );
+            T* pImpl = static_cast< T* >( $self );
 
             if( pImpl == nullptr ) 
             {
@@ -2140,7 +2118,7 @@ class CJavaInterfBase
                 break;
 
             jobject pjBuf = nullptr;
-            ret = pImpl->ConvertBufToByteArray( 
+            ret = $self->ConvertBufToByteArray( 
                 jenv, pBuf, pjBuf );
             if( ERROR( ret ) )
                 break;
@@ -2155,7 +2133,7 @@ class CJavaInterfBase
     jobject ReadStream( JNIEnv *jenv,
         jlong hChannel, gint32 dwSize )
     {
-        jobject jRet = NewJRet( jenv );
+        jobject jret = NewJRet( jenv );
         gint32 ret = 0;
         do{
             T* pImpl = static_cast
@@ -2187,18 +2165,18 @@ class CJavaInterfBase
             }
 
             jobject pjBuf = nullptr;
-            ret = pImpl->ConvertBufToByteArray(
+            ret = $self->ConvertBufToByteArray(
                 jenv, pBuf, pjBuf );
             if( ERROR( ret ) )
                 break;
 
-            AddElemToJRet( jenv, jRet, pjBuf );
+            AddElemToJRet( jenv, jret, pjBuf );
             break;
 
         }while( 0 );
 
-        SetErrorJRet( jenv, jRet, ret );
-        return jRet;
+        SetErrorJRet( jenv, jret, ret );
+        return jret;
     }
 
     jobject ReadStreamAsync( JNIEnv *jenv,
@@ -2206,11 +2184,10 @@ class CJavaInterfBase
         jobject pCb,
         guint32 dwSize )
     {
-        jobject pResp = NewJRet( jenv );
+        jobject jret = NewJRet( jenv );
         gint32 ret = 0;
         do{
-            T* pImpl = static_cast
-                < T* >( $self );
+            T* pImpl = static_cast< T* >( $self );
 
             if( pImpl == nullptr ||
                 pCb == nullptr ||
@@ -2250,17 +2227,17 @@ class CJavaInterfBase
                 break;
 
             jobject pjBuf = nullptr;
-            ret = pImpl->ConvertBufToByteArray(
+            ret = $self->ConvertBufToByteArray(
                 jenv, pBuf, pjBuf );
             if( ERROR( ret ) )
                 break;
 
-            AddElemToJRet( jenv, jRet, pjBuf );
+            AddElemToJRet( jenv, jret, pjBuf );
 
         }while( 0 );
 
-        SetErrorJRet( jenv, jRet, ret );
-        return jRet;
+        SetErrorJRet( jenv, jret, ret );
+        return jret;
     }
 
     gint32 WriteStreamAsync(
@@ -2279,8 +2256,7 @@ class CJavaInterfBase
         jobject pgbuf = nullptr;
         jobject pgcb = nullptr;
         do{
-            T* pImpl = static_cast
-                < T* >( $self );
+            T* pImpl = static_cast< T* >( $self );
 
             if( pImpl == nullptr ) 
             {
@@ -2289,7 +2265,7 @@ class CJavaInterfBase
             }
 
             BufPtr pBuf( true );
-            ret = pImpl->ConvertByteArrayToBuf(
+            ret = $self->ConvertByteArrayToBuf(
                 jenv, pjBuf, pBuf );
             if( ERROR( ret ) )
                 break;
@@ -2317,96 +2293,51 @@ class CJavaInterfBase
         return ret;
     }
 
-    jobject AddTimer(
-        JNIEnv *jenv,
-        guint32 dwTimeoutSec,
-        jobject pCb,
-        jobject pCtx )
-    {
-        T* pImpl =
-        static_cast< T* >( $self );
-        return pImpl->AddTimer( jenv,
-            dwTimeoutSec, pCb, pCtx );
-    }
-
-    gint32 DisableTimer(
-        ObjPtr& pTimer )
-    {
-        T* pImpl =
-        static_cast< T* >
-            ( $self );
-        sipRes = pImpl->DisableTimer( pTimer );
-    }
-
-    gint32 JavaDeferCall(
-        JNIEnv *jenv,
-        jobject pjCb,
-        jobject pjArgs )
-    {
-        T* pImpl =
-            static_cast< T* >( $self  );
-        return pImpl->JavaDeferCall( jenv, pjCb, pjArgs );
-    }
-
-    gint32 InstallCancelNotify(
-        JNIEnv *jenv,
-        ObjPtr& pCallback,
-        jobject pCb,
-        jobject pListResp )
-    {
-        T* pImpl =
-            static_cast< T* >( $self  );
-        return pImpl->JavaDeferCall( jenv, pjCb, pjArgs );
-    }
-
-    gint32 DeferCall(
-        JNIEnv *jenv, jobject pjCb,
-        jobject pjArgs )
-    {
-        T* pImpl =
-            static_cast< T* >( $self  );
-        return pImpl->DeferCall( jenv, pjCb, pjArgs );
-    }
-
-    gint32 SetChanCtx( JNIEnv *jenv,
-        jlong hChannel, jobject pCtx )
-    {
-        T* pImpl =
-            static_cast< T* >( $self  );
-        return pImpl->SetChanCtx( jenv,
-            ( HANDLE )hChannel, pCtx );
-    }
-
-    gint32 RemoveChanCtx(
-        JNIEnv *jenv, jlong hChannel )
-    {
-        T* pImpl =
-            static_cast< T* >( $self  );
-        return pImpl->SetChanCtx( jenv,
-            ( HANDLE )hChannel, nullptr );
-    }
-
-    jobject GetChanCtx(
-        JNIEnv *jenv, jlong hChannel )
-    {
-        T* pImpl =
-            static_cast< T* >( $self  );
-        return pImpl->GetChanCtx( jenv,
-            ( HANDLE )hChannel );
-    }
-
     jlong GetChanByIdHash( gint64 qwHash )
     {
-        T* pImpl =
-        static_cast< CJavaServerImpl* >
-            ( $self );
+        T* pImpl = static_cast< T* >( $self );
         HANDLE hChannel =
             pImpl->GetChanByIdHash( qwHash );
         if( hChannel == INVALID_HANDLE )
             return 0;
         return ( jlong )hChannel;
     }
+
+    gint32 RemoveChanCtx(
+        JNIEnv *jenv, jlong hChannel )
+    {
+        return $self->SetChanCtx( jenv,
+            ( HANDLE )hChannel, nullptr );
     }
+
+    }
+
+    jobject AddTimer(
+        JNIEnv *jenv,
+        guint32 dwTimeoutSec,
+        jobject pCb,
+        jobject pCtx );
+
+    gint32 DisableTimer(
+        JNIEnv *jenv, ObjPtr& pTimer );
+
+    gint32 DeferCall(
+        JNIEnv *jenv,
+        jobject pjCb,
+        jobject pjArgs );
+
+    gint32 InstallCancelNotify(
+        JNIEnv *jenv,
+        ObjPtr& pCallback,
+        jobject pCb,
+        jobject pListResp );
+
+    gint32 SetChanCtx( JNIEnv *jenv,
+        jlong hChannel, jobject pCtx );
+
+    jobject GetChanCtx(
+        JNIEnv *jenv, jlong hChannel );
+
 };
 
 %template(CJavaInterfBaseP) CJavaInterfBase<CJavaProxy>;
@@ -2438,7 +2369,37 @@ class CJavaProxyImpl :
         JNIEnv *jenv,
         jlong hChannel );
 
-    ObjPtr* CastToObjPtr();
+    jobject CastToObjPtr( JNIEnv *jenv );
+
+%extend{
+    jobject StartStream( JNIEnv *jenv, ObjPtr* ppObj )
+    {
+        jobject jret = NewJRet( jenv );
+        gint32 ret = 0;
+        do{
+            IConfigDb* pDesc = *ppObj;
+            if( pDesc == nullptr )
+            {
+                ret = -EINVAL;
+                break;
+            }
+            HANDLE hChannel = INVALID_HANDLE;
+            ret = $self->StartStream(
+                hChannel, pDesc );
+            if( ERROR( ret ) )
+                break;
+
+            jobject pChan = NewLong( jenv,
+                ( jlong )hChannel );
+
+            AddElemToJRet( jenv, jret, pChan );
+
+        }while( 0 );
+        SetErrorJRet( jenv, jret, ret );
+        return jret;
+    }
+    }
+
 };
 
 %clearnodefaultctor;

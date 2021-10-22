@@ -447,7 +447,26 @@ class IService : public IEventSink
 
 %header %{
 
+#define CHECK_ENV( _jenv ) \
+    gint32 ret = 0; \
+    if( _jenv == nullptr ) \
+        return nullptr; \
+    jobject jret = NewJRet( _jenv ); \
+    if( jret == nullptr ) \
+        return nullptr; \
+    do{ \
+        if( self == nullptr ) \
+        { \
+            SetErrorJRet( _jenv, jret, -EFAULT ); \
+            return jret; \
+        } \
+    }while( 0 );
+
 typedef std::vector<BufPtr> vectorBufPtr;
+
+LONGWORD GetWrappedPtr(
+    JNIEnv *jenv, jobject jObj );
+
 jobject NewJRet( JNIEnv *jenv )
 {
     jclass cls = jenv->FindClass(
@@ -460,46 +479,46 @@ jobject NewJRet( JNIEnv *jenv )
 }
 
 void AddElemToJRet( JNIEnv *jenv,
-    jobject jRet, jobject pObj )
+    jobject jret, jobject pObj )
 {
     jclass cls = jenv->FindClass(
         "org/rpcf/rpcbase/JRetVal");
 
-    jmethodId addElem = jenv->GetMethodID(
+    jmethodID addElem = jenv->GetMethodID(
         cls, "addElem",
         "(Ljava/lang/Object;)V");
 
     jenv->CallVoidMethod(
-        jRet, addElem, pObj );
+        jret, addElem, pObj );
 
     return;
 }
 
 void SetErrorJRet( JNIEnv *jenv,
-    jobject jRet, gint32 iRet )
+    jobject jret, gint32 iRet )
 {
     jclass cls = jenv->FindClass(
         "org/rpcf/rpcbase/JRetVal");
 
-    jmethodId setError = jenv->GetMethodID(
+    jmethodID setError = jenv->GetMethodID(
         cls, "setError", "(I)V");
 
     jenv->CallVoidMethod(
-        jRet, setError, iRet );
+        jret, setError, iRet );
 
     return;
 }
 
-gint32 GetErrorJRet( JNIEnv *jenv, jobject jRet )
+gint32 GetErrorJRet( JNIEnv *jenv, jobject jret )
 {
     jclass cls = jenv->FindClass(
         "org/rpcf/rpcbase/JRetVal");
 
-    jmethodId getError = jenv->GetMethodID(
+    jmethodID getError = jenv->GetMethodID(
         cls, "getError", "()I");
 
     return jenv->CallIntMethod(
-        jRet, getError );
+        jret, getError );
 }
 
 // returns an array of BufPtr
@@ -509,11 +528,11 @@ int GetParamsJRet(
     jclass cls = jenv->FindClass(
         "org/rpcf/rpcbase/JRetVal");
 
-    jmethodId getParams = jenv->GetMethodID(
+    jmethodID getParams = jenv->GetMethodID(
         cls, "getParams",
         "()Lorg/rpcf/rpcbase/vectorBufPtr;");
 
-    jobject jvecParams = jenv->CallIntMethod(
+    jobject jvecParams = jenv->CallObjectMethod(
         jret, getParams );
 
     if( jvecParams == nullptr )
@@ -538,13 +557,13 @@ int GetParamsObjArr(
     jclass cls = jenv->FindClass(
         "org/rpcf/rpcbase/Helpers");
 
-    jmethodId cotb = jenv->GetMethodID(
+    jmethodID cotb = jenv->GetStaticMethodID(
         cls, "convertObjectToBuf",
         "()Lorg/rpcf/rpcbase/vectorBufPtr;");
 
     jobject jvecParams =
-        jenv->CallStaticIntMethod(
-        jret, cotb, arrObj );
+        jenv->CallStaticObjectMethod(
+        cls, cotb, arrObj );
 
     if( jvecParams == nullptr )
         return -EFAULT;
@@ -570,10 +589,10 @@ int GetParamCountJRet(
     jclass cls = jenv->FindClass(
         "org/rpcf/rpcbase/JRetVal");
 
-    jmethodId getParams = jenv->GetMethodID(
+    jmethodID getParams = jenv->GetMethodID(
         cls, "getParamCount", "()i");
 
-    return jenv->CallIntMethod( jRet, getParams );
+    return jenv->CallIntMethod( jret, getParams );
 }
 
 EnumTypeId GetTypeId(
@@ -582,12 +601,13 @@ EnumTypeId GetTypeId(
     jclass cls = jenv->FindClass(
         "org/rpcf/rpcbase/Helpers");
 
-    jmethodId gtid_method = jenv->GetMethodID(
+    jmethodID gtid_method =
+        jenv->GetStaticMethodID(
         cls, "getTypeId",
         "(Ljava/lang/Object;)I");
 
-    jint iType = jenv->CallIntMethod(
-        jRet, gtid_method, pObj );
+    jint iType = jenv->CallStaticIntMethod(
+        cls, gtid_method, pObj );
 
     return (EnumTypeId)iType;
 }
@@ -671,23 +691,26 @@ LONGWORD GetWrappedPtr(
     jclass objClass =
         jenv->GetObjectClass( jObj );
 
-    jmethodID getName = jenv->GetMethodId(
+    jmethodID getName = jenv->GetMethodID(
         objClass, "getCanonicName",
-        ()"Ljava/lang/String;" );
+        "()Ljava/lang/String;" );
 
-    jobject jName = jenv->CallObjectMethod(
-        jenv, objClass, getName );
+    jobject jstr = jenv->CallObjectMethod(
+        jObj, getName );
+
+    jstring jName =
+        static_cast< jstring >( jstr );
 
     const char* szName =
-        jenv->GetStringUTFChars( jstr, 0 );
+        jenv->GetStringUTFChars( jName, 0 );
 
     stdstr strSig;
-    strSig = strSig + "(L" + szName + ";)J"
-    jenv->ReleaseStringUTFChars( jstr, szName );
+    strSig = strSig + "(L" + szName + ";)J";
+    jenv->ReleaseStringUTFChars( jName, szName );
 
     jmethodID getCPtr =
         jenv->GetStaticMethodID(
-            cls, "getCPtr",
+            objClass, "getCPtr",
             strSig.c_str() );
 
     return jenv->CallStaticLongMethod(
@@ -701,10 +724,12 @@ LONGWORD GetWrappedBufPtr(
         jenv->GetObjectClass( jObj );
 
     stdstr strSig =
-        "(Lorg/rpcf/rpcbase/BufPtr;)";
+        "(Lorg/rpcf/rpcbase/BufPtr;)J";
 
-    jmethodID getCPtr = jenv->GetStaticMethodID(
-        cls, "getCPtr", strSig.c_str() );
+    jmethodID getCPtr =
+        jenv->GetStaticMethodID(
+            objClass, "getCPtr",
+            strSig.c_str() );
 
     return jenv->CallStaticLongMethod(
             objClass, getCPtr, jObj );
@@ -754,7 +779,7 @@ jobject NewInt( JNIEnv *jenv, guint32 val )
     jclass cls = jenv->FindClass(
         "java/lang/Integer");
     jmethodID midInit = jenv->GetMethodID(
-        jenv, cls, "<init>", "(I)V");
+        cls, "<init>", "(I)V");
     if( nullptr == midInit )
         return nullptr;
     jobject newObj = jenv->NewObject(
@@ -793,7 +818,7 @@ jobject NewDouble( JNIEnv *jenv, double val )
     jclass cls = jenv->FindClass(
         "java/lang/Double");
     jmethodID midInit = jenv->GetMethodID(
-        jenv, cls, "<init>", "(D)V");
+        cls, "<init>", "(D)V");
     if( nullptr == midInit )
         return nullptr;
     jobject newObj = jenv->NewObject(
@@ -843,11 +868,11 @@ jobject GetJniString(JNIEnv *jenv, const stdstr& message )
         stringClass, ctor, bytes, charset);
 }
 
-bool IsArray( JNIEnv *jenv, jojbect pObj )
+bool IsArray( JNIEnv *jenv, jobject pObj )
 {
     jclass Class_class = 
         jenv->FindClass("java/lang/Class");
-    jmethodID Class_isArray_m =
+    jmethodID Class_isArray_mid =
         jenv->GetMethodID(
             Class_class, "isArray", "()Z");
     jclass obj_class =
@@ -861,14 +886,14 @@ EnumTypeId GetObjType( JNIEnv *jenv, jobject pObj )
     jclass iClass =
         jenv->FindClass("org/rpcf/rpcbase/JRetVal");
     if( jenv->IsInstanceOf( pObj, iClass ) )
-        return typeJRet;
+        return ( EnumTypeId )200;
 
     iClass =
         jenv->FindClass("java/lang/Object");
     if( jenv->IsInstanceOf( pObj, iClass ) )
     {
         if( IsArray( jenv, pObj ) )
-            return typeObjArr;
+            return ( EnumTypeId )201;
     }
     return typeNone;
 }
@@ -939,33 +964,42 @@ class ObjPtr
     {
         BufPtr pBuf( true );
         ObjPtr& pObj = *$self;
-        if( pObj.IsEmpty() )
-        {
-            SERI_HEADER_BASE ohb;
-            ohb.dwClsid = clsid( Invalid );
-            ohb.dwSize = 0;
-            ohb.bVersion = 0;
-            ohb.hton();
-            pBuf->Resize(
-                sizeof( SERI_HEADER_BASE ) );
-            memcpy( pBuf->ptr(), &ohb,
-                pBuf->size() );
-        }
-        else
-        {
-            pObj->Serialize( pBuf );
-        }
+        jobject jret = NewJRet( jenv );
+        gint32 ret = 0;
+        do{
+            if( pObj.IsEmpty() )
+            {
+                SERI_HEADER_BASE ohb;
+                ohb.dwClsid = clsid( Invalid );
+                ohb.dwSize = 0;
+                ohb.bVersion = 0;
+                ohb.hton();
+                ret = pBuf->Resize(
+                    sizeof( SERI_HEADER_BASE ) );
+                if( ERROR( ret ) )
+                    break;
 
-        jbyteArray retBuf =
-            jenv->NewByteArray(
-                pBuf->size() );
+                memcpy( pBuf->ptr(), &ohb,
+                    pBuf->size() );
+            }
+            else
+            {
+                ret = pObj->Serialize( *pBuf );
+                if( ERROR( ret ) )
+                    break;
+            }
 
-        jenv->SetByteArrayRegion(
-            retBuf, 0, size, pBuf->ptr() );
+            jbyteArray retBuf =
+                jenv->NewByteArray( pBuf->size() );
 
-        jobject jRet = NewJRet( jenv );
-        AddElemToJRet( jenv, jRet, retBuf );
-        return jRet;
+            jenv->SetByteArrayRegion(
+                retBuf, 0, pBuf->size(),
+                ( jbyte* )pBuf->ptr() );
+
+            AddElemToJRet( jenv, jret, retBuf );
+        }while( 0 );
+        SetErrorJRet( jenv, jret, ret );
+        return jret;
     }
 
     jobject DeserialObjPtr(
@@ -974,15 +1008,17 @@ class ObjPtr
         guint32 dwOffset )
     {
         gint32 ret = 0;
-        jobject jRet = NewJRet( jenv );
+        jobject jret = NewJRet( jenv );
         bool bRelease = false;
-        jbyte* buf = nullptr;
+        char* buf = nullptr;
+        jarray pArr = static_cast
+            < jarray >( pByteArray );
         do{
-            jsize len = jenv->GetArrayLength(
-                pByteArray);
+            jsize len =
+                jenv->GetArrayLength( pArr);
 
-            buf=jenv->GetPrimitiveArrayCritical(
-                pByteArray, 0 );
+            buf = ( char* )jenv->GetPrimitiveArrayCritical(
+                pArr, 0 );
             bRelease = true;
 
             char* pBuf = ( char* )buf + dwOffset;
@@ -990,8 +1026,8 @@ class ObjPtr
             memcpy( &dwClsid, pBuf, sizeof( dwClsid ) );
             dwClsid = ntohl( dwClsid );
 
-            ObjPtr* ppObj =
-                new ObjPtr( nullptr, false );
+            ObjPtr* ppObj = nullptr;
+            ppObj = new ObjPtr( nullptr, false );
 
             guint32 dwSize = 0;
             memcpy( &dwSize, 
@@ -1031,14 +1067,15 @@ class ObjPtr
                     break;
 
                 jobject jop = NewObjPtr(
-                    jenv, ppObj, true );
+                    jenv, ( jlong )ppObj, true );
                 if( jop == nullptr )
                 {
+                    delete jop;
                     ret = -EFAULT;
                     break;
                 }
 
-                AddElemToJRet( jenv, jRet, jop );
+                AddElemToJRet( jenv, jret, jop );
                 jobject jNewOff = NewInt(
                     jenv, dwSize + dwOffset );
                 if( jNewOff == nullptr )
@@ -1047,18 +1084,17 @@ class ObjPtr
                     break;
                 }
                 AddElemToJRet(
-                    jenv, jRet, jNewOff );
+                    jenv, jret, jNewOff );
             }
 
         }while( 0 );
         if( bRelease )
         {
             jenv->ReleasePrimitiveArrayCritical(
-                pByteArray, buf, 0 );
+                pArr, buf, 0 );
         }
-
-        SetErrorJRet( jenv, jRet, ret );
-        return jRet;
+        SetErrorJRet( jenv, jret, ret );
+        return jret;
     }
 };
 
@@ -1084,8 +1120,8 @@ class CfgPtr
     {
         IConfigDb* pObj =
             (IConfigDb*)*$self;
-        if( pObj == SIP_NULLPTR )
-            return SIP_NULLPTR;
+        if( pObj == nullptr )
+            return nullptr;
         return pObj;
     }
 }
@@ -1106,14 +1142,47 @@ class BufPtr
 
     BufPtr( bool );
     ~BufPtr();
-    char* ptr();
-    gint32 size() const;
-    bool IsEmpty() const;
 
-    EnumTypeId GetExDataType();
 };
 
 %extend BufPtr {
+
+    char* ptr()
+    {
+        if( $self == nullptr ||
+            $self->IsEmpty() )
+            return nullptr;
+        if( ( *$self )->empty() )
+            return nullptr;
+
+        return ( *$self )->ptr();
+    }
+
+    gint32 size() const
+    {
+        if( $self == nullptr ||
+            $self->IsEmpty() )
+            return 0;
+        return ( *$self )->size();
+    }
+
+    bool IsEmpty() const
+    {
+        if( $self == nullptr )
+            return true;
+        return $self->IsEmpty();
+    }
+ 
+    EnumTypeId GetExDataType()
+    {
+        if( $self == nullptr ||
+            $self->IsEmpty() )
+            return typeNone;
+        if( ( *$self )->empty() )
+            return typeNone;
+
+        return ( *$self )->GetExDataType(); 
+    }
 
     gint32 NewObj()
     {
@@ -1124,10 +1193,7 @@ class BufPtr
     }
     jobject GetByteArray( JNIEnv *jenv )
     {
-        if( $self == nullptr )
-            return nullptr;
-        gint32 ret = 0;
-        jobject jRet = NewJRet( jenv );
+        CHECK_ENV( jenv );
         do{
             BufPtr& pBuf = *$self;
             if( pBuf.IsEmpty() || pBuf->empty() )
@@ -1138,22 +1204,19 @@ class BufPtr
             jsize len = ( jsize )pBuf->size();
             jbyteArray bytes =
                 jenv->NewByteArray( len );
-            jenv->SetByteArrayRegion( pArr,
-                len, 0, pBuf->ptr() );
-            AddElemToJRet( jenv, jRet, bytes );
+            jenv->SetByteArrayRegion( bytes,
+                len, 0, ( jbyte* )pBuf->ptr() );
+            AddElemToJRet( jenv, jret, bytes );
 
         }while( 0 );
 
-        SetErrorJRet( jenv, jRet, ret );
-        return jRet;
+        SetErrorJRet( jenv, jret, ret );
+        return jret;
     }
 
-    jobject GetByte()
+    jobject GetByte( JNIEnv *jenv )
     {
-        if( $self == nullptr )
-            return -EINVAL;
-        gint32 ret = 0;
-        jobject jRet = NewJRet( jenv );
+        CHECK_ENV( jenv );
         do{
             BufPtr& pBuf = *$self;
             if( pBuf.IsEmpty() || pBuf->empty() )
@@ -1168,18 +1231,15 @@ class BufPtr
                 ret = -EFAULT;
                 break;
             }
-            AddElemToJRet( jenv, jRet, val );
+            AddElemToJRet( jenv, jret, jval );
             
         }while( 0 );
-        SetErrorJRet( jenv, jRet, ret );
-        return jRet;
+        SetErrorJRet( jenv, jret, ret );
+        return jret;
     }
-    jshort GetShort()
+    jobject GetShort( JNIEnv *jenv )
     {
-        if( $self == nullptr )
-            return -EINVAL;
-        gint32 ret = 0;
-        jobject jRet = NewJRet( jenv );
+        CHECK_ENV( jenv );
         do{
             BufPtr& pBuf = *$self;
             if( pBuf.IsEmpty() || pBuf->empty() )
@@ -1194,18 +1254,15 @@ class BufPtr
                 ret = -EFAULT;
                 break;
             }
-            AddElemToJRet( jenv, jRet, val );
+            AddElemToJRet( jenv, jret, jval );
             
         }while( 0 );
-        SetErrorJRet( jenv, jRet, ret );
-        return jRet;
+        SetErrorJRet( jenv, jret, ret );
+        return jret;
     }
     jobject GetInt( JNIEnv *jenv )
     {
-        if( $self == nullptr )
-            return -EINVAL;
-        gint32 ret = 0;
-        jobject jRet = NewJRet( jenv );
+        CHECK_ENV( jenv );
         do{
             BufPtr& pBuf = *$self;
             if( pBuf.IsEmpty() || pBuf->empty() )
@@ -1220,18 +1277,15 @@ class BufPtr
                 ret = -EFAULT;
                 break;
             }
-            AddElemToJRet( jenv, jRet, val );
+            AddElemToJRet( jenv, jret, jval );
             
         }while( 0 );
-        SetErrorJRet( jenv, jRet, ret );
-        return jRet;
+        SetErrorJRet( jenv, jret, ret );
+        return jret;
     }
     jobject GetLong( JNIEnv *jenv )
     {
-        if( $self == nullptr )
-            return -EINVAL;
-        gint32 ret = 0;
-        jobject jRet = NewJRet( jenv );
+        CHECK_ENV( jenv );
         do{
             BufPtr& pBuf = *$self;
             if( pBuf.IsEmpty() || pBuf->empty() )
@@ -1246,18 +1300,15 @@ class BufPtr
                 ret = -EFAULT;
                 break;
             }
-            AddElemToJRet( jenv, jRet, val );
+            AddElemToJRet( jenv, jret, jval );
             
         }while( 0 );
-        SetErrorJRet( jenv, jRet, ret );
-        return jRet;
+        SetErrorJRet( jenv, jret, ret );
+        return jret;
     }
     jobject GetFloat( JNIEnv *jenv )
     {
-        if( $self == nullptr )
-            return -EINVAL;
-        gint32 ret = 0;
-        jobject jRet = NewJRet( jenv );
+        CHECK_ENV( jenv );
         do{
             BufPtr& pBuf = *$self;
             if( pBuf.IsEmpty() || pBuf->empty() )
@@ -1272,18 +1323,15 @@ class BufPtr
                 ret = -EFAULT;
                 break;
             }
-            AddElemToJRet( jenv, jRet, val );
+            AddElemToJRet( jenv, jret, jval );
             
         }while( 0 );
-        SetErrorJRet( jenv, jRet, ret );
-        return jRet;
+        SetErrorJRet( jenv, jret, ret );
+        return jret;
     }
     jobject GetDouble( JNIEnv *jenv )
     {
-        if( $self == nullptr )
-            return -EINVAL;
-        gint32 ret = 0;
-        jobject jRet = NewJRet( jenv );
+        CHECK_ENV( jenv );
         do{
             BufPtr& pBuf = *$self;
             if( pBuf.IsEmpty() || pBuf->empty() )
@@ -1298,19 +1346,16 @@ class BufPtr
                 ret = -EFAULT;
                 break;
             }
-            AddElemToJRet( jenv, jRet, val );
+            AddElemToJRet( jenv, jret, jval );
             
         }while( 0 );
-        SetErrorJRet( jenv, jRet, ret );
-        return jRet;
+        SetErrorJRet( jenv, jret, ret );
+        return jret;
     }
 
     jobject GetObjPtr( JNIEnv *jenv )
     {
-        if( $self == nullptr )
-            return -EINVAL;
-        gint32 ret = 0;
-        jobject jRet = NewJRet( jenv );
+        CHECK_ENV( jenv );
         do{
             BufPtr& pBuf = *$self;
             if( pBuf.IsEmpty() || pBuf->empty() )
@@ -1319,25 +1364,25 @@ class BufPtr
                 break;
             }
             ObjPtr& val = ( ObjPtr& )*pBuf;
-            jobject jval = NewObjPtr( jenv, val );
+            ObjPtr* ppObj = new ObjPtr( val );
+            jobject jval =
+                NewObjPtr( jenv, ( jlong )ppObj );
             if( jval == nullptr )
             {
+                delete ppObj;
                 ret = -EFAULT;
                 break;
             }
-            AddElemToJRet( jenv, jRet, val );
+            AddElemToJRet( jenv, jret, jval );
             
         }while( 0 );
-        SetErrorJRet( jenv, jRet, ret );
-        return jRet;
+        SetErrorJRet( jenv, jret, ret );
+        return jret;
     }
 
     jobject GetString( JNIEnv *jenv )
     {
-        if( $self == nullptr )
-            return -EINVAL;
-        gint32 ret = 0;
-        jobject jRet = NewJRet( jenv );
+        CHECK_ENV( jenv );
         do{
             BufPtr& pBuf = *$self;
             if( pBuf.IsEmpty() || pBuf->empty() )
@@ -1354,11 +1399,11 @@ class BufPtr
                 ret = -EFAULT;
                 break;
             }
-            AddElemToJRet( jenv, jRet, val );
+            AddElemToJRet( jenv, jret, jval );
             
         }while( 0 );
-        SetErrorJRet( jenv, jRet, ret );
-        return jRet;
+        SetErrorJRet( jenv, jret, ret );
+        return jret;
     }
 
     gint32 SetByteArray(
@@ -1373,7 +1418,7 @@ class BufPtr
         if( ERROR( ret ) )
             return ret;
         jenv->GetByteArrayRegion( pArr,
-            len, 0, pBuf->ptr() );
+            len, 0, ( jbyte* )pBuf->ptr() );
         return ret;
     }
 
@@ -1393,7 +1438,7 @@ class BufPtr
         const char* val = 
             jenv->GetStringUTFChars( jstr, 0 );
 
-        *this = ( const stdstr& )val;
+        *pBuf = val;
         jenv->ReleaseStringUTFChars( jstr, val); 
         return STATUS_SUCCESS;
     }
@@ -1405,7 +1450,7 @@ class BufPtr
         BufPtr& pBuf = *$self;
         if( pBuf.IsEmpty() )
             pBuf.NewObj();
-        *this = ( guint8 )val;
+        *pBuf = ( guint8 )val;
         return STATUS_SUCCESS;
     }
     gint32 SetShort( jshort val )
@@ -1415,7 +1460,7 @@ class BufPtr
         BufPtr& pBuf = *$self;
         if( pBuf.IsEmpty() )
             pBuf.NewObj();
-        *this = ( guint8 )val;
+        *pBuf = ( guint8 )val;
         return STATUS_SUCCESS;
     }
     gint32 SetInt( jint val )
@@ -1425,7 +1470,7 @@ class BufPtr
         BufPtr& pBuf = *$self;
         if( pBuf.IsEmpty() )
             pBuf.NewObj();
-        *this = ( guint32 )val;
+        *pBuf = ( guint32 )val;
         return STATUS_SUCCESS;
     }
     gint32 SetLong( jlong val )
@@ -1435,7 +1480,7 @@ class BufPtr
         BufPtr& pBuf = *$self;
         if( pBuf.IsEmpty() )
             pBuf.NewObj();
-        *this = ( guint64 )val;
+        *pBuf = ( guint64 )val;
         return STATUS_SUCCESS;
     }
     gint32 SetFloat( jfloat val )
@@ -1445,7 +1490,7 @@ class BufPtr
         BufPtr& pBuf = *$self;
         if( pBuf.IsEmpty() )
             pBuf.NewObj();
-        *this = ( float )val;
+        *pBuf = ( float )val;
         return STATUS_SUCCESS;
     }
     gint32 SetDouble( jdouble val )
@@ -1455,7 +1500,7 @@ class BufPtr
         BufPtr& pBuf = *$self;
         if( pBuf.IsEmpty() )
             pBuf.NewObj();
-        *this = ( double )val;
+        *pBuf = ( double )val;
         return STATUS_SUCCESS;
     }
     gint32 SetObjPtr( ObjPtr* ppObj )
@@ -1465,7 +1510,7 @@ class BufPtr
         BufPtr& pBuf = *$self;
         if( pBuf.IsEmpty() )
             pBuf.NewObj();
-        *this = *pObj;
+        *pBuf = *ppObj;
         return STATUS_SUCCESS;
     }
 };
@@ -1476,6 +1521,25 @@ class CParamList
     CParamList();
     CParamList( const CParamList& oParams );
     CParamList( CfgPtr& pCfg );
+
+    gint32 SetStrProp( gint32,
+        const std::string& strVal );
+
+    gint32 SetDoubleProp(
+        gint32, double fVal );
+
+    gint32 SetFloatProp(
+        gint32, float fVal );
+
+    gint32 SetObjPtr(
+        gint32 iProp, ObjPtr& pObj );
+
+    gint32 SetBoolProp(
+        gint32, bool bVal );
+
+    gint32 SetProperty(
+        gint32 iProp, BufPtr& pObj );
+
 };
 
 %extend CParamList {
@@ -1484,7 +1548,7 @@ class CParamList
     {
         
         gint32 ret = 0;
-        jobject jRet = NewJRet( jenv );
+        jobject jret = NewJRet( jenv );
         do{
             CParamList& oParams = *$self;
             stdstr strVal;
@@ -1495,22 +1559,19 @@ class CParamList
             jobject jStr = GetJniString(
                 jenv, strVal );
 
-            AddElemToJRet( jenv, jRet, jStr );
+            AddElemToJRet( jenv, jret, jStr );
 
         }while( 0 );
 
-        SetErrorJRet( jenv, jRet, ret );
-        return jRet;
+        SetErrorJRet( jenv, jret, ret );
+        return jret;
     }
-
-    gint32 SetStrProp( gint32,
-        const std::string& strVal );
 
     jobject GetByteProp(
         JNIEnv *jenv, gint32 iProp )
     {
         gint32 ret = 0;
-        jobject jRet = NewJRet( jenv );
+        jobject jret = NewJRet( jenv );
         do{
             CParamList& oParams = *$self;
             guint8 byVal;
@@ -1522,12 +1583,12 @@ class CParamList
             jobject jByte =
                 NewByte( jenv, byVal );
 
-            AddElemToJRet( jenv, jRet, jByte );
+            AddElemToJRet( jenv, jret, jByte );
 
         }while( 0 );
 
-        SetErrorJRet( jenv, jRet, ret );
-        return jRet;
+        SetErrorJRet( jenv, jret, ret );
+        return jret;
     }
 
     gint32 SetByteProp(
@@ -1541,7 +1602,7 @@ class CParamList
         JNIEnv *jenv, gint32 iProp )
     {
         gint32 ret = 0;
-        jobject jRet = NewJRet( jenv );
+        jobject jret = NewJRet( jenv );
         do{
             CParamList& oParams = *$self;
             guint16 wVal;
@@ -1553,12 +1614,12 @@ class CParamList
             jobject jWord =
                 NewShort( jenv, wVal );
 
-            AddElemToJRet( jenv, jRet, jWord );
+            AddElemToJRet( jenv, jret, jWord );
 
         }while( 0 );
 
-        SetErrorJRet( jenv, jRet, ret );
-        return jRet;
+        SetErrorJRet( jenv, jret, ret );
+        return jret;
     }
 
     gint32 SetShortProp(
@@ -1572,7 +1633,7 @@ class CParamList
         JNIEnv *jenv, gint32 iProp )
     {
         gint32 ret = 0;
-        jobject jRet = NewJRet( jenv );
+        jobject jret = NewJRet( jenv );
         do{
             CParamList& oParams = *$self;
             guint32 dwVal;
@@ -1584,12 +1645,12 @@ class CParamList
             jobject jdword =
                 NewInt( jenv, dwVal );
 
-            AddElemToJRet( jenv, jRet, jdword );
+            AddElemToJRet( jenv, jret, jdword );
 
         }while( 0 );
 
-        SetErrorJRet( jenv, jRet, ret );
-        return jRet;
+        SetErrorJRet( jenv, jret, ret );
+        return jret;
     }
 
     gint32 SetIntProp(
@@ -1603,7 +1664,7 @@ class CParamList
         JNIEnv *jenv, gint32 iProp )
     {
         gint32 ret = 0;
-        jobject jRet = NewJRet( jenv );
+        jobject jret = NewJRet( jenv );
         do{
             CParamList& oParams = *$self;
             guint64 qwVal;
@@ -1615,12 +1676,12 @@ class CParamList
             jobject jqword =
                 NewInt( jenv, qwVal );
 
-            AddElemToJRet( jenv, jRet, jqword );
+            AddElemToJRet( jenv, jret, jqword );
 
         }while( 0 );
 
-        SetErrorJRet( jenv, jRet, ret );
-        return jRet;
+        SetErrorJRet( jenv, jret, ret );
+        return jret;
     }
     gint32 SetQwordProp(
         gint32 iProp, gint64 qwVal )
@@ -1633,7 +1694,7 @@ class CParamList
         JNIEnv *jenv, gint32 iProp )
     {
         gint32 ret = 0;
-        jobject jRet = NewJRet( jenv );
+        jobject jret = NewJRet( jenv );
         do{
             CParamList& oParams = *$self;
             double dblVal;
@@ -1645,21 +1706,19 @@ class CParamList
             jobject jdbl =
                 NewDouble( jenv, dblVal );
 
-            AddElemToJRet( jenv, jRet, jdbl );
+            AddElemToJRet( jenv, jret, jdbl );
 
         }while( 0 );
 
-        SetErrorJRet( jenv, jRet, ret );
-        return jRet;
+        SetErrorJRet( jenv, jret, ret );
+        return jret;
     }
-
-    gint32 SetDoubleProp( gint32, double fVal );
 
     jobject GetFloatProp(
         JNIEnv *jenv, gint32 iProp )
     {
         gint32 ret = 0;
-        jobject jRet = NewJRet( jenv );
+        jobject jret = NewJRet( jenv );
         do{
             CParamList& oParams = *$self;
             float fVal;
@@ -1671,55 +1730,55 @@ class CParamList
             jobject jfv =
                 NewFloat( jenv, fVal );
 
-            AddElemToJRet( jenv, jRet, jfv );
+            AddElemToJRet( jenv, jret, jfv );
 
         }while( 0 );
 
-        SetErrorJRet( jenv, jRet, ret );
-        return jRet;
+        SetErrorJRet( jenv, jret, ret );
+        return jret;
     }
-
-    gint32 SetFloatProp( gint32, float fVal );
 
     jobject GetObjPtr(
         JNIEnv *jenv, gint32 iProp )
     {
         gint32 ret = 0;
-        jobject jRet = NewJRet( jenv );
+        jobject jret = NewJRet( jenv );
         do{
             CParamList& oParams = *$self;
             ObjPtr* ppObj = new ObjPtr();
-            ret = oParams.GetObjPtr( iProp, &pObj );
+            ret = oParams.GetObjPtr( iProp, *ppObj );
             if( ERROR( ret ) )
+            {
+                delete ppObj;
                 break;
+            }
 
-            jobject jop =
-                NewObjPtr( jenv, ppObj, true );
+            jobject jop = NewObjPtr(
+                jenv, ( jlong )ppObj, true );
             if( jop == nullptr )
             {
+                delete ppObj;
                 ret = -ENOMEM;
                 break;
             }
-            AddElemToJRet( jenv, jRet, jop );
+            AddElemToJRet( jenv, jret, jop );
 
         }while( 0 );
 
-        SetErrorJRet( jenv, jRet, ret );
-        return jRet;
-    }
 
-    gint32 SetObjPtr(
-        gint32 iProp, ObjPtr& pObj );
+        SetErrorJRet( jenv, jret, ret );
+        return jret;
+    }
 
     jobject GetBoolProp(
         JNIEnv *jenv, gint32 iProp )
     {
         gint32 ret = 0;
-        jobject jRet = NewJRet( jenv );
+        jobject jret = NewJRet( jenv );
         do{
             CParamList& oParams = *$self;
             bool bVal;
-            ret = oParams.GetFloatProp(
+            ret = oParams.GetBoolProp(
                 iProp, bVal );
             if( ERROR( ret ) )
                 break;
@@ -1727,25 +1786,22 @@ class CParamList
             jobject jbv =
                 NewBoolean( jenv, bVal );
 
-            AddElemToJRet( jenv, jRet, jbv );
+            AddElemToJRet( jenv, jret, jbv );
 
         }while( 0 );
 
-        SetErrorJRet( jenv, jRet, ret );
-        return jRet;
+        SetErrorJRet( jenv, jret, ret );
+        return jret;
     }
-
-    gint32 SetBoolProp(
-        gint32, bool bVal );
 
     jobject GetPropertyType(
         JNIEnv *jenv, gint32 iProp )
     {
         gint32 ret = 0;
-        jobject jRet = NewJRet( jenv );
+        jobject jret = NewJRet( jenv );
         do{
             CParamList& oParams = *$self;
-            CfgPtr& pCfg = oParams.m_pCfg;
+            CfgPtr& pCfg = oParams.GetCfg();
             gint32 iType = 0;
             ret = pCfg->GetPropertyType(
                 iProp, iType );
@@ -1757,53 +1813,56 @@ class CParamList
                 ret = -ENOMEM;
                 break;
             }
-            AddElemToJRet( jenv, jRet, jval );
+            AddElemToJRet( jenv, jret, jval );
 
         }while( 0 );
-        SetErrorJRet( jenv, jRet, ret );
-        return jRet;
+        SetErrorJRet( jenv, jret, ret );
+        return jret;
     }
 
     jobject GetProperty(
         JNIEnv *jenv, gint32 iProp )
     {
         gint32 ret = 0;
-        jobject jRet = NewJRet( jenv );
+        jobject jret = NewJRet( jenv );
         do{
             CParamList& oParams = *$self;
-            BufPtr* ppBuf = new ObjPtr();
-            ret = oParams.GetProperty( iProp, &pObj );
-            if( ERROR( ret ) )
-                break;
+            BufPtr* ppBuf = new BufPtr();
 
-            jobject jop =
-                NewBufPtr( jenv, ppBuf, true );
+            ret = oParams.GetProperty(
+                iProp, *ppBuf );
+
+            if( ERROR( ret ) )
+            {
+                delete ppBuf;
+                break;
+            }
+
+            jobject jop = NewBufPtr(
+                jenv, ( jlong )ppBuf, true );
+
             if( jop == nullptr )
             {
+                delete ppBuf;
                 ret = -ENOMEM;
                 break;
             }
-            AddElemToJRet( jenv, jRet, jop );
+            AddElemToJRet( jenv, jret, jop );
 
         }while( 0 );
 
-        SetErrorJRet( jenv, jRet, ret );
-        return jRet;
+        SetErrorJRet( jenv, jret, ret );
+        return jret;
     }
-
-    gint32 SetProperty(
-        gint32 iProp, BufPtr& pObj );
-
 
     gint32 PushByte( jbyte val )
     {
-        guint8* pByte = &val;
-        return $self->Push( *pByte )
+        return $self->Push( ( guint8 )val );
     }
 
     gint32 PushObj( ObjPtr& val )
     {
-        return $self->Push( val )
+        return $self->Push( val );
     }
 
     gint32 PushStr( const std::string& val )
@@ -1839,13 +1898,13 @@ class CParamList
 
             if( len > 0 )
             {
-                ret = pBuf->Resize();
+                ret = pBuf->Resize( len );
                 if( ERROR( ret ) )
                     break;
                 
                 jenv->GetByteArrayRegion(
                     pba, len, 0,
-                    pBuf->ptr() );
+                    ( jbyte* )pBuf->ptr() );
             }
 
             ret = $self->Push( pBuf );
@@ -1858,7 +1917,7 @@ class CParamList
     jobject GetCfg( JNIEnv *jenv )
     {
         gint32 ret = 0;
-        jobject jRet = NewJRet( jenv );
+        jobject jret = NewJRet( jenv );
         do{
             if( $self == nullptr )
             {
@@ -1871,24 +1930,25 @@ class CParamList
                 $self->GetCfg(), true );
 
             jobject jObj = NewObjPtr(
-                jenv, pCfg, true );
+                jenv, ( jlong )pCfg, true );
 
             if( jObj == nullptr )
             {
+                delete pCfg;
                 ret = -EFAULT;
                 break;
             }
-            AddElemToJRet( jenv, jRet, jObj );
+            AddElemToJRet( jenv, jret, jObj );
 
         }while( 0 );
-        SetErrorJRet( jenv, jRet, ret );
-        return jRet;
+        SetErrorJRet( jenv, jret, ret );
+        return jret;
     }
 
     jobject GetSize( JNIEnv *jenv )
     {
         gint32 ret = 0;
-        jobject jRet = NewJRet( jenv );
+        jobject jret = NewJRet( jenv );
         do{
             guint32 dwSize = 0;
             gint32 ret = $self->GetSize( dwSize );
@@ -1906,11 +1966,11 @@ class CParamList
                 ret = -EFAULT;
                 break;
             }
-            AddElemToJRet( jenv, jRet, jInt );
+            AddElemToJRet( jenv, jret, jInt );
 
         }while( 0 );
-        SetErrorJRet( jenv, jRet, ret );
-        return jRet;
+        SetErrorJRet( jenv, jret, ret );
+        return jret;
     }
 };
 

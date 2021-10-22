@@ -28,6 +28,8 @@ abstract public class JavaRpcService
 
     int start()
     {
+        if( m_oInst == null )
+            return -rpcbaseConstants.EFAULT;
         m_oInst.SetJavaHost( this );
         int ret = m_oInst.Start();
 
@@ -54,6 +56,8 @@ abstract public class JavaRpcService
 
     int stop()
     {
+        if( m_oInst == null )
+            return 0;
         m_oInst.RemoveJavaHost();
         return m_oInst.Stop();
     }
@@ -90,7 +94,7 @@ abstract public class JavaRpcService
         public abstract void onTimer( Object octx, int iRet );
     }
 
-    public void TimerCallback(
+    public void timerCallback(
         Object callback, Object context, int iRet )
     {
         IUserTimerCb tcb = ( IUserTimerCb )callback; 

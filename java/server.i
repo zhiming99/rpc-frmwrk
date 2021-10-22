@@ -175,22 +175,28 @@ class CJavaServerImpl :
         if( ERROR( ret ) )
             return ret;
 
-        gint32 ret = 0;
         do{
             jobject pHost = nullptr;
             ret = GetJavaHost( pHost );
             if( ERROR( ret ) )
                 break;
 
-            jobject pCb = NewObjPtr( jenv, pCallback );
+            ObjPtr* ppObj =
+                new ObjPtr( pCallback );
+            jobject pCb = NewObjPtr(
+                jenv, ( jlong )ppObj );
             if( pCb == nullptr )
             {
+                delete ppObj;
                 ret = -EFAULT;
                 break;
             }
-            jobject pjCfg = NewCfgPtr( jenv, pCfg );
+            CfgPtr* ppCfg = new CfgPtr( pCfg );
+            jobject pjCfg = NewCfgPtr(
+                jenv, ( jlong )ppCfg );
             if( pjCfg == nullptr )
             {
+                delete ppCfg;
                 ret = -EFAULT;
                 break;
             }
@@ -198,13 +204,13 @@ class CJavaServerImpl :
             jclass cls =
                 jenv->GetObjectClass( pHost );
 
-            jmethodId ans = jenv->GetMethodID(
+            jmethodID ans = jenv->GetMethodID(
                 cls, "acceptNewStream",
-                "(Lorg/rpc/rpcbase/ObjPtr;" );
+                "(Lorg/rpc/rpcbase/ObjPtr;"
                 "Lorg/rpc/rpcbase/CfgPtr;)I" );
 
             ret = jenv->CallIntMethod( pHost,
-                stmReady, pCb, pjCfg );
+                ans, pCb, pjCfg );
 
         }while( 0 );
 
@@ -221,10 +227,8 @@ class CJavaServerImpl :
 
     jlong GetIdHashByChan( jlong hChannel )
     {
-        CJavaServerImpl* pImpl = static_cast
-            < CJavaServerImpl* >( $self );
         InterfPtr pIf;
-        gint32 ret = pImpl->GetUxStream(
+        gint32 ret = this->GetUxStream(
             ( HANDLE )hChannel, pIf );
         if( ERROR( ret ) )
             return 0;
@@ -236,7 +240,6 @@ class CJavaServerImpl :
             return 0;
          return qwHash;
     } 
-
 };
 
 gint32 ChainTasks(
@@ -268,7 +271,7 @@ jobject CreateServer(
     ObjPtr& pCfgObj )
 {
     gint32 ret = 0;
-    jobject jRet = NewJRet( jenv );
+    jobject jret = NewJRet( jenv );
 
     do{
         CfgPtr pCfg = pCfgObj;
@@ -292,16 +295,21 @@ jobject CreateServer(
         if( ERROR( ret ) )
             break;
 
-        ObjPtr pIf;
-        ret = pIf.NewObj(
+        ObjPtr* ppIf = new ObjPtr();
+        ret = ppIf->NewObj(
             clsid( CJavaServerImpl ),
             pCfg );
         if( ERROR( ret ) )
+        {
+            delete ppIf;
             break;
+        }
 
-        pjObj = NewObjPtr( jenv, pIf );
+        jobject pjObj = NewObjPtr(
+            jenv, ( jlong )ppIf );
         if( pjObj == nullptr )
         {
+            delete ppIf;
             ret = -EFAULT;
             break;
         }
@@ -320,7 +328,7 @@ CJavaServerImpl* CastToServer(
     return pSvr;
 }
 
-%}
+}
 
 %nodefaultctor;
 %template(CJavaInterfBaseS) CJavaInterfBase<CJavaServer>;
@@ -367,9 +375,9 @@ class CJavaServerImpl :
     {
         gint32 ret = 0;
         CParamList oResp;
+        CJavaServerImpl* pImpl = static_cast
+            < CJavaServerImpl* >( $self );
         do{
-            CJavaServerImpl* pImpl = static_cast
-                < CJavaServerImpl* >( $self );
 
             if( pCallback.IsEmpty() )
             {
@@ -415,9 +423,9 @@ class CJavaServerImpl :
     {
         gint32 ret = 0;
         CParamList oResp;
+        CJavaServerImpl* pImpl = static_cast
+            < CJavaServerImpl* >( $self );
         do{
-            CJavaServerImpl* pImpl = static_cast
-                < CJavaServerImpl* >( $self );
 
             if( pCallback.IsEmpty() )
             {
@@ -472,7 +480,7 @@ class CJavaServerImpl :
 
     }
 
-    ObjPtr* CastToObjPtr();
+    jobject CastToObjPtr( JNIEnv *jenv );
     jlong GetIdHashByChan( jlong hChannel );
     jobject GetPeerIdHash(
         JNIEnv *jenv,
@@ -482,6 +490,7 @@ class CJavaServerImpl :
 
 gint32 ChainTasks( ObjPtr& pObj1, ObjPtr& pObj2 );
 jobject CreateServer(
+    JNIEnv *jenv,
     ObjPtr& pMgr,
     const std::string& strDesc,
     const std::string& strObjName,

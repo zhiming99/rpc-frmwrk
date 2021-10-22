@@ -36,7 +36,7 @@ public class JavaSerialImpl extends JavaSerialBase
     {
         if( m_oInst == null )
             throw new NullPointerException(
-                "c++ object is empty");
+                "c++ instance is empty");
 
         Long qwHash = deserialInt64( buf );
         if( qwHash == rpcbaseConstants.INVALID_HANDLE )
