@@ -69,8 +69,8 @@ The 3 composite types are
 * **map** : a map consisting of key-value paires. `key` should be a comparable data type, and value can be any supported type except `HSTREAM`.
 * **struct**: as `FILE_INFO` shows in the above example, is a package of informations of different data types. It is used as a build block for other data types or as the parameter to transfer between proxy and server.
 
-The data types are mapped to the concrete data types of each supported languages, as shown in the following
-[image](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/ridldatatype.png).
+The data types are mapped to the concrete data types of each supported languages, as shown in the following.
+![image](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/ridldatatype.png).
 
 ### Statements
 
