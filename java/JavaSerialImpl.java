@@ -32,7 +32,7 @@ public class JavaSerialImpl extends JavaSerialBase
         return 0;
     }
 
-    Long deserialHStream( ByteBuffer buf )
+    long deserialHStream( ByteBuffer buf )
     {
         if( m_oInst == null )
             throw new NullPointerException(
@@ -50,6 +50,6 @@ public class JavaSerialImpl extends JavaSerialBase
             throw new NullPointerException(
                 "channel handle is invalid");
 
-        return new Long( ret );
+        return ret;
     }
 }

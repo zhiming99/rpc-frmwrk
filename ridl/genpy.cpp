@@ -3,7 +3,7 @@
  *
  *       Filename:  genpy.cpp
  *
- *    Description:  implementations of proxy/server generator for C++
+ *    Description:  implementations of proxy/server generator for Python
  *
  *        Version:  1.0
  *        Created:  08/14/2021 02:57:00 PM
