@@ -16,25 +16,26 @@ development efforts on the business logics.
 support 10 basic types and 3 composite types. The basic data types are:
 .RS
 .IP \fBbool\fP
-\- 1-byte boolean value.
+\- 1-byte boolean value. It maps to 'bool' in C++, 'bool' in Python, and 'boolean' in Java.
 .IP \fBbyte\fP
-\- 1-byte unsigned integer.
+\- 1-byte unsigned integer. It maps to 'gint8' in C++, 'int' in Python, and 'byte' in Java.
 .IP \fBint16/uint16\fP
-\- 2-byte signed integer or unsigned integer.
+\- 2-byte signed integer or unsigned integer. It maps to 'gint16/guint16' in C++, 'int' in Python and 'short' in Java.
 .IP \fBint32/uint32\fP
-\- 4-byte signed integer or unsigned integer.
+\- 4-byte signed integer or unsigned integer. It maps to 'gint32/guint32' in C++, 'int' in Python and 'int' in Java.
 .IP \fBint64/uint64\fP
-\- 8-byte signed integer or unsigned integer.
+\- 8-byte signed integer or unsigned integer. It maps to 'gint64/guint64' in C++, 'int' in Python, and 'long' in Java.
 .IP \fBfloat(32)/double(64)\fP
-\- float point number.
+\- float point number. It maps to 'float/double' in C++, 'float' in Python, and 'float/double' in Java.
 .IP \fBstring\fP
-\- null terminated string.
+\- null terminated string. It maps to 'std::sting' in C++, 'str' in Python, and 'String' in Java.
 .IP \fBHSTREAM\fP
-\- handle representing an active stream channel.
+\- handle representing an active stream channel. It maps to 'HANDLE' in C++, 'int' in Python, and 'long' in Java.
 .IP \fBbytearray\fP 
-\- binary blob.
+\- binary blob. It maps to 'BufPtr' in C++, 'bytearray' in Python and 'byte[]' in Java.
 .IP \fBObjPtr\fP
-\- \fIrpc-frmwrk\fR's built-in serializable data type.
+\- \fIrpc-frmwrk\fR's built-in serializable data type. It maps to 'ObjPtr' in C++, 'cpp.ObjPtr' in Python, and 'ObjPtr'
+in Java.
 .RE
 
 And 3 composite types:
@@ -42,14 +43,16 @@ And 3 composite types:
 .IP \fBstruct\fP
 \- a bundle of values of different data types. It is usually used as a building
 block for other data types or as the parameter to transfer between client and
-server.
+server. It maps to 'struct' in C++, 'struct' in Python, and 'class' in Java.
 .IP \fBarray\fP
 \- an array of elements of the same type, either basic type or composite type,
-except \fIHSTREAM\fR. For example, \fIarray<int32>\fR, or \fIarray<string>\fR
+except \fIHSTREAM\fR. For example, \fIarray<int32>\fR, or \fIarray<string>\fR.
+It maps to 'std::vector' in C++, 'list' in Python, and 'array' in Java.
 .IP \fBmap\fP
 \- a map consists of key-value paires. The key should be a comparable data type,
 and value could be any supported type except \fIHSTREAM\fR. For example,
-\fImap<string, int32>\fR, or \fImap<int64, array<int>>\fR
+\fImap<string, int32>\fR, or \fImap<int64, array<int>>\fR. It maps to 'std::map'
+in C++, 'dict' in Python, and 'Map' in Java.
 .RE
 
 See also the EXAMPLE section.

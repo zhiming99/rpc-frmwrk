@@ -52,22 +52,25 @@ service SimpFileSvc [ stream ]
 `ridl` support 10 basic types and 3 composite types.
 The basic data types are:
 
-* **byte**
-* **bool**
-* **int16/uint16**
-* **int32/uint32**
-* **int64/uint64**
-* **float(32)/double(64)**
-* **string**
-* **bytearray**( binary blob )
+* **byte** : 1-byte unsigned integer.
+* **bool** : 1-byte boolean value.
+* **int16/uint16** : 2-byte signed integer or unsigned integer.
+* **int32/uint32** : 4-byte signed integer or unsigned integer.
+* **int64/uint64** : 8-byte signed integer or unsigned integer.
+* **float(32)/double(64)** : float point number.
+* **string** 
+* **bytearray** : binary blob.
 * **ObjPtr** : `rpc-frmwrk` built-in serializable data type.
 * **HSTREAM** : a handle representing an existing stream channel, which can be transferred between the proxy/server.
 
 The 3 composite types are
 
-* **array** : an array of data of basic type or composite type except `HSTREAM`
-* **map** : a map consisting of key-value paires. `key` should be a comparable data type, and value could be any supported type except `HSTREAM`.
+* **array** : an array of data of basic type or composite type except `HSTREAM`. 
+* **map** : a map consisting of key-value paires. `key` should be a comparable data type, and value can be any supported type except `HSTREAM`.
 * **struct**: as `FILE_INFO` shows in the above example, is a package of informations of different data types. It is used as a build block for other data types or as the parameter to transfer between proxy and server.
+
+The data types are mapped to the concrete data types of each supported languages, as shown in the following
+[image](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/ridldatatype.png).
 
 ### Statements
 
