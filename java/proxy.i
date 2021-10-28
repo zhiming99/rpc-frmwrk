@@ -1536,9 +1536,10 @@ class CJavaProxyImpl :
         CfgPtr& pOptions,
         jobject listArgs );
 
-    jlong GetIdHashByChan(
+    jobject GetIdHashByChan(
+        JNIEnv *jenv,
         jlong hChannel )
-    { return 0; }
+    { return nullptr; }
 
     jobject GetPeerIdHash(
         JNIEnv *jenv,
@@ -2342,7 +2343,8 @@ class CJavaProxyImpl :
     public CJavaInterfBase<CJavaProxy>
 {
     public:
-    jlong GetIdHashByChan(
+    jobject GetIdHashByChan(
+        JNIEnv *jenv,
         jlong hChannel );
 
     jobject JavaProxyCall2(

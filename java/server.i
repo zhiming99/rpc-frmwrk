@@ -225,20 +225,35 @@ class CJavaServerImpl :
         jlong hChannel )
     { return nullptr; }
 
-    jlong GetIdHashByChan( jlong hChannel )
+    jobject GetIdHashByChan(
+        JNIEnv *jenv, jlong hChannel )
     {
         InterfPtr pIf;
-        gint32 ret = this->GetUxStream(
-            ( HANDLE )hChannel, pIf );
-        if( ERROR( ret ) )
-            return 0;
+        gint32 ret = 0;
+        jobject jret = NewJRet( jenv );
+        do{
+            gint32 ret = this->GetUxStream(
+                ( HANDLE )hChannel, pIf );
+            if( ERROR( ret ) )
+                break;
 
-        guint64 qwHash = 0;
-        guint64 qwId = pIf->GetObjId();
-        ret = GetObjIdHash( qwId, qwHash );
-        if( ERROR( ret ) )
-            return 0;
-         return qwHash;
+            guint64 qwHash = 0;
+            guint64 qwId = pIf->GetObjId();
+            ret = GetObjIdHash( qwId, qwHash );
+            if( ERROR( ret ) )
+                break;
+            jobject jHash = NewLong( jenv, qwHash );
+            if( jHash == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            AddElemToJRet( jenv, jret, jHash );
+            
+        }while( 0 );
+
+        SetErrorJRet( jenv, jret, ret );
+        return jret;
     } 
 };
 
@@ -481,7 +496,8 @@ class CJavaServerImpl :
     }
 
     jobject CastToObjPtr( JNIEnv *jenv );
-    jlong GetIdHashByChan( jlong hChannel );
+    jobject GetIdHashByChan(
+        JNIEnv *jenv, jlong hChannel );
     jobject GetPeerIdHash(
         JNIEnv *jenv,
         jlong hChannel );
