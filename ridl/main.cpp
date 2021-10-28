@@ -93,6 +93,9 @@ void Usage()
         "\t\t'appname' from the ridl will be used\n" );
 
     printf( "\t-p:\tTo generate the Python skelton files\n" );
+    printf( "\t-j:\tTo generate the Java skelton files\n" );
+    printf( "\t-P:\tTo specify the Java package name prefix.\n" );
+    printf( "\t\tThis option is for Java only\n" );
 
     printf( "\t-l:\tTo output a shared library\n" );
     printf( "\t\tinstead of executables. This\n" );
@@ -104,6 +107,9 @@ static std::vector< std::string > g_vecPaths;
 std::string g_strTarget;
 bool g_bNewSerial = true;
 static stdstr g_strLang = "cpp";
+
+// the prefix for java package name
+static stdstr g_strPrefix = "org.rpcf.";
 bool g_bMklib = false;
 
 #include "seribase.h"
@@ -129,7 +135,7 @@ int main( int argc, char** argv )
         bool bQuit = false;
 
         while( ( opt =
-            getopt( argc, argv, "ahlI:O:o:p" ) ) != -1 )
+            getopt( argc, argv, "ahlI:O:o:pjP:" ) ) != -1 )
         {
             switch( opt )
             {
@@ -184,6 +190,17 @@ int main( int argc, char** argv )
             case 'p':
                 {
                     g_strLang = "py";
+                    break;
+                }
+            case 'j':
+                {
+                    g_strLang = "java";
+                    break;
+                }
+            case 'P':
+                {
+                    if( g_strLang == "java" )
+                        g_strPrefix = optarg;
                     break;
                 }
             case 'l':

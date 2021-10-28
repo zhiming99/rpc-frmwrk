@@ -5304,16 +5304,20 @@ gint32 CIfAsyncCancelHandler::OnTaskComplete(
     gint32 ret = 0;
 
     do{
-        if( iRet == ERROR_TIMEOUT ||
+        if( m_pDeferCall.IsEmpty() )
+            break;
+        BufPtr pBuf( true );
+        *pBuf = iRet;
+        UpdateParamAt( 1, pBuf );
+        if( m_bSelfCleanup )
+        {
+            ( *m_pDeferCall )( 0 );
+        }
+        else if( iRet == ERROR_TIMEOUT ||
             iRet == ERROR_USER_CANCEL ||
             iRet == ERROR_CANCEL )
         {
             // call the cancel handler
-            if( m_pDeferCall.IsEmpty() )
-                break;
-            BufPtr pBuf( true );
-            *pBuf = iRet;
-            UpdateParamAt( 1, pBuf );
             ( *m_pDeferCall )( 0 );
         }
 

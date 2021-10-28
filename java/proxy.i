@@ -1253,35 +1253,17 @@ class CJavaInterfBase : public T
         if( ERROR( ret ) )
             return ret;
 
-        if( SUCCEEDED( iRet ) )
-        {
-            ret = oCfg.GetObjPtr(
-                propRespPtr, pObj ); 
-        }
-
         jobject pjCb = ( jobject)pCb;
         jobject pjResp = ( jobject)pResp;
 
-        do{
-            ret = iRet;
-            if( !pObj.IsEmpty() )
-            {
-                CCfgOpener oResp(
-                    ( IConfigDb* )pObj );
-                guint32 dwRet = 0;
-                ret = oResp.GetIntProp(
-                    propReturnValue, dwRet );
-                if( SUCCEEDED( ret ) )
-                    ret = ( gint32 )dwRet;
-                else
-                    ret = iRet;
-            }
-
-            SetErrorJRet( jenv, pjResp, ret );
+        if( iRet == ERROR_USER_CANCEL ||
+            iRet == ERROR_TIMEOUT ||
+            iRet == ERROR_CANCEL )
+        {
+            SetErrorJRet( jenv, pjResp, iRet );
             ret = JavaHandleAsyncResp( jenv,
                 pjCb, seriNone, pjResp, nullptr );
-
-        }while( 0 );
+        }
 
         if( pjCb )
             jenv->DeleteGlobalRef( pjCb );
@@ -1318,7 +1300,12 @@ class CJavaInterfBase : public T
             ( intptr_t )pCb,
             ( intptr_t)pjResp );    
 
-        if( ERROR( ret ) )
+        if( SUCCEEDED( ret ) )
+        {
+            CIfAsyncCancelHandler* pasc = pTask;
+            pasc->SetSelfCleanup();
+        }
+        else
         {
             jenv->DeleteGlobalRef( pjCb );
             jenv->DeleteGlobalRef( pjResp );

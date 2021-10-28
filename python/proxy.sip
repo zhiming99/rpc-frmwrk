@@ -1283,7 +1283,6 @@ class CPythonInterfBase : public T
         intptr_t pCb,
         intptr_t pResp )
     {
-        CCfgOpenerObj oCfg( pCallback );
         ObjPtr pObj;
 
         if( pCb == 0 || pResp == 0 )
@@ -1294,30 +1293,14 @@ class CPythonInterfBase : public T
 
         gint32 ret = 0;
 
-        if( SUCCEEDED( iRet ) )
-        {
-            ret = oCfg.GetObjPtr(
-                propRespPtr, pObj ); 
-        }
-
         PyObject* pPyCb = ( PyObject*)pCb;
         PyObject* pPyResp = ( PyObject*)pResp;
 
-        do{
+        if( iRet == ERROR_USER_CANCEL ||
+            iRet == ERROR_TIMEOUT ||
+            iRet == ERROR_CANCEL )
+        {
             ret = iRet;
-            if( !pObj.IsEmpty() )
-            {
-                CCfgOpener oResp(
-                    ( IConfigDb* )pObj );
-                guint32 dwRet = 0;
-                ret = oResp.GetIntProp(
-                    propReturnValue, dwRet );
-                if( SUCCEEDED( ret ) )
-                    ret = ( gint32 )dwRet;
-                else
-                    ret = iRet;
-            }
-
             PyObject* pHost = nullptr;
             GetPyHost( pHost );
 
@@ -1331,8 +1314,7 @@ class CPythonInterfBase : public T
                  pHost, "HandleAsyncResp", 
                  "(OiOO)", pPyCb, seriNone,
                  pPyResp, Py_None );
-
-        }while( 0 );
+        }
 
         if( pPyCb )
             Py_DECREF( pPyCb );
@@ -1361,10 +1343,13 @@ class CPythonInterfBase : public T
             ( intptr_t )pCb,
             ( intptr_t)pListResp );    
 
+
         if( SUCCEEDED( ret ) )
         {
             Py_INCREF( pCb );
             Py_INCREF( pListResp );
+            CIfAsyncCancelHandler* pasc = pTask;
+            pasc->SetSelfCleanup();
         }
         return ret;
     }

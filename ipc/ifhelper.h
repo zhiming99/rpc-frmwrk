@@ -1789,6 +1789,7 @@ inline gint32 NewDeferredHandler(
 class CIfAsyncCancelHandler :
     public CIfDeferredHandler
 {
+    bool m_bSelfCleanup = false;
     public:
     typedef CIfDeferredHandler super;
     CIfAsyncCancelHandler( const IConfigDb* pCfg )
@@ -1799,6 +1800,8 @@ class CIfAsyncCancelHandler :
     gint32 RunTask()
     { return STATUS_PENDING; }
 
+    void SetSelfCleanup()
+    { m_bSelfCleanup = true; }
     gint32 OnTaskComplete( gint32 iRet );
 };
 

@@ -404,7 +404,7 @@ struct CPrimeType : public CAstNodeBase
     inline guint32 GetName() const
     { return m_dwAttrName; }
 
-    std::string GetSignature() const
+    std::string GetSignature() const override
     {
         if( g_mapTypeSig.find( m_dwAttrName ) ==
             g_mapTypeSig.end() )
@@ -538,7 +538,7 @@ struct CArrayType : public CPrimeType
     ObjPtr& GetElemType()
     { return m_pElemType; }
 
-    std::string GetSignature() const
+    std::string GetSignature() const override
     {
         std::string strSig = "(";
         ObjPtr pObj = m_pElemType;
@@ -576,7 +576,7 @@ struct CMapType : public CArrayType
     ObjPtr& GetKeyType()
     { return m_pKeyType; }
 
-    std::string GetSignature() const
+    std::string GetSignature() const override
     {
         std::string strSig = "[";
         ObjPtr pObj = m_pKeyType;
@@ -640,7 +640,7 @@ struct CStructRef : public CPrimeType
         return ret;
     }
 
-    std::string GetSignature() const
+    std::string GetSignature() const override
     {
         ObjPtr pObj;
         pObj = ObjPtr( ( CObjBase* )this, true );

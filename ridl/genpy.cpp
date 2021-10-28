@@ -291,7 +291,7 @@ static gint32 GetArgsAndSigs( CArgList* pArgList,
     return ret;
 }
 
-static gint32 EmitFormalArgList(
+static gint32 EmitFormalArgListPy(
     CWriterBase* pWriter, CArgList* pInArgs )
 {
     gint32 ret = 0;
@@ -987,7 +987,7 @@ gint32 CDeclarePyStruct::Output()
     return ret;
 }
 
-gint32 GenStructsFile(
+gint32 GenStructsFilePy(
     CPyWriter* pWriter, ObjPtr& pRoot )
 {
     if( pWriter == nullptr ||
@@ -1259,7 +1259,7 @@ gint32 CImplPyMthdProxyBase::OutputSync( bool bSync )
                 CCOUT << "def " << strName << "( self, context, "; 
             INDENT_UPL;
 
-            ret = EmitFormalArgList(
+            ret = EmitFormalArgListPy(
                 m_pWriter, pInArgs );
             if( ERROR( ret ) )
                 break;
@@ -1776,7 +1776,7 @@ gint32 GenPyProj(
         CPyWriter oWriter(
             strOutPath, strAppName, pRoot );
 
-        ret = GenStructsFile( &oWriter, pRoot );
+        ret = GenStructsFilePy( &oWriter, pRoot );
         if( ERROR( ret ) )
             break;
 
@@ -2059,7 +2059,7 @@ gint32 CImplPyMthdSvrBase::OutputAsyncCompHandler()
             << "( self, callback : cpp.ObjPtr, iRet : int,";
         INDENT_UPL;
 
-        ret = EmitFormalArgList( m_pWriter, pOutArgs );
+        ret = EmitFormalArgListPy( m_pWriter, pOutArgs );
         if( ERROR( ret ) )
             break;
 
@@ -2148,7 +2148,7 @@ gint32 CImplPyMthdSvrBase::OutputAsyncCHWrapper()
         CCOUT << "    iRet : int, callback : cpp.ObjPtr,";
         INDENT_UPL;
 
-        ret = EmitFormalArgList( m_pWriter, pInArgs );
+        ret = EmitFormalArgListPy( m_pWriter, pInArgs );
         if( ERROR( ret ) )
             break;
 
@@ -2207,7 +2207,7 @@ gint32 CImplPyMthdSvrBase::OutputEvent()
         CCOUT << "    callback : cpp.ObjPtr,";
         INDENT_UPL;
 
-        ret = EmitFormalArgList( m_pWriter, pInArgs );
+        ret = EmitFormalArgListPy( m_pWriter, pInArgs );
         if( ERROR( ret ) )
             break;
 
@@ -2435,7 +2435,7 @@ gint32 CImplPyMthdSvr::Output()
             CCOUT << "def " << strName << "( self, callback : cpp.ObjPtr,"; 
             INDENT_UPL;
 
-            ret = EmitFormalArgList(
+            ret = EmitFormalArgListPy(
                 m_pWriter, pInArgs );
             if( ERROR( ret ) )
                 break;
@@ -2497,7 +2497,7 @@ gint32 CImplPyMthdSvr::OutputAsyncCancelHandler()
         CCOUT << "    callback : cpp.ObjPtr, iRet : int,";
         INDENT_UPL;
 
-        ret = EmitFormalArgList( m_pWriter, pInArgs );
+        ret = EmitFormalArgListPy( m_pWriter, pInArgs );
         if( ERROR( ret ) )
             break;
 
@@ -2699,7 +2699,7 @@ gint32 CImplPyMthdProxy::OutputAsyncCallback()
             CCOUT << "    context : object, ret : int, "; 
             INDENT_UPL;
 
-            ret = EmitFormalArgList(
+            ret = EmitFormalArgListPy(
                 m_pWriter, pOutArgs );
             if( ERROR( ret ) )
                 break;
@@ -2747,7 +2747,7 @@ gint32 CImplPyMthdProxy::OutputEvent()
             CCOUT << "def " << strName << "( self,"; 
             INDENT_UPL;
 
-            ret = EmitFormalArgList(
+            ret = EmitFormalArgListPy(
                 m_pWriter, pInArgs );
             if( ERROR( ret ) )
                 break;

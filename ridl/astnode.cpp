@@ -42,7 +42,7 @@ std::string GetTypeSig( ObjPtr& pObj )
         {
             ObjPtr pRefType;
             CStructRef* pRef = pObj;
-            std::string strName = pRef->GetName();
+            stdstr strName = pRef->GetName();
             ret = g_mapDecls.GetDeclNode(
                 strName, pRefType );
             if( SUCCEEDED( ret ) )
