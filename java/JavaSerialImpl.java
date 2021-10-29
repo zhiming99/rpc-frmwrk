@@ -12,11 +12,11 @@ public class JavaSerialImpl extends JavaSerialBase
     public JavaSerialImpl( Object pIf )
     { m_oInst = ( InstType )pIf; }
 
-    ObjPtr getInst()
+    public ObjPtr getInst()
     {
-        return m_oInst.CastToObjPtr();
+        return ( ObjPtr )m_oInst.CastToObjPtr();
     }
-    int serialHStream( ByteBuffer buf, long val )
+    public int serialHStream( BufPtr buf, Integer offset, long val )
     {
         if( m_oInst == null )
             return -rpcbaseConstants.EFAULT;
@@ -26,13 +26,13 @@ public class JavaSerialImpl extends JavaSerialBase
         if( jret.ERROR() ) 
             return jret.getError();
 
-        serialInt64(
-            buf, ( Long )jret.getAt( 0 ) );
+        serialInt64( buf, offset,
+            ( Long )jret.getAt( 0 ) );
 
         return 0;
     }
 
-    long deserialHStream( ByteBuffer buf )
+    public long deserialHStream( ByteBuffer buf )
     {
         if( m_oInst == null )
             throw new NullPointerException(

@@ -493,6 +493,10 @@ class CJavaServerImpl :
             ( guint32 )dwSeriProto );
     }
 
+    jobject StartStream( JNIEnv *jenv, ObjPtr* ppObj )
+    {
+        return nullptr;
+    }
     }
 
     jobject CastToObjPtr( JNIEnv *jenv );

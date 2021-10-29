@@ -31,13 +31,16 @@ import java.util.ArrayList;
 import java.nio.ByteBuffer;
 import java.util.Map.Entry;
 import java.nio.charset.StandardCharsets;
+import java.util.NoSuchElementException;
 
 abstract public class JavaSerialBase
 {
+    public static int m_iMaxSize =
+        RC.MAX_BUF_SIZE;
     public interface ISerializable
     {
         public abstract int serialize(
-            ByteBuffer buf );
+            BufPtr buf, Integer offset );
         public abstract int deserialize(
             ByteBuffer buf );
         public abstract void setInst(
@@ -47,7 +50,7 @@ abstract public class JavaSerialBase
     public interface ISerialElem
     {
         public abstract int serialize(
-            ByteBuffer buf, Object val );
+            BufPtr buf, Integer offset, Object val );
     }
     public interface IDeserialElem
     {
@@ -55,112 +58,103 @@ abstract public class JavaSerialBase
             ByteBuffer buf );
     }
 
-    int serialBoolArr( ByteBuffer buf, boolean[] val )
+    public int serialBoolArr( BufPtr buf, Integer offset, boolean[] val )
     {
         int iCount = val.length;
         int iBytes = iCount;
-        buf.putInt( iBytes );
+        serialInt32( buf, offset, iBytes );
         if( iCount == 0 )
             return 0;
+
+        int ret = 0;
         for( boolean i : val )
         {
             if( i )
-                buf.put( ( byte )1 );
+                serialInt8(
+                    buf, offset, ( byte )1 );
             else
-                buf.put( ( byte )0 );
+                serialInt8(
+                    buf, offset, ( byte )0 );
         }
-        return 0;
+        return ret;
     }
-    int serialInt8Arr( ByteBuffer buf, byte[] val )
+    public int serialInt8Arr(
+        BufPtr buf, Integer offset, byte[] val )
     {
-        serialBuf( buf, val );
+        offset = buf.SerialByteArray( offset, val );
+        if( offset < 0 )
+            return offset;
         return 0;
     }
 
-    int serialInt16Arr( ByteBuffer buf, short[] val )
+    public int serialInt16Arr(
+        BufPtr buf, Integer offset, short[] val )
     {
-        int iCount = val.length;
-        int iBytes = iCount * 2;
-        buf.putInt( iBytes );
-        buf.putInt( iCount );
-        if( iCount == 0 )
-            return 0;
-        for( short i : val )
-             buf.putShort( i );
+        offset = buf.SerialShortArr( offset, val );
+        if( offset < 0 )
+            return offset;
         return 0;
     }
 
-    int serialInt32Arr( ByteBuffer buf, int[] val )
+    public int serialInt32Arr(
+        BufPtr buf, Integer offset, int[] val )
     {
-        int iCount = val.length;
-        int iBytes = iCount * 4;
-        buf.putInt( iBytes );
-        buf.putInt( iCount );
-        if( iCount == 0 )
-            return 0;
-        for( int i : val )
-             buf.putInt( i );
+        offset = buf.SerialIntArr( offset, val );
+        if( offset < 0 )
+            return offset;
         return 0;
     }
 
-    int serialInt64Arr( ByteBuffer buf, long[] val )
+    public int serialInt64Arr(
+        BufPtr buf, Integer offset, long[] val )
     {
-        int iCount = val.length;
-        int iBytes = iCount * 8;
-        buf.putInt( iBytes );
-        buf.putInt( iCount );
-        if( iCount == 0 )
-            return 0;
-        for( long i : val )
-             buf.putLong( i );
+        offset = buf.SerialLongArr( offset, val );
+        if( offset < 0 )
+            return offset;
         return 0;
     }
 
-    int serialFloatArr( ByteBuffer buf, float[] val )
+    public int serialFloatArr(
+        BufPtr buf, Integer offset, float[] val )
     {
-        int iCount = val.length;
-        int iBytes = iCount * 4;
-        buf.putInt( iBytes );
-        buf.putInt( iCount );
-        if( iCount == 0 )
-            return 0;
-        for( float i : val )
-             buf.putFloat( i );
+        offset = buf.SerialFloatArr( offset, val );
+        if( offset < 0 )
+            return offset;
         return 0;
     }
 
-    int serialDoubleArr( ByteBuffer buf, double[] val )
+    public int serialDoubleArr(
+        BufPtr buf, Integer offset, double[] val )
+    {
+        offset = buf.SerialDoubleArr( offset, val );
+        if( offset < 0 )
+            return offset;
+        return 0;
+    }
+
+    public int serialHStreamArr( 
+        BufPtr buf, Integer offset, long[] val )
     {
         int iCount = val.length;
         int iBytes = iCount * 8;
-        buf.putInt( iBytes );
-        buf.putInt( iCount );
-        if( iCount == 0 )
-            return 0;
-        for( double i : val )
-             buf.putDouble( i );
-        return 0;
-    }
+        offset = buf.SerialInt( offset, iBytes );
+        if( offset < 0 )
+            return offset;
 
-    int serialHStreamArr( ByteBuffer buf, long[] val )
-    {
-        int iCount = val.length;
-        int iBytes = iCount * 8;
-        buf.putInt( iBytes );
-        buf.putInt( iCount );
         if( iCount == 0 )
             return 0;
+
         int ret = 0;
         for( long i : val )
         {
-             ret = serialHStream( buf, i );
-             if( ret < 0 )
-                 break;
+            ret = serialHStream( buf, offset, i );
+            if( ret < 0 )
+                break;
         }
         return ret;
     }
 
-    static boolean isPrimType( Character ch )
+    public static boolean isPrimType( Character ch )
     {
         switch( ch )
         {
@@ -180,11 +174,11 @@ abstract public class JavaSerialBase
         return false;
     }
 
-    int serialPrimArray(
-        ByteBuffer buf, Object val, String strSig )
+    public int serialPrimArray(
+        BufPtr buf, Integer offset, Object val, String strSig )
     {
         if( strSig.length() == 0 )
-            return -rpcbaseConstants.EINVAL;
+            return -RC.EINVAL;
 
         int ret = 0;
         switch( strSig.charAt( 0 ) )
@@ -194,213 +188,168 @@ abstract public class JavaSerialBase
         case 'h':
             {
                 ret = serialInt64Arr(
-                    buf, ( long[] )val );
+                    buf, offset, ( long[] )val );
                 break;
             }
         case 'D':
         case 'd':
             {
                 ret = serialInt32Arr(
-                    buf, ( int[] )val );
+                    buf, offset, ( int[] )val );
                 break;
             }
         case 'W':
         case 'w':
             {
                 ret = serialInt16Arr(
-                    buf, ( short[] )val );
+                    buf, offset, ( short[] )val );
                 break;
             }
         case 'f':
             {
                 ret = serialFloatArr(
-                    buf, ( float[] )val );
+                    buf, offset, ( float[] )val );
                 break;
             }
         case 'F':
             {
                 ret = serialDoubleArr(
-                    buf, ( double[] )val );
+                    buf, offset, ( double[] )val );
                 break;
             }
         case 'b':
         case 'B':
             {
                 ret = serialInt8Arr(
-                    buf, ( byte[] )val );
+                    buf, offset, ( byte[] )val );
                 break;
             }
         default :
-           ret = -rpcbaseConstants.EINVAL;
+           ret = -RC.EINVAL;
            break;
         }
         return ret; 
     }
 
-    void serialBool( ByteBuffer buf, boolean val )
+    public int serialBool(
+        BufPtr buf, Integer offset, boolean val )
     {
         if( val )
-            buf.put( ( byte )1 );
+        {
+            offset = buf.SerialByte(
+                offset, ( byte )1 );
+        }
         else
-            buf.put( ( byte )0 );
-    }
-    void serialInt8( ByteBuffer buf, byte val )
-    { buf.put( val ); }
-
-    void serialInt16( ByteBuffer buf, short val )
-    { buf.putShort( val ); }
-
-    void serialInt32( ByteBuffer buf, int val )
-    { buf.putInt( val ); }
-
-    void serialInt64( ByteBuffer buf, long val )
-    { buf.putLong( val ); }
-
-    void serialFloat( ByteBuffer buf, float val )
-    { buf.putFloat( val ); }
-
-    void serialDouble( ByteBuffer buf, double val )
-    { buf.putDouble( val ); }
-
-    abstract int serialHStream(
-        ByteBuffer buf, long val );
-
-    int serialBoolMap( ByteBuffer buf, Boolean val )
-    {
-        serialBool( buf, val.booleanValue() );
-        return 0;
-    }
-    int serialInt8Map(
-        ByteBuffer buf, Byte val )
-    {
-        serialInt8( buf, val.byteValue() );
-        return 0;
-    }
-
-    int serialInt16Map(
-        ByteBuffer buf, Short val )
-    {
-        serialInt16( buf, val.shortValue() );
-        return 0;
-    }
-
-    int serialInt32Map(
-        ByteBuffer buf, Integer val )
-    {
-        serialInt32( buf, val.intValue() );
-        return 0;
-    }
-
-    int serialInt64Map(
-        ByteBuffer buf, Long val )
-    {
-        serialInt64( buf, val.longValue() );
-        return 0;
-    }
-
-    int serialFloatMap(
-        ByteBuffer buf, Float val )
-    {
-        serialFloat( buf, val.floatValue() );
-        return 0;
-    }
-
-    int serialDoubleMap(
-        ByteBuffer buf, Double val )
-    {
-        serialDouble( buf, val.doubleValue() );
-        return 0;
-    }
-
-    int serialHStreamMap(
-        ByteBuffer buf, Long val )
-    {
-        return serialHStream( buf, val.longValue() );
-    }
-
-    int serialString( ByteBuffer buf, String val )
-    {
-        if( val == null )
         {
-            buf.putInt( 0 );
-            return 0;
+            offset = buf.SerialByte(
+                offset, ( byte )0 );
         }
-        byte[] b = val.getBytes(
-            StandardCharsets.UTF_8 );
-
-        int size = b.length; 
-        buf.putInt( size );
-        if( size == 0 )
-            return 0;
-        buf.put( b );
+        if( offset < 0 )
+            return offset;
         return 0;
     }
-
-    int serialBuf( ByteBuffer buf, byte[] val )
+    public int serialInt8( BufPtr buf, Integer offset, byte val )
     {
-        if( val == null )
-        {
-            buf.putInt( 0 );
-            return 0;
-        }
-        int size = val.length; 
-        buf.putInt( size );
-        if( size == 0 )
-            return 0;
-        buf.put( val );
+        offset = buf.SerialByte( offset, val );
+        if( offset < 0 )
+            return offset;
         return 0;
     }
 
-    int serialObjPtr( ByteBuffer buf, ObjPtr val )
+    public int serialInt16( BufPtr buf, Integer offset, short val )
     {
-        if( val == null )
-        {
-            // put an empty header
-            buf.putInt(
-                rpcbaseConstants.Clsid_Invalid );
-            buf.putInt( 0 );
-            buf.put( ( byte )1 );
-            buf.put( new byte[] {0,0,0} );
-            return 0;
-        }
-        JRetVal jret =
-            ( JRetVal )val.SerialToByteArray();
-
-        if( jret.ERROR() )
-            return jret.getError();
-
-        byte[] objBuf = ( byte[] )jret.getAt( 0 );
-
-        if( objBuf == null )
-            return -rpcbaseConstants.EFAULT;
-
-        buf.put( objBuf );
+        offset = buf.SerialShort( offset, val );
+        if( offset < 0 )
+            return offset;
         return 0;
     }
 
-    abstract ObjPtr getInst();
+    public int serialInt32( BufPtr buf, Integer offset, int val )
+    {
+        offset = buf.SerialInt( offset, val );
+        if( offset < 0 )
+            return offset;
+        return 0;
+    }
 
-    int serialStruct( ByteBuffer buf, ISerializable val )
+    public int serialInt64( BufPtr buf, Integer offset, long val )
+    {
+        offset = buf.SerialLong( offset, val );
+        if( offset < 0 )
+            return offset;
+        return 0;
+    }
+
+    public int serialFloat( BufPtr buf, Integer offset, float val )
+    {
+        offset = buf.SerialFloat( offset, val );
+        if( offset < 0 )
+            return offset;
+        return 0;
+    }
+
+    public int serialDouble( BufPtr buf, Integer offset, double val )
+    {
+        offset = buf.SerialDouble( offset, val );
+        if( offset < 0 )
+            return offset;
+        return 0;
+    }
+
+    public abstract int serialHStream(
+        BufPtr buf, Integer offset, long val );
+
+    public int serialString(
+        BufPtr buf, Integer offset, String val )
+    {
+        offset = buf.SerialString( offset, val );
+        if( offset < 0 )
+            return offset;
+        return 0;
+    }
+
+    public int serialBuf(
+        BufPtr buf, Integer offset, byte[] val )
+    {
+        offset = buf.SerialByteArray( offset, val );
+        if( offset < 0 )
+            return offset;
+        return 0;
+    }
+
+    public int serialObjPtr(
+        BufPtr buf, Integer offset, ObjPtr val )
+    {
+        offset = buf.SerialObjPtr( offset, val );
+        if( offset < 0 )
+            return offset;
+        return 0;
+    }
+
+    public abstract ObjPtr getInst();
+
+    public int serialStruct( BufPtr buf, Integer offset, ISerializable val )
     {
         int ret = 0;
         ObjPtr oInst = getInst();
         if( oInst == null )
-            return -rpcbaseConstants.EFAULT;
+            return -RC.EFAULT;
         val.setInst( oInst );
-        ret = val.serialize( buf );
+        ret = val.serialize( buf, offset );
         return ret;
     }
 
-    int serialArray( ByteBuffer buf, Object val, String sig )
+    public int serialArray( BufPtr buf,
+        Integer offset, Object val, String sig )
     {
         int sigLen = sig.length();
 
         if( sig.charAt( 0 ) != '(' )
-            return -rpcbaseConstants.EINVAL;
+            return -RC.EINVAL;
         if( sig.charAt( sigLen -1 ) != ')' )
-            return -rpcbaseConstants.EINVAL;
+            return -RC.EINVAL;
         if( sigLen <= 2 )
-            return -rpcbaseConstants.EINVAL;
+            return -RC.EINVAL;
 
         int ret = 0;
         do{
@@ -409,63 +358,80 @@ abstract public class JavaSerialBase
 
             if( sigElem.length() == 1 )
             {
-                if( isPrimType(
-                    sigElem.charAt( 0 ) ) )
+                Character ch =
+                    sigElem.charAt( 0 );
+
+                if( isPrimType( ch ) )
                 {
-                    ret = serialPrimArray(
-                        buf, val, sigElem );
+                    ret = serialPrimArray( buf,
+                        offset, val, sigElem );
                     break;
                 }
             }
 
-            int sizeOff = buf.position();
+            int sizeOff = offset;
             Object[] objArr = ( Object[] )val;
             int count = objArr.length;
-            buf.putInt( 0 );
-            buf.putInt( count );
+
+            ret = serialInt32( buf, offset, 0 );
+            if( ret < 0 )
+                break;
+
+            ret = serialInt32( buf, offset, count );
+            if( ret < 0 )
+                break;
+
             if( count == 0 )
                 break;
+
             for( Object elem : objArr )
             {
                 ret = serialElem(
-                    buf, elem, sigElem );
+                    buf, offset, elem, sigElem );
                 if( ret < 0 )
                     break;
             }
             if( ret < 0 )
                 break;
-            int curPos = buf.position();
-            int arrSize = curPos - sizeOff - 8;
-            if( arrSize <= 0 )
-                ret = -rpcbaseConstants.ERANGE;
 
-            buf.position( sizeOff );
-            buf.putInt( arrSize );
-            buf.position( curPos );
+            int arrSize = offset - sizeOff - 8;
+            if( arrSize <= 0 )
+                ret = -RC.ERANGE;
+
+            Integer oSizeOff = sizeOff;
+            ret = serialInt32(
+                buf, oSizeOff, arrSize );
 
         }while( false );
+
         return ret;
     }
 
-    int serialMap( ByteBuffer buf, Map<?,?> val, String sig )
+    public int serialMap( BufPtr buf, Integer offset, Map<?,?> val, String sig )
     {
-        int ret = 0;
         int sigLen = sig.length();
         Character ch = sig.charAt( 0 );
         if( sig.charAt( 1 ) != '[' )
-            return -rpcbaseConstants.EINVAL;
+            return -RC.EINVAL;
         else if( sig.charAt( sigLen -1 ) != ']' )
-            return -rpcbaseConstants.EINVAL;
+            return -RC.EINVAL;
         if( sigLen <= 2 )
-            return -rpcbaseConstants.EINVAL;
+            return -RC.EINVAL;
         String sigElem =
             sig.substring( 1, sigLen - 1 );
 
+        int ret = 0;
         do{
-            int sizeOff = buf.position();
+            int sizeOff = offset;
             int count = val.size();
-            buf.putInt( 0 );
-            buf.putInt( count );
+            ret = serialInt32( buf, offset, 0 );
+            if( ret < 0 )
+                break;
+
+            serialInt32( buf, offset, count );
+            if( ret < 0 )
+                break;
+
             if( count == 0 )
                 break;
 
@@ -474,65 +440,67 @@ abstract public class JavaSerialBase
                 Object key = elem.getKey();
                 Object value = elem.getValue();
                 ret = serialElem(
-                    buf, key, sigElem.substring( 0, 1 ) );
+                    buf, offset, key, sigElem.substring( 0, 1 ) );
                 if( ret < 0 )
                     break;
                 ret = serialElem(
-                    buf, value, sigElem.substring( 1 ) );
+                    buf, offset, value, sigElem.substring( 1 ) );
                 if( ret < 0 )
                     break;
             }
             if( ret < 0 )
                 break;
-            int curPos = buf.position();
+            int curPos = offset;
             int mapSize = curPos - sizeOff - 8;
             if( mapSize <= 0 )
             {
-                ret = -rpcbaseConstants.ERANGE;
+                ret = -RC.ERANGE;
                 break;
             }
-
-            buf.position( sizeOff );
-            buf.putInt( mapSize );
-            buf.position( curPos );
+            
+            Integer oSizeOff = sizeOff;
+            ret = serialInt32(
+                buf, oSizeOff, mapSize );
 
         }while( false );
 
         return ret;
     }
 
-    int serialElem( ByteBuffer buf, Object val, String sig )
+    public int serialElem( BufPtr buf,
+        Integer offset, Object val, String sig )
     {
         int ret = 0;
         int sigLen = sig.length();
         Character ch = sig.charAt( 0 );
         if( ch == '(' )
         {
-            return serialArray( buf, val, sig );
+            return serialArray(
+                buf, offset, val, sig );
         }
         else if( ch == '[' )
         {
             return serialMap(
-                buf, (Map<?,?>)val, sig );
+                buf, offset, (Map<?,?>)val, sig );
         }
         if( ! m_SerialFuncs.containsKey( ch ) )
-            return -rpcbaseConstants.EINVAL;
+            return -RC.ENOENT;
 
         ISerialElem o = m_SerialFuncs.get( ch );
-        o.serialize( buf, val );
+        o.serialize( buf, offset, val );
         return 0;
     }
 
-    long deserialInt64( ByteBuffer buf )
+    public long deserialInt64( ByteBuffer buf )
     { return buf.getLong(); }
 
-    int deserialInt32( ByteBuffer buf )
+    public int deserialInt32( ByteBuffer buf )
     { return buf.getInt(); }
 
-    short deserialInt16( ByteBuffer buf )
+    public short deserialInt16( ByteBuffer buf )
     { return buf.getShort(); }
 
-    boolean deserialBool( ByteBuffer buf )
+    public boolean deserialBool( ByteBuffer buf )
     {
         byte b = buf.get();
         if( b == 1 )
@@ -543,25 +511,22 @@ abstract public class JavaSerialBase
             "deserialBool with bad value" );
     }
 
-    byte deserialInt8( ByteBuffer buf )
+    public byte deserialInt8( ByteBuffer buf )
     { return buf.get(); }
 
-    float deserialFloat( ByteBuffer buf )
+    public float deserialFloat( ByteBuffer buf )
     { return buf.getFloat(); }
 
-    double deserialDouble( ByteBuffer buf )
+    public double deserialDouble( ByteBuffer buf )
     { return buf.getDouble(); }
 
-    abstract long deserialHStream( ByteBuffer buf );
+    public abstract long deserialHStream( ByteBuffer buf );
 
-    long[] deserialInt64Arr( ByteBuffer buf )
+    public long[] deserialInt64Arr( ByteBuffer buf )
     {
         int iBytes = deserialInt32( buf );
-        int count = deserialInt32( buf );
-        if( iBytes > 500 * 1024 * 1024 || iBytes < 0 )
-            throw new IndexOutOfBoundsException();
-
-        if( count != ( iBytes >> 3 ) )
+        int count = iBytes >> 3;
+        if( iBytes > m_iMaxSize || iBytes < 0 )
             throw new IndexOutOfBoundsException();
         long[] vals = new long[ count ];
         for( int i = 0; i < count; i++ )
@@ -569,13 +534,11 @@ abstract public class JavaSerialBase
         return vals;
     }
 
-    int[] deserialInt32Arr( ByteBuffer buf )
+    public int[] deserialInt32Arr( ByteBuffer buf )
     {
         int iBytes = deserialInt32( buf );
-        int count = deserialInt32( buf );
-        if( iBytes > 500 * 1024 * 1024 || iBytes < 0 )
-            throw new IndexOutOfBoundsException();
-        if( count != ( iBytes >> 2 ) )
+        int count = iBytes >> 2;
+        if( iBytes > m_iMaxSize || iBytes < 0 )
             throw new IndexOutOfBoundsException();
         int[] vals = new int[ count ];
         for( int i = 0; i < count; i++ )
@@ -583,13 +546,11 @@ abstract public class JavaSerialBase
         return vals;
     }
 
-    short[] deserialInt16Arr( ByteBuffer buf )
+    public short[] deserialInt16Arr( ByteBuffer buf )
     {
         int iBytes = deserialInt32( buf );
-        int count = deserialInt32( buf );
-        if( iBytes > 500 * 1024 * 1024 || iBytes < 0 )
-            throw new IndexOutOfBoundsException();
-        if( count != ( iBytes >> 1 ) )
+        int count = iBytes >> 1;
+        if( iBytes > m_iMaxSize || iBytes < 0 )
             throw new IndexOutOfBoundsException();
         short[] vals = new short[ count ];
         for( int i = 0; i < count; i++ )
@@ -597,7 +558,7 @@ abstract public class JavaSerialBase
         return vals;
     }
 
-    boolean[] deserialBoolArr( ByteBuffer buf )
+    public boolean[] deserialBoolArr( ByteBuffer buf )
     {
         byte[] bytes = deserialBuf( buf );
         boolean[] bools = new boolean[ bytes.length ];
@@ -611,16 +572,16 @@ abstract public class JavaSerialBase
         return bools;
     }
 
-    byte[] deserialInt8Arr( ByteBuffer buf )
+    public byte[] deserialInt8Arr( ByteBuffer buf )
     {
         return deserialBuf( buf );
     }
 
-    float[] deserialFloatArr( ByteBuffer buf )
+    public float[] deserialFloatArr( ByteBuffer buf )
     {
         int iBytes = deserialInt32( buf );
         int count = deserialInt32( buf );
-        if( iBytes > 500 * 1024 * 1024 || iBytes < 0 )
+        if( iBytes > m_iMaxSize || iBytes < 0 )
             throw new IndexOutOfBoundsException();
         if( count != ( iBytes >> 2 ) )
             throw new IndexOutOfBoundsException();
@@ -630,11 +591,11 @@ abstract public class JavaSerialBase
         return vals;
     }
 
-    double[] deserialDoubleArr( ByteBuffer buf )
+    public double[] deserialDoubleArr( ByteBuffer buf )
     {
         int iBytes = deserialInt32( buf );
         int count = deserialInt32( buf );
-        if( iBytes > 500 * 1024 * 1024 || iBytes < 0 )
+        if( iBytes > m_iMaxSize || iBytes < 0 )
             throw new IndexOutOfBoundsException();
         if( count != ( iBytes >> 2 ) )
             throw new IndexOutOfBoundsException();
@@ -644,26 +605,24 @@ abstract public class JavaSerialBase
         return vals;
     }
 
-    long[] deserialHStreamArr( ByteBuffer buf )
+    public long[] deserialHStreamArr( ByteBuffer buf )
     {
         int iBytes = deserialInt32( buf );
         int count = deserialInt32( buf );
-        if( iBytes > 500 * 1024 * 1024 || iBytes < 0 )
+        if( iBytes > m_iMaxSize || iBytes < 0 )
             throw new IndexOutOfBoundsException();
 
-        if( count != ( iBytes >> 3 ) )
-            throw new IndexOutOfBoundsException();
         long[] vals = new long[ count ];
         for( int i = 0; i < count; i++ )
             vals[ i ] = deserialHStream( buf );
         return vals;
     }
 
-    Object deserialPrimArray(
+    public Object deserialPrimArray(
         ByteBuffer buf, String strSig )
     {
         if( strSig.length() == 0 )
-            return -rpcbaseConstants.EINVAL;
+            return -RC.EINVAL;
 
         int ret = 0;
         switch( strSig.charAt( 0 ) )
@@ -709,46 +668,13 @@ abstract public class JavaSerialBase
                 break;
             }
         default :
-           ret = -rpcbaseConstants.EINVAL;
+           ret = -RC.EINVAL;
            break;
         }
         return ret; 
     }
 
-    Long deserialInt64Map( ByteBuffer buf )
-    { return new Long( buf.getLong() ); }
-
-    Integer deserialInt32Map( ByteBuffer buf )
-    { return new Integer( buf.getInt() ); }
-
-    Short deserialInt16Map( ByteBuffer buf )
-    { return buf.getShort(); }
-
-    Boolean deserialBoolMap( ByteBuffer buf )
-    {
-        byte b = buf.get();
-        if( b == 1 )
-            return new Boolean( true );
-        else if( b == 0 )
-            return new Boolean( false );
-
-        throw new IllegalArgumentException(
-            "deserialBooMap with bad value" );
-    }
-
-    Byte deserialInt8Map( ByteBuffer buf )
-    { return new Byte( buf.get() ); }
-
-    Float deserialFloatMap( ByteBuffer buf )
-    { return new Float( buf.getFloat() ); }
-
-    Double deserialDoubleMap( ByteBuffer buf )
-    { return new Double( buf.getDouble() ); }
-
-    Long deserialHStreamMap( ByteBuffer buf )
-    { return new Long( deserialHStream( buf ) ); }
-
-    String deserialString( ByteBuffer buf )
+    public String deserialString( ByteBuffer buf )
     {
         int iSize = deserialInt32( buf );
         if( iSize == 0 )
@@ -762,12 +688,12 @@ abstract public class JavaSerialBase
         return new String( b );
     }
 
-    byte[] deserialBuf( ByteBuffer buf )
+    public byte[] deserialBuf( ByteBuffer buf )
     {
         int iSize = deserialInt32( buf );
         if( iSize == 0 )
             return new byte[0];
-        if( iSize > 500 * 1024 * 1024 || iSize < 0 )
+        if( iSize > m_iMaxSize || iSize < 0 )
             throw new IndexOutOfBoundsException(
                 "byte array size out of bounds" );
 
@@ -776,7 +702,7 @@ abstract public class JavaSerialBase
         return b;
     }
         
-    ObjPtr deserialObjPtr( ByteBuffer buf )
+    public ObjPtr deserialObjPtr( ByteBuffer buf )
     {
         ObjPtr pNewObj = new ObjPtr();
 
@@ -804,7 +730,7 @@ abstract public class JavaSerialBase
         return pNewObj;
     }
 
-    ISerializable deserialStruct( ByteBuffer buf )
+    public ISerializable deserialStruct( ByteBuffer buf )
     {
         int curPos = buf.position();
         int id = buf.getInt();
@@ -819,7 +745,7 @@ abstract public class JavaSerialBase
         return oStruct;
     }
 
-    Object deserialArray( ByteBuffer buf, String sig )
+    public Object deserialArray( ByteBuffer buf, String sig )
     {
         int sigLen = sig.length();
         if( sig.charAt( 0 ) != '(' ||
@@ -843,10 +769,10 @@ abstract public class JavaSerialBase
 
         int iBytes = deserialInt32( buf );
         int count = deserialInt32( buf );
-        if( iBytes > 500 * 1024 * 1024 || iBytes < 0 )
+        if( iBytes > m_iMaxSize || iBytes < 0 )
             throw new IndexOutOfBoundsException();
 
-        if( count > 1024 * 1024 || count < 0 )
+        if( count < 0 || count > iBytes )
             throw new IndexOutOfBoundsException();
 
         Object[] objArr = new Object[ count ];
@@ -871,7 +797,7 @@ abstract public class JavaSerialBase
         return objArr;
     }
 
-    Map<Object, Object> deserialMap(
+    public Map<Object, Object> deserialMap(
         ByteBuffer buf, String sig )
     {
         int sigLen = sig.length();
@@ -886,10 +812,10 @@ abstract public class JavaSerialBase
 
         int iBytes = deserialInt32( buf );
         int count = deserialInt32( buf );
-        if( iBytes > 500 * 1024 * 1024 || iBytes < 0 )
+        if( iBytes > m_iMaxSize || iBytes < 0 )
             throw new IndexOutOfBoundsException();
 
-        if( count > 1024 * 1024 || count < 0 )
+        if( count < 0 || count > iBytes )
             throw new IndexOutOfBoundsException();
 
         Map<Object, Object >mapRet =
@@ -916,7 +842,7 @@ abstract public class JavaSerialBase
         return mapRet;
     }
 
-    Object deserialElem(
+    public Object deserialElem(
         ByteBuffer buf, String sig )
     {
         Character ch = sig.charAt( 0 );
@@ -934,11 +860,7 @@ abstract public class JavaSerialBase
         }
 
         if( !m_DeserialFuncs.containsKey( ch ) )
-            throw new IllegalArgumentException();
-
-        if( m_DeserialFuncs.containsKey( ch ) )
-            throw new RuntimeException(
-                "Error deserialElem" );
+            throw new NoSuchElementException();
 
         IDeserialElem desFun =
             m_DeserialFuncs.get( ch );
@@ -954,48 +876,48 @@ abstract public class JavaSerialBase
             new HashMap< Character, ISerialElem >();
 
         ISerialElem ent = new ISerialElem() {
-            public int serialize( ByteBuffer buf, Object elem ) // SerialInt64,    # TOK_UINT64,
-            { return serialInt64Map( buf, (Long)elem ); } };
+            public int serialize( BufPtr buf, Integer offset, Object elem ) // SerialInt64,    # TOK_UINT64,
+            { return serialInt64( buf, offset, (Long)elem ); } };
         m.put( 'Q', ent );
         m.put( 'q', ent );
 
         ent = new ISerialElem() {
-            public int serialize( ByteBuffer buf, Object elem ) // SerialInt32,    # TOK_UINT32,
-            { return serialInt32Map( buf, (Integer)elem ); } };
+            public int serialize( BufPtr buf, Integer offset, Object elem ) // SerialInt32,    # TOK_UINT32,
+            { return serialInt32( buf, offset, (Integer)elem ); } };
         m.put( 'D', ent );
         m.put( 'd', ent );
         ent = new ISerialElem() {
-            public int serialize( ByteBuffer buf, Object elem ) // SerialInt16,    # TOK_UINT16
-            { return serialInt16Map( buf, (Short)elem ); } };
+            public int serialize( BufPtr buf, Integer offset, Object elem ) // SerialInt16,    # TOK_UINT16
+            { return serialInt16( buf, offset, (Short)elem ); } };
         m.put( 'W', ent );
         m.put( 'w', ent );
         m.put( 'f', new ISerialElem() {
-            public int serialize( ByteBuffer buf, Object elem ) // SerialFloat,    # TOK_FLOAT
-            { return serialFloatMap( buf, (Float)elem ); } } );
+            public int serialize( BufPtr buf, Integer offset, Object elem ) // SerialFloat,    # TOK_FLOAT
+            { return serialFloat( buf, offset, (Float)elem ); } } );
         m.put( 'F', new ISerialElem() {
-            public int serialize( ByteBuffer buf, Object elem ) // SerialDouble,    # TOK_DOUBLE
-            { return serialDoubleMap( buf, (Double)elem ); } } );
+            public int serialize( BufPtr buf, Integer offset, Object elem ) // SerialDouble,    # TOK_DOUBLE
+            { return serialDouble( buf, offset, (Double)elem ); } } );
         m.put( 'b', new ISerialElem() {
-            public int serialize( ByteBuffer buf, Object elem ) // SerialBool,    # TOK_BOOL
-            { return serialBoolMap( buf, (Boolean)elem ); } } );
+            public int serialize( BufPtr buf, Integer offset, Object elem ) // SerialBool,    # TOK_BOOL
+            { return serialBool( buf, offset, (Boolean)elem ); } } );
         m.put( 'B' , new ISerialElem() {
-            public int serialize( ByteBuffer buf, Object elem ) // SerialInt8,    # TOK_BYTE
-            { return serialInt8Map( buf, (Byte)elem ); } } );
+            public int serialize( BufPtr buf, Integer offset, Object elem ) // SerialInt8,    # TOK_BYTE
+            { return serialInt8( buf, offset, (Byte)elem ); } } );
         m.put( 'h', new ISerialElem() {
-            public int serialize( ByteBuffer buf, Object elem ) // SerialHStream,    # TOK_HSTREAM
-            { return serialHStreamMap( buf, (Long)elem ); } } );
+            public int serialize( BufPtr buf, Integer offset, Object elem ) // SerialHStream,    # TOK_HSTREAM
+            { return serialHStream( buf, offset, (Long)elem ); } } );
         m.put( 's', new ISerialElem() {
-            public int serialize( ByteBuffer buf, Object elem ) // SerialString,    # TOK_STRING
-            { return serialString( buf, (String)elem ); } } );
+            public int serialize( BufPtr buf, Integer offset, Object elem ) // SerialString,    # TOK_STRING
+            { return serialString( buf, offset, (String)elem ); } } );
         m.put( 'a', new ISerialElem() {
-            public int serialize( ByteBuffer buf, Object elem ) // SerialBuf,    # TOK_BYTEARR
-            { return serialBuf( buf, (byte[])elem ); } } );
+            public int serialize( BufPtr buf, Integer offset, Object elem ) // SerialBuf,    # TOK_BYTEARR
+            { return serialBuf( buf, offset, (byte[])elem ); } } );
         m.put( 'o', new ISerialElem() {
-            public int serialize( ByteBuffer buf, Object elem ) // SerialObjPtr,    # TOK_OBJPTR
-            { return serialObjPtr( buf, (ObjPtr)elem ); } } );
+            public int serialize( BufPtr buf, Integer offset, Object elem ) // SerialObjPtr,    # TOK_OBJPTR
+            { return serialObjPtr( buf, offset, (ObjPtr)elem ); } } );
         m.put( 'O', new ISerialElem() {
-            public int serialize( ByteBuffer buf, Object elem ) // SerialStruct,    # TOK_STRUCT
-            { return serialStruct( buf, (ISerializable)elem ); } } );
+            public int serialize( BufPtr buf, Integer offset, Object elem ) // SerialStruct,    # TOK_STRUCT
+            { return serialStruct( buf, offset, (ISerializable)elem ); } } );
         return m;
     }
 
@@ -1008,65 +930,65 @@ abstract public class JavaSerialBase
             new HashMap< Character, IDeserialElem >();
         IDeserialElem ent = new IDeserialElem() {
             public Object deserialize( ByteBuffer buf ) // SerialInt64,    # TOK_UINT64,
-            { return ( Object )deserialInt64Map( buf ); } }; 
+            { return ( Long )deserialInt64( buf ); } }; 
         m.put( 'Q', ent );
         m.put( 'q', ent );
 
         ent = new IDeserialElem() {
             public Object deserialize( ByteBuffer buf ) // DeserialInt32,    # TOK_UINT32,
-            { return ( Object )deserialInt32Map( buf ); } }; 
+            { return ( Integer )deserialInt32( buf ); } }; 
         m.put( 'D', ent );
         m.put( 'd', ent );
 
         ent = new IDeserialElem() {
             public Object deserialize( ByteBuffer buf ) // DeserialInt16,    # TOK_UINT16,
-            { return ( Object )deserialInt32Map( buf ); } }; 
+            { return ( Short )deserialInt16( buf ); } }; 
         m.put( 'W', ent );
         m.put( 'w', ent );
 
         ent = new IDeserialElem() {
             public Object deserialize( ByteBuffer buf ) // DeserialBool,    # TOK_BOOL,
-            { return ( Object )deserialBoolMap( buf ); } }; 
+            { return ( Boolean )deserialBool( buf ); } }; 
         m.put( 'b', ent );
 
         ent = new IDeserialElem() {
             public Object deserialize( ByteBuffer buf ) // DeserialInt8,    # TOK_BYTE,
-            { return ( Object )deserialBoolMap( buf ); } }; 
+            { return ( Byte )deserialInt8( buf ); } }; 
         m.put( 'B', ent );
 
         ent = new IDeserialElem() {
             public Object deserialize( ByteBuffer buf ) // DeserialFloat,    # TOK_FLOAT,
-            { return ( Object )deserialFloatMap( buf ); } }; 
+            { return ( Float )deserialFloat( buf ); } }; 
         m.put( 'f', ent );
 
         ent = new IDeserialElem() {
             public Object deserialize( ByteBuffer buf ) // DeserialDouble,    # TOK_DOUBLE,
-            { return ( Object )deserialDoubleMap( buf ); } }; 
+            { return ( Double )deserialDouble( buf ); } }; 
         m.put( 'F', ent );
 
         ent = new IDeserialElem() {
             public Object deserialize( ByteBuffer buf ) // DeserialHStream,    # TOK_HSTREAM,
-            { return ( Object )deserialHStreamMap( buf ); } }; 
+            { return ( Long )deserialHStream( buf ); } }; 
         m.put( 'h', ent );
 
         ent = new IDeserialElem() {
             public Object deserialize( ByteBuffer buf ) // DeserialString,    # TOK_STRING, 
-            { return ( Object )deserialString( buf ); } }; 
+            { return deserialString( buf ); } }; 
         m.put( 's', ent );
 
         ent = new IDeserialElem() {
             public Object deserialize( ByteBuffer buf ) // DeserialBuf,    # TOK_BYTEARR,
-            { return ( Object )deserialBuf( buf ); } }; 
+            { return deserialBuf( buf ); } }; 
         m.put( 'a', ent );
 
         ent = new IDeserialElem() {
             public Object deserialize( ByteBuffer buf ) // DeserialObjPtr,    # TOK_OBJPTR,
-            { return ( Object )deserialObjPtr( buf ); } }; 
+            { return deserialObjPtr( buf ); } }; 
         m.put( 'o', ent );
 
         ent = new IDeserialElem() {
             public Object deserialize( ByteBuffer buf ) // DeserialStruct  # TOK_STRUCT,
-            { return ( Object )deserialStruct( buf ); } }; 
+            { return deserialStruct( buf ); } }; 
         m.put( 'O', ent );
 
         return m;

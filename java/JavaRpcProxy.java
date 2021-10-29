@@ -50,13 +50,13 @@ abstract public class JavaRpcProxy extends JavaRpcServiceP
         return;
     }
 
-    JRetVal sendRequest(
+    public JRetVal sendRequest(
         String strIfName,
         String strMethod,
         Object[] args )
     {
         return makeCall( strIfName, strMethod,
-            args, rpcbaseConstants.seriNone );
+            args, RC.seriNone );
     }
     /* sendRequestAsync returns a tuple with two
      * elements, 0 is the return code, and 1 is a
@@ -64,7 +64,7 @@ abstract public class JavaRpcProxy extends JavaRpcServiceP
      * cancel the request sent
      */
 
-    JRetVal sendRequestAsync(
+    public JRetVal sendRequestAsync(
         IAsyncRespCb callback,
         String strIfName,
         String strMethod,
@@ -72,10 +72,10 @@ abstract public class JavaRpcProxy extends JavaRpcServiceP
     {
         return makeCallAsync( callback,
             strIfName, strMethod, args,
-            rpcbaseConstants.seriNone );
+            RC.seriNone );
     }
 
-    JRetVal makeCall(
+    public JRetVal makeCall(
         String strIfName,
         String strMethod,
         Object[] args,
@@ -86,7 +86,7 @@ abstract public class JavaRpcProxy extends JavaRpcServiceP
             args, seriProto );
     }
 
-    JRetVal makeCallAsync(
+    public JRetVal makeCallAsync(
         IAsyncRespCb callback,
         String strIfName,
         String strMethod,
@@ -98,20 +98,17 @@ abstract public class JavaRpcProxy extends JavaRpcServiceP
         do{
             CParamList oParams = new CParamList();
             ret = oParams.SetStrProp(
-                rpcbaseConstants.propIfName,
-                strIfName );
+                RC.propIfName, strIfName );
             if( ret < 0 )
                 break;
 
             ret = oParams.SetStrProp(
-                rpcbaseConstants.propMethodName,
-                strMethod );
+                RC.propMethodName, strMethod );
             if( ret < 0 )
                 break;
 
             ret = oParams.SetIntProp(
-                rpcbaseConstants.propSeriProto,
-                seriProto );
+                RC.propSeriProto, seriProto );
             if( ret < 0 )
                 break;
 
@@ -157,14 +154,14 @@ abstract public class JavaRpcProxy extends JavaRpcServiceP
             if [ 0 ] is ERROR or propNoReply is true
                 [ 1 ] is None
     */
-    JRetVal makeCallWithOpt(
+    public JRetVal makeCallWithOpt(
         CfgPtr pCfg, Object[] args )
     {
         return makeCallWithOptAsync(
             null, null, pCfg, args );
     }
 
-    JRetVal makeCallWithOptAsync(
+    public JRetVal makeCallWithOptAsync(
         IAsyncRespCb callback,
         Object context,
         CfgPtr pCfg,

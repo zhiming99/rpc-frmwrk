@@ -1976,8 +1976,34 @@ jobject CastToProxy(
 void JavaDbgPrint(
     const std::string strMsg, int level = 3 );
 
-void JavaOutputMsg( const std::string strMsg );
 %nodefaultctor;
+%typemap(javadestruct_derived, methodname="delete", methodmodifiers="public synchronized") CJavaProxy {
+    if (swigCPtr != 0) {
+      if (swigCMemOwn) {
+        swigCMemOwn = false;
+      }
+      swigCPtr = 0;
+    }
+    super.delete();
+  }
+class CJavaProxy : public CInterfaceProxy
+{
+};
+
+%typemap(javadestruct_derived, methodname="delete", methodmodifiers="public synchronized") CJavaServer {
+    if (swigCPtr != 0) {
+      if (swigCMemOwn) {
+        swigCMemOwn = false;
+      }
+      swigCPtr = 0;
+    }
+    super.delete();
+  }
+class CJavaServer : public CInterfaceServer
+{
+};
+
+void JavaOutputMsg( const std::string strMsg );
 %typemap(javadestruct_derived, methodname="delete", methodmodifiers="public synchronized") CJavaInterfBase {
     if (swigCPtr != 0) {
       if (swigCMemOwn) {
@@ -1989,7 +2015,7 @@ void JavaOutputMsg( const std::string strMsg );
   }
 template< typename T >
 class CJavaInterfBase
-    : public CRpcServices 
+    : public CRpcServices
 {
     public:
 

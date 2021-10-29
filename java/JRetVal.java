@@ -9,33 +9,56 @@ public class JRetVal {
     protected List<Object> m_listResp =
         new ArrayList< Object >();
 
-    boolean ERROR( )
+    public boolean ERROR( )
     { return m_iRetVal < 0; }
 
-    boolean SUCCEEDED()
-    { return m_iRetVal >= 0; }
+    public boolean SUCCEEDED()
+    { return m_iRetVal >= RC.STATUS_SUCCESS; }
 
-    boolean isPending()
-    { return m_iRetVal == 65537; }
+    public boolean isPending()
+    { return m_iRetVal == RC.STATUS_PENDING; }
 
-    void setError( int iRet )
+    public void setError( int iRet )
     { m_iRetVal = iRet; }
 
-    void addElem( Object pObj )
+    public void addElem( Object pObj )
     { m_listResp.add( pObj ); }
 
-    void clear()
+    public void AddElemInt( int val )
+    { m_listResp.add( new Integer( val ) ); }
+
+    public void AddElemByte( byte val )
+    { m_listResp.add( new Byte( val ) ); }
+
+    public void AddElemShort( short val )
+    { m_listResp.add( new Short( val ) ); }
+
+    public void AddElemLong( long val )
+    { m_listResp.add( new Long( val ) ); }
+
+    public void AddElemBool( boolean bval )
+    { m_listResp.add( new Boolean( bval ) ); }
+
+    public void AddElemFloat( float val )
+    { m_listResp.add( new Float( val ) ); }
+
+    public void AddElemDouble( double val )
+    { m_listResp.add( new Double( val ) ); }
+
+    public void clear()
     {
         m_listResp.clear();
         m_iRetVal = 0;
     }
-    Object[] getParamArray()
+
+    public Object[] getParamArray()
     {
         if( m_listResp.size() == 0 )
             return new Object[ 0 ];
         return m_listResp.toArray();
     }
-    vectorBufPtr getParams()
+
+    public vectorBufPtr getParams()
     {
         vectorBufPtr vecBufs =
             Helpers.convertObjectToBuf(
@@ -44,16 +67,46 @@ public class JRetVal {
         return vecBufs;
     }
 
-    int getParamCount()
+    public int getParamCount()
     { return m_listResp.size(); }
 
-    int getError()
+    public int getError()
     { return m_iRetVal; }
 
-    Object getAt( int idx )
+    public Object getAt( int idx )
     {
-        if( getParamCount() <= idx )
-            return null;
+        if( idx < 0 || getParamCount() <= idx )
+            throw new IndexOutOfBoundsException(
+                "error JRetVal.getAt" );
         return m_listResp.get( idx );
+    }
+
+    public boolean getAtBool( int idx )
+    { return ( Boolean )getAt( idx ); }
+
+    public byte getAtByte( int idx )
+    { return ( Byte )getAt( idx ); }
+
+    public short getAtShort( int idx )
+    { return ( Short )getAt( idx ); }
+
+    public int getAtInt( int idx )
+    { return ( Integer )getAt( idx ); }
+
+    public long getAtLong( int idx )
+    { return ( Long )getAt( idx ); }
+
+    public float getAtFloat( int idx )
+    { return ( Float )getAt( idx ); }
+
+    public double getAtDouble( int idx )
+    { return ( Double )getAt( idx ); }
+
+    public long getTaskId()
+    {
+        if( !isPending() )
+            throw new NullPointerException(
+                "error no task id to get" );
+        return getAtLong( 0 );
     }
 }

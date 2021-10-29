@@ -31,7 +31,7 @@ abstract public class JavaRpcServer extends JavaRpcServiceS
             if( m_oInst == null )
             {
                 jret.setError(
-                    -rpcbaseConstants.EFAULT );
+                    -RC.EFAULT );
             }
 
         }while( false );
@@ -53,25 +53,25 @@ abstract public class JavaRpcServer extends JavaRpcServiceS
      * the glue between InvokeMethod and
      * OnServiceComplete.
      */
-    int onServiceComplete(
+    public int onServiceComplete(
         ObjPtr callback, int ret, Object[] args )
     {
         return m_oInst.OnServiceComplete(
             callback, ret,
-            rpcbaseConstants.seriNone,
+            RC.seriNone,
             args );
     }
 
-    int setResponse(
+    public int setResponse(
         ObjPtr callback, int ret, Object[] args )
     {
         return m_oInst.SetResponse(
             callback, ret,
-            rpcbaseConstants.seriNone,
+            RC.seriNone,
             args );
     }
 
-    int ridlOnServiceComplete(
+    public int ridlOnServiceComplete(
         ObjPtr callback, int ret, byte[] pBuf )
     {
         List<Object> lstObj =
@@ -79,11 +79,11 @@ abstract public class JavaRpcServer extends JavaRpcServiceS
         lstObj.add( pBuf );
         return m_oInst.OnServiceComplete(
             callback, ret,
-            rpcbaseConstants.seriRidl,
+            RC.seriRidl,
             lstObj.toArray() );
     }
 
-    int ridlSetResponse(
+    public int ridlSetResponse(
         ObjPtr callback, int ret, byte[] pBuf )
     {
         List<Object> lstObj =
@@ -91,7 +91,7 @@ abstract public class JavaRpcServer extends JavaRpcServiceS
         lstObj.add( pBuf );
         return m_oInst.SetResponse(
             callback, ret,
-            rpcbaseConstants.seriRidl,
+            RC.seriRidl,
             lstObj.toArray() );
     }
 
@@ -99,21 +99,21 @@ abstract public class JavaRpcServer extends JavaRpcServiceS
      * necessary to get notified of the completion.
      * destName can be none if not needed.
      */
-    int sendEvent( Object callback,
+    public int sendEvent( Object callback,
         String ifName, String evtName,
         String destName, Object[] arrArgs )
     {
         evtName = "UserEvent_" + evtName;
         return m_oInst.SendEvent( callback,
             ifName, evtName, destName, arrArgs,
-            rpcbaseConstants.seriNone );
+            RC.seriNone );
     }
 
     /* callback can be none if it is not
      * necessary to get notified of the completion.
      * destName can be none if not needed.
      */
-    int ridlSendEvent( Object callback,
+    public int ridlSendEvent( Object callback,
         String ifName, String evtName,
         String destName, byte[] pBuf )
     {
@@ -123,8 +123,7 @@ abstract public class JavaRpcServer extends JavaRpcServiceS
         lstObj.add( pBuf );
         return m_oInst.SendEvent( callback,
             ifName, evtName, destName,
-            lstObj.toArray(),
-            rpcbaseConstants.seriRidl );
+            lstObj.toArray(), RC.seriRidl );
     }
 
     /* event called when the stream channel

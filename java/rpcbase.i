@@ -140,7 +140,8 @@ enum // EnumTypeId
     typeFloatObj,
     typeDoubleObj,
     typeJRet = 200,
-    typeObjArr = 201
+    typeObjArr = 201,
+    typeBufPtr = 202
 };
 
 typedef int32_t EnumSeriProto;
@@ -341,6 +342,12 @@ enum // rpcf specific errors
 
     // for flow control
     ERROR_QUEUE_FULL       = ( ( int )0x8001000e )
+};
+
+enum // some constants
+{
+    INVALID_HANDLE = (int) 0,
+    MAX_BUF_SIZE = ( int )( 16 * 1024 * 1024 )
 };
 
 %template(vectorBufPtr) std::vector<BufPtr>;
@@ -938,6 +945,49 @@ CfgPtr* CastToCfg( ObjPtr* pObj )
     return pCfg;
 }
 
+inline gint32 CheckAndResize( BufPtr& pBuf,
+    gint32 iPos, gint32 iSize )
+{
+    gint32 ret = 0;
+    do{
+        if( pBuf.IsEmpty() || pBuf->empty() )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+        if( iPos < 0 ||
+            iPos + iSize > MAX_BYTES_PER_BUFFER )
+        {
+            ret = -ERANGE;
+            break;
+        }
+
+        if( iPos + iSize > pBuf->size() )
+        {
+            if( iPos + iSize < 2048 )
+            {
+                pBuf->Resize( 2048 );
+                break;
+            }
+
+            gint32 iNewSize = std::min(
+                ( iPos + iSize ) * 2,
+                MAX_BYTES_PER_BUFFER );
+            pBuf->Resize( iNewSize );
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+void SerialIntNoCheck(
+    BufPtr& pBuf, int iPos, gint32 val )
+{
+    guint32 nval = htonl( val );
+    memcpy( pBuf->ptr() + iPos,
+        &nval, sizeof( guint32 ) );
+}
 
 %}
 
@@ -1164,6 +1214,15 @@ class BufPtr
             $self->IsEmpty() )
             return 0;
         return ( *$self )->size();
+    }
+
+    gint32 Resize( gint32 iSize )
+    {
+        if( $self == nullptr ||
+            $self->IsEmpty() )
+            return 0;
+        return ( *$self )->Resize(
+            ( guint32 ) iSize );
     }
 
     bool IsEmpty() const
@@ -1513,6 +1572,422 @@ class BufPtr
         *pBuf = *ppObj;
         return STATUS_SUCCESS;
     }
+
+    gint32 SerialByteArray(
+        JNIEnv *jenv, int iPos, jbyteArray pArr )
+    {
+        gint32 ret = 0;
+        jsize len = jenv->GetArrayLength( pArr );
+
+        BufPtr& pBuf = *$self;
+        ret = CheckAndResize( pBuf, iPos, len + 4 );
+        if( ERROR( ret ) )
+            return ret;
+
+        SerialIntNoCheck( pBuf, iPos, len );
+        if( len == 0 )
+            return iPos + 4;
+        jenv->GetByteArrayRegion( pArr, len, 0,
+            ( jbyte* )( pBuf->ptr() + iPos + 4 ) );
+        
+        return iPos + len + 4;
+    }
+
+    gint32 SerialString(
+        JNIEnv *jenv, int iPos, jstring jstr )
+    {
+        if( $self == nullptr )
+            return -EINVAL;
+
+        if( jstr == nullptr )
+            return -EFAULT;
+
+        gint32 ret = 0;
+        do{
+            const char* val = 
+                jenv->GetStringUTFChars( jstr, 0 );
+
+            gint32 len = strlen( val );
+            BufPtr& pBuf = *$self;
+            ret = CheckAndResize( pBuf, iPos, len + 4 );
+            if( ERROR( ret ) )
+                break;
+
+            SerialIntNoCheck( pBuf, iPos, len );
+
+            iPos += 4;
+            if( len == 0 )
+                break;
+            memcpy( pBuf->ptr() + iPos + 4, val, len );
+            iPos += len;
+            jenv->ReleaseStringUTFChars( jstr, val); 
+
+        }while( 0 );
+
+        if( ERROR( ret ) )
+            return ret;
+
+        return iPos;
+    }
+
+    gint32 SerialByte( int iPos, jbyte val )
+    {
+        if( $self == nullptr )
+            return -EINVAL;
+
+        gint32 ret = 0;
+        do{
+            BufPtr& pBuf = *$self;
+            ret = CheckAndResize( pBuf, iPos, 1 );
+            if( ERROR( ret ) )
+                break;
+            *( pBuf->ptr() + iPos ) = ( guint8 )val;
+
+        }while( 0 );
+
+        if( ERROR( ret ) )
+            return ret;
+
+        return iPos + 1;
+    }
+
+    gint32 SerialShort( int iPos, jshort val )
+    { 
+        if( $self == nullptr )
+            return -EINVAL;
+        gint32 iSize = sizeof( gint32 );
+        BufPtr& pBuf = *$self;
+        gint32 ret = CheckAndResize(
+            pBuf, iPos, iSize );
+        if( ERROR( ret ) )
+            return ret;
+
+        guint16 nval = htons( val );
+        memcpy( pBuf->ptr() + iPos, &nval, iSize );
+        return iPos + iSize;
+    }
+
+    gint32 SerialInt( int iPos, jint val )
+    { 
+        if( $self == nullptr )
+            return -EINVAL;
+        gint32 iSize = sizeof( gint32 );
+        BufPtr& pBuf = *$self;
+        gint32 ret = CheckAndResize(
+            pBuf, iPos, iSize );
+        if( ERROR( ret ) )
+            return ret;
+
+        guint32 nval = htonl( val );
+        memcpy( pBuf->ptr() + iPos, &nval, iSize );
+        return iPos + iSize;
+    }
+    gint32 SerialLong( int iPos, jlong val )
+    { 
+        if( $self == nullptr )
+            return -EINVAL;
+        gint32 iSize = sizeof( gint64 );
+        BufPtr& pBuf = *$self;
+        gint32 ret = CheckAndResize(
+            pBuf, iPos, iSize );
+        if( ERROR( ret ) )
+            return ret;
+
+        guint64 nval = htonll( val );
+        memcpy( pBuf->ptr() + iPos, &nval, iSize );
+        return iPos + iSize;
+    }
+    gint32 SerialFloat( int iPos, jfloat val )
+    { 
+        if( $self == nullptr )
+            return -EINVAL;
+        gint32 iSize = sizeof( float );
+        BufPtr& pBuf = *$self;
+        gint32 ret = CheckAndResize(
+            pBuf, iPos, iSize );
+        if( ERROR( ret ) )
+            return ret;
+
+        guint32 nval = htonl( *( guint32* )&val );
+        memcpy( pBuf->ptr() + iPos, &nval, iSize );
+        return iPos + iSize;
+    }
+
+    gint32 SerialDouble( int iPos, jdouble val )
+    { 
+        if( $self == nullptr )
+            return -EINVAL;
+        gint32 iSize = sizeof( double );
+        BufPtr& pBuf = *$self;
+        gint32 ret = CheckAndResize(
+            pBuf, iPos, iSize );
+        if( ERROR( ret ) )
+            return ret;
+
+        guint64 nval = htonll( *( guint64* )&val );
+        memcpy( pBuf->ptr() + iPos, &nval, iSize );
+        return iPos + iSize;
+    }
+
+    gint32 SerialObjPtr( int iPos, ObjPtr* ppObj )
+    {
+        if( $self == nullptr )
+            return -EINVAL;
+        if( ppObj == nullptr ||
+            ( *ppObj ).IsEmpty() )
+            return -EINVAL;
+
+        BufPtr pObjBuf( true );
+        gint32 ret = 0;
+        do{
+            BufPtr& pBuf = *$self;
+            ret = ( *ppObj )->Serialize( *pObjBuf );
+            if( ERROR( ret ) )
+                break;
+
+            ret = CheckAndResize(
+                pBuf, iPos, pObjBuf->size() );
+            if( ERROR( ret ) )
+                break;
+
+            memcpy( pBuf->ptr() + iPos,
+                pObjBuf->ptr(), pObjBuf->size() );
+
+        }while( 0 );
+        if( ERROR( ret ) )
+            return ret;
+
+        return iPos + pObjBuf->size();
+    }
+
+    gint32 SerialShortArr(
+        JNIEnv *jenv, int iPos, jshortArray val )
+    { 
+        if( jenv == nullptr || val == nullptr )
+            return -EINVAL;
+        gint32 ret = 0;
+        gint32 iNewPos = 0;
+        do{
+            jsize iCount =
+                jenv->GetArrayLength( val );
+
+            BufPtr& pBuf = *$self;
+            ret = CheckAndResize( pBuf, iPos,
+                iCount * sizeof( gint16 ) + 4 );
+            if( ERROR( ret ) )
+                break;
+
+            SerialIntNoCheck( pBuf, iPos, iCount * 4 );
+            if( iCount == 0 )
+            {
+                iNewPos = iPos + 4;
+                break;
+            }
+
+            jshort* vals =
+                jenv->GetShortArrayElements( val, 0 );
+
+            gint16* pInt =
+                ( gint16* )( pBuf->ptr() + iPos + 4 );
+            for( gint32 i = 0; i < iCount; i++ )
+            {
+                *pInt++= htons( vals[ i ] );
+            }
+            iNewPos = iPos + 4 +
+                iCount * sizeof( gint16 );
+            jenv->ReleaseShortArrayElements(
+                val, vals, 0);
+        }while( 0 );
+        if( ERROR( ret ) )
+            return ret;
+        return iNewPos;
+    }
+
+    gint32 SerialIntArr(
+        JNIEnv *jenv, int iPos, jintArray val )
+    {
+        if( jenv == nullptr || val == nullptr )
+            return -EINVAL;
+        gint32 ret = 0;
+        gint32 iNewPos = 0;
+        do{
+            jsize iCount =
+                jenv->GetArrayLength( val );
+
+            BufPtr& pBuf = *$self;
+            ret = CheckAndResize( pBuf, iPos,
+                iCount * sizeof( gint32 ) + 4 );
+            if( ERROR( ret ) )
+                break;
+
+            SerialIntNoCheck( pBuf, iPos, iCount * 4 );
+            if( iCount == 0 )
+            {
+                iNewPos = iPos + 4;
+                break;
+            }
+
+            jint* vals =
+                jenv->GetIntArrayElements( val, 0 );
+
+            gint32* pInt =
+                ( gint32* )( pBuf->ptr() + iPos + 4 );
+            for( gint32 i = 0; i < iCount; i++ )
+            {
+                *pInt++= htonl( vals[ i ] );
+            }
+            iNewPos = iPos + 4 +
+                iCount * sizeof( gint32 );
+            jenv->ReleaseIntArrayElements(
+                val, vals, 0);
+        }while( 0 );
+        if( ERROR( ret ) )
+            return ret;
+        return iNewPos;
+    }
+
+    gint32 SerialLongArr(
+        JNIEnv *jenv, int iPos, jlongArray val )
+    {
+        if( jenv == nullptr || val == nullptr )
+            return -EINVAL;
+        gint32 ret = 0;
+        gint32 iNewPos = 0;
+        do{
+            jsize iCount =
+                jenv->GetArrayLength( val );
+
+            BufPtr& pBuf = *$self;
+            ret = CheckAndResize( pBuf, iPos,
+                iCount * sizeof( guint64 ) + 4 );
+            if( ERROR( ret ) )
+                break;
+
+            SerialIntNoCheck( pBuf, iPos, iCount * 4 );
+            if( iCount == 0 )
+            {
+                iNewPos = iPos + 4;
+                break;
+            }
+
+            jlong* vals =
+                jenv->GetLongArrayElements( val, 0 );
+
+            gint64* pLong =
+                ( gint64* )( pBuf->ptr() + iPos + 4 );
+            for( gint32 i = 0; i < iCount; i++ )
+            {
+                *pLong++= htonll( vals[ i ] );
+            }
+            iNewPos = iPos + 4 +
+                iCount * sizeof( guint64 );
+            jenv->ReleaseLongArrayElements(
+                val, vals, 0);
+        }while( 0 );
+        if( ERROR( ret ) )
+            return ret;
+        return iNewPos;
+    }
+    gint32 SerialFloatArr(
+        JNIEnv *jenv, int iPos, jfloatArray val )
+    {
+        if( jenv == nullptr || val == nullptr )
+            return -EINVAL;
+
+        gint32 ret = 0;
+        gint32 iNewPos = 0;
+        do{
+            jsize iCount =
+                jenv->GetArrayLength( val );
+
+            BufPtr& pBuf = *$self;
+            ret = CheckAndResize( pBuf, iPos,
+                iCount * sizeof( float ) + 4 );
+            if( ERROR( ret ) )
+                break;
+
+            SerialIntNoCheck( pBuf, iPos,
+                iCount * sizeof( float ) );
+
+            if( iCount == 0 )
+            {
+                iNewPos = iPos + 4;
+                break;
+            }
+
+            jfloat* vals =
+                jenv->GetFloatArrayElements( val, 0 );
+
+            guint32* pFloat =
+                ( guint32* )( pBuf->ptr() + iPos + 4 );
+
+            for( gint32 i = 0; i < iCount; i++ )
+            {
+                *pFloat++= htonl(
+                    *( guint32* )( vals + i ) );
+            }
+            iNewPos = iPos + 4 +
+                iCount * sizeof( float );
+
+            jenv->ReleaseFloatArrayElements(
+                val, vals, 0);
+        }while( 0 );
+        if( ERROR( ret ) )
+            return ret;
+        return iNewPos;
+    }
+
+    gint32 SerialDoubleArr(
+        JNIEnv *jenv, int iPos, jdoubleArray val )
+    {
+        if( jenv == nullptr || val == nullptr )
+            return -EINVAL;
+
+        gint32 ret = 0;
+        gint32 iNewPos = 0;
+        do{
+            jsize iCount =
+                jenv->GetArrayLength( val );
+
+            BufPtr& pBuf = *$self;
+            ret = CheckAndResize( pBuf, iPos,
+                iCount * sizeof( double ) + 4 );
+            if( ERROR( ret ) )
+                break;
+
+            SerialIntNoCheck( pBuf, iPos,
+                iCount * sizeof( double ) );
+
+            if( iCount == 0 )
+            {
+                iNewPos = iPos + 4;
+                break;
+            }
+
+            jdouble* vals =
+                jenv->GetDoubleArrayElements( val, 0 );
+
+            guint64* pDouble =
+                ( guint64* )( pBuf->ptr() + iPos + 4 );
+
+            for( gint32 i = 0; i < iCount; i++ )
+            {
+                *pDouble++= htonll(
+                    *( guint64* )( vals + i ) );
+            }
+            iNewPos = iPos + 4 +
+                iCount * sizeof( double );
+
+            jenv->ReleaseDoubleArrayElements(
+                val, vals, 0);
+
+        }while( 0 );
+
+        if( ERROR( ret ) )
+            return ret;
+        return iNewPos;
+    }
+
 };
 
 class CParamList
