@@ -2015,7 +2015,7 @@ void JavaOutputMsg( const std::string strMsg );
   }
 template< typename T >
 class CJavaInterfBase
-    : public CRpcServices
+    : public T
 {
     public:
 
