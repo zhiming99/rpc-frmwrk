@@ -9,8 +9,8 @@ import java.nio.ByteBuffer;
 public class JavaSerialImpl extends JavaSerialBase
 {
     protected InstType m_oInst = null;
-    public JavaSerialImpl( Object pIf )
-    { m_oInst = ( InstType )pIf; }
+    public JavaSerialImpl( InstType pIf )
+    { m_oInst = pIf; }
 
     public ObjPtr getInst()
     {
@@ -19,7 +19,7 @@ public class JavaSerialImpl extends JavaSerialBase
     public int serialHStream( BufPtr buf, Integer offset, long val )
     {
         if( m_oInst == null )
-            return -rpcbaseConstants.EFAULT;
+            return -RC.EFAULT;
 
         JRetVal jret =
             ( JRetVal )m_oInst.GetIdHash( val );
@@ -39,14 +39,14 @@ public class JavaSerialImpl extends JavaSerialBase
                 "c++ instance is empty");
 
         Long qwHash = deserialInt64( buf );
-        if( qwHash == rpcbaseConstants.INVALID_HANDLE )
+        if( qwHash == RC.INVALID_HANDLE )
             throw new NullPointerException(
                 "channel hash is empty");
 
         long ret = m_oInst.GetChanByIdHash(
             qwHash.longValue() );
 
-        if( ret == rpcbaseConstants.INVALID_HANDLE )
+        if( ret == RC.INVALID_HANDLE )
             throw new NullPointerException(
                 "channel handle is invalid");
 

@@ -82,7 +82,7 @@ abstract public class JavaSerialBase
         BufPtr buf, Integer offset, byte[] val )
     {
         offset = buf.SerialByteArray( offset, val );
-        if( offset < 0 )
+        if( RC.ERROR( offset ) )
             return offset;
         return 0;
     }
@@ -91,7 +91,7 @@ abstract public class JavaSerialBase
         BufPtr buf, Integer offset, short[] val )
     {
         offset = buf.SerialShortArr( offset, val );
-        if( offset < 0 )
+        if( RC.ERROR( offset ) )
             return offset;
         return 0;
     }
@@ -100,7 +100,7 @@ abstract public class JavaSerialBase
         BufPtr buf, Integer offset, int[] val )
     {
         offset = buf.SerialIntArr( offset, val );
-        if( offset < 0 )
+        if( RC.ERROR( offset ) )
             return offset;
         return 0;
     }
@@ -109,7 +109,7 @@ abstract public class JavaSerialBase
         BufPtr buf, Integer offset, long[] val )
     {
         offset = buf.SerialLongArr( offset, val );
-        if( offset < 0 )
+        if( RC.ERROR( offset ) )
             return offset;
         return 0;
     }
@@ -118,7 +118,7 @@ abstract public class JavaSerialBase
         BufPtr buf, Integer offset, float[] val )
     {
         offset = buf.SerialFloatArr( offset, val );
-        if( offset < 0 )
+        if( RC.ERROR( offset ) )
             return offset;
         return 0;
     }
@@ -127,7 +127,7 @@ abstract public class JavaSerialBase
         BufPtr buf, Integer offset, double[] val )
     {
         offset = buf.SerialDoubleArr( offset, val );
-        if( offset < 0 )
+        if( RC.ERROR( offset ) )
             return offset;
         return 0;
     }
@@ -138,7 +138,7 @@ abstract public class JavaSerialBase
         int iCount = val.length;
         int iBytes = iCount * 8;
         offset = buf.SerialInt( offset, iBytes );
-        if( offset < 0 )
+        if( RC.ERROR( offset ) )
             return offset;
 
         if( iCount == 0 )
@@ -244,14 +244,14 @@ abstract public class JavaSerialBase
             offset = buf.SerialByte(
                 offset, ( byte )0 );
         }
-        if( offset < 0 )
+        if( RC.ERROR( offset ) )
             return offset;
         return 0;
     }
     public int serialInt8( BufPtr buf, Integer offset, byte val )
     {
         offset = buf.SerialByte( offset, val );
-        if( offset < 0 )
+        if( RC.ERROR( offset ) )
             return offset;
         return 0;
     }
@@ -259,7 +259,7 @@ abstract public class JavaSerialBase
     public int serialInt16( BufPtr buf, Integer offset, short val )
     {
         offset = buf.SerialShort( offset, val );
-        if( offset < 0 )
+        if( RC.ERROR( offset ) )
             return offset;
         return 0;
     }
@@ -267,7 +267,7 @@ abstract public class JavaSerialBase
     public int serialInt32( BufPtr buf, Integer offset, int val )
     {
         offset = buf.SerialInt( offset, val );
-        if( offset < 0 )
+        if( RC.ERROR( offset ) )
             return offset;
         return 0;
     }
@@ -275,7 +275,7 @@ abstract public class JavaSerialBase
     public int serialInt64( BufPtr buf, Integer offset, long val )
     {
         offset = buf.SerialLong( offset, val );
-        if( offset < 0 )
+        if( RC.ERROR( offset ) )
             return offset;
         return 0;
     }
@@ -283,7 +283,7 @@ abstract public class JavaSerialBase
     public int serialFloat( BufPtr buf, Integer offset, float val )
     {
         offset = buf.SerialFloat( offset, val );
-        if( offset < 0 )
+        if( RC.ERROR( offset ) )
             return offset;
         return 0;
     }
@@ -291,7 +291,7 @@ abstract public class JavaSerialBase
     public int serialDouble( BufPtr buf, Integer offset, double val )
     {
         offset = buf.SerialDouble( offset, val );
-        if( offset < 0 )
+        if( RC.ERROR( offset ) )
             return offset;
         return 0;
     }
@@ -303,7 +303,7 @@ abstract public class JavaSerialBase
         BufPtr buf, Integer offset, String val )
     {
         offset = buf.SerialString( offset, val );
-        if( offset < 0 )
+        if( RC.ERROR( offset ) )
             return offset;
         return 0;
     }
@@ -312,7 +312,7 @@ abstract public class JavaSerialBase
         BufPtr buf, Integer offset, byte[] val )
     {
         offset = buf.SerialByteArray( offset, val );
-        if( offset < 0 )
+        if( RC.ERROR( offset ) )
             return offset;
         return 0;
     }
@@ -321,7 +321,7 @@ abstract public class JavaSerialBase
         BufPtr buf, Integer offset, ObjPtr val )
     {
         offset = buf.SerialObjPtr( offset, val );
-        if( offset < 0 )
+        if( RC.ERROR( offset ) )
             return offset;
         return 0;
     }

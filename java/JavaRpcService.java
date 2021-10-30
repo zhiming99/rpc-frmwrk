@@ -175,8 +175,7 @@ abstract public class JavaRpcService
 
                 if( listResp == null )
                 {
-                    listArgs.set( 1,
-                        -RC.EBADMSG );
+                    listArgs.set( 1, -RC.EBADMSG );
                     invokeCallback( asyncb, listArgs );
                     break;
                 }
@@ -199,8 +198,7 @@ abstract public class JavaRpcService
                         ret = -RC.EINVAL;
                         listArgs.set( 1, ret );
                     }
-                    if( ret ==
-                        RC.STATUS_SUCCESS )
+                    if( ret == RC.STATUS_SUCCESS )
                         for( int i = 0; i < iArgNum; i++ )
                             listArgs.set( i + 2, jret.getAt( i ) );
 

@@ -1706,7 +1706,11 @@ jobject CJavaProxyImpl::JavaProxyCall2(
 
             pjCb = jenv->NewGlobalRef( pCb );
             jgret = jenv->NewGlobalRef( jret );
-            pjContext = jenv->NewGlobalRef( pContext );
+            if( pContext != nullptr )
+            {
+                pjContext =
+                    jenv->NewGlobalRef( pContext );
+            }
             oReqCtx.Push( ( intptr_t ) pjCb );
             oReqCtx.Push( ( intptr_t ) jgret );
             oReqCtx.Push( strMethod );

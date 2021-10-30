@@ -72,11 +72,12 @@ abstract public class JavaRpcServer extends JavaRpcServiceS
     }
 
     public int ridlOnServiceComplete(
-        ObjPtr callback, int ret, byte[] pBuf )
+        ObjPtr callback, int ret, BufPtr pBuf )
     {
         List<Object> lstObj =
             new ArrayList< Object >();
-        lstObj.add( pBuf );
+        if( pBuf != null )
+            lstObj.add( pBuf );
         return m_oInst.OnServiceComplete(
             callback, ret,
             RC.seriRidl,
@@ -115,12 +116,13 @@ abstract public class JavaRpcServer extends JavaRpcServiceS
      */
     public int ridlSendEvent( Object callback,
         String ifName, String evtName,
-        String destName, byte[] pBuf )
+        String destName, BufPtr pBuf )
     {
         evtName = "UserEvent_" + evtName;
         List<Object> lstObj =
             new ArrayList< Object >();
-        lstObj.add( pBuf );
+        if( pBuf != null )
+            lstObj.add( pBuf );
         return m_oInst.SendEvent( callback,
             ifName, evtName, destName,
             lstObj.toArray(), RC.seriRidl );
