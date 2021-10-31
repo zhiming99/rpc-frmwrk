@@ -1046,14 +1046,15 @@ gint32 CImplJavaMthdSvr::ImplNewCancelNotify()
         BLOCK_OPEN;
         if( iInCount == 0 )
         {
-            CCOUT "m_oHost.onEchoCanceled( m_oReqCtx, iRet )";
+            CCOUT << "m_oHost.on"<< strName
+                << "Canceled( m_oReqCtx, iRet )";
         }
         else
         {
             CCOUT << "if( oParams.length != " << iInCount << " )";
             NEW_LINE;
             Wa( "    return;" );
-            Wa( "m_oHost.onEchoCanceled(" );
+            CCOUT << "m_oHost.on" << strName <<"Canceled(" );
             CCOUT << "    m_oReqCtx, iRet,";
             INDENT_UPL;
             CJavaSnippet::EmitCastArgsFromObject(
