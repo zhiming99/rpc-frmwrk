@@ -1050,12 +1050,12 @@ gint32 CImplJavaMthdSvr::ImplNewCancelNotify()
         }
         else
         {
+            CCOUT << "if( oParams.length != " << iInCount << " )";
+            NEW_LINE;
+            Wa( "    return;" );
             Wa( "m_oHost.onEchoCanceled(" );
             CCOUT << "    m_oReqCtx, iRet,";
             INDENT_UPL;
-            CCOUT << "if( oParams.length != " << iInCount << " )";
-            NEW_LINE;
-            Wa( "return;" );
             CJavaSnippet::EmitCastArgsFromObject(
                 pNode, true, "oParams" );
             CCOUT << ");";
