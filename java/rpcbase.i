@@ -2269,6 +2269,33 @@ class CParamList
         return jret;
     }
 
+    jobject GetByteArray(
+        JNIEnv *jenv, gint32 iProp )
+    {
+        gint32 ret = 0;
+        jobject jret = NewJRet( jenv );
+        do{
+            CParamList& oParams = *$self;
+            BufPtr pBuf;
+            ret = oParams.GetProperty(
+                iProp, pBuf );
+            if( ERROR( ret ) )
+                break;
+
+            jsize len = ( jsize )pBuf->size();
+            jbyteArray bytes =
+                jenv->NewByteArray( len );
+            jenv->SetByteArrayRegion( bytes,
+                len, 0, ( jbyte* )pBuf->ptr() );
+
+            AddElemToJRet( jenv, jret, bytes );
+
+        }while( 0 );
+
+        SetErrorJRet( jenv, jret, ret );
+        return jret;
+    }
+
     jobject GetPropertyType(
         JNIEnv *jenv, gint32 iProp )
     {

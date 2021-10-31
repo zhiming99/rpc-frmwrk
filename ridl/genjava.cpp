@@ -32,6 +32,7 @@ using namespace rpcf;
 extern CDeclMap g_mapDecls;
 extern ObjPtr g_pRootNode;
 extern CAliasMap g_mapAliases;
+extern stdstr g_strPrefix;
 
 extern std::string g_strAppName;
 extern gint32 SetStructRefs( ObjPtr& pRoot );
@@ -269,7 +270,49 @@ gint32 CJTypeHelper::GetFormalArgList(
     return ret;
 }
 
-gint32 CJavaSnippet::EmitFormalArgListJava(
+gint32 CJTypeHelper::GetActArgList(
+    ObjPtr& pArgs,
+    std::vector< STRPAIR >& vecArgs )
+{
+    if( pArgs.IsEmpty() )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        CArgList* pArgList = pArgs;
+        if( pArgList == nullptr )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        std::vector<stdstr> vecArgs;
+        guint32 dwCount = pArgList->GetCount();
+        if( dwCount == 0 )
+            break;
+
+        for( guint32 i = 0; i < dwCount; i++ )
+        {
+            ObjPtr pObj =
+                pArgList->GetChild( i );
+
+            CFormalArg* pfa = pObj;
+            if( pfa == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+
+            strArgName = pfa->GetName();
+            vecArgs.push_back( strArgName );
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CJavaSnippet::EmitFormalArgList(
     ObjPtr& pArgs )
 {
     if( pArgs.IsEmpty() || pWriter == nullptr )
@@ -296,7 +339,49 @@ gint32 CJavaSnippet::EmitFormalArgListJava(
             if( i < vecArgs.size() - 1 )
             {
                 CCOUT << ",";
-                NEWLINE;
+                NEW_LINE;
+            }
+            else
+            {
+                CCOUT << " ";
+            }
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CJavaSnippet::EmitActArgList(
+    ObjPtr& pArgs )
+{
+    if( pArgs.IsEmpty() || pWriter == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    std::vector< stdstr > vecArgs;
+    do{
+        ret = CJTypeHelper::GetActArgList(
+            pArgs, vecArgs );
+        if( ERROR( ret ) )
+            break;
+
+        if( vecArgs.empty() )
+            break;
+
+        int i = 0;
+        for( ; i < vecArgs.size(); i++ )
+        {
+            auto& elem = vecArgs[ i ];
+            CCOUT << elem;
+            if( i < vecArgs.size() - 1 )
+            {
+                CCOUT << ",";
+                NEW_LINE;
+            }
+            else
+            {
+                CCOUT << " ";
             }
         }
 
@@ -312,7 +397,7 @@ gint32 CJavaSnippet::EmitNewBufPtrSerial(
     do{
         Wa( "BufPtr _pBuf = new BufPtr( true );" );
         CCOUT << "_pBuf.Resize(" << dwSize << ");";
-        NEWLINE;
+        NEW_LINE;
         Wa( "Integer _offset = 0;" );
 
     }while( 0 );
@@ -326,15 +411,15 @@ gint32 CJavaSnippet::EmitByteBufferForDeserial(
     gint32 ret = 0;
     do{
         CCOUT<< "int iSize = " << strBuf << ".length;";
-        NEWLINE;
-        Wa( "if( iSize > rpcbaseConstants.MAX_BUF_SIZE )" );
-        Wa( "{ ret = -ERANGE; break;}" );
+        NEW_LINE;
+        Wa( "if( iSize > RC.MAX_BUF_SIZE )" );
+        Wa( "{ ret = -RC.ERANGE; break;}" );
         Wa(
             "ByteBuffer _bbuf = new ByteBuffer();" );
         CCOUT << "_bbuf.allocate( " << iSize << ");";
-        NEWLINE;
+        NEW_LINE;
         CCOUT << "_bbuf.put( " << strBuf << " );";
-        NEWLINE;
+        NEW_LINE;
         Wa( "_bbuf.flip();");
 
     }while( 0 );
@@ -342,7 +427,7 @@ gint32 CJavaSnippet::EmitByteBufferForDeserial(
     return ret;
 }
 
-gint32 CJavaSnippet::EmitSerialArgsJava(
+gint32 CJavaSnippet::EmitSerialArgs(
     ObjPtr& pArgs,
     const stdstr& strName,
     bool bCast )
@@ -374,6 +459,11 @@ gint32 CJavaSnippet::EmitSerialArgsJava(
 
             if( strName.empty() )
                 strName = pfa->GetName();
+            else
+            {
+                strName = strName + "[ " +
+                    std::to_string( i ) + " ]";
+            }
 
             stdstr strCast;
             if( bCast )
@@ -389,61 +479,61 @@ gint32 CJavaSnippet::EmitSerialArgsJava(
             {
             case 'Q':
             case 'q':
-                CCOUT << "_osh.serialInt64( _pBuf, _offset, "
+                CCOUT << "ret = _osh.serialInt64( _pBuf, _offset, "
                     << strName << " );";
                 break;
             case 'D':
             case 'd':
-                CCOUT << "_osh.serialInt32( _pBuf, _offset, "
+                CCOUT << "ret = _osh.serialInt32( _pBuf, _offset, "
                     << strName << " );";
                 break;
             case 'W':
             case 'w':
-                CCOUT << "_osh.serialInt16( _pBuf, _offset, "
+                CCOUT << "ret = _osh.serialInt16( _pBuf, _offset, "
                     << strName << " );";
                 break;
             case 'f':
-                CCOUT << "_osh.serialFloat( _pBuf, _offset, "
+                CCOUT << "ret = _osh.serialFloat( _pBuf, _offset, "
                     << strName << " );";
                 break;
             case 'F':
-                CCOUT << "_osh.serialDouble( _pBuf, _offset, "
+                CCOUT << "ret = _osh.serialDouble( _pBuf, _offset, "
                     << strName << " );";
                 break;
             case 'b':
-                CCOUT << "_osh.serialBool( _pBuf, _offset, "
+                CCOUT << "ret = _osh.serialBool( _pBuf, _offset, "
                     << strName << " );";
                 break;
             case 'B':
-                CCOUT << "_osh.serialInt8( _pBuf, _offset, "
+                CCOUT << "ret = _osh.serialInt8( _pBuf, _offset, "
                     << strName << " );";
                 break;
             case 'h':
-                CCOUT << "_osh.serialHStream( _pBuf, _offset, "
+                CCOUT << "ret = _osh.serialHStream( _pBuf, _offset, "
                     << strName << " );";
                 break;
             case 's':
-                CCOUT << "_osh.serialString( _pBuf, _offset, "
+                CCOUT << "ret = _osh.serialString( _pBuf, _offset, "
                     << strName << " );";
                 break;
             case 'a':
-                CCOUT << "_osh.serialBuf( _pBuf, _offset, "
+                CCOUT << "ret = _osh.serialBuf( _pBuf, _offset, "
                     << strName << " );";
                 break;
             case 'o':
-                CCOUT << "_osh.serialObjPtr( _pBuf, _offset, "
+                CCOUT << "ret = _osh.serialObjPtr( _pBuf, _offset, "
                     << strName << " );";
                 break;
             case 'O':
-                CCOUT << "_osh.serialStruct( _pBuf, _offset, "
+                CCOUT << "ret = _osh.serialStruct( _pBuf, _offset, "
                     << strName << " );";
                 break;
             case '(':
-                CCOUT << "_osh.serialArray( _pBuf, _offset, "
+                CCOUT << "ret = _osh.serialArray( _pBuf, _offset, "
                     << strName << ", \"" << strSig << "\");";
                 break;
             case '[':
-                CCOUT << "_osh.serialMap( _pBuf, _offset, "
+                CCOUT << "ret = _osh.serialMap( _pBuf, _offset, "
                     << strName << ", \"" << strSig << "\");";
                 break;
             default
@@ -453,6 +543,9 @@ gint32 CJavaSnippet::EmitSerialArgsJava(
             if( ERROR( ret ) )
                 break;
             NEW_LINE;
+            Wa( "if( RC.ERROR( ret ) )" );
+            Wa( "    break;" );
+
         }
 
     }while( 0 );
@@ -460,8 +553,8 @@ gint32 CJavaSnippet::EmitSerialArgsJava(
     return ret;
 }
 
-gint32 CJavaSnippet::EmitDeserialArgsJava(
-    ObjPtr& pArgs )
+gint32 CJavaSnippet::EmitDeserialArgs(
+    ObjPtr& pArgs, bool bDecl )
 {
     if( pArgs.IsEmpty() )
         return -EINVAL;
@@ -495,6 +588,11 @@ gint32 CJavaSnippet::EmitDeserialArgsJava(
                 break;
 
             stdstr strName = pfa->GetName();
+            if( bDecl )
+            {
+                strName =
+                    strTypeText + " " + strName;
+            }
             switch( strSig[ 0 ] )
             {
             case 'Q':
@@ -537,10 +635,10 @@ gint32 CJavaSnippet::EmitDeserialArgsJava(
                 CCOUT << strName " = ("<<strTypeText<<") _osh.deserialStruct( _bbuf );"
                 break;
             case '(':
-                CCOUT << strName " = ("<<strTypeText<<") _osh.deserialStruct( _bbuf, \""<< strSig << "\" );"
+                CCOUT << strName " = ("<<strTypeText<<") _osh.deserialArray( _bbuf, \""<< strSig << "\" );"
                 break;
             case '[':
-                CCOUT << strName " = ("<<strTypeText<<") _osh.deserialStruct( _bbuf, \""<< strSig << "\" );"
+                CCOUT << strName " = ("<<strTypeText<<") _osh.deserialMap( _bbuf, \""<< strSig << "\" );"
                 break;
             default
                 ret = -EINVAL;
@@ -589,14 +687,18 @@ gint32 CJavaSnippet::EmitDeclArgs(
             stdstr strName = pfa->GetName();
             if( !bInit )
             {
-                CCOUT << strType << " "
+                CCOUT << "public " << strType << " "
                     << strName << ";";
             }
             else
             {
-
+                stdstr strVal =
+                    GetDefValOfType( pType );
+                CCOUT << "public " << strType << " "
+                    << strName << " = " 
+                    << strVal << ";";
             }
-            NEWLINE;
+            NEW_LINE;
         }
 
     }while( 0 );
@@ -698,6 +800,58 @@ gint32 CJavaSnippet::EmitCastArgsFromObject(
     return ret;
 }
 
+gint32 CJavaSnippet::EmitCatchExcept(
+    stdstr strExcept, bool bSetRet )
+{
+    CCOUT << "catch( " << strExcept << " e )";
+    NEW_LINE;
+    if( !bSetRet )
+        Wa( "{}" );
+    else
+    {
+        Wa( "{" );
+        if( strExcept == "NullPointerException" )
+            Wa( "    ret = -RC.EFAULT;");
+        else if( strExcept == "IllegalArgumentException" )
+            Wa( "    ret = -RC.EINVAL;");
+        else if( strExcept == "IndexOutOfBoundsException" )
+            Wa( "    ret = -RC.ERANGE;");
+        else if( strExcept == "Exception" )
+            Wa( "    ret = RC.ERROR_FAIL;");
+        Wa( "}");
+    }
+    return 0;
+}
+
+gint32 CJavaSnippet::EmitBanner()
+{
+    Wa( "GENERATED BY RIDLC. MAKE SURE TO BACKUP BEFORE RE-COMPILING." );
+    CCOUT << "package " << g_strPrefix << "." << g_strAppName << ";";
+    NEW_LINE;
+    Wa( "import org.rpcf.rpcbase.*;" );
+    Wa( "import java.util.Map;" );
+    Wa( "import java.util.HashMap;" );
+    Wa( "import java.lang.String;" );
+    NEW_LINE;
+}
+
+gint32 CJavaSnippet::EmitArgClassObj(
+    ObjPtr& pArgs )
+{
+    std::vector< STRPAIR > vecArgs;
+    CJTypeHelper::GetFormalArgList( pArgs, vecArgs );
+    for( gint32 i = 0; i < vecArgs.size(); i++ )
+    {
+        CCOUT << vecArgs[ i ].first << ".class";
+        if( i < vecArgs.size() - 1 )
+        {
+            CCOUT << ",";
+            NEW_LINE;
+        }
+    }
+    return 0;
+}
+
 gint32 GenJavaProj(
     const std::string& strOutPath,
     const std::string& strAppName,
@@ -780,6 +934,649 @@ gint32 GenJavaProj(
 
     if( SUCCEEDED( ret ) )
         SyncCfg( strOutPath );
+
+    return ret;
+}
+
+CImplJavaMthdSvr::CImplJavaMthdSvr(
+    CJavaWriter* pWriter,
+    ObjPtr& pNode,
+    ObjPtr& pSvc )
+    : super( pWriter )
+{
+    m_pNode = pNode;
+    m_pSvc = pSvc;
+    if( m_pNode == nullptr || m_pSvc == nullptr )
+    {
+        std::string strMsg = DebugMsg(
+            -EFAULT, "internal error empty "
+            "'method/service' node" );
+        throw std::runtime_error( strMsg );
+    }
+    CAstNodeBase* pMdl = m_pNode->GetParent();
+    m_pIf = ObjPtr( pMdl->GetParent() );
+}
+
+gint32 CImplJavaMthdSvr::DeclAbstractFuncs()
+{
+    gint32 ret = 0;
+    CMethodDecl* pNode = m_pNode;
+    stdstr strName = pNode->GetName();
+    ObjPtr pInArgs = pNode->GetInArgs();
+    gint32 iCount = GetArgCount( pInArgs );
+    CInterfaceDecl* pIf = m_pIf;
+    stdstr strIfName = pIf->GetName();
+
+    CCOUT << "// " << strIfName << "::" << strName;
+    NEW_LINE;
+    for( gint32 i = 0; i < 2; i++ )
+    {
+        if( i == 0 )
+        {
+            CCOUT << "public abstract int "
+                << strName << "(";
+        }
+        else
+        {
+            if( !pNode->IsAsyncs() ||
+                pNode->IsNoReply() )
+                break;
+            CCOUT << "public abstract void on"
+                << strName << "Canceled(";
+        }
+        INDENT_UPL;
+        CCOUT << "JavaReqContext oReqCtx";
+        if( iCount == 0 )
+        {
+            CCOUT << " );";
+        }
+        else
+        {
+            Wa( "," );
+            ret = CJavaSnippet::EmitFormalArgList(
+                pInArgs );
+            if( ERROR( ret ) )
+                break;
+            CCOUT " );";
+        }
+        INDENT_DOWNL;
+        NEW_LINE;
+    }
+    return ret;
+}
+
+gint32 CImplJavaMthdSvr::ImplNewCancelNotify()
+{
+    gint32 ret = 0;
+    CMethodDecl* pNode = m_pNode;
+    CServiceDecl* pSvc = m_pSvc;
+    stdstr strName = pNode->GetName();
+    ObjPtr pInArgs = pNode->GetInArgs();
+    gint32 iInCount = GetArgCount( pInArgs );
+    stdstr strSvcName = pSvc->GetName() + "svrbase";
+    if( !pNode->IsAsyncs() ||
+        pNode->IsNoReply() )
+        return 0;
+
+    do{
+        Wa( "private ICancelNotify newCancelNotify(" );
+        CCOUT << "    " << strSvcName << " oHost,";
+        NEW_LINE;
+        CCOUT << "JavaReqContext oContext )";
+        BLOCK_OPEN;
+        Wa( "return new ICancelNotify()" );
+        BLOCK_OPEN;
+        CCOUT << strSvcName << " m_oHost = oHost;";
+        NEW_LINE;
+        Wa( "JavaReqContext m_oReqCtx = oContext;" );
+        Wa( "public int getArgCount()" );
+        CCOUT << "{ return " << iInCount << " };";
+        NEW_LINE;
+        Wa( "public Class<?>[] getArgTypes()" );
+        BLOCK_OPEN
+        CCOUT "return new Class[] {";
+        INDENT_UPL;
+        CJavaSnippet::EmitArgClassObj( pInArgs );
+        INDENT_DOWN;
+        CCOUT << "};";
+        BLOCK_CLOSE;
+
+        Wa( "public void onAsyncResp( Object oContext," );
+        Wa( "    int iRet, Object[] oParams )" );
+        BLOCK_OPEN;
+        if( iInCount == 0 )
+        {
+            CCOUT "m_oHost.onEchoCanceled( m_oReqCtx, iRet )";
+        }
+        else
+        {
+            Wa( "m_oHost.onEchoCanceled(" );
+            CCOUT << "    m_oReqCtx, iRet,";
+            INDENT_UPL;
+            CCOUT << "if( oParams.length != " << iInCount << " )";
+            NEW_LINE;
+            Wa( "return;" );
+            CJavaSnippet::EmitCastArgsFromObject(
+                pNode, true, "oParams" );
+            CCOUT << ");";
+            INDENT_DOWN;
+        }
+        BLOCK_CLOSE;
+
+        BLOCK_CLOSE; // return new ICancelNotify();
+        CCOUT << ";";
+        BLOCK_CLOSE; // newCancelNotify
+
+    }while( 0 );
+    return ret;
+}
+
+gint32 CImplJavaMthdSvr::OutputReqHandler()
+{
+    gint32 ret = 0;
+    CMethodDecl* pNode = m_pNode;
+    CInterfaceDecl* pIf = m_pIf;
+    stdstr strName = pNode->GetName();
+    ObjPtr pInArgs = pNode->GetInArgs();
+    gint32 iInCount = GetArgCount( pInArgs );
+    gint32 iOutCount = GetArgCount( pInArgs );
+    stdstr strIfName = pIf->GetName();
+
+    do{
+        CCOUT << "// Wrapper for " << strIfName << "::" << strName;
+        NEW_LINE;
+        Wa( "val = new IReqHandler() {" );
+        INDENT_UPL;
+        Wa( "public int getArgCount()" );
+        CCOUT << "{ return" << iInCount << "; }";
+        Wa( "public Class<?>[] getArgTypes()" );
+        if( iInCount == 0 )
+        {
+            Wa( "{ return new Class[ 0 ]; }" );
+            break;
+        }
+        BLOCK_OPEN;
+        Wa( "Class[] o ={" );
+        INDENT_UPL;
+        CJavaSnippet::EmitArgClassObj( pInArgs );
+        INDENT_DOWNL;
+        Wa( "};" );
+        Wa( "return o;" );
+        BLOCK_CLOSE;
+
+        ret = ImplNewCancelNotify();
+        if( ERROR( ret ) )
+            break;
+
+        ret = ImplInvoke();
+        if( ERROR( ret ) )
+            break;
+
+        INDENT_DOWNL;
+        Wa( "};" );
+        stdstr strIfName = pIf->GetName();
+        CCOUT << "o.put( \"" << strIfName << "::"
+            << strName << "\", val );";
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CImplJavaMthdSvr::ImplReqContext()
+{
+    gint32 ret = 0;
+    CMethodDecl* pNode = m_pNode;
+    CServiceDecl* pSvc = m_pSvc;
+    stdstr strName = pNode->GetName();
+    ObjPtr pInArgs = pNode->GetInArgs();
+    gint32 iInCount = GetArgCount( pInArgs );
+    ObjPtr pOutArgs = pNode->GetOutArgs();
+    gint32 iOutCount = GetArgCount( pOutArgs );
+    do{
+        Wa( "JavaReqContext _oReqCtx =" );
+        Wa( "    new JavaReqContext( oOuterObj, callback )" );
+        BLOCK_OPEN;
+        Wa( "public int iRet;" );
+        CJavaSnippet::EmitDeclArgs( pOutArgs, false );
+        if( !pNode->IsNoReply() )
+        {
+            Wa( "// call this method when the handler" );
+            Wa( "// returns immediately and successfully" );
+            Wa( "public void setResponse(" );
+            Wa( "    int ret, Object ...args )" );
+            BLOCK_OPEN;
+            Wa( "iRet = ret;" );
+            if( iOutCount > 0 )
+            {
+                Wa( "if( RC.SUCCEEDED( ret ) )" );
+                BLOCK_OPEN;
+                std::vector< STRPAIR > vecArgs;
+                ret = CJTypeHelper::GetFormalArgList(
+                    pOutArgs, vecArgs );
+                if( ERROR( ret ) )
+                    break;
+
+                for( gint32 i = 0; i < vecArgs.size(); i++ )
+                {
+                    auto& elem = vecArgs[ i ];
+                    CCOUT << elem.second " = ( "
+                        << elem.first << " )"
+                        << "args[ " << i << " ];";
+                }
+                BLOCK_CLOSE;
+            }
+            Wa( "m_bSet = true;" );
+            BLOCK_CLOSE;
+
+            Wa( "public Object[] getResponse()" )
+            BLOCK_OPEN;
+            if( iOutCount == 0 )
+            {
+                Wa( "return new Object[ 0 ];" );
+            }
+            else
+            {
+                Wa( "if( !m_bSet )" );
+                Wa( "    return new Object[ 0 ];" );
+                Wa( "return new Object[]{" );
+                CJavaSnippet::EmitActArgList( pOutArgs );
+                Wa( "};" );
+            }
+            BLOCK_CLOSE;
+
+            ret = ImplSvcComplete();
+            if( ERROR( ret ) )
+                break;
+        }
+
+        BLOCK_CLOSE;
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CImplJavaMthdSvr::ImplSvcComplete()
+{
+    gint32 ret = 0;
+    CMethodDecl* pNode = m_pNode;
+    CServiceDecl* pSvc = m_pSvc;
+    stdstr strName = pNode->GetName();
+    ObjPtr pInArgs = pNode->GetInArgs();
+    gint32 iInCount = GetArgCount( pInArgs );
+    ObjPtr pOutArgs = pNode->GetOutArgs();
+    gint32 iOutCount = GetArgCount( pOutArgs );
+
+    if( !pNode->IsAsyncs() )
+        return 0;
+
+    if( pNode->IsNoReply() )
+        return 0;
+
+    do{
+        Wa( "// call this method when the"
+        Wa( "// request has completed
+        Wa( "// asynchronously
+        Wa( "public int onServiceComplete(" );
+        Wa( "    int iRet, Object ...args )" );
+        BLOCK_OPEN;
+        Wa( "int ret = 0;" );
+        Wa( "BufPtr _pBuf = null" );
+        Wa( "JavaRpcServer oHost =" );
+        Wa( "    ( JavaRpcServer )m_oHost;" );
+        if( iOutCount > 0 )
+        {
+            CCOUT << "do";
+            BLOCK_OPEN;
+            Wa( "if( RC.ERROR( iRet ) )" );
+            Wa( "    break;" );
+            CCOUT << "if( args.length != " << iOutCount << " )";
+            BLOCK_OPEN;
+            Wa( "iRet = -RC.EINVAL;" );
+            Wa( "    break;" );
+            BLOCK_CLOSE;
+            Wa( "JavaSerialHelperS _osh =" );
+            Wa( "    new JavaSerialHelperS( oHost.getInst() );" );
+
+            Wa( "_pBuf = new BufPtr( true );" );
+            Wa( "ret = _pBuf.Resize( 1024 );" );
+            Wa( "if( RC.ERROR( ret ) )" );
+            Wa( "    break;" );
+            Wa( "Integer _offset = 0;" );
+
+            ret = CJavaSnippet::EmitSerialArgs(
+                pOutArgs, "args", true );
+            if( ERROR( ret ) )
+                break;
+
+            BLOCK_CLOSE;
+            CCOUT << "while( false );";
+            NEW_LINE;
+            Wa( "if( RC.ERROR( ret ) &&" );
+            Wa( "    RC.SUCCEEDED( iRet ) )" );
+            Wa( "    iRet = ret;" );
+        }
+        Wa( "return oHost.ridlOnServiceComplete(" );
+        Wa( "    getCallback(), iRet, _pBuf );" );
+        BLOCK_CLOSE;
+        Wa( ";" );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CImplJavaMthdSvr::ImplInvoke()
+{
+    gint32 ret = 0;
+    CMethodDecl* pNode = m_pNode;
+    CServiceDecl* pSvc = m_pSvc;
+    stdstr strName = pNode->GetName();
+    ObjPtr pInArgs = pNode->GetInArgs();
+    gint32 iInCount = GetArgCount( pInArgs );
+    ObjPtr pOutArgs = pNode->GetOutArgs();
+    gint32 iOutCount = GetArgCount( pOutArgs );
+    stdstr strSvc = pSvc->GetName();
+    do{
+        Wa( "public JRetVal invoke( Object oOuterObj," );
+        Wa( "    ObjPtr callback, Object[] oParams )" );
+        NEW_LINE;
+        ret = ImplReqContext();
+        if( ERROR( ret ) )
+            break;
+        Wa( "int ret = 0" );
+        Wa( "JRetVal jret = new JRetVal();" );
+        Wa( "do" );
+        BLOCK_OPEN;
+        CCOUT << strSvc << "svrbase oHost =" );
+        NEW_LINE;
+        CCOUT << "    ( " << strSvc << "svrbase )oOuterObj;" );
+        NEW_LINE;
+        if( iInCount == 0 )
+        {
+            CCOUT "ret = oHost." << strName << "( _oReqCtx );";
+            NEW_LINE;
+        }
+        else
+        {
+           Wa( "JavaSerialHelperS _osh =" );
+           Wa( "    new JavaSerialHelperS( oHost.getInst() );" );
+           Wa( "if( oParams.length != 1 )" );
+           Wa( "{ ret = -RC.EINVAL; break; }" );
+           Wa( "byte[] _buf = ( byte[] )oParams[ 0 ];" );
+           ret = EmitDeserialArgs( pInArgs, true );
+           if( ERROR( ret ) )
+               break;
+           CCOUT "ret = oHost." << strName << "( _oReqCtx,";
+           NEW_LINE;
+           ret = CJavaSnippet::EmitActArgList( pInArgs );
+           if( ERROR( ret ) )
+               break;
+           Wa( ");" );
+           if( pNode->IsNoReply() )
+           {
+               Wa( "ret = 0" );
+           }
+           else
+           {
+                if( !pNode->IsAsyncs() )
+                {
+                    Wa( "if( ret == RC.STATUS_PENDING )" );
+                    Wa( "    ret = RC.ERROR_STATE;" );
+                }
+                else
+                {
+                    Wa( "if( ret == RC.STATUS_PENDING )" );
+                    BLOCK_OPEN;
+                    guint32 dwTimeout = pNode->GetTimeoutSec();
+                    Wa( "oHost.getInst().SetInvTimeout(" );
+                    CCOUT << "    _oReqCtx.getCallback(), " <<
+                        std::to_string( dwTimeout ) << " );";
+
+                    Wa( "ICancelNotify o =" );
+                    Wa( "    newCancelNotify( oHost, _oReqCtx );" );
+                    Wa( "int iRet = oHost.installCancelNotify(" );
+                    Wa( "    _oReqCtx.getCallback(), o," );
+                    Wa( "    new Object[]" );
+                    BLOCK_OPEN;
+                    ret = CJavaSnippet.EmitActArgList( pInArgs );
+                    BLOCK_CLOSE;
+                    wa( " );" );
+                    Wa( "if( RC.ERROR( iRet ) )" );
+                    Wa( "    ret = iRet;" );
+                    Wa( "break;" );
+                    BLOCK_CLOSE;
+                }
+
+                Wa( "if( RC.ERROR( ret ) )" );
+                Wa( "    break;" );
+                if( iOutCount > 0 )
+                {
+                    Wa( "if( !_oReqCtx.hasResponse() )" );
+                    Wa( "{ ret = -RC.ENODATA; break; }" );
+                    Wa( "do" );
+                    BLOCK_OPEN;
+                    Wa( "BufPtr _pBuf = new BufPtr( true );" );
+                    Wa( "ret = _pBuf.Resize( 1024 );" );
+                    Wa( "if( RC.ERROR( ret ) )" );
+                    Wa( "    break;" );
+                    Wa( "Integer _offset = 0;" );
+                    Wa( "Object[] oResp = _oReqCtx.getResponse();" );
+                    ret = CJavaSnippet::EmitSerialArgs(
+                        pOutArgs, oResp, true );
+                    if( ERROR( ret ) )
+                        break;
+                    Wa( "ret = _pBuf.Resize( _offset );");
+                    Wa( "if( RC.ERROR( ret ) ) break;" );
+                    Wa( "jret.addElem( _pBuf );" );
+                    BLOCK_CLOSE;
+                    Wa( "while( false );" );
+                }
+           }
+        }
+        BLOCK_CLOSE;
+        Wa( "while( false );" );
+        Wa( "jret.setError( ret );" );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CImplJavaMthdSvr::ImplEvent()
+{
+    gint32 ret = 0;
+    stdstr strName = m_pNode->GetName();
+    ObjPtr pInArgs = m_pNode->GetInArgs();
+    gint32 iInCount = GetArgCount( pInArgs );
+    stdstr strIfName = m_pIf->GetName();
+
+    do{
+        if( iInCount == 0 )
+        {
+            CCOUT << "public int " << strName << "( Object callback )";
+            NEW_LINE;
+            BLOCK_OPEN;
+            Wa( "return ridlSendEvent( callback," );
+            CCOUT << "    \"" << strIfName << "\","
+            NEW_LINE;
+            CCOUT << "    \"" << strName << "\","
+            NEW_LINE;
+            CCOUT << "    \"\", null );"
+            NEW_LINE;
+            BLOCK_CLOSE;
+        }
+        else
+        {
+            CCOUT << "public int " << strName << "( Object callback,";
+            INDENT_UPL;
+            ret = CJavaSnippet::EmitFormalArgList( pInArgs );
+            if( ERROR( ret ) )
+                break;
+            Wa( ")" );
+            INDENT_DOWNL;
+            BLOCK_OPEN;
+            Wa( "int ret = 0;" );
+            Wa( "do" );
+            BLOCK_OPEN;
+
+            Wa( "JavaSerialHelperS _osh =" );
+            Wa( "    new JavaSerialHelperS( getInst() );" );
+            Wa( "BufPtr _pBuf = new BufPtr( true );" );
+            Wa( "ret = _pBuf.Resize( 1024 );" );
+            Wa( "if( RC.ERROR( ret ) )" );
+            Wa( "    break;" );
+            Wa( "Integer _offset = 0;" );
+            ret = CJavaSnippet::EmitSerialArgs(
+                pInArgs, "", false );
+
+            Wa( "_pBuf.Resize( _offset );" );
+            Wa( "ret = ridlSendEvent( callback," );
+            CCOUT << "    \"" << strIfName << "\","
+            NEW_LINE;
+            CCOUT << "    \"" << strName << "\","
+            NEW_LINE;
+            CCOUT << "    \"\", _pBuf );"
+            NEW_LINE;
+            BLOCK_CLOSE;
+            Wa( "while( false );" );
+            Wa( "return ret;" );
+            BLOCK_CLOSE;
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+CImplJavaSvcsvrbase::CImplJavaSvcsvrbase(
+    CJavaWriter* pWriter,
+    ObjPtr& pNode )
+{
+    m_pWriter = pWriter;
+    m_pNode = pNode;
+    if( m_pNode == nullptr )
+    {
+        std::string strMsg = DebugMsg(
+            -EFAULT, "internal error empty "
+            "'service' node" );
+        throw std::runtime_error( strMsg );
+    }
+}
+
+int CImplJavaSvcsvrbase::Output()
+{
+    CJavaSnippet::EmitBanner();
+    gint32 ret = 0;
+    do{
+        CServiceDecl* pSvc = m_pNode;
+        std::vector< ObjPtr > vecIfs;
+        ret = pSvc->GetIfRefs( vecIfs );
+        if( ERROR( ret ) )
+            break;
+
+        std::vector< ObjPtr > vecifds;
+        for( auto elem& : vecIfs )
+        {
+            CInterfRef* pifr = elem;
+            ObjPtr pifd;
+            ret = pifr->GetIfDecl( pifd );
+            if( ERROR( ret ) )
+                continue;
+            vecifds.push_back( pifd );
+        }
+
+        if( vecIfds.empty() )
+            break;
+
+        stdstr strName = pSvc->GetName();
+        CCOUT << "abstract public class " << strName
+            << "svrbase extends JavaRpcServer";
+        NEW_LINE;
+        BLOCK_OPEN;
+
+        CCOUT << "public " << strName << "svrbase( ObjPtr pIoMgr,";
+        NEW_LINE;
+        Wa( "    String strDesc, String strSvrObj )" );
+        Wa( "{ super( pIoMgr, strDesc, strSvrObj ); }" );
+
+        std::vector< ObjPtr > vecMethods;
+        std::vector< ObjPtr > vecEvents;
+        for( auto& elem : vecIfds )
+        {
+            CInterfaceDecl* pifd = elem;
+            if( pifd == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            ObjPtr pObj = pifd->GetMethodList();
+            CMethodDecls* pmdls = pObj;
+            if( pmdls == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            gint32 iCount = pmdls->GetCount();
+            if( iCount == 0 )
+                continue;
+
+            for( gint32 i = 0; i < iCount; i++ )
+            {
+                ObjPtr pmd = pmdls->GetChild( i );
+                if( pmd.IsEmpty() ) 
+                {
+                    ret = -EFAULT;
+                    break;
+                }
+                CMethodDecl* pmethod = pmd;
+                if( pmethod->IsEvent() )
+                    vecEvents.push_back( pmd );
+                else
+                    vecMethods.push_back( pmd );
+            }
+        }
+
+        for( auto& elem : vecMethods )
+        {
+            CImplJavaMthdSvr ojms(
+                m_pWriter, elem,
+                ObjPtr( m_pNode ) );
+
+            ojms.DeclAbstractFuncs();
+        }
+        
+        Wa( "public Map< String, IReqHandler > initMaps()" );
+        BLOCK_OPEN;
+
+        Wa( "Map< String, IReqHandler > o =" );
+        Wa( "    new HashMap< String, IReqHandler >();" );
+        Wa( "IReqHandler val;" );
+
+        for( auto& elem : vecMethods )
+        {
+            CImplJavaMthdSvr ojms(
+                m_pWriter, elem,
+                ObjPtr( m_pNode ) );
+
+            ojms.OutputReqHandler();
+        }
+
+        Wa( "return o;" );
+        BLOCK_CLOSE;
+
+        for( auto& elem : vecEvents )
+        {
+            CImplJavaMthdSvr ojms(
+                m_pWriter, elem,
+                ObjPtr( m_pNode ) );
+            ojms.OutputEvent();
+        }
+
+        BLOCK_CLOSE;
+
+    }while( 0 );
 
     return ret;
 }

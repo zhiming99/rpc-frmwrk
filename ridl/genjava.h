@@ -255,6 +255,10 @@ class CJTypeHelper
     static gint32 GetFormalArgList(
         ObjPtr& pArgs,
         std::vector< STRPAIR >& vecArgs )
+
+    static gint32 GetActArgList(
+        ObjPtr& pArgs,
+        std::vector< stdstr >& vecArgs )
 }
 
 class CJavaSnippet
@@ -266,23 +270,30 @@ class CJavaSnippet
         CWriterBase* pWriter )
     { m_pWriter = pWriter; }
 
+    gint32 EmitFormalArgList(
+        ObjPtr& pArgs );
+
     gint32 EmitNewBufPtrSerial(
         guint32 dwSize );
 
     gint32 EmitByteBufferForDeserial(
         const stdstr& strBuf );
 
-    gint32 EmitSerialArgsJava(
+    gint32 EmitSerialArgs(
         ObjPtr& pArgs,
         const stdstr& strName,
         bool bCast )
 
-    gint32 EmitDeserialArgsJava(
-        ObjPtr& pArgs );
+    gint32 EmitDeserialArgs(
+        ObjPtr& pArgs,
+        bool bDeclare );
 
     gint32 EmitDeclArgs(
         ObjPtr& pArgs
-        bool bDefault );
+        bool bInit );
+
+    gint32 EmitArgClassObj(
+        ObjPtr& pArgs );
 
     gint32 EmitCastArgFromObject(
         ObjPtr& pArgs
@@ -292,5 +303,43 @@ class CJavaSnippet
     gint32 EmitCastArgsFromObject(
         ObjPtr& pMethod, bool bIn,
         const stdstr strObjArr );
+
+    gint32 EmitCatchExcept(
+        stdstr strExcept, bool bSetRet );
 };
 
+class CImplJavaMthdSvr :
+    public CMethodWriter
+{
+    CMethodDecl* m_pNode = nullptr;
+    CInterfaceDecl* m_pIf = nullptr;
+    CServiceDecl* m_pSvc = nullptr;
+
+    gint32 ImplNewCancelNotify();
+    gint32 ImplInvoke();
+    gint32 ImplReqContext();
+
+    public:
+    typedef CMethodWriter super;
+
+    CImplJavaMthdSvr(
+        CJavaWriter* pWriter,
+        ObjPtr& pNode );
+
+    gint32 DeclAbstractFuncs();
+    gint32 OutputReqHandler();
+    gint32 OutputEvent();
+};
+
+class CImplJavaSvcsvrbase :
+{
+    CJavaWriter* m_pWriter = nullptr;
+    CServiceDecl* m_pSvc = nullptr;
+    public:
+
+    CImplJavaSvcsvrbase(
+        CJavaWriter* pWriter,
+        ObjPtr& pNode );
+
+    int Output();
+};

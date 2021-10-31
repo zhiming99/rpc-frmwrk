@@ -80,8 +80,7 @@ abstract public class JavaRpcService
         public abstract JRetVal invoke(
             Object oHost,
             ObjPtr callback,
-            Object[] oParams,
-            boolean bServer );
+            Object[] oParams );
     }
 
     public interface IEvtHandler extends IReqHandler{
@@ -440,7 +439,10 @@ abstract public class JavaRpcService
                 jret.setError( -RC.EFAULT );
                 break;
             }
-            CParamList oParams = new CParamList( pCfg );
+
+            CParamList oParams =
+                new CParamList( pCfg );
+
             jret = ( JRetVal )oParams.GetSize();
             if( jret.ERROR() ||
                 jret.getParamCount() == 0 )
@@ -455,7 +457,14 @@ abstract public class JavaRpcService
             if( seriProto == RC.seriRidl )
             {
                 jret = ( JRetVal )
-                    oParams.GetProperty( 0 );
+                    oParams.GetByteArray( 0 );
+                if( jret.getError() == -RC.ENOENT )
+                {
+                    // fine, OK with 0 parameter.
+                    jret.clear();
+                    break;
+                }
+
                 if( jret.ERROR() )
                     break;
 
@@ -463,34 +472,15 @@ abstract public class JavaRpcService
                 if( val == null )
                 {
                     jret.clear();
-                    jret.setError(
-                        -RC.EFAULT );
+                    jret.setError( -RC.EFAULT );
                     break;
                 }
 
-                BufPtr pcBuf = ( BufPtr )val;
-                jret.clear();
-
-                jret = ( JRetVal )
-                    pcBuf.GetByteArray();
-
-                if( jret.ERROR() ) 
-                    break;
-
-                val = jret.getAt( 0 );
-                if( val == null )
-                {
-                    jret.clear();
-                    jret.setError(
-                        -RC.EFAULT );
-                    break;
-                }
                 byte[] bytearr = ( byte[] )val;
                 jret.addElem( bytearr );
                 break;
             }
-            else if( seriProto !=
-                    RC.seriNone )
+            else if( seriProto != RC.seriNone )
             {
                 jret.setError( 
                     -RC.EBADMSG );
@@ -513,8 +503,7 @@ abstract public class JavaRpcService
                     break;
                 }
 
-                int iType =
-                    ( ( Integer )val ).intValue();
+                int iType = ( Integer )val;
 
                 JRetVal jret2 = new JRetVal();
                 switch( iType )
@@ -600,9 +589,13 @@ abstract public class JavaRpcService
                 break;
             }
 
-            Object[] argList = jret.getParamArray();
+            Object[] argList =
+                jret.getParamArray();
+
             boolean found = false;
-            String[] nameComps = methodName.split( "_" );
+            String[] nameComps =
+                methodName.split( "_" );
+
             if( isServer() )
             {
                 if( nameComps[ 0 ] != "UserMethod" )
@@ -634,8 +627,8 @@ abstract public class JavaRpcService
                 
             try
             {
-                oResp = oMethod.invoke( this,
-                    callback, argList, isServer() );
+                oResp = oMethod.invoke(
+                    this, callback, argList );
             }
             catch( IllegalArgumentException e )
             {
@@ -733,8 +726,7 @@ abstract public class JavaRpcService
     public int removeChanCtx(
         long hChannel )
     {
-        return m_oInst.RemoveChanCtx(
-            hChannel );
+        return m_oInst.RemoveChanCtx( hChannel );
     }
 
     public JRetVal getChanCtx( long hChannel )
