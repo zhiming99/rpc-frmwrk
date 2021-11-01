@@ -26,9 +26,9 @@ abstract public class StructFactoryBase
     public static int addFactory( int id , IFactory clsObj )
     {
         if( m_mapStructs.containsKey( id ) )
-            return -rpcbaseConstants.EEXIST;
+            return -RC.EEXIST;
         m_mapStructs.put( id, clsObj );
-        return rpcbaseConstants.STATUS_SUCCESS;
+        return RC.STATUS_SUCCESS;
     }
     public abstract void initMap();
 }

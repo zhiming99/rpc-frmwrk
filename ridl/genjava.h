@@ -259,6 +259,10 @@ class CJTypeHelper
     static gint32 GetActArgList(
         ObjPtr& pArgs,
         std::vector< stdstr >& vecArgs )
+
+    static gint32 GetMethodsOfSvc(
+        ObjPtr& pSvc,
+        std::vector< ObjPtr >& vecm );
 }
 
 class CJavaSnippet
@@ -306,9 +310,18 @@ class CJavaSnippet
 
     gint32 EmitCatchExcept(
         stdstr strExcept, bool bSetRet );
+
+    gint32 EmitDeclFields(
+        ObjPtr& pFields );
+
+    gint32 EmitSerialFields(
+        ObjPtr& pFields );
+
+    gint32 EmitDeserialFields(
+        ObjPtr& pFields );
 };
 
-class CImplJavaMthdSvr :
+class CImplJavaMethodSvrBase :
     public CMethodWriter
 {
     CMethodDecl* m_pNode = nullptr;
@@ -322,9 +335,10 @@ class CImplJavaMthdSvr :
     public:
     typedef CMethodWriter super;
 
-    CImplJavaMthdSvr(
+    CImplJavaMethodSvrBase(
         CJavaWriter* pWriter,
-        ObjPtr& pNode );
+        ObjPtr& pNode,
+        ObjPtr& pSvc );
 
     gint32 DeclAbstractFuncs();
     gint32 OutputReqHandler();
@@ -343,3 +357,52 @@ class CImplJavaSvcsvrbase :
 
     int Output();
 };
+
+class CImplJavaMethodCliBase :
+    public CMethodWriter
+{
+    CMethodDecl* m_pNode = nullptr;
+    CInterfaceDecl* m_pIf = nullptr;
+    CServiceDecl* m_pSvc = nullptr;
+
+    gint32 ImplAsyncCb();
+    gint32 ImplMakeCall();
+
+    public:
+    typedef CMethodWriter super;
+
+    CImplJavaMethodCliBase(
+        CJavaWriter* pWriter,
+        ObjPtr& pNode,
+        ObjPtr& pSvc );
+
+    gint32 DeclAbstractFuncs();
+    gint32 OutputReqSender();
+    gint32 OutputEvent();
+};
+
+class CImplJavaSvcclibase :
+{
+    CJavaWriter* m_pWriter = nullptr;
+    CServiceDecl* m_pSvc = nullptr;
+    public:
+
+    CImplJavaSvcclibase(
+        CJavaWriter* pWriter,
+        ObjPtr& pNode );
+
+    int Output();
+};
+
+class CDeclareStructJava
+{
+    CJavaWriter* m_pWriter = nullptr;
+    CStructDecl* m_pNode = nullptr;
+
+    public:
+    CDeclareStructJava(
+        CJavaWriter* pWriter,
+        ObjPtr& pNode );
+    gint32 Output();
+};
+

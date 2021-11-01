@@ -29,6 +29,7 @@
 #include <string>
 #include "rpc.h"
 #include "defines.h"
+#include "proxy.h"
 #include <stdint.h>
 #include <errno.h>
 #include <vector>
@@ -913,6 +914,17 @@ IService* CastToSvc(
         return nullptr;
 
     IService* pSvc = *pObj;
+    return pSvc;
+}
+
+CRpcServices* CastToRpcSvcs(
+    JNIEnv *jenv, ObjPtr* pObj )
+{
+    if( pObj == nullptr ||
+        ( *pObj ).IsEmpty() )
+        return nullptr;
+
+    CRpcServices* pSvc = *pObj;
     return pSvc;
 }
 
@@ -2541,5 +2553,9 @@ class CInterfaceServer : public CRpcServices
 };
 
 %clearnodefaultctor;
+
+%newobject CastToRpcSvcs;
+CRpcServices* CastToRpcSvcs(
+    JNIEnv *jenv, ObjPtr* pObj );
 
 %include "proxy.i"

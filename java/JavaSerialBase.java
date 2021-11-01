@@ -326,12 +326,12 @@ abstract public class JavaSerialBase
         return 0;
     }
 
-    public abstract ObjPtr getInst();
+    public abstract Object getInst();
 
     public int serialStruct( BufPtr buf, Integer offset, ISerializable val )
     {
         int ret = 0;
-        ObjPtr oInst = getInst();
+        Object oInst = getInst();
         if( oInst == null )
             return -RC.EFAULT;
         val.setInst( oInst );
