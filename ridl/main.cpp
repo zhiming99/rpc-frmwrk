@@ -109,12 +109,13 @@ bool g_bNewSerial = true;
 static stdstr g_strLang = "cpp";
 
 // the prefix for java package name
-static stdstr g_strPrefix = "org.rpcf.";
+stdstr g_strPrefix = "org.rpcf.";
 bool g_bMklib = false;
 
 #include "seribase.h"
 #include "gencpp.h"
 #include "genpy.h"
+#include "genjava.h"
 
 int main( int argc, char** argv )
 {
@@ -203,6 +204,7 @@ int main( int argc, char** argv )
                         g_strPrefix = optarg;
                     break;
                 }
+
             case 'l':
                 {
                     g_bMklib = true;
@@ -305,6 +307,11 @@ int main( int argc, char** argv )
         else if( g_strLang == "py" )
         {
             ret = GenPyProj(
+                g_strOutPath, strAppName, pRoot );
+        }
+        else if( g_strLang == "java" )
+        {
+            ret = GenJavaProj(
                 g_strOutPath, strAppName, pRoot );
         }
         else

@@ -1,10 +1,11 @@
-package org.rpcf.rpcbase;
+package org.rpcf.example;
 import java.lang.String;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.List;
 import java.util.ArrayList;
 import java.nio.ByteBuffer;
+import org.rpcf.rpcbase.*;
 
 public class JavaSerialImpl extends JavaSerialBase
 {

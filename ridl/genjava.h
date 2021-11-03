@@ -23,6 +23,7 @@
  * =====================================================================================
  */
 
+#pragma once
 #include <sys/stat.h>
 #include "rpc.h"
 using namespace rpcf;
@@ -41,6 +42,8 @@ struct CJavaFileSet : public IFileSet
     std::string  m_strObjDesc;
     std::string  m_strDriver;
     std::string  m_strMakefile;
+    std::string  m_strMainCli;
+    std::string  m_strMainSvr;
     std::string  m_strReadme;
 
     typedef IFileSet super;
@@ -75,20 +78,12 @@ class CJavaWriter : public CWriterBase
         m_pNode = pStmts;
     }
 
-    inline gint32 SelectStructsFile()
+    inline gint32 SelectFactoryFile()
     {
         CJavaFileSet* pFiles = static_cast< CJavaFileSet* >
             ( m_pFiles.get() );
-        m_strCurFile = pFiles->m_strStructsPy;
+        m_strCurFile = pFiles->m_strFactory;
         return SelectFile( 0 );
-    }
-
-    inline gint32 SelectInitFile()
-    {
-        CJavaFileSet* pFiles = static_cast< CJavaFileSet* >
-            ( m_pFiles.get() );
-        m_strCurFile = pFiles->m_strInitPy;
-        return SelectFile( 1 );
     }
 
     inline gint32 SelectDescFile()
@@ -96,7 +91,7 @@ class CJavaWriter : public CWriterBase
         CJavaFileSet* pFiles = static_cast< CJavaFileSet* >
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strObjDesc;
-        return SelectFile( 2 );
+        return SelectFile( 1 );
     }
 
     inline gint32 SelectDrvFile()
@@ -104,7 +99,7 @@ class CJavaWriter : public CWriterBase
         CJavaFileSet* pFiles = static_cast< CJavaFileSet* >
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strDriver;
-        return SelectFile( 3 );
+        return SelectFile( 2 );
     }
 
     inline gint32 SelectMakefile()
@@ -112,7 +107,7 @@ class CJavaWriter : public CWriterBase
         CJavaFileSet* pFiles = static_cast< CJavaFileSet* >
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strMakefile;
-        return SelectFile( 4 );
+        return SelectFile( 3 );
     }
 
     inline gint32 SelectMainCli()
@@ -120,7 +115,7 @@ class CJavaWriter : public CWriterBase
         CJavaFileSet* pFiles = static_cast< CJavaFileSet* >
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strMainCli;
-        return SelectFile( 5 );
+        return SelectFile( 4 );
     }
 
     inline gint32 SelectMainSvr()
@@ -128,7 +123,7 @@ class CJavaWriter : public CWriterBase
         CJavaFileSet* pFiles = static_cast< CJavaFileSet* >
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strMainSvr;
-        return SelectFile( 6 );
+        return SelectFile( 5 );
     }
 
     inline gint32 SelectReadme()
@@ -136,7 +131,7 @@ class CJavaWriter : public CWriterBase
         CJavaFileSet* pFiles = static_cast< CJavaFileSet* >
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strReadme;
-        return SelectFile( 7 );
+        return SelectFile( 6 );
     }
 
 
@@ -151,62 +146,22 @@ class CJavaWriter : public CWriterBase
         m_strCurFile = strFile;
         return SelectFile( idx );
     }
+
+    gint32 AddStructImpl(
+        const std::string& strSvcName )
+    {
+        IFileSet* pFiles = m_pFiles.get();
+        CJavaFileSet* pJFiles = static_cast
+            < CJavaFileSet* >( pFiles );
+        return pJFiles->AddStructImpl( strSvcName );
+    }
 };
 
 class CJTypeHelper
 {
-    static std::map< char, stdstr > m_mapTypeCvt =
-    {
-        { "long", "Long" },
-        { "int", "Integer" },
-        { "short", "Short" },
-        { "boolean", "Boolean" },
-        { "byte", "Byte" },
-        { "float", "Float" },
-        { "double", "Double" }
-    };
-
-    static std::map< char, stdstr > m_mapSig2JTp =
-    {
-        { '(' , "[]" },
-        { '[' , "Map" },
-        { 'O' ,"Object" },
-        { 'Q', "long" },
-        { 'q', "long" },
-        { 'D', "int" },
-        { 'd', "int" },
-        { 'W', "short" },
-        { 'w', "short" },
-        { 'b', "boolean" },
-        { 'B', "byte" },
-        { 'f', "float" },
-        { 'F', "double" },
-        { 's', "String" },
-        { 'a', "byte[]" },
-        { 'o', "ObjPtr" },
-        { 'h', "long" }
-    };
-
-    static std::map< char, stdstr > m_mapSig2DefVal =
-    {
-        { '(' , "null" },
-        { '[' , "null" },
-        { 'O' ,"null" },
-        { 'Q', "0" },
-        { 'q', "0" },
-        { 'D', "0" },
-        { 'd', "0" },
-        { 'W', "0" },
-        { 'w', "0" },
-        { 'b', "false" },
-        { 'B', "0" },
-        { 'f', "0.0" },
-        { 'F', "0.0" },
-        { 's', "\"\"" },
-        { 'a', "null" },
-        { 'o', "null" },
-        { 'h', "0" }
-    };
+    static std::map< stdstr, stdstr > m_mapTypeCvt;
+    static std::map< char, stdstr > m_mapSig2JTp;
+    static std::map< char, stdstr > m_mapSig2DefVal;
 
     public:
 
@@ -228,7 +183,7 @@ class CJTypeHelper
     }
 
     static gint32 GetObjectPrimitive(
-        const stdstr& strType, stdstr& strWrapper );
+        const stdstr& strType, stdstr& strWrapper )
     {
         if( m_mapTypeCvt.find( strType ) ==
             m_mapTypeCvt.end() )
@@ -250,20 +205,20 @@ class CJTypeHelper
         ObjPtr& pObj, stdstr& strText );
 
     static gint32 GetTypeText(
-        ObjPtr& pObj, stdstr& strText )
+        ObjPtr& pObj, stdstr& strText );
 
     static gint32 GetFormalArgList(
         ObjPtr& pArgs,
-        std::vector< STRPAIR >& vecArgs )
+        std::vector< STRPAIR >& vecArgs );
 
     static gint32 GetActArgList(
         ObjPtr& pArgs,
-        std::vector< stdstr >& vecArgs )
+        std::vector< stdstr >& vecArgs );
 
     static gint32 GetMethodsOfSvc(
         ObjPtr& pSvc,
         std::vector< ObjPtr >& vecm );
-}
+};
 
 class CJavaSnippet
 {
@@ -273,6 +228,8 @@ class CJavaSnippet
     CJavaSnippet(
         CWriterBase* pWriter )
     { m_pWriter = pWriter; }
+
+    gint32 EmitBanner();
 
     gint32 EmitFormalArgList(
         ObjPtr& pArgs );
@@ -286,21 +243,21 @@ class CJavaSnippet
     gint32 EmitSerialArgs(
         ObjPtr& pArgs,
         const stdstr& strName,
-        bool bCast )
+        bool bCast );
 
     gint32 EmitDeserialArgs(
         ObjPtr& pArgs,
         bool bDeclare );
 
     gint32 EmitDeclArgs(
-        ObjPtr& pArgs
+        ObjPtr& pArgs,
         bool bInit );
 
     gint32 EmitArgClassObj(
         ObjPtr& pArgs );
 
     gint32 EmitCastArgFromObject(
-        ObjPtr& pArgs
+        ObjPtr& pArgs,
         const stdstr& strVar,
         stdstr& strCast );
 
@@ -311,6 +268,9 @@ class CJavaSnippet
     gint32 EmitCatchExcept(
         stdstr strExcept, bool bSetRet );
 
+    void EmitCatchExcepts(
+        bool bSetRet );
+
     gint32 EmitDeclFields(
         ObjPtr& pFields );
 
@@ -319,6 +279,12 @@ class CJavaSnippet
 
     gint32 EmitDeserialFields(
         ObjPtr& pFields );
+
+    gint32 EmitActArgList(
+        ObjPtr& pArgs );
+
+    gint32 EmitGetArgTypes(
+        ObjPtr& pArgs );
 };
 
 class CImplJavaMethodSvrBase :
@@ -331,6 +297,7 @@ class CImplJavaMethodSvrBase :
     gint32 ImplNewCancelNotify();
     gint32 ImplInvoke();
     gint32 ImplReqContext();
+    gint32 ImplSvcComplete();
 
     public:
     typedef CMethodWriter super;
@@ -345,10 +312,10 @@ class CImplJavaMethodSvrBase :
     gint32 OutputEvent();
 };
 
-class CImplJavaSvcsvrbase :
+class CImplJavaSvcsvrbase
 {
     CJavaWriter* m_pWriter = nullptr;
-    CServiceDecl* m_pSvc = nullptr;
+    CServiceDecl* m_pNode = nullptr;
     public:
 
     CImplJavaSvcsvrbase(
@@ -381,10 +348,10 @@ class CImplJavaMethodCliBase :
     gint32 OutputEvent();
 };
 
-class CImplJavaSvcclibase :
+class CImplJavaSvcclibase
 {
     CJavaWriter* m_pWriter = nullptr;
-    CServiceDecl* m_pSvc = nullptr;
+    CServiceDecl* m_pNode = nullptr;
     public:
 
     CImplJavaSvcclibase(
@@ -393,6 +360,65 @@ class CImplJavaSvcclibase :
 
     int Output();
 };
+
+class CImplJavaMethodSvr:
+    public CMethodWriter
+{
+    CMethodDecl* m_pNode = nullptr;
+    CInterfaceDecl* m_pIf = nullptr;
+
+    public:
+    typedef CMethodWriter super;
+
+    CImplJavaMethodSvr(
+        CJavaWriter* pWriter,
+        ObjPtr& pNode );
+
+    gint32 Output();
+};
+
+class CImplJavaMethodCli:
+    public CMethodWriter
+{
+    CMethodDecl* m_pNode = nullptr;
+    CInterfaceDecl* m_pIf = nullptr;
+
+    public:
+    typedef CMethodWriter super;
+
+    CImplJavaMethodCli(
+        CJavaWriter* pWriter,
+        ObjPtr& pNode );
+
+    gint32 Output();
+};
+
+class CImplJavaSvcSvr
+{
+    CJavaWriter* m_pWriter = nullptr;
+    CServiceDecl* m_pNode = nullptr;
+    public:
+
+    CImplJavaSvcSvr(
+        CJavaWriter* pWriter,
+        ObjPtr& pNode );
+
+    int Output();
+};
+
+class CImplJavaSvcCli
+{
+    CJavaWriter* m_pWriter = nullptr;
+    CServiceDecl* m_pNode = nullptr;
+    public:
+
+    CImplJavaSvcCli(
+        CJavaWriter* pWriter,
+        ObjPtr& pNode );
+
+    int Output();
+};
+
 
 class CDeclareStructJava
 {
@@ -406,3 +432,36 @@ class CDeclareStructJava
     gint32 Output();
 };
 
+class CImplStructFactory
+{
+    CJavaWriter* m_pWriter;
+    CStatements* m_pNode = nullptr;
+    public:
+    CImplStructFactory(
+        CJavaWriter* pWriter,
+        ObjPtr& pNode );
+    gint32 Output();
+};
+
+class CJavaExportMakefile :
+    public CExportBase
+{
+    public:
+    typedef CExportBase super;
+    CJavaExportMakefile(
+        CWriterBase* pWriter,
+        ObjPtr& pNode );
+};
+
+class CJavaExportReadme :
+    public CExportReadme
+{
+    public:
+    typedef CExportReadme super;
+    CJavaExportReadme(
+        CWriterBase* pWriter,
+        ObjPtr& pNode )
+        : super( pWriter, pNode )
+    {}
+    gint32 Output();
+};

@@ -22,7 +22,7 @@
  *
  * =====================================================================================
  */
-package org.rpcf.rpcbase;
+package org.rpcf.example;
 import java.lang.String;
 import java.util.HashMap;
 import java.util.Map;
@@ -32,12 +32,13 @@ import java.nio.ByteBuffer;
 import java.util.Map.Entry;
 import java.nio.charset.StandardCharsets;
 import java.util.NoSuchElementException;
+import org.rpcf.rpcbase.*;
 
 abstract public class JavaSerialBase
 {
     public static int m_iMaxSize =
         RC.MAX_BUF_SIZE;
-    public interface ISerializable
+    abstract public class ISerializable
     {
         public abstract int serialize(
             BufPtr buf, Integer offset );
@@ -45,6 +46,20 @@ abstract public class JavaSerialBase
             ByteBuffer buf );
         public abstract void setInst(
             Object oInst );
+    }
+
+    public JavaSerialBase getSerialBase()
+    {
+        JavaSerialBase osb;
+        CRpcServices oSvc = m_oInst;
+        if( oSvc.IsServer() )
+            osb = new JavaSerialHelperS(
+                ( CJavaServerImpl )oSvc );
+        else
+            osb = new JavaSerialHelperP(
+                ( CJavaProxyImpl )oSvc );
+        return osb;
+        
     }
 
     public interface ISerialElem
@@ -736,7 +751,7 @@ abstract public class JavaSerialBase
         int id = buf.getInt();
         buf.position( curPos );
         ISerializable oStruct =
-            StructFactoryBase.create( id );
+            StructFactory.create( id );
         if( oStruct == null )
             throw new NullPointerException();
 
