@@ -59,6 +59,9 @@ This project depends on the following 3rd-party packags to build:
 6. Logging service
 
 ---
+[`Thu Nov 04 2021 09:34:51 PM Beijing`]   
+1. The Java code generator is almost code complete. But encountered some difficulty with deserializing maps. Fixing it may take a few days.
+
 [`Fri Oct 22 2021 06:18:56 PM Beijing`]   
 1. The progress of Java support is faster than python, because I have followed Python module's architecture. I will work out the Java generator before starting to debug.
 
