@@ -7,9 +7,8 @@ import java.util.ArrayList;
 import java.lang.ClassCastException;
 
 /*
- * Hilarious, I need c preprocessor to spawn the java
+ * Hilarious, I need C preprocessor to spawn the java
  * classes and cannot find native way to do it yet.
- * I just want to keep one version of code to maintain.
  */
 
 abstract public class JavaRpcService

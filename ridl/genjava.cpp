@@ -1564,6 +1564,69 @@ CJavaFileSet::~CJavaFileSet()
     m_vecFiles.clear();
 }
 
+gint32 FindFullPath(
+    const stdstr& strFile,
+    stdstr& strFullPath )
+{
+    stdstr strSrcFile = "./";
+    strSrcFile += basename( strFile.c_str() );
+    gint32 ret = access(
+        strSrcFile.c_str(), F_OK );
+    if( ret == -1 )
+    {
+        stdstr strPath;
+        ret = FindInstCfg( strSrcFile, strPath );
+        if( ERROR( ret ) )
+            return ret;
+        strSrcFile = strPath;
+    }
+    strFullPath = strSrcFile;
+    return ret;
+}
+gint32 GenSerialBaseFiles(
+    CJavaWriter* pWriter, ObjPtr& pRoot )
+{
+    if( pWriter == nullptr ||
+        pRoot.IsEmpty() )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        stdstr strSeribase;
+        ret = FindFullPath(
+            "JavaSerialBase.java", strSeribase );
+        if( ERROR( ret ) )
+            break;
+        stdstr strCmd = "cp ";
+        strCmd += strSeribase + " " + pWriter->GetOutPath();
+        system( strCmd.c_str() );
+
+        stdstr strSeriImpl;
+        ret = FindFullPath(
+            "JavaSerialImpl.java", strSeriImpl );
+        if( ERROR( ret ) )
+            break;
+
+        stdstr strCmdP = "cpp -P -DJavaSerialImpl=JavaSerialHelperP "
+            "-DGetIdHash=GetPeerIdHash -DInstType=CJavaProxyImpl " +
+            strSeriImpl + " > " + pWriter->GetOutPath() + "/" + 
+            "JavaSerialHelperP.java";
+        stdstr strCmdS = "cpp -P -DJavaSerialImpl=JavaSerialHelperS "
+            "-DGetIdHash=GetIdHashByChan -DInstType=CJavaServerImpl " +
+            strSeriImpl + " > " + pWriter->GetOutPath() + "/" + 
+            "JavaSerialHelperS.java";
+
+        printf( "%s\n", strCmdP.c_str() );
+        printf( "%s\n", strCmdS.c_str() );
+
+        ret = system( strCmdP.c_str() );
+        ret = system( strCmdS.c_str() );
+
+    }while( 0 );
+    
+    return ret;
+}
+
 gint32 GenStructFilesJava(
     CJavaWriter* pWriter, ObjPtr& pRoot )
 {
@@ -1573,7 +1636,7 @@ gint32 GenStructFilesJava(
 
     gint32 ret = 0;
     do{
-
+        GenSerialBaseFiles( pWriter, pRoot );
         CStatements* pStmts = pRoot;
         if( unlikely( pStmts == nullptr ) )
         {
@@ -1728,19 +1791,32 @@ gint32 GenSvcFiles(
 }
 
 gint32 GenJavaProj(
-    const std::string& strOutPath,
+    const std::string& szOutPath,
     const std::string& strAppName,
     ObjPtr pRoot )
 {
-    if( strOutPath.empty() ||
+    if( szOutPath.empty() ||
         strAppName.empty() ||
         pRoot.IsEmpty() )
         return -EINVAL;
 
     gint32 ret = 0;
+    stdstr strOutPath;
 
     do{
         struct stat sb;
+        stdstr strPkgPath = g_strPrefix;
+        std::replace( strPkgPath.begin(),
+            strPkgPath.end(), '.', '/' );
+        strPkgPath += "/";
+        strPkgPath += g_strAppName;
+
+        if( szOutPath == "output" )
+            strOutPath = strPkgPath;
+        else
+            strOutPath =
+                szOutPath + "/" + strPkgPath;
+
         if( lstat( strOutPath.c_str(), &sb ) == -1 )
         {
             std::string strCmd = "mkdir -p ";
@@ -3665,7 +3741,26 @@ CJavaExportMakefile::CJavaExportMakefile(
     super( pWriter, pNode )
 {
     m_strFile = "./pymktpl";
-};
+}
+
+gint32 CJavaExportMakefile::Output()
+{
+    gint32 ret = super::Output();
+    if( ERROR( ret ) )
+        return ret;
+
+    m_pWriter->m_curFp->flush();
+    m_pWriter->m_curFp->close();
+
+    stdstr strPath = m_pWriter->GetOutPath();
+    stdstr strFile = strPath + "/Makefile";
+    stdstr strCmdLine = "sed -i \"s:XXXXX:";
+    strCmdLine += strPath + ":g\" " +  strFile;
+
+    printf( "%s\n", strCmdLine.c_str() );
+    system( strCmdLine.c_str() );
+    return ret;
+}
 
 CImplDeserialMap::CImplDeserialMap(
     CJavaWriter* pWriter )

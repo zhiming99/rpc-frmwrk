@@ -465,6 +465,7 @@ class CJavaExportMakefile :
     CJavaExportMakefile(
         CWriterBase* pWriter,
         ObjPtr& pNode );
+    gint32 Output() override;
 };
 
 class CJavaExportReadme :
