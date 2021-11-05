@@ -13,10 +13,8 @@ public class JavaSerialImpl extends JavaSerialBase
     public JavaSerialImpl( InstType pIf )
     { m_oInst = pIf; }
 
-    public ObjPtr getInst()
-    {
-        return ( ObjPtr )m_oInst.CastToObjPtr();
-    }
+    public Object getInst()
+    { return m_oInst; }
 
     public int serialHStream(
         BufPtr buf, Integer offset, long val )

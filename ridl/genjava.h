@@ -31,6 +31,8 @@ using namespace rpcf;
 
 using STRPAIR=std::pair< stdstr, stdstr >;
 
+std::string GetTypeSigJava( ObjPtr& pObj );
+
 gint32 GenJavaProj(
     const std::string& strOutPath,
     const std::string& strAppName,
@@ -45,10 +47,14 @@ struct CJavaFileSet : public IFileSet
     std::string  m_strMainCli;
     std::string  m_strMainSvr;
     std::string  m_strReadme;
+    std::string  m_strDeserialMap;
 
     typedef IFileSet super;
     CJavaFileSet( const stdstr& strOutPath,
         const stdstr& strAppName );
+
+    void OpenFile(
+        const stdstr strName );
 
     gint32 OpenFiles();
 
@@ -134,6 +140,13 @@ class CJavaWriter : public CWriterBase
         return SelectFile( 6 );
     }
 
+    inline gint32 SelectDeserialMap()
+    {
+        CJavaFileSet* pFiles = static_cast< CJavaFileSet* >
+            ( m_pFiles.get() );
+        m_strCurFile = pFiles->m_strFactory;
+        return SelectFile( 7 );
+    }
 
     inline gint32 SelectImplFile(
         const std::string& strFile )
@@ -168,7 +181,7 @@ class CJTypeHelper
     static stdstr GetDefValOfType( ObjPtr pType )
     {
         stdstr strVal;
-        stdstr strSig = GetTypeSig( pType );
+        stdstr strSig = GetTypeSigJava( pType );
         if( m_mapSig2DefVal.find( strSig[ 0 ] ) ==
             m_mapSig2DefVal.end() )
         {
@@ -251,7 +264,8 @@ class CJavaSnippet
 
     gint32 EmitDeclArgs(
         ObjPtr& pArgs,
-        bool bInit );
+        bool bInit,
+        bool bLocal = false );
 
     gint32 EmitArgClassObj(
         ObjPtr& pArgs );
@@ -463,5 +477,14 @@ class CJavaExportReadme :
         ObjPtr& pNode )
         : super( pWriter, pNode )
     {}
+    gint32 Output();
+};
+
+class CImplDeserialMap
+{
+    CJavaWriter* m_pWriter;
+    public:
+    CImplDeserialMap(
+        CJavaWriter* pWriter );
     gint32 Output();
 };

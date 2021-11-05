@@ -25,8 +25,13 @@
 #include "rpc.h"
 using namespace rpcf;
 #include "astnode.h"
+extern stdstr g_strLang;
+extern std::string GetTypeSigJava( ObjPtr& pObj );
 std::string GetTypeSig( ObjPtr& pObj )
 {
+    if( g_strLang == "java" )
+        return GetTypeSigJava( pObj );
+
     std::string strSig;
     gint32 ret = 0;
     if( pObj.IsEmpty() )

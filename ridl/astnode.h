@@ -55,7 +55,9 @@ if( !pObj.IsEmpty() ) \
 #define MF_IN_AS_OUT      0
 
 extern std::map< gint32, char > g_mapTypeSig;
+extern std::map<stdstr, ObjPtr> g_mapMapTypeDecl;
 std::string GetTypeSig( ObjPtr& pObj );
+extern stdstr g_strLang;
 
 // declarations
 struct CDeclMap
@@ -571,6 +573,16 @@ struct CMapType : public CArrayType
     {
         m_pKeyType = pKey;
         SET_PARENT_OF( pKey );
+        AddToMapTypeMap();
+    }
+
+    void AddToMapTypeMap()
+    {
+        if( g_strLang != "java" )
+            return;
+        stdstr strSig = GetSignature();
+        g_mapMapTypeDecl[ strSig ] =
+            ObjPtr( this );
     }
 
     ObjPtr& GetKeyType()

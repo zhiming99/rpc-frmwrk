@@ -106,7 +106,7 @@ static std::string g_strOutPath = "output";
 static std::vector< std::string > g_vecPaths;
 std::string g_strTarget;
 bool g_bNewSerial = true;
-static stdstr g_strLang = "cpp";
+stdstr g_strLang = "cpp";
 
 // the prefix for java package name
 stdstr g_strPrefix = "org.rpcf.";
