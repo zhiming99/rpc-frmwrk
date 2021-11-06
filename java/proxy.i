@@ -1980,6 +1980,8 @@ jobject CastToProxy(
 void JavaDbgPrint(
     const std::string strMsg, int level = 3 );
 
+gint32 LoadJavaFactory( ObjPtr& pMgr );
+
 %nodefaultctor;
 %typemap(javadestruct_derived, methodname="delete", methodmodifiers="public synchronized") CJavaProxy {
     if (swigCPtr != 0) {

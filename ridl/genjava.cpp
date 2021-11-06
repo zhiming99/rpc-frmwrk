@@ -1644,10 +1644,7 @@ gint32 GenStructFilesJava(
             break;
         }
         std::vector< ObjPtr > vecAllStructs;
-        ret = pStmts->GetStructDecls(
-            vecAllStructs );
-        if( ERROR( ret ) )
-            break;
+        pStmts->GetStructDecls( vecAllStructs );
 
         std::vector< std::pair< std::string, ObjPtr > > vecStructs;
         for( auto& elem : vecAllStructs )
@@ -1850,48 +1847,108 @@ gint32 GenJavaProj(
         CImplStructFactory oisf( &oWriter, pRoot );
         ret = oisf.Output();
         if( ERROR( ret ) )
+        {
+            OutputMsg( ret,
+                "error generating Factory file" );
             break;
+        }
 
         oWriter.SelectDrvFile();
         CExportDrivers oedrv( &oWriter, pRoot );
         ret = oedrv.Output();
         if( ERROR( ret ) )
+        {
+            OutputMsg( ret,
+                "error generating driver.json file" );
             break;
+        }
 
         oWriter.SelectDescFile();
         CExportObjDesc oedesc( &oWriter, pRoot );
         ret = oedesc.Output();
         if( ERROR( ret ) )
+        {
+            OutputMsg( ret,
+                "error generating description file" );
             break;
+        }
 
         ret = GenSvcFiles( &oWriter, pRoot );
         if( ERROR( ret ) )
+        {
+            OutputMsg( ret,
+                "error generating java file" );
             break;
+        }
 
         oWriter.SelectMakefile();
         CJavaExportMakefile opemk( &oWriter, pRoot );
         ret = opemk.Output();
         if( ERROR( ret ) )
+        {
+            OutputMsg( ret,
+                "error generating Makefile" );
             break;
+        }
 
         oWriter.SelectReadme();
         CJavaExportReadme ordme( &oWriter, pRoot );
         ret = ordme.Output();
         if( ERROR( ret ) )
+        {
+            OutputMsg( ret,
+                "error generating README.md" );
             break;
+        }
 
         oWriter.SelectDeserialMap();
         CImplDeserialMap oidm( &oWriter );
         ret = oidm.Output();
         if( ERROR( ret ) )
+        {
+            OutputMsg( ret,
+                "error generating DeserialMaps.java" );
             break;
+        }
+
+        oWriter.SelectMainCli();
+        CImplJavaMainCli ojmc( &oWriter, pRoot );
+        ret = ojmc.Output();
+        if( ERROR( ret ) )
+        {
+            stdstr strName = 
+                g_strAppName + "Cli.java";
+            OutputMsg( ret,
+                "error generating %s.",
+                strName.c_str() );
+            break;
+        }
+
+        oWriter.SelectMainSvr();
+        CImplJavaMainSvr ojms( &oWriter, pRoot );
+        ret = ojms.Output();
+        if( ERROR( ret ) )
+        {
+            stdstr strName = 
+                g_strAppName + "Svr.java";
+            OutputMsg( ret,
+                "error generating %s.",
+                strName.c_str() );
+            break;
+        }
 
         ret = GenStructFilesJava( &oWriter, pRoot );
-
+        if( ERROR( ret ) )
+        {
+            OutputMsg( ret,
+                "error generating Struct files." );
+            break;
+        }
     }while( 0 );
 
     if( SUCCEEDED( ret ) )
         SyncCfg( strOutPath );
+
 
     return ret;
 }
@@ -2586,12 +2643,12 @@ gint32 CImplJavaMethodSvr::Output()
         BLOCK_OPEN;
         if( !bAsync )
         {
-            Wa( "// Synchronouse call. Make sure to call" );
+            Wa( "// Synchronous handler. Make sure to call" );
             Wa( "// oReqCtx.SetResponse before return" );
         }
         else
         {
-            Wa( "// Asynchronouse call. Make sure to call" );
+            Wa( "// Asynchronouse handler. Make sure to call" );
             Wa( "// oReqCtx.SetResponse with response" );
             Wa( "// parameters if return immediately or call" );
             Wa( "// oReqCtx.onServiceComplete in the future" );
@@ -3345,13 +3402,14 @@ int CImplJavaSvcSvr::Output()
         stdstr strName = m_pNode->GetName();
         CCOUT << "public class " << strName
             << "Svr extends " << strName << "svrbase";
-        NEW_LINES( 2 );
+        NEW_LINE;
         BLOCK_OPEN;
 
         CCOUT << "public " << strName << "Svr( ObjPtr pIoMgr,";
         NEW_LINE;
         Wa( "    String strDesc, String strSvrObj )" );
         Wa( "{ super( pIoMgr, strDesc, strSvrObj ); }" );
+        NEW_LINE;
 
         ObjPtr pNode = m_pNode;
         std::vector< ObjPtr > vecAllMethods;
@@ -3557,10 +3615,7 @@ gint32 CImplStructFactory::Output()
         os.EmitBanner();
         Wa( "import java.nio.ByteBuffer;" );
         std::vector< ObjPtr > vecStructs;
-        ret = m_pNode->GetStructDecls(
-            vecStructs );
-        if( ERROR( ret ) )
-            break;
+        m_pNode->GetStructDecls( vecStructs );
 
         std::vector< CStructDecl* > vecActStructs;
         for( auto& elem : vecStructs )
@@ -3601,19 +3656,22 @@ gint32 CImplStructFactory::Output()
         BLOCK_OPEN;
         Wa( "Map< Integer, IFactory > mapFactories =" );
         Wa( "    new HashMap< Integer, IFactory >();" );
-        Wa( "IFactory o;" );
-        for( auto& elem : vecActStructs )
+        if( !vecActStructs.empty() )
         {
-            stdstr strName = elem->GetName();
-            Wa( "o = new IFactory() {" );
-            Wa( "    public JavaSerialBase.ISerializable create()" );
-            CCOUT << "    " << "{ return new " << strName << "();}";
-            NEW_LINE;
-            Wa( "};" );
-            stdstr strMsgName = g_strAppName + "::" + strName;
-            gint32 iMsgId = GenClsid( strMsgName );
-            CCOUT << "mapFactories.put( " << iMsgId << ", o );";
-            NEW_LINE;
+            Wa( "IFactory o;" );
+            for( auto& elem : vecActStructs )
+            {
+                stdstr strName = elem->GetName();
+                Wa( "o = new IFactory() {" );
+                Wa( "    public JavaSerialBase.ISerializable create()" );
+                CCOUT << "    " << "{ return new " << strName << "();}";
+                NEW_LINE;
+                Wa( "};" );
+                stdstr strMsgName = g_strAppName + "::" + strName;
+                gint32 iMsgId = GenClsid( strMsgName );
+                CCOUT << "mapFactories.put( " << iMsgId << ", o );";
+                NEW_LINE;
+            }
         }
         CCOUT << "return mapFactories;";
         BLOCK_CLOSE;    
@@ -3861,5 +3919,203 @@ gint32 CImplDeserialMap::Output()
         BLOCK_CLOSE;// DeserialMaps
 
     }while( 0 );
+    return ret;
+}
+
+CImplJavaMainCli::CImplJavaMainCli(
+    CJavaWriter* pWriter,
+    ObjPtr& pNode )
+{
+    m_pWriter = pWriter;
+    m_pNode = pNode;
+    if( m_pNode == nullptr )
+    {
+        std::string strMsg = DebugMsg(
+            -EFAULT, "internal error empty "
+            "'statement' node" );
+        throw std::runtime_error( strMsg );
+    }
+}
+gint32 CImplJavaMainCli::Output()
+{
+    CJavaSnippet os( m_pWriter );
+    os.EmitBanner();
+    gint32 ret = 0;
+    do{
+        CCOUT << "public class " << g_strAppName << "Cli";
+        NEW_LINE;
+        BLOCK_OPEN;
+        Wa( "public static JavaRpcContext m_oCtx;" );
+        Wa( "public static void main( String[] args )" );
+        BLOCK_OPEN;
+        Wa( "m_oCtx = JavaRpcContext.createProxy(); " );
+        Wa( "if( m_oCtx == null )" );
+        Wa( "    return;" );
+        NEW_LINE;
+
+        std::vector< ObjPtr > vecSvcs;
+        ret = m_pNode->GetSvcDecls( vecSvcs );
+        if( ERROR( ret ) || vecSvcs.empty() )
+            break;
+        CServiceDecl* pSvc = vecSvcs[ 0 ];
+        stdstr strSvc = pSvc->GetName();
+
+        Wa( "// create the service object" );
+        CCOUT << strSvc << "Cli oProxy = new " << strSvc << "Cli(";
+        NEW_LINE;
+            Wa( "    m_oCtx.getIoMgr(), " );
+            CCOUT << "    \"./"<< g_strAppName<<"desc.json\",";
+            NEW_LINE;
+            CCOUT << "    \""<< strSvc << "\" );";
+
+        NEW_LINES( 2 );
+        Wa( "// check if there are errors" );
+        Wa( "if( RC.ERROR( oProxy.getError() ) )" );
+        Wa( "    return;" );
+
+        NEW_LINE;
+        Wa( "// start the proxy" );
+        Wa( "int ret = oProxy.start();" );
+        Wa( "if( RC.ERROR( ret ) )" );
+        Wa( "    return;" );
+        
+        NEW_LINE;
+        Wa( "do{" );
+        INDENT_UPL;
+        Wa( "/*// request something from the server" );
+        std::vector< ObjPtr > vecm;
+        ret = CJTypeHelper::GetMethodsOfSvc(
+            vecSvcs[ 0 ], vecm );
+        if( ERROR( ret ) || vecm.empty() )
+            break;
+
+        ObjPtr pMethod;
+        CArgListUtils oau;
+        for( auto& elem : vecm )
+        {
+            pMethod = elem;
+            CMethodDecl* pmd = elem;
+            ObjPtr pInArgs = pmd->GetInArgs();
+            if( oau.GetArgCount( pInArgs ) > 1 )
+                break;
+        }
+
+        CMethodDecl* pmd = pMethod;
+        CCOUT << "JRetVal jret = oProxy." << pmd->GetName();
+        ObjPtr pInArgs = pmd->GetInArgs();
+        gint32 iInCount = oau.GetArgCount( pInArgs );
+        if( iInCount == 0 && pmd->IsAsyncp() )
+        {
+            CCOUT << "( oYourCtx );";
+            NEW_LINE;
+        }
+        else if( iInCount == 0 )
+        {
+            CCOUT << "();";
+            NEW_LINE;
+        }
+        else if( iInCount > 0 )
+        {
+            if( pmd->IsAsyncp() )
+                CCOUT << "( oYourCtx,";
+            else
+                CCOUT << "(";
+            INDENT_UPL;
+            ret = os.EmitActArgList( pInArgs );
+            if( ERROR( ret ) )
+                break;
+            CCOUT << ");";
+            INDENT_DOWNL;
+        }
+        Wa( "if( jret.ERROR() )" );
+        Wa( "    break;" );
+        Wa( "*/" );
+        INDENT_DOWNL;
+        Wa( "}while( false );" );
+        CCOUT << "return;";
+        BLOCK_CLOSE; 
+        BLOCK_CLOSE; 
+
+    }while( 0 );
+
+    return ret;
+}
+
+CImplJavaMainSvr::CImplJavaMainSvr(
+    CJavaWriter* pWriter,
+    ObjPtr& pNode )
+{
+    m_pWriter = pWriter;
+    m_pNode = pNode;
+    if( m_pNode == nullptr )
+    {
+        std::string strMsg = DebugMsg(
+            -EFAULT, "internal error empty "
+            "'statement' node" );
+        throw std::runtime_error( strMsg );
+    }
+}
+
+gint32 CImplJavaMainSvr::Output()
+{
+    CJavaSnippet os( m_pWriter );
+    os.EmitBanner();
+    Wa( "import java.util.concurrent.TimeUnit;" );
+    gint32 ret = 0;
+    do{
+        CCOUT << "public class " << g_strAppName << "Svr";
+        NEW_LINE;
+        BLOCK_OPEN;
+        Wa( "public static JavaRpcContext m_oCtx;" );
+        Wa( "public static void main( String[] args )" );
+        BLOCK_OPEN;
+        Wa( "m_oCtx = JavaRpcContext.createServer(); " );
+        Wa( "if( m_oCtx == null )" );
+        Wa( "    return;" );
+        NEW_LINE;
+
+        std::vector< ObjPtr > vecSvcs;
+        ret = m_pNode->GetSvcDecls( vecSvcs );
+        if( ERROR( ret ) || vecSvcs.empty() )
+            break;
+        CServiceDecl* pSvc = vecSvcs[ 0 ];
+        stdstr strSvc = pSvc->GetName();
+
+        Wa( "// create the service object" );
+        CCOUT << strSvc << "Svr oServer = new " << strSvc << "Svr(";
+        NEW_LINE;
+            Wa( "    m_oCtx.getIoMgr(), " );
+            CCOUT << "    \"./"<< g_strAppName<<"desc.json\",";
+            NEW_LINE;
+            CCOUT << "    \""<< strSvc << "\" );";
+        NEW_LINES( 2 );
+        Wa( "// check if there are errors" );
+        Wa( "if( RC.ERROR( oServer.getError() ) )" );
+        Wa( "    return;" );
+        NEW_LINE;
+        Wa( "int ret = oServer.start();" );
+        Wa( "if( RC.ERROR( ret ) )" );
+        Wa( "    return;" );
+        
+        NEW_LINE;
+        Wa( "do{" );
+        Wa( "try{" );
+        INDENT_UPL;
+        Wa( "// replace 'sleep()' with your favorite" );
+        Wa( "// waiting logic if necessary. The requests" );
+        Wa( "// handling is going on in the background" );
+        Wa( "TimeUnit.SECONDS.sleep(1);" );
+        Wa( "if( oServer.getState() != RC.stateConnected )" );
+        Wa( "    break;" );
+        INDENT_DOWNL;
+        Wa( "}" );
+        Wa( "catch( InterruptedExecution e ){}" );
+        Wa( "}while( true );" );
+        CCOUT << "return;";
+        BLOCK_CLOSE; 
+        BLOCK_CLOSE; 
+
+    }while( 0 );
+
     return ret;
 }

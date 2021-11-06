@@ -4,59 +4,104 @@ import java.util.HashMap;
 
 public class JavaRpcContext 
 {
-    protected Object m_pIoMgr;
+    protected ObjPtr m_pIoMgr;
     protected String m_strModName;
+    protected int m_iError = 0;
 
-    Object CreateIoMgr( String strModName )
+    public ObjPtr getIoMgr()
+    { return m_pIoMgr; }
+
+    public String getModName()
+    { return m_strModName; }
+
+    public void setError( int iErr )
+    { m_iError = iErr; }
+
+    public int getError()
+    { return m_iError; }
+
+    ObjPtr CreateIoMgr( String strModName )
     {
-        Object pIoMgr = null;
+        ObjPtr pIoMgr = null;
+        int ret = 0;
         do{
-            int iRet = rpcbase.CoInitialize(0);
-            
-            CParamList oCfg=rpcbase.CParamList();
-            ret = oCfg.PushStr( strModName );
-            if( ret < 0 )
+            ret = rpcbase.CoInitialize(0);
+            if( RC.ERROR( ret ) )
                 break;
+            
+            CParamList oCfg= new CParamList();
+            ret = oCfg.PushStr( strModName );
+            if( RC.ERROR( ret ) )
+                break;
+
+            JRetVal jret =
+                ( JRetVal )oCfg.GetCfg();
+
+            if( jret.ERROR() )
+            {
+                ret = jret.getError();
+                break;
+            }
+
+            ObjPtr pObj =
+                ( ObjPtr )jret.getAt( 0 );
+
             CfgPtr pCfg =
-                rpcbase.CastToCfg( oCfg.GetCfg() );
+                rpcbase.CastToCfg( pObj );
 
             pIoMgr=rpcbase.CreateObject(
                 rpcbase.Clsid_CIoManager, pCfg );
             if( pIoMgr == null )
             {
-                ret = -1;
+                ret = -RC.EFAULT;
                 break;
             }
 
-        }while( 0 );
+        }while( false );
 
-        if( ERROR( ret ) ) 
-            return null;
+        if( RC.ERROR( ret ) ) 
+            setError( ret );
 
         return pIoMgr;
     }
 
-    int StartIoMgr( Object pIoMgr ) 
+    int StartIoMgr( ObjPtr pIoMgr ) 
     {
+        int ret = 0;
         IService pSvc =
             rpcbase.CastToSvc( pIoMgr );
 
         if( pSvc == null )
-            return -1;
+        {
+            ret = -RC.EFAULT;
+            setError( ret );
+            return ret;
+        }
 
         ret = pSvc.Start();
+        if( RC.ERROR( ret ) )
+            setError( ret );
+
         return ret;
     }
 
-    int StopIoMgr( Object pIoMgr );
+    int StopIoMgr( ObjPtr pIoMgr )
     {
+        int ret = 0;
         IService pSvc =
             rpcbase.CastToSvc( pIoMgr );
 
         if( pSvc == null )
-            return -1;
+        {
+            ret = -RC.EFAULT;
+            setError( ret );
+            return ret;
+        }
 
         ret = pSvc.Stop();
+        if( RC.ERROR( ret ) )
+            setError( ret );
+
         return ret;
     }
 
@@ -65,18 +110,18 @@ public class JavaRpcContext
         return rpcbase.CoUninitialize();
     }
 
-    int DestroyRpcCtx() :
+    int DestroyRpcCtx()
     {
         System.out.println( "rpc context is about to quit..." );
         return CleanUp();
     }
 
-    JavaRpcContext( String strModName = "JavaRpcProxy" )
+    public JavaRpcContext( String strModName )
     {
         m_strModName = strModName;
     }
 
-    int Start()
+    public int start()
     {
         int ret = 0;
         System.out.println( "entering..." );
@@ -87,16 +132,20 @@ public class JavaRpcContext
             if( ret < 0 )
                 StopIoMgr( m_pIoMgr );
             else
-                ret = LoadJavaFactory( m_pIoMgr );
+                ret = rpcbase.LoadJavaFactory(
+                    m_pIoMgr );
         }
         else
         {
-            ret = -1;
+            ret = -RC.EFAULT;
         }
+        if( RC.ERROR( ret ) )
+            setError( ret );
+
         return ret;
     }
 
-    int Stop()
+    public int stop()
     {
         System.out.println( "exiting..." );
         if( m_pIoMgr != null )
@@ -106,5 +155,26 @@ public class JavaRpcContext
         }
         return DestroyRpcCtx();
     }
+
+    static JavaRpcContext create( boolean bServer )
+    {
+        JavaRpcContext o;
+        if( bServer )
+            o = new JavaRpcContext( "JavaRpcServer" );
+        else
+            o = new JavaRpcContext( "JavaRpcProxy" );
+
+        int ret = o.start();
+        if( RC.ERROR( ret ) )
+            return null;
+
+        return o;
+    }
+
+    public static JavaRpcContext createServer()
+    { return create( true ); }
+
+    public static JavaRpcContext createProxy()
+    { return create( false ); }
 }
 

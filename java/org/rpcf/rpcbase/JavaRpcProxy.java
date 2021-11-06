@@ -15,7 +15,6 @@ abstract public class JavaRpcProxy extends JavaRpcServiceP
         JRetVal jret = null;
         do{
             m_pIoMgr = pIoMgr;
-            m_iError = 0;
             CParamList oParams = new CParamList();
             jret = ( JRetVal )oParams.GetCfg();
             if( jret.ERROR() )
@@ -42,11 +41,8 @@ abstract public class JavaRpcProxy extends JavaRpcServiceP
         }while( false );
 
         if( jret.ERROR() )
-        {
-            throw new RuntimeException(
-                "Error JavaRpcProxy ctor" +
-                jret.getError() );
-        }
+            setError( jret.getError() );
+
         return;
     }
 

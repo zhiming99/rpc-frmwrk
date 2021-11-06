@@ -13,7 +13,6 @@ abstract public class JavaRpcServer extends JavaRpcServiceS
         JRetVal jret = null;
         do{
             m_pIoMgr = pIoMgr;
-            m_iError = 0;
             CParamList oParams = new CParamList();
             jret = ( JRetVal )oParams.GetCfg();
             if( jret.ERROR() )
@@ -37,11 +36,8 @@ abstract public class JavaRpcServer extends JavaRpcServiceS
         }while( false );
 
         if( jret.ERROR() )
-        {
-            throw new RuntimeException(
-                "Error JavaRpcServer ctor" +
-                jret.getError() );
-        }
+            setError( jret.getError() );
+
         return;
     }
 

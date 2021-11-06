@@ -1,7 +1,7 @@
 ridlc_PROGRAMS=ridlc
 ridlc_SOURCES= gencpp.cpp astnode.cpp main.cpp astnode.h gencpp.h idlclsid.h genpy.cpp genpy.h fulltest.ridl tinyif.ridl README.md odesctpl.json drvtpl.json mktpl.in synccfg.py.in pymktpl genjava.cpp genjava.h
 
-EXTRA_DIST=ridlc.y ridlc.lex pytest/SimpFileSvcsvr.py pytest/SimpFileSvccli.py pytest/StreamSvcsvr.py pytest/StreamSvccli.py pytest/maincli.py pytest/mainsvr.py ridlc.1 ridl.7 seribase.py
+EXTRA_DIST=ridlc.y ridlc.lex pytest/SimpFileSvcsvr.py pytest/SimpFileSvccli.py pytest/StreamSvcsvr.py pytest/StreamSvccli.py pytest/maincli.py pytest/mainsvr.py ridlc.1 ridl.7 seribase.py JavaSerialBase.java JavaSerialImpl.java
 
 nodist_ridlc_SOURCES = ridlc.cpp lexer.cpp ridlc.h lexer.h mktpl synccfg.py
 
@@ -26,7 +26,7 @@ synccfg.py : synccfg.py.in
 ridlc_LDADD=$(COMMON_LINK) -lipc -lcombase -lutils -lstdc++ -ljsoncpp -L../combase -L../ipc -L../3rd_party
 ridlcdir=$(bindir)
 
-ridlc_conf_DATA=odesctpl.json drvtpl.json mktpl seribase.py pymktpl synccfg.py
+ridlc_conf_DATA=odesctpl.json drvtpl.json mktpl seribase.py pymktpl synccfg.py JavaSerialBase.java JavaSerialImpl.java
 ridlc_confdir=$(sysconfdir)/rpcf
 
 include_ipcdir=$(top_srcdir)/ipc

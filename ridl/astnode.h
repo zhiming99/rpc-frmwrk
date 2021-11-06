@@ -1632,5 +1632,33 @@ struct CStatements : public CAstListNode
         }
         return false;
     }
+
+    gint32 CheckSvcName()
+    {
+        gint32 ret = 0;
+        do{
+            std::vector< ObjPtr > vecSvcs;
+            ret = GetSvcDecls( vecSvcs );
+            if( ERROR( ret ) )
+                break;
+            for( auto& elem : vecSvcs )
+            {
+                CServiceDecl* pSvc = elem;
+                if( pSvc->GetName() ==
+                    this->GetName() )
+                {
+                    ret = -EEXIST;
+                    OutputMsg( ret,  "%s",
+                        "Error, the service name "
+                        "conflicts with the app "
+                        "name." );
+                    break;
+                }
+            }
+
+        }while( 0 );
+
+        return ret;
+    }
 };
 

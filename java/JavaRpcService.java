@@ -20,13 +20,19 @@ abstract public class JavaRpcService
     public boolean IsServer;
     public abstract Map< String, IReqHandler > initMaps();
 
-    public int GetError()
+    public int getError()
     { return m_iError; }
+
+    public void setError( int iError )
+    { m_iError = iError; }
 
     public InstType getInst() { return m_oInst; }
 
     public void SetError( int iErr )
     { m_iError = iErr; }
+
+    public int getState()
+    { return m_oInst.GetState(); }
 
     public int start()
     {

@@ -489,3 +489,29 @@ class CImplDeserialMap
         CJavaWriter* pWriter );
     gint32 Output();
 };
+
+class CImplJavaMainCli
+{
+    CJavaWriter* m_pWriter = nullptr;
+    CStatements* m_pNode = nullptr;
+    public:
+
+    CImplJavaMainCli(
+        CJavaWriter* pWriter,
+        ObjPtr& pNode );
+
+    int Output();
+};
+
+class CImplJavaMainSvr
+{
+    CJavaWriter* m_pWriter = nullptr;
+    CStatements* m_pNode = nullptr;
+    public:
+
+    CImplJavaMainSvr(
+        CJavaWriter* pWriter,
+        ObjPtr& pNode );
+
+    int Output();
+};

@@ -275,6 +275,11 @@ int main( int argc, char** argv )
                     "info using app name '%s' \n",
                      strAppName.c_str() );
             }
+            // make sure the svc name does not conflict with
+            // the appname.
+            ret = pRoot->CheckSvcName();
+            if( ERROR( ret ) )
+                break;
             std::vector< ObjPtr > vecSvcs;
             ret = pRoot->GetSvcDecls( vecSvcs );
             if( ERROR( ret ) )
