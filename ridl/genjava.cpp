@@ -1597,8 +1597,13 @@ gint32 GenSerialBaseFiles(
             "JavaSerialBase.java", strSeribase );
         if( ERROR( ret ) )
             break;
-        stdstr strCmd = "cp ";
-        strCmd += strSeribase + " " + pWriter->GetOutPath();
+        stdstr strCmd =
+            "cpp -P -DXXXXX=" + g_strAppName + " ";
+
+        strCmd += strSeribase + ">" +
+            pWriter->GetOutPath() + "/JavaSerialBase.java";
+    
+        printf( "%s\n", strCmd.c_str() );
         system( strCmd.c_str() );
 
         stdstr strSeriImpl;
@@ -1608,11 +1613,13 @@ gint32 GenSerialBaseFiles(
             break;
 
         stdstr strCmdP = "cpp -P -DJavaSerialImpl=JavaSerialHelperP "
-            "-DGetIdHash=GetPeerIdHash -DInstType=CJavaProxyImpl " +
+            "-DGetIdHash=GetPeerIdHash -DInstType=CJavaProxyImpl " 
+            "-DXXXXX=" + g_strAppName + " " +
             strSeriImpl + " > " + pWriter->GetOutPath() + "/" + 
             "JavaSerialHelperP.java";
         stdstr strCmdS = "cpp -P -DJavaSerialImpl=JavaSerialHelperS "
-            "-DGetIdHash=GetIdHashByChan -DInstType=CJavaServerImpl " +
+            "-DGetIdHash=GetIdHashByChan -DInstType=CJavaServerImpl "
+            "-DXXXXX=" + g_strAppName + " " +
             strSeriImpl + " > " + pWriter->GetOutPath() + "/" + 
             "JavaSerialHelperS.java";
 
@@ -4031,8 +4038,7 @@ gint32 CImplJavaMainCli::Output()
         Wa( "    break;" );
         Wa( "*/" );
         INDENT_DOWNL;
-        Wa( "}while( false );" );
-        CCOUT << "return;";
+        CCOUT << "}while( false );";
         BLOCK_CLOSE; 
         BLOCK_CLOSE; 
 
@@ -4109,9 +4115,8 @@ gint32 CImplJavaMainSvr::Output()
         Wa( "    break;" );
         INDENT_DOWNL;
         Wa( "}" );
-        Wa( "catch( InterruptedExecution e ){}" );
-        Wa( "}while( true );" );
-        CCOUT << "return;";
+        Wa( "catch( InterruptedException e ){}" );
+        CCOUT << "}while( true );";
         BLOCK_CLOSE; 
         BLOCK_CLOSE; 
 

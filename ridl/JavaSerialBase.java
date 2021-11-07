@@ -22,7 +22,7 @@
  *
  * =====================================================================================
  */
-package org.rpcf.example;
+package org.rpcf.XXXXX;
 import java.lang.String;
 import java.util.HashMap;
 import java.util.Map;

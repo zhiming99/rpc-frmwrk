@@ -494,6 +494,10 @@ class CSetStructRefs :
 
     gint32 ExtractStructMap( ObjPtr& pMap,
         std::set< ObjPtr >& setStructs );
+
+    gint32 ExtractStructStruct(
+        ObjPtr& pStruct,
+        std::set< ObjPtr >& setStructs );
 };
 
 class CDeclService

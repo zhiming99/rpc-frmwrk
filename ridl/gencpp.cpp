@@ -2769,6 +2769,72 @@ gint32 CSetStructRefs::ExtractStructMap(
     return ret;
 }
 
+gint32 CSetStructRefs::ExtractStructStruct(
+    ObjPtr& pStruct,
+    std::set< ObjPtr >& setStructs )
+{
+    if( pStruct.IsEmpty() )
+        return 0;
+
+    gint32 ret = -ENOENT;
+    bool bNew = false;
+    do{
+        CStructDecl* psd = pStruct;
+        if( psd == nullptr )
+            break;
+
+        CFieldList* pfl = psd->GetFieldList();
+        if( pfl == nullptr )
+            break;
+
+        gint32 iCount = pfl->GetCount();
+        for( gint32 i = 0; i < iCount; i++ )
+        {
+            CFieldDecl* pfd = pfl->GetChild( i );
+            if( pfd == nullptr )
+                break;
+
+            ObjPtr elem = pfd->GetType();
+            stdstr strSig = GetTypeSig( elem );
+            if( strSig[ 0 ] == 'O' )
+            {
+                // note: 'O' for java the size is 10
+                // for cpp or python it is 1
+                CStructRef* pRef = elem;
+                if( pRef == nullptr )
+                    continue;
+
+                ObjPtr pStruct;
+                ret = pRef->GetStructType( pStruct );
+                if( ERROR( ret ) )
+                    continue;
+
+                CStructDecl* psd = pStruct;
+                if( psd == nullptr )
+                    continue;
+
+                if( !bNew )
+                    bNew = setStructs.insert(
+                         pStruct ).second;
+                continue;
+            }
+            else if( strSig[ 0 ] == '(' )
+            {
+                ret = ExtractStructArr(
+                    elem, setStructs );                
+            }
+            else if( strSig[ 0 ] == '[' )
+            {
+                ret = ExtractStructMap(
+                    elem, setStructs );                
+            }
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CSetStructRefs::SetStructRefs()
 {
     guint32 ret = STATUS_SUCCESS;
@@ -2819,6 +2885,7 @@ gint32 CSetStructRefs::SetStructRefs()
             GetArgTypes( pOutArgs, setTypes );
         }
 
+        std::set< ObjPtr > setStructs;
         for( auto elem : setTypes )
         {
             std::string strSig =
@@ -2828,9 +2895,10 @@ gint32 CSetStructRefs::SetStructRefs()
                 std::string::npos )
                 continue;
 
-            std::set< ObjPtr > setStructs;
-            if( strSig.size() == 1 )
+            if( strSig[ 0 ] == 'O' )
             {
+                // note: 'O' for java the size is 10
+                // for cpp or python it is 1
                 CStructRef* pRef = elem;
                 if( pRef == nullptr )
                     continue;
@@ -2844,7 +2912,7 @@ gint32 CSetStructRefs::SetStructRefs()
                 if( ERROR( ret ) )
                 {
                     DebugPrintEx( logErr, ret,
-                        "error, %s not defined\n",
+                        "error, identifer %s not defined\n",
                         strName.c_str() );
                     continue;
                 }
@@ -2852,7 +2920,7 @@ gint32 CSetStructRefs::SetStructRefs()
                 if( psd == nullptr )
                     continue;
 
-                psd->AddRef();
+                setStructs.insert( pStruct );
                 continue;
             }
             else if( strSig[ 0 ] == '(' )
@@ -2865,14 +2933,14 @@ gint32 CSetStructRefs::SetStructRefs()
                 ret = ExtractStructMap(
                     elem, setStructs );                
             }
+        }
 
-            for( auto& elem : setStructs )
-            {
-                CStructDecl* psd = elem;
-                if( psd == nullptr )
-                    continue;
-                psd->AddRef();
-            }
+        for( auto& elem : setStructs )
+        {
+            CStructDecl* psd = elem;
+            if( psd == nullptr )
+                continue;
+            psd->AddRef();
         }
 
     }while( 0 );
