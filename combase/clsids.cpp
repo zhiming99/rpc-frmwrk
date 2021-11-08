@@ -113,7 +113,7 @@ gint32 CoLoadClassFactory( const char* pszPath  )
             if( pszError )
             {
                 fprintf( stderr,
-                    "Fail to load dll: %s\n", pszError );
+                    "Warning: Fail to load dll: %s\n", pszError );
             }
 
             break;
@@ -172,55 +172,41 @@ gint32 CoAddClassFactory(
 
 gint32 CoLoadClassFactories( const char* dir )
 {
-    DIR *dp;
-    struct dirent *entry;
-    struct stat statbuf;
+    string strPrefix = dir;
+    std::vector< stdstr > vecLibs =
+        { "libipc.so", "librpc.so" };
 
-    char* pszAbPath = realpath( dir, NULL );
-
-    if( pszAbPath == nullptr )
-        return -errno;
-
-    string strPrefix( pszAbPath );
-    strPrefix += "/";
-
-    free( pszAbPath );
-    pszAbPath = nullptr;
-
-    if((dp = opendir(dir)) == NULL)
+    gint32 ret = 0;
+    for( auto& elem : vecLibs )
     {
-        fprintf(stderr,"cannot open directory: %s\n", dir);
-        return -errno;
-    }
+        string strPath =
+            strPrefix + "/" + elem;
 
-    string strOldDir = getcwd( NULL, 0 );
+        ret = CoLoadClassFactory(
+            strPath.c_str() );
 
-    chdir(dir);
-
-    while((entry = readdir(dp)) != NULL)
-    {
-        lstat(entry->d_name,&statbuf);
-        if(S_ISDIR(statbuf.st_mode))
+        if( ERROR( ret ) )
         {
-            continue;
-        }
-        else
-        {
-            if( strcmp("libcombase.so",entry->d_name) == 0 )
+            strPath.clear();
+            // in case the libipc.so is not in
+            // the same directory as the one of
+            // libcombase.so
+            ret = GetLibPath(
+                strPath, elem.c_str() );
+
+            // error again, give up
+            if( ERROR( ret ) )
                 continue;
 
-            if( strcmp( "libipc.so", entry->d_name ) == 0 ||
-                strcmp( "librpc.so", entry->d_name ) == 0 )
-            {
-                string strPath = strPrefix + entry->d_name;
-                CoLoadClassFactory( strPath.c_str() );
-            }
+            strPath = strPath + "/" + elem;
+            ret = CoLoadClassFactory(
+                strPath.c_str() );
+            if( ERROR( ret ) )
+                continue;
         }
     }
-
-    chdir( strOldDir.c_str() );
-    closedir(dp);
-
+    // sometimes it is not necessary to load these
+    // libraries
     return 0;
 }
 

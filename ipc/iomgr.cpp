@@ -1714,6 +1714,8 @@ CIoManager::CIoManager( const std::string& strModName ) :
         m_pReg->MakeDir( "/cmdline" );
 
         StrSetPtr psetPaths( true );
+        ( *psetPaths )().insert( "./" );
+
         std::string strPath;
         // get the libcombase.so's path
         ret = GetLibPath( strPath );

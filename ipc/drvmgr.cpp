@@ -125,26 +125,27 @@ CDriverManager::CDriverManager(
         BufPtr bufPtr( true );
 
         CCfgOpener a( pCfg );
-        // DrvMgr don't hold the reference of the io manager
-        // because it totally contained in the lifecycle of
-        // io manager
-        gint32 ret = a.GetPointer(
+        // DrvMgr don't hold the reference of the io
+        // manager because it totally contained in the
+        // lifecycle of io manager
+        ret = a.GetPointer(
             propIoMgr, m_pIoMgr );
 
         if( ERROR( ret ) )
         {
-            strMsg = "cannot get IoMananger";
+            strMsg = "error cannot get IoMananger";
             break;
         }
 
         // we also need the config file to find more
         // information for driver loading
-        ret = a.GetStrProp( propConfigPath, m_strCfgPath );
+        ret = a.GetStrProp(
+            propConfigPath, m_strCfgPath );
 
         if( ERROR( ret ) )
         {
             // we cannot live without the config file
-            strMsg = "Cannot get config path";
+            strMsg = "error cannot get config path";
             break;
         }
 
@@ -156,14 +157,15 @@ CDriverManager::CDriverManager(
                 m_strCfgPath, strPath );
             if( ERROR( ret ) )
             {
-                strMsg = "error read config file";
+                strMsg = "error cannot find "
+                    "config file";
                 break;
             }
             m_strCfgPath = strPath;
             ret = ReadConfig( m_oConfig );
             if( ERROR( ret ) )
             {
-                strMsg = "error read config file 2";
+                strMsg = "error read config file";
                 break;
             }
         }
@@ -172,6 +174,7 @@ CDriverManager::CDriverManager(
     if( ERROR( ret ) )
     {
         // we cannot live without io manager
+        OutputMsg( ret, strMsg.c_str() );
         throw std::invalid_argument( strMsg );
     }
     // done

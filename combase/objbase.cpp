@@ -245,10 +245,10 @@ gint32 GetLibPath( std::string& strResult,
 
 gint32 GetModulePath( std::string& strResult )
 {
-    char cmd[ 256 ];
+    char cmd[ 1024 ];
 
     snprintf( cmd, sizeof( cmd ),
-        "dirname `head -n 1 /proc/%d/maps |  awk '{print $6}'`",
+        "dirname `awk '{print $6}' /proc/%d/maps | awk '/^./{print $1}' | head -n 1`",
         getpid() );
 
     return GetCmdOutput( strResult, cmd );
