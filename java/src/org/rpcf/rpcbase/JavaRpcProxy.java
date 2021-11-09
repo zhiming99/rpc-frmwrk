@@ -22,8 +22,7 @@ abstract public class JavaRpcProxy extends JavaRpcServiceP
 
             ObjPtr pCfg = ( ObjPtr )jret.getAt( 0 );
             jret = ( JRetVal )rpcbase.CreateProxy(
-                pIoMgr, strDesc, strSvrObj,
-                ( ObjPtr )oParams.GetCfg() );
+                pIoMgr, strDesc, strSvrObj, pCfg );
 
             if( jret.ERROR() )
                 break;

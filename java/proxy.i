@@ -1943,7 +1943,7 @@ gint32 LoadThisLib( ObjPtr& pIoMgr )
         return -EINVAL;
     do{
         std::string strResult;
-        const char* szLib = "rpcbase.java";
+        const char* szLib = "librpcbaseJNI.so";
         ret = GetLibPathName( strResult, szLib );
         if( ERROR( ret ) )
             break;

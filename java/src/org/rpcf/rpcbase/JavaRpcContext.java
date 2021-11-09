@@ -25,6 +25,19 @@ public class JavaRpcContext
         ObjPtr pIoMgr = null;
         int ret = 0;
         do{
+            try{
+                System.loadLibrary("rpcbaseJNI");
+            }
+            catch (UnsatisfiedLinkError e)
+            {
+                System.err.println(
+                    "Native code library failed to load." +
+                    " See the chapter on Dynamic Linking " +
+                    "Problems in the SWIG Java " +
+                    "documentation for help.\n" + e);
+                System.exit(1);
+            }
+
             ret = rpcbase.CoInitialize(0);
             if( RC.ERROR( ret ) )
                 break;

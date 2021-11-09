@@ -19,19 +19,19 @@ abstract public class JavaRpcServer extends JavaRpcServiceS
                 break;
             ObjPtr pCfg = ( ObjPtr )jret.getAt( 0 );
             jret = ( JRetVal )rpcbase.CreateServer(
-                pIoMgr, strDesc, strSvrObj,
-                ( ObjPtr )oParams.GetCfg() );
+                pIoMgr, strDesc, strSvrObj, pCfg );
 
             if( jret.ERROR() )
                 break;
 
             ObjPtr obj = ( ObjPtr )jret.getAt( 0 );
-            m_oInst = rpcbase.CastToServer( obj );
-            if( m_oInst == null )
-            {
-                jret.setError(
-                    -RC.EFAULT );
-            }
+            jret = ( JRetVal )
+                rpcbase.CastToServer( obj );
+            if( jret.ERROR() )
+                break;
+
+            m_oInst = ( CJavaServerImpl )
+                jret.getAt( 0 );
 
         }while( false );
 

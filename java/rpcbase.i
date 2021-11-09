@@ -567,7 +567,11 @@ int GetParamsObjArr(
 
     jmethodID cotb = jenv->GetStaticMethodID(
         cls, "convertObjectToBuf",
-        "()Lorg/rpcf/rpcbase/vectorBufPtr;");
+        "([Ljava/lang/Object;)"
+        "Lorg/rpcf/rpcbase/vectorBufPtr;");
+
+    if( cotb == nullptr )
+        return -EFAULT;
 
     jobject jvecParams =
         jenv->CallStaticObjectMethod(
@@ -699,22 +703,34 @@ LONGWORD GetWrappedPtr(
     jclass objClass =
         jenv->GetObjectClass( jObj );
 
+    jmethodID mid = jenv->GetMethodID(
+        objClass, "getClass", "()Ljava/lang/Class;");
+
+    jobject clsObj =
+        jenv->CallObjectMethod( jObj, mid);
+
+    objClass = jenv->GetObjectClass( clsObj );
+
     jmethodID getName = jenv->GetMethodID(
-        objClass, "getCanonicName",
+        objClass, "getName",
         "()Ljava/lang/String;" );
 
-    jobject jstr = jenv->CallObjectMethod(
-        jObj, getName );
+    if( getName == nullptr )
+        return 0;
 
-    jstring jName =
-        static_cast< jstring >( jstr );
+    jstring jName = ( jstring )jenv->CallObjectMethod(
+        clsObj, getName );
 
     const char* szName =
         jenv->GetStringUTFChars( jName, 0 );
 
     stdstr strSig;
     strSig = strSig + "(L" + szName + ";)J";
+    std::replace( strSig.begin(),
+        strSig.end(), '.', '/' );
     jenv->ReleaseStringUTFChars( jName, szName );
+
+    objClass = jenv->GetObjectClass( jObj );
 
     jmethodID getCPtr =
         jenv->GetStaticMethodID(

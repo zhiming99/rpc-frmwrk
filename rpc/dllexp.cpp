@@ -28,11 +28,9 @@
 #include "stlcont.h"
 #include <dlfcn.h>
 #include "frmwrk.h"
-#include "prxyport.h"
 #include "rpcroute.h"
 #include "tcpport.h"
 #include "objfctry.h"
-#include "fdodrv.h"
 #include "stmrelay.h"
 #include "tcportex.h"
 #include "taskschd.h"
@@ -52,18 +50,8 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRY( COutgoingPacket );
     INIT_MAP_ENTRY( CIncomingPacket );
 
-    INIT_MAP_ENTRYCFG( CDBusProxyFdo );
-    INIT_MAP_ENTRYCFG( CDBusProxyPdo );
-    INIT_MAP_ENTRYCFG( CDBusProxyPdoLpbk );
     INIT_MAP_ENTRYCFG( CFidoRecvDataTask );
-    INIT_MAP_ENTRYCFG( CProxyFdoListenTask );
-    INIT_MAP_ENTRYCFG( CProxyFdoModOnOfflineTask );
-    INIT_MAP_ENTRYCFG( CProxyFdoRmtDBusOfflineTask );
-    INIT_MAP_ENTRYCFG( CProxyMsgMatch );
-    INIT_MAP_ENTRYCFG( CProxyPdoConnectTask );
-    INIT_MAP_ENTRYCFG( CProxyPdoDisconnectTask );
     INIT_MAP_ENTRYCFG( CRegisteredObject );
-    INIT_MAP_ENTRYCFG( CRemoteProxyState );
     INIT_MAP_ENTRYCFG( CReqFwdrEnableRmtEventTask );
     INIT_MAP_ENTRYCFG( CReqFwdrForwardRequestTask );
     INIT_MAP_ENTRYCFG( CBridgeForwardRequestTask );
@@ -99,7 +87,6 @@ static FactoryPtr InitClassFactory()
     // INIT_MAP_ENTRYCFG( CBdgeStartRecvDataTask );
     // INIT_MAP_ENTRYCFG( CBdgeStartFetchDataTask );
     INIT_MAP_ENTRYCFG( CRpcSockWatchCallback );
-    INIT_MAP_ENTRYCFG( CProxyFdoDriver );
     INIT_MAP_ENTRYCFG( CRpcRouterManagerImpl );
     INIT_MAP_ENTRYCFG( CRpcRouterBridgeImpl );
     INIT_MAP_ENTRYCFG( CRpcRouterReqFwdrImpl );

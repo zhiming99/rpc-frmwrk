@@ -336,11 +336,27 @@ jobject CreateServer(
     return jret;
 }
 
-CJavaServerImpl* CastToServer(
+jobject CastToServer(
+    JNIEnv *jenv,
     ObjPtr& pObj )
 {
+    gint32 ret = 0;
+    jobject jret = NewJRet( jenv );
     CJavaServerImpl* pSvr = pObj;
-    return pSvr;
+    if( pSvr == nullptr )
+    {
+        SetErrorJRet( jenv, jret, -EFAULT );
+        return jret;
+    }
+    jobject jsvr = NewJavaServer(
+        jenv, ( intptr_t )pSvr );
+    if( jsvr == nullptr )
+    {
+        SetErrorJRet( jenv, jret, -EFAULT );
+        return jret;
+    }
+    AddElemToJRet( jenv, jret, jsvr );
+    return jret;
 }
 
 }
@@ -516,6 +532,7 @@ jobject CreateServer(
     const std::string& strObjName,
     ObjPtr& pCfgObj );
 
-CJavaServerImpl* CastToServer(
+jobject CastToServer(
+    JNIEnv *jenv,
     ObjPtr& pObj );
 

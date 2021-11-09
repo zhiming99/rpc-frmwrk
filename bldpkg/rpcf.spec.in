@@ -152,6 +152,8 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_includedir}/rpcf/ipc/utils.h
 %{_includedir}/rpcf/ipc/uxport.h
 %{_includedir}/rpcf/ipc/uxstream.h
+%{_includedir}/rpcf/ipc/prxyport.h
+%{_includedir}/rpcf/ipc/fdodrv.h.h
 %{_includedir}/rpcf/nsdef.h
 %{_includedir}/rpcf/objfctry.h
 %{_includedir}/rpcf/propids.h

@@ -556,7 +556,7 @@ gint32 CJavaSnippet::EmitNewBufPtrSerial(
         Wa( "BufPtr _pBuf = new BufPtr( true );" );
         CCOUT << "_pBuf.Resize(" << dwSize << ");";
         NEW_LINE;
-        Wa( "Integer _offset = 0;" );
+        Wa( "int[] _offset = new int[]{0};" );
 
     }while( 0 );
 
@@ -2261,14 +2261,14 @@ gint32 CImplJavaMethodSvrBase::ImplSvcComplete()
             Wa( "ret = _pBuf.Resize( 1024 );" );
             Wa( "if( RC.ERROR( ret ) )" );
             Wa( "    break;" );
-            Wa( "Integer _offset = 0;" );
+            Wa( "int[] _offset = new int[]{0};" );
 
             ret = os.EmitSerialArgs(
                 pOutArgs, "args", true );
             if( ERROR( ret ) )
                 break;
 
-            Wa( "ret = _pBuf.Resize( _offset );");
+            Wa( "ret = _pBuf.Resize( _offset[0] );");
             Wa( "if( RC.ERROR( ret ) ) break;" );
             BLOCK_CLOSE;
             CCOUT << "while( false );";
@@ -2389,13 +2389,13 @@ gint32 CImplJavaMethodSvrBase::ImplInvoke()
                     Wa( "ret = _pBuf.Resize( 1024 );" );
                     Wa( "if( RC.ERROR( ret ) )" );
                     Wa( "    break;" );
-                    Wa( "Integer _offset = 0;" );
+                    Wa( "int[] _offset = new int[]{0};" );
                     Wa( "Object[] oResp = _oReqCtx.getResponse();" );
                     ret = os.EmitSerialArgs(
                         pOutArgs, "oResp", true );
                     if( ERROR( ret ) )
                         break;
-                    Wa( "ret = _pBuf.Resize( _offset );");
+                    Wa( "ret = _pBuf.Resize( _offset[0] );");
                     Wa( "if( RC.ERROR( ret ) ) break;" );
                     Wa( "jret.addElem( _pBuf );" );
                     BLOCK_CLOSE;
@@ -2459,11 +2459,11 @@ gint32 CImplJavaMethodSvrBase::OutputEvent()
             Wa( "ret = _pBuf.Resize( 1024 );" );
             Wa( "if( RC.ERROR( ret ) )" );
             Wa( "    break;" );
-            Wa( "Integer _offset = 0;" );
+            Wa( "int[] _offset = new int[]{0};" );
             ret = os.EmitSerialArgs(
                 pInArgs, "", false );
 
-            Wa( "_pBuf.Resize( _offset );" );
+            Wa( "_pBuf.Resize( _offset[0] );" );
             Wa( "ret = ridlSendEvent( callback," );
             CCOUT << "    \"" << strIfName << "\",";
             NEW_LINE;
@@ -2866,14 +2866,14 @@ gint32 CImplJavaMethodCliBase::OutputReqSender()
             Wa( "ret = _pBuf.Resize( 1024 );" );
             Wa( "if( RC.ERROR( ret ) )" );
             Wa( "    break;" );
-            Wa( "Integer _offset = 0;" );
+            Wa( "int[] _offset = new int[]{0};" );
 
             ret = os.EmitSerialArgs(
                 pInArgs, "", false );
             if( ERROR( ret ) )
                 break;
 
-            Wa( "ret = _pBuf.Resize( _offset );" );
+            Wa( "ret = _pBuf.Resize( _offset[0] );" );
             Wa( "if( RC.ERROR( ret ) )" );
             Wa( "    break;" );
         }
@@ -2904,7 +2904,10 @@ gint32 CImplJavaMethodCliBase::OutputReqSender()
             NEW_LINE;
         }
 
-        Wa( "ObjPtr pObj_1 = ( ObjPtr )oParams.GetCfg();" );
+        Wa( "jret = ( JRetVal )oParams.GetCfg();" );
+        Wa( "if( jret.ERROR() )" );
+        Wa( "{ ret = jret.getError();break;}" );
+        Wa( "ObjPtr pObj_1 = ( ObjPtr )jret.getAt(0);" );
         Wa( "CfgPtr pCfg = rpcbase.CastToCfg( pObj_1 );" );
         ret = ImplAsyncCb();
         if( ERROR( ret ) )
@@ -3555,7 +3558,7 @@ gint32 CDeclareStructJava::Output()
 
         NEW_LINE;
         Wa( "public int serialize(" );
-        Wa( "    BufPtr _pBuf, Integer _offset )" );
+        Wa( "    BufPtr _pBuf, int[] _offset )" );
         BLOCK_OPEN;
         Wa( "int ret = 0;" );
         Wa( "JavaSerialBase _osh = getSerialBase();" );
@@ -3565,7 +3568,7 @@ gint32 CDeclareStructJava::Output()
         ret = os.EmitSerialFields( pFields );
         if( ERROR( ret ) )
             break;
-        Wa( "ret = _pBuf.Resize( _offset );");
+        Wa( "ret = _pBuf.Resize( _offset[0] );");
         Wa( "if( RC.ERROR( ret ) ) break;" );
         BLOCK_CLOSE;
         Wa( "while( false );" );
@@ -3947,6 +3950,7 @@ gint32 CImplJavaMainCli::Output()
 {
     CJavaSnippet os( m_pWriter );
     os.EmitBanner();
+    Wa( "import java.util.concurrent.TimeUnit;" );
     gint32 ret = 0;
     do{
         CCOUT << "public class " << g_strAppName << "Cli";
@@ -3987,8 +3991,18 @@ gint32 CImplJavaMainCli::Output()
         Wa( "    return;" );
         
         NEW_LINE;
-        Wa( "do{" );
+        CCOUT << "do{";
         INDENT_UPL;
+        Wa( "// test remote server is not online" );
+        Wa( "while( oProxy.getState() == RC.stateRecovery )" );
+        Wa( "try{" );
+        Wa( "    TimeUnit.SECONDS.sleep(1);" );
+        Wa( "}" );
+        Wa( "catch( InterruptedException e ){};" );
+        NEW_LINE;
+        Wa( "if( oProxy.getState() != RC.stateConnected )" );
+        Wa( "{ ret = RC.ERROR_STATE;break;}" );
+        NEW_LINE;
         Wa( "/*// request something from the server" );
         std::vector< ObjPtr > vecm;
         ret = CJTypeHelper::GetMethodsOfSvc(
@@ -4105,14 +4119,14 @@ gint32 CImplJavaMainSvr::Output()
         
         NEW_LINE;
         Wa( "do{" );
-        Wa( "try{" );
+        CCOUT << "try{";
         INDENT_UPL;
         Wa( "// replace 'sleep()' with your favorite" );
         Wa( "// waiting logic if necessary. The requests" );
         Wa( "// handling is going on in the background" );
         Wa( "TimeUnit.SECONDS.sleep(1);" );
         Wa( "if( oServer.getState() != RC.stateConnected )" );
-        Wa( "    break;" );
+        CCOUT << "    break;";
         INDENT_DOWNL;
         Wa( "}" );
         Wa( "catch( InterruptedException e ){}" );

@@ -42,7 +42,7 @@ abstract public class JavaSerialBase
     static abstract public class ISerializable
     {
         public abstract int serialize(
-            BufPtr buf, Integer offset );
+            BufPtr buf, int[] offset );
         public abstract int deserialize(
             ByteBuffer buf );
         public abstract void setInst(
@@ -68,7 +68,7 @@ abstract public class JavaSerialBase
     public interface ISerialElem
     {
         public abstract int serialize(
-            BufPtr buf, Integer offset, Object val );
+            BufPtr buf, int[] offset, Object val );
     }
     public interface IDeserialElem
     {
@@ -76,7 +76,7 @@ abstract public class JavaSerialBase
             ByteBuffer buf );
     }
 
-    public int serialBoolArr( BufPtr buf, Integer offset, boolean[] val )
+    public int serialBoolArr( BufPtr buf, int[] offset, boolean[] val )
     {
         int iCount = val.length;
         int iBytes = iCount;
@@ -97,67 +97,67 @@ abstract public class JavaSerialBase
         return ret;
     }
     public int serialInt8Arr(
-        BufPtr buf, Integer offset, byte[] val )
+        BufPtr buf, int[] offset, byte[] val )
     {
-        offset = buf.SerialByteArray( offset, val );
-        if( RC.ERROR( offset ) )
-            return offset;
+        offset[0] = buf.SerialByteArray( offset[0], val );
+        if( RC.ERROR( offset[0] ) )
+            return offset[0];
         return 0;
     }
 
     public int serialInt16Arr(
-        BufPtr buf, Integer offset, short[] val )
+        BufPtr buf, int[] offset, short[] val )
     {
-        offset = buf.SerialShortArr( offset, val );
-        if( RC.ERROR( offset ) )
-            return offset;
+        offset[0] = buf.SerialShortArr( offset[0], val );
+        if( RC.ERROR( offset[0] ) )
+            return offset[0];
         return 0;
     }
 
     public int serialInt32Arr(
-        BufPtr buf, Integer offset, int[] val )
+        BufPtr buf, int[] offset, int[] val )
     {
-        offset = buf.SerialIntArr( offset, val );
-        if( RC.ERROR( offset ) )
-            return offset;
+        offset[0] = buf.SerialIntArr( offset[0], val );
+        if( RC.ERROR( offset[0] ) )
+            return offset[0];
         return 0;
     }
 
     public int serialInt64Arr(
-        BufPtr buf, Integer offset, long[] val )
+        BufPtr buf, int[] offset, long[] val )
     {
-        offset = buf.SerialLongArr( offset, val );
-        if( RC.ERROR( offset ) )
-            return offset;
+        offset[0] = buf.SerialLongArr( offset[0], val );
+        if( RC.ERROR( offset[0] ) )
+            return offset[0];
         return 0;
     }
 
     public int serialFloatArr(
-        BufPtr buf, Integer offset, float[] val )
+        BufPtr buf, int[] offset, float[] val )
     {
-        offset = buf.SerialFloatArr( offset, val );
-        if( RC.ERROR( offset ) )
-            return offset;
+        offset[0] = buf.SerialFloatArr( offset[0], val );
+        if( RC.ERROR( offset[0] ) )
+            return offset[0];
         return 0;
     }
 
     public int serialDoubleArr(
-        BufPtr buf, Integer offset, double[] val )
+        BufPtr buf, int[] offset, double[] val )
     {
-        offset = buf.SerialDoubleArr( offset, val );
-        if( RC.ERROR( offset ) )
-            return offset;
+        offset[0] = buf.SerialDoubleArr( offset[0], val );
+        if( RC.ERROR( offset[0] ) )
+            return offset[0];
         return 0;
     }
 
     public int serialHStreamArr( 
-        BufPtr buf, Integer offset, long[] val )
+        BufPtr buf, int[] offset, long[] val )
     {
         int iCount = val.length;
         int iBytes = iCount * 8;
-        offset = buf.SerialInt( offset, iBytes );
-        if( RC.ERROR( offset ) )
-            return offset;
+        offset[0] = buf.SerialInt( offset[0], iBytes );
+        if( RC.ERROR( offset[0] ) )
+            return offset[0];
 
         if( iCount == 0 )
             return 0;
@@ -193,7 +193,7 @@ abstract public class JavaSerialBase
     }
 
     public int serialPrimArray(
-        BufPtr buf, Integer offset, Object val, String strSig )
+        BufPtr buf, int[] offset, Object val, String strSig )
     {
         if( strSig.length() == 0 )
             return -RC.EINVAL;
@@ -250,103 +250,107 @@ abstract public class JavaSerialBase
     }
 
     public int serialBool(
-        BufPtr buf, Integer offset, boolean val )
+        BufPtr buf, int[] offset, boolean val )
     {
         if( val )
         {
-            offset = buf.SerialByte(
-                offset, ( byte )1 );
+            offset[0] = buf.SerialByte(
+                offset[0], ( byte )1 );
         }
         else
         {
-            offset = buf.SerialByte(
-                offset, ( byte )0 );
+            offset[0] = buf.SerialByte(
+                offset[0], ( byte )0 );
         }
-        if( RC.ERROR( offset ) )
-            return offset;
+        if( RC.ERROR( offset[0] ) )
+            return offset[0];
         return 0;
     }
-    public int serialInt8( BufPtr buf, Integer offset, byte val )
+    public int serialInt8(
+        BufPtr buf, int[] offset, byte val )
     {
-        offset = buf.SerialByte( offset, val );
-        if( RC.ERROR( offset ) )
-            return offset;
-        return 0;
-    }
-
-    public int serialInt16( BufPtr buf, Integer offset, short val )
-    {
-        offset = buf.SerialShort( offset, val );
-        if( RC.ERROR( offset ) )
-            return offset;
+        offset[0] = buf.SerialByte( offset[0], val );
+        if( RC.ERROR( offset[0] ) )
+            return offset[0];
         return 0;
     }
 
-    public int serialInt32( BufPtr buf, Integer offset, int val )
+    public int serialInt16(
+        BufPtr buf, int[] offset, short val )
     {
-        offset = buf.SerialInt( offset, val );
-        if( RC.ERROR( offset ) )
-            return offset;
+        offset[0] = buf.SerialShort( offset[0], val );
+        if( RC.ERROR( offset[0] ) )
+            return offset[0];
         return 0;
     }
 
-    public int serialInt64( BufPtr buf, Integer offset, long val )
+    public int serialInt32(
+        BufPtr buf, int[] offset, int val )
     {
-        offset = buf.SerialLong( offset, val );
-        if( RC.ERROR( offset ) )
-            return offset;
+        offset[0] = buf.SerialInt( offset[0], val );
+        if( RC.ERROR( offset[0] ) )
+            return offset[0];
         return 0;
     }
 
-    public int serialFloat( BufPtr buf, Integer offset, float val )
+    public int serialInt64(
+        BufPtr buf, int[] offset, long val )
     {
-        offset = buf.SerialFloat( offset, val );
-        if( RC.ERROR( offset ) )
-            return offset;
+        offset[0] = buf.SerialLong( offset[0], val );
+        if( RC.ERROR( offset[0] ) )
+            return offset[0];
         return 0;
     }
 
-    public int serialDouble( BufPtr buf, Integer offset, double val )
+    public int serialFloat( BufPtr buf, int[] offset, float val )
     {
-        offset = buf.SerialDouble( offset, val );
-        if( RC.ERROR( offset ) )
-            return offset;
+        offset[0] = buf.SerialFloat( offset[0], val );
+        if( RC.ERROR( offset[0] ) )
+            return offset[0];
+        return 0;
+    }
+
+    public int serialDouble( BufPtr buf, int[] offset, double val )
+    {
+        offset[0] = buf.SerialDouble( offset[0], val );
+        if( RC.ERROR( offset[0] ) )
+            return offset[0];
         return 0;
     }
 
     public abstract int serialHStream(
-        BufPtr buf, Integer offset, long val );
+        BufPtr buf, int[] offset, long val );
 
     public int serialString(
-        BufPtr buf, Integer offset, String val )
+        BufPtr buf, int[] offset, String val )
     {
-        offset = buf.SerialString( offset, val );
-        if( RC.ERROR( offset ) )
-            return offset;
+        offset[0] = buf.SerialString( offset[0], val );
+        if( RC.ERROR( offset[0] ) )
+            return offset[0];
         return 0;
     }
 
     public int serialBuf(
-        BufPtr buf, Integer offset, byte[] val )
+        BufPtr buf, int[] offset, byte[] val )
     {
-        offset = buf.SerialByteArray( offset, val );
-        if( RC.ERROR( offset ) )
-            return offset;
+        offset[0] = buf.SerialByteArray( offset[0], val );
+        if( RC.ERROR( offset[0] ) )
+            return offset[0];
         return 0;
     }
 
     public int serialObjPtr(
-        BufPtr buf, Integer offset, ObjPtr val )
+        BufPtr buf, int[] offset, ObjPtr val )
     {
-        offset = buf.SerialObjPtr( offset, val );
-        if( RC.ERROR( offset ) )
-            return offset;
+        offset[0] = buf.SerialObjPtr( offset[0], val );
+        if( RC.ERROR( offset[0] ) )
+            return offset[0];
         return 0;
     }
 
     public abstract Object getInst();
 
-    public int serialStruct( BufPtr buf, Integer offset, ISerializable val )
+    public int serialStruct( BufPtr buf, int[] offset, ISerializable val )
     {
         int ret = 0;
         Object oInst = getInst();
@@ -358,7 +362,7 @@ abstract public class JavaSerialBase
     }
 
     public int serialArray( BufPtr buf,
-        Integer offset, Object val, String sig )
+        int[] offset, Object val, String sig )
     {
         int sigLen = sig.length();
 
@@ -387,7 +391,7 @@ abstract public class JavaSerialBase
                 }
             }
 
-            int sizeOff = offset;
+            int sizeOff = offset[0];
             Object[] objArr = ( Object[] )val;
             int count = objArr.length;
 
@@ -412,11 +416,11 @@ abstract public class JavaSerialBase
             if( ret < 0 )
                 break;
 
-            int arrSize = offset - sizeOff - 8;
+            int arrSize = offset[0] - sizeOff - 8;
             if( arrSize <= 0 )
                 ret = -RC.ERANGE;
 
-            Integer oSizeOff = sizeOff;
+            int[] oSizeOff = new int[]{sizeOff};
             ret = serialInt32(
                 buf, oSizeOff, arrSize );
 
@@ -425,7 +429,7 @@ abstract public class JavaSerialBase
         return ret;
     }
 
-    public int serialMap( BufPtr buf, Integer offset, Map<?,?> val, String sig )
+    public int serialMap( BufPtr buf, int[] offset, Map<?,?> val, String sig )
     {
         int sigLen = sig.length();
         Character ch = sig.charAt( 0 );
@@ -440,7 +444,7 @@ abstract public class JavaSerialBase
 
         int ret = 0;
         do{
-            int sizeOff = offset;
+            int sizeOff = offset[0];
             int count = val.size();
             ret = serialInt32( buf, offset, 0 );
             if( ret < 0 )
@@ -468,7 +472,7 @@ abstract public class JavaSerialBase
             }
             if( ret < 0 )
                 break;
-            int curPos = offset;
+            int curPos = offset[0];
             int mapSize = curPos - sizeOff - 8;
             if( mapSize <= 0 )
             {
@@ -476,7 +480,7 @@ abstract public class JavaSerialBase
                 break;
             }
             
-            Integer oSizeOff = sizeOff;
+            int[] oSizeOff = new int[]{sizeOff};
             ret = serialInt32(
                 buf, oSizeOff, mapSize );
 
@@ -486,7 +490,7 @@ abstract public class JavaSerialBase
     }
 
     public int serialElem( BufPtr buf,
-        Integer offset, Object val, String sig )
+        int[] offset, Object val, String sig )
     {
         int ret = 0;
         int sigLen = sig.length();
@@ -1097,47 +1101,47 @@ abstract public class JavaSerialBase
             new HashMap< Character, ISerialElem >();
 
         ISerialElem ent = new ISerialElem() {
-            public int serialize( BufPtr buf, Integer offset, Object elem ) // SerialInt64,    # TOK_UINT64,
+            public int serialize( BufPtr buf, int[] offset, Object elem ) // SerialInt64,    # TOK_UINT64,
             { return serialInt64( buf, offset, (Long)elem ); } };
         m.put( 'Q', ent );
         m.put( 'q', ent );
 
         ent = new ISerialElem() {
-            public int serialize( BufPtr buf, Integer offset, Object elem ) // SerialInt32,    # TOK_UINT32,
+            public int serialize( BufPtr buf, int[] offset, Object elem ) // SerialInt32,    # TOK_UINT32,
             { return serialInt32( buf, offset, (Integer)elem ); } };
         m.put( 'D', ent );
         m.put( 'd', ent );
         ent = new ISerialElem() {
-            public int serialize( BufPtr buf, Integer offset, Object elem ) // SerialInt16,    # TOK_UINT16
+            public int serialize( BufPtr buf, int[] offset, Object elem ) // SerialInt16,    # TOK_UINT16
             { return serialInt16( buf, offset, (Short)elem ); } };
         m.put( 'W', ent );
         m.put( 'w', ent );
         m.put( 'f', new ISerialElem() {
-            public int serialize( BufPtr buf, Integer offset, Object elem ) // SerialFloat,    # TOK_FLOAT
+            public int serialize( BufPtr buf, int[] offset, Object elem ) // SerialFloat,    # TOK_FLOAT
             { return serialFloat( buf, offset, (Float)elem ); } } );
         m.put( 'F', new ISerialElem() {
-            public int serialize( BufPtr buf, Integer offset, Object elem ) // SerialDouble,    # TOK_DOUBLE
+            public int serialize( BufPtr buf, int[] offset, Object elem ) // SerialDouble,    # TOK_DOUBLE
             { return serialDouble( buf, offset, (Double)elem ); } } );
         m.put( 'b', new ISerialElem() {
-            public int serialize( BufPtr buf, Integer offset, Object elem ) // SerialBool,    # TOK_BOOL
+            public int serialize( BufPtr buf, int[] offset, Object elem ) // SerialBool,    # TOK_BOOL
             { return serialBool( buf, offset, (Boolean)elem ); } } );
         m.put( 'B' , new ISerialElem() {
-            public int serialize( BufPtr buf, Integer offset, Object elem ) // SerialInt8,    # TOK_BYTE
+            public int serialize( BufPtr buf, int[] offset, Object elem ) // SerialInt8,    # TOK_BYTE
             { return serialInt8( buf, offset, (Byte)elem ); } } );
         m.put( 'h', new ISerialElem() {
-            public int serialize( BufPtr buf, Integer offset, Object elem ) // SerialHStream,    # TOK_HSTREAM
+            public int serialize( BufPtr buf, int[] offset, Object elem ) // SerialHStream,    # TOK_HSTREAM
             { return serialHStream( buf, offset, (Long)elem ); } } );
         m.put( 's', new ISerialElem() {
-            public int serialize( BufPtr buf, Integer offset, Object elem ) // SerialString,    # TOK_STRING
+            public int serialize( BufPtr buf, int[] offset, Object elem ) // SerialString,    # TOK_STRING
             { return serialString( buf, offset, (String)elem ); } } );
         m.put( 'a', new ISerialElem() {
-            public int serialize( BufPtr buf, Integer offset, Object elem ) // SerialBuf,    # TOK_BYTEARR
+            public int serialize( BufPtr buf, int[] offset, Object elem ) // SerialBuf,    # TOK_BYTEARR
             { return serialBuf( buf, offset, (byte[])elem ); } } );
         m.put( 'o', new ISerialElem() {
-            public int serialize( BufPtr buf, Integer offset, Object elem ) // SerialObjPtr,    # TOK_OBJPTR
+            public int serialize( BufPtr buf, int[] offset, Object elem ) // SerialObjPtr,    # TOK_OBJPTR
             { return serialObjPtr( buf, offset, (ObjPtr)elem ); } } );
         m.put( 'O', new ISerialElem() {
-            public int serialize( BufPtr buf, Integer offset, Object elem ) // SerialStruct,    # TOK_STRUCT
+            public int serialize( BufPtr buf, int[] offset, Object elem ) // SerialStruct,    # TOK_STRUCT
             { return serialStruct( buf, offset, (ISerializable)elem ); } } );
         return m;
     }

@@ -41,6 +41,8 @@
 #include "uxstream.h"
 #include "streamex.h"
 #include "portex.h"
+#include "prxyport.h"
+#include "fdodrv.h"
 
 #include <dlfcn.h>
 
@@ -157,6 +159,18 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CDummyInterfaceState );
     INIT_MAP_ENTRYCFG( CSimpleSyncIf );
     INIT_MAP_ENTRYCFG( CIfAsyncCancelHandler );
+
+    INIT_MAP_ENTRYCFG( CProxyFdoDriver );
+    INIT_MAP_ENTRYCFG( CDBusProxyFdo );
+    INIT_MAP_ENTRYCFG( CDBusProxyPdo );
+    INIT_MAP_ENTRYCFG( CDBusProxyPdoLpbk );
+    INIT_MAP_ENTRYCFG( CProxyFdoListenTask );
+    INIT_MAP_ENTRYCFG( CProxyFdoModOnOfflineTask );
+    INIT_MAP_ENTRYCFG( CProxyFdoRmtDBusOfflineTask );
+    INIT_MAP_ENTRYCFG( CProxyMsgMatch );
+    INIT_MAP_ENTRYCFG( CProxyPdoConnectTask );
+    INIT_MAP_ENTRYCFG( CProxyPdoDisconnectTask );
+    INIT_MAP_ENTRYCFG( CRemoteProxyState );
 
 #ifdef _USE_LIBEV
     INIT_MAP_ENTRYCFG( CDBusLoopHooks );

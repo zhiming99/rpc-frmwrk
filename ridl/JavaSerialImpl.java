@@ -17,7 +17,7 @@ public class JavaSerialImpl extends JavaSerialBase
     { return m_oInst; }
 
     public int serialHStream(
-        BufPtr buf, Integer offset, long val )
+        BufPtr buf, int[] offset, long val )
     {
         if( m_oInst == null )
             return -RC.EFAULT;
