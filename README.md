@@ -59,6 +59,9 @@ This project depends on the following 3rd-party packags to build:
 6. Logging service
 
 ---
+[`Tue Nov 09 2021 02:02:13 PM Beijing`]   
+1. Half way through the debugging of java generator. It will take me a week to handle some urgent thing, and there will be less updates in the next four or five days.
+
 [`Thu Nov 04 2021 09:34:51 PM Beijing`]   
 1. The Java code generator is almost code complete. But encountered some difficulty with deserializing maps. Fixing it may take a few days.
 
