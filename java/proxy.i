@@ -614,7 +614,7 @@ class CJavaInterfBase : public T
         return ret;
     }
 
-    gint32 GetVmPtr( JavaVM* pvm )
+    gint32 GetVmPtr( JavaVM*& pvm )
     {
         guint32* pVal = nullptr;
         CCfgOpenerObj oCfg( this );
@@ -773,6 +773,8 @@ class CJavaInterfBase : public T
                 break;
             }
 
+            // jclass cls = jenv->FindClass(
+            //    "org/rpcf/rpcbase/JavaRpcServiceS");
             jclass cls =
                 jenv->GetObjectClass( pHost );
 
@@ -800,17 +802,28 @@ class CJavaInterfBase : public T
 
             jmethodID invokeMethod = jenv->GetMethodID(
                 cls, "invokeMethod",
-                 "(Ljava/lang/Object;"
+                 "(Lorg/rpcf/rpcbase/ObjPtr;"
                  "Ljava/lang/String;"
                  "Ljava/lang/String;"
-                 "IL/java/lang/Object;)"
-                 "L/java/lang/Object" );
+                 "ILorg/rpcf/rpcbase/ObjPtr;)"
+                 "Lorg/rpcf/rpcbase/JRetVal;" );
+
+            if( invokeMethod == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+
+            jstring jsIfName = jenv->NewStringUTF(
+                strIfName.c_str() );
+            jstring jsMethod = jenv->NewStringUTF(
+                strMethod.c_str() );
 
             jobject listResp =
                 jenv->CallObjectMethod(
                  pHost, invokeMethod,
-                 pjCb, strIfName.c_str(),
-                 strMethod.c_str(), dwSeriProto,
+                 pjCb, jsIfName,
+                 jsMethod, dwSeriProto,
                  pjParams );
 
             if( unlikely( listResp == nullptr ) )

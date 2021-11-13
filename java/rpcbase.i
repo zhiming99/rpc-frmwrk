@@ -1646,7 +1646,7 @@ class BufPtr
             iPos += 4;
             if( len == 0 )
                 break;
-            memcpy( pBuf->ptr() + iPos + 4, val, len );
+            memcpy( pBuf->ptr() + iPos, val, len );
             iPos += len;
             jenv->ReleaseStringUTFChars( jstr, val); 
 
