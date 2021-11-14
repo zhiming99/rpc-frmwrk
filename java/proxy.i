@@ -773,11 +773,6 @@ class CJavaInterfBase : public T
                 break;
             }
 
-            // jclass cls = jenv->FindClass(
-            //    "org/rpcf/rpcbase/JavaRpcServiceS");
-            jclass cls =
-                jenv->GetObjectClass( pHost );
-
             ObjPtr* pCb = new ObjPtr( pCallback );
             ObjPtr* pArgs = new ObjPtr( pParams );
 
@@ -800,6 +795,8 @@ class CJavaInterfBase : public T
                 break;
             }       
 
+            jclass cls =
+                jenv->GetObjectClass( pHost );
             jmethodID invokeMethod = jenv->GetMethodID(
                 cls, "invokeMethod",
                  "(Lorg/rpcf/rpcbase/ObjPtr;"

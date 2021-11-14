@@ -453,8 +453,7 @@ abstract public class JavaRpcService
                 jret.getParamCount() == 0 )
                 break;
 
-            int iSize = ( ( Integer )
-                jret.getAt( 0 ) ).intValue();
+            int iSize = jret.getAtInt( 0 );
 
             jret.clear();
 
@@ -481,6 +480,7 @@ abstract public class JavaRpcService
                     break;
                 }
 
+                jret.clear();
                 byte[] bytearr = ( byte[] )val;
                 jret.addElem( bytearr );
                 break;
@@ -603,7 +603,8 @@ abstract public class JavaRpcService
 
             if( isServer() )
             {
-                if( nameComps[ 0 ] != "UserMethod" )
+                if( !nameComps[ 0 ].equals(
+                    "UserMethod" ) )
                 {
                     oResp.setError( -RC.EINVAL );
                     break;
@@ -611,7 +612,8 @@ abstract public class JavaRpcService
             }
             else 
             {
-                if( nameComps[ 0 ] != "UserEvent" )
+                if( !nameComps[ 0 ].equals(
+                    "UserEvent" ) )
                 {
                     oResp.setError( -RC.EINVAL );
                     break;

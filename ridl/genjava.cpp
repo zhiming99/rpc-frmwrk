@@ -3072,7 +3072,7 @@ gint32 CImplJavaMethodCliBase::ImplMakeCall()
         if( !m_pNode->IsNoReply() )
         {
             Wa( "if( jret.ERROR() )" );
-            Wa( "    break;" );
+            Wa( "{ ret = jret.getError(); break; }" );
             if( iOutCount > 0 )
             {
                 Wa( "byte[] _buf = ( byte[] )jret.getAt( 0 );" );
@@ -3091,6 +3091,7 @@ gint32 CImplJavaMethodCliBase::ImplMakeCall()
                     break;
                 Wa( "if( RC.ERROR( ret ) )" );
                 Wa( "    break;" );
+                Wa( "jret.clear();" );
                 for( auto& elem : vecArgs )
                 {
                     CCOUT << "jret.addElem( " << elem << " );";

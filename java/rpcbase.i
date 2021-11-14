@@ -602,7 +602,7 @@ int GetParamCountJRet(
         "org/rpcf/rpcbase/JRetVal");
 
     jmethodID getParams = jenv->GetMethodID(
-        cls, "getParamCount", "()i");
+        cls, "getParamCount", "()I");
 
     return jenv->CallIntMethod( jret, getParams );
 }
@@ -1292,7 +1292,7 @@ class BufPtr
             jbyteArray bytes =
                 jenv->NewByteArray( len );
             jenv->SetByteArrayRegion( bytes,
-                len, 0, ( jbyte* )pBuf->ptr() );
+                0, len, ( jbyte* )pBuf->ptr() );
             AddElemToJRet( jenv, jret, bytes );
 
         }while( 0 );
@@ -1683,7 +1683,7 @@ class BufPtr
     { 
         if( $self == nullptr )
             return -EINVAL;
-        gint32 iSize = sizeof( gint32 );
+        constexpr gint32 iSize = sizeof( gint16 );
         BufPtr& pBuf = *$self;
         gint32 ret = CheckAndResize(
             pBuf, iPos, iSize );
@@ -1691,7 +1691,11 @@ class BufPtr
             return ret;
 
         guint16 nval = htons( val );
-        memcpy( pBuf->ptr() + iPos, &nval, iSize );
+        guint8* psrc = ( guint8* )&nval;
+        guint8* pdest = ( guint8*)
+            ( pBuf->ptr() + iPos );
+        *pdest++=*psrc++;
+        *pdest=*psrc;
         return iPos + iSize;
     }
 
@@ -1699,7 +1703,7 @@ class BufPtr
     { 
         if( $self == nullptr )
             return -EINVAL;
-        gint32 iSize = sizeof( gint32 );
+        constexpr gint32 iSize = sizeof( gint32 );
         BufPtr& pBuf = *$self;
         gint32 ret = CheckAndResize(
             pBuf, iPos, iSize );
@@ -1707,14 +1711,20 @@ class BufPtr
             return ret;
 
         guint32 nval = htonl( val );
-        memcpy( pBuf->ptr() + iPos, &nval, iSize );
+        guint8* psrc = ( guint8* )&nval;
+        guint8* pdest = ( guint8*)
+            ( pBuf->ptr() + iPos );
+        *pdest++=*psrc++;
+        *pdest++=*psrc++;
+        *pdest++=*psrc++;
+        *pdest=*psrc;
         return iPos + iSize;
     }
     gint32 SerialLong( int iPos, jlong val )
     { 
         if( $self == nullptr )
             return -EINVAL;
-        gint32 iSize = sizeof( gint64 );
+        constexpr gint32 iSize = sizeof( gint64 );
         BufPtr& pBuf = *$self;
         gint32 ret = CheckAndResize(
             pBuf, iPos, iSize );
@@ -1722,7 +1732,17 @@ class BufPtr
             return ret;
 
         guint64 nval = htonll( val );
-        memcpy( pBuf->ptr() + iPos, &nval, iSize );
+        guint8* psrc = ( guint8* )&nval;
+        guint8* pdest =
+            ( guint8*) ( pBuf->ptr() + iPos );
+        *pdest++=*psrc++;
+        *pdest++=*psrc++;
+        *pdest++=*psrc++;
+        *pdest++=*psrc++;
+        *pdest++=*psrc++;
+        *pdest++=*psrc++;
+        *pdest++=*psrc++;
+        *pdest=*psrc;
         return iPos + iSize;
     }
     gint32 SerialFloat( int iPos, jfloat val )
@@ -1737,7 +1757,13 @@ class BufPtr
             return ret;
 
         guint32 nval = htonl( *( guint32* )&val );
-        memcpy( pBuf->ptr() + iPos, &nval, iSize );
+        guint8* psrc = ( guint8* )&nval;
+        guint8* pdest = ( guint8*)
+            ( pBuf->ptr() + iPos );
+        *pdest++=*psrc++;
+        *pdest++=*psrc++;
+        *pdest++=*psrc++;
+        *pdest=*psrc;
         return iPos + iSize;
     }
 
@@ -1753,7 +1779,17 @@ class BufPtr
             return ret;
 
         guint64 nval = htonll( *( guint64* )&val );
-        memcpy( pBuf->ptr() + iPos, &nval, iSize );
+        guint8* psrc = ( guint8* )&nval;
+        guint8* pdest =
+            ( guint8*) ( pBuf->ptr() + iPos );
+        *pdest++=*psrc++;
+        *pdest++=*psrc++;
+        *pdest++=*psrc++;
+        *pdest++=*psrc++;
+        *pdest++=*psrc++;
+        *pdest++=*psrc++;
+        *pdest++=*psrc++;
+        *pdest=*psrc;
         return iPos + iSize;
     }
 
@@ -2314,7 +2350,7 @@ class CParamList
             jbyteArray bytes =
                 jenv->NewByteArray( len );
             jenv->SetByteArrayRegion( bytes,
-                len, 0, ( jbyte* )pBuf->ptr() );
+                0, len, ( jbyte* )pBuf->ptr() );
 
             AddElemToJRet( jenv, jret, bytes );
 
