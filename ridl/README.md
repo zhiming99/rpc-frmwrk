@@ -126,11 +126,11 @@ On a successful compile of the above sample ridl file, `ridlc` will generate the
 
 * **maincli.cpp, mainsvr.cpp**: as the name indicate, the two files define main function of the proxy and server respectively. Each file contains a same-name function, that is a `maincli` function in maincli.cpp and `mainsvr` in mainsvr.cpp, which is the ideal place to add your custom code.
 
-* **example.cpp, example.h** : the files are named with the name defined by *appname*. It contains all the skelton method declarations, and implementations.
 * **SimpFileSvccli.cpp, SimpFileSvccli.h, SimpFileSvcsvr.cpp, SimpFileSvcsvr.h:** the files are named with the *service id* of the *service statement* appending a `svr` or `cli`. Each individual service declaration has two pairs of `.cpp` and `.h` file, for both server/client side. The cpp file contains all the methods that user should implement to get server/proxy to work. They are mainly the same-name methods as defined in ridl file on Server side as the request handlers. 
 The amount of efforts to take are different depending on whether or not the meethod is labeled `async`. Without `async` tag, the implementation is a synchronous version and time-saving at development time. And the implementation with `async` tag takes more efforts, but has better performance. The implementation consists of two parts, one is the skelton code to serialize/deserialize parameters, schedule callbacks, setup timers, and the other part are the business logics for the user to implement, including handling response, or error condition, timeout or bad response for example. And `rpc-frmwrk` provides rich utilities to help developing asynchronous implementation to reduce the developing efforts.
-* **Makefile**: The make file to build the project. It has two build targets, `debug` and `release`. the debug version of image will go to the `debug` directory, and the release version of image will go to the `release` directory. During making, the communication settings are synchronized with current system settings, and usually you don't need to manually config it.
-* **exampledesc.json, driver.json:** The configuration files. `driver.json` is for `I/O manager` and `port objsects`, which is relative stable, and `exampledesc.json` contains all the things needed for the services defined in the ridl file. Everytime you have used rpcfg.py to update the settings of `rpc-frmwrk`, you need to run `make` to update the two files as well.
+* *example.cpp, example.h* : the files are named with the name defined by *appname*. It contains all the skelton method declarations, and implementations.
+* *Makefile*: The make file to build the project. It has two build targets, `debug` and `release`. the debug version of image will go to the `debug` directory, and the release version of image will go to the `release` directory. During making, the communication settings are synchronized with current system settings, and usually you don't need to manually config it.
+* *exampledesc.json, driver.json:* The configuration files. `driver.json` is for `I/O manager` and `port objsects`, which is relative stable, and `exampledesc.json` contains all the things needed for the services defined in the ridl file. Everytime you have used rpcfg.py to update the settings of `rpc-frmwrk`, you need to run `make` to update the two files as well.
 * **run:** After a successful make, there will be two executables, `examplecli` and `examplesvr`. Run the server on the `bridge` side and the client on the `reqfwdr` side. If you have specified `-l` option when generating the code, the `make` command will produce a shared library named `examplelib.so` instead, which has all the functions and classes except the `main` function.
 
 ### Output for Python project
@@ -139,15 +139,44 @@ On a successful compile of the above sample ridl file, `ridlc` will generate the
 
 * **maincli.py, mainsvr.py**: as the name indicate, the two files define main function of the proxy and server respectively. Each file contains a same-name function, that is a `maincli` function in maincli.py and `mainsvr` in mainsvr.py, which is the ideal place to add your custom code.
 
-* **examplestructs.py, seribase.py** : the struct file is named with the name defined by *appname*. It contains all the struct declarations, with serialization implementations respectively, and `seribase.py` contains the serialization support utilities.
-
-* **SimpFileSvcclibase.py, SimpFileSvcsvrbase.py:** the files are named with the *service id* of the *service statement* plus `clibase` or `svrbase`. as their name show, they contain the the server or client side classes which serve as the base class of the client/server. These files should not be touched by the users, and they will be overwritten after running `ridlc` again.
-
 * **SimpFileSvccli.py, SimpFileSvcsvr.py:**: the files are named with the *service id* of the *service statement* plus `cli` or `svr`. These two files lists all the methods that require the user the implement. The synchronous method call has the least set of methods to implement, while the asynchronous method call has 1 or 2 more methods for each requests to implement.
 
-* **Makefile**: The make file to build the project. Note that, it just synchronizes the configuration with the system settings.
-* **exampledesc.json, driver.json:** The configuration files.
+* *examplestructs.py, seribase.py* : the struct file is named with the name defined by *appname*. It contains all the struct declarations, with serialization implementations respectively, and `seribase.py` contains the serialization support utilities.
+
+* *SimpFileSvcclibase.py, SimpFileSvcsvrbase.py:* the files are named with the *service id* of the *service statement* plus `clibase` or `svrbase`. as their name show, they contain the the server or client side classes which serve as the base class of the client/server. These files should not be touched by the users, and they will be overwritten after running `ridlc` again.
+
+
+* *Makefile*: The make file to build the project. Note that, it just synchronizes the configuration with the system settings.
+* *exampledesc.json, driver.json:* The configuration files.
 * **run:** you can run `python3 mainsvr.py` and `python3 maincli.py` to start the server and client. Before the first run after `ridlc`, make sure to run `make` to update the configuration file, that is, the `exampledesc.json` file in this context.
+
+### Output for Java Project
+* **MainCli.java**, **MainSvr.java**: Containing defintion of `main()` method for client, as the main entry for client program and definition of `main()` function server program respectively. 
+And you can make changes to the files to customize the program. The `ridlc` will not touch them if they exist in the project directory, when it runs again, and put the newly generated code in the file with '.new' as the name extension.
+
+* **SimpFileSvcSvr.java**, **SimpFileSvcCli.java**: Containing the declarations and definitions of all the server/client side methods that need to be implemented by you, mainly the request/event handlers, for service `SimpFileSvc`.
+And you need to make changes to the files to implement the functionality for server/client. The `ridlc` will not touch them if they exist in the project directory, when it runs again, and put the newly generated code to `SimpFileSvc.java.new`.
+
+* *SimpFileSvcsvrbase.java*, *SimpFileSvcclibase.java* : Containing the declarations and definitions of all the server/client side utilities and helpers for the interfaces of service `SimpFileSvc`.
+And please don't edit them, since they will be overwritten by `ridlc` without backup.
+
+* *exampleFactory.java*: Containing the definition of struct factory declared and referenced in the ridl file.
+And please don't edit it, since they will be overwritten by `ridlc` without auto-backup.
+
+* *exampledesc.json*: Containing the configuration parameters for all the services declared in the ridl file
+And please don't edit it, since they will be overwritten by `ridlc` and synccfg.py without backup.
+
+* *driver.json*: Containing the configuration parameters for all the ports and drivers
+And please don't edit it, since they will be overwritten by `ridlc` and synccfg.py without backup.
+
+* *Makefile*: The Makefile will just synchronize the configurations with the local system settings. And it does nothing else.
+And please don't edit it, since it will be overwritten by `ridlc` and synccfg.py without backup.
+
+* *DeserialMaps*, *JavaSerialBase.java*, *JavaSerialHelperS.java*, *JavaSerialHelperP.java*: Containing the utility classes for serializations.
+And please don't edit it, since they will be overwritten by `ridlc`.
+
+* *synccfg.py*: a small python script to synchronous settings with the system settings, just ignore it.
+
 
 ### Interchangable client and server between C++ and Python
 You can connect the C++ server with a python client or a Python server with a C++ client as long as both are generated with the same ridl file.
