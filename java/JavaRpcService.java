@@ -8,7 +8,7 @@ import java.lang.ClassCastException;
 
 /*
  * Hilarious, I need C preprocessor to spawn the java
- * classes and cannot find native way to do it yet.
+ * classes.
  */
 
 abstract public class JavaRpcService

@@ -6801,30 +6801,6 @@ gint32 CExportReadme::Output()
         }
 
         Wa( "### Introduction to the files:" );
-        CCOUT<< "* *" << g_strAppName << ".cpp*, *" << g_strAppName <<".h*: "
-            << "Containing all the implementations of the helpers "
-            << "and utilities for each declared interfaces, for "
-            << "both client and server.";
-        NEW_LINE;
-        CCOUT << "And please don't edit them, since they will be "
-            << "overwritten by `ridlc` without auto-backup.";
-        NEW_LINES( 2 );
-
-        CCOUT<< "* *" << g_strAppName << "desc.json*: "
-            << "Containing the configuration parameters for all "
-            << "the services declared in the ridl file";
-        NEW_LINE;
-        CCOUT << "And please don't edit it, since they will be "
-            << "overwritten by `ridlc` and synccfg.py without backup.";
-        NEW_LINES( 2 );
-
-        CCOUT << "* *driver.json*: "
-            << "Containing the configuration parameters for all "
-            << "the ports and drivers";
-        NEW_LINE;
-        CCOUT << "And please don't edit it, since they will be "
-            << "overwritten by `ridlc` and synccfg.py without backup.";
-        NEW_LINES( 2 );
 
         CCOUT << "* **maincli.cpp**, **mainsvr.cpp**: "
             << "Containing defintion of `maincli()` function for client, as the main "
@@ -6837,15 +6813,6 @@ gint32 CExportReadme::Output()
             << "The `ridlc` will not touch them if they exist in the project directory, "
             << "when it runs again, and put the newly "
             << "generated code to `maincli.cpp.new` and `mainsvr.cpp.new`.";
-        NEW_LINES( 2 );
-
-        CCOUT << "* *Makefile*: "
-            << "The Makefile will build both the server/client side program "
-            << "or shared library. Besides, it will also synchronize the configurations "
-            << "with the local system settings.";
-        NEW_LINE;
-        CCOUT << "And please don't edit it, since it will be "
-            << "overwritten by `ridlc` and synccfg.py without backup.";
         NEW_LINES( 2 );
 
         for( auto& elem : vecSvcNames )
@@ -6873,6 +6840,40 @@ gint32 CExportReadme::Output()
             NEW_LINES( 2 );
         }
 
+        CCOUT<< "* *" << g_strAppName << ".cpp*, *" << g_strAppName <<".h*: "
+            << "Containing all the implementations of the helpers "
+            << "and utilities for each declared interfaces, for "
+            << "both client and server.";
+        NEW_LINE;
+        CCOUT << "And please don't edit them, since they will be "
+            << "overwritten by `ridlc` without auto-backup.";
+        NEW_LINES( 2 );
+
+        CCOUT<< "* *" << g_strAppName << "desc.json*: "
+            << "Containing the configuration parameters for all "
+            << "the services declared in the ridl file";
+        NEW_LINE;
+        CCOUT << "And please don't edit it, since they will be "
+            << "overwritten by `ridlc` and synccfg.py without backup.";
+        NEW_LINES( 2 );
+
+        CCOUT << "* *driver.json*: "
+            << "Containing the configuration parameters for all "
+            << "the ports and drivers";
+        NEW_LINE;
+        CCOUT << "And please don't edit it, since they will be "
+            << "overwritten by `ridlc` and synccfg.py without backup.";
+        NEW_LINES( 2 );
+
+        CCOUT << "* *Makefile*: "
+            << "The Makefile will build both the server/client side program "
+            << "or shared library. Besides, it will also synchronize the configurations "
+            << "with the local system settings.";
+        NEW_LINE;
+        CCOUT << "And please don't edit it, since it will be "
+            << "overwritten by `ridlc` and synccfg.py without backup.";
+        NEW_LINES( 2 );
+
         CCOUT << "* *synccfg.py*: "
             << "a small python script to synchronous settings "
             << "with the system settings, just ignore it.";
@@ -6880,8 +6881,8 @@ gint32 CExportReadme::Output()
 
         CCOUT << "**Note**: the files in bold text need your further implementation. "
             << "And files in italic text do not. And of course, "
-            << "you can still customized the italic files by backing up them "
-            << "and overwriting the auto-generated version.";
+            << "you can still customized the italic files, but be aware they "
+            << "will be rewritten after running RIDLC again.";
         NEW_LINE;
 
    }while( 0 );

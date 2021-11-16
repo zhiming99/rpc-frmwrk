@@ -1169,7 +1169,10 @@ gint32 CJavaSnippet::EmitDeserialFields(
             }
             if( ERROR( ret ) )
                 break;
-            NEW_LINES(2);
+            if( i < iCount - 1 )
+                NEW_LINES(2);
+            else
+                NEW_LINE;
         }
 
     }while( 0 );
@@ -1350,7 +1353,7 @@ gint32 CJavaSnippet::EmitGetArgTypes(
     gint32 iCount = oau.GetArgCount( pArgs );
     do{
         Wa( "public int getArgCount()" );
-        CCOUT << "{ return " << iCount << "; };";
+        CCOUT << "{ return " << iCount << "; }";
         NEW_LINES( 2 );
         Wa( "public Class<?>[] getArgTypes()" );
         if( iCount == 0 )
@@ -1404,11 +1407,11 @@ CJavaFileSet::CJavaFileSet(
         false );
 
     GEN_FILEPATH( m_strMainCli,
-        strOutPath, strAppName + "Cli.java",
+        strOutPath, "MainCli.java",
         true );
 
     GEN_FILEPATH( m_strMainSvr, 
-        strOutPath, strAppName + "Svr.java",
+        strOutPath, "MainSvr.java",
         true );
 
     GEN_FILEPATH( m_strReadme, 
@@ -1923,8 +1926,7 @@ gint32 GenJavaProj(
         ret = ojmc.Output();
         if( ERROR( ret ) )
         {
-            stdstr strName = 
-                g_strAppName + "Cli.java";
+            stdstr strName = "MainCli.java";
             OutputMsg( ret,
                 "error generating %s.",
                 strName.c_str() );
@@ -1936,8 +1938,7 @@ gint32 GenJavaProj(
         ret = ojms.Output();
         if( ERROR( ret ) )
         {
-            stdstr strName = 
-                g_strAppName + "Svr.java";
+            stdstr strName = "MainSvr.java";
             OutputMsg( ret,
                 "error generating %s.",
                 strName.c_str() );
@@ -2174,10 +2175,13 @@ gint32 CImplJavaMethodSvrBase::ImplReqContext()
                     CCOUT << elem.second << " = ( "
                         << elem.first << " )"
                         << "args[ " << i << " ];";
+                    if( i < vecArgs.size() - 1 )
+                        NEW_LINE;
                 }
                 BLOCK_CLOSE;
+                NEW_LINE;
             }
-            Wa( "m_bSet = true;" );
+            CCOUT << "m_bSet = true;";
             BLOCK_CLOSE;
             NEW_LINE;
 
@@ -2366,11 +2370,13 @@ gint32 CImplJavaMethodSvrBase::ImplInvoke()
                     Wa( "    newCancelNotify( oHost, _oReqCtx );" );
                     Wa( "int iRet = oHost.installCancelNotify(" );
                     Wa( "    _oReqCtx.getCallback(), o," );
-                    Wa( "    new Object[]" );
+                    CCOUT << "    new Object[]"; 
+                    INDENT_UPL;
                     BLOCK_OPEN;
                     ret = os.EmitActArgList( pInArgs );
                     BLOCK_CLOSE;
-                    Wa( " );" );
+                    CCOUT << ");";
+                    INDENT_DOWNL;
                     Wa( "if( RC.ERROR( iRet ) )" );
                     Wa( "    ret = iRet;" );
                     Wa( "break;" );
@@ -2651,7 +2657,7 @@ gint32 CImplJavaMethodSvr::Output()
         if( !bAsync )
         {
             Wa( "// Synchronous handler. Make sure to call" );
-            Wa( "// oReqCtx.SetResponse before return" );
+            Wa( "// oReqCtx.setResponse before return" );
         }
         else
         {
@@ -3219,7 +3225,7 @@ gint32 CImplJavaMethodCli::Output()
             }
 
             CCOUT << "// " << strIfName << "::" << strName;
-            CCOUT << "async callback";
+            CCOUT << " async callback";
             NEW_LINE;
             CCOUT << "public void on" << strName << "Complete(";
             NEW_LINE;
@@ -3716,6 +3722,44 @@ gint32 CJavaExportReadme::Output()
         }
 
         Wa( "### Introduction to the files:" );
+
+        CCOUT << "* **MainCli.java**, **MainSvr.java**: "
+            << "Containing defintion of `main()` method for client, as the main "
+            << "entry for client program "
+            << "and definition of `main()` function server program respectively. ";
+        NEW_LINE;
+        CCOUT << "And you can make changes to the files to customize the program. "
+            << "The `ridlc` will not touch them if they exist in the project directory, "
+            << "when it runs again, and put the newly "
+            << "generated code in the file with '.new' as the name extension.";
+        NEW_LINES( 2 );
+
+        for( auto& elem : vecSvcNames )
+        {
+            CCOUT << "* **" << elem << "Svr.java**, **" << elem << "Cli.java**: "
+                << "Containing the declarations and definitions of all the server/client side "
+                << "methods that need to be implemented by you, mainly the request/event handlers, "
+                << "for service `" << elem << "`.";
+            NEW_LINE;
+            CCOUT << "And you need to make changes to the files to implement the "
+                << "functionality for server/client. "
+                << "The `ridlc` will not touch them if they exist in the project directory, "
+                << "when it runs again, and put the newly "
+                << "generated code to `"<<elem  <<".java.new`.";
+            NEW_LINES( 2 );
+        }
+
+        for( auto& elem : vecSvcNames )
+        {
+            CCOUT << "* *" << elem << "svrbase.java*, *"<< elem << "clibase.java* : "
+                << "Containing the declarations and definitions of all the server/client side "
+                << "utilities and helpers for the interfaces of service `" << elem << "`.";
+            NEW_LINE;
+            CCOUT << "And please don't edit them, since they will be "
+                << "overwritten by `ridlc` without backup.";
+            NEW_LINES( 2 );
+        }
+
         CCOUT<< "* *" << g_strAppName << "Factory.java*: "
             << "Containing the definition of struct factory "
             << "declared and referenced in the ridl file.";
@@ -3740,17 +3784,6 @@ gint32 CJavaExportReadme::Output()
             << "overwritten by `ridlc` and synccfg.py without backup.";
         NEW_LINES( 2 );
 
-        CCOUT << "* *" << g_strAppName << "Cli.java*, *"<< g_strAppName <<"Svr.java*: "
-            << "Containing defintion of `main()` method for client, as the main "
-            << "entry for client program "
-            << "and definition of `main()` function server program respectively. ";
-        NEW_LINE;
-        CCOUT << "And you can make changes to the files to customize the program. "
-            << "The `ridlc` will not touch them if they exist in the project directory, "
-            << "when it runs again, and put the newly "
-            << "generated code in the file with '.new' as the name extension.";
-        NEW_LINES( 2 );
-
         CCOUT << "* *Makefile*: "
             << "The Makefile will just synchronize the configurations "
             << "with the local system settings. And it does nothing else.";
@@ -3759,30 +3792,7 @@ gint32 CJavaExportReadme::Output()
             << "overwritten by `ridlc` and synccfg.py without backup.";
         NEW_LINES( 2 );
 
-        for( auto& elem : vecSvcNames )
-        {
-            CCOUT << "* *" << elem << "svrbase.java*, *"<< elem << "clibase.java* : "
-                << "Containing the declarations and definitions of all the server/client side "
-                << "utilities and helpers for the interfaces of service `" << elem << "`.";
-            NEW_LINE;
-            CCOUT << "And please don't edit them, since they will be "
-                << "overwritten by `ridlc` without backup.";
-            NEW_LINES( 2 );
-
-            CCOUT << "* **" << elem << "Svr.java**, **" << elem << "Cli.java**: "
-                << "Containing the declarations and definitions of all the server/client side "
-                << "methods that need to be implemented by you, mainly the request/event handlers, "
-                << "for service `" << elem << "`.";
-            NEW_LINE;
-            CCOUT << "And you need to make changes to the files to implement the "
-                << "functionality for server/client. "
-                << "The `ridlc` will not touch them if they exist in the project directory, "
-                << "when it runs again, and put the newly "
-                << "generated code to `"<<elem  <<".java.new`.";
-            NEW_LINES( 2 );
-        }
-
-        CCOUT << "* *JavaSerialBase.java*, *JavaSerialHelperS.java*, *JavaSerialHelperP.java*: "
+        CCOUT << "* *DeserialMaps*, *JavaSerialBase.java*, *JavaSerialHelperS.java*, *JavaSerialHelperP.java*: "
             << "Containing the utility classes for serializations.";
         NEW_LINE;
         CCOUT << "And please don't edit it, since they will be "
@@ -3795,8 +3805,8 @@ gint32 CJavaExportReadme::Output()
         NEW_LINES(2);
         CCOUT << "**Note**: the files in bold text need your further implementation. "
             << "And files in italic text do not. And of course, "
-            << "you can still customized the italic files by backing up them "
-            << "and overwriting the auto-generated version.";
+            << "you can still customized the italic files, but be aware they "
+            << "will be rewritten after running RIDLC again.";
         NEW_LINE;
 
    }while( 0 );
@@ -3954,7 +3964,7 @@ gint32 CImplJavaMainCli::Output()
     Wa( "import java.util.concurrent.TimeUnit;" );
     gint32 ret = 0;
     do{
-        CCOUT << "public class " << g_strAppName << "Cli";
+        CCOUT << "public class MainCli";
         NEW_LINE;
         BLOCK_OPEN;
         Wa( "public static JavaRpcContext m_oCtx;" );
@@ -4084,7 +4094,7 @@ gint32 CImplJavaMainSvr::Output()
     Wa( "import java.util.concurrent.TimeUnit;" );
     gint32 ret = 0;
     do{
-        CCOUT << "public class " << g_strAppName << "Svr";
+        CCOUT << "public class MainSvr";
         NEW_LINE;
         BLOCK_OPEN;
         Wa( "public static JavaRpcContext m_oCtx;" );

@@ -3220,6 +3220,33 @@ gint32 CExportPyReadme::Output()
         }
 
         Wa( "### Introduction to the files:" );
+
+        CCOUT << "* **maincli.py**, **mainsvr.py**: "
+            << "Containing defintion of `maincli()` function for client, as the main "
+            << "entry for client program "
+            << "and definition of `mainsvr()` function server program respectively. ";
+        NEW_LINE;
+        CCOUT << "And you can make changes to the files to customize the program. "
+            << "The `ridlc` will not touch them if they exist in the project directory, "
+            << "when it runs again, and put the newly "
+            << "generated code to `maincli.py.new` and `mainsvr.py.new`.";
+        NEW_LINES( 2 );
+
+        for( auto& elem : vecSvcNames )
+        {
+            CCOUT << "* **" << elem << "svr.py**, **" << elem << "cli.py**: "
+                << "Containing the declarations and definitions of all the server/client side "
+                << "methods that need to be implemented by you, mainly the request/event handlers, "
+                << "for service `" << elem << "`.";
+            NEW_LINE;
+            CCOUT << "And you need to make changes to the files to implement the "
+                << "functionality for server/client. "
+                << "The `ridlc` will not touch them if they exist in the project directory, "
+                << "when it runs again, and put the newly "
+                << "generated code to `"<<elem  <<".py.new`.";
+            NEW_LINES( 2 );
+        }
+
         CCOUT<< "* *" << g_strAppName << "structs.py*: "
             << "Containing all the declarations of the struct classes "
             << "declared in the ridl, with serialization methods implemented.";
@@ -3244,17 +3271,6 @@ gint32 CExportPyReadme::Output()
             << "overwritten by `ridlc` and synccfg.py without backup.";
         NEW_LINES( 2 );
 
-        CCOUT << "* **maincli.py**, **mainsvr.py**: "
-            << "Containing defintion of `maincli()` function for client, as the main "
-            << "entry for client program "
-            << "and definition of `mainsvr()` function server program respectively. ";
-        NEW_LINE;
-        CCOUT << "And you can make changes to the files to customize the program. "
-            << "The `ridlc` will not touch them if they exist in the project directory, "
-            << "when it runs again, and put the newly "
-            << "generated code to `maincli.py.new` and `mainsvr.py.new`.";
-        NEW_LINES( 2 );
-
         CCOUT << "* *Makefile*: "
             << "The Makefile will just synchronize the configurations "
             << "with the local system settings. And it does nothing else.";
@@ -3273,17 +3289,6 @@ gint32 CExportPyReadme::Output()
                 << "overwritten by `ridlc` without backup.";
             NEW_LINES( 2 );
 
-            CCOUT << "* **" << elem << "svr.py**, **" << elem << "cli.py**: "
-                << "Containing the declarations and definitions of all the server/client side "
-                << "methods that need to be implemented by you, mainly the request/event handlers, "
-                << "for service `" << elem << "`.";
-            NEW_LINE;
-            CCOUT << "And you need to make changes to the files to implement the "
-                << "functionality for server/client. "
-                << "The `ridlc` will not touch them if they exist in the project directory, "
-                << "when it runs again, and put the newly "
-                << "generated code to `"<<elem  <<".py.new`.";
-            NEW_LINES( 2 );
         }
 
         CCOUT << "* *seribase.py*: "
@@ -3299,8 +3304,8 @@ gint32 CExportPyReadme::Output()
         NEW_LINES(2);
         CCOUT << "**Note**: the files in bold text need your further implementation. "
             << "And files in italic text do not. And of course, "
-            << "you can still customized the italic files by backing up them "
-            << "and overwriting the auto-generated version.";
+            << "you can still customized the italic files, but be aware they "
+            << "will be rewritten after running RIDLC again.";
         NEW_LINE;
 
    }while( 0 );
