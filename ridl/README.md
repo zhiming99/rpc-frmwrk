@@ -139,7 +139,7 @@ On a successful compile of the above sample ridl file, `ridlc` will generate the
 
 * **maincli.py, mainsvr.py**: as the name indicate, the two files define main function of the proxy and server respectively. Each file contains a same-name function, that is a `maincli` function in maincli.py and `mainsvr` in mainsvr.py, which is the ideal place to add your custom code.
 
-* **SimpFileSvccli.py, SimpFileSvcsvr.py:**: the files are named with the *service id* of the *service statement* plus `cli` or `svr`. These two files lists all the methods that require the user the implement. The synchronous method call has the least set of methods to implement, while the asynchronous method call has 1 or 2 more methods for each requests to implement.
+* **SimpFileSvccli.py, SimpFileSvcsvr.py:**: the files are named with the *service id* of the *service statement* plus `cli` or `svr`. These files list all the methods that require the user the implement. The synchronous method call has the least set of methods to implement, while the asynchronous method call has 1 or 2 more methods for each requests to implement.
 
 * *examplestructs.py, seribase.py* : the struct file is named with the name defined by *appname*. It contains all the struct declarations, with serialization implementations respectively, and `seribase.py` contains the serialization support utilities.
 
