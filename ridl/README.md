@@ -110,7 +110,9 @@ The above example shows most of the statements ridl supports. ridl now has 7 typ
         -O:     To specify the path for the output files. 'output' is the default path if not
                 specified
                 
-        -p:     To generate Python skelton files
+        -p:     To generate Python skelton files   
+
+        -j:     To generate Java skelton files       
         
         -l:     To output a shared library instead of executables. This option is for CPP project only
 
