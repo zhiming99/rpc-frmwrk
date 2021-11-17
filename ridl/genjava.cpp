@@ -1407,11 +1407,11 @@ CJavaFileSet::CJavaFileSet(
         false );
 
     GEN_FILEPATH( m_strMainCli,
-        strOutPath, "MainCli.java",
+        strOutPath, "maincli.java",
         true );
 
     GEN_FILEPATH( m_strMainSvr, 
-        strOutPath, "MainSvr.java",
+        strOutPath, "mainsvr.java",
         true );
 
     GEN_FILEPATH( m_strReadme, 
@@ -1442,9 +1442,9 @@ gint32 CJavaFileSet::AddSvcImpl(
         gint32 idx = m_vecFiles.size();
         std::string strExt = ".java";
         std::string strSvrJava = m_strPath +
-            "/" + strSvcName + "Svr.java";
+            "/" + strSvcName + "svr.java";
         std::string strCliJava = m_strPath +
-            "/" + strSvcName + "Cli.java";
+            "/" + strSvcName + "cli.java";
 
         std::string strSvrJavaBase = m_strPath +
             "/" + strSvcName + "svrbase.java";
@@ -1457,7 +1457,7 @@ gint32 CJavaFileSet::AddSvcImpl(
         {
             strExt = ".java.new";
             strSvrJava = m_strPath + "/" +
-                strSvcName + "Svr.java.new";
+                strSvcName + "svr.java.new";
         }
 
         ret = access( strCliJava.c_str(), F_OK );
@@ -1465,7 +1465,7 @@ gint32 CJavaFileSet::AddSvcImpl(
         {
             strExt = ".java.new";
             strCliJava = m_strPath + "/" +
-                strSvcName + "Cli.java.new";
+                strSvcName + "cli.java.new";
         }
 
         STMPTR pstm( new std::ofstream(
@@ -1759,11 +1759,11 @@ gint32 GenSvcFiles(
 
             // server imlementation
             ret = pWriter->SelectImplFile(
-                strCommon + "Svr.java" );
+                strCommon + "svr.java" );
             if( ERROR( ret ) )
             {
                 ret = pWriter->SelectImplFile(
-                    strCommon + "Svr.java.new" );
+                    strCommon + "svr.java.new" );
                 if( ERROR( ret ) )
                     break;
             }
@@ -1776,11 +1776,11 @@ gint32 GenSvcFiles(
 
             // client imlementation
             ret = pWriter->SelectImplFile(
-                strCommon + "Cli.java" );
+                strCommon + "cli.java" );
             if( ERROR( ret ) )
             {
                 ret = pWriter->SelectImplFile(
-                    strCommon + "Cli.java.new" );
+                    strCommon + "cli.java.new" );
                 if( ERROR( ret ) )
                     break;
             }
@@ -1926,7 +1926,7 @@ gint32 GenJavaProj(
         ret = ojmc.Output();
         if( ERROR( ret ) )
         {
-            stdstr strName = "MainCli.java";
+            stdstr strName = "maincli.java";
             OutputMsg( ret,
                 "error generating %s.",
                 strName.c_str() );
@@ -1938,7 +1938,7 @@ gint32 GenJavaProj(
         ret = ojms.Output();
         if( ERROR( ret ) )
         {
-            stdstr strName = "MainSvr.java";
+            stdstr strName = "mainsvr.java";
             OutputMsg( ret,
                 "error generating %s.",
                 strName.c_str() );
@@ -2002,8 +2002,7 @@ gint32 CImplJavaMethodSvrBase::DeclAbstractFuncs()
         }
         else
         {
-            if( !pNode->IsAsyncs() ||
-                pNode->IsNoReply() )
+            if( !pNode->IsAsyncs() )
                 break;
             CCOUT << "public abstract void on"
                 << strName << "Canceled(";
@@ -2043,8 +2042,7 @@ gint32 CImplJavaMethodSvrBase::ImplNewCancelNotify()
     ObjPtr pInArgs = pNode->GetInArgs();
     gint32 iInCount = GetArgCount( pInArgs );
     stdstr strSvcName = pSvc->GetName() + "svrbase";
-    if( !pNode->IsAsyncs() ||
-        pNode->IsNoReply() )
+    if( !pNode->IsAsyncs() )
         return 0;
 
     CJavaSnippet os( m_pWriter );
@@ -2183,32 +2181,30 @@ gint32 CImplJavaMethodSvrBase::ImplReqContext()
             }
             CCOUT << "m_bSet = true;";
             BLOCK_CLOSE;
+
+            if( iOutCount > 0 )
+            {
+                Wa( "public Object[] getResponse()" );
+                BLOCK_OPEN;
+                {
+                    Wa( "if( !m_bSet )" );
+                    Wa( "    return new Object[ 0 ];" );
+                    CCOUT << "return new Object[]{";
+                    INDENT_UPL;
+                    os.EmitActArgList( pOutArgs );
+                    CCOUT << "};";
+                    INDENT_DOWN;
+                }
+                BLOCK_CLOSE;
+            }
+        }
+
+        if( pNode->IsAsyncs() )
             NEW_LINE;
 
-            Wa( "public Object[] getResponse()" );
-            BLOCK_OPEN;
-            if( iOutCount == 0 )
-            {
-                Wa( "return new Object[ 0 ];" );
-            }
-            else
-            {
-                Wa( "if( !m_bSet )" );
-                Wa( "    return new Object[ 0 ];" );
-                CCOUT << "return new Object[]{";
-                INDENT_UPL;
-                os.EmitActArgList( pOutArgs );
-                CCOUT << "};";
-                INDENT_DOWN;
-            }
-            BLOCK_CLOSE;
-            if( pNode->IsAsyncs() )
-                NEW_LINE;
-
-            ret = ImplSvcComplete();
-            if( ERROR( ret ) )
-                break;
-        }
+        ret = ImplSvcComplete();
+        if( ERROR( ret ) )
+            break;
 
         BLOCK_CLOSE;
         Wa( ";" );
@@ -2230,9 +2226,6 @@ gint32 CImplJavaMethodSvrBase::ImplSvcComplete()
     gint32 iOutCount = GetArgCount( pOutArgs );
 
     if( !pNode->IsAsyncs() )
-        return 0;
-
-    if( pNode->IsNoReply() )
         return 0;
 
     CJavaSnippet os( m_pWriter );
@@ -2348,7 +2341,7 @@ gint32 CImplJavaMethodSvrBase::ImplInvoke()
             INDENT_DOWNL;
             if( pNode->IsNoReply() )
             {
-                Wa( "ret = 0;" );
+                Wa( "ret = RC.STATUS_SUCCESS;" );
             }
             else
             {
@@ -2627,6 +2620,8 @@ gint32 CImplJavaMethodSvr::Output()
         stdstr strHint;
         if( m_pNode->IsAsyncp() )
             strHint = "async-handler";
+        else
+            strHint = "sync-handler";
         if( m_pNode->IsNoReply() )
             if( strHint.empty() )
                 strHint = "no-reply";
@@ -2656,22 +2651,37 @@ gint32 CImplJavaMethodSvr::Output()
         BLOCK_OPEN;
         if( !bAsync )
         {
-            Wa( "// Synchronous handler. Make sure to call" );
-            Wa( "// oReqCtx.setResponse before return" );
+            if( !m_pNode->IsNoReply() )
+            {
+                Wa( "// Synchronous handler. Make sure to call" );
+                Wa( "// oReqCtx.setResponse before return" );
+            }
+            else
+            {
+                Wa( "// Synchronous handler with no-reply" );
+                Wa( "// return value and response is ignored." );
+            }
         }
         else
         {
-            Wa( "// Asynchronouse handler. Make sure to call" );
-            Wa( "// oReqCtx.SetResponse with response" );
-            Wa( "// parameters if return immediately or call" );
+            if( !m_pNode->IsNoReply() )
+            {
+                Wa( "// Asynchronouse handler. Make sure to call" );
+                Wa( "// oReqCtx.setResponse with response" );
+                Wa( "// parameters if return immediately or call" );
+            }
+            else
+            {
+                Wa( "// Asynchronouse handler with no-reply. " );
+                Wa( "// Make sure to call" );
+            }
             Wa( "// oReqCtx.onServiceComplete in the future" );
-            Wa( "// if return RC.STATUS_PENDING." );
+            Wa( "// if returning RC.STATUS_PENDING." );
         }
         CCOUT << "return RC.ERROR_NOT_IMPL;";
         BLOCK_CLOSE;
 
-        if( !m_pNode->IsAsyncs() ||
-            m_pNode->IsNoReply() )
+        if( !m_pNode->IsAsyncs() )
         {
             NEW_LINE;
             break;
@@ -2698,10 +2708,10 @@ gint32 CImplJavaMethodSvr::Output()
         }
         NEW_LINE;
         BLOCK_OPEN;
-        CCOUT << "// " << strIfName << "::" << strName << "is canceld.";;
+        CCOUT << "// " << strIfName << "::" << strName << " is canceled.";;
         NEW_LINE;
-        Wa( "// make change here to do the clean up work if" );
-        Wa( "// the requests timed out or canceled" );
+        Wa( "// Optionally make change here to do the cleanup" );
+        Wa( "// work if the request was timed-out or canceled" );
         CCOUT << "return;";
         BLOCK_CLOSE;
         NEW_LINE;
@@ -2821,6 +2831,8 @@ gint32 CImplJavaMethodCliBase::OutputReqSender()
     stdstr strHint;
     if( m_pNode->IsAsyncp() )
         strHint = "async-req";
+    else
+        strHint = "sync-req";
     if( m_pNode->IsNoReply() )
         if( strHint.empty() )
             strHint = "no-reply";
@@ -3418,11 +3430,11 @@ int CImplJavaSvcSvr::Output()
     do{
         stdstr strName = m_pNode->GetName();
         CCOUT << "public class " << strName
-            << "Svr extends " << strName << "svrbase";
+            << "svr extends " << strName << "svrbase";
         NEW_LINE;
         BLOCK_OPEN;
 
-        CCOUT << "public " << strName << "Svr( ObjPtr pIoMgr,";
+        CCOUT << "public " << strName << "svr( ObjPtr pIoMgr,";
         NEW_LINE;
         Wa( "    String strDesc, String strSvrObj )" );
         Wa( "{ super( pIoMgr, strDesc, strSvrObj ); }" );
@@ -3476,11 +3488,11 @@ int CImplJavaSvcCli::Output()
     do{
         stdstr strName = m_pNode->GetName();
         CCOUT << "public class " << strName
-            << "Cli extends " << strName << "clibase";
+            << "cli extends " << strName << "clibase";
         NEW_LINE;
         BLOCK_OPEN;
 
-        CCOUT << "public " << strName << "Cli( ObjPtr pIoMgr,";
+        CCOUT << "public " << strName << "cli( ObjPtr pIoMgr,";
         NEW_LINE;
         Wa( "    String strDesc, String strSvrObj )" );
         Wa( "{ super( pIoMgr, strDesc, strSvrObj ); }" );
@@ -3723,7 +3735,7 @@ gint32 CJavaExportReadme::Output()
 
         Wa( "### Introduction to the files:" );
 
-        CCOUT << "* **MainCli.java**, **MainSvr.java**: "
+        CCOUT << "* **maincli.java**, **mainsvr.java**: "
             << "Containing defintion of `main()` method for client, as the main "
             << "entry for client program "
             << "and definition of `main()` function server program respectively. ";
@@ -3736,7 +3748,7 @@ gint32 CJavaExportReadme::Output()
 
         for( auto& elem : vecSvcNames )
         {
-            CCOUT << "* **" << elem << "Svr.java**, **" << elem << "Cli.java**: "
+            CCOUT << "* **" << elem << "svr.java**, **" << elem << "cli.java**: "
                 << "Containing the declarations and definitions of all the server/client side "
                 << "methods that need to be implemented by you, mainly the request/event handlers, "
                 << "for service `" << elem << "`.";
@@ -3964,7 +3976,7 @@ gint32 CImplJavaMainCli::Output()
     Wa( "import java.util.concurrent.TimeUnit;" );
     gint32 ret = 0;
     do{
-        CCOUT << "public class MainCli";
+        CCOUT << "public class maincli";
         NEW_LINE;
         BLOCK_OPEN;
         Wa( "public static JavaRpcContext m_oCtx;" );
@@ -3983,7 +3995,7 @@ gint32 CImplJavaMainCli::Output()
         stdstr strSvc = pSvc->GetName();
 
         Wa( "// create the service object" );
-        CCOUT << strSvc << "Cli oProxy = new " << strSvc << "Cli(";
+        CCOUT << strSvc << "cli oSvcCli = new " << strSvc << "cli(";
         NEW_LINE;
             Wa( "    m_oCtx.getIoMgr(), " );
             CCOUT << "    \"./"<< g_strAppName<<"desc.json\",";
@@ -3992,12 +4004,12 @@ gint32 CImplJavaMainCli::Output()
 
         NEW_LINES( 2 );
         Wa( "// check if there are errors" );
-        Wa( "if( RC.ERROR( oProxy.getError() ) )" );
+        Wa( "if( RC.ERROR( oSvcCli.getError() ) )" );
         Wa( "    return;" );
 
         NEW_LINE;
         Wa( "// start the proxy" );
-        Wa( "int ret = oProxy.start();" );
+        Wa( "int ret = oSvcCli.start();" );
         Wa( "if( RC.ERROR( ret ) )" );
         Wa( "    return;" );
         
@@ -4005,13 +4017,13 @@ gint32 CImplJavaMainCli::Output()
         CCOUT << "do{";
         INDENT_UPL;
         Wa( "// test remote server is not online" );
-        Wa( "while( oProxy.getState() == RC.stateRecovery )" );
+        Wa( "while( oSvcCli.getState() == RC.stateRecovery )" );
         Wa( "try{" );
         Wa( "    TimeUnit.SECONDS.sleep(1);" );
         Wa( "}" );
         Wa( "catch( InterruptedException e ){};" );
         NEW_LINE;
-        Wa( "if( oProxy.getState() != RC.stateConnected )" );
+        Wa( "if( oSvcCli.getState() != RC.stateConnected )" );
         Wa( "{ ret = RC.ERROR_STATE;break;}" );
         NEW_LINE;
         Wa( "/*// request something from the server" );
@@ -4033,7 +4045,7 @@ gint32 CImplJavaMainCli::Output()
         }
 
         CMethodDecl* pmd = pMethod;
-        CCOUT << "JRetVal jret = oProxy." << pmd->GetName();
+        CCOUT << "JRetVal jret = oSvcCli." << pmd->GetName();
         ObjPtr pInArgs = pmd->GetInArgs();
         gint32 iInCount = oau.GetArgCount( pInArgs );
         if( iInCount == 0 && pmd->IsAsyncp() )
@@ -4064,6 +4076,8 @@ gint32 CImplJavaMainCli::Output()
         Wa( "*/" );
         INDENT_DOWNL;
         CCOUT << "}while( false );";
+        NEW_LINES(2);
+        CCOUT << "return;";
         BLOCK_CLOSE; 
         BLOCK_CLOSE; 
 
@@ -4094,7 +4108,7 @@ gint32 CImplJavaMainSvr::Output()
     Wa( "import java.util.concurrent.TimeUnit;" );
     gint32 ret = 0;
     do{
-        CCOUT << "public class MainSvr";
+        CCOUT << "public class mainsvr";
         NEW_LINE;
         BLOCK_OPEN;
         Wa( "public static JavaRpcContext m_oCtx;" );
@@ -4113,7 +4127,7 @@ gint32 CImplJavaMainSvr::Output()
         stdstr strSvc = pSvc->GetName();
 
         Wa( "// create the service object" );
-        CCOUT << strSvc << "Svr oServer = new " << strSvc << "Svr(";
+        CCOUT << strSvc << "svr oSvcSvr = new " << strSvc << "svr(";
         NEW_LINE;
             Wa( "    m_oCtx.getIoMgr(), " );
             CCOUT << "    \"./"<< g_strAppName<<"desc.json\",";
@@ -4121,10 +4135,10 @@ gint32 CImplJavaMainSvr::Output()
             CCOUT << "    \""<< strSvc << "\" );";
         NEW_LINES( 2 );
         Wa( "// check if there are errors" );
-        Wa( "if( RC.ERROR( oServer.getError() ) )" );
+        Wa( "if( RC.ERROR( oSvcSvr.getError() ) )" );
         Wa( "    return;" );
         NEW_LINE;
-        Wa( "int ret = oServer.start();" );
+        Wa( "int ret = oSvcSvr.start();" );
         Wa( "if( RC.ERROR( ret ) )" );
         Wa( "    return;" );
         
@@ -4136,12 +4150,14 @@ gint32 CImplJavaMainSvr::Output()
         Wa( "// waiting logic if necessary. The requests" );
         Wa( "// handling is going on in the background" );
         Wa( "TimeUnit.SECONDS.sleep(1);" );
-        Wa( "if( oServer.getState() != RC.stateConnected )" );
+        Wa( "if( oSvcSvr.getState() != RC.stateConnected )" );
         CCOUT << "    break;";
         INDENT_DOWNL;
         Wa( "}" );
         Wa( "catch( InterruptedException e ){}" );
         CCOUT << "}while( true );";
+        NEW_LINES(2);
+        CCOUT << "return;";
         BLOCK_CLOSE; 
         BLOCK_CLOSE; 
 

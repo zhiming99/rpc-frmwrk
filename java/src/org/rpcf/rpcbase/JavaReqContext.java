@@ -31,5 +31,5 @@ public class JavaReqContext
     { return 0; }
         
     public Object[] getResponse()
-    { return null; }
+    { return new Object[ 0 ]; }
 }

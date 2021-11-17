@@ -77,7 +77,7 @@ def mainsvr() :
                             oStmSvr.hChannel, buf )
 
                     elif oStmSvr.curSize < 0 :
-                        print( "error size is %d" % oStmSvr.size )
+                        print( "error size is %d" % oStmSvr.curSize )
                         ret = -errno.ERANGE
                         break
 
@@ -85,7 +85,7 @@ def mainsvr() :
 
                 if oStmSvr.curTest == 2 :
 
-                    #upload test
+                    #download test
                     ret = 0
                     while oStmSvr.curSize > 0 :
                         size = oStmSvr.curSize
@@ -120,7 +120,7 @@ def mainsvr() :
                             OutputMsg( ret[ 1 ].decode() )
 
                     elif oStmSvr.curSize < 0 :
-                        print( "error size is %d" % oStmSvr.size )
+                        print( "error size is %d" % oStmSvr.curSize )
                         ret = -errno.ERANGE
                         break
                     

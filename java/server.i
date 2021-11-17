@@ -456,16 +456,45 @@ class CJavaServerImpl :
         CParamList oResp;
         CJavaServerImpl* pImpl = static_cast
             < CJavaServerImpl* >( $self );
+        bool bNoReply = false;
         do{
-
             if( pCallback.IsEmpty() )
             {
                 ret = -EINVAL;
                 break;
             }
+
             oResp[ propReturnValue ] =
                 ( guint32 )iRet;
             if( ERROR( iRet ) )
+                break;
+
+            CCfgOpenerObj oInv(
+                ( CObjBase* )pCallback );
+            ObjPtr pObj;
+            IConfigDb* pCfg = nullptr;
+
+            ret = oInv.GetObjPtr( propReqPtr, pObj );
+            if( SUCCEEDED( ret ) )
+            {
+                pCfg = pObj;
+                if( pCfg != nullptr )
+                {
+                    CReqOpener oReq( pCfg );
+                    guint32 dwCallFlags = 0;
+                    ret = oReq.GetCallFlags(
+                        dwCallFlags );
+
+                    if( SUCCEEDED( ret ) )
+                    {
+                        dwCallFlags &= CF_WITH_REPLY;
+                        if( dwCallFlags > 0 )
+                            bNoReply = true;
+                    }
+                }
+            }
+
+            if( bNoReply )
                 break;
 
             std::vector< BufPtr > vecResp;
@@ -483,10 +512,21 @@ class CJavaServerImpl :
                 ( guint32 )dwSeriProto;
 
         }while( 0 );
+
         if( SUCCEEDED( ret ) )
         {
-            pImpl->OnServiceComplete(
-                oResp.GetCfg(), pCallback );
+            if( bNoReply )
+            {
+                // don't set the response parameter
+                IEventSink* pEvt = pCallback;
+                pEvt && pEvt->OnEvent(
+                    eventTaskComp, 0, 0, 0 );
+            }
+            else
+            {
+                pImpl->OnServiceComplete(
+                    oResp.GetCfg(), pCallback );
+            }
         }
         return ret;
     }

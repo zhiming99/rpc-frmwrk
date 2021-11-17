@@ -33,7 +33,7 @@ def SyncTests( oProxy ) :
     pCfg = oParams.GetCfgAsObj();
 
     #set a string to property 0
-    oParams.PushStr( "echoPtr" );
+    oParams.PushStr( "echoCfg" );
     ret = oProxy.EchoCfg( pCfg );
 
     if ret[ 0 ] == 0 :
