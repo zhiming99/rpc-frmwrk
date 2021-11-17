@@ -151,10 +151,10 @@ On a successful compile of the above sample ridl file, `ridlc` will generate the
 * **run:** you can run `python3 mainsvr.py` and `python3 maincli.py` to start the server and client. Before the first run after `ridlc`, make sure to run `make` to update the configuration file, that is, the `exampledesc.json` file in this context.
 
 ### Output for Java Project
-* **MainCli.java**, **MainSvr.java**: Containing defintion of `main()` method for client, as the main entry for client program and definition of `main()` function server program respectively. 
+* **maincli.java**, **mainsvr.java**: Containing defintion of `main()` method for client, as the main entry for client program and definition of `main()` function server program respectively. 
 And you can make changes to the files to customize the program. The `ridlc` will not touch them if they exist in the project directory, when it runs again, and put the newly generated code in the file with '.new' as the name extension.
 
-* **SimpFileSvcSvr.java**, **SimpFileSvcCli.java**: Containing the declarations and definitions of all the server/client side methods that need to be implemented by you, mainly the request/event handlers, for service `SimpFileSvc`.
+* **SimpFileSvcsvr.java**, **SimpFileSvccli.java**: Containing the declarations and definitions of all the server/client side methods that need to be implemented by you, mainly the request/event handlers, for service `SimpFileSvc`.
 And you need to make changes to the files to implement the functionality for server/client. The `ridlc` will not touch them if they exist in the project directory, when it runs again, and put the newly generated code to `SimpFileSvc.java.new`.
 
 * *SimpFileSvcsvrbase.java*, *SimpFileSvcclibase.java* : Containing the declarations and definitions of all the server/client side utilities and helpers for the interfaces of service `SimpFileSvc`.
