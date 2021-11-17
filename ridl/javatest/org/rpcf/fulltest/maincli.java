@@ -319,7 +319,7 @@ public class maincli
             // create the service object
             oSvcCli = new SimpFileSvccli(
                     m_oCtx.getIoMgr(),
-                    "./exampledesc.json",
+                    "./fulltestdesc.json",
                     "SimpFileSvc");
 
             // check if there are errors
@@ -329,7 +329,7 @@ public class maincli
             // create the service object
             oStmCli = new StreamSvccli(
                     m_oCtx.getIoMgr(),
-                    "./exampledesc.json",
+                    "./fulltestdesc.json",
                     "StreamSvc");
 
             // check if there are errors

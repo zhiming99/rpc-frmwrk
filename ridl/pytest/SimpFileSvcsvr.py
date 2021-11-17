@@ -3,7 +3,7 @@ from typing import Tuple
 from rpcf.rpcbase import *
 from rpcf.proxy import *
 from seribase import CSerialBase
-from examplestructs import *
+from fullteststructs import *
 import errno
 
 from SimpFileSvcsvrbase import *

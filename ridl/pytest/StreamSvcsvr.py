@@ -6,7 +6,7 @@ from seribase import CSerialBase
 import errno
 
 from StreamSvcsvrbase import *
-from examplestructs import *
+from fullteststructs import *
 
 def BuildFF( fileName : str ) :
     fi = FILE_INFO()

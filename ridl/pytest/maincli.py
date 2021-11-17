@@ -5,7 +5,7 @@ import errno
 from rpcf.proxy import OutputMsg
 from SimpFileSvccli import CSimpFileSvcProxy
 from StreamSvccli import CStreamSvcProxy
-from examplestructs import *
+from fullteststructs import *
 import time
 import threading as tr
 
@@ -246,14 +246,14 @@ def maincli() :
         with oContext :
             print( "start to work here..." )
             oProxy = CSimpFileSvcProxy( oContext.pIoMgr,
-                './exampledesc.json',
+                './fulltestdesc.json',
                 'SimpFileSvc' )
             ret = oProxy.GetError()
             if ret < 0 :
                 return ret
             
             oProxy2 = CStreamSvcProxy( oContext.pIoMgr,
-                './exampledesc.json',
+                './fulltestdesc.json',
                 'StreamSvc' )
             ret = oProxy2.GetError()
             if ret < 0 :

@@ -11,14 +11,14 @@ def mainsvr() :
     with oContext :
         print( "start to work here..." )
         oFileSvr = CSimpFileSvcServer( oContext.pIoMgr,
-            './exampledesc.json',
+            './fulltestdesc.json',
             'SimpFileSvc' )
         ret = oFileSvr.GetError()
         if ret < 0 :
             return ret
 
         oStmSvr = CStreamSvcServer( oContext.pIoMgr,
-            './exampledesc.json',
+            './fulltestdesc.json',
             'StreamSvc' )
         ret = oStmSvr.GetError()
         if ret < 0 :
@@ -127,6 +127,6 @@ def mainsvr() :
 
     return ret
 
-from examplestructs import *
+from fullteststructs import *
 ret = mainsvr()
 quit( ret )

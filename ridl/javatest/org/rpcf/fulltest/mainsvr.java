@@ -21,7 +21,7 @@ public class mainsvr
             // create the service object
             oSvcSvr = new SimpFileSvcsvr(
                     m_oCtx.getIoMgr(),
-                    "./exampledesc.json",
+                    "./fulltestdesc.json",
                     "SimpFileSvc");
 
             // check if there are errors
@@ -30,7 +30,7 @@ public class mainsvr
             // create the service object
             oStmSvr = new StreamSvcsvr(
                     m_oCtx.getIoMgr(),
-                    "./exampledesc.json",
+                    "./fulltestdesc.json",
                     "StreamSvc");
             if (RC.ERROR(oStmSvr.getError()))
                 break;
