@@ -1,5 +1,5 @@
 // must have statement
-appname "example";
+appname "fulltest";
 
 include "tinyif.ridl"
 
