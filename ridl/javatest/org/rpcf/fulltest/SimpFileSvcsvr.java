@@ -14,7 +14,7 @@ public class SimpFileSvcsvr extends SimpFileSvcsvrbase
         String strDesc, String strSvrObj )
     { super( pIoMgr, strDesc, strSvrObj ); }
     
-    // ITinyInterface::Ping 
+    // ITinyInterface::Ping sync-handler
     public int Ping(
         JavaReqContext oReqCtx )
     {
@@ -22,7 +22,7 @@ public class SimpFileSvcsvr extends SimpFileSvcsvrbase
         return RC.STATUS_SUCCESS;
     }
     
-    // ITinyInterface::KAReq no-reply
+    // ITinyInterface::KAReq sync-handler no-reply
     public int KAReq(
         JavaReqContext oReqCtx,
         long qwTaskId )
@@ -53,7 +53,7 @@ public class SimpFileSvcsvr extends SimpFileSvcsvrbase
         return;
     }
     
-    // IEchoThings::Echo 
+    // IEchoThings::Echo sync-handler
     public int Echo(
         JavaReqContext oReqCtx,
         String strText )
@@ -64,7 +64,7 @@ public class SimpFileSvcsvr extends SimpFileSvcsvrbase
         return RC.STATUS_SUCCESS;
     }
     
-    // IEchoThings::EchoUnknown 
+    // IEchoThings::EchoUnknown sync-handler
     public int EchoUnknown(
         JavaReqContext oReqCtx,
         byte[] pBuf )
@@ -74,7 +74,7 @@ public class SimpFileSvcsvr extends SimpFileSvcsvrbase
         return RC.STATUS_SUCCESS;
     }
     
-    // IEchoThings::EchoCfg 
+    // IEchoThings::EchoCfg sync-handler
     public int EchoCfg(
         JavaReqContext oReqCtx,
         ObjPtr pObj )
@@ -84,7 +84,7 @@ public class SimpFileSvcsvr extends SimpFileSvcsvrbase
         return RC.STATUS_SUCCESS;
     }
     
-    // IEchoThings::EchoMany 
+    // IEchoThings::EchoMany sync-handler
     public int EchoMany(
         JavaReqContext oReqCtx,
         int i1,
@@ -109,7 +109,7 @@ public class SimpFileSvcsvr extends SimpFileSvcsvrbase
     {
         // IEchoThings::EchoMany is canceled.
         // Optionally make change here to do the cleanup
-        // here if the request was timed-out or canceled
+        // work if the request was timed-out or canceled
         return;
     }
     
@@ -128,7 +128,7 @@ public class SimpFileSvcsvr extends SimpFileSvcsvrbase
     {
         // IEchoThings::EchoStruct is canceled.
         // Optionally make change here to do the cleanup
-        // here if the request was timed-out or canceled
+        // work if the request was timed-out or canceled
         return;
     }
     
@@ -150,7 +150,7 @@ public class SimpFileSvcsvr extends SimpFileSvcsvrbase
     {
         // IEchoThings::EchoTypedef is canceled.
         // Optionally make change here to do the cleanup
-        // here if the request was timed-out or canceled
+        // work if the request was timed-out or canceled
         return;
     }
     
@@ -169,7 +169,7 @@ public class SimpFileSvcsvr extends SimpFileSvcsvrbase
     {
         // IEchoThings::EchoHandle is canceled.
         // Optionally make change here to do the cleanup
-        // here if the request was timed-out or canceled
+        // work if the request was timed-out or canceled
         return;
     }
 }

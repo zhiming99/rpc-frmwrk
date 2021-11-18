@@ -69,7 +69,7 @@ public class StreamSvcsvr extends StreamSvcsvrbase
         return;
     }
     
-    // IFileTransfer::GetFileInfo 
+    // IFileTransfer::GetFileInfo sync-handler
     public int GetFileInfo(
         JavaReqContext oReqCtx,
         String szFileName,
@@ -89,7 +89,7 @@ public class StreamSvcsvr extends StreamSvcsvrbase
     {
         // IFileTransfer::GetFileInfo is canceled.
         // Optionally make change here to do the cleanup
-        // here if the request was timed-out or canceled
+        // work if the request was timed-out or canceled
         return;
     }
     
@@ -122,7 +122,7 @@ public class StreamSvcsvr extends StreamSvcsvrbase
         return;
     }
     
-    // IChat::SpecifyChannel 
+    // IChat::SpecifyChannel sync-handler
     public int SpecifyChannel(
         JavaReqContext oReqCtx,
         long hChannel )
