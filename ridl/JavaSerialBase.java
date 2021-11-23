@@ -26,13 +26,11 @@ package org.rpcf.XXXXX;
 import java.lang.String;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.List;
-import java.util.ArrayList;
 import java.nio.ByteBuffer;
-import java.util.Map.Entry;
 import java.nio.charset.StandardCharsets;
 import java.util.NoSuchElementException;
 import org.rpcf.rpcbase.*;
+import java.lang.reflect.Array;
 
 abstract public class JavaSerialBase
 {
@@ -81,6 +79,8 @@ abstract public class JavaSerialBase
         int iCount = val.length;
         int iBytes = iCount;
         serialInt32( buf, offset, iBytes );
+        offset[ 0 ] += 4;
+        serialInt32( buf, offset, iBytes );
         if( iCount == 0 )
             return 0;
 
@@ -99,7 +99,7 @@ abstract public class JavaSerialBase
     public int serialInt8Arr(
         BufPtr buf, int[] offset, byte[] val )
     {
-        offset[0] = buf.SerialByteArray( offset[0], val );
+        offset[0] = buf.SerialInt8Arr( offset[0], val );
         if( RC.ERROR( offset[0] ) )
             return offset[0];
         return 0;
@@ -236,6 +236,11 @@ abstract public class JavaSerialBase
                 break;
             }
         case 'b':
+            {
+                ret = serialBoolArr(
+                    buf, offset, ( boolean[] )val );
+                break;
+            }
         case 'B':
             {
                 ret = serialInt8Arr(
@@ -380,9 +385,7 @@ abstract public class JavaSerialBase
 
             if( sigElem.length() == 1 )
             {
-                Character ch =
-                    sigElem.charAt( 0 );
-
+                Character ch = sigElem.charAt( 0 );
                 if( isPrimType( ch ) )
                 {
                     ret = serialPrimArray( buf,
@@ -433,7 +436,7 @@ abstract public class JavaSerialBase
     {
         int sigLen = sig.length();
         Character ch = sig.charAt( 0 );
-        if( sig.charAt( 1 ) != '[' )
+        if( ch != '[' )
             return -RC.EINVAL;
         else if( sig.charAt( sigLen -1 ) != ']' )
             return -RC.EINVAL;
@@ -462,11 +465,14 @@ abstract public class JavaSerialBase
                 Object key = elem.getKey();
                 Object value = elem.getValue();
                 ret = serialElem(
-                    buf, offset, key, sigElem.substring( 0, 1 ) );
+                    buf, offset, key,
+                    sigElem.substring( 0, 1 ) );
                 if( ret < 0 )
                     break;
+
                 ret = serialElem(
-                    buf, offset, value, sigElem.substring( 1 ) );
+                    buf, offset, value,
+                    sigElem.substring( 1 ) );
                 if( ret < 0 )
                     break;
             }
@@ -509,8 +515,7 @@ abstract public class JavaSerialBase
             return -RC.ENOENT;
 
         ISerialElem o = m_SerialFuncs.get( ch );
-        o.serialize( buf, offset, val );
-        return 0;
+        return o.serialize( buf, offset, val );
     }
 
     public long deserialInt64( ByteBuffer buf )
@@ -547,7 +552,7 @@ abstract public class JavaSerialBase
     public long[] deserialInt64Arr( ByteBuffer buf )
     {
         int iBytes = deserialInt32( buf );
-        int count = iBytes >> 3;
+        int count = deserialInt32( buf );
         if( iBytes > getMaxSize() || iBytes < 0 )
             throw new IndexOutOfBoundsException();
         long[] vals = new long[ count ];
@@ -559,7 +564,7 @@ abstract public class JavaSerialBase
     public int[] deserialInt32Arr( ByteBuffer buf )
     {
         int iBytes = deserialInt32( buf );
-        int count = iBytes >> 2;
+        int count = deserialInt32( buf );
         if( iBytes > getMaxSize() || iBytes < 0 )
             throw new IndexOutOfBoundsException();
         int[] vals = new int[ count ];
@@ -571,7 +576,7 @@ abstract public class JavaSerialBase
     public short[] deserialInt16Arr( ByteBuffer buf )
     {
         int iBytes = deserialInt32( buf );
-        int count = iBytes >> 1;
+        int count = deserialInt32( buf );
         if( iBytes > getMaxSize() || iBytes < 0 )
             throw new IndexOutOfBoundsException();
         short[] vals = new short[ count ];
@@ -582,7 +587,7 @@ abstract public class JavaSerialBase
 
     public boolean[] deserialBoolArr( ByteBuffer buf )
     {
-        byte[] bytes = deserialBuf( buf );
+        byte[] bytes = deserialInt8Arr( buf );
         boolean[] bools = new boolean[ bytes.length ];
         for( int i = 0; i < bytes.length; i++ )
         {
@@ -596,7 +601,13 @@ abstract public class JavaSerialBase
 
     public byte[] deserialInt8Arr( ByteBuffer buf )
     {
-        return deserialBuf( buf );
+        int iBytes = deserialInt32( buf );
+        int count = deserialInt32( buf );
+        if( iBytes > getMaxSize() || iBytes < 0 )
+            throw new IndexOutOfBoundsException();
+        byte[] vals = new byte[ count ];
+        buf.get( vals );
+        return vals;
     }
 
     public float[] deserialFloatArr( ByteBuffer buf )
@@ -634,6 +645,9 @@ abstract public class JavaSerialBase
         if( iBytes > getMaxSize() || iBytes < 0 )
             throw new IndexOutOfBoundsException();
 
+        if( count != ( iBytes >> 3 ) )
+            throw new IndexOutOfBoundsException();
+
         long[] vals = new long[ count ];
         for( int i = 0; i < count; i++ )
             vals[ i ] = deserialHStream( buf );
@@ -644,56 +658,63 @@ abstract public class JavaSerialBase
         ByteBuffer buf, String strSig )
     {
         if( strSig.length() == 0 )
-            return -RC.EINVAL;
+            throw new IllegalArgumentException();
 
         int ret = 0;
+        Object arrObj = null;
         switch( strSig.charAt( 0 ) )
         {
         case 'Q':
         case 'q':
+            {
+                arrObj = deserialInt64Arr( buf );
+                break;
+            }
         case 'h':
             {
-                long[] val =
-                    deserialInt64Arr( buf );
+                long[] val = deserialHStreamArr( buf );
                 break;
             }
         case 'D':
         case 'd':
             {
-                int[] val =
-                    deserialInt32Arr( buf );
+                arrObj = deserialInt32Arr( buf );
                 break;
             }
         case 'W':
         case 'w':
             {
-                short[] val =
-                    deserialInt16Arr( buf );
+                arrObj = deserialInt16Arr( buf );
                 break;
             }
         case 'f':
             {
-                float[] val =
-                    deserialFloatArr( buf );
+                arrObj = deserialFloatArr( buf );
                 break;
             }
         case 'F':
             {
-                double[] val =
-                    deserialDoubleArr( buf );
+                arrObj = deserialDoubleArr( buf );
                 break;
             }
         case 'b':
+            {
+                arrObj = deserialBoolArr( buf );
+                break;
+            }
         case 'B':
             {
-                byte[] val = deserialBuf( buf );
+                arrObj = deserialInt8Arr( buf );
                 break;
             }
         default :
            ret = -RC.EINVAL;
            break;
         }
-        return ret; 
+        if( RC.ERROR( ret ) )
+            throw new RuntimeException(
+                "Error deserialPrimArray" + ret );
+        return arrObj; 
     }
 
     public String deserialString( ByteBuffer buf )
@@ -707,7 +728,7 @@ abstract public class JavaSerialBase
 
         byte[] b = new byte[ iSize ];
         buf.get( b );
-        return new String( b );
+        return new String( b, StandardCharsets.UTF_8 );
     }
 
     public byte[] deserialBuf( ByteBuffer buf )
@@ -767,6 +788,46 @@ abstract public class JavaSerialBase
         return oStruct;
     }
 
+    public <E_ extends Object>
+        Object deserialArrayInternal(
+        ByteBuffer buf, String sig,
+        Class< E_ > elemClass )
+    {
+        int sigLen = sig.length();
+        String sigElem =
+            sig.substring( 1, sigLen - 1 );
+
+        int iBytes = deserialInt32( buf );
+        int count = deserialInt32( buf );
+        if( iBytes > getMaxSize() || iBytes < 0 )
+            throw new IndexOutOfBoundsException();
+
+        if( count < 0 || count > iBytes )
+            throw new IndexOutOfBoundsException();
+
+        E_[] objArr = ( E_[] )Array.newInstance(
+            elemClass, count );
+
+        int beginPos = buf.position();
+        if( count == 0 )
+            return objArr;
+
+        for( int i = 0; i < count; i++ )
+        {
+            E_ oElem =
+                ( E_ )deserialElem( buf, sigElem );
+
+            if( oElem == null )
+                throw new NullPointerException();
+
+            objArr[ i ] = oElem;
+        }
+        if( buf.position() - beginPos != iBytes )
+            throw new IndexOutOfBoundsException();
+
+        return objArr;
+    }
+
     public Object deserialArray( ByteBuffer buf, String sig )
     {
         int sigLen = sig.length();
@@ -781,42 +842,15 @@ abstract public class JavaSerialBase
 
         if( sigElem.length() == 1 )
         {
-            if( isPrimType(
-                sigElem.charAt( 0 ) ) )
+            Character ch = sigElem.charAt( 0 );
+            if( isPrimType( ch ) )
             {
                 return deserialPrimArray(
                     buf, sigElem );
             }
         }
-
-        int iBytes = deserialInt32( buf );
-        int count = deserialInt32( buf );
-        if( iBytes > getMaxSize() || iBytes < 0 )
-            throw new IndexOutOfBoundsException();
-
-        if( count < 0 || count > iBytes )
-            throw new IndexOutOfBoundsException();
-
-        Object[] objArr = new Object[ count ];
-
-        int beginPos = buf.position();
-        if( count == 0 )
-            return objArr;
-
-        for( int i = 0; i < count; i++ )
-        {
-            Object oElem =
-                deserialElem( buf, sigElem );
-
-            if( oElem == null )
-                throw new NullPointerException();
-
-            objArr[ i ] = oElem;
-        }
-        if( buf.position() - beginPos != iBytes )
-            throw new IndexOutOfBoundsException();
-
-        return objArr;
+        return DeserialArrays.deserialArray(
+            this, buf, sig );
     }
 
     protected int verifyValSig( String sigVal )
@@ -905,7 +939,7 @@ abstract public class JavaSerialBase
         return ret;
     }
     protected int retrieveKeyValSig(
-        String sigElem, String sigKey, String sigVal )
+        String sigElem, String[] strRet )
     {
         int sigLen = sigElem.length();
         if( sigLen == 0 )
@@ -915,6 +949,7 @@ abstract public class JavaSerialBase
         int ret = 0;
         Character ch = sigElem.charAt( 0 );
         Character c;
+        String sigVal = "", sigKey = "";
         switch( ch )
         {
         case '[':
@@ -994,7 +1029,11 @@ abstract public class JavaSerialBase
             break;
             
         }
-        return ret;
+        if( RC.ERROR( ret ) )
+            return ret;
+        strRet[ 1 ] = sigVal;
+        strRet[ 0 ] = sigKey;
+        return 0;
     }
 
     public Map< ?, ? > deserialMap(
@@ -1031,12 +1070,16 @@ abstract public class JavaSerialBase
 
         String strKey = "", strVal = "";
 
+        String[] strRet = new String[ 2 ];
         int ret = retrieveKeyValSig(
-            sigElem, strKey, strVal );
+            sigElem, strRet );
 
         if( RC.ERROR( ret ) )
             throw new IllegalArgumentException(
             "deserialMap: invalid signature");
+
+        strKey = strRet[ 0 ];
+        strVal = strRet[ 1 ];
 
         Map< K_, V_ > mapRet =
             new HashMap< K_, V_ >();

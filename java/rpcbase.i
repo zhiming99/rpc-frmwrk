@@ -1104,8 +1104,7 @@ class ObjPtr
             memcpy( &dwClsid, pBuf, sizeof( dwClsid ) );
             dwClsid = ntohl( dwClsid );
 
-            ObjPtr* ppObj = nullptr;
-            ppObj = new ObjPtr( nullptr, false );
+            ObjPtr& pObj = *$self;
 
             guint32 dwSize = 0;
             memcpy( &dwSize, 
@@ -1117,7 +1116,7 @@ class ObjPtr
 
             if( dwClsid != clsid( Invalid ) )
             {
-                ret = ppObj->NewObj(
+                ret = pObj.NewObj(
                     ( EnumClsid )dwClsid );
                 if( ERROR( ret ) )
                     break;
@@ -1133,27 +1132,13 @@ class ObjPtr
                     break;
                 }
 
-                ret = ( *ppObj )->Deserialize(
-                    pBuf, dwSize );
+                ret = pObj->Deserialize( pBuf, dwSize );
                 if( ret == -ENOTSUP )
-                {
                     ret = -EINVAL;
-                    break;
-                }
 
                 if( ERROR( ret ) )
                     break;
 
-                jobject jop = NewObjPtr(
-                    jenv, ( jlong )ppObj, true );
-                if( jop == nullptr )
-                {
-                    delete jop;
-                    ret = -EFAULT;
-                    break;
-                }
-
-                AddElemToJRet( jenv, jret, jop );
                 jobject jNewOff = NewInt(
                     jenv, dwSize + dwOffset );
                 if( jNewOff == nullptr )
@@ -1505,7 +1490,7 @@ class BufPtr
         if( ERROR( ret ) )
             return ret;
         jenv->GetByteArrayRegion( pArr,
-            len, 0, ( jbyte* )pBuf->ptr() );
+            0, len, ( jbyte* )pBuf->ptr() );
         return ret;
     }
 
@@ -1615,7 +1600,7 @@ class BufPtr
         SerialIntNoCheck( pBuf, iPos, len );
         if( len == 0 )
             return iPos + 4;
-        jenv->GetByteArrayRegion( pArr, len, 0,
+        jenv->GetByteArrayRegion( pArr, 0, len,
             ( jbyte* )( pBuf->ptr() + iPos + 4 ) );
         
         return iPos + len + 4;
@@ -1824,6 +1809,54 @@ class BufPtr
         return iPos + pObjBuf->size();
     }
 
+    gint32 SerialInt8Arr(
+        JNIEnv *jenv, int iPos, jbyteArray val )
+    { 
+        if( jenv == nullptr || val == nullptr )
+            return -EINVAL;
+        gint32 ret = 0;
+        gint32 iNewPos = 0;
+        do{
+            constexpr gint32 iHeader = 8;
+            jsize iCount =
+                jenv->GetArrayLength( val );
+
+            BufPtr& pBuf = *$self;
+            ret = CheckAndResize( pBuf, iPos,
+                iCount * sizeof( gint8 ) + iHeader );
+            if( ERROR( ret ) )
+                break;
+
+            SerialIntNoCheck( pBuf,
+                iPos, iCount * sizeof( gint8 ) );
+
+            SerialIntNoCheck( pBuf,
+                iPos + sizeof( guint32 ), iCount );
+            if( iCount == 0 )
+            {
+                iNewPos = iPos + iHeader;
+                break;
+            }
+
+            jbyte* vals =
+                jenv->GetByteArrayElements( val, 0 );
+
+            gint8* pInt =
+                ( gint8* )( pBuf->ptr() + iPos + iHeader );
+            for( gint32 i = 0; i < iCount; i++ )
+                *pInt++ = vals[ i ];
+
+            iNewPos = iPos +
+                iHeader + iCount * sizeof( gint8 );
+
+            jenv->ReleaseByteArrayElements(
+                val, vals, 0);
+        }while( 0 );
+        if( ERROR( ret ) )
+            return ret;
+        return iNewPos;
+    }
+
     gint32 SerialShortArr(
         JNIEnv *jenv, int iPos, jshortArray val )
     { 
@@ -1832,33 +1865,44 @@ class BufPtr
         gint32 ret = 0;
         gint32 iNewPos = 0;
         do{
+            constexpr gint32 iHeader = 8;
             jsize iCount =
                 jenv->GetArrayLength( val );
 
             BufPtr& pBuf = *$self;
             ret = CheckAndResize( pBuf, iPos,
-                iCount * sizeof( gint16 ) + 4 );
+                iCount * sizeof( gint16 ) + iHeader );
             if( ERROR( ret ) )
                 break;
 
-            SerialIntNoCheck( pBuf, iPos, iCount * 4 );
+            SerialIntNoCheck( pBuf,
+                iPos, iCount * sizeof( gint16 ) );
+
+            SerialIntNoCheck( pBuf,
+                iPos + sizeof( guint32 ), iCount );
             if( iCount == 0 )
             {
-                iNewPos = iPos + 4;
+                iNewPos = iPos + iHeader;
                 break;
             }
+
 
             jshort* vals =
                 jenv->GetShortArrayElements( val, 0 );
 
-            gint16* pInt =
-                ( gint16* )( pBuf->ptr() + iPos + 4 );
+            gint8* pInt =
+                ( gint8* )( pBuf->ptr() + iPos + iHeader );
             for( gint32 i = 0; i < iCount; i++ )
             {
-                *pInt++= htons( vals[ i ] );
+                guint16 sval = htons( vals[ i ] );
+                gint8* psrc = ( gint8* )&sval;
+                *pInt++ = *psrc++;
+                *pInt++ = *psrc;
             }
-            iNewPos = iPos + 4 +
-                iCount * sizeof( gint16 );
+
+            iNewPos = iPos +
+                iHeader + iCount * sizeof( gint16 );
+
             jenv->ReleaseShortArrayElements(
                 val, vals, 0);
         }while( 0 );
@@ -1875,33 +1919,44 @@ class BufPtr
         gint32 ret = 0;
         gint32 iNewPos = 0;
         do{
+            constexpr gint32 iHeader = 8;
             jsize iCount =
                 jenv->GetArrayLength( val );
 
             BufPtr& pBuf = *$self;
             ret = CheckAndResize( pBuf, iPos,
-                iCount * sizeof( gint32 ) + 4 );
+                iCount * sizeof( gint32 ) + iHeader );
             if( ERROR( ret ) )
                 break;
 
-            SerialIntNoCheck( pBuf, iPos, iCount * 4 );
+            SerialIntNoCheck( pBuf,
+                iPos, iCount * sizeof( guint32 ) );
+            SerialIntNoCheck( pBuf,
+                iPos + sizeof( guint32 ), iCount );
             if( iCount == 0 )
             {
-                iNewPos = iPos + 4;
+                iNewPos = iPos + iHeader;
                 break;
             }
 
             jint* vals =
                 jenv->GetIntArrayElements( val, 0 );
 
-            gint32* pInt =
-                ( gint32* )( pBuf->ptr() + iPos + 4 );
+            gint8* pInt =
+                ( gint8* )( pBuf->ptr() + iPos + iHeader );
             for( gint32 i = 0; i < iCount; i++ )
             {
-                *pInt++= htonl( vals[ i ] );
+                // to avoid not-align-on-boundary
+                // exception on some low-end arch
+                guint32 sval = htonl( vals[ i ] );
+                gint8* psrc = ( gint8* )&sval;
+                *pInt++ = *psrc++;
+                *pInt++ = *psrc++;
+                *pInt++ = *psrc++;
+                *pInt++ = *psrc;
             }
-            iNewPos = iPos + 4 +
-                iCount * sizeof( gint32 );
+            iNewPos = iPos +
+                iHeader + iCount * sizeof( gint32 );
             jenv->ReleaseIntArrayElements(
                 val, vals, 0);
         }while( 0 );
@@ -1918,32 +1973,46 @@ class BufPtr
         gint32 ret = 0;
         gint32 iNewPos = 0;
         do{
+            constexpr gint32 iHeader = 8;
             jsize iCount =
                 jenv->GetArrayLength( val );
 
             BufPtr& pBuf = *$self;
             ret = CheckAndResize( pBuf, iPos,
-                iCount * sizeof( guint64 ) + 4 );
+                iCount * sizeof( guint64 ) + iHeader );
             if( ERROR( ret ) )
                 break;
 
-            SerialIntNoCheck( pBuf, iPos, iCount * 4 );
+            SerialIntNoCheck( pBuf,
+                iPos, iCount * sizeof( guint64 ) );
+
+            SerialIntNoCheck( pBuf,
+                iPos + sizeof( guint32 ), iCount );
             if( iCount == 0 )
             {
-                iNewPos = iPos + 4;
+                iNewPos = iPos + iHeader;
                 break;
             }
 
             jlong* vals =
                 jenv->GetLongArrayElements( val, 0 );
 
-            gint64* pLong =
-                ( gint64* )( pBuf->ptr() + iPos + 4 );
+            gint8* pLong =
+                ( gint8* )( pBuf->ptr() + iPos + iHeader );
             for( gint32 i = 0; i < iCount; i++ )
             {
-                *pLong++= htonll( vals[ i ] );
+                guint64 sval = htonll( vals[ i ] );
+                gint8* psrc = ( gint8*)&sval;
+                *pLong++ = *psrc++;
+                *pLong++ = *psrc++;
+                *pLong++ = *psrc++;
+                *pLong++ = *psrc++;
+                *pLong++ = *psrc++;
+                *pLong++ = *psrc++;
+                *pLong++ = *psrc++;
+                *pLong++ = *psrc;
             }
-            iNewPos = iPos + 4 +
+            iNewPos = iPos + iHeader +
                 iCount * sizeof( guint64 );
             jenv->ReleaseLongArrayElements(
                 val, vals, 0);
@@ -1961,36 +2030,44 @@ class BufPtr
         gint32 ret = 0;
         gint32 iNewPos = 0;
         do{
+            constexpr gint32 iHeader = 8;
             jsize iCount =
                 jenv->GetArrayLength( val );
 
             BufPtr& pBuf = *$self;
             ret = CheckAndResize( pBuf, iPos,
-                iCount * sizeof( float ) + 4 );
+                iCount * sizeof( float ) + iHeader );
             if( ERROR( ret ) )
                 break;
 
-            SerialIntNoCheck( pBuf, iPos,
-                iCount * sizeof( float ) );
+            SerialIntNoCheck( pBuf,
+                iPos, iCount * sizeof( float ) );
+
+            SerialIntNoCheck( pBuf,
+                iPos + sizeof( guint32 ), iCount );
 
             if( iCount == 0 )
             {
-                iNewPos = iPos + 4;
+                iNewPos = iPos + iHeader;
                 break;
             }
 
             jfloat* vals =
                 jenv->GetFloatArrayElements( val, 0 );
 
-            guint32* pFloat =
-                ( guint32* )( pBuf->ptr() + iPos + 4 );
+            gint8* pInt =
+                ( gint8* )( pBuf->ptr() + iPos + iHeader );
 
             for( gint32 i = 0; i < iCount; i++ )
             {
-                *pFloat++= htonl(
-                    *( guint32* )( vals + i ) );
+                guint32 sval = htonl( vals[ i ] );
+                gint8* psrc = ( gint8* )&sval;
+                *pInt++ = *psrc++;
+                *pInt++ = *psrc++;
+                *pInt++ = *psrc++;
+                *pInt++ = *psrc;
             }
-            iNewPos = iPos + 4 +
+            iNewPos = iPos + iHeader +
                 iCount * sizeof( float );
 
             jenv->ReleaseFloatArrayElements(
@@ -2010,36 +2087,46 @@ class BufPtr
         gint32 ret = 0;
         gint32 iNewPos = 0;
         do{
+            constexpr gint32 iHeader = 8;
             jsize iCount =
                 jenv->GetArrayLength( val );
 
             BufPtr& pBuf = *$self;
             ret = CheckAndResize( pBuf, iPos,
-                iCount * sizeof( double ) + 4 );
+                iCount * sizeof( double ) + iHeader );
             if( ERROR( ret ) )
                 break;
 
-            SerialIntNoCheck( pBuf, iPos,
-                iCount * sizeof( double ) );
-
+            SerialIntNoCheck( pBuf,
+                iPos, iCount * sizeof( double ) );
+            SerialIntNoCheck( pBuf,
+                iPos + sizeof( guint32 ), iCount );
             if( iCount == 0 )
             {
-                iNewPos = iPos + 4;
+                iNewPos = iPos + iHeader;
                 break;
             }
 
             jdouble* vals =
                 jenv->GetDoubleArrayElements( val, 0 );
 
-            guint64* pDouble =
-                ( guint64* )( pBuf->ptr() + iPos + 4 );
+            gint8* pLong =
+                ( gint8* )( pBuf->ptr() + iPos + iHeader );
 
             for( gint32 i = 0; i < iCount; i++ )
             {
-                *pDouble++= htonll(
-                    *( guint64* )( vals + i ) );
+                guint64 sval = htonll( vals[ i ] );
+                gint8* psrc = ( gint8*)&sval;
+                *pLong++ = *psrc++;
+                *pLong++ = *psrc++;
+                *pLong++ = *psrc++;
+                *pLong++ = *psrc++;
+                *pLong++ = *psrc++;
+                *pLong++ = *psrc++;
+                *pLong++ = *psrc++;
+                *pLong++ = *psrc;
             }
-            iNewPos = iPos + 4 +
+            iNewPos = iPos + iHeader +
                 iCount * sizeof( double );
 
             jenv->ReleaseDoubleArrayElements(
@@ -2469,7 +2556,7 @@ class CParamList
                     break;
                 
                 jenv->GetByteArrayRegion(
-                    pba, len, 0,
+                    pba, 0, len,
                     ( jbyte* )pBuf->ptr() );
             }
 

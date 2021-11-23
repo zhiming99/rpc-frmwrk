@@ -36,6 +36,7 @@ extern CAliasMap g_mapAliases;
 extern stdstr g_strPrefix;
 
 std::map<stdstr, ObjPtr> g_mapMapTypeDecl;
+std::map<stdstr, ObjPtr> g_mapArrayTypeDecl;
 
 extern std::string g_strAppName;
 extern gint32 SetStructRefs( ObjPtr& pRoot );
@@ -1422,6 +1423,10 @@ CJavaFileSet::CJavaFileSet(
         strOutPath, "DeserialMaps.java",
         false );
 
+    GEN_FILEPATH( m_strDeserialArray, 
+        strOutPath, "DeserialArrays.java",
+        false );
+
     m_strPath = strOutPath;
 
     gint32 ret = OpenFiles();
@@ -1553,6 +1558,7 @@ gint32 CJavaFileSet::OpenFiles()
     this->OpenFile( m_strMainSvr );
     this->OpenFile( m_strReadme );
     this->OpenFile( m_strDeserialMap );
+    this->OpenFile( m_strDeserialArray );
 
     return STATUS_SUCCESS;
 }
@@ -1918,6 +1924,16 @@ gint32 GenJavaProj(
         {
             OutputMsg( ret,
                 "error generating DeserialMaps.java" );
+            break;
+        }
+
+        oWriter.SelectDeserialArray();
+        CImplDeserialArray oida( &oWriter );
+        ret = oida.Output();
+        if( ERROR( ret ) )
+        {
+            OutputMsg( ret,
+                "error generating DeserialArrays.java" );
             break;
         }
 
@@ -3552,11 +3568,11 @@ gint32 CDeclareStructJava::Output()
         CCOUT << "public class " << strName << " extends JavaSerialBase.ISerializable";
         NEW_LINE;
         BLOCK_OPEN;
-        Wa( "public static int GetStructId()" );
+        Wa( "public static int getStructId()" );
         CCOUT << "{ return "<< iMsgId <<"; };";
         NEW_LINES( 2 );
 
-        Wa( "public static String GetStructName()" );
+        Wa( "public static String getStructName()" );
         CCOUT << "{ return \""<< strMsgName <<"\"; };";
         NEW_LINES( 2 );
 
@@ -3584,6 +3600,12 @@ gint32 CDeclareStructJava::Output()
         Wa( "try{" );
         CCOUT << "do";
         BLOCK_OPEN;
+        CCOUT << "ret = _osh.serialInt32( _pBuf,"
+            << " _offset, " << "getStructId() );";
+        NEW_LINE;
+        Wa( "if( RC.ERROR( ret ) )" );
+        Wa( "    break;" );
+        NEW_LINE;
         ret = os.EmitSerialFields( pFields );
         if( ERROR( ret ) )
             break;
@@ -3597,14 +3619,16 @@ gint32 CDeclareStructJava::Output()
         BLOCK_CLOSE;
 
         NEW_LINE;
-        Wa( "public int deserialize(" );
-        Wa( "    ByteBuffer _bbuf )" );
+        Wa( "public int deserialize( ByteBuffer _bbuf )" );
         BLOCK_OPEN;
         Wa( "int ret = 0;" );
         Wa( "JavaSerialBase _osh = getSerialBase();" );
         Wa( "try{" );
         CCOUT << "do";
         BLOCK_OPEN;
+        Wa( "int _structId = _osh.deserialInt32( _bbuf );" );
+        Wa( "if( _structId != getStructId() )" );
+        Wa( "    break;" );
         ret = os.EmitDeserialFields( pFields );
         if( ERROR( ret ) )
             break;
@@ -3866,7 +3890,6 @@ gint32 CImplDeserialMap::Output()
     gint32 ret = 0;
 
     do{
-        NEW_LINE;
         Wa( "public class DeserialMaps" );
         BLOCK_OPEN;
         Wa( "public static Map<?,?> deserialMap(" );
@@ -3928,7 +3951,7 @@ gint32 CImplDeserialMap::Output()
             Wa( "public Map<?, ?>  deserialMap(" );
             Wa( "    JavaSerialBase osb, ByteBuffer bbuf, String sig )" );
             BLOCK_OPEN;
-            CCOUT << "if( sig != \""<< strSig << "\" )";
+            CCOUT << "if( !sig.equals(  \""<< strSig << "\" ) )";
             NEW_LINE;
             Wa( "    throw new IllegalArgumentException(" );
             CCOUT << "        \"deserialMap[" << strTypeText << "]\" + ";
@@ -4163,5 +4186,130 @@ gint32 CImplJavaMainSvr::Output()
 
     }while( 0 );
 
+    return ret;
+}
+
+CImplDeserialArray::CImplDeserialArray(
+    CJavaWriter* pWriter )
+{
+    m_pWriter = pWriter;
+}
+
+gint32 CImplDeserialArray::Output()
+{
+    CJavaSnippet os( m_pWriter );
+    os.EmitBanner();
+    gint32 ret = 0;
+
+    do{
+        Wa( "public class DeserialArrays" );
+        BLOCK_OPEN;
+        Wa( "public static Object deserialArray(" );
+        Wa( "    JavaSerialBase osb, ByteBuffer bbuf, String sig )" );
+        BLOCK_OPEN;
+        Wa( "IDeserialArray o = null;" );
+        Wa( "if( m_oDeserialArrays.containsKey( sig ) )" );
+        Wa( "    o = m_oDeserialArrays.get( sig );" );
+        Wa( "if( o == null )" );
+        Wa( "    return null;" );
+        CCOUT << "return o.deserialArray( osb, bbuf, sig );";
+        BLOCK_CLOSE;
+        NEW_LINES( 2 );
+        Wa( "static public interface IDeserialArray" );
+        BLOCK_OPEN;    
+        Wa( "public abstract Object deserialArray(" );
+        CCOUT << "    JavaSerialBase osb, ByteBuffer bbuf, String sig );";
+        BLOCK_CLOSE; 
+        NEW_LINES( 2 );
+        Wa( "static Map< String, IDeserialArray >" );
+        Wa( "    m_oDeserialArrays = initMaps();" );
+        NEW_LINE;
+        Wa( "static Map< String, IDeserialArray > initMaps()" );
+        BLOCK_OPEN; 
+        Wa( "Map< String, IDeserialArray > o =" );
+        Wa( "    new HashMap< String, IDeserialArray >();" );
+        Wa( "IDeserialArray val;" );
+        for( auto& elem : g_mapArrayTypeDecl )
+        {
+            CArrayType* pat = elem.second;
+            stdstr strSig = elem.first;
+            stdstr strTypeText;
+            ret = CJTypeHelper::GetTypeText(
+                elem.second, strTypeText );
+            if( ERROR( ret ) )
+                break;
+
+            stdstr strValType1;
+            ObjPtr pValType = pat->GetElemType();
+
+            ret = CJTypeHelper::GetTypeText(
+                pValType, strValType1 );
+            if( ERROR( ret ) )
+                break;
+
+            stdstr strValType;
+            CJTypeHelper::GetObjectPrimitive(
+                strValType1, strValType );
+
+            stdstr sigElem;
+            CAstNodeBase* pNode = pValType;
+            if( pNode == nullptr )
+                continue;
+
+            sigElem = pNode->GetSignature();
+            if( sigElem.size() == 1 )
+            {
+                bool bPrimitive = false;
+                switch( strValType[ 0 ] )
+                {
+                case 'Q':
+                case 'q':
+                case 'h':
+                case 'D':
+                case 'd':
+                case 'W':
+                case 'w':
+                case 'f':
+                case 'F':
+                case 'b':
+                case 'B':
+                    bPrimitive = true;
+                    break;
+                default:
+                    break;
+                }
+                if( bPrimitive )
+                    continue;
+            }
+
+            Wa( "val = new IDeserialArray() " );
+            BLOCK_OPEN;
+
+            Wa( "public Object  deserialArray(" );
+            Wa( "    JavaSerialBase osb, ByteBuffer bbuf, String sig )" );
+            BLOCK_OPEN;
+            CCOUT << "if( !sig.equals( \""<< strSig << "\" ) )";
+            NEW_LINE;
+            Wa( "    throw new IllegalArgumentException(" );
+            CCOUT << "        \"deserialArray[" << strTypeText << "]\" + ";
+            NEW_LINE;
+            CCOUT << "        " << "\" error signature\" );";
+            NEW_LINE;
+            Wa( "return osb.deserialArrayInternal(" );
+            CCOUT << "    bbuf, sig, "
+                << strValType << ".class );";
+
+            BLOCK_CLOSE;
+            BLOCK_CLOSE;
+            CCOUT << ";";
+            NEW_LINE;
+            CCOUT << "o.put( \"" << strSig << "\", val );";
+            NEW_LINES( 2 );
+        }
+        CCOUT << "return o;";
+        BLOCK_CLOSE; // initMaps
+        BLOCK_CLOSE;// DeserialArrays
+
+    }while( 0 );
     return ret;
 }

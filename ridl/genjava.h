@@ -48,6 +48,7 @@ struct CJavaFileSet : public IFileSet
     std::string  m_strMainSvr;
     std::string  m_strReadme;
     std::string  m_strDeserialMap;
+    std::string  m_strDeserialArray;
 
     typedef IFileSet super;
     CJavaFileSet( const stdstr& strOutPath,
@@ -144,8 +145,16 @@ class CJavaWriter : public CWriterBase
     {
         CJavaFileSet* pFiles = static_cast< CJavaFileSet* >
             ( m_pFiles.get() );
-        m_strCurFile = pFiles->m_strFactory;
+        m_strCurFile = pFiles->m_strDeserialMap;
         return SelectFile( 7 );
+    }
+
+    inline gint32 SelectDeserialArray()
+    {
+        CJavaFileSet* pFiles = static_cast< CJavaFileSet* >
+            ( m_pFiles.get() );
+        m_strCurFile = pFiles->m_strDeserialArray;
+        return SelectFile( 8 );
     }
 
     inline gint32 SelectImplFile(
@@ -489,6 +498,16 @@ class CImplDeserialMap
         CJavaWriter* pWriter );
     gint32 Output();
 };
+
+class CImplDeserialArray
+{
+    CJavaWriter* m_pWriter;
+    public:
+    CImplDeserialArray(
+        CJavaWriter* pWriter );
+    gint32 Output();
+};
+
 
 class CImplJavaMainCli
 {

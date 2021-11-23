@@ -36,7 +36,8 @@ public class maincli
             if (jret.SUCCEEDED()) {
                 rpcbase.JavaOutputMsg("echo unknown complete");
                 byte[] resp = (byte[]) jret.getAt(0);
-                rpcbase.JavaOutputMsg(resp.toString());
+                rpcbase.JavaOutputMsg(
+                    new String( resp, StandardCharsets.UTF_8 ) );
             } else {
                 rpcbase.JavaOutputMsg(
                         String.format("echo unknown error %d", jret.getError()));
@@ -78,7 +79,7 @@ public class maincli
                 double i5r = jret.getAtDouble(4);
                 String i6r = (String) jret.getAt(5);
                 rpcbase.JavaOutputMsg(
-                        String.format("%s, %d, %d, %ld, %f, %g, %s",
+                        String.format("%s, %d, %d, %d, %f, %g, %s",
                                 strMsg, i1r, i2r, i3r, i4r, i5r, i6r));
             } else {
                 rpcbase.JavaOutputMsg(
@@ -107,7 +108,10 @@ public class maincli
                 rpcbase.JavaOutputMsg("\tbRead = " + Boolean.toString(fir.bRead));
                 rpcbase.JavaOutputMsg("\tfileHeader = " + fir.fileHeader.toString());
                 rpcbase.JavaOutputMsg("\tvecLines = " + fir.vecLines.toString());
-                rpcbase.JavaOutputMsg("\tvecLines = " + fir.vecBlocks.toString());
+                rpcbase.JavaOutputMsg("\tvecBlocks = {" );
+                for( Map.Entry<Integer, byte[]> entry : fir.vecBlocks.entrySet())
+                    rpcbase.JavaOutputMsg(
+                            "\t\t" + new String( entry.getValue(), StandardCharsets.UTF_8) );
             }
             else
             {
