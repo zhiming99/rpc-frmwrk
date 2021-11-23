@@ -51,7 +51,7 @@ This project depends on the following 3rd-party packags to build:
 8. `python 3.5+ is required for python support.`
 
 #### Todo
-1. Java support
+1. Java support (coming soon)
 2. Json support
 3. Examples and Tutorials
 4. Performance optimization
