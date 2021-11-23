@@ -23,7 +23,7 @@ This is an asynchronous and event-driven RPC implementation for embeded system w
 14. [`Authentication support with Kerberos 5`](https://github.com/zhiming99/rpc-frmwrk/tree/master/rpc/security/README.md)
 15. [`Python Support`](https://github.com/zhiming99/rpc-frmwrk/tree/master/python)
 16. [`Node Redudancy/Load Balance`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md#load-balance--node-redudancy)
-17. [`A CPP and Python skelton code generator`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md)
+17. [`A CPP, Python and Java skelton generator`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md)
 18. [`A GUI config tool for rpcrouter`](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools/README.md)
 
 #### Building `rpc-frmwrk`   
@@ -59,6 +59,9 @@ This project depends on the following 3rd-party packags to build:
 6. Logging service
 
 ---
+[`Tue Nov 23 2021 06:21:29 PM Beijing`]   
+1. Made some progress on java generator debugging. We are 70% done with the Java support. Java support is coming.
+
 [`Tue Nov 09 2021 02:02:13 PM Beijing`]   
 1. Half way through the debugging of java generator. It will take me a week to handle some urgent thing, and there will be less updates in the next four or five days.
 
