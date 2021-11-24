@@ -36,6 +36,7 @@ public class Helpers
         oMap.put( "java.lang.Boolean", RC.typeByteObj );
         oMap.put( "java.lang.String", RC.typeString ); 
         oMap.put( "org.rpcf.rpcbase.BufPtr", RC.typeBufPtr );
+        oMap.put( "[B", RC.typeByteArr ); 
         return oMap;
     }
 
@@ -141,6 +142,7 @@ public class Helpers
                 break;
 
             vecBufs.add( pBuf );
+            pBuf = null;
         }
         if( ret < 0 )
             return null;

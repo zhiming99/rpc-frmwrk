@@ -80,8 +80,7 @@ class CJavaServerImpl :
                 jobject jret = NewJRet( jenv );
                 pjret = jenv->NewGlobalRef( jret );
 
-                oReqCtx.Push(
-                    ( intptr_t ) pjCb );
+                oReqCtx.Push( ( intptr_t ) pjCb );
                 oReqCtx.Push( ( intptr_t )pjret );
                 oReqCtx.Push( strMethod );
                 oReqCtx.Push( seriNone );
@@ -206,8 +205,14 @@ class CJavaServerImpl :
 
             jmethodID ans = jenv->GetMethodID(
                 cls, "acceptNewStream",
-                "(Lorg/rpc/rpcbase/ObjPtr;"
-                "Lorg/rpc/rpcbase/CfgPtr;)I" );
+                "(Lorg/rpcf/rpcbase/ObjPtr;"
+                "Lorg/rpcf/rpcbase/CfgPtr;)I" );
+
+            if( ans == nullptr )
+            {
+                ret = -ENOENT;
+                break;
+            }
 
             ret = jenv->CallIntMethod( pHost,
                 ans, pCb, pjCfg );

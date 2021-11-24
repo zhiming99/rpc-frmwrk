@@ -2924,6 +2924,13 @@ gint32 CImplJavaMethodCliBase::OutputReqSender()
         CCOUT << "    RC.propSeriProto, " << "RC.seriRidl );";
         NEW_LINE;
 
+        if( m_pNode->IsNoReply() )
+        {
+            Wa( "oParams.SetBoolProp(" );
+            CCOUT << "    RC.propNoReply, " << "true );";
+            NEW_LINE;
+        }
+
         guint32 dwTimeout = m_pNode->GetTimeoutSec();
         if( dwTimeout >= 2 )
         {
@@ -3095,7 +3102,10 @@ gint32 CImplJavaMethodCliBase::ImplMakeCall()
             Wa( "jret = makeCallWithOptAsync(" );
             Wa( "    callback, oContext, pCfg, args );" );
             Wa( "if( jret.isPending() )" );
-            Wa( "    break;" );
+            BLOCK_OPEN;
+            Wa( "ret = RC.STATUS_PENDING;" );
+            CCOUT << "break;";
+            BLOCK_CLOSE;
         }
         else
         {

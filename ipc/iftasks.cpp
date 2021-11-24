@@ -4358,7 +4358,7 @@ gint32 CIfInvokeMethodTask::OnTaskComplete(
                 break;
             }
 
-            if( !bResp )
+            if( !bResp || !HasReply() )
                 break;
 
             CInterfaceServer *pServer =

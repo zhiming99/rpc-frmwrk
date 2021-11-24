@@ -590,6 +590,7 @@ int GetParamsObjArr(
         ( vectorBufPtr* )lPtr;
 
     vecParams = *pvecBufs;
+    ( *pvecBufs ).clear();
     return STATUS_SUCCESS;
 }
     
@@ -953,7 +954,10 @@ ObjPtr* CreateObject(
     gint32 ret = pObj->NewObj(
         iClsid, ( IConfigDb* )pCfg ); 
     if( ret < 0 )
+    {
+        delete pObj;
         return nullptr;
+    }
 
     return pObj;
 }

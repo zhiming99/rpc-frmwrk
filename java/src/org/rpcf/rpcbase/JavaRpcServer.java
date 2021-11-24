@@ -115,13 +115,10 @@ abstract public class JavaRpcServer extends JavaRpcServiceS
         String destName, BufPtr pBuf )
     {
         evtName = "UserEvent_" + evtName;
-        List<Object> lstObj =
-            new ArrayList< Object >();
-        if( pBuf != null )
-            lstObj.add( pBuf );
+        Object[] argsArr = new Object[]{ pBuf };
         return m_oInst.SendEvent( callback,
             ifName, evtName, destName,
-            lstObj.toArray(), RC.seriRidl );
+            argsArr, RC.seriRidl );
     }
 
     /* event called when the stream channel

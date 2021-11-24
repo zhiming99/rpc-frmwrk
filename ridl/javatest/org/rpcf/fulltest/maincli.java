@@ -112,6 +112,7 @@ public class maincli
                 for( Map.Entry<Integer, byte[]> entry : fir.vecBlocks.entrySet())
                     rpcbase.JavaOutputMsg(
                             "\t\t" + new String( entry.getValue(), StandardCharsets.UTF_8) );
+                rpcbase.JavaOutputMsg("\t}" );
             }
             else
             {
@@ -132,9 +133,11 @@ public class maincli
         JRetVal jret = null;
         do{
             jret = oProxy.KAReq2( "haha", 1 );
-            if( jret.SUCCEEDED())
+            if( jret.SUCCEEDED()) {
                 rpcbase.JavaOutputMsg(
                         String.format("KAReq2 sent %d", jret.getError()));
+                break;
+            }
             else if( jret.ERROR() ) {
                 rpcbase.JavaOutputMsg(
                         String.format("KAReq2 failed %d", jret.getError()));
@@ -257,7 +260,7 @@ public class maincli
         do{
             jret = oProxy.startStream( null );
             if( jret.ERROR()) {
-                rpcbase.JavaOutputMsg("StartStream failed");
+                rpcbase.JavaOutputMsg("StartStream failed " + jret.getError() );
                 break;
             }
             hStream = jret.getAtLong(0);

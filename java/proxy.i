@@ -267,6 +267,13 @@ class CJavaInterfBase : public T
             ObjPtr* pTimer = new ObjPtr( pTask );
             jobject jtimer =
                 NewObjPtr( jenv, ( jlong )pTimer );
+            if( jtimer == nullptr )
+            {
+                delete pTimer;
+                ret = -EFAULT;
+                break;
+            }
+
             AddElemToJRet( jenv, jret, jtimer );
 
         }while( 0 );
@@ -521,8 +528,8 @@ class CJavaInterfBase : public T
                 return ret;
         }
 
-        EnumTypeId iType =
-            ( EnumTypeId )GetTypeId( pObject );
+        EnumTypeId iType = ( EnumTypeId )
+            GetTypeId( jenv, pObject );
 
         switch( iType )
         {
@@ -782,6 +789,7 @@ class CJavaInterfBase : public T
             if( unlikely( pjCb == nullptr ) )
             {
                 delete pCb;
+                delete pArgs;
                 ret = -ENOMEM;
                 break;
             }
@@ -906,8 +914,8 @@ class CJavaInterfBase : public T
             jmethodID harsp = jenv->GetMethodID(
                 cls, "handleAsyncResp",
                 "(Ljava/lang/Object;I"
-                "(Ljava/lang/Object;"
-                "(Ljava/lang/Object;)V" );
+                "Ljava/lang/Object;"
+                "Ljava/lang/Object;)V" );
 
             jenv->CallVoidMethod( pHost,
                 harsp, pjCb, dwSeriProto,
@@ -1337,9 +1345,15 @@ class CJavaInterfBase : public T
                 jenv->GetObjectClass( pHost );
 
             jmethodID stmReady = jenv->GetMethodID(
-                cls, "onStmReady", "(J)V" );
+                cls, "onStmReady", "(J)I" );
 
-            jenv->CallVoidMethod( pHost,
+            if( stmReady == nullptr )
+            {
+                ret = -ENOENT;
+                break;
+            }
+
+            jenv->CallIntMethod( pHost,
                 stmReady, ( jlong )hChannel );
 
         }while( 0 );
@@ -1379,9 +1393,15 @@ class CJavaInterfBase : public T
                 jenv->GetObjectClass( pHost );
 
             jmethodID stmClosing = jenv->GetMethodID(
-                cls, "onStmClosing", "(J)V" );
+                cls, "onStmClosing", "(J)I" );
 
-            jenv->CallVoidMethod( pHost,
+            if( stmClosing == nullptr )
+            {
+                ret = -ENOENT;
+                break;
+            }
+
+            jenv->CallIntMethod( pHost,
                 stmClosing, ( jlong )hChannel );
 
         }while( 0 );
@@ -1517,8 +1537,13 @@ class CJavaInterfBase : public T
     jobject CastToObjPtr( JNIEnv *jenv )
     {
         ObjPtr* ppObj = new ObjPtr( this );
+        if( ppObj == nullptr )
+            return nullptr;
+
         jobject pNewObj =
             NewObjPtr( jenv, ( jlong )ppObj );
+        if( pNewObj == nullptr )
+            delete ppObj;
         return pNewObj;
     }
 };

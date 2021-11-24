@@ -95,7 +95,7 @@ public class SimpFileSvcsvr extends SimpFileSvcsvrbase
         String szText )
     {
         oReqCtx.setResponse( RC.STATUS_SUCCESS,
-                i1, i2, i3, i4 + .1, i5 +.2, szText );
+                i1, i2, i3, (float)(i4 + .1), i5 +.2, szText );
         return RC.STATUS_SUCCESS;
     }
     public void onEchoManyCanceled(
