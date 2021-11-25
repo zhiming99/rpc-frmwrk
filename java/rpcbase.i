@@ -1208,6 +1208,7 @@ class BufPtr
     void Clear();
 
     BufPtr( bool );
+    BufPtr( const BufPtr );
     ~BufPtr();
 
 };

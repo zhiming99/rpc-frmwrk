@@ -2290,8 +2290,11 @@ gint32 CImplJavaMethodSvrBase::ImplSvcComplete()
             Wa( "    RC.SUCCEEDED( iRet ) )" );
             Wa( "    iRet = ret;" );
         }
-        Wa( "return oHost.ridlOnServiceComplete(" );
+        Wa( "ret = oHost.ridlOnServiceComplete(" );
         Wa( "    getCallback(), iRet, _pBuf );" );
+        Wa( "if( _pBuf != null )" );
+        Wa( "    _pBuf.Clear();" );
+        Wa( "return ret;" );
         BLOCK_CLOSE;
 
     }while( 0 );
@@ -2412,7 +2415,7 @@ gint32 CImplJavaMethodSvrBase::ImplInvoke()
                         break;
                     Wa( "ret = _pBuf.Resize( _offset[0] );");
                     Wa( "if( RC.ERROR( ret ) ) break;" );
-                    Wa( "jret.addElem( _pBuf );" );
+                    CCOUT << "jret.addElem( _pBuf );";
                     BLOCK_CLOSE;
                     Wa( "while( false );" );
                 }
@@ -2486,6 +2489,7 @@ gint32 CImplJavaMethodSvrBase::OutputEvent()
             NEW_LINE;
             CCOUT << "    \"\", _pBuf );";
             NEW_LINE;
+            CCOUT << "_pBuf.Clear();";
             BLOCK_CLOSE;
             Wa( "while( false );" );
             Wa( "return ret;" );
@@ -3101,6 +3105,8 @@ gint32 CImplJavaMethodCliBase::ImplMakeCall()
         {
             Wa( "jret = makeCallWithOptAsync(" );
             Wa( "    callback, oContext, pCfg, args );" );
+            if( iInCount > 0 )
+                Wa( "_pBuf.Clear();" );
             Wa( "if( jret.isPending() )" );
             BLOCK_OPEN;
             Wa( "ret = RC.STATUS_PENDING;" );
@@ -3110,6 +3116,8 @@ gint32 CImplJavaMethodCliBase::ImplMakeCall()
         else
         {
             Wa( "jret = makeCallWithOpt( pCfg, args );" );
+            if( iInCount > 0 )
+                Wa( "_pBuf.Clear();" );
             Wa( "if( jret.isPending() )" );
             Wa( "{ jret.setError( RC.ERROR_STATE ); break; }" );
         }
