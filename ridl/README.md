@@ -176,7 +176,7 @@ And please don't edit it, since it will be overwritten by `ridlc` and synccfg.py
 And please don't edit it, since they will be overwritten by `ridlc`.
 
 * *synccfg.py*: a small python script to synchronous settings with the system settings, just ignore it.
-* * **run:** you can run `java org.rpcf.example.mainsvr` and `java org.rpcf.example.maincli` to start the server and client. Before the first run after running `ridlc` successfully, make sure to run `make` to update the configuration file, that is, the `exampledesc.json` file.
+* **run:** you can run `java org.rpcf.example.mainsvr` and `java org.rpcf.example.maincli` to start the server and client. Before the first run after running `ridlc` successfully, make sure to run `make` to update the configuration file, that is, the `exampledesc.json` file.
 
 
 ### Interchangable client and server between C++, Python, and Java.
