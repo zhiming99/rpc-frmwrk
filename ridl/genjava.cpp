@@ -29,6 +29,7 @@
 using namespace rpcf;
 #include "genjava.h"
 #include "genpy.h"
+#include <fcntl.h>
 
 extern CDeclMap g_mapDecls;
 extern ObjPtr g_pRootNode;
@@ -1592,11 +1593,122 @@ gint32 FindFullPath(
     strFullPath = strSrcFile;
     return ret;
 }
-gint32 GenSerialBaseFiles(
-    CJavaWriter* pWriter, ObjPtr& pRoot )
+
+#include <sys/types.h>
+#include <sys/wait.h>
+gint32 SafePreprocess(
+    const char* szInput, 
+    const char* szOutPath,
+    bool bProxy )
 {
-    if( pWriter == nullptr ||
-        pRoot.IsEmpty() )
+    gint32 ret = 0;
+    stdstr strCmd;
+    const char* args[8];
+    args[ 0 ] = "/usr/bin/cpp";
+    stdstr strArg5, strArg8;
+    strArg5 = "-DXXXXX=";
+    strArg5 += g_strAppName;
+
+    strArg8 = szOutPath;
+    if( bProxy )
+        strArg8 += "/JavaSerialHelperP.java";
+    else
+        strArg8 += "/JavaSerialHelperS.java";
+
+    if( bProxy )
+    {
+         args[1] = "-P";
+         args[2] = "-DJavaSerialImpl=JavaSerialHelperP";
+         args[3] = "-DGetIdHash=GetPeerIdHash";
+         args[4] = "-DInstType=CJavaProxyImpl" ;
+         args[5] = strArg5.c_str();
+         args[6] = szInput;
+    }
+    else
+    {
+         args[1] = "-P";
+         args[2] = "-DJavaSerialImpl=JavaSerialHelperS";
+         args[3] = "-DGetIdHash=GetIdHashByChan";
+         args[4] = "-DInstType=CJavaServerImpl" ;
+         args[5] = strArg5.c_str();
+         args[6] = szInput;
+    }
+
+    const char* const args2[ 8 ] = {
+        args[0], args[1], args[2], args[3],
+        args[4], args[5], args[6], nullptr };
+
+    pid_t pid = fork();
+    int fd = -1;
+    if (pid == -1)
+        return ERROR_FAIL;
+
+    else if (pid != 0)
+    {
+        int status = 0;
+        while( ( ret = waitpid( pid, &status, 0 ) ) == -1 )
+        {
+            if (errno != EINTR) {
+                /* Handle error */
+                ret = -errno;
+                break;
+            }
+        }
+        if ((ret == 0) ||
+            !(WIFEXITED(status) && !WEXITSTATUS(status)))
+        {
+            /* Report unexpected child status */
+            ret = -ECHILD;
+        }
+    }
+    else
+    do{
+        /* ... Initialize env as a sanitized copy of
+         * environ ... */
+        close( 1 );
+        fd = open( strArg8.c_str(),
+            O_CREAT | O_WRONLY | O_TRUNC, 0644 );
+
+        if( fd == -1 )
+        {
+            ret = -errno;
+            break;
+        }
+        if( fd != 1 )
+        {
+            ret = dup2( fd, 1 );
+            if( ret == -1 )
+            {
+                ret = -errno;
+                break;
+            }
+
+            close( fd );
+            fd = 1;
+        }
+
+        char* env[ 1 ] = { nullptr };
+        if( execve("/usr/bin/cpp",
+            const_cast< char* const* >( args2 ), env) == -1 )
+        {
+            /* Handle error */
+            printf( "error running /usr/bin/cpp %d", errno );
+            ret = -errno;
+            break;
+        }
+
+    }while( 0 );
+
+    if( fd != -1 )
+        close( fd );
+
+    return ret;
+}
+
+gint32 GenSerialBaseFiles(
+    CJavaWriter* pWriter )
+{
+    if( pWriter == nullptr )
         return -EINVAL;
 
     gint32 ret = 0;
@@ -1606,14 +1718,6 @@ gint32 GenSerialBaseFiles(
             "JavaSerialBase.java", strSeribase );
         if( ERROR( ret ) )
             break;
-        stdstr strCmd =
-            "cpp -P -DXXXXX=" + g_strAppName + " ";
-
-        strCmd += strSeribase + ">" +
-            pWriter->GetOutPath() + "/JavaSerialBase.java";
-    
-        printf( "%s\n", strCmd.c_str() );
-        system( strCmd.c_str() );
 
         stdstr strSeriImpl;
         ret = FindFullPath(
@@ -1637,22 +1741,14 @@ gint32 GenSerialBaseFiles(
             break;
         }
 
-        stdstr strCmdP = "cpp -P -DJavaSerialImpl=JavaSerialHelperP "
-            "-DGetIdHash=GetPeerIdHash -DInstType=CJavaProxyImpl " 
-            "-DXXXXX=" + g_strAppName + " " +
-            strSeriImpl + " > " + pWriter->GetOutPath() + "/" + 
-            "JavaSerialHelperP.java";
-        stdstr strCmdS = "cpp -P -DJavaSerialImpl=JavaSerialHelperS "
-            "-DGetIdHash=GetIdHashByChan -DInstType=CJavaServerImpl "
-            "-DXXXXX=" + g_strAppName + " " +
-            strSeriImpl + " > " + pWriter->GetOutPath() + "/" + 
-            "JavaSerialHelperS.java";
+        ret = SafePreprocess( strSeriImpl.c_str(),
+            pWriter->GetOutPath().c_str(), true );
 
-        printf( "%s\n", strCmdP.c_str() );
-        printf( "%s\n", strCmdS.c_str() );
+        if( ERROR( ret ) )
+            break;
 
-        ret = system( strCmdP.c_str() );
-        ret = system( strCmdS.c_str() );
+        ret = SafePreprocess( strSeriImpl.c_str(),
+            pWriter->GetOutPath().c_str(), false );
 
     }while( 0 );
     
@@ -1668,7 +1764,7 @@ gint32 GenStructFilesJava(
 
     gint32 ret = 0;
     do{
-        GenSerialBaseFiles( pWriter, pRoot );
+        GenSerialBaseFiles( pWriter );
         CStatements* pStmts = pRoot;
         if( unlikely( pStmts == nullptr ) )
         {
