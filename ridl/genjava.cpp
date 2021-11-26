@@ -3602,8 +3602,11 @@ gint32 CDeclareStructJava::Output()
         CCOUT << "public class " << strName << " extends JavaSerialBase.ISerializable";
         NEW_LINE;
         BLOCK_OPEN;
+        char szHexId[ 32 ];
+        snprintf( szHexId,
+            sizeof( szHexId ) - 1, "0x%08X", iMsgId );
         Wa( "public static int getStructId()" );
-        CCOUT << "{ return "<< iMsgId <<"; };";
+        CCOUT << "{ return "<< szHexId <<"; };";
         NEW_LINES( 2 );
 
         Wa( "public static String getStructName()" );
