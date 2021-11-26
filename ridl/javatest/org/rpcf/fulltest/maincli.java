@@ -177,6 +177,10 @@ public class maincli
              if( jret.ERROR() )
                  break;
              else if( jret.isPending()) {
+                 // just for testing purpose. you can
+                 // customize to issue the next request
+                 // immediately without waiting for
+                 // completion
                  WaitForSem(oProxy);
                  if (RC.ERROR(oProxy.getError())) {
                      jret.setError(oProxy.getError());

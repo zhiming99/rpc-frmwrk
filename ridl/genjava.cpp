@@ -1621,6 +1621,22 @@ gint32 GenSerialBaseFiles(
         if( ERROR( ret ) )
             break;
 
+        ret = access(
+            strSeriImpl.c_str(), F_OK | W_OK );
+        if( ret == -1 )
+        {
+            ret = -errno;
+            break;
+        }
+
+        ret = access(
+            strSeriImpl.c_str(), X_OK );
+        if( ret == 0 )
+        {
+            ret = -EBADF;
+            break;
+        }
+
         stdstr strCmdP = "cpp -P -DJavaSerialImpl=JavaSerialHelperP "
             "-DGetIdHash=GetPeerIdHash -DInstType=CJavaProxyImpl " 
             "-DXXXXX=" + g_strAppName + " " +
@@ -3783,9 +3799,9 @@ gint32 CJavaExportReadme::Output()
             << "and definition of `main()` function server program respectively. ";
         NEW_LINE;
         CCOUT << "And you can make changes to the files to customize the program. "
-            << "The `ridlc` will not touch them if they exist in the project directory, "
-            << "when it runs again, and put the newly "
-            << "generated code in the file with '.new' as the name extension.";
+            << "The `ridlc` will not touch them if they exist in the project directory. "
+            << "When it runs again, it puts the newly "
+            << "generated code to `mainxxx.java.new` files instead.";
         NEW_LINES( 2 );
 
         for( auto& elem : vecSvcNames )
@@ -3797,9 +3813,9 @@ gint32 CJavaExportReadme::Output()
             NEW_LINE;
             CCOUT << "And you need to make changes to the files to implement the "
                 << "functionality for server/client. "
-                << "The `ridlc` will not touch them if they exist in the project directory, "
-                << "when it runs again, and put the newly "
-                << "generated code to `"<<elem  <<".java.new`.";
+                << "The `ridlc` will not touch them if they exist in the project directory. "
+                << "When it runs again, it puts the newly "
+                << "generated code to `"<<elem  <<"xxx.java.new` files instead.";
             NEW_LINES( 2 );
         }
 
@@ -3810,7 +3826,7 @@ gint32 CJavaExportReadme::Output()
                 << "utilities and helpers for the interfaces of service `" << elem << "`.";
             NEW_LINE;
             CCOUT << "And please don't edit them, since they will be "
-                << "overwritten by `ridlc` without backup.";
+                << "overwritten by next run of `ridlc` without backup.";
             NEW_LINES( 2 );
         }
 
@@ -3819,7 +3835,7 @@ gint32 CJavaExportReadme::Output()
             << "declared and referenced in the ridl file.";
         NEW_LINE;
         CCOUT << "And please don't edit it, since they will be "
-            << "overwritten by `ridlc` without auto-backup.";
+            << "overwritten by next run of `ridlc` without backup.";
         NEW_LINES( 2 );
 
         CCOUT<< "* *" << g_strAppName << "desc.json*: "
@@ -3827,7 +3843,7 @@ gint32 CJavaExportReadme::Output()
             << "the services declared in the ridl file";
         NEW_LINE;
         CCOUT << "And please don't edit it, since they will be "
-            << "overwritten by `ridlc` and synccfg.py without backup.";
+            << "overwritten by next run of `ridlc` or synccfg.py without backup.";
         NEW_LINES( 2 );
 
         CCOUT << "* *driver.json*: "
@@ -3835,7 +3851,8 @@ gint32 CJavaExportReadme::Output()
             << "the ports and drivers";
         NEW_LINE;
         CCOUT << "And please don't edit it, since they will be "
-            << "overwritten by `ridlc` and synccfg.py without backup.";
+            << "overwritten by next run of `ridlc` or synccfg.py "
+            << "without backup.";
         NEW_LINES( 2 );
 
         CCOUT << "* *Makefile*: "
@@ -3843,20 +3860,26 @@ gint32 CJavaExportReadme::Output()
             << "with the local system settings. And it does nothing else.";
         NEW_LINE;
         CCOUT << "And please don't edit it, since it will be "
-            << "overwritten by `ridlc` and synccfg.py without backup.";
+            << "overwritten by next run of `ridlc` and synccfg.py without backup.";
         NEW_LINES( 2 );
 
         CCOUT << "* *DeserialMaps*, *JavaSerialBase.java*, *JavaSerialHelperS.java*, *JavaSerialHelperP.java*: "
             << "Containing the utility classes for serializations.";
         NEW_LINE;
         CCOUT << "And please don't edit it, since they will be "
-            << "overwritten by `ridlc`.";
+            << "overwritten by next run of `ridlc`.";
         NEW_LINES( 2 );
 
         CCOUT << "* *synccfg.py*: "
             << "a small python script to synchronous settings "
             << "with the system settings, just ignore it.";
         NEW_LINES(2);
+        CCOUT <<"* **run:** you can run `java org.rpcf."<<g_strAppName<<".mainsvr`"
+            << " and `java org.rpcf."<<g_strAppName<<".maincli` to start the server "
+            << "and client. Also make sure to run `make` to update the configuration"
+            << " files, that is, the `"<< g_strAppName <<"desc.json` and `driver.json`.";
+        NEW_LINES(2);
+
         CCOUT << "**Note**: the files in bold text need your further implementation. "
             << "And files in italic text do not. And of course, "
             << "you can still customized the italic files, but be aware they "
