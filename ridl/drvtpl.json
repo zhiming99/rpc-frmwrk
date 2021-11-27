@@ -8,7 +8,7 @@
             "DriverType"    : "BusDriver",
             "BusClass"      : "DBusBus",
             "InternalClass" : "CDBusBusDriver",
-            "Description"   : "This is a bus driver, and the port it creats is the DBusBusPort",
+            "Description"   : "This is a bus driver, and the port it creates is the DBusBusPort",
             "PortClasses"   :
             [
                 "DBusBusPort"
@@ -18,7 +18,7 @@
             "DriverName"    : "ProxyFdoDriver",
             "DriverType"    : "PortDriver",
             "InternalClass" : "CProxyFdoDriver",
-            "Description"   : "This is a function port driver, and the port it creats is the DBusProxyFdo",
+            "Description"   : "This is a function port driver, and the port it creates is the DBusProxyFdo",
             "PortClasses"   :
             [
                 "DBusProxyFdo"
@@ -29,7 +29,7 @@
             "DriverType"    : "BusDriver",
             "InternalClass" : "CUnixSockBusDriver",
             "BusClass"      : "UnixSockBus",
-            "Description"   : "This is a bus driver for unix stream sock, and the port it creats is the UnixSockBusPort",
+            "Description"   : "This is a bus driver for unix stream sock, and the port it creates is the UnixSockBusPort",
             "PortClasses"   :
             [
                 "UnixSockBusPort"

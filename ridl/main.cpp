@@ -201,7 +201,11 @@ int main( int argc, char** argv )
             case 'P':
                 {
                     if( g_strLang == "java" )
+                    {
                         g_strPrefix = optarg;
+                        if( g_strPrefix.back() != '.' )
+                            g_strPrefix.append( 1, '.' );
+                    }
                     break;
                 }
 

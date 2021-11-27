@@ -493,7 +493,7 @@ class CJavaServerImpl :
                     if( SUCCEEDED( ret ) )
                     {
                         dwCallFlags &= CF_WITH_REPLY;
-                        if( dwCallFlags > 0 )
+                        if( dwCallFlags == 0 )
                             bNoReply = true;
                     }
                 }

@@ -31,6 +31,7 @@ using namespace rpcf;
 
 extern std::string g_strAppName;
 extern bool g_bMklib;
+extern stdstr g_strLang;
 
 std::map< gint32, char > g_mapTypeSig =
 {
@@ -2632,7 +2633,8 @@ gint32 CDeclService::Output()
 
 gint32 CSetStructRefs::ExtractStructArr(
     ObjPtr& pArray,
-    std::set< ObjPtr >& setStructs )
+    std::set< ObjPtr >& setStructs,
+    bool bReffed )
 {
     if( pArray.IsEmpty() )
         return 0;
@@ -2660,14 +2662,14 @@ gint32 CSetStructRefs::ExtractStructArr(
         if( pet != nullptr )
         {
             ret = ExtractStructArr(
-                pType, setStructs );
+                pType, setStructs, bReffed );
             break;
         }
         CMapType* pmt = pType;
         if( pmt != nullptr )
         {
             ret = ExtractStructMap(
-                pType, setStructs );
+                pType, setStructs, bReffed );
             break;
         }
 
@@ -2687,7 +2689,11 @@ gint32 CSetStructRefs::ExtractStructArr(
                 strName.c_str() );
             break;
         }
-        setStructs.insert( pStruct );
+        CStructDecl* psd = pStruct;
+        if( bReffed || psd->RefCount() == 0 )
+        {
+            setStructs.insert( pStruct );
+        }
 
     }while( 0 );
 
@@ -2696,7 +2702,8 @@ gint32 CSetStructRefs::ExtractStructArr(
 
 gint32 CSetStructRefs::ExtractStructMap(
     ObjPtr& pMap,
-    std::set< ObjPtr >& setStructs )
+    std::set< ObjPtr >& setStructs,
+    bool bReffed )
 {
     if( pMap.IsEmpty() )
         return 0;
@@ -2725,37 +2732,40 @@ gint32 CSetStructRefs::ExtractStructMap(
             if( pet != nullptr )
             {
                 ret = ExtractStructMap(
-                    pType, setStructs );
+                    pType, setStructs, bReffed );
                 if( ERROR( ret ) )
                     break;
             }
             else if( pat != nullptr )
             {
                 ret = ExtractStructArr(
-                    pType, setStructs );
+                    pType, setStructs, bReffed );
                 if( ERROR( ret ) )
                     break;
             }
             else
             {
                 CStructRef* pRef = pType;
-                if( pRef != nullptr ){
-                std::string strName =
-                    pRef->GetName();
-
-                ObjPtr pStruct;
-                ret = g_mapDecls.GetDeclNode(
-                    strName, pStruct );
-                if( ERROR( ret ) )
+                if( pRef != nullptr )
                 {
-                    DebugPrintEx( logErr, ret,
-                        "error, %s not defined\n",
-                        strName.c_str() );
-                    break;
-                }
-                CStructDecl* psd = pStruct;
-                if( psd != nullptr )
-                    setStructs.insert( pStruct );
+                    std::string strName =
+                        pRef->GetName();
+
+                    ObjPtr pStruct;
+                    ret = g_mapDecls.GetDeclNode(
+                        strName, pStruct );
+                    if( ERROR( ret ) )
+                    {
+                        DebugPrintEx( logErr, ret,
+                            "error, %s not defined\n",
+                            strName.c_str() );
+                        break;
+                    }
+                    CStructDecl* psd = pStruct;
+                    if( bReffed || psd->RefCount() == 0 )
+                    {
+                        setStructs.insert( pStruct );
+                    }
                 }
             }
 
@@ -2771,7 +2781,8 @@ gint32 CSetStructRefs::ExtractStructMap(
 
 gint32 CSetStructRefs::ExtractStructStruct(
     ObjPtr& pStruct,
-    std::set< ObjPtr >& setStructs )
+    std::set< ObjPtr >& setStructs,
+    bool bReffed )
 {
     if( pStruct.IsEmpty() )
         return 0;
@@ -2813,20 +2824,21 @@ gint32 CSetStructRefs::ExtractStructStruct(
                 if( psd == nullptr )
                     continue;
 
-                if( !bNew )
-                    bNew = setStructs.insert(
-                         pStruct ).second;
+                if( bReffed || psd->RefCount() == 0 )
+                {
+                    setStructs.insert( pStruct );
+                }
                 continue;
             }
             else if( strSig[ 0 ] == '(' )
             {
                 ret = ExtractStructArr(
-                    elem, setStructs );                
+                    elem, setStructs, bReffed );
             }
             else if( strSig[ 0 ] == '[' )
             {
                 ret = ExtractStructMap(
-                    elem, setStructs );                
+                    elem, setStructs, bReffed );                
             }
         }
 
@@ -2844,7 +2856,6 @@ gint32 CSetStructRefs::SetStructRefs()
         if( vecIfs.empty() )
             break;
 
-        
         std::vector< ObjPtr > vecIfds;
         for( auto& elem : vecIfs )
         {
@@ -2935,12 +2946,30 @@ gint32 CSetStructRefs::SetStructRefs()
             }
         }
 
-        for( auto& elem : setStructs )
+        while( setStructs.size() > 0 )
         {
-            CStructDecl* psd = elem;
-            if( psd == nullptr )
-                continue;
-            psd->AddRef();
+            for( auto& elem : setStructs )
+            {
+                CStructDecl* psd = elem;
+                if( psd == nullptr )
+                    continue;
+                psd->AddRef();
+            }
+
+            std::set<ObjPtr> setNewStructs;
+            for( auto elem : setStructs )
+            {
+                ExtractStructStruct(
+                    elem, setNewStructs, false );
+            }
+
+            if( setNewStructs.empty() )
+            {
+                setStructs.clear();
+                break;
+            }
+            setStructs = setNewStructs;
+            setNewStructs.clear();
         }
 
     }while( 0 );
@@ -6414,57 +6443,60 @@ gint32 CExportDrivers::Output()
         std::string strAppName =
             m_pNode->GetName();
 
-        std::vector< ObjPtr > vecSvcs;
-        ret = m_pNode->GetSvcDecls( vecSvcs );
-        if( ERROR( ret ) )
-            break;
-
-        bool bStream = false;
-        for( auto& elem : vecSvcs )
+        if( g_strLang == "cpp" )
         {
-            CServiceDecl* psd = elem;
-            if( psd == nullptr )
-                continue;
-            if( psd->IsStream() )
+            std::vector< ObjPtr > vecSvcs;
+            ret = m_pNode->GetSvcDecls( vecSvcs );
+            if( ERROR( ret ) )
+                break;
+
+            bool bStream = false;
+            for( auto& elem : vecSvcs )
             {
-                bStream = true;
+                CServiceDecl* psd = elem;
+                if( psd == nullptr )
+                    continue;
+                if( psd->IsStream() )
+                {
+                    bStream = true;
+                    break;
+                }
+            }
+
+            
+            std::string strAppCli =
+                strAppName + "cli";
+
+            std::string strAppSvr =
+                strAppName + "svr";
+
+            Json::Value& oModuleArray =
+                oVal[ JSON_ATTR_MODULES ];
+
+            if( oModuleArray == Json::Value::null )
+            {
+                ret = -EINVAL;
+            }
+
+            if( !oModuleArray.isArray() )
+            {
+                ret = -EINVAL;
                 break;
             }
+
+            Json::Value oCli;
+            oCli[ JSON_ATTR_MODNAME ] = strAppCli;
+            Json::Value oDrvToLoad;
+            oDrvToLoad.append( "DBusBusDriver" );
+            if( bStream )
+                oDrvToLoad.append( "UnixSockBusDriver" );
+            oCli[ JSON_ATTR_DRVTOLOAD ] = oDrvToLoad;
+
+            Json::Value oSvr = oCli;
+            oSvr[ JSON_ATTR_MODNAME ] = strAppSvr;
+            oModuleArray.append( oSvr );
+            oModuleArray.append( oCli );
         }
-
-        
-        std::string strAppCli =
-            strAppName + "cli";
-
-        std::string strAppSvr =
-            strAppName + "svr";
-
-        Json::Value& oModuleArray =
-            oVal[ JSON_ATTR_MODULES ];
-
-        if( oModuleArray == Json::Value::null )
-        {
-            ret = -EINVAL;
-        }
-
-        if( !oModuleArray.isArray() )
-        {
-            ret = -EINVAL;
-            break;
-        }
-
-        Json::Value oCli;
-        oCli[ JSON_ATTR_MODNAME ] = strAppCli;
-        Json::Value oDrvToLoad;
-        oDrvToLoad.append( "DBusBusDriver" );
-        if( bStream )
-            oDrvToLoad.append( "UnixSockBusDriver" );
-        oCli[ JSON_ATTR_DRVTOLOAD ] = oDrvToLoad;
-
-        Json::Value oSvr = oCli;
-        oSvr[ JSON_ATTR_MODNAME ] = strAppSvr;
-        oModuleArray.append( oSvr );
-        oModuleArray.append( oCli );
 
         Json::StreamWriterBuilder oBuilder;
         oBuilder["commentStyle"] = "None";
@@ -6846,7 +6878,7 @@ gint32 CExportReadme::Output()
             << "both client and server.";
         NEW_LINE;
         CCOUT << "And please don't edit them, since they will be "
-            << "overwritten by `ridlc` without auto-backup.";
+            << "overwritten by next run of `ridlc` without auto-backup.";
         NEW_LINES( 2 );
 
         CCOUT<< "* *" << g_strAppName << "desc.json*: "
@@ -6854,7 +6886,7 @@ gint32 CExportReadme::Output()
             << "the services declared in the ridl file";
         NEW_LINE;
         CCOUT << "And please don't edit it, since they will be "
-            << "overwritten by `ridlc` and synccfg.py without backup.";
+            << "overwritten by next run of `ridlc` and synccfg.py without backup.";
         NEW_LINES( 2 );
 
         CCOUT << "* *driver.json*: "
@@ -6862,7 +6894,7 @@ gint32 CExportReadme::Output()
             << "the ports and drivers";
         NEW_LINE;
         CCOUT << "And please don't edit it, since they will be "
-            << "overwritten by `ridlc` and synccfg.py without backup.";
+            << "overwritten by next run of `ridlc` and synccfg.py without backup.";
         NEW_LINES( 2 );
 
         CCOUT << "* *Makefile*: "
@@ -6871,7 +6903,7 @@ gint32 CExportReadme::Output()
             << "with the local system settings.";
         NEW_LINE;
         CCOUT << "And please don't edit it, since it will be "
-            << "overwritten by `ridlc` and synccfg.py without backup.";
+            << "overwritten by next run of `ridlc` and synccfg.py without backup.";
         NEW_LINES( 2 );
 
         CCOUT << "* *synccfg.py*: "

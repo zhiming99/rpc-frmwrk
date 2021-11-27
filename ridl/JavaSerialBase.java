@@ -22,7 +22,12 @@
  *
  * =====================================================================================
  */
-package org.rpcf.XXXXX;
+/*
+ * This file comes with the user package because
+ * StructFactory, DeserialMaps, and DeserialArrays are
+ * only defined in the user package.
+ */
+package XXXXX;
 import java.lang.String;
 import java.util.HashMap;
 import java.util.Map;

@@ -32,8 +32,13 @@
 namespace rpcf
 {
 
-gint32 CopyFile( gint32 iFdDest,
-    const std::string& strSrcFile );
+gint32 CopyFile(
+    gint32 iFdSrc,
+    const std::string& strDestFile );
+
+gint32 CopyFile(
+    const std::string& strSrcFile,
+    gint32 iFdDest );
 
 class IFileTransfer
 {

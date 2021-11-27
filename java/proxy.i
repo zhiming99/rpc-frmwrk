@@ -147,10 +147,14 @@ class CJavaInterfBase : public T
             jobject pgctx = ( jobject )pCtx;
 
             jmethodID timercb = jenv->GetMethodID(
-                cls, "timeCallback",
+                cls, "timerCallback",
                 "(Ljava/lang/Object;"
                 "Ljava/lang/Object;I)V" );
-
+            if( timercb == nullptr )
+            {
+                ret = -ENOENT;
+                break;
+            }
             jenv->CallVoidMethod( pHost,
                 timercb, pgcb, pgctx, iRet );
 
