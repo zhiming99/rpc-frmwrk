@@ -40,7 +40,7 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 2. [`Here`](https://github.com/zhiming99/rpc-frmwrk/tree/master/test/stress) is an example of `ridlc` generated project.
 
 #### Dependency  
-This project depends on the following 3rd-party packags to build:  
+This project depends on the following 3rd-party packags at runtime:  
 1. `dbus-1.0 (dbus-devel)`
 2. `libjson-cpp (jsoncpp-devel)` 
 3. `lz4 (lz4-devel)`   
@@ -49,6 +49,7 @@ This project depends on the following 3rd-party packags to build:
 6. `MIT krb5 for authentication and access control. ( rpm: krb5-libs, krb5-devel, or deb: libkrb5-3, libkrb5-dev )`
 7. `c++11 is required, and make sure the GCC is 5.x or higher.`
 8. `python 3.5+ is required for python support.`
+9. `Java OpenJDK 8 for python support.`
 
 #### Todo
 1. Java support (coming soon)
