@@ -1,4 +1,4 @@
-package org.rpcf.XXXXX;
+package XXXXX;
 import java.lang.String;
 import java.util.HashMap;
 import java.util.Map;

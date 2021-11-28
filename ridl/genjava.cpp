@@ -29,6 +29,8 @@
 using namespace rpcf;
 #include "genjava.h"
 #include "genpy.h"
+#include <fcntl.h>
+#include "filetran.h"
 
 extern CDeclMap g_mapDecls;
 extern ObjPtr g_pRootNode;
@@ -36,6 +38,7 @@ extern CAliasMap g_mapAliases;
 extern stdstr g_strPrefix;
 
 std::map<stdstr, ObjPtr> g_mapMapTypeDecl;
+std::map<stdstr, ObjPtr> g_mapArrayTypeDecl;
 
 extern std::string g_strAppName;
 extern gint32 SetStructRefs( ObjPtr& pRoot );
@@ -1422,6 +1425,10 @@ CJavaFileSet::CJavaFileSet(
         strOutPath, "DeserialMaps.java",
         false );
 
+    GEN_FILEPATH( m_strDeserialArray, 
+        strOutPath, "DeserialArrays.java",
+        false );
+
     m_strPath = strOutPath;
 
     gint32 ret = OpenFiles();
@@ -1553,6 +1560,7 @@ gint32 CJavaFileSet::OpenFiles()
     this->OpenFile( m_strMainSvr );
     this->OpenFile( m_strReadme );
     this->OpenFile( m_strDeserialMap );
+    this->OpenFile( m_strDeserialArray );
 
     return STATUS_SUCCESS;
 }
@@ -1586,28 +1594,161 @@ gint32 FindFullPath(
     strFullPath = strSrcFile;
     return ret;
 }
-gint32 GenSerialBaseFiles(
-    CJavaWriter* pWriter, ObjPtr& pRoot )
+
+#include <sys/types.h>
+#include <sys/wait.h>
+
+gint32 Execve(
+    const char* cmd,
+    char* const args[],
+    char* const env[] )
 {
-    if( pWriter == nullptr ||
-        pRoot.IsEmpty() )
+    int ret = 0;
+    pid_t pid = fork();
+    int fd = -1;
+    if (pid == -1)
+        return ERROR_FAIL;
+
+    else if (pid != 0)
+    {
+        int status = 0;
+        while( ( ret = waitpid( pid, &status, 0 ) ) == -1 )
+        {
+            if (errno != EINTR) {
+                /* Handle error */
+                ret = -errno;
+                break;
+            }
+        }
+        if ((ret == 0) ||
+            !(WIFEXITED(status) && !WEXITSTATUS(status)))
+        {
+            /* Report unexpected child status */
+            ret = -ECHILD;
+        }
+    }
+    else
+    {
+        /* ... Initialize env as a sanitized copy of
+         * environ ... */
+        if( execve(cmd, args, env) == -1 )
+        {
+            /* Handle error */
+            printf( "error running /usr/bin/cpp %d", errno );
+            ret = -errno;
+        }
+    }
+    return ret;
+}
+
+gint32 GenSerialHelper(
+    const stdstr& strInput, 
+    const stdstr& strOutPath,
+    bool bProxy )
+{
+    gint32 ret = 0;
+    stdstr strCmd;
+    const char* args[10];
+    args[ 0 ] = "/usr/bin/cpp";
+    stdstr strArg5, strArg8;
+    strArg5 = "-DXXXXX=";
+    strArg5 += g_strPrefix + g_strAppName;
+
+    strArg8 = strOutPath;
+    char* env[ 1 ] = { nullptr };
+    if( bProxy )
+        strArg8 += "/JavaSerialHelperP.java";
+    else
+        strArg8 += "/JavaSerialHelperS.java";
+
+    if( bProxy )
+    {
+         args[1] = "-P";
+         args[2] = "-DJavaSerialImpl=JavaSerialHelperP";
+         args[3] = "-DGetIdHash=GetPeerIdHash";
+         args[4] = "-DInstType=CJavaProxyImpl" ;
+         args[5] = strArg5.c_str();
+         args[6] = strInput.c_str();
+         args[7] = "-o";
+         args[8] = strArg8.c_str();
+    }
+    else
+    {
+         args[1] = "-P";
+         args[2] = "-DJavaSerialImpl=JavaSerialHelperS";
+         args[3] = "-DGetIdHash=GetIdHashByChan";
+         args[4] = "-DInstType=CJavaServerImpl" ;
+         args[5] = strArg5.c_str();
+         args[6] = strInput.c_str();
+         args[7] = "-o";
+         args[8] = strArg8.c_str();
+    }
+
+    const char* const args2[ 10 ] = {
+        args[0], args[1], args[2], args[3],
+        args[4], args[5], args[6], 
+        args[7], args[8], nullptr
+        };
+
+    return Execve( "/usr/bin/cpp",
+        const_cast< char* const*>( args2 ),
+        env );    
+}
+
+gint32 GenSerialBase(
+    const stdstr& strInput, 
+    const stdstr& strOutPath )
+{
+    gint32 ret = 0;
+    stdstr strCmd;
+    const char* args[7];
+    args[ 0 ] = "/usr/bin/cpp";
+    stdstr strArg5, strArg8;
+    strArg5 = "-DXXXXX=";
+    strArg5 += g_strPrefix + g_strAppName;
+
+    strArg8 = strOutPath;
+    char* env[ 1 ] = { nullptr };
+
+     args[1] = "-P";
+     args[2] = strArg5.c_str();
+     args[3] = strInput.c_str();
+     args[4] = "-o";
+     args[5] = strArg8.c_str();
+
+    const char* const args2[7] = {
+        args[0], args[1], args[2], args[3],
+        args[4], args[5], nullptr 
+        };
+
+    return Execve( "/usr/bin/cpp",
+        const_cast< char* const*>( args2 ),
+        env );    
+}
+
+gint32 GenSerialBaseFiles(
+    CJavaWriter* pWriter )
+{
+    if( pWriter == nullptr )
         return -EINVAL;
 
     gint32 ret = 0;
     do{
-        stdstr strSeribase;
+        stdstr strSeriBase;
         ret = FindFullPath(
-            "JavaSerialBase.java", strSeribase );
+            "JavaSerialBase.java", strSeriBase );
         if( ERROR( ret ) )
             break;
-        stdstr strCmd =
-            "cpp -P -DXXXXX=" + g_strAppName + " ";
 
-        strCmd += strSeribase + ">" +
-            pWriter->GetOutPath() + "/JavaSerialBase.java";
-    
-        printf( "%s\n", strCmd.c_str() );
-        system( strCmd.c_str() );
+        stdstr strDstSeriBase =
+            pWriter->GetOutPath();
+        strDstSeriBase += "/JavaSerialBase.java";
+
+        ret = GenSerialBase(
+            strSeriBase,
+            strDstSeriBase );
+        if( ERROR( ret ) )
+            break;
 
         stdstr strSeriImpl;
         ret = FindFullPath(
@@ -1615,22 +1756,34 @@ gint32 GenSerialBaseFiles(
         if( ERROR( ret ) )
             break;
 
-        stdstr strCmdP = "cpp -P -DJavaSerialImpl=JavaSerialHelperP "
-            "-DGetIdHash=GetPeerIdHash -DInstType=CJavaProxyImpl " 
-            "-DXXXXX=" + g_strAppName + " " +
-            strSeriImpl + " > " + pWriter->GetOutPath() + "/" + 
-            "JavaSerialHelperP.java";
-        stdstr strCmdS = "cpp -P -DJavaSerialImpl=JavaSerialHelperS "
-            "-DGetIdHash=GetIdHashByChan -DInstType=CJavaServerImpl "
-            "-DXXXXX=" + g_strAppName + " " +
-            strSeriImpl + " > " + pWriter->GetOutPath() + "/" + 
-            "JavaSerialHelperS.java";
+        ret = access(
+            strSeriImpl.c_str(), F_OK | R_OK );
+        if( ret == -1 )
+        {
+            ret = -errno;
+            break;
+        }
 
-        printf( "%s\n", strCmdP.c_str() );
-        printf( "%s\n", strCmdS.c_str() );
+        ret = access(
+            strSeriImpl.c_str(), X_OK );
+        if( ret == 0 )
+        {
+            ret = -EBADF;
+            break;
+        }
 
-        ret = system( strCmdP.c_str() );
-        ret = system( strCmdS.c_str() );
+        ret = GenSerialHelper(
+            strSeriImpl,
+            pWriter->GetOutPath(),
+            true );
+
+        if( ERROR( ret ) )
+            break;
+
+        ret = GenSerialHelper(
+            strSeriImpl,
+            pWriter->GetOutPath(),
+            false );
 
     }while( 0 );
     
@@ -1646,7 +1799,7 @@ gint32 GenStructFilesJava(
 
     gint32 ret = 0;
     do{
-        GenSerialBaseFiles( pWriter, pRoot );
+        GenSerialBaseFiles( pWriter );
         CStatements* pStmts = pRoot;
         if( unlikely( pStmts == nullptr ) )
         {
@@ -1921,6 +2074,16 @@ gint32 GenJavaProj(
             break;
         }
 
+        oWriter.SelectDeserialArray();
+        CImplDeserialArray oida( &oWriter );
+        ret = oida.Output();
+        if( ERROR( ret ) )
+        {
+            OutputMsg( ret,
+                "error generating DeserialArrays.java" );
+            break;
+        }
+
         oWriter.SelectMainCli();
         CImplJavaMainCli ojmc( &oWriter, pRoot );
         ret = ojmc.Output();
@@ -2050,7 +2213,8 @@ gint32 CImplJavaMethodSvrBase::ImplNewCancelNotify()
         Wa( "private ICancelNotify newCancelNotify(" );
         CCOUT << "    " << strSvcName << " oHost,";
         NEW_LINE;
-        CCOUT << "JavaReqContext oContext )";
+        CCOUT << "    JavaReqContext oContext )";
+        NEW_LINE;
         BLOCK_OPEN;
         Wa( "return new ICancelNotify()" );
         BLOCK_OPEN;
@@ -2065,7 +2229,7 @@ gint32 CImplJavaMethodSvrBase::ImplNewCancelNotify()
         if( iInCount == 0 )
         {
             CCOUT << "m_oHost.on"<< strName
-                << "Canceled( m_oReqCtx, iRet )";
+                << "Canceled( m_oReqCtx, iRet );";
         }
         else
         {
@@ -2184,6 +2348,7 @@ gint32 CImplJavaMethodSvrBase::ImplReqContext()
 
             if( iOutCount > 0 )
             {
+                NEW_LINE;
                 Wa( "public Object[] getResponse()" );
                 BLOCK_OPEN;
                 {
@@ -2237,7 +2402,8 @@ gint32 CImplJavaMethodSvrBase::ImplSvcComplete()
         Wa( "    int iRet, Object ...args )" );
         BLOCK_OPEN;
         Wa( "int ret = 0;" );
-        Wa( "BufPtr _pBuf = null;" );
+        if( iOutCount > 0 )
+            Wa( "BufPtr _pBuf = null;" );
         Wa( "JavaRpcServer oHost =" );
         Wa( "    ( JavaRpcServer )m_oHost;" );
         if( iOutCount > 0 )
@@ -2249,8 +2415,9 @@ gint32 CImplJavaMethodSvrBase::ImplSvcComplete()
             CCOUT << "if( args.length != " << iOutCount << " )";
             BLOCK_OPEN;
             Wa( "iRet = -RC.EINVAL;" );
-            Wa( "    break;" );
+            CCOUT << "    break;";
             BLOCK_CLOSE;
+            NEW_LINE;
             Wa( "JavaSerialHelperS _osh =" );
             Wa( "    new JavaSerialHelperS( oHost.getInst() );" );
 
@@ -2273,9 +2440,17 @@ gint32 CImplJavaMethodSvrBase::ImplSvcComplete()
             Wa( "if( RC.ERROR( ret ) &&" );
             Wa( "    RC.SUCCEEDED( iRet ) )" );
             Wa( "    iRet = ret;" );
+            Wa( "ret = oHost.ridlOnServiceComplete(" );
+            Wa( "    getCallback(), iRet, _pBuf );" );
+            Wa( "if( _pBuf != null )" );
+            Wa( "    _pBuf.Clear();" );
         }
-        Wa( "return oHost.ridlOnServiceComplete(" );
-        Wa( "    getCallback(), iRet, _pBuf );" );
+        else
+        {
+            Wa( "ret = oHost.ridlOnServiceComplete(" );
+            Wa( "    getCallback(), iRet, null );" );
+        }
+        Wa( "return ret;" );
         BLOCK_CLOSE;
 
     }while( 0 );
@@ -2339,30 +2514,34 @@ gint32 CImplJavaMethodSvrBase::ImplInvoke()
                 break;
             CCOUT << ");";
             INDENT_DOWNL;
-            if( pNode->IsNoReply() )
+        }
+
+        if( pNode->IsNoReply() )
+        {
+            Wa( "ret = RC.STATUS_SUCCESS;" );
+        }
+        else
+        {
+            if( !pNode->IsAsyncs() )
             {
-                Wa( "ret = RC.STATUS_SUCCESS;" );
+                Wa( "if( ret == RC.STATUS_PENDING )" );
+                Wa( "    ret = RC.ERROR_STATE;" );
             }
             else
             {
-                if( !pNode->IsAsyncs() )
+                Wa( "if( ret == RC.STATUS_PENDING )" );
+                BLOCK_OPEN;
+                guint32 dwTimeout = pNode->GetTimeoutSec();
+                Wa( "oHost.getInst().SetInvTimeout(" );
+                CCOUT << "    _oReqCtx.getCallback(), " <<
+                    std::to_string( dwTimeout ) << " );";
+                NEW_LINE;
+                Wa( "ICancelNotify o =" );
+                Wa( "    newCancelNotify( oHost, _oReqCtx );" );
+                Wa( "int iRet = oHost.installCancelNotify(" );
+                Wa( "    _oReqCtx.getCallback(), o," );
+                if( iInCount > 0 )
                 {
-                    Wa( "if( ret == RC.STATUS_PENDING )" );
-                    Wa( "    ret = RC.ERROR_STATE;" );
-                }
-                else
-                {
-                    Wa( "if( ret == RC.STATUS_PENDING )" );
-                    BLOCK_OPEN;
-                    guint32 dwTimeout = pNode->GetTimeoutSec();
-                    Wa( "oHost.getInst().SetInvTimeout(" );
-                    CCOUT << "    _oReqCtx.getCallback(), " <<
-                        std::to_string( dwTimeout ) << " );";
-                    NEW_LINE;
-                    Wa( "ICancelNotify o =" );
-                    Wa( "    newCancelNotify( oHost, _oReqCtx );" );
-                    Wa( "int iRet = oHost.installCancelNotify(" );
-                    Wa( "    _oReqCtx.getCallback(), o," );
                     CCOUT << "    new Object[]"; 
                     INDENT_UPL;
                     BLOCK_OPEN;
@@ -2370,36 +2549,46 @@ gint32 CImplJavaMethodSvrBase::ImplInvoke()
                     BLOCK_CLOSE;
                     CCOUT << ");";
                     INDENT_DOWNL;
-                    Wa( "if( RC.ERROR( iRet ) )" );
-                    Wa( "    ret = iRet;" );
-                    Wa( "break;" );
-                    BLOCK_CLOSE;
                 }
+                else
+                {
+                    CCOUT << "    new Object[0] );";
+                    NEW_LINE;
+                }
+                Wa( "if( RC.ERROR( iRet ) )" );
+                Wa( "    ret = iRet;" );
+                CCOUT << "break;";
+                BLOCK_CLOSE;
+                NEW_LINE;
+            }
 
+            Wa( "if( RC.ERROR( ret ) )" );
+            if( iOutCount > 0 )
+            {
+                Wa( "    break;" );
+                Wa( "if( !_oReqCtx.hasResponse() )" );
+                Wa( "{ ret = -RC.ENODATA; break; }" );
+                CCOUT << "do";
+                BLOCK_OPEN;
+                Wa( "BufPtr _pBuf = new BufPtr( true );" );
+                Wa( "ret = _pBuf.Resize( 1024 );" );
                 Wa( "if( RC.ERROR( ret ) )" );
                 Wa( "    break;" );
-                if( iOutCount > 0 )
-                {
-                    Wa( "if( !_oReqCtx.hasResponse() )" );
-                    Wa( "{ ret = -RC.ENODATA; break; }" );
-                    CCOUT << "do";
-                    BLOCK_OPEN;
-                    Wa( "BufPtr _pBuf = new BufPtr( true );" );
-                    Wa( "ret = _pBuf.Resize( 1024 );" );
-                    Wa( "if( RC.ERROR( ret ) )" );
-                    Wa( "    break;" );
-                    Wa( "int[] _offset = new int[]{0};" );
-                    Wa( "Object[] oResp = _oReqCtx.getResponse();" );
-                    ret = os.EmitSerialArgs(
-                        pOutArgs, "oResp", true );
-                    if( ERROR( ret ) )
-                        break;
-                    Wa( "ret = _pBuf.Resize( _offset[0] );");
-                    Wa( "if( RC.ERROR( ret ) ) break;" );
-                    Wa( "jret.addElem( _pBuf );" );
-                    BLOCK_CLOSE;
-                    Wa( "while( false );" );
-                }
+                Wa( "int[] _offset = new int[]{0};" );
+                Wa( "Object[] oResp = _oReqCtx.getResponse();" );
+                ret = os.EmitSerialArgs(
+                    pOutArgs, "oResp", true );
+                if( ERROR( ret ) )
+                    break;
+                Wa( "ret = _pBuf.Resize( _offset[0] );");
+                Wa( "if( RC.ERROR( ret ) ) break;" );
+                CCOUT << "jret.addElem( _pBuf );";
+                BLOCK_CLOSE;
+                Wa( "while( false );" );
+            }
+            else
+            {
+                CCOUT << "    break;";
             }
         }
         BLOCK_CLOSE;
@@ -2470,6 +2659,7 @@ gint32 CImplJavaMethodSvrBase::OutputEvent()
             NEW_LINE;
             CCOUT << "    \"\", _pBuf );";
             NEW_LINE;
+            CCOUT << "_pBuf.Clear();";
             BLOCK_CLOSE;
             Wa( "while( false );" );
             Wa( "return ret;" );
@@ -2562,7 +2752,7 @@ int CImplJavaSvcsvrbase::Output()
             NEW_LINE;
         }
 
-        Wa( "return o;" );
+        CCOUT << "return o;";
         BLOCK_CLOSE;
         NEW_LINE;
         for( auto& elem : vecEvents )
@@ -2618,7 +2808,7 @@ gint32 CImplJavaMethodSvr::Output()
         bool bAsync = m_pNode->IsAsyncs();
         CCOUT << "// " << strIfName << "::" << strName;
         stdstr strHint;
-        if( m_pNode->IsAsyncp() )
+        if( m_pNode->IsAsyncs() )
             strHint = "async-handler";
         else
             strHint = "sync-handler";
@@ -2666,13 +2856,13 @@ gint32 CImplJavaMethodSvr::Output()
         {
             if( !m_pNode->IsNoReply() )
             {
-                Wa( "// Asynchronouse handler. Make sure to call" );
+                Wa( "// Asynchronous handler. Make sure to call" );
                 Wa( "// oReqCtx.setResponse with response" );
                 Wa( "// parameters if return immediately or call" );
             }
             else
             {
-                Wa( "// Asynchronouse handler with no-reply. " );
+                Wa( "// Asynchronous handler with no-reply. " );
                 Wa( "// Make sure to call" );
             }
             Wa( "// oReqCtx.onServiceComplete in the future" );
@@ -2908,6 +3098,13 @@ gint32 CImplJavaMethodCliBase::OutputReqSender()
         CCOUT << "    RC.propSeriProto, " << "RC.seriRidl );";
         NEW_LINE;
 
+        if( m_pNode->IsNoReply() )
+        {
+            Wa( "oParams.SetBoolProp(" );
+            CCOUT << "    RC.propNoReply, " << "true );";
+            NEW_LINE;
+        }
+
         guint32 dwTimeout = m_pNode->GetTimeoutSec();
         if( dwTimeout >= 2 )
         {
@@ -3078,12 +3275,19 @@ gint32 CImplJavaMethodCliBase::ImplMakeCall()
         {
             Wa( "jret = makeCallWithOptAsync(" );
             Wa( "    callback, oContext, pCfg, args );" );
+            if( iInCount > 0 )
+                Wa( "_pBuf.Clear();" );
             Wa( "if( jret.isPending() )" );
-            Wa( "    break;" );
+            BLOCK_OPEN;
+            Wa( "ret = RC.STATUS_PENDING;" );
+            CCOUT << "break;";
+            BLOCK_CLOSE;
         }
         else
         {
             Wa( "jret = makeCallWithOpt( pCfg, args );" );
+            if( iInCount > 0 )
+                Wa( "_pBuf.Clear();" );
             Wa( "if( jret.isPending() )" );
             Wa( "{ jret.setError( RC.ERROR_STATE ); break; }" );
         }
@@ -3552,11 +3756,14 @@ gint32 CDeclareStructJava::Output()
         CCOUT << "public class " << strName << " extends JavaSerialBase.ISerializable";
         NEW_LINE;
         BLOCK_OPEN;
-        Wa( "public static int GetStructId()" );
-        CCOUT << "{ return "<< iMsgId <<"; };";
+        char szHexId[ 32 ];
+        snprintf( szHexId,
+            sizeof( szHexId ) - 1, "0x%08X", iMsgId );
+        Wa( "public static int getStructId()" );
+        CCOUT << "{ return "<< szHexId <<"; };";
         NEW_LINES( 2 );
 
-        Wa( "public static String GetStructName()" );
+        Wa( "public static String getStructName()" );
         CCOUT << "{ return \""<< strMsgName <<"\"; };";
         NEW_LINES( 2 );
 
@@ -3584,6 +3791,12 @@ gint32 CDeclareStructJava::Output()
         Wa( "try{" );
         CCOUT << "do";
         BLOCK_OPEN;
+        CCOUT << "ret = _osh.serialInt32( _pBuf,"
+            << " _offset, " << "getStructId() );";
+        NEW_LINE;
+        Wa( "if( RC.ERROR( ret ) )" );
+        Wa( "    break;" );
+        NEW_LINE;
         ret = os.EmitSerialFields( pFields );
         if( ERROR( ret ) )
             break;
@@ -3597,14 +3810,16 @@ gint32 CDeclareStructJava::Output()
         BLOCK_CLOSE;
 
         NEW_LINE;
-        Wa( "public int deserialize(" );
-        Wa( "    ByteBuffer _bbuf )" );
+        Wa( "public int deserialize( ByteBuffer _bbuf )" );
         BLOCK_OPEN;
         Wa( "int ret = 0;" );
         Wa( "JavaSerialBase _osh = getSerialBase();" );
         Wa( "try{" );
         CCOUT << "do";
         BLOCK_OPEN;
+        Wa( "int _structId = _osh.deserialInt32( _bbuf );" );
+        Wa( "if( _structId != getStructId() )" );
+        Wa( "    break;" );
         ret = os.EmitDeserialFields( pFields );
         if( ERROR( ret ) )
             break;
@@ -3741,9 +3956,9 @@ gint32 CJavaExportReadme::Output()
             << "and definition of `main()` function server program respectively. ";
         NEW_LINE;
         CCOUT << "And you can make changes to the files to customize the program. "
-            << "The `ridlc` will not touch them if they exist in the project directory, "
-            << "when it runs again, and put the newly "
-            << "generated code in the file with '.new' as the name extension.";
+            << "The `ridlc` will not touch them if they exist in the project directory. "
+            << "When it runs again, it puts the newly "
+            << "generated code to `mainxxx.java.new` files instead.";
         NEW_LINES( 2 );
 
         for( auto& elem : vecSvcNames )
@@ -3755,9 +3970,9 @@ gint32 CJavaExportReadme::Output()
             NEW_LINE;
             CCOUT << "And you need to make changes to the files to implement the "
                 << "functionality for server/client. "
-                << "The `ridlc` will not touch them if they exist in the project directory, "
-                << "when it runs again, and put the newly "
-                << "generated code to `"<<elem  <<".java.new`.";
+                << "The `ridlc` will not touch them if they exist in the project directory. "
+                << "When it runs again, it puts the newly "
+                << "generated code to `"<<elem  <<"xxx.java.new` files instead.";
             NEW_LINES( 2 );
         }
 
@@ -3768,7 +3983,7 @@ gint32 CJavaExportReadme::Output()
                 << "utilities and helpers for the interfaces of service `" << elem << "`.";
             NEW_LINE;
             CCOUT << "And please don't edit them, since they will be "
-                << "overwritten by `ridlc` without backup.";
+                << "overwritten by next run of `ridlc` without backup.";
             NEW_LINES( 2 );
         }
 
@@ -3777,7 +3992,7 @@ gint32 CJavaExportReadme::Output()
             << "declared and referenced in the ridl file.";
         NEW_LINE;
         CCOUT << "And please don't edit it, since they will be "
-            << "overwritten by `ridlc` without auto-backup.";
+            << "overwritten by next run of `ridlc` without backup.";
         NEW_LINES( 2 );
 
         CCOUT<< "* *" << g_strAppName << "desc.json*: "
@@ -3785,7 +4000,7 @@ gint32 CJavaExportReadme::Output()
             << "the services declared in the ridl file";
         NEW_LINE;
         CCOUT << "And please don't edit it, since they will be "
-            << "overwritten by `ridlc` and synccfg.py without backup.";
+            << "overwritten by next run of `ridlc` or synccfg.py without backup.";
         NEW_LINES( 2 );
 
         CCOUT << "* *driver.json*: "
@@ -3793,7 +4008,8 @@ gint32 CJavaExportReadme::Output()
             << "the ports and drivers";
         NEW_LINE;
         CCOUT << "And please don't edit it, since they will be "
-            << "overwritten by `ridlc` and synccfg.py without backup.";
+            << "overwritten by next run of `ridlc` or synccfg.py "
+            << "without backup.";
         NEW_LINES( 2 );
 
         CCOUT << "* *Makefile*: "
@@ -3801,20 +4017,27 @@ gint32 CJavaExportReadme::Output()
             << "with the local system settings. And it does nothing else.";
         NEW_LINE;
         CCOUT << "And please don't edit it, since it will be "
-            << "overwritten by `ridlc` and synccfg.py without backup.";
+            << "overwritten by next run of `ridlc` and synccfg.py without backup.";
         NEW_LINES( 2 );
 
-        CCOUT << "* *DeserialMaps*, *JavaSerialBase.java*, *JavaSerialHelperS.java*, *JavaSerialHelperP.java*: "
+        CCOUT << "* *DeserialMaps*, *DeserialArrays*, *JavaSerialBase.java*, "
+            << "*JavaSerialHelperS.java*, *JavaSerialHelperP.java*: "
             << "Containing the utility classes for serializations.";
         NEW_LINE;
         CCOUT << "And please don't edit it, since they will be "
-            << "overwritten by `ridlc`.";
+            << "overwritten by next run of `ridlc`.";
         NEW_LINES( 2 );
 
         CCOUT << "* *synccfg.py*: "
             << "a small python script to synchronous settings "
             << "with the system settings, just ignore it.";
         NEW_LINES(2);
+        CCOUT <<"* **run:** you can run `java org.rpcf."<<g_strAppName<<".mainsvr`"
+            << " and `java org.rpcf."<<g_strAppName<<".maincli` to start the server "
+            << "and client. Also make sure to run `make` to update the configuration"
+            << " files, that is, the `"<< g_strAppName <<"desc.json` and `driver.json`.";
+        NEW_LINES(2);
+
         CCOUT << "**Note**: the files in bold text need your further implementation. "
             << "And files in italic text do not. And of course, "
             << "you can still customized the italic files, but be aware they "
@@ -3866,7 +4089,6 @@ gint32 CImplDeserialMap::Output()
     gint32 ret = 0;
 
     do{
-        NEW_LINE;
         Wa( "public class DeserialMaps" );
         BLOCK_OPEN;
         Wa( "public static Map<?,?> deserialMap(" );
@@ -3928,7 +4150,7 @@ gint32 CImplDeserialMap::Output()
             Wa( "public Map<?, ?>  deserialMap(" );
             Wa( "    JavaSerialBase osb, ByteBuffer bbuf, String sig )" );
             BLOCK_OPEN;
-            CCOUT << "if( sig != \""<< strSig << "\" )";
+            CCOUT << "if( !sig.equals(  \""<< strSig << "\" ) )";
             NEW_LINE;
             Wa( "    throw new IllegalArgumentException(" );
             CCOUT << "        \"deserialMap[" << strTypeText << "]\" + ";
@@ -4077,6 +4299,8 @@ gint32 CImplJavaMainCli::Output()
         INDENT_DOWNL;
         CCOUT << "}while( false );";
         NEW_LINES(2);
+        Wa( "oSvcCli.stop();" );
+        Wa( "m_oCtx.stop();" );
         CCOUT << "return;";
         BLOCK_CLOSE; 
         BLOCK_CLOSE; 
@@ -4157,11 +4381,138 @@ gint32 CImplJavaMainSvr::Output()
         Wa( "catch( InterruptedException e ){}" );
         CCOUT << "}while( true );";
         NEW_LINES(2);
+        Wa( "oSvcSvr.stop();" );
+        Wa( "m_oCtx.stop();" );
         CCOUT << "return;";
         BLOCK_CLOSE; 
         BLOCK_CLOSE; 
 
     }while( 0 );
 
+    return ret;
+}
+
+CImplDeserialArray::CImplDeserialArray(
+    CJavaWriter* pWriter )
+{
+    m_pWriter = pWriter;
+}
+
+gint32 CImplDeserialArray::Output()
+{
+    CJavaSnippet os( m_pWriter );
+    os.EmitBanner();
+    gint32 ret = 0;
+
+    do{
+        Wa( "public class DeserialArrays" );
+        BLOCK_OPEN;
+        Wa( "public static Object deserialArray(" );
+        Wa( "    JavaSerialBase osb, ByteBuffer bbuf, String sig )" );
+        BLOCK_OPEN;
+        Wa( "IDeserialArray o = null;" );
+        Wa( "if( m_oDeserialArrays.containsKey( sig ) )" );
+        Wa( "    o = m_oDeserialArrays.get( sig );" );
+        Wa( "if( o == null )" );
+        Wa( "    return null;" );
+        CCOUT << "return o.deserialArray( osb, bbuf, sig );";
+        BLOCK_CLOSE;
+        NEW_LINES( 2 );
+        Wa( "static public interface IDeserialArray" );
+        BLOCK_OPEN;    
+        Wa( "public abstract Object deserialArray(" );
+        CCOUT << "    JavaSerialBase osb, ByteBuffer bbuf, String sig );";
+        BLOCK_CLOSE; 
+        NEW_LINES( 2 );
+        Wa( "static Map< String, IDeserialArray >" );
+        Wa( "    m_oDeserialArrays = initMaps();" );
+        NEW_LINE;
+        Wa( "static Map< String, IDeserialArray > initMaps()" );
+        BLOCK_OPEN; 
+        Wa( "Map< String, IDeserialArray > o =" );
+        Wa( "    new HashMap< String, IDeserialArray >();" );
+        Wa( "IDeserialArray val;" );
+        for( auto& elem : g_mapArrayTypeDecl )
+        {
+            CArrayType* pat = elem.second;
+            stdstr strSig = elem.first;
+            stdstr strTypeText;
+            ret = CJTypeHelper::GetTypeText(
+                elem.second, strTypeText );
+            if( ERROR( ret ) )
+                break;
+
+            stdstr strValType1;
+            ObjPtr pValType = pat->GetElemType();
+
+            ret = CJTypeHelper::GetTypeText(
+                pValType, strValType1 );
+            if( ERROR( ret ) )
+                break;
+
+            stdstr strValType;
+            CJTypeHelper::GetObjectPrimitive(
+                strValType1, strValType );
+
+            stdstr sigElem;
+            CAstNodeBase* pNode = pValType;
+            if( pNode == nullptr )
+                continue;
+
+            sigElem = pNode->GetSignature();
+            if( sigElem.size() == 1 )
+            {
+                bool bPrimitive = false;
+                switch( strValType[ 0 ] )
+                {
+                case 'Q':
+                case 'q':
+                case 'h':
+                case 'D':
+                case 'd':
+                case 'W':
+                case 'w':
+                case 'f':
+                case 'F':
+                case 'b':
+                case 'B':
+                    bPrimitive = true;
+                    break;
+                default:
+                    break;
+                }
+                if( bPrimitive )
+                    continue;
+            }
+
+            Wa( "val = new IDeserialArray() " );
+            BLOCK_OPEN;
+
+            Wa( "public Object  deserialArray(" );
+            Wa( "    JavaSerialBase osb, ByteBuffer bbuf, String sig )" );
+            BLOCK_OPEN;
+            CCOUT << "if( !sig.equals( \""<< strSig << "\" ) )";
+            NEW_LINE;
+            Wa( "    throw new IllegalArgumentException(" );
+            CCOUT << "        \"deserialArray[" << strTypeText << "]\" + ";
+            NEW_LINE;
+            CCOUT << "        " << "\" error signature\" );";
+            NEW_LINE;
+            Wa( "return osb.deserialArrayInternal(" );
+            CCOUT << "    bbuf, sig, "
+                << strValType << ".class );";
+
+            BLOCK_CLOSE;
+            BLOCK_CLOSE;
+            CCOUT << ";";
+            NEW_LINE;
+            CCOUT << "o.put( \"" << strSig << "\", val );";
+            NEW_LINES( 2 );
+        }
+        CCOUT << "return o;";
+        BLOCK_CLOSE; // initMaps
+        BLOCK_CLOSE;// DeserialArrays
+
+    }while( 0 );
     return ret;
 }

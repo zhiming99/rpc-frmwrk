@@ -114,6 +114,9 @@ The above example shows most of the statements ridl supports. ridl now has 7 typ
 
         -j:     To generate Java skelton files       
         
+        -P:     To specify the prefix for the target java package. The java package name would be
+                <prefix>.<appname>.
+        
         -l:     To output a shared library instead of executables. This option is for CPP project only
 
 ```
@@ -176,7 +179,8 @@ And please don't edit it, since it will be overwritten by `ridlc` and synccfg.py
 And please don't edit it, since they will be overwritten by `ridlc`.
 
 * *synccfg.py*: a small python script to synchronous settings with the system settings, just ignore it.
+* **run:** you can run `java org.rpcf.example.mainsvr` and `java org.rpcf.example.maincli` to start the server and client. Before the first run after running `ridlc` successfully, make sure to run `make` to update the configuration file, that is, the `exampledesc.json` file.
 
 
-### Interchangable client and server between C++ and Python
-You can connect the C++ server with a python client or a Python server with a C++ client as long as both are generated with the same ridl file.
+### Interchangable client and server between C++, Python, and Java.
+You can connect the C++ server with a python client or a Python server with a Java client as long as both are generated with the same ridl file.

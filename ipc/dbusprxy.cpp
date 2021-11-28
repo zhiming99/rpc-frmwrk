@@ -683,6 +683,16 @@ gint32 CDBusProxyPdo::HandleConnRequest(
                 IFNAME_REQFORWARDERAUTH );
         }
         
+        CCfgOpener oCallOptions;
+        guint32 dwCallFlags = ( CF_WITH_REPLY |
+            DBUS_MESSAGE_TYPE_METHOD_CALL );
+
+        oCallOptions[ propCallFlags ] =
+            dwCallFlags;
+
+        oParams.SetObjPtr( propCallOptions,
+            ObjPtr( oCallOptions.GetCfg() ) );
+
         oParams.SetStrProp( propMethodName, strCmd );
 
         BufPtr pBuf( true );

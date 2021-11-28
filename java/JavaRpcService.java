@@ -255,9 +255,13 @@ abstract public class JavaRpcService
 
         if( oDesc == null )
             oDesc = new CParamList();
-        JRetVal jret = ( JRetVal )
-            m_oInst.StartStream(
-                ( ObjPtr )oDesc.GetCfg() );
+        
+        JRetVal jret = ( JRetVal )oDesc.GetCfg();
+        if( jret.ERROR() )
+            return jret;
+
+        ObjPtr o = ( ObjPtr )jret.getAt( 0 );
+        jret = ( JRetVal )m_oInst.StartStream( o );
         if( jret == null )
         {
             jret = new JRetVal();

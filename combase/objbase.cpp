@@ -208,18 +208,47 @@ gint32 GetEnvLibPath( std::set< std::string >& oSet )
     return STATUS_SUCCESS;
 }
 
-gint32 GetLibPathName( std::string& strResult,
+gint32 GetLibPathName(
+    std::string& strResult,
     const char* szLibName )
 {
-    char cmd[ 256 ];
     if( szLibName == nullptr )
         szLibName = "libcombase.so";
 
-    snprintf( cmd, sizeof( cmd ),
-        "grep '%s' /proc/%d/maps |  awk '{print $6}' | uniq -d",
-        szLibName, getpid() );
+    bool bFound = false;
+    char szMap[ 128 ];
 
-    return GetCmdOutput( strResult, cmd );
+    snprintf( szMap, sizeof( szMap ) - 1,
+        "/proc/%d/maps", getpid() );
+
+    FILE* fp = fopen( szMap, "r");
+    if( fp == nullptr )
+        return -errno;
+
+    char line[ 1024 ];
+    while( fgets( line, sizeof( line ), fp ) != NULL)
+    {
+        char* szPath = strchr(line, '/');
+        if( szPath == nullptr )
+            continue;
+        char* szLoc = strstr( szPath, szLibName );
+        if( szLoc == nullptr )
+            continue;
+
+        char* szNewLine = strchr( szLoc, '\n' );
+        if( szNewLine != nullptr )
+            *szNewLine = 0;
+
+        strResult = szPath;
+        bFound = true;
+        break;
+    }
+
+    fclose( fp );
+    fp = nullptr;
+    if( !bFound )
+        return -ENOENT;
+    return 0;
 }
 
 gint32 GetLibPath( std::string& strResult,
@@ -246,12 +275,12 @@ gint32 GetLibPath( std::string& strResult,
 gint32 GetModulePath( std::string& strResult )
 {
     char cmd[ 1024 ];
-
-    snprintf( cmd, sizeof( cmd ),
-        "dirname `awk '{print $6}' /proc/%d/maps | awk '/^./{print $1}' | head -n 1`",
-        getpid() );
-
-    return GetCmdOutput( strResult, cmd );
+    gint32 ret = readlink(
+        "/proc/self/exe", cmd, sizeof( cmd ) - 1 );
+    if( ret < 0 )
+        return -errno;
+    strResult = cmd;
+    return 0;
 }
 
 gint32 FindInstCfg(

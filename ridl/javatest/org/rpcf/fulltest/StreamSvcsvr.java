@@ -24,12 +24,11 @@ public class StreamSvcsvr extends StreamSvcsvrbase
         fi.fileHeader = (fileName + "Header").getBytes(StandardCharsets.UTF_8);
         String[] listStrs = new String[]{ "alem00", "alem01"};
         String[] listStrs1 = new String[]{ "alem10", "alem11"};
-        fi.vecLines[0] = listStrs;
-        fi.vecLines[1] = listStrs1;
+        fi.vecLines = new String[][]{listStrs, listStrs1};
 
         byte[] val = "bibi".getBytes(StandardCharsets.UTF_8);
+        fi.vecBlocks = new HashMap<>();
         fi.vecBlocks.put( 0, val );
-
         val = "nono".getBytes(StandardCharsets.UTF_8);
         fi.vecBlocks.put( 1, val );
         return fi;
@@ -147,13 +146,13 @@ public class StreamSvcsvr extends StreamSvcsvrbase
     // override the default version of acceptNewStream
     public int acceptNewStream( ObjPtr pCtx, CfgPtr pDataDesc )
     {
-        rpcbase.JavaOutputMsg("AcceptNewStream " + pDataDesc.toString() );
+        rpcbase.JavaOutputMsg("acceptNewStream " + pDataDesc.toString() );
         return RC.STATUS_SUCCESS;
     }
 
     public int onStmReady( long hChannel )
     {
-        rpcbase.JavaOutputMsg( "OnStmReady " + Long.toString( hChannel) );
+        rpcbase.JavaOutputMsg( "onStmReady " + Long.toString( hChannel) );
         // send a notification to notify the server side is ready
         writeStream( hChannel, "RDY".getBytes(StandardCharsets.UTF_8));
         return 0;
@@ -161,7 +160,7 @@ public class StreamSvcsvr extends StreamSvcsvrbase
     public int onStmClosing( long hChannel )
     {
         if( m_hChannel == hChannel ) {
-            rpcbase.JavaOutputMsg("OnStmClosing " +
+            rpcbase.JavaOutputMsg("onStmClosing " +
                     Long.toString(hChannel));
             m_hChannel = 0;
         }

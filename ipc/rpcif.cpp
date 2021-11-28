@@ -6150,6 +6150,17 @@ gint32 CInterfaceServer::DoInvoke_SendData(
             if( ERROR( ret ) )
                 break;
 
+            CIfInvokeMethodTask* pInv =
+                ObjPtr( pCallback );
+            CCfgOpener oTaskCfg(
+                ( IConfigDb* )pInv->GetConfig() );
+
+            if( pDataDesc->exist( propCallOptions ) )
+            {
+                oTaskCfg.SetObjPtr(
+                    propReqPtr, ObjPtr( pDataDesc ) );
+            }
+
             if( strMethod == SYS_METHOD_SENDDATA )
             {
                 guint32 iArgCount = GetArgCount(
@@ -6171,28 +6182,14 @@ gint32 CInterfaceServer::DoInvoke_SendData(
                 guint32 dwSize =
                     ( guint32& )*vecArgs[ 3 ].second;
 
-                if( pDataDesc->exist( propCallOptions ) )
-                {
-                    CfgPtr pCallOpt( true );
-                    if( !pCallOpt.IsEmpty() )
-                    {
-                        ret = oCfg.CopyProp(
-                            propCallOptions,
-                            ( IConfigDb* )pDataDesc );
-                    }
-                }
-
                 ret = SendData( pDataDesc, fd,
                     dwOffset, dwSize, pCallback );
 
                 if( ret == STATUS_PENDING )
                 {
                     // keep-alive settings
-                    CCfgOpenerObj oTaskCfg( pCallback );
                     SET_RMT_TASKID(
                         ( IConfigDb* )pDataDesc, oTaskCfg );
-                    oTaskCfg.SetObjPtr(
-                        propReqPtr, ObjPtr( pDataDesc ) );
                     break;
                 }
                 ret = oResp.SetIntProp(
@@ -6223,17 +6220,6 @@ gint32 CInterfaceServer::DoInvoke_SendData(
                     break;
                 }
 
-                if( pDataDesc->exist( propCallOptions ) )
-                {
-                    CfgPtr pCallOpt( true );
-                    if( !pCallOpt.IsEmpty() )
-                    {
-                        ret = oCfg.CopyProp(
-                            propCallOptions,
-                            ( IConfigDb* )pDataDesc );
-                    }
-                }
-
                 int fd =
                     ( guint32& )*vecArgs[ 1 ].second;
 
@@ -6249,12 +6235,8 @@ gint32 CInterfaceServer::DoInvoke_SendData(
                 if( ret == STATUS_PENDING )
                 {
                     // keep-alive settings
-                    CCfgOpenerObj oTaskCfg( pCallback );
                     SET_RMT_TASKID(
                         ( IConfigDb* )pDataDesc, oTaskCfg );
-
-                    oTaskCfg.SetObjPtr(
-                        propReqPtr, ObjPtr( pDataDesc ) );
 
                     break;
                 }
@@ -7355,7 +7337,7 @@ gint32 CInterfaceServer::OnPostStop(
 gint32 CInterfaceServer::OnPreStart(
     IEventSink* pCallback )
 {
-    CParamList oParams;
+    /*CParamList oParams;
     oParams[ propIfPtr ] = ObjPtr( this );
     gint32 ret = m_pConnMgr.NewObj(
         clsid( CIfSvrConnMgr ),
@@ -7363,6 +7345,7 @@ gint32 CInterfaceServer::OnPreStart(
 
     if( ERROR( ret ) )
         return ret;
+    */
 
     return super::OnPreStart( pCallback );
 }

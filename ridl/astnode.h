@@ -56,6 +56,7 @@ if( !pObj.IsEmpty() ) \
 
 extern std::map< gint32, char > g_mapTypeSig;
 extern std::map<stdstr, ObjPtr> g_mapMapTypeDecl;
+extern std::map<stdstr, ObjPtr> g_mapArrayTypeDecl;
 std::string GetTypeSig( ObjPtr& pObj );
 extern stdstr g_strLang;
 
@@ -532,9 +533,21 @@ struct CArrayType : public CPrimeType
 
     ObjPtr m_pElemType;
 
+    void AddToArrayTypeMap()
+    {
+        if( g_strLang != "java" )
+            return;
+        stdstr strSig = GetSignature();
+        g_mapArrayTypeDecl[ strSig ] =
+            ObjPtr( this );
+    }
+
     void SetElemType( ObjPtr& pElem )
     {
         m_pElemType = pElem;
+        if( GetClsid() ==
+            clsid( CArrayType ) )
+            AddToArrayTypeMap();
     }
 
     ObjPtr& GetElemType()

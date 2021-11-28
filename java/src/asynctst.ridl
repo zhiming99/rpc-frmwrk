@@ -1,0 +1,13 @@
+appname "asynctst";
+
+interface IAsyncTest
+{
+    [timeout=97, async_s]LongWait( string i0 ) returns ( string i0r );
+    [async_p]LongWaitNoParam() returns ();
+    [async_s]LongWait2( string i1 ) returns ( string i1r );
+};
+
+service AsyncTest [ timeout=100 ]
+{
+    interface IAsyncTest;
+};

@@ -12,17 +12,22 @@ specified language, Python or C++ at present.
 .SH OPTIONS
 .TP
 .BR \-I " "\fIpath\fR
-Specify the path to search for the included files. This option can repeat many times.
+To specify the path to search for the included files. This option can repeat many times.
 .TP
 .BR \-O " "\fIpath\fR
-Specify the path to store the generated files.
+To specify the path to store the generated files.
 .TP
 .BR \-p " "
-Instruct the ridlc to generate the Python skelton files.
+To generate the Python skelton files.
+.TP
+.BR \-j " "
+To generate the Java skelton files.
+.TP
+.BR \-P " "\fIprefix\fR
+To specify the prefix of the Java package. This option is only effective for Java.
 .TP
 .BR \-l " "
-Instruct the ridlc to generate Makefile to output a shared library instead of a
-program. This options works only for C++.
+To build a shared library instead of a program. This option works for C++ only.
 
 .SH SEE ALSO
 ridl(7), rpcrouter(1)

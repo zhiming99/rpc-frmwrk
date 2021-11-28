@@ -1,9 +1,10 @@
 package org.rpcf.rpcbase;
 public class JavaReqContext 
 {
-    protected Object m_oHost;
-    protected ObjPtr m_pCallback;
+    protected Object m_oHost = null;
+    protected ObjPtr m_pCallback = null;
     protected boolean m_bSet = false;
+    protected Object m_oUserData = null;
 
     public JavaReqContext( Object oHost,
         ObjPtr pCallback )
@@ -11,6 +12,12 @@ public class JavaReqContext
         m_pCallback = pCallback;
         m_oHost = oHost;
     }
+
+    public void setUserData( Object oData )
+    { m_oUserData = oData; }
+
+    public Object getUserData()
+    { return m_oUserData; }
 
     public ObjPtr getCallback()
     { return m_pCallback; };
