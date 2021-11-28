@@ -1,0 +1,41 @@
+appname "iftest";
+struct GlobalFeature
+{
+    map<int32, string> adFeature;
+    map<int32, string> extendAdFeature;
+    map<int32, int32> adHistoricalStatisticsFeature;
+    map<int32, int32> userRealtimeStatisticsFeature;
+    map<int32, int32> extenduserRealtimeStatisticsFeature;
+    map<int32, int32> adRealtimeStatisticsFeature;
+    string adFormId;
+    string materialId;
+    string creativeId;
+    string sponsorId;
+};
+
+struct GlobalFeatureList
+{
+    map<int32, string> userFeature;
+    map<int32, string> extendUserFeature;
+    map<string, string> userOnlineFeature;
+    map<int32, int32> userHistoricalStatisticsFeature;
+    map<int32, string> sceneFeature;
+    array<GlobalFeature> body;
+    map<string, int32> formL24Exposure;
+    map<string, int32> industryL24Exposure;
+    string flightId;
+    string requestId;
+    int64 time;
+    int64 flag;
+};
+
+interface IEchoThings
+{
+    Echo( GlobalFeatureList i0 )
+        returns ( GlobalFeatureList i0r ) ;
+};
+
+service IfTest [ timeout=100 ]
+{
+    interface IEchoThings;
+};

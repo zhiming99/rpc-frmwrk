@@ -2856,13 +2856,13 @@ gint32 CImplJavaMethodSvr::Output()
         {
             if( !m_pNode->IsNoReply() )
             {
-                Wa( "// Asynchronouse handler. Make sure to call" );
+                Wa( "// Asynchronous handler. Make sure to call" );
                 Wa( "// oReqCtx.setResponse with response" );
                 Wa( "// parameters if return immediately or call" );
             }
             else
             {
-                Wa( "// Asynchronouse handler with no-reply. " );
+                Wa( "// Asynchronous handler with no-reply. " );
                 Wa( "// Make sure to call" );
             }
             Wa( "// oReqCtx.onServiceComplete in the future" );
@@ -4020,7 +4020,8 @@ gint32 CJavaExportReadme::Output()
             << "overwritten by next run of `ridlc` and synccfg.py without backup.";
         NEW_LINES( 2 );
 
-        CCOUT << "* *DeserialMaps*, *JavaSerialBase.java*, *JavaSerialHelperS.java*, *JavaSerialHelperP.java*: "
+        CCOUT << "* *DeserialMaps*, *DeserialArrays*, *JavaSerialBase.java*, "
+            << "*JavaSerialHelperS.java*, *JavaSerialHelperP.java*: "
             << "Containing the utility classes for serializations.";
         NEW_LINE;
         CCOUT << "And please don't edit it, since they will be "

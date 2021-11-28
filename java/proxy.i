@@ -1453,8 +1453,11 @@ class CJavaInterfBase : public T
                 jenv->GetObjectClass( pHost );
 
             jmethodID deferCall = jenv->GetMethodID(
-                cls, "DeferCallback",
+                cls, "deferCallback",
                 "(Ljava/lang/Object;Ljava/lang/Object;)V" );
+
+            if( deferCall == nullptr )
+                break;
 
             jenv->CallVoidMethod( pHost,
                 deferCall, pjCb, pjArgs );
