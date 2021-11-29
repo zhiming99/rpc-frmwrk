@@ -1319,7 +1319,7 @@ class CJavaInterfBase : public T
             -1, pTask, this,
             &CJavaInterfBase::JavaCancelNotify,
             pCallback, 0,
-            ( intptr_t )pCb,
+            ( intptr_t )pjCb,
             ( intptr_t)pjResp );    
 
         if( SUCCEEDED( ret ) )

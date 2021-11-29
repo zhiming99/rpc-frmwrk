@@ -150,7 +150,7 @@ abstract public class JavaRpcService
         for( Object i : listArgs )
             jret.addElem( i );
         return m_oInst.InstallCancelNotify(
-            task, callback, listArgs );
+            task, callback, jret );
     }
 
     /* called from the underlying C++ code on
@@ -191,11 +191,12 @@ abstract public class JavaRpcService
                 int iSize = jret.getParamCount();
                 if( jret.ERROR() || iSize == 0 )
                 {
+                    for( int i = 0; i < iSize; i++ )
+                        listArgs.set( i + 2, jret.getAt( i ) );
                     invokeCallback( asyncb, listArgs );
                     break;
                 }
-                if( seriProto ==
-                    RC.seriNone )
+                if( seriProto == RC.seriNone )
                 {
                     if( iArgNum != iSize )
                     {
@@ -208,8 +209,7 @@ abstract public class JavaRpcService
 
                     invokeCallback( asyncb, listArgs );
                 }
-                else if( seriProto ==
-                        RC.seriRidl )
+                else if( seriProto == RC.seriRidl )
                 {
                     if( iArgNum == 1 && iArgNum == iSize ) 
                         listArgs.set( 2, jret.getAt( 0 ) );
@@ -607,6 +607,11 @@ abstract public class JavaRpcService
 
             if( isServer() )
             {
+                if( nameComps[0].equals("RpcCall") )
+                {
+                    oResp.setError(-RC.ENOTSUP);
+                    break;
+                }
                 if( !nameComps[ 0 ].equals(
                     "UserMethod" ) )
                 {
@@ -616,8 +621,17 @@ abstract public class JavaRpcService
             }
             else 
             {
-                if( !nameComps[ 0 ].equals(
-                    "UserEvent" ) )
+                if( nameComps[0].equals("RpcEvt") )
+                {
+                    oResp.setError(-RC.ENOTSUP);
+                    break;
+                }
+                if( !nameComps[ 0 ].equals("UserMethod" ))
+                {
+                    oResp.setError( -RC.EINVAL );
+                    break;
+                }
+                if( !nameComps[ 0 ].equals("UserEvent" ))
                 {
                     oResp.setError( -RC.EINVAL );
                     break;

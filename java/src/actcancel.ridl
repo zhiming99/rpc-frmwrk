@@ -1,0 +1,14 @@
+appname "actcancel";
+
+interface IActiveCancel
+{
+    // to be able to actively cancel a task, the
+    // request must be sent and handled asynchronously
+    // on both server and client side.
+    [async]LongWait( string i0 ) returns ( string i0r );
+};
+
+service ActiveCancel
+{
+    interface IActiveCancel;
+};

@@ -1,4 +1,4 @@
-JDKDIR=$$(dirname $$(realpath `which java`))/../../
+JDKDIR=$$(dirname $$(realpath `which javac`))/../
 all:
 	cpp -P -DJavaRpcService=JavaRpcServiceS -DInstType=CJavaServerImpl -DIsServer="isServer(){ return true;}" JavaRpcService.java>src/org/rpcf/rpcbase/JavaRpcServiceS.java
 	cpp -P -DJavaRpcService=JavaRpcServiceP -DInstType=CJavaProxyImpl -DIsServer="isServer(){ return false;}" JavaRpcService.java>src/org/rpcf/rpcbase/JavaRpcServiceP.java

@@ -2516,80 +2516,75 @@ gint32 CImplJavaMethodSvrBase::ImplInvoke()
             INDENT_DOWNL;
         }
 
-        if( pNode->IsNoReply() )
+        if( !pNode->IsAsyncs() )
         {
-            Wa( "ret = RC.STATUS_SUCCESS;" );
+            Wa( "if( ret == RC.STATUS_PENDING )" );
+            Wa( "    ret = RC.ERROR_STATE;" );
         }
         else
         {
-            if( !pNode->IsAsyncs() )
+            // we allow no-reply request to be able to
+            // return pending too
+            Wa( "if( ret == RC.STATUS_PENDING )" );
+            BLOCK_OPEN;
+            guint32 dwTimeout = pNode->GetTimeoutSec();
+            Wa( "oHost.getInst().SetInvTimeout(" );
+            CCOUT << "    _oReqCtx.getCallback(), " <<
+                std::to_string( dwTimeout ) << " );";
+            NEW_LINE;
+            Wa( "ICancelNotify o =" );
+            Wa( "    newCancelNotify( oHost, _oReqCtx );" );
+            Wa( "int iRet = oHost.installCancelNotify(" );
+            Wa( "    _oReqCtx.getCallback(), o," );
+            if( iInCount > 0 )
             {
-                Wa( "if( ret == RC.STATUS_PENDING )" );
-                Wa( "    ret = RC.ERROR_STATE;" );
+                CCOUT << "    new Object[]"; 
+                INDENT_UPL;
+                BLOCK_OPEN;
+                ret = os.EmitActArgList( pInArgs );
+                BLOCK_CLOSE;
+                CCOUT << ");";
+                INDENT_DOWNL;
             }
             else
             {
-                Wa( "if( ret == RC.STATUS_PENDING )" );
-                BLOCK_OPEN;
-                guint32 dwTimeout = pNode->GetTimeoutSec();
-                Wa( "oHost.getInst().SetInvTimeout(" );
-                CCOUT << "    _oReqCtx.getCallback(), " <<
-                    std::to_string( dwTimeout ) << " );";
-                NEW_LINE;
-                Wa( "ICancelNotify o =" );
-                Wa( "    newCancelNotify( oHost, _oReqCtx );" );
-                Wa( "int iRet = oHost.installCancelNotify(" );
-                Wa( "    _oReqCtx.getCallback(), o," );
-                if( iInCount > 0 )
-                {
-                    CCOUT << "    new Object[]"; 
-                    INDENT_UPL;
-                    BLOCK_OPEN;
-                    ret = os.EmitActArgList( pInArgs );
-                    BLOCK_CLOSE;
-                    CCOUT << ");";
-                    INDENT_DOWNL;
-                }
-                else
-                {
-                    CCOUT << "    new Object[0] );";
-                    NEW_LINE;
-                }
-                Wa( "if( RC.ERROR( iRet ) )" );
-                Wa( "    ret = iRet;" );
-                CCOUT << "break;";
-                BLOCK_CLOSE;
+                CCOUT << "    new Object[0] );";
                 NEW_LINE;
             }
+            Wa( "if( RC.ERROR( iRet ) )" );
+            Wa( "    ret = iRet;" );
+            CCOUT << "break;";
+            BLOCK_CLOSE;
+            NEW_LINE;
+        }
 
+        Wa( "if( RC.ERROR( ret ) )" );
+        if( iOutCount > 0 )
+        {
+            Wa( "    break;" );
+            Wa( "if( !_oReqCtx.hasResponse() )" );
+            Wa( "{ ret = -RC.ENODATA; break; }" );
+            CCOUT << "do";
+            BLOCK_OPEN;
+            Wa( "BufPtr _pBuf = new BufPtr( true );" );
+            Wa( "ret = _pBuf.Resize( 1024 );" );
             Wa( "if( RC.ERROR( ret ) )" );
-            if( iOutCount > 0 )
-            {
-                Wa( "    break;" );
-                Wa( "if( !_oReqCtx.hasResponse() )" );
-                Wa( "{ ret = -RC.ENODATA; break; }" );
-                CCOUT << "do";
-                BLOCK_OPEN;
-                Wa( "BufPtr _pBuf = new BufPtr( true );" );
-                Wa( "ret = _pBuf.Resize( 1024 );" );
-                Wa( "if( RC.ERROR( ret ) )" );
-                Wa( "    break;" );
-                Wa( "int[] _offset = new int[]{0};" );
-                Wa( "Object[] oResp = _oReqCtx.getResponse();" );
-                ret = os.EmitSerialArgs(
-                    pOutArgs, "oResp", true );
-                if( ERROR( ret ) )
-                    break;
-                Wa( "ret = _pBuf.Resize( _offset[0] );");
-                Wa( "if( RC.ERROR( ret ) ) break;" );
-                CCOUT << "jret.addElem( _pBuf );";
-                BLOCK_CLOSE;
-                Wa( "while( false );" );
-            }
-            else
-            {
-                CCOUT << "    break;";
-            }
+            Wa( "    break;" );
+            Wa( "int[] _offset = new int[]{0};" );
+            Wa( "Object[] oResp = _oReqCtx.getResponse();" );
+            ret = os.EmitSerialArgs(
+                pOutArgs, "oResp", true );
+            if( ERROR( ret ) )
+                break;
+            Wa( "ret = _pBuf.Resize( _offset[0] );");
+            Wa( "if( RC.ERROR( ret ) ) break;" );
+            CCOUT << "jret.addElem( _pBuf );";
+            BLOCK_CLOSE;
+            Wa( "while( false );" );
+        }
+        else
+        {
+            CCOUT << "    break;";
         }
         BLOCK_CLOSE;
         Wa( "while( false );" );

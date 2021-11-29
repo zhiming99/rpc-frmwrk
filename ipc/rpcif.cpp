@@ -5708,13 +5708,14 @@ gint32 CInterfaceProxy::CancelRequest(
         return -EINVAL;
 
     gint32 ret = 0;
+    gint32 iRet = 0;
     do{
         // this is a built-in request
         guint64 qwThisTask = 0;
-        ret = UserCancelRequest(
+        iRet = UserCancelRequest(
             qwThisTask, qwTaskId );
 
-        if( SUCCEEDED( ret ) )
+        if( SUCCEEDED( iRet ) )
             break;
 
         TaskGrpPtr pTaskGrp;
@@ -5736,6 +5737,9 @@ gint32 CInterfaceProxy::CancelRequest(
             0, nullptr );
 
    }while( 0 ); 
+
+   if( ERROR( iRet ) )
+       return iRet;
 
    return ret;
 }
