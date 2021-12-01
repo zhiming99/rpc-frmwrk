@@ -2440,15 +2440,24 @@ gint32 CImplJavaMethodSvrBase::ImplSvcComplete()
             Wa( "if( RC.ERROR( ret ) &&" );
             Wa( "    RC.SUCCEEDED( iRet ) )" );
             Wa( "    iRet = ret;" );
-            Wa( "ret = oHost.ridlOnServiceComplete(" );
-            Wa( "    getCallback(), iRet, _pBuf );" );
-            Wa( "if( _pBuf != null )" );
-            Wa( "    _pBuf.Clear();" );
+            Wa( "ObjPtr oCallback_ = getCallback();" );
+            Wa( "if( oCallback_ != null )" );
+            Wa( "{" );
+            Wa( "    ret = oHost.ridlOnServiceComplete(" );
+            Wa( "        oCallback_, iRet, _pBuf );" );
+            Wa( "    oCallback_.Clear();" );
+            Wa( "}" );
+            Wa( "_pBuf.Clear();" );
         }
         else
         {
-            Wa( "ret = oHost.ridlOnServiceComplete(" );
-            Wa( "    getCallback(), iRet, null );" );
+            Wa( "ObjPtr oCallback_ = getCallback();" );
+            Wa( "if( oCallback_ != null )" );
+            Wa( "{" );
+            Wa( "    ret = oHost.ridlOnServiceComplete(" );
+            Wa( "        oCallback_, iRet, null );" );
+            Wa( "    oCallback_.Clear();" );
+            Wa( "}" );
         }
         Wa( "return ret;" );
         BLOCK_CLOSE;
@@ -4296,7 +4305,7 @@ gint32 CImplJavaMainCli::Output()
         NEW_LINES(2);
         Wa( "oSvcCli.stop();" );
         Wa( "m_oCtx.stop();" );
-        CCOUT << "return;";
+        CCOUT << "System.exit( jret.getError() );";
         BLOCK_CLOSE; 
         BLOCK_CLOSE; 
 
@@ -4378,7 +4387,7 @@ gint32 CImplJavaMainSvr::Output()
         NEW_LINES(2);
         Wa( "oSvcSvr.stop();" );
         Wa( "m_oCtx.stop();" );
-        CCOUT << "return;";
+        CCOUT << "System.exit( jret.getError() );";
         BLOCK_CLOSE; 
         BLOCK_CLOSE; 
 

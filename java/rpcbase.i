@@ -698,6 +698,16 @@ jobject NewJavaServer( JNIEnv *jenv,
         jenv, strClass, lPtr, bOwner );
 }
 
+jobject NewCParamList( JNIEnv *jenv,
+    long lPtr, bool bOwner = true )
+{
+    stdstr strClass =
+        "org/rpcf/rpcbase/CParamList";
+
+    return NewWrapperObj(
+        jenv, strClass, lPtr, bOwner );
+}
+
 LONGWORD GetWrappedPtr(
     JNIEnv *jenv, jobject jObj )
 {
@@ -1031,6 +1041,7 @@ class ObjPtr
 
     ObjPtr();
     ~ObjPtr();
+    void Clear();
     bool IsEmpty() const;
 };
 
@@ -1172,6 +1183,7 @@ class CfgPtr
     CfgPtr( IConfigDb* pCfg, bool bAddRef );
     ~CfgPtr();
     bool IsEmpty() const;
+    void Clear();
 };
 
 %extend CfgPtr{
@@ -2152,6 +2164,8 @@ class CParamList
     CParamList();
     CParamList( const CParamList& oParams );
     CParamList( CfgPtr& pCfg );
+
+    gint32 Reset();
 
     gint32 SetStrProp( gint32,
         const std::string& strVal );

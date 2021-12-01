@@ -1431,14 +1431,7 @@ class CParamList : public CCfgOpener
         // should make sure the properties are
         // strictly numbered from 0~(size-1) or an
         // earlier cfg generated from this class
-        m_pNewCfg = pCfg;
-        m_pCfg = m_pNewCfg;
-        m_pConstCfg = m_pNewCfg;
-
-        if( !GetCfg().IsEmpty() )
-        {
-            InitParamList();
-        }
+        Reset( pCfg );
     }
 
     CParamList( CfgPtr& pCfg )
@@ -1454,6 +1447,27 @@ class CParamList : public CCfgOpener
         CfgPtr pCfg = rhs.GetCfg();                                     
         Append( pCfg );
     } 
+
+    gint32 Reset( IConfigDb* pCfg = nullptr )
+    {
+        if( pCfg != nullptr )
+        {
+            m_pNewCfg = pCfg;
+        }
+        else
+        {
+            gint32 ret = m_pNewCfg.NewObj();
+            if( ERROR( ret ) )
+                return ret;
+        }
+
+        m_pCfg = m_pNewCfg;
+        m_pConstCfg = m_pNewCfg;
+        if( !GetCfg().IsEmpty() )
+            InitParamList();
+
+        return 0;
+    }
 
     gint32 CopyParams(
         const IConfigDb* pCfg )

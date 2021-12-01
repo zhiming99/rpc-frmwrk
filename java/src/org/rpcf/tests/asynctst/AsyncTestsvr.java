@@ -22,7 +22,8 @@ public class AsyncTestsvr extends AsyncTestsvrbase {
                 JavaReqContext oReqCtx = (JavaReqContext)octx;
                 Object oData = oReqCtx.getUserData();
                 if (oData != null) {
-                    ObjPtr var5 = (ObjPtr)oData;
+                    ObjPtr oTimer = (ObjPtr)oData;
+                    oTimer.Clear();
                 }
 
                 rpcbase.JavaOutputMsg("LongWait complete with \"" + i0 + "\"");
@@ -45,8 +46,12 @@ public class AsyncTestsvr extends AsyncTestsvrbase {
     public void onLongWaitCanceled(JavaReqContext oReqCtx, int iRet, String i0) {
         Object oData = oReqCtx.getUserData();
         if (oData != null) {
-            ObjPtr oTimerObj = (ObjPtr)oData;
-            this.disableTimer(oTimerObj);
+            ObjPtr oTimer = (ObjPtr)oData;
+            this.disableTimer(oTimer);
+            // clear the timer object to release
+            // the native c++ object, otherwise,
+            // it remains till GC works
+            oTimer.Clear();
         }
     }
 

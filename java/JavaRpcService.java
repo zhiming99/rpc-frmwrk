@@ -438,20 +438,15 @@ abstract public class JavaRpcService
      * the conversion.
      */
 
-    JRetVal argObjToList( int seriProto, ObjPtr pObj ) 
+    JRetVal argObjToList( int seriProto, CParamList oParams ) 
     {
         JRetVal jret = new JRetVal();
+        if( oParams == null )
+        {
+            jret.setError( -RC.EINVAL );
+            return jret;
+        }
         do{
-            CfgPtr pCfg = rpcbase.CastToCfg( pObj );
-            if( pCfg == null )
-            {
-                jret.setError( -RC.EFAULT );
-                break;
-            }
-
-            CParamList oParams =
-                new CParamList( pCfg );
-
             jret = ( JRetVal )oParams.GetSize();
             if( jret.ERROR() ||
                 jret.getParamCount() == 0 )
@@ -585,7 +580,7 @@ abstract public class JavaRpcService
     //for event handler 
     public JRetVal invokeMethod( ObjPtr callback,
         String ifName, String methodName,
-        int seriProto, ObjPtr cppargs )
+        int seriProto, CParamList cppargs )
     {
         JRetVal oResp = new JRetVal();
         do{
@@ -673,6 +668,20 @@ abstract public class JavaRpcService
             }
                 
         }while( false );
+
+        if( !oResp.isPending() )
+        {
+            if( callback != null )
+            {
+                callback.Clear();
+                callback = null;
+            }
+        }
+        if( cppargs != null )
+        {
+            cppargs.Reset();
+            cppargs = null;
+        }
 
         return oResp;
     }

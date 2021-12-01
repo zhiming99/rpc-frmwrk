@@ -785,7 +785,7 @@ class CJavaInterfBase : public T
             }
 
             ObjPtr* pCb = new ObjPtr( pCallback );
-            ObjPtr* pArgs = new ObjPtr( pParams );
+            CParamList* pArgs = new CParamList( pParams );
 
             pjCb =
                 NewObjPtr( jenv, ( jlong )pCb );
@@ -798,7 +798,7 @@ class CJavaInterfBase : public T
                 break;
             }
             pjParams =
-                NewObjPtr( jenv, ( jlong )pArgs );
+                NewCParamList( jenv, ( jlong )pArgs );
 
             if( unlikely( pjParams == nullptr ) ) 
             {           
@@ -814,7 +814,7 @@ class CJavaInterfBase : public T
                  "(Lorg/rpcf/rpcbase/ObjPtr;"
                  "Ljava/lang/String;"
                  "Ljava/lang/String;"
-                 "ILorg/rpcf/rpcbase/ObjPtr;)"
+                 "ILorg/rpcf/rpcbase/CParamList;)"
                  "Lorg/rpcf/rpcbase/JRetVal;" );
 
             if( invokeMethod == nullptr )
