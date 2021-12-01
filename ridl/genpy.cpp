@@ -1224,17 +1224,24 @@ void CImplPyMthdProxyBase::EmitOptions()
 
     guint32 dwTimeoutSec =
         m_pNode->GetTimeoutSec();
-    if( dwTimeoutSec == 0 )
-        return;
-
-    CCOUT << "dwTimeoutSec = " << dwTimeoutSec;
-    NEW_LINE;
-    Wa( "oOptions.SetIntProp(" );
-    Wa( "    cpp.propTimeoutSec, dwTimeoutSec )" ); 
-    Wa( "if dwTimeoutSec > 2 :" );
-    Wa( "    dwTimeoutSec /= 2" );
-    Wa( "oOptions.SetIntProp( cpp.propKeepAliveSec," );
-    Wa( "    dwTimeoutSec )" );
+    guint32 dwKeepAliveSec =
+        m_pNode->GetKeepAliveSec();
+    if( dwKeepAliveSec == 0 )
+    {
+        dwKeepAliveSec =
+            ( dwTimeoutSec >> 1 );
+    }
+    if( dwTimeoutSec > 0 &&
+        dwKeepAliveSec > 0 &&
+        dwTimeoutSec > dwKeepAliveSec )
+    {
+        CCOUT << "oOptions.SetIntProp( cpp.propTimeoutSec, " <<
+            dwTimeoutSec << " );";
+        NEW_LINE;
+        CCOUT << "oOptions.SetIntProp( cpp.propKeepAliveSec, " <<
+            dwKeepAliveSec << " );";
+        NEW_LINE;
+    }
 }
 
 gint32 CImplPyMthdProxyBase::OutputSync( bool bSync )
@@ -1939,9 +1946,31 @@ gint32 CImplPyMthdSvrBase::OutputSync( bool bSync )
         else
         {
             Wa( "if bPending:" );
-            guint32 dwTimeoutSec = m_pNode->GetTimeoutSec();
             Wa( "    self.oInst.SetInvTimeout(" );
-            CCOUT << "        callback, " << dwTimeoutSec << " )";
+
+            guint32 dwTimeoutSec =
+                m_pNode->GetTimeoutSec();
+
+            guint32 dwKeepAliveSec =
+                m_pNode->GetKeepAliveSec();
+            if( dwKeepAliveSec == 0 )
+            {
+                dwKeepAliveSec =
+                    ( dwTimeoutSec >> 1 );
+            }
+
+            if( dwTimeoutSec > 0 &&
+                dwKeepAliveSec > 0 &&
+                dwTimeoutSec > dwKeepAliveSec )
+            {
+                CCOUT << "        callback, " << dwTimeoutSec
+                    << ", " << dwKeepAliveSec << " )";
+            }
+            else
+            {
+                CCOUT << "        callback, 0 )";
+            }
+
             NEW_LINE;
             Wa( "    self.InstallCancelNotify( callback," );
             CCOUT << "        self.On" << strName << "CanceledWrapper,";

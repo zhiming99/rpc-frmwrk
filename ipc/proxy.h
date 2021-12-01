@@ -1706,7 +1706,8 @@ class CInterfaceServer :
     // second
     gint32 SetInvTimeout(
         IEventSink* pCallback,
-        guint32 dwTimeoutSec );
+        guint32 dwTimeoutSec,
+        guint32 dwKeepAliveSec = 0 );
 };
 
 

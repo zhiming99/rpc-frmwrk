@@ -384,7 +384,8 @@ class CJavaServerImpl :
 %extend{ 
     gint32 SetInvTimeout(
         ObjPtr& pCallback,
-        gint32 dwTimeoutSec )
+        gint32 dwTimeoutSec,
+        gint32 dwKeepAliveSec = 0 )
     {
         gint32 ret = 0;
         do{
@@ -396,7 +397,8 @@ class CJavaServerImpl :
                 break;
             }
             ret = pImpl->SetInvTimeout(pCallback,
-                ( guint32 )dwTimeoutSec );
+                ( guint32 )dwTimeoutSec,
+                ( guint32 )dwKeepAliveSec );
 
         }while( 0 );
         return ret;

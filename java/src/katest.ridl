@@ -1,0 +1,22 @@
+appname "katest";
+
+interface IKeepAlive
+{
+    // to enable keep-alive, the request should be
+    // handled asynchronously on the server side.
+    // While the proxy side is free to be either
+    // asynchronous or synchronous.
+    //
+    // keepalive is an expensive operation, so don't
+    // do it too frequent as does here. Max keep-alive
+    // value should be less than the minum of all the
+    // timeout values of among the nodes on the request
+    // path.
+    [async_s, timeout=300, keepalive=3]
+    LongWait( string i0 ) returns ( string i0r );
+};
+
+service KeepAlive
+{
+    interface IKeepAlive;
+};

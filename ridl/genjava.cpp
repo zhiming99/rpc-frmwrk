@@ -2536,10 +2536,27 @@ gint32 CImplJavaMethodSvrBase::ImplInvoke()
             // return pending too
             Wa( "if( ret == RC.STATUS_PENDING )" );
             BLOCK_OPEN;
-            guint32 dwTimeout = pNode->GetTimeoutSec();
             Wa( "oHost.getInst().SetInvTimeout(" );
-            CCOUT << "    _oReqCtx.getCallback(), " <<
-                std::to_string( dwTimeout ) << " );";
+            guint32 dwTimeoutSec = pNode->GetTimeoutSec();
+            guint32 dwKeepAliveSec =
+                m_pNode->GetKeepAliveSec();
+            if( dwKeepAliveSec == 0 )
+            {
+                dwKeepAliveSec =
+                    ( dwTimeoutSec >> 1 );
+            }
+
+            if( dwTimeoutSec > 0 &&
+                dwKeepAliveSec > 0 &&
+                dwTimeoutSec > dwKeepAliveSec )
+            {
+                CCOUT << "    _oReqCtx.getCallback(), " <<
+                    dwTimeoutSec << ", " << dwKeepAliveSec << " );";
+            }
+            else
+            {
+                CCOUT << "    _oReqCtx.getCallback(), 0 );";
+            }
             NEW_LINE;
             Wa( "ICancelNotify o =" );
             Wa( "    newCancelNotify( oHost, _oReqCtx );" );
@@ -3109,17 +3126,29 @@ gint32 CImplJavaMethodCliBase::OutputReqSender()
             NEW_LINE;
         }
 
-        guint32 dwTimeout = m_pNode->GetTimeoutSec();
-        if( dwTimeout >= 2 )
+        guint32 dwTimeoutSec =
+            m_pNode->GetTimeoutSec();
+        guint32 dwKeepAliveSec =
+            m_pNode->GetKeepAliveSec();
+
+        if( dwKeepAliveSec == 0 )
+        {
+            dwKeepAliveSec =
+                ( dwTimeoutSec >> 1 );
+        }
+
+        if( dwTimeoutSec > 0 &&
+            dwKeepAliveSec > 0 &&
+            dwTimeoutSec > dwKeepAliveSec )
         {
             Wa( "oParams.SetIntProp(" );
             CCOUT << "    RC.propTimeoutSec, " <<
-                dwTimeout << " );";
+                dwTimeoutSec << " );";
             NEW_LINE;
 
             Wa( "oParams.SetIntProp(" );
             CCOUT << "    RC.propKeepAliveSec, " <<
-                ( dwTimeout >> 1 ) << " );";
+                dwKeepAliveSec << " );";
             NEW_LINE;
         }
 
@@ -4210,7 +4239,7 @@ gint32 CImplJavaMainCli::Output()
         BLOCK_OPEN;
         Wa( "m_oCtx = JavaRpcContext.createProxy(); " );
         Wa( "if( m_oCtx == null )" );
-        Wa( "    return;" );
+        Wa( "    System.exit( -RC.EFAULT );" );
         NEW_LINE;
 
         std::vector< ObjPtr > vecSvcs;
@@ -4231,13 +4260,13 @@ gint32 CImplJavaMainCli::Output()
         NEW_LINES( 2 );
         Wa( "// check if there are errors" );
         Wa( "if( RC.ERROR( oSvcCli.getError() ) )" );
-        Wa( "    return;" );
+        Wa( "    System.exit( oSvcCli.getError() );" );
 
         NEW_LINE;
         Wa( "// start the proxy" );
         Wa( "int ret = oSvcCli.start();" );
         Wa( "if( RC.ERROR( ret ) )" );
-        Wa( "    return;" );
+        Wa( "    System.exit( ret );" );
         
         NEW_LINE;
         CCOUT << "do{";
@@ -4298,14 +4327,14 @@ gint32 CImplJavaMainCli::Output()
             INDENT_DOWNL;
         }
         Wa( "if( jret.ERROR() )" );
-        Wa( "    break;" );
+        Wa( "{ ret = jret.getError();break; }" );
         Wa( "*/" );
         INDENT_DOWNL;
         CCOUT << "}while( false );";
         NEW_LINES(2);
         Wa( "oSvcCli.stop();" );
         Wa( "m_oCtx.stop();" );
-        CCOUT << "System.exit( jret.getError() );";
+        CCOUT << "System.exit( ret );";
         BLOCK_CLOSE; 
         BLOCK_CLOSE; 
 
@@ -4344,7 +4373,7 @@ gint32 CImplJavaMainSvr::Output()
         BLOCK_OPEN;
         Wa( "m_oCtx = JavaRpcContext.createServer(); " );
         Wa( "if( m_oCtx == null )" );
-        Wa( "    return;" );
+        Wa( "    System.exit( -RC.EFAULT );" );
         NEW_LINE;
 
         std::vector< ObjPtr > vecSvcs;
@@ -4364,11 +4393,11 @@ gint32 CImplJavaMainSvr::Output()
         NEW_LINES( 2 );
         Wa( "// check if there are errors" );
         Wa( "if( RC.ERROR( oSvcSvr.getError() ) )" );
-        Wa( "    return;" );
+        Wa( "    System.exit( oSvcSvr.getError() );" );
         NEW_LINE;
         Wa( "int ret = oSvcSvr.start();" );
         Wa( "if( RC.ERROR( ret ) )" );
-        Wa( "    return;" );
+        Wa( "    System.exit( ret );" );
         
         NEW_LINE;
         Wa( "do{" );
@@ -4387,7 +4416,7 @@ gint32 CImplJavaMainSvr::Output()
         NEW_LINES(2);
         Wa( "oSvcSvr.stop();" );
         Wa( "m_oCtx.stop();" );
-        CCOUT << "System.exit( jret.getError() );";
+        CCOUT << "System.exit( ret );";
         BLOCK_CLOSE; 
         BLOCK_CLOSE; 
 

@@ -383,6 +383,28 @@ struct CAttrExps : public CAstListNode
         return dwTimeout;
     }
 
+    guint32 GetKeepAliveSec() const
+    {
+        BufPtr pBuf;
+        guint32 dwKeepAliveSec = 0;
+        do{
+            gint32 ret = GetAttrByToken(
+                TOK_KEEPALIVE, pBuf );
+
+            if( ERROR( ret ) )
+                break;
+
+            if( pBuf.IsEmpty() || pBuf->empty() )
+                break;
+
+            dwKeepAliveSec = *pBuf;
+
+        }while( 0 );
+
+        return dwKeepAliveSec;
+    }
+
+
     bool IsEvent() const
     {
         BufPtr pBuf;
@@ -980,6 +1002,18 @@ struct CMethodDecl : public CNamedNode
         return pList->GetTimeoutSec();
     }
 
+    guint32 GetKeepAliveSec() const
+    {
+        if( m_pAttrList.IsEmpty() )
+            return 0;
+
+        CAttrExps* pList = m_pAttrList;
+        if( pList == nullptr )
+            return 0;
+
+        return pList->GetKeepAliveSec();
+    }
+
     guint32 GetAsyncFlags() const
     {
         if( m_pAttrList.IsEmpty() )
@@ -1405,6 +1439,35 @@ struct CServiceDecl : public CInterfRef
         return ret;
     }
 
+    gint32 GetKeepAliveSec( guint32& dwKeepAliveSec )
+    {
+        BufPtr pBuf;
+        gint32 ret = 0;
+        do{
+            ret = GetValueAttr(
+                TOK_KEEPALIVE, pBuf );
+            if( ERROR( ret ) )
+                break;
+
+            if( pBuf.IsEmpty() || pBuf->empty() )
+            {
+                ret = -ENOENT;
+                break;
+            }
+
+            if( pBuf->GetExDataType() !=
+                typeUInt32 )
+            {
+                ret = -EINVAL;
+                break;
+            }
+
+            dwKeepAliveSec = *pBuf;
+
+        }while( 0 );
+
+        return ret;
+    }
     gint32 GetTimeoutSec( guint32& dwTimeout )
     {
         BufPtr pBuf;

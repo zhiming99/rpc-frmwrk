@@ -4825,18 +4825,22 @@ gint32 CIfInvokeMethodTask::SetAsyncCall(
         guint32 dwTimeoutSec = 0;
 
         ret = GetTimeoutSec( dwTimeoutSec );
-        if( ERROR( ret ) )
+        if( ERROR( ret ) || dwTimeoutSec <= 1 )
         {
-            // fine, we are ok with it
-            ret = GetKeepAliveSec( dwTimeoutSec );
+            // using the timeout value from the server
+            // object
+            CRpcServices* pIf = nullptr;
+            ret = oTaskCfg.GetPointer(
+                propIfPtr, pIf );
+
             if( ERROR( ret ) )
-            {
-                ret = 0;
                 break;
-            }
-            // let's use 2 * KeepAliveSec as
-            // the timeout value
-            dwTimeoutSec *= 2;
+
+            CCfgOpenerObj oIfCfg( pIf );
+            ret = oIfCfg.GetIntProp(
+                propTimeoutSec, dwTimeoutSec );
+            if( ERROR( ret ) )
+                break;
         }
 
         guint32 dwAge = 0;
@@ -4864,20 +4868,36 @@ gint32 CIfInvokeMethodTask::SetAsyncCall(
         m_iTimeoutId = ret;
         ret = 0;
 
+        // almost timedout
+        if( dwTimeoutSec == 1 )
+            break;
+
         if( !IsKeepAlive() )
             break;
 
-        ret = GetKeepAliveSec( dwTimeoutSec );
-        if( ERROR( ret ) )
+        guint32 dwKeepAliveSec = 0;
+        ret = GetKeepAliveSec( dwKeepAliveSec );
+        if( ERROR( ret ) ||
+            dwKeepAliveSec >= dwTimeoutSec ||
+            dwKeepAliveSec == 0 )
         {
-            ret = 0;
-            break;
+            dwKeepAliveSec =
+                ( dwTimeoutSec >> 1 );
         }
 
-        if( dwTimeoutSec == 0 )
+        // no time to keep-alive
+        if( dwKeepAliveSec == 0 )
             break;
 
-        ret = AddTimer( dwTimeoutSec,
+        // immediate keep-alive
+        if( dwAge >= dwKeepAliveSec )
+            dwKeepAliveSec = 1;
+        else
+        {
+            dwKeepAliveSec -= dwAge;
+        }
+
+        ret = AddTimer( dwKeepAliveSec,
             ( guint32 )eventKeepAlive );
 
         if( unlikely( ret < 0 ) )
@@ -4888,7 +4908,7 @@ gint32 CIfInvokeMethodTask::SetAsyncCall(
 
         DebugPrintEx( logInfo, ret,
             "KeepAliveTimer started in %d seconds",
-            dwTimeoutSec );
+            dwKeepAliveSec );
 
         break;
     }

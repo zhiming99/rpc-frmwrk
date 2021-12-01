@@ -543,6 +543,7 @@ std::map< std::string, yytokentype >
         { "ipaddr", TOK_IPADDR },
         { "portnum", TOK_PORTNUM },
         { "noreply", TOK_NOREPLY },
+        { "keepalive", TOK_KEEPALIVE },
 
         { "struct", TOK_STRUCT }, 
         { "interface", TOK_INTERFACE }, 

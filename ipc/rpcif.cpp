@@ -7525,7 +7525,8 @@ gint32 CInterfaceServer::PauseResume_Server(
 
 gint32 CInterfaceServer::SetInvTimeout(
     IEventSink* pCallback,
-    guint32 dwTimeoutSec )
+    guint32 dwTimeoutSec,
+    guint32 dwKeepAliveSec )
 {
     gint32 ret = 0;
     do{
@@ -7562,8 +7563,13 @@ gint32 CInterfaceServer::SetInvTimeout(
         oOptions[ propTimeoutSec ] =
             dwTimeoutSec;
 
+        if( dwKeepAliveSec == 0 ||
+            dwKeepAliveSec >= dwTimeoutSec )
+            dwKeepAliveSec =
+                ( dwTimeoutSec >> 1 );
+
         oOptions[ propKeepAliveSec ] =
-            ( dwTimeoutSec << 1 );
+            dwKeepAliveSec;
 
     }while( 0 );
 

@@ -28,6 +28,7 @@ using namespace rpcf;
 #include "astnode.h"
 #include "gencpp.h"
 #include "sha1.h"
+#include "proxy.h"
 
 extern std::string g_strAppName;
 extern bool g_bMklib;
@@ -4496,11 +4497,23 @@ gint32 CImplIfMethodProxy::OutputSync()
         INDENT_DOWNL;
         guint32 dwTimeoutSec =
             m_pNode->GetTimeoutSec();
-        if( dwTimeoutSec > 0 )
+        guint32 dwKeepAliveSec =
+            m_pNode->GetKeepAliveSec();
+        if( dwKeepAliveSec == 0 )
         {
-            NEW_LINE;
+            dwKeepAliveSec =
+                ( dwTimeoutSec >> 1 );
+        }
+        if( dwTimeoutSec > 0 &&
+            dwKeepAliveSec > 0 &&
+            dwTimeoutSec > dwKeepAliveSec )
+        {
             CCOUT << "oOptions_[ propTimeoutSec ] = "
                 << dwTimeoutSec << ";"; 
+            NEW_LINE;
+            CCOUT << "oOptions_[ propKeepAliveSec ] = "
+                << dwKeepAliveSec << ";"; 
+            NEW_LINE;
         }
         NEW_LINE;
 
@@ -4571,7 +4584,6 @@ gint32 CImplIfMethodProxy::OutputSync()
         }
         else /* need serialize */
         {
-            NEW_LINE;
             Wa( "//Serialize the input parameters" );
             Wa( "BufPtr pBuf_( true );" );
             ret = GenSerialArgs(
@@ -4679,12 +4691,25 @@ gint32 CImplIfMethodProxy::OutputAsync()
         INDENT_DOWNL;
         guint32 dwTimeoutSec =
             m_pNode->GetTimeoutSec();
-        if( dwTimeoutSec > 0 )
+        guint32 dwKeepAliveSec =
+            m_pNode->GetKeepAliveSec();
+        if( dwKeepAliveSec == 0 )
+        {
+            dwKeepAliveSec =
+                ( dwTimeoutSec >> 1 );
+        }
+        if( dwTimeoutSec > 0 &&
+            dwKeepAliveSec > 0 &&
+            dwTimeoutSec > dwKeepAliveSec )
         {
             CCOUT << "oOptions_[ propTimeoutSec ] = "
                 << dwTimeoutSec << ";"; 
             NEW_LINE;
+            CCOUT << "oOptions_[ propKeepAliveSec ] = "
+                << dwKeepAliveSec << ";"; 
+            NEW_LINE;
         }
+
         NEW_LINE;
 
         Wa( "CParamList oReqCtx_;" );
@@ -5341,10 +5366,28 @@ gint32 CImplIfMethodSvr::OutputAsyncNonSerial()
         guint32 dwTimeoutSec =
             m_pNode->GetTimeoutSec();
 
-        CCOUT << "ret = SetInvTimeout( pCallback, "
-            << dwTimeoutSec << " );";
-        NEW_LINE;
-        Wa( "if( ERROR( ret ) ) break;" );
+        guint32 dwKeepAliveSec =
+            m_pNode->GetKeepAliveSec();
+        if( dwKeepAliveSec == 0 )
+        {
+            dwKeepAliveSec =
+                ( dwTimeoutSec >> 1 );
+        }
+
+        if( dwTimeoutSec > 0 &&
+            dwKeepAliveSec > 0 &&
+            dwTimeoutSec > dwKeepAliveSec )
+        {
+            CCOUT << "ret = SetInvTimeout( pCallback, "
+                << dwTimeoutSec << ", " << dwKeepAliveSec <<" );";
+            NEW_LINE;
+            Wa( "if( ERROR( ret ) ) break;" );
+        }
+        else
+        {
+            Wa( "ret = SetInvTimeout( pCallback, 0 );" );
+            Wa( "if( ERROR( ret ) ) break;" );
+        }
 
         if( dwOutCount > 0 )
         {
@@ -5484,10 +5527,29 @@ gint32 CImplIfMethodSvr::OutputAsyncSerial()
 
         guint32 dwTimeoutSec =
             m_pNode->GetTimeoutSec();
-        CCOUT << "ret = SetInvTimeout( pCallback, "
-            << dwTimeoutSec << " );";
-        NEW_LINE;
-        Wa( "if( ERROR( ret ) ) break;" );
+
+        guint32 dwKeepAliveSec =
+            m_pNode->GetKeepAliveSec();
+        if( dwKeepAliveSec == 0 )
+        {
+            dwKeepAliveSec =
+                ( dwTimeoutSec >> 1 );
+        }
+
+        if( dwTimeoutSec > 0 &&
+            dwKeepAliveSec > 0 &&
+            dwTimeoutSec > dwKeepAliveSec )
+        {
+            CCOUT << "ret = SetInvTimeout( pCallback, "
+                << dwTimeoutSec << ", " << dwKeepAliveSec << " );";
+            NEW_LINE;
+            Wa( "if( ERROR( ret ) ) break;" );
+        }
+        else
+        {
+            Wa( "ret = SetInvTimeout( pCallback, 0 );" );
+            Wa( "if( ERROR( ret ) ) break;" );
+        }
 
         CCOUT << "ret = DEFER_CANCEL_HANDLER2(";
         INDENT_UPL;
@@ -6656,14 +6718,31 @@ gint32 CExportObjDesc::BuildObjDesc(
         oElem[ JSON_ATTR_OBJNAME ] = strSvcName;
 
         guint32 dwVal = 0;
+        guint32 dwkasec = 0;
+
         ret = psd->GetTimeoutSec( dwVal );
-        if( SUCCEEDED( ret ) )
+        if( SUCCEEDED( ret ) && dwVal > 1 )
         {
-            oElem[ JSON_ATTR_REQ_TIMEOUT ] =
-                std::to_string( dwVal );
-            oElem[ JSON_ATTR_KA_TIMEOUT ] =
-                std::to_string( dwVal / 2 );
+            ret = psd->GetKeepAliveSec( dwkasec );
+            if( ERROR( ret ) || dwkasec > dwVal )
+                dwkasec = ( dwVal >> 1 );
+            else if( dwkasec >
+                IFSTATE_DEFAULT_IOREQ_TIMEOUT )
+            {
+                dwkasec =
+                    IFSTATE_DEFAULT_IOREQ_TIMEOUT - 10;
+            }
         }
+        else
+        {
+            dwVal = IFSTATE_DEFAULT_IOREQ_TIMEOUT;
+            dwkasec = ( dwVal >> 1 );
+        }
+
+        oElem[ JSON_ATTR_REQ_TIMEOUT ] =
+            std::to_string( dwVal );
+        oElem[ JSON_ATTR_KA_TIMEOUT ] =
+            std::to_string( dwkasec );
 
         std::string strVal;
         ret = psd->GetIpAddr( strVal );
