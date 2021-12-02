@@ -64,13 +64,24 @@ struct HSTREAM_BASE
 
 class CSerialBase
 {
+    ObjPtr m_pIf;
+
     public:
     CSerialBase()
     {}
 
+    CSerialBase( ObjPtr& pIf )
+    { m_pIf = pIf; }
+
+    inline void SetIf( ObjPtr& pIf )
+    { m_pIf = pIf; };
+
+    inline ObjPtr& GetIf()
+    { return m_pIf; };
+
     template< typename T >
     gint32 Serialize(
-        BufPtr& pBuf, const T& val ) const
+        BufPtr& pBuf, const T& val )
     { return -ENOTSUP; }
 
     template< typename T >
@@ -97,7 +108,7 @@ class CSerialBase
              T >::type >
     gint32 SerialElem(
         BufPtr& pBuf, const T& val,
-        const char* szSignature ) const
+        const char* szSignature )
     { return Serialize( pBuf, val ); }
 
     template< typename T,
@@ -106,7 +117,7 @@ class CSerialBase
         typename T3 = T >
     gint32 SerialElem(
         BufPtr& pBuf, const T& val,
-        const char* szSignature ) const
+        const char* szSignature )
     { return SerializeArray( pBuf, val, szSignature ); }
 
     template< typename T,
@@ -116,7 +127,7 @@ class CSerialBase
         typename T4 = T >
     gint32 SerialElem(
         BufPtr& pBuf, const T& val,
-        const char* szSignature ) const
+        const char* szSignature )
     { return SerializeMap( pBuf, val, szSignature ); }
 
     template< typename T,
@@ -127,7 +138,7 @@ class CSerialBase
         typename T5 = T >
     gint32 SerialElem(
         BufPtr& pBuf, const T& val,
-        const char* szSignature ) const
+        const char* szSignature )
     { return SerialStruct( pBuf, val ); }
 
     template< typename T,
@@ -139,13 +150,17 @@ class CSerialBase
         typename T6 = T >
     gint32 SerialElem(
         BufPtr& pBuf, const T& val,
-        const char* szSignature ) const
-    { return val.Serialize( pBuf ); }
+        const char* szSignature )
+    {
+        T& val1 = const_cast<T&>(val);
+        val1.m_pIf = GetIf();
+        return val1.Serialize( pBuf );
+    }
 
     template< typename T >
     gint32 SerializeArray(
         BufPtr& pBuf, T& val,
-        const char* szSignature ) const
+        const char* szSignature )
     {
         // don't test pBuf->empty, since it is true
         // all need to do is to append
@@ -225,7 +240,7 @@ class CSerialBase
     gint32 SerializeMap(
         BufPtr& pBuf,
         const std::map< key, val >& mapVals,
-        const char* szSignature ) const
+        const char* szSignature )
     {
         if( pBuf.IsEmpty() ||
             szSignature == nullptr ||
@@ -314,9 +329,11 @@ class CSerialBase
 
     template< typename T >
     gint32 SerialStruct(
-        BufPtr& pBuf, const T& val ) const
+        BufPtr& pBuf, const T& val )
     {
-        return val.Serialize( pBuf );
+        T& val1 = const_cast< T& >(val);
+        val1.SetIf( GetIf() );
+        return val1.Serialize( pBuf );
     }
 
     template< typename T,
@@ -373,7 +390,7 @@ class CSerialBase
 
     template< typename T,
         typename T2=typename std::enable_if<
-            std::is_same<HSTREAM_BASE, T>::value, T >::type,
+            std::is_base_of<HSTREAM_BASE, T>::value, T >::type,
         typename T3 = T,
         typename T4 = T,
         typename T5 = T,
@@ -381,7 +398,10 @@ class CSerialBase
     gint32 DeserialElem(
         BufPtr& pBuf, T& val,
         const char* szSignature )
-    { return val.Deserialize( pBuf ); }
+    {
+        val.m_pIf = GetIf();
+        return val.Deserialize( pBuf );
+    }
 
     template< typename T >
     gint32 DeserialArray(
@@ -588,6 +608,7 @@ class CSerialBase
     gint32 DeserialStruct(
         BufPtr& pBuf, T& val )
     {
+        val.SetIf( GetIf() );
         return val.Deserialize( pBuf );
     }
 };
@@ -603,7 +624,7 @@ class CStructBase :
     {}
     
     virtual gint32 Serialize(
-        BufPtr& pBuf ) const = 0;
+        BufPtr& pBuf ) = 0;
 
     virtual gint32 Deserialize(
         BufPtr& pBuf ) = 0;
@@ -626,60 +647,60 @@ do{ \
 
 template<>
 gint32 CSerialBase::Serialize< gint16 >(
-    BufPtr& pBuf, const gint16& val ) const;
+    BufPtr& pBuf, const gint16& val );
 
 template<>
 gint32 CSerialBase::Serialize< guint16 >(
-    BufPtr& pBuf, const guint16& val ) const;
+    BufPtr& pBuf, const guint16& val );
 
 template<>
 gint32 CSerialBase::Serialize< gint32 >(
-    BufPtr& pBuf, const gint32& val ) const;
+    BufPtr& pBuf, const gint32& val );
 
 template<>
 gint32 CSerialBase::Serialize< guint32 >(
-    BufPtr& pBuf, const guint32& val ) const;
+    BufPtr& pBuf, const guint32& val );
 
 template<>
 gint32 CSerialBase::Serialize< gint64 >(
-    BufPtr& pBuf, const gint64& val ) const;
+    BufPtr& pBuf, const gint64& val );
 
 template<>
 gint32 CSerialBase::Serialize< guint64 >(
-    BufPtr& pBuf, const guint64& val ) const;
+    BufPtr& pBuf, const guint64& val );
 
 template<>
 gint32 CSerialBase::Serialize< float >(
-    BufPtr& pBuf, const float& val ) const;
+    BufPtr& pBuf, const float& val );
 
 template<>
 gint32 CSerialBase::Serialize< double >(
-    BufPtr& pBuf, const double& val ) const;
+    BufPtr& pBuf, const double& val );
 
 template<>
 gint32 CSerialBase::Serialize< bool >(
-    BufPtr& pBuf, const bool& val ) const;
+    BufPtr& pBuf, const bool& val );
 
 template<>
 gint32 CSerialBase::Serialize< guint8 >(
-    BufPtr& pBuf, const guint8& val ) const;
+    BufPtr& pBuf, const guint8& val );
 
 template<>
 gint32 CSerialBase::Serialize< char >(
-    BufPtr& pBuf, const char& val ) const;
+    BufPtr& pBuf, const char& val );
 
 template<>
 gint32 CSerialBase::Serialize< std::string >(
-    BufPtr& pBuf, const std::string& val ) const;
+    BufPtr& pBuf, const std::string& val );
 
 template<>
 gint32 CSerialBase::Serialize< ObjPtr >(
-    BufPtr& pBuf, const ObjPtr& val ) const;
+    BufPtr& pBuf, const ObjPtr& val );
 
 // bytearray
 template<>
 gint32 CSerialBase::Serialize< BufPtr >(
-    BufPtr& pBuf, const BufPtr& val ) const;
+    BufPtr& pBuf, const BufPtr& val );
 
 
 template<>

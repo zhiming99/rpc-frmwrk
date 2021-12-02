@@ -90,8 +90,7 @@ gint32 CArgListUtils::ToStringInArgs(
             if( dwClsid != clsid( CPrimeType ) )
             {
                 CAstNodeBase* pType = pObj;
-                strType = std::string( "const " ) +
-                    pType->ToStringCpp() + "&";
+                strType = pType->ToStringCpp() + "&";
             }
             else 
             {
@@ -470,7 +469,8 @@ gint32 CMethodWriter::GenSerialArgs(
 
     do{
         NEW_LINE;
-        Wa( "CSerialBase oSerial_;" );
+        Wa( "ObjPtr pSerialIf_(this);" );
+        Wa( "CSerialBase oSerial_( pSerialIf_ );" );
         CEmitSerialCode oesc(
             m_pWriter, pArgList );
 
@@ -493,9 +493,10 @@ gint32 CMethodWriter::GenSerialArgs(
                 NEW_LINE;
             }
 
-            CCOUT << strLocal <<
+            /*CCOUT << strLocal <<
                 ".m_pIf = this;";
             NEW_LINE;
+            */
 
             if( bAssign )
             {
@@ -537,11 +538,12 @@ gint32 CMethodWriter::GenDeserialArgs(
 {
     gint32 ret = 0;
     if( GetArgCount( pArgList ) == 0 )
-        return -ENOENT;
+        return 0;
 
     do{
         NEW_LINE;
-        Wa( "CSerialBase oDeserial_;" );
+        Wa( "ObjPtr pDeserialIf_(this);" );
+        Wa( "CSerialBase oDeserial_( pDeserialIf_ );" );
         CEmitSerialCode oedsc(
             m_pWriter, pArgList );
 
@@ -563,10 +565,10 @@ gint32 CMethodWriter::GenDeserialArgs(
                     << strLocal << ";";
                 NEW_LINE;
             }
-            CCOUT << strLocal <<
+            /*CCOUT << strLocal <<
                 ".m_pIf = this;";
-
             NEW_LINE;
+            */
         }
 
         CCOUT << "do";
@@ -1746,7 +1748,7 @@ gint32 CDeclareStruct::Output()
         // declare two methods to implement
         CCOUT<< "gint32 Serialize(";
         INDENT_UPL;
-        CCOUT << " BufPtr& pBuf_ ) const override;";
+        CCOUT << " BufPtr& pBuf_ ) override;";
         INDENT_DOWNL;
         NEW_LINE;
         CCOUT << "gint32 Deserialize(";
@@ -3275,13 +3277,14 @@ gint32 CDeclServiceImpl::Output()
 
             if( m_pNode->IsStream() )
             {
-                Wa( "/* The following two methods are important for */" );
+                Wa( "/* The following 3 methods are important for */" );
                 Wa( "/* streaming transfer. rewrite them if necessary */" );
                 Wa( "gint32 OnStreamReady( HANDLE hChannel ) override" );
                 Wa( "{ return super::OnStreamReady( hChannel ); } " );
                 NEW_LINE;
                 Wa( "gint32 OnStmClosing( HANDLE hChannel ) override" );
                 Wa( "{ return super::OnStmClosing( hChannel ); }" );
+                NEW_LINE;
             }
 
             for( guint32 i = 0;
@@ -3349,6 +3352,10 @@ gint32 CDeclServiceImpl::Output()
             NEW_LINE;
             Wa( "gint32 OnStmClosing( HANDLE hChannel ) override" );
             Wa( "{ return super::OnStmClosing( hChannel ); }" );
+            NEW_LINE;
+            Wa( "gint32 AcceptNewStream(" );
+            Wa( "    IEventSink* pCb, IConfigDb* pDataDesc ) override" );
+            Wa( "{ return STATUS_SUCCESS; }" );
             NEW_LINE;
         }
 
@@ -3613,7 +3620,7 @@ gint32 CImplSerialStruct::OutputSerial()
     gint32 ret = 0;
     do{
         CCOUT << "gint32 " << m_pNode->GetName()
-            << "::" << "Serialize( BufPtr& pBuf_ ) const";
+            << "::" << "Serialize( BufPtr& pBuf_ )";
         NEW_LINE;
         BLOCK_OPEN;
         CCOUT << "if( pBuf_.IsEmpty() )";
@@ -4094,6 +4101,9 @@ gint32 CEmitSerialCode::OutputSerial(
 
             case 'O' :
                 {
+                    CCOUT << strName << ".SetIf( "
+                        << strObj << "GetIf() );";
+                    NEW_LINE;
                     CCOUT << "ret = " << strObj
                         << "SerialStruct( ";
                     INDENT_UPL;
@@ -4104,6 +4114,9 @@ gint32 CEmitSerialCode::OutputSerial(
                 }
             case 'h':
                 {
+                    CCOUT << strName << ".m_pIf = "
+                        <<strObj << "GetIf();";
+                    NEW_LINE;
                     CCOUT << "ret = " << strName
                         <<".Serialize( " << strBuf << " );";
 
@@ -4125,8 +4138,10 @@ gint32 CEmitSerialCode::OutputSerial(
             case 'a':
             case 'o':
                 {
-                    CCOUT << "ret = " << strObj
-                        << "CSerialBase::Serialize(";
+                    if( strObj.empty() )
+                        CCOUT << "ret = CSerialBase::Serialize(";
+                    else
+                        CCOUT << "ret = " << strObj << "Serialize(";
                     INDENT_UPL;
                     CCOUT << strBuf << ", "
                         << strName << " );";
@@ -4211,6 +4226,9 @@ gint32 CEmitSerialCode::OutputDeserial(
 
             case 'O' :
                 {
+                    CCOUT << strName << ".SetIf( "
+                        << strObj << "GetIf() );";
+                    NEW_LINE;
                     CCOUT << "ret = " << strObj << "DeserialStruct(";
                     INDENT_UPL;
                     CCOUT << strBuf << ", " << strName << " );";
@@ -4220,6 +4238,9 @@ gint32 CEmitSerialCode::OutputDeserial(
                 }
             case 'h':
                 {
+                    CCOUT << strName << ".m_pIf = "
+                        << strObj << "GetIf();";
+                    NEW_LINE;
                     CCOUT << "ret = " << strName
                         <<".Deserialize( " << strBuf <<" );";
                     NEW_LINE;
@@ -4240,8 +4261,10 @@ gint32 CEmitSerialCode::OutputDeserial(
             case 'a':
             case 'o':
                 {
-                    CCOUT << "ret = " << strObj
-                        << "CSerialBase::Deserialize(";
+                    if( strObj.empty() )
+                        CCOUT << "ret = CSerialBase::Deserialize(";
+                    else
+                        CCOUT << "ret = " << strObj << "Deserialize(";
                     INDENT_UPL;
                     CCOUT << strBuf << ", " << strName << " );";
                     INDENT_DOWNL;

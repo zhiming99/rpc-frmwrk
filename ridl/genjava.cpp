@@ -4281,7 +4281,6 @@ gint32 CImplJavaMainCli::Output()
         Wa( "if( oSvcCli.getState() != RC.stateConnected )" );
         Wa( "{ ret = RC.ERROR_STATE;break;}" );
         NEW_LINE;
-        Wa( "/*// request something from the server" );
         std::vector< ObjPtr > vecm;
         ret = CJTypeHelper::GetMethodsOfSvc(
             vecSvcs[ 0 ], vecm );
@@ -4290,45 +4289,72 @@ gint32 CImplJavaMainCli::Output()
 
         ObjPtr pMethod;
         CArgListUtils oau;
+        bool bHasEvent = false;
         for( auto& elem : vecm )
         {
             pMethod = elem;
             CMethodDecl* pmd = elem;
+            if( pmd->IsEvent() )
+            {
+                bHasEvent = true;
+                pMethod.Clear();
+                continue;
+            }
             ObjPtr pInArgs = pmd->GetInArgs();
             if( oau.GetArgCount( pInArgs ) > 1 )
                 break;
         }
 
         CMethodDecl* pmd = pMethod;
-        CCOUT << "JRetVal jret = oSvcCli." << pmd->GetName();
-        ObjPtr pInArgs = pmd->GetInArgs();
-        gint32 iInCount = oau.GetArgCount( pInArgs );
-        if( iInCount == 0 && pmd->IsAsyncp() )
+        if( pmd != nullptr )
         {
-            CCOUT << "( oYourCtx );";
+            Wa( "/*// request something from the server" );
+            CCOUT << "JRetVal jret = oSvcCli."
+                << pmd->GetName();
+            ObjPtr pInArgs = pmd->GetInArgs();
+            gint32 iInCount =
+                oau.GetArgCount( pInArgs );
+
+            if( iInCount == 0 && pmd->IsAsyncp() )
+            {
+                CCOUT << "( oYourCtx );";
+                NEW_LINE;
+            }
+            else if( iInCount == 0 )
+            {
+                CCOUT << "();";
+                NEW_LINE;
+            }
+            else if( iInCount > 0 )
+            {
+                if( pmd->IsAsyncp() )
+                    CCOUT << "( oYourCtx,";
+                else
+                    CCOUT << "(";
+                INDENT_UPL;
+                ret = os.EmitActArgList( pInArgs );
+                if( ERROR( ret ) )
+                    break;
+                CCOUT << ");";
+                INDENT_DOWNL;
+            }
+            Wa( "if( jret.ERROR() )" );
+            Wa( "{ ret = jret.getError();break; }" );
+            CCOUT << "*/";
+        }
+        else if( bHasEvent )
+        {
+            Wa( "/*" );
+            Wa( " *Just waiting and events will " );
+            Wa( " *be handled in the background" );
             NEW_LINE;
+            Wa( " while( oSvcCli.getState() == RC.stateConnected )" );
+            Wa( " try{" );
+            Wa( "     TimeUnit.SECONDS.sleep(1);" );
+            Wa( " } catch (InterruptedException e) {" );
+            Wa( " }" );
+            CCOUT << " */";
         }
-        else if( iInCount == 0 )
-        {
-            CCOUT << "();";
-            NEW_LINE;
-        }
-        else if( iInCount > 0 )
-        {
-            if( pmd->IsAsyncp() )
-                CCOUT << "( oYourCtx,";
-            else
-                CCOUT << "(";
-            INDENT_UPL;
-            ret = os.EmitActArgList( pInArgs );
-            if( ERROR( ret ) )
-                break;
-            CCOUT << ");";
-            INDENT_DOWNL;
-        }
-        Wa( "if( jret.ERROR() )" );
-        Wa( "{ ret = jret.getError();break; }" );
-        Wa( "*/" );
         INDENT_DOWNL;
         CCOUT << "}while( false );";
         NEW_LINES(2);

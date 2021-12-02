@@ -607,8 +607,7 @@ abstract public class JavaRpcService
                     oResp.setError(-RC.ENOTSUP);
                     break;
                 }
-                if( !nameComps[ 0 ].equals(
-                    "UserMethod" ) )
+                if( !nameComps[ 0 ].equals("UserMethod") )
                 {
                     oResp.setError( -RC.EINVAL );
                     break;
@@ -619,11 +618,6 @@ abstract public class JavaRpcService
                 if( nameComps[0].equals("RpcEvt") )
                 {
                     oResp.setError(-RC.ENOTSUP);
-                    break;
-                }
-                if( !nameComps[ 0 ].equals("UserMethod" ))
-                {
-                    oResp.setError( -RC.EINVAL );
                     break;
                 }
                 if( !nameComps[ 0 ].equals("UserEvent" ))
@@ -644,7 +638,6 @@ abstract public class JavaRpcService
                 oResp.setError( -RC.ENOTSUP );
                 break;
             }
-                
             try
             {
                 oResp = oMethod.invoke(

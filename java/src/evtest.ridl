@@ -1,0 +1,13 @@
+appname "evtest";
+
+interface IEventTest
+{
+    // note: event method does not have response.
+    // it is sent from server to the proxies
+    [ event ]OnHelloWorld( string strMsg ) returns ();
+};
+
+service EventTest
+{
+    interface IEventTest;
+};
