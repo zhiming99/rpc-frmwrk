@@ -945,6 +945,20 @@ struct CStreamSyncBase :
     virtual gint32 OnStreamReady(
         HANDLE hStream )
     { return 0; }
+
+    gint32 OnStmStartupComplete(
+        IEventSink* pCallback,
+        gint32 iRet, HANDLE hStream )
+    {
+        if( SUCCEEDED( iRet ) ) 
+            return 0;
+
+        TaskletPtr pTask;
+        pTask.NewObj( clsid( CIfDummyTask ) ); 
+        OnClose( hStream, pTask );    
+        return 0;
+    }
+
     /**
     * @name OnConnected
     * event when a new stream is setup between the
@@ -1135,6 +1149,18 @@ struct CStreamSyncBase :
                 if( ERROR( ret ) )
                     break;
                 pTaskGrp->AppendTask( pReadyNotify );
+            }
+
+            TaskletPtr pCleanup;
+            gint32 ret = DEFER_CANCEL_HANDLER2(
+                -1, pCleanup, this,
+                &CStreamSyncBase::OnStmStartupComplete,
+                ( IEventSink* )pTaskGrp, 0, hChannel );
+
+            if( SUCCEEDED( ret ) )
+            {
+                CIfAsyncCancelHandler* pasc = pCleanup;
+                pasc->SetSelfCleanup();
             }
 
             pTaskGrp->AppendTask( pStartWriter );

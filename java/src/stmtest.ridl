@@ -1,0 +1,12 @@
+appname "stmtest";
+
+interface IStreamTest
+{
+    Echo( string i0 ) returns ( string i0r );
+};
+
+service StreamTest [stream]
+{
+    interface IStreamTest;
+};
+

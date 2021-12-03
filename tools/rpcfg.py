@@ -1807,8 +1807,9 @@ class ConfigDlg(Gtk.Dialog):
         if ret < 0 :
             return ret
 
-        return Update_InitCfg(
-            initFile, destPath )
+        ret = Update_InitCfg( initFile, destPath )
+        os.remove( initFile )
+        return ret;
 
     def UpdateConfig( self ) :
         return self.Export_Files( None, self.bServer )

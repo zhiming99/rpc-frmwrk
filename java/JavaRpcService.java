@@ -317,6 +317,11 @@ abstract public class JavaRpcService
             hChannel, pBuf, m_oWriteStmCallback );
     }
 
+    public int writeStreamNoWait( long hChannel, byte[] pBuf )
+    {
+        return m_oInst.WriteStreamNoWait( hChannel, pBuf );
+    }
+
     /* ReadStream to read `size' bytes from the
      * stream `hChannel'.  If `size' is zero, the
      * number of bytes read depends on the first
