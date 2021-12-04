@@ -575,7 +575,10 @@ gint32 CJavaSnippet::EmitByteBufferForDeserial(
         NEW_LINE;
         Wa( "ByteBuffer _bbuf = null;" );
         Wa( "if( iSize > RC.MAX_BUF_SIZE || iSize <= 0 )" );
+        Wa( "{" );
         Wa( "    ret = -RC.ERANGE;" );
+        Wa( "    break;" );
+        Wa( "}" );
         Wa( "else" );
         BLOCK_OPEN;
         Wa( "_bbuf = ByteBuffer.allocate( iSize );" );
@@ -2218,9 +2221,9 @@ gint32 CImplJavaMethodSvrBase::ImplNewCancelNotify()
         BLOCK_OPEN;
         Wa( "return new ICancelNotify()" );
         BLOCK_OPEN;
-        CCOUT << strSvcName << " m_oHost = oHost;";
+        CCOUT << "final " << strSvcName << " m_oHost = oHost;";
         NEW_LINE;
-        Wa( "JavaReqContext m_oReqCtx = oContext;" );
+        Wa( "final JavaReqContext m_oReqCtx = oContext;" );
         os.EmitGetArgTypes( pInArgs );
 
         Wa( "public void onAsyncResp( Object oContext," );
@@ -2447,7 +2450,8 @@ gint32 CImplJavaMethodSvrBase::ImplSvcComplete()
             Wa( "        oCallback_, iRet, _pBuf );" );
             Wa( "    oCallback_.Clear();" );
             Wa( "}" );
-            Wa( "_pBuf.Clear();" );
+            Wa( "if( _pBuf != null )" );
+            Wa( "    _pBuf.Clear();" );
         }
         else
         {
@@ -2459,7 +2463,7 @@ gint32 CImplJavaMethodSvrBase::ImplSvcComplete()
             Wa( "    oCallback_.Clear();" );
             Wa( "}" );
         }
-        Wa( "return ret;" );
+        CCOUT << "return ret;";
         BLOCK_CLOSE;
 
     }while( 0 );

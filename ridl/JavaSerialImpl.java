@@ -1,15 +1,10 @@
 package XXXXX;
-import java.lang.String;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.List;
-import java.util.ArrayList;
 import java.nio.ByteBuffer;
 import org.rpcf.rpcbase.*;
 
 public class JavaSerialImpl extends JavaSerialBase
 {
-    protected InstType m_oInst = null;
+    protected InstType m_oInst;
     public JavaSerialImpl( InstType pIf )
     { m_oInst = pIf; }
 
@@ -39,13 +34,13 @@ public class JavaSerialImpl extends JavaSerialBase
             throw new NullPointerException(
                 "c++ instance is empty");
 
-        Long qwHash = deserialInt64( buf );
+        long qwHash = deserialInt64( buf );
         if( qwHash == RC.INVALID_HANDLE )
             throw new NullPointerException(
                 "channel hash is empty");
 
         long ret = m_oInst.GetChanByIdHash(
-            qwHash.longValue() );
+            qwHash );
 
         if( ret == RC.INVALID_HANDLE )
             throw new NullPointerException(

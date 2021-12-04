@@ -6,8 +6,6 @@ import org.rpcf.rpcbase.JavaReqContext;
 import org.rpcf.rpcbase.ObjPtr;
 import org.rpcf.rpcbase.RC;
 import org.rpcf.rpcbase.rpcbase;
-import org.rpcf.rpcbase.JavaRpcServiceS.IDeferredCall;
-import org.rpcf.rpcbase.JavaRpcServiceS.IUserTimerCb;
 
 public class AsyncTestsvr extends AsyncTestsvrbase {
     public AsyncTestsvr(ObjPtr pIoMgr, String strDesc, String strSvrObj) {

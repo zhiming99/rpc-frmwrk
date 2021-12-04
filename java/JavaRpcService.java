@@ -11,7 +11,7 @@ import java.lang.ClassCastException;
  * classes.
  */
 
-abstract public class JavaRpcService
+abstract public class JavaRpcService implements IRpcService
 {
     protected int m_iError = 0;
     protected ObjPtr m_pIoMgr = null;
@@ -27,9 +27,6 @@ abstract public class JavaRpcService
     { m_iError = iError; }
 
     public InstType getInst() { return m_oInst; }
-
-    public void SetError( int iErr )
-    { m_iError = iErr; }
 
     public int getState()
     { return m_oInst.GetState(); }
@@ -68,40 +65,6 @@ abstract public class JavaRpcService
             return 0;
         m_oInst.RemoveJavaHost();
         return m_oInst.Stop();
-    }
-
-    // types of callback
-    //
-    public interface IAsyncRespCb {
-        public abstract int getArgCount();
-        public abstract Class<?>[] getArgTypes();
-        public abstract void onAsyncResp( Object oContext,
-            int iRet, Object[] oParams ); 
-    }
-
-    public interface IReqHandler {
-        public abstract int getArgCount();
-        public abstract Class<?>[] getArgTypes();
-        public abstract JRetVal invoke(
-            Object oHost,
-            ObjPtr callback,
-            Object[] oParams );
-    }
-
-    public interface IEvtHandler extends IReqHandler{
-    }
-
-    public interface IDeferredCall {
-        public abstract int getArgCount();
-        public abstract Class<?>[] getArgTypes();
-        public abstract void call( Object[] oParams );
-    }
-
-    public interface ICancelNotify extends IAsyncRespCb{
-    }
-
-    public interface IUserTimerCb {
-        public abstract void onTimer( Object octx, int iRet );
     }
 
     public void timerCallback(
@@ -282,7 +245,7 @@ abstract public class JavaRpcService
 
     public void onWriteStreamComplete( int iRet,
         long hChannel, byte[] buf )
-    { return; }
+    {}
 
     IAsyncRespCb m_oWriteStmCallback = new IAsyncRespCb() {
         public int getArgCount()
@@ -296,7 +259,7 @@ abstract public class JavaRpcService
             long hChannel;
             if( !( oContext instanceof Long ) )
                 return;
-            hChannel = ( ( Long )oContext ).longValue();
+            hChannel = ( Long )oContext;
             byte[] buf = null;
             if( iRet == RC.STATUS_SUCCESS )
                 buf = ( byte[] )oParams[ 0 ];
@@ -389,7 +352,7 @@ abstract public class JavaRpcService
             long hChannel;
             if( ! ( oContext instanceof Long ) )
                 return;
-            hChannel = ( ( Long )oContext ).longValue();
+            hChannel = ( Long )oContext;
             byte[] buf = null;
             if( iRet == RC.STATUS_SUCCESS )
                 buf = ( byte[] )oParams[ 0 ];
@@ -693,8 +656,7 @@ abstract public class JavaRpcService
         int ret = 0;
         try{
             Object context = listArgs.get( 0 );
-            int iRet =
-                ( ( Integer )listArgs.get( 1 ) ).intValue();
+            int iRet = ( Integer )listArgs.get( 1 );
 
             listArgs.remove( 0 );
             listArgs.remove( 0 );

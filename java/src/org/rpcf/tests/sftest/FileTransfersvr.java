@@ -66,20 +66,22 @@ public class FileTransfersvr extends FileTransfersvrbase
                 ret = RC.ENOENT;
                 break;
             }
+            StringBuilder strBuilder = new StringBuilder("");
+
             if(o.canRead())
-                fi.strAccess = "r";
+                strBuilder.append("r");
             else
-                fi.strAccess = "-";
+                strBuilder.append("-");
 
             if(o.canWrite())
-                fi.strAccess += "w";
+                strBuilder.append("w");
             else
-                fi.strAccess += "-";
+                strBuilder.append("-");
             if(o.canExecute())
-                fi.strAccess += "x";
+                strBuilder.append("x");
             else
-                fi.strAccess += "-";
-
+                strBuilder.append("-");
+            fi.strAccess = strBuilder.toString();
             fi.qwSize = o.length();
 
         }while(false);
@@ -88,6 +90,4 @@ public class FileTransfersvr extends FileTransfersvrbase
 
         return ret;
     }
-    
-    
 }

@@ -70,13 +70,12 @@ abstract public class JavaSerialBase
 
     public interface ISerialElem
     {
-        public abstract int serialize(
+        int serialize(
             BufPtr buf, int[] offset, Object val );
     }
     public interface IDeserialElem
     {
-        public abstract Object deserialize(
-            ByteBuffer buf );
+        Object deserialize( ByteBuffer buf );
     }
 
     public int serialBoolArr( BufPtr buf, int[] offset, boolean[] val )
@@ -177,7 +176,7 @@ abstract public class JavaSerialBase
         return ret;
     }
 
-    public static boolean isPrimType( Character ch )
+    public static boolean isPrimType( char ch )
     {
         switch( ch )
         {
@@ -390,7 +389,7 @@ abstract public class JavaSerialBase
 
             if( sigElem.length() == 1 )
             {
-                Character ch = sigElem.charAt( 0 );
+                char ch = sigElem.charAt( 0 );
                 if( isPrimType( ch ) )
                 {
                     ret = serialPrimArray( buf,
@@ -426,7 +425,10 @@ abstract public class JavaSerialBase
 
             int arrSize = offset[0] - sizeOff - 8;
             if( arrSize <= 0 )
+            {
                 ret = -RC.ERANGE;
+                break;
+            }
 
             int[] oSizeOff = new int[]{sizeOff};
             ret = serialInt32(
@@ -440,7 +442,7 @@ abstract public class JavaSerialBase
     public int serialMap( BufPtr buf, int[] offset, Map<?,?> val, String sig )
     {
         int sigLen = sig.length();
-        Character ch = sig.charAt( 0 );
+        char ch = sig.charAt( 0 );
         if( ch != '[' )
             return -RC.EINVAL;
         else if( sig.charAt( sigLen -1 ) != ']' )
@@ -458,7 +460,7 @@ abstract public class JavaSerialBase
             if( ret < 0 )
                 break;
 
-            serialInt32( buf, offset, count );
+            ret = serialInt32( buf, offset, count );
             if( ret < 0 )
                 break;
 
@@ -505,7 +507,7 @@ abstract public class JavaSerialBase
     {
         int ret = 0;
         int sigLen = sig.length();
-        Character ch = sig.charAt( 0 );
+        char ch = sig.charAt( 0 );
         if( ch == '(' )
         {
             return serialArray(
@@ -596,10 +598,7 @@ abstract public class JavaSerialBase
         boolean[] bools = new boolean[ bytes.length ];
         for( int i = 0; i < bytes.length; i++ )
         {
-            if( bytes[ i ] == 1 )
-                bools[ i ] = true;
-            else
-                bools[ i ] = false;
+            bools[ i ] = bytes[ i ] == 1;
         }
         return bools;
     }
@@ -726,7 +725,7 @@ abstract public class JavaSerialBase
     {
         int iSize = deserialInt32( buf );
         if( iSize == 0 )
-            return new String( "" );
+            return "";
         if( iSize > 1024 * 1024 || iSize < 0 )
             throw new IndexOutOfBoundsException(
                 "string size out of bounds");
@@ -793,8 +792,7 @@ abstract public class JavaSerialBase
         return oStruct;
     }
 
-    public <E_ extends Object>
-        Object deserialArrayInternal(
+    public <E_> Object deserialArrayInternal(
         ByteBuffer buf, String sig,
         Class< E_ > elemClass )
     {
@@ -847,7 +845,7 @@ abstract public class JavaSerialBase
 
         if( sigElem.length() == 1 )
         {
-            Character ch = sigElem.charAt( 0 );
+            char ch = sigElem.charAt( 0 );
             if( isPrimType( ch ) )
             {
                 return deserialPrimArray(
@@ -867,8 +865,8 @@ abstract public class JavaSerialBase
         // scan the elem sig to retrieve the signatures
         // for key and value
         int ret = 0;
-        Character ch = sigVal.charAt( 0 );
-        Character c;
+        char ch = sigVal.charAt( 0 );
+        char c;
         switch( ch )
         {
         case '[':
@@ -952,8 +950,8 @@ abstract public class JavaSerialBase
         // scan the elem sig to retrieve the signatures
         // for key and value
         int ret = 0;
-        Character ch = sigElem.charAt( 0 );
-        Character c;
+        char ch = sigElem.charAt( 0 );
+        char c;
         String sigVal = "", sigKey = "";
         switch( ch )
         {
@@ -1048,7 +1046,7 @@ abstract public class JavaSerialBase
             this, buf, sig );
     }
 
-    public <K_ extends Object,V_ extends Object>
+    public <K_ ,V_>
         Map<K_,V_> deserialMapInternal(
         ByteBuffer buf, String sig,
         Class< K_ > kClass,
@@ -1118,18 +1116,14 @@ abstract public class JavaSerialBase
     public Object deserialElem(
         ByteBuffer buf, String sig )
     {
-        Character ch = sig.charAt( 0 );
+        char ch = sig.charAt( 0 );
         if( ch == '(' )
         {
-            Object oArr =
-                deserialArray( buf, sig );
-            return oArr;
+            return deserialArray( buf, sig );
         }
         if( ch == '[' )
         {
-            Object oMap =
-                ( Object )deserialMap( buf, sig );
-            return oMap;
+            return deserialMap( buf, sig );
         }
 
         if( !m_DeserialFuncs.containsKey( ch ) )
