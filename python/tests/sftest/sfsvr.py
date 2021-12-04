@@ -89,7 +89,7 @@ class PyFileTransSvr( PyFileTransferBase ):
                 break
 
             try:
-                fp = open( fileName, "wb+" )
+                fp = open( fileName, "rb+" )
                 iSize = fp.seek( 0, os.SEEK_END )
                 if iSize < offset :
                     resp[ 0 ] = -errno.ERANGE
@@ -150,10 +150,7 @@ class PyFileTransSvr( PyFileTransferBase ):
         fileInfo.fileName = fileName
         fileInfo.bRead = bRead
 
-        if bRead :
-            flag = "rb+"
-        else :
-            flag = "wb+" 
+        flag = "rb"
         try:
             fp = open( strPath, flag )
             fileInfo.size = fp.seek( 0, os.SEEK_END )

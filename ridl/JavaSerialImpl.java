@@ -51,6 +51,10 @@ public class JavaSerialImpl extends JavaSerialBase
             throw new NullPointerException(
                 "channel handle is invalid");
 
+        else if( RC.ERROR( ( int )ret ) )
+            throw new NullPointerException(
+                "deserialHstream failed with error " + ret);
+
         return ret;
     }
 }

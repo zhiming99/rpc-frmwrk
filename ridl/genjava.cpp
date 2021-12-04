@@ -3925,7 +3925,7 @@ gint32 CImplStructFactory::Output()
         Wa( "IFactory oFactory = m_mapStructs.get( id );" );
         Wa( "if( oFactory == null )" );
         Wa( "    return null;" );
-        Wa( "return oFactory.create();" );
+        CCOUT << "return oFactory.create();";
         BLOCK_CLOSE;
         NEW_LINE;
 
@@ -3946,7 +3946,10 @@ gint32 CImplStructFactory::Output()
                 Wa( "};" );
                 stdstr strMsgName = g_strAppName + "::" + strName;
                 gint32 iMsgId = GenClsid( strMsgName );
-                CCOUT << "mapFactories.put( " << iMsgId << ", o );";
+                char szHexId[ 16 ] = {0};
+                snprintf( szHexId,
+                    sizeof( szHexId ) - 1, "0x%08X", iMsgId );
+                CCOUT << "mapFactories.put( " << szHexId << ", o );";
                 NEW_LINE;
             }
         }

@@ -1,0 +1,24 @@
+appname "sftest";
+
+struct FileInfo
+{
+    string strFile;
+    string strAccess;
+    uint64 qwSize;
+};
+
+interface IFileTransfer
+{
+    StartUpload( string strFile, HSTREAM hChannel,
+        uint64 qwOffet, uint64 qwSize ) returns();
+
+    StartDownload( string strFile, HSTREAM hChannel,
+        uint64 qwOffet, uint64 qwSize ) returns();
+
+    GetFileInfo( string strFile ) returns ( FileInfo fi );
+};
+
+service FileTransfer
+{
+    interface IFileTransfer;
+};

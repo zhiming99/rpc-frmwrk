@@ -2360,8 +2360,6 @@ class CJavaInterfBase
         T* pImpl = static_cast< T* >( $self );
         HANDLE hChannel =
             pImpl->GetChanByIdHash( qwHash );
-        if( hChannel == INVALID_HANDLE )
-            return 0;
         return ( jlong )hChannel;
     }
 
