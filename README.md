@@ -60,6 +60,11 @@ This project depends on the following 3rd-party packags at runtime:
 6. Logging service
 
 ---
+[`Tue Dec 07 2021 10:48:54 PM Beijing`]   
+1. After the last testcase `sftest` for java is done, the java support is also almost done. The last work is to put the Makefile.am in the building process, and delivered by the `rpm` and `deb` packages.
+2. Next I will make some improvement to expand the coverity of the automated testing process, such as openssl and kerberos setup.
+3. Besides the improvement of testing, i will also add some tutorial documents and language support, especially documents in Chinese.
+
 [`Tue Nov 23 2021 06:21:29 PM Beijing`]   
 1. Made some progress on java generator debugging. We are 70% done with the Java support. Java support is coming.
 
