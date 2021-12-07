@@ -4,7 +4,10 @@ interface IActiveCancel
 {
     // to be able to actively cancel a task, the
     // request must be sent and handled asynchronously
-    // on both server and client side.
+    // on server side. Although it is not required to
+    // send the request asynchronously from proxy side,
+    // sending the req to cancel asynchronously make it
+    // easier to send the `cancel` request to server.
     [async]LongWait( string i0 ) returns ( string i0r );
 };
 
