@@ -1,9 +1,14 @@
 appname "evtest";
 
+// this test demonstrates how the server send an event
+// and how the client handles an event
+
 interface IEventTest
 {
-    // note: event method does not have response.
-    // it is sent from server to the proxies
+    // the `event` tag tells this method is an event from
+    // server to the proxy.
+    //
+    // Note that event method does not have response.
     [ event ]OnHelloWorld( string strMsg ) returns ();
 };
 
