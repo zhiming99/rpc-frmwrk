@@ -1,5 +1,8 @@
 appname "asynctst";
 
+// this test tries to demonstrate different kinds of
+// asynchronous processing with RPC-Frmwrk
+
 interface IAsyncTest
 {
     [timeout=97, async_s]LongWait( string i0 ) returns ( string i0r );
