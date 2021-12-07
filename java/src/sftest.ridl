@@ -10,10 +10,10 @@ struct FileInfo
 interface IFileTransfer
 {
     StartUpload( string strFile, HSTREAM hChannel,
-        uint64 qwOffet, uint64 qwSize ) returns();
+        uint64 qwOffset, uint64 qwSize ) returns();
 
     StartDownload( string strFile, HSTREAM hChannel,
-        uint64 qwOffet, uint64 qwSize ) returns();
+        uint64 qwOffset, uint64 qwSize ) returns();
 
     GetFileInfo( string strFile ) returns ( FileInfo fi );
 };

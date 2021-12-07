@@ -2438,12 +2438,11 @@ class CJavaProxyImpl :
         jobject jret = NewJRet( jenv );
         gint32 ret = 0;
         do{
-            IConfigDb* pDesc = *ppObj;
-            if( pDesc == nullptr )
-            {
-                ret = -EINVAL;
-                break;
-            }
+            IConfigDb* pDesc;
+            if( ppObj != nullptr )
+                pDesc = *ppObj;
+            else
+                pDesc = nullptr;
             HANDLE hChannel = INVALID_HANDLE;
             ret = $self->StartStream(
                 hChannel, pDesc );

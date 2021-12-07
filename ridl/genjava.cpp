@@ -1298,6 +1298,8 @@ gint32 CJavaSnippet::EmitCatchExcept(
             Wa( "    ret = -RC.ERANGE;");
         else if( strExcept == "Exception" )
             Wa( "    ret = RC.ERROR_FAIL;");
+        else if( strExcept == "ClassCastException" )
+            Wa( "    ret = -RC.EINVAL;");
         Wa( "}");
     }
     return 0;
@@ -1312,6 +1314,8 @@ void CJavaSnippet::EmitCatchExcepts(
         "NullPointerException", bSetRet );
     EmitCatchExcept(
         "IndexOutOfBoundsException", bSetRet );
+    EmitCatchExcept(
+        "ClassCastException", bSetRet );
     EmitCatchExcept(
         "Exception", bSetRet );
 }

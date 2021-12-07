@@ -971,9 +971,12 @@ gint32 CStreamProxy::StartStream(
     do{
         int fd = -1;
 
-        CfgPtr pParams( true );
+        CfgPtr pParams;
         if( pDesc == nullptr )
+        {
+            pParams.NewObj();
             pDesc = pParams;
+        }
 
         CParamList oParams( pDesc );
         oParams.SetPointer( propIoMgr, GetIoMgr() );

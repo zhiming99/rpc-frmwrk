@@ -159,14 +159,18 @@ abstract public class JavaSerialBase
     {
         int iCount = val.length;
         int iBytes = iCount * 8;
-        offset[0] = buf.SerialInt( offset[0], iBytes );
-        if( RC.ERROR( offset[0] ) )
-            return offset[0];
+        int ret = 0;
+        ret = serialInt32( buf, offset, iBytes );
+        if( RC.ERROR( ret ) )
+            return ret;
+
+        ret = serialInt32( buf, offset, iCount );
+        if( RC.ERROR( ret ) )
+            return ret;
 
         if( iCount == 0 )
             return 0;
 
-        int ret = 0;
         for( long i : val )
         {
             ret = serialHStream( buf, offset, i );
@@ -202,16 +206,23 @@ abstract public class JavaSerialBase
         if( strSig.length() == 0 )
             return -RC.EINVAL;
 
+        if(buf == null || offset == null || val == null)
+            return -RC.EINVAL;
+
         int ret = 0;
         switch( strSig.charAt( 0 ) )
         {
         case 'Q':
         case 'q':
-        case 'h':
             {
                 ret = serialInt64Arr(
                     buf, offset, ( long[] )val );
                 break;
+            }
+        case 'h':
+            {
+                ret = serialHStreamArr(
+                    buf, offset, ( long[] )val );
             }
         case 'D':
         case 'd':
@@ -361,6 +372,11 @@ abstract public class JavaSerialBase
 
     public int serialStruct( BufPtr buf, int[] offset, ISerializable val )
     {
+        if( buf == null || offset == null )
+            return -RC.EINVAL;
+        if( val == null )
+            return -RC.EINVAL;
+
         int ret = 0;
         Object oInst = getInst();
         if( oInst == null )
@@ -373,6 +389,11 @@ abstract public class JavaSerialBase
     public int serialArray( BufPtr buf,
         int[] offset, Object val, String sig )
     {
+        if( buf == null || offset == null )
+            return -RC.EINVAL;
+        if( val == null || sig == null )
+            return -RC.EINVAL;
+
         int sigLen = sig.length();
 
         if( sig.charAt( 0 ) != '(' )
@@ -441,6 +462,11 @@ abstract public class JavaSerialBase
 
     public int serialMap( BufPtr buf, int[] offset, Map<?,?> val, String sig )
     {
+        if( buf == null || offset == null )
+            return -RC.EINVAL;
+        if( val == null || sig == null )
+            return -RC.EINVAL;
+
         int sigLen = sig.length();
         char ch = sig.charAt( 0 );
         if( ch != '[' )
@@ -505,8 +531,6 @@ abstract public class JavaSerialBase
     public int serialElem( BufPtr buf,
         int[] offset, Object val, String sig )
     {
-        int ret = 0;
-        int sigLen = sig.length();
         char ch = sig.charAt( 0 );
         if( ch == '(' )
         {
@@ -676,7 +700,7 @@ abstract public class JavaSerialBase
             }
         case 'h':
             {
-                long[] val = deserialHStreamArr( buf );
+                arrObj = deserialHStreamArr( buf );
                 break;
             }
         case 'D':
@@ -779,6 +803,8 @@ abstract public class JavaSerialBase
 
     public ISerializable deserialStruct( ByteBuffer buf )
     {
+        if( buf == null )
+            throw new IllegalArgumentException();
         int curPos = buf.position();
         int id = buf.getInt();
         buf.position( curPos );
@@ -833,6 +859,9 @@ abstract public class JavaSerialBase
 
     public Object deserialArray( ByteBuffer buf, String sig )
     {
+        if( buf == null || sig == null )
+            throw new IllegalArgumentException();
+
         int sigLen = sig.length();
         if( sig.charAt( 0 ) != '(' ||
             sig.charAt( sigLen -1 ) != ')' )
@@ -1042,6 +1071,8 @@ abstract public class JavaSerialBase
     public Map< ?, ? > deserialMap(
         ByteBuffer buf, String sig )
     {
+        if( buf == null || sig == null )
+            throw new IllegalArgumentException();
         return DeserialMaps.deserialMap(
             this, buf, sig );
     }

@@ -3,11 +3,13 @@ package org.rpcf.tests.sftest;
 import org.rpcf.rpcbase.*;
 import java.io.File;
 import java.lang.String;
+import java.nio.charset.StandardCharsets;
 
 public class FileTransfersvr extends FileTransfersvrbase
 {
     String m_strRootDir =
             "/tmp/sfsvr-root/" + System.getProperty("user.name");
+    TransferContext m_oTransCtx = new TransferContext(this);
     public FileTransfersvr( ObjPtr pIoMgr,
         String strDesc, String strSvrObj )
     {
@@ -22,12 +24,44 @@ public class FileTransfersvr extends FileTransfersvrbase
         JavaReqContext oReqCtx,
         String strFile,
         long hChannel,
-        long qwOffet,
+        long qwOffset,
         long qwSize )
     {
         // Synchronous handler. Make sure to call
         // oReqCtx.setResponse before return
-        return RC.ERROR_NOT_IMPL;
+        TransFileContext o = new TransFileContext(strFile);
+        o.m_cDirection='u';
+        o.m_strPath = m_strRootDir + "/" + strFile;
+        o.m_lSize = qwSize;
+        o.m_lOffset = qwOffset;
+        o.m_bServer = isServer();
+
+        int ret = o.openFile();
+        if( RC.ERROR(ret))
+            return ret;
+        m_oTransCtx.addContext(hChannel,o);
+        IDeferredCall odc = new IDeferredCall() {
+            @Override
+            public int getArgCount() {
+                return 1;
+            }
+
+            @Override
+            public Class<?>[] getArgTypes() {
+                return new Class[]{long.class};
+            }
+
+            @Override
+            public void call(Object[] oParams) {
+                long hChannel = (Long)oParams[0];
+                byte[] buf = new byte[0];
+                m_oTransCtx.writeFileAndRecv(hChannel,buf);
+            }
+        };
+        // start to receive after this call returns
+        ret = deferCall(odc, new Object[]{hChannel});
+        oReqCtx.setResponse(ret);
+        return ret;
     }
     
     // IFileTransfer::StartDownload sync-handler
@@ -35,12 +69,44 @@ public class FileTransfersvr extends FileTransfersvrbase
         JavaReqContext oReqCtx,
         String strFile,
         long hChannel,
-        long qwOffet,
+        long qwOffset,
         long qwSize )
     {
         // Synchronous handler. Make sure to call
         // oReqCtx.setResponse before return
-        return RC.ERROR_NOT_IMPL;
+        TransFileContext o = new TransFileContext(strFile);
+        o.m_lSize = qwSize;
+        o.m_lOffset = qwOffset;
+        o.m_cDirection='d';
+        o.m_strPath = m_strRootDir + "/" + strFile;
+        o.m_lSize = qwSize;
+        o.m_lOffset = qwOffset;
+        o.m_bServer = isServer();
+        int ret = o.openFile();
+        if( RC.ERROR(ret))
+            return ret;
+        m_oTransCtx.addContext(hChannel,o);
+        IDeferredCall odc = new IDeferredCall() {
+            @Override
+            public int getArgCount() {
+                return 1;
+            }
+
+            @Override
+            public Class<?>[] getArgTypes() {
+                return new Class[]{long.class};
+            }
+
+            @Override
+            public void call(Object[] oParams) {
+                long hChannel = (Long)oParams[0];
+                m_oTransCtx.readFileAndSend(hChannel);
+            }
+        };
+        // start sending file data after this call
+        ret = deferCall(odc, new Object[]{hChannel});
+        oReqCtx.setResponse(ret);
+        return ret;
     }
     
     // IFileTransfer::GetFileInfo sync-handler
@@ -89,5 +155,57 @@ public class FileTransfersvr extends FileTransfersvrbase
             oReqCtx.setResponse(ret, fi);
 
         return ret;
+    }
+
+    public void onWriteStreamComplete(
+            int iRet, long hChannel, byte[] buf)
+    {
+        if(RC.ERROR(iRet))
+        {
+            rpcbase.JavaOutputMsg(
+                    "writeStramAsync faied with error " + iRet);
+            return;
+        }
+        m_oTransCtx.onWriteStreamComplete(hChannel,buf);
+    }
+    public void onReadStreamComplete(
+            int iRet, long hChannel, byte[] buf )
+    {
+        if(RC.ERROR(iRet))
+        {
+            rpcbase.JavaOutputMsg(
+                    "readStreamAsync faied with error " + iRet);
+            return;
+        }
+        m_oTransCtx.onReadStreamComplete(hChannel,buf);
+    }
+
+    @Override
+    public int onStmReady(long hChannel) {
+        IRpcService.IDeferredCall odc = new IDeferredCall() {
+            @Override
+            public int getArgCount() {
+                return 1;
+            }
+
+            @Override
+            public Class<?>[] getArgTypes() {
+                return new Class[]{long.class};
+            }
+
+            @Override
+            public void call(Object[] oParams) {
+                m_oTransCtx.sendToken(
+                        hChannel, "rdy".getBytes(StandardCharsets.UTF_8));
+            }
+        };
+        return deferCall(odc, new Object[]{hChannel});
+    }
+
+    @Override
+    public int onStmClosing(long hChannel) {
+        m_oTransCtx.onTransferDone(
+                hChannel, -RC.ECONNABORTED );
+        return 0;
     }
 }

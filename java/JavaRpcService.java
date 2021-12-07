@@ -216,15 +216,19 @@ abstract public class JavaRpcService implements IRpcService
         if( isServer() )
             return null;
 
-        if( oDesc == null )
-            oDesc = new CParamList();
-        
-        JRetVal jret = ( JRetVal )oDesc.GetCfg();
-        if( jret.ERROR() )
-            return jret;
+        JRetVal jret;
+        ObjPtr o = null;
 
-        ObjPtr o = ( ObjPtr )jret.getAt( 0 );
+        if( oDesc != null )
+        { 
+            jret = ( JRetVal )oDesc.GetCfg();
+            if( jret.ERROR() )
+                return jret;
+            o = ( ObjPtr )jret.getAt( 0 );
+        }
+
         jret = ( JRetVal )m_oInst.StartStream( o );
+
         if( jret == null )
         {
             jret = new JRetVal();
@@ -622,6 +626,10 @@ abstract public class JavaRpcService implements IRpcService
             catch( IndexOutOfBoundsException e )
             {
                 oResp.setError( -RC.ERANGE );
+            }
+            catch( ClassCastException e )
+            {
+                oResp.setError( -RC.EINVAL );
             }
             catch( Exception e )
             {
