@@ -9,8 +9,8 @@ interface IKeepAlive
     //
     // keepalive is an expensive operation, so don't
     // do it too frequent as does here. Max keep-alive
-    // value should be less than the minum of all the
-    // timeout values of among the nodes on the request
+    // value should be less than the minimum of all the
+    // timeout values among the nodes along the request
     // path.
     [async_s, timeout=300, keepalive=3]
     LongWait( string i0 ) returns ( string i0r );
