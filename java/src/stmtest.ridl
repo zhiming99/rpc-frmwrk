@@ -1,5 +1,13 @@
 appname "stmtest";
 
+// this test demonstrates a chat session between the
+// server and the proxy. However the stream operation
+// goes through the api, and cannot be defined in
+// ridl. The interface here almost like a place-holder.
+// the significant bit is the `stream` tag on the
+// service declaration. It means the service object
+// requires streaming support.
+
 interface IStreamTest
 {
     Echo( string i0 ) returns ( string i0r );
