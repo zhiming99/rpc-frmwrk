@@ -62,7 +62,7 @@ This project depends on the following 3rd-party packags at runtime:
 ---
 [`Tue Dec 07 2021 10:48:54 PM Beijing`]   
 1. After the last testcase `sftest` for java is done, the java support is about 95% complete. The last work is to put the Makefile.am in the building process, and get it delivered by the `rpm` and `deb` packages.
-2. Next I will make some improvement to expand the coverity of the automated testing process, such as openssl and kerberos setup.
+2. Next I will make some improvement to expand the coverity of the automated testing process, such as unattented setup of openssl and kerberos.
 3. Besides the improvement of testing, i will also add some tutorial documents and language support, especially documents in Chinese.
 
 [`Tue Nov 23 2021 06:21:29 PM Beijing`]   
