@@ -488,6 +488,8 @@ class CJavaExportReadme :
         : super( pWriter, pNode )
     {}
     gint32 Output();
+    gint32 Output_en();
+    gint32 Output_cn();
 };
 
 class CImplDeserialMap

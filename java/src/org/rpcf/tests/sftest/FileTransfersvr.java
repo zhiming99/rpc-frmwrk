@@ -75,8 +75,6 @@ public class FileTransfersvr extends FileTransfersvrbase
         // Synchronous handler. Make sure to call
         // oReqCtx.setResponse before return
         TransFileContext o = new TransFileContext(strFile);
-        o.m_lSize = qwSize;
-        o.m_lOffset = qwOffset;
         o.m_cDirection='d';
         o.m_strPath = m_strRootDir + "/" + strFile;
         o.m_lSize = qwSize;
@@ -132,7 +130,7 @@ public class FileTransfersvr extends FileTransfersvrbase
                 ret = RC.ENOENT;
                 break;
             }
-            StringBuilder strBuilder = new StringBuilder("");
+            StringBuilder strBuilder = new StringBuilder();
 
             if(o.canRead())
                 strBuilder.append("r");
@@ -207,5 +205,24 @@ public class FileTransfersvr extends FileTransfersvrbase
         m_oTransCtx.onTransferDone(
                 hChannel, -RC.ECONNABORTED );
         return 0;
+    }
+
+    // IFileTransfer::RemoveFile sync-handler
+    @Override
+    public int RemoveFile(
+            JavaReqContext oReqCtx,
+            String strFile )
+    {
+        // Synchronous handler. Make sure to call
+        // oReqCtx.setResponse before return
+        int ret = 0;
+        String strBaseName =
+                TransFileContext.getFileName(strFile);
+        File oFile = new File(
+                m_strRootDir + "/" + strBaseName);
+        if(!oFile.delete())
+            ret = -RC.ENOENT;
+        oReqCtx.setResponse(ret);
+        return ret;
     }
 }

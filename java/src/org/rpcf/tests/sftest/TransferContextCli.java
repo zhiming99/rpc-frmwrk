@@ -15,11 +15,11 @@ public class TransferContextCli extends TransferContext{
         TransFileContext o = m_mapChanToCtx.get(hChannel);
         if(o == null)
             return;
-        if(!o.isDone()) {
-            o.setError(iRet);
-            o.cleanUp();
-            notifyComplete();
-        }
+        if(o.isDone())
+            return;
+        o.setError(iRet);
+        o.cleanUp();
+        notifyComplete();
     }
 
     void waitForComplete(){
@@ -27,9 +27,8 @@ public class TransferContextCli extends TransferContext{
         try {
             m_sem.acquire();
             break;
-        }catch(InterruptedException e)
+        }catch(InterruptedException ignored)
         {
-            continue;
         }
     }
     void notifyComplete()

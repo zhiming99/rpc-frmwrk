@@ -1,5 +1,9 @@
 appname "sftest";
 
+// this is a testcase for asynchronous streaming transfer.
+// it uploads a file and then download it, and compares the
+// md5sum of the two.
+
 struct FileInfo
 {
     string strFile;
@@ -16,6 +20,7 @@ interface IFileTransfer
         uint64 qwOffset, uint64 qwSize ) returns();
 
     GetFileInfo( string strFile ) returns ( FileInfo fi );
+    RemoveFile( string strFile ) returns();
 };
 
 service FileTransfer

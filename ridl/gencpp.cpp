@@ -6912,7 +6912,19 @@ CExportReadme::CExportReadme(
     }
 }
 
+extern stdstr g_strLocale;
+
 gint32 CExportReadme::Output()
+{
+    if( g_strLocale == "en" )
+        return Output_en();
+    if( g_strLocale == "cn" )
+        return Output_cn();
+
+    return -ENOTSUP;
+}
+
+gint32 CExportReadme::Output_en()
 {
    gint32 ret = 0; 
    do{
@@ -7013,10 +7025,119 @@ gint32 CExportReadme::Output()
             << "with the system settings, just ignore it.";
         NEW_LINES(2);
 
-        CCOUT << "**Note**: the files in bold text need your further implementation. "
+        CCOUT << "**Note 1**: the files in bold text need your further implementation. "
             << "And files in italic text do not. And of course, "
             << "you can still customized the italic files, but be aware they "
             << "will be rewritten after running RIDLC again.";
+        NEW_LINES(2);
+        CCOUT << "**Note 2**: Please refer to [this link](https://github.com/zhiming99/rpc-frmwrk#building-rpc-frmwrk)"
+            << "for building and installation of RPC-Frmwrk";
+        NEW_LINE;
+
+   }while( 0 );
+
+   return ret;
+}
+
+gint32 CExportReadme::Output_cn()
+{
+   gint32 ret = 0; 
+   do{
+        std::vector< ObjPtr > vecSvcs;
+        ret = m_pNode->GetSvcDecls( vecSvcs );
+        if( ERROR( ret ) )
+            break;
+
+        std::vector< stdstr > vecSvcNames;
+        for( auto& elem : vecSvcs )
+        {
+            CServiceDecl* psd = elem;
+            if( psd == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            vecSvcNames.push_back(
+                psd->GetName() );
+        }
+
+        Wa( "### 生成文件介绍:" );
+
+        CCOUT << "* **maincli.cpp**, **mainsvr.cpp**: "
+            << "分别包含对客户端和服务器端的程序入口`maincli`和`mainsvr`函数的定义。"
+            << "同时也包含作为wrapper的`main`实现。"
+            << "但是如果`ridlc`命令行指定了选项`-l`, 就不会产生`main`函数了";
+        NEW_LINE;
+        CCOUT << "你可以对这两个文件作出修改，不必担心ridlc会冲掉你修改的内容。"
+            << "`ridlc`再次编译时，如果发现目标目录存在该文件会把新生成的文件"
+            << "名加上.new后缀。";
+        NEW_LINES( 2 );
+
+        for( auto& elem : vecSvcNames )
+        {
+            CCOUT << "* **" << elem << "svr.h**, **" << elem << "svr.cpp**: "
+                << "分别包含有关service `"<<elem
+                <<"`的服务器端的所有接口函数的声明和空的实现。"
+                << "这些接口函数需要你的进一步实现, 其中主要包括"
+                << "服务器端的请求处理方法。";
+            NEW_LINE;
+            CCOUT << "* **" << elem << "cli.h**, **" << elem << "cli.cpp**: "
+                << "分别包含有关service `"<<elem
+                <<"`的客户端的所有接口函数的声明和空的实现。"
+                << "这些接口函数需要你的进一步实现, 其中主要包括"
+                << "客户端的事件处理方法。";
+            NEW_LINE;
+            CCOUT << "你可以对这四个文件作出修改，不必担心`ridlc`会冲掉你修改的内容。"
+                << "`ridlc`再次编译时，如果发现目标目录存在该文件，会为新生成的文件"
+                << "的文件名加上.new后缀。";
+            NEW_LINES( 2 );
+        }
+
+        CCOUT<< "* *" << g_strAppName << ".h*, *" << g_strAppName <<".cpp*: "
+                << "分别包含有ridl中声明所有的的service的"
+                << "服务器端和客户端的所有辅助函数和底部支持功能的声明和实现。";
+        NEW_LINE;
+        CCOUT << "这个文件务必不要做进一步的修改。"
+                << "`ridlc`在下一次运行时会重写里面的内容。";
+        NEW_LINES( 2 );
+
+        CCOUT<< "* *" << g_strAppName << "desc.json*: "
+            << "包含本应用相关的配置信息, 和所有定义的服务(service)的配置参数。";
+        NEW_LINE;
+        CCOUT << "这个文件务必不要做进一步的修改。"
+            << "`ridlc`或者`synccfg.py`都会在在下一次运行时重写里面的内容。";
+        NEW_LINES( 2 );
+
+        CCOUT << "* *driver.json*: "
+            << "包含本应用相关的配置信息,主要是底层的iomanager的配置信息。";
+        NEW_LINE;
+        CCOUT << "这个文件务必不要做进一步的修改。"
+                << "`ridlc`或者`synccfg.py`都会在在下一次运行时重写里面的内容。";
+        NEW_LINES( 2 );
+
+        CCOUT << "* *Makefile*: "
+            << "该Makefile将build服务器端和客户端的程序或者生成一个共享动态库`.so`文件"
+            << "当build成功时, 会用当前系统配置的信息更新本目录下的json配置文件。";
+        NEW_LINE;
+        CCOUT << "这个文件务必不要做进一步的修改。"
+                << "`ridlc`或者`synccfg.py`都会在在下一次运行时重写里面的内容。";
+        NEW_LINES( 2 );
+
+        CCOUT << "* *synccfg.py*: "
+            << "一个小的Python脚本，用来同步本应用配置信息。";
+        NEW_LINES(2);
+        CCOUT <<"* **运行:** Makefile会在debug/release目录下生成`"<< g_strAppName<<"cli`"
+            << "和`"<<g_strAppName<<"svr`一对可运行程序。"
+            << " 在一个命令行输入 `" << g_strAppName << "svr`以启动服务器端程序。"
+            << " 在另一个命令行输入 `" << g_strAppName << "cli`以启动服务器端程序。"
+            << "在运行前，务必运行一下`make`命令同步程序的配置文件，"
+            << "即`"<< g_strAppName <<"desc.json`和`driver.json`。";
+        NEW_LINES(2);
+
+        CCOUT << "**注1**: 上文中的粗体的文件是需要你进一步修改的文件. 斜体字的文件则不需要。"
+            << "如果仍然有修改的必要，请注意这些文件有被`ridlc`或者`synccfg.py`改写的风险。";
+        NEW_LINES(2);
+        CCOUT << "**注2**: 有关配置系统搭建和设置请参考[此文。](https://github.com/zhiming99/rpc-frmwrk#building-rpc-frmwrk)";
         NEW_LINE;
 
    }while( 0 );

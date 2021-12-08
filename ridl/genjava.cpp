@@ -36,6 +36,7 @@ extern CDeclMap g_mapDecls;
 extern ObjPtr g_pRootNode;
 extern CAliasMap g_mapAliases;
 extern stdstr g_strPrefix;
+extern stdstr g_strLocale;
 
 std::map<stdstr, ObjPtr> g_mapMapTypeDecl;
 std::map<stdstr, ObjPtr> g_mapArrayTypeDecl;
@@ -3970,128 +3971,6 @@ gint32 CImplStructFactory::Output()
     return ret;
 }
 
-gint32 CJavaExportReadme::Output()
-{
-   gint32 ret = 0; 
-   do{
-        std::vector< ObjPtr > vecSvcs;
-        ret = m_pNode->GetSvcDecls( vecSvcs );
-        if( ERROR( ret ) )
-            break;
-
-        std::vector< stdstr > vecSvcNames;
-        for( auto& elem : vecSvcs )
-        {
-            CServiceDecl* psd = elem;
-            if( psd == nullptr )
-            {
-                ret = -EFAULT;
-                break;
-            }
-            vecSvcNames.push_back(
-                psd->GetName() );
-        }
-
-        Wa( "### Introduction to the files:" );
-
-        CCOUT << "* **maincli.java**, **mainsvr.java**: "
-            << "Containing defintion of `main()` method for client, as the main "
-            << "entry for client program "
-            << "and definition of `main()` function server program respectively. ";
-        NEW_LINE;
-        CCOUT << "And you can make changes to the files to customize the program. "
-            << "The `ridlc` will not touch them if they exist in the project directory. "
-            << "When it runs again, it puts the newly "
-            << "generated code to `mainxxx.java.new` files instead.";
-        NEW_LINES( 2 );
-
-        for( auto& elem : vecSvcNames )
-        {
-            CCOUT << "* **" << elem << "svr.java**, **" << elem << "cli.java**: "
-                << "Containing the declarations and definitions of all the server/client side "
-                << "methods that need to be implemented by you, mainly the request/event handlers, "
-                << "for service `" << elem << "`.";
-            NEW_LINE;
-            CCOUT << "And you need to make changes to the files to implement the "
-                << "functionality for server/client. "
-                << "The `ridlc` will not touch them if they exist in the project directory. "
-                << "When it runs again, it puts the newly "
-                << "generated code to `"<<elem  <<"xxx.java.new` files instead.";
-            NEW_LINES( 2 );
-        }
-
-        for( auto& elem : vecSvcNames )
-        {
-            CCOUT << "* *" << elem << "svrbase.java*, *"<< elem << "clibase.java* : "
-                << "Containing the declarations and definitions of all the server/client side "
-                << "utilities and helpers for the interfaces of service `" << elem << "`.";
-            NEW_LINE;
-            CCOUT << "And please don't edit them, since they will be "
-                << "overwritten by next run of `ridlc` without backup.";
-            NEW_LINES( 2 );
-        }
-
-        CCOUT<< "* *" << g_strAppName << "Factory.java*: "
-            << "Containing the definition of struct factory "
-            << "declared and referenced in the ridl file.";
-        NEW_LINE;
-        CCOUT << "And please don't edit it, since they will be "
-            << "overwritten by next run of `ridlc` without backup.";
-        NEW_LINES( 2 );
-
-        CCOUT<< "* *" << g_strAppName << "desc.json*: "
-            << "Containing the configuration parameters for all "
-            << "the services declared in the ridl file";
-        NEW_LINE;
-        CCOUT << "And please don't edit it, since they will be "
-            << "overwritten by next run of `ridlc` or synccfg.py without backup.";
-        NEW_LINES( 2 );
-
-        CCOUT << "* *driver.json*: "
-            << "Containing the configuration parameters for all "
-            << "the ports and drivers";
-        NEW_LINE;
-        CCOUT << "And please don't edit it, since they will be "
-            << "overwritten by next run of `ridlc` or synccfg.py "
-            << "without backup.";
-        NEW_LINES( 2 );
-
-        CCOUT << "* *Makefile*: "
-            << "The Makefile will just synchronize the configurations "
-            << "with the local system settings. And it does nothing else.";
-        NEW_LINE;
-        CCOUT << "And please don't edit it, since it will be "
-            << "overwritten by next run of `ridlc` and synccfg.py without backup.";
-        NEW_LINES( 2 );
-
-        CCOUT << "* *DeserialMaps*, *DeserialArrays*, *JavaSerialBase.java*, "
-            << "*JavaSerialHelperS.java*, *JavaSerialHelperP.java*: "
-            << "Containing the utility classes for serializations.";
-        NEW_LINE;
-        CCOUT << "And please don't edit it, since they will be "
-            << "overwritten by next run of `ridlc`.";
-        NEW_LINES( 2 );
-
-        CCOUT << "* *synccfg.py*: "
-            << "a small python script to synchronous settings "
-            << "with the system settings, just ignore it.";
-        NEW_LINES(2);
-        CCOUT <<"* **run:** you can run `java org.rpcf."<<g_strAppName<<".mainsvr`"
-            << " and `java org.rpcf."<<g_strAppName<<".maincli` to start the server "
-            << "and client. Also make sure to run `make` to update the configuration"
-            << " files, that is, the `"<< g_strAppName <<"desc.json` and `driver.json`.";
-        NEW_LINES(2);
-
-        CCOUT << "**Note**: the files in bold text need your further implementation. "
-            << "And files in italic text do not. And of course, "
-            << "you can still customized the italic files, but be aware they "
-            << "will be rewritten after running RIDLC again.";
-        NEW_LINE;
-
-   }while( 0 );
-
-   return ret;
-}
     
 CJavaExportMakefile::CJavaExportMakefile(
     CWriterBase* pWriter,
@@ -4585,4 +4464,256 @@ gint32 CImplDeserialArray::Output()
 
     }while( 0 );
     return ret;
+}
+
+gint32 CJavaExportReadme::Output()
+{
+    if( g_strLocale == "en" )
+        return Output_en();
+    if( g_strLocale == "cn" )
+        return Output_cn();
+
+    return -ENOTSUP;
+}
+gint32 CJavaExportReadme::Output_en()
+{
+   gint32 ret = 0; 
+   do{
+        std::vector< ObjPtr > vecSvcs;
+        ret = m_pNode->GetSvcDecls( vecSvcs );
+        if( ERROR( ret ) )
+            break;
+
+        std::vector< stdstr > vecSvcNames;
+        for( auto& elem : vecSvcs )
+        {
+            CServiceDecl* psd = elem;
+            if( psd == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            vecSvcNames.push_back(
+                psd->GetName() );
+        }
+
+        Wa( "### Introduction to the files:" );
+
+        CCOUT << "* **maincli.java**, **mainsvr.java**: "
+            << "Containing defintion of `main()` method for client, as the main "
+            << "entry for client program "
+            << "and definition of `main()` function server program respectively. ";
+        NEW_LINE;
+        CCOUT << "And you can make changes to the files to customize the program. "
+            << "The `ridlc` will not touch them if they exist in the project directory. "
+            << "When it runs again, it puts the newly "
+            << "generated code to `mainxxx.java.new` files instead.";
+        NEW_LINES( 2 );
+
+        for( auto& elem : vecSvcNames )
+        {
+            CCOUT << "* **" << elem << "svr.java**, **" << elem << "cli.java**: "
+                << "Containing the declarations and definitions of all the server/client side "
+                << "methods that need to be implemented by you, mainly the request/event handlers, "
+                << "for service `" << elem << "`.";
+            NEW_LINE;
+            CCOUT << "And you need to make changes to the files to implement the "
+                << "functionality for server/client. "
+                << "The `ridlc` will not touch them if they exist in the project directory. "
+                << "When it runs again, it puts the newly "
+                << "generated code to `"<<elem  <<"xxx.java.new` files instead.";
+            NEW_LINES( 2 );
+        }
+
+        for( auto& elem : vecSvcNames )
+        {
+            CCOUT << "* *" << elem << "svrbase.java*, *"<< elem << "clibase.java* : "
+                << "Containing the declarations and definitions of all the server/client side "
+                << "utilities and helpers for the interfaces of service `" << elem << "`.";
+            NEW_LINE;
+            CCOUT << "And please don't edit them, since they will be "
+                << "overwritten by next run of `ridlc` without backup.";
+            NEW_LINES( 2 );
+        }
+
+        CCOUT<< "* *" << g_strAppName << "Factory.java*: "
+            << "Containing the definition of struct factory "
+            << "declared and referenced in the ridl file.";
+        NEW_LINE;
+        CCOUT << "And please don't edit it, since they will be "
+            << "overwritten by next run of `ridlc` without backup.";
+        NEW_LINES( 2 );
+
+        CCOUT<< "* *" << g_strAppName << "desc.json*: "
+            << "Containing the configuration parameters for all "
+            << "the services declared in the ridl file";
+        NEW_LINE;
+        CCOUT << "And please don't edit it, since they will be "
+            << "overwritten by next run of `ridlc` or synccfg.py without backup.";
+        NEW_LINES( 2 );
+
+        CCOUT << "* *driver.json*: "
+            << "Containing the configuration parameters for all "
+            << "the ports and drivers";
+        NEW_LINE;
+        CCOUT << "And please don't edit it, since they will be "
+            << "overwritten by next run of `ridlc` or synccfg.py "
+            << "without backup.";
+        NEW_LINES( 2 );
+
+        CCOUT << "* *Makefile*: "
+            << "The Makefile will just synchronize the configurations "
+            << "with the local system settings. And it does nothing else.";
+        NEW_LINE;
+        CCOUT << "And please don't edit it, since it will be "
+            << "overwritten by next run of `ridlc` and synccfg.py without backup.";
+        NEW_LINES( 2 );
+
+        CCOUT << "* *DeserialMaps*, *DeserialArrays*, *JavaSerialBase.java*, "
+            << "*JavaSerialHelperS.java*, *JavaSerialHelperP.java*: "
+            << "Containing the utility classes for serializations.";
+        NEW_LINE;
+        CCOUT << "And please don't edit it, since they will be "
+            << "overwritten by next run of `ridlc`.";
+        NEW_LINES( 2 );
+
+        CCOUT << "* *synccfg.py*: "
+            << "a small python script to synchronous settings "
+            << "with the system settings, just ignore it.";
+        NEW_LINES(2);
+        CCOUT <<"* **run:** you can run `java org.rpcf."<<g_strAppName<<".mainsvr`"
+            << " and `java org.rpcf."<<g_strAppName<<".maincli` to start the server "
+            << "and client. Also make sure to run `make` to update the configuration"
+            << " files, that is, the `"<< g_strAppName <<"desc.json` and `driver.json`.";
+        NEW_LINES(2);
+
+        CCOUT << "**Note 1**: the files in bold text need your further implementation. "
+            << "And files in italic text do not. And of course, "
+            << "you can still customized the italic files, but be aware they "
+            << "will be rewritten after running RIDLC again.";
+        NEW_LINES(2);
+        CCOUT << "**Note 2**: Please refer to [this link](https://github.com/zhiming99/rpc-frmwrk#building-rpc-frmwrk)"
+            << "for building and installation of RPC-Frmwrk";
+        NEW_LINE;
+
+   }while( 0 );
+
+   return ret;
+}
+
+gint32 CJavaExportReadme::Output_cn()
+{
+   gint32 ret = 0; 
+   do{
+        std::vector< ObjPtr > vecSvcs;
+        ret = m_pNode->GetSvcDecls( vecSvcs );
+        if( ERROR( ret ) )
+            break;
+
+        std::vector< stdstr > vecSvcNames;
+        for( auto& elem : vecSvcs )
+        {
+            CServiceDecl* psd = elem;
+            if( psd == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            vecSvcNames.push_back(
+                psd->GetName() );
+        }
+
+        Wa( "### 生成文件介绍:" );
+
+        CCOUT << "* **maincli.java**, **mainsvr.java**: "
+            << "分别包含对客户端和服务器端的程序入口`main()`函数的定义";
+        NEW_LINE;
+        CCOUT << "你可以对这两个文件作出修改，不必担心ridlc会冲掉你修改的内容。"
+            << "`ridlc`再次编译时，如果发现目标目录存在该文件会把新生成的文件"
+            << "名加上.new后缀。";
+        NEW_LINES( 2 );
+
+        for( auto& elem : vecSvcNames )
+        {
+            CCOUT << "* **" << elem << "svr.java**, **" << elem << "cli.java**: "
+                << "分别包含有关service `"<<elem<<"`的服务器端和客户端的所有接口函数的声明和空的实现。"
+                << "这些接口函数需要你的进一步实现, 其中主要包括"
+                << "服务器端的请求处理和客户端的事件处理。";
+            NEW_LINE;
+            CCOUT << "你可以对这两个文件作出修改，不必担心`ridlc`会冲掉你修改的内容。"
+                << "`ridlc`再次编译时，如果发现目标目录存在该文件，会为新生成的文件"
+                << "的文件名加上.new后缀。";
+            NEW_LINES( 2 );
+        }
+
+        for( auto& elem : vecSvcNames )
+        {
+            CCOUT << "* *" << elem << "svrbase.java*, *"<< elem << "clibase.java* : "
+                << "分别包含有关service `"<<elem<<"`的服务器端和客户端的所有辅助函数和底部支持功能的实现。";
+            NEW_LINE;
+            CCOUT << "这些函数和方法务必不要做进一步的修改。"
+                << "`ridlc`在下一次运行时会重写里面的内容。";
+            NEW_LINES( 2 );
+        }
+
+        CCOUT<< "* *" << g_strAppName << "Factory.java*: "
+            << "包含一个ridl文件中声明的所有用到的struct的工厂类的实现。";
+        NEW_LINE;
+        CCOUT << "这个文件务必不要做进一步的修改。"
+                << "`ridlc`在下一次运行时会重写里面的内容。";
+        NEW_LINES( 2 );
+
+        CCOUT<< "* *" << g_strAppName << "desc.json*: "
+            << "包含本应用相关的配置信息, 和所有定义的服务(service)的配置参数。";
+        NEW_LINE;
+        CCOUT << "这个文件务必不要做进一步的修改。"
+                << "`ridlc`或者`synccfg.py`都会在在下一次运行时重写里面的内容。";
+        NEW_LINES( 2 );
+
+        CCOUT << "* *driver.json*: "
+            << "包含本应用相关的配置信息,主要是底层的iomanager的配置信息。";
+        NEW_LINE;
+        CCOUT << "这个文件务必不要做进一步的修改。"
+                << "`ridlc`或者`synccfg.py`都会在在下一次运行时重写里面的内容。";
+        NEW_LINES( 2 );
+
+        CCOUT << "* *Makefile*: "
+            << "该Makefile会用当前系统配置的信息更新本目录下的json配置文件。";
+        NEW_LINE;
+        CCOUT << "这个文件务必不要做进一步的修改。"
+                << "`ridlc`或者`synccfg.py`都会在在下一次运行时重写里面的内容。";
+        NEW_LINES( 2 );
+
+        CCOUT << "* *DeserialMaps*, *DeserialArrays*, *JavaSerialBase.java*, "
+            << "*JavaSerialHelperS.java*, *JavaSerialHelperP.java*: "
+            << "这些文件包含序列化相关的支持和实现, 会随着ridl内容文件的改变而改变。";
+        NEW_LINE;
+        CCOUT << "所以这些文件务必不要做进一步的修改.";
+        NEW_LINES( 2 );
+
+        CCOUT << "* *struct declaration files*: "
+            << "这些文件包含ridl中声明并引用到的struct的定义，序列化/反序列化的实现。"
+            << "一个文件对应一个struct。";
+        NEW_LINE;
+        CCOUT << "这些文件也请务必不要做进一步的修改.";
+        NEW_LINES( 2 );
+
+        CCOUT << "* *synccfg.py*: "
+            << "一个小的Python脚本，用来同步本应用配置信息。";
+        NEW_LINES(2);
+        CCOUT <<"* **运行:** 在命令行输入`java org.rpcf."<<g_strAppName<<".mainsvr`启动服务器。"
+            << " 在另一个命令行输入 `java org.rpcf."<<g_strAppName<<".maincli`启动客户端程序。"
+            << "在运行前，务必运行一下`make`命令同步程序的配置文件，"
+            << "即`"<< g_strAppName <<"desc.json`和`driver.json`。";
+        NEW_LINES(2);
+
+        CCOUT << "**注1**: 上文中的粗体的文件是需要你进一步修改的文件. 斜体字的文件则不需要。"
+            << "如果仍然有修改的必要，请注意这些文件有被`ridlc`或者`synccfg.py`改写的风险。";
+        NEW_LINES(2);
+        CCOUT << "**注2**: 有关配置系统搭建和设置请参考[此文。](https://github.com/zhiming99/rpc-frmwrk#building-rpc-frmwrk)。";
+        NEW_LINE;
+
+   }while( 0 );
+
+   return ret;
 }

@@ -98,6 +98,7 @@ void Usage()
     printf( "\t\tThis option is for Java only\n" );
 
     printf( "\t-l:\tTo output a shared library\n" );
+    printf( "\t-L<lang>:\tTo output Readme in language <lang>\n" );
     printf( "\t\tinstead of executables. This\n" );
     printf( "\t\toption is for CPP project only\n" );
 }
@@ -107,6 +108,7 @@ static std::vector< std::string > g_vecPaths;
 std::string g_strTarget;
 bool g_bNewSerial = true;
 stdstr g_strLang = "cpp";
+stdstr g_strLocale ="en";
 
 // the prefix for java package name
 stdstr g_strPrefix = "org.rpcf.";
@@ -136,7 +138,7 @@ int main( int argc, char** argv )
         bool bQuit = false;
 
         while( ( opt =
-            getopt( argc, argv, "ahlI:O:o:pjP:" ) ) != -1 )
+            getopt( argc, argv, "ahlI:O:o:pjP:L:" ) ) != -1 )
         {
             switch( opt )
             {
@@ -213,6 +215,17 @@ int main( int argc, char** argv )
                 {
                     g_bMklib = true;
                     break;
+                }
+            case 'L':
+                {
+                    g_strLocale = optarg;
+                    if( g_strLocale != "en" &&
+                        g_strLocale != "cn" )
+                    {
+                        printf( "Error -L specifies unsupported language\n" );
+                        Usage();
+                        bQuit = true;
+                    }
                 }
             default:
                 break;

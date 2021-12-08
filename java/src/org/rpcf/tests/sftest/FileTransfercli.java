@@ -17,7 +17,7 @@ public class FileTransfercli extends FileTransferclibase
     {
         if(hChannel == RC.INVALID_HANDLE || strFile == null)
             return -RC.EINVAL;
-        int ret = 0;
+        int ret;
         do{
             TransFileContext o =
                     new TransFileContext(strFile);
@@ -32,7 +32,8 @@ public class FileTransfercli extends FileTransferclibase
             ret = m_oTransCtx.addContext(hChannel,o);
             if(RC.ERROR(ret))
                 break;
-            String strRemotName = o.getFileName(strFile);
+            String strRemotName =
+                    TransFileContext.getFileName(strFile);
             if(strRemotName.isEmpty())
             {
                 ret = -RC.EINVAL;

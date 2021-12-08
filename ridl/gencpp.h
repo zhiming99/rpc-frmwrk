@@ -740,4 +740,6 @@ class CExportReadme
     CExportReadme( CWriterBase* pWriter,
         ObjPtr& pNode );
     gint32 Output();
+    gint32 Output_en();
+    gint32 Output_cn();
 };

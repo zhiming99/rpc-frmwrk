@@ -14,7 +14,7 @@ public class TransFileContext {
     public FileChannel m_oChannel = null;
     public Character m_cDirection = 'u';
     public boolean m_bServer = false;
-    public String m_strPath = "";
+    public String m_strPath;
     public long m_lOffset = 0;
     public long m_lSize = 0;
     boolean m_bRead = false;
@@ -56,7 +56,7 @@ public class TransFileContext {
     }
 
     public int openFile() {
-        if (m_strPath == null || m_strPath == "")
+        if (m_strPath == null || m_strPath.equals(""))
             return -RC.ERROR_STATE;
         int ret = 0;
         try {
@@ -66,7 +66,7 @@ public class TransFileContext {
                     m_bRead = true;
                     m_oFile = new RandomAccessFile(m_strPath, "r");
                     m_oChannel = m_oFile.getChannel();
-                    Long iSize = m_oChannel.size();
+                    long iSize = m_oChannel.size();
                     if (m_lOffset > iSize) {
                         ret = -RC.ERANGE;
                         break;
@@ -83,7 +83,6 @@ public class TransFileContext {
                         ret = -RC.ERANGE;
                         break;
                     }
-                    m_iBytesLeft = (int)m_lSize;
                 }
                 else{
                     if(m_lSize==0)
@@ -95,15 +94,15 @@ public class TransFileContext {
 
                     m_oFile = new RandomAccessFile(m_strPath, "rw");
                     m_oChannel = m_oFile.getChannel();
-                    Long iSize = m_oChannel.size();
+                    long iSize = m_oChannel.size();
                     if (m_lOffset > iSize) {
                         ret = -RC.ERANGE;
                         break;
                     }
                     m_oFile.seek(m_lOffset);
                     m_oChannel.truncate(m_lOffset);
-                    m_iBytesLeft = (int)m_lSize;
                 }
+                m_iBytesLeft = (int)m_lSize;
 
 
             } while (false);
