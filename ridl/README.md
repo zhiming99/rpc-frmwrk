@@ -118,6 +118,9 @@ The above example shows most of the statements ridl supports. ridl now has 7 typ
                 <prefix>.<appname>.
         
         -l:     To output a shared library instead of executables. This option is for CPP project only
+        
+        -L：    To generate the README.md in the specified language. Currently we support "cn" for
+                Chinese and "en" for English.
 
 ```
 
