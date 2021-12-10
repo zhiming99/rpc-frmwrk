@@ -4,10 +4,11 @@ EXTRA_DIST=src/actcancel.ridl\
  src/iftest.ridl\
  src/katest.ridl\
  src/stmtest.ridl\
- src/sftest.ridl
+ src/sftest.ridl\
+ src/hellowld.ridl
 
 javatests=./java/src/org/rpcf/tests
-EXTRA_DIST += $(javatests)/actcancel/ActiveCancelcli.java\
+EXTRA_DIST+=$(javatests)/actcancel/ActiveCancelcli.java\
  $(javatests)/actcancel/ActiveCancelsvr.java\
  $(javatests)/actcancel/maincli.java\
  $(javatests)/asynctst/AsyncTestcli.java\
@@ -29,5 +30,7 @@ EXTRA_DIST += $(javatests)/actcancel/ActiveCancelcli.java\
  $(javatests)/sftest/TransFileContext.java \
  $(javatests)/sftest/TransferContext.java \
  $(javatests)/sftest/TransferContextCli.java \
- $(javatests)/sftest/maincli.java
+ $(javatests)/sftest/maincli.java\
+ $(javatests)/HelloWorld/HelloWorldSvcsvr.java \
+ $(javatests)/HelloWorld/maincli.java
 
