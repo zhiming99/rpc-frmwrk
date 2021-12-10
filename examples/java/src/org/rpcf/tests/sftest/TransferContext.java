@@ -5,7 +5,6 @@ import org.rpcf.rpcbase.JRetVal;
 import org.rpcf.rpcbase.RC;
 import org.rpcf.rpcbase.rpcbase;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;

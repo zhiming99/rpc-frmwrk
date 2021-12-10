@@ -31,6 +31,8 @@ AC_LANG([C++])
 AC_CHECK_PROG([python3], python3, yes)
 AC_CHECK_PROG([sipbuild], [sip-build], yes)
 AC_CHECK_PROG([sip4], [sip], yes)
+AC_CHECK_PROG([swig], [swig], yes)
+AC_CHECK_PROG([javac],[javac],yes)
 LT_INIT
 
 # Checks for libraries.
@@ -246,6 +248,8 @@ AC_CONFIG_FILES([Makefile
                  bldpkg/Makefile
                  bldpkg/control
                  bldpkg/rpcf.spec
+                 java/Makefile
+                 examples/Makefile
                  test/Makefile
                  test/actcancel/Makefile
                  test/asynctst/Makefile
@@ -281,6 +285,8 @@ AM_CONDITIONAL([ENABLE_OPENSSL],[test "$enable_openssl" = "yes"])
 AM_CONDITIONAL([ENABLE_KERBEROS],[test "$enable_kerberos" = "yes"])
 AM_CONDITIONAL([SIPBUILD],[test x$ac_cv_prog_sipbuild = xyes])
 AM_CONDITIONAL([SIP4],[test x$ac_cv_prog_sip4 = xyes])
+AM_CONDITIONAL([SWIG],[test x$ac_cv_prog_swig = xyes])
+AM_CONDITIONAL([JDK],[test x$ac_cv_prog_javac = xyes])
 
 VERSION2='$(subst .,:,$(VERSION))'
 AC_SUBST(VERSION2)

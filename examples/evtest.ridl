@@ -1,3 +1,8 @@
+// command line
+//   Java: 'ridlc -jO. -Porg.rpcf.tests. ./evtest.ridl'
+// Python: 'mkdir evtest; ridlc -p -O ./evtest evtest.ridl'
+//    C++: 'mkdir evtest; ridlc -Lcn -O ./evtest evtest.ridl'
+
 appname "evtest";
 
 // this test demonstrates how the server send an event

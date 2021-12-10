@@ -1,8 +1,14 @@
 ACLOCAL_AMFLAGS= -I m4
-SUBDIRS=3rd_party combase ipc rpc ridl tools pics
+SUBDIRS=3rd_party combase ipc rpc ridl tools pics examples
 
 if ENABLE_TESTCASES
 SUBDIRS += test
+endif
+
+if SWIG
+if JDK
+SUBDIRS += java
+endif
 endif
 
 if SIPBUILD

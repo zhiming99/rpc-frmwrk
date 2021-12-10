@@ -1,3 +1,8 @@
+// command line
+//   Java: 'ridlc -j -O. -Porg.rpcf.tests asynctst.ridl'
+// Python: 'mkdir asynctst; ridlc -p -O ./asynctst asynctst.ridl'
+//    C++: 'mkdir asynctst; ridlc -Lcn -O ./asynctst asynctst.ridl'
+
 appname "asynctst";
 
 // this test tries to demonstrate different kinds of

@@ -202,6 +202,9 @@ class CStlQwordVector : public CStlVector< guint64 >
 
     gint32 Deserialize(
         const CBuffer& obuf );
+
+    gint32 Deserialize(
+        const char* pBuf, guint32 dwBufSize );
 };
 
 typedef CAutoPtr< clsid( CStlQwordVector ), CStlQwordVector > QwVecPtr;
@@ -227,6 +230,9 @@ class CStlLongWordVector : public CStlVector< LONGWORD >
 
     gint32 Deserialize(
         const CBuffer& obuf );
+
+    gint32 Deserialize(
+        const char* pBuf, guint32 dwBufSize );
 };
 
 typedef CAutoPtr< clsid( CStlLongWordVector ), CStlLongWordVector  > LwVecPtr;
@@ -442,6 +448,9 @@ class CStlIntMap
 
     gint32 Deserialize(
         const CBuffer& obuf );
+
+    gint32 Deserialize(
+        const char* pBuf, guint32 dwBufSize );
 
 };
 

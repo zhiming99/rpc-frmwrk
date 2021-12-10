@@ -1732,7 +1732,7 @@ gint32 GenSvcFiles(
 gint32 SyncCfg( const stdstr& strPath )
 {
     sync();
-    stdstr strCmd = "make -C ";
+    stdstr strCmd = "make -sC ";
     strCmd += strPath;
     gint32 ret = system( strCmd.c_str() );
     if( ret < 0 )
@@ -3457,7 +3457,7 @@ gint32 CExportPyReadme::Output_cn()
             << "在运行前，务必运行一下`make`命令同步程序的配置文件，"
             << "即`"<< g_strAppName <<"desc.json`和`driver.json`。";
         NEW_LINES(2);
-        CCOUT << "**注1**: 上文中的粗体的文件是需要你进一步修改的文件. 斜体字的文件则不需要。"
+        CCOUT << "**注1**: 上文中的粗体字的文件是需要你进一步修改的文件. 斜体字的文件则不需要。"
             << "如果仍然有修改的必要，请注意这些文件有被`ridlc`或者`synccfg.py`改写的风险。";
         NEW_LINES(2);
         CCOUT << "**注2**: 有关配置系统搭建和设置请参考[此文。](https://github.com/zhiming99/rpc-frmwrk#building-rpc-frmwrk)。";

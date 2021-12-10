@@ -1,22 +1,39 @@
 package org.rpcf.tests.iftest;
 
-import java.util.HashMap;
-import java.util.concurrent.TimeUnit;
 import org.rpcf.rpcbase.JRetVal;
 import org.rpcf.rpcbase.JavaRpcContext;
 import org.rpcf.rpcbase.RC;
 import org.rpcf.rpcbase.rpcbase;
 
+import java.util.HashMap;
+import java.util.concurrent.TimeUnit;
+
 public class maincli {
     public static JavaRpcContext m_oCtx;
-
-    public maincli() {
+    public static String getDescPath( String strName )
+    {
+        String strDescPath =
+            maincli.class.getProtectionDomain().getCodeSource().getLocation().getPath();
+        String strDescPath2 = strDescPath + "/org/rpcf/tests/iftest/" + strName;
+        java.io.File oFile = new java.io.File( strDescPath2 );
+        if( oFile.isFile() )
+            return strDescPath2;
+        strDescPath += "/" + strName;
+        oFile = new java.io.File( strDescPath );
+        if( oFile.isFile() )
+            return strDescPath;
+        return "";
     }
 
     public static void main(String[] args) {
         m_oCtx = JavaRpcContext.createProxy();
         if (m_oCtx != null) {
-            IfTestcli oSvcCli = new IfTestcli(m_oCtx.getIoMgr(), "./iftestdesc.json", "IfTest");
+            String strDescPath =
+                    getDescPath( "iftestdesc.json" );
+            if(strDescPath.isEmpty())
+                System.exit(RC.ENOENT);
+            IfTestcli oSvcCli = new IfTestcli(
+                    m_oCtx.getIoMgr(), strDescPath, "IfTest");
             if (!RC.ERROR(oSvcCli.getError())) {
                 int ret = oSvcCli.start();
                 if (!RC.ERROR(ret)) {

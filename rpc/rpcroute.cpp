@@ -2262,11 +2262,12 @@ gint32 CRouterStopBridgeTask::SyncedTasks(
 {
     gint32 ret = 0;
     do{
+        TaskletPtr pEmptyTask;
         TaskletPtr pTask;
         ret = DEFER_OBJCALLEX_NOSCHED2(
             0, pTask, this,
             &CRouterStopBridgeTask::DoSyncedTask,
-            nullptr, pvecMatchsLoc );
+            nullptr, pvecMatchsLoc, pEmptyTask );
         if( ERROR( ret ) )
             break;
 
@@ -2290,7 +2291,8 @@ gint32 CRouterStopBridgeTask::SyncedTasks(
 
 gint32 CRouterStopBridgeTask::DoSyncedTask(
     IEventSink* pCallback,
-    ObjVecPtr& pvecMatchsLoc )
+    ObjVecPtr& pvecMatchsLoc,
+    TaskletPtr& pFwrdTasks )
 {
     gint32 ret = 0;
     TaskGrpPtr pTaskGrp;
@@ -2322,6 +2324,8 @@ gint32 CRouterStopBridgeTask::DoSyncedTask(
 
         pTaskGrp->SetRelation( logicNONE );
         pTaskGrp->SetClientNotify( pCallback );
+        if( !pFwrdTasks.IsEmpty() )
+            pTaskGrp->AppendTask( pFwrdTasks );
 
         // put the bridge to the stopping state to
         // prevent further incoming requests
@@ -2517,11 +2521,18 @@ gint32 CRouterStopBridgeTask::RunTask()
 
         CIoManager* pMgr = pRouter->GetIoMgr();
         TaskletPtr pGrpTask = pParaGrp;
-        if( pParaGrp->GetTaskCount() > 0 )
-            pMgr->RescheduleTask( pGrpTask );
+        if( pParaGrp->GetTaskCount() == 0 )
+        {
+            TaskletPtr pEmptyTask;
+            ret = DoSyncedTask(
+                this, pvecMatchesLoc, pEmptyTask );
+        }
+        else
+        {
+            ret = DoSyncedTask(
+                this, pvecMatchesLoc, pGrpTask );
+        }
 
-        ret = DoSyncedTask(
-            this, pvecMatchesLoc );
 
     }while( 0 );
 

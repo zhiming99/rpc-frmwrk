@@ -20,6 +20,20 @@ import java.util.concurrent.TimeUnit;
 public class maincli
 {
     public static JavaRpcContext m_oCtx;
+    public static String getDescPath( String strName )
+    {
+        String strDescPath =
+            maincli.class.getProtectionDomain().getCodeSource().getLocation().getPath();
+        String strDescPath2 = strDescPath + "/org/rpcf/tests/sftest/" + strName;
+        java.io.File oFile = new java.io.File( strDescPath2 );
+        if( oFile.isFile() )
+            return strDescPath2;
+        strDescPath += "/" + strName;
+        oFile = new java.io.File( strDescPath );
+        if( oFile.isFile() )
+            return strDescPath;
+        return "";
+    }
     public static byte[] getMD5(String strPath)
     {
         byte[] digest;
@@ -53,10 +67,16 @@ public class maincli
             System.out.printf("%s is not a valid file\n", args[0]);
             System.exit(RC.EINVAL);
         }
+
+        String strDescPath =
+            getDescPath( "sftestdesc.json" );
+        if( strDescPath.isEmpty() )
+            System.exit( RC.ENOENT );
+
         // create the service object
         FileTransfercli oSvcCli = new FileTransfercli(
             m_oCtx.getIoMgr(), 
-            "./sftestdesc.json",
+            strDescPath,
             "FileTransfer" );
 
         // check if there are errors

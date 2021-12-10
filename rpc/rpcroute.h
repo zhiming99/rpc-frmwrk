@@ -1081,7 +1081,7 @@ class CRpcTcpBridge :
     gint32 GetInvTaskProxyMH(
         TaskletPtr& pTask,
         InterfPtr& pIf,
-        bool bQueued );
+        bool& bQueued );
 
     protected:
     virtual gint32 SetupReqIrpFwrdEvt(
@@ -1610,7 +1610,8 @@ class CRouterStopBridgeTask
 {
     gint32 DoSyncedTask(
         IEventSink* pCallback,
-        ObjVecPtr& pvecMatchsLoc );
+        ObjVecPtr& pvecMatchsLoc,
+        TaskletPtr& pFwrdTasks );
 
     gint32 SyncedTasks(
         IEventSink* pCallback,

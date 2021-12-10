@@ -1,3 +1,7 @@
+// command line
+//   Java: 'ridlc -jO. -Porg.rpcf.tests. ./actcancel.ridl'
+// Python: 'mkdir actcancel; ridlc -p -O ./actcancel actcancel.ridl'
+//    C++: 'mkdir actcancel; ridlc -Lcn -O ./actcancel actcancel.ridl'
 appname "actcancel";
 
 interface IActiveCancel

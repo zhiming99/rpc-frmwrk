@@ -6469,7 +6469,7 @@ gint32 CExportMakefile::Output()
             strCmdLine += "s:XXXMKLIB::' ";
 
         strCmdLine += pFiles->m_strMakefile;
-        printf( "%s\n", strCmdLine.c_str() );
+        //printf( "%s\n", strCmdLine.c_str() );
         system( strCmdLine.c_str() );
 
     }while( 0 );
@@ -6719,7 +6719,7 @@ gint32 CExportObjDesc::Output()
             ":;\" " + strSrcPy + " > " +
             strDstPy;
 
-        printf( "%s\n", strCmdLine.c_str() );
+        //printf( "%s\n", strCmdLine.c_str() );
         system( strCmdLine.c_str() );
 
     }while( 0 );
@@ -7066,7 +7066,7 @@ gint32 CExportReadme::Output_cn()
         CCOUT << "* **maincli.cpp**, **mainsvr.cpp**: "
             << "分别包含对客户端和服务器端的程序入口`maincli`和`mainsvr`函数的定义。"
             << "同时也包含作为wrapper的`main`实现。"
-            << "但是如果`ridlc`命令行指定了选项`-l`, 就不会产生`main`函数了";
+            << "但是如果`ridlc`命令行指定了选项`-l`, 就不会产生`main`函数了。";
         NEW_LINE;
         CCOUT << "你可以对这两个文件作出修改，不必担心ridlc会冲掉你修改的内容。"
             << "`ridlc`再次编译时，如果发现目标目录存在该文件会把新生成的文件"
@@ -7087,7 +7087,8 @@ gint32 CExportReadme::Output_cn()
                 << "这些接口函数需要你的进一步实现, 其中主要包括"
                 << "客户端的事件处理方法。";
             NEW_LINE;
-            CCOUT << "你可以对这四个文件作出修改，不必担心`ridlc`会冲掉你修改的内容。"
+            CCOUT << "你可以对以上的这四个和service `"<<elem<<"`相关的文件作出修改，"
+                << "而不必担心`ridlc`会覆盖掉你修改的内容。"
                 << "`ridlc`再次编译时，如果发现目标目录存在该文件，会为新生成的文件"
                 << "的文件名加上.new后缀。";
             NEW_LINES( 2 );
@@ -7126,15 +7127,15 @@ gint32 CExportReadme::Output_cn()
         CCOUT << "* *synccfg.py*: "
             << "一个小的Python脚本，用来同步本应用配置信息。";
         NEW_LINES(2);
-        CCOUT <<"* **运行:** Makefile会在debug/release目录下生成`"<< g_strAppName<<"cli`"
+        CCOUT <<"* **运行:** Makefile会在debug或release目录下生成`"<< g_strAppName<<"cli`"
             << "和`"<<g_strAppName<<"svr`一对可运行程序。"
-            << " 在一个命令行输入 `" << g_strAppName << "svr`以启动服务器端程序。"
-            << " 在另一个命令行输入 `" << g_strAppName << "cli`以启动服务器端程序。"
+            << " 在一个命令行输入 `release/" << g_strAppName << "svr`以启动服务器端程序。"
+            << " 在另一个命令行输入 `release/" << g_strAppName << "cli`以启动客户端程序。"
             << "在运行前，务必运行一下`make`命令同步程序的配置文件，"
             << "即`"<< g_strAppName <<"desc.json`和`driver.json`。";
         NEW_LINES(2);
 
-        CCOUT << "**注1**: 上文中的粗体的文件是需要你进一步修改的文件. 斜体字的文件则不需要。"
+        CCOUT << "**注1**: 上文中的粗体字的文件是需要你进一步修改的文件. 斜体字的文件则不需要。"
             << "如果仍然有修改的必要，请注意这些文件有被`ridlc`或者`synccfg.py`改写的风险。";
         NEW_LINES(2);
         CCOUT << "**注2**: 有关配置系统搭建和设置请参考[此文。](https://github.com/zhiming99/rpc-frmwrk#building-rpc-frmwrk)";

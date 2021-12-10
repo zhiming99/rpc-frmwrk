@@ -1,3 +1,7 @@
+// command line
+//   Java: 'ridlc -j -Lcn -O. -Porg.rpcf.tests sftest.ridl'
+// Python: 'mkdir sftest; ridlc -p -O ./sftest sftest.ridl'
+//    C++: 'mkdir sftest; ridlc -Lcn -O ./sftest sftest.ridl'
 appname "sftest";
 
 // this is a testcase for asynchronous streaming transfer.

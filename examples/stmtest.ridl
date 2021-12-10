@@ -1,3 +1,8 @@
+// command line
+//   Java: 'ridlc -jO. -Porg.rpcf.tests. ./stmtest.ridl'
+// Python: 'mkdir stmtest; ridlc -p -O ./stmtest stmtest.ridl'
+//    C++: 'mkdir stmtest; ridlc -Lcn -O ./stmtest stmtest.ridl'
+
 appname "stmtest";
 
 // this test demonstrates a chat session between the

@@ -1,4 +1,11 @@
+// command line
+//   Java: 'ridlc -j -O. -Porg.rpcf.tests iftest.ridl'
+// Python: 'mkdir iftest; ridlc -p -O ./iftest iftest.ridl'
+//    C++: 'mkdir iftest; ridlc -Lcn -O ./iftest iftest.ridl'
 appname "iftest";
+
+// this testcase demonstrates how to define a complex parameter
+// to pass to the server.
 struct GlobalFeature
 {
     map<int32, string> adFeature;

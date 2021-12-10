@@ -1388,6 +1388,36 @@ gint32 CJavaSnippet::EmitGetArgTypes(
     return ret;
 }
 
+gint32 CJavaSnippet::EmitGetDescPath(
+    bool bServer )
+{
+    Wa( "public static String getDescPath( String strName )" );
+    BLOCK_OPEN;
+    Wa( "String strDescPath =" );
+    CCOUT << "    " << ( bServer ? "mainsvr" : "maincli" )
+    << ".class.getProtectionDomain().getCodeSource().getLocation().getPath();";
+    NEW_LINE;
+    stdstr strPrefix = "/";
+    strPrefix += g_strPrefix + g_strAppName + "/";
+    std::replace( strPrefix.begin(),
+        strPrefix.end(), '.', '/' );
+    CCOUT << "String strDescPath2 = strDescPath + "
+        << "\"" << strPrefix << "\" + strName;"; 
+    NEW_LINE;
+    Wa( "java.io.File oFile = new java.io.File( strDescPath2 );");
+    Wa( "if( oFile.isFile() )" );
+    Wa( "    return strDescPath2;" );
+    Wa( "strDescPath += \"/\" + strName;" );
+    Wa( "oFile = new java.io.File( strDescPath );" );
+    Wa( "if( oFile.isFile() )" );
+    Wa( "    return strDescPath;" );
+    CCOUT << "return \"\";";
+    BLOCK_CLOSE;
+    NEW_LINE;
+
+    return 0;
+}
+
 CJavaFileSet::CJavaFileSet(
     const std::string& strOutPath,
     const std::string& strAppName )
@@ -2123,6 +2153,35 @@ gint32 GenJavaProj(
                 "error generating Struct files." );
             break;
         }
+
+        stdstr strLibPath;
+        ret = GetLibPath( strLibPath );
+        if( ERROR( ret ) )
+            break;
+
+        stdstr strClsPath;
+        if( g_strLocale == "cn" )
+        {
+            strClsPath =
+            "\033[1;33m请确保将rpcbase.jar的路径名"
+            "添加到环境变量CLASSPATH中, 比如\n"
+            "'export CLASSPATH=";
+
+        }
+        else
+        {
+            strClsPath =
+            "\033[1;33mMake sure to add "
+            "'rpcbase.jar' to environment "
+            "variable CLASSPATH, as\n"
+            "'export CLASSPATH=";
+        }
+
+        strClsPath += strLibPath +
+            "/rpcf/rpcbase.jar:$CLASSPATH'\033[;0m";
+
+        printf("%s\n", strClsPath.c_str() );
+
     }while( 0 );
 
     if( SUCCEEDED( ret ) )
@@ -3994,7 +4053,7 @@ gint32 CJavaExportMakefile::Output()
     stdstr strCmdLine = "sed -i \"s:XXXXX:";
     strCmdLine += strPath + ":g\" " +  strFile;
 
-    printf( "%s\n", strCmdLine.c_str() );
+    //printf( "%s\n", strCmdLine.c_str() );
     system( strCmdLine.c_str() );
     return ret;
 }
@@ -4125,11 +4184,12 @@ gint32 CImplJavaMainCli::Output()
         NEW_LINE;
         BLOCK_OPEN;
         Wa( "public static JavaRpcContext m_oCtx;" );
+        os.EmitGetDescPath( false );
         Wa( "public static void main( String[] args )" );
         BLOCK_OPEN;
         Wa( "m_oCtx = JavaRpcContext.createProxy(); " );
         Wa( "if( m_oCtx == null )" );
-        Wa( "    System.exit( -RC.EFAULT );" );
+        Wa( "    System.exit( RC.EFAULT );" );
         NEW_LINE;
 
         std::vector< ObjPtr > vecSvcs;
@@ -4139,24 +4199,31 @@ gint32 CImplJavaMainCli::Output()
         CServiceDecl* pSvc = vecSvcs[ 0 ];
         stdstr strSvc = pSvc->GetName();
 
+        stdstr strDescName = g_strAppName + "desc.json";
+        Wa( "String strDescPath =" );
+        CCOUT << "    getDescPath( \"" << strDescName << "\" );";
+        NEW_LINE;
+        Wa( "if( strDescPath.isEmpty() )" );
+        Wa( "    System.exit( RC.ENOENT );" );
         Wa( "// create the service object" );
+
         CCOUT << strSvc << "cli oSvcCli = new " << strSvc << "cli(";
         NEW_LINE;
             Wa( "    m_oCtx.getIoMgr(), " );
-            CCOUT << "    \"./"<< g_strAppName<<"desc.json\",";
+            CCOUT << "    strDescPath,";
             NEW_LINE;
             CCOUT << "    \""<< strSvc << "\" );";
 
         NEW_LINES( 2 );
         Wa( "// check if there are errors" );
         Wa( "if( RC.ERROR( oSvcCli.getError() ) )" );
-        Wa( "    System.exit( oSvcCli.getError() );" );
+        Wa( "    System.exit( -oSvcCli.getError() );" );
 
         NEW_LINE;
         Wa( "// start the proxy" );
         Wa( "int ret = oSvcCli.start();" );
         Wa( "if( RC.ERROR( ret ) )" );
-        Wa( "    System.exit( ret );" );
+        Wa( "    System.exit( -ret );" );
         
         NEW_LINE;
         CCOUT << "do{";
@@ -4250,7 +4317,7 @@ gint32 CImplJavaMainCli::Output()
         NEW_LINES(2);
         Wa( "oSvcCli.stop();" );
         Wa( "m_oCtx.stop();" );
-        CCOUT << "System.exit( ret );";
+        CCOUT << "System.exit( -ret );";
         BLOCK_CLOSE; 
         BLOCK_CLOSE; 
 
@@ -4285,11 +4352,12 @@ gint32 CImplJavaMainSvr::Output()
         NEW_LINE;
         BLOCK_OPEN;
         Wa( "public static JavaRpcContext m_oCtx;" );
+        os.EmitGetDescPath( true );
         Wa( "public static void main( String[] args )" );
         BLOCK_OPEN;
         Wa( "m_oCtx = JavaRpcContext.createServer(); " );
         Wa( "if( m_oCtx == null )" );
-        Wa( "    System.exit( -RC.EFAULT );" );
+        Wa( "    System.exit( RC.EFAULT );" );
         NEW_LINE;
 
         std::vector< ObjPtr > vecSvcs;
@@ -4299,21 +4367,28 @@ gint32 CImplJavaMainSvr::Output()
         CServiceDecl* pSvc = vecSvcs[ 0 ];
         stdstr strSvc = pSvc->GetName();
 
+        stdstr strDescName = g_strAppName + "desc.json";
+        Wa( "String strDescPath =" );
+        CCOUT << "    getDescPath( \"" << strDescName << "\" );";
+        NEW_LINE;
+        Wa( "if( strDescPath.isEmpty() )" );
+        Wa( "    System.exit( RC.ENOENT );" );
         Wa( "// create the service object" );
+
         CCOUT << strSvc << "svr oSvcSvr = new " << strSvc << "svr(";
         NEW_LINE;
             Wa( "    m_oCtx.getIoMgr(), " );
-            CCOUT << "    \"./"<< g_strAppName<<"desc.json\",";
+            CCOUT << "    strDescPath,";
             NEW_LINE;
             CCOUT << "    \""<< strSvc << "\" );";
         NEW_LINES( 2 );
         Wa( "// check if there are errors" );
         Wa( "if( RC.ERROR( oSvcSvr.getError() ) )" );
-        Wa( "    System.exit( oSvcSvr.getError() );" );
+        Wa( "    System.exit( -oSvcSvr.getError() );" );
         NEW_LINE;
         Wa( "int ret = oSvcSvr.start();" );
         Wa( "if( RC.ERROR( ret ) )" );
-        Wa( "    System.exit( ret );" );
+        Wa( "    System.exit( -ret );" );
         
         NEW_LINE;
         Wa( "do{" );
@@ -4332,7 +4407,7 @@ gint32 CImplJavaMainSvr::Output()
         NEW_LINES(2);
         Wa( "oSvcSvr.stop();" );
         Wa( "m_oCtx.stop();" );
-        CCOUT << "System.exit( ret );";
+        CCOUT << "System.exit( -ret );";
         BLOCK_CLOSE; 
         BLOCK_CLOSE; 
 
@@ -4536,7 +4611,7 @@ gint32 CJavaExportReadme::Output_en()
             NEW_LINES( 2 );
         }
 
-        CCOUT<< "* *" << g_strAppName << "Factory.java*: "
+        CCOUT<< "* *StructFactory.java*: "
             << "Containing the definition of struct factory "
             << "declared and referenced in the ridl file.";
         NEW_LINE;
@@ -4583,7 +4658,7 @@ gint32 CJavaExportReadme::Output_en()
         NEW_LINES(2);
         CCOUT <<"* **run:** you can run `java org.rpcf."<<g_strAppName<<".mainsvr`"
             << " and `java org.rpcf."<<g_strAppName<<".maincli` to start the server "
-            << "and client. Also make sure to run `make` to update the configuration"
+            << "and client respectively. Also make sure to run `make` to update the configuration"
             << " files, that is, the `"<< g_strAppName <<"desc.json` and `driver.json`.";
         NEW_LINES(2);
 
@@ -4592,7 +4667,7 @@ gint32 CJavaExportReadme::Output_en()
             << "you can still customized the italic files, but be aware they "
             << "will be rewritten after running RIDLC again.";
         NEW_LINES(2);
-        CCOUT << "**Note 2**: Please refer to [this link](https://github.com/zhiming99/rpc-frmwrk#building-rpc-frmwrk)"
+        CCOUT << "**Note 2**: Please refer to [this link](https://github.com/zhiming99/rpc-frmwrk#building-rpc-frmwrk) "
             << "for building and installation of RPC-Frmwrk";
         NEW_LINE;
 
@@ -4656,7 +4731,7 @@ gint32 CJavaExportReadme::Output_cn()
             NEW_LINES( 2 );
         }
 
-        CCOUT<< "* *" << g_strAppName << "Factory.java*: "
+        CCOUT<< "* *StructFactory.java*: "
             << "包含一个ridl文件中声明的所有用到的struct的工厂类的实现。";
         NEW_LINE;
         CCOUT << "这个文件务必不要做进一步的修改。"
@@ -4707,10 +4782,10 @@ gint32 CJavaExportReadme::Output_cn()
             << "即`"<< g_strAppName <<"desc.json`和`driver.json`。";
         NEW_LINES(2);
 
-        CCOUT << "**注1**: 上文中的粗体的文件是需要你进一步修改的文件. 斜体字的文件则不需要。"
+        CCOUT << "**注1**: 上文中的粗体字的文件是需要你进一步修改的文件. 斜体字的文件则不需要。"
             << "如果仍然有修改的必要，请注意这些文件有被`ridlc`或者`synccfg.py`改写的风险。";
         NEW_LINES(2);
-        CCOUT << "**注2**: 有关配置系统搭建和设置请参考[此文。](https://github.com/zhiming99/rpc-frmwrk#building-rpc-frmwrk)。";
+        CCOUT << "**注2**: 有关配置系统搭建和设置请参考[此文。](https://github.com/zhiming99/rpc-frmwrk#building-rpc-frmwrk)";
         NEW_LINE;
 
    }while( 0 );

@@ -2252,7 +2252,7 @@ gint32 CRpcTcpBridge::FindFwrdReqsAll(
         if( ERROR( ret ) || vecInvTasks.empty() )
             break;
         
-        for( auto elem : vecInvTasks )
+        for( auto& elem : vecInvTasks )
         {
             CCfgOpenerObj oInv(
                 ( CObjBase* )elem );
@@ -2378,10 +2378,6 @@ gint32 CRpcInterfaceServer::RetrieveTaskId(
         if( iState == stateStarted )
         {
             CCfgOpenerObj oInv( pInv );
-            ret = oInv.GetQwordProp(
-                propRmtTaskId, qwTaskId );
-            if( SUCCEEDED( ret ) )
-                break;
 
             IConfigDb* pReq = nullptr;
             ret = oInv.GetPointer(
@@ -3918,7 +3914,7 @@ gint32 CRpcTcpBridge::GetAllFwrdReqs(
 gint32 CRpcTcpBridge::GetInvTaskProxyMH(
     TaskletPtr& pTask,
     InterfPtr& pIf,
-    bool bQueued )
+    bool& bQueued )
 {
     gint32 ret = 0;
     if( pTask.IsEmpty() )

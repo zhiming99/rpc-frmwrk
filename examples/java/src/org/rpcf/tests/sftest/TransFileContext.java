@@ -79,7 +79,7 @@ public class TransFileContext {
                     } else {
                         m_lSize = iSize - m_lOffset;
                     }
-                    if (m_lSize > 512 * 1024 * 1024) {
+                    if (m_lSize > (long)4096 * 1024 * 1024) {
                         ret = -RC.ERANGE;
                         break;
                     }

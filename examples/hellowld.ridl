@@ -1,5 +1,6 @@
-// for Python code, 'ridlc -pO ./outputdir hellowld.ridl'
-// for C++ code, 'ridlc -O ./outputdir hellowld.ridl'
+//   Java: 'ridlc -jO . -Porg.rpcf.tests hellowld.ridl'
+// Python: 'mkdir hellowld; ridlc -pO ./hellowld hellowld.ridl'
+//    C++: 'mkdir hellowld; ridlc -O ./hellowld hellowld.ridl'
 
 // declare the name of the application
 appname "HelloWorld";

@@ -777,7 +777,7 @@ gint32 CConfigDb::DeserializeNew(
                     ObjPtr pObj;
                     ret = pObj.NewObj(
                         ( EnumClsid )oHdr.dwClsid );
-                    if( ret )
+                    if( ERROR( ret ) )
                         break;
 
                     ret = pObj->Deserialize( pLoc, len );

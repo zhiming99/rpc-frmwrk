@@ -150,15 +150,15 @@ gint32 CStlIntMap::Serialize(
 }
 
 gint32 CStlIntMap::Deserialize(
-    const CBuffer& oBuf )
+    const char* pBuf, guint32 dwBufSize )
 {
     const SERI_HEADER* pHeader =
-        ( SERI_HEADER* )oBuf.ptr();
+        ( SERI_HEADER* )pBuf;
 
     if( pHeader == nullptr )
         return -EINVAL;
 
-    if( oBuf.size() < sizeof( SERI_HEADER ) )
+    if( dwBufSize < sizeof( SERI_HEADER ) )
         return -EINVAL;
 
     SERI_HEADER oHeader( *pHeader );
@@ -204,6 +204,16 @@ gint32 CStlIntMap::Deserialize(
     }while( 0 );
 
     return ret;
+}
+
+gint32 CStlIntMap::Deserialize(
+    const CBuffer& oBuf )
+{
+    if( oBuf.empty() )
+        return -EINVAL;
+
+    return Deserialize(
+        oBuf.ptr(), oBuf.size() );
 }
 
 #define ALIGN_MASK ( sizeof( guint32 ) - 1 )
@@ -292,7 +302,8 @@ gint32 CStlObjVector::Deserialize(
     if( oBuf.empty() )
         return -EINVAL;
 
-    return Deserialize( oBuf.ptr(), oBuf.size() );
+    return Deserialize(
+        oBuf.ptr(), oBuf.size() );
 }
 
 gint32 CStlObjVector::Deserialize(
@@ -417,15 +428,15 @@ gint32 CStlLongWordVector::Serialize(
 }
 
 gint32 CStlLongWordVector::Deserialize(
-    const CBuffer& oBuf )
+    const char* pBuf, guint32 dwBufSize )
 {
     const SERI_HEADER* pHeader =
-        ( SERI_HEADER* )oBuf.ptr();
+        ( SERI_HEADER* )pBuf;
 
     if( pHeader == nullptr )
         return -EINVAL;
 
-    if( oBuf.size() < sizeof( SERI_HEADER ) )
+    if( dwBufSize < sizeof( SERI_HEADER ) )
         return -EINVAL;
 
     SERI_HEADER oHeader( *pHeader );
@@ -479,6 +490,16 @@ gint32 CStlLongWordVector::Deserialize(
     return ret;
 }
 
+gint32 CStlLongWordVector::Deserialize(
+    const CBuffer& oBuf )
+{
+    if( oBuf.empty() )
+        return -EINVAL;
+
+    return Deserialize(
+        oBuf.ptr(), oBuf.size() );
+}
+
 gint32 CStlQwordVector::Serialize(
     CBuffer& oBuf ) const
 {
@@ -510,15 +531,15 @@ gint32 CStlQwordVector::Serialize(
 }
 
 gint32 CStlQwordVector::Deserialize(
-    const CBuffer& oBuf )
+    const char* pBuf, guint32 dwBufSize )
 {
     const SERI_HEADER* pHeader =
-        ( SERI_HEADER* )oBuf.ptr();
+        ( SERI_HEADER* )pBuf;
 
     if( pHeader == nullptr )
         return -EINVAL;
 
-    if( oBuf.size() < sizeof( SERI_HEADER ) )
+    if( dwBufSize < sizeof( SERI_HEADER ) )
         return -EINVAL;
 
     SERI_HEADER oHeader( *pHeader );
@@ -564,6 +585,16 @@ gint32 CStlQwordVector::Deserialize(
     }while( 0 );
 
     return ret;
+}
+
+gint32 CStlQwordVector::Deserialize(
+    const CBuffer& oBuf )
+{
+    if( oBuf.empty() )
+        return -EINVAL;
+
+    return Deserialize(
+        oBuf.ptr(), oBuf.size() );
 }
 
 }

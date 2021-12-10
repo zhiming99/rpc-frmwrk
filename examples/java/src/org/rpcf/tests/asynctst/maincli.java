@@ -1,25 +1,46 @@
 package org.rpcf.tests.asynctst;
 
-import java.util.concurrent.TimeUnit;
 import org.rpcf.rpcbase.JRetVal;
 import org.rpcf.rpcbase.JavaRpcContext;
 import org.rpcf.rpcbase.RC;
 import org.rpcf.rpcbase.rpcbase;
 
+import java.util.concurrent.TimeUnit;
+
 public class maincli {
     public static JavaRpcContext m_oCtx;
 
-    public maincli() {
+    public static String getDescPath( String strName )
+    {
+        String strDescPath =
+            maincli.class.getProtectionDomain().getCodeSource().getLocation().getPath();
+        String strDescPath2 = strDescPath + "/org/rpcf/tests/asynctst/" + strName;
+        java.io.File oFile = new java.io.File( strDescPath2 );
+        if( oFile.isFile() )
+            return strDescPath2;
+        strDescPath += "/" + strName;
+        oFile = new java.io.File( strDescPath );
+        if( oFile.isFile() )
+            return strDescPath;
+        return "";
     }
 
     public static void main(String[] args) {
         m_oCtx = JavaRpcContext.createProxy();
         if (m_oCtx == null)
-            return;
+            System.exit( RC.EFAULT );;
         int ret = 0;
+        AsyncTestcli oSvcCli = null;
         do{
-            AsyncTestcli oSvcCli = new AsyncTestcli(
-                m_oCtx.getIoMgr(), "./asynctstdesc.json", "AsyncTest");
+            String strDescPath =
+                    getDescPath( "asynctstdesc.json" );
+            if( strDescPath.isEmpty() )
+                System.exit( RC.ENOENT );
+
+            oSvcCli = new AsyncTestcli(
+                m_oCtx.getIoMgr(),
+                    strDescPath,
+                    "AsyncTest");
 
             if (RC.ERROR(oSvcCli.getError()))
                 break;
@@ -75,7 +96,6 @@ public class maincli {
                 ret = jret.getError();
                 break;
             }
-
             jret = oSvcCli.LongWait2("hello, LongWait2");
             if (jret.ERROR()) 
             {
@@ -86,8 +106,9 @@ public class maincli {
             rpcbase.JavaOutputMsg(
                 String.format("LongWait2 completed with resp %s", strResp));
 
-            oSvcCli.stop();
-            m_oCtx.stop();
         }while( false );
+        if(oSvcCli != null)
+            oSvcCli.stop();
+        m_oCtx.stop();
     }
 }
