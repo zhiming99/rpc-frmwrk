@@ -124,7 +124,7 @@ The above example shows most of the statements ridl supports. ridl now has 7 typ
 
 ```
 
-Currently `ridlc` can output `c++` and `python` project. In the future, it will be able to generate `Java` project as well.
+Currently `ridlc` can output skelton code in C++, Python and Java. In the future, it will be able to generate `C#` project as well.
 
 ### Output for C++ project
 
