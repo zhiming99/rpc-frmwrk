@@ -14,7 +14,7 @@ public class AsyncTestsvr extends AsyncTestsvrbase {
 
     // asynchronous handler
     public int LongWait(JavaReqContext oReqCtx, final String i0) {
-        // schedule a timer to complete this call
+        // schedule a timer to complete this call in 3 seconds
         IUserTimerCb oTimerCb = new IUserTimerCb() {
             public void onTimer(Object octx, int iRet) {
                 JavaReqContext oReqCtx = (JavaReqContext)octx;
