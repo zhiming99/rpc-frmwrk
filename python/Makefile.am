@@ -19,7 +19,8 @@ all:
         bash gentoml.sh $(libdir);\
 		sip-build --verbose --build-dir ./sipbuild; \
         rm rpcf/$(PYTHON_EXT1)*;\
-        cp `pwd`/sipbuild/rpcbase/$(PYTHON_EXT1) rpcf/$(PYTHON_EXT) ;\
+		sofile=$$(find ./sipbuild -name $(PYTHON_EXT1));\
+        cp `pwd`/$${sofile} rpcf/$(PYTHON_EXT) ;\
 		cd rpcf; ln -s $(PYTHON_EXT) $(PYTHON_EXT1);\
     elif [ "x$(SIPVER)" == "x4" ]; then \
         export CC=$(CC); \

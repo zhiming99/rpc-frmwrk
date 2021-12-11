@@ -8,7 +8,7 @@ URL:            https://github.com/zhiming99/rpc-frmwrk
 
 Source0:        SSSSS/@PACKAGE_NAME@-@VERSION@.tar.gz
 
-BuildRequires:  gcc, g++, python3, python3-devel, python3-pip, flex, bison, libtool, shtool, automake, autoconf, make, sip5, dbus-devel, jsoncpp-devel, krb5-devel, lz4-devel, openssl-devel, cppunit-devel
+BuildRequires:  gcc, g++, python3, python3-devel, python3-pip, flex, bison, libtool, shtool, automake, autoconf, make, ( sip5 or sip6 ), dbus-devel, jsoncpp-devel, krb5-devel, lz4-devel, openssl-devel, cppunit-devel
 Requires:       dbus dbus-libs jsoncpp krb5-libs lz4-libs openssl openssl-libs cppunit
 
 %description
@@ -77,6 +77,8 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_libdir}/libsslpt.so*
 %{_libdir}/libwspt.so*
 %{_libdir}/rpcf/@PACKAGE_NAME@-@VERSION@-*.whl
+%{_libdir}/librpcbaseJNI.so*
+%{_libdir}/rpcf/rpcbase.jar
 
 %{_mandir}/man1/ridlc.1.gz
 %{_mandir}/man1/rpcrouter.1.gz
@@ -148,12 +150,12 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_includedir}/rpcf/ipc/stream.h
 %{_includedir}/rpcf/ipc/streamex.h
 %{_includedir}/rpcf/ipc/tasklets.h
-%{_includedir}/rpcf/ipc/tractgrp.*h
+%{_includedir}/rpcf/ipc/tractgrp.h
 %{_includedir}/rpcf/ipc/utils.h
 %{_includedir}/rpcf/ipc/uxport.h
 %{_includedir}/rpcf/ipc/uxstream.h
 %{_includedir}/rpcf/ipc/prxyport.h
-%{_includedir}/rpcf/ipc/fdodrv.h.h
+%{_includedir}/rpcf/ipc/fdodrv.h
 %{_includedir}/rpcf/nsdef.h
 %{_includedir}/rpcf/objfctry.h
 %{_includedir}/rpcf/propids.h
@@ -167,6 +169,7 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_libdir}/librpc.la
 %{_libdir}/libsslpt.la
 %{_libdir}/libwspt.la
+%{_libdir}/librpcbaseJNI.la
 %{_libdir}/rpcf/lib*.la
 %{_libdir}/rpcf/lib*.so*
 

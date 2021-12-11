@@ -1,5 +1,5 @@
-lib_dir=/usr/local/lib
-bin_dir=/usr/local/bin
+lib_dir=@libdir@
+bin_dir=@bindir@
 export LD_LIBRARY_PATH=${lib_dir}:${lib_dir}/rpcf
 cat /proc/cpuinfo
 if [ "$1" == "2" ]; then

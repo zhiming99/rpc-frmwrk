@@ -1,11 +1,11 @@
-EXTRA_DIST=src/actcancel.ridl\
- src/asynctst.ridl\
- src/evtest.ridl\
- src/iftest.ridl\
- src/katest.ridl\
- src/stmtest.ridl\
- src/sftest.ridl\
- src/hellowld.ridl
+EXTRA_DIST=actcancel.ridl\
+ asynctst.ridl\
+ evtest.ridl\
+ iftest.ridl\
+ katest.ridl\
+ stmtest.ridl\
+ sftest.ridl\
+ hellowld.ridl
 
 javatests=./java/src/org/rpcf/tests
 EXTRA_DIST+=$(javatests)/actcancel/ActiveCancelcli.java\

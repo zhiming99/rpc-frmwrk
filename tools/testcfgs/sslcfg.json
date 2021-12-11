@@ -1,0 +1,26 @@
+{
+    "Connections": [
+        {
+            "IpAddress": "127.0.0.1",
+            "PortNumber": "4132",
+            "Compression": "true",
+            "EnableSSL": "true",
+            "HasAuth": "false",
+            "EnableWS": "false",
+            "RouterPath": "/"
+        }
+    ],
+    "Security": {
+        "SSLCred": {
+            "KeyFile": "./server.key",
+            "CertFile": "./server.crt"
+        },
+        "misc": {
+            "MaxConnections": "512",
+            "TaskScheduler": "RR"
+        }
+    },
+    "Multihop": [],
+    "LBGroup": [],
+    "IsServer": "true"
+}
