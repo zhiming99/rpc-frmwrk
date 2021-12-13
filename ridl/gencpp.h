@@ -46,6 +46,15 @@ gint32 GenCppProj(
     const std::string& strAppName,
     ObjPtr pRoot );
 
+inline stdstr FormatClsid( guint32 dwClsid )
+{
+    char szHexId[ 16 ] = {0};
+    snprintf( szHexId,
+        sizeof( szHexId ) - 1, "0x%08X", dwClsid );
+    stdstr strRet = szHexId;
+    return strRet;
+}
+
 typedef std::unique_ptr< std::ofstream > STMPTR;
 typedef std::unique_ptr< std::ifstream > STMIPTR;
 

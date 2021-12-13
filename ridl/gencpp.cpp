@@ -1467,6 +1467,7 @@ gint32 CDeclareClassIds::Output()
         strVal += elem;
 
     guint32 dwClsid = GenClsid( strVal );
+    stdstr strClsid = FormatClsid( dwClsid );
     for( auto& elem : vecSvcs )
     {
         CServiceDecl* pSvc = elem;
@@ -1482,7 +1483,7 @@ gint32 CDeclareClassIds::Output()
                 << "C" << strSvcName
                 << "_CliSkel"
                 << " ) = "
-                << dwClsid
+                << strClsid
                 << ",";
 
             bFirst = false;
@@ -1548,11 +1549,12 @@ gint32 CDeclareClassIds::Output()
         std::string strMsgId =
             strAppName + "::" + strName;
         guint32 dwMsgId = GenClsid( strMsgId );
+        strClsid = FormatClsid( dwClsid );
 
         CCOUT << "DECL_CLSID( "
             << strName
             << " ) = "
-            << dwMsgId << ",";
+            << strClsid << ",";
         NEW_LINE;
     }
 

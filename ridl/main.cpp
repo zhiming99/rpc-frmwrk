@@ -174,14 +174,57 @@ int main( int argc, char** argv )
                             strMsg.c_str() );
                         break;
                     }
-                    if( opt == 'I' )
+
+                    char szBuf[ 512 ];
+                    int iSize = strnlen(
+                        optarg, sizeof( szBuf ) + 1 );
+                    stdstr strMsg;
+                    if( iSize > sizeof( szBuf ) )
                     {
-                        g_vecPaths.push_back(
-                            std::string( optarg ) );
+                        strMsg +=
+                           "path is too long";
+                        ret = -ERANGE;
+                        bQuit = true;
+                        break;
+                    }
+                    stdstr strFullPath;
+                    if( optarg[ 0 ] == '/' )
+                    {
+                        strFullPath = optarg;
                     }
                     else
                     {
-                        g_strOutPath = optarg;
+                        char* szPath = getcwd(
+                            szBuf, sizeof( szBuf ) );
+                        if( szPath == nullptr )
+                        {
+                            strMsg +=
+                               "path is too long";
+                            ret = -errno;
+                            bQuit = true;
+                            break;
+                        }
+                        strFullPath = szPath;
+                        strFullPath += "/";
+                        strFullPath += optarg;
+                        if( strFullPath.size() >
+                            sizeof( szBuf ) )
+                        {
+                            strMsg +=
+                               "path is too long";
+                            ret = -ERANGE;
+                            bQuit = true;
+                            break;
+                        }
+                    }
+                    if( opt == 'I' )
+                    {
+                        g_vecPaths.push_back(
+                            strFullPath );
+                    }
+                    else
+                    {
+                        g_strOutPath = strFullPath;
                     }
                     break;
                 }

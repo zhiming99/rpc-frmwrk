@@ -3857,11 +3857,9 @@ gint32 CDeclareStructJava::Output()
         CCOUT << "public class " << strName << " extends JavaSerialBase.ISerializable";
         NEW_LINE;
         BLOCK_OPEN;
-        char szHexId[ 32 ];
-        snprintf( szHexId,
-            sizeof( szHexId ) - 1, "0x%08X", iMsgId );
+        stdstr strClsid = FormatClsid( iMsgId );
         Wa( "public static int getStructId()" );
-        CCOUT << "{ return "<< szHexId <<"; };";
+        CCOUT << "{ return "<< strClsid <<"; };";
         NEW_LINES( 2 );
 
         Wa( "public static String getStructName()" );
@@ -4014,10 +4012,8 @@ gint32 CImplStructFactory::Output()
                 Wa( "};" );
                 stdstr strMsgName = g_strAppName + "::" + strName;
                 gint32 iMsgId = GenClsid( strMsgName );
-                char szHexId[ 16 ] = {0};
-                snprintf( szHexId,
-                    sizeof( szHexId ) - 1, "0x%08X", iMsgId );
-                CCOUT << "mapFactories.put( " << szHexId << ", o );";
+                stdstr strClsid = FormatClsid( iMsgId );
+                CCOUT << "mapFactories.put( " << strClsid << ", o );";
                 NEW_LINE;
             }
         }

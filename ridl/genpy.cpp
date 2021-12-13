@@ -686,12 +686,13 @@ gint32 CDeclarePyStruct::Output()
             strAppName + "::" + strName;
 
         guint32 dwMsgId = GenClsid( strMsgId );
+        stdstr strClsid = FormatClsid( dwMsgId );
 
         Wa( "#Message identity" );
 
         Wa( "@classmethod" );
         Wa( "def GetStructId( cls ) -> int:" );
-        CCOUT << "    return "<< dwMsgId;
+        CCOUT << "    return "<< strClsid;
 
         NEW_LINES( 2 );
 
@@ -1065,7 +1066,8 @@ gint32 GenStructsFilePy(
             stdstr strMsgId =
                 g_strAppName + "::" + strName;
             guint32 dwMsgId = GenClsid( strMsgId );
-            ofp << "g_mapStructs[ " << dwMsgId
+            stdstr strClsid = FormatClsid( dwMsgId );
+            ofp << "g_mapStructs[ " << strClsid
                 << " ] = " << strName;
             if( i < vecActStructs.size() - 1 )
                 pWriter->NewLine();
@@ -3014,6 +3016,7 @@ gint32 CImplPyMainFunc::OutputCli(
     gint32 ret = 0;
     do{
         stdstr strName = pSvc->GetName();
+        Wa("import os" );
         NEW_LINES( 2 );
         CCOUT << "def maincli() :";
         INDENT_UPL;
@@ -3022,11 +3025,12 @@ gint32 CImplPyMainFunc::OutputCli(
         CCOUT << "with oContext :";
         INDENT_UPL;
         Wa( "print( \"start to work here...\" )" );
+        Wa( "strPath_ = os.path.dirname( os.path.realpath( __file__ ) )" );
+        CCOUT << "strPath_ += '/" << g_strAppName << "desc.json'";
+        NEW_LINE;        
         CCOUT << "oProxy = C" << strName << "Proxy( oContext.pIoMgr,";
         NEW_LINE;
-        CCOUT << "    './" << g_strAppName << "desc.json',";
-        NEW_LINE;
-        CCOUT << "    '" << strName << "' )" ;
+        CCOUT << "    strPath_, '" << strName << "' )" ;
         NEW_LINE;
         Wa( "ret = oProxy.GetError()" );
         Wa( "if ret < 0 :" );
@@ -3139,6 +3143,7 @@ gint32 CImplPyMainFunc::OutputSvr(
     gint32 ret = 0;
     do{
         stdstr strName = pSvc->GetName();
+        Wa("import os" );
         CCOUT << "import time";
         NEW_LINES( 2 );
         CCOUT << "def mainsvr() :";
@@ -3148,11 +3153,12 @@ gint32 CImplPyMainFunc::OutputSvr(
         CCOUT << "with oContext :";
         INDENT_UPL;
         Wa( "print( \"start to work here...\" )" );
+        Wa( "strPath_ = os.path.dirname( os.path.realpath( __file__ ) )" );
+        CCOUT << "strPath_ += '/" << g_strAppName << "desc.json'";
+        NEW_LINE;        
         CCOUT << "oServer = C" << strName << "Server( oContext.pIoMgr,";
         NEW_LINE;
-        CCOUT << "    './" << g_strAppName << "desc.json',";
-        NEW_LINE;
-        CCOUT << "    '" << strName << "' )" ;
+        CCOUT << "    strPath_, '" << strName << "' )" ;
         NEW_LINE;
         Wa( "ret = oServer.GetError()" );
         Wa( "if ret < 0 :" );
