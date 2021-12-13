@@ -116,21 +116,21 @@ typedef LONGWORD HANDLE;
 
 namespace cpp
 {
-    enum EnumClsid
+    enum // EnumClsid
     {
         Clsid_Invalid,
         Clsid_CIoManager,
         Clsid_CConfigDb,
     };
 
-    enum EnumEventId
+    enum // EnumEventId
     {
         eventPortStarted,
         eventPortStartFailed,
         eventRmtSvrOffline,
     };
 
-    enum EnumPropId
+    enum // EnumPropId
     {
         propIfPtr,
         propParamCount,
@@ -145,7 +145,7 @@ namespace cpp
         propKeepAliveSec
     };
 
-    enum EnumIfState
+    enum // EnumIfState
     {
         stateStopped,
         stateStarting,
@@ -162,7 +162,7 @@ namespace cpp
         stateStartFailed,
     };
 
-    enum EnumTypeId
+    enum // EnumTypeId
     {
         typeNone,
         typeByte, 
@@ -177,7 +177,7 @@ namespace cpp
         typeByteArr,
     };
 
-    enum EnumSeriProto
+    enum // EnumSeriProto
     {
         seriNone = 0,
         seriRidl = 1,
@@ -200,7 +200,10 @@ namespace cpp
         ~CObjBase();
         gint32 AddRef();
         gint32 Release();
-        gint32 SetClassId( EnumClsid iClsid );
+        gint32 SetClassId( guint32 iClsid );
+        %MethodCode
+        sipRes = sipCpp->SetClassId( (cpp::EnumClsid)a0 );
+        %End
         gint32 GetClsid() const;
     };
 
@@ -211,10 +214,10 @@ namespace cpp
         ObjPtr();
         ObjPtr( cpp::CObjBase* pObj, bool bAddRef );
         ~ObjPtr();
-        gint32 NewObj( EnumClsid iNewClsid,
+        gint32 NewObj( guint32 iNewClsid,
             cpp::IConfigDb* pCfg );
         %MethodCode
-        sipRes = sipCpp->NewObj( a0, a1 );
+        sipRes = sipCpp->NewObj( (cpp::EnumClsid)a0, a1 );
         %End
 
         bool IsEmpty() const;
@@ -410,7 +413,7 @@ namespace cpp
                 ( *sipCpp )->empty() );
         %End
 
-        EnumTypeId GetExDataType();
+        guint32 GetExDataType();
         %MethodCode
             sipRes = ( *sipCpp )->GetExDataType();
         %End
@@ -519,14 +522,14 @@ namespace cpp
         public:
 
         gint32 OnEvent(
-            EnumEventId iEvent,
+            guint32 iEvent,
             LONGWORD dwParam1, 
             LONGWORD dwParam2,
             LONGWORD* pData /In/ );
         %MethodCode
             Py_BEGIN_ALLOW_THREADS;
             sipRes = sipCpp->OnEvent(
-                a0, a1, a2, ( LONGWORD* )a3 );
+                ( EnumEventId )a0, a1, a2, ( LONGWORD* )a3 );
             Py_END_ALLOW_THREADS;
         %End
     };
@@ -656,7 +659,7 @@ namespace cpp
             gint32, bool bVal );
 
         gint32 GetPropertyType(
-            EnumPropId iProp,
+            gint32 iProp,
             gint32& iType /Out/ ); 
         %MethodCode
             CfgPtr pCfg = sipCpp->GetCfg();
@@ -728,12 +731,12 @@ namespace cpp
     };
 
     cpp::ObjPtr* CreateObject(
-        cpp::EnumClsid iClsid,
+        guint32 iClsid,
         cpp::IConfigDb* pCfg );
     %MethodCode
     cpp::ObjPtr* pObj =
         new cpp::ObjPtr( nullptr, false );
-    gint32 ret = pObj->NewObj( a0, a1 ); 
+    gint32 ret = pObj->NewObj( (cpp::EnumClsid)a0, a1 ); 
     if( ret < 0 )
         return SIP_NULLPTR;
     sipRes = pObj;
@@ -819,13 +822,13 @@ namespace cpp
             Py_END_ALLOW_THREADS;
         %End
 
-        EnumIfState GetState() const;
+        guint32 GetState() const;
     };
 
     class CInterfaceServer : public cpp::CRpcServices /Abstract/
     {
         public:
-        EnumIfState GetState() const;
+        guint32 GetState() const;
     };
 
 };
