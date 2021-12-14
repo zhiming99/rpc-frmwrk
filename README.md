@@ -52,12 +52,11 @@ This project depends on the following 3rd-party packags at runtime:
 9. `Java OpenJDK 8 for python support.`
 
 #### Todo
-1. Java support (coming soon)
-2. Json support
-3. Examples and Tutorials
-4. Performance optimization
-5. A tree-like hierarchical persistant registry.
-6. Logging service
+1. Json support
+2. Examples and Tutorials
+3. Performance optimization
+4. A tree-like hierarchical persistant registry.
+5. Logging service
 
 ---
 [`Tue Dec 07 2021 10:48:54 PM Beijing`]   
