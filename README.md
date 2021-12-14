@@ -59,6 +59,16 @@ This project depends on the following 3rd-party packags at runtime:
 5. Logging service
 
 ---
+[`Tue Dec 14 10:40:41 PM CST 2021`]   
+1. Java support is now **released!**, Congratulations!
+2. In the next two weeks, I will do some quality improvement work, including
+   * Get the deb build work on raspbian
+   * Fix some bugs in python generator
+   * Add examples for Python and C++. 
+   * Add more testcases to the CI workflow.
+   * Add some illustrations to the system design and examples.
+3. At the beginning of next year, I will start to add Json support, that is to serialize from a json string/file and deserialize to a json string/file, which serves as a preparation for FUSE support.
+
 [`Tue Dec 07 2021 10:48:54 PM Beijing`]   
 1. After the last testcase `sftest` for java is done, the java support is about 95% complete. The last work is to put the Makefile.am in the building process, and get it delivered by the `rpm` and `deb` packages.
 2. Next I will make some improvement to expand the coverity of the automated testing process, such as unattented setup of openssl and kerberos.
