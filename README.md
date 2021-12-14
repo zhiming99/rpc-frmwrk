@@ -67,7 +67,7 @@ This project depends on the following 3rd-party packags at runtime:
    * Add examples for Python and C++. 
    * Add more testcases to the CI workflow.
    * Add some illustrations to the system design and examples.
-3. At the beginning of next year, I will start to add Json support, that is to serialize from a json string/file and deserialize to a json string/file, which serves as a preparation for FUSE support.
+3. At the beginning of next year, I will start to add Json support, that is to serialize from a json string/file and deserialize to a json string/file, which serves as a preparation for `fuse` support.
 
 [`Tue Dec 07 2021 10:48:54 PM Beijing`]   
 1. After the last testcase `sftest` for java is done, the java support is about 95% complete. The last work is to put the Makefile.am in the building process, and get it delivered by the `rpm` and `deb` packages.
