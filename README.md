@@ -48,8 +48,8 @@ This project depends on the following 3rd-party packags at runtime:
 5. `openssl-1.1 for SSL communication. ( openssl-devel, optional )`
 6. `MIT krb5 for authentication and access control. ( rpm: krb5-libs, krb5-devel, or deb: libkrb5-3, libkrb5-dev )`
 7. `c++11 is required, and make sure the GCC is 5.x or higher.`
-8. `python 3.5+ is required for python support.`
-9. `Java OpenJDK 8 for python support.`
+8. `python 3.5+ is required for Python support.`
+9. `Java OpenJDK 8 for Java support.`
 
 #### Todo
 1. Json support
