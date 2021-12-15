@@ -33,7 +33,7 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 2. After you have successfully build `rpc-frmwrk`, typing `sudo make install` will install `rpc-frmwrk` to the system.
 4. On the server side, start the daemon process `rpcrouter -r 2`, and on the client side, start daemon process `rpcrouter -r 1` as the final setup step.
 5. And now on server side, start the `helloworld` server, and on the client side, start the `helloworld` client. About `rpcrouter`, please follow this [link](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/router/README.md).
-6. Please refer to this [article](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-get-Helloworld-run%3F) for more information.
+6. Please refer to [article](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-get-Helloworld-run%3F) for more information.
 
 #### Development And Examples
 1. `rpc-frmwrk` has an `interface description language`, [`ridl`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md) to help you to generate the skelton code rapidly. It is recommended to take some time to learn this simple language, and it may save you a lot of time.
@@ -61,10 +61,10 @@ This project depends on the following 3rd-party packags at runtime:
 ---
 [`Tue Dec 14 10:40:41 PM CST 2021`]   
 1. Java support is now **released!**, Congratulations!
-2. In the next two weeks, I will do some quality improvement work, including
-   * Get the deb build work on raspbian
-   * Fix some bugs in python generator
-   * Add examples for Python and C++. 
+2. In the next two weeks, I will do some quality improvement work, which includes
+   * Get the deb build to work on raspberry pi
+   * Fix a defect in python generator.
+   * Add more examples for Python and C++. 
    * Add more testcases to the CI workflow.
    * Add some illustrations to the system design and examples.
 3. At the beginning of next year, I will start to add Json support, that is to serialize from a json string/file and deserialize to a json string/file, which serves as a preparation for `fuse` support.
