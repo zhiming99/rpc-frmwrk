@@ -34,6 +34,7 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 4. On the server side, start the daemon process `rpcrouter -r 2`, and on the client side, start daemon process `rpcrouter -r 1` as the final setup step.
 5. And now on server side, start the `helloworld` server, and on the client side, start the `helloworld` client. About `rpcrouter`, please follow this [link](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/router/README.md).
 6. Please refer to [article](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-get-Helloworld-run%3F) for more information.
+7. If you are Ubuntu users or Fedora users, you can also install `rpc-frmwrk` from a deb package or an rpm package since version 0.4.0. The release tag is associated with the pre-built deb package and rpm package.
 
 #### Development And Examples
 1. `rpc-frmwrk` has an `interface description language`, [`ridl`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md) to help you to generate the skelton code rapidly. It is recommended to take some time to learn this simple language, and it may save you a lot of time.
