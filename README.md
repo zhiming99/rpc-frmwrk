@@ -33,7 +33,8 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 2. After you have successfully build `rpc-frmwrk`, typing `sudo make install` will install `rpc-frmwrk` to the system.
 4. On the server side, start the daemon process `rpcrouter -r 2`, and on the client side, start daemon process `rpcrouter -r 1` as the final setup step.
 5. And now on server side, start the `helloworld` server, and on the client side, start the `helloworld` client. About `rpcrouter`, please follow this [link](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/router/README.md).
-6. Please refer to this [article](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-get-Helloworld-run%3F) for more information.
+6. Please refer to [article](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-get-Helloworld-run%3F) for more information.
+7. If you are Ubuntu users or Fedora users, you can also install `rpc-frmwrk` from a deb package or an rpm package since version 0.4.0. The release tag is associated with the pre-built deb package and rpm package.
 
 #### Development And Examples
 1. `rpc-frmwrk` has an `interface description language`, [`ridl`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md) to help you to generate the skelton code rapidly. It is recommended to take some time to learn this simple language, and it may save you a lot of time.
@@ -48,18 +49,27 @@ This project depends on the following 3rd-party packags at runtime:
 5. `openssl-1.1 for SSL communication. ( openssl-devel, optional )`
 6. `MIT krb5 for authentication and access control. ( rpm: krb5-libs, krb5-devel, or deb: libkrb5-3, libkrb5-dev )`
 7. `c++11 is required, and make sure the GCC is 5.x or higher.`
-8. `python 3.5+ is required for python support.`
-9. `Java OpenJDK 8 for python support.`
+8. `python 3.5+ is required for Python support.`
+9. `Java OpenJDK 8 for Java support.`
 
 #### Todo
-1. Java support (coming soon)
-2. Json support
-3. Examples and Tutorials
-4. Performance optimization
-5. A tree-like hierarchical persistant registry.
-6. Logging service
+1. Json support
+2. Examples and Tutorials
+3. Performance optimization
+4. A tree-like hierarchical persistant registry.
+5. Logging service
 
 ---
+[`Tue Dec 14 10:40:41 PM CST 2021`]   
+1. Java support is now **released!**, Congratulations!
+2. In the next two weeks, I will do some quality improvement work, which includes
+   * Get the deb build to work on raspberry pi
+   * Fix a defect in python generator.
+   * Add more examples for Python and C++. 
+   * Add more testcases to the CI workflow.
+   * Add some illustrations to the system design and examples.
+3. At the beginning of next year, I will start to add Json support, that is to serialize from a json string/file and deserialize to a json string/file, which serves as a preparation for `fuse` support.
+
 [`Tue Dec 07 2021 10:48:54 PM Beijing`]   
 1. After the last testcase `sftest` for java is done, the java support is about 95% complete. The last work is to put the Makefile.am in the building process, and get it delivered by the `rpm` and `deb` packages.
 2. Next I will make some improvement to expand the coverity of the automated testing process, such as unattented setup of openssl and kerberos.
