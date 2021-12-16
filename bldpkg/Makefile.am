@@ -6,13 +6,12 @@ debdir:
 	if [ ! -d $(DISTDIR)/debian/$(PACKAGE_NAME) ]; then \
 		mkdir -p $(DISTDIR)/debian/$(PACKAGE_NAME);\
     fi;
-	arch=$(host_cpu);\
-	if [ "x$${arch}" == "xx86_64" ]; then arch="amd64";fi;\
+	arch=$$(dpkg --print-architecture);\
 	if ! bash blddpkg.sh $(DISTDIR) $(DESTDIR) $(PACKAGE_NAME)_$(VERSION)-$(rev)_$${arch} $(prefix); then \
         echo error occurs && false; \
     else \
         cd $(DISTDIR);\
-        dch --create -v $(VERSION)-$(rev) --package $(PACKAGE_NAME);\
+        DEBEMAIL="zhiming <woodhead99@gmail.com>" dch --create -v $(VERSION)-$(rev) --package $(PACKAGE_NAME);\
     fi
 
 deb:
@@ -25,19 +24,21 @@ deb:
     fi
 	for i in *.deb *.ddeb; do rm $$i; done || true
 	cd $(DISTDIR);debuild -us -uc
-	ubuntu_ver=$$(cat /etc/os-release | grep VERSION_ID | awk -F '"' '{print $$2}');\
-    echo ubuntu version is $${ubuntu_ver}; \
-    if [[ "$${ubuntu_ver}" > "21.00" ]]; then \
-        ubuntu_ver="u"$${ubuntu_ver%%.*}; \
-    else \
-        ubuntu_ver="u20";\
+	debian_ver=$$(cat /etc/os-release | grep VERSION_ID | awk -F '"' '{print $$2}');\
+    debian_id=$$(cat /etc/os-release | grep '^ID=' | awk -F '=' '{print $$2}');\
+    oid=$${debian_id:0:1};\
+    echo debian OS version is $${debian_ver}; \
+    debian_ver=$${oid}$${debian_ver%%.*};\
+    if compgen -G "*.deb" > /dev/null; then \
+        for i in *.deb; do \
+            mv $$i $${i%%.deb}.$${debian_ver}.deb; \
+        done;\
     fi;\
-    for i in *.deb; do \
-        mv $$i $${i%%.deb}.$${ubuntu_ver}.deb; \
-    done;\
-    for i in *.ddeb; do \
-        mv $$i $${i%%.ddeb}.$${ubuntu_ver}.ddeb; \
-    done
+    if compgen -G "*.ddeb" > /dev/null; then \
+        for i in *.ddeb; do \
+            mv $$i $${i%%.ddeb}.$${debian_ver}.ddeb; \
+        done;\
+    fi;
 
 rpm:
 	rm -rf $${HOME}/rpmbuild && rpmdev-setuptree

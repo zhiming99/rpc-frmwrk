@@ -7,11 +7,11 @@ prefix=$4
 
 #the script can run only on debian family of system
 os_name=`cat /etc/os-release | grep '^ID_LIKE' | awk -F '=' '{print $2}'`
-if [ "${os_name}" != "debian" ]; then
-    exit 1
+os_name2=`cat /etc/os-release | grep '^ID=' | awk -F '=' '{print $2}'`
+if [[ "${os_name}" != "debian" && "${os_name2}" != "debian" ]]; then 
+    echo not debian system 
+    exit 1 
 fi
-
-sed -i 's/x86_64/amd64/g' ./control;
 
 if [ ! -d ${DEBDIR}/source ]; then mkdir -p ${DEBDIR}/source;fi
 cp ./control ${DEBDIR}
