@@ -1,4 +1,5 @@
-EXTRA_DIST=control.in blddpkg.sh rules bldrpm.sh rpcf.spec.in
+EXTRA_DIST=control.in blddpkg.sh rules bldrpm.sh rpcf.spec.in rpcf.install.in rpcf-dev.install.in rpcf-static.install.in README.md
+
 rev=0
 DISTDIR=$$(pwd)/$(PACKAGE_NAME)-$(VERSION)-$(rev)
 
