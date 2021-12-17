@@ -4,7 +4,7 @@ dhopt:=
 build_cpu:=$(shell dpkg-architecture -qDEB_BUILD_ARCH_CPU)
 
 #Raspberry PI cannot survive through parallel building
-ifeq($(build_cpu),arm)
+ifeq ($(build_cpu),arm)
 dhopt:= --no-parallel
 endif
 
