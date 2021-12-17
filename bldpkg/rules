@@ -1,6 +1,15 @@
 #!/usr/bin/make -f
+
+dhopt:=
+build_cpu:=$(shell dpkg-architecture -qDEB_BUILD_ARCH_CPU)
+
+#Raspberry PI cannot survive through parallel building
+ifeq($(build_cpu),arm)
+dhopt:= --no-parallel
+endif
+
 %:
-	dh $@
+	dh $@ $(dhopt)
 
 override_dh_auto_configure:
 	dh_auto_configure -- "CPPFLAGS=-O2 -g3 -DRELEASE -D_DEBUG=0"
