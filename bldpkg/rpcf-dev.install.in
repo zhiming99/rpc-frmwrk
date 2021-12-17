@@ -1,0 +1,16 @@
+usr/bin/ridlc
+usr/bin/rpcf/*tst
+usr/bin/rpcf/*smk
+usr/bin/rpcf/*cli
+usr/bin/rpcf/*svr
+usr/bin/rpcf/*test
+usr/lib/@DEB_HOST_MULTIARCH@/lib*.la
+usr/lib/@DEB_HOST_MULTIARCH@/rpcf/lib*.so*
+usr/lib/@DEB_HOST_MULTIARCH@/rpcf/lib*.la
+usr/lib/@DEB_HOST_MULTIARCH@/pkgconfig/rpcf.pc
+usr/include/rpcf/*.h
+usr/include/rpcf/ipc/*.h
+etc/rpcf/*.java
+etc/rpcf/*.py
+etc/rpcf/*tpl
+

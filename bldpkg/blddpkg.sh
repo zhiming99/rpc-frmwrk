@@ -50,14 +50,16 @@ License: GPL-3+
 EOF
 
 
+DEB_HOST_MULTIARCH=$(dpkg-architecture -qDEB_HOST_MULTIARCH)
+
 echo '13' > ${DEBDIR}/compat
 echo '3.0 (quilt)' > ${DEBDIR}/source/format
 
 cat << EOF >> ${DEBDIR}/postinst
 #!/bin/bash
-for i in *.whl; do
-pip3 install XXXX/${PACKAGE_NAME}/\${i};
-done
+cd XXXX/${PACKAGE_NAME}
+pypkg=\$(compgen -G "rpcf*whl")
+pip3 install \$pypkg;
 #DEBHELPER#
 EOF
 
@@ -66,6 +68,10 @@ cat << EOF >> ${DEBDIR}/postrm
 pip3 uninstall -y ${PACKAGE_NAME}
 #DEBHELPER#
 EOF
+
+sed "s/[@]DEB_HOST_MULTIARCH[@]/${DEB_HOST_MULTIARCH}/g" rpcf.install.in > ${DEBDIR}/rpcf.install
+sed "s/[@]DEB_HOST_MULTIARCH[@]/${DEB_HOST_MULTIARCH}/g" rpcf-dev.install.in > ${DEBDIR}/rpcf-dev.install
+sed "s/[@]DEB_HOST_MULTIARCH[@]/${DEB_HOST_MULTIARCH}/g" rpcf-static.install.in > ${DEBDIR}/rpcf-static.install
 
 chmod 0755 ${DEBDIR}/postinst
 chmod 0755 ${DEBDIR}/postrm

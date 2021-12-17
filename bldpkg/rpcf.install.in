@@ -1,0 +1,10 @@
+usr/lib/@DEB_HOST_MULTIARCH@/lib*.so*
+usr/lib/@DEB_HOST_MULTIARCH@/rpcf/*.whl
+usr/lib/@DEB_HOST_MULTIARCH@/rpcf/*.jar
+usr/bin/rpcrouter
+usr/bin/rpcf/*.py
+etc/rpcf/*.json
+usr/share/man/man1/ridlc.1
+usr/share/man/man1/rpcrouter.1
+usr/share/man/man7/ridl.7
+
