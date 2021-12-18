@@ -22,6 +22,28 @@ class CITinyInterfacecli( IITinyInterface_CliImpl ):
 class CIEchoThingscli( IIEchoThings_CliImpl ):
 
     '''
+    Asynchronous callback to receive the 
+    request status, and reponse parameters
+    if any. And add code here to process the
+    request response
+    '''
+    def EchoTypedefCb( self,
+        context : object, ret : int, 
+        stmr : list ) :
+        pass
+        
+    '''
+    Asynchronous callback to receive the 
+    request status, and reponse parameters
+    if any. And add code here to process the
+    request response
+    '''
+    def EchoHandleCb( self,
+        context : object, ret : int, 
+        stmr : object ) :
+        pass
+        
+    '''
     Event handler
     Add code here to process the event
     '''

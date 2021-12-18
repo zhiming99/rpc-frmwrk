@@ -12,7 +12,7 @@ class CIHelloWorldsvr( IIHelloWorld_SvrImpl ):
     '''
     Synchronous request handler
     '''
-    def Echo( self, callback : cpp.ObjPtr,
+    def Echo( self, oReqCtx : PyReqContext,
         strText : str
         ) -> Tuple[ int, list ] :
         '''

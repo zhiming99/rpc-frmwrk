@@ -1886,6 +1886,8 @@ gint32 CImplPyMthdSvrBase::OutputSync( bool bSync )
         INDENT_UPL;
         NEW_LINE;
 
+        Wa( "oReqCtx_ = PyReqContext();" );
+        Wa( "oReqCtx_.oCallback = callback;" );
         if( dwInCount == 0 )
         {
             if( dwOutCount > 0 )
@@ -1895,12 +1897,12 @@ gint32 CImplPyMthdSvrBase::OutputSync( bool bSync )
             NEW_LINE;
             Wa( "if targetMethod is None :" );
             Wa( "    return [ -errno.EFAULT, None ]" );
-            Wa( "ret = self.InvokeCallback( targetMethod, [ callback, ] );" );
+            Wa( "ret = self.InvokeCallback( targetMethod, [ oReqCtx_, ] );" );
         }
         else
         {
             Wa( "offset = 0" );
-            Wa( "listArgs = [ callback, ]" );
+            Wa( "listArgs = [ oReqCtx_, ]" );
             Wa( "osb = CSerialBase( self )" );
             NEW_LINE;
             guint32 i = 0;
@@ -2077,17 +2079,17 @@ gint32 CImplPyMthdSvrBase::OutputAsyncCompHandler()
         {
             CCOUT << "def On" << strName << "Complete( self,";
             NEW_LINE;
-            Wa( "    callback : cpp.ObjPtr, iRet : int ): " );
+            Wa( "    oReqCtx_ : PyReqContext, iRet : int ): " );
             INDENT_UPL;
             Wa( "self.RidlOnServiceComplete(" );
-            Wa( "    callback, iRet, None )" );
+            Wa( "    oReqCtx_.oCallback, iRet, None )" );
             Wa( "return" );
             INDENT_DOWNL;
             break;
         }
 
         CCOUT << "def On" << strName << "Complete"
-            << "( self, callback : cpp.ObjPtr, iRet : int,";
+            << "( self, oReqCtx_ : PyReqContext, iRet : int,";
         INDENT_UPL;
 
         ret = EmitFormalArgListPy( m_pWriter, pOutArgs );
@@ -2098,7 +2100,7 @@ gint32 CImplPyMthdSvrBase::OutputAsyncCompHandler()
         NEW_LINE;
         Wa( "if iRet < 0:" );
         Wa( "    self.RidlOnServiceComplete(" );
-        Wa( "    callback, iRet, None )" );
+        Wa( "    oReqCtx_.oCallback, iRet, None )" );
         Wa( "    return" );
         Wa( "osb = CSerialBase( self )" );
         Wa( "buf = bytearray()" );
@@ -2138,7 +2140,7 @@ gint32 CImplPyMthdSvrBase::OutputAsyncCompHandler()
             Wa( "    buf = None" );
         }
         Wa( "self.RidlOnServiceComplete(" );
-        Wa( "    callback, iRet, buf )" );
+        Wa( "    oReqCtx_.oCallback, iRet, buf )" );
         Wa( "return" );
         INDENT_DOWNL;
 
@@ -2165,7 +2167,7 @@ gint32 CImplPyMthdSvrBase::OutputAsyncCHWrapper()
         {
             CCOUT << "def On" << strName << "CanceledWrapper( self,";
             NEW_LINE;
-            CCOUT << "    iRet : int, callback : cpp.ObjPtr ): ";
+            CCOUT << "    iRet : int, callback : PyReqContext ): ";
             NEW_LINE;
             CCOUT << "    self.On" << strName << "Canceled( self, ";
             NEW_LINE;
@@ -2176,7 +2178,7 @@ gint32 CImplPyMthdSvrBase::OutputAsyncCHWrapper()
 
         CCOUT << "def On" << strName << "CanceledWrapper( self,";
         NEW_LINE;
-        CCOUT << "    iRet : int, callback : cpp.ObjPtr,";
+        CCOUT << "    iRet : int, callback : PyReqContext,";
         INDENT_UPL;
 
         ret = EmitFormalArgListPy( m_pWriter, pInArgs );
@@ -2225,9 +2227,9 @@ gint32 CImplPyMthdSvrBase::OutputEvent()
         if( dwInCount == 0 )
         {
             CCOUT << "def " << strName
-                << "( self, callback ): ";
+                << "( self, callback : object ): ";
             INDENT_UPL;
-            Wa( "ret = self.RidlSendEvent( callback : cpp.ObjPtr, " );
+            Wa( "ret = self.RidlSendEvent( callback, " );
             CCOUT << strIfName << ", \"" 
                 << strName << "\", \"\", None )";
             break;
@@ -2235,7 +2237,7 @@ gint32 CImplPyMthdSvrBase::OutputEvent()
 
         CCOUT << "def "<< strName << "( self,";
         NEW_LINE;
-        CCOUT << "    callback : cpp.ObjPtr,";
+        CCOUT << "    callback : object,";
         INDENT_UPL;
 
         ret = EmitFormalArgListPy( m_pWriter, pInArgs );
@@ -2463,7 +2465,7 @@ gint32 CImplPyMthdSvr::Output()
 
         if( dwInCount > 0 )
         {
-            CCOUT << "def " << strName << "( self, callback : cpp.ObjPtr,"; 
+            CCOUT << "def " << strName << "( self, oReqCtx : PyReqContext,"; 
             INDENT_UPL;
 
             ret = EmitFormalArgListPy(
@@ -2474,7 +2476,7 @@ gint32 CImplPyMthdSvr::Output()
         }
         else
         {
-            CCOUT << "def " << strName << "( self, callback : cpp.ObjPtr"; 
+            CCOUT << "def " << strName << "( self, oReqCtx : PyReqContext"; 
             INDENT_UPL;
         }
 
@@ -2517,7 +2519,7 @@ gint32 CImplPyMthdSvr::OutputAsyncCancelHandler()
         {
             CCOUT << "def On" << strName << "Canceled( self,";
             NEW_LINE;
-            CCOUT << "    callback : cpp.ObjPtr, iRet : int ): ";
+            CCOUT << "    oReqCtx : PyReqContext, iRet : int ): ";
             NEW_LINE;
             Wa( "pass" );
             break;
@@ -2525,7 +2527,7 @@ gint32 CImplPyMthdSvr::OutputAsyncCancelHandler()
 
         CCOUT << "def On" << strName << "Canceled( self,";
         NEW_LINE;
-        CCOUT << "    callback : cpp.ObjPtr, iRet : int,";
+        CCOUT << "    oReqCtx : PyReqContext, iRet : int,";
         INDENT_UPL;
 
         ret = EmitFormalArgListPy( m_pWriter, pInArgs );

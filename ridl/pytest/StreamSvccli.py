@@ -17,7 +17,7 @@ class CIFileTransfercli( IIFileTransfer_CliImpl ):
     request response
     '''
     def UploadFileCb( self,
-        context : cpp.ObjPtr, ret : int ):
+        context : object, ret : int ):
     
         self.status = ret
         self.sem.release()
@@ -30,7 +30,7 @@ class CIFileTransfercli( IIFileTransfer_CliImpl ):
     request response
     '''
     def DownloadFileCb( self,
-        context : cpp.ObjPtr, ret : int ):
+        context : object, ret : int ):
     
         self.status = ret
         self.sem.release()

@@ -39,7 +39,7 @@ class CIFileTransfersvr( IIFileTransfer_SvrImpl ):
     '''
     Asynchronous request handler
     '''
-    def UploadFile( self, callback : cpp.ObjPtr,
+    def UploadFile( self, oReqCtx : PyReqContext,
         szFilePath : str,
         hChannel : int,
         offset : int,
@@ -60,7 +60,7 @@ class CIFileTransfersvr( IIFileTransfer_SvrImpl ):
     code here
     '''
     def OnUploadFileCanceled( self,
-        callback : cpp.ObjPtr, iRet : int,
+        oReqCtx : PyReqContext, iRet : int,
         szFilePath : str,
         hChannel : int,
         offset : int,
@@ -73,7 +73,7 @@ class CIFileTransfersvr( IIFileTransfer_SvrImpl ):
     '''
     Asynchronous request handler
     '''
-    def GetFileInfo( self, callback : cpp.ObjPtr,
+    def GetFileInfo( self, oReqCtx : PyReqContext,
         szFileName : str,
         bRead : int
         ) -> Tuple[ int, list ] :
@@ -91,14 +91,14 @@ class CIFileTransfersvr( IIFileTransfer_SvrImpl ):
     code here
     '''
     def OnGetFileInfoCanceled( self,
-        callback : cpp.ObjPtr, iRet : int,
+        oReqCtx : PyReqContext, iRet : int,
         szFileName : str,
         bRead : int ):
         pass
     '''
     Asynchronous request handler
     '''
-    def DownloadFile( self, callback : cpp.ObjPtr,
+    def DownloadFile( self, oReqCtx : PyReqContext,
         szFileName : str,
         hChannel : int,
         offset : int,
@@ -119,7 +119,7 @@ class CIFileTransfersvr( IIFileTransfer_SvrImpl ):
     code here
     '''
     def OnDownloadFileCanceled( self,
-        callback : cpp.ObjPtr, iRet : int,
+        oReqCtx : PyReqContext, iRet : int,
         szFileName : str,
         hChannel : int,
         offset : int,
@@ -135,7 +135,7 @@ class CIChatsvr( IIChat_SvrImpl ):
     '''
     Synchronous request handler
     '''
-    def SpecifyChannel( self, callback : cpp.ObjPtr,
+    def SpecifyChannel( self, oReqCtx : PyReqContext,
         hChannel : int
         ) -> Tuple[ int, list ] :
         '''

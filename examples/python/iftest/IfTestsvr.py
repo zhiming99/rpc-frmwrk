@@ -12,7 +12,7 @@ class CIEchoThingssvr( IIEchoThings_SvrImpl ):
     '''
     Synchronous request handler
     '''
-    def Echo( self, callback : cpp.ObjPtr,
+    def Echo( self, oReqCtx : PyReqContext,
         i0 : object
         ) -> Tuple[ int, list ] :
         '''

@@ -155,6 +155,11 @@ def GetTypeObj( typeid ) :
         return bool
     return None
 
+class PyReqContext :
+    def __init__( self ) :
+        self.oCallback = object()
+        self.oContext = object()
+
 class PyRpcContext :
     def CreateIoMgr( self, strModName ) :
         cpp.CoInitialize(0)

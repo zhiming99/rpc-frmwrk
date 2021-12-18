@@ -12,14 +12,14 @@ class CITinyInterfacesvr( IITinyInterface_SvrImpl ):
     '''
     Synchronous request handler
     '''
-    def Ping( self, callback : cpp.ObjPtr
+    def Ping( self, oReqCtx : PyReqContext
         ) -> Tuple[ int, None ] :
         return [ 0, None ]
         
     '''
     Synchronous request handler
     '''
-    def KAReq( self, callback : cpp.ObjPtr,
+    def KAReq( self, oReqCtx : PyReqContext,
         qwTaskId : int
         ) -> Tuple[ int, None ] :
         return [ ErrorCode.ERROR_NOT_IMPL, None ]
@@ -27,7 +27,7 @@ class CITinyInterfacesvr( IITinyInterface_SvrImpl ):
     '''
     Asynchronous request handler
     '''
-    def KAReq2( self, callback : cpp.ObjPtr,
+    def KAReq2( self, oReqCtx : PyReqContext,
         qwTaskId : int
         ) -> Tuple[ int, None ] :
         OutputMsg( "no-reply req KAReq2 is called" )
@@ -40,7 +40,7 @@ class CITinyInterfacesvr( IITinyInterface_SvrImpl ):
     code here
     '''
     def OnKAReq2Canceled( self,
-        callback : cpp.ObjPtr, iRet : int,
+        oReqCtx : PyReqContext, iRet : int,
         qwTaskId : int ):
         pass
         
@@ -50,7 +50,7 @@ class CIEchoThingssvr( IIEchoThings_SvrImpl ):
     '''
     Synchronous request handler
     '''
-    def Echo( self, callback : cpp.ObjPtr,
+    def Echo( self, oReqCtx : PyReqContext,
         strText : str
         ) -> Tuple[ int, list ] :
         '''
@@ -64,7 +64,7 @@ class CIEchoThingssvr( IIEchoThings_SvrImpl ):
     '''
     Synchronous request handler
     '''
-    def EchoUnknown( self, callback : cpp.ObjPtr,
+    def EchoUnknown( self, oReqCtx : PyReqContext,
         pBuf : bytearray
         ) -> Tuple[ int, list ] :
         '''
@@ -77,7 +77,7 @@ class CIEchoThingssvr( IIEchoThings_SvrImpl ):
     '''
     Synchronous request handler
     '''
-    def EchoCfg( self, callback : cpp.ObjPtr,
+    def EchoCfg( self, oReqCtx : PyReqContext,
         pObj : cpp.ObjPtr
         ) -> Tuple[ int, list ] :
         '''
@@ -90,7 +90,7 @@ class CIEchoThingssvr( IIEchoThings_SvrImpl ):
     '''
     Asynchronous request handler
     '''
-    def EchoMany( self, callback : cpp.ObjPtr,
+    def EchoMany( self, oReqCtx : PyReqContext,
         i1 : int,
         i2 : int,
         i3 : int,
@@ -118,7 +118,7 @@ class CIEchoThingssvr( IIEchoThings_SvrImpl ):
     code here
     '''
     def OnEchoManyCanceled( self,
-        callback : cpp.ObjPtr, iRet : int,
+        oReqCtx : PyReqContext, iRet : int,
         i1 : int,
         i2 : int,
         i3 : int,
@@ -130,7 +130,7 @@ class CIEchoThingssvr( IIEchoThings_SvrImpl ):
     '''
     Asynchronous request handler
     '''
-    def EchoStruct( self, callback : cpp.ObjPtr,
+    def EchoStruct( self, oReqCtx : PyReqContext,
         fi : object
         ) -> Tuple[ int, list ] :
         '''
@@ -146,8 +146,56 @@ class CIEchoThingssvr( IIEchoThings_SvrImpl ):
     code here
     '''
     def OnEchoStructCanceled( self,
-        callback : cpp.ObjPtr, iRet : int,
+        oReqCtx : PyReqContext, iRet : int,
         fi : object ):
+        pass
+        
+    '''
+    Asynchronous request handler
+    '''
+    def EchoTypedef( self, oReqCtx : PyReqContext,
+        stm : list
+        ) -> Tuple[ int, list ] :
+        '''
+        the response parameters includes
+        stmr : STRMATRIX1
+        '''
+        #Implement this method here
+        return [ ErrorCode.ERROR_NOT_IMPL, None ]
+        
+    '''
+    This method is called when the async
+    request is cancelled due to timeout
+    or user request. Add your own cleanup
+    code here
+    '''
+    def OnEchoTypedefCanceled( self,
+        oReqCtx : PyReqContext, iRet : int,
+        stm : list ):
+        pass
+        
+    '''
+    Asynchronous request handler
+    '''
+    def EchoHandle( self, oReqCtx : PyReqContext,
+        stm : object
+        ) -> Tuple[ int, list ] :
+        '''
+        the response parameters includes
+        stmr : STMHANDLE
+        '''
+        #Implement this method here
+        return [ ErrorCode.ERROR_NOT_IMPL, None ]
+        
+    '''
+    This method is called when the async
+    request is cancelled due to timeout
+    or user request. Add your own cleanup
+    code here
+    '''
+    def OnEchoHandleCanceled( self,
+        oReqCtx : PyReqContext, iRet : int,
+        stm : object ):
         pass
         
     
