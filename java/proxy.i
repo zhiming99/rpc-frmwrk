@@ -1123,6 +1123,20 @@ class CJavaInterfBase : public T
             guint32 dwSeriProto = seriNone;
             if( ERROR( ret ) )
             {
+                // most likely there is a proto value
+                oResp.GetIntProp(
+                    propSeriProto, dwSeriProto );
+
+                if( dwSeriProto != dwReqProto )
+                {
+                    ret = -EBADMSG;
+                    DebugPrint( ret,
+                        "proto not agree,"
+                        " resp %d, req %d",
+                        dwSeriProto, dwReqProto );
+                    break;
+                }
+
                 SetErrorJRet( jenv, pjResp, ret );
             }
             else

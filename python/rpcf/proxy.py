@@ -281,8 +281,7 @@ class PyRpcServices :
     def AddTimer( self, timeoutSec,
         callback, context )->Tuple[int,cpp.ObjPtr] :
         return self.oInst.AddTimer(
-            np.uint32( timeoutSec ),
-            callback, context )
+            timeoutSec, callback, context )
 
     '''Remove a previously scheduled timer.
     '''

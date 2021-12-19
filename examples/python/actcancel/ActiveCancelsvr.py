@@ -4,17 +4,22 @@ from rpcf.rpcbase import *
 from rpcf.proxy import *
 from seribase import CSerialBase
 from actcancelstructs import *
+import numpy
 import errno
 
 from ActiveCancelsvrbase import *
 class CIActiveCancelsvr( IIActiveCancel_SvrImpl ):
 
-    def LongWaitCb( self, context ) :
-        callback = context[ 0 ]
+    def LongWaitCb( self, oReqCtx : PyReqContext ) :
+        #timer callback, complete the request
+        context = oReqCtx.oContext; 
         strText = context[ 1 ]
-        OnLongWaitComplete
-            callback, 0, strText );
+        context[ 0 ] = None
+        self.OnLongWaitComplete(
+            oReqCtx, 0, strText );
+        print( "LongWait request completed " )
         return
+
     '''
     Asynchronous request handler
     '''
@@ -28,16 +33,20 @@ class CIActiveCancelsvr( IIActiveCancel_SvrImpl ):
         #Implement this method here
 
         #schedule a timer to complete this request
-        #in 2 seconds
+        #in 30 seconds
 
-        context = [ callback, strText ]
+        print( "i0 is " + str(i0))
+
         ret = self.AddTimer( 30,
-            CActcServer.LongWaitCb,
-            context )
+            CIActiveCancelsvr.LongWaitCb,
+            oReqCtx )
+            
         if ret[ 0 ] < 0 :
             return [ ret[ 0 ],  ]
 
         timerObj = ret[ 1 ]
+        oReqCtx.oContext = [ timerObj, i0 ] 
+        #return pending
         return [ 65537, ]
         
     '''
@@ -49,7 +58,13 @@ class CIActiveCancelsvr( IIActiveCancel_SvrImpl ):
     def OnLongWaitCanceled( self,
         oReqCtx : PyReqContext, iRet : int,
         i0 : str ):
-        pass
+        #disable the timer we scheduled
+        if oReqCtx.oContext is not None:
+            timerObj = oReqCtx.oContext[ 0 ]
+            self.DisableTimer( timerObj )
+            oReqCtx.oContext[ 0 ] = None
+            print( "LongWait request canceled with " + oReqCtx.oContext[1] )
+
         
     
 class CActiveCancelServer(

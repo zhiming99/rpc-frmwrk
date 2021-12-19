@@ -1155,6 +1155,20 @@ class CPythonInterfBase : public T
             guint32 dwSeriProto = seriNone;
             if( ERROR( ret ) )
             {
+                // most likely there is a proto value
+                oResp.GetIntProp(
+                    propSeriProto, dwSeriProto );
+
+                if( dwSeriProto != dwReqProto )
+                {
+                    ret = -EBADMSG;
+                    DebugPrint( ret,
+                        "proto not agree,"
+                        " resp %d, req %d",
+                        dwSeriProto, dwReqProto );
+                    break;
+                }
+
                 PyObject* pRet =
                     PyLong_FromLong( ret );
                 PyList_SetItem( pPyResp, 0, pRet );

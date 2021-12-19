@@ -3378,8 +3378,10 @@ gint32 CRpcServices::FillRespData(
 
             if( ERROR( iRet ) )
             {
+                // fill the return value in case there
+                // is no response data if error happens
+                // locally or from unexpected corner
                 oCfg[ propReturnValue ] = iRet;
-                break;
             }
 
             ret = pMsg.GetObjArgAt( 1, pObj );
@@ -6464,15 +6466,22 @@ gint32 CInterfaceServer::DoInvoke(
 
         if( ERROR( ret ) && bResp )
         {
-            oResp.SetIntProp(
-                propReturnValue, ret );
-
-            SetResponse( pCallback,
-                oResp.GetCfg() );
+            CCfgOpenerObj oTaskCfg( pCallback );
+            IConfigDb* pUserResp = nullptr;
+            // don't set response data if already 
+            // set
+            gint32 iRet = oTaskCfg.GetPointer(
+                propRespPtr, pUserResp );
+            if( ERROR( iRet ) )
+            {
+                oResp.SetIntProp(
+                    propReturnValue, ret );
+                SetResponse( pCallback,
+                    oResp.GetCfg() );
+            }
         }
 
     }while( 0 );
-
 
     return ret;
 }

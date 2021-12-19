@@ -1445,11 +1445,17 @@ gint32 CImplPyMthdProxyBase::OutputAsyncCbWrapper()
         Wa( "listResp = [ context, ret ]" );
         if( dwOutCount == 0 )
         {
-            Wa( "self.InvokeCallback( targetMethod, listResp );" );
+            Wa( "self.InvokeCallback( targetMethod, listResp )" );
             Wa( "return" );
             INDENT_DOWNL;
             break;
         }
+        NEW_LINE;
+        Wa( "if ret < 0:" );
+        CCOUT << "    listResp.extend( [None] * " << dwOutCount << ")";
+        NEW_LINE;
+        Wa( "    self.InvokeCallback( targetMethod, listResp )" );
+        Wa( "    return" );
 
         NEW_LINE;
         Wa( "if listArgs is None or len( listArgs ) == 0 :" );
