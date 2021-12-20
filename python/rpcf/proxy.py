@@ -1016,8 +1016,7 @@ class PyRpcServer( PyRpcServices ) :
         if ret == 0 and pBuf is not None :
             listResp.append( pBuf )
         return self.oInst.OnServiceComplete(
-            callback, ret, cpp.seriRidl,
-            pResp )
+            callback, ret, cpp.seriRidl, listResp )
 
     def RidlSetResponse(
         self, callback, ret, pBuf : bytearray ) :
@@ -1025,8 +1024,7 @@ class PyRpcServer( PyRpcServices ) :
         if ret == 0 and pBuf is not None :
             listResp.append( pBuf )
         return self.oInst.SetResponse(
-            callback, ret, cpp.seriRidl,
-            listResp )
+            callback, ret, cpp.seriRidl, listResp )
 
     ''' callback can be none if it is not
     necessary to get notified of the completion.

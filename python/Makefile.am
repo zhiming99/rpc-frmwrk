@@ -53,9 +53,9 @@ install:
 	if [ "x$(DESTDIR)" == "x" ]; then \
 		echo destdir is $(DESTDIR);\
 		if [ "x$${SUDO_USER}" == "x" ];then \
-			pip3 install --user $${pkg};\
+			pip3 install --force-reinstall --user $${pkg};\
 		else \
-			su -c "pip3 install --user $${pkg}" $${SUDO_USER};\
+			su -c "pip3 install --force-reinstall --user $${pkg}" $${SUDO_USER};\
 		fi; \
 	else\
         mv ./$(PYTHON_EXT).bak rpcf/$(PYTHON_EXT); \

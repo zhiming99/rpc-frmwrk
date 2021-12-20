@@ -3,23 +3,21 @@ from typing import Tuple
 from rpcf.rpcbase import *
 from rpcf.proxy import *
 from seribase import CSerialBase
-from actcancelstructs import *
-import numpy
+from kateststructs import *
 import errno
 
-from ActiveCancelsvrbase import *
-class CIActiveCancelsvr( IIActiveCancel_SvrImpl ):
+from KeepAlivesvrbase import *
+class CIKeepAlivesvr( IIKeepAlive_SvrImpl ):
 
     def LongWaitCb( self, oReqCtx : PyReqContext ) :
         #timer callback, complete the request
-        context = oReqCtx.oContext; 
+        context = oReqCtx.oContext
         strText = context[ 1 ]
-        context[ 0 ] = None
+        context = None
         self.OnLongWaitComplete(
             oReqCtx, 0, strText );
         print( "LongWait request completed " )
         return
-
     '''
     Asynchronous request handler
     '''
@@ -30,47 +28,43 @@ class CIActiveCancelsvr( IIActiveCancel_SvrImpl ):
         the response parameters includes
         i0r : str
         '''
-        #Implement this method here
 
-        #schedule a timer to complete this request
-        #in 30 seconds
-
-        print( "i0 is " + str(i0))
-
-        ret = self.AddTimer( 30,
-            CIActiveCancelsvr.LongWaitCb,
+        #let's complete the request in 295 seconds
+        ret = self.AddTimer( 295,
+            CIKeepAlivesvr.LongWaitCb,
             oReqCtx )
-            
+
         if ret[ 0 ] < 0 :
             return [ ret[ 0 ],  ]
 
+        # store timerObj to the oReqCtx so that
+        # we can use it in the complete callback
         timerObj = ret[ 1 ]
-        oReqCtx.oContext = [ timerObj, i0 ] 
-        #return pending
+        oReqCtx.oContext = [ timerObj, i0 ]
+
+        # return pending, and the keep-alive will
+        # be enabled automatically
         return [ 65537, ]
         
     '''
     This method is called when the async
     request is cancelled due to timeout
-    or user request. Add your own cleanup
-    code here
+    or at client's request. Add cleanup
+    code here.
     '''
     def OnLongWaitCanceled( self,
         oReqCtx : PyReqContext, iRet : int,
         i0 : str ):
-        #disable the timer we scheduled
         if oReqCtx.oContext is not None:
             timerObj = oReqCtx.oContext[ 0 ]
             ret = self.DisableTimer( timerObj )
             print( "timer removed " + str( ret ) )
-            oReqCtx.oContext[ 0 ] = None
-            print( "LongWait request canceled with " +
-				oReqCtx.oContext[1] )
-
+            oReqCtx.oContext = None
+            print( "LongWait request canceled with " + i0 )
         
     
-class CActiveCancelServer(
-    CIActiveCancelsvr,
+class CKeepAliveServer(
+    CIKeepAlivesvr,
     PyRpcServer ) :
     def __init__( self, pIoMgr, strDesc, strObjName ) :
         PyRpcServer.__init__( self,

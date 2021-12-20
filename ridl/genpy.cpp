@@ -1452,7 +1452,10 @@ gint32 CImplPyMthdProxyBase::OutputAsyncCbWrapper()
         }
         NEW_LINE;
         Wa( "if ret < 0:" );
-        CCOUT << "    listResp.extend( [None] * " << dwOutCount << ")";
+        if( dwOutCount > 1 )
+            CCOUT << "    listResp.extend( [None] * " << dwOutCount << ")";
+        else
+            CCOUT << "    listResp.extend( [None] )";
         NEW_LINE;
         Wa( "    self.InvokeCallback( targetMethod, listResp )" );
         Wa( "    return" );
