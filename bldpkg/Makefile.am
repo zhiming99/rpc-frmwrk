@@ -24,7 +24,7 @@ deb:
         fi;\
     fi
 	for i in *.deb *.ddeb; do rm $$i; done || true
-	cd $(DISTDIR);debuild -us -uc
+	cd $(DISTDIR);debuild -us -uc -d
 	debian_ver=$$(cat /etc/os-release | grep VERSION_ID | awk -F '"' '{print $$2}');\
     debian_id=$$(cat /etc/os-release | grep '^ID=' | awk -F '=' '{print $$2}');\
     oid=$${debian_id:0:1};\
