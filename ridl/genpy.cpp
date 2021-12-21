@@ -3084,52 +3084,67 @@ gint32 CImplPyMainFunc::OutputCli(
             if( vecMethods.empty() )
                 break;
 
+            bool bHasEvent = false;
             CMethodDecl* pmd = nullptr;
             for( auto& elem : vecMethods )
             {
                 pmd = vecMethods.front();
                 if( pmd->IsEvent() )
-                    continue;
-                break;
-            }
-            if( pmd == nullptr )
-                break;
-
-            stdstr strMName = pmd->GetName();
-            std::vector< std::pair< stdstr, stdstr >> vecArgs;
-            ObjPtr pInArgs = pmd->GetInArgs();
-            guint32 dwInCount = GetArgCount( pInArgs );
-            if( dwInCount == 0 )
-            {
-                Wa( "Calling a proxy method like" );
-                CCOUT << "oProxy." << strMName << "()";
-            }
-            else
-            {
-                ret = GetArgsAndSigs( pInArgs, vecArgs );
-                if( ERROR( ret ) )
-                    break;
-
-                Wa( "Calling a proxy method like" );
-                CCOUT << "'oProxy." << strMName << "(";
-                if( vecArgs.size() > 2 )
                 {
-                    NEW_LINE;
-                    CCOUT << "    ";
+                    pmd = nullptr;
+                    bHasEvent = true;
+                    continue;
+                }
+                break;
+            }
+
+            if( pmd != nullptr )
+            {
+                stdstr strMName = pmd->GetName();
+                std::vector< std::pair< stdstr, stdstr >> vecArgs;
+                ObjPtr pInArgs = pmd->GetInArgs();
+                guint32 dwInCount = GetArgCount( pInArgs );
+                if( dwInCount == 0 )
+                {
+                    Wa( "Calling a proxy method like" );
+                    CCOUT << "oProxy." << strMName << "()";
                 }
                 else
                 {
-                    CCOUT << " ";
-                }
-                for( int i = 0; i < vecArgs.size(); i++ )
-                {
-                    auto& elem = vecArgs[ i ];
-                    CCOUT << elem.first;
-                    if( i < vecArgs.size() - 1 )
-                        CCOUT << ", ";
+                    ret = GetArgsAndSigs( pInArgs, vecArgs );
+                    if( ERROR( ret ) )
+                        break;
+
+                    Wa( "Calling a proxy method like" );
+                    CCOUT << "'oProxy." << strMName << "(";
+                    if( vecArgs.size() > 2 )
+                    {
+                        NEW_LINE;
+                        CCOUT << "    ";
+                    }
                     else
-                        CCOUT << " )'";
+                    {
+                        CCOUT << " ";
+                    }
+                    for( int i = 0; i < vecArgs.size(); i++ )
+                    {
+                        auto& elem = vecArgs[ i ];
+                        CCOUT << elem.first;
+                        if( i < vecArgs.size() - 1 )
+                            CCOUT << ", ";
+                        else
+                            CCOUT << " )'";
+                    }
                 }
+            }
+            else if( bHasEvent )
+            {
+                Wa( "Just waiting and events will " );
+                Wa( "be handled in the background" );
+                NEW_LINE;
+                Wa( "import time" );
+                Wa( "while( oProxy.oInst.GetState() == cpp.stateConnected ):" );
+                CCOUT << "    time.sleep(1)";
             }
             NEW_LINE;
 
