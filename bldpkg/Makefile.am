@@ -12,7 +12,7 @@ debdir:
         echo error occurs && false; \
     else \
         cd $(DISTDIR);\
-        DEBEMAIL="zhiming <woodhead99@gmail.com>" dch --create -v $(VERSION)-$(rev) --package $(PACKAGE_NAME);\
+        DEBEMAIL="zhiming <woodhead99@gmail.com>" dch --create -v $(VERSION)-$(rev) --package $(PACKAGE_NAME) "$(PACKAGE_NAME)-$(VERSION)-$(rev) released";\
     fi
 
 deb:
