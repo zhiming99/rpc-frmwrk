@@ -32,5 +32,5 @@ jobs:
     - name: starting test
       run: dbus-run-session bash tools/runtest.sh 1
     - name: make debian package
-      run: make deb;cd bldpkg;ls -ltr *.deb
+      run: make deb || cd bldpkg || ls -ltr *.deb
 
