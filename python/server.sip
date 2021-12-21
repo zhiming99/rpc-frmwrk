@@ -559,7 +559,7 @@ class CPythonServer :
     gint32 SetInvTimeout(
         cpp::ObjPtr& pCallback,
         guint32 dwTimeoutSec,
-        guint32 dwKeepAliveSec );
+        guint32 dwKeepAliveSec = 0 );
     %MethodCode
         do{
             CPythonServerImpl* pImpl =

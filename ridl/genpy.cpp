@@ -1497,7 +1497,7 @@ gint32 CImplPyMthdProxyBase::OutputAsyncCbWrapper()
             NEW_LINE;
         }
 
-        Wa( "self.InvokeCallback( targetMethod, listResp );" );
+        Wa( "self.InvokeCallback( targetMethod, listResp )" );
         Wa( "return" );
         INDENT_DOWNL;
 
@@ -1895,8 +1895,8 @@ gint32 CImplPyMthdSvrBase::OutputSync( bool bSync )
         INDENT_UPL;
         NEW_LINE;
 
-        Wa( "oReqCtx_ = PyReqContext();" );
-        Wa( "oReqCtx_.oCallback = callback;" );
+        Wa( "oReqCtx_ = PyReqContext()" );
+        Wa( "oReqCtx_.oCallback = callback" );
         if( dwInCount == 0 )
         {
             if( dwOutCount > 0 )
@@ -1906,7 +1906,7 @@ gint32 CImplPyMthdSvrBase::OutputSync( bool bSync )
             NEW_LINE;
             Wa( "if targetMethod is None :" );
             Wa( "    return [ -errno.EFAULT, None ]" );
-            Wa( "ret = self.InvokeCallback( targetMethod, [ oReqCtx_, ] );" );
+            Wa( "ret = self.InvokeCallback( targetMethod, [ oReqCtx_, ] )" );
         }
         else
         {
@@ -1945,7 +1945,7 @@ gint32 CImplPyMthdSvrBase::OutputSync( bool bSync )
             Wa( "if targetMethod is None :" );
             Wa( "    return [ -errno.EFAULT, None ]" );
             Wa( "ret = self.InvokeCallback(" );
-            Wa( "    targetMethod, listArgs );" );
+            Wa( "    targetMethod, listArgs )" );
         }
 
         Wa( "bPending = ( ret[ 0 ] ==" );
@@ -1981,7 +1981,7 @@ gint32 CImplPyMthdSvrBase::OutputSync( bool bSync )
             }
             else
             {
-                CCOUT << "        callback, 0 )";
+                CCOUT << "        callback, 0, 0 )";
             }
 
             NEW_LINE;
