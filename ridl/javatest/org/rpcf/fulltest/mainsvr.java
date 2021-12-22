@@ -8,20 +8,38 @@ import java.util.concurrent.TimeUnit;
 public class mainsvr
 {
     public static JavaRpcContext m_oCtx;
+    public static String getDescPath( String strName )
+    {
+        String strDescPath =
+            mainsvr.class.getProtectionDomain().getCodeSource().getLocation().getPath();
+        String strDescPath2 = strDescPath + "/org/rpcf/fulltest/" + strName;
+        java.io.File oFile = new java.io.File( strDescPath2 );
+        if( oFile.isFile() )
+            return strDescPath2;
+        strDescPath += "/" + strName;
+        oFile = new java.io.File( strDescPath );
+        if( oFile.isFile() )
+            return strDescPath;
+        return "";
+    }
     public static void main( String[] args )
     {
         int ret = 0;
         m_oCtx = JavaRpcContext.createServer(); 
         if( m_oCtx == null )
-            return;
+            System.exit( RC.EFAULT );
 
+        String strDescPath =
+            getDescPath( "fulltestdesc.json" );
+        if( strDescPath.isEmpty() )
+            System.exit( RC.ENOENT );
         SimpFileSvcsvr oSvcSvr = null;
         StreamSvcsvr oStmSvr = null;
         do {
             // create the service object
             oSvcSvr = new SimpFileSvcsvr(
                     m_oCtx.getIoMgr(),
-                    "./fulltestdesc.json",
+                    strDescPath,
                     "SimpFileSvc");
 
             // check if there are errors
@@ -30,7 +48,7 @@ public class mainsvr
             // create the service object
             oStmSvr = new StreamSvcsvr(
                     m_oCtx.getIoMgr(),
-                    "./fulltestdesc.json",
+                    strDescPath,
                     "StreamSvc");
             if (RC.ERROR(oStmSvr.getError()))
                 break;

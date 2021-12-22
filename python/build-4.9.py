@@ -60,4 +60,4 @@ if libdir is not None :
     makefile.extra_lflags.append( rpaths )
 
 makefile.generate()
-os.system( "make -C ./sip4build" )
+os.system( "make -C ./sip4build 2>/dev/null" )
