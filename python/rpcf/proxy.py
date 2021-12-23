@@ -392,6 +392,26 @@ class PyRpcServices :
     def WriteStream( self, hChannel, pBuf ) :
         return self.oInst.WriteStream( hChannel, pBuf )
 
+    '''Write pBuf to stream hChannel, and return
+    immediately and no waiting for whether pBuf is sent
+    successfully or not
+    '''
+    def WriteStreamNoWait( self, hChannel, pBuf ) :
+        if len( pBuf ) == 0:
+            return -ErrorCode.EINVAL
+        return self.oInst.WriteStreamNoWait(
+            hChannel, pBuf )
+
+    ''' callback declaration for async stream write
+    '''
+    def WriteStmCallback( self, iRet, hChannel, pBuf ) :
+        pass
+
+    def WriteStreamAsync2( self,
+        hChannel, pBuf )->int :
+        return self.oInst.WriteStreamAsync(
+            hChannel, pBuf, self.WriteStmCallback )
+
     def WriteStreamAsync( self,
         hChannel, pBuf, callback )->int :
         return self.oInst.WriteStreamAsync(
@@ -416,6 +436,10 @@ class PyRpcServices :
         )-> Tuple[ int, bytearray, cpp.BufPtr ] :
         return self.oInst.ReadStream( hChannel, size )
 
+    ''' callback declaration for async stream read
+    '''
+    def ReadStmCallback( self, iRet, hChannel, pBuf ) :
+        pass
     '''
     ReadStreamAsync to read `size' bytes from the
     stream `hChannel', and give control to
@@ -447,6 +471,11 @@ class PyRpcServices :
         return self.oInst.ReadStreamAsync(
             hChannel, callback, size )
 
+    def ReadStreamAsync2( self,
+        hChannel, size = 0)->Tuple[
+            int, Optional[ bytearray ], Optional[ cpp.ObjPtr] ]:
+        return self.oInst.ReadStreamAsync(
+            hChannel, self.ReadStmCallback, size )
     '''
     ReadStreamNoWait to read the first block of
     bufferrd data from the stream. If there are

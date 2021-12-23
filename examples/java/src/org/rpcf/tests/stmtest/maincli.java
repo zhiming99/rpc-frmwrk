@@ -99,7 +99,7 @@ public class maincli
                 if(RC.ERROR(ret))
                     break;
                 if(RC.isPending(ret)) {
-                    // for simplicity, we don't issue many request in parallel.
+                    // for simplicity, we don't transmit multiple data blocks simultaneously
                     do {
                         try {
                             oSvcCli.m_sem.acquire();

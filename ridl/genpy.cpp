@@ -3049,6 +3049,14 @@ gint32 CImplPyMainFunc::OutputCli(
         NEW_LINE;
         CCOUT << "with oProxy :";
         INDENT_UPL;
+
+        Wa( "state = oProxy.oInst.GetState()" );
+        Wa( "while state == cpp.stateRecovery :" );
+        Wa( "    time.sleep( 1 )" );
+        Wa( "    state = oProxy.oInst.GetState()" );
+        Wa( "if state != cpp.stateConnected :" );
+        Wa( "    return ErrorCode.ERROR_STATE" );
+        NEW_LINE;
         Wa( "'''" );
         Wa( "adding your code here" );
 
