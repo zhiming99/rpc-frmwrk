@@ -12,8 +12,8 @@
     ],
     "Security": {
         "SSLCred": {
-            "KeyFile": "./server.key",
-            "CertFile": "./server.crt"
+            "KeyFile": "XXXXX/server.key",
+            "CertFile": "XXXXX/server.crt"
         },
         "misc": {
             "MaxConnections": "512",
