@@ -3028,6 +3028,7 @@ gint32 CImplPyMainFunc::OutputCli(
     do{
         stdstr strName = pSvc->GetName();
         Wa("import os" );
+        Wa("import time" );
         NEW_LINES( 2 );
         CCOUT << "def maincli() :";
         INDENT_UPL;

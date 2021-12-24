@@ -142,7 +142,7 @@ class PyFileTransClient( PyFileTransferBase ):
                 break
 
             try:
-                fp = open( fileName, "rb+" )
+                fp = open( fileName, "rb" )
                 iSize = fp.seek( 0, os.SEEK_END )
                 if iSize == 0 :
                     resp[ 0 ] = -errno.ENODATA

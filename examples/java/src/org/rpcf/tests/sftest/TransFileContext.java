@@ -67,7 +67,7 @@ public class TransFileContext {
                     m_oFile = new RandomAccessFile(m_strPath, "r");
                     m_oChannel = m_oFile.getChannel();
                     long iSize = m_oChannel.size();
-                    if (m_lOffset > iSize) {
+                    if (m_lOffset >= iSize) {
                         ret = -RC.ERANGE;
                         break;
                     }
