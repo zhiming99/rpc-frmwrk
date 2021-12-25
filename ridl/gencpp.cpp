@@ -1549,7 +1549,7 @@ gint32 CDeclareClassIds::Output()
         std::string strMsgId =
             strAppName + "::" + strName;
         guint32 dwMsgId = GenClsid( strMsgId );
-        strClsid = FormatClsid( dwClsid );
+        strClsid = FormatClsid( dwMsgId );
 
         CCOUT << "DECL_CLSID( "
             << strName
@@ -5215,6 +5215,8 @@ gint32 CImplIfMethodSvr::OutputSync()
             {
                 Wa( "CParamList oResp_;" );
                 Wa( "oResp_[ propReturnValue ] = ret;" );
+                if( bSerial )
+                    Wa( "oResp_[ propSeriProto ] = seriProto;" );
             }
         }
         else if( !bSerial )
@@ -5310,6 +5312,7 @@ gint32 CImplIfMethodSvr::OutputSync()
                 NEW_LINES( 2 );
                 Wa( "CParamList oResp_;" );
                 Wa( "oResp_[ propReturnValue ] = ret;" );
+                Wa( "oResp_[ propSeriProto ] = seriRidl;" );
                 if( dwOutCount > 0 )
                 {
                     Wa( "if( SUCCEEDED( ret ) )" );
@@ -5623,6 +5626,7 @@ gint32 CImplIfMethodSvr::OutputAsyncSerial()
             NEW_LINE;
             Wa( "CParamList oResp_;" );
             Wa( "oResp_[ propReturnValue ] = ret;" );
+            Wa( "oResp_[ propSeriProto ] = seriRidl;" );
             if( dwOutCount > 0 )
             {
                 Wa( "if( SUCCEEDED( ret ) )" );
@@ -5819,6 +5823,8 @@ gint32 CImplIfMethodSvr::OutputAsyncCallback()
         NEW_LINE;
         Wa( "CParamList oResp_;" );
         Wa( "oResp_[ propReturnValue ] = ret;" );
+        if( bSerial )
+            Wa( "oResp_[ propSeriProto ] = seriRidl;" );
 
         if( dwOutCount == 0 )
         {

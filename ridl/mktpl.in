@@ -26,30 +26,26 @@ RELEASE_FLAGS:= -D_DEBUG=0 -DRELEASE -O2 -ggdb
 DBG_DIR:=debug
 RLS_DIR:=release
 
-OBJ_DIR:=./$(DBG_DIR)
+OBJ_DIR:=$(BASE)/$(RLS_DIR)
 OUTPUT_DIR:=$(OBJ_DIR)
 
 ifeq ($(MAKECMDGOALS),) 
-	C_FLAGS+=$(DEBUG_FLAGS)
-else ifeq ($(MAKECMDGOALS),debug) 
-	C_FLAGS+=$(DEBUG_FLAGS)
-else ifeq ($(MAKECMDGOALS),$(DBG_DIR)) 
-	C_FLAGS+=$(DEBUG_FLAGS)
-else ifeq ($(MAKECMDGOALS),all) 
-	C_FLAGS+=$(DEBUG_FLAGS)
-endif
-
-ifeq ($(MAKECMDGOALS),release)
 	C_FLAGS+=$(RELEASE_FLAGS)
 	C_DEFINES+=-DPRODUCTION 
-	OUTPUT_DIR:=$(BASE)/$(RLS_DIR)
-	OBJ_DIR:=./$(RLS_DIR)
+else ifeq ($(MAKECMDGOALS),debug) 
+	C_FLAGS+=$(DEBUG_FLAGS)
+	OBJ_DIR:=$(BASE)/$(DBG_DIR)
+	OUTPUT_DIR:=$(OBJ_DIR)
+else ifeq ($(MAKECMDGOALS),all) 
+	C_FLAGS+=$(RELEASE_FLAGS)
+	C_DEFINES+=-DPRODUCTION 
+else ifeq ($(MAKECMDGOALS),release)
+	C_FLAGS+=$(RELEASE_FLAGS)
+	C_DEFINES+=-DPRODUCTION 
 else ifeq ($(MAKECMDGOALS),debug_clean)
 	OUTPUT_DIR:=$(BASE)/$(DBG_DIR)
 	OBJ_DIR:=./$(DBG_DIR)
 else ifeq ($(MAKECMDGOALS),release_clean)
-	OUTPUT_DIR:=$(BASE)/$(RLS_DIR)
-	OBJ_DIR:=./$(RLS_DIR)
 endif
 
 DIST_LIB_DIR = @DIST_LIB_DIR@
