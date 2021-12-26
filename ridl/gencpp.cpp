@@ -1810,13 +1810,11 @@ gint32 CDeclInterfProxy::Output()
         bool bStream = m_pNode->IsStream();
         if( bStream )
         {
-            strBase =
-            "CStreamProxyWrapper"; 
+            strBase = "CStreamProxyWrapper"; 
         }
         else
         {
-            strBase =
-            "CAggInterfaceProxy"; 
+            strBase = "CAggInterfaceProxy"; 
         }
 
         INDENT_UP;
@@ -2420,8 +2418,8 @@ gint32 CDeclInterfSvr::OutputAsync(
             INDENT_UPL;
             CCOUT << "IEventSink* pCallback,";
             NEW_LINE;
-            CCOUT << "gint32 iRet, "
-                << "BufPtr& pBuf_ );";
+            Wa( "IConfigDb* pReqCtx_," );
+            CCOUT << "gint32 iRet, BufPtr& pBuf_ );";
             INDENT_DOWNL;
             NEW_LINE;
         }
@@ -2440,6 +2438,7 @@ gint32 CDeclInterfSvr::OutputAsync(
             INDENT_UPL;
             CCOUT << "IEventSink* pCallback,";
             NEW_LINE;
+            Wa( "IConfigDb* pReqCtx_," );
             CCOUT << "gint32 iRet );";
             INDENT_DOWNL;
             NEW_LINE;
@@ -2462,6 +2461,7 @@ gint32 CDeclInterfSvr::OutputAsync(
             INDENT_UPL;
             CCOUT << "IEventSink* pCallback,";
             NEW_LINE;
+            Wa( "IConfigDb* pReqCtx_," );
             CCOUT << "gint32 iRet,";
             NEW_LINE;
             GenFormInArgs( pInArgs );
@@ -2474,7 +2474,7 @@ gint32 CDeclInterfSvr::OutputAsync(
         CCOUT << "virtual gint32 "
             << "On" << strName << "Canceled(";
         INDENT_UPL;
-        CCOUT << "gint32 iRet";
+        CCOUT << "IConfigDb* pReqCtx_, gint32 iRet";
         if( dwInCount > 0 )
         {
             CCOUT << ",";
@@ -2495,7 +2495,7 @@ gint32 CDeclInterfSvr::OutputAsync(
             << "Complete" << "( ";
 
         INDENT_UPL;
-        CCOUT << "IEventSink* pCallback, "
+        CCOUT << "IConfigDb* pReqCtx_, "
             << "gint32 iRet";
 
         if( dwOutCount > 0 )
@@ -2517,10 +2517,10 @@ gint32 CDeclInterfSvr::OutputAsync(
             strName + "(";
 
         CCOUT << strDecl;
-        strDecl += "IEventSink* pCallback";
+        strDecl += "IConfigDb* pReqCtx_";
 
         INDENT_UPL;
-        CCOUT << "IEventSink* pCallback";
+        CCOUT << "IConfigDb* pReqCtx_";
         if( dwCount > 0 )
         {
             strDecl += ",";
@@ -3391,6 +3391,7 @@ gint32 CDeclServiceImpl::Output()
             CCOUT << "gint32 "
                 << "On" << strName << "Canceled(";
             INDENT_UPL;
+            Wa( "IConfigDb* pReqCtx," );
             CCOUT << "gint32 iRet";
             if( dwInCount > 0 )
             {
@@ -5232,7 +5233,7 @@ gint32 CImplIfMethodSvr::OutputSync()
                 Wa( "CParamList oResp_;" );
                 Wa( "oResp_[ propReturnValue ] = ret;" );
                 if( bSerial )
-                    Wa( "oResp_[ propSeriProto ] = seriProto;" );
+                    Wa( "oResp_[ propSeriProto ] = seriRidl;" );
             }
         }
         else if( !bSerial )
@@ -5439,6 +5440,10 @@ gint32 CImplIfMethodSvr::OutputAsyncNonSerial()
             NEW_LINE;
         }
 
+        Wa( "CParamList oReqCtx_;" );
+        Wa( "oReqCtx_.SetPointer(" );
+        Wa( "    propEventSink, pCallback );" );
+        Wa( "IConfigDb* pReqCtx_ = oReqCtx_.GetCfg();" );
         CCOUT << "ret = DEFER_CANCEL_HANDLER2(";
         INDENT_UPL;
         CCOUT << "-1, pNewCb, this,";
@@ -5446,7 +5451,7 @@ gint32 CImplIfMethodSvr::OutputAsyncNonSerial()
         CCOUT << "&" << strClass << "::"
             << strMethod << "CancelWrapper,";
         NEW_LINE;
-        CCOUT << "pCallback, 0";
+        CCOUT << "pCallback, pReqCtx_, 0";
         if( dwInCount > 0 )
         {
             CCOUT << ",";
@@ -5463,7 +5468,7 @@ gint32 CImplIfMethodSvr::OutputAsyncNonSerial()
 
         // call the user's handler
         CCOUT << "ret = "
-            << strMethod << "( pCallback";
+            << strMethod << "( pReqCtx_";
 
         if( dwInCount + dwOutCount > 0 )
         {
@@ -5595,6 +5600,11 @@ gint32 CImplIfMethodSvr::OutputAsyncSerial()
             Wa( "if( ERROR( ret ) ) break;" );
         }
 
+        Wa( "CParamList oReqCtx_;" );
+        Wa( "oReqCtx_.SetPointer(" );
+        Wa( "    propEventSink, pCallback );" );
+        Wa( "IConfigDb* pReqCtx_ = oReqCtx_.GetCfg();" );
+
         CCOUT << "ret = DEFER_CANCEL_HANDLER2(";
         INDENT_UPL;
         CCOUT << "-1, pNewCb, this,";
@@ -5602,7 +5612,7 @@ gint32 CImplIfMethodSvr::OutputAsyncSerial()
         CCOUT << "&" << strClass << "::"
             << strMethod << "CancelWrapper,";
         NEW_LINE;
-        CCOUT << "pCallback, 0, pBuf_ );";
+        CCOUT << "pCallback, pReqCtx_, 0, pBuf_ );";
         INDENT_DOWNL;
         NEW_LINE;
         Wa( "if( ERROR( ret ) ) break;" );
@@ -5629,7 +5639,7 @@ gint32 CImplIfMethodSvr::OutputAsyncSerial()
             << strMethod << "(";
 
         INDENT_UPL;
-        CCOUT << "pCallback,";
+        CCOUT << "pReqCtx_,";
         NEW_LINE;
         GenActParams( pInArgs, pOutArgs );
 
@@ -5714,6 +5724,7 @@ gint32 CImplIfMethodSvr::OutputAsyncCancelWrapper()
         INDENT_UPL;
         CCOUT << "IEventSink* pCallback,";
         NEW_LINE;
+        Wa( "IConfigDb* pReqCtx_," );
         CCOUT << "gint32 iRet";
         if( bSerial )
         {
@@ -5744,7 +5755,7 @@ gint32 CImplIfMethodSvr::OutputAsyncCancelWrapper()
 
         // call the user's handler
         CCOUT << "On" << strMethod
-            << "Canceled(";
+            << "Canceled( pReqCtx_,";
 
         if( dwInCount == 0 )
         {
@@ -5793,7 +5804,7 @@ gint32 CImplIfMethodSvr::OutputAsyncCallback()
             << strMethod << "Complete( ";
         INDENT_UP;
         NEW_LINE;
-        CCOUT << "IEventSink* pCallback"
+        CCOUT << "IConfigDb* pReqCtx_"
             << ", gint32 iRet";
 
         if( dwOutCount > 0 )
@@ -5808,11 +5819,18 @@ gint32 CImplIfMethodSvr::OutputAsyncCallback()
         INDENT_DOWN;
         NEW_LINE;
 
+        BLOCK_OPEN;
+        Wa( "gint32 ret = 0;" );
+        Wa( "IEventSink* pCallback = nullptr;" );
+        Wa( "CParamList oParams( pReqCtx_ );" );
+        Wa( "ret = oParams.GetPointer(" );
+        Wa( "    propEventSink, pCallback );" );
+        Wa( "if( ERROR( ret ) )" );
+        Wa( "    return ret;" );
         if( bNoReply )
         {
-            BLOCK_OPEN;
-            Wa( "if( pCallback == nullptr ) return -EINVAL;" );
             Wa( "pCallback->OnEvent( eventTaskComp, iRet, 0, 0 );" );
+            Wa( "oParams.Clear();" );
             CCOUT << "if( SUCCEEDED( iRet ) ) return iRet;";
             NEW_LINE;
             CCOUT << "DebugPrint( iRet,";
@@ -5825,8 +5843,6 @@ gint32 CImplIfMethodSvr::OutputAsyncCallback()
             NEW_LINE;
             break;
         }
-        BLOCK_OPEN;
-        Wa( "gint32 ret = 0;" );
 
         CCOUT << "if( iRet == STATUS_PENDING )";
         INDENT_UPL;

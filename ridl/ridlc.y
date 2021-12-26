@@ -1075,6 +1075,8 @@ method_decl : attr_list TOK_IDENT '(' ')' TOK_RETURNS '(' ')'
                 g_bSemanErr = true;
             }
         }
+        if( g_bNewSerial )
+            pmd->EnableSerialize();
         BufPtr pBuf( true );
         *pBuf = pNode;
         $$ = pBuf;
