@@ -5,7 +5,7 @@
 appname "iftest";
 
 // this testcase demonstrates how to define a complex parameter
-// to pass to the server.
+// to pass between server and proxy.
 struct GlobalFeature
 {
     map<int32, string> adFeature;

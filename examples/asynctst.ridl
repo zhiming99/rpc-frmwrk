@@ -5,8 +5,8 @@
 
 appname "asynctst";
 
-// this test tries to demonstrate different kinds of
-// asynchronous processing with RPC-Frmwrk
+// this test demonstrates different approaches of
+// asynchronous processing with the RPC-Frmwrk support
 
 interface IAsyncTest
 {
