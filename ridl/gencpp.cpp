@@ -4632,15 +4632,24 @@ gint32 CImplIfMethodProxy::OutputSync()
                 NEW_LINE;
                 Wa( "guint32 dwRet_ = 0;" );
                 Wa( "CCfgOpener oResp_( ( IConfigDb* )pResp_ );" );
-                Wa( "ret = oResp_.GetIntProp( propReturnValue, dwRet_ );" );
+                Wa( "ret = oResp_.GetIntProp(" );
+                Wa( "    propReturnValue, dwRet_ );" );
                 Wa( "if( ERROR( ret ) ) return ret;" );
                 Wa( "ret = ( gint32 )dwRet_;" );
+                NEW_LINE;
                 if( dwOutCount > 0 )
                 {
                     Wa( "if( ERROR( ret ) ) return ret;" );
+                    Wa( "guint32 dwSeriProto_ = 0;" );
+                    Wa( "ret = oResp_.GetIntProp(" );
+                    Wa( "    propSeriProto, dwSeriProto_ );" );
+                    Wa( "if( ERROR( ret ) ||" );
+                    Wa( "    dwSeriProto_ != seriRidl )" );
+                    Wa( "    return ret;" );
                     Wa( "BufPtr pBuf2;" );
                     Wa( "ret = oResp_.GetProperty( 0, pBuf2 );" );
-                    Wa( "if( ERROR( ret ) ) return ret;" );
+                    Wa( "if( ERROR( ret ) )" );
+                    Wa( "    return ret;" );
 
                     if( ERROR( ret ) )
                         break;
@@ -4964,9 +4973,16 @@ gint32 CImplIfMethodProxy::OutputAsyncCbWrapper()
             NEW_LINE;
             Wa( "if( SUCCEEDED( iRet ) )" );
             BLOCK_OPEN;
+            Wa( "guint32 dwSeriProto_ = 0;" );
+            Wa( "ret = oResp_.GetIntProp(" );
+            Wa( "    propSeriProto, dwSeriProto_ );" );
+            Wa( "if( ERROR( ret ) ||" );
+            Wa( "    dwSeriProto_ != seriRidl )" );
+            Wa( "    break;" );
             Wa( "BufPtr pBuf_;" );
             Wa( "ret = oResp_.GetProperty( 0, pBuf_ );" );
-            Wa( "if( ERROR( ret ) ) break;" );
+            Wa( "if( ERROR( ret ) )" );
+            Wa( "    break;" );
 
             ret = GenDeserialArgs( pOutArgs,
                 "pBuf_", false, false, true );
