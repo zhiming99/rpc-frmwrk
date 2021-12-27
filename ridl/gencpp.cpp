@@ -2418,8 +2418,8 @@ gint32 CDeclInterfSvr::OutputAsync(
             INDENT_UPL;
             CCOUT << "IEventSink* pCallback,";
             NEW_LINE;
-            Wa( "IConfigDb* pReqCtx_," );
-            CCOUT << "gint32 iRet, BufPtr& pBuf_ );";
+            Wa( "gint32 iRet," );
+            CCOUT << "IConfigDb* pReqCtx_, BufPtr& pBuf_ );";
             INDENT_DOWNL;
             NEW_LINE;
         }
@@ -2438,8 +2438,8 @@ gint32 CDeclInterfSvr::OutputAsync(
             INDENT_UPL;
             CCOUT << "IEventSink* pCallback,";
             NEW_LINE;
-            Wa( "IConfigDb* pReqCtx_," );
-            CCOUT << "gint32 iRet );";
+            Wa( "gint32 iRet," );
+            CCOUT << "IConfigDb* pReqCtx_ );";
             INDENT_DOWNL;
             NEW_LINE;
         }
@@ -2461,8 +2461,8 @@ gint32 CDeclInterfSvr::OutputAsync(
             INDENT_UPL;
             CCOUT << "IEventSink* pCallback,";
             NEW_LINE;
-            Wa( "IConfigDb* pReqCtx_," );
-            CCOUT << "gint32 iRet,";
+            Wa( "gint32 iRet," );
+            CCOUT << "IConfigDb* pReqCtx_,";
             NEW_LINE;
             GenFormInArgs( pInArgs );
             CCOUT << " );";
@@ -5451,7 +5451,7 @@ gint32 CImplIfMethodSvr::OutputAsyncNonSerial()
         CCOUT << "&" << strClass << "::"
             << strMethod << "CancelWrapper,";
         NEW_LINE;
-        CCOUT << "pCallback, pReqCtx_, 0";
+        CCOUT << "pCallback, 0, pReqCtx_";
         if( dwInCount > 0 )
         {
             CCOUT << ",";
@@ -5612,7 +5612,7 @@ gint32 CImplIfMethodSvr::OutputAsyncSerial()
         CCOUT << "&" << strClass << "::"
             << strMethod << "CancelWrapper,";
         NEW_LINE;
-        CCOUT << "pCallback, pReqCtx_, 0, pBuf_ );";
+        CCOUT << "pCallback, 0, pReqCtx_, pBuf_ );";
         INDENT_DOWNL;
         NEW_LINE;
         Wa( "if( ERROR( ret ) ) break;" );
@@ -5724,8 +5724,8 @@ gint32 CImplIfMethodSvr::OutputAsyncCancelWrapper()
         INDENT_UPL;
         CCOUT << "IEventSink* pCallback,";
         NEW_LINE;
-        Wa( "IConfigDb* pReqCtx_," );
-        CCOUT << "gint32 iRet";
+        Wa( "gint32 iRet," );
+        CCOUT << "IConfigDb* pReqCtx_";
         if( bSerial )
         {
             CCOUT << ", BufPtr& pBuf_";

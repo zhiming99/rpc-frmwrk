@@ -3737,4 +3737,37 @@ gint32 AddSeqTaskTempl( T* pObj,
     return ret;
 }
 
+/*
+ * macro ADD_TIMER adds a timer of sepcified
+ * seconds, with the callback and its parameters.
+ * The callback has a parameter list as 
+ *
+ * [ IEventSink*, IConfigDb* pReqCtx_, ... ]
+ *
+ * The first parameter can be ignored.  The
+ * limitations of this macro are
+ * . the variable `ret' must be defined ahead.
+ * . the pReqCtx's attribute propContext will be
+ * overwritten with a timer object for cleanup
+ * purpose.
+ */
+#define ADD_TIMER( pThis, _pReqCtx_, _sec, callback_, ... ) \
+({\
+    TaskletPtr pTask_; \
+    do{ \
+        ret = DEFER_IFCALLEX_NOSCHED2( \
+            0, pTask_, ObjPtr( pThis ), callback_, \
+            nullptr, _pReqCtx_, ##__VA_ARGS__ ); \
+        if( ERROR( ret ) ) \
+            break; \
+        ObjPtr pTaskObj = pTask_;\
+        CParamList oReqCtx( pReqCtx_ );\
+        oReqCtx.SetObjPtr( propContext, pTaskObj );\
+        CIfDeferCallTaskEx* pTaskEx = pTask_;\
+        pTaskEx->EnableTimer( _sec, eventRetry );\
+    }while(0); \
+    if( ERROR( ret ) ) pTask_.Clear();\
+    pTask_; \
+})
+
 }

@@ -7223,6 +7223,7 @@ gint32 CInterfaceServer::ForceCancelRequests(
         if( pTaskGrp.IsEmpty() )
             break;
 
+        bool bFound = false;
         for( auto elem : vecTaskIds )
         {
             TaskletPtr pTask;
@@ -7230,11 +7231,9 @@ gint32 CInterfaceServer::ForceCancelRequests(
             ret = pTaskGrp->FindTaskByRmtId(
                 elem, pTask );
             if( ERROR( ret ) )
-            {
-                ret = 0;
                 continue;
-            }
 
+            bFound = true;
             CIfInvokeMethodTask* pInvTask = pTask;
             gint32 iRet = ERROR_CANCEL;
 
@@ -7245,6 +7244,8 @@ gint32 CInterfaceServer::ForceCancelRequests(
                 "Inv Task Canceled silently, 0x%llx",
                 elem );
         }
+        if( !bFound )
+            ret = -ENOENT;
 
     }while( 0 );
 

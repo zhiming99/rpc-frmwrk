@@ -5,17 +5,15 @@
 using namespace rpcf;
 #include "asynctst.h"
 #include "AsyncTestsvr.h"
+#include "ifhelper.h"
 
 gint32 CAsyncTest_SvrImpl::LongWaitCb(
-    IEventSink* pCallback,
-    IConfigDb* pReqCtx_,
+    IEventSink*, IConfigDb* pReqCtx_,
     const std::string& i0 )
 {
-    CParamList oReqCtx( pReqCtx_);
     // call the complete handler with the response
     // parameters and status code
     LongWaitComplete( pReqCtx_, 0, i0 );
-    pReqCtx_->RemoveAll();
     return 0;
 }
 
@@ -29,29 +27,24 @@ gint32 CAsyncTest_SvrImpl::LongWait(
     gint32 ret = 0;
     TaskletPtr pTask;
     do{
-        CParamList oReqCtx( pReqCtx_ );
-        // schedule a timer to complete the request
-        ret = DEFER_IFCALLEX_NOSCHED2(
-            0, pTask, ObjPtr( this ),
+        pTask = ADD_TIMER( this, pReqCtx_, 5, 
             &CAsyncTest_SvrImpl::LongWaitCb,
-            nullptr, pReqCtx_, i0 );
+            i0 );
 
-        if( ERROR( ret ) )
-        {
-            ( *pTask )( eventCancelTask );
-            return ret;
-        }
-
-        ObjPtr pTaskObj = pTask;
-        oReqCtx.Push( pTaskObj );
-        CIfDeferCallTaskEx* pTaskEx = pTask;
-        ret = pTaskEx->EnableTimer(
-            3, eventRetry );
         if( ERROR( ret ) )
             break;
 
         ret = STATUS_PENDING;
+
     }while( 0 );
+
+    if( ERROR( ret ) )
+    {
+        // cleanup
+        ( *pTask )( eventCancelTask );
+        return ret;
+    }
+
     return ret;
 }
 
@@ -62,21 +55,20 @@ gint32 CAsyncTest_SvrImpl::OnLongWaitCanceled(
     gint32 iRet,
     const std::string& i0 /*[ In ]*/ )
 {
-    DebugPrintEx( logErr, iRet,
+    OutputMsg( iRet,
         "request 'LongWait' is canceled." );
     CParamList oReqCtx( pReqCtx );
 
-    // clear the timer task
     IEventSink* pTaskEvt = nullptr;
     gint32 ret = oReqCtx.GetPointer(
-        0, pTaskEvt );
+        propContext, pTaskEvt );
 
     if( ERROR( ret ) )
         return ret;
 
+    // cancel the timer task
     TaskletPtr pTask = ObjPtr( pTaskEvt );
     ( *pTask )( eventCancelTask );
-    pReqCtx->RemoveAll();
     return 0;
 }
 
