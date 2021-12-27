@@ -25,27 +25,15 @@ gint32 CAsyncTest_SvrImpl::LongWait(
     std::string& i0r /*[ Out ]*/ )
 {
     gint32 ret = 0;
-    TaskletPtr pTask;
-    do{
-        pTask = ADD_TIMER( this, pReqCtx_, 5, 
-            &CAsyncTest_SvrImpl::LongWaitCb,
-            i0 );
 
-        if( ERROR( ret ) )
-            break;
-
-        ret = STATUS_PENDING;
-
-    }while( 0 );
+    ADD_TIMER( this, pReqCtx_, 5, 
+        &CAsyncTest_SvrImpl::LongWaitCb,
+        i0 );
 
     if( ERROR( ret ) )
-    {
-        // cleanup
-        ( *pTask )( eventCancelTask );
         return ret;
-    }
 
-    return ret;
+    return  STATUS_PENDING;
 }
 
 // RPC Async Req Cancel Handler

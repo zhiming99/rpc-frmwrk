@@ -2000,11 +2000,23 @@ gint32 CDeclInterfProxy::OutputAsync(
         NEW_LINE;
 
         CCOUT << "IConfigDb* context";
+        bool bComma = false;
+        if( dwInCount + dwOutCount == 0 )
+            CCOUT << " ";
         if( dwInCount > 0 )
         {
+            bComma = true;
             CCOUT << ", ";
             NEW_LINE;
             GenFormInArgs( pInArgs );
+            if( dwOutCount == 0 )
+                CCOUT << " ";
+        }
+        if( dwOutCount > 0 )
+        {
+            CCOUT << ", ";
+            NEW_LINE;
+            GenFormOutArgs( pOutArgs );
             CCOUT << " ";
         }
 
@@ -4682,6 +4694,7 @@ gint32 CImplIfMethodProxy::OutputAsync()
     ObjPtr pOutArgs = m_pNode->GetOutArgs();
 
     guint32 dwInCount = GetArgCount( pInArgs );
+    guint32 dwOutCount = GetArgCount( pOutArgs );
 
     bool bSerial = m_pNode->IsSerialize();
     bool bNoReply = m_pNode->IsNoReply();
@@ -4692,17 +4705,35 @@ gint32 CImplIfMethodProxy::OutputAsync()
         INDENT_UPL;
         CCOUT << "IConfigDb* context";
         // gen the param list
+        if( dwInCount + dwOutCount == 0 )
+            CCOUT << " ";
+        bool bComma = false;
         if( dwInCount > 0 )
         {
+            bComma = true;
             CCOUT << ",";
             NEW_LINE;
             GenFormInArgs( pInArgs );
         }
+        if( dwOutCount > 0 )
+        {
+            if( bComma )
+            {
+                CCOUT << ",";
+                NEW_LINE;
+            }
+            GenFormOutArgs( pOutArgs );
+        }
+    
         CCOUT << " )";
         INDENT_DOWNL;
 
         BLOCK_OPEN;
 
+        Wa( "gint32 ret = 0;" );
+        Wa( "TaskletPtr pRespCb_;" );
+        CCOUT << "do";
+        BLOCK_OPEN;
         Wa( "CParamList oOptions_;" );
         Wa( "CfgPtr pResp_;" );
         CCOUT << "oOptions_[ propIfName ] =";
@@ -4750,9 +4781,8 @@ gint32 CImplIfMethodProxy::OutputAsync()
         Wa( "CParamList oReqCtx_;" );
         Wa( "ObjPtr pTemp( context );" );
         Wa( "oReqCtx_.Push( pTemp );" );
-        Wa( "TaskletPtr pRespCb_;" );
         NEW_LINE;
-        CCOUT << "gint32 ret = NEW_PROXY_RESP_HANDLER2(";
+        CCOUT << "ret = NEW_PROXY_RESP_HANDLER2(";
         INDENT_UPL;
         CCOUT <<  "pRespCb_, ObjPtr( this ), ";
         NEW_LINE;
@@ -4762,7 +4792,7 @@ gint32 CImplIfMethodProxy::OutputAsync()
         CCOUT << "nullptr, oReqCtx_.GetCfg() );";
         INDENT_DOWN;
         NEW_LINES( 2 );
-        Wa( "if( ERROR( ret ) ) return ret;" );
+        Wa( "if( ERROR( ret ) ) break;" );
         NEW_LINE;
 
         if( dwInCount == 0 )
@@ -4821,7 +4851,7 @@ gint32 CImplIfMethodProxy::OutputAsync()
             BLOCK_OPEN;
             CCOUT << "if( context == nullptr )";
             INDENT_UPL;
-            CCOUT <<"return ret;";
+            CCOUT <<"break;";
             INDENT_DOWNL;
             CCOUT << "CCfgOpener oContext( context );";
             NEW_LINE;
@@ -4829,11 +4859,61 @@ gint32 CImplIfMethodProxy::OutputAsync()
             INDENT_UPL;
             CCOUT << "propTaskId, pResp_ );";
             INDENT_DOWNL;
-            CCOUT << "return ret;";
+            CCOUT << "break;";
             BLOCK_CLOSE;
-            NEW_LINES( 2 );
-            Wa( "( *pRespCb_ )( eventCancelTask );" );
+            NEW_LINE;
+            Wa( "else if( ERROR( ret ) )" );
+            BLOCK_OPEN;
+            CCOUT << "break;";
+            BLOCK_CLOSE;
+            NEW_LINE;
+            Wa( "CCfgOpener oResp_( ( IConfigDb* )pResp_ );" );
+            Wa( "oResp_.GetIntProp(" );
+            Wa( "    propReturnValue, ( guint32& )ret );" );
+            if( dwOutCount > 0 )
+                CCOUT << "if( ERROR( ret ) ) break;";
+            if( !bSerial )
+            {
+                if( dwOutCount > 0 )
+                {
+                    NEW_LINE;
+                    CCOUT << "ret = this->FillArgs(";
+                    INDENT_UPL;
+                    CCOUT << "pResp_, ret,";
+                    NEW_LINE;
+                    GenActParams( pOutArgs );
+                    CCOUT << " );";
+                    INDENT_DOWNL;
+                }
+            }
+            else
+            {
+                if( dwOutCount > 0 )
+                {
+                    NEW_LINE;
+                    Wa( "guint32 dwSeriProto_ = 0;" );
+                    Wa( "ret = oResp_.GetIntProp(" );
+                    Wa( "    propSeriProto, dwSeriProto_ );" );
+                    Wa( "if( ERROR( ret ) ||" );
+                    Wa( "    dwSeriProto_ != seriRidl )" );
+                    Wa( "    break;" );
+                    Wa( "BufPtr pBuf2;" );
+                    Wa( "ret = oResp_.GetProperty( 0, pBuf2 );" );
+                    Wa( "if( ERROR( ret ) )" );
+                    Wa( "    break;" );
+
+                    if( ERROR( ret ) )
+                        break;
+
+                    ret = GenDeserialArgs( pOutArgs,
+                        "pBuf2", true, true, true );
+                }
+            }
         }
+        BLOCK_CLOSE;
+        Wa( "while( 0 );" );
+        Wa( "if( ERROR( ret ) && !pRespCb_.IsEmpty() )" );
+        Wa( "    ( *pRespCb_ )( eventCancelTask );" );
         CCOUT << "return ret;";
         BLOCK_CLOSE;
         NEW_LINES( 1 );
