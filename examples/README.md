@@ -1,19 +1,21 @@
-**Introductions**
+**Brief Description**
 * This directory contains the typical examples that would be useful in distributed application development.
 * The implementations of the examples are grouped in different languages, Java, Python and C++.
-* The files listed of each example are only files manually changed from its auto-generated version. Run the `ridlc` to generate the complete set of files of the example.
+* The files under the directory of each example are only files manually changed from its auto-generated version. Run the command as listed in each ridl file to generate the complete set of files for each example.
 
-**Example Information**
-  * `hellowld.ridl`: To demonstrate the helloworld example as the start-point for a new development. 
+**Introductions to the Individual Examples**
+  * `hellowld.ridl`: To demonstrate the helloworld example as the start-point for a beginner. 
 
-  * `asynctst.ridl`: 'asynchronous test', an example to demonstrate how to call remote procedure asynchronously and how to service a remote call asynchronously
+  * `iftest.ridl`: To demonstrate how to define and pass complex data structures between the proxy and server. 
 
-  * `evtest.ridl`: 'event test', an example to demonstrate how to send a event/signal from server side and how to handle a signal or event from client side
+  * `asynctst.ridl`: To demonstrate how to call remote procedure asynchronously and how to service a remote call asynchronously
 
-  * `actcancel.ridl`: 'actively canceling test', an example to demonstrate how to cancel an ongoing request from client side actively.
+  * `evtest.ridl`: To demonstrate how to send a event/signal from server side and how to handle a signal or event from client side
 
-  * `katest.ridl`: To demonstrate the keep-alive heartbeat between the proxy and server.
+  * `actcancel.ridl`: To demonstrate how to cancel an ongoing request from client side actively.
 
-  * `stmtest.ridl`: To demonstrate the basic chatting function with the local/remote streaming support.
+  * `katest.ridl`: To demonstrate how to control the keep-alive heartbeat between the proxy and server.
 
-  * `sftest.ridl`: To demonstrate a simple file-server with the local/remote streaming support.
+  * `stmtest.ridl`: To demonstrate the basic chatting session with the streaming support.
+
+  * `sftest.ridl`: To demonstrate a simple file-server with the streaming support.
