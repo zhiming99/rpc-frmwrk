@@ -18,4 +18,4 @@
 
   * `stmtest.ridl`: To demonstrate the basic chatting session with the streaming support.
 
-  * `sftest.ridl`: To demonstrate a simple file-server with the streaming support.
+  * `sftest.ridl`: To demonstrate how to upload/download files with the streaming support.
