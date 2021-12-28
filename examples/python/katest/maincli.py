@@ -8,6 +8,7 @@ import errno
 
 from KeepAlivecli import CKeepAliveProxy
 import os
+import time
 
 
 def maincli() :
@@ -24,11 +25,14 @@ def maincli() :
             return ret
         
         with oProxy :
-            '''
-            adding your code here
-            Calling a proxy method like
-            '''
-            i0 = "hello, katest";
+            state = oProxy.oInst.GetState()
+            while state == cpp.stateRecovery :
+                time.sleep( 1 )
+                state = oProxy.oInst.GetState()
+            if state != cpp.stateConnected :
+                return ErrorCode.ERROR_STATE
+
+            i0 = "hello, katest!"
             pret = oProxy.LongWait( i0 )
             ret = pret[ 0 ]
             if ret < 0 :

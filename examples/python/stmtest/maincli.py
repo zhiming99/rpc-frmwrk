@@ -25,17 +25,17 @@ def maincli() :
         
 
         with oProxy :
-            '''
-            adding your code here
-            Calling a proxy method like
-            '''
+
             state = oProxy.oInst.GetState()
             while state == cpp.stateRecovery :
                 time.sleep( 1 )
                 state = oProxy.oInst.GetState()
             if state != cpp.stateConnected :
                 return ErrorCode.ERROR_STATE
-
+            '''
+            adding your code here
+            Calling a proxy method like
+            '''
             while True:
                 #Echo
                 pret = oProxy.Echo( "Hello, stmtest" )

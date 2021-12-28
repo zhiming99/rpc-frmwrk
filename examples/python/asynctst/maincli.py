@@ -8,6 +8,7 @@ import errno
 
 from AsyncTestcli import CAsyncTestProxy
 import os
+import time
 
 
 def maincli() :
@@ -24,11 +25,13 @@ def maincli() :
             return ret
         
         with oProxy :
-            while True:
-                if oProxy.oInst.GetState() == cpp.stateRecovery :
-                    continue
-                if oProxy.oInst.GetState() == cpp.stateConnected:
-                    break
+            state = oProxy.oInst.GetState()
+            while state == cpp.stateRecovery :
+                time.sleep( 1 )
+                state = oProxy.oInst.GetState()
+            if state != cpp.stateConnected :
+                return ErrorCode.ERROR_STATE
+
             while True:
                 i0 = "hello, LongWait"
                 pret = oProxy.LongWait( i0 )

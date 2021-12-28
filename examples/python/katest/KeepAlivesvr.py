@@ -15,7 +15,7 @@ class CIKeepAlivesvr( IIKeepAlive_SvrImpl ):
         strText = context[ 1 ]
         context = None
         self.OnLongWaitComplete(
-            oReqCtx, 0, strText );
+            oReqCtx, 0, strText )
         print( "LongWait request completed " )
         return
     '''

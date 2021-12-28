@@ -8,6 +8,7 @@ import errno
 
 from EventTestcli import CEventTestProxy
 import os
+import time
 
 
 def maincli() :
@@ -24,6 +25,13 @@ def maincli() :
             return ret
         
         with oProxy :
+            state = oProxy.oInst.GetState()
+            while state == cpp.stateRecovery :
+                time.sleep( 1 )
+                state = oProxy.oInst.GetState()
+            if state != cpp.stateConnected :
+                return ErrorCode.ERROR_STATE
+            
             '''
             adding your code here
             Just waiting and events will 
