@@ -51,9 +51,9 @@ def maincli() :
             ret = oProxy.oInst.CancelRequest( iTaskId )
             if ret < 0 :
                 print( "CancelRequest failed, wait it to complete or timeout" )
-                oProxy.WaitForComplete();
+                oProxy.WaitForComplete()
             else:
-                ret = oProxy.GetError();
+                ret = oProxy.GetError()
                 print( "CancelRequest succeeded " + str( ret ) )
 
             

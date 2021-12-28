@@ -56,7 +56,7 @@ gint32 CActiveCancel_SvrImpl::OnLongWaitCanceled(
     if( ERROR( ret ) )
         return ret;
 
-    // cancel the timer task
+    // cancel the timer object
     TaskletPtr pTask = ObjPtr( pTaskEvt );
     ( *pTask )( eventCancelTask );
     return 0;
