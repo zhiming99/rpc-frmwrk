@@ -1,13 +1,39 @@
+#!/usr/bin/env python3
 import json
 import os
 import sys 
 from shutil import move
 from copy import deepcopy
+import multiprocessing
+
+def UpdateDrv() :
+    drvFile = os.path.dirname(os.path.realpath(__file__)) + "/driver.json"
+    try:
+        srcFp = open( drvFile, "r" )
+        srcVals = json.load( srcFp )
+        srcFp.close()
+        
+        if 'Arch' in srcVals:
+            oArch = srcVals[ 'Arch' ]
+        else:
+            oArch = dict()
+
+        oArch[ 'Processors' ] = str(
+            multiprocessing.cpu_count() )
+
+        srcVals[ 'Arch' ] = oArch
+
+        destFp = open( drvFile, 'w' )
+        json.dump( srcVals, destFp, indent = 4)
+        destFp.close()
+
+    except Exception as oErr :
+        pass
 
 def SyncCfg() :
 
     srcPath = '/usr/local/etc/rpcf/echodesc.json'
-    destPath= './StressTestdesc.json.new'
+    destPath= './StressTestdesc.json'
     destObjs=['StressSvc']
 
     destPath = os.path.dirname(os.path.realpath(__file__)) + "/" + destPath
@@ -58,6 +84,7 @@ def SyncCfg() :
             json.dump( destVals, destFp, indent = 4)
             destFp.close()
 
+        UpdateDrv()
         print( "Configuration updated successfully" )
 
     except Exception as err:

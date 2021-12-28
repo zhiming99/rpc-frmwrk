@@ -36,59 +36,99 @@ gint32 IIEchoThings_PImpl::InitUserFuncs()
 
 gint32 IIEchoThings_PImpl::Echo( 
     IConfigDb* context,
-    const std::string& strText )
+    const std::string& strText,
+    std::string& strResp )
 {
-    CParamList oOptions_;
-    CfgPtr pResp_;
-    oOptions_[ propIfName ] =
-        DBUS_IF_NAME( "IEchoThings" );
-    oOptions_[ propSeriProto ] = 
-        ( guint32 )seriRidl;
-    
-    CParamList oReqCtx_;
-    ObjPtr pTemp( context );
-    oReqCtx_.Push( pTemp );
+    gint32 ret = 0;
     TaskletPtr pRespCb_;
-    
-    gint32 ret = NEW_PROXY_RESP_HANDLER2(
-        pRespCb_, ObjPtr( this ), 
-        &IIEchoThings_PImpl::EchoCbWrapper, 
-        nullptr, oReqCtx_.GetCfg() );
-
-    if( ERROR( ret ) ) return ret;
-    
-    //Serialize the input parameters
-    BufPtr pBuf_( true );
-    
-    CSerialBase oSerial_;
     do{
-        ret = oSerial_.CSerialBase::Serialize(
-            pBuf_, strText );
+        CParamList oOptions_;
+        CfgPtr pResp_;
+        oOptions_[ propIfName ] =
+            DBUS_IF_NAME( "IEchoThings" );
+        oOptions_[ propSeriProto ] = 
+            ( guint32 )seriRidl;
+        
+        CParamList oReqCtx_;
+        ObjPtr pTemp( context );
+        oReqCtx_.Push( pTemp );
+        
+        ret = NEW_PROXY_RESP_HANDLER2(
+            pRespCb_, ObjPtr( this ), 
+            &IIEchoThings_PImpl::EchoCbWrapper, 
+            nullptr, oReqCtx_.GetCfg() );
+
         if( ERROR( ret ) ) break;
         
-        pBuf_->SetOffset( 0 );
-    }while( 0 );
+        //Serialize the input parameters
+        BufPtr pBuf_( true );
+        
+        ObjPtr pSerialIf_(this);
+        CSerialBase oSerial_( pSerialIf_ );
+        do{
+            ret = oSerial_.Serialize(
+                pBuf_, strText );
+            if( ERROR( ret ) ) break;
+            
+            pBuf_->SetOffset( 0 );
+        }while( 0 );
 
-    if( ERROR( ret ) )
-        return ret;
-    
-    ret = this->AsyncCall(
-        ( IEventSink* )pRespCb_, 
-        oOptions_.GetCfg(), pResp_,
-        "Echo",
-        pBuf_ );
-    
-    if( ret == STATUS_PENDING )
-    {
-        if( context == nullptr )
+        if( ERROR( ret ) )
             return ret;
-        CCfgOpener oContext( context );
-        oContext.CopyProp(
-            propTaskId, pResp_ );
-        return ret;
-    }
+        
+        ret = this->AsyncCall(
+            ( IEventSink* )pRespCb_, 
+            oOptions_.GetCfg(), pResp_,
+            "Echo",
+            pBuf_ );
+        
+        if( ret == STATUS_PENDING )
+        {
+            if( context == nullptr )
+                break;
+            CCfgOpener oContext( context );
+            oContext.CopyProp(
+                propTaskId, pResp_ );
+            break;
+        }
+        else if( ERROR( ret ) )
+        {
+            break;
+        }
+        CCfgOpener oResp_( ( IConfigDb* )pResp_ );
+        oResp_.GetIntProp(
+            propReturnValue, ( guint32& )ret );
+        if( ERROR( ret ) ) break;
+        guint32 dwSeriProto_ = 0;
+        ret = oResp_.GetIntProp(
+            propSeriProto, dwSeriProto_ );
+        if( ERROR( ret ) ||
+            dwSeriProto_ != seriRidl )
+            break;
+        BufPtr pBuf2;
+        ret = oResp_.GetProperty( 0, pBuf2 );
+        if( ERROR( ret ) )
+            break;
+        
+        ObjPtr pDeserialIf_(this);
+        CSerialBase oDeserial_( pDeserialIf_ );
+        do{
+            guint32 dwOrigOff = pBuf2->offset();
+            ret = oDeserial_.Deserialize(
+                pBuf2, strResp );
+            
+            if( ERROR( ret ) ) break;
+            
+            pBuf2->SetOffset( dwOrigOff );
+        }while( 0 );
 
-    ( *pRespCb_ )( eventCancelTask );
+        if( ERROR( ret ) )
+            break;
+            
+        
+    }while( 0 );
+    if( ERROR( ret ) && !pRespCb_.IsEmpty() )
+        ( *pRespCb_ )( eventCancelTask );
     return ret;
 }
 //Async callback wrapper
@@ -122,14 +162,22 @@ gint32 IIEchoThings_PImpl::EchoCbWrapper(
         
         if( SUCCEEDED( iRet ) )
         {
+            guint32 dwSeriProto_ = 0;
+            ret = oResp_.GetIntProp(
+                propSeriProto, dwSeriProto_ );
+            if( ERROR( ret ) ||
+                dwSeriProto_ != seriRidl )
+                break;
             BufPtr pBuf_;
             ret = oResp_.GetProperty( 0, pBuf_ );
-            if( ERROR( ret ) ) break;
+            if( ERROR( ret ) )
+                break;
             
-            CSerialBase oDeserial_;
+            ObjPtr pDeserialIf_(this);
+            CSerialBase oDeserial_( pDeserialIf_ );
             do{
                 guint32 dwOrigOff = pBuf_->offset();
-                ret = oDeserial_.CSerialBase::Deserialize(
+                ret = oDeserial_.Deserialize(
                     pBuf_, strResp );
                 
                 if( ERROR( ret ) ) break;
@@ -164,13 +212,13 @@ gint32 IIEchoThings_PImpl::EchoUnknown(
     oOptions_[ propSeriProto ] = 
         ( guint32 )seriRidl;
     
-    
     //Serialize the input parameters
     BufPtr pBuf_( true );
     
-    CSerialBase oSerial_;
+    ObjPtr pSerialIf_(this);
+    CSerialBase oSerial_( pSerialIf_ );
     do{
-        ret = oSerial_.CSerialBase::Serialize(
+        ret = oSerial_.Serialize(
             pBuf_, pBuf );
         if( ERROR( ret ) ) break;
         
@@ -188,18 +236,28 @@ gint32 IIEchoThings_PImpl::EchoUnknown(
     
     guint32 dwRet_ = 0;
     CCfgOpener oResp_( ( IConfigDb* )pResp_ );
-    ret = oResp_.GetIntProp( propReturnValue, dwRet_ );
+    ret = oResp_.GetIntProp(
+        propReturnValue, dwRet_ );
     if( ERROR( ret ) ) return ret;
     ret = ( gint32 )dwRet_;
+    
     if( ERROR( ret ) ) return ret;
+    guint32 dwSeriProto_ = 0;
+    ret = oResp_.GetIntProp(
+        propSeriProto, dwSeriProto_ );
+    if( ERROR( ret ) ||
+        dwSeriProto_ != seriRidl )
+        return ret;
     BufPtr pBuf2;
     ret = oResp_.GetProperty( 0, pBuf2 );
-    if( ERROR( ret ) ) return ret;
+    if( ERROR( ret ) )
+        return ret;
     
-    CSerialBase oDeserial_;
+    ObjPtr pDeserialIf_(this);
+    CSerialBase oDeserial_( pDeserialIf_ );
     do{
         guint32 dwOrigOff = pBuf2->offset();
-        ret = oDeserial_.CSerialBase::Deserialize(
+        ret = oDeserial_.Deserialize(
             pBuf2, pResp );
         
         if( ERROR( ret ) ) break;
@@ -226,13 +284,13 @@ gint32 IIEchoThings_PImpl::Ping(
     oOptions_[ propSeriProto ] = 
         ( guint32 )seriRidl;
     
-    
     //Serialize the input parameters
     BufPtr pBuf_( true );
     
-    CSerialBase oSerial_;
+    ObjPtr pSerialIf_(this);
+    CSerialBase oSerial_( pSerialIf_ );
     do{
-        ret = oSerial_.CSerialBase::Serialize(
+        ret = oSerial_.Serialize(
             pBuf_, strCount );
         if( ERROR( ret ) ) break;
         
@@ -255,10 +313,11 @@ gint32 IIEchoThings_PImpl::OnHelloWorldWrapper(
     gint32 ret = 0;
     std::string strMsg;
     
-    CSerialBase oDeserial_;
+    ObjPtr pDeserialIf_(this);
+    CSerialBase oDeserial_( pDeserialIf_ );
     do{
         guint32 dwOrigOff = pBuf_->offset();
-        ret = oDeserial_.CSerialBase::Deserialize(
+        ret = oDeserial_.Deserialize(
             pBuf_, strMsg );
         
         if( ERROR( ret ) ) break;
@@ -301,10 +360,11 @@ gint32 IIEchoThings_SImpl::EchoWrapper(
     std::string strText;
     std::string strResp;
     
-    CSerialBase oDeserial_;
+    ObjPtr pDeserialIf_(this);
+    CSerialBase oDeserial_( pDeserialIf_ );
     do{
         guint32 dwOrigOff = pBuf_->offset();
-        ret = oDeserial_.CSerialBase::Deserialize(
+        ret = oDeserial_.Deserialize(
             pBuf_, strText );
         
         if( ERROR( ret ) ) break;
@@ -328,13 +388,15 @@ gint32 IIEchoThings_SImpl::EchoWrapper(
 
     CParamList oResp_;
     oResp_[ propReturnValue ] = ret;
+    oResp_[ propSeriProto ] = seriRidl;
     if( SUCCEEDED( ret ) )
     {
         BufPtr pBuf2( true );
         
-        CSerialBase oSerial_;
+        ObjPtr pSerialIf_(this);
+        CSerialBase oSerial_( pSerialIf_ );
         do{
-            ret = oSerial_.CSerialBase::Serialize(
+            ret = oSerial_.Serialize(
                 pBuf2, strResp );
             if( ERROR( ret ) ) break;
             
@@ -359,10 +421,11 @@ gint32 IIEchoThings_SImpl::EchoUnknownWrapper(
     BufPtr pBuf;
     BufPtr pResp;
     
-    CSerialBase oDeserial_;
+    ObjPtr pDeserialIf_(this);
+    CSerialBase oDeserial_( pDeserialIf_ );
     do{
         guint32 dwOrigOff = pBuf_->offset();
-        ret = oDeserial_.CSerialBase::Deserialize(
+        ret = oDeserial_.Deserialize(
             pBuf_, pBuf );
         
         if( ERROR( ret ) ) break;
@@ -386,13 +449,15 @@ gint32 IIEchoThings_SImpl::EchoUnknownWrapper(
 
     CParamList oResp_;
     oResp_[ propReturnValue ] = ret;
+    oResp_[ propSeriProto ] = seriRidl;
     if( SUCCEEDED( ret ) )
     {
         BufPtr pBuf2( true );
         
-        CSerialBase oSerial_;
+        ObjPtr pSerialIf_(this);
+        CSerialBase oSerial_( pSerialIf_ );
         do{
-            ret = oSerial_.CSerialBase::Serialize(
+            ret = oSerial_.Serialize(
                 pBuf2, pResp );
             if( ERROR( ret ) ) break;
             
@@ -416,10 +481,11 @@ gint32 IIEchoThings_SImpl::PingWrapper(
     gint32 ret = 0;
     std::string strCount;
     
-    CSerialBase oDeserial_;
+    ObjPtr pDeserialIf_(this);
+    CSerialBase oDeserial_( pDeserialIf_ );
     do{
         guint32 dwOrigOff = pBuf_->offset();
-        ret = oDeserial_.CSerialBase::Deserialize(
+        ret = oDeserial_.Deserialize(
             pBuf_, strCount );
         
         if( ERROR( ret ) ) break;
@@ -452,9 +518,10 @@ gint32 IIEchoThings_SImpl::OnHelloWorld(
     //Serialize the input parameters
     BufPtr pBuf_( true );
     
-    CSerialBase oSerial_;
+    ObjPtr pSerialIf_(this);
+    CSerialBase oSerial_( pSerialIf_ );
     do{
-        ret = oSerial_.CSerialBase::Serialize(
+        ret = oSerial_.Serialize(
             pBuf_, strMsg );
         if( ERROR( ret ) ) break;
         

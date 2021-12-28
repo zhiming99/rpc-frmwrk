@@ -158,8 +158,9 @@ gint32 echocli(
              dwIdx, ( guint32 )g_dwReqs,
              cpp::GetTid() );
 
+        stdstr strResp;
         ret = pIf->Echo(
-             oParams.GetCfg(), strMsg );
+             oParams.GetCfg(), strMsg, strResp );
         if( ERROR( ret ) )
               break;
 

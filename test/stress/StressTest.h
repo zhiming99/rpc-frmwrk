@@ -11,7 +11,7 @@
 
 enum EnumMyClsid
 {
-    DECL_CLSID( CStressSvc_CliSkel ) = 480072123,
+    DECL_CLSID( CStressSvc_CliSkel ) = 0x1C9D51BB,
     DECL_CLSID( CStressSvc_SvrSkel ),
     DECL_CLSID( CStressSvc_CliImpl ),
     DECL_CLSID( CStressSvc_SvrImpl ),
@@ -37,7 +37,8 @@ class IIEchoThings_PImpl
     //RPC Async Req Sender
     gint32 Echo( 
         IConfigDb* context, 
-        const std::string& strText );
+        const std::string& strText, 
+        std::string& strResp );
 
     gint32 EchoDummy( BufPtr& pBuf_ )
     { return STATUS_SUCCESS; }

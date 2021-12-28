@@ -1575,11 +1575,13 @@ struct CStreamSyncBase :
      * read
      *
      * pBuf: a buffer for receiving the incoming
-     * data. The pBuf must not be empty. And the
-     * method will try to fill the buffer at the
-     * best effort. If the time is up before the
-     * requested amount of data can be received,
-     * the request will be canceled.
+     * data. If the pBuf is empty, the first
+     * incoming data block is returned. And if
+     * pBuf is not empty, the method will try to
+     * fill the buffer at the best effort. If the
+     * time is up before the requested amount of
+     * data can be received, the request will be
+     * canceled.
      *
      * pCtx: context which will be passed to the
      * callback method OnReadStreamComplete.
@@ -1603,10 +1605,10 @@ struct CStreamSyncBase :
     * is any thing from peer end. It will return
     * with STATUS_PENDING if there is no requested
     * size of data ready for reading. When the
-    * request size of buffer is filled, the event
-    * OnReadStreamComplete will be called.  The
-    * callback will also  report error if the
-    * write failed not. 
+    * request size of buffer is filled, the
+    * callback pCb will be called. The callback
+    * will also be called to report error if the
+    * read failed finally. 
     * */
     /** 
      * Parameter:
@@ -1630,8 +1632,7 @@ struct CStreamSyncBase :
      * return value:
      * STATUS_SUCCESS: the pBuf contains the
      * payload from the peer side. It can be
-     * returned immediately or by
-     * OnReadStreamComplete.
+     * returned immediately or by callback pCb.
      *
      * STATUS_PENDING: the request is accepted,
      * but not complete yet. Wait till the

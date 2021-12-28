@@ -43,10 +43,11 @@ gint32 CStressSvc_CliImpl::EchoCallback(
         }
 
         if( ( dwIdx % 100 ) == 0 )
-        OutputMsg( iRet, "req %d, completed, "
-            "resp is %s, pending %d", dwIdx,
-            strResp.c_str(),
-            ( guint32 )g_dwReqs );
+            OutputMsg( iRet,
+                "req %d, completed, "
+                "resp is %s, pending %d", dwIdx,
+                strResp.c_str(),
+                ( guint32 )g_dwReqs );
 
         g_bQueueFull = false;
         dwIdx = ++g_dwCounter;
@@ -56,7 +57,8 @@ gint32 CStressSvc_CliImpl::EchoCallback(
         g_dwReqs++;
 
         TaskletPtr pTask;
-        ret = this->Echo( context, strMsg );
+        stdstr strResp2;
+        ret = this->Echo( context, strMsg, strResp2 );
         if( ret == STATUS_PENDING )
             ret = 0;
 

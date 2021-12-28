@@ -21,6 +21,10 @@ class CStressSvc_SvrImpl
     gint32 OnStmClosing( HANDLE hChannel ) override
     { return super::OnStmClosing( hChannel ); }
     
+    gint32 AcceptNewStream(
+        IEventSink* pCb, IConfigDb* pDataDesc ) override
+    { return STATUS_SUCCESS; }
+    
     // IEchoThings
     virtual gint32 Echo(
         const std::string& strText /*[ In ]*/,

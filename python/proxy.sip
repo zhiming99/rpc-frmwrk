@@ -28,7 +28,7 @@
 typedef enum 
 {
     // a pointer to pyobject of the python context
-    propChanCtx = propReservedEnd + 110,
+    // propChanCtx = propReservedEnd + 110,
 
 } EnumPyPropId;
 

@@ -38,7 +38,7 @@ typedef enum
 {
     // a pointer to pyobject of the python context
     propJavaVM = propReservedEnd + 120,
-    propChanCtx
+    // propChanCtx
 
 } EnumJavaPropId;
 

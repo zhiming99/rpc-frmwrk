@@ -1519,8 +1519,9 @@ gint32 CDeclareClassIds::Output()
     NEW_LINE;
     std::vector< ObjPtr > vecIfs;
     m_pStmts->GetIfDecls( vecIfs );
-    for( auto& elem : vecIfs )
+    for( int i = 0; i < vecIfs.size(); ++i )
     {
+        auto& elem = vecIfs[ i ];
         CInterfaceDecl* pifd = elem;
         if( pifd == nullptr )
             continue;
@@ -1534,14 +1535,17 @@ gint32 CDeclareClassIds::Output()
         CCOUT << "DECL_IID( "
             << strIfName
             << " ),";
-        NEW_LINE;
+        if( i < vecIfs.size() - 1 )
+            NEW_LINE;
     }
 
-    NEW_LINE;
     std::vector < ObjPtr > vecStructs;
     m_pStmts->GetStructDecls( vecStructs );
-    for( auto& elem : vecStructs )
+    if( vecStructs.size() )
+        NEW_LINES( 2 );
+    for( int i = 0; i < vecStructs.size(); ++i )
     {
+        auto& elem = vecStructs[ i ];
         CStructDecl* psd = elem;
         if( psd->RefCount() == 0 )
             continue;
@@ -1555,7 +1559,8 @@ gint32 CDeclareClassIds::Output()
             << strName
             << " ) = "
             << strClsid << ",";
-        NEW_LINE;
+        if( i < vecStructs.size() - 1 )
+            NEW_LINE;
     }
 
     BLOCK_CLOSE;
@@ -3291,7 +3296,7 @@ gint32 CDeclServiceImpl::Output()
 
             if( m_pNode->IsStream() )
             {
-                Wa( "/* The following 3 methods are important for */" );
+                Wa( "/* The following 2 methods are important for */" );
                 Wa( "/* streaming transfer. rewrite them if necessary */" );
                 Wa( "gint32 OnStreamReady( HANDLE hChannel ) override" );
                 Wa( "{ return super::OnStreamReady( hChannel ); } " );
@@ -3359,7 +3364,7 @@ gint32 CDeclServiceImpl::Output()
 
         if( m_pNode->IsStream() )
         {
-            Wa( "/* The following two methods are important for */" );
+            Wa( "/* The following 3 methods are important for */" );
             Wa( "/* streaming transfer. rewrite them if necessary */" );
             Wa( "gint32 OnStreamReady( HANDLE hChannel ) override" );
             Wa( "{ return super::OnStreamReady( hChannel ); } " );
@@ -6069,8 +6074,8 @@ gint32 CImplClassFactory::Output()
                 NEW_LINE;
             }
         }
-
-        NEW_LINE;
+        if( vecActStructs.size() )
+            NEW_LINE;
         for( auto& elem : vecActStructs )
         {
             CStructDecl* psd = elem;
