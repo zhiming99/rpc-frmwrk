@@ -1531,10 +1531,6 @@ struct CStreamSyncBase :
     gint32 ReadWriteAsync( HANDLE hChannel,
         BufPtr& pBuf, IConfigDb* pCtx, bool bRead )
     {
-        CCfgOpener oCtx;
-        if( pCtx == nullptr )
-            pCtx = oCtx.GetCfg();
-
         CParamList oReqCtx;
         oReqCtx.Push( hChannel );
         IConfigDb* pReqCtx = oReqCtx.GetCfg();
@@ -1548,7 +1544,8 @@ struct CStreamSyncBase :
         if( ERROR( ret ) )
             return ret;
 
-        oReqCtx.Push( ObjPtr( pCtx ) );
+        ObjPtr pObj( pCtx, true );
+        oReqCtx.Push( pObj );
 
         // whether a read/write request
         oReqCtx.Push( bRead );
@@ -1938,9 +1935,9 @@ struct CStreamSyncBase :
                 1, pCtx );
 
             if( ERROR( ret ) )
-                break;
+                pCtx = nullptr;
 
-            if( pCtx->size() == 0 )
+            if( pCtx != nullptr && pCtx->size() == 0 )
                 pCtx = nullptr;
 
             bool bRead = false;

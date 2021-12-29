@@ -129,6 +129,11 @@ do{ \
         _pIrp->SetStatus( ( _iRet ) ); \
         _pIrp->SetState( IRP_STATE_READY, \
             IRP_STATE_COMPLETED ); \
+        if( _pIrp->GetStackSize() > 0 ) \
+        { \
+            IrpCtxPtr& pctx = _pIrp->GetTopStack();\
+            pctx->SetStatus( _iRet ); \
+        } \
         if( INVOKE_CALLBACK( _pIrp ) ) break;\
         Sem_Post( &_pIrp->m_semWait ); \
         bool bNoWait = \
@@ -149,6 +154,11 @@ do{ \
         _pIrp->SetStatus( ( _iRet ) ); \
         _pIrp->SetState( IRP_STATE_READY, \
             IRP_STATE_COMPLETED ); \
+        if( _pIrp->GetStackSize() > 0 ) \
+        { \
+            IrpCtxPtr& pctx = _pIrp->GetTopStack();\
+            pctx->SetStatus( _iRet ); \
+        } \
         if( INVOKE_CALLBACK( _pIrp ) ) break;\
         Sem_Post( &_pIrp->m_semWait ); \
     } \

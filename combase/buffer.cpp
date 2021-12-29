@@ -66,13 +66,16 @@ CBuffer::operator DMsgPtr*() const
 // specialized type casting
 CBuffer::operator stdstr() const
 {
-    if( empty() ||
-        DataTypeMem != GetDataType() ||
-        typeString != GetExDataType() )
+    if( empty() ) 
     {
         throw std::invalid_argument(
             "The buffer is empty" );
-
+    }
+    if( DataTypeMem != GetDataType() ||
+        typeString != GetExDataType() )
+    {
+        throw std::invalid_argument(
+            "The buffer has a bad data type" );
     }
     return stdstr( ptr() );
 }
