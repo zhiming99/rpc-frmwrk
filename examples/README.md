@@ -3,7 +3,7 @@
 
 * The implementations of the examples are grouped in different languages, Java, Python and C++.
 
-* The files under the directory of each example are only files manually changed from its auto-generated version. Run the command as listed in each ridl file to generate the complete set of files for each example. The examples include,
+* The files under the directory of each example are only files manually changed from its auto-generated version. Run the command at the top lines of each ridl file to generate the complete set of files. The examples include,
 
     * `hellowld.ridl`: To demonstrate the helloworld example as the start-point for a beginner. 
 
