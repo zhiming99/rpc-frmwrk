@@ -1549,6 +1549,8 @@ struct CStreamSyncBase :
 
         // whether a read/write request
         oReqCtx.Push( bRead );
+        if( !bRead )
+            oReqCtx.Push( pBuf );
 
         return ReadWriteInternal( hChannel,
             pBuf, pCallback, bRead, false );
@@ -1920,10 +1922,8 @@ struct CStreamSyncBase :
             if( ERROR( ret ) )
                 break;
 
-            if( SUCCEEDED( iRet ) ) 
-                oResp.GetProperty( 0, pBuf );
             
-            CCfgOpener oReqCtx( pReqCtx );
+            CParamList oReqCtx( pReqCtx );
             HANDLE hChannel = INVALID_HANDLE;
             guint32* pTemp = nullptr;
             ret = oReqCtx.GetIntPtr( 0, pTemp );
@@ -1945,6 +1945,13 @@ struct CStreamSyncBase :
                 2, bRead );
             if( ERROR( ret ) )
                 break;
+
+            if( SUCCEEDED( iRet ) && bRead ) 
+                oResp.GetProperty( 0, pBuf );
+            else if( !bRead )
+            {
+                oReqCtx.GetProperty( 3, pBuf );
+            }
 
             if( bRead )
                 OnReadStreamComplete( hChannel,

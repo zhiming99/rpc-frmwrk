@@ -50,7 +50,7 @@ class TransFileContext :
                         self.m_fp.seek(self.m_iOffset, os.SEEK_SET)
                     if self.m_iSize > 0 :
                         if self.m_iSize > iSize - self.m_iOffset:
-                            self.m_iSize = iSize = self.m_iOffset
+                            self.m_iSize = iSize - self.m_iOffset
                     else :
                         self.m_iSize = iSize - self.m_iOffset
 

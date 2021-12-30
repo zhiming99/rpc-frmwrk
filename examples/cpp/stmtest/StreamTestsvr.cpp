@@ -169,9 +169,9 @@ gint32 CStreamTest_SvrImpl::ReadAndReply(
             strMsg += std::to_string( idx );
             pBuf.NewObj();
             *pBuf = strMsg;
+            IConfigDb* pCtx = nullptr;
             ret = this->WriteStreamAsync(
-                hChannel, pBuf,
-                ( IConfigDb* )nullptr );
+                hChannel, pBuf, pCtx );
             if( ERROR( ret ) )
                 break;
 

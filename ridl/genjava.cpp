@@ -1672,7 +1672,7 @@ gint32 Execve(
         if( execve(cmd, args, env) == -1 )
         {
             /* Handle error */
-            printf( "error running /usr/bin/cpp %d", errno );
+            printf( "error running %s(%d)", cmd, errno );
             ret = -errno;
         }
     }

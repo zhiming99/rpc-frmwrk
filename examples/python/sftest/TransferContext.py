@@ -78,7 +78,7 @@ class TransferContext :
                 o.m_iBytesLeft -= iSize
                 o.m_iBytesSent += iSize
                 OutputMsg( "Received %d, To receive %d" %
-                    ( o.m_iBytesLeft, o.m_iBytesSent ) )
+                    ( o.m_iBytesSent, o.m_iBytesLeft ) )
 
             iSizeRecv = o.m_iBytesLeft
             if iSizeRecv > iSizeLimit:
@@ -114,7 +114,7 @@ class TransferContext :
         o.m_iBytesLeft -= len(buf)
         o.m_iBytesSent += len(buf)
         OutputMsg( "Sent %d, To send %d" %
-            (o.m_iBytesLeft, o.m_iBytesSent))
+            (o.m_iBytesSent, o.m_iBytesLeft))
         self.ReadFileAndSend(hChannel)
 
     def ReadStmCallback(self, hChannel : int, buf : bytearray) :

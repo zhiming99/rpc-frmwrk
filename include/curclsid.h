@@ -47,6 +47,7 @@ namespace rpcf
 
 // for non-rpc-frmwrk components, please refer to
 // test/helloworld/ifsvr.h as an example
-#define USER_CLSIDS_ALLOCATED    ( clsid( UserClsidStart  ) + 1000 )
+// last allocation of 10 slots from examples/cpp/sftest/transctx.h
+#define USER_CLSIDS_ALLOCATED    ( clsid( UserClsidStart  ) + 1010 )
 
 }

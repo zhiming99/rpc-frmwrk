@@ -1,0 +1,131 @@
+#!/usr/bin/make
+
+SHELL := /bin/bash
+CC:=$(CROSS_COMPILE)gcc
+CPP:=$(CROSS_COMPILE)g++
+LD:=$(CROSS_COMPILE)ld
+AR:=$(CROSS_COMPILE)ar
+AS:=$(CROSS_COMPILE)as
+STRIP:=$(CROSS_COMPILE)strip
+
+mkfile_path:=$(abspath $(lastword $(MAKEFILE_LIST)))
+BASE:=$(abspath $(dir $(mkfile_path)) )
+
+C_FLAGS:=$(CFLAGS) -Wall -c -D_GNU_SOURCE -pthread
+C_DEFINES+=-D_USE_LIBEV=1
+
+PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
+
+COMMON_INCLUDE:=$(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --cflags dbus-1 jsoncpp rpcf)
+
+C_INCLUDE:=-I./ $(COMMON_INCLUDE)
+
+DEBUG_FLAGS:=-D_DEBUG=1 -DDEBUG -ggdb
+RELEASE_FLAGS:= -D_DEBUG=0 -DRELEASE -O2 -ggdb
+
+DBG_DIR:=debug
+RLS_DIR:=release
+
+OBJ_DIR:=$(BASE)/$(RLS_DIR)
+OUTPUT_DIR:=$(OBJ_DIR)
+
+ifeq ($(MAKECMDGOALS),) 
+	C_FLAGS+=$(RELEASE_FLAGS)
+	C_DEFINES+=-DPRODUCTION 
+else ifeq ($(MAKECMDGOALS),debug) 
+	C_FLAGS+=$(DEBUG_FLAGS)
+	OBJ_DIR:=$(BASE)/$(DBG_DIR)
+	OUTPUT_DIR:=$(OBJ_DIR)
+else ifeq ($(MAKECMDGOALS),all) 
+	C_FLAGS+=$(RELEASE_FLAGS)
+	C_DEFINES+=-DPRODUCTION 
+else ifeq ($(MAKECMDGOALS),release)
+	C_FLAGS+=$(RELEASE_FLAGS)
+	C_DEFINES+=-DPRODUCTION 
+else ifeq ($(MAKECMDGOALS),debug_clean)
+	OUTPUT_DIR:=$(BASE)/$(DBG_DIR)
+	OBJ_DIR:=./$(DBG_DIR)
+else ifeq ($(MAKECMDGOALS),release_clean)
+endif
+
+DIST_LIB_DIR = /usr/local/lib
+
+COMMON_LINK=$(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs dbus-1 jsoncpp rpcf)
+LINKER_OPTION:=$(COMMON_LINK) -ldl -lstdc++ -lpthread -Wl,-rpath=$(DIST_LIB_DIR) -Wl,-rpath=$(DIST_LIB_DIR)/rpcf
+
+TARGET_SVR:=sftestsvr
+TARGET_CLI:=sftestcli
+TARGET_SO:=sftestlib.so
+
+MKLIB:=
+
+ifeq ($(MKLIB),)
+TARGET:=$(OUTPUT_DIR)/$(TARGET_SVR) $(OUTPUT_DIR)/$(TARGET_CLI)
+else ifeq ($(MKLIB),1)
+TARGET:=$(OUTPUT_DIR)/$(TARGET_SO)
+CPP_FLAGS+=-fPIC
+endif
+
+OBJS_SVR:= mainsvr.o $(OBJ_DIR)/FileTransfersvr.o 
+OBJS_CLI:= maincli.o $(OBJ_DIR)/FileTransfercli.o 
+
+SOURCES:=sftest.cpp transctx.cpp
+OBJS2:=$(SOURCES:%.cpp=$(OBJ_DIR)/%.o)
+
+MUTE_CLEAN:=2>/dev/null || true
+
+all: $(TARGET)
+debug: $(TARGET)
+release: $(TARGET)
+
+debug_clean: do_clean
+release_clean: do_clean
+
+clean:
+	make debug_clean
+	make release_clean
+
+do_clean:
+	-@rm $(OBJ_DIR)/*.d $(MUTE_CLEAN)
+	-@rm $(OUTPUT_DIR)/$(TARGET_SVR) $(MUTE_CLEAN)
+	-@rm $(OUTPUT_DIR)/$(TARGET_CLI) $(MUTE_CLEAN)
+	-@rm $(OBJS2) $(MUTE_CLEAN)
+	-@rm $(OBJ_DIR)/$(OBJS_SVR) $(MUTE_CLEAN)
+	-@rm $(OBJ_DIR)/$(OBJS_CLI) $(MUTE_CLEAN)
+
+-include $(OBJS2:%.o=%.d) $(OBJS_SVR:%.o=(OBJ_DIR)/%.d) $(OBJS_CLI:%.o=(OBJ_DIR)/%.d)
+
+$(OUTPUT_DIR)/$(TARGET_SVR) : $(OBJ_DIR)/$(OBJS_SVR) $(OBJS2)
+	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
+	$(CC) -o $@ $(OBJ_DIR)/$(OBJS_SVR) $(OBJS2) $(LINKER_OPTION)
+
+$(OUTPUT_DIR)/$(TARGET_CLI) : $(OBJ_DIR)/$(OBJS_CLI) $(OBJS2)
+	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
+	$(CC) -o $@ $(OBJ_DIR)/$(OBJS_CLI) $(OBJS2) $(LINKER_OPTION)
+	@python3 ./synccfg.py
+	@cp *.json $(OUTPUT_DIR)
+
+$(OUTPUT_DIR)/$(TARGET_SO) : $(OBJ_DIR)/$(OBJS_CLI) $(OBJ_DIR)/$(OBJS_SVR) $(OBJS2)
+	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
+	$(CC) -o $@ $(OBJ_DIR)/$(OBJS_CLI) $(OBJS2) $(LINKER_OPTION) -shared
+	@python3 ./synccfg.py
+	@cp *.json $(OUTPUT_DIR)
+
+$(OUTPUT_DIR)/$(TARGET_LIB) : $(OBJ_DIR)/$(OBJS_SVR) $(OBJS2)
+	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
+	$(CC) -o $@ $(OBJ_DIR)/$(OBJS_SVR) $(OBJS2) $(LINKER_OPTION)
+
+$(OBJ_DIR)/%.o : %.cpp transctx.h
+	@echo Building file: $@
+	@if [ ! -d $(OBJ_DIR) ]; then mkdir -p $(OBJ_DIR);fi
+	$(CPP) $(C_DEFINES) $(C_FLAGS) $(CPP_FLAGS) $(C_INCLUDE) -o $@ $<
+
+$(OBJ_DIR)/%.d : %.cpp transctx.h
+	@if [ ! -d $(OBJ_DIR) ]; then mkdir -p $(OBJ_DIR);fi
+	@$(CPP) $(C_DEFINES) $(C_FLAGS) $(CPP_FLAGS) $(C_INCLUDE) -MM $*.cpp > $@
+	@mv -f $@ $@.tmp
+	@sed -e 's|.*:|$(OBJ_DIR)/$*.o:|' < $@.tmp > $@
+	@sed -e 's/.*://' -e 's/\\$$//' < $@.tmp | fmt -1 | sed -e 's/^ *//' -e 's/$$/:/' >> $@
+	@rm -f $@.tmp
+
+.PHONY: clean
