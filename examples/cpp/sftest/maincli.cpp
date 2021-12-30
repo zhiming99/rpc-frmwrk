@@ -167,13 +167,19 @@ gint32 Execve(
             /* Report unexpected child status */
             ret = -ECHILD;
         }
+        else
+        {
+            ret = 0;
+        }
     }
     else
     {
         if( szOutput != nullptr )
         {
            int fd = open( szOutput,
-               O_RDWR | O_CREAT, S_IRUSR | S_IWUSR); 
+               O_RDWR | O_CREAT | O_TRUNC,
+               S_IRUSR | S_IWUSR); 
+
            dup2( fd, 1 );
            dup2( fd, 2 );
            close( fd );
@@ -194,9 +200,8 @@ gint32 GetMD5( const stdstr& strFile, stdstr& digest )
 {
     gint32 ret = 0;
     stdstr strCmd;
-    const char* args[2];
-    args[ 0 ] = "/usr/bin/md5sum";
-    args[1] = strFile.c_str();
+    const char* args[3] = {
+        "/usr/bin/md5sum", strFile.c_str(), nullptr };
     stdstr strOutput = "./output_.md5";
     char* env[ 1 ] = { nullptr };
     ret = Execve( "/usr/bin/md5sum",
@@ -314,13 +319,17 @@ gint32 maincli(
         if( ERROR( ret ) )
             break;
 
-        stdstr strDownFile = "/";
+        stdstr strDownFile = "./";
         strDownFile += strBaseName + ".1";
         OutputMsg( 0, "DownloadFile completed" );
         stdstr origMD5;
         GetMD5( strFile, origMD5 );
+        OutputMsg( 0, "MD5 of original file: %s",
+            origMD5.c_str() );
         stdstr downMD5;
         GetMD5( strDownFile, downMD5 );
+        OutputMsg( 0, "MD5 of downloaded file: %s",
+            downMD5.c_str() );
         if( origMD5 != downMD5 )
         {
             ret = ERROR_FAIL;

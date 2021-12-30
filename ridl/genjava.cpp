@@ -1664,6 +1664,10 @@ gint32 Execve(
             /* Report unexpected child status */
             ret = -ECHILD;
         }
+        else
+        {
+            ret = 0;
+        }
     }
     else
     {
