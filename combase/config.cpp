@@ -1022,7 +1022,7 @@ gint32 CParamList::Push< const BufPtr& > ( const BufPtr& val  )
 }
 
 template<>
-gint32 CParamList::Pop< BufPtr& > ( BufPtr& val  )
+gint32 CParamList::Pop< BufPtr > ( BufPtr& val  )
 {
     gint32 ret = 0;
     do{
@@ -1033,15 +1033,18 @@ gint32 CParamList::Pop< BufPtr& > ( BufPtr& val  )
             break;
         }
 
-        try{
-            ret = GetCfg()->GetProperty( iPos, val );
-
-            if( SUCCEEDED( ret ) )
-                SetCount( iPos - 1 );
-        }
-        catch( std::invalid_argument& e )
+        if( iPos <= 0 )
         {
-            ret = -EINVAL;
+            ret = -ENOENT;
+            break;
+        }
+
+        ret = GetCfg()->GetProperty(
+            iPos - 1, val );
+        if( SUCCEEDED( ret ) )
+        {
+            SetCount( iPos - 1 );
+            RemoveProperty( iPos - 1 );
         }
 
     }while( 0 );

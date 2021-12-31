@@ -1697,7 +1697,7 @@ template<>
 gint32 CParamList::Push< const BufPtr& > ( const BufPtr& val  );
 
 template<>
-gint32 CParamList::Pop< BufPtr& > ( BufPtr& val  );
+gint32 CParamList::Pop< BufPtr > ( BufPtr& val  );
 
 #define CFGDB_MAX_SIZE  ( 16 * 1024 * 1024 )
 #define CFGDB_MAX_ITEM  1024
