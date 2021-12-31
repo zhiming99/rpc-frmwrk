@@ -1,4 +1,4 @@
-# rpc-frmwrk
+# rpc-frmwrk ![badge](https://img.shields.io/badge/IOT-C%2B%2B%2C%20Java%2C%20Python-brig)
 
 这是一个嵌入式的RPC实现，关注于跨网络，跨协议，跨平台的互联互通。本项目欢迎有兴趣的人士加入!   
 This is an asynchronous and event-driven RPC implementation for embeded system with small system footprint. It is targeting at the IOT platforms, high-throughput, and high availability over hybrid network. Welcome to join!  
@@ -16,7 +16,7 @@ This is an asynchronous and event-driven RPC implementation for embeded system w
 7. `Simultaneous object access via network, IPC, and in-process.` 
 8. `Peer online/offline awareness.`
 9. `Publishing multiple local/remote object services via single network port.`
-10. [`Streaming support to provide double-direction stream transfer`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md#streaming)
+10. [`Double-direction streaming transfer`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md#streaming)
 11. [`Secure Socket Layer (SSL) support`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/sslport/Readme.md)
 12. [`Websocket support`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/wsport/Readme.md)
 13. [`Object access via Multihop routing`](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support)
@@ -61,11 +61,11 @@ This project depends on the following 3rd-party packags at runtime:
 
 ---
 [`Fri Dec 31 2021 02:39:12 PM Beijing`]    
-1. Completed all the examples for Python and C++.
-2. Fixed some defects in generators for C++ and Python.
+1. Added all the examples for Python and C++.
+2. Fixed some defects in code generators for C++ and Python.
 3. Added an SSL test process to the CI workflow.
 4. Illustrutions to the design and examples are yet to add.
-5. Move on to the Json support!
+5. Moving on to the Json support in 2022!
 
 [`Tue Dec 14 2021 10:40:41 PM Beijing`]   
 1. Java support is now **released!**, Congratulations!
