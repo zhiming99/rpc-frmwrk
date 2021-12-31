@@ -54,10 +54,10 @@ This project depends on the following 3rd-party packags at runtime:
 
 #### Todo
 1. Json support
-2. Examples and Tutorials
-3. Performance optimization
-4. A tree-like hierarchical persistant registry.
-5. Logging service
+2. Tutorials
+3. Performance Tuning
+4. Adaptive flow control
+5. A tree-like hierarchical persistant registry.
 
 ---
 [`Fri Dec 31 2021 02:39:12 PM Beijing`]    
