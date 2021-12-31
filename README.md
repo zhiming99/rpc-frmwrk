@@ -60,7 +60,14 @@ This project depends on the following 3rd-party packags at runtime:
 5. Logging service
 
 ---
-[`Tue Dec 14 10:40:41 PM CST 2021`]   
+[`Fri Dec 31 2021 02:39:12 PM Beijing`]    
+1. Completed all the examples for Python and C++.
+2. Fixed some defects in generators for C++ and Python.
+3. Added an SSL test process to the CI workflow.
+4. Illustrutions to the design and examples are yet to add.
+5. Move on to the Json support!
+
+[`Tue Dec 14 2021 10:40:41 PM Beijing`]   
 1. Java support is now **released!**, Congratulations!
 2. In the next two weeks, I will do some quality improvement work, which includes
    * Get the deb build to work on raspberry pi
