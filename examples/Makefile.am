@@ -60,39 +60,39 @@ EXTRA_DIST += $(pytests)/actcancel/ActiveCancelcli.py \
  $(pytests)/stmtest/maincli.py
 
 cpptests=./cpp
-EXTRA_DIST += $(cpptests)/actcancel/ActiveCancelcli.cpp
-$(cpptests)/actcancel/ActiveCancelcli.h
-$(cpptests)/actcancel/ActiveCancelsvr.cpp
-$(cpptests)/actcancel/ActiveCancelsvr.h
-$(cpptests)/actcancel/maincli.cpp
-$(cpptests)/asynctst/AsyncTestcli.cpp
-$(cpptests)/asynctst/AsyncTestcli.h
-$(cpptests)/asynctst/AsyncTestsvr.cpp
-$(cpptests)/asynctst/AsyncTestsvr.h
-$(cpptests)/asynctst/maincli.cpp
-$(cpptests)/evtest/EventTestcli.cpp
-$(cpptests)/evtest/maincli.cpp
-$(cpptests)/evtest/mainsvr.cpp
-$(cpptests)/hellowld/HelloWorldSvcsvr.cpp
-$(cpptests)/hellowld/maincli.cpp
-$(cpptests)/iftest/IfTestsvr.cpp
-$(cpptests)/iftest/maincli.cpp
-$(cpptests)/katest/KeepAlivesvr.cpp
-$(cpptests)/katest/KeepAlivesvr.h
-$(cpptests)/katest/maincli.cpp
-$(cpptests)/sftest/FileTransfercli.cpp
-$(cpptests)/sftest/FileTransfercli.h
-$(cpptests)/sftest/FileTransfersvr.cpp
-$(cpptests)/sftest/FileTransfersvr.h
-$(cpptests)/sftest/Makefile
-$(cpptests)/sftest/Readme.md
-$(cpptests)/sftest/maincli.cpp
-$(cpptests)/sftest/transctx.cpp
-$(cpptests)/sftest/transctx.h
-$(cpptests)/stmtest/StreamTestcli.cpp
-$(cpptests)/stmtest/StreamTestcli.h
-$(cpptests)/stmtest/StreamTestsvr.cpp
-$(cpptests)/stmtest/StreamTestsvr.h
-$(cpptests)/stmtest/commdefs.h
-$(cpptests)/stmtest/maincli.cpp
+EXTRA_DIST += $(cpptests)/actcancel/ActiveCancelcli.cpp \
+ $(cpptests)/actcancel/ActiveCancelcli.h \
+ $(cpptests)/actcancel/ActiveCancelsvr.cpp \
+ $(cpptests)/actcancel/ActiveCancelsvr.h \
+ $(cpptests)/actcancel/maincli.cpp \
+ $(cpptests)/asynctst/AsyncTestcli.cpp \
+ $(cpptests)/asynctst/AsyncTestcli.h \
+ $(cpptests)/asynctst/AsyncTestsvr.cpp \
+ $(cpptests)/asynctst/AsyncTestsvr.h \
+ $(cpptests)/asynctst/maincli.cpp \
+ $(cpptests)/evtest/EventTestcli.cpp \
+ $(cpptests)/evtest/maincli.cpp \
+ $(cpptests)/evtest/mainsvr.cpp \
+ $(cpptests)/hellowld/HelloWorldSvcsvr.cpp \
+ $(cpptests)/hellowld/maincli.cpp \
+ $(cpptests)/iftest/IfTestsvr.cpp \
+ $(cpptests)/iftest/maincli.cpp \
+ $(cpptests)/katest/KeepAlivesvr.cpp \
+ $(cpptests)/katest/KeepAlivesvr.h \
+ $(cpptests)/katest/maincli.cpp \
+ $(cpptests)/sftest/FileTransfercli.cpp \
+ $(cpptests)/sftest/FileTransfercli.h \
+ $(cpptests)/sftest/FileTransfersvr.cpp \
+ $(cpptests)/sftest/FileTransfersvr.h \
+ $(cpptests)/sftest/Makefile \
+ $(cpptests)/sftest/Readme.md \
+ $(cpptests)/sftest/maincli.cpp \
+ $(cpptests)/sftest/transctx.cpp \
+ $(cpptests)/sftest/transctx.h \
+ $(cpptests)/stmtest/StreamTestcli.cpp \
+ $(cpptests)/stmtest/StreamTestcli.h \
+ $(cpptests)/stmtest/StreamTestsvr.cpp \
+ $(cpptests)/stmtest/StreamTestsvr.h \
+ $(cpptests)/stmtest/commdefs.h \
+ $(cpptests)/stmtest/maincli.cpp
 
