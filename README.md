@@ -60,6 +60,10 @@ This project depends on the following 3rd-party packags at runtime:
 5. A tree-like hierarchical persistant registry.
 
 ---
+[`Sat Jan 01 2022 11:47:41 AM Beijing`]    
+1. 新年快乐!
+2. Happy New Year!
+
 [`Fri Dec 31 2021 02:39:12 PM Beijing`]    
 1. Added all the examples for Python and C++.
 2. Fixed some defects in code generators for C++ and Python.
