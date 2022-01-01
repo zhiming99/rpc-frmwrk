@@ -381,11 +381,7 @@ gint32 CBuffer::ResizeWithOffset( guint32 dwSize )
                 break;
             }
 
-            if( dwSize > 1024 )
-                pData = ( char* )calloc( 1, dwSize );
-            else
-                pData = ( char* )malloc( dwSize );
-
+            pData = ( char* )malloc( dwSize );
             if( pData == nullptr )
             {
                 ret = -ENOMEM;
@@ -506,11 +502,7 @@ gint32 CBuffer::Resize( guint32 dwSize )
                 sizeof( m_arrBuf ) >= size() )
             {
                 char* pData;
-                if( dwSize > 1024 )
-                    pData = ( char* )calloc( 1, dwSize );
-                else
-                    pData = ( char* )malloc( dwSize );
-
+                pData = ( char* )malloc( dwSize );
                 if( pData == nullptr )
                 {
                     ret = -ENOMEM;
