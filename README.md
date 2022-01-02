@@ -60,6 +60,9 @@ This project depends on the following 3rd-party packags at runtime:
 5. A tree-like hierarchical persistant registry.
 
 ---
+[`Sun Jan 02 2022 07:53:48 PM Beijing`]   
+1. Trying to replace the CConfigDb's properties from BufPtr to Variant, which is an effort for performance improvement. CConfigDb is one of the fundamental data structure, so it will make the system less stable for a while.
+
 [`Sat Jan 01 2022 11:47:41 AM Beijing`]    
 1. 新年快乐!
 2. Happy New Year!
