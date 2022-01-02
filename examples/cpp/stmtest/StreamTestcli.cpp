@@ -18,11 +18,9 @@ gint32 CStreamTest_CliImpl::OnReadStreamComplete(
         this->NotifyComplete();
         return iRet;
     }
-    char szBuf[ 128 ];
-    BUF2STR( pBuf, szBuf );
-    OutputMsg( iRet,
-        "Server says( async ): %s",
-        szBuf );
+    stdstr strBuf = BUF2STR( pBuf );
+    OutputMsg( iRet, "Server says( async ): %s",
+        strBuf.c_str() );
     this->NotifyComplete();
     return iRet;
 }

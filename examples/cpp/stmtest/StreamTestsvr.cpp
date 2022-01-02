@@ -58,10 +58,9 @@ gint32 CStreamTest_SvrImpl::OnReadStreamComplete(
         return 0;
     }
 
-    char szBuf[ 128 ];
-    BUF2STR( pBuf, szBuf );
-    OutputMsg( iRet,
-        "Proxy says %s", szBuf );
+    stdstr strBuf = BUF2STR( pBuf );
+    OutputMsg( iRet, "Proxy says %s",
+        strBuf.c_str() );
     this->WriteAndReceive( hChannel );
 
     return 0;
@@ -146,7 +145,6 @@ gint32 CStreamTest_SvrImpl::ReadAndReply(
         if( ERROR( ret ) )
             break;
 
-        char szBuf[ 128 ];
         while( true )
         {
             BufPtr pBuf;
@@ -161,9 +159,10 @@ gint32 CStreamTest_SvrImpl::ReadAndReply(
                 break;
             }
 
-            BUF2STR( pBuf, szBuf );
-            OutputMsg( ret,
-                "Proxy says: %s", pBuf->ptr() );
+            stdstr strBuf = BUF2STR( pBuf );
+            OutputMsg( ret, "Proxy says: %s",
+                strBuf.c_str() );
+
             gint32 idx = ptc->GetCounter();
             stdstr strMsg = "This is message ";
             strMsg += std::to_string( idx );
@@ -203,7 +202,6 @@ gint32 CStreamTest_SvrImpl::WriteAndReceive(
         if( ERROR( ret ) )
             break;
 
-        char szBuf[ 128 ];
         while( true )
         {
             gint32 idx = ptc->GetCounter();
@@ -235,9 +233,9 @@ gint32 CStreamTest_SvrImpl::WriteAndReceive(
                 ret = 0;
                 break;
             }
-            BUF2STR( pBuf, szBuf );
-            OutputMsg( ret,
-                "Proxy says: %s", pBuf->ptr() );
+            stdstr strBuf = BUF2STR( pBuf );
+            OutputMsg( ret, "Proxy says: %s",
+                strBuf.c_str() );
         }
         if( ERROR( ret ) )
             ptc->SetError( ret );

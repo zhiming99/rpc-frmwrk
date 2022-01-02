@@ -156,7 +156,6 @@ gint32 maincli(
             break;
         }
 
-        char szBuf[ 128 ];
         for( gint32 i = 0; i < 100; i++ )
         {
             stdstr strMsg = "a message to server ";
@@ -170,10 +169,10 @@ gint32 maincli(
             ret = pIf->ReadStream( hChannel, pBuf );
             if( ERROR( ret ) )
                 break;
-            BUF2STR( pBuf, szBuf );
+            stdstr strBuf = BUF2STR( pBuf );
             OutputMsg( ret,
                 "Server says (sync): %s",
-                szBuf );
+                strBuf.c_str() );
             double dbval = i + .1;
             strMsg = "a message to server " +
                 std::to_string( dbval );
@@ -210,10 +209,10 @@ gint32 maincli(
                 continue;
             }
             // immediate return
-            BUF2STR( pBuf, szBuf );
+            strBuf = BUF2STR( pBuf );
             OutputMsg( ret,
                 "Server says(async): %s",
-                szBuf );
+                strBuf.c_str() );
         }
 
     }while( 0 );
