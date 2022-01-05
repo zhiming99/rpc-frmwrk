@@ -60,7 +60,7 @@ This project depends on the following 3rd-party packags at runtime:
 5. A tree-like hierarchical persistant registry.
 
 ---
-[`Wed Jan 05 2022 04:20:20 PM Beijing`]   
+[`Wed Jan 05 2022 04:32:54 PM Beijing`]   
 1. Added a new branch 'buf2var-dev' for migration from CConfigDb to CConfigDb2.
 
 [`Sun Jan 02 2022 07:53:48 PM Beijing`]   
