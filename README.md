@@ -60,6 +60,9 @@ This project depends on the following 3rd-party packags at runtime:
 5. A tree-like hierarchical persistant registry.
 
 ---
+[`Wed Jan 05 2022 04:32:54 PM Beijing`]   
+1. Added a new branch 'buf2var-dev' for migration from CConfigDb to CConfigDb2.
+
 [`Sun Jan 02 2022 07:53:48 PM Beijing`]   
 1. Trying to replace the CConfigDb's properties from BufPtr to Variant, which is an effort for performance improvement. CConfigDb is one of the fundamental data structure, so it will make the system less stable for a while.
 
