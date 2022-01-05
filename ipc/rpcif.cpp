@@ -58,7 +58,7 @@ CGenericInterface::CGenericInterface(
 
     guint32 iStateClass = 0;
     if( !oNewCfg.exist( propIfPtr ) )
-        oNewCfg[ propIfPtr ] = this;
+        oNewCfg[ propIfPtr ] = ObjPtr( this );
 
     gint32 ret = oNewCfg.GetIntProp(
         propIfStateClass, iStateClass ) ;

@@ -1179,13 +1179,7 @@ gint32 CConfigDb2::GetProperty(
 gint32 CConfigDb2::SetProperty(
     gint32 iProp, const CBuffer& oBuf )
 {
-    auto itr = m_mapProps.find( iProp );
-    if( itr == m_mapProps.end() )
-        itr->second = oBuf;
-    else
-    {
-        m_mapProps[ iProp ] = oBuf;
-    }
+    m_mapProps[ iProp ] = oBuf;
     return 0;
 }
 

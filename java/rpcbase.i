@@ -52,7 +52,7 @@ typedef LONGWORD HANDLE;
 
 %javaconst(0) Clsid_Invalid;
 %javaconst(0) Clsid_CIoManager;
-%javaconst(0) Clsid_CConfigDb;
+%javaconst(0) Clsid_CConfigDb2;
 
 typedef int32_t EnumClsid;
 
@@ -60,7 +60,7 @@ enum
 {
     Clsid_Invalid,
     Clsid_CIoManager,
-    Clsid_CConfigDb,
+    Clsid_CConfigDb2,
 };
 
 %javaconst(0) eventPortStarted;
@@ -1192,8 +1192,7 @@ class CfgPtr
     {
         if( $self == nullptr )
             return -EFAULT;
-        return $self->NewObj(
-            Clsid_CConfigDb, nullptr );
+        return $self->NewObj();
     }
     IConfigDb* GetPointer()
     {

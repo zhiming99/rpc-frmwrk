@@ -113,7 +113,7 @@ CPort::~CPort()
 do{\
     if( IsBusPort( m_dwFlags ) == PORTFLG_TYPE_BUS )\
     {\
-        oBuf = ( *m_pCfgDb )[ iSelf_ ];\
+        ret = m_pCfgDb->GetProperty( iSelf_, oBuf );\
         break;\
     }\
     else\

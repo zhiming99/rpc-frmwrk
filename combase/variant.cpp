@@ -314,6 +314,7 @@ Variant& Variant::operator=( const ObjPtr& pObj )
     }
     Clear();
     new( &m_pObj ) ObjPtr( pObj );
+    m_iType = typeObj;
     return *this;
 }
 Variant& Variant::operator=( const BufPtr& pBuf )
@@ -325,6 +326,7 @@ Variant& Variant::operator=( const BufPtr& pBuf )
     }
     Clear();
     new( &m_pBuf ) BufPtr( pBuf );
+    m_iType = typeByteArr;
     return *this;
 }
 Variant& Variant::operator=( const DMsgPtr& msgVal )
