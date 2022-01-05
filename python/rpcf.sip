@@ -120,7 +120,7 @@ namespace cpp
     {
         Clsid_Invalid,
         Clsid_CIoManager,
-        Clsid_CConfigDb,
+        Clsid_CConfigDb2,
     };
 
     enum // EnumEventId
@@ -368,7 +368,7 @@ namespace cpp
         gint32 NewObj();
         %MethodCode
         sipRes = sipCpp->NewObj(
-            cpp::Clsid_CConfigDb, nullptr );
+            cpp::Clsid_CConfigDb2, nullptr );
         %End
 
         bool IsEmpty() const;

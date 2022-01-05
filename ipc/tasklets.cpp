@@ -34,7 +34,9 @@ using namespace std;
 
 CTasklet::CTasklet( const IConfigDb* pCfg )
 {
-    m_pCtx.NewObj( Clsid_CConfigDb, pCfg );
+    m_pCtx.NewObj();
+    if( pCfg != nullptr )
+        *m_pCtx = *pCfg;
     m_dwTid = rpcf::GetTid();
     m_iRet = 0;
     m_bPending = false;

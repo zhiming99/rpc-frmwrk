@@ -86,17 +86,12 @@ gint32 CDirEntry::SetProperty(
 {
     gint32 ret = 0;
     do{
-        BufPtr oBufPtr( true );
-        if( ERROR( ret ) )
-            break;
-
-        // make a full copy
-        *oBufPtr = oBuf;
-
         // this is just a reference
         // increment
-        ret = m_mapProps->SetProperty(
-            iProp, *oBufPtr );
+        CCfgOpener  oCfg(
+            ( IConfigDb* ) m_mapProps );
+        Variant& o = oCfg[ iProp ];
+        o = oBuf;
 
     }while( 0 );
 
