@@ -11,7 +11,8 @@ libcombase_la_SOURCES = clsids.cpp \
 	dbuserr.cpp \
 	objfctry.cpp \
 	dmsgptr.cpp \
-    seribase.cpp 
+    seribase.cpp \
+	variant.cpp
 
 include_dir=$(top_srcdir)/include
 
@@ -29,7 +30,8 @@ rpcfcombase_HEADERS= $(include_dir)/autoptr.h \
     $(include_dir)/seribase.h \
     $(include_dir)/stlcont.h \
     $(include_dir)/buffer.h \
-    $(include_dir)/clsids.h
+    $(include_dir)/clsids.h \
+    $(include_dir)/variant.h
 
 rpcfcombasedir=$(includedir)/rpcf
 

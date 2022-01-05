@@ -188,21 +188,21 @@ class CJavaInterfBase : public T
             CStdRTMutex oTaskLock(
                 pTaskEx->GetLock() );
 
-            BufPtr pBuf;
-            ret = pTaskEx->GetParamAt( 1, pBuf );
+            Variant oVar;
+            ret = pTaskEx->GetParamAt( 1, oVar );
             if( ERROR( ret ) )
                 break;
 
-            intptr_t ptrval = ( intptr_t& )*pBuf;
+            intptr_t ptrval = ( intptr_t& )oVar;
             if( ptrval == 0 )
                 break;
 
             pCb = ( jobject )ptrval;
-            ret = pTaskEx->GetParamAt( 2, pBuf );
+            ret = pTaskEx->GetParamAt( 2, oVar );
             if( ERROR( ret ) )
                 break;
 
-            ptrval = ( intptr_t& )*pBuf;
+            ptrval = ( intptr_t& )oVar;
             if( ptrval == 0 )
                 break;
 
@@ -568,7 +568,7 @@ class CJavaInterfBase : public T
 
     gint32 List2Vector( JNIEnv *jenv,
         jobject jObj,
-        std::vector< BufPtr >& vecArgs )
+        std::vector< Variant >& vecArgs )
     {
         gint32 ret = 0;
         if( jObj == nullptr || jenv == nullptr )
@@ -858,7 +858,7 @@ class CJavaInterfBase : public T
             if( iCount == 0 )
                 break;
 
-            std::vector< BufPtr > vecResp;
+            std::vector< Variant > vecResp;
             ret = List2Vector(
                 jenv, listResp, vecResp );
             if( ERROR( ret ) )
@@ -1583,7 +1583,7 @@ class CJavaProxyImpl :
         CfgPtr& pOptions,
         CfgPtr& pResp,
         const std::string& strcMethod,
-        std::vector< BufPtr >& vecParams );
+        std::vector< Variant >& vecParams );
 
     jobject JavaProxyCall2(
         JNIEnv *jenv,
@@ -1636,7 +1636,7 @@ gint32 CJavaProxyImpl::AsyncCallVector(
     CfgPtr& pOptions,
     CfgPtr& pResp,
     const std::string& strcMethod,
-    std::vector< BufPtr >& vecParams )
+    std::vector< Variant >& vecParams )
 {
     gint32 ret = 0;
 
@@ -1709,7 +1709,7 @@ jobject CJavaProxyImpl::JavaProxyCall2(
         if( pCb == nullptr )
             bSync = true;
 
-        std::vector< BufPtr > vecParams;
+        std::vector< Variant > vecParams;
         ret = List2Vector(
            jenv, listArgs, vecParams );
         if( ERROR( ret ) )

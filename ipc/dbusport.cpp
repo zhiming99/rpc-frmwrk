@@ -1099,11 +1099,10 @@ void CDBusBusPort::ReleaseDBus()
     if( m_pDBusConn )
     {
         CCfgOpener oCfg( ( IConfigDb* )m_pCfgDb );
-        string strBusName;
-        if( oCfg.exist( propBusName ) )
-            strBusName = oCfg[ propBusName ];
-
-        ReleaseBusName( strBusName );
+        const Variant* p =
+            oCfg.GetPropPtr( propBusName );
+        if( p != nullptr )
+            ReleaseBusName( ( const stdstr& )*p );
 
         dbus_connection_remove_filter( m_pDBusConn,
             DBusMessageCallback, this );

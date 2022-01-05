@@ -498,9 +498,8 @@ gint32 CMyFileProxy::StartTransfer(
 
         // correct the first parameter to
         // OnOpenChanComplete
-        BufPtr pParam0( true );
-        *pParam0 = ObjPtr( pHandler );
-        ret = pHandler->UpdateParamAt( 0, pParam0 );
+        Variant oVar( pHandler );
+        ret = pHandler->UpdateParamAt( 0, oVar );
         if( ERROR( ret ) )
             break;
 

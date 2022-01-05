@@ -206,7 +206,8 @@ class CRegisteredObject
     {
         std::string strName;
         CCfgOpener oCfg( this );
-        strName = oCfg[ propSrcUniqName ];
+        strName = ( const stdstr& )
+            oCfg[ propSrcUniqName ];
         return strName;
     }
 
@@ -214,7 +215,8 @@ class CRegisteredObject
     {
         std::string strName;
         CCfgOpener oCfg( this );
-        strName = oCfg[ propSrcDBusName ];
+        strName = ( const stdstr& )
+            oCfg[ propSrcDBusName ];
         return strName;
     }
 
@@ -3003,10 +3005,9 @@ inline gint32 NewIfDeferredCall2( EnumClsid iTaskClsid,
         _pTask, pObj, func , ##__VA_ARGS__ ); \
     if( SUCCEEDED( _ret ) ) \
     { \
+        Variant oVar( _pTask );\
         CIfDeferCallTaskEx2* pDefer = _pTask; \
-        BufPtr pBuf( true ); \
-        *pBuf = ObjPtr( pDefer ); \
-        pDefer->UpdateParamAt( _pos, pBuf );  \
+        pDefer->UpdateParamAt( _pos, oVar );  \
     } \
     _ret; \
 })

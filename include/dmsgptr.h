@@ -34,10 +34,8 @@
 namespace rpcf
 {
 
-typedef CAutoPtr< clsid( Invalid ), DBusMessage >  DMsgPtr;
 
-template<>
-class CAutoPtr< Clsid_Invalid, DBusMessage > : public IAutoPtr
+class DMsgPtr : public IAutoPtr
 {
     private:
 
@@ -47,7 +45,7 @@ class CAutoPtr< Clsid_Invalid, DBusMessage > : public IAutoPtr
 
     // NOTE: cannot convert between different object
     // classes
-    CAutoPtr( DBusMessage* pObj = nullptr,
+    DMsgPtr( DBusMessage* pObj = nullptr,
         bool bAddRef = true )
     {
         m_pObj = nullptr;
@@ -66,7 +64,7 @@ class CAutoPtr< Clsid_Invalid, DBusMessage > : public IAutoPtr
         }
     }
 
-    CAutoPtr( const CAutoPtr& oInitPtr )
+    DMsgPtr( const DMsgPtr& oInitPtr )
     {
         m_pObj = oInitPtr.m_pObj;
         if( m_pObj )
@@ -79,7 +77,7 @@ class CAutoPtr< Clsid_Invalid, DBusMessage > : public IAutoPtr
         }
     }
 
-    ~CAutoPtr()
+    ~DMsgPtr()
     {
         Clear();
     }
@@ -110,7 +108,7 @@ class CAutoPtr< Clsid_Invalid, DBusMessage > : public IAutoPtr
         return m_pObj;
     }
 
-    CAutoPtr& operator=( const CAutoPtr& rhs ) noexcept
+    DMsgPtr& operator=( const DMsgPtr& rhs ) noexcept
     {
         Clear();
 
@@ -124,7 +122,7 @@ class CAutoPtr< Clsid_Invalid, DBusMessage > : public IAutoPtr
         return *this;
     }
 
-    bool operator==( const CAutoPtr& rhs ) noexcept
+    bool operator==( const DMsgPtr& rhs ) noexcept
     {
         DBusMessage* pObj = rhs.m_pObj;
         return ( m_pObj == pObj );
@@ -224,6 +222,10 @@ class CAutoPtr< Clsid_Invalid, DBusMessage > : public IAutoPtr
         return ret;
     }
 
+    DBusMessage* ptr()
+    { return m_pObj; }
+    const DBusMessage* ptr() const
+    { return m_pObj; }
 
     gint32 Serialize( CBuffer* pBuf );
     gint32 Deserialize( CBuffer* pBuf );

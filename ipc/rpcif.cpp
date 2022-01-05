@@ -2887,9 +2887,9 @@ gint32 CInterfaceProxy::SendFetch_Proxy(
 
             oDesc.SetIfName(
                 DBUS_IF_NAME( strIfName ) );
-
-            if( string( SYS_METHOD_FETCHDATA ) ==
-                string( oDesc[ propMethodName ] ) )
+            auto& val = ( const stdstr& )
+                oDesc[ propMethodName ];
+            if( val == SYS_METHOD_FETCHDATA )
             {
                 bFetch = true;
             }
@@ -5382,7 +5382,7 @@ gint32 CInterfaceProxy::SendProxyReq(
     IEventSink* pCallback,
     bool bNonDBus,
     const string& strMethod,
-    std::vector< BufPtr >& vecParams,
+    std::vector< Variant >& vecParams,
     guint64& qwIoTaskId )
 {
     gint32 ret = 0;

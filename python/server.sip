@@ -53,7 +53,7 @@ class CPythonServerImpl :
                 break;
             }
 
-            std::vector< BufPtr > vecArgs;
+            std::vector< Variant > vecArgs;
             ret = List2Vector( pArgs, vecArgs );
             if( ERROR( ret ) )
                 break;
@@ -138,7 +138,7 @@ class CPythonServerImpl :
                 oReq.SetMethodName( strMethod );
 
                 for( auto elem : vecArgs )
-                    oReq.Push<BufPtr&>( elem );
+                    oReq.Push( elem );
 
                 ret = BroadcastEvent( oReq.GetCfg(), pCb );
             }
@@ -278,15 +278,15 @@ class CPythonServer :
             break;
         }
 
-        BufPtr pBuf( true );
-        sipRes = pImpl->ConvertPyObjToBuf(
-            a1, pBuf );
+        Variant oVar;
+        sipRes = pImpl->ConvertPyObjToVar(
+            a1, oVar );
         if( ERROR( sipRes ) )
             break;
 
         Py_BEGIN_ALLOW_THREADS;
         sipRes = pImpl->
-            WriteStreamNoWait( a0, pBuf );
+            WriteStreamNoWait( a0, oVar );
         Py_END_ALLOW_THREADS;
 
     }while( 0 );
@@ -305,14 +305,14 @@ class CPythonServer :
             break;
         }
 
-        BufPtr pBuf( true );
-        sipRes = pImpl->ConvertPyObjToBuf(
-            a1, pBuf );
+        Variant oVar;
+        sipRes = pImpl->ConvertPyObjToVar(
+            a1, oVar );
         if( ERROR( sipRes ) )
             break;
 
         Py_BEGIN_ALLOW_THREADS;
-        sipRes = pImpl->WriteStream( a0, pBuf );
+        sipRes = pImpl->WriteStream( a0, oVar );
         Py_END_ALLOW_THREADS;
 
     }while( 0 );
@@ -522,7 +522,6 @@ class CPythonServer :
             break;
         }
 
-        BufPtr pBuf( true );
         gint32 ret = PyCallable_Check( a2 );
         if( ret == 0 )
         {
@@ -530,8 +529,9 @@ class CPythonServer :
             break;
         }
 
-        sipRes = pImpl->ConvertPyObjToBuf(
-            a1, pBuf );
+        Variant oVar;
+        sipRes = pImpl->ConvertPyObjToVar(
+            a1, oVar );
         if( ERROR( sipRes ) )
             break;
 
@@ -544,7 +544,7 @@ class CPythonServer :
         IConfigDb* pCtx = oReqCtx.GetCfg();
         Py_BEGIN_ALLOW_THREADS;
         sipRes = pImpl->WriteStreamAsync(
-            a0, pBuf, pCtx );
+            a0, oVar, pCtx );
         Py_END_ALLOW_THREADS;
         if( sipRes != STATUS_PENDING )
         {
@@ -597,7 +597,7 @@ class CPythonServer :
             if( ERROR( a1 ) )
                 break;
 
-            std::vector< BufPtr > vecResp;
+            std::vector< Variant > vecResp;
             ret = pImpl->List2Vector(
                 a3, vecResp);
             if( ERROR( ret ) )
@@ -642,7 +642,7 @@ class CPythonServer :
             if( ERROR( a1 ) )
                 break;
 
-            std::vector< BufPtr > vecResp;
+            std::vector< Variant > vecResp;
             ret = pImpl->List2Vector(
                 a3, vecResp );
             if( ERROR( ret ) )

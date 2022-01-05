@@ -5248,14 +5248,14 @@ gint32 CIfDeferredHandler::RunTask()
 }
 
 gint32 CIfDeferredHandler::UpdateParamAt(
-    guint32 i, BufPtr pBuf )
+    guint32 i, Variant& oVar )
 {
     CDeferredCallBase< CTasklet >* pTask =
         m_pDeferCall;
     if( pTask == nullptr )
         return -EINVAL;
 
-    return pTask->UpdateParamAt( i, pBuf );
+    return pTask->UpdateParamAt( i, oVar );
 }
 
 gint32 CIfDeferredHandler::OnTaskComplete( gint32 iRet ) 
@@ -5326,9 +5326,8 @@ gint32 CIfAsyncCancelHandler::OnTaskComplete(
     do{
         if( m_pDeferCall.IsEmpty() )
             break;
-        BufPtr pBuf( true );
-        *pBuf = iRet;
-        UpdateParamAt( 1, pBuf );
+        Variant oVar = iRet;
+        UpdateParamAt( 1, oVar );
         if( m_bSelfCleanup )
         {
             ( *m_pDeferCall )( 0 );
@@ -5361,7 +5360,7 @@ gint32 CIfResponseHandler::OnTaskComplete( gint32 iRet )
     do{
         // try best to make the response data
         // available in parameter 1
-        BufPtr pBuf( true );
+        Variant oVar;
         std::vector< LONGWORD > vecParams;
         ret = GetParamList( vecParams );
         if( SUCCEEDED( ret ) )
@@ -5386,7 +5385,7 @@ gint32 CIfResponseHandler::OnTaskComplete( gint32 iRet )
                         propRespPtr, pResp );
 
                     if( SUCCEEDED( ret ) )
-                        *pBuf = ObjPtr( pIoReq );
+                        oVar = ObjPtr( pIoReq );
                 }
                 else
                 {
@@ -5406,7 +5405,7 @@ gint32 CIfResponseHandler::OnTaskComplete( gint32 iRet )
                 ( IConfigDb* )GetConfig() );
             if( oCfg.exist( propRespPtr ) )
             {
-                *pBuf = ObjPtr( this );
+                oVar = ObjPtr( this );
                 ret = 0;
             }
         }
@@ -5423,9 +5422,9 @@ gint32 CIfResponseHandler::OnTaskComplete( gint32 iRet )
             pTask.NewObj(
                 clsid( CIfDummyTask ),
                 oParams.GetCfg() );
-            *pBuf = ObjPtr( pTask );
+            oVar = ObjPtr( pTask );
         }
-        UpdateParamAt( 1, pBuf );
+        UpdateParamAt( 1, oVar );
 
     }while( 0 );
 
@@ -5461,9 +5460,8 @@ gint32 CIfResponseHandler::OnIrpComplete(
             clsid( CIfDummyTask ),
             oParams.GetCfg() );
 
-        BufPtr pBuf( true );
-        *pBuf = ObjPtr( pTask );
-        UpdateParamAt( 1, pBuf );
+        Variant oVar = ObjPtr( pTask );
+        UpdateParamAt( 1, oVar );
 
     }while( 0 );
 

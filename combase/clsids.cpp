@@ -35,6 +35,7 @@
 #include "stlcont.h"
 #include <dlfcn.h>
 #include "objfctry.h"
+#include "variant.h"
 
 using namespace std;
 
@@ -65,6 +66,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRY( CStlObjMap );
 
     INIT_MAP_ENTRYCFG( CConfigDb );
+    INIT_MAP_ENTRYCFG( CConfigDb2 );
 
     END_FACTORY_MAPS;
 };

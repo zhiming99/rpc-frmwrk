@@ -34,8 +34,8 @@
 namespace rpcf
 {
 
-gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
-    ::GetArgs( std::vector< ARG_ENTRY >& vecArgs ) const
+gint32 DMsgPtr::GetArgs(
+    std::vector< ARG_ENTRY >& vecArgs ) const
 {
     gint32 ret = 0;
     CDBusError oError;
@@ -79,8 +79,7 @@ gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
     return ret;
 }
 
-gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
-    ::GetIntArgAt( gint32 iIndex, guint32& val )
+gint32 DMsgPtr::GetIntArgAt( gint32 iIndex, guint32& val )
 {
     BufPtr pBuf( true );
     gint32 iType = 0;
@@ -101,8 +100,7 @@ gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
     return 0;
 }
 
-gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
-    ::GetFdArgAt( gint32 iIndex, gint32& val )
+gint32 DMsgPtr::GetFdArgAt( gint32 iIndex, gint32& val )
 {
     BufPtr pBuf( true );
     gint32 iType = 0;
@@ -120,8 +118,7 @@ gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
     return 0;
 }
 
-gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
-    ::GetByteArgAt( gint32 iIndex, guint8& val )
+gint32 DMsgPtr::GetByteArgAt( gint32 iIndex, guint8& val )
 {
     BufPtr pBuf( true );
     gint32 iType = 0;
@@ -138,8 +135,7 @@ gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
     return 0;
 }
 
-gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
-    ::GetBoolArgAt( gint32 iIndex, bool& val )
+gint32 DMsgPtr::GetBoolArgAt( gint32 iIndex, bool& val )
 {
     BufPtr pBuf( true );
     gint32 iType = 0;
@@ -164,8 +160,8 @@ gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
     return ret;
 }
 
-gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
-    ::GetDoubleArgAt( gint32 iIndex, double& val )
+gint32 DMsgPtr::GetDoubleArgAt(
+    gint32 iIndex, double& val )
 {
     BufPtr pBuf( true );
     gint32 iType = 0;
@@ -182,8 +178,8 @@ gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
     return 0;
 }
 
-gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
-    ::GetInt64ArgAt( gint32 iIndex, guint64& val )
+gint32 DMsgPtr::GetInt64ArgAt(
+    gint32 iIndex, guint64& val )
 {
     BufPtr pBuf( true );
     gint32 iType = 0;
@@ -201,8 +197,8 @@ gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
     return 0;
 }
 
-gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
-    ::GetStrArgAt( gint32 iIndex, std::string& val )
+gint32 DMsgPtr::GetStrArgAt(
+    gint32 iIndex, std::string& val )
 {
     BufPtr pBuf( true );
     gint32 iType = 0;
@@ -219,8 +215,8 @@ gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
     return 0;
 }
 
-gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
-    ::GetMsgArgAt( gint32 iIndex, DMsgPtr& val )
+gint32 DMsgPtr::GetMsgArgAt(
+    gint32 iIndex, DMsgPtr& val )
 {
     BufPtr pBuf( true );
     gint32 iType = 0;
@@ -247,8 +243,8 @@ gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
     return 0;
 }
 
-gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
-    ::GetObjArgAt( gint32 iIndex, ObjPtr& val )
+gint32 DMsgPtr::GetObjArgAt(
+    gint32 iIndex, ObjPtr& val )
 {
     BufPtr pBuf( true );
     gint32 iType = 0;
@@ -265,8 +261,7 @@ gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
     return DeserializeObj( *pBuf, val );
 }
 
-gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
-    ::GetArgAt( gint32 iIndex,
+gint32 DMsgPtr::GetArgAt( gint32 iIndex,
     BufPtr& pArg, gint32& iType )
 {
     // get one single argument
@@ -327,8 +322,7 @@ gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
 * @{ */
 /**  @} */
 
-gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
-    ::GetValue( DBusMessageIter& itr,
+gint32 DMsgPtr::GetValue( DBusMessageIter& itr,
         BufPtr& pBuf, gint32& iType ) const
 {
     gint32 ret = 0;
@@ -418,8 +412,7 @@ gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
  * @param typecode the type
  * @returns alignment of 1, 4, or 8
  */
-int CAutoPtr< Clsid_Invalid, DBusMessage >
-    ::GetTypeBytes( int typecode ) const
+int DMsgPtr::GetTypeBytes( int typecode ) const
 {
   switch (typecode)
     {
@@ -466,8 +459,7 @@ int CAutoPtr< Clsid_Invalid, DBusMessage >
     }
 }
 
-gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
-    ::Serialize( CBuffer* pBuf )
+gint32 DMsgPtr::Serialize( CBuffer* pBuf )
 {
     if( IsEmpty() || pBuf == nullptr )
         return -EINVAL;
@@ -529,8 +521,7 @@ gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
     return ret;
 }
 
-gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
-    ::Deserialize( CBuffer* pBuf )
+gint32 DMsgPtr::Deserialize( CBuffer* pBuf )
 {
     gint32 ret = 0;
 
@@ -541,8 +532,8 @@ gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
         pBuf->ptr(), pBuf->size() );
 }
 
-gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
-    ::Deserialize( const char* pBuf, guint32 dwSizeMax )
+gint32 DMsgPtr::Deserialize(
+    const char* pBuf, guint32 dwSizeMax )
 {
     gint32 ret = 0;
     if( pBuf == nullptr )
@@ -578,8 +569,7 @@ gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
     return ret;
 }
 
-gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
-    ::Clone( DBusMessage* pSrcMsg )
+gint32 DMsgPtr::Clone( DBusMessage* pSrcMsg )
 {
     if( pSrcMsg == nullptr )
         return -EINVAL;
@@ -591,8 +581,7 @@ gint32 CAutoPtr< Clsid_Invalid, DBusMessage >
     return 0;
 }
 
-std::string CAutoPtr< Clsid_Invalid, DBusMessage >::
-    DumpMsg() const
+std::string DMsgPtr::DumpMsg() const
 {
     std::string strRet = "\n\t";
     std::string val = GetMember();

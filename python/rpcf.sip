@@ -667,10 +667,10 @@ namespace cpp
                 a0, a1 );
         %End
 
-        gint32 Push( PyObject* pObj /In/ );
+        /*gint32 Push( PyObject* pObj /In/ );
         %MethodCode
             sipRes = sipCpp->Push( *a0 );
-        %End
+        %End */
 
         gint32 PushObj( cpp::ObjPtr& val /In/ );
         %MethodCode

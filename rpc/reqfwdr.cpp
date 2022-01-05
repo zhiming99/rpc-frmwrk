@@ -1916,10 +1916,9 @@ gint32 CRpcReqForwarder::OnModEvent(
         if( ERROR( ret ) )
             break;
 
-        BufPtr pBuf( true );
-        *pBuf = ObjPtr( pDeferTask );
+        Variant oVar( pDeferTask );
         CIfDeferCallTaskEx* pTask = pDeferTask;
-        pTask->UpdateParamAt( 0, pBuf );
+        pTask->UpdateParamAt( 0, oVar );
 
         // using the reqfwdr's sequential
         // taskgroup

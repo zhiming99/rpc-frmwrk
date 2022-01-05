@@ -41,14 +41,12 @@ inline guint32 GetTypeSize( T* )
 template< typename T,
     typename Allowed = typename std::enable_if<
         std::is_same< stdstr, T >::value, T >::type >
-stdstr CastTo( BufPtr& pBuf )
+stdstr& CastTo( Variant& oVar )
 {
-    if( pBuf.IsEmpty() || pBuf->empty() )
-        return stdstr("");
-    if( pBuf->GetExDataType() != typeString )
+    if( oVar.GetTypeId() != typeString )
         throw std::invalid_argument(
             "error cast to string" );
-    return stdstr( pBuf->ptr() );
+    return ( stdstr& )oVar;
 }
 
 // cast to prime type reference except char* or const
@@ -62,18 +60,14 @@ template< typename T,
         !std::is_same< stdstr, DecType( T ) >::value &&
         !std::is_same< char*, DecType( T ) >::value &&
         !std::is_same< const char*, DecType( T ) >::value, T >::type >
-T& CastTo( BufPtr& pBuf )
+T& CastTo( Variant& oVar )
 {
-    if( pBuf.IsEmpty() || pBuf->empty() )
+    gint32 iType =
+        rpcf::GetTypeId( ( T* )nullptr );
+    if( oVar.GetTypeId() != iType )
         throw std::invalid_argument(
-            "error cast to prime types" );
-
-    guint32 dwSize = GetTypeSize( ( T* )0 );
-    if( dwSize > pBuf->size() )
-        throw std::invalid_argument(
-            "error cast to prime types" );
-
-    return ( T& )*pBuf;
+            "error cast to prime type" );
+    return ( T& )oVar;
 }
 
 // cast to CObjBase reference
@@ -83,14 +77,13 @@ template< typename T,
     typename T2= typename std::enable_if<
         std::is_base_of< CObjBase, T >::value, T >::type,
     typename T3=T >
-T& CastTo( BufPtr& pBuf )
+T& CastTo( Variant& oVar )
 {
-    if( pBuf.IsEmpty() || pBuf->empty() ||
-        pBuf->GetExDataType() != typeObj )
+    if( oVar.GetTypeId() != typeObj )
         throw std::invalid_argument(
-            "error cast to ObjPtr" );
-    CObjBase* p = (ObjPtr&)*pBuf;
-    T* pT = static_cast< T* >( p );
+            "error cast to CObjBase" );
+    ObjPtr& p = (ObjPtr&)oVar;
+    T* pT = p;
     return *pT;
 }
 
@@ -104,14 +97,13 @@ template< typename T,
         typename T3=T,
         typename T4=T
         >
-T& CastTo( BufPtr& pBuf )
+T& CastTo( Variant& oVar )
 {
-    if( pBuf.IsEmpty() || pBuf->empty() ||
-        ( pBuf->GetExDataType() != typeObj &&
-        pBuf->GetExDataType() != typeDMsg ) )
+    EnumTypeId iType = oVar.GetTypeId();
+    if( ( iType != typeObj && iType != typeDMsg ) )
         throw std::invalid_argument(
             "error cast to ObjPtr or DMsgPtr" );
-    return ( T& )*pBuf;
+    return ( T& )oVar;
 }
 
 // cast to IfPtr, CfgPtr, IrpPtr or other ptrs
@@ -122,13 +114,15 @@ template<typename T,
         !std::is_same< DMsgPtr, T >::value &&
         !std::is_same< BufPtr, T >::value &&
         !std::is_same< ObjPtr, T >::value, T >::type >
-T CastTo( BufPtr& pBuf )
+T CastTo( Variant& oVar )
 {
-    if( pBuf->empty() )
-    { T1 o; return o; }
-    ObjPtr* ppObj = ( ObjPtr* )pBuf->ptr();
-    T1 oT( *ppObj );
-    return oT;
+    EnumTypeId iType = oVar.GetTypeId();
+    if( iType != typeObj )
+        throw std::invalid_argument(
+            "error cast to ObjPtr" );
+    ObjPtr& pObj = oVar;
+    T o( pObj );
+    return o;
 }
 
 #define DFirst DecType( First )
@@ -148,30 +142,26 @@ template< typename First,
         !std::is_same< stdstr, ValTypeFirst >::value &&
         !std::is_same< char, ValTypeFirst >::value, First >
         ::type >
-ValTypeFirst* CastTo( const BufPtr& pCBuf )
+ValTypeFirst* CastTo( const Variant& oVar )
 {
-    BufPtr& pBuf = const_cast<BufPtr&>( pCBuf );
-    if( pBuf->empty() )
-    { return nullptr; }
-    if( pBuf->GetExDataType() == typeNone )
+    if( oVar.GetTypeId() == typeNone )
         throw std::invalid_argument(
             "error invalid type cast" );
-    ValTypeFirst& val = *pBuf;
+    ValTypeFirst& val = oVar;
     return &val;
 }
 
 // cast to char* or const char*
 template< typename First,
     typename Allowed = typename std::enable_if<
-        std::is_same< char*, DFirst >::value ||
         std::is_same< const char*, DFirst >::value, First >::type,
     typename T3=Allowed >
-DFirst CastTo( BufPtr& pCBuf )
+DFirst CastTo( Variant& oVar )
 {
-    BufPtr& pBuf = const_cast<BufPtr&>( pCBuf );
-    if( pBuf->empty() )
-    { return nullptr; }
-    DFirst val = pBuf->ptr();
+    if( oVar.GetTypeId() != typeString )
+        throw std::invalid_argument(
+            "error cast to string" );
+    DFirst val = oVar;
     return val;
 }
 
@@ -180,12 +170,12 @@ template< typename First,
     typename Allowed = typename std::enable_if<
         std::is_same< DBusMessage*, First >::value,
         First >::type >
-DBusMessage* CastTo( BufPtr& pCBuf )
+DBusMessage* CastTo( Variant& oVar )
 {
-    BufPtr& pBuf = const_cast<BufPtr&>( pCBuf );
-    if( pBuf->empty() )
-    { return nullptr; }
-    DMsgPtr& pMsg = *pBuf;
+    if( oVar.GetTypeId() != typeDMsg )
+        throw std::invalid_argument(
+            "error cast to string" );
+    DMsgPtr& pMsg = oVar;
     return ( First )pMsg;
 }
 
@@ -201,12 +191,12 @@ template< typename First,
         !std::is_same< CBuffer*, First >::value,
          First >::type,
     typename T5=Allowed >
-DFirst CastTo( BufPtr& pCBuf )
+DFirst CastTo( Variant& oVar )
 {
-    BufPtr& pBuf = const_cast<BufPtr&>( pCBuf );
-    if( pBuf->empty() )
-    { return nullptr; }
-    ObjPtr& pObj = *pBuf;
+    if( oVar.GetTypeId() != typeObj )
+        throw std::invalid_argument(
+            "error cast to Object" );
+    ObjPtr& pObj = oVar;
     DFirst val = pObj;
     return val;
 }
@@ -216,26 +206,32 @@ template< typename First,
     typename Allowed = typename std::enable_if<
         std::is_same< CBuffer, ValTypeFirst >::value &&
         std::is_pointer< First >::value, First >::type  >
-CBuffer* CastTo( BufPtr& pCBuf )
+CBuffer* CastTo( Variant& oVar )
 {
-    BufPtr& pBuf = const_cast<BufPtr&>( pCBuf );
-    if( pBuf.IsEmpty() )
-        return nullptr;
-
-    return ( CBuffer* )pBuf;
+    if( oVar.GetTypeId() != typeByteArr )
+        throw std::invalid_argument(
+            "error cast to CBuffer*" );
+    BufPtr& pBuf = oVar;
+    return pBuf;
 }
 
 // cast to BufPtr reference
 template< typename T,
     typename Allowed= typename std::enable_if<
         std::is_same< BufPtr, T >::value , T >::type  >
-BufPtr& CastTo( BufPtr& pBuf )
-{ return pBuf; }
+BufPtr& CastTo( Variant& oVar )
+{
+    if( oVar.GetTypeId() != typeByteArr )
+        throw std::invalid_argument(
+            "error cast to BufPtr" );
+    BufPtr& pBuf = oVar;
+    return pBuf;
+}
 
 template< typename First >
-auto VecToTupleHelper( std::vector< BufPtr >& vec ) -> std::tuple<DFirst>
+auto VecToTupleHelper( std::vector< Variant >& vec ) -> std::tuple<DFirst>
 {
-    BufPtr& i = vec.back();
+    Variant& i = vec.back();
     DFirst oVal( CastTo< DFirst >( i ) );
     return std::tuple< DFirst >( oVal );
 }
@@ -243,9 +239,9 @@ auto VecToTupleHelper( std::vector< BufPtr >& vec ) -> std::tuple<DFirst>
 // generate a tuple from the vector with the
 // proper type set for each element
 template< typename First, typename Second, typename ...Types >
-auto VecToTupleHelper( std::vector< BufPtr >& vec ) -> std::tuple< DFirst, DSecond, DTypes... >
+auto VecToTupleHelper( std::vector< Variant >& vec ) -> std::tuple< DFirst, DSecond, DTypes... >
 {
-    BufPtr& i = vec[ vec.size() - sizeof...( Types ) - 2 ];
+    Variant& i = vec[ vec.size() - sizeof...( Types ) - 2 ];
     DFirst oVal( CastTo< DFirst >( i ) );
 
     // to assign right type to the element in the
@@ -256,13 +252,13 @@ auto VecToTupleHelper( std::vector< BufPtr >& vec ) -> std::tuple< DFirst, DSeco
 }
 
 template< typename ...Types >
-auto VecToTuple( std::vector< BufPtr >& vec ) -> std::tuple< DTypes... >
+auto VecToTuple( std::vector< Variant >& vec ) -> std::tuple< DTypes... >
 {
     return VecToTupleHelper< Types...>( vec );
 }
 
 template<>
-auto VecToTuple<>( std::vector< BufPtr >& vec ) -> std::tuple<>; 
+auto VecToTuple<>( std::vector< Variant >& vec ) -> std::tuple<>; 
 
 // parameter pack generator
 template< int ... >
@@ -297,24 +293,23 @@ class CGenericCallback :
     {;}
 
     gint32 NormalizeParams( bool bResp, IConfigDb* pResp,
-        std::vector< BufPtr >& oRes )
+        std::vector< Variant >& oRes )
     {
         CParamList oResp( pResp );
         gint32 ret = 0;
         do{
             if( bResp )
             {
-                gint32 iRet = 0;
-                ret = oResp.GetIntProp( propReturnValue,
-                    ( guint32& )iRet );
+                Variant* p =
+                    oResp.GetPropPtr( propReturnValue );
 
-                if( ERROR( ret ) )
+                if( nullptr == p )
+                {
+                    ret = -ENOENT;
                     break;
+                }
 
-                BufPtr pBuf( true );
-
-                *pBuf = ( guint32 )iRet;
-                oRes.push_back( pBuf );
+                oRes.push_back( *p );
             }
 
             guint32 dwSize = 0;
@@ -327,12 +322,13 @@ class CGenericCallback :
             // to handle this
             for( guint32 i = 0; i < dwSize; i++ )
             {
-                BufPtr pBuf;
-                ret = oResp.GetProperty( i, pBuf );
-                if( ERROR( ret ) )
+                Variant* p = oResp.GetPropPtr( i );
+                if( p == nullptr )
+                {
+                    ret = -ENOENT;
                     break;
-
-                oRes.push_back( pBuf );
+                }
+                oRes.push_back( *p );
             }
         }while( 0 );
 
@@ -402,21 +398,18 @@ template<typename T,
     typename T2 = typename std::enable_if<
         std::is_base_of< IAutoPtr, T >::value, T >::type,
     typename T3=T2 >
-BufPtr PackageTo( const T& pObj )
+Variant PackageTo( const T& pObj )
 {
-    BufPtr pBuf( true );
-    *pBuf = ObjPtr( pObj );
-    return pBuf;
+    ObjPtr p( pObj );
+    return Variant( p );
 }
 
 template< typename T,
     typename T2 = typename std::enable_if<
         !std::is_base_of< IAutoPtr, T >::value, T >::type >
-BufPtr PackageTo( const T& i )
+Variant PackageTo( const T& i )
 {
-    BufPtr pBuf( true );
-    *pBuf = i;
-    return pBuf;
+    return Variant( i );
 }
 
 template<typename T,
@@ -424,11 +417,10 @@ template<typename T,
         !std::is_same<DBusMessage, T>::value, T >::type,
     typename T1 = typename std::enable_if<
         std::is_base_of<CObjBase, T>::value, T >::type >
-BufPtr PackageTo( T* pObj )
+Variant PackageTo( T* pObj )
 {
-    BufPtr pBuf( true );
-    *pBuf = ObjPtr( pObj );
-    return pBuf;
+    ObjPtr p( pObj );
+    return Variant( p );
 }
 
 template<typename T,
@@ -436,42 +428,40 @@ template<typename T,
         std::is_same<DBusMessage, T>::value, T >::type,
     typename T1 = T2,
     typename T3 = T2 >
-BufPtr PackageTo( T* pObj )
+Variant PackageTo( T* pObj )
 {
-    BufPtr pBuf( true );
-    *pBuf = DMsgPtr( pObj );
-    return pBuf;
+    DMsgPtr p = DMsgPtr( pObj );
+    return Variant( p );
 }
 
 template< typename T >
-BufPtr PackageTo( const T* pObj )
+Variant PackageTo( const T* pObj )
 {
-    BufPtr pBuf( true );
-    *pBuf = *pObj;
-    return pBuf;
+    Variant o( *pObj );
+    return o;
 }
 
 
 template<>
-CObjBase& CastTo< CObjBase >( BufPtr& i );
+CObjBase& CastTo< CObjBase >( Variant& i );
 
 template<>
-BufPtr& CastTo< BufPtr >( BufPtr& i );
+BufPtr& CastTo< BufPtr >( Variant& i );
 
 template<>
-BufPtr PackageTo< DMsgPtr >( const DMsgPtr& pMsg );
+Variant PackageTo< DMsgPtr >( const DMsgPtr& pMsg );
 
 template<>
-BufPtr PackageTo< stdstr >( const stdstr& str );
+Variant PackageTo< stdstr >( const stdstr& str );
 
 template<>
-BufPtr PackageTo< BufPtr >( const BufPtr& pBuf );
+Variant PackageTo< BufPtr >( const BufPtr& pBuf );
 
 template<>
-BufPtr PackageTo< ObjPtr >( const ObjPtr& pObj );
+Variant PackageTo< ObjPtr >( const ObjPtr& pObj );
 
 template<>
-BufPtr PackageTo< CBuffer >( CBuffer* pObj );
+Variant PackageTo< CBuffer >( CBuffer* pObj );
 
 }
 
@@ -483,10 +473,9 @@ namespace rpcf
 template< int N >
 struct _DummyClass_
 {
-    static void PackExp( std::vector< BufPtr >& vec, ... )
+    static void PackExp( std::vector< Variant >& vec, ... )
     { 
         va_list va;
-        CBuffer* pBuf = nullptr;
         // NOTE: this is an approach to make both
         // X86 and ARM happy, since the evaluation
         // of parameters of the parameter pack is
@@ -495,8 +484,8 @@ struct _DummyClass_
         va_start( va, vec );
         for( int i = 0; i < N; ++i )
         {
-            pBuf = va_arg( va, CBuffer* );
-            vec.push_back( BufPtr( pBuf ) );
+            Variant oVar = va_arg( va, Variant );
+            vec.push_back( oVar );
         }
         va_end( va );
         return;
@@ -505,11 +494,11 @@ struct _DummyClass_
 
 template< typename...Types >
 inline void PackParams(
-    std::vector< BufPtr >& vec, Types&&...args )
+    std::vector< Variant >& vec, Types&&...args )
 {
     // note that the last arg is inserted first
     _DummyClass_< sizeof...( args )>::PackExp(
-        vec, ( ( CBuffer* ) PackageTo( args ) ) ... );
+        vec, ( PackageTo( args ) ) ... );
 }
 
 // proxy related classes
@@ -536,7 +525,7 @@ class CMethodProxy :
         if( pIf == nullptr )
             return -EINVAL;
 
-        std::vector< BufPtr > vec;
+        std::vector< Variant > vec;
         if( sizeof...( Args ) )
             PackParams( vec, args ... );
 
@@ -759,7 +748,7 @@ class CDelegateBase :
     virtual gint32 Delegate(
         CObjBase* pObj,
         IEventSink* pCallback,
-        std::vector< BufPtr >& vecParams ) = 0;
+        std::vector< Variant >& vecParams ) = 0;
 
     gint32 operator()( guint32 dwContext )
     {
@@ -784,7 +773,7 @@ class CDelegateBase :
                 ret = -EFAULT;
                 break;
             }
-            std::vector< BufPtr > vecRespParams;
+            std::vector< Variant > vecRespParams;
 
             ret = NormalizeParams(
                 false, pReq, vecRespParams );
@@ -841,7 +830,7 @@ class CMethodServer :
     gint32 Delegate( 
         CObjBase* pObj,
         IEventSink* pCallback,
-        std::vector< BufPtr >& vecParams )
+        std::vector< Variant >& vecParams )
     {
         if( pObj == nullptr ||
             pCallback == nullptr )
@@ -853,7 +842,7 @@ class CMethodServer :
             return -EINVAL;
         }
 
-        std::vector< BufPtr > vecResp;
+        std::vector< Variant > vecResp;
         for( auto& elem : vecParams )
             vecResp.push_back( elem );
 
@@ -913,7 +902,7 @@ struct InitTupleDefault< std::tuple< T0, Args... > > :
     InitTupleDefault< std::tuple< Args... > >
 {
     typedef InitTupleDefault< std::tuple< Args... > > super;
-    InitTupleDefault( std::vector< BufPtr >& vecDefault )
+    InitTupleDefault( std::vector< Variant >& vecDefault )
         : super( vecDefault )
     {
         vecDefault.insert(
@@ -924,7 +913,7 @@ struct InitTupleDefault< std::tuple< T0, Args... > > :
 template<typename T0>
 struct InitTupleDefault< std::tuple< T0 > >
 {
-    InitTupleDefault( std::vector< BufPtr >& vecDefault )
+    InitTupleDefault( std::vector< Variant >& vecDefault )
     {
         vecDefault.insert(
             vecDefault.begin(),
@@ -934,7 +923,7 @@ struct InitTupleDefault< std::tuple< T0 > >
 template<>
 struct InitTupleDefault< std::tuple<> >
 {
-    InitTupleDefault( std::vector< BufPtr >& vecDefault )
+    InitTupleDefault( std::vector< Variant >& vecDefault )
     {}
 };
 
@@ -982,13 +971,13 @@ class CMethodServerEx< iNumInput, gint32 (ClassName::*)(IEventSink*, Args ...) >
     { this->SetClassId( clsid( CMethodServerEx ) ); }
 
     void TupleToVec2( std::tuple<>& oTuple,
-        std::vector< BufPtr >& vec,
+        std::vector< Variant >& vec,
         NumberSequence<> )
     {}
 
     template < int N >
     void TupleToVec2( std::tuple< DecType( Args )...>& oTuple,
-        std::vector< BufPtr >& vec,
+        std::vector< Variant >& vec,
         NumberSequence< N > )
     {
         if( N < iNumInput )
@@ -1000,7 +989,7 @@ class CMethodServerEx< iNumInput, gint32 (ClassName::*)(IEventSink*, Args ...) >
 
     template < int N, int M, int...S >
     void TupleToVec2( std::tuple< DecType( Args )...>& oTuple,
-        std::vector< BufPtr >& vec,
+        std::vector< Variant >& vec,
         NumberSequence< N, M, S... > )
     {
         if( N >= iNumInput )
@@ -1014,7 +1003,7 @@ class CMethodServerEx< iNumInput, gint32 (ClassName::*)(IEventSink*, Args ...) >
     gint32 Delegate( 
         CObjBase* pObj,
         IEventSink* pCallback,
-        std::vector< BufPtr >& vecParams )
+        std::vector< Variant >& vecParams )
     {
         if( pObj == nullptr ||
             pCallback == nullptr )
@@ -1032,11 +1021,11 @@ class CMethodServerEx< iNumInput, gint32 (ClassName::*)(IEventSink*, Args ...) >
         using OutTupType = typename OutputParamTypes<
             iNumInput, DecType( Args )... >::OutputTypes;
 
-        std::vector< BufPtr > vecResp;
+        std::vector< Variant > vecResp;
         for( auto& elem : vecParams )
             vecResp.push_back( elem );
 
-        std::vector< BufPtr > vecDefOut;
+        std::vector< Variant > vecDefOut;
 
         gint32 ret = 0;
 
@@ -1312,10 +1301,10 @@ class CDeferredCallBase :
     {;}
 
     virtual gint32 Delegate( CObjBase* pObj,
-        std::vector< BufPtr >& vecParams ) = 0;
+        std::vector< Variant >& vecParams ) = 0;
 
     ObjPtr m_pObj;
-    std::vector< BufPtr > m_vecArgs;
+    std::vector< Variant > m_vecArgs;
 
     virtual gint32 operator()( guint32 dwContext )
     {
@@ -1329,19 +1318,19 @@ class CDeferredCallBase :
         return this->SetError( ret );
     }
 
-    gint32 UpdateParamAt( guint32 i, BufPtr& pBuf )
+    gint32 UpdateParamAt( guint32 i, Variant& oVar )
     {
         if( i >= m_vecArgs.size() || i < 0 )
             return -EINVAL;
-        m_vecArgs[ i ] = pBuf;
+        m_vecArgs[ i ] = oVar;
         return 0;
     }
 
-    gint32 GetParamAt( guint32 i, BufPtr& pBuf ) const
+    gint32 GetParamAt( guint32 i, Variant& oVar ) const
     {
         if( i >= m_vecArgs.size() || i < 0 )
             return -EINVAL;
-        pBuf = m_vecArgs[ i ];
+        oVar = m_vecArgs[ i ];
         return 0;
     }
 };
@@ -1354,7 +1343,7 @@ class CDeferredCall :
 
     template< int ...S>
     gint32 CallUserFunc( ClassName* pObj, 
-        std::vector< BufPtr >& vecParams, NumberSequence< S... > )
+        std::vector< Variant >& vecParams, NumberSequence< S... > )
     {
         if( pObj == nullptr || m_pUserFunc == nullptr )
             return -EINVAL;
@@ -1398,7 +1387,7 @@ class CDeferredCall :
     }
 
     gint32 Delegate( CObjBase* pObj,
-        std::vector< BufPtr >& vecParams )
+        std::vector< Variant >& vecParams )
     {
         if( unlikely( pObj == nullptr ) )
             return -EINVAL;
@@ -1489,25 +1478,25 @@ class CIfDeferCallTaskBase :
     { return iRet; }
 
     gint32 UpdateParamAt(
-        guint32 i, BufPtr pBuf )
+        guint32 i, Variant& oVar )
     {
         CDeferredCallBase< CTasklet >*
             pTask = m_pDeferCall;
         if( pTask == nullptr )
             return -EINVAL;
 
-        return pTask->UpdateParamAt( i, pBuf );
+        return pTask->UpdateParamAt( i, oVar );
     }
 
     gint32 GetParamAt(
-        guint32 i, BufPtr& pBuf ) const
+        guint32 i, Variant& oVar ) const
     {
         CDeferredCallBase< CTasklet >*
             pTask = m_pDeferCall;
         if( pTask == nullptr )
             return -EINVAL;
 
-        return pTask->GetParamAt( i, pBuf );
+        return pTask->GetParamAt( i, oVar );
     }
 
     gint32 OnComplete( gint32 iRetVal )
@@ -1589,9 +1578,8 @@ inline gint32 NewIfDeferredCall( EnumClsid iTaskClsid,
     if( SUCCEEDED( _ret ) ) \
     { \
         CIfDeferCallTask* pDefer = _pTask; \
-        BufPtr pBuf( true ); \
-        *pBuf = ObjPtr( pDefer ); \
-        pDefer->UpdateParamAt( _pos, pBuf );  \
+        Variant oVar( _pTask ); \
+        pDefer->UpdateParamAt( _pos, oVar );  \
     } \
     _ret; \
 })
@@ -1609,9 +1597,8 @@ inline gint32 NewIfDeferredCall( EnumClsid iTaskClsid,
     if( SUCCEEDED( _ret ) ) \
     { \
         CIfDeferCallTaskEx* pDefer = _pTask; \
-        BufPtr pBuf( true ); \
-        *pBuf = ObjPtr( pDefer ); \
-        pDefer->UpdateParamAt( _pos, pBuf );  \
+        Variant oVar( _pTask ); \
+        pDefer->UpdateParamAt( _pos, oVar );  \
     } \
     _ret; \
 })
@@ -1704,7 +1691,7 @@ class CIfDeferredHandler :
 
     // just as a place holder
     gint32 RunTask();
-    gint32 UpdateParamAt( guint32 i, BufPtr pBuf );
+    gint32 UpdateParamAt( guint32 i, Variant& pBuf );
     gint32 OnTaskComplete( gint32 iRet );
     gint32 OnComplete( gint32 iRetVal );
 
@@ -1762,8 +1749,8 @@ inline gint32 NewDeferredHandler(
     CIfDeferredHandler* pDeferTask = pIfTask;
     pDeferTask->SetDeferCall( pWrapper );
 
-    BufPtr pBuf( true );
-    *pBuf = ObjPtr( pDeferTask );
+    ObjPtr p( pDeferTask );
+    Variant oVar( p );
 
     pCallback = pDeferTask;
     if( iPos < 0 )
@@ -1771,7 +1758,7 @@ inline gint32 NewDeferredHandler(
 
     // for the handler method, pass the pDeferTask
     // as the callback
-    ret = pDeferTask->UpdateParamAt( iPos, pBuf );
+    ret = pDeferTask->UpdateParamAt( iPos, oVar );
     if( ERROR( ret ) )
         return ret;
 
@@ -1922,9 +1909,8 @@ inline gint32 NewResponseHandler(
         _pIoCall->SetMajorCall( _pMajorCall );\
         CDeferredCallBase< CTasklet >* \
             pDeferCall = _pMajorCall; \
-        BufPtr pBuf( true );\
-        *pBuf = ObjPtr( _pIoCall );\
-        pDeferCall->UpdateParamAt( _iPos, pBuf );\
+        Variant oVar( __pTask );\
+        pDeferCall->UpdateParamAt( _iPos, oVar );\
     }\
     ret;\
 })
@@ -1982,9 +1968,8 @@ inline gint32 NewObjDeferredCall( EnumClsid iTaskClsid,
     if( SUCCEEDED( _ret ) ) \
     { \
         CIfDeferCallTask* pDefer = _pTask; \
-        BufPtr pBuf( true ); \
-        *pBuf = ObjPtr( pDefer ); \
-        pDefer->UpdateParamAt( _pos, pBuf );  \
+        Variant oVar( _pTask ); \
+        pDefer->UpdateParamAt( _pos, oVar );  \
     } \
     _ret; \
 })
@@ -2002,9 +1987,8 @@ inline gint32 NewObjDeferredCall( EnumClsid iTaskClsid,
     if( SUCCEEDED( _ret ) ) \
     { \
         CIfDeferCallTaskEx* pDefer = _pTask; \
-        BufPtr pBuf( true ); \
-        *pBuf = ObjPtr( pDefer ); \
-        pDefer->UpdateParamAt( _pos, pBuf );  \
+        Variant oVar( _pTask ); \
+        pDefer->UpdateParamAt( _pos, oVar );  \
     } \
     _ret; \
 })
@@ -2081,9 +2065,8 @@ inline gint32 NewResponseHandler2(
         _pIoCall->SetMajorCall( _pMajorCall );\
         CDeferredCallBase< CTasklet >* \
             pDeferCall = _pMajorCall; \
-        BufPtr pBuf( true );\
-        *pBuf = ObjPtr( _pIoCall );\
-        pDeferCall->UpdateParamAt( _iPos, pBuf );\
+        Variant oVar( __pTask ); \
+        pDeferCall->UpdateParamAt( _iPos, oVar );\
     }\
     ret;\
 })
@@ -2198,8 +2181,9 @@ class CAsyncCallbackBase :
                 ret = -EFAULT;
                 break;
             }
-            std::vector< BufPtr > vecRespParams;
-            ret = this->NormalizeParams( true, pResp, vecRespParams );
+            std::vector< Variant > vecRespParams;
+            ret = this->NormalizeParams(
+                true, pResp, vecRespParams );
             if( ERROR( ret ) )
                 break;
 
@@ -2217,7 +2201,7 @@ class CAsyncCallbackBase :
     {;}
 
     virtual gint32 Callback(
-        std::vector< BufPtr >& vecParams ) = 0;
+        std::vector< Variant >& vecParams ) = 0;
 
     gint32 operator()( guint32 dwContext = 0 )
     {
@@ -2318,28 +2302,28 @@ class CAsyncCallback :
     }
 
     template< typename T, typename S, typename ...Rest >
-    gint32 GetDefaults( std::vector< BufPtr >& vecBufs  )
+    gint32 GetDefaults( std::vector< Variant >& vecBufs  )
     {
-        BufPtr pBuf = GetDefault(
+        Variant oVar = GetDefVar(
             ( ValType( T )* )nullptr );
 
-       vecBufs.push_back(  pBuf );
+       vecBufs.push_back( oVar );
        return GetDefaults< S, Rest...>( vecBufs );
     }
 
     template< typename T >
-    gint32 GetDefaults( std::vector< BufPtr >& vecBufs )
+    gint32 GetDefaults( std::vector< Variant >& vecBufs )
     {
-        BufPtr pBuf = GetDefault(
+        Variant oVar = GetDefVar(
             ( ValType( T )* )nullptr );
 
-       vecBufs.push_back(  pBuf );
+       vecBufs.push_back( oVar );
        return 0;
     }
 
     // well, this is a virtual function in the template
     // class. 
-    gint32 Callback( std::vector< BufPtr >& vecParams )
+    gint32 Callback( std::vector< Variant >& vecParams )
     {
         if( vecParams.empty() )
             return -EINVAL;
@@ -2348,13 +2332,13 @@ class CAsyncCallback :
         try{
             if( vecParams.size() < sizeof...( Args ) )
             {
-                guint32 iRet = *vecParams[ 0 ];
+                guint32 iRet = vecParams[ 0 ];
                 if( ERROR( iRet ) )
                 {
                     // error returned, let's make some fake
                     // values to get the callback be called
                     // with the error
-                    std::vector< BufPtr > vecDefaults;
+                    std::vector< Variant > vecDefaults;
 
                     // at least there will be one argument
                     GetDefaults<Args...>( vecDefaults );
@@ -2375,7 +2359,7 @@ class CAsyncCallback :
                 }
             }
 
-            std::vector< BufPtr > vecResp;
+            std::vector< Variant > vecResp;
 
             vecResp.insert( vecResp.begin(),
                  vecParams.begin(), vecParams.end() );
@@ -2794,11 +2778,11 @@ gint32 CInterfaceServer::SendEventEx(
 
         oReq.SetMethodName( strMethod );
 
-        std::vector< BufPtr > vecArgs;
+        std::vector< Variant > vecArgs;
         PackParams( vecArgs, args... );
 
-        for( auto pBuf : vecArgs )
-            oReq.Push<BufPtr&>( pBuf );
+        for( auto elem : vecArgs )
+            oReq.Push( elem );
 
         if( pCallback == nullptr )
         {

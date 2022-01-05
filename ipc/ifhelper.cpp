@@ -41,82 +41,77 @@ stdstr CastTo( BufPtr& pBuf )
 }
 
 template<>
-BufPtr& CastTo< BufPtr >( BufPtr& i )
+BufPtr& CastTo< BufPtr >( Variant& i )
 {
     return i;
 }
 
 template<>
-BufPtr PackageTo< DMsgPtr >( const DMsgPtr& pMsg )
+Variant PackageTo< DMsgPtr >( const DMsgPtr& pMsg )
 {
-    BufPtr pBuf( true );
-    *pBuf = pMsg;
-    return pBuf;
+    Variant o( pMsg );
+    return o;
 }
 
 template<>
-BufPtr PackageTo< ObjPtr >( const ObjPtr& pObj )
+Variant PackageTo< ObjPtr >( const ObjPtr& pObj )
 {
-    BufPtr pBuf( true );
-    *pBuf = pObj;
-    return pBuf;
+    Variant o( pObj );
+    return o;
 }
 
 template<>
-BufPtr PackageTo< BufPtr >( const BufPtr& pObj )
+Variant PackageTo< BufPtr >( const BufPtr& pObj )
 {
-    return const_cast<BufPtr&>( pObj );
+    Variant o( pObj );
+    return o;
 }
 
 template<>
-BufPtr PackageTo< CObjBase >( const CObjBase* pObj )
+Variant PackageTo< CObjBase >( const CObjBase* pObj )
 {
-    BufPtr pBuf( true );
     ObjPtr ptrObj( const_cast< CObjBase* >( pObj ) );
-    *pBuf = ptrObj;
-    return pBuf;
+    Variant o( ptrObj );
+    return o;
 }
 
 template<>
-BufPtr PackageTo< DBusMessage >( const DBusMessage* pMsg )
+Variant PackageTo< DBusMessage >( const DBusMessage* pMsg )
 {
-    BufPtr pBuf( true );
-    *pBuf = DMsgPtr( const_cast< DBusMessage*>( pMsg ) );
-    return pBuf;
+    DMsgPtr p( const_cast< DBusMessage* >( pMsg ) );
+    return Variant( p );
 }
 
 template<>
-BufPtr PackageTo< char >( const char* pText )
+Variant PackageTo< char >( const char* pText )
 {
-    BufPtr pBuf( true );
-    *pBuf = stdstr( pText );
-    return pBuf;
+    Variant o( pText );
+    return o;
 }
 
 template<>
-BufPtr PackageTo< stdstr >( const stdstr& str )
+Variant PackageTo< stdstr >( const stdstr& str )
 {
-    BufPtr pBuf( true );
-    *pBuf = str;
-    return pBuf;
+    Variant o( str );
+    return o;
 }
 
 template<>
-BufPtr PackageTo< CBuffer >( CBuffer* pObj )
+Variant PackageTo< CBuffer >( CBuffer* pObj )
 {
-    BufPtr pBuf( pObj );
-    return pBuf;
+    BufPtr p( pObj );
+    return Variant( p );
 }
 
 template<>
-auto VecToTuple<>( std::vector< BufPtr >& vec ) -> std::tuple<> 
+auto VecToTuple<>( std::vector< Variant >& vec ) -> std::tuple<> 
 {
     return std::tuple<>();
 }
 
-void AssignVal( DMsgPtr& rVal, CBuffer& rBuf )
+void AssignVal( DMsgPtr& rVal, Variant& oVar )
 {
-    rVal = ( DMsgPtr& )rBuf;
+    rVal = ( DMsgPtr& )oVar;
 }
 
 }

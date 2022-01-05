@@ -376,9 +376,8 @@ class CStreamRelayBase :
             // Let the WriteStream to notify this task when
             // completed
             CIfDeferCallTaskEx* pTemp = pSendClose;
-            BufPtr pwscb( true );
-            *pwscb = ObjPtr( pSendClose );
-            pTemp->UpdateParamAt( 3, pwscb );
+            Variant oVar( pSendClose );
+            pTemp->UpdateParamAt( 3, oVar );
 
             CParamList oParams;
             oParams[ propIfPtr ] = ObjPtr( this );

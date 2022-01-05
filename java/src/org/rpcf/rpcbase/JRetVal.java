@@ -58,13 +58,13 @@ public class JRetVal {
         return m_listResp.toArray();
     }
 
-    public vectorBufPtr getParams()
+    public vectorVars getParams()
     {
-        vectorBufPtr vecBufs =
-            Helpers.convertObjectToBuf(
+        vectorVars vecVars =
+            Helpers.convertObjectToVars(
                 m_listResp.toArray() );
 
-        return vecBufs;
+        return vecVars;
     }
 
     public int getParamCount()
