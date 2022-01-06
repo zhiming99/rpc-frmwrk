@@ -1799,8 +1799,10 @@ class CParamList : public CCfgOpener
         return iPos;
     }
 
-    template< typename T >
-    gint32 Push( T&& val  )
+    template< typename T,
+        typename filter=typename std::enable_if<
+            !std::is_pointer<T>::value, T>::type >
+    gint32 Push( const T& val  )
     {
         gint32 ret = 0;
         do{
@@ -1820,6 +1822,22 @@ class CParamList : public CCfgOpener
         }while( 0 );
 
         return ret;
+    }
+
+    template< typename T,
+        typename filter=typename std::enable_if<
+            std::is_base_of< CObjBase, T >::value,
+            T>::type >
+    gint32 Push( T* val  )
+    {
+        ObjPtr pObj( val );
+        return Push( pObj );
+    }
+
+    gint32 Push( const char* val )
+    {
+        Variant o = val;
+        return Push( o );
     }
 
     template< typename T >

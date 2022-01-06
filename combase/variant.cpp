@@ -157,6 +157,7 @@ Variant::Variant( const Variant& rhs )
         break;
     case typeDouble:
         m_dblVal = rhs.m_dblVal;
+        break;
     case typeDMsg:
         new( &m_pMsg ) DMsgPtr( rhs.m_pMsg );
         break;

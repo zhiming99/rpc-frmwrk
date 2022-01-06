@@ -790,8 +790,7 @@ gint32 CRpcTcpBridgeProxy::ForwardRequest(
 
 
         // just to conform to the rule
-        oBuilder.Push( ( IConfigDb* )
-            oReqCtx.GetCfg() );
+        oBuilder.Push( oReqCtx.GetCfg() );
 
         oBuilder.Push( DMsgPtr( pReqMsg ) );
         oBuilder.CopyProp( propPortId,
@@ -3246,8 +3245,7 @@ gint32 CRpcTcpBridge::ForwardEvent(
                 strRouterPath, pMsg );
         }
 
-        oBuilder.Push( ( IConfigDb* )
-            oEvtCtx.GetCfg() );
+        oBuilder.Push( oEvtCtx.GetCfg() );
 
         oBuilder.Push( pMsg );
 
@@ -4068,7 +4066,7 @@ gint32 CRpcTcpBridge::ForwardRequestInternal(
         if( ERROR( ret ) )
             break;
 
-        oParams.Push( pReqCtx );
+        oParams.Push( ObjPtr( pReqCtx ) );
         oParams.Push( fwdrMsg );
         oParams.Push( strDest );
 

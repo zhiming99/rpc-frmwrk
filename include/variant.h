@@ -48,7 +48,7 @@ struct Variant
     };
 
     EnumTypeId m_iType = typeNone;
-    Variant(){}
+    Variant(){ m_qwVal = 0; }
     Variant( bool bVal );
     Variant( guint8 byVal );
     Variant( guint16 wVal );
@@ -217,15 +217,26 @@ struct Variant
     { return !( *this == rhs ); }
 };
 
-template< class T,
-    class allowed = typename std::enable_if<
-    std::is_scalar< T >::value ||
-    std::is_same< stdstr, T >::value ||
-    std::is_base_of< IAutoPtr, T >::value,
+/*template< typename T,
+    typename allowed = typename std::enable_if<
+    !std::is_base_of< CObjBase, T >::value &&
+    !std::is_base_of< IAutoPtr, T >::value, 
     T >::type >
 inline Variant GetDefVar( T* )
 {
-    Variant o;
+    std::string strMsg = DebugMsg(
+        -EFAULT, "we should not be here" );
+    throw std::runtime_error( strMsg );
+}*/
+
+template< class T,
+    class allowed = typename std::enable_if<
+    std::is_scalar< T >::value ||
+    std::is_same< stdstr, T >::value,
+    T >::type >
+inline Variant GetDefVar( T* )
+{
+    Variant o( ( T )0 );
     return o;
 }
 
@@ -258,9 +269,9 @@ inline Variant GetDefVar<bool>( bool* )
 }
 
 template<>
-inline Variant GetDefVar<char>( char* )
+inline Variant GetDefVar<char*>( char** )
 {
-    Variant o( ( guint8 )0  );
+    Variant o( stdstr("") );
     return o;
 }
 
@@ -306,6 +317,35 @@ inline Variant GetDefVar<double>( double* )
     return o;
 }
 
+template< class T,
+    class allowed = typename std::enable_if<
+    std::is_base_of< CObjBase, T >::value ||
+    std::is_base_of< IAutoPtr, T >::value,
+    T >::type,
+    class T2 = T >
+inline Variant GetDefVar( T* )
+{
+    ObjPtr pObj;
+    Variant o( pObj );
+    return o;
+}
+
+template< class T,
+    typename T1=typename std::enable_if<
+        std::is_pointer<T>::value,
+        std::remove_pointer<T> >::type,
+    typename allowed = typename std::enable_if<
+        std::is_base_of< CObjBase, T1 >::value ||
+        std::is_base_of< IAutoPtr, T1 >::value,
+        T >::type,
+    class T2 = T >
+inline Variant GetDefVar( T* )
+{
+    ObjPtr pObj;
+    Variant o( pObj );
+    return o;
+}
+
 template<>
 inline Variant GetDefVar<stdstr>( stdstr* )
 {
@@ -321,29 +361,4 @@ inline Variant GetDefVar<DMsgPtr>( DMsgPtr* )
     return o;
 }
 
-template<>
-inline Variant GetDefVar<ObjPtr>( ObjPtr* )
-{
-    ObjPtr pObj;
-    Variant o( pObj );
-    return o;
-}
-
-template< class T,
-    class allowed = typename std::enable_if<
-    std::is_base_of< CObjBase*, T >::value,
-    T >::type,
-    class T2 = T >
-inline Variant GetDefVar( T* )
-{
-    ObjPtr pObj;
-    Variant o( pObj );
-    return o;
-}
-
-template<>
-inline Variant GetDefVar< IConfigDb* >( IConfigDb** )
-{
-    return GetDefVar<ObjPtr>( ( ObjPtr* )nullptr );
-}
 }
