@@ -43,9 +43,9 @@ gint32 CreateObjFast( EnumClsid iClsid,
     {
         pObj = new( std::nothrow ) CBuffer();
     }
-    else if( iClsid == clsid( CConfigDb ) )
+    else if( iClsid == clsid( CConfigDb2 ) )
     {
-        pObj = new( std::nothrow ) CConfigDb( pCfg );    
+        pObj = new( std::nothrow ) CConfigDb2( pCfg );    
     }
 
     // NOTE: we have a reference count already, no need
@@ -79,7 +79,7 @@ gint32 DeserializeObj( const CBuffer& oBuf, ObjPtr& pObj )
             }
             break;
         }
-    case clsid( CConfigDb ):
+    case clsid( CConfigDb2 ):
         {
             CfgPtr pCfg( true );
             ret = pCfg->Deserialize( oBuf );

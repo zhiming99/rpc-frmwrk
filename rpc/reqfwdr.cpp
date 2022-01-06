@@ -2617,7 +2617,7 @@ gint32 CReqFwdrEnableRmtEventTask::OnTaskComplete(
                 }
 
                 CCfgOpenerObj oTaskCfg( pObj );
-                CConfigDb* pResp = nullptr;
+                IConfigDb* pResp = nullptr;
                 ret = oTaskCfg.GetPointer(
                     propRespPtr, pResp );
 
@@ -3397,7 +3397,7 @@ gint32 CRpcReqForwarder::ForwardEvent(
             CReqBuilder oBuilder( this );
 
             oBuilder.Push( pEvtCtx );
-            oBuilder.Push( *pBuf );
+            oBuilder.Push( pBuf );
 
             ObjPtr pObj;
             pObj = pMatch;

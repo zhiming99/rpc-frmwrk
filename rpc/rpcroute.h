@@ -166,10 +166,10 @@ class IRpcEventRelay
 class CRpcRouter;
 
 class CRegisteredObject
-    : public CConfigDb
+    : public CConfigDb2
 {
     public:
-    typedef CConfigDb super;
+    typedef CConfigDb2 super;
 
     CRegisteredObject( const IConfigDb* pCfg )
         : super( nullptr )

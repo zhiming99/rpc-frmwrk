@@ -508,7 +508,7 @@ void DumpObjs( bool bAll = false)
         if( pObj != nullptr )
         {
             if( pObj->GetClsid() == clsid( CBuffer ) ||
-                pObj->GetClsid() == clsid( CConfigDb ) )
+                pObj->GetClsid() == clsid( CConfigDb2 ) )
                 if( !bAll )
                     continue;
             pObj->Dump( strObj );

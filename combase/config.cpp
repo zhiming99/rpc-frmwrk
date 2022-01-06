@@ -1424,7 +1424,7 @@ gint32 CConfigDb2::Serialize(
             {
                 BufPtr& pBufVal = ( BufPtr& )oVar;
                 guint32 len = 0;
-                if( !pBufVal.IsEmpty() && pBufVal->empty() )
+                if( !pBufVal.IsEmpty() && !pBufVal->empty() )
                     len = pBufVal->size();
 
                 guint32 dwFree = pEnd - pLoc;
@@ -1514,7 +1514,6 @@ gint32 CConfigDb2::Deserialize(
             Variant oVar;
             pLoc += 1;
 
-            BufPtr pValBuf( true );
             switch( ( EnumTypeId )byType )
             {
             case typeByte: 
@@ -1537,7 +1536,11 @@ gint32 CConfigDb2::Deserialize(
                 {
                     guint32 val = 0;
                     memcpy( &val, pLoc, sizeof( guint32 ) );
-                    oVar = ntohl( val );
+                    val = ntohl( val );
+                    if( byType == typeUInt32 )
+                        oVar = val;
+                    else
+                        oVar = *( float* )&val;
                     pLoc += sizeof( guint32 );
                     break;
                 }
@@ -1546,7 +1549,11 @@ gint32 CConfigDb2::Deserialize(
                 {
                     guint64 val = 0;
                     memcpy( &val, pLoc, sizeof( guint64 ) );
-                    oVar = ntohll( val );
+                    val = ntohll( val );
+                    if( byType == typeUInt64 )
+                        oVar = val;
+                    else
+                        oVar = *( double* )&val;
                     pLoc += sizeof( guint64 );
                     break;
                 }
@@ -1566,7 +1573,7 @@ gint32 CConfigDb2::Deserialize(
                         ret = -E2BIG;
                         break;
                     }
-                    new ( &oVar ) Variant( ( const char* )pLoc, len );
+                    new ( &oVar ) Variant( ( const char* )pLoc, len - 1 );
                     pLoc += len;
                     break;
                 }
@@ -1644,8 +1651,8 @@ gint32 CConfigDb2::Deserialize(
                     ret = pBufVal->Resize( len );
                     if( ERROR( ret ) )
                         break;
-                    memcpy( pValBuf->ptr(), pLoc, len );
-                    oVar = pBuf;
+                    memcpy( pBufVal->ptr(), pLoc, len );
+                    oVar = pBufVal;
                     pLoc += len;
                     break;
                 }

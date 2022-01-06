@@ -463,6 +463,9 @@ Variant PackageTo< ObjPtr >( const ObjPtr& pObj );
 template<>
 Variant PackageTo< CBuffer >( CBuffer* pObj );
 
+template<>
+Variant PackageTo< char >( const char* pVal );
+
 }
 
 #include <stdarg.h>
@@ -907,7 +910,7 @@ struct InitTupleDefault< std::tuple< T0, Args... > > :
     {
         vecDefault.insert(
             vecDefault.begin(),
-            GetDefault( ( T0* )nullptr ) );
+            GetDefVar( ( T0* )nullptr ) );
     }
 };
 template<typename T0>
@@ -917,7 +920,7 @@ struct InitTupleDefault< std::tuple< T0 > >
     {
         vecDefault.insert(
             vecDefault.begin(),
-            GetDefault( ( T0* )nullptr ) );
+            GetDefVar( ( T0* )nullptr ) );
     }
 };
 template<>
