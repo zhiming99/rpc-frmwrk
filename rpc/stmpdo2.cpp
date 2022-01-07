@@ -1752,7 +1752,13 @@ gint32 CTcpStreamPdo2::PreStop(
         if( dwStepNo == 1 )
         {
             SetPreStopStep( pIrp, 2 );
-            ret = super::PreStop( pIrp );
+            ret = DEFER_CALL( pMgr,
+                ObjPtr( this ),
+                &CTcpStreamPdo2::CancelListeningIrp,
+                pIrp, ERROR_PORT_STOPPED );
+
+            if( SUCCEEDED( ret ) )
+                ret = STATUS_MORE_PROCESS_NEEDED;
         }
 
         if( ret == STATUS_PENDING ||
@@ -1761,6 +1767,17 @@ gint32 CTcpStreamPdo2::PreStop(
 
         GetPreStopStep( pIrp, dwStepNo );
         if( dwStepNo == 2 )
+        {
+            SetPreStopStep( pIrp, 3 );
+            ret = super::PreStop( pIrp );
+        }
+
+        if( ret == STATUS_PENDING ||
+            ret == STATUS_MORE_PROCESS_NEEDED )
+            break;
+
+        GetPreStopStep( pIrp, dwStepNo );
+        if( dwStepNo == 3 )
         {
             CCfgOpenerObj oPortCfg( this );
 
@@ -2361,6 +2378,53 @@ gint32 CTcpStreamPdo2::CompleteIoctlIrp(
     }
 
     return ret;
+}
+
+gint32 CTcpStreamPdo2::CancelListeningIrp(
+    PIRP pStopIrp, gint32 iErrno )
+{
+    CStdRMutex oPortLock( GetLock() );
+    CParamList oParams;
+    std::vector< IrpPtr > vecIrps;
+
+    for( auto& elem : m_queListeningIrps )
+        vecIrps.push_back( elem );
+    oPortLock.Unlock();
+
+    DebugPrint( iErrno, "Canceling listening IRPs..." );
+    
+    STREAM_SOCK_EVENT sse;
+    sse.m_iEvent = sseError;
+    sse.m_iData = iErrno;
+    sse.m_iEvtSrc = GetClsid();
+    gint32 ret = 0;
+
+    CIoManager* pMgr = GetIoMgr();
+    for( auto& elem : vecIrps )
+    {
+        PIRP pIrp = elem;
+        CStdRMutex oIrpLock( pIrp->GetLock() );
+        ret = pIrp->CanContinue( IRP_STATE_READY );
+        if( ERROR( ret ) )
+        {
+            ret = 0;
+            continue;
+        }
+        if( pIrp->GetStackSize() == 0 )
+            continue;
+
+        IrpCtxPtr& pCtx = pIrp->GetTopStack();
+        BufPtr pRespBuf( true );
+        pRespBuf->Resize( sizeof( sse ) );
+        memcpy( pRespBuf->ptr(),
+            &sse, sizeof( sse ) );
+        pCtx->SetRespData( pRespBuf );
+        pCtx->SetStatus( 0 );
+        oIrpLock.Unlock();
+        pMgr->CompleteIrp( pIrp );
+    }
+    pMgr->CompleteIrp( pStopIrp );
+    return 0;
 }
 
 gint32 CTcpStreamPdo2::CancelAllIrps(
