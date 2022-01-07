@@ -148,7 +148,7 @@ gint32 CPauseResumeServer::EchoUnknown(
     gint32 ret = 0;
 
     // business logics goes here
-    *pBufReply = *pBuf;
+    pBufReply = pBuf;
 
     return ret;
 }
