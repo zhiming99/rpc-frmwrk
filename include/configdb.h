@@ -1097,8 +1097,7 @@ class CCfgDbOpener< IConfigDb >
             }
             auto pdb2 = CFGDB2( m_pCfg );
             Variant& o = pdb2->GetProperty( iProp );
-            const DBusMessage* pdmsg = pMsg;
-            o = const_cast< DBusMessage* >( pdmsg );
+            o = pMsg;
 
         }while( 0 );
 
