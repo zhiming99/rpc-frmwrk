@@ -167,11 +167,11 @@ void CIfSmokeTest::testCliStartStop()
         DebugPrint( 0, "Echo 1st time..." );
         ret = pCli->Echo( strText, strReply );
         CPPUNIT_ASSERT( ERROR( ret ) );
-        DebugPrint( 0, "Completed" );
+        DebugPrint( ret, "Completed" );
 
         ret = pCli->EchoUnknown( pText, pBufReply );
         CPPUNIT_ASSERT( ERROR( ret ) );
-        DebugPrint( 0, "EchoUnknown Completed" );
+        DebugPrint( ret, "EchoUnknown Completed" );
 
         DebugPrint( 0, "Resuming the interface" );
         ret = pCli->Resume_Proxy();
