@@ -35,6 +35,16 @@ namespace rpcf
 {
 
 template<>
+BufPtr& CastTo< BufPtr >( Variant& oVar )
+{
+    if( oVar.GetTypeId() != typeByteArr )
+        throw std::invalid_argument(
+            "error cast to BufPtr" );
+    BufPtr& pBuf = oVar;
+    return pBuf;
+}
+
+template<>
 Variant PackageTo< DMsgPtr >( const DMsgPtr& pMsg )
 {
     Variant o( pMsg );
