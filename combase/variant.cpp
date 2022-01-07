@@ -204,6 +204,7 @@ Variant::Variant( const CBuffer& oBuf )
         break;
     case typeDouble:
         m_dblVal = ( double& )oBuf;
+        break;
     case typeDMsg:
         new( &m_pMsg ) DMsgPtr( ( DMsgPtr& )oBuf );
         break;
@@ -253,6 +254,7 @@ Variant::Variant( const CBuffer& oBuf )
 Variant& Variant::operator=(
     const Variant& rhs )
 {
+    Clear();
     new ( this )Variant( rhs );
     return *this;
 }
@@ -420,8 +422,6 @@ void Variant::Clear()
 {
     switch( m_iType )
     {
-    case typeNone:
-        return;
     case typeObj:
         {
             m_pObj.Clear();
@@ -442,7 +442,9 @@ void Variant::Clear()
             m_strVal.~string(); 
             break;
         }
+    case typeNone:
     default:
+        m_qwVal = 0;
         break;
     }
     m_iType = typeNone;
@@ -477,6 +479,7 @@ BufPtr Variant::ToBuf() const
     case typeDouble:
         pBuf.NewObj();
         *pBuf = m_dblVal;
+        break;
     case typeDMsg:
         pBuf.NewObj();
         *pBuf = m_pMsg;

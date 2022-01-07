@@ -34,18 +34,6 @@
 namespace rpcf
 {
 
-stdstr CastTo( BufPtr& pBuf )
-{
-    std::string strVal( pBuf->ptr() );
-    return strVal;
-}
-
-template<>
-BufPtr& CastTo< BufPtr >( Variant& i )
-{
-    return i;
-}
-
 template<>
 Variant PackageTo< DMsgPtr >( const DMsgPtr& pMsg )
 {

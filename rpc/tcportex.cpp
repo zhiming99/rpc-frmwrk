@@ -3433,7 +3433,6 @@ gint32 CRpcNativeProtoFdo::PreStop(
     // preferable to do this here, to allow lower
     // port ( still ready ) to do wrapup work in a
     // clean environment
-    StopListeningTask();
     CancelAllIrps( ERROR_PORT_STOPPED );
     return super::PreStop( pIrp );
 }
@@ -3506,6 +3505,7 @@ gint32 CRpcNativeProtoFdo::Stop(
         pIrp->GetStackSize() == 0 )
         return -EINVAL;
 
+    StopListeningTask();
     std::vector< gint32 > vecStmIds;
 
     CStdRMutex oPortLock( GetLock() );
