@@ -15,14 +15,18 @@ elif [ "$1" == "1" ]; then
     echo starting the reqfwdr...
     ${bin_dir}/rpcrouter -r 1 &
     sleep 15
-    echo starting echo test...
+    echo echo test...
     ${bin_dir}/rpcf/ifclismk || exit 1
+    echo keepalive test...
     ${bin_dir}/rpcf/kaclitst || exit 2
+    echo active-cancel test...
     ${bin_dir}/rpcf/actclitst || exit 3
+    echo pause-resume test
     ${bin_dir}/rpcf/prclitst || exit 4
     kill -9 `pidof rpcrouter`
     ${bin_dir}/rpcf/btinrtsvr &
     sleep 5
+    echo build-in-router test
     ${bin_dir}/rpcf/btinrtcli || exit 5
     kill -9 `pidof btinrtsvr`
     kill -9 `pidof ifsvrsmk`
