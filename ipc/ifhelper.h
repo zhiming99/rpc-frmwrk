@@ -67,8 +67,9 @@ T& CastTo( Variant& oVar )
     if( oVar.GetTypeId() != iType )
     {
         stdstr strMsg = DebugMsg( 0,
-            "error cast to prime type from %d to %d",
-            oVar.GetTypeId(), iType );
+            "error cast to prime type from %d to %d(%s)",
+            oVar.GetTypeId(), iType,
+            typeid(T).name() );
         throw std::invalid_argument( strMsg );
     }
     return ( T& )oVar;
