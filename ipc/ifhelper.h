@@ -65,8 +65,12 @@ T& CastTo( Variant& oVar )
     gint32 iType =
         rpcf::GetTypeId( ( T* )nullptr );
     if( oVar.GetTypeId() != iType )
-        throw std::invalid_argument(
-            "error cast to prime type" );
+    {
+        stdstr strMsg = DebugMsg( 0,
+            "error cast to prime type from %d to %d",
+            oVar.GetTypeId(), iType );
+        throw std::invalid_argument( strMsg );
+    }
     return ( T& )oVar;
 }
 
