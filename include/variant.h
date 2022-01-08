@@ -361,4 +361,11 @@ inline Variant GetDefVar<DMsgPtr>( DMsgPtr* )
     return o;
 }
 
+template<>
+inline Variant GetDefVar<BufPtr>( BufPtr* )
+{
+    BufPtr pBuf;
+    return Variant ( pBuf );
+}
+
 }
