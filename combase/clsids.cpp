@@ -65,7 +65,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRY( CStlQwordVector );
     INIT_MAP_ENTRY( CStlObjMap );
 
-    INIT_MAP_ENTRYCFG( CConfigDb );
+    //INIT_MAP_ENTRYCFG( CConfigDb );
     INIT_MAP_ENTRYCFG( CConfigDb2 );
 
     END_FACTORY_MAPS;

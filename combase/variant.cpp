@@ -136,6 +136,12 @@ Variant::Variant( EnumPropId val )
     m_dwVal = ( guint32 )val;
     m_iType = typeUInt32;
 }
+Variant::Variant( const uintptr_t* pVal )
+{
+    m_iType = typeNone;
+    *this = ( uintptr_t )pVal;
+}
+
 Variant::Variant( const Variant& rhs )
 {
     switch( rhs.m_iType )

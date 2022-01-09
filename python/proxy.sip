@@ -570,6 +570,118 @@ class CPythonInterfBase : public T
         return ret;
     }
 
+    gint32 ConvertPyObjToBuf(
+        PyObject* pObject,
+        BufPtr& pBuf )
+    {
+        if( pObject == nullptr )
+            return -EINVAL;
+
+        gint32 ret = 0;
+        if( pBuf.IsEmpty() )
+        {
+            ret = pBuf.NewObj();
+            if( ERROR( ret ) )
+                return ret;
+        }
+
+        EnumTypeId iType =
+            ( EnumTypeId )GetTypeId( pObject );
+
+        switch( iType )
+        {
+        case typeUInt32:
+            {
+                *pBuf = ( guint32 )
+                    PyLong_AsLong( pObject );
+                break;
+            }
+        case typeUInt64:
+            {
+                *pBuf = ( guint64 )
+                    PyLong_AsLong( pObject );
+                break;
+            }
+        case typeFloat:
+            {
+                *pBuf = ( float )
+                    PyFloat_AsDouble( pObject );
+                break;
+            }
+        case typeDouble:
+            {
+                *pBuf =
+                    PyFloat_AsDouble( pObject );
+                break;
+            }
+        case typeByte:
+            {
+                *pBuf = ( guint8 )
+                    PyLong_AsLong( pObject );
+                break;
+            }
+        case typeUInt16:
+            {
+                *pBuf = ( guint16 )
+                    PyLong_AsLong( pObject );
+                break;
+            }
+        case typeString:
+            {
+                std::string strVal =
+                convertPythonUnicodeObjectToStdString(
+                pObject );
+                *pBuf = strVal;
+                break;
+            }
+        case typeByteArr:
+            {
+                Py_buffer *view = (Py_buffer *)
+                    malloc(sizeof(*view));
+                ret = PyObject_GetBuffer(
+                    pObject, view, PyBUF_READ );
+                if( ret < 0 )
+                {
+                    ret = -ENOMEM;
+                    break;
+                }
+                ret = pBuf->Append( ( char* )view->buf,
+                    ( guint32 )view->len);
+                PyBuffer_Release( view );
+                break;
+            }
+        case typeObj:
+            {
+                if(sipCanConvertToType( pObject,
+                    sipType_cpp_ObjPtr, 0 ))
+                {
+                    gint32 iState = 0, iErr = 0;
+                    ObjPtr* pObj = ( ObjPtr* )
+                    sipConvertToType( pObject,
+                        sipType_cpp_ObjPtr,
+                        nullptr, 0, &iState,
+                        &iErr );
+                    if( iErr != 0 )
+                    {
+                        ret = ERROR_FAIL;
+                        break;
+                    }
+                    *pBuf = *pObj;
+                }
+                else
+                {
+                    // an empty argument
+                }
+                break;
+            }
+        default:
+            ret = -ENOTSUP;
+            break;
+        }
+
+        return ret;
+    }
+
     gint32 ConvertPyObjToVar(
         PyObject* pObject,
         Variant& oVar )
@@ -2078,14 +2190,14 @@ class CPythonProxy :
             break;
         }
 
-        Variant oVar;
-        sipRes = pImpl->ConvertPyObjToVar(
-            a1, oVar );
+        BufPtr pBuf;
+        sipRes = pImpl->ConvertPyObjToBuf(
+            a1, pBuf );
         if( ERROR( sipRes ) )
             break;
 
         Py_BEGIN_ALLOW_THREADS;
-        sipRes = pImpl->WriteStreamNoWait( a0, oVar );
+        sipRes = pImpl->WriteStreamNoWait( a0, pBuf );
         Py_END_ALLOW_THREADS;
 
     }while( 0 );
@@ -2104,14 +2216,14 @@ class CPythonProxy :
             break;
         }
 
-        Variant oVar;
-        sipRes = pImpl->ConvertPyObjToVar(
-            a1, oVar );
+        BufPtr pBuf;
+        sipRes = pImpl->ConvertPyObjToBuf(
+            a1, pBuf );
         if( ERROR( sipRes ) )
             break;
 
         Py_BEGIN_ALLOW_THREADS;
-        sipRes = pImpl->WriteStream( a0, oVar );
+        sipRes = pImpl->WriteStream( a0, pBuf );
         Py_END_ALLOW_THREADS;
 
     }while( 0 );
@@ -2328,9 +2440,9 @@ class CPythonProxy :
             break;
         }
 
-        Variant oVar;
-        sipRes = pImpl->ConvertPyObjToVar(
-            a1, oVar );
+        BufPtr pBuf;
+        sipRes = pImpl->ConvertPyObjToBuf(
+            a1, pBuf );
         if( ERROR( sipRes ) )
             break;
 
@@ -2343,7 +2455,7 @@ class CPythonProxy :
         IConfigDb* pCtx = oReqCtx.GetCfg();
         Py_BEGIN_ALLOW_THREADS;
         sipRes = pImpl->WriteStreamAsync(
-            a0, oVar, pCtx );
+            a0, pBuf, pCtx );
         Py_END_ALLOW_THREADS;
         if( sipRes != STATUS_PENDING )
         {
