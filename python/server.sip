@@ -278,15 +278,15 @@ class CPythonServer :
             break;
         }
 
-        Variant oVar;
-        sipRes = pImpl->ConvertPyObjToVar(
-            a1, oVar );
+        BufPtr pBuf;
+        sipRes = pImpl->ConvertPyObjToBuf(
+            a1, pBuf );
         if( ERROR( sipRes ) )
             break;
 
         Py_BEGIN_ALLOW_THREADS;
         sipRes = pImpl->
-            WriteStreamNoWait( a0, oVar );
+            WriteStreamNoWait( a0, pBuf );
         Py_END_ALLOW_THREADS;
 
     }while( 0 );
@@ -305,14 +305,14 @@ class CPythonServer :
             break;
         }
 
-        Variant oVar;
-        sipRes = pImpl->ConvertPyObjToVar(
-            a1, oVar );
+        BufPtr pBuf;
+        sipRes = pImpl->ConvertPyObjToBuf(
+            a1, pBuf );
         if( ERROR( sipRes ) )
             break;
 
         Py_BEGIN_ALLOW_THREADS;
-        sipRes = pImpl->WriteStream( a0, oVar );
+        sipRes = pImpl->WriteStream( a0, pBuf );
         Py_END_ALLOW_THREADS;
 
     }while( 0 );
@@ -529,9 +529,9 @@ class CPythonServer :
             break;
         }
 
-        Variant oVar;
-        sipRes = pImpl->ConvertPyObjToVar(
-            a1, oVar );
+        BufPtr pBuf;
+        sipRes = pImpl->ConvertPyObjToBuf(
+            a1, pBuf );
         if( ERROR( sipRes ) )
             break;
 
@@ -544,7 +544,7 @@ class CPythonServer :
         IConfigDb* pCtx = oReqCtx.GetCfg();
         Py_BEGIN_ALLOW_THREADS;
         sipRes = pImpl->WriteStreamAsync(
-            a0, oVar, pCtx );
+            a0, pBuf, pCtx );
         Py_END_ALLOW_THREADS;
         if( sipRes != STATUS_PENDING )
         {

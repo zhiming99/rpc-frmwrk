@@ -71,6 +71,7 @@ struct Variant
     Variant( EnumEventId );
     Variant( EnumClsid );
     Variant( EnumPropId );
+    Variant( const uintptr_t* szVal );
 
     Variant& operator=( bool bVal );
     Variant& operator=( guint8 byVal );
@@ -367,5 +368,9 @@ inline Variant GetDefVar<BufPtr>( BufPtr* )
     BufPtr pBuf;
     return Variant ( pBuf );
 }
+
+template<>
+inline Variant GetDefVar<uintptr_t*>( uintptr_t** )
+{ return Variant( ( uintptr_t )0 ); }
 
 }

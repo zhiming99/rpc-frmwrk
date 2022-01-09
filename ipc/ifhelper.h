@@ -81,7 +81,9 @@ template< typename T,
         !std::is_same< DBusMessage*, T >::value, T>::type,
     typename T2= typename std::enable_if<
         std::is_base_of< CObjBase, T >::value, T >::type,
-    typename T3=T >
+    typename T3 = typename std::enable_if<
+        !std::is_pointer< T >::value, T >::type,
+    typename T4=T >
 T& CastTo( Variant& oVar )
 {
     if( oVar.GetTypeId() != typeObj )
@@ -99,9 +101,10 @@ template< typename T,
         std::is_same< ObjPtr, T >::value, T >::type,
     typename T2 = typename std::enable_if<
         !std::is_same< BufPtr, T >::value, T >::type,
-        typename T3=T,
-        typename T4=T
-        >
+    typename T3 = typename std::enable_if<
+        !std::is_pointer< T >::value, T >::type,
+    typename T4=T,
+    typename T5=T >
 T& CastTo( Variant& oVar )
 {
     EnumTypeId iType = oVar.GetTypeId();
@@ -232,6 +235,9 @@ BufPtr& CastTo( Variant& oVar )
     BufPtr& pBuf = oVar;
     return pBuf;
 }
+
+template<>
+uintptr_t*& CastTo< uintptr_t*, uintptr_t*, uintptr_t* >( Variant& oVar );
 
 template< typename First >
 auto VecToTupleHelper( std::vector< Variant >& vec ) -> std::tuple<DFirst>
@@ -411,7 +417,8 @@ Variant PackageTo( const T& pObj )
 
 template< typename T,
     typename T2 = typename std::enable_if<
-        !std::is_base_of< IAutoPtr, T >::value, T >::type >
+        !std::is_base_of< IAutoPtr, T >::value &&
+        !std::is_pointer< T >::value, T>::type >
 Variant PackageTo( const T& i )
 {
     return Variant( i );
@@ -470,6 +477,9 @@ Variant PackageTo< CBuffer >( CBuffer* pObj );
 
 template<>
 Variant PackageTo< char >( const char* pVal );
+
+template<>
+Variant PackageTo< uintptr_t >( const uintptr_t* pVal );
 
 }
 

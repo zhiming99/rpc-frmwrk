@@ -45,6 +45,18 @@ BufPtr& CastTo< BufPtr >( Variant& oVar )
 }
 
 template<>
+uintptr_t*& CastTo< uintptr_t*, uintptr_t*, uintptr_t* >( Variant& oVar )
+{
+    gint32 iType =
+        rpcf::GetTypeId( ( uintptr_t* ) 0 );
+    if( oVar.GetTypeId() != iType )
+        throw std::invalid_argument(
+            "error cast to uintptr_t*" );
+    uintptr_t& intptr = oVar;
+    return ( uintptr_t*& )intptr;
+}
+
+template<>
 Variant PackageTo< DMsgPtr >( const DMsgPtr& pMsg )
 {
     Variant o( pMsg );
@@ -101,6 +113,11 @@ Variant PackageTo< CBuffer >( CBuffer* pObj )
     return Variant( p );
 }
 
+template<>
+Variant PackageTo< uintptr_t >( const uintptr_t* pVal )
+{
+    return Variant( pVal );
+}
 template<>
 auto VecToTuple<>( std::vector< Variant >& vec ) -> std::tuple<> 
 {
