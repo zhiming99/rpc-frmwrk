@@ -60,8 +60,10 @@ def maincli() :
                 print( "CancelRequest failed, wait it to complete or timeout" )
                 oProxy.WaitForComplete()
             else:
+                oProxy.WaitForComplete()
                 ret = oProxy.GetError()
                 print( "CancelRequest succeeded " + str( ret ) )
+                ret = 0
 
             
     return ret
