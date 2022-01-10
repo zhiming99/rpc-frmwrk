@@ -4290,11 +4290,16 @@ gint32 CIfInvokeMethodTask::OnCancel(
         // NOTE: the error is not exactly the one
         // in the response. it is used internally.
         ret = ERROR_CANCEL;
+        IConfigDb* pReq = nullptr;
+        oCfg.GetPointer( propReqPtr, pReq );
+
         CParamList oResp;
         if( dwContext == eventTimeoutCancel )
         {
             ret = -ETIMEDOUT;
             oResp[ propReturnValue ] = ret;
+            if( pReq != nullptr )
+                oResp.CopyProp( propSeriProto, pReq );
             oCfg.SetPointer( propRespPtr,
                 ( IConfigDb* )oResp.GetCfg() );
         }
@@ -4302,6 +4307,8 @@ gint32 CIfInvokeMethodTask::OnCancel(
         {
             ret = ERROR_USER_CANCEL;
             oResp[ propReturnValue ] = ret;
+            if( pReq != nullptr )
+                oResp.CopyProp( propSeriProto, pReq );
             oCfg.SetPointer( propRespPtr,
                 ( IConfigDb* )oResp.GetCfg() );
         }

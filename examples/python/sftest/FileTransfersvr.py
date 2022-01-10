@@ -9,12 +9,13 @@ import os
 from TransFileContext import TransFileContext
 from TransferContext import TransferContext
 import re
+import getpass
 
 from FileTransfersvrbase import *
 class CIFileTransfersvr( IIFileTransfer_SvrImpl ):
 
     def __init__(self):
-        self.m_strRootDir = "/tmp/sfsvr-root/" + os.getlogin()
+        self.m_strRootDir = "/tmp/sfsvr-root/" + getpass.getuser()
         if not os.path.exists(self.m_strRootDir) :
             os.makedirs( self.m_strRootDir )
         self.m_oTransctx = TransferContext(self)

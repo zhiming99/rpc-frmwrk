@@ -134,15 +134,16 @@ elif [ "$1" == "1" ]; then
     export CLASSPATH=`pwd`:${lib_dir}/rpcf/rpcbase.jar:$CLASSPATH
     export LD_LIBRARY_PATH=${lib_dir}:$LD_LIBRARY_PATH
     for i in ../../*.ridl;do b=${i%%.ridl};c=${b##../../}; ridlc -jO . -Porg.rpcf.tests  $i;done
+    sleep 1
 
-    javac org/rpcf/tests/hellowld/*.java || exit 9
-    pushd org/rpcf/tests/hellowld
+    javac org/rpcf/tests/HelloWorld/*.java || exit 9
+    pushd org/rpcf/tests/HelloWorld
     make
     popd
     echo start java testcase hellowld
-    java org.rpcf.tests.hellowld.mainsvr &
+    java org.rpcf.tests.HelloWorld.mainsvr &
     sleep 5
-    java org.rpcf.tests.hellowld.maincli || exit 9
+    java org.rpcf.tests.HelloWorld.maincli || exit 9
     kill -9 `pidof java`
     sleep 5
     popd
