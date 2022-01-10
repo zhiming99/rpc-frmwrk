@@ -106,7 +106,7 @@ gint32 IIEchoThings_PImpl::Echo(
             dwSeriProto_ != seriRidl )
             break;
         BufPtr pBuf2;
-        ret = oResp_.GetProperty( 0, pBuf2 );
+        ret = oResp_.GetBufPtr( 0, pBuf2 );
         if( ERROR( ret ) )
             break;
         
@@ -169,7 +169,7 @@ gint32 IIEchoThings_PImpl::EchoCbWrapper(
                 dwSeriProto_ != seriRidl )
                 break;
             BufPtr pBuf_;
-            ret = oResp_.GetProperty( 0, pBuf_ );
+            ret = oResp_.GetBufPtr( 0, pBuf_ );
             if( ERROR( ret ) )
                 break;
             
@@ -249,7 +249,7 @@ gint32 IIEchoThings_PImpl::EchoUnknown(
         dwSeriProto_ != seriRidl )
         return ret;
     BufPtr pBuf2;
-    ret = oResp_.GetProperty( 0, pBuf2 );
+    ret = oResp_.GetBufPtr( 0, pBuf2 );
     if( ERROR( ret ) )
         return ret;
     

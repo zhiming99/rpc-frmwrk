@@ -47,8 +47,11 @@ elif [ "$1" == "1" ]; then
     echo start the Python testcases
     python3 maincli.py || exit 7
     kill -9 `pidof python3`
+    sleep 5
     popd
 
+    echo mkdir -p /tmp/sfsvr-root/${USER}
+    mkdir -p /tmp/sfsvr-root/${USER}
     pushd ./examples
 
     pushd ./python
@@ -59,6 +62,7 @@ elif [ "$1" == "1" ]; then
     sleep 5
     python3 maincli.py || exit 8
     kill -9 `pidof python3`
+    sleep 5
     popd
 
     ${bin_dir}/ridlc -I ./ -pO ./asynctst ../asynctst.ridl || exit 6
@@ -68,6 +72,7 @@ elif [ "$1" == "1" ]; then
     sleep 5
     python3 maincli.py || exit 8
     kill -9 `pidof python3`
+    sleep 5
     popd
 
     ${bin_dir}/ridlc -I ./ -pO ./actcancel ../actcancel.ridl || exit 6
@@ -77,6 +82,7 @@ elif [ "$1" == "1" ]; then
     sleep 5
     python3 maincli.py || exit 8
     kill -9 `pidof python3`
+    sleep 5
     popd
 
     ${bin_dir}/ridlc -I ./ -pO ./hellowld ../hellowld.ridl || exit 6
@@ -86,6 +92,7 @@ elif [ "$1" == "1" ]; then
     sleep 5
     python3 maincli.py || exit 8
     kill -9 `pidof python3`
+    sleep 5
     popd
 
     ${bin_dir}/ridlc -I ./ -pO ./katest ../katest.ridl || exit 6
@@ -95,6 +102,7 @@ elif [ "$1" == "1" ]; then
     sleep 5
     python3 maincli.py || exit 8
     kill -9 `pidof python3`
+    sleep 5
     popd
 
     ${bin_dir}/ridlc -I ./ -pO ./stmtest ../stmtest.ridl || exit 6
@@ -104,6 +112,7 @@ elif [ "$1" == "1" ]; then
     sleep 5
     python3 maincli.py || exit 8
     kill -9 `pidof python3`
+    sleep 5
     popd
 
     fileTrans=../../configure.ac
@@ -112,8 +121,9 @@ elif [ "$1" == "1" ]; then
     echo start python testcase sftest
     python3 mainsvr.py&
     sleep 5
-    python3 maincli.py $fileTrans || exit 8
+    python3 maincli.py $fileTrans
     kill -9 `pidof python3`
+    sleep 5
     popd
 
     #leave python
@@ -135,6 +145,7 @@ elif [ "$1" == "1" ]; then
     sleep 5
     java org.rpcf.tests.hellowld.maincli || exit 9
     kill -9 `pidof java`
+    sleep 5
     popd
 
     javac org/rpcf/tests/iftest/*.java || exit 9
@@ -146,6 +157,7 @@ elif [ "$1" == "1" ]; then
     sleep 5
     java org.rpcf.tests.iftest.maincli || exit 9
     kill -9 `pidof java`
+    sleep 5
     popd
 
     javac org/rpcf/tests/asynctst/*.java || exit 9
@@ -157,6 +169,7 @@ elif [ "$1" == "1" ]; then
     sleep 5
     java org.rpcf.tests.asynctst.maincli || exit 9
     kill -9 `pidof java`
+    sleep 5
     popd
 
 
@@ -169,6 +182,7 @@ elif [ "$1" == "1" ]; then
     sleep 5
     java org.rpcf.tests.actcancel.maincli || exit 9
     kill -9 `pidof java`
+    sleep 5
     popd
 
     javac org/rpcf/tests/katest/*.java || exit 9
@@ -180,6 +194,7 @@ elif [ "$1" == "1" ]; then
     sleep 5
     java org.rpcf.tests.katest.maincli || exit 9
     kill -9 `pidof java`
+    sleep 5
     popd
 
     javac org/rpcf/tests/stmtest/*.java || exit 9
@@ -191,6 +206,7 @@ elif [ "$1" == "1" ]; then
     sleep 5
     java org.rpcf.tests.stmtest.maincli || exit 9
     kill -9 `pidof java`
+    sleep 5
     popd
 
     javac org/rpcf/tests/sftest/*.java || exit 9
@@ -200,8 +216,9 @@ elif [ "$1" == "1" ]; then
     echo start java testcase sftest
     java org.rpcf.tests.sftest.mainsvr &
     sleep 5
-    java org.rpcf.tests.sftest.maincli || exit 9
+    java org.rpcf.tests.sftest.maincli
     kill -9 `pidof java`
+    sleep 5
     popd
 
 #leave java
@@ -219,6 +236,7 @@ elif [ "$1" == "1" ]; then
     sleep 5
     ./HelloWorldcli || exit 8
     kill -9 `pidof HelloWorldsvr`
+    sleep 5
     popd
 
     pushd iftest
@@ -229,6 +247,7 @@ elif [ "$1" == "1" ]; then
     sleep 5
     ./iftestcli || exit 8
     kill -9 `pidof iftestsvr`
+    sleep 5
     popd
 
     pushd asynctst
@@ -239,6 +258,7 @@ elif [ "$1" == "1" ]; then
     sleep 5
     ./asynctstcli || exit 8
     kill -9 `pidof asynctstsvr`
+    sleep 5
     popd
 
     pushd actcancel
@@ -249,6 +269,7 @@ elif [ "$1" == "1" ]; then
     sleep 5
     ./actcancelcli || exit 8
     kill -9 `pidof actcancelsvr`
+    sleep 5
     popd
 
     pushd katest
@@ -259,6 +280,7 @@ elif [ "$1" == "1" ]; then
     sleep 5
     ./katestcli || exit 8
     kill -9 `pidof katestsvr`
+    sleep 5
     popd
 
     pushd stmtest
@@ -269,6 +291,7 @@ elif [ "$1" == "1" ]; then
     sleep 5
     ./stmtestcli || exit 8
     kill -9 `pidof stmtestsvr`
+    sleep 5
     popd
 
     pushd sftest
@@ -277,8 +300,9 @@ elif [ "$1" == "1" ]; then
     cd release
     ./sftestsvr &
     sleep 5
-    ./sftestcli || exit 8
+    ./sftestcli
     kill -9 `pidof sftestsvr`
+    sleep 5
     popd
 
 # leaving cpp
