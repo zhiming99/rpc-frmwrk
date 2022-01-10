@@ -115,12 +115,13 @@ elif [ "$1" == "1" ]; then
     sleep 5
     popd
 
-    fileTrans=../../configure.ac
+    fileTrans=`pwd`/../../configure.ac
     ${bin_dir}/ridlc -I ./ -pO ./sftest ../sftest.ridl || exit 6
     pushd sftest
     echo start python testcase sftest
     python3 mainsvr.py&
     sleep 5
+    echo python3 maincli.py $fileTrans
     python3 maincli.py $fileTrans
     kill -9 `pidof python3`
     sleep 5
@@ -136,6 +137,7 @@ elif [ "$1" == "1" ]; then
     for i in ../../*.ridl;do b=${i%%.ridl};c=${b##../../}; ridlc -jO . -Porg.rpcf.tests  $i;done
     sleep 1
 
+    java -version
     javac org/rpcf/tests/HelloWorld/*.java || exit 9
     pushd org/rpcf/tests/HelloWorld
     make
