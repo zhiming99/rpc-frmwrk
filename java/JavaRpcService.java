@@ -42,10 +42,10 @@ abstract public class JavaRpcService implements IRpcService
         {
             if( isServer() )
                 System.out.println(
-                    "Failed start server..." );
+                    "Failed start server..." + ret );
             else
                 System.out.println(
-                    "Failed start proxy..." );
+                    "Failed start proxy..." + ret );
         }
         else
         {
