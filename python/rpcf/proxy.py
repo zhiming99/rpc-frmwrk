@@ -354,7 +354,6 @@ class PyRpcServices :
                 self.InvokeCallback( ret, listArgs )
 
         elif seriProto == cpp.seriRidl :
-            print( "haha" )
             listArgs.insert( 0, context )
             listArgs.insert( 1, ret )
             if len( listResp ) <= 1 :
