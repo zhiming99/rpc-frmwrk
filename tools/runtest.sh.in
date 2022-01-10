@@ -134,7 +134,6 @@ elif [ "$1" == "1" ]; then
     export CLASSPATH=`pwd`:${lib_dir}/rpcf/rpcbase.jar:$CLASSPATH
     export LD_LIBRARY_PATH=${lib_dir}:$LD_LIBRARY_PATH
     for i in ../../*.ridl;do b=${i%%.ridl};c=${b##../../}; ridlc -jO . -Porg.rpcf.tests  $i;done
-    ${bin_dir}/ridlc -I ./ -jO ./iftest ../iftest.ridl || exit 6
 
     javac org/rpcf/tests/hellowld/*.java || exit 9
     pushd org/rpcf/tests/hellowld
