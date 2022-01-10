@@ -141,6 +141,9 @@ elif [ "$1" == "1" ]; then
     javac org/rpcf/tests/HelloWorld/*.java || exit 9
     pushd org/rpcf/tests/HelloWorld
     make
+    ls
+    cat HelloWorlddesc.json
+    cat driver.json
     popd
     echo start java testcase hellowld
     java org.rpcf.tests.HelloWorld.mainsvr &
