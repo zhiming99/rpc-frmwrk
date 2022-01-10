@@ -131,8 +131,10 @@ elif [ "$1" == "1" ]; then
     popd
 
     pushd cpp
+    cp sftest/Makefile Makefile.sftest
     echo "for i in ../*.ridl;do b=${i%%.ridl};c=${b##../}; ridlc -O $c $i;done"
     for i in ../*.ridl;do b=${i%%.ridl};c=${b##../}; ridlc -O ./$c $i;done
+    mv Makefile.sftest sftest/
 
     pushd hellowld
     make || exit 10
