@@ -33,6 +33,7 @@ public class maincli
             getDescPath( "HelloWorlddesc.json" );
         if( strDescPath.isEmpty() )
             System.exit( RC.ENOENT );
+        System.out.println("loading desc file " + strDescPath);
         // create the service object
         HelloWorldSvccli oSvcCli = new HelloWorldSvccli(
             m_oCtx.getIoMgr(), 
