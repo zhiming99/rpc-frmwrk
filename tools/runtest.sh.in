@@ -49,7 +49,9 @@ elif [ "$1" == "1" ]; then
     kill -9 `pidof python3`
     popd
 
-    pushd ./example/python
+    pushd ./examples
+
+    pushd ./python
     ${bin_dir}/ridlc -I ./ -pO ./iftest ../iftest.ridl || exit 6
     pushd iftest
     echo start python testcase iftest
@@ -277,6 +279,11 @@ elif [ "$1" == "1" ]; then
     sleep 5
     ./sftestcli || exit 8
     kill -9 `pidof sftestsvr`
+    popd
+
+# leaving cpp
+    popd
+# leaving examples
     popd
 
 fi
