@@ -17,8 +17,6 @@ enum EnumMyClsid
     DECL_CLSID( CStressSvc_SvrImpl ),
     
     DECL_IID( IEchoThings ),
-    
-    
 };
 
 class IIEchoThings_PImpl
