@@ -130,6 +130,91 @@ elif [ "$1" == "1" ]; then
     #leave python
     popd
 
+    pushd cpp
+    echo "for i in ../*.ridl;do b=${i%%.ridl};c=${b##../}; ridlc -O $c $i;done"
+    for i in ../*.ridl;do b=${i%%.ridl};c=${b##../}; ridlc -O ./$c $i;done
+
+    pushd hellowld
+    make || exit 10
+    echo start cpp testcase hellowld
+    cd release
+    ./HelloWorldsvr &
+    sleep 5
+    ./HelloWorldcli || exit 8
+    kill -9 `pidof HelloWorldsvr`
+    sleep 5
+    popd
+
+    pushd iftest
+    make || exit 10
+    echo start cpp testcase iftest
+    cd release
+    ./iftestsvr &
+    sleep 5
+    ./iftestcli || exit 8
+    kill -9 `pidof iftestsvr`
+    sleep 5
+    popd
+
+    pushd asynctst
+    make || exit 10
+    echo start cpp testcase asynctst
+    cd release
+    ./asynctstsvr &
+    sleep 5
+    ./asynctstcli || exit 8
+    kill -9 `pidof asynctstsvr`
+    sleep 5
+    popd
+
+    pushd actcancel
+    make || exit 10
+    echo start cpp testcase actcancel
+    cd release
+    ./actcancelsvr &
+    sleep 5
+    ./actcancelcli || exit 8
+    kill -9 `pidof actcancelsvr`
+    sleep 5
+    popd
+
+    pushd katest
+    make || exit 10
+    echo start cpp testcase katest
+    cd release
+    ./katestsvr &
+    sleep 5
+    ./katestcli || exit 8
+    kill -9 `pidof katestsvr`
+    sleep 5
+    popd
+
+    pushd stmtest
+    make || exit 10
+    echo start cpp testcase stmtest
+    cd release
+    ./stmtestsvr &
+    sleep 5
+    ./stmtestcli || exit 8
+    kill -9 `pidof stmtestsvr`
+    sleep 5
+    popd
+
+    pushd sftest
+    make || exit 10
+    echo start cpp testcase sftest
+    cd release
+    ./sftestsvr &
+    sleep 5
+    ./sftestcli
+    kill -9 `pidof sftestsvr`
+    sleep 5
+    popd
+
+# leaving cpp
+    popd
+    exit 0
+
 # java test
     pushd java/src
     export CLASSPATH=`pwd`:${lib_dir}/rpcf/rpcbase.jar:$CLASSPATH
@@ -229,89 +314,6 @@ elif [ "$1" == "1" ]; then
 #leave java
     popd
     
-    pushd cpp
-    echo "for i in ../*.ridl;do b=${i%%.ridl};c=${b##../}; ridlc -O $c $i;done"
-    for i in ../*.ridl;do b=${i%%.ridl};c=${b##../}; ridlc -O ./$c $i;done
-
-    pushd hellowld
-    make || exit 10
-    echo start cpp testcase hellowld
-    cd release
-    ./HelloWorldsvr &
-    sleep 5
-    ./HelloWorldcli || exit 8
-    kill -9 `pidof HelloWorldsvr`
-    sleep 5
-    popd
-
-    pushd iftest
-    make || exit 10
-    echo start cpp testcase iftest
-    cd release
-    ./iftestsvr &
-    sleep 5
-    ./iftestcli || exit 8
-    kill -9 `pidof iftestsvr`
-    sleep 5
-    popd
-
-    pushd asynctst
-    make || exit 10
-    echo start cpp testcase asynctst
-    cd release
-    ./asynctstsvr &
-    sleep 5
-    ./asynctstcli || exit 8
-    kill -9 `pidof asynctstsvr`
-    sleep 5
-    popd
-
-    pushd actcancel
-    make || exit 10
-    echo start cpp testcase actcancel
-    cd release
-    ./actcancelsvr &
-    sleep 5
-    ./actcancelcli || exit 8
-    kill -9 `pidof actcancelsvr`
-    sleep 5
-    popd
-
-    pushd katest
-    make || exit 10
-    echo start cpp testcase katest
-    cd release
-    ./katestsvr &
-    sleep 5
-    ./katestcli || exit 8
-    kill -9 `pidof katestsvr`
-    sleep 5
-    popd
-
-    pushd stmtest
-    make || exit 10
-    echo start cpp testcase stmtest
-    cd release
-    ./stmtestsvr &
-    sleep 5
-    ./stmtestcli || exit 8
-    kill -9 `pidof stmtestsvr`
-    sleep 5
-    popd
-
-    pushd sftest
-    make || exit 10
-    echo start cpp testcase sftest
-    cd release
-    ./sftestsvr &
-    sleep 5
-    ./sftestcli
-    kill -9 `pidof sftestsvr`
-    sleep 5
-    popd
-
-# leaving cpp
-    popd
 # leaving examples
     popd
 
