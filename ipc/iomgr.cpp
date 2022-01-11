@@ -2067,19 +2067,26 @@ gint32 CIoManager::TryFindDescFile(
         std::string strFullPath;
         for( auto& elem : ( *psetPaths )() )
         {
-            strFullPath = elem + "/" + strFile;
+            strFullPath = elem + strFile;
 
             ret = access(
                 strFullPath.c_str(), R_OK );
 
-            if( ret == -1 )
+            if( ret == 0 )
             {
-                ret = -errno;
-                continue;
+                bFound = true;
+                break;
             }
 
-            bFound = true;
-            break;
+            strFullPath = elem + "../etc/rpcf" + strFile;
+            ret = access(
+                strFullPath.c_str(), R_OK );
+            if( ret == 0 )
+            {
+                bFound = true;
+                break;
+            }
+            ret = -errno;
         }
 
         if( bFound )
