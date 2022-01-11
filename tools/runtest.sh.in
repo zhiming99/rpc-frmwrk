@@ -208,7 +208,7 @@ elif [ "$1" == "1" ]; then
     cd release
     ./sftestsvr &
     sleep 5
-    ./sftestcli
+    ./sftestcli $fileTrans || exit 10
     kill -9 `pidof sftestsvr`
     sleep 5
     popd

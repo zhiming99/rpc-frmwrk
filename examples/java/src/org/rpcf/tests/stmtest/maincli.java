@@ -30,27 +30,34 @@ public class maincli
         m_oCtx = JavaRpcContext.createProxy(); 
         if( m_oCtx == null )
             System.exit( RC.EFAULT );
-        
-        String strDescPath =
-            getDescPath( "stmtestdesc.json" );
-        if( strDescPath.isEmpty() )
-            System.exit( RC.ENOENT );
-        // create the service object
-        StreamTestcli oSvcCli = new StreamTestcli(
-            m_oCtx.getIoMgr(), 
-            strDescPath,
-            "StreamTest" );
 
-        // check if there are errors
-        if( RC.ERROR( oSvcCli.getError() ) )
-            System.exit( -oSvcCli.getError() );
-        
-        // start the proxy
-        int ret = oSvcCli.start();
-        if( RC.ERROR( ret ) )
-            System.exit( -ret );
-        
+        int ret = 0;
+        StreamTestcli oSvcCli = null;
         do{
+            String strDescPath =
+                getDescPath( "stmtestdesc.json" );
+            if( strDescPath.isEmpty() )
+            {
+                ret = -RC.ENOENT;
+                break;
+            }
+            // create the service object
+            oSvcCli = new StreamTestcli(
+                m_oCtx.getIoMgr(),
+                strDescPath,
+                "StreamTest" );
+
+            // check if there are errors
+            if( RC.ERROR( oSvcCli.getError() ) ) {
+                ret = oSvcCli.getError();
+                break;
+            }
+
+            // start the proxy
+            ret = oSvcCli.start();
+            if( RC.ERROR( ret ) )
+                break;
+        
             // test remote server is not online
             while( oSvcCli.getState() == RC.stateRecovery )
             try{
@@ -139,10 +146,10 @@ public class maincli
                             "Server says(async): " + new String(byResp,StandardCharsets.UTF_8));
                 }
             }
-        }while( false );
-
-        oSvcCli.stop();
+        }while(false);
+        if( oSvcCli != null)
+            oSvcCli.stop();
         m_oCtx.stop();
-        System.exit( -ret );
+        System.exit(-ret);
     }
 }
