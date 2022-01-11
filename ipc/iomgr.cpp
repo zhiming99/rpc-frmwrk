@@ -2040,14 +2040,14 @@ gint32 CIoManager::TryFindDescFile(
         ObjPtr pObj;
 
         // relative path
-        std::string strFile = "./";
-        strFile +=
+        std::string strFile =
             basename( strFileName.c_str() );
 
-        ret = access( strFile.c_str(), R_OK );
+        stdstr strLocal = "./" + strFile;
+        ret = access( strLocal.c_str(), R_OK );
         if( ret == 0 )
         {
-            strPath = strFile;
+            strPath = strLocal;
             ret = STATUS_SUCCESS;
             break;
         }
@@ -2067,8 +2067,7 @@ gint32 CIoManager::TryFindDescFile(
         std::string strFullPath;
         for( auto& elem : ( *psetPaths )() )
         {
-            strFullPath = elem + strFile;
-
+            strFullPath = elem + "/" +  strFile;
             ret = access(
                 strFullPath.c_str(), R_OK );
 
@@ -2078,7 +2077,7 @@ gint32 CIoManager::TryFindDescFile(
                 break;
             }
 
-            strFullPath = elem + "../etc/rpcf" + strFile;
+            strFullPath = elem + "/../etc/rpcf/" + strFile;
             ret = access(
                 strFullPath.c_str(), R_OK );
             if( ret == 0 )
