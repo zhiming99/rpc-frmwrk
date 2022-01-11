@@ -4192,6 +4192,11 @@ gint32 CImplJavaMainCli::Output()
         Wa( "    System.exit( RC.EFAULT );" );
         NEW_LINE;
 
+        Wa( "int ret = 0;" );
+        Wa( "JavaRpcProxy oSvc = null;" );
+        CCOUT << "try";
+        BLOCK_OPEN;
+
         std::vector< ObjPtr > vecSvcs;
         ret = m_pNode->GetSvcDecls( vecSvcs );
         if( ERROR( ret ) || vecSvcs.empty() )
@@ -4204,7 +4209,7 @@ gint32 CImplJavaMainCli::Output()
         CCOUT << "    getDescPath( \"" << strDescName << "\" );";
         NEW_LINE;
         Wa( "if( strDescPath.isEmpty() )" );
-        Wa( "    System.exit( RC.ENOENT );" );
+        Wa( "{ ret = -RC.ENOENT; return; }" );
         Wa( "// create the service object" );
 
         CCOUT << strSvc << "cli oSvcCli = new " << strSvc << "cli(";
@@ -4215,19 +4220,18 @@ gint32 CImplJavaMainCli::Output()
             CCOUT << "    \""<< strSvc << "\" );";
 
         NEW_LINES( 2 );
+        Wa( "oSvc = oSvcCli;" );
         Wa( "// check if there are errors" );
         Wa( "if( RC.ERROR( oSvcCli.getError() ) )" );
-        Wa( "    System.exit( -oSvcCli.getError() );" );
+        Wa( "{ ret = oSvcCli.getError(); return; }" );
 
         NEW_LINE;
         Wa( "// start the proxy" );
-        Wa( "int ret = oSvcCli.start();" );
+        Wa( "ret = oSvcCli.start();" );
         Wa( "if( RC.ERROR( ret ) )" );
-        Wa( "    System.exit( -ret );" );
+        Wa( "    return;" );
         
         NEW_LINE;
-        CCOUT << "do{";
-        INDENT_UPL;
         Wa( "// test remote server is not online" );
         Wa( "while( oSvcCli.getState() == RC.stateRecovery )" );
         Wa( "try{" );
@@ -4236,7 +4240,7 @@ gint32 CImplJavaMainCli::Output()
         Wa( "catch( InterruptedException e ){};" );
         NEW_LINE;
         Wa( "if( oSvcCli.getState() != RC.stateConnected )" );
-        Wa( "{ ret = RC.ERROR_STATE;break;}" );
+        Wa( "{ ret = RC.ERROR_STATE; return; }" );
         NEW_LINE;
         std::vector< ObjPtr > vecm;
         ret = CJTypeHelper::GetMethodsOfSvc(
@@ -4296,7 +4300,7 @@ gint32 CImplJavaMainCli::Output()
                 INDENT_DOWNL;
             }
             Wa( "if( jret.ERROR() )" );
-            Wa( "{ ret = jret.getError();break; }" );
+            Wa( "{ ret = jret.getError();return; }" );
             CCOUT << "*/";
         }
         else if( bHasEvent )
@@ -4312,13 +4316,18 @@ gint32 CImplJavaMainCli::Output()
             Wa( " }" );
             CCOUT << " */";
         }
-        INDENT_DOWNL;
-        CCOUT << "}while( false );";
-        NEW_LINES(2);
-        Wa( "oSvcCli.stop();" );
+        BLOCK_CLOSE;
+        NEW_LINE;
+        Wa( "finally" );
+        BLOCK_OPEN;
+        Wa( "if( oSvc != null )" );
+        Wa( "    oSvc.stop();" );
         Wa( "m_oCtx.stop();" );
         CCOUT << "System.exit( -ret );";
+        BLOCK_CLOSE;
+        // end of main
         BLOCK_CLOSE; 
+        // end of class
         BLOCK_CLOSE; 
 
     }while( 0 );
@@ -4360,6 +4369,11 @@ gint32 CImplJavaMainSvr::Output()
         Wa( "    System.exit( RC.EFAULT );" );
         NEW_LINE;
 
+        Wa( "int ret = 0;" );
+        Wa( "JavaRpcServer oSvc = null;" );
+        CCOUT << "try";
+        BLOCK_OPEN;
+
         std::vector< ObjPtr > vecSvcs;
         ret = m_pNode->GetSvcDecls( vecSvcs );
         if( ERROR( ret ) || vecSvcs.empty() )
@@ -4372,7 +4386,7 @@ gint32 CImplJavaMainSvr::Output()
         CCOUT << "    getDescPath( \"" << strDescName << "\" );";
         NEW_LINE;
         Wa( "if( strDescPath.isEmpty() )" );
-        Wa( "    System.exit( RC.ENOENT );" );
+        Wa( "{ ret = -RC.ENOENT; return; }" );
         Wa( "// create the service object" );
 
         CCOUT << strSvc << "svr oSvcSvr = new " << strSvc << "svr(";
@@ -4382,13 +4396,14 @@ gint32 CImplJavaMainSvr::Output()
             NEW_LINE;
             CCOUT << "    \""<< strSvc << "\" );";
         NEW_LINES( 2 );
+        Wa( "oSvc = oSvcSvr;" );
         Wa( "// check if there are errors" );
         Wa( "if( RC.ERROR( oSvcSvr.getError() ) )" );
-        Wa( "    System.exit( -oSvcSvr.getError() );" );
+        Wa( "{ ret = oSvcSvr.getError(); return; }" );
         NEW_LINE;
-        Wa( "int ret = oSvcSvr.start();" );
+        Wa( "ret = oSvcSvr.start();" );
         Wa( "if( RC.ERROR( ret ) )" );
-        Wa( "    System.exit( -ret );" );
+        Wa( "    return;" );
         
         NEW_LINE;
         Wa( "do{" );
@@ -4404,11 +4419,18 @@ gint32 CImplJavaMainSvr::Output()
         Wa( "}" );
         Wa( "catch( InterruptedException e ){}" );
         CCOUT << "}while( true );";
-        NEW_LINES(2);
-        Wa( "oSvcSvr.stop();" );
+        BLOCK_CLOSE;
+        NEW_LINE;
+        Wa( "finally" );
+        BLOCK_OPEN;
+        Wa( "if( oSvc != null )" );
+        Wa( "    oSvc.stop();" );
         Wa( "m_oCtx.stop();" );
         CCOUT << "System.exit( -ret );";
         BLOCK_CLOSE; 
+        // endof main
+        BLOCK_CLOSE; 
+        // endof class
         BLOCK_CLOSE; 
 
     }while( 0 );

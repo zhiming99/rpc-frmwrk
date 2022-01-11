@@ -657,6 +657,9 @@ class CJavaInterfBase : public T
                     ( void** )&jenv, NULL )!= 0 )
                 {
                     ret = ERROR_FAIL;
+                    OutputMsg( ret,
+                        "Failed to attach jenv "
+                        "to current thread" );
                     break;
                 }
                 bAttach = true;
