@@ -215,7 +215,6 @@ elif [ "$1" == "1" ]; then
 
 # leaving cpp
     popd
-    exit 0
 
 # java test
     pushd java/src
@@ -224,13 +223,11 @@ elif [ "$1" == "1" ]; then
     for i in ../../*.ridl;do b=${i%%.ridl};c=${b##../../}; ridlc -jO . -Porg.rpcf.tests  $i;done
     sleep 1
 
-    java -version
+    ln -s org/rpcf/tests/HelloWorld/driver.json
+
     javac org/rpcf/tests/HelloWorld/*.java || exit 9
     pushd org/rpcf/tests/HelloWorld
     make
-    ls
-    cat HelloWorlddesc.json
-    cat driver.json
     popd
     echo start java testcase hellowld
     java org.rpcf.tests.HelloWorld.mainsvr &
@@ -308,7 +305,7 @@ elif [ "$1" == "1" ]; then
     echo start java testcase sftest
     java org.rpcf.tests.sftest.mainsvr &
     sleep 5
-    java org.rpcf.tests.sftest.maincli
+    java org.rpcf.tests.sftest.maincli $fileTrans
     kill -9 `pidof java`
     sleep 5
     popd

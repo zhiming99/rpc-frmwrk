@@ -12,7 +12,7 @@ RUN apt-get -y install libjsoncpp1 || apt-get -y install libjsoncpp24
 RUN apt-get -y install git;cd ${HOME} && git clone 'https://github.com/zhiming99/rpc-frmwrk.git'
 RUN cd ${HOME}/rpc-frmwrk && libtoolize && aclocal && autoreconf -vfi && \
 automake --add-missing && autoconf; echo `pwd`;ls -l `pwd`
-RUN cd ${HOME}/rpc-frmwrk && ./configure "CPPFLAGS=-O2 -g -DRELEASE -D_DEBUG=0" && make && make install;\
+RUN cd ${HOME}/rpc-frmwrk && ./configure "CPPFLAGS=-O2 -g -DRELEASE -D_DEBUG=0 -fno-strict-aliasing" && make && make install;\
 echo 'export LD_LIBRARY_PATH=/usr/local/lib:/usr/local/lib/rpcf'>>${HOME}/.bashrc
 ADD ./testcfgs/mincfg.json ${HOME}
 RUN python3 /usr/local/bin/rpcf/rpcfgnui.py ${HOME}/mincfg.json
