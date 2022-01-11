@@ -235,7 +235,6 @@ elif [ "$1" == "1" ]; then
     java org.rpcf.tests.HelloWorld.maincli || exit 9
     kill -9 `pidof java`
     sleep 5
-    popd
 
     javac org/rpcf/tests/iftest/*.java || exit 9
     pushd org/rpcf/tests/iftest
@@ -247,7 +246,6 @@ elif [ "$1" == "1" ]; then
     java org.rpcf.tests.iftest.maincli || exit 9
     kill -9 `pidof java`
     sleep 5
-    popd
 
     javac org/rpcf/tests/asynctst/*.java || exit 9
     pushd org/rpcf/tests/asynctst
@@ -259,7 +257,6 @@ elif [ "$1" == "1" ]; then
     java org.rpcf.tests.asynctst.maincli || exit 9
     kill -9 `pidof java`
     sleep 5
-    popd
 
 
     javac org/rpcf/tests/actcancel/*.java || exit 9
@@ -272,7 +269,6 @@ elif [ "$1" == "1" ]; then
     java org.rpcf.tests.actcancel.maincli || exit 9
     kill -9 `pidof java`
     sleep 5
-    popd
 
     javac org/rpcf/tests/katest/*.java || exit 9
     pushd org/rpcf/tests/katest
@@ -284,7 +280,6 @@ elif [ "$1" == "1" ]; then
     java org.rpcf.tests.katest.maincli || exit 9
     kill -9 `pidof java`
     sleep 5
-    popd
 
     javac org/rpcf/tests/stmtest/*.java || exit 9
     pushd org/rpcf/tests/stmtest
@@ -296,7 +291,6 @@ elif [ "$1" == "1" ]; then
     java org.rpcf.tests.stmtest.maincli || exit 9
     kill -9 `pidof java`
     sleep 5
-    popd
 
     javac org/rpcf/tests/sftest/*.java || exit 9
     pushd org/rpcf/tests/sftest
@@ -308,9 +302,8 @@ elif [ "$1" == "1" ]; then
     java org.rpcf.tests.sftest.maincli $fileTrans
     kill -9 `pidof java`
     sleep 5
-    popd
 
-#leave java
+#leave java/src
     popd
     
 # leaving examples
