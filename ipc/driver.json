@@ -444,6 +444,20 @@
                 "DBusBusDriver",
                 "UnixSockBusDriver"
             ]
+        },
+        {
+            "ModName": "JavaRpcProxy",
+            "DriversToLoad": [
+                "DBusBusDriver",
+                "UnixSockBusDriver"
+            ]
+        },
+        {
+            "ModName": "JavaRpcServer",
+            "DriversToLoad": [
+                "DBusBusDriver",
+                "UnixSockBusDriver"
+            ]
         }
     ],
     "Match": [
