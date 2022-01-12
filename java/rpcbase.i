@@ -2181,7 +2181,7 @@ class CParamList
     gint32 SetBoolProp(
         gint32, bool bVal );
 
-    gint32 SetProperty(
+    gint32 SetBufPtr(
         gint32 iProp, BufPtr& pObj );
 
 };
@@ -2491,7 +2491,7 @@ class CParamList
         return jret;
     }
 
-    jobject GetProperty(
+    jobject GetBufPtr(
         JNIEnv *jenv, gint32 iProp )
     {
         gint32 ret = 0;
@@ -2500,7 +2500,7 @@ class CParamList
             CParamList& oParams = *$self;
             BufPtr* ppBuf = new BufPtr();
 
-            ret = oParams.GetProperty(
+            ret = oParams.GetBufPtr(
                 iProp, *ppBuf );
 
             if( ERROR( ret ) )

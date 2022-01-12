@@ -465,7 +465,7 @@ class CJavaInterfBase : public T
                 case typeByteArr:
                     {
                         BufPtr pBuf;
-                        ret = oResp.GetProperty( i, pBuf );
+                        ret = oResp.GetBufPtr( i, pBuf );
                         if( ERROR( ret ) )
                             break;
 

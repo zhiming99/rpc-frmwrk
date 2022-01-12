@@ -518,7 +518,7 @@ abstract public class JavaRpcService implements IRpcService
                     break;
                 case RC.typeByteArr :
                     jret2 = ( JRetVal )
-                        oParams.GetProperty( i );
+                        oParams.GetBufPtr( i );
                     break;
                 }
                 if( jret2.ERROR() )
