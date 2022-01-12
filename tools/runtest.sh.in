@@ -223,7 +223,7 @@ elif [ "$1" == "1" ]; then
     for i in ../../*.ridl;do b=${i%%.ridl};c=${b##../../}; ridlc -jO . -Porg.rpcf.tests  $i;done
     sleep 1
 
-    ln -s org/rpcf/tests/HelloWorld/driver.json
+    #ln -s org/rpcf/tests/HelloWorld/driver.json
 
     javac org/rpcf/tests/HelloWorld/*.java || exit 9
     pushd org/rpcf/tests/HelloWorld
