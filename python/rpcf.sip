@@ -648,6 +648,11 @@ namespace cpp
         gint32 SetObjPtr( gint32,
             cpp::ObjPtr& pObj );
 
+        gint32 GetBufPtr( gint32,
+            cpp::BufPtr& pObj /Out/ );
+        gint32 SetBufPtr( gint32,
+            cpp::BufPtr& pObj );
+
         gint32 GetBoolProp(
             gint32, bool& bVal /Out/ );
         %MethodCode

@@ -62,8 +62,11 @@ def maincli() :
             else:
                 oProxy.WaitForComplete()
                 ret = oProxy.GetError()
-                print( "CancelRequest succeeded " + str( ret ) )
-                ret = 0
+                if ret == ErrorCode.ERROR_USER_CANCEL:
+                    ret = 0
+                    print( "CancelRequest succeeded " + str( 0 ) )
+                else:
+                    print( "CancelRequest failed with error " + str( ret ) )
 
             
     return ret

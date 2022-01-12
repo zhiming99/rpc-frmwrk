@@ -523,7 +523,7 @@ class PyRpcServices :
 
         argList = []
         if seriProto == cpp.seriPython :
-            ret = pCfg.GetProperty( 0 )
+            ret = oParams.GetBufPtr( 0 )
             if ret[ 0 ] < 0 :
                 return [ 0, argList ]
             val = ret[ 1 ]
@@ -546,7 +546,7 @@ class PyRpcServices :
             return [ 0, argList ]
 
         elif seriProto == cpp.seriRidl :
-            ret = pCfg.GetProperty( 0 )
+            ret = oParams.GetBufPtr( 0 )
             if ret[ 0 ] < 0 :
                 return [ 0, argList ]
 
@@ -620,7 +620,7 @@ class PyRpcServices :
                     ret = [ -errno.EFAULT, ]
                     break
             elif iType == cpp.typeByteArr :
-                ret = pCfg.GetProperty( i )
+                ret = oParams.GetBufPtr( i )
                 if ret[ 0 ] < 0 :
                     break
                 val = ret[ 1 ]
