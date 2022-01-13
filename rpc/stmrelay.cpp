@@ -1625,6 +1625,7 @@ gint32 CIfTcpStmTransTask::LocalToRemote(
             }
 
             *pRemote = byToken;
+            pRemote->Resize( sizeof( byToken ) );
             break;
         }
     default:

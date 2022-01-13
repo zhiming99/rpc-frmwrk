@@ -627,7 +627,7 @@ krb5_error_code CInitHookMap::Krb5SendHook(
 
         BufPtr pToken;
         CCfgOpener oResp( ( IConfigDb* )pResp );
-        ret = oResp.GetProperty( 0, pToken );
+        ret = oResp.GetBufPtr( 0, pToken );
         if( ERROR( ret ) )
             break;
 
@@ -829,7 +829,7 @@ gint32 IAuthenticateProxy::VerifyMicMsg2p(
         memcpy( pts, &qwts, sizeof( qwts ) );
 
         BufPtr pSig;
-        ret = oSecCtx.GetProperty(
+        ret = oSecCtx.GetBufPtr(
             propSignature, pSig );
         if( ERROR( ret ) )
             break;
@@ -1212,7 +1212,7 @@ gint32 CK5AuthProxy::Krb5Login(
                 if( maj_stat == GSS_S_CONTINUE_NEEDED )
                 {
                     BufPtr pToken;
-                    ret = oResp.GetProperty(
+                    ret = oResp.GetBufPtr(
                         0, pToken );
                     if( ERROR( ret ) )
                         break;

@@ -130,8 +130,7 @@ gint32 CKdcRelayProxy::SetupReqIrp(
     do{
         CReqOpener oReq( pReqCall );
         BufPtr pToken;
-        ret = oReq.GetProperty(
-            0, pToken );
+        ret = oReq.GetBufPtr( 0, pToken );
         if( ERROR( ret ) )
             break;
 
@@ -259,8 +258,7 @@ gint32 CKdcRelayProxy::MechSpecReq(
             ret = oResp[ propReturnValue ];
             if( SUCCEEDED( ret ) )
             {
-                ret = oResp.GetProperty(
-                    0, pResp );
+                ret = oResp.GetBufPtr( 0, pResp );
             }
         }
 
@@ -381,9 +379,7 @@ gint32 CK5AuthServer::OnSendKdcRequestComplete(
         }
 
         BufPtr pToken;
-        ret = oResp.GetProperty(
-            0, pToken );
-
+        ret = oResp.GetBufPtr( 0, pToken );
         if( ERROR( ret ) )
             break;
 
@@ -450,7 +446,7 @@ gint32 CK5AuthServer::SendKdcRequest(
         }
 
         BufPtr pRealm;
-        ret = oReq.GetProperty( 1, pRealm );
+        ret = oReq.GetBufPtr( 1, pRealm );
         if( ERROR( ret ) )
         {
             ret = -EINVAL;
@@ -458,7 +454,7 @@ gint32 CK5AuthServer::SendKdcRequest(
         }
 
         BufPtr pToken;
-        ret = oReq.GetProperty( 2, pToken );
+        ret = oReq.GetBufPtr( 2, pToken );
         if( ERROR( ret ) )
         {
             ret = -EINVAL;
@@ -488,8 +484,7 @@ gint32 CK5AuthServer::SendKdcRequest(
             {
                 CParamList oArg0;
                 oArg0.Push( pRespBuf );
-                oResp.Push(
-                    oArg0.GetCfg() );
+                oResp.Push( oArg0.GetCfg() );
             }
 
             SetResponse(
@@ -1135,8 +1130,7 @@ gint32 CK5AuthServer::Login(
         BufPtr pToken;
         if( bKrbLogin )
         {
-            ret = oInfo.GetProperty(
-                2, pToken );
+            ret = oInfo.GetBufPtr( 2, pToken );
             if( ERROR( ret ) )
                 break;
         }
@@ -1327,7 +1321,7 @@ gint32 IAuthenticateServer::GetMicMsg2s(
             break;
 
         CCfgOpener oSecCtx;
-        oSecCtx.SetProperty(
+        oSecCtx.SetBufPtr(
             propSignature, pSig );
 
         oSecCtx.SetStrProp(
@@ -1374,7 +1368,7 @@ gint32 IAuthenticateServer::VerifyMicMsg2s(
         }
 
         BufPtr pSig;
-        ret = oSecCtx.GetProperty(
+        ret = oSecCtx.GetBufPtr(
             propSignature, pSig );
         if( ERROR( ret ) )
             break;

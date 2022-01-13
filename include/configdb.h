@@ -1124,6 +1124,27 @@ class CCfgDbOpener< IConfigDb >
         return ret;
     }
 
+    gint32 CopyProp( gint32 iProp, gint32 iSrcProp )
+    {
+        gint32 ret = 0;
+        do{
+            auto pCfg = CFGDB2( m_pCfg );
+            const Variant* p =
+                pCfg->GetPropertyPtr( iSrcProp );
+            if( p == nullptr )
+            {
+                ret = -ENOENT;
+                break;
+            }
+            Variant& odst =
+                pCfg->GetProperty( iProp );
+            odst = *p;
+
+        }while( 0 );
+
+        return ret;
+    }
+
     gint32 CopyProp(
         gint32 iProp, gint32 iSrcProp, const CObjBase* pSrcCfg )
     {

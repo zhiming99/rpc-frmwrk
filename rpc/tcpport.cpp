@@ -2006,10 +2006,8 @@ gint32 CRpcStreamSock::HandleWriteIrp(
             if( ERROR( ret ) )
                 break;
 
-            BufPtr pPayload( true );
-            ret = oCfg.GetProperty(
-                0, *pPayload );
-
+            BufPtr pPayload;
+            ret = oCfg.GetProperty( 0, pPayload );
             if( ERROR( ret ) )
                 break;
             

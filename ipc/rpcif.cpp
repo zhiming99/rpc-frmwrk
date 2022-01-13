@@ -4801,12 +4801,13 @@ gint32 CRpcServices::UnpackEvent(
     case eventModOnline:
     case eventModOffline:
         {
-            BufPtr pBuf;
-            ret = oParams.GetProperty( 3, pBuf );
-            if( ERROR( ret ) )
+            Variant* p = oParams.GetPropPtr( 3 );
+            if( p == nullptr )
+            {
+                ret = -ENOENT;
                 break;
-            pData = ( LONGWORD* )pBuf->ptr();
-
+            }
+            pData = ( LONGWORD* )( const char* )*p;
             break;
         }
     case eventRmtModOnline:
@@ -4818,11 +4819,13 @@ gint32 CRpcServices::UnpackEvent(
                 break;
 
             dwParam1 = ( LONGWORD )pEvtCtx;
-            BufPtr pBuf;
-            ret = oParams.GetProperty( 3, pBuf );
-            if( ERROR( ret ) )
+            Variant* p = oParams.GetPropPtr( 3 );
+            if( p == nullptr )
+            {
+                ret = -ENOENT;
                 break;
-            pData = ( LONGWORD* )pBuf->ptr();
+            }
+            pData = ( LONGWORD* )( const char* )*p;
             break;
         }
     case eventDBusOnline:

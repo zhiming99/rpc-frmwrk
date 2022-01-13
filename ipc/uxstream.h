@@ -1105,6 +1105,7 @@ class CUnixSockStream:
         do{
             BufPtr pBuf( true );
             *pBuf = byToken;
+            pBuf->Resize( sizeof( byToken ) );
             CParamList oParams;
             oParams[ propMethodName ] = __func__;
             oParams.Push( pBuf );
@@ -1127,6 +1128,7 @@ class CUnixSockStream:
             CParamList oParams;
             BufPtr pBuf( true );
             *pBuf = bPause ? tokFlowCtrl : tokLift;
+            pBuf->Resize( sizeof( tokLift ) );
             oParams[ propMethodName ] = __func__;
             oParams.Push( pBuf );
 
@@ -1325,7 +1327,7 @@ class CUnixSockStream:
             else if( strMethod == "WriteStream" )
             {
                 BufPtr pBuf;
-                oParams.GetProperty( 0, pBuf );
+                oParams.GetBufPtr( 0, pBuf );
                 pCtx->SetMinorCmd( IRP_MN_WRITE );
                 pCtx->SetIoDirection( IRP_DIR_OUT );
                 pCtx->SetReqData( pBuf );
@@ -1359,7 +1361,7 @@ class CUnixSockStream:
                 strMethod== "SendProgress" )
             {
                 BufPtr pBuf;
-                oParams.GetProperty( 0, pBuf );
+                oParams.GetBufPtr( 0, pBuf );
                 pCtx->SetMinorCmd( IRP_MN_IOCTL );
                 pCtx->SetCtrlCode( CTRLCODE_STREAM_CMD );
                 pCtx->SetIoDirection( IRP_DIR_OUT );
@@ -1377,7 +1379,7 @@ class CUnixSockStream:
             else if( strMethod == "PauseReading" )
             {
                 BufPtr pBuf;
-                oParams.GetProperty( 0, pBuf );
+                oParams.GetBufPtr( 0, pBuf );
                 pCtx->SetMinorCmd( IRP_MN_IOCTL );
                 pCtx->SetCtrlCode( CTRLCODE_STREAM_CMD );
                 pCtx->SetIoDirection( IRP_DIR_IN );

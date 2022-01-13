@@ -3187,8 +3187,8 @@ gint32 CRpcReqForwarder::BuildBufForIrpFwrdEvt(
         if( ERROR( ret ) )
             break;
 
-        BufPtr pEvtBuf( true );
-        ret = oReq.GetProperty( 1, *pEvtBuf );
+        BufPtr pEvtBuf;
+        ret = oReq.GetBufPtr( 1, pEvtBuf );
         if( ERROR( ret ) )
             break;
         

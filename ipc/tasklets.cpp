@@ -347,17 +347,9 @@ void CTaskletRetriable::ResetRetries()
     if( m_pCtx.IsEmpty() )
         return;
 
-    BufPtr pBuf( true );
-
-    gint32 ret = m_pCtx->GetProperty(
-        propRetriesBackup, *pBuf );
-
-    if( SUCCEEDED( ret ) )
-    {
-        m_pCtx->SetProperty(
-            propRetries, *pBuf );
-    }
-
+    CCfgOpener oCfg( ( IConfigDb* )m_pCtx );
+    oCfg.CopyProp( propRetries,
+        propRetriesBackup );
     RemoveTimer();
 
     return;
