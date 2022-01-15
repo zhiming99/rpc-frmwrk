@@ -145,6 +145,7 @@ gint32 CConfigDb2::GetProperty(
         break;
     case typeDouble:
         oBuf = o.m_dblVal;
+        break;
     case typeDMsg:
         oBuf = o.m_pMsg;
         break;
@@ -202,21 +203,6 @@ gint32 CConfigDb2::GetPropIds(
 
 void CConfigDb2::RemoveAll()
 { m_mapProps.clear(); }
-
-const CBuffer& CConfigDb2::operator[](
-    gint32 iProp ) const
-{
-    throw std::runtime_error( 
-        DebugMsg( -ENOTSUP,
-            "[] cannot return CBuffer" ) );
-}
-CBuffer& CConfigDb2::operator[](
-    gint32 iProp )
-{
-    throw std::runtime_error( 
-        DebugMsg( -ENOTSUP,
-            "[] cannot return CBuffer" ) );
-}
 
 #define QPAGE ( ( guint32 )( PAGE_SIZE >> 1 ) )
 gint32 CConfigDb2::Serialize(

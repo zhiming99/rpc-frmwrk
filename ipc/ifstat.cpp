@@ -723,17 +723,24 @@ bool CInterfaceState::exist(
 }
 
 gint32 CInterfaceState::GetProperty(
-    gint32 iProp, CBuffer& pVal ) const
+    gint32 iProp, Variant& oVal ) const
 {
     gint32 ret = 0;
-    CStdRMutex oStatLock( GetLock() );
-    if( unlikely( iProp == propPortId &&
-        m_hPort != INVALID_HANDLE ) )
-    {
+    do{
+        CStdRMutex oStatLock( GetLock() );
+        CCfgOpener oIfCfg(
+            ( IConfigDb* )m_pIfCfgDb );
+        if( !( iProp == propPortId &&
+            m_hPort != INVALID_HANDLE ) )
+        {
+            ret = oIfCfg.GetProperty( iProp, oVal );
+            break;
+        }
         guint32 dwPortId = ( guint32 )-1;
-        ret = m_pIfCfgDb->GetProperty( iProp, pVal );
-        if( SUCCEEDED( ret ) )
-            dwPortId = pVal;
+
+        ret = oIfCfg.GetIntProp(iProp, dwPortId );
+        if( ERROR( ret ) )
+            return ret;
 
         if( dwPortId == ( guint32 )-1 )
         {
@@ -741,7 +748,7 @@ gint32 CInterfaceState::GetProperty(
             CIoManager* pMgr = GetIoMgr();
             ret = pMgr->GetPortPtr( m_hPort, pPort );
             if( ERROR( ret ) )
-                return ret;
+                break;
 
             CCfgOpenerObj oPortCfg(
                 ( IPort* )pPort );
@@ -750,20 +757,15 @@ gint32 CInterfaceState::GetProperty(
                 propPdoId, dwPortId );
 
             if( ERROR( ret ) )
-                return ret;
+                break;
 
-            pVal = dwPortId;
-
-            CCfgOpener oIfCfg(
-                ( IConfigDb* )m_pIfCfgDb );
-
+            oVal = dwPortId;
             oIfCfg[ propPortId ] = dwPortId;
+            break;
         }
-    }
-    else
-    {
-        ret = m_pIfCfgDb->GetProperty( iProp, pVal );
-    }
+        oVal = dwPortId;
+
+    }while( 0 );
     return ret;
 }
 

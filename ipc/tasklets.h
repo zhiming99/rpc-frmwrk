@@ -70,12 +70,12 @@ class CTasklet : public ICancellableTask
     { return ( IConfigDb* )m_pCtx; }
 
     gint32 GetProperty(
-            gint32 iProp,
-            CBuffer& oBuf ) const;
+        gint32 iProp,
+        Variant& oVar ) const override;
 
     gint32 SetProperty(
-            gint32 iProp,
-            const CBuffer& oBuf );
+        gint32 iProp,
+        const Variant& oVar ) override;
 
     gint32 EnumProperties(
         std::vector< gint32 >& vecProps ) const;
@@ -296,7 +296,7 @@ class CTaskletRetriable : public CTasklet
         guint32 dwParam );
 
     virtual gint32 SetProperty(
-            gint32 iProp, const CBuffer& oBuf );
+            gint32 iProp, const Variant& oBuf );
     virtual gint32 OnCancel( guint32 dwContext );
 };
 
@@ -632,15 +632,13 @@ class CThreadSafeTask : public CTaskletRetriable
         return m_iRet;
     }
 
-    gint32 GetProperty( gint32 iProp,
-            CBuffer& oBuf ) const;
+    gint32 GetProperty(
+        gint32 iProp,
+        Variant& oVar ) const override;
 
-    gint32 SetProperty( gint32 iProp,
-        const CBuffer& oBuf )
-    {
-        CStdRTMutex oTaskLock( GetLock() );
-        return super::SetProperty( iProp, oBuf );
-    }
+    gint32 SetProperty(
+        gint32 iProp,
+        const Variant& oVar ) override;
 
     gint32 RemoveProperty( gint32 iProp )
     {

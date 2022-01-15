@@ -635,7 +635,7 @@ gint32 CRpcTcpBusPort::OnNewConnection(
 // methods from CObjBase
 gint32 CRpcTcpBusPort::GetProperty(
         gint32 iProp,
-        CBuffer& oBuf ) const
+        Variant& oBuf ) const
 {
     gint32 ret = 0;
     switch( iProp )
@@ -668,7 +668,7 @@ gint32 CRpcTcpBusPort::GetProperty(
 
 gint32 CRpcTcpBusPort::SetProperty(
         gint32 iProp,
-        const CBuffer& oBuf )
+        const Variant& oBuf )
 {
     gint32 ret = 0;
     switch( iProp )
@@ -681,7 +681,7 @@ gint32 CRpcTcpBusPort::SetProperty(
         }
     case propMaxConns:
         {
-            guint32& dwConn = oBuf;
+            guint32 dwConn = ( const guint32& )oBuf;
             if( dwConn == 0 || dwConn > 10000 )
             {
                 ret = -EINVAL;

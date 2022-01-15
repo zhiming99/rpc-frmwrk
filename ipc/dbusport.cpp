@@ -1839,8 +1839,7 @@ gint32 CDBusBusPort::EnumProperties(
 }
 
 gint32 CDBusBusPort::GetProperty(
-        gint32 iProp,
-        CBuffer& oBuf ) const
+    gint32 iProp, Variant& oBuf ) const
 {
     gint32 ret = 0;
     switch( iProp )
@@ -1868,8 +1867,7 @@ gint32 CDBusBusPort::GetProperty(
 }
 
 gint32 CDBusBusPort::SetProperty(
-        gint32 iProp,
-        const CBuffer& oBuf )
+    gint32 iProp, const Variant& oBuf )
 {
     gint32 ret = 0;
     switch( iProp )

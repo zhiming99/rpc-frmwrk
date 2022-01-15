@@ -714,7 +714,7 @@ class CTcpStreamPdo2 : public CPort
 
     // methods from CObjBase
     gint32 GetProperty( gint32 iProp,
-        CBuffer& oBuf ) const override;
+        Variant& oBuf ) const override;
 
     void OnPortStartFailed(
         IRP* pIrp, gint32 ret );

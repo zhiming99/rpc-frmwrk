@@ -5596,7 +5596,7 @@ static guint32 log2( guint32 pow2 )
 // methods from CObjBase
 gint32 CRpcRouterManager::GetProperty(
         gint32 iProp,
-        CBuffer& oBuf ) const
+        Variant& oBuf ) const
 {
     gint32 ret = 0;
     switch( iProp )
@@ -5633,7 +5633,7 @@ gint32 CRpcRouterManager::GetProperty(
 
 gint32 CRpcRouterManager::SetProperty(
         gint32 iProp,
-        const CBuffer& oBuf )
+        const Variant& oBuf )
 {
     gint32 ret = 0;
     switch( iProp )
@@ -5653,7 +5653,6 @@ gint32 CRpcRouterManager::SetProperty(
     }
     return ret;
 }
-
 gint32 CRpcRouterManager::GetCurConnLimit(
     guint32& dwMaxReqs,
     guint32& dwMaxPendings,

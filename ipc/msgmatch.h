@@ -624,7 +624,8 @@ class CMessageMatch : public IMessageMatch
     }
 
     gint32 GetProperty(
-        gint32 iProp, CBuffer& oBuf ) const
+        gint32 iProp,
+        Variant& oBuf ) const override
     {
         gint32 ret = 0;
         switch( iProp )
@@ -655,19 +656,20 @@ class CMessageMatch : public IMessageMatch
     }
 
     gint32 SetProperty(
-        gint32 iProp, const CBuffer& oBuf )
+        gint32 iProp,
+        const Variant& oBuf )
     {
         gint32 ret = 0;
         switch( iProp )
         {
         case propObjPath:
             {
-                m_strObjPath = oBuf;
+                m_strObjPath = ( stdstr& )oBuf;
                 break;
             }
         case propIfName:
             {
-                m_strIfName = oBuf;
+                m_strIfName = ( stdstr& )oBuf;
                 break;
             }
         case propMatchType:
@@ -685,7 +687,6 @@ class CMessageMatch : public IMessageMatch
         }
         return ret;
     }
-
     gint32 RemoveProperty( gint32 iProp )
     {
         gint32 ret = 0;

@@ -2885,10 +2885,12 @@ class CRpcRouterManager : public CRpcRouter
     gint32 RefreshReqLimit();
 
     gint32 SetProperty(
-        gint32 iProp, const CBuffer& oBuf );
+        gint32 iProp,
+        const Variant& oBuf ) override;
 
     gint32 GetProperty(
-        gint32 iProp, CBuffer& oBuf ) const;
+        gint32 iProp,
+        Variant& oBuf ) const override;
 
     gint32 GetCurConnLimit(
         guint32& dwMaxReqs,

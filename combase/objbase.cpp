@@ -30,6 +30,7 @@
 #include "defines.h"
 #include "autoptr.h"
 #include "buffer.h"
+#include "variant.h"
 #include "objfctry.h"
 #include <unordered_map>
 #include <byteswap.h>
@@ -637,22 +638,22 @@ gint32 CObjBase::EnumProperties(
 }
 
 gint32 CObjBase::GetProperty(
-    gint32 iProp, CBuffer& oBuf ) const
+    gint32 iProp, Variant& oVar ) const
 {
     gint32 ret = 0;
 
     switch( iProp )
     {
     case propObjId:
-        oBuf = GetObjId();
+        oVar = GetObjId();
         break;
 
     case propRefCount:
-        oBuf = ( guint32 )m_atmRefCount;
+        oVar = ( gint32 )m_atmRefCount;
         break;
 
     case propClsid:
-        oBuf = ( guint32 )GetClsid();
+        oVar = GetClsid();
         break;
 
     default:
@@ -684,18 +685,8 @@ gint32 CObjBase::GetPropertyType(
 }
 
 gint32 CObjBase::SetProperty(
-    gint32 iProp, const CBuffer& oBuf )
-{
-    gint32 ret = 0;
-
-    switch( iProp )
-    {
-    default:
-        ret = -ENOENT;
-    }
-
-    return ret;
-}
+    gint32 iProp, const Variant& oVar )
+{ return -ENOTSUP; }
 
 gint32 CObjBase::RemoveProperty(
     gint32 iProp )

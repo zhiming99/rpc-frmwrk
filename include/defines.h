@@ -514,6 +514,7 @@ struct SERI_HEADER_BASE
 
 class CBuffer;
 class IConfigDb;
+class Variant;
 class CObjBase
 {
     // boundary marker
@@ -562,10 +563,10 @@ class CObjBase
         const char* pBuf, guint32 dwSize );
 
     virtual gint32 GetProperty(
-        gint32 iProp, CBuffer& oBuf ) const;
+        gint32 iProp, Variant& oVar ) const;
 
     virtual gint32 SetProperty(
-        gint32 iProp, const CBuffer& oBuf );
+        gint32 iProp, const Variant& oVar );
 
     virtual gint32 GetPropertyType(
         gint32 iProp, gint32& iType ) const;

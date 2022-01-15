@@ -866,6 +866,22 @@ struct CStructDecl : public CNamedNode
             iProp, val );
     }
 
+    gint32 SetProperty(
+        gint32 iProp,
+        const Variant& val ) override
+    {
+        return m_oContext.SetProperty(
+            iProp, val );
+    }
+
+    gint32 GetProperty(
+        gint32 iProp,
+        Variant& val ) const override
+    {
+        return m_oContext.GetProperty(
+            iProp, val );
+    }
+
     guint32 AddRef()
     { return ++m_dwRefCount; }
 
@@ -1127,6 +1143,22 @@ struct CMethodDecl : public CNamedNode
 
     gint32 GetProperty(
         gint32 iProp, BufPtr& val ) const
+    {
+        return m_oContext.GetProperty(
+            iProp, val );
+    }
+
+    gint32 SetProperty(
+        gint32 iProp,
+        const Variant& val ) override
+    {
+        return m_oContext.SetProperty(
+            iProp, val );
+    }
+
+    gint32 GetProperty(
+        gint32 iProp,
+        Variant& val ) const override
     {
         return m_oContext.GetProperty(
             iProp, val );

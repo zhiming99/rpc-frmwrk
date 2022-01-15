@@ -275,7 +275,8 @@ class CDBusProxyPdoLpbk : public CDBusProxyPdo
         bool bNoReply = false ) const;
 
     gint32 GetProperty(
-        gint32 iProp, CBuffer& oBuf ) const;
+        gint32 iProp,
+        Variant& oVar ) const override;
 };
 
 }

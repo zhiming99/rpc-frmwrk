@@ -58,13 +58,13 @@ class CDirEntry : public CObjBase
     CDirEntry* GetChild( const std::string& strName ) const;
     gint32 AddChild( const std::string& strName );
 
-    gint32 SetProperty( 
+    gint32 GetProperty(
         gint32 iProp,
-        const CBuffer& oBuf );
+        Variant& oVar ) const override;
 
-    gint32 GetProperty( 
+    gint32 SetProperty(
         gint32 iProp,
-        CBuffer& oBuf ) const;
+        const Variant& oVar ) override;
 
     gint32 RemoveChild( const std::string& strName );
 
@@ -95,9 +95,15 @@ class CRegistry : public CObjBase
     gint32 MakeEntry( const std::string& );
     gint32 MakeDir( const std::string& );
     gint32 ChangeDir( const std::string& );
-    gint32 SetProperty( gint32 iProp, const CBuffer& oVal );
-    gint32 GetProperty( gint32 iProp, CBuffer& oVal ) const;
     gint32 RemoveProperty( guint32 iProp );
+
+    gint32 GetProperty(
+        gint32 iProp,
+        Variant& oVar ) const override;
+
+    gint32 SetProperty(
+        gint32 iProp,
+        const Variant& oVar ) override;
 
     gint32 SetObject( gint32 iProp, const ObjPtr& oVal );
     gint32 GetObject( gint32 iProp, ObjPtr& oVal ) const;

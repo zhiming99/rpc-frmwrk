@@ -200,7 +200,8 @@ gint32 CPort::EnumProperties(
     return 0;
 }
 
-gint32 CPort::GetProperty( gint32 iProp, CBuffer& oBuf ) const
+gint32 CPort::GetProperty(
+    gint32 iProp, Variant& oBuf ) const
 {
     gint32 ret = 0;
 
@@ -364,11 +365,14 @@ gint32 CPort::GetProperty( gint32 iProp, CBuffer& oBuf ) const
     return ret;
 }
 
-gint32 CPort::SetProperty( gint32 iProp, const CBuffer& oBuf )
+gint32 CPort::SetProperty(
+    gint32 iProp,
+    const Variant& oBuf )
 {
     gint32 ret = 0;
 
     CStdRMutex oPortLock( GetLock() );
+    CCfgOpener oPortCfg( ( IConfigDb* )m_pCfgDb );
 
     switch( PropIdFromInt( iProp ) )
     {
@@ -383,7 +387,7 @@ gint32 CPort::SetProperty( gint32 iProp, const CBuffer& oBuf )
     case propPortId:
     case propPortName:
     case propPortClass:
-        ( *m_pCfgDb )[ iProp ] = oBuf;
+        oPortCfg[ iProp ] = oBuf;
         break;
 
     case propUpperPortPtr:
@@ -394,7 +398,7 @@ gint32 CPort::SetProperty( gint32 iProp, const CBuffer& oBuf )
                 break;
             }
 
-            ObjPtr a = oBuf;
+            const ObjPtr& a = oBuf;
             if( a.IsEmpty() )
             {
                 m_pUpperPort = nullptr;
@@ -412,7 +416,7 @@ gint32 CPort::SetProperty( gint32 iProp, const CBuffer& oBuf )
                 ret = -EEXIST;
                 break;
             }
-            ObjPtr a = oBuf;
+            const ObjPtr& a = oBuf;
             if( a.IsEmpty() )
                 m_pLowerPort = nullptr;
             else
@@ -1777,13 +1781,13 @@ gint32 CPort::SubmitGetPropIrp( IRP* pIrp )
             break;
         }
 
-        BufPtr pResp( true );
-        ret = this->GetProperty( dwPropId, *pResp );
+        Variant oVar;
+        ret = this->GetProperty( dwPropId, oVar );
 
         pCtx->SetStatus( ret );
         if( SUCCEEDED( ret ) )
         {
-            pCtx->SetRespData( pResp );
+            pCtx->SetRespData( oVar.ToBuf() );
         }
         break;
 

@@ -216,13 +216,13 @@ class CGenericInterface :
     CGenericInterface( const IConfigDb* pCfg );
 
     virtual gint32 GetProperty(
-        gint32 iProp, CBuffer& pVal ) const
+        gint32 iProp, Variant& pVal ) const
     {
         return m_pIfStat->GetProperty( iProp, pVal );
     }
 
     virtual gint32 SetProperty(
-        gint32 iProp, const CBuffer& pVal )
+        gint32 iProp, const Variant& pVal )
     {
         return m_pIfStat->SetProperty( iProp, pVal );
     }

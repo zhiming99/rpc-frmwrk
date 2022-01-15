@@ -157,7 +157,7 @@ gint32 CRpcWebSockFido::EncodeAndSend(
         if( ERROR( ret ) )
             break;
 
-        oParams.SetProperty( 0, pOutBuf );
+        oParams.SetBufPtr( 0, pOutBuf );
 
         // send the encrypted copy down 
         PortPtr pLowerPort = GetLowerPort();

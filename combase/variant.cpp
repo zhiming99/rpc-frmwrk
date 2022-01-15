@@ -28,7 +28,6 @@ using namespace std;
 
 namespace rpcf
 {
-
 Variant::Variant( bool bVal )
 {
     m_bVal = bVal;
@@ -79,11 +78,6 @@ Variant::Variant( const DMsgPtr& msgVal )
     new ( &m_pMsg ) DMsgPtr( msgVal );
     m_iType = typeDMsg;
 }
-/*Variant::Variant( DBusMessage* msgVal )
-{
-    new ( &m_pMsg ) DMsgPtr( msgVal );
-    m_iType = typeDMsg;
-}*/
 Variant::Variant( const string& strVal )
 {
     new ( &m_strVal ) string( strVal );
@@ -94,8 +88,8 @@ Variant::Variant( const char* szVal )
     new ( &m_strVal ) string( szVal );
     m_iType = typeString;
 }
-
-Variant::Variant( const char* szVal, guint32 dwSize )
+Variant::Variant(
+    const char* szVal, guint32 dwSize )
 {
     new ( &m_strVal ) string( szVal, dwSize );
     m_iType = typeString;
@@ -136,6 +130,7 @@ Variant::Variant( EnumPropId val )
     m_dwVal = ( guint32 )val;
     m_iType = typeUInt32;
 }
+
 Variant::Variant( const uintptr_t* pVal )
 {
     m_iType = typeNone;
@@ -146,17 +141,20 @@ Variant::Variant( const Variant& rhs )
 {
     switch( rhs.m_iType )
     {
-    case typeByte: 
-        m_byVal = rhs.m_byVal;
-        break;
-    case typeUInt16:
-        m_wVal = rhs.m_wVal;
-        break;
     case typeUInt32:
         m_dwVal = rhs.m_dwVal;
         break;
     case typeUInt64:
         m_qwVal = rhs.m_qwVal;
+        break;
+    case typeObj:
+        new( &m_pObj ) ObjPtr( rhs.m_pObj );
+        break;
+    case typeByteArr:
+        new( &m_pBuf ) BufPtr( rhs.m_pBuf );
+        break;
+    case typeString:
+        new( &m_strVal ) string( rhs.m_strVal );
         break;
     case typeFloat:
         m_fVal = rhs.m_fVal;
@@ -167,14 +165,11 @@ Variant::Variant( const Variant& rhs )
     case typeDMsg:
         new( &m_pMsg ) DMsgPtr( rhs.m_pMsg );
         break;
-    case typeObj:
-        new( &m_pObj ) ObjPtr( rhs.m_pObj );
+    case typeByte: 
+        m_byVal = rhs.m_byVal;
         break;
-    case typeByteArr:
-        new( &m_pBuf ) BufPtr( rhs.m_pBuf );
-        break;
-    case typeString:
-        new( &m_strVal ) string( rhs.m_strVal );
+    case typeUInt16:
+        m_wVal = rhs.m_wVal;
         break;
     default:
         {
@@ -193,26 +188,11 @@ Variant::Variant( const CBuffer& oBuf )
 
     switch( iType )
     {
-    case typeByte: 
-        m_byVal = ( guint8& )oBuf;
-        break;
-    case typeUInt16:
-        m_wVal = ( guint16& )oBuf;
-        break;
     case typeUInt32:
         m_dwVal = ( guint32& )oBuf;
         break;
     case typeUInt64:
         m_qwVal = ( guint64& )oBuf;
-        break;
-    case typeFloat:
-        m_fVal = ( float& )oBuf;
-        break;
-    case typeDouble:
-        m_dblVal = ( double& )oBuf;
-        break;
-    case typeDMsg:
-        new( &m_pMsg ) DMsgPtr( ( DMsgPtr& )oBuf );
         break;
     case typeObj:
         new( &m_pObj ) ObjPtr( ( ObjPtr& )oBuf );
@@ -222,6 +202,21 @@ Variant::Variant( const CBuffer& oBuf )
         break;
     case typeString:
         new( &m_strVal ) string( ( const char* )oBuf );
+        break;
+    case typeFloat:
+        m_fVal = ( float& )oBuf;
+        break;
+    case typeDouble:
+        m_dblVal = ( double& )oBuf;
+        break;
+    case typeByte: 
+        m_byVal = ( guint8& )oBuf;
+        break;
+    case typeUInt16:
+        m_wVal = ( guint16& )oBuf;
+        break;
+    case typeDMsg:
+        new( &m_pMsg ) DMsgPtr( ( DMsgPtr& )oBuf );
         break;
     case typeNone:
         {
@@ -460,46 +455,39 @@ BufPtr Variant::ToBuf() const
 {
     EnumTypeId iType = m_iType;
     BufPtr pBuf;
+
+    if( iType == typeByteArr )
+    { return m_pBuf; }
+
+    pBuf.NewObj();
     switch( iType )
     {
-    case typeByte: 
-        pBuf.NewObj();
-        *pBuf = m_byVal;
-        break;
-    case typeUInt16:
-        pBuf.NewObj();
-        *pBuf = m_wVal;
-        break;
     case typeUInt32:
-        pBuf.NewObj();
         *pBuf = m_dwVal;
         break;
     case typeUInt64:
-        pBuf.NewObj();
         *pBuf = m_qwVal;
         break;
+    case typeObj:
+        *pBuf = m_pObj;
+        break;
+    case typeString:
+        *pBuf = m_strVal;
+        break;
     case typeFloat:
-        pBuf.NewObj();
         *pBuf = m_fVal;
         break;
     case typeDouble:
-        pBuf.NewObj();
         *pBuf = m_dblVal;
         break;
+    case typeByte: 
+        *pBuf = m_byVal;
+        break;
+    case typeUInt16:
+        *pBuf = m_wVal;
+        break;
     case typeDMsg:
-        pBuf.NewObj();
         *pBuf = m_pMsg;
-        break;
-    case typeObj:
-        pBuf.NewObj();
-        *pBuf = m_pObj;
-        break;
-    case typeByteArr:
-        pBuf = m_pBuf;
-        break;
-    case typeString:
-        pBuf.NewObj();
-        *pBuf = m_strVal;
         break;
     default:
         {
@@ -511,47 +499,50 @@ BufPtr Variant::ToBuf() const
     return pBuf;
 }
 bool Variant::operator==(
-    const Variant& rhs ) const
+    const Variant& r ) const
 {
     EnumTypeId iType = GetTypeId();
-    if( iType != rhs.GetTypeId() )
+    if( iType != r.GetTypeId() )
         return false;
 
     bool ret = true;
     switch( iType )
     {
     case typeByte:
-        ret =( m_byVal == rhs.m_byVal );
+        ret =( m_byVal == r.m_byVal );
         break;
     case typeUInt16:
-        ret =( m_wVal == rhs.m_wVal );
+        ret =( m_wVal == r.m_wVal );
         break;
     case typeUInt32:
-        ret =( m_dwVal == rhs.m_dwVal );
+        ret =( m_dwVal == r.m_dwVal );
         break;
     case typeUInt64:
-        ret =( m_qwVal == rhs.m_qwVal );
+        ret =( m_qwVal == r.m_qwVal );
         break;
     case typeFloat:
-        ret =( abs( m_fVal - rhs.m_fVal ) <
+        ret =( abs( m_fVal - r.m_fVal ) <
             0.000001 );
         break;
     case typeDouble:
-        ret =( abs( m_dblVal - rhs.m_dblVal ) <
+        ret =( abs( m_dblVal - r.m_dblVal ) <
             0.0000000001 );
         break;
     case typeObj:
-        ret =( m_pObj == rhs.m_pObj );
+        ret =( m_pObj == r.m_pObj );
         break;
     case typeByteArr:
-        ret =( *m_pBuf == *rhs.m_pBuf );
+        ret =( *m_pBuf == *r.m_pBuf );
         break;
     case typeDMsg:
-        ret = ( ( DBusMessage* )m_pMsg ==
-            ( DBusMessage* )rhs.m_pMsg );
+        ret = ( m_pMsg.ptr() ==
+            r.m_pMsg.ptr() );
         break;
     case typeString:
-        ret =( m_strVal == rhs.m_strVal );
+        ret = ( m_strVal == r.m_strVal );
+        break;
+    case typeNone:
+        ret = true;
         break;
     }
     return ret;

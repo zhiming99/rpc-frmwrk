@@ -80,39 +80,29 @@ const CDirEntry& CDirEntry::operator=(
     return *this;
 }
 
-gint32 CDirEntry::SetProperty( 
-        gint32 iProp,
-        const CBuffer& oBuf )
+gint32 CDirEntry::GetProperty(
+    gint32 iProp,
+    Variant& oVar ) const
 {
     gint32 ret = 0;
-    do{
-        // this is just a reference
-        // increment
-        CCfgOpener  oCfg(
-            ( IConfigDb* ) m_mapProps );
-        Variant& o = oCfg[ iProp ];
-        o = oBuf;
-
-    }while( 0 );
-
-    return ret;
+    CCfgOpener oCfg( ( IConfigDb* )m_mapProps );
+    const Variant* p =
+        oCfg.GetPropPtr( iProp );
+    if( p == nullptr )
+        return -ENOENT;
+    oVar = *p;
+    return STATUS_SUCCESS;
 }
 
-gint32 CDirEntry::GetProperty(
-    gint32 iProp, CBuffer& oBuf ) const
+gint32 CDirEntry::SetProperty(
+    gint32 iProp,
+    const Variant& oVar )
 {
-    gint32 ret = 0;
-    if( !m_mapProps->exist( iProp ) )
-    {
-        ret = -ENOENT;
-    }
-    else
-    {
-        ret = m_mapProps->GetProperty(
-            iProp, oBuf ) ;
-    }
-
-    return ret;
+    CCfgOpener  oCfg(
+        ( IConfigDb* ) m_mapProps );
+    Variant& o = oCfg[ iProp ];
+    o = oVar;
+    return STATUS_SUCCESS;
 }
 
 gint32 CDirEntry::RemoveProp(
@@ -554,43 +544,37 @@ gint32 CRegistry::GetObject(
     return a.GetObjPtr( iProp, oVal );
 }
 
-gint32 CRegistry::SetProperty(
-    gint32 iProp, const CBuffer& oVal )
+gint32 CRegistry::GetProperty(
+    gint32 iProp,
+    Variant& oVal ) const
 {
-    gint32 ret = 0;
 
+    gint32 ret = 0;
     if( m_pCurDir == nullptr )
         return -EFAULT;
 
-    try{
-        CStdRMutex a( m_oLock );
-        ret = m_pCurDir->SetProperty( iProp, oVal );
-    }
-    catch( std::bad_alloc& e )
-    {
-        ret = -ENOMEM;
-    }
+    CStdRMutex a(
+        const_cast< stdrmutex& > (m_oLock ) );
+
+    ret = m_pCurDir->GetProperty(
+        iProp, oVal );
+
     return ret;
 }
 
-gint32 CRegistry::GetProperty(
-    gint32 iProp, CBuffer& oVal ) const
+gint32 CRegistry::SetProperty(
+    gint32 iProp,
+    const Variant& oVal )
 {
-
     gint32 ret = 0;
 
     if( m_pCurDir == nullptr )
         return -EFAULT;
 
-    try{
+    CStdRMutex a( m_oLock );
+    ret = m_pCurDir->SetProperty(
+        iProp, oVal );
 
-        CStdRMutex a( const_cast< stdrmutex&> (m_oLock ) );
-        ret = m_pCurDir->GetProperty( iProp, oVal );
-    }
-    catch( std::out_of_range& e )
-    {
-        ret = -ENOENT;
-    }
     return ret;
 }
 

@@ -1009,7 +1009,8 @@ gint32 CIoManager::GetPortProp(
     if( ERROR( ret ) )
         return ret;
 
-    ret = pPort->GetProperty( iProp, *pBuf );
+    CCfgOpenerObj oCfg( ( CObjBase* )pPort );
+    ret = oCfg.GetProperty( iProp, pBuf );
 
     return ret;
 }
@@ -2109,17 +2110,17 @@ gint32 CIoManager::GetCmdLineOpt(
 {
     gint32 ret = 0;
     do{
-        BufPtr pBuf( true );
         CStdRMutex oRegLock( m_pReg->GetLock() );
         ret = m_pReg->ChangeDir( "/cmdline" );
         if( ERROR( ret ) )
             break;
 
-        ret = m_pReg->GetProperty( iPropId, *pBuf );
+        Variant oVar;
+        ret = m_pReg->GetProperty( iPropId, oVar );
         if( ERROR( ret ) )
             break;
 
-        oVal = *pBuf;
+        oVal = ( stdstr& )oVar;
     }while( 0 );
 
     return ret;

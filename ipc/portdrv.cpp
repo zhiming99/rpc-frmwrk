@@ -36,20 +36,22 @@ using namespace std;
 
 // driver method
 gint32 CPortDriver::GetProperty(
-    gint32 iProp, CBuffer& oBuf ) const
+    gint32 iProp,
+    Variant& oVar ) const
 {
     CStdRMutex oDrvLock(
          const_cast< CPortDriver* >( this )->GetLock() );
 
-    return m_pCfgDb->GetProperty( iProp, oBuf );
+    return m_pCfgDb->GetProperty( iProp, oVar );
 }
 
 gint32 CPortDriver::SetProperty(
-    gint32 iProp, const CBuffer& oBuf )
+    gint32 iProp,
+    const Variant& oVar )
 {
 
     CStdRMutex oDrvLock( GetLock() );
-    return m_pCfgDb->SetProperty( iProp, oBuf );
+    return m_pCfgDb->SetProperty( iProp, oVar );
 }
 
 gint32 CPortDriver::GetDrvName(
@@ -428,8 +430,7 @@ gint32 CGenBusDriver::RemovePort(
         return ret;
 
     PortPtr pPort( pChildPort );
-    std::map< PortPtr, TaskletPtr >::iterator
-        itr = m_mapPort2TaskGrp.find( pPort );
+    auto itr = m_mapPort2TaskGrp.find( pPort );
     if( itr == m_mapPort2TaskGrp.end() )
         return -ENOENT;
 

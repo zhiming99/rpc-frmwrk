@@ -2537,7 +2537,7 @@ CDBusProxyPdoLpbk::CDBusProxyPdoLpbk(
 }
 
 gint32 CDBusProxyPdoLpbk::GetProperty(
-    gint32 iProp, CBuffer& oBuf ) const
+    gint32 iProp, Variant& oBuf ) const
 {
     gint32 ret = 0;
 

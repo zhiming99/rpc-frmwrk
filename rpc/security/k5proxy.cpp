@@ -761,7 +761,7 @@ gint32 IAuthenticateProxy::GetMicMsg2p(
             break;
 
         CCfgOpener oSecCtx;
-        oSecCtx.SetProperty(
+        oSecCtx.SetBufPtr(
             propSignature, pSig );
 
         oSecCtx.SetStrProp(

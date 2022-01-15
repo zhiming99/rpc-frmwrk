@@ -66,15 +66,15 @@ class IConfigDb : public CObjBase
     virtual gint32 RemoveProperty( gint32 iProp ) = 0;
     virtual void RemoveAll() = 0;
 
-    virtual const CBuffer& operator[]( gint32 iProp ) const = 0;
-    virtual CBuffer& operator[]( gint32 iProp ) = 0;
-
     virtual gint32 size() const = 0;
     virtual bool exist( gint32 iProp ) const = 0;
     virtual const IConfigDb& operator=( const IConfigDb& oCfg ) = 0;
 
     virtual gint32 SetProperty( gint32 iProp, const BufPtr& pBuf ) = 0;
     virtual gint32 GetProperty( gint32 iProp, BufPtr& pBuf ) const = 0;
+
+    virtual gint32 SetProperty( gint32 iProp, const Variant& oVar ) = 0;
+    virtual gint32 GetProperty( gint32 iProp, Variant& oVar ) const = 0;
 
     // defined in CObjBase
     virtual gint32 GetProperty( gint32 iProp, CBuffer& oBuf ) const = 0;
@@ -150,9 +150,11 @@ class CConfigDb2 : public IConfigDb
     void RemoveAll();
 
     // get a reference to variant from the config db
-    gint32 GetProperty( gint32 iProp, Variant& oVar ) const;
+    gint32 GetProperty(
+        gint32 iProp, Variant& oVar ) const override;
     // add a reference to variant to the config db
-    gint32 SetProperty( gint32 iProp, const Variant& oVar );
+    gint32 SetProperty(
+        gint32 iProp, const Variant& oVar ) override;
 
     // get a reference to variant from the config db
     const Variant& GetProperty( gint32 iProp ) const
@@ -188,11 +190,7 @@ class CConfigDb2 : public IConfigDb
 
     gint32 GetPropIds( std::vector<gint32>& vecIds ) const;
 
-    const CBuffer& operator[]( gint32 iProp ) const;
-    CBuffer& operator[]( gint32 iProp );
-
     virtual gint32 Deserialize( const CBuffer& oBuf );
-
     gint32 Serialize( CBuffer& oBuf ) const override;
     gint32 Deserialize( const char* oBuf, guint32 dwSize ) override;
 
@@ -245,23 +243,58 @@ class CCfgDbOpener
         m_pCfg = pObj;
     }
 
-    gint32 GetProperty(
+    inline gint32 GetProperty(
         gint32 iProp, CBuffer& oBuf ) const
+    {
+        BufPtr pBuf;
+        gint32 ret = GetProperty( iProp, pBuf ); 
+        if( ERROR( ret ) )
+            return ret;
+        oBuf = *pBuf;
+        return 0;
+    }
+
+    inline gint32 SetProperty(
+        gint32 iProp, const CBuffer& oBuf )
+    {
+        Variant oVar( oBuf );
+        return m_pCfg->SetProperty( iProp, oVar );
+    }
+
+    inline gint32 GetProperty(
+        gint32 iProp, BufPtr& pBuf ) const
+    {
+        Variant oVar;
+        gint32 ret = GetProperty( iProp, oVar );
+        if( ERROR( ret ) )
+            return ret;
+        pBuf = oVar.ToBuf();
+        return 0;
+    }
+
+    inline gint32 SetProperty(
+        gint32 iProp, const BufPtr& pBuf )
+    {
+        Variant oVar( *pBuf );
+        return m_pCfg->SetProperty( iProp, oVar );
+    }
+
+    inline gint32 GetProperty(
+        gint32 iProp, Variant& oBuf ) const
     {
         if( m_pConstCfg == nullptr )
             return -EFAULT;
         return m_pConstCfg->GetProperty( iProp, oBuf );
     }
 
-    gint32 SetProperty(
-        gint32 iProp, const CBuffer& oBuf )
+    inline gint32 SetProperty(
+        gint32 iProp, const Variant& oBuf )
     {
         if( m_pCfg == nullptr )
             return -EFAULT;
 
         return m_pCfg->SetProperty( iProp, oBuf );
     }
-
     
     template< class U, typename U1=
         class std::enable_if< std::is_base_of< CObjBase, U >::value, U >::type  >
@@ -320,16 +353,15 @@ class CCfgDbOpener
             return -EFAULT;
 
         do{
-            BufPtr bufPtr( true ); 
-
+            Variant oVar;
             ret = m_pConstCfg->GetProperty(
-                iProp, *bufPtr );
+                iProp, oVar );
 
             if( ERROR( ret ) )
                 break;
 
             try{
-                pObj = ( ObjPtr& )*bufPtr;
+                pObj = ( ObjPtr& )oVar;
             }
             catch( std::invalid_argument& e )
             {
@@ -352,11 +384,11 @@ class CCfgDbOpener
                 break;
             }
 
-            BufPtr bufPtr( true ); 
-            if( !pObj.IsEmpty() )
-                *bufPtr = pObj;
+            Variant oVar( pObj );
+            if( pObj.IsEmpty() )
+                oVar.Clear();
 
-            ret = m_pCfg->SetProperty( iProp, *bufPtr );
+            ret = m_pCfg->SetProperty( iProp, oVar );
             if( ERROR( ret ) )
                 break;
         
@@ -373,17 +405,11 @@ class CCfgDbOpener
             return -EFAULT;
 
         do{
-            BufPtr bufPtr( true );
-            ret = m_pConstCfg->GetProperty( iProp, *bufPtr );
+            Variant oVar;
+            ret = m_pConstCfg->GetProperty( iProp, oVar );
             if( ERROR( ret ) )
                 break;
-
-            //FIXME: CBuffer does not have
-            //a proper type cast to convert this, so
-            //we use the rogue approach for temporary
-            //workaround
-            strVal = ( *bufPtr );
-
+            strVal = ( stdstr& )oVar;
         }while( 0 );
 
         return ret;
@@ -399,9 +425,8 @@ class CCfgDbOpener
                 ret = -EFAULT;
                 break;
             }
-            BufPtr bufPtr( true );
-            *bufPtr = strVal;
-            ret = m_pCfg->SetProperty( iProp, *bufPtr );
+            Variant oVar( strVal );
+            ret = m_pCfg->SetProperty( iProp, oVar );
 
         }while( 0 );
 
@@ -416,11 +441,11 @@ class CCfgDbOpener
             return -EFAULT;
 
         do{
-            BufPtr bufPtr( true );
-            ret = m_pConstCfg->GetProperty( iProp, *bufPtr );
+            Variant oVar;
+            ret = m_pConstCfg->GetProperty( iProp, oVar );
             if( ERROR( ret ) )
                 break;
-            pStr = bufPtr->ptr();
+            pStr = ( const char* )oVar;
         }while( 0 );
 
         return ret;
@@ -434,16 +459,15 @@ class CCfgDbOpener
             return -EFAULT;
 
         do{
-            BufPtr bufPtr( true ); 
-
+            Variant oVar;
             ret = m_pConstCfg->GetProperty(
-                iProp, *bufPtr );
+                iProp, oVar );
 
             if( ERROR( ret ) )
                 break;
 
             try{
-                pMsg = ( DMsgPtr& )*bufPtr;
+                pMsg = ( DMsgPtr& )oVar;
             }
             catch( std::invalid_argument& e )
             {
@@ -466,10 +490,8 @@ class CCfgDbOpener
                 break;
             }
 
-            BufPtr bufPtr( true ); 
-            *bufPtr = pMsg;
-
-            ret = m_pCfg->SetProperty( iProp, *bufPtr );
+            Variant oVar( pMsg );
+            ret = m_pCfg->SetProperty( iProp, oVar );
             if( ERROR( ret ) )
                 break;
         
@@ -486,13 +508,12 @@ class CCfgDbOpener
 
         CCfgDbOpener< CObjBase > a( pSrcCfg );
 
-        BufPtr pBuf( true );
-        gint32 ret = a.GetProperty( iSrcProp, *pBuf );
-
+        Variant oVar;
+        gint32 ret = a.GetProperty( iSrcProp, oVar );
         if( ERROR( ret ) )
             return ret;
 
-        return SetProperty( iProp, *pBuf );
+        return SetProperty( iProp, oVar );
     }
 
     gint32 CopyProp( gint32 iProp, const CObjBase* pSrcCfg )
@@ -514,18 +535,17 @@ class CCfgDbOpener
 
     gint32 SwapProp( gint32 iProp1, gint32 iProp2 )
     {
-        BufPtr pBuf1( true );
-        gint32 ret = GetProperty( iProp1, *pBuf1 );
+        Variant oVar1, oVar2;
+        gint32 ret = GetProperty( iProp1, oVar1 );
         if( ERROR( ret ) )
             return ret;
 
-        BufPtr pBuf2( true );
-        ret = GetProperty( iProp2, *pBuf2 );
+        ret = GetProperty( iProp2, oVar2 );
         if( ERROR( ret ) )
             return ret;
 
-        SetProperty( iProp1, *pBuf2 );
-        SetProperty( iProp2, *pBuf1 );
+        SetProperty( iProp1, oVar2 );
+        SetProperty( iProp2, oVar1 );
         return ret;
     }
 
@@ -534,17 +554,16 @@ class CCfgDbOpener
     {
         gint32 ret = 0;
 
-        if( m_pConstCfg == nullptr )
+        if( unlikely( m_pConstCfg == nullptr ) )
             return -EFAULT;
 
         do{
-            BufPtr bufPtr( true );
-
-            ret = m_pConstCfg->GetProperty( iProp, *bufPtr );
+            Variant oVar;
+            ret = m_pConstCfg->GetProperty( iProp, oVar );
             if( ERROR( ret ) )
                 break;
 
-            val = ( PrimType& )( *bufPtr );
+            val = ( PrimType& )oVar;
 
         }while( 0 );
 
@@ -556,16 +575,16 @@ class CCfgDbOpener
     {
         gint32 ret = 0;
         do{
-            if( m_pCfg == nullptr )
+            if( unlikely( m_pCfg == nullptr ) )
             {
                 ret = -EFAULT;
                 break;
             }
 
-            BufPtr bufPtr( true );
-            *bufPtr = val;
+            Variant oVar;
+            oVar = val;
 
-            ret = m_pCfg->SetProperty( iProp, *bufPtr );
+            ret = m_pCfg->SetProperty( iProp, oVar );
             if( ERROR( ret ) )
                 break;
 
@@ -577,22 +596,22 @@ class CCfgDbOpener
     gint32 GetIntPtr( gint32 iProp, guint32*& val ) const
     {
         intptr_t val1;
-        BufPtr pBuf( true );
-        gint32 ret = GetProperty( iProp, *pBuf );
+        Variant oVar;
+        gint32 ret = GetProperty( iProp, oVar );
 
         if( ERROR( ret ) )
             return ret;
 
-        val1 = *pBuf;
+        val1 = oVar;
         val = ( guint32* )val1;
         return 0;
     }
 
     gint32 SetIntPtr( gint32 iProp, guint32* val )
     {
-        BufPtr pBuf( true );
-        *pBuf = ( intptr_t )val;
-        return SetProperty( iProp, *pBuf );
+        Variant oVar;
+        oVar = ( intptr_t )val;
+        return SetProperty( iProp, oVar );
     }
 
     gint32 GetShortProp( gint32 iProp, guint16& val ) const
@@ -673,17 +692,15 @@ class CCfgDbOpener
                 break;
             }
 
-            BufPtr pBuf( true );
-            ret = m_pConstCfg->GetProperty( iProp, *pBuf );
+            Variant oVar1, oVar2;
+            ret = m_pConstCfg->GetProperty( iProp, oVar1 );
             if( ERROR( ret ) )
                 break;
 
-            BufPtr pBuf2( true );
-            *pBuf2 = val;
+            oVar2 = val;
 
-            if( *pBuf == *pBuf2 )
+            if( oVar2 == oVar1 )
                 break;
-
             ret = ERROR_FALSE;
         }while( 0 );
 
@@ -706,17 +723,16 @@ class CCfgDbOpener
                 break;
             }
 
-            BufPtr pBuf( true );
-            ret = pObj->GetProperty( iProp, *pBuf );
+            Variant oVar1, oVar2;
+            ret = pObj->GetProperty( iProp, oVar1 );
             if( ERROR( ret ) )
                 break;
 
-            BufPtr pBuf2( true );
-            ret = this->GetProperty( iProp, *pBuf2 );
+            ret = this->GetProperty( iProp, oVar2 );
             if( ERROR( ret ) )
                 break;
 
-            if( *pBuf == *pBuf2 )
+            if( oVar1 == oVar2 )
                 break;
 
             ret = ERROR_FALSE;
@@ -1314,17 +1330,16 @@ class CCfgDbOpener< IConfigDb >
                 break;
             }
 
-            BufPtr pBuf( true );
-            ret = pObj->GetProperty( iProp, *pBuf );
+            Variant  oVar1, oVar2;
+            ret = pObj->GetProperty( iProp, oVar1 );
             if( ERROR( ret ) )
                 break;
 
-            BufPtr pBuf2;
-            ret = this->GetProperty( iProp, pBuf2 );
+            ret = this->GetProperty( iProp, oVar2 );
             if( ERROR( ret ) )
                 break;
 
-            if( *pBuf == *pBuf2 )
+            if( oVar1 == oVar2 )
                 break;
 
             ret = ERROR_FALSE;

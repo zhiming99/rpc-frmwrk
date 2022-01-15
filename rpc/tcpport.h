@@ -588,8 +588,9 @@ class CRpcSocketBase : public IService
         addrinfo*& res );
 
     gint32 GetAsyncErr() const;
+
     virtual gint32 SetProperty(
-        gint32 iProp, const CBuffer& oBuf )
+        gint32 iProp, const Variant& oBuf )
     {
         CStdRMutex oSockLock( GetLock() );
         if( m_pCfg.IsEmpty() )
@@ -600,7 +601,7 @@ class CRpcSocketBase : public IService
     }
 
     virtual gint32 GetProperty(
-        gint32 iProp, CBuffer& oBuf ) const
+        gint32 iProp, Variant& oBuf ) const override
     {
         CStdRMutex oSockLock( GetLock() );
         if( m_pCfg.IsEmpty() )
@@ -1187,12 +1188,12 @@ class CRpcTcpBusPort :
 
     // methods from CObjBase
     gint32 GetProperty(
-            gint32 iProp,
-            CBuffer& oBuf ) const;
+        gint32 iProp,
+        Variant& oBuf ) const override;
 
     gint32 SetProperty(
-            gint32 iProp,
-            const CBuffer& oBuf );
+        gint32 iProp,
+        const Variant& oBuf ) override;
 
     virtual gint32 PreStart( IRP* pIrp ) override;
     virtual gint32 PostStop( IRP* pIrp ) override;

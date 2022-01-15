@@ -2499,9 +2499,8 @@ void CTcpStreamPdo2::OnPortStartFailed(
     return;
 }
 
-// methods from CObjBase
 gint32 CTcpStreamPdo2::GetProperty(
-    gint32 iProp, CBuffer& oBuf ) const
+    gint32 iProp, Variant& oBuf ) const
 {
     gint32 ret = 0;
     if( iProp == propRttMs )

@@ -769,8 +769,9 @@ gint32 CIfRetryTask::WaitForComplete()
     return ret;
 }
 
-gint32 CIfRetryTask::GetProperty( gint32 iProp,
-        CBuffer& oBuf ) const
+gint32 CIfRetryTask::GetProperty(
+    gint32 iProp,
+    Variant& oBuf ) const
 {
     gint32 ret = 0;
     switch( iProp )
@@ -792,18 +793,18 @@ gint32 CIfRetryTask::GetProperty( gint32 iProp,
                 break;
         }
     }
-
     return ret;
 }
+
 gint32 CIfRetryTask::SetProperty(
-    gint32 iProp, const CBuffer& oBuf )
+    gint32 iProp, const Variant& oBuf )
 {
     gint32 ret = 0;
     switch( iProp )
     {
     case propParentTask:
         {
-            ObjPtr& pObj = oBuf;
+            const ObjPtr& pObj = oBuf;
             if( pObj.IsEmpty() )
                 m_pParentTask.Clear();
             else
@@ -820,6 +821,7 @@ gint32 CIfRetryTask::SetProperty(
 
     return ret;
 }
+
 gint32 CIfRetryTask::RemoveProperty(
     gint32 iProp )
 {
@@ -3022,7 +3024,7 @@ gint32 CIfParallelTask::Process(
 }
 
 gint32 CIfParallelTask::GetProperty( gint32 iProp,
-        CBuffer& oBuf ) const
+        Variant& oBuf ) const
 {
     CStdRTMutex oTaskLock( GetLock() );
     if( iProp == propTaskState )
@@ -3041,7 +3043,7 @@ gint32 CIfParallelTask::GetProperty( gint32 iProp,
 }
 
 gint32 CIfParallelTask::SetProperty( gint32 iProp,
-    const CBuffer& oBuf )
+    const Variant& oBuf )
 {
     CStdRTMutex oTaskLock( GetLock() );
     if( iProp == propTaskState )

@@ -1913,7 +1913,6 @@ struct CStreamSyncBase :
             if( ERROR( ret ) )
                 break;
 
-            BufPtr pBuf;
             CCfgOpener oResp( pResp );
             guint32 iRet = 0;
             ret = oResp.GetIntProp(
@@ -1946,6 +1945,7 @@ struct CStreamSyncBase :
             if( ERROR( ret ) )
                 break;
 
+            BufPtr pBuf;
             if( SUCCEEDED( iRet ) && bRead ) 
                 oResp.GetProperty( 0, pBuf );
             else if( !bRead )
