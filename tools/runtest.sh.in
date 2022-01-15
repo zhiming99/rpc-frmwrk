@@ -15,14 +15,18 @@ elif [ "$1" == "1" ]; then
     echo starting the reqfwdr...
     ${bin_dir}/rpcrouter -r 1 &
     sleep 15
-    echo starting echo test...
+    echo echo test...
     ${bin_dir}/rpcf/ifclismk || exit 1
+    echo keepalive test...
     ${bin_dir}/rpcf/kaclitst || exit 2
+    echo active-cancel test...
     ${bin_dir}/rpcf/actclitst || exit 3
+    echo pause-resume test
     ${bin_dir}/rpcf/prclitst || exit 4
     kill -9 `pidof rpcrouter`
     ${bin_dir}/rpcf/btinrtsvr &
     sleep 5
+    echo build-in-router test
     ${bin_dir}/rpcf/btinrtcli || exit 5
     kill -9 `pidof btinrtsvr`
     kill -9 `pidof ifsvrsmk`
@@ -42,5 +46,267 @@ elif [ "$1" == "1" ]; then
     sleep 5
     echo start the Python testcases
     python3 maincli.py || exit 7
+    kill -9 `pidof python3`
+    sleep 5
     popd
+
+    echo mkdir -p /tmp/sfsvr-root/${USER}
+    mkdir -p /tmp/sfsvr-root/${USER}
+    pushd ./examples
+
+    pushd ./python
+    ${bin_dir}/ridlc -I ./ -pO ./iftest ../iftest.ridl || exit 6
+    pushd iftest
+    echo start python testcase iftest
+    python3 mainsvr.py&
+    sleep 5
+    python3 maincli.py || exit 8
+    kill -9 `pidof python3`
+    sleep 5
+    popd
+
+    ${bin_dir}/ridlc -I ./ -pO ./asynctst ../asynctst.ridl || exit 6
+    pushd asynctst
+    echo start python testcase asynctst
+    python3 mainsvr.py&
+    sleep 5
+    python3 maincli.py || exit 8
+    kill -9 `pidof python3`
+    sleep 5
+    popd
+
+    ${bin_dir}/ridlc -I ./ -pO ./actcancel ../actcancel.ridl || exit 6
+    pushd actcancel
+    echo start python testcase actcancel
+    python3 mainsvr.py&
+    sleep 5
+    python3 maincli.py || exit 8
+    kill -9 `pidof python3`
+    sleep 5
+    popd
+
+    ${bin_dir}/ridlc -I ./ -pO ./hellowld ../hellowld.ridl || exit 6
+    pushd hellowld
+    echo start python testcase hellowld
+    python3 mainsvr.py&
+    sleep 5
+    python3 maincli.py || exit 8
+    kill -9 `pidof python3`
+    sleep 5
+    popd
+
+    ${bin_dir}/ridlc -I ./ -pO ./katest ../katest.ridl || exit 6
+    pushd katest
+    echo start python testcase katest
+    python3 mainsvr.py&
+    sleep 5
+    python3 maincli.py || exit 8
+    kill -9 `pidof python3`
+    sleep 5
+    popd
+
+    ${bin_dir}/ridlc -I ./ -pO ./stmtest ../stmtest.ridl || exit 6
+    pushd stmtest
+    echo start python testcase stmtest
+    python3 mainsvr.py&
+    sleep 5
+    python3 maincli.py || exit 8
+    kill -9 `pidof python3`
+    sleep 5
+    popd
+
+    fileTrans=`pwd`/../../configure.ac
+    ${bin_dir}/ridlc -I ./ -pO ./sftest ../sftest.ridl || exit 6
+    pushd sftest
+    echo start python testcase sftest
+    python3 mainsvr.py&
+    sleep 5
+    echo python3 maincli.py $fileTrans
+    python3 maincli.py $fileTrans
+    kill -9 `pidof python3`
+    sleep 5
+    popd
+
+    #leave python
+    popd
+
+    pushd cpp
+    cp sftest/Makefile Makefile.sftest
+    echo "for i in ../*.ridl;do b=${i%%.ridl};c=${b##../}; ridlc -O $c $i;done"
+    for i in ../*.ridl;do b=${i%%.ridl};c=${b##../}; ridlc -O ./$c $i;done
+    mv Makefile.sftest sftest/Makefile
+
+    pushd hellowld
+    make || exit 10
+    echo start cpp testcase hellowld
+    cd release
+    ./HelloWorldsvr &
+    sleep 5
+    ./HelloWorldcli || exit 8
+    kill -9 `pidof HelloWorldsvr`
+    sleep 5
+    popd
+
+    pushd iftest
+    make || exit 10
+    echo start cpp testcase iftest
+    cd release
+    ./iftestsvr &
+    sleep 5
+    ./iftestcli || exit 8
+    kill -9 `pidof iftestsvr`
+    sleep 5
+    popd
+
+    pushd asynctst
+    make || exit 10
+    echo start cpp testcase asynctst
+    cd release
+    ./asynctstsvr &
+    sleep 5
+    ./asynctstcli || exit 8
+    kill -9 `pidof asynctstsvr`
+    sleep 5
+    popd
+
+    pushd actcancel
+    make || exit 10
+    echo start cpp testcase actcancel
+    cd release
+    ./actcancelsvr &
+    sleep 5
+    ./actcancelcli || exit 8
+    kill -9 `pidof actcancelsvr`
+    sleep 5
+    popd
+
+    pushd katest
+    make || exit 10
+    echo start cpp testcase katest
+    cd release
+    ./katestsvr &
+    sleep 5
+    ./katestcli || exit 8
+    kill -9 `pidof katestsvr`
+    sleep 5
+    popd
+
+    pushd stmtest
+    make || exit 10
+    echo start cpp testcase stmtest
+    cd release
+    ./stmtestsvr &
+    sleep 5
+    ./stmtestcli || exit 8
+    kill -9 `pidof stmtestsvr`
+    sleep 5
+    popd
+
+    pushd sftest
+    make || exit 10
+    echo start cpp testcase sftest
+    cd release
+    ./sftestsvr &
+    sleep 5
+    ./sftestcli $fileTrans || exit 10
+    kill -9 `pidof sftestsvr`
+    sleep 5
+    popd
+
+# leaving cpp
+    popd
+
+# java test
+    pushd java/src
+    export CLASSPATH=`pwd`:${lib_dir}/rpcf/rpcbase.jar:$CLASSPATH
+    export LD_LIBRARY_PATH=${lib_dir}:$LD_LIBRARY_PATH
+    for i in ../../*.ridl;do b=${i%%.ridl};c=${b##../../}; ridlc -jO . -Porg.rpcf.tests  $i;done
+    sleep 1
+
+    #ln -s org/rpcf/tests/HelloWorld/driver.json
+
+    javac org/rpcf/tests/HelloWorld/*.java || exit 9
+    pushd org/rpcf/tests/HelloWorld
+    make
+    popd
+    echo start java testcase hellowld
+    java org.rpcf.tests.HelloWorld.mainsvr &
+    sleep 5
+    java org.rpcf.tests.HelloWorld.maincli || exit 9
+    kill -9 `pidof java`
+    sleep 5
+
+    javac org/rpcf/tests/iftest/*.java || exit 9
+    pushd org/rpcf/tests/iftest
+    make
+    popd
+    echo start java testcase iftest
+    java org.rpcf.tests.iftest.mainsvr &
+    sleep 5
+    java org.rpcf.tests.iftest.maincli || exit 9
+    kill -9 `pidof java`
+    sleep 5
+
+    javac org/rpcf/tests/asynctst/*.java || exit 9
+    pushd org/rpcf/tests/asynctst
+    make
+    popd
+    echo start java testcase asynctst
+    java org.rpcf.tests.asynctst.mainsvr &
+    sleep 5
+    java org.rpcf.tests.asynctst.maincli || exit 9
+    kill -9 `pidof java`
+    sleep 5
+
+
+    javac org/rpcf/tests/actcancel/*.java || exit 9
+    pushd org/rpcf/tests/actcancel
+    make
+    popd
+    echo start java testcase actcancel
+    java org.rpcf.tests.actcancel.mainsvr &
+    sleep 5
+    java org.rpcf.tests.actcancel.maincli || exit 9
+    kill -9 `pidof java`
+    sleep 5
+
+    javac org/rpcf/tests/katest/*.java || exit 9
+    pushd org/rpcf/tests/katest
+    make
+    popd
+    echo start java testcase katest
+    java org.rpcf.tests.katest.mainsvr &
+    sleep 5
+    java org.rpcf.tests.katest.maincli || exit 9
+    kill -9 `pidof java`
+    sleep 5
+
+    javac org/rpcf/tests/stmtest/*.java || exit 9
+    pushd org/rpcf/tests/stmtest
+    make
+    popd
+    echo start java testcase stmtest
+    java org.rpcf.tests.stmtest.mainsvr &
+    sleep 5
+    java org.rpcf.tests.stmtest.maincli || exit 9
+    kill -9 `pidof java`
+    sleep 5
+
+    javac org/rpcf/tests/sftest/*.java || exit 9
+    pushd org/rpcf/tests/sftest
+    make
+    popd
+    echo start java testcase sftest
+    java org.rpcf.tests.sftest.mainsvr &
+    sleep 5
+    java org.rpcf.tests.sftest.maincli $fileTrans
+    kill -9 `pidof java`
+    sleep 5
+
+#leave java/src
+    popd
+    
+# leaving examples
+    popd
+
 fi

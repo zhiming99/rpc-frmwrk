@@ -1099,11 +1099,10 @@ void CDBusBusPort::ReleaseDBus()
     if( m_pDBusConn )
     {
         CCfgOpener oCfg( ( IConfigDb* )m_pCfgDb );
-        string strBusName;
-        if( oCfg.exist( propBusName ) )
-            strBusName = oCfg[ propBusName ];
-
-        ReleaseBusName( strBusName );
+        const Variant* p =
+            oCfg.GetPropPtr( propBusName );
+        if( p != nullptr )
+            ReleaseBusName( ( const stdstr& )*p );
 
         dbus_connection_remove_filter( m_pDBusConn,
             DBusMessageCallback, this );
@@ -1840,8 +1839,7 @@ gint32 CDBusBusPort::EnumProperties(
 }
 
 gint32 CDBusBusPort::GetProperty(
-        gint32 iProp,
-        CBuffer& oBuf ) const
+    gint32 iProp, Variant& oBuf ) const
 {
     gint32 ret = 0;
     switch( iProp )
@@ -1869,8 +1867,7 @@ gint32 CDBusBusPort::GetProperty(
 }
 
 gint32 CDBusBusPort::SetProperty(
-        gint32 iProp,
-        const CBuffer& oBuf )
+    gint32 iProp, const Variant& oBuf )
 {
     gint32 ret = 0;
     switch( iProp )

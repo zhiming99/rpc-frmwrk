@@ -53,7 +53,7 @@ class CPythonServerImpl :
                 break;
             }
 
-            std::vector< BufPtr > vecArgs;
+            std::vector< Variant > vecArgs;
             ret = List2Vector( pArgs, vecArgs );
             if( ERROR( ret ) )
                 break;
@@ -138,7 +138,7 @@ class CPythonServerImpl :
                 oReq.SetMethodName( strMethod );
 
                 for( auto elem : vecArgs )
-                    oReq.Push<BufPtr&>( elem );
+                    oReq.Push( elem );
 
                 ret = BroadcastEvent( oReq.GetCfg(), pCb );
             }
@@ -278,7 +278,7 @@ class CPythonServer :
             break;
         }
 
-        BufPtr pBuf( true );
+        BufPtr pBuf;
         sipRes = pImpl->ConvertPyObjToBuf(
             a1, pBuf );
         if( ERROR( sipRes ) )
@@ -305,7 +305,7 @@ class CPythonServer :
             break;
         }
 
-        BufPtr pBuf( true );
+        BufPtr pBuf;
         sipRes = pImpl->ConvertPyObjToBuf(
             a1, pBuf );
         if( ERROR( sipRes ) )
@@ -522,7 +522,6 @@ class CPythonServer :
             break;
         }
 
-        BufPtr pBuf( true );
         gint32 ret = PyCallable_Check( a2 );
         if( ret == 0 )
         {
@@ -530,6 +529,7 @@ class CPythonServer :
             break;
         }
 
+        BufPtr pBuf;
         sipRes = pImpl->ConvertPyObjToBuf(
             a1, pBuf );
         if( ERROR( sipRes ) )
@@ -597,7 +597,7 @@ class CPythonServer :
             if( ERROR( a1 ) )
                 break;
 
-            std::vector< BufPtr > vecResp;
+            std::vector< Variant > vecResp;
             ret = pImpl->List2Vector(
                 a3, vecResp);
             if( ERROR( ret ) )
@@ -642,7 +642,7 @@ class CPythonServer :
             if( ERROR( a1 ) )
                 break;
 
-            std::vector< BufPtr > vecResp;
+            std::vector< Variant > vecResp;
             ret = pImpl->List2Vector(
                 a3, vecResp );
             if( ERROR( ret ) )

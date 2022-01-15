@@ -216,13 +216,13 @@ class CGenericInterface :
     CGenericInterface( const IConfigDb* pCfg );
 
     virtual gint32 GetProperty(
-        gint32 iProp, CBuffer& pVal ) const
+        gint32 iProp, Variant& pVal ) const
     {
         return m_pIfStat->GetProperty( iProp, pVal );
     }
 
     virtual gint32 SetProperty(
-        gint32 iProp, const CBuffer& pVal )
+        gint32 iProp, const Variant& pVal )
     {
         return m_pIfStat->SetProperty( iProp, pVal );
     }
@@ -1273,7 +1273,7 @@ class CInterfaceProxy :
         IEventSink* pCallback,
         bool bNonDBus,
         const std::string& strMethod,
-        std::vector< BufPtr >& vecParams,
+        std::vector< Variant >& vecParams,
         guint64& qwIoTaskId );
 
     virtual gint32 CustomizeRequest(
@@ -1846,54 +1846,18 @@ gint32 CInterfaceProxy::AsyncCall(
 }
 
 template<typename T, typename T2= typename std::enable_if<
-    !std::is_same<char*, T>::value &&
-    !std::is_same<const char*, T>::value &&
-    !std::is_base_of<IAutoPtr, T>::value, T>::type >
-inline void AssignVal( T& rVal, CBuffer& rBuf )
+    !std::is_same<const char*, T>::value, T>::type >
+inline void AssignVal( T& rVal, Variant& rBuf )
 {
-    rVal = rBuf;
+    rVal = ( T& )rBuf;
 }
 
 template<typename T, typename T2= typename std::enable_if<
-    std::is_same<char*, T>::value ||
     std::is_same<const char*, T>::value, T>::type,
     typename T3=T2 >
-inline void AssignVal( T& rVal, CBuffer& rBuf )
+inline void AssignVal( T& rVal, Variant& rBuf )
 {
-    rVal = ( char* )rBuf;
-}
-
-template<typename T, typename T2= typename std::enable_if<
-    std::is_base_of<IAutoPtr, T>::value &&
-    !std::is_same<BufPtr, T>::value &&
-    !std::is_same<DMsgPtr, T>::value, T>::type,
-    typename T3=T2,
-    typename T4=T3 >
-inline void AssignVal( T& rVal, CBuffer& rBuf )
-{
-    ObjPtr& pObj = rBuf;
-    rVal = pObj;
-}
-
-template<typename T, typename T2= typename std::enable_if<
-    std::is_same<BufPtr, T>::value, T>::type,
-    typename T3=T2,
-    typename T4=T3,
-    typename T5=T4 >
-inline void AssignVal( BufPtr& rVal, CBuffer& rBuf )
-{
-    rVal = rBuf;
-}
-
-template<typename T, typename T2= typename std::enable_if<
-    std::is_same<DMsgPtr, T>::value, T>::type,
-    typename T3=T2,
-    typename T4=T3,
-    typename T5=T4,
-    typename T6=T5 >
-inline void AssignVal( DMsgPtr& rVal, CBuffer& rBuf )
-{
-    rVal = ( DMsgPtr& )rBuf;
+    rVal = ( const char* )rBuf;
 }
 
 #define AC \
@@ -1905,15 +1869,15 @@ inline void AssignVal( DMsgPtr& rVal, CBuffer& rBuf )
 
 template< int N, typename TupleType >
 void AssignValues( TupleType& oTuple,
-    std::deque< BufPtr >& queResp )
+    std::deque< Variant >& queResp )
 {}
 
 template< int N, typename TupleType, typename First >
 void AssignValues( TupleType& oTuple,
-    std::deque< BufPtr >& queResp )
+    std::deque< Variant >& queResp )
 {
 
-    CBuffer& oBuf = *queResp[ AI( N ) ];
+    Variant& oBuf = queResp[ AI( N ) ];
     // this assignment serve as a rvalue
     // storage to avoid the rvalue to go away
     // unexpectedly
@@ -1924,9 +1888,9 @@ void AssignValues( TupleType& oTuple,
 
 template< int N, typename TupleType, typename First, typename Second, typename ...Args >
 void AssignValues( TupleType& oTuple,
-        std::deque< BufPtr >& queResp )
+        std::deque< Variant >& queResp )
 {
-    CBuffer& oBuf = *queResp[ AI( N ) ];
+    Variant& oBuf = queResp[ AI( N ) ];
     DecType( First ) oVal;
 
     AssignVal< DecType( First ) >( oVal, oBuf );
@@ -1983,10 +1947,10 @@ gint32 CInterfaceProxy::FillArgs( CfgPtr& pResp,
             ret = -EINVAL;
             break;
         }
-        std::deque<BufPtr> queResp;
+        std::deque<Variant> queResp;
         for( size_t i = 0; i < sizeof...( Args ); i++ )
         {
-            BufPtr pBuf( true );
+            Variant pBuf;
             ret = oResp.GetProperty( i, pBuf );
             if( ERROR( ret ) )
                 return ret;

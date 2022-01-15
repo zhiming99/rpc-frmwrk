@@ -10,26 +10,44 @@ import java.util.concurrent.TimeUnit;
 public class maincli
 {
     public static JavaRpcContext m_oCtx;
+    public static String getDescPath( String strName )
+    {
+        String strDescPath =
+            maincli.class.getProtectionDomain().getCodeSource().getLocation().getPath();
+        String strDescPath2 = strDescPath + "/org/rpcf/tests/actcancel/" + strName;
+        java.io.File oFile = new java.io.File( strDescPath2 );
+        if( oFile.isFile() )
+            return strDescPath2;
+        strDescPath += "/" + strName;
+        oFile = new java.io.File( strDescPath );
+        if( oFile.isFile() )
+            return strDescPath;
+        return "";
+    }
     public static void main( String[] args )
     {
         m_oCtx = JavaRpcContext.createProxy(); 
         if( m_oCtx == null )
-            return;
+            System.exit( RC.EFAULT );
         
+        String strDescPath =
+            getDescPath( "actcanceldesc.json" );
+        if( strDescPath.isEmpty() )
+            System.exit( RC.ENOENT );
         // create the service object
         ActiveCancelcli oSvcCli = new ActiveCancelcli(
             m_oCtx.getIoMgr(), 
-            "./actcanceldesc.json",
+            strDescPath,
             "ActiveCancel" );
 
         // check if there are errors
         if( RC.ERROR( oSvcCli.getError() ) )
-            return;
+            System.exit( -oSvcCli.getError() );
         
         // start the proxy
         int ret = oSvcCli.start();
         if( RC.ERROR( ret ) )
-            return;
+            System.exit( -ret );
         
         do{
             // test remote server is not online

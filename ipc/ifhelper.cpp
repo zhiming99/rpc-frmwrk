@@ -34,89 +34,99 @@
 namespace rpcf
 {
 
-stdstr CastTo( BufPtr& pBuf )
-{
-    std::string strVal( pBuf->ptr() );
-    return strVal;
-}
-
 template<>
-BufPtr& CastTo< BufPtr >( BufPtr& i )
+BufPtr& CastTo< BufPtr >( Variant& oVar )
 {
-    return i;
-}
-
-template<>
-BufPtr PackageTo< DMsgPtr >( const DMsgPtr& pMsg )
-{
-    BufPtr pBuf( true );
-    *pBuf = pMsg;
+    if( oVar.GetTypeId() != typeByteArr )
+        throw std::invalid_argument(
+            "error cast to BufPtr" );
+    BufPtr& pBuf = oVar;
     return pBuf;
 }
 
 template<>
-BufPtr PackageTo< ObjPtr >( const ObjPtr& pObj )
+uintptr_t*& CastTo< uintptr_t*, uintptr_t*, uintptr_t* >( Variant& oVar )
 {
-    BufPtr pBuf( true );
-    *pBuf = pObj;
-    return pBuf;
+    gint32 iType =
+        rpcf::GetTypeId( ( uintptr_t* ) 0 );
+    if( oVar.GetTypeId() != iType )
+        throw std::invalid_argument(
+            "error cast to uintptr_t*" );
+    uintptr_t& intptr = oVar;
+    return ( uintptr_t*& )intptr;
 }
 
 template<>
-BufPtr PackageTo< BufPtr >( const BufPtr& pObj )
+Variant PackageTo< DMsgPtr >( const DMsgPtr& pMsg )
 {
-    return const_cast<BufPtr&>( pObj );
+    Variant o( pMsg );
+    return o;
 }
 
 template<>
-BufPtr PackageTo< CObjBase >( const CObjBase* pObj )
+Variant PackageTo< ObjPtr >( const ObjPtr& pObj )
 {
-    BufPtr pBuf( true );
+    Variant o( pObj );
+    return o;
+}
+
+template<>
+Variant PackageTo< BufPtr >( const BufPtr& pObj )
+{
+    Variant o( pObj );
+    return o;
+}
+
+template<>
+Variant PackageTo< CObjBase >( const CObjBase* pObj )
+{
     ObjPtr ptrObj( const_cast< CObjBase* >( pObj ) );
-    *pBuf = ptrObj;
-    return pBuf;
+    Variant o( ptrObj );
+    return o;
 }
 
 template<>
-BufPtr PackageTo< DBusMessage >( const DBusMessage* pMsg )
+Variant PackageTo< DBusMessage >( const DBusMessage* pMsg )
 {
-    BufPtr pBuf( true );
-    *pBuf = DMsgPtr( const_cast< DBusMessage*>( pMsg ) );
-    return pBuf;
+    DMsgPtr p( const_cast< DBusMessage* >( pMsg ) );
+    return Variant( p );
 }
 
 template<>
-BufPtr PackageTo< char >( const char* pText )
+Variant PackageTo< char >( const char* pText )
 {
-    BufPtr pBuf( true );
-    *pBuf = stdstr( pText );
-    return pBuf;
+    Variant o( pText );
+    return o;
 }
 
 template<>
-BufPtr PackageTo< stdstr >( const stdstr& str )
+Variant PackageTo< stdstr >( const stdstr& str )
 {
-    BufPtr pBuf( true );
-    *pBuf = str;
-    return pBuf;
+    Variant o( str );
+    return o;
 }
 
 template<>
-BufPtr PackageTo< CBuffer >( CBuffer* pObj )
+Variant PackageTo< CBuffer >( CBuffer* pObj )
 {
-    BufPtr pBuf( pObj );
-    return pBuf;
+    BufPtr p( pObj );
+    return Variant( p );
 }
 
 template<>
-auto VecToTuple<>( std::vector< BufPtr >& vec ) -> std::tuple<> 
+Variant PackageTo< uintptr_t >( const uintptr_t* pVal )
+{
+    return Variant( pVal );
+}
+template<>
+auto VecToTuple<>( std::vector< Variant >& vec ) -> std::tuple<> 
 {
     return std::tuple<>();
 }
 
-void AssignVal( DMsgPtr& rVal, CBuffer& rBuf )
+void AssignVal( DMsgPtr& rVal, Variant& oVar )
 {
-    rVal = ( DMsgPtr& )rBuf;
+    rVal = ( DMsgPtr& )oVar;
 }
 
 }

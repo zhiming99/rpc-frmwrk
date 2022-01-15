@@ -250,7 +250,9 @@ void CIfSmokeTest::testCliStartStop()
         if( ERROR( ret ) )
             break;
 
-        strReply = ( std::string )*pBufReply;
+        strReply.clear();
+        strReply.append( pBufReply->ptr(),
+            pBufReply->size()-1 );
         if( strReply != ( const char* )*pText )
         {
             DebugPrint( 0, "EchoUnknown response"\

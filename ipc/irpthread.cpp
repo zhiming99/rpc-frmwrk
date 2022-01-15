@@ -397,36 +397,36 @@ gint32 CTaskThread::GetHead(
 }
 
 gint32 CTaskThread::GetProperty(
-    gint32 iProp, CBuffer& oBuf ) const
+    gint32 iProp, Variant& oVar ) const
 {
     gint32 ret = 0;
     switch( iProp )
     {
     case propThreadId:
-        oBuf = GetTid();
+        oVar = GetTid();
         break;
 
     default:
         ret = super::GetProperty(
-            iProp, oBuf );
+            iProp, oVar );
         break;
     }
     return ret;
 }
 
 gint32 CTaskThread::SetProperty(
-    gint32 iProp, const CBuffer& oBuf )
+    gint32 iProp, const Variant& oVar )
 {
     gint32 ret = 0;
     switch( iProp )
     {
     case propThreadId:
-        SetTid( oBuf );
+        SetTid( oVar );
         break;
 
     default:
         ret = super::SetProperty(
-            iProp, oBuf );
+            iProp, oVar );
         break;
     }
     return ret;
@@ -517,7 +517,7 @@ gint32 COneshotTaskThread::Stop()
 }
 
 gint32 COneshotTaskThread::GetProperty(
-    gint32 iProp, CBuffer& oBuf ) const
+    gint32 iProp, Variant& oBuf ) const
 {
     gint32 ret = 0;
     switch( iProp )
@@ -535,7 +535,7 @@ gint32 COneshotTaskThread::GetProperty(
 }
 
 gint32 COneshotTaskThread::SetProperty(
-    gint32 iProp, const CBuffer& oBuf )
+    gint32 iProp, const Variant& oBuf )
 {
     gint32 ret = 0;
     switch( iProp )

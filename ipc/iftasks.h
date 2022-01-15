@@ -144,11 +144,13 @@ class CIfRetryTask
         LONGWORD dwParam2,
         LONGWORD* pData );
 
-    gint32 GetProperty( gint32 iProp,
-            CBuffer& oBuf ) const;
+    gint32 GetProperty(
+        gint32 iProp,
+        Variant& oVar ) const override;
 
-    gint32 SetProperty( gint32 iProp,
-        const CBuffer& oBuf );
+    gint32 SetProperty(
+        gint32 iProp,
+        const Variant& oVar ) override;
 
     gint32 RemoveProperty( gint32 iProp );
 
@@ -213,11 +215,13 @@ class CIfParallelTask
         guint32 dwContext )
     { return -ENOTSUP; }
 
-    gint32 GetProperty( gint32 iProp,
-            CBuffer& oBuf ) const;
+    gint32 GetProperty(
+        gint32 iProp,
+        Variant& oVar ) const override;
 
-    gint32 SetProperty( gint32 iProp,
-        const CBuffer& oBuf );
+    gint32 SetProperty(
+        gint32 iProp,
+        const Variant& oVar ) override;
 
     gint32 RemoveProperty( gint32 iProp );
 

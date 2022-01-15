@@ -568,17 +568,17 @@ class CIoManager : public IService
     {
         gint32 ret = 0;
         do{
-            BufPtr pBuf( true );
             CStdRMutex oRegLock( m_pReg->GetLock() );
             ret = m_pReg->ChangeDir( "/cmdline" );
             if( ERROR( ret ) )
                 break;
 
-            ret = m_pReg->GetProperty( iPropId, *pBuf );
+            Variant oVar;
+            ret = m_pReg->GetProperty( iPropId, oVar );
             if( ERROR( ret ) )
                 break;
 
-            oVal = ( T& )*pBuf;
+            oVal = ( T& )oVar;
         }while( 0 );
 
         return ret;
@@ -589,14 +589,13 @@ class CIoManager : public IService
     {
         gint32 ret = 0;
         do{
-            BufPtr pBuf( true );
-            *pBuf = oVal;
             CStdRMutex oRegLock( m_pReg->GetLock() );
             ret = m_pReg->ChangeDir( "/cmdline" );
             if( ERROR( ret ) )
                 break;
 
-            ret = m_pReg->SetProperty( iPropId, *pBuf );
+            Variant oVar( oVal );
+            ret = m_pReg->SetProperty( iPropId, oVar );
             if( ERROR( ret ) )
                 break;
 

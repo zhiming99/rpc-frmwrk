@@ -101,7 +101,7 @@ def maincli() :
 
             pret = oProxy.Echo( i0 )
             if pret[ 0 ] < 0 :
-                print( "Echo failed with error " + pret[0] )
+                print( "Echo failed with error " + str( pret[0] ) )
                 return pret[0]
             i0r = pret[ 1 ][0]
             pprint(vars( i0r ))

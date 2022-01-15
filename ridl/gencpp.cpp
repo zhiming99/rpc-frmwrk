@@ -1723,10 +1723,10 @@ gint32 CDeclareStruct::Output()
             << "\"" << strMsgId << "\";";
         NEW_LINE;
 
-        BufPtr pMsgId( true );
-        *pMsgId = dwMsgId;
+        Variant oVar;
+        oVar = dwMsgId;
         m_pNode->SetProperty(
-            PROP_MESSAGE_ID, pMsgId );
+            PROP_MESSAGE_ID, oVar );
 
         Wa( "// data members" );
         guint32 i = 0;
@@ -4665,7 +4665,7 @@ gint32 CImplIfMethodProxy::OutputSync()
                     Wa( "    dwSeriProto_ != seriRidl )" );
                     Wa( "    return ret;" );
                     Wa( "BufPtr pBuf2;" );
-                    Wa( "ret = oResp_.GetProperty( 0, pBuf2 );" );
+                    Wa( "ret = oResp_.GetBufPtr( 0, pBuf2 );" );
                     Wa( "if( ERROR( ret ) )" );
                     Wa( "    return ret;" );
 
@@ -4903,7 +4903,7 @@ gint32 CImplIfMethodProxy::OutputAsync()
                     Wa( "    dwSeriProto_ != seriRidl )" );
                     Wa( "    break;" );
                     Wa( "BufPtr pBuf2;" );
-                    Wa( "ret = oResp_.GetProperty( 0, pBuf2 );" );
+                    Wa( "ret = oResp_.GetBufPtr( 0, pBuf2 );" );
                     Wa( "if( ERROR( ret ) )" );
                     Wa( "    break;" );
 
@@ -5022,7 +5022,7 @@ gint32 CImplIfMethodProxy::OutputAsyncCbWrapper()
             NEW_LINE;
             BLOCK_OPEN;
             Wa( "BufPtr pVal;" );
-            Wa( "ret = oResp_.GetProperty( i, pVal );" );
+            Wa( "ret = oResp_.GetBufPtr( i, pVal );" );
             Wa( "if( ERROR( ret ) break;" );
             Wa( "vecParams.push_back( pVal );" ); 
             BLOCK_CLOSE;
@@ -5066,7 +5066,7 @@ gint32 CImplIfMethodProxy::OutputAsyncCbWrapper()
             Wa( "    dwSeriProto_ != seriRidl )" );
             Wa( "    break;" );
             Wa( "BufPtr pBuf_;" );
-            Wa( "ret = oResp_.GetProperty( 0, pBuf_ );" );
+            Wa( "ret = oResp_.GetBufPtr( 0, pBuf_ );" );
             Wa( "if( ERROR( ret ) )" );
             Wa( "    break;" );
 

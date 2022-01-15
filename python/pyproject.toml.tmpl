@@ -10,9 +10,10 @@ name = "rpcbase"
 [tool.sip.bindings.rpcf]
 headers = ["rpc.h"]
 include-dirs = [ "YYY/include","YYY/ipc", "YYY/test/stmtest"XXXXXXXX ]
-libraries = ["combase", "ipc" ]
+libraries = ["ipc", "combase"]
 library-dirs = ["YYY/combase/.libs", "YYY/ipc/.libs" ]
 extra-link-args=["XXXWLRPATH"]
+extra-compile-args=["-fno-strict-aliasing"]
 debug = true
 tracing = true
 define-macros = ["_USE_LIBEV" ]

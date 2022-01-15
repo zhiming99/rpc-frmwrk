@@ -120,7 +120,7 @@ namespace cpp
     {
         Clsid_Invalid,
         Clsid_CIoManager,
-        Clsid_CConfigDb,
+        Clsid_CConfigDb2,
     };
 
     enum // EnumEventId
@@ -368,7 +368,7 @@ namespace cpp
         gint32 NewObj();
         %MethodCode
         sipRes = sipCpp->NewObj(
-            cpp::Clsid_CConfigDb, nullptr );
+            cpp::Clsid_CConfigDb2, nullptr );
         %End
 
         bool IsEmpty() const;
@@ -648,6 +648,11 @@ namespace cpp
         gint32 SetObjPtr( gint32,
             cpp::ObjPtr& pObj );
 
+        gint32 GetBufPtr( gint32,
+            cpp::BufPtr& pObj /Out/ );
+        gint32 SetBufPtr( gint32,
+            cpp::BufPtr& pObj );
+
         gint32 GetBoolProp(
             gint32, bool& bVal /Out/ );
         %MethodCode
@@ -667,10 +672,10 @@ namespace cpp
                 a0, a1 );
         %End
 
-        gint32 Push( PyObject* pObj /In/ );
+        /*gint32 Push( PyObject* pObj /In/ );
         %MethodCode
             sipRes = sipCpp->Push( *a0 );
-        %End
+        %End */
 
         gint32 PushObj( cpp::ObjPtr& val /In/ );
         %MethodCode

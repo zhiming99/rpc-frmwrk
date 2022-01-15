@@ -42,10 +42,10 @@ abstract public class JavaRpcService implements IRpcService
         {
             if( isServer() )
                 System.out.println(
-                    "Failed start server..." );
+                    "Failed start server..." + ret );
             else
                 System.out.println(
-                    "Failed start proxy..." );
+                    "Failed start proxy..." + ret );
         }
         else
         {
@@ -518,7 +518,7 @@ abstract public class JavaRpcService implements IRpcService
                     break;
                 case RC.typeByteArr :
                     jret2 = ( JRetVal )
-                        oParams.GetProperty( i );
+                        oParams.GetBufPtr( i );
                     break;
                 }
                 if( jret2.ERROR() )

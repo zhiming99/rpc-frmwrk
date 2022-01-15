@@ -18,7 +18,7 @@ rpcbase.jar: rpcbase_wrap.cpp
 	cpp -P -DJavaRpcService=JavaRpcServiceS -DInstType=CJavaServerImpl -DIsServer="isServer(){ return true;}" JavaRpcService.java -o $(rpcbasedir)/JavaRpcServiceS.java
 	cpp -P -DJavaRpcService=JavaRpcServiceP -DInstType=CJavaProxyImpl -DIsServer="isServer(){ return false;}" JavaRpcService.java -o $(rpcbasedir)/JavaRpcServiceP.java
 	javac src/org/rpcf/rpcbase/*.java
-	cd src;jar -cf rpcbase.jar org/rpcf/rpcbase/*.class;mv rpcbase.jar ..
+	cd src;jar -cf ../rpcbase.jar org/rpcf/rpcbase/*.class
 
 rpcbase_wrap.cpp:rpcbase.i proxy.i server.i
 	swig -c++ -java -package org.rpcf.rpcbase -outdir src/org/rpcf/rpcbase -o rpcbase_wrap.cpp rpcbase.i

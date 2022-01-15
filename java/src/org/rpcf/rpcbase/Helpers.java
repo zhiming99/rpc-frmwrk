@@ -61,74 +61,73 @@ public class Helpers
         return iTypeId;
     }
 
-    public static vectorBufPtr
-        convertObjectToBuf( Object[] arrObjs )
+    public static vectorVars
+        convertObjectToVars( Object[] arrObjs )
     {
         int ret = 0;
-        vectorBufPtr vecBufs = new vectorBufPtr();
+        vectorVars vecVars = new vectorVars();
         for( Object i : arrObjs )
         {
             int iType = Helpers.getTypeId( i );
-            BufPtr pBuf = new BufPtr( true );
+            Variant oVar = new Variant();
             switch( iType )
             {
             case RC.typeString:
                 {
-                   ret = pBuf.SetString(
+                   ret = oVar.SetString(
                        ( String )i );
                    break;
                 }
             case RC.typeObj:
                 {
-                    ret = pBuf.SetObjPtr(
-                        ( ObjPtr )i );
+                    ret = oVar.SetObjPtr( ( ObjPtr )i );
                     break;
                 }
             case RC.typeByteArr:
                 {
-                    ret = pBuf.SetByteArray(
+                    ret = oVar.SetByteArray(
                         ( byte[] )i );
                     break;
                 }
             case RC.typeByteObj:
                 {
-                    ret = pBuf.SetByte(
+                    ret = oVar.SetByte(
                         ( ( Byte )i ).byteValue() );
                     break;
                 }
             case RC.typeUInt16Obj:
                 {
-                    ret = pBuf.SetShort(
+                    ret = oVar.SetShort(
                         ( ( Short )i ).shortValue() );
                     break;
                 }
             case RC.typeUInt32Obj:
                 {
-                    ret = pBuf.SetInt(
+                    ret = oVar.SetInt(
                         ( ( Integer )i ).intValue() );
                     break;
                 }
             case RC.typeUInt64Obj:
                 {
-                    ret = pBuf.SetLong(
+                    ret = oVar.SetLong(
                         ( ( Long )i ).longValue() );
                     break;
                 }
             case RC.typeFloatObj:
                 {
-                    ret = pBuf.SetFloat(
+                    ret = oVar.SetFloat(
                         ( ( Float )i ).floatValue() );
                     break;
                 }
             case RC.typeDoubleObj:
                 {
-                    ret = pBuf.SetDouble(
+                    ret = oVar.SetDouble(
                         ( ( Double )i ).doubleValue() );
                     break;
                 }
             case RC.typeBufPtr:
                 {
-                    pBuf = (BufPtr) i;
+                    ret = oVar.SetBufPtr( (BufPtr) i );
                     break;
                 }
             case RC.typeDMsg:
@@ -141,12 +140,12 @@ public class Helpers
             if( ret < 0 )
                 break;
 
-            vecBufs.add( pBuf );
-            pBuf = null;
+            vecVars.add( oVar );
+            oVar = null;
         }
         if( ret < 0 )
             return null;
 
-        return vecBufs;
+        return vecVars;
     }
 }

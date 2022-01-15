@@ -124,10 +124,10 @@ int main( int argc, char** argv)
             break;
         }
 
-        maincli( pSvc, argc, argv );
+        ret = maincli( pSvc, argc, argv );
         
         // Stopping the object
-        ret = pSvc->Stop();
+        pSvc->Stop();
         
     }while( 0 );
 
@@ -221,10 +221,10 @@ gint32 GetMD5( const stdstr& strFile, stdstr& digest )
     return 0;
 }
 
-void UsageAndQuit( char* cmd, gint32 ret )
+void Usage( char* cmd )
 {
     printf( "usage: %s <filename>\n", cmd );
-    exit( -ret );
+    return;
 }
 
 gint32 maincli(
@@ -234,14 +234,20 @@ gint32 maincli(
     gint32 ret = 0;
     do{
         if( argc != 2 )
-            UsageAndQuit( argv[ 0 ], -EINVAL );
+        {
+            Usage( argv[ 0 ] );
+            ret = -EINVAL;
+            break;
+        }
 
         stdstr strFile = argv[ 1 ];
         if( !IsFileExist( strFile ) ||
             GetFileSize( strFile ) == 0 )
         {
             printf( "Error not a valid file\n" );
-            UsageAndQuit( argv[ 0 ], -EINVAL );
+            Usage( argv[ 0 ] );
+            ret = -EINVAL;
+            break;
         }
 
         OutputMsg( 0, "Open stream channel..." );
@@ -344,6 +350,6 @@ gint32 maincli(
 
     }while( 0 );
 
-    return STATUS_SUCCESS;
+    return ret;
 }
 

@@ -512,11 +512,6 @@ class CBuffer : public CObjBase
                 ( typename std::remove_reference<T>::type* )nullptr ) );
         }
 
-        // well, you cannot return *this directly
-        // because an implicit coversion will
-        // happen and a temporary object is
-        // created, which is not what we want
-        // return ( T& )( *( T* )ptr() );
         return *this;
     }
 

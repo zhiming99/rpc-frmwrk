@@ -34,364 +34,185 @@ using namespace std;
 namespace rpcf
 {
 
-CConfigDb::CConfigDb( const IConfigDb* pCfg )
+guint64 htonll(guint64 iVal )
 {
-    SetClassId( Clsid_CConfigDb );
-    if( pCfg )
+    return htobe64( iVal );
+}
+guint64 ntohll(guint64 iVal )
+{
+    return be64toh( iVal );
+}
+
+const IConfigDb& CConfigDb2::operator=(
+    const IConfigDb& rhs )
+{
+    if( rhs.GetClsid() == clsid( CConfigDb2 ) )
     {
-        *this = *pCfg;
+        m_mapProps.clear();
+        const CConfigDb2* pSrc = static_cast
+            < const CConfigDb2* >( &rhs );
+        m_mapProps.insert(
+            pSrc->m_mapProps.begin(),
+            pSrc->m_mapProps.end() );
     }
-}
-
-CConfigDb::~CConfigDb()
-{
-    m_mapProps.clear();
-}
-
-void CConfigDb::BuildConfig(
-    const std::string& strJson )
-{
-
-}
-
-void CConfigDb::BuildConfig(
-    const std::hashmap<gint32, std::string>& strPropValues )
-{
-
-}
-
-gint32 CConfigDb::SetProperty(
-    gint32 iProp, const BufPtr& pBuf )
-{
-    if( pBuf.IsEmpty() )
+    else
     {
-        m_mapProps.erase( iProp );
-        return 0;
+        throw invalid_argument(
+            "unsupported source object" );
     }
-    m_mapProps[ iProp ] = pBuf;
-    return 0;
+    return *this;
 }
 
-gint32 CConfigDb::GetProperty(
+CConfigDb2::CConfigDb2( const IConfigDb* pCfg )
+{
+    SetClassId( Clsid_CConfigDb2 );
+    if( pCfg == nullptr )
+        return;
+    *this = *pCfg;
+}
+
+CConfigDb2::~CConfigDb2()
+{
+    RemoveAll();
+}
+
+gint32 CConfigDb2::GetProperty(
     gint32 iProp, BufPtr& pBuf ) const
 {
-    gint32 ret = -ENOENT;
-    
-    hashmap<gint32, BufPtr>::const_iterator itr =
-        m_mapProps.find( iProp );
-
-    if( itr != m_mapProps.cend() )
-    {
-        pBuf = itr->second;
-        ret = 0;
-    }
-    return ret;
+    auto itr = m_mapProps.find( iProp );
+    if( itr == m_mapProps.end() )
+        return -ENOENT;
+    pBuf = itr->second.ToBuf();
+    return 0;
 }
 
-gint32 CConfigDb::GetProperty(
-    gint32 iProp, CBuffer& oBuf ) const
+gint32 CConfigDb2::SetProperty(
+    gint32 iProp, const BufPtr& pBuf )
 {
-    gint32 ret = -ENOENT;
-    
-    hashmap<gint32, BufPtr>::const_iterator itr =
-        m_mapProps.find( iProp );
-
-    if( itr != m_mapProps.cend() )
+    auto itr = m_mapProps.find( iProp );
+    if( itr != m_mapProps.end() )
+        itr->second = *pBuf;
+    else
     {
-        oBuf = (*itr->second);
-        if( oBuf.ptr() == nullptr )
-        {
-            DebugPrint( -EFAULT,
-                "oBuf contains nothing, thread=%d",
-                ::GetTid() );
-        }
-        ret = 0;
-    }
-
-    if( ret == -ENOENT )
-    {
-        ret = CObjBase::GetProperty(
-            iProp, oBuf );
-    }
-    return ret;
-}
-
-gint32 CConfigDb::GetPropertyType(
-    gint32 iProp, gint32& iType ) const
-{
-    gint32 ret = -ENOENT;
-    
-    hashmap<gint32, BufPtr>::const_iterator itr =
-        m_mapProps.find( iProp );
-
-    if( itr != m_mapProps.cend() )
-    {
-        iType = ( *itr->second ).GetExDataType();
-        ret = 0;
-    }
-
-    if( ret == -ENOENT )
-    {
-        ret = CObjBase::GetPropertyType(
-            iProp, iType );
-    }
-    return ret;
-}
-
-gint32 CConfigDb::SetProperty(
-    gint32 iProp, const CBuffer& oProp )
-{
-    try{
-        // NOTE: we don't forward the request to
-        // cobjbase because properties on objbase
-        // are all read-only            
-
-        BufPtr oBufPtr( true );
-        *oBufPtr = oProp;
-        m_mapProps[ iProp ] = oBufPtr;
-
-    }
-    catch( std::bad_alloc& e )
-    {
-        return -ENOMEM;
+        m_mapProps[ iProp ] = *pBuf;
     }
     return 0;
 }
 
-CBuffer& CConfigDb::operator[]( gint32 iProp )
+// get a reference to variant from the config db
+gint32 CConfigDb2::GetProperty(
+    gint32 iProp, Variant& oVar ) const
 {
-    hashmap<gint32, BufPtr>::iterator itr
-        = m_mapProps.find( iProp );
-
-    if( itr == m_mapProps.end() )
-    {
-        BufPtr pBuf( true );
-        m_mapProps[ iProp ] = pBuf;
-        itr = m_mapProps.find( iProp );
-    }
-
-    return *itr->second;
-}
-
-const CBuffer& CConfigDb::operator[](
-    gint32 iProp ) const
-{
-    hashmap<gint32, BufPtr>::const_iterator itr
-        = m_mapProps.find( iProp );
-
+    auto itr = m_mapProps.find( iProp );
     if( itr == m_mapProps.cend() )
-    {
-        // make an empty entry
-        string strMsg = DebugMsg(
-            -ENOENT, "no such element" );
-        throw std::out_of_range( strMsg );
-    }
-
-    return *itr->second;
+        return -ENOENT;
+    oVar = itr->second;
+    return 0;
+}
+// add a reference to variant to the config db
+gint32 CConfigDb2::SetProperty(
+    gint32 iProp, const Variant& oVar )
+{
+    m_mapProps[ iProp ] = oVar;
+    return 0;
 }
 
-#define RESIZE_BUF( _Size, _Ret ) \
-do{ \
-    guint32 dwLocOff = pLoc - oBuf.ptr(); \
-    oBuf.Resize( ( _Size ) ); \
-    if( oBuf.ptr() == nullptr ) \
-    { \
-        _Ret = -ENOMEM; \
-        break; \
-    } \
-    pLoc = ( dwLocOff + oBuf.ptr() ); \
-    pEnd = ( oBuf.size() + oBuf.ptr() ); \
- \
-}while( 0 ) 
-
-gint32 CConfigDb::SerializeOld( CBuffer& oBuf ) const
+gint32 CConfigDb2::GetProperty(
+    gint32 iProp, CBuffer& oBuf ) const
 {
-    struct SERI_HEADER oHeader;
+    auto itr = m_mapProps.find( iProp );
+    if( itr == m_mapProps.end() )
+        return -ENOENT;
+    const Variant& o = itr->second;
+    EnumTypeId iType = o.GetTypeId();
     gint32 ret = 0;
-
-    hashmap<gint32, BufPtr>::const_iterator itr
-        = m_mapProps.cbegin();
-
-    oHeader.dwClsid = clsid( CConfigDb );
-    oHeader.dwCount = m_mapProps.size();
-    oHeader.bVersion = 1;
-
-    for( auto oPair : m_mapProps )
+    switch( iType )
     {
-        // reserve room for key and size values
-        oHeader.dwSize += sizeof( gint32 ) * 2;
-        oHeader.dwSize += oPair.second->size();
+    case typeByte: 
+        oBuf = o.m_byVal;
+        break;
+    case typeUInt16:
+        oBuf = o.m_wVal;
+        break;
+    case typeUInt32:
+        oBuf = o.m_dwVal;
+        break;
+    case typeUInt64:
+        oBuf = o.m_qwVal;
+        break;
+    case typeFloat:
+        oBuf = o.m_fVal;
+        break;
+    case typeDouble:
+        oBuf = o.m_dblVal;
+        break;
+    case typeDMsg:
+        oBuf = o.m_pMsg;
+        break;
+    case typeObj:
+        oBuf = o.m_pObj;
+        break;
+    case typeByteArr:
+        oBuf = *o.m_pBuf;
+        break;
+    case typeString:
+        oBuf = o.m_strVal;
+        break;
+    case typeNone:
+    default:
+        ret = -EINVAL;
     }
-
-    // NOTE: oHeader.dwSize at this point is an
-    // estimated size at this moment
-
-    oBuf.Resize( oHeader.dwSize +
-        sizeof( SERI_HEADER ) + PAGE_SIZE );
-
-    char* pLoc = oBuf.ptr();
-    oHeader.hton();
-    memcpy( pLoc, &oHeader, sizeof( oHeader ) );
-    pLoc += sizeof( oHeader );
-    oHeader.ntoh();
-
-    itr = m_mapProps.begin();
-
-    char* pEnd = oBuf.ptr() + oBuf.size();
-
-    while( itr != m_mapProps.cend() )
-    {
-        guint32 dwKey = htonl( itr->first );
-        if( pEnd - pLoc > ( gint32 )( sizeof( guint32 ) * 2 ) )
-        {
-            memcpy( pLoc, &dwKey, sizeof( guint32 ) );
-            pLoc += sizeof( guint32 ) * 2;
-        }
-        else
-        {
-            RESIZE_BUF( oBuf.size() + PAGE_SIZE, ret );
-            if( ERROR( ret ) )
-                break;
-
-            memcpy( pLoc, &dwKey, sizeof( guint32 ) );
-            pLoc += sizeof( guint32 ) * 2;
-        }
-
-        BufPtr pValBuf( true );
-        ret = itr->second->Serialize( *pValBuf );
-        if( ERROR( ret ) )
-            break;
-
-        if( pEnd - pLoc >= ( gint32 )pValBuf->size() )
-        {
-            memcpy( pLoc, pValBuf->ptr(), pValBuf->size() );
-        }
-        else
-        {
-            guint32 dwSizeInc = 
-                AlignDword( pValBuf->size() ) + PAGE_SIZE ;
-
-            RESIZE_BUF( oBuf.size() + dwSizeInc, ret );
-            if( ERROR( ret ) )
-                break;
-
-            memcpy( pLoc, pValBuf->ptr(),
-                pValBuf->size() );
-        }
-
-        // make sure the buffer element are on the
-        // boundary of 4 bytes, so that the
-        // SERI_HEADER is properly aligned
-        *( guint32* )( pLoc - sizeof( guint32 ) ) =
-            htonl( AlignDword( pValBuf->size() ) );
-
-        pLoc += AlignDword( pValBuf->size() );
-
-        if( pLoc - oBuf.ptr() > CFGDB_MAX_SIZE )
-        {
-            ret = -ENOMEM;
-            break;
-        }
-        ++itr;
-    }
-
-    if( SUCCEEDED( ret ) )
-    {
-        SERI_HEADER* pHeader =
-            ( SERI_HEADER* )oBuf.ptr();
-
-        pHeader->dwSize = htonl(
-            pLoc - oBuf.ptr() -
-            sizeof( SERI_HEADER_BASE ) );
-
-        RESIZE_BUF( pLoc - oBuf.ptr(), ret );
-    }
-
     return ret;
 }
 
-gint32 CConfigDb::DeserializeOld(
-    const char* pBuf, guint32 dwSize )
+gint32 CConfigDb2::SetProperty(
+    gint32 iProp, const CBuffer& oBuf )
 {
-    if( pBuf == nullptr || dwSize == 0 )
-        return -EINVAL;
-
-    const SERI_HEADER* pHeader =
-        reinterpret_cast< const SERI_HEADER* >( pBuf );
-
-    SERI_HEADER oHeader( *pHeader );
-    oHeader.ntoh();
-
-    gint32 ret = 0;
-
-    do{
-        if( oHeader.dwClsid != clsid( CConfigDb ) ||
-            oHeader.dwCount > CFGDB_MAX_ITEM ||
-            oHeader.dwSize + sizeof( SERI_HEADER_BASE ) > dwSize ||
-            oHeader.dwSize > CFGDB_MAX_SIZE )
-        {
-            ret = -EINVAL;
-            break;
-        }
-        if( oHeader.bVersion != 1 )
-        {
-            ret = -EINVAL;
-            break;
-        }
-
-        const char* pLoc = pBuf + sizeof( SERI_HEADER );
-
-        for( guint32 i = 0; i < oHeader.dwCount; i++ )
-        {
-            gint32 iKey = ntohl( *( guint32* )pLoc );
-            guint32 dwValSize = ntohl( ( ( guint32* )pLoc )[ 1 ] );
-            pLoc += sizeof( guint32 ) * 2;
-
-            BufPtr pValBuf( true );
-
-            ret = pValBuf->Deserialize( pLoc, dwValSize );
-            if( ERROR( ret ) )
-                break;
-
-            SetProperty( iKey, *pValBuf );
-
-            pLoc += dwValSize; 
-
-            if( ( guint32 )( pLoc - pBuf ) > dwSize )
-            {
-                // don't know how to handle
-                ret = -E2BIG;
-                break;
-            }
-        }
-
-    }while( 0 );
-
-    return ret;
+    m_mapProps[ iProp ] = oBuf;
+    return 0;
 }
 
-gint32 CConfigDb::Serialize(
-    CBuffer& oBuf ) const
+gint32 CConfigDb2::GetPropertyType(
+    gint32 iProp, gint32& iType ) const
 {
-    return SerializeNew( oBuf );
+    auto itr = m_mapProps.find( iProp );
+    if( itr == m_mapProps.end() )
+        return -ENOENT;
+    iType = itr->second.GetTypeId();
+    return STATUS_SUCCESS;
 }
-gint32 CConfigDb::Deserialize(
-    const char* oBuf, guint32 dwSize )
+
+gint32 CConfigDb2::RemoveProperty(
+    gint32 iProp )
 {
-    return DeserializeNew( oBuf, dwSize );
+    gint32 i = m_mapProps.erase( iProp );
+    if( i == 0 )
+        return -ENOENT;
+    return STATUS_SUCCESS;
 }
+
+gint32 CConfigDb2::GetPropIds(
+    std::vector<gint32>& vecIds ) const
+{
+    if( m_mapProps.empty() )
+        return -ENOENT;
+    for( auto& elem : m_mapProps )
+        vecIds.push_back( elem.first );
+    return STATUS_SUCCESS;
+}
+
+void CConfigDb2::RemoveAll()
+{ m_mapProps.clear(); }
 
 #define QPAGE ( ( guint32 )( PAGE_SIZE >> 1 ) )
-gint32 CConfigDb::SerializeNew(
+gint32 CConfigDb2::Serialize(
     CBuffer& oBuf ) const
 {
     struct SERI_HEADER oHeader;
     gint32 ret = 0;
 
-    hashmap<gint32, BufPtr>::const_iterator itr
-        = m_mapProps.cbegin();
-
-    oHeader.dwClsid = clsid( CConfigDb );
+    auto itr = m_mapProps.cbegin();
+    oHeader.dwClsid = clsid( CConfigDb2 );
     oHeader.dwCount = m_mapProps.size();
     oHeader.bVersion = 2;
 
@@ -423,19 +244,13 @@ gint32 CConfigDb::SerializeNew(
         memcpy( pLoc, &dwKey, sizeof( guint32 ) );
         pLoc += sizeof( guint32 );
 
-        const BufPtr& pValBuf = itr->second;
-        guint8 byType = pValBuf->GetExDataType();
-        if( byType == typeNone )
+        const Variant& oVar = itr->second;
+        if( oVar.empty() )
         {
-            guint32 dwType = pValBuf->GetDataType();
-            if( dwType == DataTypeObjPtr )
-                byType = typeObj;
-            else if( dwType == DataTypeMsgPtr )
-                byType = typeDMsg;
-            else
-                byType = typeByteArr;
+            ret = -EFAULT;
+            break;
         }
-
+        guint8 byType = oVar.GetTypeId();
         if( pEnd - pLoc < sizeof( byType ) )
         {
             RESIZE_BUF( oBuf.size() + QPAGE, ret );
@@ -454,13 +269,13 @@ gint32 CConfigDb::SerializeNew(
                     if( ERROR( ret ) )
                         break;
                 }
-                *pLoc++ = pValBuf->ptr()[ 0 ];
+                *pLoc++ = ( guint8& )oVar;
                 break;
             }
         case typeUInt16:
             {
                 guint16 val =
-                    htons( ( guint16& )*pValBuf );
+                    htons( ( guint16& )oVar );
                 if( pEnd - pLoc < sizeof( guint16 ) )
                 {
                     RESIZE_BUF( oBuf.size() + QPAGE, ret );
@@ -475,7 +290,7 @@ gint32 CConfigDb::SerializeNew(
         case typeFloat:
             {
                 guint32 val =
-                    htonl( ( guint32& )*pValBuf );
+                    htonl( ( guint32& )oVar );
                 if( pEnd - pLoc < sizeof( guint32 ) )
                 {
                     RESIZE_BUF( oBuf.size() + QPAGE, ret );
@@ -490,7 +305,7 @@ gint32 CConfigDb::SerializeNew(
         case typeDouble:
             {
                 guint64 val =
-                    htonll( ( guint64& )*pValBuf );
+                    htonll( ( guint64& )oVar );
 
                 if( pEnd - pLoc < sizeof( guint64 ) )
                 {
@@ -504,8 +319,7 @@ gint32 CConfigDb::SerializeNew(
             }
         case typeString:
             {
-                guint32 len = 1 + strnlen(
-                    ( char* )pValBuf->ptr(), pValBuf->size() );
+                guint32 len = 1 + oVar.m_strVal.size(); 
                 guint32 dwFree = pEnd - pLoc;
                 if( dwFree < sizeof( guint32 ) + len )
                 {
@@ -525,7 +339,7 @@ gint32 CConfigDb::SerializeNew(
                     break;
 
                 pLoc += sizeof( guint32 );
-                memcpy( pLoc, pValBuf->ptr(), len - 1 );
+                memcpy( pLoc, oVar.m_strVal.c_str(), len - 1 );
                 pLoc += len;
                 pLoc[ -1 ] = 0;
                 break;
@@ -533,7 +347,7 @@ gint32 CConfigDb::SerializeNew(
         case typeDMsg:
             {
                 BufPtr pBuf( true );
-                DMsgPtr& pMsg = ( DMsgPtr& )*pValBuf->ptr();
+                DMsgPtr& pMsg = ( DMsgPtr& )oVar;
                 ret = pMsg.Serialize( *pBuf );
                 if( ERROR( ret ) )
                     break;
@@ -562,7 +376,7 @@ gint32 CConfigDb::SerializeNew(
         case typeObj:
             {
                 BufPtr pBuf( true );
-                ObjPtr& pObj = ( ObjPtr& )*pValBuf->ptr();
+                ObjPtr& pObj = ( ObjPtr& )oVar;
                 ret = pObj->Serialize( *pBuf );
                 if( ERROR( ret ) )
                     break;
@@ -582,7 +396,11 @@ gint32 CConfigDb::SerializeNew(
             }
         case typeByteArr:
             {
-                guint32 len = pValBuf->size();
+                BufPtr& pBufVal = ( BufPtr& )oVar;
+                guint32 len = 0;
+                if( !pBufVal.IsEmpty() && !pBufVal->empty() )
+                    len = pBufVal->size();
+
                 guint32 dwFree = pEnd - pLoc;
                 if( dwFree < len + sizeof( guint32 ) )
                 {
@@ -601,15 +419,13 @@ gint32 CConfigDb::SerializeNew(
                     break;
 
                 pLoc += sizeof( guint32 );
-                memcpy( pLoc, pValBuf->ptr(), len );
+                memcpy( pLoc, pBufVal->ptr(), len );
                 pLoc += len;
                 break;
             }
         default:
-            {
-                ret = -EINVAL;
-                break;
-            }
+            ret = -EINVAL;
+            break;
         }
 
         ++itr;
@@ -630,7 +446,7 @@ gint32 CConfigDb::SerializeNew(
     return ret;
 }
 
-gint32 CConfigDb::DeserializeNew(
+gint32 CConfigDb2::Deserialize(
     const char* pBuf, guint32 dwSize )
 {
     if( pBuf == nullptr || dwSize == 0 )
@@ -646,7 +462,7 @@ gint32 CConfigDb::DeserializeNew(
     gint32 ret = 0;
 
     do{
-        if( oHeader.dwClsid != clsid( CConfigDb ) ||
+        if( oHeader.dwClsid != clsid( CConfigDb2 ) ||
             oHeader.dwCount > CFGDB_MAX_ITEM ||
             oHeader.dwSize + sizeof( SERI_HEADER_BASE ) > dwSize ||
             oHeader.dwSize > CFGDB_MAX_SIZE )
@@ -660,7 +476,6 @@ gint32 CConfigDb::DeserializeNew(
             break;
         }
 
-
         const char* pLoc = pBuf + sizeof( SERI_HEADER );
         const char* pEnd = pBuf + dwSize;
 
@@ -670,15 +485,15 @@ gint32 CConfigDb::DeserializeNew(
             guint32 dwValSize = ntohl( ( ( guint32* )pLoc )[ 1 ] );
             pLoc += sizeof( guint32 );
             guint8 byType = pLoc[ 0 ];
+            Variant oVar;
             pLoc += 1;
 
-            BufPtr pValBuf( true );
             switch( ( EnumTypeId )byType )
             {
             case typeByte: 
                 {
                     guint8 val = pLoc[ 0 ];
-                    *pValBuf = val;
+                    oVar = val;
                     pLoc++;
                     break;
                 }
@@ -686,7 +501,7 @@ gint32 CConfigDb::DeserializeNew(
                 {
                     guint16 val = 0;
                     memcpy( &val, pLoc, sizeof( guint16 ) );
-                    *pValBuf = ntohs( val );
+                    oVar = ntohs( val );
                     pLoc += sizeof( guint16 );
                     break;
                 }
@@ -695,7 +510,11 @@ gint32 CConfigDb::DeserializeNew(
                 {
                     guint32 val = 0;
                     memcpy( &val, pLoc, sizeof( guint32 ) );
-                    *pValBuf = ntohl( val );
+                    val = ntohl( val );
+                    if( byType == typeUInt32 )
+                        oVar = val;
+                    else
+                        oVar = *( float* )&val;
                     pLoc += sizeof( guint32 );
                     break;
                 }
@@ -704,7 +523,11 @@ gint32 CConfigDb::DeserializeNew(
                 {
                     guint64 val = 0;
                     memcpy( &val, pLoc, sizeof( guint64 ) );
-                    *pValBuf = ntohll( val );
+                    val = ntohll( val );
+                    if( byType == typeUInt64 )
+                        oVar = val;
+                    else
+                        oVar = *( double* )&val;
                     pLoc += sizeof( guint64 );
                     break;
                 }
@@ -724,13 +547,7 @@ gint32 CConfigDb::DeserializeNew(
                         ret = -E2BIG;
                         break;
                     }
-                    ret = pValBuf->Resize( len );
-                    if( ERROR( ret ) )
-                        break;
-                    strncpy( pValBuf->ptr(), pLoc, len );
-                    pValBuf->ptr()[ len - 1 ] = 0;
-                    pValBuf->SetDataType( DataTypeMem );
-                    pValBuf->SetExDataType( typeString );
+                    new ( &oVar ) Variant( ( const char* )pLoc, len - 1 );
                     pLoc += len;
                     break;
                 }
@@ -754,7 +571,7 @@ gint32 CConfigDb::DeserializeNew(
                     if( ERROR( ret ) )
                         break;
 
-                    *pValBuf = pMsg;
+                    oVar = ( DBusMessage* )pMsg; 
                     pLoc += len + sizeof( guint32 );
                     break;
                 }
@@ -784,7 +601,7 @@ gint32 CConfigDb::DeserializeNew(
                     if( ERROR( ret ) )
                         break;
 
-                    *pValBuf = pObj;
+                    oVar = pObj;
                     pLoc += len;
                     break;
                 }
@@ -804,13 +621,12 @@ gint32 CConfigDb::DeserializeNew(
                         ret = -E2BIG;
                         break;
                     }
-                    ret = pValBuf->Resize( len );
+                    BufPtr pBufVal( true );
+                    ret = pBufVal->Resize( len );
                     if( ERROR( ret ) )
                         break;
-
-                    memcpy( pValBuf->ptr(), pLoc, len );
-                    pValBuf->SetDataType( DataTypeMem );
-                    pValBuf->SetExDataType( typeByteArr );
+                    memcpy( pBufVal->ptr(), pLoc, len );
+                    oVar = pBufVal;
                     pLoc += len;
                     break;
                 }
@@ -822,8 +638,7 @@ gint32 CConfigDb::DeserializeNew(
             if( ERROR( ret ) )
                 break;
 
-            SetProperty( iKey, pValBuf );
-
+            SetProperty( iKey, oVar );
             if( pLoc > pEnd )
             {
                 // don't know how to handle
@@ -837,69 +652,18 @@ gint32 CConfigDb::DeserializeNew(
     return ret;
 }
 
-
-gint32 CConfigDb::Deserialize(
+gint32 CConfigDb2::Deserialize(
     const CBuffer& oBuf )
 {
     if( oBuf.empty() )
         return -EINVAL;
 
-    return Deserialize( oBuf.ptr(), oBuf.size() );
+    return Deserialize(
+        oBuf.ptr(), oBuf.size() );
 }
 
-gint32 CConfigDb::GetPropIds(
-    std::vector<gint32>& vecIds ) const
-{
-    hashmap<gint32, BufPtr>::const_iterator itr =
-        m_mapProps.cbegin();
-
-    while( itr != m_mapProps.cend() )
-    {
-        vecIds.push_back( itr->first );
-    }
-    std::sort( vecIds.begin(), vecIds.end() );
-    return vecIds.size();
-}
-
-const IConfigDb& CConfigDb::operator=(
+gint32 CConfigDb2::Clone(
     const IConfigDb& rhs )
-{
-    if( rhs.GetClsid() == clsid( CConfigDb ) )
-    {
-        // we are sure the rhs referencing a
-        // CConfigDb object
-        const CConfigDb* pSrc = static_cast
-            < const CConfigDb* >( &rhs );
-
-        if( pSrc != nullptr )
-        {
-            m_mapProps.clear();
-
-            hashmap<gint32, BufPtr>::const_iterator
-                itrSrc = pSrc->m_mapProps.begin();
-
-            while( itrSrc != pSrc->m_mapProps.end() )
-            {
-                BufPtr pBuf( true );
-                // NOTE: we will clone all the
-                // properties of simple types. for the
-                // objptr or dmsgptr, we only copy the
-                // pointer
-                *pBuf = *itrSrc->second;
-                m_mapProps[ itrSrc->first ] = pBuf;
-                ++itrSrc;
-            }
-        }
-    }
-    else
-    {
-        throw invalid_argument(
-            "the rhs is not derived from CConfigDb" );
-    }
-    return *this;
-}
-
-gint32 CConfigDb::Clone( const IConfigDb& rhs )
 {
     BufPtr bufPtr( true );
     int ret = 0;
@@ -918,138 +682,10 @@ gint32 CConfigDb::Clone( const IConfigDb& rhs )
     return ret;
 }
 
-gint32 CConfigDb::RemoveProperty( gint32 iProp )
+gint32 CConfigDb2::EnumProperties(
+    std::vector< gint32 >& vecProps ) const 
 {
-    gint32 ret = m_mapProps.erase( iProp );
-
-    if( ret == 0 )
-        ret = -ENOENT;
-    else
-        ret = 0;
-
-    return ret;
-}
-
-void CConfigDb::RemoveAll()
-{
-    m_mapProps.clear();
-}
-
-gint32 CConfigDb::EnumProperties(
-    vector< gint32 >& vecProps ) const
-{
-
-    // we don't enum the underlying properties from the
-    // objbase
-    gint32 ret = 0;
-
-    for( auto& oElem : m_mapProps )
-    {
-        vecProps.push_back( oElem.first );
-    }
-
-    std::sort( vecProps.begin(), vecProps.end() );
-    return ret;
-}
-
-
-guint64 htonll(guint64 iVal )
-{
-    return htobe64( iVal );
-}
-guint64 ntohll(guint64 iVal )
-{
-    return be64toh( iVal );
-}
-
-template<>
-gint32 CParamList::Push< BufPtr& > ( BufPtr& val  )
-{
-    gint32 ret = 0;
-    do{
-        gint32 iPos = GetCount();
-        if( ERROR( iPos ) )
-        {
-            ret = iPos;
-            break;
-        }
-
-        try{
-            ret = GetCfg()->SetProperty( iPos, val );
-
-            if( SUCCEEDED( ret ) )
-                SetCount( iPos + 1 );
-        }
-        catch( std::invalid_argument& e )
-        {
-            ret = -EINVAL;
-        }
-
-    }while( 0 );
-
-    return ret;
-}
-
-template<>
-gint32 CParamList::Push< const BufPtr& > ( const BufPtr& val  )
-{
-    gint32 ret = 0;
-    do{
-        gint32 iPos = GetCount();
-        if( ERROR( iPos ) )
-        {
-            ret = iPos;
-            break;
-        }
-
-        BufPtr pBuf;
-        try{
-            pBuf = const_cast< BufPtr& >( val );
-            ret = GetCfg()->SetProperty(
-                iPos, pBuf );
-
-            if( SUCCEEDED( ret ) )
-                SetCount( iPos + 1 );
-        }
-        catch( std::invalid_argument& e )
-        {
-            ret = -EINVAL;
-        }
-
-    }while( 0 );
-
-    return ret;
-}
-
-template<>
-gint32 CParamList::Pop< BufPtr > ( BufPtr& val  )
-{
-    gint32 ret = 0;
-    do{
-        gint32 iPos = GetCount();
-        if( ERROR( iPos ) )
-        {
-            ret = iPos;
-            break;
-        }
-
-        if( iPos <= 0 )
-        {
-            ret = -ENOENT;
-            break;
-        }
-
-        ret = GetCfg()->GetProperty(
-            iPos - 1, val );
-        if( SUCCEEDED( ret ) )
-        {
-            SetCount( iPos - 1 );
-            RemoveProperty( iPos - 1 );
-        }
-
-    }while( 0 );
-
-    return ret;
+    return GetPropIds( vecProps );
 }
 
 }

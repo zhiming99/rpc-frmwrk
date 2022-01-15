@@ -28,6 +28,7 @@
 #include "buffer.h"
 #include <stdexcept>
 #include <unordered_map>
+#include "variant.h"
 
 // NOTE:
 // changed back to std::map. Because usually the
@@ -36,6 +37,20 @@
 // keeping the order is important for generating
 // the same hash across different platform.
 #define hashmap unordered_map
+
+#define RESIZE_BUF( _Size, _Ret ) \
+do{ \
+    guint32 dwLocOff = pLoc - oBuf.ptr(); \
+    oBuf.Resize( ( _Size ) ); \
+    if( oBuf.ptr() == nullptr ) \
+    { \
+        _Ret = -ENOMEM; \
+        break; \
+    } \
+    pLoc = ( dwLocOff + oBuf.ptr() ); \
+    pEnd = ( oBuf.size() + oBuf.ptr() ); \
+ \
+}while( 0 ) 
 
 namespace rpcf
 {
@@ -47,15 +62,9 @@ class IConfigDb : public CObjBase
 
     public:
     typedef CObjBase    super;
-    virtual void BuildConfig( const std::string& strJson ) = 0;
-    virtual void BuildConfig(
-        const std::hashmap<gint32, std::string>& strPropValues ) = 0;
 
     virtual gint32 RemoveProperty( gint32 iProp ) = 0;
     virtual void RemoveAll() = 0;
-
-    virtual const CBuffer& operator[]( gint32 iProp ) const = 0;
-    virtual CBuffer& operator[]( gint32 iProp ) = 0;
 
     virtual gint32 size() const = 0;
     virtual bool exist( gint32 iProp ) const = 0;
@@ -64,19 +73,141 @@ class IConfigDb : public CObjBase
     virtual gint32 SetProperty( gint32 iProp, const BufPtr& pBuf ) = 0;
     virtual gint32 GetProperty( gint32 iProp, BufPtr& pBuf ) const = 0;
 
+    virtual gint32 SetProperty( gint32 iProp, const Variant& oVar ) = 0;
+    virtual gint32 GetProperty( gint32 iProp, Variant& oVar ) const = 0;
+
     // defined in CObjBase
     virtual gint32 GetProperty( gint32 iProp, CBuffer& oBuf ) const = 0;
     virtual gint32 SetProperty( gint32 iProp, const CBuffer& oProp ) = 0;
     virtual gint32 GetPropertyType( gint32 iProp, gint32& iType ) const = 0;
 
-    // virtual gint32 EnumProperties( std::vector< gint32 >& vecProps ) const = 0;
-
     // more helpers
     virtual gint32 Clone( const IConfigDb& oCfg ) = 0;
+
 };
 
-typedef CAutoPtr< clsid( CConfigDb ), IConfigDb > CfgPtr;
+// typedef CAutoPtr< clsid( CConfigDb2 ), IConfigDb > CfgPtr;
+class CConfigDb2 : public IConfigDb
+{
+    protected:
+    std::hashmap<gint32, Variant> m_mapProps;
 
+    public:
+    typedef IConfigDb   super;
+
+    struct SERI_HEADER : public SERI_HEADER_BASE
+    {
+        typedef SERI_HEADER_BASE super;
+        guint32 dwCount;
+
+        SERI_HEADER() : SERI_HEADER_BASE()
+        {
+            dwClsid = clsid( CConfigDb2 );
+            dwCount = 0;
+        }
+
+        SERI_HEADER( const SERI_HEADER& rhs )
+            :SERI_HEADER_BASE( rhs )
+        {
+            dwCount = rhs.dwCount;
+        }
+
+        SERI_HEADER& operator=( const SERI_HEADER& rhs )
+        {
+            super::operator=( rhs );
+            dwCount = rhs.dwCount;
+            return *this;
+        }
+
+        void ntoh()
+        {
+            super::ntoh();
+            dwCount = ntohl( dwCount );
+        }
+
+        void hton()
+        {
+            super::hton();
+            dwCount = htonl( dwCount );
+        }
+    };
+
+    CConfigDb2( const IConfigDb* pCfg = nullptr );
+    ~CConfigDb2();
+
+    // get a reference to pBuf content from the config db
+    gint32 GetProperty( gint32 iProp, BufPtr& pBuf ) const;
+    // add a reference to pBuf content to the config db
+    gint32 SetProperty( gint32 iProp, const BufPtr& pBuf );
+
+    // make a copy of oBuf content from the config db 
+    gint32 GetProperty( gint32, CBuffer& oBuf ) const;
+    // add a copy of oBuf content to the config db 
+    gint32 SetProperty( gint32, const CBuffer& oBuf );
+
+    gint32 GetPropertyType( gint32 iProp, gint32& iType ) const;
+    gint32 RemoveProperty( gint32 iProp );
+    void RemoveAll();
+
+    // get a reference to variant from the config db
+    gint32 GetProperty(
+        gint32 iProp, Variant& oVar ) const override;
+    // add a reference to variant to the config db
+    gint32 SetProperty(
+        gint32 iProp, const Variant& oVar ) override;
+
+    // get a reference to variant from the config db
+    const Variant& GetProperty( gint32 iProp ) const
+    {
+        auto itr = m_mapProps.find( iProp );
+        if( itr == m_mapProps.cend() )
+        {
+            stdstr strMsg = DebugMsg(
+                -ENOENT, "no such element" );
+            throw std::out_of_range( strMsg );
+        }
+        return itr->second;
+    }
+
+    Variant& GetProperty( gint32 iProp )
+    { return m_mapProps[ iProp ]; }
+
+    const Variant* GetPropertyPtr( gint32 iProp ) const
+    {
+        auto itr = m_mapProps.find( iProp );
+        if( itr == m_mapProps.cend() )
+            return nullptr;
+        return &itr->second;
+    }
+
+    Variant* GetPropertyPtr( gint32 iProp )
+    {
+        auto itr = m_mapProps.find( iProp );
+        if( itr == m_mapProps.end() )
+            return nullptr;
+        return &itr->second;
+    }
+
+    gint32 GetPropIds( std::vector<gint32>& vecIds ) const;
+
+    virtual gint32 Deserialize( const CBuffer& oBuf );
+    gint32 Serialize( CBuffer& oBuf ) const override;
+    gint32 Deserialize( const char* oBuf, guint32 dwSize ) override;
+
+    gint32 size() const
+    { return m_mapProps.size(); }
+
+    bool exist( gint32 iProp ) const
+    { 
+        return m_mapProps.cend() != m_mapProps.find( iProp ) ;
+    }
+
+    const IConfigDb& operator=( const IConfigDb& oCfg );
+    gint32 Clone( const IConfigDb& oCfg );
+
+    virtual gint32 EnumProperties(
+        std::vector< gint32 >& vecProps ) const; 
+};
 
 template< class T1, typename T=
     typename std::enable_if< std::is_base_of< CObjBase, T1 >::value, T1 >::type >
@@ -112,23 +243,58 @@ class CCfgDbOpener
         m_pCfg = pObj;
     }
 
-    gint32 GetProperty(
+    inline gint32 GetProperty(
         gint32 iProp, CBuffer& oBuf ) const
+    {
+        BufPtr pBuf;
+        gint32 ret = GetProperty( iProp, pBuf ); 
+        if( ERROR( ret ) )
+            return ret;
+        oBuf = *pBuf;
+        return 0;
+    }
+
+    inline gint32 SetProperty(
+        gint32 iProp, const CBuffer& oBuf )
+    {
+        Variant oVar( oBuf );
+        return m_pCfg->SetProperty( iProp, oVar );
+    }
+
+    inline gint32 GetProperty(
+        gint32 iProp, BufPtr& pBuf ) const
+    {
+        Variant oVar;
+        gint32 ret = GetProperty( iProp, oVar );
+        if( ERROR( ret ) )
+            return ret;
+        pBuf = oVar.ToBuf();
+        return 0;
+    }
+
+    inline gint32 SetProperty(
+        gint32 iProp, const BufPtr& pBuf )
+    {
+        Variant oVar( *pBuf );
+        return m_pCfg->SetProperty( iProp, oVar );
+    }
+
+    inline gint32 GetProperty(
+        gint32 iProp, Variant& oBuf ) const
     {
         if( m_pConstCfg == nullptr )
             return -EFAULT;
         return m_pConstCfg->GetProperty( iProp, oBuf );
     }
 
-    gint32 SetProperty(
-        gint32 iProp, const CBuffer& oBuf )
+    inline gint32 SetProperty(
+        gint32 iProp, const Variant& oBuf )
     {
         if( m_pCfg == nullptr )
             return -EFAULT;
 
         return m_pCfg->SetProperty( iProp, oBuf );
     }
-
     
     template< class U, typename U1=
         class std::enable_if< std::is_base_of< CObjBase, U >::value, U >::type  >
@@ -187,16 +353,15 @@ class CCfgDbOpener
             return -EFAULT;
 
         do{
-            BufPtr bufPtr( true ); 
-
+            Variant oVar;
             ret = m_pConstCfg->GetProperty(
-                iProp, *bufPtr );
+                iProp, oVar );
 
             if( ERROR( ret ) )
                 break;
 
             try{
-                pObj = ( ObjPtr& )*bufPtr;
+                pObj = ( ObjPtr& )oVar;
             }
             catch( std::invalid_argument& e )
             {
@@ -219,11 +384,11 @@ class CCfgDbOpener
                 break;
             }
 
-            BufPtr bufPtr( true ); 
-            if( !pObj.IsEmpty() )
-                *bufPtr = pObj;
+            Variant oVar( pObj );
+            if( pObj.IsEmpty() )
+                oVar.Clear();
 
-            ret = m_pCfg->SetProperty( iProp, *bufPtr );
+            ret = m_pCfg->SetProperty( iProp, oVar );
             if( ERROR( ret ) )
                 break;
         
@@ -240,17 +405,11 @@ class CCfgDbOpener
             return -EFAULT;
 
         do{
-            BufPtr bufPtr( true );
-            ret = m_pConstCfg->GetProperty( iProp, *bufPtr );
+            Variant oVar;
+            ret = m_pConstCfg->GetProperty( iProp, oVar );
             if( ERROR( ret ) )
                 break;
-
-            //FIXME: CBuffer does not have
-            //a proper type cast to convert this, so
-            //we use the rogue approach for temporary
-            //workaround
-            strVal = ( *bufPtr );
-
+            strVal = ( stdstr& )oVar;
         }while( 0 );
 
         return ret;
@@ -266,9 +425,8 @@ class CCfgDbOpener
                 ret = -EFAULT;
                 break;
             }
-            BufPtr bufPtr( true );
-            *bufPtr = strVal;
-            ret = m_pCfg->SetProperty( iProp, *bufPtr );
+            Variant oVar( strVal );
+            ret = m_pCfg->SetProperty( iProp, oVar );
 
         }while( 0 );
 
@@ -283,11 +441,11 @@ class CCfgDbOpener
             return -EFAULT;
 
         do{
-            BufPtr bufPtr( true );
-            ret = m_pConstCfg->GetProperty( iProp, *bufPtr );
+            Variant oVar;
+            ret = m_pConstCfg->GetProperty( iProp, oVar );
             if( ERROR( ret ) )
                 break;
-            pStr = bufPtr->ptr();
+            pStr = ( const char* )oVar;
         }while( 0 );
 
         return ret;
@@ -301,16 +459,15 @@ class CCfgDbOpener
             return -EFAULT;
 
         do{
-            BufPtr bufPtr( true ); 
-
+            Variant oVar;
             ret = m_pConstCfg->GetProperty(
-                iProp, *bufPtr );
+                iProp, oVar );
 
             if( ERROR( ret ) )
                 break;
 
             try{
-                pMsg = ( DMsgPtr& )*bufPtr;
+                pMsg = ( DMsgPtr& )oVar;
             }
             catch( std::invalid_argument& e )
             {
@@ -333,10 +490,8 @@ class CCfgDbOpener
                 break;
             }
 
-            BufPtr bufPtr( true ); 
-            *bufPtr = pMsg;
-
-            ret = m_pCfg->SetProperty( iProp, *bufPtr );
+            Variant oVar( pMsg );
+            ret = m_pCfg->SetProperty( iProp, oVar );
             if( ERROR( ret ) )
                 break;
         
@@ -353,13 +508,12 @@ class CCfgDbOpener
 
         CCfgDbOpener< CObjBase > a( pSrcCfg );
 
-        BufPtr pBuf( true );
-        gint32 ret = a.GetProperty( iSrcProp, *pBuf );
-
+        Variant oVar;
+        gint32 ret = a.GetProperty( iSrcProp, oVar );
         if( ERROR( ret ) )
             return ret;
 
-        return SetProperty( iProp, *pBuf );
+        return SetProperty( iProp, oVar );
     }
 
     gint32 CopyProp( gint32 iProp, const CObjBase* pSrcCfg )
@@ -381,18 +535,17 @@ class CCfgDbOpener
 
     gint32 SwapProp( gint32 iProp1, gint32 iProp2 )
     {
-        BufPtr pBuf1( true );
-        gint32 ret = GetProperty( iProp1, *pBuf1 );
+        Variant oVar1, oVar2;
+        gint32 ret = GetProperty( iProp1, oVar1 );
         if( ERROR( ret ) )
             return ret;
 
-        BufPtr pBuf2( true );
-        ret = GetProperty( iProp2, *pBuf2 );
+        ret = GetProperty( iProp2, oVar2 );
         if( ERROR( ret ) )
             return ret;
 
-        SetProperty( iProp1, *pBuf2 );
-        SetProperty( iProp2, *pBuf1 );
+        SetProperty( iProp1, oVar2 );
+        SetProperty( iProp2, oVar1 );
         return ret;
     }
 
@@ -401,17 +554,16 @@ class CCfgDbOpener
     {
         gint32 ret = 0;
 
-        if( m_pConstCfg == nullptr )
+        if( unlikely( m_pConstCfg == nullptr ) )
             return -EFAULT;
 
         do{
-            BufPtr bufPtr( true );
-
-            ret = m_pConstCfg->GetProperty( iProp, *bufPtr );
+            Variant oVar;
+            ret = m_pConstCfg->GetProperty( iProp, oVar );
             if( ERROR( ret ) )
                 break;
 
-            val = ( PrimType& )( *bufPtr );
+            val = ( PrimType& )oVar;
 
         }while( 0 );
 
@@ -423,16 +575,16 @@ class CCfgDbOpener
     {
         gint32 ret = 0;
         do{
-            if( m_pCfg == nullptr )
+            if( unlikely( m_pCfg == nullptr ) )
             {
                 ret = -EFAULT;
                 break;
             }
 
-            BufPtr bufPtr( true );
-            *bufPtr = val;
+            Variant oVar;
+            oVar = val;
 
-            ret = m_pCfg->SetProperty( iProp, *bufPtr );
+            ret = m_pCfg->SetProperty( iProp, oVar );
             if( ERROR( ret ) )
                 break;
 
@@ -444,22 +596,22 @@ class CCfgDbOpener
     gint32 GetIntPtr( gint32 iProp, guint32*& val ) const
     {
         intptr_t val1;
-        BufPtr pBuf( true );
-        gint32 ret = GetProperty( iProp, *pBuf );
+        Variant oVar;
+        gint32 ret = GetProperty( iProp, oVar );
 
         if( ERROR( ret ) )
             return ret;
 
-        val1 = *pBuf;
+        val1 = oVar;
         val = ( guint32* )val1;
         return 0;
     }
 
     gint32 SetIntPtr( gint32 iProp, guint32* val )
     {
-        BufPtr pBuf( true );
-        *pBuf = ( intptr_t )val;
-        return SetProperty( iProp, *pBuf );
+        Variant oVar;
+        oVar = ( intptr_t )val;
+        return SetProperty( iProp, oVar );
     }
 
     gint32 GetShortProp( gint32 iProp, guint16& val ) const
@@ -540,17 +692,15 @@ class CCfgDbOpener
                 break;
             }
 
-            BufPtr pBuf( true );
-            ret = m_pConstCfg->GetProperty( iProp, *pBuf );
+            Variant oVar1, oVar2;
+            ret = m_pConstCfg->GetProperty( iProp, oVar1 );
             if( ERROR( ret ) )
                 break;
 
-            BufPtr pBuf2( true );
-            *pBuf2 = val;
+            oVar2 = val;
 
-            if( *pBuf == *pBuf2 )
+            if( oVar2 == oVar1 )
                 break;
-
             ret = ERROR_FALSE;
         }while( 0 );
 
@@ -573,17 +723,16 @@ class CCfgDbOpener
                 break;
             }
 
-            BufPtr pBuf( true );
-            ret = pObj->GetProperty( iProp, *pBuf );
+            Variant oVar1, oVar2;
+            ret = pObj->GetProperty( iProp, oVar1 );
             if( ERROR( ret ) )
                 break;
 
-            BufPtr pBuf2( true );
-            ret = this->GetProperty( iProp, *pBuf2 );
+            ret = this->GetProperty( iProp, oVar2 );
             if( ERROR( ret ) )
                 break;
 
-            if( *pBuf == *pBuf2 )
+            if( oVar1 == oVar2 )
                 break;
 
             ret = ERROR_FALSE;
@@ -594,6 +743,11 @@ class CCfgDbOpener
 };
 
 // template<> class CCfgDbOpener< CObjBase >;
+#define CFGDB2( _pCfg ) \
+    static_cast< CConfigDb2* >( _pCfg ) 
+
+#define CCFGDB2( _pCfg ) \
+    static_cast< const CConfigDb2* const >( _pCfg )
 
 template<> 
 class CCfgDbOpener< IConfigDb >
@@ -602,6 +756,75 @@ class CCfgDbOpener< IConfigDb >
 
     IConfigDb*          m_pCfg;
     const IConfigDb*    m_pConstCfg;
+
+    template< typename PrimType, typename T2=
+        typename std::enable_if< !std::is_same< PrimType, stdstr >::value, PrimType >::type >
+    gint32 GetPrimProp( gint32 iProp, PrimType& val ) const 
+    {
+        gint32 ret = 0;
+
+        if( m_pConstCfg == nullptr )
+            return -EFAULT;
+
+        auto pdb2 = CCFGDB2( m_pConstCfg );
+        do{
+            const Variant* p =
+                pdb2->GetPropertyPtr( iProp );
+            if( p == nullptr )
+            {
+                ret = -ENOENT;
+                break;
+            }
+
+            val = *p;
+
+        }while( 0 );
+
+        return ret;
+    }
+
+    template< typename PrimType, typename T2=
+        typename std::enable_if< std::is_same<
+            PrimType, stdstr >::value, PrimType >::type,
+        typename T3=T2 >
+    gint32 GetPrimProp(
+        gint32 iProp, PrimType& val ) const
+    {
+        gint32 ret = 0;
+        if( m_pConstCfg == nullptr )
+            return -EFAULT;
+
+        auto pdb2 = CCFGDB2( m_pConstCfg );
+        do{
+            const Variant* p =
+                pdb2->GetPropertyPtr( iProp );
+            if( p == nullptr )
+            {
+                ret = -ENOENT;
+                break;
+            }
+            val = *p;
+
+        }while( 0 );
+
+        return ret;
+    }
+
+    template< typename PrimType >
+    gint32 SetPrimProp( gint32 iProp, PrimType val )
+    {
+        gint32 ret = 0;
+
+        auto pdb2 = CFGDB2( m_pCfg );
+        do{
+            Variant& o =
+                pdb2->GetProperty( iProp );
+            o = val;
+
+        }while( 0 );
+
+        return ret;
+    }
 
     public:
     CCfgDbOpener( const IConfigDb* pObj )
@@ -623,7 +846,7 @@ class CCfgDbOpener< IConfigDb >
         m_pCfg = pObj;
     }
 
-    gint32 GetProperty(
+    inline gint32 GetProperty(
         gint32 iProp, BufPtr& pBuf ) const
     {
         if( m_pConstCfg == nullptr )
@@ -631,7 +854,7 @@ class CCfgDbOpener< IConfigDb >
         return m_pConstCfg->GetProperty( iProp, pBuf );
     }
 
-    gint32 SetProperty(
+    inline gint32 SetProperty(
         gint32 iProp, const BufPtr& pBuf )
     {
         if( m_pCfg == nullptr )
@@ -640,7 +863,7 @@ class CCfgDbOpener< IConfigDb >
         return m_pCfg->SetProperty( iProp, pBuf );
     }
 
-    gint32 GetProperty(
+    inline gint32 GetProperty(
         gint32 iProp, CBuffer& oBuf ) const
     {
         if( m_pConstCfg == nullptr )
@@ -648,7 +871,7 @@ class CCfgDbOpener< IConfigDb >
         return m_pConstCfg->GetProperty( iProp, oBuf );
     }
 
-    gint32 SetProperty(
+    inline gint32 SetProperty(
         gint32 iProp, const CBuffer& oBuf )
     {
         if( m_pCfg == nullptr )
@@ -657,37 +880,472 @@ class CCfgDbOpener< IConfigDb >
         return m_pCfg->SetProperty( iProp, oBuf );
     }
 
-    const CBuffer& operator[]( gint32 iProp ) const
+    inline gint32 GetProperty(
+        gint32 iProp, Variant& oVar ) const
     {
-        BufPtr pBuf;
-        gint32 ret = m_pConstCfg->GetProperty(
-            iProp, pBuf );
-
-        if( ERROR( ret ) )
-        {
-            throw std::runtime_error(
-                DebugMsg( ret, "Property not found" ) );
-        }
-        return *pBuf;
+        auto pdb2 = CCFGDB2( m_pConstCfg );
+        return pdb2->GetProperty( iProp, oVar );
     }
 
-    CBuffer& operator[]( gint32 iProp )
+    inline gint32 SetProperty(
+        gint32 iProp, const Variant& oVar )
     {
-        BufPtr pBuf;
-        gint32 ret = m_pCfg->GetProperty(
-            iProp, pBuf );
+        auto pdb2 = CFGDB2( m_pCfg );
+        return pdb2->SetProperty( iProp, oVar );
+    }
 
-        if( ERROR( ret ) )
-        {
-            ret = pBuf.NewObj();
-            if( ERROR( ret ) )
+    inline const Variant* GetPropPtr( gint32 iProp ) const
+    {
+        auto pdb2 = CCFGDB2( m_pConstCfg );
+        return pdb2->GetPropertyPtr( iProp );
+    }
+
+    inline Variant* GetPropPtr( gint32 iProp )
+    {
+        auto pdb2 = CFGDB2( m_pCfg );
+        return pdb2->GetPropertyPtr( iProp );
+    }
+
+    inline const Variant& operator[]( gint32 iProp ) const
+    {
+        auto pdb2 = CCFGDB2( m_pConstCfg );
+        return pdb2->GetProperty( iProp );
+    }
+
+    inline Variant& operator[]( gint32 iProp )
+    {
+        auto pdb2 = CFGDB2( m_pCfg );
+        return pdb2->GetProperty( iProp );
+    }
+
+    gint32 GetObjPtr( gint32 iProp, ObjPtr& pObj ) const
+    {
+        gint32 ret = 0;
+
+        if( m_pConstCfg == nullptr )
+            return -EFAULT;
+
+        auto pdb2 = CCFGDB2( m_pConstCfg );
+        do{
+            const Variant* p;
+            p = pdb2->GetPropertyPtr( iProp );
+            if( p == nullptr )
             {
-                throw std::runtime_error(
-                    DebugMsg( ret, "No Memory" ) );
+                ret = -ENOENT;
+                break;
             }
-            m_pCfg->SetProperty( iProp, pBuf );
+            if( p->GetTypeId() != typeObj )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            pObj = ( const ObjPtr& )*p;
+        
+        }while( 0 );
+
+        return ret;
+    }
+
+    gint32 SetObjPtr( gint32 iProp, const ObjPtr& pObj )
+    {
+        gint32 ret = 0;
+
+        do{
+            if( m_pCfg == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            auto pdb2 = CFGDB2( m_pCfg );
+            Variant& o = pdb2->GetProperty( iProp );
+            o = pObj;
+
+        }while( 0 );
+
+        return ret;
+    }
+
+    gint32 GetBufPtr( gint32 iProp, BufPtr& pBuf ) const
+    {
+        gint32 ret = 0;
+
+        if( m_pConstCfg == nullptr )
+            return -EFAULT;
+
+        auto pdb2 = CCFGDB2( m_pConstCfg );
+        do{
+            const Variant* p;
+            p = pdb2->GetPropertyPtr( iProp );
+            if( p == nullptr )
+            {
+                ret = -ENOENT;
+                break;
+            }
+
+            if( p->GetTypeId() != typeByteArr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            pBuf = ( const BufPtr& )*p;
+        
+        }while( 0 );
+
+        return ret;
+    }
+
+    inline gint32 SetBufPtr( gint32 iProp, const BufPtr& pBuf )
+    {
+        gint32 ret = 0;
+
+        do{
+            if( m_pCfg == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            auto pdb2 = CFGDB2( m_pCfg );
+            Variant& o = pdb2->GetProperty( iProp );
+            o = pBuf;
+
+        }while( 0 );
+
+        return ret;
+    }
+
+    gint32 GetStrProp( gint32 iProp, std::string& strVal ) const
+    {
+        gint32 ret = 0;
+
+        if( m_pConstCfg == nullptr )
+            return -EFAULT;
+
+        do{
+            auto pdb2 = CCFGDB2( m_pConstCfg );
+            const Variant* p =
+                pdb2->GetPropertyPtr( iProp );
+            if( p == nullptr )
+            {
+                ret = -ENOENT;
+                break;
+            }
+            if( p->GetTypeId() != typeString )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            strVal = ( const stdstr& )*p;
+
+        }while( 0 );
+
+        return ret;
+    }
+
+    gint32 SetStrProp( gint32 iProp, const std::string& strVal )
+    {
+
+        gint32 ret = 0;
+        do{
+            if( m_pCfg == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            auto pdb2 = CFGDB2( m_pCfg );
+            Variant& o = pdb2->GetProperty( iProp );
+            o = strVal;
+
+        }while( 0 );
+
+        return ret;
+    }
+
+    gint32 GetStringProp( gint32 iProp, const char*& pStr ) const
+    {
+        gint32 ret = 0;
+
+        if( m_pConstCfg == nullptr )
+            return -EFAULT;
+
+        do{
+            auto pdb2 = CCFGDB2( m_pConstCfg );
+            const Variant* p =
+                pdb2->GetPropertyPtr( iProp );
+            if( p == nullptr )
+            {
+                ret = -ENOENT;
+                break;
+            }
+            if( p->GetTypeId() != typeString )
+                break;
+            pStr = p->m_strVal.c_str();
+
+        }while( 0 );
+
+        return ret;
+    }
+
+    gint32 GetMsgPtr( gint32 iProp, DMsgPtr& pMsg ) const
+    {
+        gint32 ret = 0;
+
+        if( m_pConstCfg == nullptr )
+            return -EFAULT;
+
+        do{
+            auto pdb2 = CCFGDB2( m_pConstCfg );
+            const Variant* p =
+                pdb2->GetPropertyPtr( iProp );
+
+            if( p == nullptr )
+            {
+                ret = -ENOENT;
+                break;
+            }
+
+            try{
+                if( p->GetTypeId() != typeDMsg )
+                {
+                    ret = -EFAULT;
+                    break;
+                }
+                pMsg = ( const DMsgPtr& )*p;
+            }
+            catch( std::invalid_argument& e )
+            {
+                ret = -EINVAL;
+            }
+        
+        }while( 0 );
+
+        return ret;
+    }
+
+    gint32 SetMsgPtr( gint32 iProp, const DMsgPtr& pMsg )
+    {
+        gint32 ret = 0;
+
+        do{
+            if( m_pCfg == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            auto pdb2 = CFGDB2( m_pCfg );
+            Variant& o = pdb2->GetProperty( iProp );
+            o = pMsg;
+
+        }while( 0 );
+
+        return ret;
+    }
+
+    gint32 CopyProp( gint32 iProp, gint32 iSrcProp )
+    {
+        gint32 ret = 0;
+        do{
+            auto pCfg = CFGDB2( m_pCfg );
+            const Variant* p =
+                pCfg->GetPropertyPtr( iSrcProp );
+            if( p == nullptr )
+            {
+                ret = -ENOENT;
+                break;
+            }
+            Variant& odst =
+                pCfg->GetProperty( iProp );
+            odst = *p;
+
+        }while( 0 );
+
+        return ret;
+    }
+
+    gint32 CopyProp(
+        gint32 iProp, gint32 iSrcProp, const CObjBase* pSrcCfg )
+    {
+        if( pSrcCfg == nullptr )
+            return -EINVAL;
+
+        gint32 ret = 0;
+        if( pSrcCfg->GetClsid() !=
+            clsid( CConfigDb2 ) )
+        {
+            CCfgDbOpener< CObjBase > a( pSrcCfg );
+
+            BufPtr pBuf( true );
+            ret = a.GetProperty( iSrcProp, *pBuf);
+
+            if( ERROR( ret ) )
+                return ret;
+
+            return SetProperty( iProp, pBuf );
         }
-        return *pBuf;
+        do{
+            auto psrc = CCFGDB2( pSrcCfg );
+            const Variant* p =
+                psrc->GetPropertyPtr( iSrcProp );
+            if( p == nullptr )
+            {
+                ret = -ENOENT;
+                break;
+            }
+
+            auto pdst = CFGDB2( m_pCfg );
+            Variant& odst = pdst->GetProperty( iProp );
+            odst = *p;
+
+        }while( 0 );
+        return ret;
+    }
+
+    inline gint32 CopyProp(
+        gint32 iProp, const CObjBase* pSrcCfg )
+    {
+        return CopyProp( iProp, iProp, pSrcCfg );
+    }
+
+    gint32 MoveProp( gint32 iProp, CObjBase* pSrcCfg )
+    {
+        gint32 ret = CopyProp( iProp, pSrcCfg );
+        if( ERROR( ret ) )
+            return ret;
+
+        ret = pSrcCfg->RemoveProperty( iProp );
+        return ret;
+    }
+
+    gint32 SwapProp( gint32 iProp1, gint32 iProp2 )
+    {
+        auto pdb2 = CFGDB2( m_pCfg );
+        Variant* p1 =
+            pdb2->GetPropertyPtr( iProp1 );
+        if( p1 == nullptr )
+            return -ENOENT;;
+
+        Variant* p2 =
+            pdb2->GetPropertyPtr( iProp2 );
+        if( p2 == nullptr )
+            return -ENOENT;
+
+        Variant o( *p1 );
+        pdb2->SetProperty( iProp1, *p2 );
+        pdb2->SetProperty( iProp2, o );
+        return STATUS_SUCCESS;
+    }
+
+
+    inline gint32 GetIntPtr( gint32 iProp, guint32*& val ) const
+    {
+        intptr_t val1;
+        auto pdb2 = CCFGDB2( m_pConstCfg );
+        const Variant* p =
+            pdb2->GetPropertyPtr( iProp );
+
+        if( p == nullptr )
+            return -ENOENT;
+
+        val1 = *p;
+        val = ( guint32* )val1;
+        return 0;
+    }
+
+    inline gint32 SetIntPtr( gint32 iProp, guint32* val )
+    {
+        auto pdb2 = CFGDB2( m_pCfg );
+        Variant& o = pdb2->GetProperty( iProp );
+        o = ( intptr_t )val;
+        return STATUS_SUCCESS;
+    }
+    inline gint32 GetShortProp( gint32 iProp, guint16& val ) const
+    {
+        return GetPrimProp( iProp, val );
+    }
+    inline gint32 SetShortProp( gint32 iProp, guint16 val )
+    {
+        return SetPrimProp( iProp, val );
+    }
+    inline gint32 GetIntProp( gint32 iProp, guint32& val ) const
+    {
+        return GetPrimProp( iProp, val );
+    }
+    inline gint32 SetIntProp( gint32 iProp, guint32 val )
+    {
+        return SetPrimProp( iProp, val );
+    }
+    inline gint32 GetBoolProp( gint32 iProp, bool& val ) const
+    {
+        return GetPrimProp( iProp, val );
+    }
+    inline gint32 SetBoolProp( gint32 iProp, bool val )
+    {
+        return SetPrimProp( iProp, val );
+    }
+    inline gint32 GetByteProp( gint32 iProp, guint8& val ) const
+    {
+        return GetPrimProp( iProp, val );
+    }
+    inline gint32 SetByteProp( gint32 iProp, guint8 val )
+    {
+        return SetPrimProp( iProp, val );
+    }
+    inline gint32 GetFloatProp( gint32 iProp, float& val ) const
+    {
+        return GetPrimProp( iProp, val );
+    }
+    inline gint32 SetFloatProp( gint32 iProp, float val )
+    {
+        return SetPrimProp( iProp, val );
+    }
+    inline gint32 GetQwordProp( gint32 iProp, guint64& val ) const
+    {
+        return GetPrimProp( iProp, val );
+    }
+    inline gint32 SetQwordProp( gint32 iProp, guint64 val )
+    {
+        return SetPrimProp( iProp, val );
+    }
+    inline gint32 GetDoubleProp( gint32 iProp, double& val ) const
+    {
+        return GetPrimProp( iProp, val );
+    }
+    inline gint32 SetDoubleProp( gint32 iProp, double val )
+    {
+        return SetPrimProp( iProp, val );
+    }
+
+    gint32 IsEqualProp( gint32 iProp, const CObjBase* pObj )
+    {
+        gint32 ret = 0;
+
+        do{
+            if( pObj == nullptr )
+            {
+                ret = -EINVAL;
+                break;
+            }
+            if( m_pConstCfg == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+
+            Variant  oVar1, oVar2;
+            ret = pObj->GetProperty( iProp, oVar1 );
+            if( ERROR( ret ) )
+                break;
+
+            ret = this->GetProperty( iProp, oVar2 );
+            if( ERROR( ret ) )
+                break;
+
+            if( oVar1 == oVar2 )
+                break;
+
+            ret = ERROR_FALSE;
+
+        }while( 0 );
+        return ret;
     }
 
     template< class U, typename U1=
@@ -739,372 +1397,7 @@ class CCfgDbOpener< IConfigDb >
         return ret;
     }
 
-    gint32 GetObjPtr( gint32 iProp, ObjPtr& pObj ) const
-    {
-        gint32 ret = 0;
-
-        if( m_pConstCfg == nullptr )
-            return -EFAULT;
-
-        do{
-            BufPtr bufPtr; 
-
-            ret = m_pConstCfg->GetProperty(
-                iProp, bufPtr );
-
-            if( ERROR( ret ) )
-                break;
-
-            try{
-                pObj = ( ObjPtr& )*bufPtr;
-            }
-            catch( std::invalid_argument& e )
-            {
-                ret = -EINVAL;
-            }
-        
-        }while( 0 );
-
-        return ret;
-    }
-
-    gint32 SetObjPtr( gint32 iProp, const ObjPtr& pObj )
-    {
-        gint32 ret = 0;
-
-        do{
-            if( m_pCfg == nullptr )
-            {
-                ret = -EFAULT;
-                break;
-            }
-
-            BufPtr bufPtr( true ); 
-            if( !pObj.IsEmpty() )
-                *bufPtr = pObj;
-
-            ret = m_pCfg->SetProperty( iProp, bufPtr );
-            if( ERROR( ret ) )
-                break;
-        
-        }while( 0 );
-
-        return ret;
-    }
-
-    gint32 GetStrProp( gint32 iProp, std::string& strVal ) const
-    {
-        gint32 ret = 0;
-
-        if( m_pConstCfg == nullptr )
-            return -EFAULT;
-
-        do{
-            BufPtr bufPtr;
-            ret = m_pConstCfg->GetProperty( iProp, bufPtr );
-            if( ERROR( ret ) )
-                break;
-
-            strVal = *bufPtr;
-
-        }while( 0 );
-
-        return ret;
-    }
-
-    gint32 SetStrProp( gint32 iProp, const std::string& strVal )
-    {
-
-        gint32 ret = 0;
-        do{
-            if( m_pCfg == nullptr )
-            {
-                ret = -EFAULT;
-                break;
-            }
-            BufPtr bufPtr( true );
-            *bufPtr = strVal;
-            ret = m_pCfg->SetProperty( iProp, bufPtr );
-
-        }while( 0 );
-
-        return ret;
-    }
-
-    gint32 GetStringProp( gint32 iProp, const char*& pStr ) const
-    {
-        gint32 ret = 0;
-
-        if( m_pConstCfg == nullptr )
-            return -EFAULT;
-
-        do{
-            BufPtr bufPtr;
-            ret = m_pConstCfg->GetProperty( iProp, bufPtr );
-            if( ERROR( ret ) )
-                break;
-            pStr = bufPtr->ptr();
-        }while( 0 );
-
-        return ret;
-    }
-
-    gint32 GetMsgPtr( gint32 iProp, DMsgPtr& pMsg ) const
-    {
-        gint32 ret = 0;
-
-        if( m_pConstCfg == nullptr )
-            return -EFAULT;
-
-        do{
-            BufPtr bufPtr; 
-
-            ret = m_pConstCfg->GetProperty(
-                iProp, bufPtr );
-
-            if( ERROR( ret ) )
-                break;
-
-            try{
-                pMsg = ( DMsgPtr& )*bufPtr;
-            }
-            catch( std::invalid_argument& e )
-            {
-                ret = -EINVAL;
-            }
-        
-        }while( 0 );
-
-        return ret;
-    }
-
-    gint32 SetMsgPtr( gint32 iProp, const DMsgPtr& pMsg )
-    {
-        gint32 ret = 0;
-
-        do{
-            if( m_pCfg == nullptr )
-            {
-                ret = -EFAULT;
-                break;
-            }
-
-            BufPtr bufPtr( true ); 
-            *bufPtr = pMsg;
-
-            ret = m_pCfg->SetProperty( iProp, bufPtr );
-            if( ERROR( ret ) )
-                break;
-        
-        }while( 0 );
-
-        return ret;
-    }
-
-    gint32 CopyProp( gint32 iProp, gint32 iSrcProp, const CObjBase* pSrcCfg )
-    {
-        CCfgDbOpener< CObjBase > a( pSrcCfg );
-
-        BufPtr pBuf( true );
-        gint32 ret = a.GetProperty( iSrcProp, *pBuf );
-
-        if( ERROR( ret ) )
-            return ret;
-
-        return SetProperty( iProp, pBuf );
-    }
-
-    gint32 CopyProp( gint32 iProp, const CObjBase* pSrcCfg )
-    {
-        return CopyProp( iProp, iProp, pSrcCfg );
-    }
-
-    gint32 MoveProp( gint32 iProp, CObjBase* pSrcCfg )
-    {
-        gint32 ret = CopyProp( iProp, pSrcCfg );
-        if( ERROR( ret ) )
-            return ret;
-
-        ret = pSrcCfg->RemoveProperty( iProp );
-        return ret;
-    }
-
-    gint32 SwapProp( gint32 iProp1, gint32 iProp2 )
-    {
-        BufPtr pBuf1;
-        gint32 ret = GetProperty( iProp1, pBuf1 );
-        if( ERROR( ret ) )
-            return ret;
-
-        BufPtr pBuf2;
-        ret = GetProperty( iProp2, pBuf2 );
-        if( ERROR( ret ) )
-            return ret;
-
-        SetProperty( iProp1, pBuf2 );
-        SetProperty( iProp2, pBuf1 );
-        return ret;
-    }
-
-    template< typename PrimType, typename T2=
-        typename std::enable_if< !std::is_same< PrimType, stdstr >::value, PrimType >::type >
-    gint32 GetPrimProp( gint32 iProp, PrimType& val ) const 
-    {
-        gint32 ret = 0;
-
-        if( m_pConstCfg == nullptr )
-            return -EFAULT;
-
-        do{
-            BufPtr bufPtr;
-
-            ret = m_pConstCfg->GetProperty( iProp, bufPtr );
-            if( ERROR( ret ) )
-                break;
-
-            val = ( PrimType& )( *bufPtr );
-
-        }while( 0 );
-
-        return ret;
-    }
-
-    template< typename PrimType, typename T2=
-        typename std::enable_if< std::is_same< PrimType, stdstr >::value, PrimType >::type,
-        typename T3=T2 >
-    gint32 GetPrimProp(
-        gint32 iProp, PrimType& val ) const
-    {
-        gint32 ret = 0;
-
-        if( m_pConstCfg == nullptr )
-            return -EFAULT;
-
-        do{
-            BufPtr bufPtr;
-
-            ret = m_pConstCfg->GetProperty( iProp, bufPtr );
-            if( ERROR( ret ) )
-                break;
-
-            val = ( const char*  )( *bufPtr );
-
-        }while( 0 );
-
-        return ret;
-    }
-
     template< typename PrimType >
-    gint32 SetPrimProp( gint32 iProp, PrimType val )
-    {
-        gint32 ret = 0;
-        do{
-            if( m_pCfg == nullptr )
-            {
-                ret = -EFAULT;
-                break;
-            }
-
-            BufPtr bufPtr( true );
-            *bufPtr = val;
-
-            ret = m_pCfg->SetProperty( iProp, bufPtr );
-            if( ERROR( ret ) )
-                break;
-
-        }while( 0 );
-
-        return ret;
-    }
-
-    gint32 GetIntPtr( gint32 iProp, guint32*& val ) const
-    {
-        intptr_t val1;
-        BufPtr pBuf;
-        gint32 ret = GetProperty( iProp, pBuf );
-
-        if( ERROR( ret ) )
-            return ret;
-
-        val1 = *pBuf;
-        val = ( guint32* )val1;
-        return 0;
-    }
-
-    gint32 SetIntPtr( gint32 iProp, guint32* val )
-    {
-        BufPtr pBuf( true );
-        *pBuf = ( intptr_t )val;
-        return SetProperty( iProp, pBuf );
-    }
-
-    gint32 GetShortProp( gint32 iProp, guint16& val ) const
-    {
-        return GetPrimProp( iProp, val );
-    }
-
-    gint32 SetShortProp( gint32 iProp, guint16 val )
-    {
-        return SetPrimProp( iProp, val );
-    }
-
-    gint32 GetIntProp( gint32 iProp, guint32& val ) const
-    {
-        return GetPrimProp( iProp, val );
-    }
-
-    gint32 SetIntProp( gint32 iProp, guint32 val )
-    {
-        return SetPrimProp( iProp, val );
-    }
-    gint32 GetBoolProp( gint32 iProp, bool& val ) const
-    {
-        return GetPrimProp( iProp, val );
-    }
-    gint32 SetBoolProp( gint32 iProp, bool val )
-    {
-        return SetPrimProp( iProp, val );
-    }
-
-    gint32 GetByteProp( gint32 iProp, guint8& val ) const
-    {
-        return GetPrimProp( iProp, val );
-    }
-    gint32 SetByteProp( gint32 iProp, guint8 val )
-    {
-        return SetPrimProp( iProp, val );
-    }
-
-    gint32 GetFloatProp( gint32 iProp, float& val ) const
-    {
-        return GetPrimProp( iProp, val );
-    }
-    gint32 SetFloatProp( gint32 iProp, float val )
-    {
-        return SetPrimProp( iProp, val );
-    }
-
-    gint32 GetQwordProp( gint32 iProp, guint64& val ) const
-    {
-        return GetPrimProp( iProp, val );
-    }
-
-    gint32 SetQwordProp( gint32 iProp, guint64 val )
-    {
-        return SetPrimProp( iProp, val );
-    }
-
-    gint32 GetDoubleProp( gint32 iProp, double& val ) const
-    {
-        return GetPrimProp( iProp, val );
-    }
-    gint32 SetDoubleProp( gint32 iProp, double val )
-    {
-        return SetPrimProp( iProp, val );
-    }
-
-    template< typename PrimType, typename T2=
-        typename std::enable_if< ! std::is_same< PrimType, stdstr >::value, PrimType >::type >
     gint32 IsEqual( gint32 iProp, const PrimType& val )
     {
         gint32 ret = 0;
@@ -1115,75 +1408,16 @@ class CCfgDbOpener< IConfigDb >
                 break;
             }
 
-            BufPtr pBuf;
-            ret = m_pConstCfg->GetProperty( iProp, pBuf );
-            if( ERROR( ret ) )
-                break;
-
-            if( val == ( const PrimType& )*pBuf )
-                break;
-
-            ret = ERROR_FALSE;
-        }while( 0 );
-
-        return ret;
-    }
-
-    template< typename PrimType, typename T2=
-        typename std::enable_if< std::is_same< PrimType, stdstr >::value, stdstr >::type,
-        typename T3=T2 >
-    gint32 IsEqual( gint32 iProp, const PrimType& val )
-    {
-        gint32 ret = 0;
-        do{
-            if( m_pConstCfg == nullptr )
+            auto pdb2 = CCFGDB2( m_pConstCfg );
+            const Variant* p =
+                pdb2->GetPropertyPtr( iProp );
+            if( p == nullptr )
             {
-                ret = -EFAULT;
+                ret = -ENOENT;
                 break;
             }
 
-            BufPtr pBuf;
-            ret = m_pConstCfg->GetProperty( iProp, pBuf );
-            if( ERROR( ret ) )
-                break;
-
-            std::string val2 = ( const char* )*pBuf;
-            if( val == val2 )
-                break;
-
-            ret = ERROR_FALSE;
-        }while( 0 );
-
-        return ret;
-    }
-
-    gint32 IsEqualProp( gint32 iProp, const CObjBase* pObj )
-    {
-        gint32 ret = 0;
-
-        do{
-            if( pObj == nullptr )
-            {
-                ret = -EINVAL;
-                break;
-            }
-            if( m_pConstCfg == nullptr )
-            {
-                ret = -EFAULT;
-                break;
-            }
-
-            BufPtr pBuf( true );
-            ret = pObj->GetProperty( iProp, *pBuf );
-            if( ERROR( ret ) )
-                break;
-
-            BufPtr pBuf2;
-            ret = this->GetProperty( iProp, pBuf2 );
-            if( ERROR( ret ) )
-                break;
-
-            if( *pBuf == *pBuf2 )
+            if( val == ( const PrimType& )*p )
                 break;
 
             ret = ERROR_FALSE;
@@ -1340,20 +1574,27 @@ class CCfgOpener : public CCfgOpenerBase
                 break;
             }
 
-            BufPtr pBuf;
-            ret = pObj->GetProperty( iProp, pBuf );
-            if( ERROR( ret ) )
-                break;
+            auto psrc = CCFGDB2( pObj );
+            auto pdst = CCFGDB2( m_pConstCfg );
+            ret = STATUS_SUCCESS;
 
-            BufPtr pBuf2;
-            ret = this->GetProperty( iProp, pBuf2 );
-            if( ERROR( ret ) )
+            const Variant* p1 =
+                psrc->GetPropertyPtr( iProp );
+            if( p1 == nullptr )
+            {
+                ret = -ENOENT;
                 break;
+            }
 
-            if( *pBuf == *pBuf2 )
+            const Variant* p2 =
+                pdst->GetPropertyPtr( iProp );
+            if( p2 == nullptr )
+            {
+                ret = -ENOENT;
                 break;
-
-            ret = ERROR_FALSE;
+            }
+            if( *p1 != *p2 )
+                ret = ERROR_FALSE;
 
         }while( 0 );
         return ret;
@@ -1588,8 +1829,10 @@ class CParamList : public CCfgOpener
         return iPos;
     }
 
-    template< typename T >
-    gint32 Push( T&& val  )
+    template< typename T,
+        typename filter=typename std::enable_if<
+            !std::is_pointer<T>::value, T>::type >
+    gint32 Push( const T& val  )
     {
         gint32 ret = 0;
         do{
@@ -1600,25 +1843,31 @@ class CParamList : public CCfgOpener
                 break;
             }
 
-            BufPtr pBuf( true );
-
-            try{
-                *pBuf = val;
-
-                ret = GetCfg()->SetProperty(
-                    iPos, pBuf );
-
-                if( SUCCEEDED( ret ) )
-                    SetCount( iPos + 1 );
-            }
-            catch( std::invalid_argument& e )
-            {
-                ret = -EINVAL;
-            }
+            auto pdb2 = CFGDB2(
+                ( IConfigDb* )GetCfg() );
+            Variant& o = pdb2->GetProperty( iPos );
+            o = val;
+            SetCount( iPos + 1 );
 
         }while( 0 );
 
         return ret;
+    }
+
+    template< typename T,
+        typename filter=typename std::enable_if<
+            std::is_base_of< CObjBase, T >::value,
+            T>::type >
+    gint32 Push( T* val  )
+    {
+        ObjPtr pObj( val );
+        return Push( pObj );
+    }
+
+    gint32 Push( const char* val )
+    {
+        Variant o = val;
+        return Push( o );
     }
 
     template< typename T >
@@ -1626,12 +1875,6 @@ class CParamList : public CCfgOpener
     {
         gint32 ret = 0;
         do{
-            if( IsEmpty() )
-            {
-                ret = -ENOENT;
-                break;
-            }
-
             gint32 iPos = ( gint32 )GetCount();
             if( ERROR( iPos ) )
             {
@@ -1639,33 +1882,29 @@ class CParamList : public CCfgOpener
                 break;
             }
 
-            if( iPos == 0 )
+            if( iPos <= 0 )
             {
                 ret = -ENOENT;
                 break;
             }
 
-            BufPtr pBuf;
             try{
+                auto pdb2 = CFGDB2( GetCfg() );
                 gint32 idx = iPos - 1;
-                ret = GetCfg()->GetProperty(
-                    idx, pBuf );
-
-                if( ERROR( ret ) )
+                Variant* p = pdb2->GetPropertyPtr( idx );
+                if( p == nullptr )
                     break;
 
-                val = ( T& )( *pBuf );
-                ret = GetCfg()->RemoveProperty(
-                    idx );
-
-                if( SUCCEEDED( ret ) )
+                gint32 iType =
+                    rpcf::GetTypeId((T*)nullptr );
+                if( iType != p->GetTypeId() )
                 {
-                    SetCount( idx );
-                }
-                else
-                {
+                    ret = -EINVAL;
                     break;
                 }
+                val = ( T& )*p;
+                pdb2->RemoveProperty( idx );
+                SetCount( idx );
             }
             catch( std::invalid_argument& e )
             {
@@ -1689,114 +1928,7 @@ class CParamList : public CCfgOpener
     }
 };
 
-
-template<>
-gint32 CParamList::Push< BufPtr& > ( BufPtr& val  );
-
-template<>
-gint32 CParamList::Push< const BufPtr& > ( const BufPtr& val  );
-
-template<>
-gint32 CParamList::Pop< BufPtr > ( BufPtr& val  );
-
 #define CFGDB_MAX_SIZE  ( 16 * 1024 * 1024 )
 #define CFGDB_MAX_ITEM  1024
-
-class CConfigDb : public IConfigDb
-{
-    protected:
-    std::hashmap<gint32, BufPtr> m_mapProps;
-
-    public:
-    typedef IConfigDb   super;
-
-    struct SERI_HEADER : public SERI_HEADER_BASE
-    {
-        typedef SERI_HEADER_BASE super;
-        guint32 dwCount;
-
-        SERI_HEADER() : SERI_HEADER_BASE()
-        {
-            dwClsid = clsid( CConfigDb );
-            dwCount = 0;
-        }
-
-        SERI_HEADER( const SERI_HEADER& rhs )
-            :SERI_HEADER_BASE( rhs )
-        {
-            dwCount = rhs.dwCount;
-        }
-
-        SERI_HEADER& operator=( const SERI_HEADER& rhs )
-        {
-            super::operator=( rhs );
-            dwCount = rhs.dwCount;
-            return *this;
-        }
-
-        void ntoh()
-        {
-            super::ntoh();
-            dwCount = ntohl( dwCount );
-        }
-
-        void hton()
-        {
-            super::hton();
-            dwCount = htonl( dwCount );
-        }
-    };
-
-    CConfigDb( const IConfigDb* pCfg = nullptr );
-    ~CConfigDb();
-
-    void BuildConfig( const std::string& strJson );
-    void BuildConfig( const std::hashmap<gint32, std::string>& strPropValues );
-
-
-    // get a reference to pBuf content from the config db
-    gint32 GetProperty( gint32 iProp, BufPtr& pBuf ) const;
-    // add a reference to pBuf content to the config db
-    gint32 SetProperty( gint32 iProp, const BufPtr& pBuf );
-
-    // make a copy of oBuf content from the config db 
-    gint32 GetProperty( gint32, CBuffer& oBuf ) const;
-    // add a copy of oBuf content to the config db 
-    gint32 SetProperty( gint32, const CBuffer& oBuf );
-
-    gint32 GetPropertyType( gint32 iProp, gint32& iType ) const;
-    gint32 RemoveProperty( gint32 iProp );
-    void RemoveAll();
-
-    gint32 GetPropIds( std::vector<gint32>& vecIds ) const;
-
-    const CBuffer& operator[]( gint32 iProp ) const;
-    CBuffer& operator[]( gint32 iProp );
-
-    gint32 SerializeOld( CBuffer& oBuf ) const;
-    gint32 DeserializeOld( const char* oBuf, guint32 dwSize );
-
-    virtual gint32 Deserialize( const CBuffer& oBuf );
-
-    virtual gint32 Serialize( CBuffer& oBuf ) const;
-    virtual gint32 Deserialize( const char* oBuf, guint32 dwSize );
-
-    gint32 SerializeNew( CBuffer& oBuf ) const;
-    gint32 DeserializeNew( const char* oBuf, guint32 dwSize );
-
-    gint32 size() const
-    { return m_mapProps.size(); }
-
-    bool exist( gint32 iProp ) const
-    { 
-        return m_mapProps.cend() != m_mapProps.find( iProp ) ;
-    }
-
-    const IConfigDb& operator=( const IConfigDb& oCfg );
-    gint32 Clone( const IConfigDb& oCfg );
-
-    virtual gint32 EnumProperties(
-        std::vector< gint32 >& vecProps ) const; 
-};
 
 }

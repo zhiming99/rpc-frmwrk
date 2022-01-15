@@ -1916,10 +1916,9 @@ gint32 CRpcReqForwarder::OnModEvent(
         if( ERROR( ret ) )
             break;
 
-        BufPtr pBuf( true );
-        *pBuf = ObjPtr( pDeferTask );
+        Variant oVar( pDeferTask );
         CIfDeferCallTaskEx* pTask = pDeferTask;
-        pTask->UpdateParamAt( 0, pBuf );
+        pTask->UpdateParamAt( 0, oVar );
 
         // using the reqfwdr's sequential
         // taskgroup
@@ -2618,7 +2617,7 @@ gint32 CReqFwdrEnableRmtEventTask::OnTaskComplete(
                 }
 
                 CCfgOpenerObj oTaskCfg( pObj );
-                CConfigDb* pResp = nullptr;
+                IConfigDb* pResp = nullptr;
                 ret = oTaskCfg.GetPointer(
                     propRespPtr, pResp );
 
@@ -3188,8 +3187,8 @@ gint32 CRpcReqForwarder::BuildBufForIrpFwrdEvt(
         if( ERROR( ret ) )
             break;
 
-        BufPtr pEvtBuf( true );
-        ret = oReq.GetProperty( 1, *pEvtBuf );
+        BufPtr pEvtBuf;
+        ret = oReq.GetBufPtr( 1, pEvtBuf );
         if( ERROR( ret ) )
             break;
         
@@ -3398,7 +3397,7 @@ gint32 CRpcReqForwarder::ForwardEvent(
             CReqBuilder oBuilder( this );
 
             oBuilder.Push( pEvtCtx );
-            oBuilder.Push( *pBuf );
+            oBuilder.Push( pBuf );
 
             ObjPtr pObj;
             pObj = pMatch;

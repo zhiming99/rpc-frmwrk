@@ -521,11 +521,10 @@ class CMessageMatch : public IMessageMatch
         }
 
         CCfgOpener oCfg( ( IConfigDb* )GetCfg() );
-        if( oCfg.exist( propMethodName ) )
+        ret = oCfg.GetStrProp(
+            propMethodName, strRule );
+        if( SUCCEEDED( ret ) )
         {
-            ret = oCfg.GetStrProp(
-                propMethodName, strRule );
-
             if( SUCCEEDED( ret ) && !strRule.empty() )
             {
                 strMatch += std::string( ",member='" )
@@ -625,7 +624,8 @@ class CMessageMatch : public IMessageMatch
     }
 
     gint32 GetProperty(
-        gint32 iProp, CBuffer& oBuf ) const
+        gint32 iProp,
+        Variant& oBuf ) const override
     {
         gint32 ret = 0;
         switch( iProp )
@@ -656,19 +656,20 @@ class CMessageMatch : public IMessageMatch
     }
 
     gint32 SetProperty(
-        gint32 iProp, const CBuffer& oBuf )
+        gint32 iProp,
+        const Variant& oBuf )
     {
         gint32 ret = 0;
         switch( iProp )
         {
         case propObjPath:
             {
-                m_strObjPath = oBuf;
+                m_strObjPath = ( stdstr& )oBuf;
                 break;
             }
         case propIfName:
             {
-                m_strIfName = oBuf;
+                m_strIfName = ( stdstr& )oBuf;
                 break;
             }
         case propMatchType:
@@ -686,7 +687,6 @@ class CMessageMatch : public IMessageMatch
         }
         return ret;
     }
-
     gint32 RemoveProperty( gint32 iProp )
     {
         gint32 ret = 0;
@@ -741,8 +741,9 @@ class CMessageMatch : public IMessageMatch
         gint32 ret = 0;
         CfgPtr pCfg( true );
         *pCfg = *m_pCfg;
-        ( *pCfg )[ propIfName ] = m_strIfName;
-        ( *pCfg )[ propObjPath ] = m_strObjPath;
+        CCfgOpener oCfg( ( IConfigDb* )pCfg );
+        oCfg[ propIfName ] = m_strIfName;
+        oCfg[ propObjPath ] = m_strObjPath;
 
         SERI_HEADER oHeader;
 
@@ -829,19 +830,17 @@ class CMessageMatch : public IMessageMatch
             if( ERROR( ret ) )
                 return ret;
 
-            if( !m_pCfg->exist( propIfName ) )
-            {
-                ret = -EFAULT;
+            CCfgOpener oCfg( ( IConfigDb* )m_pCfg );
+            ret = oCfg.GetStrProp(
+                propIfName, m_strIfName );
+            if( ERROR( ret ) )
                 break;
-            }
-            if( !m_pCfg->exist( propObjPath ) )
-            {
-                ret = -EFAULT;
-                break;
-            }
 
-            m_strIfName = ( *m_pCfg )[ propIfName ];
-            m_strObjPath = ( *m_pCfg )[ propObjPath ];
+            ret = oCfg.GetStrProp(
+                propObjPath, m_strObjPath );
+            if( ERROR( ret ) )
+                break;
+
             SetType( ( EnumMatchType )oHeader.iMatchType );
 
         }while( 0 );

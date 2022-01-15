@@ -353,7 +353,10 @@ gint32 CBuffer::ResizeWithOffset( guint32 dwSize )
             bArrBuf = true;
 
         if( dwSize == size() )
+        {
+            SetExDataType( typeByteArr );
             break;
+        }
 
         guint32 dwBytesCopy =
             std::min( size(), dwSize );
@@ -481,6 +484,7 @@ gint32 CBuffer::Resize( guint32 dwSize )
                 if( pBase != nullptr && pBase != m_arrBuf )
                     free( pBase );
                 SetBuffer( nullptr, 0 );
+                SetExDataType( typeNone );
                 break;
             }
 
@@ -490,10 +494,8 @@ gint32 CBuffer::Resize( guint32 dwSize )
                 break;
             }
 
-            if( dwSize == size() )
-                break;
-
-            if( sizeof( m_arrBuf ) >= dwSize &&
+            if( unlikely( dwSize == size() ) ){}
+            else if( sizeof( m_arrBuf ) >= dwSize &&
                 sizeof( m_arrBuf ) >= size() )
             {
                 SetBuffer( m_arrBuf, dwSize );

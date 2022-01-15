@@ -89,11 +89,13 @@ class CTaskThread : public IThread
     void SetTid( const gint32 iTid )
     { m_iMyTid = iTid; }
 
-    virtual gint32 GetProperty(
-        gint32 iProp, CBuffer& oBuf ) const;
+    gint32 GetProperty(
+        gint32 iProp,
+        Variant& oVar ) const override;
 
-    virtual gint32 SetProperty(
-        gint32 iProp, const CBuffer& oBuf );
+    gint32 SetProperty(
+        gint32 iProp,
+        const Variant& oVar ) override;
 
     virtual gint32 EnumProperties(
         std::vector< gint32 >& vecProps ) const;
@@ -126,10 +128,12 @@ class COneshotTaskThread : public CTaskThread
     }
 
     gint32 GetProperty(
-        gint32 iProp, CBuffer& oBuf ) const;
+        gint32 iProp,
+        Variant& oVar ) const override;
 
     gint32 SetProperty(
-        gint32 iProp, const CBuffer& oBuf );
+        gint32 iProp,
+        const Variant& oVar ) override;
 
     gint32 EnumProperties(
         std::vector< gint32 >& vecProps ) const;

@@ -58,7 +58,7 @@ CGenericInterface::CGenericInterface(
 
     guint32 iStateClass = 0;
     if( !oNewCfg.exist( propIfPtr ) )
-        oNewCfg[ propIfPtr ] = this;
+        oNewCfg[ propIfPtr ] = ObjPtr( this );
 
     gint32 ret = oNewCfg.GetIntProp(
         propIfStateClass, iStateClass ) ;
@@ -2887,9 +2887,9 @@ gint32 CInterfaceProxy::SendFetch_Proxy(
 
             oDesc.SetIfName(
                 DBUS_IF_NAME( strIfName ) );
-
-            if( string( SYS_METHOD_FETCHDATA ) ==
-                string( oDesc[ propMethodName ] ) )
+            auto& val = ( const stdstr& )
+                oDesc[ propMethodName ];
+            if( val == SYS_METHOD_FETCHDATA )
             {
                 bFetch = true;
             }
@@ -4801,12 +4801,13 @@ gint32 CRpcServices::UnpackEvent(
     case eventModOnline:
     case eventModOffline:
         {
-            BufPtr pBuf;
-            ret = oParams.GetProperty( 3, pBuf );
-            if( ERROR( ret ) )
+            Variant* p = oParams.GetPropPtr( 3 );
+            if( p == nullptr )
+            {
+                ret = -ENOENT;
                 break;
-            pData = ( LONGWORD* )pBuf->ptr();
-
+            }
+            pData = ( LONGWORD* )( const char* )*p;
             break;
         }
     case eventRmtModOnline:
@@ -4818,11 +4819,13 @@ gint32 CRpcServices::UnpackEvent(
                 break;
 
             dwParam1 = ( LONGWORD )pEvtCtx;
-            BufPtr pBuf;
-            ret = oParams.GetProperty( 3, pBuf );
-            if( ERROR( ret ) )
+            Variant* p = oParams.GetPropPtr( 3 );
+            if( p == nullptr )
+            {
+                ret = -ENOENT;
                 break;
-            pData = ( LONGWORD* )pBuf->ptr();
+            }
+            pData = ( LONGWORD* )( const char* )*p;
             break;
         }
     case eventDBusOnline:
@@ -5382,7 +5385,7 @@ gint32 CInterfaceProxy::SendProxyReq(
     IEventSink* pCallback,
     bool bNonDBus,
     const string& strMethod,
-    std::vector< BufPtr >& vecParams,
+    std::vector< Variant >& vecParams,
     guint64& qwIoTaskId )
 {
     gint32 ret = 0;

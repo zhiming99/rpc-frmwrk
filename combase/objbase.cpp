@@ -30,6 +30,7 @@
 #include "defines.h"
 #include "autoptr.h"
 #include "buffer.h"
+#include "variant.h"
 #include "objfctry.h"
 #include <unordered_map>
 #include <byteswap.h>
@@ -272,6 +273,7 @@ gint32 GetLibPath( std::string& strResult,
     return ret;
 }
 
+#include <libgen.h>
 gint32 GetModulePath( std::string& strResult )
 {
     char cmd[ 1024 ];
@@ -279,7 +281,7 @@ gint32 GetModulePath( std::string& strResult )
         "/proc/self/exe", cmd, sizeof( cmd ) - 1 );
     if( ret < 0 )
         return -errno;
-    strResult = cmd;
+    strResult = dirname( cmd );
     return 0;
 }
 
@@ -295,8 +297,12 @@ gint32 FindInstCfg(
 
     // relative path
     std::string strFile = "./";
-    strFile +=
-        basename( strFileName.c_str() );
+    char buf[ 1024 ];
+    size_t iSize = std::min(
+        strFileName.size(), sizeof( buf ) - 1 );
+    strncpy( buf,
+        strFileName.c_str(), iSize + 1 );
+    strFile += basename( buf );
 
     do{
         std::string strFullPath = "/etc/rpcf/";
@@ -508,7 +514,7 @@ void DumpObjs( bool bAll = false)
         if( pObj != nullptr )
         {
             if( pObj->GetClsid() == clsid( CBuffer ) ||
-                pObj->GetClsid() == clsid( CConfigDb ) )
+                pObj->GetClsid() == clsid( CConfigDb2 ) )
                 if( !bAll )
                     continue;
             pObj->Dump( strObj );
@@ -632,22 +638,22 @@ gint32 CObjBase::EnumProperties(
 }
 
 gint32 CObjBase::GetProperty(
-    gint32 iProp, CBuffer& oBuf ) const
+    gint32 iProp, Variant& oVar ) const
 {
     gint32 ret = 0;
 
     switch( iProp )
     {
     case propObjId:
-        oBuf = GetObjId();
+        oVar = GetObjId();
         break;
 
     case propRefCount:
-        oBuf = ( guint32 )m_atmRefCount;
+        oVar = ( gint32 )m_atmRefCount;
         break;
 
     case propClsid:
-        oBuf = ( guint32 )GetClsid();
+        oVar = GetClsid();
         break;
 
     default:
@@ -679,18 +685,8 @@ gint32 CObjBase::GetPropertyType(
 }
 
 gint32 CObjBase::SetProperty(
-    gint32 iProp, const CBuffer& oBuf )
-{
-    gint32 ret = 0;
-
-    switch( iProp )
-    {
-    default:
-        ret = -ENOENT;
-    }
-
-    return ret;
-}
+    gint32 iProp, const Variant& oVar )
+{ return -ENOTSUP; }
 
 gint32 CObjBase::RemoveProperty(
     gint32 iProp )

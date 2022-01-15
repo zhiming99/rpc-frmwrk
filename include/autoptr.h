@@ -440,10 +440,10 @@ class CAutoPtr : public IAutoPtr
 typedef CAutoPtr< clsid( Invalid ), CObjBase >         ObjPtr;
 typedef CAutoPtr< clsid( CBuffer ), CBuffer >          BufPtr;
 typedef CAutoPtr< clsid( Invalid ), IService >         ServicePtr;
-typedef CAutoPtr< clsid( CConfigDb ), IConfigDb >      CfgPtr;
+typedef CAutoPtr< clsid( CConfigDb2 ), IConfigDb >     CfgPtr;
 typedef CAutoPtr< clsid( Invalid ), IEventSink >       EventPtr;
 typedef CAutoPtr< clsid( Invalid ), IThread >          ThreadPtr;
-typedef CAutoPtr< clsid( Invalid ), DBusMessage >      DMsgPtr;
+// typedef CAutoPtr< clsid( Invalid ), DBusMessage >      DMsgPtr;
 
 }
 

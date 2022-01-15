@@ -254,21 +254,21 @@ class CPythonInterfBase : public T
             CStdRTMutex oTaskLock(
                 pTaskEx->GetLock() );
 
-            BufPtr pBuf;
-            ret = pTaskEx->GetParamAt( 1, pBuf );
+            Variant oVar;
+            ret = pTaskEx->GetParamAt( 1, oVar );
             if( ERROR( ret ) )
                 break;
 
-            intptr_t ptrval = ( intptr_t& )*pBuf;
+            intptr_t ptrval = ( intptr_t& )oVar;
             if( ptrval == 0 )
                 break;
 
             pCb = ( PyObject* )ptrval;
-            ret = pTaskEx->GetParamAt( 2, pBuf );
+            ret = pTaskEx->GetParamAt( 2, oVar );
             if( ERROR( ret ) )
                 break;
 
-            ptrval = ( intptr_t& )*pBuf;
+            ptrval = ( intptr_t& )oVar;
             if( ptrval == 0 )
                 break;
 
@@ -490,7 +490,7 @@ class CPythonInterfBase : public T
                 case typeByteArr:
                     {
                         BufPtr pBuf;
-                        ret = oResp.GetProperty( i, pBuf );
+                        ret = oResp.GetBufPtr( i, pBuf );
                         if( ERROR( ret ) )
                             break;
                         if( pBuf.IsEmpty() || pBuf->empty() )
@@ -682,9 +682,116 @@ class CPythonInterfBase : public T
         return ret;
     }
 
+    gint32 ConvertPyObjToVar(
+        PyObject* pObject,
+        Variant& oVar )
+    {
+        if( pObject == nullptr )
+            return -EINVAL;
+
+        gint32 ret = 0;
+
+        EnumTypeId iType =
+            ( EnumTypeId )GetTypeId( pObject );
+
+        switch( iType )
+        {
+        case typeUInt32:
+            {
+                oVar = ( guint32 )
+                    PyLong_AsLong( pObject );
+                break;
+            }
+        case typeUInt64:
+            {
+                oVar = ( guint64 )
+                    PyLong_AsLong( pObject );
+                break;
+            }
+        case typeFloat:
+            {
+                oVar = ( float )
+                    PyFloat_AsDouble( pObject );
+                break;
+            }
+        case typeDouble:
+            {
+                oVar =
+                    PyFloat_AsDouble( pObject );
+                break;
+            }
+        case typeByte:
+            {
+                oVar = ( guint8 )
+                    PyLong_AsLong( pObject );
+                break;
+            }
+        case typeUInt16:
+            {
+                oVar = ( guint16 )
+                    PyLong_AsLong( pObject );
+                break;
+            }
+        case typeString:
+            {
+                oVar =
+                convertPythonUnicodeObjectToStdString(
+                pObject );
+                break;
+            }
+        case typeByteArr:
+            {
+                BufPtr pBuf( true );
+                Py_buffer *view = (Py_buffer *)
+                    malloc(sizeof(*view));
+                ret = PyObject_GetBuffer(
+                    pObject, view, PyBUF_READ );
+                if( ret < 0 )
+                {
+                    ret = -ENOMEM;
+                    break;
+                }
+                ret = pBuf->Append( ( char* )view->buf,
+                    ( guint32 )view->len);
+                PyBuffer_Release( view );
+                oVar = pBuf;
+                break;
+            }
+        case typeObj:
+            {
+                if(sipCanConvertToType( pObject,
+                    sipType_cpp_ObjPtr, 0 ))
+                {
+                    gint32 iState = 0, iErr = 0;
+                    ObjPtr* pObj = ( ObjPtr* )
+                    sipConvertToType( pObject,
+                        sipType_cpp_ObjPtr,
+                        nullptr, 0, &iState,
+                        &iErr );
+                    if( iErr != 0 )
+                    {
+                        ret = ERROR_FAIL;
+                        break;
+                    }
+                    oVar = *pObj;
+                }
+                else
+                {
+                    // an empty argument
+                }
+                break;
+            }
+        default:
+            ret = -ENOTSUP;
+            break;
+        }
+
+        return ret;
+    }
+
     gint32 List2Vector(
         PyObject *pList,
-        std::vector< BufPtr >& vecArgs )
+        std::vector< Variant >& vecArgs )
     {
         gint32 ret = 0;
         if( pList == nullptr )
@@ -704,11 +811,11 @@ class CPythonInterfBase : public T
                 PyObject* pElem =
                     PyList_GetItem( pList, i );
 
-                BufPtr pBuf( true );
-                ret = ConvertPyObjToBuf( pElem, pBuf );
+                Variant oVar;
+                ret = ConvertPyObjToVar( pElem, oVar );
                 if( ERROR( ret ) )
                     break;
-                vecArgs.push_back( pBuf );
+                vecArgs.push_back( oVar );
             }
             
         }while( 0 );
@@ -882,7 +989,7 @@ class CPythonInterfBase : public T
                 PyList_Size( pyRespArgs ) == 0 )
                 break;
 
-            std::vector< BufPtr > vecResp;
+            std::vector< Variant > vecResp;
             ret = List2Vector( pyRespArgs, vecResp );
             if( ERROR( ret ) )
                 break;
@@ -1494,7 +1601,7 @@ class CPythonProxyImpl :
         CfgPtr& pOptions,
         CfgPtr& pResp,
         const std::string& strcMethod,
-        std::vector< BufPtr >& vecParams );
+        std::vector< Variant >& vecParams );
 
     gint32 PyProxyCall(
         PyObject* pCb,
@@ -1529,7 +1636,7 @@ gint32 CPythonProxyImpl::AsyncCallVector(
     CfgPtr& pOptions,
     CfgPtr& pResp,
     const std::string& strcMethod,
-    std::vector< BufPtr >& vecParams )
+    std::vector< Variant >& vecParams )
 {
     gint32 ret = 0;
 
@@ -1605,7 +1712,7 @@ gint32 CPythonProxyImpl::PyProxyCall(
                 break;
             }
         }
-        std::vector< BufPtr > vecParams;
+        std::vector< Variant > vecParams;
         ret = List2Vector(listArgs, vecParams );
         if( ERROR( ret ) )
             break;
@@ -1748,7 +1855,7 @@ PyObject* CPythonProxyImpl::PyProxyCall2(
                 break;
             }
         }
-        std::vector< BufPtr > vecParams;
+        std::vector< Variant > vecParams;
         ret = List2Vector(listArgs, vecParams );
         if( ERROR( ret ) )
             break;
@@ -2083,7 +2190,7 @@ class CPythonProxy :
             break;
         }
 
-        BufPtr pBuf( true );
+        BufPtr pBuf;
         sipRes = pImpl->ConvertPyObjToBuf(
             a1, pBuf );
         if( ERROR( sipRes ) )
@@ -2109,7 +2216,7 @@ class CPythonProxy :
             break;
         }
 
-        BufPtr pBuf( true );
+        BufPtr pBuf;
         sipRes = pImpl->ConvertPyObjToBuf(
             a1, pBuf );
         if( ERROR( sipRes ) )
@@ -2326,7 +2433,6 @@ class CPythonProxy :
             break;
         }
 
-        BufPtr pBuf( true );
         gint32 ret = PyCallable_Check( a2 );
         if( ret == 0 )
         {
@@ -2334,6 +2440,7 @@ class CPythonProxy :
             break;
         }
 
+        BufPtr pBuf;
         sipRes = pImpl->ConvertPyObjToBuf(
             a1, pBuf );
         if( ERROR( sipRes ) )

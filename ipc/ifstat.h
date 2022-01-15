@@ -222,15 +222,14 @@ class CInterfaceState : public IInterfaceState
     virtual gint32 ClosePort(
         IEventSink* pCallback = nullptr );
 
-    // subscribe a connection point event
     virtual gint32 GetProperty(
-        gint32 iProp, CBuffer& pVal ) const;
+        gint32 iProp, Variant& oVar ) const override;
 
     virtual gint32 SetProperty(
-        gint32 iProp, const CBuffer& pVal )
+        gint32 iProp, const Variant& oVar ) override
     {
         CStdRMutex oStatLock( GetLock() );
-        return m_pIfCfgDb->SetProperty( iProp, pVal );
+        return m_pIfCfgDb->SetProperty( iProp, oVar );
     }
 
     gint32 RemoveProperty( gint32 iProp )

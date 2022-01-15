@@ -34,7 +34,9 @@ using namespace std;
 
 CTasklet::CTasklet( const IConfigDb* pCfg )
 {
-    m_pCtx.NewObj( Clsid_CConfigDb, pCfg );
+    m_pCtx.NewObj();
+    if( pCfg != nullptr )
+        *m_pCtx = *pCfg;
     m_dwTid = rpcf::GetTid();
     m_iRet = 0;
     m_bPending = false;
@@ -44,29 +46,28 @@ CTasklet::CTasklet( const IConfigDb* pCfg )
 }
 
 gint32 CTasklet::GetProperty(
-        gint32 iProp,
-        CBuffer& oBuf ) const
+    gint32 iProp,
+    Variant& oVar ) const
 {
     if( m_pCtx.IsEmpty() )
         return -ENOENT;
 
     gint32 ret = 0;
-
-    ret = m_pCtx->GetProperty( iProp, oBuf );
+    ret = m_pCtx->GetProperty( iProp, oVar );
     if( ret == -ENOENT )
-        ret =super::GetProperty( iProp, oBuf );
+        ret =super::GetProperty( iProp, oVar );
 
     return ret;
 }
 
 gint32 CTasklet::SetProperty(
     gint32 iProp,
-    const CBuffer& oBuf )
+    const Variant& oVar )
 {
     if( m_pCtx.IsEmpty() )
         return -ENOENT;
 
-    return m_pCtx->SetProperty( iProp, oBuf );
+    return m_pCtx->SetProperty( iProp, oVar );
 }
 
 gint32 CTasklet::RemoveProperty(
@@ -321,7 +322,7 @@ gint32 CTaskletRetriable::operator()(
 }
 
 gint32 CTaskletRetriable::SetProperty(
-        gint32 iProp, const CBuffer& oBuf )
+        gint32 iProp, const Variant& oBuf )
 {
     gint32 ret = 0;
     if( m_pCtx.IsEmpty() )
@@ -345,17 +346,9 @@ void CTaskletRetriable::ResetRetries()
     if( m_pCtx.IsEmpty() )
         return;
 
-    BufPtr pBuf( true );
-
-    gint32 ret = m_pCtx->GetProperty(
-        propRetriesBackup, *pBuf );
-
-    if( SUCCEEDED( ret ) )
-    {
-        m_pCtx->SetProperty(
-            propRetries, *pBuf );
-    }
-
+    CCfgOpener oCfg( ( IConfigDb* )m_pCtx );
+    oCfg.CopyProp( propRetries,
+        propRetriesBackup );
     RemoveTimer();
 
     return;
@@ -540,11 +533,20 @@ gint32 CThreadSafeTask::OnEvent(
     return GetError();
 }
 
-gint32 CThreadSafeTask::GetProperty( gint32 iProp,
-        CBuffer& oBuf ) const
+gint32 CThreadSafeTask::GetProperty(
+    gint32 iProp,
+    Variant& oVar ) const
 {
     CStdRTMutex oTaskLock( GetLock() );
-    return super::GetProperty( iProp, oBuf );
+    return super::GetProperty( iProp, oVar );
+}
+
+gint32 CThreadSafeTask::SetProperty(
+    gint32 iProp,
+    const Variant& oVar )
+{
+    CStdRTMutex oTaskLock( GetLock() );
+    return super::SetProperty( iProp, oVar );
 }
 
 gint32 CSyncCallback::operator()(

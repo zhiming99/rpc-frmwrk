@@ -311,6 +311,7 @@ typedef enum : guint32
     DECL_CLSID( CJavaProxyImpl ),
     DECL_CLSID( CJavaServerImpl ),
     DECL_CLSID( CStlObjMap ),
+    DECL_CLSID( CConfigDb2 ),
     DECL_CLSID( MaxClsid ),
     DECL_CLSID( ClassFactoryStart ) = 0x02000000,
     DECL_CLSID( ReservedClsidEnd ) = 0x0FFFFFFF,

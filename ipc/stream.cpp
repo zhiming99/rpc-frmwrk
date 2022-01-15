@@ -203,7 +203,7 @@ gint32 IStream::OnUxStmEvtWrapper(
     CParamList oParams( pCfg );
     return OnUxStreamEvent( hChannel,
         ( guint8& )oParams[ 0 ],
-        ( CBuffer* )oParams[ 1 ] );
+        *( BufPtr& )oParams[ 1 ] );
 }
 
 gint32 IStream::WriteStream(

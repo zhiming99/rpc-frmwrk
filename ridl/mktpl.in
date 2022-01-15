@@ -21,7 +21,7 @@ COMMON_INCLUDE:=$(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --cflags d
 C_INCLUDE:=-I./ $(COMMON_INCLUDE)
 
 DEBUG_FLAGS:=-D_DEBUG=1 -DDEBUG -ggdb
-RELEASE_FLAGS:= -D_DEBUG=0 -DRELEASE -O2 -ggdb
+RELEASE_FLAGS:= -D_DEBUG=0 -DRELEASE -O2 -ggdb -fno-strict-aliasing
 
 DBG_DIR:=debug
 RLS_DIR:=release

@@ -769,8 +769,9 @@ gint32 CIfRetryTask::WaitForComplete()
     return ret;
 }
 
-gint32 CIfRetryTask::GetProperty( gint32 iProp,
-        CBuffer& oBuf ) const
+gint32 CIfRetryTask::GetProperty(
+    gint32 iProp,
+    Variant& oBuf ) const
 {
     gint32 ret = 0;
     switch( iProp )
@@ -792,18 +793,18 @@ gint32 CIfRetryTask::GetProperty( gint32 iProp,
                 break;
         }
     }
-
     return ret;
 }
+
 gint32 CIfRetryTask::SetProperty(
-    gint32 iProp, const CBuffer& oBuf )
+    gint32 iProp, const Variant& oBuf )
 {
     gint32 ret = 0;
     switch( iProp )
     {
     case propParentTask:
         {
-            ObjPtr& pObj = oBuf;
+            const ObjPtr& pObj = oBuf;
             if( pObj.IsEmpty() )
                 m_pParentTask.Clear();
             else
@@ -820,6 +821,7 @@ gint32 CIfRetryTask::SetProperty(
 
     return ret;
 }
+
 gint32 CIfRetryTask::RemoveProperty(
     gint32 iProp )
 {
@@ -3022,7 +3024,7 @@ gint32 CIfParallelTask::Process(
 }
 
 gint32 CIfParallelTask::GetProperty( gint32 iProp,
-        CBuffer& oBuf ) const
+        Variant& oBuf ) const
 {
     CStdRTMutex oTaskLock( GetLock() );
     if( iProp == propTaskState )
@@ -3041,7 +3043,7 @@ gint32 CIfParallelTask::GetProperty( gint32 iProp,
 }
 
 gint32 CIfParallelTask::SetProperty( gint32 iProp,
-    const CBuffer& oBuf )
+    const Variant& oBuf )
 {
     CStdRTMutex oTaskLock( GetLock() );
     if( iProp == propTaskState )
@@ -4290,11 +4292,16 @@ gint32 CIfInvokeMethodTask::OnCancel(
         // NOTE: the error is not exactly the one
         // in the response. it is used internally.
         ret = ERROR_CANCEL;
+        IConfigDb* pReq = nullptr;
+        oCfg.GetPointer( propReqPtr, pReq );
+
         CParamList oResp;
         if( dwContext == eventTimeoutCancel )
         {
             ret = -ETIMEDOUT;
             oResp[ propReturnValue ] = ret;
+            if( pReq != nullptr )
+                oResp.CopyProp( propSeriProto, pReq );
             oCfg.SetPointer( propRespPtr,
                 ( IConfigDb* )oResp.GetCfg() );
         }
@@ -4302,6 +4309,8 @@ gint32 CIfInvokeMethodTask::OnCancel(
         {
             ret = ERROR_USER_CANCEL;
             oResp[ propReturnValue ] = ret;
+            if( pReq != nullptr )
+                oResp.CopyProp( propSeriProto, pReq );
             oCfg.SetPointer( propRespPtr,
                 ( IConfigDb* )oResp.GetCfg() );
         }
@@ -5248,14 +5257,14 @@ gint32 CIfDeferredHandler::RunTask()
 }
 
 gint32 CIfDeferredHandler::UpdateParamAt(
-    guint32 i, BufPtr pBuf )
+    guint32 i, Variant& oVar )
 {
     CDeferredCallBase< CTasklet >* pTask =
         m_pDeferCall;
     if( pTask == nullptr )
         return -EINVAL;
 
-    return pTask->UpdateParamAt( i, pBuf );
+    return pTask->UpdateParamAt( i, oVar );
 }
 
 gint32 CIfDeferredHandler::OnTaskComplete( gint32 iRet ) 
@@ -5326,9 +5335,8 @@ gint32 CIfAsyncCancelHandler::OnTaskComplete(
     do{
         if( m_pDeferCall.IsEmpty() )
             break;
-        BufPtr pBuf( true );
-        *pBuf = iRet;
-        UpdateParamAt( 1, pBuf );
+        Variant oVar = iRet;
+        UpdateParamAt( 1, oVar );
         if( m_bSelfCleanup )
         {
             ( *m_pDeferCall )( 0 );
@@ -5361,7 +5369,7 @@ gint32 CIfResponseHandler::OnTaskComplete( gint32 iRet )
     do{
         // try best to make the response data
         // available in parameter 1
-        BufPtr pBuf( true );
+        Variant oVar;
         std::vector< LONGWORD > vecParams;
         ret = GetParamList( vecParams );
         if( SUCCEEDED( ret ) )
@@ -5386,7 +5394,7 @@ gint32 CIfResponseHandler::OnTaskComplete( gint32 iRet )
                         propRespPtr, pResp );
 
                     if( SUCCEEDED( ret ) )
-                        *pBuf = ObjPtr( pIoReq );
+                        oVar = ObjPtr( pIoReq );
                 }
                 else
                 {
@@ -5406,7 +5414,7 @@ gint32 CIfResponseHandler::OnTaskComplete( gint32 iRet )
                 ( IConfigDb* )GetConfig() );
             if( oCfg.exist( propRespPtr ) )
             {
-                *pBuf = ObjPtr( this );
+                oVar = ObjPtr( this );
                 ret = 0;
             }
         }
@@ -5423,9 +5431,9 @@ gint32 CIfResponseHandler::OnTaskComplete( gint32 iRet )
             pTask.NewObj(
                 clsid( CIfDummyTask ),
                 oParams.GetCfg() );
-            *pBuf = ObjPtr( pTask );
+            oVar = ObjPtr( pTask );
         }
-        UpdateParamAt( 1, pBuf );
+        UpdateParamAt( 1, oVar );
 
     }while( 0 );
 
@@ -5461,9 +5469,8 @@ gint32 CIfResponseHandler::OnIrpComplete(
             clsid( CIfDummyTask ),
             oParams.GetCfg() );
 
-        BufPtr pBuf( true );
-        *pBuf = ObjPtr( pTask );
-        UpdateParamAt( 1, pBuf );
+        Variant oVar = ObjPtr( pTask );
+        UpdateParamAt( 1, oVar );
 
     }while( 0 );
 

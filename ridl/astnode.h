@@ -853,14 +853,16 @@ struct CStructDecl : public CNamedNode
     { return m_oFieldList; }
 
     gint32 SetProperty(
-        gint32 iProp, const BufPtr& val )
+        gint32 iProp,
+        const Variant& val ) override
     {
         return m_oContext.SetProperty(
             iProp, val );
     }
 
     gint32 GetProperty(
-        gint32 iProp, BufPtr& val ) const
+        gint32 iProp,
+        Variant& val ) const override
     {
         return m_oContext.GetProperty(
             iProp, val );
@@ -1119,14 +1121,16 @@ struct CMethodDecl : public CNamedNode
     }
 
     gint32 SetProperty(
-        gint32 iProp, const BufPtr& val )
+        gint32 iProp,
+        const Variant& val ) override
     {
         return m_oContext.SetProperty(
             iProp, val );
     }
 
     gint32 GetProperty(
-        gint32 iProp, BufPtr& val ) const
+        gint32 iProp,
+        Variant& val ) const override
     {
         return m_oContext.GetProperty(
             iProp, val );

@@ -55,7 +55,7 @@ class CJavaServerImpl :
                 break;
             }
 
-            std::vector< BufPtr > vecArgs;
+            std::vector< Variant > vecArgs;
             ret = List2Vector( jenv, pArgs, vecArgs );
             if( ERROR( ret ) )
                 break;
@@ -428,7 +428,7 @@ class CJavaServerImpl :
             if( ERROR( iRet ) )
                 break;
 
-            std::vector< BufPtr > vecResp;
+            std::vector< Variant > vecResp;
             ret = pImpl->List2Vector(
                 jenv, arrArgs, vecResp);
             if( ERROR( ret ) )
@@ -504,7 +504,7 @@ class CJavaServerImpl :
             if( bNoReply )
                 break;
 
-            std::vector< BufPtr > vecResp;
+            std::vector< Variant > vecResp;
             ret = pImpl->List2Vector(
                 jenv, arrArgs, vecResp );
             if( ERROR( ret ) )

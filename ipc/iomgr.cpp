@@ -1009,7 +1009,8 @@ gint32 CIoManager::GetPortProp(
     if( ERROR( ret ) )
         return ret;
 
-    ret = pPort->GetProperty( iProp, *pBuf );
+    CCfgOpenerObj oCfg( ( CObjBase* )pPort );
+    ret = oCfg.GetProperty( iProp, pBuf );
 
     return ret;
 }
@@ -2040,14 +2041,14 @@ gint32 CIoManager::TryFindDescFile(
         ObjPtr pObj;
 
         // relative path
-        std::string strFile = "./";
-        strFile +=
+        std::string strFile =
             basename( strFileName.c_str() );
 
-        ret = access( strFile.c_str(), R_OK );
+        stdstr strLocal = "./" + strFile;
+        ret = access( strLocal.c_str(), R_OK );
         if( ret == 0 )
         {
-            strPath = strFile;
+            strPath = strLocal;
             ret = STATUS_SUCCESS;
             break;
         }
@@ -2067,19 +2068,25 @@ gint32 CIoManager::TryFindDescFile(
         std::string strFullPath;
         for( auto& elem : ( *psetPaths )() )
         {
-            strFullPath = elem + "/" + strFile;
-
+            strFullPath = elem + "/" +  strFile;
             ret = access(
                 strFullPath.c_str(), R_OK );
 
-            if( ret == -1 )
+            if( ret == 0 )
             {
-                ret = -errno;
-                continue;
+                bFound = true;
+                break;
             }
 
-            bFound = true;
-            break;
+            strFullPath = elem + "/../etc/rpcf/" + strFile;
+            ret = access(
+                strFullPath.c_str(), R_OK );
+            if( ret == 0 )
+            {
+                bFound = true;
+                break;
+            }
+            ret = -errno;
         }
 
         if( bFound )
@@ -2103,17 +2110,17 @@ gint32 CIoManager::GetCmdLineOpt(
 {
     gint32 ret = 0;
     do{
-        BufPtr pBuf( true );
         CStdRMutex oRegLock( m_pReg->GetLock() );
         ret = m_pReg->ChangeDir( "/cmdline" );
         if( ERROR( ret ) )
             break;
 
-        ret = m_pReg->GetProperty( iPropId, *pBuf );
+        Variant oVar;
+        ret = m_pReg->GetProperty( iPropId, oVar );
         if( ERROR( ret ) )
             break;
 
-        oVal = *pBuf;
+        oVal = ( stdstr& )oVar;
     }while( 0 );
 
     return ret;

@@ -166,10 +166,10 @@ class IRpcEventRelay
 class CRpcRouter;
 
 class CRegisteredObject
-    : public CConfigDb
+    : public CConfigDb2
 {
     public:
-    typedef CConfigDb super;
+    typedef CConfigDb2 super;
 
     CRegisteredObject( const IConfigDb* pCfg )
         : super( nullptr )
@@ -206,7 +206,8 @@ class CRegisteredObject
     {
         std::string strName;
         CCfgOpener oCfg( this );
-        strName = oCfg[ propSrcUniqName ];
+        strName = ( const stdstr& )
+            oCfg[ propSrcUniqName ];
         return strName;
     }
 
@@ -214,7 +215,8 @@ class CRegisteredObject
     {
         std::string strName;
         CCfgOpener oCfg( this );
-        strName = oCfg[ propSrcDBusName ];
+        strName = ( const stdstr& )
+            oCfg[ propSrcDBusName ];
         return strName;
     }
 
@@ -2883,10 +2885,12 @@ class CRpcRouterManager : public CRpcRouter
     gint32 RefreshReqLimit();
 
     gint32 SetProperty(
-        gint32 iProp, const CBuffer& oBuf );
+        gint32 iProp,
+        const Variant& oBuf ) override;
 
     gint32 GetProperty(
-        gint32 iProp, CBuffer& oBuf ) const;
+        gint32 iProp,
+        Variant& oBuf ) const override;
 
     gint32 GetCurConnLimit(
         guint32& dwMaxReqs,
@@ -3003,10 +3007,9 @@ inline gint32 NewIfDeferredCall2( EnumClsid iTaskClsid,
         _pTask, pObj, func , ##__VA_ARGS__ ); \
     if( SUCCEEDED( _ret ) ) \
     { \
+        Variant oVar( _pTask );\
         CIfDeferCallTaskEx2* pDefer = _pTask; \
-        BufPtr pBuf( true ); \
-        *pBuf = ObjPtr( pDefer ); \
-        pDefer->UpdateParamAt( _pos, pBuf );  \
+        pDefer->UpdateParamAt( _pos, oVar );  \
     } \
     _ret; \
 })

@@ -618,7 +618,7 @@ class CMyFileServerBase :
             BufPtr pCtxBuf;
             CParamList oCfg(
                 ( IConfigDb* )pDataDesc );
-            ret = oCfg.GetProperty( 0, pCtxBuf );
+            ret = oCfg.GetBufPtr( 0, pCtxBuf );
             if( ERROR( ret ) )
                 break;
             

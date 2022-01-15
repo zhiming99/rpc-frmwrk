@@ -1478,12 +1478,12 @@ class CDBusBusPort : public CGenericBusPortEx
 
     // methods from CObjBase
     gint32 GetProperty(
-            gint32 iProp,
-            CBuffer& oBuf ) const;
+        gint32 iProp,
+        Variant& oVar ) const override;
 
     gint32 SetProperty(
-            gint32 iProp,
-            const CBuffer& oBuf );
+        gint32 iProp,
+        const Variant& oVar ) override;
 
     gint32 EnumProperties(
         std::vector< gint32 >& vecProps ) const;
