@@ -702,10 +702,10 @@ gint32 CDeclarePyStruct::Output()
 
         NEW_LINES( 2 );
 
-        BufPtr pMsgId( true );
-        *pMsgId = dwMsgId;
+        Variant oVar;
+        oVar = dwMsgId;
         m_pNode->SetProperty(
-            PROP_MESSAGE_ID, pMsgId );
+            PROP_MESSAGE_ID, oVar );
 
         CCOUT << "def __init__( self, pIf : PyRpcServices = None ) :";
         INDENT_UPL;

@@ -1723,10 +1723,10 @@ gint32 CDeclareStruct::Output()
             << "\"" << strMsgId << "\";";
         NEW_LINE;
 
-        BufPtr pMsgId( true );
-        *pMsgId = dwMsgId;
+        Variant oVar;
+        oVar = dwMsgId;
         m_pNode->SetProperty(
-            PROP_MESSAGE_ID, pMsgId );
+            PROP_MESSAGE_ID, oVar );
 
         Wa( "// data members" );
         guint32 i = 0;
