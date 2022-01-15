@@ -60,6 +60,11 @@ This project depends on the following 3rd-party packags at runtime:
 5. A tree-like hierarchical persistant registry.
 
 ---
+[`Sat Jan 15 2022 07:03:42 PM Beijing`]   
+1. Merged buf2var-dev to the master branch. 
+2. The performance gain is about 10%~20%.
+3. Next we start the Json support.
+
 [`Wed Jan 05 2022 04:20:20 PM Beijing`]   
 1. Added a new branch 'buf2var-dev' for migration from CConfigDb to CConfigDb2.
 
