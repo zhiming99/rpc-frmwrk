@@ -112,6 +112,9 @@ class CTasklet : public ICancellableTask
         return err;
     }
 
+    LwVecPtr GetParamList(
+        EnumPropId iProp = propParamList );
+
     virtual gint32 GetParamList(
         std::vector< LONGWORD >& vecParams,
         EnumPropId iProp = propParamList );
@@ -290,6 +293,8 @@ class CTaskletRetriable : public CTasklet
     gint32 ResetTimer();
     gint32 RemoveTimer( gint32 iTimerId ) const;
     gint32 RemoveTimer();
+    inline void ClearTimer()
+    { m_iTimerId = 0; }
 
     gint32 AddTimer(
         guint32 dwIntervalSec,
@@ -660,6 +665,7 @@ class CThreadSafeTask : public CTaskletRetriable
         return super::GetPropertyType( iProp, iType );
     }
 
+    using CTasklet::GetParamList;
     virtual gint32 GetParamList(
         std::vector< LONGWORD >& vecParams,
         EnumPropId iProp = propParamList )

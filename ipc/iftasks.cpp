@@ -644,11 +644,13 @@ gint32 CIfRetryTask::Process( guint32 dwContext )
             }
         case eventTaskComp:
             {
-                vector< LONGWORD > vecParams;
-                ret = GetParamList( vecParams );
-                if( ERROR( ret ) )
+                LwVecPtr pVec = this->GetParamList();
+                if( pVec.IsEmpty() )
+                {
+                    ret = -EFAULT;
                     break;
-
+                }
+                auto& vecParams = ( *pVec )();
                 guint32 dwContext = vecParams[ 1 ];
                 ret = OnTaskComplete( dwContext );
                 break;
@@ -667,13 +669,14 @@ gint32 CIfRetryTask::Process( guint32 dwContext )
             }
         case eventTimeout:
             {
-                vector< LONGWORD > vecParams;
-                ret = GetParamList( vecParams,
+                LwVecPtr pVec = GetParamList(
                     propTimerParamList );
-
-                if( ERROR( ret ) )
+                if( pVec.IsEmpty() )
+                {
+                    ret = -EFAULT;
                     break;
-
+                }
+                auto& vecParams = ( *pVec )();
                 if( vecParams[ 1 ] == eventRetry )
                 {
                     ret = OnRetry();
@@ -2974,15 +2977,20 @@ gint32 CIfParallelTask::Process(
                 break;
             }
 
-            if( vecParams[ 1 ] == eventKeepAlive )
+            LONGWORD p1 = vecParams[ 1 ];
+            if( p1 == eventKeepAlive )
             {
                 ret = OnKeepAlive( eventTimeout );
                 break;
             }
-            else if( vecParams[ 1 ] == eventTimeoutCancel )
+            else if( p1 == eventTimeoutCancel )
             {
                 // redirect to CIfRetryTask::Process
                 dwContext = vecParams[ 1 ];
+            }
+            else if( p1 == eventRetry )
+            {
+                this->ClearTimer();
             }
             ret = -ENOTSUP;
             break;
@@ -3292,32 +3300,30 @@ gint32 CIfIoReqTask::FilterMessageSend(
         if( pIf != nullptr )
         {
             IEventSink* pFilter = nullptr;
-            std::vector< LONGWORD > vecParams;
-
-            ret = GetParamList( vecParams );
-            if( ERROR( ret ) )
+            LwVecPtr pVec = GetParamList();
+            if( !pVec.IsEmpty() )
             {
-                ret = 0;
-            }
-            else if( vecParams[ 0 ] == eventFilterComp )
-            {
-                guint32 dwCount = GetArgCount(
-                    &IEventSink::OnEvent );
-
-                if( vecParams.size() >= dwCount )
+                auto& vecParams = ( *pVec )();
+                if( vecParams[ 0 ] == eventFilterComp )
                 {
-                    ret = vecParams[ 1 ];
-                    CObjBase* pObj =
-                        ( CObjBase* )vecParams[ 3 ];
-                    pFilter = static_cast
-                        < IEventSink* >( pObj );
+                    guint32 dwCount = GetArgCount(
+                        &IEventSink::OnEvent );
+
+                    if( vecParams.size() >= dwCount )
+                    {
+                        ret = vecParams[ 1 ];
+                        CObjBase* pObj =
+                            ( CObjBase* )vecParams[ 3 ];
+                        pFilter = static_cast
+                            < IEventSink* >( pObj );
+                    }
                 }
-            }
-            else
-            {
-                // maybe a retry happens, not our call
-                ret = 0;
-                break;
+                else
+                {
+                    // maybe a retry happens, not our call
+                    ret = 0;
+                    break;
+                }
             }
 
             // the result of the last filter
@@ -3847,11 +3853,14 @@ gint32 CIfInvokeMethodTask::OnFilterComp()
 {
     gint32 ret = 0;
     do{
-        vector< LONGWORD > vecParams;
-        ret = GetParamList( vecParams );
-        if( ERROR( ret ) )
+        LwVecPtr pVec = GetParamList();
+        if( pVec.IsEmpty() )
+        {
+            ret = -ENOENT;
             break;
+        }
 
+        auto& vecParams = ( *pVec )();
         gint32 iRet = ( gint32 )vecParams[ 1 ];
 
         if( iRet == ERROR_PREMATURE )
@@ -5140,7 +5149,6 @@ gint32 CIoReqSyncCallback::operator()(
     {
     case eventTaskComp:
         {
-            std::vector< LONGWORD > vecParams;
             CParamList oResp;
             bool bSet = false;
             gint32 iRet = 0;
@@ -5148,12 +5156,14 @@ gint32 CIoReqSyncCallback::operator()(
                 (IConfigDb*)GetConfig() );
 
             do{
-                ret = GetParamList(
-                    vecParams, propParamList );
-
-                if( ERROR( ret ) )
+                LwVecPtr pVec = GetParamList();
+                if( pVec.IsEmpty() )
+                {
+                    ret = -ENOENT;
                     break;
+                }
 
+                auto& vecParams = ( *pVec )();
                 // the result of the io request
                 iRet = vecParams[ 1 ];
 
@@ -5370,10 +5380,10 @@ gint32 CIfResponseHandler::OnTaskComplete( gint32 iRet )
         // try best to make the response data
         // available in parameter 1
         Variant oVar;
-        std::vector< LONGWORD > vecParams;
-        ret = GetParamList( vecParams );
-        if( SUCCEEDED( ret ) )
+        LwVecPtr pVec = GetParamList();
+        if( !pVec.IsEmpty() )
         {
+            auto& vecParams = ( *pVec )();
             // comes from a eventTaskComp
             if( vecParams.size() < 
                 GetArgCount( &IEventSink::OnEvent ) )

@@ -136,30 +136,38 @@ gint32 CTasklet::OnEvent(
     return GetError();
 }
 
+LwVecPtr CTasklet::GetParamList(
+    EnumPropId iProp )
+{
+    CCfgOpener oCfg(
+        ( IConfigDb* )m_pCtx );
+    LwVecPtr pVec;
+
+    ObjPtr pParams;
+    gint32 ret = oCfg.GetObjPtr(
+        iProp, pParams );
+
+    if( SUCCEEDED( ret ) )
+        pVec = pParams;
+    return pVec;
+}
+
 gint32 CTasklet::GetParamList(
-    vector< LONGWORD >& vecParams, EnumPropId iProp )
+    vector< LONGWORD >& vecParams,
+    EnumPropId iProp )
 {
 
     gint32 ret = 0;
-    ObjPtr pParams;
 
     do{
-        CCfgOpener oCfg( ( IConfigDb* )m_pCtx );
-        LwVecPtr pVec;
-
-        ret = oCfg.GetObjPtr( iProp, pParams );
-        if( ERROR( ret ) )
-            break;
-
-        pVec = pParams;
+        LwVecPtr pVec = GetParamList( iProp );
         if( pVec.IsEmpty() )
         {
             ret = -EFAULT;
             break;
         }
 
-        CStlLongWordVector::MyType& oIntVec = ( *pVec )();
-
+        auto& oIntVec = ( *pVec )();
         guint32 dwArgCount = 
             GetArgCount( &IEventSink::OnEvent );
 
@@ -180,14 +188,15 @@ gint32 CTasklet::GetParamList(
 gint32 CTasklet::GetIrpFromParams( IrpPtr& pIrp )
 {
     gint32 ret = 0;
-    ObjPtr pParams;
 
     do{
-        CStlLongWordVector::MyType oIntVec;
-        ret = GetParamList( oIntVec );
-        if( ERROR( ret ) )
+        LwVecPtr pVec = GetParamList();
+        if( pVec.IsEmpty() )
+        {
+            ret = -EFAULT;
             break;
-
+        }
+        auto& oIntVec = ( *pVec )();
         if( oIntVec[ 1 ] == 0 )
         {
             ret = -EFAULT;
@@ -294,12 +303,12 @@ gint32 CTaskletRetriable::operator()(
 
     CReentrancyGuard oTaskEntered( this );
     // test if we are from a retry
-    if( dwContext == eventTimeout )
+    if( unlikely( dwContext == eventTimeout ) )
     {
-        vector< LONGWORD > vecParams;
-        ret = GetParamList( vecParams );
-        if( SUCCEEDED( ret ) )
+        LwVecPtr pVec = GetParamList();
+        if( !pVec.IsEmpty() )
         {
+            auto& vecParams = ( *pVec )();
             gint32 iEvent = vecParams[ 1 ];
             if( iEvent == eventRetry )
             {
@@ -561,17 +570,16 @@ gint32 CSyncCallback::operator()(
     {
     case eventTaskComp:
         {
-            std::vector< LONGWORD > vecParams;
-            ret = GetParamList( vecParams );
-            if( ERROR( ret ) )
+            LwVecPtr pVec = GetParamList();
+            if( pVec.IsEmpty() )
             {
                 ret = 0;
                 break;
             }
+            auto& vecParams = ( *pVec )();
             if( vecParams.size() < 
                 GetArgCount( &IEventSink::OnEvent ) )
                 break;
-
             ret = vecParams[ 1 ];
             break;
         }
