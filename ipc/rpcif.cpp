@@ -2713,8 +2713,7 @@ gint32 CRpcServices::RunIoTask(
             break;
         }
 
-        pIoTask->SetClientNotify(
-            pCallback );
+        pIoTask->SetClientNotify( pCallback );
 
         // set the req and the resp
         pIoTask->SetReqCall( pReqCall );

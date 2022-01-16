@@ -639,8 +639,8 @@ gint32 CRpcTcpBridgeProxy::CustomizeRequest(
 
         CRpcRouter* pRouter = GetParent();
 
-        if( strMethod ==
-            SYS_METHOD_CHECK_ROUTERPATH )
+        if( unlikely( strMethod ==
+            SYS_METHOD_CHECK_ROUTERPATH ) )
         {
             if( !pRouter->HasBridge() )
                 break;

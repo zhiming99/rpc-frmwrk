@@ -348,7 +348,7 @@ class CMessageMatch : public IMessageMatch
 
     virtual std::string GetDest() const
     {
-        CCfgOpenerObj oCfg( this );
+        CCfgOpener oCfg( ( IConfigDb* )GetCfg() );
         std::string strMyDest;
 
         gint32 ret = oCfg.GetStrProp(
@@ -441,29 +441,37 @@ class CMessageMatch : public IMessageMatch
         return ( *this = oMatch );
     }
 
-    EnumMatchType GetType() const
+    inline EnumMatchType GetType() const
     {
         return m_iMatchType;
     }
 
-    void SetType( EnumMatchType iType )
+    inline void SetType( EnumMatchType iType )
     {
         m_iMatchType = iType;
     }
 
-    gint32 GetIfName(
+    inline gint32 GetIfName(
         std::string& strIfName ) const
     {
         strIfName = m_strIfName;
         return 0;
     }
 
-    gint32 GetObjPath(
+    inline void SetIfName(
+        const std::string& strIfName )
+    { m_strIfName = strIfName; }
+
+    inline gint32 GetObjPath(
         std::string& strObjPath ) const
     {
         strObjPath = m_strObjPath;
         return 0;
     }
+
+    inline void SetObjPath(
+        const std::string& strObjPath )
+    { m_strObjPath = strObjPath; }
 
     std::string ToDBusRules(
         gint32 iMsgType ) const
@@ -870,8 +878,8 @@ class CProxyMsgMatch : public CMessageMatch
         if( pCfg == nullptr )
             return;
 
-       CCfgOpenerObj oThisCfg( this );
-       oThisCfg.CopyProp( propIpAddr, pCfg );
+       CCfgOpener oCfg( ( IConfigDb* )GetCfg() );
+       oCfg.CopyProp( propIpAddr, pCfg );
     }
     
     // test if a event message this match is
@@ -892,9 +900,9 @@ class CProxyMsgMatch : public CMessageMatch
         if( ERROR( ret ) )
             return ret;
 
-        CCfgOpenerObj oCfg( this );
-        ret = oCfg.IsEqualProp(
-            propConnHandle, pTransCtx );
+        CCfgOpener oCfg( ( IConfigDb* )GetCfg() );
+        ret = oCfg.IsEqualProp( propConnHandle,
+            ( CObjBase* )pTransCtx );
 
         if( ERROR( ret ) )
             return ret;
@@ -949,7 +957,7 @@ class CProxyMsgMatch : public CMessageMatch
     {
         std::string strAll = super::ToString();
 
-        CCfgOpenerObj oCfg( this );
+        CCfgOpener oCfg( ( IConfigDb* )GetCfg() );
 
         guint32 dwConnHandle = 0;
         gint32 ret = oCfg.GetIntProp(
@@ -994,26 +1002,11 @@ class CDBusDisconnMatch : public CMessageMatch
         }
 
         do{
-            CCfgOpenerObj oCfg( this );
+            SetObjPath( DBUS_PATH_LOCAL );
+            SetIfName( DBUS_INTERFACE_LOCAL );
+            SetType( matchClient );
 
-            ret = oCfg.SetStrProp(
-                propObjPath, DBUS_PATH_LOCAL );
-
-            if( ERROR( ret ) )
-                break;
-
-            ret = oCfg.SetStrProp(
-                propIfName, DBUS_INTERFACE_LOCAL );
-
-            if( ERROR( ret ) )
-                break;
-
-            ret = oCfg.SetIntProp(
-                propMatchType, matchClient );
-
-            if( ERROR( ret ) )
-                break;
-
+            CCfgOpener oCfg( ( IConfigDb* )m_pCfg );
             ret = oCfg.SetStrProp(
                 propMethodName, "Disconnected" );
 
@@ -1080,25 +1073,12 @@ class CDBusSysMatch : public CMessageMatch
 
         gint32 ret = 0;
         do{
-            CCfgOpenerObj matchCfg( this );
+            CCfgOpener matchCfg(
+                ( IConfigDb* )m_pCfg );
 
-            ret = matchCfg.SetStrProp(
-                propObjPath, DBUS_SYS_OBJPATH );
-
-            if( ERROR( ret ) )
-                break;
-
-            ret = matchCfg.SetStrProp(
-                propIfName, DBUS_SYS_INTERFACE );
-
-            if( ERROR( ret ) )
-                break;
-
-            ret = matchCfg.SetIntProp(
-                propMatchType, matchClient );
-
-            if( ERROR( ret ) )
-                break;
+            SetObjPath( DBUS_SYS_OBJPATH );
+            SetIfName( DBUS_SYS_INTERFACE );
+            SetType( matchClient );
 
             ret = matchCfg.SetStrProp(
                 propDestDBusName, 
@@ -1207,7 +1187,7 @@ class CRouterRemoteMatch : public CMessageMatch
     {
         std::string strAll = super::ToString();
 
-        CCfgOpenerObj oCfg( this );
+        CCfgOpener oCfg( ( IConfigDb* )GetCfg() );
 
         guint32 dwPortId = 0;
         gint32 ret = oCfg.GetIntProp(
@@ -1375,7 +1355,7 @@ class CRouterRemoteMatch : public CMessageMatch
 
     guint32 GetPortId()
     {
-        CCfgOpenerObj oCfg( this );
+        CCfgOpener oCfg( ( IConfigDb* )GetCfg() );
         guint32 dwPortId = 0;
         oCfg.GetIntProp( propPortId, dwPortId );
         return dwPortId;
@@ -1447,7 +1427,7 @@ class CRouterLocalMatch : public CRouterRemoteMatch
             super::super::ToString();
 
         std::string strValue;
-        CCfgOpenerObj oCfg( this );
+        CCfgOpener oCfg( ( IConfigDb* )GetCfg() );
 
         oCfg.GetStrProp(
             propSrcUniqName, strValue );
@@ -1567,7 +1547,7 @@ class CRouterLocalMatch : public CRouterRemoteMatch
         std::replace( strObjPath.begin(),
             strObjPath.end(), '.', '/');
 
-        CCfgOpenerObj oCfg( this );
+        CCfgOpener oCfg( ( IConfigDb* )GetCfg() );
         ret = oCfg.IsEqual( propSrcDBusName,
             strModName );
 

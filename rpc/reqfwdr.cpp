@@ -788,12 +788,19 @@ gint32 CReqFwdrOpenRmtPortTask::RunTaskInternal(
                 if( ERROR( ret ) )
                     break;
 
+                if( dwPortId == 0 )
+                {
+                    ret = -EBADF;
+                    break;
+                }
+
                 oCfg.SetIntProp(
                     propPortId, dwPortId );
 
                 oCfg.CopyProp( propConnParams,
                     ( CObjBase* )m_pProxy );
 
+                // ignore the error code 
                 pReqFwdr->AddRefCount(
                     dwPortId,
                     strUniqName,

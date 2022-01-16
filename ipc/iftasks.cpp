@@ -1602,7 +1602,7 @@ gint32 CIfTaskGroup::OnChildComplete(
             break;
         }
 
-        TaskletPtr pHead = m_queTasks.front();
+        TaskletPtr& pHead = m_queTasks.front();
         if( pChild != pHead )
         {
             // Possibly racing in this function between
