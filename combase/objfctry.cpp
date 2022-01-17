@@ -56,13 +56,13 @@ gint32 CClassFactory::CreateInstance(
     CObjBase*& pObj,
     const IConfigDb* pCfg )
 {
-    gint32 ret = -ENOENT;
+    gint32 ret = 0;
 
-    if( m_oMapObjMakers.find( iClsid )
-        != m_oMapObjMakers.end() )
+    auto itr = m_oMapObjMakers.find( iClsid );
+    if( itr != m_oMapObjMakers.end() )
     {
         ret = 0;
-        pObj = ( *m_oMapObjMakers.at( iClsid ) )( pCfg );
+        pObj = ( *itr->second )( pCfg );
         if( pObj != nullptr )
         {
             pObj->AddRef();
@@ -71,6 +71,10 @@ gint32 CClassFactory::CreateInstance(
         {
             ret = -EFAULT;
         }
+    }
+    else
+    {
+        ret = -ENOENT;
     }
 
     return ret;

@@ -1656,7 +1656,7 @@ class CParamList : public CCfgOpener
         if( GetCfg().IsEmpty() )
             return;
 
-        InitParamList();
+        SetIntProp( propParamCount, 0 );
     }
 
     ~CParamList()

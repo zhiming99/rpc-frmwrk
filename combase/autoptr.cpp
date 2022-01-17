@@ -37,9 +37,7 @@ namespace rpcf
 gint32 CreateObjFast( EnumClsid iClsid,
     CObjBase*& pObj, const IConfigDb* pCfg ) 
 {
-    gint32 ret = -ENOTSUP;
-    if( iClsid == clsid( CBuffer ) &&
-        pCfg == nullptr )
+    if( iClsid == clsid( CBuffer ) )
     {
         pObj = new( std::nothrow ) CBuffer();
     }
@@ -47,13 +45,17 @@ gint32 CreateObjFast( EnumClsid iClsid,
     {
         pObj = new( std::nothrow ) CConfigDb2( pCfg );    
     }
+    else
+    {
+        return  -ENOTSUP;
+    }
 
     // NOTE: we have a reference count already, no need
     // to AddRef again
-    if( pObj != nullptr )
-        ret = 0;
+    if( unlikely( pObj == nullptr ) )
+        return -ENOMEM;
 
-    return ret;
+    return STATUS_SUCCESS;
 }
 
 gint32 DeserializeObj( const CBuffer& oBuf, ObjPtr& pObj )
