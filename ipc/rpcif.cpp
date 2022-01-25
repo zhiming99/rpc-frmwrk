@@ -4398,7 +4398,7 @@ gint32 CRpcServices::LoadObjDesc(
                 oObjElem[ JSON_ATTR_ROUTER_ROLE ].isString() )
             {
                 strVal = oObjElem[ JSON_ATTR_ROUTER_ROLE ].asString(); 
-                oCfg[ propRouterRole ] = std::strtol(
+                oCfg[ propRouterRole ] = ( guint32 )std::strtol(
                     strVal.c_str(), nullptr, 10 );
             }
             else
