@@ -60,6 +60,10 @@ This project depends on the following 3rd-party packags at runtime:
 5. A tree-like hierarchical persistant registry.
 
 ---
+[`Tue Jan 25 2022 01:38:47 PM Beijing`]   
+1. Back from some urgent tasks. Continue the development of Json support.
+2. With Json support, the client can send/receive req/resp with a Json string. The server handler will handle and respond the client request in Json string too. 
+
 [`Sat Jan 15 2022 07:03:42 PM Beijing`]   
 1. Merged buf2var-dev to the master branch. 
 2. The performance gain is about 10%~20%.
