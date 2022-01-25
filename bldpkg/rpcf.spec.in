@@ -37,7 +37,7 @@ the @PACKAGE_NAME@ static libraries.
 ./configure --prefix=/usr --includedir=%{_includedir} --mandir=%{_mandir} \
 --infodir=%{_infodir} --sysconfdir=%{_sysconfdir} --localstatedir=%{_localstatedir} \
 --disable-silent-rules --libdir=%{_libdir} \
---disable-maintainer-mode --disable-dependency-tracking CPPFLAGS="-O2 -g3 -DRELEASE -D_DEBUG=0"
+--disable-maintainer-mode --disable-dependency-tracking CPPFLAGS="-O2 -g3 -DRELEASE -D_DEBUG=0 -fno-strict-aliasing"
 
 %make_build
 

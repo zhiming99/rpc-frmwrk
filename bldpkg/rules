@@ -12,4 +12,4 @@ endif
 	dh $@ $(dhopt)
 
 override_dh_auto_configure:
-	dh_auto_configure -- "CPPFLAGS=-O2 -g3 -DRELEASE -D_DEBUG=0"
+	dh_auto_configure -- "CPPFLAGS=-O2 -g3 -DRELEASE -D_DEBUG=0 -fno-strict-aliasing"
