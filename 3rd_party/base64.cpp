@@ -78,8 +78,17 @@ gint32 base64_encode(unsigned char const* bytes_to_encode, unsigned int in_len, 
       return 0;
 
   guint32 dest_bytes = base64_enc_len( in_len );
-  dest_buf->Resize( dest_bytes );
-  buf = dest_buf->ptr(); 
+
+  if( dest_buf.IsEmpty() )
+  {
+      gint32 ret = dest_buf.NewObj();
+      if( ERROR( ret ) )
+          return ret;
+  }
+
+  guint32 dwOldSize = dest_buf->size();
+  dest_buf->Resize( dwOldSize + dest_bytes );
+  buf = dest_buf->ptr() + dwOldSize; 
 
   while (in_len--) {
     char_array_3[i++] = *(bytes_to_encode++);
@@ -151,8 +160,19 @@ gint32 base64_decode( const char* src_buf, unsigned int in_len, BufPtr& dest_buf
   if( dest_bytes == 0 )
       return -EINVAL;
 
-  dest_buf->Resize( dest_bytes );
-  char* buf = dest_buf->ptr();
+  gint32 ret = 0;
+  if( dest_buf.IsEmpty() )
+  {
+      ret = dest_buf.NewObj();
+      if( ERROR( ret ) )
+          return ret;
+  }
+  guint32 dwOldSize = dest_buf->size();
+  ret = dest_buf->Resize( dwOldSize + dest_bytes );
+  if( ERROR( ret ) )
+    return ret;
+
+  char* buf = dest_buf->ptr() + dwOldSize;
 
   while (in_len-- && ( src_buf[in_] != '=') && is_base64(src_buf[in_])) {
     char_array_4[i++] = src_buf[in_]; in_++;

@@ -1,3 +1,27 @@
+'''
+ * =====================================================================================
+ *
+ *       Filename:  seribase.py
+ *
+ *    Description:  serialization utilities for Python
+ *
+ *        Version:  1.0
+ *        Created:  10/24/2021 17:37:00 PM
+ *       Revision:  none
+ *    Interpreter:  python3
+ *
+ *         Author:  Ming Zhi( woodhead99@gmail.com )
+ *   Organization:
+ *
+ *      Copyright:  2021 Ming Zhi( woodhead99@gmail.com )
+ *
+ *        License:  This program is free software; you can redistribute it
+ *                  and/or modify it under the terms of the GNU General Public
+ *                  License version 3.0 as published by the Free Software
+ *                  Foundation at 'http://www.gnu.org/licenses/gpl-3.0.html'
+ *
+ * =====================================================================================
+'''
 from typing import Tuple
 from rpcf.rpcbase import *
 import struct

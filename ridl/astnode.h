@@ -1303,7 +1303,7 @@ struct CServiceDecl : public CInterfRef
         return pifrs->GetIfRefs( vecIfs );
     }
 
-    bool CheckBoolAttr( guint32 token )
+    bool CheckBoolAttr( guint32 token ) const
     {
         bool bRet = false;
         do{
@@ -1313,7 +1313,7 @@ struct CServiceDecl : public CInterfRef
 
             BufPtr pBuf;
             gint32 ret = pal->
-                GetAttrByToken( TOK_SSL, pBuf );
+                GetAttrByToken( token, pBuf );
             if( ERROR( ret ) )
                 break;
 
@@ -1341,102 +1341,6 @@ struct CServiceDecl : public CInterfRef
 
             if( ERROR( ret ) )
                 break;
-
-        }while( 0 );
-
-        return ret;
-    }
-
-    bool IsSSL()
-    { return CheckBoolAttr( TOK_SSL ); }
-
-    bool IsWebSocket()
-    { return CheckBoolAttr( TOK_WEBSOCK ); }
-
-    gint32 GetAuthVal( BufPtr& pAuth )
-    {
-        gint32 ret = 0;
-        do{
-            ret = GetValueAttr(
-                TOK_AUTH, pAuth );
-            if( ERROR( ret ) )
-                break;
-
-            if( pAuth.IsEmpty() || pAuth->empty() )
-            {
-                ret = -ENOENT;
-                break;
-            }
-
-            if( pAuth->GetExDataType() !=
-                typeString )
-            {
-                ret = -EINVAL;
-                break;
-            }
-
-        }while( 0 );
-
-        return ret;
-    }
-
-    bool IsCompress()
-    { return CheckBoolAttr( TOK_COMPRES ); }
-
-    gint32 GetRouterPath( std::string& strRtPath )
-    {
-        BufPtr pBuf;
-        gint32 ret = 0;
-        do{
-            ret = GetValueAttr(
-                TOK_RTPATH, pBuf );
-            if( ERROR( ret ) )
-                break;
-
-            if( pBuf.IsEmpty() || pBuf->empty() )
-            {
-                ret = -ENOENT;
-                break;
-            }
-
-            if( pBuf->GetExDataType() !=
-                typeString )
-            {
-                ret = -EINVAL;
-                break;
-            }
-
-            strRtPath = *pBuf;
-
-        }while( 0 );
-
-        return ret;
-    }
-
-    gint32 GetIpAddr( std::string& strIpAddr )
-    {
-        BufPtr pBuf;
-        gint32 ret = 0;
-        do{
-            ret = GetValueAttr(
-                TOK_IPADDR, pBuf );
-            if( ERROR( ret ) )
-                break;
-
-            if( pBuf.IsEmpty() || pBuf->empty() )
-            {
-                ret = -ENOENT;
-                break;
-            }
-
-            if( pBuf->GetExDataType() !=
-                typeString )
-            {
-                ret = -EINVAL;
-                break;
-            }
-
-            strIpAddr = *pBuf;
 
         }while( 0 );
 
@@ -1496,36 +1400,6 @@ struct CServiceDecl : public CInterfRef
             }
 
             dwTimeout = *pBuf;
-
-        }while( 0 );
-
-        return ret;
-    }
-
-    gint32 GetPortNum( guint32& dwPort )
-    {
-        BufPtr pBuf;
-        gint32 ret = 0;
-        do{
-            ret = GetValueAttr(
-                TOK_PORTNUM, pBuf );
-            if( ERROR( ret ) )
-                break;
-
-            if( pBuf.IsEmpty() || pBuf->empty() )
-            {
-                ret = -ENOENT;
-                break;
-            }
-
-            if( pBuf->GetExDataType() !=
-                typeUInt32 )
-            {
-                ret = -EINVAL;
-                break;
-            }
-
-            dwPort = *pBuf;
 
         }while( 0 );
 

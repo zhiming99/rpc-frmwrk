@@ -622,6 +622,9 @@ class CStructBase :
     CStructBase() :
         super(), CObjBase()
     {}
+    CStructBase( ObjPtr& pIf ) :
+        super( pIf ), CObjBase()
+    {}
     
     virtual gint32 Serialize(
         BufPtr& pBuf ) = 0;

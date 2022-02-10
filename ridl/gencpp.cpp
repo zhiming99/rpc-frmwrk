@@ -33,6 +33,7 @@ using namespace rpcf;
 extern std::string g_strAppName;
 extern bool g_bMklib;
 extern stdstr g_strLang;
+extern guint32 g_dwFlags;
 
 std::map< gint32, char > g_mapTypeSig =
 {
@@ -1214,6 +1215,9 @@ gint32 GenHeaderFile(
     return ret;
 }
 
+extern gint32 FuseDeclareMsgSet(
+    CCppWriter* m_pWriter, ObjPtr& pRoot );
+
 gint32 GenCppFile(
     CCppWriter* m_pWriter, ObjPtr& pRoot )
 {
@@ -1244,15 +1248,15 @@ gint32 GenCppFile(
         NEW_LINE;
         std::vector< ObjPtr > vecSvcs;
         pStmts->GetSvcDecls( vecSvcs );
-        /*for( auto& elem : vecSvcs )
-        {
-            CServiceDecl* psvd = elem;
-            std::string strName = psvd->GetName();
-            CCOUT<< "#include \"" <<
-                strName << ".h\"";
-            NEW_LINE;
-        }*/
         NEW_LINE;
+
+        if( bFuse )
+        {
+            ret = FuseDeclareMsgSet(
+                m_pWriter, pRoot );
+            if( ERROR( ret ) )
+                break;
+        }
 
         for( guint32 i = 0;
             i < pStmts->GetCount(); i++ )
@@ -1679,6 +1683,11 @@ gint32 CDeclareStruct::Output()
 {
     gint32 ret = 0;
     do{
+        if( bFuse )
+        {
+            ret = OutputFuse();
+            break;
+        }
         std::string strName =
             m_pNode->GetName();
 
@@ -1755,12 +1764,12 @@ gint32 CDeclareStruct::Output()
         // declare two methods to implement
         CCOUT<< "gint32 Serialize(";
         INDENT_UPL;
-        CCOUT << " BufPtr& pBuf_ ) override;";
+        CCOUT << "BufPtr& pBuf_ ) override;";
         INDENT_DOWNL;
         NEW_LINE;
         CCOUT << "gint32 Deserialize(";
         INDENT_UPL;
-        CCOUT <<" BufPtr& pBuf_ ) override;"; 
+        CCOUT <<"BufPtr& pBuf_ ) override;"; 
         INDENT_DOWNL;
         NEW_LINE;
         Wa( "guint32 GetMsgId() const override" );
@@ -3806,16 +3815,31 @@ gint32 CImplSerialStruct::OutputAssign()
 
 gint32 CImplSerialStruct::Output()
 {
-    gint32 ret = OutputSerial();
-    if( ERROR( ret ) )
-        return ret;
-    NEW_LINE;
-    ret = OutputDeserial();
-    if( ERROR( ret ) )
-        return ret;
-    NEW_LINE;
-    ret = OutputAssign();
-    NEW_LINE;
+    gint32 ret = 0;
+    do{
+        bool bFuseBoth = ( bFuseP && bFuseS );
+        if( bFuseBoth )
+        {
+            ret = OutputFuse();
+            break;
+        }
+        else if( bFuseP || bFuseS )
+        {
+            ret = OutputFuse();
+            if( ERROR( ret ) )
+                break;
+        }
+        ret = OutputSerial();
+        if( ERROR( ret ) )
+            break;
+        NEW_LINE;
+        ret = OutputDeserial();
+        if( ERROR( ret ) )
+            break;
+        NEW_LINE;
+        ret = OutputAssign();
+        NEW_LINE;
+    }while( 0 );
     return ret;
 }
 
@@ -6891,69 +6915,6 @@ gint32 CExportObjDesc::BuildObjDesc(
             std::to_string( dwVal );
         oElem[ JSON_ATTR_KA_TIMEOUT ] =
             std::to_string( dwkasec );
-
-        std::string strVal;
-        ret = psd->GetIpAddr( strVal );
-        if( SUCCEEDED( ret ) )
-            oElem[ JSON_ATTR_IPADDR ] = strVal;
-
-        ret = psd->GetPortNum( dwVal );
-        if( SUCCEEDED( ret ) )
-            oElem[ JSON_ATTR_TCPPORT ] =
-                std::to_string( dwVal / 2 );
-
-        ret = psd->GetRouterPath( strVal );
-        if( SUCCEEDED( ret ) )
-            oElem[ JSON_ATTR_ROUTER_PATH ] =
-                strVal;
-
-        BufPtr pAuth;
-        ret = psd->GetAuthVal( pAuth );
-        if( SUCCEEDED( ret ) )
-        {
-            Json::CharReaderBuilder oBuilder;
-            std::unique_ptr< Json::CharReader >
-                pReader( oBuilder.newCharReader() );
-
-            if( pReader == nullptr )
-            {
-                ret = -EFAULT;
-                break;
-            }
-            Json::Value oAuth;
-            std::string strMsg;
-            if( !pReader->parse( pAuth->ptr(),
-                pAuth->ptr() + pAuth->size(),
-                &oAuth, &strMsg ) )
-            {
-                DebugPrintEx( logErr, ret,
-                    "error, %s\n", strMsg.c_str() );
-                ret = -EBADMSG;
-                break;
-            }
-            oElem[ JSON_ATTR_AUTHINFO ] = oAuth;
-        }
-
-        if( psd->IsWebSocket() )
-            oElem[ JSON_ATTR_ENABLE_WEBSOCKET ] =
-                "true";
-        else
-            oElem[ JSON_ATTR_ENABLE_WEBSOCKET ] =
-                "false";
-
-        if( psd->IsCompress() )
-            oElem[ JSON_ATTR_ENABLE_COMPRESS ] =
-                "true";
-        else
-            oElem[ JSON_ATTR_ENABLE_COMPRESS ] =
-                "false";
-
-        if( psd->IsSSL() )
-            oElem[ JSON_ATTR_ENABLE_SSL ] =
-                "true";
-        else
-            oElem[ JSON_ATTR_ENABLE_SSL ] =
-                "false";
 
         ret = 0;
 

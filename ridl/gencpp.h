@@ -38,6 +38,14 @@ do{ \
         strRet += ".new"; \
 }while( 0 )
 
+#define FUSE_PROXY  1
+#define FUSE_SERVER 2
+#define FUSE_BOTH   3
+
+#define bFuseP ( ( g_dwFlags & FUSE_PROXY ) > 0 )
+#define bFuseS ( ( g_dwFlags & FUSE_SERVER ) > 0 )
+#define bFuse ( ( g_dwFlags & FUSE_BOTH ) > 0 )
+
 guint32 GenClsid(
     const std::string& strName );
 
@@ -374,6 +382,7 @@ class CDeclareStruct
     CDeclareStruct( CCppWriter* pWriter,
         ObjPtr& pNode );
     gint32 Output();
+    gint32 OutputFuse();
 };
 
 struct CArgListUtils
@@ -578,6 +587,9 @@ class CImplSerialStruct
     gint32 OutputSerial();
     gint32 OutputDeserial();
     gint32 Output();
+    gint32 OutputFuse();
+    gint32 OutputSerialFuse();
+    gint32 OutputDeserialFuse();
 };
 
 class CImplIufProxy
