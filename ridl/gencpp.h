@@ -433,13 +433,13 @@ struct CMethodWriter
         ObjPtr& pArgList,
         ObjPtr& pArgList2 );
 
-    gint32 GenSerialArgs(
+    virtual gint32 GenSerialArgs(
         ObjPtr& pArgList,
         const std::string& strBuf,
         bool bDeclare, bool bAssign,
         bool bNoRet = false );
 
-    gint32 GenDeserialArgs(
+    virtual gint32 GenDeserialArgs(
         ObjPtr& pArgList,
         const std::string& strBuf,
         bool bDeclare, bool bAssign,
@@ -549,7 +549,7 @@ class CDeclServiceImpl :
         std::vector< ABSTE >& vecMethods,
         bool bProxy );
 
-    gint32 DeclAbstMethod(
+    virtual gint32 DeclAbstMethod(
         ABSTE oMethod,
         bool bProxy,
         bool bComma = true );

@@ -1,8 +1,8 @@
 #!/sh/bash
 if [ "x$1" == "xd" ]; then
-    ./configure "CPPFLAGS=-O0 -ggdb -DDEBUG -D_DEBUG=1"
+    CONFIG_SHELL=/bin/bash ./configure "CPPFLAGS=-O0 -ggdb -DDEBUG -D_DEBUG=1"
 elif [ "x$1" == "xr" ]; then
-    ./configure "CPPFLAGS=-O2 -g -DRELEASE -D_DEBUG=0 -fno-strict-aliasing"
+    CONFIG_SHELL=/bin/bash ./configure "CPPFLAGS=-O2 -g -DRELEASE -D_DEBUG=0 -fno-strict-aliasing"
 elif [ "x$1" == "x" ]; then
     echo "Usage: cfgsel <d/r>"
     echo "  d: debug build"

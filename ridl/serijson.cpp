@@ -24,9 +24,10 @@
  * =====================================================================================
  */
 
+#include "rpc.h"
+using namespace rpcf;
 #include "serijson.h"
 #include "streamex.h"
-using namespace rpcf;
 
 gint32 CJsonSerialBase::SerializeBool(
     BufPtr& pBuf, const Value& val )
@@ -106,9 +107,9 @@ gint32 CJsonSerialBase::SerializeHStream(
 {
     if( val.empty() || !val.isUInt64() )
         return -EINVAL;
-    HANDLE hStream = val.asUInt64();
+    HANDLE hstm = val.asUInt64();
     HSTREAM oStm;
-    oStm.m_hStream = hStream;
+    oStm.m_hStream = hstm;
     oStm.m_pIf = this->GetIf();
     return oStm.Serialize( pBuf );
 }
@@ -149,15 +150,15 @@ gint32 CJsonSerialBase::SerializeStruct(
             break;
         }
 
-        if( !( val.isMember( JSON_ATTR_MSGID ) &&
-            val[ JSON_ATTR_MSGID ].isUInt() ) )
+        if( !( val.isMember( JSON_ATTR_STRUCTID ) &&
+            val[ JSON_ATTR_STRUCTID ].isUInt() ) )
         {
             ret = -EINVAL;
             break;
         }
 
         guint32 dwMsgId =
-            val[ JSON_ATTR_MSGID ].asUInt(); 
+            val[ JSON_ATTR_STRUCTID ].asUInt(); 
 
         if( g_setMsgIds.find( dwMsgId ) ==
             g_setMsgIds.end() )
@@ -172,8 +173,8 @@ gint32 CJsonSerialBase::SerializeStruct(
             break;
 
         CJsonStructBase* pStruct = pObj;
-        ret = pStruct->JsonSerialize(
-            pBuf, val );
+        pStruct->SetIf( this->GetIf() );
+        ret = pStruct->JsonSerialize( pBuf, val );
     }while( 0 );
 
     return ret;
@@ -236,8 +237,10 @@ gint32 CJsonSerialBase::SerializeArray(
         gint32 ret = 0;
         for( size_t i = 0; i < dwCount; ++i )
         {
-            ret = SerialElem( pBuf, val[ ( gint32 )i ],
+            ret = SerializeElem( pBuf,
+                val[ ( gint32 )i ],
                 strElemSig.c_str() );
+
             if( ERROR( ret ) )
                 break;
         }
@@ -319,7 +322,7 @@ gint32 CJsonSerialBase::SerializeFromStr(
     case 'q':
         {
             guint64 qwVal = ( guint64 )strtoull(
-                strKey.c_str(), nullptr, 10 );
+                strKey.c_str(), nullptr, 0 );
             ret = Serialize( pBuf, qwVal );
             break;
         }
@@ -327,7 +330,7 @@ gint32 CJsonSerialBase::SerializeFromStr(
     case 'd':
         {
             guint32 dwVal = ( guint32 )strtoul(
-                strKey.c_str(), nullptr, 10 );
+                strKey.c_str(), nullptr, 0 );
             ret = Serialize( pBuf, dwVal );
             break;
         }
@@ -335,7 +338,7 @@ gint32 CJsonSerialBase::SerializeFromStr(
     case 'w':
         {
             guint16 wVal = ( guint16 )strtoul(
-                strKey.c_str(), nullptr, 10 );
+                strKey.c_str(), nullptr, 0 );
             ret = Serialize( pBuf, wVal );
             break;
         }
@@ -372,14 +375,14 @@ gint32 CJsonSerialBase::SerializeFromStr(
     case 'B':
         {
             guint8 bVal = strtoul(
-                strKey.c_str(), nullptr, 10 );
+                strKey.c_str(), nullptr, 0 );
             ret = Serialize( pBuf, bVal );
             break;
         }
     case 'h':
         {
             guint64 qwVal = ( guint64 )strtoull(
-                strKey.c_str(), nullptr, 10 );
+                strKey.c_str(), nullptr, 0 );
             Value valStm( qwVal );
             ret = SerializeHStream( pBuf, valStm );
             break;
@@ -489,14 +492,14 @@ gint32 CJsonSerialBase::SerializeMap(
                 strKey = vecNames[ i ];
 
             Value oKey( strKey );
-            ret = SerialElem(
+            ret = SerializeElem(
                 pBuf, oKey ,
                 strKeySig.c_str(),
                 true );
             if( ERROR( ret ) )
                 break;
 
-            ret = SerialElem(
+            ret = SerializeElem(
                 pBuf, val[ strKey ] ,
                 strElemSig.c_str() );
             if( ERROR( ret ) )
@@ -521,7 +524,7 @@ gint32 CJsonSerialBase::SerializeMap(
     return ret;
 }
 
-gint32 CJsonSerialBase::SerialElem(
+gint32 CJsonSerialBase::SerializeElem(
     BufPtr& pBuf, const Value& val,
     const char* szSignature, bool bKey )
 {
@@ -864,6 +867,7 @@ gint32 CJsonSerialBase::DeserializeArray(
         if( ERROR( ret ) )
             break;
 
+        val = Json::Value( arrayValue );
         if( dwBytes == 0 || dwCount == 0 )
             break;
 
@@ -880,7 +884,7 @@ gint32 CJsonSerialBase::DeserializeArray(
         for( size_t i = 0; i < dwCount; ++i )
         {
             Value elem;
-            ret = DeserialElem( pBuf, elem,
+            ret = DeserializeElem( pBuf, elem,
                 strElemSig.c_str() );
             if( ERROR( ret ) )
                 break;
@@ -963,6 +967,7 @@ gint32 CJsonSerialBase::DeserializeMap(
         if( ERROR( ret ) )
             break;
 
+        val = Json::Value( objectValue );
         if( dwCount == 0 )
             break;
 
@@ -977,7 +982,7 @@ gint32 CJsonSerialBase::DeserializeMap(
         for( guint32 i = 0; i < dwCount; ++i )
         {
             Value key, elem;
-            ret = DeserialElem(
+            ret = DeserializeElem(
                 pBuf, key,
                 strKeySig.c_str(),
                 true );
@@ -985,7 +990,7 @@ gint32 CJsonSerialBase::DeserializeMap(
             if( ERROR( ret ) )
                 break;
 
-            ret = DeserialElem(
+            ret = DeserializeElem(
                 pBuf, elem,
                 strElemSig.c_str() );
 
@@ -1012,7 +1017,7 @@ gint32 CJsonSerialBase::DeserializeMap(
     return ret;
 }
 
-gint32 CJsonSerialBase::DeserialElem(
+gint32 CJsonSerialBase::DeserializeElem(
     BufPtr& pBuf, Value& val,
     const char* szSignature, bool bKey )
 {

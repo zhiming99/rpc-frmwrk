@@ -29,36 +29,44 @@
 #include <json/json.h>
 #include <set>
 
-#define JSON_ATTR_MSGID         "rpcf_MessageId"
+// Json request/response must have a string attribute
+// 'interface' and a string attributes 'method' to
+// specify which interface and which method the
+// parameters are for.
 #define JSON_ATTR_IFNAME        "rpcf_Interface"
-#define JSON_ATTR_SVCNAME       "rpcf_Service"
 #define JSON_ATTR_METHOD        "rpcf_Method"
-#define JSON_ATTR_REQPARAMS     "rpcf_Request"
-#define JSON_ATTR_RSPPARAMS     "rpcf_Response"
-#define JSON_ATTR_EVTPARAMS     "rpcf_Event"
-#define JSON_ATTR_RETCODE       "ReturnCode"
-#define JSON_ATTR_REQCTXT       "ReqCtx"
+
+// A json message must have a string attribute MsgType
+// and the value wiill be one of 'req', 'resp' or
+// 'event'
+#define JSON_ATTR_MSGTYPE       "rpcf_MsgType"
+
+// A json message can have an object attribute 'params'
+#define JSON_ATTR_PARAMS        "rpcf_Params"
+
+// Json representation of a struct must have a UInt
+// attribute 'structId', as mapped to the internal
+// msgid
+#define JSON_ATTR_STRUCTID      "rpcf_StructId"
+
+// Each json request/response/event message has an
+// UInt64 attribute reqctxid, as a unique identifier of
+// the request. Particularly, the response's identifer
+// must be the same as the one from the associated
+// request.
+#define JSON_ATTR_REQCTXID      "rpcf_ReqCtxId"
+
+// Each json response msg must have an attribute
+// ReturnCode with a negative int value defined in
+// 'errno.h'. If it is < 0, attribute PARAMS is
+// ignored. if its value is STATUS_PENDING on proxy
+// side, a uint64 attribute 'taskid' is also returned
+// as for canceling purpose. And the true response
+// message will be returned in the future.
+#define JSON_ATTR_RETCODE       "rpcf_ReturnCode"
 
 using namespace Json;
 extern std::set< guint32 > g_setMsgIds;
-
-class CJsonStructBase : public CStructBase
-{
-    public:
-    typedef CStructBase super;
-    CJsonStructBase() :
-        super()
-    {}
-    CJsonStructBase( ObjPtr& pIf ) :
-        super( pIf )
-    {}
-
-    virtual gint32 JsonSerialize(
-        BufPtr& pBuf, const Value& val ) = 0;
-
-    virtual gint32 JsonDeserialize(
-        BufPtr& pBuf, Value& val ) = 0;
-};
 
 class CJsonSerialBase : public CSerialBase
 {
@@ -120,7 +128,7 @@ class CJsonSerialBase : public CSerialBase
         const Value& val,
         const char* szSignature );
 
-    gint32 SerialElem(
+    gint32 SerializeElem(
         BufPtr& pBuf, const Value& val,
         const char* szSignature,
         bool bKey = false );
@@ -170,8 +178,30 @@ class CJsonSerialBase : public CSerialBase
         Value& val,
         const char* szSignature );
 
-    gint32 DeserialElem(
+    gint32 DeserializeElem(
         BufPtr& pBuf, Value& val,
         const char* szSignature,
         bool bKey = false );
 };
+
+class CJsonStructBase :
+    public CJsonSerialBase,
+    public CObjBase
+{
+    public:
+    typedef CJsonSerialBase super;
+    CJsonStructBase() :
+        super(), CObjBase()
+    {}
+
+    CJsonStructBase( ObjPtr& pIf ) :
+        super( pIf ), CObjBase()
+    {}
+
+    virtual gint32 JsonSerialize(
+        BufPtr& pBuf, const Value& val ) = 0;
+
+    virtual gint32 JsonDeserialize(
+        BufPtr& pBuf, Value& val ) = 0;
+};
+

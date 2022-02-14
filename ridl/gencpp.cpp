@@ -1769,7 +1769,7 @@ gint32 CDeclareStruct::Output()
         NEW_LINE;
         CCOUT << "gint32 Deserialize(";
         INDENT_UPL;
-        CCOUT <<"BufPtr& pBuf_ ) override;"; 
+        CCOUT << "BufPtr& pBuf_ ) override;"; 
         INDENT_DOWNL;
         NEW_LINE;
         Wa( "guint32 GetMsgId() const override" );
@@ -2428,7 +2428,27 @@ gint32 CDeclInterfSvr::OutputAsync(
             GetArgCount( pOutArgs );
 
         guint32 dwCount = dwInCount + dwOutCount;
-        if( pmd->IsSerialize() )
+        if( dwInCount == 0 )
+        {
+            Wa( "//RPC Async Req Handler wrapper" );
+            CCOUT << "gint32 "
+                << strName << "Wrapper(";
+            INDENT_UPL;
+            CCOUT << "IEventSink* pCallback );";
+            INDENT_DOWNL;
+            NEW_LINE;
+
+            CCOUT << "gint32 "
+                << strName << "CancelWrapper(";
+            INDENT_UPL;
+            CCOUT << "IEventSink* pCallback,";
+            NEW_LINE;
+            Wa( "gint32 iRet," );
+            CCOUT << "IConfigDb* pReqCtx_ );";
+            INDENT_DOWNL;
+            NEW_LINE;
+        }
+        else if( pmd->IsSerialize() )
         {
             Wa( "//RPC Async Req Handler wrapper" );
             CCOUT << "gint32 "
@@ -2446,26 +2466,6 @@ gint32 CDeclInterfSvr::OutputAsync(
             NEW_LINE;
             Wa( "gint32 iRet," );
             CCOUT << "IConfigDb* pReqCtx_, BufPtr& pBuf_ );";
-            INDENT_DOWNL;
-            NEW_LINE;
-        }
-        else if( dwInCount == 0 )
-        {
-            Wa( "//RPC Async Req Handler wrapper" );
-            CCOUT << "gint32 "
-                << strName << "Wrapper(";
-            INDENT_UPL;
-            CCOUT << "IEventSink* pCallback );";
-            INDENT_DOWNL;
-            NEW_LINE;
-
-            CCOUT << "gint32 "
-                << strName << "CancelWrapper(";
-            INDENT_UPL;
-            CCOUT << "IEventSink* pCallback,";
-            NEW_LINE;
-            Wa( "gint32 iRet," );
-            CCOUT << "IConfigDb* pReqCtx_ );";
             INDENT_DOWNL;
             NEW_LINE;
         }
@@ -5077,7 +5077,7 @@ gint32 CImplIfMethodProxy::OutputAsyncCbWrapper()
             INDENT_DOWN;
             NEW_LINE;
         }
-        else /* need serialization */
+        else /* need deserialization */
         {
             DeclLocals( pOutArgs );
             NEW_LINE;
@@ -5114,10 +5114,9 @@ gint32 CImplIfMethodProxy::OutputAsyncCbWrapper()
         BLOCK_CLOSE;
         Wa( "while( 0 );" );
         NEW_LINE;
-        Wa( "return 0;" );
-
+        CCOUT << "return 0;";
         BLOCK_CLOSE;
-        NEW_LINES( 1 );
+        NEW_LINE;
 
     }while( 0 );
     
@@ -5721,7 +5720,10 @@ gint32 CImplIfMethodSvr::OutputAsyncSerial()
         CCOUT << "&" << strClass << "::"
             << strMethod << "CancelWrapper,";
         NEW_LINE;
-        CCOUT << "pCallback, 0, pReqCtx_, pBuf_ );";
+        if( dwInCount > 0 )
+            CCOUT << "pCallback, 0, pReqCtx_, pBuf_ );";
+        else
+            CCOUT << "pCallback, 0, pReqCtx_ );";
         INDENT_DOWNL;
         NEW_LINE;
         Wa( "if( ERROR( ret ) ) break;" );
@@ -5748,9 +5750,13 @@ gint32 CImplIfMethodSvr::OutputAsyncSerial()
             << strMethod << "(";
 
         INDENT_UPL;
-        CCOUT << "pReqCtx_,";
-        NEW_LINE;
-        GenActParams( pInArgs, pOutArgs );
+        CCOUT << "pReqCtx_";
+        if( dwInCount + dwOutCount > 0 )
+        {
+            CCOUT << ",";
+            NEW_LINE;
+            GenActParams( pInArgs, pOutArgs );
+        }
 
         CCOUT << " );";
         INDENT_DOWNL;
@@ -5835,7 +5841,7 @@ gint32 CImplIfMethodSvr::OutputAsyncCancelWrapper()
         NEW_LINE;
         Wa( "gint32 iRet," );
         CCOUT << "IConfigDb* pReqCtx_";
-        if( bSerial )
+        if( dwInCount > 0 && bSerial )
         {
             CCOUT << ", BufPtr& pBuf_";
         }
@@ -5853,7 +5859,7 @@ gint32 CImplIfMethodSvr::OutputAsyncCancelWrapper()
 
         CCOUT << "do";
         BLOCK_OPEN;
-        if( bSerial )
+        if( dwInCount > 0 && bSerial )
         {
             DeclLocals( pInArgs );
             ret = GenDeserialArgs( pInArgs,
