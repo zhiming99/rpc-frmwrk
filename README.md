@@ -60,7 +60,7 @@ This project depends on the following 3rd-party packags at runtime:
 5. A tree-like hierarchical persistant registry.
 
 ---
-[`Sat Feb 19 2022 11:47:25 PM Beijing`]
+[`Sat Feb 19 2022 11:47:25 PM Beijing`]   
 1. Renamed `Json support` to `Fuse Integration`.
 2. And the development of `Fuse Integration` takes two steps, the first is to add fuctions to `ridlc` to generate the proxy/server library for FUSE integration, and the second is to implement the `file system` part over the generated code. The development is on branch `fusesup`.
 
