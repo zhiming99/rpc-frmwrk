@@ -68,7 +68,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRY( CStlIrpVector2 );
     INIT_MAP_ENTRY( CStlPortVector );
     INIT_MAP_ENTRY( COneshotTaskThread );
-    INIT_MAP_ENTRY( CTaskWrapper );
+    INIT_MAP_ENTRYCFG( CTaskWrapper );
 
     INIT_MAP_ENTRYCFG( CTaskThread );
     INIT_MAP_ENTRYCFG( CMainIoLoop );

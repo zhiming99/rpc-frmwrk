@@ -294,26 +294,7 @@ struct CAttrExps : public CAstListNode
     CAttrExps() : CAstListNode()
     { SetClassId( clsid( CAttrExps ) ); }
 
-    guint32 GetAsyncFlags() const
-    {
-        guint32 dwFlags = 0;
-        for( auto elem : m_queChilds )
-        {
-            CAttrExp* pExp = elem;
-            if( pExp == nullptr )
-                continue;
-            guint32 dwToken = pExp->GetName();
-            if( dwToken == TOK_ASYNC )
-                dwFlags = NODE_FLAG_ASYNC;
-            else if( dwToken == TOK_ASYNCP )
-                dwFlags = NODE_FLAG_ASYNCP;
-            else if( dwToken == TOK_ASYNCS )
-                dwFlags = NODE_FLAG_ASYNCS;
-            if( dwFlags > 0 )
-                break;
-        }
-        return dwFlags;
-    }
+    guint32 GetAsyncFlags() const;
 
     gint32 GetAttrByToken(
         guint32 token, BufPtr& pVal ) const

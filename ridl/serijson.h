@@ -38,7 +38,7 @@
 
 // A json message must have a string attribute MsgType
 // and the value wiill be one of 'req', 'resp' or
-// 'event'
+// 'evt'
 #define JSON_ATTR_MSGTYPE       "rpcf_MsgType"
 
 // A json message can have an object attribute 'params'

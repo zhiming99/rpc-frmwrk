@@ -5624,6 +5624,150 @@ gint32 CInterfaceProxy::UserCancelRequest(
     return ret;
 }
 
+// a user-initialized cancel request
+gint32 CInterfaceProxy::UserCancelReqAsync(
+    IEventSink* pCallback,
+	guint64& qwThisTaskId,
+	guint64 qwTaskToCancel )
+{
+	if( qwTaskToCancel == 0 )
+		return -EINVAL;
+
+    const string& strIfName = CoGetIfNameFromIid(
+        iid( IInterfaceServer ), "p" );
+
+    if( strIfName.empty() )
+        return ERROR_FAIL;
+
+    CParamList oOptions;
+    oOptions[ propIfName ] =
+        DBUS_IF_NAME( strIfName );
+    oOptions[ propSysMethod ] = true;
+
+    CCfgOpener oResp;
+    // make the call
+    std::string strMethod( "UserCancelRequest" );
+    gint32 ret = AsyncCall(
+        pCallback, oOptions.GetCfg(),
+        oResp.GetCfg(), strMethod,
+        qwTaskToCancel );
+
+    if( ERROR( ret ) )
+        return ret;
+
+    if( ret == STATUS_PENDING )
+    {
+        qwThisTaskId = oResp[ propTaskId ];
+        return ret;
+    }
+
+    if( SUCCEEDED( ret ) )
+    {
+        DebugPrint( 0,
+            "Req Task Canceled, 0x%llx",
+            qwTaskToCancel );
+    }
+    return ret;
+}
+
+gint32 CInterfaceProxy::CancelReqAsync(
+    IEventSink* pCallback,
+	guint64 qwTaskToCancel )
+{
+    gint32 ret = 0;
+    do{
+        TaskletPtr pWrapper, pTask;
+        CCfgOpener oCfg;
+        oCfg.SetPointer( propIfPtr,  this );
+        ret = pWrapper.NewObj(
+            clsid( CTaskWrapper ),
+            ( IConfigDb* )oCfg.GetCfg() );
+
+        if( ERROR( ret ) )
+            break;
+
+        gint32 ( *func )(IEventSink*,
+            IEventSink*, CRpcServices*, guint64) =
+            ([]( IEventSink* pWrapper,
+                IEventSink* pComplete,
+                CRpcServices* pIf,
+                guint64 qwTaskToCancel ) -> gint32
+        {
+            gint32 ret = 0;
+            do{
+                if( pComplete != nullptr )
+                {
+                    TaskletPtr pThis = ObjPtr( pWrapper );
+                    CCfgOpener oCfg( ( IConfigDb* )
+                        pThis->GetConfig() );
+                    IConfigDb* pResp = nullptr;
+                    ret = oCfg.GetPointer(
+                        propRespPtr, pResp );
+                    if( SUCCEEDED( ret ) )
+                    {
+                        CCfgOpenerObj oCompCfg( pComplete );
+                        oCompCfg.MoveProp(
+                            propRespPtr, pResp );
+                    }
+                    TaskletPtr pCb = ObjPtr( pComplete );
+                    ( *pCb )( eventZero );
+                }
+
+                TaskGrpPtr pTaskGrp;
+                ret = pIf->GetParallelGrp( pTaskGrp );
+                if( ERROR( ret ) )
+                    break;
+
+                TaskletPtr pTaskCancel;
+                ret = pTaskGrp->FindTask(
+                    qwTaskToCancel, pTaskCancel );
+                if( ERROR( ret ) )
+                    break;
+
+                ret = DEFER_CALL(
+                    pIf->GetIoMgr(), pTaskCancel,
+                    &IEventSink::OnEvent,
+                    eventUserCancel,
+                    ERROR_USER_CANCEL,
+                    0, nullptr );
+
+            }while( 0 );
+
+            return 0;
+        });
+
+        ret = NEW_FUNCCALL_TASK(
+            pTask, GetIoMgr(), func,
+            nullptr, pCallback, this,
+            qwTaskToCancel );
+
+        if( ERROR( ret ) )
+            break;
+
+        CDeferredFuncCallBase< CIfRetryTask >* pCall = pTask;
+        ObjPtr pObj( pCall );
+        Variant oArg0( pObj );
+        pCall->UpdateParamAt( 0, oArg0 );
+
+        CTaskWrapper* ptw = pWrapper;
+        ptw->SetCompleteTask( pTask );
+        // start the task
+        ( *ptw )( eventZero );
+
+        guint64 qwThisTask = 0;
+        ret = UserCancelReqAsync( ptw, 
+            qwThisTask, qwTaskToCancel );
+        if( ERROR( ret ) )
+        {
+            ptw->OnEvent(
+                eventCancelTask, ret, 0, 0 );
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CInterfaceProxy::Pause_Proxy()
 {
     return PauseResume_Proxy( "Pause" );

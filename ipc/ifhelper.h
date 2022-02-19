@@ -351,57 +351,74 @@ class CGenericCallback :
 };
 
 class CTaskWrapper :
-    public CGenericCallback< CTasklet >
+    public CGenericCallback< CIfInterceptTaskProxy >
 {
     TaskletPtr m_pTask;
+    TaskletPtr m_pMajor;
     public:
-    typedef CGenericCallback< CTasklet > super;
+    typedef CGenericCallback< CIfInterceptTaskProxy > super;
 
-    CTaskWrapper()
-    {
-        SetClassId( clsid( CTaskWrapper ) );
-    }
+    CTaskWrapper( const IConfigDb* pCfg ):
+        super( pCfg )
+    { SetClassId( clsid( CTaskWrapper ) ); }
 
-    gint32 SetTask( IEventSink* pTask )
+    gint32 SetCompleteTask( IEventSink* pTask )
     {
         if( pTask == nullptr )
-            return 0;
+            m_pTask.Clear();
+        else
+            m_pTask = ObjPtr( pTask );
+        return 0;
+    }
 
-        m_pTask = ObjPtr( pTask );
+    gint32 SetMajorTask( IEventSink* pTask )
+    {
+        if( pTask == nullptr )
+            m_pMajor.Clear();
+        else
+            m_pMajor = ObjPtr( pTask );
         return 0;
     }
 
     void TransferParams()
     {
+        if( m_pTask.IsEmpty() )
+            return;
+
         CCfgOpener oCfg( ( IConfigDb* )
             m_pTask->GetConfig() );
 
-        oCfg.MoveProp( propRespPtr, this );
-        oCfg.MoveProp( propMsgPtr, this );
-        oCfg.MoveProp( propReqPtr, this );
+        IConfigDb* pSrc = this->GetConfig();
+        oCfg.MoveProp( propRespPtr, pSrc );
+        oCfg.MoveProp( propMsgPtr, pSrc );
+        oCfg.MoveProp( propReqPtr, pSrc );
     }
 
-    virtual gint32 OnEvent( EnumEventId iEvent,
-        LONGWORD dwParam1 = 0,
-        LONGWORD dwParam2 = 0,
-        LONGWORD* pData = NULL  )
+    gint32 RunTask() override
     {
-        if( m_pTask.IsEmpty() )
-            return 0;
+        if( m_pMajor.IsEmpty() )
+            return STATUS_PENDING;
 
-        TransferParams();
-        return m_pTask->OnEvent( iEvent,
-            dwParam1, dwParam2, pData );
+        ( *m_pMajor )( eventZero );
+        return m_pMajor->GetError();
     }
 
-    virtual gint32 operator()(
-        guint32 dwContext )
+    gint32 OnTaskComplete( gint32 iRet ) override
     {
-        if( m_pTask.IsEmpty() )
-            return 0;
-
         TransferParams();
-        return m_pTask->operator()( dwContext );
+        super::OnTaskComplete( iRet );
+        CIfRetryTask* pTask = m_pTask;
+        if( pTask != nullptr )
+            ( *pTask )( eventZero );
+        return iRet;
+    }
+
+    gint32 OnComplete( gint32 iRetVal ) override
+    {
+        super::OnComplete( iRetVal );
+        m_pTask.Clear();
+        m_pMajor.Clear();
+        return iRetVal;
     }
 };
 
@@ -3772,4 +3789,141 @@ gint32 AddSeqTaskTempl( T* pObj,
     pTask_; \
 })
 
+template< class T >
+class CDeferredFuncCallBase :
+    public CGenericCallback< T >
+{
+
+    public:
+    typedef CGenericCallback< T > super;
+
+    CDeferredFuncCallBase( const IConfigDb* pCfg = nullptr)
+        : CGenericCallback< T >( pCfg )
+    {;}
+
+    virtual gint32 Delegate(
+        std::vector< Variant >& vecParams ) = 0;
+
+    std::vector< Variant > m_vecArgs;
+
+    virtual gint32 operator()( guint32 dwContext )
+    {
+#ifdef DEBUG
+        this->SetError( -1 );
+#endif
+        gint32 ret = this->Delegate( m_vecArgs );
+        return this->SetError( ret );
+    }
+
+    gint32 UpdateParamAt( guint32 i, Variant& oVar )
+    {
+        if( i >= m_vecArgs.size() || i < 0 )
+            return -EINVAL;
+        m_vecArgs[ i ] = oVar;
+        return 0;
+    }
+
+    gint32 GetParamAt( guint32 i, Variant& oVar ) const
+    {
+        if( i >= m_vecArgs.size() || i < 0 )
+            return -EINVAL;
+        oVar = m_vecArgs[ i ];
+        return 0;
+    }
+};
+
+template<typename TaskType, typename ...Args>
+class CDeferredFuncCall :
+    public CDeferredFuncCallBase< TaskType >
+{
+    typedef gint32 ( *FuncType)( Args... ) ;
+
+    FuncType m_pUserFunc;
+
+    template< int ...S>
+    gint32 CallUserFunc(
+        std::vector< Variant >& vecParams, NumberSequence< S... > )
+    {
+        if( m_pUserFunc == nullptr )
+            return -EINVAL;
+
+        std::tuple< DecType( Args )...> oTuple( 
+            VecToTuple< DecType( Args )... >(
+                vecParams ) );
+
+        return ( *m_pUserFunc )(
+            std::get< S >( oTuple )... );
+    }
+
+    static CfgPtr InitCfg( CIoManager* pMgr )
+    {
+        CParamList oParams;
+        // the pObj must be a interface object
+        // so that the CIfParallelTask can be
+        // constructed
+        if( pMgr != nullptr )
+            oParams.SetPointer( propIoMgr, pMgr );
+
+        return oParams.GetCfg();
+    }
+    public:
+    typedef CDeferredFuncCallBase< TaskType > super;
+    CDeferredFuncCall( FuncType pFunc, CIoManager* pMgr, Args... args )
+        :super( InitCfg( pMgr ) )
+    {
+        m_pUserFunc = pFunc;
+        this->SetClassId( clsid( CDeferredCall ) );
+        if( sizeof...( args ) )
+            PackParams( this->m_vecArgs, args... );
+    }
+
+    gint32 Delegate(
+        std::vector< Variant >& vecParams ) override
+    {
+        if( unlikely( vecParams.size() != sizeof...( Args ) ) )
+            return -EINVAL;
+
+        gint32 ret = CallUserFunc( vecParams,
+            typename GenSequence< sizeof...( Args ) >::type() );
+
+        return ret;
+    }
+
+    using TaskType::RunTask;
+    gint32 RunTask() override
+    {
+        return this->SetError(
+            Delegate( this->m_vecArgs ) );
+    }
+
+    using TaskType::OnComplete;
+    gint32 OnComplete( gint32 iRetVal ) override
+    {
+        super::OnComplete( iRetVal );
+        this->m_vecArgs.clear();
+        return iRetVal;
+    }
+};
+
+template < typename ... Types, typename ...Args>
+inline gint32 NewDeferredFuncCall( TaskletPtr& pCallback,
+    CIoManager* pMgr, gint32(*f)(Types ...), Args&&... args )
+{
+    CTasklet* pDeferredCall;
+    if( pMgr == nullptr )
+        return -EFAULT;
+
+    pDeferredCall = new CDeferredFuncCall< CIfRetryTask, Types... >(
+        f, pMgr, args... );
+
+    if( unlikely( pDeferredCall == nullptr ) )
+        return -EFAULT;
+
+    pCallback = pDeferredCall;
+    pCallback->DecRef();
+    return 0;
+}
+
+#define NEW_FUNCCALL_TASK( __pTask, pMgr, func, ... ) \
+    NewDeferredFuncCall( __pTask, pMgr, func , ##__VA_ARGS__ )
 }

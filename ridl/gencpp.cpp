@@ -3560,8 +3560,6 @@ gint32 CImplServiceImpl::Output()
                 BLOCK_CLOSE;
                 NEW_LINES( 2 );
             }
-
-            NEW_LINE;
         }
 
         if( vecSMethods.empty() || !IsServer() )
@@ -3588,11 +3586,11 @@ gint32 CImplServiceImpl::Output()
             CMethodDecl* pmd = elem.second;
             bool bAsync = pmd->IsAsyncs();
             bool bEvent = pmd->IsEvent();
+            if( bEvent )
+                continue;
 
             if( bAsync )
                 Wa( "/* Async Req */" );
-            else if( bEvent )
-                Wa( "/* Event */" );
             else
                 Wa( "/* Sync Req */" );
 
@@ -3611,7 +3609,7 @@ gint32 CImplServiceImpl::Output()
                 NEW_LINE;    
                 CCOUT << "return ERROR_NOT_IMPL;";
             }
-            else if( !bEvent )
+            else
             {
                 // sync method
                 Wa( "// TODO: Process the sync request here " );
@@ -3622,8 +3620,6 @@ gint32 CImplServiceImpl::Output()
             BLOCK_CLOSE;
             NEW_LINES( 2 );
         }
-
-        NEW_LINE;
 
     }while( 0 );
 

@@ -533,6 +533,8 @@ class CDeclService
     gint32 Output();
 };
 
+using ABSTE = std::pair< std::string, ObjPtr >;
+
 class CDeclServiceImpl :
     public CMethodWriter
 {
@@ -542,8 +544,6 @@ class CDeclServiceImpl :
     typedef CMethodWriter super;
     CDeclServiceImpl( CCppWriter* pWriter,
         ObjPtr& pNode, bool bServer );
-
-    using ABSTE = std::pair< std::string, ObjPtr >;
 
     gint32 FindAbstMethod(
         std::vector< ABSTE >& vecMethods,

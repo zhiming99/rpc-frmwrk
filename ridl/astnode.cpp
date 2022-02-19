@@ -25,6 +25,8 @@
 #include "rpc.h"
 using namespace rpcf;
 #include "astnode.h"
+#include "gencpp.h"
+extern guint32 g_dwFlags;
 extern stdstr g_strLang;
 extern std::string GetTypeSigJava( ObjPtr& pObj );
 std::string GetTypeSig( ObjPtr& pObj )
@@ -65,4 +67,34 @@ std::string GetTypeSig( ObjPtr& pObj )
     }while( 0 );
 
     return strSig;
+}
+
+guint32 CAttrExps::GetAsyncFlags() const
+{
+    guint32 dwFlags = 0;
+    if( bFuseP && bFuseS )
+        return NODE_FLAG_ASYNC;
+
+    for( auto elem : m_queChilds )
+    {
+        CAttrExp* pExp = elem;
+        if( pExp == nullptr )
+            continue;
+        guint32 dwToken = pExp->GetName();
+        if( dwToken == TOK_ASYNC )
+            dwFlags = NODE_FLAG_ASYNC;
+        else if( dwToken == TOK_ASYNCP )
+            dwFlags = NODE_FLAG_ASYNCP;
+        else if( dwToken == TOK_ASYNCS )
+            dwFlags = NODE_FLAG_ASYNCS;
+        if( dwFlags > 0 )
+            break;
+    }
+
+    if( bFuseP )
+        dwFlags |= NODE_FLAG_ASYNCP;
+    else if( bFuseS );
+        dwFlags |= NODE_FLAG_ASYNCS;
+
+    return dwFlags;
 }

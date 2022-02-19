@@ -1333,6 +1333,17 @@ class CInterfaceProxy :
     gint32 CancelRequest(
         guint64 qwTaskId );
 
+    // asynchronous version of UserCancelRequest
+    gint32 UserCancelReqAsync(
+        IEventSink* pCallback,
+        guint64& qwThisTaskId,
+        guint64 qwTaskToCancel );
+
+    // asynchronous version of CancelRequest
+    gint32 CancelReqAsync(
+        IEventSink* pCallback,
+        guint64 qwTaskToCancel );
+
     gint32 Pause_Proxy();
     gint32 Resume_Proxy();
 
