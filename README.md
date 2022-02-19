@@ -53,13 +53,17 @@ This project depends on the following 3rd-party packags at runtime:
 9. `Java OpenJDK 8 for Java support.`
 
 #### Todo
-1. Json support
+1. FUSE integration.
 2. Tutorials
 3. Performance Tuning
 4. Adaptive flow control
 5. A tree-like hierarchical persistant registry.
 
 ---
+[`Sat Feb 19 2022 11:47:25 PM Beijing`]
+1. Renamed `Json support` to `Fuse Integration`.
+2. And the development of `Fuse Integration` takes two steps, the first is to add fuctions to `ridlc` to generate the proxy/server library for FUSE integration, and the second is to implement the `file system` part over the generated code. The development is on branch `fusesup`.
+
 [`Tue Jan 25 2022 01:38:47 PM Beijing`]   
 1. Back from some urgent tasks. Continue the development of Json support.
 2. With Json support, the client can send/receive req/resp with a Json string. The server handler will handle and respond the client request in Json string too. 
