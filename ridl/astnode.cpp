@@ -93,7 +93,7 @@ guint32 CAttrExps::GetAsyncFlags() const
 
     if( bFuseP )
         dwFlags |= NODE_FLAG_ASYNCP;
-    else if( bFuseS );
+    else if( bFuseS )
         dwFlags |= NODE_FLAG_ASYNCS;
 
     return dwFlags;

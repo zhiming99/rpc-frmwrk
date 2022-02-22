@@ -274,6 +274,7 @@ int main( int argc, char** argv )
                         Usage();
                         bQuit = true;
                     }
+                    break;
                 }
             case 'f':
                 {
