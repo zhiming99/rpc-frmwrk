@@ -29,6 +29,7 @@ using namespace rpcf;
 #include "gencpp.h"
 #include "sha1.h"
 #include "proxy.h"
+#include "genfuse.h"
 
 extern std::string g_strAppName;
 extern bool g_bMklib;
@@ -1070,16 +1071,37 @@ gint32 GenHeaderFile(
                     if( pNode->RefCount() == 0 )
                         break;
 
-                    CDeclInterfProxy odip(
-                        pWriter, pObj );
-                    ret = odip.Output();
-                    if( ERROR( ret ) )
-                        break;
+                    if( bFuseP )
+                    {
+                        CDeclInterfProxyFuse odip(
+                            pWriter, pObj );
+                        ret = odip.Output();
+                        if( ERROR( ret ) )
+                            break;
+                    }
+                    else
+                    {
+                        CDeclInterfProxy odip(
+                            pWriter, pObj );
+                        ret = odip.Output();
+                        if( ERROR( ret ) )
+                            break;
+                    }
 
-                    CDeclInterfSvr odis(
-                        pWriter, pObj );
+                    if( bFuseS )
+                    {
+                        CDeclInterfSvrFuse odis(
+                            pWriter, pObj );
 
-                    ret = odis.Output();
+                        ret = odis.Output();
+                    }
+                    else
+                    {
+                        CDeclInterfSvr odis(
+                            pWriter, pObj );
+
+                        ret = odis.Output();
+                    }
                     break;
                 }
             case clsid( CServiceDecl ):
@@ -1137,12 +1159,24 @@ gint32 GenHeaderFile(
                     elem.first + "svr.h.new" );
             }
 
-            CDeclServiceImpl osi(
-                pWriter, elem.second, true );
+            if( bFuseS )
+            {
+                CDeclServiceImplFuse osi(
+                    pWriter, elem.second, true );
 
-            ret = osi.Output();
-            if( ERROR( ret ) )
-                break;
+                ret = osi.Output();
+                if( ERROR( ret ) )
+                    break;
+            }
+            else
+            {
+                CDeclServiceImpl osi(
+                    pWriter, elem.second, true );
+
+                ret = osi.Output();
+                if( ERROR( ret ) )
+                    break;
+            }
 
             // client declarations
             ret = pWriter->SelectImplFile(
@@ -1154,12 +1188,24 @@ gint32 GenHeaderFile(
                     elem.first + "cli.h.new" );
             }
 
-            CDeclServiceImpl osi2(
-                pWriter, elem.second, false );
+            if( bFuseP )
+            {
+                CDeclServiceImplFuse osi2(
+                    pWriter, elem.second, false );
 
-            ret = osi2.Output();
-            if( ERROR( ret ) )
-                break;
+                ret = osi2.Output();
+                if( ERROR( ret ) )
+                    break;
+            }
+            else
+            {
+                CDeclServiceImpl osi2(
+                    pWriter, elem.second, false );
+
+                ret = osi2.Output();
+                if( ERROR( ret ) )
+                    break;
+            }
 
             /* svr implementions*/
             ret = pWriter->SelectImplFile(
@@ -1174,12 +1220,24 @@ gint32 GenHeaderFile(
             if( ERROR( ret ) )
                 break;
 
-            CImplServiceImpl oisi(
-                pWriter, elem.second, true );
+            if( bFuseS )
+            {
+                CImplServiceImplFuse oisi(
+                    pWriter, elem.second, true );
 
-            ret = oisi.Output();
-            if( ERROR( ret ) )
-                break;
+                ret = oisi.Output();
+                if( ERROR( ret ) )
+                    break;
+            }
+            else
+            {
+                CImplServiceImpl oisi(
+                    pWriter, elem.second, true );
+
+                ret = oisi.Output();
+                if( ERROR( ret ) )
+                    break;
+            }
 
             /* client implementions*/
             ret = pWriter->SelectImplFile(
@@ -1194,12 +1252,24 @@ gint32 GenHeaderFile(
             if( ERROR( ret ) )
                 break;
 
-            CImplServiceImpl oisi2(
-                pWriter, elem.second, false );
+            if( bFuseP )
+            {
+                CImplServiceImplFuse oisi2(
+                    pWriter, elem.second, false );
 
-            ret = oisi2.Output();
-            if( ERROR( ret ) )
-                break;
+                ret = oisi2.Output();
+                if( ERROR( ret ) )
+                    break;
+            }
+            else
+            {
+                CImplServiceImpl oisi2(
+                    pWriter, elem.second, false );
+
+                ret = oisi2.Output();
+                if( ERROR( ret ) )
+                    break;
+            }
         }
 
         if( !vecSvcNames.empty() )
@@ -1217,6 +1287,9 @@ gint32 GenHeaderFile(
 
 extern gint32 FuseDeclareMsgSet(
     CCppWriter* m_pWriter, ObjPtr& pRoot );
+
+extern gint32 EmitBuildJsonReq( 
+    CWriterBase* m_pWriter );
 
 gint32 GenCppFile(
     CCppWriter* m_pWriter, ObjPtr& pRoot )
@@ -1252,10 +1325,17 @@ gint32 GenCppFile(
 
         if( bFuse )
         {
+            Wa( "#include \"serijson.h\"" );
             ret = FuseDeclareMsgSet(
                 m_pWriter, pRoot );
             if( ERROR( ret ) )
                 break;
+
+            ret = EmitBuildJsonReq(
+                m_pWriter );
+            if( ERROR( ret ) )
+                break;
+            NEW_LINE;
         }
 
         for( guint32 i = 0;
@@ -1290,9 +1370,18 @@ gint32 GenCppFile(
                     if( pifd->RefCount() == 0 )
                         break;
 
-                    CImplIufProxy oiufp(
-                        m_pWriter, pObj );
-                    oiufp.Output();
+                    if( bFuseP )
+                    {
+                        CImplIufProxyFuse oiufp(
+                            m_pWriter, pObj );
+                        oiufp.Output();
+                    }
+                    else
+                    {
+                        CImplIufProxy oiufp(
+                            m_pWriter, pObj );
+                        oiufp.Output();
+                    }
 
                     ObjPtr pmdlobj =
                         pifd->GetMethodList();
@@ -1308,26 +1397,57 @@ gint32 GenCppFile(
                         i < pmdl->GetCount(); i++ )
                     {
                         ObjPtr pmd = pmdl->GetChild( i );
-                        CImplIfMethodProxy oiimp(
-                            m_pWriter, pmd );
-                        ret = oiimp.Output();
-                        if( ERROR( ret ) )
-                            break;
+                        if( bFuseP )
+                        {
+                            CImplIfMethodProxyFuse oiimp(
+                                m_pWriter, pmd );
+                            ret = oiimp.Output();
+                            if( ERROR( ret ) )
+                                break;
+                        }
+                        else
+                        {
+                            CImplIfMethodProxy oiimp(
+                                m_pWriter, pmd );
+                            ret = oiimp.Output();
+                            if( ERROR( ret ) )
+                                break;
+                        }
                     }
 
-                    CImplIufSvr oiufs(
-                        m_pWriter, pObj );
-                    oiufs.Output();
+                    if( bFuseS )
+                    {
+                        CImplIufSvrFuse oiufs(
+                            m_pWriter, pObj );
+                        oiufs.Output();
+                    }
+                    else
+                    {
+                        CImplIufSvr oiufs(
+                            m_pWriter, pObj );
+                        oiufs.Output();
+                    }
 
                     for( guint32 i = 0;
                         i < pmdl->GetCount(); i++ )
                     {
                         ObjPtr pmd = pmdl->GetChild( i );
-                        CImplIfMethodSvr oiims(
-                            m_pWriter, pmd );
-                        ret = oiims.Output();
-                        if( ERROR( ret ) )
-                            break;
+                        if( bFuseS )
+                        {
+                            CImplIfMethodSvrFuse oiims(
+                                m_pWriter, pmd );
+                            ret = oiims.Output();
+                            if( ERROR( ret ) )
+                                break;
+                        }
+                        else
+                        {
+                            CImplIfMethodSvr oiims(
+                                m_pWriter, pmd );
+                            ret = oiims.Output();
+                            if( ERROR( ret ) )
+                                break;
+                        }
                     }
 
                     break;
@@ -4979,17 +5099,16 @@ gint32 CImplIfMethodProxy::OutputAsyncCbWrapper()
         Wa( "gint32 ret = 0;" );
         CCOUT << "do";
         BLOCK_OPEN;
-        NEW_LINE; 
         Wa( "IConfigDb* pResp_ = nullptr;" );
         Wa( "CCfgOpenerObj oReq_( pIoReq );" );
         CCOUT << "ret = oReq_.GetPointer(";
-        INDENT_UPL;
-        CCOUT << "propRespPtr, pResp_ );";
-        INDENT_DOWNL;
+        NEW_LINE;
+        CCOUT << "    propRespPtr, pResp_ );";
+        NEW_LINE;
         CCOUT << "if( ERROR( ret ) )";
-        INDENT_UPL;
-        CCOUT << "break;";
-        INDENT_DOWNL;
+        NEW_LINE;
+        CCOUT << "    break;";
+        NEW_LINE;
         NEW_LINE;
 
         Wa( "CCfgOpener oResp_( pResp_ );" );
@@ -6593,6 +6712,11 @@ gint32 CExportMakefile::Output()
                 psd->GetName() + "svr.o ";
         }
 
+        if( bFuseP )
+            strObjClient += "$(OBJ_DIR)/serijson.o ";
+        if( bFuseS )
+            strObjServer += "$(OBJ_DIR)/serijson.o ";
+
         std::string strClient =
             strAppName + "cli";
 
@@ -6872,6 +6996,26 @@ gint32 CExportObjDesc::Output()
 
         //printf( "%s\n", strCmdLine.c_str() );
         system( strCmdLine.c_str() );
+
+        if( bFuse )
+        {
+            stdstr strSeriCpp, strSeriHdr;
+            ret = FindInstCfg(
+                "serijson.cpp", strSeriCpp );
+            if( ERROR( ret ) )
+                break;
+
+            ret = FindInstCfg(
+                "serijson.h", strSeriHdr );
+            if( ERROR( ret ) )
+                break;
+
+            strCmdLine = "cp ";
+            strCmdLine += strSeriCpp + " " +
+                strSeriHdr + " " +
+                m_pWriter->GetOutPath() + "/";
+            system( strCmdLine.c_str() );
+        }
 
     }while( 0 );
 

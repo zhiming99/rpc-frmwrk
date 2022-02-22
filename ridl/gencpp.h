@@ -595,6 +595,7 @@ class CImplSerialStruct
 class CImplIufProxy
     : public CArgListUtils
 {
+    protected:
     CCppWriter* m_pWriter = nullptr;
     CInterfaceDecl* m_pNode = nullptr;
 
@@ -608,6 +609,7 @@ class CImplIufProxy
 class CImplIufSvr :
     public CArgListUtils
 {
+    protected:
     CCppWriter* m_pWriter = nullptr;
     CInterfaceDecl* m_pNode = nullptr;
 
