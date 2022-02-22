@@ -2088,7 +2088,7 @@ gint32 CImplPyMthdSvrBase::OutputAsyncCompHandler()
         {
             CCOUT << "def On" << strName << "Complete( self,";
             NEW_LINE;
-            Wa( "    oReqCtx_ : PyReqContext, iRet : int ): " );
+            Wa( "    oReqCtx_ : PyReqContext, iRet : int ):" );
             INDENT_UPL;
             Wa( "self.RidlOnServiceComplete(" );
             Wa( "    oReqCtx_.oCallback, iRet, None )" );
@@ -2176,11 +2176,11 @@ gint32 CImplPyMthdSvrBase::OutputAsyncCHWrapper()
         {
             CCOUT << "def On" << strName << "CanceledWrapper( self,";
             NEW_LINE;
-            CCOUT << "    iRet : int, callback : PyReqContext ): ";
+            CCOUT << "    iRet : int, callback : PyReqContext ):";
             NEW_LINE;
-            CCOUT << "    self.On" << strName << "Canceled( self, ";
+            CCOUT << "    self.On" << strName << "Canceled( self,";
             NEW_LINE;
-            CCOUT << "    callback, iRet ): ";
+            CCOUT << "        callback, iRet )";
             NEW_LINE;
             break;
         }
