@@ -8,5 +8,5 @@ Description: an RPC framework
 URL: https://github.com/zhiming99/rpc-frmwrk
 Version: @VERSION@
 Requires:
-Libs: -lipc -lcombase -L${libdir}
+Libs: -lipc -lcombase -L${libdir} -L${libdir}/rpcf
 Cflags: -I${includedir}/rpcf -I${includedir}/rpcf/ipc

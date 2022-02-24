@@ -165,6 +165,8 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_includedir}/rpcf/rpc.h
 %{_includedir}/rpcf/seribase.h
 %{_includedir}/rpcf/stlcont.h
+%{_includedir}/rpcf/base64.h
+%{_includedir}/rpcf/sha1.h
 %{_libdir}/libauth.la
 %{_libdir}/libcombase.la
 %{_libdir}/libipc.la

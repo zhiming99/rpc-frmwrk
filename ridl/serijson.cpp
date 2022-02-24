@@ -731,21 +731,22 @@ gint32 CJsonSerialBase::DeserializeObjPtr(
     BufPtr& pBuf, Value& val )
 {
     gint32 ret = 0;
-    SERI_HEADER_BASE* pHeader =
-        ( SERI_HEADER_BASE* )pBuf->ptr();
-    SERI_HEADER_BASE oHeader;
-    memcpy( &oHeader, pHeader,
-        sizeof( SERI_HEADER_BASE ) );
-    oHeader.ntoh();
-    guint32 dwSize = oHeader.dwSize +
+    guint32 dwSize = 0;
+    guint8* pHead = ( guint8* )pBuf->ptr();
+
+    guint32 dwHdrSize =
         sizeof( SERI_HEADER_BASE );
-    if( oHeader.dwSize == 0 )
-    {
-        val = "";
-        pBuf->IncOffset(
-            sizeof( SERI_HEADER_BASE ) );
-        return STATUS_SUCCESS;
-    }
+
+    memcpy( &dwSize,
+        pHead + sizeof( dwSize ),
+        sizeof( dwSize ) );
+
+    dwSize = ntohl( dwSize );
+    dwSize += dwHdrSize;
+
+    if( dwSize > pBuf->size() )
+        return -ERANGE;
+
     BufPtr pNewBuf( true ); 
     ret = base64_encode(
         ( guint8* )pBuf->ptr(),
@@ -783,14 +784,18 @@ gint32 CJsonSerialBase::DeserializeStruct(
 {
     gint32 ret = 0;
     do{
-        SERI_HEADER_BASE* pHeader =
-            ( SERI_HEADER_BASE* )pBuf->ptr();
-        SERI_HEADER_BASE oHeader;
-        memcpy( &oHeader, pHeader,
-            sizeof( SERI_HEADER_BASE ) );
-        oHeader.ntoh();
 
-        guint32 dwMsgId = oHeader.dwClsid;
+        guint32 dwMsgId = 0;
+        if( pBuf->size() < sizeof( dwMsgId ) )
+        {
+            ret = -ERANGE;
+            break;
+        }
+
+        memcpy( &dwMsgId, pBuf->ptr(),
+            sizeof( dwMsgId ) );
+
+        dwMsgId = ntohl( dwMsgId );
         if( g_setMsgIds.find( dwMsgId ) ==
             g_setMsgIds.end() )
         {

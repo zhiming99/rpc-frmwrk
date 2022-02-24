@@ -989,6 +989,8 @@ gint32 CHeaderPrologue::Output()
         Wa( "#include \"streamex.h\"" );
     else
         Wa( "#include \"seribase.h\"" );
+    if( bFuse )
+        Wa( "#include \"serijson.h\"" );
     NEW_LINE;
     CCOUT << "#define DECLPTRO( _type, _name ) \\";
     INDENT_UPL;
@@ -1019,6 +1021,13 @@ gint32 GenHeaderFile(
         ret = oHeader.Output();
         if( ERROR( ret ) )
             break;
+
+        if( bFuseP )
+        {
+            CCppWriter* m_pWriter = pWriter;
+            Wa( "#define eventRemoveReq \\" );
+            Wa( "    ( ( EnumEventId )( rpcf::eventUserStart + 101 ) )" );
+        }
 
         CDeclareClassIds odci(
             pWriter, pRoot );
@@ -1325,7 +1334,6 @@ gint32 GenCppFile(
 
         if( bFuse )
         {
-            Wa( "#include \"serijson.h\"" );
             ret = FuseDeclareMsgSet(
                 m_pWriter, pRoot );
             if( ERROR( ret ) )
@@ -6738,6 +6746,11 @@ gint32 CExportMakefile::Output()
             "s:XXXOBJSSVR:" + strObjServer + ":; " +
             "s:XXXOBJSCLI:" + strObjClient + ":; ";
 
+        if( bFuse )
+            strCmdLine +="s:XXXFUSE:-lutils:; ";
+        else
+            strCmdLine +="s:XXXFUSE::; ";
+
         if( g_bMklib )
             strCmdLine += "s:XXXMKLIB:1:' ";
         else
@@ -7262,7 +7275,8 @@ gint32 CExportReadme::Output_en()
             << "you can still customized the italic files, but be aware they "
             << "will be rewritten after running RIDLC again.";
         NEW_LINES(2);
-        CCOUT << "**Note 2**: Please refer to [this link](https://github.com/zhiming99/rpc-frmwrk#building-rpc-frmwrk)"
+        CCOUT << "**Note 2**: Please refer to [this link]"
+            << "(https://github.com/zhiming99/rpc-frmwrk#building-rpc-frmwrk) "
             << "for building and installation of RPC-Frmwrk";
         NEW_LINE;
 
