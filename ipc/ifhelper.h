@@ -3735,15 +3735,6 @@ class CDeferredFuncCallBase :
 
     std::vector< Variant > m_vecArgs;
 
-    virtual gint32 operator()( guint32 dwContext )
-    {
-#ifdef DEBUG
-        this->SetError( -1 );
-#endif
-        gint32 ret = this->Delegate( m_vecArgs );
-        return this->SetError( ret );
-    }
-
     gint32 UpdateParamAt( guint32 i, Variant& oVar )
     {
         if( i >= m_vecArgs.size() || i < 0 )
