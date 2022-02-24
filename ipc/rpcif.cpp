@@ -5695,7 +5695,9 @@ gint32 CInterfaceProxy::CancelReqAsync(
         {
             gint32 ret = 0;
             do{
-                if( pComplete != nullptr )
+
+                gint32 iRet = -ENOENT;
+                if( pWrapper != nullptr )
                 {
                     TaskletPtr pThis = ObjPtr( pWrapper );
                     CCfgOpener oCfg( ( IConfigDb* )
@@ -5705,12 +5707,10 @@ gint32 CInterfaceProxy::CancelReqAsync(
                         propRespPtr, pResp );
                     if( SUCCEEDED( ret ) )
                     {
-                        CCfgOpenerObj oCompCfg( pComplete );
-                        oCompCfg.MoveProp(
-                            propRespPtr, pResp );
+                        CCfgOpener oResp( pResp );
+                        oResp.GetIntProp( propReturnValue,
+                            ( guint32& )iRet );
                     }
-                    TaskletPtr pCb = ObjPtr( pComplete );
-                    ( *pCb )( eventZero );
                 }
 
                 TaskGrpPtr pTaskGrp;
@@ -5721,15 +5721,21 @@ gint32 CInterfaceProxy::CancelReqAsync(
                 TaskletPtr pTaskCancel;
                 ret = pTaskGrp->FindTask(
                     qwTaskToCancel, pTaskCancel );
-                if( ERROR( ret ) )
-                    break;
+                if( SUCCEEDED( ret ) )
+                {
+                    DEFER_CALL( pIf->GetIoMgr(),
+                        pTaskCancel,
+                        &IEventSink::OnEvent,
+                        eventUserCancel,
+                        ERROR_USER_CANCEL,
+                        0, nullptr );
+                }
 
-                ret = DEFER_CALL(
-                    pIf->GetIoMgr(), pTaskCancel,
-                    &IEventSink::OnEvent,
-                    eventUserCancel,
-                    ERROR_USER_CANCEL,
-                    0, nullptr );
+                if( pComplete != nullptr )
+                {
+                    pComplete->OnEvent( eventTaskComp,
+                        iRet, 0, ( LONGWORD* )pWrapper );
+                }
 
             }while( 0 );
 

@@ -159,7 +159,7 @@ void CIfSmokeTest::testCliActCancel()
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );
     
     CActcClient* pCli = pIf;
-    if( pCli != nullptr )
+    while( pCli != nullptr )
     {
         while( !pCli->IsConnected() )
             sleep( 1 );
@@ -195,41 +195,118 @@ void CIfSmokeTest::testCliActCancel()
         //the request to cancel.
 
         // we are about to actively cancel this request
+        OutputMsg( 0, "testing sync canceling" );
         CPPUNIT_ASSERT( qwTaskId != 0 );
-        for( int i = 0; i < 2; i++ )
-        {
+        do{
             ret = pCli->CancelRequest( qwTaskId );
             if( SUCCEEDED( ret ) )
             {
-                DebugPrint( 0, "Request is successfully cancelled" );
+                OutputMsg( 0, "Request is successfully cancelled" );
                 break;
             }
             else
             {
                 if( ret == -ENOENT )
                 {
-                    sleep( 3 );
-                    DebugPrint( 0, "Request is not found to cancel" );
+                    OutputMsg( ret, "Request is not found to cancel" );
                 }
                 else
                 {
-                    DebugPrint( 0, "canceling failed" );
+                    OutputMsg( ret, "canceling failed" );
                     break;
                 }
             }
-        }
+
+        }while( 0 );
+
         oParams.Clear();
-    }
-    else
-    {
-        CPPUNIT_ASSERT( false );
+        if( ERROR( ret ) )
+            break;
+
+        // send out the request again for asynchronous cancel
+        
+        ret = pCli->LongWait(
+            pResp, strText, strReply );
+
+        CPPUNIT_ASSERT( ret == STATUS_PENDING );
+        if( oParams.exist( propTaskId ) )
+            qwTaskId = oParams[ propTaskId ];
+
+        OutputMsg( 0, "testing async canceling" );
+        do{
+            TaskletPtr pTask;
+            ret = pTask.NewObj(
+                clsid( CIoReqSyncCallback ) );
+            if( ERROR( ret ) )
+                break;
+
+            ret = pCli->CancelReqAsync(
+                pTask, qwTaskId );
+
+            if( SUCCEEDED( ret ) )
+            {
+                OutputMsg( 0,
+                    "Request is successfully cancelled" );
+                break;
+            }
+
+            if( ret == STATUS_PENDING )
+            {
+                CIoReqSyncCallback* pSync = pTask;
+                pSync->WaitForComplete();
+                ret = pSync->GetError();
+                if( SUCCEEDED( ret ) )
+                {
+                    IConfigDb* pResp = nullptr;
+                    CCfgOpenerObj oTask( pSync );
+                    ret = oTask.GetPointer(
+                        propRespPtr, pResp );
+                    if( SUCCEEDED( ret ) )
+                    {
+                        gint32 iRet = 0;
+                        CCfgOpener oResp( pResp );
+                        ret = oResp.GetIntProp(
+                            propReturnValue,
+                            ( guint32& )iRet );
+                        if( SUCCEEDED( ret ) )
+                            ret = iRet;
+                    }
+
+                }
+
+            }
+            if( ret == -ENOENT )
+            {
+                OutputMsg( ret,
+                    "Request is not found to cancel" );
+            }
+            else if( ERROR( ret ) )
+            {
+                OutputMsg( ret, "canceling failed" );
+                break;
+            }
+            else
+            {
+                OutputMsg( ret,
+                    "Request 2 is successfully cancelled" );
+                break;
+            }
+
+        }while( 0 );
+
+        oParams.Clear();
+        break;
     }
 
-    ret = pIf->Stop();
-    pIf.Clear();
+    if( pCli == nullptr )
+        CPPUNIT_ASSERT( false );
 
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );
+
+    pIf->Stop();
+    pIf.Clear();
 }
+
 #endif
 
 int main( int argc, char** argv )

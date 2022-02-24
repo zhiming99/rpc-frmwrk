@@ -5661,4 +5661,102 @@ gint32 CIfInterceptTaskProxy::OnComplete(
     return super::OnComplete( iRetVal );
 }
 
+gint32 CTaskWrapper::TransferParams()
+{
+    if( m_pTask.IsEmpty() )
+        return 0;
+
+    gint32 ret = 0;
+    CCfgOpener oCfg( ( IConfigDb* )
+        m_pTask->GetConfig() );
+    do{
+
+        IConfigDb* pSrc = this->GetConfig();
+        if( pSrc->exist( propRespPtr ) )
+        {
+            oCfg.CopyProp( propRespPtr, pSrc );
+            break;
+        }
+
+        // try to find the respptr from the caller
+        // task.
+        LwVecPtr pVec = GetParamList();
+        if( pVec.IsEmpty() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+
+        auto& vecParams = ( *pVec )();
+        // the result of the io request
+        gint32 iRet = vecParams[ 1 ];
+        if( ERROR( iRet ) )
+        {
+            ret = iRet;
+            break;
+        }
+
+        // the task could be the CIfIoReqTask
+        CObjBase* pTask =
+            ( CObjBase* ) vecParams[ 3 ];
+
+        if( pTask == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        TaskletPtr pT =
+            static_cast< CTasklet* >( pTask );
+
+        if( pT.IsEmpty() )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        pSrc = pT->GetConfig();
+        oCfg.CopyProp( propRespPtr, pSrc );
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+    {
+        CCfgOpener oResp;
+        oResp[ propReturnValue ] = ret;
+        oResp[ propSeqNo ] = 0x12345;
+        oCfg.SetPointer( propRespPtr,
+            ( IConfigDb* )oResp.GetCfg() );
+    }
+    return ret;
+}
+
+gint32 CTaskWrapper::RunTask()
+{
+    if( m_pMajor.IsEmpty() )
+        return STATUS_PENDING;
+
+    ( *m_pMajor )( eventZero );
+    return m_pMajor->GetError();
+}
+
+gint32 CTaskWrapper::OnTaskComplete(
+    gint32 iRet )
+{
+    TransferParams();
+    super::OnTaskComplete( iRet );
+    CIfRetryTask* pTask = m_pTask;
+    if( pTask != nullptr )
+        ( *pTask )( eventZero );
+    return iRet;
+}
+
+gint32 CTaskWrapper::OnComplete(
+    gint32 iRetVal )
+{
+    super::OnComplete( iRetVal );
+    m_pTask.Clear();
+    m_pMajor.Clear();
+    return iRetVal;
+}
 }

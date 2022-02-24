@@ -350,77 +350,6 @@ class CGenericCallback :
     }
 };
 
-class CTaskWrapper :
-    public CGenericCallback< CIfInterceptTaskProxy >
-{
-    TaskletPtr m_pTask;
-    TaskletPtr m_pMajor;
-    public:
-    typedef CGenericCallback< CIfInterceptTaskProxy > super;
-
-    CTaskWrapper( const IConfigDb* pCfg ):
-        super( pCfg )
-    { SetClassId( clsid( CTaskWrapper ) ); }
-
-    gint32 SetCompleteTask( IEventSink* pTask )
-    {
-        if( pTask == nullptr )
-            m_pTask.Clear();
-        else
-            m_pTask = ObjPtr( pTask );
-        return 0;
-    }
-
-    gint32 SetMajorTask( IEventSink* pTask )
-    {
-        if( pTask == nullptr )
-            m_pMajor.Clear();
-        else
-            m_pMajor = ObjPtr( pTask );
-        return 0;
-    }
-
-    void TransferParams()
-    {
-        if( m_pTask.IsEmpty() )
-            return;
-
-        CCfgOpener oCfg( ( IConfigDb* )
-            m_pTask->GetConfig() );
-
-        IConfigDb* pSrc = this->GetConfig();
-        oCfg.MoveProp( propRespPtr, pSrc );
-        oCfg.MoveProp( propMsgPtr, pSrc );
-        oCfg.MoveProp( propReqPtr, pSrc );
-    }
-
-    gint32 RunTask() override
-    {
-        if( m_pMajor.IsEmpty() )
-            return STATUS_PENDING;
-
-        ( *m_pMajor )( eventZero );
-        return m_pMajor->GetError();
-    }
-
-    gint32 OnTaskComplete( gint32 iRet ) override
-    {
-        TransferParams();
-        super::OnTaskComplete( iRet );
-        CIfRetryTask* pTask = m_pTask;
-        if( pTask != nullptr )
-            ( *pTask )( eventZero );
-        return iRet;
-    }
-
-    gint32 OnComplete( gint32 iRetVal ) override
-    {
-        super::OnComplete( iRetVal );
-        m_pTask.Clear();
-        m_pMajor.Clear();
-        return iRetVal;
-    }
-};
 
 template<typename T,
     typename T2 = typename std::enable_if<
@@ -3926,4 +3855,41 @@ inline gint32 NewDeferredFuncCall( TaskletPtr& pCallback,
 
 #define NEW_FUNCCALL_TASK( __pTask, pMgr, func, ... ) \
     NewDeferredFuncCall( __pTask, pMgr, func , ##__VA_ARGS__ )
+
+class CTaskWrapper :
+    public CGenericCallback< CIfInterceptTaskProxy >
+{
+    TaskletPtr m_pTask;
+    TaskletPtr m_pMajor;
+    public:
+    typedef CGenericCallback< CIfInterceptTaskProxy > super;
+
+    CTaskWrapper( const IConfigDb* pCfg ):
+        super( pCfg )
+    { SetClassId( clsid( CTaskWrapper ) ); }
+
+    inline gint32 SetCompleteTask( IEventSink* pTask )
+    {
+        if( pTask == nullptr )
+            m_pTask.Clear();
+        else
+            m_pTask = ObjPtr( pTask );
+        return 0;
+    }
+
+    inline gint32 SetMajorTask( IEventSink* pTask )
+    {
+        if( pTask == nullptr )
+            m_pMajor.Clear();
+        else
+            m_pMajor = ObjPtr( pTask );
+        return 0;
+    }
+
+    gint32 TransferParams();
+    gint32 RunTask() override;
+    gint32 OnTaskComplete( gint32 iRet ) override;
+    gint32 OnComplete( gint32 iRetVal ) override;
+};
+
 }
