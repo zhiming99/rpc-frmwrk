@@ -195,7 +195,7 @@ void CIfSmokeTest::testCliActCancel()
         //the request to cancel.
 
         // we are about to actively cancel this request
-        OutputMsg( 0, "testing sync canceling" );
+        OutputMsg( 0, "testing sync canceling..." );
         CPPUNIT_ASSERT( qwTaskId != 0 );
         do{
             ret = pCli->CancelRequest( qwTaskId );
@@ -218,21 +218,24 @@ void CIfSmokeTest::testCliActCancel()
             }
 
         }while( 0 );
-
-        oParams.Clear();
         if( ERROR( ret ) )
             break;
 
+        oParams.Clear();
+        oParams.Reset();
+
         // send out the request again for asynchronous cancel
-        
+        OutputMsg( 0, "testing async canceling..." );
         ret = pCli->LongWait(
-            pResp, strText, strReply );
+            oParams.GetCfg(), strText, strReply );
 
-        CPPUNIT_ASSERT( ret == STATUS_PENDING );
-        if( oParams.exist( propTaskId ) )
-            qwTaskId = oParams[ propTaskId ];
+        if( ret != STATUS_PENDING )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+        qwTaskId = oParams[ propTaskId ];
 
-        OutputMsg( 0, "testing async canceling" );
         do{
             TaskletPtr pTask;
             ret = pTask.NewObj(
@@ -251,30 +254,30 @@ void CIfSmokeTest::testCliActCancel()
             }
 
             if( ret == STATUS_PENDING )
-            {
+            do{
                 CIoReqSyncCallback* pSync = pTask;
                 pSync->WaitForComplete();
                 ret = pSync->GetError();
+                if( ERROR( ret ) )
+                    break;
+
+                IConfigDb* pResp = nullptr;
+                CCfgOpenerObj oTask( pSync );
+                ret = oTask.GetPointer(
+                    propRespPtr, pResp );
+                if( ERROR( ret ) )
+                    break;
+
+                gint32 iRet = 0;
+                CCfgOpener oResp( pResp );
+                ret = oResp.GetIntProp(
+                    propReturnValue,
+                    ( guint32& )iRet );
                 if( SUCCEEDED( ret ) )
-                {
-                    IConfigDb* pResp = nullptr;
-                    CCfgOpenerObj oTask( pSync );
-                    ret = oTask.GetPointer(
-                        propRespPtr, pResp );
-                    if( SUCCEEDED( ret ) )
-                    {
-                        gint32 iRet = 0;
-                        CCfgOpener oResp( pResp );
-                        ret = oResp.GetIntProp(
-                            propReturnValue,
-                            ( guint32& )iRet );
-                        if( SUCCEEDED( ret ) )
-                            ret = iRet;
-                    }
+                    ret = iRet;
 
-                }
+            }while( 0 );
 
-            }
             if( ret == -ENOENT )
             {
                 OutputMsg( ret,
@@ -301,10 +304,9 @@ void CIfSmokeTest::testCliActCancel()
     if( pCli == nullptr )
         CPPUNIT_ASSERT( false );
 
-    CPPUNIT_ASSERT( SUCCEEDED( ret ) );
-
     pIf->Stop();
     pIf.Clear();
+    CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 }
 
 #endif

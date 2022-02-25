@@ -5723,6 +5723,10 @@ gint32 CInterfaceProxy::CancelReqAsync(
                     qwTaskToCancel, pTaskCancel );
                 if( SUCCEEDED( ret ) )
                 {
+                    // usually we do not land here
+                    // because the task has already
+                    // been completed with the error
+                    // response from the server
                     DEFER_CALL( pIf->GetIoMgr(),
                         pTaskCancel,
                         &IEventSink::OnEvent,
