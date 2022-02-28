@@ -60,6 +60,10 @@ This project depends on the following 3rd-party packags at runtime:
 5. A tree-like hierarchical persistant registry.
 
 ---
+[`Mon Feb 28 2022 08:53:32 AM Beijing`]    
+1. The ridlc part is 90% code complete, and remain the interface with the file system part.
+2. seems the file system is not a trivial work, and it will take a month to get it done.
+
 [`Sat Feb 19 2022 11:47:25 PM Beijing`]   
 1. Renamed `Json support` to `Fuse Integration`.
 2. And the development of `Fuse Integration` takes two steps, the first is to add fuctions to `ridlc` to generate the proxy/server library for FUSE integration, and the second is to implement the `file system` part over the generated code. The development is on branch `fusesup`.
