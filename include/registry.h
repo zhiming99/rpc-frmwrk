@@ -35,7 +35,7 @@ class CDirEntry : public CObjBase
 {
     friend class CRegistry;
     protected:
-    std::map<std::string, CDirEntry*> m_mapChilds;
+    std::map<std::string, std::shared_ptr< CDirEntry>> m_mapChilds;
     CfgPtr      m_mapProps;
     CDirEntry* m_pParent;
     std::string m_strName;
@@ -57,6 +57,7 @@ class CDirEntry : public CObjBase
 
     CDirEntry* GetChild( const std::string& strName ) const;
     gint32 AddChild( const std::string& strName );
+    gint32 AddChild( std::shared_ptr< CDirEntry >& pEnt );
 
     gint32 GetProperty(
         gint32 iProp,
@@ -71,6 +72,9 @@ class CDirEntry : public CObjBase
     gint32 RemoveProp( gint32 iProp );
     const CDirEntry& operator=( const CDirEntry& rhs );
 
+    inline gint32 GetCount() const
+    { return m_mapChilds.size(); }
+
     gint32 RemoveAllChildren();
     void RemoveAllProps();
 
@@ -81,7 +85,7 @@ class CRegistry : public CObjBase
     protected:
     CDirEntry m_oRootDir;
     CDirEntry *m_pCurDir;
-    std::recursive_mutex m_oLock;
+    mutable std::recursive_mutex m_oLock;
 
     public:
 
@@ -95,6 +99,11 @@ class CRegistry : public CObjBase
     gint32 MakeEntry( const std::string& );
     gint32 MakeDir( const std::string& );
     gint32 ChangeDir( const std::string& );
+
+    gint32 GetEntry(
+        const std::string& strPath,
+        CDirEntry*& pDir ) const;
+
     gint32 RemoveProperty( guint32 iProp );
 
     gint32 GetProperty(

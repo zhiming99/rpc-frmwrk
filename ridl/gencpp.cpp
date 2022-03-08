@@ -2744,7 +2744,7 @@ gint32 CDeclService::Output()
 
         CCOUT << "C" << strSvcName << "_CliSkel,";
         NEW_LINE;
-        if( m_pNode->IsStream() )
+        if( m_pNode->IsStream() || bFuseP )
             Wa( "CStreamProxyAsync," );
         for( guint32 i = 0;
             i < vecIfs.size(); i++ )
@@ -2767,7 +2767,7 @@ gint32 CDeclService::Output()
         NEW_LINE;
         CCOUT << "C" << strSvcName << "_SvrSkel,";
         NEW_LINE;
-        if( m_pNode->IsStream() )
+        if( m_pNode->IsStream() || bFuseS )
             Wa( "CStreamServerAsync," );
         for( guint32 i = 0;
             i < vecIfs.size(); i++ )
@@ -6731,8 +6731,8 @@ gint32 CExportMakefile::Output()
         std::string strServer =
             strAppName + "svr";
 
-        std::string strLib =
-            strAppName + "lib.so";
+        std::string strLib = "lib";
+        strLib += strAppName + ".so";
 
         std::string strCmdLine =
             "sed -i 's:XXXSRCS:";

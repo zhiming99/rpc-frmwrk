@@ -33,28 +33,28 @@
 // 'interface' and a string attributes 'method' to
 // specify which interface and which method the
 // parameters are for.
-#define JSON_ATTR_IFNAME        "rpcf_Interface"
-#define JSON_ATTR_METHOD        "rpcf_Method"
+#define JSON_ATTR_IFNAME        "Interface"
+#define JSON_ATTR_METHOD        "Method"
 
 // A json message must have a string attribute MsgType
 // and the value wiill be one of 'req', 'resp' or
 // 'evt'
-#define JSON_ATTR_MSGTYPE       "rpcf_MsgType"
+#define JSON_ATTR_MSGTYPE       "MessageType"
 
 // A json message can have an object attribute 'params'
-#define JSON_ATTR_PARAMS        "rpcf_Params"
+#define JSON_ATTR_PARAMS        "Parameters"
 
 // Json representation of a struct must have a UInt
 // attribute 'structId', as mapped to the internal
 // msgid
-#define JSON_ATTR_STRUCTID      "rpcf_StructId"
+#define JSON_ATTR_STRUCTID      "StructId"
 
 // Each json request/response/event message has an
 // UInt64 attribute reqctxid, as a unique identifier of
 // the request. Particularly, the response's identifer
 // must be the same as the one from the associated
 // request.
-#define JSON_ATTR_REQCTXID      "rpcf_ReqCtxId"
+#define JSON_ATTR_REQCTXID      "RequestId"
 
 // Each json response msg must have an attribute
 // ReturnCode with a negative int value defined in
@@ -63,7 +63,7 @@
 // side, a uint64 attribute 'taskid' is also returned
 // as for canceling purpose. And the true response
 // message will be returned in the future.
-#define JSON_ATTR_RETCODE       "rpcf_ReturnCode"
+#define JSON_ATTR_RETCODE       "ReturnCode"
 
 using namespace Json;
 extern std::set< guint32 > g_setMsgIds;
