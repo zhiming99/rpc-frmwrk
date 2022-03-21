@@ -318,7 +318,7 @@ class CBuffer : public CObjBase
     }
     inline bool IsNoFree()
     {
-        return ( 0 ==
+        return ( 0 !=
             ( m_dwType & BUFFLAG_NOFREE ) );
     }
 

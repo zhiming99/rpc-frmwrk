@@ -340,11 +340,11 @@ gint32 CRegistry::GetEntry(
     if( strDir.size() > REG_MAX_PATH )
         return -EINVAL;
 
-    CStdRMutex a( m_oLock );
     ret = Namei( strDir, vecComp );
     if( ERROR( ret ) )
         return ret;
 
+    CStdRMutex a( m_oLock );
     auto itr = vecComp.begin();
     CDirEntry* pCurDir = m_pCurDir;
     while( itr != vecComp.end() )
