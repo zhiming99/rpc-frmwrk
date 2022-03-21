@@ -279,10 +279,11 @@ int main( int argc, char** argv )
             case 'f':
                 {
                     // make a shared lib for FUSE integration
-                    g_bMklib = true;
-                    g_dwFlags = FUSE_BOTH;
                     if( optarg == nullptr )
+                    {
+                        g_dwFlags = FUSE_BOTH;
                         break;
+                    }
                     char ch = optarg[ 0 ];
                     if( ch == 's' )
                         g_dwFlags = FUSE_SERVER;

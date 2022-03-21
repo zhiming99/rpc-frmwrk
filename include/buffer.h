@@ -40,6 +40,8 @@ using cchar = const char;
 #define DATATYPE_MASK       0x0FUL
 #define DATATYPE_MASK_EX    0xF0UL
 #define BUF_MAX_SIZE        ( 512 * 1024 * 1024 )
+#define BUFFLAG_MASK        0xF00UL
+#define BUFFLAG_NOFREE      0x100UL
 
 namespace rpcf
 {
@@ -158,7 +160,7 @@ class CBuffer : public CObjBase
 {
 	char* m_pData;
 	guint32 m_dwSize;
-    guint32 m_dwType;
+    guint32 m_dwType = 0;
     guint32 m_dwOffset = 0;
     guint32 m_dwTailOff = 0;
     char m_arrBuf[ 48 ] __attribute__( ( aligned ( 8 ) ) );
@@ -218,6 +220,8 @@ class CBuffer : public CObjBase
 	CBuffer( const char* pData, guint32 dwSize );
     CBuffer( const ObjPtr& rhs );
     CBuffer( const DMsgPtr& rhs );
+	CBuffer( const char* pData,
+        guint32 dwSize, bool bNoFree );
 
 	~CBuffer();
 
@@ -301,6 +305,22 @@ class CBuffer : public CObjBase
 
     void SetExDataType( EnumTypeId dt );
     EnumTypeId GetExDataType() const;
+
+    inline guint32 GetBufFlags()
+    { return ( m_dwType & BUFFLAG_MASK ); }
+
+    inline void SetNoFree( bool bNoFree )
+    {
+        if( bNoFree )
+            m_dwType |= BUFFLAG_NOFREE;
+        else
+            m_dwType &= ~BUFFLAG_NOFREE;
+    }
+    inline bool IsNoFree()
+    {
+        return ( 0 ==
+            ( m_dwType & BUFFLAG_NOFREE ) );
+    }
 
     bool operator==( const CBuffer& rhs ) const;
     gint32 Serialize( CBuffer& oBuf ) const;
@@ -591,12 +611,15 @@ class CBuffer : public CObjBase
         if( GetDataType() != DataTypeMem )
             return -EINVAL;
 
+        if( IsNoFree() )
+            return -EACCES;
         // plain object only
         // NOTE: c++11 required
         gint32 ret = 0;
         guint32 dwOldSize = size();
-        Resize( size() + sizeof( rhs ) );
-        memcpy( ptr() + dwOldSize, &rhs, sizeof( rhs ) );
+        ret = Resize( size() + sizeof( rhs ) );
+        if( SUCCEEDED( ret ) )
+            memcpy( ptr() + dwOldSize, &rhs, sizeof( rhs ) );
         return ret;
     }
 
@@ -608,6 +631,9 @@ class CBuffer : public CObjBase
         if( GetDataType() != DataTypeObjPtr )
             return -EINVAL;
 
+        if( IsNoFree() )
+            return -EACCES;
+
         // plain object only
         // NOTE: c++11 required
         gint32 ret = 0;
@@ -618,10 +644,10 @@ class CBuffer : public CObjBase
         if( SUCCEEDED( ret ) )
         {
             guint32 dwOldSize = size();
-            Resize( size() + pBuf->size() );
-
-            memcpy( ptr() + dwOldSize,
-                pBuf->ptr(), pBuf->size() );
+            ret = Resize( size() + pBuf->size() );
+            if( SUCCEEDED( ret ) )
+                memcpy( ptr() + dwOldSize,
+                    pBuf->ptr(), pBuf->size() );
         }
 
         if( pBuf )
@@ -640,6 +666,8 @@ class CBuffer : public CObjBase
         if( GetDataType() != DataTypeMem )
             return -EINVAL;
 
+        if( IsNoFree() )
+            return -EACCES;
         // plain object only
         // NOTE: c++11 required
         gint32 ret = 0;
@@ -816,5 +844,17 @@ inline BufPtr GetDefault< IConfigDb* >( IConfigDb** pT )
 {
     return GetDefault<ObjPtr>( ( ObjPtr* )nullptr );
 }
+
+// Create a buffer just taking the pointer pData as the
+// storage without allocation. bNoFree tells if the
+// BufPtr take the ownership of the pData, and
+// responsible to free it. This will only happen when
+// the dwSize is larger than 1KB, otherwise, allocation
+// and memcpy will happen as the normal buffer creation
+// does.
+BufPtr NewBufNoAlloc(
+    const char* pData,
+    guint32 dwSize,
+    bool bNoFree );
 
 }

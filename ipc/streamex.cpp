@@ -354,7 +354,7 @@ gint32 CIfStmReadWriteTask::OnWorkerIrpComplete(
     {
         pIrp->RemoveCallback();
         pIrp->RemoveTimer();
-        Sem_Post( &pIrp->m_semWait ); \
+        Sem_Post( &pIrp->m_semWait );
     }
 
     if( !bHead )

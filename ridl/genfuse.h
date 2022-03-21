@@ -206,3 +206,20 @@ class CImplIufSvrFuse :
         return OutputDispatch();
     }
 };
+
+class CImplMainFuncFuse :
+    public CArgListUtils
+{
+    CCppWriter* m_pWriter = nullptr;
+    CStatements* m_pNode = nullptr;
+    bool m_bProxy = true;
+    public:
+    typedef CArgListUtils super;
+
+    CImplMainFuncFuse(
+        CCppWriter* pWriter,
+        ObjPtr& pNode,
+        bool bProxy );
+    gint32 Output();
+};
+

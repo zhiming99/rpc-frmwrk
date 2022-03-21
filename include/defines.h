@@ -274,6 +274,7 @@ extern int Sem_Timedwait( sem_t* psem, const timespec& ts );
 extern int Sem_TimedwaitSec( sem_t* psem, gint32 iSec );
 extern int Sem_Post( sem_t* psem );
 extern int Sem_Wait( sem_t* psem );
+extern int Sem_Wait_Wakable( sem_t* psem );
 
 // set the name of the current thread
 extern gint32 SetThreadName(const std::string& strName );

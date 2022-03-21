@@ -121,16 +121,29 @@ void CDirEntry::RemoveAllProps()
 CDirEntry* CDirEntry::GetChild(
     const std::string& strName ) const
 {
-    CDirEntry* pRet = NULL;
-
     if( strName.size() > REG_MAX_NAME )
         return nullptr;
 
+    CDirEntry* pRet = nullptr;
     auto itr = m_mapChilds.find( strName );
     if( itr != m_mapChilds.end() )
         pRet = itr->second.get();
 
     return pRet;
+}
+
+gint32 CDirEntry::GetChild(
+    const std::string& strName,
+    CHILD_TYPE& pChild ) const
+{
+    if( strName.size() > REG_MAX_NAME )
+        return -ENAMETOOLONG;
+
+    auto itr = m_mapChilds.find( strName );
+    if( itr != m_mapChilds.end() )
+        pChild = itr->second;
+
+    return -ENOENT;
 }
 
 gint32 CDirEntry::RemoveAllChildren()
@@ -163,7 +176,7 @@ gint32 CDirEntry::AddChild(
 }
 
 gint32 CDirEntry::AddChild(
-    std::shared_ptr< CDirEntry >& pEnt )
+    const CHILD_TYPE& pEnt )
 {
     gint32 ret = -ENOENT;
 
@@ -198,10 +211,20 @@ gint32 CDirEntry::RemoveChild(
     return ret;
 }
 
-CRegistry::CRegistry()
-    : super(),
-    m_pCurDir( &m_oRootDir )
+gint32 CDirEntry::GetChildren(
+    std::vector< CHILD_TYPE >& vecChildren ) const
 {
+    for( auto& elem : m_mapChilds )
+        vecChildren.push_back( elem.second );
+    return vecChildren.size();
+}
+
+CRegistry::CRegistry()
+    : super()
+{
+    m_pRootDir = CHILD_TYPE( new CDirEntry() );
+    m_pRootDir->SetName( "/" );
+    m_pCurDir = m_pRootDir.get();
     SetClassId( Clsid_CRegistry );
 }
 
@@ -331,7 +354,7 @@ gint32 CRegistry::GetEntry(
         }
         else if( *itr == ".." )
         {
-            if( pCurDir == &m_oRootDir )
+            if( pCurDir == GetRootDir() )
             {
                 ret = -ENOENT;
                 break;
@@ -340,7 +363,7 @@ gint32 CRegistry::GetEntry(
         }
         else if( *itr == "/" )
         {
-            pCurDir = &GetRootDir();
+            pCurDir = GetRootDir();
         }
         else
         {
@@ -429,7 +452,7 @@ gint32 CRegistry::ExistingDir(
 
         if( vecComp[ 0 ] == "/" )
         {
-            pCurDir = &GetRootDir();
+            pCurDir = GetRootDir();
             ++itr;
         }
 
@@ -475,7 +498,7 @@ gint32 CRegistry::MakeDir(
 
         if( vecComp[ 0 ] == "/" )
         {
-            pCurDir = &GetRootDir();
+            pCurDir = GetRootDir();
             ++itr;
         }
 

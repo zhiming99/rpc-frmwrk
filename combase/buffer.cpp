@@ -248,7 +248,6 @@ CBuffer& CBuffer::operator=( const CBuffer& rhs )
 }
 
 CBuffer::CBuffer( guint32 dwSize )
-    : m_dwType( 0 )
 {
     SetClassId( clsid( CBuffer ) );
 
@@ -276,14 +275,57 @@ CBuffer::CBuffer( const char* pData, guint32 dwSize )
     return;
 }
 
+CBuffer::CBuffer( const char* pData,
+    guint32 dwSize, bool bNoFree )
+    : CBuffer( 0 )
+{
+    if( pData == nullptr )
+    {
+        throw std::invalid_argument(
+            "the bufer cannot be null" );
+        return;
+    }
+
+    if( dwSize < 128 )
+    {
+        Resize( dwSize );
+        memcpy( ptr(), pData, size() );
+        return;
+    }
+
+    m_pData = const_cast< char* >( pData );
+    m_dwSize = m_dwTailOff = dwSize;
+
+    if( bNoFree )
+        SetNoFree( true );
+
+    return;
+}
+
+BufPtr NewBufNoAlloc( const char* pData,
+    guint32 dwSize, bool bNoFree ) 
+{
+    CBuffer* pBuf = new CBuffer(
+        pData, dwSize, bNoFree );
+    if( pBuf == nullptr )
+    {
+        BufPtr ptrBuf;
+        return ptrBuf;
+    }
+    BufPtr ptrBuf( pBuf, false );
+    return ptrBuf;
+}
+
 CBuffer::~CBuffer()
 {
-    Resize( 0 );
+    if( IsNoFree() )
+        SetBuffer( m_arrBuf, 0 );
+    else
+        Resize( 0 );
 }
 
 CBuffer::CBuffer( const ObjPtr& rhs )
-    : CObjBase(),
-     m_dwType( 0 )
+    : CObjBase()
 {
     Resize( sizeof( ObjPtr ) );
     SetDataType( DataTypeObjPtr );
@@ -293,8 +335,7 @@ CBuffer::CBuffer( const ObjPtr& rhs )
 }
 
 CBuffer::CBuffer( const DMsgPtr& rhs )
-    : CObjBase(),
-     m_dwType( 0 )
+    : CObjBase()
 {
     Resize( sizeof( DMsgPtr ) );
     SetDataType( DataTypeMsgPtr );
@@ -446,6 +487,9 @@ gint32 CBuffer::Resize( guint32 dwSize )
 {
     if( dwSize > MAX_BYTES_PER_BUFFER )
         return -E2BIG;
+
+    if( IsNoFree() )
+        return -EACCES;
 
     gint32 ret = 0;
     switch( GetDataType() )
@@ -995,6 +1039,9 @@ gint32 CBuffer::Append(
 {
     if( GetDataType() != DataTypeMem )
         return -EINVAL;
+
+    if( IsNoFree() )
+        return -EACCES;
 
     if( pBlock == nullptr ||
         dwSize > BUF_MAX_SIZE ||

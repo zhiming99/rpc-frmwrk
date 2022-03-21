@@ -699,11 +699,14 @@ class CImplMainFunc :
 {
     CCppWriter* m_pWriter = nullptr;
     CStatements* m_pNode = nullptr;
+    bool m_bProxy = true;
     public:
     typedef CArgListUtils super;
 
-    CImplMainFunc( CCppWriter* pWriter,
-        ObjPtr& pNode );
+    CImplMainFunc(
+        CCppWriter* pWriter,
+        ObjPtr& pNode,
+        bool bProxy );
     gint32 Output();
 };
 

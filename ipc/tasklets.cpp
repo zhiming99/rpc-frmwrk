@@ -615,4 +615,12 @@ gint32 CSyncCallback::WaitForComplete()
     return Sem_Wait( &m_semWait );
 }
 
+gint32 CSyncCallback::WaitForCompleteWakable()
+{
+    gint32 ret = Sem_Wait_Wakable( &m_semWait );
+    if( ERROR( ret ) )
+        SetError( ret );
+    return ret;
+}
+
 }

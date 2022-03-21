@@ -710,6 +710,7 @@ class CSyncCallback :
 
     gint32 operator()( guint32 dwContext = 0 );
     gint32 WaitForComplete();
+    gint32 WaitForCompleteWakable();
     gint32 Process( guint32 dwContext )
     { return -ENOTSUP; }
 };

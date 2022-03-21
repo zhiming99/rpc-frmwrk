@@ -1589,17 +1589,36 @@ gint32 CDeclServiceImplFuse::Output()
             NEW_LINE;
             Wa( "gint32 CancelRequestByReqId(" );
             Wa( "    guint64 qwReqId );" );
-            if( m_pNode->IsStream() )
-            {
-                Wa( "/* The following 2 methods are important for */" );
-                Wa( "/* streaming transfer. rewrite them if necessary */" );
-                Wa( "gint32 OnStreamReady( HANDLE hChannel ) override" );
-                Wa( "{ return super::OnStreamReady( hChannel ); } " );
-                NEW_LINE;
-                Wa( "gint32 OnStmClosing( HANDLE hChannel ) override" );
-                Wa( "{ return super::OnStmClosing( hChannel ); }" );
-                NEW_LINE;
-            }
+
+            Wa( "/* The following 2 methods are important for */" );
+            Wa( "/* streaming transfer. rewrite them if necessary */" );
+            Wa( "gint32 OnStreamReady2( HANDLE hChannel ) override" );
+            BLOCK_OPEN;
+            Wa( "gint32 ret = super::OnStreamReady( hChannel );" );
+            Wa( "if( ERROR( ret ) )" );
+            Wa( "    return ret;" );
+            CCOUT << "return OnStreamReadyFuse( hChannel );";
+            BLOCK_CLOSE;
+            NEW_LINE;
+            Wa( "gint32 OnStmClosing( HANDLE hChannel ) override" );
+            BLOCK_OPEN;
+            Wa( "OnStmClosingFuse( hChannel );" );
+            CCOUT << "return super::OnStmClosing( hChannel ); }";
+            BLOCK_CLOSE;
+            NEW_LINE;
+
+            Wa( "gint32 OnReadStreamComplete( HANDLE hChannel," );
+            Wa( "    gint32 iRet, BufPtr& pBuf, IConfigDb* pCtx ) override" );
+            Wa( "{ return OnReadStreamCompleteFuse( hChannel, iRet, pBuf, pCtx ); } ");
+            NEW_LINE;
+
+            Wa( "gint32 OnWriteStreamComplete( HANDLE hChannel," );
+            Wa( "    gint32 iRet, BufPtr& pBuf, IConfigDb* pCtx ) override" );
+            Wa( "{ return OnWriteStreamCompleteFuse( hChannel, iRet, pBuf, pCtx ); } ");
+            NEW_LINE;
+
+            Wa( "gint32 OnWriteResumed( HANDLE hChannel ) override" );
+            CCOUT << "{ return OnWriteResumedFuse( hChannel ); } ";
 
             BLOCK_CLOSE;
             CCOUT << ";";
@@ -1645,21 +1664,38 @@ gint32 CDeclServiceImplFuse::Output()
         Wa( "gint32 DispatchMsg(" );
         CCOUT << "    const std::string& strMsg );";
 
-        if( m_pNode->IsStream() )
-        {
-            NEW_LINE;
-            Wa( "/* The following 3 methods are important for */" );
-            Wa( "/* streaming transfer. rewrite them if necessary */" );
-            Wa( "gint32 OnStreamReady( HANDLE hChannel ) override" );
-            Wa( "{ return super::OnStreamReady( hChannel ); } " );
-            NEW_LINE;
-            Wa( "gint32 OnStmClosing( HANDLE hChannel ) override" );
-            Wa( "{ return super::OnStmClosing( hChannel ); }" );
-            NEW_LINE;
-            Wa( "gint32 AcceptNewStream(" );
-            Wa( "    IEventSink* pCb, IConfigDb* pDataDesc ) override" );
-            CCOUT << "{ return STATUS_SUCCESS; }";
-        }
+        NEW_LINE;
+        Wa( "gint32 OnStreamReady( HANDLE hChannel ) override" );
+        BLOCK_OPEN;
+        Wa( "gint32 ret = super::OnStreamReady( hChannel );" );
+        Wa( "if( ERROR( ret ) )" );
+        Wa( "    return ret;" );
+        CCOUT << "return OnStreamReadyFuse( hChannel );";
+        BLOCK_CLOSE;
+        NEW_LINE;
+        Wa( "gint32 OnStmClosing( HANDLE hChannel ) override" );
+        BLOCK_OPEN;
+        Wa( "OnStmClosingFuse( hChannel );" );
+        CCOUT << "return super::OnStmClosing( hChannel ); }";
+        BLOCK_CLOSE;
+        NEW_LINE;
+        Wa( "gint32 AcceptNewStream(" );
+        Wa( "    IEventSink* pCb, IConfigDb* pDataDesc ) override" );
+        Wa( "{ return CFuseSvcServer::AcceptNewStreamFuse( pcb, pDataDesc ); }");
+        NEW_LINE;
+
+        Wa( "gint32 OnReadStreamComplete( HANDLE hChannel," );
+        Wa( "    gint32 iRet, BufPtr& pBuf, IConfigDb* pCtx ) override" );
+        Wa( "{ return OnReadStreamCompleteFuse( hChannel, iRet, pBuf, pCtx ); } ");
+        NEW_LINE;
+
+        Wa( "gint32 OnWriteStreamComplete( HANDLE hChannel," );
+        Wa( "    gint32 iRet, BufPtr& pBuf, IConfigDb* pCtx ) override" );
+        Wa( "{ return OnWriteStreamCompleteFuse( hChannel, iRet, pBuf, pCtx ); } ");
+        NEW_LINE;
+
+        Wa( "gint32 OnWriteResumed( HANDLE hChannel ) override" );
+        CCOUT << "{ return OnWriteResumedFuse( hChannel ); } ";
 
         BLOCK_CLOSE;
         CCOUT << ";";
@@ -1897,7 +1933,9 @@ gint32 CImplIfMethodProxyFuse::OutputAsyncCbWrapper()
         Wa( "CRpcServices* pIf = this;" );
         Wa( "LONGWORD* pData = ( LONGWORD* )pReqCtx;" );
         Wa( "pIf->OnEvent( eventRemoveReq, 0, 0, pData );" );
-        CCOUT << "//TODO: pass strReq to FUSE";
+        Wa( "//TODO: pass strReq to FUSE" );
+        Wa( "CFuseSvcProxy* pFuse = ObjPtr( this );" );
+        CCOUT << "pFuse->ReceiveMsgJson( strReq );";
         BLOCK_CLOSE;
         Wa( "while( 0 );" );
         NEW_LINE;
@@ -1968,6 +2006,8 @@ gint32 CImplIfMethodProxyFuse::OutputEvent()
         NEW_LINE;
         Wa( "    0, strEvent, true, false );" );
         CCOUT << "//TODO: pass strEvent to FUSE";
+        Wa( "CFuseSvcServer* pFuse = ObjPtr( this );" );
+        Wa( "pFuse->ReceiveMsgJson( strEvent );" );
         Wa( "if( ERROR( ret ) ) break;" );
 
         BLOCK_CLOSE;
@@ -3073,7 +3113,8 @@ gint32 CImplServiceImplFuse::Output()
             CCOUT <<  "stdstr strResp = Json::writeString( "
                 << "oBuilder, oJsResp );";
             NEW_LINE;
-            CCOUT << "//TODO: pass strResp to FUSE";
+            Wa( "//TODO: pass strResp to FUSE" );
+            CCOUT << "this->ReceiveMsgJson( strResp );";
             BLOCK_CLOSE;
             Wa( "while( 0 );" );
             CCOUT << "return 0;";
@@ -3122,6 +3163,7 @@ gint32 CImplIufProxyFuse::OutputDispatch()
         Wa( "    IConfigDb* pContext," );
         Wa( "    const Json::Value& oReq," );
         CCOUT << "    Json::Value& oResp )";
+        NEW_LINE;
         BLOCK_OPEN;
 
         Wa( "gint32 ret = 0;" );
@@ -3292,6 +3334,247 @@ gint32 CImplIufSvrFuse::OutputDispatch()
         CCOUT << "return ret;";
         BLOCK_CLOSE;
         NEW_LINE;
+
+    }while( 0 );
+
+    return ret;
+}
+
+CImplMainFuncFuse::CImplMainFuncFuse(
+    CCppWriter* pWriter,
+    ObjPtr& pNode,
+    bool bProxy )
+{
+    m_pWriter = pWriter;
+    m_pNode = pNode;
+    m_bProxy = bProxy;
+}
+
+extern std::string g_strTarget;
+gint32 CImplMainFuncFuse::Output()
+{
+    gint32 ret = 0;
+
+    do{
+        CStatements* pStmts = m_pNode;
+        std::vector< ObjPtr > vecSvcs;
+        pStmts->GetSvcDecls( vecSvcs );
+        std::string strModName = g_strTarget;
+        stdstr strSuffix;
+        if( m_bProxy )
+            strSuffix = "cli";
+        else
+            strSuffix = "svr";
+        {
+            bool bProxy = ( strSuffix == "cli" );
+            if( bProxy )
+            {
+                m_pWriter->SelectMainCli();
+            }
+            else
+            {
+                m_pWriter->SelectMainSvr();
+            }
+
+            Wa( "// Generated by ridlc" );
+            Wa( "#include \"rpc.h\"" );
+            Wa( "#include \"proxy.h\"" );
+            Wa( "#include \"fuseif.h\"" );
+            Wa( "using namespace rpcf;" );
+            for( auto elem : vecSvcs )
+            {
+                CServiceDecl* pSvc = elem;
+                if( bProxy )
+                {
+                    CCOUT << "#include \""
+                        << pSvc->GetName() << "cli.h\"";
+                }
+                else
+                {
+                    CCOUT << "#include \""
+                        << pSvc->GetName() << "svr.h\"";
+                }
+                NEW_LINE;
+            }
+            NEW_LINES( 1 );
+            Wa( "ObjPtr g_pIoMgr;" );
+            NEW_LINE;
+
+            // InitContext
+            Wa( "extern FactoryPtr InitClassFactory();" );
+            Wa( "gint32 InitContext()" );
+            BLOCK_OPEN;
+            Wa( "gint32 ret = CoInitialize( 0 );" );
+            CCOUT << "if( ERROR( ret ) )";
+            INDENT_UPL;
+            CCOUT << "return ret;";
+            INDENT_DOWNL;
+
+            CCOUT << "do";
+            BLOCK_OPEN;
+            CCOUT << "// load class factory for '"
+                << strModName << "'";
+            NEW_LINE;
+            CCOUT << "FactoryPtr p = "
+                << "InitClassFactory();";
+            NEW_LINE;
+            CCOUT << "ret = CoAddClassFactory( p );";
+            NEW_LINE;
+            CCOUT << "if( ERROR( ret ) )";
+            INDENT_UPL;
+            CCOUT << "break;";
+            INDENT_DOWNL;
+            NEW_LINE;
+            Wa( "CParamList oParams;" );
+            CCOUT << "oParams.Push( \""
+                << strModName + strSuffix << "\" );";
+            NEW_LINES( 2 );
+
+            Wa( "// adjust the thread number if necessary" );
+            if( bProxy )
+            {
+                Wa( "oParams[ propMaxIrpThrd ] = 0;" );
+                Wa( "oParams[ propMaxTaskThrd ] = 1;" );
+            }
+            else
+            {
+                Wa( "oParams[ propMaxIrpThrd ] = 2;" );
+                Wa( "oParams[ propMaxTaskThrd ] = 2;" );
+            }
+            NEW_LINE;
+
+            CCOUT << "ret = g_pIoMgr.NewObj(";
+            INDENT_UPL;
+            CCOUT << "clsid( CIoManager ), ";
+            NEW_LINE;
+            CCOUT << "oParams.GetCfg() );";
+            INDENT_DOWNL;
+            CCOUT << "if( ERROR( ret ) )";
+            INDENT_UPL;
+            CCOUT << "break;";
+            INDENT_DOWNL;
+            NEW_LINE;
+            CCOUT << "IService* pSvc = g_pIoMgr;";
+            NEW_LINE;
+            CCOUT << "ret = pSvc->Start();";
+            NEW_LINE;
+            BLOCK_CLOSE;
+            CCOUT << "while( 0 );";
+            NEW_LINES( 2 );
+            Wa( "if( ERROR( ret ) )" );
+            BLOCK_OPEN;
+            CCOUT << "g_pIoMgr.Clear();";
+            NEW_LINE;
+            CCOUT << "CoUninitialize();";
+            BLOCK_CLOSE;
+            NEW_LINE;
+            CCOUT << "return ret;";
+            BLOCK_CLOSE;
+            NEW_LINES( 2 );
+
+            // DestroyContext
+            Wa( "gint32 DestroyContext()" );
+            BLOCK_OPEN;
+            Wa( "IService* pSvc = g_pIoMgr;" );
+            Wa( "if( pSvc != nullptr )" );
+            BLOCK_OPEN;
+            Wa( "pSvc->Stop();" );
+            CCOUT << "g_pIoMgr.Clear();";
+            BLOCK_CLOSE;
+            NEW_LINES( 2 );
+            Wa( "CoUninitialize();" );
+
+            CCOUT << "DebugPrintEx( logErr, 0,";
+            INDENT_UPL;
+            CCOUT << "\"#Leaked objects is %d\",";
+            NEW_LINE;
+            CCOUT << "CObjBase::GetActCount() );";
+            INDENT_DOWNL;
+            CCOUT << "return STATUS_SUCCESS;";
+            BLOCK_CLOSE;
+            NEW_LINES( 2 );
+
+            ObjPtr pRoot( m_pNode );
+            CImplClassFactory oicf(
+                m_pWriter, pRoot, !bProxy );
+
+            ret = oicf.Output();
+            if( ERROR( ret ) )
+                break;
+            NEW_LINE;
+
+            // main function
+            Wa( "int main( int argc, char** argv)" );
+            BLOCK_OPEN;
+            Wa( "gint32 ret = 0;" );
+            CCOUT << "do";
+            BLOCK_OPEN;
+            Wa( "fuse_args args = FUSE_ARGS_INIT(argc, argv);" );
+            Wa( "fuse_cmdline_opts opts;" );
+            Wa( "ret = fuseif_daemonize( args, opts, argc, argv );" );
+            CCOUT << "if( ERROR( ret ) )";
+            NEW_LINE;
+            CCOUT << "    break;";
+            NEW_LINES( 2 );
+            Wa( "ret = InitContext();" );
+            CCOUT << "if( ERROR( ret ) )";
+            NEW_LINE;
+            CCOUT << "    break;";
+            NEW_LINE;
+            CCOUT << "ret = InitRootIf( g_pIoMgr, "
+                << ( bProxy ? "true" : "false" ) << " );";
+            NEW_LINE;
+            CCOUT << "if( ERROR( ret ) )";
+            NEW_LINE;
+            CCOUT << "    break;";
+            NEW_LINE;
+            if( bProxy )
+                Wa( "CFuseRootProxy* pRoot = GetRootIf();" );
+            else
+                Wa( "CFuseRootServer* pRoot = GetRootIf();" );
+            for( auto& elem : vecSvcs )
+            {
+                CServiceDecl* pSvc = elem;
+                stdstr strSvcName = pSvc->GetName();
+
+                std::string strClass =
+                    std::string( "C" ) + strSvcName;
+                if( bProxy )
+                    strClass += "_CliImpl";
+                else
+                    strClass += "_SvrImpl";
+
+                CCOUT << "// add the " << strSvcName << " directory";
+                NEW_LINE;
+                CCOUT << "ret = pRoot->AddSvcPoint(";
+                NEW_LINE;
+                CCOUT << "    \"./"
+                    << g_strAppName << "desc.json\",";
+                NEW_LINE;
+                CCOUT << "    \"" << strSvcName << "\",";
+                NEW_LINE;
+                CCOUT << "    clsid( " << strClass << " ) );";
+                NEW_LINE;
+                CCOUT << "if( ERROR( ret ) )";
+                NEW_LINE;
+                CCOUT << "    break;";
+                NEW_LINE;
+            }
+            NEW_LINE;
+             Wa( "ret = fuseif_main( args, opts );" );
+
+            NEW_LINE;
+            Wa( "// Stop the root object" );
+            CCOUT << "pRoot->Stop();";
+            NEW_LINE;
+            BLOCK_CLOSE;
+            CCOUT<< "while( 0 );";
+            NEW_LINES( 2 );
+            Wa( "DestroyContext();" );
+            CCOUT << "return ret;";
+            BLOCK_CLOSE;
+            NEW_LINES(2);
+        }
 
     }while( 0 );
 

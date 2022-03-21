@@ -990,7 +990,10 @@ gint32 CHeaderPrologue::Output()
     else
         Wa( "#include \"seribase.h\"" );
     if( bFuse )
+    {
         Wa( "#include \"serijson.h\"" );
+        Wa( "#include \"fuseif.h\"" );
+    }
     NEW_LINE;
     CCOUT << "#define DECLPTRO( _type, _name ) \\";
     INDENT_UPL;
@@ -1283,10 +1286,41 @@ gint32 GenHeaderFile(
 
         if( !vecSvcNames.empty() )
         {
-            CImplMainFunc omf( pWriter, pRoot );
-            ret = omf.Output();
-            if( ERROR( ret ) )
-                break;
+            // client side
+            if( bFuseP )
+            {
+                CImplMainFuncFuse omf(
+                    pWriter, pRoot, true );
+                ret = omf.Output();
+                if( ERROR( ret ) )
+                    break;
+            }
+            else
+            {
+                CImplMainFunc omf(
+                    pWriter, pRoot, true );
+                ret = omf.Output();
+                if( ERROR( ret ) )
+                    break;
+            }
+
+            // server side
+            if( bFuseS )
+            {
+                CImplMainFuncFuse omf(
+                    pWriter, pRoot, false );
+                ret = omf.Output();
+                if( ERROR( ret ) )
+                    break;
+            }
+            else
+            {
+                CImplMainFunc omf(
+                    pWriter, pRoot, false );
+                ret = omf.Output();
+                if( ERROR( ret ) )
+                    break;
+            }
         }
 
     }while( 0 );
@@ -2746,6 +2780,8 @@ gint32 CDeclService::Output()
         NEW_LINE;
         if( m_pNode->IsStream() || bFuseP )
             Wa( "CStreamProxyAsync," );
+        if( bFuseP )
+            Wa( "CFuseSvcProxy," );
         for( guint32 i = 0;
             i < vecIfs.size(); i++ )
         {
@@ -2769,6 +2805,8 @@ gint32 CDeclService::Output()
         NEW_LINE;
         if( m_pNode->IsStream() || bFuseS )
             Wa( "CStreamServerAsync," );
+        if( bFuseS )
+            Wa( "CFuseSvcServer," );
         for( guint32 i = 0;
             i < vecIfs.size(); i++ )
         {
@@ -6263,10 +6301,12 @@ extern std::string g_strTarget;
 
 CImplMainFunc::CImplMainFunc(
     CCppWriter* pWriter,
-    ObjPtr& pNode )
+    ObjPtr& pNode,
+    bool bProxy )
 {
     m_pWriter = pWriter;
     m_pNode = pNode;
+    m_bProxy = bProxy;
 }
 
 gint32 CImplMainFunc::Output()
@@ -6280,11 +6320,13 @@ gint32 CImplMainFunc::Output()
         CServiceDecl* pSvc = vecSvcs[ 0 ];
         std::string strSvcName = pSvc->GetName();
         std::string strModName = g_strTarget;
-        std::vector< std::string > vecSuffix =
-            { "cli", "svr" };
-        for( auto& elem : vecSuffix )
+        stdstr strSuffix;
+        if( m_bProxy )
+            strSuffix = "cli";
+        else
+            strSuffix = "svr";
         {
-            bool bProxy = ( elem == "cli" );
+            bool bProxy = ( strSuffix == "cli" );
             std::string strClass =
                 std::string( "C" ) + strSvcName;
             if( bProxy )
@@ -6348,7 +6390,7 @@ gint32 CImplMainFunc::Output()
             NEW_LINE;
             Wa( "CParamList oParams;" );
             CCOUT << "oParams.Push( \""
-                << strModName + elem << "\" );";
+                << strModName + strSuffix << "\" );";
             NEW_LINES( 2 );
 
             Wa( "// adjust the thread number if necessary" );
