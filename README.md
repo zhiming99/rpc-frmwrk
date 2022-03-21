@@ -60,6 +60,9 @@ This project depends on the following 3rd-party packags at runtime:
 5. A tree-like hierarchical persistant registry.
 
 ---
+[`Mon Mar 21 2022 07:57:49 PM Beijing`]   
+1. Checked in some newly added code for fuse integration. And the file system interface is 60% code complete. A little bit behind the schedule.
+
 [`Mon Feb 28 2022 08:53:32 AM Beijing`]    
 1. The ridlc part is 90% code complete, and remain the interface with the file system part.
 2. seems the file system is not a trivial work, and it will take a month to get it done.
