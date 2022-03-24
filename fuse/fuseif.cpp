@@ -171,9 +171,9 @@ gint32 CFuseStmFile::OnReadStreamComplete(
             while( m_queReqs.size() )
             {
                 auto& elem = m_queReqs.front();
-                auto req = std::get<0>( elem );
+                auto req = elem.req;
                 fuseif_finish_interrupt( GetFuse(),
-                    req, std::get<2>( elem ).get() );
+                    req, elem.pintr.get() );
                 fuse_reply_err( req, iRet );
                 m_queReqs.pop_front();
             }
@@ -185,9 +185,9 @@ gint32 CFuseStmFile::OnReadStreamComplete(
             m_queIncoming.size() > 0 )
         {
             auto& elem = m_queReqs.front();
-            fuse_req_t req = std::get<0>( elem );
-            size_t& dwReqSize = std::get<1>( elem );
-            auto d = std::get<2>( elem).get();
+            fuse_req_t req = elem.req;
+            size_t& dwReqSize = elem.dwReqSize;
+            auto d = elem.pintr.get();
             fuse_bufvec* bufvec = nullptr;
 
             // the vector to keep the buffer valid
@@ -230,70 +230,76 @@ gint32 CFuseStmFile::fs_read(
         if( ERROR( ret ) )
             break;
 
-        if( m_queReqs.size() &&
-            m_queIncoming.size() )
-        {
-            ret = ERROR_STATE;
-            break;
-        }
-
-        std::unique_ptr< fuseif_intr_data >
-            pdata( d );
-
+        PINTR pdata( d );
+        // any size is ok
         if( size == SIZE_MAX )
             size = 0;
-        if( m_queReqs.size() )
-        {
-            m_queReqs.push_back(
-                { req, size, pdata } );
 
-            ret = STATUS_PENDING;
+        if( m_queReqs.size() > MAX_STM_QUE_SIZE )
+        {
+            ret = -EAGAIN;
             break;
         }
 
-        if( m_queIncoming.empty() )
+        InterfPtr pIf = GetIf();
+        CRpcServices* pSvc = pIf;
+        CStreamServerSync* pStmSvr = pIf;
+        CStreamProxySync* pStmProxy = pIf;
+        HANDLE hstm = GetStream();
+
+        BufPtr pBuf( true );
+        // a zero size pBuf indicates it is OK with
+        // an incoming messages of any length
+        // greater than zero.
+        if( size != 0 && !IsNonBlock() )
+            pBuf->Resize( size );
+
+        if( pSvc->IsServer() )
         {
-            InterfPtr pIf = GetIf();
-            CRpcServices* pSvc = pIf;
-            CStreamServerSync* pStmSvr = pIf;
-            CStreamProxySync* pStmProxy = pIf;
-            HANDLE hstm = GetStream();
-
-            BufPtr pBuf( true );
-            // a zero size pBuf indicates it is OK with
-            // an incoming messages of any length
-            // greater than zero.
-            if( size != 0 )
-                pBuf->Resize( size );
-
-            if( pSvc->IsServer() )
-            {
+            if( IsNonBlock() )
+                ret = pStmSvr->ReadStreamNoWait(
+                    hstm, pBuf );
+            else
                 ret = pStmSvr->ReadStreamAsync(
                     hstm, pBuf, nullptr );
-            }
+        }
+        else
+        {
+            if( IsNonBlock() )
+                ret = pStmProxy->ReadStreamNoWait(
+                    hstm, pBuf );
             else
-            {
                 ret = pStmProxy->ReadStreamAsync(
                     hstm, pBuf, nullptr );
-            }
-            if( ret == STATUS_PENDING )
-            {
-                m_queReqs.push_back(
-                    { req, size, pdata } );
-                break;
-            }
-            if( ERROR( ret ) )
-                break;
-
-            m_queIncoming.push_back( { pBuf, 0 } );
         }
-
-        ret = FillBufVec( size, m_queIncoming,
-            vecBackup, bufvec );
         if( ret == STATUS_PENDING )
         {
             m_queReqs.push_back(
                 { req, size, pdata } );
+            break;
+        }
+        if( ERROR( ret ) )
+            break;
+
+        m_queIncoming.push_back( { pBuf, 0 } );
+        if( m_queReqs.empty() )
+        {
+            ret = FillBufVec( size, m_queIncoming,
+                vecBackup, bufvec );
+            if( ret == STATUS_PENDING )
+            {
+                m_queReqs.push_back(
+                    { req, size, pdata } );
+            }
+            break;
+        }
+        else
+        {
+            // we should not be here            
+            ret = -EFAULT;
+            throw std::runtime_error( 
+                DebugMsg( ret, "fs_write_buf: "
+                    "unexpacted error" ) );
         }
 
     }while( 0 );
@@ -301,84 +307,6 @@ gint32 CFuseStmFile::fs_read(
     return ret;
 }
 
-gint32 CFuseFileEntry::FillBufVec(
-    guint32& dwReqSize,
-    std::deque< INBUF >& queBufs,
-    std::vector< BufPtr >& vecBufs,
-    fuse_bufvec*& bufvec )
-{
-    gint32 ret = 0;
-    do{
-        guint32 dwAvail = 0;
-        auto itr = queBufs.begin();
-        while( itr != queBufs.end() )
-        {
-           size_t& dwOff = std::get<1>( *itr );
-           BufPtr& pBuf = std::get<0>( *itr );
-           dwAvail += pBuf->size() - dwOff;
-           if( dwAvail >= dwReqSize )
-               break;
-        }
-        if( dwAvail == 0 )
-        {
-            dwReqSize = 0;
-            queBufs.clear();
-            break;
-        }
-
-        if( dwReqSize == 0 )
-            dwReqSize = dwAvail;
-
-        if( dwAvail < dwReqSize )
-        {
-            ret = STATUS_PENDING;
-            break;
-        }
-
-        gint32 iCount = itr - queBufs.begin();
-        bufvec = malloc( 
-            sizeof( fuse_bufvec ) +
-            sizeof( fuse_buf ) * iCount );
-        iCount += 1;
-        bufvec->count = iCount;
-        bufvec->idx = 0;
-        bufvec->off = 0;
-        guint32 dwAlloced = 0;
-        for( int i = 0; i < iCount; i++ )
-        {
-            BufPtr& pBuf =
-                std::get<0>( queBufs.front() );
-            size_t& dwOff =
-                std::get<1>( queBufs.front() );
-            fuse_buf& slot = bufvec->buf[ i ];
-            slot.flags = (enum fuse_buf_flags) 0;
-            slot.fd = -1;
-            slot.pos = 0;
-            slot.mem = pBuf->ptr() + dwOff;
-
-            if( i < iCount - 1 )
-            {
-                slot.size = pBuf->size() - dwOff;
-                dwAlloced += slot.size();
-                vecBufs.push_back( pBuf );
-                queBufs.pop_front();
-            }
-            else
-            {
-                slot.size = dwReqSize - dwAlloced;
-                dwOff += slot.size;
-                if( dwOff == pBuf->size() )
-                {
-                    vecBufs.push_back( pBuf );
-                    queBufs.pop_front();
-                }
-            }
-        }
-
-    }while( 0 );
-
-    return ret; 
-}
 
 gint32 CFuseFileEntry::CopyFromPipe(
     BufPtr& pBuf, fuse_buf* src )
@@ -436,10 +364,10 @@ gint32 CFuseStmFile::SendBufVec( OUTREQ& oreq )
 {
     gint32 ret = 0;
     do{
-        fuse_req_t& req = std::get<0>( oreq );
-        fuse_bufvec* bufvec= std::get<1>( oreq );
-        gint32& idx = std::get<2>( oreq );
-        fuseif_intr_data* pintr = std::get<3>( oreq );
+        fuse_req_t& req = oreq.req;
+        fuse_bufvec* bufvec= oreq.bufvec; 
+        gint32& idx = oreq.idx;
+        fuseif_intr_data* pintr = oreq.pintr;
 
         InterfPtr pIf = GetIf();
         CRpcServices* pSvc = pIf;
@@ -448,75 +376,75 @@ gint32 CFuseStmFile::SendBufVec( OUTREQ& oreq )
         HANDLE hstm = GetStream();
 
         int i = bufvec->idx;
-        guint32 dwSent = 0;
+        std::vector< BufPtr > vecBufs;
+        ret = CopyFromBufVec( vecBufs, bufvec );
+        if( ERROR( ret ) )
+            break;
+
+        TaskletPtr pCb;
+        ret = pCb.NewObj(
+            clsid( CSyncCallback ) );
+        if( ERROR( ret ) )
+            break;
+
         BufPtr pBuf;
-        for( ;i < bufvec->count; i++ )
+        pBuf = vecBufs.front();
+        if( vecBufs.size() > 1 || IsNonBlock() )
         {
-            fuse_buf& fb = bufvec->buf[ i ];
-            if( fb.flags & FUSE_BUF_IS_FD )
-            {
-                ret = CopyFromPipe( pBuf, &fb );
-                if( ERROR( ret ) )
-                    break;
-                if( pBuf.IsEmpty() || pBuf->empty() )
-                    break;
-            }
+            // local copy is better than multiple round
+            // trip.
+            if( pBuf->IsNoFree() )
+                pBuf.NewObj();
             else
             {
-                char* pData = fb.mem;
-                guint32 dwSize = fb.size;
-                if( i == bufvec->idx )
-                {
-                    pData += bufvec->off;
-                    dwSize -= bufvec->off;
-                }
-                pBuf = NewBufNoAlloc(
-                    pData, dwSize, true );
+                vecBufs.pop_front();
             }
-
-            TaskletPtr pCb;
-            ret = pCb.NewObj(
-                clsid( CSyncCallback ) );
-            if( ERROR( ret ) )
-                break;
-
-            // write can complete immediately, if the
-            // load is not very heavy.
-            if( pSvc->IsServer() )
+            for( auto& elem :vecBufs )
             {
+                pBuf->Append(
+                    elem->ptr(), elem->size() );
+            }
+        }
+
+        // write can complete immediately, if the
+        // load is not very heavy.
+        if( pSvc->IsServer() )
+        {
+            if( IsNonBlock() )
+                ret = pStmSvr->WriteStreamNoWait(
+                    hstm, pBuf );
+            else
                 ret = pStmSvr->WriteStreamAsync(
                     hstm, pBuf, ( IEventSink* )pCb );
-            }
+        }
+        else
+        {
+            if( IsNonBlock() )
+                ret = pStmProxy->WriteStreamNoWait(
+                    hstm, pBuf );
             else
-            {
                 ret = pStmProxy->WriteStreamAsync(
                     hstm, pBuf, pCb );
-            }
-
-            if( ret == STATUS_PENDING )
-            {
-                CSyncCallback* pSync = pCb;
-                pSync->WaitForCompleteWakable();
-                ret = pSync->GetError();
-            }
-
-            if( ret == ERROR_QUEUE_FULL )
-            {
-                SetFlowCtrl( true );
-                if( dwSent == 0 )
-                    ret = -EAGAIN;
-                else
-                    ret = STATUS_SUCCESS;
-                break;
-            }
-
-            if( ERROR( ret ) )
-                break;
-
-            dwSent += dwSize;
-            pBuf.Clear();
         }
-        bufvec->idx = i;
+
+        if( ret == STATUS_PENDING )
+        {
+            CSyncCallback* pSync = pCb;
+            pSync->WaitForCompleteWakable();
+            ret = pSync->GetError();
+        }
+
+        if( ret == ERROR_QUEUE_FULL )
+        {
+            SetFlowCtrl( true );
+            ret = -EAGAIN;
+            break;
+        }
+
+        if( ERROR( ret ) )
+            break;
+
+        bufvec->idx = bufvec->count;
 
     }while( 0 );
 
@@ -544,9 +472,7 @@ gint32 CFuseStmFile::fs_write_buf(
             break;
         }
 
-        std::unique_ptr< fuseif_intr_data >
-            pintr( d );
-
+        PINTR pintr( d );
         OUTREQ oreq =
             { req, bufvec, bufvec->idx, pintr };
 
@@ -653,8 +579,7 @@ gint32 CFuseFileEntry::CancelRequest(
     auto itr = m_queReqs.begin();
     while( itr != m_queReqs.end() )
     {
-        if( req->unique ==
-            std::get<0>( *itr )->unique)
+        if( req->unique == itr->req->unique)
         {
             bFound = true;
             break;
@@ -663,8 +588,8 @@ gint32 CFuseFileEntry::CancelRequest(
     }
     if( bFound )
     {
-        auto d = std::get<2>( *itr ).get();
-        auto req = std::get<0>( *itr );
+        auto d = itr->pintr.get();
+        auto req = itr->req;
         fuseif_finish_interrupt(
                 GetFuse(), req, d );
         fuse_reply_err( req, ECANCELED );
@@ -682,8 +607,8 @@ gint32 CFuseFileEntry::CancelRequests()
     for( auto& elem : m_queReqs ) 
     {
         fuseif_finish_interrupt( GetFuse(),
-            std::get<0>( elem ), 
-            std::get<2>( elem ).get() );
+            elem.req, 
+            elem.pintr.get() );
         fuse_reply_err(
             std::get<0>( elem ), ECANCELED );
     }
@@ -705,17 +630,12 @@ gint32 CFuseEvtFile::fs_read(
         if( ERROR( ret ) )
             break;
 
-        if( m_queReqs.size() &&
-            m_queIncoming.size() )
-        {
-            ret = ERROR_STATE;
-            break;
-        }
-
-        std::unique_ptr< fuseif_intr_data >
-            pdata( d );
+        PINTR pdata( d );
 
         if( size == SIZE_MAX )
+            size = 0;
+
+        if( IsNonBlock() )
             size = 0;
 
         if( m_queReqs.size() ||
@@ -741,7 +661,7 @@ gint32 CFuseEvtFile::fs_read(
     return ret;
 }
 
-gint32 CFuseEvtFile::ReceiveMsgJson(
+gint32 CFuseEvtFile::ReceiveEvtJson(
         const stdstr& strMsg )
 {
     gint32 ret = 0;
@@ -765,9 +685,8 @@ gint32 CFuseEvtFile::ReceiveMsgJson(
         {
             pBuf.NewObj();
             pBuf->Append(
-                pSizeBuf->ptr(), pSizeBuf->size() );
-            pBuf->Append(
                 strMsg.c_str(), strMsg.size());
+            m_queIncoming.push_back( { pSizeBuf, 0 } );
             m_queIncoming.push_back( {pBuf, 0} );
             fuse_pollhandle* ph = GetPollHandle();
             if( ph != nullptr )
@@ -781,9 +700,9 @@ gint32 CFuseEvtFile::ReceiveMsgJson(
             m_queIncoming.size() > 0 )
         {
             auto& elem = m_queReqs.front();
-            fuse_req_t req = std::get<0>( elem );
-            size_t& dwReqSize = std::get<1>( elem );
-            auto d = std::get<2>( elem).get();
+            fuse_req_t req = elem.req;
+            size_t& dwReqSize = elem.dwReqSize;
+            auto d = elem.pintr.get();
             fuse_bufvec* bufvec = nullptr;
 
             // the vector to keep the buffer valid
@@ -792,7 +711,7 @@ gint32 CFuseEvtFile::ReceiveMsgJson(
                 m_queIncoming, vecRemoved, bufvec );
             if( ret == STATUS_PENDING )
             {
-                // incoming data is not enough.
+                // more incoming data is needed
                 ret = 0;
                 break;
             }
@@ -854,30 +773,31 @@ gint32 CFuseFileEntry::CopyFromBufVec(
 
 static std::unique_ptr< Json::CharReader > g_pReader;
 
-gint32 CFuseReqFile::GetReqSize(
-    std::vector< BufPtr >& vecBufs )
+gint32 CFuseEvtFile::GetReqSize(
+    BufPtr& pReqSize,
+    BUFARR& vecBufs )
 {
     gint32 ret = 0;
     do{
         guint32 dwSize = sizeof( guint32 );
-        if( m_pReqSize->size() == dwSize )
+        if( pReqSize->size() == dwSize )
             break;
 
-        if( m_pReqSize->size() > dwSize )
+        if( pReqSize->size() > dwSize )
         {
             ret = -EOVERFLOW;
             break;
         }
 
         guint32 dwCopy = sizeof( guint32 ) -
-            m_pReqSize->size();
+            pReqSize->size();
         
         while( vecBufs.size() )
         {
             auto& elem = vecBufs.front();
             if( elem->size() <= dwCopy )
             {
-                m_pReqSize->Append(
+                pReqSize->Append(
                     elem->ptr(), elem->size() );
                 dwCopy -= elem->size();
                 vecBufs.pop_front();
@@ -885,7 +805,7 @@ gint32 CFuseReqFile::GetReqSize(
                     break;
                 continue;
             }
-            m_pReqSize->Append(
+            pReqSize->Append(
                 elem->ptr(), dwCopy );
             elem->SetOffset(
                 elem->offset() + dwCopy );
@@ -905,7 +825,7 @@ gint32 CFuseReqFile::GetReqSize(
     return ret;
 }
 
-gint32 CFuseReqFile::fs_write_buf(
+gint32 CFuseRespFileSvr::fs_write_buf(
     fuse_req_t req,
     fuse_bufvec *bufvec,
     fuse_file_info *fi
@@ -917,8 +837,7 @@ gint32 CFuseReqFile::fs_write_buf(
     if( ERROR( ret ) )
         return ret;
 
-    std::unique_ptr< fuseif_intr_data >
-        pintr( d );
+    PINTR pintr( d );
 
     ret = CopyFromBufVec(
             m_vecOutBufs, bufvec );
@@ -926,9 +845,11 @@ gint32 CFuseReqFile::fs_write_buf(
         return ret;
 
     do{
+        // receive the 4-byte size in local endian
         if( m_pReqSize->size() < sizeof( guint32 ) )
         {
-            ret = GetReqSize( m_vecOutBufs );
+            ret = GetReqSize(
+                m_pReqSize, m_vecOutBufs );
             if( ERROR( ret ) )
                 break;
             if( ret == STATUS_PENDING )
@@ -948,6 +869,7 @@ gint32 CFuseReqFile::fs_write_buf(
             break;
         }
 
+        // receive the bytearray of dwReqSize bytes
         guint32 dwAvail = 0;
         for( auto& elem : m_vecOutBufs )
             dwAvail += elem->size();
@@ -955,6 +877,7 @@ gint32 CFuseReqFile::fs_write_buf(
         std::vector< BufPtr > vecBufs;
         if( dwAvail < dwReqSize )
         {
+            // make a copy and waiting for more input
             for( auto& elem : m_vecOutBufs )
             {
                 BufPtr pCopy;
@@ -977,6 +900,207 @@ gint32 CFuseReqFile::fs_write_buf(
             break;
         }
 
+        // has received complete requests
+        guint32 dwToAdd = dwReqSize;
+        while( m_vecOutBufs.size() )
+        {
+            auto& elem = m_vecOutBufs.front();
+            if( dwToAdd >= elem->size() )
+            {
+                dwToAdd -= elem->size();
+                vecBufs.push_back( elem );
+                m_vecOutBufs.pop_front();
+                if( dwToAdd > 0 )
+                    continue;
+                break;
+            }
+
+            BufPtr pBuf = NewBufNoAlloc(
+                elem->ptr(), dwToAdd );
+            vecBufs.push_back( pBuf );
+            elem->SetOffset(
+                elem->offset() + dwToAdd );
+            dwToAdd = 0;
+            break;
+        }
+
+        // merge to a single buffer
+        BufPtr pBuf = vecBufs.front();
+        if( vecBufs.size() > 1 )
+        {
+            if( pBuf->IsNoFree() )
+                pBuf.NewObj();
+            else
+                vecBufs.pop_front();
+            for( auto& elem : vecBufs )
+            {
+                pBuf->Append(
+                    elem->ptr(), elem->size() );
+            }
+        }
+        vecBufs.clear();
+
+        Json::Value valResp;
+        if( !g_pReader->parse( pBuf->ptr(),
+            pBuf->ptr() + pBuf->size(),
+            &valResp, nullptr ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        // send the response
+        CFuseSvcServer* pSvr = GetIf();
+        ret = pSvr->DispatchIfMsg( valResp );
+        if( ret == STATUS_PENDING )
+            ret = 0;
+
+        if( m_vecOutBufs.empty() )
+        {
+            bufvec->idx = bufvec->count;
+            ret = 0;
+            break;
+        }
+
+        m_pReqSize->Resize( 0 );
+
+    }while( 1 );
+
+    return ret;
+}
+
+gint32 CFuseRespFileProxy::ReceiveMsgJson(
+    const stdstr& strMsg,
+    guint64 qwReqId )
+{
+    gint32 ret = 0;
+    do{
+        InterfPtr pIf = GetIf();
+        CFuseSvcProxy* pProxy = pIf;
+        CHILD_TYPE pEnt = pProxy->GetSvcDir();
+        CFuseSvcDir* pDir = static_cast
+            < CFuseSvcDir* >( pEnt.get() );
+        auto p = pDir->GetChild( JSON_REQ_FILE );
+        CFuseReqFileProxy* pReqFile = static_cast
+            < CFuseReqFileProxy* >( p );
+        pReqFile->RemoveResp( qwReqId );
+
+        ret = super::ReceiveMsgJson(
+            strMsg, qwReqId );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CFuseReqFileProxy::RemoveResp(
+    guint64 qwReqId )
+{
+    CWriteLock oFileLock( GetLock() );
+    gint32 ret = oFileLock.GetStatus();
+    if( ERROR( ret ) )
+        return ret;
+
+    bool bFound = false;
+    auto itr = m_queTaskIds.begin();
+    while( itr != m_queTaskIds.end() )
+    {
+        if( itr->qwReqId == qwReqId )
+        {
+            bFount = true;
+            break;
+        }
+        itr++;
+    }
+
+    ret = -ENOENT;
+    if( bFound )
+    {
+        m_queTaskIds.erase( itr );
+        ret = 0;
+    }
+
+    return ret;
+}
+
+gint32 CFuseReqFileProxy::fs_write_buf(
+    fuse_req_t req,
+    fuse_bufvec *bufvec,
+    fuse_file_info *fi
+    fuseif_intr_data* d )
+{
+    gint32 ret = 0;
+    CWriteLock oFileLock( GetLock() );
+    ret = oFileLock.GetStatus();
+    if( ERROR( ret ) )
+        return ret;
+
+    PINTR pintr( d );
+
+    ret = CopyFromBufVec(
+            m_vecOutBufs, bufvec );
+    if( ERROR( ret ) )
+        return ret;
+
+    do{
+        // receive the size value of 4-bytes in local
+        // endian
+        if( m_pReqSize->size() < sizeof( guint32 ) )
+        {
+            ret = GetReqSize(
+                m_pReqSize, m_vecOutBufs );
+
+            if( ERROR( ret ) )
+                break;
+            if( ret == STATUS_PENDING )
+            {
+                // wait for more input
+                bufvec->idx = bufvec->count;
+                ret = 0;
+                break;
+            }
+        }
+
+        guint32 dwReqSize =
+            ( guint32& )*m_pReqSize;
+        if( dwReqSize >
+            MAX_BYTES_PER_TRANSFER * 2 )
+        {
+            ret = -EFBIG;
+            break;
+        }
+
+        // receive the bytearray of dwReqSize bytes
+        guint32 dwAvail = 0;
+        for( auto& elem : m_vecOutBufs )
+            dwAvail += elem->size();
+
+        std::vector< BufPtr > vecBufs;
+        if( dwAvail < dwReqSize )
+        {
+            // need more input
+            for( auto& elem : m_vecOutBufs )
+            {
+                BufPtr pCopy;
+                if( elem->IsNoFree() )
+                {
+                    pCopy.NewObj();
+                    ret = pCopy->Resize(
+                        elem->size() );
+                    if( ERROR( ret ) )
+                        break;
+
+                    memcpy( pCopy->ptr(),
+                        elem->ptr(),
+                        elem->size() );
+                    elem = pCopy;
+                }
+            }
+            bufvec->idx = bufvec->count;
+            ret = 0;
+            break;
+        }
+        // received one or more complete requests
         guint32 dwToAdd = dwReqSize;
         while( m_vecOutBufs.size() )
         {
@@ -1023,30 +1147,63 @@ gint32 CFuseReqFile::fs_write_buf(
             ret = -EINVAL;
             break;
         }
+        
+        CFuseSvcProxy* pProxy = GetIf();
+        ret = pProxy->DispatchIfReq(
+            nullptr, valReq, valResp );
 
-        CRpcServices* pIf = GetIf();
-        if( pIf->IsServer() )
+        Json::Value& valrid =
+            valResp[ JSON_ATTR_REQCTXID ];
+
+        guint64 qwReqId = valrid.asUInt64();
+
+        Json::StreamWriterBuilder oBuilder;
+        oBuilder["commentStyle"] = "None";
+        stdstr strResp =
+            Json::writeString( oBuilder, oResp );
+
+        if( ret == STATUS_PENDING )
         {
-            CFuseSvcServer* pSvr = GetIf();
-            ret = pSvr->DispatchIfMsg( valReq );
+            // append the response to the
+            // m_queTaskIds of request file
+            m_queTaskIds.push_back(
+                { strResp, qwReqId } );
+            ret = 0;
         }
-        else
+        else if( SUCCEEDED( ret ) )
         {
-            CFuseSvcProxy* pProxy = GetIf();
-            ret = pProxy->DispatchIfReq(
-                nullptr, valReq, valResp );
-            if( ret == STATUS_PENDING )
+            // append the response to the file
+            // JSON_RESP_FILE
+            void (*func)( CFuseSvcProxy*,
+                const stdstr& )=([](
+                    CFuseSvcProxy* pIf,
+                    const stdstr& strResp )
             {
-                // append the response to the
-                // m_queIncoming of request file
+                gint32 ret = 0;
+                do{
+                    RLOCK_TESTMNT2( pIf );
+                    auto pResp = _pDir->GetChild(
+                        JSON_RESP_FILE );
+                    CFuseEvtFile* p = dynamic_cast
+                        < CFuseEvtFile* >( pResp );
+                    p->ReceiveEvtJson( strMsg );
+
+                }while( 0 );
+
+                return;
             }
-            else
-            {
-                // append the response to the response
-                // file
-            }
+
+            TaskletPtr pTask;
+            ret = NEW_FUNCCALL_TASK( pTask,
+                this->GetIoMgr(), func,
+                pProxy, strResp, qwReqId );
+            if( ERROR( ret ) )
+                break;
+
+            GetIoMgr()->RescheduleTask( pTask );
         }
 
+        m_pReqSize->Resize( 0 );
         if( m_vecOutBufs.empty() )
         {
             bufvec->idx = bufvec->count;
@@ -1054,9 +1211,12 @@ gint32 CFuseReqFile::fs_write_buf(
             break;
         }
 
-        m_pReqSize->Resize( 0 );
-
     }while( 1 );
+    if( ERROR( ret ) )
+    {
+        m_pReqSize.Clear();
+        m_vecOutBufs.clear();    
+    }
 
     return ret;
 }

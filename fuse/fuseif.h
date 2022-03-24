@@ -393,7 +393,7 @@ class CFuseConnDir : public CFuseObjBase
         stdstr strName = HOP_DIR;
         auto pDir = std::shared_ptr<CDirEntry>
             ( new CFuseDirectory( strName, nullptr ) ); 
-        CFuseObjBase* pObj = static_cast
+        CFuseObjBase* pObj = dynamic_cast
             < CFuseObjBase >( pDir.get() );
         pObj->SetMode( S_IRUSR | S_IXUSR );
         pObj->DecRef();
@@ -403,7 +403,7 @@ class CFuseConnDir : public CFuseObjBase
         strName = CONN_PARAM_FILE;
         auto pFile = std::shared_ptr<CDirEntry>
             ( new CFuseTextFile( strName ) ); 
-        pObj = static_cast
+        pObj = dynamic_cast
             < CFuseObjBase* >( pFile.get() );
         pObj->SetMode( S_IRUSR );
         pObj->DecRef();
@@ -745,23 +745,123 @@ class CFuseSvcDir : public CFuseDirectory
 class CFuseFileEntry : public CFuseObjBase
 {
     protected:
-    using INBUF=std::tuple< BufPtr, size_t >;
-    std::deque< INBUF > m_queIncoming;
-    using REQCTX = std::tuple< fuse_req_t, size_t,
-        std::unique_ptr< fuseif_intr_data > >;
-    std::deque< REQCTX > m_queReqs;
 
-    using OUTREQ=std::tuple< fuse_req_t,
-        fuse_bufvec*, gint32, 
-        std::unique_ptr< fuseif_intr_data > >;
+    struct INBUF
+    {
+        BufPtr pBuf;
+        guint32 dwOff = 0;
+    };
+
+    std::deque< INBUF > m_queIncoming;
+
+    using PINTR = 
+        std::unique_ptr< fuseif_intr_data >;
+    struct REQCTX
+    {
+        fuse_req_t req = nullptr;
+        guint32 dwReqSize = 0;
+        PINTR pintr;
+    };
+
+
+    std::deque< REQCTX > m_queReqs;
 
     CRpcServices* m_pIf;
 
-    void FillBufVec(
+    template< typename T >
+    gint32 FillBufVec(
         guint32& dwReqSize,
-        std::deque< INBUF >& queBufs,
+        std::deque< T >& queBufs,
         std::vector< BufPtr >& vecBufs,
-        fuse_bufvec*& bufvec );
+        fuse_bufvec*& bufvec )
+    {
+        gint32 ret = 0;
+        do{
+            guint32 dwAvail = 0;
+            auto itr = queBufs.begin();
+            while( itr != queBufs.end() )
+            {
+               size_t& dwOff = itr->dwOff;
+               BufPtr& pBuf = itr->pBuf;
+               dwAvail += pBuf->size() - dwOff;
+               if( dwReqSize == 0 )
+               {
+                   itr++;
+                   continue;
+               }
+               if( dwAvail >= dwReqSize )
+                   break;
+               itr++;
+            }
+            if( dwAvail == 0 )
+            {
+                dwReqSize = 0;
+                queBufs.clear();
+                break;
+            }
+
+            if( dwReqSize == 0 )
+                dwReqSize = dwAvail;
+
+            if( dwAvail < dwReqSize )
+            {
+                ret = STATUS_PENDING;
+                break;
+            }
+
+            gint32 iCount = itr - queBufs.begin();
+            bufvec = malloc( 
+                sizeof( fuse_bufvec ) +
+                sizeof( fuse_buf ) * iCount );
+            iCount += 1;
+            bufvec->count = iCount;
+            bufvec->idx = 0;
+            bufvec->off = 0;
+            guint32 dwAlloced = 0;
+            for( int i = 0; i < iCount; i++ )
+            {
+                BufPtr& pBuf =
+                    queBufs.front().pBuf;
+                size_t& dwOff =
+                    queBufs.front().dwOff;
+
+                fuse_buf& slot = bufvec->buf[ i ];
+                slot.flags = (enum fuse_buf_flags) 0;
+                slot.fd = -1;
+                slot.pos = 0;
+                slot.mem = pBuf->ptr() + dwOff;
+
+                if( i < iCount - 1 )
+                {
+                    slot.size = pBuf->size() - dwOff;
+                    dwAlloced += slot.size();
+                    vecBufs.push_back( pBuf );
+                    queBufs.pop_front();
+                    continue;
+                }
+                
+                slot.size = dwReqSize - dwAlloced;
+                dwOff += slot.size;
+                if( dwOff == pBuf->size() )
+                {
+                    vecBufs.push_back( pBuf );
+                    queBufs.pop_front();
+                }
+            }
+
+        }while( 0 );
+
+        return ret; 
+    }
+
+    gint32 CopyFromPipe(
+        BufPtr& pBuf, fuse_buf* src );
+
+    // don't clear vecBuf, which may have contents in
+    // advance
+    gint32 CopyFromBufVec(
+         std::vector< BufPtr >& vecBuf,
+         fuse_bufvec* bufvec );
 
     public:
     typedef CFuseObjBase super;
@@ -782,9 +882,6 @@ class CFuseFileEntry : public CFuseObjBase
 
     virtual gint32 CancelRequest();
     virtual gint32 CancelRequests();
-    gint32 CopyFromPipe(
-        BufPtr& pBuf, fuse_buf* src );
-
 };
 
 class CFuseTextFile : public CFuseObjBase
@@ -822,14 +919,13 @@ class CFuseEvtFile : CFuseFileEntry
         std::vector< BufPtr >& vecBackup,
         fuseif_intr_data* d ) override;
 
-    gint32 ReceiveMsgJson(
-            const stdstr& strMsg );
+    gint32 ReceiveEvtJson(
+        const stdstr& strMsg );
 
-    gint32 fs_read( fuse_req_t req,
-        fuse_bufvec*& bufvec,
-        size_t size, fuse_file_info *fi
-        std::vector< BufPtr >& vecBackup,
-        fuseif_intr_data* d );
+    virtual gint32 ReceiveMsgJson(
+        const stdstr& strMsg,
+        guint64 qwReqId )
+    { return -EACCES; };
 
     gint32 fs_write_buf(
         fuse_req_t req,
@@ -837,27 +933,144 @@ class CFuseEvtFile : CFuseFileEntry
         fuse_file_info *fi
         fuseif_intr_data* d ) override
     { return -EACCES; }
+
+    using BUFARR=std::vector< BufPtr >;
+    gint32 GetReqSize(
+        BufPtr& pReqSize,
+        BUFARR& vecBufs );
 };
 
-class CFuseReqFile : CFuseEvtFile
+class CFuseRespFileSvr : CFuseEvtFile
 {
-    public:
+    protected:
+
     std::vector< BufPtr > m_vecOutBufs;
     BufPtr  m_pReqSize;
 
+    public:
+
     typedef CFuseEvtFile super;
-    CFuseReqFile(
+
+    CFuseRespFile(
         const stdstr& strName,
         CRpcServices* pIf ) :
-        super( strName, pIf ),
-        m_pReqSize( true )
-    { SetClassId( clsid( CFuseReqFile ) ); }
+        : super( strName, pIf )
+    { SetClassId( clsid( CFuseRespFileSvr ) ); }
+
+    gint32 fs_read( fuse_req_t req,
+        fuse_bufvec*& buf,
+        size_t size,
+        fuse_file_info *fi,
+        std::vector< BufPtr >& vecBackup,
+        fuseif_intr_data* d ) override;
+    { return -EACCES; }
 
     gint32 fs_write_buf(
         fuse_req_t req,
         fuse_bufvec *buf,
         fuse_file_info *fi
         fuseif_intr_data* d ) override;
+};
+
+class CFuseReqFileSvr : public CFuseRespFileSvr
+{
+    public:
+    typedef CFuseRespFile super;
+
+    CFuseReqFile(
+        const stdstr& strName,
+        CRpcServices* pIf ) :
+        super( strName, pIf ),
+        m_pReqSize( true )
+    { SetClassId( clsid( CFuseReqFileSvr ) ); }
+
+    gint32 fs_write_buf(
+        fuse_req_t req,
+        fuse_bufvec *buf,
+        fuse_file_info *fi
+        fuseif_intr_data* d ) override;
+    { return -EACCES;}
+
+    gint32 fs_read( fuse_req_t req,
+        fuse_bufvec*& buf,
+        size_t size,
+        fuse_file_info *fi,
+        std::vector< BufPtr >& vecBackup,
+        fuseif_intr_data* d ) override
+    {
+        return CFuseEvtFile::fs_read(
+            req, buf, size, fi, vecBackup, d ); 
+    }
+
+    gint32 ReceiveMsgJson(
+        const stdstr& strMsg,
+        guint64 qwReqId )
+    { return ReceiveEvtJson( strMsg ); }
+};
+
+class CFuseRespFileProxy : public CFuseEvtFile
+{
+    protected:
+
+    std::vector< BufPtr > m_vecOutBufs;
+    BufPtr  m_pReqSize;
+
+    public:
+    typedef CFuseEvtFile super;
+
+    CFuseRespFileProxy(
+        const stdstr& strName,
+        CRpcServices* pIf ) :
+        super( strName, pIf ),
+        m_pReqSize( true )
+    { SetClassId( clsid( CFuseRespFileProxy ) ); }
+
+    gint32 fs_write_buf(
+        fuse_req_t req,
+        fuse_bufvec *buf,
+        fuse_file_info *fi
+        fuseif_intr_data* d ) override;
+    { return -EACCES;}
+
+    // receiving the request's response
+    gint32 ReceiveMsgJson(
+        const stdstr& strMsg,
+        guint64 qwReqId );
+};
+
+class CFuseReqFileProxy : public CFuseRespFileProxy
+{
+    public:
+
+    struct REQID_RESP
+    {
+        stdstr strResp;
+        guint64 qwReqId = 0;
+    };
+    std::deque< REQID_RESP > m_queTaskids;
+
+    typedef CFuseEvtFile super;
+
+    CFuseReqFileProxy(
+        const stdstr& strName,
+        CRpcServices* pIf ) :
+        : super( strName, pIf )
+    { SetClassId( clsid( CFuseReqFileProxy ) ); }
+
+    gint32 fs_read( fuse_req_t req,
+        fuse_bufvec*& buf,
+        size_t size,
+        fuse_file_info *fi,
+        std::vector< BufPtr >& vecBackup,
+        fuseif_intr_data* d ) override;
+
+    gint32 fs_write_buf(
+        fuse_req_t req,
+        fuse_bufvec *buf,
+        fuse_file_info *fi
+        fuseif_intr_data* d ) override;
+
+    gint32 RemoveResp( guint64 qwReqId );
 };
 
 class CFuseStmDir : CFuseDirectory
@@ -872,14 +1085,22 @@ class CFuseStmDir : CFuseDirectory
 
 class CFuseStmFile : CFuseFileEntry
 {
+    protected:
+
+    struct OUTREQ
+    {
+        fuse_req_t req,
+        fuse_bufvec* bufvec,
+        gint32 idx, 
+        PINTR pintr;
+    };
+
     HANDLE m_hStream = INVALID_HANDLE;
     bool    m_bFlowCtrl = false;
     gint32 SendBufVec( OUTREQ& oreq );
 
-    gint32 CopyFromBufVec(
-         std::vector< BufPtr >& vecBuf,
-         fuse_bufvec* bufvec );
     public:
+
     typedef CFuseFileEntry super;
     CFuseStmFile( const stdstr& strName,
         HANDLE hStm, CRpcServices* pIf ) :
@@ -983,9 +1204,23 @@ class CFuseStmEvtFile : CFuseEvtFile
     }
 
 #define RLOCK_TESTMNT \
-    auto pDir = GetSvcDir(); \
+    auto _pDir = GetSvcDir(); \
     CFuseSvcDir* pSp = static_cast \
-        < CFuseSvcDir* >( pDir.get() ) \
+        < CFuseSvcDir* >( _pDir.get() ) \
+    CReadLock oLock( pSp->GetLock() ); \
+    ret = oLock.GetStatus();\
+    if( ERROR( ret ) )\
+        break;\
+    if( IsUnmounted() ) \
+    { \
+        ret = ERROR_STATE; \
+        break; \
+    }
+
+#define RLOCK_TESTMNT2( pIf ) \
+    auto _pDir = pIf->GetSvcDir(); \
+    CFuseSvcDir* pSp = static_cast \
+        < CFuseSvcDir* >( _pDir.get() ) \
     CReadLock oLock( pSp->GetLock() ); \
     ret = oLock.GetStatus();\
     if( ERROR( ret ) )\
@@ -1052,44 +1287,69 @@ class CFuseServicePoint :
                 ( new CFuseSvcDir( strName, this ) ); 
             m_pSvcDir->DecRef();
 
-            // add an RW request file
             strName = JSON_REQ_FILE;
-            auto pFile = std::shared_ptr<CDirEntry>
-                ( new CFuseReqFile( strName, this ) ); 
-            m_pSvcDir->AddChild( pFile );
-            CFuseObjBase* pObj = static_cast
-                < CFuseObjBase* >( pFile.get() );
-            pObj->SetMode( S_IRUSR | S_IWUSR );
-            pObj->DecRef();
-
             if( bProxy )
             {
-                // add an RO/WO event file 
+                // add an RW request file
+                auto pFile = std::shared_ptr<CDirEntry>
+                    ( new CFuseReqFileProxy( strName, this ) ); 
+                m_pSvcDir->AddChild( pFile );
+                CFuseObjBase* pObj = dynamic_cast
+                    < CFuseObjBase* >( pFile.get() );
+                pObj->SetMode( S_IRUSR | S_IWUSR );
+                pObj->DecRef();
+
+                // add an RO RESP file 
                 strName = JSON_RESP_FILE;
+                pFile = std::shared_ptr<CDirEntry>
+                    ( new CFuseRespFile( strName, this ) ); 
+                m_pSvcDir->AddChild( pFile );
+                pObj = dynamic_cast
+                    < CFuseObjBase* >( pFile.get() );
+                pObj->SetMode( S_IRUSR );
+                pObj->DecRef();
+
+                // add an RO event file 
+                strName = JSON_EVT_FILE;
                 pFile = std::shared_ptr<CDirEntry>
                     ( new CFuseEvtFile( strName, this ) ); 
                 m_pSvcDir->AddChild( pFile );
-                pObj = static_cast
+                pObj = dynamic_cast
                     < CFuseObjBase* >( pFile.get() );
                 pObj->SetMode( S_IRUSR );
                 pObj->DecRef();
             }
+            else
+            {
+                // add an RO request file
+                auto pFile = std::shared_ptr<CDirEntry>
+                    ( new CFuseReqFileSvr( strName, this ) ); 
+                m_pSvcDir->AddChild( pFile );
+                CFuseObjBase* pObj = dynamic_cast
+                    < CFuseObjBase* >( pFile.get() );
+                if( bProxy )
+                    pObj->SetMode( S_IRUSR | S_IWUSR );
+                else
+                    pObj->SetMode( S_IRUSR );
+                pObj->DecRef();
 
-            // add an RO/WO event file 
-            strName = JSON_EVT_FILE;
-            pFile = std::shared_ptr<CDirEntry>
-                ( new CFuseEvtFile( strName, this ) ); 
-            m_pSvcDir->AddChild( pFile );
-            pObj = static_cast
-                < CFuseObjBase* >( pFile.get() );
-            pObj->SetMode( S_IRUSR );
-            pObj->DecRef();
+                // add an WO RESP file for both
+                // response and event
+                strName = JSON_RESP_FILE;
+                pFile = std::shared_ptr<CDirEntry>
+                    ( new CFuseRespFileSvr strName, this ) ); 
+                m_pSvcDir->AddChild( pFile );
+                pObj = dynamic_cast
+                    < CFuseObjBase* >( pFile.get() );
+                pObj->SetMode( S_IWUSR );
+                pObj->DecRef();
+            }
 
             // add an RW directory for streams
             auto pDir = std::shared_ptr<CDirEntry>
                 ( new CFuseStmDir( this ) ); 
             m_pSvcDir->AddChild( pDir );
-            pObj = static_cast
+            pObj = dynamic_cast
                 < CFuseObjBase* >( pDir.get() );
             pObj->SetMode( S_IRWXU );
             pObj->DecRef();
@@ -1098,12 +1358,13 @@ class CFuseServicePoint :
             pFile = std::shared_ptr<CDirEntry>
                 ( new CFuseStmEvtFile( this ) ); 
             pDir->AddChild( pFile );
-            pObj = static_cast
+            pObj = dynamic_cast
                 < CFuseObjBase* >( pFile.get() );
             pObj->SetMode( S_IRUSR );
             pObj->DecRef();
 
         }while( 0 );
+
         return ret;
     }
 
@@ -1271,7 +1532,7 @@ class CFuseServicePoint :
                     strName, pChild );
             if( ERROR( ret ) )
                 break;
-            CFuseStmFile pFile =
+            CFuseStmFile* pFile =
                 static_cast< CFuseStmFile* >
                 ( pChild.get() );
 
@@ -1558,21 +1819,24 @@ class CFuseServicePoint :
     // to receive a request on server side or a
     // response or event on the proxy side
     gint32 ReceiveMsgJson(
-            const stdstr& strMsg )
+            const stdstr& strMsg,
+            guint64 qwReqId )
     {
         gint32 ret = 0;
         do{
-            auto pEnt = GetSvcDir();
+            RLOCK_TESTMNT;
+
             stdstr strFile = bProxy ?
                 JSON_RESP_FILE : JSON_REQ_FILE;
 
             auto pReqEnt =
-                pEnt->GetChild( strFile );
+                pDir_->GetChild( strFile );
 
-            auto pReqFile = static_cast
+            auto pEvtFile = dynamic_cast
                 < CFuseEvtFile* >( pReqEnt.get() );
 
-            ret = pReqFile->ReceiveMsgJson( strMsg );
+            ret = pEvtFile->ReceiveMsgJson(
+                strMsg, qwReqId );
 
         }while( 0 ):
 
@@ -1594,6 +1858,28 @@ class CFuseSvcProxy :
         const stdstr& strReq,
         stdstr& strResp ) = 0;
 
+    // to receive a request on server side or a
+    // response or event on the proxy side
+    gint32 ReceiveEvtJson(
+            const stdstr& strMsg )
+    {
+        gint32 ret = 0;
+        do{
+            RLOCK_TESTMNT; 
+            stdstr strFile = JSON_EVT_FILE;
+
+            auto pReqEnt =
+                pDir_->GetChild( strFile );
+
+            auto pEvtFile = dynamic_cast
+                < CFuseEvtFile* >( pReqEnt.get() );
+
+            ret = pEvtFile->ReceiveEvtJson( strMsg )
+
+        }while( 0 ):
+
+        return ret;
+    }
 };
 
 class CFuseSvcServer :
@@ -1690,7 +1976,7 @@ class CFuseRootBase:
         if( ERROR( ret ) )
             return ret;
 
-        pDir = static_cast
+        pDir = dynamic_cast
             < CFuseObjBase* >( pTemp );
         return STATUS_SUCCESS;
     }
