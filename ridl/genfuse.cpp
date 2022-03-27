@@ -1588,7 +1588,7 @@ gint32 CDeclServiceImplFuse::Output()
             Wa( "gint32 DispatchReq(" );
             Wa( "    IConfigDb* pContext," );
             Wa( "    const std::string& strReq," );
-            Wa( "    std::string& strResp );" );
+            Wa( "    std::string& strResp ) override;" );
             NEW_LINE;
             Wa( "gint32 CancelRequestByReqId(" );
             Wa( "    guint64 qwReqId );" );
@@ -1665,7 +1665,7 @@ gint32 CDeclServiceImplFuse::Output()
 
         Wa( "//Response&Event Dispatcher" );
         Wa( "gint32 DispatchMsg(" );
-        CCOUT << "    const std::string& strMsg );";
+        CCOUT << "    const std::string& strMsg ) override;";
 
         NEW_LINE;
         Wa( "gint32 OnStreamReady( HANDLE hChannel ) override" );

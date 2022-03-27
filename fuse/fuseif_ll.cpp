@@ -187,7 +187,6 @@ void fuseif_ll_read(fuse_req_t req,
         fuseif_prepare_interrupt( pFuse, req, d );
         fuse_bufvec* buf = nullptr;
         std::vector< BufPtr > vecBackup;
-        CWriteLock oLock( d.fe->GetLock() );
         ret = d->fe->fs_read(
             req, buf, size, fi, vecBackup, d );
         if( ret == STATUS_PENDING )
@@ -198,7 +197,12 @@ void fuseif_ll_read(fuse_req_t req,
         fuseif_finish_interrupt( pFuse, req, d );
         delete d;
         if( SUCCEEDED( ret ) )
-            fuse_reply_data(req, buf, FUSE_BUF_SPLICE_MOVE);
+        {
+            if( buf != nullptr )
+                fuse_reply_data(req, buf, FUSE_BUF_SPLICE_MOVE);
+            else
+                fuse_reply_err( req, 0 );
+        }
         else
             fuse_reply_err( req, ret );
 
@@ -208,6 +212,7 @@ void fuseif_ll_read(fuse_req_t req,
 
     return;
 }
+
 
 void fuseif_ll_write_buf(fuse_req_t req,
     fuse_ino_t ino, fuse_bufvec *buf,
@@ -219,10 +224,7 @@ void fuseif_ll_write_buf(fuse_req_t req,
         fuseif_intr_data* d = new fuseif_intr_data;
         d->fe = ( CFuseObjBase* )fi->fh;
         fuseif_prepare_interrupt( pFuse, req, d );
-        CWriteLock oLock( d.fe->GetLock() );
-        guint32 dwSent = 0;
-        ret = d->fe->fs_write_buf(
-            req, buf, fi, d, dwSent );
+        d->fe->fs_write_buf( req, buf, fi, d );
         fuseif_finish_interrupt( pFuse, req, d );
         delete d;
         if( SUCCEEDED( ret ) )

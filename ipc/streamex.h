@@ -265,7 +265,9 @@ class CIfStmReadWriteTask :
     bool CanSend();
     gint32 ReschedRead();
     gint32 PeekStream( BufPtr& pBuf );
-    inline bool IsReport( BufPtr& pBuf ) const
+    gint32 GetPendingBytes( guint32& dwBytes ) const;
+    gint32 GetPendingReqs( guint32& dwCount ) const;
+    inline bool IsReport( const BufPtr& pBuf ) const
     { return pBuf->GetExDataType() == typeObj; }
     gint32 SendProgress( BufPtr& pBuf ) const;
     gint32 GetUxStream( InterfPtr& pIf ) const;
@@ -1886,6 +1888,66 @@ struct CStreamSyncBase :
                 break;
             }
             ret = pRdTask->PeekStream( pBuf );
+
+        }while( 0 );
+
+        return ret;
+    }
+
+    gint32 GetPendingBytes(
+        HANDLE hChannel, guint32& dwBytes )
+    {
+        gint32 ret = 0;
+        do{
+            TaskletPtr pTask;
+
+            if( !this->IsConnected( nullptr ) )
+                return ERROR_STATE;
+
+            ret = GetWorker(
+                hChannel, true, pTask );
+            if( ERROR( ret ) )
+                return ret;
+
+
+            CIfStmReadWriteTask* pRdTask = pTask;
+            if( pRdTask == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            ret = pRdTask->GetPendingBytes(
+                dwBytes );
+
+        }while( 0 );
+
+        return ret;
+    }
+
+    gint32 GetPendingReqs(
+        HANDLE hChannel, guint32& dwCount )
+    {
+        gint32 ret = 0;
+        do{
+            TaskletPtr pTask;
+
+            if( !this->IsConnected( nullptr ) )
+                return ERROR_STATE;
+
+            ret = GetWorker(
+                hChannel, true, pTask );
+            if( ERROR( ret ) )
+                return ret;
+
+
+            CIfStmReadWriteTask* pRdTask = pTask;
+            if( pRdTask == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            ret = pRdTask->GetPendingReqs(
+                dwCount );
 
         }while( 0 );
 

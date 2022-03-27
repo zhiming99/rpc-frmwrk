@@ -133,7 +133,7 @@ gint32 CFuseStmFile::OnReadStreamComplete(
     UNREFERENCED( pCtx );
     gint32 ret = 0;
     do{
-        CWriteLock oLock( GetLock() );
+        CFuseMutex oLock( GetLock() );
         ret = oLock.GetStatus();
         if( ERROR( ret ) )
             break;
@@ -212,6 +212,98 @@ gint32 CFuseStmFile::OnReadStreamComplete(
             m_queReqs.pop_front();
         }
 
+        if( m_queReqs.empty() )
+            break;
+
+        oLock.Unlock();
+        InterfPtr pIf = GetIf();
+        CRpcServices* pSvc = pIf;
+        CStreamServerSync* pStmSvr = pIf;
+        CStreamProxySync* pStmProxy = pIf;
+        guint32 dwPReq = 0;
+        if( pStmSvr != nullptr )
+        {
+            ret = pStmSvr->GetPendingReqs(
+                dwPReq );
+        }
+        else
+        {
+            ret = pStmProxy->GetPendingReqs(
+                dwPReq );
+        }
+        if( ERROR( ret ) )
+            break;
+
+        if( dwPReq > 0 )
+            break;
+        
+        if( pStmSvr != nullptr )
+        {
+            ret = pStmSvr->ReadStreamAsync(
+                hStream, pBuf, nullptr );
+        }
+        else
+        {
+            ret = pStmProxy->ReadStreamAsync(
+                hStream, pBuf, nullptr );
+        }
+        if( ret == STATUS_PENDING )
+        {
+            ret = 0;
+            break;
+        }
+        if( ERROR( ret ) )
+            iRet = ret;
+
+    }while( 1 );
+
+    return ret;
+}
+
+gint32 CFuseStmFile::FillIncomingQue()
+{
+    gint32 ret = 0;
+    do{
+
+        InterfPtr pIf = GetIf();
+        CStreamServerSync* pStmSvr = pIf;
+        CStreamProxySync* pStmProxy = pIf;
+        HANDLE hstm = GetStream();
+
+        guint32 dwSize = 0;
+        if( pStmSvr != nullptr )
+        {
+            ret = pStmSvr->GetPendingBytes(
+                hstm, dwSize );
+        }
+        else
+        {
+            ret = pStmProxy->GetPendingBytes(
+                hstm, dwSize );
+        }
+        if( ERROR( ret ) )
+            break;
+        
+        while( dwSize > 0 )
+        {
+            BufPtr pBuf;
+            if( pStmSvr != nullptr )
+            {
+                ret = pStmSvr->ReadStreamNoWait(
+                    hstm, pBuf );
+            }
+            else
+            {
+                ret = pStmProxy->ReadStreamNoWait(
+                    hstm, pBuf );
+            }
+            if( ERROR( ret ) )
+                break;
+
+            dwSize -= pBuf->size();
+            m_queIncoming.push_back( { pBuf, 0 } );
+        }
+
     }while( 0 );
 
     return ret;
@@ -224,22 +316,31 @@ gint32 CFuseStmFile::fs_read(
     fuseif_intr_data* d )
 {
     gint32 ret = 0;
+    CFuseMutex oFileLock( GetLock() );
+    ret = oFileLock.GetStatus();
+    if( ERROR( ret ) )
+        return ret;
+
+    if( m_queReqs.size() > MAX_STM_QUE_SIZE )
+        return -EAGAIN;
+
+    PINTR pdata( d );
     do{
-        CWriteLock oFileLock( GetLock() );
-        ret = oFileLock.GetStatus();
+        if( size == 0 )
+            break;
+
+        if( size > MAX_FUSE_MSG_SIZE )
+        {
+            ret = -E2BIG;
+            break;
+        }
+
+        ret = FillIncomingQue();
         if( ERROR( ret ) )
             break;
 
-        PINTR pdata( d );
-        // any size is ok
-        if( size == SIZE_MAX )
-            size = 0;
-
-        if( m_queReqs.size() > MAX_STM_QUE_SIZE )
-        {
-            ret = -EAGAIN;
-            break;
-        }
+        guint32 dwAvail = GetBytesAvail();
+        guint32 dwPReqs = 0;
 
         InterfPtr pIf = GetIf();
         CRpcServices* pSvc = pIf;
@@ -247,62 +348,165 @@ gint32 CFuseStmFile::fs_read(
         CStreamProxySync* pStmProxy = pIf;
         HANDLE hstm = GetStream();
 
-        BufPtr pBuf( true );
-        // a zero size pBuf indicates it is OK with
-        // an incoming messages of any length
-        // greater than zero.
-        if( size != 0 && !IsNonBlock() )
-            pBuf->Resize( size );
-
-        if( pSvc->IsServer() )
+        if( m_queReqs.size() &&
+            m_queReqs.front().req->unique != req->uniuqe )
         {
-            if( IsNonBlock() )
-                ret = pStmSvr->ReadStreamNoWait(
-                    hstm, pBuf );
-            else
-                ret = pStmSvr->ReadStreamAsync(
-                    hstm, pBuf, nullptr );
-        }
-        else
-        {
-            if( IsNonBlock() )
-                ret = pStmProxy->ReadStreamNoWait(
-                    hstm, pBuf );
-            else
-                ret = pStmProxy->ReadStreamAsync(
-                    hstm, pBuf, nullptr );
-        }
-        if( ret == STATUS_PENDING )
-        {
+            // we need to complete the earilier
+            // requests before this request
+            ret = STATUS_PENDING;
             m_queReqs.push_back(
                 { req, size, pdata } );
-            break;
-        }
-        if( ERROR( ret ) )
-            break;
-
-        m_queIncoming.push_back( { pBuf, 0 } );
-        if( m_queReqs.empty() )
-        {
-            ret = FillBufVec( size, m_queIncoming,
-                vecBackup, bufvec );
-            if( ret == STATUS_PENDING )
+            guint32 dwReqSize =
+                    m_queReqs.front().size;
+            if( dwAvail > 0 && dwReqSize <= dwAvail )
             {
-                m_queReqs.push_back(
-                    { req, size, pdata } );
+                BufPtr pBuf = m_queIncoming.back().pBuf;
+                m_queIncoming.pop_back();
+                void (*func)=([]( CRpcServices* pIf,
+                    CFuseStmFile* pFile, BufPtr& pBuf_ )
+                {
+                    gint32 ret = 0;
+                    do{
+                        if( pIf->IsServer() )
+                        {
+                            CFuseSvcServer* pSvr = ObjPtr( pIf );
+                            RLOCK_TESTMNT2( pSvr );
+                            pFile->OnReadStreamComplete(
+                                hstm, 0, pBuf_, nullptr ); 
+                        }
+                        else
+                        {
+                            CFuseSvcProxy* pProxy = ObjPtr( pIf );
+                            RLOCK_TESTMNT2( pProxy );
+                            pFile->OnReadStreamComplete(
+                                hstm, 0, pBuf_, nullptr ); 
+                        }
+
+                    }while( 0 );
+                    return;
+                });
+
+                CIoManager* pMgr = pSvc->GetIoMgr();
+                TaskletPtr pTask;
+                ret = NEW_FUNCCALL_TASK( pTask,
+                    pMgr, func, pSvc, this, pBuf );
+                if( ERROR( ret ) )
+                    break;
+                ret = pMgr->RescheduleTask( pTask );
             }
             break;
         }
+
+        // any size is ok
+        if( size == SIZE_MAX )
+            size = 0;
+
+        BufPtr pBuf;
+
+        // dwAvail == 0, size == 0, dwAvail >= size > 0, IsNonBlock 
+        if( size == 0 && dwAvail > 0 )
+            size = m_queIncoming.front()->size();
+
+        if( pStmSvr != nullptr )
+        {
+            pStmSvr->GetPendingReqs( hstm, dwPReqs );
+        }
         else
         {
-            // we should not be here            
-            ret = -EFAULT;
-            throw std::runtime_error( 
-                DebugMsg( ret, "fs_write_buf: "
-                    "unexpacted error" ) );
+            pStmProxy->GetPendingReqs( hstm, dwPReqs );
         }
 
-    }while( 0 );
+        bool bRead = ( dwPReqs == 0 &&
+            ( dwAvail == 0 || dwAvail < size ) );
+
+        guint32 dwBytesRead = 0;
+        if( IsNonBlock() )
+        {
+            if( size > 0 )
+            {
+                if( dwAvail > 0 )
+                {
+                    dwBytesRead = std::min(
+                        dwAvail, ( guint32 )size );
+                }
+                else
+                {
+                    ret = -EAGAIN;
+                }
+            }
+            else
+            {
+                // size == 0
+                if( dwAvail > 0 )
+                {
+                    dwBytesRead =
+                        m_queIncoming.front().pBuf->size();
+                }
+                else
+                {
+                    ret = -EAGAIN;
+                }
+            }
+        }
+        else if( size == 0 )
+        {
+            if( dwAvail > 0 )
+            {
+                dwBytesRead =
+                    m_queIncoming.front().pBuf->size();
+            }
+            else
+            {
+                ret = STATUS_PENDING;
+            }
+        }
+        else
+        {
+            if( dwAvail >= size )
+            {
+                dwBytesRead = size;
+            }
+            else
+            {
+                ret = STATUS_PENDING;
+            }
+        }
+        if( dwBytesRead > 0 )
+        {
+            ret = FillBufVec( dwBytesRead, m_queIncoming,
+                vecBackup, bufvec );
+            if( ret == STATUS_PENDING )
+                ret = ERROR_STATE;
+        }
+        else if( ret == STATUS_PENDING )
+        {
+            m_queReqs.push_back(
+                { req, size, pdata } );
+        }
+
+        if( !bRead )
+            break;
+
+        gint32 iRet = 0;
+        if( pSvc->IsServer() )
+        {
+            iRet = pStmSvr->ReadStreamAsync(
+                hstm, pBuf, nullptr );
+        }
+        else
+        {
+            iRet = pStmProxy->ReadStreamAsync(
+                hstm, pBuf, nullptr );
+        }
+        if( ERROR( iRet ) )
+            break;
+
+        if( iRet == STATUS_PENDING )
+            break;
+
+        m_queIncoming.push_back( { pBuf, 0 } );
+
+    }while( 1 );
 
     return ret;
 }
@@ -461,7 +665,7 @@ gint32 CFuseStmFile::fs_write_buf(
     do{
         // this is a synchronous call since the bufvec
         // is controlled by the caller
-        CWriteLock oFileLock( GetLock() );
+        CFuseMutex oFileLock( GetLock() );
         ret = oFileLock.GetStatus();
         if( ERROR( ret ) )
             break;
@@ -487,7 +691,7 @@ gint32 CFuseStmFile::OnWriteResumed()
 {
     gint32 ret = 0;
     do{
-        CWriteLock oFileLock( GetLock() );
+        CFuseMutex oFileLock( GetLock() );
         pStmFile->SetFlowCtrl( false );
         fuse_pollhandle* ph =
                 GetPollHandle();
@@ -512,7 +716,7 @@ gint32 CFuseStmFile::OnWriteStreamComplete(
     UNREFERENCED( pCtx );
     gint32 ret = 0;
     do{
-        CWriteLock oFileLock( GetLock() );
+        CFuseMutex oFileLock( GetLock() );
         SetFlowCtrl( false );
         fuse_pollhandle* ph = GetPollHandle();
         if( ph != nullptr )
@@ -533,7 +737,7 @@ gint32 CFuseStmFile::fs_poll(const char *path,
 {
     gint32 ret = 0;
     do{
-        CWriteLock oLock( GetLock() );
+        CFuseMutex oLock( GetLock() );
         ret = oLock.GetStatus();
         if( ERROR( ret ) )
             break;
@@ -569,7 +773,7 @@ gint32 CFuseStmFile::fs_poll(const char *path,
     return ret;
 }
 
-gint32 CFuseFileEntry::CancelRequest(
+gint32 CFuseFileEntry::CancelFsRequest(
     fuse_req_t req )
 {
     //NOTE: must have file lock acquired
@@ -600,7 +804,7 @@ gint32 CFuseFileEntry::CancelRequest(
     return -ENOENT;
 }
 
-gint32 CFuseFileEntry::CancelRequests()
+gint32 CFuseFileEntry::CancelFsRequests()
 {
     //NOTE: must have file lock acquired
     gint32 ret = 0;
@@ -625,21 +829,14 @@ gint32 CFuseEvtFile::fs_read(
 {
     gint32 ret = 0;
     do{
-        CWriteLock oFileLock( GetLock() );
+        CFuseMutex oFileLock( GetLock() );
         ret = oFileLock.GetStatus();
         if( ERROR( ret ) )
             break;
 
         PINTR pdata( d );
 
-        if( size == SIZE_MAX )
-            size = 0;
-
-        if( IsNonBlock() )
-            size = 0;
-
-        if( m_queReqs.size() ||
-            m_queIncoming.empty() )
+        if( m_queReqs.size() )
         {
             m_queReqs.push_back(
                 { req, size, pdata } );
@@ -647,13 +844,73 @@ gint32 CFuseEvtFile::fs_read(
             break;
         }
 
-        ret = FillBufVec( size,
-            m_queIncoming, vecBackup, bufvec );
-
-        if( ret == STATUS_PENDING )
+        guint32 dwAvail = GetBytesAvail();
+        if( size > MAX_FUSE_MSG_SIZE )
         {
-            m_queReqs.push_back(
-                { req, size, pdata } );
+            ret = -E2BIG;
+            break;
+        }
+
+        if( IsNonBlock() )
+        {
+            if( size > 0 )
+            {
+                if( dwAvail >= size )
+                {
+                    FillBufVec( size,
+                        m_queIncoming,
+                        vecBackup, bufvec );
+                }
+                else
+                {
+                    ret = -EAGAIN;
+                }
+            }
+            else
+            {
+                // size == 0
+                if( dwAvail > 0 )
+                {
+                    FillBufVec( dwAvail,
+                        m_queIncoming,
+                        vecBackup, bufvec );
+                }
+                else
+                {
+                    ret = -EAGAIN;
+                }
+            }
+        }
+        else if( size == 0 )
+        {
+            if( dwAvail == 0 )
+            {
+                ret = STATUS_PENDING;
+                m_queReqs.push_back(
+                    { req, size, pdata } );
+            }
+            else
+            {
+                FillBufVec( dwAvail,
+                    m_queIncoming,
+                    vecBackup, bufvec );
+            }
+        }
+        else
+        {
+            // size > 0
+            if( dwAvail >= size )
+            {
+                FillBufVec( size,
+                    m_queIncoming,
+                    vecBackup, bufvec );
+            }
+            else
+            {
+                ret = STATUS_PENDING;
+                m_queReqs.push_back(
+                    { req, size, pdata } );
+            }
         }
 
     }while( 0 );
@@ -666,7 +923,7 @@ gint32 CFuseEvtFile::ReceiveEvtJson(
 {
     gint32 ret = 0;
     do{
-        CWriteLock oFileLock( GetLock() );
+        CFuseMutex oFileLock( GetLock() );
         ret = oFileLock.GetStatus();
         if( ERROR( ret ) )
             break;
@@ -832,10 +1089,6 @@ gint32 CFuseRespFileSvr::fs_write_buf(
     fuseif_intr_data* d )
 {
     gint32 ret = 0;
-    CWriteLock oFileLock( GetLock() );
-    ret = oFileLock.GetStatus();
-    if( ERROR( ret ) )
-        return ret;
 
     PINTR pintr( d );
 
@@ -951,7 +1204,15 @@ gint32 CFuseRespFileSvr::fs_write_buf(
 
         // send the response
         CFuseSvcServer* pSvr = GetIf();
-        ret = pSvr->DispatchIfMsg( valResp );
+        {
+            RLOCK_TESTMNT2( pSvr );
+            if( pSvr->GetState() != stateConnected )
+            {
+                ret = -EBADF;
+                break;
+            }
+            ret = pSvr->DispatchMsg( valResp );
+        }
         if( ret == STATUS_PENDING )
             ret = 0;
 
@@ -996,7 +1257,7 @@ gint32 CFuseRespFileProxy::ReceiveMsgJson(
 gint32 CFuseReqFileProxy::RemoveResp(
     guint64 qwReqId )
 {
-    CWriteLock oFileLock( GetLock() );
+    CFuseMutex oFileLock( GetLock() );
     gint32 ret = oFileLock.GetStatus();
     if( ERROR( ret ) )
         return ret;
@@ -1023,6 +1284,182 @@ gint32 CFuseReqFileProxy::RemoveResp(
     return ret;
 }
 
+gint32 CFuseReqFileProxy::ConvertAndFillBufVec(
+    guint32 dwAvail,
+    guint32 dwNewBytes,
+    guint32 dwReqSize, 
+    std::vector< BufPtr >& vecBackup,
+    fuse_bufvec*& bufvec )
+{
+    gint32 ret = 0;
+    if( dwReqSize == 0 )
+        return -EINVAL;
+
+    if( dwAvail + dwNewBytes < dwReqSize )
+        return -EINVAL;
+
+    do{
+        guint32 dwBytesCvt = dwReqSize - dwAvail;
+        while( m_queTaskIds.size() )
+        {
+            auto& elem = m_queTaskIds.front();
+            BufPtr pBuf( true );
+            *pBuf = ( guint32 )elem.strResp.size();
+
+            pBuf->Append( elem.strResp.c_str(),
+                elem.strResp.size() );
+
+            m_queIncoming.push_back( { pBuf, 0 } );
+            m_queTaskIds.pop_front();
+
+            if( dwBytesCvt <= elem.strResp.size() +
+                sizeof( guint32 ) )
+                break;
+            dwBytesCvt -= elem.strResp.size();
+        }
+
+        ret = FillBufVec(
+            dwReqSize, m_queIncoming,
+            vecBackup, bufvec );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CFuseReqFileProxy::fs_read(
+    fuse_req_t req,
+    fuse_bufvec*& buf,
+    size_t size,
+    fuse_file_info *fi,
+    std::vector< BufPtr >& vecBackup,
+    fuseif_intr_data* d )
+{
+    gint32 ret = 0;
+    do{
+        CFuseMutex oFileLock( GetLock() );
+        ret = oFileLock.GetStatus();
+        if( ERROR( ret ) )
+            break;
+
+        PINTR pdata( d );
+
+        if( size == SIZE_MAX )
+            size = 0;
+
+        guint32 dwAvail = GetBytesAvail();
+        guint32 dwNewBytes = 0;
+        for( auto& elem : m_queTaskIds )
+        {
+            dwNewBytes += elem.strResp.size() +
+                sizeof( guint32 );
+            if( dwAvail >= size )
+                break;
+        }
+
+        if( IsNonBlock() )
+        {
+            if( size > 0 )
+            {
+                if( dwAvail >= size )
+                {
+                    FillBufVec( size,
+                        m_queIncoming,
+                        vecBackup, bufvec );
+                }
+                else if( dwAvail + dwNewBytes >= size )
+                {
+                    ConvertAndFillBufVec( dwAvail,
+                        dwNewBytes, size, 
+                        vecBackup, bufvec );
+                }
+                else
+                {
+                    ret = -EAGAIN;
+                }
+            }
+            else
+            {
+                // size == 0
+                if( dwAvail + dwNewBytes == 0 )
+                {
+                    ret = -EAGAIN;
+                }
+                else
+                {
+                    if( dwAvail > 0 )
+                    {
+                        FillBufVec( dwAvail,
+                            m_queIncoming,
+                            vecBackup, bufvec );
+                    }
+                    else
+                    {
+                        guint32 dwReqSize =
+                            sizeof( guint32 ) +
+                            m_queTaskIds.front().pBuf->size();
+                        ConvertAndFillBufVec( dwAvail,
+                            dwNewBytes, dwReqSize, 
+                            vecBackup, bufvec );
+                    }
+                }
+            }
+        }
+        else if( size == 0 )
+        {
+            if( dwAvail + dwNewBytes == 0 )
+            {
+                ret = STATUS_PENDING;
+                m_queReqs.push_back(
+                    { req, size, pdata } );
+            }
+            else
+            {
+                if( dwAvail > 0 )
+                {
+                    FillBufVec( dwAvail,
+                        m_queIncoming,
+                        vecBackup, bufvec );
+                }
+                else
+                {
+                    guint32 dwReqSize =
+                        sizeof( guint32 ) +
+                        m_queTaskIds.front().pBuf->size();
+                    ConvertAndFillBufVec( dwAvail,
+                        dwNewBytes, dwReqSize, 
+                        vecBackup, bufvec );
+                }
+            }
+        }
+        else
+        {
+            // size > 0
+            if( dwAvail >= size )
+            {
+                FillBufVec( size,
+                    m_queIncoming,
+                    vecBackup, bufvec );
+            }
+            else if( dwAvail + dwNewBytes >= size )
+            {
+                ConvertAndFillBufVec( dwAvail,
+                    dwNewBytes, size,
+                    vecBackup, bufvec );
+            }
+            else
+            {
+                ret = STATUS_PENDING;
+                m_queReqs.push_back(
+                    { req, size, pdata } );
+            }
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CFuseReqFileProxy::fs_write_buf(
     fuse_req_t req,
     fuse_bufvec *bufvec,
@@ -1030,11 +1467,6 @@ gint32 CFuseReqFileProxy::fs_write_buf(
     fuseif_intr_data* d )
 {
     gint32 ret = 0;
-    CWriteLock oFileLock( GetLock() );
-    ret = oFileLock.GetStatus();
-    if( ERROR( ret ) )
-        return ret;
-
     PINTR pintr( d );
 
     ret = CopyFromBufVec(
@@ -1149,8 +1581,16 @@ gint32 CFuseReqFileProxy::fs_write_buf(
         }
         
         CFuseSvcProxy* pProxy = GetIf();
-        ret = pProxy->DispatchIfReq(
-            nullptr, valReq, valResp );
+        {
+            RLOCK_TESTMNT2( pProxy );
+            if( pProxy->GetState() != stateConnected )
+            {
+                ret = -EBADF;
+                break;
+            }
+            ret = pProxy->DispatchReq(
+                nullptr, valReq, valResp );
+        }
 
         Json::Value& valrid =
             valResp[ JSON_ATTR_REQCTXID ];
@@ -1173,7 +1613,7 @@ gint32 CFuseReqFileProxy::fs_write_buf(
         else if( SUCCEEDED( ret ) )
         {
             // append the response to the file
-            // JSON_RESP_FILE
+            // JSON_RESP_FILE for an immediate return.
             void (*func)( CFuseSvcProxy*,
                 const stdstr& )=([](
                     CFuseSvcProxy* pIf,
@@ -1191,12 +1631,12 @@ gint32 CFuseReqFileProxy::fs_write_buf(
                 }while( 0 );
 
                 return;
-            }
+            });
 
             TaskletPtr pTask;
             ret = NEW_FUNCCALL_TASK( pTask,
                 this->GetIoMgr(), func,
-                pProxy, strResp, qwReqId );
+                pProxy, strResp );
             if( ERROR( ret ) )
                 break;
 
@@ -1234,7 +1674,7 @@ gint32 fuseop_open(
     if( ERROR( ret ) )
         return ret;
 
-    CWriteLock oLock( pObj->GetLock() );
+    CFuseMutex oLock( pObj->GetLock() );
     ret = oLock.GetStatus();
     if( ERROR( ret ) )
         return ret;
@@ -1242,6 +1682,7 @@ gint32 fuseop_open(
 
     fi->direct_io = 1;
     fi->keep_cache = 0;
+    fi->nonseekable = 1;
     fi->fh = ( guint64 )pObj;
 
     return ret;
@@ -1259,7 +1700,7 @@ gint32 fuseop_release(
             < CFuseStmFile* >( pObj );
         if( pStm == nullptr )
         {
-            CWriteLock oFileLock(
+            CFuseMutex oFileLock(
                 pObj->GetLock() );
             ret = oFileLock.GetStatus();
             if( ERROR( ret ) )
@@ -1283,11 +1724,11 @@ gint32 fuseop_release(
                 ( pProxy->GetSvcDir().get() );
         }
 
-        CWriteLock oSvcLock( pSp->GetLock() );
+        CWriteLock oSvcLock( pSp->GetSvcLock() );
         ret = oSvcLock.GetStatus();
         if( ERROR( ret ) )
             break;
-        CWriteLock oFileLock( pStm->GetLock() );
+        CFuseMutex oFileLock( pStm->GetLock() );
         ret = oFileLock.GetStatus();
         if( ERROR( ret ) )
             break;
@@ -1305,7 +1746,7 @@ gint32 fuseop_release(
             break;
         }
 
-        pStm->CancelRequests();
+        pStm->CancelFsRequests();
 
         // keep a copy of pStm
         CHILD_TYPE pEnt;
@@ -1386,14 +1827,14 @@ gint32 fuseop_unlink( const char* path )
                 ( pProxy->GetSvcDir().get() );
         }
 
-        CWriteLock oSvcLock( pSp->GetLock() );
+        CWriteLock oSvcLock( pSp->GetSvcLock() );
         ret = oSvcLock.GetStatus();
         if( ERROR( ret ) )
             break;
         if( !pStmFile->IsHidden() )
             break;
 
-        CWriteLock oFileLock(
+        CFuseMutex oFileLock(
                 pStmFile->GetLock() );
         ret = oFileLock.GetStatus();
         if( ERROR( ret ) )
@@ -1404,7 +1845,7 @@ gint32 fuseop_unlink( const char* path )
             break;
         }
 
-        pStmFile->CancelRequests();
+        pStmFile->CancelFsRequests();
 
         CFuseStmDir* pParent = dynamic_cast
             < CFuseStmDir* >( pObj->GetParent() );
@@ -1424,7 +1865,7 @@ gint32 fuseop_unlink( const char* path )
         pParent->RemoveChild( strName );
 
         oFileLock.Unlock();
-        oLock.Unlock();
+        oSvcLock.Unlock();
 
         InterfPtr pIf = pStmFile->GetIf();
         HANDLE hStream = pStmFile->GetStream();
@@ -1503,10 +1944,11 @@ gint32 fuseop_create( const char* path,
                 break;
         }
 
-        CWriteLock oSvcLock( pSvcDir->GetLock());
+        CWriteLock oSvcLock( pSvcDir->GetSvcLock());
         ret = oSvcLock.GetStatus();
         if( ERROR( ret ) )
             break;
+
         CFuseObjBase* pObj = new CFuseStmFile(
             strName, hStream, pSvc );
         auto pEnt = std::shared_ptr
