@@ -34,7 +34,7 @@
 #include <exception>
 
 #define CONN_PARAM_FILE "conn_params"
-#define HOPDIR  "_nexthop"
+#define HOP_DIR  "_nexthop"
 #define STREAM_DIR "_streams"
 #define JSON_REQ_FILE "json_request"
 #define JSON_RESP_FILE "json_response"
@@ -271,7 +271,7 @@ class CFuseObjBase : public CDirEntry
     guint32 m_dwMode = S_IRUSR;
     guint32 m_dwOpenCount = 0;
     bool m_bHidden = false;
-    bool m_bNonBlock = false;
+    std::atomic< bool > m_bNonBlock;
 
     // poll related members
     fuse_pollhandle* m_pollHandle = nullptr;
@@ -284,6 +284,7 @@ class CFuseObjBase : public CDirEntry
     typedef CDirEntry super;
     CFuseObjBase() :
         super(),
+        m_bNonBlock( false )
     {}
 
     ~CFuseObjBase()
@@ -349,6 +350,7 @@ class CFuseObjBase : public CDirEntry
     gint32 write();
     gint32 readdir();
     gint32 opendir();
+    gint32 releasedir();
     gint32 getattr();
     gint32 setattr();
     gint32 flock();
@@ -359,6 +361,7 @@ class CFuseObjBase : public CDirEntry
     virtual gint32 fs_read(
         fuse_req_t req,
         fuse_bufvec*& buf,
+        off_t off,
         size_t size,
         fuse_file_info *fi,
         std::vector< BufPtr >& vecBackup,
@@ -376,6 +379,29 @@ class CFuseObjBase : public CDirEntry
         fuse_file_info *fi,
         fuse_pollhandle *ph,
         unsigned *reventsp )
+    { return -ENOSYS; }
+
+    virtual gint32 fs_opendir(
+        const char *path,
+        struct fuse_file_info *fi )
+    { return -ENOSYS; }
+
+    virtual gint32 fs_readdir(const char *path,
+        void *buf, fuse_fill_dir_t filler,
+        off_t off, struct fuse_file_info *fi,
+        enum fuse_readdir_flags flags)
+    { return -ENOSYS; }
+
+    virtual gint32 fs_getattr(
+        const char *path,
+        stat *stbuf,
+        fuse_file_info* fi)
+    { return -ENOSYS; }
+
+    virtual gint32 fs_ioctl(
+        const char *path, unsigned int cmd,
+        void *arg, fuse_file_info *fi,
+        unsigned int flags, void *data )
     { return -ENOSYS; }
 };
 
@@ -704,6 +730,9 @@ class CFuseRootDir : public CFuseObjBase
         SetName( "/" );
         SetClassId( clsid( CFuseRootDir ) );
     }
+    gint32 fs_getattr(
+        const char *path, stat *stbuf,
+        fuse_file_info* fi) override;
 }
 
 class CFuseDirectory : public CFuseObjBase
@@ -725,6 +754,9 @@ class CFuseDirectory : public CFuseObjBase
     inline void SetIf( CRpcServices* pIf )
     { m_pIf = pIf; }
 
+    gint32 fs_getattr(
+        const char *path, stat *stbuf,
+        fuse_file_info* fi) override;
 };
 
 class CFuseSvcDir : public CFuseDirectory
@@ -894,7 +926,8 @@ class CFuseFileEntry : public CFuseObjBase
     { 
         guint32 ret = 0;
         for( auto& elem : m_queIncoming )
-            ret += elem->pBuf->size();
+            ret += elem->pBuf->size() -
+                elem->dwOff;
         return ret;
     }
 
@@ -905,6 +938,16 @@ class CFuseFileEntry : public CFuseObjBase
             ret += elem->dwReqSize;
         return ret;
     }
+
+    gint32 fs_getattr(
+        const char *path, stat *stbuf,
+        fuse_file_info* fi) override;
+
+    gint32 fs_ioctl(
+        const char *path, unsigned int cmd,
+        void *arg, fuse_file_info *fi,
+        unsigned int flags,
+        void *data ) override;
 };
 
 class CFuseTextFile : public CFuseObjBase
@@ -929,14 +972,19 @@ class CFuseTextFile : public CFuseObjBase
         fuse_bufvec *buf,
         fuse_file_info *fi
         fuseif_intr_data* d ) override
-    { return -EACCES; }
+    { return -ENOSYS; }
 
     gint32 fs_read( fuse_req_t req,
         fuse_bufvec*& buf,
+        off_t off,
         size_t size,
         fuse_file_info *fi,
         std::vector< BufPtr >& vecBackup,
         fuseif_intr_data* d ) override;
+
+    gint32 fs_getattr(
+        const char *path, stat *stbuf,
+        fuse_file_info* fi) override;
 }
 
 class CFuseEvtFile : CFuseFileEntry
@@ -951,6 +999,7 @@ class CFuseEvtFile : CFuseFileEntry
 
     gint32 fs_read( fuse_req_t req,
         fuse_bufvec*& buf,
+        off_t off,
         size_t size,
         fuse_file_info *fi,
         std::vector< BufPtr >& vecBackup,
@@ -969,12 +1018,18 @@ class CFuseEvtFile : CFuseFileEntry
         fuse_bufvec *buf,
         fuse_file_info *fi
         fuseif_intr_data* d ) override
-    { return -EACCES; }
+    { return -ENOSYS; }
 
     using BUFARR=std::vector< BufPtr >;
     gint32 GetReqSize(
         BufPtr& pReqSize,
         BUFARR& vecBufs );
+
+    gint32 fs_poll(const char *path,
+        fuse_file_info *fi,
+        fuse_pollhandle *ph,
+        unsigned *reventsp ) override;
+
 };
 
 class CFuseRespFileSvr : CFuseEvtFile
@@ -996,11 +1051,12 @@ class CFuseRespFileSvr : CFuseEvtFile
 
     gint32 fs_read( fuse_req_t req,
         fuse_bufvec*& buf,
+        off_t off,
         size_t size,
         fuse_file_info *fi,
         std::vector< BufPtr >& vecBackup,
         fuseif_intr_data* d ) override;
-    { return -EACCES; }
+    { return -ENOSYS; }
 
     gint32 fs_write_buf(
         fuse_req_t req,
@@ -1026,17 +1082,18 @@ class CFuseReqFileSvr : public CFuseRespFileSvr
         fuse_bufvec *buf,
         fuse_file_info *fi
         fuseif_intr_data* d ) override;
-    { return -EACCES;}
+    { return -ENOSYS;}
 
     gint32 fs_read( fuse_req_t req,
         fuse_bufvec*& buf,
+        off_t off,
         size_t size,
         fuse_file_info *fi,
         std::vector< BufPtr >& vecBackup,
         fuseif_intr_data* d ) override
     {
         return CFuseEvtFile::fs_read(
-            req, buf, size, fi, vecBackup, d ); 
+            req, buf, off, size, fi, vecBackup, d ); 
     }
 
     gint32 ReceiveMsgJson(
@@ -1067,7 +1124,7 @@ class CFuseRespFileProxy : public CFuseEvtFile
         fuse_bufvec *buf,
         fuse_file_info *fi
         fuseif_intr_data* d ) override;
-    { return -EACCES;}
+    { return -ENOSYS;}
 
     // receiving the request's response
     gint32 ReceiveMsgJson(
@@ -1105,6 +1162,7 @@ class CFuseReqFileProxy : public CFuseRespFileProxy
 
     gint32 fs_read( fuse_req_t req,
         fuse_bufvec*& buf,
+        off_t off,
         size_t size,
         fuse_file_info *fi,
         std::vector< BufPtr >& vecBackup,
@@ -1117,6 +1175,12 @@ class CFuseReqFileProxy : public CFuseRespFileProxy
         fuseif_intr_data* d ) override;
 
     gint32 RemoveResp( guint64 qwReqId );
+
+    gint32 fs_ioctl(
+        const char *path, unsigned int cmd,
+        void *arg, fuse_file_info *fi,
+        unsigned int flags,
+        void *data ) override;
 };
 
 class CFuseStmDir : CFuseDirectory
@@ -1126,7 +1190,6 @@ class CFuseStmDir : CFuseDirectory
     CFuseStmDir( CRpcServices* pIf ) :
         super( STREAM_DIR, pIf )
     { SetClassId( clsid( CFuseStmDir ) ); }
-
 };
 
 class CFuseStmFile : CFuseFileEntry
@@ -1142,7 +1205,7 @@ class CFuseStmFile : CFuseFileEntry
     };
 
     HANDLE m_hStream = INVALID_HANDLE;
-    bool    m_bFlowCtrl = false;
+    std::atomic< bool >  m_bFlowCtrl;
     gint32 SendBufVec( OUTREQ& oreq );
     gint32 FillIncomingQue();
 
@@ -1153,11 +1216,12 @@ class CFuseStmFile : CFuseFileEntry
         HANDLE hStm, CRpcServices* pIf ) :
         super( strName, pIf ),
         m_hStream( hStm ),
+        m_bFlowCtrl( false )
     {
         SetClassId( clsid( CFuseStmFile ) );
     }
 
-    inline guint32 GetFlowCtrl() const
+    inline bool GetFlowCtrl() const
     { return m_bFlowCtrl; }
 
     inline void SetFlowCtrl( bool bFlowCtl )
@@ -1190,6 +1254,7 @@ class CFuseStmFile : CFuseFileEntry
 
     gint32 fs_read( fuse_req_t req,
         fuse_bufvec*& buf,
+        off_t off,
         size_t size,
         fuse_file_info *fi,
         std::vector< BufPtr >& vecBackup
@@ -1200,6 +1265,12 @@ class CFuseStmFile : CFuseFileEntry
         fuse_bufvec *buf,
         fuse_file_info *fi
         fuseif_intr_data* d ) override;
+
+    gint32 fs_ioctl(
+        const char *path, unsigned int cmd,
+        void *arg, fuse_file_info *fi,
+        unsigned int flags,
+        void *data ) override;
 };
 
 class CFuseStmEvtFile : CFuseEvtFile
@@ -1236,10 +1307,10 @@ class CFuseStmEvtFile : CFuseEvtFile
 #define IFBASE( _bProxy ) typename std::conditional< _bProxy, \
     CAggInterfaceProxy, CAggInterfaceServer>::type
 
-#define WLOCK_TESTMNT \
-    auto _pDir = GetSvcDir(); \
+
+#define WLOCK_TESTMNT0( _pDir_ )\
     CFuseSvcDir* pSp = static_cast \
-        < CFuseSvcDir* >( _pDir.get() ) \
+        < CFuseSvcDir* >( 0( _pDir_.get() ) \
     CWriteLock oSvcLock( pSp->GetSvcLock() ); \
     ret = oSvcLock.GetStatus();\
     if( ERROR( ret ) )\
@@ -1249,12 +1320,14 @@ class CFuseStmEvtFile : CFuseEvtFile
         ret = ERROR_STATE; \
         break; \
     }
+#define WLOCK_TESTMNT \
+    auto _pDir = GetSvcDir(); \
+    WLOCK_TESTMNT0( _pDir.get() )
 
-#define WLOCK_TESTMNT2( _pIf ) \
-    auto _pDir = _pIf->GetSvcDir(); \
+#define RLOCK_TESTMNT0( _pDir_ ) \
     CFuseSvcDir* pSp = static_cast \
-        < CFuseSvcDir* >( _pDir.get() ) \
-    CWriteLock oSvcLock( pSp->GetSvcLock() ); \
+        < CFuseSvcDir* >( _pDir_.get() ) \
+    CReadLock oSvcLock( pSp->GetSvcLock() ); \
     ret = oSvcLock.GetStatus();\
     if( ERROR( ret ) )\
         break;\
@@ -1266,31 +1339,77 @@ class CFuseStmEvtFile : CFuseEvtFile
 
 #define RLOCK_TESTMNT \
     auto _pDir = GetSvcDir(); \
-    CFuseSvcDir* pSp = static_cast \
-        < CFuseSvcDir* >( _pDir.get() ) \
-    CReadLock oSvcLock( pSp->GetSvcLock() ); \
+    RLOCK_TESTMNT0( _pDir.get() )
+
+#define LOCK_TESTMNT( _pIf, _lock_ ) \
+    CFuseSvcDir* _pSp = nullptr; \
+    CFuseSvcServer* _pSvr = ObjPtr( _pIf );\
+    CFuseSvcProxy* _pCli = ObjPtr( _pIf );\
+    if( _pSvr != nullptr ) \
+    {\
+        auto _pDir = _pSvr->GetSvcDir(); \
+        _pSp = static_cast \
+            < CFuseSvcDir* >( _pDir.get() ) \
+    }\
+    else \
+    {\
+        auto _pDir = _pCli->GetSvcDir(); \
+        _pSp = static_cast \
+            < CFuseSvcDir* >( _pDir.get() ) \
+    } \
+    _lock_ oSvcLock( _pSp->GetSvcLock() ); \
     ret = oSvcLock.GetStatus();\
     if( ERROR( ret ) )\
         break;\
-    if( IsUnmounted() ) \
+    if( _pSvr != nullptr  ) \
+    { \
+        if( _pSvr->IsUnmounted() ) \
+        { \
+            ret = ERROR_STATE; \
+            break; \
+        } \
+    }\
+    else if( _pCli->IsUnmounted() ) \
     { \
         ret = ERROR_STATE; \
         break; \
     }
 
 #define RLOCK_TESTMNT2( _pIf ) \
-    auto _pDir = _pIf->GetSvcDir(); \
-    CFuseSvcDir* pSp = static_cast \
-        < CFuseSvcDir* >( _pDir.get() ) \
-    CReadLock oSvcLock( pSp->GetSvcLock() ); \
-    ret = oSvcLock.GetStatus();\
-    if( ERROR( ret ) )\
-        break;\
-    if( IsUnmounted() ) \
+    LOCK_TESTMNT( _pIf, CReadLock )
+
+#define WLOCK_TESTMNT2( _pIf ) \
+    LOCK_TESTMNT( _pIf, CWriteLock )
+
+#define RLOCK_TESTMNT3( _lock_,  _path ) \
+    auto _pIf = GetRootIf(); \
+    CFuseRootServer* _pSvr = pIf; \
+    CFuseRootProxy* _pCli = pIf; \
+    CFuseSvcDir* _pSvcDir = nullptr;\
+    if( pSvr != nullptr ) \
     { \
-        ret = ERROR_STATE; \
-        break; \
-    }
+        ret = _pSvr->GetSvcDir( _path, _pSvcDir ); \
+    } \
+    else \
+    { \
+        ret = _pCli->GetSvcDir( _path, _pSvcDir ); \
+    } \
+    RLOCK_TESTMNT0( _pSvcDir );
+
+#define WLOCK_TESTMNT3( _path ) \
+    auto _pIf = GetRootIf(); \
+    CFuseRootServer* _pSvr = pIf; \
+    CFuseRootProxy* _pCli = pIf; \
+    CFuseSvcDir* _pSvcDir = nullptr;\
+    if( pSvr != nullptr ) \
+    { \
+        ret = _pSvr->GetSvcDir( _path, _pSvcDir ); \
+    } \
+    else \
+    { \
+        ret = _pCli->GetSvcDir( _path, _pSvcDir ); \
+    } \
+    WLOCK_TESTMNT0( _pSvcDir );
 
 template< bool bProxy >
 class CFuseServicePoint :
@@ -1462,7 +1581,10 @@ class CFuseServicePoint :
         do{
             CfgPtr pCtx;
             CFuseMutex oLock( GetLock() );
-            GET_STMCTX_LOCKED( hStream, pCtx );
+            ret = GET_STMCTX_LOCKED(
+                hStream, pCtx );
+            if( ERROR( ret ) )
+                break;
             ret = oCfg.GetStrProp(
                 propPath1, strName );
             
@@ -1510,7 +1632,10 @@ class CFuseServicePoint :
         do{
             CfgPtr pCtx;
             CFuseMutex oLock( GetLock() );
-            GET_STMCTX_LOCKED( hStream, pCtx );
+            ret = GET_STMCTX_LOCKED(
+                hStream, pCtx );
+            if( ERROR( ret ) )
+                break;
             ret = oCfg.SetStrProp(
                 propPath1, strName );
         }while( 0 );
@@ -1808,7 +1933,7 @@ class CFuseServicePoint :
     {
         gint32 ret = 0;
         do{
-            WLOCK_TESTMNT;
+            RLOCK_TESTMNT;
             if( bProxy )
                 break;
             if( GetState() != stateConnected )
@@ -2036,6 +2161,62 @@ class CFuseRootBase:
         return pRet;
     }
 
+    gint32 GetSvcDir( const stdstr& path,
+        CFuseSvcDir*& pDir ) const
+    {
+        gint32 ret = 0;
+        vector<string> vecComp;
+        if( strDir.size() > REG_MAX_PATH )
+            return -EINVAL;
+
+        ret = Namei( strDir, vecComp );
+        if( ERROR( ret ) )
+            return ret;
+
+        CStdRMutex a( m_oReg.GetLock() );
+        auto itr = vecComp.begin();
+        CDirEntry* pCurDir = m_pCurDir;
+        ret = -ENOENT;
+        while( itr != vecComp.end() )
+        {
+            if( *itr == "." )
+            {
+            }
+            else if( *itr == ".." )
+            {
+                if( pCurDir == GetRootDir() )
+                {
+                    ret = -EINVAL;
+                    break;
+                }
+
+                pCurDir = pCurDir->GetParent();
+            }
+            else if( *itr == "/" )
+            {
+                pCurDir = GetRootDir();
+            }
+            else
+            {
+                pCurDir = pCurDir->GetChild( *itr );
+                if( pCurDir == NULL )
+                    break;
+            }
+            if( pCurDir->GetClsid() == 
+                clsid( CFuseSvcDir ) )
+            {
+                ret = STATUS_SUCCESS;
+                break;
+            }
+            ++itr;
+        }
+        if( SUCCEEDED( ret ) )
+            pDir = static_cast< CFuseSvcDir* >
+                ( pCurDir );
+
+        return ret;
+    }
+
     CFuseRootBase( const IConfigDb* pCfg ):
         super( pCfg )
     {
@@ -2111,7 +2292,6 @@ class CFuseRootBase:
                 pIf->Unmount();
             }
         }
-        m_vecIfs.clear();
         SetFuse( nullptr );
         return STATUS_SUCCESS;
     }
@@ -2211,6 +2391,52 @@ class CFuseRootBase:
             }
         }
 
+        return ret;
+    }
+
+    gint32 OnPreStop( IEventSink* pCallback )
+    {
+        gint32 ret = 0;
+        do{
+            CParamList oParams;
+            oParams.SetPointer( propIfPtr, this );
+
+            TaskGrpPtr pStopTasks;
+            ret = pStopTasks.NewObj(
+                clsid( CIfTaskGroup ),
+                oParams.GetCfg() );
+            if( ERROR( ret ) )
+                break;
+
+            pStopTasks->SetRelation( logicNONE );
+
+            for( auto& elem : m_vecIfs )
+            {
+                TaskletPtr pTask;
+                ret = DEFER_IFCALLEX_NOSCHED2(
+                    0, pTask, ObjPtr( elem ),
+                    &CRpcServices::Stop );
+
+                if( ERROR( ret ) )
+                    break;
+
+                pStopTasks->AppendTask( pTask );
+            }
+            m_vecIfs.clear();
+            CIfRetryTask* pTask = pStopTasks;
+            pTask->SetClientNotify( pCallback );
+            ret = GetIoMgr()->RescheduleTask(
+                pTask );
+            if( ERROR( ret ) )
+            {
+                ( *pStopTasks )( eventCancelTask );
+            }
+            else
+            {
+                ret = STATUS_PENDING;
+            }
+
+        }while( 0 );
         return ret;
     }
 };

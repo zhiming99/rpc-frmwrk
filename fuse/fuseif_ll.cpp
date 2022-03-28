@@ -188,7 +188,7 @@ void fuseif_ll_read(fuse_req_t req,
         fuse_bufvec* buf = nullptr;
         std::vector< BufPtr > vecBackup;
         ret = d->fe->fs_read(
-            req, buf, size, fi, vecBackup, d );
+            req, buf, off, size, fi, vecBackup, d );
         if( ret == STATUS_PENDING )
         {
             ret = 0;
@@ -199,7 +199,8 @@ void fuseif_ll_read(fuse_req_t req,
         if( SUCCEEDED( ret ) )
         {
             if( buf != nullptr )
-                fuse_reply_data(req, buf, FUSE_BUF_SPLICE_MOVE);
+                fuse_reply_data(req,
+                    buf, FUSE_BUF_SPLICE_MOVE);
             else
                 fuse_reply_err( req, 0 );
         }
