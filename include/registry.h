@@ -106,7 +106,8 @@ class CRegistry : public CObjBase
     CRegistry();
     ~CRegistry();
 
-    std::recursive_mutex& GetLock(){ return m_oLock; };
+    std::recursive_mutex& GetLock() const
+    { return m_oLock; };
 
     gint32 MakeEntry( const std::string& );
     gint32 MakeDir( const std::string& );

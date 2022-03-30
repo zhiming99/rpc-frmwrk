@@ -34,44 +34,10 @@
   See the file COPYING.LIB
 */
 #include "fuseif.h"
-extern "C" {
+#include "fuse_i.h"
+#include <signal.h>
+using namespace rpcf;
 
-struct fuse_session_dup {
-    char *mountpoint;
-    volatile int exited;
-    int fd;
-    struct mount_opts *mo;
-    int debug;
-    int deny_others;
-    struct fuse_lowlevel_ops op;
-    int got_init;
-    struct cuse_data *cuse_data;
-    void *userdata;
-    uid_t owner;
-    struct fuse_conn_info conn;
-    struct fuse_req list;
-    struct fuse_req interrupts;
-    pthread_mutex_t lock;
-    int got_destroy;
-    pthread_key_t pipe_key;
-    int broken_splice_nonblock;
-    uint64_t notify_ctr;
-    struct fuse_notify_req notify_list;
-    size_t bufsize;
-    int error;
-};
-
-struct fuseif_intr_data {
-    pthread_t id;
-    pthread_cond_t cond;
-    int finished;
-    CFuseObjBase* fe;
-};
-
-}
-
-void fuseif_free_buf( fuse_bufvec* buf )
-{ free( buf ); }
 static size_t fuseif_buf_size(const fuse_bufvec *bufv)
 {
     size_t i;
@@ -97,8 +63,9 @@ static size_t fuseif_buf_size(const fuse_bufvec *bufv)
 static void fuseif_rwinterrupt(
     fuse_req_t req, void *d_)
 {
-    struct fuseif_intr_data *d = d_;
-    struct fuse *f = req_fuse(req);
+    fuseif_intr_data *d =
+        ( fuseif_intr_data* )d_;
+    fuse *f = rpcf::GetFuse();
 
     if (d->id == pthread_self())
         return;
@@ -110,15 +77,15 @@ static void fuseif_rwinterrupt(
             < CFuseStmFile* >( pObj );
         if( pstm != nullptr )
         {
-            CWriteLock oLock( pstm->GetLock() );
-            pstm->CancelRequest( req );
+            CFuseMutex oLock( pstm->GetLock() );
+            pstm->CancelFsRequest( req );
             break;
         }
         CFuseFileEntry* pfe = dynamic_cast
             < CFuseFileEntry* >( pObj );
         {
-            CWriteLock oLock( pfe->GetLock() );
-            pfe->CancelRequest( req );
+            CFuseMutex oLock( pfe->GetLock() );
+            pfe->CancelFsRequest( req );
             break;
         }
         break;
@@ -128,7 +95,7 @@ static void fuseif_rwinterrupt(
         struct timeval now;
         struct timespec timeout;
 
-        pthread_kill(d->id, f->conf.intr_signal);
+        pthread_kill(d->id, SIGUSR1 );
         gettimeofday(&now, NULL);
         timeout.tv_sec = now.tv_sec + 1;
         timeout.tv_nsec = now.tv_usec * 1000;
@@ -159,7 +126,7 @@ static void fuseif_do_prepare_interrupt(
     fuse_req_interrupt_func(req, fuseif_rwinterrupt, d);
 }       
         
-static inline void fuseif_finish_interrupt(
+inline void fuseif_finish_interrupt(
     fuse *f, fuse_req_t req,
     fuseif_intr_data *d)
 {   
@@ -167,13 +134,25 @@ static inline void fuseif_finish_interrupt(
         fuseif_do_finish_interrupt(f, req, d);
 }       
 
-static inline void fuseif_prepare_interrupt(
+inline void fuseif_prepare_interrupt(
     fuse *f, fuse_req_t req,
     fuseif_intr_data *d)
 {              
     if (f->conf.intr)
         fuseif_do_prepare_interrupt(req, d);
 }
+
+void fuseif_free_buf(struct fuse_bufvec *buf)
+{      
+    if (buf != NULL)
+    {
+        size_t i;
+        for (i = 0; i < buf->count; i++)
+            if (!(buf->buf[i].flags & FUSE_BUF_IS_FD))
+                free(buf->buf[i].mem);
+        free(buf);
+    }  
+}     
 
 void fuseif_ll_read(fuse_req_t req,
     fuse_ino_t ino, size_t size,
@@ -243,13 +222,9 @@ void fuseif_tweak_llops( fuse_session* se )
 {
     if( se == nullptr )
         return;
-    fuse_session_dup* ps = reinterpret_cast
-        < fuse_session_dup* >(se );
-    if( ps == nullptr )
-        return;
 
-    ps->op.read = fuseif_ll_read;
-    ps->op.write = fuseif_ll_write;
+    se->op.read = fuseif_ll_read;
+    se->op.write_buf = fuseif_ll_write_buf;
     return;
 }
 

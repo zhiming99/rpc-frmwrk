@@ -1304,15 +1304,14 @@ struct CStreamSyncBase :
     }
 
     gint32 GetContext( HANDLE hChannel,
-        CfgPtr& pCtx )
+        CfgPtr& pCtx ) const
     {
         // a place to store channel specific data.
         if( hChannel == INVALID_HANDLE )
             return -EINVAL;
 
         CStdRMutex oIfLock( this->GetLock() );
-        typename WORKER_MAP::iterator itr = 
-            m_mapStmWorkers.find( hChannel );
+        auto itr = m_mapStmWorkers.find( hChannel );
 
         if( itr == m_mapStmWorkers.end() )
             return -ENOENT;

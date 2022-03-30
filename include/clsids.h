@@ -314,6 +314,7 @@ typedef enum : guint32
     DECL_CLSID( CConfigDb2 ),
     DECL_CLSID( CDeferredFuncCall ),
     DECL_CLSID( CFuseConnDir ),
+    DECL_CLSID( CFuseDirectory ),
     DECL_CLSID( CFuseSvcDir ),
     DECL_CLSID( CFuseStmDir ),
     DECL_CLSID( CFuseRootDir ),

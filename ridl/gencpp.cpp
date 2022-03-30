@@ -6789,7 +6789,10 @@ gint32 CExportMakefile::Output()
             "s:XXXOBJSCLI:" + strObjClient + ":; ";
 
         if( bFuse )
-            strCmdLine +="s:XXXFUSE:-lutils:; ";
+        {
+            strCmdLine +="s:XXXFUSE:-lutils -lfuseif:; ";
+            strCmdLine +="s:jsoncpp:jsoncpp fuse3:; ";
+        }
         else
             strCmdLine +="s:XXXFUSE::; ";
 

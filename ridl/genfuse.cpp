@@ -30,7 +30,7 @@ using namespace rpcf;
 gint32 EmitBuildJsonReq( 
     CWriterBase* m_pWriter )
 {
-    Wa( "static gint32 BuildJsonReq(" );
+    Wa( "gint32 BuildJsonReq(" );
     Wa( "    IConfigDb* pReqCtx_," );
     Wa( "    const Json::Value& oJsParams," );
     Wa( "    const std::string& strMethod," );
@@ -1282,7 +1282,12 @@ gint32 CDeclInterfSvrFuse::Output()
                 if( ERROR( ret ) )
                     break;
             }
-            ret = OutputAsync( pmd );
+            else
+            {
+                ret = OutputAsync( pmd );
+                if( ERROR( ret ) )
+                    break;
+            }
             if( i + 1 < dwCount )
                 NEW_LINE;
         }
@@ -1587,15 +1592,25 @@ gint32 CDeclServiceImplFuse::Output()
             Wa( "//Request Dispatcher" );
             Wa( "gint32 DispatchReq(" );
             Wa( "    IConfigDb* pContext," );
-            Wa( "    const std::string& strReq," );
-            Wa( "    std::string& strResp ) override;" );
+            Wa( "    const Json::Value& valReq," );
+            Wa( "    Json::Value& valResp ) override;" );
             NEW_LINE;
             Wa( "gint32 CancelRequestByReqId(" );
             Wa( "    guint64 qwReqId );" );
 
+            NEW_LINE;
+            Wa( "gint32 OnReqComplete(" );
+            Wa( "    IEventSink* pCallback," );
+            Wa( "    IConfigDb* pReqCtx," );
+            Wa( "    Json::Value& valResp," );
+            Wa( "    const std::string& strIfName," );
+            Wa( "    const std::string& strMethod," );
+            Wa( "    gint32 iRet ) override;" );
+            NEW_LINE;
+
             Wa( "/* The following 2 methods are important for */" );
             Wa( "/* streaming transfer. rewrite them if necessary */" );
-            Wa( "gint32 OnStreamReady2( HANDLE hChannel ) override" );
+            Wa( "gint32 OnStreamReady( HANDLE hChannel ) override" );
             BLOCK_OPEN;
             Wa( "gint32 ret = super::OnStreamReady( hChannel );" );
             Wa( "if( ERROR( ret ) )" );
@@ -1606,7 +1621,7 @@ gint32 CDeclServiceImplFuse::Output()
             Wa( "gint32 OnStmClosing( HANDLE hChannel ) override" );
             BLOCK_OPEN;
             Wa( "OnStmClosingFuse( hChannel );" );
-            CCOUT << "return super::OnStmClosing( hChannel ); }";
+            CCOUT << "return super::OnStmClosing( hChannel );";
             BLOCK_CLOSE;
             NEW_LINE;
 
@@ -1665,7 +1680,7 @@ gint32 CDeclServiceImplFuse::Output()
 
         Wa( "//Response&Event Dispatcher" );
         Wa( "gint32 DispatchMsg(" );
-        CCOUT << "    const std::string& strMsg ) override;";
+        CCOUT << "    const Json::Value& valMsg ) override;";
 
         NEW_LINE;
         Wa( "gint32 OnStreamReady( HANDLE hChannel ) override" );
@@ -1679,12 +1694,12 @@ gint32 CDeclServiceImplFuse::Output()
         Wa( "gint32 OnStmClosing( HANDLE hChannel ) override" );
         BLOCK_OPEN;
         Wa( "OnStmClosingFuse( hChannel );" );
-        CCOUT << "return super::OnStmClosing( hChannel ); }";
+        CCOUT << "return super::OnStmClosing( hChannel );";
         BLOCK_CLOSE;
         NEW_LINE;
         Wa( "gint32 AcceptNewStream(" );
         Wa( "    IEventSink* pCb, IConfigDb* pDataDesc ) override" );
-        Wa( "{ return CFuseSvcServer::AcceptNewStreamFuse( pcb, pDataDesc ); }");
+        Wa( "{ return CFuseSvcServer::AcceptNewStreamFuse( pCb, pDataDesc ); }");
         NEW_LINE;
 
         Wa( "gint32 OnReadStreamComplete( HANDLE hChannel," );
@@ -2003,7 +2018,7 @@ gint32 CImplIfMethodProxyFuse::OutputEvent()
         CCOUT << "    \"" << pifd->GetName() << "\",";
         NEW_LINE;
         Wa( "    0, strEvent, true, false );" );
-        CCOUT << "//TODO: pass strEvent to FUSE";
+        Wa( "//TODO: pass strEvent to FUSE" );
         Wa( "CFuseSvcProxy* pFuse = ObjPtr( this );" );
         Wa( "pFuse->ReceiveEvtJson( strEvent );" );
         Wa( "if( ERROR( ret ) ) break;" );
@@ -2163,11 +2178,11 @@ gint32 CImplIfMethodProxyFuse::OutputAsync()
             CCOUT << "pBuf_ );";
             INDENT_DOWNL;
         }
+        NEW_LINE;
+        Wa( "CCfgOpener oResp_(" );
+        Wa( "    ( IConfigDb* )pResp_ );" );
         if( !bNoReply )
         {
-            NEW_LINE;
-            Wa( "CCfgOpener oResp_(" );
-            Wa( "    ( IConfigDb* )pResp_ );" );
             Wa( "if( ret == STATUS_PENDING )" );
             BLOCK_OPEN;
             Wa( "guint64 qwTaskId = oResp_[ propTaskId ];" );
@@ -2225,7 +2240,6 @@ gint32 CImplIfMethodProxyFuse::OutputAsync()
         }
         else
         {
-            NEW_LINE;
             Wa( "if( ret == STATUS_PENDING )" );
             BLOCK_OPEN;
             Wa( "guint64 qwTaskId = oResp_[ propTaskId ];" );
@@ -2844,19 +2858,9 @@ gint32 CImplServiceImplFuse::Output()
             CCOUT << "gint32 " << strClass
                 << "::DispatchMsg(";
             NEW_LINE;
-            Wa( "    const stdstr& strMsg )" );
+            Wa( "    const Json::Value& oMsg )" );
             BLOCK_OPEN;
             Wa( "gint32 ret = 0;" );
-            Wa( "Json::CharReaderBuilder oReader;" );
-            Wa( "std::shared_ptr< Json::CharReader >" );
-            Wa( "    pReader( oReader.newCharReader() );" );
-            Wa( "if( pReader == nullptr ) return -ENOMEM;" );
-            Wa( "const char* pszMsg = strMsg.c_str();" );
-            Wa( "Json::Value oMsg;" );
-            Wa( "if( !pReader->parse( pszMsg," );
-            Wa( "    pszMsg + strMsg.size()," );
-            Wa( "    &oMsg, nullptr ) )" );
-            Wa( "{ return -EBADMSG; }" );
             Wa( "if( oMsg.empty() || !oMsg.isObject() )" );
             Wa( "    return -EINVAL;" );
             Wa( "do" );
@@ -2965,24 +2969,19 @@ gint32 CImplServiceImplFuse::Output()
                 << "::DispatchReq(";
             NEW_LINE;
             Wa( "    IConfigDb* pContext," );
-            Wa( "    const stdstr& strReq," );
-            Wa( "    stdstr& strResp )" );
+            Wa( "    const Json::Value& oReq," );
+            Wa( "    Json::Value& oResp )" );
             BLOCK_OPEN;
-            Wa( "Json::CharReaderBuilder oReader;" );
-            Wa( "std::shared_ptr< Json::CharReader >" );
-            Wa( "    pReader( oReader.newCharReader() );" );
-            Wa( "if( pReader == nullptr ) return -ENOMEM;" );
             Wa( "gint32 ret = 0;" );
-            Wa( "const char* pszReq = strReq.c_str();" );
-            Wa( "Json::Value oReq, oResp;" );
-            Wa( "if( !pReader->parse( pszReq," );
-            Wa( "    pszReq + strReq.size()," );
-            Wa( "    &oReq, nullptr ) )" );
-            Wa( "{ return -EBADMSG; }" );
             Wa( "if( oReq.empty() || !oReq.isObject() )" );
             Wa( "    return -EINVAL;" );
             Wa( "do" );
             BLOCK_OPEN;
+            Wa( "if( !oReq.isMember( JSON_ATTR_METHOD ) ||");
+            Wa( "    !oReq[ JSON_ATTR_METHOD ].isString() )" );
+            Wa( "{ ret = -EINVAL; break; }" );
+            Wa( "stdstr strMethod =" );
+            Wa( "    oReq[ JSON_ATTR_METHOD ].asString();" );
             Wa( "if( !oReq.isMember( JSON_ATTR_IFNAME ) ||");
             Wa( "    !oReq[ JSON_ATTR_IFNAME ].isString() )" );
             Wa( "{ ret = -EINVAL; break; }" );
@@ -3035,11 +3034,6 @@ gint32 CImplServiceImplFuse::Output()
             }
             Wa( "if( strIfName == \"IInterfaceServer\" )" );
             BLOCK_OPEN;
-            Wa( "if( !oReq.isMember( JSON_ATTR_METHOD ) ||");
-            Wa( "    !oReq[ JSON_ATTR_METHOD ].isString() )" );
-            Wa( "{ ret = -EINVAL; break; }" );
-            Wa( "stdstr strMethod =" );
-            Wa( "    oReq[ JSON_ATTR_METHOD ].asString();" );
             Wa( "if( strMethod != \"UserCancelRequest\" )" );
             Wa( "{ ret = -EINVAL; break; }" );
             Wa( "if( !oReq.isMember( JSON_ATTR_REQCTXID ) ||");
@@ -3051,13 +3045,11 @@ gint32 CImplServiceImplFuse::Output()
             Wa( "    !oReq[ JSON_ATTR_PARAMS ].isObject() ||" );
             Wa( "    oReq[ JSON_ATTR_PARAMS ].empty() )" );
             Wa( "{ ret = -EINVAL; break; }" );
-            Wa( "Json::Value& val_ = oReq[ JSON_ATTR_PARAMS ];" );
+            Wa( "Json::Value val_ = oReq[ JSON_ATTR_PARAMS ];" );
             Wa( "if( !val_.isMember( JSON_ATTR_REQCTXID ) ||");
             Wa( "    !val_[ JSON_ATTR_REQCTXID ].isUInt64() )" );
             Wa( "{ ret = -EINVAL; break; }" );
-            Wa( "guint64 qwTaskCancel =" );
-            Wa( "    val_[ JSON_ATTR_REQCTXID ].asUInt64();" );
-            Wa( "ret = CancelRequestByReqId( qwTaskCancel );" );
+            Wa( "ret = CancelRequestByReqId( qwReqId );" );
             CCOUT << "break;";
             BLOCK_CLOSE;
             NEW_LINE;
@@ -3065,11 +3057,6 @@ gint32 CImplServiceImplFuse::Output()
             BLOCK_CLOSE;
             Wa( "while( 0 );" );
             Wa( "oResp[ JSON_ATTR_RETCODE ] = ret;" );
-            Wa( "Json::StreamWriterBuilder oBuilder;" );
-            Wa( "oBuilder[\"commentStyle\"] = \"None\";" );
-            CCOUT <<  "strResp = Json::writeString( "
-                << "oBuilder, oResp );";
-            NEW_LINE;
             CCOUT << "return ret;";
             BLOCK_CLOSE;
             NEW_LINE;
@@ -3153,6 +3140,18 @@ gint32 CImplServiceImplFuse::Output()
             BLOCK_CLOSE;
             NEW_LINE;
 
+            NEW_LINE;
+            Wa( "extern gint32 BuildJsonReq(" );
+            Wa( "    IConfigDb* pReqCtx_," );
+            Wa( "    const Json::Value& oJsParams," );
+            Wa( "    const std::string& strMethod," );
+            Wa( "    const std::string& strIfName, " );
+            Wa( "    gint32 iRet," );
+            Wa( "    std::string& strReq," );
+            Wa( "    bool bProxy," );
+            Wa( "    bool bResp );" );
+            NEW_LINE;
+
             // implement OnReqComplete
             CCOUT << "gint32 " << strClass;
             Wa( "::OnReqComplete(" );
@@ -3175,7 +3174,7 @@ gint32 CImplServiceImplFuse::Output()
             Wa( "    break;" );
             Wa( "LONGWORD* pData = ( LONGWORD* )pReqCtx;" );
             Wa( "this->OnEvent( eventRemoveReq, 0, 0, pData );" );
-            Wa( "CCfgOpener oReqCtx_( pReqCtx )" );
+            Wa( "CCfgOpener oReqCtx_( pReqCtx );" );
             Wa( "guint64 qwReqId = 0;" );
             Wa( "ret = oReqCtx_.GetQwordProp( 1, qwReqId );" );
             Wa( "if( ERROR( ret ) )" );
@@ -3235,6 +3234,9 @@ gint32 CImplIufProxyFuse::OutputDispatch()
                 ret = -EFAULT;
                 break;
             }
+
+            if( pmd->IsEvent() )
+                continue;
 
             ObjPtr pInArgs = pmd->GetInArgs();
             guint32 dwInCount = GetArgCount( pInArgs );
