@@ -60,6 +60,9 @@ This project depends on the following 3rd-party packags at runtime:
 5. A tree-like hierarchical persistant registry.
 
 ---
+[`Wed Mar 30 2022 10:25:04 PM Beijing`]    
+1. Finally, the file system interface is code complete. Next let's make it run.
+
 [`Mon Mar 21 2022 07:57:49 PM Beijing`]   
 1. Checked in some newly added code for fuse integration. And the file system interface is 60% code complete. A little bit behind the schedule.
 
