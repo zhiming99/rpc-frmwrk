@@ -10,6 +10,7 @@ rpcffuseif_HEADERS=fuseif.h
 rpcffuseifdir=$(includedir)/rpcf/ipc
 
 libfuseif_ladir=$(libdir)
+EXTRA_DIST=fuse_i.h
 
 libfuseif_la_LDFLAGS=-version-info @VERSION2@
 libfuseif_la_LIBADD= -lpthread -ldl -llz4 $(COMMON_LINK_FUSE3) 
