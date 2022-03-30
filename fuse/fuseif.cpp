@@ -2246,10 +2246,17 @@ int fuseop_poll(const char *path,
     return ret;
 }
 
+#if FUSE_USE_VERSION < 35
 int fuseop_ioctl(
     const char *path, int cmd,
     void *arg, fuse_file_info *fi,
     unsigned int flags, void *data )
+#else
+int fuseop_ioctl(
+    const char *path, unsigned int cmd,
+    void *arg, fuse_file_info *fi,
+    unsigned int flags, void *data )
+#endif
 {
     gint32 ret = 0;
     do{
