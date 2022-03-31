@@ -652,7 +652,10 @@ extern gint32 FuseDeclareMsgSet(
         }
 
         if( vecMsgIds.empty() )
+        {
+            Wa( "std::set< guint32 > g_setMsgIds;" );
             break;
+        }
 
         Wa( "std::set< guint32 > g_setMsgIds = " );
         BLOCK_OPEN;
@@ -3555,6 +3558,11 @@ gint32 CImplMainFuncFuse::Output()
             Wa( "gint32 ret = 0;" );
             CCOUT << "do";
             BLOCK_OPEN;
+            Wa( "ret = InitContext();" );
+            CCOUT << "if( ERROR( ret ) )";
+            NEW_LINE;
+            CCOUT << "    break;";
+            NEW_LINE;
             Wa( "fuse_args args = FUSE_ARGS_INIT(argc, argv);" );
             Wa( "fuse_cmdline_opts opts;" );
             Wa( "ret = fuseif_daemonize( args, opts, argc, argv );" );
@@ -3562,11 +3570,6 @@ gint32 CImplMainFuncFuse::Output()
             NEW_LINE;
             CCOUT << "    break;";
             NEW_LINES( 2 );
-            Wa( "ret = InitContext();" );
-            CCOUT << "if( ERROR( ret ) )";
-            NEW_LINE;
-            CCOUT << "    break;";
-            NEW_LINE;
             CCOUT << "ret = InitRootIf( g_pIoMgr, "
                 << ( bProxy ? "true" : "false" ) << " );";
             NEW_LINE;
@@ -3574,10 +3577,7 @@ gint32 CImplMainFuncFuse::Output()
             NEW_LINE;
             CCOUT << "    break;";
             NEW_LINE;
-            if( bProxy )
-                Wa( "CFuseRootProxy* pRoot = GetRootIf();" );
-            else
-                Wa( "CFuseRootServer* pRoot = GetRootIf();" );
+            Wa( "CRpcServices* pRoot = GetRootIf();" );
             for( auto& elem : vecSvcs )
             {
                 CServiceDecl* pSvc = elem;
@@ -3590,16 +3590,22 @@ gint32 CImplMainFuncFuse::Output()
                 else
                     strClass += "_SvrImpl";
 
-                CCOUT << "// add the " << strSvcName << " directory";
+                CCOUT << "// add the "
+                    << strSvcName << " directory";
                 NEW_LINE;
-                CCOUT << "ret = pRoot->AddSvcPoint(";
+                CCOUT << "ret = AddSvcPoint(";
+                NEW_LINE;
+                CCOUT << "    \""
+                    << strSvcName << "\",";
                 NEW_LINE;
                 CCOUT << "    \"./"
                     << g_strAppName << "desc.json\",";
                 NEW_LINE;
-                CCOUT << "    \"" << strSvcName << "\",";
+                CCOUT << "    clsid( " << strClass << " ),";
                 NEW_LINE;
-                CCOUT << "    clsid( " << strClass << " ) );";
+                CCOUT << "    " 
+                    << ( bProxy ? "true" : "false" )
+                    << " );";
                 NEW_LINE;
                 CCOUT << "if( ERROR( ret ) )";
                 NEW_LINE;
@@ -3607,7 +3613,8 @@ gint32 CImplMainFuncFuse::Output()
                 NEW_LINE;
             }
             NEW_LINE;
-             Wa( "ret = fuseif_main( args, opts );" );
+            Wa( "args = FUSE_ARGS_INIT(argc, argv);" );
+            Wa( "ret = fuseif_main( args, opts );" );
 
             NEW_LINE;
             Wa( "// Stop the root object" );

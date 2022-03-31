@@ -186,6 +186,24 @@ gint32 CloseChannel(
     return ret;
 }
 
+gint32 AddSvcPoint(
+    const stdstr& strObj,
+    const stdstr& strDesc,
+    EnumClsid iClsid,
+    bool bProxy )
+{
+    if( bProxy )
+    {
+        CFuseRootProxy* pRoot = GetRootIf();
+        return pRoot->AddSvcPoint(
+            strObj, strDesc, iClsid );
+    }
+    CFuseRootServer* pRoot = GetRootIf();
+    return pRoot->AddSvcPoint(
+        strObj, strDesc, iClsid );
+}
+
+
 gint32 CFuseTextFile::fs_open(
     const char* path,
     fuse_file_info *fi )
@@ -321,6 +339,14 @@ gint32 CFuseTextFile::fs_getattr(
     return 0;
 }
 
+#define INIT_STATBUF( _stbuf ) \
+do{ \
+    ( _stbuf )->st_uid = getuid(); \
+    ( _stbuf )->st_gid = getgid(); \
+    ( _stbuf )->st_atime = \
+        ( _stbuf )->st_mtime = time(NULL); \
+}while( 0 )
+
 gint32 CFuseDirectory::fs_readdir(
     const char *path,
     void *buf, fuse_fill_dir_t filler,
@@ -342,6 +368,7 @@ gint32 CFuseDirectory::fs_readdir(
                 break;
             }
             struct stat file_stat;
+            INIT_STATBUF( &file_stat );
             fs_getattr( "", &file_stat, nullptr );
             filler( buf, pObj->GetName().c_str(),
                 &file_stat, 0,
@@ -368,7 +395,7 @@ gint32 CFuseTextFile::fs_read(
 
         if( off >= m_strContent.size() )
         {
-            ret = -ERANGE;
+            ret = 0;
             break;
         }
 
@@ -1973,6 +2000,15 @@ gint32 InitRootIf(
     return ret;
 }
 
+static FactoryPtr InitClassFactory()
+{
+    BEGIN_FACTORY_MAPS;
+
+    INIT_MAP_ENTRYCFG( CFuseRootServer );
+    INIT_MAP_ENTRYCFG( CFuseRootProxy );
+
+    END_FACTORY_MAPS;
+};
 
 } // namespace
 
@@ -1981,14 +2017,20 @@ gint32 fuseop_open(
 {
     gint32 ret = 0;
     do{
-        RLOCK_TESTMNT3( path );
-
         CFuseObjBase* pObj;
         gint32 ret = GetFuseObj( path, pObj );
         if( ERROR( ret ) )
             return ret;
 
-        ret = pObj->fs_open( path, fi );
+        CFuseSvcDir* pSvcDir =
+            rpcf::GetSvcDir( path );
+        if( pSvcDir == nullptr )
+            ret = pObj->fs_open( path, fi );
+        else
+        {
+            RLOCK_TESTMNT0( pSvcDir );
+            ret = pObj->fs_open( path, fi );
+        }
 
     }while( 0 );
 
@@ -2078,14 +2120,20 @@ gint32 fuseop_opendir(
 {
     gint32 ret = 0;
     do{
-        RLOCK_TESTMNT3( path );
-
         CFuseObjBase* pObj;
         gint32 ret = GetFuseObj( path, pObj );
         if( ERROR( ret ) )
             return ret;
 
-        ret = pObj->fs_opendir( path, fi );
+        CFuseSvcDir* pSvcDir =
+            rpcf::GetSvcDir( path );
+        if( pSvcDir == nullptr )
+            ret = pObj->fs_opendir( path, fi );
+        else
+        {
+            RLOCK_TESTMNT0( pSvcDir );
+            ret = pObj->fs_opendir( path, fi );
+        }
 
     }while( 0 );
 
@@ -2227,19 +2275,30 @@ int fuseop_poll(const char *path,
 {
     gint32 ret = 0;
     do{
-        RLOCK_TESTMNT3( path );
-
-        if( fi->fh == 0 )
+        CFuseObjBase* pObj = nullptr;
+        if( fi != nullptr && fi->fh != 0 )
         {
-            ret = -EFAULT;
-            break;
+            pObj = reinterpret_cast
+                < CFuseObjBase* >( fi->fh );
         }
-        CFuseObjBase* pObj =
-            reinterpret_cast< CFuseObjBase* >
-                ( fi->fh );
+        else
+        {
+            ret = GetFuseObj( path, pObj );            
+            if( ERROR( ret ) )
+                break;
+        }
 
-        ret = pObj->fs_poll(
-            path, fi, ph, reventsp );
+        CFuseSvcDir* pSvcDir =
+            rpcf::GetSvcDir( path );
+        if( pSvcDir == nullptr )
+            ret = pObj->fs_poll(
+                path, fi, ph, reventsp );
+        else
+        {
+            RLOCK_TESTMNT0( pSvcDir );
+            ret = pObj->fs_poll(
+                path, fi, ph, reventsp );
+        }
 
     }while( 0 );
 
@@ -2260,8 +2319,6 @@ int fuseop_ioctl(
 {
     gint32 ret = 0;
     do{
-        RLOCK_TESTMNT3( path );
-
         if( fi->fh == 0 )
         {
             ret = -EFAULT;
@@ -2271,8 +2328,17 @@ int fuseop_ioctl(
             reinterpret_cast< CFuseObjBase* >
                 ( fi->fh );
 
-        ret = pObj->fs_ioctl(
-            path, cmd, arg, fi, flags, data );
+        CFuseSvcDir* pSvcDir =
+            rpcf::GetSvcDir( path );
+        if( pSvcDir == nullptr )
+            ret = pObj->fs_ioctl(
+                path, cmd, arg, fi, flags, data );
+        else
+        {
+            RLOCK_TESTMNT0( pSvcDir );
+            ret = pObj->fs_ioctl(
+                path, cmd, arg, fi, flags, data );
+        }
 
     }while( 0 );
 
@@ -2286,19 +2352,30 @@ int fuseop_getattr(
 {
     gint32 ret = 0;
     do{
-        RLOCK_TESTMNT3( path );
-
-        if( fi->fh == 0 )
+        CFuseObjBase* pObj = nullptr;
+        if( fi != nullptr && fi->fh != 0 )
         {
-            ret = -EFAULT;
-            break;
+            pObj = reinterpret_cast
+                < CFuseObjBase* >( fi->fh );
         }
-        CFuseObjBase* pObj =
-            reinterpret_cast< CFuseObjBase* >
-                ( fi->fh );
+        else
+        {
+            ret = GetFuseObj( path, pObj );            
+            if( ERROR( ret ) )
+                break;
+        }
 
-        ret = pObj->fs_getattr(
-            path, stbuf, fi );
+        CFuseSvcDir* pSvcDir =
+            rpcf::GetSvcDir( path );
+        if( pSvcDir == nullptr )
+            ret = pObj->fs_getattr(
+                path, stbuf, fi );
+        else
+        {
+            RLOCK_TESTMNT0( pSvcDir );
+            ret = pObj->fs_getattr(
+                path, stbuf, fi );
+        }
 
     }while( 0 );
 
@@ -2314,19 +2391,29 @@ int fuseop_readdir(
 
     gint32 ret = 0;
     do{
-        RLOCK_TESTMNT3( path );
-
-        if( fi->fh == 0 )
+        CFuseObjBase* pObj = nullptr;
+        if( fi != nullptr && fi->fh != 0 )
         {
-            ret = -EFAULT;
-            break;
+            pObj = reinterpret_cast
+                < CFuseObjBase* >( fi->fh );
         }
-        CFuseObjBase* pObj =
-            reinterpret_cast< CFuseObjBase* >
-                ( fi->fh );
-
-        ret = pObj->fs_readdir(
-            path, buf, filler, off, fi, flags );
+        else
+        {
+            ret = GetFuseObj( path, pObj );            
+            if( ERROR( ret ) )
+                break;
+        }
+        CFuseSvcDir* pSvcDir =
+            rpcf::GetSvcDir( path );
+        if( pSvcDir == nullptr )
+            ret = pObj->fs_readdir(
+                path, buf, filler, off, fi, flags );
+        else
+        {
+            RLOCK_TESTMNT0( pSvcDir );
+            ret = pObj->fs_readdir(
+                path, buf, filler, off, fi, flags );
+        }
 
 
     }while( 0 );
@@ -2477,3 +2564,13 @@ out1:
     return res;
 }
 
+// common method for a class factory library
+extern "C"
+gint32 DllLoadFactory( FactoryPtr& pFactory )
+{
+    pFactory = InitClassFactory();
+    if( pFactory.IsEmpty() )
+        return -EFAULT;
+
+    return 0;
+}

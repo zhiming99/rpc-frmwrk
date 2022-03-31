@@ -326,8 +326,6 @@ typedef enum : guint32
     DECL_CLSID( CFuseRespFileProxy ),
     DECL_CLSID( CFuseStmFile ),
     DECL_CLSID( CFuseStmEvtFile ),
-    DECL_CLSID( CFuseSvcProxy ),
-    DECL_CLSID( CFuseSvcServer ),
     DECL_CLSID( CFuseRootProxy ),
     DECL_CLSID( CFuseRootServer ),
     DECL_CLSID( MaxClsid ),

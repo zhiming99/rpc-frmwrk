@@ -6910,8 +6910,27 @@ gint32 CExportDrivers::Output()
                 oDrvToLoad.append( "UnixSockBusDriver" );
             oCli[ JSON_ATTR_DRVTOLOAD ] = oDrvToLoad;
 
-            Json::Value oSvr = oCli;
+            if( bFuseP )
+            {
+                Json::Value oFactories =
+                    Json::Value( Json::arrayValue );
+                oFactories.append(
+                    Json::Value( "./libfuseif.so" ) );
+                oCli[ JSON_ATTR_FACTORIES ] = oFactories;
+            }
+
+            Json::Value oSvr;
             oSvr[ JSON_ATTR_MODNAME ] = strAppSvr;
+            oSvr[ JSON_ATTR_DRVTOLOAD ] = oDrvToLoad;
+            if( bFuseS )
+            {
+                Json::Value oFactories =
+                    Json::Value( Json::arrayValue );
+                oFactories.append(
+                    Json::Value( "./libfuseif.so" ) );
+                oSvr[ JSON_ATTR_FACTORIES ] = oFactories;
+
+            }
             oModuleArray.append( oSvr );
             oModuleArray.append( oCli );
         }

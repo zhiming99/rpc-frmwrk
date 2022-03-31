@@ -78,6 +78,12 @@ gint32 InitRootIf(
 gint32 CloseChannel(
     InterfPtr& pIf, HANDLE hStream );
 
+gint32 AddSvcPoint(
+    const stdstr& strObj,
+    const stdstr& strDesc,
+    EnumClsid iClsid,
+    bool bProxy );
+
 class CSharedLock
 {
     stdmutex m_oLock;
@@ -479,6 +485,7 @@ class CFuseRootDir : public CFuseDirectory
     CFuseRootDir() : super( "/", nullptr )
     {
         SetClassId( clsid( CFuseRootDir ) );
+        SetMode( S_IRUSR | S_IXUSR );
     }
     gint32 fs_getattr(
         const char *path,
@@ -1124,8 +1131,12 @@ class CFuseConnDir : public CFuseDirectory
                 break;
             }
 
-            CConnParamsProxy oConn( pConnParams );
-            stdstr strPath = oConn.GetRouterPath();
+            stdstr strPath; 
+            ret = oIfCfg.GetStrProp(
+                propRouterPath, strPath );
+            if( ERROR( ret ) )
+                break;
+
             stdstr strPath2 = "/";
             if( strPath == strPath2 )
             {
@@ -1422,10 +1433,14 @@ CFuseSvcDir* GetSvcDir( CRpcServices* pIf );
 
 #define RLOCK_TESTMNT3( _path ) \
     CFuseSvcDir* _pDir = rpcf::GetSvcDir( _path );\
+    if( _pDir == nullptr ) \
+    { ret = -ENOENT; break; } \
     RLOCK_TESTMNT0( _pDir );
 
 #define WLOCK_TESTMNT3( _path ) \
     CFuseSvcDir* _pDir = rpcf::GetSvcDir( _path );\
+    if( _pDir == nullptr ) \
+    { ret = -ENOENT; break; } \
     WLOCK_TESTMNT0( _pDir );
 
 #define IFBASE( _bProxy ) std::conditional< \
@@ -2200,9 +2215,7 @@ class CFuseRootBase:
         if( ERROR( ret ) )
             return ret;
 
-        CStdRMutex a( m_oReg.GetLock() );
         auto itr = vecComp.begin();
-        m_oReg.ChangeDir( "/" );
         CDirEntry* pCurDir = m_oReg.GetRootDir();
         ret = -ENOENT;
         while( itr != vecComp.end() )
@@ -2342,6 +2355,9 @@ class CFuseRootBase:
                 break;
 
             InterfPtr pIf;
+            CCfgOpener oCfg( ( IConfigDb* )pCfg );
+            oCfg.SetPointer(
+                propIoMgr, this->GetIoMgr() );
             ret = pIf.NewObj( iClsid, pCfg );
             if( ERROR( ret ) )
                 break;
@@ -2381,6 +2397,7 @@ class CFuseRootBase:
             {
                 std::vector< CHILD_TYPE > vecConns;
                 pRoot->GetChildren( vecConns );
+                ret = -ENOENT;
                 for( auto& elem : vecConns )
                 {
                     CFuseConnDir* pConn = static_cast
