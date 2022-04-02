@@ -65,7 +65,8 @@ class CDirEntry : public CObjBase
         CHILD_TYPE& pChild ) const;
 
     gint32 AddChild( const std::string& strName );
-    gint32 AddChild( const CHILD_TYPE& pEnt );
+    virtual gint32 AddChild(
+        const CHILD_TYPE& pEnt );
 
     gint32 GetChildren(
         std::vector< CHILD_TYPE >& vecChildren ) const;
@@ -78,7 +79,8 @@ class CDirEntry : public CObjBase
         gint32 iProp,
         const Variant& oVar ) override;
 
-    gint32 RemoveChild( const std::string& strName );
+    virtual gint32 RemoveChild(
+        const std::string& strName );
 
     gint32 RemoveProp( gint32 iProp );
     const CDirEntry& operator=( const CDirEntry& rhs );

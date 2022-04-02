@@ -6,6 +6,8 @@
   See the file COPYING.LIB
 */
 
+#pragma once
+
 #include "fuse.h"
 #include "fuse_lowlevel.h"
 
@@ -100,3 +102,127 @@ struct fuse_session {
 #ifdef __cplusplus
 }
 #endif
+namespace rpcf
+{
+template< typename ...Args1, typename ...Args2 >
+static gint32 SafeCall(
+    bool bExclusive,
+    gint32 (CFuseObjBase::*func )(
+        const char*, fuse_file_info*, Args1... ),
+    const char* path,
+    fuse_file_info* fi,
+    Args2&&... args )
+{
+    gint32 ret = 0;
+    do{
+        CFuseObjBase* pObj = nullptr;
+        if( fi != nullptr && fi->fh != 0 )
+        {
+            auto pIf = GetRootIf();
+            CFuseRootServer* pSvr = pIf;
+            CFuseRootProxy* pCli = pIf;
+            FHCTX fhctx;
+            if( pSvr )
+            {
+                ret = pSvr->GetFhCtx(
+                    fi->fh, fhctx );
+            }
+            else
+            {
+                ret = pCli->GetFhCtx(
+                    fi->fh, fhctx );
+            }
+            // removed
+            if( ERROR( ret ) )
+                break;
+
+            pObj = reinterpret_cast
+                < CFuseObjBase* >( fi->fh );
+            if( fhctx.pSvc == nullptr )
+            {
+                ( pObj->*func )( path, fi, args... );
+            }
+            else
+            {
+                if( bExclusive )
+                {
+                    WLOCK_TESTMNT2( fhctx.pSvc );
+                    ret = ( pObj->*func )(
+                        path, fi, args... );
+                }
+                else
+                {
+                    RLOCK_TESTMNT2( fhctx.pSvc );
+                    ret = ( pObj->*func )(
+                        path, fi, args... );
+                }
+            }
+        }
+        else if( path != nullptr )
+        {
+            std::vector<stdstr> vecSubdirs;
+            CFuseObjBase* pSvcDir = nullptr;
+            ret = rpcf::GetSvcDir(
+                path, pSvcDir, vecSubdirs );
+            if( ERROR( ret ) )
+                break;
+            if( ret == ENOENT )
+                ret = ( pSvcDir->*func )(
+                        path, fi, args... );
+            else if( bExclusive )
+            {
+                WLOCK_TESTMNT0( pSvcDir );
+                CFuseSvcProxy* pProxy =
+                    ObjPtr( _pSvcDir->GetIf() );
+                CFuseSvcServer* pSvr =
+                    ObjPtr( _pSvcDir->GetIf() );
+
+                if( pSvr )
+                    pObj = pSvr->GetEntryLocked(
+                        vecSubdirs );
+                else
+                    pObj = pProxy->GetEntryLocked(
+                        vecSubdirs );
+                if( pObj == nullptr )
+                {
+                    ret = -ENOENT;
+                    break;
+                }
+                ret = ( pObj->*func )(
+                        path, fi, args... );
+            }
+            else
+            {
+                RLOCK_TESTMNT0( pSvcDir );
+                CFuseSvcProxy* pProxy =
+                    ObjPtr( _pSvcDir->GetIf() );
+                CFuseSvcServer* pSvr =
+                    ObjPtr( _pSvcDir->GetIf() );
+
+                if( pSvr )
+                    pObj = pSvr->GetEntryLocked(
+                        vecSubdirs );
+                else
+                    pObj = pProxy->GetEntryLocked(
+                        vecSubdirs );
+                if( pObj == nullptr )
+                {
+                    ret = -ENOENT;
+                    break;
+                }
+                ret = ( pObj->*func )(
+                        path, fi, args... );
+                        
+            }
+        }
+        else
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+}

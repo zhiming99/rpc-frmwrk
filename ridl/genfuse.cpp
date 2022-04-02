@@ -3618,7 +3618,8 @@ gint32 CImplMainFuncFuse::Output()
 
             NEW_LINE;
             Wa( "// Stop the root object" );
-            CCOUT << "pRoot->Stop();";
+            Wa( "pRoot->Stop();" );
+            CCOUT << "ReleaseRootIf();";
             NEW_LINE;
             BLOCK_CLOSE;
             CCOUT<< "while( 0 );";

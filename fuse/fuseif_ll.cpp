@@ -144,14 +144,7 @@ inline void fuseif_prepare_interrupt(
 
 void fuseif_free_buf(struct fuse_bufvec *buf)
 {      
-    if (buf != NULL)
-    {
-        size_t i;
-        for (i = 0; i < buf->count; i++)
-            if (!(buf->buf[i].flags & FUSE_BUF_IS_FD))
-                free(buf->buf[i].mem);
-        free(buf);
-    }  
+    free(buf);
 }     
 
 void fuseif_ll_read(fuse_req_t req,
@@ -166,8 +159,11 @@ void fuseif_ll_read(fuse_req_t req,
         fuseif_prepare_interrupt( pFuse, req, d );
         fuse_bufvec* buf = nullptr;
         std::vector< BufPtr > vecBackup;
-        ret = d->fe->fs_read(
-            req, buf, off, size, fi, vecBackup, d );
+        ret = SafeCall( false,
+            &CFuseObjBase::fs_read,
+            ( const char* )nullptr, fi,
+            req, buf, off, size,
+            vecBackup, d );
         if( ret == STATUS_PENDING )
         {
             ret = 0;
@@ -204,7 +200,9 @@ void fuseif_ll_write_buf(fuse_req_t req,
         fuseif_intr_data* d = new fuseif_intr_data;
         d->fe = ( CFuseObjBase* )fi->fh;
         fuseif_prepare_interrupt( pFuse, req, d );
-        d->fe->fs_write_buf( req, buf, fi, d );
+        ret = SafeCall( false,
+            &CFuseObjBase:: fs_write_buf,
+            nullptr, fi, req, buf, d );
         fuseif_finish_interrupt( pFuse, req, d );
         delete d;
         if( SUCCEEDED( ret ) )

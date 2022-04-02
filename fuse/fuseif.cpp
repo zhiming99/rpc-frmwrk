@@ -28,6 +28,7 @@ using namespace rpcf;
 
 #include "fuseif.h"
 #include "ridl/serijson.h"
+#include "fuse_i.h"
 
 void fuseif_finish_interrupt(
     fuse *f, fuse_req_t req,
@@ -47,24 +48,24 @@ static std::unique_ptr< Json::CharReader > g_pReader;
 InterfPtr& GetRootIf()
 { return g_pRootIf; }
 
-CFuseSvcDir* GetSvcDir( const char* path )
+gint32 GetSvcDir( const char* path,
+    CFuseObjBase*& pSvcDir,
+    std::vector< stdstr >& v )
 {
     auto pIf = GetRootIf();
     CFuseRootServer* pSvr = pIf;
     CFuseRootProxy* pCli = pIf;
-    CFuseSvcDir* pSvcDir = nullptr;
     gint32 ret = 0;
     if( pSvr != nullptr )
     {
-        ret = pSvr->GetSvcDir( path, pSvcDir );
+        ret = pSvr->GetSvcDir( path, pSvcDir, v );
     }
     else
     {
-        ret = pCli->GetSvcDir( path, pSvcDir );
+        ret = pCli->GetSvcDir( path, pSvcDir, v );
     }
-    if( ERROR( ret ) )
-        return nullptr;
-    return pSvcDir;
+
+    return ret;
 }
 
 CFuseSvcDir* GetSvcDir( CRpcServices* pIf )
@@ -132,7 +133,7 @@ CFuseDirectory* GetRootDir()
     return pProxy->GetRootDir();
 };
 
-gint32 GetFuseObj( const stdstr& strPath,
+/*gint32 GetFuseObj( const stdstr& strPath,
     CFuseObjBase*& pDir )
 {
     CRpcServices* pSvc = GetRootIf();
@@ -143,10 +144,10 @@ gint32 GetFuseObj( const stdstr& strPath,
     }
     CFuseRootProxy* pProxy = GetRootIf();
     return pProxy->GetFuseObj( strPath, pDir );
-}
+}*/
 
 gint32 CloseChannel(
-    InterfPtr& pIf, HANDLE hStream )
+    ObjPtr& pIf, HANDLE hStream )
 {
     if( hStream == INVALID_HANDLE ||
         pIf.IsEmpty() )
@@ -203,6 +204,74 @@ gint32 AddSvcPoint(
         strObj, strDesc, iClsid );
 }
 
+
+gint32 CFuseObjBase::AddChild(
+    const CHILD_TYPE& pEnt )
+{
+    gint32 ret = 0;
+    do{
+        ret = super::AddChild( pEnt );
+        if( ERROR( ret ) )
+            break;
+        
+        auto pIf = GetRootIf();
+        CFuseRootServer* pSvr = pIf;
+        CFuseRootProxy* pCli = pIf;
+        FHCTX fhctx;
+        CFuseObjBase* pObj = dynamic_cast
+            < CFuseObjBase* >( pEnt.get() );
+        fhctx.pFile = pEnt;
+        fhctx.pSvc = pObj->GetIf();
+        if( pSvr != nullptr )
+        {
+            ret = pSvr->Add2FhMap(
+                ( HANDLE )pObj, fhctx );
+        }
+        else
+        {
+            ret = pCli->Add2FhMap(
+                ( HANDLE )pObj, fhctx );
+        }
+
+    }while( 0 );
+    return ret;
+}
+
+gint32 CFuseObjBase::RemoveChild(
+    const std::string& strName )
+{
+    gint32 ret = 0;
+    do{
+        CHILD_TYPE pEnt;
+        ret = GetChild( strName, pEnt );
+        if( ERROR( ret ) )
+            break;
+
+        ret = super::RemoveChild( strName );
+        if( ERROR( ret ) )
+            break;
+
+        auto pObj = dynamic_cast
+            <CFuseObjBase*>( pEnt.get() );
+        
+        auto pIf = GetRootIf();
+        CFuseRootServer* pSvr = pIf;
+        CFuseRootProxy* pCli = pIf;
+        if( pSvr )
+        {
+            pSvr->RemoveFromFhMap(
+                ( HANDLE )pObj );
+        }
+        else
+        {
+            pSvr->RemoveFromFhMap(
+                ( HANDLE )pObj );
+        }
+
+    }while( 0 );
+
+    return ret;
+}
 
 gint32 CFuseTextFile::fs_open(
     const char* path,
@@ -293,11 +362,21 @@ gint32 CFuseFileEntry::fs_open(
     return ret;
 }
 
+#define INIT_STATBUF( _stbuf ) \
+do{ \
+    memset( _stbuf, 0, sizeof(struct stat ) );\
+    ( _stbuf )->st_uid = getuid(); \
+    ( _stbuf )->st_gid = getgid(); \
+    ( _stbuf )->st_atime = \
+        ( _stbuf )->st_mtime = time(NULL); \
+}while( 0 )
+
 gint32 CFuseRootDir::fs_getattr(
     const char *path,
-    struct stat *stbuf,
-    fuse_file_info* fi)
+    fuse_file_info* fi,
+    struct stat *stbuf)
 {
+    INIT_STATBUF( stbuf );
     stbuf->st_ino = 1;
     stbuf->st_mode = S_IFDIR | GetMode();
     stbuf->st_nlink = 1;
@@ -306,9 +385,10 @@ gint32 CFuseRootDir::fs_getattr(
 
 gint32 CFuseDirectory::fs_getattr(
     const char *path,
-    struct stat *stbuf,
-    fuse_file_info* fi)
+    fuse_file_info* fi,
+    struct stat *stbuf)
 {
+    INIT_STATBUF( stbuf );
     stbuf->st_ino = GetObjId();
     stbuf->st_mode = S_IFDIR | GetMode();
     stbuf->st_nlink = 1;
@@ -317,9 +397,10 @@ gint32 CFuseDirectory::fs_getattr(
 
 gint32 CFuseFileEntry::fs_getattr(
     const char *path,
-    struct stat *stbuf,
-    fuse_file_info* fi)
+    fuse_file_info* fi,
+    struct stat *stbuf)
 {
+    INIT_STATBUF( stbuf );
     stbuf->st_ino = GetObjId();
     stbuf->st_mode = S_IFREG | GetMode();
     stbuf->st_nlink = 1;
@@ -329,29 +410,22 @@ gint32 CFuseFileEntry::fs_getattr(
 
 gint32 CFuseTextFile::fs_getattr(
     const char *path,
-    struct stat *stbuf,
-    fuse_file_info* fi)
+    fuse_file_info* fi,
+    struct stat *stbuf)
 {
+    INIT_STATBUF( stbuf );
     stbuf->st_ino = GetObjId();
-    stbuf->st_mode = S_IFREG | 0400;
+    stbuf->st_mode = S_IFREG | GetMode();
     stbuf->st_nlink = 1;
     stbuf->st_size = m_strContent.size();
     return 0;
 }
 
-#define INIT_STATBUF( _stbuf ) \
-do{ \
-    ( _stbuf )->st_uid = getuid(); \
-    ( _stbuf )->st_gid = getgid(); \
-    ( _stbuf )->st_atime = \
-        ( _stbuf )->st_mtime = time(NULL); \
-}while( 0 )
-
 gint32 CFuseDirectory::fs_readdir(
     const char *path,
+    fuse_file_info *fi,
     void *buf, fuse_fill_dir_t filler,
-    off_t off, fuse_file_info *fi,
-    fuse_readdir_flags flags)
+    off_t off, fuse_readdir_flags flags )
 {
     gint32 ret = 0;
     do{
@@ -360,7 +434,7 @@ gint32 CFuseDirectory::fs_readdir(
         GetChildren( vecChildren );
         for( auto& elem : vecChildren )
         {
-            CFuseObjBase* pObj = dynamic_cast
+            auto pObj = dynamic_cast
                 < CFuseObjBase* >( elem.get() );
             if( pObj == nullptr )
             {
@@ -368,8 +442,7 @@ gint32 CFuseDirectory::fs_readdir(
                 break;
             }
             struct stat file_stat;
-            INIT_STATBUF( &file_stat );
-            fs_getattr( "", &file_stat, nullptr );
+            pObj->fs_getattr( "", nullptr, &file_stat );
             filler( buf, pObj->GetName().c_str(),
                 &file_stat, 0,
                 ( fuse_fill_dir_flags )0 );
@@ -381,10 +454,11 @@ gint32 CFuseDirectory::fs_readdir(
 }
 
 gint32 CFuseTextFile::fs_read(
+    const char* path,
+    fuse_file_info *fi,
     fuse_req_t req,
     fuse_bufvec*& bufvec,
     off_t off, size_t size,
-    fuse_file_info *fi,
     std::vector< BufPtr >& vecBackup,
     fuseif_intr_data* d )
 {
@@ -464,8 +538,10 @@ gint32 CFuseEvtFile::fs_poll(
 
 #include <sys/ioctl.h>
 gint32 CFuseFileEntry::fs_ioctl(
-    const char *path, unsigned int cmd,
-    void *arg, fuse_file_info *fi,
+    const char *path, 
+    fuse_file_info *fi,
+    unsigned int cmd,
+    void *arg, 
     unsigned int flags,
     void *data )
 {
@@ -494,8 +570,10 @@ gint32 CFuseFileEntry::fs_ioctl(
 }
 
 gint32 CFuseReqFileProxy::fs_ioctl(
-    const char *path, unsigned int cmd,
-    void *arg, fuse_file_info *fi,
+    const char *path, 
+    fuse_file_info *fi,
+    unsigned int cmd,
+    void *arg,
     unsigned int flags,
     void *data )
 {
@@ -529,14 +607,13 @@ gint32 CFuseReqFileProxy::fs_ioctl(
     return ret;
 }
 
-gint32 CFuseStmFile::fs_unlink( const char* path )
+gint32 CFuseStmFile::fs_unlink(
+    const char* path,
+    fuse_file_info *fi )
 {
     gint32 ret = 0;
     do{
         CRpcServices* pSvc = GetIf();
-        WLOCK_TESTMNT2( pSvc );
-        if( !IsHidden() )
-            break;
 
         CFuseMutex oFileLock(
                 GetLock() );
@@ -550,6 +627,9 @@ gint32 CFuseStmFile::fs_unlink( const char* path )
         }
 
         CancelFsRequests();
+        SetRemoved();
+
+        oFileLock.Unlock();
 
         CFuseStmDir* pParent = dynamic_cast
             < CFuseStmDir* >( GetParent() );
@@ -568,12 +648,17 @@ gint32 CFuseStmFile::fs_unlink( const char* path )
 
         pParent->RemoveChild( strName );
 
-        oFileLock.Unlock();
-        oSvcLock.Unlock();
-
-        InterfPtr pIf = GetIf();
+        ObjPtr pIf = GetIf();
         HANDLE hStream = GetStream();
-        CloseChannel( pIf, hStream );
+
+        CIoManager* pMgr = pSvc->GetIoMgr();
+        TaskletPtr pTask;
+        ret = DEFER_CALL_NOSCHED( pTask,
+            pSvc, &rpcf::IStream::OnClose,
+            hStream, ( IEventSink* )nullptr );
+        if( ERROR( ret ) )
+            break;
+        ret = pMgr->RescheduleTask( pTask );
 
     }while( 0 );
 
@@ -769,9 +854,10 @@ gint32 CFuseStmFile::FillIncomingQue()
 }
  
 gint32 CFuseStmFile::fs_read(
+    const char* path,
+    fuse_file_info *fi,
     fuse_req_t req, fuse_bufvec*& bufvec,
     off_t off, size_t size,
-    fuse_file_info *fi,
     std::vector< BufPtr >& vecBackup,
     fuseif_intr_data* d )
 {
@@ -783,7 +869,6 @@ gint32 CFuseStmFile::fs_read(
     PINTR pdata( d );
     do{
         CRpcServices* pIf = GetIf();
-        RLOCK_TESTMNT2( pIf );
 
         CFuseMutex oFileLock( GetLock() );
         ret = oFileLock.GetStatus();
@@ -1076,15 +1161,15 @@ gint32 CFuseStmFile::SendBufVec( OUTREQ& oreq )
 }
 
 gint32 CFuseStmFile::fs_write_buf(
+    const char* path,
+    fuse_file_info *fi,
     fuse_req_t req,
     fuse_bufvec *bufvec,
-    fuse_file_info *fi,
     fuseif_intr_data* d )
 {
     gint32 ret = 0;
     do{
         CRpcServices* pIf = GetIf();
-        RLOCK_TESTMNT2( pIf );
 
         // this is a synchronous call since the bufvec
         // is controlled by the caller
@@ -1247,9 +1332,10 @@ gint32 CFuseFileEntry::CancelFsRequests()
 }
 
 gint32 CFuseEvtFile::fs_read(
+    const char* path,
+    fuse_file_info *fi,
     fuse_req_t req, fuse_bufvec*& bufvec,
     off_t off, size_t size,
-    fuse_file_info *fi,
     std::vector< BufPtr >& vecBackup,
     fuseif_intr_data* d )
 {
@@ -1259,7 +1345,6 @@ gint32 CFuseEvtFile::fs_read(
             break;
 
         CRpcServices* pSvc = GetIf();
-        RLOCK_TESTMNT2( pSvc );
 
         CFuseMutex oFileLock( GetLock() );
         ret = oFileLock.GetStatus();
@@ -1463,9 +1548,10 @@ gint32 CFuseEvtFile::GetReqSize(
 }
 
 gint32 CFuseRespFileSvr::fs_write_buf(
+    const char* path,
+    fuse_file_info *fi,
     fuse_req_t req,
     fuse_bufvec *bufvec,
-    fuse_file_info *fi,
     fuseif_intr_data* d )
 {
     gint32 ret = 0;
@@ -1482,8 +1568,6 @@ gint32 CFuseRespFileSvr::fs_write_buf(
         return ret;
 
     do{
-        RLOCK_TESTMNT2( pSvr );
-
         // receive the 4-byte size in local endian
         if( m_pReqSize->size() < sizeof( guint32 ) )
         {
@@ -1709,10 +1793,11 @@ gint32 CFuseReqFileProxy::ConvertAndFillBufVec(
 }
 
 gint32 CFuseReqFileProxy::fs_read(
+    const char* path,
+    fuse_file_info *fi,
     fuse_req_t req,
     fuse_bufvec*& bufvec,
     off_t off, size_t size,
-    fuse_file_info *fi,
     std::vector< BufPtr >& vecBackup,
     fuseif_intr_data* d )
 {
@@ -1720,9 +1805,6 @@ gint32 CFuseReqFileProxy::fs_read(
     do{
         if( size == 0 )
             break;
-
-        CRpcServices* pSvc = GetIf();
-        RLOCK_TESTMNT2( pSvc );
 
         CFuseMutex oFileLock( GetLock() );
         ret = oFileLock.GetStatus();
@@ -1769,9 +1851,10 @@ gint32 CFuseReqFileProxy::fs_read(
 }
 
 gint32 CFuseReqFileProxy::fs_write_buf(
+    const char* path,
+    fuse_file_info *fi,
     fuse_req_t req,
     fuse_bufvec *bufvec,
-    fuse_file_info *fi,
     fuseif_intr_data* d )
 {
     gint32 ret = 0;
@@ -1787,8 +1870,6 @@ gint32 CFuseReqFileProxy::fs_write_buf(
         return ret;
 
     do{
-        RLOCK_TESTMNT2( pProxy );
-
         // receive the size value of 4-bytes in local
         // endian
         if( m_pReqSize->size() < sizeof( guint32 ) )
@@ -2000,6 +2081,9 @@ gint32 InitRootIf(
     return ret;
 }
 
+void ReleaseRootIf()
+{ g_pRootIf.Clear(); }
+
 static FactoryPtr InitClassFactory()
 {
     BEGIN_FACTORY_MAPS;
@@ -2010,31 +2094,15 @@ static FactoryPtr InitClassFactory()
     END_FACTORY_MAPS;
 };
 
+
 } // namespace
 
 gint32 fuseop_open(
     const char* path, fuse_file_info * fi)
 {
-    gint32 ret = 0;
-    do{
-        CFuseObjBase* pObj;
-        gint32 ret = GetFuseObj( path, pObj );
-        if( ERROR( ret ) )
-            return ret;
-
-        CFuseSvcDir* pSvcDir =
-            rpcf::GetSvcDir( path );
-        if( pSvcDir == nullptr )
-            ret = pObj->fs_open( path, fi );
-        else
-        {
-            RLOCK_TESTMNT0( pSvcDir );
-            ret = pObj->fs_open( path, fi );
-        }
-
-    }while( 0 );
-
-    return ret;
+    return SafeCall( 
+        false, &CFuseObjBase::fs_open,
+        path, fi );
 }
 
 gint32 fuseop_release(
@@ -2106,9 +2174,17 @@ gint32 fuseop_release(
             strName.size() );
 
 
-        InterfPtr pIf = pStm->GetIf();
+        ObjPtr pIf = pStm->GetIf();
         HANDLE hStream = pStm->GetStream();
-        CloseChannel( pIf, hStream );
+
+        CIoManager* pMgr = pSvc->GetIoMgr();
+        TaskletPtr pTask;
+        ret = DEFER_CALL_NOSCHED( pTask,
+            pSvc, &rpcf::IStream::OnClose,
+            hStream, ( IEventSink* )nullptr );
+        if( ERROR( ret ) )
+            break;
+        ret = pMgr->RescheduleTask( pTask );
 
     }while( 0 );
 
@@ -2118,57 +2194,29 @@ gint32 fuseop_release(
 gint32 fuseop_opendir(
     const char* path, fuse_file_info * fi )
 {
-    gint32 ret = 0;
-    do{
-        CFuseObjBase* pObj;
-        gint32 ret = GetFuseObj( path, pObj );
-        if( ERROR( ret ) )
-            return ret;
-
-        CFuseSvcDir* pSvcDir =
-            rpcf::GetSvcDir( path );
-        if( pSvcDir == nullptr )
-            ret = pObj->fs_opendir( path, fi );
-        else
-        {
-            RLOCK_TESTMNT0( pSvcDir );
-            ret = pObj->fs_opendir( path, fi );
-        }
-
-    }while( 0 );
-
-    return ret;
+    return SafeCall( false,
+        &CFuseObjBase::fs_opendir,
+        path, fi );
 }
 
 gint32 fuseop_releasedir(
     const char* path,
     fuse_file_info * fi )
 {
-    gint32 ret = 0;
-    CFuseObjBase* pObj = reinterpret_cast
-        < CFuseObjBase* >( fi->fh );
-    if( pObj == nullptr )
-        return -EFAULT;
-
-    return pObj->fs_releasedir( path, fi );
+    return SafeCall( false,
+        &CFuseObjBase::fs_releasedir,
+        path, fi );
 }
 
 gint32 fuseop_unlink( const char* path )
 {
     if( path == nullptr )
         return -EINVAL;
-    gint32 ret = 0;
-    do{
-        CFuseObjBase* pObj;
-        ret = GetFuseObj( path, pObj );
-        if( ERROR( ret ) )
-            break;
 
-        ret = pObj->fs_unlink( path );
-
-    }while( 0 );
-
-    return ret;
+    fuse_file_info* fi = nullptr;
+    return SafeCall( true,
+        &CFuseObjBase::fs_unlink,
+        path, fi ) ;
 }
          
 
@@ -2190,10 +2238,25 @@ gint32 fuseop_create( const char* path,
             strPath.substr( pos + 1 );
         strPath.erase( pos );
 
+        std::vector< stdstr > vecSubdirs;
         CFuseObjBase* pObj = nullptr;
-        gint32 ret = GetFuseObj( strPath, pObj );
+        gint32 ret = GetSvcDir(
+            strPath.c_str(), pObj, vecSubdirs );
         if( ERROR( ret ) )
             break;
+
+        if( ret == ENOENT )
+        {
+            ret = -ENOENT;
+            break;
+        }
+
+        if( vecSubdirs.size() != 1 &&
+            vecSubdirs[ 0 ] != STREAM_DIR )
+        {
+            ret = -EACCES;
+            break;
+        }
 
         CFuseStmDir* pDir = dynamic_cast
             < CFuseStmDir* >( pObj );
@@ -2210,8 +2273,17 @@ gint32 fuseop_create( const char* path,
             ret = -EACCES;
             break;
         }
-        CStreamProxySync* pStm =
-            ObjPtr( pSvc );
+        else
+        {
+            WLOCK_TESTMNT2( pSvc );
+            if( pDir->GetChild( strName ) != nullptr )
+            {
+                ret = -EEXIST;
+                break;
+            }
+        }
+
+        CStreamProxySync* pStm = ObjPtr( pSvc );
         if( pStm == nullptr ) 
         {
             ret = -EFAULT;
@@ -2250,10 +2322,11 @@ gint32 fuseop_create( const char* path,
                 break;
         }
 
-        RLOCK_TESTMNT2( pStm );
+        WLOCK_TESTMNT2( pStm );
 
         CFuseStmFile* pStmFile = new CFuseStmFile(
             strName, hStream, pStm );
+
         auto pEnt = std::shared_ptr
                 < CDirEntry >( pStmFile ); 
         fi->fh = ( guint64 )
@@ -2273,36 +2346,9 @@ int fuseop_poll(const char *path,
     fuse_pollhandle *ph,
     unsigned *reventsp )
 {
-    gint32 ret = 0;
-    do{
-        CFuseObjBase* pObj = nullptr;
-        if( fi != nullptr && fi->fh != 0 )
-        {
-            pObj = reinterpret_cast
-                < CFuseObjBase* >( fi->fh );
-        }
-        else
-        {
-            ret = GetFuseObj( path, pObj );            
-            if( ERROR( ret ) )
-                break;
-        }
-
-        CFuseSvcDir* pSvcDir =
-            rpcf::GetSvcDir( path );
-        if( pSvcDir == nullptr )
-            ret = pObj->fs_poll(
-                path, fi, ph, reventsp );
-        else
-        {
-            RLOCK_TESTMNT0( pSvcDir );
-            ret = pObj->fs_poll(
-                path, fi, ph, reventsp );
-        }
-
-    }while( 0 );
-
-    return ret;
+    return SafeCall( false, 
+        &CFuseObjBase::fs_poll,
+        path, fi, ph, reventsp );
 }
 
 #if FUSE_USE_VERSION < 35
@@ -2317,32 +2363,9 @@ int fuseop_ioctl(
     unsigned int flags, void *data )
 #endif
 {
-    gint32 ret = 0;
-    do{
-        if( fi->fh == 0 )
-        {
-            ret = -EFAULT;
-            break;
-        }
-        CFuseObjBase* pObj =
-            reinterpret_cast< CFuseObjBase* >
-                ( fi->fh );
-
-        CFuseSvcDir* pSvcDir =
-            rpcf::GetSvcDir( path );
-        if( pSvcDir == nullptr )
-            ret = pObj->fs_ioctl(
-                path, cmd, arg, fi, flags, data );
-        else
-        {
-            RLOCK_TESTMNT0( pSvcDir );
-            ret = pObj->fs_ioctl(
-                path, cmd, arg, fi, flags, data );
-        }
-
-    }while( 0 );
-
-    return ret;
+    return SafeCall( false,
+        &CFuseObjBase::fs_ioctl,
+        path, fi, cmd, arg, flags, data );
 }
 
 int fuseop_getattr(
@@ -2350,36 +2373,10 @@ int fuseop_getattr(
     struct stat *stbuf,
     fuse_file_info* fi )
 {
-    gint32 ret = 0;
-    do{
-        CFuseObjBase* pObj = nullptr;
-        if( fi != nullptr && fi->fh != 0 )
-        {
-            pObj = reinterpret_cast
-                < CFuseObjBase* >( fi->fh );
-        }
-        else
-        {
-            ret = GetFuseObj( path, pObj );            
-            if( ERROR( ret ) )
-                break;
-        }
-
-        CFuseSvcDir* pSvcDir =
-            rpcf::GetSvcDir( path );
-        if( pSvcDir == nullptr )
-            ret = pObj->fs_getattr(
-                path, stbuf, fi );
-        else
-        {
-            RLOCK_TESTMNT0( pSvcDir );
-            ret = pObj->fs_getattr(
-                path, stbuf, fi );
-        }
-
-    }while( 0 );
-
-    return ret;
+    return SafeCall(
+        false,
+        &CFuseObjBase::fs_getattr,
+        path, fi, stbuf );
 }
 
 int fuseop_readdir(
@@ -2388,37 +2385,9 @@ int fuseop_readdir(
     off_t off, struct fuse_file_info *fi,
     enum fuse_readdir_flags flags)
 {
-
-    gint32 ret = 0;
-    do{
-        CFuseObjBase* pObj = nullptr;
-        if( fi != nullptr && fi->fh != 0 )
-        {
-            pObj = reinterpret_cast
-                < CFuseObjBase* >( fi->fh );
-        }
-        else
-        {
-            ret = GetFuseObj( path, pObj );            
-            if( ERROR( ret ) )
-                break;
-        }
-        CFuseSvcDir* pSvcDir =
-            rpcf::GetSvcDir( path );
-        if( pSvcDir == nullptr )
-            ret = pObj->fs_readdir(
-                path, buf, filler, off, fi, flags );
-        else
-        {
-            RLOCK_TESTMNT0( pSvcDir );
-            ret = pObj->fs_readdir(
-                path, buf, filler, off, fi, flags );
-        }
-
-
-    }while( 0 );
-
-    return ret;
+    return SafeCall( false,
+        &CFuseObjBase::fs_readdir,
+        path, fi, buf, filler, off, flags );
 }
 
 void* fuseop_init(
