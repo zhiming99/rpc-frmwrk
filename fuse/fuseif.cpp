@@ -29,6 +29,8 @@ using namespace rpcf;
 #include "fuseif.h"
 #include "ridl/serijson.h"
 #include "fuse_i.h"
+#include <sys/ioctl.h>
+#include <unistd.h>
 
 void fuseif_finish_interrupt(
     fuse *f, fuse_req_t req,
@@ -273,6 +275,36 @@ gint32 CFuseObjBase::RemoveChild(
     return ret;
 }
 
+gint32 CFuseObjBase::fs_access(
+    const char * path,
+    fuse_file_info* fi,
+    int flags )
+{
+    guint32 dwMode = GetMode();
+    gint32 ret = -EACCES;
+    do{
+        bool bReq =
+           (  ( flags & W_OK ) != 0 );
+        bool bCur =
+           ( ( dwMode & S_IWUSR ) != 0 );
+        if( bReq != bCur )
+            break;
+
+        bReq = (  ( flags & R_OK ) != 0 );
+        bCur = ( ( dwMode & S_IRUSR ) != 0 );
+        if( bReq != bCur )
+            break;
+
+        bReq = (  ( flags & X_OK ) != 0 );
+        bCur = ( ( dwMode & S_IXUSR ) != 0 );
+        if( bReq != bCur )
+            break;
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CFuseTextFile::fs_open(
     const char* path,
     fuse_file_info *fi )
@@ -367,8 +399,8 @@ do{ \
     memset( _stbuf, 0, sizeof(struct stat ) );\
     ( _stbuf )->st_uid = getuid(); \
     ( _stbuf )->st_gid = getgid(); \
-    ( _stbuf )->st_atime = \
-        ( _stbuf )->st_mtime = time(NULL); \
+    ( _stbuf )->st_atime = GetAccTime();\
+    ( _stbuf )->st_mtime = GetModifyTime(); \
 }while( 0 )
 
 gint32 CFuseRootDir::fs_getattr(
@@ -404,7 +436,9 @@ gint32 CFuseFileEntry::fs_getattr(
     stbuf->st_ino = GetObjId();
     stbuf->st_mode = S_IFREG | GetMode();
     stbuf->st_nlink = 1;
-    stbuf->st_size = MAX_FUSE_MSG_SIZE;
+    this->fs_ioctl( path, fi,
+        FIONREAD, nullptr, 0,
+        &stbuf->st_size );
     return 0;
 }
 
@@ -536,7 +570,6 @@ gint32 CFuseEvtFile::fs_poll(
     return ret;
 }
 
-#include <sys/ioctl.h>
 gint32 CFuseFileEntry::fs_ioctl(
     const char *path, 
     fuse_file_info *fi,
@@ -868,8 +901,6 @@ gint32 CFuseStmFile::fs_read(
 
     PINTR pdata( d );
     do{
-        CRpcServices* pIf = GetIf();
-
         CFuseMutex oFileLock( GetLock() );
         ret = oFileLock.GetStatus();
         if( ERROR( ret ) )
@@ -888,9 +919,9 @@ gint32 CFuseStmFile::fs_read(
         guint32 dwAvail = GetBytesAvail();
         guint32 dwPReqs = 0;
 
-        CRpcServices* pSvc = pIf;
-        CStreamServerSync* pStmSvr = ObjPtr( pIf );
-        CStreamProxySync* pStmProxy = ObjPtr( pIf );
+        CRpcServices* pSvc = GetIf();
+        CStreamServerSync* pStmSvr = ObjPtr( pSvc );
+        CStreamProxySync* pStmProxy = ObjPtr( pSvc );
         HANDLE hstm = GetStream();
 
         if( m_queReqs.size() &&
@@ -1344,8 +1375,6 @@ gint32 CFuseEvtFile::fs_read(
         if( size == 0 )
             break;
 
-        CRpcServices* pSvc = GetIf();
-
         CFuseMutex oFileLock( GetLock() );
         ret = oFileLock.GetStatus();
         if( ERROR( ret ) )
@@ -1728,6 +1757,8 @@ gint32 CFuseReqFileProxy::RemoveResp(
         return ret;
 
     bool bFound = false;
+    if( m_queTaskIds.empty() )
+        return -ENOENT;
     auto itr = m_queTaskIds.begin();
     while( itr != m_queTaskIds.end() )
     {
@@ -1997,6 +2028,7 @@ gint32 CFuseReqFileProxy::fs_write_buf(
 
         if( ret == STATUS_PENDING )
         {
+            CFuseMutex oLock( GetLock() );
             // append the response to the
             // m_queTaskIds of request file
             m_queTaskIds.push_back(
@@ -2096,6 +2128,15 @@ static FactoryPtr InitClassFactory()
 
 
 } // namespace
+
+gint32 fuseop_access(
+    const char* path, int flags )
+{
+    fuse_file_info* fi = nullptr;
+    return SafeCall( 
+        false, &CFuseObjBase::fs_access,
+        path, fi, flags );
+}
 
 gint32 fuseop_open(
     const char* path, fuse_file_info * fi)

@@ -281,8 +281,8 @@ typedef CLocalLock< false > CWriteLock;
 
 class CFuseObjBase : public CDirEntry
 {
-    timespec m_tsUpdTime = { 0 };
-    timespec m_tsModtime = { 0 };
+    time_t m_tsAccTime = { 0 };
+    time_t m_tsModTime = { 0 };
     guint32 m_dwStat;
     guint32 m_dwMode = S_IRUSR;
     guint32 m_dwOpenCount = 0;
@@ -305,7 +305,10 @@ class CFuseObjBase : public CDirEntry
     CFuseObjBase() :
         super(),
         m_bNonBlock( false )
-    {}
+    {
+        UpdateTime();
+        UpdateTime( true );
+    }
 
     ~CFuseObjBase()
     {
@@ -369,12 +372,26 @@ class CFuseObjBase : public CDirEntry
         m_pollHandle = pollHandle;
     }
 
+    inline const time_t& GetAccTime() const
+    { return m_tsAccTime; }
+
+    inline void UpdateTime( bool bMod = false )
+    {
+        bMod ? m_tsModTime = time( nullptr ) :
+           m_tsAccTime = time( nullptr ); 
+    }
+
+    inline const time_t& GetModifyTime() const
+    { return m_tsModTime; }
+
     gint32 AddChild(
         const CHILD_TYPE& pEnt ) override;
 
     gint32 RemoveChild(
         const std::string& strName ) override;
 
+    gint32 fs_access(const char *,
+        fuse_file_info*, int);
     /*
     gint32 create();
     gint32 unlink();
