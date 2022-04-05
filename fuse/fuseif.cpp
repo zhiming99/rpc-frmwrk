@@ -384,7 +384,7 @@ gint32 CFuseFileEntry::fs_open(
     IncOpCount();
 
     if( fi->flags & O_NONBLOCK )
-        SetNonBlock( true );
+        SetNonBlock();
 
     fi->direct_io = 1;
     fi->keep_cache = 0;
@@ -580,22 +580,46 @@ gint32 CFuseFileEntry::fs_ioctl(
 {
     gint32 ret = 0;
     do{
-        if( cmd != FIONREAD )
+        switch( cmd )
         {
-            ret = -ENOSYS;
+        case FIONREAD:
+            {
+                CFuseMutex oLock( GetLock() );
+                ret = oLock.GetStatus();
+                if( ERROR( ret ) )
+                    break;
+
+                size_t* pSize = ( size_t* )data;
+
+                if( m_queReqs.size() )
+                    break;
+
+                *pSize = GetBytesAvail();
+                break;
+            }
+        case FIOC_SETNONBLOCK:
+            {
+                CFuseMutex oLock( GetLock() );
+                ret = oLock.GetStatus();
+                if( ERROR( ret ) )
+                    break;
+                SetNonBlock( true );
+                break;
+            }
+        case FIOC_SETBLOCK:
+            {
+                CFuseMutex oLock( GetLock() );
+                ret = oLock.GetStatus();
+                if( ERROR( ret ) )
+                    break;
+                SetNonBlock( false );
+                break;
+            }
+        default:
+            ret = super::fs_ioctl( path, fi,
+                cmd, arg, flags, data );
             break;
         }
-
-        CFuseMutex oLock( GetLock() );
-        ret = oLock.GetStatus();
-        if( ERROR( ret ) )
-            break;
-
-        size_t* pSize = ( size_t* )data;
-        if( m_queReqs.size() )
-            break;
-
-        *pSize = GetBytesAvail();
 
     }while( 0 );
 
@@ -612,27 +636,32 @@ gint32 CFuseReqFileProxy::fs_ioctl(
 {
     gint32 ret = 0;
     do{
-        if( cmd != FIONREAD )
+        switch( cmd )
         {
-            ret = -ENOSYS;
+        case FIONREAD:
+            {
+                CFuseMutex oLock( GetLock() );
+                ret = oLock.GetStatus();
+                if( ERROR( ret ) )
+                    break;
+
+                size_t* pSize = ( size_t* )data;
+
+                if( m_queReqs.size() )
+                    break;
+
+                *pSize = GetBytesAvail();
+                for( auto& elem : m_queTaskIds )
+                {
+                    *pSize += elem.strResp.size()
+                        + sizeof( guint32 );
+                }
+                break;
+            }
+        default:
+            ret = super::fs_ioctl( path, fi,
+                cmd, arg, flags, data );
             break;
-        }
-
-        CFuseMutex oLock( GetLock() );
-        ret = oLock.GetStatus();
-        if( ERROR( ret ) )
-            break;
-
-        size_t* pSize = ( size_t* )data;
-
-        if( m_queReqs.size() )
-            break;
-
-        *pSize = GetBytesAvail();
-        for( auto& elem : m_queTaskIds )
-        {
-            *pSize += elem.strResp.size() +
-                sizeof( guint32 );
         }
 
     }while( 0 );
@@ -899,7 +928,6 @@ gint32 CFuseStmFile::fs_read(
     if( size == 0 )
         return 0;
 
-    PINTR pdata( d );
     do{
         CFuseMutex oFileLock( GetLock() );
         ret = oFileLock.GetStatus();
@@ -927,12 +955,17 @@ gint32 CFuseStmFile::fs_read(
         if( m_queReqs.size() &&
             m_queReqs.front().req != req )
         {
+            if( IsNonBlock() )
+            {
+                ret = -EAGAIN;
+                break;
+            }
             // we need to complete the earilier
             // requests before this request
             ret = STATUS_PENDING;
 
             m_queReqs.push_back(
-                { req, size, std::move( pdata ) } );
+                { req, size, PINTR( d ) } );
 
             size_t dwReqSize =
                     m_queReqs.front().dwReqSize;
@@ -986,7 +1019,7 @@ gint32 CFuseStmFile::fs_read(
         }
         else if( IsNonBlock() )
         {
-            ret = -EAGAIN;
+            dwBytesRead = dwAvail;
         }
         else
         {
@@ -1003,7 +1036,7 @@ gint32 CFuseStmFile::fs_read(
         else if( ret == STATUS_PENDING )
         {
             m_queReqs.push_back(
-                { req, size, std::move( pdata ) } );
+                { req, size, PINTR( d ) } );
         }
 
         if( pStmSvr != nullptr )
@@ -1131,8 +1164,8 @@ gint32 CFuseStmFile::SendBufVec( OUTREQ& oreq )
         pBuf = vecBufs.front();
         if( vecBufs.size() > 1 || IsNonBlock() )
         {
-            // local copy is better than multiple round
-            // trip.
+            // copying is better than multiple round
+            // trip in performance.
             if( pBuf->IsNoFree() )
                 pBuf.NewObj();
             else
@@ -1211,15 +1244,12 @@ gint32 CFuseStmFile::fs_write_buf(
             break;
         }
 
-        PINTR pintr( d );
-        OUTREQ oreq =
-            { req, bufvec, bufvec->idx,
-                std::move( pintr ) };
-
+        OUTREQ oreq = { req, bufvec,
+                bufvec->idx, PINTR( d ) };
         ret = SendBufVec( oreq );
+        oreq.pintr.release();
 
     }while( 0 );
-
     return ret;
 }
 
@@ -1380,12 +1410,15 @@ gint32 CFuseEvtFile::fs_read(
         if( ERROR( ret ) )
             break;
 
-        PINTR pdata( d );
-
         if( m_queReqs.size() )
         {
+            if( IsNonBlock() )
+            {
+                ret = -EAGAIN;
+                break;
+            }
             m_queReqs.push_back(
-                { req, size, std::move( pdata ) } );
+                { req, size, PINTR( d ) } );
             ret = STATUS_PENDING;
             break;
         }
@@ -1399,13 +1432,16 @@ gint32 CFuseEvtFile::fs_read(
         }
         else if( IsNonBlock() )
         {
-            ret = -EAGAIN;
+            size = dwAvail;
+            FillBufVec( size,
+                m_queIncoming,
+                vecBackup, bufvec );
         }
         else
         {
             ret = STATUS_PENDING;
             m_queReqs.push_back(
-                { req, size, std::move( pdata ) } );
+                { req, size, PINTR( d ) } );
         }
 
     }while( 0 );
@@ -1584,8 +1620,6 @@ gint32 CFuseRespFileSvr::fs_write_buf(
     fuseif_intr_data* d )
 {
     gint32 ret = 0;
-
-    PINTR pintr( d );
 
     CFuseSvcServer* pSvr = ObjPtr( GetIf() );
     if( pSvr == nullptr )
@@ -1842,7 +1876,6 @@ gint32 CFuseReqFileProxy::fs_read(
         if( ERROR( ret ) )
             break;
 
-        PINTR pdata( d );
         guint32 dwAvail = GetBytesAvail();
         guint32 dwNewBytes = 0;
         for( auto& elem : m_queTaskIds )
@@ -1855,25 +1888,29 @@ gint32 CFuseReqFileProxy::fs_read(
 
         if( dwAvail >= size )
         {
-            FillBufVec( size, m_queIncoming,
+            ret = FillBufVec( size, m_queIncoming,
                 vecBackup, bufvec );
         }
         else if( dwAvail + dwNewBytes >= size )
         {
-            ConvertAndFillBufVec( dwAvail,
+            ret = ConvertAndFillBufVec( dwAvail,
+                dwNewBytes, size, 
+                vecBackup, bufvec );
+        }
+        else if( IsNonBlock() )
+        {
+            size = dwAvail + dwNewBytes;
+            if( size == 0 )
+                break;
+            ret = ConvertAndFillBufVec( dwAvail,
                 dwNewBytes, size, 
                 vecBackup, bufvec );
         }
         else
         {
-            if( IsNonBlock() )
-                ret = -EAGAIN;
-            else
-            {
-                ret = STATUS_PENDING;
-                m_queReqs.push_back(
-                    { req, size, std::move( pdata ) } );
-            }
+            ret = STATUS_PENDING;
+            m_queReqs.push_back(
+                { req, size, PINTR( d ) } );
         }
 
     }while( 0 );
@@ -1889,7 +1926,6 @@ gint32 CFuseReqFileProxy::fs_write_buf(
     fuseif_intr_data* d )
 {
     gint32 ret = 0;
-    PINTR pintr( d );
 
     CFuseSvcProxy* pProxy = ObjPtr( GetIf() );
     if( pProxy == nullptr )
@@ -2322,6 +2358,11 @@ gint32 fuseop_create( const char* path,
                 ret = -EEXIST;
                 break;
             }
+            if( pDir->GetCount() > MAX_STREAMS_PER_SVC )
+            {
+                ret = -EMFILE;
+                break;
+            }
         }
 
         CStreamProxySync* pStm = ObjPtr( pSvc );
@@ -2517,6 +2558,24 @@ static fuse_operations fuseif_ops =
     .poll = fuseop_poll,
 };
 
+/* Command line parsing */
+struct options {
+    int reconnect;
+    // int update_interval;
+};
+static struct options options = {
+        .reconnect = 0,
+    //     .update_interval = 1,
+};
+
+#define OPTION(t, p) { t, offsetof(struct options, p), 1 }
+static const struct fuse_opt option_spec[] = {
+        OPTION("--reconnect", reconnect),
+   //      OPTION("--update-interval=%d", update_interval),
+        FUSE_OPT_END
+};
+
+extern ObjPtr g_pIoMgr;
 gint32 fuseif_main( fuse_args& args,
     fuse_cmdline_opts& opts )
 {
@@ -2525,8 +2584,14 @@ gint32 fuseif_main( fuse_args& args,
     struct fuse_session *se = nullptr; 
     int res;
 
-    // if (fuse_opt_parse(&args, &options, option_spec, NULL) == -1)
-    //     return 1;
+    if (fuse_opt_parse(&args, &options, option_spec, NULL) == -1)
+        return 1;
+
+    if( options.reconnect )
+    {
+        CIoManager* pMgr = g_pIoMgr;
+        pMgr->SetCmdLineOpt( propConnRecover, true );
+    }
 
     if (fuse_parse_cmdline(&args, &opts) != 0)
         return 1;

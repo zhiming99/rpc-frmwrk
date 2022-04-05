@@ -5,7 +5,7 @@ libfuseif_la_SOURCES = fuseif.cpp \
 
 libfuseif_la_CXXFLAGS=-I $(top_srcdir)/ipc
 
-rpcffuseif_HEADERS=fuseif.h
+rpcffuseif_HEADERS=fuseif.h fusedefs.h
 
 rpcffuseifdir=$(includedir)/rpcf/ipc
 

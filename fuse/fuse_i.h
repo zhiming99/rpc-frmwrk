@@ -124,14 +124,13 @@ static gint32 SafeCall(
             FHCTX fhctx;
             if( pSvr )
             {
-                ret = pSvr->GetFhCtx(
-                    fi->fh, fhctx );
+                ret = pSvr->GetFhCtx( fi->fh, fhctx );
             }
             else
             {
-                ret = pCli->GetFhCtx(
-                    fi->fh, fhctx );
+                ret = pCli->GetFhCtx( fi->fh, fhctx );
             }
+
             // removed
             if( ERROR( ret ) )
                 break;
@@ -140,22 +139,45 @@ static gint32 SafeCall(
                 < CFuseObjBase* >( fi->fh );
             if( fhctx.pSvc == nullptr )
             {
-                ( pObj->*func )( path, fi, args... );
+                ret = ( pObj->*func )( path, fi,
+                    std::forward< Args2 >( args )... );
+                break;
+            }
+
+            auto pSvc = fhctx.pSvc;
+            if( bExclusive )
+            {
+                WLOCK_TESTMNT2( pSvc );
+                if( pSvc->GetState() !=
+                    stateConnected )
+                {
+                    ret = -EIO;
+                    break;
+                }
+                else if( pObj->IsRemoved() )
+                {
+                    ret = -ENOENT;
+                    break;
+                }
+                ret = ( pObj->*func )( path, fi, 
+                    std::forward< Args2 >( args )... );
             }
             else
             {
-                if( bExclusive )
+                RLOCK_TESTMNT2( pSvc );
+                if( pSvc->GetState() !=
+                    stateConnected )
                 {
-                    WLOCK_TESTMNT2( fhctx.pSvc );
-                    ret = ( pObj->*func )(
-                        path, fi, args... );
+                    ret = -EIO;
+                    break;
                 }
-                else
+                else if( pObj->IsRemoved() )
                 {
-                    RLOCK_TESTMNT2( fhctx.pSvc );
-                    ret = ( pObj->*func )(
-                        path, fi, args... );
+                    ret = -ENOENT;
+                    break;
                 }
+                ret = ( pObj->*func )( path, fi,
+                    std::forward< Args2 >( args )... );
             }
         }
         else if( path != nullptr )
@@ -167,15 +189,27 @@ static gint32 SafeCall(
             if( ERROR( ret ) )
                 break;
             if( ret == ENOENT )
-                ret = ( pSvcDir->*func )(
-                        path, fi, args... );
-            else if( bExclusive )
+            {
+                ret = ( pSvcDir->*func )( path, fi,
+                    std::forward< Args2 >( args )... );
+                break;
+            }
+
+            CRpcServices* pSvc = pSvcDir->GetIf();
+
+            if( bExclusive )
             {
                 WLOCK_TESTMNT0( pSvcDir );
-                CFuseSvcProxy* pProxy =
-                    ObjPtr( _pSvcDir->GetIf() );
-                CFuseSvcServer* pSvr =
-                    ObjPtr( _pSvcDir->GetIf() );
+
+                if( pSvc->GetState() !=
+                    stateConnected )
+                {
+                    ret = -EIO;
+                    break;
+                }
+
+                CFuseSvcProxy* pProxy = ObjPtr( pSvc );
+                CFuseSvcServer* pSvr = ObjPtr( pSvc );
 
                 if( pSvr )
                     pObj = pSvr->GetEntryLocked(
@@ -188,16 +222,21 @@ static gint32 SafeCall(
                     ret = -ENOENT;
                     break;
                 }
-                ret = ( pObj->*func )(
-                        path, fi, args... );
+                ret = ( pObj->*func )( path, fi,
+                    std::forward< Args2 >( args )... );
             }
             else
             {
                 RLOCK_TESTMNT0( pSvcDir );
-                CFuseSvcProxy* pProxy =
-                    ObjPtr( _pSvcDir->GetIf() );
-                CFuseSvcServer* pSvr =
-                    ObjPtr( _pSvcDir->GetIf() );
+                if( pSvc->GetState() !=
+                    stateConnected )
+                {
+                    ret = -EIO;
+                    break;
+                }
+
+                CFuseSvcProxy* pProxy = ObjPtr( pSvc );
+                CFuseSvcServer* pSvr = ObjPtr( pSvc );
 
                 if( pSvr )
                     pObj = pSvr->GetEntryLocked(
@@ -210,8 +249,8 @@ static gint32 SafeCall(
                     ret = -ENOENT;
                     break;
                 }
-                ret = ( pObj->*func )(
-                        path, fi, args... );
+                ret = ( pObj->*func )( path, fi,
+                    std::forward< Args2 >( args )... );
                         
             }
         }

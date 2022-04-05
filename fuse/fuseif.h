@@ -37,25 +37,16 @@
 #include <unistd.h>
 #include "dbusport.h"
 #include "streamex.h"
-
-#define CONN_PARAM_FILE "conn_params"
-#define HOP_DIR  "_nexthop"
-#define STREAM_DIR "_streams"
-#define JSON_REQ_FILE "json_request"
-#define JSON_RESP_FILE "json_response"
-#define JSON_EVT_FILE "json_event"
-#define JSON_STMEVT_FILE "json_stmevt"
-#define CONN_DIR_PREFIX "connection_"
-
-#define MAX_STREAMS_PER_SVC 1024
-#define MAX_STM_QUE_SIZE   STM_MAX_PACKETS_REPORT
-#define MAX_REQ_QUE_SIZE   32
-#define MAX_EVT_QUE_SIZE   32
-
-#define MAX_FUSE_MSG_SIZE    ( MAX_BYTES_PER_TRANSFER * 2 )
-
+#include <sys/ioctl.h>
+#include "fusedefs.h"
 
 struct fuseif_intr_data;
+enum {
+    // set the fd to operate in blocking mode
+    FIOC_SETBLOCK = _IO('J', 0),
+    // set the fd to operate in non-blocking mode
+    FIOC_SETNONBLOCK = _IO('J', 1)
+};
 
 namespace rpcf
 {
@@ -288,7 +279,7 @@ class CFuseObjBase : public CDirEntry
     guint32 m_dwOpenCount = 0;
     bool m_bHidden = false;
     bool m_bRemoved = false;
-    std::atomic< bool > m_bNonBlock;
+    bool m_bNonBlock = true;
 
     // poll related members
     fuse_pollhandle* m_pollHandle = nullptr;
@@ -303,8 +294,7 @@ class CFuseObjBase : public CDirEntry
     public:
     typedef CDirEntry super;
     CFuseObjBase() :
-        super(),
-        m_bNonBlock( false )
+        super()
     {
         UpdateTime();
         UpdateTime( true );
@@ -356,7 +346,8 @@ class CFuseObjBase : public CDirEntry
     inline bool IsRemoved() const
     {return m_bRemoved; }
 
-    inline void SetNonBlock( bool bNonBlock )
+    inline void SetNonBlock(
+        bool bNonBlock = true )
     { m_bNonBlock = bNonBlock; }
 
     inline bool IsNonBlock() const
@@ -1507,9 +1498,11 @@ class CFuseServicePoint :
     { return iid( CFuseServicePoint ); }
 
     using super::OnPostStart;
-    gint32 OnPostStart(
-        IEventSink* pCallback ) override
-    { return BuildDirectories(); }
+    gint32 OnPostStart( IEventSink* pCallback ) override
+    {
+        gint32 ret = BuildDirectories();
+        return ret; 
+    }
 
     inline CHILD_TYPE GetSvcDir() const
     { return m_pSvcDir; }
@@ -1524,6 +1517,12 @@ class CFuseServicePoint :
         do{
             stdstr strObjPath;
             CCfgOpenerObj oIfCfg( this );
+
+            if( m_pSvcDir.get() != nullptr )
+            {
+                // restart in process
+                break;
+            }
 
             ret = oIfCfg.GetStrProp(
                 propObjPath, strObjPath );
@@ -2153,28 +2152,48 @@ class CFuseServicePoint :
                 if( ERROR( ret ) )
                     break;
 
-                gint32 (*func)( CFuseServicePoint* pIf ) =
-                    ([]( CFuseServicePoint* pIf )
-                {
-                    gint32 ret = 0;
-                    do{
-                        WLOCK_TESTMNT2( pIf );
-                        TaskletPtr pDummy;
-                        pDummy.NewObj( clsid(
-                            CIfDummyTask ) );
-                        pIf->StopEx( pDummy );
-
-                    }while( 0 );
-                    return 0;
-                });
-
-                CIoManager* pMgr = this->GetIoMgr();
                 TaskletPtr pTask;
-                ret = NEW_FUNCCALL_TASK(
-                    pTask, pMgr, func, this );
+                CIoManager* pMgr = this->GetIoMgr();
+                bool bRestart = true;
+                pMgr->GetCmdLineOpt(
+                    propConnRecover, bRestart );
+
+                TaskletPtr pStopTask;
+                ret = DEFER_IFCALLEX_NOSCHED2(
+                    0, pStopTask, this,
+                    &CRpcServices::StopEx, 
+                    ( IEventSink* )nullptr );
                 if( ERROR( ret ) )
                     break;
-                pMgr->RescheduleTask( pTask );
+
+                if( bRestart )
+                {
+                    TaskGrpPtr pGrp;
+                    CParamList oParams;
+                    oParams[ propIfPtr ] = ObjPtr( this );
+                    ret = pGrp.NewObj(
+                        clsid( CIfTaskGroup ),
+                        oParams.GetCfg() );
+
+                    TaskletPtr pStartTask;
+                    ret = DEFER_IFCALLEX_NOSCHED2(
+                        0, pStartTask, this,
+                        &CRpcServices::StartEx, 
+                        ( IEventSink* )nullptr );
+                    if( ERROR( ret ) )
+                        break;
+
+                    pGrp->SetRelation( logicAND );
+                    pGrp->AppendTask( pStopTask );
+                    pGrp->AppendTask( pStartTask );
+                    pTask = pGrp;
+                }
+                else
+                {
+                    pTask = pStopTask;
+                }
+
+                ret = pMgr->RescheduleTask( pTask );
                 break;
             }
         default:
@@ -2183,6 +2202,36 @@ class CFuseServicePoint :
                 break;
             }
         }
+        return ret;
+    }
+
+    gint32 StartEx( IEventSink* pCallback )
+    {
+        gint32 ret = 0;
+        do{
+            if( m_pSvcDir.get() == nullptr )
+                ret = super::StartEx( pCallback );
+            else
+            {
+                WLOCK_TESTMNT;
+                ret = super::StartEx( pCallback );
+            }
+        }while( 0 );
+        return ret;
+    }
+
+    gint32 StopEx( IEventSink* pCallback )
+    {
+        gint32 ret = 0;
+        do{
+            if( m_pSvcDir.get() == nullptr )
+                ret = super::StopEx( pCallback );
+            else
+            {
+                WLOCK_TESTMNT;
+                ret = super::StopEx( pCallback );
+            }
+        }while( 0 );
         return ret;
     }
 };
