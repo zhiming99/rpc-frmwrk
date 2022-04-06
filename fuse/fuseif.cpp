@@ -27,7 +27,6 @@
 using namespace rpcf;
 
 #include "fuseif.h"
-#include "ridl/serijson.h"
 #include "fuse_i.h"
 #include <sys/ioctl.h>
 #include <unistd.h>
@@ -538,13 +537,7 @@ gint32 CFuseEvtFile::fs_poll(
         if( ERROR( ret ) )
             break;
 
-        auto oldph = GetPollHandle();
-        if( ph != nullptr )
-        {
-            fuse_pollhandle_destroy( oldph );
-            SetPollHandle( ph );
-        }
-
+        SetPollHandle( ph );
         if( GetMode() & S_IRUSR )
         {
             if( m_queIncoming.size() > 0 &&
@@ -552,7 +545,7 @@ gint32 CFuseEvtFile::fs_poll(
                 *reventsp |= POLLIN;
         }
 
-        *reventsp = (
+        *reventsp |= (
             fi->poll_events & GetRevents() );
 
         if( GetRevents() & POLLHUP )
@@ -1217,7 +1210,7 @@ gint32 CFuseStmFile::SendBufVec( OUTREQ& oreq )
         if( ERROR( ret ) )
             break;
 
-        bufvec->idx = bufvec->count;
+        // bufvec->idx = bufvec->count;
 
     }while( 0 );
 
@@ -1312,13 +1305,8 @@ gint32 CFuseStmFile::fs_poll(
         ret = oLock.GetStatus();
         if( ERROR( ret ) )
             break;
-        auto oldph = GetPollHandle();
-        if( ph != nullptr )
-        {
-            fuse_pollhandle_destroy( oldph );
-            SetPollHandle( ph );
-        }
 
+        SetPollHandle( ph );
         if( m_queIncoming.size() > 0 &&
             m_queReqs.empty() )
             *reventsp |= POLLIN;
@@ -1326,7 +1314,7 @@ gint32 CFuseStmFile::fs_poll(
         if( !GetFlowCtrl() )
             *reventsp |= POLLOUT;
 
-        *reventsp = (
+        *reventsp |= (
             fi->poll_events & GetRevents() );
 
         if( GetRevents() & POLLHUP )
@@ -1465,14 +1453,14 @@ gint32 CFuseEvtFile::ReceiveEvtJson(
             BufPtr pSizeBuf( true );
             pBuf = NewBufNoAlloc(
                 strMsg.c_str(), strMsg.size(), true );
-            *pSizeBuf = pBuf->size();
+            *pSizeBuf = htonl( pBuf->size() );
             m_queIncoming.push_back( { pSizeBuf, 0 } );
             m_queIncoming.push_back( { pBuf, 0 } );
         }
         else
         {
             pBuf.NewObj();
-            *pBuf = strMsg.size();
+            *pBuf = htonl( strMsg.size() );
             pBuf->Append(
                 strMsg.c_str(), strMsg.size());
             m_queIncoming.push_back( { pBuf, 0 } );
@@ -1641,13 +1629,13 @@ gint32 CFuseRespFileSvr::fs_write_buf(
             if( ret == STATUS_PENDING )
             {
                 // wait for more input
-                bufvec->idx = bufvec->count;
+                // bufvec->idx = bufvec->count;
                 ret = 0;
                 break;
             }
         }
         size_t dwReqSize =
-            ( guint32& )*m_pReqSize;
+            ntohl( ( guint32& )*m_pReqSize );
         if( dwReqSize >
             MAX_BYTES_PER_TRANSFER * 2 )
         {
@@ -1681,7 +1669,7 @@ gint32 CFuseRespFileSvr::fs_write_buf(
                     elem = pCopy;
                 }
             }
-            bufvec->idx = bufvec->count;
+            // bufvec->idx = bufvec->count;
             ret = 0;
             break;
         }
@@ -1746,7 +1734,7 @@ gint32 CFuseRespFileSvr::fs_write_buf(
 
         if( m_vecOutBufs.empty() )
         {
-            bufvec->idx = bufvec->count;
+            // bufvec->idx = bufvec->count;
             ret = 0;
             break;
         }
@@ -1774,8 +1762,7 @@ gint32 CFuseRespFileProxy::ReceiveMsgJson(
             < CFuseReqFileProxy* >( p );
         pReqFile->RemoveResp( qwReqId );
 
-        ret = super::ReceiveMsgJson(
-            strMsg, qwReqId );
+        ret = super::ReceiveEvtJson( strMsg );
 
     }while( 0 );
 
@@ -1834,7 +1821,7 @@ gint32 CFuseReqFileProxy::ConvertAndFillBufVec(
         {
             auto& elem = m_queTaskIds.front();
             BufPtr pBuf( true );
-            *pBuf = ( guint32 )elem.strResp.size();
+            *pBuf = htonl( elem.strResp.size() );
 
             pBuf->Append( elem.strResp.c_str(),
                 elem.strResp.size() );
@@ -1949,13 +1936,14 @@ gint32 CFuseReqFileProxy::fs_write_buf(
             if( ret == STATUS_PENDING )
             {
                 // wait for more input
-                bufvec->idx = bufvec->count;
+                // bufvec->idx = bufvec->count;
                 ret = 0;
                 break;
             }
         }
 
-        size_t dwReqSize = ( guint32& )*m_pReqSize;
+        size_t dwReqSize =
+            ntohl( ( guint32& )*m_pReqSize );
         if( dwReqSize >
             MAX_BYTES_PER_TRANSFER * 2 )
         {
@@ -1989,7 +1977,7 @@ gint32 CFuseReqFileProxy::fs_write_buf(
                     elem = pCopy;
                 }
             }
-            bufvec->idx = bufvec->count;
+            // bufvec->idx = vec->count;
             ret = 0;
             break;
         }
@@ -2071,7 +2059,12 @@ gint32 CFuseReqFileProxy::fs_write_buf(
                 { strResp, qwReqId } );
             ret = 0;
         }
-        else if( SUCCEEDED( ret ) )
+        else if( ret == -STATUS_PENDING )
+        {
+            // the request has been completed
+            ret = 0;
+        }
+        else
         {
             // append the response to the file
             // JSON_RESP_FILE for an immediate return.
@@ -2106,7 +2099,7 @@ gint32 CFuseReqFileProxy::fs_write_buf(
         m_pReqSize->Resize( 0 );
         if( m_vecOutBufs.empty() )
         {
-            bufvec->idx = bufvec->count;
+            // bufvec->idx = bufvec->count;
             ret = 0;
             break;
         }
@@ -2115,7 +2108,7 @@ gint32 CFuseReqFileProxy::fs_write_buf(
 
     if( ERROR( ret ) )
     {
-        m_pReqSize.Clear();
+        m_pReqSize->Resize( 0 );
         m_vecOutBufs.clear();    
     }
 

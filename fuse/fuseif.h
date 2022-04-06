@@ -37,16 +37,9 @@
 #include <unistd.h>
 #include "dbusport.h"
 #include "streamex.h"
-#include <sys/ioctl.h>
 #include "fusedefs.h"
 
 struct fuseif_intr_data;
-enum {
-    // set the fd to operate in blocking mode
-    FIOC_SETBLOCK = _IO('J', 0),
-    // set the fd to operate in non-blocking mode
-    FIOC_SETNONBLOCK = _IO('J', 1)
-};
 
 namespace rpcf
 {
@@ -302,12 +295,7 @@ class CFuseObjBase : public CDirEntry
 
     ~CFuseObjBase()
     {
-        if( m_pollHandle != nullptr )
-        {
-            fuse_pollhandle_destroy(
-                m_pollHandle );
-            m_pollHandle = nullptr;
-        }
+        SetPollHandle( nullptr );
     }
 
     CSharedLock& GetLock() const

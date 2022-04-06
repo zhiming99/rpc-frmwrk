@@ -2914,25 +2914,26 @@ gint32 CImplServiceImplFuse::Output()
             Wa( "#undef ADD_REQTASK" );
             Wa( "#endif" );
             Wa( "#define ADD_REQTASK \\" );
-            CCOUT << "{\\";
+            CCOUT << "do{\\";
             INDENT_UPL;
             Wa( "TaskGrpPtr pGrp;\\" );
-            Wa( "ret = this->GetParallelGrp( pGrp );\\" );
-            Wa( "if( ERROR( ret ) )\\" );
+            Wa( "iRet = this->GetParallelGrp( pGrp );\\" );
+            Wa( "if( ERROR( iRet ) )\\" );
             Wa( "    break;\\" );
             Wa( "TaskletPtr pTask;\\" );
-            Wa( "ret = pGrp->FindTask( qwTaskId, pTask );\\" );
-            Wa( "if( ERROR( ret ) )\\" );
+            Wa( "iRet = pGrp->FindTask( qwTaskId, pTask );\\" );
+            Wa( "if( ERROR( iRet ) )\\" );
             Wa( "    break;\\" );
             Wa( "CIfParallelTask* pParaTask = pTask;\\" );
             Wa( "if( pParaTask == nullptr )\\" );
-            Wa( "{ ret = -EFAULT; break;}\\" );
+            Wa( "{ iRet = -EFAULT; break;}\\" );
             Wa( "CStdRTMutex oTaskLock(\\" );
             Wa( "    pParaTask->GetLock() );\\" );
             Wa( "if( pParaTask->GetTaskState() != stateStarted )\\" );
-            Wa( "{ ret = ERROR_STATE; break; }\\" );
-            CCOUT << "AddReq( qwReqId, qwTaskId); }";
-            INDENT_DOWN;
+            Wa( "{ iRet = ERROR_STATE; break; }\\" );
+            CCOUT << "AddReq( qwReqId, qwTaskId);\\";
+            BLOCK_CLOSE;
+            Wa( "while( 0 )" );
             NEW_LINES( 2 );
 
             CCOUT << "gint32 " << strClass
@@ -3019,6 +3020,7 @@ gint32 CImplServiceImplFuse::Output()
                 stdstr strIfName = pifd->GetName();
                 CCOUT << "if( strIfName == \""
                     << strIfName << "\" )";
+                NEW_LINE;
                 BLOCK_OPEN;
                 CCOUT << "ret = " << "I" << strIfName
                     << "_PImpl::DispatchIfReq( ";
@@ -3027,8 +3029,11 @@ gint32 CImplServiceImplFuse::Output()
                 NEW_LINE;
                 Wa( "if( ret == STATUS_PENDING )" );
                 BLOCK_OPEN;
+                Wa( "gint32 iRet = 0;" );
                 Wa( "guint64 qwTaskId = oCtx_[ propTaskId ];" );
                 Wa( "ADD_REQTASK;" );
+                Wa( "if( ERROR( iRet ) )" );
+                CCOUT << "    ret = -STATUS_PENDING;";
                 BLOCK_CLOSE;
                 NEW_LINE;
                 CCOUT << "break;";
@@ -3056,10 +3061,13 @@ gint32 CImplServiceImplFuse::Output()
             CCOUT << "break;";
             BLOCK_CLOSE;
             NEW_LINE;
-            CCOUT << "ret = -ENOENT;";
+            CCOUT << "ret = -ENOSYS;";
             BLOCK_CLOSE;
             Wa( "while( 0 );" );
-            Wa( "oResp[ JSON_ATTR_RETCODE ] = ret;" );
+            Wa( "if( ret == -STATUS_PENDING )" );
+            Wa( "    oResp[ JSON_ATTR_RETCODE ] = STATUS_PENDING;" );
+            Wa( "else" );
+            Wa( "    oResp[ JSON_ATTR_RETCODE ] = ret;" );
             CCOUT << "return ret;";
             BLOCK_CLOSE;
             NEW_LINE;

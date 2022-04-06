@@ -28,42 +28,7 @@
 #include "base64.h"
 #include <json/json.h>
 #include <set>
-
-// Json request/response must have a string attribute
-// 'interface' and a string attributes 'method' to
-// specify which interface and which method the
-// parameters are for.
-#define JSON_ATTR_IFNAME        "Interface"
-#define JSON_ATTR_METHOD        "Method"
-
-// A json message must have a string attribute MsgType
-// and the value wiill be one of 'req', 'resp' or
-// 'evt'
-#define JSON_ATTR_MSGTYPE       "MessageType"
-
-// A json message can have an object attribute 'params'
-#define JSON_ATTR_PARAMS        "Parameters"
-
-// Json representation of a struct must have a UInt
-// attribute 'structId', as mapped to the internal
-// msgid
-#define JSON_ATTR_STRUCTID      "StructId"
-
-// Each json request/response/event message has an
-// UInt64 attribute reqctxid, as a unique identifier of
-// the request. Particularly, the response's identifer
-// must be the same as the one from the associated
-// request.
-#define JSON_ATTR_REQCTXID      "RequestId"
-
-// Each json response msg must have an attribute
-// ReturnCode with a negative int value defined in
-// 'errno.h'. If it is < 0, attribute PARAMS is
-// ignored. if its value is STATUS_PENDING on proxy
-// side, a uint64 attribute 'taskid' is also returned
-// as for canceling purpose. And the true response
-// message will be returned in the future.
-#define JSON_ATTR_RETCODE       "ReturnCode"
+#include "fusedefs.h"
 
 using namespace Json;
 extern std::set< guint32 > g_setMsgIds;
