@@ -886,7 +886,8 @@ class CFuseRespFileProxy : public CFuseEvtFile
         guint64 qwReqId );
 };
 
-class CFuseReqFileProxy : public CFuseRespFileProxy
+class CFuseReqFileProxy :
+    public CFuseRespFileProxy
 {
     protected:
 
@@ -940,6 +941,11 @@ class CFuseReqFileProxy : public CFuseRespFileProxy
         void *arg,
         unsigned int flags,
         void *data ) override;
+
+    gint32 fs_poll(const char *path,
+        fuse_file_info *fi,
+        fuse_pollhandle *ph,
+        unsigned *reventsp ) override;
 };
 
 class CFuseStmDir : public CFuseDirectory

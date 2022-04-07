@@ -545,8 +545,8 @@ gint32 CFuseEvtFile::fs_poll(
                 *reventsp |= POLLIN;
         }
 
-        *reventsp |= (
-            fi->poll_events & GetRevents() );
+        *reventsp = ( fi->poll_events &
+            ( GetRevents() | *reventsp ) );
 
         if( GetRevents() & POLLHUP )
             *reventsp |= POLLHUP;
@@ -1314,8 +1314,8 @@ gint32 CFuseStmFile::fs_poll(
         if( !GetFlowCtrl() )
             *reventsp |= POLLOUT;
 
-        *reventsp |= (
-            fi->poll_events & GetRevents() );
+        *reventsp = ( fi->poll_events &
+            ( GetRevents() | *reventsp ) );
 
         if( GetRevents() & POLLHUP )
             *reventsp |= POLLHUP;
@@ -2115,6 +2115,45 @@ gint32 CFuseReqFileProxy::fs_write_buf(
     return ret;
 }
 
+gint32 CFuseReqFileProxy::fs_poll(
+    const char *path,
+    fuse_file_info *fi,
+    fuse_pollhandle *ph,
+    unsigned *reventsp )
+{
+    gint32 ret = 0;
+    do{
+        CFuseMutex oLock( GetLock() );
+        ret = oLock.GetStatus();
+        if( ERROR( ret ) )
+            break;
+
+        SetPollHandle( ph );
+        if( ( m_queIncoming.size() ||
+            m_queTaskIds.size() ) &&
+            m_queReqs.empty() )
+            *reventsp |= POLLIN;
+
+        *reventsp |= POLLOUT;
+
+        *reventsp = ( fi->poll_events &
+            ( GetRevents() | *reventsp ) );
+
+        if( GetRevents() & POLLHUP )
+            *reventsp |= POLLHUP;
+        if( GetRevents() & POLLERR )
+            *reventsp |= POLLERR;
+        if( *reventsp != 0 )
+        {
+            SetRevents( ( ~*reventsp ) &
+                GetRevents() );
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 InitRootIf(
     CIoManager* pMgr, bool bProxy )
 {
@@ -2553,17 +2592,17 @@ static fuse_operations fuseif_ops =
 
 /* Command line parsing */
 struct options {
-    int reconnect;
+    int no_reconnect;
     // int update_interval;
 };
 static struct options options = {
-        .reconnect = 0,
+        .no_reconnect = 0,
     //     .update_interval = 1,
 };
 
 #define OPTION(t, p) { t, offsetof(struct options, p), 1 }
 static const struct fuse_opt option_spec[] = {
-        OPTION("--reconnect", reconnect),
+        OPTION("--no-reconnect", no_reconnect),
    //      OPTION("--update-interval=%d", update_interval),
         FUSE_OPT_END
 };
@@ -2580,10 +2619,10 @@ gint32 fuseif_main( fuse_args& args,
     if (fuse_opt_parse(&args, &options, option_spec, NULL) == -1)
         return 1;
 
-    if( options.reconnect )
+    if( options.no_reconnect )
     {
         CIoManager* pMgr = g_pIoMgr;
-        pMgr->SetCmdLineOpt( propConnRecover, true );
+        pMgr->SetCmdLineOpt( propConnRecover, false );
     }
 
     if (fuse_parse_cmdline(&args, &opts) != 0)

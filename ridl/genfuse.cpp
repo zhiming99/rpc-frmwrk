@@ -43,7 +43,7 @@ gint32 EmitBuildJsonReq(
     Wa( "gint32 ret = 0;" );
     Wa( "if( pReqCtx_ == nullptr )" );
     Wa( "    return -EINVAL;" );
-    Wa( "do" );
+    CCOUT << "do";
     BLOCK_OPEN;
     Wa( "CCfgOpener oReqCtx( pReqCtx_ );" );
     Wa( "IEventSink* pCallback = nullptr;" );
@@ -1995,7 +1995,7 @@ gint32 CImplIfMethodProxyFuse::OutputEvent()
         BLOCK_OPEN;
 
         Wa( "gint32 ret = 0;" );
-        Wa( "do" );
+        CCOUT << "do";
         BLOCK_OPEN;
         Wa( "Json::Value val_( Json::objectValue );" );
         if( dwCount > 0 )
@@ -2416,7 +2416,7 @@ gint32 CImplIfMethodSvrFuse::OutputEvent()
         }
         else /* need serialize */
         {
-            Wa( "do" );
+            CCOUT << "do";
             BLOCK_OPEN;
             Wa( "//Serialize the input parameters" );
             Wa( "BufPtr pBuf_( true );" );
@@ -2866,7 +2866,7 @@ gint32 CImplServiceImplFuse::Output()
             Wa( "gint32 ret = 0;" );
             Wa( "if( oMsg.empty() || !oMsg.isObject() )" );
             Wa( "    return -EINVAL;" );
-            Wa( "do" );
+            CCOUT << "do";
             BLOCK_OPEN;
             Wa( "if( !oMsg.isMember( JSON_ATTR_MSGTYPE ) ||");
             Wa( "    !oMsg[ JSON_ATTR_MSGTYPE ].isString() )" );
@@ -2979,7 +2979,7 @@ gint32 CImplServiceImplFuse::Output()
             Wa( "gint32 ret = 0;" );
             Wa( "if( oReq.empty() || !oReq.isObject() )" );
             Wa( "    return -EINVAL;" );
-            Wa( "do" );
+            CCOUT << "do";
             BLOCK_OPEN;
             Wa( "if( !oReq.isMember( JSON_ATTR_METHOD ) ||");
             Wa( "    !oReq[ JSON_ATTR_METHOD ].isString() )" );
@@ -3080,7 +3080,7 @@ gint32 CImplServiceImplFuse::Output()
             NEW_LINE;
             BLOCK_OPEN;
             Wa( "gint32 ret = 0;" );
-            Wa( "do" );
+            CCOUT << "do";
             BLOCK_OPEN;
             Wa( "guint64 qwTaskId = 0;" );
             Wa( "ret = this->GetTaskId( qwReqId, qwTaskId );" );
@@ -3090,7 +3090,7 @@ gint32 CImplServiceImplFuse::Output()
             Wa("    ([]( CRpcServices* pIf, IEventSink* pThis, guint64 qwReqId )->gint32" );
             BLOCK_OPEN;
             Wa( "gint32 ret = 0;" );
-            Wa( "do" );
+            CCOUT << "do";
             BLOCK_OPEN;
             Wa( "IConfigDb* pResp = nullptr;" );
             Wa( "CCfgOpenerObj oCfg( pThis );" );
@@ -3221,7 +3221,7 @@ gint32 CImplIufProxyFuse::OutputDispatch()
         BLOCK_OPEN;
 
         Wa( "gint32 ret = 0;" );
-        Wa( "do" );
+        CCOUT << "do";
         BLOCK_OPEN;
         ObjPtr pMethods =
             m_pNode->GetMethodList();
@@ -3292,7 +3292,7 @@ gint32 CImplIufSvrFuse::OutputDispatch()
         BLOCK_OPEN;
 
         Wa( "gint32 ret = 0;" );
-        Wa( "do" );
+        CCOUT <<"do";
         BLOCK_OPEN;
         ObjPtr pMethods =
             m_pNode->GetMethodList();
