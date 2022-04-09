@@ -121,7 +121,7 @@ gint32 CEmitSerialCodeFuse::OutputSerial(
 
         guint32 i = 0;
         guint32 dwCount = m_pArgs->GetCount();
-        Wa( "Value _oMember;" );
+        Wa( "Json::Value _oMember;" );
         for( ; i < dwCount; i++ )
         {
             ObjPtr pObj = m_pArgs->GetChild( i );
@@ -372,7 +372,7 @@ gint32 CEmitSerialCodeFuse::OutputDeserial(
         guint32 i = 0;
         guint32 dwCount = m_pArgs->GetCount();
 
-        Wa( "Value _oMember, _oVal;" );
+        Wa( "Json::Value _oMember, _oVal;" );
 
         for( ; i < dwCount; i++ )
         {
@@ -810,10 +810,10 @@ gint32 CDeclareStruct::OutputFuse()
         NEW_LINES(2);
 
         Wa( "gint32 JsonSerialize(" );
-        Wa( "    BufPtr& pBuf, const Value& val ) override;" );
+        Wa( "    BufPtr& pBuf, const Json::Value& val ) override;" );
         NEW_LINE;
         Wa( "gint32 JsonDeserialize(" );
-        CCOUT << "    BufPtr& pBuf, Value& val ) override;";
+        CCOUT << "    BufPtr& pBuf, Json::Value& val ) override;";
         BLOCK_CLOSE;
         CCOUT << ";";
         NEW_LINES( 2 );
@@ -846,7 +846,7 @@ gint32 CImplSerialStruct::OutputSerialFuse()
         CCOUT << "gint32 " << m_pNode->GetName()
             << "::" << "JsonSerialize(";
         NEW_LINE;
-        Wa( "    BufPtr& pBuf_, const Value& val_ )" );
+        Wa( "    BufPtr& pBuf_, const Json::Value& val_ )" );
         BLOCK_OPEN;
         CCOUT << "if( pBuf_.IsEmpty() )";
         INDENT_UPL;
@@ -890,7 +890,8 @@ gint32 CImplSerialStruct::OutputDeserialFuse()
     do{
         CCOUT << "gint32 " << m_pNode->GetName()
             << "::" << "JsonDeserialize( ";
-        CCOUT << "BufPtr& pBuf_, Value& val_ )";
+        NEW_LINE;
+        CCOUT << "BufPtr& pBuf_, Json::Value& val_ )";
         NEW_LINE;
         BLOCK_OPEN;
         CCOUT << "if( pBuf_.IsEmpty() )";

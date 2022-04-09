@@ -265,7 +265,7 @@ gint32 CFuseObjBase::RemoveChild(
         }
         else
         {
-            pSvr->RemoveFromFhMap(
+            pCli->RemoveFromFhMap(
                 ( HANDLE )pObj );
         }
 
@@ -1155,7 +1155,7 @@ gint32 CFuseStmFile::SendBufVec( OUTREQ& oreq )
 
         BufPtr pBuf;
         pBuf = vecBufs.front();
-        if( vecBufs.size() > 1 || IsNonBlock() )
+        if( vecBufs.size() > 1 )
         {
             // copying is better than multiple round
             // trip in performance.
@@ -1177,8 +1177,12 @@ gint32 CFuseStmFile::SendBufVec( OUTREQ& oreq )
         if( pStmSvr != nullptr )
         {
             if( IsNonBlock() )
+            {
                 ret = pStmSvr->WriteStreamNoWait(
                     hstm, pBuf );
+                if( ret == STATUS_PENDING )
+                    ret = 0;
+            }
             else
                 ret = pStmSvr->WriteStreamAsync(
                     hstm, pBuf, ( IEventSink* )pCb );
@@ -1186,8 +1190,12 @@ gint32 CFuseStmFile::SendBufVec( OUTREQ& oreq )
         else
         {
             if( IsNonBlock() )
+            {
                 ret = pStmProxy->WriteStreamNoWait(
                     hstm, pBuf );
+                if( ret == STATUS_PENDING )
+                    ret = 0;
+            }
             else
                 ret = pStmProxy->WriteStreamAsync(
                     hstm, pBuf, pCb );
@@ -2367,8 +2375,9 @@ gint32 fuseop_create( const char* path,
             break;
         }
 
-        CFuseStmDir* pDir = dynamic_cast
-            < CFuseStmDir* >( pObj );
+        auto pDir = static_cast< CFuseStmDir* >
+            ( pObj->GetChild( STREAM_DIR ) );
+
         if( unlikely( pDir == nullptr ) )
         {
             // create allowed only under STREAM_DIR
@@ -2410,12 +2419,12 @@ gint32 fuseop_create( const char* path,
 
         TaskletPtr pCallback;
         ret = pCallback.NewObj(
-            clsid( CIoReqSyncCallback ),
+            clsid( CSyncCallback ),
             oParams.GetCfg() );
         if( ERROR( ret ) )
             break;
 
-        CIoReqSyncCallback* pSync = pCallback;
+        CSyncCallback* pSync = pCallback;
 
         CParamList oDesc;
         oDesc[ propNodeName ] = strName;
@@ -2434,6 +2443,20 @@ gint32 fuseop_create( const char* path,
             ret = pSync->GetError();
             if( ERROR( ret ) )
                 break;
+
+            CCfgOpenerObj oTaskCfg( pSync );
+            IConfigDb* pResp = nullptr;
+            ret = oTaskCfg.GetPointer(
+                propRespPtr, pResp );
+            if( ERROR( ret ) )
+                break;
+
+            CCfgOpener oResp( pResp );
+            ret = oResp.GetIntPtr(
+                1, ( guint32*& )hStream );
+            if( ERROR( ret ) )
+                break;
+
         }
 
         WLOCK_TESTMNT2( pStm );
@@ -2515,11 +2538,22 @@ void* fuseop_init(
     cfg->negative_timeout = 0;
     cfg->direct_io = 1;
     cfg->kernel_cache = 0;
+    cfg->intr = 1;
 
     // init some other stuffs
     Json::CharReaderBuilder oBuilder;
     g_pReader.reset( oBuilder.newCharReader() );
     return GetFuse();
+}
+
+int fuseop_utimens(
+    const char *path,
+    const timespec tv[2],
+    fuse_file_info *fi)
+{
+    return SafeCall( false,
+        &CFuseObjBase::fs_utimens,
+        path, fi, tv );
 }
 
 
@@ -2586,6 +2620,7 @@ static fuse_operations fuseif_ops =
     .releasedir = fuseop_releasedir,
     .init = fuseop_init,
     .create = fuseop_create,
+    .utimens = fuseop_utimens,
     .ioctl = fuseop_ioctl,
     .poll = fuseop_poll,
 };

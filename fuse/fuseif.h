@@ -113,18 +113,6 @@ class CSharedLock
         }
     }
 
-    inline gint32 TryLockRead()
-    {
-        CStdMutex oLock( m_oLock );
-        if( !m_bWrite && m_queue.empty() )
-        {
-            m_iReadCount++;
-            oLock.Unlock();
-            return STATUS_SUCCESS;
-        }
-        return -EAGAIN;
-    }
-
     inline gint32 LockWrite()
     {
         CStdMutex oLock( m_oLock );
@@ -148,25 +136,10 @@ class CSharedLock
         return -EFAULT;
     }
 
-    inline gint32 TryLockWrite()
-    {
-        CStdMutex oLock( m_oLock );
-        if( m_bWrite || m_iReadCount > 0 ) 
-            return -EAGAIN;
-
-        if( m_iReadCount == 0 )
-        {
-            m_bWrite = true;
-            oLock.Unlock();
-            return 0;
-        }
-        return -EFAULT;
-    }
-
     inline gint32 ReleaseRead()
     {
         CStdMutex oLock( m_oLock );
-        m_iReadCount--;
+        --m_iReadCount;
         if( m_iReadCount > 0 )
             return STATUS_SUCCESS;
 
@@ -198,14 +171,48 @@ class CSharedLock
             m_queue.pop_front();
             Sem_Post( &m_semWriter );
         }
-        else while( m_queue.front() == true )
+        else
         {
-            m_iReadCount++;
-            Sem_Post( &m_semReader );
-            m_queue.pop_front();
+            m_bWrite = false;
+            while( m_queue.front() == true )
+            {
+                m_iReadCount++;
+                m_queue.pop_front();
+                Sem_Post( &m_semReader );
+                if( m_queue.empty() )
+                    break;
+            }
         }
         return STATUS_SUCCESS;
     }
+
+    inline gint32 TryLockRead()
+    {
+        CStdMutex oLock( m_oLock );
+        if( !m_bWrite && m_queue.empty() )
+        {
+            m_iReadCount++;
+            oLock.Unlock();
+            return STATUS_SUCCESS;
+        }
+        return -EAGAIN;
+    }
+
+    inline gint32 TryLockWrite()
+    {
+        CStdMutex oLock( m_oLock );
+        if( m_bWrite || m_iReadCount > 0 ) 
+            return -EAGAIN;
+
+        if( m_iReadCount == 0 )
+        {
+            m_bWrite = true;
+            oLock.Unlock();
+            return 0;
+        }
+        return -EFAULT;
+    }
+
 };
 
 #define CFuseMutex  CWriteLock
@@ -220,26 +227,18 @@ struct CLocalLock
     CLocalLock( CSharedLock& oLock )
     {
         m_pLock = &oLock;
-        m_iStatus = ( bRead ?
-            oLock.LockRead():
-            oLock.LockWrite() );
-        m_bLocked = true;
+        Lock();
     }
 
     ~CLocalLock()
     { 
-        if( m_bLocked && m_pLock != nullptr )
-        {
-            m_bLocked = false;
-            bRead ? m_pLock->ReleaseRead() : 
-                m_pLock->ReleaseWrite();
-            m_pLock = nullptr;
-        }
+        Unlock();
+        m_pLock = nullptr;
     }
 
     void Unlock()
     {
-        if( !m_bLocked )
+        if( !m_bLocked || m_pLock == nullptr )
             return;
         m_bLocked = false;
         bRead ? m_pLock->ReleaseRead() :
@@ -359,6 +358,12 @@ class CFuseObjBase : public CDirEntry
         bMod ? m_tsModTime = time( nullptr ) :
            m_tsAccTime = time( nullptr ); 
     }
+    inline void SetTime(
+        const timespec& ts, bool bMod )
+    {
+        bMod ? m_tsModTime = ts.tv_sec :
+           m_tsAccTime = ts.tv_sec; 
+    }
 
     inline const time_t& GetModifyTime() const
     { return m_tsModTime; }
@@ -453,6 +458,16 @@ class CFuseObjBase : public CDirEntry
         const char* path,
         fuse_file_info* fi )
     { return -ENOSYS; }
+
+    gint32 fs_utimens(
+        const char *path,
+        fuse_file_info *fi,
+        const timespec tv[2] )
+    {
+        SetTime( tv[ 0 ], false );
+        SetTime( tv[ 1 ], true );
+        return 0;
+    }
 
     inline CRpcServices* GetIf() const
     { return m_pIf; }
@@ -1376,7 +1391,7 @@ class CFuseConnDir : public CFuseDirectory
 };
 
 bool IsUnmounted( CRpcServices* pIf );
-#define GET_STMCTX_LOCKED( _hStream, _pCtx ) \
+#define GET_STMDESC_LOCKED( _hStream, _pCtx ) \
     CFuseServicePoint* _pSp = const_cast \
         < CFuseServicePoint* >( this );\
     CRpcServices* _pSvc = _pSp;\
@@ -1384,7 +1399,7 @@ bool IsUnmounted( CRpcServices* pIf );
     {\
         CStreamServerSync *pStm =\
             dynamic_cast< CStreamServerSync*>( _pSvc );\
-        ret = pStm->GetContext( _hStream, _pCtx );\
+        ret = pStm->GetDataDesc( _hStream, _pCtx );\
         if( ERROR( ret ) )\
             break;\
     }\
@@ -1392,7 +1407,7 @@ bool IsUnmounted( CRpcServices* pIf );
     {\
         CStreamProxySync *pStm = \
             dynamic_cast< CStreamProxySync*>( _pSvc );\
-        ret = pStm->GetContext( _hStream, _pCtx ); \
+        ret = pStm->GetDataDesc( _hStream, _pCtx ); \
         if( ERROR( ret ) ) \
             break; \
     } \
@@ -1677,9 +1692,9 @@ class CFuseServicePoint :
         do{
             CfgPtr pCtx;
             CStdRMutex oLock( this->GetLock() );
-            GET_STMCTX_LOCKED( hStream, pCtx );
+            GET_STMDESC_LOCKED( hStream, pCtx );
             ret = oCfg.GetStrProp(
-                propPath1, strName );
+                propNodeName, strName );
             
         }while( 0 );
 
@@ -1712,22 +1727,6 @@ class CFuseServicePoint :
                     ( pStmDir );
             hStream = pStmFile->GetStream();
 
-        }while( 0 );
-
-        return ret;
-    }
-
-    gint32 AddStreamName(
-        HANDLE hStream,
-        stdstr& strName )
-    {
-        gint32 ret = 0;
-        do{
-            CfgPtr pCtx;
-            CStdRMutex oLock( this->GetLock() );
-            GET_STMCTX_LOCKED( hStream, pCtx );
-            ret = oCfg.SetStrProp(
-                propPath1, strName );
         }while( 0 );
 
         return ret;
@@ -2162,6 +2161,14 @@ class CFuseServicePoint :
 
                 if( bRestart )
                 {
+                    ObjVecPtr pvecMatches( true );
+                    for( auto& elem : this->m_vecMatches )
+                    {
+                        ObjPtr pObj( elem );
+                        ( *pvecMatches )().push_back( pObj );
+                    }
+                    ObjPtr pMatches = pvecMatches;
+
                     TaskGrpPtr pGrp;
                     CParamList oParams;
                     oParams[ propIfPtr ] = ObjPtr( this );
@@ -2176,6 +2183,12 @@ class CFuseServicePoint :
                         ( IEventSink* )nullptr );
                     if( ERROR( ret ) )
                         break;
+
+                    CCfgOpener oTaskCfg( ( IConfigDb* )
+                        pStartTask->GetConfig() );
+
+                    oTaskCfg.SetObjPtr(
+                        propMatchMap, pMatches );
 
                     pGrp->SetRelation( logicAND );
                     pGrp->AppendTask( pStopTask );
@@ -2208,6 +2221,20 @@ class CFuseServicePoint :
             else
             {
                 WLOCK_TESTMNT;
+                CCfgOpenerObj oTaskCfg( pCallback );
+                ObjPtr pMatches;
+                ret = oTaskCfg.GetObjPtr(
+                    propMatchMap, pMatches );
+                if( SUCCEEDED( ret ) )
+                {
+                    ObjVecPtr pvecMatches = pMatches;
+                    this->m_vecMatches.clear();
+                    for( auto& elem : (*pvecMatches)() )
+                    {
+                        MatchPtr pMatch = elem;
+                        this->m_vecMatches.push_back( pMatch );
+                    }
+                }
                 ret = super::StartEx( pCallback );
             }
         }while( 0 );
@@ -2220,10 +2247,16 @@ class CFuseServicePoint :
         do{
             if( m_pSvcDir.get() == nullptr )
                 ret = super::StopEx( pCallback );
-            else
+            else 
             {
-                WLOCK_TESTMNT;
-                ret = super::StopEx( pCallback );
+                bool bUnmounted = true;
+                do{
+                    WLOCK_TESTMNT;
+                    bUnmounted = false;
+                    ret = super::StopEx( pCallback );
+                }while( 0 );
+                if( bUnmounted )
+                    ret = super::StopEx( pCallback );
             }
         }while( 0 );
         return ret;

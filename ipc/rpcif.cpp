@@ -2929,6 +2929,9 @@ gint32 CInterfaceProxy::SendFetch_Proxy(
             ret = RunIoTask( oBuilder.GetCfg(),
                 oResp.GetCfg(), pCallback, &qwTaskId );
 
+            if( ERROR( ret ) )
+                break;
+
             if( ret == STATUS_PENDING )
             {
                 // the parameter list does not have a
@@ -5960,7 +5963,14 @@ static CfgPtr InitIfSvrCfg(
     gint32 ret = 0;
     CCfgOpener oNewCfg;
     do{
+        guint32 iStateClass = clsid( CIfServerState );
         *oNewCfg.GetCfg() = *pCfg;
+        if( oNewCfg.exist( propNoPort ) )
+        {
+            oNewCfg.SetIntProp(
+                propIfStateClass, iStateClass );
+            break;
+        }
 
         string strPortClass;
         ret = oNewCfg.GetStrProp(
@@ -5969,13 +5979,11 @@ static CfgPtr InitIfSvrCfg(
         if( ERROR( ret ) )
             break;
 
-        guint32 iStateClass = clsid( CIfServerState );
         if( strPortClass == PORT_CLASS_UXSOCK_STM_PDO )
             iStateClass = clsid( CUnixSockStmState );
 
         oNewCfg.SetIntProp(
-            propIfStateClass,
-            iStateClass );
+            propIfStateClass, iStateClass );
 
     }while( 0 );
 
@@ -6062,6 +6070,9 @@ CInterfaceServer::CInterfaceServer(
     do{
         CCfgOpener oCfg( pCfg );
         string strPortClass;
+
+        if( oCfg.exist( propNoPort ) )
+            break;
 
         if( !oCfg.exist( propPortClass ) )
         {

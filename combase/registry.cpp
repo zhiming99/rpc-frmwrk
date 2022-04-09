@@ -141,7 +141,10 @@ gint32 CDirEntry::GetChild(
 
     auto itr = m_mapChilds.find( strName );
     if( itr != m_mapChilds.end() )
+    {
         pChild = itr->second;
+        return 0;
+    }
 
     return -ENOENT;
 }
