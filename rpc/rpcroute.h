@@ -684,12 +684,12 @@ class CRpcReqForwarder :
         DMsgPtr& pRespMsg,
         IEventSink* pCallback );
 
-    virtual gint32 FetchData_Server(
+    gint32 FetchData_Server(
         IConfigDb* pDataDesc,           // [in]
-        gint32 fd,                      // [in]
-        guint32 dwOffset,               // [in]
-        guint32 dwSize,                 // [in]
-        IEventSink* pCallback )
+        gint32& fd,                      // [in]
+        guint32& dwOffset,               // [in]
+        guint32& dwSize,                 // [in]
+        IEventSink* pCallback ) override
     {
         return SendFetch_Server( pDataDesc,
             fd, dwOffset, dwSize, pCallback );
@@ -1355,6 +1355,13 @@ class CRpcTcpBridge :
     gint32 FindFwrdReqsByPath(
         const stdstr& strPath,
         FWRDREQS& vecTasks );
+
+    virtual gint32 FetchData_Filter(
+        IConfigDb* pDataDesc,           // [in]
+        gint32& fd,                      // [in]
+        guint32& dwOffset,               // [in]
+        guint32& dwSize,                 // [in]
+        IEventSink* pCallback );
 
 }; // CRpcTcpBridge
 

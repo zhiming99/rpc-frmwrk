@@ -55,6 +55,13 @@ gint32 CStreamServerRelay::FetchData_Server(
     gint32 ret = 0;
 
     do{
+        CRpcTcpBridge* pBdge = ObjPtr( this );
+        ret = pBdge->FetchData_Filter(
+            pDataDesc, fd, dwOffset,
+            dwSize, pCallback );
+        if( ERROR( ret ) )
+            break;
+
         std::string strDest;
         CCfgOpener oDataDesc( pDataDesc );
         ret = oDataDesc.GetStrProp(

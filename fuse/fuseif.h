@@ -447,7 +447,7 @@ class CFuseObjBase : public CDirEntry
     virtual gint32 fs_unlink(
         const char* path,
         fuse_file_info *fi )
-    { return -ENOSYS; }
+    { return -EACCES; }
 
     virtual gint32 fs_opendir(
         const char* path,
@@ -464,8 +464,6 @@ class CFuseObjBase : public CDirEntry
         fuse_file_info *fi,
         const timespec tv[2] )
     {
-        SetTime( tv[ 0 ], false );
-        SetTime( tv[ 1 ], true );
         return 0;
     }
 
@@ -999,6 +997,7 @@ class CFuseStmFile : public CFuseFileEntry
         m_bFlowCtrl( false )
     {
         SetClassId( clsid( CFuseStmFile ) );
+        SetMode( S_IRUSR | S_IWUSR );
     }
 
     inline bool GetFlowCtrl() const
@@ -1494,6 +1493,8 @@ class CFuseServicePoint :
     std::shared_ptr< CDirEntry > m_pSvcDir;
     stdstr m_strSvcPath;
     bool    m_bUnmounted = false;
+
+    std::hashmap< stdstr, int > m_mapSessCount;
 
     public:
     typedef typename IFBASE( bProxy ) _MyVirtBase;
@@ -2026,6 +2027,48 @@ class CFuseServicePoint :
         return ret;
     }
 
+    gint32 IncStmCount( const stdstr& strSess )
+    {
+        auto itr = m_mapSessCount.find( strSess );
+
+        if( itr == m_mapSessCount.end() )
+        {
+            m_mapSessCount[ strSess ] = 1;
+        }
+        else
+        {
+            if( itr->second >= MAX_STREAMS_PER_SESS )
+            {
+                return -EMFILE;
+            }
+            ++itr->second;
+            DebugPrint( 0, "Session %s opened %d streams",
+                strSess.c_str(), itr->second );
+        }
+        return STATUS_SUCCESS;
+    }
+
+    gint32 DecStmCount( const stdstr& strSess )
+    {
+        auto itr = m_mapSessCount.find( strSess );
+        if( itr == m_mapSessCount.end() )
+        {
+            return -ENOENT;
+        }
+        else
+        {
+            if( itr->second <= 0 )
+            {
+                return -ERANGE;
+            }
+            --itr->second;
+            DebugPrint( 0,
+                "Session %s closed a stream",
+                strSess.c_str() );
+        }
+        return STATUS_SUCCESS;
+    }
+
     inline gint32 OnStreamReadyFuse(
         HANDLE hStream )
     {
@@ -2036,9 +2079,32 @@ class CFuseServicePoint :
                 break;
             if( this->GetState() != stateConnected )
                 break;
+
             ret = CreateStmFile( hStream );
 
         }while( 0 );
+
+        while( ERROR( ret ) )
+        {
+            gint32 iRet = 0;
+            CfgPtr pDesc;
+            IConfigDb* ptctx = nullptr;
+            CStdRMutex oLock( this->GetLock() );
+            GET_STMDESC_LOCKED( hStream, pDesc );
+            iRet = oCfg.GetPointer(
+                propTransCtx, ptctx );
+            if( ERROR( iRet ) )
+                break;
+
+            stdstr strSess;
+            CCfgOpener oCtx( ptctx ); 
+            iRet = oCtx.GetStrProp(
+                propSessHash, strSess );
+            if( ERROR( iRet ) )
+                break;
+            DecStmCount( strSess );
+            break;
+        }
 
         return ret;
     }
@@ -2048,10 +2114,25 @@ class CFuseServicePoint :
     {
         gint32 ret = 0;
         do{
+            CfgPtr pDesc;
+            IConfigDb* ptctx = nullptr;
+            CStdRMutex oLock( this->GetLock() );
+            GET_STMDESC_LOCKED( hStream, pDesc );
+            ret = oCfg.GetPointer(
+                propTransCtx, ptctx );
+            if( SUCCEEDED( ret ) )
+            {
+                stdstr strSess;
+                CCfgOpener oCtx( ptctx ); 
+                ret = oCtx.GetStrProp(
+                    propSessHash, strSess );
+                if( SUCCEEDED( ret ) )
+                    DecStmCount( strSess );
+            }
+
             WLOCK_TESTMNT;
             stdstr strName;
-            ret = StreamToName(
-                hStream, strName );
+            ret = StreamToName( hStream, strName);
             if( ERROR( ret ) )
                 break;
             ret = DeleteStmFile( strName );
@@ -2075,7 +2156,7 @@ class CFuseServicePoint :
             if( pStmDir->GetCount() >
                 MAX_STREAMS_PER_SVC )
             {
-                ret = -EOVERFLOW;
+                ret = -EMFILE;
                 break;
             }
 
@@ -2099,6 +2180,21 @@ class CFuseServicePoint :
                 ret = -EEXIST;
                 break;
             }
+
+            IConfigDb* ptctx = nullptr;
+            CStdRMutex oLock( this->GetLock() );
+            ret = oDesc.GetPointer(
+                propTransCtx, ptctx );
+            if( ERROR( ret ) )
+                break;
+
+            stdstr strSess;
+            CCfgOpener oCtx( ptctx ); 
+            ret = oCtx.GetStrProp(
+                propSessHash, strSess );
+            if( ERROR( ret ) )
+                break;
+            ret = IncStmCount( strSess );
 
         }while( 0 );
 
@@ -2602,6 +2698,7 @@ class CFuseRootBase:
                     std::to_string( idx ) ) );
                 CFuseConnDir* pConn = static_cast
                     < CFuseConnDir* >( pNewDir.get() );
+                pConn->DecRef();
                 ret = pConn->AddSvcDir( pSvcDir );
                 if( ERROR( ret ) )
                     break;

@@ -2357,8 +2357,8 @@ gint32 fuseop_create( const char* path,
 
         std::vector< stdstr > vecSubdirs;
         CFuseObjBase* pObj = nullptr;
-        gint32 ret = GetSvcDir(
-            strPath.c_str(), pObj, vecSubdirs );
+        ret = GetSvcDir( strPath.c_str(),
+            pObj, vecSubdirs );
         if( ERROR( ret ) )
             break;
 
@@ -2452,6 +2452,15 @@ gint32 fuseop_create( const char* path,
                 break;
 
             CCfgOpener oResp( pResp );
+            gint32 iRet = 0;
+            ret = oResp.GetIntProp(
+                propReturnValue,
+                ( guint32& )iRet );
+            if( ERROR( ret ) )
+                break;
+            ret = iRet;
+            if( ERROR( ret ) )
+                break;
             ret = oResp.GetIntPtr(
                 1, ( guint32*& )hStream );
             if( ERROR( ret ) )

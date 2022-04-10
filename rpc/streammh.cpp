@@ -1254,6 +1254,13 @@ gint32 CStreamServerRelayMH::FetchData_Server(
     CParamList oContext;
 
     do{
+        CRpcTcpBridge* pBdge = ObjPtr( this );
+        ret = pBdge->FetchData_Filter(
+            pDataDesc, fd, dwOffset,
+            dwSize, pCallback );
+        if( ERROR( ret ) )
+            break;
+
         CRpcRouterBridge* pRouter = 
         static_cast< CRpcRouterBridge* >
             ( GetParent() );

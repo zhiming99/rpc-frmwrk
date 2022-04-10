@@ -5325,6 +5325,36 @@ gint32 CRpcTcpBridge::GenSessHash(
     return ret;
 }
 
+gint32 CRpcTcpBridge::FetchData_Filter(
+    IConfigDb* pDataDesc,           // [in]
+    gint32& fd,                     // [out]
+    guint32& dwOffset,              // [in, out]
+    guint32& dwSize,                // [in, out]
+    IEventSink* pCallback )
+{
+    if( pDataDesc == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        CCfgOpener oDataDesc( pDataDesc );
+        IConfigDb* pTransCtx = nullptr;
+        ret = oDataDesc.GetPointer(
+            propTransCtx, pTransCtx );
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpener oTransCtx( pTransCtx );
+        ret = oTransCtx.SetStrProp(
+            propSessHash, GetSessHash() );
+        if( ERROR( ret ) )
+            break;
+
+    }while( 0 );
+
+    return ret;
+}
+
 CRpcTcpBridgeShared::CRpcTcpBridgeShared(
     CRpcServices* pIf )
 {
