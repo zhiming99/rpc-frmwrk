@@ -28,6 +28,7 @@
 using namespace rpcf;
 #include "serijson.h"
 #include "streamex.h"
+#include "fuseif.h"
 
 gint32 CJsonSerialBase::SerializeBool(
     BufPtr& pBuf, const Value& val )
@@ -105,14 +106,54 @@ gint32 CJsonSerialBase::SerializeString(
 gint32 CJsonSerialBase::SerializeHStream(
     BufPtr& pBuf, const Value& val )
 {
-    if( val.empty() || !val.isUInt64() )
+    if( val.empty() || !val.isString() )
         return -EINVAL;
-    HANDLE hstm = val.asUInt64();
+    gint32 ret = 0;
+    ObjPtr pIf = this->GetIf();
+    CFuseSvcServer* pSvr = pIf;
+    CFuseSvcProxy* pProxy = pIf;
+    HANDLE hstm = INVALID_HANDLE;
+    do{
+        // we are within the RLOCK/WLOCK
+        if( IsLocked() )
+        {
+            if( pSvr != nullptr )
+            {
+                ret = pSvr->NameToStream(
+                    val.asString(), hstm );
+            }
+            else
+            {
+                ret = pProxy->NameToStream(
+                    val.asString(), hstm );
+            }
+        }
+        else
+        {
+            RLOCK_TESTMNT2( this->GetIf() );
+            if( pSvr != nullptr )
+            {
+                ret = pSvr->NameToStream(
+                    val.asString(), hstm );
+            }
+            else
+            {
+                ret = pProxy->NameToStream(
+                    val.asString(), hstm );
+            }
+        }
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+        return ret;
+
     HSTREAM oStm;
     oStm.m_hStream = hstm;
     oStm.m_pIf = this->GetIf();
     return oStm.Serialize( pBuf );
 }
+
 gint32 CJsonSerialBase::SerializeObjPtr(
     BufPtr& pBuf, const Value& val )
 {
@@ -174,6 +215,7 @@ gint32 CJsonSerialBase::SerializeStruct(
 
         CJsonStructBase* pStruct = pObj;
         pStruct->SetIf( this->GetIf() );
+        pStruct->SetLocked( IsLocked() );
         ret = pStruct->JsonSerialize( pBuf, val );
     }while( 0 );
 
@@ -723,7 +765,46 @@ gint32 CJsonSerialBase::DeserializeHStream(
     gint32 ret = oStm.Deserialize( pBuf );
     if( ERROR( ret ) )
         return ret;
-    val = ( HANDLE )oStm.m_hStream;
+    HANDLE hstm = oStm.m_hStream;
+    ObjPtr pIf = oStm.m_pIf;
+    CFuseSvcServer* pSvr = pIf;
+    CFuseSvcProxy* pProxy = pIf;
+    stdstr strFile;
+    do{
+        if( IsLocked() )
+        {
+            if( pSvr != nullptr )
+            {
+                ret = pSvr->StreamToName(
+                    hstm, strFile );
+            }
+            else
+            {
+                ret = pProxy->StreamToName(
+                    hstm, strFile );
+            }
+        }
+        else
+        {
+            RLOCK_TESTMNT2( this->GetIf() );
+            if( pSvr != nullptr )
+            {
+                ret = pSvr->StreamToName(
+                    hstm, strFile );
+            }
+            else
+            {
+                ret = pProxy->StreamToName(
+                    hstm, strFile );
+            }
+        }
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+        return ret;
+
+    val = strFile;
     return STATUS_SUCCESS;
 }
 
@@ -769,8 +850,8 @@ gint32 CJsonSerialBase::DeserializeByteArray(
         return ret;
     BufPtr pNewBuf( true );
     ret = base64_encode(
-        ( guint8* )pBuf->ptr(),
-        pBuf->size(), pNewBuf );
+        ( guint8* )pVal->ptr(),
+        pVal->size(), pNewBuf );
 
     if( ERROR( ret ) )
         return ret;
@@ -809,6 +890,7 @@ gint32 CJsonSerialBase::DeserializeStruct(
             break;
 
         CJsonStructBase* pStruct = pObj;
+        pStruct->SetLocked( IsLocked() );
         ret = pStruct->JsonDeserialize(
             pBuf, val );
 

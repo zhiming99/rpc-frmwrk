@@ -2778,10 +2778,13 @@ gint32 CDeclService::Output()
 
         CCOUT << "C" << strSvcName << "_CliSkel,";
         NEW_LINE;
-        if( m_pNode->IsStream() || bFuseP )
-            Wa( "CStreamProxyAsync," );
         if( bFuseP )
+        {
+            Wa( "CStreamProxyFuse," );
             Wa( "CFuseSvcProxy," );
+        }
+        else if( m_pNode->IsStream() )
+            Wa( "CStreamProxyAsync," );
         for( guint32 i = 0;
             i < vecIfs.size(); i++ )
         {
@@ -2803,10 +2806,15 @@ gint32 CDeclService::Output()
         NEW_LINE;
         CCOUT << "C" << strSvcName << "_SvrSkel,";
         NEW_LINE;
-        if( m_pNode->IsStream() || bFuseS )
-            Wa( "CStreamServerAsync," );
+
         if( bFuseS )
+        {
+            Wa( "CStreamServerFuse," );
             Wa( "CFuseSvcServer," );
+        }
+        else if( m_pNode->IsStream() )
+            Wa( "CStreamServerAsync," );
+
         for( guint32 i = 0;
             i < vecIfs.size(); i++ )
         {

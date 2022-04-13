@@ -109,13 +109,15 @@ struct CMethodWriterFuse
         ObjPtr& pArgList,
         const std::string& strBuf,
         bool bDeclare, bool bAssign,
-        bool bNoRet = false );
+        bool bNoRet = false,
+        bool bLocked = false );
 
     virtual gint32 GenDeserialArgs(
         ObjPtr& pArgList,
         const std::string& strBuf,
         bool bDeclare, bool bAssign,
-        bool bNoRet = false );
+        bool bNoRet = false,
+        bool bLocked = false );
 };
 
 class CImplIfMethodProxyFuse

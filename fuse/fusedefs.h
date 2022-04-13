@@ -88,5 +88,6 @@ enum {
     // set the fd to operate in blocking mode
     FIOC_SETBLOCK = _IO('J', 0),    // 0x4a00
     // set the fd to operate in non-blocking mode
-    FIOC_SETNONBLOCK = _IO('J', 1)  // 0x4a01
+    FIOC_SETNONBLOCK = _IO('J', 1),  // 0x4a01
+    FIOC_GETSIZE = _IOR('J', 2, int)  // 0x80044a02
 };

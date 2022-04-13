@@ -35,6 +35,7 @@ extern std::set< guint32 > g_setMsgIds;
 
 class CJsonSerialBase : public CSerialBase
 {
+    bool m_bLocked = true;
     protected:
     gint32 SerializeFromStr(
         BufPtr& pBuf,
@@ -45,8 +46,17 @@ class CJsonSerialBase : public CSerialBase
     typedef CSerialBase super;
     CJsonSerialBase() : super()
     {}
-    CJsonSerialBase( ObjPtr pIf ) : super(pIf)
-    {}
+    CJsonSerialBase(
+        ObjPtr pIf, bool bLocked ) : super(pIf)
+    {
+        m_bLocked = bLocked;
+    }
+
+    void SetLocked( bool bLocked = true )
+    { m_bLocked = bLocked; }
+
+    bool IsLocked()
+    { return m_bLocked; }
 
     gint32 SerializeBool(
         BufPtr& pBuf, const Value& val );
@@ -159,8 +169,8 @@ class CJsonStructBase :
         super(), CObjBase()
     {}
 
-    CJsonStructBase( ObjPtr pIf ) :
-        super( pIf ), CObjBase()
+    CJsonStructBase( ObjPtr pIf, bool bLocked ) :
+        super( pIf, bLocked ), CObjBase()
     {}
 
     virtual gint32 Serialize(

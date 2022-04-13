@@ -1051,6 +1051,15 @@ class CFuseStmFile : public CFuseFileEntry
     gint32 fs_unlink(
         const char* path,
         fuse_file_info *fi ) override;
+
+    gint32 fs_ioctl(
+        const char *path,
+        fuse_file_info *fi,
+        unsigned int cmd,
+        void *arg, 
+        unsigned int flags,
+        void *data ) override;
+    void NotifyPoll();
 };
 
 class CFuseStmEvtFile : public CFuseEvtFile
@@ -2357,6 +2366,35 @@ class CFuseServicePoint :
         }while( 0 );
         return ret;
     }
+
+    gint32 OnStmRecvFuse(
+        HANDLE hChannel, BufPtr& pBuf )
+    {
+        gint32 ret = 0;
+        do{
+            if( pBuf->GetDataType()!=DataTypeMem )
+                break;
+            RLOCK_TESTMNT2( this );
+            auto pDir = static_cast< CFuseStmDir* >
+            ( _pSvcDir->GetChild( STREAM_DIR ) );
+
+            stdstr strName;
+            ret = StreamToName( hChannel, strName );
+            if( ERROR( ret ) )
+                break;
+
+            auto pObj = pDir->GetChild( strName );
+            if( pObj == nullptr )
+                break;
+
+            auto pStmFile = static_cast
+                < CFuseStmFile* >( pObj );
+            pStmFile->NotifyPoll();
+
+        }while( 0 );
+
+        return ret;
+    }
 };
 
 class CFuseSvcProxy :
@@ -2792,6 +2830,34 @@ class CFuseRootServer :
     CFuseRootServer( const IConfigDb* pCfg ) :
         super( pCfg )
     { SetClassId( clsid( CFuseRootServer ) ); }
+};
+
+class CStreamServerFuse :
+    public CStreamServerAsync
+{
+    public:
+    typedef CStreamServerAsync super;
+
+    CStreamServerFuse( const IConfigDb* pCfg ) :
+        _MyVirtBase( pCfg ), super( pCfg )
+    {}
+
+    gint32 OnStmRecv( HANDLE hChannel,
+        BufPtr& pBuf ) override;
+};
+
+class CStreamProxyFuse :
+    public CStreamProxyAsync
+{
+    public:
+    typedef CStreamProxyAsync super;
+
+    CStreamProxyFuse( const IConfigDb* pCfg ) :
+        _MyVirtBase( pCfg ), super( pCfg )
+    {}
+
+    gint32 OnStmRecv( HANDLE hChannel,
+        BufPtr& pBuf ) override;
 };
 
 }

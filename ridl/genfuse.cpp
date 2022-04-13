@@ -201,12 +201,13 @@ gint32 CEmitSerialCodeFuse::OutputSerial(
                 }
             case 'h':
                 {
-                    Wa( "if( !_oMember.isUInt64() &&" );
-                    Wa( "    !_oMember.isInt64() )" );
+                    Wa( "if( !_oMember.isString() )" );
                     Wa( "{ ret = -EINVAL; break; }" );
                     CCOUT << "ret = " << strObj
-                        <<"SerializeHStream( "
-                        << strBuf << ", _oMember );";
+                        <<"SerializeHStream( ";
+                    NEW_LINE;
+                    CCOUT << "    " << strBuf
+                        << ", _oMember );";
                     NEW_LINE;
                     Wa( "if( ERROR( ret ) ) break;" );
                     break;
@@ -488,7 +489,7 @@ gint32 CEmitSerialCodeFuse::OutputDeserial(
                         << "DeserializeUInt( ";
                     NEW_LINE;
                     CCOUT << "    " <<  strBuf
-                        <<", _oMember );";
+                        <<", _oVal );";
                     NEW_LINE;
                     Wa( "if( ERROR( ret ) ) break;" );
                     Wa( "_oMember = _oVal.asInt();" );
@@ -511,7 +512,7 @@ gint32 CEmitSerialCodeFuse::OutputDeserial(
                         << "DeserializeUShort( ";
                     NEW_LINE;
                     CCOUT << "    " <<  strBuf
-                        <<", _oMember );";
+                        <<", _oVal );";
                     NEW_LINE;
                     Wa( "if( ERROR( ret ) ) break;" );
                     Wa( "_oMember = _oVal.asInt();" );
@@ -922,6 +923,7 @@ gint32 CImplSerialStruct::OutputDeserialFuse()
         Wa( "if( ERROR( ret ) ) return ret;" );
         Wa( "if( m_dwMsgId != dwMsgId )" );
         Wa( "    return -EINVAL;" );
+        Wa( "val_[ JSON_ATTR_STRUCTID ] = dwMsgId;" );
         NEW_LINE;
 
         CEmitSerialCodeFuse odesc( m_pWriter, pFields );
@@ -1732,7 +1734,8 @@ gint32 CMethodWriterFuse::GenSerialArgs(
     ObjPtr& pArgList,
     const std::string& strBuf,
     bool bDeclare, bool bAssign,
-    bool bNoRet )
+    bool bNoRet,
+    bool bLocked )
 {
     gint32 ret = 0;
     if( GetArgCount( pArgList ) == 0 )
@@ -1741,7 +1744,9 @@ gint32 CMethodWriterFuse::GenSerialArgs(
     do{
         NEW_LINE;
         Wa( "CJsonSerialBase oSerial_(" );
-        Wa( "    ObjPtr( this ) );" );
+        CCOUT << "    ObjPtr( this ), "<<
+            ( bLocked ? "true );" : "false );" );
+        NEW_LINE;
 
         CEmitSerialCodeFuse oesc(
             m_pWriter, pArgList );
@@ -1774,7 +1779,8 @@ gint32 CMethodWriterFuse::GenDeserialArgs(
     ObjPtr& pArgList,
     const std::string& strBuf,
     bool bDeclare, bool bAssign,
-    bool bNoRet )
+    bool bNoRet,
+    bool bLocked )
 {
     gint32 ret = 0;
     if( GetArgCount( pArgList ) == 0 )
@@ -1783,7 +1789,10 @@ gint32 CMethodWriterFuse::GenDeserialArgs(
     do{
         NEW_LINE;
         Wa( "CJsonSerialBase oDeserial_(" );
-        Wa( "    ObjPtr( this ) );" );
+
+        CCOUT << "    ObjPtr( this ), "<<
+            ( bLocked ? "true );" : "false );" );
+        NEW_LINE;
         CEmitSerialCodeFuse oedsc(
             m_pWriter, pArgList );
 
@@ -2167,8 +2176,8 @@ gint32 CImplIfMethodProxyFuse::OutputAsync()
             Wa( "if( val_.empty() || !val_.isObject() )" );
             Wa( "{ ret = -EINVAL; break; }" );
 
-            ret = GenSerialArgs(
-                pInArgs, "pBuf_", true, true );
+            ret = GenSerialArgs( pInArgs,
+                "pBuf_", true, true, false, true );
             if( ERROR( ret ) )
                 break;
 
@@ -2230,7 +2239,7 @@ gint32 CImplIfMethodProxyFuse::OutputAsync()
                     break;
 
                 ret = GenDeserialArgs( pOutArgs,
-                    "pBuf2", true, true, true );
+                    "pBuf2", true, true, true, true );
                 if( ERROR( ret ) )
                     break;
                 BLOCK_CLOSE;
@@ -2428,8 +2437,8 @@ gint32 CImplIfMethodSvrFuse::OutputEvent()
             Wa( "{ ret = -EINVAL; break; }" );
             Wa( "Json::Value val_ =" );
             Wa( "    oJsEvt[ JSON_ATTR_PARAMS ];" );
-            ret = GenSerialArgs(
-                pInArgs, "pBuf_", true, true );
+            ret = GenSerialArgs( pInArgs,
+                "pBuf_", true, true, false, true );
             if( ERROR( ret ) )
                 break;
 
@@ -2713,8 +2722,8 @@ gint32 CImplIfMethodSvrFuse::OutputAsyncCallback()
             Wa( "BufPtr pBuf_( true );" );
             Wa( "Json::Value val_ =" );
             Wa( "    oJsResp[ JSON_ATTR_PARAMS ];" );
-            ret = GenSerialArgs(
-                pOutArgs, "pBuf_", true, true );
+            ret = GenSerialArgs( pOutArgs,
+                "pBuf_", true, true, false, true );
             if( ERROR( ret ) )
                 break;
             Wa( "oResp_.Push( pBuf_ );" );
@@ -2780,7 +2789,7 @@ gint32 CImplIfMethodSvrFuse::OutputAsyncCancelWrapper()
         {
             Wa( "Json::Value val_;" );
             ret = GenDeserialArgs( pInArgs,
-                "pBuf_", false, false, true );
+                "pBuf_", false, false, true, false );
             if( ERROR( ret ) )
                 break;
         }

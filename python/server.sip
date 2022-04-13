@@ -744,16 +744,17 @@ class CPythonServer :
             *a0, a1, a2 );
     %End
 
-    guint64 GetIdHashByChan( HANDLE );
+    gint32 GetIdHashByChan( HANDLE, guint64& /Out/ );
     %MethodCode
+    gint32 ret = 0;
+    a1 = 0;
     do{
         sipRes = 0;
         CPythonServerImpl* pImpl =
         static_cast< CPythonServerImpl* >
             ( sipCpp );
-        
         InterfPtr pIf;
-        gint32 ret = pImpl->GetUxStream( a0, pIf );
+        ret = pImpl->GetUxStream( a0, pIf );
         if( ERROR( ret ) )
             break;
         guint64 qwHash = 0;
@@ -761,9 +762,11 @@ class CPythonServer :
         ret = GetObjIdHash( qwId, qwHash );
         if( ERROR( ret ) )
             break;
-        sipRes = qwHash;
+        a1 = qwHash;
     }while( 0 );
+    sipRes = ret;
     %End
+
     HANDLE GetChanByIdHash( guint64 );
     %MethodCode
         CPythonServerImpl* pImpl =

@@ -435,9 +435,11 @@ gint32 CFuseFileEntry::fs_getattr(
     stbuf->st_ino = GetObjId();
     stbuf->st_mode = S_IFREG | GetMode();
     stbuf->st_nlink = 1;
+    guint32 size = 0;
     this->fs_ioctl( path, fi,
-        FIONREAD, nullptr, 0,
-        &stbuf->st_size );
+        FIOC_GETSIZE, nullptr, 0,
+        &size );
+    stbuf->st_size = size;
     return 0;
 }
 
@@ -575,14 +577,14 @@ gint32 CFuseFileEntry::fs_ioctl(
     do{
         switch( cmd )
         {
-        case FIONREAD:
+        case FIOC_GETSIZE:
             {
                 CFuseMutex oLock( GetLock() );
                 ret = oLock.GetStatus();
                 if( ERROR( ret ) )
                     break;
 
-                size_t* pSize = ( size_t* )data;
+                guint32* pSize = ( guint32* )data;
 
                 if( m_queReqs.size() )
                     break;
@@ -631,14 +633,14 @@ gint32 CFuseReqFileProxy::fs_ioctl(
     do{
         switch( cmd )
         {
-        case FIONREAD:
+        case FIOC_GETSIZE:
             {
                 CFuseMutex oLock( GetLock() );
                 ret = oLock.GetStatus();
                 if( ERROR( ret ) )
                     break;
 
-                size_t* pSize = ( size_t* )data;
+                guint32* pSize = ( guint32* )data;
 
                 if( m_queReqs.size() )
                     break;
@@ -649,6 +651,66 @@ gint32 CFuseReqFileProxy::fs_ioctl(
                     *pSize += elem.strResp.size()
                         + sizeof( guint32 );
                 }
+                break;
+            }
+        default:
+            ret = super::fs_ioctl( path, fi,
+                cmd, arg, flags, data );
+            break;
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CFuseStmFile::fs_ioctl(
+    const char *path,
+    fuse_file_info *fi,
+    unsigned int cmd,
+    void *arg, 
+    unsigned int flags,
+    void *data )
+{
+    gint32 ret = 0;
+    do{
+        switch( cmd )
+        {
+        case FIOC_GETSIZE:
+            {
+                CFuseMutex oLock( GetLock() );
+                ret = oLock.GetStatus();
+                if( ERROR( ret ) )
+                    break;
+
+                guint32* pSize = ( guint32* )data;
+
+                if( m_queReqs.size() )
+                    break;
+
+                *pSize = GetBytesAvail();
+                guint32 dwSize = 0;
+                {
+                    InterfPtr pIf = GetIf();
+                    CStreamServerFuse* pSvr = pIf;
+                    CStreamProxyFuse* pProxy = pIf;
+                    HANDLE hstm = GetStream();
+
+                    if( pSvr != nullptr )
+                    {
+                        ret = pSvr->GetPendingBytes(
+                            hstm, dwSize );
+                    }
+                    else
+                    {
+                        ret = pProxy->GetPendingBytes(
+                            hstm, dwSize );
+                    }
+                    if( ERROR( ret ) )
+                        break;
+                }
+                *pSize += dwSize;
+
                 break;
             }
         default:
@@ -1178,7 +1240,7 @@ gint32 CFuseStmFile::SendBufVec( OUTREQ& oreq )
         {
             if( IsNonBlock() )
             {
-                ret = pStmSvr->WriteStreamNoWait(
+                ret = pStmSvr->WriteStream(
                     hstm, pBuf );
                 if( ret == STATUS_PENDING )
                     ret = 0;
@@ -1191,7 +1253,7 @@ gint32 CFuseStmFile::SendBufVec( OUTREQ& oreq )
         {
             if( IsNonBlock() )
             {
-                ret = pStmProxy->WriteStreamNoWait(
+                ret = pStmProxy->WriteStream(
                     hstm, pBuf );
                 if( ret == STATUS_PENDING )
                     ret = 0;
@@ -1278,6 +1340,21 @@ gint32 CFuseStmFile::OnWriteResumed()
     return ret;
 }
 
+void CFuseStmFile::NotifyPoll()
+{
+    do{
+        CFuseMutex oFileLock( GetLock() );
+        fuse_pollhandle* ph = GetPollHandle();
+        if( ph != nullptr )
+        {
+            fuse_notify_poll( ph );
+            SetPollHandle( nullptr );
+        }
+
+    }while( 0 );
+    return;
+}
+
 gint32 CFuseStmFile::OnWriteStreamComplete(
     HANDLE hStream,
     gint32 iRet,
@@ -1317,6 +1394,25 @@ gint32 CFuseStmFile::fs_poll(
         SetPollHandle( ph );
         if( m_queIncoming.size() > 0 &&
             m_queReqs.empty() )
+            *reventsp |= POLLIN;
+        gint32 ret = 0;
+        guint32 dwSize = 0;
+        {
+            ObjPtr pObj = GetIf();
+            CStreamProxyFuse* pProxy = pObj;
+            CStreamServerFuse* pSvr = pObj;
+            if( pSvr != nullptr )
+            {
+                ret = pSvr->GetPendingBytes(
+                    GetStream(), dwSize );
+            }
+            else
+            {
+                ret = pProxy->GetPendingBytes(
+                    GetStream(), dwSize );
+            }
+        }
+        if( SUCCEEDED( ret ) && dwSize > 0 )
             *reventsp |= POLLIN;
 
         if( !GetFlowCtrl() )
@@ -2200,8 +2296,40 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CFuseRootProxy );
 
     END_FACTORY_MAPS;
-};
+}
 
+gint32 CStreamServerFuse::OnStmRecv(
+    HANDLE hChannel, BufPtr& pBuf )
+{
+    gint32 ret = 0;
+    do{
+        ret = super::OnStmRecv( hChannel, pBuf );
+        if( ERROR( ret ) )
+            break;
+        CFuseSvcServer* pSvc = ObjPtr( this );
+        pSvc->OnStmRecvFuse( hChannel, pBuf );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CStreamProxyFuse::OnStmRecv(
+    HANDLE hChannel, BufPtr& pBuf )
+{
+    gint32 ret = 0;
+    do{
+        ret = super::OnStmRecv( hChannel, pBuf );
+        if( ERROR( ret ) )
+            break;
+
+        CFuseSvcProxy* pSvc = ObjPtr( this );
+        pSvc->OnStmRecvFuse( hChannel, pBuf );
+
+    }while( 0 );
+
+    return ret;
+}
 
 } // namespace
 
@@ -2368,7 +2496,7 @@ gint32 fuseop_create( const char* path,
             break;
         }
 
-        if( vecSubdirs.size() != 1 &&
+        if( vecSubdirs.size() != 1 || 
             vecSubdirs[ 0 ] != STREAM_DIR )
         {
             ret = -EACCES;
