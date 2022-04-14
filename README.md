@@ -25,6 +25,7 @@ This is an asynchronous and event-driven RPC implementation for embeded system w
 16. [`Node Redudancy/Load Balance`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md#load-balance--node-redudancy)
 17. [`A CPP, Python and Java skelton generator`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md)
 18. [`A GUI config tool for rpcrouter`](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools/README.md)
+19. [**Supporting all the Programing Language via RPC-FS**](coming soon)
 
 #### Building `rpc-frmwrk`   
 Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60) for details.
@@ -53,13 +54,17 @@ This project depends on the following 3rd-party packags at runtime:
 9. `Java OpenJDK 8 for Java support.`
 
 #### Todo
-1. FUSE integration.
+1. FUSE integration ( coming soon ).
 2. Tutorials
 3. Performance Tuning
 4. Adaptive flow control
 5. A tree-like hierarchical persistant registry.
 
 ---
+[`Thu Apr 14 2022 09:11:27 PM Beijing`]   
+1. The fuse integration has passed most of the test cases, and I will merge it to the master branch soon.
+2. Next, there should be many documentation work and auto-testcases to write.
+
 [`Wed Mar 30 2022 10:25:04 PM Beijing`]    
 1. Finally, the file system interface is code complete. Next let's make it run.
 
