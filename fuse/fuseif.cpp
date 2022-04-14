@@ -1031,7 +1031,7 @@ gint32 CFuseStmFile::fs_read(
                 gint32 (*func)( CRpcServices*, CFuseStmFile*, BufPtr& )=
                     ([]( CRpcServices* pIf,
                         CFuseStmFile* pFile,
-                        BufPtr& pBuf_ )
+                        BufPtr& pBuf_ )->gint32
                 {
                     gint32 ret = 0;
                     do{
@@ -2664,6 +2664,37 @@ int fuseop_readdir(
         path, fi, buf, filler, off, flags );
 }
 
+#include <signal.h>
+static int set_one_signal_handler(
+    int sig, void (*handler)(int), int remove)
+{
+    struct sigaction sa;
+    struct sigaction old_sa;
+
+    memset(&sa, 0, sizeof(struct sigaction));
+    sa.sa_handler = remove ? SIG_DFL : handler;
+    sigemptyset(&(sa.sa_mask));
+    sa.sa_flags = 0;
+
+    if (sigaction(sig, NULL, &old_sa) == -1) {
+        perror("fuse: cannot get old signal handler");
+        return -1;
+    }
+
+    if (old_sa.sa_handler == (remove ? handler : SIG_DFL) &&
+        sigaction(sig, &sa, NULL) == -1) {
+        perror("fuse: cannot set signal handler");
+        return -1;
+    }
+    return 0;
+}
+
+static void do_nothing(int sig)
+{
+    OutputMsg( sig, "doing nothing with signal" );
+}
+
+
 void* fuseop_init(
    fuse_conn_info *conn,
    fuse_config *cfg )
@@ -2677,6 +2708,8 @@ void* fuseop_init(
     cfg->kernel_cache = 0;
     cfg->intr = 1;
 
+    set_one_signal_handler(
+        cfg->intr_signal, do_nothing, 0 );
     // init some other stuffs
     Json::CharReaderBuilder oBuilder;
     g_pReader.reset( oBuilder.newCharReader() );

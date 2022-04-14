@@ -95,7 +95,7 @@ static void fuseif_rwinterrupt(
         struct timeval now;
         struct timespec timeout;
 
-        pthread_kill(d->id, SIGUSR1 );
+        pthread_kill(d->id, f->conf.intr_signal );
         gettimeofday(&now, NULL);
         timeout.tv_sec = now.tv_sec + 1;
         timeout.tv_nsec = now.tv_usec * 1000;
