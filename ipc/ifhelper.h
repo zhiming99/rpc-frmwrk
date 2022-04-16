@@ -3881,6 +3881,7 @@ class CTaskWrapper :
     gint32 RunTask() override;
     gint32 OnTaskComplete( gint32 iRet ) override;
     gint32 OnComplete( gint32 iRetVal ) override;
+    gint32 OnCancel( guint32 dwContext ) override;
 };
 
 }

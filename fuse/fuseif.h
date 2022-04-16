@@ -681,9 +681,11 @@ class CFuseFileEntry : public CFuseObjBase
     }
 
     virtual gint32 CancelFsRequest(
-        fuse_req_t req );
+        fuse_req_t req,
+        gint32 iRet = -ECANCELED );
 
-    virtual gint32 CancelFsRequests();
+    virtual gint32 CancelFsRequests(
+        gint32 iRet = -ECANCELED );
 
     guint32 GetBytesAvail() const
     { 
@@ -2390,6 +2392,41 @@ class CFuseServicePoint :
             auto pStmFile = static_cast
                 < CFuseStmFile* >( pObj );
             pStmFile->NotifyPoll();
+
+        }while( 0 );
+
+        return ret;
+    }
+
+    gint32 DoRmtModEventFuse(
+        EnumEventId iEvent,
+        const std::string& strModule,
+        IConfigDb* pEvtCtx )
+    {
+        gint32 ret = 0;
+        do{
+            if( iEvent != eventRmtModOffline )
+                break;
+            
+            RLOCK_TESTMNT2( this );
+            auto pChild = _pSvcDir->GetChild(
+                JSON_REQ_FILE );
+
+            auto pReq = dynamic_cast
+                < CFuseFileEntry* >( pChild );
+            pReq->CancelFsRequests( -EIO );
+
+            pChild = _pSvcDir->GetChild(
+                JSON_RESP_FILE );
+            auto pResp = dynamic_cast
+                < CFuseFileEntry* >( pChild );
+            pResp->CancelFsRequests( -EIO );
+
+            pChild = _pSvcDir->GetChild(
+                JSON_EVT_FILE );
+            auto pEvt = dynamic_cast
+                < CFuseFileEntry* >( pChild );
+            pEvt->CancelFsRequests( -EIO );
 
         }while( 0 );
 

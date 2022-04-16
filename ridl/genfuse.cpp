@@ -1602,7 +1602,7 @@ gint32 CDeclServiceImplFuse::Output()
             Wa( "    Json::Value& valResp ) override;" );
             NEW_LINE;
             Wa( "gint32 CancelRequestByReqId(" );
-            Wa( "    guint64 qwReqId );" );
+            Wa( "    guint64 qwReqId, guint64 qwThisReq );" );
 
             NEW_LINE;
             Wa( "gint32 OnReqComplete(" );
@@ -1643,6 +1643,20 @@ gint32 CDeclServiceImplFuse::Output()
 
             Wa( "gint32 OnWriteResumed( HANDLE hChannel ) override" );
             CCOUT << "{ return OnWriteResumedFuse( hChannel ); } ";
+            NEW_LINES(2);
+            Wa( "gint32 DoRmtModEvent(" );
+            Wa( "    EnumEventId iEvent," );
+            Wa( "    const std::string& strModule," );
+            CCOUT << "    IConfigDb* pEvtCtx ) override";
+            NEW_LINE;
+            BLOCK_OPEN;
+            Wa( "gint32 ret = super::DoRmtModEvent(" );
+            Wa( "     iEvent, strModule, pEvtCtx );");
+            Wa( "if( SUCCEEDED( ret ) )" );
+            Wa( "    ret = DoRmtModEventFuse(" );
+            Wa( "        iEvent, strModule, pEvtCtx );" );
+            CCOUT << "return ret;";
+            BLOCK_CLOSE;
 
             BLOCK_CLOSE;
             CCOUT << ";";
@@ -3057,7 +3071,7 @@ gint32 CImplServiceImplFuse::Output()
             Wa( "if( !oReq.isMember( JSON_ATTR_REQCTXID ) ||");
             Wa( "    !oReq[ JSON_ATTR_REQCTXID ].isUInt64() )" );
             Wa( "{ ret = -EINVAL; break; }" );
-            Wa( "guint64 qwReqId =" );
+            Wa( "guint64 qwThisReq =" );
             Wa( "    oReq[ JSON_ATTR_REQCTXID ].asUInt64();" );
             Wa( "if( !oReq.isMember( JSON_ATTR_PARAMS ) ||");
             Wa( "    !oReq[ JSON_ATTR_PARAMS ].isObject() ||" );
@@ -3067,7 +3081,9 @@ gint32 CImplServiceImplFuse::Output()
             Wa( "if( !val_.isMember( JSON_ATTR_REQCTXID ) ||");
             Wa( "    !val_[ JSON_ATTR_REQCTXID ].isUInt64() )" );
             Wa( "{ ret = -EINVAL; break; }" );
-            Wa( "ret = CancelRequestByReqId( qwReqId );" );
+            Wa( "guint64 qwReqId =" );
+            Wa( "    val_[ JSON_ATTR_REQCTXID ].asUInt64();" );
+            Wa( "ret = CancelRequestByReqId( qwReqId, qwThisReq );" );
             CCOUT << "break;";
             BLOCK_CLOSE;
             NEW_LINE;
@@ -3086,7 +3102,7 @@ gint32 CImplServiceImplFuse::Output()
             CCOUT << "gint32 " << strClass
                 << "::CancelRequestByReqId( ";
             NEW_LINE;
-            CCOUT << "    guint64 qwReqId )";
+            CCOUT << "    guint64 qwReqId, guint64 qwThisReq )";
             NEW_LINE;
             BLOCK_OPEN;
             Wa( "gint32 ret = 0;" );
@@ -3130,18 +3146,16 @@ gint32 CImplServiceImplFuse::Output()
             CCOUT << strClass << "* pClient = ObjPtr( pIf );";
             NEW_LINE;
             Wa( "pClient->ReceiveMsgJson( strResp, qwReqId );" );
-            Wa( "pClient->RemoveReq( qwReqId );" );
             CCOUT << "";
             BLOCK_CLOSE;
             Wa( "while( 0 );" );
             CCOUT << "return 0;";
             BLOCK_CLOSE;
-            NEW_LINE;
             Wa( ");" );
             Wa( "TaskletPtr pCb;" );
             Wa( "ret = NEW_FUNCCALL_TASK( pCb," );
             Wa( "    this->GetIoMgr(), func," );
-            Wa( "    this, nullptr, qwReqId );" );
+            Wa( "    this, nullptr, qwThisReq );" );
             Wa( "if( ERROR( ret ) )" );
             Wa( "    break;" );
             Wa( "CDeferredFuncCallBase< CIfRetryTask >*" );
@@ -3150,10 +3164,21 @@ gint32 CImplServiceImplFuse::Output()
             Wa( "Variant oArg0( pObj );" );
             Wa( "pCall->UpdateParamAt( 1, oArg0 );" );
             NEW_LINE;
-            Wa( "ret = this->CancelReqAsync(" );
-            Wa( "    pCb, qwTaskId );" );
+            Wa( "TaskletPtr pWrapper;" );
+            Wa( "CCfgOpener oCfg;" );
+            Wa( "oCfg.SetPointer( propIfPtr, this );" );
+            Wa( "ret = pWrapper.NewObj(" );
+            Wa( "   clsid( CTaskWrapper )," );
+            Wa( "   ( IConfigDb* )oCfg.GetCfg() );" );
             Wa( "if( ERROR( ret ) )" );
-            Wa( "   ( *pCb )( eventCancelTask );" );
+            Wa( "    break;" );
+            Wa( "CTaskWrapper* ptw = pWrapper;" );
+            Wa( "ptw->SetCompleteTask( pCall );" );
+            NEW_LINE;
+            Wa( "ret = this->CancelReqAsync(" );
+            Wa( "    ptw, qwTaskId );" );
+            Wa( "if( ERROR( ret ) )" );
+            Wa( "   ( *ptw )( eventCancelTask );" );
             Wa( "break;" );
             BLOCK_CLOSE;
             Wa( "while( 0 );" );

@@ -1437,7 +1437,7 @@ gint32 CFuseStmFile::fs_poll(
 }
 
 gint32 CFuseFileEntry::CancelFsRequest(
-    fuse_req_t req )
+    fuse_req_t req, gint32 iRet )
 {
     //NOTE: must have file lock acquired
     gint32 ret = 0;
@@ -1459,7 +1459,7 @@ gint32 CFuseFileEntry::CancelFsRequest(
         auto req = itr->req;
         fuseif_finish_interrupt(
                 GetFuse(), req, d );
-        fuse_reply_err( req, ECANCELED );
+        fuse_reply_err( req, iRet );
         m_queReqs.erase( itr );
         return STATUS_SUCCESS;
     }
@@ -1467,7 +1467,8 @@ gint32 CFuseFileEntry::CancelFsRequest(
     return -ENOENT;
 }
 
-gint32 CFuseFileEntry::CancelFsRequests()
+gint32 CFuseFileEntry::CancelFsRequests(
+    gint32 iRet )
 {
     //NOTE: must have file lock acquired
     gint32 ret = 0;
@@ -1476,8 +1477,7 @@ gint32 CFuseFileEntry::CancelFsRequests()
         fuseif_finish_interrupt( GetFuse(),
             elem.req, 
             elem.pintr.get() );
-        fuse_reply_err(
-            elem.req, ECANCELED );
+        fuse_reply_err( elem.req, iRet );
     }
     m_queReqs.clear();
 
@@ -1856,16 +1856,6 @@ gint32 CFuseRespFileProxy::ReceiveMsgJson(
 {
     gint32 ret = 0;
     do{
-        InterfPtr pIf = GetIf();
-        CFuseSvcProxy* pProxy = pIf;
-        CHILD_TYPE pEnt = pProxy->GetSvcDir();
-        CFuseSvcDir* pDir = static_cast
-            < CFuseSvcDir* >( pEnt.get() );
-        auto p = pDir->GetChild( JSON_REQ_FILE );
-        CFuseReqFileProxy* pReqFile = static_cast
-            < CFuseReqFileProxy* >( p );
-        pReqFile->RemoveResp( qwReqId );
-
         ret = super::ReceiveEvtJson( strMsg );
 
     }while( 0 );
@@ -2156,11 +2146,6 @@ gint32 CFuseReqFileProxy::fs_write_buf(
 
         if( ret == STATUS_PENDING )
         {
-            CFuseMutex oLock( GetLock() );
-            // append the response to the
-            // m_queTaskIds of request file
-            m_queTaskIds.push_back(
-                { strResp, qwReqId } );
             ret = 0;
         }
         else if( ret == -STATUS_PENDING )

@@ -5759,4 +5759,14 @@ gint32 CTaskWrapper::OnComplete(
     m_pMajor.Clear();
     return iRetVal;
 }
+gint32 CTaskWrapper::OnCancel(
+    guint32 dwContext )
+{
+    if( !m_pTask.IsEmpty() )
+        ( *m_pTask )( eventCancelTask );
+    if( !m_pMajor.IsEmpty() )
+        ( *m_pMajor )( eventCancelTask );
+    return super::OnCancel( dwContext );
+}
+
 }
