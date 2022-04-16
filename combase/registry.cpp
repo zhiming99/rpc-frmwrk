@@ -121,32 +121,42 @@ void CDirEntry::RemoveAllProps()
 CDirEntry* CDirEntry::GetChild(
     const std::string& strName ) const
 {
-    CDirEntry* pRet = NULL;
-
     if( strName.size() > REG_MAX_NAME )
         return nullptr;
 
-    map< string, CDirEntry* >::const_iterator itr =
-                        m_mapChilds.find( strName );
+    CDirEntry* pRet = nullptr;
+    auto itr = m_mapChilds.find( strName );
+    if( itr != m_mapChilds.end() )
+        pRet = itr->second.get();
 
+    return pRet;
+}
+
+gint32 CDirEntry::GetChild(
+    const std::string& strName,
+    CHILD_TYPE& pChild ) const
+{
+    if( strName.size() > REG_MAX_NAME )
+        return -ENAMETOOLONG;
+
+    auto itr = m_mapChilds.find( strName );
     if( itr != m_mapChilds.end() )
     {
-        pRet = itr->second;
+        pChild = itr->second;
+        return 0;
     }
-    return pRet;
+
+    return -ENOENT;
 }
 
 gint32 CDirEntry::RemoveAllChildren()
 {
     
     gint32 ret = 0;
-    map< string, CDirEntry* >::iterator
-        itr = m_mapChilds.begin();
+    auto itr = m_mapChilds.begin();
 
     while( itr != m_mapChilds.end() )
     {
-        delete itr->second;
-        itr->second = NULL;
         itr = m_mapChilds.erase( itr );
     }
 
@@ -156,23 +166,35 @@ gint32 CDirEntry::RemoveAllChildren()
 gint32 CDirEntry::AddChild(
     const std::string& strName )
 {
-    gint32 ret = -ENOENT;
-
     if( strName.size() > REG_MAX_NAME )
         return -EINVAL;
 
-    map< string, CDirEntry* >::iterator itr =
-                        m_mapChilds.find( strName );
+    std::shared_ptr< CDirEntry >
+        pEnt( new CDirEntry() );
 
-    if( itr == m_mapChilds.end() )
-    {
-        CDirEntry* pEnt = new CDirEntry;
-        pEnt->DecRef();
-        pEnt->SetName( strName );
-        pEnt->SetParent( this );
-        m_mapChilds[ strName ] = pEnt;
-        ret = 0;
-    }
+    // give up ownership
+    pEnt->DecRef();
+    pEnt->SetName( strName );
+    return AddChild( pEnt );
+}
+
+gint32 CDirEntry::AddChild(
+    const CHILD_TYPE& pEnt )
+{
+    gint32 ret = -ENOENT;
+
+    if( pEnt.get() == nullptr )
+        return -EINVAL;
+
+    stdstr strName = pEnt->GetName();
+
+    auto itr = m_mapChilds.find( strName );
+    if( itr != m_mapChilds.end() )
+        return -EEXIST;
+
+    pEnt->SetParent( this );
+    m_mapChilds[ strName ] = pEnt;
+    ret = 0;
     return ret;
 }
 
@@ -183,22 +205,29 @@ gint32 CDirEntry::RemoveChild(
     if( strName.size() > REG_MAX_NAME )
         return -EINVAL;
 
-    map< string, CDirEntry* >::iterator itr =
-                        m_mapChilds.find( strName );
-
+    auto itr = m_mapChilds.find( strName );
     if( itr != m_mapChilds.end() )
     {
-        delete itr->second;
         m_mapChilds.erase( itr );
         ret = 0;
     }
     return ret;
 }
 
-CRegistry::CRegistry()
-    : super(),
-    m_pCurDir( &m_oRootDir )
+gint32 CDirEntry::GetChildren(
+    std::vector< CHILD_TYPE >& vecChildren ) const
 {
+    for( auto& elem : m_mapChilds )
+        vecChildren.push_back( elem.second );
+    return vecChildren.size();
+}
+
+CRegistry::CRegistry()
+    : super()
+{
+    m_pRootDir = CHILD_TYPE( new CDirEntry() );
+    m_pRootDir->SetName( "/" );
+    m_pCurDir = m_pRootDir.get();
     SetClassId( Clsid_CRegistry );
 }
 
@@ -278,9 +307,8 @@ gint32 CRegistry::ListDir(
     else
     {
         vecContents.clear();
-        CStdRMutex a( const_cast< stdrmutex&> (m_oLock ) );
-        map<std::string, CDirEntry*>::const_iterator itr =
-                        m_pCurDir->m_mapChilds.begin();
+        CStdRMutex a( m_oLock );
+        auto itr = m_pCurDir->m_mapChilds.begin();
 
         while( itr != m_pCurDir->m_mapChilds.end() )
         {
@@ -291,57 +319,69 @@ gint32 CRegistry::ListDir(
     return ret;
 }
 
+
 gint32 CRegistry::ChangeDir(
     const std::string& strDir )
 {
     gint32 ret = 0;
-    vector<string> vecComp;
-    CDirEntry* pCurDir = m_pCurDir;
+    CStdRMutex a( m_oLock );
+    CDirEntry* pDir = nullptr;
+    ret = GetEntry( strDir, pDir );
+    if( ERROR( ret ) )
+        return ret;
 
+    m_pCurDir = pDir;
+    return ret;
+}
+
+gint32 CRegistry::GetEntry(
+    const std::string& strDir,
+    CDirEntry*& pDir ) const
+{
+    gint32 ret = 0;
+    vector<string> vecComp;
     if( strDir.size() > REG_MAX_PATH )
-    {
         return -EINVAL;
-    }
 
     ret = Namei( strDir, vecComp );
-    if( ret == 0 )
+    if( ERROR( ret ) )
+        return ret;
+
+    CStdRMutex a( m_oLock );
+    auto itr = vecComp.begin();
+    CDirEntry* pCurDir = m_pCurDir;
+    while( itr != vecComp.end() )
     {
-        vector<string>::iterator itr = vecComp.begin();
-        CStdRMutex a( m_oLock );
-        while( itr != vecComp.end() )
+        if( *itr == "." )
         {
-            if( *itr == "." )
-            {
-            }
-            else if( *itr == ".." )
-            {
-                if( pCurDir == &m_oRootDir )
-                {
-                    ret = -ENOENT;
-                    break;
-                }
-                pCurDir = pCurDir->GetParent();
-            }
-            else if( *itr == "/" )
-            {
-                pCurDir = &m_oRootDir;
-            }
-            else
-            {
-                pCurDir = pCurDir->GetChild( *itr );
-                if( pCurDir == NULL )
-                {
-                    ret = -ENOENT;
-                    break;
-                }
-            }
-            ++itr;
         }
-        if( ret == 0 )
+        else if( *itr == ".." )
         {
-            m_pCurDir = pCurDir;
+            if( pCurDir == GetRootDir() )
+            {
+                ret = -ENOENT;
+                break;
+            }
+            pCurDir = pCurDir->GetParent();
         }
+        else if( *itr == "/" )
+        {
+            pCurDir = GetRootDir();
+        }
+        else
+        {
+            pCurDir = pCurDir->GetChild( *itr );
+            if( pCurDir == NULL )
+            {
+                ret = -ENOENT;
+                break;
+            }
+        }
+        ++itr;
     }
+    if( SUCCEEDED( ret ) )
+        pDir = pCurDir;
+
     return ret;
 }
 
@@ -415,7 +455,7 @@ gint32 CRegistry::ExistingDir(
 
         if( vecComp[ 0 ] == "/" )
         {
-            pCurDir = &GetRootDir();
+            pCurDir = GetRootDir();
             ++itr;
         }
 
@@ -461,7 +501,7 @@ gint32 CRegistry::MakeDir(
 
         if( vecComp[ 0 ] == "/" )
         {
-            pCurDir = &GetRootDir();
+            pCurDir = GetRootDir();
             ++itr;
         }
 

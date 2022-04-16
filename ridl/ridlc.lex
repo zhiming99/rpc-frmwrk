@@ -510,6 +510,7 @@ std::vector< std::unique_ptr< FILECTX > > g_vecBufs;
 
 std::map< std::string, yytokentype >
     g_mapKeywords = {
+        // types
         { "string", TOK_STRING }, 
         { "uint64", TOK_UINT64 }, 
         { "int64", TOK_INT64 }, 
@@ -527,30 +528,24 @@ std::map< std::string, yytokentype >
         { "ObjPtr", TOK_OBJPTR },
         { "HSTREAM", TOK_HSTREAM },
 
+        // flags
         { "async", TOK_ASYNC },
         { "async_p", TOK_ASYNCP },
         { "async_s", TOK_ASYNCS },
         { "event", TOK_EVENT },
-        { "returns", TOK_RETURNS },
         { "stream", TOK_STREAM },
-        // { "serial", TOK_SERIAL },
         { "timeout", TOK_TIMEOUT },
-        { "rtpath", TOK_RTPATH },
-        { "ssl", TOK_SSL },
-        { "websock", TOK_WEBSOCK },
-        { "compress", TOK_COMPRES },
-        { "auth", TOK_AUTH },
-        { "ipaddr", TOK_IPADDR },
-        { "portnum", TOK_PORTNUM },
         { "noreply", TOK_NOREPLY },
         { "keepalive", TOK_KEEPALIVE },
 
+        // keywords
         { "struct", TOK_STRUCT }, 
         { "interface", TOK_INTERFACE }, 
         { "service", TOK_SERVICE },
         { "typedef", TOK_TYPEDEF },
         { "appname", TOK_APPNAME },
         { "const", TOK_CONST },
+        { "returns", TOK_RETURNS },
     };
 
 FILECTX::FILECTX()

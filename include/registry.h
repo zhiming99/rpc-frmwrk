@@ -31,11 +31,13 @@
 namespace rpcf
 {
 
+#define CHILD_TYPE std::shared_ptr< CDirEntry >
+
 class CDirEntry : public CObjBase
 {
     friend class CRegistry;
     protected:
-    std::map<std::string, CDirEntry*> m_mapChilds;
+    std::map<std::string, CHILD_TYPE> m_mapChilds;
     CfgPtr      m_mapProps;
     CDirEntry* m_pParent;
     std::string m_strName;
@@ -55,8 +57,19 @@ class CDirEntry : public CObjBase
 
     bool IsRoot() const;
 
-    CDirEntry* GetChild( const std::string& strName ) const;
+    CDirEntry* GetChild(
+        const std::string& strName ) const;
+
+    gint32 GetChild(
+        const std::string& strName,
+        CHILD_TYPE& pChild ) const;
+
     gint32 AddChild( const std::string& strName );
+    virtual gint32 AddChild(
+        const CHILD_TYPE& pEnt );
+
+    gint32 GetChildren(
+        std::vector< CHILD_TYPE >& vecChildren ) const;
 
     gint32 GetProperty(
         gint32 iProp,
@@ -66,10 +79,14 @@ class CDirEntry : public CObjBase
         gint32 iProp,
         const Variant& oVar ) override;
 
-    gint32 RemoveChild( const std::string& strName );
+    virtual gint32 RemoveChild(
+        const std::string& strName );
 
     gint32 RemoveProp( gint32 iProp );
     const CDirEntry& operator=( const CDirEntry& rhs );
+
+    inline gint32 GetCount() const
+    { return m_mapChilds.size(); }
 
     gint32 RemoveAllChildren();
     void RemoveAllProps();
@@ -80,8 +97,9 @@ class CRegistry : public CObjBase
 {
     protected:
     CDirEntry m_oRootDir;
+    CHILD_TYPE m_pRootDir;
     CDirEntry *m_pCurDir;
-    std::recursive_mutex m_oLock;
+    mutable std::recursive_mutex m_oLock;
 
     public:
 
@@ -90,11 +108,17 @@ class CRegistry : public CObjBase
     CRegistry();
     ~CRegistry();
 
-    std::recursive_mutex& GetLock(){ return m_oLock; };
+    std::recursive_mutex& GetLock() const
+    { return m_oLock; };
 
     gint32 MakeEntry( const std::string& );
     gint32 MakeDir( const std::string& );
     gint32 ChangeDir( const std::string& );
+
+    gint32 GetEntry(
+        const std::string& strPath,
+        CDirEntry*& pDir ) const;
+
     gint32 RemoveProperty( guint32 iProp );
 
     gint32 GetProperty(
@@ -118,8 +142,14 @@ class CRegistry : public CObjBase
     gint32 ListDir(
         std::vector<std::string>& vecContents ) const;
 
-    CDirEntry& GetRootDir() const
-    { return ( CDirEntry& )m_oRootDir; }
+    CDirEntry* GetRootDir() const
+    { return m_pRootDir.get(); }
+
+    inline void SetRootDir( CHILD_TYPE pRoot )
+    {
+        m_pRootDir = pRoot;
+        m_pRootDir->SetName( "/" );
+    }
 };
 
 typedef CAutoPtr< clsid( CRegistry ), CRegistry > RegPtr;

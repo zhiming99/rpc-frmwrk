@@ -536,12 +536,12 @@ class CRpcTcpBridgeAuth :
         DMsgPtr& pRespMsg,
         IEventSink* pCallback );
 
-    virtual gint32 FetchData_Server(
+    gint32 FetchData_Filter(
         IConfigDb* pDataDesc,           // [in]
         gint32& fd,                     // [out]
         guint32& dwOffset,              // [in, out]
         guint32& dwSize,                // [in, out]
-        IEventSink* pCallback );
+        IEventSink* pCallback ) override;
 
     gint32 DoInvoke(
         DBusMessage* pReqMsg,

@@ -2929,6 +2929,9 @@ gint32 CInterfaceProxy::SendFetch_Proxy(
             ret = RunIoTask( oBuilder.GetCfg(),
                 oResp.GetCfg(), pCallback, &qwTaskId );
 
+            if( ERROR( ret ) )
+                break;
+
             if( ret == STATUS_PENDING )
             {
                 // the parameter list does not have a
@@ -5624,6 +5627,160 @@ gint32 CInterfaceProxy::UserCancelRequest(
     return ret;
 }
 
+// a user-initialized cancel request
+gint32 CInterfaceProxy::UserCancelReqAsync(
+    IEventSink* pCallback,
+	guint64& qwThisTaskId,
+	guint64 qwTaskToCancel )
+{
+	if( qwTaskToCancel == 0 )
+		return -EINVAL;
+
+    const string& strIfName = CoGetIfNameFromIid(
+        iid( IInterfaceServer ), "p" );
+
+    if( strIfName.empty() )
+        return ERROR_FAIL;
+
+    CParamList oOptions;
+    oOptions[ propIfName ] =
+        DBUS_IF_NAME( strIfName );
+    oOptions[ propSysMethod ] = true;
+
+    CCfgOpener oResp;
+    // make the call
+    std::string strMethod( "UserCancelRequest" );
+    gint32 ret = AsyncCall(
+        pCallback, oOptions.GetCfg(),
+        oResp.GetCfg(), strMethod,
+        qwTaskToCancel );
+
+    if( ERROR( ret ) )
+        return ret;
+
+    if( ret == STATUS_PENDING )
+    {
+        qwThisTaskId = oResp[ propTaskId ];
+        return ret;
+    }
+
+    if( SUCCEEDED( ret ) )
+    {
+        DebugPrint( 0,
+            "Req Task Canceled, 0x%llx",
+            qwTaskToCancel );
+    }
+    return ret;
+}
+
+gint32 CInterfaceProxy::CancelReqAsync(
+    IEventSink* pCallback,
+	guint64 qwTaskToCancel )
+{
+    gint32 ret = 0;
+    do{
+        TaskletPtr pWrapper, pTask;
+        CCfgOpener oCfg;
+        oCfg.SetPointer( propIfPtr,  this );
+        ret = pWrapper.NewObj(
+            clsid( CTaskWrapper ),
+            ( IConfigDb* )oCfg.GetCfg() );
+
+        if( ERROR( ret ) )
+            break;
+
+        gint32 ( *func )(IEventSink*,
+            IEventSink*, CRpcServices*, guint64) =
+            ([]( IEventSink* pWrapper,
+                IEventSink* pComplete,
+                CRpcServices* pIf,
+                guint64 qwTaskToCancel ) -> gint32
+        {
+            gint32 ret = 0;
+            do{
+
+                gint32 iRet = -ENOENT;
+                if( pWrapper != nullptr )
+                {
+                    TaskletPtr pThis = ObjPtr( pWrapper );
+                    CCfgOpener oCfg( ( IConfigDb* )
+                        pThis->GetConfig() );
+                    IConfigDb* pResp = nullptr;
+                    ret = oCfg.GetPointer(
+                        propRespPtr, pResp );
+                    if( SUCCEEDED( ret ) )
+                    {
+                        CCfgOpener oResp( pResp );
+                        oResp.GetIntProp( propReturnValue,
+                            ( guint32& )iRet );
+                    }
+                }
+
+                TaskGrpPtr pTaskGrp;
+                ret = pIf->GetParallelGrp( pTaskGrp );
+                if( ERROR( ret ) )
+                    break;
+
+                TaskletPtr pTaskCancel;
+                ret = pTaskGrp->FindTask(
+                    qwTaskToCancel, pTaskCancel );
+                if( SUCCEEDED( ret ) )
+                {
+                    // usually we do not land here
+                    // because the task has already
+                    // been completed with the error
+                    // response from the server
+                    DEFER_CALL( pIf->GetIoMgr(),
+                        pTaskCancel,
+                        &IEventSink::OnEvent,
+                        eventUserCancel,
+                        ERROR_USER_CANCEL,
+                        0, nullptr );
+                }
+
+                if( pComplete != nullptr )
+                {
+                    pComplete->OnEvent( eventTaskComp,
+                        iRet, 0, ( LONGWORD* )pWrapper );
+                }
+
+            }while( 0 );
+
+            return 0;
+        });
+
+        ret = NEW_FUNCCALL_TASK(
+            pTask, GetIoMgr(), func,
+            nullptr, pCallback, this,
+            qwTaskToCancel );
+
+        if( ERROR( ret ) )
+            break;
+
+        CDeferredFuncCallBase< CIfRetryTask >* pCall = pTask;
+        ObjPtr pObj( pCall );
+        Variant oArg0( pObj );
+        pCall->UpdateParamAt( 0, oArg0 );
+
+        CTaskWrapper* ptw = pWrapper;
+        ptw->SetCompleteTask( pTask );
+        // start the task
+        ( *ptw )( eventZero );
+
+        guint64 qwThisTask = 0;
+        ret = UserCancelReqAsync( ptw, 
+            qwThisTask, qwTaskToCancel );
+        if( ERROR( ret ) )
+        {
+            ptw->OnEvent(
+                eventCancelTask, ret, 0, 0 );
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CInterfaceProxy::Pause_Proxy()
 {
     return PauseResume_Proxy( "Pause" );
@@ -5806,7 +5963,14 @@ static CfgPtr InitIfSvrCfg(
     gint32 ret = 0;
     CCfgOpener oNewCfg;
     do{
+        guint32 iStateClass = clsid( CIfServerState );
         *oNewCfg.GetCfg() = *pCfg;
+        if( oNewCfg.exist( propNoPort ) )
+        {
+            oNewCfg.SetIntProp(
+                propIfStateClass, iStateClass );
+            break;
+        }
 
         string strPortClass;
         ret = oNewCfg.GetStrProp(
@@ -5815,13 +5979,11 @@ static CfgPtr InitIfSvrCfg(
         if( ERROR( ret ) )
             break;
 
-        guint32 iStateClass = clsid( CIfServerState );
         if( strPortClass == PORT_CLASS_UXSOCK_STM_PDO )
             iStateClass = clsid( CUnixSockStmState );
 
         oNewCfg.SetIntProp(
-            propIfStateClass,
-            iStateClass );
+            propIfStateClass, iStateClass );
 
     }while( 0 );
 
@@ -5908,6 +6070,9 @@ CInterfaceServer::CInterfaceServer(
     do{
         CCfgOpener oCfg( pCfg );
         string strPortClass;
+
+        if( oCfg.exist( propNoPort ) )
+            break;
 
         if( !oCfg.exist( propPortClass ) )
         {

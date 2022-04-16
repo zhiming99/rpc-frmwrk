@@ -8,7 +8,7 @@
  *        Version:  1.0
  *        Created:  10/24/2021 17:37:00 PM
  *       Revision:  none
- *       Compiler:  gcc
+ *       Compiler:  javac
  *
  *         Author:  Ming Zhi( woodhead99@gmail.com )
  *   Organization:

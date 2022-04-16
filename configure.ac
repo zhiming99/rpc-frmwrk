@@ -63,6 +63,11 @@ AC_CHECK_LIB([krb5], [krb5_init_context],
 [LIBS="${LIBS}"
 AC_DEFINE([HAVE_LIBkrb5], [1], [Define to 1 if you have krb5.])])
 
+AC_CHECK_LIB([fuse3], [fuse_mount],
+[LIBS="${LIBS}"
+AC_DEFINE([HAVE_LIBfuse3], [1], [Define to 1 if you have fuse3.]) ],
+[AC_MSG_ERROR([fuse3 was not found])] )
+
 AC_CHECK_LIB([atomic], [__atomic_fetch_add_8],
 [LIBS="${LIBS}"
 AC_DEFINE([HAVE_LIBatomic], [1], [Define to 1 if you have atomic.])])
@@ -122,17 +127,19 @@ AC_TYPE_UINT32_T
 AC_TYPE_UINT64_T
 AC_TYPE_UINT8_T 
 
-DEPLIBS_ALL='dbus-1 jsoncpp cppunit openssl mit-krb5'
+DEPLIBS_ALL='dbus-1 jsoncpp cppunit openssl mit-krb5 fuse3'
 DEPLIBS='dbus-1 jsoncpp'
 DEPLIBS_CPPUNIT='dbus-1 jsoncpp cppunit'
 DEPLIBS_SSL='dbus-1 jsoncpp openssl'
 DEPLIBS_KRB5='dbus-1 jsoncpp mit-krb5 mit-krb5-gssapi'
+DEPLIBS_FUSE3='dbus-1 jsoncpp fuse3'
 
 AC_SUBST(DEPLIBS)
 AC_SUBST(DEPLIBS_ALL)
 AC_SUBST(DEPLIBS_CPPUNIT)
 AC_SUBST(DEPLIBS_SSL)
 AC_SUBST(DEPLIBS_KRB5)
+AC_SUBST(DEPLIBS_FUSE3)
 
 case ${with_sysroot} in
     no)
@@ -141,6 +148,7 @@ case ${with_sysroot} in
     COMMON_LINK_CPPUNIT='`pkg-config --libs ${DEPLIBS_CPPUNIT}`'
     COMMON_LINK_SSL='`pkg-config --libs ${DEPLIBS_SSL}`'
     COMMON_LINK_KRB5='`pkg-config --libs ${DEPLIBS_KRB5}`'
+    COMMON_LINK_FUSE3='`pkg-config --libs ${DEPLIBS_FUSE3}`'
     SYSROOT=
     ;;
 
@@ -165,6 +173,9 @@ case ${with_sysroot} in
     COMMON_LINK_KRB5='`PKG_CONFIG_SYSROOT_DIR=${PKG_CONFIG_SYSROOT_DIR} \
     PKG_CONFIG_LIBDIR=${PKG_CONFIG_LIBDIR} pkg-config --libs \
     ${DEPLIBS_KRB5}`'
+    COMMON_LINK_FUSE3='`PKG_CONFIG_SYSROOT_DIR=${PKG_CONFIG_SYSROOT_DIR} \
+    PKG_CONFIG_LIBDIR=${PKG_CONFIG_LIBDIR} pkg-config --libs \
+    ${DEPLIBS_FUSE3}`'
 
     AC_SUBST(PKG_CONFIG_PATH)
     AC_SUBST(PKG_CONFIG_LIBDIR)
@@ -177,6 +188,7 @@ AC_SUBST(COMMON_LINK)
 AC_SUBST(COMMON_LINK_CPPUNIT)
 AC_SUBST(COMMON_LINK_SSL)
 AC_SUBST(COMMON_LINK_KRB5)
+AC_SUBST(COMMON_LINK_FUSE3)
 
 AC_SUBST(SYSROOT)
 
@@ -189,6 +201,7 @@ case $host in
         COMMON_LINK_CPPUNIT+=' -latomic'
         COMMON_LINK_SSL+=' -latomic'
         COMMON_LINK_KRB5+=' -latomic'
+        COMMON_LINK_FUSE3+=' -latomic'
     ;;
     aarch64)
         CXXFLAGS+=' -DARM'
@@ -196,6 +209,7 @@ case $host in
         COMMON_LINK_CPPUNIT+=' -latomic'
         COMMON_LINK_SSL+=' -latomic'
         COMMON_LINK_KRB5+=' -latomic'
+        COMMON_LINK_FUSE3+=' -latomic'
     ;;
 esac
 
@@ -250,6 +264,7 @@ AC_CONFIG_FILES([Makefile
                  bldpkg/rpcf.spec
                  java/Makefile
                  examples/Makefile
+                 fuse/Makefile
                  test/Makefile
                  test/actcancel/Makefile
                  test/asynctst/Makefile
@@ -287,6 +302,7 @@ AM_CONDITIONAL([SIPBUILD],[test x$ac_cv_prog_sipbuild = xyes])
 AM_CONDITIONAL([SIP4],[test x$ac_cv_prog_sip4 = xyes])
 AM_CONDITIONAL([SWIG],[test x$ac_cv_prog_swig = xyes])
 AM_CONDITIONAL([JDK],[test x$ac_cv_prog_javac = xyes])
+AM_CONDITIONAL([FUSE3],[test x$ac_cv_lib_fuse3_fuse_mount = xyes])
 
 VERSION2='$(subst .,:,$(VERSION))'
 AC_SUBST(VERSION2)

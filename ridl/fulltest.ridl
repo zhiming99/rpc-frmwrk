@@ -54,6 +54,7 @@ interface IEchoThings
     // a event from server to the proxy, response list is alway empty and the
     // server gets no feedback related to the proxy.
     [ event ]OnHelloWorld( string strMsg ) returns ();
+    [ async ]EchoNoParams() returns ();
 };
 
 /*

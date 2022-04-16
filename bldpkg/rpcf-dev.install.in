@@ -11,6 +11,8 @@ usr/lib/@DEB_HOST_MULTIARCH@/pkgconfig/rpcf.pc
 usr/include/rpcf/*.h
 usr/include/rpcf/ipc/*.h
 etc/rpcf/*.java
+etc/rpcf/*.cpp
+etc/rpcf/*.h
 etc/rpcf/*.py
 etc/rpcf/*tpl
 

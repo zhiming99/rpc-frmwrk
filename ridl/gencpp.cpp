@@ -29,10 +29,12 @@ using namespace rpcf;
 #include "gencpp.h"
 #include "sha1.h"
 #include "proxy.h"
+#include "genfuse.h"
 
 extern std::string g_strAppName;
 extern bool g_bMklib;
 extern stdstr g_strLang;
+extern guint32 g_dwFlags;
 
 std::map< gint32, char > g_mapTypeSig =
 {
@@ -987,6 +989,11 @@ gint32 CHeaderPrologue::Output()
         Wa( "#include \"streamex.h\"" );
     else
         Wa( "#include \"seribase.h\"" );
+    if( bFuse )
+    {
+        Wa( "#include \"serijson.h\"" );
+        Wa( "#include \"fuseif.h\"" );
+    }
     NEW_LINE;
     CCOUT << "#define DECLPTRO( _type, _name ) \\";
     INDENT_UPL;
@@ -1017,6 +1024,13 @@ gint32 GenHeaderFile(
         ret = oHeader.Output();
         if( ERROR( ret ) )
             break;
+
+        if( bFuseP )
+        {
+            CCppWriter* m_pWriter = pWriter;
+            Wa( "#define eventRemoveReq \\" );
+            Wa( "    ( ( EnumEventId )( rpcf::eventUserStart + 101 ) )" );
+        }
 
         CDeclareClassIds odci(
             pWriter, pRoot );
@@ -1069,16 +1083,37 @@ gint32 GenHeaderFile(
                     if( pNode->RefCount() == 0 )
                         break;
 
-                    CDeclInterfProxy odip(
-                        pWriter, pObj );
-                    ret = odip.Output();
-                    if( ERROR( ret ) )
-                        break;
+                    if( bFuseP )
+                    {
+                        CDeclInterfProxyFuse odip(
+                            pWriter, pObj );
+                        ret = odip.Output();
+                        if( ERROR( ret ) )
+                            break;
+                    }
+                    else
+                    {
+                        CDeclInterfProxy odip(
+                            pWriter, pObj );
+                        ret = odip.Output();
+                        if( ERROR( ret ) )
+                            break;
+                    }
 
-                    CDeclInterfSvr odis(
-                        pWriter, pObj );
+                    if( bFuseS )
+                    {
+                        CDeclInterfSvrFuse odis(
+                            pWriter, pObj );
 
-                    ret = odis.Output();
+                        ret = odis.Output();
+                    }
+                    else
+                    {
+                        CDeclInterfSvr odis(
+                            pWriter, pObj );
+
+                        ret = odis.Output();
+                    }
                     break;
                 }
             case clsid( CServiceDecl ):
@@ -1136,12 +1171,24 @@ gint32 GenHeaderFile(
                     elem.first + "svr.h.new" );
             }
 
-            CDeclServiceImpl osi(
-                pWriter, elem.second, true );
+            if( bFuseS )
+            {
+                CDeclServiceImplFuse osi(
+                    pWriter, elem.second, true );
 
-            ret = osi.Output();
-            if( ERROR( ret ) )
-                break;
+                ret = osi.Output();
+                if( ERROR( ret ) )
+                    break;
+            }
+            else
+            {
+                CDeclServiceImpl osi(
+                    pWriter, elem.second, true );
+
+                ret = osi.Output();
+                if( ERROR( ret ) )
+                    break;
+            }
 
             // client declarations
             ret = pWriter->SelectImplFile(
@@ -1153,12 +1200,24 @@ gint32 GenHeaderFile(
                     elem.first + "cli.h.new" );
             }
 
-            CDeclServiceImpl osi2(
-                pWriter, elem.second, false );
+            if( bFuseP )
+            {
+                CDeclServiceImplFuse osi2(
+                    pWriter, elem.second, false );
 
-            ret = osi2.Output();
-            if( ERROR( ret ) )
-                break;
+                ret = osi2.Output();
+                if( ERROR( ret ) )
+                    break;
+            }
+            else
+            {
+                CDeclServiceImpl osi2(
+                    pWriter, elem.second, false );
+
+                ret = osi2.Output();
+                if( ERROR( ret ) )
+                    break;
+            }
 
             /* svr implementions*/
             ret = pWriter->SelectImplFile(
@@ -1173,12 +1232,24 @@ gint32 GenHeaderFile(
             if( ERROR( ret ) )
                 break;
 
-            CImplServiceImpl oisi(
-                pWriter, elem.second, true );
+            if( bFuseS )
+            {
+                CImplServiceImplFuse oisi(
+                    pWriter, elem.second, true );
 
-            ret = oisi.Output();
-            if( ERROR( ret ) )
-                break;
+                ret = oisi.Output();
+                if( ERROR( ret ) )
+                    break;
+            }
+            else
+            {
+                CImplServiceImpl oisi(
+                    pWriter, elem.second, true );
+
+                ret = oisi.Output();
+                if( ERROR( ret ) )
+                    break;
+            }
 
             /* client implementions*/
             ret = pWriter->SelectImplFile(
@@ -1193,26 +1264,75 @@ gint32 GenHeaderFile(
             if( ERROR( ret ) )
                 break;
 
-            CImplServiceImpl oisi2(
-                pWriter, elem.second, false );
+            if( bFuseP )
+            {
+                CImplServiceImplFuse oisi2(
+                    pWriter, elem.second, false );
 
-            ret = oisi2.Output();
-            if( ERROR( ret ) )
-                break;
+                ret = oisi2.Output();
+                if( ERROR( ret ) )
+                    break;
+            }
+            else
+            {
+                CImplServiceImpl oisi2(
+                    pWriter, elem.second, false );
+
+                ret = oisi2.Output();
+                if( ERROR( ret ) )
+                    break;
+            }
         }
 
         if( !vecSvcNames.empty() )
         {
-            CImplMainFunc omf( pWriter, pRoot );
-            ret = omf.Output();
-            if( ERROR( ret ) )
-                break;
+            // client side
+            if( bFuseP )
+            {
+                CImplMainFuncFuse omf(
+                    pWriter, pRoot, true );
+                ret = omf.Output();
+                if( ERROR( ret ) )
+                    break;
+            }
+            else
+            {
+                CImplMainFunc omf(
+                    pWriter, pRoot, true );
+                ret = omf.Output();
+                if( ERROR( ret ) )
+                    break;
+            }
+
+            // server side
+            if( bFuseS )
+            {
+                CImplMainFuncFuse omf(
+                    pWriter, pRoot, false );
+                ret = omf.Output();
+                if( ERROR( ret ) )
+                    break;
+            }
+            else
+            {
+                CImplMainFunc omf(
+                    pWriter, pRoot, false );
+                ret = omf.Output();
+                if( ERROR( ret ) )
+                    break;
+            }
         }
 
     }while( 0 );
 
     return ret;
 }
+
+extern gint32 FuseDeclareMsgSet(
+    CCppWriter* m_pWriter, ObjPtr& pRoot );
+
+extern gint32 EmitBuildJsonReq( 
+    CWriterBase* m_pWriter );
 
 gint32 GenCppFile(
     CCppWriter* m_pWriter, ObjPtr& pRoot )
@@ -1244,15 +1364,21 @@ gint32 GenCppFile(
         NEW_LINE;
         std::vector< ObjPtr > vecSvcs;
         pStmts->GetSvcDecls( vecSvcs );
-        /*for( auto& elem : vecSvcs )
-        {
-            CServiceDecl* psvd = elem;
-            std::string strName = psvd->GetName();
-            CCOUT<< "#include \"" <<
-                strName << ".h\"";
-            NEW_LINE;
-        }*/
         NEW_LINE;
+
+        if( bFuse )
+        {
+            ret = FuseDeclareMsgSet(
+                m_pWriter, pRoot );
+            if( ERROR( ret ) )
+                break;
+
+            ret = EmitBuildJsonReq(
+                m_pWriter );
+            if( ERROR( ret ) )
+                break;
+            NEW_LINE;
+        }
 
         for( guint32 i = 0;
             i < pStmts->GetCount(); i++ )
@@ -1286,9 +1412,18 @@ gint32 GenCppFile(
                     if( pifd->RefCount() == 0 )
                         break;
 
-                    CImplIufProxy oiufp(
-                        m_pWriter, pObj );
-                    oiufp.Output();
+                    if( bFuseP )
+                    {
+                        CImplIufProxyFuse oiufp(
+                            m_pWriter, pObj );
+                        oiufp.Output();
+                    }
+                    else
+                    {
+                        CImplIufProxy oiufp(
+                            m_pWriter, pObj );
+                        oiufp.Output();
+                    }
 
                     ObjPtr pmdlobj =
                         pifd->GetMethodList();
@@ -1304,26 +1439,57 @@ gint32 GenCppFile(
                         i < pmdl->GetCount(); i++ )
                     {
                         ObjPtr pmd = pmdl->GetChild( i );
-                        CImplIfMethodProxy oiimp(
-                            m_pWriter, pmd );
-                        ret = oiimp.Output();
-                        if( ERROR( ret ) )
-                            break;
+                        if( bFuseP )
+                        {
+                            CImplIfMethodProxyFuse oiimp(
+                                m_pWriter, pmd );
+                            ret = oiimp.Output();
+                            if( ERROR( ret ) )
+                                break;
+                        }
+                        else
+                        {
+                            CImplIfMethodProxy oiimp(
+                                m_pWriter, pmd );
+                            ret = oiimp.Output();
+                            if( ERROR( ret ) )
+                                break;
+                        }
                     }
 
-                    CImplIufSvr oiufs(
-                        m_pWriter, pObj );
-                    oiufs.Output();
+                    if( bFuseS )
+                    {
+                        CImplIufSvrFuse oiufs(
+                            m_pWriter, pObj );
+                        oiufs.Output();
+                    }
+                    else
+                    {
+                        CImplIufSvr oiufs(
+                            m_pWriter, pObj );
+                        oiufs.Output();
+                    }
 
                     for( guint32 i = 0;
                         i < pmdl->GetCount(); i++ )
                     {
                         ObjPtr pmd = pmdl->GetChild( i );
-                        CImplIfMethodSvr oiims(
-                            m_pWriter, pmd );
-                        ret = oiims.Output();
-                        if( ERROR( ret ) )
-                            break;
+                        if( bFuseS )
+                        {
+                            CImplIfMethodSvrFuse oiims(
+                                m_pWriter, pmd );
+                            ret = oiims.Output();
+                            if( ERROR( ret ) )
+                                break;
+                        }
+                        else
+                        {
+                            CImplIfMethodSvr oiims(
+                                m_pWriter, pmd );
+                            ret = oiims.Output();
+                            if( ERROR( ret ) )
+                                break;
+                        }
                     }
 
                     break;
@@ -1679,6 +1845,11 @@ gint32 CDeclareStruct::Output()
 {
     gint32 ret = 0;
     do{
+        if( bFuse )
+        {
+            ret = OutputFuse();
+            break;
+        }
         std::string strName =
             m_pNode->GetName();
 
@@ -1755,12 +1926,12 @@ gint32 CDeclareStruct::Output()
         // declare two methods to implement
         CCOUT<< "gint32 Serialize(";
         INDENT_UPL;
-        CCOUT << " BufPtr& pBuf_ ) override;";
+        CCOUT << "BufPtr& pBuf_ ) override;";
         INDENT_DOWNL;
         NEW_LINE;
         CCOUT << "gint32 Deserialize(";
         INDENT_UPL;
-        CCOUT <<" BufPtr& pBuf_ ) override;"; 
+        CCOUT << "BufPtr& pBuf_ ) override;"; 
         INDENT_DOWNL;
         NEW_LINE;
         Wa( "guint32 GetMsgId() const override" );
@@ -2419,7 +2590,27 @@ gint32 CDeclInterfSvr::OutputAsync(
             GetArgCount( pOutArgs );
 
         guint32 dwCount = dwInCount + dwOutCount;
-        if( pmd->IsSerialize() )
+        if( dwInCount == 0 )
+        {
+            Wa( "//RPC Async Req Handler wrapper" );
+            CCOUT << "gint32 "
+                << strName << "Wrapper(";
+            INDENT_UPL;
+            CCOUT << "IEventSink* pCallback );";
+            INDENT_DOWNL;
+            NEW_LINE;
+
+            CCOUT << "gint32 "
+                << strName << "CancelWrapper(";
+            INDENT_UPL;
+            CCOUT << "IEventSink* pCallback,";
+            NEW_LINE;
+            Wa( "gint32 iRet," );
+            CCOUT << "IConfigDb* pReqCtx_ );";
+            INDENT_DOWNL;
+            NEW_LINE;
+        }
+        else if( pmd->IsSerialize() )
         {
             Wa( "//RPC Async Req Handler wrapper" );
             CCOUT << "gint32 "
@@ -2437,26 +2628,6 @@ gint32 CDeclInterfSvr::OutputAsync(
             NEW_LINE;
             Wa( "gint32 iRet," );
             CCOUT << "IConfigDb* pReqCtx_, BufPtr& pBuf_ );";
-            INDENT_DOWNL;
-            NEW_LINE;
-        }
-        else if( dwInCount == 0 )
-        {
-            Wa( "//RPC Async Req Handler wrapper" );
-            CCOUT << "gint32 "
-                << strName << "Wrapper(";
-            INDENT_UPL;
-            CCOUT << "IEventSink* pCallback );";
-            INDENT_DOWNL;
-            NEW_LINE;
-
-            CCOUT << "gint32 "
-                << strName << "CancelWrapper(";
-            INDENT_UPL;
-            CCOUT << "IEventSink* pCallback,";
-            NEW_LINE;
-            Wa( "gint32 iRet," );
-            CCOUT << "IConfigDb* pReqCtx_ );";
             INDENT_DOWNL;
             NEW_LINE;
         }
@@ -2607,7 +2778,12 @@ gint32 CDeclService::Output()
 
         CCOUT << "C" << strSvcName << "_CliSkel,";
         NEW_LINE;
-        if( m_pNode->IsStream() )
+        if( bFuseP )
+        {
+            Wa( "CStreamProxyFuse," );
+            Wa( "CFuseSvcProxy," );
+        }
+        else if( m_pNode->IsStream() )
             Wa( "CStreamProxyAsync," );
         for( guint32 i = 0;
             i < vecIfs.size(); i++ )
@@ -2630,8 +2806,15 @@ gint32 CDeclService::Output()
         NEW_LINE;
         CCOUT << "C" << strSvcName << "_SvrSkel,";
         NEW_LINE;
-        if( m_pNode->IsStream() )
+
+        if( bFuseS )
+        {
+            Wa( "CStreamServerFuse," );
+            Wa( "CFuseSvcServer," );
+        }
+        else if( m_pNode->IsStream() )
             Wa( "CStreamServerAsync," );
+
         for( guint32 i = 0;
             i < vecIfs.size(); i++ )
         {
@@ -3551,8 +3734,6 @@ gint32 CImplServiceImpl::Output()
                 BLOCK_CLOSE;
                 NEW_LINES( 2 );
             }
-
-            NEW_LINE;
         }
 
         if( vecSMethods.empty() || !IsServer() )
@@ -3579,11 +3760,11 @@ gint32 CImplServiceImpl::Output()
             CMethodDecl* pmd = elem.second;
             bool bAsync = pmd->IsAsyncs();
             bool bEvent = pmd->IsEvent();
+            if( bEvent )
+                continue;
 
             if( bAsync )
                 Wa( "/* Async Req */" );
-            else if( bEvent )
-                Wa( "/* Event */" );
             else
                 Wa( "/* Sync Req */" );
 
@@ -3602,7 +3783,7 @@ gint32 CImplServiceImpl::Output()
                 NEW_LINE;    
                 CCOUT << "return ERROR_NOT_IMPL;";
             }
-            else if( !bEvent )
+            else
             {
                 // sync method
                 Wa( "// TODO: Process the sync request here " );
@@ -3613,8 +3794,6 @@ gint32 CImplServiceImpl::Output()
             BLOCK_CLOSE;
             NEW_LINES( 2 );
         }
-
-        NEW_LINE;
 
     }while( 0 );
 
@@ -3806,16 +3985,31 @@ gint32 CImplSerialStruct::OutputAssign()
 
 gint32 CImplSerialStruct::Output()
 {
-    gint32 ret = OutputSerial();
-    if( ERROR( ret ) )
-        return ret;
-    NEW_LINE;
-    ret = OutputDeserial();
-    if( ERROR( ret ) )
-        return ret;
-    NEW_LINE;
-    ret = OutputAssign();
-    NEW_LINE;
+    gint32 ret = 0;
+    do{
+        bool bFuseBoth = ( bFuseP && bFuseS );
+        if( bFuseBoth )
+        {
+            ret = OutputFuse();
+            break;
+        }
+        else if( bFuseP || bFuseS )
+        {
+            ret = OutputFuse();
+            if( ERROR( ret ) )
+                break;
+        }
+        ret = OutputSerial();
+        if( ERROR( ret ) )
+            break;
+        NEW_LINE;
+        ret = OutputDeserial();
+        if( ERROR( ret ) )
+            break;
+        NEW_LINE;
+        ret = OutputAssign();
+        NEW_LINE;
+    }while( 0 );
     return ret;
 }
 
@@ -4959,17 +5153,16 @@ gint32 CImplIfMethodProxy::OutputAsyncCbWrapper()
         Wa( "gint32 ret = 0;" );
         CCOUT << "do";
         BLOCK_OPEN;
-        NEW_LINE; 
         Wa( "IConfigDb* pResp_ = nullptr;" );
         Wa( "CCfgOpenerObj oReq_( pIoReq );" );
         CCOUT << "ret = oReq_.GetPointer(";
-        INDENT_UPL;
-        CCOUT << "propRespPtr, pResp_ );";
-        INDENT_DOWNL;
+        NEW_LINE;
+        CCOUT << "    propRespPtr, pResp_ );";
+        NEW_LINE;
         CCOUT << "if( ERROR( ret ) )";
-        INDENT_UPL;
-        CCOUT << "break;";
-        INDENT_DOWNL;
+        NEW_LINE;
+        CCOUT << "    break;";
+        NEW_LINE;
         NEW_LINE;
 
         Wa( "CCfgOpener oResp_( pResp_ );" );
@@ -5053,7 +5246,7 @@ gint32 CImplIfMethodProxy::OutputAsyncCbWrapper()
             INDENT_DOWN;
             NEW_LINE;
         }
-        else /* need serialization */
+        else /* need deserialization */
         {
             DeclLocals( pOutArgs );
             NEW_LINE;
@@ -5090,10 +5283,9 @@ gint32 CImplIfMethodProxy::OutputAsyncCbWrapper()
         BLOCK_CLOSE;
         Wa( "while( 0 );" );
         NEW_LINE;
-        Wa( "return 0;" );
-
+        CCOUT << "return 0;";
         BLOCK_CLOSE;
-        NEW_LINES( 1 );
+        NEW_LINE;
 
     }while( 0 );
     
@@ -5697,7 +5889,10 @@ gint32 CImplIfMethodSvr::OutputAsyncSerial()
         CCOUT << "&" << strClass << "::"
             << strMethod << "CancelWrapper,";
         NEW_LINE;
-        CCOUT << "pCallback, 0, pReqCtx_, pBuf_ );";
+        if( dwInCount > 0 )
+            CCOUT << "pCallback, 0, pReqCtx_, pBuf_ );";
+        else
+            CCOUT << "pCallback, 0, pReqCtx_ );";
         INDENT_DOWNL;
         NEW_LINE;
         Wa( "if( ERROR( ret ) ) break;" );
@@ -5724,9 +5919,13 @@ gint32 CImplIfMethodSvr::OutputAsyncSerial()
             << strMethod << "(";
 
         INDENT_UPL;
-        CCOUT << "pReqCtx_,";
-        NEW_LINE;
-        GenActParams( pInArgs, pOutArgs );
+        CCOUT << "pReqCtx_";
+        if( dwInCount + dwOutCount > 0 )
+        {
+            CCOUT << ",";
+            NEW_LINE;
+            GenActParams( pInArgs, pOutArgs );
+        }
 
         CCOUT << " );";
         INDENT_DOWNL;
@@ -5811,7 +6010,7 @@ gint32 CImplIfMethodSvr::OutputAsyncCancelWrapper()
         NEW_LINE;
         Wa( "gint32 iRet," );
         CCOUT << "IConfigDb* pReqCtx_";
-        if( bSerial )
+        if( dwInCount > 0 && bSerial )
         {
             CCOUT << ", BufPtr& pBuf_";
         }
@@ -5829,7 +6028,7 @@ gint32 CImplIfMethodSvr::OutputAsyncCancelWrapper()
 
         CCOUT << "do";
         BLOCK_OPEN;
-        if( bSerial )
+        if( dwInCount > 0 && bSerial )
         {
             DeclLocals( pInArgs );
             ret = GenDeserialArgs( pInArgs,
@@ -6110,10 +6309,12 @@ extern std::string g_strTarget;
 
 CImplMainFunc::CImplMainFunc(
     CCppWriter* pWriter,
-    ObjPtr& pNode )
+    ObjPtr& pNode,
+    bool bProxy )
 {
     m_pWriter = pWriter;
     m_pNode = pNode;
+    m_bProxy = bProxy;
 }
 
 gint32 CImplMainFunc::Output()
@@ -6127,11 +6328,13 @@ gint32 CImplMainFunc::Output()
         CServiceDecl* pSvc = vecSvcs[ 0 ];
         std::string strSvcName = pSvc->GetName();
         std::string strModName = g_strTarget;
-        std::vector< std::string > vecSuffix =
-            { "cli", "svr" };
-        for( auto& elem : vecSuffix )
+        stdstr strSuffix;
+        if( m_bProxy )
+            strSuffix = "cli";
+        else
+            strSuffix = "svr";
         {
-            bool bProxy = ( elem == "cli" );
+            bool bProxy = ( strSuffix == "cli" );
             std::string strClass =
                 std::string( "C" ) + strSvcName;
             if( bProxy )
@@ -6195,7 +6398,7 @@ gint32 CImplMainFunc::Output()
             NEW_LINE;
             Wa( "CParamList oParams;" );
             CCOUT << "oParams.Push( \""
-                << strModName + elem << "\" );";
+                << strModName + strSuffix << "\" );";
             NEW_LINES( 2 );
 
             Wa( "// adjust the thread number if necessary" );
@@ -6567,14 +6770,19 @@ gint32 CExportMakefile::Output()
                 psd->GetName() + "svr.o ";
         }
 
+        if( bFuseP )
+            strObjClient += "$(OBJ_DIR)/serijson.o ";
+        if( bFuseS )
+            strObjServer += "$(OBJ_DIR)/serijson.o ";
+
         std::string strClient =
             strAppName + "cli";
 
         std::string strServer =
             strAppName + "svr";
 
-        std::string strLib =
-            strAppName + "lib.so";
+        std::string strLib = "lib";
+        strLib += strAppName + ".so";
 
         std::string strCmdLine =
             "sed -i 's:XXXSRCS:";
@@ -6587,6 +6795,14 @@ gint32 CExportMakefile::Output()
             "s:XXXLIB:" + strLib + ":; " +
             "s:XXXOBJSSVR:" + strObjServer + ":; " +
             "s:XXXOBJSCLI:" + strObjClient + ":; ";
+
+        if( bFuse )
+        {
+            strCmdLine +="s:XXXFUSE:-lutils -lfuseif:; ";
+            strCmdLine +="s:jsoncpp:jsoncpp fuse3:; ";
+        }
+        else
+            strCmdLine +="s:XXXFUSE::; ";
 
         if( g_bMklib )
             strCmdLine += "s:XXXMKLIB:1:' ";
@@ -6698,12 +6914,31 @@ gint32 CExportDrivers::Output()
             oCli[ JSON_ATTR_MODNAME ] = strAppCli;
             Json::Value oDrvToLoad;
             oDrvToLoad.append( "DBusBusDriver" );
-            if( bStream )
+            if( bStream || bFuse )
                 oDrvToLoad.append( "UnixSockBusDriver" );
             oCli[ JSON_ATTR_DRVTOLOAD ] = oDrvToLoad;
 
-            Json::Value oSvr = oCli;
+            if( bFuseP )
+            {
+                Json::Value oFactories =
+                    Json::Value( Json::arrayValue );
+                oFactories.append(
+                    Json::Value( "./libfuseif.so" ) );
+                oCli[ JSON_ATTR_FACTORIES ] = oFactories;
+            }
+
+            Json::Value oSvr;
             oSvr[ JSON_ATTR_MODNAME ] = strAppSvr;
+            oSvr[ JSON_ATTR_DRVTOLOAD ] = oDrvToLoad;
+            if( bFuseS )
+            {
+                Json::Value oFactories =
+                    Json::Value( Json::arrayValue );
+                oFactories.append(
+                    Json::Value( "./libfuseif.so" ) );
+                oSvr[ JSON_ATTR_FACTORIES ] = oFactories;
+
+            }
             oModuleArray.append( oSvr );
             oModuleArray.append( oCli );
         }
@@ -6847,6 +7082,26 @@ gint32 CExportObjDesc::Output()
         //printf( "%s\n", strCmdLine.c_str() );
         system( strCmdLine.c_str() );
 
+        if( bFuse )
+        {
+            stdstr strSeriCpp, strSeriHdr;
+            ret = FindInstCfg(
+                "serijson.cpp", strSeriCpp );
+            if( ERROR( ret ) )
+                break;
+
+            ret = FindInstCfg(
+                "serijson.h", strSeriHdr );
+            if( ERROR( ret ) )
+                break;
+
+            strCmdLine = "cp ";
+            strCmdLine += strSeriCpp + " " +
+                strSeriHdr + " " +
+                m_pWriter->GetOutPath() + "/";
+            system( strCmdLine.c_str() );
+        }
+
     }while( 0 );
 
     return ret;
@@ -6892,69 +7147,6 @@ gint32 CExportObjDesc::BuildObjDesc(
         oElem[ JSON_ATTR_KA_TIMEOUT ] =
             std::to_string( dwkasec );
 
-        std::string strVal;
-        ret = psd->GetIpAddr( strVal );
-        if( SUCCEEDED( ret ) )
-            oElem[ JSON_ATTR_IPADDR ] = strVal;
-
-        ret = psd->GetPortNum( dwVal );
-        if( SUCCEEDED( ret ) )
-            oElem[ JSON_ATTR_TCPPORT ] =
-                std::to_string( dwVal / 2 );
-
-        ret = psd->GetRouterPath( strVal );
-        if( SUCCEEDED( ret ) )
-            oElem[ JSON_ATTR_ROUTER_PATH ] =
-                strVal;
-
-        BufPtr pAuth;
-        ret = psd->GetAuthVal( pAuth );
-        if( SUCCEEDED( ret ) )
-        {
-            Json::CharReaderBuilder oBuilder;
-            std::unique_ptr< Json::CharReader >
-                pReader( oBuilder.newCharReader() );
-
-            if( pReader == nullptr )
-            {
-                ret = -EFAULT;
-                break;
-            }
-            Json::Value oAuth;
-            std::string strMsg;
-            if( !pReader->parse( pAuth->ptr(),
-                pAuth->ptr() + pAuth->size(),
-                &oAuth, &strMsg ) )
-            {
-                DebugPrintEx( logErr, ret,
-                    "error, %s\n", strMsg.c_str() );
-                ret = -EBADMSG;
-                break;
-            }
-            oElem[ JSON_ATTR_AUTHINFO ] = oAuth;
-        }
-
-        if( psd->IsWebSocket() )
-            oElem[ JSON_ATTR_ENABLE_WEBSOCKET ] =
-                "true";
-        else
-            oElem[ JSON_ATTR_ENABLE_WEBSOCKET ] =
-                "false";
-
-        if( psd->IsCompress() )
-            oElem[ JSON_ATTR_ENABLE_COMPRESS ] =
-                "true";
-        else
-            oElem[ JSON_ATTR_ENABLE_COMPRESS ] =
-                "false";
-
-        if( psd->IsSSL() )
-            oElem[ JSON_ATTR_ENABLE_SSL ] =
-                "true";
-        else
-            oElem[ JSON_ATTR_ENABLE_SSL ] =
-                "false";
-
         ret = 0;
 
         // get interface array
@@ -6991,7 +7183,7 @@ gint32 CExportObjDesc::BuildObjDesc(
             }
         }
 
-        if( psd->IsStream() )
+        if( psd->IsStream() || bFuse )
         {
             Json::Value oJif;
             oJif[ JSON_ATTR_IFNAME ] =
@@ -7155,7 +7347,8 @@ gint32 CExportReadme::Output_en()
             << "you can still customized the italic files, but be aware they "
             << "will be rewritten after running RIDLC again.";
         NEW_LINES(2);
-        CCOUT << "**Note 2**: Please refer to [this link](https://github.com/zhiming99/rpc-frmwrk#building-rpc-frmwrk)"
+        CCOUT << "**Note 2**: Please refer to [this link]"
+            << "(https://github.com/zhiming99/rpc-frmwrk#building-rpc-frmwrk) "
             << "for building and installation of RPC-Frmwrk";
         NEW_LINE;
 

@@ -354,7 +354,7 @@ gint32 CIfStmReadWriteTask::OnWorkerIrpComplete(
     {
         pIrp->RemoveCallback();
         pIrp->RemoveTimer();
-        Sem_Post( &pIrp->m_semWait ); \
+        Sem_Post( &pIrp->m_semWait );
     }
 
     if( !bHead )
@@ -602,6 +602,73 @@ gint32 CIfStmReadWriteTask::PeekStream(
         SendProgress( pBuf );
 
     }while( 1 );
+
+    return ret;
+}
+
+gint32 CIfStmReadWriteTask::GetPendingBytes(
+    guint32& dwBytes ) const
+{
+    gint32 ret = 0;
+
+    if( !IsReading() )
+        return -EINVAL;
+
+    if( m_bDiscard )
+        return ERROR_STATE;
+
+    do{
+        dwBytes = 0;
+        CStdRTMutex oTaskLock( GetLock() );
+        EnumIfState dwState = GetTaskState();
+        if( dwState == stateStopped )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+
+        if( m_queBufRead.empty() || 
+            m_queRequests.size() )
+        {
+            ret = 0;
+            break;
+        }
+        for( auto& elem : m_queBufRead )
+        {
+            if( IsReport( elem ) )
+                continue;
+            dwBytes += elem->size();
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CIfStmReadWriteTask::GetPendingReqs(
+    guint32& dwCount ) const
+{
+    gint32 ret = 0;
+
+    if( !IsReading() )
+        return -EINVAL;
+
+    if( m_bDiscard )
+        return ERROR_STATE;
+
+    do{
+        dwCount = 0;
+        CStdRTMutex oTaskLock( GetLock() );
+        EnumIfState dwState = GetTaskState();
+        if( dwState == stateStopped )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+
+        dwCount = m_queRequests.size();
+
+    }while( 0 );
 
     return ret;
 }

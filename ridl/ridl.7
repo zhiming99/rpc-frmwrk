@@ -26,13 +26,13 @@ support 10 basic types and 3 composite types. The basic data types are:
 .IP \fBint64/uint64\fP
 \- 8-byte signed integer or unsigned integer. It maps to 'gint64/guint64' in C++, 'int' in Python, and 'long' in Java.
 .IP \fBfloat(32)/double(64)\fP
-\- float point number. It maps to 'float/double' in C++, 'float' in Python, and 'float/double' in Java.
+\- Float point number. It maps to 'float/double' in C++, 'float' in Python, and 'float/double' in Java.
 .IP \fBstring\fP
-\- null terminated string. It maps to 'std::sting' in C++, 'str' in Python, and 'String' in Java.
+\- Null terminated string. It maps to 'std::sting' in C++, 'str' in Python, and 'String' in Java.
 .IP \fBHSTREAM\fP
-\- handle representing an active stream channel. It maps to 'HANDLE' in C++, 'int' in Python, and 'long' in Java.
+\- Handle representing an active stream channel. It maps to 'HANDLE' in C++, 'int' in Python, and 'long' in Java.
 .IP \fBbytearray\fP 
-\- binary blob. It maps to 'BufPtr' in C++, 'bytearray' in Python and 'byte[]' in Java.
+\- Binary blob. It maps to 'BufPtr' in C++, 'bytearray' in Python and 'byte[]' in Java.
 .IP \fBObjPtr\fP
 \- \fIrpc-frmwrk\fR's built-in serializable data type. It maps to 'ObjPtr' in C++, 'cpp.ObjPtr' in Python, and 'ObjPtr'
 in Java.
@@ -41,15 +41,15 @@ in Java.
 And 3 composite types:
 .RS
 .IP \fBstruct\fP
-\- a bundle of values of different data types. It is usually used as a building
+\- A bundle of values of different data types. It is usually used as a building
 block for other data types or as the parameter to transfer between client and
 server. It maps to 'struct' in C++, 'struct' in Python, and 'class' in Java.
 .IP \fBarray\fP
-\- an array of elements of the same type, either basic type or composite type,
+\- An array of elements of the same type, either basic type or composite type,
 except \fIHSTREAM\fR. For example, \fIarray<int32>\fR, or \fIarray<string>\fR.
 It maps to 'std::vector' in C++, 'list' in Python, and 'array' in Java.
 .IP \fBmap\fP
-\- a map consists of key-value paires. The key should be a comparable data type,
+\- A map consists of key-value paires. The key should be a comparable data type,
 and value could be any supported type except \fIHSTREAM\fR. For example,
 \fImap<string, int32>\fR, or \fImap<int64, array<int>>\fR. It maps to 'std::map'
 in C++, 'dict' in Python, and 'Map' in Java.
@@ -107,23 +107,31 @@ supported are,
 
 .RS
 .IP \fBevent\fP
-\- the method is an event handler on the proxy side, and the method on the
+\- The method is an event handler on the proxy side, and the method on the
 server side broadcasts event. 
 .IP \fBnoreply\fP
-\- the method will send the request and returns immediately without waiting for
+\- The method will send the request and returns immediately without waiting for
 the response from the server.
 .IP \fBtimeout=intValSec\fP
-\- the proxy will wait the response from the server for 'intvalSec' seconds,
-until when, it will cancel the request and report error to the caller. This
-value supercedes the timeout value defined in the config files.
+\- The 'timeout' attribute defines the proxy will wait the response from the
+ server for 'intvalSec' seconds, until when, it will cancel the request and
+ report error to the caller. It also controls the server to cancel the request in
+ asynchronous mode, if the request cannot complete within 'timeout' seconds. And
+ this value supercedes the timeout value defined in the config file.
+
+.IP \fBkeepalive=intValSec\fP
+\- The 'keepalive' attribute controls how frequent the keepalive heartbeats are 
+ exchanged between server/proxy, and this value will supercedes the timeout
+ value defined in the config file.
+
 .IP \fBasync,async_s,async_p\fP
-\- async indicates the methods would behave asynchronously, both server side and
-proxy side, async_s indicates the server side asynchronously, and proxy side
-synchronously, and async_p indicates the server side synchronously, and proxy
-side asynchronously. If a method on proxy side is asynchronous, it will have a
-callback to handle the response. And if a method on server side is asynchronous,
-the user code is required to send a complete notification when it has handled
-the request.
+\- The async attribute indicates the methods would behave asynchronously, both
+ server side and proxy side, async_s indicates the server side asynchronously,
+ and proxy side synchronously, and async_p indicates the server side
+ synchronously, and proxy side asynchronously. If a method on proxy side is
+ asynchronous, it will have a callback to handle the response. And if a method on
+ server side is asynchronous, the user code is required to send a complete
+ notification when it has handled the request.
 .RE
 
 The input parameter list and output parameter list follow the similiar format to

@@ -1187,6 +1187,13 @@ class CConnParamsProxy : public CConnParams
 
         return ret;
     }
+
+    bool operator==( const CConnParamsProxy& rhs ) const
+    {
+        if( !less( rhs ) && !rhs.less( *this ) )
+            return true;
+        return false;
+    }
 };
 
 class CConnParamsProxySepConns :

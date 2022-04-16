@@ -6,6 +6,7 @@ RUN apt-get install -y gcc g++ python3 python3-dev python3-pip flex bison \
 libtool shtool automake autoconf autotools-dev make dbus libdbus-1-3 \
 libdbus-1-dev libjsoncpp1 libjsoncpp-dev libkrb5-3 libkrb5-dev liblz4-1 \
 liblz4-dev lz4 openssl libssl1.1 libssl-dev libcppunit-1.15-0 libcppunit-dev \
+libfuse3-3 libfuse3-dev \
 bash net-tools procps swig openjdk-8-jdk-headless;pip3 install numpy wheel
 RUN apt-get -y install sip5-tools || apt-get -y install sip-dev python3-sip python3-sip-dev || true
 RUN apt-get -y install libjsoncpp1 || apt-get -y install libjsoncpp24

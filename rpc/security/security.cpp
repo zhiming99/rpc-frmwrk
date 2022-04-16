@@ -897,7 +897,7 @@ gint32 CRpcTcpBridgeAuth::DoInvoke(
         pEvtMsg, pCallback );
 }
 
-gint32 CRpcTcpBridgeAuth::FetchData_Server(
+gint32 CRpcTcpBridgeAuth::FetchData_Filter(
     IConfigDb* pDataDesc,           // [in]
     gint32& fd,                     // [out]
     guint32& dwOffset,              // [in, out]
@@ -922,9 +922,9 @@ gint32 CRpcTcpBridgeAuth::FetchData_Server(
         if( ERROR( ret ) )
             break;
 
-        ret = super::FetchData_Server(
-            pDataDesc, fd, dwOffset,
-            dwSize, pCallback );
+        // ret = super::FetchData_Server(
+        //     pDataDesc, fd, dwOffset,
+        //     dwSize, pCallback );
 
     }while( 0 );
 

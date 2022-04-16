@@ -8,8 +8,8 @@ URL:            https://github.com/zhiming99/rpc-frmwrk
 
 Source0:        SSSSS/@PACKAGE_NAME@-@VERSION@.tar.gz
 
-BuildRequires:  gcc, g++, python3, python3-devel, python3-pip, flex, bison, libtool, shtool, automake, autoconf, make, ( sip5 or sip6 ), dbus-devel, jsoncpp-devel, krb5-devel, lz4-devel, openssl-devel, cppunit-devel
-Requires:       dbus dbus-libs jsoncpp krb5-libs lz4-libs openssl openssl-libs cppunit
+BuildRequires:  gcc, g++, python3, python3-devel, python3-pip, flex, bison, libtool, shtool, automake, autoconf, make, ( sip5 or sip6 ), dbus-devel, jsoncpp-devel, krb5-devel, lz4-devel, openssl-devel, cppunit-devel fuse3-devel
+Requires:       dbus dbus-libs jsoncpp krb5-libs lz4-libs openssl openssl-libs cppunit fuse3 fuse3-libs
 
 %description
 RPC-frmwrk is a small event-driven, asynchronous RPC framework with high performance and high flexibility, suitable for embedded environment.
@@ -91,6 +91,8 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_sysconfdir}/rpcf/odesctpl.json
 %{_sysconfdir}/rpcf/pymktpl
 %{_sysconfdir}/rpcf/seribase.py
+%{_sysconfdir}/rpcf/serijson.h
+%{_sysconfdir}/rpcf/serijson.cpp
 %{_sysconfdir}/rpcf/synccfg.py
 %{_sysconfdir}/rpcf/JavaSerialBase.java
 %{_sysconfdir}/rpcf/JavaSerialImpl.java
@@ -156,6 +158,8 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_includedir}/rpcf/ipc/uxstream.h
 %{_includedir}/rpcf/ipc/prxyport.h
 %{_includedir}/rpcf/ipc/fdodrv.h
+%{_includedir}/rpcf/ipc/fuseif.h
+%{_includedir}/rpcf/ipc/fusedefs.h
 %{_includedir}/rpcf/nsdef.h
 %{_includedir}/rpcf/objfctry.h
 %{_includedir}/rpcf/propids.h
@@ -163,12 +167,15 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_includedir}/rpcf/rpc.h
 %{_includedir}/rpcf/seribase.h
 %{_includedir}/rpcf/stlcont.h
+%{_includedir}/rpcf/base64.h
+%{_includedir}/rpcf/sha1.h
 %{_libdir}/libauth.la
 %{_libdir}/libcombase.la
 %{_libdir}/libipc.la
 %{_libdir}/librpc.la
 %{_libdir}/libsslpt.la
 %{_libdir}/libwspt.la
+%{_libdir}/libfuseif.la
 %{_libdir}/librpcbaseJNI.la
 %{_libdir}/rpcf/lib*.la
 %{_libdir}/rpcf/lib*.so*

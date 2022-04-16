@@ -38,6 +38,14 @@ do{ \
         strRet += ".new"; \
 }while( 0 )
 
+#define FUSE_PROXY  1
+#define FUSE_SERVER 2
+#define FUSE_BOTH   3
+
+#define bFuseP ( ( g_dwFlags & FUSE_PROXY ) > 0 )
+#define bFuseS ( ( g_dwFlags & FUSE_SERVER ) > 0 )
+#define bFuse ( ( g_dwFlags & FUSE_BOTH ) > 0 )
+
 guint32 GenClsid(
     const std::string& strName );
 
@@ -374,6 +382,7 @@ class CDeclareStruct
     CDeclareStruct( CCppWriter* pWriter,
         ObjPtr& pNode );
     gint32 Output();
+    gint32 OutputFuse();
 };
 
 struct CArgListUtils
@@ -424,13 +433,13 @@ struct CMethodWriter
         ObjPtr& pArgList,
         ObjPtr& pArgList2 );
 
-    gint32 GenSerialArgs(
+    virtual gint32 GenSerialArgs(
         ObjPtr& pArgList,
         const std::string& strBuf,
         bool bDeclare, bool bAssign,
         bool bNoRet = false );
 
-    gint32 GenDeserialArgs(
+    virtual gint32 GenDeserialArgs(
         ObjPtr& pArgList,
         const std::string& strBuf,
         bool bDeclare, bool bAssign,
@@ -524,6 +533,8 @@ class CDeclService
     gint32 Output();
 };
 
+using ABSTE = std::pair< std::string, ObjPtr >;
+
 class CDeclServiceImpl :
     public CMethodWriter
 {
@@ -534,13 +545,11 @@ class CDeclServiceImpl :
     CDeclServiceImpl( CCppWriter* pWriter,
         ObjPtr& pNode, bool bServer );
 
-    using ABSTE = std::pair< std::string, ObjPtr >;
-
     gint32 FindAbstMethod(
         std::vector< ABSTE >& vecMethods,
         bool bProxy );
 
-    gint32 DeclAbstMethod(
+    virtual gint32 DeclAbstMethod(
         ABSTE oMethod,
         bool bProxy,
         bool bComma = true );
@@ -578,11 +587,15 @@ class CImplSerialStruct
     gint32 OutputSerial();
     gint32 OutputDeserial();
     gint32 Output();
+    gint32 OutputFuse();
+    gint32 OutputSerialFuse();
+    gint32 OutputDeserialFuse();
 };
 
 class CImplIufProxy
     : public CArgListUtils
 {
+    protected:
     CCppWriter* m_pWriter = nullptr;
     CInterfaceDecl* m_pNode = nullptr;
 
@@ -596,6 +609,7 @@ class CImplIufProxy
 class CImplIufSvr :
     public CArgListUtils
 {
+    protected:
     CCppWriter* m_pWriter = nullptr;
     CInterfaceDecl* m_pNode = nullptr;
 
@@ -685,11 +699,14 @@ class CImplMainFunc :
 {
     CCppWriter* m_pWriter = nullptr;
     CStatements* m_pNode = nullptr;
+    bool m_bProxy = true;
     public:
     typedef CArgListUtils super;
 
-    CImplMainFunc( CCppWriter* pWriter,
-        ObjPtr& pNode );
+    CImplMainFunc(
+        CCppWriter* pWriter,
+        ObjPtr& pNode,
+        bool bProxy );
     gint32 Output();
 };
 

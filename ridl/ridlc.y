@@ -30,6 +30,10 @@ using namespace rpcf;
 #include "astnode.h"
 #include <memory>
 
+#define FUSE_PROXY  1
+#define FUSE_SERVER 2
+#define FUSE_BOTH   3
+
 CDeclMap g_mapDecls;
 ObjPtr g_pRootNode;
 CAliasMap g_mapAliases;
@@ -68,6 +72,15 @@ std::map< gint32, EnumTypeId >
         { TOK_FLOAT, typeFloat },
         { TOK_DOUBLE, typeDouble },
         { TOK_BYTE, typeByte }
+};
+
+std::set< gint32 > g_setValidFlags = {
+    TOK_ASYNC,
+    TOK_ASYNCP,
+    TOK_ASYNCS,
+    TOK_EVENT,
+    TOK_STREAM,
+    TOK_NOREPLY,
 };
 
 extern std::vector<
@@ -241,33 +254,24 @@ gint32 CheckNameDup(
 %token TOK_ARRAY
 %token TOK_MAP
 
-// statements
+// keywords
 %token TOK_INTERFACE
 %token TOK_STRUCT
 %token TOK_SERVICE
 %token TOK_TYPEDEF
 %token TOK_APPNAME
 %token TOK_CONST
-
-// operators
 %token TOK_RETURNS
 
+// flags
 %token TOK_ASYNC
 %token TOK_ASYNCP
 %token TOK_ASYNCS
 %token TOK_STREAM
 %token TOK_EVENT
-// %token TOK_SERIAL
 %token TOK_TIMEOUT
-%token TOK_RTPATH
-%token TOK_SSL
-%token TOK_WEBSOCK
-%token TOK_COMPRES
-%token TOK_AUTH
-%token TOK_IPADDR
-%token TOK_PORTNUM
-%token TOK_NOREPLY
 %token TOK_KEEPALIVE
+%token TOK_NOREPLY
 
 %parse-param { char const *file_name };
 %initial-action
@@ -676,17 +680,10 @@ attr_name :
     | TOK_ASYNCS { DEFAULT_ACTION; }
     | TOK_EVENT { DEFAULT_ACTION; }
     | TOK_STREAM { DEFAULT_ACTION; }
-    // | TOK_SERIAL { DEFAULT_ACTION; }
+    | TOK_NOREPLY { DEFAULT_ACTION; }
+    // flag with value
     | TOK_TIMEOUT { DEFAULT_ACTION; }
     | TOK_KEEPALIVE { DEFAULT_ACTION; }
-    | TOK_RTPATH { DEFAULT_ACTION; }
-    | TOK_SSL { DEFAULT_ACTION; }
-    | TOK_WEBSOCK { DEFAULT_ACTION; }
-    | TOK_COMPRES { DEFAULT_ACTION; }
-    | TOK_AUTH { DEFAULT_ACTION; }
-    | TOK_IPADDR { DEFAULT_ACTION; }
-    | TOK_PORTNUM { DEFAULT_ACTION; }
-    | TOK_NOREPLY { DEFAULT_ACTION; }
     ;
 
 attr_exp : attr_name
@@ -695,12 +692,8 @@ attr_exp : attr_name
         pNode.NewObj( clsid( CAttrExp ) );
         CAttrExp* pae = pNode;
         guint32& dwName = *$1;
-        if( dwName != TOK_ASYNC &&
-            dwName != TOK_ASYNCP &&
-            dwName != TOK_ASYNCS &&
-            dwName != TOK_EVENT &&
-            dwName != TOK_STREAM && 
-            dwName != TOK_NOREPLY )
+        if( g_setValidFlags.find( dwName ) ==
+            g_setValidFlags.end() )
         {
             std::string strMsg = "invalid flag found"; 
             PrintMsg( -EINVAL, strMsg.c_str() );
@@ -721,9 +714,7 @@ attr_exp : attr_name '=' const_val
         CAttrExp* pae = pNode;
         guint32& dwName = *$1;
         if( dwName != TOK_TIMEOUT &&
-            dwName != TOK_KEEPALIVE &&
-            dwName != TOK_IPADDR &&
-            dwName != TOK_PORTNUM )
+            dwName != TOK_KEEPALIVE )
         {
             std::string strMsg =
                 "invalid flag expression"; 
@@ -731,57 +722,31 @@ attr_exp : attr_name '=' const_val
                 -EINVAL, strMsg.c_str() );
             g_bSemanErr = true;
         }
-        if( dwName == TOK_IPADDR )
+
+        BufPtr pValBuf = $3;
+        if( pValBuf.IsEmpty() || pValBuf->empty() )
         {
-            BufPtr pBuf = $3;
-            if( pBuf.IsEmpty() || pBuf->empty() )
-            {
-                std::string strMsg =
-                    "ipaddr has empty address"; 
-                PrintMsg(
-                    -EINVAL, strMsg.c_str() );
-                g_bSemanErr = true;
-            }
-            else
-            {
-                EnumTypeId iType =
-                    pBuf->GetExDataType();
-                if( iType != typeString )
-                {
-                    std::string strMsg =
-                        "ipaddr should be a string"; 
-                    PrintMsg(
-                        -EINVAL, strMsg.c_str() );
-                    g_bSemanErr = true;
-                }
-            }
+            std::string strMsg =
+                "flag expression"; 
+            PrintMsg(
+                -EINVAL, strMsg.c_str() );
+            g_bSemanErr = true;
         }
         else
         {
-            BufPtr pBuf = $3;
-            if( pBuf.IsEmpty() || pBuf->empty() )
+            EnumTypeId iType =
+                pValBuf->GetExDataType();
+            if( iType != typeUInt32 )
             {
                 std::string strMsg =
-                    "flag expression"; 
+                    "flag should be a number "
+                    "value"; 
                 PrintMsg(
                     -EINVAL, strMsg.c_str() );
                 g_bSemanErr = true;
             }
-            else
-            {
-                EnumTypeId iType =
-                    pBuf->GetExDataType();
-                if( iType != typeUInt32 )
-                {
-                    std::string strMsg =
-                        "flag should be a number "
-                        "value"; 
-                    PrintMsg(
-                        -EINVAL, strMsg.c_str() );
-                    g_bSemanErr = true;
-                }
-            }
         }
+
         pae->SetName( dwName );
         pae->SetVal( $3 );
         BufPtr pBuf( true );

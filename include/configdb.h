@@ -312,12 +312,6 @@ class CCfgDbOpener
 
             pObj = objPtr;
 
-            if( pObj == nullptr )
-            {
-                ret = -EINVAL;
-                break;
-            }
-
         }while( 0 );
 
         return ret;
@@ -330,14 +324,7 @@ class CCfgDbOpener
         gint32 ret = 0;
 
         do{
-            if( pObj == nullptr )
-            {
-                ret = -EINVAL;
-                break;
-            }
-
             ObjPtr objPtr( pObj );
-
             ret = SetObjPtr( iProp, objPtr );
 
         }while( 0 );
@@ -1364,12 +1351,6 @@ class CCfgDbOpener< IConfigDb >
 
             pObj = objPtr;
 
-            if( pObj == nullptr )
-            {
-                ret = -EINVAL;
-                break;
-            }
-
         }while( 0 );
 
         return ret;
@@ -1382,14 +1363,7 @@ class CCfgDbOpener< IConfigDb >
         gint32 ret = 0;
 
         do{
-            if( pObj == nullptr )
-            {
-                ret = -EINVAL;
-                break;
-            }
-
             ObjPtr objPtr( pObj );
-
             ret = SetObjPtr( iProp, objPtr );
 
         }while( 0 );

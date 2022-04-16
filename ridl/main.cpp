@@ -96,6 +96,10 @@ void Usage()
     printf( "\t-j:\tTo generate the Java skelton files\n" );
     printf( "\t-P:\tTo specify the Java package name prefix.\n" );
     printf( "\t\tThis option is for Java only\n" );
+    printf( "\t-f[s|p]:\tTo generate cpp skelton files for\n" );
+    printf( "\t\tFUSE integration. And parameter 's' is for\n" );
+    printf( "\t\tserver FUSE only, 'p' for proxy FUSE only,\n" );
+    printf( "\t\tnone for FUSE on both side\n." );
 
     printf( "\t-l:\tTo output a shared library\n" );
     printf( "\t-L<lang>:\tTo output Readme in language <lang>\n" );
@@ -109,6 +113,7 @@ std::string g_strTarget;
 bool g_bNewSerial = true;
 stdstr g_strLang = "cpp";
 stdstr g_strLocale ="en";
+guint32 g_dwFlags = 0;
 
 // the prefix for java package name
 stdstr g_strPrefix = "org.rpcf.";
@@ -138,7 +143,7 @@ int main( int argc, char** argv )
         bool bQuit = false;
 
         while( ( opt =
-            getopt( argc, argv, "ahlI:O:o:pjP:L:" ) ) != -1 )
+            getopt( argc, argv, "ahlI:O:o:pjP:L:f::" ) ) != -1 )
         {
             switch( opt )
             {
@@ -269,6 +274,28 @@ int main( int argc, char** argv )
                         Usage();
                         bQuit = true;
                     }
+                    break;
+                }
+            case 'f':
+                {
+                    // make a shared lib for FUSE integration
+                    if( optarg == nullptr )
+                    {
+                        g_dwFlags = FUSE_BOTH;
+                        break;
+                    }
+                    char ch = optarg[ 0 ];
+                    if( ch == 's' )
+                        g_dwFlags = FUSE_SERVER;
+                    else if( ch == 'p' )
+                        g_dwFlags = FUSE_PROXY;
+                    else
+                    {
+                        printf( "Error '-f' is followed with invalid argument\n" );
+                        Usage();
+                        bQuit = true;
+                    }
+                    break;
                 }
             default:
                 break;

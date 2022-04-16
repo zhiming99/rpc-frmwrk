@@ -5,6 +5,10 @@ if ENABLE_TESTCASES
 SUBDIRS += test
 endif
 
+if FUSE3
+SUBDIRS += fuse
+endif
+
 if SWIG
 if JDK
 SUBDIRS += java
