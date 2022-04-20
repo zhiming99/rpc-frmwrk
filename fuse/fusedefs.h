@@ -61,12 +61,12 @@
 // message will be returned in the future.
 #define JSON_ATTR_RETCODE       "ReturnCode"
 #define CONN_PARAM_FILE "conn_params"
-#define HOP_DIR  "_nexthop"
-#define STREAM_DIR "_streams"
-#define JSON_REQ_FILE "json_request"
-#define JSON_RESP_FILE "json_response"
-#define JSON_EVT_FILE "json_event"
-#define JSON_STMEVT_FILE "json_stmevt"
+#define HOP_DIR  "nexthop"
+#define STREAM_DIR "streams"
+#define JSON_REQ_FILE "jreq_0"
+#define JSON_RESP_FILE "jrsp_0"
+#define JSON_EVT_FILE "jevt_0"
+#define JSON_STMEVT_FILE "jevt_streams"
 #define CONN_DIR_PREFIX "connection_"
 
 #define MAX_STREAMS_PER_SVC 1024

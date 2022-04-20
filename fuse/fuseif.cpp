@@ -40,11 +40,9 @@ void fuseif_prepare_interrupt(
     fuseif_intr_data *d);
 
 void fuseif_free_buf(struct fuse_bufvec *buf);
-
 namespace rpcf
 {
 InterfPtr g_pRootIf;
-static std::unique_ptr< Json::CharReader > g_pReader;
 
 InterfPtr& GetRootIf()
 { return g_pRootIf; }
@@ -134,19 +132,6 @@ CFuseDirectory* GetRootDir()
     return pProxy->GetRootDir();
 };
 
-/*gint32 GetFuseObj( const stdstr& strPath,
-    CFuseObjBase*& pDir )
-{
-    CRpcServices* pSvc = GetRootIf();
-    if( pSvc->IsServer() )
-    {
-        CFuseRootServer* pSvr = GetRootIf();
-        return pSvr->GetFuseObj( strPath, pDir );
-    }
-    CFuseRootProxy* pProxy = GetRootIf();
-    return pProxy->GetFuseObj( strPath, pDir );
-}*/
-
 gint32 CloseChannel(
     ObjPtr& pIf, HANDLE hStream )
 {
@@ -207,7 +192,7 @@ gint32 AddSvcPoint(
 
 
 gint32 CFuseObjBase::AddChild(
-    const CHILD_TYPE& pEnt )
+    const DIR_SPTR& pEnt )
 {
     gint32 ret = 0;
     do{
@@ -238,12 +223,24 @@ gint32 CFuseObjBase::AddChild(
     return ret;
 }
 
+gint32 CFuseObjBase::fs_release(
+    const char* path,
+    fuse_file_info * fi )
+{
+    CFuseMutex oFileLock( GetLock() );
+    gint32 ret = oFileLock.GetStatus();
+    if( ERROR( ret ) )
+        return ret;
+    DecOpCount();
+    return 0;
+}
+
 gint32 CFuseObjBase::RemoveChild(
     const std::string& strName )
 {
     gint32 ret = 0;
     do{
-        CHILD_TYPE pEnt;
+        DIR_SPTR pEnt;
         ret = GetChild( strName, pEnt );
         if( ERROR( ret ) )
             break;
@@ -465,7 +462,7 @@ gint32 CFuseDirectory::fs_readdir(
     gint32 ret = 0;
     do{
         CFuseMutex oLock( GetLock() );
-        std::vector< CHILD_TYPE > vecChildren;
+        std::vector< DIR_SPTR > vecChildren;
         GetChildren( vecChildren );
         for( auto& elem : vecChildren )
         {
@@ -646,11 +643,6 @@ gint32 CFuseReqFileProxy::fs_ioctl(
                     break;
 
                 *pSize = GetBytesAvail();
-                for( auto& elem : m_queTaskIds )
-                {
-                    *pSize += elem.strResp.size()
-                        + sizeof( guint32 );
-                }
                 break;
             }
         default:
@@ -726,17 +718,14 @@ gint32 CFuseStmFile::fs_ioctl(
 
 gint32 CFuseStmFile::fs_unlink(
     const char* path,
-    fuse_file_info *fi )
+    fuse_file_info *fi,
+    bool bSched )
 {
+    UNREFERENCED( bSched );
     gint32 ret = 0;
     do{
         CRpcServices* pSvc = GetIf();
 
-        CFuseMutex oFileLock(
-                GetLock() );
-        ret = oFileLock.GetStatus();
-        if( ERROR( ret ) )
-            break;
         if( GetOpCount() > 0 )
         {
             SetHidden();
@@ -746,9 +735,7 @@ gint32 CFuseStmFile::fs_unlink(
         CancelFsRequests();
         SetRemoved();
 
-        oFileLock.Unlock();
-
-        CFuseStmDir* pParent = dynamic_cast
+        CFuseStmDir* pParent = static_cast
             < CFuseStmDir* >( GetParent() );
         if( pParent == nullptr )
         {
@@ -757,7 +744,7 @@ gint32 CFuseStmFile::fs_unlink(
         }
 
         // keep a copy of pObj
-        CHILD_TYPE pEnt;
+        DIR_SPTR pEnt;
         stdstr strName = GetName();
         ret = pParent->GetChild( strName, pEnt );
         if( ERROR( ret ) )
@@ -1134,6 +1121,91 @@ gint32 CFuseStmFile::fs_read(
     return ret;
 }
 
+gint32 CFuseFileEntry::FillBufVec(
+    size_t& dwReqSize,
+    std::deque< INBUF >& queBufs,
+    std::vector< BufPtr >& vecBufs,
+    fuse_bufvec*& bufvec )
+{
+    gint32 ret = 0;
+    do{
+        guint32 dwAvail = 0;
+        auto itr = queBufs.begin();
+        while( itr != queBufs.end() )
+        {
+          
+            guint32& dwOff = itr->dwOff;
+            BufPtr& pBuf = itr->pBuf;
+            dwAvail += pBuf->size() - dwOff;
+
+            if( dwReqSize == 0 )
+                dwReqSize = dwAvail;
+
+            if( dwAvail >= dwReqSize )
+                break;
+
+            itr++;
+        }
+        if( dwAvail == 0 )
+        {
+            dwReqSize = 0;
+            queBufs.clear();
+            break;
+        }
+
+        if( dwReqSize == 0 )
+            dwReqSize = dwAvail;
+
+        if( dwAvail < dwReqSize )
+        {
+            ret = STATUS_PENDING;
+            break;
+        }
+
+        gint32 iCount = itr - queBufs.begin();
+        bufvec = ( fuse_bufvec* )malloc( 
+            sizeof( fuse_bufvec ) +
+            sizeof( fuse_buf ) * iCount );
+        iCount += 1;
+        bufvec->count = iCount;
+        bufvec->idx = 0;
+        bufvec->off = 0;
+        guint32 dwAlloced = 0;
+        for( int i = 0; i < iCount; i++ )
+        {
+            BufPtr& pBuf =
+                queBufs.front().pBuf;
+            guint32& dwOff =
+                queBufs.front().dwOff;
+
+            fuse_buf& slot = bufvec->buf[ i ];
+            slot.flags = (enum fuse_buf_flags) 0;
+            slot.fd = -1;
+            slot.pos = 0;
+            slot.mem = pBuf->ptr() + dwOff;
+
+            if( i < iCount - 1 )
+            {
+                slot.size = pBuf->size() - dwOff;
+                dwAlloced += slot.size;
+                vecBufs.push_back( pBuf );
+                queBufs.pop_front();
+                continue;
+            }
+            
+            slot.size = dwReqSize - dwAlloced;
+            dwOff += slot.size;
+            if( dwOff == pBuf->size() )
+            {
+                vecBufs.push_back( pBuf );
+                queBufs.pop_front();
+            }
+        }
+
+    }while( 0 );
+
+    return ret; 
+}
 
 gint32 CFuseFileEntry::CopyFromPipe(
     BufPtr& pBuf, fuse_buf* src )
@@ -1436,6 +1508,70 @@ gint32 CFuseStmFile::fs_poll(
     return ret;
 }
 
+gint32 CFuseStmFile::fs_release(
+    const char* path,
+    fuse_file_info * fi )
+{
+    gint32 ret = 0;
+    do{
+        if( DecOpCount() > 0 )
+            break;
+
+        if( !IsHidden() )
+            break;
+
+        CFuseStmDir* pParent = static_cast
+            < CFuseStmDir* >( GetParent() );
+        if( pParent == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        CancelFsRequests();
+
+        // keep a copy of pStm
+        DIR_SPTR pEnt;
+        stdstr strName = GetName();
+        ret = pParent->GetChild( strName, pEnt );
+        if( ERROR( ret ) )
+            break;
+
+        pParent->RemoveChild( strName );
+        fuse_ino_t inoParent =
+                pParent->GetObjId();
+
+        fuse_ino_t inoChild = GetObjId();
+        fuse* pFuse = GetFuse();
+        if( pFuse == nullptr )
+            break;
+
+        fuse_session* se =
+            fuse_get_session( pFuse );
+
+        fuse_lowlevel_notify_delete( se,
+            inoParent, inoChild,
+            strName.c_str(),
+            strName.size() );
+
+        CRpcServices* pSvc = GetIf();
+        HANDLE hStream = GetStream();
+
+        CIoManager* pMgr = pSvc->GetIoMgr();
+        TaskletPtr pTask;
+        ret = DEFER_CALL_NOSCHED( pTask,
+            pSvc, &rpcf::IStream::OnClose,
+            hStream, ( IEventSink* )nullptr );
+        if( ERROR( ret ) )
+            break;
+
+        ret = pMgr->RescheduleTask( pTask );
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CFuseFileEntry::CancelFsRequest(
     fuse_req_t req, gint32 iRet )
 {
@@ -1470,8 +1606,8 @@ gint32 CFuseFileEntry::CancelFsRequest(
 gint32 CFuseFileEntry::CancelFsRequests(
     gint32 iRet )
 {
-    //NOTE: must have file lock acquired
     gint32 ret = 0;
+    CFuseMutex oLock( GetLock() );
     for( auto& elem : m_queReqs ) 
     {
         fuseif_finish_interrupt( GetFuse(),
@@ -1612,6 +1748,333 @@ gint32 CFuseEvtFile::ReceiveEvtJson(
     return ret;
 }
 
+using INO_INFO=std::pair< guint64, stdstr>;
+static gint32 fuseif_remove_req_svr(
+    CRpcServices* pIf,
+    stdstr& strSuffix,
+    guint32 dwGrpId )
+{
+    gint32 ret = 0;
+    do{
+        auto pSvr = dynamic_cast
+            < CFuseSvcServer* >( pIf );
+
+        std::vector< INO_INFO > vecInoid;
+        WLOCK_TESTMNT2( pIf );
+
+        stdstr strPath;
+        ret = pSvr->GetSvcPath(
+            strPath );
+        if( ERROR( ret ) )
+            break;
+
+        stdstr strReq = "jreq_";
+        strReq += strSuffix;
+
+        auto pReq = static_cast
+            < CFuseReqFileSvr* >
+            ( _pSvcDir->GetChild( strReq ) );
+
+        if( pReq != nullptr )
+        {
+            fuse_file_info fi = {0};
+            fi.fh = ( guint64 )
+                ( CFuseObjBase* )pReq;
+            stdstr strReqPath =
+                strPath + "/" + strReq;
+            pReq->fs_unlink(
+                strReqPath.c_str(), &fi, false );
+            vecInoid.push_back( {
+               pReq->GetObjId(), strReq } );
+        }
+
+        stdstr strResp = "jrsp_";
+        strResp += strSuffix;
+
+        auto pResp = static_cast
+            < CFuseRespFileSvr* >
+            ( _pSvcDir->GetChild( strResp ) );
+
+        if( pResp != nullptr )
+        {
+            fuse_file_info fi = {0};
+            fi.fh = ( guint64 )
+                ( CFuseObjBase* )pResp;
+            stdstr strRespPath =
+                strPath + "/" + strResp;
+            pResp->fs_unlink(
+                strRespPath.c_str(), &fi, false );
+
+            vecInoid.push_back( {
+               pResp->GetObjId(), strResp } );
+        }
+        pSvr->RemoveGroup( dwGrpId );
+
+        fuse_ino_t inoParent =
+            _pSvcDir->GetObjId();
+
+        fuse* pFuse = GetFuse();
+        if( pFuse == nullptr )
+            break;
+
+        fuse_session* se =
+            fuse_get_session( pFuse );
+
+        for( auto& elem : vecInoid )
+        {
+            fuse_lowlevel_notify_delete( se,
+                inoParent, elem.first,
+                elem.second.c_str(),
+                elem.second.size() );
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+static gint32 fuseif_remove_req_proxy(
+    CRpcServices* pIf,
+    stdstr& strSuffix,
+    guint32 dwGrpId )
+{
+    gint32 ret = 0;
+    do{
+
+        auto pProxy = dynamic_cast
+            < CFuseSvcProxy* >( pIf );
+
+        std::vector< INO_INFO > vecInoid;
+        WLOCK_TESTMNT2( pIf );
+
+        stdstr strPath;
+        ret = pProxy->GetSvcPath(
+            strPath );
+        if( ERROR( ret ) )
+            break;
+
+        stdstr strReq = "jreq_";
+        strReq += strSuffix;
+
+        auto pReq = static_cast
+            < CFuseReqFileProxy* >
+            ( _pSvcDir->GetChild( strReq ) );
+
+        if( pReq != nullptr )
+        {
+            fuse_file_info fi = {0};
+            fi.fh = ( guint64 )
+                ( CFuseObjBase* )pReq;
+            stdstr strReqPath =
+                strPath + "/" + strReq;
+            pReq->fs_unlink(
+                strReqPath.c_str(), &fi, false );
+
+            vecInoid.push_back( {
+               pReq->GetObjId(), strReq } );
+        }
+
+        stdstr strResp = "jrsp_";
+        strResp += strSuffix;
+
+        auto pResp = static_cast
+            < CFuseRespFileProxy* >
+            ( _pSvcDir->GetChild( strResp ) );
+
+        if( pResp != nullptr )
+        {
+            fuse_file_info fi = {0};
+            fi.fh = ( guint64 )pResp;
+            fi.fh = ( guint64 )
+                ( CFuseObjBase* )pResp;
+            stdstr strRespPath =
+                strPath + "/" + strResp;
+            pResp->fs_unlink(
+                strRespPath.c_str(), &fi, false );
+
+            vecInoid.push_back( {
+               pResp->GetObjId(), strResp } );
+        }
+
+        stdstr strEvt = "jevt_";
+        strEvt += strSuffix;
+
+        auto pEvt = static_cast< CFuseEvtFile* >
+            ( _pSvcDir->GetChild( strEvt ) );
+
+        if( pEvt != nullptr )
+        {
+            fuse_file_info fi = {0};
+            fi.fh = ( guint64 )
+                ( CFuseObjBase* )pEvt;
+
+            stdstr strEvtPath =
+                strPath + "/" + strEvt;
+
+            pEvt->fs_unlink(
+                strEvtPath.c_str(), &fi, false );
+
+            vecInoid.push_back( {
+               pEvt->GetObjId(), strEvt } );
+        }
+
+        pProxy->RemoveGroup( dwGrpId );
+
+        fuse_ino_t inoParent =
+            _pSvcDir->GetObjId();
+
+        fuse* pFuse = GetFuse();
+        if( pFuse == nullptr )
+            break;
+
+        fuse_session* se =
+            fuse_get_session( pFuse );
+
+        for( auto& elem : vecInoid )
+        {
+            fuse_lowlevel_notify_delete( se,
+                inoParent, elem.first,
+                elem.second.c_str(),
+                elem.second.size() );
+            DebugPrint( 0, "%s is removed",
+                elem.second.c_str() );
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CFuseEvtFile::do_remove( bool bSched )
+{
+    gint32 ret = 0;
+    do{
+        CancelFsRequests();
+
+        CFuseSvcDir* pParent = static_cast
+            < CFuseSvcDir* >( GetParent() );
+        if( pParent == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        // keep a copy of the file to delete
+        DIR_SPTR pEnt;
+        stdstr strName = GetName();
+        ret = pParent->GetChild( strName, pEnt );
+        if( ERROR( ret ) )
+            break;
+
+        pParent->RemoveChild( strName );
+
+        if( !bSched )
+            break;
+
+        guint32 dwGrpId = GetGroupId();
+
+        gint32 ( *func )( CRpcServices*,
+            const stdstr&, guint32 ) =
+            ([]( CRpcServices* pIf,
+                const stdstr& strName,
+                guint32 dwGrpId )->gint32
+        {
+            gint32 ret = 0;
+            do{
+                if( strName.size() <= 5 )
+                {
+                    ret = -EINVAL;
+                    break;
+                }
+
+                stdstr strSuffix =
+                    strName.substr( 5 );
+
+                if( pIf->IsServer() )
+                {
+                    ret = fuseif_remove_req_svr(
+                        pIf, strSuffix, dwGrpId );
+                }
+                else
+                {
+                    ret = fuseif_remove_req_proxy(
+                        pIf, strSuffix, dwGrpId );
+                }
+
+            }while( 0 );
+
+            return ret;
+        });
+
+        TaskletPtr pTask;
+        CRpcServices* pIf = GetIf();
+        CIoManager* pMgr = pIf->GetIoMgr();
+        ret = NEW_FUNCCALL_TASK( pTask,
+            pMgr, func, pIf, strName,
+            GetGroupId() );
+
+        if( ERROR( ret ) )
+            break;
+
+        pMgr->RescheduleTask( pTask );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CFuseEvtFile::fs_release(
+    const char* path,
+    fuse_file_info * fi )
+{
+    gint32 ret = 0;
+    do{
+        if( DecOpCount() > 0 )
+            break;
+
+        if( GetGroupId() == 0 )
+        {
+            ret = -EACCES;
+            break;
+        }
+
+        if( !IsHidden() )
+            break;
+
+        ret = do_remove( true );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CFuseEvtFile::fs_unlink(
+    const char* path,
+    fuse_file_info * fi,
+    bool bSched )
+{
+    gint32 ret = 0;
+    do{
+        if( GetGroupId() == 0 )
+        {
+            ret = -EACCES;
+            break;
+        }
+
+        if( GetOpCount() > 0 )
+        {
+            SetHidden();
+            break;
+        }
+
+        SetRemoved();
+        ret = do_remove( bSched );
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CFuseFileEntry::CopyFromBufVec(
      std::vector< BufPtr >& vecBuf,
      fuse_bufvec* bufvec )
@@ -1723,7 +2186,7 @@ gint32 CFuseRespFileSvr::fs_write_buf(
         return ret;
 
     do{
-        // receive the 4-byte size in local endian
+        // receive the 4-byte size in big endian
         if( m_pReqSize->size() < sizeof( guint32 ) )
         {
             ret = GetReqSize(
@@ -1820,7 +2283,7 @@ gint32 CFuseRespFileSvr::fs_write_buf(
         vecBufs.clear();
 
         Json::Value valResp;
-        if( !g_pReader->parse( pBuf->ptr(),
+        if( !m_pReader->parse( pBuf->ptr(),
             pBuf->ptr() + pBuf->size(),
             &valResp, nullptr ) )
         {
@@ -1854,84 +2317,63 @@ gint32 CFuseRespFileProxy::ReceiveMsgJson(
     const stdstr& strMsg,
     guint64 qwReqId )
 {
-    gint32 ret = 0;
-    do{
-        ret = super::ReceiveEvtJson( strMsg );
-
-    }while( 0 );
-
-    return ret;
+    UNREFERENCED( qwReqId );
+    return super::ReceiveEvtJson( strMsg );
 }
 
-gint32 CFuseReqFileProxy::RemoveResp(
-    guint64 qwReqId )
+gint32 CFuseRespFileProxy::CancelFsRequests(
+    gint32 iRet )
 {
-    CFuseMutex oFileLock( GetLock() );
-    gint32 ret = oFileLock.GetStatus();
-    if( ERROR( ret ) )
-        return ret;
+    gint32 ret = 0;
+    do{
+        super::CancelFsRequests( iRet );
 
-    bool bFound = false;
-    if( m_queTaskIds.empty() )
-        return -ENOENT;
-    auto itr = m_queTaskIds.begin();
-    while( itr != m_queTaskIds.end() )
-    {
-        if( itr->qwReqId == qwReqId )
-        {
-            bFound = true;
+        auto pSvc = GetIf();
+        auto pProxy = dynamic_cast
+            < CFuseSvcProxy* >( pSvc );
+        std::vector< guint64 > vecReqs;
+        ret = pProxy->RemoveGrpReqs(
+            GetGroupId(), vecReqs );
+        if( ERROR( ret ) )
             break;
-        }
-        itr++;
-    }
 
-    ret = -ENOENT;
-    if( bFound )
-    {
-        m_queTaskIds.erase( itr );
-        ret = 0;
-    }
-
-    return ret;
-}
-
-gint32 CFuseReqFileProxy::ConvertAndFillBufVec(
-    guint32 dwAvail,
-    guint32 dwNewBytes,
-    size_t dwReqSize, 
-    std::vector< BufPtr >& vecBackup,
-    fuse_bufvec*& bufvec )
-{
-    gint32 ret = 0;
-    if( dwReqSize == 0 )
-        return -EINVAL;
-
-    if( dwAvail + dwNewBytes < dwReqSize )
-        return -EINVAL;
-
-    do{
-        guint32 dwBytesCvt = dwReqSize - dwAvail;
-        while( m_queTaskIds.size() )
+        if( vecReqs.empty() )
+            break;
+        if( GetOpCount() > 0 || !IsHidden() )
         {
-            auto& elem = m_queTaskIds.front();
-            BufPtr pBuf( true );
-            *pBuf = htonl( elem.strResp.size() );
+            Json::StreamWriterBuilder oBuilder;
+            oBuilder["commentStyle"] = "None";
 
-            pBuf->Append( elem.strResp.c_str(),
-                elem.strResp.size() );
-
-            m_queIncoming.push_back( { pBuf, 0 } );
-            m_queTaskIds.pop_front();
-
-            if( dwBytesCvt <= elem.strResp.size() +
-                sizeof( guint32 ) )
+            CFuseMutex oFileLock( GetLock() );
+            ret = oFileLock.GetStatus();
+            if( ERROR( ret ) )
                 break;
-            dwBytesCvt -= elem.strResp.size();
+
+            for( auto& elem : vecReqs )
+            {
+                Json::Value oVal;
+                oVal[ JSON_ATTR_REQCTXID ] = elem;
+                oVal[ JSON_ATTR_MSGTYPE ] = "resp";
+                oVal[ JSON_ATTR_RETCODE ] = iRet;
+                oVal[ "information" ] =
+                    "The request is canceled unexpectedly";
+                stdstr strResp = Json::writeString(
+                    oBuilder, oVal );
+
+                BufPtr pBuf( true );
+                *pBuf = htonl( strResp.size() );
+                pBuf->Append(
+                    strResp.c_str(), strResp.size());
+                m_queIncoming.push_back( { pBuf, 0 } );
+            }
         }
 
-        ret = FillBufVec(
-            dwReqSize, m_queIncoming,
-            vecBackup, bufvec );
+        fuse_pollhandle* ph = GetPollHandle();
+        if( ph != nullptr )
+        {
+            fuse_notify_poll( ph );
+            SetPollHandle( nullptr );
+        }
 
     }while( 0 );
 
@@ -1958,33 +2400,18 @@ gint32 CFuseReqFileProxy::fs_read(
             break;
 
         guint32 dwAvail = GetBytesAvail();
-        guint32 dwNewBytes = 0;
-        for( auto& elem : m_queTaskIds )
-        {
-            dwNewBytes += elem.strResp.size() +
-                sizeof( guint32 );
-            if( dwAvail >= size )
-                break;
-        }
 
         if( dwAvail >= size )
         {
             ret = FillBufVec( size, m_queIncoming,
                 vecBackup, bufvec );
         }
-        else if( dwAvail + dwNewBytes >= size )
-        {
-            ret = ConvertAndFillBufVec( dwAvail,
-                dwNewBytes, size, 
-                vecBackup, bufvec );
-        }
         else if( IsNonBlock() )
         {
-            size = dwAvail + dwNewBytes;
+            size = dwAvail;
             if( size == 0 )
                 break;
-            ret = ConvertAndFillBufVec( dwAvail,
-                dwNewBytes, size, 
+            ret = FillBufVec( size, m_queIncoming,
                 vecBackup, bufvec );
         }
         else
@@ -2018,7 +2445,7 @@ gint32 CFuseReqFileProxy::fs_write_buf(
         return ret;
 
     do{
-        // receive the size value of 4-bytes in local
+        // receive the size value of 4-bytes in big
         // endian
         if( m_pReqSize->size() < sizeof( guint32 ) )
         {
@@ -2116,7 +2543,7 @@ gint32 CFuseReqFileProxy::fs_write_buf(
         vecBufs.clear();
 
         Json::Value valReq, valResp;
-        if( !g_pReader->parse( pBuf->ptr(),
+        if( !m_pReader->parse( pBuf->ptr(),
             pBuf->ptr() + pBuf->size(),
             &valReq, nullptr ) )
         {
@@ -2144,41 +2571,46 @@ gint32 CFuseReqFileProxy::fs_write_buf(
         stdstr strResp =
             Json::writeString( oBuilder, valResp );
 
-        if( ret == STATUS_PENDING )
+        if( ret == STATUS_PENDING ||
+            ret == -STATUS_PENDING )
         {
-            ret = 0;
-        }
-        else if( ret == -STATUS_PENDING )
-        {
-            // the request has been completed
+            pProxy->AddReqGrp(
+                qwReqId, GetGroupId() );
             ret = 0;
         }
         else
         {
-            // append the response to the file
-            // JSON_RESP_FILE for an immediate return.
+            // append the response to the resp file
             gint32 (*func)( CFuseSvcProxy*,
+                guint64, guint32,
                 const stdstr& )=([](
                     CFuseSvcProxy* pIf,
-                    const stdstr& strResp )
+                    guint64 qwReqId,
+                    guint32 dwGrpId,
+                    const stdstr& strResp )->gint32
             {
                 gint32 ret = 0;
                 do{
                     RLOCK_TESTMNT2( pIf );
-                    auto pResp = _pSvcDir->GetChild(
-                        JSON_RESP_FILE );
-                    CFuseEvtFile* p = dynamic_cast
-                        < CFuseEvtFile* >( pResp );
-                    p->ReceiveEvtJson( strResp );
+                    CFuseSvcProxy::GRP_ELEM oElem;
+                    ret = pIf->GetGroup( dwGrpId, oElem );
+                    if( ERROR( ret ) )
+                        break;
+                    auto pResp = oElem.m_pRespFile;
+                    auto p = static_cast
+                        < CFuseRespFileProxy* >( pResp );
+                    p->ReceiveMsgJson(
+                        strResp, qwReqId );
 
                 }while( 0 );
                 return ret;
             });
 
-            CIoManager* pMgr = pProxy->GetIoMgr();
             TaskletPtr pTask;
+            CIoManager* pMgr = pProxy->GetIoMgr();
             ret = NEW_FUNCCALL_TASK( pTask,
-                pMgr, func, pProxy, strResp );
+                pMgr, func, pProxy, qwReqId,
+                GetGroupId(), strResp );
             if( ERROR( ret ) )
                 break;
 
@@ -2218,8 +2650,7 @@ gint32 CFuseReqFileProxy::fs_poll(
             break;
 
         SetPollHandle( ph );
-        if( ( m_queIncoming.size() ||
-            m_queTaskIds.size() ) &&
+        if( m_queIncoming.size() &&
             m_queReqs.empty() )
             *reventsp |= POLLIN;
 
@@ -2316,6 +2747,190 @@ gint32 CStreamProxyFuse::OnStmRecv(
     return ret;
 }
 
+gint32 CFuseSvcProxy::ReceiveEvtJson(
+    const stdstr& strMsg )
+{
+    gint32 ret = 0;
+    do{
+        RLOCK_TESTMNT; 
+
+        CStdRMutex oLock( GetLock() );
+        std::vector< CFuseRespFileProxy* > vecResps;
+        // broadcast events
+        for( auto& elem : m_mapGroups )
+            vecResps.push_back(
+                elem.second.m_pRespFile );
+
+        oLock.Unlock();
+
+        for( auto& elem : vecResps )
+            elem->ReceiveEvtJson( strMsg );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CFuseSvcProxy::ReceiveMsgJson(
+        const stdstr& strMsg,
+        guint64 qwReqId )
+{
+    gint32 ret = 0;
+    do{
+        RLOCK_TESTMNT;
+
+        guint32 dwGrpId = 0;
+        CStdRMutex oLock( GetLock() );
+        ret = GetGrpByReq( qwReqId, dwGrpId );
+        if( ERROR( ret ) )
+            break;
+
+        GRP_ELEM ge;
+        ret = GetGroup( dwGrpId, ge );
+        if( ERROR( ret ) )
+            break;
+
+        oLock.Unlock();
+        auto pRespFile = ge.m_pRespFile;
+        ret = pRespFile->ReceiveMsgJson(
+            strMsg, qwReqId );
+
+        RemoveReqGrp( qwReqId );
+
+    }while( 0 );
+
+    return ret;
+}
+
+void CFuseSvcProxy::AddReqFiles(
+    const stdstr& strSuffix )
+{
+    // add an RW request file
+    CFuseObjBase* pObj = nullptr;
+    guint32 dwGrpId = 0;
+    if( !( strSuffix.size() == 1 &&
+        strSuffix.front() == '0' ) )
+        dwGrpId = GetGroupId();
+    stdstr strName = "jreq_";
+    strName += strSuffix;
+
+    auto pFile = DIR_SPTR(
+        new CFuseReqFileProxy( strName, this ) ); 
+    m_pSvcDir->AddChild( pFile );
+    pObj = dynamic_cast< CFuseObjBase* >
+        ( pFile.get() );
+    pObj->SetMode( S_IRUSR | S_IWUSR );
+    pObj->DecRef();
+    auto pReqFile = static_cast
+        < CFuseReqFileProxy* >( pObj );
+    pReqFile->SetGroupId( dwGrpId );
+
+    // add an RO RESP file 
+    strName = "jrsp_";
+    strName += strSuffix;
+    pFile.reset( 
+        new CFuseRespFileProxy( strName, this ) );
+    m_pSvcDir->AddChild( pFile );
+    pObj = dynamic_cast
+        < CFuseObjBase* >( pFile.get() );
+    pObj->SetMode( S_IRUSR );
+    pObj->DecRef();
+    auto pRespFile = static_cast
+        < CFuseRespFileProxy* >( pObj );
+    pRespFile->SetGroupId( dwGrpId );
+
+    // add an RO event file 
+    strName = "jevt_";
+    strName += strSuffix;
+    pFile = DIR_SPTR(
+        new CFuseEvtFile( strName, this ) ); 
+    m_pSvcDir->AddChild( pFile );
+    pObj = dynamic_cast
+        < CFuseObjBase* >( pFile.get() );
+    pObj->SetMode( S_IRUSR );
+    pObj->DecRef();
+    auto pEvtFile = static_cast
+        < CFuseEvtFile* >( pObj );
+    pEvtFile->SetGroupId( dwGrpId );
+    AddGroup( dwGrpId,
+        { pReqFile, pRespFile, pEvtFile } );
+}
+
+gint32 CFuseSvcServer::ReceiveMsgJson(
+        const stdstr& strMsg,
+        guint64 qwReqId )
+{
+    gint32 ret = 0;
+    do{
+        RLOCK_TESTMNT;
+
+        CStdRMutex oLock( GetLock() );
+        GRP_ELEM oElem;
+        gint32 iGrpId = m_vecGrpIds[ m_iLastGrp ];
+
+        if( m_vecGrpIds.size() > 1 )
+        {
+            m_iLastGrp++;
+            m_iLastGrp %= m_vecGrpIds.size();
+        }
+
+        ret = GetGroup( iGrpId, oElem );
+        if( ERROR( ret ) )
+            break;
+        oLock.Unlock();
+
+        auto pReqFile = oElem.m_pReqFile;
+
+        ret = pReqFile->ReceiveMsgJson(
+            strMsg, qwReqId );
+
+    }while( 0 );
+
+    return ret;
+}
+
+void CFuseSvcServer::AddReqFiles(
+    const stdstr& strSuffix )
+{
+    // add an RO request file
+    CFuseObjBase* pObj = nullptr;
+    guint32 dwGrpId = 0;
+    if( !( strSuffix.size() == 1 &&
+        strSuffix.front() == '0' ) )
+        dwGrpId = GetGroupId();
+
+    stdstr strName = "jreq_";
+    strName += strSuffix;
+    auto pFile = DIR_SPTR(
+        new CFuseReqFileSvr( strName, this ) ); 
+    m_pSvcDir->AddChild( pFile );
+    pObj = dynamic_cast< CFuseObjBase* >
+        ( pFile.get() );
+    pObj->SetMode( S_IRUSR );
+    pObj->DecRef();
+    auto pReqFile = static_cast
+        < CFuseReqFileSvr* >( pObj );
+    pReqFile->SetGroupId( dwGrpId );
+
+    // add an WO RESP file for both
+    // response and event
+    strName = "jrsp_";
+    strName += strSuffix;
+
+    pFile = DIR_SPTR(
+        new CFuseRespFileSvr( strName, this ) ); 
+    m_pSvcDir->AddChild( pFile );
+    pObj = dynamic_cast
+        < CFuseObjBase* >( pFile.get() );
+    pObj->SetMode( S_IWUSR );
+    pObj->DecRef();
+    auto pRespFile = static_cast
+        < CFuseRespFileSvr* >( pObj );
+    pRespFile->SetGroupId( dwGrpId );
+    AddGroup( dwGrpId, 
+        { pReqFile, pRespFile } );
+}
+
 } // namespace
 
 gint32 fuseop_access(
@@ -2338,87 +2953,9 @@ gint32 fuseop_open(
 gint32 fuseop_release(
     const char* path, fuse_file_info * fi )
 {
-    CFuseObjBase* pObj = reinterpret_cast
-        < CFuseObjBase* >( fi->fh );
-    if( pObj == nullptr )
-        return -EFAULT;
-
-    gint32 ret = 0;
-    do{
-        CFuseStmFile* pStm = dynamic_cast
-            < CFuseStmFile* >( pObj );
-        if( pStm == nullptr )
-        {
-            CFuseMutex oFileLock(
-                pObj->GetLock() );
-            ret = oFileLock.GetStatus();
-            if( ERROR( ret ) )
-                break;
-            pObj->DecOpCount();
-            break;
-        }
-
-        CRpcServices* pSvc = pStm->GetIf();
-        WLOCK_TESTMNT2( pSvc );
-
-        if( pStm->DecOpCount() > 0 )
-            break;
-
-        if( !pStm->IsHidden() )
-            break;
-
-        CFuseStmDir* pParent = dynamic_cast
-            < CFuseStmDir* >( pStm->GetParent() );
-        if( pParent == nullptr )
-        {
-            ret = -EFAULT;
-            break;
-        }
-
-        pStm->CancelFsRequests();
-
-        // keep a copy of pStm
-        CHILD_TYPE pEnt;
-        stdstr strName = pStm->GetName();
-        ret = pParent->GetChild( strName, pEnt );
-        if( ERROR( ret ) )
-            break;
-
-        pParent->RemoveChild( strName );
-        fuse_ino_t inoParent =
-                pParent->GetObjId();
-
-        oSvcLock.Unlock();
-
-        fuse_ino_t inoChild = pStm->GetObjId();
-        fuse* pFuse = GetFuse();
-        if( pFuse == nullptr )
-            break;
-
-        fuse_session* se =
-            fuse_get_session( pFuse );
-
-        fuse_lowlevel_notify_delete( se,
-            inoParent, inoChild,
-            strName.c_str(),
-            strName.size() );
-
-
-        ObjPtr pIf = pStm->GetIf();
-        HANDLE hStream = pStm->GetStream();
-
-        CIoManager* pMgr = pSvc->GetIoMgr();
-        TaskletPtr pTask;
-        ret = DEFER_CALL_NOSCHED( pTask,
-            pSvc, &rpcf::IStream::OnClose,
-            hStream, ( IEventSink* )nullptr );
-        if( ERROR( ret ) )
-            break;
-        ret = pMgr->RescheduleTask( pTask );
-
-    }while( 0 );
-
-    return ret;
+    return SafeCall(
+        true, &CFuseObjBase::fs_release,
+        path, fi );
 }
 
 gint32 fuseop_opendir(
@@ -2446,58 +2983,69 @@ gint32 fuseop_unlink( const char* path )
     fuse_file_info* fi = nullptr;
     return SafeCall( true,
         &CFuseObjBase::fs_unlink,
-        path, fi ) ;
+        path, fi, true ) ;
 }
-         
 
-gint32 fuseop_create( const char* path,
-    mode_t mode, fuse_file_info* fi )
+static gint32 fuseif_create_req(
+    const stdstr& strSuffix,
+    CFuseSvcDir* pDir, 
+    fuse_file_info* fi )
 {
-    if( path == nullptr || fi == nullptr )
-        return -EINVAL;
     gint32 ret = 0;
     do{
-        stdstr strPath( path );
-        size_t pos = strPath.rfind( '/' );
-        if( pos + 1 == strPath.size() )
+        if( strSuffix.empty() )
         {
             ret = -EINVAL;
             break;
         }
-        stdstr strName =
-            strPath.substr( pos + 1 );
-        strPath.erase( pos );
 
-        std::vector< stdstr > vecSubdirs;
-        CFuseObjBase* pObj = nullptr;
-        ret = GetSvcDir( strPath.c_str(),
-            pObj, vecSubdirs );
-        if( ERROR( ret ) )
-            break;
-
-        if( ret == ENOENT )
+        CRpcServices* pSvc = pDir->GetIf();
+        WLOCK_TESTMNT2( pSvc );
+        stdstr strName = "jreq_";
+        strName += strSuffix;
+        if( pDir->GetChild( strName ) != nullptr )
         {
-            ret = -ENOENT;
+            ret = -EEXIST;
             break;
         }
 
-        if( vecSubdirs.size() != 1 || 
-            vecSubdirs[ 0 ] != STREAM_DIR )
+        if( pSvc->IsServer() )
         {
-            ret = -EACCES;
+            CFuseSvcServer* pSvr = ObjPtr( pSvc );
+            pSvr->AddReqFiles( strSuffix );
+        }
+        else
+        {
+            CFuseSvcProxy* pProxy = ObjPtr( pSvc );
+            pProxy->AddReqFiles( strSuffix );
+        }
+
+        auto pEnt = _pSvcDir->GetChild( strName );
+        if( pEnt == nullptr )
+        {
+            ret = -EFAULT;
             break;
         }
 
-        auto pDir = static_cast< CFuseStmDir* >
-            ( pObj->GetChild( STREAM_DIR ) );
+        auto pReqFile = dynamic_cast
+            < CFuseObjBase* >( pEnt );
 
-        if( unlikely( pDir == nullptr ) )
-        {
-            // create allowed only under STREAM_DIR
-            ret = -ENOSYS;
-            break;
-        }
+        fi->fh = ( guint64 )pReqFile;
+        fi->direct_io = 1;
+        fi->keep_cache = 0;
 
+    }while( 0 );
+
+    return ret;
+}
+         
+static gint32 fuseif_create_stream(
+    const stdstr& strName,
+    CFuseStmDir* pDir, 
+    fuse_file_info* fi )
+{
+    gint32 ret = 0;
+    do{
         CRpcServices* pSvc = pDir->GetIf();
         if( pSvc->IsServer() )
         {
@@ -2586,14 +3134,84 @@ gint32 fuseop_create( const char* path,
         CFuseStmFile* pStmFile = new CFuseStmFile(
             strName, hStream, pStm );
 
-        auto pEnt = std::shared_ptr
-                < CDirEntry >( pStmFile ); 
+        auto pEnt = DIR_SPTR( pStmFile ); 
         fi->fh = ( guint64 )
             ( CFuseObjBase* )pStmFile;
         fi->direct_io = 1;
         fi->keep_cache = 0;
         pStmFile->IncOpCount();
         pDir->AddChild( pEnt );
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 fuseop_create( const char* path,
+    mode_t mode, fuse_file_info* fi )
+{
+    if( path == nullptr || fi == nullptr )
+        return -EINVAL;
+    gint32 ret = 0;
+    do{
+        stdstr strPath( path );
+        size_t pos = strPath.rfind( '/' );
+        if( pos + 1 == strPath.size() )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        stdstr strName =
+            strPath.substr( pos + 1 );
+        strPath.erase( pos );
+
+        std::vector< stdstr > vecSubdirs;
+        CFuseObjBase* pObj = nullptr;
+        ret = GetSvcDir( strPath.c_str(),
+            pObj, vecSubdirs );
+        if( ERROR( ret ) )
+            break;
+
+        if( ret == ENOENT )
+        {
+            ret = -ENOENT;
+            break;
+        }
+
+        if( vecSubdirs.empty() )
+        {
+            if( strName.size() <= 5 ||
+                strName.substr( 0, 5 ) != "jreq_" )
+            {
+                ret = -EINVAL;
+                break;
+            }
+            auto pDir = static_cast
+                < CFuseSvcDir* >( pObj );
+
+            ret = fuseif_create_req(
+                strName.substr( 5 ), pDir, fi );
+            break;
+        }
+
+        if( vecSubdirs.size() != 1 || 
+            vecSubdirs[ 0 ] != STREAM_DIR )
+        {
+            ret = -EACCES;
+            break;
+        }
+
+        auto pDir = static_cast< CFuseStmDir* >
+            ( pObj->GetChild( STREAM_DIR ) );
+
+        if( unlikely( pDir == nullptr ) )
+        {
+            // create allowed only under STREAM_DIR
+            ret = -ENOSYS;
+            break;
+        }
+
+        ret = fuseif_create_stream(
+            strName, pDir, fi );
 
     }while( 0 );
 
@@ -2696,8 +3314,6 @@ void* fuseop_init(
     set_one_signal_handler(
         cfg->intr_signal, do_nothing, 0 );
     // init some other stuffs
-    Json::CharReaderBuilder oBuilder;
-    g_pReader.reset( oBuilder.newCharReader() );
     return GetFuse();
 }
 
@@ -2753,9 +3369,8 @@ gint32 fuseif_daemonize( fuse_args& args,
         goto out1;
     }
 
-    /*if (fuse_daemonize(opts.foreground) != 0)
-        ret = -ERROR_FAIL;
-    */
+    //if (fuse_daemonize(opts.foreground) != 0)
+    //    ret = -ERROR_FAIL;
 out1:
     free(opts.mountpoint);
     fuse_opt_free_args(&args);
@@ -2779,7 +3394,6 @@ static fuse_operations fuseif_ops =
     .ioctl = fuseop_ioctl,
     .poll = fuseop_poll,
 };
-
 /* Command line parsing */
 struct options {
     int no_reconnect;
