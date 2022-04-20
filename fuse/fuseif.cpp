@@ -2352,7 +2352,8 @@ gint32 CFuseRespFileProxy::CancelFsRequests(
             for( auto& elem : vecReqs )
             {
                 Json::Value oVal;
-                oVal[ JSON_ATTR_REQCTXID ] = elem;
+                oVal[ JSON_ATTR_REQCTXID ] =
+                    (  Json::UInt64& )elem;
                 oVal[ JSON_ATTR_MSGTYPE ] = "resp";
                 oVal[ JSON_ATTR_RETCODE ] = iRet;
                 oVal[ "information" ] =
