@@ -856,7 +856,8 @@ gint32 CJsonSerialBase::DeserializeByteArray(
     if( ERROR( ret ) )
         return ret;
 
-    val = pNewBuf->ptr();
+    val = Value( pNewBuf->ptr(),
+        pNewBuf->ptr() + pNewBuf->size() );
     return STATUS_SUCCESS;
 }
 

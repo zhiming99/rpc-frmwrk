@@ -2299,6 +2299,7 @@ gint32 CFuseRespFileSvr::fs_write_buf(
         if( ret == STATUS_PENDING )
             ret = 0;
 
+        m_pReqSize->Resize( 0 );
         if( m_vecOutBufs.empty() )
         {
             // bufvec->idx = bufvec->count;
@@ -2306,9 +2307,13 @@ gint32 CFuseRespFileSvr::fs_write_buf(
             break;
         }
 
-        m_pReqSize->Resize( 0 );
-
     }while( 1 );
+
+    if( ERROR( ret ) )
+    {
+        m_pReqSize->Resize( 0 );
+        m_vecOutBufs.clear();    
+    }
 
     return ret;
 }

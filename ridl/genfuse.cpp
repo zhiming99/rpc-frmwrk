@@ -2046,8 +2046,8 @@ gint32 CImplIfMethodProxyFuse::OutputEvent()
         NEW_LINE;
         Wa( "    0, strEvent, true, false );" );
         Wa( "//TODO: pass strEvent to FUSE" );
-        Wa( "CFuseSvcProxy* pFuse = ObjPtr( this );" );
-        Wa( "pFuse->ReceiveEvtJson( strEvent );" );
+        Wa( "CFuseSvcProxy* pProxy = ObjPtr( this );" );
+        Wa( "pProxy->ReceiveEvtJson( strEvent );" );
         Wa( "if( ERROR( ret ) ) break;" );
 
         BLOCK_CLOSE;
@@ -2597,13 +2597,15 @@ gint32 CImplIfMethodSvrFuse::OutputAsyncSerial()
         Wa( "if( ERROR( ret ) ) break;" );
         CCOUT << "//TODO: pass strReq to FUSE";
         NEW_LINE;
-        Wa( "CFuseSvcServer* pFuse = ObjPtr( this );" );
-        Wa( "pFuse->ReceiveMsgJson( strReq," );
+        Wa( "CFuseSvcServer* pSvr = ObjPtr( this );" );
+        Wa( "pSvr->ReceiveMsgJson( strReq," );
         CCOUT << "    pCallback->GetObjId() );";
 
         if( !bNoReply )
         {
             NEW_LINE;
+            Wa( "if( ret == STATUS_SUCCESS )" );
+            Wa( "    ret = STATUS_PENDING;" );
             Wa( "if( ret == STATUS_PENDING ) break;" );
             NEW_LINE;
             Wa( "CParamList oResp_;" );
