@@ -63,7 +63,7 @@ This project depends on the following 3rd-party packags at runtime:
 ---
 [`Mon Apr 25 2022 10:33:13 PM Beijing`]   
 1. Have passed a difficult test for fuse support. 
-2. There are still two important requirements to implement before the release, the informational files and counter files, and the removable 'service directory'. Examples, and testcases will be added after the release.
+2. There are still two important requirements to implement before the release, the informational files and counter files, and the duplicatable 'service directory'. Examples, and testcases will be added after the release.
 
 [`Thu Apr 14 2022 09:11:27 PM Beijing`]   
 1. The fuse integration has passed most of the test cases, and I will merge it to the master branch soon.
