@@ -700,6 +700,7 @@ class CFuseEvtFile : public CFuseFileEntry
     guint32 m_dwGrpId = 0;
 
     gint32 do_remove( bool bSched );
+    guint32 m_dwMsgCount = 0;
 
     public:
     typedef CFuseFileEntry super;
@@ -2092,7 +2093,7 @@ class CFuseServicePoint :
                 if( SUCCEEDED( ret ) )
                     DecStmCount( strSess );
             }
-
+            oLock.Unlock();
             WLOCK_TESTMNT;
             stdstr strName;
             ret = StreamToName( hStream, strName);

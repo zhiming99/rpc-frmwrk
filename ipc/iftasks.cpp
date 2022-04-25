@@ -4795,6 +4795,32 @@ gint32 CIfInvokeMethodTask::GetKeepAliveSec(
     return ret;
 }
 
+gint32 CIfInvokeMethodTask::DisableKeepAlive()
+{
+    gint32 ret = 0;
+    CfgPtr pCfg;
+    do{
+        ret = GetCallOptions( pCfg );
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpener oCfg( ( IConfigDb* )pCfg );
+        guint32 dwFlags = 0;
+        ret = oCfg.GetIntProp(
+            propCallFlags, dwFlags );
+
+        if( ERROR( ret ) )
+            break;
+
+        dwFlags &= ~CF_KEEP_ALIVE;
+        oCfg.SetIntProp(
+            propCallFlags, dwFlags );
+        
+    }while( 0 );
+
+    return ret;
+}
+
 bool CIfInvokeMethodTask::HasReply() const
 {
     guint32 dwFlags = 0;

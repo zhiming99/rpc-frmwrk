@@ -655,6 +655,7 @@ class CIfInvokeMethodTask
     gint32 GetCallFlags( guint32& dwCallFlags ) const;
     // interval to send out the heartbeat
     gint32 GetKeepAliveSec( guint32& dwTimeoutSec ) const; 
+    gint32 DisableKeepAlive();
 
     // interval before cancel the request if async
     gint32 GetTimeoutSec( guint32& dwTimeoutSec ) const; 

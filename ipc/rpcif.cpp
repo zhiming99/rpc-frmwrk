@@ -7095,7 +7095,9 @@ gint32 CInterfaceServer::OnKeepAliveOrig(
 
     gint32 ret = 0;
     do{
-        CCfgOpenerObj oCfg( pTask );
+        CTasklet* pInv = ObjPtr( pTask );
+        CCfgOpener oCfg(
+            ( IConfigDb* )pInv->GetConfig() );
         DMsgPtr pMsg;
         ret = oCfg.GetMsgPtr( propMsgPtr, pMsg );
         if( ERROR( ret ) )
@@ -7124,21 +7126,14 @@ gint32 CInterfaceServer::OnKeepAliveOrig(
             break;
         }
 
-        ObjPtr pObj;
-        ret = pMsg.GetObjArgAt( 0, pObj );
+        IConfigDb* pCfg = nullptr;
+        ret = oCfg.GetPointer( propReqPtr, pCfg );
         if( ERROR( ret ) )
             break;
 
-        IConfigDb* pCfg = pObj;
-        if( pCfg == nullptr )
-        {
-            ret = -EFAULT;
-            break;
-        }
-
         CReqOpener oReq( pCfg );
-        if( !oReq.IsKeepAlive() )
-            break;
+        // if( !oReq.IsKeepAlive() )
+        //     break;
 
         guint64 iTaskId = 0;
         ret = oReq.GetTaskId( iTaskId );
@@ -7753,5 +7748,62 @@ gint32 CInterfaceServer::SetInvTimeout(
     return ret;
 }
 
+gint32 CInterfaceServer::DisableKeepAlive(
+    IEventSink* pCallback )
+{
+    if( pCallback == nullptr )
+        return -EINVAL;
+    CIfInvokeMethodTask* pInv =
+        ObjPtr( pCallback );
+    if( pInv == nullptr )
+        return -EFAULT;
+
+    return pInv->DisableKeepAlive();
+}
+
+gint32 CInterfaceServer::OnKeepAlive(
+    guint64 qwTaskId )
+{
+    gint32 ret = 0;
+    do{
+        if( qwTaskId == 0 )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        CStdRMutex oLock( GetLock() );
+        if( GetState() != stateConnected )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+        TaskGrpPtr pGrp;
+        ret = GetParallelGrp( pGrp );
+        if( ERROR( ret ) )
+            break;
+        TaskletPtr pTask;
+        ret = pGrp->FindTask( qwTaskId, pTask );
+        if( ERROR( ret ) )
+            break;
+        oLock.Unlock();
+
+        CIfInvokeMethodTask* pInv = pTask;
+        if( pInv == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        CStdRTMutex oTaskLock( pInv->GetLock() );
+        if( pInv->GetTaskState() != stateStarted )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+        ret = this->OnKeepAlive( pInv, KAOrigin );
+
+    }while( 0 );
+
+    return ret;
+}
 
 }

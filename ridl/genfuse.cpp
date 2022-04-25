@@ -446,7 +446,8 @@ gint32 CEmitSerialCodeFuse::OutputDeserial(
                     CCOUT << "    " <<  strBuf
                         <<", _oMember );";
                     NEW_LINE;
-                    Wa( "if( ERROR( ret ) ) break;" );
+                    Wa( "if( ERROR( ret ) )" );
+                    Wa( "    break;" );
                     break;
                 }
             case 'Q':
@@ -2546,11 +2547,13 @@ gint32 CImplIfMethodSvrFuse::OutputAsyncSerial()
                 << dwKeepAliveSec << " );";
             NEW_LINE;
             Wa( "if( ERROR( ret ) ) break;" );
+            Wa( "DisableKeepAlive( pCallback );" );
         }
         else
         {
             Wa( "ret = SetInvTimeout( pCallback, 0 );" );
             Wa( "if( ERROR( ret ) ) break;" );
+            Wa( "DisableKeepAlive( pCallback );" );
         }
 
         Wa( "CParamList oReqCtx_;" );
@@ -2919,6 +2922,7 @@ gint32 CImplServiceImplFuse::Output()
                 CCOUT << "if( strIfName == \""
                     << strIfName << "\" )";
                 BLOCK_OPEN;
+                NEW_LINE;
                 CCOUT << "ret = " << "I" << strIfName
                     << "_SImpl::DispatchIfMsg( oMsg );";
                 NEW_LINE;
@@ -2926,6 +2930,25 @@ gint32 CImplServiceImplFuse::Output()
                 BLOCK_CLOSE;
                 NEW_LINE;
             }
+            Wa( "if( strIfName == \"IInterfaceServer\" )" );
+            BLOCK_OPEN;
+            Wa( "if( !oMsg.isMember( JSON_ATTR_METHOD ) ||" );
+            Wa( "    !oMsg[ JSON_ATTR_METHOD ].isString() )" );
+            Wa( "{ ret = -EINVAL; break; }" );
+            Wa( "stdstr strMethod =" );
+            Wa( "    oMsg[ JSON_ATTR_METHOD ].asString();" );
+            Wa( "if( strMethod != \"KeepAlive\" )" );
+            Wa( "{ ret = -ENOTSUP; break;}" );
+            Wa( "if( !oMsg.isMember( JSON_ATTR_REQCTXID ) ||" );
+            Wa( "    !oMsg[ JSON_ATTR_REQCTXID ].isUInt64() )" );
+            Wa( "{ ret = -EINVAL; break; }" );
+            Wa( "guint64 dwTaskId =" );
+            Wa( "    oMsg[ JSON_ATTR_REQCTXID ].asUInt64();" );
+            Wa( "ret = this->OnKeepAlive( dwTaskId );" );
+            CCOUT << "break;";
+            BLOCK_CLOSE;
+            NEW_LINE;
+            CCOUT << "ret = -ENOTSUP;";
             BLOCK_CLOSE;
             Wa( "while( 0 );" );
             CCOUT << "return ret;";

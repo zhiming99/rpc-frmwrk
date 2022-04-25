@@ -1719,6 +1719,12 @@ class CInterfaceServer :
         IEventSink* pCallback,
         guint32 dwTimeoutSec,
         guint32 dwKeepAliveSec = 0 );
+
+    gint32 DisableKeepAlive(
+        IEventSink* pCallback );
+
+    gint32 OnKeepAlive(
+        guint64 qwTaskId );
 };
 
 

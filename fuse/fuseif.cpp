@@ -838,8 +838,9 @@ gint32 CFuseStmFile::OnReadStreamComplete(
 
             // the vector to keep the buffer valid
             std::vector< BufPtr > vecRemoved;
-            ret = FillBufVec( dwReqSize,
-                m_queIncoming, vecRemoved, bufvec );
+            ret = FillBufVec(
+                dwReqSize, m_queIncoming,
+                vecRemoved, bufvec );
             if( ret == STATUS_PENDING )
             {
                 // incoming data is not enough.
@@ -1070,7 +1071,8 @@ gint32 CFuseStmFile::fs_read(
 
         if( dwBytesRead > 0 )
         {
-            ret = FillBufVec( dwBytesRead, m_queIncoming,
+            ret = FillBufVec(
+                dwBytesRead, m_queIncoming,
                 vecBackup, bufvec );
             if( ret == STATUS_PENDING )
                 ret = ERROR_STATE;
@@ -1623,7 +1625,8 @@ gint32 CFuseFileEntry::CancelFsRequests(
 gint32 CFuseEvtFile::fs_read(
     const char* path,
     fuse_file_info *fi,
-    fuse_req_t req, fuse_bufvec*& bufvec,
+    fuse_req_t req,
+    fuse_bufvec*& bufvec,
     off_t off, size_t size,
     std::vector< BufPtr >& vecBackup,
     fuseif_intr_data* d )
@@ -1687,31 +1690,19 @@ gint32 CFuseEvtFile::ReceiveEvtJson(
         if( ERROR( ret ) )
             break;
 
-        BufPtr pBuf;
-        if( m_queReqs.size() )
+        BufPtr pBuf( true );
+        *pBuf = htonl( strMsg.size() );
+        pBuf->Append(
+            strMsg.c_str(), strMsg.size());
+        m_queIncoming.push_back( { pBuf, 0 } );
+        fuse_pollhandle* ph = GetPollHandle();
+        if( ph != nullptr )
         {
-            BufPtr pSizeBuf( true );
-            pBuf = NewBufNoAlloc(
-                strMsg.c_str(), strMsg.size(), true );
-            *pSizeBuf = htonl( pBuf->size() );
-            m_queIncoming.push_back( { pSizeBuf, 0 } );
-            m_queIncoming.push_back( { pBuf, 0 } );
-        }
-        else
-        {
-            pBuf.NewObj();
-            *pBuf = htonl( strMsg.size() );
-            pBuf->Append(
-                strMsg.c_str(), strMsg.size());
-            m_queIncoming.push_back( { pBuf, 0 } );
-            fuse_pollhandle* ph = GetPollHandle();
-            if( ph != nullptr )
-            {
-                fuse_notify_poll( ph );
-                SetPollHandle( nullptr );
-            }
+            fuse_notify_poll( ph );
+            SetPollHandle( nullptr );
         }
 
+        ++m_dwMsgCount;
         while( m_queReqs.size() > 0 &&
             m_queIncoming.size() > 0 )
         {
@@ -1723,8 +1714,9 @@ gint32 CFuseEvtFile::ReceiveEvtJson(
 
             // the vector to keep the buffer valid
             std::vector< BufPtr > vecRemoved;
-            ret = FillBufVec( dwReqSize,
-                m_queIncoming, vecRemoved, bufvec );
+            ret = FillBufVec(
+                dwReqSize, m_queIncoming,
+                vecRemoved, bufvec );
             if( ret == STATUS_PENDING )
             {
                 // more incoming data is needed
@@ -1735,8 +1727,10 @@ gint32 CFuseEvtFile::ReceiveEvtJson(
             fuseif_finish_interrupt(
                     GetFuse(), req, d );
             if( dwReqSize > 0 )
-                fuse_reply_data(
-                    req, bufvec, FUSE_BUF_SPLICE_MOVE );
+            {
+                fuse_reply_data( req, bufvec,
+                    FUSE_BUF_SPLICE_MOVE );
+            }
             else
                 fuse_reply_err( req, -EAGAIN );
             fuseif_free_buf( bufvec );
@@ -2409,7 +2403,8 @@ gint32 CFuseReqFileProxy::fs_read(
 
         if( dwAvail >= size )
         {
-            ret = FillBufVec( size, m_queIncoming,
+            ret = FillBufVec(
+                size, m_queIncoming,
                 vecBackup, bufvec );
         }
         else if( IsNonBlock() )
@@ -2417,7 +2412,8 @@ gint32 CFuseReqFileProxy::fs_read(
             size = dwAvail;
             if( size == 0 )
                 break;
-            ret = FillBufVec( size, m_queIncoming,
+            ret = FillBufVec(
+                size, m_queIncoming,
                 vecBackup, bufvec );
         }
         else
