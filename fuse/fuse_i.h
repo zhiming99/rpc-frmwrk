@@ -105,7 +105,7 @@ struct fuse_session {
 namespace rpcf
 {
 template< typename ...Args1, typename ...Args2 >
-static gint32 SafeCall(
+static gint32 SafeCallInternal(
     bool bExclusive,
     gint32 (CFuseObjBase::*func )(
         const char*, fuse_file_info*, Args1... ),
@@ -116,6 +116,7 @@ static gint32 SafeCall(
     gint32 ret = 0;
     do{
         CFuseObjBase* pObj = nullptr;
+        ROOTLK_SHARED;
         if( fi != nullptr && fi->fh != 0 )
         {
             auto pIf = GetRootIf();
@@ -145,9 +146,10 @@ static gint32 SafeCall(
             }
 
             auto pSvc = fhctx.pSvc;
+            auto pSvcDir = rpcf::GetSvcDir( pSvc );
             if( bExclusive )
             {
-                WLOCK_TESTMNT2( pSvc );
+                WLOCK_TESTMNT0( pSvcDir );
                 if( pSvc->GetState() !=
                     stateConnected )
                 {
@@ -164,7 +166,7 @@ static gint32 SafeCall(
             }
             else
             {
-                RLOCK_TESTMNT2( pSvc );
+                RLOCK_TESTMNT0( pSvcDir );
                 if( pSvc->GetState() !=
                     stateConnected )
                 {
@@ -188,10 +190,15 @@ static gint32 SafeCall(
                 path, pSvcDir, vecSubdirs );
             if( ERROR( ret ) )
                 break;
-            if( ret == ENOENT )
+            if( ret == ENOENT && pSvcDir != nullptr )
             {
                 ret = ( pSvcDir->*func )( path, fi,
                     std::forward< Args2 >( args )... );
+                break;
+            }
+            else if( ret == ENOENT )
+            {
+                ret = -EFAULT;
                 break;
             }
 
@@ -264,4 +271,109 @@ static gint32 SafeCall(
 
     return ret;
 }
+
+template< typename ...Args1, typename ...Args2 >
+static gint32 SafeCall(
+    const stdstr& strMethod,
+    bool bExclusive,
+    gint32 (CFuseObjBase::*func )(
+        const char*, fuse_file_info*, Args1... ),
+    const char* path,
+    fuse_file_info* fi,
+    Args2&&... args )
+{
+    gint32 ret = 0;
+    do{
+        if( strMethod == "rmdir" )
+        {
+            ROOTLK_SHARED;
+            std::vector<stdstr> vecSubdirs;
+            CFuseObjBase* pSvcDir = nullptr;
+            ret = rpcf::GetSvcDir(
+                path, pSvcDir, vecSubdirs );
+            if( SUCCEEDED( ret ) && vecSubdirs.empty() )
+            {
+                TaskletPtr pCallback;
+                ret = pCallback.NewObj(
+                    clsid( CSyncCallback ) );
+                if( ERROR( ret ) )
+                    break;
+
+                CSyncCallback* pSync = pCallback;
+                fuse_file_info fi1 = {0};
+                fi1.fh = ( intptr_t )( IEventSink* )pSync;
+                stdstr strName = pSvcDir->GetName();
+                auto pParent = dynamic_cast
+                < CFuseDirectory* >( pSvcDir->GetParent() );
+                ret = ( pParent->*func )(
+                    strName.c_str(), &fi1,
+                    std::forward< Args2 >( args )... );
+
+                _ortlk.Unlock();
+
+                if( ret == STATUS_PENDING )
+                {
+                    pSync->WaitForCompleteWakable();
+                    ret = pSync->GetError();
+                }
+
+                break;
+            }
+            else
+            {
+                ret = -EACCES;
+                break;
+            }
+        }
+        else if( strMethod == "mkdir" )
+        {
+            ROOTLK_EXCLUSIVE;
+            std::vector<stdstr> vecSubdirs;
+            CFuseObjBase* pSvcDir = nullptr;
+            stdstr strPath = path;
+            size_t pos = strPath.rfind( '/' );
+            if( pos == stdstr::npos )
+            {
+                ret = -EINVAL;
+                break;
+            }
+            stdstr strParent;
+            if( pos == 0 )
+            {
+                strParent.push_back( '/' );
+            }
+            else
+            {
+                strParent =
+                    strPath.substr( 0, pos );
+            }
+
+            stdstr strName =
+                strPath.substr( pos + 1 );
+
+            CFuseObjBase* pParent = nullptr;
+            ret = rpcf::GetSvcDir( strParent.c_str(),
+                pParent, vecSubdirs );
+            if( ret == ENOENT && pParent != nullptr )
+            {
+                ret = ( pParent->*func )(
+                    strName.c_str(),
+                    nullptr, args... );
+                break;
+            }
+            ret = -ENOTDIR;
+            break;
+        }
+        else
+        {
+            ret = SafeCallInternal(
+                bExclusive, func, path, fi, 
+                std::forward< Args2 >( args )... );
+            break;
+        }
+
+    }while( 0 );
+    return ret;
+}
+
 }

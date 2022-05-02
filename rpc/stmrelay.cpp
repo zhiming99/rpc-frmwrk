@@ -147,7 +147,16 @@ gint32 CStreamServerRelay::FetchData_Server(
             fd, dwOffset, dwSize, pWrapper );
 
         if( ERROR( ret ) )
+        {
             ( *pWrapper )( eventCancelTask );
+            break;
+        }
+
+        if( ret == STATUS_PENDING )
+            break;
+
+        // wierd, sometimes, it can complete immediately
+        // though across the process boundary.
 
     }while( 0 );
 
@@ -698,18 +707,13 @@ gint32 CIfStartUxSockStmRelayTask::OnTaskComplete(
         IStream* pStream = nullptr;
         if( pParent->IsServer() )
         {
-            CStreamServerRelay* pIf =
-                ObjPtr( pParent );
-            pStream = static_cast< IStream* >
-                ( pIf );
+            CStreamServerRelay* pstm = pIf;
+            pStream = pstm;
         }
         else
         {
-            CStreamProxyRelay* pIf =
-                ObjPtr( pParent );
-
-            pStream = static_cast< IStream* >
-                ( pIf );
+            CStreamProxyRelay* pstm = pIf;
+            pStream = pstm;
         }
 
         if( pStream == nullptr ||
@@ -786,17 +790,34 @@ gint32 CIfStartUxSockStmRelayTask::OnTaskComplete(
 
         // set the response for OpenChannel
         TaskletPtr pConnTask;
-        ret = DEFER_IFCALLEX_NOSCHED( pConnTask,
-            ObjPtr( pParent ),
-            &IStream::OnConnected,
-            hChannel );
+
+        if( bBdgSvr )
+        {
+            ret = DEFER_IFCALLEX_NOSCHED( pConnTask,
+                ObjPtr( pParent ),
+                &CStreamServerRelay::OnConnected,
+                hChannel );
+        }
+        else
+        {
+            ret = DEFER_IFCALLEX_NOSCHED( pConnTask,
+                ObjPtr( pParent ),
+                &CStreamProxyRelay::OnConnected,
+                hChannel );
+        }
 
         if( ERROR( ret ) )
             break;
 
         ret = pParent->RunManagedTask( pConnTask );
         if( ERROR( ret ) )
+        {
             ( *pConnTask )( eventCancelTask );
+            break;
+        }
+
+        if( SUCCEEDED( ret ) )
+            ret = pConnTask->GetError();
 
         if( ret == STATUS_PENDING )
             ret = 0;
@@ -836,8 +857,12 @@ gint32 CIfStartUxSockStmRelayTask::OnTaskComplete(
 
         break;
     }
-
-    if( ERROR( ret ) && SUCCEEDED( iRet ) )
+    if( ERROR( iRet ) )
+    {
+        oResp[ propReturnValue ] = iRet;
+        ret = iRet;
+    }
+    else if( ERROR( ret ) )
     {
         oResp[ propReturnValue ] = ret;
         iRet = ret;

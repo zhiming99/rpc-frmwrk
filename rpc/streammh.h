@@ -130,6 +130,11 @@ class CStreamServerRelayMH :
     // error occues
     virtual gint32 OnClose( HANDLE hChannel,
         IEventSink* pCallback = nullptr );
+
+    using IStream::OnConnected;
+    gint32 OnConnected( HANDLE hChannel ) override
+    { return 0; }
+
 };
 
 /**

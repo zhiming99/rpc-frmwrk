@@ -220,10 +220,6 @@ class CStreamRelayBase :
         return ret;
     }
 
-    using IStream::OnConnected;
-    gint32 OnConnected( HANDLE hChannel )
-    { return 0; }
-
     // return STATUS_SUCCESS if iStmId is a valid
     // stream
     gint32 IsTcpStmExist( gint32 iStmId )
@@ -442,6 +438,10 @@ class CStreamServerRelay :
         IEventSink* pIoReqTask,
         IConfigDb* pContext );
 
+    using IStream::OnConnected;
+    gint32 OnConnected( HANDLE hChannel ) override
+    { return 0; }
+
 };
 
 // this interface will be hosted by
@@ -495,6 +495,11 @@ class CStreamProxyRelay :
         IEventSink* pCallback,
         IEventSink* pIoReqTask,
         IConfigDb* pContext );
+
+    using IStream::OnConnected;
+    gint32 OnConnected( HANDLE hChannel ) override
+    { return 0; }
+
 };
 
 class CIfStartUxSockStmRelayTask :

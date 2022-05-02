@@ -159,7 +159,7 @@ void fuseif_ll_read(fuse_req_t req,
         fuseif_prepare_interrupt( pFuse, req, d );
         fuse_bufvec* buf = nullptr;
         std::vector< BufPtr > vecBackup;
-        ret = SafeCall( false,
+        ret = SafeCall( "read", false,
             &CFuseObjBase::fs_read,
             ( const char* )nullptr, fi,
             req, buf, off, size,
@@ -200,7 +200,7 @@ void fuseif_ll_write_buf(fuse_req_t req,
         fuseif_intr_data* d = new fuseif_intr_data;
         d->fe = ( CFuseObjBase* )fi->fh;
         fuseif_prepare_interrupt( pFuse, req, d );
-        ret = SafeCall( false,
+        ret = SafeCall( "write_buf", false,
             &CFuseObjBase:: fs_write_buf,
             nullptr, fi, req, buf, d );
         fuseif_finish_interrupt( pFuse, req, d );

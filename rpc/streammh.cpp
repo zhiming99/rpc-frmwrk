@@ -1972,7 +1972,7 @@ gint32 CIfStartUxSockStmRelayTaskMH::OnTaskComplete(
         TaskletPtr pConnTask;
         ret = DEFER_IFCALLEX_NOSCHED( pConnTask,
             ObjPtr( pParent ),
-            &IStream::OnConnected,
+            &CStreamServerRelayMH::OnConnected,
             hChannel );
 
         if( ERROR( ret ) )
@@ -2023,7 +2023,7 @@ gint32 CIfStartUxSockStmRelayTaskMH::OnTaskComplete(
     else if( ERROR( ret ) )
     {
         oResp[ propReturnValue ] = ret;
-        iRet = iRet;
+        iRet = ret;
     }
 
     EventPtr pEvt;

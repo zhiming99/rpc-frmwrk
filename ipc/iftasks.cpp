@@ -1850,6 +1850,7 @@ gint32 CIfTaskGroup::FindTask(
 {
     gint32 ret = -ENOENT;
 
+    std::vector< TaskGrpPtr > vecGrps;
     CStdRTMutex oTaskLock( GetLock() );
     for( auto&& pTask : m_queTasks )
     {
@@ -1863,11 +1864,18 @@ gint32 CIfTaskGroup::FindTask(
         CIfTaskGroup* pGrp = pTask;
         if( pGrp != nullptr )
         {
-            ret = pGrp->FindTask( iTaskId, pRet );
-            if( SUCCEEDED( ret ) )
-                break;
+            vecGrps.push_back( TaskGrpPtr( pGrp ) );
         }
     }
+    oTaskLock.Unlock(); 
+
+    for( auto& pGrp :vecGrps )
+    {
+        ret = pGrp->FindTask( iTaskId, pRet );
+        if( SUCCEEDED( ret ) )
+            break;
+    }
+
     return ret;
 }
 
@@ -2448,6 +2456,7 @@ gint32 CIfParallelTaskGrp::FindTask(
 {
     gint32 ret = -ENOENT;
 
+    std::vector< TaskGrpPtr > vecGrps;
     CStdRTMutex oTaskLock( GetLock() );
 
     for( auto&& pTask : m_setTasks )
@@ -2462,9 +2471,8 @@ gint32 CIfParallelTaskGrp::FindTask(
         CIfTaskGroup* pGrp = pTask;
         if( pGrp != nullptr )
         {
-            ret = pGrp->FindTask( iTaskId, pRet );
-            if( SUCCEEDED( ret ) )
-                break;
+            vecGrps.push_back(
+                TaskGrpPtr( pGrp ) );
         }
     }
 
@@ -2480,11 +2488,18 @@ gint32 CIfParallelTaskGrp::FindTask(
         CIfTaskGroup* pGrp = pTask;
         if( pGrp != nullptr )
         {
-            ret = pGrp->FindTask( iTaskId, pRet );
-            if( SUCCEEDED( ret ) )
-                break;
+            vecGrps.push_back(
+                TaskGrpPtr( pGrp ) );
         }
     }
+    oTaskLock.Unlock();
+    for( auto& pGrp :vecGrps )
+    {
+        ret = pGrp->FindTask( iTaskId, pRet );
+        if( SUCCEEDED( ret ) )
+            break;
+    }
+
     return ret;
 }
 

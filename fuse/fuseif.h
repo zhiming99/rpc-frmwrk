@@ -215,7 +215,7 @@ class CSharedLock
 
 };
 
-#define CFuseMutex  CWriteLock
+#define CFuseMutex  CStdRMutex
 
 template < bool bRead >
 struct CLocalLock
@@ -280,7 +280,7 @@ class CFuseObjBase : public CDirEntry
 
     // events to return
     guint32 m_dwRevents = 0;
-    mutable CSharedLock m_oLock;
+    mutable stdrmutex m_oLock;
 
     protected:
     CRpcServices* m_pIf = nullptr;
@@ -299,7 +299,7 @@ class CFuseObjBase : public CDirEntry
         SetPollHandle( nullptr );
     }
 
-    CSharedLock& GetLock() const
+    stdrmutex& GetLock() const
     { return m_oLock; }
 
     inline guint32 GetRevents() const
@@ -478,6 +478,15 @@ class CFuseObjBase : public CDirEntry
     inline void SetIf( CRpcServices* pIf )
     { m_pIf = pIf; }
 
+    virtual int fs_mkdir( const char *,
+        fuse_file_info*,
+        mode_t )
+    { return -ENOSYS; }
+
+    virtual int fs_rmdir(
+        const char *,
+        fuse_file_info* )
+    { return -ENOSYS; }
 };
 
 class CFuseDirectory : public CFuseObjBase
@@ -515,17 +524,31 @@ class CFuseDirectory : public CFuseObjBase
         void *buf, fuse_fill_dir_t filler,
         off_t off,
         fuse_readdir_flags flags) override;
+
+    gint32 fs_mkdir( const char *,
+        fuse_file_info*,
+        mode_t ) override;
+
+    gint32 fs_rmdir(
+        const char *,
+        fuse_file_info* ) override;
 };
 
 class CFuseRootDir : public CFuseDirectory
 {
+    mutable CSharedLock m_oRootLock;
     public:
     typedef CFuseDirectory super;
-    CFuseRootDir() : super( "/", nullptr )
+    CFuseRootDir( CRpcServices* pIf ) :
+        super( "/", pIf )
     {
         SetClassId( clsid( CFuseRootDir ) );
         SetMode( S_IRUSR | S_IXUSR );
     }
+
+    CSharedLock& GetRootLock() const
+    { return m_oRootLock; }
+
     gint32 fs_getattr(
         const char *path,
         fuse_file_info* fi,
@@ -1041,7 +1064,8 @@ class CFuseConnDir : public CFuseDirectory
         : super( strName, nullptr )
     {
         SetClassId( clsid( CFuseConnDir ) );
-        SetMode( S_IRUSR | S_IXUSR );
+        // SetMode( S_IRUSR | S_IXUSR );
+        SetMode( S_IRWXU );
 
         // add an RO _nexthop directory this dir is
         // for docking nodes of sub router-path
@@ -1352,9 +1376,27 @@ class CFuseConnDir : public CFuseDirectory
 
         return strRet;
     }
+
 };
 
 bool IsUnmounted( CRpcServices* pIf );
+
+#define ROOTLK_SHARED \
+    CFuseRootDir* _pRootDir = static_cast \
+        < CFuseRootDir* >( GetRootDir() ); \
+    CReadLock _ortlk( _pRootDir->GetRootLock() ); \
+    ret = _ortlk.GetStatus(); \
+    if( ERROR( ret ) ) \
+        break;
+
+#define ROOTLK_EXCLUSIVE \
+    CFuseRootDir* _pRootDir = static_cast \
+        < CFuseRootDir* >( GetRootDir() ); \
+    CWriteLock _ortlk( _pRootDir->GetRootLock() ); \
+    ret = _ortlk.GetStatus(); \
+    if( ERROR( ret ) ) \
+        break;
+
 #define GET_STMDESC_LOCKED( _hStream, _pCtx ) \
     CFuseServicePoint* _pSp = const_cast \
         < CFuseServicePoint* >( this );\
@@ -1390,9 +1432,6 @@ bool IsUnmounted( CRpcServices* pIf );
         ret = ERROR_STATE; \
         break; \
     }
-#define WLOCK_TESTMNT \
-    auto _pDir = GetSvcDir(); \
-    WLOCK_TESTMNT0( _pDir.get() )
 
 #define RLOCK_TESTMNT0( _pDir_ ) \
     CFuseSvcDir* _pSvcDir = static_cast \
@@ -1407,9 +1446,25 @@ bool IsUnmounted( CRpcServices* pIf );
         break; \
     }
 
+#define WLOCK_TESTMNT \
+    ROOTLK_SHARED; \
+    auto _pDir = GetSvcDir(); \
+    WLOCK_TESTMNT0( _pDir.get() )
+
 #define RLOCK_TESTMNT \
-    DIR_SPTR _pDir = GetSvcDir(); \
+    ROOTLK_SHARED; \
+    auto _pDir = GetSvcDir(); \
     RLOCK_TESTMNT0( _pDir.get() )
+
+#define RLOCK_TESTMNT2( _pIf ) \
+    ROOTLK_SHARED; \
+    auto _pDir = rpcf::GetSvcDir( _pIf ); \
+    RLOCK_TESTMNT0( _pDir );
+
+#define WLOCK_TESTMNT2( _pIf ) \
+    ROOTLK_SHARED; \
+    auto _pDir = rpcf::GetSvcDir( _pIf ); \
+    WLOCK_TESTMNT0( _pDir );
 
 class CFuseSvcServer;
 class CFuseSvcProxy;
@@ -1419,33 +1474,6 @@ CFuseSvcDir* GetSvcDir( CRpcServices* pIf );
 gint32 GetSvcDir( const char* path,
     CFuseObjBase*& pSvcDir,
     std::vector< stdstr >& v );
-
-#define LOCK_TESTMNT( _pIf, _lock_ ) \
-    CFuseSvcDir* _pSvcDir = rpcf::GetSvcDir( _pIf ); \
-    _lock_ oSvcLock( _pSvcDir->GetSvcLock() ); \
-    ret = oSvcLock.GetStatus();\
-    if( ERROR( ret ) )\
-        break;\
-    if( rpcf::IsUnmounted( _pIf ) ) \
-    { ret = ERROR_STATE; break; }
-
-#define RLOCK_TESTMNT2( _pIf ) \
-    LOCK_TESTMNT( _pIf, CReadLock )
-
-#define WLOCK_TESTMNT2( _pIf ) \
-    LOCK_TESTMNT( _pIf, CWriteLock )
-
-#define RLOCK_TESTMNT3( _path ) \
-    CFuseSvcDir* _pDir = rpcf::GetSvcDir( _path );\
-    if( _pDir == nullptr ) \
-    { ret = -ENOENT; break; } \
-    RLOCK_TESTMNT0( _pDir );
-
-#define WLOCK_TESTMNT3( _path ) \
-    CFuseSvcDir* _pDir = rpcf::GetSvcDir( _path );\
-    if( _pDir == nullptr ) \
-    { ret = -ENOENT; break; } \
-    WLOCK_TESTMNT0( _pDir );
 
 #define IFBASE( _bProxy ) std::conditional< \
     _bProxy, CAggInterfaceProxy, CAggInterfaceServer>::type
@@ -1709,35 +1737,35 @@ class CFuseServicePoint :
             if( ERROR( ret ) )
                 break;
             DIR_SPTR pSp = GetSvcDir();
-            CFuseStmDir* pDir =
-                static_cast< CFuseStmDir* >
+            auto pDir = static_cast< CFuseStmDir* >
                 ( pSp->GetChild( STREAM_DIR ) );
 
             CfgPtr pCfg;
             stdstr strName;
-            IStream* pStmIf = dynamic_cast
+            auto pStmIf = dynamic_cast
                 < IStream* >( this );
             if( unlikely( pStmIf == nullptr ) )
             {
                 ret = -EFAULT;
                 break;
             }
-            ret = pStmIf->GetDataDesc(
-                hStream, pCfg );
-            if( SUCCEEDED( ret ) )
+
+            pStmIf->GetDataDesc( hStream, pCfg );
+            if( pCfg.IsEmpty() )
             {
-                CCfgOpener oDesc(
-                    ( IConfigDb* )pCfg );
-                ret = oDesc.GetStrProp(
-                    propNodeName, strName );
-
-                if( strName.size() > REG_MAX_NAME )
-                    strName.erase( REG_MAX_NAME );
-
-                if( SUCCEEDED( ret ) &&
-                    pDir->GetChild( strName ) != nullptr )
-                    ret = -EEXIST;
+                ret = -EFAULT;
+                break;
             }
+            CCfgOpener oDesc( ( IConfigDb* )pCfg );
+            ret = oDesc.GetStrProp(
+                propNodeName, strName );
+
+            if( strName.size() > REG_MAX_NAME )
+                strName.erase( REG_MAX_NAME );
+
+            if( SUCCEEDED( ret ) &&
+                pDir->GetChild( strName ) != nullptr )
+                ret = -EEXIST;
 
             if( ERROR( ret ) )
             {
@@ -1767,10 +1795,6 @@ class CFuseServicePoint :
     {
         gint32 ret = 0;        
         do{
-            stdstr strSvcPath;
-            ret = GetSvcPath( strSvcPath );
-            if( ERROR( ret ) )
-                break;
             DIR_SPTR pSp = GetSvcDir();
             CFuseStmDir* pDir =
                 static_cast< CFuseStmDir* >
@@ -1825,10 +1849,6 @@ class CFuseServicePoint :
         gint32 ret = 0;        
         do{
             WLOCK_TESTMNT;
-            stdstr strSvcPath;
-            ret = GetSvcPath( strSvcPath );
-            if( ERROR( ret ) )
-                break;
             std::vector< DIR_SPTR > vecChildren;
 
             m_bUnmounted = true;
@@ -1858,6 +1878,22 @@ class CFuseServicePoint :
                 pDir->RemoveChild(
                         elem->GetName() );
             }
+
+            vecChildren.clear();
+            ret = _pSvcDir->GetChildren(
+                vecChildren );
+
+            for( auto& elem : vecChildren )
+            {
+                auto pFile =
+                dynamic_cast< CFuseFileEntry* >
+                    ( elem.get() );
+                if( pFile != nullptr )
+                    pFile->CancelFsRequests( -ECANCELED );
+                _pSvcDir->RemoveChild(
+                        elem->GetName() );
+            }
+
             oSvcLock.Unlock();
 
             ObjPtr pIf = this;
@@ -1885,10 +1921,6 @@ class CFuseServicePoint :
             if( ERROR( ret ) )
                 break;
 
-            stdstr strSvcPath;
-            ret = GetSvcPath( strSvcPath );
-            if( ERROR( ret ) )
-                break;
             CFuseStmDir* pDir =
                 static_cast< CFuseStmDir* >
                 ( _pSvcDir->GetChild( STREAM_DIR ) );
@@ -1923,10 +1955,6 @@ class CFuseServicePoint :
             if( ERROR( ret ) )
                 break;
 
-            stdstr strSvcPath;
-            ret = GetSvcPath( strSvcPath );
-            if( ERROR( ret ) )
-                break;
             CFuseStmDir* pDir =
                 static_cast< CFuseStmDir* >
                 ( _pSvcDir->GetChild( STREAM_DIR ) );
@@ -1966,10 +1994,6 @@ class CFuseServicePoint :
             if( ERROR( ret ) )
                 break;
 
-            stdstr strSvcPath;
-            ret = GetSvcPath( strSvcPath );
-            if( ERROR( ret ) )
-                break;
             CFuseStmDir* pDir =
                 static_cast< CFuseStmDir* >
                 ( _pSvcDir->GetChild( STREAM_DIR ) );
@@ -2038,7 +2062,8 @@ class CFuseServicePoint :
     {
         gint32 ret = 0;
         do{
-            RLOCK_TESTMNT;
+            WLOCK_TESTMNT;
+
             if( bProxy )
                 break;
             if( this->GetState() != stateConnected )
@@ -2046,14 +2071,12 @@ class CFuseServicePoint :
 
             ret = CreateStmFile( hStream );
 
-        }while( 0 );
+            if( SUCCEEDED( ret ) )
+                break;
 
-        while( ERROR( ret ) )
-        {
             gint32 iRet = 0;
             CfgPtr pDesc;
             IConfigDb* ptctx = nullptr;
-            CStdRMutex oLock( this->GetLock() );
             GET_STMDESC_LOCKED( hStream, pDesc );
             iRet = oCfg.GetPointer(
                 propTransCtx, ptctx );
@@ -2066,9 +2089,10 @@ class CFuseServicePoint :
                 propSessHash, strSess );
             if( ERROR( iRet ) )
                 break;
+
             DecStmCount( strSess );
-            break;
-        }
+
+        }while( 0 );
 
         return ret;
     }
@@ -2078,9 +2102,9 @@ class CFuseServicePoint :
     {
         gint32 ret = 0;
         do{
+            WLOCK_TESTMNT;
             CfgPtr pDesc;
             IConfigDb* ptctx = nullptr;
-            CStdRMutex oLock( this->GetLock() );
             GET_STMDESC_LOCKED( hStream, pDesc );
             ret = oCfg.GetPointer(
                 propTransCtx, ptctx );
@@ -2093,8 +2117,6 @@ class CFuseServicePoint :
                 if( SUCCEEDED( ret ) )
                     DecStmCount( strSess );
             }
-            oLock.Unlock();
-            WLOCK_TESTMNT;
             stdstr strName;
             ret = StreamToName( hStream, strName);
             if( ERROR( ret ) )
@@ -2302,7 +2324,7 @@ class CFuseServicePoint :
         do{
             if( pBuf->GetDataType()!=DataTypeMem )
                 break;
-            RLOCK_TESTMNT2( this );
+            RLOCK_TESTMNT;
             auto pDir = static_cast< CFuseStmDir* >
             ( _pSvcDir->GetChild( STREAM_DIR ) );
 
@@ -2334,25 +2356,16 @@ class CFuseServicePoint :
             if( iEvent != eventRmtModOffline )
                 break;
             
-            RLOCK_TESTMNT2( this );
-            auto pChild = _pSvcDir->GetChild(
-                JSON_REQ_FILE );
-
-            auto pReq = dynamic_cast
-                < CFuseFileEntry* >( pChild );
-            pReq->CancelFsRequests( -EIO );
-
-            pChild = _pSvcDir->GetChild(
-                JSON_RESP_FILE );
-            auto pResp = dynamic_cast
-                < CFuseFileEntry* >( pChild );
-            pResp->CancelFsRequests( -EIO );
-
-            pChild = _pSvcDir->GetChild(
-                JSON_EVT_FILE );
-            auto pEvt = dynamic_cast
-                < CFuseFileEntry* >( pChild );
-            pEvt->CancelFsRequests( -EIO );
+            RLOCK_TESTMNT;
+            std::vector< DIR_SPTR > vecReqFiles;
+            _pSvcDir->GetChildren( vecReqFiles );
+            for( auto& elem : vecReqFiles )
+            {
+                auto pReq = dynamic_cast
+                < CFuseFileEntry* >( elem.get() );
+                if( pReq != nullptr )
+                    pReq->CancelFsRequests( -EIO );
+            }
 
         }while( 0 );
 
@@ -2541,6 +2554,13 @@ struct FHCTX
     DIR_SPTR pFile;
 };
 
+struct SVC_INFO
+{
+    stdstr m_strSvcName;
+    stdstr m_strDescPath;
+    EnumClsid m_iClsid;
+};
+
 template< bool bProxy,
     class T= typename std::conditional<
         bProxy,
@@ -2555,8 +2575,11 @@ class CFuseRootBase:
     std::vector< ObjPtr > m_vecIfs;
     CIoManager* m_pMgr = nullptr;
 
-    using FHMAP =std::hashmap< HANDLE, FHCTX  >;
+    using FHMAP = std::hashmap< HANDLE, FHCTX  >;
     FHMAP   m_mapHandles;
+
+    std::vector< SVC_INFO > m_vecServices;
+    std::hashmap< stdstr, guint32 > m_mapSvcInsts;
 
     public:
     typedef T super;
@@ -2599,6 +2622,45 @@ class CFuseRootBase:
             return -ENOENT;
         fhctx = itr->second;
         return STATUS_SUCCESS;
+    }
+
+    gint32 RemoveSvcPoint( CRpcServices* pIf )
+    {
+        if( pIf == nullptr )
+            return -EINVAL;
+
+        stdstr strInstName;
+        if( this->IsServer() )
+        {
+            CFuseSvcServer* pSvc = ObjPtr( pIf );
+            strInstName = pSvc->
+                GetSvcDir()->GetName();
+        }
+        else
+        {
+            CFuseSvcProxy* pSvc = ObjPtr( pIf );
+            strInstName = pSvc->
+                GetSvcDir()->GetName();
+        }
+        m_mapSvcInsts.erase( strInstName );
+
+        bool bErased = false;
+        auto itr = m_vecIfs.begin();
+        while( itr != m_vecIfs.end() )
+        {
+            if( ( *itr )->GetObjId() ==
+                pIf->GetObjId() )
+            {
+                m_vecIfs.erase( itr );
+                bErased = true;
+                break;
+            }
+            itr++;
+        }
+        if( bErased )
+            return STATUS_SUCCESS;
+
+        return -ENOENT;
     }
 
     gint32 GetSvcDir(
@@ -2664,7 +2726,7 @@ class CFuseRootBase:
         else if( ret == ENOENT &&
             pCurDir != nullptr )
         {
-            pDir = static_cast< CFuseSvcDir* >
+            pDir = dynamic_cast< CFuseObjBase* >
                 ( pCurDir );
         }
         else if( ret == ENOENT )
@@ -2709,7 +2771,7 @@ class CFuseRootBase:
                 "CFuseRootBase's ctor" );
             throw std::runtime_error( strMsg );
         }
-        m_pRootDir = DIR_SPTR( new CFuseRootDir() );
+        m_pRootDir = DIR_SPTR( new CFuseRootDir( this ) );
 
         CFuseObjBase* pObj = GetRootDir();
         FHCTX fc = { nullptr, m_pRootDir };
@@ -2747,28 +2809,76 @@ class CFuseRootBase:
         return STATUS_SUCCESS;
     }
 
-    // add a service point
     gint32 AddSvcPoint(
-        const stdstr& strName,
-        const stdstr& strDesc,
-        EnumClsid iClsid )
+        const stdstr& strInstName,
+        guint32 dwTimeout = 90 )
     {
-        if( strName.empty() || strDesc.empty() )
-            return -EINVAL;
         gint32 ret = 0;
-        bool bAdded = false;
+        bool bStarted = false;
+        InterfPtr pIf;
+        CIoManager* pMgr = this->GetIoMgr();
         do{
-            CfgPtr pCfg;
+            SVC_INFO* psi = nullptr;
+            if( strInstName.size() > REG_MAX_NAME )
+            {
+                ret = -EINVAL;
+                break;
+            }
+
+            if( m_mapSvcInsts.find( strInstName ) !=
+                m_mapSvcInsts.end() )
+            {
+                ret = -EEXIST;
+                break;
+            }
+
+            for( auto& elem : m_vecServices )
+            {
+                if( strInstName.substr( 0,
+                    elem.m_strSvcName.size() ) ==
+                    elem.m_strSvcName )
+                {
+                    psi = &elem;
+                    break;
+                }
+            }
+            if( psi == nullptr )
+            {
+                ret = -ENOENT;
+                break;
+            }
+
+            gint32 pos = strInstName.rfind( '_' );
+            stdstr strObjInst;
+            if( pos == stdstr::npos )
+            {
+                strObjInst = strInstName;
+            }
+            else
+            {
+                strObjInst =
+                    strInstName.substr( 0, pos );
+            }
+
+            CfgPtr pCfg( true );
+            if( strObjInst != psi->m_strSvcName )
+            {
+                CCfgOpener oCfg(
+                    ( IConfigDb* )pCfg );
+                // object instance name
+                oCfg[ propObjInstName ] =
+                    strObjInst;
+            }
+
             ret = CRpcServices::LoadObjDesc(
-                strDesc, strName, !bProxy, pCfg );
+                psi->m_strDescPath,
+                psi->m_strSvcName, !bProxy, pCfg );
             if( ERROR( ret ) )
                 break;
 
-            InterfPtr pIf;
             CCfgOpener oCfg( ( IConfigDb* )pCfg );
-            oCfg.SetPointer(
-                propIoMgr, this->GetIoMgr() );
-            ret = pIf.NewObj( iClsid, pCfg );
+            oCfg.SetPointer( propIoMgr, pMgr );
+            ret = pIf.NewObj( psi->m_iClsid, pCfg );
             if( ERROR( ret ) )
                 break;
 
@@ -2783,21 +2893,30 @@ class CFuseRootBase:
             if( ERROR( ret ) )
                 break;
 
+            bStarted = true;
+            EnumIfState st = pSp->GetState();
             if( bProxy )
             {
-                while( pSp->GetState()== stateRecovery )
-                    sleep( 1 );
-                if( pSp->GetState() != stateConnected )
+                while( st == stateRecovery )
                 {
-                    ret = ERROR_STATE;
-                    break;
+                    sleep( 1 );
+                    st = pSp->GetState();
+                    dwTimeout--;
+                    if( dwTimeout == 0 )
+                        break;
                 }
             }
+            if( st != stateConnected )
+            {
+                ret = -ENOTCONN;
+                break;
+            }
 
-            bAdded = true;
-            m_vecIfs.push_back( pIf );
             DIR_SPTR pSvcDir = pSp->GetSvcDir();
             CFuseObjBase* pRoot = GetRootDir();
+            CFuseSvcDir* psd = static_cast
+                < CFuseSvcDir* >( pSvcDir.get() );
+            psd->SetName( strInstName );
 
             if( !this->IsServer() )
             {
@@ -2806,44 +2925,89 @@ class CFuseRootBase:
                 ret = -ENOENT;
                 for( auto& elem : vecConns )
                 {
-                    CFuseConnDir* pConn = static_cast
+                    CFuseConnDir* pConn = dynamic_cast
                         < CFuseConnDir* >( elem.get() );
+                    if( pConn == nullptr )
+                        continue;
                     ret = pConn->AddSvcDir( pSvcDir );
                     if( SUCCEEDED( ret ) )
                         break;
                 }
-                if( SUCCEEDED( ret ) )
-                    break;
-
-                gint32 idx = vecConns.size();
-                DIR_SPTR pNewDir( new CFuseConnDir(
-                    stdstr( CONN_DIR_PREFIX ) +
-                    std::to_string( idx ) ) );
-                CFuseConnDir* pConn = static_cast
-                    < CFuseConnDir* >( pNewDir.get() );
-                pConn->DecRef();
-                ret = pConn->AddSvcDir( pSvcDir );
                 if( ERROR( ret ) )
-                    break;
-
-                ret = pRoot->AddChild( pNewDir );
+                {
+                    gint32 idx = vecConns.size();
+                    DIR_SPTR pNewDir( new CFuseConnDir(
+                        stdstr( CONN_DIR_PREFIX ) +
+                        std::to_string( idx ) ) );
+                    CFuseConnDir* pConn = static_cast
+                        < CFuseConnDir* >( pNewDir.get() );
+                    pConn->DecRef();
+                    ret = pConn->AddSvcDir( pSvcDir );
+                    if( ERROR( ret ) )
+                        break;
+                    ret = pRoot->AddChild( pNewDir );
+                }
             }
             else
             {
                 ret = pRoot->AddChild( pSvcDir );
             }
 
+            if( ERROR( ret ) )
+                break;
+
+            m_vecIfs.push_back( pIf );
+            m_mapSvcInsts[ strInstName ] =
+                psi->m_strSvcName.size();
+
         }while( 0 );
 
         if( ERROR( ret ) )
         {
-            if( bAdded )
+            if( bStarted && !pIf.IsEmpty() )
             {
-                InterfPtr pIf = m_vecIfs.back();
-                m_vecIfs.pop_back();
-                pIf->Stop();
+                TaskletPtr pTask;
+                gint32 iRet = DEFER_IFCALLEX_NOSCHED2(
+                    0, pTask, ObjPtr( pIf ),
+                    &CRpcServices::StopEx, 
+                    ( IEventSink* )nullptr );
+                if( SUCCEEDED( iRet ) )
+                    pMgr->RescheduleTask( pTask );
             }
         }
+
+        return ret;
+    }
+
+    bool CanRemove( const stdstr& strName ) const
+    {
+        auto itr = m_mapSvcInsts.find( strName );
+        if( itr == m_mapSvcInsts.cend() )
+            return false;
+        if( strName.size() == itr->second )
+            return false;
+        return true;
+    }
+
+    // add a service point
+    gint32 AddSvcPoint(
+        const stdstr& strName,
+        const stdstr& strDesc,
+        EnumClsid iClsid )
+    {
+        if( strName.empty() ||
+            strDesc.empty() ||
+            iClsid == clsid( Invalid ) )
+            return -EINVAL;
+        gint32 ret = 0;
+        bool bAdded = false;
+        do{
+            m_vecServices.push_back(
+                { strName, strDesc, iClsid } );
+
+            ret = AddSvcPoint( strName );
+
+        }while( 0 );
 
         return ret;
     }

@@ -6414,11 +6414,10 @@ gint32 CInterfaceServer::DoInvoke_SendData(
                     break;
                 }
 
-                gint32 ret2 = oResp.SetIntProp(
+                oResp.SetIntProp(
                     propReturnValue, ret );
 
-                if( SUCCEEDED( ret2 ) &&
-                    SUCCEEDED( ret ) )
+                if( SUCCEEDED( ret ) )
                 {
                     oResp.Push( ObjPtr( pDataDesc ) );
                     oResp.Push( fd );
@@ -6428,25 +6427,19 @@ gint32 CInterfaceServer::DoInvoke_SendData(
                     // iFd2Close = fd;
                     
                 }
-                else if( SUCCEEDED( ret ) )
-                {
-                    ret = ret2;
-                }
-
-                if( SUCCEEDED( ret ) )
-                {
-                    // on success , we need to set the
-                    // response immediately
-                    SetResponse( pCallback,
-                        oResp.GetCfg() );
-                }
-                else
+                else if( ERROR( ret ) )
                 {
                     // SetResponse at the end and here
                     // close the fd only
                     if( fd >= 0 )
                         close( fd );
                 }
+
+                // on success , we need to set the
+                // response immediately
+                SetResponse( pCallback,
+                    oResp.GetCfg() );
+
                 break;
             }
 
@@ -6823,26 +6816,31 @@ gint32 CInterfaceServer::SendResponse(
                 break;
             }
 #else
-            if( iFd <= 0 || bNonFd )
+            if( iFd < 0 || bNonFd )
                 iFdType = DBUS_TYPE_UINT32;
 #endif
 
             if( SUCCEEDED( iRet ) )
             {
                 const char* pData = pBuf->ptr();
-                if( !dbus_message_append_args( pRespMsg,
+                bool bRet = dbus_message_append_args(
+                    pRespMsg,
                     DBUS_TYPE_UINT32, &iRet,
                     DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
                     &pData, pBuf->size(),
                     iFdType, &iFd,
                     DBUS_TYPE_UINT32, &dwOffset,
                     DBUS_TYPE_UINT32, &dwSize,
-                    DBUS_TYPE_INVALID ) )
+                    DBUS_TYPE_INVALID );
+
+                if( iFdType == DBUS_TYPE_UNIX_FD )
+                    close( iFd );
+
+                if( !bRet )
                 {
                     ret = -ENOMEM;
                     break;
                 }
-                close( iFd );
             }
             else
             {
@@ -6966,7 +6964,7 @@ gint32 CInterfaceServer::SendResponse(
         }
 
         pIrp->SetTimer(
-            IFSTATE_ENABLE_EVENT_TIMEOUT, GetIoMgr() );
+            IFSTATE_ENABLE_EVENT_TIMEOUT, pMgr );
 
         ret = pMgr->SubmitIrp(
             GetPortHandle(), pIrp );
