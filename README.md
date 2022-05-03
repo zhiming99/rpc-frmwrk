@@ -61,6 +61,10 @@ This project depends on the following 3rd-party packags at runtime:
 5. A tree-like hierarchical persistant registry.
 
 ---
+[`Tue May 03 2022 12:00:48 PM Beijing`]   
+1. the duplicatable 'service directory' has been added.
+2. There are still some bugs to fix related to the operations of filesystem so far.
+
 [`Mon Apr 25 2022 10:33:13 PM Beijing`]   
 1. Have passed a difficult test for fuse support. 
 2. There are still two important requirements to implement before the release, the informational files, and the duplicatable 'service directory'. Examples, and testcases will be added after the release.
