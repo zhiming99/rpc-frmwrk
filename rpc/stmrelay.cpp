@@ -146,17 +146,41 @@ gint32 CStreamServerRelay::FetchData_Server(
         ret = pProxy->FetchData( pDataDesc,
             fd, dwOffset, dwSize, pWrapper );
 
-        if( ERROR( ret ) )
-        {
-            ( *pWrapper )( eventCancelTask );
-            break;
-        }
-
         if( ret == STATUS_PENDING )
             break;
 
+        ( *pWrapper )( eventCancelTask );
+        if( ERROR( ret ) )
+            break;
         // wierd, sometimes, it can complete immediately
         // though across the process boundary.
+        CParamList oResp;
+        oResp[ propReturnValue ] = 0;
+        oResp.Push( ObjPtr( pDataDesc ) );
+        oResp.Push( ( guint32 )fd );
+        oResp.Push( dwOffset );
+        oResp.Push( dwSize );
+
+        TaskletPtr pDummy;
+        pDummy.NewObj( clsid( CIfDummyTask ) );
+        CCfgOpener oCfg(
+            ( IConfigDb*)pDummy->GetConfig() );
+        oCfg.SetPointer( propRespPtr,
+            ( IConfigDb* )oResp.GetCfg() );
+
+        TaskletPtr pTask;
+        ret = DEFER_IFCALL_NOSCHED(
+            pTask, ObjPtr( this ), 
+            &CStreamServerRelay::OnFetchDataComplete,
+            pCallback, ( IEventSink* )pDummy, 
+            oContext.GetCfg() );
+        if( ERROR( ret ) )
+            break;
+
+        CIoManager* pMgr = GetIoMgr();
+        ret = pMgr->RescheduleTask( pTask );
+        if( ret == 0 )
+            ret = STATUS_PENDING;
 
     }while( 0 );
 
@@ -508,8 +532,7 @@ gint32 CStreamProxyRelay::OnOpenStreamComplete(
             break;
 
         guint32 dwProtocol;
-        ret = oResp.GetIntProp(
-            1, dwProtocol );
+        ret = oResp.GetIntProp( 1, dwProtocol );
         if( ERROR( ret ) )
             break;
 
@@ -626,8 +649,43 @@ gint32 CStreamProxyRelay::FetchData_Proxy(
         ret = pProxy->OpenStream(
             protoStream, iStmId, pWrapper );
 
+        if( ret == STATUS_PENDING )
+            break;
+
+        ( *pWrapper )( eventCancelTask );
         if( ERROR( ret ) )
-            ( *pWrapper )( eventCancelTask );
+            break;
+
+        // ghost event, sometimes, it can complete
+        // immediately, though across the network. But
+        // we cannot return status_success directly
+        // since we have not create the local stream
+        // sock yet.
+        CParamList oResp;
+        oResp[ propReturnValue ] = 0;
+        oResp.Push( iStmId );
+        oResp.Push( ( guint32 )protoStream );
+
+        TaskletPtr pDummy;
+        pDummy.NewObj( clsid( CIfDummyTask ) );
+        CCfgOpener oCfg(
+            ( IConfigDb*)pDummy->GetConfig() );
+        oCfg.SetPointer( propRespPtr,
+            ( IConfigDb* )oResp.GetCfg() );
+
+        TaskletPtr pTask;
+        ret = DEFER_IFCALL_NOSCHED(
+            pTask, ObjPtr( this ), 
+            &CStreamProxyRelay::OnOpenStreamComplete,
+            pCallback, ( IEventSink* )pDummy, 
+            oContext.GetCfg() );
+        if( ERROR( ret ) )
+            break;
+
+        CIoManager* pMgr = GetIoMgr();
+        ret = pMgr->RescheduleTask( pTask );
+        if( ret == 0 )
+            ret = STATUS_PENDING;
 
     }while( 0 );
 
