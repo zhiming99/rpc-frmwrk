@@ -126,7 +126,7 @@ gint32 CStreamServerRelay::FetchData_Server(
 
         fd = -1;
         TaskletPtr pWrapper;
-        ret = NEW_PROXY_RESP_HANDLER(
+        ret = NEW_PROXY_RESP_HANDLER2(
             pWrapper, ObjPtr( this ),
             &CStreamServerRelay::OnFetchDataComplete,
             pCallback, oContext.GetCfg() );
@@ -135,8 +135,6 @@ gint32 CStreamServerRelay::FetchData_Server(
             break;
 
         oContext.Push( ObjPtr( pWrapper ) );
-
-        ( *pWrapper )( eventZero );
 
         // give a valid value just to pass parameter
         // validation
@@ -149,10 +147,23 @@ gint32 CStreamServerRelay::FetchData_Server(
         if( ret == STATUS_PENDING )
             break;
 
-        ( *pWrapper )( eventCancelTask );
         if( ERROR( ret ) )
+        {
+            ( *pWrapper )( eventCancelTask );
             break;
-        // wierd, sometimes, it can complete immediately
+        }
+
+        ret = pWrapper->GetError();
+        if( ret != STATUS_PENDING )
+        {
+            // the wrapper task has been completed
+            // somewhere else, the callback will be
+            // called when we return.
+            ret = STATUS_PENDING;
+            break;
+        }
+
+        // the wrapper task has not run yet
         // though across the process boundary.
         CParamList oResp;
         oResp[ propReturnValue ] = 0;
@@ -557,7 +568,7 @@ gint32 CStreamProxyRelay::OnOpenStreamComplete(
         oContext.Push( iStmId );
 
         TaskletPtr pWrapper;
-        ret = NEW_PROXY_RESP_HANDLER(
+        ret = NEW_PROXY_RESP_HANDLER2(
             pWrapper, ObjPtr( this ),
             &CStreamProxyRelay::OnFetchDataComplete,
             pCallback, oContext.GetCfg() );
@@ -565,16 +576,57 @@ gint32 CStreamProxyRelay::OnOpenStreamComplete(
         if( ERROR( ret ) )
             break;
 
-        ( *pWrapper )( eventZero );
-
         guint32 dwSize = 0x20;
         guint32 dwOffset = 0;
         ret = pProxy->super::FetchData_Proxy(
             pDataDesc, iStmId, dwOffset, dwSize,
             pWrapper );
-        
+
         if( ERROR( ret ) )
+        {
             ( *pWrapper )( eventCancelTask );
+            break;
+        }
+
+        if( ret == STATUS_PENDING )
+        {
+            // retire this task
+            ret = 0;
+            break;
+        }
+
+        // immediate return
+        CIfParallelTask* pPara = pWrapper;
+        ret = pPara->GetError();
+        if( ret != STATUS_PENDING )
+        {
+            // already completed
+            break;
+        }
+
+        // the response handler was not called
+        // and lets' call it here
+        CParamList oFdResp;
+        oFdResp[ propReturnValue ] = 0;
+        oFdResp.Push( ObjPtr( pDataDesc ) );
+        oFdResp.Push( ( guint32 )iStmId );
+        oFdResp.Push( dwOffset );
+        oFdResp.Push( dwSize );
+
+        TaskletPtr pDummy;
+        pDummy.NewObj( clsid( CIfDummyTask ) );
+        CCfgOpener oCfg(
+            ( IConfigDb*)pDummy->GetConfig() );
+        oCfg.SetPointer( propRespPtr,
+            ( IConfigDb* )oFdResp.GetCfg() );
+
+        IEventSink* pIoReq = pDummy;
+        CIfResponseHandler* pHandler = pWrapper;
+        pHandler->OnEvent( eventTaskComp,
+            STATUS_SUCCESS, 0, ( LONGWORD* )pIoReq  );
+
+        // retire this task
+        ret = STATUS_SUCCESS;
 
     }while( 0 );
 
@@ -636,7 +688,7 @@ gint32 CStreamProxyRelay::FetchData_Proxy(
         oContext.Push( ObjPtr( pDataDesc ) );
 
         TaskletPtr pWrapper;
-        ret = NEW_PROXY_RESP_HANDLER(
+        ret = NEW_PROXY_RESP_HANDLER2(
             pWrapper, ObjPtr( this ),
             &CStreamProxyRelay::OnOpenStreamComplete,
             pCallback, oContext.GetCfg() );
@@ -644,18 +696,30 @@ gint32 CStreamProxyRelay::FetchData_Proxy(
         if( ERROR( ret ) )
             break;
 
-        ( *pWrapper )( eventZero );
-
         ret = pProxy->OpenStream(
             protoStream, iStmId, pWrapper );
 
         if( ret == STATUS_PENDING )
             break;
 
-        ( *pWrapper )( eventCancelTask );
+        if( ERROR( ret ) )
+        {
+            ( *pWrapper )( eventCancelTask );
+            break;
+        }
+
+        ret = pWrapper->GetError();
         if( ERROR( ret ) )
             break;
 
+        if( ret != STATUS_PENDING )
+        {
+            // some other guy is doing the work
+            ret = STATUS_PENDING;
+            break;
+        }
+
+        ( *pWrapper )( eventCancelTask );
         // ghost event, sometimes, it can complete
         // immediately, though across the network. But
         // we cannot return status_success directly

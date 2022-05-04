@@ -2255,7 +2255,9 @@ class CFuseServicePoint :
                     pTask = pStopTask;
                 }
 
-                ret = pMgr->RescheduleTask( pTask );
+                InterfPtr pRootIf = GetRootIf();
+                CRpcServices* pRootSvc = pRootIf;
+                ret = pRootSvc->AddSeqTask( pTask );
                 break;
             }
         default:

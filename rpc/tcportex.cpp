@@ -2240,7 +2240,7 @@ gint32 CRpcNativeProtoFdo::StartSend(
             // completion handler. Let them move
             // on.
             ret = STATUS_PENDING;
-            DebugPrint( 0, "stream is busy" );
+            //DebugPrint( 0, "stream is busy" );
             break;
         }
         else if( ret == -ENOENT )

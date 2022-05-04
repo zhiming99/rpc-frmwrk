@@ -1821,7 +1821,7 @@ gint32 CRpcInterfaceBase::OnEvent(
     case eventPortStopped:
         {
             ret = OnPortEvent( iEvent, dwParam1 );
-#ifdef DEBUG
+#if 0
             if( ERROR( ret ) )
             {
                 HANDLE hPort = dwParam1;
@@ -1902,7 +1902,7 @@ gint32 CRpcInterfaceBase::OnEvent(
         }
     }
 
-#ifdef DEBUG
+#if 0
     if( ERROR( ret ) )
     {
         DebugPrint( ret,
