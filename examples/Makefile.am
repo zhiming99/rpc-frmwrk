@@ -5,7 +5,8 @@ EXTRA_DIST=actcancel.ridl\
  katest.ridl\
  stmtest.ridl\
  sftest.ridl\
- hellowld.ridl
+ hellowld.ridl\
+ testypes.ridl
 
 javatests=./java/src/org/rpcf/tests
 EXTRA_DIST+=$(javatests)/actcancel/ActiveCancelcli.java\
