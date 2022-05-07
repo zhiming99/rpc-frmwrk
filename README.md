@@ -61,6 +61,9 @@ This project depends on the following 3rd-party packags at runtime:
 5. A tree-like hierarchical persistant registry.
 
 ---
+[`Sat May 07 2022 09:21:35 PM Beijing`]    
+1. I have encountered a mysterious request dropping issue, and plan to digging into the FUSE kernel module to find some clue. 
+
 [`Tue May 03 2022 12:00:48 PM Beijing`]   
 1. the duplicatable 'service directory' has been added.
 2. There are still some bugs to fix related to the operations of filesystem so far.
