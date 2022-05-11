@@ -13,8 +13,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-    - name: update repository || true
-      run: apt-get update
     - name: install tzdata
       run: sudo DEBIAN_FRONTEND="noninteractive" apt-get -y install tzdata
     - name: install tools
