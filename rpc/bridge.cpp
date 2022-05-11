@@ -213,7 +213,7 @@ gint32 CRpcTcpBridgeProxy::OnHandshakeComplete(
             break;
 
         timespec ts;
-        clock_gettime( CLOCK_MONOTONIC, &ts );
+        clock_gettime( CLOCK_REALTIME, &ts );
         m_oTs.SetBase(
             ( qwOriginTs + ts.tv_sec ) >> 1 );
         m_oTs.SetPeer( qwTimestamp );
@@ -295,7 +295,7 @@ gint32 CRpcTcpBridgeProxy::DoStartHandshake(
     gint32 ret = 0;
     do{
         timespec tv;
-        ret = clock_gettime( CLOCK_MONOTONIC, &tv );
+        ret = clock_gettime( CLOCK_REALTIME, &tv );
         if( ret == -1 )
         {
             ret = -errno;
@@ -357,7 +357,7 @@ gint32 CRpcTcpBridgeProxy::DoStartHandshake(
             break;
 
         timespec ts;
-        clock_gettime( CLOCK_MONOTONIC, &ts );
+        clock_gettime( CLOCK_REALTIME, &ts );
         m_oTs.SetBase(
             ( tv.tv_sec + ts.tv_sec ) >> 1 );
         m_oTs.SetPeer( qwTimestamp );
@@ -5133,7 +5133,7 @@ gint32 CRpcTcpBridge::Handshake(
         else
         {
             timespec tv;
-            clock_gettime( CLOCK_MONOTONIC, &tv );
+            clock_gettime( CLOCK_REALTIME, &tv );
             guint64 qwTs = tv.tv_sec;
             CParamList oParams;
             oParams.Push( BRIDGE_GREETINGS );

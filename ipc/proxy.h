@@ -593,7 +593,7 @@ struct CTimestampSvr
         guint64 qwTimestampSec )
     {
         timespec tv;
-        clock_gettime( CLOCK_MONOTONIC, &tv );
+        clock_gettime( CLOCK_REALTIME, &tv );
         return ( ( guint64 )tv.tv_sec -
             qwTimestampSec );
     }
@@ -629,7 +629,7 @@ struct CTimestampProxy :
     guint64 GetPeerTimestamp() const
     {
         timespec tv;
-        clock_gettime( CLOCK_MONOTONIC, &tv );
+        clock_gettime( CLOCK_REALTIME, &tv );
         return GetPeerTimestamp( tv.tv_sec );
     }
 };

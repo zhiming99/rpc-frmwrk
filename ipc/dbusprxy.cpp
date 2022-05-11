@@ -663,7 +663,7 @@ gint32 CDBusProxyPdo::HandleConnRequest(
             strCmd = SYS_METHOD_OPENRMTPORT;
 
             timespec tv;
-            clock_gettime( CLOCK_MONOTONIC, &tv );
+            clock_gettime( CLOCK_REALTIME, &tv );
 
             oMethodArgs.SetQwordProp(
                 propTimestamp, tv.tv_sec );
@@ -859,7 +859,7 @@ gint32 CDBusProxyPdo::PackupReqMsg(
             oReqCtx[ propNoReply ] = true;
 
         timespec tv;
-        clock_gettime( CLOCK_MONOTONIC, &tv );
+        clock_gettime( CLOCK_REALTIME, &tv );
         oReqCtx.SetQwordProp(
             propTimestamp, tv.tv_sec );
 

@@ -726,7 +726,7 @@ gint32 CStreamProxyRelay::FetchData_Proxy(
         // since we have not create the local stream
         // sock yet.
 
-        DebugPrint( ret,
+        DebugPrintEx( logWarning, ret,
             "%s: catched an immediate return",
             __func__ );
 

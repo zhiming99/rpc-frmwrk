@@ -1411,7 +1411,7 @@ gint32 CRpcRouterBridge::AddToHistory(
     guint32 dwMaxPendings )
 {
     timespec tv;
-    clock_gettime( CLOCK_MONOTONIC_COARSE, &tv );
+    clock_gettime( CLOCK_REALTIME_COARSE, &tv );
     CStdRMutex oRouterLock( GetLock() );
     REQ_LIMIT rl ={ dwMaxReqs, dwMaxPendings };
     HISTORY_ELEM he( tv.tv_sec, rl );

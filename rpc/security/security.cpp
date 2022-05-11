@@ -2331,7 +2331,7 @@ gint32 CRpcReqForwarderAuth::OnSessImplLoginComplete(
             break;
 
         timespec tv;
-        clock_gettime( CLOCK_MONOTONIC, &tv );
+        clock_gettime( CLOCK_REALTIME, &tv );
         guint64 qwNow = tv.tv_sec;
         guint32 dwDiff = abs( (
             ( gint64 )qwNow - ( gint64 )qwts ) );
