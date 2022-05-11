@@ -975,7 +975,8 @@ struct CStreamSyncBase :
     {
         WORKER_ELEM oWorker;
         gint32 ret = 0;
-        DebugPrint( 0, "OnConnected..." );
+        DebugPrintEx( logInfo,
+            0, "OnConnected..." );
 
         TaskGrpPtr pTaskGrp;
         HANDLE hChannel = INVALID_HANDLE;

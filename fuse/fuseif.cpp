@@ -1025,7 +1025,7 @@ gint32 CFuseStmFile::OnReadStreamComplete(
             if( ph != nullptr )
             {
                 fuse_notify_poll( ph );
-                // SetPollHandle( nullptr );
+                SetPollHandle( nullptr );
             }
             break;
         }
@@ -1047,36 +1047,32 @@ gint32 CFuseStmFile::OnReadStreamComplete(
         }
 
         m_queIncoming.push_back( { pBuf, 0 } );
-        while( m_queReqs.size() > 0 &&
-            m_queIncoming.size() > 0 )
+        size_t dwAvail = GetBytesAvail();
+        while( m_queReqs.size() > 0 && dwAvail > 0 )
         {
             auto& elem = m_queReqs.front();
             fuse_req_t req = elem.req;
-            size_t& dwReqSize = elem.dwReqSize;
+            size_t dwReqSize = elem.dwReqSize;
             auto d = elem.pintr.get();
             fuse_bufvec* bufvec = nullptr;
 
             // the vector to keep the buffer valid
+            size_t dwToRead =
+                std::min( dwAvail, dwToRead );
             std::vector< BufPtr > vecRemoved;
             ret = FillBufVec(
-                dwReqSize, m_queIncoming,
+                dwToRead, m_queIncoming,
                 vecRemoved, bufvec );
-            if( ret == STATUS_PENDING )
-            {
-                // incoming data is not enough.
-                ret = 0;
-                break;
-            }
-
             fuseif_finish_interrupt(
                 GetFuse(), req, d );
-            if( dwReqSize > 0 )
+            if( dwToRead > 0 )
                 fuse_reply_data(
                     req, bufvec, FUSE_BUF_SPLICE_MOVE );
             else
-                fuse_reply_err( req, -EAGAIN );
+                fuse_reply_err( req, 0 );
             fuseif_free_buf( bufvec );
             m_queReqs.pop_front();
+            dwAvail -= dwToRead;
         }
 
         if( m_queReqs.empty() )
@@ -1188,10 +1184,10 @@ gint32 CFuseStmFile::fs_read(
 {
     gint32 ret = 0;
 
-    if( size == 0 )
-        return 0;
-
     do{
+        if( size == 0 )
+            break;
+
         CFuseMutex oFileLock( GetLock() );
         if( m_queReqs.size() > MAX_STM_QUE_SIZE )
         {
@@ -1348,20 +1344,18 @@ gint32 CFuseFileEntry::FillBufVec(
     gint32 ret = 0;
     do{
         guint32 dwAvail = 0;
+        if( dwReqSize == 0 )
+            break;
+
         auto itr = queBufs.begin();
         while( itr != queBufs.end() )
         {
-          
             guint32& dwOff = itr->dwOff;
             BufPtr& pBuf = itr->pBuf;
             dwAvail += pBuf->size() - dwOff;
 
-            if( dwReqSize == 0 )
-                dwReqSize = dwAvail;
-
             if( dwAvail >= dwReqSize )
                 break;
-
             itr++;
         }
         if( dwAvail == 0 )
@@ -1370,9 +1364,6 @@ gint32 CFuseFileEntry::FillBufVec(
             queBufs.clear();
             break;
         }
-
-        if( dwReqSize == 0 )
-            dwReqSize = dwAvail;
 
         if( dwAvail < dwReqSize )
         {
@@ -1848,10 +1839,8 @@ gint32 CFuseEvtFile::fs_read(
         if( m_queReqs.size() )
         {
             if( IsNonBlock() )
-            {
-                ret = -EAGAIN;
                 break;
-            }
+
             m_queReqs.push_back(
                 { req, size, PINTR( d ) } );
             ret = STATUS_PENDING;
@@ -1859,7 +1848,12 @@ gint32 CFuseEvtFile::fs_read(
         }
 
         guint32 dwAvail = GetBytesAvail();
-        if( dwAvail >= size )
+        if( dwAvail == 0 )
+        {
+            size = 0;
+            break;
+        }
+        else if( dwAvail >= size )
         {
             FillBufVec( size,
                 m_queIncoming,
@@ -1867,7 +1861,17 @@ gint32 CFuseEvtFile::fs_read(
         }
         else if( IsNonBlock() )
         {
+            m_dwMsgRead += m_queIncoming.size();
             size = dwAvail;
+            if( m_dwLastOff > off )
+            {
+                DebugPrint( off-m_dwLastOff,
+                    "alert, trying to read old data" );
+            }
+            else
+            {
+                m_dwLastOff = off + size;
+            }
             FillBufVec( size,
                 m_queIncoming,
                 vecBackup, bufvec );
@@ -1900,42 +1904,42 @@ gint32 CFuseEvtFile::ReceiveEvtJson(
         if( ph != nullptr )
         {
             fuse_notify_poll( ph );
-            // SetPollHandle( nullptr );
+            SetPollHandle( nullptr );
         }
 
         ++m_dwMsgCount;
-        while( m_queReqs.size() > 0 &&
-            m_queIncoming.size() > 0 )
+        size_t dwAvail = GetBytesAvail();
+        while( m_queReqs.size() > 0 && dwAvail > 0 )
         {
             auto& elem = m_queReqs.front();
             fuse_req_t req = elem.req;
-            size_t& dwReqSize = elem.dwReqSize;
+            size_t dwReqSize = elem.dwReqSize;
             auto d = elem.pintr.get();
             fuse_bufvec* bufvec = nullptr;
 
             // the vector to keep the buffer valid
+            size_t dwToRead =
+                std::min( dwAvail, dwReqSize );
+
+            DebugPrint( dwToRead,
+                "completing queued read request" );
             std::vector< BufPtr > vecRemoved;
-            ret = FillBufVec(
-                dwReqSize, m_queIncoming,
+            FillBufVec(
+                dwToRead, m_queIncoming,
                 vecRemoved, bufvec );
-            if( ret == STATUS_PENDING )
-            {
-                // more incoming data is needed
-                ret = 0;
-                break;
-            }
 
             fuseif_finish_interrupt(
                     GetFuse(), req, d );
-            if( dwReqSize > 0 )
+            if( dwToRead > 0 )
             {
                 fuse_reply_data( req, bufvec,
                     FUSE_BUF_SPLICE_MOVE );
             }
             else
-                fuse_reply_err( req, -EAGAIN );
+                fuse_reply_err( req, 0 );
             fuseif_free_buf( bufvec );
             m_queReqs.pop_front();
+            dwAvail -= dwToRead;
         }
 
     }while( 0 );
@@ -2569,51 +2573,6 @@ gint32 CFuseRespFileProxy::CancelFsRequests(
         {
             fuse_notify_poll( ph );
             SetPollHandle( nullptr );
-        }
-
-    }while( 0 );
-
-    return ret;
-}
-
-gint32 CFuseReqFileProxy::fs_read(
-    const char* path,
-    fuse_file_info *fi,
-    fuse_req_t req,
-    fuse_bufvec*& bufvec,
-    off_t off, size_t size,
-    std::vector< BufPtr >& vecBackup,
-    fuseif_intr_data* d )
-{
-    gint32 ret = 0;
-    do{
-        if( size == 0 )
-            break;
-
-        CFuseMutex oFileLock( GetLock() );
-
-        guint32 dwAvail = GetBytesAvail();
-
-        if( dwAvail >= size )
-        {
-            ret = FillBufVec(
-                size, m_queIncoming,
-                vecBackup, bufvec );
-        }
-        else if( IsNonBlock() )
-        {
-            size = dwAvail;
-            if( size == 0 )
-                break;
-            ret = FillBufVec(
-                size, m_queIncoming,
-                vecBackup, bufvec );
-        }
-        else
-        {
-            ret = STATUS_PENDING;
-            m_queReqs.push_back(
-                { req, size, PINTR( d ) } );
         }
 
     }while( 0 );

@@ -1585,7 +1585,8 @@ class CUnixSockStream:
         m_pListeningTask.Clear();
         m_pPingTicker.Clear();
         m_pReadingTask.Clear();
-        DebugPrint( 0, "a CUnixSockStream object"
+        DebugPrintEx( logInfo, 0,
+            "a CUnixSockStream object"
             "@0x%x is over", this );
         return 0;
     }

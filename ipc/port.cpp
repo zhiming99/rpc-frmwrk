@@ -724,7 +724,8 @@ void CPort::OnPortStopped()
         eventPortStopped,
         !GetIoMgr()->RunningOnMainThread() );
 
-    DebugPrint( 0, "%s is stopped...",
+    DebugPrintEx( logNotice,
+        0, "%s is stopped...",
         CoGetClassName( GetClsid() ) );
 }
 
@@ -1166,7 +1167,8 @@ gint32 CPort::SubmitStopIrpEx( IRP* pIrp )
         pIrp->GetStackSize() == 0 )
         return -EINVAL;
 
-    DebugPrint( 0, "Stopping %s @0x%x...",
+    DebugPrintEx( logNotice, 0,
+        "Stopping %s @0x%x...",
         CoGetClassName( GetClsid() ), this );
     // PNP_STATE_STOP_PRELOCK is a state before
     // the port switch to PORT_STATE_STOPPING,

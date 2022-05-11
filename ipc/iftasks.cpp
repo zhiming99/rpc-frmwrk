@@ -1012,7 +1012,8 @@ gint32 CIfRetryTask::DoCancelTaskChain(
     const char* pszClass =
         CoGetClassName( iClsid );
 
-    DebugPrint( dwContext, "scheduled to "
+    DebugPrintEx( logWarning,
+        dwContext, "scheduled to "
         "cancel task %s...", pszClass );
 
     return pTask->OnEvent(

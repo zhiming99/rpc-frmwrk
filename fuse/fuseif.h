@@ -644,6 +644,25 @@ class CFuseFileEntry : public CFuseObjBase
         return ret;
     }
 
+    guint32 GetBytesOneMsg() const
+    { 
+        if( m_queIncoming.empty() )
+            return 0;
+
+        auto elem = m_queIncoming.front();
+        guint32 dwSize = 0;
+        if( elem.pBuf->size() - elem.dwOff < 4 )
+            return 0;
+
+        char* src = elem.pBuf->ptr() + elem.dwOff; 
+        char* dst = ( char* )&dwSize;
+        dst[ 0 ] = src[0];
+        dst[ 1 ] = src[1];
+        dst[ 2 ] = src[2];
+        dst[ 3 ] = src[3];
+        return ntohl( dwSize ) + sizeof( dwSize );
+    }
+
     guint32 GetBytesRequired() const
     { 
         guint32 ret = 0;
@@ -724,6 +743,8 @@ class CFuseEvtFile : public CFuseFileEntry
 
     gint32 do_remove( bool bSched );
     guint32 m_dwMsgCount = 0;
+    guint32 m_dwMsgRead = 0;
+    guint32 m_dwLastOff = 0;
 
     public:
     typedef CFuseFileEntry super;
@@ -905,7 +926,7 @@ class CFuseReqFileProxy :
         m_pReader.reset( oBuilder.newCharReader() );
     }
 
-    gint32 fs_read(
+    /*gint32 fs_read(
         const char* path,
         fuse_file_info *fi,
         fuse_req_t req,
@@ -914,6 +935,7 @@ class CFuseReqFileProxy :
         size_t size,
         std::vector< BufPtr >& vecBackup,
         fuseif_intr_data* d ) override;
+    */
 
     gint32 fs_write_buf(
         const char* path,
@@ -2030,8 +2052,6 @@ class CFuseServicePoint :
                 return -EMFILE;
             }
             ++itr->second;
-            DebugPrint( 0, "Session %s opened %d streams",
-                strSess.c_str(), itr->second );
         }
         return STATUS_SUCCESS;
     }
@@ -2050,9 +2070,6 @@ class CFuseServicePoint :
                 return -ERANGE;
             }
             --itr->second;
-            DebugPrint( 0,
-                "Session %s closed a stream",
-                strSess.c_str() );
         }
         return STATUS_SUCCESS;
     }
@@ -2062,6 +2079,8 @@ class CFuseServicePoint :
     {
         gint32 ret = 0;
         do{
+            break;
+
             WLOCK_TESTMNT;
 
             if( bProxy )
@@ -2070,7 +2089,6 @@ class CFuseServicePoint :
                 break;
 
             ret = CreateStmFile( hStream );
-
             if( SUCCEEDED( ret ) )
                 break;
 

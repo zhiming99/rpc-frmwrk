@@ -725,6 +725,11 @@ gint32 CStreamProxyRelay::FetchData_Proxy(
         // we cannot return status_success directly
         // since we have not create the local stream
         // sock yet.
+
+        DebugPrint( ret,
+            "%s: catched an immediate return",
+            __func__ );
+
         CParamList oResp;
         oResp[ propReturnValue ] = 0;
         oResp.Push( iStmId );
@@ -748,7 +753,7 @@ gint32 CStreamProxyRelay::FetchData_Proxy(
 
         CIoManager* pMgr = GetIoMgr();
         ret = pMgr->RescheduleTask( pTask );
-        if( ret == 0 )
+        if( SUCCEEDED( ret ) )
             ret = STATUS_PENDING;
 
     }while( 0 );

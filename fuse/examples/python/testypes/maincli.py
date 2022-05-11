@@ -35,16 +35,16 @@ def test() :
     num = sys.argv[1]
     try:
         reqFile = svcdir + "/jreq_" + num
-        reqfp = open( reqFile, "wb" )
+        reqfp = open( reqFile, "wb", buffering=0 )
 
         respFile = svcdir + "/jrsp_" + num
-        respfp = open( respFile, "rb")
+        respfp = open( respFile, "rb", buffering=0)
 
         evtFile = svcdir + "/jevt_" + num
-        evtfp = open( evtFile, "rb")
+        evtfp = open( evtFile, "rb", buffering=0)
 
         stmFile = svcdir + "/streams/stream_" + num
-        stmfp = open( stmFile, "wb")
+        stmfp = open( stmFile, "wb", buffering=0)
 
         idx = 1 + int( num ) * 1000
         while True:

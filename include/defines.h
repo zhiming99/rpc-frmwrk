@@ -36,6 +36,7 @@
 #include <syscall.h>
 #include <thread>
 #include <set>
+#include <memory>
 #include <string.h>
 
 #include "clsids.h"

@@ -88,6 +88,7 @@ def EchoMany( req : object )->object:
     AddParameter( resp, 'i4r', params['i4'] + 4)
     AddParameter( resp, 'i5r', params['i5'] + 5)
     AddParameter( resp, 'szTextr', params['szText'] + 'll')
+    print("EchoMany ", resp)
     return resp
 
 def test() :
@@ -115,6 +116,7 @@ def test() :
 
         respFile = srcdir + "/jrsp_" + num
         respfp = open( respFile, "wb")
+        count = 0
 
         while True:
             #print( time.time() )
@@ -127,6 +129,8 @@ def test() :
             while len( reqs ) > 0 :
                 req = reqs[0]
                 reqs.pop(0)
+                print( count )
+                count += 1
                 if req[ "Interface"] != "ITestTypes" :
                     print( "the req is invalid ", req )
                     continue

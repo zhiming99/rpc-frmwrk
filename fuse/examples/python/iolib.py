@@ -56,7 +56,7 @@ def recvResp2( respfp : object)->[object] :
 
     return res
 
-def recvResp( respfp : object)->[object] :
+def recvResp3( respfp : object)->[object] :
     inputs = [respfp]
     # wait for the reponse, it could take
     # up to 2 min to return when something
@@ -80,6 +80,43 @@ def recvResp( respfp : object)->[object] :
         data = respfp.read(4)
     
     return res
+
+def recvResp( respfp : object)->[object] :
+    inputs = [respfp]
+    # wait for the reponse, it could take
+    # up to 2 min to return when something
+    # wrong
+    res = []
+    inBuf = bytearray()
+    while len( inBuf ) == 0:
+        resp = select.select( inputs, [], [] )
+        # read at the page boundary
+        data = respfp.read(4096)
+        if len( data ) > 0 and len( data ) < 4096:
+            inBuf = data
+            break
+        while True:
+            inBuf.extend(data)
+            if len( data ) < 4096:
+                break
+            data = respfp.read(4096)
+    
+    pos = 0
+    while pos < len( inBuf ):
+        size = int.from_bytes(inBuf[pos:pos+4], 'big')
+        if size == 0 :
+            error = errno.ENODATA
+            raise Exception( 'response with error %d' % error )
+        payload = inBuf[ pos + 4 : pos + 4 + size ]
+        if len( payload ) == 0:
+            error = errno.EBADMSG
+            raise Exception( 'partial response with error %d' % error )
+        strResp = payload.decode( "UTF-8" )
+        res.append( json.loads( strResp ) )
+        pos += 4 + size
+    
+    return res
+
     
 def sendReq( reqfp : object, reqObj : object ):
     strReq = json.dumps(reqObj)

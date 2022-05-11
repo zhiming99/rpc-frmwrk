@@ -147,6 +147,28 @@ void fuseif_free_buf(struct fuse_bufvec *buf)
     free(buf);
 }     
 
+void fuseif_complete_read(
+    fuse* pFuse,
+    fuse_req_t req,
+    gint32 ret,
+    fuse_bufvec* buf )
+{
+    if( SUCCEEDED( ret ) )
+    {
+        if( buf != nullptr )
+            fuse_reply_data( req,
+                buf, FUSE_BUF_SPLICE_MOVE);
+        else
+            fuse_reply_err( req, 0 );
+    }
+    else
+    {
+        fuse_reply_err( req, ret );
+    }
+    if( buf != nullptr )
+        fuseif_free_buf( buf );
+}
+
 void fuseif_ll_read(fuse_req_t req,
     fuse_ino_t ino, size_t size,
     off_t off, fuse_file_info *fi)
@@ -165,24 +187,14 @@ void fuseif_ll_read(fuse_req_t req,
             req, buf, off, size,
             vecBackup, d );
         if( ret == STATUS_PENDING )
-        {
-            ret = 0;
             break;
-        }
-        fuseif_finish_interrupt( pFuse, req, d );
-        delete d;
-        if( SUCCEEDED( ret ) )
-        {
-            if( buf != nullptr )
-                fuse_reply_data(req,
-                    buf, FUSE_BUF_SPLICE_MOVE);
-            else
-                fuse_reply_err( req, 0 );
-        }
-        else
-            fuse_reply_err( req, ret );
 
-        fuseif_free_buf( buf );
+        fuseif_finish_interrupt( pFuse, req, d );
+        if( d != nullptr )
+            delete d;
+
+        fuseif_complete_read(
+            pFuse, req, ret, buf );
 
     }while( 0 );
 
