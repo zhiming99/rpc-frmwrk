@@ -2079,8 +2079,6 @@ class CFuseServicePoint :
     {
         gint32 ret = 0;
         do{
-            break;
-
             WLOCK_TESTMNT;
 
             if( bProxy )
