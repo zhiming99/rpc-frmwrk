@@ -13,10 +13,12 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    - name: update repository
+      run: sudo apt-get -o Acquire::Retries=3 update
     - name: install tzdata
       run: sudo DEBIAN_FRONTEND="noninteractive" apt-get -y install tzdata
     - name: install tools
-      run: sudo apt-get install -y gcc g++ python3 python3-dev python3-pip flex bison libtool shtool automake autoconf autotools-dev make dbus libdbus-1-3 libdbus-1-dev libjsoncpp1 libjsoncpp-dev libkrb5-3 libkrb5-dev liblz4-1 liblz4-dev lz4 openssl libssl1.1 libssl-dev libcppunit-1.15-0 libcppunit-dev bash net-tools procps swig;pip3 install numpy wheel 
+      run: sudo apt-get -o Acquire::Retries=3 install -y gcc g++ python3 python3-dev python3-pip flex bison libtool shtool automake autoconf autotools-dev make dbus libdbus-1-3 libdbus-1-dev libjsoncpp1 libjsoncpp-dev libkrb5-3 libkrb5-dev liblz4-1 liblz4-dev lz4 openssl libssl1.1 libssl-dev libcppunit-1.15-0 libcppunit-dev bash net-tools procps swig;pip3 install numpy wheel 
     - name: install sip
       run: sudo apt-get -y install sip5-tools || sudo apt-get -y install sip-dev python3-sip python3-sip-dev || true; sudo apt-get -y install fuse3 libfuse3-3 libfuse3-dev || true
     - name: setup build env
