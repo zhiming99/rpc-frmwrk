@@ -1821,6 +1821,16 @@ gint32 CFuseFileEntry::CancelFsRequests(
     return ret;
 }
 
+gint32 CFuseEvtFile::fs_open(
+    const char* path,
+    fuse_file_info *fi )
+{
+    gint32 ret = super::fs_open( path, fi );
+    if( ERROR( ret ) )
+        return ret;
+    m_dwLastOff = 0;
+    return ret;
+}
 gint32 CFuseEvtFile::fs_read(
     const char* path,
     fuse_file_info *fi,

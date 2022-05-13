@@ -797,6 +797,10 @@ class CFuseEvtFile : public CFuseFileEntry
         const char* path,
         fuse_file_info *fi,
         bool bSched ) override;
+
+    gint32 fs_open(
+        const char* path,
+        fuse_file_info *fi );
 };
 
 class CFuseRespFileSvr : public CFuseEvtFile

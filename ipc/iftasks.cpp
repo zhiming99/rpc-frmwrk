@@ -1853,7 +1853,7 @@ gint32 CIfTaskGroup::FindTask(
 
     std::vector< TaskGrpPtr > vecGrps;
     CStdRTMutex oTaskLock( GetLock() );
-    for( auto&& pTask : m_queTasks )
+    for( auto& pTask : m_queTasks )
     {
         if( pTask->GetObjId() == iTaskId )
         {
@@ -1869,6 +1869,8 @@ gint32 CIfTaskGroup::FindTask(
         }
     }
     oTaskLock.Unlock(); 
+    if( SUCCEEDED( ret ) )
+        return ret;
 
     for( auto& pGrp :vecGrps )
     {
@@ -2460,7 +2462,7 @@ gint32 CIfParallelTaskGrp::FindTask(
     std::vector< TaskGrpPtr > vecGrps;
     CStdRTMutex oTaskLock( GetLock() );
 
-    for( auto&& pTask : m_setTasks )
+    for( auto& pTask : m_setTasks )
     {
         if( pTask->GetObjId() == iTaskId )
         {
@@ -2476,8 +2478,10 @@ gint32 CIfParallelTaskGrp::FindTask(
                 TaskGrpPtr( pGrp ) );
         }
     }
+    if( SUCCEEDED( ret ) )
+        return ret;
 
-    for( auto&& pTask : m_quePendingTasks )
+    for( auto& pTask : m_quePendingTasks )
     {
         if( pTask->GetObjId() == iTaskId )
         {
@@ -2493,6 +2497,9 @@ gint32 CIfParallelTaskGrp::FindTask(
                 TaskGrpPtr( pGrp ) );
         }
     }
+    if( SUCCEEDED( ret ) )
+        return ret;
+
     oTaskLock.Unlock();
     for( auto& pGrp :vecGrps )
     {

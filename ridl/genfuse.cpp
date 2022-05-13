@@ -1944,7 +1944,7 @@ gint32 CImplIfMethodProxyFuse::OutputAsyncCbWrapper()
         if( dwOutCount > 0 )
         {
             /* need deserialization */
-            Wa( "if( SUCCEEDED( iRet ) )" );
+            Wa( "while( SUCCEEDED( iRet ) )" );
             BLOCK_OPEN;
             Wa( "guint32 dwSeriProto_ = 0;" );
             Wa( "ret = oResp_.GetIntProp(" );
@@ -1960,9 +1960,10 @@ gint32 CImplIfMethodProxyFuse::OutputAsyncCbWrapper()
                 "pBuf_", false, false, true );
             if( ERROR( ret ) )
                 break;
+            CCOUT << "break;";
             BLOCK_CLOSE;
             NEW_LINE;
-
+            Wa( "if( ERROR( ret ) ) iRet = ret;" );
         }
         CMethodDecls* pmds =
             ObjPtr( m_pNode->GetParent() );
@@ -2192,7 +2193,7 @@ gint32 CImplIfMethodProxyFuse::OutputAsync()
             Wa( "{ ret = -EINVAL; break; }" );
 
             ret = GenSerialArgs( pInArgs,
-                "pBuf_", true, true, false, true );
+                "pBuf_", true, true, true, true );
             if( ERROR( ret ) )
                 break;
 
@@ -2453,7 +2454,7 @@ gint32 CImplIfMethodSvrFuse::OutputEvent()
             Wa( "Json::Value val_ =" );
             Wa( "    oJsEvt[ JSON_ATTR_PARAMS ];" );
             ret = GenSerialArgs( pInArgs,
-                "pBuf_", true, true, false, true );
+                "pBuf_", true, true, true, true );
             if( ERROR( ret ) )
                 break;
 
@@ -2469,7 +2470,7 @@ gint32 CImplIfMethodSvrFuse::OutputEvent()
             BLOCK_CLOSE;
             Wa( "while( 0 );" );
         }
-        NEW_LINES( 2 );
+        NEW_LINE;
         CCOUT << "return ret;";
 
         BLOCK_CLOSE;
@@ -2523,59 +2524,62 @@ gint32 CImplIfMethodSvrFuse::OutputAsyncSerial()
         BLOCK_OPEN;
 
         Wa( "gint32 ret = 0;" );
-        Wa( "TaskletPtr pNewCb;" );
+        if( !bNoReply )
+            Wa( "TaskletPtr pNewCb;" );
         CCOUT << "do";
         BLOCK_OPEN;
-
-        guint32 dwTimeoutSec =
-            m_pNode->GetTimeoutSec();
-
-        guint32 dwKeepAliveSec =
-            m_pNode->GetKeepAliveSec();
-        if( dwKeepAliveSec == 0 )
-        {
-            dwKeepAliveSec =
-                ( dwTimeoutSec >> 1 );
-        }
-
-        if( dwTimeoutSec > 0 &&
-            dwKeepAliveSec > 0 &&
-            dwTimeoutSec > dwKeepAliveSec )
-        {
-            CCOUT << "ret = SetInvTimeout( pCallback, "
-                << dwTimeoutSec << ", "
-                << dwKeepAliveSec << " );";
-            NEW_LINE;
-            Wa( "if( ERROR( ret ) ) break;" );
-            Wa( "DisableKeepAlive( pCallback );" );
-        }
-        else
-        {
-            Wa( "ret = SetInvTimeout( pCallback, 0 );" );
-            Wa( "if( ERROR( ret ) ) break;" );
-            Wa( "DisableKeepAlive( pCallback );" );
-        }
 
         Wa( "CParamList oReqCtx_;" );
         Wa( "oReqCtx_.SetPointer(" );
         Wa( "    propEventSink, pCallback );" );
         Wa( "IConfigDb* pReqCtx_ = oReqCtx_.GetCfg();" );
 
-        CCOUT << "ret = DEFER_CANCEL_HANDLER2(";
-        INDENT_UPL;
-        CCOUT << "-1, pNewCb, this,";
-        NEW_LINE;
-        CCOUT << "&" << strClass << "::"
-            << strMethod << "CancelWrapper,";
-        NEW_LINE;
-        if( dwInCount > 0 )
-            CCOUT << "pCallback, 0, pReqCtx_, pBuf_ );";
-        else
-            CCOUT << "pCallback, 0, pReqCtx_ );";
-        INDENT_DOWNL;
-        NEW_LINE;
-        Wa( "if( ERROR( ret ) ) break;" );
-        NEW_LINE;
+        if( !bNoReply )
+        {
+            guint32 dwTimeoutSec =
+                m_pNode->GetTimeoutSec();
+
+            guint32 dwKeepAliveSec =
+                m_pNode->GetKeepAliveSec();
+            if( dwKeepAliveSec == 0 )
+            {
+                dwKeepAliveSec =
+                    ( dwTimeoutSec >> 1 );
+            }
+
+            if( dwTimeoutSec > 0 &&
+                dwKeepAliveSec > 0 &&
+                dwTimeoutSec > dwKeepAliveSec )
+            {
+                CCOUT << "ret = SetInvTimeout( pCallback, "
+                    << dwTimeoutSec << ", "
+                    << dwKeepAliveSec << " );";
+                NEW_LINE;
+            }
+            else
+            {
+                Wa( "ret = SetInvTimeout( pCallback, 0 );" );
+            }
+            Wa( "if( ERROR( ret ) ) break;" );
+            Wa( "DisableKeepAlive( pCallback );" );
+            NEW_LINE;
+
+            CCOUT << "ret = DEFER_CANCEL_HANDLER2(";
+            INDENT_UPL;
+            CCOUT << "-1, pNewCb, this,";
+            NEW_LINE;
+            CCOUT << "&" << strClass << "::"
+                << strMethod << "CancelWrapper,";
+            NEW_LINE;
+            if( dwInCount > 0 )
+                CCOUT << "pCallback, 0, pReqCtx_, pBuf_ );";
+            else
+                CCOUT << "pCallback, 0, pReqCtx_ );";
+            INDENT_DOWNL;
+            NEW_LINE;
+            Wa( "if( ERROR( ret ) ) break;" );
+            NEW_LINE;
+        }
 
         Wa( "Json::Value val_( objectValue );" );
         if( dwInCount > 0 )
@@ -2587,9 +2591,6 @@ gint32 CImplIfMethodSvrFuse::OutputAsyncSerial()
                 break;
         }
 
-        if( dwOutCount > 0 )
-            Wa( "Json::Value oJsResp_( objectValue );" );
-
         Wa( "stdstr strReq;" );
         Wa( "ret = BuildJsonReq( pReqCtx_, val_," );
         CCOUT << "    \"" << strMethod << "\",";
@@ -2598,56 +2599,47 @@ gint32 CImplIfMethodSvrFuse::OutputAsyncSerial()
         NEW_LINE;
         Wa( "    0, strReq, false, false );" );
         Wa( "if( ERROR( ret ) ) break;" );
-        CCOUT << "//TODO: pass strReq to FUSE";
+        CCOUT << "//NOTE: pass strReq to FUSE";
         NEW_LINE;
         Wa( "CFuseSvcServer* pSvr = ObjPtr( this );" );
-        Wa( "pSvr->ReceiveMsgJson( strReq," );
+        Wa( "ret = pSvr->ReceiveMsgJson( strReq," );
         CCOUT << "    pCallback->GetObjId() );";
-
+        NEW_LINE;
+        if( !bNoReply )
+        {
+            Wa( "if( SUCCEEDED( ret ) )" );
+            CCOUT << "    ret = STATUS_PENDING;";
+        }
+        else
+        {
+            Wa( "if( ret == STATUS_PENDING )" );
+            CCOUT << "    ret = STATUS_SUCCESS;";
+        }
+        BLOCK_CLOSE;
+        Wa( "while( 0 );" );
         if( !bNoReply )
         {
             NEW_LINE;
-            Wa( "if( ret == STATUS_SUCCESS )" );
-            Wa( "    ret = STATUS_PENDING;" );
-            Wa( "if( ret == STATUS_PENDING ) break;" );
+            Wa( "if( ret == STATUS_PENDING )" );
+            Wa( "    return ret;" );
             NEW_LINE;
             Wa( "CParamList oResp_;" );
-            Wa( "oResp_[ propReturnValue ] = ret;" );
             Wa( "oResp_[ propSeriProto ] = seriRidl;" );
-            if( dwOutCount > 0 )
-            {
-                Wa( "if( SUCCEEDED( ret ) )" );
-                BLOCK_OPEN;
-                Wa( "val_ = oJsResp_[ JSON_ATTR_PARAMS ];" );
-                Wa( "BufPtr pBuf2( true );" );
-                ret = GenSerialArgs(
-                    pOutArgs, "pBuf2", false,
-                    false, true );
-                CCOUT << "oResp_.Push( pBuf2 );";
-                BLOCK_CLOSE;
-                NEW_LINE;
-            }
-            NEW_LINE;
+            Wa( "oResp_[ propReturnValue ] = ret;" );
             Wa( "this->SetResponse( pCallback," );
-            CCOUT << "    oResp_.GetCfg() );";
+            Wa(  "    oResp_.GetCfg() );" );
+            NEW_LINE;
+            Wa( "if( !pNewCb.IsEmpty() )" );
+            BLOCK_OPEN;
+            Wa( "CIfRetryTask* pTask = pNewCb;" );
+            Wa( "pTask->ClearClientNotify();" );
+            Wa( "if( pCallback != nullptr )" );
+            Wa( "    rpcf::RemoveInterceptCallback(" );
+            Wa( "        pTask, pCallback );" );
+            CCOUT << "( *pNewCb )( eventCancelTask );";
+            BLOCK_CLOSE;
+            NEW_LINE;
         }
-        BLOCK_CLOSE; // do
-        NEW_LINE;
-        Wa( "while( 0 );" );
-        NEW_LINE;
-        CCOUT << "if( ret != STATUS_PENDING &&";
-        INDENT_UPL;
-        CCOUT << "!pNewCb.IsEmpty() )";
-        INDENT_DOWNL;
-        BLOCK_OPEN;
-        Wa( "CIfRetryTask* pTask = pNewCb;" );
-        Wa( "pTask->ClearClientNotify();" );
-        Wa( "if( pCallback != nullptr )" );
-        Wa( "    rpcf::RemoveInterceptCallback(" );
-        Wa( "        pTask, pCallback );" );
-        CCOUT << "( *pNewCb )( eventCancelTask );";
-        BLOCK_CLOSE;
-        NEW_LINE;
         CCOUT << "return ret;";
         BLOCK_CLOSE;
         NEW_LINE;
@@ -2731,7 +2723,6 @@ gint32 CImplIfMethodSvrFuse::OutputAsyncCallback()
         NEW_LINE;
         NEW_LINE;
         Wa( "CParamList oResp_;" );
-        Wa( "oResp_[ propReturnValue ] = ret;" );
         Wa( "oResp_[ propSeriProto ] = seriRidl;" );
 
         if( dwOutCount > 0 )
@@ -2742,13 +2733,15 @@ gint32 CImplIfMethodSvrFuse::OutputAsyncCallback()
             Wa( "Json::Value val_ =" );
             Wa( "    oJsResp[ JSON_ATTR_PARAMS ];" );
             ret = GenSerialArgs( pOutArgs,
-                "pBuf_", true, true, false, true );
+                "pBuf_", true, true, true, true );
             if( ERROR( ret ) )
                 break;
             Wa( "oResp_.Push( pBuf_ );" );
             CCOUT << "break;";
             BLOCK_CLOSE;
+            NEW_LINE;
         }
+        Wa( "oResp_[ propReturnValue ] = ret;" );
         NEW_LINE;
 
         CCOUT << "this->OnServiceComplete( ";
@@ -2806,11 +2799,13 @@ gint32 CImplIfMethodSvrFuse::OutputAsyncCancelWrapper()
 
         if( dwInCount > 0 )
         {
+            Wa( "/*" );
             Wa( "Json::Value val_;" );
             ret = GenDeserialArgs( pInArgs,
                 "pBuf_", false, false, true, false );
             if( ERROR( ret ) )
                 break;
+            Wa( "*/" );
         }
 
         Wa( "//TODO: clean up the FUSE resources if any" );
