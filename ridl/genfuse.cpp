@@ -2799,7 +2799,9 @@ gint32 CImplIfMethodSvrFuse::OutputAsyncCancelWrapper()
 
         if( dwInCount > 0 )
         {
-            Wa( "/*" );
+            Wa( "/* // uncomment the block if you" );
+            Wa( "   // want to examine the request " );
+            Wa( "   // parameters " );
             Wa( "Json::Value val_;" );
             ret = GenDeserialArgs( pInArgs,
                 "pBuf_", false, false, true, false );
@@ -3641,6 +3643,8 @@ gint32 CImplMainFuncFuse::Output()
             CCOUT << "    break;";
             NEW_LINE;
             Wa( "CRpcServices* pRoot = GetRootIf();" );
+            Wa( "do" );
+            BLOCK_OPEN;
             for( auto& elem : vecSvcs )
             {
                 CServiceDecl* pSvc = elem;
@@ -3678,6 +3682,8 @@ gint32 CImplMainFuncFuse::Output()
             NEW_LINE;
             Wa( "args = FUSE_ARGS_INIT(argc, argv);" );
             Wa( "ret = fuseif_main( args, opts );" );
+            BLOCK_CLOSE;
+            Wa( "while( 0 );" );
 
             NEW_LINE;
             Wa( "// Stop the root object" );

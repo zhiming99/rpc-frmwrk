@@ -1312,6 +1312,8 @@ gint32 IStream::OnPreStopShared(
         if( pCallback != nullptr )
             pTaskGrp->SetClientNotify( pCallback );
 
+        pTaskGrp->SetRelation( logicNONE );
+
         for( auto elem : mapStreams )
         {
             CParamList oParams;

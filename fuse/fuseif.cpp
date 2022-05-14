@@ -2443,7 +2443,6 @@ gint32 CFuseRespFileSvr::fs_write_buf(
                     elem = pCopy;
                 }
             }
-            // bufvec->idx = bufvec->count;
             ret = 0;
             break;
         }
@@ -2500,16 +2499,13 @@ gint32 CFuseRespFileSvr::fs_write_buf(
 
         // send the response
         CFuseSvcServer* pSvr = ObjPtr( GetIf() );
-        {
-            ret = pSvr->DispatchMsg( valResp );
-        }
+        ret = pSvr->DispatchMsg( valResp );
         if( ret == STATUS_PENDING )
             ret = 0;
 
         m_pReqSize->Resize( 0 );
         if( m_vecOutBufs.empty() )
         {
-            // bufvec->idx = bufvec->count;
             ret = 0;
             break;
         }

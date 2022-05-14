@@ -2053,7 +2053,8 @@ gint32 CIfStopTask::RunTask()
         if( pIf->IsServer() )
             dwServer = 1;
 
-        DebugPrint( dwServer,
+        DebugPrintEx(
+            logWarning, dwServer,
             "About to close port, %d",
             rpcf::GetTid() );
 

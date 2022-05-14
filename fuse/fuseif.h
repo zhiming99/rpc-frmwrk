@@ -2913,7 +2913,10 @@ class CFuseRootBase:
 
             ret = pIf->Start();
             if( ERROR( ret ) )
+            {
+                pIf->Stop();
                 break;
+            }
 
             bStarted = true;
             EnumIfState st = pSp->GetState();

@@ -65,7 +65,8 @@ void DumpTask( TaskletPtr& pTask )
             strTaskName = pName;
         }
 
-        DebugPrint( iTaskRet,
+        DebugPrintEx(
+            logWarning, iTaskRet,
             strTaskName + " failed" ); 
     }
 #endif
