@@ -327,7 +327,7 @@ static gint32 SafeCall(
         }
         else if( strMethod == "mkdir" )
         {
-            ROOTLK_EXCLUSIVE;
+            ROOTLK_SHARED;
             std::vector<stdstr> vecSubdirs;
             CFuseObjBase* pSvcDir = nullptr;
             stdstr strPath = path;
@@ -354,14 +354,39 @@ static gint32 SafeCall(
             CFuseObjBase* pParent = nullptr;
             ret = rpcf::GetSvcDir( strParent.c_str(),
                 pParent, vecSubdirs );
-            if( ret == ENOENT && pParent != nullptr )
+            if( SUCCEEDED( ret ) && vecSubdirs.size() )
             {
-                ret = ( pParent->*func )(
-                    strName.c_str(),
-                    nullptr, args... );
+                ret = -EACCES;
                 break;
             }
-            ret = -ENOTDIR;
+            else if( SUCCEEDED( ret ) )
+            {
+                ret = -EEXIST;
+                break;
+            }
+            if( ret == ENOENT && pParent != nullptr )
+            {
+                TaskletPtr pCallback;
+                ret = pCallback.NewObj(
+                    clsid( CSyncCallback ) );
+                if( ERROR( ret ) )
+                    break;
+
+                CSyncCallback* pSync = pCallback;
+                fuse_file_info fi1 = {0};
+                fi1.fh = ( intptr_t )( IEventSink* )pSync;
+                ret = ( pParent->*func )(
+                    strName.c_str(), &fi1, args... );
+                _ortlk.Unlock();
+                if( ret == STATUS_PENDING )
+                {
+                    pSync->WaitForCompleteWakable();
+                    ret = pSync->GetError();
+                }
+
+                break;
+            }
+            ret = -EEXIST;
             break;
         }
         else

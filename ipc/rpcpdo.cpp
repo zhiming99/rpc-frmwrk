@@ -2243,7 +2243,8 @@ gint32 CRpcPdoPort::SetupDBusSetting(
             string strDest =
                 pMsgMatch->GetDest();
 
-            if( strDest.empty() )
+            if( strDest.empty() ||
+                !IsValidDBusName( strDest  ) )
             {
                 ret = -EINVAL;
                 break;

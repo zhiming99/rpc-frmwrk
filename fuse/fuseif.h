@@ -745,6 +745,7 @@ class CFuseEvtFile : public CFuseFileEntry
     guint32 m_dwMsgCount = 0;
     guint32 m_dwMsgRead = 0;
     guint32 m_dwLastOff = 0;
+    guint32 m_dwBytesAvail = 0;
 
     public:
     typedef CFuseFileEntry super;
@@ -1410,6 +1411,8 @@ bool IsUnmounted( CRpcServices* pIf );
 #define ROOTLK_SHARED \
     CFuseRootDir* _pRootDir = static_cast \
         < CFuseRootDir* >( GetRootDir() ); \
+    if( _pRootDir == nullptr ) \
+    { ret = -EFAULT; break; } \
     CReadLock _ortlk( _pRootDir->GetRootLock() ); \
     ret = _ortlk.GetStatus(); \
     if( ERROR( ret ) ) \
@@ -1418,6 +1421,8 @@ bool IsUnmounted( CRpcServices* pIf );
 #define ROOTLK_EXCLUSIVE \
     CFuseRootDir* _pRootDir = static_cast \
         < CFuseRootDir* >( GetRootDir() ); \
+    if( _pRootDir == nullptr ) \
+    { ret = -EFAULT; break; } \
     CWriteLock _ortlk( _pRootDir->GetRootLock() ); \
     ret = _ortlk.GetStatus(); \
     if( ERROR( ret ) ) \
@@ -2083,10 +2088,10 @@ class CFuseServicePoint :
     {
         gint32 ret = 0;
         do{
-            WLOCK_TESTMNT;
-
             if( bProxy )
                 break;
+            WLOCK_TESTMNT;
+
             if( this->GetState() != stateConnected )
                 break;
 
@@ -2831,8 +2836,84 @@ class CFuseRootBase:
         return STATUS_SUCCESS;
     }
 
+    gint32 DoAddSvcPoint(
+        IEventSink* pCallback,
+        ObjPtr& pSvc,
+        const stdstr& strInstName,
+        HANDLE lwsi )
+    {
+        gint32 ret = 0;
+        do{
+            ROOTLK_EXCLUSIVE;
+            if( this->GetState() != stateConnected )
+            {
+                ret = ERROR_STATE;
+                break;
+            }
+
+            SVC_INFO* psi = ( SVC_INFO* )lwsi;
+            SVC_TYPE* pSp = pSvc;
+            DIR_SPTR pSvcDir = pSp->GetSvcDir();
+            CFuseObjBase* pRoot = _pRootDir;
+            CFuseSvcDir* psd = static_cast
+                < CFuseSvcDir* >( pSvcDir.get() );
+            psd->SetName( strInstName );
+
+            if( !this->IsServer() )
+            {
+                std::vector< DIR_SPTR > vecConns;
+                pRoot->GetChildren( vecConns );
+                ret = -ENOENT;
+                for( auto& elem : vecConns )
+                {
+                    CFuseConnDir* pConn = dynamic_cast
+                        < CFuseConnDir* >( elem.get() );
+                    if( pConn == nullptr )
+                        continue;
+                    ret = pConn->AddSvcDir( pSvcDir );
+                    if( SUCCEEDED( ret ) )
+                        break;
+                }
+                if( ERROR( ret ) )
+                {
+                    gint32 idx = vecConns.size();
+                    DIR_SPTR pNewDir( new CFuseConnDir(
+                        stdstr( CONN_DIR_PREFIX ) +
+                        std::to_string( idx ) ) );
+                    CFuseConnDir* pConn = static_cast
+                        < CFuseConnDir* >( pNewDir.get() );
+                    pConn->DecRef();
+                    ret = pConn->AddSvcDir( pSvcDir );
+                    if( ERROR( ret ) )
+                        break;
+                    ret = pRoot->AddChild( pNewDir );
+                }
+            }
+            else
+            {
+                ret = pRoot->AddChild( pSvcDir );
+            }
+
+            if( ERROR( ret ) )
+                break;
+
+            InterfPtr pIf = ObjPtr( pSp );
+            m_vecIfs.push_back( pIf );
+            m_mapSvcInsts[ strInstName ] =
+                psi->m_strSvcName.size();
+
+        }while( 0 );
+
+        if( pCallback != nullptr )
+            pCallback->OnEvent(
+                eventTaskComp, ret, 0, nullptr );
+
+        return ret;
+    };
+
     gint32 AddSvcPoint(
         const stdstr& strInstName,
+        IEventSink* pCallback = nullptr,
         guint32 dwTimeout = 90 )
     {
         gint32 ret = 0;
@@ -2841,7 +2922,7 @@ class CFuseRootBase:
         CIoManager* pMgr = this->GetIoMgr();
         do{
             SVC_INFO* psi = nullptr;
-            if( strInstName.size() > REG_MAX_NAME )
+            if( unlikely( !IsValidName( strInstName ) ) )
             {
                 ret = -EINVAL;
                 break;
@@ -2887,7 +2968,8 @@ class CFuseRootBase:
             {
                 CCfgOpener oCfg(
                     ( IConfigDb* )pCfg );
-                // object instance name
+                // to override the original object
+                // instance name
                 oCfg[ propObjInstName ] =
                     strObjInst;
             }
@@ -2937,53 +3019,22 @@ class CFuseRootBase:
                 break;
             }
 
-            DIR_SPTR pSvcDir = pSp->GetSvcDir();
-            CFuseObjBase* pRoot = GetRootDir();
-            CFuseSvcDir* psd = static_cast
-                < CFuseSvcDir* >( pSvcDir.get() );
-            psd->SetName( strInstName );
-
-            if( !this->IsServer() )
-            {
-                std::vector< DIR_SPTR > vecConns;
-                pRoot->GetChildren( vecConns );
-                ret = -ENOENT;
-                for( auto& elem : vecConns )
-                {
-                    CFuseConnDir* pConn = dynamic_cast
-                        < CFuseConnDir* >( elem.get() );
-                    if( pConn == nullptr )
-                        continue;
-                    ret = pConn->AddSvcDir( pSvcDir );
-                    if( SUCCEEDED( ret ) )
-                        break;
-                }
-                if( ERROR( ret ) )
-                {
-                    gint32 idx = vecConns.size();
-                    DIR_SPTR pNewDir( new CFuseConnDir(
-                        stdstr( CONN_DIR_PREFIX ) +
-                        std::to_string( idx ) ) );
-                    CFuseConnDir* pConn = static_cast
-                        < CFuseConnDir* >( pNewDir.get() );
-                    pConn->DecRef();
-                    ret = pConn->AddSvcDir( pSvcDir );
-                    if( ERROR( ret ) )
-                        break;
-                    ret = pRoot->AddChild( pNewDir );
-                }
-            }
-            else
-            {
-                ret = pRoot->AddChild( pSvcDir );
-            }
-
+            TaskletPtr pUpdTask;
+            ret = DEFER_OBJCALL_NOSCHED(
+                pUpdTask, this,
+                &CFuseRootBase::DoAddSvcPoint,
+                pCallback, ObjPtr( pSp ),
+                strInstName, ( HANDLE )psi );
             if( ERROR( ret ) )
                 break;
 
-            m_vecIfs.push_back( pIf );
-            m_mapSvcInsts[ strInstName ] =
-                psi->m_strSvcName.size();
+            ret = pMgr->RescheduleTask( pUpdTask );
+            if( ERROR( ret ) )
+                ( *pUpdTask )( eventCancelTask );
+            else
+            {
+                ret = STATUS_PENDING;
+            }
 
         }while( 0 );
 
@@ -3030,7 +3081,21 @@ class CFuseRootBase:
             m_vecServices.push_back(
                 { strName, strDesc, iClsid } );
 
-            ret = AddSvcPoint( strName );
+            TaskletPtr pCallback;
+            ret = pCallback.NewObj(
+                clsid( CSyncCallback ) );
+            if( ERROR( ret ) )
+                break;
+
+            CSyncCallback* pSync = pCallback;
+
+            ret = AddSvcPoint(
+                strName, pSync );
+            if( ret == STATUS_PENDING )
+            {
+                pSync->WaitForCompleteWakable();
+                ret = pSync->GetError();
+            }
 
         }while( 0 );
 

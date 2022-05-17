@@ -30,6 +30,7 @@
 #include "dmsgptr.h"
 #include "buffer.h"
 #include "configdb.h"
+#include "registry.h"
 
 namespace rpcf
 {
@@ -569,6 +570,22 @@ gint32 DMsgPtr::Deserialize(
     return ret;
 }
 
+gint32 DMsgPtr::SetMember(
+    const std::string& strMember )
+{
+    if( IsEmpty() )
+        return -EFAULT; 
+
+    if( !IsValidName( strMember ) )
+        return -EINVAL;
+
+    if( !dbus_message_set_member(
+        m_pObj, strMember.c_str() ) )
+        return -ENOMEM;
+       
+    return 0; 
+}
+
 gint32 DMsgPtr::Clone( DBusMessage* pSrcMsg )
 {
     if( pSrcMsg == nullptr )
@@ -701,6 +718,137 @@ std::string DMsgPtr::DumpMsg() const
         }
     }
     return strRet;
+}
+
+bool IsValidName( const stdstr& strName )
+{
+    bool ret = false;
+    do{
+        if( strName.empty() ||
+            strName.size() > REG_MAX_NAME )
+            break;
+
+        const char* ptr = strName.c_str();
+        const char* pend = ptr + strName.size();
+        if( !VALID_INITIAL_NAME_CHAR( *ptr ) )
+            break;
+        ++ptr;
+        while( ptr != pend )
+        {
+            if( !VALID_NAME_CHAR( *ptr ) )
+                break;
+            ++ptr;
+        }
+        if( ptr == pend )
+            ret = true;
+
+    }while( 0 );
+
+    return ret;
+}
+
+bool IsValidDBusPath( const stdstr& strName )
+{
+    bool ret = false;
+    do{
+        if( strName.empty() ||
+            strName.size() > REG_MAX_PATH )
+            break;
+
+        const char* ptr = strName.c_str();
+        const char* pend = ptr + strName.size();
+        if( *ptr != '/' )
+            break;
+        while( ptr != pend )
+        {
+            if( *ptr == '/' )
+            {
+                const char* pnext = ptr + 1;
+                if( pnext == pend )
+                    break;
+                if( unlikely( !VALID_INITIAL_NAME_CHAR( *pnext ) ) )
+                    break;
+                ptr += 2;
+                continue;
+            }
+            if( unlikely( !VALID_NAME_CHAR( *ptr ) ) )
+                break;
+            ++ptr;
+        }
+        if( ptr == pend )
+            ret = true;
+
+    }while( 0 );
+
+    return ret;
+}
+
+bool IsValidDBusName( const stdstr& strName )
+{
+    bool ret = false;
+    do{
+        if( strName.empty() ||
+            strName.size() > REG_MAX_PATH )
+            break;
+
+        const char* ptr = strName.c_str();
+        const char* pend = ptr + strName.size();
+        if( *ptr == ':' )
+        {   ++ptr;
+            while( ptr != pend )
+            {
+                if( *ptr == '.' )
+                {
+                    const char* pnext = ptr + 1;
+                    if( pnext == pend )
+                    {
+                        // '.' not allowed as the last
+                        // one
+                        break;
+                    }
+                    if( unlikely( !VALID_NAME_CHAR( *pnext ) ) )
+                    {
+                        break;
+                    }
+                    ptr += 2;
+                    continue;
+                }
+                if( unlikely( !VALID_NAME_CHAR( *ptr ) ) )
+                    break;
+                ++ptr;
+            }
+            if( ptr == pend )
+                ret = true;
+        }
+        else if( *ptr == '.' )
+        {
+            // cannot begin with '.'
+            break;
+        }
+
+        ++ptr;
+        while( ptr != pend )
+        {
+            if( *ptr == '.' )
+            {
+                const char* pnext = ptr + 1;
+                if( pnext == pend )
+                    break;
+                if( unlikely( !VALID_INITIAL_NAME_CHAR( *pnext ) ) )
+                    break;
+                ptr += 2;
+                continue;
+            }
+            if( unlikely( !VALID_NAME_CHAR( *ptr ) ) )
+                break;
+            ++ptr;
+        }
+        if( ptr == pend )
+            ret = true;
+
+    }while( 0 );
+
+    return ret;
 }
 
 }

@@ -672,11 +672,21 @@ class CMessageMatch : public IMessageMatch
         {
         case propObjPath:
             {
+                if( !IsValidDBusPath( ( stdstr& )oBuf ) )
+                {
+                    ret = -EINVAL;
+                    break;
+                }
                 m_strObjPath = ( stdstr& )oBuf;
                 break;
             }
         case propIfName:
             {
+                if( !IsValidDBusName( ( stdstr& )oBuf ) )
+                {
+                    ret = -EINVAL;
+                    break;
+                }
                 m_strIfName = ( stdstr& )oBuf;
                 break;
             }

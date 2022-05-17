@@ -74,11 +74,12 @@
 
 // don't modify these values
 #define MAX_STM_QUE_SIZE   32     // STM_MAX_PACKETS_REPORT
-#define MAX_REQ_QUE_SIZE   32
-#define MAX_EVT_QUE_SIZE   32
+#define MAX_REQ_QUE_SIZE   1024
+#define MAX_EVT_QUE_SIZE   1024
 
 // max bytes per request/response
 #define MAX_FUSE_MSG_SIZE  ( 1024 * 1024 ) // MAX_BYTES_PER_TRANSFER
+#define MAX_EVT_QUE_BYTES  ( 16 * MAX_FUSE_MSG_SIZE )
 
 // max bytes per stream read/write
 #define MAX_FUSE_STM_PACKET ( MAX_FUSE_MSG_SIZE * 16 )

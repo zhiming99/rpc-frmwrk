@@ -2139,8 +2139,16 @@ gint32 CDBusBusPort::RegBusName(
     gint32 ret = 0;
 
     do{
+        if( !IsValidDBusName( strName ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
         if( m_pDBusConn == nullptr )
-            return ERROR_STATE;
+        {
+            ret = ERROR_STATE;
+            break;
+        }
 
         CDBusError error;
         // request the name for this connection

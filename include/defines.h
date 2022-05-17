@@ -152,35 +152,12 @@ do{\
     }\
 }while( 0 )
 
-// Connection Management
-// Passive Connection
-// a controller notifies to be online
-#define NOTIFY_CONTROLLER_ONLINE
-
-// a controller notifies to be offline 
-#define NOTIFY_CONTROLLER_OFFLINE
-
-// Active Connection
-// the client asks to setup the UI session
-#define MSG_REQ_LOGIN
-
-// the client is about to end the UI session
-#define MSG_REQ_LOGOUT
-
-// end a connection to a controller
-// or a session
-#define MSG_REQ_DISCONNECT
-
-// make a tcp connection to a controller
-// or a session
-#define MSG_REQ_CONNECT
-
 // a flag to indicate if the mod event has connection
 // to all the attached object
 #define MOD_ONOFFLINE_IRRELEVANT    0x02
 
 #define REG_MAX_PATH    2048
-#define REG_MAX_NAME    128 
+#define REG_MAX_NAME    DBUS_MAXIMUM_NAME_LENGTH
 
 #define __FILENAME__ (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 

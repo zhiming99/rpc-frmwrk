@@ -745,7 +745,7 @@ gint32 CRpcTcpBusPort::CreateMLoopPool()
             // thread name
             oCfg.Push( strName );
 
-            // don't start new thread
+            // start new thread
             oCfg.Push( true );
 
             MloopPtr pLoop;

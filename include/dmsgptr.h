@@ -31,9 +31,34 @@
 #define DMSG_FIX_TYPE_SIZE  8
 #define DMSG_MAX_ARGS       16
 
+#define VALID_INITIAL_NAME_CHAR(c)         \
+  ( ((c) >= 'A' && (c) <= 'Z') ||               \
+    ((c) >= 'a' && (c) <= 'z') ||               \
+    ((c) == '_') || ((c) == '-'))
+
+#define VALID_NAME_CHAR(c)                 \
+  ( ((c) >= '0' && (c) <= '9') ||               \
+    ((c) >= 'A' && (c) <= 'Z') ||               \
+    ((c) >= 'a' && (c) <= 'z') ||               \
+    ((c) == '_') || ((c) == '-'))
+
+#define VALID_PATH_CHAR(c)                 \
+  ( VALID_NAME_CHAR(c) || (c) == '/' )
+
+#define VALID_DBUS_NAME_CHAR(c)                 \
+  ( VALID_NAME_CHAR(c) || (c) == '.' )
+
 namespace rpcf
 {
 
+bool IsValidName(
+    const std::string& strName );
+
+bool IsValidDBusPath(
+    const std::string& strName ); 
+
+bool IsValidDBusName(
+    const std::string& strName ); 
 
 class DMsgPtr : public IAutoPtr
 {
@@ -249,13 +274,18 @@ class DMsgPtr : public IAutoPtr
             SetSerial(
                 dbus_message_get_serial( pMsg ) );
 
-            SetDestination(
+            ret = SetDestination(
                 pSrcMsg.GetDestination() );
+            if( ERROR( ret ) )
+                break;
 
             SetInterface(
                 pSrcMsg.GetInterface() );
 
-            SetPath( pSrcMsg.GetPath() );
+            ret = SetPath( pSrcMsg.GetPath() );
+            if( ERROR( ret ) )
+                break;
+
             SetMember( pSrcMsg.GetMember() );
             SetSender( pSrcMsg.GetSender() );
 
@@ -287,17 +317,7 @@ class DMsgPtr : public IAutoPtr
     }
 
     gint32 SetMember(
-        const std::string& strMember )
-    {
-        if( IsEmpty() )
-            return -EFAULT; 
-
-        if( !dbus_message_set_member(
-            m_pObj, strMember.c_str() ) )
-            return -ENOMEM;
-           
-        return 0; 
-    }
+        const std::string& strMember );
 
     std::string GetInterface() const
     {
@@ -318,6 +338,9 @@ class DMsgPtr : public IAutoPtr
     {
         if( IsEmpty() )
             return -EFAULT; 
+
+        if( !IsValidDBusName( strInterface ) )
+            return -EINVAL;
 
         if( !dbus_message_set_interface(
             m_pObj, strInterface.c_str() ) )
@@ -349,6 +372,9 @@ class DMsgPtr : public IAutoPtr
         if( strPath.empty() )
             return -EINVAL;
 
+        if( !IsValidDBusPath( strPath ) )
+            return -EINVAL;
+
         if( !dbus_message_set_path(
             m_pObj, strPath.c_str() ) )
             return -ENOMEM;
@@ -375,6 +401,9 @@ class DMsgPtr : public IAutoPtr
     {
         if( IsEmpty() )
             return -EFAULT; 
+
+        if( !IsValidDBusName( strSender ) )
+            return -EINVAL;
 
         if( !dbus_message_set_sender(
             m_pObj, strSender.c_str() ) )
@@ -404,6 +433,9 @@ class DMsgPtr : public IAutoPtr
             return -EFAULT; 
 
         if( strDestination.empty() )
+            return -EINVAL;
+
+        if( !IsValidDBusName( strDestination ) )
             return -EINVAL;
 
         if( !dbus_message_set_destination(

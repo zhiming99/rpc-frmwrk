@@ -123,6 +123,8 @@ void SetFuse( fuse* pFuse )
 CFuseDirectory* GetRootDir()
 {
     CRpcServices* pSvc = GetRootIf();
+    if( pSvc == nullptr )
+        return nullptr;
     if( pSvc->IsServer() )
     {
         CFuseRootServer* pSvr = GetRootIf();
@@ -606,7 +608,12 @@ gint32 CFuseDirectory::fs_mkdir(
 {
     gint32 ret = 0;
     do{
-
+        if( unlikely( fi == nullptr ||
+            fi->fh == 0 ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
         CRpcServices* pIf = GetRootIf();
         EnumClsid iClsid = GetClsid();
 
@@ -628,7 +635,8 @@ gint32 CFuseDirectory::fs_mkdir(
                 ret = -EFAULT;
                 break;
             }
-            ret = pSvc->AddSvcPoint( path, 20 );
+            IEventSink* pCb = ( IEventSink* )fi->fh;
+            ret = pSvc->AddSvcPoint( path, pCb );
             if( ERROR( ret ) )
                 break;
             fuse_invalidate_path(
@@ -644,7 +652,8 @@ gint32 CFuseDirectory::fs_mkdir(
                 break;
             }
 
-            ret = pSvc->AddSvcPoint( path, 20 );
+            IEventSink* pCb = ( IEventSink* )fi->fh;
+            ret = pSvc->AddSvcPoint( path, pCb );
             if( ERROR( ret ) )
                 break;
             stdstr strPath = "/" + GetName();
@@ -1868,6 +1877,7 @@ gint32 CFuseEvtFile::fs_read(
             FillBufVec( size,
                 m_queIncoming,
                 vecBackup, bufvec );
+            m_dwBytesAvail -= size;
         }
         else if( IsNonBlock() )
         {
@@ -1885,6 +1895,7 @@ gint32 CFuseEvtFile::fs_read(
             FillBufVec( size,
                 m_queIncoming,
                 vecBackup, bufvec );
+            m_dwBytesAvail -= size;
         }
         else
         {
@@ -1910,6 +1921,16 @@ gint32 CFuseEvtFile::ReceiveEvtJson(
         pBuf->Append(
             strMsg.c_str(), strMsg.size());
         m_queIncoming.push_back( { pBuf, 0 } );
+        m_dwBytesAvail += pBuf->size();
+
+        while( m_dwBytesAvail > MAX_EVT_QUE_BYTES ||
+            m_queIncoming.size() > MAX_EVT_QUE_SIZE )
+        {
+            m_dwBytesAvail -=
+                m_queIncoming.front().pBuf->size();
+            m_queIncoming.pop_front();
+        }
+
         fuse_pollhandle* ph = GetPollHandle();
         if( ph != nullptr )
         {

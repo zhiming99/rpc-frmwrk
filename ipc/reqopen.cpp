@@ -125,6 +125,8 @@ CReqBuilder::CReqBuilder(
 gint32 CReqBuilder::SetIfName(
     const std::string& strIfName )
 {
+    if( !IsValidDBusName( strIfName ) )
+        return -EINVAL;
     return SetStrProp(
         propIfName, strIfName );
 }
@@ -132,12 +134,16 @@ gint32 CReqBuilder::SetIfName(
 gint32 CReqBuilder::SetObjPath(
     const std::string& strObjPath ) 
 {
+    if( !IsValidDBusName( strObjPath ) )
+        return -EINVAL;
     return SetStrProp(
         propObjPath, strObjPath );
 }
 gint32 CReqBuilder::SetDestination(
     const std::string& strDestination ) 
 {
+    if( !IsValidDBusName( strDestination ) )
+        return -EINVAL;
     return SetStrProp(
         propDestDBusName, strDestination );
 }
@@ -145,6 +151,8 @@ gint32 CReqBuilder::SetDestination(
 gint32 CReqBuilder::SetSender(
     const std::string& strSender ) 
 {
+    if( !IsValidDBusName( strSender ) )
+        return -EINVAL;
     return SetStrProp(
         propSrcDBusName, strSender );
 }
@@ -152,6 +160,8 @@ gint32 CReqBuilder::SetSender(
 gint32 CReqBuilder::SetMethodName(
     const std::string& strMethodName ) 
 {
+    if( !IsValidName( strMethodName ) )
+        return -EINVAL;
     return SetStrProp(
         propMethodName, strMethodName );
 }
