@@ -1216,6 +1216,12 @@ gint32 CFuseStmFile::fs_read(
         CStreamProxySync* pStmProxy = ObjPtr( pSvc );
         HANDLE hstm = GetStream();
 
+        if( pSvc->GetState() != stateConnected )
+        {
+            ret = -ENOTCONN;
+            break;
+        }
+
         if( m_queReqs.size() &&
             m_queReqs.front().req != req )
         {
@@ -1570,8 +1576,6 @@ gint32 CFuseStmFile::SendBufVec( OUTREQ& oreq )
         if( ERROR( ret ) )
             break;
 
-        // bufvec->idx = bufvec->count;
-
     }while( 0 );
 
     return ret;
@@ -1588,6 +1592,11 @@ gint32 CFuseStmFile::fs_write_buf(
     do{
         CRpcServices* pIf = GetIf();
 
+        if( pIf->GetState() != stateConnected )
+        {
+            ret = -ENOTCONN;
+            break;
+        }
         // this is a synchronous call since the bufvec
         // is controlled by the caller
 
@@ -2732,15 +2741,8 @@ gint32 CFuseReqFileProxy::fs_write_buf(
             break;
         }
         
-        {
-            if( pProxy->GetState() != stateConnected )
-            {
-                ret = -EBADF;
-                break;
-            }
-            ret = pProxy->DispatchReq(
-                nullptr, valReq, valResp );
-        }
+        ret = pProxy->DispatchReq(
+            nullptr, valReq, valResp );
 
         Json::Value& valrid =
             valResp[ JSON_ATTR_REQCTXID ];
@@ -2851,6 +2853,327 @@ gint32 CFuseReqFileProxy::fs_poll(
 
     return ret;
 }
+
+CFuseConnDir::CFuseConnDir( const stdstr& strName )
+    : super( strName, nullptr )
+{
+    SetClassId( clsid( CFuseConnDir ) );
+    // SetMode( S_IRUSR | S_IXUSR );
+    SetMode( S_IRWXU );
+
+    // add an RO _nexthop directory this dir is
+    // for docking nodes of sub router-path
+    stdstr strHopDir = HOP_DIR;
+    auto pDir = DIR_SPTR(
+        new CFuseDirectory( strHopDir, nullptr ) ); 
+    CFuseObjBase* pObj = dynamic_cast
+        < CFuseObjBase* >( pDir.get() );
+    pObj->SetMode( S_IRUSR | S_IXUSR );
+    pObj->DecRef();
+    AddChild( pDir );
+
+    // add an RO file for connection parameters
+    stdstr strParams = CONN_PARAM_FILE;
+    auto pFile = DIR_SPTR(
+        new CFuseTextFile( strParams ) ); 
+    pObj = dynamic_cast
+        < CFuseObjBase* >( pFile.get() );
+    pObj->SetMode( S_IRUSR );
+    pObj->DecRef();
+    AddChild( pFile );
+}
+
+stdstr CFuseConnDir::GetRouterPath(
+    CDirEntry* pDir ) const
+{
+    if( pDir->IsRoot() )
+        return stdstr( "" );
+
+    stdstr strPath;
+    strPath = "/";
+    CFuseConnDir* pConnDir = dynamic_cast
+        < CFuseConnDir* >( pDir );
+    if( pConnDir != nullptr )
+        return strPath;
+
+    stdstr strName = pDir->GetName();
+    strPath += strName;
+
+    CDirEntry* pParent = pDir->GetParent();
+    while( pParent != nullptr &&
+        pConnDir == nullptr )
+    {
+        strName = "/";
+        strName += pParent->GetName();
+        pParent = pParent->GetParent();
+        pConnDir = dynamic_cast
+            < CFuseConnDir* >( pParent );
+        if( strName == HOP_DIR )
+            continue;
+        strPath.insert( 0, strName );
+    }
+    return strPath;
+}
+
+gint32 CFuseConnDir::AddSvcDir(
+    const DIR_SPTR& pEnt )
+{
+    auto pDir = static_cast
+        < CFuseSvcDir* >( pEnt.get() );
+    gint32 ret = 0;
+    do{
+        if( pDir == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        ObjPtr pIf = pDir->GetIf();
+        if( pIf.IsEmpty() )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        CCfgOpenerObj oIfCfg(
+            ( CObjBase* )pIf ); 
+
+        IConfigDb* pConnParams = nullptr;
+        ret = oIfCfg.GetPointer(
+            propConnParams, pConnParams );
+        if( ERROR( ret ) )
+            break;
+
+        if( super::GetCount() <= 2 )
+        {
+            SetConnParams( pConnParams );
+        }
+        else if( !IsEqualConn( pConnParams ) )
+        {
+            ret = -EACCES;
+            break;
+        }
+
+        stdstr strPath; 
+        ret = oIfCfg.GetStrProp(
+            propRouterPath, strPath );
+        if( ERROR( ret ) )
+            break;
+
+        stdstr strPath2 = "/";
+        if( strPath == strPath2 )
+        {
+            ret = AddChild( pEnt );
+            break;
+        }
+
+        ret =IsMidwayPath( strPath2, strPath );
+        if( ERROR( ret ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        stdstr strRest =
+            strPath.substr( strPath2.size() );
+
+        std::vector< stdstr > vecComps;
+        ret = CRegistry::Namei(
+            strRest, vecComps );
+        if( ERROR( ret ) )
+            break;
+
+        if( vecComps.empty() )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        if( vecComps[ 0 ] == "/" )
+            vecComps.erase( vecComps.begin() );
+
+        CDirEntry* pDir = nullptr;
+        CDirEntry* pCur = this;
+        CDirEntry* pHop = nullptr;
+        for( auto& elem : vecComps )
+        {
+            pDir = pCur->GetChild( HOP_DIR );
+            if( pDir == nullptr )
+            {
+                CFuseDirectory* pNewDir =
+                new CFuseDirectory( HOP_DIR, pIf );
+                pNewDir->DecRef();
+
+                DIR_SPTR pEnt1( pNewDir );
+                pCur->AddChild( pEnt1 );
+                pDir = pNewDir;
+                pNewDir->SetMode( S_IRUSR | S_IXUSR );
+                pHop = nullptr;
+            }
+            else
+            {
+                pHop = pDir->GetChild( elem );
+            }
+
+            if( pHop == nullptr )
+            {
+                CFuseDirectory* pNewDir =
+                    new CFuseDirectory( elem, pIf );
+                pNewDir->DecRef();
+
+                DIR_SPTR pEnt1( pNewDir );
+                pDir->AddChild( pEnt1 );
+                pNewDir->SetMode( S_IRUSR | S_IXUSR );
+                pHop = pEnt1.get();
+            }
+            pCur = pHop;
+        }
+        pCur->AddChild( pEnt );
+
+    }while( 0 );
+
+    return ret;
+};
+
+void CFuseConnDir::SetConnParams(
+    const CfgPtr& pCfg )
+{
+    m_pConnParams = pCfg;
+    stdstr strDump = DumpConnParams();
+    CDirEntry* pEnt =
+        GetChild( CONN_PARAM_FILE );
+    CFuseTextFile* pText = static_cast
+        < CFuseTextFile* >( pEnt );
+    pText->SetContent( strDump );
+}
+
+bool CFuseConnDir::IsEqualConn(
+    const IConfigDb* pConn ) const
+{
+    CConnParamsProxy oConn(
+        ( IConfigDb* )m_pConnParams );
+    CConnParamsProxy oConn1( pConn );
+    return ( oConn == oConn1 );
+}
+
+stdstr CFuseConnDir::DumpConnParams()
+{
+    gint32 ret = 0;
+    if( m_pConnParams.IsEmpty() )
+        return "";
+
+    stdstr strRet;
+    do{
+        CConnParamsProxy oConn(
+            ( IConfigDb* )m_pConnParams );
+        
+        bool bVal = oConn.IsServer();
+        strRet += "IsServer=";
+        strRet += ( bVal ? "true\n" : "false\n" );
+
+        stdstr strVal = oConn.GetSrcIpAddr();
+        if( strVal.size() )
+        {
+            strRet += "SrcIpAddr=";
+            strRet += strVal + "\n";
+        }
+
+        guint32 dwVal = oConn.GetSrcPortNum();
+        if( dwVal != 0 )
+        {
+            strRet += "SrcPortNum=";
+            strRet += std::to_string( dwVal );
+            strRet += "\n";
+        }
+
+        strVal = oConn.GetDestIpAddr();
+        if( strVal.size() )
+        {
+            strRet += "DestIpAddr";
+            strRet += strVal + "\n";
+        }
+
+        dwVal = oConn.GetDestPortNum();
+
+        if( dwVal != 0 )
+        {
+            strRet += "DestPortNum=";
+            strRet += std::to_string( dwVal );
+            strRet += "\n";
+        }
+
+        bVal = oConn.IsWebSocket();
+        strRet += "WebSocket=";
+        strRet += ( bVal ?\
+            "enabled\n" : "disabled\n" );
+
+        if( bVal )
+        {
+            strRet += "URL=";
+            strRet += oConn.GetUrl() + "\n";
+        }
+
+        bVal = oConn.IsSSL();
+        strRet += "SSL=";
+        strRet += ( bVal ?
+            "enabled\n" : "disabled\n" );
+
+        bVal = oConn.HasAuth(); 
+        strRet += "Authentication=";
+        strRet += ( bVal ?
+            "enabled\n" : "disabled\n" );
+
+        if( bVal )
+        {
+            CCfgOpener oCfg(
+                ( IConfigDb*)m_pConnParams );
+            IConfigDb* pAuthInfo;
+            ret = oCfg.GetPointer(
+                propAuthInfo, pAuthInfo );
+            if( ERROR( ret ) )
+                break;
+
+            CCfgOpener oAuth( pAuthInfo );
+            ret = oAuth.GetStrProp(
+                propAuthMech, strVal );
+            if( ERROR( ret ) )
+                break;
+
+            strRet += "mechanism=";
+            strRet += strVal + "\n";
+
+            if( strVal != "krb5" )
+                break;
+
+            ret = oAuth.GetStrProp(
+                propUserName, strVal );
+            if( SUCCEEDED( ret ) )
+            {
+                strRet += "\tuser=\"";
+                strRet += strVal + "\"\n";
+            }
+
+            ret = oAuth.GetStrProp(
+                propRealm, strVal );
+            if( SUCCEEDED( ret ) ) 
+            {
+                strRet += "\trealm=\"";
+                strRet += strVal + "\"\n";
+            }
+
+            ret = oAuth.GetBoolProp(
+                propSignMsg, bVal );
+            if( SUCCEEDED( ret ) )
+            {
+                strRet += "\tsignmsg=";
+                strRet += ( bVal ?
+                    "true\n" : "false\n" );
+            }
+        }
+
+    }while( 0 );
+
+    return strRet;
+}
+
 
 gint32 InitRootIf(
     CIoManager* pMgr, bool bProxy )
@@ -2994,7 +3317,6 @@ void CFuseSvcProxy::AddReqFiles(
 
     auto pFile = DIR_SPTR(
         new CFuseReqFileProxy( strName, this ) ); 
-    m_pSvcDir->AddChild( pFile );
     pObj = dynamic_cast< CFuseObjBase* >
         ( pFile.get() );
     pObj->SetMode( S_IRUSR | S_IWUSR );
@@ -3002,13 +3324,13 @@ void CFuseSvcProxy::AddReqFiles(
     auto pReqFile = static_cast
         < CFuseReqFileProxy* >( pObj );
     pReqFile->SetGroupId( dwGrpId );
+    m_pSvcDir->AddChild( pFile );
 
     // add an RO RESP file 
     strName = "jrsp_";
     strName += strSuffix;
-    pFile.reset( 
+    pFile = DIR_SPTR(
         new CFuseRespFileProxy( strName, this ) );
-    m_pSvcDir->AddChild( pFile );
     pObj = dynamic_cast
         < CFuseObjBase* >( pFile.get() );
     pObj->SetMode( S_IRUSR );
@@ -3016,13 +3338,13 @@ void CFuseSvcProxy::AddReqFiles(
     auto pRespFile = static_cast
         < CFuseRespFileProxy* >( pObj );
     pRespFile->SetGroupId( dwGrpId );
+    m_pSvcDir->AddChild( pFile );
 
     // add an RO event file 
     strName = "jevt_";
     strName += strSuffix;
     pFile = DIR_SPTR(
         new CFuseEvtFile( strName, this ) ); 
-    m_pSvcDir->AddChild( pFile );
     pObj = dynamic_cast
         < CFuseObjBase* >( pFile.get() );
     pObj->SetMode( S_IRUSR );
@@ -3032,6 +3354,50 @@ void CFuseSvcProxy::AddReqFiles(
     pEvtFile->SetGroupId( dwGrpId );
     AddGroup( dwGrpId,
         { pReqFile, pRespFile, pEvtFile } );
+    m_pSvcDir->AddChild( pFile );
+}
+
+gint32 CFuseSvcProxy::DoRmtModEventFuse(
+    EnumEventId iEvent,
+    const std::string& strModule,
+    IConfigDb* pEvtCtx )
+{
+    gint32 ret = 0;
+    do{
+        if( iEvent != eventRmtModOffline )
+            break;
+        
+        RLOCK_TESTMNT;
+        std::vector< DIR_SPTR > vecReqFiles;
+        _pSvcDir->GetChildren( vecReqFiles );
+        for( auto& elem : vecReqFiles )
+        {
+            auto pReq = dynamic_cast
+            < CFuseFileEntry* >( elem.get() );
+            if( pReq != nullptr )
+                pReq->CancelFsRequests( -EIO );
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CFuseSvcProxy::OnStmClosingFuse(
+    HANDLE hStream )
+{
+    gint32 ret = 0;
+    do{
+        stdstr strName;
+        WLOCK_TESTMNT;
+        ret = StreamToName( hStream, strName);
+        if( ERROR( ret ) )
+            break;
+        ret = DeleteStmFile( strName );
+
+    }while( 0 );
+
+    return ret;
 }
 
 gint32 CFuseSvcServer::ReceiveMsgJson(
@@ -3081,7 +3447,6 @@ void CFuseSvcServer::AddReqFiles(
     strName += strSuffix;
     auto pFile = DIR_SPTR(
         new CFuseReqFileSvr( strName, this ) ); 
-    m_pSvcDir->AddChild( pFile );
     pObj = dynamic_cast< CFuseObjBase* >
         ( pFile.get() );
     pObj->SetMode( S_IRUSR );
@@ -3089,6 +3454,7 @@ void CFuseSvcServer::AddReqFiles(
     auto pReqFile = static_cast
         < CFuseReqFileSvr* >( pObj );
     pReqFile->SetGroupId( dwGrpId );
+    m_pSvcDir->AddChild( pFile );
 
     // add an WO RESP file for both
     // response and event
@@ -3097,7 +3463,6 @@ void CFuseSvcServer::AddReqFiles(
 
     pFile = DIR_SPTR(
         new CFuseRespFileSvr( strName, this ) ); 
-    m_pSvcDir->AddChild( pFile );
     pObj = dynamic_cast
         < CFuseObjBase* >( pFile.get() );
     pObj->SetMode( S_IWUSR );
@@ -3107,6 +3472,214 @@ void CFuseSvcServer::AddReqFiles(
     pRespFile->SetGroupId( dwGrpId );
     AddGroup( dwGrpId, 
         { pReqFile, pRespFile } );
+    m_pSvcDir->AddChild( pFile );
+}
+
+gint32 CFuseSvcServer::IncStmCount(
+    const stdstr& strSess )
+{
+    auto itr = m_mapSessCount.find( strSess );
+
+    if( itr == m_mapSessCount.end() )
+    {
+        m_mapSessCount[ strSess ] = 1;
+    }
+    else
+    {
+        if( itr->second >= MAX_STREAMS_PER_SESS )
+        {
+            return -EMFILE;
+        }
+        ++itr->second;
+    }
+    return STATUS_SUCCESS;
+}
+
+gint32 CFuseSvcServer::DecStmCount(
+    const stdstr& strSess )
+{
+    auto itr = m_mapSessCount.find( strSess );
+    if( itr == m_mapSessCount.end() )
+    {
+        return -ENOENT;
+    }
+    else
+    {
+        if( itr->second <= 0 )
+        {
+            return -ERANGE;
+        }
+        --itr->second;
+    }
+    return STATUS_SUCCESS;
+}
+
+gint32 CFuseSvcServer::AcceptNewStreamFuse(
+    IEventSink* pCallback,
+    IConfigDb* pDataDesc )
+{
+    gint32 ret = 0;
+    do{
+        RLOCK_TESTMNT;
+
+        auto pEnt = GetSvcDir();
+        auto pStmDir =
+            pEnt->GetChild( STREAM_DIR );
+        if( pStmDir->GetCount() >
+            MAX_STREAMS_PER_SVC )
+        {
+            ret = -EMFILE;
+            break;
+        }
+
+        if( pDataDesc == nullptr )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        stdstr strName;
+        CCfgOpener oDesc( pDataDesc );
+        ret = oDesc.GetStrProp(
+            propNodeName, strName );
+        if( ERROR( ret ) )
+        {
+            ret = -ENOENT;
+            break;
+        }
+        if( pStmDir->GetChild( strName ) )
+        {
+            ret = -EEXIST;
+            break;
+        }
+
+        IConfigDb* ptctx = nullptr;
+        CStdRMutex oLock( this->GetLock() );
+        ret = oDesc.GetPointer(
+            propTransCtx, ptctx );
+        if( ERROR( ret ) )
+            break;
+
+        stdstr strSess;
+        CCfgOpener oCtx( ptctx ); 
+        ret = oCtx.GetStrProp(
+            propSessHash, strSess );
+        if( ERROR( ret ) )
+            break;
+        ret = IncStmCount( strSess );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CFuseSvcServer::OnStreamReadyFuse(
+    HANDLE hStream )
+{
+    gint32 ret = 0;
+    do{
+        if( this->GetState() != stateConnected )
+            break;
+
+        WLOCK_TESTMNT;
+        ret = CreateStmFile( hStream );
+        if( SUCCEEDED( ret ) )
+            break;
+
+        gint32 iRet = 0;
+        CfgPtr pDesc;
+        IConfigDb* ptctx = nullptr;
+        GET_STMDESC_LOCKED( hStream, pDesc );
+        iRet = oCfg.GetPointer(
+            propTransCtx, ptctx );
+        if( ERROR( iRet ) )
+            break;
+
+        stdstr strSess;
+        CCfgOpener oCtx( ptctx ); 
+        iRet = oCtx.GetStrProp(
+            propSessHash, strSess );
+        if( ERROR( iRet ) )
+            break;
+
+        DecStmCount( strSess );
+
+    }while( 0 );
+
+    return ret;
+}
+
+
+gint32 CFuseSvcServer::OnStmClosingFuse(
+    HANDLE hStream )
+{
+    gint32 ret = 0;
+    do{
+        WLOCK_TESTMNT;
+        CfgPtr pDesc;
+        IConfigDb* ptctx = nullptr;
+        GET_STMDESC_LOCKED( hStream, pDesc );
+        ret = oCfg.GetPointer(
+            propTransCtx, ptctx );
+        if( SUCCEEDED( ret ) )
+        {
+            stdstr strSess;
+            CCfgOpener oCtx( ptctx ); 
+            ret = oCtx.GetStrProp(
+                propSessHash, strSess );
+            if( SUCCEEDED( ret ) )
+                DecStmCount( strSess );
+        }
+        stdstr strName;
+        ret = StreamToName( hStream, strName);
+        if( ERROR( ret ) )
+            break;
+        ret = DeleteStmFile( strName );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CFuseSvcServer::AddGroup(
+    guint32 dwGrpId,
+    const GRP_ELEM& oElem )
+{
+    CStdRMutex oLock( GetLock() );
+    gint32 ret = super::AddGroup(
+        dwGrpId, oElem );
+    if( ERROR( ret ) )
+        return ret;
+
+    m_vecGrpIds.push_back( dwGrpId );
+    return STATUS_SUCCESS;
+}
+
+gint32 CFuseSvcServer::RemoveGroup(
+    guint32 dwGrpId )
+{
+    CStdRMutex oLock( GetLock() );
+    gint32 ret = super::RemoveGroup(
+        dwGrpId );
+    if( ERROR( ret ) )
+        return ret;
+
+    bool bFound = false;
+    auto itr = m_vecGrpIds.begin();
+    while( itr != m_vecGrpIds.end() )
+    {
+        if( *itr == dwGrpId )
+        {
+            bFound = true;
+            m_vecGrpIds.erase( itr );
+            break;
+        }
+        ++itr;
+    }
+    if( bFound )
+        return STATUS_SUCCESS;
+
+    return -ENOENT;
 }
 
 } // namespace
@@ -3180,7 +3753,11 @@ static gint32 fuseif_create_req(
         CRpcServices* pSvc = pDir->GetIf();
         CFuseSvcProxy* pProxy = ObjPtr( pSvc );
         CFuseSvcServer* pSvr = ObjPtr( pSvc );
-
+        if( pSvc->GetState() != stateConnected )
+        {
+            ret = -ENOTCONN;
+            break;
+        }
         DIR_SPTR pSvcEnt = nullptr;
         if( pProxy != nullptr )
             pSvcEnt = pProxy->GetSvcDir();
@@ -3236,6 +3813,12 @@ static gint32 fuseif_create_stream(
         if( pIf == nullptr )
         {
             ret = -EACCES;
+            break;
+        }
+
+        if( pIf->GetState() != stateConnected )
+        {
+            ret = -ENOTCONN;
             break;
         }
 

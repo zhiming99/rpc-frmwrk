@@ -150,13 +150,7 @@ static gint32 SafeCallInternal(
             if( bExclusive )
             {
                 WLOCK_TESTMNT0( pSvcDir );
-                if( pSvc->GetState() !=
-                    stateConnected )
-                {
-                    ret = -EIO;
-                    break;
-                }
-                else if( pObj->IsRemoved() )
+                if( pObj->IsRemoved() )
                 {
                     ret = -ENOENT;
                     break;
@@ -167,13 +161,7 @@ static gint32 SafeCallInternal(
             else
             {
                 RLOCK_TESTMNT0( pSvcDir );
-                if( pSvc->GetState() !=
-                    stateConnected )
-                {
-                    ret = -EIO;
-                    break;
-                }
-                else if( pObj->IsRemoved() )
+                if( pObj->IsRemoved() )
                 {
                     ret = -ENOENT;
                     break;
@@ -208,13 +196,6 @@ static gint32 SafeCallInternal(
             {
                 WLOCK_TESTMNT0( pSvcDir );
 
-                if( pSvc->GetState() !=
-                    stateConnected )
-                {
-                    ret = -EIO;
-                    break;
-                }
-
                 CFuseSvcProxy* pProxy = ObjPtr( pSvc );
                 CFuseSvcServer* pSvr = ObjPtr( pSvc );
 
@@ -235,12 +216,6 @@ static gint32 SafeCallInternal(
             else
             {
                 RLOCK_TESTMNT0( pSvcDir );
-                if( pSvc->GetState() !=
-                    stateConnected )
-                {
-                    ret = -EIO;
-                    break;
-                }
 
                 CFuseSvcProxy* pProxy = ObjPtr( pSvc );
                 CFuseSvcServer* pSvr = ObjPtr( pSvc );

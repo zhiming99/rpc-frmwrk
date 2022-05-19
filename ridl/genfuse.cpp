@@ -2894,6 +2894,8 @@ gint32 CImplServiceImplFuse::Output()
             Wa( "    return -EINVAL;" );
             CCOUT << "do";
             BLOCK_OPEN;
+            Wa( "if( this->GetState() != stateConnected )" );
+            Wa( "{ ret = -ENOTCONN; break; }" );
             Wa( "if( !oMsg.isMember( JSON_ATTR_MSGTYPE ) ||");
             Wa( "    !oMsg[ JSON_ATTR_MSGTYPE ].isString() )" );
             Wa( "{ ret = -EINVAL; break; }" );
@@ -3054,6 +3056,8 @@ gint32 CImplServiceImplFuse::Output()
             Wa( "oResp[ JSON_ATTR_METHOD ] = strMethod;" );
             Wa( "oResp[ JSON_ATTR_IFNAME ] = strIfName;" );
             Wa( "oResp[ JSON_ATTR_REQCTXID ] = qwReqId;" );
+            Wa( "if( this->GetState() != stateConnected )" );
+            Wa( "{ ret = -ENOTCONN; break; }" );
             Wa( "CParamList oCtx_( pContext );" );
             std::vector< ObjPtr > vecIfRefs;
             m_pNode->GetIfRefs( vecIfRefs );
