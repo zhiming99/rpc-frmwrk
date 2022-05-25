@@ -2063,8 +2063,20 @@ gint32 CIfStopTask::RunTask()
         if( ret == STATUS_PENDING )
             break;
 
-        pIf->OnPortEvent( eventPortStopped,
-            pIf->GetPortHandle() );
+        HANDLE hPort = pIf->GetPortHandle();
+        if( hPort != INVALID_HANDLE )
+        {
+            pIf->OnPortEvent(
+                eventPortStopped, hPort );
+        }
+        else
+        {
+            // the port is already gone, but the
+            // interface state is out sync
+            pIf->SetStateOnEvent(
+                cmdClosePort );
+        }
+        ret = 0;
 
     }while( 0 );
 

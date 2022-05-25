@@ -63,6 +63,13 @@ struct IStream
         return STATUS_SUCCESS;
     }
 
+    inline guint32 GetStreamCount() const
+    {
+        CRpcServices* pThis = GetInterface();
+        CStdRMutex oIfLock( pThis->GetLock() );
+        return m_mapUxStreams.size();
+    }
+
     inline gint32 AddUxStream(
         HANDLE hChannel, InterfPtr& pIf )
     {

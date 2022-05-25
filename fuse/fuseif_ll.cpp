@@ -83,6 +83,7 @@ static void fuseif_rwinterrupt(
         }
         CFuseFileEntry* pfe = dynamic_cast
             < CFuseFileEntry* >( pObj );
+        if( pfe != nullptr )
         {
             CFuseMutex oLock( pfe->GetLock() );
             pfe->CancelFsRequest( req );

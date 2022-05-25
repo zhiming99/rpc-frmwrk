@@ -383,6 +383,13 @@ do{ \
     ( _stbuf )->st_mtime = GetModifyTime(); \
 }while( 0 )
 
+CFuseRootDir::CFuseRootDir( CRpcServices* pIf ) :
+    super( "/", pIf )
+{
+    SetClassId( clsid( CFuseRootDir ) );
+    SetMode( S_IRUSR | S_IXUSR );
+}
+
 gint32 CFuseRootDir::fs_getattr(
     const char *path,
     fuse_file_info* fi,
@@ -396,7 +403,9 @@ gint32 CFuseRootDir::fs_getattr(
 }
 
 gint32 CFuseDirectory::fs_rmdir(
-    const char *path, fuse_file_info* fi )
+    const char *path,
+    fuse_file_info* fi,
+    bool bReload )
 {
     gint32 ret = 0;
     TaskGrpPtr pStopTasks;
@@ -419,9 +428,15 @@ gint32 CFuseDirectory::fs_rmdir(
         {
             auto pSvc = static_cast
                 < CFuseRootServer* >( pIf );
-            if( !pSvc->CanRemove( path ) )
+            ret = pSvc->CanRemove( path );
+            if( ret == ERROR_FALSE && !bReload )
             {
                 ret = -EACCES;
+                break;
+            }
+            else if( ret == -ENOENT )
+            {
+                ret = 0;
                 break;
             }
         }
@@ -429,9 +444,15 @@ gint32 CFuseDirectory::fs_rmdir(
         {
             auto pSvc = static_cast
                 < CFuseRootProxy* >( pIf );
-            if( !pSvc->CanRemove( path ) )
+            ret = pSvc->CanRemove( path );
+            if( ret == ERROR_FALSE && !bReload )
             {
                 ret = -EACCES;
+                break;
+            }
+            else if( ret == -ENOENT )
+            {
+                ret = 0;
                 break;
             }
         }
@@ -661,6 +682,8 @@ gint32 CFuseDirectory::fs_mkdir(
                 GetFuse(), strPath.c_str() );
         }
 
+        // SetMode( mode );
+
     }while( 0 );
 
     return ret;
@@ -771,6 +794,419 @@ gint32 CFuseTextFile::fs_read(
         bufvec->buf[ 0 ].mem = pBuf->ptr();
         bufvec->buf[ 0 ].size = pBuf->size();
         vecBackup.push_back( pBuf );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CFuseSvcStat::UpdateContent()
+{
+    gint32 ret = 0;
+    do{
+        CRpcServices* pIf = GetIf();
+        if( unlikely( pIf == nullptr ) )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        bool bServer = pIf->IsServer();
+
+        timespec tsNow, tsStart;
+        ret = clock_gettime(
+            CLOCK_REALTIME, &tsNow );
+
+        m_strContent += "CurTime=";
+        char szBuf[ 64 ];
+        szBuf[ sizeof( szBuf ) - 1 ] = 0;
+        snprintf( szBuf,
+            sizeof( szBuf ) - 1,
+            "%ld.%09ld\n",
+            tsNow.tv_sec,
+            tsNow.tv_nsec );
+        m_strContent += szBuf;
+        
+        stdstr strState;
+        EnumIfState iState = pIf->GetState();
+        switch( iState )
+        {
+        case stateStopped:
+            strState = "Stopped";
+            break;
+        case stateStarting:
+            strState = "Starting";
+            break;
+        case stateStarted:
+            strState = "Started";
+            break;
+        case stateConnected:
+            strState = "Connected";
+            break;
+        case stateRecovery:
+            strState = "Recovery";
+            break;
+        case statePaused:
+            strState = "Paused";
+            break;
+        case stateUnknown:
+            strState = "Unknown";
+            break;
+        case stateStopping:
+            strState = "Stopping";
+            break;
+        case statePausing:
+            strState = "Pausing";
+            break;
+        case stateResuming:
+            strState = "Resuming";
+            break;
+        case stateIoDone:
+            strState = "IoDone";
+            break;
+        case stateStartFailed:
+            strState = "StartFailed";
+            break;
+        case stateInvalid:
+        default:
+            strState = "Invalid";
+            break;
+        }
+        m_strContent += "IfStat=";
+        m_strContent += strState + "\n";
+        guint32 dwCount = this->GetActCount();
+        m_strContent += "Objects=";
+
+        m_strContent +=
+            std::to_string( dwCount ) + "\n";
+
+        auto pSvr = dynamic_cast
+            < CFuseSvcServer* >( pIf );
+
+        auto pProxy = dynamic_cast
+            < CFuseSvcProxy* >( pIf );
+
+        time_t uptime;
+        if( SUCCEEDED( ret ) )
+        {
+            if( bServer )
+            {
+                tsStart = pSvr->GetStartTime();
+            }
+            else
+            {
+                tsStart = pProxy->GetStartTime();
+            }
+            uptime =
+                tsNow.tv_sec - tsStart.tv_sec;
+
+            m_strContent += "UpTime=";
+            m_strContent += std::to_string(
+                uptime ) + "\n";
+        }
+
+        stdstr strVal;
+        CCfgOpenerObj oIfCfg( pIf );
+        ret = oIfCfg.GetStrProp(
+            propObjDescPath, strVal );
+        if( SUCCEEDED( ret ) )
+        {
+            m_strContent += "DescFile=";
+            m_strContent += strVal + "\n";
+        }
+       ret = oIfCfg.GetStrProp(
+        propObjName, strVal );
+       if( SUCCEEDED( ret ) )
+       {
+           m_strContent += "ObjName=";
+           m_strContent += strVal + "\n";
+       }
+
+        ret = oIfCfg.GetStrProp(
+            propObjPath, strVal );
+        if( SUCCEEDED( ret ) )
+        {
+            m_strContent += "ObjectPath=";
+            m_strContent += strVal + "\n";
+        }
+
+        CFuseSvcDir* pSvcDir = GetSvcDir( pIf );
+        strVal = pSvcDir->GetName();
+        m_strContent += "SvcName=";
+        m_strContent += strVal + "\n";
+
+        TaskGrpPtr pParaGrp;
+        ret = pIf->GetParallelGrp( pParaGrp );
+        std::vector< TaskletPtr > vecTasks;
+        if( SUCCEEDED( ret ) && bServer )
+        {
+            pParaGrp->FindTaskByClsid(
+                clsid( CIfInvokeMethodTask ),
+                vecTasks );
+            m_strContent += "IncomingReqs=";
+            m_strContent += std::to_string(
+                vecTasks.size() ) + "\n";
+        }
+        else if( SUCCEEDED( ret ) )
+        {
+            pParaGrp->FindTaskByClsid(
+                clsid( CIfIoReqTask ),
+                vecTasks );
+            m_strContent += "OutgoingReqs=";
+            m_strContent += std::to_string(
+                vecTasks.size() ) + "\n";
+        }
+        m_strContent += "IsServer=";
+        strVal = bServer ? "true\n" : "false\n";
+        m_strContent += strVal;
+
+        m_strContent += "StmCount=";
+        auto pStm = dynamic_cast
+            < IStream* >( pIf );
+        strVal = std::to_string( 
+            pStm->GetStreamCount() );
+        m_strContent += strVal + "\n";
+
+        m_strContent += "ReqFiles=";
+        if( bServer )
+        {
+            strVal = std::to_string(
+                pSvr->GetGroupCount() );
+        }
+        else
+        {
+            strVal = std::to_string(
+                pProxy->GetGroupCount() );
+        }
+        m_strContent += strVal + "\n";
+
+    }while( 0 );
+
+    return 0;
+}
+
+gint32 CFuseSvcStat::fs_read(
+    const char* path,
+    fuse_file_info *fi,
+    fuse_req_t req,
+    fuse_bufvec*& bufvec,
+    off_t off, size_t size,
+    std::vector< BufPtr >& vecBackup,
+    fuseif_intr_data* d )
+{
+    gint32 ret = 0;
+    do{
+        if( size == 0 )        
+            break;
+
+        CFuseMutex oLock( GetLock() );
+        m_strContent.clear();
+        UpdateContent();
+        if( off >= m_strContent.size() )
+        {
+            ret = 0;
+            break;
+        }
+
+        size_t dwBytes = std::min(
+            size, m_strContent.size() - off );
+
+        BufPtr pBuf = NewBufNoAlloc(
+            m_strContent.c_str() + off,
+            dwBytes, true );
+
+        bufvec = new fuse_bufvec;
+        *bufvec = FUSE_BUFVEC_INIT( dwBytes );
+        bufvec->buf[ 0 ].mem = pBuf->ptr();
+        bufvec->buf[ 0 ].size = pBuf->size();
+        vecBackup.push_back( pBuf );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CFuseCmdFile::fs_getattr(
+    const char *path,
+    fuse_file_info* fi,
+    struct stat *stbuf)
+{
+    INIT_STATBUF( stbuf );
+    stbuf->st_ino = GetObjId();
+    stbuf->st_mode = S_IFREG | S_IWUSR;
+    stbuf->st_nlink = 1;
+    stbuf->st_size = 0;
+    return 0;
+}
+
+gint32 CFuseCmdFile::fs_open(
+    const char *path,
+    fuse_file_info *fi )
+{
+    if( path == nullptr || fi == nullptr )
+        return -EINVAL;
+
+    CFuseMutex oLock( GetLock() );
+    IncOpCount();
+
+    fi->direct_io = 1;
+    fi->keep_cache = 0;
+    fi->nonseekable = 1;
+    fi->fh = ( guint64 )( CFuseObjBase* )this;
+    return STATUS_SUCCESS;
+}
+
+gint32 CFuseCmdFile::fs_release(
+    const char* path,
+    fuse_file_info * fi )
+{
+    CFuseMutex oLock( GetLock() );
+    DecOpCount();
+    return 0;
+}
+
+gint32 CFuseCmdFile::fs_write_buf(
+    const char* path,
+    fuse_file_info *fi,
+    fuse_req_t req,
+    fuse_bufvec *buf,
+    fuseif_intr_data* d )
+{
+    gint32 ret = 0;
+
+    std::vector< BufPtr > vecOutBufs;
+    ret = CopyFromBufVec( vecOutBufs, buf );
+    if( ERROR( ret ) )
+        return ret;
+
+    do{
+        if( vecOutBufs.size() != 1 )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        BufPtr& pCmd = vecOutBufs.front();
+        if( pCmd->size() <= 2 ||
+            pCmd->size() > REG_MAX_PATH ) 
+        {
+            ret = -EINVAL;
+            break;
+        }
+        char* p = pCmd->ptr();
+        char* pend = pCmd->ptr() + pCmd->size();
+        if( pend[ -1 ] != '\n' )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        --pend;
+        while( p != pend )
+        {
+            if( *p == ' ' )
+                break;
+            ++p;
+        }
+        if( p - pCmd->ptr() == 0 )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        stdstr strCmd( pCmd->ptr(),
+            p - pCmd->ptr() );
+
+        if( strCmd != "restart" &&
+            strCmd != "reload" )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        stdstr strSvc( p + 1, pend - p - 1 );
+        if( !IsValidName( strSvc ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        auto pParent = dynamic_cast
+            < CFuseDirectory* >( GetParent() );
+        auto pSd = pParent->GetChild( strSvc );
+        if( pSd == nullptr && strCmd == "reload" )
+        {
+            TaskletPtr pCallback;
+            ret = pCallback.NewObj(
+                clsid( CIfDummyTask ) );
+            if( ERROR( ret ) )
+                break;
+
+            IEventSink* pDummy = pCallback;
+            fuse_file_info fi1 = {0};
+            fi1.fh = ( intptr_t )pDummy;
+
+            ret = pParent->fs_mkdir(
+                strSvc.c_str(), &fi1, S_IRWXU );
+
+            if( ret == STATUS_PENDING )
+                ret = 0;
+
+            break;
+        }
+        auto pSvcDir = dynamic_cast
+            < CFuseSvcDir* >( pSd );
+        if( pSvcDir == nullptr )
+        {
+            // not a svcpoint directory
+            ret = -EACCES;
+            break;
+        }
+
+        CRpcServices* pIf = pSvcDir->GetIf();
+        if( unlikely( pIf == nullptr ) )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        TaskletPtr pTask;
+        CIoManager* pMgr = pIf->GetIoMgr();
+        if( strCmd == "restart" )
+        {
+            if( pIf->IsServer() )
+            {
+                auto pSvr = dynamic_cast
+                    < CFuseSvcServer* >( pIf );
+                ret = pSvr->RestartSvcPoint(
+                    nullptr );
+            }
+            else
+            {
+                auto pProxy = dynamic_cast
+                    < CFuseSvcProxy* >( pIf );
+                ret = pProxy->RestartSvcPoint(
+                    nullptr );
+            }
+        }
+        else
+        {
+            stdstr strPath;
+            if( pIf->IsServer() )
+            {
+                auto pSvr = dynamic_cast
+                    < CFuseSvcServer* >( pIf );
+                ret = pSvr->ReloadSvcPoint(
+                    nullptr );
+            }
+            else
+            {
+                auto pProxy = dynamic_cast
+                    < CFuseSvcProxy* >( pIf );
+                ret = pProxy->ReloadSvcPoint(
+                    nullptr );
+            }
+        }
+
+        if( ret == STATUS_PENDING )
+            ret = 0;
 
     }while( 0 );
 
@@ -1243,7 +1679,8 @@ gint32 CFuseStmFile::fs_read(
             {
                 BufPtr pBuf = m_queIncoming.back().pBuf;
                 m_queIncoming.pop_back();
-                gint32 (*func)( CRpcServices*, CFuseStmFile*, BufPtr& )=
+                gint32 (*func)( CRpcServices*,
+                    CFuseStmFile*, BufPtr& ) =
                     ([]( CRpcServices* pIf,
                         CFuseStmFile* pFile,
                         BufPtr& pBuf_ )->gint32
@@ -1431,7 +1868,7 @@ gint32 CFuseFileEntry::FillBufVec(
     return ret; 
 }
 
-gint32 CFuseFileEntry::CopyFromPipe(
+gint32 CFuseObjBase::CopyFromPipe(
     BufPtr& pBuf, fuse_buf* src )
 {
     gint32 ret = 0;
@@ -1935,6 +2372,7 @@ gint32 CFuseEvtFile::ReceiveEvtJson(
         while( m_dwBytesAvail > MAX_EVT_QUE_BYTES ||
             m_queIncoming.size() > MAX_EVT_QUE_SIZE )
         {
+            // overflow
             m_dwBytesAvail -=
                 m_queIncoming.front().pBuf->size();
             m_queIncoming.pop_front();
@@ -2186,8 +2624,6 @@ gint32 CFuseEvtFile::do_remove( bool bSched )
 {
     gint32 ret = 0;
     do{
-        CancelFsRequests();
-
         CFuseSvcDir* pParent = static_cast
             < CFuseSvcDir* >( GetParent() );
         if( pParent == nullptr )
@@ -2269,14 +2705,17 @@ gint32 CFuseEvtFile::fs_release(
         if( DecOpCount() > 0 )
             break;
 
+        CancelFsRequests( -ECANCELED );
+        m_queIncoming.clear();
+
+        if( !IsHidden() )
+            break;
+
         if( GetGroupId() == 0 )
         {
             ret = -EACCES;
             break;
         }
-
-        if( !IsHidden() )
-            break;
 
         ret = do_remove( true );
 
@@ -2298,6 +2737,8 @@ gint32 CFuseEvtFile::fs_unlink(
             break;
         }
 
+        CancelFsRequests( -ECANCELED );
+
         if( GetOpCount() > 0 )
         {
             SetHidden();
@@ -2312,7 +2753,7 @@ gint32 CFuseEvtFile::fs_unlink(
     return ret;
 }
 
-gint32 CFuseFileEntry::CopyFromBufVec(
+gint32 CFuseObjBase::CopyFromBufVec(
      std::vector< BufPtr >& vecBuf,
      fuse_bufvec* bufvec )
 {
@@ -2404,6 +2845,52 @@ gint32 CFuseEvtFile::GetReqSize(
     return ret;
 }
 
+gint32 CFuseRespFileSvr::CancelFsRequests(
+    gint32 iRet )
+{
+    gint32 ret = 0;
+    do{
+        // super::CancelFsRequests( iRet );
+        auto pSvr = dynamic_cast
+            < CFuseSvcServer* >( GetIf() );
+
+        if( pSvr == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        std::vector< guint64 > vecTaskIds;
+        CFuseMutex oFileLock( GetLock() );
+        for( auto& elem : m_setTaskIds )
+            vecTaskIds.push_back( elem );
+        m_setTaskIds.clear();
+
+        oFileLock.Unlock();
+
+        TaskGrpPtr pGrp;
+        ret = pSvr->GetParallelGrp( pGrp );
+        if( ERROR( ret ) )
+            break;
+
+        for( auto& elem : vecTaskIds )
+        {
+            TaskletPtr pTask;
+            ret = pGrp->FindTask( elem, pTask );
+            if( ERROR( ret ) )
+                continue;
+
+            CCfgOpener oCfg;
+            oCfg[ propReturnValue ] = iRet;
+            oCfg[ propSeriProto ] = seriRidl;
+            pSvr->OnServiceComplete(
+                oCfg.GetCfg(), pTask );
+        }
+
+    }while( 0 );
+
+    return iRet;
+}
+
 gint32 CFuseRespFileSvr::fs_write_buf(
     const char* path,
     fuse_file_info *fi,
@@ -2416,6 +2903,8 @@ gint32 CFuseRespFileSvr::fs_write_buf(
     CFuseSvcServer* pSvr = ObjPtr( GetIf() );
     if( pSvr == nullptr )
         return -EFAULT;
+
+    CFuseMutex oFileLock( GetLock() );
 
     ret = CopyFromBufVec(
             m_vecOutBufs, bufvec );
@@ -2527,6 +3016,17 @@ gint32 CFuseRespFileSvr::fs_write_buf(
             break;
         }
 
+        if( !valResp.isMember( JSON_ATTR_REQCTXID ) ||
+            !valResp[ JSON_ATTR_REQCTXID ].isUInt64() )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        guint32 dwTaskId =
+            valResp[ JSON_ATTR_REQCTXID ].asUInt64();
+        RemoveTaskId( dwTaskId );
+
         // send the response
         CFuseSvcServer* pSvr = ObjPtr( GetIf() );
         ret = pSvr->DispatchMsg( valResp );
@@ -2547,6 +3047,45 @@ gint32 CFuseRespFileSvr::fs_write_buf(
         m_pReqSize->Resize( 0 );
         m_vecOutBufs.clear();    
     }
+
+    return ret;
+}
+
+gint32 CFuseRespFileSvr::fs_release(
+    const char* path, fuse_file_info * fi )
+{
+    gint32 ret = 0;
+    m_pReqSize->Resize(0);
+    m_vecOutBufs.clear();
+    return super::fs_release( path, fi );
+}
+
+gint32 CFuseReqFileSvr::ReceiveMsgJson(
+    const stdstr& strMsg,
+    guint64 qwReqId )
+{
+    gint32 ret = 0;
+    do{
+        guint32 dwGrpId = GetGroupId();
+        auto pSvr = dynamic_cast
+            < CFuseSvcServer* >( GetIf() );
+        if( unlikely( pSvr == nullptr ) )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        CFuseSvcServer::GRP_ELEM oElem;
+        ret = pSvr->GetGroup( dwGrpId, oElem );
+        if( ERROR( ret ) )
+            break;
+
+        oElem.m_pRespFile->AddTaskId( qwReqId );
+        ret = super::ReceiveEvtJson( strMsg );
+        if( SUCCEEDED( ret ) )
+            break;
+        oElem.m_pRespFile->RemoveTaskId( qwReqId );
+
+    }while( 0 );
 
     return ret;
 }
@@ -2577,12 +3116,12 @@ gint32 CFuseRespFileProxy::CancelFsRequests(
 
         if( vecReqs.empty() )
             break;
+
+        CFuseMutex oFileLock( GetLock() );
         if( GetOpCount() > 0 || !IsHidden() )
         {
             Json::StreamWriterBuilder oBuilder;
             oBuilder["commentStyle"] = "None";
-
-            CFuseMutex oFileLock( GetLock() );
 
             for( auto& elem : vecReqs )
             {
@@ -2629,6 +3168,7 @@ gint32 CFuseReqFileProxy::fs_write_buf(
     if( pProxy == nullptr )
         return -EFAULT;
 
+    CFuseMutex oFileLock( GetLock() );
     ret = CopyFromBufVec(
             m_vecOutBufs, bufvec );
     if( ERROR( ret ) )
@@ -2854,6 +3394,15 @@ gint32 CFuseReqFileProxy::fs_poll(
     return ret;
 }
 
+gint32 CFuseReqFileProxy::fs_release(
+    const char* path, fuse_file_info * fi )
+{
+    gint32 ret = 0;
+    m_pReqSize->Resize(0);
+    m_vecOutBufs.clear();
+    return super::fs_release( path, fi );
+}
+
 CFuseConnDir::CFuseConnDir( const stdstr& strName )
     : super( strName, nullptr )
 {
@@ -2881,6 +3430,15 @@ CFuseConnDir::CFuseConnDir( const stdstr& strName )
     pObj->SetMode( S_IRUSR );
     pObj->DecRef();
     AddChild( pFile );
+
+    // add a WO file as admin-command file
+    auto pCmd = DIR_SPTR(
+        new CFuseCmdFile() ); 
+    pObj = dynamic_cast
+        < CFuseObjBase* >( pCmd.get() );
+    pObj->SetMode( S_IWUSR );
+    pObj->DecRef();
+    AddChild( pCmd );
 }
 
 stdstr CFuseConnDir::GetRouterPath(
@@ -2943,7 +3501,7 @@ gint32 CFuseConnDir::AddSvcDir(
         if( ERROR( ret ) )
             break;
 
-        if( super::GetCount() <= 2 )
+        if( super::GetCount() <= 3 )
         {
             SetConnParams( pConnParams );
         }
@@ -4116,7 +4674,24 @@ int fuseop_rmdir(
 {
     return SafeCall( "rmdir", false,
         &CFuseObjBase::fs_rmdir,
-        path, nullptr );
+        path, nullptr, false );
+}
+
+gint32 fuseif_remkdir(
+    const stdstr& strPath,
+    guint32 dwMode )
+{
+    gint32 ret = 0;
+    ret = SafeCall( "rmdir", false,
+        &CFuseObjBase::fs_rmdir,
+        strPath.c_str(),
+        nullptr, true );
+
+    if( ERROR( ret ) )
+        return ret;
+
+    return fuseop_mkdir(
+        strPath.c_str(), dwMode );
 }
 
 void fuseif_tweak_llops( fuse_session* se );

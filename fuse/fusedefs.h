@@ -63,6 +63,8 @@
 #define CONN_PARAM_FILE "conn_params"
 #define HOP_DIR  "nexthop"
 #define STREAM_DIR "streams"
+#define COMMAND_FILE "commands"
+#define SVCSTAT_FILE "svcstat"
 #define JSON_REQ_FILE "jreq_0"
 #define JSON_RESP_FILE "jrsp_0"
 #define JSON_EVT_FILE "jevt_0"

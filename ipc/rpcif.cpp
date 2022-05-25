@@ -3966,6 +3966,8 @@ gint32 CRpcServices::LoadObjDesc(
 
         oCfg.SetStrProp(
             propObjDescPath, strPath );
+        oCfg.SetStrProp(
+            propObjName, strObjName );
 
         string strSvrName;
         ret = oCfg.GetStrProp(

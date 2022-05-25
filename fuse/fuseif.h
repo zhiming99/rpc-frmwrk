@@ -40,6 +40,7 @@
 #include "fusedefs.h"
 
 struct fuseif_intr_data;
+gint32 fuseif_remkdir( const stdstr&, guint32 );
 
 namespace rpcf
 {
@@ -485,8 +486,19 @@ class CFuseObjBase : public CDirEntry
 
     virtual int fs_rmdir(
         const char *,
-        fuse_file_info* )
+        fuse_file_info*,
+        bool bReload )
     { return -ENOSYS; }
+
+    protected:
+    gint32 CopyFromPipe(
+        BufPtr& pBuf, fuse_buf* src );
+
+    // don't clear vecBuf, which may have contents in
+    // advance
+    gint32 CopyFromBufVec(
+         std::vector< BufPtr >& vecBuf,
+         fuse_bufvec* bufvec );
 };
 
 class CFuseDirectory : public CFuseObjBase
@@ -531,7 +543,8 @@ class CFuseDirectory : public CFuseObjBase
 
     gint32 fs_rmdir(
         const char *,
-        fuse_file_info* ) override;
+        fuse_file_info*,
+        bool bReload ) override;
 };
 
 class CFuseRootDir : public CFuseDirectory
@@ -539,14 +552,9 @@ class CFuseRootDir : public CFuseDirectory
     mutable CSharedLock m_oRootLock;
     public:
     typedef CFuseDirectory super;
-    CFuseRootDir( CRpcServices* pIf ) :
-        super( "/", pIf )
-    {
-        SetClassId( clsid( CFuseRootDir ) );
-        SetMode( S_IRUSR | S_IXUSR );
-    }
 
-    CSharedLock& GetRootLock() const
+    CFuseRootDir( CRpcServices* pIf );
+    inline CSharedLock& GetRootLock() const
     { return m_oRootLock; }
 
     gint32 fs_getattr(
@@ -607,15 +615,6 @@ class CFuseFileEntry : public CFuseObjBase
         std::deque< INBUF >& queBufs,
         std::vector< BufPtr >& vecBufs,
         fuse_bufvec*& bufvec );
-
-    gint32 CopyFromPipe(
-        BufPtr& pBuf, fuse_buf* src );
-
-    // don't clear vecBuf, which may have contents in
-    // advance
-    gint32 CopyFromBufVec(
-         std::vector< BufPtr >& vecBuf,
-         fuse_bufvec* bufvec );
 
     public:
     typedef CFuseObjBase super;
@@ -700,6 +699,7 @@ class CFuseFileEntry : public CFuseObjBase
 
 class CFuseTextFile : public CFuseObjBase
 {
+    protected:
     stdstr m_strContent;
 
     public:
@@ -735,17 +735,24 @@ class CFuseTextFile : public CFuseObjBase
     gint32 fs_open(
         const char *path,
         fuse_file_info *fi ) override;
+
+    gint32 fs_unlink(
+        const char* path,
+        fuse_file_info *fi,
+        bool bSched ) override
+    { return -EACCES;}
+
 };
 
 class CFuseEvtFile : public CFuseFileEntry
 {
     guint32 m_dwGrpId = 0;
-
-    gint32 do_remove( bool bSched );
     guint32 m_dwMsgCount = 0;
     guint32 m_dwMsgRead = 0;
     guint32 m_dwLastOff = 0;
     guint32 m_dwBytesAvail = 0;
+
+    gint32 do_remove( bool bSched );
 
     public:
     typedef CFuseFileEntry super;
@@ -812,6 +819,7 @@ class CFuseRespFileSvr : public CFuseEvtFile
     BufPtr  m_pReqSize;
 
     std::unique_ptr< Json::CharReader > m_pReader;
+    std::set< guint64 > m_setTaskIds;
 
     public:
 
@@ -844,6 +852,26 @@ class CFuseRespFileSvr : public CFuseEvtFile
         fuse_req_t req,
         fuse_bufvec *buf,
         fuseif_intr_data* d ) override;
+
+    inline void AddTaskId( guint64 qwTaskId )
+    {
+        CFuseMutex oLock( GetLock() );
+        m_setTaskIds.insert( qwTaskId );
+    }
+
+    inline void RemoveTaskId( guint64 qwTaskId )
+    {
+        CFuseMutex oLock( GetLock() );
+        m_setTaskIds.erase( qwTaskId );
+    }
+
+    gint32 CancelFsRequests(
+        gint32 iRet ) override;
+
+    gint32 fs_release(
+        const char* path,
+        fuse_file_info * fi ) override;
+
 };
 
 class CFuseReqFileSvr : public CFuseRespFileSvr
@@ -882,16 +910,11 @@ class CFuseReqFileSvr : public CFuseRespFileSvr
 
     gint32 ReceiveMsgJson(
         const stdstr& strMsg,
-        guint64 qwReqId )
-    { return ReceiveEvtJson( strMsg ); }
+        guint64 qwReqId );
 };
 
 class CFuseRespFileProxy : public CFuseEvtFile
 {
-    protected:
-
-    std::vector< BufPtr > m_vecOutBufs;
-    BufPtr  m_pReqSize;
 
     public:
     typedef CFuseEvtFile super;
@@ -899,8 +922,7 @@ class CFuseRespFileProxy : public CFuseEvtFile
     CFuseRespFileProxy(
         const stdstr& strName,
         CRpcServices* pIf ) :
-        super( strName, pIf ),
-        m_pReqSize( true )
+        super( strName, pIf )
     { SetClassId( clsid( CFuseRespFileProxy ) ); }
 
     // receiving the request's response
@@ -915,6 +937,10 @@ class CFuseRespFileProxy : public CFuseEvtFile
 class CFuseReqFileProxy :
     public CFuseRespFileProxy
 {
+    protected:
+    std::vector< BufPtr > m_vecOutBufs;
+    BufPtr  m_pReqSize;
+
     public:
 
     std::unique_ptr< Json::CharReader > m_pReader;
@@ -924,23 +950,13 @@ class CFuseReqFileProxy :
     CFuseReqFileProxy(
         const stdstr& strName,
         CRpcServices* pIf ) :
-            super( strName, pIf )
+            super( strName, pIf ),
+            m_pReqSize( true )
     {
         SetClassId( clsid( CFuseReqFileProxy ) );
         Json::CharReaderBuilder oBuilder;
         m_pReader.reset( oBuilder.newCharReader() );
     }
-
-    /*gint32 fs_read(
-        const char* path,
-        fuse_file_info *fi,
-        fuse_req_t req,
-        fuse_bufvec*& buf,
-        off_t off,
-        size_t size,
-        std::vector< BufPtr >& vecBackup,
-        fuseif_intr_data* d ) override;
-    */
 
     gint32 fs_write_buf(
         const char* path,
@@ -961,6 +977,10 @@ class CFuseReqFileProxy :
         fuse_file_info *fi,
         fuse_pollhandle *ph,
         unsigned *reventsp ) override;
+
+    gint32 fs_release(
+        const char* path,
+        fuse_file_info * fi ) override;
 };
 
 class CFuseStmDir : public CFuseDirectory
@@ -970,6 +990,55 @@ class CFuseStmDir : public CFuseDirectory
     CFuseStmDir( CRpcServices* pIf ) :
         super( STREAM_DIR, pIf )
     { SetClassId( clsid( CFuseStmDir ) ); }
+};
+
+class CFuseSvcStat : public CFuseTextFile
+{
+    public:
+    typedef CFuseTextFile super;
+    CFuseSvcStat( CRpcServices* pIf ) :
+        super( SVCSTAT_FILE )
+    { SetIf( pIf ); }
+
+    gint32 UpdateContent();
+    gint32 fs_read(
+        const char* path,
+        fuse_file_info *fi,
+        fuse_req_t req,
+        fuse_bufvec*& bufvec,
+        off_t off, size_t size,
+        std::vector< BufPtr >& vecBackup,
+        fuseif_intr_data* d );
+};
+
+class CFuseCmdFile : public CFuseObjBase
+{
+    protected:
+
+    public:
+    typedef CFuseObjBase super;
+    CFuseCmdFile() : super()
+    { SetName( COMMAND_FILE ); }
+
+    gint32 fs_getattr(
+        const char *path,
+        fuse_file_info* fi,
+        struct stat *stbuf) override;
+
+    gint32 fs_open(
+        const char *path,
+        fuse_file_info *fi ) override;
+
+    gint32 fs_release(
+        const char* path,
+        fuse_file_info * fi ) override;
+
+    gint32 fs_write_buf(
+        const char* path,
+        fuse_file_info *fi,
+        fuse_req_t req,
+        fuse_bufvec *buf,
+        fuseif_intr_data* d ) override;
 };
 
 class CFuseStmFile : public CFuseFileEntry
@@ -1221,6 +1290,7 @@ class CFuseServicePoint :
     private:
     stdstr m_strSvcPath;
     bool    m_bUnmounted = false;
+    timespec m_tsStartTime;
 
     protected:
     DIR_SPTR m_pSvcDir;
@@ -1232,7 +1302,10 @@ class CFuseServicePoint :
     typedef typename IFBASE( bProxy ) super;
     CFuseServicePoint( const IConfigDb* pCfg ) :
         super( pCfg ), m_dwGrpIdx( 1 )
-    {}
+    {
+        clock_gettime(
+            CLOCK_REALTIME, &m_tsStartTime );
+    }
 
     using super::GetIid;
     const EnumClsid GetIid() const override
@@ -1244,6 +1317,9 @@ class CFuseServicePoint :
         gint32 ret = BuildDirectories();
         return ret; 
     }
+
+    inline timespec GetStartTime() const
+    { return m_tsStartTime; }
 
     inline DIR_SPTR GetSvcDir() const
     { return m_pSvcDir; }
@@ -1284,6 +1360,12 @@ class CFuseServicePoint :
             return -ENOENT;
         m_mapGroups.erase( itr );
         return STATUS_SUCCESS;
+    }
+
+    gint32 GetGroupCount() const
+    {
+        CStdRMutex oLock( this->GetLock() );
+        return m_mapGroups.size();
     }
 
     virtual void AddReqFiles(
@@ -1330,17 +1412,24 @@ class CFuseServicePoint :
             auto pStmDir =
                 new CFuseStmDir( this );
             auto pDir = DIR_SPTR( pStmDir ); 
-            m_pSvcDir->AddChild( pDir );
             pStmDir->DecRef();
             pStmDir->SetMode( S_IRWXU );
+            m_pSvcDir->AddChild( pDir );
 
-            // add an RW stmevt file for stream events
+            /*// add an RW stmevt file for stream events
             auto pStmEvt = 
                 new CFuseStmEvtFile( this );
             auto pFile = DIR_SPTR( pStmEvt ); 
             pDir->AddChild( pFile );
             pStmEvt->DecRef();
-            pStmEvt->SetMode( S_IRUSR );
+            pStmEvt->SetMode( S_IRUSR );*/
+
+            auto pStat=
+                new CFuseSvcStat( this );
+            auto psf = DIR_SPTR( pStat );
+            pStat->DecRef();
+            pStat->SetMode( S_IRUSR );
+            m_pSvcDir->AddChild( psf );
 
         }while( 0 );
 
@@ -1747,58 +1836,26 @@ class CFuseServicePoint :
                 pMgr->GetCmdLineOpt(
                     propConnRecover, bRestart );
 
+                if( bRestart )
+                {
+                    RestartSvcPoint( nullptr );
+                    break;
+                }
+
                 TaskletPtr pStopTask;
                 ret = DEFER_IFCALLEX_NOSCHED2(
                     0, pStopTask, this,
                     &CRpcServices::StopEx, 
                     ( IEventSink* )nullptr );
+
                 if( ERROR( ret ) )
                     break;
 
-                if( bRestart )
-                {
-                    ObjVecPtr pvecMatches( true );
-                    for( auto& elem : this->m_vecMatches )
-                    {
-                        ObjPtr pObj( elem );
-                        ( *pvecMatches )().push_back( pObj );
-                    }
-                    ObjPtr pMatches = pvecMatches;
-
-                    TaskGrpPtr pGrp;
-                    CParamList oParams;
-                    oParams[ propIfPtr ] = ObjPtr( this );
-                    ret = pGrp.NewObj(
-                        clsid( CIfTaskGroup ),
-                        oParams.GetCfg() );
-
-                    TaskletPtr pStartTask;
-                    ret = DEFER_IFCALLEX_NOSCHED2(
-                        0, pStartTask, this,
-                        &CRpcServices::StartEx, 
-                        ( IEventSink* )nullptr );
-                    if( ERROR( ret ) )
-                        break;
-
-                    CCfgOpener oTaskCfg( ( IConfigDb* )
-                        pStartTask->GetConfig() );
-
-                    oTaskCfg.SetObjPtr(
-                        propMatchMap, pMatches );
-
-                    pGrp->SetRelation( logicAND );
-                    pGrp->AppendTask( pStopTask );
-                    pGrp->AppendTask( pStartTask );
-                    pTask = pGrp;
-                }
-                else
-                {
-                    pTask = pStopTask;
-                }
-
                 InterfPtr pRootIf = GetRootIf();
                 CRpcServices* pRootSvc = pRootIf;
-                ret = pRootSvc->AddSeqTask( pTask );
+                ret = pRootSvc->AddSeqTask(
+                    pStopTask );
+
                 break;
             }
         default:
@@ -1815,27 +1872,31 @@ class CFuseServicePoint :
         gint32 ret = 0;
         do{
             if( m_pSvcDir.get() == nullptr )
-                ret = super::StartEx( pCallback );
-            else
             {
-                // restart
-                WLOCK_TESTMNT;
-                CCfgOpenerObj oTaskCfg( pCallback );
-                ObjPtr pMatches;
-                ret = oTaskCfg.GetObjPtr(
-                    propMatchMap, pMatches );
-                if( SUCCEEDED( ret ) )
-                {
-                    ObjVecPtr pvecMatches = pMatches;
-                    this->m_vecMatches.clear();
-                    for( auto& elem : (*pvecMatches)() )
-                    {
-                        MatchPtr pMatch = elem;
-                        this->m_vecMatches.push_back( pMatch );
-                    }
-                }
                 ret = super::StartEx( pCallback );
+                break;
             }
+
+            // restart
+            WLOCK_TESTMNT;
+            CCfgOpenerObj oTaskCfg( pCallback );
+            ObjPtr pMatches;
+            ret = oTaskCfg.GetObjPtr(
+                propMatchMap, pMatches );
+            if( ERROR( ret ) )
+                break;
+            ObjVecPtr pvecMatches = pMatches;
+            auto& vecMatches = this->m_vecMatches;
+            vecMatches.clear();
+            for( auto& elem : (*pvecMatches)() )
+            {
+                MatchPtr pMatch = elem;
+                if( pMatch == this->m_pIfMatch )
+                    continue;
+                vecMatches.push_back( pMatch );
+            }
+            ret = super::StartEx( pCallback );
+
         }while( 0 );
 
         return ret;
@@ -1843,22 +1904,20 @@ class CFuseServicePoint :
 
     gint32 StopEx( IEventSink* pCallback )
     {
+        if( m_pSvcDir.get() == nullptr )
+            return super::StopEx( pCallback );
+
         gint32 ret = 0;
+        bool bUnmounted = true;
         do{
-            if( m_pSvcDir.get() == nullptr )
-                ret = super::StopEx( pCallback );
-            else 
-            {
-                bool bUnmounted = true;
-                do{
-                    WLOCK_TESTMNT;
-                    bUnmounted = false;
-                    ret = super::StopEx( pCallback );
-                }while( 0 );
-                if( bUnmounted )
-                    ret = super::StopEx( pCallback );
-            }
+            WLOCK_TESTMNT;
+            bUnmounted = false;
+            ret = super::StopEx( pCallback );
         }while( 0 );
+
+        if( bUnmounted )
+            ret = super::StopEx( pCallback );
+
         return ret;
     }
 
@@ -1887,6 +1946,131 @@ class CFuseServicePoint :
             pStmFile->NotifyPoll();
 
         }while( 0 );
+
+        return ret;
+    }
+
+    gint32 RestartSvcPoint( IEventSink* pCallback )
+    {
+        gint32 ret = 0;
+        do{
+            TaskletPtr pStopTask;
+            EnumIfState iState = this->GetState();
+            if( iState == stateStopped )
+            {
+                ret = ERROR_STATE;
+                DebugPrintEx( logErr, ret,
+                "Cannot 'restart' when the "
+                "svc point is fully stopped. Use "
+                "'reload' to start the svc point." );
+                break;
+            }
+            else if( iState == stateStarting )
+            {
+                ret = ERROR_STATE;
+                DebugPrintEx( logErr, ret,
+                "Cannot 'restart' when the svc point "
+                "is still in the starting stage. Use "
+                "'reload' to start the svc point." );
+                break;
+            }
+
+            ret = DEFER_IFCALLEX_NOSCHED2(
+                0, pStopTask, this,
+                &CRpcServices::StopEx, 
+                ( IEventSink* )nullptr );
+
+            if( ERROR( ret ) )
+                break;
+
+            ObjVecPtr pvecMatches( true );
+            for( auto& elem : this->m_vecMatches )
+            {
+                ObjPtr pObj( elem );
+                ( *pvecMatches )().push_back( pObj );
+            }
+
+            ObjPtr pMatches = pvecMatches;
+            TaskGrpPtr pGrp;
+            CParamList oParams;
+            oParams[ propIfPtr ] = ObjPtr( this );
+            ret = pGrp.NewObj(
+                clsid( CIfTaskGroup ),
+                oParams.GetCfg() );
+
+            pGrp->SetRelation( logicNONE );
+            if( pCallback != nullptr )
+                pGrp->SetClientNotify( pCallback );
+
+            TaskletPtr pStartTask;
+            ret = DEFER_IFCALLEX_NOSCHED2(
+                0, pStartTask, this,
+                &CRpcServices::StartEx, 
+                ( IEventSink* )nullptr );
+            if( ERROR( ret ) )
+                break;
+
+            CCfgOpener oTaskCfg( ( IConfigDb* )
+                pStartTask->GetConfig() );
+
+            oTaskCfg.SetObjPtr(
+                propMatchMap, pMatches );
+
+            pGrp->AppendTask( pStopTask );
+            pGrp->AppendTask( pStartTask );
+            TaskletPtr pTask = pGrp;
+
+            InterfPtr pRootIf = GetRootIf();
+            CRpcServices* pRootSvc = pRootIf;
+            ret = pRootSvc->AddSeqTask( pTask );
+
+            if( SUCCEEDED( ret ) )
+                ret = pTask->GetError();
+
+            break;
+
+        }while( 0 );
+
+        return ret;
+    }
+
+    gint32 ReloadSvcPoint( IEventSink* pCallback )
+    {
+        gint32 ret = 0;
+        TaskGrpPtr pGrp;
+        do{
+            stdstr strPath;
+            ret = GetSvcPath( strPath );
+            if( ERROR( ret ) )
+                break;
+
+            CFuseSvcDir* pSvcDir = static_cast
+                < CFuseSvcDir* >( GetSvcDir().get() );
+            CIoManager* pMgr = this->GetIoMgr();
+            guint32 dwMode = pSvcDir->GetMode();
+            TaskletPtr pMkDir;
+            ret = NEW_FUNCCALL_TASK( pMkDir,
+                pMgr, fuseif_remkdir, strPath, dwMode );
+            if( ERROR( ret ) )
+                break;
+
+            if( pCallback != nullptr )
+            {
+                CIfRetryTask* pRetry = pMkDir;
+                pRetry->SetClientNotify( pCallback );
+            }
+
+            // start a dedicated thread for this
+            ret = pMgr->RescheduleTask(
+                pMkDir, true );
+
+            if( SUCCEEDED( ret ) )
+                ret = pMkDir->GetError();
+
+        }while( 0 );
+
+        if( ERROR( ret ) && !pGrp.IsEmpty() )
+            ( *pGrp )( eventCancelTask );
 
         return ret;
     }
@@ -2511,7 +2695,7 @@ class CFuseRootBase:
                 ( *pUpdTask )( eventCancelTask );
             else
             {
-                ret = STATUS_PENDING;
+                ret = pUpdTask->GetError();
             }
 
         }while( 0 );
@@ -2533,14 +2717,14 @@ class CFuseRootBase:
         return ret;
     }
 
-    bool CanRemove( const stdstr& strName ) const
+    gint32 CanRemove( const stdstr& strName ) const
     {
         auto itr = m_mapSvcInsts.find( strName );
         if( itr == m_mapSvcInsts.cend() )
-            return false;
+            return -ENOENT;
         if( strName.size() == itr->second )
-            return false;
-        return true;
+            return ERROR_FALSE;
+        return STATUS_SUCCESS;
     }
 
     // add a service point
@@ -2625,6 +2809,24 @@ class CFuseRootBase:
             }
 
         }while( 0 );
+        return ret;
+    }
+    gint32 OnPostStart(
+        IEventSink* pCallback ) override
+    {
+        gint32 ret = 0;
+        if( this->IsServer() )
+        {
+            auto pRoot = GetRootDir();
+            // add a WO file as admin-command file
+            auto pFile = DIR_SPTR(
+                new CFuseCmdFile() ); 
+            auto pObj = dynamic_cast
+                < CFuseObjBase* >( pFile.get() );
+            pObj->SetMode( S_IWUSR );
+            pObj->DecRef();
+            ret = pRoot->AddChild( pFile );
+        }
         return ret;
     }
 };

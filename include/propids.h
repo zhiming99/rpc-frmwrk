@@ -257,6 +257,7 @@ enum EnumPropId : gint32
     propTaskSched,      // type: a string to indicate the type of task scheduler, currently only "RR" for round-robin.
     propConnections,    // type: a guint32 to specify the connections the router has at the moment
     propChanCtx,
+    propObjName,        // type: a string to specify the object in the description file
 
     propReservedEnd = 0x10000000,
     propInvalid = -1, 
