@@ -64,7 +64,7 @@ This project depends on the following 3rd-party packags at runtime:
 [`Wed May 25 2022 10:28:02 PM Beijing`]   
 1. Made the individual `service point` of a mounted file system restartable, and reloadable.
 2. There are still some more tests to do and the documentation for the FUSE integration.
-3. Actually, FUSE integration goes beyond the scope of RPC. It has introduced a new way to build the system when everything is file. It deserves a new project for FUSE integration related staffs.
+3. Actually, FUSE integration goes beyond the scope of RPC. It has introduced a new way to build the system when everything is file. It deserves a new project for FUSE integration related stuffs.
 
 [`Fri May 13 2022 05:05:33 PM Beijing`]    
 1. Fixed the mysterious request dropping issue. There are still two bugs ahead, but should be easier to handle.
