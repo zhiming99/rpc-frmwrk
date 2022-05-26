@@ -908,8 +908,8 @@ gint32 CTcpStreamPdo2::OnReceive(
         }
         else if( ret != ( gint32 )dwBytes )
         {
-            DebugPrint( 0, "Surprise!!!, the bytes"\
-            "returned is not the same as expected" );
+            DebugPrint( 0, "Surprise!!!, the #bytes"
+            "received is not as expected" );
         }
         else
         {

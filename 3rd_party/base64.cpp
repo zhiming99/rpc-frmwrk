@@ -146,7 +146,7 @@ gint32 base64_decode( const char* src_buf, unsigned int in_len, BufPtr& dest_buf
   if( src_buf == nullptr || in_len < 4 )
       return -EINVAL;
 
-  if( in_len % 3 != 0 )
+  if( ( in_len & 3 ) != 0 )
       return -EINVAL;
 
   int i = 0;

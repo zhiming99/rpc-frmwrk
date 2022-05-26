@@ -1077,7 +1077,7 @@ class CFuseStmFile : public CFuseFileEntry
     inline void SetFlowCtrl( bool bFlowCtl )
     { m_bFlowCtrl = bFlowCtl; }
 
-    HANDLE GetStream() const
+    inline HANDLE GetStream() const
     { return m_hStream; }
 
     void SetStream( HANDLE hStream )

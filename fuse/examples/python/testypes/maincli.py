@@ -44,7 +44,7 @@ def test() :
         evtfp = open( evtFile, "rb", buffering=0)
 
         stmFile = svcdir + "/streams/stream_" + num
-        stmfp = open( stmFile, "wb", buffering=0)
+        stmfp = open( stmFile, "w+b", buffering=0)
 
         idx = 1 + int( num ) * 1000
         while True:
@@ -94,9 +94,14 @@ def test() :
             req = BuildReqHdr( "EchoByteArray", idx )
             idx += 1
             binBuf = bytearray("Hello, World!".encode( "UTF-8" ) )
+            binBuf.extend( idx.to_bytes(4, "big") )
+            binBuf.extend( bytearray( 8 * 1024 ) )
+            pos = len(binBuf) - 2
+            binBuf[ pos ] = 0x31
+            binBuf[ pos + 1 ] = 0x32
+
             # bytearray must be base64 encoded before adding
             # to json
-            binBuf.extend( idx.to_bytes(4, "big") )
             res = base64.b64encode(binBuf)
             
             AddParameter( req, "pBuf", res.decode())
@@ -168,11 +173,17 @@ def test() :
             idx += 1
             AddParameter(req, "hstm", "stream_" + num )
             sendReq( reqfp, req )
+            stmfp.write(binBuf[0:64*1024])
             objResp = recvResp( respfp )[0]
             error = objResp[ "ReturnCode"]
             if error < 0 :
                 raise Exception( 'EchoStream %s failed with error %d' % ( num, error ) )
+            else :
+                inputs = [stmfp]
+                notifylist = select.select( inputs, [], [] )
+                binBuf = stmfp.read(8*1024)
             hstmr = objResp[ 'Parameters']["hstmr"]
+            print( binBuf )
             print( 'EchoStream %s completed with %s' % ( num, hstmr ))
             break
 

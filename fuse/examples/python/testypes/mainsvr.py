@@ -6,6 +6,8 @@ import io
 
 import time
 from iolib import *
+mp = '/home/zhiming/mywork/github/rpc-frmwrk/ridl/ftest1/mpsvr'
+
 def BuildRespHdr( methodName : str, idx : int ) -> dict:
         resp = dict()
         # request header, the information can be found
@@ -73,10 +75,32 @@ def EchoNoParams( req : object)->object:
     return resp
 
 def EchoStream( req : object)->object:
+    global mp
     resp = BuildRespHdr('EchoStream', req['RequestId'])
     res = req[ 'Parameters']['hstm']
     print("EchoStream ", res)
     AddParameter(resp, 'hstmr', res)
+    #read content in the stream and echo back
+    try:
+        stmfp = open( mp + "/TestTypesSvc/streams/" + res, "r+b", buffering=0 )
+        inputs = [stmfp]
+        inBuf = bytearray()
+        size = 8 * 1024
+        while size > 0 :
+            notifylist = select.select( inputs, [], [] )
+            data = stmfp.read(8*1024)
+            inBuf.extend( data )
+            size -= len( data )
+        pos = len(inBuf) - 2
+        inBuf[ pos ] = 0x41
+        inBuf[ pos + 1 ] = 0x42
+        stmfp.write(inBuf)
+        stmfp.write(inBuf)
+        stmfp.close()
+
+    except Exception as err:
+            print( err )
+
     return resp
 
 def EchoMany( req : object )->object:
@@ -93,7 +117,7 @@ def EchoMany( req : object )->object:
 
 def test() :
     error = 0
-    mp = '/home/zhiming/mywork/github/rpc-frmwrk/ridl/ftest1/mpsvr'
+    global mp
     srcdir = mp + "/TestTypesSvc"
     reqfp = object()
     respfp = object()

@@ -1973,7 +1973,7 @@ gint32 CFuseStmFile::SendBufVec( OUTREQ& oreq )
         {
             if( IsNonBlock() )
             {
-                ret = pStmSvr->WriteStream(
+                ret = pStmSvr->WriteStreamNoWait(
                     hstm, pBuf );
                 if( ret == STATUS_PENDING )
                     ret = 0;
@@ -1986,7 +1986,7 @@ gint32 CFuseStmFile::SendBufVec( OUTREQ& oreq )
         {
             if( IsNonBlock() )
             {
-                ret = pStmProxy->WriteStream(
+                ret = pStmProxy->WriteStreamNoWait(
                     hstm, pBuf );
                 if( ret == STATUS_PENDING )
                     ret = 0;
@@ -2125,25 +2125,29 @@ gint32 CFuseStmFile::fs_poll(
             *reventsp |= POLLIN;
         gint32 ret = 0;
         guint32 dwSize = 0;
+        bool bCanSend = false;
         {
+            HANDLE hstm = GetStream();
             ObjPtr pObj = GetIf();
             CStreamProxyFuse* pProxy = pObj;
             CStreamServerFuse* pSvr = pObj;
             if( pSvr != nullptr )
             {
                 ret = pSvr->GetPendingBytes(
-                    GetStream(), dwSize );
+                    hstm, dwSize );
+                bCanSend = pSvr->CanSend( hstm );
             }
             else
             {
                 ret = pProxy->GetPendingBytes(
-                    GetStream(), dwSize );
+                    hstm, dwSize );
+                bCanSend = pProxy->CanSend( hstm );
             }
         }
         if( SUCCEEDED( ret ) && dwSize > 0 )
             *reventsp |= POLLIN;
 
-        if( !GetFlowCtrl() )
+        if( !GetFlowCtrl() && bCanSend )
             *reventsp |= POLLOUT;
 
         *reventsp = ( fi->poll_events &

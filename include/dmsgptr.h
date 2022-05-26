@@ -27,7 +27,7 @@
 #include "autoptr.h"
 #include "dbuserr.h"
 
-#define DMSG_MAX_SIZE       16384
+#define DMSG_MAX_SIZE       MAX_BYTES_PER_TRANSFER 
 #define DMSG_FIX_TYPE_SIZE  8
 #define DMSG_MAX_ARGS       16
 
