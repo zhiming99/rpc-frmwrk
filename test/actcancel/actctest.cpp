@@ -202,22 +202,22 @@ void CIfSmokeTest::testCliActCancel()
             if( SUCCEEDED( ret ) )
             {
                 OutputMsg( 0, "Request is successfully cancelled" );
-                break;
             }
             else
             {
                 if( ret == -ENOENT )
                 {
                     OutputMsg( ret, "Request is not found to cancel" );
+                    ret = 0;
                 }
                 else
                 {
                     OutputMsg( ret, "canceling failed" );
-                    break;
                 }
             }
 
         }while( 0 );
+
         if( ERROR( ret ) )
             break;
 
