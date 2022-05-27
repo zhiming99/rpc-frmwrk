@@ -2810,7 +2810,10 @@ gint32 CImplIfMethodSvrFuse::OutputAsyncCancelWrapper()
             Wa( "*/" );
         }
 
-        Wa( "//TODO: clean up the FUSE resources if any" );
+        Wa( "// clean up the FUSE resources" );
+        Wa( "guint64 qwTaskId = pCallback->GetObjId();" );
+        Wa( "CFuseSvcServer* pSvr = ObjPtr( this );" );
+        Wa( "pSvr->OnUserCancelRequest( qwTaskId );" );
 
         BLOCK_CLOSE;
         CCOUT << "while( 0 );";

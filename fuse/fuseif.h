@@ -859,10 +859,14 @@ class CFuseRespFileSvr : public CFuseEvtFile
         m_setTaskIds.insert( qwTaskId );
     }
 
-    inline void RemoveTaskId( guint64 qwTaskId )
+    inline gint32 RemoveTaskId( guint64 qwTaskId )
     {
         CFuseMutex oLock( GetLock() );
-        m_setTaskIds.erase( qwTaskId );
+        size_t count =
+            m_setTaskIds.erase( qwTaskId );
+        if( count > 0 )
+            return STATUS_SUCCESS;
+        return -ENOENT;
     }
 
     gint32 CancelFsRequests(
@@ -872,6 +876,8 @@ class CFuseRespFileSvr : public CFuseEvtFile
         const char* path,
         fuse_file_info * fi ) override;
 
+    gint32 OnUserCancelRequest( guint64 qwReqId )
+    { return RemoveTaskId( qwReqId ); }
 };
 
 class CFuseReqFileSvr : public CFuseRespFileSvr
@@ -2219,6 +2225,8 @@ class CFuseSvcServer :
     gint32 ReceiveMsgJson(
             const stdstr& strMsg,
             guint64 qwReqId );
+
+    gint32 OnUserCancelRequest( guint64 qwReqId );
 
     gint32 AcceptNewStreamFuse(
         IEventSink* pCallback,

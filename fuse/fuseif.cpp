@@ -3029,7 +3029,16 @@ gint32 CFuseRespFileSvr::fs_write_buf(
 
         guint32 dwTaskId =
             valResp[ JSON_ATTR_REQCTXID ].asUInt64();
-        RemoveTaskId( dwTaskId );
+        ret = RemoveTaskId( dwTaskId );
+        if( ERROR( ret ) )
+        {
+            // the request is gone
+            ret = 0;
+            m_pReqSize->Resize( 0 );
+            if( m_vecOutBufs.empty() )
+                break;
+            continue;
+        }
 
         // send the response
         CFuseSvcServer* pSvr = ObjPtr( GetIf() );
@@ -3956,6 +3965,42 @@ gint32 CFuseSvcProxy::OnStmClosingFuse(
         if( ERROR( ret ) )
             break;
         ret = DeleteStmFile( strName );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CFuseSvcServer::OnUserCancelRequest(
+    guint64 qwReqId )
+{
+    gint32 ret = 0;
+    do{
+        std::vector< CFuseRespFileSvr* >
+            vecRespFile;
+
+        RLOCK_TESTMNT;
+
+        CStdRMutex oLock( GetLock() );
+        for( auto& elem : m_mapGroups )
+        {
+            auto pRespFile =
+                elem.second.m_pRespFile;
+            vecRespFile.push_back( pRespFile );
+        }
+        oLock.Unlock();
+        for( auto& elem : vecRespFile )
+        {
+            ret = elem->OnUserCancelRequest(
+                qwReqId );
+            if( SUCCEEDED( ret ) )
+            {
+                DebugPrint( 0,
+                    "Fuse Request %lld canceled", 
+                    qwReqId );
+                break;
+            }
+        }
 
     }while( 0 );
 
