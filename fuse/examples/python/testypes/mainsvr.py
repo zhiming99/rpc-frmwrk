@@ -1,3 +1,4 @@
+#!/bin/python3
 import os
 import sys
 import json
@@ -6,7 +7,7 @@ import io
 
 import time
 from iolib import *
-mp = '/home/zhiming/mywork/github/rpc-frmwrk/ridl/ftest1/mpsvr'
+svcdir = str()
 
 def BuildRespHdr( methodName : str, idx : int ) -> dict:
         resp = dict()
@@ -75,14 +76,14 @@ def EchoNoParams( req : object)->object:
     return resp
 
 def EchoStream( req : object)->object:
-    global mp
+    global svcdir
     resp = BuildRespHdr('EchoStream', req['RequestId'])
     res = req[ 'Parameters']['hstm']
     print("EchoStream ", res)
     AddParameter(resp, 'hstmr', res)
     #read content in the stream and echo back
     try:
-        stmfp = open( mp + "/TestTypesSvc/streams/" + res, "r+b", buffering=0 )
+        stmfp = open( svcdir + "/streams/" + res, "r+b", buffering=0 )
         inputs = [stmfp]
         inBuf = bytearray()
         size = 8 * 1024
@@ -117,8 +118,7 @@ def EchoMany( req : object )->object:
 
 def test() :
     error = 0
-    global mp
-    srcdir = mp + "/TestTypesSvc"
+    global svcdir
     reqfp = object()
     respfp = object()
 
@@ -134,11 +134,12 @@ def test() :
          }
 
     try:
-        num = sys.argv[1]
-        reqFile = srcdir + "/jreq_" + num
+        num = sys.argv[2]
+        svcdir = sys.argv[1]
+        reqFile = svcdir + "/jreq_" + num
         reqfp = open( reqFile, "rb" )
 
-        respFile = srcdir + "/jrsp_" + num
+        respFile = svcdir + "/jrsp_" + num
         respfp = open( respFile, "wb")
         count = 0
 
@@ -181,6 +182,9 @@ def test() :
 
     except Exception as err:
         print( err )
+        print( "usage: mainsvr.py <service path> <req num>")
+        print( "\t<service path> is /'path to mountpoint'/TestTypesSvc")
+        print( "\t<req num> is the suffix of the req file under <service path>" )
         reqfp.close()
         respfp.close()
         evtfp.close()

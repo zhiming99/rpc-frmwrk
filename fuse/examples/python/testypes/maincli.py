@@ -1,3 +1,4 @@
+#!/bin/python3
 import os
 import sys
 import json
@@ -28,11 +29,11 @@ def AddParameter( req : dict, paramName : str, val : object ) :
 
 def test() :
     error = 0
-    mp = '/home/zhiming/mywork/github/rpc-frmwrk/ridl/ftest1/mp'
-    svcdir = mp + "/connection_0/TestTypesSvc"
     reqfp = object()
     respfp = object()
-    num = sys.argv[1]
+
+    svcdir = sys.argv[1]
+    num = sys.argv[2]
     try:
         reqFile = svcdir + "/jreq_" + num
         reqfp = open( reqFile, "wb", buffering=0 )
@@ -194,6 +195,9 @@ def test() :
         
     except Exception as err:
         print( "error is", err )
+        print( "usage: maincli.py <service path> <req num>")
+        print( "\t<service path> is /'path to mountpoint'/connection_X/TestTypesSvc")
+        print( "\t<req num> is the suffix of the req file under <service path>" )
         error = -err.errno
         reqfp.close()
         respfp.close()
