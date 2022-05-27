@@ -160,3 +160,5 @@ def recvReq( reqfp : object ) -> [object]:
 def sendResp( respfp : object, resp:object ) :
     sendReq( respfp, resp )
 
+def sendEvent( respfp : object, evt:object ) :
+    sendReq( respfp, evt )
