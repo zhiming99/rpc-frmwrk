@@ -164,7 +164,7 @@ void fuseif_complete_read(
     }
     else
     {
-        fuse_reply_err( req, ret );
+        fuse_reply_err( req, -ret );
     }
     if( buf != nullptr )
         fuseif_free_buf( buf );
@@ -222,7 +222,7 @@ void fuseif_ll_write_buf(fuse_req_t req,
             fuse_reply_write(
                 req, fuseif_buf_size( buf ) );
         else
-            fuse_reply_err( req, ret );
+            fuse_reply_err( req, -ret );
 
     }while( 0 );
 
