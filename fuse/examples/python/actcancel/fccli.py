@@ -34,12 +34,14 @@ def fctest() :
                     continue
                 break
 
-        stmfd.close()
+        stmfp.close()
     except Exception as err:
         print( err )
+        error = err.errno
         print( "usage: fctest.py <service path>")
-        print( "\t<service path> is /'path to mountpoint'/connection_X/ActiveCancel")
-        stmfd.close()
+        print( "\t<service path> is /'path to mountpoint'/ActiveCancel on server side ")
+        print( "\tor /'path to mountpoint'/connection_X/ActiveCancel on proxy side")
+        stmfp.close()
     finally :
         return error
 
