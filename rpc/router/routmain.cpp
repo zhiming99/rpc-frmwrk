@@ -219,6 +219,18 @@ void CIfRouterTest::testSvrStartStop()
     return;
 }
 
+void Usage( char* szName )
+{
+    fprintf( stderr,
+        "Usage: %s [ -r <role number, 1: reqfwrd, 2: bridge>, mandatory ]\n"
+        "\t [ -a to enable authentication ]\n"
+        "\t [ -c to establish a seperate connection to the same bridge per client, only for role 1 ]\n"
+        "\t [ -f to enable request-based flow control on the gateway bridge, ignore it if no massive connections ]\n"
+        "\t [ -s < Service Name for authentication, valid for role 2 or 3, and ignored for role 1 > ]\n"
+        "\t [ -h this help ]\n",
+        szName );
+}
+
 int main( int argc, char** argv )
 {
     CppUnit::TextUi::TestRunner runner;
@@ -227,7 +239,8 @@ int main( int argc, char** argv )
 
     int opt = 0;
     int ret = 0;
-    while( ( opt = getopt( argc, argv, "r:acfs:" ) ) != -1 )
+    bool bRole = false;
+    while( ( opt = getopt( argc, argv, "hr:acfs:" ) ) != -1 )
     {
         switch (opt)
         {
@@ -236,6 +249,7 @@ int main( int argc, char** argv )
                 g_dwRole = ( guint32 )atoi( optarg );
                 if( g_dwRole == 0 || g_dwRole > 3 )
                     ret = -EINVAL;
+                bRole = true;
                 break;
             }
         case 'a':
@@ -258,10 +272,19 @@ int main( int argc, char** argv )
                 g_bRfc = true;
                 break;
             }
+        case 'h':
+            {
+                Usage( argv[ 0 ] );
+                exit(0);
+            }
         default: /*  '?' */
             ret = -EINVAL;
             break;
         }
+
+        if( ERROR( ret ) )
+            break;
+
         if( !g_bAuth )
         {
             if( g_strService.size() > 0 )
@@ -281,15 +304,9 @@ int main( int argc, char** argv )
             break;
     }
 
-    if( ERROR( ret ) )
+    if( ERROR( ret ) || !bRole )
     {
-        fprintf( stderr,
-            "Usage: %s [-r <role number, 1: reqfwrd, 2: bridge, 3: both>, mandatory ]\n"
-            "\t [-a to enable authentication ]\n"
-            "\t [-c to establish a seperate connection to the same bridge per client, only for role 1]\n"
-            "\t [-f to enable request-based flow control on the gateway bridge, ignore it if no massive connections ]\n"
-            "\t [-s < Service Name for authentication, valid for role 2 or 3, and ignored for role 1 >]\n",
-            argv[ 0 ] );
+        Usage( argv[ 0 ] );
         exit( -ret );
     }
 
