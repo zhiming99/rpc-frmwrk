@@ -1,6 +1,6 @@
 ### The Introduction to FUSE Integration and the `rpcfs` filesystem
 This module enables `rpc-frmwrk` to operate via a set of files as known as the FUSE, the userspace filesystem, which makes `rpc-frmwrk` unique among all the RPC systems on the planet. And it has the following major features:
-  * You can generate the RPC filesystem for both server/client side by the `ridl` file fully automatically.
+  * You can generate the RPC filesystem for both server/client side with an `ridl` file fully automatically.
   * All the requests/responses/events are sent and received by reading/writing specific files.
   * The difference of synch/async programming depends only on how you polling the respective file descriptiors. 
   * The request/response/events are in JSON format, and programming language neutral.
@@ -17,6 +17,10 @@ This module enables `rpc-frmwrk` to operate via a set of files as known as the F
 ![this screenshot](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/rpcfs-cli.png)   
 The above picture is the directory hierarchy of a client side `rpcfs`. The blue texts are directories, and the white texts are regular files.
 
-### 
-
+### How to Make an RPC call via `rpcfs`
+Let's use the above example client side `rpcfs` to illustrate the control flow, as shows in the following graph.   
+* The following graph shows a client side processing sequence   
+![sync-async call](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/sync-async.png)   
+* The following graph shows a server side processing sequence   
+![sync-async call](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/sync-async-svr.png)   
   
