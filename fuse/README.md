@@ -11,8 +11,8 @@ This module enables `rpc-frmwrk` to operate via a set of files as known as the F
   * You can increase the extent of concurrency and resource load for request handling by sharing the fd between thread, 
     or creating new request files `jreq_XXX` , or adding new instances of `service point` on both client and server sides.
     And you can reduce the resource load by `rm jreq_1` or `rmdir service_point` or your favorite file removing functions. 
-  * Monitoring the working status of `service point` via `svcstat` files.
-  * Restart/reload individual `service point` with the `commands` file.
+  * Monitoring the working status of `service point` with the read-only file `svcstat`.
+  * Restarting/reloading/adding individual `service point`.
 
 ### The Structures of Generated `rpcfs` Filesystems.
 ![this screenshot](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/rpcfs-cli.png)   
@@ -21,9 +21,9 @@ The above picture shows the directory hierarchy of a client side `rpcfs`. The bl
 The above picture shows the directory hierarchy of a server side `rpcfs`. Notice the differences from the client side `rpcfs`.   
 ### A Closer Look of the Business Code Interacting With `rpcfs`
 Let's use the above client side `rpcfs` to illustrate the control flow as the example.   
-* The following graph shows a client side flow chart.   
+* The following graph shows a simple synchronous client side flow chart, as well as a simple asynchronous one.   
 ![sync-async call](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/sync-async.png)   
-* The following graph shows a server side flow chart.   
+* The following graph shows a simple synchronous server side flow chart, as well as a simple asynchronouse one.   
 ![sync-async call](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/sync-async-svr.png)   
 
 ### RPC Request/Response/Event format
