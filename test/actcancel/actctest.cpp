@@ -198,6 +198,10 @@ void CIfSmokeTest::testCliActCancel()
         OutputMsg( 0, "testing sync canceling..." );
         CPPUNIT_ASSERT( qwTaskId != 0 );
         do{
+            // if no wait, the canceling request has a
+            // chance to arrive ahead of the request to
+            // cancel.
+            sleep( 2 );
             ret = pCli->CancelRequest( qwTaskId );
             if( SUCCEEDED( ret ) )
             {
@@ -208,7 +212,6 @@ void CIfSmokeTest::testCliActCancel()
                 if( ret == -ENOENT )
                 {
                     OutputMsg( ret, "Request is not found to cancel" );
-                    ret = 0;
                 }
                 else
                 {
@@ -243,6 +246,7 @@ void CIfSmokeTest::testCliActCancel()
             if( ERROR( ret ) )
                 break;
 
+            sleep( 2 );
             ret = pCli->CancelReqAsync(
                 pTask, qwTaskId );
 
