@@ -14,5 +14,6 @@ This module enables `rpc-frmwrk` to operate via a set of files as known as the F
   * Monitoring the working status of `service point` via `svcstat` files.
 
 ### Illustration of the Directory Hierarchy of a generated filesystem.
+[this screenshot](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/rpcfs-cli.png)
 
   
