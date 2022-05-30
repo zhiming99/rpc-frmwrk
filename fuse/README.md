@@ -8,24 +8,25 @@ This module enables `rpc-frmwrk` to operate via a set of files as known as the F
   * You can create stream channels by `touch stream_0`, any `open_file` function call of your programming language.
     The stream channel is similiar to a Unix Domain Socket over the internet connection, and protected
     transparently by double encrypted channel of SSL & kerberos.
-  * You can increase the concurrency of request handling by sharing the fd between thread, 
-    creating new request files `jreq_1` , or adding new instances of `service_point` on both client and server sides.
-    And you can reduce the resource occupation by `rm jreq_1` or `rmdir service_point` or your favorite file removing functions. 
+  * You can increase the extent of concurrency and resource load for request handling by sharing the fd between thread, 
+    or creating new request files `jreq_XXX` , or adding new instances of `service point` on both client and server sides.
+    And you can reduce the resource load by `rm jreq_1` or `rmdir service_point` or your favorite file removing functions. 
   * Monitoring the working status of `service point` via `svcstat` files.
+  * Restart/reload individual `service point` with the `commands` file.
 
 ### The Structures of Generated `rpcfs` Filesystems.
 ![this screenshot](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/rpcfs-cli.png)   
 The above picture shows the directory hierarchy of a client side `rpcfs`. The blue texts are directories, and the white texts are regular files.   
 ![this screenshot](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/rpcfs-svr.png)   
-The above picture shows the directory hierarchy of a server side `rpcfs`. Notice the difference from the client side `rpcfs`.   
-### A Close Look of Your Business Code Interacting With `rpcfs`
+The above picture shows the directory hierarchy of a server side `rpcfs`. Notice the differences from the client side `rpcfs`.   
+### A Closer Look of the Business Code Interacting With `rpcfs`
 Let's use the above client side `rpcfs` to illustrate the control flow as the example.   
 * The following graph shows a client side flow chart.   
 ![sync-async call](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/sync-async.png)   
 * The following graph shows a server side flow chart.   
 ![sync-async call](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/sync-async-svr.png)   
 
-### RPC Request/Response/Event format in JSON
+### RPC Request/Response/Event format
 ### Using Streams
-### Monitoring the Working Status of a Service Point
+### Restart/Reload a Service Point
   
