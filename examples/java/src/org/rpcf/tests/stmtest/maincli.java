@@ -147,6 +147,8 @@ public class maincli
                 }
             }
         }while(false);
+        rpcbase.JavaOutputMsg(
+                 "Quit with status: " + ret);
         if( oSvcCli != null)
             oSvcCli.stop();
         m_oCtx.stop();
