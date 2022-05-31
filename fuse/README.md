@@ -32,6 +32,6 @@ Let's use the above client side `rpcfs` to illustrate the control flow as the ex
 ### Terminology
   * `rpcfs` is  an RPC interface through filesystem, but not a filesystem accessed via RPC.
   * `service point` is either the server object or proxy object at the either end of an RPC connection.
-  * `jreq_0` is a name of a file to input requests on client side or ouput requests on the server side. The name has a fixed prefix `jreq_` followed by a   customized string. There are jrsp_0 and jevt_0 too if there is a jreq_0. And the jrsp_0 is for the respones of the requests sent via jreq_0 on the client side.
+  * `jreq_0` is a name of a file to input requests on client side or ouput requests on the server side. The name has a fixed prefix `jreq_` followed by a   customized string. There are `jrsp_0` and `jevt_0` too if there is a `jreq_0`. And the `jrsp_0` is for the respones of the requests sent via `jreq_0` on the client side. While `jevt_0` receives a copy of event message from the server, the same as that going to `jevt_1`, `jevt_hello`, or whatever.
 
   
