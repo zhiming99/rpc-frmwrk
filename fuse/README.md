@@ -28,14 +28,19 @@ Let's use the above generated `rpcfs` to illustrate the control flow.
 ![sync-async call](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/sync-async-svr.png)   
 
 ### RPC Request/Response/Event format
-. A formal request consists two parts, a network-order 32bit `length` followed by a JSON string, without `\0`. The following picture shows the request/response and relationships with the [`ridl`](https://github.com/zhiming99/rpc-frmwrk/blob/master/examples/hellowld.ridl) file.   
-![req/resp format](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/ridl-req-mapping.png) 
+* A formal request consists two parts, a network-order 32bit `string length` followed by a JSON string, without `\0`. The following picture shows the request/response and relationships with the [`ridl`](https://github.com/zhiming99/rpc-frmwrk/examples/hellowld.ridl) file. For detail information about `ridl`, please refer to this [article](https://github.com/zhiming99/rpc-frmwrk/blob/master/ridl/README.md)   
+![req/resp format](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/ridl-req-mapping.png)    
 
 ### Using Streams
-### Restart/Reload a Service Point
+* Stream is a binary channel between the server and the proxy. Stream files are those files created under `streams` directory, as shown in the above picture. There is a pair of stream files sharing the same name the `steams` directory on the both end of the RPC connection. The proxy side stream file is always first created, and then the server side is created. The server side cannot create the stream file on its own.
+* Unlike the req file, the resp file or the event file, which can do single direction transfer, the stream channel is a full duplex byte stream channel, and you can read/write the file concurrently. 
+* The stream channel has flow control, and if the peer has too many data accumulated in the stream file, the sending party will fail till the peer has consumed some of them, that is, `write` operation will fail with `EAGAIN` till flow control lifted.   
+
+### Managing a Service Point
+
 ### Terminology
-  * `rpcfs` is  an RPC interface through filesystem, but not a filesystem accessed via RPC.
+  * `rpcfs` is  an RPC system with the file system as its interface, but not a filesystem accessed via RPC.
   * `service point` is either the server object or proxy object at the either end of an RPC connection.
-  * `jreq_0` is a name of a file to input requests on client side or ouput requests on the server side. The name has a fixed prefix `jreq_` followed by a   customized string. There are `jrsp_0` and `jevt_0` too if there is a `jreq_0`. And the `jrsp_0` is for the respones of the requests sent via `jreq_0` on the client side. While `jevt_0` receives a copy of event message from the server, the same as that going to `jevt_1`, `jevt_hello`, or whatever.
+  * `jreq_0` is a name of a file to input requests on client side or ouput requests on the server side. The name has a fixed prefix `jreq_` followed by a   customized string. There are `jrsp_0` and `jevt_0` too if there is a `jreq_0`. And the `jrsp_0` is for the respones of the requests sent via `jreq_0` on the client side. While `jevt_0` receives a copy of event message from the server, the same as that goes to `jevt_1`, `jevt_hello`, or whatever if exists.
 
   
