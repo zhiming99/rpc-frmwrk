@@ -12,7 +12,7 @@ This module enables `rpc-frmwrk` to operate via a set of files as known as the F
     or creating new request files `jreq_XXX` , or adding new instances of `service point` on both client and server sides.
     And you can reduce the resource load by `rm jreq_1` or `rmdir service_point` or your favorite file removing functions. 
   * Monitoring the working status of `service point` with the read-only file `svcstat`.
-  * Restarting/reloading/adding individual `service point`.
+  * Restarting/reloading individual `service point`.
 
 ### The Structures of Generated `rpcfs` Filesystems.
 ![this screenshot](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/rpcfs-cli.png)   
