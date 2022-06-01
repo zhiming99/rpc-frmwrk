@@ -13,6 +13,7 @@ This module enables `rpc-frmwrk` to operate via a set of files as known as the F
     And you can reduce the resource load by `rm jreq_1` or `rmdir service_point` or your favorite file removing functions. 
   * Monitoring the working status of `service point` with the read-only file `svcstat`.
   * Restarting/reloading individual `service point`.
+  * Supported filesystem operations: `open` `close` `read` `write` `unlink` `stat` `rmdir` `mkdir` `readdir` `releasedir` `poll` `ioctl` 
 
 ### The Structures of Generated `rpcfs` Filesystems.
 ![this screenshot](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/rpcfs-cli.png)   
@@ -27,6 +28,19 @@ Let's use the above client side `rpcfs` to illustrate the control flow as the ex
 ![sync-async call](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/sync-async-svr.png)   
 
 ### RPC Request/Response/Event format
+. A formal request consists two parts, a network-order 32bit `length` followed by a JSON string, without `\0`. The example JSON string looks like
+```
+{
+    'Interface': 'ITestTypes',
+    'MessageType': 'req',
+    'Method': 'Echo',
+    'RequestId': 2,
+    'Parameters':
+    {
+        'strText': 'Hello, World!'
+    }
+}
+```
 ### Using Streams
 ### Restart/Reload a Service Point
 ### Terminology
