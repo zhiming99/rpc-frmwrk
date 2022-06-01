@@ -4320,6 +4320,8 @@ gint32 CImplJavaMainCli::Output()
         NEW_LINE;
         Wa( "finally" );
         BLOCK_OPEN;
+        Wa( "rpcbase.JavaOutputMsg(" );
+        Wa( "    \"Quit with status: \" + ret);" );
         Wa( "if( oSvc != null )" );
         Wa( "    oSvc.stop();" );
         Wa( "m_oCtx.stop();" );
@@ -4423,6 +4425,8 @@ gint32 CImplJavaMainSvr::Output()
         NEW_LINE;
         Wa( "finally" );
         BLOCK_OPEN;
+        Wa( "rpcbase.JavaOutputMsg(" );
+        Wa( "    \"Quit with status: \" + ret);" );
         Wa( "if( oSvc != null )" );
         Wa( "    oSvc.stop();" );
         Wa( "m_oCtx.stop();" );

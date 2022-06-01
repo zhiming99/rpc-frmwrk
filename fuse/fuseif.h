@@ -1695,6 +1695,8 @@ class CFuseServicePoint :
             ret = _pSvcDir->GetChildren(
                 vecChildren );
 
+            oSvcLock.Unlock();
+
             for( auto& elem : vecChildren )
             {
                 auto pFile =
@@ -1705,8 +1707,6 @@ class CFuseServicePoint :
                 _pSvcDir->RemoveChild(
                         elem->GetName() );
             }
-
-            oSvcLock.Unlock();
 
             ObjPtr pIf = this;
             for( auto& elem : vecStreams )

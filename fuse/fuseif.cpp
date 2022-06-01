@@ -2863,7 +2863,10 @@ gint32 CFuseRespFileSvr::CancelFsRequests(
             ret = -EFAULT;
             break;
         }
-        std::vector< guint64 > vecTaskIds;
+
+        QwVecPtr pqwVec( true );
+        std::vector< guint64 >& vecTaskIds =
+            ( *pqwVec )();
         CFuseMutex oFileLock( GetLock() );
         for( auto& elem : m_setTaskIds )
             vecTaskIds.push_back( elem );
@@ -2871,24 +2874,44 @@ gint32 CFuseRespFileSvr::CancelFsRequests(
 
         oFileLock.Unlock();
 
-        TaskGrpPtr pGrp;
-        ret = pSvr->GetParallelGrp( pGrp );
+        // cannot cancel the task directly within an
+        // exclusive lock, let's schedule a task.
+        gint32 (*func)( CFuseSvcServer*, ObjPtr, gint32 ) =
+        ([]( CFuseSvcServer* pSvr,
+            ObjPtr pvecIds, gint32 iRet )->gint32
+        {
+            gint32 ret = 0;
+            TaskGrpPtr pGrp;
+            ret = pSvr->GetParallelGrp( pGrp );
+            if( ERROR( ret ) )
+                return ret;
+            QwVecPtr pqwVec = pvecIds;
+            std::vector< guint64 >& vecTaskIds =
+                ( *pqwVec )();
+            for( auto& elem : vecTaskIds )
+            {
+                TaskletPtr pTask;
+                ret = pGrp->FindTask( elem, pTask );
+                if( ERROR( ret ) )
+                    continue;
+
+                CCfgOpener oCfg;
+                oCfg[ propReturnValue ] = iRet;
+                oCfg[ propSeriProto ] = seriRidl;
+                pSvr->OnServiceComplete(
+                    oCfg.GetCfg(), pTask );
+            }
+            return 0;
+        });
+
+        TaskletPtr pTask;
+        CIoManager* pMgr = pSvr->GetIoMgr();
+        ret = NEW_FUNCCALL_TASK( pTask, pMgr,
+            func, pSvr, pqwVec, iRet );
         if( ERROR( ret ) )
             break;
 
-        for( auto& elem : vecTaskIds )
-        {
-            TaskletPtr pTask;
-            ret = pGrp->FindTask( elem, pTask );
-            if( ERROR( ret ) )
-                continue;
-
-            CCfgOpener oCfg;
-            oCfg[ propReturnValue ] = iRet;
-            oCfg[ propSeriProto ] = seriRidl;
-            pSvr->OnServiceComplete(
-                oCfg.GetCfg(), pTask );
-        }
+        ret = pMgr->RescheduleTask( pTask );
 
     }while( 0 );
 
@@ -3027,7 +3050,7 @@ gint32 CFuseRespFileSvr::fs_write_buf(
             break;
         }
 
-        guint32 dwTaskId =
+        guint64 dwTaskId =
             valResp[ JSON_ATTR_REQCTXID ].asUInt64();
         ret = RemoveTaskId( dwTaskId );
         if( ERROR( ret ) )
