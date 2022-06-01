@@ -34,9 +34,10 @@ Let's use the above generated `rpcfs` to illustrate the control flow.
 ### Using Streams
 * Stream is a binary channel between the server and the proxy. Stream files are those files created under `streams` directory, as shown in the above picture. There is a pair of stream files sharing the same name the `steams` directory on the both end of the RPC connection. The proxy side stream file is always first created, and then the server side is created. The server side cannot create the stream file on its own.
 * Unlike the req file, the resp file or the event file, which can do single direction transfer, the stream channel is a full duplex byte stream channel, and you can read/write the file concurrently. 
-* The stream channel has flow control, and if the peer has too many data accumulated in the stream file, the sending party will fail till the peer has consumed some of them, that is, `write` operation will fail with `EAGAIN` till flow control lifted.
+* The stream channel has flow control, and if the peer has too many data accumulated in the stream file, the sending party will fail till the peer has consumed some of them, that is, `write` operation will fail with `EAGAIN` till flow control lifted.   
 
-### Restart/Reload a Service Point
+### Managing a Service Point
+
 ### Terminology
   * `rpcfs` is  an RPC system with the file system as its interface, but not a filesystem accessed via RPC.
   * `service point` is either the server object or proxy object at the either end of an RPC connection.
