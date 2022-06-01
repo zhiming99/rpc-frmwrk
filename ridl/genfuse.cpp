@@ -1519,7 +1519,7 @@ gint32 CDeclServiceImplFuse::Output()
                 << "super( pCfg )";
             INDENT_DOWN;
             NEW_LINE;
-            CCOUT << "{}";
+            CCOUT << "{ SetClassId( clsid(" << strClass << " ) ); }";
             NEW_LINES( 2 );
 
             Wa( "std::hashmap< guint64, guint64 >" );
@@ -1696,7 +1696,7 @@ gint32 CDeclServiceImplFuse::Output()
             << "super( pCfg )";
         INDENT_DOWN;
         NEW_LINE;
-        CCOUT << "{}";
+        CCOUT << "{ SetClassId( clsid(" << strClass << " ) ); }";
         NEW_LINES( 2 );
 
         Wa( "//Response&Event Dispatcher" );

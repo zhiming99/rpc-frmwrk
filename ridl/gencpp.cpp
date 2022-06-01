@@ -3474,7 +3474,7 @@ gint32 CDeclServiceImpl::Output()
                 << "super( pCfg )";
             INDENT_DOWN;
             NEW_LINE;
-            CCOUT << "{}";
+            CCOUT << "{ SetClassId( clsid(" << strClass << " ) ); }";
             NEW_LINES( 2 );
 
             if( m_pNode->IsStream() )
@@ -3542,7 +3542,7 @@ gint32 CDeclServiceImpl::Output()
             << "super( pCfg )";
         INDENT_DOWN;
         NEW_LINE;
-        CCOUT << "{}";
+        CCOUT << "{ SetClassId( clsid(" << strClass << " ) ); }";
         NEW_LINES( 2 );
 
         if( m_pNode->IsStream() )
