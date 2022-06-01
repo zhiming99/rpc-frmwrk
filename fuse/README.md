@@ -28,19 +28,9 @@ Let's use the above client side `rpcfs` to illustrate the control flow as the ex
 ![sync-async call](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/sync-async-svr.png)   
 
 ### RPC Request/Response/Event format
-. A formal request consists two parts, a network-order 32bit `length` followed by a JSON string, without `\0`. The example JSON string looks like
-```
-{
-    'Interface': 'ITestTypes',
-    'MessageType': 'req',
-    'Method': 'Echo',
-    'RequestId': 2,
-    'Parameters':
-    {
-        'strText': 'Hello, World!'
-    }
-}
-```
+. A formal request consists two parts, a network-order 32bit `length` followed by a JSON string, without `\0`. The following picture shows the request/response and relationships with the `ridl` file.   
+![req/resp format](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/ridl-req-mapping.png) 
+
 ### Using Streams
 ### Restart/Reload a Service Point
 ### Terminology
