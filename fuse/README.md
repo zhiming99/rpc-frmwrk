@@ -21,7 +21,7 @@ The above picture shows the directory hierarchy of a client side `rpcfs`. The bl
 ![this screenshot](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/rpcfs-svr.png)   
 The above picture shows the directory hierarchy of a server side `rpcfs`. Notice the differences from the client side `rpcfs`.   
 ### A Closer Look of the Business Code Interacting With `rpcfs`
-Let's use the above client side `rpcfs` to illustrate the control flow as the example.   
+Let's use the above generated `rpcfs` to illustrate the control flow.   
 * The following graph shows a simple synchronous client side flow chart, as well as a simple asynchronous one.   
 ![sync-async call](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/sync-async.png)   
 * The following graph shows a simple synchronous server side flow chart, as well as a simple asynchronouse one.   
