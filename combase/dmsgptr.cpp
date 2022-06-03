@@ -269,7 +269,7 @@ gint32 DMsgPtr::GetArgAt( gint32 iIndex,
     gint32 ret = 0;
     CDBusError oError;
 
-    if( IsEmpty() || pArg.IsEmpty() )
+    if( IsEmpty() )
         return -EINVAL;
 
     if( iIndex < 0 || iIndex > DMSG_MAX_ARGS )
@@ -283,8 +283,6 @@ gint32 DMsgPtr::GetArgAt( gint32 iIndex,
 
     // let's get the first argument, which should
     do{
-        BufPtr pBuf( true );
-
         if( i < iIndex )
         {
             if( dbus_message_iter_next( &itr ) )
@@ -301,6 +299,7 @@ gint32 DMsgPtr::GetArgAt( gint32 iIndex,
 
         if( i == iIndex )
         {
+            BufPtr pBuf( true );
             ret = GetValue( itr, pBuf, iType );
             if( ERROR( ret ) )
             {

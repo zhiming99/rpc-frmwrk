@@ -266,7 +266,7 @@ void CIfSmokeTest::testCliStartStop()
         // CPPUNIT_ASSERT( SUCCEEDED( ret ) );
         DebugPrint( 0, "Upload/Download Completed" );
 
-        BufPtr pCount( true );
+        /*BufPtr pCount( true );
         ret = pCli->GetCounter(
             propMsgCount, pCount );
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
@@ -277,7 +277,7 @@ void CIfSmokeTest::testCliStartStop()
             propMsgRespCount, pCount );
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
         DebugPrint( 0, "GetCounter Completed, resp count is %d",
-            ( guint32 )*pCount  );
+            ( guint32 )*pCount  );*/
 
         if( bPause )
         {

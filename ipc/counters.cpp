@@ -180,9 +180,6 @@ gint32 CStatCountersServer::GetCounter(
     guint32 iPropId,
     BufPtr& pBuf  )
 {
-    if( pBuf.IsEmpty() )
-        pBuf.NewObj();
-
     CStdRMutex oIfLock( m_oStatLock );
     if( m_mapCounters.empty() )
         return -EFAULT;
@@ -192,7 +189,7 @@ gint32 CStatCountersServer::GetCounter(
         itr = m_mapCounters.find( iPropId );
     if( itr == m_mapCounters.end() )
         return -ENOENT;
-    *pBuf = itr->second;
+    pBuf = itr->second.ToBuf();
     return STATUS_SUCCESS;
 }
 
