@@ -28,11 +28,7 @@
                 },
                 {
                     "InterfaceName": "CRpcReqForwarder",
-                    "Pausable": "true"
-                },
-                {
-                    "InterfaceName": "CStatCountersServer",
-                    "Pausable": "true"
+                    "Pausable": "false"
                 }
             ]
         },
@@ -70,11 +66,7 @@
                 },
                 {
                     "InterfaceName": "CRpcTcpBridge",
-                    "Pausable": "true"
-                },
-                {
-                    "InterfaceName": "CStatCountersServer",
-                    "Pausable": "true"
+                    "Pausable": "false"
                 }
             ]
         },
@@ -103,10 +95,6 @@
                 },
                 {
                     "InterfaceName": "CRpcRouterReqFwdr",
-                    "Pausable": "false"
-                },
-                {
-                    "InterfaceName": "CStatCountersServer",
                     "Pausable": "false"
                 }
             ]
@@ -137,17 +125,13 @@
                 {
                     "InterfaceName": "CRpcRouterBridge",
                     "Pausable": "false"
-                },
-                {
-                    "InterfaceName": "CStatCountersServer",
-                    "Pausable": "false"
                 }
             ],
             "Nodes": [
                 {
                     "Comments-0": "here, we define the nodes this bridge allows to relay requests to",
                     "NodeName": "rasp2",
-                    "Enabled": "true",
+                    "Enabled": "false",
                     "Protocol": "native",
                     "AddrFormat": "ipv4",
                     "IpAddress": "192.168.3.8",
@@ -156,8 +140,7 @@
                     "EnableWS": "false",
                     "EnableSSL": "false",
                     "ConnRecover": "false",
-                    "EnalbeSSL": "false",
-                    "DestURL": ""
+                    "EnalbeSSL": "false"
                 },
                 {
                     "Comments-0": "here, we define the nodes this bridge allows to relay requests to",
@@ -171,8 +154,7 @@
                     "EnableWS": "false",
                     "EnableSSL": "false",
                     "ConnRecover": "false",
-                    "EnalbeSSL": "false",
-                    "DestURL": ""
+                    "EnalbeSSL": "false"
                 }
             ],
             "LBGroup": [

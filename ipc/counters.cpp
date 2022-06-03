@@ -36,15 +36,6 @@ gint32 CStatCountersProxy::InitUserFuncs()
 {
     // don't call super::InitUserFuncs here
     BEGIN_IFPROXY_MAP( CStatCounters, false );
-
-    ADD_USER_PROXY_METHOD_EX( 0,
-        CStatCountersProxy::GetCounters,
-        METHOD_GetCounters );
-
-    ADD_USER_PROXY_METHOD_EX( 1,
-        CStatCountersProxy::GetCounter,
-        METHOD_GetCounter );
-
     END_IFPROXY_MAP;
 
     return 0;
@@ -68,15 +59,6 @@ gint32 CStatCountersProxy::GetCounter(
 gint32 CStatCountersServer::InitUserFuncs()
 {
     BEGIN_IFHANDLER_MAP( CStatCounters );
-
-    ADD_USER_SERVICE_HANDLER_EX( 0,
-        CStatCountersServer::GetCounters,
-        METHOD_GetCounters );
-
-    ADD_USER_SERVICE_HANDLER_EX( 1,
-        CStatCountersServer::GetCounter,
-        METHOD_GetCounter );
-
     END_IFHANDLER_MAP;
 
     return 0;
@@ -135,10 +117,16 @@ gint32 CStatCountersServer::IncCounter(
     gint32 ret = 0;
     guint32 dwCount = 0;
     CStdRMutex oIfLock( m_oStatLock );
-    std::hashmap< gint32, guint32 >::iterator
+    std::hashmap< gint32, Variant >::iterator
         itr = m_mapCounters.find( iProp );
     if( itr != m_mapCounters.end() )
+    {
+        gint32 iTypeId =
+            itr->second.GetTypeId();
+        if( iTypeId != typeUInt32 )
+            return -EINVAL;
         dwCount = itr->second;
+    }
 
     if( bNegative && dwCount == 0 )
         return -ERANGE ;
@@ -160,7 +148,7 @@ gint32 CStatCountersServer::GetCounter2(
     EnumPropId iProp, guint32& dwVal  )
 {
     CStdRMutex oIfLock( m_oStatLock );
-    std::hashmap< gint32, guint32 >::iterator
+    std::hashmap< gint32, Variant >::iterator
         itr = m_mapCounters.find( iProp );
     if( itr == m_mapCounters.end() )
         return -ENOENT;
@@ -200,7 +188,7 @@ gint32 CStatCountersServer::GetCounter(
         return -EFAULT;
 
     // make a copy
-    std::hashmap< gint32, guint32 >::iterator
+    std::hashmap< gint32, Variant >::iterator
         itr = m_mapCounters.find( iPropId );
     if( itr == m_mapCounters.end() )
         return -ENOENT;

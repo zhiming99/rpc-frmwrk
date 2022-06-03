@@ -28,13 +28,10 @@
                 },
                 {
                     "InterfaceName": "CRpcReqForwarder",
-                    "Pausable": "true"
-                },
-                {
-                    "InterfaceName": "CStatCountersServer",
-                    "Pausable": "true"
+                    "Pausable": "false"
                 }
-            ]
+            ],
+            "TaskScheduler": "RR"
         },
         {
             "ObjectName": "RpcReqForwarderAuthImpl",
@@ -64,11 +61,9 @@
                 },
                 {
                     "InterfaceName": "CRpcReqForwarderAuth"
-                },
-                {
-                    "InterfaceName": "CStatCountersServer"
                 }
-            ]
+            ],
+            "TaskScheduler": "RR"
         },
         {
             "comment": "For creation of CRpcTcpBridgeProxyImpl only",
@@ -106,11 +101,7 @@
                 },
                 {
                     "InterfaceName": "CRpcTcpBridge",
-                    "Pausable": "true"
-                },
-                {
-                    "InterfaceName": "CStatCountersServer",
-                    "Pausable": "true"
+                    "Pausable": "false"
                 }
             ]
         },
@@ -154,12 +145,7 @@
                 },
                 {
                     "InterfaceName": "CRpcTcpBridge",
-                    "Pausable": "true"
-                },
-                {
-                    "InterfaceName": "CStatCountersServer",
-                    "Pausable": "true",
-                    "DummyInterface": "true"
+                    "Pausable": "false"
                 }
             ]
         },
@@ -188,10 +174,6 @@
                 },
                 {
                     "InterfaceName": "CRpcRouterReqFwdrAuth",
-                    "Pausable": "false"
-                },
-                {
-                    "InterfaceName": "CStatCountersServer",
                     "Pausable": "false"
                 }
             ]
@@ -231,10 +213,6 @@
                     "Pausable": "false"
                 },
                 {
-                    "InterfaceName": "CStatCountersServer",
-                    "Pausable": "false"
-                },
-                {
                     "comment": "this is the destination interface for authentication",
                     "InterfaceName": "IAuthenticate",
                     "Pausable": "false"
@@ -244,7 +222,7 @@
                 {
                     "Comments-0": "here, we define the nodes this bridge allows to relay requests to",
                     "NodeName": "rasp2",
-                    "Enabled": "true",
+                    "Enabled": "false",
                     "Protocol": "native",
                     "AddrFormat": "ipv4",
                     "IpAddress": "192.168.3.8",
@@ -253,8 +231,7 @@
                     "EnableWS": "false",
                     "EnableSSL": "false",
                     "ConnRecover": "false",
-                    "EnalbeSSL": "false",
-                    "DestURL": ""
+                    "EnalbeSSL": "false"
                 },
                 {
                     "Comments-0": "here, we define the nodes this bridge allows to relay requests to",
@@ -268,8 +245,7 @@
                     "EnableWS": "false",
                     "EnableSSL": "false",
                     "ConnRecover": "false",
-                    "EnalbeSSL": "false",
-                    "DestURL": ""
+                    "EnalbeSSL": "false"
                 }
             ],
             "Comments-1": "The LBGroup is the list of mappings from pysudo-name to a group of physical nodes, which is used for node reduantancy or load balance purpose",

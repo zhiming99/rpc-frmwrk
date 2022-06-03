@@ -3393,10 +3393,23 @@ struct ClassName : CAggregatedObject< CAggInterfaceServer, ##__VA_ARGS__ >, IUnk
     {\
         if( pClsids.IsEmpty() )\
             pClsids.NewObj();\
-        ( *pClsids )().push_back( GetClsid() );\
-        ( *pClsids )().push_back( iid( IInterfaceServer ) );\
-        ( *pClsids )().push_back( iid( IUnknown ) );\
-        GetIids( ( *pClsids)() );\
+        std::vector< guint32 >& vecClsids = (*pClsids )();\
+        vecClsids.push_back( GetClsid() );\
+        vecClsids.push_back( iid( IInterfaceServer ) );\
+        vecClsids.push_back( iid( IUnknown ) );\
+        GetIids( vecClsids );\
+        auto itr = vecClsids.begin(); \
+        while( itr != vecClsids.end() ) \
+        { \
+            EnumClsid iClsid = ( EnumClsid )*itr; \
+            FUNC_MAP* fm = GetFuncMap( iClsid ); \
+            if( fm == nullptr || fm->size() == 0 ) \
+            { \
+                itr = vecClsids.erase( itr ); \
+                continue; \
+            } \
+            ++itr; \
+        } \
         return 0;\
     }\
 }

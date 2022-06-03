@@ -64,13 +64,23 @@ gint32 CStlIntVector::Serialize(
 gint32 CStlIntVector::Deserialize(
     const CBuffer& oBuf )
 {
+    if( oBuf.empty() )
+        return -EINVAL;
+
+    return Deserialize(
+        oBuf.ptr(), oBuf.size() );
+}
+
+gint32 CStlIntVector::Deserialize(
+    const char* pBuf, guint32 dwBufSize )
+{
     const SERI_HEADER* pHeader =
-        ( SERI_HEADER* )oBuf.ptr();
+        ( SERI_HEADER* )pBuf;
 
     if( pHeader == nullptr )
         return -EINVAL;
 
-    if( oBuf.size() < sizeof( SERI_HEADER ) )
+    if( dwBufSize < sizeof( SERI_HEADER ) )
         return -EINVAL;
 
     SERI_HEADER oHeader( *pHeader );

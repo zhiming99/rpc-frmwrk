@@ -184,6 +184,9 @@ class CStlIntVector : public CStlVector< guint32 >
 
     gint32 Deserialize(
         const CBuffer& obuf );
+
+    gint32 Deserialize(
+        const char* pBuf, guint32 dwBufSize );
 };
 
 typedef CAutoPtr< clsid( CStlIntVector ), CStlIntVector > IntVecPtr;

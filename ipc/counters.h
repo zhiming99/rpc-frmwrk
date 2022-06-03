@@ -69,7 +69,7 @@ class CStatCountersServer:
     public virtual CAggInterfaceServer
 {
     // storage for the counters
-    std::hashmap< gint32, guint32 > m_mapCounters;
+    std::hashmap< gint32, Variant > m_mapCounters;
 
     // message filter for message counter
     TaskletPtr m_pMsgFilter;
