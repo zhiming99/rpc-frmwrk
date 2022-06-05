@@ -8,9 +8,7 @@ This module enables `rpc-frmwrk` to operate via a set of files as known as the F
   * You can create stream channels by `touch stream_0`, any `open_file` function call of your programming language.
     The stream channel is similiar to a Unix Domain Socket over the internet connection, and protected
     transparently by double encrypted channel of SSL & kerberos.
-  * You can increase the extent of concurrency and resource load for request handling by sharing the fd between thread, 
-    or creating new request files `jreq_XXX` , or adding new instances of `service point` on both client and server sides.
-    And you can reduce the resource load by `rm jreq_1` or `rmdir service_point` or your favorite file removing functions. 
+  * Easily managing the concurrency of the servers and clients.
   * Monitoring the working status of `service point` with the read-only file `svcstat`.
   * Restarting/reloading individual `service point`.
   * Supported filesystem operations: `open` `close` `read` `write` `unlink` `stat` `rmdir` `mkdir` `readdir` `releasedir` `poll` `ioctl` 
@@ -34,10 +32,13 @@ Let's use the above generated `rpcfs` to illustrate the control flow.
 ### Using Streams
 * Stream is a binary channel between the server and the proxy. Stream files are those files created under `streams` directory, as shown in the above picture. There is a pair of stream files sharing the same name the `steams` directory on the both end of the RPC connection. The proxy side stream file is always first created, and then the server side is created. The server side cannot create the stream file on its own.
 * Unlike the req file, the resp file or the event file, which can do single direction transfer, the stream channel is a full duplex byte stream channel, and you can read/write the file concurrently. 
-* The stream channel has flow control, and if the peer has too many data accumulated in the stream file, the sending party will fail till the peer has consumed some of them, that is, `write` operation will fail with `EAGAIN` till flow control lifted.   
+* The stream channel has flow control, and if the peer has too many data accumulated in the stream file, the sending party will fail till the peer has consumed some of them, that is, `write` operation will fail with `EAGAIN` till flow control lifted.
+* The advantage of the stream channel is that it is much faster than the request/reponse transfer. And it's limitations is size, 2^64 the maximum, compared to 1MB limit per request.
 
-### Managing a Service Point
-
+### Managing the Concurrency in the Server and the Client
+You can increase the volume of concurrency and throughput for request handling by sharing the fd between thread, 
+or creating new request files `jreq_XXX` , or adding new instances of `service point` on both client and server sides.
+And vice versa, you can reduce the resource load by `rm jreq_1` or `rmdir service_point` or your favorite file removing functions. 
 ### Terminology
   * `rpcfs` is  an RPC system with the file system as its interface, but not a filesystem accessed via RPC.
   * `service point` is either the server object or proxy object at the either end of an RPC connection.
