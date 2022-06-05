@@ -4140,6 +4140,8 @@ gint32 CFuseSvcServer::DecStmCount(
             return -ERANGE;
         }
         --itr->second;
+        if( itr->second == 0 )
+            m_mapSessCount.erase( itr );
     }
     return STATUS_SUCCESS;
 }

@@ -993,6 +993,7 @@ gint32 CHeaderPrologue::Output()
     {
         Wa( "#include \"serijson.h\"" );
         Wa( "#include \"fuseif.h\"" );
+        Wa( "#include \"counters.h\"" );
     }
     NEW_LINE;
     CCOUT << "#define DECLPTRO( _type, _name ) \\";
@@ -2780,6 +2781,7 @@ gint32 CDeclService::Output()
         NEW_LINE;
         if( bFuseP )
         {
+            Wa( "CStatCountersProxy," );
             Wa( "CStreamProxyFuse," );
             Wa( "CFuseSvcProxy," );
         }
@@ -2809,6 +2811,7 @@ gint32 CDeclService::Output()
 
         if( bFuseS )
         {
+            Wa( "CStatCountersServer," );
             Wa( "CStreamServerFuse," );
             Wa( "CFuseSvcServer," );
         }
