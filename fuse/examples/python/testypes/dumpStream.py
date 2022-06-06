@@ -12,13 +12,13 @@ from iolib import *
 
 def dumpStream() :
     error = 0
-    mp = '/home/zhiming/mywork/github/rpc-frmwrk/ridl/ftest1/mpsvr'
-    #mp = '/home/zhiming/mywork/github/rpc-frmwrk/ridl/ftest1/mp'
-    srcdir = mp + "/TestTypesSvc/_streams"
-    #srcdir = mp + "/connection_0/TestTypesSvc/_streams"
-    dumpFile = '/home/zhiming/stmdump'
+    svcdir = sys.argv[ 1 ] + "/streams"
+    if len( sys.argv ) > 2 :
+        dumpFile = sys.argv[ 2 ]
+    else:
+        dumpFile = "/tmp/stmdump"
     try:
-        stmFile = srcdir + "/abc"
+        stmFile = svcdir + "/stream_0"
         stmfp = open( stmFile, "rb" )
         dumpfp = open( dumpFile, "wb")
 

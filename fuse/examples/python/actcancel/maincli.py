@@ -9,7 +9,7 @@ from iolib import *
 def BuildReqHdr( methodName : str, idx : int, ifName : str="IActiveCancel" ) -> dict:
         req = dict()
         # request header, the information can be found
-        # in examples/hellwld.ridl.
+        # in examples/actcancel.ridl.
 
         # the interface name this request belongs to
         req[ "Interface" ] = ifName

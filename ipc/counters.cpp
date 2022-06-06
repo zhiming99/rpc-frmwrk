@@ -145,7 +145,7 @@ gint32 CStatCountersServer::IncCounter(
 }
 
 gint32 CStatCountersServer::GetCounter2( 
-    EnumPropId iProp, guint32& dwVal  )
+    guint32 iProp, guint32& dwVal  )
 {
     CStdRMutex oIfLock( m_oStatLock );
     std::hashmap< gint32, Variant >::iterator
@@ -160,7 +160,6 @@ gint32 CStatCountersServer::GetCounter2(
 
 // interface implementations
 gint32 CStatCountersServer::GetCounters(
-    IEventSink* pCallback,
     CfgPtr& pCfg )
 {
     if( pCfg.IsEmpty() )
@@ -176,7 +175,6 @@ gint32 CStatCountersServer::GetCounters(
 }
 
 gint32 CStatCountersServer::GetCounter(
-    IEventSink* pCallback,
     guint32 iPropId,
     BufPtr& pBuf  )
 {

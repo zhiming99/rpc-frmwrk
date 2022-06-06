@@ -43,6 +43,9 @@ struct IStatCounters
 
     virtual gint32 GetCounter(
         guint32 iPropId, BufPtr& pBuf ) = 0;
+
+    virtual gint32 GetCounter2(
+        guint32 iPropId, guint32& dwVal ) = 0;
 };
 
 class CStatCountersProxy:
@@ -60,13 +63,17 @@ class CStatCountersProxy:
     { return iid( CStatCounters ); }
 
     virtual gint32 InitUserFuncs();
-    gint32 GetCounters( CfgPtr& pCfg );
+    gint32 GetCounters( CfgPtr& pCfg ) override;
     gint32 GetCounter(
-        guint32 iPropId, BufPtr& pBuf );
+        guint32 iPropId, BufPtr& pBuf ) override;
+    gint32 GetCounter2(
+        guint32 iPropId, guint32& dwVal ) override
+    { return -ENOSYS; }
 };
 
 class CStatCountersServer:
-    public virtual CAggInterfaceServer
+    public virtual CAggInterfaceServer,
+    public IStatCounters
 {
     // storage for the counters
     std::hashmap< gint32, Variant > m_mapCounters;
@@ -98,16 +105,15 @@ class CStatCountersServer:
         EnumPropId iProp, guint32 dwVal );
 
     gint32 GetCounter2( 
-        EnumPropId iPropId, guint32& dwVal  );
+        guint32 iPropId,
+        guint32& dwVal  ) override;
 
     gint32 GetCounters(
-        IEventSink* pCallback,
-        CfgPtr& pCfg );
+        CfgPtr& pCfg ) override;
 
     gint32 GetCounter(
-        IEventSink* pCallback,
         guint32 iPropId,
-        BufPtr& pBuf  );
+        BufPtr& pBuf  ) override;
 };
 
 class CMessageCounterTask : 

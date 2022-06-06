@@ -30,6 +30,7 @@ using namespace rpcf;
 #include "fuse_i.h"
 #include <sys/ioctl.h>
 #include <unistd.h>
+#include <counters.h>
 
 void fuseif_finish_interrupt(
     fuse *f, fuse_req_t req,
@@ -978,6 +979,23 @@ gint32 CFuseSvcStat::UpdateContent()
                 pProxy->GetGroupCount() );
         }
         m_strContent += strVal + "\n";
+
+        while( pIf->IsServer() )
+        {
+            auto psc = dynamic_cast
+                < CStatCountersServer* >( pIf );
+            guint32 dwVal = 0;
+            if( psc == nullptr )
+                break;
+            ret = psc->GetCounter2(
+                propMsgCount, dwVal );
+            if( ERROR( ret ) )
+                break;
+            m_strContent += "IncomingReqs=";
+            m_strContent +=
+                std::to_string( dwVal ) + "\n";
+            break;
+        }
 
     }while( 0 );
 
