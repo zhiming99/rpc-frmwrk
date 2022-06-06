@@ -1,4 +1,5 @@
 #!/bin/bash
+# script adapted from https://github.com/ist-dsi/docker-kerberos
 REALM=rpcf.org
 SUPPORTED_ENCRYPTION_TYPES="aes256-cts:normal aes128-cts:normal"
 KADMIN_PRINCIPAL="kadmin/admi"
