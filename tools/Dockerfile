@@ -2,6 +2,15 @@ FROM ubuntu
 MAINTAINER woodhead99@gmail.com
 RUN apt-get update
 RUN DEBIAN_FRONTEND="noninteractive" apt-get -y install tzdata
+
+#install the kerberos servers and client
+ADD ./initkrb5.sh /root
+RUN apt-get install -qq krb5-kdc krb5-admin-server krb5-user 
+#setup the kdc and kadmind and start the servers
+CMD bash /root/initkrb5.sh || exit 1
+#login with principal zhiming
+CMD kinit -k -t /etc/krb5.keytab zhiming || exit 2
+
 RUN apt-get install -y gcc g++ python3 python3-dev python3-pip flex bison \
 libtool shtool automake autoconf autotools-dev make dbus libdbus-1-3 \
 libdbus-1-dev libjsoncpp1 libjsoncpp-dev libkrb5-3 libkrb5-dev liblz4-1 \

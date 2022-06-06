@@ -1,8 +1,8 @@
 #!/bin/bash
 REALM=rpcf.org
-SUPPORTED_ENCRYPTION_TYPES=aes256-cts:normal aes128-cts:normal 
-KADMIN_PRINCIPAL=kadmin/admin
-KADMIN_PASSWORD=MITiys5K6
+SUPPORTED_ENCRYPTION_TYPES="aes256-cts:normal aes128-cts:normal"
+KADMIN_PRINCIPAL="kadmin/admi"
+KADMIN_PASSWORD="MITiys5K6"
 
 echo "==================================================================================="
 echo "==== Kerberos KDC and Kadmin ======================================================"
@@ -43,7 +43,6 @@ tee /etc/krb5kdc/kdc.conf <<EOF
 	$REALM = {
 		acl_file = /etc/krb5kdc/kadm5.acl
 		max_renewable_life = 7d 0h 0m 0s
-        master_key_type = aes256-cts:normal
 		supported_enctypes = $SUPPORTED_ENCRYPTION_TYPES
 		default_principal_flags = +preauth
 	}
