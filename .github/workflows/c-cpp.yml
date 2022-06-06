@@ -19,6 +19,8 @@ jobs:
       run: sudo DEBIAN_FRONTEND="noninteractive" apt-get -y install tzdata
     - name: install kerberos
       run: sudo apt-get install -qq krb5-kdc krb5-admin-server krb5-user
+    - name: kill kerberos servers
+      run: sudo kill -9 `pidof kadmind` || sudo kill -9 `pidof krb5kdc` || exit 0
     - name: configure kerberos
       run: sudo bash ./tools/initkrb5.sh && kinit -k -t /etc/krb5.keytab zhiming
     - name: install tools
