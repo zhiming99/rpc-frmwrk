@@ -113,8 +113,6 @@ echo "==========================================================================
 #   https://docs.docker.com/engine/reference/run/#detached-vs-foreground
 # for a better explanation.
 
-echo pidof krb5kdc
 kill -9 `pidof krb5kdc`
 kill -9 `pidof kadmind`
-cat /etc/passwd | grep runner
 chown runner /etc/krb5.keytab
