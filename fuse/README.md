@@ -2,7 +2,7 @@
 This module enables `rpc-frmwrk` to operate via a set of files as known as the FUSE, the userspace filesystem, which makes `rpc-frmwrk` unique among all the RPC systems on the planet. And it has the following major features:
   * You can generate the RPC filesystem `rpcfs` for both server/client side with an `ridl` file fully automatically.
   * All the requests/responses/events are sent and received by reading/writing specific files.
-  * The difference of synch/async programming depends only on how you polling the respective file descriptiors. 
+  * Programming with `rpcfs` requires only file operations and JSON support from a programming language.
   * The request/response/events are in JSON format, and programming language neutral.
     For example, you can even send a request via shell commands like `cat requests_file > jreq_0`. 
   * You can create stream channels by `touch stream_0`, any `open_file` function call of your programming language.
@@ -26,7 +26,7 @@ Let's use the above generated `rpcfs` to illustrate the control flow.
 ![sync-async call](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/sync-async-svr.png)   
 
 ### RPC Request/Response/Event format
-* A formal request consists two parts, a network-order 32bit `string length` followed by a JSON string, without `\0`. The following picture shows the request/response and relationships with the [`ridl`](https://github.com/zhiming99/rpc-frmwrk/examples/hellowld.ridl) file. For detail information about `ridl`, please refer to this [article](https://github.com/zhiming99/rpc-frmwrk/blob/master/ridl/README.md)   
+* A formal request consists two parts, a network-order 32bit `string length` followed by a JSON string, without `\0`. The following picture shows the request/response and relationships with the [`ridl file`](https://github.com/zhiming99/rpc-frmwrk/blob/master/examples/hellowld.ridl). And for detail information about `ridl language`, please refer to this [article](https://github.com/zhiming99/rpc-frmwrk/blob/master/ridl/README.md)   
 ![req/resp format](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/ridl-req-mapping.png)    
 
 ### Using Streams
