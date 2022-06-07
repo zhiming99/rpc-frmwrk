@@ -117,4 +117,4 @@ echo pidof krb5kdc
 kill -9 `pidof krb5kdc`
 kill -9 `pidof kadmind`
 cat /etc/passwd | grep runner
-chown 1000:1000 /etc/krb5.keytab
+chown runner /etc/krb5.keytab
