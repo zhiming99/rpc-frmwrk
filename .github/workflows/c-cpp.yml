@@ -22,7 +22,9 @@ jobs:
     - name: kill kerberos servers
       run: sudo kill -9 `pidof kadmind` || sudo kill -9 `pidof krb5kdc` || exit 0
     - name: configure kerberos
-      run: sudo bash ./tools/initkrb5.sh 
+      run: sudo bash ./tools/initkrb5.sh
+    - name: run kdc
+      run: sudo krb5kdc
     - name: login
       run: kinit -k -t /etc/krb5.keytab zhiming
     - name: install tools
