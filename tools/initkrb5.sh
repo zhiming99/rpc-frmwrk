@@ -116,6 +116,7 @@ echo "==========================================================================
 kill -9 `pidof krb5kdc`
 kill -9 `pidof kadmind`
 
+#comment this line if when using docker
 chown runner /etc/krb5.keytab
 
 krb5kdc

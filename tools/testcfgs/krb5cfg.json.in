@@ -1,0 +1,34 @@
+{
+    "Connections": [
+        {
+            "IpAddress": "127.0.0.1",
+            "PortNumber": "4132",
+            "Compression": "true",
+            "EnableSSL": "true",
+            "HasAuth": "true",
+            "EnableWS": "false",
+            "RouterPath": "/"
+        }
+    ],
+    "Security": {
+        "SSLCred": {
+            "KeyFile": "XXXXX/server.key",
+            "CertFile": "XXXXX/server.crt"
+        },
+        "misc": {
+            "MaxConnections": "512",
+            "TaskScheduler": "RR"
+        },
+        "AuthInfo": {
+            "Realm": "rpcf.org",
+            "ServiceName": "rasp1@rpcf.org",
+            "AuthMech": "krb5",
+            "UserName": "zhiming@rpcf.org",
+            "KdcIp": "127.0.0.1",
+            "SignMessage": "true"
+        }
+    },
+    "Multihop": [],
+    "LBGroup": [],
+    "IsServer": "true"
+}

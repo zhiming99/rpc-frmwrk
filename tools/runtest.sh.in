@@ -3,6 +3,11 @@ bin_dir=@bindir@
 etc_dir=@sysconfdir@/rpcf
 export LD_LIBRARY_PATH=${lib_dir}:${lib_dir}/rpcf
 cat /proc/cpuinfo
+if [ "x$2" == "xk" ]; then
+    auth="-a";
+else
+    auth="";
+fi
 if [ "$1" == "2" ]; then
     echo starting the app server...
     ${bin_dir}/rpcf/ifsvrsmk &
@@ -11,10 +16,10 @@ if [ "$1" == "2" ]; then
     ${bin_dir}/rpcf/prsvrtst &
     ${bin_dir}/rpcf/stmsvrtst &
     echo starting the bridge...
-    ${bin_dir}/rpcrouter -r 2 
+    ${bin_dir}/rpcrouter $auth -r 2 
 elif [ "$1" == "1" ]; then
     echo starting the reqfwdr...
-    ${bin_dir}/rpcrouter -r 1 &
+    ${bin_dir}/rpcrouter $auth -r 1 &
     sleep 15
     echo echo test...
     ${bin_dir}/rpcf/ifclismk || exit 1
@@ -40,8 +45,8 @@ elif [ "$1" == "1" ]; then
     
     echo restart rpcrouters...
     cat ${etc_dir}/driver.json
-    ${bin_dir}/rpcrouter -r 2&
-    ${bin_dir}/rpcrouter -r 1&
+    ${bin_dir}/rpcrouter $auth -r 2&
+    ${bin_dir}/rpcrouter $auth -r 1&
     pwd
     pushd ./ridl
     ${bin_dir}/ridlc -I ./ -pO ./pytest fulltest.ridl || exit 6
