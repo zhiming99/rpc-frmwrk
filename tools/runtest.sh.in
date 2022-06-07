@@ -2,11 +2,9 @@ lib_dir=@libdir@
 bin_dir=@bindir@
 etc_dir=@sysconfdir@/rpcf
 export LD_LIBRARY_PATH=${lib_dir}:${lib_dir}/rpcf
-cat /proc/cpuinfo
 if [ "x$2" == "xk" ]; then
     auth="-a";
     pwd
-    ps aux | grep rpcrouter
     cat tools/testcfgs/krb5cfg.json
     cat /usr/local/etc/rpcf/driver.json
     cat /usr/local/etc/rpcf/kadesc.json
@@ -16,9 +14,10 @@ else
     auth="";
 fi
 if [ "$1" == "2" ]; then
+    cat /proc/cpuinfo
     echo starting the app server...
     ${bin_dir}/rpcf/ifsvrsmk &
-    strace -f ${bin_dir}/rpcf/kasvrtst 
+    ${bin_dir}/rpcf/kasvrtst &
     ${bin_dir}/rpcf/actcsvrtst &
     ${bin_dir}/rpcf/prsvrtst &
     ${bin_dir}/rpcf/stmsvrtst &
@@ -30,6 +29,7 @@ elif [ "$1" == "1" ]; then
     echo ${bin_dir}/rpcrouter $auth -r 1
     ${bin_dir}/rpcrouter $auth -r 1 &
     sleep 15
+    ps aux | grep rpcrouter
     echo echo test...
     ${bin_dir}/rpcf/ifclismk || exit 1
     echo keepalive test...
