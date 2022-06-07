@@ -113,5 +113,3 @@ echo "==========================================================================
 #   https://docs.docker.com/engine/reference/run/#detached-vs-foreground
 # for a better explanation.
 ls /sbin/k* -l
-/sbin/krb5kdc
-/sbin/kadmind -nofork
