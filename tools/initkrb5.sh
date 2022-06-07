@@ -116,8 +116,7 @@ echo "==========================================================================
 kill -9 `pidof krb5kdc`
 kill -9 `pidof kadmind`
 
-username=`who am i | awk "{print $1}"`
-chown $username /etc/krb5.keytab
+chown runner /etc/krb5.keytab
 
 krb5kdc
 kadmind
