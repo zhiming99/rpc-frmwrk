@@ -2,7 +2,7 @@
 This module enables `rpc-frmwrk` to operate via a set of files as known as the FUSE, the userspace filesystem, which makes `rpc-frmwrk` unique among all the RPC systems on the planet. And it has the following major features:
   * You can generate the RPC filesystem `rpcfs` for both server/client side with an `ridl` file fully automatically.
   * All the requests/responses/events are sent and received by reading/writing specific files.
-  * The difference of synch/async programming depends only on how you polling the respective file descriptiors. 
+  * Programming with `rpcfs` requires only file operations and JSON support from a programming language.
   * The request/response/events are in JSON format, and programming language neutral.
     For example, you can even send a request via shell commands like `cat requests_file > jreq_0`. 
   * You can create stream channels by `touch stream_0`, any `open_file` function call of your programming language.
