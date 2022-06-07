@@ -115,4 +115,9 @@ echo "==========================================================================
 
 kill -9 `pidof krb5kdc`
 kill -9 `pidof kadmind`
-chown runner /etc/krb5.keytab
+
+chown `logname` /etc/krb5.keytab
+
+krb5kdc
+kadmind
+
