@@ -113,3 +113,7 @@ echo "==========================================================================
 #   https://docs.docker.com/engine/reference/run/#detached-vs-foreground
 # for a better explanation.
 ls /sbin/k* -l
+ls /var/lib/krb5kdc -l
+cat /etc/krb5.conf
+cat /etc/krb5kdc/kdc.conf
+ls -l /etc/krb5.keytab
