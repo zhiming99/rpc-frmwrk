@@ -18,9 +18,11 @@ if [ "$1" == "2" ]; then
     ${bin_dir}/rpcf/prsvrtst &
     ${bin_dir}/rpcf/stmsvrtst &
     echo starting the bridge...
-    ${bin_dir}/rpcrouter $auth -r 2 
+    echo ${bin_dir}/rpcrouter $auth -r 2 
+    ${bin_dir}/rpcrouter $auth -r 2 &
 elif [ "$1" == "1" ]; then
     echo starting the reqfwdr...
+    echo ${bin_dir}/rpcrouter $auth -r 1
     ${bin_dir}/rpcrouter $auth -r 1 &
     sleep 15
     echo echo test...
