@@ -24,7 +24,7 @@ jobs:
     - name: configure kerberos
       run: sudo bash ./tools/initkrb5.sh
     - name: run kdc
-      run: sudo krb5kdc
+      run: sudo krb5kdc && sudo kadmind
     - name: login
       run: kinit -k -t /etc/krb5.keytab zhiming
     - name: install tools
