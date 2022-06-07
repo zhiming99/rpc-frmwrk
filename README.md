@@ -37,10 +37,9 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 6. Please refer to [article](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-get-Helloworld-run%3F) for more information.
 7. If you are Ubuntu users or Fedora users, you can also install `rpc-frmwrk` from a deb package or an rpm package since version 0.4.0. The release tag is associated with the pre-built deb package and rpm package.
 
-#### Development And Examples
+#### Development
 1. `rpc-frmwrk` has an `interface description language`, [`ridl`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md) to help you to generate the skelton code rapidly. It is recommended to take some time to learn this simple language, and it may save you a lot of time.
-2. [`Here`](https://github.com/zhiming99/rpc-frmwrk/tree/master/test/stress) is an example of `ridlc` generated project.
-3. Programming with `rpcfs` requires the leaset learning efforts, and zero footprint of the `rpc-frmwrk` in your business code. 
+2. Programming with `rpcfs` requires the leaset learning efforts, and zero footprint of the `rpc-frmwrk` in your business code. 
 
 #### Dependency  
 This project depends on the following 3rd-party packags at runtime:  
