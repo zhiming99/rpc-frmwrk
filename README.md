@@ -40,6 +40,7 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 #### Development And Examples
 1. `rpc-frmwrk` has an `interface description language`, [`ridl`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md) to help you to generate the skelton code rapidly. It is recommended to take some time to learn this simple language, and it may save you a lot of time.
 2. [`Here`](https://github.com/zhiming99/rpc-frmwrk/tree/master/test/stress) is an example of `ridlc` generated project.
+3. Programming with `rpcfs` requires the leaset learning efforts, and zero footprint of the `rpc-frmwrk` in your business code. 
 
 #### Dependency  
 This project depends on the following 3rd-party packags at runtime:  
