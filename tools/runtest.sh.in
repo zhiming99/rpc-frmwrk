@@ -8,6 +8,8 @@ if [ "x$2" == "xk" ]; then
     pwd
     ps aux | grep rpcrouter
     cat tools/testcfgs/krb5cfg.json
+    cat /usr/local/etc/rpcf/drivers.json
+    cat /usr/local/etc/rpcf/kadesc.json
     kinit -k -t /etc/krb5.keytab zhiming || exit 1;
     klist
 else
