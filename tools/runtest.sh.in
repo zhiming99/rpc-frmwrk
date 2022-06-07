@@ -5,6 +5,9 @@ export LD_LIBRARY_PATH=${lib_dir}:${lib_dir}/rpcf
 cat /proc/cpuinfo
 if [ "x$2" == "xk" ]; then
     auth="-a";
+    pwd
+    ps aux | grep rpcrouter
+    cat tools/testcfgs/krb5cfg.json
     kinit -k -t /etc/krb5.keytab zhiming || exit 1;
     klist
 else

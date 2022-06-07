@@ -3,7 +3,7 @@
         {
             "IpAddress": "127.0.0.1",
             "PortNumber": "4132",
-            "Compression": "true",
+            "Compression": "false",
             "EnableSSL": "true",
             "HasAuth": "true",
             "EnableWS": "false",
