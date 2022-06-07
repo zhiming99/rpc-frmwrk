@@ -117,3 +117,5 @@ ls /var/lib/krb5kdc -l
 cat /etc/krb5.conf
 cat /etc/krb5kdc/kdc.conf
 ls -l /etc/krb5.keytab
+echo pidof krb5kdc
+pidof krb5kdc
