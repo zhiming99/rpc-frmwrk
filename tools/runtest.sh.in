@@ -5,6 +5,8 @@ export LD_LIBRARY_PATH=${lib_dir}:${lib_dir}/rpcf
 cat /proc/cpuinfo
 if [ "x$2" == "xk" ]; then
     auth="-a";
+    kinit -k -t /etc/krb5.keytab zhiming || exit 1;
+    klist
 else
     auth="";
 fi
