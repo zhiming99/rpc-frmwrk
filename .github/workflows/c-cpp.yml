@@ -18,7 +18,7 @@ jobs:
     - name: install tzdata
       run: sudo DEBIAN_FRONTEND="noninteractive" apt-get -y install tzdata
     - name: install kerberos
-      run: sudo apt-get install -qq krb5-kdc krb5-admin-server krb5-user
+      run: sudo apt-get install -qq krb5-kdc krb5-admin-server krb5-user strace
     - name: configure kerberos
       run: sudo bash ./tools/initkrb5.sh
     - name: install tools

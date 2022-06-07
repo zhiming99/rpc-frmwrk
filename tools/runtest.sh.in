@@ -8,7 +8,7 @@ if [ "x$2" == "xk" ]; then
     pwd
     ps aux | grep rpcrouter
     cat tools/testcfgs/krb5cfg.json
-    cat /usr/local/etc/rpcf/drivers.json
+    cat /usr/local/etc/rpcf/driver.json
     cat /usr/local/etc/rpcf/kadesc.json
     kinit -k -t /etc/krb5.keytab zhiming || exit 1;
     klist
@@ -18,7 +18,7 @@ fi
 if [ "$1" == "2" ]; then
     echo starting the app server...
     ${bin_dir}/rpcf/ifsvrsmk &
-    ${bin_dir}/rpcf/kasvrtst &
+    strace ${bin_dir}/rpcf/kasvrtst 
     ${bin_dir}/rpcf/actcsvrtst &
     ${bin_dir}/rpcf/prsvrtst &
     ${bin_dir}/rpcf/stmsvrtst &
