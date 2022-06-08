@@ -16,10 +16,15 @@ fi
 if [ "$1" == "2" ]; then
     cat /proc/cpuinfo
     echo starting the app server...
-    strace ${bin_dir}/rpcf/ifsvrsmk 
+    echo ${bin_dir}/rpcf/ifsvrsmk
+    ${bin_dir}/rpcf/ifsvrsmk
+    echo ${bin_dir}/rpcf/kasvrtst
     ${bin_dir}/rpcf/kasvrtst &
+    echo ${bin_dir}/rpcf/actcsvrtst
     ${bin_dir}/rpcf/actcsvrtst &
+    echo ${bin_dir}/rpcf/prsvrtst
     ${bin_dir}/rpcf/prsvrtst &
+    echo ${bin_dir}/rpcf/stmsvrtst
     ${bin_dir}/rpcf/stmsvrtst &
     echo starting the bridge...
     echo ${bin_dir}/rpcrouter $auth -r 2 

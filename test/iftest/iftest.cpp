@@ -125,9 +125,11 @@ void CIfSmokeTest::testSvrStartStop()
         sleep( 1 );
 
     // stop the server
-    ret = pIf->Stop();
+    pIf->Stop();
     pIf.Clear();
 
+    if( ERROR( ret ) )
+        exit( ret );
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 }
 #endif
