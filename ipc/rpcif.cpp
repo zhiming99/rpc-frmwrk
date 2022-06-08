@@ -4263,9 +4263,11 @@ gint32 CRpcServices::LoadObjDesc(
                     if( strVal.size() > 0 )
                         oAuth.SetStrProp( propUserName, strVal );
                 }
-                if( strVal.empty() )
+                if( strVal.empty() && !bServer )
                 {
-                    strVal = getenv( "LOGNAME" );
+                    char* szVal = getenv( "LOGNAME" );
+                    if( szVal != nullptr )
+                        strVal = szVal;
                     if( strVal.size() > 0 )
                         oAuth.SetStrProp( propUserName, strVal );
                 }
