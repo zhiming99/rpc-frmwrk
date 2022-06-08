@@ -28,10 +28,7 @@ if [ "$1" == "2" ]; then
     ${bin_dir}/rpcf/stmsvrtst &
     echo starting the bridge...
     echo ${bin_dir}/rpcrouter $auth -r 2 
-    ${bin_dir}/rpcrouter $auth -r 2 &
-    sleep 15
-    sudo chmod -R +rwx /cores/*
-    ls /cores/*
+    ${bin_dir}/rpcrouter $auth -r 2
 elif [ "$1" == "1" ]; then
     echo starting the reqfwdr...
     echo ${bin_dir}/rpcrouter $auth -r 1
