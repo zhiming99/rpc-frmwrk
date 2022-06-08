@@ -2,7 +2,7 @@
 # script adapted from https://github.com/ist-dsi/docker-kerberos
 REALM=rpcf.org
 SUPPORTED_ENCRYPTION_TYPES="aes256-cts:normal aes128-cts:normal"
-KADMIN_PRINCIPAL="kadmin/admi"
+KADMIN_PRINCIPAL="kadmin/admin"
 KADMIN_PASSWORD="MITiys5K6"
 
 echo "==================================================================================="
@@ -23,16 +23,33 @@ echo '127.0.0.1	kdc.rpcf.org rasp1' >> /etc/hosts
 KDC_KADMIN_SERVER=kdc.rpcf.org
 
 tee /etc/krb5.conf <<EOF
+[logging]
+        default = FILE:/var/log/krb5libs.log
+        kdc = FILE:/var/log/krb5kdc.log
+        admin_server = FILE:/var/log/kadmind.log
+
 [libdefaults]
-	default_realm = $REALM
+    default_realm = $REALM
+    kdc_timesync = 1
+    forwardable = true
+    proxiable = true
+    dns_lookup_realm = false
+    ticket_lifetime = 24h
+    renew_lifetime = 7d
+    rdns = false
 
 [realms]
-	$REALM = {
-		kdc_ports = 88,750
-		kadmind_port = 749
-		kdc = $KDC_KADMIN_SERVER
-		admin_server = $KDC_KADMIN_SERVER
-	}
+    $REALM = {
+        kdc_ports = 88,750
+        kadmind_port = 749
+        kdc = $KDC_KADMIN_SERVER
+        admin_server = $KDC_KADMIN_SERVER
+    }
+
+[domain_realm]
+        .rpcf.org = rpcf.org
+        rpcf.org = rpcf.org
+
 EOF
 echo ""
 
@@ -46,6 +63,7 @@ tee /etc/krb5kdc/kdc.conf <<EOF
 		max_renewable_life = 7d 0h 0m 0s
 		supported_enctypes = $SUPPORTED_ENCRYPTION_TYPES
 		default_principal_flags = +preauth
+        key_stash_file = /etc/krb5kdc/stash
 	}
 EOF
 echo ""
@@ -57,7 +75,6 @@ tee /etc/krb5kdc/kadm5.acl <<EOF
 $KADMIN_PRINCIPAL_FULL *
 rasp1/$REALM@$REALM *
 zhiming@$REALM *
-noPermissions@$REALM X
 EOF
 echo ""
 
@@ -81,12 +98,6 @@ echo "Adding $KADMIN_PRINCIPAL principal"
 kadmin.local -q "delete_principal -force $KADMIN_PRINCIPAL_FULL"
 echo ""
 kadmin.local -q "addprinc -pw $KADMIN_PASSWORD $KADMIN_PRINCIPAL_FULL"
-echo ""
-
-echo "Adding noPermissions principal"
-kadmin.local -q "delete_principal -force noPermissions@$REALM"
-echo ""
-kadmin.local -q "addprinc -pw $KADMIN_PASSWORD noPermissions@$REALM"
 echo ""
 
 echo "Adding 'zhiming' principal"
@@ -113,12 +124,6 @@ echo "==========================================================================
 #   https://docs.docker.com/engine/reference/run/#detached-vs-foreground
 # for a better explanation.
 
-kill -9 `pidof krb5kdc`
-kill -9 `pidof kadmind`
-
 #comment this line if when using docker
 chown runner /etc/krb5.keytab
-
-krb5kdc
-kadmind
 

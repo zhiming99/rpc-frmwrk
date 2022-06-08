@@ -212,9 +212,10 @@ void CIfRouterTest::testSvrStartStop()
     }while( 0 );
 
     if( !pIf.IsEmpty() )
-        ret = pIf->Stop();
+        pIf->Stop();
 
-    CPPUNIT_ASSERT( SUCCEEDED( ret ) );
+    if( ERROR( ret ) )
+        OutputMsg( ret, "error run rpcrouter" );
 
     return;
 }
