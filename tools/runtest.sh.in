@@ -17,7 +17,7 @@ if [ "$1" == "2" ]; then
     cat /proc/cpuinfo
     echo starting the app server...
     echo ${bin_dir}/rpcf/ifsvrsmk
-    ${bin_dir}/rpcf/ifsvrsmk
+    ${bin_dir}/rpcf/ifsvrsmk &
     echo ${bin_dir}/rpcf/kasvrtst
     ${bin_dir}/rpcf/kasvrtst &
     echo ${bin_dir}/rpcf/actcsvrtst
@@ -28,7 +28,7 @@ if [ "$1" == "2" ]; then
     ${bin_dir}/rpcf/stmsvrtst &
     echo starting the bridge...
     echo ${bin_dir}/rpcrouter $auth -r 2 
-    ${bin_dir}/rpcrouter $auth -r 2
+    ${bin_dir}/rpcrouter $auth -r 2 &
 elif [ "$1" == "1" ]; then
     echo starting the reqfwdr...
     echo ${bin_dir}/rpcrouter $auth -r 1
