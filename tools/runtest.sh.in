@@ -7,7 +7,7 @@ if [ "x$2" == "xk" ]; then
     pwd
     cat tools/testcfgs/krb5cfg.json
     cat /usr/local/etc/rpcf/driver.json
-    cat /usr/local/etc/rpcf/kadesc.json
+    cat /usr/local/etc/rpcf/echodesc.json
     kinit -k -t /etc/krb5.keytab zhiming || exit 1;
     klist
 else
@@ -16,14 +16,14 @@ fi
 if [ "$1" == "2" ]; then
     cat /proc/cpuinfo
     echo starting the app server...
-    ${bin_dir}/rpcf/ifsvrsmk &
+    strace ${bin_dir}/rpcf/ifsvrsmk 
     ${bin_dir}/rpcf/kasvrtst &
     ${bin_dir}/rpcf/actcsvrtst &
     ${bin_dir}/rpcf/prsvrtst &
     ${bin_dir}/rpcf/stmsvrtst &
     echo starting the bridge...
     echo ${bin_dir}/rpcrouter $auth -r 2 
-    ${bin_dir}/rpcrouter $auth -r 2 &
+    ${bin_dir}/rpcrouter $auth -r 2
 elif [ "$1" == "1" ]; then
     echo starting the reqfwdr...
     echo ${bin_dir}/rpcrouter $auth -r 1

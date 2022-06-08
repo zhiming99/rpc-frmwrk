@@ -250,17 +250,7 @@ void CIfSmokeTest::testCliStartStop()
         OutputMsg( ret, "Error, quit loop" );
     }
     // stop the proxy
-    ret = pIf->Stop();
-    if( ret == STATUS_PENDING )
-    {
-        // the underlying port is also stopping,
-        // wait till it is done. otherwise the
-        // iomanager's stop could go wrong
-        while( pIf->GetState() == stateStopped )
-            sleep( 1 );
-
-        ret = 0;
-    }
+    pIf->Stop();
 
     // release all the resources of the proxy
     pIf.Clear();
