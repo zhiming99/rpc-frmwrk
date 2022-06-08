@@ -14,7 +14,7 @@ else
     auth="";
 fi
 if [ "$1" == "2" ]; then
-    cat /proc/cpuinfo
+    ulimit -c unlimited
     echo starting the app server...
     echo ${bin_dir}/rpcf/ifsvrsmk
     ${bin_dir}/rpcf/ifsvrsmk &
@@ -29,6 +29,9 @@ if [ "$1" == "2" ]; then
     echo starting the bridge...
     echo ${bin_dir}/rpcrouter $auth -r 2 
     ${bin_dir}/rpcrouter $auth -r 2 &
+    sleep 15
+    sudo chmod -R +rwx /cores/*
+    ls /cores/*
 elif [ "$1" == "1" ]; then
     echo starting the reqfwdr...
     echo ${bin_dir}/rpcrouter $auth -r 1
