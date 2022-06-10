@@ -61,6 +61,11 @@ This project depends on the following 3rd-party packags at runtime:
 5. A tree-like hierarchical persistant registry.
 
 ---
+[`Thu Jun 09 2022 07:19:33 PM Beijing`]   
+1. Finished adding tests for kerberos connection to the github's workflow.
+2. Next is to add tests for websocket connection to the github's workflow as well as some tests for FUSE integration.
+3. The second stage of development for `rpcfs` is on the horizon. There are many things to do and I have to take some time to figure out the target to achieve.
+
 [`Wed May 25 2022 10:28:02 PM Beijing`]   
 1. Made the individual `service point` of a mounted file system restartable, and reloadable.
 2. There are still some more tests to do and the documentation for the FUSE integration.
