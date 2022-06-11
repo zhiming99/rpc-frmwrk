@@ -82,7 +82,7 @@ to work with `rpc-frmwrk` on such a simple network.
   last one day, and when it expires, the login session will ends.
   * In some environment when you cannot access `kdc` directly, `rpc-frmwrk` can provide a `kdc` communication channel for `kdc` 
   access via the RPC connection, thus you can use `kinit`, `kadmin` as usual. The approach is to symbolic link `libauth.so`
-  under the directory, `/usr/lib64/krb5/plugins/libkrb5`, for example. the directory name could vary from different distributions
+  under the directory, `/usr/lib/x86_64-linux-gnu/krb5/plugins/libkrb5`(ubuntu) or `/usr/lib64/krb5/plugins/libkrb5`(fedora), for example. the directory name could vary from different distributions
   or architectures.
   * The official document is at [here](https://web.mit.edu/kerberos/krb5-devel/doc/admin/install_clients.html)
   
