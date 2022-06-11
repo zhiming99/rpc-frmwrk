@@ -1,8 +1,10 @@
 keydir=$(pwd)/tools/testcfgs
-if [ ! -e /etc/ssl/certs/rpcf.key ]; then
-    ln -s $keydir/server.key /etc/ssl/certs/rpcf.key
+if [ ! -e /etc/ssl/private/rpcf.key ]; then
+    mkdir -p /etc/ssl/private || true
+    ln -s $keydir/server.key /etc/ssl/private/rpcf.key
 fi
 if [ ! -e /etc/ssl/certs/rpcf.crt ]; then
+    mkdir -p /etc/ssl/certs || true
     ln -s $keydir/server.crt /etc/ssl/certs/rpcf.crt
 fi
 
