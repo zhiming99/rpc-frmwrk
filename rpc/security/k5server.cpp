@@ -510,7 +510,7 @@ gint32 CK5AuthServer::SendKdcRequest(
     if( ret == STATUS_MORE_PROCESS_NEEDED )
     {
         // move on to create the proxy
-        return -STATUS_MORE_PROCESS_NEEDED;
+        ret = -STATUS_MORE_PROCESS_NEEDED;
     }
 
     if( ERROR( ret ) )

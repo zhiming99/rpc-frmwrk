@@ -5477,7 +5477,7 @@ gint32 CIfResponseHandler::OnTaskComplete( gint32 iRet )
             }
         }
 
-        if( ERROR( ret ) )
+        if( pVec.IsEmpty() || ERROR( ret ) )
         {
             // test whether response on this task
             // from an immediate return or

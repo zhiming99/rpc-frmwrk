@@ -153,12 +153,13 @@ gint32 CPortState::CanContinue(
     if( dwNewState > PORTSTAT_MAP_LEN )
         return -EINVAL;
 
+    guint32 dwCurState = 0;
     do{
         CStdRMutex a( GetLock() );
         if( m_vecStates.empty() )
             return ERROR_STATE;
 
-        guint32 dwCurState = m_vecStates.back();
+        dwCurState = m_vecStates.back();
         if( pdwOldState != nullptr )
             *pdwOldState = dwCurState;
 
@@ -254,8 +255,25 @@ gint32 CPortState::CanContinue(
 
     if( ERROR( ret ) )
     {
+        stdstr strName = "";
+        if( m_pPort != nullptr )
+        {
+            EnumClsid iClsid = m_pPort->GetClsid();
+            const char* pszName = CoGetClassName( iClsid );
+            if( pszName != nullptr )
+                strName = pszName;
+        }
+        guint32 dwMajorCmd =
+            pIrp->GetTopStack()->GetMajorCmd();
+
+        guint32 dwMinorCmd =
+            pIrp->GetTopStack()->GetMinorCmd();
+
         DebugPrint( ret,
-            "Failed to change port state" );
+            "Failed to change port %s state from %d to %d\n"
+            "\tmajor=%d, minor=%d", strName.c_str(),
+            dwCurState, dwNewState,
+            dwMajorCmd, dwMinorCmd );
     }
     
     return ret;

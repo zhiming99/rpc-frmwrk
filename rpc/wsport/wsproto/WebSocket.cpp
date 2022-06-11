@@ -150,7 +150,7 @@ gint32 WebSocket::makeHandshake(
         if( ERROR( ret ) )
             break;
 
-        if( vec_nodes.size() < 3 )
+        if( vec_nodes.size() < 2 )
         {
             ret = -EINVAL;
             break;
@@ -171,11 +171,20 @@ gint32 WebSocket::makeHandshake(
         strDomain += vec_nodes[ 1 ];
 
         string strPath = string( "/" );
-        strPath += vec_nodes[ 2 ];
+        if( vec_nodes.size() > 2 )
+        {
+            int i = 2;
+            for( ;i < vec_nodes.size(); ++i )
+            {
+                strPath += vec_nodes[ i ];
+                if( i < vec_nodes.size() - 1 )
+                    strPath.push_back( '/' );
+            }
+        }
 
         strCliReq = "GET ";
         strCliReq += strPath + " HTTP/1.1\r\n";
-        strCliReq += "Host: server.example.com\r\n";
+        strCliReq += "Host: " + vec_nodes[ 1 ] + "\r\n";
         strCliReq += "Upgrade: websocket\r\n";
         strCliReq += "Connection: Upgrade\r\n";
         strCliReq += "Sec-WebSocket-Key: " + key + "\r\n";
