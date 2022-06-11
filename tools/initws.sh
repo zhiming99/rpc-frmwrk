@@ -33,10 +33,10 @@ server {
     root /usr/share/nginx/html;
 
     location /chat {
-        proxy_set_header        Host $host;
-        proxy_set_header        X-Real-IP $remote_addr;
-        proxy_set_header        X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header        X-Forwarded-Proto $scheme;
+        proxy_set_header        Host \$host;
+        proxy_set_header        X-Real-IP \$remote_addr;
+        proxy_set_header        X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header        X-Forwarded-Proto \$scheme;
 
 
       # Fix the “It appears that your reverse proxy set up is broken" error.
@@ -48,7 +48,7 @@ server {
 
         # WebSocket support
         proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection "upgrade";
     }
 
@@ -80,7 +80,7 @@ if [ ! -e /etc/nginx/default.d ]; then
 fi
 
 tee /etc/nginx/default.d/ssl-redirect.conf <<EOF
-return 301 https://$host$request_uri/;
+return 301 https://\$host\$request_uri/;
 EOF
 
 kill -3 `pidof nginx`
