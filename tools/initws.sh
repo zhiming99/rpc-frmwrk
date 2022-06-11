@@ -27,7 +27,7 @@ server {
 
     ssl_certificate /etc/ssl/certs/rpcf.crt;
     ssl_certificate_key /etc/ssl/private/rpcf.key;
-    ssl_dhparam /etc/ssl/certs/dhparam.pem;
+    #ssl_dhparam /etc/ssl/certs/dhparam.pem;
     ssl_protocols       TLSv1.2 TLSv1.3;
     ssl_ciphers         HIGH:!aNULL:!MD5;
 
