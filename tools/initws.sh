@@ -46,7 +46,7 @@ server {
         proxy_ssl_certificate     /etc/ssl/certs/rpcf.crt;
         proxy_ssl_certificate_key /etc/ssl/private/rpcf.key;
    
-        proxy_read_timeout  90;
+        proxy_read_timeout  300s;
 
         # WebSocket support
         proxy_http_version 1.1;
