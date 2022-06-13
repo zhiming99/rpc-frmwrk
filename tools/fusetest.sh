@@ -42,8 +42,8 @@ echo "scale=10;$end-$start" | bc
 
 kill -9 `ps aux | grep mainsvr | grep -v grep | awk '{print $2}'`
 
-fusermount -u mp
-fusermount -u mpsvr
+fusermount3 -u mp
+fusermount3 -u mpsvr
 
 popd
 popd
