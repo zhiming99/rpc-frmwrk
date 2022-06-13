@@ -84,7 +84,8 @@ gint32 EmitBuildJsonReq(
     Wa( "else" );
     Wa( "    oJsReq[ JSON_ATTR_MSGTYPE ] = \"req\";" );
 
-    Wa( "oJsReq[ JSON_ATTR_REQCTXID ] = qwReqId;" );
+    Wa( "oJsReq[ JSON_ATTR_REQCTXID ] =" );
+    Wa( "    ( Json::UInt64& )qwReqId;" );
     NEW_LINE;
     Wa( "Json::StreamWriterBuilder oBuilder;" );
     Wa( "oBuilder[\"commentStyle\"] = \"None\";" );
@@ -2215,7 +2216,8 @@ gint32 CImplIfMethodProxyFuse::OutputAsync()
             Wa( "if( ret == STATUS_PENDING )" );
             BLOCK_OPEN;
             Wa( "guint64 qwTaskId = oResp_[ propTaskId ];" );
-            Wa( "oJsResp[ JSON_ATTR_REQCTXID ] = qwReqId;" );
+            Wa( "oJsResp[ JSON_ATTR_REQCTXID ] =" );
+            Wa( "    ( Json::UInt64& )qwReqId;" );
             CCOUT << "CCfgOpener oContext( context );";
             NEW_LINE;
             CCOUT <<"oContext.SetQwordProp(";
@@ -2272,7 +2274,8 @@ gint32 CImplIfMethodProxyFuse::OutputAsync()
             Wa( "if( ret == STATUS_PENDING )" );
             BLOCK_OPEN;
             Wa( "guint64 qwTaskId = oResp_[ propTaskId ];" );
-            Wa( "oJsResp[ JSON_ATTR_REQCTXID ] = qwReqId;" );
+            Wa( "oJsResp[ JSON_ATTR_REQCTXID ] =" );
+            Wa( "    ( Json::UInt64& )qwReqId;" );
             CCOUT << "CCfgOpener oContext( context );";
             NEW_LINE;
             CCOUT <<"oContext.SetQwordProp(";
@@ -3058,7 +3061,8 @@ gint32 CImplServiceImplFuse::Output()
             Wa( "oResp[ JSON_ATTR_MSGTYPE ] = \"resp\";" );
             Wa( "oResp[ JSON_ATTR_METHOD ] = strMethod;" );
             Wa( "oResp[ JSON_ATTR_IFNAME ] = strIfName;" );
-            Wa( "oResp[ JSON_ATTR_REQCTXID ] = qwReqId;" );
+            Wa( "oResp[ JSON_ATTR_REQCTXID ] =" );
+            Wa( "    ( Json::UInt64& )qwReqId;" );
             Wa( "if( this->GetState() != stateConnected )" );
             Wa( "{ ret = -ENOTCONN; break; }" );
             Wa( "CParamList oCtx_( pContext );" );
@@ -3166,7 +3170,8 @@ gint32 CImplServiceImplFuse::Output()
             Wa( "    \"UserCancelRequest\";" );
             Wa( "oJsResp[ JSON_ATTR_MSGTYPE ] = \"resp\";" );
             Wa( "oJsResp[ JSON_ATTR_RETCODE ] = iRet;" );
-            Wa( "oJsResp[ JSON_ATTR_REQCTXID ] = qwReqId;" );
+            Wa( "oJsResp[ JSON_ATTR_REQCTXID ] =" );
+            Wa( "    ( Json::UInt64& )qwReqId;" );
             Wa( "Json::StreamWriterBuilder oBuilder;" );
             Wa( "oBuilder[\"commentStyle\"] = \"None\";" );
             CCOUT <<  "stdstr strResp = Json::writeString( "
