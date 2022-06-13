@@ -1,7 +1,7 @@
 //   Java: 'ridlc -jO . -Porg.rpcf.tests hellowld.ridl'
 // Python: 'mkdir hellowld; ridlc -pO ./hellowld hellowld.ridl'
 //    C++: 'mkdir hellowld; ridlc -O ./hellowld hellowld.ridl'
-//   FUSE: 'mkdir hellowld; ridlc -fO ./hellowld hellowld.ridl'
+//   FUSE: 'mkdir hellowld; ridlc -f -O ./hellowld hellowld.ridl'
 
 // declare the name of the application
 appname "HelloWorld";

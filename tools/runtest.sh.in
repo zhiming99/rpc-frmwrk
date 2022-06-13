@@ -330,5 +330,6 @@ elif [ "$1" == "1" ]; then
     
 # leaving examples
     popd
-
+    echo start fuse test
+    bash tools/fusetest.sh
 fi

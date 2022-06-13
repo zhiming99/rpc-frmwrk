@@ -1,6 +1,7 @@
 //   Java: 'ridlc -jO . -Porg.rpcf.tests testypes.ridl'
 // Python: 'mkdir testypes; ridlc -pO ./testypes testypes.ridl'
 //    C++: 'mkdir testypes; ridlc -O ./testypes testypes.ridl'
+//   FUSE: 'mkdir testypes; ridlc -f -O ./testypes testypes.ridl'
 
 // this example demonstrates different data types an interface can accept
 
