@@ -721,7 +721,7 @@ gint32 CJsonSerialBase::DeserializeUInt64(
     gint32 ret = Deserialize( pBuf, qwVal );
     if( ERROR( ret ) )
         return ret;
-    val = qwVal;
+    val = ( Json::UInt64& )qwVal;
     return STATUS_SUCCESS;
 }
 
