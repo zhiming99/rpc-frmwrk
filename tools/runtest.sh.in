@@ -1,5 +1,5 @@
 lib_dir=@libdir@
-bin_dir=@bindir@
+export bin_dir=@bindir@
 etc_dir=@sysconfdir@/rpcf
 export LD_LIBRARY_PATH=${lib_dir}:${lib_dir}/rpcf
 if [ "x$2" == "xk" ]; then
