@@ -425,7 +425,7 @@ gint32 CJsonSerialBase::SerializeFromStr(
         {
             guint64 qwVal = ( guint64 )strtoull(
                 strKey.c_str(), nullptr, 0 );
-            Value valStm( qwVal );
+            Value valStm( ( Json::UInt64& )qwVal );
             ret = SerializeHStream( pBuf, valStm );
             break;
         }
