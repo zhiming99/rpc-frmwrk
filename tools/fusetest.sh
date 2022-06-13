@@ -8,7 +8,7 @@ else
     mkdir testypes
 fi
 
-$bindir/ridlc -f -O ./testypes ../testypes.ridl
+$bin_dir/ridlc -f -O ./testypes ../testypes.ridl
 pushd testypes
 make || exit 10
 
@@ -40,6 +40,7 @@ done
 end=$(date +%s.%N)
 echo "scale=10;$end-$start" | bc
 
+echo kill -9 `ps aux | grep mainsvr | grep -v grep | awk '{print $2}'`
 kill -9 `ps aux | grep mainsvr | grep -v grep | awk '{print $2}'`
 
 fusermount3 -u mp
