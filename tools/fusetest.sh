@@ -25,14 +25,14 @@ sleep 5
 python3 $pydir/testypes/mainsvr.py mpsvr/TestTypesSvc 0 &
 
 start=$(date +%s.%N)
-for((i=0;i<100;i++));do
+for((i=0;i<200;i++));do
     python3 $pydir/testypes/maincli.py mp/connection_0/TestTypesSvc $i &
 done
 
 #wait
 for((i=0;i<1000;i++)); do
 count=`jobs | grep 'maincli.py'|wc -l`
-if [ count == '100' ]; then
+if [ count == '200' ]; then
     break
 fi
 done

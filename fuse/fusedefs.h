@@ -72,7 +72,7 @@
 #define CONN_DIR_PREFIX "connection_"
 
 #define MAX_STREAMS_PER_SVC 1024
-#define MAX_STREAMS_PER_SESS 16
+#define MAX_STREAMS_PER_SESS 256
 
 // don't modify these values
 #define MAX_STM_QUE_SIZE   32     // STM_MAX_PACKETS_REPORT
