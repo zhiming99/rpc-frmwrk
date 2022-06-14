@@ -127,7 +127,7 @@ static void fuseif_do_prepare_interrupt(
     fuse_req_interrupt_func(req, fuseif_rwinterrupt, d);
 }       
         
-inline void fuseif_finish_interrupt(
+void fuseif_finish_interrupt(
     fuse *f, fuse_req_t req,
     fuseif_intr_data *d)
 {   
@@ -135,7 +135,7 @@ inline void fuseif_finish_interrupt(
         fuseif_do_finish_interrupt(f, req, d);
 }       
 
-inline void fuseif_prepare_interrupt(
+void fuseif_prepare_interrupt(
     fuse *f, fuse_req_t req,
     fuseif_intr_data *d)
 {              
