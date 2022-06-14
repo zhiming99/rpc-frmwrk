@@ -115,7 +115,7 @@ def test() :
             res = strBufr.encode()
             binBufr = base64.b64decode(res)
             bufsize = len( binBuf )
-            print( binBufr[bufsize - 128:bufsize] )
+            print( binBuf[bufsize - 128:bufsize] )
 
             # EchoArray
             req = BuildReqHdr( "EchoArray", idx )

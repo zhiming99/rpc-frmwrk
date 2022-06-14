@@ -42,7 +42,8 @@ def EchoByteArray( req : object )->object :
         resp = BuildRespHdr('EchoByteArray', req['RequestId'])
         res = req[ 'Parameters']['pBuf'].encode()
         bytearr = base64.b64decode(res)
-        print(bytearr)
+        bufsize = len(bytearr)
+        print(bytearr[bufsize-128:bufsize])
         AddParameter(resp, 'pRespBuf', req['Parameters']['pBuf'])
         return resp
     except Exception as err:
