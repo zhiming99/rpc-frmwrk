@@ -18,7 +18,7 @@ release/TestTypescli mp &
 
 pydir=$basedir/fuse/examples/python
 if [ ! -e $pydir/testypes/iolib.py ]; then
-    ln -s $pydir/iolib.py testypes/ || exit 10
+    ln -s $pydir/iolib.py $pydir/testypes/ || exit 10
 fi
 sleep 5 
 
