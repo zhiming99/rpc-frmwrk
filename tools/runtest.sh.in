@@ -23,7 +23,7 @@ if [ "$1" == "2" ]; then
     echo ${bin_dir}/rpcf/prsvrtst
     ${bin_dir}/rpcf/prsvrtst &
     echo ${bin_dir}/rpcf/stmsvrtst
-    ${bin_dir}/rpcf/stmsvrtst &
+    ${bin_dir}/rpcf/stmsvrtst > /dev/null &
     echo starting the bridge...
     echo ${bin_dir}/rpcrouter $auth -r 2 
     ${bin_dir}/rpcrouter $auth -r 2
