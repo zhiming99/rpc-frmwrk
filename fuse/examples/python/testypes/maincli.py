@@ -114,7 +114,8 @@ def test() :
             strBufr = objResp[ "Parameters"]["pRespBuf"]
             res = strBufr.encode()
             binBufr = base64.b64decode(res)
-            print( binBufr )
+            bufsize = len( binBuf )
+            print( binBufr[bufsize - 128:bufsize] )
 
             # EchoArray
             req = BuildReqHdr( "EchoArray", idx )
@@ -174,7 +175,7 @@ def test() :
             idx += 1
             AddParameter(req, "hstm", "stream_" + num )
             sendReq( reqfp, req )
-            stmfp.write(binBuf[0:64*1024])
+            stmfp.write(binBuf[0:8*1024])
             objResp = recvResp( respfp )[0]
             error = objResp[ "ReturnCode"]
             if error < 0 :
@@ -184,7 +185,8 @@ def test() :
                 notifylist = select.select( inputs, [], [] )
                 binBuf = stmfp.read(8*1024)
             hstmr = objResp[ 'Parameters']["hstmr"]
-            print( binBuf )
+            bufsize = len( binBuf )
+            print(binBuf[ bufsize - 128 : bufsize ])
             print( 'EchoStream %s completed with %s' % ( num, hstmr ))
             break
 
