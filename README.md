@@ -64,7 +64,7 @@ This project depends on the following 3rd-party packags at runtime:
     * a surrogate program to host multiple `serivce point` objects
     * more commands for the `commands` file
     * a management `rpcfs` for `rpcrouter`
-    * Runtime configuration files similiar to the Linux's `proc` filesystem.
+    * Runtime configuration files similiar to the `sysfs` filesystem.
 
 [`Thu Jun 09 2022 07:19:33 PM Beijing`]   
 1. Finished adding tests for kerberos connection to the github's workflow.
