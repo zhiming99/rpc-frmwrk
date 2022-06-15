@@ -59,12 +59,12 @@ This project depends on the following 3rd-party packags at runtime:
 ---
 [`Wed Jun 15 2022 10:29:58 AM Beijing`]   
 1. So far the workflow has covered all the types of the connections rpc-frmwrk supports.
-2. I have also added a `rpcfs` testcase. 
+2. And added a `rpcfs` testcase. 
 3. Next I will add more mangement and user interface supports to `rpcfs` and `rpcrouter`, including
-    * a surrogate program to host `serivce point` objects
+    * a surrogate program to host multiple `serivce point` objects
     * more commands for the `commands` file
     * a management `rpcfs` for `rpcrouter`
-    * configuration files similiar to the Linux's `proc` filesystem.
+    * Runtime configuration files similiar to the Linux's `proc` filesystem.
 
 [`Thu Jun 09 2022 07:19:33 PM Beijing`]   
 1. Finished adding tests for kerberos connection to the github's workflow.
