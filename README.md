@@ -14,7 +14,7 @@ This is an asynchronous and event-driven RPC implementation for embeded system w
 5. `Simultaneous object access over network and IPC.` 
 6. `Peer online/offline awareness.`
 7. `Publishing multiple local/remote object services via single network port.`
-8. [`Full-duplex streaming transfer`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md#streaming)
+8. [`Full-duplex streaming channels`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md#streaming)
 9. [`Secure Socket Layer (SSL) support`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/sslport/Readme.md)
 10. [`Websocket support`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/wsport/Readme.md)
 11. [`Object access via Multihop routing`](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support)
@@ -60,10 +60,10 @@ This project depends on the following 3rd-party packags at runtime:
 [`Wed Jun 15 2022 10:29:58 AM Beijing`]   
 1. So far the workflow has covered all the types of the connections rpc-frmwrk supports.
 2. I have also added a `rpcfs` testcase. 
-3. Next I will add more mangement and user interface related supports to `rpcfs` and `rpcrouter`, including
+3. Next I will add more mangement and user interface supports to `rpcfs` and `rpcrouter`, including
     * a surrogate program to host `serivce point` objects
     * more commands for the `commands` file
-    * an `rpcfs` for `rpcrouter` for management purpose
+    * a management `rpcfs` for `rpcrouter`
     * configuration files similiar to the Linux's `proc` filesystem.
 
 [`Thu Jun 09 2022 07:19:33 PM Beijing`]   
