@@ -51,13 +51,21 @@ This project depends on the following 3rd-party packags at runtime:
 9. `Java OpenJDK 8 for Java support.`
 
 #### Todo
-1. FUSE integration ( coming soon ).
-2. Tutorials
-3. Performance Tuning
-4. Adaptive flow control
-5. A tree-like hierarchical persistant registry.
+1. Tutorials
+2. Performance Tuning
+3. Adaptive flow control
+4. A tree-like hierarchical persistant registry.
 
 ---
+[`Wed Jun 15 2022 10:29:58 AM Beijing`]   
+1. So far the workflow has covered all the types of the connections rpc-frmwrk supports.
+2. I have also added a `rpcfs` testcase. 
+3. Next I will add more mangement and user interface related supports to `rpcfs` and `rpcrouter`, including
+    * a surrogate program to host `serivce point` objects
+    * more commands for the `commands` file
+    * an `rpcfs` for `rpcrouter` for management purpose
+    * configuration files similiar to the Linux's `proc` filesystem.
+
 [`Thu Jun 09 2022 07:19:33 PM Beijing`]   
 1. Finished adding tests for kerberos connection to the github's workflow.
 2. Next is to add tests for websocket connection to the github's workflow as well as some tests for FUSE integration.
