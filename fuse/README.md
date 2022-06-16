@@ -35,10 +35,13 @@ Let's use the above generated `rpcfs` to illustrate the control flow.
 * The stream channel has flow control, and if the peer has too many data accumulated in the stream file, the sending party will fail till the peer has consumed some of them, that is, `write` operation will fail with `EAGAIN` till flow control lifted.
 * The advantage of the stream channel is that it is much faster than the request/reponse transfer. And it's limitations is size, 2^64 the maximum, compared to 1MB limit per request.
 
-### Managing the Concurrency in the Server and the Client
-You can increase the volume of concurrency and throughput for request handling by sharing the fd between thread, 
-or creating new request files `jreq_XXX` , or adding new instances of `service point` on both client and server sides.
-And vice versa, you can reduce the resource load by `rm jreq_1` or `rmdir service_point` or your favorite file removing functions. 
+### Managing the Concurrency with `rpcfs`
+According to the above `rpcfs` struture, You can increase the concurrency and throughput for request handling by
+ * Sharing the request/response files between threads, 
+ * Creating new request files like `jreq_XXX` 
+ * Making directories like `TestTypesSvcXXX_XXX` under the same parent directory as `TestTypesSvc`.
+
+And vice versa, by removing `jreq_XXX` or `TestTypesSvcXXX_XXX`, you can reduce the concurrency or the resource load. 
 ### Terminology
   * `rpcfs` is  an RPC system with the file system as its interface, but not a filesystem accessed via RPC.
   * `service point` is either the server object or proxy object at the either end of an RPC connection.
