@@ -54,4 +54,4 @@ openssl req -x509 -newkey rsa:4096 -nodes -keyout key.pem -out cert.pem -days 36
             ......
         }
 ```
-* Note that, you can use the tool [`rpcfg.py`](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools#rpc-router-config-tool) to set the options without editing the json files.
+* Note that, you can use the tool [`rpcfg.py`](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools#rpc-router-config-tool) to set the options without editing the json files manually.
