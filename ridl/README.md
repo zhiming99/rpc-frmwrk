@@ -114,6 +114,8 @@ The above example shows most of the statements ridl supports. ridl now has 7 typ
 
         -j:     To generate Java skelton files       
         
+        -f:     To generate `FUSE integration` skelton files.
+        
         -P:     To specify the prefix for the target java package. The java package name would be
                 <prefix>.<appname>.
         
