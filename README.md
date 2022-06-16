@@ -14,7 +14,7 @@ This is an asynchronous and event-driven RPC implementation for embeded system w
 5. `Simultaneous object access over network and IPC.` 
 6. `Peer online/offline awareness.`
 7. `Publishing multiple local/remote object services via single network port.`
-8. [`Full-duplex streaming transfer`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md#streaming)
+8. [`Full-duplex streaming channels`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md#streaming)
 9. [`Secure Socket Layer (SSL) support`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/sslport/Readme.md)
 10. [`Websocket support`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/wsport/Readme.md)
 11. [`Object access via Multihop routing`](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support)
@@ -25,7 +25,7 @@ This is an asynchronous and event-driven RPC implementation for embeded system w
 16. [`rpcfs - filesystem interface for rpc-frmwrk`(soon)](https://github.com/zhiming99/rpc-frmwrk/tree/master/fuse/README.md)
 
 #### Building `rpc-frmwrk`   
-Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60) for details.
+Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60) for detail description.
 #### Install & Run
 1. Using the config tool to setup the parameters `rpc-frwmrk` requires. [Here](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools/README.md) is the illustration of the configuration tool.
 2. After you have successfully build `rpc-frmwrk`, typing `sudo make install` will install `rpc-frmwrk` to the system.
@@ -51,13 +51,21 @@ This project depends on the following 3rd-party packags at runtime:
 9. `Java OpenJDK 8 for Java support.`
 
 #### Todo
-1. FUSE integration ( coming soon ).
-2. Tutorials
-3. Performance Tuning
-4. Adaptive flow control
-5. A tree-like hierarchical persistant registry.
+1. Tutorials
+2. Performance Tuning
+3. Adaptive flow control
+4. A tree-like hierarchical persistant registry.
 
 ---
+[`Wed Jun 15 2022 10:29:58 AM Beijing`]   
+1. So far the workflow has covered all the types of the connections rpc-frmwrk supports.
+2. And added a `rpcfs` testcase. 
+3. Next I will add more mangement and user interface supports to `rpcfs` and `rpcrouter`, including
+    * a surrogate program to host multiple `serivce point` objects
+    * more commands for the `commands` file
+    * a management `rpcfs` for `rpcrouter`
+    * Runtime configuration files similiar to the `sysfs` filesystem.
+
 [`Thu Jun 09 2022 07:19:33 PM Beijing`]   
 1. Finished adding tests for kerberos connection to the github's workflow.
 2. Next is to add tests for websocket connection to the github's workflow as well as some tests for FUSE integration.
