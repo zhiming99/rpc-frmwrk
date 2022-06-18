@@ -202,6 +202,7 @@ class CIoWatchTask:
     // stateStopped, the stream is closed
     std::atomic< EnumIfState > m_dwState;
     gint32 m_iWatTimerId;
+    MloopPtr m_pLoop;
 
     protected:
 
@@ -236,6 +237,12 @@ class CIoWatchTask:
             return -1;
         return iFd;
     }
+
+    inline MloopPtr GetMainLoop() const
+    { return m_pLoop; }
+
+    inline void SetMainLoop( MloopPtr pLoop )
+    { m_pLoop = pLoop; }
 
     // watch handler for error
     inline gint32 OnIoError( guint32 revent )
@@ -450,6 +457,12 @@ class CUnixSockBusPort :
     virtual gint32 CreatePdoPort(
         IConfigDb* pConfig,
         PortPtr& pNewPort );
+
+    virtual gint32 PreStart(
+        IRP* pIrp ) override;
+
+    virtual gint32 PostStop(
+        IRP* pIrp ) override;
 };
 
 class CUnixSockBusDriver :

@@ -726,12 +726,15 @@ gint32 CIoWatchTask::RunTask()
         }
         
         CIoManager* pMgr = pPort->GetIoMgr();
-        CMainIoLoop* pLoop = pMgr->GetMainIoLoop();
-        if( unlikely( pLoop == nullptr ) )
-        {
-            ret = -EFAULT;
+        CLoopPools& oLoops = pMgr->GetLoopPools();
+        MloopPtr pLoop;
+        ret = oLoops.AllocMainLoop(
+            UXSOCK_TAG, pLoop );
+
+        if( ERROR( ret ) )
             break;
-        }
+
+        SetMainLoop( pLoop );
 
         oCfg.Push( m_iFd );
         oCfg.Push( ( guint32 )POLLIN );
@@ -906,8 +909,7 @@ gint32 CIoWatchTask::StartStopWatch(
         return -EFAULT;
 
     do{
-        CIoManager* pMgr = pPort->GetIoMgr();
-        CMainIoLoop* pLoop = pMgr->GetMainIoLoop();
+        CMainIoLoop* pLoop = GetMainLoop();
 
 #ifdef _USE_LIBEV
         HANDLE hWatch = m_hWriteWatch;
@@ -1039,11 +1041,8 @@ gint32 CIoWatchTask::OnIoReady( guint32 revent )
 gint32 CIoWatchTask::ReleaseChannel()
 {
     do{
-        CIoManager* pMgr = GetIoMgr();
-        CMainIoLoop* pLoop =
-            pMgr->GetMainIoLoop();
-
-        if( unlikely( pLoop == nullptr ) )
+        MloopPtr pLoop = GetMainLoop();
+        if( unlikely( pLoop.IsEmpty() ) )
             break;
 
         pLoop->RemoveIoWatch( m_hReadWatch );
@@ -1053,6 +1052,15 @@ gint32 CIoWatchTask::ReleaseChannel()
         m_hWriteWatch = INVALID_HANDLE;
         m_hErrWatch = INVALID_HANDLE;
         StopTimer();
+
+        IPort* pPort = m_pPort;
+        if( pPort == nullptr )
+            break;
+
+        CLoopPools& oLoops =
+            GetIoMgr()->GetLoopPools();
+        oLoops.ReleaseMainLoop(
+            UXSOCK_TAG, pLoop );
 
     }while( 0 );
 
@@ -2351,6 +2359,30 @@ gint32 CUnixSockBusPort::CreateUxStreamPdo(
     }while( 0 );
 
     return ret;
+}
+
+gint32 CUnixSockBusPort::PreStart( IRP* pIrp )
+{
+    CIoManager* pMgr = GetIoMgr();
+    CLoopPools& oPools = pMgr->GetLoopPools();
+
+    guint32 dwCount = std::max( 1U,
+        pMgr->GetNumCores() >> 1 );
+
+    gint32 ret = oPools.CreatePool(
+        UXSOCK_TAG, "UxLoop-", dwCount, 20 );
+    if( ERROR( ret ) )
+        return ret;
+
+    return super::PreStart( pIrp );
+}
+
+gint32 CUnixSockBusPort::PostStop( IRP* pIrp )
+{
+    gint32 ret = 0; 
+    CIoManager* pMgr = GetIoMgr();
+    CLoopPools& oPools = pMgr->GetLoopPools();
+    return oPools.DestroyPool( UXSOCK_TAG );
 }
 
 }
