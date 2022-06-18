@@ -57,6 +57,9 @@ This project depends on the following 3rd-party packags at runtime:
 4. A tree-like hierarchical persistant registry.
 
 ---
+[`Sat Jun 18 2022 09:28:10 PM Beijing`]   
+1. Made a performance optimization by polling the stream channels on a dedicated group of loops different from the previous DBus's loop. It will improve the throughtput when there are a large number stream channels and heavy traffics.
+
 [`Wed Jun 15 2022 10:29:58 AM Beijing`]   
 1. So far the workflow has covered all the types of the connections rpc-frmwrk supports.
 2. And added a `rpcfs` testcase. 
