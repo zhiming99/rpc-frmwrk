@@ -367,6 +367,12 @@ template<> struct std::less<rpcf::MloopPtr>
     }
 };
 
+template <> struct std::hash<rpcf::MloopPtr>
+{
+  auto operator()(const rpcf::MloopPtr& r1 ) const -> size_t
+  { return r1->GetObjId(); }
+};
+
 #ifdef _USE_LIBEV
 #include "evloop.h"
 namespace rpcf

@@ -1,7 +1,7 @@
 lib_LTLIBRARIES=libipc.la
 
 libipc_la_SOURCES = \
-stream.cpp portex.cpp iftasks.cpp ifstat.cpp \
+loopool.cpp stream.cpp portex.cpp iftasks.cpp ifstat.cpp \
 rpcif.cpp sevpoll.cpp counters.cpp \
 connmgr.cpp filetran.cpp mainloop.cpp dllexp.cpp \
 evloop.cpp dbushook.cpp irp.cpp irpthread.cpp \
@@ -15,7 +15,7 @@ prxyfdo.cpp dbusprxy.cpp fdodrv.cpp
 include_dir=$(top_srcdir)/include
 
 rpcfipc_HEADERS=  \
-connhelp.h counters.h dbusport.h emaphelp.h \
+loopool.h connhelp.h counters.h dbusport.h emaphelp.h \
 evloop.h filetran.h frmwrk.h ifhelper.h \
 ifstat.h iftasks.h iiddict.h irp.h jsondef.h \
 mainloop.h msgmatch.h namespc.h port.h \

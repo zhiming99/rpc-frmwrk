@@ -718,6 +718,12 @@ CIoManager::GetTaskThreadPool() const
     return *m_pTaskThrdPool;
 }
 
+CLoopPools&
+CIoManager::GetLoopPools() const
+{
+    return *m_pLPools;
+}
+
 ObjPtr&
 CIoManager::GetSyncIf() const
 {
@@ -1425,6 +1431,7 @@ gint32 CIoManager::Start()
 
         GetTaskThreadPool().Start();
         GetIrpThreadPool().Start();
+        GetLoopPools().Start();
 
         // this task will be executed in the
         // mainloop
@@ -1815,6 +1822,11 @@ CIoManager::CIoManager( const std::string& strModName ) :
 
         Sem_Init( &m_semSync, 0, 0 );
 
+        ret = m_pLPools.NewObj(
+            clsid( CLoopPools ), pCfg );
+        if( ERROR( ret ) )
+            break;
+
         Json::Value& oCfg = m_pDrvMgr->GetJsonCfg();
         if( oCfg == Json::Value::null )
         {
@@ -2189,6 +2201,7 @@ gint32 CIoMgrStopTask::operator()(
         }
         ret = pMgr->GetTaskThreadPool().Stop();
         ret = pMgr->GetIrpThreadPool().Stop();
+        ret = pMgr->GetLoopPools().Stop();
         ret = pMgr->GetMainIoLoop()->Stop();
         ret = pMgr->GetUtils().Stop();
     }

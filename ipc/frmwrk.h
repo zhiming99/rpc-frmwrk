@@ -35,6 +35,7 @@
 #include "port.h"
 #include "portdrv.h"
 #include "mainloop.h"
+#include "loopool.h"
 
 namespace rpcf
 {
@@ -334,6 +335,7 @@ class CIoManager : public IService
     UtilsPtr                    m_pUtils;
     PnpMgrPtr                   m_pPnpMgr;
     sem_t                       m_semSync;
+    LPoolsPtr                   m_pLPools;
 
     // currently we allow only one instance of
     // CIoManager in a process. we use
@@ -471,6 +473,7 @@ class CIoManager : public IService
     CThreadPool& GetTaskThreadPool() const;
     const std::string& GetModName() const;
     sem_t* GetSyncSem() const;
+    CLoopPools& GetLoopPools() const;
 
     ObjPtr& GetSyncIf() const;
 

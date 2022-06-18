@@ -800,7 +800,7 @@ gint32 CSimpleEvPoll::RunLoop()
             pPollInfo, iReadyCount );
     }
 
-    return 0;
+    return ret;
 }
 
 CIoManager* CSimpleEvPoll::GetIoMgr()

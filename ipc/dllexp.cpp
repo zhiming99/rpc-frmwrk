@@ -43,6 +43,7 @@
 #include "portex.h"
 #include "prxyport.h"
 #include "fdodrv.h"
+#include "loopool.h"
 
 #include <dlfcn.h>
 
@@ -181,6 +182,8 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CDBusLoopHooks );
     INIT_MAP_ENTRYCFG( CEvLoopStopCb );
     INIT_MAP_ENTRYCFG( CEvLoopAsyncCallback );
+    INIT_MAP_ENTRYCFG( CLoopPool );
+    INIT_MAP_ENTRYCFG( CLoopPools );
 
 #endif
 

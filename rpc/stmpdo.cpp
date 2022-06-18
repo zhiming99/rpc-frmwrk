@@ -734,35 +734,10 @@ gint32 CRpcTcpBusPort::CreateMLoopPool()
                 dwCount = dwNumCores >> 1;
         }
 
-        for( int i = 0; i < dwCount; ++i )
-        {
-            CParamList oCfg;
-            oCfg.SetPointer( propIoMgr,
-                this->GetIoMgr() );
-            std::string strName( "SockLoop-" );
-            strName += std::to_string( i );
+        CLoopPools& oPools = pMgr->GetLoopPools();
+        ret = oPools.CreatePool( NETSOCK_TAG,
+            "SockLoop-", dwCount, 20 );
 
-            // thread name
-            oCfg.Push( strName );
-
-            // start new thread
-            oCfg.Push( true );
-
-            MloopPtr pLoop;
-            ret = pLoop.NewObj(
-                clsid( CMainIoLoop ),
-                oCfg.GetCfg() );
-
-            if( ERROR( ret ) )
-                break;
-
-            ret = pLoop->Start();
-            if( ERROR( ret ) )
-                break;
-
-            m_mapLoops[ pLoop ] = 0;
-        }
-            
     }while( 0 );
 
    return ret;
@@ -771,79 +746,30 @@ gint32 CRpcTcpBusPort::CreateMLoopPool()
 gint32 CRpcTcpBusPort::DestroyMLoopPool()
 {
     gint32 ret = 0; 
-    do{
-        guint32 dwCount =
-            GetIoMgr()->GetNumCores();
-        for( auto elem : m_mapLoops )
-        {
-            CMainIoLoop* pLoop = elem.first;
-            gint32 iRet = pLoop->GetError();
-            if( iRet == STATUS_PENDING )
-                iRet = 0;
-            // don't call pLoop->Stop, which is
-            // dedicated to stop the mainloop
-            pLoop->WakeupLoop( aevtStop, iRet );
-            pLoop->WaitForQuit();
-        }
-        m_mapLoops.clear();
-
-    }while( 0 );
-    return ret;
+    CIoManager* pMgr = GetIoMgr();
+    CLoopPools& oPools = pMgr->GetLoopPools();
+    return oPools.DestroyPool( NETSOCK_TAG );
 }
 
 gint32 CRpcTcpBusPort::AllocMainLoop(
     MloopPtr& pLoop )
 {
-    /*if( !m_bRfc )
-    {
-        pLoop = GetIoMgr()->GetMainIoLoop();
-        return STATUS_SUCCESS;
-    }*/
-
-    gint32 ret = STATUS_SUCCESS;
-    do{
-        CStdRMutex oLock( GetLock() );
-        guint32 dwCount = 10000;
-        LOOPMAP_ITR itr = m_mapLoops.begin();
-        LOOPMAP_ITR itrRet = itr;
-        for( ; itr != m_mapLoops.end(); ++itr )
-        {
-            if( dwCount > itr->second )
-            {
-                itrRet = itr;
-                dwCount = itr->second;
-            }
-        }
-
-        ++itrRet->second;
-        pLoop = itrRet->first;
-
-    }while( 0 );
-
-    return ret;
+    CIoManager* pMgr = GetIoMgr();
+    CLoopPools& oPools = pMgr->GetLoopPools();
+    return oPools.AllocMainLoop(
+        NETSOCK_TAG, pLoop );
 }
 
 gint32 CRpcTcpBusPort::ReleaseMainLoop(
     MloopPtr& pLoop )
 {
-    /*if( !m_bRfc )
-        return STATUS_SUCCESS;*/
-
     if( pLoop.IsEmpty() )
         return -EINVAL;
 
-    gint32 ret = 0;
-    do{
-        CStdRMutex oLock( GetLock() );
-        LOOPMAP_ITR itr =
-            m_mapLoops.find( pLoop );
-        if( itr == m_mapLoops.end() )
-            break;
-        --itr->second;
-
-    }while( 0 );
-
-    return ret;
+    CIoManager* pMgr = GetIoMgr();
+    CLoopPools& oPools = pMgr->GetLoopPools();
+    return oPools.ReleaseMainLoop(
+        NETSOCK_TAG, pLoop );
 }
 
 gint32 CRpcTcpBusPort::PreStart( IRP* pIrp )
@@ -862,9 +788,6 @@ gint32 CRpcTcpBusPort::PreStart( IRP* pIrp )
         else
             m_bRfc = bRfc;
 
-        /*if( !m_bRfc )
-            break;*/
-
         ret = CreateMLoopPool();
         if( ERROR( ret ) )
             return ret;
@@ -877,8 +800,7 @@ gint32 CRpcTcpBusPort::PreStart( IRP* pIrp )
 gint32 CRpcTcpBusPort::PostStop( IRP* pIrp )
 {
     gint32 ret = 0;
-    //if( m_bRfc )
-        ret = DestroyMLoopPool();
+    ret = DestroyMLoopPool();
     if( ERROR( ret ) )
         return ret;
     return super::PostStop( pIrp );

@@ -265,31 +265,39 @@ gint32 CEvLoop::Start()
     // now we have a way to inject the command
     // to the main loop
     HANDLE hAsync = INVALID_HANDLE;
-    TaskletPtr pTask;
-    CParamList oParams;
-    oParams.Push( ObjPtr( this ) );
-    gint32 ret = pTask.NewObj(
-        clsid( CEvLoopAsyncCallback ),
-        oParams.GetCfg() );
-    if( ERROR( ret ) )
-        return ret;
+    gint32 ret = 0;
+    do{
+        TaskletPtr pTask;
+        CParamList oParams;
+        oParams.Push( ObjPtr( this ) );
+        ret = pTask.NewObj(
+            clsid( CEvLoopAsyncCallback ),
+            oParams.GetCfg() );
+        if( ERROR( ret ) )
+            break;
 
-    CParamList oTaskCfg(
-        ( IConfigDb* )pTask->GetConfig() );
-    oTaskCfg.ClearParams();
-    // Start immediately
-    oTaskCfg.Push( m_iPiper );
-    // flags for poll
-    guint32 dwCond = POLLIN;
-    oTaskCfg.Push( dwCond );
-    oTaskCfg.Push( true );
-    ret = AddIoWatch( pTask, hAsync );
-    if( ERROR( ret ) )
-        return ret;
+        CParamList oTaskCfg(
+            ( IConfigDb* )pTask->GetConfig() );
+        oTaskCfg.ClearParams();
+        // Start immediately
+        oTaskCfg.Push( m_iPiper );
+        // flags for poll
+        guint32 dwCond = POLLIN;
+        oTaskCfg.Push( dwCond );
+        oTaskCfg.Push( true );
+        ret = AddIoWatch( pTask, hAsync );
+        if( ERROR( ret ) )
+            break;
 
-    OnPreLoop();
-    ret = RunLoop();
-    RemoveIoWatch( hAsync );
+        OnPreLoop();
+        ret = RunLoop();
+        RemoveIoWatch( hAsync );
+
+    }while( 0 );
+
+    if( GetError() == STATUS_PENDING )
+        SetError( ret );
+
     return ret;
 }
 
