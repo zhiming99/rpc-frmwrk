@@ -771,6 +771,7 @@ gint32 CSimpleEvPoll::RunLoop()
             if( ret >= 0 )
             {
                 iReadyCount = ret;
+                ret = 0;
                 break;
             }
             if( errno == EAGAIN ||
