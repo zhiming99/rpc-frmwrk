@@ -2,13 +2,12 @@
 This module enables `rpc-frmwrk` to operate via a set of files as known as the `rpcfs`, supported by FUSE, the userspace filesystem. And it has the following major features:
   * Generating the RPC filesystem `rpcfs` on both server/client side with an `ridl` file fully automatically.
   * All the requests/responses/events are sent and received by reading/writing specific files.
-  * Programming with `rpcfs` requires only file operations and JSON support from a programming language.
+  * Programming with `rpcfs` requires only file operations and JSON support, and very little training effort.
   * The request/response/events are in JSON format, and programming language neutral.
     For example, you can even send a request via shell commands like `cat requests_file > jreq_0`. 
-  * Create stream channels by `touch stream_0`, any `open_file` function call of your programming language.
-    The stream channel is similiar to a Unix Domain Socket over the internet connection, and protected
-    transparently by double encrypted channel of SSL & kerberos.
-  * Easy management of the concurrency and resource consumption of the servers and clients.
+  * Creating stream channels by `touch stream_0`, an `open` call from your programming language.
+    The stream channel delivers full-duplex bytes stream transfer through double encrypted channel of SSL & kerberos.
+  * Easy management of the concurrency and resource consumption by adding/removing files or adding/removing directories.
   * Monitoring the working status of `service point` with the read-only file `svcstat`.
   * Restarting/reloading individual `service point` online.
   * Supported filesystem operations: `open` `close` `read` `write` `unlink` `stat` `rmdir` `mkdir` `readdir` `releasedir` `poll` `ioctl` 
