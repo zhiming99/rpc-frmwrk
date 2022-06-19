@@ -6773,11 +6773,6 @@ gint32 CExportMakefile::Output()
                 psd->GetName() + "svr.o ";
         }
 
-        if( bFuseP )
-            strObjClient += "$(OBJ_DIR)/serijson.o ";
-        if( bFuseS )
-            strObjServer += "$(OBJ_DIR)/serijson.o ";
-
         std::string strClient =
             strAppName + "cli";
 
@@ -7084,26 +7079,6 @@ gint32 CExportObjDesc::Output()
 
         //printf( "%s\n", strCmdLine.c_str() );
         system( strCmdLine.c_str() );
-
-        if( bFuse )
-        {
-            stdstr strSeriCpp, strSeriHdr;
-            ret = FindInstCfg(
-                "serijson.cpp", strSeriCpp );
-            if( ERROR( ret ) )
-                break;
-
-            ret = FindInstCfg(
-                "serijson.h", strSeriHdr );
-            if( ERROR( ret ) )
-                break;
-
-            strCmdLine = "cp ";
-            strCmdLine += strSeriCpp + " " +
-                strSeriHdr + " " +
-                m_pWriter->GetOutPath() + "/";
-            system( strCmdLine.c_str() );
-        }
 
     }while( 0 );
 

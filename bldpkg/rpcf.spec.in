@@ -91,8 +91,6 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_sysconfdir}/rpcf/odesctpl.json
 %{_sysconfdir}/rpcf/pymktpl
 %{_sysconfdir}/rpcf/seribase.py
-%{_sysconfdir}/rpcf/serijson.h
-%{_sysconfdir}/rpcf/serijson.cpp
 %{_sysconfdir}/rpcf/synccfg.py
 %{_sysconfdir}/rpcf/JavaSerialBase.java
 %{_sysconfdir}/rpcf/JavaSerialImpl.java
@@ -160,6 +158,7 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_includedir}/rpcf/ipc/fdodrv.h
 %{_includedir}/rpcf/ipc/fuseif.h
 %{_includedir}/rpcf/ipc/fusedefs.h
+%{_includedir}/rpcf/ipc/serijson.h
 %{_includedir}/rpcf/nsdef.h
 %{_includedir}/rpcf/objfctry.h
 %{_includedir}/rpcf/propids.h
