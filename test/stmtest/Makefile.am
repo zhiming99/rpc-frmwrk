@@ -1,6 +1,6 @@
 include_ipcdir=$(top_srcdir)/ipc
 stmtest_LDFLAGS=@TSTLDFLG@ -lpthread 
-stmtest_CPPFLAGS= -I$(include_ipcdir)
+stmtest_CPPFLAGS= -I$(include_ipcdir) -fPIC
 
 libstmsvr_LTLIBRARIES=libstmsvr.la
 libstmsvrdir=$(libdir)/rpcf

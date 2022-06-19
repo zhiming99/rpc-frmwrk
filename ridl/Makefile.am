@@ -33,5 +33,5 @@ include_ipcdir=$(top_srcdir)/ipc
 include_ridlcdir=$(top_srcdir)/ridlc
 
 link_dir=-L$(top_srcdir)/debug64/
-ridlc_CPPFLAGS= -I$(include_ipcdir) -I$(top_srcdir)/include
+ridlc_CPPFLAGS= -I$(include_ipcdir) -I$(top_srcdir)/include -fPIC
 

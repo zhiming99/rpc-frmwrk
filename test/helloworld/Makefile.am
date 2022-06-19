@@ -1,6 +1,6 @@
 include_ipcdir=$(top_srcdir)/ipc
 iftest_LDFLAGS=@TSTLDFLG@
-iftest_CPPFLAGS= -I$(include_ipcdir)
+iftest_CPPFLAGS= -I$(include_ipcdir) -fPIC
 
 libhellowrd_LTLIBRARIES=libhellowrd.la
 libhellowrddir=$(libdir)/rpcf

@@ -1,6 +1,6 @@
 include_ipcdir=$(top_srcdir)/ipc
 katest_LDFLAGS=@TSTLDFLG@
-katest_CPPFLAGS= -I$(include_ipcdir)
+katest_CPPFLAGS= -I$(include_ipcdir) -fPIC
 
 libkasvr_LTLIBRARIES=libkasvr.la
 libkasvrdir=$(libdir)/rpcf

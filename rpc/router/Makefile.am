@@ -15,4 +15,4 @@ link_dir=$(top_srcdir)/combase/
 include_rpcdir=$(top_srcdir)/rpc
 include_ipcdir=$(top_srcdir)/ipc
 
-rpcrouter_CPPFLAGS= -I$(include_rpcdir) -I$(include_ipcdir)
+rpcrouter_CPPFLAGS= -I$(include_rpcdir) -I$(include_ipcdir) -fPIC

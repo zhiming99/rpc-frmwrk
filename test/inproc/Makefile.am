@@ -1,6 +1,6 @@
 include_ipcdir=$(top_srcdir)/ipc
 inproc_LDFLAGS=@TSTLDFLG@
-inproc_CPPFLAGS= -I$(include_ipcdir)
+inproc_CPPFLAGS= -I$(include_ipcdir) -fPIC
 
 libinproc_LTLIBRARIES=libinproc.la
 libinprocdir=$(libdir)/rpcf

@@ -1,6 +1,6 @@
 include_ipcdir=$(top_srcdir)/ipc
 prtest_LDFLAGS=@TSTLDFLG@
-prtest_CPPFLAGS= -I$(include_ipcdir)
+prtest_CPPFLAGS= -I$(include_ipcdir) -fPIC
 
 libprsvr_LTLIBRARIES= libprsvr.la
 libprsvrdir=$(libdir)/rpcf

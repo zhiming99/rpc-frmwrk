@@ -21,7 +21,7 @@ actclitst_CPPFLAGS=$(actc_CPPFLAGS) -DCLIENT
 
 actcsvrtst_SOURCES=actctest.cpp actctest.h
 actcsvrtst_LDADD=$(actc_LDFLAGS) libactc.la
-actcsvrtst_CPPFLAGS=$(actc_CPPFLAGS) -DSERVER
+actcsvrtst_CPPFLAGS=$(actc_CPPFLAGS) -DSERVER -fPIC
 
 link_dir=./
 

@@ -1,6 +1,6 @@
 include_ipcdir=$(top_srcdir)/ipc
 evtest_LDFLAGS=@TSTLDFLG@
-evtest_CPPFLAGS= -I$(include_ipcdir)
+evtest_CPPFLAGS= -I$(include_ipcdir) -fPIC
 
 libevtst_LTLIBRARIES=libevtst.la
 libevtstdir=$(libdir)/rpcf

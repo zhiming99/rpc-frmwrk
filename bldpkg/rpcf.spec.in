@@ -79,6 +79,7 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_libdir}/rpcf/@PACKAGE_NAME@-@VERSION@-*.whl
 %{_libdir}/librpcbaseJNI.so*
 %{_libdir}/rpcf/rpcbase.jar
+%{_libdir}/libfuseif.so*
 
 %{_mandir}/man1/ridlc.1.gz
 %{_mandir}/man1/rpcrouter.1.gz
@@ -166,17 +167,10 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_includedir}/rpcf/rpc.h
 %{_includedir}/rpcf/seribase.h
 %{_includedir}/rpcf/stlcont.h
-%{_includedir}/rpcf/base64.h
-%{_includedir}/rpcf/sha1.h
-%{_libdir}/libauth.la
-%{_libdir}/libcombase.la
-%{_libdir}/libipc.la
-%{_libdir}/librpc.la
-%{_libdir}/libsslpt.la
-%{_libdir}/libwspt.la
-%{_libdir}/libfuseif.la
-%{_libdir}/librpcbaseJNI.la
-%{_libdir}/rpcf/lib*.la
+%{_includedir}/rpcf/ipc/base64.h
+%{_includedir}/rpcf/ipc/sha1.h
+%{_includedir}/rpcf/ipc/loopool.h
+%{_includedir}/rpcf/variant.h
 %{_libdir}/rpcf/lib*.so*
 
 %files static

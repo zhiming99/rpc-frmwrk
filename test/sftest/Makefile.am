@@ -1,6 +1,6 @@
 include_ipcdir=$(top_srcdir)/ipc
 sftest_LDFLAGS=@TSTLDFLG@ -lpthread 
-sftest_CPPFLAGS= -I$(include_ipcdir)
+sftest_CPPFLAGS= -I$(include_ipcdir) -fPIC
 
 libsfsvr_LTLIBRARIES= libsfsvr.la
 libsfsvrdir=$(libdir)/rpcf

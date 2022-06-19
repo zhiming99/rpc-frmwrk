@@ -1,6 +1,6 @@
 include_ipcdir=$(top_srcdir)/ipc
 async_LDFLAGS=@TSTLDFLG@
-async_CPPFLAGS= -I$(include_ipcdir)
+async_CPPFLAGS= -I$(include_ipcdir) -fPIC
 
 libascsvr_LTLIBRARIES=libascsvr.la
 libascsvrdir=$(libdir)/rpcf

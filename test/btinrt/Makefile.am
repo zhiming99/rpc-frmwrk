@@ -1,6 +1,6 @@
 include_ipcdir=$(top_srcdir)/ipc
 btinrt_LDFLAGS=@TSTLDFLG@
-btinrt_CPPFLAGS= -I$(include_ipcdir)
+btinrt_CPPFLAGS= -I$(include_ipcdir) -fPIC
 
 libbtinrt_LTLIBRARIES=libbtinrt.la
 libbtinrtdir=$(libdir)/rpcf
