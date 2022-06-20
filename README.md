@@ -26,13 +26,15 @@ This is an asynchronous and event-driven RPC implementation for embeded system w
 
 #### Building `rpc-frmwrk`   
 Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60) for detail description.
+If you are a Ubuntu user or a Fedora user, you may want to install the [`deb package` or `rpm package`](https://github.com/zhiming99/rpc-frmwrk/releases/tag/0.4.0) and skip the painstaking building process.
+
 #### Install & Run `helloworld`
-1. Configure the runtime parameters for `rpc-frwmrk` as described [Here](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools/README.md).
-2. Install `rpc-frmwrk` by `sudo make install`.
-4. Start the daemon process `rpcrouter -r 2` on server side, and on start daemon process `rpcrouter -r 1` on client side. And now we are ready to run the `helloworld` program. About `rpcrouter`, please follow this [link](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/router/README.md).
-5. Start the `hwsvrsmk`, the `helloworld` server on server side. And start the `hwclismk`, the `helloworld` client.
-6. Please refer to [article](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-get-Helloworld-run%3F) for more information.
-7. If you are Ubuntu users or Fedora users, you can also install `rpc-frmwrk` from a deb package or an rpm package since version 0.4.0. The release tag is associated with the pre-built deb package and rpm package.
+1. Install `rpc-frmwrk` by `sudo make install`.
+2. Configure the runtime parameters for `rpc-frwmrk` as described [Here](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools/README.md).
+3. Start the daemon process `rpcrouter -r 2` on server side, and on start daemon process `rpcrouter -r 1` on client side. And now we are ready to run the `helloworld` program. About `rpcrouter`, please follow this [link](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/router/README.md).
+4. Start the `hwsvrsmk`, the `helloworld` server on server side. And start the `hwclismk` on the client side.
+5. This [wiki](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-get-Helloworld-run%3F) has some detail information.
+
 
 #### Development
 1. `rpc-frmwrk` has an `interface description language`, [`ridl`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md) to help you to generate the skelton code rapidly. It is recommended to take some time to learn this simple language, and it may save you a lot of time.
