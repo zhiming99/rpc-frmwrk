@@ -36,8 +36,9 @@ If you are using Ubuntu or Fedora, you may want to install the [`deb package` or
 5. This [wiki](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-get-Helloworld-run%3F) has some detail information.
 
 #### Development
-1. `rpc-frmwrk` has an `interface description language`, [`ridl`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md) to help you to generate the skelton code rapidly. It is recommended to take some time to learn this simple language, and it may save you a lot of time.
-2. Programming with `rpcfs` requires the leaset learning efforts, and zero footprint of the `rpc-frmwrk` in your business code. 
+`rpc-frmwrk` supports two approaches for distributed application development.
+1. The traditional RPC. `rpc-frmwrk` has an `interface description language`, [`ridl`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md) to help you to generate the skelton code rapidly. Example code can be found [here](https://github.com/zhiming99/rpc-frmwrk/edit/master/examples/README.md#generating-the-example-program-of-hellowld).
+2. Programming with [`rpcfs`](https://github.com/zhiming99/rpc-frmwrk/tree/master/fuse). The `ridlc` can also generate a pair of filesystem on server and client respectively. All the `rpc` traffic goes through file read/write and other file operations, and so does the system management.
 
 #### Runtime Dependency  
 This project depends on the following 3rd-party packags at runtime:  
