@@ -26,10 +26,10 @@ This is an asynchronous and event-driven RPC implementation for embeded system w
 
 #### Building `rpc-frmwrk`   
 Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60) for detail description.
-#### Install & Run
-1. Using the config tool to setup the parameters `rpc-frwmrk` requires. [Here](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools/README.md) is the illustration of the configuration tool.
-2. After you have successfully build `rpc-frmwrk`, typing `sudo make install` will install `rpc-frmwrk` to the system.
-4. On the server side, start the daemon process `rpcrouter -r 2`, and on the client side, start daemon process `rpcrouter -r 1` as the final setup step.
+#### Install & Run `helloworld`
+1. Using the config tool to setup the parameters for `rpc-frwmrk` as described [Here](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools/README.md).
+2. After a successful build, typing `sudo make install` to install `rpc-frmwrk`.
+4. On the server side, start the daemon process `rpcrouter -r 2`, and on the client side, start daemon process `rpcrouter -r 1`. And now the RPC environment is completely setup.
 5. And now on server side, start the `helloworld` server, and on the client side, start the `helloworld` client. About `rpcrouter`, please follow this [link](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/router/README.md).
 6. Please refer to [article](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-get-Helloworld-run%3F) for more information.
 7. If you are Ubuntu users or Fedora users, you can also install `rpc-frmwrk` from a deb package or an rpm package since version 0.4.0. The release tag is associated with the pre-built deb package and rpm package.
@@ -38,17 +38,18 @@ Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhim
 1. `rpc-frmwrk` has an `interface description language`, [`ridl`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md) to help you to generate the skelton code rapidly. It is recommended to take some time to learn this simple language, and it may save you a lot of time.
 2. Programming with `rpcfs` requires the leaset learning efforts, and zero footprint of the `rpc-frmwrk` in your business code. 
 
-#### Dependency  
+#### Runtime Dependency  
 This project depends on the following 3rd-party packags at runtime:  
 1. `dbus-1.0 (dbus-devel)`
 2. `libjson-cpp (jsoncpp-devel)` 
 3. `lz4 (lz4-devel)`   
 4. `cppunit-1 (for the test cases, cppunit and cppunit-devel)`   
-5. `openssl-1.1 for SSL communication. ( openssl-devel, optional )`
+5. `openssl-1.1 for SSL communication.`
 6. `MIT krb5 for authentication and access control. ( rpm: krb5-libs, krb5-devel, or deb: libkrb5-3, libkrb5-dev )`
 7. `c++11 is required, and make sure the GCC is 5.x or higher.`
 8. `python 3.5+ is required for Python support.`
-9. `Java OpenJDK 8 for Java support.`
+9. `Java OpenJDK 8 or higher for Java support.`
+10. `FUSE-3 for rpcfs`
 
 #### Todo
 1. Tutorials
