@@ -27,10 +27,10 @@ This is an asynchronous and event-driven RPC implementation for embeded system w
 #### Building `rpc-frmwrk`   
 Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60) for detail description.
 #### Install & Run `helloworld`
-1. Using the config tool to setup the parameters for `rpc-frwmrk` as described [Here](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools/README.md).
-2. After a successful build, typing `sudo make install` to install `rpc-frmwrk`.
-4. On the server side, start the daemon process `rpcrouter -r 2`, and on the client side, start daemon process `rpcrouter -r 1`. And now the RPC environment is completely setup.
-5. And now on server side, start the `helloworld` server, and on the client side, start the `helloworld` client. About `rpcrouter`, please follow this [link](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/router/README.md).
+1. Configure the runtime parameters for `rpc-frwmrk` as described [Here](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools/README.md).
+2. Install `rpc-frmwrk` by `sudo make install`.
+4. Start the daemon process `rpcrouter -r 2` on server side, and on start daemon process `rpcrouter -r 1` on client side. And now we are ready to run the `helloworld` program. About `rpcrouter`, please follow this [link](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/router/README.md).
+5. Start the `hwsvrsmk`, the `helloworld` server on server side. And start the `hwclismk`, the `helloworld` client.
 6. Please refer to [article](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-get-Helloworld-run%3F) for more information.
 7. If you are Ubuntu users or Fedora users, you can also install `rpc-frmwrk` from a deb package or an rpm package since version 0.4.0. The release tag is associated with the pre-built deb package and rpm package.
 
