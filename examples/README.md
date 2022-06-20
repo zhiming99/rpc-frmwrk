@@ -30,3 +30,5 @@
    * Run `make` to build the hellowld project on both server and client host.
    * Under the `release` directory, you will get `HelloWorldsvr` as server program, and HelloWorldcli as client program.
    * Check the `README.md` for detain information about the files.
+   * The output is like the following:
+   ![output](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/hellowld.png)
