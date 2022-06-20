@@ -1,4 +1,4 @@
-**Indroduction**
+#### Indroduction
 * This directory contains the typical examples that would be useful in distributed application development.
 
 * The implementations of the examples are grouped in different languages, Java, Python and C++.
@@ -21,7 +21,7 @@
 
     * `sftest.ridl`: To demonstrate how to upload/download files with the streaming support.
 
-**Generating the example program of `hellowld`**
+#### Generating the example program of `hellowld`
    * Make sure `rpc-frmwrk` has been properly setup on both server and client host.
    * Let's use C++ `hellowld` for example.
    * Change to the subdirectory `cpp`
