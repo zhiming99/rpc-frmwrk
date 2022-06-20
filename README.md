@@ -28,7 +28,7 @@ This is an asynchronous and event-driven RPC implementation for embeded system w
 Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60) for detail description.
 If you are using Ubuntu or Fedora, you may want to install the [`deb package` or `rpm package`](https://github.com/zhiming99/rpc-frmwrk/releases/tag/0.4.0) to skip the painstaking building process.
 
-#### Installation and Starting
+#### Installation
 1. Run `sudo make install` from the root directory of `rpc-frmwrk` source tree.
 2. Configure the runtime parameters for `rpc-frwmrk` as described [Here](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools/README.md).
 3. Start the daemon process `rpcrouter -r 2` on server side, and on start daemon process `rpcrouter -r 1` on client side. And now we are ready to run the `helloworld` program. About `rpcrouter`, please follow this [link](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/router/README.md).
