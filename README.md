@@ -30,7 +30,7 @@ If you are using Ubuntu or Fedora, you may want to install the [`deb package` or
 
 #### Installation
 1. Run `sudo make install` from the root directory of `rpc-frmwrk` source tree.
-2. Configure the runtime parameters for `rpc-frwmrk` as described [Here](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools/README.md).
+2. Configure the runtime parameters for `rpc-frwmrk` as described on [this page](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools/README.md).
 3. Start the daemon process `rpcrouter -r 2` on server side, and on start daemon process `rpcrouter -r 1` on client side. And now we are ready to run the `helloworld` program. About `rpcrouter`, please follow this [link](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/router/README.md).
 4. Smoketest with `HelloWorld`. Start the `hwsvrsmk`, the `helloworld` server on server side. And start the `hwclismk` on the client side.
 5. This [wiki](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-get-Helloworld-run%3F) has some detail information.
