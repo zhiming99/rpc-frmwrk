@@ -37,7 +37,7 @@ If you are using Ubuntu or Fedora, you may want to install the [`deb package` or
 
 #### Development
 `rpc-frmwrk` supports two approaches for distributed application development.
-1. The traditional RPC. `rpc-frmwrk` has an `interface description language`, [`ridl`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md) to help you to generate the skelton code rapidly. Example code can be found [here](https://github.com/zhiming99/rpc-frmwrk/edit/master/examples/README.md#generating-the-example-program-of-hellowld).
+1. The traditional RPC. `rpc-frmwrk` has an `interface description language`, [`ridl`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md) to help you to generate the skelton code rapidly. Example code can be found [here](https://github.com/zhiming99/rpc-frmwrk/master/examples/README.md#generating-the-example-program-of-hellowld).
 2. Programming with [`rpcfs`](https://github.com/zhiming99/rpc-frmwrk/tree/master/fuse#the-introduction-to-fuse-integration-and-the-rpcfs-filesystem). The `ridl` compiler can also generate a pair of filesystem on server and client respectively. All the `rpc` traffic goes through file read/write and other file operations, and so does the system management.
 
 #### Runtime Dependency  
