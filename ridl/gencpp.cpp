@@ -6268,7 +6268,7 @@ gint32 CImplClassFactory::Output()
                     << "_SvrImpl );";
                 NEW_LINE;
             }
-            else
+            if( !IsServer() || g_bMklib )
             {
                 CCOUT << "INIT_MAP_ENTRYCFG( ";
                 CCOUT << "C" << pSvc->GetName()
@@ -6358,13 +6358,17 @@ gint32 CImplMainFunc::Output()
             for( auto elem : vecSvcs )
             {
                 CServiceDecl* pSvc = elem;
-                if( bProxy )
+                bool bNewLine = false;
+                if( bProxy || g_bMklib )
                 {
                     CCOUT << "#include \""
                         << pSvc->GetName() << "cli.h\"";
+                    bNewLine = true;
                 }
-                else
+                if( !bProxy )
                 {
+                    if( bNewLine )
+                        NEW_LINE;
                     CCOUT << "#include \""
                         << pSvc->GetName() << "svr.h\"";
                 }
@@ -6374,8 +6378,22 @@ gint32 CImplMainFunc::Output()
             Wa( "ObjPtr g_pIoMgr;" );
             NEW_LINE;
 
+            if( g_bMklib && bProxy )
+                break;
+
+            ObjPtr pRoot( m_pNode );
+            CImplClassFactory oicf(
+                m_pWriter, pRoot, !bProxy );
+
+            ret = oicf.Output();
+            if( ERROR( ret ) )
+                break;
+
+            if( g_bMklib )
+                break;
+
+            NEW_LINE;
             // InitContext
-            Wa( "extern FactoryPtr InitClassFactory();" );
             Wa( "gint32 InitContext()" );
             BLOCK_OPEN;
             Wa( "gint32 ret = CoInitialize( 0 );" );
@@ -6468,15 +6486,6 @@ gint32 CImplMainFunc::Output()
             BLOCK_CLOSE;
             NEW_LINES( 2 );
 
-            ObjPtr pRoot( m_pNode );
-            CImplClassFactory oicf(
-                m_pWriter, pRoot, !bProxy );
-
-            ret = oicf.Output();
-            if( ERROR( ret ) )
-                break;
-
-            NEW_LINE;
             //  business logic
             if( bProxy )
             {

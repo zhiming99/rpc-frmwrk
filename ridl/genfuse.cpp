@@ -26,6 +26,7 @@
 using namespace rpcf;
 #include "genfuse.h"
 #include <json/json.h>
+extern bool g_bMklib;
 
 gint32 EmitBuildJsonReq( 
     CWriterBase* m_pWriter )
@@ -3510,13 +3511,17 @@ gint32 CImplMainFuncFuse::Output()
             for( auto elem : vecSvcs )
             {
                 CServiceDecl* pSvc = elem;
-                if( bProxy )
+                bool bNewLine = false;
+                if( bProxy || g_bMklib )
                 {
                     CCOUT << "#include \""
                         << pSvc->GetName() << "cli.h\"";
+                    bNewLine = true;
                 }
-                else
+                if( !bProxy )
                 {
+                    if( bNewLine )
+                        NEW_LINE;
                     CCOUT << "#include \""
                         << pSvc->GetName() << "svr.h\"";
                 }
@@ -3526,8 +3531,23 @@ gint32 CImplMainFuncFuse::Output()
             Wa( "ObjPtr g_pIoMgr;" );
             NEW_LINE;
 
+            if( g_bMklib && bProxy )
+                break;
+
+            ObjPtr pRoot( m_pNode );
+            CImplClassFactory oicf(
+                m_pWriter, pRoot, !bProxy );
+
+            ret = oicf.Output();
+            if( ERROR( ret ) )
+                break;
+
+            if( g_bMklib )
+                break;
+
+            NEW_LINE;
+
             // InitContext
-            Wa( "extern FactoryPtr InitClassFactory();" );
             Wa( "gint32 InitContext()" );
             BLOCK_OPEN;
             Wa( "gint32 ret = CoInitialize( 0 );" );
@@ -3619,15 +3639,6 @@ gint32 CImplMainFuncFuse::Output()
             CCOUT << "return STATUS_SUCCESS;";
             BLOCK_CLOSE;
             NEW_LINES( 2 );
-
-            ObjPtr pRoot( m_pNode );
-            CImplClassFactory oicf(
-                m_pWriter, pRoot, !bProxy );
-
-            ret = oicf.Output();
-            if( ERROR( ret ) )
-                break;
-            NEW_LINE;
 
             // main function
             Wa( "int main( int argc, char** argv)" );
