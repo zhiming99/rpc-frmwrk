@@ -2,9 +2,9 @@
 - [Quick Start with Dockerfile](#quick-start-with-dockerfile)
 
 ### RPC Router config Tool
-`rpcfg.py` is a GUI tool for rpcrouter configuration. It generate the configuration files including `driver.json, router.json, rtauth.json, and authprxy.json`. Please refer to this [article](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/readme.md), for `rpcrouter`'s concept.
-The UI dialog consists of the following tab pages
-* Connection page. Mainly to setup the ip address and port number to listen to remote connections. It is recommended not to use `0.0.0.0` whenever possible. Otherwise, you need to manually setup the destination IP addresses in `router.json`, `rtauth.json` and `authprxy.json`.   
+[`rpcfg.py`](https://github.com/zhiming99/rpc-frmwrk/blob/master/tools/rpcfg.py) is a GUI tool for rpcrouter configuration. It generate the configuration files including `driver.json, router.json, rtauth.json, and authprxy.json`. Please refer to this [article](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/readme.md), for `rpcrouter`'s concept.
+The UI dialog has the following tab pages
+* Connection page. Mainly to setup the IP address and port number to listen to remote connections. It is recommended not to use `0.0.0.0` whenever possible. Otherwise, you have to manually setup the destination IP addresses in `router.json`, `rtauth.json` and `authprxy.json`.   
   ![rpcfg tab1](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/rpcfg.png)
   
 * Security Page. The infomation on this page takes effect only when you have enabled the related options on the Connection Page. The detailed illustration of generation of key and certification files can be found at [SSL](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/sslport). And the explaination of `Auth Information` can be found [here](https://github.com/zhiming99/rpc-frmwrk/tree/master/rpc/security#4-enable-authentication-for-rpc-frmwrk).   
@@ -17,7 +17,7 @@ The UI dialog consists of the following tab pages
 **Depending** on the location of rpcfg.py, the set of config files updated will be different. If rpcfg.py is under the installation directory, it will update all the config files installed. If rpcfg.py is under the source tree, it will update all the config files under the source tree, which will finally go to the installation directory by `make install`.
 `rpcfg.py` accepts a command line option `-c`, to config the local host to be a client only. The UI has just `connection` and `security` tabs.
 
-**`rpcfgnui.py`** is a command line config tool in case the target host is not running X. There are two steps to get the settings update.
+**[`rpcfgnui.py`](https://github.com/zhiming99/rpc-frmwrk/blob/master/tools/rpcfgnui.py)** is a command line config tool in case the target host is not running X. There are two steps to get the settings update.
   * Setting up the parameters with rpcfg.py on your desktop host, and uses the `SaveAs`button to generate the config file, `initcfg.json`.
   * copy the `initcfg.json` to the target host, and type `python3 rpcfgnui.py initcfg.json`. You may want to use `sudo` when you are updating the config files in the priviledged directory.
   * `rpcfgnui.py` have the same behavor as `rpcfg.py` in updating the different set of config files according to its location.

@@ -1,4 +1,4 @@
-**Indroduction**
+#### Indroduction
 * This directory contains the typical examples that would be useful in distributed application development.
 
 * The implementations of the examples are grouped in different languages, Java, Python and C++.
@@ -20,3 +20,17 @@
     * `stmtest.ridl`: To demonstrate the basic chatting session with the streaming support.
 
     * `sftest.ridl`: To demonstrate how to upload/download files with the streaming support.
+
+#### Generating the example program of `hellowld`
+   * Make sure `rpc-frmwrk` has been properly setup on both server and client host.
+   * Let's use C++ `hellowld` for example.
+   * Change to the subdirectory `cpp`
+   * Run `ridlc -O ./hellowld ../hellowld.ridl`
+   * Change to the subdirectory `cpp/hellowld`
+   * Run `make` to build the hellowld project on both server and client host.
+   * Under the `release` directory, you will get `HelloWorldsvr` as server program, and HelloWorldcli as client program.
+   * Check the `README.md` for detain information about the files.
+   * The `hellowld` directory layout is   
+   ![tree](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/hellowld-tree.png)
+   * The output is as follows   
+   ![output](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/hellowld.png)

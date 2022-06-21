@@ -4,7 +4,7 @@
 This is an asynchronous and event-driven RPC implementation for embeded system with small system footprint. It is targeting at the IOT platforms, high-throughput, and high availability over hybrid network. Welcome to join!  
 
 #### Concept
-[`Here`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md) is an introduction about some concepts that help to understand this project.
+[`Here`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md) is an introduction to the concept of `rpc-frwmrk`.
 
 #### Features   
 1. `Synchronous/asynchronous request handling`   
@@ -25,30 +25,33 @@ This is an asynchronous and event-driven RPC implementation for embeded system w
 16. [`rpcfs - filesystem interface for rpc-frmwrk`(soon)](https://github.com/zhiming99/rpc-frmwrk/tree/master/fuse/README.md)
 
 #### Building `rpc-frmwrk`   
-Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60) for detail description.
-#### Install & Run
-1. Using the config tool to setup the parameters `rpc-frwmrk` requires. [Here](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools/README.md) is the illustration of the configuration tool.
-2. After you have successfully build `rpc-frmwrk`, typing `sudo make install` will install `rpc-frmwrk` to the system.
-4. On the server side, start the daemon process `rpcrouter -r 2`, and on the client side, start daemon process `rpcrouter -r 1` as the final setup step.
-5. And now on server side, start the `helloworld` server, and on the client side, start the `helloworld` client. About `rpcrouter`, please follow this [link](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/router/README.md).
-6. Please refer to [article](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-get-Helloworld-run%3F) for more information.
-7. If you are Ubuntu users or Fedora users, you can also install `rpc-frmwrk` from a deb package or an rpm package since version 0.4.0. The release tag is associated with the pre-built deb package and rpm package.
+* Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60) for detail description.   
+* If you are using Ubuntu or Fedora, you may want to install the [`deb package` or `rpm package`](https://github.com/zhiming99/rpc-frmwrk/releases/tag/0.4.0) to skip the painstaking building process.
+
+#### Installation
+1. Run `sudo make install` from the root directory of `rpc-frmwrk` source tree.
+2. Configure the runtime parameters for `rpc-frwmrk` as described on [this page](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools/README.md).
+3. Start the daemon process `rpcrouter -r 2` on server side, and on start daemon process `rpcrouter -r 1` on client side. And now we are ready to run the `helloworld` program. About `rpcrouter`, please follow this [link](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/router/README.md).
+4. Smoketest with `HelloWorld`. Start the `hwsvrsmk`, the `helloworld` server on server side. And start the `hwclismk` on the client side.
+5. This [wiki](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-get-Helloworld-run%3F) has some detail information.
 
 #### Development
-1. `rpc-frmwrk` has an `interface description language`, [`ridl`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md) to help you to generate the skelton code rapidly. It is recommended to take some time to learn this simple language, and it may save you a lot of time.
-2. Programming with `rpcfs` requires the leaset learning efforts, and zero footprint of the `rpc-frmwrk` in your business code. 
+`rpc-frmwrk` supports two approaches for distributed application development.
+1. The classic RPC. `rpc-frmwrk` has an `interface description language`, [`ridl`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md) to help you to generate the skelton code rapidly. Examples can be found [here](https://github.com/zhiming99/rpc-frmwrk/tree/master/examples#generating-the-example-program-of-hellowld).
+2. Programming with [`rpcfs`](https://github.com/zhiming99/rpc-frmwrk/tree/master/fuse#the-introduction-to-fuse-integration-and-the-rpcfs-filesystem). The `ridl` compiler can generate a pair of filesystems for server and client respectively with the `ridl` file. And all the `rpc` traffic goes through file read/write and other file operations. And the system monitoring and management are conducted via file operations, too.
 
-#### Dependency  
+#### Runtime Dependency  
 This project depends on the following 3rd-party packags at runtime:  
 1. `dbus-1.0 (dbus-devel)`
 2. `libjson-cpp (jsoncpp-devel)` 
 3. `lz4 (lz4-devel)`   
 4. `cppunit-1 (for the test cases, cppunit and cppunit-devel)`   
-5. `openssl-1.1 for SSL communication. ( openssl-devel, optional )`
-6. `MIT krb5 for authentication and access control. ( rpm: krb5-libs, krb5-devel, or deb: libkrb5-3, libkrb5-dev )`
+5. `openssl-1.1 for SSL communication.`
+6. `MIT krb5 for authentication and access control.`
 7. `c++11 is required, and make sure the GCC is 5.x or higher.`
 8. `python 3.5+ is required for Python support.`
-9. `Java OpenJDK 8 for Java support.`
+9. `Java OpenJDK 8 or higher for Java support.`
+10. `FUSE-3 for rpcfs`
 
 #### Todo
 1. Tutorials
