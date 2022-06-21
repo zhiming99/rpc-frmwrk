@@ -4,7 +4,7 @@
 This is an asynchronous and event-driven RPC implementation for embeded system with small system footprint. It is targeting at the IOT platforms, high-throughput, and high availability over hybrid network. Welcome to join!  
 
 #### Concept
-[`Here`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md) is an introduction about some concepts that help to understand this project.
+[`Here`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md) is an introduction to the concept of `rpc-frwmrk`.
 
 #### Features   
 1. `Synchronous/asynchronous request handling`   
@@ -38,7 +38,7 @@ This is an asynchronous and event-driven RPC implementation for embeded system w
 #### Development
 `rpc-frmwrk` supports two approaches for distributed application development.
 1. The classic RPC. `rpc-frmwrk` has an `interface description language`, [`ridl`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md) to help you to generate the skelton code rapidly. Examples can be found [here](https://github.com/zhiming99/rpc-frmwrk/tree/master/examples#generating-the-example-program-of-hellowld).
-2. Programming with [`rpcfs`](https://github.com/zhiming99/rpc-frmwrk/tree/master/fuse#the-introduction-to-fuse-integration-and-the-rpcfs-filesystem). The `ridl` compiler can generate a pair of filesystem on server and client respectively with the `ridl` file. And all the `rpc` traffic goes through file read/write and other file operations. And the system monitoring and management are conducted via file operations, too.
+2. Programming with [`rpcfs`](https://github.com/zhiming99/rpc-frmwrk/tree/master/fuse#the-introduction-to-fuse-integration-and-the-rpcfs-filesystem). The `ridl` compiler can generate a pair of filesystems for server and client respectively with the `ridl` file. And all the `rpc` traffic goes through file read/write and other file operations. And the system monitoring and management are conducted via file operations, too.
 
 #### Runtime Dependency  
 This project depends on the following 3rd-party packags at runtime:  
