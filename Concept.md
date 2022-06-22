@@ -32,12 +32,12 @@ under the `test` directory.
 
 #### Security over the Network
 
-RPC-frmwrk can be configured to use WSS(Secure WebSocket) for the
-communication with the web server over the internet. And it can also be
-configured to use SSL within the intranet. And Kerberos authentication
-can be enabled over SSL. The auth module adds more to security by signing
-all the outbound messages. When authentication is enabled, the
-server side can obtain the session information of each requests. 
+RPC-frmwrk supports SSL connection or WSS connection between the peer over
+the internet. And RPC-frmwrk also supports the Kerberos authentication over
+SSL. Besides authentication, The auth module adds even more to security by
+signing or encrypting all the outbound messages. Also, the server can
+filter the individual messages with the auth infomation for more precise
+access control.
 
 ## Object and Interface
 
