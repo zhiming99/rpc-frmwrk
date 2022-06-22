@@ -23,12 +23,13 @@ relationship, that is, the single `Server` instance can service mulitple
 
 ### RPC, IPC and In-Process
 
-RPC-frmwrk supports `RPC` as remote process call, `IPC` as inter-process
-call, and `In-Process` as in-process call. That is, a `Server` can
-simutaneously be accessed by `Proxies` from internet, different processes,
-or different threads. A `Proxy` can switch to different target `Server` by
-modifying its configuration file, as `XXXdesc.json` from the sample codes
-under the `test` directory.
+RPC-frmwrk supports `RPC` aka. remote process call, `IPC` aka.
+inter-process call, and `In-Process` aka. in-process call. That is, a
+`Server` can simutaneously be accessed by proxies from internet,
+different processes, or different threads. A Proxy can be configured to
+connect to different target `Server` by modifying the associated
+configuration file, the `XXXdesc.json` as long as the server support the
+same set of interfaces.
 
 #### Security over the Network
 
