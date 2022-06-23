@@ -23,21 +23,22 @@ relationship, that is, the single `Server` instance can service mulitple
 
 ### RPC, IPC and In-Process
 
-RPC-frmwrk supports `RPC` as remote process call, `IPC` as inter-process
-call, and `In-Process` as in-process call. That is, a `Server` can
-simutaneously be accessed by `Proxies` from internet, different processes,
-or different threads. A `Proxy` can switch to different target `Server` by
-modifying its configuration file, as `XXXdesc.json` from the sample codes
-under the `test` directory.
+RPC-frmwrk supports `RPC` aka. remote process call, `IPC` aka.
+inter-process call, and `In-Process` aka. in-process call. That is, a
+`Server` can simutaneously be accessed by proxies from internet,
+different processes, or different threads. A Proxy can be configured to
+connect to different target `Server` by modifying the associated
+configuration file, the `XXXdesc.json` as long as the server support the
+same set of interfaces.
 
 #### Security over the Network
 
-RPC-frmwrk can be configured to use WSS(Secure WebSocket) for the
-communication with the web server over the internet. And it can also be
-configured to use SSL within the intranet. And Kerberos authentication
-can be enabled over SSL. The auth module adds more to security by signing
-all the outbound messages. When authentication is enabled, the
-server side can obtain the session information of each requests. 
+RPC-frmwrk supports SSL connection or WSS connection between the peer over
+the internet. And RPC-frmwrk also supports the Kerberos authentication over
+SSL. Besides authentication, The auth module adds even more to security by
+signing or encrypting all the outbound messages. Also, the server can
+filter the individual messages with the auth infomation for more precise
+access control.
 
 ## Object and Interface
 
