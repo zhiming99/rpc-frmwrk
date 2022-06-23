@@ -6378,7 +6378,10 @@ gint32 CImplMainFunc::Output()
                 break;
 
             NEW_LINES( 1 );
-            Wa( "ObjPtr g_pIoMgr;" );
+            if( g_bMklib )
+                Wa( "extern ObjPtr g_pIoMgr;" );
+            else
+                Wa( "ObjPtr g_pIoMgr;" );
             NEW_LINE;
 
             ObjPtr pRoot( m_pNode );

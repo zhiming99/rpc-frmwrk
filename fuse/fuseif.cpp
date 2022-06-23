@@ -1248,9 +1248,15 @@ gint32 CFuseCmdFile::fs_write_buf(
         else if( strCmd == "addsp" )
         {
             stdstr strArgs( p + 1, pend - p - 1 );
-            std::regex e( "^\\s*([a-zA-Z_]\\w*)\\s+((?:/?[^/\\s]*)+)\\s*$" );
+            std::regex e(
+            "^\\s*([a-zA-Z_]\\w*)\\s+((?:/[^/\\s]+)+|(?:[^/\\s]+(?:/[^/\\s]+)*))\\s*$" );
             std::smatch m;
-            std::regex_search( strArgs, m, e );
+            if( !std::regex_match( strArgs, m, e ) )
+            {
+                ret = -EINVAL;
+                break;
+            }
+
             if( m.size() > 3 )
             {
                 ret = -EINVAL;
