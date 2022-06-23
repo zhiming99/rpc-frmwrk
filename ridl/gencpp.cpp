@@ -6374,12 +6374,12 @@ gint32 CImplMainFunc::Output()
                 }
                 NEW_LINE;
             }
+            if( g_bMklib && bProxy )
+                break;
+
             NEW_LINES( 1 );
             Wa( "ObjPtr g_pIoMgr;" );
             NEW_LINE;
-
-            if( g_bMklib && bProxy )
-                break;
 
             ObjPtr pRoot( m_pNode );
             CImplClassFactory oicf(

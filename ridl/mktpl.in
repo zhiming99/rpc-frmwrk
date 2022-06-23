@@ -107,7 +107,7 @@ $(OUTPUT_DIR)/$(TARGET_CLI) : $(OBJ_DIR)/$(OBJS_CLI) $(OBJS2)
 
 $(OUTPUT_DIR)/$(TARGET_SO) : $(OBJ_DIR)/$(OBJS_CLI) $(OBJ_DIR)/$(OBJS_SVR) $(OBJS2)
 	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
-	$(CC) -o $@ $(OBJ_DIR)/$(OBJS_CLI) $(OBJS2) $(LINKER_OPTION) -shared
+	$(CC) -o $@ $(OBJ_DIR)/$(OBJS_CLI) $(OBJ_DIR)/$(OBJS_SVR) $(OBJS2) $(LINKER_OPTION) -shared
 	@python3 ./synccfg.py
 	@cp *.json $(OUTPUT_DIR)
 

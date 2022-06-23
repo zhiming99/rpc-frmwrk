@@ -107,7 +107,9 @@ gint32 CoLoadClassFactory( const char* pszPath  )
         if( SUCCEEDED( ret ) )
             break;
 
-        hDll = dlopen( pszPath, RTLD_LAZY );
+        hDll = dlopen( pszPath,
+            RTLD_NOW |  RTLD_LOCAL );
+
         if( hDll == nullptr )
         {
             ret = -EBADF;

@@ -1045,6 +1045,15 @@ class CFuseCmdFile : public CFuseObjBase
         fuse_req_t req,
         fuse_bufvec *buf,
         fuseif_intr_data* d ) override;
+
+    gint32 fs_read(
+        const char* path,
+        fuse_file_info *fi,
+        fuse_req_t req,
+        fuse_bufvec*& bufvec,
+        off_t off, size_t size,
+        std::vector< BufPtr >& vecBackup,
+        fuseif_intr_data* d ) override;
 };
 
 class CFuseStmFile : public CFuseFileEntry
@@ -2598,6 +2607,7 @@ class CFuseRootBase:
                 break;
             }
 
+            // m_mapSvcInst is protected by ROOTLK
             if( m_mapSvcInsts.find( strInstName ) !=
                 m_mapSvcInsts.end() )
             {
@@ -2605,6 +2615,7 @@ class CFuseRootBase:
                 break;
             }
 
+            CStdRMutex oLock( this->GetLock() );
             for( auto& elem : m_vecServices )
             {
                 if( strInstName.substr( 0,
@@ -2615,6 +2626,8 @@ class CFuseRootBase:
                     break;
                 }
             }
+            oLock.Unlock();
+
             if( psi == nullptr )
             {
                 ret = -ENOENT;
@@ -2739,7 +2752,8 @@ class CFuseRootBase:
     gint32 AddSvcPoint(
         const stdstr& strName,
         const stdstr& strDesc,
-        EnumClsid iClsid )
+        EnumClsid iClsid,
+        bool bSync = true )
     {
         if( strName.empty() ||
             strDesc.empty() ||
@@ -2748,8 +2762,43 @@ class CFuseRootBase:
         gint32 ret = 0;
         bool bAdded = false;
         do{
+            CStdRMutex oLock( this->GetLock() );
+            for( auto& elem : m_vecServices )
+            {
+                stdstr strPrefix =
+                    elem.m_strSvcName.substr(
+                        0, strName.size() );
+                if( strPrefix == strName )
+                {
+                    ret = -EEXIST;
+                    break;
+                }
+                if( elem.m_iClsid == iClsid )
+                {
+                    ret = -EEXIST;
+                    break;
+                }
+            }
+
+            if( ERROR( ret ) )
+                break;
+
             m_vecServices.push_back(
                 { strName, strDesc, iClsid } );
+
+            oLock.Unlock();
+
+            if( !bSync )
+            {
+                TaskletPtr pCallback;
+                ret = pCallback.NewObj(
+                    clsid( CIfDummyTask ) );
+                if( ERROR( ret ) )
+                    break;
+                ret = AddSvcPoint(
+                    strName, pCallback );
+                break;
+            }
 
             TaskletPtr pCallback;
             ret = pCallback.NewObj(

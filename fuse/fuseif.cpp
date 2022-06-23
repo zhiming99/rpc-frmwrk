@@ -31,6 +31,7 @@ using namespace rpcf;
 #include <sys/ioctl.h>
 #include <unistd.h>
 #include <counters.h>
+#include <regex>
 
 void fuseif_finish_interrupt(
     fuse *f, fuse_req_t req,
@@ -1082,6 +1083,10 @@ gint32 CFuseCmdFile::fs_release(
     return 0;
 }
 
+std::set< stdstr > g_setValidCmd = {
+    "restart", "reload", "loadl", "addsp"
+};
+
 gint32 CFuseCmdFile::fs_write_buf(
     const char* path,
     fuse_file_info *fi,
@@ -1132,99 +1137,263 @@ gint32 CFuseCmdFile::fs_write_buf(
         stdstr strCmd( pCmd->ptr(),
             p - pCmd->ptr() );
 
-        if( strCmd != "restart" &&
-            strCmd != "reload" )
+        if( g_setValidCmd.find( strCmd ) ==
+            g_setValidCmd.end() ) 
         {
             ret = -EINVAL;
             break;
         }
 
-        stdstr strSvc( p + 1, pend - p - 1 );
-        if( !IsValidName( strSvc ) )
+        if( strCmd == "reload" ||
+            strCmd == "restart" )
         {
-            ret = -EINVAL;
-            break;
-        }
-
-        auto pParent = dynamic_cast
-            < CFuseDirectory* >( GetParent() );
-        auto pSd = pParent->GetChild( strSvc );
-        if( pSd == nullptr && strCmd == "reload" )
-        {
-            TaskletPtr pCallback;
-            ret = pCallback.NewObj(
-                clsid( CIfDummyTask ) );
-            if( ERROR( ret ) )
+            stdstr strSvc( p + 1, pend - p - 1 );
+            if( !IsValidName( strSvc ) )
+            {
+                ret = -EINVAL;
                 break;
+            }
 
-            IEventSink* pDummy = pCallback;
-            fuse_file_info fi1 = {0};
-            fi1.fh = ( intptr_t )pDummy;
+            auto pParent = dynamic_cast
+                < CFuseDirectory* >( GetParent() );
+            auto pSd = pParent->GetChild( strSvc );
+            if( pSd == nullptr && strCmd == "reload" )
+            {
+                TaskletPtr pCallback;
+                ret = pCallback.NewObj(
+                    clsid( CIfDummyTask ) );
+                if( ERROR( ret ) )
+                    break;
 
-            ret = pParent->fs_mkdir(
-                strSvc.c_str(), &fi1, S_IRWXU );
+                IEventSink* pDummy = pCallback;
+                fuse_file_info fi1 = {0};
+                fi1.fh = ( intptr_t )pDummy;
+
+                ret = pParent->fs_mkdir(
+                    strSvc.c_str(), &fi1, S_IRWXU );
+
+                if( ret == STATUS_PENDING )
+                    ret = 0;
+
+                break;
+            }
+            auto pSvcDir = dynamic_cast
+                < CFuseSvcDir* >( pSd );
+            if( pSvcDir == nullptr )
+            {
+                // not a svcpoint directory
+                ret = -EACCES;
+                break;
+            }
+
+            CRpcServices* pIf = pSvcDir->GetIf();
+            if( unlikely( pIf == nullptr ) )
+            {
+                ret = -EFAULT;
+                break;
+            }
+
+            TaskletPtr pTask;
+            CIoManager* pMgr = pIf->GetIoMgr();
+            if( strCmd == "restart" )
+            {
+                if( pIf->IsServer() )
+                {
+                    auto pSvr = dynamic_cast
+                        < CFuseSvcServer* >( pIf );
+                    ret = pSvr->RestartSvcPoint(
+                        nullptr );
+                }
+                else
+                {
+                    auto pProxy = dynamic_cast
+                        < CFuseSvcProxy* >( pIf );
+                    ret = pProxy->RestartSvcPoint(
+                        nullptr );
+                }
+            }
+            else
+            {
+                if( pIf->IsServer() )
+                {
+                    auto pSvr = dynamic_cast
+                        < CFuseSvcServer* >( pIf );
+                    ret = pSvr->ReloadSvcPoint(
+                        nullptr );
+                }
+                else
+                {
+                    auto pProxy = dynamic_cast
+                        < CFuseSvcProxy* >( pIf );
+                    ret = pProxy->ReloadSvcPoint(
+                        nullptr );
+                }
+            }
 
             if( ret == STATUS_PENDING )
                 ret = 0;
-
-            break;
         }
-        auto pSvcDir = dynamic_cast
-            < CFuseSvcDir* >( pSd );
-        if( pSvcDir == nullptr )
+        else if( strCmd == "loadl" )
         {
-            // not a svcpoint directory
-            ret = -EACCES;
-            break;
+            stdstr strPath( p + 1, pend - p - 1 );
+            ret = access( strPath.c_str(), R_OK );
+            if( ret < 0 )
+            {
+                ret = -errno;
+                break;
+            }
+            ret = CoLoadClassFactory(
+                strPath.c_str() );
         }
-
-        CRpcServices* pIf = pSvcDir->GetIf();
-        if( unlikely( pIf == nullptr ) )
+        else if( strCmd == "addsp" )
         {
-            ret = -EFAULT;
-            break;
-        }
+            stdstr strArgs( p + 1, pend - p - 1 );
+            std::regex e( "^\\s*([a-zA-Z_]\\w*)\\s+((?:/?[^/\\s]*)+)\\s*$" );
+            std::smatch m;
+            std::regex_search( strArgs, m, e );
+            if( m.size() > 3 )
+            {
+                ret = -EINVAL;
+                break;
+            }
+            stdstr strSvc = m[ 1 ];
+            stdstr strDesc = m[ 2 ];
 
-        TaskletPtr pTask;
-        CIoManager* pMgr = pIf->GetIoMgr();
-        if( strCmd == "restart" )
-        {
+            CRpcServices* pIf = GetRootIf();
+            stdstr strClass = "C";
+            bool bServer = true;
             if( pIf->IsServer() )
             {
-                auto pSvr = dynamic_cast
-                    < CFuseSvcServer* >( pIf );
-                ret = pSvr->RestartSvcPoint(
-                    nullptr );
+                strClass += strSvc + "_SvrImpl";
             }
             else
             {
-                auto pProxy = dynamic_cast
-                    < CFuseSvcProxy* >( pIf );
-                ret = pProxy->RestartSvcPoint(
-                    nullptr );
+                bServer = false;
+                strClass += strSvc + "_CliImpl";
             }
-        }
-        else
-        {
-            stdstr strPath;
-            if( pIf->IsServer() )
+
+            EnumClsid iClsid = CoGetClassId(
+                strClass.c_str() );
+            if( iClsid == clsid( Invalid ) )
             {
-                auto pSvr = dynamic_cast
-                    < CFuseSvcServer* >( pIf );
-                ret = pSvr->ReloadSvcPoint(
-                    nullptr );
+                ret = -ENOENT;
+                break;
             }
-            else
+
+            ret = access( strDesc.c_str(), R_OK );
+            if( ret < 0 )
             {
-                auto pProxy = dynamic_cast
-                    < CFuseSvcProxy* >( pIf );
-                ret = pProxy->ReloadSvcPoint(
-                    nullptr );
+                ret = -errno;
+                break;
             }
+
+            CfgPtr pCfg;
+            ret = CRpcServices::LoadObjDesc(
+                strDesc, strSvc, bServer, pCfg );
+            if( ERROR( ret ) )
+            {
+                ret = -EINVAL;
+                break;
+            }
+
+            gint32 ( *func )( const stdstr&,
+               EnumClsid, const stdstr& ) =
+               ([]( const stdstr& strDesc,
+                   EnumClsid iClsid,
+                   const stdstr& strObj )->gint32
+            {
+                gint32 ret = 0;
+                do{
+                    auto pIf = GetRootIf();
+                    ROOTLK_SHARED;
+                    CFuseRootServer* ps = pIf;
+                    CFuseRootProxy* pp = pIf;
+                    if( pIf->IsServer() )
+                    {
+                        ret = ps->AddSvcPoint(
+                            strObj, strDesc,
+                            iClsid, false );
+                            break;
+                    }
+                    else
+                    {
+                        ret = pp->AddSvcPoint(
+                            strObj, strDesc,
+                            iClsid, false );
+                    }
+                }while( 0 );
+
+                return ret;
+            });
+
+            CIoManager* pMgr = pIf->GetIoMgr();
+            TaskletPtr pTask;
+            ret = NEW_FUNCCALL_TASK( pTask,
+                pMgr, func, strDesc, iClsid,
+                strSvc );
+
+            if( ERROR( ret ) )
+                break;
+
+            ret = pMgr->RescheduleTask(
+                 pTask, true );
+            break;
         }
 
-        if( ret == STATUS_PENDING )
-            ret = 0;
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CFuseCmdFile::fs_read(
+    const char* path,
+    fuse_file_info *fi,
+    fuse_req_t req,
+    fuse_bufvec*& bufvec,
+    off_t off, size_t size,
+    std::vector< BufPtr >& vecBackup,
+    fuseif_intr_data* d )
+{
+    gint32 ret = 0;
+    do{
+        if( size == 0 )        
+            break;
+
+        stdstr strContent;
+        strContent = "Commands:\n";
+        strContent += "reload <serivce point> :\n"
+            "\treload a 'service point' under the "
+            "same directory of this command file. The 'service point' will be "
+            "removed and recreated\n";
+
+        strContent += "restart <serivce point> :\n"
+            "\trestart a service point under the "
+            "same directory of this command file. The 'service point' will be "
+            "stopped and started again.\n";
+
+        strContent += "loadl <library> :\n"
+            "\tload the class factory exported from a shared library.\n";
+
+        strContent += "addsp <service point> <desc file> :\n"
+            "\tadd a new 'service point' from the 'desc file'. "
+            "<service point> must be an object as can be find in <desc file>.\n"
+            "\t<desc file> is a path to an object description file\n";
+
+        if( off >= strContent.size() )
+            break;
+
+        size_t dwBytes = std::min(
+            size, strContent.size() - off );
+
+        BufPtr pBuf( true );
+        pBuf->Append(
+            strContent.c_str() + off, dwBytes );
+
+        bufvec = new fuse_bufvec;
+        *bufvec = FUSE_BUFVEC_INIT( dwBytes );
+        bufvec->buf[ 0 ].mem = pBuf->ptr();
+        bufvec->buf[ 0 ].size = pBuf->size();
+        vecBackup.push_back( pBuf );
 
     }while( 0 );
 
