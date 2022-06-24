@@ -654,28 +654,51 @@ extern gint32 FuseDeclareMsgSet(
             strMsgId += strName + " )";
             vecMsgIds.push_back( strMsgId );
         }
-
-        if( vecMsgIds.empty() )
+        if( !g_bMklib )
         {
-            Wa( "std::set< guint32 > g_setMsgIds;" );
-            break;
-        }
-
-        Wa( "std::set< guint32 > g_setMsgIds = " );
-        BLOCK_OPEN;
-        size_t i = 0, count = vecMsgIds.size();
-        for( ;i < count; i++ )
-        {
-            CCOUT << vecMsgIds[ i ];
-            if( i < count - 1 ) 
+            if( vecMsgIds.empty() )
             {
-                CCOUT << ",";
-                NEW_LINE;
+                Wa( "std::set< guint32 > g_setMsgIds;" );
+                break;
             }
+
+            Wa( "std::set< guint32 > g_setMsgIds = " );
+            BLOCK_OPEN;
+            size_t i = 0, count = vecMsgIds.size();
+            for( ;i < count; i++ )
+            {
+                CCOUT << vecMsgIds[ i ];
+                if( i < count - 1 ) 
+                {
+                    CCOUT << ",";
+                    NEW_LINE;
+                }
+            }
+            BLOCK_CLOSE;
+            Wa( ";" );
+            NEW_LINE;
         }
-        BLOCK_CLOSE;
-        Wa( ";" );
-        NEW_LINE;
+        else
+        {
+            Wa( "extern std::set< guint32 > g_setMsgIds; " );
+            Wa( "void InitMsgIds() " );
+            if( vecMsgIds.empty() )
+            {
+                Wa( "{}" );
+                break;
+            }
+            BLOCK_OPEN;
+            size_t i = 0, count = vecMsgIds.size();
+            for( ;i < count; i++ )
+            {
+                Wa( "g_setMsgIds.insert( " );
+                CCOUT << "    " <<  vecMsgIds[ i ] << " );";
+                if( i < count - 1 ) 
+                    NEW_LINE;
+            }
+            BLOCK_CLOSE;
+            NEW_LINE;
+        }
 
     }while( 0 );
 

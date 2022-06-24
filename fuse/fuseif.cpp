@@ -1235,7 +1235,23 @@ gint32 CFuseCmdFile::fs_write_buf(
         }
         else if( strCmd == "loadl" )
         {
-            stdstr strPath( p + 1, pend - p - 1 );
+            stdstr strPath0( p + 1, pend - p - 1 );
+            std::smatch m;
+            std::regex e(
+            "^\\s*((?:/[^/\\s]+)+|(?:[^/\\s]+(?:/[^/\\s]+)*))\\s*$" );
+            if( !std::regex_match( strPath0, m, e ) )
+            {
+                ret = -EINVAL;
+                break;
+            }
+
+            if( m.size() < 2 ||
+                !m[ 1 ].matched )
+            {
+                ret = -EINVAL;
+                break;
+            }
+            stdstr strPath = m[ 1 ].str();
             ret = access( strPath.c_str(), R_OK );
             if( ret < 0 )
             {
@@ -1257,13 +1273,15 @@ gint32 CFuseCmdFile::fs_write_buf(
                 break;
             }
 
-            if( m.size() > 3 )
+            if( m.size() < 3 ||
+                !m[ 1 ].matched ||
+                !m[ 2 ].matched  )
             {
                 ret = -EINVAL;
                 break;
             }
-            stdstr strSvc = m[ 1 ];
-            stdstr strDesc = m[ 2 ];
+            stdstr strSvc = m[ 1 ].str();
+            stdstr strDesc = m[ 2 ].str();
 
             CRpcServices* pIf = GetRootIf();
             stdstr strClass = "C";

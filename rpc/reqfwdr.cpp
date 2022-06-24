@@ -88,7 +88,7 @@ CRpcReqForwarder::CRpcReqForwarder(
         if( SUCCEEDED( ret ) && strType == "RR" )
         {
             CCfgOpener oParams;
-            oParams[ propIfPtr ] = this;
+            oParams.SetPointer( propIfPtr, this );
             ret = m_pScheduler.NewObj(
                 clsid( CRRTaskScheduler ),
                 oParams.GetCfg() );

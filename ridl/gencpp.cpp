@@ -6253,6 +6253,9 @@ gint32 CImplClassFactory::Output()
 
         NEW_LINE;
 
+        if( g_bMklib && bFuse )
+            Wa( "extern void InitMsgIds();" );
+
         Wa( "FactoryPtr InitClassFactory()" ); 
         BLOCK_OPEN;
         CCOUT << "BEGIN_FACTORY_MAPS;";
@@ -6294,6 +6297,10 @@ gint32 CImplClassFactory::Output()
         Wa( "extern \"C\"" );
         Wa( "gint32 DllLoadFactory( FactoryPtr& pFactory )" );
         BLOCK_OPEN;
+
+        if( g_bMklib && bFuse )
+            Wa( "InitMsgIds();" );
+
         Wa( "pFactory = InitClassFactory();" );
         CCOUT << "if( pFactory.IsEmpty() )";
         INDENT_UPL;

@@ -43,6 +43,7 @@ static bool g_bAuth = false;
 static bool g_bRfc = false;
 static bool g_bSepConn = false;
 static std::string g_strService;
+static bool g_bDaemon = false;
 
 void CIfRouterTest::setUp()
 {
@@ -241,7 +242,7 @@ int main( int argc, char** argv )
     int opt = 0;
     int ret = 0;
     bool bRole = false;
-    while( ( opt = getopt( argc, argv, "hr:acfs:" ) ) != -1 )
+    while( ( opt = getopt( argc, argv, "hr:adcfs:" ) ) != -1 )
     {
         switch (opt)
         {
@@ -266,6 +267,11 @@ int main( int argc, char** argv )
         case 's':
             {
                 g_strService = optarg;
+                break;
+            }
+        case 'd':
+            {
+                g_bDaemon = true;
                 break;
             }
         case 'f':
@@ -310,6 +316,9 @@ int main( int argc, char** argv )
         Usage( argv[ 0 ] );
         exit( -ret );
     }
+
+    if( g_bDaemon )
+        daemon( 1, 0 );
 
     runner.addTest( registry.makeTest() );
     bool wasSuccessful = runner.run( "", false );
