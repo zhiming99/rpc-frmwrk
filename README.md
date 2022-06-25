@@ -61,7 +61,7 @@ This project depends on the following 3rd-party packags at runtime:
 
 ---
 [`Sat Jun25  2022 01:36:03 PM Beijing`]    
-1. Added `loadl` and `addsp` command to the `commands` file. An instance of `rpcfs` filesystem can aggregrate new `service point` dynamically. 
+1. Added two commands `loadl` and `addsp` to the `commands` file. And now the `rpcfs` filesystem can aggregrate new `service point` dynamically. 
 2. Next I will integrate an instance of `rpcfs` to the `rpcrouter` for monitoring and control purpose. 
 
 [`Sat Jun 18 2022 09:28:10 PM Beijing`]   
