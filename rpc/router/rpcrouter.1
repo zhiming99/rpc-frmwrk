@@ -1,6 +1,6 @@
 .\" Manpage for rpcrouter.
 .\" Contact woodhead99@gmail.com to correct errors or typos.
-.TH man 1 "26 Sep. 2021" "1.0" "rpc-frmwrk user manuals"
+.TH man 1 "25 Jun. 2022" "1.1" "rpc-frmwrk user manuals"
 .SH NAME
 rpcrouter \- the RPC traffic router program for \fIrpc-frmwrk\fR
 .SH SYNOPSIS
@@ -17,14 +17,14 @@ if both are on the same host.
 .SH OPTIONS
 .TP
 .BR \-r " "\fInum\fR
-Specify the role the rpcrouter plays.
+To specify the role the rpcrouter plays.
 1 to run as a \fIreqfwdr\fR on the client side.
 2 to run as a \fIbridge\fR on the server side.
 It is a mandatory option, and must be present to invoke the rpcrouter.
 
 .TP
 .BR \-a
-Enable the authentication between \fIreqfwdr\fR and \fIbridge\fR.
+To enable the authentication between \fIreqfwdr\fR and \fIbridge\fR.
 And Kerberos is only supported authentication mechanism so far.
 Make sure both sides have this option, otherwise the connection request will be
 rejected.
@@ -35,7 +35,7 @@ To establish a seperate connection to the remote \fIbridge\fR for each proxy.  I
 
 .TP
 .BR \-f
-Enable the request-based flow control. The \fIbridge\fR with this option,
+To enable the request-based flow control. The \fIbridge\fR with this option,
 will limit the outstanding requests to 2 * connections,
 and buffered requests to 4 * connections.
 And requests beyond this limit will be rejected with error ERROR_QUEUE_FULL.
@@ -44,6 +44,10 @@ The \fIreqfwdr\fR with this option will queue the rejected requests from the
 if the client has overdone it without stopping.
 So it is for situation when there are large number of connections, not necessary
 for light weight traffic.
+
+.TP
+.BR \-d
+To run rpcrouter as a daemon.
 
 .SH RELATED FILES
 router.json, rtauth.json, authprxy.json
