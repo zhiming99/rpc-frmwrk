@@ -1,7 +1,7 @@
 # rpc-frmwrk ![badge](https://img.shields.io/badge/IOT-C%2B%2B%2C%20Java%2C%20Python-brig)
 
 这是一个嵌入式的RPC实现，关注于跨网络，跨协议，跨平台的互联互通。本项目欢迎有兴趣的人士加入!   
-This is an asynchronous and event-driven RPC implementation for embeded system with small system footprint. It is targeting at the IOT platforms, high-throughput, and high availability over hybrid network. Welcome to join!  
+This is an asynchronous and event-driven RPC implementation for embeded system with small system footprint. It is targeting at the IOT platforms with high-throughput and high availability over hybrid networks. Welcome to join!  
 
 #### Concept
 [`Here`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md) is an introduction to the concept of `rpc-frwmrk`.
