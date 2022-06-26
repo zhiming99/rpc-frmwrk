@@ -4525,6 +4525,45 @@ gint32 CFuseSvcServer::RemoveGroup(
     return -ENOENT;
 }
 
+gint32 CFuseRootServer::OnPostStart(
+    IEventSink* pCallback )
+{
+    gint32 ret = 0;
+    do{
+        auto pRoot = GetRootDir();
+        // add a WO file as admin-command file
+        auto pFile = DIR_SPTR(
+            new CFuseCmdFile() ); 
+        auto pObj = dynamic_cast
+            < CFuseObjBase* >( pFile.get() );
+        pObj->SetMode( S_IWUSR );
+        pObj->DecRef();
+        ret = pRoot->AddChild( pFile );
+        if( ERROR( ret ) )
+            break;
+
+        auto pUserDir = new CFuseDirectory(
+            USER_DIR, nullptr );
+        pUserDir->SetMode( S_IRUSR | S_IXUSR );
+        pUserDir->DecRef();
+        m_pUserDir = DIR_SPTR( pUserDir );
+        ret = pRoot->AddChild( m_pUserDir );
+        if( ERROR( ret ) )
+            break;
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CFuseRootServer::Add2UserDir(
+    DIR_SPTR& pEnt )
+{
+    // don't call it after the initialization stage so
+    // far
+    return m_pUserDir->AddChild( pEnt );
+}
+
 } // namespace
 
 gint32 fuseop_access(
@@ -5020,8 +5059,8 @@ gint32 fuseif_daemonize( fuse_args& args,
         goto out1;
     }
 
-    //if (fuse_daemonize(opts.foreground) != 0)
-    //    ret = -ERROR_FAIL;
+    if( opts.foreground == 0 )
+        daemon( 1, 0 );
 out1:
     free(opts.mountpoint);
     fuse_opt_free_args(&args);
@@ -5091,6 +5130,11 @@ gint32 fuseif_main( fuse_args& args,
         goto out1;
     }
     SetFuse( fuse );
+    if( opts.mountpoint == nullptr )
+    {
+        res = 1;
+        goto out1;
+    }
 
     if (fuse_mount(fuse,opts.mountpoint) != 0) {
         res = 1;

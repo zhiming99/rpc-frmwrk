@@ -70,6 +70,7 @@
 #define JSON_EVT_FILE "jevt_0"
 #define JSON_STMEVT_FILE "jevt_streams"
 #define CONN_DIR_PREFIX "connection_"
+#define USER_DIR "user"
 
 #define MAX_STREAMS_PER_SVC 1024
 #define MAX_STREAMS_PER_SESS 256

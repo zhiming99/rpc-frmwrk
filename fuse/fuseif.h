@@ -286,6 +286,9 @@ class CFuseObjBase : public CDirEntry
     protected:
     CRpcServices* m_pIf = nullptr;
 
+    // an object to hold user data
+    ObjPtr m_pUserObj;
+
     public:
     typedef CDirEntry super;
     CFuseObjBase() :
@@ -478,6 +481,12 @@ class CFuseObjBase : public CDirEntry
 
     inline void SetIf( CRpcServices* pIf )
     { m_pIf = pIf; }
+
+    inline ObjPtr GetUserObj() const
+    { return m_pUserObj; }
+
+    inline void SetUserObj( ObjPtr& pObj )
+    { m_pUserObj = pObj; }
 
     virtual int fs_mkdir( const char *,
         fuse_file_info*,
@@ -2868,24 +2877,6 @@ class CFuseRootBase:
         }while( 0 );
         return ret;
     }
-    gint32 OnPostStart(
-        IEventSink* pCallback ) override
-    {
-        gint32 ret = 0;
-        if( this->IsServer() )
-        {
-            auto pRoot = GetRootDir();
-            // add a WO file as admin-command file
-            auto pFile = DIR_SPTR(
-                new CFuseCmdFile() ); 
-            auto pObj = dynamic_cast
-                < CFuseObjBase* >( pFile.get() );
-            pObj->SetMode( S_IWUSR );
-            pObj->DecRef();
-            ret = pRoot->AddChild( pFile );
-        }
-        return ret;
-    }
 };
 
 class CFuseRootProxy :
@@ -2901,11 +2892,17 @@ class CFuseRootProxy :
 class CFuseRootServer :
     public CFuseRootBase< false >
 {
+    DIR_SPTR m_pUserDir;
     public:
     typedef CFuseRootBase< false > super;
     CFuseRootServer( const IConfigDb* pCfg ) :
         super( pCfg )
     { SetClassId( clsid( CFuseRootServer ) ); }
+
+    gint32 OnPostStart(
+        IEventSink* pCallback ) override;
+
+    gint32 Add2UserDir( DIR_SPTR& pEnt );
 };
 
 class CStreamServerFuse :

@@ -3672,11 +3672,6 @@ gint32 CImplMainFuncFuse::Output()
             Wa( "gint32 ret = 0;" );
             CCOUT << "do";
             BLOCK_OPEN;
-            Wa( "ret = InitContext();" );
-            CCOUT << "if( ERROR( ret ) )";
-            NEW_LINE;
-            CCOUT << "    break;";
-            NEW_LINE;
             Wa( "fuse_args args = FUSE_ARGS_INIT(argc, argv);" );
             Wa( "fuse_cmdline_opts opts;" );
             Wa( "ret = fuseif_daemonize( args, opts, argc, argv );" );
@@ -3684,6 +3679,11 @@ gint32 CImplMainFuncFuse::Output()
             NEW_LINE;
             CCOUT << "    break;";
             NEW_LINES( 2 );
+            Wa( "ret = InitContext();" );
+            CCOUT << "if( ERROR( ret ) )";
+            NEW_LINE;
+            CCOUT << "    break;";
+            NEW_LINE;
             CCOUT << "ret = InitRootIf( g_pIoMgr, "
                 << ( bProxy ? "true" : "false" ) << " );";
             NEW_LINE;
