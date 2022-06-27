@@ -30,10 +30,13 @@
 #include <ifhelper.h>
 #include <frmwrk.h>
 #include <rpcroute.h>
+#include <fuseif.h>
 
 #include <cppunit/extensions/TestFactoryRegistry.h>
 #include <cppunit/ui/text/TestRunner.h>
 #include <cppunit/extensions/HelperMacros.h>
+
+#define MAX_BYTES_MPOINT  REG_MAX_NAME
 
 CPPUNIT_TEST_SUITE_REGISTRATION( CIfRouterTest );
 
@@ -44,6 +47,12 @@ static bool g_bRfc = false;
 static bool g_bSepConn = false;
 static std::string g_strService;
 static bool g_bDaemon = false;
+static std::string g_strMPoint;
+
+// two globals must be present for libfuseif.so
+ObjPtr g_pIoMgr;
+std::set< guint32 > g_setMsgIds;
+
 
 void CIfRouterTest::setUp()
 {
@@ -181,6 +190,66 @@ CfgPtr CIfRouterTest::InitRouterCfg(
     return oCfg.GetCfg();
 }
 
+gint32 AddFilesAndDirs( CRpcServices* pSvc )
+{
+    if( pSvc == nullptr )
+        return -EFAULT;
+
+    return 0;
+}
+
+gint32 MountAndLoop( CRpcServices* pSvc )
+{
+    if( pSvc == nullptr )
+        return -EFAULT;
+
+    gint32 ret = 0;
+    do{
+        gint32 argc = 3;
+        char args_buf[ 3 ][ MAX_BYTES_MPOINT ] = {
+            "rpcrouter",
+            "-f"
+        };
+
+        char* argv[ 3 ] = {
+            args_buf[ 0 ],
+            args_buf[ 1 ],
+            args_buf[ 2 ]
+        };
+
+        strcpy( argv[ 2 ], g_strMPoint.c_str() );
+
+        fuse_cmdline_opts opts;
+        fuse_args args = FUSE_ARGS_INIT(argc, argv);
+        ret = fuseif_daemonize( args, opts, argc, argv );
+        if( ERROR( ret ) )
+            break;
+
+        g_pIoMgr = pSvc->GetIoMgr();
+        ret = InitRootIf(
+            pSvc->GetIoMgr(), false );
+        if( ERROR( ret ) )
+            break;
+
+        ret = AddFilesAndDirs( pSvc );
+        if( ERROR( ret ) )
+            break;
+
+        args = FUSE_ARGS_INIT(argc, argv);
+        ret = fuseif_main( args, opts );
+        InterfPtr pRoot = GetRootIf();        
+        if( !pRoot.IsEmpty() )
+        {
+            pRoot->Stop();
+            ReleaseRootIf();
+        }
+        g_pIoMgr.Clear();
+        
+    }while( 0 );
+
+    return ret;
+}
+
 void CIfRouterTest::testSvrStartStop()
 {
     CPPUNIT_ASSERT( !m_pMgr.IsEmpty() );
@@ -207,8 +276,15 @@ void CIfRouterTest::testSvrStartStop()
             break;
 
         CInterfaceServer* pSvr = pIf;
-        while( pSvr->IsConnected() )
-            sleep( 1 );
+        if( g_strMPoint.empty() )
+        {
+            while( pSvr->IsConnected() )
+                sleep( 1 );
+        }
+        else
+        {
+           ret = MountAndLoop( pSvr );
+        }
 
     }while( 0 );
 
@@ -242,7 +318,7 @@ int main( int argc, char** argv )
     int opt = 0;
     int ret = 0;
     bool bRole = false;
-    while( ( opt = getopt( argc, argv, "hr:adcfs:" ) ) != -1 )
+    while( ( opt = getopt( argc, argv, "hr:adcfs:m:" ) ) != -1 )
     {
         switch (opt)
         {
@@ -277,6 +353,17 @@ int main( int argc, char** argv )
         case 'f':
             {
                 g_bRfc = true;
+                break;
+            }
+        case 'm':
+            {
+                g_strMPoint = optarg;
+                if( g_strMPoint.size() >
+                    MAX_BYTES_MPOINT - 1 )
+                {
+                    ret = -ENAMETOOLONG;
+                    break;
+                }
                 break;
             }
         case 'h':
