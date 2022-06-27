@@ -11,6 +11,7 @@ This module enables `rpc-frmwrk` to operate via a set of files as known as the `
   * Monitoring the working status of `service point` with the read-only file `svcstat`.
   * Restarting/reloading individual `service point` online.
   * Supported filesystem operations: `open` `close` `read` `write` `unlink` `stat` `rmdir` `mkdir` `readdir` `releasedir` `poll` `ioctl` 
+  * Dynamically pluggable `service points` under a single mountpoint.
 
 ### The Structures of Generated `rpcfs` Filesystems.
 ![this screenshot](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/rpcfs-cli.png)   
