@@ -390,7 +390,8 @@
             "ClassFactories": [
                 "./libauth.so",
                 "./libsslpt.so",
-                "./libwspt.so"
+                "./libwspt.so",
+                "./libfuseif.so"
             ]
         },
         {
