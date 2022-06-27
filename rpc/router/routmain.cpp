@@ -305,6 +305,8 @@ void Usage( char* szName )
         "\t [ -c to establish a seperate connection to the same bridge per client, only for role 1 ]\n"
         "\t [ -f to enable request-based flow control on the gateway bridge, ignore it if no massive connections ]\n"
         "\t [ -s < Service Name for authentication, valid for role 2 or 3, and ignored for role 1 > ]\n"
+        "\t [ -m <mount point> to export runtime information via 'rpcfs' at the directory 'mount point' ]\n"
+        "\t [ -d to run as a daemon ]\n"
         "\t [ -h this help ]\n",
         szName );
 }
