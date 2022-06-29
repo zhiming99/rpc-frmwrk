@@ -119,7 +119,7 @@ The above example shows most of the statements ridl supports. ridl now has 7 typ
         -P:     To specify the prefix for the target java package. The java package name would be
                 <prefix>.<appname>.
         
-        -l:     To output a shared library instead of executables. This option is for CPP project only
+        -l:     To output a shared library instead of executables. This option is for CPP project or FUSE project.
         
         -L：    To generate the README.md in the specified language. Currently we support "cn" for
                 Chinese and "en" for English.
