@@ -995,6 +995,7 @@ gint32 CIfStartUxSockStmRelayTask::OnTaskComplete(
         iRet = ret;
     }
 
+    bool bClosed = false;
     EventPtr pEvt;
     ret = GetInterceptTask( pEvt );
     if( SUCCEEDED( ret ) )
@@ -1004,13 +1005,16 @@ gint32 CIfStartUxSockStmRelayTask::OnTaskComplete(
             ( CObjBase* )oResp.GetCfg() );
 
         pEvt->OnEvent( eventTaskComp, iRet, 0, 0 );
+        if( SUCCEEDED( iRet ) )
+            bClosed = true;
     }
 
-    if( iRemote > 0 )
+    if( !bClosed && iRemote > 0 )
     {
         close( iRemote );
         iRemote = -1;
     }
+
     oParams.ClearParams();
     ClearClientNotify();
 

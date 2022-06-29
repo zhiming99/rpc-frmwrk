@@ -3274,18 +3274,24 @@ gint32 CFuseRespFileSvr::fs_write_buf(
             continue;
         }
 
+        m_pReqSize->Resize( 0 );
+
+        // must release lock here, otherwise, deadlock
+        // could happen
+        oFileLock.Unlock();
+
         // send the response
         CFuseSvcServer* pSvr = ObjPtr( GetIf() );
         ret = pSvr->DispatchMsg( valResp );
         if( ret == STATUS_PENDING )
             ret = 0;
 
-        m_pReqSize->Resize( 0 );
-        if( m_vecOutBufs.empty() )
-        {
-            ret = 0;
+        oFileLock.Lock();
+
+        if( ERROR( ret ) )
             break;
-        }
+        if( m_vecOutBufs.empty() )
+            break;
 
     }while( 1 );
 
@@ -3528,6 +3534,12 @@ gint32 CFuseReqFileProxy::fs_write_buf(
             break;
         }
         
+        m_pReqSize->Resize( 0 );
+
+        // must release lock here, otherwise, deadlock
+        // could happen
+        oFileLock.Unlock();
+
         ret = pProxy->DispatchReq(
             nullptr, valReq, valResp );
 
@@ -3581,19 +3593,17 @@ gint32 CFuseReqFileProxy::fs_write_buf(
             ret = NEW_FUNCCALL_TASK( pTask,
                 pMgr, func, pProxy, qwReqId,
                 GetGroupId(), strResp );
-            if( ERROR( ret ) )
-                break;
-
-            pMgr->RescheduleTask( pTask );
+            if( SUCCEEDED( ret ) )
+                pMgr->RescheduleTask( pTask );
         }
 
-        m_pReqSize->Resize( 0 );
-        if( m_vecOutBufs.empty() )
-        {
-            // bufvec->idx = bufvec->count;
-            ret = 0;
+        oFileLock.Lock();
+
+        if( ERROR( ret ) )
             break;
-        }
+
+        if( m_vecOutBufs.empty() )
+            break;
 
     }while( 1 );
 
@@ -3677,15 +3687,6 @@ CFuseConnDir::CFuseConnDir( const stdstr& strName )
     pObj->SetMode( S_IRUSR );
     pObj->DecRef();
     AddChild( pFile );
-
-    // add a WO file as admin-command file
-    auto pCmd = DIR_SPTR(
-        new CFuseCmdFile() ); 
-    pObj = dynamic_cast
-        < CFuseObjBase* >( pCmd.get() );
-    pObj->SetMode( S_IWUSR );
-    pObj->DecRef();
-    AddChild( pCmd );
 }
 
 stdstr CFuseConnDir::GetRouterPath(
@@ -4523,45 +4524,6 @@ gint32 CFuseSvcServer::RemoveGroup(
         return STATUS_SUCCESS;
 
     return -ENOENT;
-}
-
-gint32 CFuseRootServer::OnPostStart(
-    IEventSink* pCallback )
-{
-    gint32 ret = 0;
-    do{
-        auto pRoot = GetRootDir();
-        // add a WO file as admin-command file
-        auto pFile = DIR_SPTR(
-            new CFuseCmdFile() ); 
-        auto pObj = dynamic_cast
-            < CFuseObjBase* >( pFile.get() );
-        pObj->SetMode( S_IWUSR );
-        pObj->DecRef();
-        ret = pRoot->AddChild( pFile );
-        if( ERROR( ret ) )
-            break;
-
-        auto pUserDir = new CFuseDirectory(
-            USER_DIR, nullptr );
-        pUserDir->SetMode( S_IRUSR | S_IXUSR );
-        pUserDir->DecRef();
-        m_pUserDir = DIR_SPTR( pUserDir );
-        ret = pRoot->AddChild( m_pUserDir );
-        if( ERROR( ret ) )
-            break;
-
-    }while( 0 );
-
-    return ret;
-}
-
-gint32 CFuseRootServer::Add2UserDir(
-    DIR_SPTR& pEnt )
-{
-    // don't call it after the initialization stage so
-    // far
-    return m_pUserDir->AddChild( pEnt );
 }
 
 } // namespace

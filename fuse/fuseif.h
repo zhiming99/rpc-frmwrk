@@ -2295,6 +2295,7 @@ class CFuseRootBase:
 
     std::vector< SVC_INFO > m_vecServices;
     std::hashmap< stdstr, guint32 > m_mapSvcInsts;
+    DIR_SPTR m_pUserDir;
 
     public:
     typedef T super;
@@ -2830,6 +2831,37 @@ class CFuseRootBase:
         return ret;
     }
 
+    gint32 OnPostStart(
+        IEventSink* pCallback )
+    {
+        gint32 ret = 0;
+        do{
+            auto pRoot = GetRootDir();
+            // add a WO file as admin-command file
+            auto pFile = DIR_SPTR(
+                new CFuseCmdFile() ); 
+            auto pObj = dynamic_cast
+                < CFuseObjBase* >( pFile.get() );
+            pObj->SetMode( S_IWUSR );
+            pObj->DecRef();
+            ret = pRoot->AddChild( pFile );
+            if( ERROR( ret ) )
+                break;
+
+            auto pUserDir = new CFuseDirectory(
+                USER_DIR, nullptr );
+            pUserDir->SetMode( S_IRUSR | S_IXUSR );
+            pUserDir->DecRef();
+            m_pUserDir = DIR_SPTR( pUserDir );
+            ret = pRoot->AddChild( m_pUserDir );
+            if( ERROR( ret ) )
+                break;
+
+        }while( 0 );
+
+        return ret;
+    }
+
     gint32 OnPreStop( IEventSink* pCallback )
     {
         gint32 ret = 0;
@@ -2875,7 +2907,15 @@ class CFuseRootBase:
             }
 
         }while( 0 );
+
         return ret;
+    }
+
+    gint32 Add2UserDir( DIR_SPTR& pEnt )
+    {
+        // don't call it after the initialization stage so
+        // far
+        return m_pUserDir->AddChild( pEnt );
     }
 };
 
@@ -2887,12 +2927,15 @@ class CFuseRootProxy :
     CFuseRootProxy( const IConfigDb* pCfg ) :
         super( pCfg )
     { SetClassId( clsid( CFuseRootProxy ) ); }
+
+    gint32 OnPostStart(
+        IEventSink* pCallback ) override
+    { return super::OnPostStart( pCallback ); }
 };
 
 class CFuseRootServer :
     public CFuseRootBase< false >
 {
-    DIR_SPTR m_pUserDir;
     public:
     typedef CFuseRootBase< false > super;
     CFuseRootServer( const IConfigDb* pCfg ) :
@@ -2900,9 +2943,8 @@ class CFuseRootServer :
     { SetClassId( clsid( CFuseRootServer ) ); }
 
     gint32 OnPostStart(
-        IEventSink* pCallback ) override;
-
-    gint32 Add2UserDir( DIR_SPTR& pEnt );
+        IEventSink* pCallback ) override
+    { return super::OnPostStart( pCallback ); }
 };
 
 class CStreamServerFuse :

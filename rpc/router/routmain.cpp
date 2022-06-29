@@ -227,7 +227,7 @@ gint32 MountAndLoop( CRpcServices* pSvc )
 
         g_pIoMgr = pSvc->GetIoMgr();
         ret = InitRootIf(
-            pSvc->GetIoMgr(), false );
+            pSvc->GetIoMgr(), g_dwRole == 1 );
         if( ERROR( ret ) )
             break;
 
