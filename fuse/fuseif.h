@@ -2296,6 +2296,7 @@ class CFuseRootBase:
     std::vector< SVC_INFO > m_vecServices;
     std::hashmap< stdstr, guint32 > m_mapSvcInsts;
     DIR_SPTR m_pUserDir;
+    std::atomic< guint32 > m_dwConnId;
 
     public:
     typedef T super;
@@ -2476,6 +2477,7 @@ class CFuseRootBase:
             iClsid = clsid( CFuseRootServer );
         else
             iClsid = clsid( CFuseRootProxy );
+        m_dwConnId = 0;
         this->SetClassId( iClsid );
         CCfgOpener oCfg( pCfg );
         gint32 ret = oCfg.GetPointer(
@@ -2565,7 +2567,7 @@ class CFuseRootBase:
                 }
                 if( ERROR( ret ) )
                 {
-                    gint32 idx = vecConns.size();
+                    gint32 idx = m_dwConnId++;
                     DIR_SPTR pNewDir( new CFuseConnDir(
                         stdstr( CONN_DIR_PREFIX ) +
                         std::to_string( idx ) ) );
