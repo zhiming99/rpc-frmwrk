@@ -4,7 +4,7 @@ The Java support for RPC-Frmwrk is an API wrapper over the C++ RPC-Frmwrk. It ex
   * The source code for C/C++ interface library consists of all the `.i` files, `rpcbase.i`, `proxy.i`, `server.i`, which will generate the skelton of the C/C++ interface library with SWIG. [`SWIG`](http://www.swig.org/Doc1.3/Sections.html#Sections) is a tool for automatically generating Java bindings for C and C++ libraries, and the installation command is `apt install swig`.
 
 ### Building your Java RPC applications
-The Java support package must be used as the support library for the `ridlc` generated the Java skelton project. The information about `ridlc` can be found [here](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl#introduction).
+The Java support package must be used as the support library for the `ridlc` generated the Java skelton project. The information about `ridlc` can be found [here](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl#invoking-ridlc).
 
 ### Technical Information
 At present, Java wrapper suport 1 type of serializations for data transfer.
