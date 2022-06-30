@@ -1539,6 +1539,21 @@ gint32 CFuseReqFileProxy::fs_ioctl(
     return ret;
 }
 
+gint32 CFuseStmFile::fs_open(
+    const char *path,
+    fuse_file_info *fi )
+{
+    CFuseMutex oLock( GetLock() );
+    IncOpCount();
+
+    fi->direct_io = 1;
+    fi->keep_cache = 0;
+    fi->nonseekable = 1;
+    fi->fh = ( guint64 )( CFuseObjBase* )this;
+
+    return STATUS_SUCCESS;
+}
+
 gint32 CFuseStmFile::fs_ioctl(
     const char *path,
     fuse_file_info *fi,
@@ -1870,7 +1885,8 @@ gint32 CFuseStmFile::fs_read(
         }
 
         if( m_queReqs.size() &&
-            m_queReqs.front().req != req )
+            m_queReqs.front().req->unique !=
+            req->unique )
         {
             if( IsNonBlock() )
             {

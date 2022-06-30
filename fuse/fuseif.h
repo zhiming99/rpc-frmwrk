@@ -1107,6 +1107,10 @@ class CFuseStmFile : public CFuseFileEntry
     void SetStream( HANDLE hStream )
     { m_hStream = hStream; }
 
+    gint32 fs_open(
+        const char *path,
+        fuse_file_info *fi ) override;
+
     gint32 OnReadStreamComplete(
         HANDLE hStream,
         gint32 iRet,
