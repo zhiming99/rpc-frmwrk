@@ -969,7 +969,7 @@ gint32 CFuseSvcStat::UpdateContent()
                 clsid( CIfInvokeMethodTask ),
                 vecTasks );
             oVal[ "IncomingReqs" ] =
-                vecTasks.size();
+                ( Json::UInt )vecTasks.size();
         }
         else if( SUCCEEDED( ret ) )
         {
@@ -1008,7 +1008,8 @@ gint32 CFuseSvcStat::UpdateContent()
                 propMsgCount, dwVal );
             if( ERROR( ret ) )
                 break;
-            oVal[ "IncomingReqs" ] = dwVal;
+            oVal[ "IncomingReqs" ] =
+                ( Json::UInt )dwVal;
             break;
         }
 
