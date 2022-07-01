@@ -38,6 +38,7 @@
 #include "dbusport.h"
 #include "streamex.h"
 #include "fusedefs.h"
+#include "tractgrp.h"
 
 struct fuseif_intr_data;
 gint32 fuseif_remkdir( const stdstr&, guint32 );
@@ -1015,7 +1016,7 @@ class CFuseSvcStat : public CFuseTextFile
         super( SVCSTAT_FILE )
     { SetIf( pIf ); }
 
-    gint32 UpdateContent();
+    virtual gint32 UpdateContent();
     gint32 fs_read(
         const char* path,
         fuse_file_info *fi,
@@ -1063,6 +1064,17 @@ class CFuseCmdFile : public CFuseObjBase
         off_t off, size_t size,
         std::vector< BufPtr >& vecBackup,
         fuseif_intr_data* d ) override;
+};
+
+class CFuseClassList : public CFuseSvcStat
+{
+    public:
+    typedef CFuseSvcStat super;
+    CFuseClassList( CRpcServices* pIf )
+        : super( pIf )
+    { SetName( CLSLIST_FILE ); }
+
+    gint32 UpdateContent() override;
 };
 
 class CFuseStmFile : public CFuseFileEntry
@@ -2606,6 +2618,14 @@ class CFuseRootBase:
         return ret;
     };
 
+    void GetClassesAvail(
+        std::vector< stdstr >& vecInfo ) const
+    {
+        CStdRMutex oLock( this->GetLock() );
+        for( auto& elem : m_vecServices )
+            vecInfo.push_back( elem.m_strSvcName );
+    }
+
     gint32 AddSvcPoint(
         const stdstr& strInstName,
         IEventSink* pCallback = nullptr,
@@ -2615,6 +2635,7 @@ class CFuseRootBase:
         bool bStarted = false;
         InterfPtr pIf;
         CIoManager* pMgr = this->GetIoMgr();
+        TaskletPtr pTaskGrp;
         do{
             SVC_INFO* psi = nullptr;
             if( unlikely( !IsValidName( strInstName ) ) )
@@ -2692,31 +2713,25 @@ class CFuseRootBase:
                 break;
             }
 
-            ret = pIf->Start();
+            CParamList oParams;
+            oParams[ propIfPtr ] = ObjPtr( this );
+            ret = pTaskGrp.NewObj(
+                clsid( CIfTransactGroup ),
+                oParams.GetCfg() );
             if( ERROR( ret ) )
-            {
-                pIf->Stop();
                 break;
-            }
 
-            bStarted = true;
-            EnumIfState st = pSp->GetState();
-            if( bProxy )
-            {
-                while( st == stateRecovery )
-                {
-                    sleep( 1 );
-                    st = pSp->GetState();
-                    dwTimeout--;
-                    if( dwTimeout == 0 )
-                        break;
-                }
-            }
-            if( st != stateConnected )
-            {
-                ret = -ENOTCONN;
+            CIfTransactGroup* pTransGrp = pTaskGrp;
+
+            TaskletPtr pStartTask;
+            ret = DEFER_IFCALLEX_NOSCHED2(
+                0, pStartTask, ObjPtr( pIf ),
+                &CRpcServices::StartEx, nullptr );
+
+            if( ERROR( ret ) )
                 break;
-            }
+
+            pTransGrp->AppendTask( pStartTask );
 
             TaskletPtr pUpdTask;
             ret = DEFER_OBJCALL_NOSCHED(
@@ -2727,28 +2742,25 @@ class CFuseRootBase:
             if( ERROR( ret ) )
                 break;
 
-            ret = pMgr->RescheduleTask( pUpdTask );
+            pTransGrp->AppendTask( pUpdTask );
+
+            TaskletPtr pStopTask;
+            ret = DEFER_IFCALLEX_NOSCHED2(
+                0, pStopTask, ObjPtr( pIf ),
+                &CRpcServices::StopEx, nullptr );
+
             if( ERROR( ret ) )
-                ( *pUpdTask )( eventCancelTask );
-            else
-            {
-                ret = pUpdTask->GetError();
-            }
+                break;
+
+            pTransGrp->AddRollback( pStopTask );
+            ret = this->AddSeqTask( pTaskGrp, true );
 
         }while( 0 );
 
         if( ERROR( ret ) )
         {
-            if( bStarted && !pIf.IsEmpty() )
-            {
-                TaskletPtr pTask;
-                gint32 iRet = DEFER_IFCALLEX_NOSCHED2(
-                    0, pTask, ObjPtr( pIf ),
-                    &CRpcServices::StopEx, 
-                    ( IEventSink* )nullptr );
-                if( SUCCEEDED( iRet ) )
-                    pMgr->RescheduleTask( pTask );
-            }
+            if( !pTaskGrp.IsEmpty() )
+                ( *pTaskGrp )( eventCancelTask );
         }
 
         return ret;
@@ -2759,8 +2771,6 @@ class CFuseRootBase:
         auto itr = m_mapSvcInsts.find( strName );
         if( itr == m_mapSvcInsts.cend() )
             return -ENOENT;
-        if( strName.size() == itr->second )
-            return ERROR_FALSE;
         return STATUS_SUCCESS;
     }
 
@@ -2796,11 +2806,11 @@ class CFuseRootBase:
                 }
             }
 
-            if( ERROR( ret ) )
-                break;
-
-            m_vecServices.push_back(
-                { strName, strDesc, iClsid } );
+            if( SUCCEEDED( ret ) )
+                m_vecServices.push_back(
+                    { strName, strDesc, iClsid } );
+            else
+                ret = 0;
 
             oLock.Unlock();
 
@@ -2824,8 +2834,7 @@ class CFuseRootBase:
 
             CSyncCallback* pSync = pCallback;
 
-            ret = AddSvcPoint(
-                strName, pSync );
+            ret = AddSvcPoint( strName, pSync );
             if( ret == STATUS_PENDING )
             {
                 pSync->WaitForCompleteWakable();
@@ -2851,6 +2860,16 @@ class CFuseRootBase:
             pObj->SetMode( S_IWUSR );
             pObj->DecRef();
             ret = pRoot->AddChild( pFile );
+            if( ERROR( ret ) )
+                break;
+
+            auto pList = DIR_SPTR(
+                new CFuseClassList( nullptr ) ); 
+            pObj = dynamic_cast
+                < CFuseObjBase* >( pList.get() );
+            pObj->SetMode( S_IWUSR );
+            pObj->DecRef();
+            ret = pRoot->AddChild( pList );
             if( ERROR( ret ) )
                 break;
 

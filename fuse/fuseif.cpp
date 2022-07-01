@@ -33,6 +33,8 @@ using namespace rpcf;
 #include <counters.h>
 #include <regex>
 
+#define FUSE_MIN_FILES 2
+
 void fuseif_finish_interrupt(
     fuse *f, fuse_req_t req,
     fuseif_intr_data *d);
@@ -469,6 +471,22 @@ gint32 CFuseDirectory::fs_rmdir(
 
         std::vector< DIR_SPTR > vecChildren;
         psd->GetChildren( vecChildren );
+        for( auto& elem : vecChildren )
+        {
+            auto pFile = dynamic_cast
+                < CFuseFileEntry* >( elem.get() );
+            if( pFile == nullptr )
+                continue;
+            if( pFile->GetOpCount() > 0 )
+            {
+                ret = -EBUSY;
+                break;
+            }
+        }
+
+        vecChildren.clear();
+        if( ERROR( ret ) )
+            break;
 
         auto* pStmDir =
             psd->GetChild( STREAM_DIR );
@@ -501,6 +519,7 @@ gint32 CFuseDirectory::fs_rmdir(
                 fuse_ino_t inoParent = 0;
                 fuse_ino_t inoChild = 0;
 
+                stdstr strDir = strName;
                 if( pSvcIf->IsServer() )
                 {
                     ROOTLK_EXCLUSIVE;
@@ -516,7 +535,7 @@ gint32 CFuseDirectory::fs_rmdir(
                     CFuseRootServer* pRootIf =
                         GetRootIf();
 
-                    pParent->RemoveChild( strName );
+                    pParent->RemoveChild( strDir );
                     pRootIf->RemoveSvcPoint( pSvc );
 
                     inoParent = pParent->GetObjId();
@@ -537,11 +556,25 @@ gint32 CFuseDirectory::fs_rmdir(
                     CFuseRootProxy* pRootIf =
                         GetRootIf();
 
-                    pParent->RemoveChild( strName );
+                    pParent->RemoveChild( strDir );
                     pRootIf->RemoveSvcPoint( pSvc );
-
                     inoParent = pParent->GetObjId();
                     inoChild = psd->GetObjId();
+                    if( pParent->GetCount() <= FUSE_MIN_FILES )
+                    {
+                        // remove the empty connection directory
+                        auto pNextHop =
+                            pParent->GetChild( HOP_DIR );
+                        if( pNextHop != nullptr &&
+                            pNextHop->GetCount() == 0 )
+                        {
+                            auto pRoot = pParent->GetParent();
+                            strDir = pParent->GetName();
+                            inoParent = pRoot->GetObjId();
+                            inoChild = pParent->GetObjId();
+                            pRoot->RemoveChild( strDir );
+                        }
+                    }
                 }
 
                 fuse* pFuse = GetFuse();
@@ -553,8 +586,8 @@ gint32 CFuseDirectory::fs_rmdir(
 
                 fuse_lowlevel_notify_delete( se,
                     inoParent, inoChild,
-                    strName.c_str(),
-                    strName.size() );
+                    strDir.c_str(),
+                    strDir.size() );
 
                 pCb->OnEvent( eventTaskComp,
                     STATUS_SUCCESS, 0, nullptr );
@@ -806,6 +839,12 @@ gint32 CFuseSvcStat::UpdateContent()
 {
     gint32 ret = 0;
     do{
+        Json::StreamWriterBuilder oBuilder;
+        oBuilder["commentStyle"] = "None";
+        oBuilder["indentation"] = "   ";
+
+        Json::Value oVal;
+
         CRpcServices* pIf = GetIf();
         if( unlikely( pIf == nullptr ) )
         {
@@ -818,15 +857,14 @@ gint32 CFuseSvcStat::UpdateContent()
         ret = clock_gettime(
             CLOCK_REALTIME, &tsNow );
 
-        m_strContent += "CurTime=";
         char szBuf[ 64 ];
         szBuf[ sizeof( szBuf ) - 1 ] = 0;
         snprintf( szBuf,
             sizeof( szBuf ) - 1,
-            "%ld.%09ld\n",
+            "%ld.%09ld",
             tsNow.tv_sec,
             tsNow.tv_nsec );
-        m_strContent += szBuf;
+        oVal[ "CurTime" ] = szBuf;
         
         stdstr strState;
         EnumIfState iState = pIf->GetState();
@@ -873,13 +911,9 @@ gint32 CFuseSvcStat::UpdateContent()
             strState = "Invalid";
             break;
         }
-        m_strContent += "IfStat=";
-        m_strContent += strState + "\n";
+        oVal[ "IfStat" ] = strState;
         guint32 dwCount = this->GetActCount();
-        m_strContent += "Objects=";
-
-        m_strContent +=
-            std::to_string( dwCount ) + "\n";
+        oVal[ "Objects" ] = dwCount;
 
         auto pSvr = dynamic_cast
             < CFuseSvcServer* >( pIf );
@@ -901,9 +935,7 @@ gint32 CFuseSvcStat::UpdateContent()
             uptime =
                 tsNow.tv_sec - tsStart.tv_sec;
 
-            m_strContent += "UpTime=";
-            m_strContent += std::to_string(
-                uptime ) + "\n";
+            oVal[ "UpTimeSec" ] = uptime;
         }
 
         stdstr strVal;
@@ -911,30 +943,21 @@ gint32 CFuseSvcStat::UpdateContent()
         ret = oIfCfg.GetStrProp(
             propObjDescPath, strVal );
         if( SUCCEEDED( ret ) )
-        {
-            m_strContent += "DescFile=";
-            m_strContent += strVal + "\n";
-        }
+            oVal[ "DescFile" ] = strVal;
+
        ret = oIfCfg.GetStrProp(
         propObjName, strVal );
        if( SUCCEEDED( ret ) )
-       {
-           m_strContent += "ObjName=";
-           m_strContent += strVal + "\n";
-       }
+           oVal[ "ObjName" ] = strVal;
 
         ret = oIfCfg.GetStrProp(
             propObjPath, strVal );
         if( SUCCEEDED( ret ) )
-        {
-            m_strContent += "ObjectPath=";
-            m_strContent += strVal + "\n";
-        }
+             oVal[ "ObjectPath" ] = strVal;
 
         CFuseSvcDir* pSvcDir = GetSvcDir( pIf );
         strVal = pSvcDir->GetName();
-        m_strContent += "SvcName=";
-        m_strContent += strVal + "\n";
+        oVal[ "SvcName" ] = strVal;
 
         TaskGrpPtr pParaGrp;
         ret = pIf->GetParallelGrp( pParaGrp );
@@ -944,42 +967,34 @@ gint32 CFuseSvcStat::UpdateContent()
             pParaGrp->FindTaskByClsid(
                 clsid( CIfInvokeMethodTask ),
                 vecTasks );
-            m_strContent += "IncomingReqs=";
-            m_strContent += std::to_string(
-                vecTasks.size() ) + "\n";
+            oVal[ "IncomingReqs" ] =
+                vecTasks.size();
         }
         else if( SUCCEEDED( ret ) )
         {
             pParaGrp->FindTaskByClsid(
                 clsid( CIfIoReqTask ),
                 vecTasks );
-            m_strContent += "OutgoingReqs=";
-            m_strContent += std::to_string(
-                vecTasks.size() ) + "\n";
+            oVal[ "OutgoingReqs" ] =
+                vecTasks.size();
         }
-        m_strContent += "IsServer=";
-        strVal = bServer ? "true\n" : "false\n";
-        m_strContent += strVal;
+        oVal[ "IsServer" ] = bServer;
 
-        m_strContent += "StmCount=";
         auto pStm = dynamic_cast
             < IStream* >( pIf );
-        strVal = std::to_string( 
-            pStm->GetStreamCount() );
-        m_strContent += strVal + "\n";
+        oVal[ "StmCount" ] =
+            pStm->GetStreamCount();
 
-        m_strContent += "ReqFiles=";
         if( bServer )
         {
-            strVal = std::to_string(
-                pSvr->GetGroupCount() );
+            oVal[ "ReqFiles" ] =
+                pSvr->GetGroupCount();
         }
         else
         {
-            strVal = std::to_string(
-                pProxy->GetGroupCount() );
+            oVal[ "ReqFiles" ] =
+                pProxy->GetGroupCount();
         }
-        m_strContent += strVal + "\n";
 
         while( pIf->IsServer() )
         {
@@ -992,11 +1007,12 @@ gint32 CFuseSvcStat::UpdateContent()
                 propMsgCount, dwVal );
             if( ERROR( ret ) )
                 break;
-            m_strContent += "IncomingReqs=";
-            m_strContent +=
-                std::to_string( dwVal ) + "\n";
+            oVal[ "IncomingReqs" ] = dwVal;
             break;
         }
+
+        m_strContent = Json::writeString(
+            oBuilder, oVal );
 
     }while( 0 );
 
@@ -1042,6 +1058,43 @@ gint32 CFuseSvcStat::fs_read(
     }while( 0 );
 
     return ret;
+}
+
+gint32 CFuseClassList::UpdateContent()
+{
+    gint32 ret = 0;
+    do{
+        Json::StreamWriterBuilder oBuilder;
+        oBuilder["commentStyle"] = "None";
+        oBuilder["indentation"] = "   ";
+        Json::Value oVal( Json::arrayValue);
+
+        InterfPtr pIf = GetRootIf();
+        std::vector< stdstr > vecClasses;
+        if( pIf->IsServer() )
+        {
+            CFuseRootServer* pSvr = pIf;
+            pSvr->GetClassesAvail( vecClasses );
+        }
+        else
+        {
+            CFuseRootProxy* pProxy = pIf;
+            pProxy->GetClassesAvail( vecClasses );
+        }
+
+        if( vecClasses.size() )
+        {
+            oVal.resize( vecClasses.size() );
+            Json::ArrayIndex i = 0;
+            for( ; i < vecClasses.size(); ++i )
+                oVal[ i ] = vecClasses[ i ];
+        }
+        m_strContent = Json::writeString(
+            oBuilder, oVal );
+
+    }while( 0 );
+
+    return 0;
 }
 
 gint32 CFuseCmdFile::fs_getattr(
@@ -3884,64 +3937,45 @@ stdstr CFuseConnDir::DumpConnParams()
 
     stdstr strRet;
     do{
+        Json::StreamWriterBuilder oBuilder;
+        oBuilder["commentStyle"] = "None";
+        oBuilder["indentation"] = "   ";
+
+        Json::Value oVal;
         CConnParamsProxy oConn(
             ( IConfigDb* )m_pConnParams );
         
         bool bVal = oConn.IsServer();
-        strRet += "IsServer=";
-        strRet += ( bVal ? "true\n" : "false\n" );
+        oVal[ "IsServer" ] = bVal;
 
         stdstr strVal = oConn.GetSrcIpAddr();
         if( strVal.size() )
-        {
-            strRet += "SrcIpAddr=";
-            strRet += strVal + "\n";
-        }
+            oVal[ "SrcIpAddr" ] = strVal;
 
         guint32 dwVal = oConn.GetSrcPortNum();
         if( dwVal != 0 )
-        {
-            strRet += "SrcPortNum=";
-            strRet += std::to_string( dwVal );
-            strRet += "\n";
-        }
+            oVal[ "SrcPortNum" ] = dwVal;
 
         strVal = oConn.GetDestIpAddr();
         if( strVal.size() )
-        {
-            strRet += "DestIpAddr";
-            strRet += strVal + "\n";
-        }
+            oVal[ "DestIpAddr" ] = strVal;
 
         dwVal = oConn.GetDestPortNum();
 
         if( dwVal != 0 )
-        {
-            strRet += "DestPortNum=";
-            strRet += std::to_string( dwVal );
-            strRet += "\n";
-        }
+            oVal[ "DestPortNum" ] = dwVal;
 
         bVal = oConn.IsWebSocket();
-        strRet += "WebSocket=";
-        strRet += ( bVal ?\
-            "enabled\n" : "disabled\n" );
+        oVal[ "WebSocket" ] = bVal;
 
         if( bVal )
-        {
-            strRet += "URL=";
-            strRet += oConn.GetUrl() + "\n";
-        }
+            oVal[ "URL" ] = oConn.GetUrl();
 
         bVal = oConn.IsSSL();
-        strRet += "SSL=";
-        strRet += ( bVal ?
-            "enabled\n" : "disabled\n" );
+        oVal[ "SSL" ] = bVal;
 
         bVal = oConn.HasAuth(); 
-        strRet += "Authentication=";
-        strRet += ( bVal ?
-            "enabled\n" : "disabled\n" );
+        oVal[ "Authentication" ] = bVal;
 
         if( bVal )
         {
@@ -3959,37 +3993,31 @@ stdstr CFuseConnDir::DumpConnParams()
             if( ERROR( ret ) )
                 break;
 
-            strRet += "mechanism=";
-            strRet += strVal + "\n";
-
+            Json::Value oAuthVal;
+            oAuthVal[ "mechanism" ] = strVal;
             if( strVal != "krb5" )
                 break;
 
             ret = oAuth.GetStrProp(
                 propUserName, strVal );
             if( SUCCEEDED( ret ) )
-            {
-                strRet += "\tuser=\"";
-                strRet += strVal + "\"\n";
-            }
+                oAuthVal[ "user" ] = strVal;
 
             ret = oAuth.GetStrProp(
                 propRealm, strVal );
             if( SUCCEEDED( ret ) ) 
-            {
-                strRet += "\trealm=\"";
-                strRet += strVal + "\"\n";
-            }
+                oAuthVal[ "realm" ] = strVal;
 
             ret = oAuth.GetBoolProp(
                 propSignMsg, bVal );
             if( SUCCEEDED( ret ) )
-            {
-                strRet += "\tsignmsg=";
-                strRet += ( bVal ?
-                    "true\n" : "false\n" );
-            }
+                oAuthVal[ "signmsg" ] = bVal;
+
+            oVal[ "AuthInfo" ] = oAuthVal;
         }
+
+        strRet = Json::writeString(
+            oBuilder, oVal );
 
     }while( 0 );
 
