@@ -935,7 +935,8 @@ gint32 CFuseSvcStat::UpdateContent()
             uptime =
                 tsNow.tv_sec - tsStart.tv_sec;
 
-            oVal[ "UpTimeSec" ] = uptime;
+            oVal[ "UpTimeSec" ] =
+                ( Json::UInt )uptime;
         }
 
         stdstr strVal;
@@ -976,7 +977,7 @@ gint32 CFuseSvcStat::UpdateContent()
                 clsid( CIfIoReqTask ),
                 vecTasks );
             oVal[ "OutgoingReqs" ] =
-                vecTasks.size();
+                ( Json::UInt )vecTasks.size();
         }
         oVal[ "IsServer" ] = bServer;
 
@@ -5066,7 +5067,11 @@ gint32 fuseif_daemonize( fuse_args& args,
     }
 
     if( opts.foreground == 0 )
-        daemon( 1, 0 );
+    {
+        res = daemon( 1, 0 );
+        if( res == -1 )
+            res = errno;
+    }
 out1:
     free(opts.mountpoint);
     fuse_opt_free_args(&args);
