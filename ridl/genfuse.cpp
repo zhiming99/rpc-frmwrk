@@ -70,7 +70,7 @@ gint32 EmitBuildJsonReq(
     Wa( "    oJsParams.isObject() )" );
     Wa( "    oJsReq[ JSON_ATTR_PARAMS ] = oJsParams;" );
     Wa( "oJsReq[ JSON_ATTR_METHOD ] = strMethod;" );
-    Wa( "oJsReq[ JSON_ATTR_IFNAME ] = strIfName;" );
+    Wa( "oJsReq[ JSON_ATTR_IFNAME1 ] = strIfName;" );
     Wa( "if( bProxy )" );
     BLOCK_OPEN;
     Wa( "if( bResp )" );
@@ -2934,11 +2934,11 @@ gint32 CImplServiceImplFuse::Output()
             Wa( "if( strType != \"resp\" &&" );
             Wa( "    strType != \"evt\" )" );
             Wa( "{ ret = -EINVAL; break; }" );
-            Wa( "if( !oMsg.isMember( JSON_ATTR_IFNAME ) ||" );
-            Wa( "    !oMsg[ JSON_ATTR_IFNAME ].isString() )" );
+            Wa( "if( !oMsg.isMember( JSON_ATTR_IFNAME1 ) ||" );
+            Wa( "    !oMsg[ JSON_ATTR_IFNAME1 ].isString() )" );
             Wa( "{ ret = -EINVAL; break; }" );
             Wa( "stdstr strIfName =" );
-            Wa( "    oMsg[ JSON_ATTR_IFNAME ].asString();" );
+            Wa( "    oMsg[ JSON_ATTR_IFNAME1 ].asString();" );
             std::vector< ObjPtr > vecIfRefs;
             m_pNode->GetIfRefs( vecIfRefs );
             for( auto& elem : vecIfRefs )
@@ -3064,11 +3064,11 @@ gint32 CImplServiceImplFuse::Output()
             Wa( "{ ret = -EINVAL; break; }" );
             Wa( "stdstr strMethod =" );
             Wa( "    oReq[ JSON_ATTR_METHOD ].asString();" );
-            Wa( "if( !oReq.isMember( JSON_ATTR_IFNAME ) ||");
-            Wa( "    !oReq[ JSON_ATTR_IFNAME ].isString() )" );
+            Wa( "if( !oReq.isMember( JSON_ATTR_IFNAME1 ) ||");
+            Wa( "    !oReq[ JSON_ATTR_IFNAME1 ].isString() )" );
             Wa( "{ ret = -EINVAL; break; }" );
             Wa( "stdstr strIfName =" );
-            Wa( "    oReq[ JSON_ATTR_IFNAME ].asString();" );
+            Wa( "    oReq[ JSON_ATTR_IFNAME1 ].asString();" );
             Wa( "if( !oReq.isMember( JSON_ATTR_MSGTYPE ) ||");
             Wa( "    !oReq[ JSON_ATTR_MSGTYPE ].isString() )" );
             Wa( "{ ret = -EINVAL; break; }" );
@@ -3084,7 +3084,7 @@ gint32 CImplServiceImplFuse::Output()
             Wa( "// init the response value" );
             Wa( "oResp[ JSON_ATTR_MSGTYPE ] = \"resp\";" );
             Wa( "oResp[ JSON_ATTR_METHOD ] = strMethod;" );
-            Wa( "oResp[ JSON_ATTR_IFNAME ] = strIfName;" );
+            Wa( "oResp[ JSON_ATTR_IFNAME1 ] = strIfName;" );
             Wa( "oResp[ JSON_ATTR_REQCTXID ] =" );
             Wa( "    ( Json::UInt64& )qwReqId;" );
             Wa( "if( this->GetState() != stateConnected )" );
@@ -3188,7 +3188,7 @@ gint32 CImplServiceImplFuse::Output()
             Wa( "if( ERROR( ret ) )" );
             Wa( "    break;" );
             Wa( "Json::Value oJsResp( objectValue );" );
-            Wa( "oJsResp[ JSON_ATTR_IFNAME ] =" );
+            Wa( "oJsResp[ JSON_ATTR_IFNAME1 ] =" );
             Wa( "    \"IInterfaceServer\";" );
             Wa( "oJsResp[ JSON_ATTR_METHOD ] =" );
             Wa( "    \"UserCancelRequest\";" );

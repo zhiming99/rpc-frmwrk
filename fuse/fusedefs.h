@@ -29,7 +29,7 @@
 // 'interface' and a string attributes 'method' to
 // specify which interface and which method the
 // parameters are for.
-#define JSON_ATTR_IFNAME        "Interface"
+#define JSON_ATTR_IFNAME1       "Interface"
 #define JSON_ATTR_METHOD        "Method"
 
 // A json message must have a string attribute MsgType

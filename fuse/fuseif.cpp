@@ -32,6 +32,7 @@ using namespace rpcf;
 #include <unistd.h>
 #include <counters.h>
 #include <regex>
+#include "jsondef.h"
 
 #define FUSE_MIN_FILES 2
 
@@ -949,7 +950,7 @@ gint32 CFuseSvcStat::UpdateContent()
        ret = oIfCfg.GetStrProp(
         propObjName, strVal );
        if( SUCCEEDED( ret ) )
-           oVal[ "ObjName" ] = strVal;
+           oVal[ JSON_ATTR_OBJNAME ] = strVal;
 
         ret = oIfCfg.GetStrProp(
             propObjPath, strVal );
@@ -3967,17 +3968,20 @@ stdstr CFuseConnDir::DumpConnParams()
         if( dwVal != 0 )
             oVal[ "DestPortNum" ] = dwVal;
 
+        bVal = oConn.IsCompression();
+        oVal[ JSON_ATTR_ENABLE_COMPRESS ] = bVal;
+
         bVal = oConn.IsWebSocket();
-        oVal[ "WebSocket" ] = bVal;
+        oVal[ JSON_ATTR_ENABLE_WEBSOCKET ] = bVal;
 
         if( bVal )
-            oVal[ "URL" ] = oConn.GetUrl();
+            oVal[ JSON_ATTR_DEST_URL ] = oConn.GetUrl();
 
         bVal = oConn.IsSSL();
-        oVal[ "SSL" ] = bVal;
+        oVal[ JSON_ATTR_ENABLE_SSL ] = bVal;
 
         bVal = oConn.HasAuth(); 
-        oVal[ "Authentication" ] = bVal;
+        oVal[ JSON_ATTR_HASAUTH ] = bVal;
 
         if( bVal )
         {
@@ -3996,26 +4000,26 @@ stdstr CFuseConnDir::DumpConnParams()
                 break;
 
             Json::Value oAuthVal;
-            oAuthVal[ "mechanism" ] = strVal;
+            oAuthVal[ JSON_ATTR_AUTHMECH ] = strVal;
             if( strVal != "krb5" )
                 break;
 
             ret = oAuth.GetStrProp(
                 propUserName, strVal );
             if( SUCCEEDED( ret ) )
-                oAuthVal[ "user" ] = strVal;
+                oAuthVal[ JSON_ATTR_USERNAME ] = strVal;
 
             ret = oAuth.GetStrProp(
                 propRealm, strVal );
             if( SUCCEEDED( ret ) ) 
-                oAuthVal[ "realm" ] = strVal;
+                oAuthVal[ JSON_ATTR_REALM ] = strVal;
 
             ret = oAuth.GetBoolProp(
                 propSignMsg, bVal );
             if( SUCCEEDED( ret ) )
-                oAuthVal[ "signmsg" ] = bVal;
+                oAuthVal[ JSON_ATTR_SIGN_MSG ] = bVal;
 
-            oVal[ "AuthInfo" ] = oAuthVal;
+            oVal[ JSON_ATTR_AUTHINFO ] = oAuthVal;
         }
 
         strRet = Json::writeString(
