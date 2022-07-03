@@ -140,6 +140,8 @@ void CIfRouterTest::tearDown()
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 
         m_pMgr.Clear();
+        if( !g_pIoMgr.IsEmpty() )
+            g_pIoMgr.Clear();
 
         ret = CoUninitialize();
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
@@ -246,15 +248,18 @@ gint32 MountAndLoop( CRpcServices* pSvc )
 
         args = FUSE_ARGS_INIT(argc, argv);
         ret = fuseif_main( args, opts );
-        InterfPtr pRoot = GetRootIf();        
-        if( !pRoot.IsEmpty() )
-        {
-            pRoot->Stop();
-            ReleaseRootIf();
-        }
-        g_pIoMgr.Clear();
         
     }while( 0 );
+
+    InterfPtr pRoot = GetRootIf();        
+    if( !pRoot.IsEmpty() )
+    {
+        pRoot->Stop();
+        ReleaseRootIf();
+    }
+
+    if( !g_pIoMgr.IsEmpty() )
+        g_pIoMgr.Clear();
 
     return ret;
 }

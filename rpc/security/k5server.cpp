@@ -766,7 +766,7 @@ gint32 CK5AuthServer::OnPostStop(
         &min_stat, &m_pSvcCred );
 
     m_pSvcCred = nullptr;
-    return 0;
+    return super::OnPostStop( pCallback );
 }
 
 gint32 CK5AuthServer::GenSessHash(

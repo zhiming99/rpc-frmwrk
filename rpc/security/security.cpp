@@ -3347,15 +3347,17 @@ gint32 CAuthentServer::OnPreStopComplete(
     IConfigDb* pReqCtx )
 {
     if( pCallback == nullptr ||
-        pIoReq == nullptr ||
-        pReqCtx == nullptr )
+        pIoReq == nullptr )
         return -EINVAL;
 
     gint32 ret = 0;
     CParamList oParams;
-    CCfgOpener oReqCtx( pReqCtx );
+    UNREFERENCED( pReqCtx );
 
     do{
+        if( !m_pAuthImpl.IsEmpty() )
+            m_pAuthImpl.Clear();
+
         CCfgOpenerObj oReq( pIoReq );
         IConfigDb* pResp = nullptr;
         ret = oReq.GetPointer(
@@ -3377,8 +3379,6 @@ gint32 CAuthentServer::OnPreStopComplete(
             ret = iRet;
             break;
         }
-
-        m_pAuthImpl.Clear();
 
     }while( 0 );
 
