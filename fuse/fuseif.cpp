@@ -1212,7 +1212,29 @@ gint32 CFuseCmdFile::fs_write_buf(
 
             auto pParent = dynamic_cast
                 < CFuseDirectory* >( GetParent() );
-            auto pSd = pParent->GetChild( strSvc );
+            CDirEntry* pSd = nullptr;
+            auto pParentIf = pParent->GetIf();
+            if( pParentIf->IsServer() )
+                pSd = pParent->GetChild( strSvc );
+            else
+            {
+                std::vector< DIR_SPTR > vecConns;
+                pParent->GetChildren( vecConns );
+                stdstr strPrefix = CONN_DIR_PREFIX;
+                for( auto& elem : vecConns )
+                {
+                    auto pDir = dynamic_cast
+                        < CFuseDirectory* >( elem.get() );
+                    if( pDir == nullptr )
+                        continue;
+                    stdstr strName = pDir->GetName();
+                    if( strName.substr( 0, strPrefix.size() ) !=
+                        strPrefix )
+                        continue;
+                    pSd = pDir->GetChild( strName );
+                    break;
+                }
+            }
             if( pSd == nullptr && strCmd == "reload" )
             {
                 TaskletPtr pCallback;
