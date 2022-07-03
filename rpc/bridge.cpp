@@ -1748,7 +1748,15 @@ gint32 CRpcTcpBridge::OnPostStart(
 
         this->m_pConnMgr.Clear();
 
-        GenSessHash( m_strSess );
+        CCfgOpenerObj oIfCfg( this );
+        ret = oIfCfg.GetStrProp(
+            propSessHash, m_strSess );
+        if( ERROR( ret ) )
+        {
+            GenSessHash( m_strSess );
+            ret = oIfCfg.SetStrProp(
+                propSessHash, m_strSess );
+        }
         
 
     }while( 0 );

@@ -1317,8 +1317,12 @@ class CRpcTcpBridge :
         DMsgPtr& pRespMsg,
         IEventSink* pCallback );
 
-    inline guint64 GetAgeSec( guint64 qwTs )
+    inline guint64 GetAgeSec(
+        guint64 qwTs ) const
     { return m_oTs.GetAgeSec( qwTs ); }
+
+    inline guint64 GetStartSec() const
+    { return m_oTs.m_qwLocalBaseSec; }
 
     gint32 PostDisconnEvent();
 
@@ -1448,6 +1452,9 @@ class CRpcTcpBridgeProxy :
         IEventSink* pCallback,
         const IConfigDb* pCfg )
     { return -ENOTSUP; }
+
+    inline guint64 GetStartSec() const
+    { return m_oTs.m_qwLocalBaseSec; }
 
     // the method to do cleanup when the client is
     // down
@@ -2827,6 +2834,15 @@ class CRpcRouterBridge : public CRpcRouter
     {
         CStdRMutex oRouterLock( GetLock() );
         return m_mapPortId2Bdge.size();
+    }
+
+    inline void GetBridges(
+        std::vector< InterfPtr >& vecBdges )
+    {
+        CStdRMutex oRouterLock( GetLock() );
+        for( auto& elem : m_mapPortId2Bdge )
+        { vecBdges.push_back( elem.second ); }
+        return;
     }
 
     gint32 GetCurConnLimit(

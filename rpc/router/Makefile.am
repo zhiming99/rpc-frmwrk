@@ -1,5 +1,5 @@
 rpcrouter_PROGRAMS=rpcrouter
-rpcrouter_SOURCES=routmain.cpp routmain.h README.md rpcrouter.1
+rpcrouter_SOURCES=routmain.cpp routmain.h rtfiles.cpp rtfiles.h README.md rpcrouter.1
 rpcrouter_LDADD=$(COMMON_LINK) -lrpc -lfuseif -lipc -lcombase -lutils -lstdc++ -lcppunit \
  -L$(top_srcdir)/combase -L$(top_srcdir)/ipc -L$(top_srcdir)/rpc \
  -L$(top_srcdir)/3rd_party -L$(top_srcdir)/fuse 

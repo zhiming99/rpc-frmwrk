@@ -190,12 +190,21 @@ CfgPtr CIfRouterTest::InitRouterCfg(
     return oCfg.GetCfg();
 }
 
+extern gint32 AddFilesAndDirsBdge(
+    CRpcServices* pSvc );
+
+extern gint32 AddFilesAndDirsReqFwdr(
+    CRpcServices* pSvc );
+
 gint32 AddFilesAndDirs( CRpcServices* pSvc )
 {
     if( pSvc == nullptr )
         return -EFAULT;
 
-    return 0;
+    if( g_dwRole == 1 )
+        return AddFilesAndDirsReqFwdr( pSvc );
+
+    return AddFilesAndDirsBdge( pSvc );
 }
 
 gint32 MountAndLoop( CRpcServices* pSvc )

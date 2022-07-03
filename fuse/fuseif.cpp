@@ -198,6 +198,14 @@ gint32 AddSvcPoint(
 }
 
 
+void CFuseObjBase::SetPollHandle(
+    fuse_pollhandle* pollHandle )
+{
+    if( m_pollHandle != nullptr )
+        fuse_pollhandle_destroy( m_pollHandle );
+    m_pollHandle = pollHandle;
+}
+
 gint32 CFuseObjBase::AddChild(
     const DIR_SPTR& pEnt )
 {
@@ -836,6 +844,40 @@ gint32 CFuseTextFile::fs_read(
     return ret;
 }
 
+const char* IfStateToString( EnumIfState dwState )
+{
+    switch( dwState )
+    {
+    case stateStopped:
+        return "Stopped";
+    case stateStarting:
+        return "Starting";
+    case stateStarted:
+        return "Started";
+    case stateConnected:
+        return "Connected";
+    case stateRecovery:
+        return "Recovery";
+    case statePaused:
+        return "Paused";
+    case stateUnknown:
+        return "Unknown";
+    case stateStopping:
+        return "Stopping";
+    case statePausing:
+        return "Pausing";
+    case stateResuming:
+        return "Resuming";
+    case stateIoDone:
+        return "IoDone";
+    case stateStartFailed:
+        return "StartFailed";
+    case stateInvalid:
+    default:
+        return "Invalid";
+    }
+}
+
 gint32 CFuseSvcStat::UpdateContent()
 {
     gint32 ret = 0;
@@ -868,53 +910,11 @@ gint32 CFuseSvcStat::UpdateContent()
         oVal[ "CurTime" ] = szBuf;
         
         stdstr strState;
-        EnumIfState iState = pIf->GetState();
-        switch( iState )
-        {
-        case stateStopped:
-            strState = "Stopped";
-            break;
-        case stateStarting:
-            strState = "Starting";
-            break;
-        case stateStarted:
-            strState = "Started";
-            break;
-        case stateConnected:
-            strState = "Connected";
-            break;
-        case stateRecovery:
-            strState = "Recovery";
-            break;
-        case statePaused:
-            strState = "Paused";
-            break;
-        case stateUnknown:
-            strState = "Unknown";
-            break;
-        case stateStopping:
-            strState = "Stopping";
-            break;
-        case statePausing:
-            strState = "Pausing";
-            break;
-        case stateResuming:
-            strState = "Resuming";
-            break;
-        case stateIoDone:
-            strState = "IoDone";
-            break;
-        case stateStartFailed:
-            strState = "StartFailed";
-            break;
-        case stateInvalid:
-        default:
-            strState = "Invalid";
-            break;
-        }
+        strState = IfStateToString(
+            pIf->GetState() );
         oVal[ "IfStat" ] = strState;
         guint32 dwCount = this->GetActCount();
-        oVal[ "Objects" ] = dwCount;
+        oVal[ "NumObjects" ] = dwCount;
 
         auto pSvr = dynamic_cast
             < CFuseSvcServer* >( pIf );
@@ -4802,6 +4802,8 @@ static gint32 fuseif_create_stream(
             auto pStmFile = new CFuseStmFile(
                 strName, hStream, pStm );
             auto pEnt = DIR_SPTR( pStmFile ); 
+            pStmFile->SetMode( S_IRUSR | S_IWUSR );
+            pStmFile->DecRef();
             fi->fh = ( guint64 )
                 ( CFuseObjBase* )pStmFile;
             fi->direct_io = 1;

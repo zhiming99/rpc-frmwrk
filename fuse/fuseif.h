@@ -69,6 +69,9 @@ gint32 AddSvcPoint(
     EnumClsid iClsid,
     bool bProxy );
 
+const char* IfStateToString(
+    EnumIfState dwState );
+
 class CSharedLock
 {
     stdmutex m_oLock;
@@ -350,12 +353,8 @@ class CFuseObjBase : public CDirEntry
     inline fuse_pollhandle* GetPollHandle() const
     { return m_pollHandle; }
 
-    void SetPollHandle( fuse_pollhandle* pollHandle )
-    {
-        if( m_pollHandle != nullptr )
-            fuse_pollhandle_destroy( m_pollHandle );
-        m_pollHandle = pollHandle;
-    }
+    void SetPollHandle(
+        fuse_pollhandle* pollHandle );
 
     inline const time_t& GetAccTime() const
     { return m_tsAccTime; }
@@ -1620,9 +1619,13 @@ class CFuseServicePoint :
                     pDir->GetCount() );
             }
 
+            auto pStmFile = new CFuseStmFile(
+                strName, hStream, this );
+            pStmFile->SetMode( S_IRUSR | S_IWUSR );
+            pStmFile->DecRef();
+
             ret = pDir->AddChild(
-                DIR_SPTR( new CFuseStmFile( 
-                    strName, hStream, this ) ) );
+                DIR_SPTR( pStmFile ) );
 
             strSvcPath.push_back( '/' );
             strSvcPath.append( STREAM_DIR );
