@@ -1046,6 +1046,20 @@ class CRpcServices :
         guint32 dwPropId,
         BufPtr& pVal );
 
+    virtual gint32 IncCounter( EnumPropId )
+    { return 0; }
+
+    virtual gint32 DecCounter( EnumPropId )
+    { return 0; }
+
+    virtual gint32 SetCounter(
+        EnumPropId iProp, guint32 dwVal )
+    { return 0; }
+
+    virtual gint32 SetCounter(
+        EnumPropId iProp, guint64 qwVal )
+    { return 0; }
+
     private:
     template< class T >
     gint32 FilterMessageInternal(

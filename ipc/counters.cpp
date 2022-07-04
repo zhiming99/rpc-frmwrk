@@ -32,38 +32,6 @@
 namespace rpcf
 {
 
-gint32 CStatCountersProxy::InitUserFuncs()
-{
-    // don't call super::InitUserFuncs here
-    BEGIN_IFPROXY_MAP( CStatCounters, false );
-    END_IFPROXY_MAP;
-
-    return 0;
-}
-
-gint32 CStatCountersProxy::GetCounters(
-    CfgPtr& pCfg )
-{
-    return FORWARD_IF_CALL( iid( CStatCounters ),
-        0, METHOD_GetCounters, pCfg );
-}
-
-gint32 CStatCountersProxy::GetCounter(
-    guint32 iPropId, BufPtr& pBuf  )
-{
-    return FORWARD_IF_CALL( iid( CStatCounters ),
-        1, METHOD_GetCounter, iPropId, pBuf );
-}
-
-// init the functions
-gint32 CStatCountersServer::InitUserFuncs()
-{
-    BEGIN_IFHANDLER_MAP( CStatCounters );
-    END_IFHANDLER_MAP;
-
-    return 0;
-}
-
 // allocate resources
 gint32 CStatCountersServer::OnPreStart(
     IEventSink* pCallback )
@@ -86,65 +54,101 @@ gint32 CStatCountersServer::OnPostStop(
     IEventSink* pCallback )
 {
     UnregisterFilter( m_pMsgFilter );
-    m_mapCounters.clear();
     m_pMsgFilter.Clear();
     return 0;
 }
 
-gint32 CStatCountersServer::IncCounter(
+gint32 IStatCounters::IncCounter(
     EnumPropId iProp )
 {
     return IncCounter( iProp, false );
 }
 
-gint32 CStatCountersServer::DecCounter(
+gint32 IStatCounters::DecCounter(
     EnumPropId iProp )
 {
     return IncCounter( iProp, true );
 }
 
-gint32 CStatCountersServer::SetCounter(
+gint32 IStatCounters::SetCounter(
     EnumPropId iProp, guint32 dwVal )
 {
     CStdRMutex oIfLock( m_oStatLock );
     m_mapCounters[ iProp ] = dwVal;
     return 0;
 }
+
+gint32 IStatCounters::SetCounter(
+    EnumPropId iProp, guint64 qwVal )
+{
+    CStdRMutex oIfLock( m_oStatLock );
+    m_mapCounters[ iProp ] = qwVal;
+    return 0;
+}
+
 // business logics
-gint32 CStatCountersServer::IncCounter(
+gint32 IStatCounters::IncCounter(
     EnumPropId iProp, bool bNegative )
 {
     gint32 ret = 0;
-    guint32 dwCount = 0;
-    CStdRMutex oIfLock( m_oStatLock );
-    std::hashmap< gint32, Variant >::iterator
-        itr = m_mapCounters.find( iProp );
-    if( itr != m_mapCounters.end() )
-    {
+    do{
+        CStdRMutex oIfLock( m_oStatLock );
+        std::hashmap< gint32, Variant >::iterator
+            itr = m_mapCounters.find( iProp );
+
+        if( itr == m_mapCounters.end() )
+        {
+            if( bNegative )
+                m_mapCounters[ iProp ] = 0U;
+            else
+                m_mapCounters[ iProp ] = 1U;
+            break;
+        }
+
         gint32 iTypeId =
             itr->second.GetTypeId();
-        if( iTypeId != typeUInt32 )
-            return -EINVAL;
-        dwCount = itr->second;
-    }
+        if( iTypeId != typeUInt32 &&
+            iTypeId != typeUInt64 )
+        {
+            ret = -EINVAL;
+            break;
+        }
 
-    if( bNegative && dwCount == 0 )
-        return -ERANGE ;
+        if( iTypeId == typeUInt32 )
+        {
+            guint32& dwCount = itr->second;
+            if( bNegative && dwCount == 0 )
+            {
+                ret = -ERANGE ;
+                break;
+            }
 
-    if( bNegative )
-        dwCount -= 1;
-    else
-        dwCount += 1;
+            if( bNegative )
+                dwCount -= 1;
+            else
+                dwCount += 1;
+        }
+        else 
+        {
+            guint64& qwCount = itr->second;
+            if( bNegative && qwCount == 0 )
+            {
+                ret = -ERANGE ;
+                break;
+            }
 
-    if( itr != m_mapCounters.end() )
-        itr->second = dwCount;
-    else
-        m_mapCounters[ iProp ] = dwCount;
+            if( bNegative )
+                qwCount -= 1;
+            else
+                qwCount += 1;
+        }
 
-    return STATUS_SUCCESS;
+    }while( 0 );
+
+    return ret;
 }
 
-gint32 CStatCountersServer::GetCounter2( 
+gint32 IStatCounters::GetCounter2( 
     guint32 iProp, guint32& dwVal  )
 {
     CStdRMutex oIfLock( m_oStatLock );
@@ -154,12 +158,24 @@ gint32 CStatCountersServer::GetCounter2(
         return -ENOENT;
 
     dwVal = itr->second;
-    
+    return STATUS_SUCCESS;
+}
+
+gint32 IStatCounters::GetCounter2( 
+    guint32 iProp, guint64& qwVal  )
+{
+    CStdRMutex oIfLock( m_oStatLock );
+    std::hashmap< gint32, Variant >::iterator
+        itr = m_mapCounters.find( iProp );
+    if( itr == m_mapCounters.end() )
+        return -ENOENT;
+
+    qwVal = itr->second;
     return STATUS_SUCCESS;
 }
 
 // interface implementations
-gint32 CStatCountersServer::GetCounters(
+gint32 IStatCounters::GetCounters(
     CfgPtr& pCfg )
 {
     if( pCfg.IsEmpty() )
@@ -174,7 +190,7 @@ gint32 CStatCountersServer::GetCounters(
     return 0;
 }
 
-gint32 CStatCountersServer::GetCounter(
+gint32 IStatCounters::GetCounter(
     guint32 iPropId,
     BufPtr& pBuf  )
 {

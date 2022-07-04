@@ -38,21 +38,50 @@ namespace rpcf
 // a read-only interface
 struct IStatCounters
 {
-    virtual gint32 GetCounters(
-        CfgPtr& pCfg ) = 0;
+    protected:
+    std::hashmap< gint32, Variant > m_mapCounters;
 
-    virtual gint32 GetCounter(
-        guint32 iPropId, BufPtr& pBuf ) = 0;
+    gint32 IncCounter(
+        EnumPropId iProp, bool bNegative );
 
-    virtual gint32 GetCounter2(
-        guint32 iPropId, guint32& dwVal ) = 0;
+    CStdRMutex m_oStatLock;
+
+    public:
+    gint32 IncCounter(
+        EnumPropId iProp );
+
+    gint32 DecCounter(
+        EnumPropId iProp );
+
+    gint32 SetCounter(
+        EnumPropId iProp,
+        guint32 dwVal );
+
+    gint32 SetCounter(
+        EnumPropId iProp,
+        guint64 qwVal );
+
+    gint32 GetCounter2( 
+        guint32 iPropId,
+        guint32& dwVal  );
+
+    gint32 GetCounter2( 
+        guint32 iPropId,
+        guint64& qwVal  );
+
+    gint32 GetCounters(
+        CfgPtr& pCfg );
+
+    gint32 GetCounter(
+        guint32 iPropId,
+        BufPtr& pBuf  );
 };
 
 class CStatCountersProxy:
-    public virtual CAggInterfaceProxy,
-    public IStatCounters
+    public virtual CAggInterfaceProxy
 {
 
+    IStatCounters m_oCounters;
     public:
     typedef CAggInterfaceProxy super;
     CStatCountersProxy( const IConfigDb* pCfg )
@@ -62,29 +91,63 @@ class CStatCountersProxy:
     const EnumClsid GetIid() const
     { return iid( CStatCounters ); }
 
-    virtual gint32 InitUserFuncs();
-    gint32 GetCounters( CfgPtr& pCfg ) override;
+    gint32 IncCounter(
+        EnumPropId iProp ) override
+    {
+        return m_oCounters.IncCounter( iProp );
+    };
+
+    gint32 DecCounter(
+        EnumPropId iProp ) override
+    {
+        return m_oCounters.DecCounter( iProp );
+    }
+    gint32 SetCounter(
+        EnumPropId iProp, guint32 dwVal ) override
+    {
+        return m_oCounters.SetCounter(
+            iProp, dwVal );
+    }
+
+    gint32 SetCounter(
+        EnumPropId iProp, guint64 qwVal ) override
+    {
+        return m_oCounters.SetCounter(
+            iProp, qwVal );
+    }
+
+    gint32 GetCounters( CfgPtr& pCfg )
+    { return m_oCounters.GetCounters( pCfg ); }
+
     gint32 GetCounter(
-        guint32 iPropId, BufPtr& pBuf ) override;
+        guint32 iPropId, BufPtr& pBuf )
+    {
+        return m_oCounters.GetCounter(
+            iPropId, pBuf );
+    }
+
     gint32 GetCounter2(
-        guint32 iPropId, guint32& dwVal ) override
-    { return -ENOSYS; }
+        guint32 iPropId, guint32& dwVal )
+    {
+        return m_oCounters.GetCounter2(
+            iPropId, dwVal );
+    }
+
+    gint32 GetCounter2(
+        guint32 iPropId, guint64& qwVal )
+    {
+        return m_oCounters.GetCounter2(
+            iPropId, qwVal );
+    }
 };
 
 class CStatCountersServer:
-    public virtual CAggInterfaceServer,
-    public IStatCounters
+    public virtual CAggInterfaceServer
 {
-    // storage for the counters
-    std::hashmap< gint32, Variant > m_mapCounters;
-
     // message filter for message counter
     TaskletPtr m_pMsgFilter;
+    IStatCounters m_oCounters;
 
-    gint32 IncCounter(
-        EnumPropId iProp, bool bMinus );
-
-    CStdRMutex m_oStatLock;
     public:
     typedef CAggInterfaceServer super;
     CStatCountersServer( const IConfigDb* pCfg )
@@ -94,26 +157,60 @@ class CStatCountersServer:
     const EnumClsid GetIid() const
     { return iid( CStatCounters ); }
 
-    virtual gint32 InitUserFuncs();
-    virtual gint32 OnPreStart( IEventSink* pCallback );
-    virtual gint32 OnPostStop( IEventSink* pCallback );
+    virtual gint32 OnPreStart(
+        IEventSink* pCallback ) override;
 
-    gint32 IncCounter( EnumPropId iProp );
-    gint32 DecCounter( EnumPropId iProp );
+    virtual gint32 OnPostStop(
+        IEventSink* pCallback ) override;
+
+    gint32 IncCounter(
+        EnumPropId iProp ) override
+    {
+        return m_oCounters.IncCounter( iProp );
+    };
+
+    gint32 DecCounter(
+        EnumPropId iProp ) override
+    {
+        return m_oCounters.DecCounter( iProp );
+    }
+    gint32 SetCounter(
+        EnumPropId iProp, guint32 dwVal ) override
+    {
+        return m_oCounters.SetCounter(
+            iProp, dwVal );
+    }
 
     gint32 SetCounter(
-        EnumPropId iProp, guint32 dwVal );
+        EnumPropId iProp, guint64 qwVal ) override
+    {
+        return m_oCounters.SetCounter(
+            iProp, qwVal );
+    }
 
-    gint32 GetCounter2( 
-        guint32 iPropId,
-        guint32& dwVal  ) override;
-
-    gint32 GetCounters(
-        CfgPtr& pCfg ) override;
+    gint32 GetCounters( CfgPtr& pCfg )
+    { return m_oCounters.GetCounters( pCfg ); }
 
     gint32 GetCounter(
-        guint32 iPropId,
-        BufPtr& pBuf  ) override;
+        guint32 iPropId, BufPtr& pBuf )
+    {
+        return m_oCounters.GetCounter(
+            iPropId, pBuf );
+    }
+
+    gint32 GetCounter2(
+        guint32 iPropId, guint32& dwVal )
+    {
+        return m_oCounters.GetCounter2(
+            iPropId, dwVal );
+    }
+
+    gint32 GetCounter2(
+        guint32 iPropId, guint64& qwVal )
+    {
+        return m_oCounters.GetCounter2(
+            iPropId, qwVal );
+    }
 };
 
 class CMessageCounterTask : 

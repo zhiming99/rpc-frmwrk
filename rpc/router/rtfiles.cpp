@@ -53,7 +53,7 @@ gint32 CFuseBdgeList::UpdateContent()
         std::vector< InterfPtr > vecBdges;
         pRouter->GetBridges( vecBdges );
 
-        oVal[ "NumBridges" ] =
+        oVal[ "NumConnections" ] =
             ( guint32 )vecBdges.size();
 
         Json::Value oArray( Json::arrayValue );
@@ -61,6 +61,7 @@ gint32 CFuseBdgeList::UpdateContent()
         {
             Json::Value oBridge;
             CRpcTcpBridge* pBridge = elem;
+            CStatCountersServer* pStat = elem;
             CCfgOpenerObj oIfCfg(
                 ( CObjBase* )elem );
             stdstr strVal;
@@ -139,6 +140,18 @@ gint32 CFuseBdgeList::UpdateContent()
                 if( SUCCEEDED( ret ) )
                     oBridge[ "MaxPendings" ] = dwVal;
             }
+            if( pStat )
+            {
+                ret = pStat->GetCounter2(
+                    propMsgCount, dwVal );
+                if( SUCCEEDED( ret ) )
+                    oBridge[ "InRequests" ] = dwVal;
+
+                ret = pStat->GetCounter2(
+                    propMsgRespCount, dwVal );
+                if( SUCCEEDED( ret ) )
+                    oBridge[ "OutResponses" ] = dwVal;
+            }
 
             timespec tv;
             clock_gettime( CLOCK_REALTIME, &tv );
@@ -151,7 +164,7 @@ gint32 CFuseBdgeList::UpdateContent()
             oArray.append( oBridge );
         }
 
-        oVal[ "Bridges" ] = oArray;
+        oVal[ "Connections" ] = oArray;
         m_strContent = Json::writeString(
             oBuilder, oVal );
 

@@ -25,7 +25,7 @@
 
 #pragma once
 
-#define BDGELIST_FILE "bdgelist"
+#define BDGELIST_FILE "InConnections"
 
 class CFuseBdgeList : public CFuseSvcStat
 {

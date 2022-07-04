@@ -6969,6 +6969,7 @@ gint32 CInterfaceServer::SendResponse(
             pIrp->SetCallback( pEvent, 0 );
         }
 
+        this->IncCounter( propMsgRespCount );
         pIrp->SetTimer(
             IFSTATE_ENABLE_EVENT_TIMEOUT, pMgr );
 
