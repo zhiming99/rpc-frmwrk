@@ -513,6 +513,9 @@ class CIfParallelTaskGrp
     std::set< TaskletPtr > m_setTasks;
     std::deque< TaskletPtr > m_quePendingTasks;
 
+    guint32 GetPendingCount()
+    { return m_quePendingTasks.size(); }
+
     public:
 
     virtual bool IsMultiThreadSafe()
@@ -544,7 +547,7 @@ class CIfParallelTaskGrp
         EnumClsid iClsid,
         std::vector< TaskletPtr >& vecTasks );
 
-    virtual guint32 GetTaskCount() 
+    virtual guint32 GetTaskCount() override
     {
         CStdRTMutex oLock( GetLock() );
         return m_setTasks.size() +
@@ -559,9 +562,10 @@ class CIfParallelTaskGrp
         return 0;
     }
 
-    guint32 GetPendingCount()
+    guint32 GetPendingCountLocked()
     {
-        return m_quePendingTasks.size();
+        CStdRTMutex oLock( GetLock() );
+        return GetPendingCount();
     }
 
     virtual gint32 RemoveTask( TaskletPtr& pTask );

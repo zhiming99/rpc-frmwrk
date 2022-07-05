@@ -342,7 +342,7 @@ CRRTaskScheduler::CRRTaskScheduler(
     do{
         SetClassId( clsid( CRRTaskScheduler ) );
         CCfgOpener oCfg( pCfg );
-        ret = oCfg.GetObjPtr(
+        ret = oCfg.GetPointer(
             propIfPtr, m_pSchedMgr );
         if( ERROR( ret ) )
             break;
@@ -492,8 +492,7 @@ gint32 CRRTaskScheduler::GetNextTaskGrp(
             std::list< TaskGrpPtr >&
                 orq = *ocq.m_plstReady;
             CIfParallelTaskGrp* pPalGrp = orq.front();
-            CStdRTMutex oTaskLock( pPalGrp->GetLock() );
-            if( pPalGrp->GetPendingCount() > 0 )
+            if( pPalGrp->GetPendingCountLocked() > 0 )
             {
                 pGrp = orq.front();
                 m_dwLastOp = 0;
@@ -521,9 +520,7 @@ gint32 CRRTaskScheduler::GetNextTaskGrp(
                 orq = *ocq.m_plstReady;
             TaskGrpPtr pHead = orq.front();     
             CIfParallelTaskGrp* pPalGrp = pHead;
-            CStdRTMutex oTaskLock(
-                pPalGrp->GetLock() );
-            if( pPalGrp->GetPendingCount() )
+            if( pPalGrp->GetPendingCountLocked() )
             {
                 pGrp = pPalGrp;
                 break;
@@ -975,7 +972,8 @@ void CRRTaskScheduler::KillTasks(
     std::vector< guint64 >&
         vecTaskIds = ( *pvecTaskIds )();
 
-    CRpcReqForwarder* pReqFwdr = m_pSchedMgr;
+    auto pReqFwdr = dynamic_cast
+        < CRpcReqForwarder* >( m_pSchedMgr );
 
     if( pReqFwdr != nullptr )
     {

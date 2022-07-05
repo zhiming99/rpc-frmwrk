@@ -96,7 +96,7 @@ struct CONNQUE_ELEM
 class CRRTaskScheduler :
     public ITaskScheduler
 {
-    ObjPtr m_pSchedMgr;
+    CRpcServices* m_pSchedMgr;
     std::map< InterfPtr, CONNQUE_ELEM > m_mapConnQues;
     std::list< InterfPtr > m_lstConns;
     std::hashmap< guint32, InterfPtr > m_mapId2If;

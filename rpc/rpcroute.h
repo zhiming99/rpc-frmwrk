@@ -1107,16 +1107,6 @@ class CRpcTcpBridge :
         IEventSink* pCallback,
         bool bSeqTask );
 
-    virtual gint32 GetGrpRfc(
-        DMsgPtr& pMsg,
-        TaskGrpPtr& pGrp )
-    {
-        pGrp = m_pGrpRfc;
-        if( pGrp.IsEmpty() )
-            return -EFAULT;
-        return 0;
-    }
-
     protected:
     TaskletPtr m_pHsTicker;
     bool m_bHandshaked = false;
@@ -1366,6 +1356,16 @@ class CRpcTcpBridge :
         guint32& dwOffset,               // [in]
         guint32& dwSize,                 // [in]
         IEventSink* pCallback );
+
+    gint32 GetGrpRfc(
+        DMsgPtr& pMsg,
+        TaskGrpPtr& pGrp ) override
+    {
+        pGrp = m_pGrpRfc;
+        if( pGrp.IsEmpty() )
+            return -EFAULT;
+        return 0;
+    }
 
 }; // CRpcTcpBridge
 

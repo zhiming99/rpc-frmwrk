@@ -33,6 +33,48 @@
 using namespace rpcf;
 #include "rtfiles.h"
 
+Json::Value DumpConnParams( const IConfigDb* pConn )
+{
+    bool bVal;
+
+    Json::Value oConnVal( Json::objectValue );
+    CConnParams oConn( pConn );
+
+    stdstr strVal = oConn.GetSrcIpAddr();
+    if( strVal.size() )
+        oConnVal[ "SrcIpAddr" ] = strVal;
+
+    guint32 dwVal = oConn.GetSrcPortNum();
+    if( dwVal != 0 )
+        oConnVal[ "SrcPortNum" ] = dwVal;
+
+    strVal = oConn.GetDestIpAddr();
+    if( strVal.size() )
+        oConnVal[ "DestIpAddr" ] = strVal;
+
+    dwVal = oConn.GetDestPortNum();
+
+    if( dwVal != 0 )
+        oConnVal[ "DestPortNum" ] = dwVal;
+
+    bVal = oConn.IsCompression();
+    oConnVal[ JSON_ATTR_ENABLE_COMPRESS ] = bVal;
+
+    bVal = oConn.IsWebSocket();
+    oConnVal[ JSON_ATTR_ENABLE_WEBSOCKET ] = bVal;
+
+    if( bVal )
+        oConnVal[ JSON_ATTR_DEST_URL ] = oConn.GetUrl();
+
+    bVal = oConn.IsSSL();
+    oConnVal[ JSON_ATTR_ENABLE_SSL ] = bVal;
+
+    bVal = oConn.HasAuth(); 
+    oConnVal[ JSON_ATTR_HASAUTH ] = bVal;
+
+    return oConnVal;
+}
+
 gint32 CFuseBdgeList::UpdateContent() 
 {
     gint32 ret = 0;
@@ -72,47 +114,13 @@ gint32 CFuseBdgeList::UpdateContent()
             if( SUCCEEDED( ret ) )
                 oBridge[ "SessionHash" ] = strVal;
                 
-            ObjPtr pObj;
-            ret = oIfCfg.GetObjPtr(
-                propConnParams, pObj );
+            IConfigDb* pConn;
+            ret = oIfCfg.GetPointer(
+                propConnParams, pConn );
             if( SUCCEEDED( ret ) )
             {
-                Json::Value oConnVal( Json::objectValue );
-                CConnParams oConn(
-                    ( IConfigDb* )pObj );
-
-                stdstr strVal = oConn.GetSrcIpAddr();
-                if( strVal.size() )
-                    oConnVal[ "SrcIpAddr" ] = strVal;
-
-                guint32 dwVal = oConn.GetSrcPortNum();
-                if( dwVal != 0 )
-                    oConnVal[ "SrcPortNum" ] = dwVal;
-
-                strVal = oConn.GetDestIpAddr();
-                if( strVal.size() )
-                    oConnVal[ "DestIpAddr" ] = strVal;
-
-                dwVal = oConn.GetDestPortNum();
-
-                if( dwVal != 0 )
-                    oConnVal[ "DestPortNum" ] = dwVal;
-
-                bVal = oConn.IsCompression();
-                oConnVal[ JSON_ATTR_ENABLE_COMPRESS ] = bVal;
-
-                bVal = oConn.IsWebSocket();
-                oConnVal[ JSON_ATTR_ENABLE_WEBSOCKET ] = bVal;
-
-                if( bVal )
-                    oConnVal[ JSON_ATTR_DEST_URL ] = oConn.GetUrl();
-
-                bVal = oConn.IsSSL();
-                oConnVal[ JSON_ATTR_ENABLE_SSL ] = bVal;
-
-                bVal = oConn.HasAuth(); 
-                oConnVal[ JSON_ATTR_HASAUTH ] = bVal;
-                oBridge[ "ConnParams" ] = oConnVal;
+                oBridge[ "ConnParams" ] =
+                    DumpConnParams( pConn );
             }
 
             ret = oIfCfg.GetIntProp(
@@ -151,6 +159,30 @@ gint32 CFuseBdgeList::UpdateContent()
                     propMsgRespCount, dwVal );
                 if( SUCCEEDED( ret ) )
                     oBridge[ "OutResponses" ] = dwVal;
+            }
+            TaskGrpPtr pGrp;
+            if( !pBridge->IsRfcEnabled() )
+            {
+                ret = pBridge->GetParallelGrp( pGrp );
+            }
+            else
+            {
+                DMsgPtr pMsg;
+                ret = pBridge->GetGrpRfc( pMsg, pGrp );
+            }
+
+            if( SUCCEEDED( ret ) )
+            {
+                CIfParallelTaskGrp* pParaGrp = pGrp;
+                dwVal = pParaGrp->GetTaskCount();
+                guint32 dwPending =
+                    pParaGrp->GetPendingCountLocked();
+
+                oBridge[ "ActiveTasks" ] =
+                    dwVal - dwPending;
+
+                oBridge[ "PendingTasks" ] =
+                    dwPending;
             }
 
             timespec tv;
