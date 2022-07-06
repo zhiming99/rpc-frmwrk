@@ -104,6 +104,9 @@ gint32 CFuseBdgeList::UpdateContent()
             Json::Value oBridge;
             CRpcTcpBridge* pBridge = elem;
             CStatCountersServer* pStat = elem;
+            CStreamServerRelay* pstm = elem;
+            CStreamServerRelayMH* pstmmh = elem;
+
             CCfgOpenerObj oIfCfg(
                 ( CObjBase* )elem );
             stdstr strVal;
@@ -184,6 +187,14 @@ gint32 CFuseBdgeList::UpdateContent()
                 oBridge[ "PendingTasks" ] =
                     dwPending;
             }
+
+            IStream* ps = pstm;
+            dwVal = ps->GetStreamCount();
+            oBridge[ "NumStreams" ] = dwVal;
+
+            ps = pstmmh;
+            dwVal = ps->GetStreamCount();
+            oBridge[ "NumStreamsRelay" ] = dwVal;
 
             timespec tv;
             clock_gettime( CLOCK_REALTIME, &tv );

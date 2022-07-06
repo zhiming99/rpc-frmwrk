@@ -4412,7 +4412,12 @@ gint32 CIfInvokeMethodTask::OnTaskComplete(
                 break;
             }
 
-            if( !bResp || !HasReply() )
+            // NOTE: removed HasReply() check because
+            // this task can reach here at the starting
+            // state, when the message is not unpacked
+            // and the call options are not copied to
+            // this task at all, esp. req-flow-control
+            if( !bResp )
                 break;
 
             CInterfaceServer *pServer =
