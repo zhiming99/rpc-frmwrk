@@ -965,6 +965,15 @@ gint32 CRpcReqForwarder::ForwardRequest(
         if( ERROR( ret ) )
             break;
 
+        if( IsRfcEnabled() )
+        {
+            CIoManager* pMgr = GetIoMgr();
+            ret = pMgr->RescheduleTask( pTask );
+            if( SUCCEEDED( ret ) )
+                ret = STATUS_PENDING;
+            break;
+        }
+
         ( *pTask )( eventZero );
 
         ret = pTask->GetError();

@@ -1231,7 +1231,7 @@ gint32 CFuseCmdFile::fs_write_buf(
                     if( strName.substr( 0, strPrefix.size() ) !=
                         strPrefix )
                         continue;
-                    pSd = pDir->GetChild( strName );
+                    pSd = pDir->GetChild( strSvc );
                     break;
                 }
             }
