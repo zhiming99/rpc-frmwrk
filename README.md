@@ -60,8 +60,13 @@ This project depends on the following 3rd-party packags at runtime:
 4. A tree-like hierarchical persistant registry.
 
 ---
-[`Sat Jun25  2022 01:36:03 PM Beijing`]    
-1. Added two commands `loadl` and `addsp` to the `commands` file. And now the `rpcfs` filesystem can aggregrate new `service point` dynamically. 
+[`Fri Jul 08 2022 08:42:04 AM Beijing`]   
+1. Added a `InConnections` file to the rpcrouter to show the statistics of the current connections of the rpcrouter.
+2. We will add `OutConnections` and `sockets` files to the rpcrouter next. 
+3. And then we turn to generate skelton code for the `rpcfs`.
+
+[`Sat Jun 25 2022 01:36:03 PM Beijing`]    
+1. Added two more commands `loadl` and `addsp` to the `commands` file. And now the `rpcfs` filesystem can aggregrate new `service point` dynamically. 
 2. Next I will integrate an instance of `rpcfs` to the `rpcrouter` for monitoring and control purpose. 
 
 [`Sat Jun 18 2022 09:28:10 PM Beijing`]   
