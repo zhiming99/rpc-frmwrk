@@ -4052,6 +4052,8 @@ stdstr CFuseConnDir::DumpConnParams()
     return strRet;
 }
 
+void ReleaseRootIf()
+{ g_pRootIf.Clear(); }
 
 gint32 InitRootIf(
     CIoManager* pMgr, bool bProxy )
@@ -4075,13 +4077,15 @@ gint32 InitRootIf(
 
         CRpcServices* pIf = GetRootIf();
         ret = pIf->Start();
+        if( ERROR( ret ) )
+        {
+            pIf->Stop();
+            ReleaseRootIf();
+        }
 
     }while( 0 );
     return ret;
 }
-
-void ReleaseRootIf()
-{ g_pRootIf.Clear(); }
 
 static FactoryPtr InitClassFactory()
 {

@@ -2,6 +2,8 @@ usr/lib/@DEB_HOST_MULTIARCH@/lib*.so*
 usr/lib/@DEB_HOST_MULTIARCH@/rpcf/*.whl
 usr/lib/@DEB_HOST_MULTIARCH@/rpcf/*.jar
 usr/bin/rpcrouter
+usr/bin/hostsvr
+usr/bin/hostcli
 usr/bin/rpcf/*.py
 etc/rpcf/*.json
 usr/share/man/man1/ridlc.1

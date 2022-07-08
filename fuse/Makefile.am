@@ -1,7 +1,6 @@
 lib_LTLIBRARIES=libfuseif.la
 
-libfuseif_la_SOURCES = fuseif.cpp \
-    fuseif_ll.cpp serijson.cpp
+libfuseif_la_SOURCES = fuseif.cpp fuseif_ll.cpp serijson.cpp
 
 libfuseif_la_CXXFLAGS=-I $(top_srcdir)/ipc
 
@@ -26,3 +25,23 @@ examples/python/testypes/mainsvr.py
 
 libfuseif_la_LDFLAGS=-version-info @VERSION2@
 libfuseif_la_LIBADD= -lpthread -ldl -llz4 $(COMMON_LINK_FUSE3) -L../3rd_party -lutils 
+
+include_ipcdir=$(top_srcdir)/ipc
+
+hostsvr_PROGRAMS=hostsvr
+hostsvr_SOURCES=rpcfshst.cpp
+hostsvrdir=$(bindir)
+
+hostsvr_LDADD=$(COMMON_LINK_FUSE3) libfuseif.la ../ipc/libipc.la ../combase/libcombase.la -lutils -lstdc++ -lcppunit \
+ -L$(top_srcdir)/combase -L$(top_srcdir)/ipc -L$(top_srcdir)/3rd_party -L$(top_srcdir)/fuse 
+
+hostsvr_CPPFLAGS= -I$(include_ipcdir) -fPIC -DSERVER
+
+hostcli_PROGRAMS=hostcli
+hostcli_SOURCES=rpcfshst.cpp
+hostclidir=$(bindir)
+
+hostcli_LDADD=$(COMMON_LINK_FUSE3) libfuseif.la ../ipc/libipc.la ../combase/libcombase.la -lutils -lstdc++ -lcppunit \
+ -L$(top_srcdir)/combase -L$(top_srcdir)/ipc -L$(top_srcdir)/3rd_party -L$(top_srcdir)/fuse 
+
+hostcli_CPPFLAGS= -I$(include_ipcdir) -fPIC -DCLIENT

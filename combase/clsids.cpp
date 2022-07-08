@@ -280,8 +280,11 @@ gint32 CoInitialize( guint32 dwContext )
 
 gint32 CoUninitialize()
 {
-    g_pFactories->Clear();    
-    g_pFactories.Clear();
+    if( !g_pFactories.IsEmpty() )
+    {
+        g_pFactories->Clear();    
+        g_pFactories.Clear();
+    }
     return 0;
 }
 

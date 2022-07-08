@@ -121,7 +121,48 @@
                 "DBusBusDriver",
                 "UnixSockBusDriver"
             ]
-        }     
+        },     
+        {
+            "ModName": "rpcrouter",
+            "DriversToLoad": [
+                "DBusBusDriver",
+                "RpcTcpBusDriver",
+                "UnixSockBusDriver"
+            ],
+            "PreloadableObjects": [
+                {
+                    "comment": "remove the surfix '-1' of the field name to enable the object",
+                    "ObjectName-1": "RpcRouter-0",
+                    "ObjectClass-1": "RpcRouterImpl"
+                }
+            ],
+            "ClassFactories": [
+                "./libfuseif.so",
+                "./libauth.so",
+                "./libsslpt.so",
+                "./libwspt.so"
+            ]
+        },
+        {
+            "ModName": "hostsvr",
+            "DriversToLoad": [
+                "DBusBusDriver",
+                "UnixSockBusDriver"
+            ],
+            "ClassFactories": [
+                "./libfuseif.so"
+            ]
+        },
+        {
+            "ModName": "hostcli",
+            "DriversToLoad": [
+                "DBusBusDriver",
+                "UnixSockBusDriver"
+            ],
+            "ClassFactories": [
+                "./libfuseif.so"
+            ]
+        }
     ],
 
     "Match" :

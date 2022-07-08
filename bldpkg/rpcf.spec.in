@@ -55,6 +55,8 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_bindir}/rpcf/rpcfgnui.py
 %{_bindir}/rpcf/updcfg.py
 %{_bindir}/rpcrouter
+%{_bindir}/hostsvr
+%{_bindir}/hostcli
 %{_sysconfdir}/rpcf/authprxy.json
 %{_sysconfdir}/rpcf/driver.json
 %{_sysconfdir}/rpcf/router.json

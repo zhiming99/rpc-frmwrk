@@ -395,6 +395,26 @@
             ]
         },
         {
+            "ModName": "hostsvr",
+            "DriversToLoad": [
+                "DBusBusDriver",
+                "UnixSockBusDriver"
+            ],
+            "ClassFactories": [
+                "./libfuseif.so"
+            ]
+        },
+        {
+            "ModName": "hostcli",
+            "DriversToLoad": [
+                "DBusBusDriver",
+                "UnixSockBusDriver"
+            ],
+            "ClassFactories": [
+                "./libfuseif.so"
+            ]
+        },
+        {
             "ModName": "btinrtsvr",
             "DriversToLoad": [
                 "DBusBusDriver",
