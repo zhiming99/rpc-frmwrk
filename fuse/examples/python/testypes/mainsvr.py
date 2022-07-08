@@ -97,7 +97,6 @@ def EchoStream( req : object)->object:
         inBuf[ pos ] = 0x41
         inBuf[ pos + 1 ] = 0x42
         stmfp.write(inBuf)
-        stmfp.write(inBuf)
         stmfp.close()
 
     except Exception as err:
