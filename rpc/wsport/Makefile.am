@@ -8,6 +8,7 @@ libwspt_ladir=$(libdir)
 
 libwspt_la_LDFLAGS = -version-info @VERSION2@
 libwspt_la_LIBADD = $(COMMON_LINK) -L../../combase -L.. -L../../ipc -L./wsproto \
--L../../3rd_party -lwsock -lutils -lrpc -lipc -lcombase -lpthread -ldl
+-L../../3rd_party -lwsock -lutils ../librpc.la ../../ipc/libipc.la ../../combase/libcombase.la -lpthread -ldl
+
 
 SUBDIRS= wsproto

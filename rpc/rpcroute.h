@@ -3062,8 +3062,8 @@ class CIfParallelTaskGrpRfc :
 {
     guint32 m_dwMaxRunning = RFC_MAX_REQS;
     guint32 m_dwMaxPending = RFC_MAX_PENDINGS;
-    guint32 m_dwTaskAdded = 0;
-    guint32 m_dwTaskRejected = 0;
+    std::atomic< guint32 > m_dwTaskAdded;
+    std::atomic< guint32 > m_dwTaskRejected;
 
     public:
     typedef CIfParallelTaskGrp super;
@@ -3101,6 +3101,11 @@ class CIfParallelTaskGrpRfc :
     virtual gint32 InsertTask(
         TaskletPtr& pTask ) override ;
 
+    inline guint32 GetTaskAdded() const
+    { return m_dwTaskAdded; }
+
+    inline guint32 GetTaskRejected() const
+    { return m_dwTaskRejected; }
 };
 
 class CIfParallelTaskGrpRfc2 :

@@ -31,4 +31,4 @@ ipcconfdir=$(sysconfdir)/rpcf
 libipc_ladir=$(libdir)
 
 libipc_la_LDFLAGS=-version-info @VERSION2@
-libipc_la_LIBADD= -L../3rd_party -L../combase -lcombase -lutils -lpthread -ldl $(COMMON_LINK) 
+libipc_la_LIBADD= -L../3rd_party -L../combase ../combase/libcombase.la -lutils -lpthread -ldl $(COMMON_LINK) 

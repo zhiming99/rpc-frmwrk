@@ -8,5 +8,6 @@ libsslpt_la_CPPFLAGS = -I$(top_srcdir)/ipc -I../ -I$(top_srcdir)/combase -I$(SYS
 
 libsslpt_ladir=$(libdir)
 libsslpt_la_LDFLAGS = -version-info @VERSION2@
-libsslpt_la_LIBADD = -L../../combase -L.. -L../../ipc -L$(top_srcdir)/3rd_party -lrpc -lipc -lcombase -lpthread -ldl $(COMMON_LINK_SSL) 
+libsslpt_la_LIBADD = -L../../combase -L.. -L../../ipc -L$(top_srcdir)/3rd_party\
+ ../librpc.la ../../ipc/libipc.la ../../combase/libcombase.la -lpthread -ldl $(COMMON_LINK_SSL) 
 

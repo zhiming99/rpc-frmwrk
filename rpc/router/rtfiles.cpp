@@ -172,6 +172,11 @@ gint32 CFuseBdgeList::UpdateContent()
             {
                 DMsgPtr pMsg;
                 ret = pBridge->GetGrpRfc( pMsg, pGrp );
+                CIfParallelTaskGrpRfc* pGrpRfc = pGrp;
+                dwVal = pGrpRfc->GetTaskAdded();
+                oBridge[ "NumTaskAdded" ] = dwVal;
+                dwVal = pGrpRfc->GetTaskRejected();
+                oBridge[ "NumTaskRejected" ] = dwVal;
             }
 
             if( SUCCEEDED( ret ) )

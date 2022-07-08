@@ -26,6 +26,7 @@
 #pragma once
 
 #define BDGELIST_FILE "InConnections"
+#define BDGEPROXYLIST_FILE "OutConnections"
 
 class CFuseBdgeList : public CFuseSvcStat
 {
@@ -34,5 +35,15 @@ class CFuseBdgeList : public CFuseSvcStat
     CFuseBdgeList( CRpcServices* pIf )
         : super( pIf )
     { SetName( BDGELIST_FILE ); }
+    virtual gint32 UpdateContent();
+};
+
+class CFuseBdgeProxyList : public CFuseSvcStat
+{
+    public:
+    typedef CFuseSvcStat super;
+    CFuseBdgeProxyList( CRpcServices* pIf )
+        : super( pIf )
+    { SetName( BDGEPROXYLIST_FILE ); }
     virtual gint32 UpdateContent();
 };

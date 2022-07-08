@@ -5762,7 +5762,9 @@ gint32 CIfRouterMgrState::SubscribeEvents()
 
 CIfParallelTaskGrpRfc::CIfParallelTaskGrpRfc(
     const IConfigDb* pCfg )
-    : super( pCfg )
+    : super( pCfg ),
+      m_dwTaskAdded( 0 ),
+      m_dwTaskRejected( 0 )
 {
     SetClassId( clsid( CIfParallelTaskGrpRfc ) );
 

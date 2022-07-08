@@ -12,5 +12,7 @@ dist_libauth_conf_DATA=authprxy.json
 libauth_confdir=$(sysconfdir)/rpcf
 
 libauth_la_LDFLAGS = -version-info @VERSION2@
-libauth_la_LIBADD = -L$(top_srcdir)/combase -L.. -L$(top_srcdir)/ipc -L$(top_srcdir)/3rd_party -lutils -lrpc -lipc -lcombase -lpthread -ldl $(COMMON_LINK_KRB5) 
+libauth_la_LIBADD = -L$(top_srcdir)/combase -L.. -L$(top_srcdir)/ipc \
+ -L$(top_srcdir)/3rd_party -lutils \
+../librpc.la ../../ipc/libipc.la ../../combase/libcombase.la  -lpthread -ldl $(COMMON_LINK_KRB5) 
 
