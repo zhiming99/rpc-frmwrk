@@ -116,24 +116,24 @@ class CStatCountersProxy:
             iProp, qwVal );
     }
 
-    gint32 GetCounters( CfgPtr& pCfg )
+    virtual gint32 GetCounters( CfgPtr& pCfg )
     { return m_oCounters.GetCounters( pCfg ); }
 
-    gint32 GetCounter(
+    virtual gint32 GetCounter(
         guint32 iPropId, BufPtr& pBuf )
     {
         return m_oCounters.GetCounter(
             iPropId, pBuf );
     }
 
-    gint32 GetCounter2(
+    virtual gint32 GetCounter2(
         guint32 iPropId, guint32& dwVal )
     {
         return m_oCounters.GetCounter2(
             iPropId, dwVal );
     }
 
-    gint32 GetCounter2(
+    virtual gint32 GetCounter2(
         guint32 iPropId, guint64& qwVal )
     {
         return m_oCounters.GetCounter2(
@@ -188,24 +188,24 @@ class CStatCountersServer:
             iProp, qwVal );
     }
 
-    gint32 GetCounters( CfgPtr& pCfg )
+    virtual gint32 GetCounters( CfgPtr& pCfg )
     { return m_oCounters.GetCounters( pCfg ); }
 
-    gint32 GetCounter(
+    virtual gint32 GetCounter(
         guint32 iPropId, BufPtr& pBuf )
     {
         return m_oCounters.GetCounter(
             iPropId, pBuf );
     }
 
-    gint32 GetCounter2(
+    virtual gint32 GetCounter2(
         guint32 iPropId, guint32& dwVal )
     {
         return m_oCounters.GetCounter2(
             iPropId, dwVal );
     }
 
-    gint32 GetCounter2(
+    virtual gint32 GetCounter2(
         guint32 iPropId, guint64& qwVal )
     {
         return m_oCounters.GetCounter2(

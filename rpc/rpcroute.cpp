@@ -6168,4 +6168,123 @@ gint32 AppendConnParams(
     return ret;
 }
 
+gint32 CStatCountersServer2::IncCounter(
+    EnumPropId iProp )
+{
+    switch( iProp )
+    {
+    case propMsgCount:
+        m_dwMsgCount++;
+        break;
+    case propMsgRespCount:
+        m_dwMsgRespCount++;
+        break;
+    case propEventCount:
+        m_dwEvtCount++;
+        break;
+    default:
+        return super::IncCounter( iProp );
+    }
+    return 0;
+}
+
+gint32 CStatCountersServer2::DecCounter(
+    EnumPropId iProp )
+{
+    switch( iProp )
+    {
+    case propMsgCount:
+        m_dwMsgCount--;
+        break;
+    case propMsgRespCount:
+        m_dwMsgRespCount--;
+        break;
+    case propEventCount:
+        m_dwEvtCount--;
+        break;
+    default:
+        return super::DecCounter( iProp );
+    }
+    return 0;
+}
+
+gint32 CStatCountersServer2::SetCounter(
+    EnumPropId iProp, guint32 dwVal )
+{
+    switch( iProp )
+    {
+    case propMsgCount:
+        m_dwMsgCount = dwVal;
+        break;
+    case propMsgRespCount:
+        m_dwMsgRespCount = dwVal;
+        break;
+    case propEventCount:
+        m_dwEvtCount = dwVal;
+        break;
+    default:
+        return super::SetCounter(
+            iProp, dwVal );
+    }
+    return 0;
+}
+
+gint32 CStatCountersServer2::GetCounter(
+    guint32 iProp, BufPtr& pBuf )
+{
+    switch( iProp )
+    {
+    case propMsgCount:
+        *pBuf = ( guint32 )m_dwMsgCount;
+        break;
+    case propMsgRespCount:
+        *pBuf = ( guint32 )m_dwMsgRespCount;
+        break;
+    case propEventCount:
+        *pBuf = ( guint32 )m_dwEvtCount;
+        break;
+    default:
+        return super::GetCounter(
+            iProp, pBuf );
+    }
+    return 0;
+}
+
+gint32 CStatCountersServer2::GetCounter2(
+    guint32 iProp, guint32& dwVal )
+{
+    switch( iProp )
+    {
+    case propMsgCount:
+        dwVal = m_dwMsgCount;
+        break;
+    case propMsgRespCount:
+        dwVal = m_dwMsgRespCount;
+        break;
+    case propEventCount:
+        dwVal = m_dwEvtCount;
+        break;
+    default:
+        return super::GetCounter2(
+            iProp, dwVal );
+    }
+    return 0;
+}
+
+gint32 CStatCountersServer2::GetCounters(
+    CfgPtr& pCfg )
+{
+    gint32 ret = super::GetCounters( pCfg );
+    if( ERROR( ret ) )
+        return ret;
+    CCfgOpener oCfg( ( IConfigDb* )pCfg );
+    oCfg[ propMsgCount ] =
+        ( guint32 )m_dwMsgCount;
+    oCfg[ propMsgRespCount ] =
+        ( guint32 )m_dwMsgRespCount;
+    oCfg[ propEventCount ] =
+        ( guint32 )m_dwEvtCount;
+    return 0;
+}
+
 }

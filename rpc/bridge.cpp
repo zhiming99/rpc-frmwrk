@@ -1329,16 +1329,15 @@ gint32 CRpcTcpBridgeProxy::SetupReqIrp(
         if( ERROR( ret ) )
             break;
 
-        ObjPtr pPortObj( GetPort() );
+        PortPtr pPortObj( GetPort() );
         if( unlikely( pPortObj.IsEmpty() ) )
         {
             ret = -EFAULT;
             break;
         }
 
-        CPort* pPort = pPortObj;
-        pPort = static_cast< CPort* >
-            ( pPort->GetTopmostPort() );
+        CPort* pPort =
+            pPortObj->GetTopmostPort();
 
         if( strMethod == IF_METHOD_LISTENING )
         {
@@ -3231,6 +3230,10 @@ gint32 CRpcTcpBridge::ForwardEvent(
 
     gint32 ret = 0;
     do{
+        auto psc = dynamic_cast
+        < CStatCountersServer* >( GetParent() );
+        psc->IncCounter( propEventCount );
+
         CReqBuilder oBuilder( this );
         CCfgOpener oEvtCtx;
         ret = oEvtCtx.CopyProp(
@@ -3974,6 +3977,10 @@ gint32 CRpcTcpBridge::ForwardRequest(
     DMsgPtr& pRespMsg,
     IEventSink* pCallback )
 {
+    auto psc = dynamic_cast
+        < CStatCountersServer* >( GetParent() );
+    psc->IncCounter( propMsgCount );
+
     return ForwardRequestInternal( pReqCtx,
         pFwdrMsg, pRespMsg, pCallback, false );
 }

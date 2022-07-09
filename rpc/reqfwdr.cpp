@@ -923,6 +923,10 @@ gint32 CRpcReqForwarder::ForwardRequest(
     pRespMsg.Clear();
 
     do{
+        auto psc = dynamic_cast
+            < CStatCountersServer* >( GetParent() );
+        psc->IncCounter( propMsgCount );
+
         DMsgPtr fwdrMsg( pFwdrMsg );
 
         MatchPtr pMatch;
@@ -2960,6 +2964,10 @@ gint32 CReqFwdrForwardRequestTask::OnTaskComplete(
             ret = -EFAULT;
         }
 
+        auto psc = dynamic_cast
+            < CStatCountersServer* >( pIfSvr->GetParent() );
+        psc->IncCounter( propMsgRespCount );
+
         if( IsPending() )
         {
             // the response will finally be sent
@@ -3353,6 +3361,10 @@ gint32 CRpcReqForwarder::ForwardEvent(
         CRpcRouterReqFwdr* pRouter =
             static_cast< CRpcRouterReqFwdr* >
                 ( GetParent() );
+
+        auto psc = dynamic_cast
+            < CStatCountersServer* >( GetParent() );
+        psc->IncCounter( propEventCount );
 
         vector< MatchPtr > vecMatches;
         DMsgPtr pEvtMsg( pEventMsg );

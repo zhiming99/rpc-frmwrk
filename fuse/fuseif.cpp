@@ -1037,8 +1037,12 @@ gint32 CFuseSvcStat::fs_read(
             break;
 
         CFuseMutex oLock( GetLock() );
-        m_strContent.clear();
-        UpdateContent();
+        if( off == 0 )
+        {
+            m_strContent.clear();
+            UpdateContent();
+        }
+
         if( off >= m_strContent.size() )
         {
             ret = 0;

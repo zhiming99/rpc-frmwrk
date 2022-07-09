@@ -258,6 +258,7 @@ enum EnumPropId : gint32
     propConnections,    // type: a guint32 to specify the connections the router has at the moment
     propChanCtx,
     propObjName,        // type: a string to specify the object in the description file
+    propEventCount,     // type: a guint32 counter of the events received.
 
     propReservedEnd = 0x10000000,
     propInvalid = -1, 

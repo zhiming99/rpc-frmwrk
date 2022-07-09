@@ -2921,6 +2921,36 @@ class CRpcRouterManager : public CRpcRouter
         bool bNew = false ) const;
 };
 
+class CStatCountersServer2 :
+    public CStatCountersServer
+{
+    std::atomic< guint32 > m_dwMsgCount;
+    std::atomic< guint32 > m_dwMsgRespCount;
+    std::atomic< guint32 > m_dwEvtCount;
+    public:
+    typedef CStatCountersServer super;
+    CStatCountersServer2( const IConfigDb* pCfg )
+        : CAggInterfaceServer( pCfg ), super( pCfg ),
+        m_dwMsgCount( 0 ), m_dwMsgRespCount( 0 ),
+        m_dwEvtCount( 0 )
+    {}
+
+    gint32 IncCounter( EnumPropId ) override;
+    gint32 DecCounter( EnumPropId ) override;
+
+    gint32 SetCounter(
+        EnumPropId, guint32 ) override;
+
+    gint32 GetCounters(
+        CfgPtr& pCfg ) override;
+
+    gint32 GetCounter(
+        guint32, BufPtr& ) override;
+
+    gint32 GetCounter2(
+        guint32, guint32& ) override;
+};
+
 DECLARE_AGGREGATED_SERVER(
      CRpcRouterManagerImpl,
      CRpcRouterManager );
@@ -2928,12 +2958,12 @@ DECLARE_AGGREGATED_SERVER(
 DECLARE_AGGREGATED_SERVER(
      CRpcRouterReqFwdrImpl,
      CRpcRouterReqFwdr,
-     CStatCountersServer ); 
+     CStatCountersServer2 ); 
 
 DECLARE_AGGREGATED_SERVER(
      CRpcRouterBridgeImpl,
      CRpcRouterBridge,
-     CStatCountersServer ); 
+     CStatCountersServer2 ); 
 
 DECLARE_AGGREGATED_PROXY(
     CRpcReqForwarderProxyImpl,

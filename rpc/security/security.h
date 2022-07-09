@@ -980,13 +980,13 @@ DECLARE_AGGREGATED_SERVER(
 DECLARE_AGGREGATED_SERVER(
     CRpcRouterReqFwdrAuthImpl,
     CRpcRouterReqFwdrAuth,
-    CStatCountersServer ); 
+    CStatCountersServer2 ); 
 
 // authent server implementation
 DECLARE_AGGREGATED_SERVER(
     CRpcRouterBridgeAuthImpl,
     CRpcRouterBridgeAuth,
     CAuthentServer,
-    CStatCountersServer ); 
+    CStatCountersServer2 ); 
 
 }

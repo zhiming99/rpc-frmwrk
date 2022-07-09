@@ -99,9 +99,11 @@ gint32 IStatCounters::IncCounter(
         if( itr == m_mapCounters.end() )
         {
             if( bNegative )
-                m_mapCounters[ iProp ] = 0U;
+                m_mapCounters[ iProp ] =
+                    ( guint32 )0;
             else
-                m_mapCounters[ iProp ] = 1U;
+                m_mapCounters[ iProp ] =
+                    ( guint32 )1;
             break;
         }
 

@@ -92,6 +92,9 @@ gint32 CFuseBdgeList::UpdateContent()
             break;
         }
 
+        CStatCountersServer* psc =
+            GetUserObj();
+
         std::vector< InterfPtr > vecBdges;
         pRouter->GetBridges( vecBdges );
 
@@ -99,6 +102,7 @@ gint32 CFuseBdgeList::UpdateContent()
             ( guint32 )vecBdges.size();
 
         Json::Value oArray( Json::arrayValue );
+        guint32 dwVal = 0;
         for( auto& elem : vecBdges )
         {
             Json::Value oBridge;
@@ -110,7 +114,6 @@ gint32 CFuseBdgeList::UpdateContent()
             CCfgOpenerObj oIfCfg(
                 ( CObjBase* )elem );
             stdstr strVal;
-            guint32 dwVal;
             bool bVal;
             ret = oIfCfg.GetStrProp(
                 propSessHash, strVal );
@@ -211,6 +214,21 @@ gint32 CFuseBdgeList::UpdateContent()
 
             oArray.append( oBridge );
         }
+
+        ret = psc->GetCounter2(
+            propMsgCount, dwVal );
+        if( SUCCEEDED( ret ) )
+            oVal[ "TotalInRequests" ] = dwVal;
+
+        ret = psc->GetCounter2(
+            propEventCount, dwVal );
+        if( SUCCEEDED( ret ) )
+            oVal[ "TotalEvents" ] = dwVal;
+
+        ret = psc->GetCounter2(
+            propMsgRespCount, dwVal );
+        if( SUCCEEDED( ret ) )
+            oVal[ "TotalOutResponses" ] = dwVal;
 
         oVal[ "Connections" ] = oArray;
         m_strContent = Json::writeString(
