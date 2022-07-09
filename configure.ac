@@ -237,7 +237,7 @@ AC_SUBST([CXXFLAGS])
 
 AC_DEFINE(_GNU_SOURCE, 1,[GNU non-portable features])
 
-AC_SUBST( TSTLDFLG, '-lipc -lcombase -lstdc++ -lcppunit \
+AC_SUBST( TSTLDFLG, '$(top_srcdir)/ipc/libipc.la $(top_srcdir)/combase/libcombase.la -lstdc++ -lcppunit \
 -L$(top_srcdir)/3rd_party -L$(top_srcdir)/combase -L$(top_srcdir)/ipc \
 ${COMMON_LINK_CPPUNIT}' )
 
