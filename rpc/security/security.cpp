@@ -1472,7 +1472,7 @@ gint32 CAuthentProxy::CreateSessImpl(
             break;
 
         // force the router path to be the root
-        oConn.SetStrProp( propRouterPath, "/" );
+        // oConn.SetStrProp( propRouterPath, "/" );
 
         IConfigDb* pAuth = nullptr;
         ret = oConn.GetPointer(

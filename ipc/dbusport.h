@@ -910,6 +910,24 @@ class CConnParamsProxy : public CConnParams
         super( rhs )
     {}
 
+    inline guint32 GetClassId() const
+    {
+        CCfgOpener lhs(
+            ( const IConfigDb* )m_pParams );
+        guint32 dwClsid = 0;
+        lhs.GetIntProp(
+            propClsid, dwClsid );
+        return dwClsid;
+    }
+
+    inline void SetClassId( guint32 dwClsid )
+    {
+        CCfgOpener lhs(
+            ( IConfigDb* )m_pParams );
+        lhs.SetIntProp(
+            propClsid, dwClsid );
+    }
+
     bool LessAuth( const CConnParamsProxy& rhs ) const
     {
         bool ret = 0;
@@ -1081,6 +1099,20 @@ class CConnParamsProxy : public CConnParams
             bVal1 = GetDestPortNum();
             bVal2 = rhs.GetDestPortNum();
 
+            if( bVal1 < bVal2 )
+            {
+                ret = true;
+                break;
+            }
+
+            if( bVal2 < bVal1 )
+            {
+                ret = false;
+                break;
+            }
+
+            bVal1 = GetClassId();
+            bVal2 = rhs.GetClassId();
             if( bVal1 < bVal2 )
             {
                 ret = true;

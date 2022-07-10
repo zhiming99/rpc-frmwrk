@@ -379,9 +379,21 @@ gint32 CDBusBusPort::BuildPdoPortName(
                         propConnParams, pConnParams );
                     if( ERROR( ret ) )
                         break;
+                    CCfgOpener oConn;
+                    *oConn.GetCfg() = *pConnParams;
+                    ret = oConn.CopyProp(
+                        propRouterPath, pCfg );
+                    if( ERROR( ret ) )
+                        break;
+                    if( strClass == PORT_CLASS_DBUS_PROXY_PDO )
+                        oConn[ propClsid ] =
+                            clsid( CDBusProxyPdo );
+                    else
+                        oConn[ propClsid ] =
+                            clsid( CDBusProxyPdoLpbk );
 
                     CStdRMutex oPortLock( GetLock() );
-                    CConnParamsProxy ocps( pConnParams );
+                    CConnParamsProxy ocps( oConn.GetCfg() );
 
                     ret = m_mapAddrToId.Find(
                         ocps, dwPortId );
@@ -527,7 +539,15 @@ gint32 CDBusBusPort::CreateRpcProxyPdoShared(
             if( ERROR( ret ) )
                 break;
 
-            CConnParamsProxy ocp( pConnParams );
+            CCfgOpener oConn;
+            *oConn.GetCfg() = *pConnParams;
+            oConn[ propClsid ] = iClsid;
+            ret = oConn.CopyProp(
+                propRouterPath, pCfg );
+            if( ERROR( ret ) )
+                break;
+
+            CConnParamsProxy ocp( oConn.GetCfg() );
 
             // bind the ip addr and the port-id
             CStdRMutex oPortLock( GetLock() );
@@ -2439,22 +2459,28 @@ void CDBusBusPort::RemovePdoPort(
     PortPtr pPort;
     CStdRMutex oPortLock( GetLock() );
     gint32 ret = GetPdoPort( iPortId, pPort );
+    oPortLock.Unlock();
     if( ERROR( ret ) )
         return;
 
-    super::RemovePdoPort( iPortId );
-
-    CCfgOpenerObj oPortCfg(
-        ( IPort* )pPort );
-
+    CCfgOpenerObj oPortCfg( ( IPort* )pPort );
     IConfigDb* pConnParams;
     ret = oPortCfg.GetPointer(
         propConnParams, pConnParams );
-
     if( ERROR( ret ) )
         return;
 
-    CConnParamsProxy ocps( pConnParams );
+    CCfgOpener oConn;
+    *oConn.GetCfg() = *pConnParams;
+    oConn[ propClsid ] = pPort->GetClsid();
+    ret = oConn.CopyProp( propRouterPath,
+        ( CObjBase* )pPort );
+    if( ERROR( ret ) )
+        return;
+
+    oPortLock.Lock();
+    super::RemovePdoPort( iPortId );
+    CConnParamsProxy ocps( oConn.GetCfg() );
     m_mapAddrToId.Erase( ocps );
 }
 
