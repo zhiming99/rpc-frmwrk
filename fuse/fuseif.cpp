@@ -682,10 +682,7 @@ gint32 CFuseDirectory::fs_mkdir(
         CRpcServices* pIf = GetRootIf();
         EnumClsid iClsid = GetClsid();
 
-        if( ( pIf->IsServer() &&
-            iClsid != clsid( CFuseRootDir ) ) ||
-            ( !pIf->IsServer() &&
-            iClsid != clsid( CFuseConnDir ) ) )
+        if( iClsid != clsid( CFuseRootDir ) )
         {
             ret = -EACCES;
             break;
