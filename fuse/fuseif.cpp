@@ -3838,17 +3838,39 @@ gint32 CFuseConnDir::AddSvcDir(
         CCfgOpenerObj oIfCfg(
             ( CObjBase* )pIf ); 
 
+        stdstr strClass;
+        ret = oIfCfg.GetStrProp(
+            propPortClass, strClass );
+        if( ERROR( ret ) )
+            break;
+
+
         IConfigDb* pConnParams = nullptr;
         ret = oIfCfg.GetPointer(
             propConnParams, pConnParams );
         if( ERROR( ret ) )
             break;
 
+        CCfgOpener oConn;
+        *oConn.GetCfg() = *pConnParams;
+        ret = oConn.CopyProp( propRouterPath,
+            ( CObjBase*) pIf );
+        if( ERROR( ret ) )
+            break;
+
+        if( strClass == PORT_CLASS_DBUS_PROXY_PDO )
+            oConn[ propClsid ] =
+                clsid( CDBusProxyPdo );
+        else
+            oConn[ propClsid ] =
+                clsid( CDBusProxyPdoLpbk );
+
+
         if( super::GetCount() <= 3 )
         {
-            SetConnParams( pConnParams );
+            SetConnParams( oConn.GetCfg() );
         }
-        else if( !IsEqualConn( pConnParams ) )
+        else if( !IsEqualConn( oConn.GetCfg() ) )
         {
             ret = -EACCES;
             break;
