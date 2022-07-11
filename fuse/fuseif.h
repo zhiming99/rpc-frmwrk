@@ -1586,7 +1586,6 @@ class CFuseServicePoint :
                 ( pSp->GetChild( STREAM_DIR ) );
 
             CfgPtr pCfg;
-            stdstr strName;
             auto pStmIf = dynamic_cast
                 < IStream* >( this );
             if( unlikely( pStmIf == nullptr ) )
@@ -1601,6 +1600,8 @@ class CFuseServicePoint :
                 ret = -EFAULT;
                 break;
             }
+
+            stdstr strName;
             CCfgOpener oDesc( ( IConfigDb* )pCfg );
             ret = oDesc.GetStrProp(
                 propNodeName, strName );
@@ -1613,11 +1614,7 @@ class CFuseServicePoint :
                 ret = -EEXIST;
 
             if( ERROR( ret ) )
-            {
-                strName = "_stm";
-                strName += std::to_string(
-                    pDir->GetCount() );
-            }
+                break;
 
             auto pStmFile = new CFuseStmFile(
                 strName, hStream, this );

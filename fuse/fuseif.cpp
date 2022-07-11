@@ -4490,12 +4490,6 @@ gint32 CFuseSvcServer::AcceptNewStreamFuse(
             ret = -ENOENT;
             break;
         }
-        if( pStmDir->GetChild( strName ) )
-        {
-            ret = -EEXIST;
-            break;
-        }
-
         IConfigDb* ptctx = nullptr;
         CStdRMutex oLock( this->GetLock() );
         ret = oDesc.GetPointer(
@@ -4510,6 +4504,40 @@ gint32 CFuseSvcServer::AcceptNewStreamFuse(
         if( ERROR( ret ) )
             break;
         ret = IncStmCount( strSess );
+        if( ERROR( ret ) )
+            break;
+
+        oLock.Unlock();
+
+        if( strName.size() > REG_MAX_NAME - 20 )
+        {
+            strName.erase( REG_MAX_NAME - 20 );
+            oDesc.SetStrProp(
+                propNodeName, strName );
+        }
+
+        if( pStmDir->GetChild( strName ) == nullptr )
+            break;
+
+        // resolve name conflict
+        strName += "_";
+        strName += strSess.substr( 0, 10 );
+        if( pStmDir->GetChild( strName ) != nullptr )
+        {
+            strName += "_";
+            guint32 dwCount = pStmDir->GetCount();
+            strName += std::to_string( dwCount );
+            if( pStmDir->GetChild( strName ) != nullptr )
+            {
+                ret = -EEXIST;
+                oLock.Lock();
+                DecStmCount( strSess );
+                break;
+            }
+        }
+        // update the storage with new name
+        oDesc.SetStrProp(
+            propNodeName, strName );
 
     }while( 0 );
 
