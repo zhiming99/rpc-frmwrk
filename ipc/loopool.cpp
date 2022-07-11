@@ -284,11 +284,8 @@ gint32 CLoopPools::Stop()
 {
     std::vector< LPoolPtr > vecPools;
     CStdRMutex oLock( GetLock() );
-    while( m_mapLPools.size() )
-    {
-        auto elem = m_mapLPools.begin();
-        vecPools.push_back( elem->second );
-    }
+    for( auto elem : m_mapLPools )
+        vecPools.push_back( elem.second );
 
     m_mapLPools.clear();
     oLock.Unlock();
