@@ -30,7 +30,7 @@
 #if ARM
 #define FUSE_USE_VERSION 34
 #else
-#define FUSE_USE_VERSION 35
+#define FUSE_USE_VERSION 34
 #endif
 #define _FILE_OFFSET_BITS 64
 #endif
