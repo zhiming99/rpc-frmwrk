@@ -215,18 +215,23 @@ esac
 
 case $host in
     x86_64*)
+        BITWIDTH=64
         CXXFLAGS+=' -DBUILD_64=1 -m64'
     ;;
     aarch64*)
+        BITWIDTH=64
         CXXFLAGS+=' -DBUILD_64=1'
     ;;
     arm64*)
+        BITWIDTH=64
         CXXFLAGS+=' -DBUILD_64=1'
     ;;
     arm*)
+        BITWIDTH=32
         CXXFLAGS+=' -DBUILD_64=0'
     ;;
     i?86*)
+        BITWIDTH=32
         CXXFLAGS+=' -DBUILD_64=0 -m32'
     ;;
 esac
@@ -234,6 +239,7 @@ esac
 CXXFLAGS+=' -std=c++11'
 
 AC_SUBST([CXXFLAGS])
+AC_SUBST([BITWIDTH])
 
 AC_DEFINE(_GNU_SOURCE, 1,[GNU non-portable features])
 
@@ -303,6 +309,7 @@ AM_CONDITIONAL([SIP4],[test x$ac_cv_prog_sip4 = xyes])
 AM_CONDITIONAL([SWIG],[test x$ac_cv_prog_swig = xyes])
 AM_CONDITIONAL([JDK],[test x$ac_cv_prog_javac = xyes])
 AM_CONDITIONAL([FUSE3],[test x$ac_cv_lib_fuse3_fuse_mount = xyes])
+AM_CONDITIONAL([BITWIDTH32],[test x$BITWIDTH = x32])
 
 VERSION2='$(subst .,:,$(VERSION))'
 AC_SUBST(VERSION2)

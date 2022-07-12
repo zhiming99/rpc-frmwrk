@@ -24,7 +24,17 @@
  * =====================================================================================
  */
 #pragma once
+#if BUILD_64
 #define FUSE_USE_VERSION 35
+#else
+#if ARM
+#define FUSE_USE_VERSION 34
+#else
+#define FUSE_USE_VERSION 35
+#endif
+#define _FILE_OFFSET_BITS 64
+#endif
+
 #include <fuse.h>
 #include <fuse_lowlevel.h>  /* for fuse_cmdline_opts */
 

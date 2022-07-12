@@ -823,8 +823,8 @@ gint32 CFuseTextFile::fs_read(
             break;
         }
 
-        size_t dwBytes = std::min(
-            size, m_strContent.size() - off );
+        size_t actSize = m_strContent.size() - off;
+        size_t dwBytes = std::min( size, actSize );
 
         BufPtr pBuf = NewBufNoAlloc(
             m_strContent.c_str() + off,
@@ -1046,8 +1046,8 @@ gint32 CFuseSvcStat::fs_read(
             break;
         }
 
-        size_t dwBytes = std::min(
-            size, m_strContent.size() - off );
+        size_t actSize = m_strContent.size() - off;
+        size_t dwBytes = std::min( size, actSize );
 
         BufPtr pBuf = NewBufNoAlloc(
             m_strContent.c_str() + off,
@@ -1485,8 +1485,8 @@ gint32 CFuseCmdFile::fs_read(
         if( off >= strContent.size() )
             break;
 
-        size_t dwBytes = std::min(
-            size, strContent.size() - off );
+        size_t actSize = strContent.size() - off;
+        size_t dwBytes = std::min( size, actSize );
 
         BufPtr pBuf( true );
         pBuf->Append(

@@ -1,8 +1,14 @@
 lib_LTLIBRARIES=libfuseif.la
 
+if BITWIDTH32
+OFFSET_MACRO=-D_FILE_OFFSET_BITS=64
+else
+OFFSET_MACRO=
+endif
+
 libfuseif_la_SOURCES = fuseif.cpp fuseif_ll.cpp serijson.cpp
 
-libfuseif_la_CXXFLAGS=-I $(top_srcdir)/ipc
+libfuseif_la_CXXFLAGS=-I $(top_srcdir)/ipc $(OFFSET_MACRO)
 
 rpcffuseif_HEADERS=fuseif.h fusedefs.h serijson.h
 
@@ -35,7 +41,7 @@ hostsvrdir=$(bindir)
 hostsvr_LDADD=$(COMMON_LINK_FUSE3) libfuseif.la ../ipc/libipc.la ../combase/libcombase.la -lutils -lstdc++ -lcppunit \
  -L$(top_srcdir)/combase -L$(top_srcdir)/ipc -L$(top_srcdir)/3rd_party -L$(top_srcdir)/fuse 
 
-hostsvr_CPPFLAGS= -I$(include_ipcdir) -fPIC -DSERVER
+hostsvr_CPPFLAGS= -I$(include_ipcdir) -fPIC -DSERVER $(OFFSET_MACRO)
 
 hostcli_PROGRAMS=hostcli
 hostcli_SOURCES=rpcfshst.cpp
@@ -44,4 +50,4 @@ hostclidir=$(bindir)
 hostcli_LDADD=$(COMMON_LINK_FUSE3) libfuseif.la ../ipc/libipc.la ../combase/libcombase.la -lutils -lstdc++ -lcppunit \
  -L$(top_srcdir)/combase -L$(top_srcdir)/ipc -L$(top_srcdir)/3rd_party -L$(top_srcdir)/fuse 
 
-hostcli_CPPFLAGS= -I$(include_ipcdir) -fPIC -DCLIENT
+hostcli_CPPFLAGS= -I$(include_ipcdir) -fPIC -DCLIENT $(OFFSET_MACRO)

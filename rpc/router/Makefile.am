@@ -17,5 +17,11 @@ include_rpcdir=$(top_srcdir)/rpc
 include_ipcdir=$(top_srcdir)/ipc
 include_fusedir=$(top_srcdir)/fuse
 
+if BITWIDTH32
+OFFSET_MACRO=-D_FILE_OFFSET_BITS=64
+else
+OFFSET_MACRO=
+endif
+
 rpcrouter_CPPFLAGS= -I$(include_rpcdir) -I$(include_ipcdir) -fPIC \
- -I$(include_fusedir)
+ -I$(include_fusedir) $(OFFSET_MACRO)

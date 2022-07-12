@@ -47,7 +47,9 @@ for light weight traffic.
 
 .TP
 .BR \-m <mount point>
-To export rpcrouter's runtime information via 'rpcfs' mounted at the directory 'mount point'.
+To export rpcrouter's runtime information via 'rpcfs' mounted at the directory
+ 'mount point'. The files are exported in Json format under the 'users' directory, including
+ 'InConnections', and 'OutConnections' at present. 
 
 .TP
 .BR \-d
