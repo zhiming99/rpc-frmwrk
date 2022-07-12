@@ -18,7 +18,7 @@ It is not required, if your client/server program just do some IPC, as known as 
 
 * -f To enable the `request-based flow control`. The `bridge` with this option, will limit the outstanding requests to 2 * connections, and buffered requests to 4 * connections, and requests beyond this limit will be rejected with error `ERROR_QUEUE_FULL`. The `reqfwdr` with this option will buffer some number of rejected requests and retry them later, or pass on `ERROR_QUEUE_FULL` to the proxy if the client has overdone it without stopping. 
 
-* -m _mount point_ : To export rpcrouter's runtime information via 'rpcfs' mounted at the directory 'mount point'. The files are exported in JSON format under 'users' directory,  including 'InConnections' and 'OutConnections'.
+* -m _mount point_ : To export rpcrouter's runtime information via 'rpcfs' mounted at the directory 'mount point'. The files are exported in JSON format under 'users' directory,  including 'InConnections' and 'OutConnections' at present.
 
 * -d To run `rpcrouter` as a daemon
 
