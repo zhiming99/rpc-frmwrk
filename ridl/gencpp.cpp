@@ -6817,9 +6817,13 @@ gint32 CExportMakefile::Output()
         {
             strCmdLine +="s:XXXFUSE:-lutils -lfuseif:; ";
             strCmdLine +="s:jsoncpp:jsoncpp fuse3:; ";
+            strCmdLine +="s:XXXDEFINES:-D_FILE_OFFSET_BITS=64:; ";
         }
         else
+        {
             strCmdLine +="s:XXXFUSE::; ";
+            strCmdLine +="s:XXXDEFINES::; ";
+        }
 
         if( g_bMklib )
             strCmdLine += "s:XXXMKLIB:1:' ";

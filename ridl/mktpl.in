@@ -20,8 +20,16 @@ COMMON_INCLUDE:=$(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --cflags d
 
 C_INCLUDE:=-I./ $(COMMON_INCLUDE)
 
+BITWIDTH:=@BITWIDTH@
+
 DEBUG_FLAGS:=-D_DEBUG=1 -DDEBUG -ggdb
 RELEASE_FLAGS:= -D_DEBUG=0 -DRELEASE -O2 -ggdb -fno-strict-aliasing
+
+ifeq ($(BITWIDTH),32)
+FUSE_DEFINES:=XXXDEFINES
+else
+FUSE_DEFINES:=
+endif
 
 DBG_DIR:=debug
 RLS_DIR:=release
@@ -47,6 +55,8 @@ else ifeq ($(MAKECMDGOALS),debug_clean)
 	OBJ_DIR:=./$(DBG_DIR)
 else ifeq ($(MAKECMDGOALS),release_clean)
 endif
+
+C_DEFINES+=$(FUSE_DEFINES)
 
 DIST_LIB_DIR = @DIST_LIB_DIR@
 FUSE_LIB:=XXXFUSE

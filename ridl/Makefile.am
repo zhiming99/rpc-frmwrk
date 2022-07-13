@@ -18,12 +18,12 @@ ridlc.cpp ridlc.h : ridlc.y
 	bison --defines=ridlc.h --output=ridlc.cpp -r all ridlc.y
 
 mktpl : mktpl.in
-	sed -e 's,[@]PKG_CONFIG_PATH[@],$(pkgconfigdir),g;s,[@]DIST_LIB_DIR[@],$(libdir),g' mktpl.in > mktpl
+	sed -e 's,[@]PKG_CONFIG_PATH[@],$(pkgconfigdir),g;s,[@]DIST_LIB_DIR[@],$(libdir),g;s,[@]BITWIDTH[@],$(BITWIDTH),g;' mktpl.in > mktpl
 
 synccfg.py : synccfg.py.in
 	sed -e 's,[@]SRCCFG[@],$(ridlc_confdir)/echodesc.json,g' synccfg.py.in > synccfg.py
 
-ridlc_LDADD=$(COMMON_LINK) -lipc -lcombase -lutils -lstdc++ -ljsoncpp -L../combase -L../ipc -L../3rd_party
+ridlc_LDADD=$(COMMON_LINK) ../ipc/libipc.la ../combase/libcombase.la -lutils -lstdc++ -ljsoncpp -L../combase -L../ipc -L../3rd_party
 ridlcdir=$(bindir)
 
 ridlc_conf_DATA=odesctpl.json drvtpl.json mktpl seribase.py pymktpl synccfg.py JavaSerialBase.java JavaSerialImpl.java
