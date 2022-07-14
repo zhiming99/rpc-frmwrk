@@ -416,7 +416,7 @@ gint32 CFuseRootDir::fs_getattr(
 }
 
 gint32 CFuseDirectory::fs_rmdir(
-    const char *path,
+    const char *szChild,
     fuse_file_info* fi,
     bool bReload )
 {
@@ -431,7 +431,8 @@ gint32 CFuseDirectory::fs_rmdir(
         if( ( pIf->IsServer() &&
             iClsid != clsid( CFuseRootDir ) ) ||
             ( !pIf->IsServer() &&
-            iClsid != clsid( CFuseConnDir ) ) )
+            iClsid != clsid( CFuseConnDir ) &&
+            iClsid != clsid( CFuseDirectory ) ) )
         {
             ret = -EACCES;
             break;
@@ -441,7 +442,7 @@ gint32 CFuseDirectory::fs_rmdir(
         {
             auto pSvc = static_cast
                 < CFuseRootServer* >( pIf );
-            ret = pSvc->CanRemove( path );
+            ret = pSvc->CanRemove( szChild );
             if( ret == ERROR_FALSE && !bReload )
             {
                 ret = -EACCES;
@@ -457,7 +458,7 @@ gint32 CFuseDirectory::fs_rmdir(
         {
             auto pSvc = static_cast
                 < CFuseRootProxy* >( pIf );
-            ret = pSvc->CanRemove( path );
+            ret = pSvc->CanRemove( szChild );
             if( ret == ERROR_FALSE && !bReload )
             {
                 ret = -EACCES;
@@ -471,7 +472,7 @@ gint32 CFuseDirectory::fs_rmdir(
         }
 
         DIR_SPTR pSvcDir;
-        ret = this->GetChild( path, pSvcDir );
+        ret = this->GetChild( szChild, pSvcDir );
         if( ERROR( ret ) )
             break;
 
@@ -528,7 +529,12 @@ gint32 CFuseDirectory::fs_rmdir(
                 fuse_ino_t inoParent = 0;
                 fuse_ino_t inoChild = 0;
 
-                stdstr strDir = strName;
+                stdstr strChild = strName;
+
+                fuse* pFuse = GetFuse();
+                fuse_session* se =
+                    fuse_get_session( pFuse );
+
                 if( pSvcIf->IsServer() )
                 {
                     ROOTLK_EXCLUSIVE;
@@ -544,11 +550,16 @@ gint32 CFuseDirectory::fs_rmdir(
                     CFuseRootServer* pRootIf =
                         GetRootIf();
 
-                    pParent->RemoveChild( strDir );
+                    pParent->RemoveChild( strChild );
                     pRootIf->RemoveSvcPoint( pSvc );
 
                     inoParent = pParent->GetObjId();
                     inoChild = psd->GetObjId();
+
+                    fuse_lowlevel_notify_delete( se,
+                        inoParent, inoChild,
+                        strChild.c_str(),
+                        strChild.size() );
                 }
                 else
                 {
@@ -559,44 +570,66 @@ gint32 CFuseDirectory::fs_rmdir(
                     auto psd = static_cast< CFuseSvcDir* >
                         ( pSvc->GetSvcDir().get() );
 
-                    auto pParent = static_cast
-                    < CFuseConnDir* >( psd->GetParent() );
+                    auto pConn = dynamic_cast
+                    < CFuseDirectory* >( psd->GetParent() );
 
                     CFuseRootProxy* pRootIf =
                         GetRootIf();
 
-                    pParent->RemoveChild( strDir );
+                    pConn->RemoveChild( strChild );
                     pRootIf->RemoveSvcPoint( pSvc );
-                    inoParent = pParent->GetObjId();
+
+                    inoParent = pConn->GetObjId();
                     inoChild = psd->GetObjId();
-                    if( pParent->GetCount() <= FUSE_MIN_FILES )
-                    {
+
+                    fuse_lowlevel_notify_delete( se,
+                        inoParent, inoChild,
+                        strChild.c_str(),
+                        strChild.size() );
+                    
+                    do{
+                        bool bRoot = false;
+                        if( pConn->GetClsid() ==
+                            clsid( CFuseConnDir ) )
+                            bRoot = true;
+
+                        guint32 dwCount = pConn->GetCount();
+                        bool bRemovable = false;
+                        if( ( bRoot && dwCount <= FUSE_MIN_FILES ) ||
+                            ( !bRoot && dwCount == 0 ) )
+                            bRemovable = true;
+
+                        if( !bRemovable )
+                            break;
+
                         // remove the empty connection directory
                         auto pNextHop =
-                            pParent->GetChild( HOP_DIR );
+                            pConn->GetChild( HOP_DIR );
                         if( pNextHop != nullptr &&
-                            pNextHop->GetCount() == 0 )
-                        {
-                            auto pRoot = pParent->GetParent();
-                            strDir = pParent->GetName();
-                            inoParent = pRoot->GetObjId();
-                            inoChild = pParent->GetObjId();
-                            pRoot->RemoveChild( strDir );
-                        }
-                    }
+                            pNextHop->GetCount() > 0 )
+                            break;
+
+                        auto pHop = pConn->GetParent();
+                        strChild = pConn->GetName();
+                        inoParent = pHop->GetObjId();
+                        inoChild = pConn->GetObjId();
+                        pHop->RemoveChild( strChild );
+
+                        fuse_lowlevel_notify_delete( se,
+                            inoParent, inoChild,
+                            strChild.c_str(),
+                            strChild.size() );
+
+                        if( bRoot )
+                            break;
+
+                        pConn = dynamic_cast < CFuseDirectory* >
+                            ( pHop->GetParent() );
+                        if( pConn == nullptr )
+                            break;
+
+                    }while( true );
                 }
-
-                fuse* pFuse = GetFuse();
-                if( pFuse == nullptr )
-                    break;
-
-                fuse_session* se =
-                    fuse_get_session( pFuse );
-
-                fuse_lowlevel_notify_delete( se,
-                    inoParent, inoChild,
-                    strDir.c_str(),
-                    strDir.size() );
 
                 pCb->OnEvent( eventTaskComp,
                     STATUS_SUCCESS, 0, nullptr );
@@ -612,7 +645,7 @@ gint32 CFuseDirectory::fs_rmdir(
         TaskletPtr pRmDir;
         ret = NEW_FUNCCALL_TASK( pRmDir,
             pMgr, func, pSvc,
-            stdstr( path ), pCallback );
+            stdstr( szChild ), pCallback );
         if( ERROR( ret ) )
             break;
 
@@ -3858,13 +3891,8 @@ gint32 CFuseConnDir::AddSvcDir(
         if( ERROR( ret ) )
             break;
 
-        if( strClass == PORT_CLASS_DBUS_PROXY_PDO )
-            oConn[ propClsid ] =
-                clsid( CDBusProxyPdo );
-        else
-            oConn[ propClsid ] =
-                clsid( CDBusProxyPdoLpbk );
-
+        oConn[ propClsid ] =
+             clsid( CDBusProxyPdo );
 
         if( super::GetCount() <= 3 )
         {
@@ -3889,8 +3917,7 @@ gint32 CFuseConnDir::AddSvcDir(
             break;
         }
 
-        ret =IsMidwayPath( strPath2, strPath );
-        if( ERROR( ret ) )
+        if( strPath[ 0 ] != '/' )
         {
             ret = -EINVAL;
             break;
@@ -3910,16 +3937,20 @@ gint32 CFuseConnDir::AddSvcDir(
             ret = -EINVAL;
             break;
         }
-        if( vecComps[ 0 ] == "/" )
-            vecComps.erase( vecComps.begin() );
 
-        CDirEntry* pDir = nullptr;
-        CDirEntry* pCur = this;
+        if( vecComps[ 0 ] == "/" )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
         CDirEntry* pHop = nullptr;
+        CDirEntry* pCur = this;
+        CDirEntry* pConn = nullptr;
         for( auto& elem : vecComps )
         {
-            pDir = pCur->GetChild( HOP_DIR );
-            if( pDir == nullptr )
+            pHop = pCur->GetChild( HOP_DIR );
+            if( pHop == nullptr )
             {
                 CFuseDirectory* pNewDir =
                 new CFuseDirectory( HOP_DIR, pIf );
@@ -3927,27 +3958,27 @@ gint32 CFuseConnDir::AddSvcDir(
 
                 DIR_SPTR pEnt1( pNewDir );
                 pCur->AddChild( pEnt1 );
-                pDir = pNewDir;
+                pHop = pNewDir;
                 pNewDir->SetMode( S_IRUSR | S_IXUSR );
-                pHop = nullptr;
+                pConn = nullptr;
             }
             else
             {
-                pHop = pDir->GetChild( elem );
+                pConn = pHop->GetChild( elem );
             }
 
-            if( pHop == nullptr )
+            if( pConn == nullptr )
             {
                 CFuseDirectory* pNewDir =
                     new CFuseDirectory( elem, pIf );
                 pNewDir->DecRef();
 
                 DIR_SPTR pEnt1( pNewDir );
-                pDir->AddChild( pEnt1 );
+                pHop->AddChild( pEnt1 );
                 pNewDir->SetMode( S_IRUSR | S_IXUSR );
-                pHop = pEnt1.get();
+                pConn = pEnt1.get();
             }
-            pCur = pHop;
+            pCur = pConn;
         }
         pCur->AddChild( pEnt );
 
