@@ -10,7 +10,7 @@ rpcrouter must run on both side of the client and server hosts to accomplish the
 It is not required, if your client/server program just do some IPC, as known as Inter-Process-Communication.
 
 #### Options
-* -r _role number_ 1: running on the client side aka. a `reqfwdr`, 2: running on the server side aka. a `bridge`. It is a mandatory option.
+* -r _role number_ 1: running on the client side aka. a `reqfwdr`, abbr. of _request forwarder_, 2: running on the server side aka. a `bridge`. It is a mandatory option.
 
 * -a To enable the authentication. So far, kerberos is the only authentication mechanism supported.
 
@@ -24,7 +24,7 @@ It is not required, if your client/server program just do some IPC, as known as 
 
 #### Examples
 *   On the server side, `rpcrouter -r 2` for non-authentication `bridge`, and `rpcrouter -afr 2` for `bridge` with both authentication and request flow-control.
-*   On the client side, `rpcrouter -r 1` for non-authentication `bridge`, and `rpcrouter -afr 1` for `bridge` with both authentication and request flow-control.
+*   On the client side, `rpcrouter -r 1` for non-authentication `reqfwdr`, and `rpcrouter -afr 1` for `reqfwdr` with both authentication and request flow-control.
 
 #### Related Files
 *   router.json, rtauth.json, authprxy.json, driver.json
