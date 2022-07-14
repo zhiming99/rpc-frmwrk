@@ -31,14 +31,14 @@ This is an asynchronous and event-driven RPC implementation for embeded system w
 #### Installation
 1. Run `sudo make install` from the root directory of `rpc-frmwrk` source tree.
 2. Configure the runtime parameters for `rpc-frwmrk` as described on [this page](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools/README.md).
-3. Start the daemon process `rpcrouter -r 2` on server side, and on start daemon process `rpcrouter -r 1` on client side. And now we are ready to run the `helloworld` program. About `rpcrouter`, please follow this [link](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/router/README.md).
+3. Start the daemon process `rpcrouter -dr 2` on server side, and on start daemon process `rpcrouter -dr 1` on client side. And now we are ready to run the `helloworld` program. For more information about `rpcrouter`, please follow this [link](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/router/README.md).
 4. Smoketest with `HelloWorld`. Start the `hwsvrsmk`, the `helloworld` server on server side. And start the `hwclismk` on the client side.
 5. This [wiki](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-get-Helloworld-run%3F) has some detail information.
 
 #### Development
 `rpc-frmwrk` supports two approaches for distributed application development.
 1. The classic RPC. `rpc-frmwrk` has an `interface description language`, [`ridl`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md) to help you to generate the skelton code rapidly. Examples can be found [here](https://github.com/zhiming99/rpc-frmwrk/tree/master/examples#generating-the-example-program-of-hellowld).
-2. Programming with [`rpcfs`](https://github.com/zhiming99/rpc-frmwrk/tree/master/fuse#the-introduction-to-fuse-integration-and-the-rpcfs-filesystem). The `ridl` compiler can generate a pair of filesystems for server and client respectively with the `ridl` file. And all the `rpc` traffic goes through file read/write and other file operations. And the system monitoring and management are conducted via file operations, too.
+2. Programming with [`rpcfs`](https://github.com/zhiming99/rpc-frmwrk/tree/master/fuse#the-introduction-to-fuse-integration-and-the-rpcfs-filesystem). The `ridl` compiler can generate a pair of filesystems for server and client respectively with the `ridl` file. And all the `rpc` traffic goes through file read/write and other file operations. And moreover `rpcfs` hosted by the `rpcrouter` provides information for runtime monitoring and management.
 
 #### Runtime Dependency  
 This project depends on the following 3rd-party packags at runtime:  
