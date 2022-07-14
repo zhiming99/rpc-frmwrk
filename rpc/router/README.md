@@ -23,8 +23,9 @@ It is not required, if your client/server program just do some IPC, as known as 
 * -d To run `rpcrouter` as a daemon
 
 #### Examples
-*   On the server side, `rpcrouter -r 2` for non-authentication `bridge`, and `rpcrouter -afr 2` for `bridge` with both authentication and request flow-control.
-*   On the client side, `rpcrouter -r 1` for non-authentication `reqfwdr`, and `rpcrouter -afr 1` for `reqfwdr` with both authentication and request flow-control.
+*   On the server side, `rpcrouter -dr 2` for non-authentication `bridge`, and `rpcrouter -adfr 2` for `bridge` with both authentication and request flow-control.
+*   On the client side, `rpcrouter -dr 1` for non-authentication `reqfwdr`, and `rpcrouter -adfr 1` for `reqfwdr` with both authentication and request flow-control.
+*   To export the runtime information, add the `-m` option with a directory as a mountpoint, so that the rpcrouter will export several files which contains  statistics counters and important running status about the rpcrouter. `rpcrouter -adfr 2 -m ./foodir`, for example.
 
-#### Related Files
+#### Related Configuration Files
 *   router.json, rtauth.json, authprxy.json, driver.json
