@@ -75,6 +75,62 @@ Json::Value DumpConnParams( const IConfigDb* pConn )
     return oConnVal;
 }
 
+gint32 DumpStream(
+    InterfPtr& pUxStream,
+    Json::Value& oStmInfo )
+{
+    if( pUxStream.IsEmpty() )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        CRpcServices* pSvc = pUxStream;
+        CStdRMutex oLock( pSvc->GetLock() ); 
+        EnumIfState iState = pSvc->GetState();
+        stdstr strState = IfStateToString( iState );
+        oStmInfo[ "StreamState" ] = strState;
+        if( pSvc->IsServer() )
+        {
+            CUnixSockStmServer* pSvr = pUxStream; 
+            guint64 qwRxBytes, qwTxBytes;
+            pSvr->GetBytesTransfered(
+                qwRxBytes, qwTxBytes );
+            oStmInfo[ "BytesReceived" ] = qwRxBytes;
+            oStmInfo[ "BytesSent" ] = qwTxBytes;
+            oStmInfo[ "CanSend" ] =
+                pSvr->CanSend();
+        }
+        else
+        {
+            CUnixSockStmProxy* pProxy = pUxStream; 
+            guint64 qwRxBytes, qwTxBytes;
+            pProxy->GetBytesTransfered(
+                qwRxBytes, qwTxBytes );
+            oStmInfo[ "BytesReceived" ] = qwRxBytes;
+            oStmInfo[ "BytesSent" ] = qwTxBytes;
+            oStmInfo[ "CanSend" ] =
+                pProxy->CanSend();
+        }
+        CCfgOpenerObj oIfCfg( pSvc );
+        IConfigDb* pDesc;
+        ret = oIfCfg.GetPointer(
+            propDataDesc, pDesc );
+        if( ERROR( ret ) )
+            break;
+
+        stdstr strName;
+        CCfgOpener oDesc( pDesc );
+        ret = oDesc.GetStrProp(
+            propNodeName, strName );
+        if( ERROR( ret ) )
+            break;
+        oStmInfo[ "ClientName" ] = strName;
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CFuseBdgeList::UpdateContent() 
 {
     gint32 ret = 0;
@@ -199,10 +255,46 @@ gint32 CFuseBdgeList::UpdateContent()
             IStream* ps = pstm;
             dwVal = ps->GetStreamCount();
             oBridge[ "NumStreams" ] = dwVal;
+            guint64 qwRxTotal = 0, qwTxTotal = 0;
+            if( dwVal > 0 )
+            {
+                Json::Value oStreams( Json::arrayValue );
+                std::vector< InterfPtr > vecUxStms;
+                ps->EnumStreams( vecUxStms );
+                for( auto& elem : vecUxStms )
+                {
+                    Json::Value oVal( Json::objectValue );
+                    DumpStream( elem, oVal );
+                    oStreams.append( oVal  );
+                    qwRxTotal += oVal[ "BytesReceived" ].asUInt64();
+                    qwTxTotal += oVal[ "BytesSent" ].asUInt64();
+                }
+                oBridge[ "Streams" ] = oStreams;
+                oBridge[ "StreamsTotalRx" ] = qwRxTotal;
+                oBridge[ "StreamsTotalTx" ] = qwTxTotal;
+            }
 
+            qwRxTotal = 0, qwTxTotal = 0;
             ps = pstmmh;
             dwVal = ps->GetStreamCount();
             oBridge[ "NumStreamsRelay" ] = dwVal;
+            if( dwVal > 0 )
+            {
+                Json::Value oStreams( Json::arrayValue );
+                std::vector< InterfPtr > vecUxStms;
+                pstmmh->EnumStreams( vecUxStms );
+                for( auto& elem : vecUxStms )
+                {
+                    Json::Value oVal( Json::objectValue );
+                    DumpStream( elem, oVal );
+                    oStreams.append( oVal  );
+                    qwRxTotal += oVal[ "BytesReceived" ].asUInt64();
+                    qwTxTotal += oVal[ "BytesSent" ].asUInt64();
+                }
+                oBridge[ "StreamsRelay" ] = oStreams;
+                oBridge[ "StreamsRelayTotalRx" ] = qwRxTotal;
+                oBridge[ "StreamsRelayTotalTx" ] = qwTxTotal;
+            }
 
             timespec tv;
             clock_gettime( CLOCK_REALTIME, &tv );

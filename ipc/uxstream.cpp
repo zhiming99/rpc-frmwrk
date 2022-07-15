@@ -26,6 +26,219 @@
 namespace rpcf
 {
 
+EnumFCState CFlowControl::OnReportInternal(
+    guint64 qwAckTxBytes, guint64 qwAckTxPkts )
+{
+    EnumFCState ret = fcsKeep;
+
+    bool bAboveLast = false;
+    bool bAbove = false;
+
+    CStdRMutex oLock( GetLock() );
+    if( qwAckTxBytes <= m_qwAckTxBytes ||
+        qwAckTxPkts <= m_qwAckTxPkts )
+        return ret;
+
+    if( m_qwTxBytes - m_qwAckTxBytes >=
+        STM_MAX_PENDING_WRITE ||
+        m_qwTxPkts - m_qwAckTxPkts >=
+        STM_MAX_PACKETS_REPORT )
+        bAboveLast = true;
+
+    if( m_qwTxBytes - qwAckTxBytes >=
+        STM_MAX_PENDING_WRITE ||
+        m_qwTxPkts - qwAckTxPkts >=
+        STM_MAX_PACKETS_REPORT )
+        bAbove = true;
+
+    m_qwAckTxBytes = qwAckTxBytes;
+    m_qwAckTxPkts = qwAckTxPkts;
+
+    if( bAboveLast != bAbove )
+        ret = DecFCCount();
+
+    return ret;
+}
+
+EnumFCState CFlowControl::IncTxBytes(
+    guint32 dwSize )
+{
+    EnumFCState ret = fcsKeep;
+    if( dwSize == 0 ||
+        dwSize > MAX_BYTES_PER_TRANSFER )
+        return ret;
+
+    bool bAboveLastBytes = false;
+    bool bAboveLastPkts = false;
+    bool bAboveBytes = false;
+    bool bAbovePkts = false;
+
+    CStdRMutex oLock( GetLock() );
+
+    if( m_qwTxBytes - m_qwAckTxBytes >=
+        STM_MAX_PENDING_WRITE )
+        bAboveLastBytes = true;
+
+    if( m_qwTxPkts - m_qwAckTxPkts >=
+        STM_MAX_PACKETS_REPORT )
+        bAboveLastPkts = true;
+
+    m_qwTxBytes += dwSize;
+    m_qwTxPkts++;
+
+    if( m_qwTxBytes - m_qwAckTxBytes >=
+        STM_MAX_PENDING_WRITE )
+        bAboveBytes = true;
+
+    if( m_qwTxPkts - m_qwAckTxPkts >=
+        STM_MAX_PACKETS_REPORT )
+        bAbovePkts = true;
+
+    // get the flow control to take effect
+    // immediately
+    if( bAboveLastBytes != bAboveBytes ||
+        bAboveLastPkts != bAbovePkts )
+        ret = IncFCCount();
+
+    return ret;
+}
+
+EnumFCState CFlowControl::IncTxBytes(
+    const BufPtr& pBuf )
+{
+    if( pBuf.IsEmpty() || pBuf->empty() )
+        return fcsKeep;
+
+    return IncTxBytes( pBuf->size() );
+}
+
+
+EnumFCState CFlowControl::IncRxBytes(
+    guint32 dwSize )
+{
+    EnumFCState ret = fcsKeep;
+    if( dwSize == 0 ||
+        dwSize > MAX_BYTES_PER_TRANSFER )
+        return ret;
+
+    bool bAboveLastBytes = false;
+    bool bAboveLastPkts = false;
+    bool bAboveBytes = false;
+    bool bAbovePkts = false;
+
+    CStdRMutex oLock( GetLock() );
+
+    if( m_qwRxBytes - m_qwAckRxBytes >=
+        STM_MAX_PENDING_WRITE )
+        bAboveLastBytes = true;
+
+    if( m_qwRxPkts - m_qwAckRxPkts >=
+        STM_MAX_PACKETS_REPORT )
+        bAboveLastPkts = true;
+
+    m_qwRxBytes += dwSize;
+    m_qwRxPkts++;
+
+    if( m_qwRxBytes - m_qwAckRxBytes >=
+        STM_MAX_PENDING_WRITE  )
+        bAboveBytes = true;
+
+    if( m_qwRxPkts - m_qwAckRxPkts >=
+        STM_MAX_PACKETS_REPORT )
+        bAbovePkts = true;
+
+    if( bAboveLastBytes != bAboveBytes ||
+        bAboveLastPkts != bAbovePkts )
+    {
+        ret = fcsReport;
+        m_qwAckRxBytes = m_qwRxBytes;
+        m_qwAckRxPkts = m_qwRxPkts;
+    }
+
+    return ret;
+}
+
+EnumFCState CFlowControl::IncRxBytes(
+    const BufPtr& pBuf )
+{
+    if( pBuf.IsEmpty() || pBuf->empty() )
+        return fcsKeep;
+
+    return IncRxBytes( pBuf->size() );
+}
+
+EnumFCState CFlowControl::IncFCCount()
+{
+    EnumFCState ret = fcsKeep;
+    CStdRMutex oLock( GetLock() );
+    ++m_byFlowCtrl;
+    if( m_byFlowCtrl == 1 )
+        ret = fcsFlowCtrl;
+    return ret;
+}
+
+EnumFCState CFlowControl::DecFCCount()
+{
+    EnumFCState ret = fcsKeep;
+    CStdRMutex oLock( GetLock() );
+    --m_byFlowCtrl;
+    if( m_byFlowCtrl == 0 )
+        ret = fcsLift;
+    return ret;
+}
+
+EnumFCState CFlowControl::OnFCReport(
+    CfgPtr& pReport )
+{
+    CCfgOpener oCfg(
+        ( IConfigDb* )pReport );
+
+    guint64 qwAckTxPkts = 0;
+    guint64 qwAckTxBytes = 0;
+    gint32 ret = oCfg.GetQwordProp(
+        propRxBytes, qwAckTxBytes );
+    if( ERROR( ret ) )
+        return fcsKeep;
+
+    ret = oCfg.GetQwordProp(
+        propRxPkts, qwAckTxPkts );
+    if( ERROR( ret ) )
+        return fcsKeep;
+
+    return OnReportInternal(
+        qwAckTxBytes, qwAckTxPkts );
+}
+
+bool CFlowControl::CanSend()
+{
+    if( m_bMonitor )
+        return true;
+
+    CStdRMutex oLock( GetLock() );
+    return m_byFlowCtrl == 0;
+}
+
+CfgPtr CFlowControl::GetReport()
+{
+    CParamList oProgress;
+    CStdRMutex oLock( GetLock() );
+    oProgress.SetQwordProp(
+        propRxBytes, m_qwRxBytes );
+
+    oProgress.SetQwordProp(
+        propRxPkts, m_qwRxPkts );
+
+    return oProgress.GetCfg();
+}
+
+void CFlowControl::GetBytesTransfered(
+    guint64& qwRxBytes, guint64& qwTxBytes )
+{
+    CStdRMutex oLock( GetLock() );
+    qwRxBytes = m_qwRxBytes;
+    qwTxBytes = m_qwTxBytes;
+}
+
 gint32 CIfUxPingTask::RunTask()
 {
     gint32 ret = 0;

@@ -70,6 +70,16 @@ struct IStream
         return m_mapUxStreams.size();
     }
 
+    inline void EnumStreams(
+        std::vector< InterfPtr >& vecStreams ) const
+    {
+        CRpcServices* pThis = GetInterface();
+        CStdRMutex oIfLock( pThis->GetLock() );
+        for( auto& elem : m_mapUxStreams )
+        { vecStreams.push_back( elem.second ); }
+        return;
+    }
+
     inline gint32 AddUxStream(
         HANDLE hChannel, InterfPtr& pIf )
     {
