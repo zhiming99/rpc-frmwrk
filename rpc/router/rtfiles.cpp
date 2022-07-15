@@ -95,8 +95,10 @@ gint32 DumpStream(
             guint64 qwRxBytes, qwTxBytes;
             pSvr->GetBytesTransfered(
                 qwRxBytes, qwTxBytes );
-            oStmInfo[ "BytesReceived" ] = qwRxBytes;
-            oStmInfo[ "BytesSent" ] = qwTxBytes;
+            oStmInfo[ "BytesReceived" ] =
+                ( Json::UInt64 )qwRxBytes;
+            oStmInfo[ "BytesSent" ] =
+                ( Json::UInt64 )qwTxBytes;
             oStmInfo[ "CanSend" ] =
                 pSvr->CanSend();
         }
@@ -106,8 +108,10 @@ gint32 DumpStream(
             guint64 qwRxBytes, qwTxBytes;
             pProxy->GetBytesTransfered(
                 qwRxBytes, qwTxBytes );
-            oStmInfo[ "BytesReceived" ] = qwRxBytes;
-            oStmInfo[ "BytesSent" ] = qwTxBytes;
+            oStmInfo[ "BytesReceived" ] =
+                ( Json::UInt64 )qwRxBytes;
+            oStmInfo[ "BytesSent" ] =
+                ( Json::UInt64 )qwTxBytes;
             oStmInfo[ "CanSend" ] =
                 pProxy->CanSend();
         }
@@ -270,8 +274,10 @@ gint32 CFuseBdgeList::UpdateContent()
                     qwTxTotal += oVal[ "BytesSent" ].asUInt64();
                 }
                 oBridge[ "Streams" ] = oStreams;
-                oBridge[ "StreamsTotalRx" ] = qwRxTotal;
-                oBridge[ "StreamsTotalTx" ] = qwTxTotal;
+                oBridge[ "StreamsTotalRx" ] =
+                    ( Json::UInt64 )qwRxTotal;
+                oBridge[ "StreamsTotalTx" ] =
+                    ( Json::UInt64 )qwTxTotal;
             }
 
             qwRxTotal = 0, qwTxTotal = 0;
