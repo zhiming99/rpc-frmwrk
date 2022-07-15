@@ -298,8 +298,10 @@ gint32 CFuseBdgeList::UpdateContent()
                     qwTxTotal += oVal[ "BytesSent" ].asUInt64();
                 }
                 oBridge[ "StreamsRelay" ] = oStreams;
-                oBridge[ "StreamsRelayTotalRx" ] = qwRxTotal;
-                oBridge[ "StreamsRelayTotalTx" ] = qwTxTotal;
+                oBridge[ "StreamsRelayTotalRx" ] =
+                    ( Json::UInt64 )qwRxTotal;
+                oBridge[ "StreamsRelayTotalTx" ] =
+                    ( Json::UInt64 )qwTxTotal;
             }
 
             timespec tv;
