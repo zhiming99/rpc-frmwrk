@@ -1680,6 +1680,13 @@ gint32 CK5AuthProxy::StartLogin(
             ret = NoTokenLogin();
         }
 
+        if( SUCCEEDED( ret ) )
+        {
+            std::string strSess;
+            GetSess( strSess );
+            DebugPrint( 0, "Sess hash is %s",
+                strSess.c_str() );
+        }
     }while( 0 );
 
     if( bHooked )

@@ -757,7 +757,8 @@ gint32 CRpcTcpBridgeAuth::ForwardRequest(
         ret = oIfCfg.GetStrProp(
             propSessHash, strHash );
 
-        if( SUCCEEDED( ret ) )
+        if( SUCCEEDED( ret ) &&
+            strHash.substr( 0, 2 ) == "AU" )
             bAuthed = true;
 
         ret = IsAuthRequest(
