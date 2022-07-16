@@ -205,6 +205,8 @@ gint32 CRpcTcpBridgeProxy::OnHandshakeComplete(
                 break;
         }
 
+        oIfCfg.CopyProp( propSessHash, pResp );
+
         CCfgOpener oReqCtx( pReqCtx );
         guint64 qwOriginTs = 0;
         ret = oReqCtx.GetQwordProp(
@@ -1746,17 +1748,6 @@ gint32 CRpcTcpBridge::OnPostStart(
             pContext, pMatch );
 
         this->m_pConnMgr.Clear();
-
-        CCfgOpenerObj oIfCfg( this );
-        ret = oIfCfg.GetStrProp(
-            propSessHash, m_strSess );
-        if( ERROR( ret ) )
-        {
-            GenSessHash( m_strSess );
-            ret = oIfCfg.SetStrProp(
-                propSessHash, m_strSess );
-        }
-        
 
     }while( 0 );
 
@@ -4997,6 +4988,14 @@ gint32 CRpcTcpBridge::SetupReqIrpFwrdEvt(
 gint32 CRpcTcpBridge::StartEx2(
     IEventSink* pCallback )
 {
+    gint32 ret = GenSessHash( m_strSess );
+    if( ERROR( ret ) )
+        return ret;
+
+    CCfgOpenerObj oIfCfg( this );
+    oIfCfg.SetStrProp(
+        propSessHash, m_strSess );
+
     return CRpcTcpBridgeShared::StartEx2(
         pCallback );
 }
@@ -5157,9 +5156,6 @@ gint32 CRpcTcpBridge::Handshake(
             oResp.Push( oParams.GetCfg() );
             m_oTs.SetBase( qwTs );
 
-            SetResponse(
-                pCallback, oResp.GetCfg() );
-
             if( IsRfcEnabled() )
             {
                 oParams.CopyProp( 
@@ -5198,6 +5194,9 @@ gint32 CRpcTcpBridge::Handshake(
                     ret = iRet;
             }
         }
+
+        if( !m_bHsFailed )
+            oResp.CopyProp( propSessHash, this );
 
         oResp[ propReturnValue ] = ret;
         SetResponse( pCallback, oResp.GetCfg() );

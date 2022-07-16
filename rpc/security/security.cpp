@@ -350,7 +350,8 @@ gint32 CRpcTcpBridgeAuth::SetSessHash(
         CCfgOpenerObj oIfCfg( this );
         ret = oIfCfg.GetStrProp(
             propSessHash, strHash1 );
-        if( SUCCEEDED( ret ) )
+        if( SUCCEEDED( ret ) &&
+            strHash1.substr( 0, 2 ) == "AU" )
         { 
             if( !strHash.empty() )
             {
@@ -2072,7 +2073,8 @@ gint32 CRpcTcpBridgeProxyAuth::SetSessHash(
         CCfgOpenerObj oIfCfg( this );
         ret = oIfCfg.GetStrProp(
             propSessHash, strHash1 );
-        if( SUCCEEDED( ret ) )
+        if( SUCCEEDED( ret ) &&
+            strHash1.substr( 0, 2 ) == "AU" )
         { 
             if( strHash.empty() )
             {

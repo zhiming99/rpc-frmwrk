@@ -362,6 +362,59 @@ gint32 CFuseDirectory::fs_releasedir(
     return STATUS_SUCCESS;
 }
 
+gint32 CFuseDirectory::FindSvcDir(
+    const stdstr& strName, DIR_SPTR& pObj )
+{
+    if( strName[ 0 ] == '/' )
+        return -EINVAL;
+
+    gint32 ret = 0; 
+    std::vector< DIR_SPTR > vecChildren;
+    GetChildren( vecChildren );
+    ret = -ENOENT;
+
+    while( vecChildren.size() )
+    {
+        auto child = vecChildren.front();
+        auto pDir = dynamic_cast
+            < CFuseDirectory* >( child.get() );
+        if( pDir == nullptr )
+        {
+            vecChildren.erase(
+                vecChildren.begin() );
+            continue;
+        }
+        auto pSd = dynamic_cast
+            < CFuseSvcDir* >( child.get() );
+
+        if( child->GetName() == strName )
+        {
+            if( pSd == nullptr )
+                break;
+
+            pObj = child;
+            ret = 0;
+            break;
+        }
+        if( pSd != nullptr )
+        {
+            vecChildren.erase(
+                vecChildren.begin() );
+            continue;
+        }
+        ret = pDir->FindSvcDir( strName, pObj );
+        if( ERROR( ret ) )
+        {
+            vecChildren.erase(
+                vecChildren.begin() );
+            continue;
+        }
+        break;
+    }
+
+    return ret;
+}
+
 gint32 CFuseFileEntry::fs_open(
     const char* path,
     fuse_file_info *fi )
@@ -1252,22 +1305,12 @@ gint32 CFuseCmdFile::fs_write_buf(
                 pSd = pParent->GetChild( strSvc );
             else
             {
-                std::vector< DIR_SPTR > vecConns;
-                pParent->GetChildren( vecConns );
-                stdstr strPrefix = CONN_DIR_PREFIX;
-                for( auto& elem : vecConns )
-                {
-                    auto pDir = dynamic_cast
-                        < CFuseDirectory* >( elem.get() );
-                    if( pDir == nullptr )
-                        continue;
-                    stdstr strName = pDir->GetName();
-                    if( strName.substr( 0, strPrefix.size() ) !=
-                        strPrefix )
-                        continue;
-                    pSd = pDir->GetChild( strSvc );
-                    break;
-                }
+                DIR_SPTR pObj;
+                ret = pParent->FindSvcDir( strSvc, pObj );
+                if( ERROR( ret ) )
+                    pSd = nullptr;
+                else
+                    pSd = pObj.get();
             }
             if( pSd == nullptr && strCmd == "reload" )
             {

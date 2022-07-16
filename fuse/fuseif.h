@@ -564,6 +564,9 @@ class CFuseDirectory : public CFuseObjBase
         const char *,
         fuse_file_info*,
         bool bReload ) override;
+
+    gint32 FindSvcDir(
+        const stdstr&, DIR_SPTR& pObj );
 };
 
 class CFuseRootDir : public CFuseDirectory

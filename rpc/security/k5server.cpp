@@ -1178,6 +1178,13 @@ gint32 CK5AuthServer::Login(
             bContinue = true;
             ret = 0;
         }
+        else if( SUCCEEDED( ret ) )
+        {
+            stdstr strSess;
+            ret = GetSess( dwPortId, strSess );
+            if( SUCCEEDED( ret ) )
+                oResp[ propSessHash ] = strSess;
+        }
         oResp[ propReturnValue ] = ret;
         oResp[ propContinue ] = bContinue;
 
