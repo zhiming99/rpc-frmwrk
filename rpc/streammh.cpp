@@ -743,10 +743,12 @@ gint32 CIfUxSockTransRelayTaskMH::RunTask()
 
             CRpcTcpBridgeProxyStream* pIf =
                 GetOwnerIf();
-            if( pIf != nullptr )
+            if( pIf != nullptr &&
+                byToken == tokData )
             {
                 pIf->IncTxBytes(
-                    pPayload->size() );
+                    pPayload->size() -
+                    UXPKT_HEADER_SIZE );
             }
 
             // remove the packet from the queue
@@ -858,10 +860,12 @@ gint32 CIfTcpStmTransTaskMH::RunTask()
             {
                 CRpcTcpBridgeProxyStream* pIf =
                     GetOwnerIf();
-                if( pIf != nullptr )
+                if( pIf != nullptr &&
+                    byToken == tokData )
                 {
                     pIf->IncTxBytesRemote(
-                        pPayload->size() );
+                        pPayload->size() -
+                        UXPKT_HEADER_SIZE );
                 }
             }
         }
@@ -885,7 +889,7 @@ gint32 CIfTcpStmTransTaskMH::PostEvent(
         return -EINVAL;
 
     gint32 ret = 0;
-    BufPtr pNewBuf( true );
+    BufPtr pNewBuf;
     guint8 byToken = pBuf->ptr()[ 0 ];
 
     CIfUxRelayTaskHelperMH oHelper( this );
@@ -922,6 +926,7 @@ gint32 CIfTcpStmTransTaskMH::PostEvent(
     if( ERROR( ret ) )
         return ret;
 
+    pNewBuf = pBuf;
     oHelper.PostTcpStmEvent(
         byToken, pNewBuf );
 
@@ -996,6 +1001,7 @@ gint32 CIfUxListeningRelayTaskMH::PostEvent(
         {
             ret = oHelper.ForwardToRemote(
                 byToken, pBuf );
+            break;
         }
     case tokError:
         {
