@@ -1902,56 +1902,6 @@ gint32 gss_sess_hash_partial(
     return ret;
 }
 
-gint32 CK5AuthProxy::GenSessHash(
-    gss_ctx_id_t gssctx,
-    std::string& strSess )
-{
-    gint32 ret = 0;
-
-    do{
-        BufPtr pBuf( true );
-        ret = gss_sess_hash_partial(
-            gssctx, pBuf );
-        if( ERROR( ret ) )
-            break;
-
-        CCfgOpenerObj oIfCfg( this );
-        IConfigDb* pConn;
-        ret = oIfCfg.GetPointer(
-            propConnParams, pConn );
-        if( ERROR( ret ) )
-            break;
-
-        ret = AppendConnParams( pConn, pBuf );
-        if( ERROR( ret ) )
-            break;
-
-        if( m_qwSalt == 0 )
-        {
-            ret = ERROR_STATE;
-            break;
-        }
-
-        guint64 qwSalt = htonll( m_qwSalt );
-        pBuf->Append( ( char* )&qwSalt,
-            sizeof( qwSalt ) );
-
-        stdstr strRet;
-        ret = gen_sess_hash( pBuf, strRet );
-        if( ERROR( ret ) )
-            break;
-
-        strSess = "AU";
-        strSess += strRet;
-
-        DebugPrint( 0, "Sess hash is %s",
-            strSess.c_str() );
-
-    }while( 0 );
-
-    return ret;
-}
-
 gint32 CKdcChannelProxy::InitUserFuncs()
 {
     BEGIN_IFPROXY_MAP( IAuthenticate, false );

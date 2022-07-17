@@ -2026,6 +2026,9 @@ gint32 CRpcTcpBridgeProxy::RefreshReqLimit(
     pGrpRfc->SetLimit(
         dwMaxReqs, RFC_MAX_PENDINGS );
 
+    CCfgOpenerObj oIfCfg( this );
+    oIfCfg.SetIntProp( propMaxReqs, dwMaxReqs );
+
     CRpcRouter* pRouter = GetParent();
     if( pRouter->HasReqForwarder() )
     {

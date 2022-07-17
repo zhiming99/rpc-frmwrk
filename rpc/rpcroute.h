@@ -1727,6 +1727,15 @@ class CRpcRouter :
     gint32 SubscribeEvents();
     gint32 UnsubscribeEvents();
 
+    inline void GetBridgeProxies(
+        std::vector< InterfPtr >& vecProxies )
+    {
+        CStdRMutex oRouterLock( GetLock() );
+        for( auto& elem : m_mapPid2BdgeProxies )
+        { vecProxies.push_back( elem.second ); }
+        return;
+    }
+
     protected:
     virtual gint32 OnRmtSvrOffline(
         IEventSink* pCallback,

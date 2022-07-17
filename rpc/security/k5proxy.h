@@ -278,10 +278,6 @@ class CK5AuthProxy :
         const std::string& strUserName,
         const std::string& strSvcName );
 
-    gint32 GenSessHash(
-        gss_ctx_id_t gssctx,
-        std::string& strSess );
-
     gint32 DeleteSecCtx();
     gint32 NoTokenLogin();
 

@@ -114,6 +114,25 @@ gint32 DumpStream(
                 ( Json::UInt64 )qwTxBytes;
             oStmInfo[ "CanSend" ] =
                 pProxy->CanSend();
+            CRpcTcpBridgeProxyStream* pbpstm =
+                pUxStream;
+            if( pbpstm != nullptr )
+            {
+                oStmInfo[ "BridgeStreamId" ] =
+                    pbpstm->GetStreamId( false );
+                oStmInfo[ "BridgeProxyStreammId" ] =
+                    pbpstm->GetStreamId( true );
+
+                CRpcTcpBridgeProxy* pbp =
+                    pbpstm->GetBridgeProxy();
+                CCfgOpenerObj oIfCfg( pbp );
+                guint32 dwPortId = 0;
+                ret = oIfCfg.GetIntProp(
+                    propPortId, dwPortId );
+                if( SUCCEEDED( ret ) )
+                    oStmInfo[ "ProxyPortId" ] =
+                        ( Json::UInt )dwPortId;
+            }
         }
         CCfgOpenerObj oIfCfg( pSvc );
         IConfigDb* pDesc;
@@ -339,6 +358,174 @@ gint32 CFuseBdgeList::UpdateContent()
     return ret;
 }
 
+gint32 CFuseBdgeProxyList::UpdateContent() 
+{
+    gint32 ret = 0;
+    do{
+        Json::StreamWriterBuilder oBuilder;
+        oBuilder["commentStyle"] = "None";
+        oBuilder["indentation"] = "   ";
+        Json::Value oVal( Json::objectValue);
+
+        CRpcRouterBridge* pRouter =
+            GetUserObj();
+        if( pRouter == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        CStatCountersServer* psc =
+            GetUserObj();
+
+        std::vector< InterfPtr > vecProxies;
+        pRouter->GetBridgeProxies( vecProxies );
+
+        oVal[ "NumConnections" ] =
+            ( guint32 )vecProxies.size();
+
+        Json::Value oArray( Json::arrayValue );
+        guint32 dwVal = 0;
+        for( auto& elem : vecProxies )
+        {
+            Json::Value oProxy;
+            CRpcTcpBridgeProxy* pProxy = elem;
+            CStatCountersProxy* pStat = elem;
+            CStreamProxyRelay* pstm = elem;
+
+            CCfgOpenerObj oIfCfg(
+                ( CObjBase* )elem );
+            stdstr strVal;
+            bool bVal;
+            ret = oIfCfg.GetStrProp(
+                propSessHash, strVal );
+            if( SUCCEEDED( ret ) )
+                oProxy[ "SessionHash" ] = strVal;
+                
+            IConfigDb* pConn;
+            ret = oIfCfg.GetPointer(
+                propConnParams, pConn );
+            if( SUCCEEDED( ret ) )
+            {
+                oProxy[ "ConnParams" ] =
+                    DumpConnParams( pConn );
+            }
+
+            ret = oIfCfg.GetIntProp(
+                propPortId, dwVal );
+            if( SUCCEEDED( ret ) )
+                oProxy[ JSON_ATTR_PORTID ] = dwVal;
+
+            ret = oIfCfg.GetStrProp(
+                propNodeName, strVal );
+            if( SUCCEEDED( ret ) )
+                oProxy[ JSON_ATTR_NODENAME ] = strVal;
+
+            stdstr strState = IfStateToString(
+                elem->GetState() );
+
+            oProxy[ "IfStat" ] = strState;
+            bVal = pProxy->IsRfcEnabled();
+
+            oProxy[ "RfcEnabled" ] = bVal;
+
+            if( bVal )
+            {
+                ret = oIfCfg.GetIntProp(
+                    propMaxReqs, dwVal );
+                if( SUCCEEDED( ret ) )
+                    oProxy[ "MaxReqs" ] = dwVal;
+
+                ret = oIfCfg.GetIntProp(
+                    propMaxPendings, dwVal );
+                if( SUCCEEDED( ret ) )
+                    oProxy[ "MaxPendings" ] = dwVal;
+            }
+            if( pStat )
+            {
+                ret = pStat->GetCounter2(
+                    propMsgCount, dwVal );
+                if( SUCCEEDED( ret ) )
+                    oProxy[ "InRequests" ] = dwVal;
+
+                ret = pStat->GetCounter2(
+                    propMsgRespCount, dwVal );
+                if( SUCCEEDED( ret ) )
+                    oProxy[ "OutResponses" ] = dwVal;
+            }
+            TaskGrpPtr pGrp;
+            if( !pProxy->IsRfcEnabled() )
+            {
+                ret = pProxy->GetParallelGrp( pGrp );
+            }
+            else
+            {
+                ret = pProxy->GetGrpRfc( pGrp );
+                CIfParallelTaskGrpRfc* pGrpRfc = pGrp;
+                dwVal = pGrpRfc->GetTaskAdded();
+                oProxy[ "NumTaskAdded" ] = dwVal;
+                dwVal = pGrpRfc->GetTaskRejected();
+                oProxy[ "NumTaskRejected" ] = dwVal;
+            }
+
+            if( SUCCEEDED( ret ) )
+            {
+                CIfParallelTaskGrp* pParaGrp = pGrp;
+                dwVal = pParaGrp->GetTaskCount();
+                guint32 dwPending =
+                    pParaGrp->GetPendingCountLocked();
+
+                oProxy[ "ActiveTasks" ] =
+                    dwVal - dwPending;
+                oProxy[ "PendingTasks" ] =
+                    dwPending;
+            }
+
+            IStream* ps = pstm;
+            dwVal = ps->GetStreamCount();
+            oProxy[ "NumStreams" ] = dwVal;
+            guint64 qwRxTotal = 0, qwTxTotal = 0;
+            if( dwVal > 0 )
+            {
+                Json::Value oStreams( Json::arrayValue );
+                std::vector< InterfPtr > vecUxStms;
+                ps->EnumStreams( vecUxStms );
+                for( auto& elem : vecUxStms )
+                {
+                    Json::Value oVal( Json::objectValue );
+                    DumpStream( elem, oVal );
+                    oStreams.append( oVal  );
+                    qwRxTotal += oVal[ "BytesReceived" ].asUInt64();
+                    qwTxTotal += oVal[ "BytesSent" ].asUInt64();
+                }
+                oProxy[ "Streams" ] = oStreams;
+                oProxy[ "StreamsTotalRx" ] =
+                    ( Json::UInt64 )qwRxTotal;
+                oProxy[ "StreamsTotalTx" ] =
+                    ( Json::UInt64 )qwTxTotal;
+            }
+
+            timespec tv;
+            clock_gettime( CLOCK_REALTIME, &tv );
+
+            guint32 dwts =
+                tv.tv_sec - pProxy->GetStartSec();
+
+            oProxy[ "UpTimeSec" ] =
+                ( Json::UInt )dwts;
+
+            oArray.append( oProxy );
+        }
+
+        oVal[ "Connections" ] = oArray;
+        m_strContent = Json::writeString(
+            oBuilder, oVal );
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 AddFilesAndDirsBdge(
     CRpcServices* pSvc )
 {
@@ -374,13 +561,22 @@ gint32 AddFilesAndDirsBdge(
             break;
         }
 
-        auto pList = new CFuseBdgeList( nullptr );
+        ObjPtr pObj( pRouter );
+        CFuseObjBase* pList =
+            new CFuseBdgeList( nullptr );
         pList->SetMode( S_IRUSR );
         pList->DecRef();
-        ObjPtr pObj( pRouter );
         pList->SetUserObj( pObj );
 
         auto pEnt = DIR_SPTR( pList );
+        pSvr->Add2UserDir( pEnt );
+
+        pList = new CFuseBdgeProxyList( nullptr );
+        pList->SetMode( S_IRUSR );
+        pList->DecRef();
+        pList->SetUserObj( pObj );
+
+        pEnt = DIR_SPTR( pList );
         pSvr->Add2UserDir( pEnt );
 
     }while( 0 );
