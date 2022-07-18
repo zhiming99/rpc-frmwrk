@@ -1109,6 +1109,11 @@ gint32 CIfUxListeningRelayTask::PostEvent(
             break;
         }
     case tokData:
+        {
+            guint32 dwSize = pBuf->size() -
+                UXPKT_HEADER_SIZE;
+            oHelper.IncRxBytes( dwSize );
+        }
     case tokProgress:
         {
             pBuf->SetOffset( pBuf->offset() +
@@ -2462,6 +2467,44 @@ gint32 CIfUxRelayTaskHelper::PauseReading(
         CUnixSockStmProxyRelay*
             pUxStm = ObjPtr( m_pSvc );
         ret = pUxStm->PauseReading( bPause );
+    }
+    return ret;
+}
+
+EnumFCState CIfUxRelayTaskHelper::IncRxBytes(
+    guint32 dwSize )
+{
+    EnumFCState ret;
+    if( m_pSvc->IsServer() )
+    {
+        CUnixSockStmServerRelay*
+            pUxStm = ObjPtr( m_pSvc );
+        ret = pUxStm->IncRxBytes( dwSize );
+    }
+    else
+    {
+        CUnixSockStmProxyRelay*
+            pUxStm = ObjPtr( m_pSvc );
+        ret = pUxStm->IncRxBytes( dwSize );
+    }
+    return ret;
+}
+
+EnumFCState CIfUxRelayTaskHelper::IncTxBytes(
+    guint32 dwSize )
+{
+    EnumFCState ret;
+    if( m_pSvc->IsServer() )
+    {
+        CUnixSockStmServerRelay*
+            pUxStm = ObjPtr( m_pSvc );
+        ret = pUxStm->IncTxBytes( dwSize );
+    }
+    else
+    {
+        CUnixSockStmProxyRelay*
+            pUxStm = ObjPtr( m_pSvc );
+        ret = pUxStm->IncTxBytes( dwSize );
     }
     return ret;
 }

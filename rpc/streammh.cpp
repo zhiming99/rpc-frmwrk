@@ -512,16 +512,12 @@ gint32 CRpcTcpBridgeProxyStream::OnPostStop(
 gint32 CRpcTcpBridgeProxyStream::OnDataReceived(
     CBuffer* pBuf )
 {
-    this->m_oFlowCtrl.IncRxBytes(
-        pBuf->size() - UXPKT_HEADER_SIZE );
     return 0;
 }
 
 gint32 CRpcTcpBridgeProxyStream::OnDataReceivedRemote(
     CBuffer* pBuf )
 {
-    this->m_oFlowCtrlRmt.IncRxBytes(
-        pBuf->size() - UXPKT_HEADER_SIZE );
     return 0;
 }
 
@@ -895,9 +891,14 @@ gint32 CIfTcpStmTransTaskMH::PostEvent(
     CIfUxRelayTaskHelperMH oHelper( this );
     switch( byToken )
     {
+    case tokData:
+        {
+            auto pIf = GetOwnerIf();
+            pIf->IncRxBytesRemote( pBuf->size() -
+                UXPKT_HEADER_SIZE );
+        }
     case tokPing:
     case tokPong:
-    case tokData:
     case tokProgress:
         {
             ret = oHelper.ForwardToLocal(
@@ -994,9 +995,13 @@ gint32 CIfUxListeningRelayTaskMH::PostEvent(
     BufPtr pNewBuf = pBuf;
     switch( byToken )
     {
+    case tokData:
+        {
+            oHelper.IncRxBytes( pBuf->size() -
+                UXPKT_HEADER_SIZE );
+        }
     case tokPing:
     case tokPong:
-    case tokData:
     case tokProgress:
         {
             ret = oHelper.ForwardToRemote(

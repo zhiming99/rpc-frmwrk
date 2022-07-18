@@ -169,11 +169,11 @@ class CRpcTcpBridgeProxyStream :
 
     virtual gint32 OnFlowControl();
 
-    inline gint32 IncTxBytes( guint32 dwSize )
-    { return m_oFlowCtrl.IncTxBytes( dwSize ); }
-
     inline gint32 IncTxBytesRemote( guint32 dwSize )
     { return m_oFlowCtrlRmt.IncTxBytes( dwSize ); }
+
+    inline gint32 IncRxBytesRemote( guint32 dwSize )
+    { return m_oFlowCtrlRmt.IncRxBytes( dwSize ); }
 
     using CUnixSockStream::GetParent;
     inline InterfPtr GetBridge() const

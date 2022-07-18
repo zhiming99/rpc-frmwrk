@@ -1168,7 +1168,6 @@ struct CUnixSockStmRelayBase :
 
     virtual gint32 OnDataReceived( CBuffer* pBuf )
     {
-        this->m_oFlowCtrl.IncRxBytes( pBuf );
         return 0;
     }
 
@@ -1346,13 +1345,18 @@ struct CUnixSockStmRelayBase :
             ret = this->SubmitRequest(
                 oParams.GetCfg(), pCallback, true );
 
-             this->m_oFlowCtrl.IncTxBytes( pBuf );
+            IncTxBytes( pBuf->size() );
 
         }while( 0 );
 
         return ret;
     }
 
+    inline EnumFCState IncTxBytes( guint32 dwSize )
+    { return this->m_oFlowCtrl.IncTxBytes( dwSize ); }
+
+    inline EnumFCState IncRxBytes( guint32 dwSize )
+    { return this->m_oFlowCtrl.IncRxBytes( dwSize ); }
 };
 
 class CUnixSockStmServerRelay :
@@ -1489,6 +1493,9 @@ struct CIfUxRelayTaskHelper
         IEventSink* pCallback );
 
     gint32 PauseReading( bool bPause );
+
+    EnumFCState IncRxBytes( guint32 dwSize );
+    EnumFCState IncTxBytes( guint32 dwSize );
 };
 
 class CIfUxSockTransRelayTask :

@@ -95,9 +95,9 @@ gint32 DumpStream(
             guint64 qwRxBytes, qwTxBytes;
             pSvr->GetBytesTransfered(
                 qwRxBytes, qwTxBytes );
-            oStmInfo[ "BytesReceived" ] =
+            oStmInfo[ "BytesToServer" ] =
                 ( Json::UInt64 )qwRxBytes;
-            oStmInfo[ "BytesSent" ] =
+            oStmInfo[ "BytesToClient" ] =
                 ( Json::UInt64 )qwTxBytes;
             oStmInfo[ "CanSend" ] =
                 pSvr->CanSend();
@@ -108,9 +108,9 @@ gint32 DumpStream(
             guint64 qwRxBytes, qwTxBytes;
             pProxy->GetBytesTransfered(
                 qwRxBytes, qwTxBytes );
-            oStmInfo[ "BytesReceived" ] =
+            oStmInfo[ "BytesToServer" ] =
                 ( Json::UInt64 )qwRxBytes;
-            oStmInfo[ "BytesSent" ] =
+            oStmInfo[ "BytesToClient" ] =
                 ( Json::UInt64 )qwTxBytes;
             oStmInfo[ "CanSend" ] =
                 pProxy->CanSend();
@@ -289,8 +289,8 @@ gint32 CFuseBdgeList::UpdateContent()
                     Json::Value oVal( Json::objectValue );
                     DumpStream( elem, oVal );
                     oStreams.append( oVal  );
-                    qwRxTotal += oVal[ "BytesReceived" ].asUInt64();
-                    qwTxTotal += oVal[ "BytesSent" ].asUInt64();
+                    qwRxTotal += oVal[ "BytesToServer" ].asUInt64();
+                    qwTxTotal += oVal[ "BytesToClient" ].asUInt64();
                 }
                 oBridge[ "Streams" ] = oStreams;
                 oBridge[ "StreamsTotalRx" ] =
@@ -313,8 +313,8 @@ gint32 CFuseBdgeList::UpdateContent()
                     Json::Value oVal( Json::objectValue );
                     DumpStream( elem, oVal );
                     oStreams.append( oVal  );
-                    qwRxTotal += oVal[ "BytesReceived" ].asUInt64();
-                    qwTxTotal += oVal[ "BytesSent" ].asUInt64();
+                    qwRxTotal += oVal[ "BytesToServer" ].asUInt64();
+                    qwTxTotal += oVal[ "BytesToClient" ].asUInt64();
                 }
                 oBridge[ "StreamsRelay" ] = oStreams;
                 oBridge[ "StreamsRelayTotalRx" ] =
@@ -367,16 +367,12 @@ gint32 CFuseBdgeProxyList::UpdateContent()
         oBuilder["indentation"] = "   ";
         Json::Value oVal( Json::objectValue);
 
-        CRpcRouterBridge* pRouter =
-            GetUserObj();
+        CRpcRouter* pRouter = GetUserObj();
         if( pRouter == nullptr )
         {
             ret = -EFAULT;
             break;
         }
-
-        CStatCountersServer* psc =
-            GetUserObj();
 
         std::vector< InterfPtr > vecProxies;
         pRouter->GetBridgeProxies( vecProxies );
@@ -495,8 +491,8 @@ gint32 CFuseBdgeProxyList::UpdateContent()
                     Json::Value oVal( Json::objectValue );
                     DumpStream( elem, oVal );
                     oStreams.append( oVal  );
-                    qwRxTotal += oVal[ "BytesReceived" ].asUInt64();
-                    qwTxTotal += oVal[ "BytesSent" ].asUInt64();
+                    qwRxTotal += oVal[ "BytesToServer" ].asUInt64();
+                    qwTxTotal += oVal[ "BytesToClient" ].asUInt64();
                 }
                 oProxy[ "Streams" ] = oStreams;
                 oProxy[ "StreamsTotalRx" ] =
@@ -586,5 +582,51 @@ gint32 AddFilesAndDirsBdge(
 
 gint32 AddFilesAndDirsReqFwdr(
     CRpcServices* pSvc )
-{ return 0; }
+{
+    gint32 ret = 0;
+    do{
+        CRpcRouterManagerImpl* prmgr =
+            ObjPtr( pSvc );
+        if( prmgr == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+ 
+        std::vector< InterfPtr > vecRts;
+        prmgr->GetRouters( vecRts );
+        if( vecRts.empty() )
+            break;
+
+        CRpcRouterReqFwdr* pRouter = nullptr;
+        for( auto& elem : vecRts )
+        {
+            pRouter = elem;
+            if( pRouter == nullptr )
+                continue;
+            break;
+        }
+
+        ObjPtr pObj( pRouter );
+        InterfPtr pRootIf = GetRootIf();
+        CFuseRootProxy* pProxy = pRootIf;
+        if( pProxy == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        auto pList =
+            new CFuseBdgeProxyList( nullptr );
+        pList->SetMode( S_IRUSR );
+        pList->DecRef();
+        pList->SetUserObj( pObj );
+
+        auto pEnt = DIR_SPTR( pList );
+        pProxy->Add2UserDir( pEnt );
+
+    }while( 0 );
+
+    return ret;
+}
 
