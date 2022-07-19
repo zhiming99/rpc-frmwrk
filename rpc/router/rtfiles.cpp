@@ -323,24 +323,23 @@ gint32 CFuseBdgeList::UpdateContent()
                     ( Json::UInt64 )qwTxTotalR;
             }
             pStat->GetCounter2( propRxBytes, qwVal );
-            oBridge[ "BytesThruToCli" ] =
-                qwRxTotalR + qwRxTotal + qwVal;
+            oBridge[ "BytesThruToCli" ] = ( Json::UInt64 )
+                ( qwRxTotalR + qwRxTotal + qwVal );
 
             qwRouterRx += 
                 qwRxTotalR + qwRxTotal + qwVal;
 
             qwVal = 0;
             pStat->GetCounter2( propTxBytes, qwVal );
-            oBridge[ "BytesThruToSvr" ] =
-                qwTxTotalR + qwTxTotal + qwVal;
+            oBridge[ "BytesThruToSvr" ] = ( Json::UInt64 )
+                ( qwTxTotalR + qwTxTotal + qwVal );
 
             timespec tv;
             clock_gettime( CLOCK_REALTIME, &tv );
             guint32 dwts = tv.tv_sec -
                 pBridge->GetStartSec();
 
-            oBridge[ "UpTimeSec" ] =
-                ( Json::UInt )dwts;
+            oBridge[ "UpTimeSec" ] = dwts;
 
             oArray.append( oBridge );
 
@@ -352,12 +351,12 @@ gint32 CFuseBdgeList::UpdateContent()
         psc->GetCounter2( propRxBytes, qwVal );
         qwRouterRx += qwVal;
         oVal[ "TotalBytesToCli" ] =
-            qwRouterRx + qwVal;
+            ( Json::UInt64 )( qwRouterRx + qwVal );
 
         qwVal = 0;
         psc->GetCounter2( propTxBytes, qwVal );
         oVal[ "TotalBytesToSvr" ] =
-            qwRouterTx + qwVal;
+            ( Json::UInt64 )( qwRouterTx + qwVal );
         
         ret = psc->GetCounter2(
             propMsgCount, dwVal );
@@ -546,8 +545,7 @@ gint32 CFuseBdgeProxyList::UpdateContent()
             guint32 dwts =
                 tv.tv_sec - pProxy->GetStartSec();
 
-            oProxy[ "UpTimeSec" ] =
-                ( Json::UInt )dwts;
+            oProxy[ "UpTimeSec" ] = dwts;
 
             oArray.append( oProxy );
         }
@@ -557,13 +555,13 @@ gint32 CFuseBdgeProxyList::UpdateContent()
             CStatCountersServer* psc = GetUserObj();
             qwVal = 0;
             psc->GetCounter2( propRxBytes, qwVal );
-            oVal[ "TotalBytesToSvr" ] =
-                qwRouterRx + qwVal;
+            oVal[ "TotalBytesToSvr" ] = ( Json::UInt64 )
+                ( qwRouterRx + qwVal );
 
             qwVal = 0;
             psc->GetCounter2( propTxBytes, qwVal );
-            oVal[ "TotalBytesToCli" ] =
-                qwRouterTx + qwVal;
+            oVal[ "TotalBytesToCli" ] = ( Json::UInt64 )
+                ( qwRouterTx + qwVal );
         }
 
         oVal[ "Connections" ] = oArray;
