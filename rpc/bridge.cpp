@@ -1978,7 +1978,7 @@ gint32 CRpcTcpBridgeProxy::OnPostStop(
         if( psc == nullptr || ppsc == nullptr )
             break;
 
-        guint64 qwRx, qwTx, qwVal;
+        guint64 qwRx = 0, qwTx = 0, qwVal = 0;
 
         psc->GetCounter2(
             propRxBytes, qwRx );
@@ -1991,6 +1991,7 @@ gint32 CRpcTcpBridgeProxy::OnPostStop(
         ppsc->SetCounter(
             propRxBytes, qwVal );
 
+        qwRx = 0, qwTx = 0, qwVal = 0;
         psc->GetCounter2(
             propTxBytes, qwTx );
 
@@ -5344,7 +5345,7 @@ gint32 CRpcTcpBridge::OnPostStop(
         if( psc == nullptr || ppsc == nullptr )
             break;
 
-        guint64 qwRx, qwTx, qwVal;
+        guint64 qwRx = 0, qwTx = 0, qwVal = 0;
 
         psc->GetCounter2(
             propRxBytes, qwRx );
@@ -5357,6 +5358,7 @@ gint32 CRpcTcpBridge::OnPostStop(
         ppsc->SetCounter(
             propRxBytes, qwVal );
 
+        qwRx = 0, qwTx = 0, qwVal = 0;
         psc->GetCounter2(
             propTxBytes, qwTx );
 
