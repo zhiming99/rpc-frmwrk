@@ -500,6 +500,19 @@ class CStreamProxyRelay :
     gint32 OnConnected( HANDLE hChannel ) override
     { return 0; }
 
+    using super::OnPostStart;
+    gint32 OnPostStart(
+        IEventSink* pContext ) override
+    {
+        CStatCountersProxy* psc = ObjPtr( this );    
+        if( psc == nullptr )
+            return -EFAULT;
+        psc->SetCounter(
+            propRxBytes, ( guint64 )0 );
+        psc->SetCounter(
+            propTxBytes, ( guint64 )0 );
+        return 0;
+    }
 };
 
 class CIfStartUxSockStmRelayTask :
@@ -1238,7 +1251,7 @@ struct CUnixSockStmRelayBase :
     }
 
     virtual gint32 OnPostStart(
-        IEventSink* pContext )
+        IEventSink* pContext ) override
     {
         gint32 ret = 0;
 
@@ -1307,8 +1320,74 @@ struct CUnixSockStmRelayBase :
         return ret;
     }
 
+    gint32 ReportByteStat()
+    {
+        gint32 ret = 0;
+        do{
+            InterfPtr pParent;
+            this->GetParent( pParent );
+            if( pParent.IsEmpty() )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            guint64 qwRx, qwTx, qwVal;
+            this->GetBytesTransfered(
+                qwRx, qwTx );
+
+            if( qwRx == 0 && qwTx == 0 )
+                break;
+
+            if( pParent->IsServer() )
+            {
+                CStatCountersServer* psc =
+                    pParent;
+
+                psc->GetCounter2(
+                    propRxBytes, qwVal );
+                qwVal += qwRx;
+
+                psc->SetCounter(
+                    propRxBytes, qwVal );
+
+                psc->GetCounter2(
+                    propTxBytes, qwVal );
+
+                qwVal += qwTx;
+
+                psc->SetCounter(
+                    propTxBytes, qwVal );
+            }
+            else
+            {
+                CStatCountersProxy* psc =
+                    pParent;
+
+                psc->GetCounter2(
+                    propRxBytes, qwVal );
+                qwVal += qwRx;
+
+                psc->SetCounter(
+                    propRxBytes, qwVal );
+
+                psc->GetCounter2(
+                    propTxBytes, qwVal );
+
+                qwVal += qwTx;
+
+                psc->SetCounter(
+                    propTxBytes, qwVal );
+            }
+
+        }while( 0 );
+
+        return ret;
+    }
+
     virtual gint32 OnPreStop( IEventSink* pCallback ) 
     {
+        ReportByteStat();
+
         super::OnPreStop( pCallback );
 
         if( !m_pWrTcpStmTask.IsEmpty() )

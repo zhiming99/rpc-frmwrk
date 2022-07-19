@@ -6202,6 +6202,9 @@ gint32 CStatCountersServer2::DecCounter(
     case propEventCount:
         m_dwEvtCount--;
         break;
+    case propRxBytes:
+    case propTxBytes:
+        return -ENOTSUP;
     default:
         return super::DecCounter( iProp );
     }
@@ -6225,6 +6228,24 @@ gint32 CStatCountersServer2::SetCounter(
     default:
         return super::SetCounter(
             iProp, dwVal );
+    }
+    return 0;
+}
+
+gint32 CStatCountersServer2::SetCounter(
+    EnumPropId iProp, guint64 qwVal )
+{
+    switch( iProp )
+    {
+    case propRxBytes:
+        m_qwRxBytes = qwVal;
+        break;
+    case propTxBytes:
+        m_qwTxBytes = qwVal;
+        break;
+    default:
+        return super::SetCounter(
+            iProp, qwVal );
     }
     return 0;
 }
@@ -6271,6 +6292,24 @@ gint32 CStatCountersServer2::GetCounter2(
     return 0;
 }
 
+gint32 CStatCountersServer2::GetCounter2(
+    guint32 iProp, guint64& qwVal )
+{
+    switch( iProp )
+    {
+    case propRxBytes:
+        qwVal = m_qwRxBytes;
+        break;
+    case propTxBytes:
+        qwVal = m_qwTxBytes;
+        break;
+    default:
+        return super::GetCounter2(
+            iProp, qwVal );
+    }
+    return 0;
+}
+
 gint32 CStatCountersServer2::GetCounters(
     CfgPtr& pCfg )
 {
@@ -6284,6 +6323,10 @@ gint32 CStatCountersServer2::GetCounters(
         ( guint32 )m_dwMsgRespCount;
     oCfg[ propEventCount ] =
         ( guint32 )m_dwEvtCount;
+    oCfg[ propRxBytes ] =
+        ( guint64 )m_qwRxBytes;
+    oCfg[ propTxBytes ] =
+        ( guint64 )m_qwTxBytes;
     return 0;
 }
 

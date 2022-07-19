@@ -968,12 +968,12 @@ DECLARE_AGGREGATED_PROXY(
 DECLARE_AGGREGATED_SERVER(
     CRpcReqForwarderAuthImpl,
     CRpcReqForwarderAuth,
-    CStatCountersServer ); 
+    CStatCountersServer2 ); 
 
 DECLARE_AGGREGATED_SERVER(
     CRpcTcpBridgeAuthImpl,
     CRpcTcpBridgeAuth,
-    CStatCountersServer,
+    CStatCountersServer2,
     CStreamServerRelay,
     CStreamServerRelayMH ); 
 

@@ -108,9 +108,9 @@ gint32 DumpStream(
             guint64 qwRxBytes, qwTxBytes;
             pProxy->GetBytesTransfered(
                 qwRxBytes, qwTxBytes );
-            oStmInfo[ "BytesToServer" ] =
-                ( Json::UInt64 )qwRxBytes;
             oStmInfo[ "BytesToClient" ] =
+                ( Json::UInt64 )qwRxBytes;
+            oStmInfo[ "BytesToServer" ] =
                 ( Json::UInt64 )qwTxBytes;
             oStmInfo[ "CanSend" ] =
                 pProxy->CanSend();
@@ -182,6 +182,7 @@ gint32 CFuseBdgeList::UpdateContent()
 
         Json::Value oArray( Json::arrayValue );
         guint32 dwVal = 0;
+        guint64 qwRouterRx = 0, qwRouterTx = 0, qwVal = 0;
         for( auto& elem : vecBdges )
         {
             Json::Value oBridge;
@@ -233,18 +234,17 @@ gint32 CFuseBdgeList::UpdateContent()
                 if( SUCCEEDED( ret ) )
                     oBridge[ "MaxPendings" ] = dwVal;
             }
-            if( pStat )
-            {
-                ret = pStat->GetCounter2(
-                    propMsgCount, dwVal );
-                if( SUCCEEDED( ret ) )
-                    oBridge[ "InRequests" ] = dwVal;
 
-                ret = pStat->GetCounter2(
-                    propMsgRespCount, dwVal );
-                if( SUCCEEDED( ret ) )
-                    oBridge[ "OutResponses" ] = dwVal;
-            }
+            ret = pStat->GetCounter2(
+                propMsgCount, dwVal );
+            if( SUCCEEDED( ret ) )
+                oBridge[ "InRequests" ] = dwVal;
+
+            ret = pStat->GetCounter2(
+                propMsgRespCount, dwVal );
+            if( SUCCEEDED( ret ) )
+                oBridge[ "OutResponses" ] = dwVal;
+
             TaskGrpPtr pGrp;
             if( !pBridge->IsRfcEnabled() )
             {
@@ -289,17 +289,17 @@ gint32 CFuseBdgeList::UpdateContent()
                     Json::Value oVal( Json::objectValue );
                     DumpStream( elem, oVal );
                     oStreams.append( oVal  );
-                    qwRxTotal += oVal[ "BytesToServer" ].asUInt64();
-                    qwTxTotal += oVal[ "BytesToClient" ].asUInt64();
+                    qwRxTotal += oVal[ "BytesToClient" ].asUInt64();
+                    qwTxTotal += oVal[ "BytesToServer" ].asUInt64();
                 }
                 oBridge[ "Streams" ] = oStreams;
-                oBridge[ "StreamsTotalRx" ] =
+                oBridge[ "BytesToClient" ] =
                     ( Json::UInt64 )qwRxTotal;
-                oBridge[ "StreamsTotalTx" ] =
+                oBridge[ "BytesToServer" ] =
                     ( Json::UInt64 )qwTxTotal;
             }
 
-            qwRxTotal = 0, qwTxTotal = 0;
+            guint64 qwRxTotalR = 0, qwTxTotalR = 0;
             ps = pstmmh;
             dwVal = ps->GetStreamCount();
             oBridge[ "NumStreamsRelay" ] = dwVal;
@@ -313,15 +313,26 @@ gint32 CFuseBdgeList::UpdateContent()
                     Json::Value oVal( Json::objectValue );
                     DumpStream( elem, oVal );
                     oStreams.append( oVal  );
-                    qwRxTotal += oVal[ "BytesToServer" ].asUInt64();
-                    qwTxTotal += oVal[ "BytesToClient" ].asUInt64();
+                    qwRxTotalR += oVal[ "BytesToClient" ].asUInt64();
+                    qwTxTotalR += oVal[ "BytesToServer" ].asUInt64();
                 }
                 oBridge[ "StreamsRelay" ] = oStreams;
-                oBridge[ "StreamsRelayTotalRx" ] =
-                    ( Json::UInt64 )qwRxTotal;
-                oBridge[ "StreamsRelayTotalTx" ] =
-                    ( Json::UInt64 )qwTxTotal;
+                oBridge[ "BytesRelayCli" ] =
+                    ( Json::UInt64 )qwRxTotalR;
+                oBridge[ "BytesRelayRx" ] =
+                    ( Json::UInt64 )qwTxTotalR;
             }
+            pStat->GetCounter2( propRxBytes, qwVal );
+            oBridge[ "BytesThruToCli" ] =
+                qwRxTotalR + qwRxTotal + qwVal;
+
+            qwRouterRx += 
+                qwRxTotalR + qwRxTotal + qwVal;
+
+            qwVal = 0;
+            pStat->GetCounter2( propTxBytes, qwVal );
+            oBridge[ "BytesThruToSvr" ] =
+                qwTxTotalR + qwTxTotal + qwVal;
 
             timespec tv;
             clock_gettime( CLOCK_REALTIME, &tv );
@@ -332,8 +343,22 @@ gint32 CFuseBdgeList::UpdateContent()
                 ( Json::UInt )dwts;
 
             oArray.append( oBridge );
+
+            qwRouterTx +=
+                qwTxTotalR + qwTxTotal + qwVal;
         }
 
+        qwVal = 0;
+        psc->GetCounter2( propRxBytes, qwVal );
+        qwRouterRx += qwVal;
+        oVal[ "TotalBytesToCli" ] =
+            qwRouterRx + qwVal;
+
+        qwVal = 0;
+        psc->GetCounter2( propTxBytes, qwVal );
+        oVal[ "TotalBytesToSvr" ] =
+            qwRouterTx + qwVal;
+        
         ret = psc->GetCounter2(
             propMsgCount, dwVal );
         if( SUCCEEDED( ret ) )
@@ -376,10 +401,12 @@ gint32 CFuseBdgeProxyList::UpdateContent()
 
         std::vector< InterfPtr > vecProxies;
         pRouter->GetBridgeProxies( vecProxies );
+        CRpcRouterReqFwdr* pRfRouter = GetUserObj();
 
         oVal[ "NumConnections" ] =
             ( guint32 )vecProxies.size();
 
+        guint64 qwRouterRx = 0, qwRouterTx = 0, qwVal = 0;
         Json::Value oArray( Json::arrayValue );
         guint32 dwVal = 0;
         for( auto& elem : vecProxies )
@@ -437,18 +464,17 @@ gint32 CFuseBdgeProxyList::UpdateContent()
                 if( SUCCEEDED( ret ) )
                     oProxy[ "MaxPendings" ] = dwVal;
             }
-            if( pStat )
-            {
-                ret = pStat->GetCounter2(
-                    propMsgCount, dwVal );
-                if( SUCCEEDED( ret ) )
-                    oProxy[ "InRequests" ] = dwVal;
 
-                ret = pStat->GetCounter2(
-                    propMsgRespCount, dwVal );
-                if( SUCCEEDED( ret ) )
-                    oProxy[ "OutResponses" ] = dwVal;
-            }
+            ret = pStat->GetCounter2(
+                propMsgCount, dwVal );
+            if( SUCCEEDED( ret ) )
+                oProxy[ "InRequests" ] = dwVal;
+
+            ret = pStat->GetCounter2(
+                propMsgRespCount, dwVal );
+            if( SUCCEEDED( ret ) )
+                oProxy[ "OutResponses" ] = dwVal;
+
             TaskGrpPtr pGrp;
             if( !pProxy->IsRfcEnabled() )
             {
@@ -477,28 +503,41 @@ gint32 CFuseBdgeProxyList::UpdateContent()
                     dwPending;
             }
 
-            IStream* ps = pstm;
-            dwVal = ps->GetStreamCount();
-            oProxy[ "NumStreams" ] = dwVal;
-            guint64 qwRxTotal = 0, qwTxTotal = 0;
-            if( dwVal > 0 )
+            if( pRfRouter != nullptr )
             {
-                Json::Value oStreams( Json::arrayValue );
-                std::vector< InterfPtr > vecUxStms;
-                ps->EnumStreams( vecUxStms );
-                for( auto& elem : vecUxStms )
+                IStream* ps = pstm;
+                dwVal = ps->GetStreamCount();
+                oProxy[ "NumStreams" ] = dwVal;
+                guint64 qwRxTotal = 0, qwTxTotal = 0;
+                if( dwVal > 0 )
                 {
-                    Json::Value oVal( Json::objectValue );
-                    DumpStream( elem, oVal );
-                    oStreams.append( oVal  );
-                    qwRxTotal += oVal[ "BytesToServer" ].asUInt64();
-                    qwTxTotal += oVal[ "BytesToClient" ].asUInt64();
+                    Json::Value oStreams( Json::arrayValue );
+                    std::vector< InterfPtr > vecUxStms;
+                    ps->EnumStreams( vecUxStms );
+                    for( auto& elem : vecUxStms )
+                    {
+                        Json::Value oVal( Json::objectValue );
+                        DumpStream( elem, oVal );
+                        oStreams.append( oVal  );
+                        qwRxTotal +=
+                            oVal[ "BytesToServer" ].asUInt64();
+                        qwTxTotal +=
+                            oVal[ "BytesToClient" ].asUInt64();
+                    }
+                    oProxy[ "Streams" ] = oStreams;
                 }
-                oProxy[ "Streams" ] = oStreams;
-                oProxy[ "StreamsTotalRx" ] =
-                    ( Json::UInt64 )qwRxTotal;
-                oProxy[ "StreamsTotalTx" ] =
-                    ( Json::UInt64 )qwTxTotal;
+
+                qwVal = 0;
+                pStat->GetCounter2( propRxBytes, qwVal );
+                oProxy[ "BytesThruToSvr" ] =
+                    ( Json::UInt64 )( qwRxTotal + qwVal );
+                qwRouterRx = qwRxTotal + qwVal;
+
+                qwVal = 0;
+                pStat->GetCounter2( propTxBytes, qwVal );
+                oProxy[ "BytesThruToCli" ] =
+                    ( Json::UInt64 )( qwTxTotal + qwVal );
+                qwRouterTx = qwTxTotal + qwVal;
             }
 
             timespec tv;
@@ -511,6 +550,20 @@ gint32 CFuseBdgeProxyList::UpdateContent()
                 ( Json::UInt )dwts;
 
             oArray.append( oProxy );
+        }
+
+        if( pRfRouter != nullptr )
+        {
+            CStatCountersServer* psc = GetUserObj();
+            qwVal = 0;
+            psc->GetCounter2( propRxBytes, qwVal );
+            oVal[ "TotalBytesToSvr" ] =
+                qwRouterRx + qwVal;
+
+            qwVal = 0;
+            psc->GetCounter2( propTxBytes, qwVal );
+            oVal[ "TotalBytesToCli" ] =
+                qwRouterTx + qwVal;
         }
 
         oVal[ "Connections" ] = oArray;

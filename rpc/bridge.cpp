@@ -1962,6 +1962,48 @@ gint32 CRpcTcpBridgeProxy::OnPostStop(
     if( IsRfcEnabled() )
         m_pGrpRfc.Clear();
 
+    CRpcRouter* pParent = GetParent();
+    CRpcRouterReqFwdr* pRouter =
+        ObjPtr( pParent );
+    if( pRouter == nullptr )
+        return 0;
+
+    do{
+        CStatCountersProxy* psc =
+            ObjPtr( this );
+
+        CStatCountersServer* ppsc =
+            ObjPtr( pParent );
+
+        if( psc == nullptr || ppsc == nullptr )
+            break;
+
+        guint64 qwRx, qwTx, qwVal;
+
+        psc->GetCounter2(
+            propRxBytes, qwRx );
+        qwVal += qwRx;
+
+        ppsc->GetCounter2(
+            propRxBytes, qwVal );
+
+        qwVal += qwRx;
+        ppsc->SetCounter(
+            propRxBytes, qwVal );
+
+        psc->GetCounter2(
+            propTxBytes, qwTx );
+
+        ppsc->GetCounter2(
+            propTxBytes, qwVal );
+
+        qwVal += qwTx;
+
+        ppsc->SetCounter(
+            propTxBytes, qwVal );
+
+    }while( 0 );
+
     return 0;
 }
 
@@ -5285,6 +5327,48 @@ gint32 CRpcTcpBridge::OnPostStop(
 {
     if( IsRfcEnabled() )
         m_pGrpRfc.Clear();
+
+    CRpcRouter* pParent = GetParent();
+    CRpcRouterBridge* pRouter =
+        ObjPtr( pParent );
+    if( pRouter == nullptr )
+        return 0;
+
+    do{
+        CStatCountersServer* psc =
+            ObjPtr( this );
+
+        CStatCountersServer* ppsc =
+            ObjPtr( pParent );
+
+        if( psc == nullptr || ppsc == nullptr )
+            break;
+
+        guint64 qwRx, qwTx, qwVal;
+
+        psc->GetCounter2(
+            propRxBytes, qwRx );
+        qwVal += qwRx;
+
+        ppsc->GetCounter2(
+            propRxBytes, qwVal );
+
+        qwVal += qwRx;
+        ppsc->SetCounter(
+            propRxBytes, qwVal );
+
+        psc->GetCounter2(
+            propTxBytes, qwTx );
+
+        ppsc->GetCounter2(
+            propTxBytes, qwVal );
+
+        qwVal += qwTx;
+
+        ppsc->SetCounter(
+            propTxBytes, qwVal );
+
+    }while( 0 );
 
     return 0;
 }

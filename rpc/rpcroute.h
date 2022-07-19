@@ -2936,12 +2936,16 @@ class CStatCountersServer2 :
     std::atomic< guint32 > m_dwMsgCount;
     std::atomic< guint32 > m_dwMsgRespCount;
     std::atomic< guint32 > m_dwEvtCount;
+    std::atomic< guint64 > m_qwRxBytes;
+    std::atomic< guint64 > m_qwTxBytes;
+
     public:
     typedef CStatCountersServer super;
     CStatCountersServer2( const IConfigDb* pCfg )
         : CAggInterfaceServer( pCfg ), super( pCfg ),
         m_dwMsgCount( 0 ), m_dwMsgRespCount( 0 ),
-        m_dwEvtCount( 0 )
+        m_dwEvtCount( 0 ), m_qwRxBytes( 0 ),
+        m_qwTxBytes( 0 )
     {}
 
     gint32 IncCounter( EnumPropId ) override;
@@ -2949,6 +2953,9 @@ class CStatCountersServer2 :
 
     gint32 SetCounter(
         EnumPropId, guint32 ) override;
+
+    gint32 SetCounter(
+        EnumPropId, guint64 ) override;
 
     gint32 GetCounters(
         CfgPtr& pCfg ) override;
@@ -2958,6 +2965,9 @@ class CStatCountersServer2 :
 
     gint32 GetCounter2(
         guint32, guint32& ) override;
+
+    gint32 GetCounter2(
+        guint32, guint64& ) override;
 };
 
 DECLARE_AGGREGATED_SERVER(
@@ -2990,12 +3000,12 @@ namespace rpcf
 DECLARE_AGGREGATED_SERVER(
     CRpcReqForwarderImpl,
     CRpcReqForwarder,
-    CStatCountersServer ); 
+    CStatCountersServer2 ); 
 
 DECLARE_AGGREGATED_SERVER(
     CRpcTcpBridgeImpl,
     CRpcTcpBridge,
-    CStatCountersServer,
+    CStatCountersServer2,
     CStreamServerRelay,
     CStreamServerRelayMH
     ); 

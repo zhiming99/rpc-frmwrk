@@ -839,6 +839,16 @@ gint32 CIfStopUxSockStmTask::RunTask()
         CParamList oParams(
             ( IConfigDb* )GetConfig() );
 
+        LONGWORD qwStream = 0;
+        ret = oParams.GetIntPtr( 1,
+            ( guint32*& )qwStream );
+
+        if( ERROR( ret ) )
+            break;
+
+        IStream* pStm = reinterpret_cast
+            < IStream* >( qwStream );
+
         ret = oParams.GetObjPtr( 0, pIf );
         if( ERROR( ret ) )
             break;
@@ -849,6 +859,8 @@ gint32 CIfStopUxSockStmTask::RunTask()
             ret = -EFAULT;
             break;
         }
+
+        pStm->RemoveUxStream( ( HANDLE )pSvc );
 
         ret = pSvc->Shutdown( this );
         if( ERROR( ret ) )
@@ -874,27 +886,8 @@ gint32 CIfStopUxSockStmTask::OnTaskComplete(
 
     CParamList oParams(
         ( IConfigDb* )GetConfig() );
-
-    do{
-        LONGWORD qwStream = 0;
-        ret = oParams.Pop( qwStream );
-        if( ERROR( ret ) )
-            break;
-
-        CObjBase* pIf = nullptr;
-        ret = oParams.GetPointer( 0, pIf );
-        if( ERROR( ret ) )
-            break;
-
-        IStream* pStm = reinterpret_cast
-            < IStream* >( qwStream );
-
-        pStm->RemoveUxStream(
-            ( HANDLE )pIf );
-
-    }while( 0 );
-
     oParams.ClearParams();
+
     return ret;
 }
 
