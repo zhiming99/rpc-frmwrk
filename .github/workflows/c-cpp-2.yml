@@ -28,7 +28,7 @@ jobs:
     - name: configure
       run: ./configure "CPPFLAGS=-O2 -g -DRELEASE -D_DEBUG=0 -fno-strict-aliasing"
     - name: make
-      run: make
+      run: cat /proc/cpuinfo && make
     - name: install
       run: sudo make install
 
