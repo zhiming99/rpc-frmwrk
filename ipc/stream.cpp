@@ -1060,17 +1060,16 @@ gint32 IStream::CloseChannel(
         CParamList oParams;
         oParams.Push( ObjPtr( pIf ) );
         oParams[ propIfPtr ] = ObjPtr( pThisIf );
+        if( pCallback != nullptr )
+        {
+            oParams[ propEventSink ] =
+                ObjPtr( pCallback );
+        }
 
         TaskletPtr pStopTask;
         pStopTask.NewObj(
             clsid( CIfStopUxSockStmTask ),
             oParams.GetCfg() );
-
-        if( pCallback != nullptr )
-        {
-            CIfRetryTask* pRetry = pStopTask;
-            pRetry->SetClientNotify( pCallback );
-        }
 
         ret = pThisIf->AddSeqTask( pStopTask );
 
