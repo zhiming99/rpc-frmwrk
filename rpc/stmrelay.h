@@ -531,10 +531,10 @@ class CIfStartUxSockStmRelayTask :
 };
 
 template< class T >
-struct CUnixSockStmRelayBase :
+class CUnixSockStmRelayBase :
     public T
 {
-    typedef T super;
+    protected:
 
     TaskletPtr m_pWrTcpStmTask;
     TaskletPtr m_pRdTcpStmTask;
@@ -546,8 +546,11 @@ struct CUnixSockStmRelayBase :
     typedef std::deque< std::pair< guint8, BufPtr > > SENDQUE;
     SENDQUE m_queToLocal;
     SENDQUE m_queToRemote;
-
     bool  m_bTcpFlowCtrl = false;
+
+    public:
+    typedef T super;
+
     inline guint32 QueueLimit()
     { return STM_MAX_PACKETS_REPORT + 4; }
 

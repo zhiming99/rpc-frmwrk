@@ -839,16 +839,6 @@ gint32 CIfStopUxSockStmTask::RunTask()
         CParamList oParams(
             ( IConfigDb* )GetConfig() );
 
-        LONGWORD qwStream = 0;
-        ret = oParams.GetIntPtr( 1,
-            ( guint32*& )qwStream );
-
-        if( ERROR( ret ) )
-            break;
-
-        IStream* pStm = reinterpret_cast
-            < IStream* >( qwStream );
-
         ret = oParams.GetObjPtr( 0, pIf );
         if( ERROR( ret ) )
             break;
@@ -859,8 +849,6 @@ gint32 CIfStopUxSockStmTask::RunTask()
             ret = -EFAULT;
             break;
         }
-
-        pStm->RemoveUxStream( ( HANDLE )pSvc );
 
         ret = pSvc->Shutdown( this );
         if( ERROR( ret ) )
@@ -886,7 +874,8 @@ gint32 CIfStopUxSockStmTask::OnTaskComplete(
 
     CParamList oParams(
         ( IConfigDb* )GetConfig() );
-    oParams.ClearParams();
+
+    oParams.Clear();
 
     return ret;
 }
@@ -1055,6 +1044,8 @@ gint32 IStream::CloseChannel(
         return ret;
 
     do{
+        RemoveUxStream( hChannel );
+
         CRpcServices* pSvc = pIf;
         CRpcServices* pThisIf = GetInterface();
 
@@ -1073,9 +1064,6 @@ gint32 IStream::CloseChannel(
             oParams[ propEventSink ] =
                 ObjPtr( pCallback );
         }
-
-        LONGWORD qwThis = ( LONGWORD )this;
-        oParams.Push( qwThis );
 
         TaskletPtr pStopTask;
         pStopTask.NewObj(
@@ -1290,6 +1278,7 @@ gint32 IStream::OnPreStopShared(
             break;
 
         UXSTREAM_MAP mapStreams = m_mapUxStreams;
+        m_mapUxStreams.clear();
         oIfLock.Unlock();
         CParamList oGrpParams;
         TaskGrpPtr pTaskGrp;
@@ -1312,8 +1301,6 @@ gint32 IStream::OnPreStopShared(
             CParamList oParams;
             oParams.Push( ObjPtr( elem.second ) );
             oParams[ propIfPtr ] = ObjPtr( pThis );
-            LONGWORD qwThis = ( LONGWORD )this;
-            oParams.Push( qwThis );
 
             TaskletPtr pStopTask;
             ret = pStopTask.NewObj(
