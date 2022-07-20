@@ -2530,7 +2530,7 @@ gint32 CImplPyMthdSvr::OutputAsyncCancelHandler()
             NEW_LINE;
             CCOUT << "    oReqCtx : PyReqContext, iRet : int ): ";
             NEW_LINE;
-            Wa( "pass" );
+            Wa( "    pass" );
             break;
         }
 
