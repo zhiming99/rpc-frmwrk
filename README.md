@@ -60,6 +60,11 @@ This project depends on the following 3rd-party packags at runtime:
 4. A tree-like hierarchical persistant registry.
 
 ---
+[`Wed Jul 20 2022 09:34:11 PM Beijing`]   
+1. Made build for raspberry pi work.
+2. Continued fixing bugs in `rpcfs`, and fixed some regression bugs.
+3. After adding session file and reqfwdr's runtime information file, we will move on to write auto skelton generator for `rpcfs`
+
 [`Fri Jul 08 2022 08:42:04 AM Beijing`]   
 1. Added a `InConnections` file to the rpcrouter to show the statistics of the current connections of the rpcrouter.
 2. We will add `OutConnections` and `sockets` files to the rpcrouter next. 
