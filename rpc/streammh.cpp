@@ -531,6 +531,10 @@ gint32 CIfUxRelayTaskHelperMH::GetBridgeIf(
     static_cast< CRpcTcpBridgeProxyStream* >
         ( m_pSvc );
 
+    CStdRMutex oLock( pStream->GetLock() );
+    if( pStream->GetState() == stateStopped )
+        return ERROR_STATE;
+
     if( bProxy )
     {
         pIf = pStream->GetBridgeProxy();
@@ -1750,15 +1754,12 @@ gint32 CStreamServerRelayMH::OnCloseInternal(
         if( hChannel != INVALID_HANDLE )
         {
             InterfPtr pIf;
-            ret = IStream::GetUxStream(
-                hChannel, pIf );
+            CStdRMutex oIfLock( GetLock() );
+            ret = GetUxStream( hChannel, pIf );
             if( ERROR( ret ) )
                 break;
-            CRpcTcpBridgeProxyStream*
-                pStm = pIf;
-            iStreamId =
-                pStm->GetStreamId( true );
-
+            CRpcTcpBridgeProxyStream* pStm = pIf;
+            iStreamId = pStm->GetStreamId( true );
             pClass = pStm->GetBridgeProxy();
         }
 

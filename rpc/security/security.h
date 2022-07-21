@@ -314,6 +314,9 @@ struct IAuthenticateServer : public IAuthenticate
     virtual gint32 IsSessExpired(
         const std::string& strSess ) = 0;
 
+    virtual gint32 InquireSess(
+        const std::string& strSess,
+        CfgPtr& pInfo ) = 0;
 };
 
 class CAuthentServer:
@@ -408,6 +411,10 @@ class CAuthentServer:
         const std::string& strSess,
         BufPtr& pInMsg,
         BufPtr& pInMic );
+
+    virtual gint32 InquireSess(
+        const std::string& strSess,
+        CfgPtr& pInfo );
 };
 
 /**

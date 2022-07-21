@@ -153,7 +153,7 @@ class CInterfaceState : public IInterfaceState
     // timeval                  m_tvReqTimeout;
     // std::string              m_strPortPath;
     CfgPtr                      m_pIfCfgDb;
-    mutable stdrmutex           m_oLock;
+    // mutable stdrmutex           m_oLock;
     std::atomic< EnumIfState >  m_iState;
     EnumIfState                 m_iResumeState;
 
@@ -182,8 +182,7 @@ class CInterfaceState : public IInterfaceState
 
     CRpcInterfaceBase* GetInterface();
 
-    stdrmutex& GetLock() const
-    { return m_oLock; }
+    stdrmutex& GetLock() const;
 
     CInterfaceState(
         const IConfigDb* pCfg );

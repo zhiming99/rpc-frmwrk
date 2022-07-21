@@ -158,6 +158,13 @@ CInterfaceState::~CInterfaceState()
 {
 }
 
+stdrmutex& CInterfaceState::GetLock() const
+{
+    auto pSvc = static_cast
+        < CGenericInterface* >( m_pInterface );
+    return pSvc->GetLock();
+}
+
 gint32 CInterfaceState::SubscribeEventsInternal(
     const std::vector< EnumPropId >& vecEvtToSubscribe )
 {

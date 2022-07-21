@@ -76,6 +76,7 @@ def maincli() :
 
                 ret = oProxy.UploadFile(hChannel, strFile)
                 if ret < 0:
+                    print( "error UploadFile", ret )
                     break
 
                 if ret == ErrorCode.STATUS_PENDING:

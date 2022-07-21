@@ -980,6 +980,89 @@ gint32 CK5AuthServer::IsSessExpired(
     return ret;
 }
 
+gint32 CK5AuthServer::InquireSess(
+    const std::string& strSess,
+    CfgPtr& pInfo )
+{
+    gint32 ret = 0;
+    OM_uint32 maj_stat, min_stat; 
+    gss_name_t src_name, targ_name;
+    gss_buffer_desc sname = {0}, tname = {0};
+    do{
+        // the caller makes sure the gss lock is
+        // acquired.
+        gss_ctx_id_t context = GSS_C_NO_CONTEXT;
+        CStdRMutex oGssLock( GetGssLock() );
+        ret = GetGssCtx( strSess, context );
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpener oCfg( ( IConfigDb* )pInfo );
+        OM_uint32 lifetime; 
+        gss_OID  doid, name_type;
+        maj_stat = gss_inquire_context(
+            &min_stat, context, &src_name,
+            &targ_name, &lifetime, &doid,
+            nullptr, nullptr, nullptr );
+        if( maj_stat != GSS_S_COMPLETE )
+        {
+            ret = ERROR_FAIL;
+            break;
+        }
+
+        maj_stat = gss_display_name(
+            &min_stat, src_name, &sname, &name_type);
+
+        if (maj_stat != GSS_S_COMPLETE)
+        {
+            ret = ERROR_FAIL + 100;
+            break;
+        }
+        maj_stat = gss_display_name(&min_stat,
+            targ_name, &tname,
+            (gss_OID *) NULL);
+
+        if (maj_stat != GSS_S_COMPLETE)
+        {
+            ret = ERROR_FAIL + 101;
+            break;
+        }
+
+        stdstr strSrcName(
+            (char*)sname.value, sname.length );
+        oCfg.SetStrProp(
+            propUserName, strSrcName );
+
+        stdstr strTargName(
+            (char*)tname.value, tname.length );
+
+        oCfg.SetStrProp(
+            propServiceName, strTargName );
+
+        oCfg.SetIntProp(
+            propTimeoutSec, lifetime );
+
+    }while( 0 );
+
+    if( ret == -ENOENT )
+        return ret;
+
+    if( ret == ERROR_FAIL )
+        return ret;
+
+    (void) gss_release_name(&min_stat, &src_name);
+    (void) gss_release_name(&min_stat, &targ_name);
+
+    if( ret == ERROR_FAIL + 100 )
+        return ERROR_FAIL;
+
+    (void) gss_release_buffer(&min_stat, &sname);
+    if( ret == ERROR_FAIL + 101 )
+        return ERROR_FAIL;
+
+    (void) gss_release_buffer(&min_stat, &tname);
+    return ret;
+}
 
 gint32 CK5AuthServer::Krb5Login(
     IEventSink* pCallback,

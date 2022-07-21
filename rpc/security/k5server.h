@@ -204,22 +204,26 @@ class CK5AuthServer :
     gint32 WrapMessage(
         const std::string& strSess,
         BufPtr& pInMsg,
-        BufPtr& pOutMsg );
+        BufPtr& pOutMsg ) override;
         
     gint32 UnwrapMessage(
         const std::string& strSess,
         BufPtr& pInMsg,
-        BufPtr& pOutMsg );
+        BufPtr& pOutMsg ) override;
 
     gint32 GetMicMsg(
         const std::string& strSess,
         BufPtr& pInMsg,
-        BufPtr& pOutMic );
+        BufPtr& pOutMic ) override;
         
     gint32 VerifyMicMsg(
         const std::string& strSess,
         BufPtr& pInMsg,
-        BufPtr& pInMic );
+        BufPtr& pInMic ) override;
+
+    gint32 InquireSess(
+        const std::string& strSess,
+        CfgPtr& pInfo ) override;
 
     gint32 GetPortId(
         const std::string& strSess,

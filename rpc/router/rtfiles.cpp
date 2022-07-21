@@ -29,6 +29,7 @@
 #include <rpcroute.h>
 #include "fuseif.h"
 #include "jsondef.h"
+#include "security/security.h"
 
 using namespace rpcf;
 #include "rtfiles.h"
@@ -573,6 +574,87 @@ gint32 CFuseBdgeProxyList::UpdateContent()
     return ret;
 }
 
+gint32 CFuseSessionFile::UpdateContent() 
+{
+    gint32 ret = 0;
+    do{
+        Json::StreamWriterBuilder oBuilder;
+        oBuilder["commentStyle"] = "None";
+        oBuilder["indentation"] = "   ";
+        Json::Value oVal( Json::objectValue);
+
+        CRpcRouterBridge* pRouter =
+            GetUserObj();
+        if( pRouter == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        std::vector< InterfPtr > vecBdges;
+        pRouter->GetBridges( vecBdges );
+
+        oVal[ "NumConnections" ] =
+            ( guint32 )vecBdges.size();
+
+        Json::Value oArray( Json::arrayValue );
+        guint32 dwVal = 0;
+        for( auto& elem : vecBdges )
+        {
+            Json::Value oBridge;
+            CRpcTcpBridge* pBridge = elem;
+
+            CCfgOpenerObj oIfCfg(
+                ( CObjBase* )elem );
+            stdstr strVal;
+            bool bVal;
+            ret = oIfCfg.GetStrProp(
+                propSessHash, strVal );
+            if( SUCCEEDED( ret ) )
+                oBridge[ "SessionHash" ] = strVal;
+                
+            IConfigDb* pConn;
+            ret = oIfCfg.GetPointer(
+                propConnParams, pConn );
+            if( SUCCEEDED( ret ) )
+            {
+                oBridge[ "ConnParams" ] =
+                    DumpConnParams( pConn );
+            }
+            if( strVal.substr( 0, 2 ) != "AU" )
+                continue;
+            
+            /*IAuthenticateServer* pas = dynamic_cast
+                < CRpcRouterBridgeAuthImpl* >( pRouter );
+
+            if( pas == nullptr )
+                continue;
+
+            CfgPtr pCfg( true );
+            ret = pas->InquireSess( strVal, pCfg );
+            if( ERROR( ret ) )
+                continue;
+
+            Json::Value oVal( Json::objectValue );
+            CCfgOpener oCfg( ( IConfigDb* )pCfg );
+            oCfg.GetStrProp( propUserName, strVal );
+            oVal[ "UserName" ] = strVal;
+            oCfg.GetStrProp( propServiceName, strVal );
+            oVal[ "ServiceName" ] = strVal;
+            oCfg.GetIntProp( propTimeoutSec, dwVal );
+            oVal[ "TimeLeft" ] = dwVal;
+            oVal[ "Mech" ] = "krb5";
+            oBridge[ "AuthInfo" ] = oVal;*/
+        }
+
+        m_strContent = Json::writeString(
+            oBuilder, oVal );
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 AddFilesAndDirsBdge(
     CRpcServices* pSvc )
 {
@@ -624,6 +706,14 @@ gint32 AddFilesAndDirsBdge(
         pList->SetUserObj( pObj );
 
         pEnt = DIR_SPTR( pList );
+        pSvr->Add2UserDir( pEnt );
+
+        CFuseSessionFile* pSess =
+            new CFuseSessionFile( nullptr );
+        pSess->SetMode( S_IRUSR );
+        pSess->DecRef();
+        pSess->SetUserObj( pObj );
+        pEnt = DIR_SPTR( pSess );
         pSvr->Add2UserDir( pEnt );
 
     }while( 0 );

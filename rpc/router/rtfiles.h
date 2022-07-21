@@ -27,6 +27,7 @@
 
 #define BDGELIST_FILE "InConnections"
 #define BDGEPROXYLIST_FILE "OutConnections"
+#define BDGESESSLIST_FILE "Sessions"
 
 class CFuseBdgeList : public CFuseSvcStat
 {
@@ -45,5 +46,15 @@ class CFuseBdgeProxyList : public CFuseSvcStat
     CFuseBdgeProxyList( CRpcServices* pIf )
         : super( pIf )
     { SetName( BDGEPROXYLIST_FILE ); }
+    virtual gint32 UpdateContent();
+};
+
+class CFuseSessionFile : public CFuseSvcStat
+{
+    public:
+    typedef CFuseSvcStat super;
+    CFuseSessionFile( CRpcServices* pIf )
+        : super( pIf )
+    { SetName( BDGESESSLIST_FILE ); }
     virtual gint32 UpdateContent();
 };

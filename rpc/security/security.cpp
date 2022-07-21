@@ -3196,6 +3196,36 @@ gint32 CAuthentServer::VerifyMicMsg(
     return ret;
 }
 
+gint32 CAuthentServer::InquireSess(
+    const std::string& strSess,
+    CfgPtr& pInfo )
+{
+    gint32 ret = 0;
+    do{
+        CRpcServices* pObj = m_pAuthImpl;
+        if( pObj == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        IAuthenticateServer* pAuth =
+        dynamic_cast< IAuthenticateServer* >
+                ( pObj );
+
+        if( unlikely( pAuth == nullptr ) )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        ret = pAuth->InquireSess(
+            strSess, pInfo );
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CAuthentServer::OnStartAuthImplComplete(
     IEventSink* pCallback,
     IEventSink* pIoReq,
