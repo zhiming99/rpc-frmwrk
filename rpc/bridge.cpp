@@ -1744,27 +1744,30 @@ gint32 CRpcTcpBridge::OnPostStart(
             break;
         }
 
-        DMsgPtr pMsg;
-        TaskGrpPtr pGrp;
-        ret = GetGrpRfc( pMsg, pGrp );
-        if( ERROR( ret ) )
-            break;
-        CIfParallelTaskGrpRfc* pGrpRfc = pGrp;
-        guint32 dwMaxReqs = 0, dwMaxPendings = 0;
-        CCfgOpenerObj oIfCfg( this );
-        ret = oIfCfg.GetIntProp(
-            propMaxReqs, dwMaxReqs );
-        if( ERROR( ret ) )
-            break;
+        if( IsRfcEnabled() )
+        {
+            DMsgPtr pMsg;
+            TaskGrpPtr pGrp;
+            ret = GetGrpRfc( pMsg, pGrp );
+            if( ERROR( ret ) )
+                break;
+            CIfParallelTaskGrpRfc* pGrpRfc = pGrp;
+            guint32 dwMaxReqs = 0, dwMaxPendings = 0;
+            CCfgOpenerObj oIfCfg( this );
+            ret = oIfCfg.GetIntProp(
+                propMaxReqs, dwMaxReqs );
+            if( ERROR( ret ) )
+                break;
 
-        ret = oIfCfg.GetIntProp(
-            propMaxPendings, dwMaxPendings );
+            ret = oIfCfg.GetIntProp(
+                propMaxPendings, dwMaxPendings );
 
-        if( ERROR( ret ) )
-            break;
-        
-        pGrpRfc->SetLimit(
-            dwMaxReqs, dwMaxPendings );
+            if( ERROR( ret ) )
+                break;
+
+            pGrpRfc->SetLimit(
+                dwMaxReqs, dwMaxPendings );
+        }
 
         OnPostStartShared(
             pContext, pMatch );
