@@ -205,6 +205,32 @@ class CAuthentProxy :
     const EnumClsid GetIid() const
     { return iid( IAuthenticate ); }
 
+    gint32 GetIidEx(
+        std::vector< guint32 >& vecIids ) const override
+    {
+        vecIids.push_back( iid( IAuthenticate ) );
+        vecIids.push_back( iid( IAuthenticateProxy ) );
+        return 0;
+    }
+
+    gint32 QueryInterface( EnumClsid iid, void*& pIf ) override
+    {
+        gint32 ret = -ENOENT;
+        if( iid == iid( IAuthenticate ) )
+        {
+            IAuthenticate* pauth = this;
+            pIf = reinterpret_cast< void* >( pauth );
+            ret = 0;
+        }
+        else if( iid == iid( IAuthenticateProxy ) )
+        {
+            IAuthenticateProxy* pauth = this;
+            pIf = reinterpret_cast< void* >( pauth );
+            ret = 0;
+        }
+        return ret;
+    }
+
     static gint32 InitEnvRouter(
         CIoManager* pMgr );
 
@@ -346,6 +372,32 @@ class CAuthentServer:
 
     const EnumClsid GetIid() const
     { return iid( IAuthenticate ); }
+
+    gint32 GetIidEx(
+        std::vector< guint32 >& vecIids ) const override
+    {
+        vecIids.push_back( iid( IAuthenticate ) );
+        vecIids.push_back( iid( IAuthenticateServer ) );
+        return 0;
+    }
+
+    gint32 QueryInterface( EnumClsid iid, void*& pIf ) override
+    {
+        gint32 ret = -ENOENT;
+        if( iid == iid( IAuthenticate ) )
+        {
+            IAuthenticate* pauth = this;
+            pIf = reinterpret_cast< void* >( pauth );
+            ret = 0;
+        }
+        else if( iid == iid( IAuthenticateServer ) )
+        {
+            IAuthenticateServer* pauth = this;
+            pIf = reinterpret_cast< void* >( pauth );
+            ret = 0;
+        }
+        return ret;
+    }
 
     // request handlers
     gint32 InitUserFuncs();
@@ -600,6 +652,14 @@ class CRpcReqForwarderAuth :
 
     const EnumClsid GetIid() const
     { return iid( CRpcReqForwarderAuth ); }
+
+    gint32 GetIidEx(
+        std::vector< guint32 >& vecIids ) const override
+    {
+        vecIids.push_back( iid( CRpcReqForwarder ) );
+        vecIids.push_back( iid( CRpcReqForwarderAuth ) );
+        return 0;
+    }
 
     bool SupportIid( EnumClsid iid ) const
     {

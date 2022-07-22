@@ -3120,6 +3120,45 @@ struct has_##MethodName\
         return ret; \
     }
 
+#define ITERATE_IF_VIRT_METHODS_TILL_SUCCESS( _MethodName, rettype, PARAMS, ARGS ) \
+    private: \
+    DEFINE_HAS_METHOD( _MethodName, rettype, PARAMS ); \
+    gint32 Interf##_MethodName( NumberSequence<>  ) \
+    { return -ENOENT; } \
+    template < int N > \
+    gint32 Interf##_MethodName( \
+         NumberSequence< N >, PARAMS ) \
+    { \
+        using ClassName = typename std::tuple_element< N, std::tuple<Types...>>::type; \
+        if( has_##_MethodName< ClassName >::value ) \
+            return this->ClassName::_MethodName( ARGS ); \
+        return -ENOENT; \
+    } \
+    template < int N, int M, int...S > \
+    gint32 Interf##_MethodName( \
+        NumberSequence< N, M, S... >, PARAMS ) \
+    { \
+        using ClassName = typename std::tuple_element< N, std::tuple<Types...>>::type; \
+        if( has_##_MethodName< ClassName >::value ) \
+        { \
+            gint32 ret = this->ClassName::_MethodName( ARGS ); \
+            if( SUCCEEDED( ret ) ) return ret; \
+        } \
+        return Interf##_MethodName( NumberSequence<M, S...>(), ARGS ); \
+    } \
+    public: \
+    virtual rettype _MethodName( PARAMS ) \
+    { \
+        gint32 ret = 0;\
+        if( sizeof...( Types ) ) \
+        { \
+            using seq = typename GenSequence< sizeof...( Types ) >::type; \
+            ret = Interf##_MethodName( seq(), ARGS ); \
+            if( SUCCEEDED( ret ) ) return ret;\
+        } \
+        return virtbase::_MethodName( ARGS ); \
+    }
+
 template< typename DefaultType, typename DesiredType, typename ... Types >
 struct TypeContained;
 
@@ -3166,6 +3205,14 @@ struct CAggInterfaceServer :
     // interfaces
     virtual bool SupportIid( EnumClsid ) const
     { return false; }
+
+    virtual gint32 GetIidEx(
+        std::vector< guint32 >& vecIids ) const
+    { return -ENOTSUP; }
+
+    virtual gint32 QueryInterface(
+        EnumClsid iid, void*& pIf )
+    { return -ENOENT; }
 };
 
 class CStreamServer;
@@ -3180,12 +3227,14 @@ struct CAggregatedObject
     : virtbase( pCfg ), Types( pCfg )...
     {
     }
-
 };
 
 template< typename Type >
 gint32 GetIidOfType( std::vector< guint32 >& vecIids, Type* pType )
 {
+    gint32 ret = pType->Type::GetIidEx( vecIids );
+    if( SUCCEEDED( ret ) )
+        return ret;
     vecIids.push_back( pType->Type::GetIid() );
     return 0;
 }
@@ -3306,6 +3355,9 @@ struct CAggregatedObject< CAggInterfaceServer, Types... >
     ITERATE_IF_VIRT_METHODS_ASYNC_IMPL( 0, OnPreStop, gint32,
         VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
 
+    ITERATE_IF_VIRT_METHODS_TILL_SUCCESS( QueryInterface, gint32,
+        VA_LIST( EnumClsid iid, void*& pIf ), VA_LIST( iid, pIf ) )
+
     const EnumClsid GetIid() const
     { return this->GetClsid(); }
 
@@ -3425,6 +3477,12 @@ struct CAggInterfaceProxy :
     virtual const EnumClsid GetIid() const = 0;
     virtual bool SupportIid( EnumClsid ) const
     { return false; }
+    virtual gint32 GetIidEx(
+        std::vector< guint32 >& vecIids ) const
+    { return -ENOTSUP; }
+    virtual gint32 QueryInterface(
+        EnumClsid iid, void*& pIf )
+    { return -ENOENT; }
 };
 
 template< typename...Types >
@@ -3456,6 +3514,9 @@ struct CAggregatedObject< CAggInterfaceProxy, Types... >
 
     ITERATE_IF_VIRT_METHODS_ASYNC_IMPL( 0, OnPreStop, gint32,
         VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
+
+    ITERATE_IF_VIRT_METHODS_TILL_SUCCESS( QueryInterface, gint32,
+        VA_LIST( EnumClsid iid, void*& pIf ), VA_LIST( iid, pIf ) )
 
     const EnumClsid GetIid() const
     { return this->GetClsid(); }

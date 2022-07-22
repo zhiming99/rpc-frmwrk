@@ -597,6 +597,14 @@ gint32 CFuseSessionFile::UpdateContent()
         oVal[ "NumConnections" ] =
             ( guint32 )vecBdges.size();
 
+        IAuthenticateServer* pas;
+        ret = pRouter->QueryInterface(
+            iid( IAuthenticateServer ),
+            ( void*& )pas );
+
+        if( ERROR( ret ) )
+            pas = nullptr;
+
         Json::Value oArray( Json::arrayValue );
         guint32 dwVal = 0;
         for( auto& elem : vecBdges )
@@ -621,15 +629,12 @@ gint32 CFuseSessionFile::UpdateContent()
                 oBridge[ "ConnParams" ] =
                     DumpConnParams( pConn );
             }
-            if( strVal.substr( 0, 2 ) != "AU" )
-                continue;
-            
-            /*IAuthenticateServer* pas = dynamic_cast
-                < CRpcRouterBridgeAuthImpl* >( pRouter );
-
             if( pas == nullptr )
                 continue;
 
+            if( strVal.substr( 0, 2 ) != "AU" )
+                continue;
+            
             CfgPtr pCfg( true );
             ret = pas->InquireSess( strVal, pCfg );
             if( ERROR( ret ) )
@@ -644,7 +649,7 @@ gint32 CFuseSessionFile::UpdateContent()
             oCfg.GetIntProp( propTimeoutSec, dwVal );
             oVal[ "TimeLeft" ] = dwVal;
             oVal[ "Mech" ] = "krb5";
-            oBridge[ "AuthInfo" ] = oVal;*/
+            oBridge[ "AuthInfo" ] = oVal;
         }
 
         m_strContent = Json::writeString(

@@ -21,7 +21,9 @@ def GetMD5(strPath : str ) :
     return md5Hash.hexdigest()
 
 def UsageAndQuit():
-    print( "usage: {} <filename>".format(sys.argv[0]))
+    print( "Usage: {} <filename>".format(sys.argv[0]))
+    print( "Note: the file size has an upper limit of 128MB" );
+    print( "\ttweak it in TransFileContext.py" );
     quit(errno.EINVAL)
 
 def maincli() :

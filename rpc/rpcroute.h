@@ -740,6 +740,13 @@ class CRpcReqForwarder :
     virtual gint32 OnPreStop(
         IEventSink* pCallback ) override;
 
+    gint32 GetIidEx( std::vector< guint32 >& vecIids ) const override
+    {
+        vecIids.push_back( iid( IStream ) );
+        vecIids.push_back( iid( IStreamMH ) );
+        return 0;
+    }
+
 }; // CRpcReqForwarder
 
 class CRpcRfpForwardEventTask
