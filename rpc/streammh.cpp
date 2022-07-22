@@ -1755,7 +1755,8 @@ gint32 CStreamServerRelayMH::OnCloseInternal(
         {
             InterfPtr pIf;
             CStdRMutex oIfLock( GetLock() );
-            ret = GetUxStream( hChannel, pIf );
+            ret = IStream::GetUxStream(
+                hChannel, pIf );
             if( ERROR( ret ) )
                 break;
             CRpcTcpBridgeProxyStream* pStm = pIf;

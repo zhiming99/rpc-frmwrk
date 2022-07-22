@@ -90,9 +90,25 @@ gint32 DumpStream(
         EnumIfState iState = pSvc->GetState();
         stdstr strState = IfStateToString( iState );
         oStmInfo[ "StreamState" ] = strState;
+
+        CCfgOpenerObj oIfCfg( pSvc );
+        IConfigDb* pDesc;
+        ret = oIfCfg.GetPointer(
+            propDataDesc, pDesc );
+
+        if( SUCCEEDED( ret ) )
+        {
+            stdstr strName;
+            CCfgOpener oDesc( pDesc );
+            ret = oDesc.GetStrProp(
+                propNodeName, strName );
+            if( SUCCEEDED( ret ) )
+                oStmInfo[ "ClientName" ] = strName;
+        }
+
         if( pSvc->IsServer() )
         {
-            CUnixSockStmServer* pSvr = pUxStream; 
+            CUnixSockStmServerRelay* pSvr = pUxStream; 
             guint64 qwRxBytes, qwTxBytes;
             pSvr->GetBytesTransfered(
                 qwRxBytes, qwTxBytes );
@@ -117,38 +133,28 @@ gint32 DumpStream(
                 pProxy->CanSend();
             CRpcTcpBridgeProxyStream* pbpstm =
                 pUxStream;
-            if( pbpstm != nullptr )
-            {
-                oStmInfo[ "BridgeStreamId" ] =
-                    pbpstm->GetStreamId( false );
-                oStmInfo[ "BridgeProxyStreammId" ] =
-                    pbpstm->GetStreamId( true );
+            if( pbpstm == nullptr )
+                break;
+            oStmInfo[ "BridgeStreamId" ] =
+                pbpstm->GetStreamId( false );
+            oStmInfo[ "BridgeProxyStreammId" ] =
+                pbpstm->GetStreamId( true );
 
-                CRpcTcpBridgeProxy* pbp =
-                    pbpstm->GetBridgeProxy();
-                CCfgOpenerObj oIfCfg( pbp );
-                guint32 dwPortId = 0;
-                ret = oIfCfg.GetIntProp(
-                    propPortId, dwPortId );
-                if( SUCCEEDED( ret ) )
-                    oStmInfo[ "ProxyPortId" ] =
-                        ( Json::UInt )dwPortId;
-            }
+            CRpcTcpBridgeProxy* pbp =
+                pbpstm->GetBridgeProxy();
+
+            oLock.Unlock();
+            if( pbp == nullptr )
+                break;
+            CCfgOpenerObj oIfCfg( pbp );
+            guint32 dwPortId = 0;
+            ret = oIfCfg.GetIntProp(
+                propPortId, dwPortId );
+            if( ERROR( ret ) )
+                break;
+            oStmInfo[ "ProxyPortId" ] =
+                ( Json::UInt )dwPortId;
         }
-        CCfgOpenerObj oIfCfg( pSvc );
-        IConfigDb* pDesc;
-        ret = oIfCfg.GetPointer(
-            propDataDesc, pDesc );
-        if( ERROR( ret ) )
-            break;
-
-        stdstr strName;
-        CCfgOpener oDesc( pDesc );
-        ret = oDesc.GetStrProp(
-            propNodeName, strName );
-        if( ERROR( ret ) )
-            break;
-        oStmInfo[ "ClientName" ] = strName;
 
     }while( 0 );
 
@@ -630,10 +636,16 @@ gint32 CFuseSessionFile::UpdateContent()
                     DumpConnParams( pConn );
             }
             if( pas == nullptr )
+            {
+                oArray.append( oBridge );
                 continue;
+            }
 
             if( strVal.substr( 0, 2 ) != "AU" )
+            {
+                oArray.append( oBridge );
                 continue;
+            }
             
             CfgPtr pCfg( true );
             ret = pas->InquireSess( strVal, pCfg );
@@ -647,11 +659,12 @@ gint32 CFuseSessionFile::UpdateContent()
             oCfg.GetStrProp( propServiceName, strVal );
             oVal[ "ServiceName" ] = strVal;
             oCfg.GetIntProp( propTimeoutSec, dwVal );
-            oVal[ "TimeLeft" ] = dwVal;
+            oVal[ "ExpireInSec" ] = dwVal;
             oVal[ "Mech" ] = "krb5";
             oBridge[ "AuthInfo" ] = oVal;
+            oArray.append( oBridge );
         }
-
+        oVal[ "Sessions" ] = oArray;
         m_strContent = Json::writeString(
             oBuilder, oVal );
 

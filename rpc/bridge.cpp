@@ -1744,6 +1744,28 @@ gint32 CRpcTcpBridge::OnPostStart(
             break;
         }
 
+        DMsgPtr pMsg;
+        TaskGrpPtr pGrp;
+        ret = GetGrpRfc( pMsg, pGrp );
+        if( ERROR( ret ) )
+            break;
+        CIfParallelTaskGrpRfc* pGrpRfc = pGrp;
+        guint32 dwMaxReqs = 0, dwMaxPendings = 0;
+        CCfgOpenerObj oIfCfg( this );
+        ret = oIfCfg.GetIntProp(
+            propMaxReqs, dwMaxReqs );
+        if( ERROR( ret ) )
+            break;
+
+        ret = oIfCfg.GetIntProp(
+            propMaxPendings, dwMaxPendings );
+
+        if( ERROR( ret ) )
+            break;
+        
+        pGrpRfc->SetLimit(
+            dwMaxReqs, dwMaxPendings );
+
         OnPostStartShared(
             pContext, pMatch );
 
@@ -5215,23 +5237,11 @@ gint32 CRpcTcpBridge::Handshake(
         if( IsRfcEnabled() )
         {
             CCfgOpener oCfg;
-            gint32 iRet = oCfg.CopyProp(
-                propMaxReqs, this );
-            if( ERROR( iRet ) )
-            {
-                oCfg.SetIntProp(
-                    propMaxReqs, RFC_MAX_REQS );
-            }
-            iRet = oCfg.CopyProp(
-                propMaxPendings, this );
-            if( ERROR( iRet ) )
-            {
-                oCfg.SetIntProp(
-                    propMaxPendings,
-                    RFC_MAX_PENDINGS );
-            }
+            // start with a small concurrency window
+            oCfg.SetIntProp( propMaxReqs, 1 );
+            oCfg.SetIntProp( propMaxPendings, 0 );
 
-            iRet = InitRfc( oCfg );
+            gint32 iRet = InitRfc( oCfg );
             if( ERROR( iRet ) )
             {
                 // fatal error
