@@ -61,7 +61,7 @@ This project depends on the following 3rd-party packags at runtime:
 
 ---
 [`Sat Jul 23 2022 07:56:59 PM Beijing`]   
-1. took two days to block some of the security holes in authentication mode. To minize the security risk, the request flow control must also be enabled at the same time. The changes made it diffcult to flush illegal requests during the authentication process. 
+1. We still have the reqfwdr's runtime information file to implement. It won't take too long before we start to write parsers again.
 
 [`Wed Jul 20 2022 09:34:11 PM Beijing`]   
 1. Made build for raspberry pi work.
