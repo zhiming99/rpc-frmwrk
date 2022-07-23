@@ -291,14 +291,13 @@ gint32 CRpcTcpBridgeAuth::EnableInterfaces()
             ( IEventSink* )pRespCb );
 
         TaskletPtr pTask = pTaskGrp;
-        ret = AddAndRun( pTask );
+        ( *pTask )( eventZero );
+        ret = pTask->GetError();
+        if( ret == STATUS_PENDING )
+            break;
+
         if( SUCCEEDED( ret ) )
         {
-            ret = pTask->GetError();
-            if( ERROR( ret ) ||
-                ret == STATUS_PENDING )
-                break;
-
             CParamList oParms;
             oParams[ propReturnValue ] = 0;
 
@@ -473,7 +472,6 @@ gint32 CRpcTcpBridgeAuth::SetSessHash(
         // start all the rest interfaces,
         // espacially the stream interfaces
 
-        EnableInterfaces();
         if( IsKdcChannel() )
         {
             ret = 0;
@@ -659,7 +657,8 @@ gint32 CRpcTcpBridgeAuth::OnLoginComplete(
         if( ERROR( ret ) )
             break;
 
-        if( true )
+        // the login is not complete yet.
+        if( bContinue )
         {
             // We need to send out the response
             // without encryption, and must be ahead
@@ -677,11 +676,11 @@ gint32 CRpcTcpBridgeAuth::OnLoginComplete(
             // response can be sent without encrypted.
             //
             OnServiceComplete( pResp, pCallback );
+            break;
         }
 
-        // the login is not complete yet.
-        if( bContinue )
-            break;
+        EnableInterfaces();
+        OnServiceComplete( pResp, pCallback );
 
         CCfgOpenerObj oIfCfg( this );
         guint32 dwPortId = 0;

@@ -634,7 +634,7 @@ gint32 CRpcTcpBridgeProxy::BuildBufForIrpFwrdReq(
             DBUS_DESTINATION( strRtName );
 
         string strIfName = DBUS_IF_NAME(
-            IFNAME_TCP_BRIDGE );
+            "CRpcMinBridge" );
 
 
         ret = pMsg.NewObj();
