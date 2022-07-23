@@ -60,6 +60,9 @@ This project depends on the following 3rd-party packags at runtime:
 4. A tree-like hierarchical persistant registry.
 
 ---
+[`Sat Jul 23 2022 07:56:59 PM Beijing`]   
+1. took two days to block some of the security holes in authentication mode. The request flow control must also be enabled at the same time.
+
 [`Wed Jul 20 2022 09:34:11 PM Beijing`]   
 1. Made build for raspberry pi work.
 2. Continued fixing bugs in `rpcfs`, and fixed some regression bugs.
