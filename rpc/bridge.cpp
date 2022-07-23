@@ -105,6 +105,10 @@ gint32 CRpcTcpBridgeProxy::InitUserFuncs()
         CRpcTcpBridgeProxy::CheckRouterPath,
         SYS_METHOD_CHECK_ROUTERPATH );
 
+    END_IFPROXY_MAP;
+
+    BEGIN_IFPROXY_MAP( CRpcMinBridge, false );
+
     ADD_PROXY_METHOD_EX( 1,
         CRpcTcpBridgeProxy::Handshake,
         SYS_METHOD_HANDSAKE );
@@ -244,7 +248,7 @@ gint32 CRpcTcpBridgeProxy::Handshake(
     do{
         CParamList oOptions;
         CParamList oResp;
-        EnumClsid iid = iid( CRpcTcpBridge );
+        EnumClsid iid = iid( CRpcMinBridge );
         const string& strIfName =
             CoGetIfNameFromIid( iid, "p" );
 
@@ -790,6 +794,9 @@ gint32 CRpcTcpBridgeProxy::ForwardRequest(
                 propPath2, pReqCtx );
         }
 
+
+        oBuilder[ propIfName ] = 
+            DBUS_IF_NAME( "CRpcMinBridge" );
 
         // just to conform to the rule
         oBuilder.Push( oReqCtx.GetCfg() );
@@ -4898,6 +4905,10 @@ gint32 CRpcTcpBridge::InitUserFuncs()
     ADD_SERVICE_HANDLER(
         CRpcTcpBridge::CheckRouterPath,
         SYS_METHOD_CHECK_ROUTERPATH );
+
+    END_HANDLER_MAP;
+
+    BEGIN_IFHANDLER_MAP( CRpcMinBridge );
 
     ADD_SERVICE_HANDLER(
         CRpcTcpBridge::Handshake,

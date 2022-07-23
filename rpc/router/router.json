@@ -49,14 +49,6 @@
                     "BindToClsid": "true"
                 },
                 {
-                    "InterfaceName": "IInterfaceServer",
-                    "Pausable": "false"
-                },
-                {
-                    "InterfaceName": "IUnknown",
-                    "Pausable": "false"
-                },
-                {
                     "InterfaceName": "IStream",
                     "Pausable": "false"
                 },
@@ -66,6 +58,10 @@
                 },
                 {
                     "InterfaceName": "CRpcTcpBridge",
+                    "Pausable": "false"
+                },
+                {
+                    "InterfaceName": "CRpcMinBridge",
                     "Pausable": "false"
                 }
             ]

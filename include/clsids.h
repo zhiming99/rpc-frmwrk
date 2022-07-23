@@ -349,6 +349,7 @@ typedef enum : guint32
     DECL_IID( IAuthenticateServer ),
     DECL_IID( CFuseServicePoint ),
     DECL_IID( IAuthenticateProxy ),
+    DECL_IID( CRpcMinBridge ),
     DECL_CLSID( ReservedIidEnd ) = 0x1FFFFFFF,
     DECL_CLSID( UserClsidStart ) = 0x20000000,
 
