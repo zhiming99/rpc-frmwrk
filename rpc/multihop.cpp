@@ -1285,7 +1285,7 @@ gint32 CRpcRouterBridge::ClearRemoteEventsMH(
 
         pTaskGrp->SetClientNotify( pCallback );
 
-        std::map< guint32, std::vector< ObjPtr > >
+        std::map< InterfPtr, std::vector< ObjPtr > >
             mapIfMatches;
 
         for( auto pObj : vecMatches )
@@ -1324,13 +1324,14 @@ gint32 CRpcRouterBridge::ClearRemoteEventsMH(
                 continue;
 
             guint32 dwPortId = 0;
-            ret = oMatch.GetIntProp(
-                propPrxyPortId, dwPortId );
+            InterfPtr pIf;
+            ret = GetBridgeProxyByPath(
+                strPath, pIf );
             if( ERROR( ret ) )
                 continue;
-            
+
             std::vector< ObjPtr >& vecIfMatches =
-                mapIfMatches[ dwPortId ];
+                mapIfMatches[ pIf ];
 
             std::string strNode;
             ret = GetNodeName( strPath, strNode );
@@ -1358,11 +1359,7 @@ gint32 CRpcRouterBridge::ClearRemoteEventsMH(
 
         for( auto elem : mapIfMatches )
         {
-            InterfPtr pIf;
-
-            ret = GetBridgeProxy(
-                elem.first, pIf );
-
+            InterfPtr pIf = elem.first;
             if( ERROR( ret ) )
                 continue;
 
@@ -1375,7 +1372,6 @@ gint32 CRpcRouterBridge::ClearRemoteEventsMH(
                 pvecTaskIds = itr->second;
                 mapTaskIds.erase( itr );
             }
-                
             
             CRpcTcpBridgeProxy* pProxy = pIf;
 
@@ -1384,7 +1380,7 @@ gint32 CRpcRouterBridge::ClearRemoteEventsMH(
             ( *pvecIfMat )() = elem.second;
 
             ret = DEFER_IFCALLEX_NOSCHED2(
-                1, pTask, ObjPtr( pProxy ),
+                2, pTask, ObjPtr( pProxy ),
                 &CRpcTcpBridgeProxy::ClearRemoteEvents,
                 ObjPtr( pvecIfMat ),
                 ObjPtr( pvecTaskIds ),
@@ -1399,7 +1395,7 @@ gint32 CRpcRouterBridge::ClearRemoteEventsMH(
         {
             TaskletPtr pTask;
             ret = DEFER_IFCALLEX_NOSCHED2(
-                1, pTask, elem.first,
+                2, pTask, elem.first,
                 &CRpcTcpBridgeProxy::ClearRemoteEvents,
                 ObjPtr( pvecIfMat ),
                 ObjPtr( elem.second ),

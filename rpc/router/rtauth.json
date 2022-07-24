@@ -16,15 +16,8 @@
                 {
                     "Comment-0": "the following attributes are mandatory",
                     "InterfaceName": "CRpcReqForwarderImpl",
+                    "DummyInterface": "true",
                     "BindToClsid": "true"
-                },
-                {
-                    "InterfaceName": "IInterfaceServer",
-                    "Pausable": "false"
-                },
-                {
-                    "InterfaceName": "IUnknown",
-                    "Pausable": "false"
                 },
                 {
                     "InterfaceName": "CRpcReqForwarder",
@@ -48,13 +41,8 @@
                 {
                     "Comment-0": "the following attributes are mandatory",
                     "InterfaceName": "CRpcReqForwarderAuthImpl",
+                    "DummyInterface": "true",
                     "BindToClsid": "true"
-                },
-                {
-                    "InterfaceName": "IInterfaceServer"
-                },
-                {
-                    "InterfaceName": "IUnknown"
                 },
                 {
                     "InterfaceName": "CRpcReqForwarder"
@@ -81,6 +69,7 @@
                 {
                     "Comment-0": "the following attributes are mandatory",
                     "InterfaceName": "CRpcTcpBridgeImpl",
+                    "DummyInterface": "true",
                     "BindToClsid": "true"
                 },
                 {
@@ -153,19 +142,8 @@
                 {
                     "Comment-0": "the following attributes are mandatory",
                     "InterfaceName": "CRpcRouterReqFwdrAuthImpl",
+                    "DummyInterface": "true",
                     "BindToClsid": "true"
-                },
-                {
-                    "InterfaceName": "IInterfaceServer",
-                    "Pausable": "false"
-                },
-                {
-                    "InterfaceName": "IUnknown",
-                    "Pausable": "false"
-                },
-                {
-                    "InterfaceName": "CRpcRouterReqFwdrAuth",
-                    "Pausable": "false"
                 }
             ]
         },
@@ -189,19 +167,8 @@
                 {
                     "Comment-0": "the following attributes are mandatory",
                     "InterfaceName": "CRpcRouterBridgeAuthImpl",
+                    "DummyInterface": "true",
                     "BindToClsid": "true"
-                },
-                {
-                    "InterfaceName": "IInterfaceServer",
-                    "Pausable": "false"
-                },
-                {
-                    "InterfaceName": "IUnknown",
-                    "Pausable": "false"
-                },
-                {
-                    "InterfaceName": "CRpcRouterBridge",
-                    "Pausable": "false"
                 },
                 {
                     "comment": "this is the destination interface for authentication",
@@ -263,11 +230,8 @@
             "Interfaces": [
                 {
                     "InterfaceName": "CRpcRouterManagerImpl",
+                    "DummyInterface": "true",
                     "BindToClsid": "true"
-                },
-                {
-                    "InterfaceName": "IInterfaceServer",
-                    "Pausable": "false"
                 }
             ],
             "MaxRequests": "4096",

@@ -214,23 +214,39 @@ gint32 CRpcTcpBridgeAuth::EnableInterfaces()
             break;
         }
         std::vector< MatchPtr > vecMatches;
+        const char* szName = CoGetClassName(
+            this->GetClsid() );
+
+        stdstr strClass = DBUS_IF_NAME( szName );
         for( auto& elem : m_vecMatches )
         {
             CCfgOpenerObj oMatch(
                 ( CObjBase* )elem );
-            std::string strIfName;
             bool bDummy = true;
             ret = oMatch.GetBoolProp(
                 propDummyMatch, bDummy );
             if( ERROR( ret ) )
                 continue;
 
-            if( bDummy )
+            if( !bDummy )
+                continue;
+
+            std::string strIfName;
+            if( strClass == strIfName )
             {
-                oMatch.RemoveProperty(
-                    propDummyMatch );
-                vecMatches.push_back( elem );
+                // this is a true dummy interface
+                continue;
             }
+
+            ret = oMatch.GetStrProp(
+                propIfName, strIfName );
+            if( ERROR( ret ) )
+                continue;
+
+            oMatch.RemoveProperty(
+                propDummyMatch );
+
+            vecMatches.push_back( elem );
         }
 
         if( vecMatches.empty() )
@@ -298,6 +314,8 @@ gint32 CRpcTcpBridgeAuth::EnableInterfaces()
 
         if( SUCCEEDED( ret ) )
         {
+            ( *pRespCb )( eventCancelTask );
+
             CParamList oParms;
             oParams[ propReturnValue ] = 0;
 
@@ -314,15 +332,6 @@ gint32 CRpcTcpBridgeAuth::EnableInterfaces()
         }
 
     }while( 0 );
-
-    if( !ERROR( ret ) )
-        return ret;
-
-    if( !pTaskGrp.IsEmpty() )
-        ( *pTaskGrp )( eventCancelTask );
-
-    if( pRespCb.IsEmpty() )
-        ( *pRespCb )( eventCancelTask );
 
     return ret;
 };

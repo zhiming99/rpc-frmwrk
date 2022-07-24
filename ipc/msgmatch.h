@@ -1169,6 +1169,7 @@ class CRouterRemoteMatch : public CMessageMatch
 
             CCfgOpener oCfg2( ( IConfigDb* )GetCfg() );
             IConfigDb* prhs = pMatch->GetCfg();
+            CCfgOpener orhs( prhs );
 
             ret = oCfg2.CopyProp(
                 propDestDBusName, prhs );
@@ -1176,13 +1177,18 @@ class CRouterRemoteMatch : public CMessageMatch
             if( ERROR( ret ) )
                 break;
 
-            ret = oCfg2.CopyProp( propRouterPath, prhs );
+            ret = oCfg2.CopyProp( propPortId, prhs );
             if( ERROR( ret ) )
                 break;
 
-            ret = oCfg2.CopyProp( propPortId, prhs );
-            if( oCfg2.IsEqual(
-                propRouterPath, std::string( "/" ) ) )
+            stdstr strPath;
+            ret = orhs.GetStrProp(
+                propRouterPath, strPath );
+            if( ERROR( ret ) )
+                break;
+
+            oCfg2.SetStrProp( propRouterPath, strPath );
+            if( strPath == "/" )
                 break;
 
             // optional
