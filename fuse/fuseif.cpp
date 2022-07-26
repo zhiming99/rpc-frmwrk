@@ -740,7 +740,7 @@ gint32 CFuseDirectory::fs_rmdir(
         pStopTasks->AppendTask( pRmDir );
 
         TaskletPtr pGrp = pStopTasks;
-        ret = pMgr->RescheduleTask( pGrp );
+        ret = pIf->AddSeqTask( pGrp );
         if( SUCCEEDED( ret ) )
             ret = STATUS_PENDING;
 
@@ -1245,6 +1245,10 @@ gint32 CFuseCmdFile::fs_write_buf(
         return ret;
 
     do{
+        IEventSink* pCallback = nullptr;
+        if( d && d->pCb )
+            pCallback = d->pCb;
+
         if( vecOutBufs.size() != 1 )
         {
             ret = -EINVAL;
@@ -1306,7 +1310,9 @@ gint32 CFuseCmdFile::fs_write_buf(
             else
             {
                 DIR_SPTR pObj;
-                ret = pParent->FindSvcDir( strSvc, pObj );
+                ret = pParent->FindSvcDir(
+                    strSvc, pObj );
+
                 if( ERROR( ret ) )
                     pSd = nullptr;
                 else
@@ -1314,27 +1320,17 @@ gint32 CFuseCmdFile::fs_write_buf(
             }
             if( pSd == nullptr && strCmd == "reload" )
             {
-                TaskletPtr pCallback;
-                ret = pCallback.NewObj(
-                    clsid( CIfDummyTask ) );
-                if( ERROR( ret ) )
-                    break;
-
-                IEventSink* pDummy = pCallback;
                 fuse_file_info fi1 = {0};
-                fi1.fh = ( intptr_t )pDummy;
+                if( pCallback != nullptr )
+                    fi1.fh = ( intptr_t )pCallback;
 
                 ret = pParent->fs_mkdir(
                     strSvc.c_str(), &fi1, S_IRWXU );
-
-                if( ret == STATUS_PENDING )
-                    ret = 0;
-
                 break;
             }
             auto pSvcDir = dynamic_cast
                 < CFuseSvcDir* >( pSd );
-            if( pSvcDir == nullptr )
+            if( pSd == nullptr || pSvcDir == nullptr )
             {
                 // not a svcpoint directory
                 ret = -EACCES;
@@ -1357,14 +1353,14 @@ gint32 CFuseCmdFile::fs_write_buf(
                     auto pSvr = dynamic_cast
                         < CFuseSvcServer* >( pIf );
                     ret = pSvr->RestartSvcPoint(
-                        nullptr );
+                        pCallback );
                 }
                 else
                 {
                     auto pProxy = dynamic_cast
                         < CFuseSvcProxy* >( pIf );
                     ret = pProxy->RestartSvcPoint(
-                        nullptr );
+                        pCallback );
                 }
             }
             else
@@ -1374,19 +1370,16 @@ gint32 CFuseCmdFile::fs_write_buf(
                     auto pSvr = dynamic_cast
                         < CFuseSvcServer* >( pIf );
                     ret = pSvr->ReloadSvcPoint(
-                        nullptr );
+                        pCallback );
                 }
                 else
                 {
                     auto pProxy = dynamic_cast
                         < CFuseSvcProxy* >( pIf );
                     ret = pProxy->ReloadSvcPoint(
-                        nullptr );
+                        pCallback );
                 }
             }
-
-            if( ret == STATUS_PENDING )
-                ret = 0;
         }
         else if( strCmd == "loadl" )
         {
@@ -1476,10 +1469,11 @@ gint32 CFuseCmdFile::fs_write_buf(
             }
 
             gint32 ( *func )( const stdstr&,
-               EnumClsid, const stdstr& ) =
+               EnumClsid, const stdstr&, IEventSink* ) =
                ([]( const stdstr& strDesc,
                    EnumClsid iClsid,
-                   const stdstr& strObj )->gint32
+                   const stdstr& strObj,
+                   IEventSink* pCallback )->gint32
             {
                 gint32 ret = 0;
                 do{
@@ -1491,14 +1485,14 @@ gint32 CFuseCmdFile::fs_write_buf(
                     {
                         ret = ps->AddSvcPoint(
                             strObj, strDesc,
-                            iClsid, false );
+                            iClsid, pCallback );
                             break;
                     }
                     else
                     {
                         ret = pp->AddSvcPoint(
                             strObj, strDesc,
-                            iClsid, false );
+                            iClsid, pCallback );
                     }
                 }while( 0 );
 
@@ -1509,13 +1503,15 @@ gint32 CFuseCmdFile::fs_write_buf(
             TaskletPtr pTask;
             ret = NEW_FUNCCALL_TASK( pTask,
                 pMgr, func, strDesc, iClsid,
-                strSvc );
+                strSvc, pCallback );
 
             if( ERROR( ret ) )
                 break;
 
             ret = pMgr->RescheduleTask(
                  pTask, true );
+            if( SUCCEEDED( ret ) )
+                ret = STATUS_PENDING;
             break;
         }
 

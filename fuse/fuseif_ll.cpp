@@ -177,7 +177,8 @@ void fuseif_ll_read(fuse_req_t req,
     gint32 ret = 0;
     do{
         fuse* pFuse = GetFuse();
-        fuseif_intr_data* d = new fuseif_intr_data;
+        auto d = ( fuseif_intr_data* )
+            calloc( 1, sizeof( fuseif_intr_data ) );
         d->fe = ( CFuseObjBase* )fi->fh;
         fuseif_prepare_interrupt( pFuse, req, d );
         fuse_bufvec* buf = nullptr;
@@ -192,7 +193,7 @@ void fuseif_ll_read(fuse_req_t req,
 
         fuseif_finish_interrupt( pFuse, req, d );
         if( d != nullptr )
-            delete d;
+            free( d );
 
         fuseif_complete_read(
             pFuse, req, ret, buf );
@@ -208,16 +209,52 @@ void fuseif_ll_write_buf(fuse_req_t req,
     off_t off, fuse_file_info *fi)
 {
     gint32 ret = 0;
+
+    auto d = ( fuseif_intr_data* )
+        calloc( 1, sizeof( fuseif_intr_data ) );
     do{
         fuse* pFuse = GetFuse();
-        fuseif_intr_data* d = new fuseif_intr_data;
         d->fe = ( CFuseObjBase* )fi->fh;
+        if( unlikely( d->fe == nullptr ) )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        TaskletPtr pCallback;
+        auto pCmd = dynamic_cast
+            < CFuseCmdFile* >( d->fe );
+        if( unlikely( pCmd != nullptr ) )
+        {
+            // extra parameter for cmdfile
+            CParamList oParams;
+            CRpcServices* pSvc = GetRootIf();
+            if( unlikely( pSvc == nullptr ) )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            oParams.SetPointer(
+                propIoMgr, pSvc->GetIoMgr() );
+            ret = pCallback.NewObj(
+                clsid( CSyncCallback ),
+                oParams.GetCfg() );
+            if( ERROR( ret ) )
+                break;
+            d->pCb = pCallback;
+        }
+
         fuseif_prepare_interrupt( pFuse, req, d );
         ret = SafeCall( "write_buf", false,
-            &CFuseObjBase:: fs_write_buf,
+            &CFuseObjBase::fs_write_buf,
             nullptr, fi, req, buf, d );
+        if( ret == STATUS_PENDING &&
+            !pCallback.IsEmpty() )
+        {
+            CSyncCallback* pSync = pCallback;
+            pSync->WaitForCompleteWakable();
+            ret = pSync->GetError();
+        }
         fuseif_finish_interrupt( pFuse, req, d );
-        delete d;
         if( SUCCEEDED( ret ) )
             fuse_reply_write(
                 req, fuseif_buf_size( buf ) );
@@ -225,6 +262,7 @@ void fuseif_ll_write_buf(fuse_req_t req,
             fuse_reply_err( req, -ret );
 
     }while( 0 );
+    free( d );
 
     return;
 }

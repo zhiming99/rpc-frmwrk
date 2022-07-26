@@ -1879,10 +1879,6 @@ class CFuseServicePoint :
         {
         case eventDBusOffline:
             {
-                ret = this->SetStateOnEvent( iEvent );
-                if( ERROR( ret ) )
-                    break;
-
                 TaskletPtr pTask;
                 CIoManager* pMgr = this->GetIoMgr();
                 bool bRestart = true;
@@ -1894,6 +1890,19 @@ class CFuseServicePoint :
                     RestartSvcPoint( nullptr );
                     break;
                 }
+
+                CStdRMutex oIfLock( this->GetLock() );
+
+                gint32 ret =
+                    this->SetStateOnEvent( iEvent );
+
+                if( ERROR( ret ) )
+                    break;
+
+                if( this->GetState() == stateStopped )
+                    break;
+
+                oIfLock.Unlock();
 
                 TaskletPtr pStopTask;
                 ret = DEFER_IFCALLEX_NOSCHED2(
@@ -2006,45 +2015,11 @@ class CFuseServicePoint :
     gint32 RestartSvcPoint( IEventSink* pCallback )
     {
         gint32 ret = 0;
+        TaskGrpPtr pGrp;
+
         do{
             TaskletPtr pStopTask;
-            EnumIfState iState = this->GetState();
-            if( iState == stateStopped )
-            {
-                ret = ERROR_STATE;
-                DebugPrintEx( logErr, ret,
-                "Cannot 'restart' when the "
-                "svc point is fully stopped. Use "
-                "'reload' to start the svc point." );
-                break;
-            }
-            else if( iState == stateStarting )
-            {
-                ret = ERROR_STATE;
-                DebugPrintEx( logErr, ret,
-                "Cannot 'restart' when the svc point "
-                "is still in the starting stage. Use "
-                "'reload' to start the svc point." );
-                break;
-            }
 
-            ret = DEFER_IFCALLEX_NOSCHED2(
-                0, pStopTask, this,
-                &CRpcServices::StopEx, 
-                ( IEventSink* )nullptr );
-
-            if( ERROR( ret ) )
-                break;
-
-            ObjVecPtr pvecMatches( true );
-            for( auto& elem : this->m_vecMatches )
-            {
-                ObjPtr pObj( elem );
-                ( *pvecMatches )().push_back( pObj );
-            }
-
-            ObjPtr pMatches = pvecMatches;
-            TaskGrpPtr pGrp;
             CParamList oParams;
             oParams[ propIfPtr ] = ObjPtr( this );
             ret = pGrp.NewObj(
@@ -2055,6 +2030,81 @@ class CFuseServicePoint :
             if( pCallback != nullptr )
                 pGrp->SetClientNotify( pCallback );
 
+            CStdRMutex oIfLock( this->GetLock() );
+            EnumIfState iState = this->GetState();
+
+            if( iState == stateStarting ||
+                iState == stateStopping )
+            {
+                ret = ERROR_STATE;
+                DebugPrintEx( logErr, ret,
+                "the svc point is already"
+                " undergoing starting "
+                "or stopping. Please standby." );
+                break;
+            }
+
+            ObjVecPtr pvecMatches( true );
+            if( iState != stateStopped )
+            {
+                ret = this->SetStateOnEvent( cmdShutdown );
+                if( ERROR( ret ) )
+                    break;
+
+                ret = DEFER_IFCALLEX_NOSCHED2(
+                    0, pStopTask, this,
+                    &CRpcServices::StopEx, 
+                    ( IEventSink* )nullptr );
+
+                if( ERROR( ret ) )
+                    break;
+
+                pGrp->AppendTask( pStopTask );
+
+                for( auto& elem : this->m_vecMatches )
+                {
+                    ObjPtr pObj( elem );
+                    ( *pvecMatches )().push_back( pObj );
+                }
+                oIfLock.Unlock();
+            }
+            else
+            {
+                // stopped already
+                oIfLock.Unlock();
+
+                // the m_vecMatches is cleared at this
+                // point. rebuild the interface matches
+                // from the config file.
+                stdstr strPath, strName; 
+                CCfgOpenerObj oIfCfg( this );
+                ret = oIfCfg.GetStrProp(
+                    propObjDescPath, strPath );
+                if( ERROR( ret ) )
+                    break;
+
+                ret = oIfCfg.GetStrProp(
+                    propObjName, strName );
+                if( ERROR( ret ) )
+                    break;
+
+                CfgPtr pCfg;
+                ret = CRpcServices::LoadObjDesc(
+                    strPath, strName,
+                    this->IsServer(), pCfg );
+                if( ERROR( ret ) )
+                    break;
+
+                ObjPtr pObj;
+                CCfgOpener oCfg( ( IConfigDb* )pCfg );
+                ret = oCfg.GetObjPtr( propObjList, pObj );
+                if( ERROR( ret ) )
+                    break;
+
+                pvecMatches = pObj;
+            }
+
+            ObjPtr pMatches = pvecMatches;
             TaskletPtr pStartTask;
             ret = DEFER_IFCALLEX_NOSCHED2(
                 0, pStartTask, this,
@@ -2069,9 +2119,17 @@ class CFuseServicePoint :
             oTaskCfg.SetObjPtr(
                 propMatchMap, pMatches );
 
-            pGrp->AppendTask( pStopTask );
-            pGrp->AppendTask( pStartTask );
             TaskletPtr pTask = pGrp;
+            if( pGrp->GetTaskCount() )
+                pGrp->AppendTask( pStartTask );
+            else
+                pTask = pStartTask;
+
+            if( pCallback != nullptr )
+            {
+                CIfRetryTask* pRetry = pTask;
+                pRetry->SetClientNotify( pCallback );
+            }
 
             InterfPtr pRootIf = GetRootIf();
             CRpcServices* pRootSvc = pRootIf;
@@ -2083,6 +2141,11 @@ class CFuseServicePoint :
             break;
 
         }while( 0 );
+
+        if( ERROR( ret ) && pGrp->GetTaskCount() )
+        {
+            ( *pGrp )( eventCancelTask );
+        }
 
         return ret;
     }
@@ -2115,7 +2178,7 @@ class CFuseServicePoint :
 
             // start a dedicated thread for this
             ret = pMgr->RescheduleTask(
-                pMkDir, true );
+                pMkDir, !this->IsServer() );
 
             if( SUCCEEDED( ret ) )
                 ret = pMkDir->GetError();
@@ -2557,7 +2620,6 @@ class CFuseRootBase:
     }
 
     gint32 DoAddSvcPoint(
-        IEventSink* pCallback,
         ObjPtr& pSvc,
         const stdstr& strInstName,
         HANDLE lwsi )
@@ -2623,10 +2685,6 @@ class CFuseRootBase:
                 psi->m_strSvcName.size();
 
         }while( 0 );
-
-        if( pCallback != nullptr )
-            pCallback->OnEvent(
-                eventTaskComp, ret, 0, nullptr );
 
         return ret;
     };
@@ -2750,8 +2808,8 @@ class CFuseRootBase:
             ret = DEFER_OBJCALL_NOSCHED(
                 pUpdTask, this,
                 &CFuseRootBase::DoAddSvcPoint,
-                pCallback, ObjPtr( pSp ),
-                strInstName, ( HANDLE )psi );
+                ObjPtr( pSp ), strInstName,
+                ( HANDLE )psi );
             if( ERROR( ret ) )
                 break;
 
@@ -2765,8 +2823,14 @@ class CFuseRootBase:
             if( ERROR( ret ) )
                 break;
 
+            if( pCallback != nullptr )
+                pTransGrp->SetClientNotify( pCallback );
+
             pTransGrp->AddRollback( pStopTask );
-            ret = this->AddSeqTask( pTaskGrp, true );
+            ret = this->AddSeqTask(
+                pTaskGrp, true );
+            if( SUCCEEDED( ret ) )
+                ret = pTaskGrp->GetError();
 
         }while( 0 );
 
@@ -2792,7 +2856,7 @@ class CFuseRootBase:
         const stdstr& strName,
         const stdstr& strDesc,
         EnumClsid iClsid,
-        bool bSync = true )
+        IEventSink* pCallback = nullptr )
     {
         if( strName.empty() ||
             strDesc.empty() ||
@@ -2827,13 +2891,8 @@ class CFuseRootBase:
 
             oLock.Unlock();
 
-            if( !bSync )
+            if( pCallback != nullptr )
             {
-                TaskletPtr pCallback;
-                ret = pCallback.NewObj(
-                    clsid( CIfDummyTask ) );
-                if( ERROR( ret ) )
-                    break;
                 ret = AddSvcPoint(
                     strName, pCallback );
                 break;
@@ -3020,6 +3079,7 @@ struct fuseif_intr_data {
     pthread_cond_t cond;
     int finished;
     rpcf::CFuseObjBase* fe;
+    rpcf::IEventSink* pCb;
 };
 
 gint32 fuseif_main( fuse_args& args,

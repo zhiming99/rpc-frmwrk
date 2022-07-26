@@ -383,6 +383,7 @@ gint32 CFuseBdgeList::UpdateContent()
         oVal[ "Connections" ] = oArray;
         m_strContent = Json::writeString(
             oBuilder, oVal );
+        m_strContent.append( 1, '\n' );
 
     }while( 0 );
 
@@ -574,6 +575,7 @@ gint32 CFuseBdgeProxyList::UpdateContent()
         oVal[ "Connections" ] = oArray;
         m_strContent = Json::writeString(
             oBuilder, oVal );
+        m_strContent.append( 1, '\n' );
 
     }while( 0 );
 
@@ -667,6 +669,7 @@ gint32 CFuseSessionFile::UpdateContent()
         oVal[ "Sessions" ] = oArray;
         m_strContent = Json::writeString(
             oBuilder, oVal );
+        m_strContent.append( 1, '\n' );
 
     }while( 0 );
 
