@@ -2047,7 +2047,11 @@ class CFuseServicePoint :
             ObjVecPtr pvecMatches( true );
             if( iState != stateStopped )
             {
-                ret = this->SetStateOnEvent( cmdShutdown );
+                if( iState == stateStartFailed )
+                    ret = this->SetStateOnEvent( cmdCleanup );
+                else
+                    ret = this->SetStateOnEvent( cmdShutdown );
+
                 if( ERROR( ret ) )
                     break;
 

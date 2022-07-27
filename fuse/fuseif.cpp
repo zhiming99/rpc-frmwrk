@@ -1494,7 +1494,13 @@ gint32 CFuseCmdFile::fs_write_buf(
                             strObj, strDesc,
                             iClsid, pCallback );
                     }
+
                 }while( 0 );
+                if( ret != STATUS_PENDING )
+                {
+                    pCallback->OnEvent( eventTaskComp,
+                        ret, 0, nullptr );
+                }
 
                 return ret;
             });
