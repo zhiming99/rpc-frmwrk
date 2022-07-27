@@ -127,7 +127,7 @@ gint32 CDBusProxyFdo::BuildSendDataMsg(
         // because in the pdo, the config data is
         // already serialized
 
-        // correct the objpath and if name
+        // correct the objpath and destination
         string strRtName;
         GetIoMgr()->GetRouterName( strRtName );
 
@@ -135,11 +135,6 @@ gint32 CDBusProxyFdo::BuildSendDataMsg(
             strRtName, REQFWDR_NAME );
 
         pMsg.SetPath( strPath );
-
-        string strIfName =
-            DBUS_IF_NAME( IFNAME_REQFORWARDER );
-
-        pMsg.SetInterface( strIfName );
 
         string strDest = DBUS_DESTINATION2(
                 strRtName,

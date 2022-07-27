@@ -1280,6 +1280,9 @@ gint32 CRpcBasePort::IsIfSvrOnline(
                     ret = ENOTCONN;
                 break;
             }
+            else
+                ret = 0;
+
             ++itr;
         }
 

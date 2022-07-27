@@ -159,6 +159,7 @@ inline std::string DBUS_DESTINATION(
 // service
 #define IFNAME_REQFORWARDER             "CRpcReqForwarder"
 #define IFNAME_TCP_BRIDGE               "CRpcTcpBridge"
+#define IFNAME_MIN_BRIDGE               "CRpcMinBridge"
 
 #define IFNAME_REQFORWARDERAUTH         "CRpcReqForwarderAuth"
 

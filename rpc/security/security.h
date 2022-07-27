@@ -656,7 +656,7 @@ class CRpcReqForwarderAuth :
     gint32 GetIidEx(
         std::vector< guint32 >& vecIids ) const override
     {
-        vecIids.push_back( iid( CRpcReqForwarder ) );
+        super::GetIidEx( vecIids );
         vecIids.push_back( iid( CRpcReqForwarderAuth ) );
         return 0;
     }

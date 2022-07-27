@@ -634,7 +634,7 @@ gint32 CRpcTcpBridgeProxy::BuildBufForIrpFwrdReq(
             DBUS_DESTINATION( strRtName );
 
         string strIfName = DBUS_IF_NAME(
-            "CRpcMinBridge" );
+            IFNAME_MIN_BRIDGE );
 
 
         ret = pMsg.NewObj();
@@ -796,7 +796,7 @@ gint32 CRpcTcpBridgeProxy::ForwardRequest(
 
 
         oBuilder[ propIfName ] = 
-            DBUS_IF_NAME( "CRpcMinBridge" );
+            DBUS_IF_NAME( IFNAME_MIN_BRIDGE );
 
         // just to conform to the rule
         oBuilder.Push( oReqCtx.GetCfg() );
@@ -4258,6 +4258,9 @@ gint32 CRpcInterfaceServer::ValidateRequest_SendData(
     return ret;
 }
 
+const stdstr IFNAME_FWRDREQ =
+    DBUS_IF_NAME( IFNAME_MIN_BRIDGE );
+
 gint32 CRpcInterfaceServer::DoInvoke(
     DBusMessage* pReqMsg,
     IEventSink* pCallback )
@@ -4329,6 +4332,13 @@ gint32 CRpcInterfaceServer::DoInvoke(
                 {
                     qwFwdrTaskId =
                         ( guint64& )*vecArgs[ 2 ].second;
+
+                    stdstr strIf = pMsg.GetInterface();
+                    if( strIf != IFNAME_FWRDREQ  )
+                    {
+                        ret = -EINVAL;
+                        break;
+                    }
                 }
 
                 // NOTE: bring the retrieving of the

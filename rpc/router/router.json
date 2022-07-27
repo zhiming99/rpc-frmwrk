@@ -16,18 +16,15 @@
                 {
                     "Comment-0": "the following attributes are mandatory",
                     "InterfaceName": "CRpcReqForwarderImpl",
+                    "DummyInterface": "true",
                     "BindToClsid": "true"
                 },
                 {
-                    "InterfaceName": "IInterfaceServer",
-                    "Pausable": "false"
-                },
-                {
-                    "InterfaceName": "IUnknown",
-                    "Pausable": "false"
-                },
-                {
                     "InterfaceName": "CRpcReqForwarder",
+                    "Pausable": "false"
+                },
+                {
+                    "InterfaceName": "IStream",
                     "Pausable": "false"
                 }
             ]
@@ -79,19 +76,8 @@
                 {
                     "Comment-0": "the following attributes are mandatory",
                     "InterfaceName": "CRpcRouterReqFwdrImpl",
+                    "DummyInterface": "true",
                     "BindToClsid": "true"
-                },
-                {
-                    "InterfaceName": "IInterfaceServer",
-                    "Pausable": "false"
-                },
-                {
-                    "InterfaceName": "IUnknown",
-                    "Pausable": "false"
-                },
-                {
-                    "InterfaceName": "CRpcRouterReqFwdr",
-                    "Pausable": "false"
                 }
             ]
         },
@@ -108,19 +94,8 @@
                 {
                     "Comment-0": "the following attributes are mandatory",
                     "InterfaceName": "CRpcRouterBridgeImpl",
+                    "DummyInterface": "true",
                     "BindToClsid": "true"
-                },
-                {
-                    "InterfaceName": "IInterfaceServer",
-                    "Pausable": "false"
-                },
-                {
-                    "InterfaceName": "IUnknown",
-                    "Pausable": "false"
-                },
-                {
-                    "InterfaceName": "CRpcRouterBridge",
-                    "Pausable": "false"
                 }
             ],
             "Nodes": [
@@ -176,11 +151,8 @@
             "Interfaces": [
                 {
                     "InterfaceName": "CRpcRouterManagerImpl",
+                    "DummyInterface": "true",
                     "BindToClsid": "true"
-                },
-                {
-                    "InterfaceName": "IInterfaceServer",
-                    "Pausable": "false"
                 }
             ],
             "MaxRequests": "4096",

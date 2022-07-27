@@ -743,7 +743,7 @@ class CRpcReqForwarder :
     gint32 GetIidEx( std::vector< guint32 >& vecIids ) const override
     {
         vecIids.push_back( iid( IStream ) );
-        vecIids.push_back( iid( IStreamMH ) );
+        vecIids.push_back( iid( CRpcReqForwarder ) );
         return 0;
     }
 
@@ -1371,6 +1371,16 @@ class CRpcTcpBridge :
         pGrp = m_pGrpRfc;
         if( pGrp.IsEmpty() )
             return -EFAULT;
+        return 0;
+    }
+
+    gint32 GetIidEx(
+        std::vector< guint32 >& vecIids ) const override
+    {
+        vecIids.push_back( iid( IStream ) );
+        vecIids.push_back( iid( IStreamMH ) );
+        vecIids.push_back( iid( CRpcMinBridge ) );
+        vecIids.push_back( iid( CRpcTcpBridge ) );
         return 0;
     }
 

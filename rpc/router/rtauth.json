@@ -22,6 +22,10 @@
                 {
                     "InterfaceName": "CRpcReqForwarder",
                     "Pausable": "false"
+                },
+                {
+                    "InterfaceName": "IStream",
+                    "Pausable": "false"
                 }
             ],
             "TaskScheduler": "RR"
@@ -49,6 +53,9 @@
                 },
                 {
                     "InterfaceName": "CRpcReqForwarderAuth"
+                },
+                {
+                    "InterfaceName": "IStream"
                 }
             ],
             "TaskScheduler": "RR"
