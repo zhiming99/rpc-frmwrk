@@ -51,10 +51,10 @@ This project depends on the following 3rd-party packags at runtime:
 7. `c++11 is required, and make sure the GCC is 5.x or higher.`
 8. `python 3.5+ is required for Python support.`
 9. `Java OpenJDK 8 or higher for Java support.`
-10. `FUSE-3 for rpcfs`
+10. `FUSE-3 for rpcfs support`
 
 #### Todo
-1. Tutorials
+1. Skelton code generator for `rpcfs` programming
 2. Performance Tuning
 3. Adaptive flow control
 4. A tree-like hierarchical persistant registry.
