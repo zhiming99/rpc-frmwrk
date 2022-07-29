@@ -509,6 +509,13 @@ class CFuseObjBase : public CDirEntry
         bool bReload )
     { return -ENOSYS; }
 
+    virtual gint32 fs_lseek(
+        const char* path,
+        fuse_file_info* fi,
+        off_t off, int whence,
+        off_t& offr )
+    { return -ENOSYS; }
+
     protected:
     gint32 CopyFromPipe(
         BufPtr& pBuf, fuse_buf* src );
@@ -1105,6 +1112,7 @@ class CFuseStmFile : public CFuseFileEntry
     std::atomic< bool >  m_bFlowCtrl;
     gint32 SendBufVec( OUTREQ& oreq );
     gint32 FillIncomingQue();
+    sem_t m_semFlowCtrl;
 
     public:
 
@@ -1117,6 +1125,7 @@ class CFuseStmFile : public CFuseFileEntry
     {
         SetClassId( clsid( CFuseStmFile ) );
         SetMode( S_IRUSR | S_IWUSR );
+        Sem_Init( &m_semFlowCtrl, 0, 0 );
     }
 
     inline bool GetFlowCtrl() const
@@ -1189,6 +1198,11 @@ class CFuseStmFile : public CFuseFileEntry
         const char* path,
         fuse_file_info * fi ) override;
 
+    gint32 fs_lseek(
+        const char* path,
+        fuse_file_info* fi,
+        off_t off, int whence,
+        off_t& offr ) override;
 };
 
 class CFuseStmEvtFile : public CFuseEvtFile

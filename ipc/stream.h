@@ -249,7 +249,7 @@ class CStreamProxy :
         return 0;
     }
 
-    gint32 OnFCLifted( HANDLE hChannel )
+    gint32 OnFCLifted( HANDLE hChannel ) override
     { return 0; }
 
     virtual gint32 OnPreStop( IEventSink* pCallback )
@@ -330,7 +330,7 @@ class CStreamServer :
         return 0;
     }
 
-    gint32 OnFCLifted( HANDLE hChannel )
+    gint32 OnFCLifted( HANDLE hChannel ) override
     { return 0; }
 
     virtual gint32 OnPreStop( IEventSink* pCallback )

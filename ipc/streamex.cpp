@@ -262,6 +262,51 @@ bool CIfStmReadWriteTask::CanSend()
     return bRet;
 }
 
+gint32 CIfStmReadWriteTask::PopWriteRequest()
+{
+    gint32 ret = 0;
+    do{
+        size_t size = m_queRequests.size();
+        m_queRequests.pop_front();
+        if( IsReading() )
+            break;
+        if( size == STM_MAX_PACKETS_REPORT )
+        {
+            CRpcServices* pSvc = nullptr;
+            GET_STMPTR2( pSvc, ret );
+            if( ERROR( ret ) )
+                return ret;
+
+            TaskletPtr pTask;
+            if( pSvc->IsServer() )
+            {
+                CStreamServerSync* pIf =
+                    ObjPtr( pSvc );
+                ret = DEFER_IFCALLEX_NOSCHED(
+                    pTask, ObjPtr( pSvc ),
+                    &CStreamServerSync::OnWriteResumed,
+                    m_hChannel );
+            }
+            else
+            {
+                CStreamProxySync* pIf =
+                    ObjPtr( pSvc );
+                ret = DEFER_IFCALLEX_NOSCHED(
+                    pTask, ObjPtr( pSvc ),
+                    &CStreamProxySync::OnWriteResumed,
+                    m_hChannel );
+            }
+            if( ERROR( ret ) )
+                break;
+
+            CIoManager* pMgr = pSvc->GetIoMgr();
+            pMgr->RescheduleTask( pTask );
+        }
+
+    }while( 0 );
+
+    return ret;
+}
 gint32 CIfStmReadWriteTask::OnFCLifted()
 {
     CStdRTMutex oTaskLock( GetLock() );
@@ -276,7 +321,7 @@ gint32 CIfStmReadWriteTask::OnFCLifted()
             stmevtLifted, ret );
     }
     else
-    {
+    {/*
         CRpcServices* pSvc = nullptr;
         GET_STMPTR2( pSvc, ret );
         if( ERROR( ret ) )
@@ -297,7 +342,7 @@ gint32 CIfStmReadWriteTask::OnFCLifted()
                 ObjPtr( pSvc );
             pIf->OnWriteResumed( hChannel );
         }
-    }
+    */}
     return 0;
 }
 
@@ -490,7 +535,7 @@ gint32 CIfStmReadWriteTask::OnIoIrpComplete(
         {
             pBuf->SetOffset( pExt->dwOffset );
             pBuf->SetTailOff( pExt->dwTailOff );
-            m_queRequests.pop_front();
+            PopWriteRequest();
             iRet = pCurIrp->GetStatus();
             COMPLETE_IRP( pCurIrp, iRet );
         }
@@ -509,7 +554,7 @@ gint32 CIfStmReadWriteTask::OnIoIrpComplete(
                 }
                 pBuf->SetOffset( pExt->dwOffset );
                 pBuf->SetTailOff( pExt->dwTailOff );
-                m_queRequests.pop_front();
+                PopWriteRequest();
                 COMPLETE_IRP( pCurIrp, iRet );
             }
         }
@@ -1114,7 +1159,7 @@ gint32 CIfStmReadWriteTask::RunTask()
         CStdRMutex oIrpLock( pIrp->GetLock() );
         if( pIrp->GetState() != IRP_STATE_READY )
         {
-            m_queRequests.pop_front();
+            PopWriteRequest();
             continue;
         }
         if( pIrp->IsSubmited() )
@@ -1159,7 +1204,7 @@ gint32 CIfStmReadWriteTask::RunTask()
             if( ERROR( ret ) )
                 break;
 
-            m_queRequests.pop_front();
+            PopWriteRequest();
             COMPLETE_IRP( pIrp, ret );
             // move on to the next
         }
@@ -1191,7 +1236,7 @@ gint32 CIfStmReadWriteTask::RunTask()
             {
                 pBuf->SetOffset( pExt->dwOffset );
                 pBuf->SetTailOff( pExt->dwTailOff );
-                m_queRequests.pop_front();
+                PopWriteRequest();
                 COMPLETE_IRP( pIrp, ret );
                 continue;
             }
@@ -1205,7 +1250,7 @@ gint32 CIfStmReadWriteTask::RunTask()
             {
                 pBuf->SetOffset( pExt->dwOffset );
                 pBuf->SetTailOff( pExt->dwTailOff );
-                m_queRequests.pop_front();
+                PopWriteRequest();
                 COMPLETE_IRP( pIrp, ret );
                 continue;
             }
@@ -1222,7 +1267,7 @@ gint32 CIfStmReadWriteTask::RunTask()
                     ret = 0;
                 pBuf->SetOffset( pExt->dwOffset );
                 pBuf->SetTailOff( pExt->dwTailOff );
-                m_queRequests.pop_front();
+                PopWriteRequest();
                 COMPLETE_IRP( pIrp, ret );
             }
         }

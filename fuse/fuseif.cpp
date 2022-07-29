@@ -2355,7 +2355,8 @@ gint32 CFuseStmFile::SendBufVec( OUTREQ& oreq )
         // system load is not very high.
         if( pStmSvr != nullptr )
         {
-            if( IsNonBlock() )
+            if( IsNonBlock() && pBuf->size() <
+                STM_MAX_BYTES_PER_BUF )
             {
                 ret = pStmSvr->WriteStreamNoWait(
                     hstm, pBuf );
@@ -2363,12 +2364,15 @@ gint32 CFuseStmFile::SendBufVec( OUTREQ& oreq )
                     ret = 0;
             }
             else
+            {
                 ret = pStmSvr->WriteStreamAsync(
                     hstm, pBuf, ( IEventSink* )pCb );
+            }
         }
         else
         {
-            if( IsNonBlock() )
+            if( IsNonBlock() && pBuf->size() <
+                STM_MAX_BYTES_PER_BUF )
             {
                 ret = pStmProxy->WriteStreamNoWait(
                     hstm, pBuf );
@@ -2376,8 +2380,10 @@ gint32 CFuseStmFile::SendBufVec( OUTREQ& oreq )
                     ret = 0;
             }
             else
+            {
                 ret = pStmProxy->WriteStreamAsync(
                     hstm, pBuf, pCb );
+            }
         }
 
         if( ret == STATUS_PENDING )
@@ -2421,15 +2427,23 @@ gint32 CFuseStmFile::fs_write_buf(
         // this is a synchronous call since the bufvec
         // is controlled by the caller
 
-        if( GetFlowCtrl() )
-        {
-            ret = -EAGAIN;
-            break;
-        }
-
         OUTREQ oreq = { req, bufvec,
                 bufvec->idx, PINTR( d ) };
-        ret = SendBufVec( oreq );
+        do{
+            if( GetFlowCtrl() )
+            {
+                ret = Sem_Wait_Wakable(
+                    &m_semFlowCtrl );
+
+                if( ERROR( ret ) )
+                    break;
+            }
+
+            ret = SendBufVec( oreq );
+            if( ret == -EAGAIN )
+                continue;
+            break;
+        }while( 1 );
         oreq.pintr.release();
 
     }while( 0 );
@@ -2442,15 +2456,8 @@ gint32 CFuseStmFile::OnWriteResumed()
     do{
         CFuseMutex oFileLock( GetLock() );
         SetFlowCtrl( false );
-        fuse_pollhandle* ph =
-                GetPollHandle();
-        if( ph != nullptr )
-        {
-            fuse_notify_poll( ph );
-            SetPollHandle( nullptr );
-        }
-        break;
-
+        NotifyPoll();
+        sem_post( &m_semFlowCtrl );
     }while( 0 );
 
     return ret;
@@ -2614,6 +2621,17 @@ gint32 CFuseStmFile::fs_release(
     }while( 0 );
 
     return ret;
+}
+
+gint32 CFuseStmFile::fs_lseek(
+    const char* path,
+    fuse_file_info* fi,
+    off_t off, int whence, off_t& offr )
+{
+    DebugPrint( 0, "lseek entered, off=%lld"
+        "whence=%ld", off, whence );
+    offr = off;
+    return 0;
 }
 
 gint32 CFuseFileEntry::CancelFsRequest(
@@ -5168,6 +5186,18 @@ int fuseop_rmdir(
         path, nullptr, false );
 }
 
+
+off_t fuseop_lseek (const char * path,
+    off_t off, int whence,
+    struct fuse_file_info * fi)
+{
+    off_t offr = 0;
+    gint32 ret = SafeCall( "lseek", false,
+        &CFuseObjBase::fs_lseek,
+        path, fi, off, whence, offr );
+    return offr;
+}
+
 gint32 fuseif_remkdir(
     const stdstr& strPath,
     guint32 dwMode )
@@ -5256,6 +5286,7 @@ static fuse_operations fuseif_ops =
     .utimens = fuseop_utimens,
     .ioctl = fuseop_ioctl,
     .poll = fuseop_poll,
+    .lseek = fuseop_lseek,
 };
 /* Command line parsing */
 struct options {

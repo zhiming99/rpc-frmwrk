@@ -10,6 +10,18 @@ import select
 import fcntl
 import array
 
+def setBlocking( fp : object )->int:
+    try:
+        return fcntl.ioctl( fp.fileno(), 0x4a00 )
+    except Exception as err:
+        print( err )
+
+def setNonBlocking( fp : object )->int:
+    try:
+        return fcntl.ioctl( fp.fileno(), 0x4a01 )
+    except Exception as err:
+        print( err )
+
 def getBytesAvail( fp : object )->int:
     buf=array.array('i',[0])
     res = fcntl.ioctl( fp.fileno(), 0x80044a02, buf, 1 )
