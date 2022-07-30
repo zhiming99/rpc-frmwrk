@@ -266,11 +266,11 @@ gint32 CIfStmReadWriteTask::PopWriteRequest()
 {
     gint32 ret = 0;
     do{
-        size_t size = m_queRequests.size();
         m_queRequests.pop_front();
         if( IsReading() )
             break;
-        if( size == STM_MAX_PACKETS_REPORT )
+        size_t size = m_queRequests.size();
+        if( size == STM_MAX_PACKETS_REPORT - 1 )
         {
             CRpcServices* pSvc = nullptr;
             GET_STMPTR2( pSvc, ret );
@@ -695,10 +695,7 @@ gint32 CIfStmReadWriteTask::GetPendingReqs(
 {
     gint32 ret = 0;
 
-    if( !IsReading() )
-        return -EINVAL;
-
-    if( m_bDiscard )
+    if( IsReading() && m_bDiscard )
         return ERROR_STATE;
 
     do{

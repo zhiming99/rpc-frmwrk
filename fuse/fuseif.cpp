@@ -868,6 +868,7 @@ gint32 CFuseDirectory::fs_readdir(
         CFuseMutex oLock( GetLock() );
         std::vector< DIR_SPTR > vecChildren;
         GetChildren( vecChildren );
+        oLock.Unlock();
         for( auto& elem : vecChildren )
         {
             auto pObj = dynamic_cast
@@ -1739,6 +1740,7 @@ gint32 CFuseStmFile::fs_ioctl(
                     CStreamProxyFuse* pProxy = pIf;
                     HANDLE hstm = GetStream();
 
+                    oLock.Unlock();
                     if( pSvr != nullptr )
                     {
                         ret = pSvr->GetPendingBytes(
@@ -1820,6 +1822,115 @@ gint32 CFuseStmFile::fs_unlink(
     return ret;
 }
 
+gint32 CFuseStmFile::StartNextRead( BufPtr& pBuf )
+{
+    gint32 ret = 0;
+    do{
+        InterfPtr pIf = GetIf();
+        CRpcServices* pSvc = pIf;
+        CStreamServerSync* pStmSvr = pIf;
+        CStreamProxySync* pStmProxy = pIf;
+        guint32 dwPReq = 0;
+        HANDLE hStream = GetStream();
+        if( pStmSvr != nullptr )
+        {
+            ret = pStmSvr->GetPendingReqs(
+                hStream, dwPReq );
+        }
+        else
+        {
+            ret = pStmProxy->GetPendingReqs(
+                hStream, dwPReq );
+        }
+        if( ERROR( ret ) )
+            break;
+
+        if( dwPReq > 0 )
+        {
+            ret = STATUS_PENDING;
+            break;
+        }
+        
+        if( pStmSvr != nullptr )
+        {
+            ret = pStmSvr->ReadStreamAsync(
+                hStream, pBuf,
+                ( IConfigDb* )nullptr );
+        }
+        else
+        {
+            ret = pStmProxy->ReadStreamAsync(
+                hStream, pBuf,
+                ( IConfigDb* )nullptr );
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CFuseStmFile::OnCompleteReadReq()
+{
+    gint32 ret = 0;
+    CFuseMutex oLock( GetLock() );
+    do{
+        size_t dwAvail = GetBytesAvail();
+        if( m_queReqs.empty() && dwAvail > 0  )
+        {
+            guint32 dwFlags = POLLIN;
+            SetRevents( GetRevents() | dwFlags );
+            NotifyPoll();
+            break;
+        }
+
+        while( m_queReqs.size() > 0 && dwAvail > 0 )
+        {
+            auto& elem = m_queReqs.front();
+            fuse_req_t req = elem.req;
+            size_t dwReqSize = elem.dwReqSize;
+            auto d = elem.pintr.get();
+            fuse_bufvec* bufvec = nullptr;
+
+            // the vector to keep the buffer valid
+            size_t dwToRead = dwReqSize;
+            if( dwToRead > dwAvail )
+                break;
+
+            std::vector< BufPtr > vecRemoved;
+            ret = FillBufVec(
+                dwToRead, m_queIncoming,
+                vecRemoved, bufvec );
+            fuseif_finish_interrupt(
+                GetFuse(), req, d );
+            if( dwToRead > 0 )
+                fuse_reply_data(
+                    req, bufvec, FUSE_BUF_SPLICE_MOVE );
+            else
+                fuse_reply_err( req, 0 );
+            fuseif_free_buf( bufvec );
+            m_queReqs.pop_front();
+            dwAvail -= dwToRead;
+        }
+
+        if( m_queReqs.empty() )
+            break;
+
+        oLock.Unlock();
+        BufPtr pBuf;
+        ret = StartNextRead( pBuf );
+        if( ERROR( ret ) )
+            break;
+        if( ret == STATUS_PENDING )
+            break;
+
+        oLock.Lock();
+        m_queIncoming.push_back( {pBuf, 0} );
+
+    }while( 1 );
+
+    return ret;
+}
+
 gint32 CFuseStmFile::OnReadStreamComplete(
     HANDLE hStream,
     gint32 iRet,
@@ -1828,8 +1939,8 @@ gint32 CFuseStmFile::OnReadStreamComplete(
 {
     UNREFERENCED( pCtx );
     gint32 ret = 0;
+    CFuseMutex oLock( GetLock() );
     do{
-        CFuseMutex oLock( GetLock() );
         if( m_queReqs.empty() )
         {
             guint32 dwFlags = POLLIN;
@@ -1849,12 +1960,7 @@ gint32 CFuseStmFile::OnReadStreamComplete(
                     m_queIncoming.pop_front();
             }
             SetRevents( GetRevents() | dwFlags );
-            fuse_pollhandle* ph = GetPollHandle();
-            if( ph != nullptr )
-            {
-                fuse_notify_poll( ph );
-                SetPollHandle( nullptr );
-            }
+            NotifyPoll();
             break;
         }
 
@@ -1885,19 +1991,26 @@ gint32 CFuseStmFile::OnReadStreamComplete(
             fuse_bufvec* bufvec = nullptr;
 
             // the vector to keep the buffer valid
-            size_t dwToRead =
-                std::min( dwAvail, dwToRead );
+            size_t dwToRead = dwReqSize;
+            if( dwToRead > dwAvail )
+                break;
+
             std::vector< BufPtr > vecRemoved;
-            ret = FillBufVec(
-                dwToRead, m_queIncoming,
-                vecRemoved, bufvec );
+            if( dwToRead > 0 )
+            {
+                FillBufVec( dwToRead, m_queIncoming,
+                    vecRemoved, bufvec );
+            }
+
             fuseif_finish_interrupt(
                 GetFuse(), req, d );
+
             if( dwToRead > 0 )
                 fuse_reply_data(
                     req, bufvec, FUSE_BUF_SPLICE_MOVE );
             else
                 fuse_reply_err( req, 0 );
+
             fuseif_free_buf( bufvec );
             m_queReqs.pop_front();
             dwAvail -= dwToRead;
@@ -1907,53 +2020,23 @@ gint32 CFuseStmFile::OnReadStreamComplete(
             break;
 
         oLock.Unlock();
-        InterfPtr pIf = GetIf();
-        CRpcServices* pSvc = pIf;
-        CStreamServerSync* pStmSvr = pIf;
-        CStreamProxySync* pStmProxy = pIf;
-        guint32 dwPReq = 0;
-        if( pStmSvr != nullptr )
-        {
-            ret = pStmSvr->GetPendingReqs(
-                hStream, dwPReq );
-        }
-        else
-        {
-            ret = pStmProxy->GetPendingReqs(
-                hStream, dwPReq );
-        }
+        ret = StartNextRead( pBuf );
         if( ERROR( ret ) )
+            break;
+        if( ret == STATUS_PENDING )
             break;
 
-        if( dwPReq > 0 )
-            break;
-        
-        if( pStmSvr != nullptr )
-        {
-            ret = pStmSvr->ReadStreamAsync(
-                hStream, pBuf,
-                ( IConfigDb* )nullptr );
-        }
-        else
-        {
-            ret = pStmProxy->ReadStreamAsync(
-                hStream, pBuf,
-                ( IConfigDb* )nullptr );
-        }
-        if( ret == STATUS_PENDING )
-        {
-            ret = 0;
-            break;
-        }
-        if( ERROR( ret ) )
-            iRet = ret;
+        iRet = ret;
+        oLock.Lock();
+        m_queIncoming.push_back( { pBuf, 0 } );
 
     }while( 1 );
 
     return ret;
 }
 
-gint32 CFuseStmFile::FillIncomingQue()
+gint32 CFuseStmFile::FillIncomingQue(
+    std::vector<INBUF>& vecIncoming )
 {
     gint32 ret = 0;
     do{
@@ -1994,7 +2077,7 @@ gint32 CFuseStmFile::FillIncomingQue()
                 break;
 
             dwSize -= pBuf->size();
-            m_queIncoming.push_back( { pBuf, 0 } );
+            vecIncoming.push_back( { pBuf, 0 } );
         }
 
     }while( 0 );
@@ -2016,23 +2099,26 @@ gint32 CFuseStmFile::fs_read(
         if( size == 0 )
             break;
 
-        CFuseMutex oFileLock( GetLock() );
+        std::vector< INBUF > vecIncoming;
+        FillIncomingQue( vecIncoming );
+
+        CFuseMutex oLock( GetLock() );
         if( m_queReqs.size() > MAX_STM_QUE_SIZE )
         {
             ret = -EAGAIN;
             break;
         }
 
-        ret = FillIncomingQue();
-        if( ERROR( ret ) )
-            break;
+        auto endPos = m_queIncoming.end();
+        if( vecIncoming.size() )
+            m_queIncoming.insert( endPos,
+                vecIncoming.begin(),
+                vecIncoming.end());
 
         guint32 dwAvail = GetBytesAvail();
         guint32 dwPReqs = 0;
 
         CRpcServices* pSvc = GetIf();
-        CStreamServerSync* pStmSvr = ObjPtr( pSvc );
-        CStreamProxySync* pStmProxy = ObjPtr( pSvc );
         HANDLE hstm = GetStream();
 
         if( pSvc->GetState() != stateConnected )
@@ -2061,13 +2147,10 @@ gint32 CFuseStmFile::fs_read(
                     m_queReqs.front().dwReqSize;
             if( dwReqSize <= dwAvail )
             {
-                BufPtr pBuf = m_queIncoming.back().pBuf;
-                m_queIncoming.pop_back();
                 gint32 (*func)( CRpcServices*,
-                    CFuseStmFile*, BufPtr& ) =
+                    CFuseStmFile* ) =
                     ([]( CRpcServices* pIf,
-                        CFuseStmFile* pFile,
-                        BufPtr& pBuf_ )->gint32
+                        CFuseStmFile* pFile )->gint32
                 {
                     gint32 ret = 0;
                     do{
@@ -2076,15 +2159,13 @@ gint32 CFuseStmFile::fs_read(
                         {
                             CFuseSvcServer* pSvr = ObjPtr( pIf );
                             RLOCK_TESTMNT2( pSvr );
-                            pFile->OnReadStreamComplete(
-                                hstm, 0, pBuf_, nullptr ); 
+                            pFile->OnCompleteReadReq(); 
                         }
                         else
                         {
                             CFuseSvcProxy* pProxy = ObjPtr( pIf );
                             RLOCK_TESTMNT2( pProxy );
-                            pFile->OnReadStreamComplete(
-                                hstm, 0, pBuf_, nullptr ); 
+                            pFile->OnCompleteReadReq(); 
                         }
 
                     }while( 0 );
@@ -2094,12 +2175,16 @@ gint32 CFuseStmFile::fs_read(
                 CIoManager* pMgr = pSvc->GetIoMgr();
                 TaskletPtr pTask;
                 ret = NEW_FUNCCALL_TASK( pTask,
-                    pMgr, func, pSvc, this, pBuf );
+                    pMgr, func, pSvc, this );
                 if( ERROR( ret ) )
                     break;
                 ret = pMgr->RescheduleTask( pTask );
             }
             break;
+        }
+        else if( m_queReqs.size() )
+        {
+            m_queReqs.pop_front();
         }
 
         size_t dwBytesRead = 0;
@@ -2115,56 +2200,30 @@ gint32 CFuseStmFile::fs_read(
         else
         {
             ret = STATUS_PENDING;
+            m_queReqs.push_front(
+                { req, size, PINTR( d ) } );
         }
 
         if( dwBytesRead > 0 )
         {
-            ret = FillBufVec(
+            FillBufVec(
                 dwBytesRead, m_queIncoming,
                 vecBackup, bufvec );
-            if( ret == STATUS_PENDING )
-                ret = ERROR_STATE;
-        }
-        else if( ret == STATUS_PENDING )
-        {
-            m_queReqs.push_back(
-                { req, size, PINTR( d ) } );
         }
 
-        if( pStmSvr != nullptr )
-        {
-            pStmSvr->GetPendingReqs( hstm, dwPReqs );
-        }
-        else
-        {
-            pStmProxy->GetPendingReqs( hstm, dwPReqs );
-        }
-
-        bool bRead =
-            ( dwPReqs == 0 && m_queReqs.size() );
-
-        if( !bRead )
-            break;
-
+        oLock.Unlock();
         BufPtr pBuf;
-        gint32 iRet = 0;
-        if( pStmSvr != nullptr )
-        {
-            iRet = pStmSvr->ReadStreamAsync( hstm,
-                pBuf, ( IConfigDb* )nullptr );
-        }
-        else
-        {
-            iRet = pStmProxy->ReadStreamAsync( hstm,
-                pBuf, ( IConfigDb* )nullptr );
-        }
+        gint32 iRet = StartNextRead( pBuf );
         if( ERROR( iRet ) )
             break;
 
         if( iRet == STATUS_PENDING )
             break;
 
+        oLock.Lock();
         m_queIncoming.push_back( { pBuf, 0 } );
+        if( bufvec != nullptr )
+            break;
 
     }while( 1 );
 
@@ -2452,15 +2511,9 @@ gint32 CFuseStmFile::fs_write_buf(
 
 gint32 CFuseStmFile::OnWriteResumed()
 {
-    gint32 ret = 0;
-    do{
-        CFuseMutex oFileLock( GetLock() );
-        SetFlowCtrl( false );
-        NotifyPoll();
-        sem_post( &m_semFlowCtrl );
-    }while( 0 );
-
-    return ret;
+    SetFlowCtrl( false );
+    Sem_Post( &m_semFlowCtrl );
+    return 0;
 }
 
 void CFuseStmFile::NotifyPoll()
@@ -2484,21 +2537,11 @@ gint32 CFuseStmFile::OnWriteStreamComplete(
     BufPtr& pBuf,
     IConfigDb* pCtx )
 {
+    UNREFERENCED( hStream );
+    UNREFERENCED( iRet );
+    UNREFERENCED( pBuf );
     UNREFERENCED( pCtx );
-    gint32 ret = 0;
-    do{
-        CFuseMutex oFileLock( GetLock() );
-        SetFlowCtrl( false );
-        fuse_pollhandle* ph = GetPollHandle();
-        if( ph != nullptr )
-        {
-            fuse_notify_poll( ph );
-            SetPollHandle( nullptr );
-        }
-
-    }while( 0 );
-
-    return ret;
+    return 0;
 }
 
 gint32 CFuseStmFile::fs_poll(
@@ -2509,36 +2552,35 @@ gint32 CFuseStmFile::fs_poll(
 {
     gint32 ret = 0;
     do{
+        gint32 ret = 0;
+        guint32 dwSize = 0;
+
+        HANDLE hstm = GetStream();
+        ObjPtr pObj = GetIf();
+        CStreamProxyFuse* pProxy = pObj;
+        CStreamServerFuse* pSvr = pObj;
+        if( pSvr != nullptr )
+        {
+            ret = pSvr->GetPendingBytes(
+                hstm, dwSize );
+        }
+        else
+        {
+            ret = pProxy->GetPendingBytes(
+                hstm, dwSize );
+        }
+
         CFuseMutex oLock( GetLock() );
+        bool bCanSend = !GetFlowCtrl();
         SetPollHandle( ph );
         if( m_queIncoming.size() > 0 &&
             m_queReqs.empty() )
             *reventsp |= POLLIN;
-        gint32 ret = 0;
-        guint32 dwSize = 0;
-        bool bCanSend = false;
-        {
-            HANDLE hstm = GetStream();
-            ObjPtr pObj = GetIf();
-            CStreamProxyFuse* pProxy = pObj;
-            CStreamServerFuse* pSvr = pObj;
-            if( pSvr != nullptr )
-            {
-                ret = pSvr->GetPendingBytes(
-                    hstm, dwSize );
-                bCanSend = pSvr->CanSend( hstm );
-            }
-            else
-            {
-                ret = pProxy->GetPendingBytes(
-                    hstm, dwSize );
-                bCanSend = pProxy->CanSend( hstm );
-            }
-        }
+
         if( SUCCEEDED( ret ) && dwSize > 0 )
             *reventsp |= POLLIN;
 
-        if( !GetFlowCtrl() && bCanSend )
+        if(  bCanSend )
             *reventsp |= POLLOUT;
 
         *reventsp = ( fi->poll_events &

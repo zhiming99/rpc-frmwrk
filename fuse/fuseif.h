@@ -1111,7 +1111,8 @@ class CFuseStmFile : public CFuseFileEntry
     HANDLE m_hStream = INVALID_HANDLE;
     std::atomic< bool >  m_bFlowCtrl;
     gint32 SendBufVec( OUTREQ& oreq );
-    gint32 FillIncomingQue();
+    gint32 FillIncomingQue(
+        std::vector<INBUF>& vecIncoming );
     sem_t m_semFlowCtrl;
 
     public:
@@ -1149,6 +1150,9 @@ class CFuseStmFile : public CFuseFileEntry
         gint32 iRet,
         BufPtr& pBuf,
         IConfigDb* pCtx );
+
+    gint32 StartNextRead( BufPtr& pRetBuf );
+    gint32 OnCompleteReadReq();
 
     gint32 OnWriteStreamComplete(
         HANDLE hStream,
