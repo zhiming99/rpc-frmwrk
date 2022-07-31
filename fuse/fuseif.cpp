@@ -2371,7 +2371,6 @@ gint32 CFuseStmFile::SendBufVec( OUTREQ& oreq )
         fuse_req_t& req = oreq.req;
         fuse_bufvec* bufvec= oreq.bufvec; 
         size_t& idx = oreq.idx;
-        fuseif_intr_data* pintr = oreq.pintr.get();
 
         InterfPtr pIf = GetIf();
         CRpcServices* pSvc = pIf;
@@ -2395,8 +2394,8 @@ gint32 CFuseStmFile::SendBufVec( OUTREQ& oreq )
         pBuf = vecBufs.front();
         if( vecBufs.size() > 1 )
         {
-            // copying is better than multiple round
-            // trip in performance.
+            // copying is better than multiple
+            // transmission
             if( pBuf->IsNoFree() )
                 pBuf.NewObj();
             else
@@ -2410,13 +2409,21 @@ gint32 CFuseStmFile::SendBufVec( OUTREQ& oreq )
             }
         }
 
-        // write can complete immediately, if the
-        // system load is not very high.
         if( pStmSvr != nullptr )
         {
-            if( IsNonBlock() && pBuf->size() <
+            if( IsNonBlock() && pBuf->size() <=
                 STM_MAX_BYTES_PER_BUF )
             {
+                if( pBuf->IsNoFree() )
+                {
+                    // make a true copy, since the
+                    // buffer would stay in the queue
+                    // if load is high
+                    BufPtr pNewBuf( true );
+                    pNewBuf->Append(
+                        pBuf->ptr(), pBuf->size() );
+                    pBuf = pNewBuf;
+                }
                 ret = pStmSvr->WriteStreamNoWait(
                     hstm, pBuf );
                 if( ret == STATUS_PENDING )
@@ -2430,9 +2437,19 @@ gint32 CFuseStmFile::SendBufVec( OUTREQ& oreq )
         }
         else
         {
-            if( IsNonBlock() && pBuf->size() <
+            if( IsNonBlock() && pBuf->size() <=
                 STM_MAX_BYTES_PER_BUF )
             {
+                if( pBuf->IsNoFree() )
+                {
+                    // make a true copy, since the
+                    // buffer would stay in the queue
+                    // if load is high
+                    BufPtr pNewBuf( true );
+                    pNewBuf->Append(
+                        pBuf->ptr(), pBuf->size() );
+                    pBuf = pNewBuf;
+                }
                 ret = pStmProxy->WriteStreamNoWait(
                     hstm, pBuf );
                 if( ret == STATUS_PENDING )
