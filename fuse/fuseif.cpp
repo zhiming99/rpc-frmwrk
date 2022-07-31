@@ -2364,44 +2364,42 @@ gint32 CFuseObjBase::CopyFromPipe(
     return ret;
 }
 
-gint32 CFuseStmFile::SendBufVec( OUTREQ& oreq )
+gint32 CFuseStmFile::SendBufVec( fuse_bufvec* bufvec )
 {
     gint32 ret = 0;
     do{
-        fuse_req_t& req = oreq.req;
-        fuse_bufvec* bufvec= oreq.bufvec; 
-        size_t& idx = oreq.idx;
-
-        InterfPtr pIf = GetIf();
-        CRpcServices* pSvc = pIf;
-        CStreamServerSync* pStmSvr = pIf;
-        CStreamProxySync* pStmProxy = pIf;
-        HANDLE hstm = GetStream();
-
-        int i = bufvec->idx;
+        if( bufvec == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
         std::vector< BufPtr > vecBufs;
         ret = CopyFromBufVec( vecBufs, bufvec );
         if( ERROR( ret ) )
             break;
 
-        TaskletPtr pCb;
-        ret = pCb.NewObj(
-            clsid( CSyncCallback ) );
-        if( ERROR( ret ) )
+        if( vecBufs.empty() )
+        {
+            ret = -EINVAL;
             break;
+        }
 
         BufPtr pBuf;
         pBuf = vecBufs.front();
-        if( vecBufs.size() > 1 )
+        if( pBuf->IsNoFree() )
+        {
+            // make a true copy, since the
+            BufPtr pNewBuf( true );
+            pNewBuf->Append(
+                pBuf->ptr(), pBuf->size() );
+            pBuf = pNewBuf;
+        }
+
+        vecBufs.erase( vecBufs.begin() );
+        if( vecBufs.size() > 0 )
         {
             // copying is better than multiple
             // transmission
-            if( pBuf->IsNoFree() )
-                pBuf.NewObj();
-            else
-            {
-                vecBufs.erase( vecBufs.begin() );
-            }
             for( auto& elem :vecBufs )
             {
                 pBuf->Append(
@@ -2409,75 +2407,21 @@ gint32 CFuseStmFile::SendBufVec( OUTREQ& oreq )
             }
         }
 
+        InterfPtr pIf = GetIf();
+        CStreamServerSync* pStmSvr = pIf;
+        CStreamProxySync* pStmProxy = pIf;
+        HANDLE hstm = GetStream();
+
         if( pStmSvr != nullptr )
         {
-            if( IsNonBlock() && pBuf->size() <=
-                STM_MAX_BYTES_PER_BUF )
-            {
-                if( pBuf->IsNoFree() )
-                {
-                    // make a true copy, since the
-                    // buffer would stay in the queue
-                    // if load is high
-                    BufPtr pNewBuf( true );
-                    pNewBuf->Append(
-                        pBuf->ptr(), pBuf->size() );
-                    pBuf = pNewBuf;
-                }
-                ret = pStmSvr->WriteStreamNoWait(
-                    hstm, pBuf );
-                if( ret == STATUS_PENDING )
-                    ret = 0;
-            }
-            else
-            {
-                ret = pStmSvr->WriteStreamAsync(
-                    hstm, pBuf, ( IEventSink* )pCb );
-            }
+            ret = pStmSvr->WriteStreamAsync(
+                hstm, pBuf, ( IConfigDb* )nullptr );
         }
         else
         {
-            if( IsNonBlock() && pBuf->size() <=
-                STM_MAX_BYTES_PER_BUF )
-            {
-                if( pBuf->IsNoFree() )
-                {
-                    // make a true copy, since the
-                    // buffer would stay in the queue
-                    // if load is high
-                    BufPtr pNewBuf( true );
-                    pNewBuf->Append(
-                        pBuf->ptr(), pBuf->size() );
-                    pBuf = pNewBuf;
-                }
-                ret = pStmProxy->WriteStreamNoWait(
-                    hstm, pBuf );
-                if( ret == STATUS_PENDING )
-                    ret = 0;
-            }
-            else
-            {
-                ret = pStmProxy->WriteStreamAsync(
-                    hstm, pBuf, pCb );
-            }
+            ret = pStmProxy->WriteStreamAsync(
+                hstm, pBuf, ( IConfigDb* )nullptr );
         }
-
-        if( ret == STATUS_PENDING )
-        {
-            CSyncCallback* pSync = pCb;
-            pSync->WaitForCompleteWakable();
-            ret = pSync->GetError();
-        }
-
-        if( ret == ERROR_QUEUE_FULL )
-        {
-            SetFlowCtrl( true );
-            ret = -EAGAIN;
-            break;
-        }
-
-        if( ERROR( ret ) )
-            break;
 
     }while( 0 );
 
@@ -2500,36 +2444,34 @@ gint32 CFuseStmFile::fs_write_buf(
             ret = -ENOTCONN;
             break;
         }
-        // this is a synchronous call since the bufvec
+
+        // this is an asynchronous call since the bufvec
         // is controlled by the caller
 
-        OUTREQ oreq = { req, bufvec,
-                bufvec->idx, PINTR( d ) };
-        do{
-            if( GetFlowCtrl() )
-            {
-                ret = Sem_Wait_Wakable(
-                    &m_semFlowCtrl );
-
-                if( ERROR( ret ) )
-                    break;
-            }
-
-            ret = SendBufVec( oreq );
-            if( ret == -EAGAIN )
-                continue;
+        ret = Sem_Wait_Wakable( &m_semFlowCtrl );
+        if( ERROR( ret ) )
             break;
-        }while( 1 );
-        oreq.pintr.release();
+
+        ret = SendBufVec( bufvec );
+
+        if( ret == STATUS_PENDING )
+        {
+            ret = 0;
+        }
+        else
+        {
+            Sem_Post( &m_semFlowCtrl );
+        }
 
     }while( 0 );
+
     return ret;
 }
 
 gint32 CFuseStmFile::OnWriteResumed()
 {
-    SetFlowCtrl( false );
-    Sem_Post( &m_semFlowCtrl );
+    DebugPrintEx( logErr, 0,
+        "bugbug, we shoud not be here" );
     return 0;
 }
 
@@ -2558,6 +2500,7 @@ gint32 CFuseStmFile::OnWriteStreamComplete(
     UNREFERENCED( iRet );
     UNREFERENCED( pBuf );
     UNREFERENCED( pCtx );
+    Sem_Post( &m_semFlowCtrl );
     return 0;
 }
 

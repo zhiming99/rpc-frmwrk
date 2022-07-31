@@ -1110,7 +1110,9 @@ class CFuseStmFile : public CFuseFileEntry
 
     HANDLE m_hStream = INVALID_HANDLE;
     std::atomic< bool >  m_bFlowCtrl;
-    gint32 SendBufVec( OUTREQ& oreq );
+
+    gint32 SendBufVec( fuse_bufvec* bufvec );
+
     gint32 FillIncomingQue(
         std::vector<INBUF>& vecIncoming );
     sem_t m_semFlowCtrl;
@@ -1126,7 +1128,8 @@ class CFuseStmFile : public CFuseFileEntry
     {
         SetClassId( clsid( CFuseStmFile ) );
         SetMode( S_IRUSR | S_IWUSR );
-        Sem_Init( &m_semFlowCtrl, 0, 0 );
+        Sem_Init( &m_semFlowCtrl,
+            0, STM_MAX_PACKETS_REPORT - 1 );
     }
 
     inline bool GetFlowCtrl() const
