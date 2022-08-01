@@ -1706,7 +1706,7 @@ gint32 CFuseStmFile::fs_open(
 
     fi->direct_io = 1;
     fi->keep_cache = 0;
-    fi->nonseekable = 1;
+    fi->nonseekable = 0;
     fi->fh = ( guint64 )( CFuseObjBase* )this;
 
     return STATUS_SUCCESS;
@@ -1733,27 +1733,27 @@ gint32 CFuseStmFile::fs_ioctl(
                     break;
 
                 *pSize = GetBytesAvail();
-                guint32 dwSize = 0;
-                {
-                    InterfPtr pIf = GetIf();
-                    CStreamServerFuse* pSvr = pIf;
-                    CStreamProxyFuse* pProxy = pIf;
-                    HANDLE hstm = GetStream();
+                oLock.Unlock();
 
-                    oLock.Unlock();
-                    if( pSvr != nullptr )
-                    {
-                        ret = pSvr->GetPendingBytes(
-                            hstm, dwSize );
-                    }
-                    else
-                    {
-                        ret = pProxy->GetPendingBytes(
-                            hstm, dwSize );
-                    }
-                    if( ERROR( ret ) )
-                        break;
+                guint32 dwSize = 0;
+                InterfPtr pIf = GetIf();
+                CStreamServerFuse* pSvr = pIf;
+                CStreamProxyFuse* pProxy = pIf;
+                HANDLE hstm = GetStream();
+
+                if( pSvr != nullptr )
+                {
+                    ret = pSvr->GetPendingBytes(
+                        hstm, dwSize );
                 }
+                else
+                {
+                    ret = pProxy->GetPendingBytes(
+                        hstm, dwSize );
+                }
+                if( ERROR( ret ) )
+                    break;
+
                 *pSize += dwSize;
 
                 break;
@@ -1939,8 +1939,18 @@ gint32 CFuseStmFile::OnReadStreamComplete(
 {
     UNREFERENCED( pCtx );
     gint32 ret = 0;
-    CFuseMutex oLock( GetLock() );
     do{
+        if( iRet == -ETIMEDOUT )
+        {
+            ret = StartNextRead( pBuf );
+            if( ERROR( ret ) )
+                break;
+            if( ret == STATUS_PENDING )
+                break;
+            iRet = ret;
+            continue;
+        }
+        CFuseMutex oLock( GetLock() );
         if( m_queReqs.empty() )
         {
             guint32 dwFlags = POLLIN;
@@ -2016,9 +2026,6 @@ gint32 CFuseStmFile::OnReadStreamComplete(
             dwAvail -= dwToRead;
         }
 
-        if( m_queReqs.empty() )
-            break;
-
         oLock.Unlock();
         ret = StartNextRead( pBuf );
         if( ERROR( ret ) )
@@ -2029,6 +2036,8 @@ gint32 CFuseStmFile::OnReadStreamComplete(
         iRet = ret;
         oLock.Lock();
         m_queIncoming.push_back( { pBuf, 0 } );
+        if( m_queReqs.empty() )
+            break;
 
     }while( 1 );
 

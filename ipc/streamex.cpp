@@ -383,9 +383,10 @@ gint32 CIfStmReadWriteTask::OnWorkerIrpComplete(
     std::deque< IrpPtr >::iterator
         itr = m_queRequests.begin();
 
+    IrpPtr irpPtr( pIrp );
     for( ; itr != m_queRequests.end(); ++itr )
     {
-        if( *itr == IrpPtr( pIrp ) )
+        if( *itr == irpPtr )
         {
             if( itr == m_queRequests.begin() )
                 bHead = true;
@@ -397,9 +398,8 @@ gint32 CIfStmReadWriteTask::OnWorkerIrpComplete(
 
     if( bFound )
     {
-        pIrp->RemoveCallback();
-        pIrp->RemoveTimer();
-        Sem_Post( &pIrp->m_semWait );
+        gint32 iRet = pIrp->GetStatus();
+        COMPLETE_IRP( irpPtr, iRet );
     }
 
     if( !bHead )
@@ -1358,7 +1358,7 @@ gint32 CIfStmReadWriteTask::WriteStreamInternal(
         return -EINVAL;
     
     gint32 ret = 0;
-    IrpPtr pIrp( true );
+    IrpPtr pIrp;
 
     do{
         CStdRTMutex oTaskLock( GetLock() );
@@ -1375,7 +1375,7 @@ gint32 CIfStmReadWriteTask::WriteStreamInternal(
             ret = ERROR_QUEUE_FULL;
             break;
         }
-
+        pIrp.NewObj();
         pIrp->AllocNextStack( nullptr );
         IrpCtxPtr& pIrpCtx = pIrp->GetTopStack(); 
 
@@ -1519,6 +1519,7 @@ gint32 CIfStmReadWriteTask::ReschedRead()
             pIrp.Clear();
         }
 
+        oTaskLock.Unlock();
         // the buffer needs further
         // processing
         for( auto elem : vecIrps )
@@ -1659,6 +1660,7 @@ gint32 CIfStmReadWriteTask::OnStmRecv(
             pIrp.Clear();
         }
 
+        oTaskLock.Unlock();
         // the buffer needs further
         // processing
         for( auto elem : vecIrps )

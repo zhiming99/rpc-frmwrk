@@ -11,27 +11,20 @@ import array
 from iolib import *
 
 def Usage():
-    print( "Usage: dump the data to a file as from the peer to stream_0 " )
-    print( "\tpython3 dumpStream.py  <path to service point > [path to the dump file]" )
-    print( "\tif the path to the dump file is not given, it will dump to file /tmp/stmdump" )
+    print( "Usage: dump the data over the stream channel to standard output" )
+    print( "\tpython3 tailFile.py  <path to stream file >" )
+    print( "" )
 
-def dumpStream() :
+def tailStream() :
     error = 0
     try:
-        svcdir = sys.argv[ 1 ] + "/streams"
-        if len( sys.argv ) > 2 :
-            dumpFile = sys.argv[ 2 ]
-        else:
-            dumpFile = "/tmp/stmdump"
+        stmFile = sys.argv[ 1 ]
     except Exception as err:
         Usage()
         error = 22
-        return error
-
+        return
     try:
-        stmFile = svcdir + "/stream_0"
         stmfp = open( stmFile, "rb" )
-        dumpfp = open( dumpFile, "wb")
 
         pollobj = select.poll()
         pollobj.register(stmfp, select.POLLIN)
@@ -46,28 +39,24 @@ def dumpStream() :
             if ( flags & select.POLLHUP or
                 flags & select.POLLERR ):
                 break
-            size = getBytesAvail(stmfp)
-            if size == 0 :
-                break
+            size = 65536
             data = stmfp.read(size)
             while len( data ) > 0:
-                dumpfp.write(data)
+                print(data.decode(),end='')
                 data = stmfp.read(size)
 
         print( "done!")
         print( time.time())
         stmfp.close()
-        dumpfp.close()
     except Exception as err:
         print( err )
-        dumpfp.close()
         stmfp.close()
     finally :
         return error
 
 
 def main() :
-    return dumpStream()
+    return tailStream()
 
 if __name__ == "__main__":
     main()

@@ -1128,6 +1128,10 @@ class CFuseStmFile : public CFuseFileEntry
     {
         SetClassId( clsid( CFuseStmFile ) );
         SetMode( S_IRUSR | S_IWUSR );
+
+        // using STM_MAX_PACKETS_REPORT - 1 to avoid
+        // sending out the flow-control-lifted
+        // notification
         Sem_Init( &m_semFlowCtrl,
             0, STM_MAX_PACKETS_REPORT - 1 );
     }

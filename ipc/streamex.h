@@ -1556,8 +1556,13 @@ struct CStreamSyncBase :
         if( !bRead )
             oReqCtx.Push( pBuf );
 
-        return ReadWriteInternal( hChannel,
+        ret = ReadWriteInternal( hChannel,
             pBuf, pCallback, bRead, false );
+
+        if( ret != STATUS_PENDING )
+            ( *pCallback )( eventCancelTask );
+
+        return ret;
     }
 
     /**
