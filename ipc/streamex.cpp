@@ -262,51 +262,56 @@ bool CIfStmReadWriteTask::CanSend()
     return bRet;
 }
 
-gint32 CIfStmReadWriteTask::PopWriteRequest()
+gint32 CIfStmReadWriteTask::NotifyWriteResumed()
 {
     gint32 ret = 0;
     do{
-        m_queRequests.pop_front();
-        if( IsReading() )
-            break;
         size_t size = m_queRequests.size();
-        if( size == STM_MAX_PACKETS_REPORT - 1 )
+        if( size != STM_MAX_PACKETS_REPORT - 1 )
+            break;
+        CRpcServices* pSvc = nullptr;
+        GET_STMPTR2( pSvc, ret );
+        if( ERROR( ret ) )
+            return ret;
+
+        TaskletPtr pTask;
+        if( pSvc->IsServer() )
         {
-            CRpcServices* pSvc = nullptr;
-            GET_STMPTR2( pSvc, ret );
-            if( ERROR( ret ) )
-                return ret;
-
-            TaskletPtr pTask;
-            if( pSvc->IsServer() )
-            {
-                CStreamServerSync* pIf =
-                    ObjPtr( pSvc );
-                ret = DEFER_IFCALLEX_NOSCHED(
-                    pTask, ObjPtr( pSvc ),
-                    &CStreamServerSync::OnWriteResumed,
-                    m_hChannel );
-            }
-            else
-            {
-                CStreamProxySync* pIf =
-                    ObjPtr( pSvc );
-                ret = DEFER_IFCALLEX_NOSCHED(
-                    pTask, ObjPtr( pSvc ),
-                    &CStreamProxySync::OnWriteResumed,
-                    m_hChannel );
-            }
-            if( ERROR( ret ) )
-                break;
-
-            CIoManager* pMgr = pSvc->GetIoMgr();
-            pMgr->RescheduleTask( pTask );
+            CStreamServerSync* pIf =
+                ObjPtr( pSvc );
+            ret = DEFER_IFCALLEX_NOSCHED(
+                pTask, ObjPtr( pSvc ),
+                &CStreamServerSync::OnWriteResumed,
+                m_hChannel );
         }
+        else
+        {
+            CStreamProxySync* pIf =
+                ObjPtr( pSvc );
+            ret = DEFER_IFCALLEX_NOSCHED(
+                pTask, ObjPtr( pSvc ),
+                &CStreamProxySync::OnWriteResumed,
+                m_hChannel );
+        }
+        if( ERROR( ret ) )
+            break;
+
+        CIoManager* pMgr = pSvc->GetIoMgr();
+        pMgr->RescheduleTask( pTask );
 
     }while( 0 );
-
     return ret;
 }
+
+gint32 CIfStmReadWriteTask::PopWriteRequest()
+{
+    m_queRequests.pop_front();
+    if( IsReading() )
+        return STATUS_SUCCESS;
+
+    return NotifyWriteResumed();
+}
+
 gint32 CIfStmReadWriteTask::OnFCLifted()
 {
     CStdRTMutex oTaskLock( GetLock() );
@@ -320,29 +325,6 @@ gint32 CIfStmReadWriteTask::OnFCLifted()
         POST_LOOP_EVENT( m_hChannel, 
             stmevtLifted, ret );
     }
-    else
-    {/*
-        CRpcServices* pSvc = nullptr;
-        GET_STMPTR2( pSvc, ret );
-        if( ERROR( ret ) )
-            return ret;
-
-        HANDLE hChannel = m_hChannel;
-        oTaskLock.Unlock();
-
-        if( pSvc->IsServer() )
-        {
-            CStreamServerSync* pIf =
-                ObjPtr( pSvc );
-            pIf->OnWriteResumed( hChannel );
-        }
-        else
-        {
-            CStreamProxySync* pIf =
-                ObjPtr( pSvc );
-            pIf->OnWriteResumed( hChannel );
-        }
-    */}
     return 0;
 }
 
@@ -398,8 +380,16 @@ gint32 CIfStmReadWriteTask::OnWorkerIrpComplete(
 
     if( bFound )
     {
+        // ugly tweak
+        // at this point, the pIrp is retired and owned
+        // by no one else.
+        pIrp->SetState( pIrp->GetState(),
+            IRP_STATE_READY );
+
         gint32 iRet = pIrp->GetStatus();
         COMPLETE_IRP( irpPtr, iRet );
+        if( !IsReading() )
+            NotifyWriteResumed();
     }
 
     if( !bHead )

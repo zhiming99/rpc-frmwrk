@@ -133,6 +133,7 @@ class CIfStmReadWriteTask :
     gint32 AdjustSizeToWrite( IrpPtr& pIrp,
         BufPtr& pBuf, bool bSlide = false );
 
+    gint32 NotifyWriteResumed();
     gint32 PopWriteRequest();
 
     public:

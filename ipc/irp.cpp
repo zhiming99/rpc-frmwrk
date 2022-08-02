@@ -595,8 +595,8 @@ gint32 IoRequestPacket::OnEvent(
     {
     case eventTimeout:
         {
-            CIoManager* pMgr =
-                reinterpret_cast< CIoManager* >( dwParam1 );
+            CIoManager* pMgr = reinterpret_cast
+                < CIoManager* >( dwParam1 );
 
             if( pMgr == nullptr )
             {
@@ -604,10 +604,18 @@ gint32 IoRequestPacket::OnEvent(
                 break;
             }
 
+            CStdRMutex oLock( GetLock() );
+            ret = CanContinue( IRP_STATE_READY );
+            if( ERROR( ret ) )
+                break;
+            m_iTimerId = -1;
             IrpCtxPtr& pCtx = GetTopStack();
-            ret = -ETIMEDOUT;
-            pCtx->SetStatus( ret );
-            pMgr->CancelIrp( this, true, ret );
+            pCtx->SetStatus( -ETIMEDOUT );
+            oLock.Unlock();
+
+            pMgr->CancelIrp(
+                this, true, -ETIMEDOUT );
+
             break;
         }
     default:
