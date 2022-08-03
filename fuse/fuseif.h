@@ -1117,6 +1117,14 @@ class CFuseStmFile : public CFuseFileEntry
         std::vector<INBUF>& vecIncoming );
     sem_t m_semFlowCtrl;
 
+    gint32 fs_read_blocking(
+        const char* path,
+        fuse_file_info *fi,
+        fuse_req_t req, fuse_bufvec*& bufvec,
+        off_t off, size_t size,
+        std::vector< BufPtr >& vecBackup,
+        fuseif_intr_data* d );
+
     public:
 
     typedef CFuseFileEntry super;

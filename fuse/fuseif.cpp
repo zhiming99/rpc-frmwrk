@@ -45,6 +45,13 @@ void fuseif_prepare_interrupt(
     fuseif_intr_data *d);
 
 void fuseif_free_buf(struct fuse_bufvec *buf);
+
+void fuseif_complete_read(
+    fuse* pFuse,
+    fuse_req_t req,
+    gint32 ret,
+    fuse_bufvec* buf );
+
 namespace rpcf
 {
 InterfPtr g_pRootIf;
@@ -1758,6 +1765,19 @@ gint32 CFuseStmFile::fs_ioctl(
 
                 break;
             }
+        case FIOC_SETNONBLOCK:
+            {
+                CFuseMutex oLock( GetLock() );
+                if( m_queReqs.size() &&
+                    !IsNonBlock() )
+                {
+                    ret = -EBUSY;
+                    break;
+                }
+                SetNonBlock( true );
+                break;
+            }
+        case FIOC_SETBLOCK:
         default:
             ret = super::fs_ioctl( path, fi,
                 cmd, arg, flags, data );
@@ -1872,8 +1892,10 @@ gint32 CFuseStmFile::StartNextRead( BufPtr& pBuf )
 gint32 CFuseStmFile::OnCompleteReadReq()
 {
     gint32 ret = 0;
-    CFuseMutex oLock( GetLock() );
+
     do{
+        CFuseMutex oLock( GetLock() );
+
         size_t dwAvail = GetBytesAvail();
         if( m_queReqs.empty() && dwAvail > 0  )
         {
@@ -1887,46 +1909,33 @@ gint32 CFuseStmFile::OnCompleteReadReq()
         {
             auto& elem = m_queReqs.front();
             fuse_req_t req = elem.req;
-            size_t dwReqSize = elem.dwReqSize;
             auto d = elem.pintr.get();
             fuse_bufvec* bufvec = nullptr;
 
             // the vector to keep the buffer valid
-            size_t dwToRead = dwReqSize;
+            size_t dwToRead = elem.dwReqSize;
             if( dwToRead > dwAvail )
                 break;
 
             std::vector< BufPtr > vecRemoved;
+
             ret = FillBufVec(
                 dwToRead, m_queIncoming,
                 vecRemoved, bufvec );
+            if( ret == STATUS_PENDING )
+                ret = ERROR_STATE;
+
             fuseif_finish_interrupt(
                 GetFuse(), req, d );
-            if( dwToRead > 0 )
-                fuse_reply_data(
-                    req, bufvec, FUSE_BUF_SPLICE_MOVE );
-            else
-                fuse_reply_err( req, 0 );
-            fuseif_free_buf( bufvec );
+
+            fuseif_complete_read(
+                GetFuse(), req, ret, bufvec );
+
             m_queReqs.pop_front();
             dwAvail -= dwToRead;
         }
 
-        if( m_queReqs.empty() )
-            break;
-
-        oLock.Unlock();
-        BufPtr pBuf;
-        ret = StartNextRead( pBuf );
-        if( ERROR( ret ) )
-            break;
-        if( ret == STATUS_PENDING )
-            break;
-
-        oLock.Lock();
-        m_queIncoming.push_back( {pBuf, 0} );
-
-    }while( 1 );
+    }while( 0 );
 
     return ret;
 }
@@ -1940,16 +1949,6 @@ gint32 CFuseStmFile::OnReadStreamComplete(
     UNREFERENCED( pCtx );
     gint32 ret = 0;
     do{
-        if( iRet == -ETIMEDOUT )
-        {
-            ret = StartNextRead( pBuf );
-            if( ERROR( ret ) )
-                break;
-            if( ret == STATUS_PENDING )
-                break;
-            iRet = ret;
-            continue;
-        }
         CFuseMutex oLock( GetLock() );
         if( m_queReqs.empty() )
         {
@@ -1965,12 +1964,13 @@ gint32 CFuseStmFile::OnReadStreamComplete(
             {
                 INBUF a={.pBuf=pBuf,.dwOff=0 };
                 m_queIncoming.push_back( a );
-                if( m_queIncoming.size() >
+                while( m_queIncoming.size() >
                     MAX_STM_QUE_SIZE )
                     m_queIncoming.pop_front();
             }
             SetRevents( GetRevents() | dwFlags );
-            NotifyPoll();
+            // NotifyPoll will b called later in
+            // OnStmRecvFuse
             break;
         }
 
@@ -1996,15 +1996,14 @@ gint32 CFuseStmFile::OnReadStreamComplete(
         {
             auto& elem = m_queReqs.front();
             fuse_req_t req = elem.req;
-            size_t dwReqSize = elem.dwReqSize;
             auto d = elem.pintr.get();
             fuse_bufvec* bufvec = nullptr;
+            size_t dwToRead = elem.dwReqSize;
 
-            // the vector to keep the buffer valid
-            size_t dwToRead = dwReqSize;
             if( dwToRead > dwAvail )
                 break;
 
+            // the vector to keep the buffer valid
             std::vector< BufPtr > vecRemoved;
             if( dwToRead > 0 )
             {
@@ -2015,33 +2014,16 @@ gint32 CFuseStmFile::OnReadStreamComplete(
             fuseif_finish_interrupt(
                 GetFuse(), req, d );
 
-            if( dwToRead > 0 )
-                fuse_reply_data(
-                    req, bufvec, FUSE_BUF_SPLICE_MOVE );
-            else
-                fuse_reply_err( req, 0 );
+            fuseif_complete_read(
+                GetFuse(), req, 0, bufvec );
 
-            fuseif_free_buf( bufvec );
             m_queReqs.pop_front();
             dwAvail -= dwToRead;
         }
 
-        oLock.Unlock();
-        ret = StartNextRead( pBuf );
-        if( ERROR( ret ) )
-            break;
-        if( ret == STATUS_PENDING )
-            break;
+    }while( 0 );
 
-        iRet = ret;
-        oLock.Lock();
-        m_queIncoming.push_back( { pBuf, 0 } );
-        if( m_queReqs.empty() )
-            break;
-
-    }while( 1 );
-
-    return ret;
+    return 0;
 }
 
 gint32 CFuseStmFile::FillIncomingQue(
@@ -2094,7 +2076,7 @@ gint32 CFuseStmFile::FillIncomingQue(
     return ret;
 }
  
-gint32 CFuseStmFile::fs_read(
+gint32 CFuseStmFile::fs_read_blocking(
     const char* path,
     fuse_file_info *fi,
     fuse_req_t req, fuse_bufvec*& bufvec,
@@ -2105,50 +2087,21 @@ gint32 CFuseStmFile::fs_read(
     gint32 ret = 0;
 
     do{
-        if( size == 0 )
-            break;
-
-        std::vector< INBUF > vecIncoming;
-        FillIncomingQue( vecIncoming );
-
-        CFuseMutex oLock( GetLock() );
         if( m_queReqs.size() > MAX_STM_QUE_SIZE )
         {
             ret = -EAGAIN;
             break;
         }
 
-        auto endPos = m_queIncoming.end();
-        if( vecIncoming.size() )
-            m_queIncoming.insert( endPos,
-                vecIncoming.begin(),
-                vecIncoming.end());
-
         guint32 dwAvail = GetBytesAvail();
-        guint32 dwPReqs = 0;
-
-        CRpcServices* pSvc = GetIf();
-        HANDLE hstm = GetStream();
-
-        if( pSvc->GetState() != stateConnected )
-        {
-            ret = -ENOTCONN;
-            break;
-        }
 
         if( m_queReqs.size() &&
             m_queReqs.front().req->unique !=
             req->unique )
         {
-            if( IsNonBlock() )
-            {
-                ret = -EAGAIN;
-                break;
-            }
             // we need to complete the earilier
             // requests before this request
             ret = STATUS_PENDING;
-
             m_queReqs.push_back(
                 { req, size, PINTR( d ) } );
 
@@ -2181,6 +2134,7 @@ gint32 CFuseStmFile::fs_read(
                     return ret;
                 });
 
+                CRpcServices* pSvc = GetIf();
                 CIoManager* pMgr = pSvc->GetIoMgr();
                 TaskletPtr pTask;
                 ret = NEW_FUNCCALL_TASK( pTask,
@@ -2188,6 +2142,8 @@ gint32 CFuseStmFile::fs_read(
                 if( ERROR( ret ) )
                     break;
                 ret = pMgr->RescheduleTask( pTask );
+                if( SUCCEEDED( ret ) )
+                    ret = STATUS_PENDING;
             }
             break;
         }
@@ -2202,39 +2158,66 @@ gint32 CFuseStmFile::fs_read(
         {
             dwBytesRead = size;
         }
-        else if( IsNonBlock() )
-        {
-            dwBytesRead = dwAvail;
-        }
         else
         {
             ret = STATUS_PENDING;
             m_queReqs.push_front(
                 { req, size, PINTR( d ) } );
+            break;
         }
 
-        if( dwBytesRead > 0 )
+        FillBufVec(
+            dwBytesRead, m_queIncoming,
+            vecBackup, bufvec );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CFuseStmFile::fs_read(
+    const char* path,
+    fuse_file_info *fi,
+    fuse_req_t req, fuse_bufvec*& bufvec,
+    off_t off, size_t size,
+    std::vector< BufPtr >& vecBackup,
+    fuseif_intr_data* d )
+{
+    gint32 ret = 0;
+
+    do{
+        if( size == 0 )
+            break;
+
+        std::vector< INBUF > vecIncoming;
+        FillIncomingQue( vecIncoming );
+
+        CFuseMutex oLock( GetLock() );
+
+        auto endPos = m_queIncoming.end();
+        if( vecIncoming.size() )
+            m_queIncoming.insert( endPos,
+                vecIncoming.begin(),
+                vecIncoming.end());
+
+        if( !IsNonBlock() )
         {
-            FillBufVec(
-                dwBytesRead, m_queIncoming,
-                vecBackup, bufvec );
+            ret = fs_read_blocking(
+                path, fi, req, bufvec, off,
+                size, vecBackup, d );
+            break;
         }
 
-        oLock.Unlock();
-        BufPtr pBuf;
-        gint32 iRet = StartNextRead( pBuf );
-        if( ERROR( iRet ) )
-            break;
+        // no-blocking read
+        size_t dwAvail = GetBytesAvail();
+        size_t dwBytesRead = 
+            std::min( size, dwAvail );
 
-        if( iRet == STATUS_PENDING )
-            break;
+        FillBufVec( dwBytesRead,
+            m_queIncoming, vecBackup,
+            bufvec );
 
-        oLock.Lock();
-        m_queIncoming.push_back( { pBuf, 0 } );
-        if( bufvec != nullptr )
-            break;
-
-    }while( 1 );
+    }while( 0 );
 
     return ret;
 }
@@ -2486,16 +2469,13 @@ gint32 CFuseStmFile::OnWriteResumed()
 
 void CFuseStmFile::NotifyPoll()
 {
-    do{
-        CFuseMutex oFileLock( GetLock() );
-        fuse_pollhandle* ph = GetPollHandle();
-        if( ph != nullptr )
-        {
-            fuse_notify_poll( ph );
-            SetPollHandle( nullptr );
-        }
-
-    }while( 0 );
+    CFuseMutex oFileLock( GetLock() );
+    fuse_pollhandle* ph = GetPollHandle();
+    if( ph != nullptr )
+    {
+        fuse_notify_poll( ph );
+        SetPollHandle( nullptr );
+    }
     return;
 }
 
@@ -4231,8 +4211,6 @@ gint32 CStreamServerFuse::OnStmRecv(
     gint32 ret = 0;
     do{
         ret = super::OnStmRecv( hChannel, pBuf );
-        if( ERROR( ret ) )
-            break;
         CFuseSvcServer* pSvc = ObjPtr( this );
         pSvc->OnStmRecvFuse( hChannel, pBuf );
 
@@ -4247,9 +4225,6 @@ gint32 CStreamProxyFuse::OnStmRecv(
     gint32 ret = 0;
     do{
         ret = super::OnStmRecv( hChannel, pBuf );
-        if( ERROR( ret ) )
-            break;
-
         CFuseSvcProxy* pSvc = ObjPtr( this );
         pSvc->OnStmRecvFuse( hChannel, pBuf );
 
