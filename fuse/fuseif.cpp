@@ -179,7 +179,7 @@ gint32 CloseChannel(
             ret = pProxy->OnClose(
                 hStream, pCallback);
         }
-        if( ret == STATUS_PENDING )
+        if( SUCCEEDED( ret ) )
             ret = pSync->WaitForCompleteWakable();
 
     }while( 0 );
