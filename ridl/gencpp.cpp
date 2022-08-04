@@ -7102,14 +7102,22 @@ gint32 CExportObjDesc::Output()
                 strObjList += ",";
         }
 
-        stdstr strCmdLine = "sed \"s:XXXDESTDIR:";
+        stdstr strCmdLine = "s:XXXDESTDIR:";
         strCmdLine += strDesc + ":;" +
             "s:XXXOBJLIST:" + strObjList +
-            ":;\" " + strSrcPy + " > " +
-            strDstPy;
+            ":";
 
-        //printf( "%s\n", strCmdLine.c_str() );
-        system( strCmdLine.c_str() );
+        const char* args[5];
+
+        args[ 0 ] = "/usr/bin/sed";
+        args[ 1 ] = strCmdLine.c_str();
+        args[ 2 ] = strSrcPy.c_str();
+        args[ 3 ] = nullptr;
+        char* env[ 1 ] = { nullptr };
+
+        Execve( "/usr/bin/sed",
+            const_cast< char* const*>( args ),
+            env, strDstPy.c_str() );
 
     }while( 0 );
 
