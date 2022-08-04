@@ -6802,7 +6802,7 @@ gint32 CExportMakefile::Output()
         strLib += strAppName + ".so";
 
         std::string strCmdLine =
-            "sed -i 's:XXXSRCS:";
+            "s:XXXSRCS:";
 
         CFileSet* pFiles = static_cast< CFileSet* >
             ( m_pWriter->m_pFiles.get() );
@@ -6826,13 +6826,21 @@ gint32 CExportMakefile::Output()
         }
 
         if( g_bMklib )
-            strCmdLine += "s:XXXMKLIB:1:' ";
+            strCmdLine += "s:XXXMKLIB:1:";
         else
-            strCmdLine += "s:XXXMKLIB::' ";
+            strCmdLine += "s:XXXMKLIB::";
 
-        strCmdLine += pFiles->m_strMakefile;
-        //printf( "%s\n", strCmdLine.c_str() );
-        system( strCmdLine.c_str() );
+        const char* args[5];
+
+        args[ 0 ] = "/usr/bin/sed";
+        args[ 1 ] = "-i";
+        args[ 2 ] = strCmdLine.c_str();
+        args[ 3 ] = pFiles->m_strMakefile.c_str();
+        args[ 4 ] = nullptr;
+        char* env[ 1 ] = { nullptr };
+
+        Execve( "/usr/bin/sed",
+            const_cast< char* const*>( args ), env );
 
     }while( 0 );
 

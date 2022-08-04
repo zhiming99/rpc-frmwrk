@@ -136,65 +136,6 @@ int main( int argc, char** argv)
 }
 
 //-----Your code begins here---
-#include <sys/types.h>
-#include <sys/wait.h>
-
-gint32 Execve(
-    const char* cmd,
-    char* const args[],
-    char* const env[],
-    const char* szOutput )
-{
-    int ret = 0;
-    pid_t pid = fork();
-    if (pid == -1)
-        return ERROR_FAIL;
-
-    else if (pid != 0)
-    {
-        int status = 0;
-        while( ( ret = waitpid( pid, &status, 0 ) ) == -1 )
-        {
-            if (errno != EINTR) {
-                /* Handle error */
-                ret = -errno;
-                break;
-            }
-        }
-        if ((ret == 0) ||
-            !(WIFEXITED(status) && !WEXITSTATUS(status)))
-        {
-            /* Report unexpected child status */
-            ret = -ECHILD;
-        }
-        else
-        {
-            ret = 0;
-        }
-    }
-    else
-    {
-        if( szOutput != nullptr )
-        {
-           int fd = open( szOutput,
-               O_RDWR | O_CREAT | O_TRUNC,
-               S_IRUSR | S_IWUSR); 
-
-           dup2( fd, 1 );
-           dup2( fd, 2 );
-           close( fd );
-        }
-        /* ... Initialize env as a sanitized copy of
-         * environ ... */
-        if( execve(cmd, args, env) == -1 )
-        {
-            /* Handle error */
-            printf( "error running %s(%d)", cmd, errno );
-            ret = -errno;
-        }
-    }
-    return ret;
-}
 
 gint32 GetMD5( const stdstr& strFile, stdstr& digest )
 {

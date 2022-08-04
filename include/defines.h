@@ -284,6 +284,12 @@ gint32 FindInstCfg(
     const std::string& strFileName,
     std::string& strPath );
 
+gint32 Execve(
+    const char* cmd,
+    char* const args[],
+    char* const env[],
+    const char* szOutput = nullptr );
+
 using stdstr = std::string;
 
 // Event ids for the IEventSink
