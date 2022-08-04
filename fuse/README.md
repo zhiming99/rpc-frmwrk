@@ -32,8 +32,8 @@ Let's use the above generated `rpcfs` to illustrate the control flow.
 ### Using Streams
 * Stream is a binary channel between the server and the proxy. Stream files are those files created under `streams` directory, as shown in the above picture. There is a pair of stream files sharing the same name the `steams` directory on the both end of the RPC connection. The proxy side stream file is always first created, and then the server side is created. The server side cannot create the stream file on its own.
 * Unlike the req file, the resp file or the event file, which can do single direction transfer, the stream channel is a full duplex byte stream channel, and you can read/write the file concurrently. 
-* The stream channel has flow control, and if the peer has too many data accumulated in the stream file, the sending party will fail till the peer has consumed some of them, that is, `write` operation will fail with error `EAGAIN` till flow control is lifted.
-* The advantage of the stream channel is that it is much faster than the request/reponse transfer. And it's limitations is size, 2^64 the maximum, compared to 1MB limit per request.
+* The stream channel has a flow control mechamism, and if the peer has many data packets accumulated in the receiving queue, the sending party will be blocked till the peer has consumed some of them, that is, the last `send` becomes synchronous till the flow control is lifted by the peer.
+* The advantage of the stream channel is that it is much faster than the request/reponse transfer. And it's limitation in size is 2^64 bytes at most , compared to 1MB limit along with the normal request.
 * Tips: to access a remote shell, you can do this `bash -i < /path-to-stream_0 1>/path-to-stream_1` on the server side and on the client side, type `echo ls -l > /path-to-stream_0` and `cat /path-to-stream_1` to run a `ls` command remotely and show the output locally.
 
 ### Managing the Concurrency with `rpcfs`
