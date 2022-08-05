@@ -3200,7 +3200,10 @@ struct CAggInterfaceServer :
     CAggInterfaceServer( const IConfigDb* pCfg )
         : CInterfaceServer( pCfg )
     {}
-    virtual const EnumClsid GetIid() const = 0;
+
+    virtual const EnumClsid GetIid() const
+    { return clsid( Invalid ); }
+
     // for those interface who inherits other
     // interfaces
     virtual bool SupportIid( EnumClsid ) const
@@ -3235,6 +3238,9 @@ gint32 GetIidOfType( std::vector< guint32 >& vecIids, Type* pType )
     gint32 ret = pType->Type::GetIidEx( vecIids );
     if( SUCCEEDED( ret ) )
         return ret;
+    guint32 iid = pType->Type::GetIid();
+    if( iid == clsid( Invalid ) )
+        return 0;
     vecIids.push_back( pType->Type::GetIid() );
     return 0;
 }
@@ -3474,7 +3480,8 @@ struct CAggInterfaceProxy :
     CAggInterfaceProxy( const IConfigDb* pCfg )
         : CInterfaceProxy( pCfg )
     {}
-    virtual const EnumClsid GetIid() const = 0;
+    virtual const EnumClsid GetIid() const
+    { return clsid( Invalid ); }
     virtual bool SupportIid( EnumClsid ) const
     { return false; }
     virtual gint32 GetIidEx(

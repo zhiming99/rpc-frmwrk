@@ -132,6 +132,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CDBusConnFlushTask );
     INIT_MAP_ENTRYCFG( CIfSvrConnMgr );
     INIT_MAP_ENTRYCFG( CMessageCounterTask );
+    INIT_MAP_ENTRYCFG( CMessageCounterTaskProxy );
     INIT_MAP_ENTRYCFG( CIoWatchTask );
     INIT_MAP_ENTRYCFG( CIfTransactGroup );
     INIT_MAP_ENTRYCFG( CRpcBasePortModOnOfflineTask );

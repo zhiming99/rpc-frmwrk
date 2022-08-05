@@ -58,6 +58,32 @@ gint32 CStatCountersServer::OnPostStop(
     return 0;
 }
 
+// allocate resources
+gint32 CStatCountersProxy::OnPreStart(
+    IEventSink* pCallback )
+{
+    gint32 ret = 0;
+    CParamList oParams;
+    oParams[ propIfPtr ] = ObjPtr( this );
+    ret = m_pMsgFilter.NewObj(
+        clsid( CMessageCounterTaskProxy ),
+        oParams.GetCfg() );
+
+    if( ERROR( ret ) )
+        return ret;
+
+    return RegisterFilter( m_pMsgFilter );
+}
+
+// deallocate resources
+gint32 CStatCountersProxy::OnPostStop(
+    IEventSink* pCallback )
+{
+    UnregisterFilter( m_pMsgFilter );
+    m_pMsgFilter.Clear();
+    return 0;
+}
+
 gint32 IStatCounters::IncCounter(
     EnumPropId iProp )
 {
@@ -207,40 +233,6 @@ gint32 IStatCounters::GetCounter(
         return -ENOENT;
     pBuf = itr->second.ToBuf();
     return STATUS_SUCCESS;
-}
-
-gint32 CMessageCounterTask::FilterMsgOutgoing(
-    IEventSink* pReqTask, DBusMessage* pRawMsg )
-{
-    gint32 ret = 0;
-    if( pRawMsg == nullptr ||
-        pReqTask == nullptr )
-        return STATUS_SUCCESS;
-
-    do{
-        DMsgPtr pMsg( pRawMsg );
-        CStatCountersServer* pIf = nullptr;
-
-        CCfgOpener oTaskCfg(
-            ( IConfigDb* )GetConfig() );    
-
-        gint32 ret = oTaskCfg.GetPointer(
-            propIfPtr, pIf );
-
-        if( ERROR( ret ) )
-            break;
-
-        CIfIoReqTask* pReq = ObjPtr( pReqTask );
-        if( pReq != nullptr )
-        {
-            ret = pIf->IncCounter(
-                propMsgOutCount );
-            break;
-        }
-
-    }while( 0 );
-
-    return ret;
 }
 
 }

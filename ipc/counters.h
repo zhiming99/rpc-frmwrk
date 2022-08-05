@@ -44,7 +44,7 @@ struct IStatCounters
     gint32 IncCounter(
         EnumPropId iProp, bool bNegative );
 
-    CStdRMutex m_oStatLock;
+    stdrmutex m_oStatLock;
 
     public:
     gint32 IncCounter(
@@ -81,6 +81,7 @@ class CStatCountersProxy:
     public virtual CAggInterfaceProxy
 {
 
+    TaskletPtr m_pMsgFilter;
     IStatCounters m_oCounters;
     public:
     typedef CAggInterfaceProxy super;
@@ -90,6 +91,11 @@ class CStatCountersProxy:
 
     const EnumClsid GetIid() const
     { return iid( CStatCounters ); }
+    gint32 OnPreStart(
+        IEventSink* pCallback ) override;
+
+    gint32 OnPostStop(
+        IEventSink* pCallback ) override;
 
     gint32 IncCounter(
         EnumPropId iProp ) override
@@ -213,22 +219,23 @@ class CStatCountersServer:
     }
 };
 
-class CMessageCounterTask : 
+template< class T >
+class CMessageCounterBase : 
     public CThreadSafeTask,
     public IMessageFilter
 { 
     public:
 
     typedef CThreadSafeTask super;
-    CMessageCounterTask( const IConfigDb* pCfg )
+    CMessageCounterBase( const IConfigDb* pCfg )
         : super( pCfg )
-    { SetClassId( clsid( CMessageCounterTask ) ); }
+    {}
 
     virtual gint32 FilterMsgIncoming(
         IEventSink* pInvTask, DBusMessage* pMsg )
     {
         CCfgOpenerObj oTaskCfg( this );    
-        CStatCountersServer* pIf = nullptr;
+        T* pIf = nullptr;
 
         gint32 ret = oTaskCfg.GetPointer(
             propIfPtr, pIf );
@@ -258,7 +265,7 @@ class CMessageCounterTask :
         IEventSink* pReqTask, IConfigDb* pMsg )
     {
         CCfgOpenerObj oTaskCfg( this );    
-        CStatCountersServer* pIf = nullptr;
+        T* pIf = nullptr;
 
         gint32 ret = oTaskCfg.GetPointer(
             propIfPtr, pIf );
@@ -269,10 +276,61 @@ class CMessageCounterTask :
     }
 
     virtual gint32 FilterMsgOutgoing(
-        IEventSink* pReqTask, DBusMessage* pMsg );
+        IEventSink* pReqTask,
+        DBusMessage* pRawMsg )
+    {
+        gint32 ret = 0;
+        if( pRawMsg == nullptr ||
+            pReqTask == nullptr )
+            return STATUS_SUCCESS;
+
+        do{
+            DMsgPtr pMsg( pRawMsg );
+            CStatCountersServer* pIf = nullptr;
+
+            CCfgOpener oTaskCfg(
+                ( IConfigDb* )GetConfig() );    
+
+            gint32 ret = oTaskCfg.GetPointer(
+                propIfPtr, pIf );
+
+            if( ERROR( ret ) )
+                break;
+
+            CIfIoReqTask* pReq = ObjPtr( pReqTask );
+            if( pReq != nullptr )
+            {
+                ret = pIf->IncCounter(
+                    propMsgRespCount );
+                break;
+            }
+
+        }while( 0 );
+
+        return ret;
+    }
 
     virtual gint32 Process( guint32 dwContext )
     { return 0; }
+};
+
+class CMessageCounterTask :
+    public CMessageCounterBase< CStatCountersServer > 
+{
+    public:
+    typedef CMessageCounterBase< CStatCountersServer > super;
+    CMessageCounterTask( const IConfigDb* pCfg )
+        : super( pCfg )
+    { SetClassId( clsid( CMessageCounterTask ) ); }
+};
+class CMessageCounterTaskProxy :
+    public CMessageCounterBase< CStatCountersProxy >
+{
+    public:
+    typedef CMessageCounterBase< CStatCountersProxy > super;
+    CMessageCounterTaskProxy( const IConfigDb* pCfg )
+        : super( pCfg )
+    { SetClassId( clsid( CMessageCounterTaskProxy ) ); }
 };
 
 }

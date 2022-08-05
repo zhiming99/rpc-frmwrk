@@ -4012,6 +4012,9 @@ CRpcReqForwarderProxy::CRpcReqForwarderProxy(
             break;
         }
         RemoveProperty( propRouterPtr );
+        timespec tv;
+        clock_gettime( CLOCK_REALTIME, &tv );
+        m_oTs.SetBase( ( guint64 )tv.tv_sec );
 
     }while( 0 );
 
@@ -4841,6 +4844,49 @@ gint32 CRpcReqForwarderProxy::RemoveInterface(
     }while( 0 );
 
     return ret;
+}
+
+void CRpcReqForwarderProxy::GetActiveInterfaces(
+    std::vector< MatchPtr >& vecMatches ) const
+{
+    CStdRMutex oIfLock( GetLock() );
+    for( auto& elem : m_vecMatches )
+    {
+        IMessageMatch* pMatch = elem; 
+        CCfgOpenerObj oMatch( pMatch );
+        bool bDummy = false;
+
+        gint32 ret = oMatch.GetBoolProp(
+            propDummyMatch, bDummy );
+
+        if( SUCCEEDED( ret ) && bDummy )
+            continue;
+
+        vecMatches.push_back( elem );
+    }
+    return;
+}
+
+gint32 CRpcReqForwarderProxy::GetActiveIfCount() const
+{
+    gint32 iCount = 0;
+
+    CStdRMutex oIfLock( GetLock() );
+    for( auto elem : m_vecMatches )
+    {
+        IMessageMatch* pMatch = elem; 
+        CCfgOpenerObj oMatch( pMatch );
+        bool bDummy = false;
+
+        gint32 ret = oMatch.GetBoolProp(
+            propDummyMatch, bDummy );
+
+        if( SUCCEEDED( ret ) && bDummy )
+            continue;
+
+        ++iCount;
+    }
+    return iCount;
 }
 
 gint32 CRpcReqForwarderProxy::OnRmtSvrEvent(

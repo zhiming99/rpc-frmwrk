@@ -1023,13 +1023,13 @@ class CRpcRouterBridgeAuth :
 DECLARE_AGGREGATED_PROXY(
     CRpcReqForwarderProxyAuthImpl,
     CRpcReqForwarderProxyAuth,
-    CStatCountersProxy );
+    CStatCountersProxy2 );
 
 DECLARE_AGGREGATED_PROXY(
     CRpcTcpBridgeProxyAuthImpl,
     CRpcTcpBridgeProxyAuth,
     CAuthentProxy,
-    CStatCountersProxy,
+    CStatCountersProxy2,
     CStreamProxyRelay );
 
 DECLARE_AGGREGATED_SERVER(

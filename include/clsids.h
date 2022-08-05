@@ -330,6 +330,7 @@ typedef enum : guint32
     DECL_CLSID( CFuseRootServer ),
     DECL_CLSID( CLoopPool ),
     DECL_CLSID( CLoopPools ),
+    DECL_CLSID( CMessageCounterTaskProxy ),
     DECL_CLSID( MaxClsid ),
     DECL_CLSID( ClassFactoryStart ) = 0x02000000,
     DECL_CLSID( ReservedClsidEnd ) = 0x0FFFFFFF,

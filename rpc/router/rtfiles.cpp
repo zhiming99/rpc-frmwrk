@@ -31,8 +31,9 @@
 #include "jsondef.h"
 #include "security/security.h"
 
-using namespace rpcf;
 #include "rtfiles.h"
+
+namespace rpcf{
 
 Json::Value DumpConnParams( const IConfigDb* pConn )
 {
@@ -397,7 +398,7 @@ gint32 CFuseBdgeProxyList::UpdateContent()
         Json::StreamWriterBuilder oBuilder;
         oBuilder["commentStyle"] = "None";
         oBuilder["indentation"] = "   ";
-        Json::Value oVal( Json::objectValue);
+        Json::Value oVal( Json::objectValue );
 
         CRpcRouter* pRouter = GetUserObj();
         if( pRouter == nullptr )
@@ -473,14 +474,9 @@ gint32 CFuseBdgeProxyList::UpdateContent()
             }
 
             ret = pStat->GetCounter2(
-                propMsgCount, dwVal );
-            if( SUCCEEDED( ret ) )
-                oProxy[ "InRequests" ] = dwVal;
-
-            ret = pStat->GetCounter2(
                 propMsgRespCount, dwVal );
             if( SUCCEEDED( ret ) )
-                oProxy[ "OutResponses" ] = dwVal;
+                oProxy[ "RequestsSent" ] = dwVal;
 
             TaskGrpPtr pGrp;
             if( !pProxy->IsRfcEnabled() )
@@ -676,6 +672,105 @@ gint32 CFuseSessionFile::UpdateContent()
     return ret;
 }
 
+gint32 CFuseReqProxyList::UpdateContent()
+{
+    gint32 ret = 0;
+    do{
+        Json::StreamWriterBuilder oBuilder;
+        oBuilder["commentStyle"] = "None";
+        oBuilder["indentation"] = "   ";
+        Json::Value oVal( Json::objectValue);
+
+        CRpcRouter* pRt = GetUserObj();
+        if( pRt == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        ARR_REQPROXIES vecProxies;
+        CRpcRouterBridge* pRouter = GetUserObj();
+        pRouter->GetReqFwdrProxies( vecProxies );
+
+        oVal[ "NumReqProxies" ] =
+            ( guint32 )vecProxies.size();
+
+        guint32 dwVal = 0;
+        Json::Value oArray( Json::arrayValue );
+        for( auto& elem : vecProxies )
+        {
+            Json::Value oProxy;
+
+            CRpcReqForwarderProxy* pProxy =
+                elem.second;
+
+            CStatCountersProxy* pStat =
+                elem.second;
+
+            CCfgOpenerObj oIfCfg(
+                ( CObjBase* )pProxy );
+            stdstr strVal;
+            bool bVal;
+            strVal = elem.first;
+            if( SUCCEEDED( ret ) )
+                oProxy[ "Destination" ] = strVal;
+                
+            stdstr strState = IfStateToString(
+                pProxy->GetState() );
+
+            oProxy[ "IfStat" ] = strState;
+
+            ret = pStat->GetCounter2(
+                propMsgRespCount, dwVal );
+            if( SUCCEEDED( ret ) )
+                oProxy[ "RequestsSent" ] = dwVal;
+
+            TaskGrpPtr pGrp;
+            ret = pProxy->GetParallelGrp( pGrp );
+            if( SUCCEEDED( ret ) )
+            {
+                CIfParallelTaskGrp* pParaGrp = pGrp;
+                dwVal = pParaGrp->GetTaskCount();
+                guint32 dwPending =
+                    pParaGrp->GetPendingCountLocked();
+
+                oProxy[ "ActiveTasks" ] =
+                    dwVal - dwPending;
+                oProxy[ "PendingTasks" ] =
+                    dwPending;
+            }
+
+            Json::Value oMatches( Json::arrayValue );
+            std::vector< MatchPtr > vecMatches;
+            pProxy->GetActiveInterfaces( vecMatches );
+            for( auto& elem : vecMatches )
+            {
+                stdstr strMatch = elem->ToString();
+                oMatches.append( strMatch );
+            }
+
+            oProxy[ "Matches" ] = oMatches;
+
+            timespec tv;
+            clock_gettime( CLOCK_REALTIME, &tv );
+
+            guint32 dwts =
+                tv.tv_sec - pProxy->GetStartSec();
+
+            oProxy[ "UpTimeSec" ] = dwts;
+            oArray.append( oProxy );
+        }
+
+        oVal[ "ReqProxies" ] = oArray ;
+        m_strContent = Json::writeString(
+            oBuilder, oVal );
+        m_strContent.append( 1, '\n' );
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 AddFilesAndDirsBdge(
     CRpcServices* pSvc )
 {
@@ -729,12 +824,20 @@ gint32 AddFilesAndDirsBdge(
         pEnt = DIR_SPTR( pList );
         pSvr->Add2UserDir( pEnt );
 
-        CFuseSessionFile* pSess =
+        auto pSess =
             new CFuseSessionFile( nullptr );
         pSess->SetMode( S_IRUSR );
         pSess->DecRef();
         pSess->SetUserObj( pObj );
         pEnt = DIR_SPTR( pSess );
+        pSvr->Add2UserDir( pEnt );
+
+        auto preql =
+            new CFuseReqProxyList( nullptr );
+        preql->SetMode( S_IRUSR );
+        preql->DecRef();
+        preql->SetUserObj( pObj );
+        pEnt = DIR_SPTR( preql );
         pSvr->Add2UserDir( pEnt );
 
     }while( 0 );
@@ -790,5 +893,7 @@ gint32 AddFilesAndDirsReqFwdr(
     }while( 0 );
 
     return ret;
+}
+
 }
 

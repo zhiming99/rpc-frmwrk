@@ -28,6 +28,9 @@
 #define BDGELIST_FILE "InConnections"
 #define BDGEPROXYLIST_FILE "OutConnections"
 #define BDGESESSLIST_FILE "Sessions"
+#define REQPROXYLIST_FILE "LocalReqProxies"
+
+namespace rpcf {
 
 class CFuseBdgeList : public CFuseSvcStat
 {
@@ -58,3 +61,15 @@ class CFuseSessionFile : public CFuseSvcStat
     { SetName( BDGESESSLIST_FILE ); }
     virtual gint32 UpdateContent();
 };
+
+class CFuseReqProxyList : public CFuseSvcStat
+{
+    public:
+    typedef CFuseSvcStat super;
+    CFuseReqProxyList( CRpcServices* pIf )
+        : super( pIf )
+    { SetName( REQPROXYLIST_FILE ); }
+    virtual gint32 UpdateContent();
+};
+
+}

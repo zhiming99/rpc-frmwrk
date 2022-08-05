@@ -192,11 +192,10 @@ CfgPtr CIfRouterTest::InitRouterCfg(
     return oCfg.GetCfg();
 }
 
-extern gint32 AddFilesAndDirsBdge(
-    CRpcServices* pSvc );
-
-extern gint32 AddFilesAndDirsReqFwdr(
-    CRpcServices* pSvc );
+namespace rpcf{
+gint32 AddFilesAndDirsReqFwdr( CRpcServices* );
+gint32 AddFilesAndDirsBdge( CRpcServices* );
+}
 
 gint32 AddFilesAndDirs( CRpcServices* pSvc )
 {

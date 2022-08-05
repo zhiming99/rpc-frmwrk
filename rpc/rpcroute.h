@@ -782,6 +782,8 @@ class CRfpModEventRespTask :
 class CRpcReqForwarderProxy :
     public CRpcInterfaceProxy
 {
+    CTimestampSvr m_oTs;
+
     protected:
     // tcp port handle and the related
     // informations
@@ -813,6 +815,9 @@ class CRpcReqForwarderProxy :
 
     const EnumClsid GetIid() const
     { return iid( CRpcReqForwarder ); }
+
+    inline guint64 GetStartSec() const
+    { return m_oTs.m_qwLocalBaseSec; }
 
     virtual gint32 SetupReqIrp( IRP* pIrp,
         IConfigDb* pReqCall,
@@ -871,27 +876,10 @@ class CRpcReqForwarderProxy :
     gint32 RemoveInterface(
         IMessageMatch* pMatch );
 
-    gint32 GetActiveIfCount()
-    {
-        gint32 iCount = 0;
+    void GetActiveInterfaces(
+        std::vector< MatchPtr >& vecMatches ) const;
 
-        CStdRMutex oIfLock( GetLock() );
-        for( auto elem : m_vecMatches )
-        {
-            IMessageMatch* pMatch = elem; 
-            CCfgOpenerObj oMatch( pMatch );
-            bool bDummy = false;
-
-            gint32 ret = oMatch.GetBoolProp(
-                propDummyMatch, bDummy );
-
-            if( SUCCEEDED( ret ) && bDummy )
-                continue;
-
-            ++iCount;
-        }
-        return iCount;
-    }
+    gint32 GetActiveIfCount() const;
 
     gint32 OnRmtSvrEvent(
         EnumEventId iEvent,
@@ -2432,6 +2420,9 @@ class CRedudantNodes : public ILoadBalancer
     gint32 LoadLBInfo( Json::Value& oLBInfo );
 };
 
+using ARR_REQPROXIES=
+    std::vector< std::pair< stdstr, InterfPtr > >;
+
 class CRpcRouterBridge : public CRpcRouter
 {
     // the key is the peer ip-addr plus peer port-number
@@ -2585,6 +2576,15 @@ class CRpcRouterBridge : public CRpcRouter
 
         pIf = citr->second;
         return 0;
+    }
+
+    inline void GetReqFwdrProxies(
+        ARR_REQPROXIES& vecProxies )
+    {
+        CStdRMutex oRouterLock( GetLock() );
+        for( auto& elem : m_mapReqProxies )
+        { vecProxies.push_back( elem ); }
+        return;
     }
 
     const EnumClsid GetIid() const
@@ -2987,6 +2987,46 @@ class CStatCountersServer2 :
         guint32, guint64& ) override;
 };
 
+class CStatCountersProxy2 :
+    public CStatCountersProxy
+{
+    std::atomic< guint32 > m_dwMsgCount;
+    std::atomic< guint32 > m_dwMsgRespCount;
+    std::atomic< guint32 > m_dwEvtCount;
+    std::atomic< guint64 > m_qwRxBytes;
+    std::atomic< guint64 > m_qwTxBytes;
+
+    public:
+    typedef CStatCountersProxy super;
+    CStatCountersProxy2( const IConfigDb* pCfg )
+        : CAggInterfaceProxy( pCfg ), super( pCfg ),
+        m_dwMsgCount( 0 ), m_dwMsgRespCount( 0 ),
+        m_dwEvtCount( 0 ), m_qwRxBytes( 0 ),
+        m_qwTxBytes( 0 )
+    {}
+
+    gint32 IncCounter( EnumPropId ) override;
+    gint32 DecCounter( EnumPropId ) override;
+
+    gint32 SetCounter(
+        EnumPropId, guint32 ) override;
+
+    gint32 SetCounter(
+        EnumPropId, guint64 ) override;
+
+    gint32 GetCounters(
+        CfgPtr& pCfg ) override;
+
+    gint32 GetCounter(
+        guint32, BufPtr& ) override;
+
+    gint32 GetCounter2(
+        guint32, guint32& ) override;
+
+    gint32 GetCounter2(
+        guint32, guint64& ) override;
+};
+
 DECLARE_AGGREGATED_SERVER(
      CRpcRouterManagerImpl,
      CRpcRouterManager );
@@ -3004,7 +3044,7 @@ DECLARE_AGGREGATED_SERVER(
 DECLARE_AGGREGATED_PROXY(
     CRpcReqForwarderProxyImpl,
     CRpcReqForwarderProxy,
-    CStatCountersProxy );
+    CStatCountersProxy2 );
 
 }
 
@@ -3030,7 +3070,7 @@ DECLARE_AGGREGATED_SERVER(
 DECLARE_AGGREGATED_PROXY(
     CRpcTcpBridgeProxyImpl,
     CRpcTcpBridgeProxy,
-    CStatCountersProxy,
+    CStatCountersProxy2,
     CStreamProxyRelay );
 
 #define AUTH_DEST( _pObj ) \
