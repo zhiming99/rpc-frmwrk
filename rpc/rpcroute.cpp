@@ -6182,6 +6182,9 @@ gint32 CStatCountersServer2::IncCounter(
     case propEventCount:
         m_dwEvtCount++;
         break;
+    case propFailureCount:
+        m_dwFailCount++;
+        break;
     default:
         return super::IncCounter( iProp );
     }
@@ -6201,6 +6204,9 @@ gint32 CStatCountersServer2::DecCounter(
         break;
     case propEventCount:
         m_dwEvtCount--;
+        break;
+    case propFailureCount:
+        m_dwFailCount--;
         break;
     case propRxBytes:
     case propTxBytes:
@@ -6224,6 +6230,9 @@ gint32 CStatCountersServer2::SetCounter(
         break;
     case propEventCount:
         m_dwEvtCount = dwVal;
+        break;
+    case propFailureCount:
+        m_dwFailCount = dwVal;
         break;
     default:
         return super::SetCounter(
@@ -6264,6 +6273,9 @@ gint32 CStatCountersServer2::GetCounter(
     case propEventCount:
         *pBuf = ( guint32 )m_dwEvtCount;
         break;
+    case propFailureCount:
+        *pBuf = ( guint32 )m_dwFailCount;
+        break;
     default:
         return super::GetCounter(
             iProp, pBuf );
@@ -6284,6 +6296,9 @@ gint32 CStatCountersServer2::GetCounter2(
         break;
     case propEventCount:
         dwVal = m_dwEvtCount;
+        break;
+    case propFailureCount:
+        dwVal = m_dwFailCount;
         break;
     default:
         return super::GetCounter2(
@@ -6327,6 +6342,8 @@ gint32 CStatCountersServer2::GetCounters(
         ( guint64 )m_qwRxBytes;
     oCfg[ propTxBytes ] =
         ( guint64 )m_qwTxBytes;
+    oCfg[ propFailureCount ] =
+        ( guint32 )m_dwFailCount;
     return 0;
 }
 
@@ -6344,6 +6361,14 @@ gint32 CStatCountersProxy2::IncCounter(
     case propEventCount:
         m_dwEvtCount++;
         break;
+    case propFailureCount:
+        m_dwFailCount++;
+        break;
+    case propRxBytes:
+        m_qwRxBytes++; 
+        break;
+    case propTxBytes:
+        m_qwTxBytes++;
     default:
         return super::IncCounter( iProp );
     }
@@ -6364,9 +6389,14 @@ gint32 CStatCountersProxy2::DecCounter(
     case propEventCount:
         m_dwEvtCount--;
         break;
+    case propFailureCount:
+        m_dwFailCount--;
+        break;
     case propRxBytes:
+        m_qwRxBytes--; 
+        break;
     case propTxBytes:
-        return -ENOTSUP;
+        m_qwTxBytes--;
     default:
         return super::DecCounter( iProp );
     }
@@ -6387,6 +6417,12 @@ gint32 CStatCountersProxy2::SetCounter(
     case propEventCount:
         m_dwEvtCount = dwVal;
         break;
+    case propFailureCount:
+        m_dwFailCount = dwVal;
+        break;
+    case propRxBytes:
+    case propTxBytes:
+        return -EINVAL;
     default:
         return super::SetCounter(
             iProp, dwVal );
@@ -6405,6 +6441,11 @@ gint32 CStatCountersProxy2::SetCounter(
     case propTxBytes:
         m_qwTxBytes = qwVal;
         break;
+    case propMsgCount:
+    case propMsgRespCount:
+    case propEventCount:
+    case propFailureCount:
+        return -EINVAL;
     default:
         return super::SetCounter(
             iProp, qwVal );
@@ -6418,13 +6459,22 @@ gint32 CStatCountersProxy2::GetCounter(
     switch( iProp )
     {
     case propMsgCount:
-        *pBuf = ( guint32 )m_dwMsgCount;
+        *pBuf = m_dwMsgCount;
         break;
     case propMsgRespCount:
-        *pBuf = ( guint32 )m_dwMsgRespCount;
+        *pBuf = m_dwMsgRespCount;
         break;
     case propEventCount:
-        *pBuf = ( guint32 )m_dwEvtCount;
+        *pBuf = m_dwEvtCount;
+        break;
+    case propFailureCount:
+        *pBuf = m_dwFailCount;
+        break;
+    case propRxBytes:
+        *pBuf = m_qwRxBytes;
+        break;
+    case propTxBytes:
+        *pBuf = m_qwTxBytes;
         break;
     default:
         return super::GetCounter(
@@ -6446,6 +6496,9 @@ gint32 CStatCountersProxy2::GetCounter2(
         break;
     case propEventCount:
         dwVal = m_dwEvtCount;
+        break;
+    case propFailureCount:
+        dwVal = m_dwFailCount;
         break;
     default:
         return super::GetCounter2(
@@ -6485,6 +6538,8 @@ gint32 CStatCountersProxy2::GetCounters(
         ( guint32 )m_dwMsgRespCount;
     oCfg[ propEventCount ] =
         ( guint32 )m_dwEvtCount;
+    oCfg[ propFailureCount ] =
+        ( guint32 )m_dwFailCount;
     oCfg[ propRxBytes ] =
         ( guint64 )m_qwRxBytes;
     oCfg[ propTxBytes ] =

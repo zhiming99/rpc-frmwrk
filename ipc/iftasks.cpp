@@ -4381,6 +4381,9 @@ gint32 CIfInvokeMethodTask::OnTaskComplete(
         if( !pIf->IsServer() )
             break;
 
+        if( ERROR( iRetVal ) )
+            pIf->IncCounter( propFailureCount );
+
         bool bResp = true;
         ObjPtr pObj;
         ret = oCfg.GetObjPtr( propRespPtr, pObj );

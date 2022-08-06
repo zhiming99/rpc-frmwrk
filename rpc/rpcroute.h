@@ -2953,6 +2953,7 @@ class CStatCountersServer2 :
     std::atomic< guint32 > m_dwMsgCount;
     std::atomic< guint32 > m_dwMsgRespCount;
     std::atomic< guint32 > m_dwEvtCount;
+    std::atomic< guint32 > m_dwFailCount;
     std::atomic< guint64 > m_qwRxBytes;
     std::atomic< guint64 > m_qwTxBytes;
 
@@ -2961,8 +2962,8 @@ class CStatCountersServer2 :
     CStatCountersServer2( const IConfigDb* pCfg )
         : CAggInterfaceServer( pCfg ), super( pCfg ),
         m_dwMsgCount( 0 ), m_dwMsgRespCount( 0 ),
-        m_dwEvtCount( 0 ), m_qwRxBytes( 0 ),
-        m_qwTxBytes( 0 )
+        m_dwEvtCount( 0 ), m_dwFailCount( 0 ),
+        m_qwRxBytes( 0 ), m_qwTxBytes( 0 )
     {}
 
     gint32 IncCounter( EnumPropId ) override;
@@ -2993,6 +2994,7 @@ class CStatCountersProxy2 :
     std::atomic< guint32 > m_dwMsgCount;
     std::atomic< guint32 > m_dwMsgRespCount;
     std::atomic< guint32 > m_dwEvtCount;
+    std::atomic< guint32 > m_dwFailCount;
     std::atomic< guint64 > m_qwRxBytes;
     std::atomic< guint64 > m_qwTxBytes;
 
@@ -3001,8 +3003,8 @@ class CStatCountersProxy2 :
     CStatCountersProxy2( const IConfigDb* pCfg )
         : CAggInterfaceProxy( pCfg ), super( pCfg ),
         m_dwMsgCount( 0 ), m_dwMsgRespCount( 0 ),
-        m_dwEvtCount( 0 ), m_qwRxBytes( 0 ),
-        m_qwTxBytes( 0 )
+        m_dwEvtCount( 0 ), m_dwFailCount( 0 ),
+        m_qwRxBytes( 0 ), m_qwTxBytes( 0 )
     {}
 
     gint32 IncCounter( EnumPropId ) override;

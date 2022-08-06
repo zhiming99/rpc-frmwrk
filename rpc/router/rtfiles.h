@@ -29,6 +29,7 @@
 #define BDGEPROXYLIST_FILE "OutConnections"
 #define BDGESESSLIST_FILE "Sessions"
 #define REQPROXYLIST_FILE "LocalReqProxies"
+#define REQFWDRINFO_FILE "ReqFwdrInfo"
 
 namespace rpcf {
 
@@ -69,6 +70,16 @@ class CFuseReqProxyList : public CFuseSvcStat
     CFuseReqProxyList( CRpcServices* pIf )
         : super( pIf )
     { SetName( REQPROXYLIST_FILE ); }
+    virtual gint32 UpdateContent();
+};
+
+class CFuseReqFwdrInfo : public CFuseSvcStat
+{
+    public:
+    typedef CFuseSvcStat super;
+    CFuseReqFwdrInfo( CRpcServices* pIf )
+        : super( pIf )
+    { SetName( REQFWDRINFO_FILE ); }
     virtual gint32 UpdateContent();
 };
 

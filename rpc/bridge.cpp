@@ -1988,6 +1988,15 @@ gint32 CRpcTcpBridgeProxy::OnInvalidStreamId(
     return 0;
 }
 
+#define SUM_COUNTER( _dest, _src, _prop, _type ) \
+do{ \
+    _type destVal = 0, tempVal = 0; \
+    _src->GetCounter2( _prop, tempVal ); \
+    _dest->GetCounter2( _prop, destVal ); \
+    destVal += tempVal; \
+    _dest->SetCounter( _prop, destVal ); \
+}while( 0 )
+
 gint32 CRpcTcpBridgeProxy::OnPostStop(
     IEventSink* pCallback )
 {
@@ -2010,30 +2019,23 @@ gint32 CRpcTcpBridgeProxy::OnPostStop(
         if( psc == nullptr || ppsc == nullptr )
             break;
 
-        guint64 qwRx = 0, qwTx = 0, qwVal = 0;
+        SUM_COUNTER(
+            ppsc, psc, propRxBytes, guint64 );
 
-        psc->GetCounter2(
-            propRxBytes, qwRx );
-        qwVal += qwRx;
+        SUM_COUNTER(
+            ppsc, psc, propTxBytes, guint64 );
 
-        ppsc->GetCounter2(
-            propRxBytes, qwVal );
+        SUM_COUNTER(
+            ppsc, psc, propMsgCount, guint32 );
 
-        qwVal += qwRx;
-        ppsc->SetCounter(
-            propRxBytes, qwVal );
+        SUM_COUNTER(
+            ppsc, psc, propEventCount, guint32 );
 
-        qwRx = 0, qwTx = 0, qwVal = 0;
-        psc->GetCounter2(
-            propTxBytes, qwTx );
+        SUM_COUNTER(
+            ppsc, psc, propMsgRespCount, guint32 );
 
-        ppsc->GetCounter2(
-            propTxBytes, qwVal );
-
-        qwVal += qwTx;
-
-        ppsc->SetCounter(
-            propTxBytes, qwVal );
+        SUM_COUNTER(
+            ppsc, psc, propFailureCount, guint32 );
 
     }while( 0 );
 
@@ -5379,30 +5381,23 @@ gint32 CRpcTcpBridge::OnPostStop(
         if( psc == nullptr || ppsc == nullptr )
             break;
 
-        guint64 qwRx = 0, qwTx = 0, qwVal = 0;
+        SUM_COUNTER(
+            ppsc, psc, propRxBytes, guint64 );
 
-        psc->GetCounter2(
-            propRxBytes, qwRx );
-        qwVal += qwRx;
+        SUM_COUNTER(
+            ppsc, psc, propTxBytes, guint64 );
 
-        ppsc->GetCounter2(
-            propRxBytes, qwVal );
+        SUM_COUNTER(
+            ppsc, psc, propMsgCount, guint32 );
 
-        qwVal += qwRx;
-        ppsc->SetCounter(
-            propRxBytes, qwVal );
+        SUM_COUNTER(
+            ppsc, psc, propEventCount, guint32 );
 
-        qwRx = 0, qwTx = 0, qwVal = 0;
-        psc->GetCounter2(
-            propTxBytes, qwTx );
+        SUM_COUNTER(
+            ppsc, psc, propMsgRespCount, guint32 );
 
-        ppsc->GetCounter2(
-            propTxBytes, qwVal );
-
-        qwVal += qwTx;
-
-        ppsc->SetCounter(
-            propTxBytes, qwVal );
+        SUM_COUNTER(
+            ppsc, psc, propFailureCount, guint32 );
 
     }while( 0 );
 

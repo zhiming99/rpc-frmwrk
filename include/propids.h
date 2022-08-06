@@ -259,6 +259,7 @@ enum EnumPropId : gint32
     propChanCtx,
     propObjName,        // type: a string to specify the object in the description file
     propEventCount,     // type: a guint32 counter of the events received.
+    propFailureCount,   // type: a guint32 counter of the failed requests .
 
     propReservedEnd = 0x10000000,
     propInvalid = -1, 

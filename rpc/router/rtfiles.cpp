@@ -190,6 +190,7 @@ gint32 CFuseBdgeList::UpdateContent()
 
         Json::Value oArray( Json::arrayValue );
         guint32 dwVal = 0;
+        guint32 dwReqs = 0, dwResps = 0, dwEvts = 0, dwFails = 0;
         guint64 qwRouterRx = 0, qwRouterTx = 0, qwVal = 0;
         for( auto& elem : vecBdges )
         {
@@ -246,12 +247,34 @@ gint32 CFuseBdgeList::UpdateContent()
             ret = pStat->GetCounter2(
                 propMsgCount, dwVal );
             if( SUCCEEDED( ret ) )
+            {
                 oBridge[ "InRequests" ] = dwVal;
+                dwReqs += dwVal;
+            }
 
             ret = pStat->GetCounter2(
                 propMsgRespCount, dwVal );
             if( SUCCEEDED( ret ) )
+            {
                 oBridge[ "OutResponses" ] = dwVal;
+                dwResps += dwVal;
+            }
+
+            ret = pStat->GetCounter2(
+                propEventCount, dwVal );
+            if( SUCCEEDED( ret ) )
+            {
+                oBridge[ "Events" ] = dwVal;
+                dwEvts += dwVal;
+            }
+
+            ret = pStat->GetCounter2(
+                propFailureCount, dwVal );
+            if( SUCCEEDED( ret ) )
+            {
+                oBridge[ "FailedRequests" ] = dwVal;
+                dwFails += dwVal;
+            }
 
             TaskGrpPtr pGrp;
             if( !pBridge->IsRfcEnabled() )
@@ -369,17 +392,26 @@ gint32 CFuseBdgeList::UpdateContent()
         ret = psc->GetCounter2(
             propMsgCount, dwVal );
         if( SUCCEEDED( ret ) )
-            oVal[ "TotalInRequests" ] = dwVal;
+            oVal[ "TotalInRequests" ] =
+                dwVal + dwReqs;
 
         ret = psc->GetCounter2(
             propEventCount, dwVal );
         if( SUCCEEDED( ret ) )
-            oVal[ "TotalEvents" ] = dwVal;
+            oVal[ "TotalEvents" ] =
+                dwVal + dwEvts;
 
         ret = psc->GetCounter2(
             propMsgRespCount, dwVal );
         if( SUCCEEDED( ret ) )
-            oVal[ "TotalOutResponses" ] = dwVal;
+            oVal[ "TotalOutResponses" ] =
+                dwVal + dwResps;
+
+        ret = psc->GetCounter2(
+            propFailureCount, dwVal );
+        if( SUCCEEDED( ret ) )
+            oVal[ "TotalFailures" ] =
+                dwVal + dwFails;
 
         oVal[ "Connections" ] = oArray;
         m_strContent = Json::writeString(
