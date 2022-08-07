@@ -5272,7 +5272,9 @@ static fuse_operations fuseif_ops =
     .utimens = fuseop_utimens,
     .ioctl = fuseop_ioctl,
     .poll = fuseop_poll,
+#if FUSE_USE_VERSION >= 35
     .lseek = fuseop_lseek,
+#endif
 };
 /* Command line parsing */
 struct options {
