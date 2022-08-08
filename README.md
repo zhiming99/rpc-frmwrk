@@ -61,14 +61,14 @@ This project depends on the following 3rd-party packags at runtime:
 
 ---
 [`Mon Aug 08 2022 08:49:45 AM Beijing`]
-1. Found a way to boost the performace of rpc-frmwrk. It involves development of a new `port` module and some complicated changes in code generator module and the impact is still under evaluation.
-2. It took 10 days to fix bugs and test the `rpcfs` with different connection setup. So I am still working on exporting reqfwdr's runtime information to router-specific file `ReqFwdrInfo`. I will wrap up the work in two days so that we can move on to next task, `skelton code generator`.
+1. Found a way to boost the performace of rpc-frmwrk. It involves development of a new `port` module and some complicated changes in code generator module. And the impact is still under evaluation.
+2. It took 10 days to fix bugs, harden the `bridge` security, refact the CFuseStmFile, and make damage tests on the `rpcfs`. And therefore I am now still working on exporting reqfwdr's runtime information to router-specific file `ReqFwdrInfo`. I will wrap up the work in two days so that we can move on to next task, `skelton code generator`.
 
 [`Sat Jul 23 2022 07:56:59 PM Beijing`]   
 1. We still have the reqfwdr's runtime information file to implement. It won't take too long before we start to write parsers again.
 
 [`Wed Jul 20 2022 09:34:11 PM Beijing`]   
-1. Made build for raspberry pi work.
+1. Fixed building issues and made successful building on Raspberry Pi.
 2. Continued fixing bugs in `rpcfs`, and fixed some regression bugs.
 3. After adding session file and reqfwdr's runtime information file, we will move on to write auto skelton generator for `rpcfs`
 
