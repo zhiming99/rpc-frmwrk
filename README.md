@@ -60,6 +60,10 @@ This project depends on the following 3rd-party packags at runtime:
 4. A tree-like hierarchical persistant registry.
 
 ---
+[`Mon Aug 08 2022 08:49:45 AM Beijing`]
+1. Found a way to boost the performace of rpc-frmwrk. It involves development of a new `port` module and some complicated changes in code generator module and the impact is still under evaluation.
+2. It took 10 days to fix bugs and test the `rpcfs` with different connection setup. So I am still working on exporting reqfwdr's runtime information to router-specific file `ReqFwdrInfo`. I will wrap up the work in two days so that we can move on to next task, `skelton code generator`.
+
 [`Sat Jul 23 2022 07:56:59 PM Beijing`]   
 1. We still have the reqfwdr's runtime information file to implement. It won't take too long before we start to write parsers again.
 
