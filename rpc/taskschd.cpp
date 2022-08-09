@@ -528,9 +528,7 @@ gint32 CRRTaskScheduler::GetNextTaskGrp(
             continue;
         }
 
-        std::map< InterfPtr, CONNQUE_ELEM >::iterator
-            itr = m_mapConnQues.find( pIf );
-
+        auto itr = m_mapConnQues.find( pIf );
         if( itr == m_mapConnQues.end() )
             continue;
 
@@ -577,9 +575,6 @@ gint32 CRRTaskScheduler::GetNextTaskGrp(
                     orq.push_back( pHead );
                     continue;
                 }
-
-                std::list< TaskGrpPtr >::iterator
-                    itr = owq.begin();
 
                 TaskGrpPtr pwh;
                 CIfParallelTaskGrpRfc2* pGrpRfc2 = nullptr;
