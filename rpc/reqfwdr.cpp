@@ -158,8 +158,7 @@ gint32 CRpcReqForwarder::CreateGrpRfc(
     do{
         GRPRFC_KEY oKey( dwPortId, strUniqName );
         CStdRMutex oLock( GetLock() );
-        std::map< GRPRFC_KEY, TaskGrpPtr >::iterator
-            itr = m_mapGrpRfcs.find( oKey );
+        auto itr = m_mapGrpRfcs.find( oKey );
         if( itr != m_mapGrpRfcs.end() )
             break;
 
@@ -5548,7 +5547,7 @@ gint32 CRpcReqForwarder::AddAndRun(
         if( SUCCEEDED( ret ) )
         {
             // run the tasks
-            RunNextTaskGrp( pGrp, 1 );
+            RunNextTaskGrp( pGrp, 0 );
             return STATUS_SUCCESS;
         }
         else if( ERROR( ret ) &&
@@ -5753,7 +5752,7 @@ gint32 CIfParallelTaskGrpRfc2::DeferredRemove(
             break;
 
         TaskGrpPtr pGrp( this );
-        ret = pReqFwdr->RunNextTaskGrp( pGrp, 0 );
+        ret = pReqFwdr->RunNextTaskGrp( pGrp, 1 );
         break;
 
     }while( 1 );

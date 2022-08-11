@@ -734,6 +734,9 @@ class CRpcReqForwarder :
     inline bool HasScheduler() const
     { return !m_pScheduler.IsEmpty(); }
 
+    inline ObjPtr GetScheduler() const
+    { return m_pScheduler; }
+
     virtual gint32 OnPostStart(
         IEventSink* pContext ) override;
 
@@ -2138,6 +2141,7 @@ class CBdgeProxyReadWriteComplete:
     { return STATUS_PENDING; }
 };
 
+using REFCOUNT_ELEM = std::pair< RegObjPtr, guint32 >;
 class CRpcRouterReqFwdr : public CRpcRouter
 {
     // local registered matches
@@ -2242,6 +2246,9 @@ class CRpcRouterReqFwdr : public CRpcRouter
 
     gint32 RemoveLocalMatchByPortId(
         guint32 dwPortId );
+
+    void GetRefCountObjs(
+        std::vector< REFCOUNT_ELEM >& ) const;
 
     gint32 RemoveLocalMatchByUniqName(
         const std::string& strUniqName,

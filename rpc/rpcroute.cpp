@@ -4756,6 +4756,15 @@ gint32 CRpcRouterReqFwdr::ClearRefCountByPortId(
     return vecUniqNames.size();
 }
 
+void CRpcRouterReqFwdr::GetRefCountObjs(
+    std::vector< REFCOUNT_ELEM >& vecRegObjs ) const
+{
+    CStdRMutex oRouterLock( GetLock() );
+    for( auto& oPair : m_mapRefCount )
+        vecRegObjs.push_back( oPair );
+    return;
+}
+
 gint32 CRpcRouterReqFwdr::CheckMatch(
     IMessageMatch* pMatch )
 {
@@ -4763,7 +4772,7 @@ gint32 CRpcRouterReqFwdr::CheckMatch(
         return -EINVAL;
 
     CStdRMutex oRouterLock( GetLock() );
-    for( auto&& oPair : m_mapRefCount )
+    for( auto& oPair : m_mapRefCount )
     {
         RegObjPtr pRegObj = oPair.first;
         gint32 ret = pRegObj->IsMyMatch( pMatch );
@@ -5840,7 +5849,7 @@ gint32 CIfParallelTaskGrpRfc::RunTaskInternal(
 
     if( GetTaskCount() == 0 )
     {
-        SetRunning( true );
+        SetRunning( false );
         return STATUS_SUCCESS;
     }
 

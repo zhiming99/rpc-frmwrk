@@ -803,6 +803,73 @@ gint32 CFuseReqProxyList::UpdateContent()
     return ret;
 }
 
+gint32 CFuseReqFwdrInfo::UpdateContent()
+{
+    gint32 ret = 0;
+    do{
+        Json::StreamWriterBuilder oBuilder;
+        oBuilder["commentStyle"] = "None";
+        oBuilder["indentation"] = "   ";
+        Json::Value oVal( Json::objectValue );
+
+        CRpcRouter* pRouter = GetUserObj();
+        if( pRouter == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        CRpcRouterReqFwdr* pRfRouter = GetUserObj();
+        if( pRfRouter == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        InterfPtr pIf;
+        pRfRouter->GetReqFwdr( pIf );
+        CRpcReqForwarder* pReqFwdr = pIf;
+
+        std::vector< REFCOUNT_ELEM > vecRegObjs;
+        pRfRouter->GetRefCountObjs( vecRegObjs );
+
+        oVal[ "NumRefCountObjs" ] =
+            ( guint32 )vecRegObjs.size();
+
+        guint32 dwVal = 0;
+        Json::Value oArray( Json::arrayValue );
+        for( auto& elem : vecRegObjs )
+        {
+            Json::Value oRegObj( Json::objectValue );
+            CRegisteredObject* pRegObj = elem.first;
+
+            oRegObj[ "ProxyPortId" ] =
+                pRegObj->GetPortId();
+
+            oRegObj[ "SrcUniqName" ] =
+                pRegObj->GetUniqName();
+                
+            oRegObj[ "SrcDBusName" ] =
+                pRegObj->GetSrcDBusName();
+
+            oRegObj[ "ReferenceCount" ] =
+                elem.second;
+
+            oArray.append( oRegObj );
+        }
+
+        oVal[ "RegObjects" ] = oArray;
+
+        m_strContent = Json::writeString(
+            oBuilder, oVal );
+        m_strContent.append( 1, '\n' );
+
+    }while( 0 );
+
+    return ret;
+}
+
+
 gint32 AddFilesAndDirsBdge(
     CRpcServices* pSvc )
 {

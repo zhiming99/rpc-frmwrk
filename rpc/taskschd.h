@@ -152,6 +152,15 @@ class CRRTaskScheduler :
         return m_mapConnQues.size() - 1;
     }
 
+    gint32 GetNextTaskGrpsRMG(
+        std::deque< TaskGrpPtr >& queGrps );
+
+    gint32 GetNextTaskGrpAAR(
+        TaskGrpPtr& pGrp );
+
+    gint32 GetNextTaskGrpOCC(
+        TaskGrpPtr& pGrp );
+
     public:
     typedef ITaskScheduler super;
 
