@@ -1040,7 +1040,7 @@ gint32 CDeclInterfProxyFuse::Output()
         }
         INDENT_DOWN;
         NEW_LINE;
-        Wa( "gint32 InitUserFuncs();" );
+        Wa( "gint32 InitUserFuncs() override;" );
         NEW_LINE;
         Wa( "virtual gint32 OnReqComplete( IEventSink*," );
         Wa( "    IConfigDb* pReqCtx, Json::Value& val_," );
@@ -1585,6 +1585,37 @@ gint32 CDeclServiceImplFuse::Output()
             Wa( "    return -ENOENT;" );
             Wa( "qwTask = itrReq->second;" );
             Wa( "return STATUS_SUCCESS;" );
+            BLOCK_CLOSE;
+            NEW_LINE;
+
+            NEW_LINE;
+            Wa( "gint32 CustomizeRequest(" );
+            Wa( "    IConfigDb* pReqCfg," );
+            Wa( "    IEventSink* pCallback ) override" );
+            BLOCK_OPEN;
+            Wa( "gint32 ret = 0;" );
+            Wa( "do" );
+            BLOCK_OPEN;
+            Wa( "ret = super::CustomizeRequest(");
+            Wa( "    pReqCfg, pCallback );" );
+            Wa( "if( ERROR( ret ) )" );
+            Wa( "    break;" );
+            Wa( "guint64 qwTaskId = 0, qwReqId = 0;" );
+            Wa( "CCfgOpener oReq( ( IConfigDb*)pReqCfg );" );
+            Wa( "ret = oReq.GetQwordProp(" );
+            Wa( "    propTaskId, qwTaskId );" );
+            Wa( "if( ERROR( ret ) )" );
+            Wa( "    break;" );
+            Wa( "CCfgOpenerObj oCfg( ( IConfigDb*)pCallback );" );
+            Wa( "ret = oCfg.GetQwordProp(" );
+            Wa( "    propTaskId, qwReqId );" );
+            Wa( "if( ERROR( ret ) )" );
+            Wa( "    break;" );
+            Wa( "ret = AddReq( qwReqId, qwTaskId );" );
+            BLOCK_CLOSE;
+            Wa( "while( 0 );" );
+            NEW_LINE;
+            Wa( "return ret;" );
             BLOCK_CLOSE;
             NEW_LINE;
 
@@ -2195,6 +2226,12 @@ gint32 CImplIfMethodProxyFuse::OutputAsync()
         INDENT_DOWN;
         NEW_LINES( 2 );
         Wa( "if( ERROR( ret ) ) break;" );
+        NEW_LINE;
+
+        Wa( "CCfgOpener oResp(" );
+        Wa( "    ( IConfigDb* )pRespCb_->GetConfig() );" );
+        Wa( "oResp.SetQwordProp(" );
+        Wa( "     propTaskId, qwReqId );" );
         NEW_LINE;
 
         if( dwInCount == 0 )
@@ -2988,31 +3025,6 @@ gint32 CImplServiceImplFuse::Output()
         {
             strClass = "C";
             strClass += strSvcName + "_CliImpl";
-            Wa( "#ifdef ADD_REQTASK" );
-            Wa( "#undef ADD_REQTASK" );
-            Wa( "#endif" );
-            Wa( "#define ADD_REQTASK \\" );
-            CCOUT << "do{\\";
-            INDENT_UPL;
-            Wa( "TaskGrpPtr pGrp;\\" );
-            Wa( "iRet = this->GetParallelGrp( pGrp );\\" );
-            Wa( "if( ERROR( iRet ) )\\" );
-            Wa( "    break;\\" );
-            Wa( "TaskletPtr pTask;\\" );
-            Wa( "iRet = pGrp->FindTask( qwTaskId, pTask );\\" );
-            Wa( "if( ERROR( iRet ) )\\" );
-            Wa( "    break;\\" );
-            Wa( "CIfParallelTask* pParaTask = pTask;\\" );
-            Wa( "if( pParaTask == nullptr )\\" );
-            Wa( "{ iRet = -EFAULT; break;}\\" );
-            Wa( "CStdRTMutex oTaskLock(\\" );
-            Wa( "    pParaTask->GetLock() );\\" );
-            Wa( "if( pParaTask->GetTaskState() != stateStarted )\\" );
-            Wa( "{ iRet = ERROR_STATE; break; }\\" );
-            CCOUT << "AddReq( qwReqId, qwTaskId);\\";
-            BLOCK_CLOSE;
-            Wa( "while( 0 )" );
-            NEW_LINES( 2 );
 
             CCOUT << "gint32 " << strClass
                 << "::OnEvent( EnumEventId iEvent,";
@@ -3034,7 +3046,7 @@ gint32 CImplServiceImplFuse::Output()
             Wa( "ret = oCfg.GetQwordProp( 1, qwReqId );" );
             Wa( "if( ERROR( ret ) ) break;" );
             Wa( "RemoveReq( qwReqId );" );
-            Wa( "break;" );
+            CCOUT << "break;";
             BLOCK_CLOSE;
             NEW_LINE;
             Wa( "default:" );
@@ -3108,14 +3120,8 @@ gint32 CImplServiceImplFuse::Output()
                 NEW_LINE;
                 CCOUT << "    oCtx_.GetCfg(), oReq, oResp );";
                 NEW_LINE;
-                Wa( "if( ret == STATUS_PENDING )" );
-                BLOCK_OPEN;
-                Wa( "gint32 iRet = 0;" );
-                Wa( "guint64 qwTaskId = oCtx_[ propTaskId ];" );
-                Wa( "ADD_REQTASK;" );
-                Wa( "if( ERROR( iRet ) )" );
-                CCOUT << "    ret = -STATUS_PENDING;";
-                BLOCK_CLOSE;
+                Wa( "if( ret != STATUS_PENDING )" );
+                Wa( "    this->RemoveReq( qwReqId );" );
                 NEW_LINE;
                 CCOUT << "break;";
                 BLOCK_CLOSE;
@@ -3276,8 +3282,6 @@ gint32 CImplServiceImplFuse::Output()
             Wa( "    strReq, true, true );" );
             Wa( "if( ERROR( ret ) )" );
             Wa( "    break;" );
-            Wa( "LONGWORD* pData = ( LONGWORD* )pReqCtx;" );
-            Wa( "this->OnEvent( eventRemoveReq, 0, 0, pData );" );
             Wa( "CCfgOpener oReqCtx_( pReqCtx );" );
             Wa( "guint64 qwReqId = 0;" );
             Wa( "ret = oReqCtx_.GetQwordProp( 1, qwReqId );" );

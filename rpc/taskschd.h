@@ -63,6 +63,13 @@ struct ITaskScheduler : public IService
     virtual gint32 RemoveConn(
         InterfPtr& pIf ) = 0;
 
+    virtual void EnumTaskGrps(
+        InterfPtr pIf,
+        std::vector< TaskGrpPtr >& vecGrps ) = 0;
+
+    virtual void EnumIfs(
+        std::vector< InterfPtr >& vecIfs ) = 0;
+
     inline stdrmutex& GetLock()
     { return m_oSchedLock; }
 
@@ -90,6 +97,24 @@ struct CONNQUE_ELEM
         return m_lstWaitSlot.size() +
             m_lstRunningGrps[ 0 ].size() +
             m_lstRunningGrps[ 1 ].size();
+    }
+
+    void EnumTaskGrps(
+        std::vector< TaskGrpPtr >& vecGrps )
+    {
+        if( m_lstWaitSlot.size() )
+            vecGrps.insert( vecGrps.end(),
+                m_lstWaitSlot.begin(),
+                m_lstWaitSlot.end() );
+        if( m_plstReady->size() )
+            vecGrps.insert( vecGrps.end(),
+                m_plstReady->begin(),
+                m_plstReady->end() );
+        if( m_plstNextSched->size() )
+            vecGrps.insert( vecGrps.end(),
+                m_plstNextSched->begin(),
+                m_plstNextSched->end() );
+        return;
     }
 };
 
@@ -153,6 +178,7 @@ class CRRTaskScheduler :
     }
 
     gint32 GetNextTaskGrpsRMG(
+        InterfPtr pIf,
         std::deque< TaskGrpPtr >& queGrps );
 
     gint32 GetNextTaskGrpAAR(
@@ -212,6 +238,22 @@ class CRRTaskScheduler :
 
     gint32 Start() override;
     gint32 Stop() override;
+
+    void ReportCounters(
+        TaskGrpPtr pGrp );
+
+    void ReportCounters(
+        std::vector< TaskGrpPtr >& vecGrps );
+
+    void ReportCounters(
+        guint32 dwPortId );
+
+    void EnumTaskGrps( InterfPtr pIf,
+        std::vector< TaskGrpPtr >& vecGrps ) override;
+
+    void EnumIfs(
+        std::vector< InterfPtr >& vecIfs ) override;
+
 };
 
 }

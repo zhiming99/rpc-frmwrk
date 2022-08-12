@@ -24,14 +24,15 @@
  */
 
 #include "routmain.h"
-#include <ifhelper.h>
-#include <frmwrk.h>
-#include <rpcroute.h>
+#include "ifhelper.h"
+#include "frmwrk.h"
+#include "rpcroute.h"
 #include "fuseif.h"
 #include "jsondef.h"
 #include "security/security.h"
 
 #include "rtfiles.h"
+#include "taskschd.h"
 
 namespace rpcf{
 
@@ -829,6 +830,7 @@ gint32 CFuseReqFwdrInfo::UpdateContent()
         InterfPtr pIf;
         pRfRouter->GetReqFwdr( pIf );
         CRpcReqForwarder* pReqFwdr = pIf;
+        CStatCountersServer* psc = pIf;
 
         std::vector< REFCOUNT_ELEM > vecRegObjs;
         pRfRouter->GetRefCountObjs( vecRegObjs );
@@ -859,6 +861,92 @@ gint32 CFuseReqFwdrInfo::UpdateContent()
         }
 
         oVal[ "RegObjects" ] = oArray;
+        if( !pRfRouter->IsRfcEnabled() )
+        {
+            m_strContent = Json::writeString(
+                oBuilder, oVal );
+            m_strContent.append( 1, '\n' );
+            break;
+        }
+
+        ITaskScheduler* pSched =
+            pReqFwdr->GetScheduler();
+        std::vector< InterfPtr > vecIfs;
+        pSched->EnumIfs( vecIfs );
+        stdstr strVal;
+        Json::Value oMap( Json::objectValue );
+        guint32 dwTaskAdded = 0, dwTaskRejected = 0;
+        for( auto& elem : vecIfs )
+        {
+            guint32 dwPortId = 0;
+            CCfgOpenerObj oIfCfg( ( CObjBase* )elem );
+            ret = oIfCfg.GetIntProp(
+                propPortId, dwPortId );
+            if( ERROR( ret ) )
+                continue;
+            std::vector< TaskGrpPtr > vecGrps;
+            pSched->EnumTaskGrps( elem, vecGrps );
+            Json::Value oArrGrps( Json::arrayValue );
+            for( auto& pGrp : vecGrps )
+            {
+                CIfParallelTaskGrpRfc* pGrpRfc = pGrp;
+                CStdRTMutex oTaskLock( pGrpRfc->GetLock() );
+
+                CCfgOpener oGrpCfg(
+                    ( IConfigDb* )pGrp->GetConfig() );
+                Json::Value oElem;
+                ret = oGrpCfg.GetStrProp(
+                    propSrcUniqName, strVal );
+                if( SUCCEEDED( ret ) )
+                    oElem[ "SrcUniqName" ] = strVal;
+
+                ret = oGrpCfg.GetStrProp(
+                    propSrcDBusName, strVal );
+
+                if( SUCCEEDED( ret ) )
+                    oElem[ "SrcDBusName" ] = strVal;
+
+                oElem[ "MaxPendings" ] = ( guint32 )
+                    pGrpRfc->GetMaxPending();
+
+                oElem[ "MaxRunning" ] = ( guint32 )
+                    pGrpRfc->GetMaxRunning();
+
+                dwVal = pGrpRfc->GetTaskAdded();
+                oElem[ "TaskAdded" ] = dwVal;
+                dwTaskAdded += dwVal;
+
+                dwVal = pGrpRfc->GetTaskRejected();
+                oElem[ "TaskRejected" ] = dwVal;
+                dwTaskRejected += dwVal;
+
+                oElem[ "RunningTask" ] = ( guint32 )
+                    pGrpRfc->GetRunningCount();
+
+                oElem[ "PendingTask" ] = ( guint32 )
+                    pGrpRfc->GetPendingCountLocked();
+
+                oTaskLock.Unlock();
+                oArrGrps.append( oElem );
+            }
+            strVal = "Port-";
+            strVal += std::to_string( dwPortId );
+            oMap[ strVal ] = oArrGrps;
+        }
+
+        oVal[ "RFCGroups" ] = oMap;
+
+        ret = psc->GetCounter2(
+            propTaskAdded, dwVal );
+        if( SUCCEEDED( ret ) )
+            oVal[ "TotalTaskAdded" ] =
+                dwVal + dwTaskAdded;
+
+        ret = psc->GetCounter2(
+            propTaskRejected, dwVal );
+        if( SUCCEEDED( ret ) )
+            oVal[ "TotalTaskRejected" ] =
+                dwVal + dwTaskRejected;
 
         m_strContent = Json::writeString(
             oBuilder, oVal );
@@ -987,6 +1075,15 @@ gint32 AddFilesAndDirsReqFwdr(
         pList->SetUserObj( pObj );
 
         auto pEnt = DIR_SPTR( pList );
+        pProxy->Add2UserDir( pEnt );
+
+        auto pRfInfo =
+            new CFuseReqFwdrInfo( nullptr );
+        pRfInfo->SetMode( S_IRUSR );
+        pRfInfo->DecRef();
+        pRfInfo->SetUserObj( pObj );
+
+        pEnt = DIR_SPTR( pRfInfo );
         pProxy->Add2UserDir( pEnt );
 
     }while( 0 );

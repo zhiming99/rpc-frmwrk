@@ -85,15 +85,15 @@ gint32 CStatCountersProxy::OnPostStop(
 }
 
 gint32 IStatCounters::IncCounter(
-    EnumPropId iProp )
+    EnumPropId iProp, guint32 dwVal )
 {
-    return IncCounter( iProp, false );
+    return IncCounter( iProp, dwVal, false );
 }
 
 gint32 IStatCounters::DecCounter(
-    EnumPropId iProp )
+    EnumPropId iProp, guint32 dwVal )
 {
-    return IncCounter( iProp, true );
+    return IncCounter( iProp, dwVal, true );
 }
 
 gint32 IStatCounters::SetCounter(
@@ -114,7 +114,9 @@ gint32 IStatCounters::SetCounter(
 
 // business logics
 gint32 IStatCounters::IncCounter(
-    EnumPropId iProp, bool bNegative )
+    EnumPropId iProp,
+    guint32 dwVal,
+    bool bNegative )
 {
     gint32 ret = 0;
     do{
@@ -129,7 +131,7 @@ gint32 IStatCounters::IncCounter(
                     ( guint32 )0;
             else
                 m_mapCounters[ iProp ] =
-                    ( guint32 )1;
+                    ( guint32 )dwVal;
             break;
         }
 
@@ -152,9 +154,9 @@ gint32 IStatCounters::IncCounter(
             }
 
             if( bNegative )
-                dwCount -= 1;
+                dwCount -= dwVal;
             else
-                dwCount += 1;
+                dwCount += dwVal;
         }
         else 
         {
@@ -166,9 +168,9 @@ gint32 IStatCounters::IncCounter(
             }
 
             if( bNegative )
-                qwCount -= 1;
+                qwCount -= dwVal;
             else
-                qwCount += 1;
+                qwCount += dwVal;
         }
 
     }while( 0 );

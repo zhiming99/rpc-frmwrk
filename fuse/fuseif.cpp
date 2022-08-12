@@ -3735,8 +3735,7 @@ gint32 CFuseReqFileProxy::fs_write_buf(
         stdstr strResp =
             Json::writeString( oBuilder, valResp );
 
-        if( ret == STATUS_PENDING ||
-            ret == -STATUS_PENDING )
+        if( ret == STATUS_PENDING )
         {
             pProxy->AddReqGrp(
                 qwReqId, GetGroupId() );

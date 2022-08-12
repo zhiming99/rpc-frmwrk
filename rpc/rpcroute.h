@@ -2973,8 +2973,11 @@ class CStatCountersServer2 :
         m_qwRxBytes( 0 ), m_qwTxBytes( 0 )
     {}
 
-    gint32 IncCounter( EnumPropId ) override;
-    gint32 DecCounter( EnumPropId ) override;
+    gint32 IncCounter( EnumPropId,
+        guint32 dwVal = 1 ) override;
+
+    gint32 DecCounter( EnumPropId,
+        guint32 dwVal = 1 ) override;
 
     gint32 SetCounter(
         EnumPropId, guint32 ) override;
@@ -3014,8 +3017,11 @@ class CStatCountersProxy2 :
         m_qwRxBytes( 0 ), m_qwTxBytes( 0 )
     {}
 
-    gint32 IncCounter( EnumPropId ) override;
-    gint32 DecCounter( EnumPropId ) override;
+    gint32 IncCounter( EnumPropId,
+        guint32 dwVal = 1 ) override;
+
+    gint32 DecCounter( EnumPropId,
+        guint32 dwVal = 1 ) override;
 
     gint32 SetCounter(
         EnumPropId, guint32 ) override;

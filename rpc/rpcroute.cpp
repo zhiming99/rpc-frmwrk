@@ -6178,21 +6178,27 @@ gint32 AppendConnParams(
 }
 
 gint32 CStatCountersServer2::IncCounter(
-    EnumPropId iProp )
+    EnumPropId iProp, guint32 dwVal )
 {
     switch( iProp )
     {
     case propMsgCount:
-        m_dwMsgCount++;
+        m_dwMsgCount+=dwVal;
         break;
     case propMsgRespCount:
-        m_dwMsgRespCount++;
+        m_dwMsgRespCount+=dwVal;
         break;
     case propEventCount:
-        m_dwEvtCount++;
+        m_dwEvtCount+=dwVal;
         break;
     case propFailureCount:
-        m_dwFailCount++;
+        m_dwFailCount+=dwVal;
+        break;
+    case propRxBytes:
+        m_qwRxBytes+=dwVal;
+        break;
+    case propTxBytes:
+        m_qwTxBytes+=dwVal;
         break;
     default:
         return super::IncCounter( iProp );
@@ -6201,25 +6207,28 @@ gint32 CStatCountersServer2::IncCounter(
 }
 
 gint32 CStatCountersServer2::DecCounter(
-    EnumPropId iProp )
+    EnumPropId iProp, guint32 dwVal )
 {
     switch( iProp )
     {
     case propMsgCount:
-        m_dwMsgCount--;
+        m_dwMsgCount-=dwVal;
         break;
     case propMsgRespCount:
-        m_dwMsgRespCount--;
+        m_dwMsgRespCount-=dwVal;
         break;
     case propEventCount:
-        m_dwEvtCount--;
+        m_dwEvtCount-=dwVal;
         break;
     case propFailureCount:
-        m_dwFailCount--;
+        m_dwFailCount-=dwVal;
         break;
     case propRxBytes:
+        m_qwRxBytes-=dwVal;
+        break;
     case propTxBytes:
-        return -ENOTSUP;
+        m_qwTxBytes-=dwVal;
+        break;
     default:
         return super::DecCounter( iProp );
     }
@@ -6357,57 +6366,57 @@ gint32 CStatCountersServer2::GetCounters(
 }
 
 gint32 CStatCountersProxy2::IncCounter(
-    EnumPropId iProp )
+    EnumPropId iProp, guint32 dwVal )
 {
     switch( iProp )
     {
     case propMsgCount:
-        m_dwMsgCount++;
+        m_dwMsgCount+=dwVal;
         break;
     case propMsgRespCount:
-        m_dwMsgRespCount++;
+        m_dwMsgRespCount+=dwVal;
         break;
     case propEventCount:
-        m_dwEvtCount++;
+        m_dwEvtCount+=dwVal;
         break;
     case propFailureCount:
-        m_dwFailCount++;
+        m_dwFailCount+=dwVal;
         break;
     case propRxBytes:
-        m_qwRxBytes++; 
+        m_qwRxBytes+=dwVal; 
         break;
     case propTxBytes:
-        m_qwTxBytes++;
+        m_qwTxBytes+=dwVal;
     default:
-        return super::IncCounter( iProp );
+        return super::IncCounter( iProp, dwVal );
     }
     return 0;
 }
 
 gint32 CStatCountersProxy2::DecCounter(
-    EnumPropId iProp )
+    EnumPropId iProp, guint32 dwVal )
 {
     switch( iProp )
     {
     case propMsgCount:
-        m_dwMsgCount--;
+        m_dwMsgCount-=dwVal;
         break;
     case propMsgRespCount:
-        m_dwMsgRespCount--;
+        m_dwMsgRespCount-=dwVal;
         break;
     case propEventCount:
-        m_dwEvtCount--;
+        m_dwEvtCount-=dwVal;
         break;
     case propFailureCount:
-        m_dwFailCount--;
+        m_dwFailCount-=dwVal;
         break;
     case propRxBytes:
-        m_qwRxBytes--; 
+        m_qwRxBytes-=dwVal; 
         break;
     case propTxBytes:
-        m_qwTxBytes--;
+        m_qwTxBytes-=dwVal;
     default:
-        return super::DecCounter( iProp );
+        return super::DecCounter( iProp, dwVal );
     }
     return 0;
 }

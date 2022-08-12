@@ -41,17 +41,17 @@ struct IStatCounters
     protected:
     std::hashmap< gint32, Variant > m_mapCounters;
 
-    gint32 IncCounter(
-        EnumPropId iProp, bool bNegative );
+    gint32 IncCounter( EnumPropId iProp,
+        guint32 dwVal, bool bNegative );
 
     stdrmutex m_oStatLock;
 
     public:
-    gint32 IncCounter(
-        EnumPropId iProp );
+    gint32 IncCounter( EnumPropId iProp,
+        guint32 dwVal = 1 );
 
-    gint32 DecCounter(
-        EnumPropId iProp );
+    gint32 DecCounter( EnumPropId iProp,
+        guint32 dwVal = 1 );
 
     gint32 SetCounter(
         EnumPropId iProp,
@@ -97,16 +97,16 @@ class CStatCountersProxy:
     gint32 OnPostStop(
         IEventSink* pCallback ) override;
 
-    gint32 IncCounter(
-        EnumPropId iProp ) override
+    gint32 IncCounter( EnumPropId iProp,
+        guint32 dwVal = 1 ) override
     {
-        return m_oCounters.IncCounter( iProp );
+        return m_oCounters.IncCounter( iProp, dwVal );
     };
 
-    gint32 DecCounter(
-        EnumPropId iProp ) override
+    gint32 DecCounter( EnumPropId iProp,
+        guint32 dwVal = 1 ) override
     {
-        return m_oCounters.DecCounter( iProp );
+        return m_oCounters.DecCounter( iProp, dwVal );
     }
     gint32 SetCounter(
         EnumPropId iProp, guint32 dwVal ) override
@@ -169,16 +169,16 @@ class CStatCountersServer:
     virtual gint32 OnPostStop(
         IEventSink* pCallback ) override;
 
-    gint32 IncCounter(
-        EnumPropId iProp ) override
+    gint32 IncCounter( EnumPropId iProp,
+        guint32 dwVal = 1 ) override
     {
-        return m_oCounters.IncCounter( iProp );
+        return m_oCounters.IncCounter( iProp, dwVal );
     };
 
-    gint32 DecCounter(
-        EnumPropId iProp ) override
+    gint32 DecCounter( EnumPropId iProp,
+        guint32 dwVal = 1  ) override
     {
-        return m_oCounters.DecCounter( iProp );
+        return m_oCounters.DecCounter( iProp, dwVal );
     }
     gint32 SetCounter(
         EnumPropId iProp, guint32 dwVal ) override

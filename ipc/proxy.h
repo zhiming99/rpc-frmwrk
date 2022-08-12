@@ -1046,10 +1046,12 @@ class CRpcServices :
         guint32 dwPropId,
         BufPtr& pVal );
 
-    virtual gint32 IncCounter( EnumPropId )
+    virtual gint32 IncCounter(
+        EnumPropId, guint32 dwVal = 1 )
     { return 0; }
 
-    virtual gint32 DecCounter( EnumPropId )
+    virtual gint32 DecCounter(
+        EnumPropId, guint32 dwVal = 1 )
     { return 0; }
 
     virtual gint32 SetCounter(

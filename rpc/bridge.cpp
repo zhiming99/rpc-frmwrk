@@ -1990,11 +1990,9 @@ gint32 CRpcTcpBridgeProxy::OnInvalidStreamId(
 
 #define SUM_COUNTER( _dest, _src, _prop, _type ) \
 do{ \
-    _type destVal = 0, tempVal = 0; \
+    _type tempVal = 0; \
     _src->GetCounter2( _prop, tempVal ); \
-    _dest->GetCounter2( _prop, destVal ); \
-    destVal += tempVal; \
-    _dest->SetCounter( _prop, destVal ); \
+    _dest->IncCounter( _prop, tempVal ); \
 }while( 0 )
 
 gint32 CRpcTcpBridgeProxy::OnPostStop(

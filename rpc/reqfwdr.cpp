@@ -168,6 +168,7 @@ gint32 CRpcReqForwarder::CreateGrpRfc(
         oParams[ propSrcUniqName ] = strUniqName;
         oParams[ propPrxyPortId ] = dwPortId;
         oParams[ propMaxPendings ] = RFC_MAX_PENDINGS;
+        oParams[ propSrcDBusName ] = strSdName;
 
         if( !m_pScheduler.IsEmpty() )
             oParams[ propMaxReqs ] = 0;
@@ -5629,6 +5630,17 @@ gint32 CRpcReqForwarder::OnPostStart(
 {
     if( m_pScheduler.IsEmpty() )
         return 0;
+
+    auto psc = dynamic_cast
+        < CStatCountersServer* >( this );
+    if( psc != nullptr )
+    {
+        psc->SetCounter(
+            propTaskAdded, ( guint32 )0 );
+
+        psc->SetCounter(
+            propTaskRejected, ( guint32 )0 );
+    }
 
     ITaskScheduler* pSched = m_pScheduler;
     return pSched->Start();

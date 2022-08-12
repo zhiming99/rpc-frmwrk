@@ -260,6 +260,8 @@ enum EnumPropId : gint32
     propObjName,        // type: a string to specify the object in the description file
     propEventCount,     // type: a guint32 counter of the events received.
     propFailureCount,   // type: a guint32 counter of the failed requests .
+    propTaskAdded,      // type: a guint32 counter of the number of tasks added by the taskgroup
+    propTaskRejected,   // type: a guint32 counter of the number of tasks rejected by the taskgroup
 
     propReservedEnd = 0x10000000,
     propInvalid = -1, 

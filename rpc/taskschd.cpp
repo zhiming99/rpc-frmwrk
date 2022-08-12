@@ -512,29 +512,20 @@ gint32 CRRTaskScheduler::GetNextTaskGrpAAR(
 }
 
 gint32 CRRTaskScheduler::GetNextTaskGrpsRMG(
+    InterfPtr pIf,
     std::deque< TaskGrpPtr >& queGrps )
 {
     gint32 ret = 0;
     int i = 0;
 
-    CStdRMutex oLock( GetLock() );
-
-    for( ; i < m_lstConns.size(); i++ )
-    {
-        InterfPtr pIf = m_lstConns.front();
-        if( m_lstConns.size() > 1 )
-        {
-            m_lstConns.pop_front();
-            m_lstConns.push_back( pIf );
-        }
-
+    do{
         if( pIf->GetObjId() ==
             m_pSchedMgr->GetObjId() )
-            continue;
+            break;
 
         auto itr = m_mapConnQues.find( pIf );
         if( itr == m_mapConnQues.end() )
-            continue;
+            break;
 
         CONNQUE_ELEM& ocq = itr->second;
         std::list< TaskGrpPtr >&
@@ -563,10 +554,8 @@ gint32 CRRTaskScheduler::GetNextTaskGrpsRMG(
         }
         if( queGrps.size() )
             break;
-    }
 
-    if( i == m_lstConns.size() )
-        ret = -ENOENT;
+    }while( 0 );
 
     return ret;
 }
@@ -595,28 +584,23 @@ gint32 CRRTaskScheduler::GetNextTaskGrpOCC(
     int i = 0;
 
     CStdRMutex oLock( GetLock() );
-    if( m_lstConns.size() >= 64 )
+
+    if( m_lstConns.size() >= 32 &&
+        ( m_dwNumSched & 0x1f ) == 0 )
     {
-        if( m_dwLastOp == 1 &&
-            ( m_dwNumSched & 0x3f ) == 0 )
+        // let the schdmgr's taskgrp every once per 32
+        // scheduling.
+        CONNQUE_ELEM& ocq = m_ocqSchdMgr;
+        auto& orq = *ocq.m_plstReady;
+        CIfParallelTaskGrp* pPalGrp = orq.front();
+        if( pPalGrp->GetPendingCountLocked() > 0 )
         {
-            // let the schdmgr's taskgrp to run
-            CONNQUE_ELEM& ocq = m_ocqSchdMgr;
-            std::list< TaskGrpPtr >&
-                orq = *ocq.m_plstReady;
-            CIfParallelTaskGrp* pPalGrp = orq.front();
-            if( pPalGrp->GetPendingCountLocked() > 0 )
-            {
-                pGrp = orq.front();
-                m_dwLastOp = 0;
-                return ret;
-            }
+            TaskletPtr pTask = orq.front();
+            GetIoMgr()->RescheduleTask( pTask );
         }
     }
 
-    m_dwLastOp = 1;
     m_dwNumSched++;
-
     for( ; i < m_lstConns.size(); i++ )
     {
         InterfPtr pIf = m_lstConns.front();
@@ -716,6 +700,108 @@ gint32 CRRTaskScheduler::GetNextTaskGrpOCC(
     return ret;
 }
 
+void CRRTaskScheduler::ReportCounters(
+    TaskGrpPtr pGrp )
+{
+    CIfParallelTaskGrpRfc* pGrpRfc = pGrp;
+    if( pGrpRfc == nullptr )
+        return;
+
+    auto psc = dynamic_cast
+        < CStatCountersServer* >( m_pSchedMgr );
+    if( psc == nullptr )
+        return;
+
+    psc->IncCounter( propTaskRejected,
+        pGrpRfc->GetTaskRejected() );
+
+    psc->IncCounter( propTaskAdded,
+        pGrpRfc->GetTaskAdded() );
+    return;
+}
+
+void CRRTaskScheduler::ReportCounters(
+    std::vector< TaskGrpPtr >& vecGrps )
+{
+    auto psc = dynamic_cast
+        < CStatCountersServer* >( m_pSchedMgr );
+    if( psc == nullptr )
+        return;
+
+    for( auto& pGrp : vecGrps )
+    {
+        CIfParallelTaskGrpRfc* pGrpRfc = pGrp;
+        if( pGrpRfc == nullptr )
+            continue;
+
+        psc->IncCounter( propTaskRejected,
+            pGrpRfc->GetTaskRejected() );
+
+        psc->IncCounter( propTaskAdded,
+            pGrpRfc->GetTaskAdded() );
+    }
+    return;
+}
+
+void CRRTaskScheduler::EnumTaskGrps(
+    InterfPtr pIf,
+    std::vector< TaskGrpPtr >& vecGrps )
+{
+    gint32 ret = 0;
+    do{
+        if( pIf.IsEmpty() )
+            break;
+        CStdRMutex oLock( GetLock() );
+        auto itrm = m_mapConnQues.find( pIf );
+        if( itrm == m_mapConnQues.end() )
+            break;
+        auto& ocq = itrm->second;
+        ocq.EnumTaskGrps( vecGrps );
+
+    }while( 0 );
+
+    return;
+}
+
+void CRRTaskScheduler::EnumIfs(
+    std::vector< InterfPtr >& vecIfs )
+{
+    do{
+        CStdRMutex oLock( GetLock() );
+        for( auto& elem : m_lstConns )
+        {
+            if( elem->GetObjId() ==
+                m_pSchedMgr->GetObjId() )
+                continue;
+            vecIfs.push_back( elem );
+        }
+
+    }while( 0 );
+
+    return;
+}
+
+void CRRTaskScheduler::ReportCounters(
+    guint32 dwPortId )
+{
+    do{
+        InterfPtr pIf;
+        CStdRMutex oLock( GetLock() );
+        auto itr2 = m_mapId2If.find( dwPortId );
+        if( itr2 == m_mapId2If.end() )
+            break;
+        pIf = itr2->second;
+        std::vector< TaskGrpPtr > vecGrps;
+        EnumTaskGrps( pIf, vecGrps );
+        oLock.Unlock();
+
+        ReportCounters( vecGrps );
+
+    }while( 0 );
+
+    return;
+}
+
 gint32 CRRTaskScheduler::RemoveTaskGrp(
     TaskGrpPtr& pGrp )
 {
@@ -732,10 +818,8 @@ gint32 CRRTaskScheduler::RemoveTaskGrp(
         if( ERROR( ret ) )
             break;
 
-        CStdRMutex oLock( GetLock() );
-
         InterfPtr pIf;
-
+        CStdRMutex oLock( GetLock() );
         std::hashmap< guint32, InterfPtr >::iterator
             itr2 = m_mapId2If.find( dwPortId );
 
@@ -746,9 +830,8 @@ gint32 CRRTaskScheduler::RemoveTaskGrp(
         }
 
         pIf = itr2->second;
-        CONNQUE_ELEM& ocq = m_mapConnQues[ pIf ];
-        std::list< TaskGrpPtr >::iterator
-            itr = std::find(
+        auto& ocq = m_mapConnQues[ pIf ];
+        auto itr = std::find(
                 ocq.m_lstWaitSlot.begin(),
                 ocq.m_lstWaitSlot.end(),
                 pGrp );
@@ -788,10 +871,7 @@ gint32 CRRTaskScheduler::RemoveTaskGrp(
         if( dwAvg == 0 )
         {
             if( ocq.m_lstWaitSlot.empty() )
-            {
-                ret = -EFAULT;
                 break;
-            }
             IncWaitingGrp( ocq, 1 );
         }
         else
@@ -800,23 +880,24 @@ gint32 CRRTaskScheduler::RemoveTaskGrp(
             IncRunningGrps( ocq, dwModulo );
         }
 
+        if( !bFreeSlot )
+            break;
+
+        std::deque< TaskGrpPtr > queGrps;
+        ret = GetNextTaskGrpsRMG( pIf, queGrps );
+        if( ERROR( ret ) || queGrps.empty() )
+            break;
+
+        CIoManager* pMgr = GetIoMgr();
+        for( auto& elem : queGrps )
+        {
+            TaskletPtr pTask = elem;
+            pMgr->RescheduleTask( pTask );
+        }
+
     }while( 0 );
 
-    if( bFreeSlot )
-    {
-        std::deque< TaskGrpPtr > queGrps;
-        ret = GetNextTaskGrpsRMG( queGrps );
-        if( SUCCEEDED( ret ) && queGrps.size() )
-        {
-            CIoManager* pMgr = GetIoMgr();
-            for( auto& elem : queGrps )
-            {
-                TaskletPtr pTask = elem;
-                pMgr->RescheduleTask( pTask );
-            }
-        }
-    }
-
+    ReportCounters( pGrp );
     return 0;
 }
 
@@ -825,6 +906,8 @@ gint32 CRRTaskScheduler::RemoveTaskGrps(
 {
     gint32 ret = 0;
     do{
+        ReportCounters( dwPortId );
+
         CStdRMutex oLock( GetLock() );
         InterfPtr pIf;
         std::hashmap< guint32, InterfPtr >::iterator
@@ -846,7 +929,6 @@ gint32 CRRTaskScheduler::RemoveTaskGrps(
     std::vector< TaskGrpPtr >& vecGrps )
 {
     gint32 ret = 0;
-    bool bFreeSlot = false;
     do{
         CStdRMutex oLock( GetLock() );
 
@@ -887,19 +969,18 @@ gint32 CRRTaskScheduler::RemoveTaskGrps(
                 if( itr == orq.end() )
                     continue;
                 orq.erase( itr );
-                bFreeSlot = true;
+                setIfs.insert( pIf );
             }
             else
             {
                 owq.erase( itr );
             }
-            setIfs.insert( pIf );
         }
 
-        for( auto elem : setIfs )
+        CIoManager* pMgr = GetIoMgr();
+        for( auto& elem : setIfs )
         {
-            std::map< InterfPtr, CONNQUE_ELEM >::iterator
-                itr = m_mapConnQues.find( elem );
+            auto itr = m_mapConnQues.find( elem );
             if( itr == m_mapConnQues.end() )
                 continue;
 
@@ -908,25 +989,21 @@ gint32 CRRTaskScheduler::RemoveTaskGrps(
                 continue;
 
             ResetSlotCountRelease( ocq, 0 );
-        }
+            std::deque< TaskGrpPtr > queGrps;
+            ret = GetNextTaskGrpsRMG( elem, queGrps );
+            if( ERROR( ret ) || queGrps.empty() )
+                continue;
 
-    }while( 0 );
-
-    if( bFreeSlot )
-    {
-        std::deque< TaskGrpPtr > queGrps;
-        ret = GetNextTaskGrpsRMG( queGrps );
-        if( SUCCEEDED( ret ) && queGrps.size() )
-        {
-            CIoManager* pMgr = GetIoMgr();
             for( auto& elem : queGrps )
             {
                 TaskletPtr pTask = elem;
                 pMgr->RescheduleTask( pTask );
             }
         }
-    }
 
+    }while( 0 );
+
+    ReportCounters( vecGrps );
     return 0;
 }
 
