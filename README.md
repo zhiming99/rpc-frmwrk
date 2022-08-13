@@ -22,7 +22,7 @@ This is an asynchronous and event-driven RPC implementation for embeded system w
 13. [`Node Redudancy/Load Balance`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md#load-balance--node-redudancy)
 14. [`A skelton generator for CPP, Python and Java`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md)
 15. [`A GUI config tool for rpcrouter`](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools/README.md)
-16. [`rpcfs - filesystem interface for rpc-frmwrk`(soon)](https://github.com/zhiming99/rpc-frmwrk/tree/master/fuse/README.md)
+16. [`rpcfs - filesystem interface for rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/tree/master/fuse/README.md)
 
 #### Building `rpc-frmwrk`   
 * Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60) for detail description.   
@@ -60,6 +60,10 @@ This project depends on the following 3rd-party packags at runtime:
 4. A tree-like hierarchical persistant registry.
 
 ---
+[`Sat Aug 13 2022 09:49:37 AM Beijing`]   
+1. Finally we wrapped up the `rpcfs` development. Congratulations!
+2. Next I need to evaluate how much the performance optimization for `rpc-frmwrk` affects to the whole architecture of `rpc-frmwrk`. Previously, it was planned to move on to auto code generator for `rpcfs` programming. But the performance optimization will affect it a lot. Therefore it is paused before the evaluation is done.
+
 [`Mon Aug 08 2022 08:49:45 AM Beijing`]
 1. Found a way to boost the performace of rpc-frmwrk. It involves development of a new `port` module and some complicated changes in code generator module. And the impact is still under evaluation.
 2. It took 10 days to fix bugs, harden the `bridge` security, refact the CFuseStmFile, and make damage tests on the `rpcfs`. And therefore I am now still working on exporting reqfwdr's runtime information to router-specific file `ReqFwdrInfo`. I will wrap up the work in two days so that we can move on to next task, `skelton code generator`.
