@@ -11,9 +11,9 @@ class CStressSvc_SvrImpl
     typedef CStressSvc_SvrSkel super;
     CStressSvc_SvrImpl( const IConfigDb* pCfg ) :
         super::virtbase( pCfg ), super( pCfg )
-    {}
+    { SetClassId( clsid(CStressSvc_SvrImpl ) ); }
 
-    /* The following two methods are important for */
+    /* The following 3 methods are important for */
     /* streaming transfer. rewrite them if necessary */
     gint32 OnStreamReady( HANDLE hChannel ) override
     { return super::OnStreamReady( hChannel ); } 

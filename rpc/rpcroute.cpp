@@ -6201,7 +6201,7 @@ gint32 CStatCountersServer2::IncCounter(
         m_qwTxBytes+=dwVal;
         break;
     default:
-        return super::IncCounter( iProp );
+        return super::IncCounter( iProp, dwVal );
     }
     return 0;
 }
@@ -6230,7 +6230,7 @@ gint32 CStatCountersServer2::DecCounter(
         m_qwTxBytes-=dwVal;
         break;
     default:
-        return super::DecCounter( iProp );
+        return super::DecCounter( iProp, dwVal );
     }
     return 0;
 }

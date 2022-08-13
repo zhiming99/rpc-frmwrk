@@ -11,7 +11,7 @@ class CStressSvc_CliImpl
     typedef CStressSvc_CliSkel super;
     CStressSvc_CliImpl( const IConfigDb* pCfg ) :
         super::virtbase( pCfg ), super( pCfg )
-    {}
+    { SetClassId( clsid(CStressSvc_CliImpl ) ); }
 
     /* The following two methods are important for */
     /* streaming transfer. rewrite them if necessary */
