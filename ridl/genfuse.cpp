@@ -1646,12 +1646,6 @@ gint32 CDeclServiceImplFuse::Output()
             BLOCK_CLOSE;
             NEW_LINE;
 
-            CCOUT << "gint32 OnEvent( EnumEventId iEvent,";
-            NEW_LINE;
-            Wa( "    LONGWORD dwParam1," );
-            Wa( "    LONGWORD dwParam2," );
-            Wa( "    LONGWORD* pData ) override;" );
-
             Wa( "//Request Dispatcher" );
             Wa( "gint32 DispatchReq(" );
             Wa( "    IConfigDb* pContext," );
@@ -3026,38 +3020,6 @@ gint32 CImplServiceImplFuse::Output()
             strClass = "C";
             strClass += strSvcName + "_CliImpl";
 
-            CCOUT << "gint32 " << strClass
-                << "::OnEvent( EnumEventId iEvent,";
-            NEW_LINE;
-            Wa( "    LONGWORD dwParam1," );
-            Wa( "    LONGWORD dwParam2," );
-            Wa( "    LONGWORD* pData )" );
-            BLOCK_OPEN;
-            Wa( "gint32 ret = 0;" );
-            Wa( "switch( ( guint32 )iEvent )" );
-            BLOCK_OPEN;
-            Wa( "case eventRemoveReq:" );
-            BLOCK_OPEN;
-            Wa( "IConfigDb* pCfg = ( IConfigDb* )pData;" );
-            Wa( "if( pCfg == nullptr )" );
-            Wa( "{ ret = -EFAULT; break; }" );
-            Wa( "CCfgOpener oCfg( pCfg );" );
-            Wa( "guint64 qwReqId = 0;" );
-            Wa( "ret = oCfg.GetQwordProp( 1, qwReqId );" );
-            Wa( "if( ERROR( ret ) ) break;" );
-            Wa( "RemoveReq( qwReqId );" );
-            CCOUT << "break;";
-            BLOCK_CLOSE;
-            NEW_LINE;
-            Wa( "default:" );
-            Wa( "    ret = super::OnEvent( iEvent," );
-            Wa( "        dwParam1, dwParam1, pData );" );
-            CCOUT << "    break;";
-            BLOCK_CLOSE;
-            NEW_LINE;
-            CCOUT << "return ret;";
-            BLOCK_CLOSE;
-            NEW_LINE;
             // implement the DispatchReq
             CCOUT << "gint32 " << strClass
                 << "::DispatchReq(";
@@ -3288,7 +3250,7 @@ gint32 CImplServiceImplFuse::Output()
             Wa( "if( ERROR( ret ) )" );
             Wa( "    break;" );
             Wa( "this->ReceiveMsgJson( strReq, qwReqId );" );
-            Wa( "this->RemoveReq( qwReqId );" );
+            CCOUT << "this->RemoveReq( qwReqId );";
             BLOCK_CLOSE;
             Wa( "while( 0 );" );
             CCOUT << "return ret;";
