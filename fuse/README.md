@@ -34,7 +34,7 @@ Let's use the above generated `rpcfs` to illustrate the control flow.
 * Unlike the req file, the resp file or the event file, which can do single direction transfer, the stream channel is a full duplex byte stream channel, and you can read/write the file concurrently. 
 * The stream channel has a flow control mechamism, and if the peer has many data packets accumulated in the receiving queue, the sending party will be blocked till the peer has consumed some of them, that is, the last `send` becomes synchronous till the flow control is lifted by the peer.
 * The advantage of the stream channel is that it is much faster than the request/reponse transfer. And it's limitation in size is 2^64 bytes at most , compared to 1MB limit along with the normal request.
-* Tip: To access a remote shell, you can do this `bash -i < /path-to-stream_0 1>/path-to-stream_1` on the server side and on the client side, type `echo ls -l > /path-to-stream_0` and `cat /path-to-stream_1` to run a `ls` command remotely and show the output locally.
+* Tip: To access a remote shell, you can do this `bash -i < /path-to-stream_0 &>/path-to-stream_1` on the server side and on the client side, type `echo ls -l > /path-to-stream_0` and `cat /path-to-stream_1` to run a `ls` command remotely and show the output locally. Note that is very dangeouse to do so over internet unless SSL and authentication are enabled.
 
 ### Managing the Concurrency with `rpcfs`
 According to the above `rpcfs` struture, You can increase the concurrency and throughput for request handling by
