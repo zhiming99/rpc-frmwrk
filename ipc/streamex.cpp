@@ -227,14 +227,14 @@ CIfStmReadWriteTask::CIfStmReadWriteTask(
         if( pIf->IsServer() )
         {
             CStreamServerSync* pStm =
-                ObjPtr( pSvc );
+                ObjPtr( pIf );
             EnableOutQueLimit(
                 pStm->HasOutQueLimit() );
         }
         else
         {
             CStreamProxySync* pStm =
-                ObjPtr( pSvc );
+                ObjPtr( pIf );
             EnableOutQueLimit(
                 pStm->HasOutQueLimit() );
         }
