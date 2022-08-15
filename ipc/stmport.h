@@ -31,9 +31,22 @@
 #include "autoptr.h"
 #include "msgmatch.h"
 #include "dbusport.h"
+#define SESS_HASH_SIZE 48
 
 namespace rpcf
 {
+
+struct IRPCTX_EXTDSP {
+    IRPCTX_EXTDSP()
+    {
+        m_hStream = 0;
+        m_szHash[ 0 ] = 0;
+        m_bWaitWrite = false;
+    }
+    HANDLE m_hStream;
+    char m_szHash[ SESS_HASH_SIZE ];
+    bool m_bWaitWrite;
+};
 
 class CDBusStreamPdo :
     public CRpcPdoPort
@@ -64,14 +77,23 @@ class CDBusStreamPdo :
     bool IsServer() const
     { return m_bServer; }
 
-    gint32 SendDBusMsg( DBusMessage* pMsg,
-        guint32* pdwSerial ) override;
+    gint32 HandleSendReq(
+        IRP* pIrp ) override;
+
+    gint32 HandleSendEvent(
+        IRP* pIrp ) override;
 
     DBusHandlerResult PreDispatchMsg(
         gint32 iType, DBusMessage* pMsg ) override;
 
     bool Unloadable() override
     { return true; }
+
+    gint32 SendDBusMsg(
+        PIRP pIrp, DMsgPtr& pMsg );
+
+    gint32 BroadcastDBusMsg(
+        PIRP pIrp, DMsgPtr& pMsg );
 
     gint32 PreStop( IRP* pIrp ) override;
 

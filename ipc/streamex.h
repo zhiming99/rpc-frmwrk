@@ -112,6 +112,7 @@ class CIfStmReadWriteTask :
     bool    m_bIn;
     bool    m_bDiscard = false;
     HANDLE  m_hChannel = INVALID_HANDLE;
+    bool    m_bOutQueLimit = true;
 
     gint32 ReadStreamInternal(
         IEventSink* pCallback,
@@ -135,6 +136,12 @@ class CIfStmReadWriteTask :
 
     gint32 NotifyWriteResumed();
     gint32 PopWriteRequest();
+
+    inline void EnableOutQueLimit( bool bEnable )
+    { m_bOutQueLimit = bEnable; }
+
+    inline bool HasOutQueLimit()
+    { return m_bOutQueLimit; }
 
     public:
     typedef CIfUxTaskBase super;
@@ -793,6 +800,9 @@ struct CStreamSyncBase :
         return 0;
     }
     
+    virtual bool HasOutQueLimit() const 
+    { return true; }
+
     gint32 CloseStream( HANDLE hChannel )
     {
         if( hChannel == INVALID_HANDLE )
