@@ -402,7 +402,8 @@ gint32 CArgListUtils::FindParentByClsid(
     }
     if( pParent == nullptr )
         return -ENOENT;
-        pNode = pParent;
+
+    pNode = pParent;
     return STATUS_SUCCESS;
 }
 
