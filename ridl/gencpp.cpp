@@ -383,6 +383,29 @@ gint32 CArgListUtils::GetArgTypes(
     return ret;
 }
 
+gint32 CArgListUtils::FindParentByClsid(
+    ObjPtr& pArgList,
+    EnumClsid iClsid,
+    ObjPtr& pNode ) const
+{
+    CArgList* pinal = pArgList;
+    if( pinal == nullptr )
+        return -EINVAL;
+   
+    gint32 ret = 0; 
+    CAstNodeBase* pParent = pinal->GetParent();
+    while( pParent != nullptr )
+    {
+        if( pParent->GetClsid() == iClsid )
+            break;
+        pParent = pParent->GetParent();
+    }
+    if( pParent == nullptr )
+        return -ENOENT;
+        pNode = pParent;
+    return STATUS_SUCCESS;
+}
+
 gint32 CMethodWriter::GenActParams(
     ObjPtr& pArgList )
 {
@@ -471,7 +494,16 @@ gint32 CMethodWriter::GenSerialArgs(
 
     do{
         NEW_LINE;
-        Wa( "ObjPtr pSerialIf_(this);" );
+        ObjPtr pObj;
+        ret = FindParentByClsid( pArgList,
+            clsid( CInterfaceDecl ), pObj );
+        if( ERROR( ret ) )
+            break;
+        CInterfaceDecl* pifd = pObj;
+        if( pifd->IsStream() )
+            Wa( "ObjPtr pSerialIf_(GetStreamIf());" );
+        else
+            Wa( "ObjPtr pSerialIf_(this);" );
         Wa( "CSerialBase oSerial_( pSerialIf_ );" );
         CEmitSerialCode oesc(
             m_pWriter, pArgList );

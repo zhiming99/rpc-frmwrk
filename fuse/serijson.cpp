@@ -122,10 +122,14 @@ gint32 CJsonSerialBase::SerializeHStream(
                 ret = pSvr->NameToStream(
                     val.asString(), hstm );
             }
-            else
+            else if( pProxy != nullptr )
             {
                 ret = pProxy->NameToStream(
                     val.asString(), hstm );
+            }
+            else
+            {
+                ret = -EFAULT;
             }
         }
         else
@@ -136,10 +140,14 @@ gint32 CJsonSerialBase::SerializeHStream(
                 ret = pSvr->NameToStream(
                     val.asString(), hstm );
             }
-            else
+            else if( pProxy != nullptr )
             {
                 ret = pProxy->NameToStream(
                     val.asString(), hstm );
+            }
+            else
+            {
+                ret = -EFAULT;
             }
         }
 

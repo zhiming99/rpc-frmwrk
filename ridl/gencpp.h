@@ -416,6 +416,11 @@ struct CArgListUtils
 
     gint32 GetArgTypes( ObjPtr& pArgList,
         std::set< ObjPtr >& vecTypes ) const;
+
+    gint32 FindParentByClsid(
+        ObjPtr& pArgList,
+        EnumClsid iClsid,
+        ObjPtr& pNode ) const;
 };
 
 struct CMethodWriter 
