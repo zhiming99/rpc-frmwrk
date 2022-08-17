@@ -64,6 +64,8 @@ class CDBusStreamPdo :
         IMessageMatch* pMatch ) override
     { return 0; }
 
+    gint32 StopStreamChan( IRP* pIrp );
+
     public:
 
     typedef CRpcPdoPort super;
@@ -73,6 +75,9 @@ class CDBusStreamPdo :
 
     inline ObjPtr GetStreamIf() const
     { return m_pIf; }
+
+    inline SetStreamIf( ObjPtr& pIf )
+    { m_pIf = pIf; }
 
     bool IsServer() const
     { return m_bServer; }
@@ -98,6 +103,39 @@ class CDBusStreamPdo :
     gint32 PreStop( IRP* pIrp ) override;
 
     gint32 PostStart( IRP* pIrp ) override;
+};
+
+class CDBusStreamBusPort : 
+    public CGenericBusPortEx
+{
+    gint32 CreateDBusStreamPdo(
+        IConfigDb* pCfg,
+        PortPtr& pNewPort );
+
+    public:
+    typedef CGenericBusPortEx super;
+    CDBusStreamBusPort ( const IConfigDb* pCfg ) :
+        super( pCfg )
+    { SetClassId( clsid( CDBusStreamBusPort ) ); }
+
+    virtual gint32 BuildPdoPortName(
+        IConfigDb* pCfg,
+        std::string& strPortName );
+
+    virtual gint32 CreatePdoPort(
+        IConfigDb* pConfig,
+        PortPtr& pNewPort );
+};
+
+class CDBusStreamBusDrv :
+    public CGenBusDriverEx
+{
+    public:
+    typedef CGenBusDriverEx super;
+    CDBusStreamBusDrv( const IConfigDb* pCfg );
+	gint32 Probe( IPort* pLowerPort,
+        PortPtr& pNewPort,
+        const IConfigDb* pConfig = NULL );
 };
 
 }
