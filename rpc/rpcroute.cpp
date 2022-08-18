@@ -1971,17 +1971,18 @@ gint32 CRpcRouterBridge::OnRmtSvrEvent(
         return -EINVAL;
 
     TaskletPtr pDeferTask;
+
+    std::string strPath;
+    CCfgOpener oEvtCtx( pEvtCtx );
+    ret = oEvtCtx.GetStrProp(
+        propRouterPath, strPath );
+    if( ERROR( ret ) )
+        return ret;
+
     switch( iEvent )
     {
     case eventRmtSvrOnline:
         {
-            std::string strPath;
-            CCfgOpener oEvtCtx( pEvtCtx );
-            ret = oEvtCtx.GetStrProp(
-                propRouterPath, strPath );
-            if( ERROR( ret ) )
-                break;
-
             if( strPath == "/" )
             {
                 PortPtr pPort;
