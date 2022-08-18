@@ -812,4 +812,139 @@ gint32 Execve(
     return ret;
 }
 
+CSharedLock::CSharedLock()
+{
+    Sem_Init( &m_semReader, 0, 0 );
+    Sem_Init( &m_semWriter, 0, 0 );
+}
+
+CSharedLock::~CSharedLock()
+{
+    sem_destroy( &m_semReader );
+    sem_destroy( &m_semWriter );
+}
+
+gint32 CSharedLock::LockRead()
+{
+    CStdMutex oLock( m_oLock );
+    if( m_bWrite )
+    {
+        m_queue.push_back( true );
+        oLock.Unlock();
+        return Sem_Wait_Wakable( &m_semReader );
+    }
+    else
+    {
+        if( m_queue.empty() )
+        {
+            m_iReadCount++;
+            oLock.Unlock();
+            return STATUS_SUCCESS;
+        }
+        m_queue.push_back( true );
+        oLock.Unlock();
+        return Sem_Wait_Wakable( &m_semReader );
+    }
+}
+
+gint32 CSharedLock::LockWrite()
+{
+    CStdMutex oLock( m_oLock );
+    if( m_bWrite )
+    {
+        m_queue.push_back( false );
+        oLock.Unlock();
+        return Sem_Wait_Wakable( &m_semWriter );
+    }
+    else if( m_iReadCount > 0 )
+    {
+        m_queue.push_back( false );
+        oLock.Unlock();
+        return Sem_Wait_Wakable( &m_semWriter );
+    }
+    else if( m_iReadCount == 0 )
+    {
+        m_bWrite = true;
+        return 0;
+    }
+    return -EFAULT;
+}
+
+gint32 CSharedLock::ReleaseRead()
+{
+    CStdMutex oLock( m_oLock );
+    --m_iReadCount;
+    if( m_iReadCount > 0 )
+        return STATUS_SUCCESS;
+
+    if( m_iReadCount == 0 )
+    {
+        if( m_queue.empty() )
+            return STATUS_SUCCESS;
+
+        if( m_queue.front() == true )
+            return -EFAULT;
+
+        m_bWrite = true;
+        m_queue.pop_front();
+        return Sem_Post( &m_semWriter );
+    }
+    return -EFAULT;
+}
+
+gint32 CSharedLock::ReleaseWrite()
+{
+    CStdMutex oLock( m_oLock );
+    if( m_queue.empty() )
+    {
+        m_bWrite = false;
+    }
+    else if( m_queue.front() == false )
+    {
+        m_bWrite = true;
+        m_queue.pop_front();
+        Sem_Post( &m_semWriter );
+    }
+    else
+    {
+        m_bWrite = false;
+        while( m_queue.front() == true )
+        {
+            m_iReadCount++;
+            m_queue.pop_front();
+            Sem_Post( &m_semReader );
+            if( m_queue.empty() )
+                break;
+        }
+    }
+    return STATUS_SUCCESS;
+}
+
+gint32 CSharedLock::TryLockRead()
+{
+    CStdMutex oLock( m_oLock );
+    if( !m_bWrite && m_queue.empty() )
+    {
+        m_iReadCount++;
+        oLock.Unlock();
+        return STATUS_SUCCESS;
+    }
+    return -EAGAIN;
+}
+
+gint32 CSharedLock::TryLockWrite()
+{
+    CStdMutex oLock( m_oLock );
+    if( m_bWrite || m_iReadCount > 0 ) 
+        return -EAGAIN;
+
+    if( m_iReadCount == 0 )
+    {
+        m_bWrite = true;
+        oLock.Unlock();
+        return 0;
+    }
+    return -EFAULT;
+}
+
 }
