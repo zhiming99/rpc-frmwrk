@@ -30,32 +30,46 @@
 #include "streamex.h"
 #include "stmport.h"
 
+#define IFBASE2( _bProxy ) std::conditional< \
+    _bProxy, CStreamProxyWrapper, CStreamServerWrapper>::type
+
 #define IFBASE( _bProxy ) std::conditional< \
     _bProxy, CStreamProxyAsync, CStreamServerAsync>::type
+
+#define IFBASE3( _bProxy ) std::conditional< \
+    _bProxy, CAggInterfaceProxy, CAggInterfaceServer>::type
+
+#define MAX_REQCHAN_PER_SESS 200
 
 namespace rpc{
 
 using SESS_INFO=std::pair< stdstr, stdstr >;
 
 template< bool bProxy >
-class CRpcReqStreamBase :
+class CRpcStmChanBase :
     public virtual IFBASE( bProxy ) 
 {
     timespec m_tsStartTime;
+
+    CSharedLock m_oSharedLock;
+
     std::hashmap< HANDLE, SESS_INFO > m_mapStm2Sess;
     std::map< stdstr, guint32 > m_mapSessRefs;
 
-    using BUFQUE=std::deque< BufPtr >;
-    std::map< HANDLE, DMsgPtr > m_mapMsgRead;
-    std::hashmap< HANDLE, BufPtr > m_mapBufReading;
-    guint32 m_dwNumReqs = 0;
+    using MSGQUE=
+        std::pair< guint32, std::deque< DMsgPtr > >;
+    std::hashmap< HANDLE, MSGQUE  > m_mapMsgRead;
+    using BUFQUE= std::deque< BufPtr >;
+    std::hashmap< HANDLE, BUFQUE > m_mapBufReading;
     std::set< HANDLE > m_setStreams;
-    std::list< HANDLE > m_lstStreams;
-    std::list< HANDLE > m_lstStmSched;
+
     IPort* m_pPort = nullptr;
 
     public:
     typedef typename IFBASE( bProxy ) super;
+
+    CSharedLock& GetSharedLock()
+    { return m_oSharedLock; }
 
     CRpcReqStreamBase( const IConfigDb* pCfg ) :
         _MyVirtBase( pCfg ), super( pCfg )
@@ -72,7 +86,7 @@ class CRpcReqStreamBase :
     {
         gint32 ret = 0;
         do{
-            CStdRMutex oLock( this->GetLock() );
+            CReadLock oLock( this->GetLock() );
             auto itr =
                 m_mapStm2Sess.find( hStream );
             if( itr == m_mapStm2Sess.end() )
@@ -91,7 +105,7 @@ class CRpcReqStreamBase :
     {
         gint32 ret = 0;
         do{
-            CStdRMutex oLock( this->GetLock() );
+            CReadLock oLock( this->GetSharedLock() );
             auto itr =
                 m_mapStm2Sess.find( hStream );
             if( itr == m_mapStm2Sess.end() )
@@ -140,7 +154,7 @@ class CRpcReqStreamBase :
             if( ERROR( ret ) )
                 break;
                 
-            CStdRMutex oLock( this->GetLock() );
+            CWriteLock oLock( this->GetSharedLock() );
 
             auto itr = m_mapSessRefs.find(
                 strSess );
@@ -166,36 +180,67 @@ class CRpcReqStreamBase :
         return ret;
     }
 
-    gint32 OnStmReady( HANDLE hstm ) override
+    gint32 OnStreamReady( HANDLE hstm ) override
     {
         gint32 ret = 0;
         do{
             ret = super::OnStreamReady( hstm );
-            CStdRMutex oLock( this->GetLock() );
+            if( ERROR( ret ) )
+                break;
+
+            CWriteLock oLock( this->GetSharedLock() );
+
             m_setStreams.insert( hstm );
-            m_lstStmSched.push_back( hstm );
+
+            auto& msgElem =
+                    _mapMsgRead[ hstm ];
+            auto& bufElem =
+                    m_mapBufReading[ hstm ];
+
+            oLock.Unlock();
+
+            ret = m_pPort->OnEvent( eventNewConn,
+                hstm, 0, nullptr );
 
         }while( 0 );
 
         return ret;
     }
 
-    gint32 AddRecvReq()
+    gint32 AddRecvReq( HANDLE hstm )
     {
         gint32 ret = 0;
         do{
-            FillReadBuf();
-
-            CStdRMutex oLock( this->GetLock() );
-            m_dwNumReqs++;
-            if( m_mapMsgRead.empty())
+            auto pPort = static_cast
+                < CDBusStreamBusPort* >( m_pPort ); 
+            PortPtr pPdoPort;
+            ret = pPort->GetStreamPort(
+                hstm, pPdoPort );
+            if( ERROR( ret ) )
                 break;
+
+            CReadLock oLock( this->GetSharedLock() );
+            auto itr = m_mapMsgRead.find( hstm );
+            if( itr == m_mapMsgRead.end() )
+                break;
+
+            CPort* pPdo = pPdoPort;
+            CStdRMutex oPortLock( pPdo->GetLock() );
+
+            auto& msgElem = itr.second;
+            auto& dwReqCount = msgElem.first;
+            dwReqCount++;
+
+            oPortLock.Unlock();
+            oLock.Unlock();
+
+            FillReadBuf( hstm );
 
             TaskletPtr pTask;
             ret = DEFER_IFCALLEX_NOSCHED2(
                 0, pTask, this,
                 &CRpcReqStreamBase::DispatchData, 
-                INVALID_HANDLE );
+                hstm );
             
             if( ERROR( ret ) )
                 break;
@@ -212,9 +257,20 @@ class CRpcReqStreamBase :
     {
         gint32 ret = 0;
         do{
+            auto pPort = static_cast
+                < CDBusStreamBusPort* >( m_pPort ); 
+            PortPtr pPdoPort;
+            pPort->GetStreamPort( hstm, pPdoPort );
+
+            if( !pPdoPort.IsEmpty() )
+            {
+                pPdoPort->OnEvent(
+                    eventDisconn, 0, 0, nullptr );
+            }
+
             ret = super::OnStmClosing( hstm );
 
-            CStdRMutex oLock( this->GetLock() );
+            CWriteLock oLock( this->GetSharedLock() );
             auto itr =
                 m_mapStm2Sess.find( hStream );
             if( itr == m_mapStm2Sess.end() )
@@ -239,29 +295,6 @@ class CRpcReqStreamBase :
             m_mapMsgRead.erase( hstm );
             m_mapBufReading.erase( hstm );
             m_setStreams.erase( hstm );
-            auto itr = m_lstStreams.begin();
-            while( itr != m_lstStreams.end() )
-            {
-                if( *itr == hstm )
-                {
-                    itr = m_lstStreams.erase( itr );
-                    break;
-                }
-                else
-                    itr++;
-            }
-            auto itr = m_lstStmSched.begin();
-            while( itr != m_lstmSched.end() )
-            {
-                if( *itr == hstm )
-                {
-                    itr = m_lstStmSched.erase( itr );
-                    break;
-                }
-                else
-                    itr++;
-            }
-            oLock.Unlock();
 
         }while( 0 );
 
@@ -269,7 +302,7 @@ class CRpcReqStreamBase :
     }
 
     bool HasOutQueLimit() const override
-    { return true; }
+    { return false; }
 
     inline gint32 CompleteWriteIrp(
         HANDLE hStream,
@@ -347,7 +380,7 @@ class CRpcReqStreamBase :
             oReqCtx.SetStrProp(
                 propSessHash, si.first );
 
-            oReqCtx.SetIntPtr( propStreamId,
+            oReqCtx.SetIntPtr( propStmHandle,
                 ( guint32* )hstm );
 
             timespec ts;
@@ -390,20 +423,40 @@ class CRpcReqStreamBase :
         HANDLE hstm, BufPtr& pBuf ) 
     {
         gint32 ret = 0;
-        CStdRMutex oLock( this->GetLock() );
+        auto pPort = static_cast
+            < CDBusStreamBusPort* >( m_pPort ); 
+        PortPtr pPdoPort;
+        ret = pPort->GetStreamPort(
+            hstm, pPdoPort );
+        if( ERROR( ret ) )
+            return ret;
+
+        CReadLock oLock( this->GetSharedLock() );
         do{
-            auto itr1 = m_mapMsgRead.find( hstm );
-            if( itr1 != m_mapMsgRead.end() )
+            auto itr = m_mapMsgRead.find( hstm );
+            if( itr == m_mapMsgRead.end() )
             {
-                ret = -EEXIST;
+                ret = -ENOENT;
                 break;
             }
+
+            CPort* pPdo = pPdoPort;
+            CStdRMutex oPortLock( pPdo->GetLock() );
+
+            auto& msgElem = itr.second;
+            auto& msgQue = msgElem.second;
 
             BufPtr pBufReady;
             auto itr =
                 m_mapBufReading.find( hstm );
-
             if( itr == m_mapBufReading.end() )
+            {
+                ret = -ENOENT;
+                break;
+            }
+            
+            BUFQUE queBuf = itr->second;
+            if( queBuf.empty() )
             {
                 guint32 dwSize = 0;
                 memcpy( &dwSize, pBuf->ptr(),
@@ -432,11 +485,11 @@ class CRpcReqStreamBase :
                         pMsg, pNewMsg );
                     if( ERROR( ret ) )
                         break;
-                    m_mapMsgRead[ hstm ]= pNewMsg;
+                    msgQue.push_back( pNewMsg );
                 }
                 else if( dwPayload < dwSize )
                 {
-                    m_mapBufReading[ hstm ] = pBuf;
+                    queBuf.push_back( pBuf );
                     ret = STATUS_MORE_PROCESS_NEEDED;
                 }
                 else 
@@ -448,7 +501,7 @@ class CRpcReqStreamBase :
             else
             {
                 guint32 dwSize = 0;
-                BufPtr& pHeadBuf = itr->second;
+                BufPtr& pHeadBuf = queBuf.front();
                 memcpy( &dwSize, pHeadBuf->ptr(),
                     sizeof( dwSize ) );
                 dwSize = ntohl( dwSize );
@@ -472,13 +525,14 @@ class CRpcReqStreamBase :
                         pMsg, pNewMsg );
                     if( ERROR( ret ) )
                         break;
-                    m_mapMsgRead[ hstm ]= pNewMsg;
-                    m_mapBufReading.erase( hstm );
+                    msgQue.push_back( pNewMsg );
+                    queBuf.pop_front( hstm );
                 }
                 else if( dwPayload < dwSize )
                 {
                     pHeadBuf->append(
                         pBuf->ptr(), pBuf->size() );
+                    ret = STATUS_MORE_PROCESS_NEEDED;
                 }
                 else
                 {
@@ -487,9 +541,6 @@ class CRpcReqStreamBase :
             }
 
         }while( 0 );
-
-        if( SUCCEEDED( ret ) )
-            m_lstStreams.push_back( hstm );
 
         return ret;
     }
@@ -501,13 +552,30 @@ class CRpcReqStreamBase :
 
         gint32 ret = 0;
         do{
-            CStdRMutex oLock( this->GetLock() );
-            auto itr = m_mapMsgRead.find( hstm );
-            if( itr != m_mapMsgRead.end() )
-            {
-                ret = -EEXIST;
+            auto pPort = static_cast
+                < CDBusStreamBusPort* >( m_pPort ); 
+            PortPtr pPdoPort;
+            ret = pPort->GetStreamPort(
+                hstm, pPdoPort );
+            if( ERROR( ret ) )
                 break;
-            }
+
+            CReadLock oLock( this->GetSharedLock() );
+            auto itr = m_mapMsgRead.find( hstm );
+            if( itr == m_mapMsgRead.end() )
+                break;
+
+            CPort* pPdo = pPdoPort;
+            CStdRMutex oPortLock( pPdo->GetLock() );
+
+            auto& msgElem = itr.second;
+            auto& msgQue = msgElem.second;
+            auto& dwReqCount = msgElem.first;
+
+            if( dwReqCount <= msgQue.size() )
+                break;
+
+            oPortLock.Unlock();
             oLock.Unlock();
 
             BufPtr pBuf;
@@ -524,64 +592,52 @@ class CRpcReqStreamBase :
         return ret;
     }
 
-    gint32 FillReadBuf()
-    {
-        gint32 ret = 0;
-        do{
-            CStdRMutex oLock( this->GetLock() );
-            guint32 dwCount = m_lstStmSched.size();
-            for( guint32 i = 0; i < dwCount; ++i )
-            {
-                HANDLE hstm = m_lstStmSched.front();
-                m_lstStmSched.pop_front();
-                m_lstStmSched.push_back( hstm );
-                oLock.Unlock();
-
-                FillReadBuf( hstm );
-                oLock.Lock();
-                dwCount = m_lstStmSched.size();
-            }
-
-        }while( 0 );
-
-        return ret;
-    }
-
-    gint32 DispatchData()
+    gint32 DispatchData( HANDLE hstm )
     {
         gint32 ret = 0;    
         do{
+            auto pPort = static_cast
+                < CDBusStreamBusPort* >( m_pPort ); 
+            PortPtr pPdoPort;
+            ret = pPort->GetStreamPort(
+                hstm, pPdoPort );
+            if( ERROR( ret ) )
+                break;
+
             std::vector< DMsgPtr > vecMsgs;
-            CStdRMutex oLock( this->GetLock() );
+            CReadLock oLock( this->GetLock() );
             if( this->GetState() != stateConnected )
             {
                 ret = ERROR_STATE;
                 break;
             }
 
-            if( m_mapMsgRead.empty() ||
-                m_dwNumReqs == 0 )
+            auto itr = m_mapMsgRead.find( hstm );
+            if( itr == m_mapMsgRead.end() )
+                break;
+
+            CPort* pPdo = pPdoPort;
+            CStdRMutex oPortLock( pPdo->GetLock() );
+
+            auto& msgElem = itr.second;
+            auto& msgQue = msgElem.second;
+            if( msgQue.empty() )
                 break;
 
             guint32 dwCount = ( gint32 )std::min(
-                ( guint32 )m_lstStreams.size(),
-                m_dwNumReqs );
+                ( guint32 )msgElem.first,
+                msgQue.size() );
 
             gint32 iCount = ( gint32 )dwCount;
             while( iCount > 0 )
             {
                 --iCount;
-                HANDLE hstm = m_lstStreams.front();
-                m_lstStreams.pop_front();
-                auto itr = m_mapMsgRead.find( hstm );
-                if( itr == m_mapMsgRead.end() )
-                    continue;
-
-                vecMsgs.push_back( *itr )
-                m_mapMsgRead.erase( itr );
+                vecMsgs.push_back( msgQue.front() )
+                msgQue.pop_front();
             }
 
-            m_dwNumReqs -= dwCount;
+            msgElem.first -= dwCount;
+            oPortLock.Unlock();
             oLock.Unlock();
 
             BufPtr pBuf( true );
@@ -589,7 +645,7 @@ class CRpcReqStreamBase :
             {
                 *pBuf = elem;
                 auto ptr = ( CBuffer* )pBuf;
-                m_pPort->OnEvent(
+                pPdoPort->OnEvent(
                     cmdDispatchData, 0, 0,
                     ( LONGWORD* )ptr );
             }
@@ -608,23 +664,28 @@ class CRpcReqStreamBase :
             return ret;
 
         FillReadBuf( hstm );
-        DispatchData();
+        DispatchData( hstm );
         return ret;
     }
 
-    gint32 DoRmtModEvent(
+    gint32 OnRmtSvrEvent(
         EnumEventId iEvent,
-        const std::string& strModule,
-        IConfigDb* pEvtCtx ) override
+        IConfigDb* pEvtCtx,
+        HANDLE hPort ) override
     {
-        gint32 ret = super::DoRmtModEvent(
-             iEvent, strModule, pEvtCtx );
-        if( SUCCEEDED( ret ) )
+        gint32 ret = super::OnRmtSvrEvent(
+             iEvent, pEvtCtx, hPort );
+        if( ERROR( ret ) )
+            return ret;
+
+        if( IsServer() )
+            return ret;
+
+        if( iEvent == eventRmtSvrOnline )
         {
-            if( iEvent != eventRmtModOffline )
-                break;
-        
+            return ret;
         }
+
         return ret;
     }
 
@@ -646,7 +707,7 @@ class CRpcReqStreamBase :
             if( ERROR( ret ) )
                 break;
 
-            CDBusStreamPdo* pPort = nullptr;
+            CDBusStreamBusPort* pPort = nullptr;
             ret = oReqCtx.GetPointer(
                     propPortPtr, pPort );
             if( ERROR( ret ) )
@@ -657,8 +718,7 @@ class CRpcReqStreamBase :
             gint32 iRet = oReqCfg.GetPointer(
                 propRespPtr, pResp );
             
-            CStdRMutex oIrpLock(
-                    pIrp->GetLock() );
+            CStdRMutex oIrpLock( pIrp->GetLock() );
             ret = pIrp->CanContinue(
                 IRP_STATE_READY );
             if( ERROR( ret ) )
@@ -707,35 +767,243 @@ class CRpcReqStreamBase :
 
         return ret;
     }
+
+#define OnStopStmComplete OnStartStmComplete
+
+    gint32 OnStartStmComplete(
+        IEventSink* pCallback,
+        IEventSink* pIoReq,
+        IConfigDb* pReqCtx );
+    {
+        if( pIoReq == nullptr ||
+            pReqCtx == nullptr )
+            return -EINVAL;
+
+        gint32 ret = 0;
+        do{
+            CCfgOpener oReqCtx( pReqCtx );
+            PIRP pIrp = nullptr;
+            ret = oReqCtx.GetPointer(
+                    propIrpPtr, pIrp );
+            if( ERROR( ret ) )
+                break;
+
+            CCfgOpenerObj oReqCfg( pIoReq );
+            IConfigDb* pResp;
+            gint32 iRet = oReqCfg.GetPointer(
+                propRespPtr, pResp );
+            
+            CDBusStreamPdo* pPort = nullptr;
+            ret = oReqCtx.GetPointer(
+                    propPortPtr, pPort );
+            if( ERROR( ret ) )
+                break;
+
+            CStdRMutex oIrpLock( pIrp->GetLock() );
+            ret = pIrp->CanContinue(
+                IRP_STATE_READY );
+            if( ERROR( ret ) )
+                break;
+
+            if( pIrp->GetStackSize() == 0 )
+            {
+                ret = -EINVAL;
+                break;
+            }
+
+            CCfgOpener oResp( pResp );
+            pIrpCtxPtr& pCtx =
+                    pIrp->GetTopStack();
+            if( ERROR( iRet ) )
+            {
+                pCtx->SetStatus( iRet );
+            }
+            else
+            {
+                ret = oResp.GetIntProp(
+                    propReturnValue, iRet );
+                if( ERROR( ret ) )
+                    pCtx->SetStatus( ret );
+                else
+                    pCtx->SetStatus( iRet );
+            }
+
+            guint32 dwMinCmd =
+                    pCtx->GetMinorCmd();
+            if( dwMinCmd == IRP_MN_PNP_START &&
+                SUCCEEDED( pCtx->GetStatus() ) )
+            {
+                HANDLE hstm = INVALID_HANDLE;
+                ret = oResp.GetIntPtr(
+                    1, ( guint32*& )hstm );
+                if( ERROR( ret ) )
+                    pCtx->SetStatus( ret );
+                else
+                    pPort->SetStream( hstm );
+            }
+            oIrpLock.Unlock();
+
+            auto pMgr = GetIoMgr();
+            pMgr->CompleteIrp( pIrp );
+
+        }while( 0 );
+
+        return ret;
+    }
+    
 };
 
-class CRpcReqStreamProxy :
+class CRpcStmChanCli :
     public CRpcReqStreamBase< true >
 {
     public:
-    typedef CRpcReqStreamBase< true > super;
-    CRpcReqStreamProxy( const IConfigDb* pCfg )
+    typedef CRpcStmChanBase< true > super;
+    CRpcStmChanCli( const IConfigDb* pCfg )
         : super( pCfg )
     {}
 
 };
 
-class CRpcReqStreamServer :
-    public CRpcReqStreamBase< false >
+class CRpcStmChanSvr :
+    public CRpcStmChanBase< false >
 {
     public:
-    typedef CRpcReqStreamBase< false > super;
-    CRpcReqStreamServer( const IConfigDb* pCfg )
+    typedef CRpcStmChanBase< false > super;
+    CRpcStmChanSvr( const IConfigDb* pCfg )
         : super( pCfg )
     {}
+};
+
+template< bool bProxy >
+class CFastRpcSkelBase
+    public IFBASE2< bProxy >
+{
+    InterfPtr m_pStreamIf;
+
+    public:
+
+    typedef typename IFBASE2( bProxy ) super;
+    typedef super::super _MyVirtBase;
+
+    CFastRpcSkeltonBase(
+        const IConfigDb* pCfg ) :
+        _MyVirtBase( pCfg ), super( pCfg )
+    {}
+
+    InterfPtr GetStreamIf()
+    { return m_pStreamIf; }
+
+    void SetStreamIf( InterfPtr pIf )
+    { m_pStreamIf = pIf; }
+};
+
+class CRpcSkelProxyState :
+    public CInterfaceState
+{
+    public:
+    typedef CInterfaceState super;
+    CRpcSkelProxyState ( const IConfigDb* pCfg )
+        : super( pCfg )
+    { SetClassId( clsid( CRpcSkelProxyState ) ); }
+    gint32 SubscribeEvents();
+};
+
+class CRpcSkelServerState :
+    public CIfServerState
+{
+    public:
+    typedef CIfServerState super;
+    CRpcSkelProxyState ( const IConfigDb* pCfg )
+        : super( pCfg )
+    { SetClassId( clsid( CRpcSkelProxyState ) ); }
+    gint32 SubscribeEvents();
+};
+
+class CFastRpcServerState :
+    public CIfServerState
+{
+    public:
+    typedef CIfServerState super;
+    CFastRpcServerState ( const IConfigDb* pCfg )
+        : super( pCfg )
+    { SetClassId( clsid( CFastRpcServerState ) ); }
+    gint32 SubscribeEvents();
+};
+
+class CFastRpcProxyState :
+    public CRemoteProxyState
+{
+    public:
+    typedef CRemoteProxyState super;
+    CFastRpcProxyState ( const IConfigDb* pCfg )
+        : super( pCfg )
+    { SetClassId( clsid( CFastRpcProxyState ) ); }
+    gint32 SubscribeEvents();
+};
+
+class CFastRpcSkelProxyBase :
+    public CFastRpcSkelBase< true >
+{
+    public:
+    typedef CFastRpcSkelBase< true > super;
+    CFastRpcSkelProxyBase( const IConfigDb* pCfg )
+        : _MyVirtBase( pCfg ), super( pCfg )
+    {}
+};
+
+class CFastRpcSkelSvrBase :
+    public CFastRpcSkelBase< false >
+{
+    public:
+    typedef CFastRpcSkelBase< false > super;
+    CFastRpcSkelServerBase( const IConfigDb* pCfg )
+        : _MyVirtBase( pCfg ), super( pCfg )
+    {}
+};
+
+class CFastRpcServerBase :
+    public IFBASE3< false >
+{
+    public:
+    typedef IFBASE3< false > super;
+
+    gint32 OnRmtSvrEvent(
+        EnumEventId iEvent,
+        IConfigDb* pEvtCtx,
+        HANDLE hPort ) override;
+
+    gint32 OnPostStart(
+        IEventSink* pCallback ) override;
+
+    gint32 OnPreStop(
+        IEventSink* pCallback ) override;
+};
+
+class CFastRpcProxyBase :
+    public IFBASE3< true >
+{
+    InterfPtr m_pSkelImp;
+    public:
+    typedef IFBASE3< true > super;
+
+    gint32 OnRmtSvrEvent(
+        EnumEventId iEvent,
+        IConfigDb* pEvtCtx,
+        HANDLE hPort ) override;
+
+    gint32 OnPostStart(
+        IEventSink* pCallback ) override;
+
+    gint32 OnPreStop(
+        IEventSink* pCallback ) override;
 };
 
 DECLARE_AGGREGATED_SERVER(
      CRpcStreamChannelSvr,
-     CRpcReqStreamProxy ); 
+     CRpcStmChanSvr ); 
 
 DECLARE_AGGREGATED_PROXY(
     CRpcStreamChannelCli,
-    CRpcReqStreamServer );
+    CRpcStmChanCli );
 
 }

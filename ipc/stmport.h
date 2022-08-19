@@ -31,28 +31,28 @@
 #include "autoptr.h"
 #include "msgmatch.h"
 #include "dbusport.h"
+
 #define SESS_HASH_SIZE 48
 
 namespace rpcf
 {
 
-struct IRPCTX_EXTDSP {
-    IRPCTX_EXTDSP()
-    {
-        m_hStream = 0;
-        m_szHash[ 0 ] = 0;
-        m_bWaitWrite = false;
-    }
-    HANDLE m_hStream;
-    char m_szHash[ SESS_HASH_SIZE ];
-    bool m_bWaitWrite;
+struct IRPCTX_EXTDSP
+{
+    bool m_bWaitWrite = false;
 };
 
 class CDBusStreamPdo :
     public CRpcPdoPort
 {
-    ObjPtr m_pIf;
     bool m_bServer = false;
+    HANDLE m_hStream = INVALID_HANDLE;
+
+    stdstr m_strHash;
+    stdstr m_strPath;
+
+    CTimestampSvr m_oTs;
+    sem_t   m_semFireSync;
 
     protected:
 
@@ -64,8 +64,6 @@ class CDBusStreamPdo :
         IMessageMatch* pMatch ) override
     { return 0; }
 
-    gint32 StopStreamChan( IRP* pIrp );
-
     public:
 
     typedef CRpcPdoPort super;
@@ -73,11 +71,18 @@ class CDBusStreamPdo :
     CDBusStreamPdo(
         const IConfigDb* pCfg );
 
-    inline ObjPtr GetStreamIf() const
-    { return m_pIf; }
+    inline HANDLE GetStream() const
+    { return m_hStream; }
 
-    inline SetStreamIf( ObjPtr& pIf )
-    { m_pIf = pIf; }
+    inline SetStream( HANDLE hStream )
+    { m_hStream = hStream; }
+
+    inline ObjPtr GetStreamIf() const
+    {
+        auto pPort = static_cast
+            < CDBusStreamBusPort* >( m_pBusPort );
+        return pPort->GetStreamIf();
+    }
 
     bool IsServer() const
     { return m_bServer; }
@@ -97,12 +102,18 @@ class CDBusStreamPdo :
     gint32 SendDBusMsg(
         PIRP pIrp, DMsgPtr& pMsg );
 
-    gint32 BroadcastDBusMsg(
-        PIRP pIrp, DMsgPtr& pMsg );
-
     gint32 PreStop( IRP* pIrp ) override;
-
     gint32 PostStart( IRP* pIrp ) override;
+    gint23 OnPortStackReady( IRP* pIrp ) override;
+
+    gint32 IsIfSvrOnline(
+        const DMsgPtr& pMsg ) override;
+
+    gint32 OnEvent(
+        EnumEventId iEvent,
+        LONGWORD dwParam1,
+        LONGWORD dwParam2,
+        LONGWORD* data ) override;
 };
 
 class CDBusStreamBusPort : 
@@ -112,19 +123,52 @@ class CDBusStreamBusPort :
         IConfigDb* pCfg,
         PortPtr& pNewPort );
 
+    gint32 StopStreamChan( IRP* pIrp );
+    ObjPtr m_pIf;
+
+    inline SetStreamIf( ObjPtr pIf )
+    { m_pIf = pIf; }
+
+    std::hashmap< HANDLE, PortPtr > m_mapStm2Port;
+    bool m_bServer = false;
+
     public:
     typedef CGenericBusPortEx super;
+
+    inline ObjPtr GetStreamIf() const
+    { return m_pIf; }
+
     CDBusStreamBusPort ( const IConfigDb* pCfg ) :
         super( pCfg )
     { SetClassId( clsid( CDBusStreamBusPort ) ); }
 
-    virtual gint32 BuildPdoPortName(
-        IConfigDb* pCfg,
-        std::string& strPortName );
+    gint32 BroadcastDBusMsg(
+        PIRP pIrp, DMsgPtr& pMsg );
 
-    virtual gint32 CreatePdoPort(
+    gint32 BuildPdoPortName(
+        IConfigDb* pCfg,
+        std::string& strPortName ) override;
+
+    gint32 CreatePdoPort(
         IConfigDb* pConfig,
-        PortPtr& pNewPort );
+        PortPtr& pNewPort ) override;
+
+    gint32 Stop( IRP* pIrp ) override;
+    gint32 PostStart( IRP* pIrp ) override;
+    gint32 BindStreamPort(
+        HANDLE hStream, PortPtr pPort );
+    gint32 RemoveBinding( HANDLE hStream );
+
+    gint32 GetStreamPort(
+        HANDLE hStream, PortPtr& pPort );
+
+    gint32 OnNewConnection( HANDLE hStream );
+
+    gint32 OnEvent(
+        EnumEventId iEvent,
+        LONGWORD dwParam1,
+        LONGWORD dwParam2,
+        LONGWORD* data ) override;
 };
 
 class CDBusStreamBusDrv :

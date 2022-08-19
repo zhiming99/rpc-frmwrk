@@ -39,6 +39,61 @@
 namespace rpcf
 {
 
+static gint32 FireRmtSvrEvent(
+    IPort* pPort, EnumEventId iEvent )
+{
+    // this is an event detected by the
+    // socket
+    gint32 ret = 0;
+
+    switch( iEvent )
+    {
+    case eventRmtSvrOffline:
+    case eventRmtSvrOnline:
+        {
+            CCfgOpenerObj oCfg( pPort );
+            auto pcPort = static_cast
+                < CDBusStreamPdo* >( pPort );
+
+            guint32 dwPortId = 0;
+            ret = oCfg.GetIntProp( propPortId,
+                dwPortId );
+
+            CCfgOpener oEvtCtx;
+            HANDLE hStream = pcPort->GetStream();
+            if( hStream == INVALID_HANDLE )
+                break;
+
+            oEvtCtx.SetIntPtr( propStmHandle,
+                ( guint32* )hStream );
+
+            IConfigDb* pEvtExt =
+                oEvtCtx.GetCfg();
+
+            // pass on this event to the pnp
+            // manager
+            CEventMapHelper< CPort >
+                oEvtHelper( pcPort );
+
+            HANDLE hPort =
+                PortToHandle( pPort );
+
+            oEvtHelper.BroadcastEvent(
+                eventConnPoint, iEvent,
+                ( LONGWORD )pEvtExt,
+                ( LONGWORD* )hPort );
+
+            break;
+        }
+    default:
+        {
+            ret = -EINVAL;
+            break;
+        }
+    }
+    return ret;
+}
+
 CDBusStreamPdo::CDBusStreamPdo(
     const IConfigDb* pCfg )
     : super( pCfg )
@@ -50,6 +105,8 @@ CDBusStreamPdo::CDBusStreamPdo(
             propIsServer, m_bServer );
         if( ERROR( ret ) )
             break;
+
+        Sem_Init( m_semFireSync, 0, 0 );
 
     }while( 0 );
 
@@ -79,7 +136,7 @@ gint32 CDBusStreamPdo::SendDBusMsg(
             break;
         }
         IRPCTX_EXTDSP* pExt = pExtBuf->ptr();
-        HANDLE hStream = pExt->m_hStream;
+        HANDLE hStream = GetStream();
 
         BufPtr pBuf( true );
         ret = pMsg.Serialize( *pBuf );
@@ -111,7 +168,7 @@ gint32 CDBusStreamPdo::SendDBusMsg(
     return ret;
 }
 
-gint32 CDBusStreamPdo::BroadcastDBusMsg(
+gint32 CDBusStreamBusPort::BroadcastDBusMsg(
     PIRP pIrp, DMsgPtr& pMsg )
 {
     gint32 ret = 0;
@@ -130,7 +187,7 @@ gint32 CDBusStreamPdo::BroadcastDBusMsg(
         IRPCTX_EXTDSP* pExt = pExtBuf->ptr();
         pExt->m_bWaitWrite = true;
 
-        HANDLE hStream = pExt->m_hStream;
+        HANDLE hStream = GetStream();
 
         BufPtr pBuf( true );
         ret = pMsg.Serialize( *pBuf );
@@ -186,8 +243,8 @@ gint32 CDBusStreamPdo::HandleSendReq( IRP* pIrp )
             dwIoDir == IRP_DIR_OUT )
         {
             DMsgPtr pMsg = *pCtx->m_pReqData;
-            CDBusBusPort *pBusPort = static_cast
-                < CDBusBusPort* >( m_pBusPort );
+            auto *pBusPort = static_cast
+                < CDBusStreamBusPort* >( m_pBusPort );
 
             dwSerial =
                 pBusPort->LabelMessage( pMsg );
@@ -265,14 +322,15 @@ gint32 CDBusStreamPdo::HandleSendEvent( IRP* pIrp )
             if( ERROR( ret ) )
                 break;
 
-            CDBusBusPort *pBusPort = static_cast
-                < CDBusBusPort* >( m_pBusPort );
+            auto *pBusPort = static_cast
+                < CDBusStreamBusPort* >( m_pBusPort );
 
             dwSerial =
                 pBusPort->LabelMessage( pMsg );
 
             pMsg.SetNoReply( true );
-            ret = BroadcastDBusMsg( pIrp, pMsg );
+            ret = pBusPort->BroadcastDBusMsg(
+                pIrp, pMsg );
         }
         else
         {
@@ -372,55 +430,48 @@ gint32 CDBusStreamPdo::CompleteSendReq(
             // the response we need to check if the
             // port is still in the valid state for
             // io request
-            guint32 dwOldState = 0;
             CStdRMutex oPortLock( GetLock() );
 
-            ret = CanContinue( pIrp,
-                PORT_STATE_BUSY_SHARED, &dwOldState );
-
-            if( SUCCEEDED( ret ) )
+            auto itr =
+                m_mapRespMsgs.find( dwSerial );
+            if( itr == m_mapRespMsgs.end() )
             {
-                auto itr =
-                    m_mapRespMsgs.find( dwSerial );
-                if( itr == m_mapRespMsgs.end() )
-                {
-                    m_mapSerial2Resp[ dwSerial ] = pIrp;
-                    ret = STATUS_PENDING;
-                }
-                else
-                {
-                    // the message arrives before
-                    // the irp arrives here
-                    DMsgPtr pRespMsg = itr->second;
-                    m_mapRespMsgs.erase( itr );
-
-                    DMsgPtr& pReqMsg = *pCtx->m_pReqData;
-                    guint32 dwOldSeqNo = 0;
-                    pReqMsg.GetSerial( dwOldSeqNo );
-                    pRespMsg.SetReplySerial( dwOldSeqNo );
-
-                    BufPtr pRespBuf( true );
-                    *pRespBuf = pRespMsg;
-                    pCtx->SetRespData( pRespBuf );
-                    pCtx->SetStatus( ret );
-                }
+                m_mapSerial2Resp[ dwSerial ] = pIrp;
+                ret = STATUS_PENDING;
             }
-            PopState( dwOldState );
+            else
+            {
+                // the message arrives before
+                // the irp arrives here
+                DMsgPtr pRespMsg = itr->second;
+                m_mapRespMsgs.erase( itr );
+
+                DMsgPtr& pReqMsg = *pCtx->m_pReqData;
+                guint32 dwOldSeqNo = 0;
+                pReqMsg.GetSerial( dwOldSeqNo );
+                pRespMsg.SetReplySerial( dwOldSeqNo );
+
+                BufPtr pRespBuf( true );
+                *pRespBuf = pRespMsg;
+                pCtx->SetRespData( pRespBuf );
+                pCtx->SetStatus( ret );
+            }
+
             oPortLock.Unlock();
             if( ERROR( ret ) )
                 break;
 
             if( IsServer() )
             {
-                CRpcReqStreamServer *pIf =
+                CRpcStreamChannelSvr *pIf =
                     GetStreamIf();
-                pIf->AddRecvReq();
+                pIf->AddRecvReq( hstm );
             }
             else
             {
-                CRpcReqStreamProxy *pIf =
+                CRpcStreamChannelCli *pIf =
                     GetStreamIf();
-                pIf->AddRecvReq();
+                pIf->AddRecvReq( hstm );
             }
         }
         else
@@ -490,10 +541,18 @@ gint32 CDBusStreamPdo::CompleteIoctlIrp(
     return ret;
 }
 
+gint32 CDBusStreamPdo::IsIfSvrOnline(
+    const DMsgPtr& pMsg )
+{
+    auto *pBusPort = static_cast
+        < CDBusStreamBusPort* >( m_pBusPort );
+    return ( pBusPort->GetState() ==
+        stateConnected );
+}
+
 gint32 CDBusStreamPdo::HandleListening(
     IRP* pIrp )
 {
-
     // the irp carry a buffer to receive, it is
     // assumed to be a DMsgPtr
     gint32 ret = 0;
@@ -509,15 +568,15 @@ gint32 CDBusStreamPdo::HandleListening(
 
     if( IsServer() )
     {
-        CRpcReqStreamServer *pIf =
+        CRpcStreamChannelSvr *pIf =
             GetStreamIf();
-        pIf->AddRecvReq();
+        pIf->AddRecvReq( hstm );
     }
     else
     {
-        CRpcReqStreamProxy *pIf =
+        CRpcStreamChannelCli *pIf =
             GetStreamIf();
-        pIf->AddRecvReq();
+        pIf->AddRecvReq( hstm );
     }
     
     return ret;
@@ -526,91 +585,201 @@ gint32 CDBusStreamPdo::HandleListening(
 gint32 CDBusStreamPdo::CompleteListening(
     IRP* pIrp )
 {
-    gint32 ret = 0;
+    return STATUS_SUCCESS;
+}
+
+gint32 CDBusStreamPdo::PreStop(
+    IRP* pIrp )
+{
     if( pIrp == nullptr ||
         pIrp->GetStackSize() == 0 )
         return -EINVAL;
 
-    IrpCtxPtr& pCtx = pIrp->GetTopStack();
+    gint32 ret = 0;
+    guint32 dwStepNo = 0;
     do{
-        ret = pCtx->GetStatus();
-        if( ERROR( ret ) )
-            break;
-
-        DMsgPtr& pRespMsg =
-            *pCtx->m_pRespData;
-
-        stdstr strSender = pRespMsg.GetSender();
-        if( strSender.empty() ||
-            strSender[ 0 ] != ':' )
+        ret = GetPreStopStep( pIrp, dwStepNo );
+        while( dwStepNo == 0 )
         {
-            ret = -EBADMSG;
-            break;
-        }
+            HANDLE hstm = GetStream();
+            auto *pBusPort = static_cast
+            < CDBusStreamBusPort* >( m_pBusPort );
+            pBusPort->RemoveBinding( hstm );
+            SetPreStopStep( pIrp, 1 );
 
-        stdstr strStream = strSender.substr( 1 );
-        if( strStream.empty() )
-        {
-            ret = -EBADMSG;
-            break;
-        }
+            TaskletPtr pStopCb;
+            CCfgOpener oReqctx;
+            oReqCtx[ propIrpPtr ] = ObjPtr( pIrp );
+            oReqCtx[ propPortPtr ] = ObjPtr( this );
 
-        HANDLE hStream = 0;
-#if BUILD_64 == 1
-        hStream = strtoll(
-            strStream.c_str(), nullptr, 10 );
-#else
-        hStream = strtol(
-            strStream.c_str(), nullptr, 10 );
-#endif
-
-        stdstr strHash;
-        if( IsServer() )
-        {
-            CRpcReqStreamServer *pIf =
-                GetStreamIf();
-            ret = pIf->GetSessHash(
-                hStream, strHash );
-            if( ERROR( ret ) )
+            CRpcServices* pSvc = GetStreamIf();
+            if( pSvc->GetState() != stateConnected )
+            {
+                SetPreStopStep( pIrp, 1 );
                 break;
-        }
-        else
-        {
-            CRpcReqStreamProxy *pIf =
-                GetStreamIf();
-            ret = pIf->GetSessHash(
-                hStream, strHash );
-            if( ERROR( ret ) )
+            }
+
+            if( IsServer() )
+            {
+                ret = NEW_PROXY_RESP_HANDLER2(
+                    pStopCb, GetStreamIf(), 
+                    &CRpcStreamChannelSvr::OnStopStmComplete,
+                    ( IEventSink* )nullptr,
+                    ( IConfigDb* )oReqCtx.GetCfg() );
+                if( SUCCEEDED( ret ) )
+                {
+                    CStreamServerSync* pstm = GetStreamIf();
+                    ret = pstm->OnClose( hstm, pStopCb );
+                }
+            }
+            else
+            {
+                ret = NEW_PROXY_RESP_HANDLER2(
+                    pStopCb, GetStreamIf(), 
+                    &CRpcStreamChannelCli::OnStopStmComplete,
+                    ( IEventSink* )nullptr,
+                    ( IConfigDb* )oReqCtx.GetCfg() );
+                if( SUCCEEDED( ret ) )
+                {
+                    CStreamProxySync* pstm = GetStreamIf();
+                    ret = pstm->OnClose( hstm, pStopCb );
+                }
+            }
+            if( ret == STATUS_PENDING )
+            {
+                ret = STATUS_MORE_PROCESS_NEEDED;
                 break;
-        }
-        
-        BufPtr pExtBuf;
-        IrpCtxPtr& pCtx = pIrp->GetCurCtx();
-        pCtx->GetExtBuf( pExtBuf );
-        if( unlikely( pExtBuf.IsEmpty() ) )
-        {
-            ret = -EFAULT;
+            }
+            ( *pStopCb )( eventCancelTask );
+            SetPreStopStep( pIrp, 1 );
             break;
         }
 
-        IRPCTX_EXTDSP* pExt = pExtBuf->ptr();
-        pExt->m_hStream = hStream;
-
-        strncpy( pExt->m_szHash,
-            strHash.c_str(), SESS_HASH_SIZE );
+        ret = GetPreStopStep( pIrp, dwStepNo );
+        if( dwStepNo == 1 )
+        {
+            SetPreStopStep( pIrp, 2 );
+            ret = super::PreStop( pIrp );
+        }
 
     }while( 0 );
-
-    if( ERROR( ret ) )
-    {
-        pCtx->SetStatus( ret );
-        pCtx->m_pRespData.clear();
-    }
 
     return ret;
 }
 
 gint32 CDBusStreamPdo::PostStart(
+    IRP* pIrp )
+{
+    gint32 ret = 0;
+    if( IsServer() )
+        return STATUS_SUCCESS;
+    do{
+        CStreamProxySync* pstm = GetStreamIf();
+        if( pstm == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        CCfgOpener oReqctx;
+        oReqCtx[ propIrpPtr ] = ObjPtr( pIrp );
+        oReqCtx[ propPortPtr ] = ObjPtr( this );
+
+        TaskletPtr pRespCb;
+        ret = NEW_PROXY_RESP_HANDLER2(
+            pRespCb, GetStreamIf(), 
+            &CRpcStreamChannelCli::OnStartStmComplete,
+            ( IEventSink* )nullptr,
+            ( IConfigDb* )oReqCtx.GetCfg() );
+        if( ERROR( ret ) )
+        {
+            ( *pStartTask )( eventCancelTask );
+            break;
+        }
+
+        CCfgOpener oDesc;
+        HANDLE hstm = INVALID_HANDLE;
+
+        ret = pstm->StartStream(
+                hstm, nullptr, pRespCb );
+        if( ret == STATUS_PENDING )
+            break;
+
+        if( SUCCEEDED( ret ) )
+            SetStream( hstm );
+
+        ( *pRespCb )( eventCancelTask );
+        IrpCtxPtr& pCtx = pIrp->GetTopStack();
+        pCtx->SetStatus( ret );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CDBusStreamPdo::OnPortStackReady(
+    IRP* pIrp )
+{
+    if( pIrp == nullptr ||
+        pIrp->GetStackSize() == 0 )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        CStdRMutex oPortLock( GetLock() );
+
+        EnumSockState iState =
+            m_pStmSock->GetState();
+
+        if( iState != sockStarted )
+        {
+            ret = ERROR_PORT_STOPPED;
+            break;
+        }
+
+        oPortLock.Unlock();
+
+        auto *pBusPort = static_cast
+            < CDBusStreamBusPort* >( m_pBusPort );
+        pBusPort->BindStreamPort(
+            GetStream(), PortPtr( this ) );
+
+        FireRmtSvrEvent( this, eventRmtSvrOnline );
+        Sem_Post( &m_semFireSync );
+
+    }while( 0 );
+
+    pIrp->GetCurCtx()->SetStatus( ret );
+
+    return super::OnPortReady( pIrp );
+}
+
+gint32 CDBusStreamPdo::OnEvent(
+    EnumEventId iEvent,
+    LONGWORD dwParam1,
+    LONGWORD dwParam2,
+    LONGWORD* data )
+{
+    gint32 ret = 0;
+    switch( iEvent )
+    {
+    case eventDisconn:
+        {
+            // passive disconnection detected
+            Sem_Wait( &m_semFireSync );
+            ret = FireRmtSvrEvent(
+                this, eventRmtSvrOffline );
+            break;
+        }
+    default:
+        ret = super::OnEvent( iEvent,
+            dwParam1, dwParam2, data );
+        break;
+    }
+
+    return ret;
+}
+
+gint32 CDBusStreamBusPort::PostStart(
     IRP* pIrp )
 {
     if( pIrp == nullptr ||
@@ -650,7 +819,9 @@ gint32 CDBusStreamPdo::PostStart(
 
         CRpcServices* pSvc = pIf;
         if( IsServer() )
+        {
             ret = pSvc->Start();
+        }
         else
         {
             CRpcStreamChannelCli* pCli = pIf;
@@ -664,6 +835,8 @@ gint32 CDBusStreamPdo::PostStart(
 
             CCfgOpener oReqCtx;
             oReqCtx.SetPointer( propIrpPtr, pIrp );
+            oReqCtx.SetPointer( propPortPtr, this );
+
             TaskletPtr pRespCb;
             ret = NEW_PROXY_RESP_HANDLER2(
                 pRespCb, ObjPtr( pSvc ), 
@@ -696,7 +869,7 @@ gint32 CDBusStreamPdo::PostStart(
     return ret;
 }
 
-gint32 CDBusStreamPdo::StopStreamChan(
+gint32 CDBusStreamBusPort::StopStreamChan(
     IRP* pIrp )
 {
     if( pIrp == nullptr ||
@@ -758,37 +931,44 @@ gint32 CDBusStreamPdo::StopStreamChan(
     return ret;
 }
 
-gint32 CDBusStreamPdo::PreStop(
+gint32 CDBusStreamBusPort::Stop( PIRP pIrp )
 {
     if( pIrp == nullptr ||
         pIrp->GetStackSize() == 0 )
         return -EINVAL;
 
-    gint32 ret = 0;
-    guint32 dwStepNo = 0;
-    do{
-        ret = GetPreStopStep( pIrp, dwStepNo );
-        if( dwStepNo == 0 )
-        {
-            SetPreStopStep( pIrp, 1 );
-            ret = StopStreamChan( pIrp );
-            if( ret == STATUS_PENDING )
-            {
-                ret = STATUS_MORE_PROCESS_NEEDED;
-                break;
-            }
-        }
+    return StopStreamChan( pIrp );
+}
 
-        ret = GetPreStopStep( pIrp, dwStepNo );
-        if( dwStepNo == 1 )
-        {
-            SetPreStopStep( pIrp, 2 );
-            ret = super::PreStop( pIrp );
-        }
+void CDBusStreamBusPort::BindStreamPort(
+    HANDLE hStream, PortPtr pPort )
+{
+    if( hStream == INVALID_HANDLE ||
+        pPort == nullptr )
+        return;
+    CStdRMutex oPortLock( GetLock() );
+    m_mapStm2Port[ hStream ] = pPort;
+}
 
-    }while( 0 );
+gint32  CDBusStreamBusPort::RemoveBinding(
+    HANDLE hStream )
+{
+    CStdRMutex oPortLock( GetLock() );
+    m_mapStm2Port.erase( hStream );
+}
 
-    return ret;
+gint32 CDBusStreamBusPort::GetStreamPort(
+    HANDLE hStream, PortPtr& pPort )
+{
+    if( hStream == INVALID_HANDLE ||
+        pPort == nullptr )
+        return -EINVAL;;
+    CStdRMutex oPortLock( GetLock() );
+    auto itr = m_mapStm2Port.find( hStream );
+    if( itr == m_mapStm2Port.end() )
+        return -ENOENT;
+    pPort = itr->second;
+    return STATUS_SUCCESS;
 }
 
 CDBusStreamBusDrv::CDBusStreamBusDrv(
@@ -897,6 +1077,7 @@ gint32 CDBusStreamBusPort::CreatePdoPort(
         {
             strPortClass =
                 PORT_CLASS_DBUS_STREAM_PDO;
+            ret = 0;
         }
 
         if( strPortClass
@@ -953,6 +1134,107 @@ gint32 CDBusStreamBusPort::CreateDBusStreamPdo(
 
     }while( 0 );
 
+    return ret;
+}
+
+gint32 CDBusStreamBusPort::BuildPdoPortName(
+    IConfigDb* pCfg,
+    std::string& strPortName )
+{
+    if( pCfg == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        CCfgOpener oCfg( pCfg );
+
+        std::string strClass;
+        ret = oCfg.GetStrProp(
+            propPortClass, strClass );
+
+        if( ERROR( ret ) )
+            break;
+
+        // port name is composed in the following
+        // format:
+        // <PortClassName> + "_" + <PortId>
+
+        if( strClass !=
+            PORT_CLASS_DBUS_STREAM_PDO )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        guint32 dwPortId = 0;
+
+        ret = oCfg.GetIntProp(
+            propPortId, dwPortId );
+        if( ERROR( ret ) )
+        {
+            dwPortId = NewPdoId();
+            oCfg.SetIntProp(
+                propPortId, dwPortId );
+        }
+
+        strPortName = strClass +
+            std::string( "_" )
+            + std::to_string( dwPortId );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CDBusStreamBusPort::OnNewConnection(
+    HANDLE hStream )
+{
+    gint32 ret = 0; 
+    do{
+        CCfgOpener oCfg;
+        oCfg[ propIsServer ] = IsServer();
+
+        oCfg[ propPortClass ] =
+            PORT_CLASS_DBUS_STREAM_PDO;
+
+        oCfg[ propBusName ] =
+            PORT_CLASS_DBUS_STREAM_BUS;
+
+        ret = BuildPdoPortName(
+            oCfg.GetCfg, strPortName );
+        if( ERROR( ret ) )
+            break;
+
+        PortPtr pPort;
+        ret = OpenPdoPort(
+            oCfg.GetCfg(), pPort );
+
+    }while( 0 )
+
+    return ret;
+}
+
+gint32 CDBusStreamBusPort::OnEvent(
+    EnumEventId iEvent,
+    LONGWORD dwParam1,
+    LONGWORD dwParam2,
+    LONGWORD* data )
+{
+    gint32 ret = 0;
+    switch( iEvent )
+    {
+    case eventNewConn:
+        {
+            // passive disconnection detected
+            ret = OnNewConnection(
+                ( HANDLE )dwParam1 );
+            break;
+        }
+    default:
+        ret = super::OnEvent( iEvent,
+            dwParam1, dwParam2, data );
+        break;
+    }
     return ret;
 }
 
