@@ -298,7 +298,7 @@ int main( int argc, char** argv )
                     }
                     break;
                 }
-            case 's'
+            case 's':
                 {
                     g_bRpcOverStm = true;
                     break;
