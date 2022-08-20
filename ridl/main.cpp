@@ -118,6 +118,7 @@ guint32 g_dwFlags = 0;
 // the prefix for java package name
 stdstr g_strPrefix = "org.rpcf.";
 bool g_bMklib = false;
+bool g_bRpcOverStm = false;
 
 #include "seribase.h"
 #include "gencpp.h"
@@ -143,7 +144,7 @@ int main( int argc, char** argv )
         bool bQuit = false;
 
         while( ( opt =
-            getopt( argc, argv, "ahlI:O:o:pjP:L:f::" ) ) != -1 )
+            getopt( argc, argv, "ahlI:O:o:pjP:L:f::s" ) ) != -1 )
         {
             switch( opt )
             {
@@ -295,6 +296,11 @@ int main( int argc, char** argv )
                         Usage();
                         bQuit = true;
                     }
+                    break;
+                }
+            case 's'
+                {
+                    g_bRpcOverStm = true;
                     break;
                 }
             default:
