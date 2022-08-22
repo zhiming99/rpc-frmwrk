@@ -3095,8 +3095,8 @@ gint32 CExportObjDesc2::OutputROS()
 
             Json::Value oElems( Json::arrayValue );
             Json::Value oMaster1, oSkel1;
-            oMaster1.copy( oMaster );
-            oSkel1.copy( oSkel );
+            oMaster1 = oMaster;
+            oSkel1 = oSkel;
             oElems.append( oMaster );
             oElems.append( oSkel );
             ret = BuildObjDescROS( psd, oElems );
